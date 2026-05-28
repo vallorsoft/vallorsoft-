@@ -19,7 +19,7 @@ const mailTransporter = nodemailer.createTransport({
 
 async function sendInviteEmail(toEmail, kod, pozicio, cegNev, igazgatoNev) {
   if (!process.env.MAIL_USER || !toEmail) return;
-  const registerUrl = process.env.APP_URL || 'http://localhost:3000';
+  const registerUrl = process.env.APP_URL || 'https://vallorsoft.onrender.com';
   const udvozles = igazgatoNev ? `Tisztelt ${igazgatoNev}!` : 'Tisztelt Partnerünk!';
   try {
     await mailTransporter.sendMail({
