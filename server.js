@@ -70,6 +70,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -83,13 +84,14 @@ app.use(session({
     tableName: 'session',
     createTableIfMissing: true,
   }),
-  secret: process.env.SESSION_SECRET,
+  secret: process.env.SESSION_SECRET || 'fallback-secret-key',
   resave: false,
   saveUninitialized: false,
+  proxy: true,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 1000 * 60 * 60 * 24 * 7, // 7 nap
   },
 }));
@@ -246,8 +248,8 @@ app.post('/api/fuvarlevel-save', async (req, res) => {
         loc_plecare, loc_sosire, loc_desc_tur, loc_inc_retur,
         diurna_externa, diurna_interna,
         cant_inceput, cant_sfarsit, motorina_folosit, total_alim, consum_100,
-        alte_mentiuni, alimentari, achizitii, tranzite, order_id
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)`,
+        alte_mentiuni, alimentari, achizitii, tranzite
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)`,
       [
         id, fileName, req.session.user.email, req.session.user.nume,
         d.numarCamion || null, d.numarRemorca || null, d.numarFisa || null, d.cursaSaptamanii || null,
@@ -258,8 +260,7 @@ app.post('/api/fuvarlevel-save', async (req, res) => {
         d.alteMentiuni || null,
         JSON.stringify(alimentari),
         JSON.stringify(Array.isArray(d.achizitii) ? d.achizitii : []),
-        JSON.stringify(Array.isArray(d.tranzite) ? d.tranzite : []),
-        d.orderId || null
+        JSON.stringify(Array.isArray(d.tranzite) ? d.tranzite : [])
       ]
     );
     res.json({ success: true, id });
@@ -476,72 +477,13 @@ app.post('/api/execute', async (req, res) => {
       if (!req.session.user) return res.json({ result: [] });
       const cid = req.session.user.company_id;
       const isAdmin = ['Admin', 'Manager'].includes(req.session.user.pozicio);
-      if (isAdmin) {
-        const r = await pool.query(
-          `SELECT f.id, f.file_name, f.email_sofer, f.nume_sofer, f.data_completare,
-                  f.total_km, f.consum_100, f.diurna_externa, f.diurna_interna,
-                  f.motorina_folosit, f.numar_camion, f.order_id
-           FROM fuvarlevelek f JOIN users u ON u.email = f.email_sofer
-           WHERE u.company_id = $1 ORDER BY f.nume_sofer, f.data_completare DESC LIMIT 500`,
-          [cid]
-        );
-        // Group by driver
-        const grouped = {};
-        r.rows.forEach(f => {
-          const key = f.email_sofer;
-          if (!grouped[key]) grouped[key] = { email: f.email_sofer, neve: f.nume_sofer, fuvarlevelek: [] };
-          grouped[key].fuvarlevelek.push(f);
-        });
-        return res.json({ result: Object.values(grouped) });
-      } else {
-        const r = await pool.query(
-          `SELECT id, file_name, email_sofer, nume_sofer, data_completare, total_km, consum_100, order_id
-           FROM fuvarlevelek WHERE email_sofer = $1 ORDER BY data_completare DESC`,
-          [req.session.user.email]
-        );
-        return res.json({ result: r.rows });
-      }
+      const r = isAdmin
+        ? await pool.query('SELECT f.id, f.file_name, f.email_sofer, f.nume_sofer, f.data_completare, f.total_km, f.consum_100 FROM fuvarlevelek f JOIN users u ON u.email = f.email_sofer WHERE u.company_id = $1 ORDER BY f.data_completare DESC LIMIT 200', [cid])
+        : await pool.query('SELECT id, file_name, email_sofer, nume_sofer, data_completare, total_km, consum_100 FROM fuvarlevelek WHERE email_sofer = $1 ORDER BY data_completare DESC', [req.session.user.email]);
+      return res.json({ result: r.rows });
     } catch (err) {
       console.error('getFuvarlevelek hiba:', err);
       return res.json({ result: [] });
-    }
-  }
-
-  // ANALYTICS
-  if (functionName === 'getAnalytics') {
-    try {
-      if (!req.session.user || !['Admin','Manager'].includes(req.session.user.pozicio)) return res.json({ result: [] });
-      const cid = req.session.user.company_id;
-      const year = parseInt(args[0]) || new Date().getFullYear();
-      const month = parseInt(args[1]) || 0; // 0 = mind
-      const drivers = Array.isArray(args[2]) && args[2].length ? args[2] : null;
-      const r = await pool.query(
-        `SELECT f.email_sofer, f.nume_sofer,
-                SUM(f.total_km) AS osszes_km,
-                SUM(f.motorina_folosit) AS osszes_motorina,
-                CASE WHEN SUM(f.total_km)>0 THEN ROUND((SUM(f.motorina_folosit)/SUM(f.total_km)*100)::numeric,2) ELSE 0 END AS atlag_fogyasztas,
-                SUM(f.diurna_externa) AS diurna_ext,
-                SUM(f.diurna_interna) AS diurna_int,
-                COUNT(f.id) AS db_fuvarlevél
-         FROM fuvarlevelek f JOIN users u ON u.email = f.email_sofer
-         WHERE u.company_id = $1
-           AND EXTRACT(YEAR FROM f.data_completare) = $2
-           AND ($3 = 0 OR EXTRACT(MONTH FROM f.data_completare) = $3)
-           AND ($4::text[] IS NULL OR f.email_sofer = ANY($4))
-         GROUP BY f.email_sofer, f.nume_sofer
-         ORDER BY osszes_km DESC`,
-        [cid, year, month, drivers]
-      );
-      // Also get years available
-      const years = await pool.query(
-        `SELECT DISTINCT EXTRACT(YEAR FROM f.data_completare)::int AS ev
-         FROM fuvarlevelek f JOIN users u ON u.email = f.email_sofer
-         WHERE u.company_id = $1 ORDER BY ev DESC`, [cid]
-      );
-      return res.json({ result: r.rows, years: years.rows.map(y => y.ev) });
-    } catch (err) {
-      console.error('getAnalytics hiba:', err);
-      return res.json({ result: [], years: [] });
     }
   }
 
