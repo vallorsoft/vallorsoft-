@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vallorSoft - Regisztráció</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="toast-wrap" id="toasts"></div>
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px">
+    <div class="login-card glass" style="width:min(460px,100%);padding:30px">
+      <div style="text-align:center;margin-bottom:20px">
+        <div class="vs-logo lg"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
+        <div style="color:var(--muted);font-size:14px;margin-top:6px">Regisztráció meghívókóddal</div>
+      </div>
+      <div class="field"><label>Meghívókód</label><input class="input" id="kod" placeholder="VS-XXXXXX" style="text-transform:uppercase;letter-spacing:1.5px;font-weight:700"></div>
+      <div class="field"><label>Teljes név</label><input class="input" id="nume" placeholder="Példa János"></div>
+      <div class="field"><label>E-mail</label><input class="input" id="email" type="email" placeholder="nev@pelda.hu"></div>
+      <div class="field"><label>Telefon</label><input class="input" id="tel" placeholder="+40 ..."></div>
+      <div class="field"><label>Jelszó (min. 6 karakter)</label><input class="input" id="jelszo" type="password" placeholder="••••••••"></div>
+      <button class="btn primary block xl" id="btnReg">Regisztráció</button>
+      <div style="text-align:center;margin-top:14px;color:var(--muted);font-size:14px">
+        Van már fiókja? <a href="/login" id="goLogin" style="color:#fff;font-weight:600;text-decoration:none;border-bottom:1px dashed rgba(255,255,255,0.4)">Bejelentkezés</a>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    function toast(m,k){var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(function(){e.remove();},3000);}
+    
+    // 🚀 UNIVERZÁLIS NODE.JS FETCH ENGINE A RÉGI GOOGLE MEGHÍVÁSOKHOZ
+    function gas(fn, args){
+      return new Promise(function(res, rej){
+        fetch('/api/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ functionName: fn, arguments: args || [] })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.error) { rej(data.error); }
+          else { res(data.result); }
+        })
+        .catch(err => rej(err));
+      });
+    }
+
+    document.getElementById('btnReg').onclick=function(){
+      var p={
+        nume: document.getElementById('nume').value, 
+        email: document.getElementById('email').value, 
+        tel: document.getElementById('tel').value,
+        jelszo: document.getElementById('jelszo').value, 
+        kod: document.getElementById('kod').value
+      };
+      var btn=this; 
+      btn.disabled=true; 
+      btn.innerHTML='<span class="spinner"></span> Regisztráció...';
+      
+      gas('authRegister',[p]).then(function(r){
+        btn.disabled=false; 
+        btn.textContent='Regisztráció';
+        if(!r.ok){ toast(r.err || 'Hiba történt','err'); return; }
+        toast(r.msg || 'Sikeres regisztráció!','ok');
+        setTimeout(function(){
+          window.location.href = '/login';
+        }, 1200);
+      }).catch(function(e){ 
+        btn.disabled=false; 
+        btn.textContent='Regisztráció'; 
+        toast(String(e.message||e),'err'); 
+      });
+    };
+
+    document.getElementById('goLogin').onclick=function(e){
+      e.preventDefault();
+      window.location.href = '/login';
+    };
+  </script>
+</body>
+</html>

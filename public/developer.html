@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VallorSoft — Developer Console</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    :root { --dev-accent: #a855f7; --dev-accent2: #7c3aed; }
+    body { background: radial-gradient(1200px 600px at 10% -10%, rgba(168,85,247,0.08), transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, rgba(59,130,246,0.06), transparent 60%),
+      linear-gradient(180deg, #05070b 0%, #0a0f15 100%); }
+    .dev-layout { display: flex; min-height: 100vh; }
+    .dev-sidebar { width: 240px; background: linear-gradient(180deg, rgba(12,18,24,0.98), rgba(5,7,11,0.99));
+      border-right: 1px solid rgba(168,85,247,0.15); padding: 24px 16px;
+      display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+    .dev-logo { font-weight: 800; font-size: 18px; margin-bottom: 4px; }
+    .dev-logo span { color: var(--dev-accent); }
+    .dev-subtitle { font-size: 11px; color: var(--muted); margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
+    .dev-tab { padding: 10px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600;
+      color: var(--muted); transition: all .15s; border: 1px solid transparent; }
+    .dev-tab:hover { background: rgba(168,85,247,0.05); color: #fff; }
+    .dev-tab.active { background: linear-gradient(180deg, rgba(168,85,247,0.2), rgba(168,85,247,0.05));
+      color: #fff; border-color: rgba(168,85,247,0.3); }
+    .dev-main { flex: 1; padding: 28px; overflow-y: auto; }
+    .dev-pane { display: block; }
+    .dev-pane.hidden { display: none !important; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+    .kpi { padding: 20px; border-radius: 14px; background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.3));
+      border: 1px solid var(--border); }
+    .kpi .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+    .kpi .val { font-size: 36px; font-weight: 800; color: #fff; }
+    .kpi.purple .val { color: var(--dev-accent); }
+    .section-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 14px; }
+    .ceg-card { background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.2));
+      border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 12px; }
+    .ceg-card .ceg-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .ceg-card .ceg-name { font-size: 16px; font-weight: 700; color: #fff; }
+    .ceg-card .ceg-meta { display: flex; gap: 10px; flex-wrap: wrap; }
+    .ceg-card .ceg-meta span { font-size: 12px; color: var(--muted); }
+    .status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+    .status-badge.active { background: rgba(34,197,94,0.15); color: var(--ok); border: 1px solid rgba(34,197,94,0.3); }
+    .status-badge.inactive { background: rgba(239,68,68,0.15); color: var(--err); border: 1px solid rgba(239,68,68,0.3); }
+    .status-badge.cancelled { background: rgba(107,114,128,0.15); color: var(--muted); border: 1px solid rgba(107,114,128,0.3); }
+    .btn-dev { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; border: none;
+      background: linear-gradient(180deg, rgba(168,85,247,0.3), rgba(168,85,247,0.1)); color: #c084fc;
+      border: 1px solid rgba(168,85,247,0.3); transition: all .15s; }
+    .btn-dev:hover { background: linear-gradient(180deg, rgba(168,85,247,0.5), rgba(168,85,247,0.2)); color: #fff; }
+    .btn-danger-sm { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
+      background: rgba(239,68,68,0.1); color: var(--err); border: 1px solid rgba(239,68,68,0.3); }
+    .btn-ok-sm { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
+      background: rgba(34,197,94,0.1); color: var(--ok); border: 1px solid rgba(34,197,94,0.3); }
+    .modal-back { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px);
+      align-items:center; justify-content:center; z-index:1000; padding:20px; }
+    .modal-back.open { display:flex; }
+    .dev-modal { width: min(520px,100%); max-height: 90vh; overflow-y: auto; padding: 28px;
+      border-radius: 18px; background: var(--bg-2); border: 1px solid rgba(168,85,247,0.3); }
+    .dev-modal h3 { font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 20px; }
+    .field { margin-bottom: 12px; }
+    .field label { display:block; font-size:11px; color:var(--muted); margin-bottom:5px; font-weight:700; text-transform:uppercase; }
+    .input, .select { width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border-bright);
+      border-radius:8px; padding:10px 14px; color:var(--text); font-size:14px; outline:none; }
+    .select option { background: var(--bg-2); }
+    .row-btns { display:flex; gap:10px; margin-top:16px; }
+    .table { width:100%; border-collapse:collapse; font-size:13px; }
+    .table th { text-align:left; padding:10px 12px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px; border-bottom:1px solid var(--border); }
+    .table td { padding:10px 12px; border-bottom:1px solid rgba(255,255,255,0.04); color:var(--soft); }
+    .table tr:hover td { background: rgba(255,255,255,0.02); }
+  </style>
+</head>
+<body>
+<div class="toast-wrap" id="toasts"></div>
+
+<div class="dev-layout">
+  <div class="dev-sidebar">
+    <div class="dev-logo">vallor<span>Dev</span></div>
+    <div class="dev-subtitle">Developer Console</div>
+    <div class="dev-tab active" onclick="showPane('dash')">📊 Áttekintés</div>
+    <div class="dev-tab" onclick="showPane('cegek')">🏢 Cégek</div>
+    <div class="dev-tab" onclick="showPane('userek')">👥 Felhasználók</div>
+    <div style="margin-top:auto; padding-top:20px; border-top:1px solid var(--border);">
+      <div id="devBadge" style="font-size:12px; color:var(--muted); margin-bottom:10px;">—</div>
+      <button class="btn-danger-sm" style="width:100%;" onclick="logout()">Kilépés</button>
+    </div>
+  </div>
+
+  <div class="dev-main">
+
+    <!-- ÁTTEKINTÉS -->
+    <div class="dev-pane" id="pane-dash">
+      <div class="section-title">Rendszer áttekintés</div>
+      <div class="kpi-grid">
+        <div class="kpi purple"><div class="label">Cégek</div><div class="val" id="kCegek">—</div></div>
+        <div class="kpi"><div class="label">Aktív cégek</div><div class="val" id="kAktiv" style="color:var(--ok);">—</div></div>
+        <div class="kpi"><div class="label">Felhasználók</div><div class="val" id="kUsers">—</div></div>
+        <div class="kpi"><div class="label">Összes fuvar</div><div class="val" id="kFuvar">—</div></div>
+      </div>
+    </div>
+
+    <!-- CÉGEK -->
+    <div class="dev-pane hidden" id="pane-cegek">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <div class="section-title" style="margin:0;">Cégek kezelése</div>
+        <button class="btn-dev" onclick="openNewCeg()">+ Új cég</button>
+      </div>
+      <div id="cegList">Betöltés...</div>
+    </div>
+
+    <!-- FELHASZNÁLÓK -->
+    <div class="dev-pane hidden" id="pane-userek">
+      <div class="section-title">Összes felhasználó</div>
+      <div class="glass" style="padding:0; overflow:hidden;">
+        <table class="table">
+          <thead><tr><th>Név</th><th>Email</th><th>Pozíció</th><th>Cég</th></tr></thead>
+          <tbody id="devUserTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- CEG MODAL -->
+<div class="modal-back" id="cegModal">
+  <div class="dev-modal">
+    <h3 id="cegModalTitle">Cég szerkesztése</h3>
+    <input type="hidden" id="cegId">
+    <div class="field"><label>Cég neve *</label><input class="input" id="cegNev"></div>
+    <div class="field"><label>Igazgató neve</label><input class="input" id="cegIgazgato" placeholder="pl. Nagy János"></div>
+    <div class="field"><label>Kapcsolattartó email</label><input class="input" id="cegEmail" type="email" placeholder="pl. info@ceg.hu"></div>
+    <div class="field"><label>Telefon</label><input class="input" id="cegTel"></div>
+    <div class="grid-2">
+      <div class="field"><label>Max felhasználók</label><input class="input" id="cegMaxUsers" type="number" value="10"></div>
+      <div class="field"><label>Max járművek</label><input class="input" id="cegMaxTrucks" type="number" value="10"></div>
+    </div>
+    <div class="field"><label>Előfizetés státusz</label>
+      <select class="select" id="cegStatus">
+        <option value="active">Aktív</option>
+        <option value="inactive">Inaktív (blokkolt)</option>
+        <option value="cancelled">Lemondva</option>
+      </select>
+    </div>
+    <div class="field"><label>Fizetve eddig</label><input class="input" id="cegPaidUntil" type="date"></div>
+    <div class="row-btns">
+      <button class="btn-danger-sm" style="flex:1;" onclick="closeCegModal()">Mégse</button>
+      <button class="btn-dev" style="flex:2;" onclick="saveCeg()">💾 Mentés</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function toast(m,k){var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(function(){e.remove();},3000);}
+function gas(fn,args){return new Promise(function(res,rej){fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({functionName:fn,arguments:args||[]})}).then(r=>r.json()).then(d=>{res(d.result);}).catch(rej);});}
+
+function showPane(id) {
+  document.querySelectorAll('.dev-pane').forEach(function(p){p.classList.add('hidden');});
+  document.querySelectorAll('.dev-tab').forEach(function(t){t.classList.remove('active');});
+  document.getElementById('pane-'+id).classList.remove('hidden');
+  if(id==='dash') loadDash();
+  if(id==='cegek') loadCegek();
+  if(id==='userek') loadUsers();
+}
+
+function loadDash(){
+  gas('devStats').then(function(r){
+    if(!r||!r.ok) return;
+    document.getElementById('kCegek').textContent = r.cegek;
+    document.getElementById('kAktiv').textContent = r.aktiv_cegek;
+    document.getElementById('kUsers').textContent = r.userek;
+    document.getElementById('kFuvar').textContent = r.fuvarok;
+  });
+}
+
+function loadCegek(){
+  gas('devCompanyList').then(function(list){
+    if(!list||!list.length){document.getElementById('cegList').innerHTML='<div style="color:var(--muted);padding:20px;">Nincs cég.</div>';return;}
+    document.getElementById('cegList').innerHTML = list.map(function(c){
+      var sClass = c.subscription_status==='active' ? 'active' : c.subscription_status==='inactive' ? 'inactive' : 'cancelled';
+      var sText = c.subscription_status==='active' ? 'Aktív' : c.subscription_status==='inactive' ? 'Blokkolt' : 'Lemondva';
+      var paid = c.paid_until ? new Date(c.paid_until).toLocaleDateString('hu-HU') : '—';
+      return '<div class="ceg-card">'
+        +'<div class="ceg-header">'
+        +'<div>'
+        +'<div class="ceg-name">'+c.nev+'</div>'
+        +'<div class="ceg-meta" style="margin-top:4px;">'
+        +'<span>👥 '+c.user_count+' user</span>'
+        +'<span>🚚 '+c.order_count+' fuvar</span>'
+        +'<span>📅 fizetve: '+paid+'</span>'
+        +(c.email_contact?'<span>✉️ '+c.email_contact+'</span>':'')
+        +'</div></div>'
+        +'<div style="display:flex;gap:8px;align-items:center;">'
+        +'<span class="status-badge '+sClass+'">'+sText+'</span>'
+        +'<button class="btn-dev" onclick="openEditCeg('+JSON.stringify(c).replace(/"/g,"&quot;")+')" >Szerkeszt</button>'
+        +(c.subscription_status==='active'
+          ? '<button class="btn-danger-sm" onclick="blockCeg('+c.id+')">🔒 Blokkolás</button>'
+          : '<button class="btn-ok-sm" onclick="unblockCeg('+c.id+')">🔓 Aktiválás</button>')
+        +'<button class="btn-danger-sm" onclick="deleteCeg('+c.id+',\''+c.nev.replace(/'/g,"\\'")+'\')" style="background:rgba(239,68,68,0.2);">🗑 Törlés</button>'
+        +'</div></div>'
+        +'</div>';
+    }).join('');
+  });
+}
+
+function loadUsers(){
+  gas('devUserList').then(function(list){
+    if(!list||!list.length){document.getElementById('devUserTbody').innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Nincs felhasználó.</td></tr>';return;}
+    document.getElementById('devUserTbody').innerHTML = list.map(function(u){
+      return '<tr><td>'+u.nume+'</td><td>'+u.email+'</td><td><span class="status-badge active">'+u.pozicio+'</span></td><td>'+(u.ceg_nev||'—')+'</td></tr>';
+    }).join('');
+  });
+}
+
+function openNewCeg(){
+  document.getElementById('cegModalTitle').textContent = 'Új cég létrehozása';
+  document.getElementById('cegId').value = '';
+  document.getElementById('cegNev').value = '';
+  document.getElementById('cegIgazgato').value = '';
+  document.getElementById('cegEmail').value = '';
+  document.getElementById('cegTel').value = '';
+  document.getElementById('cegMaxUsers').value = 10;
+  document.getElementById('cegMaxTrucks').value = 10;
+  document.getElementById('cegStatus').value = 'active';
+  document.getElementById('cegPaidUntil').value = '';
+  document.getElementById('cegModal').classList.add('open');
+}
+
+function openEditCeg(c){
+  document.getElementById('cegModalTitle').textContent = 'Cég szerkesztése';
+  document.getElementById('cegId').value = c.id;
+  document.getElementById('cegNev').value = c.nev||'';
+  document.getElementById('cegIgazgato').value = c.igazgato_nev||'';
+  document.getElementById('cegEmail').value = c.email_contact||'';
+  document.getElementById('cegTel').value = c.telefon||'';
+  document.getElementById('cegMaxUsers').value = c.max_users||10;
+  document.getElementById('cegMaxTrucks').value = c.max_trucks||10;
+  document.getElementById('cegStatus').value = c.subscription_status||'active';
+  document.getElementById('cegPaidUntil').value = c.paid_until ? c.paid_until.substring(0,10) : '';
+  document.getElementById('cegModal').classList.add('open');
+}
+
+function closeCegModal(){ document.getElementById('cegModal').classList.remove('open'); }
+
+function saveCeg(){
+  var id = document.getElementById('cegId').value;
+  var email = document.getElementById('cegEmail').value.trim();
+  if(email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    toast('Érvénytelen email cím!','err'); return;
+  }
+  var f = {
+    nev: document.getElementById('cegNev').value.trim(),
+    igazgato_nev: document.getElementById('cegIgazgato').value.trim(),
+    email_contact: email,
+    telefon: document.getElementById('cegTel').value.trim(),
+    max_users: document.getElementById('cegMaxUsers').value,
+    max_trucks: document.getElementById('cegMaxTrucks').value,
+    subscription_status: document.getElementById('cegStatus').value,
+    paid_until: document.getElementById('cegPaidUntil').value || null
+  };
+  if(!f.nev){toast('A cég neve kötelező!','err');return;}
+  var fn = id ? 'devCompanyUpdate' : 'devCompanyCreate';
+  var args = id ? [parseInt(id), f] : [f];
+  gas(fn, args).then(function(r){
+    if(r&&r.ok){
+      closeCegModal(); loadCegek(); loadDash();
+      if(r.invite_kod){
+        alert('✅ Cég létrehozva!\n\nAdmin meghívókód: ' + r.invite_kod + '\n\n' + (email ? 'Az email el lett küldve: ' + email : 'Add át az ügyfélnek ezt a kódot.'));
+      } else {
+        toast('Mentve!','ok');
+      }
+    } else { toast(r&&r.err||'Hiba','err'); }
+  });
+}
+
+function deleteCeg(id, nev){
+  var kod = prompt('⚠️ FIGYELEM: Ez törli a céget és MINDEN hozzátartozó adatot!\n\nCég: ' + nev + '\n\nA törlés megerősítéséhez írd be:\nvallorsoftcegtorlo1');
+  if(kod === null) return;
+  if(kod !== 'vallorsoftcegtorlo1'){toast('Helytelen megerősítő kód!','err');return;}
+  gas('devCompanyDelete',[id, kod]).then(function(r){
+    if(r&&r.ok){toast('Cég törölve!','ok');loadCegek();loadDash();}
+    else{toast(r&&r.err||'Hiba','err');}
+  });
+}
+
+function blockCeg(id){
+  if(!confirm('Biztosan blokkolod ezt a céget? A felhasználók nem tudnak bejelentkezni.')) return;
+  gas('devCompanyUpdate',[id,{subscription_status:'inactive'}]).then(function(r){
+    if(r&&r.ok){toast('Cég blokkolva!','ok');loadCegek();}else{toast(r&&r.err||'Hiba','err');}
+  });
+}
+
+function unblockCeg(id){
+  gas('devCompanyUpdate',[id,{subscription_status:'active'}]).then(function(r){
+    if(r&&r.ok){toast('Cég aktiválva!','ok');loadCegek();}else{toast(r&&r.err||'Hiba','err');}
+  });
+}
+
+function logout(){
+  gas('authLogout').then(function(){window.location.href='/login';});
+}
+
+// INIT
+gas('authMe').then(function(u){
+  if(!u||!u.is_dev){window.location.href='/login';return;}
+  document.getElementById('devBadge').textContent = u.nume;
+  loadDash();
+});
+</script>
+</body>
+</html>

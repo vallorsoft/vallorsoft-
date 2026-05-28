@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vallorSoft - Bejelentkezés</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="toast-wrap" id="toasts"></div>
+  
+  <div class="login-wrap">
+    <div class="login-card glass">
+      <div class="head">
+        <div class="vs-logo lg"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
+        <div class="sub">Fuvarmenedzsment Rendszer</div>
+      </div>
+      
+      <div class="field">
+        <label>E-mail cím</label>
+        <input class="input" type="email" id="email" placeholder="nev@vallorsoft.hu" required>
+      </div>
+      
+      <div class="field">
+        <label>Jelszó</label>
+        <input class="input" type="password" id="jelszo" placeholder="••••••••" required>
+      </div>
+      
+      <button class="btn primary block xl" onclick="executeLogin()" id="btnLog">Bejelentkezés</button>
+      
+      <div class="switch-link">
+        Nincs még fiókja? <a href="/register">Regisztráció kóddal</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toast(m,k){
+      var e=document.createElement('div');
+      e.className='toast '+(k||'');
+      e.textContent=m;
+      document.getElementById('toasts').appendChild(e);
+      setTimeout(function(){e.remove();},3000);
+    }
+
+    function executeLogin() {
+      var emailVal = document.getElementById('email').value.trim();
+      var pwdVal = document.getElementById('jelszo').value;
+      
+      if(!emailVal || !pwdVal) {
+        toast('Minden mező kitöltése kötelező!', 'err');
+        return;
+      }
+      
+      var btn = document.getElementById('btnLog');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Ellenőrzés...';
+      
+      fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailVal, password: pwdVal })
+      })
+      .then(res => res.json())
+      .then(data => {
+        btn.disabled = false;
+        btn.textContent = 'Bejelentkezés';
+        
+        if(data.success && data.redirect) {
+          // Csak akkor irányítunk át, ha a szerver nyugtázta a sikeres session mentést
+          window.location.href = data.redirect;
+        } else {
+          toast(data.message || 'Hibás belépési adatok!', 'err');
+        }
+      })
+      .catch(err => {
+        btn.disabled = false;
+        btn.textContent = 'Bejelentkezés';
+        toast('Szerver kommunikációs hiba!', 'err');
+      });
+    }
+    
+    // Enter gomb leütésre is induljon a belépés
+    document.getElementById('jelszo').addEventListener('keypress', function(e) {
+      if(e.key === 'Enter') executeLogin();
+    });
+  </script>
+</body>
+</html>
