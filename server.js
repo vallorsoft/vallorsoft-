@@ -7,8 +7,11 @@ const pgSession = require('connect-pg-simple')(session);
 const bcrypt = require('bcrypt');
 const cookieParser = require('cookie-parser');
 const { Pool } = require('pg');
+const nodemailer = require('nodemailer');
 const dns = require('dns');
-dns.setDefaultResultOrder('ipv4first'); // Render IPv6 -> IPv4 fix (ENETUNREACH)
+dns.setDefaultResultOrder('ipv4first');
+
+const mailTransporter = nodemailer.createTransport({
 
 // Gmail SMTP - App Password szukseges (nem a sima Gmail jelszo!)
 // Gmail fiok -> Biztonsag -> 2 lepeses hitelesites -> Alkalmazasjelszavak -> "VallorSoft"
