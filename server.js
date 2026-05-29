@@ -70,6 +70,7 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+app.set('trust proxy', 1); // Render / reverse proxy mogotti HTTPS session fix
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -735,6 +736,33 @@ app.post('/api/execute', async (req, res) => {
       return res.json({ result: { ok: false, err: 'Szerver hiba' } });
     }
   }
+  // EGY FUVAR ADATAI + SZAKASZOK (szerkeszto modal)
+  if (functionName === 'getOrderById') {
+    try {
+      if (!req.session.user || !['Admin','Manager'].includes(req.session.user.pozicio))
+        return res.json({ result: null, legs: [] });
+      const id = String(args[0] || '').trim();
+      const cid = req.session.user.company_id;
+      const or = await pool.query(
+        'SELECT * FROM orders WHERE id = $1 AND company_id = $2',
+        [id, cid]
+      );
+      const order = or.rows[0] || null;
+      let legs = [];
+      if (order) {
+        const lr = await pool.query(
+          'SELECT * FROM order_legs WHERE order_id = $1 ORDER BY leg_number',
+          [id]
+        );
+        legs = lr.rows;
+      }
+      return res.json({ result: order, legs });
+    } catch (err) {
+      console.error('getOrderById hiba:', err);
+      return res.json({ result: null, legs: [] });
+    }
+  }
+
   // FUVARFELADATOK LISTAJA (DB-bol)
   if (functionName === 'comList') {
     try {
