@@ -44,9 +44,7 @@
     .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
     .input, .textarea { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid var(--border-bright);
       border-radius: var(--r-sm); padding: 12px 14px; color: var(--text); font-size: 15px; outline: none;
-    appearance: none;
--webkit-appearance: none;
-}
+      appearance: none; -webkit-appearance: none; }
     .input:focus, .textarea:focus { border-color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.06); }
     .textarea { min-height: 80px; resize: none; font-family: inherit; }
     .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -243,39 +241,30 @@
 
   <!-- ====== CHAT (Firebase - WhatsApp stílus) ====== -->
   <div class="pane-sofer hidden" id="sec-chat" style="padding:0;">
-    <!-- Betöltő képernyő -->
     <div id="chatInitMsg" style="padding:40px 16px; text-align:center; color:var(--muted); font-size:13px;">
       <div class="spinner" style="margin:0 auto 12px;"></div>Kapcsolódás a chathez...
     </div>
 
     <!-- Kontaktlista nézet -->
     <div id="chatContactView" style="display:none; flex-direction:column; height:calc(100vh - 160px);">
-      <div style="padding:12px 16px 8px; border-bottom:1px solid var(--border);">
-        <div style="font-weight:700; font-size:16px; color:#fff;">💬 Diszpécserek</div>
-        <div style="font-size:11px; color:var(--muted); margin-top:2px;">Válassz, akinek írni szeretnél</div>
+      <div style="padding:12px 16px; font-size:16px; font-weight:700; color:#fff; border-bottom:1px solid var(--border);">
+        💬 Üzenetek
       </div>
-      <div id="chatContactList" style="flex:1; overflow-y:auto;"></div>
+      <div id="chatContactList" style="flex:1; overflow-y:auto; padding:8px 0;"></div>
     </div>
 
-    <!-- Üzenet nézet (1-1 szoba) -->
+    <!-- Chat szoba nézet -->
     <div id="chatRoomView" style="display:none; flex-direction:column; height:calc(100vh - 160px);">
-      <!-- fejléc vissza gombbal -->
-      <div style="display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--border); background:rgba(0,0,0,0.2);">
-        <button onclick="soferChatBack()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:2px 6px;">←</button>
-        <div class="av" id="chatHeadAv" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#e10b1a,#3b82f6);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:14px;">?</div>
-        <div>
-          <div style="font-weight:700; font-size:14px; color:#fff;" id="chatRoomTitle">—</div>
-          <div style="font-size:11px; color:var(--muted);" id="chatRoomSub">Manager</div>
-        </div>
+      <div style="display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--border);">
+        <button onclick="soferChatBack()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px;">←</button>
+        <div id="chatHeadAv" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff;flex-shrink:0;"></div>
+        <div id="chatHeadName" style="font-weight:700;font-size:15px;color:#fff;"></div>
       </div>
-      <!-- üzenetek -->
-      <div id="chatMsgs" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding:12px 16px 8px;"></div>
-      <!-- bevitel -->
-      <div style="display:flex; gap:8px; padding:10px 16px 14px; border-top:1px solid var(--border);">
-        <input class="input" id="chatInput" placeholder="Üzenet..." style="flex:1; padding:12px 14px; font-size:15px;"
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
-        <button onclick="chatSend()" style="padding:12px 18px; border-radius:12px; background:linear-gradient(180deg,#fff,#d9dee6);
-          color:#0a0f15; font-weight:800; border:none; cursor:pointer; font-size:18px;">➤</button>
+      <div id="chatMsgs" style="flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:6px;"></div>
+      <div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;">
+        <input id="chatInput" class="input" placeholder="Üzenet..." style="flex:1;padding:10px 14px;"
+          onkeydown="if(event.key==='Enter')chatSend()">
+        <button onclick="chatSend()" style="padding:10px 18px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;font-weight:700;cursor:pointer;font-size:18px;">➤</button>
       </div>
     </div>
   </div>
@@ -291,7 +280,150 @@
 </div>
 
 <script>
-// --- TOAST ---
+// ============================================================
+// SESSION STATE — oldal frissítés utáni visszaállítás
+// sessionStorage: csak ugyanazon a fülön él, új fülön üres
+// ============================================================
+var SS_KEY = 'vs_sofer_state';
+
+function stateSave(extra) {
+  try {
+    var cur = stateGet();
+    var merged = Object.assign({}, cur, extra || {});
+    sessionStorage.setItem(SS_KEY, JSON.stringify(merged));
+  } catch(e) {}
+}
+
+function stateGet() {
+  try {
+    return JSON.parse(sessionStorage.getItem(SS_KEY) || '{}');
+  } catch(e) { return {}; }
+}
+
+function stateClear() {
+  try { sessionStorage.removeItem(SS_KEY); } catch(e) {}
+}
+
+// Menetlevél piszkozat mentése (debounce 600ms)
+var _draftTimer = null;
+function draftSave() {
+  clearTimeout(_draftTimer);
+  _draftTimer = setTimeout(function() {
+    var step2Visible = document.getElementById('fuvarStep2').style.display !== 'none';
+    if (!step2Visible) return;
+
+    // Pontok
+    var puncte = [];
+    document.querySelectorAll('#puncteContainer .dyn-row').forEach(function(row) {
+      puncte.push({
+        tip: (row.querySelector('.punct-tip') || {}).value || '',
+        loc: (row.querySelector('.punct-loc') || {}).value || '',
+        data: (row.querySelector('.punct-data') || {}).value || ''
+      });
+    });
+
+    // Tankolások
+    var alimentari = [];
+    document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function(row) {
+      alimentari.push({
+        loc: (row.querySelector('.alim-loc') || {}).value || '',
+        tip: (row.querySelector('.alim-tip') || {}).value || 'Motorină',
+        litru: (row.querySelector('.alim-lit') || {}).value || '0',
+        km: (row.querySelector('.alim-km') || {}).value || '0',
+        plata: (row.querySelector('.alim-plata') || {}).value || 'Card',
+        suma: (row.querySelector('.alim-suma') || {}).value || '0'
+      });
+    });
+
+    // Kiadások
+    var achizitii = [];
+    document.querySelectorAll('#achizitiiContainer .dyn-row').forEach(function(row) {
+      achizitii.push({
+        produs: (row.querySelector('.ach-prod') || {}).value || '',
+        loc: (row.querySelector('.ach-loc') || {}).value || '',
+        pret: (row.querySelector('.ach-pret') || {}).value || '0',
+        plata: (row.querySelector('.ach-plata') || {}).value || 'Card'
+      });
+    });
+
+    stateSave({
+      draft: {
+        fisa: document.getElementById('fFisa').value,
+        cursaSapt: document.getElementById('fCursaSapt').value,
+        camion: document.getElementById('fCamion').value,
+        remorca: document.getElementById('fRemorca').value,
+        kmInc: document.getElementById('fKmInc').value,
+        kmSf: document.getElementById('fKmSf').value,
+        diurnaEx: document.getElementById('fDiurnaEx').value,
+        diurnaIn: document.getElementById('fDiurnaIn').value,
+        cantInc: document.getElementById('fCantInc').value,
+        cantSf: document.getElementById('fCantSf').value,
+        mentiuni: document.getElementById('fMentiuni').value,
+        puncte: puncte,
+        alimentari: alimentari,
+        achizitii: achizitii,
+        orderIds: _selectedOrderIds,
+        summary: document.getElementById('selectedOrdersSummary').innerHTML
+      }
+    });
+  }, 600);
+}
+
+function draftRestore(draft) {
+  if (!draft) return;
+  document.getElementById('fFisa').value = draft.fisa || '';
+  document.getElementById('fCursaSapt').value = draft.cursaSapt || '';
+  document.getElementById('fCamion').value = draft.camion || '';
+  document.getElementById('fRemorca').value = draft.remorca || '';
+  document.getElementById('fKmInc').value = draft.kmInc || '0';
+  document.getElementById('fKmSf').value = draft.kmSf || '0';
+  document.getElementById('fDiurnaEx').value = draft.diurnaEx || '0';
+  document.getElementById('fDiurnaIn').value = draft.diurnaIn || '0';
+  document.getElementById('fCantInc').value = draft.cantInc || '0';
+  document.getElementById('fCantSf').value = draft.cantSf || '0';
+  document.getElementById('fMentiuni').value = draft.mentiuni || '';
+
+  // Útvonal pontok visszaállítása
+  document.getElementById('puncteContainer').innerHTML = '';
+  punctIdx = 0;
+  (draft.puncte || []).forEach(function(p) {
+    addPunctRow(p.loc, p.tip, p.data);
+  });
+
+  // Tankolások visszaállítása
+  document.getElementById('alimentariContainer').innerHTML = '';
+  alimIdx = 0;
+  (draft.alimentari || []).forEach(function(a) {
+    addAlimRow(a);
+  });
+
+  // Kiadások visszaállítása
+  document.getElementById('achizitiiContainer').innerHTML = '';
+  achIdx = 0;
+  (draft.achizitii || []).forEach(function(a) {
+    addAchRow(a);
+  });
+
+  // Kiválasztott fuvar ID-k és összesítő
+  _selectedOrderIds = draft.orderIds || [];
+  if (draft.summary) {
+    document.getElementById('selectedOrdersSummary').innerHTML = draft.summary;
+  }
+}
+
+function draftClear() {
+  stateSave({ draft: null });
+}
+
+// Oldal bezárás/frissítés előtt azonnal mentünk
+window.addEventListener('beforeunload', function() {
+  var step2Visible = document.getElementById('fuvarStep2').style.display !== 'none';
+  if (step2Visible) draftSave();
+});
+
+// ============================================================
+// TOAST
+// ============================================================
 function toast(m, k) {
   var e = document.createElement('div');
   e.className = 'toast ' + (k || '');
@@ -300,8 +432,11 @@ function toast(m, k) {
   setTimeout(function() { e.remove(); }, 3000);
 }
 
-// --- NAVIGÁCIÓ ---
-const sections = ['dash','border','fuvar','docs','chat'];
+// ============================================================
+// NAVIGÁCIÓ
+// ============================================================
+var sections = ['dash','border','fuvar','docs','chat'];
+
 function goSec(id) {
   sections.forEach(function(s) {
     document.getElementById('sec-' + s).classList.add('hidden');
@@ -311,11 +446,17 @@ function goSec(id) {
   document.getElementById('sec-' + id).classList.remove('hidden');
   var nb = document.getElementById('nb-' + id);
   if (nb) nb.classList.add('active');
+
+  // Állapot mentése
+  stateSave({ sec: id });
+
   if (id === 'border') loadBorderLog();
   if (id === 'fuvar') loadSoferOrders();
 }
 
-// --- HATÁRÁTLÉPÉS ---
+// ============================================================
+// HATÁRÁTLÉPÉS
+// ============================================================
 function sendBorderCross(tip, tara) {
   var statusEl = document.getElementById('gpsStatus');
   statusEl.innerHTML = '<div class="gps-badge"><span class="spinner"></span> GPS lekérés...</div>';
@@ -330,14 +471,14 @@ function sendBorderCross(tip, tara) {
       if (d.success) {
         toast(tip === 'Intrare' ? '🇷🇴 Románia BE rögzítve!' : '🇷🇴 Románia KI rögzítve!', 'ok');
         statusEl.innerHTML = lat
-          ? '<div class="gps-badge">📍 ' + lat.toFixed(5) + ', ' + lng.toFixed(5) + '</div>'
-          : '<div class="gps-badge">📍 GPS nem elérhető — rögzítve</div>';
+          ? '<div class="gps-badge">📍 GPS: ' + lat.toFixed(4) + ', ' + lng.toFixed(4) + '</div>'
+          : '<div class="gps-badge">⚠️ GPS nélkül rögzítve</div>';
         loadBorderLog();
       } else {
         toast('Hiba: ' + (d.err || 'ismeretlen'), 'err');
         statusEl.innerHTML = '';
       }
-    }).catch(function() { toast('Hálózati hiba', 'err'); statusEl.innerHTML = ''; });
+    });
   }
 
   if (navigator.geolocation) {
@@ -346,106 +487,83 @@ function sendBorderCross(tip, tara) {
       function() { doSend(null, null); },
       { timeout: 8000 }
     );
-  } else { doSend(null, null); }
+  } else {
+    doSend(null, null);
+  }
 }
 
 function loadBorderLog() {
-  fetch('/api/execute', { method:'POST', headers:{'Content-Type':'application/json'},
+  fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ functionName: 'getBorderLogs' }) })
   .then(function(r) { return r.json(); }).then(function(d) {
     var list = d.result || [];
     var el = document.getElementById('borderLogList');
-    if (!list.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;">Még nincs rögzített átlépés.</div>'; return; }
-    el.innerHTML = list.slice(0,10).map(function(item) {
-      var dt = item.created_at ? new Date(item.created_at).toLocaleString('hu-HU') : '—';
-      var gps = item.gps_lat ? ('📍 ' + parseFloat(item.gps_lat).toFixed(4) + ', ' + parseFloat(item.gps_lng).toFixed(4)) : '📍 GPS n/a';
-      return '<div class="border-log-item"><strong>' + (item.tip||'') + ' — ' + (item.tara||'') + '</strong><br>' + dt + '<br><span style="font-size:11px;color:var(--muted)">' + gps + '</span></div>';
+    if (!list.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;">Nincs rögzített átlépés.</div>'; return; }
+    el.innerHTML = list.slice(0, 20).map(function(l) {
+      var dt = l.created_at ? new Date(l.created_at).toLocaleString('hu-HU') : '—';
+      return '<div class="border-log-item">'
+        + '<strong>' + (l.tip === 'Intrare' ? '🇷🇴 BE' : '🇷🇴 KI') + '</strong>'
+        + ' — ' + dt
+        + (l.locatie ? '<br><span style="font-size:11px;color:var(--muted);">📍 ' + l.locatie + '</span>' : '')
+        + '</div>';
     }).join('');
   });
 }
 
-// --- MENETLEVÉL: FUVAR KIVÁLASZTÁS (1. lépés) ---
-var _selectedOrderIds = [];
+// ============================================================
+// MENETLEVÉL — fuvar kiválasztás
+// ============================================================
 var _soferOrdersCache = [];
+var _selectedOrderIds = [];
 
 function loadSoferOrders() {
-  fetch('/api/execute', { method:'POST', headers:{'Content-Type':'application/json'},
+  fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ functionName: 'getMySoferOrders' }) })
-  .then(function(r){ return r.json(); }).then(function(d){
+  .then(function(r) { return r.json(); }).then(function(d) {
     _soferOrdersCache = d.result || [];
     var el = document.getElementById('soferOrderList');
     if (!_soferOrdersCache.length) {
-      el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);font-size:13px;">Nincs kiosztott fuvarod.<br>Kérd meg a menedzsert hogy osztjon ki fuvarokat.</div>';
+      el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Nincs aktív kiosztott fuvar.</div>';
       return;
     }
     el.innerHTML = _soferOrdersCache.map(function(o) {
-      return '<div id="card_' + o.id + '" onclick="toggleOrder(\'' + o.id + '\')" '
-        + 'style="display:flex;align-items:flex-start;gap:12px;padding:14px;background:var(--bg-2);'
-        + 'border:1px solid var(--border);border-radius:14px;margin-bottom:10px;cursor:pointer;">'
-        + '<div id="chk_' + o.id + '" style="width:24px;height:24px;min-width:24px;border-radius:6px;'
-        + 'border:2px solid var(--border-bright);background:transparent;display:flex;align-items:center;'
-        + 'justify-content:center;margin-top:1px;font-size:14px;"></div>'
-        + '<div style="flex:1;min-width:0;">'
-        + '<div style="font-weight:700;font-size:14px;color:#fff;">' + (o.client || '—')
-        + ' <span style="font-size:11px;color:var(--muted);">#' + o.id + '</span></div>'
-        + '<div style="font-size:12px;color:var(--soft);margin-top:3px;">📍 '
-        + (o.loc_incarcare || '—') + ' → ' + (o.loc_descarcare || '—') + '</div>'
-        + (o.rendszam_camion ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">🚛 '
-          + o.rendszam_camion + (o.rendszam_remorca ? ' + ' + o.rendszam_remorca : '') + '</div>' : '')
-        + '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'
-        + (o.km ? o.km + ' km' : '') + (o.ref ? ' · Ref: ' + o.ref : '') + '</div>'
-        + '</div></div>';
+      var checked = _selectedOrderIds.indexOf(o.id) !== -1;
+      return '<label style="display:flex;align-items:flex-start;gap:12px;background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;">'
+        + '<input type="checkbox" value="' + o.id + '" ' + (checked ? 'checked' : '') + ' onchange="toggleOrderSel(this)" style="margin-top:3px;width:18px;height:18px;accent-color:#e10b1a;flex-shrink:0;">'
+        + '<div>'
+        + '<div style="font-weight:700;font-size:14px;color:#fff;">' + (o.client || '—') + ' <span style="font-size:11px;color:var(--muted);">#' + o.id + '</span></div>'
+        + '<div style="font-size:12px;color:var(--soft);margin-top:3px;">📍 ' + (o.loc_incarcare || '—') + ' → ' + (o.loc_descarcare || '—') + '</div>'
+        + (o.rendszam_camion ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">🚛 ' + o.rendszam_camion + (o.rendszam_remorca ? ' / ' + o.rendszam_remorca : '') + '</div>' : '')
+        + '</div></label>';
     }).join('');
   });
 }
 
-function toggleOrder(id) {
-  var chk = document.getElementById('chk_' + id);
-  var card = document.getElementById('card_' + id);
-  if (!chk || !card) return;
-  var idx = _selectedOrderIds.indexOf(id);
-  if (idx === -1) {
-    _selectedOrderIds.push(id);
-    chk.style.background = '#e10b1a';
-    chk.style.borderColor = '#e10b1a';
-    chk.innerHTML = '✓';
-    chk.style.color = '#fff';
-    chk.style.fontWeight = '800';
-    card.style.borderColor = 'rgba(225,11,26,0.6)';
-    card.style.background = 'rgba(225,11,26,0.10)';
+function toggleOrderSel(cb) {
+  var id = cb.value;
+  if (cb.checked) {
+    if (_selectedOrderIds.indexOf(id) === -1) _selectedOrderIds.push(id);
   } else {
-    _selectedOrderIds.splice(idx, 1);
-    chk.style.background = 'transparent';
-    chk.style.borderColor = 'var(--border-bright)';
-    chk.innerHTML = '';
-    card.style.borderColor = 'var(--border)';
-    card.style.background = 'var(--bg-2)';
+    _selectedOrderIds = _selectedOrderIds.filter(function(x) { return x !== id; });
   }
 }
 
 function fuvarStep2() {
-  if (!_selectedOrderIds.length) {
-    toast('Válassz ki legalább 1 fuvarfeladatot!', 'err');
-    return;
-  }
-  // Összesítő megjelenítés
-  var selected = _soferOrdersCache.filter(function(o){ return _selectedOrderIds.indexOf(o.id) !== -1; });
+  if (!_selectedOrderIds.length) { toast('Jelölj be legalább egy fuvart!', 'err'); return; }
+  var selected = _soferOrdersCache.filter(function(o) { return _selectedOrderIds.indexOf(o.id) !== -1; });
   var sumEl = document.getElementById('selectedOrdersSummary');
   sumEl.innerHTML = '<b style="color:#fff;">✅ ' + selected.length + ' fuvar kiválasztva:</b><br>'
-    + selected.map(function(o){
-        return '• ' + (o.client||'—') + ': ' + (o.loc_incarcare||'—') + ' → ' + (o.loc_descarcare||'—');
+    + selected.map(function(o) {
+        return '• ' + (o.client || '—') + ': ' + (o.loc_incarcare || '—') + ' → ' + (o.loc_descarcare || '—');
       }).join('<br>');
 
-  // Camion/remorca auto kitöltés az első fuvarból
   var first = selected[0];
   if (first && first.rendszam_camion) {
     document.getElementById('fCamion').value = first.rendszam_camion;
     document.getElementById('fRemorca').value = first.rendszam_remorca || '';
   }
 
-  // Pontok: minden fuvarhoz 1 indulási + érkezési pont
-  var puncteContainer = document.getElementById('puncteContainer');
-  puncteContainer.innerHTML = '';
+  document.getElementById('puncteContainer').innerHTML = '';
   punctIdx = 0;
   selected.forEach(function(o) {
     if (o.loc_incarcare) addPunctRow(o.loc_incarcare, 'Încărcare');
@@ -454,109 +572,147 @@ function fuvarStep2() {
 
   document.getElementById('fuvarStep1').style.display = 'none';
   document.getElementById('fuvarStep2').style.display = 'block';
-  // Reset dyn rows
   document.getElementById('alimentariContainer').innerHTML = '';
   document.getElementById('achizitiiContainer').innerHTML = '';
   alimIdx = 0; achIdx = 0;
+
+  // Piszkozat figyeli a változásokat
+  attachDraftListeners();
+  stateSave({ fuvarStep: 2 });
 }
 
 function fuvarBackStep1() {
   document.getElementById('fuvarStep2').style.display = 'none';
   document.getElementById('fuvarStep1').style.display = 'block';
+  stateSave({ fuvarStep: 1 });
 }
 
-// --- MENETLEVÉL DINAMIKUS SOROK ---
+// Input változások figyelése → piszkozat auto-mentés
+function attachDraftListeners() {
+  var ids = ['fFisa','fCursaSapt','fCamion','fRemorca','fKmInc','fKmSf','fDiurnaEx','fDiurnaIn','fCantInc','fCantSf','fMentiuni'];
+  ids.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.removeEventListener('input', draftSave);
+      el.addEventListener('input', draftSave);
+    }
+  });
+  // Dinamikus sorok figyelése MutationObserver-rel
+  ['puncteContainer','alimentariContainer','achizitiiContainer'].forEach(function(cId) {
+    var container = document.getElementById(cId);
+    if (!container._observer) {
+      var obs = new MutationObserver(draftSave);
+      obs.observe(container, { childList: true, subtree: true, characterData: true });
+      container._observer = obs;
+    }
+  });
+}
+
+// ============================================================
+// DINAMIKUS SOROK
+// ============================================================
 var alimIdx = 0, achIdx = 0, punctIdx = 0;
 
-function addPunctRow(locVal, tipVal) {
+function addPunctRow(locVal, tipVal, dataVal) {
   punctIdx++;
   var d = document.createElement('div');
   d.className = 'dyn-row';
   var tipOptions = ['Încărcare','Descărcare','Tranzit','Vamă','Parcare','Altele'];
-  d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove()">✕</button>'
+  var today = new Date().toISOString().split('T')[0];
+  d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
     + '<div class="g2">'
-    + '<div class="field"><label>Tip punct</label><select class="input punct-tip" style="padding:10px 14px;">'
-    + tipOptions.map(function(t){ return '<option' + (t===(tipVal||'Încărcare')?' selected':'') + '>' + t + '</option>'; }).join('')
+    + '<div class="field"><label>Tip punct</label><select class="input punct-tip" style="padding:10px 14px;" onchange="draftSave()">'
+    + tipOptions.map(function(t) { return '<option' + (t === (tipVal || 'Încărcare') ? ' selected' : '') + '>' + t + '</option>'; }).join('')
     + '</select></div>'
-    + '<div class="field"><label>Dată</label><input class="input punct-data" type="date" value="' + new Date().toISOString().split('T')[0] + '"></div>'
+    + '<div class="field"><label>Dată</label><input class="input punct-data" type="date" value="' + (dataVal || today) + '" onchange="draftSave()"></div>'
     + '</div>'
-    + '<div class="field"><label>Localitate / Adresă</label><input class="input punct-loc" placeholder="pl. Budapest, Keleti pu." value="' + (locVal||'') + '"></div>';
+    + '<div class="field"><label>Localitate / Adresă</label><input class="input punct-loc" placeholder="pl. Budapest, Keleti pu." value="' + (locVal || '') + '" oninput="draftSave()"></div>';
   document.getElementById('puncteContainer').appendChild(d);
 }
 
-function addAlimRow() {
+function addAlimRow(a) {
   alimIdx++;
+  a = a || {};
   var d = document.createElement('div');
   d.className = 'dyn-row';
-  d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove()">✕</button>'
-    + '<div class="field"><label>Helyszín & Dátum</label><input class="input alim-loc" placeholder="pl. Győr, 2025-01-15"></div>'
+  d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
+    + '<div class="field"><label>Helyszín & Dátum</label><input class="input alim-loc" placeholder="pl. Győr, 2025-01-15" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
     + '<div class="g2">'
-    + '<div class="field"><label>Tip combustibil</label><select class="input alim-tip" style="padding:10px 14px;"><option>Motorină</option><option>AdBlue</option></select></div>'
-    + '<div class="field"><label>Litri</label><input class="input alim-lit" type="number" value="0" inputmode="numeric"></div>'
+    + '<div class="field"><label>Tip combustibil</label><select class="input alim-tip" style="padding:10px 14px;" onchange="draftSave()"><option' + (a.tip === 'AdBlue' ? '' : ' selected') + '>Motorină</option><option' + (a.tip === 'AdBlue' ? ' selected' : '') + '>AdBlue</option></select></div>'
+    + '<div class="field"><label>Litri</label><input class="input alim-lit" type="number" value="' + (a.litru || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
     + '</div>'
     + '<div class="g3">'
-    + '<div class="field"><label>Km</label><input class="input alim-km" type="number" value="0" inputmode="numeric"></div>'
-    + '<div class="field"><label>Plată</label><select class="input alim-plata" style="padding:10px 14px;"><option>Card</option><option>Cash</option><option>Flota Card</option><option>DKV</option></select></div>'
-    + '<div class="field"><label>Sumă (RON)</label><input class="input alim-suma" type="number" value="0" inputmode="numeric"></div>'
+    + '<div class="field"><label>Km</label><input class="input alim-km" type="number" value="' + (a.km || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
+    + '<div class="field"><label>Plată</label><select class="input alim-plata" style="padding:10px 14px;" onchange="draftSave()"><option>Card</option><option>Cash</option><option>Flota Card</option><option>DKV</option></select></div>'
+    + '<div class="field"><label>Sumă (RON)</label><input class="input alim-suma" type="number" value="' + (a.suma || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
     + '</div>';
   document.getElementById('alimentariContainer').appendChild(d);
+  // Plată visszaállítás
+  if (a.plata) {
+    var sel = d.querySelector('.alim-plata');
+    if (sel) sel.value = a.plata;
+  }
 }
 
-function addAchRow() {
+function addAchRow(a) {
   achIdx++;
+  a = a || {};
   var d = document.createElement('div');
   d.className = 'dyn-row';
-  d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove()">✕</button>'
-    + '<div class="field"><label>Produs / Serviciu</label><input class="input ach-prod" placeholder="pl. Autostrăzi vigneta"></div>'
+  d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
+    + '<div class="field"><label>Produs / Serviciu</label><input class="input ach-prod" placeholder="pl. Autostrăzi vigneta" value="' + (a.produs || '') + '" oninput="draftSave()"></div>'
     + '<div class="g2">'
-    + '<div class="field"><label>Helyszín</label><input class="input ach-loc" placeholder="pl. Győr"></div>'
-    + '<div class="field"><label>Sumă (RON)</label><input class="input ach-pret" type="number" value="0" inputmode="numeric"></div>'
+    + '<div class="field"><label>Helyszín</label><input class="input ach-loc" placeholder="pl. Győr" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
+    + '<div class="field"><label>Sumă (RON)</label><input class="input ach-pret" type="number" value="' + (a.pret || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
     + '</div>'
-    + '<div class="field"><label>Plată</label><select class="input ach-plata" style="padding:10px 14px;"><option>Card</option><option>Cash</option><option>Flota Card</option><option>DKV</option></select></div>';
+    + '<div class="field"><label>Plată</label><select class="input ach-plata" style="padding:10px 14px;" onchange="draftSave()"><option>Card</option><option>Cash</option><option>Flota Card</option><option>DKV</option></select></div>';
   document.getElementById('achizitiiContainer').appendChild(d);
+  if (a.plata) {
+    var sel = d.querySelector('.ach-plata');
+    if (sel) sel.value = a.plata;
+  }
 }
 
+// ============================================================
+// MENETLEVÉL BEKÜLDÉS
+// ============================================================
 function submitFuvarlevel() {
   var fisa = document.getElementById('fFisa').value.trim();
   if (!fisa) { toast('Add meg a fișă számát!', 'err'); return; }
 
-  // Pontok összegyűjtése
   var puncte = [];
   document.querySelectorAll('#puncteContainer .dyn-row').forEach(function(row) {
     puncte.push({
-      tip: (row.querySelector('.punct-tip')||{}).value || '',
-      loc: (row.querySelector('.punct-loc')||{}).value || '',
-      data: (row.querySelector('.punct-data')||{}).value || ''
+      tip: (row.querySelector('.punct-tip') || {}).value || '',
+      loc: (row.querySelector('.punct-loc') || {}).value || '',
+      data: (row.querySelector('.punct-data') || {}).value || ''
     });
   });
 
-  // Tankolások
   var alimentari = [];
   document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function(row) {
     alimentari.push({
-      loc: (row.querySelector('.alim-loc')||{}).value || '',
-      tip: (row.querySelector('.alim-tip')||{}).value || 'Motorină',
-      litru: parseFloat((row.querySelector('.alim-lit')||{}).value) || 0,
-      km: parseFloat((row.querySelector('.alim-km')||{}).value) || 0,
-      plata: (row.querySelector('.alim-plata')||{}).value || 'Card',
-      suma: parseFloat((row.querySelector('.alim-suma')||{}).value) || 0
+      loc: (row.querySelector('.alim-loc') || {}).value || '',
+      tip: (row.querySelector('.alim-tip') || {}).value || 'Motorină',
+      litru: parseFloat((row.querySelector('.alim-lit') || {}).value) || 0,
+      km: parseFloat((row.querySelector('.alim-km') || {}).value) || 0,
+      plata: (row.querySelector('.alim-plata') || {}).value || 'Card',
+      suma: parseFloat((row.querySelector('.alim-suma') || {}).value) || 0
     });
   });
 
-  // Kiadások
   var achizitii = [];
   document.querySelectorAll('#achizitiiContainer .dyn-row').forEach(function(row) {
     achizitii.push({
-      produs: (row.querySelector('.ach-prod')||{}).value || '',
-      loc: (row.querySelector('.ach-loc')||{}).value || '',
-      pret: parseFloat((row.querySelector('.ach-pret')||{}).value) || 0,
-      plata: (row.querySelector('.ach-plata')||{}).value || 'Card'
+      produs: (row.querySelector('.ach-prod') || {}).value || '',
+      loc: (row.querySelector('.ach-loc') || {}).value || '',
+      pret: parseFloat((row.querySelector('.ach-pret') || {}).value) || 0,
+      plata: (row.querySelector('.ach-plata') || {}).value || 'Card'
     });
   });
 
-  // Útvonal első/utolsó pont → loc_plecare / loc_sosire
   var locPlecare = puncte.length ? puncte[0].loc : '';
-  var locSosire = puncte.length > 1 ? puncte[puncte.length-1].loc : '';
+  var locSosire = puncte.length > 1 ? puncte[puncte.length - 1].loc : '';
 
   var payload = {
     numarFisa: fisa,
@@ -579,15 +735,15 @@ function submitFuvarlevel() {
     orderIds: _selectedOrderIds
   };
 
-  fetch('/api/fuvarlevel-save', { method:'POST', headers:{'Content-Type':'application/json'},
+  fetch('/api/fuvarlevel-save', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload) })
-  .then(function(r){ return r.json(); }).then(function(d){
+  .then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
       toast('✅ Menetlevél elküldve!', 'ok');
+      draftClear();
       _selectedOrderIds = [];
       goSec('dash');
-      // Reset
-      setTimeout(function(){
+      setTimeout(function() {
         document.getElementById('fuvarStep1').style.display = '';
         document.getElementById('fuvarStep2').style.display = 'none';
         document.getElementById('alimentariContainer').innerHTML = '';
@@ -607,10 +763,12 @@ function submitFuvarlevel() {
     } else {
       toast('Hiba: ' + (d.err || 'ismeretlen'), 'err');
     }
-  }).catch(function(){ toast('Hálózati hiba', 'err'); });
+  }).catch(function() { toast('Hálózati hiba', 'err'); });
 }
 
-// --- IRATOK ---
+// ============================================================
+// IRATOK
+// ============================================================
 var selDocTip = 'CMR';
 function selDocType(el, tip) {
   selDocTip = tip;
@@ -628,7 +786,7 @@ function uploadDoc() {
   if (!file) { toast('Válassz fájlt!', 'err'); return; }
   var fr = new FileReader();
   fr.onload = function(e) {
-    fetch('/api/doc-upload', { method:'POST', headers:{'Content-Type':'application/json'},
+    fetch('/api/doc-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ base64: e.target.result, numeFisier: file.name, tip: selDocTip }) })
     .then(function(r) { return r.json(); }).then(function(d) {
       if (d.success) { toast('✅ Feltöltve!', 'ok'); goSec('dash'); }
@@ -638,34 +796,63 @@ function uploadDoc() {
   fr.readAsDataURL(file);
 }
 
-// --- LOGOUT ---
+// ============================================================
+// LOGOUT
+// ============================================================
 function logoutSofer() {
-  fetch('/api/execute', { method:'POST', headers:{'Content-Type':'application/json'},
+  stateClear();
+  fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ functionName: 'authLogout' }) })
   .then(function() { window.location.href = '/login'; })
   .catch(function() { window.location.href = '/login'; });
 }
 
-// --- INIT ---
+// ============================================================
+// INIT — authMe + állapot visszaállítás
+// ============================================================
 var _meData = null;
-fetch('/api/execute', { method:'POST', headers:{'Content-Type':'application/json'},
+
+fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ functionName: 'authMe' }) })
 .then(function(r) { return r.json(); }).then(function(d) {
   if (!d.result) { window.location.href = '/login'; return; }
   _meData = d.result;
   document.getElementById('meBadge').textContent = d.result.nume;
   initFirebaseChat(d.result);
+
+  // ── Állapot visszaállítás ──
+  var state = stateGet();
+
+  // Menetlevél piszkozat visszaállítás (legmagasabb prioritás)
+  if (state.draft && state.sec === 'fuvar' && state.fuvarStep === 2) {
+    goSec('fuvar');
+    // Fuvarok betöltése után visszaállítjuk
+    fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ functionName: 'getMySoferOrders' }) })
+    .then(function(r) { return r.json(); }).then(function(d2) {
+      _soferOrdersCache = d2.result || [];
+      // Step2 megnyitása
+      document.getElementById('fuvarStep1').style.display = 'none';
+      document.getElementById('fuvarStep2').style.display = 'block';
+      draftRestore(state.draft);
+      attachDraftListeners();
+      toast('📝 Piszkozat visszaállítva', 'ok');
+    });
+    return;
+  }
+
+  // Aktív szekció visszaállítás
+  if (state.sec && state.sec !== 'dash') {
+    goSec(state.sec);
+  }
 });
 
 // ============================================================
-// FIREBASE CHAT — Sofőr oldal (WhatsApp-szerű)
-// Sofőr látja az összes Managert, privát dm_ szobákat nyit.
-// Ha Manager/Admin ír neki, az is megjelenik a listán.
-// Room ID: dm_{kisebb_email_escaped}_{nagyobb_email_escaped}
+// FIREBASE CHAT — Sofőr oldal
 // ============================================================
 var _fbDb = null, _chatCompanyId = null;
 var _chatCurrentRoom = null, _chatUnsubscribe = null, _chatRoomsListener = null;
-var _chatManagers = []; // céges managerek listája
+var _chatManagers = [];
 
 function dmRoomId(emailA, emailB) {
   var a = emailA.toLowerCase().replace(/@/g,'__').replace(/\./g,'_d_');
@@ -675,8 +862,8 @@ function dmRoomId(emailA, emailB) {
 
 function initFirebaseChat(me) {
   fetch('/api/firebase-config')
-    .then(function(r){ return r.json(); })
-    .then(function(cfg){
+    .then(function(r) { return r.json(); })
+    .then(function(cfg) {
       if (!cfg || !cfg.apiKey) {
         document.getElementById('chatInitMsg').textContent = '⚠️ Chat konfiguráció hiányzik.';
         return;
@@ -692,100 +879,76 @@ function initFirebaseChat(me) {
           if (!firebase.apps.length) firebase.initializeApp(cfg);
           _fbDb = firebase.database();
           _chatCompanyId = String(me.company_id || 'global');
-          // Managerek betöltése az API-ból
-          fetch('/api/execute', { method:'POST', headers:{'Content-Type':'application/json'},
+          fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ functionName: 'userListAll' }) })
-          .then(function(r){ return r.json(); })
-          .then(function(d){
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
             var list = d.result || [];
-            _chatManagers = list.filter(function(u){
+            _chatManagers = list.filter(function(u) {
               return (u.pozicio === 'Manager' || u.pozicio === 'Admin') && u.email !== me.email;
             });
             document.getElementById('chatInitMsg').style.display = 'none';
             soferShowContactList(me);
+
+            // Chat szoba visszaállítás
+            var state = stateGet();
+            if (state.chatRoom) {
+              var manager = _chatManagers.find(function(u) {
+                return dmRoomId(me.email, u.email) === state.chatRoom;
+              });
+              if (manager) {
+                setTimeout(function() { soferOpenRoom(me, manager); }, 300);
+              }
+            }
           });
         };
       };
     })
-    .catch(function(){ document.getElementById('chatInitMsg').textContent = '⚠️ Chat nem elérhető.'; });
+    .catch(function() { document.getElementById('chatInitMsg').textContent = '⚠️ Chat nem elérhető.'; });
 }
 
 function soferShowContactList(me) {
   var contactView = document.getElementById('chatContactView');
-  var roomView = document.getElementById('chatRoomView');
   contactView.style.display = 'flex';
-  roomView.style.display = 'none';
-  if (_chatUnsubscribe) { _chatUnsubscribe(); _chatUnsubscribe = null; }
+  document.getElementById('chatRoomView').style.display = 'none';
 
   var listEl = document.getElementById('chatContactList');
-  listEl.innerHTML = '<div style="padding:12px 16px;font-size:12px;color:var(--muted);">Betöltés...</div>';
+  if (!_chatManagers.length) {
+    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">Nincs elérhető manager.</div>';
+    return;
+  }
 
-  // Figyeljük az összes szobát amiben érintett vagyok
-  var roomsRef = _fbDb.ref('chats/' + _chatCompanyId + '/rooms');
-  if (_chatRoomsListener) roomsRef.off('value', _chatRoomsListener);
+  listEl.innerHTML = _chatManagers.map(function(u) {
+    var av = (u.nume || u.email).replace(/[^a-zA-Z]/g, '').charAt(0).toUpperCase() || '?';
+    var roomId = dmRoomId(me.email, u.email);
+    return '<div onclick="soferOpenRoom(_meData, ' + JSON.stringify(u).replace(/"/g, '&quot;') + ')" '
+      + 'style="display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .15s;" '
+      + 'onmouseenter="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseleave="this.style.background=\'\'"> '
+      + '<div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;color:#fff;flex-shrink:0;">' + av + '</div>'
+      + '<div><div style="font-weight:700;font-size:14px;color:#fff;">' + escHtml(u.nume || u.email) + '</div>'
+      + '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + escHtml(u.pozicio || '') + '</div></div>'
+      + '</div>';
+  }).join('');
 
-  _chatRoomsListener = roomsRef.on('value', function(snap) {
-    var existingRooms = {};
-    snap.forEach(function(child) {
-      existingRooms[child.key] = child.val().meta || {};
-    });
-
-    // Beépítjük a managereket + meglevő szobák utolsó üzenet adataival
-    var contacts = _chatManagers.map(function(mgr) {
-      var rId = dmRoomId(me.email, mgr.email);
-      var meta = existingRooms[rId] || {};
-      return {
-        email: mgr.email,
-        name: mgr.nume || mgr.email,
-        role: mgr.pozicio,
-        roomId: rId,
-        lastMsg: meta.lastMsg || '',
-        lastTime: meta.lastTime || 0,
-        lastFrom: meta.lastFrom || ''
-      };
-    });
-
-    // Rendezés: akivel volt üzenet → frissebb előbb; akivel még nem → végén
-    contacts.sort(function(a, b) { return (b.lastTime || 0) - (a.lastTime || 0); });
-
-    if (!contacts.length) {
-      listEl.innerHTML = '<div style="padding:20px 16px;font-size:13px;color:var(--muted);">Nincs elérhető diszpécser.</div>';
-      return;
-    }
-
-    listEl.innerHTML = contacts.map(function(c) {
-      var av = (c.name.charAt(0) || '?').toUpperCase();
-      var lastLine = c.lastMsg
-        ? '<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;">'
-          + escHtml(c.lastMsg.substring(0,45)) + '</div>'
-        : '<div style="font-size:11px;color:var(--muted);">Kezdj el írni...</div>';
-      var badge = c.role === 'Admin'
-        ? '<span style="font-size:10px;background:rgba(225,11,26,0.15);color:#f87171;padding:2px 6px;border-radius:8px;margin-left:4px;">Admin</span>'
-        : '<span style="font-size:10px;background:rgba(59,130,246,0.15);color:#60a5fa;padding:2px 6px;border-radius:8px;margin-left:4px;">Manager</span>';
-      return '<div onclick="soferOpenRoom(\'' + c.roomId + '\',\'' + escHtml(c.name) + '\',\'' + escHtml(c.role) + '\')" '
-        + 'style="display:flex;gap:12px;align-items:center;padding:14px 16px;cursor:pointer;border-bottom:1px solid var(--border);'
-        + 'transition:background .15s;" onmouseover="this.style.background=\'rgba(255,255,255,0.03)\'" onmouseout="this.style.background=\'\'">'
-        + '<div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#1d4ed8);'
-        + 'display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:17px;flex-shrink:0;">' + av + '</div>'
-        + '<div style="flex:1;min-width:0;">'
-        + '<div style="font-weight:700;font-size:14px;color:#fff;display:flex;align-items:center;">'
-        + escHtml(c.name) + badge + '</div>'
-        + lastLine + '</div>'
-        + (c.lastTime ? '<div style="font-size:10px;color:var(--muted);flex-shrink:0;">'
-          + new Date(c.lastTime).toLocaleTimeString('hu-HU',{hour:'2-digit',minute:'2-digit'}) + '</div>' : '')
-        + '</div>';
-    }).join('');
-  });
+  // Rooms listener — olvasatlan jelzők frissítése
+  if (_chatRoomsListener) _chatRoomsListener();
+  if (_fbDb) {
+    var ref = _fbDb.ref('chats/' + _chatCompanyId + '/rooms');
+    ref.on('value', function() {}); // figyelés aktív
+    _chatRoomsListener = function() { ref.off(); };
+  }
 }
 
-function soferOpenRoom(roomId, managerName, managerRole) {
-  document.getElementById('chatContactView').style.display = 'none';
-  var roomView = document.getElementById('chatRoomView');
-  roomView.style.display = 'flex';
+function soferOpenRoom(me, manager) {
+  var roomId = dmRoomId(me.email, manager.email);
+  stateSave({ chatRoom: roomId });
 
-  document.getElementById('chatRoomTitle').textContent = managerName;
-  document.getElementById('chatRoomSub').textContent = managerRole;
-  var av = (managerName.charAt(0) || '?').toUpperCase();
+  document.getElementById('chatContactView').style.display = 'none';
+  document.getElementById('chatRoomView').style.display = 'flex';
+
+  var name = manager.nume || manager.email;
+  document.getElementById('chatHeadName').textContent = name;
+  var av = name.replace(/[^a-zA-Z]/g, '').charAt(0).toUpperCase() || '?';
   document.getElementById('chatHeadAv').textContent = av;
 
   if (_chatUnsubscribe) { _chatUnsubscribe(); _chatUnsubscribe = null; }
@@ -807,11 +970,11 @@ function soferOpenRoom(roomId, managerName, managerRole) {
         + (isMine
           ? 'align-self:flex-end;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border-bottom-right-radius:3px;'
           : 'align-self:flex-start;background:rgba(255,255,255,0.08);border:1px solid var(--border-bright);color:var(--text);border-bottom-left-radius:3px;');
-      var ts = msg.ts ? new Date(msg.ts).toLocaleTimeString('hu-HU', {hour:'2-digit',minute:'2-digit'}) : '';
+      var ts = msg.ts ? new Date(msg.ts).toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' }) : '';
       bubble.innerHTML = (!isMine
-          ? '<div style="font-size:10px;color:var(--muted);margin-bottom:3px;font-weight:600;">' + escHtml(msg.fromName||'') + '</div>'
+          ? '<div style="font-size:10px;color:var(--muted);margin-bottom:3px;font-weight:600;">' + escHtml(msg.fromName || '') + '</div>'
           : '')
-        + '<div>' + escHtml(msg.text||'') + '</div>'
+        + '<div>' + escHtml(msg.text || '') + '</div>'
         + '<div style="font-size:10px;opacity:.5;text-align:right;margin-top:4px;">' + ts + '</div>';
       msgsEl.appendChild(bubble);
     });
@@ -824,6 +987,7 @@ function soferOpenRoom(roomId, managerName, managerRole) {
 function soferChatBack() {
   if (_chatUnsubscribe) { _chatUnsubscribe(); _chatUnsubscribe = null; }
   _chatCurrentRoom = null;
+  stateSave({ chatRoom: null });
   document.getElementById('chatRoomView').style.display = 'none';
   document.getElementById('chatContactView').style.display = 'flex';
 }
@@ -834,7 +998,6 @@ function chatSend() {
   var text = input.value.trim();
   if (!text) return;
   input.value = '';
-
   _fbDb.ref('chats/' + _chatCompanyId + '/rooms/' + _chatCurrentRoom + '/messages').push({
     fromEmail: _meData.email || '',
     fromName: _meData.nume || 'Sofőr',
@@ -843,7 +1006,7 @@ function chatSend() {
     ts: firebase.database.ServerValue.TIMESTAMP
   });
   _fbDb.ref('chats/' + _chatCompanyId + '/rooms/' + _chatCurrentRoom + '/meta').update({
-    lastMsg: text.substring(0,80),
+    lastMsg: text.substring(0, 80),
     lastTime: firebase.database.ServerValue.TIMESTAMP,
     lastFrom: _meData.nume
   });

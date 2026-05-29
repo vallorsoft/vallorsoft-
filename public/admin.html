@@ -577,17 +577,24 @@ function gas(fn,args){return new Promise(function(res,rej){fetch('/api/execute',
 function logout(){gas('authLogout').then(function(){window.location.href='/login';}).catch(function(){window.location.href='/login';});}
 function toggleUserMenu(){document.getElementById('userMenuGroup').classList.toggle('open');}
 
+function activateTab(name){
+  document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(x){x.classList.remove('active');});
+  var tabEl=document.querySelector('.sidebar [data-tab="'+name+'"]');
+  if(tabEl){
+    tabEl.classList.add('active');
+    var sub=tabEl.closest?tabEl.closest('.submenu'):null;
+    if(sub){var grp=sub.closest?sub.closest('.menu-group'):null;if(grp)grp.classList.add('open');}
+  }
+  document.querySelectorAll('.pane').forEach(function(p){p.classList.add('hidden');});
+  var pane=document.querySelector('.pane[data-pane="'+name+'"]');
+  if(pane)pane.classList.remove('hidden');
+  try{sessionStorage.setItem('vs_admin_tab',name);}catch(e){}
+  loadTab(name);
+}
 document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(t){
   t.onclick=function(e){
     if(t.id==='userParentTab'){toggleUserMenu();return;}
-    document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(x){x.classList.remove('active');});
-    t.classList.add('active');
-    var tp=t.dataset.tab;
-    if(tp){
-      document.querySelectorAll('.pane').forEach(function(p){p.classList.add('hidden');});
-      document.querySelector('.pane[data-pane="'+tp+'"]').classList.remove('hidden');
-      loadTab(tp);
-    }
+    activateTab(t.dataset.tab);
   };
 });
 
@@ -974,7 +981,17 @@ function saveAdminSigFile(){var fi=document.getElementById('sigFile');if(!fi.fil
 function loadAdminSigPreview(){gas('stampGet').then(r=>{if(r&&r.ok&&r.base64){document.getElementById('adminSigPreview').src=r.base64;document.getElementById('adminSigPreview').style.display='block';document.getElementById('noSigText').style.display='none';}});}
 
 let myEmail = '';
-gas('authMe').then(u=>{if(u){document.getElementById('meBadge').textContent=u.nume; myEmail=u.email; initFirebaseChatPanel(u);}loadTab('dash');});
+gas('authMe').then(u=>{
+  if(!u||u.pozicio!=='Admin'){window.location.href='/login';return;}
+  document.getElementById('meBadge').textContent=u.nume;
+  myEmail=u.email;
+  initFirebaseChatPanel(u);
+  var savedTab='';
+  var savedRoom='';
+  try{savedTab=sessionStorage.getItem('vs_admin_tab')||'dash';savedRoom=sessionStorage.getItem('vs_admin_chat_room')||'';}catch(e){}
+  if(savedTab==='chat'&&savedRoom){window._restoreChatRoom=savedRoom;}
+  activateTab(savedTab||'dash');
+});
 </script>
 
 <script>
@@ -1342,6 +1359,12 @@ function startRoomListListener(me){
       _roomsSnapData[child.key]=child.val().meta||{};
     });
     renderAdminRoomList(me);
+    // ── Chat szoba visszaállítás frissítés után ──
+    if(window._restoreChatRoom){
+      var rId=window._restoreChatRoom;
+      window._restoreChatRoom=null;
+      if(_roomsSnapData[rId]){setTimeout(function(){openChatRoom(rId);},200);}
+    }
   });
 }
 
@@ -1394,6 +1417,7 @@ function chatGetLabel(roomId,meta,me){
 }
 
 function openChatRoom(roomId){
+  try{sessionStorage.setItem('vs_admin_chat_room',roomId);}catch(e){}
   if(!_fbDb||!_meChat)return;
   if(_chatUnsubscribe){_chatUnsubscribe();_chatUnsubscribe=null;}
   _chatCurrentRoom=roomId;
