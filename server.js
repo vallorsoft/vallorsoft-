@@ -117,6 +117,20 @@ function requireRole(...roles) {
 
 const getNowStr = () => new Date().toISOString().replace('T', ' ').substring(0, 19);
 
+// Keep-alive ping endpoint (Render free tier ne aludjon el)
+app.get('/ping', (req, res) => res.json({ ok: true, ts: Date.now() }));
+
+// Önmaga pingelése 14 percenként (Render 15 perc után alszik)
+if (process.env.NODE_ENV !== 'development') {
+  const SELF_URL = (process.env.APP_URL || 'https://vallorsoft.onrender.com') + '/ping';
+  setInterval(() => {
+    const https = require('https');
+    const http = require('http');
+    const mod = SELF_URL.startsWith('https') ? https : http;
+    mod.get(SELF_URL, () => {}).on('error', () => {});
+  }, 14 * 60 * 1000); // 14 perc
+}
+
 // Firebase konfig endpoint — a frontend olvassa be (public config, nem titkos)
 app.get('/api/firebase-config', requireLogin, (req, res) => {
   res.json({

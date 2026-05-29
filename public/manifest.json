@@ -1,0 +1,24 @@
+{
+  "name": "VallorSoft",
+  "short_name": "VallorSoft",
+  "description": "Fuvarmenedzsment Platform",
+  "start_url": "/sofer",
+  "display": "standalone",
+  "background_color": "#0a0f15",
+  "theme_color": "#0a0f15",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
