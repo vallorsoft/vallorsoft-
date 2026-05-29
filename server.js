@@ -14,11 +14,15 @@ const nodemailer = require('nodemailer');
 // Render env: MAIL_USER=te@gmail.com  MAIL_PASS=xxxx xxxx xxxx xxxx
 const mailTransporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // SSL
+  port: 587,
+  secure: false, // STARTTLS
+  family: 4,     // IPv4 kenyszerites (Render IPv6 fix)
   auth: {
     user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS, // Gmail App Password (16 karakter, szokozok nelkul)
+    pass: process.env.MAIL_PASS,
+  },
+  tls: {
+    rejectUnauthorized: false,
   },
 });
 
