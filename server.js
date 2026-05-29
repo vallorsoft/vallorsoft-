@@ -117,20 +117,6 @@ function requireRole(...roles) {
 
 const getNowStr = () => new Date().toISOString().replace('T', ' ').substring(0, 19);
 
-// Keep-alive ping endpoint (Render free tier ne aludjon el)
-app.get('/ping', (req, res) => res.json({ ok: true, ts: Date.now() }));
-
-// Önmaga pingelése 14 percenként (Render 15 perc után alszik)
-if (process.env.NODE_ENV !== 'development') {
-  const SELF_URL = (process.env.APP_URL || 'https://vallorsoft.onrender.com') + '/ping';
-  setInterval(() => {
-    const https = require('https');
-    const http = require('http');
-    const mod = SELF_URL.startsWith('https') ? https : http;
-    mod.get(SELF_URL, () => {}).on('error', () => {});
-  }, 14 * 60 * 1000); // 14 perc
-}
-
 // Firebase konfig endpoint — a frontend olvassa be (public config, nem titkos)
 app.get('/api/firebase-config', requireLogin, (req, res) => {
   res.json({
@@ -828,6 +814,7 @@ app.post('/api/execute', async (req, res) => {
       const external_driver_id = o.external_driver_id ? parseInt(o.external_driver_id, 10) : null;
       const rendszam_camion = o.rendszam_camion ? String(o.rendszam_camion).trim().toUpperCase() : null;
       const rendszam_remorca = o.rendszam_remorca ? String(o.rendszam_remorca).trim().toUpperCase() : null;
+      const company_id = req.session.user.company_id;
 
       let status = 'Disponibil';
       if (sofer_type === 'Intern' && email_sofer) status = 'Alocat';
@@ -839,16 +826,16 @@ app.post('/api/execute', async (req, res) => {
           data_incarcare, data_descarcare, pret, km,
           sofer_type, email_sofer, nume_sofer,
           firma_extern, telefon_extern, external_driver_id,
-          rendszam_camion, rendszam_remorca, status
+          rendszam_camion, rendszam_remorca, status, company_id
         ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
         )`,
         [
           id, client, ref, loc_incarcare, loc_descarcare,
           data_incarcare, data_descarcare, pret, km,
           sofer_type, email_sofer, nume_sofer,
           firma_extern, telefon_extern, external_driver_id,
-          rendszam_camion, rendszam_remorca, status
+          rendszam_camion, rendszam_remorca, status, company_id
         ]
       );
 
@@ -857,13 +844,13 @@ app.post('/api/execute', async (req, res) => {
           order_id, leg_number, sofer_type, email_sofer, nume_sofer,
           firma_extern, telefon_extern, external_driver_id,
           rendszam_camion, rendszam_remorca,
-          loc_preluare, data_preluare
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          loc_preluare, data_preluare, company_id
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [
           id, 1, sofer_type, email_sofer, nume_sofer,
           firma_extern, telefon_extern, external_driver_id,
           rendszam_camion, rendszam_remorca,
-          loc_incarcare, data_incarcare
+          loc_incarcare, data_incarcare, company_id
         ]
       );
 

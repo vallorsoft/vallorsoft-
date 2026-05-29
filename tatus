@@ -1,0 +1,109 @@
+warning: in the working copy of 'public/admin.html', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/public/admin.html b/public/admin.html[m
+[1mindex 8da4217..d757ad0 100644[m
+[1m--- a/public/admin.html[m
+[1m+++ b/public/admin.html[m
+[36m@@ -158,7 +158,7 @@[m
+   <h3 style="margin-bottom:16px;">Fuvarfeladatok listája</h3>[m
+   <div style="overflow-x:auto;">[m
+   <table class="table" id="tblOrders">[m
+[31m-         <thead><tr><th>ID</th><th>Ügyfél</th><th>Útvonal</th><th>KM</th><th>Ár</th><th>Sofőr</th><th>Vontató</th><th>Státusz</th><th>Megrendelő</th></tr></thead>  <tbody></tbody>[m
+[32m+[m[32m         <thead><tr><th>ID</th><th>Ügyfél</th><th>Útvonal</th><th>KM</th><th>Ár</th><th>Sofőr</th><th>Vontató</th><th>Státusz</th><th>Megrendelő</th></tr></thead>  <tbody id="tblOrdersBody"></tbody>[m
+         </table>[m
+       </div>[m
+     </div>[m
+[36m@@ -498,6 +498,79 @@[m
+   </div>[m
+ </div>[m
+ [m
+[32m+[m[32m<div class="modal-back" id="orderEditModal">[m
+[32m+[m[32m  <div class="modal glass" style="width:min(700px,100%);max-height:92vh;overflow-y:auto;">[m
+[32m+[m[32m    <h3>✏️ Fuvar szerkesztése — <span id="oeModalId" style="color:var(--muted);font-size:14px;font-weight:400;"></span></h3>[m
+[32m+[m
+[32m+[m[32m    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">[m
+[32m+[m[32m      <div class="field"><label>Ügyfél</label><input class="input" id="oeClient"></div>[m
+[32m+[m[32m      <div class="field"><label>Referencia</label><input class="input" id="oeRef"></div>[m
+[32m+[m[32m      <div class="field"><label>Rakodás helye</label><input class="input" id="oeLocInc"></div>[m
+[32m+[m[32m      <div class="field"><label>Lerakás helye</label><input class="input" id="oeLocDesc"></div>[m
+[32m+[m[32m      <div class="field"><label>Rakodás dátuma</label><input class="input" id="oeDataInc" type="date"></div>[m
+[32m+[m[32m      <div class="field"><label>Lerakás dátuma</label><input class="input" id="oeDataDesc" type="date"></div>[m
+[32m+[m[32m      <div class="field"><label>Ár (EUR)</label><input class="input" id="oePret" type="number"></div>[m
+[32m+[m[32m      <div class="field"><label>Km</label><input class="input" id="oeKm" type="number"></div>[m
+[32m+[m[32m    </div>[m
+[32m+[m
+[32m+[m[32m    <div class="field"><label>Státusz</label>[m
+[32m+[m[32m      <select class="select" id="oeStatus">[m
+[32m+[m[32m        <option>Disponibil</option>[m
+[32m+[m[32m        <option>Alocat</option>[m
+[32m+[m[32m        <option>In Curs</option>[m
+[32m+[m[32m        <option>Finalizat</option>[m
+[32m+[m[32m        <option>Anulat</option>[m
+[32m+[m[32m        <option>Extern</option>[m
+[32m+[m[32m      </select>[m
+[32m+[m[32m    </div>[m
+[32m+[m
+[32m+[m[32m    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">[m
+[32m+[m[32m      <div style="font-weight:700;color:#fff;margin-bottom:10px;">🚛 Sofőr / Jármű</div>[m
+[32m+[m[32m      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">[m
+[32m+[m[32m        <div class="field"><label>Sofőr típus</label>[m
+[32m+[m[32m          <select class="select" id="oeSoferType" onchange="oeToggleSoferType()">[m
+[32m+[m[32m            <option value="">— Nincs —</option>[m
+[32m+[m[32m            <option value="Intern">Intern</option>[m
+[32m+[m[32m            <option value="Extern">Extern</option>[m
+[32m+[m[32m          </select>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m        <div class="field" id="oeInternWrap"><label>Belső sofőr</label>[m
+[32m+[m[32m          <select class="select" id="oeEmailSofer">[m
+[32m+[m[32m            <option value="">— Válassz —</option>[m
+[32m+[m[32m          </select>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m        <div class="field" id="oeExternWrap" style="display:none;"><label>Extern sofőr neve</label><input class="input" id="oeNumeSoferExtern"></div>[m
+[32m+[m[32m        <div class="field" id="oeExternFirmaWrap" style="display:none;"><label>Extern cég</label><input class="input" id="oeFirmaExtern"></div>[m
+[32m+[m[32m        <div class="field"><label>Vontató rendszám</label>[m
+[32m+[m[32m          <select class="select" id="oeCamion">[m
+[32m+[m[32m            <option value="">— Nincs —</option>[m
+[32m+[m[32m          </select>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m        <div class="field"><label>Pótkocsi rendszám</label>[m
+[32m+[m[32m          <select class="select" id="oeRemorca">[m
+[32m+[m[32m            <option value="">— Nincs —</option>[m
+[32m+[m[32m          </select>[m
+[32m+[m[32m        </div>[m
+[32m+[m[32m      </div>[m
+[32m+[m[32m    </div>[m
+[32m+[m
+[32m+[m[32m    <!-- LEGS szekció -->[m
+[32m+[m[32m    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">[m
+[32m+[m[32m      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">[m
+[32m+[m[32m        <div style="font-weight:700;color:#fff;">🔄 Jármű / Sofőr váltások</div>[m
+[32m+[m[32m        <button class="btn primary" style="padding:6px 14px;font-size:12px;" onclick="oeAddLeg()">+ Váltás hozzáadása</button>[m
+[32m+[m[32m      </div>[m
+[32m+[m[32m      <div id="oeLegsList" style="display:flex;flex-direction:column;gap:8px;"></div>[m
+[32m+[m[32m    </div>[m
+[32m+[m
+[32m+[m[32m    <div style="display:flex;gap:10px;margin-top:16px;">[m
+[32m+[m[32m      <button class="btn ghost col" onclick="closeOrderEditModal()">Mégse</button>[m
+[32m+[m[32m      <button class="btn primary col" onclick="saveOrderEdit()">💾 Mentés</button>[m
+[32m+[m[32m    </div>[m
+[32m+[m[32m  </div>[m
+[32m+[m[32m</div>[m
+[32m+[m
+[32m+[m
+ <script>[m
+ function toast(m,k){var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(function(){e.remove();},3000);}[m
+ function gas(fn,args){return new Promise(function(res,rej){fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({functionName:fn,arguments:args||[]})}).then(r=>r.json()).then(d=>{res(d.result);}).catch(rej);});}[m
+[36m@@ -642,7 +715,7 @@[m [mlet internDriversCache=[],externDriversCache=[],camionCache=[],remorcaCache=[];[m
+ function loadOrders(){[m
+   gas('comList').then(list=>{[m
+     if(!Array.isArray(list))list=[];[m
+[31m-    document.querySelector('#tblOrders tbody').innerHTML=list.map(c=>{[m
+[32m+[m[32m    document.getElementById('tblOrdersBody').innerHTML=list.map(c=>{[m
+       let soferInfo='—';[m
+       if(c.sofer_type==='Intern')soferInfo=c.nume_sofer||c.email_sofer||'—';[m
+       else if(c.sofer_type==='Extern')soferInfo=c.nume_sofer||c.firma_extern||'—';[m
+[36m@@ -652,7 +725,7 @@[m [mfunction loadOrders(){[m
+       if(c.status==='Finalizat')sc='ok';[m
+       if(c.status==='Anulat')sc='err';[m
+       if(c.status==='Extern')sc='warn';[m
+[31m-     return`<tr><td><b>${c.id}</b></td><td>${c.client||'—'}</td><td>${c.loc_incarcare||'—'} → ${c.loc_descarcare||'—'}</td><td>${c.km||'—'}</td><td>${c.pret||'—'}</td><td>${soferInfo}</td><td>${c.rendszam_camion||'—'}</td><td><span class="badge ${sc}">${c.status}</span></td><td><button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="openDocModal('${c.id}')">📎 Iratok</button></td></tr>`;[m
+[32m+[m[32m     return`<tr><td><b>${c.id}</b></td><td>${c.client||'—'}</td><td>${c.loc_incarcare||'—'} → ${c.loc_descarcare||'—'}</td><td>${c.km||'—'}</td><td>${c.pret||'—'}</td><td>${soferInfo}</td><td>${c.rendszam_camion||'—'}</td><td><span class="badge ${sc}">${c.status}</span></td><td style="display:flex;gap:4px;"><button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="openDocModal('${c.id}')">📎</button><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="openOrderEdit('${c.id}')">✏

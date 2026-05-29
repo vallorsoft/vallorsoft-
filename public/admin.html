@@ -158,7 +158,7 @@
   <h3 style="margin-bottom:16px;">Fuvarfeladatok listája</h3>
   <div style="overflow-x:auto;">
   <table class="table" id="tblOrders">
-         <thead><tr><th>ID</th><th>Ügyfél</th><th>Útvonal</th><th>KM</th><th>Ár</th><th>Sofőr</th><th>Vontató</th><th>Státusz</th><th>Megrendelő</th></tr></thead>  <tbody></tbody>
+         <thead><tr><th>ID</th><th>Ügyfél</th><th>Útvonal</th><th>KM</th><th>Ár</th><th>Sofőr</th><th>Vontató</th><th>Státusz</th><th>Megrendelő</th></tr></thead>  <tbody id="tblOrdersBody"></tbody>
         </table>
       </div>
     </div>
@@ -498,6 +498,79 @@
   </div>
 </div>
 
+<div class="modal-back" id="orderEditModal">
+  <div class="modal glass" style="width:min(700px,100%);max-height:92vh;overflow-y:auto;">
+    <h3>✏️ Fuvar szerkesztése — <span id="oeModalId" style="color:var(--muted);font-size:14px;font-weight:400;"></span></h3>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div class="field"><label>Ügyfél</label><input class="input" id="oeClient"></div>
+      <div class="field"><label>Referencia</label><input class="input" id="oeRef"></div>
+      <div class="field"><label>Rakodás helye</label><input class="input" id="oeLocInc"></div>
+      <div class="field"><label>Lerakás helye</label><input class="input" id="oeLocDesc"></div>
+      <div class="field"><label>Rakodás dátuma</label><input class="input" id="oeDataInc" type="date"></div>
+      <div class="field"><label>Lerakás dátuma</label><input class="input" id="oeDataDesc" type="date"></div>
+      <div class="field"><label>Ár (EUR)</label><input class="input" id="oePret" type="number"></div>
+      <div class="field"><label>Km</label><input class="input" id="oeKm" type="number"></div>
+    </div>
+
+    <div class="field"><label>Státusz</label>
+      <select class="select" id="oeStatus">
+        <option>Disponibil</option>
+        <option>Alocat</option>
+        <option>In Curs</option>
+        <option>Finalizat</option>
+        <option>Anulat</option>
+        <option>Extern</option>
+      </select>
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
+      <div style="font-weight:700;color:#fff;margin-bottom:10px;">🚛 Sofőr / Jármű</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="field"><label>Sofőr típus</label>
+          <select class="select" id="oeSoferType" onchange="oeToggleSoferType()">
+            <option value="">— Nincs —</option>
+            <option value="Intern">Intern</option>
+            <option value="Extern">Extern</option>
+          </select>
+        </div>
+        <div class="field" id="oeInternWrap"><label>Belső sofőr</label>
+          <select class="select" id="oeEmailSofer">
+            <option value="">— Válassz —</option>
+          </select>
+        </div>
+        <div class="field" id="oeExternWrap" style="display:none;"><label>Extern sofőr neve</label><input class="input" id="oeNumeSoferExtern"></div>
+        <div class="field" id="oeExternFirmaWrap" style="display:none;"><label>Extern cég</label><input class="input" id="oeFirmaExtern"></div>
+        <div class="field"><label>Vontató rendszám</label>
+          <select class="select" id="oeCamion">
+            <option value="">— Nincs —</option>
+          </select>
+        </div>
+        <div class="field"><label>Pótkocsi rendszám</label>
+          <select class="select" id="oeRemorca">
+            <option value="">— Nincs —</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEGS szekció -->
+    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-weight:700;color:#fff;">🔄 Jármű / Sofőr váltások</div>
+        <button class="btn primary" style="padding:6px 14px;font-size:12px;" onclick="oeAddLeg()">+ Váltás hozzáadása</button>
+      </div>
+      <div id="oeLegsList" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button class="btn ghost col" onclick="closeOrderEditModal()">Mégse</button>
+      <button class="btn primary col" onclick="saveOrderEdit()">💾 Mentés</button>
+    </div>
+  </div>
+</div>
+
+
 <script>
 function toast(m,k){var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(function(){e.remove();},3000);}
 function gas(fn,args){return new Promise(function(res,rej){fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({functionName:fn,arguments:args||[]})}).then(r=>r.json()).then(d=>{res(d.result);}).catch(rej);});}
@@ -642,7 +715,7 @@ let internDriversCache=[],externDriversCache=[],camionCache=[],remorcaCache=[];
 function loadOrders(){
   gas('comList').then(list=>{
     if(!Array.isArray(list))list=[];
-    document.querySelector('#tblOrders tbody').innerHTML=list.map(c=>{
+    document.getElementById('tblOrdersBody').innerHTML=list.map(c=>{
       let soferInfo='—';
       if(c.sofer_type==='Intern')soferInfo=c.nume_sofer||c.email_sofer||'—';
       else if(c.sofer_type==='Extern')soferInfo=c.nume_sofer||c.firma_extern||'—';
@@ -652,7 +725,7 @@ function loadOrders(){
       if(c.status==='Finalizat')sc='ok';
       if(c.status==='Anulat')sc='err';
       if(c.status==='Extern')sc='warn';
-     return`<tr><td><b>${c.id}</b></td><td>${c.client||'—'}</td><td>${c.loc_incarcare||'—'} → ${c.loc_descarcare||'—'}</td><td>${c.km||'—'}</td><td>${c.pret||'—'}</td><td>${soferInfo}</td><td>${c.rendszam_camion||'—'}</td><td><span class="badge ${sc}">${c.status}</span></td><td><button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="openDocModal('${c.id}')">📎 Iratok</button></td></tr>`;
+     return`<tr><td><b>${c.id}</b></td><td>${c.client||'—'}</td><td>${c.loc_incarcare||'—'} → ${c.loc_descarcare||'—'}</td><td>${c.km||'—'}</td><td>${c.pret||'—'}</td><td>${soferInfo}</td><td>${c.rendszam_camion||'—'}</td><td><span class="badge ${sc}">${c.status}</span></td><td style="display:flex;gap:4px;"><button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="openDocModal('${c.id}')">📎</button><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="openOrderEdit('${c.id}')">✏️</button></td></tr>`;
     }).join('');
   });
 }
@@ -1418,6 +1491,177 @@ function chatStartNewRoom(){
 
 function escHtml(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ============================================================
+// FUVAR SZERKESZTŐ MODAL
+// ============================================================
+var _oeOrderId = null;
+var _oeSoferCache = [], _oeCamionCache = [], _oeRemorcaCache = [];
+
+function openOrderEdit(id) {
+  _oeOrderId = id;
+  document.getElementById('oeModalId').textContent = id;
+
+  // Adatok betöltése
+  Promise.all([
+    gas('getOrderById', [id]),
+    gas('userListAll'),
+    gas('vehicleList')
+  ]).then(function(results) {
+    // getOrderById result + legs
+    fetch('/api/execute', {method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({functionName:'getOrderById',arguments:[id]})})
+    .then(r=>r.json()).then(function(d) {
+      var o = d.result;
+      var legs = d.legs || [];
+      if (!o) { toast('Nem található','err'); return; }
+
+      document.getElementById('oeClient').value = o.client||'';
+      document.getElementById('oeRef').value = o.ref||'';
+      document.getElementById('oeLocInc').value = o.loc_incarcare||'';
+      document.getElementById('oeLocDesc').value = o.loc_descarcare||'';
+      document.getElementById('oeDataInc').value = o.data_incarcare ? o.data_incarcare.split('T')[0] : '';
+      document.getElementById('oeDataDesc').value = o.data_descarcare ? o.data_descarcare.split('T')[0] : '';
+      document.getElementById('oePret').value = o.pret||0;
+      document.getElementById('oeKm').value = o.km||0;
+      document.getElementById('oeStatus').value = o.status||'Disponibil';
+      document.getElementById('oeSoferType').value = o.sofer_type||'';
+
+      // Sofőr dropdown
+      var users = results[1] || [];
+      _oeSoferCache = users.filter(u => u.pozicio === 'Sofer');
+      var sel = document.getElementById('oeEmailSofer');
+      sel.innerHTML = '<option value="">— Válassz —</option>' +
+        _oeSoferCache.map(u => '<option value="'+u.email+'"'+(u.email===o.email_sofer?' selected':'')+'>'+u.nume+' ('+u.email+')</option>').join('');
+
+      // Jármű dropdown
+      var vehicles = results[2] || [];
+      _oeCamionCache = vehicles.filter(v => v.tip === 'Vontato');
+      _oeRemorcaCache = vehicles.filter(v => v.tip === 'Potkocsi');
+      var camSel = document.getElementById('oeCamion');
+      camSel.innerHTML = '<option value="">— Nincs —</option>' +
+        _oeCamionCache.map(v => '<option value="'+v.rendszam+'"'+(v.rendszam===o.rendszam_camion?' selected':'')+'>'+v.rendszam+(v.marca?' — '+v.marca:'')+'</option>').join('');
+      var remSel = document.getElementById('oeRemorca');
+      remSel.innerHTML = '<option value="">— Nincs —</option>' +
+        _oeRemorcaCache.map(v => '<option value="'+v.rendszam+'"'+(v.rendszam===o.rendszam_remorca?' selected':'')+'>'+v.rendszam+(v.marca?' — '+v.marca:'')+'</option>').join('');
+
+      if (o.sofer_type === 'Extern') {
+        document.getElementById('oeNumeSoferExtern').value = o.nume_sofer||'';
+        document.getElementById('oeFirmaExtern').value = o.firma_extern||'';
+      }
+      oeToggleSoferType();
+
+      // Legs renderelése
+      renderOeLegs(legs);
+
+      document.getElementById('orderEditModal').classList.add('open');
+    });
+  });
+}
+
+function oeToggleSoferType() {
+  var t = document.getElementById('oeSoferType').value;
+  document.getElementById('oeInternWrap').style.display = t === 'Intern' ? '' : 'none';
+  document.getElementById('oeExternWrap').style.display = t === 'Extern' ? '' : 'none';
+  document.getElementById('oeExternFirmaWrap').style.display = t === 'Extern' ? '' : 'none';
+}
+
+function renderOeLegs(legs) {
+  var el = document.getElementById('oeLegsList');
+  if (!legs.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px;">Nincs rögzített váltás.</div>';
+    return;
+  }
+  el.innerHTML = legs.map(function(leg) {
+    return '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;display:flex;justify-content:space-between;align-items:center;">'
+      + '<div>'
+      + '<b style="color:#fff;">' + leg.leg_number + '. szakasz</b>'
+      + (leg.rendszam_camion ? ' &nbsp;🚛 ' + leg.rendszam_camion : '')
+      + (leg.rendszam_remorca ? ' + ' + leg.rendszam_remorca : '')
+      + (leg.nume_sofer ? ' &nbsp;👤 ' + leg.nume_sofer : '')
+      + (leg.loc_preluare ? ' &nbsp;📍 ' + leg.loc_preluare : '')
+      + '</div>'
+      + '<button onclick="deleteLeg('+leg.id+')" style="background:none;border:none;color:var(--err);cursor:pointer;font-size:16px;">✕</button>'
+      + '</div>';
+  }).join('');
+}
+
+function oeAddLeg() {
+  var camSel = document.getElementById('oeCamion');
+  var remSel = document.getElementById('oeRemorca');
+  var soferSel = document.getElementById('oeEmailSofer');
+  var soferType = document.getElementById('oeSoferType').value;
+  var selectedUser = _oeSoferCache.find(u => u.email === soferSel.value);
+
+  var leg = {
+    sofer_type: soferType||null,
+    email_sofer: soferSel.value||null,
+    nume_sofer: selectedUser ? selectedUser.nume : (document.getElementById('oeNumeSoferExtern').value||null),
+    firma_extern: document.getElementById('oeFirmaExtern').value||null,
+    rendszam_camion: camSel.value||null,
+    rendszam_remorca: remSel.value||null,
+    loc_preluare: document.getElementById('oeLocInc').value||null,
+    data_preluare: document.getElementById('oeDataInc').value||null
+  };
+
+  gas('addOrderLeg', [_oeOrderId, leg]).then(function(r) {
+    if (r && r.ok) {
+      toast('Váltás hozzáadva!', 'ok');
+      // Frissítsük a legs listát
+      fetch('/api/execute', {method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({functionName:'getOrderById',arguments:[_oeOrderId]})})
+      .then(r=>r.json()).then(d => renderOeLegs(d.legs||[]));
+    } else { toast(r&&r.err||'Hiba','err'); }
+  });
+}
+
+function deleteLeg(legId) {
+  if (!confirm('Törlöd ezt a váltást?')) return;
+  gas('deleteOrderLeg', [legId]).then(function(r) {
+    if (r && r.ok) {
+      toast('Törölve','ok');
+      fetch('/api/execute', {method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({functionName:'getOrderById',arguments:[_oeOrderId]})})
+      .then(r=>r.json()).then(d => renderOeLegs(d.legs||[]));
+    }
+  });
+}
+
+function saveOrderEdit() {
+  var soferType = document.getElementById('oeSoferType').value;
+  var soferSel = document.getElementById('oeEmailSofer');
+  var selectedUser = _oeSoferCache.find(u => u.email === soferSel.value);
+
+  var payload = {
+    client:           document.getElementById('oeClient').value,
+    ref:              document.getElementById('oeRef').value,
+    loc_incarcare:    document.getElementById('oeLocInc').value,
+    loc_descarcare:   document.getElementById('oeLocDesc').value,
+    data_incarcare:   document.getElementById('oeDataInc').value||null,
+    data_descarcare:  document.getElementById('oeDataDesc').value||null,
+    pret:             document.getElementById('oePret').value,
+    km:               document.getElementById('oeKm').value,
+    status:           document.getElementById('oeStatus').value,
+    sofer_type:       soferType||null,
+    email_sofer:      soferType==='Intern' ? soferSel.value : null,
+    nume_sofer:       soferType==='Intern' ? (selectedUser ? selectedUser.nume : '') : document.getElementById('oeNumeSoferExtern').value,
+    firma_extern:     soferType==='Extern' ? document.getElementById('oeFirmaExtern').value : null,
+    rendszam_camion:  document.getElementById('oeCamion').value||null,
+    rendszam_remorca: document.getElementById('oeRemorca').value||null,
+  };
+
+  gas('comUpdate', [_oeOrderId, payload]).then(function(r) {
+    if (r && r.ok) {
+      toast('✅ Mentve!', 'ok');
+      closeOrderEditModal();
+      loadOrders();
+    } else { toast(r&&r.err||'Szerver hiba','err'); }
+  });
+}
+
+function closeOrderEditModal() {
+  document.getElementById('orderEditModal').classList.remove('open');
 }
 
 </script>
