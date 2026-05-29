@@ -11,25 +11,52 @@ const { Pool } = require('pg');
 // Email — Resend HTTP API
 console.log('RESEND_API_KEY present:', !!process.env.RESEND_API_KEY);
 
-// Nodemailer + mailTransporter TÖRLÉSE, helyette:
 async function sendInviteEmail(toEmail, kod, pozicio, cegNev, igazgatoNev) {
   if (!process.env.RESEND_API_KEY || !toEmail) return;
   const registerUrl = process.env.APP_URL || 'https://vallorsoft.onrender.com';
   const udvozles = igazgatoNev ? `Tisztelt ${igazgatoNev}!` : 'Tisztelt Partnerünk!';
-  
-  await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: 'VallorSoft <noreply@vallorsoft.com>',  // ← Resend-ben hitelesített domain
-      to: toEmail,
-      subject: `VallorSoft — Meghívó (${cegNev || 'VallorSoft'})`,
-      html: `<!-- ugyanaz a HTML mint eddig -->`
-    })
-  });
+  try {
+    const resp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: process.env.MAIL_FROM || 'VallorSoft <onboarding@resend.dev>',
+        to: [toEmail],
+        subject: `VallorSoft — Meghívó (${cegNev || 'VallorSoft'})`,
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#05070b;color:#e9eef5;padding:32px;border-radius:16px;">
+            <div style="font-size:24px;font-weight:800;margin-bottom:4px;"><span style="color:#fff;">vallor</span><span style="color:#e10b1a;">Soft</span></div>
+            <div style="font-size:12px;color:#8a97a8;margin-bottom:28px;">Fuvarmenedzsment Platform</div>
+            <h2 style="font-size:20px;margin-bottom:8px;">${udvozles}</h2>
+            <p style="color:#8a97a8;margin-bottom:16px;">A <b style="color:#fff;">VallorSoft</b> cégtől kapta ezt az emailt, előfizetésére vonatkozó meghívóval.</p>
+            <p style="color:#8a97a8;margin-bottom:24px;">${cegNev ? 'A <b style="color:#fff;">' + cegNev + '</b> cég számára' : 'Az Ön számára'} aktiválva lett a VallorSoft platform hozzáférés <b style="color:#fff;">${pozicio}</b> szerepkörben.</p>
+            <div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;margin-bottom:24px;text-align:center;">
+              <div style="font-size:12px;color:#8a97a8;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Meghívókódja</div>
+              <div style="font-size:32px;font-weight:800;letter-spacing:4px;color:#fff;">${kod}</div>
+            </div>
+            <div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;margin-bottom:24px;">
+              <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:12px;">📋 Regisztráció lépései:</div>
+              <ol style="color:#8a97a8;font-size:13px;line-height:1.8;padding-left:20px;margin:0;">
+                <li>Nyissa meg: <a href="${registerUrl}/register" style="color:#3b82f6;">${registerUrl}/register</a></li>
+                <li>Adja meg a nevét, email címét és egy jelszót</li>
+                <li>A meghívókód mezőbe írja be: <b style="color:#fff;">${kod}</b></li>
+                <li>Kattintson a <b style="color:#fff;">Regisztráció</b> gombra</li>
+                <li>Ezután bejelentkezhet a <a href="${registerUrl}/login" style="color:#3b82f6;">${registerUrl}/login</a> oldalon</li>
+              </ol>
+            </div>
+            <p style="font-size:11px;color:#8a97a8;margin:0;">Ez az email automatikusan lett elküldve a VallorSoft rendszer által.</p>
+          </div>
+        `
+      })
+    });
+    const data = await resp.json();
+    console.log('Resend result:', JSON.stringify(data));
+  } catch (err) {
+    console.error('Resend hiba:', err.message);
+  }
 }
 
     const data = await resp.json();
