@@ -61,7 +61,7 @@ if (!process.env.MAIL_USER || !toEmail) { console.log('early return - no mail us
       `
     });
   } catch (err) {
-    console.error('Email kuldesi hiba:', err.message);
+    console.error('Email kuldesi hiba:', err.message, err.code, err.response);
   }
 }
 
