@@ -81,8 +81,14 @@ CREATE TABLE IF NOT EXISTS fuvarlevelek (
   alte_mentiuni     TEXT,
   alimentari        JSONB DEFAULT '[]'::jsonb,
   achizitii         JSONB DEFAULT '[]'::jsonb,
-  tranzite          JSONB DEFAULT '[]'::jsonb
+  tranzite          JSONB DEFAULT '[]'::jsonb,
+  puncte            JSONB DEFAULT '[]'::jsonb,
+  order_ids         JSONB DEFAULT '[]'::jsonb
 );
+
+-- Ha a tabla mar letezik, adj hozza uj mezokat:
+-- ALTER TABLE fuvarlevelek ADD COLUMN IF NOT EXISTS puncte JSONB DEFAULT '[]'::jsonb;
+-- ALTER TABLE fuvarlevelek ADD COLUMN IF NOT EXISTS order_ids JSONB DEFAULT '[]'::jsonb;
 
 -- 6. HATARATLEPESEK
 CREATE TABLE IF NOT EXISTS border_crossings (
@@ -126,20 +132,7 @@ CREATE TABLE IF NOT EXISTS stamps (
   updated_at  TIMESTAMP DEFAULT NOW()
 );
 
--- 9. MEGRENDELO DOKUMENTUMOK (Order Documents)
-CREATE TABLE IF NOT EXISTS order_documents (
-  id            SERIAL PRIMARY KEY,
-  order_id      VARCHAR(20) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  file_name     VARCHAR(255) NOT NULL,
-  original_b64  TEXT NOT NULL,
-  signed_b64    TEXT,
-  uploaded_by   VARCHAR(255),
-  created_at    TIMESTAMP DEFAULT NOW(),
-  signed_at     TIMESTAMP
-);
-
 -- INDEXEK A GYORS KERESESHEZ
-CREATE INDEX IF NOT EXISTS idx_orderdocs_order ON order_documents(order_id);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_orders_email_sofer ON orders(email_sofer);
 CREATE INDEX IF NOT EXISTS idx_fuvarlevelek_email ON fuvarlevelek(email_sofer);

@@ -19,7 +19,7 @@ const mailTransporter = nodemailer.createTransport({
 
 async function sendInviteEmail(toEmail, kod, pozicio, cegNev, igazgatoNev) {
   if (!process.env.MAIL_USER || !toEmail) return;
-  const registerUrl = process.env.APP_URL || 'https://vallorsoft.onrender.com';
+  const registerUrl = process.env.APP_URL || 'http://localhost:3000';
   const udvozles = igazgatoNev ? `Tisztelt ${igazgatoNev}!` : 'Tisztelt Partnerünk!';
   try {
     await mailTransporter.sendMail({
@@ -70,7 +70,6 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
-app.set('trust proxy', 1);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -84,14 +83,13 @@ app.use(session({
     tableName: 'session',
     createTableIfMissing: true,
   }),
-  secret: process.env.SESSION_SECRET || 'fallback-secret-key',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  proxy: true,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    sameSite: 'lax',
     maxAge: 1000 * 60 * 60 * 24 * 7, // 7 nap
   },
 }));
@@ -118,6 +116,17 @@ function requireRole(...roles) {
 }
 
 const getNowStr = () => new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+// Firebase konfig endpoint — a frontend olvassa be (public config, nem titkos)
+app.get('/api/firebase-config', requireLogin, (req, res) => {
+  res.json({
+    apiKey:        process.env.FIREBASE_API_KEY        || null,
+    authDomain:    process.env.FIREBASE_AUTH_DOMAIN    || null,
+    databaseURL:   process.env.FIREBASE_DB_URL         || null,
+    projectId:     process.env.FIREBASE_PROJECT_ID     || null,
+    appId:         process.env.FIREBASE_APP_ID         || null,
+  });
+});
 
 
 
@@ -240,6 +249,9 @@ app.post('/api/fuvarlevel-save', async (req, res) => {
     const motorinaFolosit = Math.max(0, cantInc + totalAlim - cantSf);
     const consum100 = totalKm > 0 ? Math.round((motorinaFolosit / totalKm * 100) * 100) / 100 : 0;
 
+    const puncte = Array.isArray(d.puncte) ? d.puncte : [];
+    const orderIds = Array.isArray(d.orderIds) ? d.orderIds : [];
+
     await pool.query(
       `INSERT INTO fuvarlevelek (
         id, file_name, email_sofer, nume_sofer,
@@ -248,8 +260,8 @@ app.post('/api/fuvarlevel-save', async (req, res) => {
         loc_plecare, loc_sosire, loc_desc_tur, loc_inc_retur,
         diurna_externa, diurna_interna,
         cant_inceput, cant_sfarsit, motorina_folosit, total_alim, consum_100,
-        alte_mentiuni, alimentari, achizitii, tranzite
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)`,
+        alte_mentiuni, alimentari, achizitii, tranzite, puncte, order_ids
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
       [
         id, fileName, req.session.user.email, req.session.user.nume,
         d.numarCamion || null, d.numarRemorca || null, d.numarFisa || null, d.cursaSaptamanii || null,
@@ -260,7 +272,9 @@ app.post('/api/fuvarlevel-save', async (req, res) => {
         d.alteMentiuni || null,
         JSON.stringify(alimentari),
         JSON.stringify(Array.isArray(d.achizitii) ? d.achizitii : []),
-        JSON.stringify(Array.isArray(d.tranzite) ? d.tranzite : [])
+        JSON.stringify(Array.isArray(d.tranzite) ? d.tranzite : []),
+        JSON.stringify(puncte),
+        JSON.stringify(orderIds)
       ]
     );
     res.json({ success: true, id });
@@ -300,68 +314,120 @@ app.get('/api/pdf-download/:id', async (req, res) => {
     const f = r.rows[0];
 
     const alimentari = Array.isArray(f.alimentari) ? f.alimentari : [];
-    const achizitii = Array.isArray(f.achizitii) ? f.achizitii : [];
+    const achizitii  = Array.isArray(f.achizitii)  ? f.achizitii  : [];
+    const puncte     = Array.isArray(f.puncte)      ? f.puncte     : [];
+    const orderIds   = Array.isArray(f.order_ids)   ? f.order_ids  : [];
 
-    let alimHtml = '';
-    if (alimentari.length > 0) {
-      alimentari.forEach((a, idx) => {
-        alimHtml += `<tr><td>${idx+1}. sor: ${a.loc || '—'}</td><td>${a.litru || 0} L</td><td>${a.km || 0} km</td><td>—</td><td>${a.plata || '—'}</td></tr>`;
+    // Útvonal pontok HTML
+    let puncteHtml = '';
+    if (puncte.length > 0) {
+      puncte.forEach((p, i) => {
+        puncteHtml += `<tr><td>${i+1}.</td><td>${p.tip || '—'}</td><td>${p.loc || '—'}</td><td>${p.data || '—'}</td></tr>`;
       });
     } else {
-      alimHtml = '<tr><td colspan="5">Nem lett rögzítve tankolás.</td></tr>';
+      // Ha nincs puncte, a régi loc_plecare/loc_sosire mutatjuk
+      if (f.loc_plecare) puncteHtml += `<tr><td>1.</td><td>Plecare</td><td>${f.loc_plecare}</td><td>—</td></tr>`;
+      if (f.loc_sosire)  puncteHtml += `<tr><td>2.</td><td>Sosire</td><td>${f.loc_sosire}</td><td>—</td></tr>`;
+      if (!puncteHtml)   puncteHtml  = '<tr><td colspan="4">—</td></tr>';
     }
 
+    // Tankolások HTML
+    let alimHtml = '';
+    if (alimentari.length > 0) {
+      alimentari.forEach((a, i) => {
+        alimHtml += `<tr>
+          <td>${i+1}. ${a.loc || '—'}</td>
+          <td>${a.tip || 'Motorină'}</td>
+          <td>${a.litru || 0} L</td>
+          <td>${a.km || 0} km</td>
+          <td>${a.plata || '—'}</td>
+          <td>${a.suma ? a.suma + ' RON' : '—'}</td>
+        </tr>`;
+      });
+    } else {
+      alimHtml = '<tr><td colspan="6">Nem lett rögzítve tankolás.</td></tr>';
+    }
+
+    // Kiadások HTML
     let achHtml = '';
     if (achizitii.length > 0) {
-      achizitii.forEach((ach, idx) => {
-        achHtml += `<tr><td>${idx+1}. sor: ${ach.loc || '—'}</td><td>${ach.produs || '—'}</td><td>${ach.pret || 0} RON</td><td>Card</td></tr>`;
+      achizitii.forEach((ach, i) => {
+        achHtml += `<tr>
+          <td>${i+1}. ${ach.loc || '—'}</td>
+          <td>${ach.produs || '—'}</td>
+          <td>${ach.pret || 0} RON</td>
+          <td>${ach.plata || '—'}</td>
+        </tr>`;
       });
     } else {
       achHtml = '<tr><td colspan="4">Nem lett rögzítve kiadás.</td></tr>';
     }
 
+    // Fuvar ID-k
+    const orderIdsStr = orderIds.length ? orderIds.join(', ') : '—';
+
     res.send(`
   <html>
   <head>
     <title>${f.file_name}</title>
+    <meta charset="UTF-8">
     <style>
-      body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.4; color:#000; }
-      .header-box { text-align: center; font-weight: bold; font-size: 16px; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
-      .grid-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-      .grid-table td { border: 1px solid #000; padding: 6px; vertical-align: top; }
-      .title { font-weight: bold; background: #e0e0e0; text-transform: uppercase; padding: 5px; border: 1px solid #000; margin-top: 15px; }
-      @media print { .no-print { display: none; } }
+      body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.5; color:#000; font-size:13px; }
+      .header-box { text-align:center; font-weight:bold; font-size:17px; border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:18px; }
+      .grid-table { width:100%; border-collapse:collapse; margin-bottom:14px; }
+      .grid-table td { border:1px solid #000; padding:5px 7px; vertical-align:top; }
+      .grid-table th { border:1px solid #000; padding:5px 7px; background:#e8e8e8; font-weight:bold; text-align:left; }
+      .sec-title { font-weight:bold; background:#d0d0d0; text-transform:uppercase; padding:5px 7px; border:1px solid #000; margin-top:14px; margin-bottom:0; font-size:12px; letter-spacing:.5px; }
+      @media print { .no-print { display:none; } body { padding:10px; } }
     </style>
   </head>
   <body>
-    <div class="no-print" style="margin-bottom:20px;"><button onclick="window.print()" style="padding:10px 20px; background:#000; color:#fff; font-weight:bold; cursor:pointer;">Mentés PDF / Nyomtatás</button></div>
-    <div class="header-box">VALLOR TEAM <br> FIȘĂ DE CURSĂ SĂPTĂMÂNALĂ</div>
+    <div class="no-print" style="margin-bottom:16px;">
+      <button onclick="window.print()" style="padding:10px 24px;background:#000;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">🖨️ Nyomtatás / PDF mentés</button>
+    </div>
+    <div class="header-box">VALLOR TEAM SRL<br><span style="font-size:14px;">FIȘĂ DE CURSĂ SĂPTĂMÂNALĂ</span></div>
+
     <table class="grid-table">
-      <tr><td><b>Nume șofer:</b> ${f.nume_sofer}</td><td><b>*Număr fișă:</b> ${f.numar_fisa || '—'}</td></tr>
-      <tr><td><b>Număr camion:</b> ${f.numar_camion || '—'}</td><td><b>Cursa Săptămânii:</b> ${f.cursa_saptamanii || '—'}</td></tr>
-      <tr><td><b>Număr remorcă:</b> ${f.numar_remorca || '—'}</td><td><b>Loc și Data plecare:</b> ${f.loc_plecare || '—'}</td></tr>
-      <tr><td><b>Km început:</b> ${f.km_inceput} km</td><td><b>Loc și Data sosire:</b> ${f.loc_sosire || '—'}</td></tr>
-      <tr><td><b>Km sfârșit:</b> ${f.km_sfarsit} km</td><td><b>Loc desc. TUR:</b> ${f.loc_desc_tur || '—'}</td></tr>
-      <tr><td><b>Total kilometri parcurși:</b> ${f.total_km} km</td><td><b>Loc înc. RETUR:</b> ${f.loc_inc_retur || '—'}</td></tr>
+      <tr><td width="50%"><b>Nume șofer:</b> ${f.nume_sofer || '—'}</td><td><b>Număr fișă:</b> ${f.numar_fisa || '—'}</td></tr>
+      <tr><td><b>Număr camion:</b> ${f.numar_camion || '—'}</td><td><b>Număr remorcă:</b> ${f.numar_remorca || '—'}</td></tr>
+      <tr><td><b>Cursa săptămânii:</b> ${f.cursa_saptamanii || '—'}</td><td><b>Fuvar ID-k:</b> ${orderIdsStr}</td></tr>
+      <tr><td><b>Km început:</b> ${f.km_inceput || 0} km</td><td><b>Km sfârșit:</b> ${f.km_sfarsit || 0} km</td></tr>
+      <tr><td colspan="2"><b>Total kilometri parcurși: ${f.total_km || 0} km</b></td></tr>
+      <tr><td><b>Diurnă externă:</b> ${f.diurna_externa || 0} nap</td><td><b>Diurnă internă:</b> ${f.diurna_interna || 0} nap</td></tr>
     </table>
-    <div class="title">Alimentări</div>
+
+    <div class="sec-title">Puncte de traseu (Útvonal pontok)</div>
     <table class="grid-table">
-      <tr style="background:#f2f2f2;"><td><b>Locul és data</b></td><td><b>Litru</b></td><td><b>Km alimentare</b></td><td><b>A-M</b></td><td><b>Metodă platá</b></td></tr>
+      <tr><th>#</th><th>Tip</th><th>Localitate / Adresă</th><th>Dată</th></tr>
+      ${puncteHtml}
+    </table>
+
+    <div class="sec-title">Alimentări (Tankolások)</div>
+    <table class="grid-table">
+      <tr><th>Loc & Data</th><th>Combustibil</th><th>Litri</th><th>Km</th><th>Plată</th><th>Sumă</th></tr>
       ${alimHtml}
     </table>
-    <div class="title">Calcul Consum Üzemanyag</div>
+
+    <div class="sec-title">Calcul consum combustibil</div>
     <table class="grid-table">
-      <tr><td><b>Cantitate inceput:</b> ${f.cant_inceput} L</td><td><b>Cantitate sfarsit:</b> ${f.cant_sfarsit} L</td></tr>
-      <tr><td><b>Total alimentări:</b> ${f.total_alim} L</td><td><b>Motorina Folosit:</b> ${f.motorina_folosit} L</td></tr>
-      <tr><td colspan="2" style="font-size:14px;"><b>Consum mediu / 100km: ${f.consum_100} L</b></td></tr>
+      <tr><td><b>Cantitate început:</b> ${f.cant_inceput || 0} L</td><td><b>Cantitate sfârșit:</b> ${f.cant_sfarsit || 0} L</td></tr>
+      <tr><td><b>Total alimentări:</b> ${f.total_alim || 0} L</td><td><b>Motorină folosită:</b> ${f.motorina_folosit || 0} L</td></tr>
+      <tr><td colspan="2"><b>Consum mediu / 100 km: ${f.consum_100 || 0} L</b></td></tr>
     </table>
-    <div class="title">Achiziții / Cumpărături</div>
+
+    <div class="sec-title">Achiziții / Cheltuieli (Kiadások)</div>
     <table class="grid-table">
-      <tr style="background:#f2f2f2;"><td><b>Loc & Data cumpărării</b></td><td><b>Produs/Servicii</b></td><td><b>Preț</b></td><td><b>Metodă de plată</b></td></tr>
+      <tr><th>Loc & Data</th><th>Produs / Serviciu</th><th>Preț</th><th>Metodă plată</th></tr>
       ${achHtml}
     </table>
-    <div class="title">Alte mențiuni</div>
-    <div style="border:1px solid #000; padding:10px; min-height:50px;">${f.alte_mentiuni || '—'}</div>
+
+    <div class="sec-title">Alte mențiuni (Megjegyzések)</div>
+    <div style="border:1px solid #000;padding:10px;min-height:40px;">${f.alte_mentiuni || '—'}</div>
+
+    <div style="margin-top:30px;display:flex;justify-content:space-between;">
+      <div style="text-align:center;"><div style="border-top:1px solid #000;width:180px;margin:0 auto;padding-top:4px;">Semnătura șofer</div></div>
+      <div style="text-align:center;"><div style="border-top:1px solid #000;width:180px;margin:0 auto;padding-top:4px;">Semnătura dispecer</div></div>
+    </div>
   </body>
   </html>`);
   } catch (err) {
@@ -475,11 +541,31 @@ app.post('/api/execute', async (req, res) => {
   if (functionName === 'getFuvarlevelek') {
     try {
       if (!req.session.user) return res.json({ result: [] });
-      const cid = req.session.user.company_id;
-      const isAdmin = ['Admin', 'Manager'].includes(req.session.user.pozicio);
-      const r = isAdmin
-        ? await pool.query('SELECT f.id, f.file_name, f.email_sofer, f.nume_sofer, f.data_completare, f.total_km, f.consum_100 FROM fuvarlevelek f JOIN users u ON u.email = f.email_sofer WHERE u.company_id = $1 ORDER BY f.data_completare DESC LIMIT 200', [cid])
-        : await pool.query('SELECT id, file_name, email_sofer, nume_sofer, data_completare, total_km, consum_100 FROM fuvarlevelek WHERE email_sofer = $1 ORDER BY data_completare DESC', [req.session.user.email]);
+      const me = req.session.user;
+      const cid = me.company_id;
+      const isAdmin = ['Admin', 'Manager'].includes(me.pozicio);
+      let r;
+      if (isAdmin && cid) {
+        // Cég összes sofőrjének menetlevelei — email lista alapján (nem JOIN, megbízhatóbb online)
+        const sofors = await pool.query(
+          'SELECT email FROM users WHERE company_id = $1 AND pozicio = $2', [cid, 'Sofer']
+        );
+        const emails = sofors.rows.map(u => u.email);
+        if (!emails.length) return res.json({ result: [] });
+        r = await pool.query(
+          `SELECT id, file_name, email_sofer, nume_sofer, data_completare, total_km, consum_100, order_ids
+           FROM fuvarlevelek WHERE email_sofer = ANY($1)
+           ORDER BY data_completare DESC LIMIT 200`,
+          [emails]
+        );
+      } else {
+        r = await pool.query(
+          `SELECT id, file_name, email_sofer, nume_sofer, data_completare, total_km, consum_100, order_ids
+           FROM fuvarlevelek WHERE email_sofer = $1
+           ORDER BY data_completare DESC`,
+          [me.email]
+        );
+      }
       return res.json({ result: r.rows });
     } catch (err) {
       console.error('getFuvarlevelek hiba:', err);
@@ -665,12 +751,13 @@ app.post('/api/execute', async (req, res) => {
           [cid]
         );
       } else {
+        // Sofernek csak a sajat nevere kiosztott fuvarok latszanak
         r = await pool.query(
           `SELECT id, client, ref, loc_incarcare, loc_descarcare,
                   pret, km, status, sofer_type, email_sofer, nume_sofer,
                   firma_extern, telefon_extern, rendszam_camion, rendszam_remorca
            FROM orders
-           WHERE company_id = $1 AND (LOWER(email_sofer) = LOWER($2) OR status = 'Disponibil')
+           WHERE company_id = $1 AND LOWER(email_sofer) = LOWER($2)
            ORDER BY created_at DESC`,
           [cid, me.email]
         );
@@ -678,6 +765,26 @@ app.post('/api/execute', async (req, res) => {
       return res.json({ result: r.rows });
     } catch (err) {
       console.error('comList hiba:', err);
+      return res.json({ result: [] });
+    }
+  }
+
+  // SOFER SAJÁT KIOSZTOTT FUVARJAI (menetlevélhez való kiválasztáshoz)
+  if (functionName === 'getMySoferOrders') {
+    try {
+      if (!req.session.user) return res.json({ result: [] });
+      const me = req.session.user;
+      const r = await pool.query(
+        `SELECT id, client, ref, loc_incarcare, loc_descarcare, km, rendszam_camion, rendszam_remorca, status
+         FROM orders
+         WHERE company_id = $1 AND LOWER(email_sofer) = LOWER($2)
+           AND status IN ('Alocat','In Curs')
+         ORDER BY created_at DESC`,
+        [me.company_id, me.email]
+      );
+      return res.json({ result: r.rows });
+    } catch (err) {
+      console.error('getMySoferOrders hiba:', err);
       return res.json({ result: [] });
     }
   }

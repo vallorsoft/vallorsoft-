@@ -23,7 +23,6 @@
       <div class="menu-title">Fuvarozás & Logisztika</div>
       <div class="tab" data-tab="orders">Fuvarfeladatok kiírása</div>
       <div class="tab" data-tab="received-fuv">Beérkezett Fuvarlevelek</div>
-      <div class="tab" data-tab="analytics">📊 Kimutatások</div>
       <div class="tab" data-tab="border-logs">GPS Határnapló</div>
       <div class="tab" data-tab="driver-docs-pane">Feltöltött Iratok & CMR-ek</div>
     </div>
@@ -171,44 +170,10 @@
     <div class="pane hidden" data-pane="received-fuv">
       <div class="glass" style="padding:22px">
         <h2>Beérkezett heti menetlevelek</h2>
-        <div id="fuvGroupedWrap"><div style="color:var(--muted);text-align:center;padding:30px;">Betöltés…</div></div>
-      </div>
-    </div>
-
-    <div class="pane hidden" data-pane="analytics">
-      <div class="glass" style="padding:22px">
-        <h2 class="h-title">📊 Kimutatások & Statisztikák</h2>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:20px;">
-          <div class="field" style="margin:0;min-width:110px;"><label>Év</label><select class="select" id="aYear"></select></div>
-          <div class="field" style="margin:0;min-width:130px;"><label>Hónap</label>
-            <select class="select" id="aMonth">
-              <option value="0">Mind (egész év)</option>
-              <option value="1">Január</option><option value="2">Február</option><option value="3">Március</option>
-              <option value="4">Április</option><option value="5">Május</option><option value="6">Június</option>
-              <option value="7">Július</option><option value="8">Augusztus</option><option value="9">Szeptember</option>
-              <option value="10">Október</option><option value="11">November</option><option value="12">December</option>
-            </select>
-          </div>
-          <div class="field" style="margin:0;flex:1;min-width:180px;"><label>Sofőr(ök) — több is választható</label>
-            <select class="select" id="aDrivers" multiple style="height:80px;"></select>
-          </div>
-          <button class="btn primary" style="height:38px;" onclick="loadAnalytics()">Kimutatás</button>
-        </div>
-        <div id="analyticsResult" style="display:none;">
-          <div class="grid-2" style="margin-bottom:20px;">
-            <div class="glass-soft" style="padding:16px;"><canvas id="chartAKm" height="220"></canvas></div>
-            <div class="glass-soft" style="padding:16px;"><canvas id="chartAFogy" height="220"></canvas></div>
-          </div>
-          <div class="glass-soft" style="padding:16px;margin-bottom:20px;"><canvas id="chartADiurna" height="160"></canvas></div>
-          <div class="glass-soft" style="padding:16px;">
-            <h3 style="margin-bottom:12px;">Összefoglaló táblázat</h3>
-            <table class="table" id="tblAnalytics">
-              <thead><tr><th>Sofőr</th><th>Fuvarlevelek</th><th>Összes km</th><th>Motorina (L)</th><th>Fogyasztás (L/100km)</th><th>Diurna ext.</th><th>Diurna int.</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </div>
-        <div id="analyticsEmpty" style="color:var(--muted);text-align:center;padding:30px;display:none;">Nincs adat a kiválasztott szűrőre.</div>
+        <table class="table" id="tblReceivedFuv">
+          <thead><tr><th>Fájlnév</th><th>Sofőr</th><th>Beküldés ideje</th><th>Művelet</th></tr></thead>
+          <tbody></tbody>
+        </table>
       </div>
     </div>
 
@@ -344,8 +309,51 @@
       </div>
     </div>
 
-    <div class="pane hidden" data-pane="chat">
-      <div class="glass" style="padding:22px;"><h3>Központi Belső Csevegés</h3><p style="color:var(--muted);">Hamarosan.</p></div>
+    <div class="pane hidden" data-pane="chat" id="chatPane">
+      <div id="chatLoadMsg" style="padding:60px; text-align:center; color:var(--muted);">
+        <div class="spinner" style="margin:0 auto 12px; width:24px; height:24px;"></div>
+        Firebase kapcsolódás...
+      </div>
+      <div class="chat-app" id="chatApp" style="display:none;">
+        <div class="chat-side">
+          <div style="padding:14px 12px 10px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
+            <div style="font-weight:700; font-size:14px;">Csevegések</div>
+            <button onclick="chatOpenNewRoom()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;" title="Új chat">＋</button>
+          </div>
+          <div id="chatRoomList"><div style="padding:16px 12px; font-size:12px; color:var(--muted);">Betöltés...</div></div>
+        </div>
+        <div class="chat-main">
+          <div class="chat-head" id="chatHead">
+            <div class="av" id="chatHeadAv">?</div>
+            <div style="flex:1;">
+              <div style="font-weight:700; font-size:14px;" id="chatHeadName">Válassz csevegést</div>
+              <div style="font-size:11px; color:var(--muted);" id="chatHeadSub"></div>
+            </div>
+          </div>
+          <div class="chat-body" id="chatMsgs">
+            <div style="flex:1; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:13px;">
+              ← Válassz egy csevegést
+            </div>
+          </div>
+          <div style="padding:12px 16px; border-top:1px solid var(--border); display:flex; gap:8px;">
+            <input class="input" id="chatInput" placeholder="Üzenet írása..." style="flex:1;"
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
+            <button onclick="chatSend()" class="btn primary" style="padding:10px 16px;">➤</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-back" id="newRoomModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; align-items:center; justify-content:center;">
+        <div class="modal glass" style="min-width:320px;">
+          <h3>Új chat indítása</h3>
+          <div class="field"><label>Felhasználó kiválasztása</label>
+            <select class="select" id="newRoomUser"><option value="">— Betöltés... —</option></select>
+          </div>
+          <div style="display:flex; gap:10px; margin-top:14px;">
+            <button class="btn ghost col" onclick="document.getElementById('newRoomModal').style.display='none'">Mégse</button>
+            <button class="btn primary col" onclick="chatStartNewRoom()">Chat indítása</button>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -513,7 +521,6 @@ function loadTab(name){
   if(name==='dash') loadDash();
   if(name==='orders'){loadOrderFormData();loadOrders();}
   if(name==='received-fuv') loadReceivedFuvarlevelek();
-  if(name==='analytics') initAnalytics();
   if(name==='driver-docs-pane') loadDriverUploadedDocs();
   if(name==='border-logs') loadBorderLogs();
   if(name==='users') loadUsers();
@@ -663,79 +670,10 @@ function saveUser(){
 }
 
 function loadReceivedFuvarlevelek(){
-  const wrap=document.getElementById('fuvGroupedWrap');
-  wrap.innerHTML='<div style="color:var(--muted);text-align:center;padding:30px;">Betöltés…</div>';
-  gas('getFuvarlevelek').then(groups=>{
-    if(!groups||!groups.length){wrap.innerHTML='<div style="color:var(--muted);text-align:center;padding:30px;">Nincs beküldött fuvarlevél.</div>';return;}
-    wrap.innerHTML=groups.map((g,i)=>`
-      <div style="margin-bottom:10px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
-        <div onclick="toggleFuvGroup(${i})" style="padding:14px 18px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:var(--bg2);">
-          <div><b style="font-size:15px;">${g.neve||g.email}</b> <span style="color:var(--muted);font-size:12px;">${g.email}</span></div>
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span class="badge info">${g.fuvarlevelek.length} db</span>
-            <span id="fuvarr-arrow-${i}" style="color:var(--muted);">▼</span>
-          </div>
-        </div>
-        <div id="fuvarr-body-${i}" style="display:none;padding:12px 18px;">
-          ${g.fuvarlevelek.map(f=>`
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
-              <div>
-                <div style="font-size:13px;color:#fff;">${f.file_name||'—'} ${f.order_id?'<span style="color:var(--muted);font-size:11px;">#'+f.order_id+'</span>':''}</div>
-                <div style="font-size:11px;color:var(--muted);">${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'} | 🛣 ${f.total_km||0} km | ⛽ ${f.motorina_folosit||0} L</div>
-              </div>
-              <a href="/api/pdf-download/${f.id}" target="_blank" class="btn primary" style="text-decoration:none;padding:5px 12px;font-size:12px;white-space:nowrap;">⬇ PDF</a>
-            </div>`).join('')}
-        </div>
-      </div>`).join('');
-  });
-}
-function toggleFuvGroup(i){
-  const body=document.getElementById('fuvarr-body-'+i);
-  const arrow=document.getElementById('fuvarr-arrow-'+i);
-  const open=body.style.display==='block';
-  body.style.display=open?'none':'block';
-  arrow.textContent=open?'▼':'▲';
-}
-let analyticsCharts={};
-function initAnalytics(){
-  gas('getAnalytics',[new Date().getFullYear(),0,null]).then(data=>{
-    const ySel=document.getElementById('aYear');
-    const years=data.years&&data.years.length?data.years:[new Date().getFullYear()];
-    ySel.innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join('');
-    gas('userListAll').then(users=>{
-      const dSel=document.getElementById('aDrivers');
-      dSel.innerHTML=(users||[]).filter(u=>u.pozicio==='Sofer').map(u=>`<option value="${u.email}">${u.nume}</option>`).join('');
-    });
-  });
-}
-function loadAnalytics(){
-  const year=parseInt(document.getElementById('aYear').value)||new Date().getFullYear();
-  const month=parseInt(document.getElementById('aMonth').value)||0;
-  const dSel=document.getElementById('aDrivers');
-  const drivers=Array.from(dSel.selectedOptions).map(o=>o.value);
-  gas('getAnalytics',[year,month,drivers.length?drivers:null]).then(data=>{
-    const rows=data.result||[];
-    document.getElementById('analyticsResult').style.display=rows.length?'block':'none';
-    document.getElementById('analyticsEmpty').style.display=rows.length?'none':'block';
-    if(!rows.length)return;
-    const labels=rows.map(r=>r.nume_sofer||r.email_sofer);
-    const renderChart=(id,type,label,vals,color)=>{
-      const ctx=document.getElementById(id);
-      if(analyticsCharts[id])analyticsCharts[id].destroy();
-      analyticsCharts[id]=new Chart(ctx,{type,data:{labels,datasets:[{label,data:vals,backgroundColor:color,borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
-    };
-    renderChart('chartAKm','bar','Összes km',rows.map(r=>parseFloat(r.osszes_km||0)),'rgba(99,102,241,0.8)');
-    renderChart('chartAFogy','bar','Fogyasztás (L/100km)',rows.map(r=>parseFloat(r.atlag_fogyasztas||0)),'rgba(34,197,94,0.8)');
-    renderChart('chartADiurna','bar','Diurna externă',rows.map(r=>parseFloat(r.diurna_ext||0)),'rgba(245,158,11,0.8)');
-    document.querySelector('#tblAnalytics tbody').innerHTML=rows.map(r=>`<tr>
-      <td><b>${r.nume_sofer||r.email_sofer}</b></td>
-      <td style="text-align:center;">${r.db_fuvarlevel||0}</td>
-      <td style="text-align:right;">${parseFloat(r.osszes_km||0).toLocaleString('hu-HU')} km</td>
-      <td style="text-align:right;">${parseFloat(r.osszes_motorina||0).toLocaleString('hu-HU')} L</td>
-      <td style="text-align:right;">${parseFloat(r.atlag_fogyasztas||0)} L/100</td>
-      <td style="text-align:right;">${r.diurna_ext||0} nap</td>
-      <td style="text-align:right;">${r.diurna_int||0} nap</td>
-    </tr>`).join('');
+  gas('getFuvarlevelek').then(list=>{
+    var tb=document.querySelector('#tblReceivedFuv tbody');
+    if(!list||list.length===0){tb.innerHTML='<tr><td colspan="4">Nincs beküldött fuvarlevél.</td></tr>';return;}
+    tb.innerHTML=list.map(f=>`<tr><td><b style="color:#fff;">${f.file_name||'—'}</b></td><td>${f.nume_sofer||f.email_sofer||'—'}</td><td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td><td><a href="/api/pdf-download/${f.id}" target="_blank" class="btn primary" style="text-decoration:none;padding:5px 10px;">Letöltés</a></td></tr>`).join('');
   });
 }
 function loadDriverUploadedDocs(){
@@ -1034,6 +972,7 @@ gas('authMe').then(u => {
   if (u) {
     myEmail = u.email;
     document.getElementById('meBadge').textContent = u.nume;
+    initFirebaseChatPanel(u);
   }
   loadTab('dash');
 });
@@ -1373,6 +1312,217 @@ function downloadDoc(docId,which){
     a.click();
   });
 }
+
+// ============================================================
+// FIREBASE CHAT — Admin/Manager oldal (dm_ privát szobák)
+// Room ID: dm_{kisebb_email_escaped}_X_{nagyobb_email_escaped}
+// Manager: írhat bármely sofőrnek/adminnak, sofőr visszaírhat
+// Admin: mindenkivel írhat
+// ============================================================
+var _fbDb=null,_chatCompanyId=null,_meChat=null;
+var _chatCurrentRoom=null,_chatUnsubscribe=null,_roomsSnapData={};
+
+function dmRoomId(emailA,emailB){
+  var a=emailA.toLowerCase().replace(/@/g,'__').replace(/\./g,'_d_');
+  var b=emailB.toLowerCase().replace(/@/g,'__').replace(/\./g,'_d_');
+  return 'dm_'+(a<b?a+'_X_'+b:b+'_X_'+a);
+}
+
+function initFirebaseChatPanel(me){
+  _meChat=me;
+  fetch('/api/firebase-config')
+    .then(function(r){return r.json();})
+    .then(function(cfg){
+      if(!cfg||!cfg.apiKey){
+        var el=document.getElementById('chatLoadMsg');
+        if(el)el.textContent='⚠️ Chat konfiguráció hiányzik. Állítsd be a Firebase env változókat!';
+        return;
+      }
+      var s1=document.createElement('script');
+      s1.src='https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js';
+      document.head.appendChild(s1);
+      s1.onload=function(){
+        var s2=document.createElement('script');
+        s2.src='https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js';
+        document.head.appendChild(s2);
+        s2.onload=function(){
+          if(!firebase.apps.length)firebase.initializeApp(cfg);
+          _fbDb=firebase.database();
+          _chatCompanyId=String(me.company_id||'global');
+          var el=document.getElementById('chatLoadMsg');
+          if(el)el.style.display='none';
+          var ca=document.getElementById('chatApp');
+          if(ca)ca.style.display='';
+          startRoomListListener(me);
+        };
+      };
+    })
+    .catch(function(){
+      var el=document.getElementById('chatLoadMsg');
+      if(el)el.textContent='⚠️ Chat nem elérhető.';
+    });
+}
+
+function startRoomListListener(me){
+  if(!_fbDb)return;
+  var ref=_fbDb.ref('chats/'+_chatCompanyId+'/rooms');
+  ref.on('value',function(snap){
+    _roomsSnapData={};
+    snap.forEach(function(child){
+      _roomsSnapData[child.key]=child.val().meta||{};
+    });
+    renderAdminRoomList(me);
+  });
+}
+
+function renderAdminRoomList(me){
+  var listEl=document.getElementById('chatRoomList');
+  if(!listEl)return;
+  var keys=Object.keys(_roomsSnapData);
+  // Csak azok a szobák ahol én érintett vagyok (email megjelenik a room id-ban)
+  var myEsc=(me.email||'').toLowerCase().replace(/@/g,'__').replace(/\./g,'_d_');
+  var myRooms=keys.filter(function(k){
+    return k.indexOf(myEsc)!==-1||k==='manager'||k==='admin_manager';
+  });
+  myRooms.sort(function(a,b){
+    return((_roomsSnapData[b]||{}).lastTime||0)-((_roomsSnapData[a]||{}).lastTime||0);
+  });
+  if(!myRooms.length){
+    listEl.innerHTML='<div style="padding:16px 12px;font-size:12px;color:var(--muted);">Még nincs csevegés.<br>Kattints a + gombra!</div>';
+    return;
+  }
+  listEl.innerHTML=myRooms.map(function(rId){
+    var meta=_roomsSnapData[rId]||{};
+    var label=chatGetLabel(rId,meta,me);
+    var last=meta.lastMsg?'<div class="lst">'+escHtml(meta.lastMsg.substring(0,42))+'</div>':'';
+    var av=(label.replace(/[^a-zA-Z\u00C0-\u024F]/g,'')||'?').charAt(0).toUpperCase();
+    var active=(_chatCurrentRoom===rId)?'background:rgba(255,255,255,0.06);border-left:2px solid #3b82f6;':'';
+    var ts=meta.lastTime?new Date(meta.lastTime).toLocaleTimeString('hu-HU',{hour:'2-digit',minute:'2-digit'}):'';
+    return '<div class="contact" onclick="openChatRoom(\''+rId+'\')" style="'+active+'position:relative;">'
+      +'<div class="av">'+av+'</div>'
+      +'<div class="meta"><div class="nm">'+escHtml(label)+'</div>'+last+'</div>'
+      +(ts?'<div style="font-size:10px;color:var(--muted);position:absolute;right:10px;top:14px;">'+ts+'</div>':'')
+      +'</div>';
+  }).join('');
+}
+
+function chatGetLabel(roomId,meta,me){
+  if(roomId==='manager')return '📡 Sofőrök → Diszpécser (csoport)';
+  if(roomId==='admin_manager')return '🔐 Admin ↔ Manager';
+  if(roomId.startsWith('dm_')){
+    // Kinyerjük a másik fél emailjét
+    var inner=roomId.replace('dm_','');
+    var parts=inner.split('_X_');
+    if(parts.length===2){
+      var myEsc=(me.email||'').toLowerCase().replace(/@/g,'__').replace(/\./g,'_d_');
+      var otherEsc=parts[0]===myEsc?parts[1]:parts[0];
+      var decoded=otherEsc.replace(/__/g,'@').replace(/_d_/g,'.');
+      return meta.otherName?meta.otherName+' ('+decoded+')':decoded;
+    }
+  }
+  return meta.label||roomId;
+}
+
+function openChatRoom(roomId){
+  if(!_fbDb||!_meChat)return;
+  if(_chatUnsubscribe){_chatUnsubscribe();_chatUnsubscribe=null;}
+  _chatCurrentRoom=roomId;
+
+  var meta=_roomsSnapData[roomId]||{};
+  var label=chatGetLabel(roomId,meta,_meChat);
+  var hn=document.getElementById('chatHeadName');
+  var hs=document.getElementById('chatHeadSub');
+  var ha=document.getElementById('chatHeadAv');
+  if(hn)hn.textContent=label;
+  if(hs)hs.textContent=meta.lastFrom?'Utolsó: '+meta.lastFrom+'':(meta.participants?meta.participants.join(', '):'');
+  if(ha)ha.textContent=(label.replace(/[^a-zA-Z\u00C0-\u024F]/g,'')||'?').charAt(0).toUpperCase();
+
+  var msgsEl=document.getElementById('chatMsgs');
+  if(msgsEl)msgsEl.innerHTML='<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px;">Betöltés...</div>';
+
+  var ref=_fbDb.ref('chats/'+_chatCompanyId+'/rooms/'+roomId+'/messages');
+  var query=ref.orderByChild('ts').limitToLast(100);
+  var listener=query.on('value',function(snap){
+    if(!msgsEl)return;
+    msgsEl.innerHTML='';
+    snap.forEach(function(child){
+      var msg=child.val();
+      var isMine=(msg.fromEmail===(_meChat.email||''));
+      var bubble=document.createElement('div');
+      bubble.className='bubble '+(isMine?'me':'other');
+      var ts=msg.ts?new Date(msg.ts).toLocaleTimeString('hu-HU',{hour:'2-digit',minute:'2-digit'}):'';
+      bubble.innerHTML=(!isMine
+        ?'<div style="font-size:10px;font-weight:700;margin-bottom:3px;opacity:.7;">'+escHtml(msg.fromName||'')+' <span style="opacity:.5;font-weight:400;">'+escHtml(msg.fromRole||'')+'</span></div>'
+        :'')
+        +'<div>'+escHtml(msg.text||'')+'</div>'
+        +'<div style="font-size:10px;opacity:.5;text-align:right;margin-top:4px;">'+ts+'</div>';
+      msgsEl.appendChild(bubble);
+    });
+    msgsEl.scrollTop=msgsEl.scrollHeight;
+  });
+  _chatUnsubscribe=function(){query.off('value',listener);};
+  renderAdminRoomList(_meChat);
+}
+
+function chatSend(){
+  if(!_fbDb||!_meChat||!_chatCurrentRoom)return;
+  var input=document.getElementById('chatInput');
+  var text=(input?input.value:'').trim();
+  if(!text)return;
+  if(input)input.value='';
+  _fbDb.ref('chats/'+_chatCompanyId+'/rooms/'+_chatCurrentRoom+'/messages').push({
+    fromEmail:_meChat.email||'',
+    fromName:_meChat.nume||'Manager',
+    fromRole:_meChat.pozicio||'Manager',
+    text:text,
+    ts:firebase.database.ServerValue.TIMESTAMP
+  });
+  _fbDb.ref('chats/'+_chatCompanyId+'/rooms/'+_chatCurrentRoom+'/meta').update({
+    lastMsg:text.substring(0,80),
+    lastTime:firebase.database.ServerValue.TIMESTAMP,
+    lastFrom:_meChat.nume
+  });
+}
+
+function chatOpenNewRoom(){
+  gas('userListAll').then(function(list){
+    var sel=document.getElementById('newRoomUser');
+    if(!sel)return;
+    sel.innerHTML=list
+      .filter(function(u){return u.email!==(_meChat&&_meChat.email);})
+      .map(function(u){
+        return '<option value="'+u.email+'|'+u.pozicio+'|'+escHtml(u.nume||u.email)+'">'
+          +escHtml(u.nume||u.email)+' ('+u.pozicio+')</option>';
+      }).join('');
+  });
+  var modal=document.getElementById('newRoomModal');
+  if(modal)modal.style.display='flex';
+}
+
+function chatStartNewRoom(){
+  var sel=document.getElementById('newRoomUser');
+  if(!sel||!sel.value)return;
+  var parts=sel.value.split('|');
+  var email=parts[0],role=parts[1],name=parts[2]||parts[0];
+  var roomId=dmRoomId(_meChat.email,email);
+  _fbDb.ref('chats/'+_chatCompanyId+'/rooms/'+roomId+'/meta').set({
+    roomId:roomId,
+    label:name+' ↔ '+(_meChat.nume||''),
+    otherName:name,
+    otherEmail:email,
+    participants:[_meChat.email||'',email],
+    lastMsg:'',
+    lastTime:firebase.database.ServerValue.TIMESTAMP
+  });
+  var modal=document.getElementById('newRoomModal');
+  if(modal)modal.style.display='none';
+  setTimeout(function(){openChatRoom(roomId);},400);
+}
+
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 </script>
 </body>
 </html>
