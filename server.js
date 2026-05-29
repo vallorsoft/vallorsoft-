@@ -17,6 +17,8 @@ const mailTransporter = nodemailer.createTransport({
   }
 });
 
+console.log('MAIL ready:', !!process.env.MAIL_USER, !!process.env.MAIL_PASS);
+
 async function sendInviteEmail(toEmail, kod, pozicio, cegNev, igazgatoNev) {
   if (!process.env.MAIL_USER || !toEmail) return;
   const registerUrl = process.env.APP_URL || 'http://localhost:3000';
@@ -1709,4 +1711,3 @@ app.post('/api/execute', async (req, res) => {
 app.listen(PORT, () => {
   console.log('Szerver fut a http://localhost:' + PORT + ' cimen');
 });
-
