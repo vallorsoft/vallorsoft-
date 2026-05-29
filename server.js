@@ -9,6 +9,7 @@ const cookieParser = require('cookie-parser');
 const { Pool } = require('pg');
 
 // Email — Resend HTTP API
+console.log('RESEND_API_KEY present:', !!process.env.RESEND_API_KEY);
 
 async function sendInviteEmail(toEmail, kod, pozicio, cegNev, igazgatoNev) {
   if (!process.env.RESEND_API_KEY || !toEmail) return;
