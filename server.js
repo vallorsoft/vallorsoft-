@@ -12,15 +12,10 @@ const dns = require('dns');
 dns.setDefaultResultOrder('ipv4first');
 
 const mailTransporter = nodemailer.createTransport({
-
-// Gmail SMTP - App Password szukseges (nem a sima Gmail jelszo!)
-// Gmail fiok -> Biztonsag -> 2 lepeses hitelesites -> Alkalmazasjelszavak -> "VallorSoft"
-// Render env: MAIL_USER=te@gmail.com  MAIL_PASS=xxxx xxxx xxxx xxxx
-const mailTransporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
-  secure: false, // STARTTLS
-  family: 4,     // IPv4 (backup a dns fix mellett)
+  secure: false,
+  family: 4,
   auth: {
     user: process.env.MAIL_USER,
     pass: process.env.MAIL_PASS,
