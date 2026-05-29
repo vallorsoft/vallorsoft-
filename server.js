@@ -7,7 +7,8 @@ const pgSession = require('connect-pg-simple')(session);
 const bcrypt = require('bcrypt');
 const cookieParser = require('cookie-parser');
 const { Pool } = require('pg');
-const nodemailer = require('nodemailer');
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first'); // Render IPv6 -> IPv4 fix (ENETUNREACH)
 
 // Gmail SMTP - App Password szukseges (nem a sima Gmail jelszo!)
 // Gmail fiok -> Biztonsag -> 2 lepeses hitelesites -> Alkalmazasjelszavak -> "VallorSoft"
@@ -16,13 +17,10 @@ const mailTransporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
   secure: false, // STARTTLS
-  family: 4,     // IPv4 kenyszerites (Render IPv6 fix)
+  family: 4,     // IPv4 (backup a dns fix mellett)
   auth: {
     user: process.env.MAIL_USER,
     pass: process.env.MAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false,
   },
 });
 
@@ -675,7 +673,8 @@ app.post('/api/execute', async (req, res) => {
         const cegRes = await pool.query('SELECT nev, igazgato_nev FROM companies WHERE id = $1', [req.session.user.company_id]);
         const cegNev = cegRes.rows[0]?.nev || '';
         const igazgatoNev = cegRes.rows[0]?.igazgato_nev || null;
-        await sendInviteEmail(email, kod, pozicio, cegNev, igazgatoNev);
+        sendInviteEmail(email, kod, pozicio, cegNev, igazgatoNev)
+          .catch(e => console.error('Email hatter hiba:', e.message));
       }
 
       return res.json({ result: { ok: true, kod: kod } });
@@ -1648,7 +1647,8 @@ app.post('/api/execute', async (req, res) => {
       );
 
       if (f.email_contact) {
-        await sendInviteEmail(f.email_contact, kod, 'Admin', f.nev, f.igazgato_nev||null);
+        sendInviteEmail(f.email_contact, kod, 'Admin', f.nev, f.igazgato_nev||null)
+          .catch(e => console.error('Email hatter hiba:', e.message));
       }
 
       return res.json({ result: { ok: true, id: companyId, invite_kod: kod } });
