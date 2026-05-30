@@ -4,9 +4,9 @@ const bcrypt = require('bcrypt');
 
 // IDE IRD BE A SAJAT ADATAIDAT
 const ADMIN_NAME = 'Admin Felhasznalo';
-const ADMIN_EMAIL = 'admin@vallorsoft.ro';
+const ADMIN_EMAIL = 'vallorsoft@gmail.com';
 const ADMIN_PHONE = '+40700000000';
-const ADMIN_PASSWORD = '123456';
+const ADMIN_PASSWORD = 'vallorteam25';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
