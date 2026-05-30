@@ -355,15 +355,28 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
     grid-template-columns: 1fr !important;
   }
 
-  /* --- Modális: teljes képernyős mobilon --- */
-  .modal-back { padding: 0; align-items: flex-end; }
-  .modal {
+  /* --- Modális: teljes képernyős mobilon (általános) --- */
+  .modal-back:not(#signModal) { padding: 0; align-items: flex-end; }
+  .modal-back:not(#signModal) .modal {
     width: 100% !important;
     max-width: 100% !important;
     max-height: 92vh;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
     padding: 20px 16px;
+  }
+
+  /* signModal: teljes képernyő, felülről lefele görgetés */
+  #signModal {
+    padding: 0 !important;
+    align-items: flex-start !important;
+  }
+  #signModal > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
   }
 
   /* --- Chat app --- */

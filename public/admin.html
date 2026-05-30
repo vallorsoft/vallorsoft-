@@ -464,58 +464,60 @@
 </div>
 
 <!-- ALAIRO MODAL -->
-<div class="modal-back" id="signModal">
-  <div class="modal glass" style="width:min(980px,100%); max-height:95vh; overflow-y:auto;">
-    <h3>✍️ Aláírás / Pecsét elhelyezése</h3>
-    <div class="grid-2" style="gap:16px; margin-bottom:16px; align-items:start;">
+<div class="modal-back" id="signModal" style="align-items:flex-start;padding:0;">
+  <div class="modal glass" style="width:100%;max-width:980px;max-height:100vh;overflow-y:auto;border-radius:0;margin:0 auto;">
 
-      <!-- BAL: PDF lapozhato elonezet, ide huzhato az alairas/pecset -->
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <span style="font-size:13px;color:var(--muted);">Megrendelő — húzd a helyére az elemeket</span>
-          <span style="font-size:13px;color:#fff;">
-            <button class="btn ghost" style="padding:2px 10px;" onclick="signPrevPage()">◀</button>
-            <span id="signPageInfo" style="margin:0 8px;">– / –</span>
-            <button class="btn ghost" style="padding:2px 10px;" onclick="signNextPage()">▶</button>
+    <!-- Fejléc — sticky, bezárás gomb mindig látható -->
+    <div style="position:sticky;top:0;z-index:10;background:var(--bg-2);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
+      <h3 style="margin:0;font-size:16px;">✍️ Aláírás / Pecsét</h3>
+      <button class="btn ghost" onclick="closeSignModal()" style="padding:8px 16px;font-size:14px;min-width:80px;">✕ Bezárás</button>
+    </div>
+
+    <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
+
+      <!-- 1. Aláírás rajzolás -->
+      <div class="glass-soft" style="padding:14px;">
+        <div style="font-weight:600;color:#fff;margin-bottom:8px;">1. Aláírás rajzolása</div>
+        <canvas id="signCanvas" style="width:100%;height:140px;background:#fff;border-radius:8px;border:2px solid var(--border-bright);cursor:crosshair;touch-action:none;display:block;"></canvas>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="btn ghost" style="flex:1;padding:10px;" onclick="clearSignCanvas()">Törlés</button>
+          <button class="btn ok" style="flex:1;padding:10px;" onclick="addSignatureToPage()">➕ Hozzáad</button>
+        </div>
+      </div>
+
+      <!-- 2. Pecsét -->
+      <div class="glass-soft" style="padding:14px;">
+        <div style="font-weight:600;color:#fff;margin-bottom:8px;">2. Pecsét (mentett PNG)</div>
+        <div id="stampPreviewWrap" style="background:#fff;padding:8px;border-radius:8px;text-align:center;min-height:60px;">
+          <img id="signStampImg" style="max-height:70px;display:none;">
+          <span id="signNoStamp" style="color:#999;font-size:12px;">Nincs mentett pecsét.</span>
+        </div>
+        <button class="btn primary" style="width:100%;margin-top:8px;padding:10px;" onclick="addStampToPage()">➕ Pecsét hozzáadása</button>
+      </div>
+
+      <!-- 3. PDF előnézet -->
+      <div class="glass-soft" style="padding:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+          <span style="font-size:13px;color:var(--muted);">PDF előnézet — húzd a helyére az elemeket</span>
+          <span style="display:flex;align-items:center;gap:6px;">
+            <button class="btn ghost" style="padding:4px 12px;" onclick="signPrevPage()">◀</button>
+            <span id="signPageInfo" style="font-size:13px;color:#fff;min-width:50px;text-align:center;">– / –</span>
+            <button class="btn ghost" style="padding:4px 12px;" onclick="signNextPage()">▶</button>
           </span>
         </div>
-        <div id="signPdfStage" style="position:relative;width:100%;background:#666;border:1px solid var(--border-bright);border-radius:var(--r-md);overflow:hidden;display:flex;justify-content:center;">
+        <div id="signPdfStage" style="position:relative;width:100%;background:#555;border:1px solid var(--border-bright);border-radius:var(--r-md);overflow:hidden;display:flex;justify-content:center;min-height:200px;">
           <canvas id="signPdfCanvas" style="max-width:100%;display:block;"></canvas>
         </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">💡 Az elhelyezett elemeket ujjal húzhatod, a zöld sarokkal átméretezheted.</div>
       </div>
 
-      <!-- JOBB: vezerlok -->
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        <div class="glass-soft" style="padding:14px;">
-          <div style="font-weight:600;color:#fff;margin-bottom:8px;">1. Aláírás rajzolása</div>
-          <canvas id="signCanvas" style="width:100%;height:120px;background:#fff;border-radius:8px;border:1px solid var(--border-bright);cursor:crosshair;touch-action:none;"></canvas>
-          <div style="display:flex;gap:8px;margin-top:8px;">
-            <button class="btn ghost" style="flex:1;padding:8px;" onclick="clearSignCanvas()">Törlés</button>
-            <button class="btn ok" style="flex:1;padding:8px;" onclick="addSignatureToPage()">Hozzáad az oldalhoz</button>
-          </div>
-        </div>
-        <div class="glass-soft" style="padding:14px;">
-          <div style="font-weight:600;color:#fff;margin-bottom:8px;">2. Pecsét (mentett PNG)</div>
-          <div id="stampPreviewWrap" style="background:#fff;padding:8px;border-radius:8px;text-align:center;min-height:60px;">
-            <img id="signStampImg" style="max-height:70px;display:none;">
-            <span id="signNoStamp" style="color:#999;font-size:12px;">Nincs mentett pecsét.</span>
-          </div>
-          <button class="btn primary" style="width:100%;margin-top:8px;" onclick="addStampToPage()">Pecsét hozzáadása</button>
-        </div>
-        <div class="glass-soft" style="padding:14px;">
-          <div style="font-size:12px;color:var(--muted);">
-            Húzd az elemeket a helyükre, a méretüket a jobb alsó sarkukból állíthatod. A ráégetés csak az aktuális oldalra történik.
-          </div>
-        </div>
-        <div class="glass-soft" style="padding:14px;">
-          <div style="font-weight:600;color:#fff;margin-bottom:8px;">3. Véglegesítés</div>
-          <button class="btn ok" style="width:100%;margin-bottom:8px;" onclick="burnAndSaveDoc()">🔥 Ráégetés és mentés</button>
-          <button class="btn primary" style="width:100%;" onclick="burnAndDownloadDoc()">⬇️ Ráégetés és letöltés (PDF)</button>
-        </div>
+      <!-- 4. Véglegesítés -->
+      <div class="glass-soft" style="padding:14px;">
+        <div style="font-weight:600;color:#fff;margin-bottom:10px;">3. Véglegesítés</div>
+        <button class="btn ok" style="width:100%;margin-bottom:8px;padding:14px;" onclick="burnAndSaveDoc()">🔥 Ráégetés és mentés</button>
+        <button class="btn primary" style="width:100%;padding:14px;" onclick="burnAndDownloadDoc()">⬇️ Ráégetés és letöltés (PDF)</button>
       </div>
-    </div>
-    <div style="text-align:right;">
-      <button class="btn ghost" onclick="closeSignModal()">Bezárás</button>
+
     </div>
   </div>
 </div>
@@ -1157,21 +1159,36 @@ function openSignModal(docId,which){
   setTimeout(()=>{
     signCanvasEl=document.getElementById('signCanvas');
     signCtxEl=signCanvasEl.getContext('2d');
-    signCanvasEl.width=signCanvasEl.offsetWidth;
-    signCanvasEl.height=signCanvasEl.offsetHeight;
-    signCtxEl.strokeStyle='#000';
-    signCtxEl.lineWidth=2;
-    const getP=e=>{
-      const r=signCanvasEl.getBoundingClientRect();
-      return{x:(e.clientX||(e.touches&&e.touches[0].clientX)||0)-r.left,y:(e.clientY||(e.touches&&e.touches[0].clientY)||0)-r.top};
+
+    // Helyes méret: ratio figyelembe véve (retina / mobile pixel ratio)
+    function resizeSignCanvas(){
+      var rect=signCanvasEl.getBoundingClientRect();
+      var dpr=window.devicePixelRatio||1;
+      var w=Math.round(rect.width||300);
+      var h=Math.round(rect.height||140);
+      signCanvasEl.width=w*dpr;
+      signCanvasEl.height=h*dpr;
+      signCtxEl=signCanvasEl.getContext('2d');
+      signCtxEl.scale(dpr,dpr);
+      signCtxEl.strokeStyle='#000';
+      signCtxEl.lineWidth=2.5;
+      signCtxEl.lineCap='round';
+      signCtxEl.lineJoin='round';
+    }
+    resizeSignCanvas();
+
+    const getP=function(e){
+      var r=signCanvasEl.getBoundingClientRect();
+      var src=e.touches?e.touches[0]:e;
+      return{x:src.clientX-r.left, y:src.clientY-r.top};
     };
-    signCanvasEl.onmousedown=e=>{isSignDrawing=true;const p=getP(e);signCtxEl.beginPath();signCtxEl.moveTo(p.x,p.y);};
-    signCanvasEl.onmousemove=e=>{if(!isSignDrawing)return;const p=getP(e);signCtxEl.lineTo(p.x,p.y);signCtxEl.stroke();};
-    signCanvasEl.ontouchstart=e=>{e.preventDefault();isSignDrawing=true;const p=getP(e);signCtxEl.beginPath();signCtxEl.moveTo(p.x,p.y);};
-    signCanvasEl.ontouchmove=e=>{e.preventDefault();if(!isSignDrawing)return;const p=getP(e);signCtxEl.lineTo(p.x,p.y);signCtxEl.stroke();};
-    window.onmouseup=()=>isSignDrawing=false;
-    window.ontouchend=()=>isSignDrawing=false;
-  },200);
+    signCanvasEl.addEventListener('mousedown',function(e){e.preventDefault();isSignDrawing=true;var p=getP(e);signCtxEl.beginPath();signCtxEl.moveTo(p.x,p.y);});
+    signCanvasEl.addEventListener('mousemove',function(e){if(!isSignDrawing)return;var p=getP(e);signCtxEl.lineTo(p.x,p.y);signCtxEl.stroke();});
+    signCanvasEl.addEventListener('touchstart',function(e){e.preventDefault();isSignDrawing=true;var p=getP(e);signCtxEl.beginPath();signCtxEl.moveTo(p.x,p.y);},{passive:false});
+    signCanvasEl.addEventListener('touchmove',function(e){e.preventDefault();if(!isSignDrawing)return;var p=getP(e);signCtxEl.lineTo(p.x,p.y);signCtxEl.stroke();},{passive:false});
+    window.addEventListener('mouseup',function(){isSignDrawing=false;});
+    window.addEventListener('touchend',function(){isSignDrawing=false;});
+  },300);
 
   gas('orderDocGet',[docId,which]).then(async r=>{
     if(!r.ok||!r.base64){ toast(r.err||'PDF betöltési hiba','err'); return; }
