@@ -7,37 +7,24 @@ const pgSession = require('connect-pg-simple')(session);
 const bcrypt = require('bcrypt');
 const cookieParser = require('cookie-parser');
 const { Pool } = require('pg');
-const nodemailer = require('nodemailer');
-const dns = require('dns');
-dns.setDefaultResultOrder('ipv4first');
+// ===== EMAIL KULDES: Brevo HTTP API (port 443, Render NEM blokkolja) =====
+// Az SMTP (587/465) NEM mukodik Render ingyenes csomagon -> HTTP API kell.
+// Brevo ingyenes 300 email/nap. Domain NEM kell, csak felado-cim hitelesites.
+// Render env: BREVO_API_KEY=xkeysib-...   BREVO_SENDER=vallorteam.office@gmail.com
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const BREVO_SENDER  = process.env.BREVO_SENDER || process.env.MAIL_USER;
 
-const mailTransporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  family: 4,
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
-  },
-});
-
-console.log('MAIL ready:', !!process.env.MAIL_USER, !!process.env.MAIL_PASS);
+console.log('BREVO ready:', !!BREVO_API_KEY, '| sender:', BREVO_SENDER);
 
 async function sendInviteEmail(toEmail, kod, pozicio, cegNev, igazgatoNev) {
-  console.log('sendInviteEmail called:', toEmail, !!process.env.MAIL_USER);
-  if (!process.env.MAIL_USER || !process.env.MAIL_PASS || !toEmail) {
-    console.log('early return - MAIL_USER, MAIL_PASS vagy toEmail hianyzik');
+  console.log('sendInviteEmail called:', toEmail, !!BREVO_API_KEY);
+  if (!BREVO_API_KEY || !BREVO_SENDER || !toEmail) {
+    console.log('early return - BREVO_API_KEY, BREVO_SENDER vagy toEmail hianyzik');
     return;
   }
   const registerUrl = process.env.APP_URL || 'http://localhost:3000';
   const udvozles = igazgatoNev ? `Tisztelt ${igazgatoNev}!` : 'Tisztelt Partnerünk!';
-  try {
-    const info = await mailTransporter.sendMail({
-      from: `"VallorSoft" <${process.env.MAIL_USER}>`,
-      to: toEmail,
-      subject: `VallorSoft — Meghívó (${cegNev || 'VallorSoft'})`,
-      html: `
+  const html = `
         <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#05070b;color:#e9eef5;padding:32px;border-radius:16px;">
           <div style="font-size:24px;font-weight:800;margin-bottom:4px;">
             <span style="color:#fff;">vallor</span><span style="color:#e10b1a;">Soft</span>
@@ -66,16 +53,32 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, igazgatoNev) {
           </div>
           <p style="font-size:11px;color:#8a97a8;margin:0;">Ez az email automatikusan lett elküldve a VallorSoft rendszer által. Ha nem várta ezt az üzenetet, kérjük hagyja figyelmen kívül.</p>
         </div>
-      `,
+      `;
+  try {
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': BREVO_API_KEY,
+        'Content-Type': 'application/json',
+        'accept': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: 'VallorSoft', email: BREVO_SENDER },
+        to: [{ email: toEmail }],
+        subject: `VallorSoft — Meghívó (${cegNev || 'VallorSoft'})`,
+        htmlContent: html,
+      }),
     });
-    console.log('Email elkulve:', info.messageId);
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.error('Brevo hiba:', resp.status, JSON.stringify(data));
+    } else {
+      console.log('Email elkulve, messageId:', data.messageId);
+    }
   } catch (err) {
-    console.error('Email kuldesi hiba:', err.message, err.code);
+    console.error('Email kuldesi hiba:', err.message);
   }
 }
-
-const app = express();
-const PORT = process.env.PORT || 3000;
 
 // Adatbazis kapcsolat (a .env-bol)
 const pool = new Pool({
