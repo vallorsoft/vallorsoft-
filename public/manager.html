@@ -11,8 +11,17 @@
 </head>
 <body>
 <div class="toast-wrap" id="toasts"></div>
+
+<!-- Mobil top bar -->
+<div class="mob-topbar">
+  <div class="vs-logo"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
+  <button class="hamburger" onclick="toggleSidebar()" aria-label="Menü">☰</button>
+</div>
+<!-- Sidebar overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
 <div class="app-layout">
-  <div class="sidebar">
+  <div class="sidebar" id="mainSidebar">
     <div class="vs-logo" style="padding-left:12px; margin-bottom:10px;"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
     <div style="font-size:11px; color:var(--muted); padding-left:12px; margin-top:-15px; margin-bottom:15px; font-weight:600;">Manager Console</div>
     <div class="menu-group">
@@ -1640,6 +1649,23 @@ function oeAddLeg(){var soferType=document.getElementById('oeSoferType').value;v
 function deleteLeg(legId){if(!confirm('Törlöd ezt a váltást?'))return;gas('deleteOrderLeg',[legId]).then(function(r){if(r&&r.ok){toast('Törölve','ok');fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({functionName:'getOrderById',arguments:[_oeOrderId]})}).then(r=>r.json()).then(d=>renderOeLegs(d.legs||[]));}});}
 function saveOrderEdit(){var soferType=document.getElementById('oeSoferType').value;var soferSel=document.getElementById('oeEmailSofer');var selectedUser=_oeSoferCache.find(u=>u.email===soferSel.value);var payload={client:document.getElementById('oeClient').value,ref:document.getElementById('oeRef').value,loc_incarcare:document.getElementById('oeLocInc').value,loc_descarcare:document.getElementById('oeLocDesc').value,data_incarcare:document.getElementById('oeDataInc').value||null,data_descarcare:document.getElementById('oeDataDesc').value||null,pret:document.getElementById('oePret').value,km:document.getElementById('oeKm').value,status:document.getElementById('oeStatus').value,sofer_type:soferType||null,email_sofer:soferType==='Intern'?soferSel.value:null,nume_sofer:soferType==='Intern'?(selectedUser?selectedUser.nume:''):document.getElementById('oeNumeSoferExtern').value,firma_extern:soferType==='Extern'?document.getElementById('oeFirmaExtern').value:null,rendszam_camion:document.getElementById('oeCamion').value||null,rendszam_remorca:document.getElementById('oeRemorca').value||null};gas('comUpdate',[_oeOrderId,payload]).then(function(r){if(r&&r.ok){toast('✅ Mentve!','ok');closeOrderEditModal();loadOrders();}else{toast(r&&r.err||'Szerver hiba','err');}});}
 function closeOrderEditModal(){document.getElementById('orderEditModal').classList.remove('open');}
+
+/* ── Mobil sidebar (hamburger) ── */
+function toggleSidebar() {
+  var sb = document.getElementById('mainSidebar');
+  var ov = document.getElementById('sidebarOverlay');
+  sb.classList.toggle('mob-open');
+  ov.classList.toggle('open');
+}
+function closeSidebar() {
+  document.getElementById('mainSidebar').classList.remove('mob-open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+}
+document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(el) {
+  el.addEventListener('click', function() {
+    if (window.innerWidth <= 768) closeSidebar();
+  });
+});
 
 </script>
 </body>

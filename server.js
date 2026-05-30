@@ -1529,7 +1529,8 @@ app.post('/api/execute', async (req, res) => {
 
       updates.push(`updated_at = NOW()`);
       values.push(id);
-      const sql = `UPDATE orders SET ${updates.join(', ')} WHERE id = $${i}`;
+      values.push(req.session.user.company_id);
+      const sql = `UPDATE orders SET ${updates.join(', ')} WHERE id = $${i} AND company_id = $${i + 1}`;
       const r = await pool.query(sql, values);
 
       if (r.rowCount === 0) {
@@ -1553,14 +1554,102 @@ app.post('/api/execute', async (req, res) => {
       if (!id) {
         return res.json({ result: { ok: false, err: 'ID kotelezo.' } });
       }
+      // Ellenorzés: a fuvar ehhez a céghez tartozik-e
+      const check = await pool.query(
+        'SELECT id FROM orders WHERE id = $1 AND company_id = $2',
+        [id, req.session.user.company_id]
+      );
+      if (!check.rows.length) {
+        return res.json({ result: { ok: false, err: 'Fuvar nem talalhato vagy nincs jogosultsag.' } });
+      }
       await pool.query('DELETE FROM order_legs WHERE order_id = $1', [id]);
-      const r = await pool.query('DELETE FROM orders WHERE id = $1', [id]);
+      const r = await pool.query('DELETE FROM orders WHERE id = $1 AND company_id = $2', [id, req.session.user.company_id]);
       if (r.rowCount === 0) {
         return res.json({ result: { ok: false, err: 'Fuvar nem talalhato.' } });
       }
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('comDelete hiba:', err);
+      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    }
+  }
+
+  // VÁLTÁS HOZZÁADÁSA (order_legs)
+  if (functionName === 'addOrderLeg') {
+    try {
+      if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      }
+      const orderId = String(args[0] || '').trim();
+      const leg = args[1] || {};
+      if (!orderId) {
+        return res.json({ result: { ok: false, err: 'Fuvar ID kotelezo.' } });
+      }
+      // Ellenorzes: a fuvar ugyanahhoz a ceghez tartozik-e
+      const orderCheck = await pool.query(
+        'SELECT id FROM orders WHERE id = $1 AND company_id = $2',
+        [orderId, req.session.user.company_id]
+      );
+      if (!orderCheck.rows.length) {
+        return res.json({ result: { ok: false, err: 'Fuvar nem talalhato vagy nincs jogosultsag.' } });
+      }
+      // Kovetkezo leg_number kiszamitasa
+      const legNumR = await pool.query(
+        'SELECT COALESCE(MAX(leg_number), 0) + 1 AS next_num FROM order_legs WHERE order_id = $1',
+        [orderId]
+      );
+      const legNum = legNumR.rows[0].next_num;
+      await pool.query(
+        `INSERT INTO order_legs
+           (order_id, leg_number, sofer_type, email_sofer, nume_sofer, firma_extern,
+            rendszam_camion, rendszam_remorca, loc_preluare, data_preluare, company_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [
+          orderId,
+          legNum,
+          leg.sofer_type || null,
+          leg.email_sofer || null,
+          leg.nume_sofer || null,
+          leg.firma_extern || null,
+          leg.rendszam_camion ? leg.rendszam_camion.toUpperCase() : null,
+          leg.rendszam_remorca ? leg.rendszam_remorca.toUpperCase() : null,
+          leg.loc_preluare || null,
+          leg.data_preluare || null,
+          req.session.user.company_id
+        ]
+      );
+      return res.json({ result: { ok: true, leg_number: legNum } });
+    } catch (err) {
+      console.error('addOrderLeg hiba:', err);
+      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    }
+  }
+
+  // VÁLTÁS TÖRLÉSE (order_legs)
+  if (functionName === 'deleteOrderLeg') {
+    try {
+      if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      }
+      const legId = parseInt(args[0], 10);
+      if (!legId) {
+        return res.json({ result: { ok: false, err: 'Leg ID kotelezo.' } });
+      }
+      // company_id ellenorzese JOIN-nal
+      const r = await pool.query(
+        `DELETE FROM order_legs
+         USING orders
+         WHERE order_legs.id = $1
+           AND order_legs.order_id = orders.id
+           AND orders.company_id = $2`,
+        [legId, req.session.user.company_id]
+      );
+      if (r.rowCount === 0) {
+        return res.json({ result: { ok: false, err: 'Nem talalhato vagy nincs jogosultsag.' } });
+      }
+      return res.json({ result: { ok: true } });
+    } catch (err) {
+      console.error('deleteOrderLeg hiba:', err);
       return res.json({ result: { ok: false, err: 'Szerver hiba' } });
     }
   }

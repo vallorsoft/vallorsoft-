@@ -11,8 +11,17 @@
 </head>
 <body>
 <div class="toast-wrap" id="toasts"></div>
+
+<!-- Mobil top bar -->
+<div class="mob-topbar">
+  <div class="vs-logo"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
+  <button class="hamburger" onclick="toggleSidebar()" aria-label="Menü">☰</button>
+</div>
+<!-- Sidebar overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
 <div class="app-layout">
-  <div class="sidebar">
+  <div class="sidebar" id="mainSidebar">
     <div class="vs-logo" style="padding-left:12px; margin-bottom:10px;"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
     <div style="font-size:11px; color:var(--muted); padding-left:12px; margin-top:-15px; margin-bottom:15px; font-weight:600;">Admin Console</div>
     <div class="menu-group">
@@ -1687,6 +1696,24 @@ function saveOrderEdit() {
 function closeOrderEditModal() {
   document.getElementById('orderEditModal').classList.remove('open');
 }
+
+/* ── Mobil sidebar (hamburger) ── */
+function toggleSidebar() {
+  var sb = document.getElementById('mainSidebar');
+  var ov = document.getElementById('sidebarOverlay');
+  sb.classList.toggle('mob-open');
+  ov.classList.toggle('open');
+}
+function closeSidebar() {
+  document.getElementById('mainSidebar').classList.remove('mob-open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+}
+// Tab váltáskor csukja be a sidebar-t mobilon
+document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(el) {
+  el.addEventListener('click', function() {
+    if (window.innerWidth <= 768) closeSidebar();
+  });
+});
 
 </script>
 </body>
