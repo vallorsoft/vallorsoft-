@@ -248,7 +248,32 @@
     <div class="pane hidden" data-pane="internal-drivers">
       <div class="glass" style="padding:22px;">
         <h2 class="h-title">Belső sofőrök</h2>
-        <div class="h-sub">Sofőr pozíciójú regisztrált felhasználók és jármű-hozzárendelés — hamarosan.</div>
+        <div class="h-sub">Saját cég sofőr pozíciójú felhasználói. Új sofőrt meghívóval adhat hozzá — a sofőr e-mailben kapja a kódot, és maga állítja be a jelszavát.</div>
+      </div>
+
+      <div class="glass" style="padding:22px; margin-top:16px;">
+        <h3 style="margin-bottom:16px;">Új belső sofőr meghívása</h3>
+        <div class="grid-3">
+          <div class="field" style="grid-column:span 2;"><label>Sofőr e-mail címe *</label><input class="input" id="idEmail" type="email" placeholder="sofor@pelda.hu"></div>
+          <div class="field" style="display:flex; align-items:flex-end;"><button class="btn primary" onclick="inviteInternalDriver()" style="width:100%;">+ Meghívó küldése</button></div>
+        </div>
+        <div id="idInviteResult" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="glass" style="padding:22px; margin-top:16px;">
+        <h3 style="margin-bottom:16px;">Regisztrált belső sofőrök</h3>
+        <table class="table" id="tblInternalDrivers">
+          <thead><tr><th>Név</th><th>E-mail</th><th>Telefon</th><th>Művelet</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="glass" style="padding:22px; margin-top:16px;">
+        <h3 style="margin-bottom:16px;">Függőben lévő meghívások</h3>
+        <table class="table" id="tblPendingDriverInvites">
+          <thead><tr><th>Meghívókód</th><th>E-mail</th><th>Státusz</th><th>Művelet</th></tr></thead>
+          <tbody></tbody>
+        </table>
       </div>
     </div>
 
@@ -635,6 +660,7 @@ function loadTab(name){
   if(name==='users') loadUsers();
   if(name==='invites') loadInvites();
   if(name==='vehicles') loadVehicles();
+  if(name==='internal-drivers') loadInternalDrivers();
   if(name==='external-drivers') loadExtDrivers();
   if(name==='signature') initAdminSigCanvas();
 }
@@ -698,6 +724,7 @@ function deleteUser(email, nev){
       toast('Felhasználó törölve!','ok');
       loadUsers();
       loadDash();
+      if(typeof loadInternalDrivers==='function')loadInternalDrivers();
     }else{
       toast(r.err||'Hiba történt','err');
     }
@@ -707,7 +734,40 @@ function editUser(u){uNume.value=u.nume;uEmail.value=u.email;uTel.value=u.tel||'
 function closeModal(){document.getElementById('userModal').classList.remove('open');}
 function saveUser(){
   var f={nume:uNume.value,tel:uTel.value,pozicio:uPoz.value};if(uPwd.value)f.jelszo=uPwd.value;
-  gas('userUpdate',[uEmail.value,f]).then(()=>{toast('Sikeresen mentve!','ok');closeModal();loadUsers();loadDash();});
+  gas('userUpdate',[uEmail.value,f]).then(()=>{toast('Sikeresen mentve!','ok');closeModal();loadUsers();loadDash();if(typeof loadInternalDrivers==='function')loadInternalDrivers();});
+}
+
+// ===== BELSŐ SOFŐRÖK =====
+function loadInternalDrivers(){
+  gas('userListAll').then(list=>{
+    if(!Array.isArray(list))list=[];
+    const drivers=list.filter(u=>u.pozicio==='Sofer');
+    const tb=document.querySelector('#tblInternalDrivers tbody');
+    if(drivers.length===0){tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);">Még nincs regisztrált belső sofőr.</td></tr>';}
+    else{tb.innerHTML=drivers.map(u=>`<tr><td>${u.nume}</td><td>${u.email}</td><td>${u.tel||'—'}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick='editUser(${JSON.stringify(u)})'>Szerk</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUser('${u.email}','${(u.nume||'').replace(/'/g,"\\'")}')">Töröl</button></td></tr>`).join('');}
+  });
+  gas('invListAll').then(list=>{
+    if(!Array.isArray(list))list=[];
+    const pend=list.filter(i=>i.pozicio==='Sofer'&&i.statusz==='Aktiv');
+    const tb=document.querySelector('#tblPendingDriverInvites tbody');
+    if(pend.length===0){tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);">Nincs függőben lévő meghívás.</td></tr>';}
+    else{tb.innerHTML=pend.map(i=>`<tr><td><b>${i.kod}</b></td><td>${i.email||'—'}</td><td><span class="badge warn">${i.statusz}</span></td><td><button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="revokeDriverInvite('${i.kod}')">Visszavon</button></td></tr>`).join('');}
+  });
+}
+function inviteInternalDriver(){
+  const email=(document.getElementById('idEmail').value||'').trim();
+  if(!email){toast('Az e-mail cím kötelező!','err');return;}
+  gas('invCreate',['Sofer',email]).then(r=>{
+    if(r&&r.ok){
+      document.getElementById('idInviteResult').innerHTML='<span class="badge ok">Meghívó elküldve — kód: <b>'+r.kod+'</b></span>';
+      document.getElementById('idEmail').value='';
+      loadInternalDrivers();
+    }else{toast((r&&r.err)||'Hiba történt','err');}
+  });
+}
+function revokeDriverInvite(kod){
+  if(!confirm('Biztosan visszavonod a meghívót: '+kod+'?'))return;
+  gas('invRevoke',[kod]).then(r=>{if(r.ok){toast('Visszavonva!','ok');loadInternalDrivers();}else{toast(r.err||'Hiba','err');}});
 }
 
 function loadReceivedFuvarlevelek(){

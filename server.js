@@ -850,9 +850,26 @@ app.get('/api/doc-download/:id', async (req, res) => {
 });
 
 // PDF DOWNLOAD (DB-bol)
-app.get('/api/pdf-download/:id', async (req, res) => {
+app.get('/api/pdf-download/:id', requireLogin, async (req, res) => {
   try {
-    const r = await pool.query('SELECT * FROM fuvarlevelek WHERE id = $1', [req.params.id]);
+    const me = req.session.user;
+    const isAdmin = ['Admin', 'Manager'].includes(me.pozicio);
+    let r;
+    if (isAdmin) {
+      // csak a sajat ceg soforjenek menetlevele
+      r = await pool.query(
+        `SELECT f.* FROM fuvarlevelek f
+         JOIN users u ON LOWER(u.email) = LOWER(f.email_sofer)
+         WHERE f.id = $1 AND u.company_id = $2`,
+        [req.params.id, me.company_id]
+      );
+    } else {
+      // sofor csak a sajat menetleveleit
+      r = await pool.query(
+        'SELECT * FROM fuvarlevelek WHERE id = $1 AND LOWER(email_sofer) = LOWER($2)',
+        [req.params.id, me.email]
+      );
+    }
     if (!r.rows.length) return res.status(404).send('Nem található.');
     const f = r.rows[0];
 
@@ -1190,6 +1207,21 @@ app.post('/api/execute', requireLogin, async (req, res) => {
         return res.json({ result: { ok: false, err: 'Ervenytelen pozicio.' } });
       }
 
+      // max_users limit: regisztralt userek + fuggoben levo aktiv meghivok
+      const cidLim = req.session.user.company_id;
+      if (cidLim) {
+        const lim = await pool.query('SELECT max_users FROM companies WHERE id = $1', [cidLim]);
+        const maxU = lim.rows[0]?.max_users ?? 0;
+        const cnt = await pool.query(
+          `SELECT (SELECT COUNT(*) FROM users   WHERE company_id = $1)
+                + (SELECT COUNT(*) FROM invites WHERE company_id = $1 AND status = 'Aktiv') AS db`,
+          [cidLim]
+        );
+        if (maxU > 0 && Number(cnt.rows[0].db) >= maxU) {
+          return res.json({ result: { ok: false, err: 'Elerted a max. felhasznaloszamot (' + maxU + '). Boviteni kell a csomagot.' } });
+        }
+      }
+
       // veletlen kod generalas - hasonloan a regi _genCode-hoz
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let kod = 'VS-';
@@ -1509,7 +1541,8 @@ app.post('/api/execute', requireLogin, async (req, res) => {
         // - utolso Admin nem fokozhato le (rendszer mindig kell legyen egy Admin)
         if (targetUser.pozicio === 'Admin' && fields.pozicio !== 'Admin') {
           const adminCount = await pool.query(
-            "SELECT COUNT(*)::int AS db FROM users WHERE pozicio = 'Admin'"
+            "SELECT COUNT(*)::int AS db FROM users WHERE pozicio = 'Admin' AND company_id = $1",
+            [targetUser.company_id]
           );
           if (adminCount.rows[0].db <= 1) {
             return res.json({ result: { ok: false, err: 'Nem maradhat a rendszer Admin nelkul.' } });
@@ -1583,7 +1616,8 @@ app.post('/api/execute', requireLogin, async (req, res) => {
       // 🔒 KIEGESZITES: utolso Admin torlese sem engedett
       if (targetRes.rows[0].pozicio === 'Admin') {
         const adminCount = await pool.query(
-          "SELECT COUNT(*)::int AS db FROM users WHERE pozicio = 'Admin'"
+          "SELECT COUNT(*)::int AS db FROM users WHERE pozicio = 'Admin' AND company_id = $1",
+          [targetRes.rows[0].company_id]
         );
         if (adminCount.rows[0].db <= 1) {
           return res.json({ result: { ok: false, err: 'Az utolso Admin nem torolheto.' } });
@@ -1853,7 +1887,8 @@ app.post('/api/execute', requireLogin, async (req, res) => {
 
       updates.push(`updated_at = NOW()`);
       values.push(id);
-      const sql = `UPDATE external_drivers SET ${updates.join(', ')} WHERE id = $${i}`;
+      values.push(req.session.user.company_id);
+      const sql = `UPDATE external_drivers SET ${updates.join(', ')} WHERE id = $${i} AND company_id = $${i + 1}`;
       const r = await pool.query(sql, values);
 
       if (r.rowCount === 0) {
