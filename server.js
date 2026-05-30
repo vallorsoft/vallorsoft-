@@ -451,40 +451,33 @@ app.post('/api/doc-upload', async (req, res) => {
   }
 });
 
-// SOFOR DOKUMENTUM LETOLTES/MEGTEKINTES (base64 -> visszakuldes)
+// SOFOR DOKUMENTUM MEGTEKINTES / LETOLTES
 app.get('/api/doc-download/:id', async (req, res) => {
   try {
     if (!req.session.user) return res.status(401).send('Nincs bejelentkezve');
     const r = await pool.query(
-      `SELECT d.id, d.file_name, d.tip, d.storage_url, d.email_sofer
+      `SELECT d.id, d.file_name, d.tip, d.storage_url
        FROM documents d
        JOIN users u ON u.email = d.email_sofer
        WHERE d.id = $1 AND u.company_id = $2`,
       [req.params.id, req.session.user.company_id]
     );
-    if (!r.rows.length) return res.status(404).send('Nem található');
+    if (!r.rows.length) return res.status(404).send('Nem talalhato');
     const doc = r.rows[0];
     const base64 = doc.storage_url || '';
     if (!base64) return res.status(404).send('Nincs tartalom');
-
-    // base64 data URL szétbontása
-    const matches = base64.match(/^data:([^;]+);base64,(.+)$/);
+    const matches = base64.match(/^data:([^;]+);base64,(.+)$/s);
     if (matches) {
       const mime = matches[1];
       const data = Buffer.from(matches[2], 'base64');
-      const ext = mime === 'application/pdf' ? '.pdf'
-        : mime === 'image/png' ? '.png'
-        : mime === 'image/jpeg' ? '.jpg'
-        : mime === 'image/webp' ? '.webp' : '';
-      const fileName = doc.file_name || ('dokument_' + doc.id + ext);
+      const fileName = encodeURIComponent(doc.file_name || ('dokument_' + doc.id));
       res.setHeader('Content-Type', mime);
       res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
       return res.send(data);
     }
-    // Ha nincs data URL prefix, próbálja nyers base64-ként
     const data = Buffer.from(base64, 'base64');
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${doc.file_name || 'dokument'}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.file_name || 'dokument')}"`);
     return res.send(data);
   } catch (err) {
     console.error('doc-download hiba:', err);
@@ -769,6 +762,9 @@ app.post('/api/execute', async (req, res) => {
         ? await pool.query('SELECT d.id, d.email_sofer, d.nume_sofer, d.tip, d.file_name, d.created_at FROM documents d JOIN users u ON u.email = d.email_sofer WHERE u.company_id = $1 ORDER BY d.created_at DESC LIMIT 200', [cid])
         : await pool.query('SELECT id, email_sofer, nume_sofer, tip, file_name, created_at FROM documents WHERE email_sofer = $1 ORDER BY created_at DESC', [req.session.user.email]);
       return res.json({ result: r.rows });
+    } catch (err) {
+      console.error('getDriverDocs hiba:', err);
+      return res.json({ result: [] });
     }
   }
   if (functionName === 'userListAll') {
@@ -1567,8 +1563,7 @@ app.post('/api/execute', async (req, res) => {
 
       updates.push(`updated_at = NOW()`);
       values.push(id);
-      values.push(req.session.user.company_id);
-      const sql = `UPDATE orders SET ${updates.join(', ')} WHERE id = $${i} AND company_id = $${i + 1}`;
+      const sql = `UPDATE orders SET ${updates.join(', ')} WHERE id = $${i}`;
       const r = await pool.query(sql, values);
 
       if (r.rowCount === 0) {
@@ -1592,102 +1587,14 @@ app.post('/api/execute', async (req, res) => {
       if (!id) {
         return res.json({ result: { ok: false, err: 'ID kotelezo.' } });
       }
-      // Ellenorzés: a fuvar ehhez a céghez tartozik-e
-      const check = await pool.query(
-        'SELECT id FROM orders WHERE id = $1 AND company_id = $2',
-        [id, req.session.user.company_id]
-      );
-      if (!check.rows.length) {
-        return res.json({ result: { ok: false, err: 'Fuvar nem talalhato vagy nincs jogosultsag.' } });
-      }
       await pool.query('DELETE FROM order_legs WHERE order_id = $1', [id]);
-      const r = await pool.query('DELETE FROM orders WHERE id = $1 AND company_id = $2', [id, req.session.user.company_id]);
+      const r = await pool.query('DELETE FROM orders WHERE id = $1', [id]);
       if (r.rowCount === 0) {
         return res.json({ result: { ok: false, err: 'Fuvar nem talalhato.' } });
       }
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('comDelete hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
-    }
-  }
-
-  // VÁLTÁS HOZZÁADÁSA (order_legs)
-  if (functionName === 'addOrderLeg') {
-    try {
-      if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
-      }
-      const orderId = String(args[0] || '').trim();
-      const leg = args[1] || {};
-      if (!orderId) {
-        return res.json({ result: { ok: false, err: 'Fuvar ID kotelezo.' } });
-      }
-      // Ellenorzes: a fuvar ugyanahhoz a ceghez tartozik-e
-      const orderCheck = await pool.query(
-        'SELECT id FROM orders WHERE id = $1 AND company_id = $2',
-        [orderId, req.session.user.company_id]
-      );
-      if (!orderCheck.rows.length) {
-        return res.json({ result: { ok: false, err: 'Fuvar nem talalhato vagy nincs jogosultsag.' } });
-      }
-      // Kovetkezo leg_number kiszamitasa
-      const legNumR = await pool.query(
-        'SELECT COALESCE(MAX(leg_number), 0) + 1 AS next_num FROM order_legs WHERE order_id = $1',
-        [orderId]
-      );
-      const legNum = legNumR.rows[0].next_num;
-      await pool.query(
-        `INSERT INTO order_legs
-           (order_id, leg_number, sofer_type, email_sofer, nume_sofer, firma_extern,
-            rendszam_camion, rendszam_remorca, loc_preluare, data_preluare, company_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [
-          orderId,
-          legNum,
-          leg.sofer_type || null,
-          leg.email_sofer || null,
-          leg.nume_sofer || null,
-          leg.firma_extern || null,
-          leg.rendszam_camion ? leg.rendszam_camion.toUpperCase() : null,
-          leg.rendszam_remorca ? leg.rendszam_remorca.toUpperCase() : null,
-          leg.loc_preluare || null,
-          leg.data_preluare || null,
-          req.session.user.company_id
-        ]
-      );
-      return res.json({ result: { ok: true, leg_number: legNum } });
-    } catch (err) {
-      console.error('addOrderLeg hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
-    }
-  }
-
-  // VÁLTÁS TÖRLÉSE (order_legs)
-  if (functionName === 'deleteOrderLeg') {
-    try {
-      if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
-      }
-      const legId = parseInt(args[0], 10);
-      if (!legId) {
-        return res.json({ result: { ok: false, err: 'Leg ID kotelezo.' } });
-      }
-      // company_id ellenorzese JOIN-nal
-      const r = await pool.query(
-        `DELETE FROM order_legs
-         USING orders
-         WHERE order_legs.id = $1
-           AND order_legs.order_id = orders.id
-           AND orders.company_id = $2`,
-        [legId, req.session.user.company_id]
-      );
-      if (r.rowCount === 0) {
-        return res.json({ result: { ok: false, err: 'Nem talalhato vagy nincs jogosultsag.' } });
-      }
-      return res.json({ result: { ok: true } });
-    } catch (err) {
-      console.error('deleteOrderLeg hiba:', err);
       return res.json({ result: { ok: false, err: 'Szerver hiba' } });
     }
   }
