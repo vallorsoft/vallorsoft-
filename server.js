@@ -1724,6 +1724,7 @@ app.post('/api/execute', async (req, res) => {
 });
 
 // SZERVER INDITAS
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log('Szerver fut a http://localhost:' + PORT + ' cimen');
 });
