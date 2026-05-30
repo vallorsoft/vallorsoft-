@@ -2,12 +2,16 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>vallorSoft - Manager Console</title>
+  <link rel="apple-touch-icon" href="/icon192.png">
+  <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css">
   <!-- PDF megjelenites (PDF.js) es PDF keszites (pdf-lib) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+  <script src="/push-client.js"></script>
+  <script src="/session-guard.js"></script>
 </head>
 <body>
 <div class="toast-wrap" id="toasts"></div>
@@ -22,8 +26,8 @@
 
 <div class="app-layout">
   <div class="sidebar" id="mainSidebar">
-    <div class="vs-logo" style="padding-left:12px; margin-bottom:10px;"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
-    <div style="font-size:11px; color:var(--muted); padding-left:12px; margin-top:-15px; margin-bottom:15px; font-weight:600;">Manager Console</div>
+    <div class="vs-logo sidebar-logo" style="padding-left:12px; margin-bottom:10px;"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
+    <div class="sidebar-subtitle" style="font-size:11px; color:var(--muted); padding-left:12px; margin-top:-15px; margin-bottom:15px; font-weight:600;">Manager Console</div>
     <div class="menu-group">
       <div class="menu-title">Áttekintés</div>
       <div class="tab active" data-tab="dash">Vezérlőpult</div>
@@ -1108,6 +1112,7 @@ gas('authMe').then(u => {
   myEmail = u.email;
   document.getElementById('meBadge').textContent = u.nume;
   initFirebaseChatPanel(u);
+  if (window.VS_PUSH) VS_PUSH.init(u.email, u.pozicio);
   var savedTab = '';
   var savedRoom = '';
   try { savedTab = sessionStorage.getItem('vs_manager_tab') || 'dash'; savedRoom = sessionStorage.getItem('vs_manager_chat_room') || ''; } catch(e) {}
@@ -1494,11 +1499,20 @@ function initFirebaseChatPanel(me){
       s1.src='https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js';
       document.head.appendChild(s1);
       s1.onload=function(){
+        var sAuth=document.createElement('script');
+        sAuth.src='https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js';
+        document.head.appendChild(sAuth);
+        sAuth.onload=function(){
         var s2=document.createElement('script');
         s2.src='https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js';
         document.head.appendChild(s2);
         s2.onload=function(){
           if(!firebase.apps.length)firebase.initializeApp(cfg);
+          fetch('/api/firebase-token').then(function(r){return r.json();}).then(function(td){
+            var authPromise=(td.ok&&td.token&&firebase.auth)
+              ?firebase.auth().signInWithCustomToken(td.token).catch(function(e){console.warn('FB auth hiba:',e);})
+              :Promise.resolve();
+            authPromise.then(function(){
           _fbDb=firebase.database();
           _chatCompanyId=String(me.company_id||'global');
           var el=document.getElementById('chatLoadMsg');
@@ -1506,6 +1520,9 @@ function initFirebaseChatPanel(me){
           var ca=document.getElementById('chatApp');
           if(ca)ca.style.display='';
           startRoomListListener(me);
+            });
+          });
+        };
         };
       };
     })
@@ -1641,6 +1658,25 @@ function chatSend(){
     lastTime:firebase.database.ServerValue.TIMESTAMP,
     lastFrom:_meChat.nume
   });
+  // Push ertesites
+  if(window.VS_PUSH){
+    var roomId=_chatCurrentRoom;
+    var toEmails=[];
+    var toRoles=[];
+    if(roomId&&roomId.startsWith('dm_')){
+      var inner=roomId.replace('dm_','');
+      var parts=inner.split('_X_');
+      if(parts.length===2){
+        var myEsc=(typeof _meChat!=='undefined'&&_meChat.email||'').toLowerCase().replace(/@/g,'__').replace(/\./g,'_d_');
+        var otherEsc=parts[0]===myEsc?parts[1]:parts[0];
+        var otherEmail=otherEsc.replace(/__/g,'@').replace(/_d_/g,'.');
+        toEmails=[otherEmail];
+      }
+    } else if(roomId==='manager'){
+      toRoles=['Manager','Admin'];
+    }
+    VS_PUSH.notifyChat({toEmails:toEmails,toRoles:toRoles,fromName:(typeof _meChat!=='undefined'?_meChat.nume:''),text:(typeof text!=='undefined'?text:''),room:roomId,companyId:(typeof _chatCompanyId!=='undefined'?_chatCompanyId:null)});
+  }
 }
 
 function chatOpenNewRoom(){
@@ -1740,7 +1776,9 @@ function closeSidebar() {
 }
 document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(el) {
   el.addEventListener('click', function() {
-    if (window.innerWidth <= 768) closeSidebar();
+    if (window.innerWidth <= 768 && el.id !== 'userParentTab') {
+      setTimeout(function() { closeSidebar(); }, 120);
+    }
   });
 });
 

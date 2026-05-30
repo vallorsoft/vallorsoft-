@@ -16,9 +16,15 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
     "express-session": "^1.19.0",
+    "firebase-admin": "^13.10.0",
+    "helmet": "^8.2.0",
     "nodemailer": "^8.0.9",
-    "pg": "^8.21.0"
+    "pg": "^8.21.0",
+    "qrcode": "^1.5.4",
+    "speakeasy": "^2.0.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

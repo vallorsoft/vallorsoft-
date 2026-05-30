@@ -8,6 +8,55 @@ const bcrypt = require('bcrypt');
 const cookieParser = require('cookie-parser');
 const { Pool } = require('pg');
 const crypto = require('crypto');
+
+// ===== BIZTONSAG: helmet + rate-limit =====
+let helmet, rateLimit;
+try { helmet = require('helmet'); } catch(e) { helmet = null; console.warn('helmet nincs telepitve'); }
+try { rateLimit = require('express-rate-limit'); } catch(e) { rateLimit = null; console.warn('express-rate-limit nincs telepitve'); }
+
+// 2FA (TOTP)
+let speakeasy = null, qrcode = null;
+try { speakeasy = require('speakeasy'); } catch(e) { speakeasy = null; console.warn('speakeasy nincs telepitve - 2FA nem mukodik'); }
+try { qrcode = require('qrcode'); } catch(e) { qrcode = null; console.warn('qrcode nincs telepitve'); }
+
+// Firebase Admin SDK (custom token a chat hitelesiteshez)
+let fbAdmin = null;
+try {
+  fbAdmin = require('firebase-admin');
+  if (process.env.FIREBASE_SERVICE_ACCOUNT && !fbAdmin.apps.length) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    fbAdmin.initializeApp({
+      credential: fbAdmin.credential.cert(serviceAccount),
+      databaseURL: process.env.FIREBASE_DB_URL
+    });
+    console.log('Firebase Admin inicializalva');
+  } else if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+    console.warn('FIREBASE_SERVICE_ACCOUNT hianyzik - Firebase custom token nem mukodik');
+    fbAdmin = null;
+  }
+} catch(e) {
+  fbAdmin = null;
+  console.warn('firebase-admin nincs telepitve');
+}
+
+// Web Push
+let webpush = null;
+try {
+  webpush = require('web-push');
+  const vapidPublic  = process.env.VAPID_PUBLIC_KEY;
+  const vapidPrivate = process.env.VAPID_PRIVATE_KEY;
+  const vapidEmail   = process.env.VAPID_EMAIL || ('mailto:' + (process.env.BREVO_SENDER || 'admin@vallorsoft.hu'));
+  if (vapidPublic && vapidPrivate) {
+    webpush.setVapidDetails(vapidEmail, vapidPublic, vapidPrivate);
+    console.log('Web Push VAPID beallitva');
+  } else {
+    console.warn('VAPID kulcsok hianyzanak - push ertesitesek nem mukodnek');
+    webpush = null;
+  }
+} catch(e) {
+  webpush = null;
+  console.warn('web-push nincs telepitve');
+}
 // ===== EMAIL KULDES: Brevo HTTP API (port 443, Render NEM blokkolja) =====
 // Az SMTP (587/465) NEM mukodik Render ingyenes csomagon -> HTTP API kell.
 // Brevo ingyenes 300 email/nap. Domain NEM kell, csak felado-cim hitelesites.
@@ -143,8 +192,75 @@ const pool = new Pool({
 
 const app = express();
 app.set('trust proxy', 1); // Render / reverse proxy mogotti HTTPS session fix
+
+// ===== HELMET: HTTP biztonsagi fejlecek =====
+if (helmet) {
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'", "'unsafe-inline'",
+          "https://cdnjs.cloudflare.com",
+          "https://cdn.jsdelivr.net",
+          "https://www.gstatic.com",
+          "https://www.googleapis.com",
+          "https://*.firebaseio.com",
+          "https://*.firebase.com",
+        ],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        connectSrc: [
+          "'self'",
+          "https://*.firebaseio.com",
+          "https://*.firebase.com",
+          "wss://*.firebaseio.com",
+          "https://api.brevo.com",
+        ],
+        frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+    crossOriginEmbedderPolicy: false, // Firebase miatt ki kell kapcsolni
+    hsts: {
+      maxAge: 63072000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    noSniff: true,
+    xssFilter: true,
+    frameguard: { action: 'deny' },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  }));
+}
+
+// ===== RATE LIMITING: brute-force vedelem =====
+if (rateLimit) {
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 perc
+    max: 10,
+    message: { success: false, message: 'Tul sok bejelentkezesi kiserletes. Probald ujra 15 perc mulva.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  const forgotLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 ora
+    max: 5,
+    message: { success: false, message: 'Tul sok jelszo-visszaallitasi kerelem. Probald ujra 1 ora mulva.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+  app.use('/api/login', loginLimiter);
+  app.use('/api/forgot-password', forgotLimiter);
+}
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Statikus fajlok CSAK a nem-vedett eleresi utakra (public mappan belul a HTML fajlok
+// nem szolgalhatoak ki kozvetlenul - a route-ok vedelme lejjebb tortenik)
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Cookie es session kezeles
@@ -190,8 +306,15 @@ function requireRole(...roles) {
 
 const getNowStr = () => new Date().toISOString().replace('T', ' ').substring(0, 19);
 
-// Firebase konfig endpoint — a frontend olvassa be (public config, nem titkos)
+// Firebase konfig endpoint — szerepkor alapjan szurt
 app.get('/api/firebase-config', requireLogin, (req, res) => {
+  const pozicio = req.session.user.pozicio;
+  const isDev = req.session.user.is_dev;
+  // Minden bejelentkezett user kap config-ot (chat mindenkinek kell)
+  // de csak HTTPS-rol, session utan
+  if (!['Admin', 'Manager', 'Sofer'].includes(pozicio) && !isDev) {
+    return res.status(403).json({ error: 'Nincs jogosultsag' });
+  }
   res.json({
     apiKey:        process.env.FIREBASE_API_KEY        || null,
     authDomain:    process.env.FIREBASE_AUTH_DOMAIN    || null,
@@ -201,11 +324,72 @@ app.get('/api/firebase-config', requireLogin, (req, res) => {
   });
 });
 
+// Firebase Custom Token - a chat hitelesiteshez (company_id custom claim)
+app.get('/api/firebase-token', requireLogin, async (req, res) => {
+  try {
+    if (!fbAdmin) return res.json({ ok: false, err: 'Firebase Admin nincs konfiguralva' });
+    const uid = 'user_' + req.session.user.id;
+    const customToken = await fbAdmin.auth().createCustomToken(uid, {
+      company_id: String(req.session.user.company_id || 'global'),
+      email:      req.session.user.email,
+      pozicio:    req.session.user.pozicio
+    });
+    res.json({ ok: true, token: customToken });
+  } catch (err) {
+    console.error('firebase-token hiba:', err);
+    res.json({ ok: false, err: 'Szerver hiba' });
+  }
+});
 
 
-// HTML oldalak
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
-app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+
+// ===== HTML OLDALAK — szerver oldali jogosultsag-ellenorzes =====
+// Ha nincs session -> redirect /login
+// Ha rossz szerepkor -> redirect sajat oldalara
+
+function requirePageLogin(req, res, next) {
+  if (!req.session || !req.session.user) {
+    return res.redirect('/login');
+  }
+  next();
+}
+
+function requirePageRole(...roles) {
+  return function(req, res, next) {
+    if (!req.session || !req.session.user) {
+      return res.redirect('/login');
+    }
+    if (!roles.includes(req.session.user.pozicio) && !req.session.user.is_dev) {
+      // Helyes oldalra kuldjuk vissza
+      const p = req.session.user.pozicio;
+      if (p === 'Admin') return res.redirect('/admin');
+      if (p === 'Manager') return res.redirect('/manager');
+      return res.redirect('/sofer');
+    }
+    next();
+  };
+}
+
+app.get('/', (req, res) => {
+  if (req.session && req.session.user) {
+    const p = req.session.user.pozicio;
+    if (req.session.user.is_dev) return res.redirect('/developer');
+    if (p === 'Admin') return res.redirect('/admin');
+    if (p === 'Manager') return res.redirect('/manager');
+    return res.redirect('/sofer');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+app.get('/login', (req, res) => {
+  if (req.session && req.session.user) {
+    const p = req.session.user.pozicio;
+    if (req.session.user.is_dev) return res.redirect('/developer');
+    if (p === 'Admin') return res.redirect('/admin');
+    if (p === 'Manager') return res.redirect('/manager');
+    return res.redirect('/sofer');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
 app.get('/reset-password', (req, res) => res.sendFile(path.join(__dirname, 'public', 'reset-password.html')));
 
@@ -279,10 +463,19 @@ app.post('/api/reset-password', async (req, res) => {
   }
 });
 
-app.get('/developer', (req, res) => res.sendFile(path.join(__dirname, 'public', 'developer.html')));
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
-app.get('/manager', (req, res) => res.sendFile(path.join(__dirname, 'public', 'manager.html')));
-app.get('/sofer', (req, res) => res.sendFile(path.join(__dirname, 'public', 'sofer.html')));
+app.get('/developer', requirePageLogin, function(req, res) {
+  if (!req.session.user.is_dev) return res.redirect('/login');
+  res.sendFile(path.join(__dirname, 'public', 'developer.html'));
+});
+app.get('/admin', requirePageLogin, requirePageRole('Admin'), function(req, res) {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+app.get('/manager', requirePageLogin, requirePageRole('Manager', 'Admin'), function(req, res) {
+  res.sendFile(path.join(__dirname, 'public', 'manager.html'));
+});
+app.get('/sofer', requirePageLogin, requirePageRole('Sofer', 'Admin', 'Manager'), function(req, res) {
+  res.sendFile(path.join(__dirname, 'public', 'sofer.html'));
+});
 
 // LOGIN (DB-bol, bcrypt-tel, session-nel)
 app.post('/api/login', async (req, res) => {
@@ -295,7 +488,7 @@ app.post('/api/login', async (req, res) => {
     }
 
     const result = await pool.query(
-      'SELECT id, nume, email, tel, pozicio, password_hash, company_id, pozicio_dev FROM users WHERE email = $1',
+      'SELECT id, nume, email, tel, pozicio, password_hash, company_id, pozicio_dev, totp_secret, totp_enabled FROM users WHERE email = $1',
       [email]
     );
 
@@ -324,6 +517,30 @@ app.post('/api/login', async (req, res) => {
       }
     }
 
+    // ===== 2FA KAPU =====
+    // A jelszo helyes. Most a 2FA allapot dont.
+    // Atmeneti "pre-auth" session - csak a 2FA lepeshez
+    if (speakeasy) {
+      if (user.totp_enabled && user.totp_secret) {
+        // 2FA be van kapcsolva -> kodot kerunk
+        req.session.pendingUser = {
+          id: user.id, nume: user.nume, email: user.email, tel: user.tel,
+          pozicio: user.pozicio, company_id: user.company_id,
+          is_dev: user.pozicio_dev || false,
+        };
+        return res.json({ success: true, need2fa: true });
+      } else {
+        // 2FA meg nincs beallitva -> KOTELEZO setup
+        req.session.pendingUser = {
+          id: user.id, nume: user.nume, email: user.email, tel: user.tel,
+          pozicio: user.pozicio, company_id: user.company_id,
+          is_dev: user.pozicio_dev || false,
+        };
+        return res.json({ success: true, setup2fa: true });
+      }
+    }
+
+    // Ha speakeasy nincs telepitve, fallback a regi viselkedeshez
     req.session.user = {
       id: user.id,
       nume: user.nume,
@@ -348,6 +565,153 @@ app.post('/api/login', async (req, res) => {
   } catch (err) {
     console.error('Login hiba:', err);
     return res.status(500).json({ success: false, message: 'Szerver hiba' });
+  }
+});
+
+// ===== 2FA: helper - redirect kiszamitasa =====
+function calc2faRedirect(u) {
+  if (u.is_dev) return '/developer';
+  if (u.pozicio === 'Admin') return '/admin';
+  if (u.pozicio === 'Manager') return '/manager';
+  return '/sofer';
+}
+
+// ===== 2FA SETUP: QR kod generalas (pre-auth session-bol) =====
+app.post('/api/2fa/setup', async (req, res) => {
+  try {
+    if (!speakeasy || !qrcode) return res.json({ success: false, message: '2FA nem elerheto' });
+    if (!req.session.pendingUser) return res.json({ success: false, message: 'Nincs folyamatban bejelentkezes' });
+
+    const email = req.session.pendingUser.email;
+    const secret = speakeasy.generateSecret({
+      name: 'VallorSoft (' + email + ')',
+      length: 20
+    });
+
+    // Ideiglenesen a pending session-be tesszuk, csak verify utan mentjuk DB-be
+    req.session.pending2faSecret = secret.base32;
+
+    const otpauthUrl = secret.otpauth_url;
+    const qrDataUrl = await qrcode.toDataURL(otpauthUrl);
+
+    return res.json({
+      success: true,
+      qr: qrDataUrl,
+      secret: secret.base32  // manualis bevitelhez
+    });
+  } catch (err) {
+    console.error('2fa setup hiba:', err);
+    return res.json({ success: false, message: 'Szerver hiba' });
+  }
+});
+
+// ===== 2FA SETUP VERIFY: elso kod ellenorzese + mentes + bejelentkezes =====
+app.post('/api/2fa/setup-verify', async (req, res) => {
+  try {
+    if (!speakeasy) return res.json({ success: false, message: '2FA nem elerheto' });
+    if (!req.session.pendingUser || !req.session.pending2faSecret) {
+      return res.json({ success: false, message: 'Nincs folyamatban 2FA beallitas' });
+    }
+    const token = (req.body.token || '').trim().replace(/\s/g, '');
+    const secret = req.session.pending2faSecret;
+
+    const verified = speakeasy.totp.verify({
+      secret: secret,
+      encoding: 'base32',
+      token: token,
+      window: 2
+    });
+
+    if (!verified) {
+      return res.json({ success: false, message: 'Helytelen kod. Probald ujra.' });
+    }
+
+    // Backup kodok generalasa (8 db)
+    const backupCodes = [];
+    for (let i = 0; i < 8; i++) {
+      backupCodes.push(crypto.randomBytes(4).toString('hex').toUpperCase());
+    }
+    const hashedBackup = await Promise.all(backupCodes.map(c => bcrypt.hash(c, 8)));
+
+    // Mentes DB-be
+    await pool.query(
+      'UPDATE users SET totp_secret = $1, totp_enabled = TRUE, totp_backup_codes = $2 WHERE id = $3',
+      [secret, JSON.stringify(hashedBackup), req.session.pendingUser.id]
+    );
+
+    // Bejelentkezes vegleges
+    req.session.user = req.session.pendingUser;
+    delete req.session.pendingUser;
+    delete req.session.pending2faSecret;
+
+    return res.json({
+      success: true,
+      redirect: calc2faRedirect(req.session.user),
+      backupCodes: backupCodes  // egyszer megmutatjuk a usernek
+    });
+  } catch (err) {
+    console.error('2fa setup-verify hiba:', err);
+    return res.json({ success: false, message: 'Szerver hiba' });
+  }
+});
+
+// ===== 2FA LOGIN VERIFY: bejelentkezeskor a kod ellenorzese =====
+app.post('/api/2fa/verify', async (req, res) => {
+  try {
+    if (!speakeasy) return res.json({ success: false, message: '2FA nem elerheto' });
+    if (!req.session.pendingUser) {
+      return res.json({ success: false, message: 'Nincs folyamatban bejelentkezes' });
+    }
+    const token = (req.body.token || '').trim().replace(/\s/g, '');
+    const userId = req.session.pendingUser.id;
+
+    const r = await pool.query('SELECT totp_secret, totp_backup_codes FROM users WHERE id = $1', [userId]);
+    if (!r.rows.length || !r.rows[0].totp_secret) {
+      return res.json({ success: false, message: 'Hiba: nincs 2FA beallitva' });
+    }
+    const secret = r.rows[0].totp_secret;
+
+    let verified = speakeasy.totp.verify({
+      secret: secret,
+      encoding: 'base32',
+      token: token,
+      window: 2
+    });
+
+    // Ha a TOTP nem jo, probaljuk backup kodkent
+    if (!verified && r.rows[0].totp_backup_codes) {
+      try {
+        const codes = typeof r.rows[0].totp_backup_codes === 'string'
+          ? JSON.parse(r.rows[0].totp_backup_codes)
+          : r.rows[0].totp_backup_codes;
+        for (let i = 0; i < codes.length; i++) {
+          if (codes[i] && await bcrypt.compare(token.toUpperCase(), codes[i])) {
+            verified = true;
+            // Felhasznalt backup kod torlese (null-ra)
+            codes[i] = null;
+            await pool.query('UPDATE users SET totp_backup_codes = $1 WHERE id = $2',
+              [JSON.stringify(codes), userId]);
+            break;
+          }
+        }
+      } catch(e) {}
+    }
+
+    if (!verified) {
+      return res.json({ success: false, message: 'Helytelen kod.' });
+    }
+
+    // Sikeres -> vegleges bejelentkezes
+    req.session.user = req.session.pendingUser;
+    delete req.session.pendingUser;
+
+    return res.json({
+      success: true,
+      redirect: calc2faRedirect(req.session.user)
+    });
+  } catch (err) {
+    console.error('2fa verify hiba:', err);
+    return res.json({ success: false, message: 'Szerver hiba' });
   }
 });
 
@@ -618,7 +982,7 @@ app.get('/api/pdf-download/:id', async (req, res) => {
 
 
 // GENERIKUS DISPATCHER (regi GAS-szeru hivasok)
-app.post('/api/execute', async (req, res) => {
+app.post('/api/execute', requireLogin, async (req, res) => {
   const { functionName, arguments: args } = req.body;
 
   // AUTH ME (session-bol)
@@ -769,10 +1133,16 @@ app.post('/api/execute', async (req, res) => {
   }
   if (functionName === 'userListAll') {
     try {
-      const cid = req.session.user ? req.session.user.company_id : null;
-      const r = cid
-        ? await pool.query('SELECT id, nume, email, tel, pozicio FROM users WHERE company_id = $1 ORDER BY id', [cid])
-        : await pool.query('SELECT id, nume, email, tel, pozicio FROM users ORDER BY id');
+      // requireLogin mar futott - req.session.user letezik
+      if (!['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+        return res.json({ result: [] });
+      }
+      const cid = req.session.user.company_id;
+      if (!cid) return res.json({ result: [] });
+      const r = await pool.query(
+        'SELECT id, nume, email, tel, pozicio FROM users WHERE company_id = $1 ORDER BY id',
+        [cid]
+      );
       return res.json({ result: r.rows });
     } catch (e) {
       console.error(e);
@@ -1517,6 +1887,70 @@ app.post('/api/execute', async (req, res) => {
     }
   }
   
+  // VALTAS HOZZAADASA (order_legs)
+  if (functionName === 'addOrderLeg') {
+    try {
+      if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      }
+      const orderId = String(args[0] || '').trim();
+      const leg = args[1] || {};
+      if (!orderId) return res.json({ result: { ok: false, err: 'Fuvar ID kotelezo.' } });
+      const orderCheck = await pool.query(
+        'SELECT id FROM orders WHERE id = $1 AND company_id = $2',
+        [orderId, req.session.user.company_id]
+      );
+      if (!orderCheck.rows.length) return res.json({ result: { ok: false, err: 'Fuvar nem talalhato vagy nincs jogosultsag.' } });
+      const legNumR = await pool.query(
+        'SELECT COALESCE(MAX(leg_number), 0) + 1 AS next_num FROM order_legs WHERE order_id = $1',
+        [orderId]
+      );
+      const legNum = legNumR.rows[0].next_num;
+      await pool.query(
+        `INSERT INTO order_legs
+           (order_id, leg_number, sofer_type, email_sofer, nume_sofer, firma_extern,
+            rendszam_camion, rendszam_remorca, loc_preluare, data_preluare, company_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [
+          orderId, legNum,
+          leg.sofer_type || null, leg.email_sofer || null, leg.nume_sofer || null, leg.firma_extern || null,
+          leg.rendszam_camion ? leg.rendszam_camion.toUpperCase() : null,
+          leg.rendszam_remorca ? leg.rendszam_remorca.toUpperCase() : null,
+          leg.loc_preluare || null, leg.data_preluare || null,
+          req.session.user.company_id
+        ]
+      );
+      return res.json({ result: { ok: true, leg_number: legNum } });
+    } catch (err) {
+      console.error('addOrderLeg hiba:', err);
+      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    }
+  }
+
+  // VALTAS TORLESE (order_legs)
+  if (functionName === 'deleteOrderLeg') {
+    try {
+      if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      }
+      const legId = parseInt(args[0], 10);
+      if (!legId) return res.json({ result: { ok: false, err: 'Leg ID kotelezo.' } });
+      const r = await pool.query(
+        `DELETE FROM order_legs
+         USING orders
+         WHERE order_legs.id = $1
+           AND order_legs.order_id = orders.id
+           AND orders.company_id = $2`,
+        [legId, req.session.user.company_id]
+      );
+      if (r.rowCount === 0) return res.json({ result: { ok: false, err: 'Nem talalhato vagy nincs jogosultsag.' } });
+      return res.json({ result: { ok: true } });
+    } catch (err) {
+      console.error('deleteOrderLeg hiba:', err);
+      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    }
+  }
+
   // FUVAR MODOSITAS (Admin/Manager)
   if (functionName === 'comUpdate') {
     try {
@@ -1563,7 +1997,8 @@ app.post('/api/execute', async (req, res) => {
 
       updates.push(`updated_at = NOW()`);
       values.push(id);
-      const sql = `UPDATE orders SET ${updates.join(', ')} WHERE id = $${i}`;
+      values.push(req.session.user.company_id);
+      const sql = `UPDATE orders SET ${updates.join(', ')} WHERE id = $${i} AND company_id = $${i + 1}`;
       const r = await pool.query(sql, values);
 
       if (r.rowCount === 0) {
@@ -1587,8 +2022,15 @@ app.post('/api/execute', async (req, res) => {
       if (!id) {
         return res.json({ result: { ok: false, err: 'ID kotelezo.' } });
       }
+      const check = await pool.query(
+        'SELECT id FROM orders WHERE id = $1 AND company_id = $2',
+        [id, req.session.user.company_id]
+      );
+      if (!check.rows.length) {
+        return res.json({ result: { ok: false, err: 'Fuvar nem talalhato vagy nincs jogosultsag.' } });
+      }
       await pool.query('DELETE FROM order_legs WHERE order_id = $1', [id]);
-      const r = await pool.query('DELETE FROM orders WHERE id = $1', [id]);
+      const r = await pool.query('DELETE FROM orders WHERE id = $1 AND company_id = $2', [id, req.session.user.company_id]);
       if (r.rowCount === 0) {
         return res.json({ result: { ok: false, err: 'Fuvar nem talalhato.' } });
       }
@@ -1883,6 +2325,201 @@ app.post('/api/execute', async (req, res) => {
 
   // Ismeretlen funkcio
   return res.json({ result: { ok: false, err: 'Ismeretlen funkcio: ' + functionName } });
+});
+
+
+// ============================================================
+//  WEB PUSH VEGPONTOK
+// ============================================================
+
+// VAPID public key lekeres (frontendnek kell a subscription-hoz)
+app.get('/api/push-vapid-key', requireLogin, (req, res) => {
+  if (!webpush || !process.env.VAPID_PUBLIC_KEY) {
+    return res.json({ ok: false, key: null });
+  }
+  res.json({ ok: true, key: process.env.VAPID_PUBLIC_KEY });
+});
+
+// Subscription mentese / frissitese
+app.post('/api/push-subscribe', requireLogin, async (req, res) => {
+  try {
+    const subscription = req.body.subscription;
+    if (!subscription || !subscription.endpoint) {
+      return res.json({ ok: false, err: 'Ervenytelen subscription' });
+    }
+    const email     = req.session.user.email;
+    const companyId = req.session.user.company_id;
+    const ua        = req.headers['user-agent'] ? req.headers['user-agent'].substring(0, 500) : null;
+    
+    // endpoint hash az egyedi azonositashoz
+    const endpointHash = crypto.createHash('sha256').update(subscription.endpoint).digest('hex');
+
+    // Upsert: ha mar letezik ez az endpoint, frissitjuk
+    await pool.query(
+      `INSERT INTO push_subscriptions (email, company_id, subscription, user_agent, endpoint_hash, updated_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT (endpoint_hash) DO UPDATE
+         SET subscription = $3, updated_at = NOW()`,
+      [email, companyId, JSON.stringify(subscription), ua, endpointHash]
+    );
+    return res.json({ ok: true });
+  } catch (err) {
+    // Ha az UNIQUE constraint nincs endpoint_hash-on, fallback
+    try {
+      const subscription = req.body.subscription;
+      const email     = req.session.user.email;
+      const companyId = req.session.user.company_id;
+      const ua        = req.headers['user-agent'] ? req.headers['user-agent'].substring(0, 500) : null;
+      const endpointHash = crypto.createHash('sha256').update(subscription.endpoint).digest('hex');
+      
+      // Delete + insert fallback
+      await pool.query('DELETE FROM push_subscriptions WHERE endpoint_hash = $1', [endpointHash]);
+      await pool.query(
+        `INSERT INTO push_subscriptions (email, company_id, subscription, user_agent, endpoint_hash)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [email, companyId, JSON.stringify(subscription), ua, endpointHash]
+      );
+      return res.json({ ok: true });
+    } catch(err2) {
+      console.error('push-subscribe hiba:', err2);
+      return res.json({ ok: false, err: 'Szerver hiba' });
+    }
+  }
+});
+
+// Subscription torlese (leiratkozas)
+app.post('/api/push-unsubscribe', requireLogin, async (req, res) => {
+  try {
+    const endpoint = req.body.endpoint;
+    if (!endpoint) return res.json({ ok: false });
+    const hash = crypto.createHash('sha256').update(endpoint).digest('hex');
+    await pool.query('DELETE FROM push_subscriptions WHERE endpoint_hash = $1 AND email = $2',
+      [hash, req.session.user.email]);
+    return res.json({ ok: true });
+  } catch(err) {
+    return res.json({ ok: false });
+  }
+});
+
+// ============================================================
+//  BELSO SEGEDLY FUNKCIOK: push uzenet kuldese
+// ============================================================
+
+// Kuldj push ertesitest egy adott email-re (vagy email tombnek)
+async function sendPushToEmail(emails, payload) {
+  if (!webpush) return;
+  if (!Array.isArray(emails)) emails = [emails];
+  if (!emails.length) return;
+
+  try {
+    const placeholders = emails.map((_, i) => '$' + (i + 1)).join(',');
+    const r = await pool.query(
+      `SELECT id, subscription FROM push_subscriptions WHERE email IN (${placeholders})`,
+      emails
+    );
+    if (!r.rows.length) return;
+
+    const payloadStr = JSON.stringify(payload);
+    const sends = r.rows.map(async (row) => {
+      try {
+        const sub = typeof row.subscription === 'string'
+          ? JSON.parse(row.subscription)
+          : row.subscription;
+        await webpush.sendNotification(sub, payloadStr);
+      } catch (err) {
+        // 410 Gone = subscription lejart, toroljuk
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [row.id]);
+          console.log('Push subscription torolve (lejart):', row.id);
+        } else {
+          console.error('Push kuldesi hiba:', err.message);
+        }
+      }
+    });
+    await Promise.allSettled(sends);
+  } catch(err) {
+    console.error('sendPushToEmail hiba:', err);
+  }
+}
+
+// Push kuldese csoport (company_id + szerepkor) alapjan
+async function sendPushToRole(companyId, roles, payload) {
+  if (!webpush || !companyId) return;
+  if (!Array.isArray(roles)) roles = [roles];
+  try {
+    const r = await pool.query(
+      `SELECT ps.id, ps.subscription FROM push_subscriptions ps
+       JOIN users u ON u.email = ps.email
+       WHERE ps.company_id = $1 AND u.pozicio = ANY($2)`,
+      [companyId, roles]
+    );
+    if (!r.rows.length) return;
+    const payloadStr = JSON.stringify(payload);
+    const sends = r.rows.map(async (row) => {
+      try {
+        const sub = typeof row.subscription === 'string'
+          ? JSON.parse(row.subscription)
+          : row.subscription;
+        await webpush.sendNotification(sub, payloadStr);
+      } catch (err) {
+        if (err.statusCode === 410 || err.statusCode === 404) {
+          await pool.query('DELETE FROM push_subscriptions WHERE id = $1', [row.id]);
+        }
+      }
+    });
+    await Promise.allSettled(sends);
+  } catch(err) {
+    console.error('sendPushToRole hiba:', err);
+  }
+}
+
+
+// CHAT PUSH ERTESITES — frontend hivja uzenet kuldese utan
+app.post('/api/chat-notify', requireLogin, async (req, res) => {
+  try {
+    if (!webpush) return res.json({ ok: false, reason: 'push not configured' });
+    
+    const { toEmails, toRoles, fromName, text, room, companyId } = req.body;
+    const senderEmail = req.session.user.email;
+    const senderRole  = req.session.user.pozicio;
+    
+    // Csak sajat ceg felhasznaloinak kuldjuk
+    if (companyId && companyId !== req.session.user.company_id) {
+      return res.json({ ok: false, err: 'Nincs jogosultsag' });
+    }
+    const cid = req.session.user.company_id;
+    
+    const shortText = text ? text.substring(0, 100) : 'Uj uzenet';
+    const senderDisplay = fromName || req.session.user.nume || senderEmail;
+    
+    const payload = {
+      title: '💬 VallorSoft — ' + senderDisplay,
+      body:  shortText,
+      icon:  '/icon192.png',
+      badge: '/icon192.png',
+      tag:   'vs-chat-' + (room || 'general'),
+      room:  room || null,
+      role:  senderRole,
+      url:   senderRole === 'Sofer' ? '/sofer' : (senderRole === 'Manager' ? '/manager' : '/admin'),
+    };
+
+    // Kuldes email lista alapjan (ha meg van adva)
+    if (toEmails && Array.isArray(toEmails) && toEmails.length) {
+      const filtered = toEmails.filter(e => e !== senderEmail);
+      if (filtered.length) await sendPushToEmail(filtered, payload);
+    }
+    
+    // Kuldes szerepkor alapjan (ha meg van adva)
+    if (toRoles && Array.isArray(toRoles) && toRoles.length) {
+      // Ne kuldjunk a kuldőnek
+      await sendPushToRole(cid, toRoles, payload);
+    }
+
+    return res.json({ ok: true });
+  } catch(err) {
+    console.error('chat-notify hiba:', err);
+    return res.json({ ok: false });
+  }
 });
 
 // SZERVER INDITAS

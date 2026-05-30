@@ -395,3 +395,28 @@ WHERE l.company_id IS NULL
 -- 5/c) Maradek arva fuvarok - CSAK egy ceg eseten futtasd!
 --      Tobb ceg eseten egyesevel, id szerint rendezd hozza.
 --      Elobb: SELECT id, nev FROM companies;
+
+-- ------------------------------------------------------------
+-- PUSH SUBSCRIPTIONS (Web Push ertesitesek)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id         SERIAL PRIMARY KEY,
+  email      VARCHAR(255) NOT NULL,
+  company_id INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+  subscription JSONB NOT NULL,
+  user_agent VARCHAR(500),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(email, subscription)
+);
+CREATE INDEX IF NOT EXISTS idx_push_subs_email ON push_subscriptions(email);
+CREATE INDEX IF NOT EXISTS idx_push_subs_company ON push_subscriptions(company_id);
+
+ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS endpoint_hash VARCHAR(64);
+
+-- ------------------------------------------------------------
+-- 2FA (ketlepeses hitelesites) - TOTP
+-- ------------------------------------------------------------
+ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(64);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_backup_codes JSONB;

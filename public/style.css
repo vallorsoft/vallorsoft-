@@ -447,3 +447,149 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
   .input, .select, .textarea { padding: 10px 12px; font-size: 14px; }
   h2.h-title { font-size: 18px; }
 }
+/* =========================================================
+   DEVELOPER OLDAL RESPONSIVE
+   ========================================================= */
+.dev-mob-topbar {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 56px;
+  background: rgba(5,7,11,0.97);
+  border-bottom: 1px solid rgba(168,85,247,0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 200;
+}
+.dev-mob-topbar .dev-logo-sm { font-weight: 800; font-size: 17px; color: #fff; }
+.dev-mob-topbar .dev-logo-sm span { color: #a855f7; }
+.dev-sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 149;
+}
+.dev-sidebar-overlay.open { display: block; }
+
+@media (max-width: 768px) {
+  .dev-mob-topbar { display: flex; }
+
+  .dev-layout { flex-direction: column; }
+
+  .dev-sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 260px;
+    z-index: 150;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+    overflow-y: auto;
+    padding-top: 68px;
+  }
+  .dev-sidebar.mob-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 40px rgba(168,85,247,0.3);
+  }
+
+  .dev-main {
+    padding: 72px 12px 24px;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px;
+  }
+
+  .ceg-card .ceg-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .dev-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    max-height: 92vh;
+  }
+
+  .dev-mob-topbar ~ .dev-sidebar-overlay + .dev-layout .dev-main table {
+    min-width: 500px;
+  }
+}
+
+@media (max-width: 420px) {
+  .kpi-grid { grid-template-columns: 1fr !important; }
+  .dev-main { padding: 68px 10px 20px; }
+}
+
+/* =========================================================
+   SOFER OLDAL — g3 mobilon
+   ========================================================= */
+@media (max-width: 600px) {
+  .g3 { grid-template-columns: 1fr !important; }
+  .g2 { grid-template-columns: 1fr !important; }
+}
+
+/* =========================================================
+   SIDEBAR — logo elrejtese mobilon (mob-topbar-ban van mar)
+   ========================================================= */
+@media (max-width: 768px) {
+  .sidebar > .vs-logo,
+  .sidebar > div[style*="font-size:11px"] {
+    display: none;
+  }
+  .sidebar { padding-top: 16px; gap: 12px; }
+}
+
+/* =========================================================
+   TABLAZATOK — minden glass-on beluli tabla goroghet
+   ========================================================= */
+@media (max-width: 768px) {
+  .glass { overflow-x: auto; }
+  .glass table { min-width: 520px; }
+}
+
+/* =========================================================
+   INLINE GRID OVERRIDE — szokozos valtozat is
+   ========================================================= */
+@media (max-width: 768px) {
+  [style*="grid-template-columns: 1fr 1fr 1fr"],
+  [style*="grid-template-columns:1fr 1fr 1fr"],
+  [style*="grid-template-columns: 1fr 1fr"],
+  [style*="grid-template-columns:1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* orderEditModal es fuvar form inline grid */
+  [style*="display:grid"][style*="grid-template-columns"],
+  [style*="display: grid"][style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* glass padding override - mindket irasmod */
+  .glass[style*="padding:22px"],
+  .glass[style*="padding: 22px"] { padding: 14px !important; }
+  .glass[style*="padding:16px"],
+  .glass[style*="padding: 16px"] { padding: 12px !important; }
+}
+
+/* =========================================================
+   SIDEBAR LOGO + SUBTITLE ELREJTESE MOBILON
+   (mob-topbar-ban mar latszik a logo)
+   ========================================================= */
+@media (max-width: 768px) {
+  .sidebar-logo,
+  .sidebar-subtitle { display: none !important; }
+
+  /* Submenu tab kattintaskor bezarul a sidebar */
+  .sidebar .sub-tab { min-height: 44px; display: flex; align-items: center; }
+  .sidebar .tab { min-height: 44px; display: flex; align-items: center; }
+}

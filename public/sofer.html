@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="VallorSoft">
   <link rel="manifest" href="/manifest.json">
-  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css">
   <style>
     .sofer-shell { max-width: 520px; margin: 0 auto; padding: 0 0 90px 0; min-height: 100vh; }
@@ -91,6 +91,8 @@
       border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
+  <script src="/push-client.js"></script>
+  <script src="/session-guard.js"></script>
 </head>
 <body>
 <div class="toast-wrap" id="toasts"></div>
@@ -818,6 +820,7 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
   if (!d.result) { window.location.href = '/login'; return; }
   _meData = d.result;
   document.getElementById('meBadge').textContent = d.result.nume;
+  if (window.VS_PUSH) VS_PUSH.init(d.result.email, d.result.pozicio);
   initFirebaseChat(d.result);
 
   // ── Állapot visszaállítás ──
@@ -872,11 +875,21 @@ function initFirebaseChat(me) {
       s1.src = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js';
       document.head.appendChild(s1);
       s1.onload = function() {
+        var sAuth = document.createElement('script');
+        sAuth.src = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js';
+        document.head.appendChild(sAuth);
+        sAuth.onload = function() {
         var s2 = document.createElement('script');
         s2.src = 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js';
         document.head.appendChild(s2);
         s2.onload = function() {
           if (!firebase.apps.length) firebase.initializeApp(cfg);
+          // Firebase custom token bejelentkezes (company_id alapu vedelem)
+          fetch('/api/firebase-token').then(function(r){return r.json();}).then(function(td){
+            var authPromise = (td.ok && td.token && firebase.auth)
+              ? firebase.auth().signInWithCustomToken(td.token).catch(function(e){ console.warn('FB auth hiba:', e); })
+              : Promise.resolve();
+            authPromise.then(function(){
           _fbDb = firebase.database();
           _chatCompanyId = String(me.company_id || 'global');
           fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -901,7 +914,10 @@ function initFirebaseChat(me) {
               }
             }
           });
-        };
+            }); // authPromise.then vege
+          }); // firebase-token fetch vege
+        }; // s2.onload vege
+        }; // sAuth.onload vege
       };
     })
     .catch(function() { document.getElementById('chatInitMsg').textContent = '⚠️ Chat nem elérhető.'; });
@@ -1010,6 +1026,31 @@ function chatSend() {
     lastTime: firebase.database.ServerValue.TIMESTAMP,
     lastFrom: _meData.nume
   });
+  // Push ertesites a Managernek / Adminnak
+  if(window.VS_PUSH){
+    var roomId = _chatCurrentRoom;
+    var toEmails = [];
+    var toRoles  = [];
+    if(roomId && roomId.startsWith('dm_')){
+      var inner = roomId.replace('dm_','');
+      var parts = inner.split('_X_');
+      if(parts.length===2){
+        var myEsc=(_meData.email||'').toLowerCase().replace(/@/g,'__').replace(/\./g,'_d_');
+        var otherEsc=parts[0]===myEsc?parts[1]:parts[0];
+        toEmails=[otherEsc.replace(/__/g,'@').replace(/_d_/g,'.')];
+      }
+    } else {
+      toRoles = ['Manager','Admin'];
+    }
+    VS_PUSH.notifyChat({
+      toEmails: toEmails,
+      toRoles:  toRoles,
+      fromName: _meData.nume || 'Sofőr',
+      text:     text,
+      room:     roomId,
+      companyId: _chatCompanyId
+    });
+  }
 }
 
 function escHtml(s) {
