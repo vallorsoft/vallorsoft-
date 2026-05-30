@@ -185,11 +185,24 @@
 
     <div class="pane hidden" data-pane="driver-docs-pane">
       <div class="glass" style="padding:22px">
-        <h2 class="h-title">Sofőrök által fotózott iratok és CMR-ek</h2>
-        <table class="table" id="tblDriverDocs">
-          <thead><tr><th>Dátum</th><th>Sofőr</th><th>Típus</th><th>Fájl név</th><th>Megtekintés</th></tr></thead>
-          <tbody></tbody>
-        </table>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+          <h2 class="h-title" style="margin:0;">📷 Feltöltött iratok és CMR-ek</h2>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select class="select" id="docFilterSofer" style="max-width:180px;padding:8px 10px;font-size:13px;" onchange="renderDocGroups()">
+              <option value="">Összes sofőr</option>
+            </select>
+            <select class="select" id="docFilterTip" style="max-width:140px;padding:8px 10px;font-size:13px;" onchange="renderDocGroups()">
+              <option value="">Összes típus</option>
+              <option value="CMR">CMR</option>
+              <option value="Számla">Számla</option>
+              <option value="Vám">Vám</option>
+              <option value="Egyéb">Egyéb</option>
+            </select>
+          </div>
+        </div>
+        <div id="docGroupsContainer">
+          <div style="text-align:center;color:var(--muted);padding:40px;">Betöltés...</div>
+        </div>
       </div>
     </div>
 
@@ -698,12 +711,76 @@ function loadReceivedFuvarlevelek(){
     tb.innerHTML=list.map(f=>`<tr><td><b style="color:#fff;">${f.file_name||'—'}</b></td><td>${f.nume_sofer||f.email_sofer||'—'}</td><td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td><td><a href="/api/pdf-download/${f.id}" target="_blank" class="btn primary" style="text-decoration:none;padding:5px 10px;">Letöltés</a></td></tr>`).join('');
   });
 }
-function loadDriverUploadedDocs(){
-  gas('getDriverDocs').then(list=>{
-    var tb=document.querySelector('#tblDriverDocs tbody');
-    if(!list||list.length===0){tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);">Nincs még feltöltött kép.</td></tr>';return;}
-    tb.innerHTML=list.map(d=>`<tr><td>${d.created_at?new Date(d.created_at).toLocaleString('hu-HU'):'—'}</td><td><b>${d.nume_sofer||d.email_sofer||'—'}</b></td><td><span class="badge warn">${d.tip||'—'}</span></td><td>${d.file_name||'—'}</td><td>—</td></tr>`).join('');
+var _driverDocsCache = [];
+function loadDriverUploadedDocs() {
+  var container = document.getElementById('docGroupsContainer');
+  if (container) container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;"><div class="spinner" style="margin:0 auto 10px;"></div>Betöltés...</div>';
+  gas('getDriverDocs').then(function(list) {
+    _driverDocsCache = list || [];
+    // Sofőr filter feltöltése
+    var sel = document.getElementById('docFilterSofer');
+    if (sel) {
+      var sofors = [...new Set(_driverDocsCache.map(d => d.nume_sofer || d.email_sofer).filter(Boolean))].sort();
+      sel.innerHTML = '<option value="">Összes sofőr</option>' + sofors.map(s => '<option value="' + s + '">' + s + '</option>').join('');
+    }
+    renderDocGroups();
   });
+}
+
+function renderDocGroups() {
+  var container = document.getElementById('docGroupsContainer');
+  if (!container) return;
+  var filterSofer = (document.getElementById('docFilterSofer') || {}).value || '';
+  var filterTip   = (document.getElementById('docFilterTip')   || {}).value || '';
+
+  var list = _driverDocsCache.filter(function(d) {
+    if (filterSofer && (d.nume_sofer || d.email_sofer) !== filterSofer) return false;
+    if (filterTip   && d.tip !== filterTip) return false;
+    return true;
+  });
+
+  if (!list.length) {
+    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;">Nincs találat.</div>';
+    return;
+  }
+
+  // Csoportosítás: sofőr + nap szerint
+  var groups = {};
+  list.forEach(function(d) {
+    var nev = d.nume_sofer || d.email_sofer || '—';
+    var nap = d.created_at ? new Date(d.created_at).toLocaleDateString('hu-HU') : '—';
+    var key = nev + '||' + nap;
+    if (!groups[key]) groups[key] = { nev: nev, nap: nap, docs: [] };
+    groups[key].docs.push(d);
+  });
+
+  var html = '';
+  Object.values(groups).forEach(function(g) {
+    html += '<div style="margin-bottom:20px;">';
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0 8px;border-bottom:1px solid var(--border);margin-bottom:10px;">';
+    html += '<span style="font-size:15px;font-weight:700;color:#fff;">👤 ' + g.nev + '</span>';
+    html += '<span style="font-size:12px;color:var(--muted);background:var(--bg-3);padding:3px 10px;border-radius:20px;border:1px solid var(--border);">📅 ' + g.nap + '</span>';
+    html += '<span style="font-size:12px;color:var(--muted);">' + g.docs.length + ' fájl</span>';
+    html += '</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;">';
+    g.docs.forEach(function(d) {
+      var badgeClass = d.tip === 'CMR' ? 'ok' : d.tip === 'Számla' ? 'info' : 'warn';
+      var time = d.created_at ? new Date(d.created_at).toLocaleTimeString('hu-HU', {hour:'2-digit',minute:'2-digit'}) : '';
+      html += '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px;">';
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">';
+      html += '<span class="badge ' + badgeClass + '">' + (d.tip || 'Egyéb') + '</span>';
+      html += '<span style="font-size:11px;color:var(--muted);">' + time + '</span>';
+      html += '</div>';
+      html += '<div style="font-size:13px;color:var(--soft);margin-bottom:10px;word-break:break-all;">' + (d.file_name || '—') + '</div>';
+      html += '<div style="display:flex;gap:6px;">';
+      html += '<a href="/api/doc-download/' + d.id + '" target="_blank" class="btn primary" style="flex:1;text-align:center;text-decoration:none;padding:8px 10px;font-size:12px;">👁 Megtekintés</a>';
+      html += '<a href="/api/doc-download/' + d.id + '" download class="btn ghost" style="flex:1;text-align:center;text-decoration:none;padding:8px 10px;font-size:12px;">⬇ Letöltés</a>';
+      html += '</div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  });
+  container.innerHTML = html;
 }
 function loadBorderLogs(){gas('getBorderLogs').then(list=>{document.querySelector('#tblBorderLogs tbody').innerHTML=list.map(l=>`<tr><td>${l.created_at?new Date(l.created_at).toLocaleString('hu-HU'):'—'}</td><td>${l.nume_sofer||l.email_sofer||'—'}</td><td><span class="badge warn">${l.tip||'—'}</span></td><td>${l.gps_lat?('📍 '+parseFloat(l.gps_lat).toFixed(4)+', '+parseFloat(l.gps_lng).toFixed(4)):'GPS n/a'}</td></tr>`).join('');});}
 

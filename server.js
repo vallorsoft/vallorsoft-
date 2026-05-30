@@ -451,6 +451,47 @@ app.post('/api/doc-upload', async (req, res) => {
   }
 });
 
+// SOFOR DOKUMENTUM LETOLTES/MEGTEKINTES (base64 -> visszakuldes)
+app.get('/api/doc-download/:id', async (req, res) => {
+  try {
+    if (!req.session.user) return res.status(401).send('Nincs bejelentkezve');
+    const r = await pool.query(
+      `SELECT d.id, d.file_name, d.tip, d.storage_url, d.email_sofer
+       FROM documents d
+       JOIN users u ON u.email = d.email_sofer
+       WHERE d.id = $1 AND u.company_id = $2`,
+      [req.params.id, req.session.user.company_id]
+    );
+    if (!r.rows.length) return res.status(404).send('Nem található');
+    const doc = r.rows[0];
+    const base64 = doc.storage_url || '';
+    if (!base64) return res.status(404).send('Nincs tartalom');
+
+    // base64 data URL szétbontása
+    const matches = base64.match(/^data:([^;]+);base64,(.+)$/);
+    if (matches) {
+      const mime = matches[1];
+      const data = Buffer.from(matches[2], 'base64');
+      const ext = mime === 'application/pdf' ? '.pdf'
+        : mime === 'image/png' ? '.png'
+        : mime === 'image/jpeg' ? '.jpg'
+        : mime === 'image/webp' ? '.webp' : '';
+      const fileName = doc.file_name || ('dokument_' + doc.id + ext);
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+      return res.send(data);
+    }
+    // Ha nincs data URL prefix, próbálja nyers base64-ként
+    const data = Buffer.from(base64, 'base64');
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${doc.file_name || 'dokument'}"`);
+    return res.send(data);
+  } catch (err) {
+    console.error('doc-download hiba:', err);
+    res.status(500).send('Szerver hiba');
+  }
+});
+
 // PDF DOWNLOAD (DB-bol)
 app.get('/api/pdf-download/:id', async (req, res) => {
   try {
@@ -728,9 +769,6 @@ app.post('/api/execute', async (req, res) => {
         ? await pool.query('SELECT d.id, d.email_sofer, d.nume_sofer, d.tip, d.file_name, d.created_at FROM documents d JOIN users u ON u.email = d.email_sofer WHERE u.company_id = $1 ORDER BY d.created_at DESC LIMIT 200', [cid])
         : await pool.query('SELECT id, email_sofer, nume_sofer, tip, file_name, created_at FROM documents WHERE email_sofer = $1 ORDER BY created_at DESC', [req.session.user.email]);
       return res.json({ result: r.rows });
-    } catch (err) {
-      console.error('getDriverDocs hiba:', err);
-      return res.json({ result: [] });
     }
   }
   if (functionName === 'userListAll') {
