@@ -7,6 +7,7 @@ const pgSession = require('connect-pg-simple')(session);
 const bcrypt = require('bcrypt');
 const cookieParser = require('cookie-parser');
 const { Pool } = require('pg');
+const crypto = require('crypto');
 // ===== EMAIL KULDES: Brevo HTTP API (port 443, Render NEM blokkolja) =====
 // Az SMTP (587/465) NEM mukodik Render ingyenes csomagon -> HTTP API kell.
 // Brevo ingyenes 300 email/nap. Domain NEM kell, csak felado-cim hitelesites.
@@ -77,6 +78,61 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, igazgatoNev) {
     }
   } catch (err) {
     console.error('Email kuldesi hiba:', err.message);
+  }
+}
+
+// ============ JELSZO-VISSZAALLITO EMAIL ============
+async function sendResetEmail(toEmail, nume, resetUrl) {
+  console.log('sendResetEmail called:', toEmail, !!BREVO_API_KEY);
+  if (!BREVO_API_KEY || !BREVO_SENDER || !toEmail) {
+    console.log('early return - BREVO config vagy toEmail hianyzik');
+    return;
+  }
+  const udvozles = nume ? `Tisztelt ${nume}!` : 'Tisztelt Felhasználónk!';
+  const html = `
+        <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#05070b;color:#e9eef5;padding:32px;border-radius:16px;">
+          <div style="font-size:24px;font-weight:800;margin-bottom:4px;">
+            <span style="color:#fff;">vallor</span><span style="color:#e10b1a;">Soft</span>
+          </div>
+          <div style="font-size:12px;color:#8a97a8;margin-bottom:28px;">Fuvarmenedzsment Platform</div>
+          <h2 style="font-size:20px;margin-bottom:8px;">${udvozles}</h2>
+          <p style="color:#8a97a8;margin-bottom:16px;">
+            Jelszó-visszaállítási kérelmet kaptunk a fiókjához. Ha Ön kérte, kattintson az alábbi gombra egy új jelszó beállításához.
+          </p>
+          <div style="text-align:center;margin:28px 0;">
+            <a href="${resetUrl}" style="display:inline-block;background:#e10b1a;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">Új jelszó beállítása</a>
+          </div>
+          <p style="color:#8a97a8;font-size:13px;margin-bottom:8px;">Vagy másolja be ezt a linket a böngészőbe:</p>
+          <p style="word-break:break-all;font-size:12px;color:#3b82f6;margin-bottom:24px;">${resetUrl}</p>
+          <div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;margin-bottom:24px;">
+            <p style="font-size:12px;color:#8a97a8;margin:0;">⏱️ Ez a link <b style="color:#fff;">1 óráig</b> érvényes. Ha nem Ön kérte a visszaállítást, hagyja figyelmen kívül ezt az emailt — a jelszava változatlan marad.</p>
+          </div>
+          <p style="font-size:11px;color:#8a97a8;margin:0;">Ez az email automatikusan lett elküldve a VallorSoft rendszer által.</p>
+        </div>
+      `;
+  try {
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': BREVO_API_KEY,
+        'Content-Type': 'application/json',
+        'accept': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: 'VallorSoft', email: BREVO_SENDER },
+        to: [{ email: toEmail }],
+        subject: 'VallorSoft — Jelszó visszaállítás',
+        htmlContent: html,
+      }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.error('Reset email Brevo hiba:', resp.status, JSON.stringify(data));
+    } else {
+      console.log('Reset email elkulve, messageId:', data.messageId);
+    }
+  } catch (err) {
+    console.error('Reset email hiba:', err.message);
   }
 }
 
@@ -151,6 +207,78 @@ app.get('/api/firebase-config', requireLogin, (req, res) => {
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
+app.get('/reset-password', (req, res) => res.sendFile(path.join(__dirname, 'public', 'reset-password.html')));
+
+// Elfelejtett jelszo - visszaallito link kerese
+app.post('/api/forgot-password', async (req, res) => {
+  try {
+    const email = (req.body.email || '').trim().toLowerCase();
+    const genericMsg = { success: true, message: 'Ha létezik fiók ezzel az email címmel, elküldtük a visszaállítási linket.' };
+    if (!email) return res.json(genericMsg);
+
+    const result = await pool.query('SELECT id, nume FROM users WHERE email = $1', [email]);
+    if (result.rows.length === 0) {
+      return res.json(genericMsg); // nem letezik - de ugyanazt valaszoljuk (biztonsag)
+    }
+    const user = result.rows[0];
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 ora
+
+    await pool.query(
+      'UPDATE users SET reset_token = $1, reset_token_expiry = $2 WHERE id = $3',
+      [token, expiry, user.id]
+    );
+
+    const resetUrl = (process.env.APP_URL || 'http://localhost:3000') + '/reset-password?token=' + token;
+    sendResetEmail(email, user.nume, resetUrl).catch(e => console.error('Reset email hatter hiba:', e.message));
+
+    return res.json(genericMsg);
+  } catch (err) {
+    console.error('Forgot password hiba:', err);
+    return res.json({ success: false, message: 'Szerver hiba. Próbálja újra később.' });
+  }
+});
+
+// Uj jelszo beallitasa token-nel
+app.post('/api/reset-password', async (req, res) => {
+  try {
+    const token = (req.body.token || '').trim();
+    const newPassword = req.body.password || '';
+
+    if (!token || !newPassword) {
+      return res.json({ success: false, message: 'Hiányzó adatok.' });
+    }
+    if (newPassword.length < 6) {
+      return res.json({ success: false, message: 'A jelszó legalább 6 karakter legyen.' });
+    }
+
+    const result = await pool.query(
+      'SELECT id, reset_token_expiry FROM users WHERE reset_token = $1',
+      [token]
+    );
+    if (result.rows.length === 0) {
+      return res.json({ success: false, message: 'Érvénytelen vagy már felhasznált link.' });
+    }
+    const user = result.rows[0];
+
+    if (!user.reset_token_expiry || new Date(user.reset_token_expiry) < new Date()) {
+      return res.json({ success: false, message: 'A link lejárt. Kérjen új visszaállítási linket.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await pool.query(
+      'UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expiry = NULL WHERE id = $2',
+      [passwordHash, user.id]
+    );
+
+    return res.json({ success: true, message: 'Jelszó sikeresen megváltoztatva. Most már bejelentkezhet.' });
+  } catch (err) {
+    console.error('Reset password hiba:', err);
+    return res.json({ success: false, message: 'Szerver hiba. Próbálja újra később.' });
+  }
+});
+
 app.get('/developer', (req, res) => res.sendFile(path.join(__dirname, 'public', 'developer.html')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 app.get('/manager', (req, res) => res.sendFile(path.join(__dirname, 'public', 'manager.html')));

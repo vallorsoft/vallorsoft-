@@ -28,6 +28,9 @@
       
       <button class="btn primary block xl" onclick="executeLogin()" id="btnLog">Bejelentkezés</button>
       
+      <div class="switch-link" style="margin-bottom:8px;">
+        <a href="#" onclick="forgotPassword();return false;">Elfelejtette a jelszavát?</a>
+      </div>
       <div class="switch-link">
         Nincs még fiókja? <a href="/register">Regisztráció kóddal</a>
       </div>
@@ -76,6 +79,26 @@
       .catch(err => {
         btn.disabled = false;
         btn.textContent = 'Bejelentkezés';
+        toast('Szerver kommunikációs hiba!', 'err');
+      });
+    }
+    
+    function forgotPassword(){
+      var emailVal = document.getElementById('email').value.trim();
+      if(!emailVal){
+        toast('Adja meg az email címét a mezőben, majd kattintson újra!', 'err');
+        return;
+      }
+      fetch('/api/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailVal })
+      })
+      .then(res => res.json())
+      .then(data => {
+        toast(data.message || 'Ha létezik a fiók, elküldtük a linket.', 'ok');
+      })
+      .catch(err => {
         toast('Szerver kommunikációs hiba!', 'err');
       });
     }
