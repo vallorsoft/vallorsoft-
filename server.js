@@ -219,7 +219,6 @@ if (helmet) {
           "https://*.firebase.com",
           "https://*.firebaseapp.com",
         ],
-        scriptSrcAttr: ["'unsafe-inline'"], // inline onclick/onchange handlerek (helmet default 'none' felulirasa)
         workerSrc: ["'self'", "blob:"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
@@ -537,24 +536,16 @@ app.post('/api/login', async (req, res) => {
     // Atmeneti "pre-auth" session - csak a 2FA lepeshez
     if (speakeasy) {
       if (user.totp_enabled && user.totp_secret) {
-        // 2FA be van kapcsolva -> kodot kerunk (minden szerepkor)
+        // 2FA be van kapcsolva -> kodot kerunk
         req.session.pendingUser = {
           id: user.id, nume: user.nume, email: user.email, tel: user.tel,
           pozicio: user.pozicio, company_id: user.company_id,
           is_dev: user.pozicio_dev || false,
         };
         return res.json({ success: true, need2fa: true });
-      } else if (user.pozicio !== 'Sofer') {
-        // 2FA meg nincs beallitva -> Admin/Manager kenyszeritett setup
-        // Sofor: 2FA nem kotelezo, egyenesen belep
-        req.session.pendingUser = {
-          id: user.id, nume: user.nume, email: user.email, tel: user.tel,
-          pozicio: user.pozicio, company_id: user.company_id,
-          is_dev: user.pozicio_dev || false,
-        };
-        return res.json({ success: true, setup2fa: true });
       }
-      // Sofor 2FA nelkul: folytatodik a normalis beleptetes lent
+      // 2FA nincs beallitva vagy ki van kapcsolva -> egyenesen belep
+      // Bekapcsolas onkentes, a Beallitasokbol (settings2faEnable)
     }
 
     // Ha speakeasy nincs telepitve, fallback a regi viselkedeshez
@@ -592,6 +583,44 @@ function calc2faRedirect(u) {
   if (u.pozicio === 'Manager') return '/manager';
   return '/sofer';
 }
+
+
+// ===== 2FA SETTINGS-BŐL: QR generálás (már bejelentkezett user) =====
+app.post('/api/2fa/settings-setup', requireLogin, async (req, res) => {
+  try {
+    if (!speakeasy || !qrcode) return res.json({ success: false, message: '2FA nem elérhető' });
+    const email = req.session.user.email;
+    const secret = speakeasy.generateSecret({ name: 'VallorSoft (' + email + ')', length: 20 });
+    req.session.pending2faSecret = secret.base32;
+    const qrDataUrl = await qrcode.toDataURL(secret.otpauth_url);
+    return res.json({ success: true, qr: qrDataUrl, secret: secret.base32 });
+  } catch (err) {
+    return res.json({ success: false, message: 'Szerver hiba' });
+  }
+});
+
+// ===== 2FA SETTINGS-BŐL: Megerősítés + bekapcsolás =====
+app.post('/api/2fa/settings-verify', requireLogin, async (req, res) => {
+  try {
+    if (!speakeasy) return res.json({ success: false, message: '2FA nem elérhető' });
+    const token = (req.body.token || '').trim().replace(/\s/g, '');
+    const secret = req.session.pending2faSecret;
+    if (!secret) return res.json({ success: false, message: 'Nincs folyamatban 2FA beállítás. Kezdd újra.' });
+    const verified = speakeasy.totp.verify({ secret, encoding: 'base32', token, window: 2 });
+    if (!verified) return res.json({ success: false, message: 'Helytelen kód. Próbáld újra.' });
+    const backupCodes = [];
+    for (let i = 0; i < 8; i++) backupCodes.push(crypto.randomBytes(4).toString('hex').toUpperCase());
+    const hashedBackup = await Promise.all(backupCodes.map(c => bcrypt.hash(c, 8)));
+    await pool.query(
+      'UPDATE users SET totp_secret = $1, totp_enabled = TRUE, totp_backup_codes = $2 WHERE id = $3',
+      [secret, JSON.stringify(hashedBackup), req.session.user.id]
+    );
+    delete req.session.pending2faSecret;
+    return res.json({ success: true, backupCodes });
+  } catch (err) {
+    return res.json({ success: false, message: 'Szerver hiba' });
+  }
+});
 
 // ===== 2FA SETUP: QR kod generalas (pre-auth session-bol) =====
 app.post('/api/2fa/setup', async (req, res) => {
@@ -757,124 +786,6 @@ app.post('/api/border-cross', async (req, res) => {
   }
 });
 
-
-// ============================================================
-//  DIURNA KALKULATOR
-//  Input: border_crossings sorok [{direction:'OUT'|'IN', crossed_at}]
-//  Output: {externDays, internDays, crossingLog:[{day,minutes,hours,type}]}
-//  Szabaly: adott naptari napon >= 12 ora kulfoldon = EXTERN, <12 = INTERN
-// ============================================================
-function calculateDiurna(crossings) {
-  if (!crossings || !crossings.length) return { externDays:0, internDays:0, crossingLog:[] };
-  const dayMin = {};
-  let lastOut = null;
-  for (const c of crossings) {
-    const ts = new Date(c.crossed_at);
-    if (c.direction === 'OUT') {
-      lastOut = ts;
-    } else if (c.direction === 'IN' && lastOut) {
-      let cur = new Date(lastOut);
-      while (cur < ts) {
-        const dk = cur.toISOString().slice(0,10);
-        const nextDay = new Date(dk); nextDay.setDate(nextDay.getDate()+1);
-        const end = ts < nextDay ? ts : nextDay;
-        dayMin[dk] = (dayMin[dk]||0) + Math.floor((end-cur)/60000);
-        cur = end;
-      }
-      lastOut = null;
-    }
-  }
-  let externDays=0, internDays=0;
-  const crossingLog = Object.entries(dayMin).sort().map(([day,min]) => {
-    const hours = +(min/60).toFixed(2);
-    const type = hours>=12 ? 'EXTERN' : 'INTERN';
-    if (type==='EXTERN') externDays++; else internDays++;
-    return {day, minutes:min, hours, type};
-  });
-  return {externDays, internDays, crossingLog};
-}
-
-// ============================================================
-//  GET /api/diurna-stats — Diurna statisztika minden sofőrre
-//  Csak Manager/Admin
-// ============================================================
-app.get('/api/diurna-stats', requireLogin, requireRole('Manager','Admin'), async (req,res) => {
-  const cid = req.session.user.company_id;
-  try {
-    const sofors = await pool.query(
-      `SELECT id, nume, email FROM users WHERE company_id=$1 AND pozicio='Sofer' ORDER BY nume`, [cid]
-    );
-    const result = [];
-    for (const s of sofors.rows) {
-      const cr = await pool.query(
-        `SELECT direction, crossed_at, lat, lng FROM border_crossings
-         WHERE email_sofer=$1 ORDER BY crossed_at ASC`, [s.email]
-      );
-      const d = calculateDiurna(cr.rows);
-      result.push({ driver_id:s.id, nume:s.nume, email:s.email,
-        externDays:d.externDays, internDays:d.internDays, crossingLog:d.crossingLog });
-    }
-    return res.json({ ok:true, data:result });
-  } catch(err) {
-    console.error('[diurna-stats]',err);
-    return res.json({ ok:false });
-  }
-});
-
-// ============================================================
-//  GET  /api/document-series?type=MT  — Aktuális széria lekérés
-//  POST /api/document-series          — Széria beállítás (prefix)
-//  POST /api/document-series/next     — Következő sorszám (atomikus)
-// ============================================================
-app.get('/api/document-series', requireLogin, requireRole('Manager','Admin'), async (req,res) => {
-  const cid = req.session.user.company_id;
-  const docType = (req.query.type||'MT').toUpperCase();
-  const year = new Date().getFullYear();
-  try {
-    const r = await pool.query(
-      `SELECT prefix, current_seq FROM document_series
-       WHERE company_id=$1 AND doc_type=$2 AND year=$3`, [cid,docType,year]
-    );
-    return res.json({ ok:true, prefix: r.rows[0]?.prefix||docType, currentSeq: r.rows[0]?.current_seq||0 });
-  } catch(err) { return res.json({ok:false}); }
-});
-
-app.post('/api/document-series', requireLogin, requireRole('Manager','Admin'), async (req,res) => {
-  const cid = req.session.user.company_id;
-  const { docType='MT', prefix } = req.body;
-  const year = new Date().getFullYear();
-  if (!prefix) return res.json({ok:false, err:'Prefix kötelező.'});
-  try {
-    await pool.query(
-      `INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq)
-       VALUES ($1,$2,$3,$4,0)
-       ON CONFLICT (company_id,doc_type,year)
-       DO UPDATE SET prefix=$3, current_seq=0, updated_at=NOW()`,
-      [cid, docType.toUpperCase(), prefix.toUpperCase(), year]
-    );
-    return res.json({ok:true});
-  } catch(err) { return res.json({ok:false}); }
-});
-
-app.post('/api/document-series/next', requireLogin, async (req,res) => {
-  const cid = req.session.user.company_id;
-  const docType = ((req.body&&req.body.docType)||'MT').toUpperCase();
-  const year = new Date().getFullYear();
-  try {
-    const r = await pool.query(
-      `INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq)
-       VALUES ($1,$2,$2,$3,1)
-       ON CONFLICT (company_id,doc_type,year)
-       DO UPDATE SET current_seq=document_series.current_seq+1, updated_at=NOW()
-       RETURNING prefix, current_seq`,
-      [cid, docType, year]
-    );
-    const {prefix, current_seq} = r.rows[0];
-    const docNumber = `${prefix}-${year}-${String(current_seq).padStart(4,'0')}`;
-    return res.json({ok:true, docNumber, seq:current_seq});
-  } catch(err) { return res.json({ok:false}); }
-});
-
 app.post('/api/fuvarlevel-save', async (req, res) => {
   try {
     if (!req.session.user) return res.json({ success: false, err: 'Nincs bejelentkezve' });
@@ -883,33 +794,6 @@ app.post('/api/fuvarlevel-save', async (req, res) => {
     const soferNameClean = req.session.user.nume.replace(/\s+/g, '_');
     const id = "FUV-" + randId;
     const fileName = `Menetlevel_${soferNameClean}_${randId}.pdf`;
-
-    // Auto sorszám generálás
-    const cid = req.session.user.company_id;
-    const year = new Date().getFullYear();
-    const seqR = await pool.query(
-      `INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq)
-       VALUES ($1,'MT','MT',$2,1)
-       ON CONFLICT (company_id,doc_type,year)
-       DO UPDATE SET current_seq=document_series.current_seq+1, updated_at=NOW()
-       RETURNING prefix, current_seq`,
-      [cid, year]
-    );
-    const autoDocNumber = seqR.rows[0]
-      ? `${seqR.rows[0].prefix}-${year}-${String(seqR.rows[0].current_seq).padStart(4,'0')}`
-      : null;
-
-    // Auto diurna számítás a sofőr határátlépési adataiból (utolsó 90 nap)
-    const crossR = await pool.query(
-      `SELECT direction, crossed_at FROM border_crossings
-       WHERE email_sofer=$1 AND crossed_at >= NOW()-INTERVAL '90 days'
-       ORDER BY crossed_at ASC`,
-      [req.session.user.email]
-    );
-    const diurnaCalc = calculateDiurna(crossR.rows);
-    const autoExtern = diurnaCalc.externDays;
-    const autoIntern = diurnaCalc.internDays;
-    const autoCrossings = diurnaCalc.crossingLog;
 
     const totalKm = Math.max(0, Number(d.kmSfarsit || 0) - Number(d.kmInceput || 0));
     let totalAlim = 0;
@@ -935,10 +819,10 @@ app.post('/api/fuvarlevel-save', async (req, res) => {
       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
       [
         id, fileName, req.session.user.email, req.session.user.nume,
-        d.numarCamion || null, d.numarRemorca || null, autoDocNumber || d.numarFisa || null, d.cursaSaptamanii || null,
+        d.numarCamion || null, d.numarRemorca || null, d.numarFisa || null, d.cursaSaptamanii || null,
         Number(d.kmInceput || 0), Number(d.kmSfarsit || 0), totalKm,
         d.locPlecare || null, d.locSosire || null, d.locDescTUR || null, d.locIncRETUR || null,
-        autoExtern || parseInt(d.diurnaExterna || 0), autoIntern || parseInt(d.diurnaInterna || 0),
+        parseInt(d.diurnaExterna || 0), parseInt(d.diurnaInterna || 0),
         cantInc, cantSf, motorinaFolosit, totalAlim, consum100,
         d.alteMentiuni || null,
         JSON.stringify(alimentari),
@@ -1018,14 +902,6 @@ app.get('/api/pdf-download/:id', async (req, res) => {
     if (!r.rows.length) return res.status(404).send('Nem található.');
     const f = r.rows[0];
 
-    // Határátlépési log a diurna táblázathoz
-    const crossR2 = await pool.query(
-      `SELECT direction, crossed_at FROM border_crossings WHERE email_sofer=$1 ORDER BY crossed_at ASC`,
-      [f.email_sofer]
-    );
-    const diurnaData = calculateDiurna(crossR2.rows);
-    const crossingsLog = diurnaData.crossingLog;
-
     const alimentari = Array.isArray(f.alimentari) ? f.alimentari : [];
     const achizitii  = Array.isArray(f.achizitii)  ? f.achizitii  : [];
     const puncte     = Array.isArray(f.puncte)      ? f.puncte     : [];
@@ -1101,9 +977,9 @@ app.get('/api/pdf-download/:id', async (req, res) => {
     <div class="header-box">VALLOR TEAM SRL<br><span style="font-size:14px;">FIȘĂ DE CURSĂ SĂPTĂMÂNALĂ</span></div>
 
     <table class="grid-table">
-      <tr><td width="50%"><b>Nume șofer:</b> ${f.nume_sofer || '—'}</td><td><b>Nr. document:</b> ${f.numar_fisa || '—'}</td></tr>
+      <tr><td width="50%"><b>Nume șofer:</b> ${f.nume_sofer || '—'}</td><td><b>Număr fișă:</b> ${f.numar_fisa || '—'}</td></tr>
       <tr><td><b>Număr camion:</b> ${f.numar_camion || '—'}</td><td><b>Număr remorcă:</b> ${f.numar_remorca || '—'}</td></tr>
-      <tr><td><b>Fuvar ID-k:</b> ${orderIdsStr}</td><td><b>Data:</b> ${new Date(f.data_completare||Date.now()).toLocaleDateString('ro-RO')}</td></tr>
+      <tr><td><b>Cursa săptămânii:</b> ${f.cursa_saptamanii || '—'}</td><td><b>Fuvar ID-k:</b> ${orderIdsStr}</td></tr>
       <tr><td><b>Km început:</b> ${f.km_inceput || 0} km</td><td><b>Km sfârșit:</b> ${f.km_sfarsit || 0} km</td></tr>
       <tr><td colspan="2"><b>Total kilometri parcurși: ${f.total_km || 0} km</b></td></tr>
       <tr><td><b>Diurnă externă:</b> ${f.diurna_externa || 0} nap</td><td><b>Diurnă internă:</b> ${f.diurna_interna || 0} nap</td></tr>
@@ -1136,18 +1012,6 @@ app.get('/api/pdf-download/:id', async (req, res) => {
 
     <div class="sec-title">Alte mențiuni (Megjegyzések)</div>
     <div style="border:1px solid #000;padding:10px;min-height:40px;">${f.alte_mentiuni || '—'}</div>
-
-    <div class="sec-title">Traversări frontieră (Határátlépések)</div>
-    <table class="grid-table">
-      <tr><th>Dată</th><th>Direcție</th><th>Ore în străinătate</th><th>Tip diurnă</th></tr>
-      \${(function(){
-        try {
-          var log = ${JSON.stringify(crossingsLog)};
-          if(!log||!log.length) return '<tr><td colspan=4>—</td></tr>';
-          return log.map(function(r){ return '<tr><td>'+r.day+'</td><td>Kint</td><td>'+r.hours+' ó</td><td><b style="color:'+(r.type==='EXTERN'?'#006400':'#8B4513')+'">'+r.type+'</b></td></tr>'; }).join('');
-        } catch(e){ return '<tr><td colspan=4>—</td></tr>'; }
-      })()}
-    </table>
 
     <div style="margin-top:30px;display:flex;justify-content:space-between;">
       <div style="text-align:center;"><div style="border-top:1px solid #000;width:180px;margin:0 auto;padding-top:4px;">Semnătura șofer</div></div>
@@ -1386,8 +1250,6 @@ app.post('/api/execute', requireLogin, async (req, res) => {
       }
     
       const email = String(args[1] || '').trim().toLowerCase();
-      const nume  = String(args[2] || '').trim() || null;
-      const tel   = String(args[3] || '').trim() || null;
 
       if (!['Admin', 'Manager', 'Sofer'].includes(pozicio)) {
         return res.json({ result: { ok: false, err: 'Ervenytelen pozicio.' } });
@@ -1401,8 +1263,8 @@ app.post('/api/execute', requireLogin, async (req, res) => {
       }
 
       await pool.query(
-        `INSERT INTO invites (kod, pozicio, email, status, company_id, nume, tel) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [kod, pozicio, email, 'Aktiv', req.session.user.company_id || null, nume, tel]
+        `INSERT INTO invites (kod, pozicio, email, status, company_id) VALUES ($1, $2, $3, $4, $5)`,
+        [kod, pozicio, email, 'Aktiv', req.session.user.company_id || null]
       );
 
       // Email kuldese ha van email cim
@@ -1558,6 +1420,7 @@ app.post('/api/execute', requireLogin, async (req, res) => {
         `SELECT id, client, ref, loc_incarcare, loc_descarcare, km, rendszam_camion, rendszam_remorca, status
          FROM orders
          WHERE company_id = $1 AND LOWER(email_sofer) = LOWER($2)
+           AND status IN ('Alocat','In Curs')
          ORDER BY created_at DESC`,
         [me.company_id, me.email]
       );
@@ -2528,7 +2391,7 @@ app.post('/api/execute', requireLogin, async (req, res) => {
       for (let i = 0; i < 6; i++) kod += chars.charAt(Math.floor(Math.random() * chars.length));
 
       await pool.query(
-        `INSERT INTO invites (kod, pozicio, email, status, company_id, nume, tel) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO invites (kod, pozicio, email, status, company_id) VALUES ($1, $2, $3, $4, $5)`,
         [kod, 'Admin', f.email_contact||null, 'Aktiv', companyId]
       );
 
@@ -3340,157 +3203,6 @@ app.get('/api/shift/week-summary', requireLogin, async (req, res) => {
   } catch (err) {
     console.error('[shift/week-summary] hiba:', err);
     return res.json({ ok: false });
-  }
-});
-
-
-// ============================================================
-//  GET /api/shift/fleet-compliance — Admin/Manager flotta dashboard
-//  Query: ?week_offset=N  (0 = aktualis het, 1 = elozo het, ...)
-//  Visszaadja: kpi, fleet_status, compliance, rest_avg, overtime_alerts
-//  Cegszures: csak a sajat ceg (company_id) soforjei
-// ============================================================
-app.get('/api/shift/fleet-compliance', requireLogin, requireRole('Manager', 'Admin'), async (req, res) => {
-  const user = req.session.user;
-  try {
-    const cid = user.company_id;
-    const weekOffset = Math.max(0, Math.min(52, parseInt(req.query.week_offset, 10) || 0));
-    const base = new Date();
-    base.setUTCDate(base.getUTCDate() - weekOffset * 7);
-    const weekStart = getWeekStart(base);
-
-    // ---- 1. Flotta valos ideju statusz (legutobbi nem-INACTIVE shift soforonkent) ----
-    const fleetRes = await pool.query(
-      `SELECT u.id AS driver_id, u.nume, u.email,
-              COALESCE(ds.status, 'INACTIVE') AS status,
-              ds.day_started_at, ds.paused_at, ds.rest_type,
-              ds.next_shift_start, ds.locked_until, ds.is_overtime,
-              ds.shift_index_in_week, ds.weekly_hours_total,
-              CASE WHEN ds.status = 'ACTIVE' AND ds.day_started_at IS NOT NULL
-                   THEN GREATEST(0,
-                        EXTRACT(EPOCH FROM (NOW() - ds.day_started_at)) / 3600.0
-                        - COALESCE(ds.paused_total_minutes, 0) / 60.0)
-                   ELSE NULL END AS current_active_hours
-       FROM users u
-       LEFT JOIN LATERAL (
-         SELECT * FROM driver_shifts d
-         WHERE d.driver_id = u.id AND d.status <> 'INACTIVE'
-         ORDER BY d.updated_at DESC LIMIT 1
-       ) ds ON TRUE
-       WHERE u.company_id = $1 AND u.pozicio = 'Sofer'
-       ORDER BY u.nume`,
-      [cid]
-    );
-    const fleet_status = fleetRes.rows.map(r => ({
-      driver_id:            r.driver_id,
-      nume:                 r.nume,
-      email:                r.email,
-      status:               r.status,
-      rest_type:            r.rest_type,
-      current_active_hours: r.current_active_hours,
-      next_shift_start:     r.next_shift_start,
-      shift_index_in_week:  r.shift_index_in_week,
-      weekly_hours_total:   r.weekly_hours_total,
-      locked_until:         r.locked_until,
-      is_overtime:          r.is_overtime,
-      paused_at:            r.paused_at
-    }));
-
-    const now = Date.now();
-    const kpi = {
-      total_drivers: fleet_status.length,
-      active_count:  fleet_status.filter(f => f.status === 'ACTIVE').length,
-      paused_count:  fleet_status.filter(f => f.status === 'PAUSED').length,
-      rest_count:    fleet_status.filter(f => f.status === 'REST' && f.rest_type !== 'vacation').length,
-      vacation_count:fleet_status.filter(f => f.status === 'REST' && f.rest_type === 'vacation').length,
-      locked_count:  fleet_status.filter(f => f.locked_until && new Date(f.locked_until).getTime() > now).length
-    };
-
-    // ---- 2. Heti compliance: lezart muszakok oraszama soforonkent az adott heten ----
-    const compRes = await pool.query(
-      `SELECT u.id AS driver_id, u.nume, u.email,
-              COALESCE(SUM(
-                CASE WHEN ds.day_started_at IS NOT NULL AND ds.day_closed_at IS NOT NULL
-                     THEN GREATEST(0,
-                          EXTRACT(EPOCH FROM (ds.day_closed_at - ds.day_started_at)) / 3600.0
-                          - COALESCE(ds.paused_total_minutes, 0) / 60.0)
-                     ELSE 0 END), 0) AS weekly_hours,
-              COUNT(ds.shift_id) FILTER (WHERE ds.day_started_at IS NOT NULL) AS shifts_count,
-              COUNT(ds.shift_id) FILTER (WHERE ds.is_overtime = TRUE)        AS overtime_count
-       FROM users u
-       LEFT JOIN driver_shifts ds
-         ON ds.driver_id = u.id AND ds.week_start_date = $2
-       WHERE u.company_id = $1 AND u.pozicio = 'Sofer'
-       GROUP BY u.id, u.nume, u.email
-       ORDER BY weekly_hours DESC`,
-      [cid, weekStart]
-    );
-    const compliance = compRes.rows.map(r => ({
-      driver_id:      r.driver_id,
-      nume:           r.nume,
-      weekly_hours:   parseFloat(r.weekly_hours).toFixed(1),
-      shifts_count:   parseInt(r.shifts_count, 10),
-      overtime_count: parseInt(r.overtime_count, 10)
-    }));
-
-    // ---- 3. Piheno atlagok (utolso 30 nap, tipusonkent) ----
-    const restRes = await pool.query(
-      `SELECT ds.rest_type,
-              AVG(ds.rest_hours)  AS avg_hours,
-              MIN(ds.rest_hours)  AS min_hours,
-              MAX(ds.rest_hours)  AS max_hours,
-              COUNT(*)            AS db
-       FROM driver_shifts ds
-       JOIN users u ON u.id = ds.driver_id
-       WHERE u.company_id = $1 AND u.pozicio = 'Sofer'
-         AND ds.rest_type IS NOT NULL AND ds.rest_hours IS NOT NULL
-         AND ds.created_at >= NOW() - INTERVAL '30 days'
-       GROUP BY ds.rest_type`,
-      [cid]
-    );
-    const rest_avg = restRes.rows.map(r => ({
-      rest_type: r.rest_type,
-      avg_hours: parseFloat(r.avg_hours).toFixed(1),
-      min_hours: parseFloat(r.min_hours).toFixed(1),
-      max_hours: parseFloat(r.max_hours).toFixed(1),
-      db:        parseInt(r.db, 10)
-    }));
-
-    // ---- 4. Tullepes riasztasok (utolso 14 nap, is_overtime) ----
-    const otRes = await pool.query(
-      `SELECT u.nume, u.email, ds.day_started_at, ds.overtime_reason,
-              CASE WHEN ds.day_closed_at IS NOT NULL AND ds.day_started_at IS NOT NULL
-                   THEN EXTRACT(EPOCH FROM (ds.day_closed_at - ds.day_started_at)) / 3600.0
-                   ELSE NULL END AS active_hours
-       FROM driver_shifts ds
-       JOIN users u ON u.id = ds.driver_id
-       WHERE u.company_id = $1 AND u.pozicio = 'Sofer'
-         AND ds.is_overtime = TRUE
-         AND ds.day_started_at >= NOW() - INTERVAL '14 days'
-       ORDER BY ds.day_started_at DESC
-       LIMIT 50`,
-      [cid]
-    );
-    const overtime_alerts = otRes.rows.map(r => ({
-      nume:            r.nume,
-      email:           r.email,
-      day_started_at:  r.day_started_at,
-      active_hours:    r.active_hours != null ? parseFloat(r.active_hours).toFixed(1) : '0',
-      overtime_reason: r.overtime_reason
-    }));
-
-    return res.json({
-      ok: true,
-      week_start: weekStart,
-      kpi,
-      fleet_status,
-      compliance,
-      rest_avg,
-      overtime_alerts
-    });
-  } catch (err) {
-    console.error('[shift/fleet-compliance] hiba:', err);
-    return res.json({ ok: false, message: 'Szerver hiba a flotta statisztika lekeresekor.' });
   }
 });
 

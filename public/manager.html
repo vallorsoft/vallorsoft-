@@ -610,8 +610,29 @@
             </div>
             <button class="btn danger" onclick="settings2faDisable()">🔓 2FA kikapcsolása</button>
           </div>
+
           <div id="st2faEnableWrap" style="display:none;">
-            <p style="color:var(--muted);font-size:13px;margin:0 0 12px 0;">A 2FA aktiválásához jelentkezz ki, majd az első bejelentkezéskor automatikusan be kell állítani.</p>
+            <p style="color:var(--muted);font-size:13px;margin:0 0 14px;">A 2FA bekapcsolásával minden belépésnél kódbevitel szükséges (Google Authenticator vagy hasonló app).</p>
+            <button class="btn primary" type="button" id="btn2faStart" onclick="settings2faStart()">🔐 2FA bekapcsolása</button>
+          </div>
+
+          <!-- 2FA setup modal (settings-ből) -->
+          <div class="modal-back" id="modal2faSetup">
+            <div class="modal glass" style="width:min(420px,100%);text-align:center;">
+              <h3 style="margin-top:0;">🔐 2FA bekapcsolása</h3>
+              <p style="color:var(--muted);font-size:13px;">Olvasd be a QR kódot Google Authenticator vagy Authy appban, majd add meg az első kódot a megerősítéshez.</p>
+              <div id="setup2faQrWrap" style="margin:16px 0;">
+                <div class="spinner" style="margin:0 auto;"></div>
+              </div>
+              <div class="field" style="text-align:left;">
+                <label>Megerősítő kód (6 jegy)</label>
+                <input class="input" type="tel" id="setup2faCode" maxlength="6" placeholder="000000" style="font-size:22px;letter-spacing:6px;text-align:center;">
+              </div>
+              <div style="display:flex;gap:10px;margin-top:14px;">
+                <button class="btn ghost col" type="button" onclick="close2faSetupModal()">Mégse</button>
+                <button class="btn primary col" type="button" id="btn2faConfirm" onclick="settings2faConfirm()">✅ Megerősítés</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -962,6 +983,47 @@ function settingsChangePassword(){
       toast((r&&r.err)||'Hiba','err');
     }
   });
+}
+
+
+// ── 2FA Settings bekapcsolás ──────────────────────────────
+function settings2faStart() {
+  document.getElementById('setup2faQrWrap').innerHTML = '<div class="spinner" style="margin:0 auto;"></div>';
+  document.getElementById('setup2faCode').value = '';
+  document.getElementById('modal2faSetup').classList.add('open');
+  fetch('/api/2fa/settings-setup', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.success) {
+        document.getElementById('setup2faQrWrap').innerHTML =
+          '<img src="'+d.qr+'" style="width:180px;height:180px;border-radius:8px;">';
+      } else {
+        document.getElementById('setup2faQrWrap').innerHTML =
+          '<p style="color:var(--err);">'+( d.message||'Hiba')+'</p>';
+      }
+    });
+}
+function settings2faConfirm() {
+  var code = document.getElementById('setup2faCode').value.trim();
+  if (!code || code.length !== 6) { toast('Add meg a 6 jegyű kódot!','err'); return; }
+  var btn = document.getElementById('btn2faConfirm');
+  btn.disabled = true; btn.textContent = '...';
+  fetch('/api/2fa/settings-verify', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ token: code })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    btn.disabled = false; btn.textContent = '✅ Megerősítés';
+    if (d.success) {
+      document.getElementById('modal2faSetup').classList.remove('open');
+      toast('✅ 2FA sikeresen bekapcsolva!','ok');
+      loadSettingsPane();
+    } else {
+      toast(d.message||'Helytelen kód','err');
+    }
+  });
+}
+function close2faSetupModal() {
+  document.getElementById('modal2faSetup').classList.remove('open');
 }
 
 function settings2faDisable(){
