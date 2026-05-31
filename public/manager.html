@@ -1426,23 +1426,44 @@ function downloadSelectedOrders() {
   var ids = Array.from(checked).map(function(cb){ return String(cb.value); });
   var selected = _ordersAllCache.filter(function(c){ return ids.indexOf(String(c.id)) !== -1; });
   var now = new Date().toLocaleDateString('hu-HU');
+
   var rows = selected.map(function(c){
     var soferInfo = '—';
     if (c.sofer_type === 'Intern') soferInfo = c.nume_sofer || c.email_sofer || '—';
     else if (c.sofer_type === 'Extern') soferInfo = c.nume_sofer || c.firma_extern || '—';
-    return '<tr>'+
-      '<td style="font-weight:bold;">'+esc(String(c.id))+'</td>'+
-      '<td>'+esc(c.client||'—')+'</td>'+
-      '<td>'+esc(c.ref||'—')+'</td>'+
-      '<td>'+esc(c.loc_incarcare||'—')+'</td>'+
-      '<td>'+esc(c.loc_descarcare||'—')+'</td>'+
-      '<td style="text-align:right;">'+esc(String(c.km||'—'))+'</td>'+
-      '<td style="text-align:right;">'+esc(String(c.pret||'—'))+'</td>'+
-      '<td>'+esc(soferInfo)+'</td>'+
-      '<td>'+esc(c.rendszam_camion||'—')+(c.rendszam_remorca?' / '+esc(c.rendszam_remorca):'')+'</td>'+
-      '<td style="text-align:center;">'+esc(c.status||'—')+'</td>'+
+    var legs = Array.isArray(c.legs_json) ? c.legs_json : [];
+
+    // Alap sor
+    var out = '<tr style="background:#fff;">'+
+      '<td style="font-weight:bold;vertical-align:top;">'+esc(String(c.id))+'</td>'+
+      '<td style="vertical-align:top;">'+esc(c.client||'—')+'</td>'+
+      '<td style="vertical-align:top;">'+esc(c.ref||'—')+'</td>'+
+      '<td style="vertical-align:top;">'+esc(c.loc_incarcare||'—')+'</td>'+
+      '<td style="vertical-align:top;">'+esc(c.loc_descarcare||'—')+'</td>'+
+      '<td style="text-align:right;vertical-align:top;">'+esc(String(c.km||'—'))+'</td>'+
+      '<td style="text-align:right;vertical-align:top;">'+esc(String(c.pret||'—'))+'</td>'+
+      '<td style="vertical-align:top;">'+esc(soferInfo)+'</td>'+
+      '<td style="vertical-align:top;">'+esc(c.rendszam_camion||'—')+(c.rendszam_remorca?' / '+esc(c.rendszam_remorca):'')+'</td>'+
+      '<td style="text-align:center;vertical-align:top;">'+esc(c.status||'—')+'</td>'+
     '</tr>';
+
+    // Szakasz sorok (váltások)
+    legs.forEach(function(l){
+      out += '<tr style="background:#f0f4ff;">'+
+        '<td style="padding-left:18px;font-size:11px;color:#555;">↳ '+esc(String(l.leg_number||''))+'</td>'+
+        '<td colspan="2" style="font-size:11px;color:#555;font-style:italic;">Váltás / szakasz</td>'+
+        '<td style="font-size:11px;">'+esc(l.loc_preluare||'—')+'</td>'+
+        '<td style="font-size:11px;color:#888;">—</td>'+
+        '<td></td><td></td>'+
+        '<td style="font-size:11px;">'+esc(l.sofer||'—')+'</td>'+
+        '<td style="font-size:11px;">'+esc(l.rendszam||'—')+'</td>'+
+        '<td></td>'+
+      '</tr>';
+    });
+
+    return out;
   }).join('');
+
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fuvarfeladatok — '+now+'</title>'+
     '<style>'+
     'body{font-family:Arial,sans-serif;padding:24px;font-size:13px;color:#000;}'+
@@ -1450,28 +1471,29 @@ function downloadSelectedOrders() {
     '.header h1{font-size:18px;margin:0 0 2px;}'+
     '.header p{font-size:12px;color:#555;margin:0;}'+
     'table{width:100%;border-collapse:collapse;margin-top:4px;}'+
-    'th{background:#d8d8d8;border:1px solid #aaa;padding:6px 8px;font-size:11px;text-align:left;white-space:nowrap;}'+
-    'td{border:1px solid #ccc;padding:5px 8px;font-size:12px;vertical-align:top;}'+
-    'tr:nth-child(even) td{background:#f5f5f5;}'+
+    'th{background:#d0d0d0;border:1px solid #aaa;padding:6px 8px;font-size:11px;text-align:left;white-space:nowrap;}'+
+    'td{border:1px solid #ddd;padding:5px 8px;font-size:12px;}'+
     '.footer{font-size:11px;color:#888;margin-top:14px;}'+
     '.no-print{margin-bottom:18px;}'+
     '@media print{.no-print{display:none;} body{padding:12px;}}'+
     '</style></head><body>'+
     '<div class="no-print"><button onclick="window.print()" style="padding:10px 24px;background:#1a1a2e;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:6px;font-size:14px;">🖨️ Nyomtatás / PDF mentés</button></div>'+
-    '<div class="header"><h1>VALLOR TEAM SRL — Fuvarfeladatok</h1><p>Nyomtatva: '+now+' &nbsp;·&nbsp; '+selected.length+' fuvar</p></div>'+
+    '<div class="header"><h1>VALLOR TEAM SRL — Fuvarfeladatok</h1>'+
+    '<p>Nyomtatva: '+now+' &nbsp;·&nbsp; '+selected.length+' fuvar &nbsp;·&nbsp; A kék sorok a váltásokat / szakaszokat jelölik</p></div>'+
     '<table><thead><tr>'+
-    '<th>#ID</th><th>Ügyfél</th><th>Ref</th><th>Felrakás helye</th><th>Lerakás helye</th>'+
-    '<th>KM</th><th>Ár (EUR)</th><th>Sofőr</th><th>Vontató / Pótkocsi</th><th>Státusz</th>'+
+    '<th>#ID</th><th>Ügyfél</th><th>Ref</th><th>Felrakás / Átvétel helye</th><th>Lerakás helye</th>'+
+    '<th>KM</th><th>Ár (EUR)</th><th>Sofőr / Váltó sofőr</th><th>Vontató / Pótkocsi</th><th>Státusz</th>'+
     '</tr></thead><tbody>'+rows+'</tbody></table>'+
-    '<div class="footer">VallorSoft fuvarmenedzsment rendszer &nbsp;·&nbsp; Generálva: '+now+'</div>'+
+    '<div class="footer">VallorSoft fuvarmenedzsment · Generálva: '+now+'</div>'+
     '</body></html>';
+
   var blob = new Blob([html], {type:'text/html;charset=utf-8'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url; a.download = 'fuvarok-'+now.replace(/\./g,'-')+'.html';
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
-  toast('✅ Táblázat letöltve — megnyitás után nyomtatható / PDF-ként menthető!', 'ok');
+  toast('✅ Táblázat letöltve — a váltások kék sorokban jelennek meg!', 'ok');
 }
 
 function loadOrderFormData(){
