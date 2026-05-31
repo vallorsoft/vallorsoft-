@@ -13,187 +13,361 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css">
   <style>
-    .sofer-shell { max-width: 520px; margin: 0 auto; padding: 0 0 72px 0; min-height: 100svh; }
-    .sofer-top { display: flex; align-items: center; justify-content: space-between; padding: 16px 16px 10px; }
-    .sofer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px 16px; }
-    .big-card { border-radius: 18px; padding: 22px 12px; text-align: center;
-      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(0,0,0,0.4));
-      border: 1px solid var(--border-bright); box-shadow: var(--shadow-lg);
-      cursor: pointer; min-height: 80px; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 8px;
-      font-weight: 700; font-size: 15px; color: var(--text); }
-    .big-card .ico { font-size: 32px; }
-    .big-card.red { background: linear-gradient(180deg, rgba(225,11,26,0.30), rgba(0,0,0,0.5)); border-color: rgba(225,11,26,0.6); }
-    .big-card.white { background: linear-gradient(180deg, #ffffff, #d9dee6); color: #0a0f15; border-color: #fff; }
-    .big-card.logout { background: rgba(239,68,68,0.08); border-color: var(--err); }
-    .pane-sofer { padding: 0 16px; }
-    .pane-sofer.hidden { display: none !important; }
-    .sec-title { display: flex; align-items: center; gap: 10px; padding: 10px 16px 6px; }
-    .sec-title .back-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 22px; padding: 4px; }
-    .sec-title h3 { margin: 0; font-size: 18px; color: #fff; }
-    .border-btns { display: flex; flex-direction: column; gap: 14px; margin-top: 10px; }
-    .border-btn { padding: 28px 16px; border-radius: 18px; font-size: 20px; font-weight: 800;
-      text-align: center; cursor: pointer; border: none; color: #fff; letter-spacing: .3px; }
-    .border-btn.in { background: linear-gradient(180deg, #22c55e, #15803d); }
-    .border-btn.out { background: linear-gradient(180deg, #ef4444, #b91c1c); }
-    .border-log { margin-top: 16px; }
-    .border-log-item { background: var(--bg-2); border: 1px solid var(--border); border-radius: 10px;
-      padding: 10px 14px; margin-bottom: 8px; font-size: 13px; color: var(--soft); }
-    .border-log-item strong { color: #fff; }
-    .field { margin-bottom: 12px; }
-    .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
-    .input, .textarea { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid var(--border-bright);
-      border-radius: var(--r-sm); padding: 12px 14px; color: var(--text); font-size: 15px; outline: none;
-      appearance: none; -webkit-appearance: none; }
-    .input:focus, .textarea:focus { border-color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.06); }
-    .textarea { min-height: 80px; resize: none; font-family: inherit; }
-    .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-    .section-head { font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .5px;
-      color: var(--muted); border-bottom: 1px solid var(--border); padding-bottom: 6px; margin: 20px 0 10px; }
-    .dyn-row { background: var(--bg-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; position: relative; }
-    .dyn-row .del-row { position: absolute; top: 10px; right: 10px; background: none; border: none;
-      color: var(--err); cursor: pointer; font-size: 18px; line-height: 1; padding: 2px; }
-    .add-row-btn { display: flex; align-items: center; justify-content: center; gap: 6px;
-      width: 100%; padding: 12px; border-radius: 10px; border: 1px dashed var(--border-bright);
-      background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
-    .submit-btn { width: 100%; padding: 18px; border-radius: 14px; background: linear-gradient(180deg,#fff,#d9dee6);
-      color: #0a0f15; font-size: 17px; font-weight: 800; border: none; cursor: pointer; margin-top: 20px; letter-spacing: .3px; }
-    .docs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
-    .doc-type-btn { padding: 18px 10px; border-radius: 14px; text-align: center; font-size: 14px; font-weight: 700;
-      background: var(--bg-2); border: 1px solid var(--border-bright); color: var(--text); cursor: pointer; }
-    .doc-type-btn.sel { border-color: var(--ok); color: var(--ok); background: rgba(34,197,94,0.08); }
-    .upload-area { margin-top: 16px; border: 2px dashed var(--border-bright); border-radius: 14px;
-      padding: 32px 16px; text-align: center; color: var(--muted); cursor: pointer; }
-    .upload-area input { display: none; }
-    .sofer-bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 12px;
-      background: linear-gradient(180deg, rgba(10,15,21,0.4), rgba(10,15,21,0.97));
-      border-top: 1px solid var(--border); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      display: flex; gap: 6px; justify-content: space-around; z-index: 50; }
-    .nav-btn { flex: 1; padding: 11px 4px; border-radius: 12px; text-align: center; font-weight: 600;
-      background: rgba(255,255,255,0.03); border: 1px solid var(--border); color: var(--muted);
-      cursor: pointer; font-size: 11px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
-    .nav-btn .nav-ico { font-size: 20px; }
-    .nav-btn.active { background: linear-gradient(180deg,#fff,#dde3ec); color: #0a0f15; border-color: #fff; }
-    .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
-    .badge.info { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
-    .toast-wrap { position: fixed; top: 16px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
-    .toast { padding: 12px 18px; border-radius: 10px; font-size: 14px; font-weight: 600;
-      background: var(--bg-3); border: 1px solid var(--border-bright); color: var(--text);
-      animation: slideIn .2s ease; max-width: 280px; }
-    .toast.ok { border-color: var(--ok); color: var(--ok); }
-    .toast.err { border-color: var(--err); color: var(--err); }
-    @keyframes slideIn { from { opacity:0; transform: translateX(20px); } to { opacity:1; transform: translateX(0); } }
-    .gps-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
-      border-radius: 20px; font-size: 12px; font-weight: 700; margin-top: 10px;
-      background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3); color: var(--ok); }
-    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.2);
-      border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  
-    
- 
-  /* ── Shift banner a főoldalon ─────────────────────────────── */
+  /* ── Alapok ──────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { height: 100%; overflow-x: hidden; }
+  body { overflow-x: hidden; touch-action: pan-y; }
+
+  /* ── Shell — safe area + dynamic viewport ────────────────── */
+  .sofer-shell {
+    max-width: 520px; margin: 0 auto;
+    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+    min-height: 100dvh;
+  }
+
+  /* ── Top bar — sticky, blur, safe area top ───────────────── */
+  .sofer-top {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px;
+    background: rgba(5,7,11,0.92);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── Szekciók ────────────────────────────────────────────── */
+  .pane-sofer { padding: 0 16px 8px; }
+  .pane-sofer.hidden { display: none !important; }
+  @keyframes secEnter { from { opacity:0; transform:translateX(8px); } to { opacity:1; transform:translateX(0); } }
+  .pane-sofer.sec-entering { animation: secEnter .2s ease forwards; }
+
+  /* ── Main grid ───────────────────────────────────────────── */
+  .sofer-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; padding: 10px 16px 4px;
+  }
+  .big-card {
+    border-radius: 18px; padding: 22px 12px; text-align: center;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border-bright);
+    cursor: pointer; min-height: 80px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; font-weight: 700; font-size: 15px; color: var(--text);
+    touch-action: manipulation;
+    transition: transform .12s ease, opacity .12s ease;
+    user-select: none;
+  }
+  .big-card:active { transform: scale(0.95); opacity: .82; }
+  .big-card .ico { font-size: 30px; }
+  .big-card.red {
+    background: rgba(225,11,26,0.12);
+    border-color: rgba(225,11,26,0.45);
+  }
+  .big-card.logout { background: rgba(239,68,68,0.07); border-color: rgba(239,68,68,0.35); }
+
+  /* ── Szekció cím ─────────────────────────────────────────── */
+  .sec-title {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 0 8px; position: sticky; top: 56px; z-index: 30;
+    background: var(--bg-1);
+  }
+  .back-btn {
+    background: rgba(255,255,255,0.06); border: 1px solid var(--border-bright);
+    color: var(--soft); cursor: pointer; font-size: 18px;
+    padding: 0; width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; touch-action: manipulation;
+    transition: opacity .12s;
+  }
+  .back-btn:active { opacity: .6; }
+  .sec-title h3 { margin: 0; font-size: 17px; font-weight: 800; color: #fff; }
+
+  /* ── Határátlépés ────────────────────────────────────────── */
+  .border-btns { display: flex; flex-direction: column; gap: 12px; margin-top: 6px; }
+  .border-btn {
+    padding: 26px 16px; border-radius: 20px; font-size: 20px; font-weight: 800;
+    text-align: center; cursor: pointer; border: none; color: #fff;
+    letter-spacing: .3px; touch-action: manipulation;
+    transition: transform .12s, opacity .12s;
+  }
+  .border-btn:active { transform: scale(0.97); opacity: .88; }
+  .border-btn.in  { background: linear-gradient(180deg,#22c55e,#15803d); }
+  .border-btn.out { background: linear-gradient(180deg,#ef4444,#b91c1c); }
+  .border-log-item {
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;
+    font-size: 13px; color: var(--soft);
+  }
+  .border-log-item strong { color: #fff; }
+
+  /* ── Form elemek — iOS zoom fix: min 16px ────────────────── */
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block; font-size: 12px; color: var(--muted);
+    margin-bottom: 6px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .5px;
+  }
+  .input, .textarea {
+    width: 100%;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border-bright);
+    border-radius: var(--r-sm);
+    padding: 13px 14px;
+    color: var(--text);
+    font-size: 16px; /* iOS zoom: min 16px */
+    outline: none;
+    appearance: none; -webkit-appearance: none;
+    transition: border-color .15s, background .15s, box-shadow .15s;
+  }
+  .input:focus, .textarea:focus {
+    border-color: rgba(255,255,255,0.4);
+    background: rgba(255,255,255,0.07);
+    box-shadow: 0 0 0 3px rgba(225,11,26,0.12);
+  }
+  .textarea { min-height: 80px; resize: none; font-family: inherit; }
+  select.input { padding-right: 32px; }
+
+  /* ── Grid elrendezések ───────────────────────────────────── */
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+  /* ── Szekció fejlécek ────────────────────────────────────── */
+  .section-head {
+    font-weight: 700; font-size: 12px; text-transform: uppercase;
+    letter-spacing: .5px; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px; margin: 20px 0 12px;
+  }
+
+  /* ── Dinamikus sorok ─────────────────────────────────────── */
+  .dyn-row {
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 12px 10px; margin-bottom: 10px;
+    position: relative;
+  }
+  .dyn-row .del-row {
+    position: absolute; top: 10px; right: 10px;
+    background: none; border: none; color: var(--err);
+    cursor: pointer; font-size: 20px; line-height: 1;
+    padding: 4px; min-width: 32px; min-height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    touch-action: manipulation;
+  }
+  .add-row-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; padding: 13px; border-radius: 12px;
+    border: 1.5px dashed var(--border-bright);
+    background: transparent; color: var(--muted);
+    cursor: pointer; font-size: 14px; font-weight: 600;
+    margin-bottom: 4px; touch-action: manipulation;
+    transition: opacity .12s;
+  }
+  .add-row-btn:active { opacity: .6; }
+
+  /* ── Fő akció gomb ───────────────────────────────────────── */
+  .submit-btn {
+    width: 100%; padding: 17px;
+    border-radius: 16px;
+    background: linear-gradient(180deg,#fff,#d9dee6);
+    color: #0a0f15; font-size: 16px; font-weight: 800;
+    border: none; cursor: pointer; margin-top: 20px;
+    letter-spacing: .2px; touch-action: manipulation;
+    transition: transform .12s, opacity .12s;
+  }
+  .submit-btn:active { transform: scale(0.98); opacity: .88; }
+
+  /* ── Iratok ──────────────────────────────────────────────── */
+  .docs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .doc-type-btn {
+    padding: 18px 10px; border-radius: 14px; text-align: center;
+    font-size: 14px; font-weight: 700;
+    background: var(--bg-2); border: 1px solid var(--border-bright);
+    color: var(--text); cursor: pointer;
+    touch-action: manipulation; transition: transform .12s, opacity .12s;
+  }
+  .doc-type-btn:active { transform: scale(0.96); }
+  .doc-type-btn.sel {
+    border-color: var(--ok); color: var(--ok);
+    background: rgba(34,197,94,0.08);
+  }
+  .upload-area {
+    margin-top: 14px; border: 2px dashed var(--border-bright);
+    border-radius: 16px; padding: 36px 16px; text-align: center;
+    color: var(--muted); cursor: pointer; touch-action: manipulation;
+    transition: border-color .15s, background .15s;
+  }
+  .upload-area:active { background: rgba(255,255,255,0.03); }
+  .upload-area input { display: none; }
+
+  /* ── Bottom nav — safe area, pill active indicator ───────── */
+  .sofer-bottom-bar {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    padding: 8px 6px calc(env(safe-area-inset-bottom, 0px) + 6px);
+    background: rgba(5,7,11,0.96);
+    border-top: 1px solid var(--border);
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    display: flex; gap: 2px; justify-content: space-around; z-index: 50;
+  }
+  .nav-btn {
+    flex: 1; padding: 6px 4px 4px; border-radius: 10px;
+    text-align: center; background: none; border: none;
+    color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 600;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    min-height: 50px; touch-action: manipulation;
+    transition: color .15s;
+  }
+  .nav-btn .nav-ico {
+    font-size: 22px; width: 44px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; transition: background .15s;
+  }
+  .nav-btn.active { color: #fff; }
+  .nav-btn.active .nav-ico { background: rgba(255,255,255,0.12); }
+  .nav-btn:active { opacity: .65; }
+
+  /* ── Chat ────────────────────────────────────────────────── */
+  #chatContactView, #chatRoomView {
+    height: calc(100dvh - 130px) !important;
+  }
+  #chatMsgs { overscroll-behavior: contain; }
+  #chatInput { font-size: 16px; }
+
+  /* ── Toast ───────────────────────────────────────────────── */
+  .toast-wrap {
+    position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px);
+    right: 14px; z-index: 9999; display: flex; flex-direction: column; gap: 8px;
+  }
+  .toast {
+    padding: 11px 16px; border-radius: 12px; font-size: 14px; font-weight: 600;
+    background: var(--bg-3); border: 1px solid var(--border-bright);
+    color: var(--text); animation: slideIn .18s ease; max-width: 260px;
+  }
+  .toast.ok  { border-color: var(--ok); color: var(--ok); }
+  .toast.err { border-color: var(--err); color: var(--err); }
+  @keyframes slideIn { from { opacity:0; transform:translateX(16px); } to { opacity:1; transform:none; } }
+
+  /* ── GPS badge ───────────────────────────────────────────── */
+  .gps-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    margin-top: 10px;
+    background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3);
+    color: var(--ok);
+  }
+
+  /* ── Spinner ─────────────────────────────────────────────── */
+  .spinner {
+    display: inline-block; width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.15);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin .6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Badge ───────────────────────────────────────────────── */
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; white-space: nowrap;
+  }
+  .badge.info { background: rgba(59,130,246,0.15); color:#60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+  .badge.ok   { background: rgba(34,197,94,0.15);  color:#4ade80; border: 1px solid rgba(34,197,94,0.3); }
+  .badge.warn { background: rgba(245,158,11,0.15); color:#fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+  .badge.err  { background: rgba(239,68,68,0.15);  color:#f87171; border: 1px solid rgba(239,68,68,0.3); }
+
+  /* ── Shift banner (főoldal) ──────────────────────────────── */
   .shift-card {
-    grid-column: span 2;
     border-radius: 18px; padding: 16px 18px;
     border: 1px solid var(--border-bright);
-    background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.35));
-    cursor: pointer; min-height: 80px;
-    display: flex; flex-direction: column; gap: 6px;
-    transition: border-color .25s;
+    background: rgba(255,255,255,0.03);
+    cursor: pointer; min-height: 76px;
+    display: flex; flex-direction: column; gap: 5px;
+    touch-action: manipulation;
+    transition: transform .12s, border-color .2s;
   }
-  .shift-card.sc-active  { border-color: rgba(34,197,94,0.55);  background: linear-gradient(180deg,rgba(34,197,94,0.09),rgba(0,0,0,0.4)); }
-  .shift-card.sc-paused  { border-color: rgba(251,191,36,0.55); background: linear-gradient(180deg,rgba(251,191,36,0.09),rgba(0,0,0,0.4)); }
-  .shift-card.sc-rest    { border-color: rgba(59,130,246,0.55); background: linear-gradient(180deg,rgba(59,130,246,0.09),rgba(0,0,0,0.4)); }
-  .shift-card.sc-locked  { border-color: rgba(239,68,68,0.55);  background: linear-gradient(180deg,rgba(239,68,68,0.09),rgba(0,0,0,0.4)); }
+  .shift-card:active { transform: scale(0.98); }
+  .shift-card.sc-active  { border-color: rgba(34,197,94,0.5);  background: rgba(34,197,94,0.06); }
+  .shift-card.sc-paused  { border-color: rgba(251,191,36,0.5); background: rgba(251,191,36,0.06); }
+  .shift-card.sc-rest    { border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.06); }
+  .shift-card.sc-locked  { border-color: rgba(239,68,68,0.5);  background: rgba(239,68,68,0.06); }
   .sc-row { display: flex; align-items: center; justify-content: space-between; }
-  .sc-label { font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .6px; color: var(--muted); }
-  .sc-timer { font-size: 24px; font-weight: 800; color: #fff;
-    font-variant-numeric: tabular-nums; line-height: 1.1; }
-  .sc-sub { font-size: 12px; color: var(--muted); }
-  .sc-ico { font-size: 26px; }
- 
-  /* ── EU progress bar (megosztott: banner + szekció) ────────── */
-  .eu-wrap { background: rgba(255,255,255,0.08); border-radius: 20px;
-    height: 5px; overflow: hidden; margin-top: 8px; }
-  .eu-fill { height: 100%; border-radius: 20px;
-    transition: width .5s ease, background .4s; background: #22c55e; }
-  .eu-fill.w  { background: #f59e0b; }
-  .eu-fill.d  { background: #ef4444; }
- 
-  /* ── Szekció státusz kártya ────────────────────────────────── */
+  .sc-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+  .sc-timer { font-size: 24px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .sc-sub   { font-size: 12px; color: var(--muted); }
+  .sc-ico   { font-size: 24px; }
+
+  /* ── EU progress bar ─────────────────────────────────────── */
+  .eu-wrap  { background: rgba(255,255,255,0.08); border-radius: 20px; height: 4px; overflow: hidden; margin-top: 8px; }
+  .eu-fill  { height: 100%; border-radius: 20px; transition: width .5s ease, background .4s; background: #22c55e; }
+  .eu-fill.w { background: #f59e0b; }
+  .eu-fill.d { background: #ef4444; }
+
+  /* ── Shift szekció kártya ────────────────────────────────── */
   .shift-stat-card {
-    margin: 0 16px 14px; border-radius: 18px; padding: 20px 18px;
+    margin: 0 0 14px; border-radius: 18px; padding: 18px 18px;
     border: 1px solid var(--border-bright);
-    background: linear-gradient(180deg,rgba(255,255,255,0.05),rgba(0,0,0,0.35));
+    background: rgba(255,255,255,0.03);
     transition: border-color .25s;
   }
-  .ssc-top { display: flex; align-items: flex-start; justify-content: space-between; }
-  .ssc-timer { font-size: 38px; font-weight: 800; color: #fff;
-    font-variant-numeric: tabular-nums; margin-top: 2px; line-height: 1.15; }
-  .ssc-right { text-align: right; }
+  .ssc-top    { display: flex; align-items: flex-start; justify-content: space-between; }
+  .ssc-timer  { font-size: 36px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; margin-top: 2px; line-height: 1.15; }
+  .ssc-right  { text-align: right; }
   .ssc-week-label { font-size: 11px; color: var(--muted); font-weight: 600; }
   .ssc-week-val   { font-size: 20px; font-weight: 800; color: #fff; }
-  .eu-legend { display: flex; justify-content: space-between;
-    font-size: 10px; color: var(--muted); margin-top: 3px; }
- 
-  /* ── Akció gombok ──────────────────────────────────────────── */
+  .eu-legend  { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+  /* ── Műszak gombok ───────────────────────────────────────── */
   .sh-btn {
     flex: 1; padding: 16px 8px; border-radius: 14px; border: none;
     font-size: 15px; font-weight: 800; cursor: pointer; text-align: center;
-    letter-spacing: .2px; -webkit-tap-highlight-color: transparent;
+    letter-spacing: .2px; touch-action: manipulation;
+    transition: transform .1s, opacity .1s;
   }
-  .sh-btn.start  { background: linear-gradient(180deg,#22c55e,#15803d); color:#fff; }
-  .sh-btn.pause  { background: rgba(251,191,36,0.14); color:#fbbf24;
-    border: 1px solid rgba(251,191,36,0.4); }
-  .sh-btn.resume { background: linear-gradient(180deg,#22c55e,#15803d); color:#fff; }
-  .sh-btn.close  { background: rgba(225,11,26,0.15); color:#f87171;
-    border: 1px solid rgba(225,11,26,0.4); }
+  .sh-btn:active { transform: scale(0.96); opacity: .85; }
+  .sh-btn.start   { background: linear-gradient(180deg,#22c55e,#15803d); color:#fff; }
+  .sh-btn.pause   { background: rgba(251,191,36,0.14); color:#fbbf24; border:1px solid rgba(251,191,36,0.4); }
+  .sh-btn.resume  { background: linear-gradient(180deg,#22c55e,#15803d); color:#fff; }
+  .sh-btn.close   { background: rgba(225,11,26,0.15); color:#f87171; border:1px solid rgba(225,11,26,0.4); }
   .sh-btn.confirm { background: linear-gradient(180deg,#ef4444,#b91c1c); color:#fff; }
-  .sh-btn.cancel  { background: rgba(255,255,255,0.06); color:var(--muted);
-    border: 1px solid var(--border-bright); }
-  .sh-actions { display: flex; gap: 10px; padding: 0 16px 14px; }
- 
-  /* ── Szünet panel ──────────────────────────────────────────── */
+  .sh-btn.cancel  { background: rgba(255,255,255,0.06); color:var(--muted); border:1px solid var(--border-bright); }
+  .sh-actions { display: flex; gap: 10px; padding: 0 0 14px; }
+
+  /* ── Szünet panel ────────────────────────────────────────── */
   .sh-pause-panel {
-    margin: 0 16px 14px; padding: 16px; border-radius: 16px;
+    margin: 0 0 14px; padding: 16px; border-radius: 16px;
     background: rgba(251,191,36,0.07); border: 1px solid rgba(251,191,36,0.3);
   }
   .sh-pause-title { font-size: 14px; font-weight: 700; color: #fbbf24; margin-bottom: 12px; }
   .snooze-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; margin-top: 8px; }
   .snooze-btn {
-    padding: 11px 4px; border-radius: 11px; border: none; text-align: center;
-    font-size: 13px; font-weight: 700; cursor: pointer;
+    padding: 12px 4px; border-radius: 11px; border: none; text-align: center;
+    font-size: 14px; font-weight: 700; cursor: pointer;
     background: rgba(251,191,36,0.12); color: #fbbf24;
     border: 1px solid rgba(251,191,36,0.3);
-    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation; transition: opacity .1s;
   }
- 
-  /* ── Pihenő választó ───────────────────────────────────────── */
-  .sh-rest-panel { margin: 0 16px 14px; }
-  .sh-rest-title { font-size: 11px; font-weight: 700; color: var(--muted);
-    text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
-  .rest-grid-4 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .snooze-btn:active { opacity: .65; }
+
+  /* ── Pihenő gombok ───────────────────────────────────────── */
+  .sh-rest-panel { margin: 0 0 14px; }
+  .sh-rest-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
+  .rest-grid-4 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
   .rest-grid-8 { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 14px; }
   .rest-btn {
-    padding: 13px 6px; border-radius: 12px; border: none; text-align: center;
-    font-size: 13px; font-weight: 700; cursor: pointer;
+    padding: 14px 6px; border-radius: 12px; border: none; text-align: center;
+    font-size: 14px; font-weight: 700; cursor: pointer;
     background: var(--bg-2); border: 1px solid var(--border-bright); color: var(--text);
-    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation; transition: opacity .1s;
   }
-  .rest-btn:active { opacity: .75; }
- 
-  /* ── Zárolás panel ─────────────────────────────────────────── */
+  .rest-btn:active { opacity: .65; }
+
+  /* ── Heti zárolás panel ──────────────────────────────────── */
   .sh-locked-panel {
-    margin: 0 16px 14px; padding: 22px 16px; border-radius: 16px; text-align: center;
+    margin: 0 0 14px; padding: 22px 16px; border-radius: 16px; text-align: center;
     background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.35);
   }
   .sh-locked-ico   { font-size: 40px; margin-bottom: 8px; }
   .sh-locked-title { font-size: 16px; font-weight: 800; color: #f87171; margin-bottom: 6px; }
   .sh-locked-text  { font-size: 13px; color: var(--muted); }
- 
 </style>
   <script src="/push-client.js"></script>
   <script src="/session-guard.js"></script>
@@ -211,8 +385,9 @@
 
   <!-- ====== FŐOLDAL ====== -->
   <div class="pane-sofer" id="sec-dash">
-     <!-- MŰSZAK GYORS-KÁRTYA (dinamikusan frissül) -->
-    <div id="shiftBanner" class="shift-card" onclick="goSec('shift')" style="margin:0 4px 0;">
+    <!-- MŰSZAK GYORS-KÁRTYA -->
+    <div style="padding:12px 0 6px;">
+    <div id="shiftBanner" class="shift-card" onclick="goSec('shift')">
       <div class="sc-row">
         <div>
           <div class="sc-label" id="scLabel">Betöltés...</div>
@@ -224,6 +399,7 @@
       <div class="eu-wrap" id="scEuWrap" style="display:none;">
         <div class="eu-fill" id="scEuFill" style="width:0%"></div>
       </div>
+    </div>
     </div>
     <div class="sofer-grid">
       <div class="big-card red" onclick="goSec('border')">
@@ -500,11 +676,21 @@
 
   <!-- BOTTOM NAV -->
   <div class="sofer-bottom-bar">
-    <div class="nav-btn active" id="nb-dash" onclick="goSec('dash')"><span class="nav-ico">🏠</span>Főoldal</div>
-    <div class="nav-btn" id="nb-border" onclick="goSec('border')"><span class="nav-ico">🛂</span>Határ</div>
-    <div class="nav-btn" id="nb-fuvar" onclick="goSec('fuvar')"><span class="nav-ico">📄</span>Menetlevél</div>
-    <div class="nav-btn" id="nb-docs" onclick="goSec('docs')"><span class="nav-ico">📷</span>Iratok</div>
-    <div class="nav-btn" id="nb-chat" onclick="goSec('chat')"><span class="nav-ico">💬</span>Chat</div>
+    <div class="nav-btn active" id="nb-dash" onclick="goSec('dash')">
+      <span class="nav-ico">🏠</span><span>Főoldal</span>
+    </div>
+    <div class="nav-btn" id="nb-border" onclick="goSec('border')">
+      <span class="nav-ico">🛂</span><span>Határ</span>
+    </div>
+    <div class="nav-btn" id="nb-fuvar" onclick="goSec('fuvar')">
+      <span class="nav-ico">📄</span><span>Menetlevél</span>
+    </div>
+    <div class="nav-btn" id="nb-docs" onclick="goSec('docs')">
+      <span class="nav-ico">📷</span><span>Iratok</span>
+    </div>
+    <div class="nav-btn" id="nb-chat" onclick="goSec('chat')">
+      <span class="nav-ico">💬</span><span>Chat</span>
+    </div>
   </div>
 </div>
 
@@ -672,17 +858,22 @@ function goSec(id) {
     var nb = document.getElementById('nb-' + s);
     if (nb) nb.classList.remove('active');
   });
-  document.getElementById('sec-' + id).classList.remove('hidden');
+  var next = document.getElementById('sec-' + id);
+  next.classList.remove('hidden');
+  next.classList.add('sec-entering');
+  // Scroll reset — a szekció és az oldal tetejére
+  next.scrollTop = 0;
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  setTimeout(function() { next.classList.remove('sec-entering'); }, 250);
+
   var nb = document.getElementById('nb-' + id);
   if (nb) nb.classList.add('active');
 
-  // Állapot mentése
   stateSave({ sec: id });
-
-   if (id === 'border') loadBorderLog();
-    if (id === 'fuvar') loadSoferOrders();
-    if (id === 'shift') loadShiftState();
-    if (id !== 'shift' && _shiftTimer) { clearInterval(_shiftTimer); _shiftTimer = null; }
+  if (id === 'border') loadBorderLog();
+  if (id === 'fuvar') loadSoferOrders();
+  if (id === 'shift') loadShiftState();
+  if (id !== 'shift' && _shiftTimer) { clearInterval(_shiftTimer); _shiftTimer = null; }
 }
 
 // ============================================================
