@@ -2715,6 +2715,645 @@ app.post('/api/chat-notify', requireLogin, async (req, res) => {
   }
 });
 
+// ============================================================
+//  DRIVER SHIFTS — API VEGPONTOK + SCHEDULER
+//  VallorSoft / EU 561/2006 munkaidő-kezelés
+//
+//  BEILLESZTÉSI PONT: a "// SZERVER INDITAS" komment elé
+//
+//  Függőségek: pool, webpush, sendPushToEmail (mind meglévő)
+//  Új npm csomag: NEM szükséges (setInterval alapú scheduler)
+// ============================================================
+
+
+// ============================================================
+//  SEGÉDFÜGGVÉNY: ISO hét kezdőnapja (hétfő, UTC)
+//  Visszatér: 'YYYY-MM-DD' string — a week_start_date mezőhöz
+// ============================================================
+function getWeekStart(date = new Date()) {
+  const d = new Date(date);
+  const dow = d.getUTCDay();                   // 0=vasárnap … 6=szombat
+  const diff = dow === 0 ? -6 : 1 - dow;      // visszalépés hétfőre
+  d.setUTCDate(d.getUTCDate() + diff);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString().split('T')[0];        // 'YYYY-MM-DD'
+}
+
+
+// ============================================================
+//  POST /api/shift/start — Nap kezdése
+//  - Zárolás ellenőrzés (heti 6 műszak utáni 24h)
+//  - Dupla start védelme (partial UNIQUE index)
+//  - Heti sorszám (shift_index_in_week) számítása
+// ============================================================
+app.post('/api/shift/start', requireLogin, requireRole('Sofer'), async (req, res) => {
+  const driver = req.session.user;
+  try {
+    // 1. Van-e aktív/nyitott shift? (partial UNIQUE index elkapná DB szinten is,
+    //    de szebb üzenettel visszatérünk felette)
+    const activeCheck = await pool.query(
+      `SELECT shift_id FROM driver_shifts
+       WHERE driver_id = $1 AND status IN ('ACTIVE','PAUSED','REST','SCHEDULED')
+       LIMIT 1`,
+      [driver.id]
+    );
+    if (activeCheck.rows.length) {
+      return res.json({ ok: false, message: 'Már van aktív műszakod. Zárd le előbb a jelenlegi napot.' });
+    }
+
+    // 2. Zárolás ellenőrzés (heti 6. nap utáni 24h)
+    const lockRow = await pool.query(
+      `SELECT locked_until FROM driver_shifts
+       WHERE driver_id = $1 AND locked_until IS NOT NULL
+       ORDER BY created_at DESC LIMIT 1`,
+      [driver.id]
+    );
+    if (lockRow.rows.length) {
+      const lu = lockRow.rows[0].locked_until;
+      if (lu && new Date(lu) > new Date()) {
+        return res.json({
+          ok: false,
+          locked: true,
+          locked_until: new Date(lu).toISOString(),
+          message: `Zárolva (heti 6 munkanap teljesítve). Legkorábban: ${new Date(lu).toLocaleString('hu-HU')} -tól indíthatsz újra.`
+        });
+      }
+    }
+
+    // 3. Heti sorszám kiszámítása
+    const weekStart = getWeekStart();
+    const weekCount = await pool.query(
+      `SELECT COUNT(*)::int AS db FROM driver_shifts
+       WHERE driver_id = $1 AND week_start_date = $2 AND day_started_at IS NOT NULL`,
+      [driver.id, weekStart]
+    );
+    const shiftIndex = (weekCount.rows[0].db || 0) + 1;
+
+    // 4. Heti összmunkaidő az eddigi lezárt shiftekből
+    const weekHours = await pool.query(
+      `SELECT COALESCE(SUM(
+         EXTRACT(EPOCH FROM (day_closed_at - day_started_at)) / 3600.0
+         - (paused_total_minutes / 60.0)
+       ), 0)::numeric(6,2) AS total
+       FROM driver_shifts
+       WHERE driver_id = $1 AND week_start_date = $2
+         AND day_closed_at IS NOT NULL AND day_started_at IS NOT NULL`,
+      [driver.id, weekStart]
+    );
+    const weekTotal = parseFloat(weekHours.rows[0].total) || 0;
+
+    // 5. Új shift létrehozása
+    const r = await pool.query(
+      `INSERT INTO driver_shifts
+         (driver_id, driver_email, company_id, status,
+          day_started_at, week_start_date, shift_index_in_week, weekly_hours_total)
+       VALUES ($1, $2, $3, 'ACTIVE', NOW(), $4, $5, $6)
+       RETURNING shift_id, day_started_at`,
+      [driver.id, driver.email, driver.company_id, weekStart, shiftIndex, weekTotal]
+    );
+
+    return res.json({
+      ok: true,
+      shift_id: r.rows[0].shift_id,
+      started_at: r.rows[0].day_started_at,
+      shift_index: shiftIndex,
+      week_hours_so_far: weekTotal
+    });
+  } catch (err) {
+    console.error('[shift/start] hiba:', err);
+    return res.json({ ok: false, message: 'Szerver hiba.' });
+  }
+});
+
+
+// ============================================================
+//  POST /api/shift/pause — Szünet kezdése
+//  ACTIVE → PAUSED, rögzíti a paused_at timestamp-et
+// ============================================================
+app.post('/api/shift/pause', requireLogin, requireRole('Sofer'), async (req, res) => {
+  const driver = req.session.user;
+  try {
+    const shift = await pool.query(
+      `SELECT shift_id FROM driver_shifts
+       WHERE driver_id = $1 AND status = 'ACTIVE' LIMIT 1`,
+      [driver.id]
+    );
+    if (!shift.rows.length) {
+      return res.json({ ok: false, message: 'Nincs aktív műszak.' });
+    }
+    await pool.query(
+      `UPDATE driver_shifts
+       SET status='PAUSED', paused_at=NOW(),
+           pause_notif_sent_at=NULL, snooze_until=NULL, updated_at=NOW()
+       WHERE shift_id = $1`,
+      [shift.rows[0].shift_id]
+    );
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[shift/pause] hiba:', err);
+    return res.json({ ok: false, message: 'Szerver hiba.' });
+  }
+});
+
+
+// ============================================================
+//  POST /api/shift/resume — Visszatérés szünetből
+//  PAUSED → ACTIVE, szünet percek hozzáadódnak paused_total-hoz
+//  Body: {} (nincs adat, a session azonosít)
+// ============================================================
+app.post('/api/shift/resume', requireLogin, requireRole('Sofer'), async (req, res) => {
+  const driver = req.session.user;
+  try {
+    const shift = await pool.query(
+      `SELECT shift_id, paused_at, paused_total_minutes FROM driver_shifts
+       WHERE driver_id = $1 AND status = 'PAUSED' LIMIT 1`,
+      [driver.id]
+    );
+    if (!shift.rows.length) {
+      return res.json({ ok: false, message: 'Nincs szünetelő műszak.' });
+    }
+    const s = shift.rows[0];
+    const addedMin = s.paused_at
+      ? Math.max(0, Math.round((Date.now() - new Date(s.paused_at).getTime()) / 60000))
+      : 0;
+
+    await pool.query(
+      `UPDATE driver_shifts
+       SET status='ACTIVE', paused_at=NULL,
+           pause_notif_sent_at=NULL, snooze_until=NULL,
+           paused_total_minutes = paused_total_minutes + $1,
+           updated_at=NOW()
+       WHERE shift_id = $2`,
+      [addedMin, s.shift_id]
+    );
+    return res.json({ ok: true, paused_minutes_added: addedMin });
+  } catch (err) {
+    console.error('[shift/resume] hiba:', err);
+    return res.json({ ok: false, message: 'Szerver hiba.' });
+  }
+});
+
+
+// ============================================================
+//  POST /api/shift/close — Nap zárása (sofőr manuálisan zárja)
+//  ACTIVE | PAUSED → INACTIVE
+//  Body: { overtime_reason?: string }
+//  - is_overtime flag beállítása ha > 15h
+//  - locked_until beállítása ha ez a 6. nap
+//  - weekly_hours_total frissítése
+// ============================================================
+app.post('/api/shift/close', requireLogin, requireRole('Sofer'), async (req, res) => {
+  const driver = req.session.user;
+  const { overtime_reason } = req.body || {};
+  try {
+    const shift = await pool.query(
+      `SELECT shift_id, day_started_at, paused_total_minutes,
+              shift_index_in_week, week_start_date
+       FROM driver_shifts
+       WHERE driver_id = $1 AND status IN ('ACTIVE','PAUSED') LIMIT 1`,
+      [driver.id]
+    );
+    if (!shift.rows.length) {
+      return res.json({ ok: false, message: 'Nincs lezárható műszak.' });
+    }
+    const s = shift.rows[0];
+    const now = new Date();
+    const activeHours = (now - new Date(s.day_started_at)) / 3600000
+                        - (s.paused_total_minutes || 0) / 60;
+    const isOvertime  = activeHours > 15;
+
+    // Heti zárolás: ha ez a 6. (vagy több) nap
+    const lockedUntil = s.shift_index_in_week >= 6
+      ? new Date(now.getTime() + 24 * 3600 * 1000)
+      : null;
+
+    // Heti összmunkaidő frissítése (eddigi lezárt + ez a shift)
+    const prevHours = await pool.query(
+      `SELECT COALESCE(SUM(
+         EXTRACT(EPOCH FROM (day_closed_at - day_started_at)) / 3600.0
+         - (paused_total_minutes / 60.0)
+       ), 0)::numeric(6,2) AS total
+       FROM driver_shifts
+       WHERE driver_id = $1 AND week_start_date = $2
+         AND day_closed_at IS NOT NULL AND day_started_at IS NOT NULL
+         AND shift_id != $3`,
+      [driver.id, s.week_start_date, s.shift_id]
+    );
+    const weeklyTotal = parseFloat(prevHours.rows[0].total || 0) + Math.max(0, activeHours);
+
+    await pool.query(
+      `UPDATE driver_shifts
+       SET status='INACTIVE', day_closed_at=NOW(),
+           is_overtime=$1, overtime_reason=$2,
+           locked_until=$3, weekly_hours_total=$4,
+           updated_at=NOW()
+       WHERE shift_id = $5`,
+      [isOvertime, overtime_reason || null, lockedUntil, weeklyTotal.toFixed(2), s.shift_id]
+    );
+
+    // Push ha 6. nap → heti zárolás
+    if (lockedUntil) {
+      await sendPushToEmail([driver.email], {
+        title: '🔒 VallorSoft — Heti zárolás aktív',
+        body: `6. munkanap kész. Következő indulás: ${lockedUntil.toLocaleString('hu-HU')} után lehetséges.`,
+        icon: '/icon192.png', badge: '/icon192.png',
+        tag:  'vs-shift-lock',
+        url:  '/sofer',
+        data: { type: 'weekly_lock' }
+      });
+    }
+
+    return res.json({
+      ok: true,
+      is_overtime: isOvertime,
+      active_hours: parseFloat(activeHours.toFixed(2)),
+      weekly_hours: parseFloat(weeklyTotal.toFixed(2)),
+      locked_until: lockedUntil
+    });
+  } catch (err) {
+    console.error('[shift/close] hiba:', err);
+    return res.json({ ok: false, message: 'Szerver hiba.' });
+  }
+});
+
+
+// ============================================================
+//  POST /api/shift/rest — Pihenő beállítása (nap zárása után)
+//  INACTIVE (rest_type=NULL) → REST
+//  Body: { rest_type: '9h'|'11h'|'24h'|'45h'|'custom'|'vacation',
+//          rest_hours?: number }   (custom/vacation esetén kötelező)
+//  Visszatér: next_shift_start timestamp
+// ============================================================
+app.post('/api/shift/rest', requireLogin, requireRole('Sofer'), async (req, res) => {
+  const driver = req.session.user;
+  const { rest_type, rest_hours } = req.body || {};
+  try {
+    // A legutóbb lezárt shift ahol még nincs pihenő beállítva
+    const shift = await pool.query(
+      `SELECT shift_id, day_closed_at FROM driver_shifts
+       WHERE driver_id = $1 AND status = 'INACTIVE'
+         AND day_closed_at IS NOT NULL AND rest_type IS NULL
+       ORDER BY day_closed_at DESC LIMIT 1`,
+      [driver.id]
+    );
+    if (!shift.rows.length) {
+      return res.json({ ok: false, message: 'Nincs lezárt (pihenő nélküli) műszak.' });
+    }
+    const s = shift.rows[0];
+
+    const presetMap = { '9h': 9, '11h': 11, '24h': 24, '45h': 45 };
+    const hours = presetMap[rest_type] ?? parseFloat(rest_hours);
+    if (!hours || isNaN(hours) || hours <= 0) {
+      return res.json({ ok: false, message: 'Érvénytelen pihenő típus vagy óraszám.' });
+    }
+
+    const nextShiftStart = new Date(
+      new Date(s.day_closed_at).getTime() + hours * 3600 * 1000
+    );
+
+    await pool.query(
+      `UPDATE driver_shifts
+       SET rest_type=$1, rest_hours=$2, next_shift_start=$3,
+           status='REST', updated_at=NOW()
+       WHERE shift_id = $4`,
+      [rest_type, hours, nextShiftStart, s.shift_id]
+    );
+
+    return res.json({ ok: true, next_shift_start: nextShiftStart, rest_hours: hours });
+  } catch (err) {
+    console.error('[shift/rest] hiba:', err);
+    return res.json({ ok: false, message: 'Szerver hiba.' });
+  }
+});
+
+
+// ============================================================
+//  POST /api/shift/snooze-pause — "X óra múlva visszakérdez"
+//  Szünet PAUSED állapotban: a sofőr nem indult el, de
+//  el akarja halasztani a 48-perces push-t.
+//  Body: { snooze_hours: number }  (1, 2, 3, 4, 5 — egész)
+// ============================================================
+app.post('/api/shift/snooze-pause', requireLogin, requireRole('Sofer'), async (req, res) => {
+  const driver = req.session.user;
+  const snoozeH = Math.max(1, Math.min(12, parseInt(req.body.snooze_hours) || 1));
+  try {
+    const shift = await pool.query(
+      `SELECT shift_id FROM driver_shifts WHERE driver_id = $1 AND status = 'PAUSED' LIMIT 1`,
+      [driver.id]
+    );
+    if (!shift.rows.length) return res.json({ ok: false });
+
+    const snoozeUntil = new Date(Date.now() + snoozeH * 3600 * 1000);
+    await pool.query(
+      `UPDATE driver_shifts
+       SET snooze_until=$1, pause_notif_sent_at=NULL, updated_at=NOW()
+       WHERE shift_id=$2`,
+      [snoozeUntil, shift.rows[0].shift_id]
+    );
+    return res.json({ ok: true, snooze_until: snoozeUntil, snooze_hours: snoozeH });
+  } catch (err) {
+    console.error('[shift/snooze-pause] hiba:', err);
+    return res.json({ ok: false });
+  }
+});
+
+
+// ============================================================
+//  GET /api/shift/current — Aktuális shift lekérése (UI polling)
+//  Visszaadja az élő shif minden adatát, vagy:
+//  { shift: null, locked_until } ha nincs élő, de zárolva van
+// ============================================================
+app.get('/api/shift/current', requireLogin, async (req, res) => {
+  const driver = req.session.user;
+  try {
+    const r = await pool.query(
+      `SELECT shift_id, status, day_started_at, day_closed_at,
+              paused_at, paused_total_minutes, pause_notif_sent_at, snooze_until,
+              rest_type, rest_hours, next_shift_start, notif_sent_at,
+              week_start_date, shift_index_in_week,
+              weekly_hours_total, locked_until, is_overtime
+       FROM driver_shifts
+       WHERE driver_id = $1 AND status NOT IN ('INACTIVE')
+       ORDER BY created_at DESC LIMIT 1`,
+      [driver.id]
+    );
+
+    if (r.rows.length) {
+      return res.json({ ok: true, shift: r.rows[0] });
+    }
+
+    // Nincs élő shift — ellenőrzés: van-e aktív zárolás?
+    const lastLock = await pool.query(
+      `SELECT locked_until, shift_index_in_week, weekly_hours_total
+       FROM driver_shifts
+       WHERE driver_id = $1
+       ORDER BY created_at DESC LIMIT 1`,
+      [driver.id]
+    );
+    return res.json({
+      ok: true,
+      shift: null,
+      locked_until: lastLock.rows[0]?.locked_until || null,
+      last_week_hours: lastLock.rows[0]?.weekly_hours_total || 0
+    });
+  } catch (err) {
+    console.error('[shift/current] hiba:', err);
+    return res.json({ ok: false, shift: null });
+  }
+});
+
+
+// ============================================================
+//  GET /api/shift/week-summary — Heti összesítő (Manager + saját)
+//  Sofőr: csak saját adatai (driver_id = session user)
+//  Manager/Admin: query param ?driver_id=X (saját cég sofőrje)
+// ============================================================
+app.get('/api/shift/week-summary', requireLogin, async (req, res) => {
+  const user = req.session.user;
+  try {
+    let targetDriverId;
+
+    if (user.pozicio === 'Sofer') {
+      targetDriverId = user.id;
+    } else if (user.pozicio === 'Manager' || user.pozicio === 'Admin') {
+      if (!req.query.driver_id) {
+        // Visszaadja az összes sofőr aktuális státuszát (flotta nézet)
+        const fleet = await pool.query(
+          `SELECT u.id AS driver_id, u.nume, u.email,
+                  ds.status, ds.day_started_at, ds.weekly_hours_total,
+                  ds.shift_index_in_week, ds.rest_type, ds.next_shift_start,
+                  ds.locked_until
+           FROM users u
+           LEFT JOIN driver_shifts ds ON ds.driver_id = u.id
+             AND ds.status NOT IN ('INACTIVE')
+           WHERE u.company_id = $1 AND u.pozicio = 'Sofer'
+           ORDER BY u.nume`,
+          [user.company_id]
+        );
+        return res.json({ ok: true, fleet: fleet.rows });
+      }
+      // Jogosultság: csak saját cég sofőrje
+      const driverCheck = await pool.query(
+        'SELECT id FROM users WHERE id=$1 AND company_id=$2 AND pozicio=$3',
+        [parseInt(req.query.driver_id), user.company_id, 'Sofer']
+      );
+      if (!driverCheck.rows.length) return res.json({ ok: false, message: 'Nincs jogosultság.' });
+      targetDriverId = parseInt(req.query.driver_id);
+    } else {
+      return res.json({ ok: false, message: 'Nincs jogosultság.' });
+    }
+
+    const weekStart = getWeekStart();
+    const rows = await pool.query(
+      `SELECT shift_id, status, day_started_at, day_closed_at,
+              paused_total_minutes, rest_type, rest_hours,
+              shift_index_in_week, weekly_hours_total,
+              is_overtime, locked_until
+       FROM driver_shifts
+       WHERE driver_id = $1 AND week_start_date = $2
+       ORDER BY COALESCE(day_started_at, created_at) ASC`,
+      [targetDriverId, weekStart]
+    );
+    return res.json({ ok: true, week_start: weekStart, shifts: rows.rows });
+  } catch (err) {
+    console.error('[shift/week-summary] hiba:', err);
+    return res.json({ ok: false });
+  }
+});
+
+
+// ============================================================
+//  SHIFT SCHEDULER — 1 perces ciklus (setInterval, 0 extra npm)
+//
+//  Tick-ek:
+//   1. 48 perces szünet push    → PAUSED + paused_at+48m <= NOW()
+//   2. Indulás előtti push      → REST/SCHEDULED + next_shift_start-10m <= NOW()
+//   3. 11h figyelmeztetés       → ACTIVE + day_started_at+11h <= NOW()
+//   4. 15h automatikus zárás    → ACTIVE/PAUSED + day_started_at+15h <= NOW()
+//
+//  Meghívás: startShiftScheduler() — az app.listen() callback-jéből
+// ============================================================
+function startShiftScheduler() {
+  async function schedulerTick() {
+    if (!webpush) return; // Push nélkül nincs értesítő — csendben kihagyjuk
+
+    try {
+
+      // ----------------------------------------------------------
+      //  TICK 1 — Szünet értesítő: 48 perc eltelt
+      //  Feltétel: PAUSED, 48 perce szünetel, értesítő még nem ment,
+      //            és nincs aktív snooze
+      // ----------------------------------------------------------
+      const paused48 = await pool.query(`
+        SELECT shift_id, driver_email
+        FROM driver_shifts
+        WHERE status = 'PAUSED'
+          AND paused_at + INTERVAL '48 minutes' <= NOW()
+          AND (pause_notif_sent_at IS NULL
+               OR pause_notif_sent_at + INTERVAL '48 minutes' <= NOW())
+          AND (snooze_until IS NULL OR snooze_until <= NOW())
+      `);
+      for (const row of paused48.rows) {
+        await sendPushToEmail([row.driver_email], {
+          title: '⏰ VallorSoft — Szünet emlékeztető',
+          body:  '48 perce szünetel. Elindultál már?',
+          icon:  '/icon192.png',
+          badge: '/icon192.png',
+          tag:   'vs-pause-check-' + row.shift_id,
+          url:   '/sofer',
+          data:  { type: 'pause_check', shift_id: row.shift_id }
+        });
+        await pool.query(
+          `UPDATE driver_shifts
+           SET pause_notif_sent_at=NOW(), snooze_until=NULL, updated_at=NOW()
+           WHERE shift_id=$1`,
+          [row.shift_id]
+        );
+        console.log('[Scheduler] TICK1 pause push → shift', row.shift_id);
+      }
+
+      // ----------------------------------------------------------
+      //  TICK 2 — Indulás előtti értesítő: next_shift_start – 10 perc
+      //  Feltétel: REST vagy SCHEDULED, van next_shift_start,
+      //            -10 perc kapuban van, értesítő még nem ment
+      // ----------------------------------------------------------
+      const upcoming = await pool.query(`
+        SELECT shift_id, driver_email, next_shift_start
+        FROM driver_shifts
+        WHERE status IN ('REST','SCHEDULED')
+          AND next_shift_start IS NOT NULL
+          AND next_shift_start - INTERVAL '10 minutes' <= NOW()
+          AND next_shift_start > NOW()
+          AND notif_sent_at IS NULL
+      `);
+      for (const row of upcoming.rows) {
+        await sendPushToEmail([row.driver_email], {
+          title: '🚛 VallorSoft — Műszak közeleg',
+          body:  '10 perc múlva kezdődik a műszakod. Készen állsz?',
+          icon:  '/icon192.png',
+          badge: '/icon192.png',
+          tag:   'vs-shift-soon-' + row.shift_id,
+          url:   '/sofer',
+          data:  { type: 'shift_upcoming', shift_id: row.shift_id }
+        });
+        await pool.query(
+          `UPDATE driver_shifts SET notif_sent_at=NOW(), updated_at=NOW() WHERE shift_id=$1`,
+          [row.shift_id]
+        );
+        console.log('[Scheduler] TICK2 upcoming push → shift', row.shift_id);
+      }
+
+      // ----------------------------------------------------------
+      //  TICK 3 — 11 órás munkaidő figyelmeztetés
+      //  Feltétel: ACTIVE, 11 óra eltelt, nyitott nap, még nem ment
+      // ----------------------------------------------------------
+      const warn11 = await pool.query(`
+        SELECT shift_id, driver_email
+        FROM driver_shifts
+        WHERE status = 'ACTIVE'
+          AND day_started_at + INTERVAL '11 hours' <= NOW()
+          AND day_closed_at IS NULL
+          AND warn11h_sent_at IS NULL
+      `);
+      for (const row of warn11.rows) {
+        await sendPushToEmail([row.driver_email], {
+          title: '⚠️ VallorSoft — 11 óra aktív',
+          body:  '11 órája vezetsz. EU limit: 15 óra. Gondolj a pihenőre!',
+          icon:  '/icon192.png',
+          badge: '/icon192.png',
+          tag:   'vs-warn11h-' + row.shift_id,
+          url:   '/sofer',
+          data:  { type: 'warn_11h', shift_id: row.shift_id }
+        });
+        await pool.query(
+          `UPDATE driver_shifts SET warn11h_sent_at=NOW(), updated_at=NOW() WHERE shift_id=$1`,
+          [row.shift_id]
+        );
+        console.log('[Scheduler] TICK3 11h warn push → shift', row.shift_id);
+      }
+
+      // ----------------------------------------------------------
+      //  TICK 4 — 15 óra: automatikus naplezárás
+      //  Feltétel: ACTIVE vagy PAUSED, 15 óra eltelt, még nincs day_closed_at
+      //  Hatás: INACTIVE, is_overtime=TRUE, locked_until ha 6. nap
+      // ----------------------------------------------------------
+      const auto15 = await pool.query(`
+        SELECT shift_id, driver_email, driver_id,
+               shift_index_in_week, week_start_date, paused_total_minutes
+        FROM driver_shifts
+        WHERE status IN ('ACTIVE','PAUSED')
+          AND day_started_at + INTERVAL '15 hours' <= NOW()
+          AND day_closed_at IS NULL
+      `);
+      for (const row of auto15.rows) {
+        const now = new Date();
+        const lockedUntil = row.shift_index_in_week >= 6
+          ? new Date(now.getTime() + 24 * 3600 * 1000)
+          : null;
+
+        // Heti összmunkaidő frissítése
+        const prevH = await pool.query(
+          `SELECT COALESCE(SUM(
+             EXTRACT(EPOCH FROM (day_closed_at - day_started_at)) / 3600.0
+             - (paused_total_minutes / 60.0)
+           ), 0)::numeric(6,2) AS total
+           FROM driver_shifts
+           WHERE driver_id = $1 AND week_start_date = $2
+             AND day_closed_at IS NOT NULL AND shift_id != $3`,
+          [row.driver_id, row.week_start_date, row.shift_id]
+        );
+        // 15h - paused_total_minutes = tényleges aktív
+        const thisShiftH = 15 - (row.paused_total_minutes || 0) / 60;
+        const weeklyTotal = parseFloat(prevH.rows[0].total || 0) + thisShiftH;
+
+        await pool.query(
+          `UPDATE driver_shifts
+           SET status='INACTIVE', day_closed_at=NOW(),
+               is_overtime=TRUE,
+               overtime_reason='Automatikus zárás — EU 561/2006 15h napi limit elérve',
+               locked_until=$1, weekly_hours_total=$2, updated_at=NOW()
+           WHERE shift_id=$3`,
+          [lockedUntil, weeklyTotal.toFixed(2), row.shift_id]
+        );
+
+        await sendPushToEmail([row.driver_email], {
+          title: '⛔ VallorSoft — Nap automatikusan lezárva',
+          body:  '15 óra EU limit elérve. Válassz pihenő típust a sofer oldalon!',
+          icon:  '/icon192.png',
+          badge: '/icon192.png',
+          tag:   'vs-auto15h-' + row.shift_id,
+          url:   '/sofer',
+          data:  { type: 'auto_close_15h', shift_id: row.shift_id }
+        });
+
+        if (lockedUntil) {
+          await sendPushToEmail([row.driver_email], {
+            title: '🔒 VallorSoft — Heti zárolás aktív',
+            body:  `6. munkanap teljesítve. Legközelebb: ${lockedUntil.toLocaleString('hu-HU')} után indíthatsz.`,
+            icon:  '/icon192.png',
+            badge: '/icon192.png',
+            tag:   'vs-weekly-lock-' + row.shift_id,
+            url:   '/sofer',
+            data:  { type: 'weekly_lock' }
+          });
+        }
+        console.log('[Scheduler] TICK4 auto-close 15h → shift', row.shift_id, '| locked_until:', lockedUntil);
+      }
+
+    } catch (err) {
+      // Scheduler hiba NEM állítja le a szervert — csak naplózza
+      console.error('[Shift Scheduler] tick hiba:', err.message);
+    }
+  }
+
+  // Azonnali első futás (szerver újraindítás utáni „elmaradt" tickek kezelése),
+  // majd 60 másodpercenként
+  schedulerTick();
+  const interval = setInterval(schedulerTick, 60 * 1000);
+  console.log('[Shift Scheduler] Elindítva — 1 perces ciklus');
+  return interval; // visszaadja az intervallt (tesztekhez / graceful shutdown)
+}
+
 // SZERVER INDITAS
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

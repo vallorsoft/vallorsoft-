@@ -437,3 +437,127 @@ CREATE TABLE IF NOT EXISTS bug_reports (
 );
 CREATE INDEX IF NOT EXISTS idx_bug_reports_company ON bug_reports(company_id);
 CREATE INDEX IF NOT EXISTS idx_bug_reports_read    ON bug_reports(is_read);
+
+-- ============================================================
+--  DRIVER SHIFTS (Muszak / GPS sprint - 1. feladat)
+--  EU 561/2006 vezetesi-pihenoido szabalyok kovetese.
+--  Egy rekord = egy munkanap (shift). Egy sofornek egyszerre
+--  csak EGY elo (nem-INACTIVE) shiftje lehet.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS driver_shifts (
+  shift_id              SERIAL PRIMARY KEY,
+
+  -- Sofor azonositok (FK + redundans email a meglevo konvencio miatt)
+  driver_id             INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  driver_email          VARCHAR(255) NOT NULL,
+  company_id            INTEGER REFERENCES companies(id) ON DELETE CASCADE,
+
+  -- Eletciklus allapot
+  status                VARCHAR(20)  NOT NULL DEFAULT 'INACTIVE'
+                          CHECK (status IN ('INACTIVE','ACTIVE','PAUSED','REST','SCHEDULED')),
+
+  -- Nap kezdes / zaras
+  day_started_at        TIMESTAMP,
+  day_closed_at         TIMESTAMP,
+
+  -- Szunet kezelese (48 perces ertesito flow)
+  paused_at             TIMESTAMP,                    -- utolso szunet kezdete
+  pause_notif_sent_at   TIMESTAMP,                    -- paused_at + 48 perc push kuldve
+  paused_total_minutes  INTEGER NOT NULL DEFAULT 0,   -- shift osszes szunet-ideje (statisztikahoz)
+
+  -- Piheno tipus es idotartam
+  -- 9h/11h: napi piheno (csokkentett/normal)
+  -- 24h/45h: heti piheno (csokkentett/rendes)
+  -- custom: sofor altal megadott egesz orak (1,2,3,4,5...)
+  -- vacation: szabadsag (datum + ora, perc nelkul)
+  rest_type             VARCHAR(20)
+                          CHECK (rest_type IS NULL OR rest_type IN ('9h','11h','24h','45h','custom','vacation')),
+  rest_hours            NUMERIC(6,2),                 -- custom/vacation eseten az orak szama
+  next_shift_start      TIMESTAMP,                    -- tervezett kovetkezo muszak kezdes
+  notif_sent_at         TIMESTAMP,                    -- "ideje indulni" push elkuldve (next_shift_start + 10 perc)
+
+  -- EU 561/2006 compliance mezok
+  week_start_date       DATE,                         -- a het hetfője (ISO het) - heti aggregaciohoz
+  shift_index_in_week   INTEGER NOT NULL DEFAULT 1
+                          CHECK (shift_index_in_week BETWEEN 1 AND 7),
+  weekly_hours_total    NUMERIC(6,2) NOT NULL DEFAULT 0,  -- aktualis heti osszes munkaora (scheduler frissiti)
+  locked_until          TIMESTAMP,                        -- 6. muszak utan 24h zarolas vege
+
+  -- Tulora kezeles (15h-os EU limit SOFT, vegszuksegben atleptheto)
+  is_overtime           BOOLEAN NOT NULL DEFAULT FALSE,
+  overtime_reason       TEXT,
+
+  -- Audit / metaadat
+  notes                 TEXT,
+  created_at            TIMESTAMP DEFAULT NOW(),
+  updated_at            TIMESTAMP DEFAULT NOW(),
+
+  -- ----- Integritasi constraintek -----
+  CONSTRAINT chk_shift_closed_after_started
+    CHECK (day_closed_at IS NULL OR day_started_at IS NULL OR day_closed_at >= day_started_at),
+
+  -- LAZA fels keret: 24 ora alatt minden valós muszak. Tovabb mar lehetetlen ertek.
+  -- (A 15 oras EU limit a scheduler/kod feladata, is_overtime jelzi.)
+  CONSTRAINT chk_shift_max_24h
+    CHECK (day_closed_at IS NULL OR day_started_at IS NULL
+           OR EXTRACT(EPOCH FROM (day_closed_at - day_started_at)) <= 24 * 3600),
+
+  -- Tulora csak akkor allithato, ha tobb mint 15 oras a muszak
+  CONSTRAINT chk_overtime_reason_required
+    CHECK (is_overtime = FALSE OR overtime_reason IS NOT NULL),
+
+  -- Rest_hours csak custom/vacation eseten kotelezo
+  CONSTRAINT chk_rest_hours_when_custom
+    CHECK (rest_type IS NULL OR rest_type NOT IN ('custom','vacation') OR rest_hours IS NOT NULL)
+);
+
+
+-- ============================================================
+--  INDEXEK (driver_shifts)
+-- ============================================================
+CREATE INDEX IF NOT EXISTS idx_shifts_driver_id      ON driver_shifts(driver_id);
+CREATE INDEX IF NOT EXISTS idx_shifts_driver_email   ON driver_shifts(driver_email);
+CREATE INDEX IF NOT EXISTS idx_shifts_company        ON driver_shifts(company_id);
+CREATE INDEX IF NOT EXISTS idx_shifts_status         ON driver_shifts(status);
+CREATE INDEX IF NOT EXISTS idx_shifts_day_started    ON driver_shifts(day_started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_shifts_week           ON driver_shifts(driver_id, week_start_date);
+
+-- Scheduler heti compliance lekerdezesekhez (gyors aggregacio)
+CREATE INDEX IF NOT EXISTS idx_shifts_company_week
+  ON driver_shifts(company_id, week_start_date, status);
+
+-- Scheduler ertesitokhoz: aktiv shiftek time-alapu lekerdezese
+CREATE INDEX IF NOT EXISTS idx_shifts_paused_pending
+  ON driver_shifts(paused_at)
+  WHERE status = 'PAUSED' AND pause_notif_sent_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_shifts_next_start_pending
+  ON driver_shifts(next_shift_start)
+  WHERE status IN ('REST','SCHEDULED') AND notif_sent_at IS NULL;
+
+-- KRITIKUS: csak egy elo shift / sofor (data integrity)
+-- A 'INACTIVE' (lezart, tortneti) rekordok nem szamitanak.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_shifts_one_active_per_driver
+  ON driver_shifts(driver_id)
+  WHERE status IN ('ACTIVE','PAUSED','REST','SCHEDULED');
+
+
+-- ============================================================
+--  MIGRACIO: meglevo telepitesre - idempotens
+--  (Ha mar letezik a tabla regebbi verzioja, ez frissiti.)
+-- ============================================================
+ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS paused_total_minutes  INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS rest_hours            NUMERIC(6,2);
+ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS week_start_date       DATE;
+ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS shift_index_in_week   INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS weekly_hours_total    NUMERIC(6,2) NOT NULL DEFAULT 0;
+ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS locked_until          TIMESTAMP;
+ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS is_overtime           BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS overtime_reason       TEXT;
+ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS notes                 TEXT;
+ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS updated_at            TIMESTAMP DEFAULT NOW();
+ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS warn11h_sent_at TIMESTAMP;
+ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS snooze_until TIMESTAMP;
+CREATE INDEX IF NOT EXISTS idx_shifts_warn11h_pending
+  ON driver_shifts(day_started_at)
+  WHERE status = 'ACTIVE' AND warn11h_sent_at IS NULL;

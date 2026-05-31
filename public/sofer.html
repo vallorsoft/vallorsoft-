@@ -90,7 +90,111 @@
     .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.2);
       border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
+  
+    
+ 
+  /* ── Shift banner a főoldalon ─────────────────────────────── */
+  .shift-card {
+    grid-column: span 2;
+    border-radius: 18px; padding: 16px 18px;
+    border: 1px solid var(--border-bright);
+    background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.35));
+    cursor: pointer; min-height: 80px;
+    display: flex; flex-direction: column; gap: 6px;
+    transition: border-color .25s;
+  }
+  .shift-card.sc-active  { border-color: rgba(34,197,94,0.55);  background: linear-gradient(180deg,rgba(34,197,94,0.09),rgba(0,0,0,0.4)); }
+  .shift-card.sc-paused  { border-color: rgba(251,191,36,0.55); background: linear-gradient(180deg,rgba(251,191,36,0.09),rgba(0,0,0,0.4)); }
+  .shift-card.sc-rest    { border-color: rgba(59,130,246,0.55); background: linear-gradient(180deg,rgba(59,130,246,0.09),rgba(0,0,0,0.4)); }
+  .shift-card.sc-locked  { border-color: rgba(239,68,68,0.55);  background: linear-gradient(180deg,rgba(239,68,68,0.09),rgba(0,0,0,0.4)); }
+  .sc-row { display: flex; align-items: center; justify-content: space-between; }
+  .sc-label { font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .6px; color: var(--muted); }
+  .sc-timer { font-size: 24px; font-weight: 800; color: #fff;
+    font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .sc-sub { font-size: 12px; color: var(--muted); }
+  .sc-ico { font-size: 26px; }
+ 
+  /* ── EU progress bar (megosztott: banner + szekció) ────────── */
+  .eu-wrap { background: rgba(255,255,255,0.08); border-radius: 20px;
+    height: 5px; overflow: hidden; margin-top: 8px; }
+  .eu-fill { height: 100%; border-radius: 20px;
+    transition: width .5s ease, background .4s; background: #22c55e; }
+  .eu-fill.w  { background: #f59e0b; }
+  .eu-fill.d  { background: #ef4444; }
+ 
+  /* ── Szekció státusz kártya ────────────────────────────────── */
+  .shift-stat-card {
+    margin: 0 16px 14px; border-radius: 18px; padding: 20px 18px;
+    border: 1px solid var(--border-bright);
+    background: linear-gradient(180deg,rgba(255,255,255,0.05),rgba(0,0,0,0.35));
+    transition: border-color .25s;
+  }
+  .ssc-top { display: flex; align-items: flex-start; justify-content: space-between; }
+  .ssc-timer { font-size: 38px; font-weight: 800; color: #fff;
+    font-variant-numeric: tabular-nums; margin-top: 2px; line-height: 1.15; }
+  .ssc-right { text-align: right; }
+  .ssc-week-label { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .ssc-week-val   { font-size: 20px; font-weight: 800; color: #fff; }
+  .eu-legend { display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--muted); margin-top: 3px; }
+ 
+  /* ── Akció gombok ──────────────────────────────────────────── */
+  .sh-btn {
+    flex: 1; padding: 16px 8px; border-radius: 14px; border: none;
+    font-size: 15px; font-weight: 800; cursor: pointer; text-align: center;
+    letter-spacing: .2px; -webkit-tap-highlight-color: transparent;
+  }
+  .sh-btn.start  { background: linear-gradient(180deg,#22c55e,#15803d); color:#fff; }
+  .sh-btn.pause  { background: rgba(251,191,36,0.14); color:#fbbf24;
+    border: 1px solid rgba(251,191,36,0.4); }
+  .sh-btn.resume { background: linear-gradient(180deg,#22c55e,#15803d); color:#fff; }
+  .sh-btn.close  { background: rgba(225,11,26,0.15); color:#f87171;
+    border: 1px solid rgba(225,11,26,0.4); }
+  .sh-btn.confirm { background: linear-gradient(180deg,#ef4444,#b91c1c); color:#fff; }
+  .sh-btn.cancel  { background: rgba(255,255,255,0.06); color:var(--muted);
+    border: 1px solid var(--border-bright); }
+  .sh-actions { display: flex; gap: 10px; padding: 0 16px 14px; }
+ 
+  /* ── Szünet panel ──────────────────────────────────────────── */
+  .sh-pause-panel {
+    margin: 0 16px 14px; padding: 16px; border-radius: 16px;
+    background: rgba(251,191,36,0.07); border: 1px solid rgba(251,191,36,0.3);
+  }
+  .sh-pause-title { font-size: 14px; font-weight: 700; color: #fbbf24; margin-bottom: 12px; }
+  .snooze-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; margin-top: 8px; }
+  .snooze-btn {
+    padding: 11px 4px; border-radius: 11px; border: none; text-align: center;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    background: rgba(251,191,36,0.12); color: #fbbf24;
+    border: 1px solid rgba(251,191,36,0.3);
+    -webkit-tap-highlight-color: transparent;
+  }
+ 
+  /* ── Pihenő választó ───────────────────────────────────────── */
+  .sh-rest-panel { margin: 0 16px 14px; }
+  .sh-rest-title { font-size: 11px; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .6px; margin-bottom: 10px; }
+  .rest-grid-4 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .rest-grid-8 { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 14px; }
+  .rest-btn {
+    padding: 13px 6px; border-radius: 12px; border: none; text-align: center;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    background: var(--bg-2); border: 1px solid var(--border-bright); color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .rest-btn:active { opacity: .75; }
+ 
+  /* ── Zárolás panel ─────────────────────────────────────────── */
+  .sh-locked-panel {
+    margin: 0 16px 14px; padding: 22px 16px; border-radius: 16px; text-align: center;
+    background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.35);
+  }
+  .sh-locked-ico   { font-size: 40px; margin-bottom: 8px; }
+  .sh-locked-title { font-size: 16px; font-weight: 800; color: #f87171; margin-bottom: 6px; }
+  .sh-locked-text  { font-size: 13px; color: var(--muted); }
+ 
+</style>
   <script src="/push-client.js"></script>
   <script src="/session-guard.js"></script>
 </head>
@@ -107,6 +211,20 @@
 
   <!-- ====== FŐOLDAL ====== -->
   <div class="pane-sofer" id="sec-dash">
+     <!-- MŰSZAK GYORS-KÁRTYA (dinamikusan frissül) -->
+    <div id="shiftBanner" class="shift-card" onclick="goSec('shift')" style="margin:0 4px 0;">
+      <div class="sc-row">
+        <div>
+          <div class="sc-label" id="scLabel">Betöltés...</div>
+          <div class="sc-timer" id="scTimer">—</div>
+        </div>
+        <div class="sc-ico" id="scIco">🕐</div>
+      </div>
+      <div class="sc-sub" id="scSub">Koppints a műszak kezeléséhez</div>
+      <div class="eu-wrap" id="scEuWrap" style="display:none;">
+        <div class="eu-fill" id="scEuFill" style="width:0%"></div>
+      </div>
+    </div>
     <div class="sofer-grid">
       <div class="big-card red" onclick="goSec('border')">
         <span class="ico">🛂</span><span>Határátlépés</span>
@@ -268,6 +386,102 @@
           onkeydown="if(event.key==='Enter')chatSend()">
         <button onclick="chatSend()" style="padding:10px 18px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;font-weight:700;cursor:pointer;font-size:18px;">➤</button>
       </div>
+    </div>
+  </div>
+
+   <!-- ====== MŰSZAK / MUNKAIDŐ ====== -->
+  <div class="pane-sofer hidden" id="sec-shift">
+    <div class="sec-title">
+      <button class="back-btn" onclick="goSec('dash')">←</button>
+      <h3>🕐 Műszak</h3>
+    </div>
+ 
+    <!-- Státusz kártya + timer -->
+    <div class="shift-stat-card" id="shiftStatCard">
+      <div class="sc-label" id="shiftSecLabel">—</div>
+      <div class="ssc-top">
+        <div class="ssc-timer" id="shiftSecTimer">—</div>
+        <div class="ssc-right">
+          <div class="ssc-week-label" id="shiftWeekLabel"></div>
+          <div class="ssc-week-val"   id="shiftWeekVal"></div>
+        </div>
+      </div>
+      <div class="eu-wrap" id="shiftSecEuWrap" style="display:none;">
+        <div class="eu-fill" id="shiftSecEuFill" style="width:0%"></div>
+      </div>
+      <div class="eu-legend" id="shiftEuLegend" style="display:none;">
+        <span>0ó</span><span>11ó ⚠</span><span>15ó 🔴</span>
+      </div>
+    </div>
+ 
+    <!-- Akció gombok (JS rendereli) -->
+    <div class="sh-actions" id="shiftActions"></div>
+ 
+    <!-- Szünet "Elindultál?" panel -->
+    <div class="sh-pause-panel" id="shiftPausePanel" style="display:none;">
+      <div class="sh-pause-title">⏰ Elindultál már?</div>
+      <button class="sh-btn resume" style="width:100%;margin-bottom:10px;" onclick="shiftResume()">
+        ✅ Igen, elindultam
+      </button>
+      <div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px;">
+        Nem — emlékeztess X óra múlva:
+      </div>
+      <div class="snooze-grid">
+        <button class="snooze-btn" onclick="shiftSnooze(1)">1ó</button>
+        <button class="snooze-btn" onclick="shiftSnooze(2)">2ó</button>
+        <button class="snooze-btn" onclick="shiftSnooze(3)">3ó</button>
+        <button class="snooze-btn" onclick="shiftSnooze(4)">4ó</button>
+        <button class="snooze-btn" onclick="shiftSnooze(5)">5ó</button>
+      </div>
+    </div>
+ 
+    <!-- Pihenő választó (NAP ZÁRÁSA után) -->
+    <div class="sh-rest-panel" id="shiftRestPanel" style="display:none;">
+      <div class="sh-rest-title">Válassz pihenő típust</div>
+ 
+      <!-- Gyors gombok: EU preset -->
+      <div class="rest-grid-4">
+        <button class="rest-btn" onclick="shiftRest('9h')">🟡 9ó<br><small style="font-weight:500;font-size:11px;">Rövid napi</small></button>
+        <button class="rest-btn" onclick="shiftRest('11h')">🟢 11ó<br><small style="font-weight:500;font-size:11px;">Normál napi</small></button>
+        <button class="rest-btn" onclick="shiftRest('24h')">🔵 24ó<br><small style="font-weight:500;font-size:11px;">Heti csökkentett</small></button>
+        <button class="rest-btn" onclick="shiftRest('45h')">🟣 45ó<br><small style="font-weight:500;font-size:11px;">Heti teljes</small></button>
+      </div>
+ 
+      <!-- Egyedi egész órák -->
+      <div class="sh-rest-title" style="margin-top:4px;">Egyedi (egész óra)</div>
+      <div class="rest-grid-8">
+        <button class="rest-btn" onclick="shiftRest('custom',1)">1ó</button>
+        <button class="rest-btn" onclick="shiftRest('custom',2)">2ó</button>
+        <button class="rest-btn" onclick="shiftRest('custom',3)">3ó</button>
+        <button class="rest-btn" onclick="shiftRest('custom',4)">4ó</button>
+        <button class="rest-btn" onclick="shiftRest('custom',5)">5ó</button>
+        <button class="rest-btn" onclick="shiftRest('custom',6)">6ó</button>
+        <button class="rest-btn" onclick="shiftRest('custom',7)">7ó</button>
+        <button class="rest-btn" onclick="shiftRest('custom',8)">8ó</button>
+      </div>
+ 
+      <!-- Szabadság: dátum + óra -->
+      <div class="sh-rest-title" style="margin-top:4px;">🏖 Szabadság — visszatérés dátuma</div>
+      <div class="g2" style="margin-bottom:10px;">
+        <div class="field">
+          <label>Dátum</label>
+          <input class="input" type="date" id="vacDate">
+        </div>
+        <div class="field">
+          <label>Óra (0–23)</label>
+          <input class="input" type="number" id="vacHour" min="0" max="23" value="6" inputmode="numeric">
+        </div>
+      </div>
+      <button class="submit-btn" onclick="shiftVacation()" style="margin-top:0;">
+        🏖 Szabadság mentése
+      </button>
+    </div>
+ 
+    <!-- Heti zárolás panel -->
+    <div class="sh-locked-panel" id="shiftLockedPanel" style="display:none;">
+      <div class="sh-locked-ico">🔒</div>
+      <div class="sh-locked-title">Heti zárolás aktív</div>
+      <div class="sh-locked-text" id="shiftLockedText">—</div>
     </div>
   </div>
 
@@ -437,7 +651,7 @@ function toast(m, k) {
 // ============================================================
 // NAVIGÁCIÓ
 // ============================================================
-var sections = ['dash','border','fuvar','docs','chat'];
+var sections = ['dash','border','fuvar','docs','chat','shift'];;
 
 function goSec(id) {
   sections.forEach(function(s) {
@@ -452,8 +666,10 @@ function goSec(id) {
   // Állapot mentése
   stateSave({ sec: id });
 
-  if (id === 'border') loadBorderLog();
-  if (id === 'fuvar') loadSoferOrders();
+   if (id === 'border') loadBorderLog();
+    if (id === 'fuvar') loadSoferOrders();
+    if (id === 'shift') loadShiftState();
+    if (id !== 'shift' && _shiftTimer) { clearInterval(_shiftTimer); _shiftTimer = null; }
 }
 
 // ============================================================
@@ -798,6 +1014,361 @@ function uploadDoc() {
   fr.readAsDataURL(file);
 }
 
+
+// ============================================================
+// MŰSZAK (SHIFT) — STATE, TIMER, API
+// ============================================================
+var _shiftData        = null;   // legutolsó API adat
+var _shiftTimer       = null;   // setInterval: 1s timer a szekción
+var _shiftPoll        = null;   // setInterval: 30s polling
+var _showRestPicker   = false;  // lokális flag: nap zárása után REST picker látszik
+ 
+// Polling indítása (szerver indítás után, és navigáció után)
+function startShiftPoll() {
+  if (_shiftPoll) clearInterval(_shiftPoll);
+  _shiftPoll = setInterval(loadShiftState, 30000);
+}
+ 
+// ── Adatlekérés és renderelés ─────────────────────────────────
+function loadShiftState() {
+  fetch('/api/shift/current')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) return;
+      _shiftData = d.shift;
+      renderShiftBanner(d.shift, d.locked_until);
+      // Szekció csak akkor renderel, ha látható (vagy ha REST picker flag él)
+      var secVisible = !document.getElementById('sec-shift').classList.contains('hidden');
+      if (secVisible || _showRestPicker) {
+        renderShiftSection(d.shift, d.locked_until);
+      }
+    }).catch(function(){});
+}
+ 
+// ── BANNER RENDERELÉS (főoldal kártya) ────────────────────────
+function renderShiftBanner(shift, lockedUntil) {
+  var banner  = document.getElementById('shiftBanner');
+  var label   = document.getElementById('scLabel');
+  var timer   = document.getElementById('scTimer');
+  var ico     = document.getElementById('scIco');
+  var sub     = document.getElementById('scSub');
+  var euWrap  = document.getElementById('scEuWrap');
+  var euFill  = document.getElementById('scEuFill');
+  if (!banner) return;
+ 
+  // Osztályok reset
+  banner.className = 'shift-card';
+ 
+  if (!shift) {
+    if (lockedUntil && new Date(lockedUntil) > new Date()) {
+      banner.classList.add('sc-locked');
+      label.textContent = '🔒 Heti zárolás';
+      timer.textContent = fmtCountdown(lockedUntil);
+      ico.textContent   = '🔒';
+      sub.textContent   = 'Koppints a részletekért';
+    } else {
+      label.textContent = 'Nincs aktív műszak';
+      timer.textContent = '▶ Indítás';
+      ico.textContent   = '🕐';
+      sub.textContent   = 'Koppints a nap kezdéséhez';
+    }
+    euWrap.style.display = 'none';
+    return;
+  }
+ 
+  if (shift.status === 'ACTIVE') {
+    banner.classList.add('sc-active');
+    label.textContent = '🟢 Aktív műszak';
+    ico.textContent   = '🟢';
+    sub.textContent   = (shift.shift_index_in_week || 1) + '. nap · ' +
+                        parseFloat(shift.weekly_hours_total || 0).toFixed(1) + 'ó a héten';
+    euWrap.style.display = 'block';
+    updateEuFill(euFill, calcActiveH(shift));
+    timer.textContent = fmtSecs(calcActiveSecs(shift));
+  } else if (shift.status === 'PAUSED') {
+    banner.classList.add('sc-paused');
+    label.textContent = '⏸ Szünet';
+    ico.textContent   = '⏸';
+    sub.textContent   = 'Koppints a visszatéréshez';
+    timer.textContent = fmtSecs(calcPauseSecs(shift));
+    euWrap.style.display = 'none';
+  } else if (shift.status === 'REST') {
+    banner.classList.add('sc-rest');
+    label.textContent = '😴 Pihenő';
+    ico.textContent   = '😴';
+    timer.textContent = shift.rest_type === 'vacation' ? '🏖 Szabadság' : (shift.rest_type || '—');
+    sub.textContent   = shift.next_shift_start
+      ? 'Következő: ' + fmtDt(shift.next_shift_start)
+      : 'Koppints a részletekért';
+    euWrap.style.display = 'none';
+  }
+}
+ 
+// ── SZEKCIÓ RENDERELÉS (sec-shift tartalom) ───────────────────
+function renderShiftSection(shift, lockedUntil) {
+  // Timer törlése (majd újra indul ha ACTIVE)
+  if (_shiftTimer) { clearInterval(_shiftTimer); _shiftTimer = null; }
+ 
+  var actions     = document.getElementById('shiftActions');
+  var pausePanel  = document.getElementById('shiftPausePanel');
+  var restPanel   = document.getElementById('shiftRestPanel');
+  var lockedPanel = document.getElementById('shiftLockedPanel');
+  var statCard    = document.getElementById('shiftStatCard');
+  var secLabel    = document.getElementById('shiftSecLabel');
+  var secTimer    = document.getElementById('shiftSecTimer');
+  var weekLabel   = document.getElementById('shiftWeekLabel');
+  var weekVal     = document.getElementById('shiftWeekVal');
+  var euWrap      = document.getElementById('shiftSecEuWrap');
+  var euFill      = document.getElementById('shiftSecEuFill');
+  var euLegend    = document.getElementById('shiftEuLegend');
+  if (!actions) return;
+ 
+  // Reset mindent
+  actions.innerHTML       = '';
+  pausePanel.style.display  = 'none';
+  restPanel.style.display   = 'none';
+  lockedPanel.style.display = 'none';
+  euWrap.style.display      = 'none';
+  euLegend.style.display    = 'none';
+  statCard.style.borderColor = 'var(--border-bright)';
+ 
+  // ── LOCKED ─────────────────────────────────────────────────
+  if (!shift && lockedUntil && new Date(lockedUntil) > new Date()) {
+    secLabel.textContent = '🔒 HETI ZÁROLÁS';
+    secTimer.textContent = fmtCountdown(lockedUntil);
+    weekLabel.textContent = '';
+    weekVal.textContent   = '';
+    statCard.style.borderColor = 'rgba(239,68,68,0.45)';
+    lockedPanel.style.display  = 'block';
+    document.getElementById('shiftLockedText').textContent =
+      'Felszabadul: ' + fmtDt(lockedUntil);
+    _showRestPicker = false;
+    return;
+  }
+ 
+  // ── REST PICKER — nap zárása után (lokális flag) ────────────
+  if (!shift && _showRestPicker) {
+    secLabel.textContent  = '⏹ NAP LEZÁRVA';
+    secTimer.textContent  = '😴';
+    weekLabel.textContent = 'Válassz pihenőt!';
+    weekVal.textContent   = '';
+    statCard.style.borderColor = 'rgba(59,130,246,0.45)';
+    restPanel.style.display    = 'block';
+    // Szabadság dátum default: holnap
+    var tom = new Date();
+    tom.setDate(tom.getDate() + 1);
+    document.getElementById('vacDate').value = tom.toISOString().split('T')[0];
+    return;
+  }
+ 
+  // ── NINCS SHIFT ────────────────────────────────────────────
+  if (!shift) {
+    secLabel.textContent  = 'NINCS AKTÍV MŰSZAK';
+    secTimer.textContent  = '—';
+    weekLabel.textContent = '';
+    weekVal.textContent   = '';
+    actions.innerHTML =
+      '<button class="sh-btn start" style="width:100%;padding:22px;font-size:18px;" onclick="shiftStart()">' +
+      '▶ Nap kezdése</button>';
+    return;
+  }
+ 
+  // Heti info (minden státusznál)
+  weekLabel.textContent = (shift.shift_index_in_week || 1) + '. nap a héten';
+  weekVal.textContent   = parseFloat(shift.weekly_hours_total || 0).toFixed(1) + ' ó';
+ 
+  // ── ACTIVE ─────────────────────────────────────────────────
+  if (shift.status === 'ACTIVE') {
+    secLabel.textContent = '🟢 AKTÍV MŰSZAK';
+    statCard.style.borderColor = 'rgba(34,197,94,0.45)';
+    euWrap.style.display    = 'block';
+    euLegend.style.display  = 'flex';
+    updateEuFill(euFill, calcActiveH(shift));
+    // 1 mp-es timer
+    (function startT(){
+      secTimer.textContent = fmtSecs(calcActiveSecs(shift));
+      updateEuFill(euFill, calcActiveH(shift));
+      // banner timer is frissítése
+      var bt = document.getElementById('scTimer');
+      if (bt) bt.textContent = fmtSecs(calcActiveSecs(shift));
+      _shiftTimer = setInterval(function(){
+        secTimer.textContent = fmtSecs(calcActiveSecs(shift));
+        updateEuFill(euFill, calcActiveH(shift));
+        if (bt) bt.textContent = fmtSecs(calcActiveSecs(shift));
+      }, 1000);
+    })();
+    actions.innerHTML =
+      '<button class="sh-btn pause" onclick="shiftPause()">⏸ Szünet</button>' +
+      '<button class="sh-btn close" onclick="shiftCloseConfirm()">⏹ Nap zárása</button>';
+  }
+ 
+  // ── PAUSED ─────────────────────────────────────────────────
+  else if (shift.status === 'PAUSED') {
+    secLabel.textContent = '⏸ SZÜNET';
+    statCard.style.borderColor = 'rgba(251,191,36,0.45)';
+    (function startPT(){
+      secTimer.textContent = fmtSecs(calcPauseSecs(shift));
+      _shiftTimer = setInterval(function(){
+        secTimer.textContent = fmtSecs(calcPauseSecs(shift));
+        var bt = document.getElementById('scTimer');
+        if (bt) bt.textContent = fmtSecs(calcPauseSecs(shift));
+      }, 1000);
+    })();
+    pausePanel.style.display = 'block';
+    actions.innerHTML =
+      '<button class="sh-btn close" style="width:100%;" onclick="shiftCloseConfirm()">' +
+      '⏹ Nap zárása szünetből</button>';
+  }
+ 
+  // ── REST ───────────────────────────────────────────────────
+  else if (shift.status === 'REST') {
+    secLabel.textContent = '😴 PIHENŐ';
+    statCard.style.borderColor = 'rgba(59,130,246,0.45)';
+    secTimer.textContent = shift.next_shift_start ? fmtDt(shift.next_shift_start) : (shift.rest_type || '—');
+    weekLabel.textContent = (shift.shift_index_in_week || 1) + '. nap a héten';
+  }
+}
+ 
+// ── IDŐSZÁMÍTÁSOK ──────────────────────────────────────────────
+function calcActiveSecs(shift) {
+  if (!shift || !shift.day_started_at) return 0;
+  var elapsed = (Date.now() - new Date(shift.day_started_at).getTime()) / 1000;
+  var paused  = (shift.paused_total_minutes || 0) * 60;
+  if (shift.status === 'PAUSED' && shift.paused_at) {
+    paused += (Date.now() - new Date(shift.paused_at).getTime()) / 1000;
+  }
+  return Math.max(0, elapsed - paused);
+}
+function calcActiveH(shift)  { return calcActiveSecs(shift) / 3600; }
+function calcPauseSecs(shift) {
+  if (!shift || !shift.paused_at) return 0;
+  return Math.max(0, (Date.now() - new Date(shift.paused_at).getTime()) / 1000);
+}
+ 
+// ── FORMÁZÓK ──────────────────────────────────────────────────
+function fmtSecs(s) {
+  var h = Math.floor(s/3600), m = Math.floor((s%3600)/60), ss = Math.floor(s%60);
+  return p2(h)+':'+p2(m)+':'+p2(ss);
+}
+function p2(n){ return n<10?'0'+n:''+n; }
+function fmtDt(iso) {
+  return new Date(iso).toLocaleString('hu-HU',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function fmtCountdown(iso) {
+  var diff = Math.max(0, new Date(iso).getTime() - Date.now());
+  var h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000);
+  return h+'ó '+m+'p';
+}
+function updateEuFill(el, h) {
+  if (!el) return;
+  var pct = Math.min(100, (h/15)*100);
+  el.style.width = pct+'%';
+  el.className = 'eu-fill' + (h>=13?' d':h>=11?' w':'');
+}
+ 
+// ── API HÍVÁSOK ───────────────────────────────────────────────
+function shiftStart() {
+  fetch('/api/shift/start',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if (d.ok) {
+        toast('▶ Műszak elindítva!','ok');
+        _showRestPicker = false;
+        loadShiftState();
+      } else if (d.locked) {
+        toast('🔒 '+d.message,'err');
+        loadShiftState();
+      } else {
+        toast('Hiba: '+(d.message||'ismeretlen'),'err');
+      }
+    }).catch(function(){toast('Hálózati hiba','err');});
+}
+ 
+function shiftPause() {
+  fetch('/api/shift/pause',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if (d.ok) { toast('⏸ Szünet elindítva','ok'); loadShiftState(); }
+      else { toast('Hiba: '+(d.message||''),'err'); }
+    });
+}
+ 
+function shiftResume() {
+  fetch('/api/shift/resume',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if (d.ok) { toast('✅ Visszatértél a műszakba!','ok'); loadShiftState(); }
+      else { toast('Hiba: '+(d.message||''),'err'); }
+    });
+}
+ 
+function shiftCloseConfirm() {
+  var a = document.getElementById('shiftActions');
+  if (!a) return;
+  a.innerHTML =
+    '<div style="width:100%;">' +
+    '<div style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:10px;">Biztosan lezárod a napot?</div>' +
+    '<div style="display:flex;gap:10px;">' +
+    '<button class="sh-btn confirm" style="flex:1;" onclick="shiftClose()">✅ Igen, lezárom</button>' +
+    '<button class="sh-btn cancel"  style="flex:1;" onclick="loadShiftState()">← Vissza</button>' +
+    '</div></div>';
+}
+ 
+function shiftClose() {
+  fetch('/api/shift/close',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if (d.ok) {
+        if (d.is_overtime) toast('⚠️ Túllépte a 15 órás EU limitet!','err');
+        if (d.locked_until) toast('🔒 Heti zárolás aktív','err');
+        toast('⏹ Nap lezárva — válassz pihenőt!','ok');
+        _showRestPicker = true;
+        loadShiftState();
+      } else {
+        toast('Hiba: '+(d.message||''),'err');
+      }
+    });
+}
+ 
+function shiftRest(type, hours) {
+  var body = {rest_type:type};
+  if (hours !== undefined) body.rest_hours = hours;
+  fetch('/api/shift/rest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if (d.ok) {
+        var ns = d.next_shift_start ? fmtDt(d.next_shift_start) : '—';
+        toast('😴 Pihenő beállítva. Értesítő: '+ns+' előtt.','ok');
+        _showRestPicker = false;
+        loadShiftState();
+      } else {
+        toast('Hiba: '+(d.message||''),'err');
+      }
+    });
+}
+ 
+function shiftVacation() {
+  var dateVal = document.getElementById('vacDate').value;
+  var hourVal = parseInt(document.getElementById('vacHour').value);
+  if (!dateVal) { toast('Add meg a visszatérés dátumát!','err'); return; }
+  if (isNaN(hourVal)||hourVal<0||hourVal>23) { toast('Az óra 0–23 között legyen!','err'); return; }
+  var target = new Date(dateVal);
+  target.setHours(hourVal,0,0,0);
+  var hoursUntil = (target.getTime()-Date.now())/3600000;
+  if (hoursUntil<=0) { toast('A dátum a múltban van!','err'); return; }
+  shiftRest('vacation', parseFloat(hoursUntil.toFixed(1)));
+}
+ 
+function shiftSnooze(hours) {
+  fetch('/api/shift/snooze-pause',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({snooze_hours:hours})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if (d.ok) toast('⏰ Emlékeztető '+hours+' óra múlva.','ok');
+    });
+}
+
+
 // ============================================================
 // LOGOUT
 // ============================================================
@@ -821,7 +1392,9 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
   _meData = d.result;
   document.getElementById('meBadge').textContent = d.result.nume;
   if (window.VS_PUSH) VS_PUSH.init(d.result.email, d.result.pozicio);
-  initFirebaseChat(d.result);
+    initFirebaseChat(d.result);
+    loadShiftState();
+    startShiftPoll();
 
   // ── Állapot visszaállítás ──
   var state = stateGet();
