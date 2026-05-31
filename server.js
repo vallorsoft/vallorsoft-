@@ -219,6 +219,7 @@ if (helmet) {
           "https://*.firebase.com",
           "https://*.firebaseapp.com",
         ],
+        scriptSrcAttr: ["'unsafe-inline'"], // inline onclick/onchange handlerek (helmet default 'none' felulirasa)
         workerSrc: ["'self'", "blob:"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
