@@ -1,4 +1,4 @@
-const CACHE = 'vallorsoft-v3';
+const CACHE = 'vallorsoft-v2';
 const PRECACHE = ['/style.css', '/sofer'];
 
 self.addEventListener('install', e => {
