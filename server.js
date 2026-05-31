@@ -208,6 +208,7 @@ if (helmet) {
           "https://*.firebaseio.com",
           "https://*.firebase.com",
         ],
+        scriptSrcAttr: ["'unsafe-inline'"],   // <-- EZ AZ ÚJ SOR: engedi az onclick handlereket
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:"],
