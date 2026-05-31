@@ -53,12 +53,10 @@
           })
           .then(function(sub) {
             if (sub) {
-              // Mar van subscription - szerverre kuldj frissitest
               _subscription = sub;
               VS_PUSH._saveToServer(sub);
               console.log('[Push] Meglevo subscription talalhato');
             } else {
-              // Elso alkalommal: kerj engedely + iratkozz fel
               VS_PUSH._askPermission();
             }
           });
@@ -70,18 +68,22 @@
 
   /* ---------- Engedely keres ---------- */
   VS_PUSH._askPermission = function() {
-    // Csak egyszer kerdjuk (ha mar elutasitotta, nem zavarjuk)
     if (Notification.permission === 'denied') return;
     if (Notification.permission === 'granted') {
       VS_PUSH._subscribe();
       return;
     }
 
-    // Kis ido utan kerdjuk (ne azonnal betoltes utan)
+    // Ha mar elutasitotta (7 napon belul), ne zavarja ujra
+    try {
+      var dismissed = localStorage.getItem('vs_push_dismissed');
+      if (dismissed && (Date.now() - parseInt(dismissed, 10)) < 7 * 24 * 60 * 60 * 1000) return;
+    } catch(e) {}
+
+    // 4 masodperc utan kerjuk (ne azonnal betoltes utan)
     setTimeout(function() {
-      // Kis UI banner megjelenitese a kodolas elott (baratsagosabb mint a nyers browser popup)
       VS_PUSH._showBanner();
-    }, 3000);
+    }, 4000);
   };
 
   /* ---------- Push banner (sajat UI) ---------- */
@@ -106,7 +108,7 @@
       'box-shadow:0 20px 60px rgba(0,0,0,0.7)',
       'max-width:360px',
       'width:calc(100vw - 32px)',
-      'animation:vsSlideUp .3s ease',
+      'animation:vsSlideUp .3s ease'
     ].join(';');
 
     banner.innerHTML = [
@@ -121,7 +123,7 @@
       '<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">',
       '  <button id="vs-push-yes" style="background:linear-gradient(180deg,#fff,#d9dee6);color:#0a0f15;border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:12px;cursor:pointer;">Igen</button>',
       '  <button id="vs-push-no"  style="background:transparent;color:#8a97a8;border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;">Nem</button>',
-      '</div>',
+      '</div>'
     ].join('');
 
     document.body.appendChild(banner);
@@ -132,7 +134,6 @@
     };
     document.getElementById('vs-push-no').onclick = function() {
       banner.remove();
-      // 7 nap mulva kerdezzuk ujra
       try { localStorage.setItem('vs_push_dismissed', Date.now()); } catch(e) {}
     };
 
@@ -191,16 +192,6 @@
 
   /* ---------- Chat uzenet kuldese utan hivd ezt ---------- */
   VS_PUSH.notifyChat = function(opts) {
-    /*
-      opts: {
-        toEmails: ['...'],   // specifikus emailek
-        toRoles:  ['Manager','Admin'],  // vagy szerepkor alapjan
-        fromName: '...',
-        text:     '...',
-        room:     'dm_...',
-        companyId: 1
-      }
-    */
     fetch('/api/chat-notify', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -212,11 +203,9 @@
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', function(e) {
       if (e.data && e.data.type === 'CHAT_NOTIFICATION_CLICK') {
-        // Chat tab megnyitasa + a megfelelo szoba megnyitasa
         var room = e.data.room;
         if (room && typeof activateTab === 'function') {
           activateTab('chat');
-          // Kis kesleltetesre van szukseg amig a tab betoltodik
           setTimeout(function() {
             if (typeof openChatRoom === 'function') openChatRoom(room);
           }, 600);
