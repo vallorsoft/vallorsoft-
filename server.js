@@ -1134,14 +1134,13 @@ app.post('/api/execute', requireLogin, async (req, res) => {
   }
   if (functionName === 'userListAll') {
     try {
-      // requireLogin mar futott - req.session.user letezik
       if (!['Admin', 'Manager'].includes(req.session.user.pozicio)) {
         return res.json({ result: [] });
       }
       const cid = req.session.user.company_id;
       if (!cid) return res.json({ result: [] });
       const r = await pool.query(
-        'SELECT id, nume, email, tel, pozicio FROM users WHERE company_id = $1 ORDER BY id',
+        'SELECT id, nume, email, tel, pozicio FROM users WHERE company_id = $1 AND (pozicio_dev IS NOT TRUE) ORDER BY id',
         [cid]
       );
       return res.json({ result: r.rows });
