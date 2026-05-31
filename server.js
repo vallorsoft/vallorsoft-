@@ -536,7 +536,8 @@ app.post('/api/login', async (req, res) => {
     // A jelszo helyes. Most a 2FA allapot dont.
     // Atmeneti "pre-auth" session - csak a 2FA lepeshez
     if (speakeasy) {
-      if (user.totp_enabled && user.totp_secret) {
+      // ⚠️ IDEIGLENES: Sofer szerepkornél 2FA kihagyva (visszakapcsoláshoz töröld az && feltételt)
+      if (user.totp_enabled && user.totp_secret && user.pozicio !== 'Sofer') {
         // 2FA be van kapcsolva -> kodot kerunk
         req.session.pendingUser = {
           id: user.id, nume: user.nume, email: user.email, tel: user.tel,
