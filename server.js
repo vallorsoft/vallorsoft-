@@ -537,15 +537,16 @@ app.post('/api/login', async (req, res) => {
     // Atmeneti "pre-auth" session - csak a 2FA lepeshez
     if (speakeasy) {
       if (user.totp_enabled && user.totp_secret) {
-        // 2FA be van kapcsolva -> kodot kerunk
+        // 2FA be van kapcsolva -> kodot kerunk (minden szerepkor)
         req.session.pendingUser = {
           id: user.id, nume: user.nume, email: user.email, tel: user.tel,
           pozicio: user.pozicio, company_id: user.company_id,
           is_dev: user.pozicio_dev || false,
         };
         return res.json({ success: true, need2fa: true });
-      } else {
-        // 2FA meg nincs beallitva -> KOTELEZO setup
+      } else if (user.pozicio !== 'Sofer') {
+        // 2FA meg nincs beallitva -> Admin/Manager kenyszeritett setup
+        // Sofor: 2FA nem kotelezo, egyenesen belep
         req.session.pendingUser = {
           id: user.id, nume: user.nume, email: user.email, tel: user.tel,
           pozicio: user.pozicio, company_id: user.company_id,
@@ -553,6 +554,7 @@ app.post('/api/login', async (req, res) => {
         };
         return res.json({ success: true, setup2fa: true });
       }
+      // Sofor 2FA nelkul: folytatodik a normalis beleptetes lent
     }
 
     // Ha speakeasy nincs telepitve, fallback a regi viselkedeshez

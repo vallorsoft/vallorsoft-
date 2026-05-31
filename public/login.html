@@ -27,7 +27,7 @@
         <input class="input" type="password" id="jelszo" placeholder="••••••••" required>
       </div>
       
-      <button class="btn primary block xl" onclick="executeLogin()" id="btnLog">Bejelentkezés</button>
+      <button class="btn primary block xl" type="button" id="btnLog">Bejelentkezés</button>
       
       <div class="switch-link" style="margin-bottom:8px;">
         <a href="#" onclick="forgotPassword();return false;">Elfelejtette a jelszavát?</a>
@@ -280,7 +280,11 @@
       });
     }
     
-    // Enter gomb leütésre is induljon a belépés
+    // Gomb + Enter kötés (type=button, onclick nélkül - CSP-safe)
+    document.getElementById('btnLog').addEventListener('click', executeLogin);
+    document.getElementById('email').addEventListener('keypress', function(e) {
+      if(e.key === 'Enter') { document.getElementById('jelszo').focus(); }
+    });
     document.getElementById('jelszo').addEventListener('keypress', function(e) {
       if(e.key === 'Enter') executeLogin();
     });
