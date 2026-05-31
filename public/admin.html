@@ -37,8 +37,7 @@
       <div class="menu-title">Fuvarozás & Logisztika</div>
       <div class="tab" data-tab="orders">Fuvarfeladatok kiírása</div>
       <div class="tab" data-tab="received-fuv">Beérkezett Fuvarlevelek</div>
-      <div class="tab" data-tab="border-logs">GPS Határnapló</div>
-      <div class="tab" data-tab="driver-docs-pane">Feltöltött Iratok & CMR-ek</div>
+            <div class="tab" data-tab="driver-docs-pane">Feltöltött Iratok & CMR-ek</div>
       <div class="tab" data-tab="shift-fleet">📊 Műszak & Munkaidő</div>
     </div>
     <div class="menu-group" id="userMenuGroup">
@@ -281,6 +280,37 @@
         <h3 style="margin:0 0 12px;font-size:15px;">⚠️ Túllépés riasztások (utolsó 14 nap)</h3>
         <div id="sfOvertimeList"></div>
       </div>
+
+      <!-- ── Diurna statisztika sofőrönként ── -->
+      <div class="glass" style="padding:18px;margin-top:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="margin:0;font-size:15px;">🌍 Diurna összesítő — sofőrönként</h3>
+          <button class="btn ghost" style="padding:5px 12px;font-size:12px;" onclick="loadDiurnaStats()">🔄 Frissítés</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="table">
+            <thead><tr>
+              <th>Sofőr</th>
+              <th>Extern napok</th>
+              <th>Intern napok</th>
+              <th>Össz. külföldi nap</th>
+              <th>Részletek</th>
+            </tr></thead>
+            <tbody id="sfDiurnaTblBody">
+              <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <!-- ── Diurna részletek modal ── -->
+      <div class="modal-back" id="diurnaModal">
+        <div class="modal glass" style="width:min(600px,100%);max-height:80vh;overflow-y:auto;">
+          <h3 style="margin-top:0;" id="diurnaModalTitle">Diurna részletek</h3>
+          <div id="diurnaModalBody"></div>
+          <button class="btn ghost" style="margin-top:14px;" onclick="document.getElementById('diurnaModal').classList.remove('open')">Bezárás</button>
+        </div>
+      </div>
+
     </div>
  
  
@@ -306,16 +336,8 @@
         </div>
       </div>
     </div>
+    <!-- GPS határnapló szekció eltávolítva - adatok a Műszak & Munkaidő / Diurna szekcióban -->
 
-    <div class="pane hidden" data-pane="border-logs">
-      <div class="glass" style="padding:22px">
-        <h2>GPS Határátlépési Napló</h2>
-        <table class="table" id="tblBorderLogs">
-          <thead><tr><th>Időpont</th><th>Sofőr</th><th>Esemény</th><th>GPS Pozíció</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
 
     <div class="pane hidden" data-pane="users">
       <div class="glass" style="padding:22px;">
@@ -828,13 +850,12 @@ function loadTab(name){
   if(name==='orders'){loadOrderFormData();loadOrders();}
   if(name==='received-fuv') loadReceivedFuvarlevelek();
   if(name==='driver-docs-pane') loadDriverUploadedDocs();
-  if(name==='border-logs') loadBorderLogs();
   if(name==='users') loadUsers();
   if(name==='invites') loadInvites();
   if(name==='vehicles') loadVehicles();
   if(name==='external-drivers') loadExtDrivers();
   if(name==='signature') initAdminSigCanvas();
-  if(name==='shift-fleet') loadShiftFleet();
+  if(name==='shift-fleet') { loadShiftFleet(); loadDiurnaStats(); }
   if(name==='settings') loadSettingsPane();
   if(name==='internal-drivers') loadInternalDrivers();
 }
@@ -2342,6 +2363,47 @@ function sfStartPoll() {
   }, 30000);
 }
  
+
+// ── Diurna statisztika ──────────────────────────────────────
+var _diurnaCache = [];
+function loadDiurnaStats() {
+  fetch('/api/diurna-stats').then(r=>r.json()).then(function(d){
+    var tb = document.getElementById('sfDiurnaTblBody');
+    if (!tb) return;
+    if (!d.ok||!d.data||!d.data.length) {
+      tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px;">Nincs adat.</td></tr>';
+      return;
+    }
+    _diurnaCache = d.data;
+    tb.innerHTML = d.data.map(function(s, idx){
+      var total = s.externDays + s.internDays;
+      return '<tr>'+
+        '<td><b style="color:#fff;">'+esc(s.nume)+'</b><br><span style="font-size:11px;color:var(--muted);">'+esc(s.email)+'</span></td>'+
+        '<td><span style="color:#22c55e;font-weight:700;">'+s.externDays+'</span></td>'+
+        '<td><span style="color:#f59e0b;font-weight:700;">'+s.internDays+'</span></td>'+
+        '<td>'+total+'</td>'+
+        '<td><button class="btn ghost" style="padding:3px 10px;font-size:12px;" onclick="openDiurnaDetail('+idx+')">Részletek</button></td>'+
+      '</tr>';
+    }).join('');
+  }).catch(function(){ console.error('diurna-stats hiba'); });
+}
+function openDiurnaDetail(idx) {
+  var s = _diurnaCache[idx];
+  if (!s) return;
+  document.getElementById('diurnaModalTitle').textContent = '🌍 Diurna — ' + s.nume;
+  var body = document.getElementById('diurnaModalBody');
+  var log = s.crossingLog || [];
+  if (!log.length) { body.innerHTML='<p style="color:var(--muted);">Nincs határátlépési adat.</p>'; }
+  else {
+    body.innerHTML = '<table class="table"><thead><tr><th>Nap</th><th>Külföldön</th><th>Típus</th></tr></thead><tbody>'+
+      log.map(function(r){
+        var c = r.type==='EXTERN'?'#22c55e':'#f59e0b';
+        return '<tr><td>'+r.day+'</td><td>'+r.hours+' ó</td>'+
+          '<td><b style="color:'+c+';">'+r.type+'</b></td></tr>';
+      }).join('')+'</tbody></table>';
+  }
+  document.getElementById('diurnaModal').classList.add('open');
+}
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
                       .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');

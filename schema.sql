@@ -561,3 +561,20 @@ ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS snooze_until TIMESTAMP;
 CREATE INDEX IF NOT EXISTS idx_shifts_warn11h_pending
   ON driver_shifts(day_started_at)
   WHERE status = 'ACTIVE' AND warn11h_sent_at IS NULL;
+
+-- ------------------------------------------------------------
+-- DOKUMENTUM SOROZATSZÁMOK (menetlevél MT, jövőbeli típusok)
+-- Admin/Manager beállítja a prefix-et, rendszer számolja a seq-t
+-- Ha új prefix-et adnak meg, seq visszaáll 0-ra
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS document_series (
+  id          SERIAL PRIMARY KEY,
+  company_id  INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  doc_type    VARCHAR(20) NOT NULL DEFAULT 'MT',
+  prefix      VARCHAR(20) NOT NULL DEFAULT 'MT',
+  year        INTEGER     NOT NULL,
+  current_seq INTEGER     NOT NULL DEFAULT 0,
+  created_at  TIMESTAMP DEFAULT NOW(),
+  updated_at  TIMESTAMP DEFAULT NOW(),
+  UNIQUE(company_id, doc_type, year)
+);
