@@ -38,6 +38,7 @@
     </div>
 
     <!-- ===== 2. LEPES: 2FA kod bevitel ===== -->
+  
     <div class="login-card glass" id="verify2faStep" style="display:none;">
       <div class="head">
         <div class="vs-logo lg"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
@@ -57,6 +58,13 @@
           30 napig ne kérjen kódot ezen az eszközön
         </label>
       </div>
+      <button class="btn primary block xl" onclick="verify2fa()" id="btn2fa">Belépés</button>
+      <div class="switch-link" style="margin-top:10px;">
+        <a href="#" onclick="cancelLogin();return false;">← Vissza</a>
+      </div>
+      <p style="color:#6b7280;font-size:12px;margin-top:14px;text-align:center;">
+        Elveszett a telefonod? Használd valamelyik tartalék kódot.
+      </p>
     </div>
 
     <!-- ===== 3. LEPES: 2FA elso beallitas ===== -->
