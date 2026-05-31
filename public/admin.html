@@ -1981,13 +1981,73 @@ document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(e
   });
 });
 
-// ===== BEÁLLÍTÁSOK =====
+// ===== BEÁLLÍTÁSOK — pane dinamikus létrehozása =====
+(function() {
+  var mc = document.querySelector('.main-content');
+  if (!mc || document.querySelector('.pane[data-pane="settings"]')) return;
+  var el = document.createElement('div');
+  el.className = 'pane hidden';
+  el.setAttribute('data-pane', 'settings');
+  el.innerHTML = [
+    '<div style="max-width:600px;">',
+    '<h2 style="font-size:20px;font-weight:800;color:#fff;margin-bottom:4px;">⚙️ Beállítások</h2>',
+    '<div style="font-size:13px;color:var(--muted);margin-bottom:24px;">Saját fiók biztonsági és profil beállításai</div>',
+
+    '<div class="card" style="margin-bottom:14px;">',
+    '<div style="font-weight:700;color:#fff;font-size:15px;margin-bottom:14px;">🔐 Biztonság</div>',
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 0;border-top:1px solid var(--border);">',
+    '<div><div style="font-size:14px;color:#fff;margin-bottom:2px;">Kétlépéses hitelesítés</div>',
+    '<div id="settings2faStatus" style="font-size:12px;color:var(--muted);">Betöltés...</div></div>',
+    '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">',
+    '<span id="settings2faLabel" style="font-size:13px;color:var(--muted);min-width:80px;text-align:right;"></span>',
+    '<div style="position:relative;width:46px;height:26px;flex-shrink:0;">',
+    '<input type="checkbox" id="toggle2fa" style="opacity:0;width:0;height:0;position:absolute;" onchange="on2faToggle(this.checked)">',
+    '<span id="toggle2faSlider" style="position:absolute;inset:0;background:#374151;border-radius:26px;transition:.3s;cursor:pointer;display:block;"></span>',
+    '<span id="toggle2faKnob" style="position:absolute;left:3px;top:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.3s;pointer-events:none;display:block;"></span>',
+    '</div></label></div>',
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 0;border-top:1px solid var(--border);">',
+    '<div><div style="font-size:14px;color:#fff;margin-bottom:2px;">Megbízható eszközök</div>',
+    '<div id="settingsTrustCount" style="font-size:12px;color:var(--muted);">Betöltés...</div></div>',
+    '<button class="btn ghost" onclick="clearTrustedDevices()" style="font-size:13px;padding:6px 14px;">🗑 Törlés</button>',
+    '</div></div>',
+
+    '<div class="card" style="margin-bottom:14px;">',
+    '<div style="font-weight:700;color:#fff;font-size:15px;margin-bottom:14px;">🔑 Jelszó módosítása</div>',
+    '<div class="field"><label>Jelenlegi jelszó</label>',
+    '<input class="input" type="password" id="settingsCurPw" placeholder="••••••••" autocomplete="current-password"></div>',
+    '<div class="field"><label>Új jelszó</label>',
+    '<input class="input" type="password" id="settingsNewPw" placeholder="••••••••" autocomplete="new-password" oninput="updatePwStrength(this.value)">',
+    '<div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;margin-top:6px;overflow:hidden;">',
+    '<div id="pwStrengthBar" style="height:100%;width:0;border-radius:2px;transition:width .3s,background .3s;"></div></div>',
+    '<div id="pwStrengthLabel" style="font-size:11px;margin-top:3px;color:var(--muted);"></div></div>',
+    '<div class="field"><label>Új jelszó megerősítése</label>',
+    '<input class="input" type="password" id="settingsConfPw" placeholder="••••••••" autocomplete="new-password"></div>',
+    '<button class="btn primary" onclick="changePassword()" id="btnChangePw" style="margin-top:4px;">💾 Jelszó mentése</button>',
+    '</div>',
+
+    '<div class="card">',
+    '<div style="font-weight:700;color:#fff;font-size:15px;margin-bottom:14px;">👤 Profil</div>',
+    '<div class="field"><label>Megjelenítési név</label>',
+    '<input class="input" type="text" id="settingsNume" placeholder="Teljes név"></div>',
+    '<div class="field"><label>Telefonszám</label>',
+    '<input class="input" type="tel" id="settingsTel" placeholder="+40 7xx xxx xxx"></div>',
+    '<div class="field"><label>Email <span style="font-size:11px;color:var(--muted);font-weight:400;">(nem módosítható)</span></label>',
+    '<input class="input" type="email" id="settingsEmail" disabled style="opacity:.5;cursor:not-allowed;"></div>',
+    '<button class="btn primary" onclick="updateProfile()" id="btnUpdateProfile" style="margin-top:4px;">💾 Profil mentése</button>',
+    '</div>',
+    '</div>'
+  ].join('');
+  mc.appendChild(el);
+})();
+
 function loadSettings() {
   fetch('/api/settings/me')
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (!d.success) return;
-      var cb=document.getElementById('toggle2fa'), slider=document.getElementById('toggle2faSlider'), knob=document.getElementById('toggle2faKnob');
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d.success) return;
+      var cb=document.getElementById('toggle2fa');
+      var slider=document.getElementById('toggle2faSlider');
+      var knob=document.getElementById('toggle2faKnob');
       cb.checked=d.totp_required;
       slider.style.background=d.totp_required?'#6366f1':'#374151';
       knob.style.left=d.totp_required?'23px':'3px';
@@ -2001,34 +2061,46 @@ function loadSettings() {
     })
     .catch(function(){toast('Beállítások betöltési hiba','err');});
 }
+
 function on2faToggle(checked){
   var slider=document.getElementById('toggle2faSlider'),knob=document.getElementById('toggle2faKnob');
-  slider.style.background=checked?'#6366f1':'#374151'; knob.style.left=checked?'23px':'3px';
+  slider.style.background=checked?'#6366f1':'#374151';
+  knob.style.left=checked?'23px':'3px';
   document.getElementById('settings2faLabel').textContent=checked?'Bekapcsolva':'Kikapcsolva';
   fetch('/api/settings/2fa-toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enable:checked})})
   .then(function(r){return r.json();}).then(function(d){
     if(d.success){toast(checked?'🔐 2FA bekapcsolva':'🔓 2FA kikapcsolva','ok');}
-    else{toast(d.message||'Hiba','err');var cb=document.getElementById('toggle2fa');cb.checked=!checked;slider.style.background=!checked?'#6366f1':'#374151';knob.style.left=!checked?'23px':'3px';document.getElementById('settings2faLabel').textContent=!checked?'Bekapcsolva':'Kikapcsolva';}
+    else{
+      toast(d.message||'Hiba','err');
+      var cb=document.getElementById('toggle2fa'); cb.checked=!checked;
+      slider.style.background=!checked?'#6366f1':'#374151';
+      knob.style.left=!checked?'23px':'3px';
+      document.getElementById('settings2faLabel').textContent=!checked?'Bekapcsolva':'Kikapcsolva';
+    }
   }).catch(function(){toast('Szerver hiba','err');});
 }
+
 function clearTrustedDevices(){
-  if(!confirm('Törli az összes megbízható eszközt? Legközelebb minden eszközön kódot kell megadni.'))return;
+  if(!confirm('Törli az összes megbízható eszközt?')) return;
   fetch('/api/settings/trusted-devices-clear',{method:'POST',headers:{'Content-Type':'application/json'}})
   .then(function(r){return r.json();}).then(function(d){
-    if(d.success){toast('Megbízható eszközök törölve','ok');loadSettings();}else toast(d.message||'Hiba','err');
+    if(d.success){toast('Megbízható eszközök törölve','ok');loadSettings();}
+    else toast(d.message||'Hiba','err');
   }).catch(function(){toast('Szerver hiba','err');});
 }
+
 function updatePwStrength(v){
-  var bar=document.getElementById('pwStrengthBar'),label=document.getElementById('pwStrengthLabel');
-  if(!v){bar.style.width='0';label.textContent='';return;}
+  var bar=document.getElementById('pwStrengthBar'),lbl=document.getElementById('pwStrengthLabel');
+  if(!v){bar.style.width='0';lbl.textContent='';return;}
   var s=0;
   if(v.length>=8)s++; if(v.length>=12)s++;
   if(/[A-Z]/.test(v))s++; if(/[0-9]/.test(v))s++; if(/[^A-Za-z0-9]/.test(v))s++;
   var pct=['0','25%','45%','65%','85%','100%'][s];
   var clr=['#374151','#ef4444','#f59e0b','#f59e0b','#22c55e','#22c55e'][s];
   var txt=['','Gyenge','Gyenge','Közepes','Erős','Nagyon erős'][s];
-  bar.style.width=pct; bar.style.background=clr; label.style.color=clr; label.textContent=txt;
+  bar.style.width=pct; bar.style.background=clr; lbl.style.color=clr; lbl.textContent=txt;
 }
+
 function changePassword(){
   var cur=document.getElementById('settingsCurPw').value;
   var nw=document.getElementById('settingsNewPw').value;
@@ -2041,10 +2113,16 @@ function changePassword(){
   fetch('/api/settings/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:cur,newPassword:nw})})
   .then(function(r){return r.json();}).then(function(d){
     btn.disabled=false; btn.textContent='💾 Jelszó mentése';
-    if(d.success){toast('Jelszó sikeresen megváltoztatva!','ok');document.getElementById('settingsCurPw').value='';document.getElementById('settingsNewPw').value='';document.getElementById('settingsConfPw').value='';updatePwStrength('');}
-    else toast(d.message||'Hiba','err');
+    if(d.success){
+      toast('Jelszó sikeresen megváltoztatva!','ok');
+      document.getElementById('settingsCurPw').value='';
+      document.getElementById('settingsNewPw').value='';
+      document.getElementById('settingsConfPw').value='';
+      updatePwStrength('');
+    } else toast(d.message||'Hiba','err');
   }).catch(function(){btn.disabled=false;btn.textContent='💾 Jelszó mentése';toast('Szerver hiba','err');});
 }
+
 function updateProfile(){
   var nume=document.getElementById('settingsNume').value.trim();
   var tel=document.getElementById('settingsTel').value.trim();
@@ -2058,8 +2136,6 @@ function updateProfile(){
     else toast(d.message||'Hiba','err');
   }).catch(function(){btn.disabled=false;btn.textContent='💾 Profil mentése';toast('Szerver hiba','err');});
 }
-
-
 
 </script>
 </body>
