@@ -1,9 +1,12 @@
-const CACHE = 'vallorsoft-v2';
-const PRECACHE = ['/style.css', '/sofer'];
+const CACHE = 'vallorsoft-v3';      // verzió bump → kényszeríti a frissülést
+const PRECACHE = ['/style.css'];    // '/sofer' KIVÉVE (auth-védett, megbuktatja az install-t)
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(PRECACHE)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then(c => c.addAll(PRECACHE))
+      .catch(() => {})                 // ne bukjon el az install egy asset miatt
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -16,9 +19,12 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;     // POST/stb. nem cache-elhető
   if (e.request.url.includes('/api/')) return;
   e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
+    fetch(e.request).catch(() =>
+      caches.match(e.request).then(c => c || Response.error())  // ne adjon vissza undefined-et
+    )
   );
 });
 
