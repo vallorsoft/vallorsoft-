@@ -1473,24 +1473,45 @@ app.post('/api/execute', requireLogin, async (req, res) => {
       if (!req.session.user) return res.json({ result: [] });
       const me = req.session.user;
       const cid = me.company_id;
+      // Kozos subquery: order_legs aggregacio (szakaszok szama + reszletek)
+      const legsSubquery = `
+        LEFT JOIN (
+          SELECT order_id,
+                 COUNT(*)::int AS leg_count,
+                 JSON_AGG(
+                   JSON_BUILD_OBJECT(
+                     'leg_number',    leg_number,
+                     'sofer',         COALESCE(nume_sofer, email_sofer, firma_extern, '—'),
+                     'rendszam',      COALESCE(rendszam_camion, ''),
+                     'loc_preluare',  COALESCE(loc_preluare, '')
+                   ) ORDER BY leg_number
+                 ) AS legs_json
+          FROM order_legs
+          GROUP BY order_id
+        ) legs ON legs.order_id = o.id`;
       let r;
       if (me.pozicio === 'Admin' || me.pozicio === 'Manager') {
         r = await pool.query(
-          `SELECT id, client, ref, loc_incarcare, loc_descarcare,
-                  pret, km, status, sofer_type, email_sofer, nume_sofer,
-                  firma_extern, telefon_extern, rendszam_camion, rendszam_remorca
-           FROM orders WHERE company_id = $1 ORDER BY created_at DESC`,
+          `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare,
+                  o.pret, o.km, o.status, o.sofer_type, o.email_sofer, o.nume_sofer,
+                  o.firma_extern, o.telefon_extern, o.rendszam_camion, o.rendszam_remorca,
+                  COALESCE(legs.leg_count, 0) AS leg_count,
+                  COALESCE(legs.legs_json, '[]'::json) AS legs_json
+           FROM orders o ${legsSubquery}
+           WHERE o.company_id = $1 ORDER BY o.created_at DESC`,
           [cid]
         );
       } else {
         // Sofernek csak a sajat nevere kiosztott fuvarok latszanak
         r = await pool.query(
-          `SELECT id, client, ref, loc_incarcare, loc_descarcare,
-                  pret, km, status, sofer_type, email_sofer, nume_sofer,
-                  firma_extern, telefon_extern, rendszam_camion, rendszam_remorca
-           FROM orders
-           WHERE company_id = $1 AND LOWER(email_sofer) = LOWER($2)
-           ORDER BY created_at DESC`,
+          `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare,
+                  o.pret, o.km, o.status, o.sofer_type, o.email_sofer, o.nume_sofer,
+                  o.firma_extern, o.telefon_extern, o.rendszam_camion, o.rendszam_remorca,
+                  COALESCE(legs.leg_count, 0) AS leg_count,
+                  COALESCE(legs.legs_json, '[]'::json) AS legs_json
+           FROM orders o ${legsSubquery}
+           WHERE o.company_id = $1 AND LOWER(o.email_sofer) = LOWER($2)
+           ORDER BY o.created_at DESC`,
           [cid, me.email]
         );
       }

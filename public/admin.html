@@ -1306,10 +1306,42 @@ function renderFilteredOrders(list) {
     if(c.status==='In Curs'||c.status==='Finalizat')sc='ok';
     if(c.status==='Anulat')sc='err';
     if(c.status==='Extern')sc='warn';
-    return '<tr><td><b>'+c.id+'</b></td><td>'+(c.client||'—')+'</td>'+
-      '<td>'+(c.loc_incarcare||'—')+' → '+(c.loc_descarcare||'—')+'</td>'+
+
+    // Szakaszok (order_legs) megjelenítése
+    var legs = Array.isArray(c.legs_json) ? c.legs_json : [];
+    var legCount = parseInt(c.leg_count)||0;
+
+    // Útvonal cella: alap útvonal + szakasz közbülső pontok
+    var routeCell = esc(c.loc_incarcare||'—')+' → '+esc(c.loc_descarcare||'—');
+    if (legCount > 0) {
+      routeCell += '<div style="margin-top:4px;">';
+      legs.forEach(function(l){
+        if (l.loc_preluare) {
+          routeCell += '<div style="font-size:11px;color:var(--muted);padding-left:8px;border-left:2px solid rgba(225,11,26,0.4);margin-top:2px;">'+
+            '↳ '+esc(l.loc_preluare)+
+          '</div>';
+        }
+      });
+      routeCell += '</div>';
+    }
+
+    // Sofőr cella: alap sofőr + váltások badge-del
+    var soferCell = esc(soferInfo);
+    if (legCount > 0) {
+      soferCell += ' <span style="font-size:10px;background:rgba(225,11,26,0.15);color:#f87171;border:1px solid rgba(225,11,26,0.3);border-radius:6px;padding:1px 6px;white-space:nowrap;">+'+legCount+' váltás</span>';
+      soferCell += '<div style="margin-top:4px;">';
+      legs.forEach(function(l){
+        soferCell += '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+
+          '↳ '+esc(l.sofer||'—')+(l.rendszam?' <span style="opacity:.6;">'+esc(l.rendszam)+'</span>':'')+
+        '</div>';
+      });
+      soferCell += '</div>';
+    }
+
+    return '<tr><td><b>'+c.id+'</b></td><td>'+esc(c.client||'—')+'</td>'+
+      '<td>'+routeCell+'</td>'+
       '<td>'+(c.km||'—')+'</td><td>'+(c.pret||'—')+'</td>'+
-      '<td>'+soferInfo+'</td><td>'+(c.rendszam_camion||'—')+'</td>'+
+      '<td>'+soferCell+'</td><td>'+esc(c.rendszam_camion||'—')+'</td>'+
       '<td><span class="badge '+sc+'">'+c.status+'</span></td>'+
       '<td style="display:flex;gap:4px;">'+
         '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="openDocModal(\''+c.id+'\')">📎</button>'+
