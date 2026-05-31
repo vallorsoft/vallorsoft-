@@ -2299,9 +2299,10 @@ app.post('/api/execute', requireLogin, async (req, res) => {
     if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
     try {
       const r = await pool.query(`
-        SELECT c.*, 
+        SELECT c.*,
           (SELECT COUNT(*)::int FROM users u WHERE u.company_id = c.id) AS user_count,
-          (SELECT COUNT(*)::int FROM orders o WHERE o.company_id = c.id) AS order_count
+          (SELECT COUNT(*)::int FROM orders o WHERE o.company_id = c.id) AS order_count,
+          (SELECT COUNT(*)::int FROM bug_reports b WHERE b.company_id = c.id AND b.is_read = FALSE) AS unread_bugs
         FROM companies c ORDER BY c.created_at DESC
       `);
       return res.json({ result: r.rows });
@@ -2405,8 +2406,103 @@ app.post('/api/execute', requireLogin, async (req, res) => {
     } catch (err) { return res.json({ result: [] }); }
   }
 
-  if (functionName === 'devStats') {
+  // ── HIBAJELENTÉS KÜLDÉSE (minden bejelentkezett user) ──
+  if (functionName === 'sendBugReport') {
+    try {
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve.' } });
+      const szoveg = String(args[0] || '').trim();
+      const oldal  = String(args[1] || '').trim();
+      if (!szoveg || szoveg.length < 5) return res.json({ result: { ok: false, err: 'Írj le legalább 5 karaktert!' } });
+      if (szoveg.length > 2000) return res.json({ result: { ok: false, err: 'Túl hosszú szöveg (max 2000 karakter).' } });
+      await pool.query(
+        `INSERT INTO bug_reports (company_id, user_email, user_name, user_role, szoveg, oldal)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [req.session.user.company_id||null, req.session.user.email, req.session.user.nume, req.session.user.pozicio, szoveg, oldal||null]
+      );
+      return res.json({ result: { ok: true } });
+    } catch (err) {
+      console.error('sendBugReport hiba:', err);
+      return res.json({ result: { ok: false, err: 'Szerver hiba.' } });
+    }
+  }
+
+  // ── HIBAJELENTÉSEK LEKÉRÉSE (dev only) ──
+  if (functionName === 'getBugReports') {
+    if (!isDev) return res.json({ result: [] });
+    try {
+      const companyId = args[0] ? parseInt(args[0]) : null;
+      const r = companyId
+        ? await pool.query(
+            `SELECT b.*, c.nev AS ceg_nev FROM bug_reports b
+             LEFT JOIN companies c ON c.id = b.company_id
+             WHERE b.company_id = $1 ORDER BY b.created_at DESC LIMIT 100`,
+            [companyId])
+        : await pool.query(
+            `SELECT b.*, c.nev AS ceg_nev FROM bug_reports b
+             LEFT JOIN companies c ON c.id = b.company_id
+             ORDER BY b.created_at DESC LIMIT 200`);
+      return res.json({ result: r.rows });
+    } catch (err) {
+      console.error('getBugReports hiba:', err);
+      return res.json({ result: [] });
+    }
+  }
+
+  // ── HIBAJELENTÉS OLVASOTTNAK JELÖLÉSE (dev only) ──
+  if (functionName === 'markBugRead') {
     if (!isDev) return res.json({ result: { ok: false } });
+    try {
+      const id = parseInt(args[0]);
+      await pool.query('UPDATE bug_reports SET is_read = TRUE WHERE id = $1', [id]);
+      return res.json({ result: { ok: true } });
+    } catch (err) {
+      return res.json({ result: { ok: false } });
+    }
+  }
+
+  // ── CEG RÉSZLETES AKTIVITÁS (dev only) ──
+  if (functionName === 'devCompanyDetail') {
+    if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    try {
+      const cid = parseInt(args[0]);
+      if (!cid) return res.json({ result: { ok: false, err: 'Hiányzó cég ID.' } });
+
+      const users = await pool.query(`
+        SELECT
+          u.id, u.nume, u.email, u.pozicio, u.tel,
+          (SELECT COUNT(*)::int FROM orders o
+           WHERE o.company_id = $1 AND LOWER(o.email_sofer) = LOWER(u.email)) AS fuvarok_kezelt,
+          (SELECT COUNT(*)::int FROM fuvarlevelek fl
+           WHERE LOWER(fl.email_sofer) = LOWER(u.email)) AS menetlevelek,
+          (SELECT COUNT(*)::int FROM documents d
+           WHERE LOWER(d.email_sofer) = LOWER(u.email)) AS dokumentumok,
+          (SELECT COUNT(*)::int FROM border_crossings b
+           WHERE LOWER(b.email_sofer) = LOWER(u.email)) AS hataratlepesek,
+          (SELECT MAX(bc.created_at) FROM border_crossings bc
+           WHERE LOWER(bc.email_sofer) = LOWER(u.email)) AS utolso_aktiv
+        FROM users u
+        WHERE u.company_id = $1 AND (u.pozicio_dev IS NOT TRUE)
+        ORDER BY u.pozicio, u.nume
+      `, [cid]);
+
+      const osszesito = await pool.query(`
+        SELECT
+          (SELECT COUNT(*)::int FROM orders WHERE company_id = $1) AS osszes_fuvar,
+          (SELECT COUNT(*)::int FROM orders WHERE company_id = $1 AND status IN ('In Curs','Alocat')) AS aktiv_fuvar,
+          (SELECT COUNT(*)::int FROM fuvarlevelek fl JOIN users u ON LOWER(u.email)=LOWER(fl.email_sofer) WHERE u.company_id=$1) AS osszes_menetlevel,
+          (SELECT COUNT(*)::int FROM documents d JOIN users u ON LOWER(u.email)=LOWER(d.email_sofer) WHERE u.company_id=$1) AS osszes_dok,
+          (SELECT COUNT(*)::int FROM bug_reports WHERE company_id=$1) AS osszes_hiba,
+          (SELECT COUNT(*)::int FROM bug_reports WHERE company_id=$1 AND is_read=FALSE) AS olvasatlan_hiba
+      `, [cid]);
+
+      return res.json({ result: { ok: true, users: users.rows, osszesito: osszesito.rows[0] }});
+    } catch (err) {
+      console.error('devCompanyDetail hiba:', err);
+      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    }
+  }
+
+  if (functionName === 'devStats') {
     try {
       const cegek = await pool.query('SELECT COUNT(*)::int AS db FROM companies');
       const userek = await pool.query('SELECT COUNT(*)::int AS db FROM users WHERE pozicio_dev IS NOT TRUE');

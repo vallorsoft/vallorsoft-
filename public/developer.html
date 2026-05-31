@@ -156,6 +156,30 @@
   </div>
 </div>
 
+<!-- CEG DETAIL MODAL -->
+<div class="modal-back" id="detailModal">
+  <div class="dev-modal" style="width:min(780px,100%);max-height:92vh;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <h3 id="detailModalTitle" style="margin:0;font-size:17px;">🏢 Cég</h3>
+      <button onclick="closeDetailModal()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;">✕</button>
+    </div>
+    <!-- Tab sáv -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;">
+      <button id="dtab-aktivitas" onclick="switchDetailTab('aktivitas')"
+        style="padding:10px 18px;background:none;border:none;border-bottom:2px solid #a855f7;color:#fff;font-size:13px;font-weight:800;cursor:pointer;">
+        📊 Aktivitás
+      </button>
+      <button id="dtab-hibak" onclick="switchDetailTab('hibak')"
+        style="padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;">
+        🐛 Hibajelentések
+      </button>
+    </div>
+    <!-- Tab tartalom -->
+    <div id="dpane-aktivitas" style="display:block;overflow-y:auto;max-height:60vh;">Betöltés...</div>
+    <div id="dpane-hibak"     style="display:none;overflow-y:auto;max-height:60vh;">Betöltés...</div>
+  </div>
+</div>
+
 <script>
 function toast(m,k){var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(function(){e.remove();},3000);}
 function gas(fn,args){return new Promise(function(res,rej){fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({functionName:fn,arguments:args||[]})}).then(r=>r.json()).then(d=>{res(d.result);}).catch(rej);});}
@@ -184,28 +208,149 @@ function loadCegek(){
     if(!list||!list.length){document.getElementById('cegList').innerHTML='<div style="color:var(--muted);padding:20px;">Nincs cég.</div>';return;}
     document.getElementById('cegList').innerHTML = list.map(function(c){
       var sClass = c.subscription_status==='active' ? 'active' : c.subscription_status==='inactive' ? 'inactive' : 'cancelled';
-      var sText = c.subscription_status==='active' ? 'Aktív' : c.subscription_status==='inactive' ? 'Blokkolt' : 'Lemondva';
-      var paid = c.paid_until ? new Date(c.paid_until).toLocaleDateString('hu-HU') : '—';
+      var sText  = c.subscription_status==='active' ? 'Aktív' : c.subscription_status==='inactive' ? 'Blokkolt' : 'Lemondva';
+      var paid   = c.paid_until ? new Date(c.paid_until).toLocaleDateString('hu-HU') : '—';
+      var bugBadge = c.unread_bugs > 0
+        ? '<span style="background:rgba(239,68,68,0.2);color:var(--err);border:1px solid rgba(239,68,68,0.4);border-radius:20px;padding:2px 8px;font-size:11px;font-weight:700;">🐛 '+c.unread_bugs+' új hiba</span>'
+        : '';
       return '<div class="ceg-card">'
         +'<div class="ceg-header">'
         +'<div>'
         +'<div class="ceg-name">'+c.nev+'</div>'
-        +'<div class="ceg-meta" style="margin-top:4px;">'
+        +'<div class="ceg-meta" style="margin-top:6px;gap:8px;">'
         +'<span>👥 '+c.user_count+' user</span>'
         +'<span>🚚 '+c.order_count+' fuvar</span>'
-        +'<span>📅 fizetve: '+paid+'</span>'
+        +'<span>📅 '+paid+'</span>'
         +(c.email_contact?'<span>✉️ '+c.email_contact+'</span>':'')
+        +(bugBadge ? '&nbsp;'+bugBadge : '')
         +'</div></div>'
-        +'<div style="display:flex;gap:8px;align-items:center;">'
+        +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
         +'<span class="status-badge '+sClass+'">'+sText+'</span>'
-        +'<button class="btn-dev" onclick="openEditCeg('+JSON.stringify(c).replace(/"/g,"&quot;")+')" >Szerkeszt</button>'
+        +'<button class="btn-dev" onclick="openCegDetail('+c.id+',\''+c.nev.replace(/'/g,"\\'")+'\')">🔍 Részletek</button>'
+        +'<button class="btn-dev" onclick="openEditCeg('+JSON.stringify(c).replace(/"/g,"&quot;")+')" style="background:rgba(255,255,255,0.05);color:var(--soft);border-color:var(--border);">Szerkeszt</button>'
         +(c.subscription_status==='active'
-          ? '<button class="btn-danger-sm" onclick="blockCeg('+c.id+')">🔒 Blokkolás</button>'
-          : '<button class="btn-ok-sm" onclick="unblockCeg('+c.id+')">🔓 Aktiválás</button>')
-        +'<button class="btn-danger-sm" onclick="deleteCeg('+c.id+',\''+c.nev.replace(/'/g,"\\'")+'\')" style="background:rgba(239,68,68,0.2);">🗑 Törlés</button>'
+          ? '<button class="btn-danger-sm" onclick="blockCeg('+c.id+')">🔒 Blokk</button>'
+          : '<button class="btn-ok-sm" onclick="unblockCeg('+c.id+')">🔓 Aktív</button>')
+        +'<button class="btn-danger-sm" onclick="deleteCeg('+c.id+',\''+c.nev.replace(/'/g,"\\'")+'\')" style="background:rgba(239,68,68,0.1);">🗑</button>'
         +'</div></div>'
         +'</div>';
     }).join('');
+  });
+}
+
+/* ── CEG DETAIL MODAL ── */
+var _detailCegId = null;
+var _detailTab   = 'aktivitas';
+
+function openCegDetail(id, nev){
+  _detailCegId = id;
+  document.getElementById('detailModalTitle').textContent = '🏢 ' + nev;
+  document.getElementById('detailModal').classList.add('open');
+  switchDetailTab('aktivitas');
+}
+function closeDetailModal(){ document.getElementById('detailModal').classList.remove('open'); }
+
+function switchDetailTab(tab){
+  _detailTab = tab;
+  ['aktivitas','hibak'].forEach(function(t){
+    document.getElementById('dtab-'+t).style.fontWeight = t===tab ? '800' : '500';
+    document.getElementById('dtab-'+t).style.borderBottom = t===tab ? '2px solid #a855f7' : '2px solid transparent';
+    document.getElementById('dtab-'+t).style.color = t===tab ? '#fff' : 'var(--muted)';
+    document.getElementById('dpane-'+t).style.display = t===tab ? 'block' : 'none';
+  });
+  if(tab==='aktivitas') loadDetailAktivitas();
+  if(tab==='hibak')     loadDetailHibak();
+}
+
+function loadDetailAktivitas(){
+  var el = document.getElementById('dpane-aktivitas');
+  el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(168,85,247,0.2);border-top-color:#a855f7;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
+  gas('devCompanyDetail',[_detailCegId]).then(function(r){
+    if(!r||!r.ok){ el.innerHTML='<div style="color:var(--err);padding:20px;">Hiba a betöltés során.</div>'; return; }
+    var o = r.osszesito;
+    var html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;">';
+    html += kpiBox('Összes fuvar', o.osszes_fuvar, '#3b82f6');
+    html += kpiBox('Aktív fuvar', o.aktiv_fuvar, '#22c55e');
+    html += kpiBox('Menetlevelek', o.osszes_menetlevel, '#a855f7');
+    html += kpiBox('Dokumentumok', o.osszes_dok, '#f59e0b');
+    html += kpiBox('Összes hiba', o.osszes_hiba, '#ef4444');
+    html += kpiBox('Olvasatlan hiba', o.olvasatlan_hiba, '#ef4444');
+    html += '</div>';
+    html += '<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Felhasználók aktivitása</div>';
+    if(!r.users||!r.users.length){
+      html += '<div style="color:var(--muted);font-size:13px;">Nincs felhasználó.</div>';
+    } else {
+      html += '<table class="table" style="font-size:12px;">';
+      html += '<thead><tr><th>Név</th><th>Pozíció</th><th>Fuvar</th><th>Menetlevél</th><th>Dok</th><th>Határátlépés</th><th>Utolsó aktivitás</th></tr></thead><tbody>';
+      html += r.users.map(function(u){
+        var aktiv = u.utolso_aktiv ? new Date(u.utolso_aktiv).toLocaleDateString('hu-HU') : '—';
+        var total = (u.fuvarok_kezelt||0)+(u.menetlevelek||0)+(u.dokumentumok||0)+(u.hataratlepesek||0);
+        var aktColor = total===0 ? 'color:var(--err)' : total<3 ? 'color:var(--warn)' : 'color:var(--ok)';
+        return '<tr>'
+          +'<td style="font-weight:600;color:#fff;">'+u.nume+'</td>'
+          +'<td><span class="status-badge active" style="font-size:10px;">'+u.pozicio+'</span></td>'
+          +'<td style="text-align:center;'+aktColor+'">'+u.fuvarok_kezelt+'</td>'
+          +'<td style="text-align:center;'+aktColor+'">'+u.menetlevelek+'</td>'
+          +'<td style="text-align:center;'+aktColor+'">'+u.dokumentumok+'</td>'
+          +'<td style="text-align:center;'+aktColor+'">'+u.hataratlepesek+'</td>'
+          +'<td style="font-size:11px;color:var(--muted);">'+aktiv+'</td>'
+          +'</tr>';
+      }).join('');
+      html += '</tbody></table>';
+      html += '<div style="font-size:11px;color:var(--muted);margin-top:8px;">🟢 aktív &nbsp; 🟡 kevés aktivitás &nbsp; 🔴 nincs adat</div>';
+    }
+    el.innerHTML = html;
+  });
+}
+
+function kpiBox(label, val, color){
+  return '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;">'
+    +'<div style="font-size:10px;color:var(--muted);margin-bottom:4px;">'+label+'</div>'
+    +'<div style="font-size:24px;font-weight:800;color:'+color+';">'+(val||0)+'</div>'
+    +'</div>';
+}
+
+function loadDetailHibak(){
+  var el = document.getElementById('dpane-hibak');
+  el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(168,85,247,0.2);border-top-color:#a855f7;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
+  gas('getBugReports',[_detailCegId]).then(function(list){
+    if(!list||!list.length){
+      el.innerHTML='<div style="color:var(--muted);padding:24px;text-align:center;">✅ Nincs beküldött hibajelentés.</div>';
+      return;
+    }
+    el.innerHTML = list.map(function(b){
+      var dt  = b.created_at ? new Date(b.created_at).toLocaleString('hu-HU') : '—';
+      var bg  = b.is_read ? 'rgba(255,255,255,0.02)' : 'rgba(239,68,68,0.06)';
+      var bdr = b.is_read ? 'var(--border)' : 'rgba(239,68,68,0.3)';
+      return '<div id="bug-'+b.id+'" style="background:'+bg+';border:1px solid '+bdr+';border-radius:10px;padding:14px;margin-bottom:10px;">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">'
+        +'<div style="font-size:12px;color:var(--muted);">👤 <b style="color:var(--soft);">'+b.user_name+'</b> ('+b.user_role+')'
+        +' &nbsp;·&nbsp; 🕐 '+dt
+        +(b.oldal?' &nbsp;·&nbsp; 📄 '+b.oldal:'')
+        +'</div>'
+        +(b.is_read ? '<span style="font-size:10px;color:var(--muted);">✓ olvasva</span>'
+          : '<button onclick="markRead('+b.id+')" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.1);color:#c084fc;cursor:pointer;font-weight:600;">✓ Olvasott</button>')
+        +'</div>'
+        +'<div style="font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap;">'+escHtml(b.szoveg)+'</div>'
+        +'</div>';
+    }).join('');
+  });
+}
+
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function markRead(id){
+  gas('markBugRead',[id]).then(function(r){
+    if(r&&r.ok){
+      var el=document.getElementById('bug-'+id);
+      if(el){
+        el.style.background='rgba(255,255,255,0.02)';
+        el.style.border='1px solid var(--border)';
+        var btn=el.querySelector('button');
+        if(btn){ btn.outerHTML='<span style="font-size:10px;color:var(--muted);">✓ olvasva</span>'; }
+      }
+      loadCegek(); // frissíti a badge-et
+    }
   });
 }
 

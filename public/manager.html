@@ -668,6 +668,25 @@ function gas(fn,args){return new Promise(function(res,rej){fetch('/api/execute',
 function logout(){gas('authLogout').then(function(){window.location.href='/login';}).catch(function(){window.location.href='/login';});}
 function toggleUserMenu(){document.getElementById('userMenuGroup').classList.toggle('open');}
 
+/* ── Bug report ── */
+function openBugReport(){
+  document.getElementById('bugText').value='';
+  document.getElementById('bugModal').classList.add('open');
+  setTimeout(function(){document.getElementById('bugText').focus();},150);
+}
+function closeBugReport(){ document.getElementById('bugModal').classList.remove('open'); }
+function submitBugReport(){
+  var txt = document.getElementById('bugText').value.trim();
+  if(!txt || txt.length<5){ toast('Írj le legalább 5 karaktert!','err'); return; }
+  var btn = document.getElementById('bugSubmitBtn');
+  btn.disabled=true; btn.textContent='Küldés...';
+  gas('sendBugReport',[txt,'manager']).then(function(r){
+    btn.disabled=false; btn.textContent='📤 Küldés';
+    if(r&&r.ok){ toast('Hibajelentés elküldve, köszönjük!','ok'); closeBugReport(); }
+    else { toast((r&&r.err)||'Hiba történt','err'); }
+  });
+}
+
 function activateTab(name){
   document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(x){x.classList.remove('active');});
   var tabEl=document.querySelector('.sidebar [data-tab="'+name+'"]');
@@ -1970,5 +1989,32 @@ document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(e
 });
 
 </script>
+
+<!-- ── BUG REPORT FAB ── -->
+<button onclick="openBugReport()" title="Hibajelentés küldése"
+  style="position:fixed;bottom:24px;right:24px;z-index:500;width:48px;height:48px;border-radius:50%;
+  border:1px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.12);color:#f59e0b;
+  font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 20px rgba(0,0,0,0.4);transition:all .2s;"
+  onmouseover="this.style.background='rgba(245,158,11,0.25)'"
+  onmouseout="this.style.background='rgba(245,158,11,0.12)'">🐛</button>
+
+<!-- ── BUG REPORT MODAL ── -->
+<div class="modal-back" id="bugModal">
+  <div class="modal glass" style="width:min(480px,100%);max-height:90vh;">
+    <h3 style="margin-top:0;">🐛 Hibajelentés</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">Írd le pontosan mi történt, mit csináltál, és mi nem működött megfelelően. A fejlesztőhöz kerül.</p>
+    <div class="field">
+      <label>Leírás *</label>
+      <textarea id="bugText" class="input" style="min-height:130px;resize:vertical;font-family:inherit;line-height:1.5;"
+        placeholder="pl. A Beérkezett Fuvarlevelek fülön kattintottam a letöltés gombra, de semmi sem történt..."></textarea>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:6px;">
+      <button class="btn ghost col" onclick="closeBugReport()">Mégse</button>
+      <button class="btn primary col" id="bugSubmitBtn" onclick="submitBugReport()">📤 Küldés</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

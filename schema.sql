@@ -420,3 +420,20 @@ ALTER TABLE push_subscriptions ADD COLUMN IF NOT EXISTS endpoint_hash VARCHAR(64
 ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret VARCHAR(64);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_backup_codes JSONB;
+
+-- ------------------------------------------------------------
+-- BUG REPORTS (Hibajelentések)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS bug_reports (
+  id          SERIAL PRIMARY KEY,
+  company_id  INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+  user_email  VARCHAR(255),
+  user_name   VARCHAR(255),
+  user_role   VARCHAR(50),
+  szoveg      TEXT NOT NULL,
+  oldal       VARCHAR(100),
+  is_read     BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_bug_reports_company ON bug_reports(company_id);
+CREATE INDEX IF NOT EXISTS idx_bug_reports_read    ON bug_reports(is_read);
