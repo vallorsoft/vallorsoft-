@@ -51,13 +51,12 @@
         <input class="input" type="text" id="totpCode" inputmode="numeric" autocomplete="one-time-code"
           maxlength="9" placeholder="123456" style="text-align:center;font-size:22px;letter-spacing:4px;">
       </div>
-      <button class="btn primary block xl" onclick="verify2fa()" id="btn2fa">Belépés</button>
-      <div class="switch-link" style="margin-top:10px;">
-        <a href="#" onclick="cancelLogin();return false;">← Vissza</a>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:12px;background:rgba(255,255,255,0.05);border-radius:10px;">
+        <input type="checkbox" id="trustDevice" style="width:18px;height:18px;cursor:pointer;accent-color:#6366f1;flex-shrink:0;">
+        <label for="trustDevice" style="font-size:13px;color:#8a97a8;cursor:pointer;line-height:1.4;">
+          30 napig ne kérjen kódot ezen az eszközön
+        </label>
       </div>
-      <p style="color:#6b7280;font-size:12px;margin-top:14px;text-align:center;">
-        Elveszett a telefonod? Használd valamelyik tartalék kódot.
-      </p>
     </div>
 
     <!-- ===== 3. LEPES: 2FA elso beallitas ===== -->
@@ -174,10 +173,12 @@
       var btn = document.getElementById('btn2fa');
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Ellenőrzés...';
+      var trustCb = document.getElementById('trustDevice');
+      var trustDevice = trustCb ? trustCb.checked : false;
       fetch('/api/2fa/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: code })
+        body: JSON.stringify({ token: code, trustDevice: trustDevice })
       })
       .then(r => r.json())
       .then(data => {

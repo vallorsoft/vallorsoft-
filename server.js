@@ -489,7 +489,7 @@ app.post('/api/login', async (req, res) => {
     }
 
     const result = await pool.query(
-      'SELECT id, nume, email, tel, pozicio, password_hash, company_id, pozicio_dev, totp_secret, totp_enabled FROM users WHERE email = $1',
+      'SELECT id, nume, email, tel, pozicio, password_hash, company_id, pozicio_dev, totp_secret, totp_enabled, totp_required FROM users WHERE email = $1',
       [email]
     );
 
@@ -519,24 +519,40 @@ app.post('/api/login', async (req, res) => {
     }
 
     // ===== 2FA KAPU =====
-    // A jelszo helyes. Most a 2FA allapot dont.
-    // Atmeneti "pre-auth" session - csak a 2FA lepeshez
     if (speakeasy) {
+      const pendingUserObj = {
+        id: user.id, nume: user.nume, email: user.email, tel: user.tel,
+        pozicio: user.pozicio, company_id: user.company_id,
+        is_dev: user.pozicio_dev || false,
+      };
+
+      // 2FA ki van kapcsolva ennél a usernél -> direkt belépés
+      if (!user.totp_required) {
+        req.session.user = pendingUserObj;
+        return res.json({ success: true, redirect: calc2faRedirect(pendingUserObj), user: pendingUserObj });
+      }
+
+      // 2FA kötelező
       if (user.totp_enabled && user.totp_secret) {
-        // 2FA be van kapcsolva -> kodot kerunk
-        req.session.pendingUser = {
-          id: user.id, nume: user.nume, email: user.email, tel: user.tel,
-          pozicio: user.pozicio, company_id: user.company_id,
-          is_dev: user.pozicio_dev || false,
-        };
+        // Trusted device ellenőrzés
+        const trustToken = req.cookies && req.cookies['vs_trust'];
+        if (trustToken) {
+          try {
+            const td = await pool.query(
+              'SELECT id FROM trusted_devices WHERE user_id=$1 AND token=$2 AND expires_at>NOW()',
+              [user.id, trustToken]
+            );
+            if (td.rows.length > 0) {
+              req.session.user = pendingUserObj;
+              return res.json({ success: true, redirect: calc2faRedirect(pendingUserObj), user: pendingUserObj });
+            }
+          } catch(e) { /* nem blokkolja a normál flow-t */ }
+        }
+        req.session.pendingUser = pendingUserObj;
         return res.json({ success: true, need2fa: true });
       } else {
-        // 2FA meg nincs beallitva -> KOTELEZO setup
-        req.session.pendingUser = {
-          id: user.id, nume: user.nume, email: user.email, tel: user.tel,
-          pozicio: user.pozicio, company_id: user.company_id,
-          is_dev: user.pozicio_dev || false,
-        };
+        // 2FA még nincs beállítva -> kötelező setup
+        req.session.pendingUser = pendingUserObj;
         return res.json({ success: true, setup2fa: true });
       }
     }
@@ -702,9 +718,28 @@ app.post('/api/2fa/verify', async (req, res) => {
       return res.json({ success: false, message: 'Helytelen kod.' });
     }
 
-    // Sikeres -> vegleges bejelentkezes
+    // Sikeres -> végleges bejelentkezés
     req.session.user = req.session.pendingUser;
     delete req.session.pendingUser;
+
+    // Trusted device cookie (ha kérte)
+    if (req.body.trustDevice === true) {
+      try {
+        const trustToken = crypto.randomBytes(32).toString('hex');
+        const expiresAt  = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        await pool.query(
+          'INSERT INTO trusted_devices (user_id, token, expires_at) VALUES ($1,$2,$3)',
+          [req.session.user.id, trustToken, expiresAt]
+        );
+        res.cookie('vs_trust', trustToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+          path: '/'
+        });
+      } catch(e) { console.error('trusted device mentési hiba:', e); }
+    }
 
     return res.json({
       success: true,
@@ -712,6 +747,54 @@ app.post('/api/2fa/verify', async (req, res) => {
     });
   } catch (err) {
     console.error('2fa verify hiba:', err);
+    return res.json({ success: false, message: 'Szerver hiba' });
+  }
+});
+
+// ===== BEÁLLÍTÁSOK: saját 2FA státusz =====
+app.get('/api/settings/me', requireLogin, async (req, res) => {
+  try {
+    const r  = await pool.query('SELECT totp_enabled, totp_required FROM users WHERE id=$1', [req.session.user.id]);
+    if (!r.rows.length) return res.json({ success: false });
+    const dc = await pool.query(
+      'SELECT COUNT(*) as cnt FROM trusted_devices WHERE user_id=$1 AND expires_at>NOW()',
+      [req.session.user.id]
+    );
+    return res.json({
+      success: true,
+      totp_enabled:         r.rows[0].totp_enabled,
+      totp_required:        r.rows[0].totp_required,
+      trusted_device_count: parseInt(dc.rows[0].cnt)
+    });
+  } catch(e) {
+    console.error('settings/me hiba:', e);
+    return res.json({ success: false, message: 'Szerver hiba' });
+  }
+});
+
+// ===== BEÁLLÍTÁSOK: 2FA be/ki kapcsolás =====
+app.post('/api/settings/2fa-toggle', requireLogin, async (req, res) => {
+  try {
+    if (!['Admin','Manager'].includes(req.session.user.pozicio) && !req.session.user.is_dev) {
+      return res.status(403).json({ success: false, message: 'Nincs jogosultság' });
+    }
+    const enable = req.body.enable === true;
+    await pool.query('UPDATE users SET totp_required=$1 WHERE id=$2', [enable, req.session.user.id]);
+    return res.json({ success: true, totp_required: enable });
+  } catch(e) {
+    console.error('2fa-toggle hiba:', e);
+    return res.json({ success: false, message: 'Szerver hiba' });
+  }
+});
+
+// ===== BEÁLLÍTÁSOK: megbízható eszközök törlése =====
+app.post('/api/settings/trusted-devices-clear', requireLogin, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM trusted_devices WHERE user_id=$1', [req.session.user.id]);
+    res.clearCookie('vs_trust', { path: '/' });
+    return res.json({ success: true });
+  } catch(e) {
+    console.error('trusted-devices-clear hiba:', e);
     return res.json({ success: false, message: 'Szerver hiba' });
   }
 });
