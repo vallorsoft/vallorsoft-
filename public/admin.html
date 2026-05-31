@@ -114,8 +114,11 @@
     </div>
 
     <div class="pane hidden" data-pane="orders">
-      <div class="glass" style="padding:22px; margin-bottom:16px;">
-        <h2 class="h-title">Új fuvarfeladat</h2>
+      <div style="display:grid;grid-template-columns:minmax(0,440px) 1fr;gap:16px;align-items:start;">
+
+        <!-- Bal: Fuvar kiírás -->
+        <div class="glass" style="padding:22px;">
+          <h2 class="h-title">Új fuvarfeladat</h2>
         <div class="grid-3">
           <div class="field"><label>Ügyfél / Client</label><input class="input" id="oClient" placeholder="pl. Vallor Logistics"></div>
           <div class="field"><label>Referencia</label><input class="input" id="oRef" placeholder="opcionális"></div>
@@ -170,15 +173,48 @@
           </div>
         </div>
         <button class="btn primary" onclick="createOrder()" style="margin-top:20px; width:100%;">Fuvarfeladat mentése</button>
+        </div>
+
+        <!-- Jobb: Lista + kereső -->
+        <div class="glass" style="padding:22px;">
+          <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+            <input class="input" id="orderSearch" placeholder="🔍 Ügyfél, sofőr, ID..." oninput="filterOrders()" style="flex:1;min-width:160px;">
+            <select class="select" id="orderStatusFilter" onchange="filterOrders()" style="max-width:140px;">
+              <option value="">Minden státusz</option>
+              <option value="Disponibil">Disponibil</option>
+              <option value="Alocat">Alocat</option>
+              <option value="In Curs">In Curs</option>
+              <option value="Finalizat">Finalizat</option>
+              <option value="Anulat">Anulat</option>
+            </select>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="table" id="tblOrders">
+              <thead><tr><th>ID</th><th>Ügyfél</th><th>Útvonal</th><th>KM</th><th>Ár</th><th>Sofőr</th><th>Vontató</th><th>Státusz</th><th>Megrendelő</th></tr></thead>
+              <tbody id="tblOrdersBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Dokumentum szériák -->
+        <div class="glass" style="padding:24px;">
+          <h2 class="h-title" style="margin-top:0;">📋 Dokumentum szériák</h2>
+          <p style="color:var(--muted);font-size:13px;margin:0 0 14px;">Sorszám formátuma: [Prefix]-[Év]-[0001]. Új prefix beállításakor a számozás 1-ről indul újra.</p>
+          <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+            <div class="field" style="flex:1;min-width:140px;margin:0;">
+              <label>Menetlevél prefix</label>
+              <input class="input" id="docSeriesPrefix" placeholder="MT" maxlength="10" oninput="updateDocSeriesPreview()">
+            </div>
+            <div style="padding-bottom:2px;">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Aktuális sorszám</div>
+              <div id="docSeriesCurrentSeq" style="font-size:20px;font-weight:800;color:#fff;min-width:50px;">—</div>
+            </div>
+            <button class="btn primary" style="padding:10px 20px;" onclick="saveDocSeries()">💾 Mentés</button>
+          </div>
+          <div style="margin-top:10px;font-size:12px;color:var(--muted);" id="docSeriesPreview">Előnézet: MT-2025-0001</div>
+        </div>
+
       </div>
-      <div class="glass" style="padding:22px;">
-  <h3 style="margin-bottom:16px;">Fuvarfeladatok listája</h3>
-  <div style="overflow-x:auto;">
-  <table class="table" id="tblOrders">
-         <thead><tr><th>ID</th><th>Ügyfél</th><th>Útvonal</th><th>KM</th><th>Ár</th><th>Sofőr</th><th>Vontató</th><th>Státusz</th><th>Megrendelő</th></tr></thead>  <tbody id="tblOrdersBody"></tbody>
-        </table>
-      </div>
-    </div>
     </div>
 
     <div class="pane hidden" data-pane="received-fuv">
@@ -856,7 +892,7 @@ function loadTab(name){
   if(name==='external-drivers') loadExtDrivers();
   if(name==='signature') initAdminSigCanvas();
   if(name==='shift-fleet') { loadShiftFleet(); loadDiurnaStats(); }
-  if(name==='settings') loadSettingsPane();
+  if(name==='settings') { loadSettingsPane(); loadDocSeries(); }
   if(name==='internal-drivers') loadInternalDrivers();
 }
 
@@ -1124,7 +1160,10 @@ let internDriversCache=[],externDriversCache=[],camionCache=[],remorcaCache=[];
 function loadOrders(){
   gas('comList').then(list=>{
     if(!Array.isArray(list))list=[];
-    document.getElementById('tblOrdersBody').innerHTML=list.map(c=>{
+    _ordersAllCache = list;
+    renderFilteredOrders(list);
+    return; // legacy map lent törölve
+    list.map(c=>{
       let soferInfo='—';
       if(c.sofer_type==='Intern')soferInfo=c.nume_sofer||c.email_sofer||'—';
       else if(c.sofer_type==='Extern')soferInfo=c.nume_sofer||c.firma_extern||'—';
@@ -1137,6 +1176,45 @@ function loadOrders(){
      return`<tr><td><b>${c.id}</b></td><td>${c.client||'—'}</td><td>${c.loc_incarcare||'—'} → ${c.loc_descarcare||'—'}</td><td>${c.km||'—'}</td><td>${c.pret||'—'}</td><td>${soferInfo}</td><td>${c.rendszam_camion||'—'}</td><td><span class="badge ${sc}">${c.status}</span></td><td style="display:flex;gap:4px;"><button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="openDocModal('${c.id}')">📎</button><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="openOrderEdit('${c.id}')">✏️</button></td></tr>`;
     }).join('');
   });
+}
+
+
+// ── Fuvar kereső / szűrő ──────────────────────────────────
+var _ordersAllCache = [];
+var _origLoadOrders;
+function filterOrders() {
+  var q = ((document.getElementById('orderSearch')||{}).value||'').toLowerCase();
+  var st = (document.getElementById('orderStatusFilter')||{}).value||'';
+  var filtered = _ordersAllCache.filter(function(c){
+    var txt = [c.id,c.client,c.ref,c.loc_incarcare,c.loc_descarcare,
+               c.email_sofer,c.nume_sofer,c.rendszam_camion].join(' ').toLowerCase();
+    return (!q||txt.includes(q))&&(!st||c.status===st);
+  });
+  renderFilteredOrders(filtered);
+}
+function renderFilteredOrders(list) {
+  var tbody = document.getElementById('tblOrdersBody');
+  if (!tbody) return;
+  if (!list.length) { tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px;">Nincs találat.</td></tr>'; return; }
+  tbody.innerHTML = list.map(function(c){
+    var soferInfo='—';
+    if(c.sofer_type==='Intern')soferInfo=c.nume_sofer||c.email_sofer||'—';
+    else if(c.sofer_type==='Extern')soferInfo=c.nume_sofer||c.firma_extern||'—';
+    var sc='info';
+    if(c.status==='Alocat')sc='warn';
+    if(c.status==='In Curs'||c.status==='Finalizat')sc='ok';
+    if(c.status==='Anulat')sc='err';
+    if(c.status==='Extern')sc='warn';
+    return '<tr><td><b>'+c.id+'</b></td><td>'+(c.client||'—')+'</td>'+
+      '<td>'+(c.loc_incarcare||'—')+' → '+(c.loc_descarcare||'—')+'</td>'+
+      '<td>'+(c.km||'—')+'</td><td>'+(c.pret||'—')+'</td>'+
+      '<td>'+soferInfo+'</td><td>'+(c.rendszam_camion||'—')+'</td>'+
+      '<td><span class="badge '+sc+'">'+c.status+'</span></td>'+
+      '<td style="display:flex;gap:4px;">'+
+        '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="openDocModal(\''+c.id+'\')">📎</button>'+
+        '<button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="openOrderEdit(\''+c.id+'\')">✏️</button>'+
+      '</td></tr>';
+  }).join('');
 }
 
 function loadOrderFormData(){
@@ -2404,6 +2482,35 @@ function openDiurnaDetail(idx) {
   }
   document.getElementById('diurnaModal').classList.add('open');
 }
+
+// ── Dokumentum széria konfigurátor ───────────────────────
+function loadDocSeries() {
+  fetch('/api/document-series?type=MT').then(function(r){return r.json();}).then(function(d){
+    if (!d.ok) return;
+    var inp = document.getElementById('docSeriesPrefix');
+    if (inp) inp.value = d.prefix||'MT';
+    var seq = document.getElementById('docSeriesCurrentSeq');
+    if (seq) seq.textContent = d.currentSeq||0;
+    updateDocSeriesPreview();
+  }).catch(function(){});
+}
+function updateDocSeriesPreview() {
+  var p = (document.getElementById('docSeriesPrefix')||{}).value||'MT';
+  var y = new Date().getFullYear();
+  var el = document.getElementById('docSeriesPreview');
+  if (el) el.textContent = 'Előnézet: '+p+'-'+y+'-0001 (új prefix esetén 1-től)';
+}
+function saveDocSeries() {
+  var prefix = ((document.getElementById('docSeriesPrefix')||{}).value||'').trim();
+  if (!prefix) { toast('Add meg a prefixet!','err'); return; }
+  fetch('/api/document-series',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({docType:'MT',prefix:prefix})})
+  .then(function(r){return r.json();}).then(function(d){
+    if (d.ok) { toast('✅ Széria elmentve — '+prefix+'-'+new Date().getFullYear()+'-0001-től','ok'); loadDocSeries(); }
+    else toast(d.err||'Hiba','err');
+  });
+}
+
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
                       .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');

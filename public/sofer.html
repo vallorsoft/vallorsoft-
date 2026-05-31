@@ -293,7 +293,7 @@
       <!-- Kiválasztott fuvarok összesítő -->
       <div id="selectedOrdersSummary" style="background:rgba(225,11,26,0.08);border:1px solid rgba(225,11,26,0.3);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--soft);"></div>
 
-      <div class="field"><label>* Număr fișă</label><input class="input" id="fFisa" placeholder="pl. 2025-42"></div>
+      <!-- Număr fișă eltávolítva - rendszer generálja automatikusan (MT-YYYY-XXXX) -->
       <div class="field"><label>Cursa Săptămânii</label><input class="input" id="fCursaSapt" placeholder="pl. BUD–BUC"></div>
       <div class="g2">
         <div class="field"><label>Număr camion</label><input class="input" id="fCamion"></div>
@@ -807,7 +807,7 @@ function fuvarBackStep1() {
 
 // Input változások figyelése → piszkozat auto-mentés
 function attachDraftListeners() {
-  var ids = ['fFisa','fCursaSapt','fCamion','fRemorca','fKmInc','fKmSf','fDiurnaEx','fDiurnaIn','fCantInc','fCantSf','fMentiuni'];
+  var ids = ['fCursaSapt','fCamion','fRemorca','fKmInc','fKmSf','fDiurnaEx','fDiurnaIn','fCantInc','fCantSf','fMentiuni'];
   ids.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) {
@@ -967,7 +967,7 @@ function submitFuvarlevel() {
         document.getElementById('alimentariContainer').innerHTML = '';
         document.getElementById('achizitiiContainer').innerHTML = '';
         document.getElementById('puncteContainer').innerHTML = '';
-        document.getElementById('fFisa').value = '';
+        if(document.getElementById('fFisa')) document.getElementById('fFisa').value = '';
         document.getElementById('fCamion').value = '';
         document.getElementById('fRemorca').value = '';
         document.getElementById('fKmInc').value = '0';
