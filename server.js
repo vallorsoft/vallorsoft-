@@ -208,6 +208,7 @@ if (helmet) {
           "https://*.firebaseio.com",
           "https://*.firebase.com",
         ],
+        scriptSrcAttr: ["'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:"],
@@ -1146,6 +1147,26 @@ app.post('/api/execute', requireLogin, async (req, res) => {
       return res.json({ result: r.rows });
     } catch (e) {
       console.error(e);
+      return res.json({ result: [] });
+    }
+  }
+
+  // BELSŐ SOFŐRÖK LISTÁJA (Sofer pozíciójú regisztrált felhasználók)
+  if (functionName === 'getInternalDrivers') {
+    try {
+      if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+        return res.json({ result: [] });
+      }
+      const cid = req.session.user.company_id;
+      const r = await pool.query(
+        `SELECT id, nume, email, tel FROM users
+         WHERE company_id = $1 AND pozicio = 'Sofer'
+         ORDER BY nume`,
+        [cid]
+      );
+      return res.json({ result: r.rows });
+    } catch (e) {
+      console.error('getInternalDrivers hiba:', e);
       return res.json({ result: [] });
     }
   }

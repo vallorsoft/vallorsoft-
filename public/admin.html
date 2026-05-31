@@ -251,7 +251,11 @@
     <div class="pane hidden" data-pane="internal-drivers">
       <div class="glass" style="padding:22px;">
         <h2 class="h-title">Belső sofőrök</h2>
-        <div class="h-sub">Sofőr pozíciójú regisztrált felhasználók és jármű-hozzárendelés — hamarosan.</div>
+        <div class="h-sub" style="margin-bottom:18px;">Sofőr pozíciójú regisztrált felhasználók</div>
+        <table class="table" id="tblInternalDrivers">
+          <thead><tr><th>Név</th><th>E-mail</th><th>Telefon</th><th>Műveletek</th></tr></thead>
+          <tbody></tbody>
+        </table>
       </div>
     </div>
 
@@ -718,6 +722,30 @@ function loadTab(name){
   if(name==='external-drivers') loadExtDrivers();
   if(name==='signature') initAdminSigCanvas();
   if(name==='settings') loadSettingsPane();
+  if(name==='internal-drivers') loadInternalDrivers();
+}
+
+function loadInternalDrivers(){
+  gas('getInternalDrivers').then(function(list){
+    var tbody = document.querySelector('#tblInternalDrivers tbody');
+    if(!tbody) return;
+    if(!list||!list.length){
+      tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">Nincs regisztrált belső sofőr.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = list.map(function(d){
+      var safeJson = JSON.stringify(d).replace(/"/g,'&quot;');
+      return '<tr>'
+        +'<td>'+d.nume+'</td>'
+        +'<td>'+d.email+'</td>'
+        +'<td>'+(d.tel||'—')+'</td>'
+        +'<td>'
+        +'<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="editUser('+safeJson+')">Szerkeszt</button> '
+        +'<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUser(\''+d.email+'\',\''+d.nume+'\')">Töröl</button>'
+        +'</td>'
+        +'</tr>';
+    }).join('');
+  });
 }
 
 /* ─── BEÁLLÍTÁSOK PANE ─── */
