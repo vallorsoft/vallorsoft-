@@ -754,7 +754,7 @@ app.post('/api/2fa/verify', async (req, res) => {
 // ===== BEÁLLÍTÁSOK: saját 2FA státusz =====
 app.get('/api/settings/me', requireLogin, async (req, res) => {
   try {
-    const r  = await pool.query('SELECT totp_enabled, totp_required FROM users WHERE id=$1', [req.session.user.id]);
+    const r  = await pool.query('SELECT totp_enabled, totp_required, nume, tel, email FROM users WHERE id=$1', [req.session.user.id]);
     if (!r.rows.length) return res.json({ success: false });
     const dc = await pool.query(
       'SELECT COUNT(*) as cnt FROM trusted_devices WHERE user_id=$1 AND expires_at>NOW()',
@@ -764,7 +764,10 @@ app.get('/api/settings/me', requireLogin, async (req, res) => {
       success: true,
       totp_enabled:         r.rows[0].totp_enabled,
       totp_required:        r.rows[0].totp_required,
-      trusted_device_count: parseInt(dc.rows[0].cnt)
+      trusted_device_count: parseInt(dc.rows[0].cnt),
+      nume:  r.rows[0].nume  || '',
+      tel:   r.rows[0].tel   || '',
+      email: r.rows[0].email || ''
     });
   } catch(e) {
     console.error('settings/me hiba:', e);
@@ -795,6 +798,43 @@ app.post('/api/settings/trusted-devices-clear', requireLogin, async (req, res) =
     return res.json({ success: true });
   } catch(e) {
     console.error('trusted-devices-clear hiba:', e);
+    return res.json({ success: false, message: 'Szerver hiba' });
+  }
+});
+
+// ===== BEÁLLÍTÁSOK: jelszó módosítás =====
+app.post('/api/settings/change-password', requireLogin, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword)
+      return res.json({ success: false, message: 'Hiányzó adatok' });
+    if (newPassword.length < 6)
+      return res.json({ success: false, message: 'Az új jelszó legalább 6 karakter legyen' });
+    const r = await pool.query('SELECT password_hash FROM users WHERE id=$1', [req.session.user.id]);
+    if (!r.rows.length) return res.json({ success: false, message: 'Felhasználó nem található' });
+    const match = await bcrypt.compare(currentPassword, r.rows[0].password_hash);
+    if (!match) return res.json({ success: false, message: 'A jelenlegi jelszó helytelen' });
+    const hash = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [hash, req.session.user.id]);
+    return res.json({ success: true });
+  } catch(e) {
+    console.error('change-password hiba:', e);
+    return res.json({ success: false, message: 'Szerver hiba' });
+  }
+});
+
+// ===== BEÁLLÍTÁSOK: profil frissítés =====
+app.post('/api/settings/update-profile', requireLogin, async (req, res) => {
+  try {
+    const { nume, tel } = req.body;
+    if (!nume || !nume.trim()) return res.json({ success: false, message: 'A név nem lehet üres' });
+    await pool.query('UPDATE users SET nume=$1, tel=$2 WHERE id=$3',
+      [nume.trim(), (tel || '').trim(), req.session.user.id]);
+    req.session.user.nume = nume.trim();
+    req.session.user.tel  = (tel || '').trim();
+    return res.json({ success: true });
+  } catch(e) {
+    console.error('update-profile hiba:', e);
     return res.json({ success: false, message: 'Szerver hiba' });
   }
 });
