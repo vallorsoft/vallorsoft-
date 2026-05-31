@@ -198,9 +198,19 @@
           </div>
           <div style="overflow-x:auto;">
             <table class="table" id="tblOrders">
-              <thead><tr><th>ID</th><th>Ügyfél</th><th>Útvonal</th><th>KM</th><th>Ár</th><th>Sofőr</th><th>Vontató</th><th>Státusz</th><th>Megrendelő</th></tr></thead>
+              <thead><tr><th>ID</th><th>Ügyfél</th><th>Útvonal</th><th>KM</th><th>Ár</th><th>Sofőr</th><th>Vontató</th><th>Státusz</th><th>Műveletek</th><th style="width:36px;text-align:center;"><input type="checkbox" id="selectAllOrders" title="Mind kijelöl" onchange="toggleAllOrders(this)" style="width:16px;height:16px;cursor:pointer;accent-color:#e10b1a;vertical-align:middle;"></th></tr></thead>
               <tbody id="tblOrdersBody"></tbody>
             </table>
+          </div>
+          <!-- ── Kijelölt fuvarok letöltés sáv ── -->
+          <div id="orderSelBar" style="display:none;position:sticky;bottom:16px;left:0;right:0;z-index:100;margin-top:12px;">
+            <div style="background:rgba(10,14,21,0.97);border:1px solid rgba(225,11,26,0.45);border-radius:12px;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+              <span id="orderSelCount" style="font-size:13px;font-weight:700;color:#fff;">0 fuvar kiválasztva</span>
+              <div style="display:flex;gap:8px;">
+                <button class="btn ghost" style="padding:7px 14px;font-size:13px;" onclick="clearOrderSel()">✕ Törlés</button>
+                <button class="btn primary" style="padding:7px 16px;font-size:13px;" onclick="downloadSelectedOrders()">⬇️ Letöltés (nyomtatható)</button>
+              </div>
+            </div>
           </div>
         </div>
           </div>
@@ -1322,7 +1332,7 @@ function filterOrders() {
 function renderFilteredOrders(list) {
   var tbody = document.getElementById('tblOrdersBody');
   if (!tbody) return;
-  if (!list.length) { tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px;">Nincs találat.</td></tr>'; return; }
+  if (!list.length) { tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px;">Nincs találat.</td></tr>'; return; }
   tbody.innerHTML = list.map(function(c){
     var soferInfo='—';
     if(c.sofer_type==='Intern')soferInfo=c.nume_sofer||c.email_sofer||'—';
@@ -1340,8 +1350,96 @@ function renderFilteredOrders(list) {
       '<td style="display:flex;gap:4px;">'+
         '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="openDocModal(\''+c.id+'\')">📎</button>'+
         '<button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="openOrderEdit(\''+c.id+'\')">✏️</button>'+
-      '</td></tr>';
+      '</td>'+
+      '<td style="text-align:center;vertical-align:middle;">'+
+        '<input type="checkbox" class="orderRowCb" value="'+c.id+'" onchange="updateOrderSelBar()" '+
+        'style="width:16px;height:16px;cursor:pointer;accent-color:#e10b1a;">'+
+      '</td>'+
+      '</tr>';
   }).join('');
+  updateOrderSelBar();
+}
+
+// ── Kijelölés & letöltés logika ───────────────────────────
+function updateOrderSelBar() {
+  var checked = document.querySelectorAll('.orderRowCb:checked');
+  var bar = document.getElementById('orderSelBar');
+  var cnt = document.getElementById('orderSelCount');
+  if (!bar) return;
+  if (checked.length > 0) {
+    bar.style.display = 'block';
+    cnt.textContent = checked.length + ' fuvar kiválasztva';
+  } else {
+    bar.style.display = 'none';
+    var sa = document.getElementById('selectAllOrders');
+    if (sa) sa.checked = false;
+  }
+}
+
+function toggleAllOrders(cb) {
+  document.querySelectorAll('.orderRowCb').forEach(function(c){ c.checked = cb.checked; });
+  updateOrderSelBar();
+}
+
+function clearOrderSel() {
+  document.querySelectorAll('.orderRowCb').forEach(function(c){ c.checked = false; });
+  var sa = document.getElementById('selectAllOrders');
+  if (sa) sa.checked = false;
+  updateOrderSelBar();
+}
+
+function downloadSelectedOrders() {
+  var checked = document.querySelectorAll('.orderRowCb:checked');
+  if (!checked.length) { toast('Jelölj ki legalább egy fuvart!', 'err'); return; }
+  var ids = Array.from(checked).map(function(cb){ return String(cb.value); });
+  var selected = _ordersAllCache.filter(function(c){ return ids.indexOf(String(c.id)) !== -1; });
+  var now = new Date().toLocaleDateString('hu-HU');
+  var rows = selected.map(function(c){
+    var soferInfo = '—';
+    if (c.sofer_type === 'Intern') soferInfo = c.nume_sofer || c.email_sofer || '—';
+    else if (c.sofer_type === 'Extern') soferInfo = c.nume_sofer || c.firma_extern || '—';
+    return '<tr>'+
+      '<td style="font-weight:bold;">'+esc(String(c.id))+'</td>'+
+      '<td>'+esc(c.client||'—')+'</td>'+
+      '<td>'+esc(c.ref||'—')+'</td>'+
+      '<td>'+esc(c.loc_incarcare||'—')+'</td>'+
+      '<td>'+esc(c.loc_descarcare||'—')+'</td>'+
+      '<td style="text-align:right;">'+esc(String(c.km||'—'))+'</td>'+
+      '<td style="text-align:right;">'+esc(String(c.pret||'—'))+'</td>'+
+      '<td>'+esc(soferInfo)+'</td>'+
+      '<td>'+esc(c.rendszam_camion||'—')+(c.rendszam_remorca?' / '+esc(c.rendszam_remorca):'')+'</td>'+
+      '<td style="text-align:center;">'+esc(c.status||'—')+'</td>'+
+    '</tr>';
+  }).join('');
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fuvarfeladatok — '+now+'</title>'+
+    '<style>'+
+    'body{font-family:Arial,sans-serif;padding:24px;font-size:13px;color:#000;}'+
+    '.header{text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:16px;}'+
+    '.header h1{font-size:18px;margin:0 0 2px;}'+
+    '.header p{font-size:12px;color:#555;margin:0;}'+
+    'table{width:100%;border-collapse:collapse;margin-top:4px;}'+
+    'th{background:#d8d8d8;border:1px solid #aaa;padding:6px 8px;font-size:11px;text-align:left;white-space:nowrap;}'+
+    'td{border:1px solid #ccc;padding:5px 8px;font-size:12px;vertical-align:top;}'+
+    'tr:nth-child(even) td{background:#f5f5f5;}'+
+    '.footer{font-size:11px;color:#888;margin-top:14px;}'+
+    '.no-print{margin-bottom:18px;}'+
+    '@media print{.no-print{display:none;} body{padding:12px;}}'+
+    '</style></head><body>'+
+    '<div class="no-print"><button onclick="window.print()" style="padding:10px 24px;background:#1a1a2e;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:6px;font-size:14px;">🖨️ Nyomtatás / PDF mentés</button></div>'+
+    '<div class="header"><h1>VALLOR TEAM SRL — Fuvarfeladatok</h1><p>Nyomtatva: '+now+' &nbsp;·&nbsp; '+selected.length+' fuvar</p></div>'+
+    '<table><thead><tr>'+
+    '<th>#ID</th><th>Ügyfél</th><th>Ref</th><th>Felrakás helye</th><th>Lerakás helye</th>'+
+    '<th>KM</th><th>Ár (EUR)</th><th>Sofőr</th><th>Vontató / Pótkocsi</th><th>Státusz</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table>'+
+    '<div class="footer">VallorSoft fuvarmenedzsment rendszer &nbsp;·&nbsp; Generálva: '+now+'</div>'+
+    '</body></html>';
+  var blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'fuvarok-'+now.replace(/\./g,'-')+'.html';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1000);
+  toast('✅ Táblázat letöltve — megnyitás után nyomtatható / PDF-ként menthető!', 'ok');
 }
 
 function loadOrderFormData(){
