@@ -242,6 +242,14 @@
         <span class="ico">🚪</span><span style="color:var(--err);">Kilépés</span>
       </div>
     </div>
+
+    <!-- ── Kiosztott fuvarok ── -->
+    <div style="margin:16px 16px 80px;">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">📋 Kiosztott fuvarok</div>
+      <div id="dashOrderList">
+        <div style="text-align:center;padding:16px;color:var(--muted);font-size:13px;">Betöltés...</div>
+      </div>
+    </div>
   </div>
 
   <!-- ====== HATÁRÁTLÉPÉS ====== -->
@@ -1412,6 +1420,7 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
     initFirebaseChat(d.result);
     loadShiftState();
     startShiftPoll();
+    loadDashOrders();
 
   // ── Állapot visszaállítás ──
   var state = stateGet();
@@ -1673,6 +1682,59 @@ function submitBugReport(){
     var r=d.result;
     if(r&&r.ok){ toast('Hibajelentés elküldve, köszönjük!','ok'); closeBugReport(); }
     else { toast((r&&r.err)||'Hiba történt','err'); }
+  });
+}
+
+// ── Kiosztott fuvarok a főoldalon ────────────────────────
+function loadDashOrders() {
+  fetch('/api/execute', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ functionName:'getMySoferOrders' }) })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    var list = d.result || [];
+    var el = document.getElementById('dashOrderList');
+    if (!el) return;
+    var active = list.filter(function(o){ return o.status==='Alocat'||o.status==='In Curs'; });
+    if (!active.length) {
+      el.innerHTML = '<div style="text-align:center;padding:12px 0;color:var(--muted);font-size:13px;">Nincs aktív kiosztott fuvar.</div>';
+      return;
+    }
+    el.innerHTML = active.map(function(o){
+      var isAlocat = o.status === 'Alocat';
+      var sc = isAlocat ? 'warn' : 'ok';
+      return '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'+
+          '<div style="font-weight:700;font-size:14px;color:#fff;">'+(o.client||'—')+
+            ' <span style="font-size:11px;color:var(--muted);">#'+o.id+'</span>'+
+          '</div>'+
+          '<span class="badge '+sc+'">'+o.status+'</span>'+
+        '</div>'+
+        '<div style="font-size:12px;color:var(--soft);margin-bottom:10px;">'+
+          '📍 '+(o.loc_incarcare||'—')+' → '+(o.loc_descarcare||'—')+
+        '</div>'+
+        (o.rendszam_camion ? '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">🚛 '+o.rendszam_camion+(o.rendszam_remorca?' / '+o.rendszam_remorca:'')+'</div>' : '')+
+        '<div style="display:flex;gap:8px;">'+
+          (isAlocat ? '<button class="sh-btn resume" style="flex:1;padding:13px 8px;font-size:13px;" onclick="driverOrderStatus('+o.id+',\'In Curs\')">✅ Elfogadom</button>' : '')+
+          (!isAlocat ? '<button class="sh-btn confirm" style="flex:1;padding:13px 8px;font-size:13px;" onclick="driverOrderStatus('+o.id+',\'Finalizat\')">🏁 Elvégeztem</button>' : '')+
+        '</div>'+
+      '</div>';
+    }).join('');
+  });
+}
+
+function driverOrderStatus(id, status) {
+  fetch('/api/orders/'+id+'/driver-status', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ status: status })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.ok) {
+      toast(status==='In Curs' ? '✅ Fuvar elfogadva!' : '🏁 Fuvar teljesítve! Manager értesítve.', 'ok');
+      loadDashOrders();
+    } else {
+      toast(d.err||'Hiba', 'err');
+    }
   });
 }
 </script>

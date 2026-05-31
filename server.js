@@ -3575,6 +3575,48 @@ function startShiftScheduler() {
 
 
 
+// ============================================================
+//  SOFŐR STÁTUSZ FRISSÍTÉS + PUSH VISSZAJELZÉS
+//  POST /api/orders/:id/driver-status
+//  Csak Sofőr role — csak 'In Curs' vagy 'Finalizat'
+// ============================================================
+app.post('/api/orders/:id/driver-status', requireLogin, requireRole('Sofer'), async (req, res) => {
+  const { status } = req.body;
+  const driver = req.session.user;
+  if (!['In Curs', 'Finalizat'].includes(status)) {
+    return res.json({ ok: false, err: 'Érvénytelen státusz' });
+  }
+  try {
+    const check = await pool.query(
+      `SELECT id, client FROM orders
+       WHERE id = $1 AND company_id = $2 AND LOWER(email_sofer) = LOWER($3)`,
+      [req.params.id, driver.company_id, driver.email]
+    );
+    if (!check.rows.length) {
+      return res.json({ ok: false, err: 'Nem található vagy nincs jogosultság' });
+    }
+    await pool.query(
+      'UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2',
+      [status, req.params.id]
+    );
+    // Push értesítés a Manager / Admin szerepkörűeknek
+    const label = status === 'In Curs' ? 'elfogadta' : 'teljesítette';
+    const clientName = check.rows[0].client || ('#' + req.params.id);
+    await sendPushToRole(driver.company_id, ['Manager', 'Admin'], {
+      title: '🚛 Fuvar státusz frissítve',
+      body: (driver.nume || driver.email) + ' ' + label + ': ' + clientName,
+      icon: '/icon192.png',
+      badge: '/icon192.png',
+      tag: 'order-status-' + req.params.id,
+      url: '/manager',
+    });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('driver-status hiba:', err);
+    return res.json({ ok: false, err: 'Szerver hiba' });
+  }
+});
+
 // SZERVER INDITAS
 var PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
