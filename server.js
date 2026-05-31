@@ -3354,10 +3354,10 @@ function startShiftScheduler() {
   return interval; // visszaadja az intervallt (tesztekhez / graceful shutdown)
 }
 
-app.get('/api/shift/fleet-compliance',
+
 
 // SZERVER INDITAS
-const PORT = process.env.PORT || 3000;
+var PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log('Szerver fut a http://localhost:' + PORT + ' cimen');
 });
