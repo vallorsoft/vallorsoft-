@@ -391,13 +391,19 @@
     <div class="pane hidden" data-pane="invites">
       <div class="glass" style="padding:22px">
         <h2 class="h-title">Meghívókódok generálása</h2>
-        <div class="row" style="margin-bottom:16px; display:flex; gap:10px;">
-          <select class="select" id="invPoz" style="max-width:200px"><option>Sofer</option><option>Manager</option><option>Admin</option></select>
-          <input class="input" id="invEmail" placeholder="Kötés e-mailhez (opcionális)">
-          <button class="btn primary" onclick="createInv()">+ Kód generálása</button>
+        <div style="display:grid;grid-template-columns:160px 1fr 1fr 1fr auto;gap:10px;margin-bottom:16px;align-items:end;flex-wrap:wrap;">
+          <div><label style="font-size:11px;color:var(--muted);font-weight:600;">Pozíció</label>
+            <select class="select" id="invPoz"><option>Sofer</option><option>Manager</option><option>Admin</option></select></div>
+          <div><label style="font-size:11px;color:var(--muted);font-weight:600;">E-mail <span style="font-weight:400;">(opcionális)</span></label>
+            <input class="input" id="invEmail" placeholder="pl. sofor@ceg.ro"></div>
+          <div><label style="font-size:11px;color:var(--muted);font-weight:600;">Név <span style="font-weight:400;">(opcionális)</span></label>
+            <input class="input" id="invNume" placeholder="pl. Nagy János"></div>
+          <div><label style="font-size:11px;color:var(--muted);font-weight:600;">Telefon <span style="font-weight:400;">(opcionális)</span></label>
+            <input class="input" id="invTel" placeholder="pl. +40 700 000 000"></div>
+          <button class="btn primary" style="height:40px;white-space:nowrap;" onclick="createInv()">+ Kód generálása</button>
         </div>
         <table class="table" id="tblInv">
-          <thead><tr><th>Kód</th><th>Pozíció</th><th>E-mail</th><th>Státusz</th><th>Művelet</th></tr></thead>
+          <thead><tr><th>Kód</th><th>Pozíció</th><th>Név</th><th>E-mail</th><th>Telefon</th><th>Státusz</th><th>Művelet</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -1144,13 +1150,18 @@ function loadBorderLogs(){gas('getBorderLogs').then(list=>{document.querySelecto
 
 function loadInvites(){
   gas('invListAll').then(list=>{
-    if(!Array.isArray(list)){document.querySelector('#tblInv tbody').innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);">Nincs meghivokod.</td></tr>';return;}
+    if(!Array.isArray(list)){document.querySelector('#tblInv tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);">Nincs meghívókód.</td></tr>';return;}
     document.querySelector('#tblInv tbody').innerHTML=list.map(i=>{
-      let bc='ok';
-      if(i.statusz==='Felhasznalva')bc='info';
-      if(i.statusz==='Visszavonva')bc='err';
-      let mv=i.statusz==='Aktiv'?`<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="revokeInv('${i.kod}')">Visszavonás</button>`:'<span style="color:var(--muted);font-size:12px;">—</span>';
-      return`<tr><td><b>${i.kod}</b></td><td>${i.pozicio}</td><td>${i.email||'—'}</td><td><span class="badge ${bc}">${i.statusz}</span></td><td>${mv}</td></tr>`;
+      var sc=i.status==='Aktiv'?'ok':i.status==='Felhasznalva'?'info':'err';
+      return '<tr>'
+        +'<td><b style="color:#fff;">'+i.kod+'</b></td>'
+        +'<td>'+i.pozicio+'</td>'
+        +'<td>'+(i.nume||'—')+'</td>'
+        +'<td>'+(i.email||'—')+'</td>'
+        +'<td>'+(i.tel||'—')+'</td>'
+        +'<td><span class="badge '+sc+'">'+i.status+'</span></td>'
+        +'<td><button class="btn ghost" style="padding:3px 10px;font-size:12px;" onclick="revokeInv(\''+i.kod+'\')" '+(i.status!=='Aktiv'?'disabled':'')+'>Visszavon</button></td>'
+        +'</tr>';
     }).join('');
   });
 }
@@ -1158,7 +1169,19 @@ function revokeInv(kod){
   if(!confirm('Biztosan visszavonod a(z) '+kod+' kodot?'))return;
   gas('invRevoke',[kod]).then(r=>{if(r.ok){toast('Visszavonva!','ok');loadInvites();}else{toast(r.err||'Hiba','err');}});
 }
-function createInv(){gas('invCreate',[invPoz.value,invEmail.value]).then(r=>{toast('Új kód: '+r.kod,'ok');loadInvites();});}
+function createInv(){
+  var poz   = document.getElementById('invPoz').value;
+  var email = document.getElementById('invEmail').value.trim();
+  var nume  = document.getElementById('invNume').value.trim();
+  var tel   = document.getElementById('invTel').value.trim();
+  gas('invCreate',[poz, email, nume, tel]).then(function(r){
+    if(r&&r.ok){ toast('✅ Kód: '+r.kod,'ok'); loadInvites();
+      document.getElementById('invEmail').value='';
+      document.getElementById('invNume').value='';
+      document.getElementById('invTel').value=''; }
+    else toast((r&&r.err)||'Hiba','err');
+  });
+}
 
 // FUVAR
 let internDriversCache=[],externDriversCache=[],camionCache=[],remorcaCache=[];

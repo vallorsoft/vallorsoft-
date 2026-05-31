@@ -578,3 +578,7 @@ CREATE TABLE IF NOT EXISTS document_series (
   updated_at  TIMESTAMP DEFAULT NOW(),
   UNIQUE(company_id, doc_type, year)
 );
+
+-- Meghívó: opcionális név és telefonszám
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS nume VARCHAR(255);
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS tel  VARCHAR(50);

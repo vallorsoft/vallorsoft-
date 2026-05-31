@@ -1384,6 +1384,8 @@ app.post('/api/execute', requireLogin, async (req, res) => {
       }
     
       const email = String(args[1] || '').trim().toLowerCase();
+      const nume  = String(args[2] || '').trim() || null;
+      const tel   = String(args[3] || '').trim() || null;
 
       if (!['Admin', 'Manager', 'Sofer'].includes(pozicio)) {
         return res.json({ result: { ok: false, err: 'Ervenytelen pozicio.' } });
@@ -1397,8 +1399,8 @@ app.post('/api/execute', requireLogin, async (req, res) => {
       }
 
       await pool.query(
-        `INSERT INTO invites (kod, pozicio, email, status, company_id) VALUES ($1, $2, $3, $4, $5)`,
-        [kod, pozicio, email, 'Aktiv', req.session.user.company_id || null]
+        `INSERT INTO invites (kod, pozicio, email, status, company_id, nume, tel) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [kod, pozicio, email, 'Aktiv', req.session.user.company_id || null, nume, tel]
       );
 
       // Email kuldese ha van email cim
@@ -2524,7 +2526,7 @@ app.post('/api/execute', requireLogin, async (req, res) => {
       for (let i = 0; i < 6; i++) kod += chars.charAt(Math.floor(Math.random() * chars.length));
 
       await pool.query(
-        `INSERT INTO invites (kod, pozicio, email, status, company_id) VALUES ($1, $2, $3, $4, $5)`,
+        `INSERT INTO invites (kod, pozicio, email, status, company_id, nume, tel) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [kod, 'Admin', f.email_contact||null, 'Aktiv', companyId]
       );
 
