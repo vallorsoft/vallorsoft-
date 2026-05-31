@@ -17,12 +17,12 @@
 <body>
 <div class="toast-wrap" id="toasts"></div>
 
- Mobil top bar 
+ <!-- Mobil top bar -->
 <div class="mob-topbar">
   <div class="vs-logo"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
   <button class="hamburger" onclick="toggleSidebar()" aria-label="Menü">☰</button>
 </div>
- Sidebar overlay 
+ <!-- Sidebar overlay -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
 <div class="app-layout">
@@ -76,7 +76,7 @@
           <div style="font-size:12px; color:var(--muted);">Cég dashboard</div>
         </div>
       </div>
-       KPI kártyák 
+       <!-- KPI kártyák -->
       <div class="grid-4" style="margin-bottom:20px;">
         <div class="glass" style="padding:18px;">
           <div style="font-size:12px;color:var(--muted);">Összes fuvar</div>
@@ -195,10 +195,10 @@
       </div>
     </div>
 
-      ====== MŰSZAK & MUNKAIDŐ ====== 
+      <!-- ====== MŰSZAK & MUNKAIDŐ ====== -->
     <div class="pane hidden" data-pane="shift-fleet">
  
-       Fejléc + hét navigátor 
+       <!-- Fejléc + hét navigátor -->
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px;">
         <div>
           <h2 class="h-title" style="margin:0;">📊 Műszak & Munkaidő</h2>
@@ -247,7 +247,7 @@
         </div>
       </div>
  
-       Flotta státusz tábla: ki mit csinál most 
+       <!-- Flotta státusz tábla: ki mit csinál most -->
       <div class="glass" style="padding:18px;margin-bottom:14px;">
         <h3 style="margin:0 0 12px;font-size:15px;">🚛 Flotta valós idejű státusz</h3>
         <div style="overflow-x:auto;">
@@ -263,7 +263,7 @@
         </div>
       </div>
  
-       Heti compliance tábla: heti összegzés sofőrönként 
+       <!-- Heti compliance tábla: heti összegzés sofőrönként -->
       <div class="glass" style="padding:18px;margin-bottom:14px;">
         <h3 style="margin:0 0 12px;font-size:15px;">📋 Heti munkaidő — minden sofőr</h3>
         <div style="overflow-x:auto;">
@@ -279,7 +279,7 @@
         </div>
       </div>
  
-       Túllépés riasztások 
+       <!-- Túllépés riasztások -->
       <div class="glass" style="padding:18px;">
         <h3 style="margin:0 0 12px;font-size:15px;">⚠️ Túllépés riasztások (utolsó 14 nap)</h3>
         <div id="sfOvertimeList"></div>
@@ -482,13 +482,13 @@
       </div>
     </div>
 
-     ═══════════════════════════════════════════════
-         BEÁLLÍTÁSOK PANE
-    ════════════════════════════════════════════════════ 
+     <!-- ═══════════════════════════════════════════════ -->
+         <!-- BEÁLLÍTÁSOK PANE -->
+    <!-- ════════════════════════════════════════════════════ -->
     <div class="pane hidden" data-pane="settings">
       <div style="max-width:640px; margin:0 auto; display:flex; flex-direction:column; gap:18px;">
 
-         PROFIL 
+         <!-- PROFIL -->
         <div class="glass" style="padding:24px;">
           <h2 class="h-title" style="margin-top:0;">👤 Profil adatok</h2>
           <div class="grid-2">
@@ -512,7 +512,7 @@
           <button class="btn primary" style="margin-top:14px;" onclick="settingsSaveProfile()">💾 Profil mentése</button>
         </div>
 
-         JELSZÓ MÓDOSÍTÁS 
+         <!-- JELSZÓ MÓDOSÍTÁS -->
         <div class="glass" style="padding:24px;">
           <h2 class="h-title" style="margin-top:0;">🔑 Jelszó módosítása</h2>
           <div class="field">
@@ -624,7 +624,7 @@
   </div>
 </div>
 
- MEGRENDELO MODAL 
+ <!-- MEGRENDELO MODAL -->
 <div class="modal-back" id="docModal">
   <div class="modal glass" style="width:min(700px,100%); max-height:90vh; overflow-y:auto;">
     <h3>📎 Megrendelő — <span id="docModalOrderId"></span></h3>
@@ -640,7 +640,7 @@
   </div>
 </div>
 
- ALAIRO MODAL 
+ <!-- ALAIRO MODAL -->
 <div class="modal-back" id="signModal" style="align-items:flex-start;padding:0;">
   <div class="modal glass" style="width:100%;max-width:980px;max-height:100vh;overflow-y:auto;border-radius:0;margin:0 auto;">
 
@@ -2346,7 +2346,7 @@ window.addEventListener('load', function(){ sfStartPoll(); });
 
 </script>
 
- ── BUG REPORT FAB ── 
+ <!-- ── BUG REPORT FAB ── -->
 <button onclick="openBugReport()" title="Hibajelentés küldése"
   style="position:fixed;bottom:24px;right:24px;z-index:500;width:48px;height:48px;border-radius:50%;
   border:1px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.12);color:#f59e0b;
@@ -2355,7 +2355,7 @@ window.addEventListener('load', function(){ sfStartPoll(); });
   onmouseover="this.style.background='rgba(245,158,11,0.25)'"
   onmouseout="this.style.background='rgba(245,158,11,0.12)'">🐛</button>
 
- ── BUG REPORT MODAL ── 
+ <!-- ── BUG REPORT MODAL ── -->
 <div class="modal-back" id="bugModal">
   <div class="modal glass" style="width:min(480px,100%);max-height:90vh;">
     <h3 style="margin-top:0;">🐛 Hibajelentés</h3>

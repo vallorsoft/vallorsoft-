@@ -3176,6 +3176,157 @@ app.get('/api/shift/week-summary', requireLogin, async (req, res) => {
 
 
 // ============================================================
+//  GET /api/shift/fleet-compliance — Admin/Manager flotta dashboard
+//  Query: ?week_offset=N  (0 = aktualis het, 1 = elozo het, ...)
+//  Visszaadja: kpi, fleet_status, compliance, rest_avg, overtime_alerts
+//  Cegszures: csak a sajat ceg (company_id) soforjei
+// ============================================================
+app.get('/api/shift/fleet-compliance', requireLogin, requireRole('Manager', 'Admin'), async (req, res) => {
+  const user = req.session.user;
+  try {
+    const cid = user.company_id;
+    const weekOffset = Math.max(0, Math.min(52, parseInt(req.query.week_offset, 10) || 0));
+    const base = new Date();
+    base.setUTCDate(base.getUTCDate() - weekOffset * 7);
+    const weekStart = getWeekStart(base);
+
+    // ---- 1. Flotta valos ideju statusz (legutobbi nem-INACTIVE shift soforonkent) ----
+    const fleetRes = await pool.query(
+      `SELECT u.id AS driver_id, u.nume, u.email,
+              COALESCE(ds.status, 'INACTIVE') AS status,
+              ds.day_started_at, ds.paused_at, ds.rest_type,
+              ds.next_shift_start, ds.locked_until, ds.is_overtime,
+              ds.shift_index_in_week, ds.weekly_hours_total,
+              CASE WHEN ds.status = 'ACTIVE' AND ds.day_started_at IS NOT NULL
+                   THEN GREATEST(0,
+                        EXTRACT(EPOCH FROM (NOW() - ds.day_started_at)) / 3600.0
+                        - COALESCE(ds.paused_total_minutes, 0) / 60.0)
+                   ELSE NULL END AS current_active_hours
+       FROM users u
+       LEFT JOIN LATERAL (
+         SELECT * FROM driver_shifts d
+         WHERE d.driver_id = u.id AND d.status <> 'INACTIVE'
+         ORDER BY d.updated_at DESC LIMIT 1
+       ) ds ON TRUE
+       WHERE u.company_id = $1 AND u.pozicio = 'Sofer'
+       ORDER BY u.nume`,
+      [cid]
+    );
+    const fleet_status = fleetRes.rows.map(r => ({
+      driver_id:            r.driver_id,
+      nume:                 r.nume,
+      email:                r.email,
+      status:               r.status,
+      rest_type:            r.rest_type,
+      current_active_hours: r.current_active_hours,
+      next_shift_start:     r.next_shift_start,
+      shift_index_in_week:  r.shift_index_in_week,
+      weekly_hours_total:   r.weekly_hours_total,
+      locked_until:         r.locked_until,
+      is_overtime:          r.is_overtime,
+      paused_at:            r.paused_at
+    }));
+
+    const now = Date.now();
+    const kpi = {
+      total_drivers: fleet_status.length,
+      active_count:  fleet_status.filter(f => f.status === 'ACTIVE').length,
+      paused_count:  fleet_status.filter(f => f.status === 'PAUSED').length,
+      rest_count:    fleet_status.filter(f => f.status === 'REST' && f.rest_type !== 'vacation').length,
+      vacation_count:fleet_status.filter(f => f.status === 'REST' && f.rest_type === 'vacation').length,
+      locked_count:  fleet_status.filter(f => f.locked_until && new Date(f.locked_until).getTime() > now).length
+    };
+
+    // ---- 2. Heti compliance: lezart muszakok oraszama soforonkent az adott heten ----
+    const compRes = await pool.query(
+      `SELECT u.id AS driver_id, u.nume, u.email,
+              COALESCE(SUM(
+                CASE WHEN ds.day_started_at IS NOT NULL AND ds.day_closed_at IS NOT NULL
+                     THEN GREATEST(0,
+                          EXTRACT(EPOCH FROM (ds.day_closed_at - ds.day_started_at)) / 3600.0
+                          - COALESCE(ds.paused_total_minutes, 0) / 60.0)
+                     ELSE 0 END), 0) AS weekly_hours,
+              COUNT(ds.shift_id) FILTER (WHERE ds.day_started_at IS NOT NULL) AS shifts_count,
+              COUNT(ds.shift_id) FILTER (WHERE ds.is_overtime = TRUE)        AS overtime_count
+       FROM users u
+       LEFT JOIN driver_shifts ds
+         ON ds.driver_id = u.id AND ds.week_start_date = $2
+       WHERE u.company_id = $1 AND u.pozicio = 'Sofer'
+       GROUP BY u.id, u.nume, u.email
+       ORDER BY weekly_hours DESC`,
+      [cid, weekStart]
+    );
+    const compliance = compRes.rows.map(r => ({
+      driver_id:      r.driver_id,
+      nume:           r.nume,
+      weekly_hours:   parseFloat(r.weekly_hours).toFixed(1),
+      shifts_count:   parseInt(r.shifts_count, 10),
+      overtime_count: parseInt(r.overtime_count, 10)
+    }));
+
+    // ---- 3. Piheno atlagok (utolso 30 nap, tipusonkent) ----
+    const restRes = await pool.query(
+      `SELECT ds.rest_type,
+              AVG(ds.rest_hours)  AS avg_hours,
+              MIN(ds.rest_hours)  AS min_hours,
+              MAX(ds.rest_hours)  AS max_hours,
+              COUNT(*)            AS db
+       FROM driver_shifts ds
+       JOIN users u ON u.id = ds.driver_id
+       WHERE u.company_id = $1 AND u.pozicio = 'Sofer'
+         AND ds.rest_type IS NOT NULL AND ds.rest_hours IS NOT NULL
+         AND ds.created_at >= NOW() - INTERVAL '30 days'
+       GROUP BY ds.rest_type`,
+      [cid]
+    );
+    const rest_avg = restRes.rows.map(r => ({
+      rest_type: r.rest_type,
+      avg_hours: parseFloat(r.avg_hours).toFixed(1),
+      min_hours: parseFloat(r.min_hours).toFixed(1),
+      max_hours: parseFloat(r.max_hours).toFixed(1),
+      db:        parseInt(r.db, 10)
+    }));
+
+    // ---- 4. Tullepes riasztasok (utolso 14 nap, is_overtime) ----
+    const otRes = await pool.query(
+      `SELECT u.nume, u.email, ds.day_started_at, ds.overtime_reason,
+              CASE WHEN ds.day_closed_at IS NOT NULL AND ds.day_started_at IS NOT NULL
+                   THEN EXTRACT(EPOCH FROM (ds.day_closed_at - ds.day_started_at)) / 3600.0
+                   ELSE NULL END AS active_hours
+       FROM driver_shifts ds
+       JOIN users u ON u.id = ds.driver_id
+       WHERE u.company_id = $1 AND u.pozicio = 'Sofer'
+         AND ds.is_overtime = TRUE
+         AND ds.day_started_at >= NOW() - INTERVAL '14 days'
+       ORDER BY ds.day_started_at DESC
+       LIMIT 50`,
+      [cid]
+    );
+    const overtime_alerts = otRes.rows.map(r => ({
+      nume:            r.nume,
+      email:           r.email,
+      day_started_at:  r.day_started_at,
+      active_hours:    r.active_hours != null ? parseFloat(r.active_hours).toFixed(1) : '0',
+      overtime_reason: r.overtime_reason
+    }));
+
+    return res.json({
+      ok: true,
+      week_start: weekStart,
+      kpi,
+      fleet_status,
+      compliance,
+      rest_avg,
+      overtime_alerts
+    });
+  } catch (err) {
+    console.error('[shift/fleet-compliance] hiba:', err);
+    return res.json({ ok: false, message: 'Szerver hiba a flotta statisztika lekeresekor.' });
+  }
+});
+
+
+// ============================================================
 //  SHIFT SCHEDULER — 1 perces ciklus (setInterval, 0 extra npm)
 //
 //  Tick-ek:
