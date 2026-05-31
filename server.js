@@ -3193,6 +3193,26 @@ app.post('/api/shift/snooze-pause', requireLogin, requireRole('Sofer'), async (r
 
 
 // ============================================================
+
+//  POST /api/shift/cancel-rest — Pihenő megszüntetése
+//  Törli az aktív REST státuszú shift-et -> sofőr elölről kezdhet
+app.post('/api/shift/cancel-rest', requireLogin, requireRole('Sofer'), async (req, res) => {
+  const user = req.session.user;
+  try {
+    const r = await pool.query(
+      `UPDATE driver_shifts SET status='INACTIVE', updated_at=NOW()
+       WHERE driver_id=$1 AND status='REST'
+       RETURNING shift_id`,
+      [user.id]
+    );
+    if (!r.rows.length) return res.json({ ok: false, message: 'Nincs aktív pihenő.' });
+    return res.json({ ok: true });
+  } catch(err) {
+    console.error('[shift/cancel-rest]', err);
+    return res.json({ ok: false, message: 'Szerver hiba' });
+  }
+});
+
 //  GET /api/shift/current — Aktuális shift lekérése (UI polling)
 //  Visszaadja az élő shif minden adatát, vagy:
 //  { shift: null, locked_until } ha nincs élő, de zárolva van
