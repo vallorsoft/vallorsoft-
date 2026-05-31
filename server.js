@@ -3575,8 +3575,25 @@ function startShiftScheduler() {
 
 
 
-// ============================================================
-//  SOFŐR STÁTUSZ FRISSÍTÉS + PUSH VISSZAJELZÉS
+// ── Gyors státusz (Admin / Manager) ──────────────────────
+app.post('/api/orders/:id/quick-status', requireLogin, requireRole('Admin','Manager'), async (req, res) => {
+  const { status } = req.body;
+  const valid = ['Disponibil','Alocat','Extern','In Curs','Finalizat','Anulat'];
+  if (!valid.includes(status)) return res.json({ ok: false, err: 'Érvénytelen státusz' });
+  try {
+    const r = await pool.query(
+      'UPDATE orders SET status=$1, updated_at=NOW() WHERE id=$2 AND company_id=$3',
+      [status, req.params.id, req.session.user.company_id]
+    );
+    if (r.rowCount === 0) return res.json({ ok: false, err: 'Fuvar nem található' });
+    return res.json({ ok: true });
+  } catch(err) {
+    console.error('quick-status hiba:', err);
+    return res.json({ ok: false, err: 'Szerver hiba' });
+  }
+});
+
+// ── Sofőr státusz frissítés + push visszajelzés ───────────
 //  POST /api/orders/:id/driver-status
 //  Csak Sofőr role — csak 'In Curs' vagy 'Finalizat'
 // ============================================================

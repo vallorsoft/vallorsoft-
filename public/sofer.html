@@ -1905,8 +1905,8 @@ function loadDashOrders() {
         '</div>'+
         (o.rendszam_camion ? '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">🚛 '+o.rendszam_camion+(o.rendszam_remorca?' / '+o.rendszam_remorca:'')+'</div>' : '')+
         '<div style="display:flex;gap:8px;">'+
-          (isAlocat ? '<button class="sh-btn resume" style="flex:1;padding:13px 8px;font-size:13px;" onclick="driverOrderStatus('+o.id+',\'In Curs\')">✅ Elfogadom</button>' : '')+
-          (!isAlocat ? '<button class="sh-btn confirm" style="flex:1;padding:13px 8px;font-size:13px;" onclick="driverOrderStatus('+o.id+',\'Finalizat\')">🏁 Elvégeztem</button>' : '')+
+          (isAlocat ? '<button class="sh-btn resume" style="flex:1;padding:13px 8px;font-size:13px;" onclick="driverOrderStatus(\''+o.id+'\',\'In Curs\')">✅ Elfogadom</button>' : '')+
+          (!isAlocat ? '<button class="sh-btn confirm" style="flex:1;padding:13px 8px;font-size:13px;" onclick="driverOrderStatus(\''+o.id+'\',\'Finalizat\')">🏁 Elvégeztem</button>' : '')+
         '</div>'+
       '</div>';
     }).join('');

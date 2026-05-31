@@ -1307,13 +1307,20 @@ function renderFilteredOrders(list) {
     if(c.status==='Anulat')sc='err';
     if(c.status==='Extern')sc='warn';
 
-    // Státusz dropdown (inline szerkesztés)
+    // Státusz dropdown — gombszerű, színes, kattintható
     var statuses = ['Disponibil','Alocat','In Curs','Finalizat','Anulat'];
-    var statusSel = '<select class="badge '+sc+'" onchange="quickStatusChange(\''+c.id+'\',this)" '+
-      'style="cursor:pointer;border:none;background:inherit;color:inherit;font-size:11px;font-weight:700;'+
-      'padding:2px 4px;border-radius:6px;appearance:none;-webkit-appearance:none;outline:none;max-width:90px;">'+
+    var selStyle = 'cursor:pointer;font-size:11px;font-weight:700;border-radius:8px;padding:4px 20px 4px 8px;'+
+      'border:1px solid;appearance:auto;-webkit-appearance:auto;outline:none;min-width:80px;';
+    var bgMap = {
+      'info': 'background:rgba(59,130,246,0.18);color:#60a5fa;border-color:rgba(59,130,246,0.4);',
+      'warn': 'background:rgba(245,158,11,0.18);color:#fbbf24;border-color:rgba(245,158,11,0.4);',
+      'ok':   'background:rgba(34,197,94,0.18);color:#4ade80;border-color:rgba(34,197,94,0.4);',
+      'err':  'background:rgba(239,68,68,0.18);color:#f87171;border-color:rgba(239,68,68,0.4);'
+    };
+    var statusSel = '<select onchange="quickStatusChange(\''+c.id+'\',this)" '+
+      'style="'+selStyle+(bgMap[sc]||bgMap['info'])+'">'+
       statuses.map(function(s){
-        return '<option value="'+s+'" '+(c.status===s?'selected':'')+'>'+s+'</option>';
+        return '<option value="'+s+'" '+(c.status===s?'selected':'')+' style="background:#0c1218;color:#e9eef5;">'+s+'</option>';
       }).join('')+
     '</select>';
     var legs = Array.isArray(c.legs_json) ? c.legs_json : [];
@@ -1370,21 +1377,31 @@ function quickStatusChange(id, sel) {
   var sc = newStatus==='Alocat'||newStatus==='Extern'?'warn':
            newStatus==='In Curs'||newStatus==='Finalizat'?'ok':
            newStatus==='Anulat'?'err':'info';
-  sel.className = 'badge '+sc;
-  fetch('/api/execute', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ functionName:'comUpdate', args:[id, { status: newStatus }] }) })
+  var bgMap = {
+    'info': 'background:rgba(59,130,246,0.18);color:#60a5fa;border-color:rgba(59,130,246,0.4);',
+    'warn': 'background:rgba(245,158,11,0.18);color:#fbbf24;border-color:rgba(245,158,11,0.4);',
+    'ok':   'background:rgba(34,197,94,0.18);color:#4ade80;border-color:rgba(34,197,94,0.4);',
+    'err':  'background:rgba(239,68,68,0.18);color:#f87171;border-color:rgba(239,68,68,0.4);'
+  };
+  var base = 'cursor:pointer;font-size:11px;font-weight:700;border-radius:8px;padding:4px 20px 4px 8px;border:1px solid;appearance:auto;-webkit-appearance:auto;outline:none;min-width:80px;';
+  sel.style.cssText = base + (bgMap[sc]||bgMap['info']);
+  fetch('/api/orders/' + encodeURIComponent(id) + '/quick-status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: newStatus })
+  })
   .then(function(r){ return r.json(); })
   .then(function(d){
-    if (d.result && d.result.ok) {
-      toast('✅ Státusz: '+newStatus, 'ok');
-      var idx = _ordersAllCache.findIndex ? _ordersAllCache.findIndex(function(c){ return String(c.id)===String(id); }) :
-        _ordersAllCache.map(function(c){return String(c.id);}).indexOf(String(id));
+    if (d.ok) {
+      toast('✅ Státusz: ' + newStatus, 'ok');
+      var idx = -1;
+      _ordersAllCache.forEach(function(c,i){ if(String(c.id)===String(id)) idx=i; });
       if (idx !== -1) _ordersAllCache[idx].status = newStatus;
     } else {
-      toast((d.result&&d.result.err)||'Hiba', 'err');
+      toast(d.err || 'Hiba', 'err');
       loadOrders();
     }
-  }).catch(function(){ toast('Hiba', 'err'); loadOrders(); });
+  }).catch(function(){ toast('Kapcsolat hiba', 'err'); loadOrders(); });
 }
 
 // ── Kijelölés & letöltés logika ───────────────────────────
