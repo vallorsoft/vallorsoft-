@@ -208,7 +208,6 @@ if (helmet) {
           "https://*.firebaseio.com",
           "https://*.firebase.com",
         ],
-        scriptSrcAttr: ["'unsafe-inline'"],   // <-- EZ AZ ÚJ SOR: engedi az onclick handlereket
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "blob:"],
@@ -489,7 +488,7 @@ app.post('/api/login', async (req, res) => {
     }
 
     const result = await pool.query(
-      'SELECT id, nume, email, tel, pozicio, password_hash, company_id, pozicio_dev, totp_secret, totp_enabled, totp_required FROM users WHERE email = $1',
+      'SELECT id, nume, email, tel, pozicio, password_hash, company_id, pozicio_dev, totp_secret, totp_enabled FROM users WHERE email = $1',
       [email]
     );
 
@@ -519,40 +518,24 @@ app.post('/api/login', async (req, res) => {
     }
 
     // ===== 2FA KAPU =====
+    // A jelszo helyes. Most a 2FA allapot dont.
+    // Atmeneti "pre-auth" session - csak a 2FA lepeshez
     if (speakeasy) {
-      const pendingUserObj = {
-        id: user.id, nume: user.nume, email: user.email, tel: user.tel,
-        pozicio: user.pozicio, company_id: user.company_id,
-        is_dev: user.pozicio_dev || false,
-      };
-
-      // 2FA ki van kapcsolva ennél a usernél -> direkt belépés
-      if (!user.totp_required) {
-        req.session.user = pendingUserObj;
-        return res.json({ success: true, redirect: calc2faRedirect(pendingUserObj), user: pendingUserObj });
-      }
-
-      // 2FA kötelező
       if (user.totp_enabled && user.totp_secret) {
-        // Trusted device ellenőrzés
-        const trustToken = req.cookies && req.cookies['vs_trust'];
-        if (trustToken) {
-          try {
-            const td = await pool.query(
-              'SELECT id FROM trusted_devices WHERE user_id=$1 AND token=$2 AND expires_at>NOW()',
-              [user.id, trustToken]
-            );
-            if (td.rows.length > 0) {
-              req.session.user = pendingUserObj;
-              return res.json({ success: true, redirect: calc2faRedirect(pendingUserObj), user: pendingUserObj });
-            }
-          } catch(e) { /* nem blokkolja a normál flow-t */ }
-        }
-        req.session.pendingUser = pendingUserObj;
+        // 2FA be van kapcsolva -> kodot kerunk
+        req.session.pendingUser = {
+          id: user.id, nume: user.nume, email: user.email, tel: user.tel,
+          pozicio: user.pozicio, company_id: user.company_id,
+          is_dev: user.pozicio_dev || false,
+        };
         return res.json({ success: true, need2fa: true });
       } else {
-        // 2FA még nincs beállítva -> kötelező setup
-        req.session.pendingUser = pendingUserObj;
+        // 2FA meg nincs beallitva -> KOTELEZO setup
+        req.session.pendingUser = {
+          id: user.id, nume: user.nume, email: user.email, tel: user.tel,
+          pozicio: user.pozicio, company_id: user.company_id,
+          is_dev: user.pozicio_dev || false,
+        };
         return res.json({ success: true, setup2fa: true });
       }
     }
@@ -718,28 +701,9 @@ app.post('/api/2fa/verify', async (req, res) => {
       return res.json({ success: false, message: 'Helytelen kod.' });
     }
 
-    // Sikeres -> végleges bejelentkezés
+    // Sikeres -> vegleges bejelentkezes
     req.session.user = req.session.pendingUser;
     delete req.session.pendingUser;
-
-    // Trusted device cookie (ha kérte)
-    if (req.body.trustDevice === true) {
-      try {
-        const trustToken = crypto.randomBytes(32).toString('hex');
-        const expiresAt  = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-        await pool.query(
-          'INSERT INTO trusted_devices (user_id, token, expires_at) VALUES ($1,$2,$3)',
-          [req.session.user.id, trustToken, expiresAt]
-        );
-        res.cookie('vs_trust', trustToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
-          maxAge: 30 * 24 * 60 * 60 * 1000,
-          path: '/'
-        });
-      } catch(e) { console.error('trusted device mentési hiba:', e); }
-    }
 
     return res.json({
       success: true,
@@ -747,94 +711,6 @@ app.post('/api/2fa/verify', async (req, res) => {
     });
   } catch (err) {
     console.error('2fa verify hiba:', err);
-    return res.json({ success: false, message: 'Szerver hiba' });
-  }
-});
-
-// ===== BEÁLLÍTÁSOK: saját 2FA státusz =====
-app.get('/api/settings/me', requireLogin, async (req, res) => {
-  try {
-    const r  = await pool.query('SELECT totp_enabled, totp_required, nume, tel, email FROM users WHERE id=$1', [req.session.user.id]);
-    if (!r.rows.length) return res.json({ success: false });
-    const dc = await pool.query(
-      'SELECT COUNT(*) as cnt FROM trusted_devices WHERE user_id=$1 AND expires_at>NOW()',
-      [req.session.user.id]
-    );
-    return res.json({
-      success: true,
-      totp_enabled:         r.rows[0].totp_enabled,
-      totp_required:        r.rows[0].totp_required,
-      trusted_device_count: parseInt(dc.rows[0].cnt),
-      nume:  r.rows[0].nume  || '',
-      tel:   r.rows[0].tel   || '',
-      email: r.rows[0].email || ''
-    });
-  } catch(e) {
-    console.error('settings/me hiba:', e);
-    return res.json({ success: false, message: 'Szerver hiba' });
-  }
-});
-
-// ===== BEÁLLÍTÁSOK: 2FA be/ki kapcsolás =====
-app.post('/api/settings/2fa-toggle', requireLogin, async (req, res) => {
-  try {
-    if (!['Admin','Manager'].includes(req.session.user.pozicio) && !req.session.user.is_dev) {
-      return res.status(403).json({ success: false, message: 'Nincs jogosultság' });
-    }
-    const enable = req.body.enable === true;
-    await pool.query('UPDATE users SET totp_required=$1 WHERE id=$2', [enable, req.session.user.id]);
-    return res.json({ success: true, totp_required: enable });
-  } catch(e) {
-    console.error('2fa-toggle hiba:', e);
-    return res.json({ success: false, message: 'Szerver hiba' });
-  }
-});
-
-// ===== BEÁLLÍTÁSOK: megbízható eszközök törlése =====
-app.post('/api/settings/trusted-devices-clear', requireLogin, async (req, res) => {
-  try {
-    await pool.query('DELETE FROM trusted_devices WHERE user_id=$1', [req.session.user.id]);
-    res.clearCookie('vs_trust', { path: '/' });
-    return res.json({ success: true });
-  } catch(e) {
-    console.error('trusted-devices-clear hiba:', e);
-    return res.json({ success: false, message: 'Szerver hiba' });
-  }
-});
-
-// ===== BEÁLLÍTÁSOK: jelszó módosítás =====
-app.post('/api/settings/change-password', requireLogin, async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-    if (!currentPassword || !newPassword)
-      return res.json({ success: false, message: 'Hiányzó adatok' });
-    if (newPassword.length < 6)
-      return res.json({ success: false, message: 'Az új jelszó legalább 6 karakter legyen' });
-    const r = await pool.query('SELECT password_hash FROM users WHERE id=$1', [req.session.user.id]);
-    if (!r.rows.length) return res.json({ success: false, message: 'Felhasználó nem található' });
-    const match = await bcrypt.compare(currentPassword, r.rows[0].password_hash);
-    if (!match) return res.json({ success: false, message: 'A jelenlegi jelszó helytelen' });
-    const hash = await bcrypt.hash(newPassword, 10);
-    await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [hash, req.session.user.id]);
-    return res.json({ success: true });
-  } catch(e) {
-    console.error('change-password hiba:', e);
-    return res.json({ success: false, message: 'Szerver hiba' });
-  }
-});
-
-// ===== BEÁLLÍTÁSOK: profil frissítés =====
-app.post('/api/settings/update-profile', requireLogin, async (req, res) => {
-  try {
-    const { nume, tel } = req.body;
-    if (!nume || !nume.trim()) return res.json({ success: false, message: 'A név nem lehet üres' });
-    await pool.query('UPDATE users SET nume=$1, tel=$2 WHERE id=$3',
-      [nume.trim(), (tel || '').trim(), req.session.user.id]);
-    req.session.user.nume = nume.trim();
-    req.session.user.tel  = (tel || '').trim();
-    return res.json({ success: true });
-  } catch(e) {
-    console.error('update-profile hiba:', e);
     return res.json({ success: false, message: 'Szerver hiba' });
   }
 });
@@ -974,26 +850,9 @@ app.get('/api/doc-download/:id', async (req, res) => {
 });
 
 // PDF DOWNLOAD (DB-bol)
-app.get('/api/pdf-download/:id', requireLogin, async (req, res) => {
+app.get('/api/pdf-download/:id', async (req, res) => {
   try {
-    const me = req.session.user;
-    const isAdmin = ['Admin', 'Manager'].includes(me.pozicio);
-    let r;
-    if (isAdmin) {
-      // csak a sajat ceg soforjenek menetlevele
-      r = await pool.query(
-        `SELECT f.* FROM fuvarlevelek f
-         JOIN users u ON LOWER(u.email) = LOWER(f.email_sofer)
-         WHERE f.id = $1 AND u.company_id = $2`,
-        [req.params.id, me.company_id]
-      );
-    } else {
-      // sofor csak a sajat menetleveleit
-      r = await pool.query(
-        'SELECT * FROM fuvarlevelek WHERE id = $1 AND LOWER(email_sofer) = LOWER($2)',
-        [req.params.id, me.email]
-      );
-    }
+    const r = await pool.query('SELECT * FROM fuvarlevelek WHERE id = $1', [req.params.id]);
     if (!r.rows.length) return res.status(404).send('Nem található.');
     const f = r.rows[0];
 
@@ -1331,21 +1190,6 @@ app.post('/api/execute', requireLogin, async (req, res) => {
         return res.json({ result: { ok: false, err: 'Ervenytelen pozicio.' } });
       }
 
-      // max_users limit: regisztralt userek + fuggoben levo aktiv meghivok
-      const cidLim = req.session.user.company_id;
-      if (cidLim) {
-        const lim = await pool.query('SELECT max_users FROM companies WHERE id = $1', [cidLim]);
-        const maxU = lim.rows[0]?.max_users ?? 0;
-        const cnt = await pool.query(
-          `SELECT (SELECT COUNT(*) FROM users   WHERE company_id = $1)
-                + (SELECT COUNT(*) FROM invites WHERE company_id = $1 AND status = 'Aktiv') AS db`,
-          [cidLim]
-        );
-        if (maxU > 0 && Number(cnt.rows[0].db) >= maxU) {
-          return res.json({ result: { ok: false, err: 'Elerted a max. felhasznaloszamot (' + maxU + '). Boviteni kell a csomagot.' } });
-        }
-      }
-
       // veletlen kod generalas - hasonloan a regi _genCode-hoz
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let kod = 'VS-';
@@ -1665,8 +1509,7 @@ app.post('/api/execute', requireLogin, async (req, res) => {
         // - utolso Admin nem fokozhato le (rendszer mindig kell legyen egy Admin)
         if (targetUser.pozicio === 'Admin' && fields.pozicio !== 'Admin') {
           const adminCount = await pool.query(
-            "SELECT COUNT(*)::int AS db FROM users WHERE pozicio = 'Admin' AND company_id = $1",
-            [targetUser.company_id]
+            "SELECT COUNT(*)::int AS db FROM users WHERE pozicio = 'Admin'"
           );
           if (adminCount.rows[0].db <= 1) {
             return res.json({ result: { ok: false, err: 'Nem maradhat a rendszer Admin nelkul.' } });
@@ -1699,6 +1542,83 @@ app.post('/api/execute', requireLogin, async (req, res) => {
     } catch (err) {
       console.error('userUpdate hiba:', err);
       return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    }
+  }
+
+  // ── BEÁLLÍTÁSOK: Saját jelszó módosítása (minden bejelentkezett user) ──
+  if (functionName === 'settingsChangePassword') {
+    try {
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve.' } });
+      const { current, newPwd } = args[0] || {};
+      if (!current || !newPwd) return res.json({ result: { ok: false, err: 'Minden mező kötelező.' } });
+      if (newPwd.length < 6) return res.json({ result: { ok: false, err: 'Az új jelszó legalább 6 karakter legyen.' } });
+
+      const r = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.session.user.id]);
+      if (!r.rows.length) return res.json({ result: { ok: false, err: 'Felhasználó nem található.' } });
+
+      const ok = await bcrypt.compare(current, r.rows[0].password_hash);
+      if (!ok) return res.json({ result: { ok: false, err: 'A jelenlegi jelszó helytelen.' } });
+
+      const hash = await bcrypt.hash(newPwd, 10);
+      await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.session.user.id]);
+      return res.json({ result: { ok: true } });
+    } catch (err) {
+      console.error('settingsChangePassword hiba:', err);
+      return res.json({ result: { ok: false, err: 'Szerver hiba.' } });
+    }
+  }
+
+  // ── BEÁLLÍTÁSOK: Saját profil mentése (név, telefon) ──
+  if (functionName === 'settingsSaveProfile') {
+    try {
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve.' } });
+      const { nume, tel } = args[0] || {};
+      if (!nume || !String(nume).trim()) return res.json({ result: { ok: false, err: 'A név kötelező.' } });
+
+      const newNume = String(nume).trim();
+      const newTel  = String(tel || '').trim();
+      await pool.query('UPDATE users SET nume = $1, tel = $2 WHERE id = $3', [newNume, newTel, req.session.user.id]);
+
+      // session frissítése
+      req.session.user.nume = newNume;
+      req.session.user.tel  = newTel;
+      return res.json({ result: { ok: true } });
+    } catch (err) {
+      console.error('settingsSaveProfile hiba:', err);
+      return res.json({ result: { ok: false, err: 'Szerver hiba.' } });
+    }
+  }
+
+  // ── BEÁLLÍTÁSOK: 2FA kikapcsolása (csak saját fiók) ──
+  if (functionName === 'settings2faDisable') {
+    try {
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve.' } });
+      const { currentPwd } = args[0] || {};
+      if (!currentPwd) return res.json({ result: { ok: false, err: 'A jelszó megadása kötelező a 2FA kikapcsolásához.' } });
+
+      const r = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.session.user.id]);
+      if (!r.rows.length) return res.json({ result: { ok: false, err: 'Felhasználó nem található.' } });
+
+      const ok = await bcrypt.compare(currentPwd, r.rows[0].password_hash);
+      if (!ok) return res.json({ result: { ok: false, err: 'Helytelen jelszó.' } });
+
+      await pool.query('UPDATE users SET totp_enabled = FALSE, totp_secret = NULL, totp_backup_codes = NULL WHERE id = $1', [req.session.user.id]);
+      return res.json({ result: { ok: true } });
+    } catch (err) {
+      console.error('settings2faDisable hiba:', err);
+      return res.json({ result: { ok: false, err: 'Szerver hiba.' } });
+    }
+  }
+
+  // ── BEÁLLÍTÁSOK: 2FA státusz lekérése ──
+  if (functionName === 'settings2faStatus') {
+    try {
+      if (!req.session.user) return res.json({ result: { ok: false } });
+      const r = await pool.query('SELECT totp_enabled FROM users WHERE id = $1', [req.session.user.id]);
+      const enabled = r.rows.length ? !!r.rows[0].totp_enabled : false;
+      return res.json({ result: { ok: true, totp_enabled: enabled } });
+    } catch (err) {
+      return res.json({ result: { ok: false, totp_enabled: false } });
     }
   }
 
@@ -1740,8 +1660,7 @@ app.post('/api/execute', requireLogin, async (req, res) => {
       // 🔒 KIEGESZITES: utolso Admin torlese sem engedett
       if (targetRes.rows[0].pozicio === 'Admin') {
         const adminCount = await pool.query(
-          "SELECT COUNT(*)::int AS db FROM users WHERE pozicio = 'Admin' AND company_id = $1",
-          [targetRes.rows[0].company_id]
+          "SELECT COUNT(*)::int AS db FROM users WHERE pozicio = 'Admin'"
         );
         if (adminCount.rows[0].db <= 1) {
           return res.json({ result: { ok: false, err: 'Az utolso Admin nem torolheto.' } });
@@ -2011,8 +1930,7 @@ app.post('/api/execute', requireLogin, async (req, res) => {
 
       updates.push(`updated_at = NOW()`);
       values.push(id);
-      values.push(req.session.user.company_id);
-      const sql = `UPDATE external_drivers SET ${updates.join(', ')} WHERE id = $${i} AND company_id = $${i + 1}`;
+      const sql = `UPDATE external_drivers SET ${updates.join(', ')} WHERE id = $${i}`;
       const r = await pool.query(sql, values);
 
       if (r.rowCount === 0) {

@@ -55,11 +55,10 @@
       <div class="menu-title">Kommunikáció</div>
       <div class="tab" data-tab="chat">Belső Chat</div>
     </div>
-    <div class="menu-group">
-      <div class="menu-title">Fiók</div>
-      <div class="tab" data-tab="settings">⚙️ Beállítások</div>
+    <div class="menu-group" style="margin-top:auto;">
+      <div class="tab" data-tab="settings" style="display:flex;align-items:center;gap:8px;">⚙️ Beállítások</div>
     </div>
-    <div style="margin-top:auto; padding:10px 12px; border-top:1px solid var(--border);">
+    <div style="padding:10px 12px; border-top:1px solid var(--border); margin-top:8px;">
       <div id="meBadge" style="font-size:12px; color:var(--muted); margin-bottom:10px;">—</div>
       <button class="btn ghost block" onclick="logout()" style="padding:8px;">Kilépés</button>
     </div>
@@ -255,32 +254,7 @@
     <div class="pane hidden" data-pane="internal-drivers">
       <div class="glass" style="padding:22px;">
         <h2 class="h-title">Belső sofőrök</h2>
-        <div class="h-sub">Saját cég sofőr pozíciójú felhasználói. Új sofőrt meghívóval adhat hozzá — a sofőr e-mailben kapja a kódot, és maga állítja be a jelszavát.</div>
-      </div>
-
-      <div class="glass" style="padding:22px; margin-top:16px;">
-        <h3 style="margin-bottom:16px;">Új belső sofőr meghívása</h3>
-        <div class="grid-3">
-          <div class="field" style="grid-column:span 2;"><label>Sofőr e-mail címe *</label><input class="input" id="idEmail" type="email" placeholder="sofor@pelda.hu"></div>
-          <div class="field" style="display:flex; align-items:flex-end;"><button class="btn primary" onclick="inviteInternalDriver()" style="width:100%;">+ Meghívó küldése</button></div>
-        </div>
-        <div id="idInviteResult" style="margin-top:12px;"></div>
-      </div>
-
-      <div class="glass" style="padding:22px; margin-top:16px;">
-        <h3 style="margin-bottom:16px;">Regisztrált belső sofőrök</h3>
-        <table class="table" id="tblInternalDrivers">
-          <thead><tr><th>Név</th><th>E-mail</th><th>Telefon</th><th>Művelet</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-
-      <div class="glass" style="padding:22px; margin-top:16px;">
-        <h3 style="margin-bottom:16px;">Függőben lévő meghívások</h3>
-        <table class="table" id="tblPendingDriverInvites">
-          <thead><tr><th>Meghívókód</th><th>E-mail</th><th>Státusz</th><th>Művelet</th></tr></thead>
-          <tbody></tbody>
-        </table>
+        <div class="h-sub">Sofőr pozíciójú regisztrált felhasználók és jármű-hozzárendelés — hamarosan.</div>
       </div>
     </div>
 
@@ -408,6 +382,82 @@
             <button class="btn primary col" onclick="chatStartNewRoom()">Chat indítása</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         BEÁLLÍTÁSOK PANE
+    ════════════════════════════════════════════════════ -->
+    <div class="pane hidden" data-pane="settings">
+      <div style="max-width:640px; margin:0 auto; display:flex; flex-direction:column; gap:18px;">
+
+        <!-- PROFIL -->
+        <div class="glass" style="padding:24px;">
+          <h2 class="h-title" style="margin-top:0;">👤 Profil adatok</h2>
+          <div class="grid-2">
+            <div class="field">
+              <label>Teljes név</label>
+              <input class="input" id="stNume" placeholder="Teljes név">
+            </div>
+            <div class="field">
+              <label>E-mail cím (nem módosítható)</label>
+              <input class="input" id="stEmail" disabled style="opacity:0.5;">
+            </div>
+            <div class="field">
+              <label>Telefonszám</label>
+              <input class="input" id="stTel" placeholder="+40 ...">
+            </div>
+            <div class="field">
+              <label>Pozíció</label>
+              <input class="input" id="stPozicio" disabled style="opacity:0.5;">
+            </div>
+          </div>
+          <button class="btn primary" style="margin-top:14px;" onclick="settingsSaveProfile()">💾 Profil mentése</button>
+        </div>
+
+        <!-- JELSZÓ MÓDOSÍTÁS -->
+        <div class="glass" style="padding:24px;">
+          <h2 class="h-title" style="margin-top:0;">🔑 Jelszó módosítása</h2>
+          <div class="field">
+            <label>Jelenlegi jelszó</label>
+            <input class="input" type="password" id="stPwdCurrent" placeholder="••••••••" autocomplete="current-password">
+          </div>
+          <div class="field">
+            <label>Új jelszó</label>
+            <input class="input" type="password" id="stPwdNew" placeholder="Legalább 6 karakter" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label>Új jelszó megerősítése</label>
+            <input class="input" type="password" id="stPwdNew2" placeholder="••••••••" autocomplete="new-password">
+          </div>
+          <button class="btn primary" style="margin-top:6px;" onclick="settingsChangePassword()">🔒 Jelszó módosítása</button>
+        </div>
+
+        <!-- BIZTONSÁG (2FA) -->
+        <div class="glass" style="padding:24px;">
+          <h2 class="h-title" style="margin-top:0;">🛡️ Kétlépéses hitelesítés (2FA)</h2>
+          <div id="st2faStatus" style="display:flex; align-items:center; gap:12px; margin-bottom:16px; padding:12px 14px; background:rgba(255,255,255,0.04); border-radius:var(--r-sm); border:1px solid var(--border);">
+            <div id="st2faDot" style="width:10px;height:10px;border-radius:50%;background:var(--muted);flex-shrink:0;"></div>
+            <div>
+              <div id="st2faLabel" style="font-weight:600;font-size:13px;color:#fff;">Betöltés...</div>
+              <div id="st2faDesc" style="font-size:12px;color:var(--muted);margin-top:2px;"></div>
+            </div>
+          </div>
+          <div id="st2faDisableWrap" style="display:none;">
+            <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); border-radius:var(--r-sm); padding:12px 14px; margin-bottom:12px;">
+              <div style="font-size:12px;color:var(--warn);">⚠️ A 2FA kikapcsolása csökkenti a fiókod biztonságát. Csak akkor tedd, ha indokolt.</div>
+            </div>
+            <div class="field">
+              <label>Jelenlegi jelszó a megerősítéshez</label>
+              <input class="input" type="password" id="st2faDisablePwd" placeholder="••••••••">
+            </div>
+            <button class="btn danger" onclick="settings2faDisable()">🔓 2FA kikapcsolása</button>
+          </div>
+          <div id="st2faEnableWrap" style="display:none;">
+            <p style="color:var(--muted);font-size:13px;margin:0 0 12px 0;">A 2FA aktiválásához jelentkezz ki, majd az első bejelentkezéskor automatikusan be kell állítani.</p>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -550,75 +600,6 @@
 
     </div>
   </div>
-    <div class="pane hidden" data-pane="settings">
-      <div style="max-width:600px;">
-        <h2 style="font-size:20px;font-weight:800;color:#fff;margin-bottom:4px;">⚙️ Beállítások</h2>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:24px;">Saját fiók biztonsági és profil beállításai</div>
-
-        <div class="card" style="margin-bottom:14px;">
-          <div style="font-weight:700;color:#fff;font-size:15px;margin-bottom:14px;">🔐 Biztonság</div>
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 0;border-top:1px solid var(--border);">
-            <div>
-              <div style="font-size:14px;color:#fff;margin-bottom:2px;">Kétlépéses hitelesítés</div>
-              <div id="settings2faStatus" style="font-size:12px;color:var(--muted);">Betöltés...</div>
-            </div>
-            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">
-              <span id="settings2faLabel" style="font-size:13px;color:var(--muted);min-width:80px;text-align:right;"></span>
-              <div style="position:relative;width:46px;height:26px;flex-shrink:0;">
-                <input type="checkbox" id="toggle2fa" style="opacity:0;width:0;height:0;position:absolute;" onchange="on2faToggle(this.checked)">
-                <span id="toggle2faSlider" style="position:absolute;inset:0;background:#374151;border-radius:26px;transition:.3s;cursor:pointer;display:block;"></span>
-                <span id="toggle2faKnob" style="position:absolute;left:3px;top:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.3s;pointer-events:none;display:block;"></span>
-              </div>
-            </label>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 0;border-top:1px solid var(--border);">
-            <div>
-              <div style="font-size:14px;color:#fff;margin-bottom:2px;">Megbízható eszközök</div>
-              <div id="settingsTrustCount" style="font-size:12px;color:var(--muted);">Betöltés...</div>
-            </div>
-            <button class="btn ghost" onclick="clearTrustedDevices()" style="font-size:13px;padding:6px 14px;">🗑 Törlés</button>
-          </div>
-        </div>
-
-        <div class="card" style="margin-bottom:14px;">
-          <div style="font-weight:700;color:#fff;font-size:15px;margin-bottom:14px;">🔑 Jelszó módosítása</div>
-          <div class="field">
-            <label>Jelenlegi jelszó</label>
-            <input class="input" type="password" id="settingsCurPw" placeholder="••••••••" autocomplete="current-password">
-          </div>
-          <div class="field">
-            <label>Új jelszó</label>
-            <input class="input" type="password" id="settingsNewPw" placeholder="••••••••" autocomplete="new-password" oninput="updatePwStrength(this.value)">
-            <div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;margin-top:6px;overflow:hidden;">
-              <div id="pwStrengthBar" style="height:100%;width:0;border-radius:2px;transition:width .3s,background .3s;"></div>
-            </div>
-            <div id="pwStrengthLabel" style="font-size:11px;margin-top:3px;color:var(--muted);"></div>
-          </div>
-          <div class="field">
-            <label>Új jelszó megerősítése</label>
-            <input class="input" type="password" id="settingsConfPw" placeholder="••••••••" autocomplete="new-password">
-          </div>
-          <button class="btn primary" onclick="changePassword()" id="btnChangePw" style="margin-top:4px;">💾 Jelszó mentése</button>
-        </div>
-
-        <div class="card">
-          <div style="font-weight:700;color:#fff;font-size:15px;margin-bottom:14px;">👤 Profil</div>
-          <div class="field">
-            <label>Megjelenítési név</label>
-            <input class="input" type="text" id="settingsNume" placeholder="Teljes név">
-          </div>
-          <div class="field">
-            <label>Telefonszám</label>
-            <input class="input" type="tel" id="settingsTel" placeholder="+40 7xx xxx xxx">
-          </div>
-          <div class="field">
-            <label>Email <span style="font-size:11px;color:var(--muted);font-weight:400;">(nem módosítható)</span></label>
-            <input class="input" type="email" id="settingsEmail" disabled style="opacity:.5;cursor:not-allowed;">
-          </div>
-          <button class="btn primary" onclick="updateProfile()" id="btnUpdateProfile" style="margin-top:4px;">💾 Profil mentése</button>
-        </div>
-      </div>
-    </div>
 </div>
 
 <div class="modal-back" id="orderEditModal">
@@ -677,7 +658,6 @@
   </div>
 </div>
 
-
 <script>
 function toast(m,k){var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(function(){e.remove();},3000);}
 function gas(fn,args){return new Promise(function(res,rej){fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({functionName:fn,arguments:args||[]})}).then(r=>r.json()).then(d=>{res(d.result);}).catch(rej);});}
@@ -714,10 +694,88 @@ function loadTab(name){
   if(name==='users') loadUsers();
   if(name==='invites') loadInvites();
   if(name==='vehicles') loadVehicles();
-  if(name==='internal-drivers') loadInternalDrivers();
   if(name==='external-drivers') loadExtDrivers();
   if(name==='signature') initAdminSigCanvas();
-  if(name==='settings') loadSettings();
+  if(name==='settings') loadSettingsPane();
+}
+
+/* ─── BEÁLLÍTÁSOK PANE ─── */
+function loadSettingsPane(){
+  gas('authMe').then(function(u){
+    if(!u) return;
+    document.getElementById('stNume').value    = u.nume  || '';
+    document.getElementById('stEmail').value   = u.email || '';
+    document.getElementById('stTel').value     = u.tel   || '';
+    document.getElementById('stPozicio').value = u.pozicio || '';
+  });
+  gas('settings2faStatus').then(function(r){
+    var dot   = document.getElementById('st2faDot');
+    var label = document.getElementById('st2faLabel');
+    var desc  = document.getElementById('st2faDesc');
+    var disW  = document.getElementById('st2faDisableWrap');
+    var enW   = document.getElementById('st2faEnableWrap');
+    if(r && r.totp_enabled){
+      dot.style.background   = 'var(--ok)';
+      label.textContent      = 'Aktív — fiókod védett';
+      desc.textContent       = 'A kétlépéses hitelesítés be van kapcsolva.';
+      disW.style.display     = '';
+      enW.style.display      = 'none';
+    } else {
+      dot.style.background   = 'var(--warn)';
+      label.textContent      = 'Nincs bekapcsolva';
+      desc.textContent       = 'Javasolt a 2FA aktiválása a fiókod védelméhez.';
+      disW.style.display     = 'none';
+      enW.style.display      = '';
+    }
+  });
+}
+
+function settingsSaveProfile(){
+  var nume = document.getElementById('stNume').value.trim();
+  var tel  = document.getElementById('stTel').value.trim();
+  if(!nume){ toast('A név kötelező!','err'); return; }
+  gas('settingsSaveProfile',[{nume:nume,tel:tel}]).then(function(r){
+    if(r&&r.ok){
+      toast('Profil mentve!','ok');
+      document.getElementById('meBadge').textContent = nume;
+    } else {
+      toast((r&&r.err)||'Hiba történt','err');
+    }
+  });
+}
+
+function settingsChangePassword(){
+  var cur  = document.getElementById('stPwdCurrent').value;
+  var nw   = document.getElementById('stPwdNew').value;
+  var nw2  = document.getElementById('stPwdNew2').value;
+  if(!cur||!nw||!nw2){ toast('Minden mező kötelező!','err'); return; }
+  if(nw!==nw2){ toast('A két új jelszó nem egyezik!','err'); return; }
+  if(nw.length<6){ toast('Az új jelszó legalább 6 karakter legyen!','err'); return; }
+  gas('settingsChangePassword',[{current:cur,newPwd:nw}]).then(function(r){
+    if(r&&r.ok){
+      toast('Jelszó sikeresen módosítva!','ok');
+      document.getElementById('stPwdCurrent').value='';
+      document.getElementById('stPwdNew').value='';
+      document.getElementById('stPwdNew2').value='';
+    } else {
+      toast((r&&r.err)||'Hiba','err');
+    }
+  });
+}
+
+function settings2faDisable(){
+  var pwd = document.getElementById('st2faDisablePwd').value;
+  if(!pwd){ toast('Add meg a jelszavadat!','err'); return; }
+  if(!confirm('Biztosan kikapcsolod a kétlépéses hitelesítést? Ez csökkenti a fiókod biztonságát.')) return;
+  gas('settings2faDisable',[{currentPwd:pwd}]).then(function(r){
+    if(r&&r.ok){
+      toast('2FA kikapcsolva.','ok');
+      document.getElementById('st2faDisablePwd').value='';
+      loadSettingsPane();
+    } else {
+      toast((r&&r.err)||'Hiba','err');
+    }
+  });
 }
 
 function loadDash(){
@@ -800,7 +858,6 @@ function deleteUser(email, nev){
       toast('Sofőr törölve!','ok');
       loadUsers();
       loadDash();
-      if(typeof loadInternalDrivers==='function')loadInternalDrivers();
     }else{
       toast(r.err||'Hiba történt','err');
     }
@@ -854,7 +911,6 @@ function saveUser(){
       closeModal();
       loadUsers();
       loadDash();
-      if(typeof loadInternalDrivers==='function')loadInternalDrivers();
     } else {
       toast((r && r.err) || 'Hiba történt', 'err');
     }
@@ -1028,38 +1084,6 @@ function createOrder(){
 
 // KULSO SOFOROK
 let extDriverCache=[];
-// ===== BELSŐ SOFŐRÖK =====
-function loadInternalDrivers(){
-  gas('userListAll').then(list=>{
-    if(!Array.isArray(list))list=[];
-    const drivers=list.filter(u=>u.pozicio==='Sofer');
-    const tb=document.querySelector('#tblInternalDrivers tbody');
-    if(drivers.length===0){tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);">Még nincs regisztrált belső sofőr.</td></tr>';}
-    else{tb.innerHTML=drivers.map(u=>`<tr><td>${u.nume}</td><td>${u.email}</td><td>${u.tel||'—'}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick='editUser(${JSON.stringify(u)})'>Szerk</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUser('${u.email}','${(u.nume||'').replace(/'/g,"\\'")}')">Töröl</button></td></tr>`).join('');}
-  });
-  gas('invListAll').then(list=>{
-    if(!Array.isArray(list))list=[];
-    const pend=list.filter(i=>i.pozicio==='Sofer'&&i.statusz==='Aktiv');
-    const tb=document.querySelector('#tblPendingDriverInvites tbody');
-    if(pend.length===0){tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);">Nincs függőben lévő meghívás.</td></tr>';}
-    else{tb.innerHTML=pend.map(i=>`<tr><td><b>${i.kod}</b></td><td>${i.email||'—'}</td><td><span class="badge warn">${i.statusz}</span></td><td><button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="revokeDriverInvite('${i.kod}')">Visszavon</button></td></tr>`).join('');}
-  });
-}
-function inviteInternalDriver(){
-  const email=(document.getElementById('idEmail').value||'').trim();
-  if(!email){toast('Az e-mail cím kötelező!','err');return;}
-  gas('invCreate',['Sofer',email]).then(r=>{
-    if(r&&r.ok){
-      document.getElementById('idInviteResult').innerHTML='<span class="badge ok">Meghívó elküldve — kód: <b>'+r.kod+'</b></span>';
-      document.getElementById('idEmail').value='';
-      loadInternalDrivers();
-    }else{toast((r&&r.err)||'Hiba történt','err');}
-  });
-}
-function revokeDriverInvite(kod){
-  if(!confirm('Biztosan visszavonod a meghívót: '+kod+'?'))return;
-  gas('invRevoke',[kod]).then(r=>{if(r.ok){toast('Visszavonva!','ok');loadInternalDrivers();}else{toast(r.err||'Hiba','err');}});
-}
 function loadExtDrivers(){
   gas('extDriverList').then(list=>{
     if(!Array.isArray(list))list=[];
@@ -1916,162 +1940,6 @@ document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(e
     }
   });
 });
-
-// ===== BEÁLLÍTÁSOK — pane dinamikus létrehozása =====
-(function() {
-  var mc = document.querySelector('.main-content');
-  if (!mc || document.querySelector('.pane[data-pane="settings"]')) return;
-  var el = document.createElement('div');
-  el.className = 'pane hidden';
-  el.setAttribute('data-pane', 'settings');
-  el.innerHTML = [
-    '<div style="max-width:600px;">',
-    '<h2 style="font-size:20px;font-weight:800;color:#fff;margin-bottom:4px;">⚙️ Beállítások</h2>',
-    '<div style="font-size:13px;color:var(--muted);margin-bottom:24px;">Saját fiók biztonsági és profil beállításai</div>',
-
-    '<div class="card" style="margin-bottom:14px;">',
-    '<div style="font-weight:700;color:#fff;font-size:15px;margin-bottom:14px;">🔐 Biztonság</div>',
-    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 0;border-top:1px solid var(--border);">',
-    '<div><div style="font-size:14px;color:#fff;margin-bottom:2px;">Kétlépéses hitelesítés</div>',
-    '<div id="settings2faStatus" style="font-size:12px;color:var(--muted);">Betöltés...</div></div>',
-    '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">',
-    '<span id="settings2faLabel" style="font-size:13px;color:var(--muted);min-width:80px;text-align:right;"></span>',
-    '<div style="position:relative;width:46px;height:26px;flex-shrink:0;">',
-    '<input type="checkbox" id="toggle2fa" style="opacity:0;width:0;height:0;position:absolute;" onchange="on2faToggle(this.checked)">',
-    '<span id="toggle2faSlider" style="position:absolute;inset:0;background:#374151;border-radius:26px;transition:.3s;cursor:pointer;display:block;"></span>',
-    '<span id="toggle2faKnob" style="position:absolute;left:3px;top:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.3s;pointer-events:none;display:block;"></span>',
-    '</div></label></div>',
-    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 0;border-top:1px solid var(--border);">',
-    '<div><div style="font-size:14px;color:#fff;margin-bottom:2px;">Megbízható eszközök</div>',
-    '<div id="settingsTrustCount" style="font-size:12px;color:var(--muted);">Betöltés...</div></div>',
-    '<button class="btn ghost" onclick="clearTrustedDevices()" style="font-size:13px;padding:6px 14px;">🗑 Törlés</button>',
-    '</div></div>',
-
-    '<div class="card" style="margin-bottom:14px;">',
-    '<div style="font-weight:700;color:#fff;font-size:15px;margin-bottom:14px;">🔑 Jelszó módosítása</div>',
-    '<div class="field"><label>Jelenlegi jelszó</label>',
-    '<input class="input" type="password" id="settingsCurPw" placeholder="••••••••" autocomplete="current-password"></div>',
-    '<div class="field"><label>Új jelszó</label>',
-    '<input class="input" type="password" id="settingsNewPw" placeholder="••••••••" autocomplete="new-password" oninput="updatePwStrength(this.value)">',
-    '<div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;margin-top:6px;overflow:hidden;">',
-    '<div id="pwStrengthBar" style="height:100%;width:0;border-radius:2px;transition:width .3s,background .3s;"></div></div>',
-    '<div id="pwStrengthLabel" style="font-size:11px;margin-top:3px;color:var(--muted);"></div></div>',
-    '<div class="field"><label>Új jelszó megerősítése</label>',
-    '<input class="input" type="password" id="settingsConfPw" placeholder="••••••••" autocomplete="new-password"></div>',
-    '<button class="btn primary" onclick="changePassword()" id="btnChangePw" style="margin-top:4px;">💾 Jelszó mentése</button>',
-    '</div>',
-
-    '<div class="card">',
-    '<div style="font-weight:700;color:#fff;font-size:15px;margin-bottom:14px;">👤 Profil</div>',
-    '<div class="field"><label>Megjelenítési név</label>',
-    '<input class="input" type="text" id="settingsNume" placeholder="Teljes név"></div>',
-    '<div class="field"><label>Telefonszám</label>',
-    '<input class="input" type="tel" id="settingsTel" placeholder="+40 7xx xxx xxx"></div>',
-    '<div class="field"><label>Email <span style="font-size:11px;color:var(--muted);font-weight:400;">(nem módosítható)</span></label>',
-    '<input class="input" type="email" id="settingsEmail" disabled style="opacity:.5;cursor:not-allowed;"></div>',
-    '<button class="btn primary" onclick="updateProfile()" id="btnUpdateProfile" style="margin-top:4px;">💾 Profil mentése</button>',
-    '</div>',
-    '</div>'
-  ].join('');
-  mc.appendChild(el);
-})();
-
-function loadSettings() {
-  fetch('/api/settings/me')
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if(!d.success) return;
-      var cb=document.getElementById('toggle2fa');
-      var slider=document.getElementById('toggle2faSlider');
-      var knob=document.getElementById('toggle2faKnob');
-      cb.checked=d.totp_required;
-      slider.style.background=d.totp_required?'#6366f1':'#374151';
-      knob.style.left=d.totp_required?'23px':'3px';
-      document.getElementById('settings2faLabel').textContent=d.totp_required?'Bekapcsolva':'Kikapcsolva';
-      document.getElementById('settings2faStatus').textContent=d.totp_enabled?'Az authenticator app be van állítva.':'Az authenticator app nincs beállítva.';
-      var cnt=d.trusted_device_count||0;
-      document.getElementById('settingsTrustCount').textContent=cnt>0?cnt+' megbízható eszköz van mentve (30 napos lejárat).':'Nincs mentett megbízható eszköz.';
-      document.getElementById('settingsNume').value=d.nume||'';
-      document.getElementById('settingsTel').value=d.tel||'';
-      document.getElementById('settingsEmail').value=d.email||'';
-    })
-    .catch(function(){toast('Beállítások betöltési hiba','err');});
-}
-
-function on2faToggle(checked){
-  var slider=document.getElementById('toggle2faSlider'),knob=document.getElementById('toggle2faKnob');
-  slider.style.background=checked?'#6366f1':'#374151';
-  knob.style.left=checked?'23px':'3px';
-  document.getElementById('settings2faLabel').textContent=checked?'Bekapcsolva':'Kikapcsolva';
-  fetch('/api/settings/2fa-toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enable:checked})})
-  .then(function(r){return r.json();}).then(function(d){
-    if(d.success){toast(checked?'🔐 2FA bekapcsolva':'🔓 2FA kikapcsolva','ok');}
-    else{
-      toast(d.message||'Hiba','err');
-      var cb=document.getElementById('toggle2fa'); cb.checked=!checked;
-      slider.style.background=!checked?'#6366f1':'#374151';
-      knob.style.left=!checked?'23px':'3px';
-      document.getElementById('settings2faLabel').textContent=!checked?'Bekapcsolva':'Kikapcsolva';
-    }
-  }).catch(function(){toast('Szerver hiba','err');});
-}
-
-function clearTrustedDevices(){
-  if(!confirm('Törli az összes megbízható eszközt?')) return;
-  fetch('/api/settings/trusted-devices-clear',{method:'POST',headers:{'Content-Type':'application/json'}})
-  .then(function(r){return r.json();}).then(function(d){
-    if(d.success){toast('Megbízható eszközök törölve','ok');loadSettings();}
-    else toast(d.message||'Hiba','err');
-  }).catch(function(){toast('Szerver hiba','err');});
-}
-
-function updatePwStrength(v){
-  var bar=document.getElementById('pwStrengthBar'),lbl=document.getElementById('pwStrengthLabel');
-  if(!v){bar.style.width='0';lbl.textContent='';return;}
-  var s=0;
-  if(v.length>=8)s++; if(v.length>=12)s++;
-  if(/[A-Z]/.test(v))s++; if(/[0-9]/.test(v))s++; if(/[^A-Za-z0-9]/.test(v))s++;
-  var pct=['0','25%','45%','65%','85%','100%'][s];
-  var clr=['#374151','#ef4444','#f59e0b','#f59e0b','#22c55e','#22c55e'][s];
-  var txt=['','Gyenge','Gyenge','Közepes','Erős','Nagyon erős'][s];
-  bar.style.width=pct; bar.style.background=clr; lbl.style.color=clr; lbl.textContent=txt;
-}
-
-function changePassword(){
-  var cur=document.getElementById('settingsCurPw').value;
-  var nw=document.getElementById('settingsNewPw').value;
-  var conf=document.getElementById('settingsConfPw').value;
-  if(!cur||!nw||!conf){toast('Minden mező kitöltése kötelező!','err');return;}
-  if(nw.length<6){toast('Az új jelszó legalább 6 karakter legyen!','err');return;}
-  if(nw!==conf){toast('A két új jelszó nem egyezik!','err');return;}
-  var btn=document.getElementById('btnChangePw');
-  btn.disabled=true; btn.textContent='Mentés...';
-  fetch('/api/settings/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:cur,newPassword:nw})})
-  .then(function(r){return r.json();}).then(function(d){
-    btn.disabled=false; btn.textContent='💾 Jelszó mentése';
-    if(d.success){
-      toast('Jelszó sikeresen megváltoztatva!','ok');
-      document.getElementById('settingsCurPw').value='';
-      document.getElementById('settingsNewPw').value='';
-      document.getElementById('settingsConfPw').value='';
-      updatePwStrength('');
-    } else toast(d.message||'Hiba','err');
-  }).catch(function(){btn.disabled=false;btn.textContent='💾 Jelszó mentése';toast('Szerver hiba','err');});
-}
-
-function updateProfile(){
-  var nume=document.getElementById('settingsNume').value.trim();
-  var tel=document.getElementById('settingsTel').value.trim();
-  if(!nume){toast('A név nem lehet üres!','err');return;}
-  var btn=document.getElementById('btnUpdateProfile');
-  btn.disabled=true; btn.textContent='Mentés...';
-  fetch('/api/settings/update-profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nume:nume,tel:tel})})
-  .then(function(r){return r.json();}).then(function(d){
-    btn.disabled=false; btn.textContent='💾 Profil mentése';
-    if(d.success){toast('Profil sikeresen frissítve!','ok');document.getElementById('meBadge').textContent=nume;}
-    else toast(d.message||'Hiba','err');
-  }).catch(function(){btn.disabled=false;btn.textContent='💾 Profil mentése';toast('Szerver hiba','err');});
-}
 
 </script>
 </body>
