@@ -132,7 +132,6 @@ app.use(require('./routes/auth'));
 app.use(require('./routes/soferApi'));
 app.use(require('./routes/execute'));
 app.use(require('./routes/push'));
-app.use(require('./routes/shifts'));
 app.use(require('./routes/ordersRest'));
 
 // ===== INTEGRACIOK (Ugyfelek / CargoTrack GPS / Szamlazas) =====
@@ -142,13 +141,6 @@ app.use(require('./routes/invoices'));
 app.use(require('./routes/uit'));
 app.use(require('./routes/inbound-orders'));
 app.use(require('./routes/client-mail'));
-
-// ===== MUSZAK UTEMEZO =====
-// FONTOS: az EREDETI server.js soha NEM hivta meg ezt a fuggvenyt
-// (csak definialta). A viselkedes valtozatlan megtartasahoz itt is
-// kikommentezve hagyjuk. Bekapcsolashoz tavolitsd el a // jeleket:
-// const { startShiftScheduler } = require('./services/scheduler');
-// startShiftScheduler();
 
 // E-mail intake (beérkező megrendelések) — csak akkor fut, ha az INTAKE_IMAP_* be van állítva.
 const { startIntakeScheduler } = require('./services/scheduler');

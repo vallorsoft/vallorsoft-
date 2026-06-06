@@ -353,27 +353,6 @@ function loadAdminSigPreview(){gas('stampGet').then(r=>{if(r&&r.ok&&r.base64){do
 
 function loadBorderLogs(){gas('getBorderLogs').then(list=>{document.querySelector('#tblBorderLogs tbody').innerHTML=list.map(l=>`<tr><td>${l.created_at?new Date(l.created_at).toLocaleString('hu-HU'):'—'}</td><td>${l.nume_sofer||l.email_sofer||'—'}</td><td><span class="badge warn">${l.tip||'—'}</span></td><td>${l.gps_lat?('📍 '+parseFloat(l.gps_lat).toFixed(4)+', '+parseFloat(l.gps_lng).toFixed(4)):'GPS n/a'}</td></tr>`).join('');});}
 
-function loadDiurnaStats() {
-  fetch('/api/diurna-stats').then(r=>r.json()).then(function(d){
-    var tb = document.getElementById('sfDiurnaTblBody');
-    if (!tb) return;
-    if (!d.ok||!d.data||!d.data.length) {
-      tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px;">Nincs adat.</td></tr>';
-      return;
-    }
-    _diurnaCache = d.data;
-    tb.innerHTML = d.data.map(function(s, idx){
-      var total = s.externDays + s.internDays;
-      return '<tr>'+
-        '<td><b style="color:#fff;">'+esc(s.nume)+'</b><br><span style="font-size:11px;color:var(--muted);">'+esc(s.email)+'</span></td>'+
-        '<td><span style="color:#22c55e;font-weight:700;">'+s.externDays+'</span></td>'+
-        '<td><span style="color:#f59e0b;font-weight:700;">'+s.internDays+'</span></td>'+
-        '<td>'+total+'</td>'+
-        '<td><button class="btn ghost" style="padding:3px 10px;font-size:12px;" onclick="openDiurnaDetail('+idx+')">Részletek</button></td>'+
-      '</tr>';
-    }).join('');
-  }).catch(function(){ console.error('diurna-stats hiba'); });
-}
 
 function loadDocSeries() {
   fetch('/api/document-series?type=MT').then(function(r){return r.json();}).then(function(d){
@@ -491,15 +470,6 @@ function loadReceivedFuvarlevelek(){
   });
 }
 
-function loadShiftFleet() {
-  fetch('/api/shift/fleet-compliance?week_offset=' + _sfWeekOffset)
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if (!d.ok) { if (d.message) toast(d.message, 'err'); return; }
-      _sfData = d;
-      renderShiftFleet(d);
-    }).catch(function(){ toast('Hálózati hiba', 'err'); });
-}
 
 function loadVehicles(){
   gas('vehicleList').then(list=>{
@@ -569,23 +539,6 @@ function openChatRoom(roomId){
   renderAdminRoomList(_meChat);
 }
 
-function openDiurnaDetail(idx) {
-  var s = _diurnaCache[idx];
-  if (!s) return;
-  document.getElementById('diurnaModalTitle').textContent = '🌍 Diurna — ' + s.nume;
-  var body = document.getElementById('diurnaModalBody');
-  var log = s.crossingLog || [];
-  if (!log.length) { body.innerHTML='<p style="color:var(--muted);">Nincs határátlépési adat.</p>'; }
-  else {
-    body.innerHTML = '<table class="table"><thead><tr><th>Nap</th><th>Külföldön</th><th>Típus</th></tr></thead><tbody>'+
-      log.map(function(r){
-        var c = r.type==='EXTERN'?'#22c55e':'#f59e0b';
-        return '<tr><td>'+r.day+'</td><td>'+r.hours+' ó</td>'+
-          '<td><b style="color:'+c+';">'+r.type+'</b></td></tr>';
-      }).join('')+'</tbody></table>';
-  }
-  document.getElementById('diurnaModal').classList.add('open');
-}
 
 function openDocModal(orderId){
   currentDocOrderId = orderId;
@@ -671,27 +624,6 @@ function renderAdminRoomList(me){
 
 function renderCamions(list){const sel=document.getElementById('oCamionSelect');if(!sel)return;sel.innerHTML='<option value="">— Nincs megadva —</option>'+list.map(v=>`<option value="${v.rendszam}">${v.rendszam}${v.marca?' — '+v.marca:''}${v.model?' '+v.model:''}</option>`).join('');}
 
-function renderComplianceTable(comp) {
-  var tb = document.getElementById('sfComplianceTblBody');
-  if (!comp.length) { tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">Nincs adat.</td></tr>'; return; }
-  tb.innerHTML = comp.map(function(c){
-    var hours = parseFloat(c.weekly_hours)||0;
-    var pct = (hours/90)*100;
-    var pctColor = pct>=80 ? '#ef4444' : pct>=60 ? '#f59e0b' : '#22c55e';
-    var overtime = c.overtime_count>0
-      ? '<span style="color:#ef4444;font-weight:700;">'+c.overtime_count+'×</span>'
-      : '<span style="color:var(--muted);">0</span>';
-    return '<tr>'+
-      '<td><b style="color:#fff;">'+esc(c.nume)+'</b></td>'+
-      '<td><b style="color:#fff;">'+hours.toFixed(1)+' ó</b></td>'+
-      '<td><span style="color:'+pctColor+';font-weight:700;">'+pct.toFixed(0)+' %</span></td>'+
-      '<td>'+(c.shifts_count||0)+'</td>'+
-      '<td>'+overtime+'</td>'+
-      '<td><button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="sfDriverDrillDown('+c.driver_id+',\''+esc(c.nume)+'\')">Részletek</button></td>'+
-    '</tr>';
-  }).join('');
-}
-
 function renderDocGroups() {
   var container = document.getElementById('docGroupsContainer');
   if (!container) return;
@@ -742,39 +674,6 @@ function renderInternDrivers(list){const sel=document.getElementById('oInternDri
 
 function renderRemorcas(list){const sel=document.getElementById('oRemorcaSelect');if(!sel)return;sel.innerHTML='<option value="">— Nincs megadva —</option>'+list.map(v=>`<option value="${v.rendszam}">${v.rendszam}${v.marca?' — '+v.marca:''}${v.model?' '+v.model:''}</option>`).join('');}
 
-function renderRestChart(rest) {
-  var ctx = document.getElementById('sfChartRest');
-  if (!ctx || typeof Chart === 'undefined') return;
-  if (ctx._chart) ctx._chart.destroy();
-  var labelMap = {'9h':'Rövid (9h)','11h':'Normál (11h)','24h':'Heti csökk.',
-                  '45h':'Heti teljes','custom':'Egyedi','vacation':'Szabadság'};
-  var colors = ['#fbbf24','#22c55e','#3b82f6','#a855f7','#94a3b8','#ec4899'];
-  ctx._chart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: rest.map(function(r){ return labelMap[r.rest_type]||r.rest_type; }),
-      datasets: [{ label:'átlag óra', data: rest.map(function(r){ return parseFloat(r.avg_hours)||0; }),
-        backgroundColor: rest.map(function(_,i){ return colors[i%colors.length]; }), borderWidth:0 }]
-    },
-    options: {
-      plugins: { legend:{display:false}, tooltip:{callbacks:{label:function(c){
-        var row=rest[c.dataIndex];
-        return [c.parsed.y.toFixed(1)+' ó átlag', row.db+' db ('+row.min_hours+'–'+row.max_hours+' ó)'];
-      }}}},
-      scales: { x:{ticks:{color:'#8a97a8'}}, y:{ticks:{color:'#8a97a8'},title:{display:true,text:'óra',color:'#8a97a8'}} }
-    }
-  });
-}
-
-function renderStatusBadge(status, restType) {
-  var cfg = {
-    'ACTIVE':    {bg:'rgba(34,197,94,0.15)',  c:'#22c55e', t:'🟢 Aktív'},
-    'PAUSED':    {bg:'rgba(251,191,36,0.15)', c:'#fbbf24', t:'⏸ Szünet'},
-    'REST':      {bg:'rgba(59,130,246,0.15)', c:'#60a5fa', t: restType==='vacation' ? '🏖 Szabadság' : '😴 Pihenő'},
-    'SCHEDULED': {bg:'rgba(168,85,247,0.15)', c:'#c084fc', t:'📅 Ütemezett'}
-  }[status] || {bg:'rgba(148,163,184,0.12)', c:'#94a3b8', t:'⚫ Inaktív'};
-  return '<span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;background:'+cfg.bg+';color:'+cfg.c+';border:1px solid '+cfg.c+'40;">'+cfg.t+'</span>';
-}
 
 function renderVehicleTable(tableId,list){
   const tb=document.querySelector('#'+tableId+' tbody');
@@ -953,13 +852,6 @@ function settingsSaveProfile(){
   });
 }
 
-function sfStartPoll() {
-  if (_sfPollInterval) clearInterval(_sfPollInterval);
-  _sfPollInterval = setInterval(function(){
-    var pane = document.querySelector('.pane[data-pane="shift-fleet"]');
-    if (pane && !pane.classList.contains('hidden')) loadShiftFleet();
-  }, 30000);
-}
 
 function signNextPage(){
   if(signCurrentPage<signTotalPages){ signCurrentPage++; renderSignPage(signCurrentPage); }
