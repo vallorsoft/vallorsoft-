@@ -582,3 +582,232 @@ CREATE TABLE IF NOT EXISTS document_series (
 -- Meghívó: opcionális név és telefonszám
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS nume VARCHAR(255);
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS tel  VARCHAR(50);
+
+-- ============================================================
+-- INTEGRACIOK (Ugyfelek / CargoTrack GPS / Szamlazas)
+-- Forras: db/integrations.sql (idempotens, CREATE ... IF NOT EXISTS)
+-- ============================================================
+-- db/integrations.sql — minden integrációs tábla egyben
+-- Futtatás: psql "$DATABASE_URL" -f db/integrations.sql  (vagy másold a schema.sql-be)
+
+-- ===== company_integrations + vehicle_gps_map =====
+-- cargotrack-migration.sql
+-- Általános integráció-tároló (CargoTrack, Fomco, FGO, SmartBill, ... mind ide kerül).
+-- A hitelesítő adat TITKOSÍTVA tárolódik (crypto-util.js), soha nem nyíltan.
+
+CREATE TABLE IF NOT EXISTS company_integrations (
+    id              SERIAL PRIMARY KEY,
+    company_id      INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    provider        TEXT    NOT NULL,            -- 'cargotrack' | 'fomco' | 'fgo' | 'smartbill' | ...
+    category        TEXT    NOT NULL,            -- 'gps' | 'invoicing'
+    enabled         BOOLEAN NOT NULL DEFAULT false,
+    credentials_enc TEXT,                         -- AES-256-GCM titkosított kulcs/credential
+    status          TEXT    DEFAULT 'disconnected', -- 'connected' | 'error' | 'disconnected'
+    status_message  TEXT,
+    last_check      TIMESTAMPTZ,
+    meta            JSONB   DEFAULT '{}'::jsonb,   -- pl. { "objectCount": 12 }
+    updated_at      TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (company_id, provider)
+);
+
+CREATE INDEX IF NOT EXISTS idx_company_integrations_company
+    ON company_integrations (company_id);
+
+-- Opcionális: rendszám <-> GPS object_id párosítás (a járművek összekötéséhez).
+-- Egyelőre a pozíció-lekérés object_id-vel is megy; ezt akkor töltjük, ha a felületen párosítunk.
+CREATE TABLE IF NOT EXISTS vehicle_gps_map (
+    id          SERIAL PRIMARY KEY,
+    company_id  INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    provider    TEXT    NOT NULL DEFAULT 'cargotrack',
+    rendszam    TEXT    NOT NULL,
+    object_id   TEXT    NOT NULL,
+    object_name TEXT,
+    updated_at  TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (company_id, provider, rendszam)
+);
+
+-- ===== invoices =====
+-- invoicing-migration.sql
+-- Számlák tárolása. A számlázó-hitelesítő adatok + beállítások a company_integrations táblába kerülnek
+-- (category='invoicing', credentials_enc = titkosított {CodUnic, PrivateKey}, meta = serie/vat_payer/...).
+-- Ehhez a company_integrations táblának léteznie kell (lásd cargotrack-migration.sql).
+
+CREATE TABLE IF NOT EXISTS invoices (
+    id               SERIAL PRIMARY KEY,
+    company_id       INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    order_id         TEXT,                       -- orders.id (CMD-xxxx, VARCHAR)
+    provider         TEXT    NOT NULL,           -- 'fgo' | 'smartbill' | 'oblio' | ...
+    serie            TEXT,
+    numar            TEXT,
+    total            NUMERIC(12,2),
+    valuta           TEXT DEFAULT 'RON',
+    tva              NUMERIC(6,2),
+    pdf_link         TEXT,
+    status           TEXT DEFAULT 'issued',      -- 'issued' | 'error' | 'cancelled'
+    provider_message TEXT,
+    efactura_status  TEXT,                        -- ha a szolgáltató API-n adja (tisztázandó)
+
+    -- ÜGYFÉL-PILLANATKÉP a kiállítás idejéből (utólagos ügyfél-módosítás nem írja át)
+    client_name      TEXT,
+    client_cui       TEXT,
+    client_tip       TEXT,
+    client_address   TEXT,
+
+    payload          JSONB,                       -- a beküldött számla (audithoz)
+    created_by       INTEGER,
+    created_at       TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_invoices_company_order ON invoices (company_id, order_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_company_created ON invoices (company_id, created_at DESC);
+
+-- ===== clients =====
+-- clients-migration.sql
+-- Ügyfelek (számlázáshoz). Önálló — nem módosít meglévő logikát.
+
+CREATE TABLE IF NOT EXISTS clients (
+    id                SERIAL PRIMARY KEY,
+    company_id        INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    denumire          TEXT    NOT NULL,           -- cég/ügyfél neve (kötelező)
+    tip               TEXT    DEFAULT 'PJ',        -- 'PJ' (cég) | 'PF' (magánszemély)
+    cui_cif           TEXT,
+    reg_com           TEXT,
+    tara              TEXT    DEFAULT 'RO',
+    judet             TEXT,
+    localitate        TEXT,
+    adresa            TEXT,
+    email             TEXT,
+    telefon           TEXT,
+    iban              TEXT,
+    banca             TEXT,
+    default_tva       NUMERIC(6,2),
+    valuta            TEXT    DEFAULT 'RON',
+    nota              TEXT,
+    complet_facturare BOOLEAN DEFAULT false,       -- számlázáshoz elég adat van-e
+    anaf_status       TEXT,                         -- 'activ' | 'inactiv' | NULL
+    anaf_last_check   TIMESTAMPTZ,
+    created_at        TIMESTAMPTZ DEFAULT now(),
+    updated_at        TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_clients_company ON clients (company_id);
+CREATE INDEX IF NOT EXISTS idx_clients_company_name ON clients (company_id, denumire);
+
+-- ----------------------------------------------------------------------------
+-- OPCIONÁLIS — csak amikor a fuvart összekötöd az ügyféllel (1/B).
+-- Önmagában ártalmatlan (nullable), de a fuvar-mentő kódnak ezután be kell
+-- állítania a client_id-t. Addig a szöveges `client` mező marad fallbacknek.
+-- ----------------------------------------------------------------------------
+-- ALTER TABLE orders ADD COLUMN IF NOT EXISTS client_id INTEGER REFERENCES clients(id);
+-- CREATE INDEX IF NOT EXISTS idx_orders_client ON orders (client_id);
+
+
+-- ============================================================
+-- RO e-Transport UIT-kódok (db/uit-migration.sql)
+-- ============================================================
+-- db/uit-migration.sql
+-- RO e-Transport UIT-kódok fuvaronként. Egy fuvarhoz TÖBB UIT tartozhat.
+-- A UIT-ot az ANAF generálja (a megbízó deklarációjára); itt a KAPOTT kódot
+-- rögzítjük, és a járműhöz/GPS-eszközhöz rendeljük (CargoTrack), majd a transport
+-- végén leállítjuk a küldést.
+-- Futtatás:  psql "$DATABASE_URL" -f db/uit-migration.sql
+
+CREATE TABLE IF NOT EXISTS order_uit_codes (
+    id            SERIAL PRIMARY KEY,
+    company_id    INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    order_id      VARCHAR(20) NOT NULL,             -- orders.id (CMD-xxxx)
+    uit_code      TEXT    NOT NULL,                 -- az ANAF-tól kapott UIT
+    rendszam      TEXT,                             -- melyik jármű (alapból a fuvar vontatója)
+    object_id     TEXT,                             -- CargoTrack/FM-Track GPS object_id (ha párosítva)
+    provider      TEXT    NOT NULL DEFAULT 'cargotrack',
+    status        TEXT    NOT NULL DEFAULT 'new',   -- 'new' | 'active' | 'stopped' | 'error'
+    valid_until   DATE,                             -- UIT lejárat (belföld 5 / nemzetközi 15 nap)
+    last_message  TEXT,                             -- utolsó visszajelzés a szolgáltatótól
+    sent_at       TIMESTAMPTZ,                      -- mikor indult a küldés
+    stopped_at    TIMESTAMPTZ,                      -- mikor lett leállítva
+    created_by    INTEGER,
+    created_at    TIMESTAMPTZ DEFAULT now(),
+    updated_at    TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (company_id, order_id, uit_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_uit_company_order ON order_uit_codes (company_id, order_id);
+
+-- UIT ANAF-visszaigazolás oszlopok (db/uit-anaf-confirm.sql)
+-- db/uit-anaf-confirm.sql
+-- Meglévő telepítéshez: az ANAF-visszaigazolás oszlopok hozzáadása az order_uit_codes-hoz.
+-- (Friss telepítésnél a uit-migration.sql már tartalmazza ezeket.)
+-- Futtatás:  psql "$DATABASE_URL" -f db/uit-anaf-confirm.sql
+
+ALTER TABLE order_uit_codes ADD COLUMN IF NOT EXISTS anaf_confirmed    BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE order_uit_codes ADD COLUMN IF NOT EXISTS anaf_confirmed_at TIMESTAMPTZ;
+
+-- Beérkező megrendelések (db/inbound-orders-migration.sql)
+-- db/inbound-orders-migration.sql
+-- Beérkező megrendelések (e-mail → OCR/AI → mezők) staging tábla.
+-- A jóváhagyott megrendelésből valódi orders rekord lesz (status 'Disponibil' vagy 'Alocat').
+-- Futtatás:  psql "$DATABASE_URL" -f db/inbound-orders-migration.sql
+
+CREATE TABLE IF NOT EXISTS inbound_orders (
+    id            SERIAL PRIMARY KEY,
+    company_id    INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    source_email  TEXT,                 -- feladó
+    subject       TEXT,
+    received_at   TIMESTAMPTZ,
+    message_uid   TEXT,                 -- IMAP UID (duplikátum-szűrés)
+    raw_text      TEXT,                 -- a levél/PDF kinyert szövege
+    pdf_name      TEXT,
+    pdf_data      BYTEA,                -- az eredeti melléklet (megnyitáshoz)
+    extracted     JSONB DEFAULT '{}',   -- AI/heurisztika által kiolvasott mezők
+    confidence    NUMERIC,              -- 0..1 (kiemeléshez)
+    ai_used       BOOLEAN DEFAULT FALSE,
+    status        TEXT NOT NULL DEFAULT 'new',  -- new | parsed | reviewed | approved | rejected
+    created_order_id VARCHAR(20),       -- a létrejött orders.id (jóváhagyás után)
+    created_at    TIMESTAMPTZ DEFAULT now(),
+    updated_at    TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (company_id, message_uid)
+);
+
+CREATE INDEX IF NOT EXISTS idx_inbound_company_status ON inbound_orders (company_id, status, received_at DESC);
+
+-- Branding (logó), e-mail sablonok, kliens-e-mail napló (db/email-branding-migration.sql)
+-- db/email-branding-migration.sql
+-- Cég-logó (branding), e-mail sablonok, és kimenő kliens-e-mailek naplója.
+-- Futtatás:  psql "$DATABASE_URL" -f db/email-branding-migration.sql
+
+-- Cégenkénti logó (most az e-mail fejlécbe; később a dokumentumokra is)
+CREATE TABLE IF NOT EXISTS company_branding (
+    company_id  INTEGER PRIMARY KEY REFERENCES companies(id) ON DELETE CASCADE,
+    logo_base64 TEXT,                 -- data nélkül, tiszta base64
+    logo_mime   TEXT DEFAULT 'image/png',
+    updated_at  TIMESTAMPTZ DEFAULT now()
+);
+
+-- E-mail sablonok (cégenként, kezdetben üres; a felhasználó viszi be)
+CREATE TABLE IF NOT EXISTS email_templates (
+    id          SERIAL PRIMARY KEY,
+    company_id  INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    subject     TEXT,
+    body        TEXT,                 -- {{client}}, {{ref}}, {{loc_incarcare}}, {{loc_descarcare}}, {{pret}}, {{order_id}}
+    created_by  INTEGER,
+    created_at  TIMESTAMPTZ DEFAULT now(),
+    updated_at  TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_email_templates_company ON email_templates (company_id);
+
+-- Kimenő kliens-e-mailek naplója (beszélgetés-előzmény)
+CREATE TABLE IF NOT EXISTS client_emails (
+    id               SERIAL PRIMARY KEY,
+    company_id       INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    inbound_order_id INTEGER,
+    order_id         VARCHAR(20),
+    to_email         TEXT NOT NULL,
+    subject          TEXT,
+    body             TEXT,
+    status           TEXT DEFAULT 'sent',  -- sent | error
+    error_message    TEXT,
+    sent_by          INTEGER,
+    sent_at          TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_client_emails_company ON client_emails (company_id, sent_at DESC);

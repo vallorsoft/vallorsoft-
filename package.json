@@ -24,7 +24,11 @@
     "pg": "^8.21.0",
     "qrcode": "^1.5.4",
     "speakeasy": "^2.0.0",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "imapflow": "^1.0.171",
+    "mailparser": "^3.7.1",
+    "pdf-parse": "^1.1.1",
+    "tesseract.js": "^5.1.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
