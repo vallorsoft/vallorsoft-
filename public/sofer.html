@@ -32,22 +32,6 @@
 
   <!-- ====== FŐOLDAL ====== -->
   <div class="pane-sofer" id="sec-dash">
-    <!-- MŰSZAK GYORS-KÁRTYA -->
-    <div style="padding:12px 0 6px;">
-    <div id="shiftBanner" class="shift-card" onclick="goSec('shift')">
-      <div class="sc-row">
-        <div>
-          <div class="sc-label" id="scLabel">Betöltés...</div>
-          <div class="sc-timer" id="scTimer">—</div>
-        </div>
-        <div class="sc-ico" id="scIco">🕐</div>
-      </div>
-      <div class="sc-sub" id="scSub">Koppints a műszak kezeléséhez</div>
-      <div class="eu-wrap" id="scEuWrap" style="display:none;">
-        <div class="eu-fill" id="scEuFill" style="width:0%"></div>
-      </div>
-    </div>
-    </div>
     <div class="sofer-grid">
       <div class="big-card red" onclick="goSec('border')">
         <span class="ico">🛂</span><span>Határátlépés</span>
@@ -217,107 +201,6 @@
           onkeydown="if(event.key==='Enter')chatSend()">
         <button onclick="chatSend()" style="padding:10px 18px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;font-weight:700;cursor:pointer;font-size:18px;">➤</button>
       </div>
-    </div>
-  </div>
-
-   <!-- ====== MŰSZAK / MUNKAIDŐ ====== -->
-  <div class="pane-sofer hidden" id="sec-shift">
-    <div class="sec-title">
-      <button class="back-btn" onclick="goSec('dash')">←</button>
-      <h3>🕐 Műszak</h3>
-    </div>
- 
-    <!-- Státusz kártya + timer -->
-    <div class="shift-stat-card" id="shiftStatCard">
-      <div class="sc-label" id="shiftSecLabel">—</div>
-      <div class="ssc-top">
-        <div class="ssc-timer" id="shiftSecTimer">—</div>
-        <div class="ssc-right">
-          <div class="ssc-week-label" id="shiftWeekLabel"></div>
-          <div class="ssc-week-val"   id="shiftWeekVal"></div>
-        </div>
-      </div>
-      <div class="eu-wrap" id="shiftSecEuWrap" style="display:none;">
-        <div class="eu-fill" id="shiftSecEuFill" style="width:0%"></div>
-      </div>
-      <div class="eu-legend" id="shiftEuLegend" style="display:none;">
-        <span>0ó</span><span>11ó ⚠</span><span>15ó 🔴</span>
-      </div>
-    </div>
- 
-    <!-- Akció gombok (JS rendereli) -->
-    <div class="sh-actions" id="shiftActions"></div>
- 
-    <!-- Szünet "Elindultál?" panel -->
-    <div class="sh-pause-panel" id="shiftPausePanel" style="display:none;">
-      <div class="sh-pause-title">⏰ Elindultál már?</div>
-      <button class="sh-btn resume" style="width:100%;margin-bottom:10px;" onclick="shiftResume()">
-        ✅ Igen, elindultam
-      </button>
-      <div style="font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px;">
-        Nem — emlékeztess X óra múlva:
-      </div>
-      <div class="snooze-grid">
-        <button class="snooze-btn" onclick="shiftSnooze(1)">1ó</button>
-        <button class="snooze-btn" onclick="shiftSnooze(2)">2ó</button>
-        <button class="snooze-btn" onclick="shiftSnooze(3)">3ó</button>
-        <button class="snooze-btn" onclick="shiftSnooze(4)">4ó</button>
-        <button class="snooze-btn" onclick="shiftSnooze(5)">5ó</button>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
-        <input class="input" type="number" id="snoozeCustomH" min="1" max="12" value="6" inputmode="numeric" style="width:70px;text-align:center;font-size:18px;font-weight:700;padding:8px;">
-        <span style="color:var(--muted);font-size:13px;">óra</span>
-        <button class="snooze-btn" style="flex:1;" onclick="shiftSnooze(parseInt(document.getElementById('snoozeCustomH').value)||1)">Emlékeztess</button>
-      </div>
-    </div>
- 
-    <!-- Pihenő választó (NAP ZÁRÁSA után) -->
-    <div class="sh-rest-panel" id="shiftRestPanel" style="display:none;">
-      <div class="sh-rest-title">Válassz pihenő típust</div>
- 
-      <!-- Gyors gombok: EU preset -->
-      <div class="rest-grid-4">
-        <button class="rest-btn" onclick="shiftRest('9h')">🟡 9ó<br><small style="font-weight:500;font-size:11px;">Rövid napi</small></button>
-        <button class="rest-btn" onclick="shiftRest('11h')">🟢 11ó<br><small style="font-weight:500;font-size:11px;">Normál napi</small></button>
-        <button class="rest-btn" onclick="shiftRest('24h')">🔵 24ó<br><small style="font-weight:500;font-size:11px;">Heti csökkentett</small></button>
-        <button class="rest-btn" onclick="shiftRest('45h')">🟣 45ó<br><small style="font-weight:500;font-size:11px;">Heti teljes</small></button>
-      </div>
- 
-      <!-- Egyedi egész órák -->
-      <div class="sh-rest-title" style="margin-top:4px;">Egyedi (egész óra)</div>
-      <div class="rest-grid-8">
-        <button class="rest-btn" onclick="shiftRest('custom',1)">1ó</button>
-        <button class="rest-btn" onclick="shiftRest('custom',2)">2ó</button>
-        <button class="rest-btn" onclick="shiftRest('custom',3)">3ó</button>
-        <button class="rest-btn" onclick="shiftRest('custom',4)">4ó</button>
-        <button class="rest-btn" onclick="shiftRest('custom',5)">5ó</button>
-        <button class="rest-btn" onclick="shiftRest('custom',6)">6ó</button>
-        <button class="rest-btn" onclick="shiftRest('custom',7)">7ó</button>
-        <button class="rest-btn" onclick="shiftRest('custom',8)">8ó</button>
-      </div>
- 
-      <!-- Szabadság: dátum + óra -->
-      <div class="sh-rest-title" style="margin-top:4px;">🏖 Szabadság — visszatérés dátuma</div>
-      <div class="g2" style="margin-bottom:10px;">
-        <div class="field">
-          <label>Dátum</label>
-          <input class="input" type="date" id="vacDate">
-        </div>
-        <div class="field">
-          <label>Óra (0–23)</label>
-          <input class="input" type="number" id="vacHour" min="0" max="23" value="6" inputmode="numeric">
-        </div>
-      </div>
-      <button class="submit-btn" onclick="shiftVacation()" style="margin-top:0;">
-        🏖 Szabadság mentése
-      </button>
-    </div>
- 
-    <!-- Heti zárolás panel -->
-    <div class="sh-locked-panel" id="shiftLockedPanel" style="display:none;">
-      <div class="sh-locked-ico">🔒</div>
-      <div class="sh-locked-title">Heti zárolás aktív</div>
-      <div class="sh-locked-text" id="shiftLockedText">—</div>
     </div>
   </div>
 

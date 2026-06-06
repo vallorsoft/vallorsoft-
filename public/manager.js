@@ -38,7 +38,6 @@ function loadTab(name){
     if(name==='vehicles') loadVehicles();
     if(name==='external-drivers') loadExtDrivers();
     if(name==='signature') initAdminSigCanvas();
-  if(name==='shift-fleet') { loadShiftFleet(); loadDiurnaStats(); }
   if(name==='clients' && window.ClientsPage) ClientsPage.mount('clientsBox');
   }
 
@@ -860,178 +859,14 @@ document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(e
   });
 });
 
-// ============================================================
-// MŰSZAK FLOTTA STATISZTIKA — Manager dashboard
-// ============================================================
-var _sfWeekOffset = 0;
-var _sfData = null;
-var _sfPollInterval = null;
-var _sfDriverDetailModal = null; // jövőbeli részletes modal
- 
-function shiftFleetWeek(delta) {
-  var nw = _sfWeekOffset + delta;
-  if (nw < 0) return;       // jövőbe nem
-  if (nw > 52) return;      // 1 év max visszafelé
-  _sfWeekOffset = nw;
-  loadShiftFleet();
-}
- 
- 
-function renderShiftFleet(d) {
-  // Hét label
-  var lbl = document.getElementById('sfWeekLabel');
-  if (lbl) {
-    if (_sfWeekOffset === 0) {
-      lbl.textContent = 'Aktuális hét';
-    } else {
-      var ws = new Date(d.week_start);
-      var we = new Date(ws); we.setDate(we.getDate() + 6);
-      var fmt = function(dt){ return dt.toLocaleDateString('hu-HU', {month:'short', day:'numeric'}); };
-      lbl.textContent = fmt(ws) + ' – ' + fmt(we);
-    }
-  }
-  document.getElementById('sfNextWeek').disabled = (_sfWeekOffset === 0);
- 
-  // ── KPI ───────────────────────────────────────────────────
-  var k = d.kpi || {};
-  document.getElementById('sfKpiActive').textContent     = k.active_count || 0;
-  document.getElementById('sfKpiPaused').textContent     = k.paused_count || 0;
-  document.getElementById('sfKpiRest').textContent       = k.rest_count || 0;
-  document.getElementById('sfKpiVacation').textContent   = k.vacation_count || 0;
-  document.getElementById('sfKpiActiveSub').textContent  = (k.total_drivers || 0) + ' sofőrből';
-  document.getElementById('sfKpiRestSub').textContent    = (k.locked_count || 0) + ' zárolt';
- 
-  // ── Compliance grafikon (bar chart) ───────────────────────
-  renderComplianceChart(d.compliance || []);
- 
-  // ── Pihenő átlagok grafikon (bar chart) ───────────────────
-  renderRestChart(d.rest_avg || []);
- 
-  // ── Flotta státusz tábla ──────────────────────────────────
-  renderFleetTable(d.fleet_status || []);
- 
-  // ── Compliance tábla ──────────────────────────────────────
-  renderComplianceTable(d.compliance || []);
- 
-  // ── Túllépés riasztások ───────────────────────────────────
-  renderOvertimeAlerts(d.overtime_alerts || []);
-}
- 
-function renderComplianceChart(comp) {
-  var ctx = document.getElementById('sfChartCompliance');
-  if (!ctx || typeof Chart === 'undefined') return;
-  if (ctx._chart) ctx._chart.destroy();
- 
-  // Color-kód: piros 80% felett, sárga 60-80%, zöld alatta
-  var bgColors = comp.map(function(c){
-    var pct = parseFloat(c.weekly_hours) / 90 * 100;
-    return pct >= 80 ? 'rgba(239,68,68,0.7)'
-         : pct >= 60 ? 'rgba(245,158,11,0.7)'
-         : 'rgba(34,197,94,0.7)';
-  });
- 
-  ctx._chart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: comp.map(function(c){ return c.nume; }),
-      datasets: [{
-        label: 'óra',
-        data: comp.map(function(c){ return parseFloat(c.weekly_hours) || 0; }),
-        backgroundColor: bgColors,
-        borderColor: '#1f2937',
-        borderWidth: 1
-      }]
-    },
-    options: {
-      indexAxis: 'y',
-      plugins: { legend: { display: false },
-                 tooltip: { callbacks: { label: function(c){ return c.parsed.x + ' óra'; } } } },
-      scales: {
-        x: { ticks: { color: '#8a97a8' },
-             title: { display: true, text: 'óra (max 90)', color: '#8a97a8' },
-             max: 100 },
-        y: { ticks: { color: '#8a97a8' } }
-      }
-    }
-  });
-}
- 
- 
-function renderFleetTable(fleet) {
-  var tb = document.getElementById('sfFleetTblBody');
-  if (!fleet.length) {
-    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">Nincs sofőr.</td></tr>';
-    return;
-  }
-  tb.innerHTML = fleet.map(function(f){
-    var statusBadge = renderStatusBadge(f.status, f.rest_type);
-    var current = f.current_active_hours
-      ? parseFloat(f.current_active_hours).toFixed(1) + ' ó'
-      : (f.next_shift_start ? '↪ ' + new Date(f.next_shift_start).toLocaleString('hu-HU',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—');
-    var weekIdx = f.shift_index_in_week || 0;
-    var weekH = parseFloat(f.weekly_hours_total || 0).toFixed(1);
-    var note = '';
-    if (f.locked_until && new Date(f.locked_until) > new Date()) {
-      note = '🔒 zárolva ' + new Date(f.locked_until).toLocaleString('hu-HU',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) + '-ig';
-    } else if (f.is_overtime) {
-      note = '<span style="color:#ef4444;">⚠️ túlóra</span>';
-    } else if (f.status === 'PAUSED' && f.paused_at) {
-      var pmin = Math.floor((Date.now() - new Date(f.paused_at).getTime()) / 60000);
-      note = '⏰ ' + pmin + ' perce szünetel';
-    }
-    return '<tr>' +
-      '<td><b style="color:#fff;">' + esc(f.nume) + '</b><br><span style="font-size:11px;color:var(--muted);">' + esc(f.email) + '</span></td>' +
-      '<td>' + statusBadge + '</td>' +
-      '<td>' + current + '</td>' +
-      '<td>' + (weekIdx ? weekIdx + '. nap' : '—') + '</td>' +
-      '<td>' + weekH + ' ó</td>' +
-      '<td style="font-size:12px;">' + note + '</td>' +
-    '</tr>';
-  }).join('');
-}
- 
- 
- 
-function renderOvertimeAlerts(alerts) {
-  var el = document.getElementById('sfOvertimeList');
-  if (!alerts.length) {
-    el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:14px;">' +
-                   'Nincs túllépés az utolsó 14 napban. ✅</div>';
-    return;
-  }
-  el.innerHTML = alerts.map(function(a){
-    var day = new Date(a.day_started_at).toLocaleDateString('hu-HU');
-    var reason = a.overtime_reason ? esc(a.overtime_reason) : 'Indok nincs megadva';
-    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;' +
-           'padding:10px 14px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.3);' +
-           'border-radius:10px;margin-bottom:6px;flex-wrap:wrap;">' +
-             '<div>' +
-               '<b style="color:#fff;">' + esc(a.nume) + '</b> · ' +
-               '<span style="color:var(--muted);font-size:12px;">' + day + '</span>' +
-               '<div style="font-size:11px;color:var(--muted);margin-top:2px;">' + reason + '</div>' +
-             '</div>' +
-             '<div style="color:#f87171;font-weight:800;font-size:15px;">' + parseFloat(a.active_hours).toFixed(1) + ' ó</div>' +
-           '</div>';
-  }).join('');
-}
- 
-function sfDriverDrillDown(driverId, nume) {
-  // Egyelőre toast — későbbi modal implementáció helye
-  // (a /api/shift/stats?driver_id=X&week_offset=Y endpoint kész és működik)
-  toast('Részletes nézet (' + nume + ') — fejlesztés alatt.', 'ok');
-}
  
 // Polling indítás: 30 másodpercenként frissül a flotta státusz amíg az aktuális tab
  
 // HTML escape (XSS védelem inline render-eknél)
 
-// ── Diurna statisztika ──────────────────────────────────────
-var _diurnaCache = [];
 
 // ── Dokumentum széria konfigurátor ───────────────────────
 
  
-// Polling automatikus indítása page load után
-window.addEventListener('load', function(){ sfStartPoll(); });
 
 
