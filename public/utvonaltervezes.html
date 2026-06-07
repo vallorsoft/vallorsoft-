@@ -50,6 +50,19 @@
     .main-content[data-theme="light"] .rp-veh,
     .main-content[data-theme="light"] .rp-gps-box { background:rgba(0,0,0,0.02); }
     .main-content[data-theme="light"] .rp-ac-dd { background:#fff; }
+    /* HERE prémium funkciók panel */
+    .here-panel-content { max-height:0; overflow:hidden; transition:max-height 0.3s ease; }
+    .here-panel-content.open { max-height:2000px; }
+    .rp-pf { border:1px solid var(--border); border-radius:var(--radius-md); padding:12px; margin-bottom:8px; background:rgba(255,255,255,0.02); }
+    .rp-pbar { height:7px; border-radius:6px; background:rgba(255,255,255,0.10); overflow:hidden; margin-top:8px; }
+    .rp-pbar > i { display:block; height:100%; border-radius:6px; }
+    .fsw { position:relative; display:inline-block; width:42px; height:24px; cursor:pointer; flex-shrink:0; }
+    .fsw input { opacity:0; width:0; height:0; }
+    .fsw-s { position:absolute; inset:0; background:rgba(255,255,255,0.12); border:1px solid var(--border-bright); border-radius:24px; transition:.2s; }
+    .fsw-s:before { content:''; position:absolute; height:18px; width:18px; left:3px; top:2px; background:#94a3b8; border-radius:50%; transition:.2s; }
+    .fsw input:checked + .fsw-s { background:rgba(34,197,94,0.3); border-color:rgba(34,197,94,0.6); }
+    .fsw input:checked + .fsw-s:before { transform:translateX(18px); background:var(--status-ok); }
+    .fsw input:disabled + .fsw-s { opacity:.5; cursor:not-allowed; }
   </style>
 </head>
 <body>
@@ -145,6 +158,21 @@
       <div class="glass stat-tile"><div class="stat-ico">⛽</div><div><div class="stat-val text-primary" id="rpFuel">—</div><div class="stat-lbl text-muted">Becsült fogyasztás</div></div></div>
     </div>
     <div id="rpLegs"></div>
+    <div id="rpPremiumResult" style="margin-top:6px;"></div>
+  </div>
+
+  <!-- HERE prémium funkciók — összecsukható, az oldal alján -->
+  <div class="glass rp-card" id="rpPremiumPanel">
+    <div class="here-panel-head" onclick="rpTogglePremiumPanel()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:10px;">
+      <div>
+        <div class="rp-sec-title" style="margin-bottom:2px;color:#a855f7;">🗺 HERE Térkép szolgáltatások</div>
+        <div class="text-muted" style="font-size:12px;">Havi használat és díjak</div>
+      </div>
+      <span id="rpPremiumChevron" style="color:#a855f7;font-size:16px;flex-shrink:0;">▼</span>
+    </div>
+    <div class="here-panel-content" id="rpPremiumContent">
+      <div id="rpPremiumList" style="padding-top:12px;"><div class="text-muted" style="font-size:12px;">Betöltés...</div></div>
+    </div>
   </div>
 
 </div>
@@ -435,7 +463,11 @@ function rpPlan(){
   gas('calculateRoute',[{ tractorId:selTractor.id, trailerId:selTrailer?selTrailer.id:null, params:rpCollectParams(), waypoints:rpBuildWaypoints() }])
   .then(function(r){
     sp.style.display='none'; rpUpdatePlanBtn();
-    if(!r||!r.ok){ toast((r&&r.err)||'Nem sikerült az útvonaltervezés','err'); return; }
+    if(!r||!r.ok){
+      var m=(r&&r.err)||'Nem sikerült az útvonaltervezés';
+      if(/429|too many|limit/i.test(m)) m='HERE API limit elérve — funkció ideiglenesen nem elérhető';
+      toast(m,'err'); return;
+    }
     rpDrawRoute(r);
   }).catch(function(){ sp.style.display='none'; rpUpdatePlanBtn(); toast('Hálózati hiba az útvonaltervezésnél','err'); });
 }
@@ -508,10 +540,76 @@ function rpDrawRoute(r){
       + ' tartalmaz — a térképen <span style="color:#ff2d55;font-weight:700;">pirossal kiemelve ⛔</span>. Csak indokolt esetben, engedéllyel közlekedj ott.<br>'
       + '<span style="font-size:12px;opacity:.9;">'+detail.join(' · ')+'</span>';
   } else { warn.style.display='none'; warn.innerHTML=''; }
+
+  // a HERE szolgáltatások panel frissítése (a geocode + routing tranzakciók most naplózódtak)
+  rpLoadPremium();
+}
+
+// ───────── HERE Térkép szolgáltatások panel (havi használat + díj) ─────────
+var HERE_ICONS={autocomplete:'🔍',geocode:'📍',raster_tile:'🗺',routing_truck:'🚛'};
+function rpLoadPremium(){
+  gas('getMyHereUsage').then(function(r){
+    var box=document.getElementById('rpPremiumList'); if(!box) return;
+    if(!r||!r.ok){ box.innerHTML='<div class="text-muted" style="font-size:12px;">Nem elérhető.</div>'; return; }
+    var used=r.free_pool_used||0, total=r.free_pool_total||1000, rem=r.free_pool_remaining||0;
+    var pct=Math.min(100, Math.round((used/total)*100));
+    var barColor=pct>=100?'#ef4444':pct>=80?'#f59e0b':'#22c55e';
+    var poolFoot = rem>0
+      ? '<div class="text-muted" style="font-size:11px;margin-top:4px;">Maradék: <b>'+rem+'</b> ingyenes tranzakció</div>'
+      : '<div style="font-size:11px;margin-top:4px;color:#ef4444;font-weight:700;">⚠ Ingyenes keret elfogyott — további használat díjköteles</div>';
+    var html='<div class="rp-pf">'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;"><span class="text-primary" style="font-weight:700;">🎁 Ingyenes keret</span><span class="text-muted">'+used+' / '+total+' trz</span></div>'
+      +'<div class="rp-pbar" style="margin-top:6px;"><i style="width:'+pct+'%;background:'+barColor+';"></i></div>'
+      +poolFoot+'</div>';
+    (r.services||[]).forEach(function(s){
+      var ic=HERE_ICONS[s.feature_key]||'⚡';
+      var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
+        +'<div><div class="text-primary" style="font-weight:700;font-size:13px;">'+ic+' '+esc(s.display_name)+'</div>'
+        +'<div class="text-muted" style="font-size:12px;">'+esc(s.description||'')+'</div></div>'
+        +'<span class="text-muted" style="font-size:12px;white-space:nowrap;">'+s.total_used+' trz</span></div>';
+      var body;
+      if((s.billable_trx||0)<=0){
+        body='<div style="margin-top:6px;font-size:12px;color:#22c55e;">✅ Ingyenes keretből fedezve &nbsp; €0.00</div>';
+      } else {
+        body='<div class="text-muted" style="margin-top:6px;font-size:12px;">'+Number(s.price_eur).toFixed(2)+' € / 1000 trz &nbsp;·&nbsp; '+s.billable_trx+' fizetős trz = '+s.units+'×1000 egység</div>'
+          +'<div style="font-size:12px;margin-top:2px;color:#ef4444;font-weight:700;">Nettó: €'+s.net_eur+' &nbsp; ÁFA(21%): €'+s.vat_eur+' &nbsp; Bruttó: €'+s.gross_eur+'</div>';
+      }
+      html+='<div class="rp-pf">'+head+body+'</div>';
+    });
+    var anyBillable=(r.services||[]).some(function(s){return (s.billable_trx||0)>0;});
+    if(!anyBillable){
+      html+='<div class="rp-pf" style="text-align:center;"><div class="text-primary" style="font-size:13px;">Ez a hónap: teljes használat <b style="color:#22c55e;">ingyenes</b></div><div class="text-muted" style="font-size:12px;margin-top:2px;">Becsült díj: €0.00</div></div>';
+    } else {
+      var rowsH=(r.services||[]).filter(function(s){return (s.billable_trx||0)>0;}).map(function(s){
+        return '<div class="text-muted" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;"><span>'+esc(s.display_name)+' ('+s.billable_trx+' trz)</span><span>€'+s.net_eur+' / €'+s.gross_eur+'</span></div>';
+      }).join('');
+      html+='<div class="rp-pf"><div class="text-primary" style="font-weight:700;font-size:12px;margin-bottom:4px;">Összesítő (nettó / bruttó)</div>'+rowsH
+        +'<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;color:#a855f7;"><span>VÉGÖSSZEG</span><span>€'+r.total_net_eur+' / €'+r.total_gross_eur+'</span></div></div>';
+    }
+    box.innerHTML=html;
+  });
+}
+function rpTogglePremiumPanel(){
+  var c=document.getElementById('rpPremiumContent');
+  var ch=document.getElementById('rpPremiumChevron');
+  if(!c) return;
+  var open=c.classList.toggle('open');
+  if(ch) ch.textContent=open?'▲':'▼';
+  try{ localStorage.setItem('vs-here-panel', open?'open':'closed'); }catch(e){}
+}
+function rpInitPremiumPanel(){
+  var c=document.getElementById('rpPremiumContent');
+  var ch=document.getElementById('rpPremiumChevron');
+  if(!c) return;
+  var saved='closed';
+  try{ saved=localStorage.getItem('vs-here-panel')||'closed'; }catch(e){}
+  if(saved==='open'){ c.classList.add('open'); if(ch) ch.textContent='▲'; }
+  else { c.classList.remove('open'); if(ch) ch.textContent='▼'; }
 }
 
 // ───────── Indítás ─────────
 rpSyncThemeIcon();
+rpInitPremiumPanel();
 attachAutocomplete(document.getElementById('rpLoading'), document.getElementById('rpLoadingDD'));
 attachAutocomplete(document.getElementById('rpUnloading'), document.getElementById('rpUnloadingDD'));
 gas('authMe').then(function(u){ if(!u){ window.location.href='/login'; return; }
@@ -519,7 +617,7 @@ gas('authMe').then(function(u){ if(!u){ window.location.href='/login'; return; }
 fetch('/api/here-config',{credentials:'same-origin'}).then(function(r){return r.ok?r.json():{};})
   .then(function(cfg){ rpHereKey=(cfg&&cfg.apiKey)||null; })
   .catch(function(){ rpHereKey=null; })
-  .finally(function(){ rpInitMap(); rpLoadOrders(); rpLoadVehicles(); });
+  .finally(function(){ rpInitMap(); rpLoadOrders(); rpLoadVehicles(); rpLoadPremium(); });
 </script>
 </body>
 </html>

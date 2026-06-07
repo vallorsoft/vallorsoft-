@@ -6,6 +6,7 @@ const express = require('express');
 const router = express.Router();
 const { requireLogin } = require('../middleware/auth');
 const fbAdmin = require('../services/firebase');
+const { logHereTransaction } = require('../lib/hereUsage');
 
 router.get('/api/firebase-config', requireLogin, (req, res) => {
   const pozicio = req.session.user.pozicio;
@@ -27,7 +28,10 @@ router.get('/api/firebase-config', requireLogin, (req, res) => {
 // HERE Maps kliens-konfiguracio — csak az API kulcsot adja vissza a terkep-csempekhez.
 // A kulcs SOHA nem kerul kozvetlenul HTML-be/kliens JS-be, csak innen toltodik.
 router.get('/api/here-config', requireLogin, (req, res) => {
-  res.json({ apiKey: process.env.HERE_API_KEY || null });
+  const apiKey = process.env.HERE_API_KEY || null;
+  // Térkép betöltés -> becsült raster_tile használat (átlag 20 csempe / betöltés)
+  if (apiKey) logHereTransaction('raster_tile', 20, req.session.user.company_id, req.session.user.id);
+  res.json({ apiKey });
 });
 
 // HERE cim-autocomplete (proxy) — a kulcs szerver oldalon marad.
@@ -44,6 +48,7 @@ router.get('/api/here-autocomplete', requireLogin, async (req, res) => {
       label: (it.address && it.address.label) || it.title || '',
       title: it.title || '',
     })).filter((it) => it.label);
+    logHereTransaction('autocomplete', 1, req.session.user.company_id, req.session.user.id);
     res.json({ items });
   } catch (e) {
     res.json({ items: [] });

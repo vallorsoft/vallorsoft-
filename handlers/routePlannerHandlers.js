@@ -13,6 +13,7 @@
 const pool = require('../db');
 const ctSvc = require('../services/cargotrack');
 const { decrypt } = require('../lib/crypto');
+const { logHereTransaction } = require('../lib/hereUsage');
 
 const HERE_TIMEOUT_MS = 15000;
 
@@ -64,6 +65,18 @@ async function hereGet(url) {
   } finally {
     clearTimeout(t);
   }
+}
+
+// Opcionális HERE-hívás: hiba/429/megszűnt végpont esetén null (nem dob).
+async function fetchJsonSafe(url) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) { return null; }
+  finally { clearTimeout(t); }
 }
 
 // --- CargoTrack kulcs + object_id feloldás (élő GPS-hez) ---
@@ -197,6 +210,7 @@ handlers.calculateRoute = async function (req, res, args) {
     if (!apiKey) return res.json({ result: { ok: false, err: 'A HERE_API_KEY nincs beállítva a szerveren.' } });
 
     const cid = req.session.user.company_id;
+    const uid = req.session.user.id;
     if (await routeFeatureOff(cid)) {
       return res.json({ result: { ok: false, err: 'Az útvonaltervezés nincs előfizetve ennél a cégnél.' } });
     }
@@ -222,11 +236,12 @@ handlers.calculateRoute = async function (req, res, args) {
     //    értékek (HERE v8 a végső kombinált méreteket/súlyt várja; nem összegzünk!).
     const cp = (a.params && typeof a.params === 'object') ? a.params : {};
 
-    // 3) Geocoding a koordináta nélküli pontokra
+    // 3) Geocoding a koordináta nélküli pontokra (minden hívás = 1 'geocode' tranzakció)
     const geocode = async (addr) => {
       const url = 'https://geocode.search.hereapi.com/v1/geocode?q=' +
         encodeURIComponent(addr) + '&lang=ro&apiKey=' + encodeURIComponent(apiKey);
       const data = await hereGet(url);
+      logHereTransaction('geocode', 1, cid, uid);
       const item = (data.items || [])[0];
       if (!item || !item.position) {
         const e = new Error('Nem található koordináta ehhez a címhez: ' + addr);
@@ -276,6 +291,7 @@ handlers.calculateRoute = async function (req, res, args) {
     params.push('apiKey=' + encodeURIComponent(apiKey));
 
     const routeData = await hereGet('https://router.hereapi.com/v8/routes?' + params.join('&'));
+    logHereTransaction('routing_truck', 1, cid, uid);
     const route = (routeData.routes || [])[0];
     if (!route || !route.sections || !route.sections.length) {
       return res.json({ result: { ok: false, err: 'Nem található útvonal a megadott pontok között.' } });

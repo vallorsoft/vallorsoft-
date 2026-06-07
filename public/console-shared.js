@@ -1010,21 +1010,9 @@ function uploadOrderDoc(){
 //  Mind az admin, mind a manager konzol ezt használja.
 // ============================================================
 
-/* ── HERE Maps konfiguráció + csempe-URL (a kulcs a szerverről jön) ── */
-function getHereConfig() {
-  if (window._hereCfgPromise) return window._hereCfgPromise;
-  window._hereCfgPromise = fetch('/api/here-config', { credentials: 'same-origin' })
-    .then(function (r) { return r.ok ? r.json() : {}; })
-    .catch(function () { return {}; });
-  return window._hereCfgPromise;
-}
-function hereTileUrl(theme, apiKey) {
-  // HERE Raster Tile API v3 (a v2.1 maptile API le lett kapcsolva).
-  var style = (theme === 'light') ? 'explore.day' : 'explore.night';
-  return 'https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png?style=' + style +
-    '&size=512&apiKey=' + apiKey;
-}
-// CartoDB tartalék, ha nincs HERE kulcs (a térkép ne maradjon üres)
+/* ── Térkép-csempe URL (OpenStreetMap / CartoDB — ingyenes, NINCS HERE kulcs) ── */
+// A vezérlőpult térképe nem használ HERE-t és nem hívja a /api/here-config-ot.
+// HERE Maps csak a külön Útvonaltervező oldalon (utvonaltervezes.html) van.
 function cartoTileUrl(theme) {
   return theme === 'light'
     ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
@@ -1039,11 +1027,9 @@ function toggleTheme() {
   mc.setAttribute('data-theme', next);
   try { localStorage.setItem('vs-theme', next); } catch (e) {}
   syncThemeToggleIcon();
-  // Térkép-csempék cseréje a témához (HERE, vagy CartoDB tartalék)
+  // Térkép-csempék cseréje a témához (CartoDB / OpenStreetMap)
   if (window._dashMap && window._dashTileLayer) {
-    window._dashTileLayer.setUrl(window._hereApiKey
-      ? hereTileUrl(next, window._hereApiKey)
-      : cartoTileUrl(next));
+    window._dashTileLayer.setUrl(cartoTileUrl(next));
   }
 }
 
@@ -1161,21 +1147,9 @@ function initDashMap() {
     .setView([45.9432, 24.9668], 7);                  // Románia közepe
   window._dashMarkers = L.layerGroup().addTo(window._dashMap);
 
-  // HERE csempék (a kulcs a /api/here-config-ról); ha nincs kulcs -> CartoDB tartalék.
-  getHereConfig().then(function (cfg) {
-    var key = (cfg && cfg.apiKey) || null;
-    window._hereApiKey = key;
-    if (window._dashTileLayer && window._dashMap) window._dashMap.removeLayer(window._dashTileLayer);
-    window._dashTileLayer = key
-      ? L.tileLayer(hereTileUrl(theme, key),
-          { attribution: '© HERE Technologies', maxZoom: 20, tileSize: 512, zoomOffset: -1 })
-      : L.tileLayer(cartoTileUrl(theme),
-          { attribution: '© CARTO', maxZoom: 19, subdomains: 'abcd' });
-    if (window._dashMap) {
-      window._dashTileLayer.addTo(window._dashMap);
-      window._dashMap.invalidateSize();
-    }
-  });
+  // OpenStreetMap (CartoDB) csempék — ingyenes, nincs HERE kulcs ezen az oldalon.
+  window._dashTileLayer = L.tileLayer(cartoTileUrl(theme),
+    { attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(window._dashMap);
 
   // A térkép gyakran üresen marad, ha induláskor a konténer mérete még nem véglegesült.
   // Több ütemezett invalidateSize + ablakméret-figyelő biztosítja a csempék kirajzolását.

@@ -95,6 +95,9 @@
     <div class="dev-tab active" onclick="showPane('dash')">📊 Áttekintés</div>
     <div class="dev-tab" onclick="showPane('cegek')">🏢 Cégek</div>
     <div class="dev-tab" onclick="showPane('userek')">👥 Felhasználók</div>
+    <div class="dev-tab" onclick="showPane('here')">⚡ HERE API</div>
+    <div class="dev-tab" onclick="showPane('integ')">💳 Integrációk</div>
+    <div class="dev-tab" onclick="showPane('elofiz')">📦 Előfizetések</div>
     <div style="margin-top:auto; padding-top:20px; border-top:1px solid var(--border);">
       <div id="devBadge" style="font-size:12px; color:var(--muted); margin-bottom:10px;">—</div>
       <button class="btn-danger-sm" style="width:100%;" onclick="logout()">Kilépés</button>
@@ -130,6 +133,52 @@
         <table class="table">
           <thead><tr><th>Név</th><th>Email</th><th>Pozíció</th><th>Cég</th><th>Státusz</th><th>Műveletek</th></tr></thead>
           <tbody id="devUserTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- HERE API FUNKCIÓK -->
+    <div class="dev-pane hidden" id="pane-here">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+        <div class="section-title" style="margin:0;">⚡ HERE API Funkciók</div>
+        <div id="hereTotalCost" style="font-size:14px;font-weight:800;color:#c084fc;">—</div>
+      </div>
+      <div class="glass" style="padding:0; overflow:hidden;">
+        <table class="table">
+          <thead><tr><th>Funkció</th><th>Státusz</th><th>Havi használat</th><th>Költség</th></tr></thead>
+          <tbody id="hereTbody"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
+        </table>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:10px;">🔄 Automatikus frissítés 30 másodpercenként. A költség az ingyenes limit feletti használatból számolódik.</div>
+
+      <div class="section-title" style="margin-top:26px;">Cégenkénti használat — felhasználói bontással (aktuális hónap)</div>
+      <div id="hereByCompany"><div style="color:var(--muted);font-size:13px;">Betöltés...</div></div>
+    </div>
+
+    <!-- INTEGRÁCIÓK (számlázó programok) -->
+    <div class="dev-pane hidden" id="pane-integ">
+      <div class="section-title">💳 Támogatott számlázó programok</div>
+      <div id="providerList" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;"><div style="color:var(--muted);font-size:13px;">Betöltés...</div></div>
+
+      <div class="section-title">Cégek számlázó integrációi</div>
+      <div class="glass" style="padding:0; overflow:hidden;">
+        <table class="table">
+          <thead><tr><th>Cég</th><th>Számlázó</th><th>Számlázás</th></tr></thead>
+          <tbody id="compBillingTbody"><tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ELŐFIZETÉSEK (csomagok + cég-hozzárendelés) -->
+    <div class="dev-pane hidden" id="pane-elofiz">
+      <div class="section-title">📦 Előfizetési csomagok</div>
+      <div id="planEditor"><div style="color:var(--muted);">Betöltés...</div></div>
+
+      <div class="section-title" style="margin-top:26px;">Cégek előfizetése</div>
+      <div class="glass" style="padding:0; overflow:hidden;">
+        <table class="table">
+          <thead><tr><th>Cég</th><th>Hozzárendelt csomag</th></tr></thead>
+          <tbody id="compPlanTbody"><tr><td colspan="2" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -194,6 +243,13 @@
   </div>
 </div>
 
+<!-- HERE SZÁMLA MODAL -->
+<div class="modal-back" id="invoiceModal">
+  <div class="dev-modal" style="width:min(560px,100%);">
+    <div id="invoiceModalBody">Betöltés...</div>
+  </div>
+</div>
+
 <script>
 function toast(m,k){var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(function(){e.remove();},3000);}
 function gas(fn,args){return new Promise(function(res,rej){fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({functionName:fn,arguments:args||[]})}).then(r=>r.json()).then(d=>{res(d.result);}).catch(rej);});}
@@ -205,6 +261,240 @@ function showPane(id) {
   if(id==='dash') loadDash();
   if(id==='cegek') loadCegek();
   if(id==='userek') loadUsers();
+  if(id==='here') loadHerePane();
+  if(id==='integ') loadIntegPane();
+  if(id==='elofiz') loadElofizPane();
+}
+
+/* ── Integrációk: számlázó programok + cégek számlázói ── */
+function loadIntegPane(){ loadProviders(); loadCompBilling(); }
+/* ── Előfizetések: csomagok + cég-hozzárendelés ── */
+function loadElofizPane(){ loadPlanEditor(); loadCompPlans(); }
+
+function loadProviders(){
+  gas('getAvailableProviders').then(function(list){
+    var el=document.getElementById('providerList'); if(!el) return;
+    list=list||[];
+    if(!list.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;">Nincs elérhető számlázó.</div>'; return; }
+    el.innerHTML=list.map(function(p){
+      var fields=(p.fields||[]).map(function(f){return f.label;}).join(', ');
+      return '<div style="border:1px solid rgba(168,85,247,0.3);background:rgba(168,85,247,0.06);border-radius:12px;padding:12px 16px;min-width:160px;">'
+        +'<div style="font-weight:800;color:#fff;font-size:14px;">'+escHtml(p.display_name)+'</div>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:4px;">'+escHtml(fields)+'</div></div>';
+    }).join('');
+  });
+}
+function loadCompPlans(){
+  Promise.all([gas('getCompaniesBillingOverview'),gas('getSubscriptionPlans')]).then(function(res){
+    var ov=res[0], pl=res[1]; var tb=document.getElementById('compPlanTbody'); if(!tb) return;
+    if(!ov||!ov.ok){ tb.innerHTML='<tr><td colspan="2" style="text-align:center;color:var(--err);padding:20px;">Nem elérhető.</td></tr>'; return; }
+    var plans=(pl&&pl.plans)||[];
+    tb.innerHTML=(ov.companies||[]).map(function(c){
+      var opts='<option value="">— Nincs —</option>'+plans.map(function(p){return '<option value="'+p.id+'"'+(c.subscription_plan_id===p.id?' selected':'')+'>'+escHtml(p.name)+'</option>';}).join('');
+      return '<tr><td><b style="color:#fff;">'+escHtml(c.nev)+'</b></td>'
+        +'<td><select class="select" style="max-width:200px;" onchange="setCompPlan('+c.id+',this.value)">'+opts+'</select></td></tr>';
+    }).join('');
+  });
+}
+function loadPlanEditor(){
+  gas('getSubscriptionPlans').then(function(r){
+    var el=document.getElementById('planEditor'); if(!el) return;
+    if(!r||!r.ok){ el.innerHTML='<div style="color:var(--err);">Nem elérhető.</div>'; return; }
+    el.innerHTML=(r.plans||[]).map(function(p){
+      var net=parseFloat(p.price_net)||0, vat=parseFloat(p.vat_percent)||21;
+      var brutto=net*(1+vat/100), afa=brutto-net;
+      return '<div class="ceg-card">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
+        +'<div class="ceg-name">'+p.id+' — '+escHtml(p.name)+'</div>'
+        +'<label class="fsw"><input type="checkbox" id="plActive_'+p.id+'" '+(p.is_active?'checked':'')+'><span class="fsw-s"></span></label></div>'
+        +'<div class="field"><label>Név</label><input class="input" id="plName_'+p.id+'" value="'+escHtml(p.name)+'"></div>'
+        +'<div class="field"><label>Leírás</label><input class="input" id="plDesc_'+p.id+'" value="'+escHtml(p.description||'')+'"></div>'
+        +'<div class="field"><label>Nettó ár (EUR/hó)</label><input class="input" id="plPrice_'+p.id+'" type="number" step="0.01" value="'+net.toFixed(2)+'" oninput="recalcPlan('+p.id+','+vat+')"></div>'
+        +'<div style="font-size:13px;color:var(--muted);margin-bottom:12px;">ÁFA ('+vat+'%): <span id="plVat_'+p.id+'">'+afa.toFixed(2)+'</span> EUR &nbsp;·&nbsp; Bruttó: <b style="color:#c084fc;" id="plGross_'+p.id+'">'+brutto.toFixed(2)+'</b> EUR</div>'
+        +'<button class="btn-dev" onclick="savePlan('+p.id+')">💾 Mentés</button>'
+        +'</div>';
+    }).join('');
+  });
+}
+function recalcPlan(id,vat){
+  var net=parseFloat(document.getElementById('plPrice_'+id).value)||0;
+  var brutto=net*(1+(vat||21)/100), afa=brutto-net;
+  var v=document.getElementById('plVat_'+id), g=document.getElementById('plGross_'+id);
+  if(v) v.textContent=afa.toFixed(2); if(g) g.textContent=brutto.toFixed(2);
+}
+function savePlan(id){
+  var f={id:id,
+    name:document.getElementById('plName_'+id).value.trim(),
+    description:document.getElementById('plDesc_'+id).value.trim(),
+    price_net:document.getElementById('plPrice_'+id).value,
+    is_active:document.getElementById('plActive_'+id).checked};
+  gas('updateSubscriptionPlan',[f]).then(function(r){ if(r&&r.ok){toast('Csomag mentve','ok');loadPlanEditor();}else{toast((r&&r.err)||'Hiba','err');} });
+}
+function loadCompBilling(){
+  gas('getCompaniesBillingOverview').then(function(ov){
+    var tb=document.getElementById('compBillingTbody'); if(!tb) return;
+    if(!ov||!ov.ok){ tb.innerHTML='<tr><td colspan="3" style="text-align:center;color:var(--err);padding:20px;">Nem elérhető.</td></tr>'; return; }
+    tb.innerHTML=(ov.companies||[]).map(function(c){
+      var since=c.billing_since?new Date(c.billing_since).toLocaleDateString('hu-HU'):'';
+      var billing = c.provider
+        ? escHtml(c.billing_name||c.provider)+' <button class="btn-dev" style="padding:3px 9px;font-size:11px;" onclick="viewCompBilling(\''+escHtml(c.billing_name||c.provider)+'\',\''+since+'\')">megtekintés</button>'
+        : '<span style="color:var(--muted);">—</span>';
+      var invBtn = c.provider
+        ? '<button class="btn-dev" onclick="openInvoiceModal('+c.id+')">🧾 Számla kiállítása</button>'
+        : '<button class="btn-dev" disabled title="Nincs beállítva számlázó (Admin/Manager állítja be)" style="opacity:.5;cursor:not-allowed;">🧾 nincs számlázó</button>';
+      return '<tr><td><b style="color:#fff;">'+escHtml(c.nev)+'</b></td>'
+        +'<td>'+billing+'</td>'
+        +'<td>'+invBtn+'</td></tr>';
+    }).join('');
+  });
+}
+function setCompPlan(cid,planId){
+  gas('setCompanyPlan',[{company_id:cid,plan_id:planId||null}]).then(function(r){ if(r&&r.ok){toast('Csomag módosítva','ok');}else{toast((r&&r.err)||'Hiba','err');} });
+}
+function viewCompBilling(name,since){
+  alert('💳 '+name+'\n\nBeállítva: '+(since||'—')+'\n\nA hitelesítő adatok titkosítva tárolódnak — developer számára sem láthatók.');
+}
+
+/* ── HERE szolgáltatási számla kiállítása ── */
+var _invCompanyId=null, _invLastPdf=null;
+function _invSpinner(txt){ return '<div style="text-align:center;padding:30px;color:var(--muted);"><span class="spinner" style="margin:0 auto 10px;width:26px;height:26px;"></span><div>'+txt+'</div></div>'; }
+function _invErr(msg){ return '<h3 style="color:var(--err);">❌ Hiba</h3><div style="font-size:13px;margin-bottom:16px;">'+escHtml(msg)+'</div><div class="row-btns"><button class="btn-danger-sm" style="flex:1;" onclick="closeInvoiceModal()">Bezárás</button></div>'; }
+function closeInvoiceModal(){ document.getElementById('invoiceModal').classList.remove('open'); }
+function openInvoiceModal(cid){
+  _invCompanyId=cid; _invLastPdf=null;
+  document.getElementById('invoiceModal').classList.add('open');
+  document.getElementById('invoiceModalBody').innerHTML=_invSpinner('Előnézet betöltése...');
+  gas('previewHereInvoice',[{company_id:cid}]).then(function(r){
+    var b=document.getElementById('invoiceModalBody');
+    if(!r||!r.ok){ b.innerHTML=_invErr((r&&r.err)||'Nem sikerült az előnézet.'); return; }
+    renderInvoicePreview(r);
+  }).catch(function(){ document.getElementById('invoiceModalBody').innerHTML=_invErr('Hálózati hiba.'); });
+}
+function renderInvoicePreview(r){
+  var b=document.getElementById('invoiceModalBody');
+  var rows=(r.items||[]).map(function(it,i){
+    var lineNet=it.quantity*it.price_net, afa=lineNet*(it.vat_percent/100), brutto=lineNet+afa;
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--border);">'
+      +'<div style="color:#fff;font-size:13px;">'+(i+1)+'. '+escHtml(it.name)+'</div>'
+      +'<div style="font-size:12px;color:var(--muted);">'+it.quantity+' × '+it.price_net.toFixed(2)+' = '+lineNet.toFixed(2)+' nettó &nbsp;·&nbsp; ÁFA ('+it.vat_percent+'%): '+afa.toFixed(2)+' &nbsp;·&nbsp; Bruttó: '+brutto.toFixed(2)+'</div></div>';
+  }).join('');
+  var warn='';
+  if(!r.has_plan) warn+='<div style="color:var(--warn);font-size:12px;margin-bottom:8px;">⚠ Nincs előfizetési csomag beállítva ehhez a céghez. Csak HERE tételek kerülnek a számlára.</div>';
+  if(!r.has_here) warn+='<div style="color:var(--muted);font-size:12px;margin-bottom:8px;">ℹ Nincs HERE API használat ebben a hónapban.</div>';
+  var canIssue = r.provider && (r.items||[]).length;
+  b.innerHTML='<h3>🧾 Számla előnézet</h3>'
+    +'<div style="color:var(--muted);font-size:13px;margin-bottom:6px;">'+escHtml(r.company_name)+' — '+escHtml(r.month_label)+'</div>'
+    +'<div style="font-size:13px;margin-bottom:10px;">Számlázó: <b style="color:#c084fc;">'+escHtml(r.provider_name||r.provider||'—')+'</b> '+(r.provider?'✅':'❌')+'</div>'
+    +warn
+    +((r.items||[]).length?rows:'<div style="color:var(--muted);padding:10px 0;">Nincs számlázható tétel.</div>')
+    +'<div style="margin-top:12px;padding-top:10px;border-top:2px solid var(--border);font-size:13px;">'
+    +'<div style="display:flex;justify-content:space-between;"><span>Végösszeg nettó:</span><b>'+r.totals.net.toFixed(2)+' EUR</b></div>'
+    +'<div style="display:flex;justify-content:space-between;"><span>Végösszeg ÁFA:</span><b>'+r.totals.vat.toFixed(2)+' EUR</b></div>'
+    +'<div style="display:flex;justify-content:space-between;font-size:15px;color:#c084fc;font-weight:800;margin-top:4px;"><span>Végösszeg bruttó:</span><span>'+r.totals.gross.toFixed(2)+' EUR</span></div>'
+    +'</div>'
+    +'<div style="color:var(--muted);font-size:12px;margin-top:10px;">Fizetési határidő: '+escHtml(r.due_date)+'</div>'
+    +(canIssue
+       ? '<div style="color:var(--warn);font-size:12px;margin-top:8px;">⚠ Ez a számla a '+escHtml(r.provider_name||r.provider)+' rendszerben kerül kiállításra. A művelet nem visszavonható.</div>'
+       : '<div style="color:var(--err);font-size:12px;margin-top:8px;">❌ Nincs aktív számlázó vagy tétel — a kiállítás nem lehetséges.</div>')
+    +'<div class="row-btns"><button class="btn-danger-sm" style="flex:1;" onclick="closeInvoiceModal()">❌ Mégsem</button>'
+    +(canIssue?'<button class="btn-dev" style="flex:2;" onclick="confirmInvoice()">✅ Kiállítás megerősítése</button>':'')+'</div>';
+}
+function confirmInvoice(){
+  var b=document.getElementById('invoiceModalBody');
+  b.innerHTML=_invSpinner('Számla kiállítása folyamatban...');
+  gas('generateHereInvoice',[{company_id:_invCompanyId}]).then(function(r){
+    if(r&&r.ok){
+      _invLastPdf=r.pdf_url||null;
+      b.innerHTML='<h3>✅ Számla sikeresen kiállítva!</h3>'
+        +'<div style="font-size:14px;margin-bottom:6px;">Számlaszám: <b style="color:#fff;">'+escHtml(r.invoice_number||'—')+'</b></div>'
+        +'<div style="font-size:14px;margin-bottom:16px;">Számlázó: <b>'+escHtml(r.provider)+'</b></div>'
+        +'<div class="row-btns">'
+        +(_invLastPdf?'<button class="btn-dev" style="flex:1;" onclick="window.open(_invLastPdf,\'_blank\')">📄 PDF megnyitása</button>':'')
+        +'<button class="btn-danger-sm" style="flex:1;" onclick="closeInvoiceModal()">❌ Bezárás</button></div>';
+      loadCompBilling();
+    } else {
+      b.innerHTML='<h3 style="color:var(--err);">❌ Számla kiállítása sikertelen</h3>'
+        +'<div style="font-size:13px;margin-bottom:10px;">Hiba: '+escHtml((r&&r.err)||'ismeretlen')+'</div>'
+        +'<div style="font-size:12px;color:var(--muted);margin-bottom:16px;">Ellenőrizd a számlázó integrációt az Integrációk fülön.</div>'
+        +'<div class="row-btns"><button class="btn-danger-sm" style="flex:1;" onclick="closeInvoiceModal()">❌ Bezárás</button></div>';
+    }
+  }).catch(function(){ b.innerHTML=_invErr('Hálózati hiba a kiállításnál.'); });
+}
+
+/* ── HERE API funkciók (developer) ── */
+var _hereTimer=null;
+var HERE_ICONS={realtime_traffic:'🚦',destination_weather:'🌤',fuel_prices:'⛽',waypoints_sequence:'🔀',intermodal:'🔄'};
+function loadHerePane(){
+  loadHereByCompany();
+  gas('getHereFeatures').then(function(r){
+    var tb=document.getElementById('hereTbody'); if(!tb) return;
+    if(!r||!r.ok){ tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--err);padding:20px;">Nem elérhető.</td></tr>'; return; }
+    tb.innerHTML=(r.features||[]).map(function(f){
+      var ic=HERE_ICONS[f.feature_key]||'⚡';
+      var pct=f.usage_percent||0;
+      var barColor=pct>=100?'#ef4444':pct>=80?'#f59e0b':'#22c55e';
+      var cost=Number(f.cost_usd)||0;
+      var costStr=cost>0?'<span style="color:var(--err);font-weight:700;">$'+cost.toFixed(2)+'</span>':'<span style="color:var(--ok);">$0.00</span>';
+      return '<tr>'
+        +'<td><b style="color:#fff;">'+ic+' '+escHtml(f.display_name)+'</b><div style="font-size:11px;color:var(--muted);">'+escHtml(f.description||'')+'</div></td>'
+        +'<td><label class="fsw"><input type="checkbox" '+(f.enabled?'checked':'')+' onchange="toggleHereDev(\''+f.feature_key+'\',this.checked,this)"><span class="fsw-s"></span></label></td>'
+        +'<td style="min-width:150px;">'+f.used_this_month+' / '+f.free_limit
+          +'<div style="height:6px;border-radius:6px;background:rgba(255,255,255,0.1);overflow:hidden;margin-top:4px;"><i style="display:block;height:100%;width:'+Math.min(100,pct)+'%;background:'+barColor+';"></i></div></td>'
+        +'<td>'+costStr+'</td></tr>';
+    }).join('');
+    var tc=document.getElementById('hereTotalCost');
+    if(tc) tc.textContent='Összes becsült HERE költség: $'+(Number(r.total_cost)||0).toFixed(2)+' / hó';
+  });
+  if(!_hereTimer){
+    _hereTimer=setInterval(function(){
+      var pane=document.getElementById('pane-here');
+      if(pane && !pane.classList.contains('hidden')) loadHerePane();
+    },30000);
+  }
+}
+function toggleHereDev(key,enabled,inp){
+  inp.disabled=true;
+  gas('toggleHereFeature',[{feature_key:key,enabled:enabled}]).then(function(r){
+    inp.disabled=false;
+    if(r&&r.ok){ toast(enabled?'✅ Bekapcsolva':'⛔ Kikapcsolva','ok'); loadHerePane(); }
+    else { inp.checked=!enabled; toast((r&&r.err)||'Hiba','err'); }
+  }).catch(function(){ inp.disabled=false; inp.checked=!enabled; toast('Hiba','err'); });
+}
+function loadHereByCompany(){
+  gas('getHereUsageByCompany').then(function(r){
+    var el=document.getElementById('hereByCompany'); if(!el) return;
+    if(!r||!r.ok){ el.innerHTML='<div style="color:var(--err);font-size:13px;">Nem elérhető.</div>'; return; }
+    var comps=r.companies||[];
+    if(!comps.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:6px 0;">Ebben a hónapban nincs cégenkénti HERE használat.</div>'; return; }
+    el.innerHTML=comps.map(function(c){
+      var feats=c.features.map(function(f){
+        var uid=c.company_id+'_'+f.feature_key;
+        var users=(f.users||[]).map(function(u){
+          return '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--soft);padding:3px 0 3px 14px;border-left:2px solid rgba(168,85,247,0.35);margin-bottom:2px;">'
+            +'<span>'+escHtml(u.user_name)+' <span style="color:var(--muted);">('+escHtml(u.user_role)+')</span></span><span>'+u.used+' trz</span></div>';
+        }).join('');
+        return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;background:rgba(255,255,255,0.02);">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+          +'<div style="color:#fff;font-weight:600;font-size:13px;">'+escHtml(f.display_name)+'</div>'
+          +'<button class="btn-dev" style="padding:3px 10px;font-size:11px;" onclick="toggleFeatUsers(\''+uid+'\',this)">▼ Részletezés</button></div>'
+          +'<div style="font-size:12px;color:var(--muted);margin-top:4px;">Összesen: '+f.total_used+' trz = '+f.units+'×1000 egység</div>'
+          +'<div id="fu_'+uid+'" style="display:none;margin-top:8px;">'+users+'</div>'
+          +'<div style="font-size:12px;margin-top:8px;color:var(--muted);">Nettó: <b style="color:#fff;">$'+f.net_usd+'</b> &nbsp; ÁFA: <b style="color:#fff;">$'+f.vat_usd+'</b> &nbsp; Bruttó: <b style="color:#c084fc;">$'+f.gross_usd+'</b></div>'
+          +'</div>';
+      }).join('');
+      return '<div class="ceg-card">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px;">'
+        +'<div class="ceg-name">🏢 '+escHtml(c.company_name)+'</div>'
+        +'<div style="font-size:13px;color:#c084fc;font-weight:700;">Részösszeg (bruttó): $'+c.subtotal_gross+'</div></div>'
+        +feats+'</div>';
+    }).join('');
+  });
+}
+function toggleFeatUsers(uid,btn){
+  var el=document.getElementById('fu_'+uid); if(!el) return;
+  var open=el.style.display==='none';
+  el.style.display=open?'block':'none';
+  if(btn) btn.textContent=open?'▲ Bezárás':'▼ Részletezés';
 }
 
 function loadDash(){

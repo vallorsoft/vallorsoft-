@@ -62,23 +62,10 @@ window.CargoTrackWhereIs = (function () {
       const mapEl = overlay.querySelector('#ctw-map'); mapEl.style.display = '';
       const infoEl = overlay.querySelector('#ctw-info'); infoEl.style.display = '';
 
-      // HERE térkép-csempe (a kulcs a szerverről, /api/here-config). A modal világos -> normal.day.
-      let hereKey = null;
-      try {
-        const hc = await fetch('/api/here-config', { credentials: 'same-origin' }).then((r) => r.json());
-        hereKey = hc && hc.apiKey;
-      } catch (_) {}
-
+      // OpenStreetMap (CartoDB) csempe — ingyenes, NINCS HERE kulcs. A modal világos -> light_all.
       map = L.map(mapEl).setView([p.latitude, p.longitude], 13);
-      if (hereKey) {
-        // HERE Raster Tile API v3 (a v2.1 maptile API le lett kapcsolva).
-        L.tileLayer('https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png?style=explore.day&size=512&apiKey=' + hereKey,
-          { attribution: '© HERE Technologies', maxZoom: 20, tileSize: 512, zoomOffset: -1 }).addTo(map);
-      } else {
-        // tartalék, ha nincs HERE kulcs
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-          { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
-      }
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        { attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
       marker = L.marker([p.latitude, p.longitude]).addTo(map);
       setTimeout(() => map.invalidateSize(), 100);
 

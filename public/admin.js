@@ -42,6 +42,7 @@ function loadTab(name){
   if(name==='internal-drivers') loadInternalDrivers();
   if(name==='clients' && window.ClientsPage) ClientsPage.mount('clientsBox');
   if(name==='integrations'){
+    if(window.BillingCard)      BillingCard.mount('billingCardBox');
     if(window.InvoicingCard)    InvoicingCard.mount('invCardBox');
     if(window.CargoTrackCard)   CargoTrackCard.mount('ctCardBox');
     if(window.CargoTrackPairing) CargoTrackPairing.mount('ctPairBox');

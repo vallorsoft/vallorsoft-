@@ -17,8 +17,19 @@ window.VS_FEATURES = [
   { key: 'external-drivers', label: 'Külső sofőrök',               group: 'Adminisztráció' },
   { key: 'vehicles',         label: 'Járművek',                    group: 'Adminisztráció' },
   { key: 'clients',          label: 'Ügyfelek',                    group: 'Adminisztráció' },
+  { key: 'billing',          label: 'Számlázó integráció',         group: 'Adminisztráció' },
   { key: 'integrations',     label: 'Integrációk (csak Admin)',    group: 'Adminisztráció' },
   { key: 'signature',        label: 'Aláírás és bélyegző',         group: 'Adminisztráció' },
   { key: 'chat',             label: 'Belső chat',                  group: 'Kommunikáció' },
   { key: 'settings',         label: 'Beállítások',                 group: 'Rendszer', core: true },
+];
+
+// HERE Map prémium funkciók — cégre szabott JOGOSULTSÁG (developer a Funkciók fülön).
+// A kulcs a here_feature_flags.feature_key; a company_features-ben 'here:<kulcs>' tárolja.
+window.VS_HERE_FEATURES = [
+  { key: 'realtime_traffic',    label: 'Valós idejű forgalom' },
+  { key: 'destination_weather', label: 'Időjárás előrejelzés' },
+  { key: 'fuel_prices',         label: 'Üzemanyagárak' },
+  { key: 'waypoints_sequence',  label: 'Megálló sorrend optimalizáló' },
+  { key: 'intermodal',          label: 'Intermodális útvonal' },
 ];
