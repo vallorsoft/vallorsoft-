@@ -86,6 +86,8 @@ async function pollOnce(pool, creds, companyId, opts) {
   const cfg = resolveImap(creds);
   if (!cfg.host || !cfg.user || !cfg.pass) return { skipped: true };
   const limit = (opts && opts.limit) || 25;   // körönkénti köteg-méret (a többi a következő ciklusban)
+  // Aktiválási időpont: csak az ENNÉL újabb leveleket dolgozzuk fel (a korábbiakat soha).
+  const sinceDate = (opts && opts.since) ? new Date(opts.since) : null;
 
   const aiEnabled = await aiEnabledFor(pool, companyId);
 
@@ -96,7 +98,12 @@ async function pollOnce(pool, creds, companyId, opts) {
   try {
     const lock = await client.getMailboxLock(cfg.mailbox || 'INBOX');
     try {
-      for await (const msg of client.fetch({ seen: false }, { uid: true, source: true })) {
+      // A SINCE keresés napra szűr (csökkenti a letöltést); a percre pontos vágást az envelope dátuma adja.
+      const search = { seen: false };
+      if (sinceDate && !isNaN(sinceDate)) search.since = sinceDate;
+      for await (const msg of client.fetch(search, { uid: true, source: true, envelope: true })) {
+        const mdate = msg.envelope && msg.envelope.date ? new Date(msg.envelope.date) : null;
+        if (sinceDate && !isNaN(sinceDate) && mdate && mdate < sinceDate) continue;  // aktiválás előtti levél kihagyása
         collected.push({ uid: String(msg.uid), source: msg.source });
         if (collected.length >= limit) break;
       }

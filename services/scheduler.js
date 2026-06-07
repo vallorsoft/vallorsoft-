@@ -20,7 +20,7 @@ function startIntakeScheduler() {
     let rows;
     try {
       ({ rows } = await pool.query(
-        `SELECT company_id, credentials_enc FROM company_integrations
+        `SELECT company_id, credentials_enc, meta FROM company_integrations
          WHERE provider='email_intake' AND enabled=true AND credentials_enc IS NOT NULL`));
     } catch (err) { console.error('[Intake] cégek lekérése hiba:', err.message); return; }
 
@@ -28,8 +28,9 @@ function startIntakeScheduler() {
       let creds;
       try { creds = JSON.parse(decrypt(row.credentials_enc)); }
       catch (e) { console.error('[Intake] cég #' + row.company_id + ' credentials dekódolás hiba:', e.message); continue; }
+      const since = row.meta && row.meta.since ? row.meta.since : null;
       try {
-        const r = await intake.pollOnce(pool, creds, row.company_id);
+        const r = await intake.pollOnce(pool, creds, row.company_id, { since });
         if (r && r.processed) console.log('[Intake] cég #' + row.company_id + ' — feldolgozott levél:', r.processed);
         // Sikeres kör után az utolsó lekérdezés idejének frissítése (last_check oszlop).
         await pool.query(

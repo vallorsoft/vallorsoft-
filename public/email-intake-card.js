@@ -62,6 +62,7 @@ window.EmailIntakeCard = (function () {
     return new Date(iso).toLocaleDateString('hu-HU');
   }
   function dateHu(iso) { if (!iso) return '—'; var dt = new Date(iso); return isNaN(dt) ? '—' : dt.toLocaleDateString('hu-HU'); }
+  function dateHuTime(iso) { if (!iso) return '—'; var dt = new Date(iso); return isNaN(dt) ? '—' : dt.toLocaleString('hu-HU'); }
 
   function mount(target, opts) {
     var el = typeof target === 'string' ? document.getElementById(target) : target;
@@ -98,7 +99,7 @@ window.EmailIntakeCard = (function () {
         '<div class="eic-sub">Még nincs megrendelés-fiók beállítva. A beállítást az Admin kezeli.</div>');
       return;
     }
-    var inner = '<div class="eic-sub">Nincs beállítva — add meg azt az email fiókot, amelyre a megrendeléseket kapod.</div>'
+    var inner = '<div class="eic-sub">Nincs beállítva — add meg azt az email fiókot, amelyre a megrendeléseket kapod. <b>A mentés pillanatától</b> csak az azután beérkező leveleket dolgozza fel (a régieket nem).</div>'
       + '<div style="font-size:13px;color:var(--text-primary);font-weight:600;margin-bottom:8px;">Válassz szolgáltatót:</div>'
       + '<div class="eic-prov">'
       + '<button data-prov="gmail"><span class="ic">✉️</span>Gmail</button>'
@@ -118,6 +119,7 @@ window.EmailIntakeCard = (function () {
       + (r.email ? '<div class="eic-kv"><span>Email</span><span>' + E(r.email) + '</span></div>' : '')
       + '<div class="eic-kv"><span>Postafiók</span><span>' + E(r.mailbox || 'INBOX') + '</span></div>'
       + '<div class="eic-kv"><span>Beállítva</span><span>' + dateHu(r.configured_at) + '</span></div>'
+      + (r.since ? '<div class="eic-kv"><span>Csak ettől dolgozza fel</span><span>' + dateHuTime(r.since) + '</span></div>' : '')
       + '<div class="eic-kv" style="border-bottom:none;"><span>Utolsó lekérdezés</span><span>' + relTime(r.last_polled_at) + '</span></div>';
 
     if (ctx.readOnly) {

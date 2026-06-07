@@ -73,6 +73,7 @@ handlers.getEmailIntakeConfig = async function (req, res, args) {
       mailbox: meta.mailbox || 'INBOX',
       enabled: r.enabled !== false,
       configured_at: r.updated_at,
+      since: meta.since || null,
       last_polled_at: r.last_check,
     } });
   } catch (err) {
@@ -89,8 +90,15 @@ handlers.saveEmailIntakeConfig = async function (req, res, args) {
     let creds;
     try { creds = buildCreds(argOf(args)); } catch (e) { return res.json({ result: { ok: false, err: e.message } }); }
 
+    // Aktiválás időpontja: INNENTŐL dolgozza fel a beérkező leveleket (a korábbiakat nem).
+    // Megőrizzük, ha már be volt állítva (szerkesztéskor nem nullázódik); új beállításnál = MOST.
+    const prev = await pool.query(
+      `SELECT meta FROM company_integrations WHERE company_id=$1 AND provider='email_intake'`, [u.company_id]);
+    const prevSince = prev.rows[0] && prev.rows[0].meta && prev.rows[0].meta.since;
+    const since = prevSince || new Date().toISOString();
+
     const enc = encrypt(JSON.stringify(creds));
-    const meta = { provider: creds.provider, email_masked: maskEmail(creds.email), mailbox: creds.mailbox };
+    const meta = { provider: creds.provider, email_masked: maskEmail(creds.email), mailbox: creds.mailbox, since: since };
     await pool.query(
       `INSERT INTO company_integrations (company_id, provider, category, enabled, credentials_enc, meta, updated_at)
        VALUES ($1,'email_intake','intake',true,$2,$3,now())

@@ -10,12 +10,16 @@ const { decrypt } = require('../lib/crypto');
 
 const router = express.Router();
 
-// A cég mentett (titkosított) e-mail intake beállítása -> objektum (vagy null).
+// A cég mentett (titkosított) e-mail intake beállítása -> { creds, since } (vagy null).
 async function loadIntakeCreds(companyId) {
   const { rows } = await pool.query(
-    `SELECT credentials_enc FROM company_integrations WHERE company_id=$1 AND provider='email_intake' AND enabled=true`, [companyId]);
+    `SELECT credentials_enc, meta FROM company_integrations WHERE company_id=$1 AND provider='email_intake' AND enabled=true`, [companyId]);
   if (!rows.length || !rows[0].credentials_enc) return null;
-  try { return JSON.parse(decrypt(rows[0].credentials_enc)); } catch (_) { return null; }
+  try {
+    const creds = JSON.parse(decrypt(rows[0].credentials_enc));
+    const since = rows[0].meta && rows[0].meta.since ? rows[0].meta.since : null;
+    return { creds, since };
+  } catch (_) { return null; }
 }
 const own = (req) => req.session.user.company_id;
 const LIST_COLS = `id, source_email, subject, received_at, raw_text, pdf_name, extracted,
@@ -46,9 +50,9 @@ router.post('/api/inbound-orders/settings', requireLogin, requireRole('Admin'), 
 // ---- Kézi lekérdezés (teszthez, fiók beállítása után) ----
 router.post('/api/inbound-orders/poll', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   try {
-    const creds = await loadIntakeCreds(own(req));
-    if (!creds) return res.json({ skipped: true });
-    const r = await intake.pollOnce(pool, creds, own(req));
+    const cfg = await loadIntakeCreds(own(req));
+    if (!cfg) return res.json({ skipped: true });
+    const r = await intake.pollOnce(pool, cfg.creds, own(req), { since: cfg.since });
     // Kézi lekérdezés is frissítse az utolsó lekérdezés idejét.
     if (!r.skipped) {
       await pool.query(`UPDATE company_integrations SET last_check=now() WHERE company_id=$1 AND provider='email_intake'`, [own(req)]).catch(() => {});
