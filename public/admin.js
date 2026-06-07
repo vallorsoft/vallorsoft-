@@ -96,46 +96,8 @@ function loadSettingsPane(){
 
 // ── 2FA Settings bekapcsolás ──────────────────────────────
 
-function loadDash(){
-  gas('userListAll').then(u=>{ document.getElementById('cUsers').textContent=u.length; });
-  gas('getFuvarlevelek').then(d=>{ document.getElementById('countFuv').textContent=d.length; });
-  gas('dashStats').then(function(r){
-    if(!r||!r.ok) return;
-    document.getElementById('dashCegNev').textContent = r.ceg_nev;
-    const total = r.statuszok.reduce(function(s,x){return s+x.db;},0);
-    const aktiv = r.statuszok.filter(function(x){return x.status==='In Curs'||x.status==='Alocat';}).reduce(function(s,x){return s+x.db;},0);
-    document.getElementById('kpiTotal').textContent = total;
-    document.getElementById('kpiAktiv').textContent = aktiv;
-    const colors = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4'];
-    var ctx1 = document.getElementById('chartStatusz');
-    if(ctx1._chart) ctx1._chart.destroy();
-    ctx1._chart = new Chart(ctx1, { type:'doughnut', data:{
-      labels: r.statuszok.map(function(x){return x.status;}),
-      datasets:[{data: r.statuszok.map(function(x){return x.db;}), backgroundColor:colors, borderWidth:0}]
-    }, options:{plugins:{legend:{labels:{color:'#8a97a8'}}}}});
-    var ctx2 = document.getElementById('chartBevetel');
-    if(ctx2._chart) ctx2._chart.destroy();
-    ctx2._chart = new Chart(ctx2, { type:'bar', data:{
-      labels: r.havi_bevetel.map(function(x){return x.ho;}),
-      datasets:[{label:'EUR', data: r.havi_bevetel.map(function(x){return parseFloat(x.osszeg)||0;}),
-        backgroundColor:'rgba(59,130,246,0.6)', borderColor:'#3b82f6', borderWidth:1}]
-    }, options:{plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#8a97a8'}},y:{ticks:{color:'#8a97a8'}}}}});
-    var ctx3 = document.getElementById('chartKm');
-    if(ctx3._chart) ctx3._chart.destroy();
-    ctx3._chart = new Chart(ctx3, { type:'bar', data:{
-      labels: r.sofor_km.map(function(x){return x.nume_sofer;}),
-      datasets:[{label:'km', data: r.sofor_km.map(function(x){return parseFloat(x.total_km)||0;}),
-        backgroundColor:'rgba(34,197,94,0.6)', borderColor:'#22c55e', borderWidth:1}]
-    }, options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#8a97a8'}},y:{ticks:{color:'#8a97a8'}}}}});
-    var ctx4 = document.getElementById('chartJarmu');
-    if(ctx4._chart) ctx4._chart.destroy();
-    ctx4._chart = new Chart(ctx4, { type:'bar', data:{
-      labels: r.jarmu_kihasznaltsag.map(function(x){return x.rendszam;}),
-      datasets:[{label:'Fuvarok', data: r.jarmu_kihasznaltsag.map(function(x){return x.fuvarok;}),
-        backgroundColor:'rgba(245,158,11,0.6)', borderColor:'#f59e0b', borderWidth:1}]
-    }, options:{plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#8a97a8'}},y:{ticks:{color:'#8a97a8'}}}}});
-  });
-}
+// A vezérlőpult-renderelés a console-shared.js loadDashboard()-jában él (közös admin/manager).
+function loadDash(){ loadDashboard(); }
 
 function loadUsers(){
   gas('userListAll').then(list=>{
