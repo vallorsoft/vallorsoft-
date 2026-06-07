@@ -939,3 +939,192 @@ function uploadOrderDoc(){
   };
   reader.readAsDataURL(file);
 }
+
+// ============================================================
+//  VEZÉRLŐPULT REDESIGN — közös dashboard + téma (light/dark)
+//  Mind az admin, mind a manager konzol ezt használja.
+// ============================================================
+
+/* ── Téma (light/dark) — a .main-content[data-theme] attribútumon ── */
+function toggleTheme() {
+  var mc = document.getElementById('mainContent');
+  if (!mc) return;
+  var next = (mc.getAttribute('data-theme') === 'light') ? 'dark' : 'light';
+  mc.setAttribute('data-theme', next);
+  try { localStorage.setItem('vs-theme', next); } catch (e) {}
+  syncThemeToggleIcon();
+  // Térkép-csempék cseréje a témához
+  if (window._dashMap && window._dashTileLayer) {
+    window._dashTileLayer.setUrl(next === 'light'
+      ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
+  }
+}
+
+function syncThemeToggleIcon() {
+  var mc = document.getElementById('mainContent');
+  var btn = document.getElementById('themeToggle');
+  if (!mc || !btn) return;
+  var light = mc.getAttribute('data-theme') === 'light';
+  btn.textContent = light ? '☀️' : '🌙';
+  btn.title = light ? 'Sötét mód' : 'Világos mód';
+}
+
+/* ── A teljes vezérlőpult betöltése ── */
+function loadDashboard() {
+  // KPI: felhasználók + beérkezett menetlevelek
+  gas('userListAll').then(function (u) {
+    var e = document.getElementById('cUsers'); if (e) e.textContent = (u && u.length) || 0;
+  });
+  gas('getFuvarlevelek').then(function (d) {
+    var e = document.getElementById('countFuv'); if (e) e.textContent = (d && d.length) || 0;
+  });
+  // Cég neve + fuvar-KPI-k
+  gas('dashStats').then(function (r) {
+    if (!r || !r.ok) return;
+    var cn = document.getElementById('dashCegNev'); if (cn) cn.textContent = r.ceg_nev;
+    var total = (r.statuszok || []).reduce(function (s, x) { return s + x.db; }, 0);
+    var aktiv = (r.statuszok || [])
+      .filter(function (x) { return x.status === 'In Curs' || x.status === 'Alocat'; })
+      .reduce(function (s, x) { return s + x.db; }, 0);
+    var t = document.getElementById('kpiTotal'); if (t) t.textContent = total;
+    var a = document.getElementById('kpiAktiv');
+    if (a) { a.textContent = aktiv; a.style.color = aktiv > 0 ? 'var(--status-ok)' : 'var(--text-muted)'; }
+  });
+
+  loadDashRecentOrders();
+  loadDashVehicleSummary();
+  syncThemeToggleIcon();
+  initDashMap();
+  refreshDashVehicles();
+  if (window._dashVehTimer) clearInterval(window._dashVehTimer);
+  window._dashVehTimer = setInterval(refreshDashVehicles, 30000);
+}
+
+/* ── Legutóbbi fuvarok ── */
+// A DB román státuszokat tárol — magyar címke + szín-leképezés.
+var DASH_STATUS_MAP = {
+  'Finalizat':  { c: 'ok',   t: 'Teljesítve' },
+  'In Curs':    { c: 'warn', t: 'Folyamatban' },
+  'Alocat':     { c: 'info', t: 'Várakozik' },
+  'Disponibil': { c: 'err',  t: 'Tervezetlen' },
+  'Extern':     { c: 'info', t: 'Külső' },
+  'Anulat':     { c: 'err',  t: 'Törölve' }
+};
+function loadDashRecentOrders() {
+  var tb = document.getElementById('dashRecentOrdersBody');
+  if (!tb) return;
+  gas('getRecentOrders', [8]).then(function (r) {
+    if (!r || !r.ok) {
+      tb.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">Nem sikerült betölteni.</td></tr>';
+      return;
+    }
+    var list = r.orders || [];
+    if (!list.length) {
+      tb.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">Nincs fuvar.</td></tr>';
+      return;
+    }
+    tb.innerHTML = list.map(function (o) {
+      var drv = o.nume_sofer || o.driver_user_name || o.email_sofer || '—';
+      var dest = o.loc_descarcare || '—';
+      var sm = DASH_STATUS_MAP[o.status] || { c: 'info', t: o.status || '—' };
+      var dt = o.created_at ? new Date(o.created_at).toLocaleDateString('hu-HU') : '—';
+      return '<tr>'
+        + '<td><b class="text-primary">' + esc(String(o.id)) + '</b></td>'
+        + '<td>' + esc(dest) + '</td>'
+        + '<td>' + esc(drv) + '</td>'
+        + '<td><span class="badge ' + sm.c + '">' + esc(sm.t) + '</span></td>'
+        + '<td class="text-muted">' + dt + '</td>'
+        + '</tr>';
+    }).join('');
+  });
+}
+
+/* ── Jármű státusz összesítő ── */
+function loadDashVehicleSummary() {
+  var box = document.getElementById('dashVehicleSummary');
+  if (!box) return;
+  gas('getVehicleStatusSummary').then(function (r) {
+    if (!r || !r.ok) { box.innerHTML = ''; return; }
+    var cards = [
+      { l: 'Aktív járművek', v: r.active || 0,   col: (r.active > 0 ? 'var(--status-ok)' : 'var(--text-muted)'), ico: '🟢' },
+      { l: 'Álló járművek',  v: r.inactive || 0, col: 'var(--text-muted)', ico: '⚪' },
+      { l: 'Ismeretlen',     v: r.unknown || 0,  col: 'var(--text-muted)', ico: '❔' }
+    ];
+    box.innerHTML = cards.map(function (c) {
+      return '<div class="dash-mini glass-soft">'
+        + '<div style="font-size:20px;">' + c.ico + '</div>'
+        + '<div style="font-size:24px;font-weight:800;color:' + c.col + ';">' + c.v + '</div>'
+        + '<div class="text-muted" style="font-size:11px;">' + c.l + '</div>'
+        + '</div>';
+    }).join('');
+  });
+}
+
+/* ── Térkép (Leaflet + CartoDB) ── */
+function initDashMap() {
+  if (typeof L === 'undefined') return;               // Leaflet még nem töltött be
+  var el = document.getElementById('dashMap');
+  if (!el) return;
+  if (window._dashMap) { setTimeout(function () { window._dashMap.invalidateSize(); }, 150); return; }
+
+  var mc = document.getElementById('mainContent');
+  var light = mc && mc.getAttribute('data-theme') === 'light';
+  window._dashMap = L.map(el, { zoomControl: true, attributionControl: false })
+    .setView([45.9432, 24.9668], 7);                  // Románia közepe
+  window._dashTileLayer = L.tileLayer(
+    light
+      ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    { maxZoom: 19, subdomains: 'abcd' }
+  ).addTo(window._dashMap);
+  window._dashMarkers = L.layerGroup().addTo(window._dashMap);
+
+  // A térkép gyakran üresen marad, ha induláskor a konténer mérete még nem véglegesült.
+  // Több ütemezett invalidateSize + ablakméret-figyelő biztosítja a csempék kirajzolását.
+  [0, 150, 400, 800].forEach(function (d) {
+    setTimeout(function () { if (window._dashMap) window._dashMap.invalidateSize(); }, d);
+  });
+  if (!window._dashResizeBound) {
+    window._dashResizeBound = true;
+    window.addEventListener('resize', function () {
+      if (window._dashMap) window._dashMap.invalidateSize();
+    });
+  }
+}
+
+function refreshDashVehicles() {
+  if (!window._dashMap || !window._dashMarkers) return;
+  // Ne pollozzon, ha a vezérlőpult nem látható
+  var pane = document.querySelector('.pane[data-pane="dash"]');
+  if (pane && pane.classList.contains('hidden')) return;
+
+  gas('getActiveVehiclePositions').then(function (r) {
+    if (!r || !r.ok || !window._dashMarkers) return;
+    window._dashMarkers.clearLayers();
+    var pts = r.positions || [];
+    if (!pts.length) {
+      // Nincs élő GPS adat -> placeholder Románia közepén
+      var ph = L.circleMarker([45.9432, 24.9668], {
+        radius: 9, color: '#8a97a8', fillColor: '#8a97a8', fillOpacity: 0.6, weight: 2
+      });
+      ph.bindTooltip(r.gps_configured ? 'Nincs aktív GPS adat' : 'GPS integráció nincs beállítva');
+      ph.addTo(window._dashMarkers);
+      return;
+    }
+    var bounds = [];
+    pts.forEach(function (p) {
+      var spd = (p.speed != null) ? Math.round(p.speed) + ' km/h' : '—';
+      var m = L.circleMarker([p.lat, p.lng], {
+        radius: 8, color: '#e10b1a', fillColor: '#e10b1a', fillOpacity: 0.85, weight: 2
+      });
+      m.bindTooltip('🚛 ' + (p.object_name || p.rendszam) + ' · ' + spd);
+      m.bindPopup('<b>' + esc(p.object_name || p.rendszam) + '</b><br>Sebesség: ' + spd
+        + (p.datetime ? '<br>' + new Date(p.datetime).toLocaleString('hu-HU') : ''));
+      m.addTo(window._dashMarkers);
+      bounds.push([p.lat, p.lng]);
+    });
+    if (bounds.length === 1) window._dashMap.setView(bounds[0], 10);
+    else if (bounds.length > 1) window._dashMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 12 });
+  });
+}

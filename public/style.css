@@ -592,3 +592,145 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
   .sidebar .sub-tab { min-height: 44px; display: flex; align-items: center; }
   .sidebar .tab { min-height: 44px; display: flex; align-items: center; }
 }
+
+/* =========================================================
+   ADMIN/MANAGER DASHBOARD REDESIGN — Glassmorphism + Light/Dark
+   A téma a .main-content[data-theme] attribútumon él, a SIDEBAR
+   mindig sötét marad (a toggle nem érinti).
+   ========================================================= */
+:root {
+  --bg-deepest: #05070b;
+  --bg-panel: #0c1218;
+  --bg-panel-raised: #141c25;
+  --text-primary: #e9eef5;
+  --text-muted: #8a97a8;
+  --status-ok: #22c55e;
+  --status-warn: #f59e0b;
+  --status-danger: #ef4444;
+  --status-info: #3b82f6;
+  --glass-bg-dark: rgba(255, 255, 255, 0.04);
+  --glass-border-dark: rgba(255, 255, 255, 0.08);
+  --glass-bg-light: rgba(255, 255, 255, 0.82);
+  --glass-border-light: rgba(0, 0, 0, 0.08);
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+}
+
+/* A sidebar MINDIG sötét — a theme toggle nem hat rá */
+.sidebar { background: var(--bg-deepest) !important; }
+
+/* Téma-érzékeny szöveg-segédosztályok */
+.text-primary { color: var(--text-primary); }
+.text-muted { color: var(--text-muted); }
+
+/* ----- DARK (alapértelmezett) ----- */
+.main-content[data-theme="dark"] .glass {
+  background: var(--glass-bg-dark);
+  border: 1px solid var(--glass-border-dark);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* ----- LIGHT ----- */
+.main-content[data-theme="light"] {
+  background: #f0f4f8;
+  color: #1a2332;
+}
+.main-content[data-theme="light"] .glass {
+  background: var(--glass-bg-light);
+  border: 1px solid var(--glass-border-light);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.main-content[data-theme="light"] .glass-soft {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: var(--glass-border-light);
+}
+.main-content[data-theme="light"] .text-primary { color: #1a2332; }
+.main-content[data-theme="light"] .text-muted { color: #4a5568; }
+/* Általános light-mode olvashatóság a többi panelen is */
+.main-content[data-theme="light"] .h-title,
+.main-content[data-theme="light"] h1,
+.main-content[data-theme="light"] h2,
+.main-content[data-theme="light"] h3,
+.main-content[data-theme="light"] h4 { color: #1a2332; }
+.main-content[data-theme="light"] .h-sub { color: #4a5568; }
+.main-content[data-theme="light"] .input,
+.main-content[data-theme="light"] .select,
+.main-content[data-theme="light"] .textarea {
+  background: #ffffff; color: #1a2332; border-color: rgba(0, 0, 0, 0.15);
+}
+.main-content[data-theme="light"] .table th { color: #4a5568; }
+.main-content[data-theme="light"] .table td { color: #1a2332; border-bottom-color: rgba(0, 0, 0, 0.08); }
+.main-content[data-theme="light"] .table tr:hover td { background: rgba(0, 0, 0, 0.03); }
+.main-content[data-theme="light"] .btn:not(.primary):not(.danger):not(.ok) {
+  background: #ffffff; color: #1a2332; border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* ----- Felső sáv + theme toggle ----- */
+.dash-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.theme-toggle {
+  width: 42px; height: 42px; flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: var(--glass-bg-dark);
+  border: 1px solid var(--glass-border-dark);
+  color: var(--text-primary);
+  font-size: 20px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: filter .15s ease, background .2s ease;
+}
+.theme-toggle:hover { filter: brightness(1.25); }
+.main-content[data-theme="light"] .theme-toggle {
+  background: #ffffff; border-color: rgba(0, 0, 0, 0.1); color: #1a2332;
+}
+
+/* ----- Stat kártyák (4 db) ----- */
+.dash-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+}
+.stat-tile { padding: 18px; display: flex; align-items: center; gap: 14px; }
+.stat-ico {
+  width: 46px; height: 46px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; border-radius: var(--radius-md);
+  background: rgba(225, 11, 26, 0.12);
+  border: 1px solid rgba(225, 11, 26, 0.25);
+}
+.stat-val { font-size: 28px; font-weight: 800; line-height: 1.1; }
+.stat-lbl { font-size: 12px; margin-top: 2px; }
+
+/* ----- Fő tartalom: 2 oszlop (55% / 45%) ----- */
+.dash-grid {
+  display: grid; grid-template-columns: 55fr 45fr; gap: 16px; align-items: start;
+}
+.dash-col-left { display: flex; flex-direction: column; gap: 16px; }
+.dash-link { font-size: 12px; font-weight: 600; color: var(--status-info); cursor: pointer; }
+.dash-link:hover { text-decoration: underline; }
+.dash-veh-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.dash-mini { padding: 14px; text-align: center; border-radius: var(--radius-md); }
+
+/* ----- Térkép panel ----- */
+/* A térkép-konténernek EXPLICIT magasság kell (a Leaflet a flex:1-et nem mindig
+   méri be jól induláskor -> üres/szürke térkép). */
+.dash-map-wrap {
+  padding: 0; overflow: hidden; border-radius: var(--radius-lg);
+}
+#dashMap { height: 520px; width: 100%; border-radius: var(--radius-lg); }
+.leaflet-container { background: var(--bg-panel); font: inherit; }
+
+/* ----- Reszponzív ----- */
+@media (max-width: 1024px) {
+  .dash-grid { grid-template-columns: 1fr 1fr; }
+  .dash-stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .dash-grid { grid-template-columns: 1fr; }
+  /* stat kártyák 2x2-ben maradnak kis képernyőn is */
+  .dash-stats { grid-template-columns: repeat(2, 1fr); }
+  #dashMap { height: 360px; }
+}
