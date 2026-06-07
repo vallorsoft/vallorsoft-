@@ -6,8 +6,17 @@ const { requireLogin, requireRole } = require('../middleware/auth');
 const pdfx = require('../services/pdf-extract');
 const orderAi = require('../services/order-ai');
 const intake = require('../services/email-intake');
+const { decrypt } = require('../lib/crypto');
 
 const router = express.Router();
+
+// A cég mentett (titkosított) e-mail intake beállítása -> objektum (vagy null).
+async function loadIntakeCreds(companyId) {
+  const { rows } = await pool.query(
+    `SELECT credentials_enc FROM company_integrations WHERE company_id=$1 AND provider='email_intake' AND enabled=true`, [companyId]);
+  if (!rows.length || !rows[0].credentials_enc) return null;
+  try { return JSON.parse(decrypt(rows[0].credentials_enc)); } catch (_) { return null; }
+}
 const own = (req) => req.session.user.company_id;
 const LIST_COLS = `id, source_email, subject, received_at, raw_text, pdf_name, extracted,
                    confidence, ai_used, status, created_order_id, created_at`;
@@ -17,7 +26,9 @@ router.get('/api/inbound-orders/settings', requireLogin, requireRole('Admin', 'M
   try {
     const { rows } = await pool.query(
       `SELECT meta FROM company_integrations WHERE company_id=$1 AND provider='order_intake'`, [own(req)]);
-    res.json({ ai_enabled: !!(rows[0] && rows[0].meta && rows[0].meta.ai_enabled), intake_configured: intake.configured() });
+    const cfg = await pool.query(
+      `SELECT 1 FROM company_integrations WHERE company_id=$1 AND provider='email_intake' AND enabled=true AND credentials_enc IS NOT NULL`, [own(req)]);
+    res.json({ ai_enabled: !!(rows[0] && rows[0].meta && rows[0].meta.ai_enabled), intake_configured: cfg.rows.length > 0 });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 router.post('/api/inbound-orders/settings', requireLogin, requireRole('Admin'), async (req, res) => {
@@ -34,8 +45,16 @@ router.post('/api/inbound-orders/settings', requireLogin, requireRole('Admin'), 
 
 // ---- Kézi lekérdezés (teszthez, fiók beállítása után) ----
 router.post('/api/inbound-orders/poll', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
-  try { res.json(await intake.pollOnce(pool)); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    const creds = await loadIntakeCreds(own(req));
+    if (!creds) return res.json({ skipped: true });
+    const r = await intake.pollOnce(pool, creds, own(req));
+    // Kézi lekérdezés is frissítse az utolsó lekérdezés idejét.
+    if (!r.skipped) {
+      await pool.query(`UPDATE company_integrations SET last_check=now() WHERE company_id=$1 AND provider='email_intake'`, [own(req)]).catch(() => {});
+    }
+    res.json(r);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ---- Lista ----

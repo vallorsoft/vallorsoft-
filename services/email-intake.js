@@ -1,10 +1,13 @@
 // services/email-intake.js
-// Adott postafiók figyelése IMAP-pal (1-3 percenként a scheduler hívja), PDF kinyerése,
+// Adott postafiók figyelése IMAP-pal (a scheduler 2 percenként hívja cégenként), PDF kinyerése,
 // majd OCR/AI-kiolvasás -> inbound_orders staging rekord. Ingyenes: IMAP + pdf-parse/Tesseract.
 //
-// Konfiguráció (.env) — amíg üres, a szolgáltatás ÜRESJÁRATBAN marad (nem hibázik):
-//   INTAKE_IMAP_HOST, INTAKE_IMAP_PORT (993), INTAKE_IMAP_USER, INTAKE_IMAP_PASS, INTAKE_IMAP_TLS (true)
-//   INTAKE_MAILBOX (INBOX), INTAKE_COMPANY_ID (melyik céghez tartozik a fiók — több fiók/cég később)
+// FONTOS: a postafiók-beállítás NEM a .env-ből jön, hanem cégenként a company_integrations
+// táblából (provider='email_intake', credentials_enc = AES-256-GCM titkosított JSON).
+// A kapott `creds` objektum alakja (lásd handlers/intakeHandlers.js):
+//   gmail:   { provider:'gmail',   email, app_password, mailbox }
+//   outlook: { provider:'outlook', email, password,     mailbox }
+//   custom:  { provider:'custom',  host, port, tls, email, password, mailbox }
 
 const pdfx = require('./pdf-extract');
 const orderAi = require('./order-ai');
@@ -13,9 +16,25 @@ let ImapFlow = null, simpleParser = null;
 try { ImapFlow = require('imapflow').ImapFlow; } catch (_) { /* npm i imapflow */ }
 try { simpleParser = require('mailparser').simpleParser; } catch (_) { /* npm i mailparser */ }
 
-function configured() {
-  return !!(process.env.INTAKE_IMAP_HOST && process.env.INTAKE_IMAP_USER &&
-            process.env.INTAKE_IMAP_PASS && process.env.INTAKE_COMPANY_ID);
+// Szolgáltató -> IMAP kapcsolat. Egységes alak: { host, port, secure, user, pass, mailbox }.
+function resolveImap(creds) {
+  const c = creds || {};
+  const provider = c.provider || 'custom';
+  const mailbox = c.mailbox || 'INBOX';
+  const user = c.email;
+  if (provider === 'gmail') {
+    return { host: 'imap.gmail.com', port: 993, secure: true, user, pass: c.app_password || c.password, mailbox };
+  }
+  if (provider === 'outlook') {
+    return { host: 'outlook.office365.com', port: 993, secure: true, user, pass: c.password, mailbox };
+  }
+  // custom
+  return {
+    host: c.host,
+    port: parseInt(c.port || 993, 10),
+    secure: c.tls !== false && String(c.tls) !== 'false',
+    user, pass: c.password, mailbox,
+  };
 }
 
 async function aiEnabledFor(pool, companyId) {
@@ -26,22 +45,42 @@ async function aiEnabledFor(pool, companyId) {
   } catch (_) { return false; }
 }
 
-// Egy lekérdezési kör. Visszaadja a feldolgozott levelek számát.
-async function pollOnce(pool) {
-  if (!configured() || !ImapFlow || !simpleParser) return { skipped: true };
-  const companyId = parseInt(process.env.INTAKE_COMPANY_ID, 10);
+// Kapcsolat-teszt: csatlakozás + INBOX méret. Siker: {ok:true,count}. Hiba: dob.
+async function testConnection(creds) {
+  if (!ImapFlow) throw new Error('Az imapflow csomag nincs telepítve a szerveren.');
+  const cfg = resolveImap(creds);
+  if (!cfg.user || !cfg.pass) throw new Error('Hiányzó e-mail cím vagy jelszó.');
+  if (!cfg.host) throw new Error('Hiányzó IMAP szerver.');
+  const client = new ImapFlow({
+    host: cfg.host, port: cfg.port, secure: cfg.secure,
+    auth: { user: cfg.user, pass: cfg.pass }, logger: false,
+  });
+  await client.connect();
+  let count = 0;
+  try {
+    const lock = await client.getMailboxLock(cfg.mailbox || 'INBOX');
+    try { count = client.mailbox && client.mailbox.exists != null ? client.mailbox.exists : 0; }
+    finally { lock.release(); }
+  } finally { await client.logout().catch(() => {}); }
+  return { ok: true, count };
+}
+
+// Egy lekérdezési kör egy cégre. Visszaadja a feldolgozott levelek számát.
+async function pollOnce(pool, creds, companyId) {
+  if (!ImapFlow || !simpleParser) return { skipped: true };
+  if (!creds || !companyId) return { skipped: true };
+  const cfg = resolveImap(creds);
+  if (!cfg.host || !cfg.user || !cfg.pass) return { skipped: true };
+
   const aiEnabled = await aiEnabledFor(pool, companyId);
   const client = new ImapFlow({
-    host: process.env.INTAKE_IMAP_HOST,
-    port: parseInt(process.env.INTAKE_IMAP_PORT || '993', 10),
-    secure: String(process.env.INTAKE_IMAP_TLS || 'true') !== 'false',
-    auth: { user: process.env.INTAKE_IMAP_USER, pass: process.env.INTAKE_IMAP_PASS },
-    logger: false,
+    host: cfg.host, port: cfg.port, secure: cfg.secure,
+    auth: { user: cfg.user, pass: cfg.pass }, logger: false,
   });
   let processed = 0;
   await client.connect();
   try {
-    const lock = await client.getMailboxLock(process.env.INTAKE_MAILBOX || 'INBOX');
+    const lock = await client.getMailboxLock(cfg.mailbox || 'INBOX');
     try {
       for await (const msg of client.fetch({ seen: false }, { uid: true, source: true })) {
         try {
@@ -74,4 +113,4 @@ async function pollOnce(pool) {
   return { processed };
 }
 
-module.exports = { pollOnce, configured };
+module.exports = { pollOnce, testConnection, resolveImap, aiEnabledFor };

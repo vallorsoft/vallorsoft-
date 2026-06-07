@@ -39,7 +39,10 @@ function loadTab(name){
     if(name==='external-drivers') loadExtDrivers();
     if(name==='signature') initAdminSigCanvas();
   if(name==='clients' && window.ClientsPage) ClientsPage.mount('clientsBox');
-  if(name==='billing' && window.BillingCard) BillingCard.mount('billingCardBox');
+  if(name==='billing'){
+    if(window.EmailIntakeCard) EmailIntakeCard.mount('emailIntakeCardBox', {readOnly:true});
+    if(window.BillingCard) BillingCard.mount('billingCardBox');
+  }
   }
 
 // Ügyfélválasztó a fuvarűrlapon (egyszer mountoljuk; a kiválasztott nevet a meglévő

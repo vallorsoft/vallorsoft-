@@ -4,27 +4,47 @@
 //   csak az e-mail intake ütemező maradt.)
 // ============================================================
 const pool = require('../db');
+const { decrypt } = require('../lib/crypto');
 
 // ============================================================
 //  E-mail intake ütemező — beérkező megrendelések (2 perces ciklus).
-//  Csak akkor csinál bármit, ha az INTAKE_IMAP_* be van állítva (.env).
+//  A postafiók-beállítás CÉGENKÉNT a company_integrations táblából jön
+//  (provider='email_intake'); minden konfigurált céget végigpörget.
+//  Egy cég hibája nem állítja le a többit.
 // ============================================================
 function startIntakeScheduler() {
   let intake;
   try { intake = require('./email-intake'); } catch (_) { return null; }
-  if (!intake.configured()) {
-    console.log('[Intake] Postafiók nincs beállítva — az e-mail intake kihagyva.');
-    return null;
-  }
+
   async function tick() {
+    let rows;
     try {
-      const r = await intake.pollOnce(pool);
-      if (r && r.processed) console.log('[Intake] feldolgozott levél:', r.processed);
-    } catch (err) { console.error('[Intake] tick hiba:', err.message); }
+      ({ rows } = await pool.query(
+        `SELECT company_id, credentials_enc FROM company_integrations
+         WHERE provider='email_intake' AND enabled=true AND credentials_enc IS NOT NULL`));
+    } catch (err) { console.error('[Intake] cégek lekérése hiba:', err.message); return; }
+
+    for (const row of rows) {
+      let creds;
+      try { creds = JSON.parse(decrypt(row.credentials_enc)); }
+      catch (e) { console.error('[Intake] cég #' + row.company_id + ' credentials dekódolás hiba:', e.message); continue; }
+      try {
+        const r = await intake.pollOnce(pool, creds, row.company_id);
+        if (r && r.processed) console.log('[Intake] cég #' + row.company_id + ' — feldolgozott levél:', r.processed);
+        // Sikeres kör után az utolsó lekérdezés idejének frissítése (last_check oszlop).
+        await pool.query(
+          `UPDATE company_integrations SET last_check=now() WHERE company_id=$1 AND provider='email_intake'`,
+          [row.company_id]);
+      } catch (err) {
+        console.error('[Intake] cég #' + row.company_id + ' lekérdezés hiba:', err.message);
+        // egy cég hibája NE állítsa le a többit
+      }
+    }
   }
+
   tick();
   const interval = setInterval(tick, 2 * 60 * 1000);
-  console.log('[Intake] Elindítva — 2 perces ciklus');
+  console.log('[Intake] Ütemező elindítva — 2 perces ciklus (cégenkénti postafiók a beállításokból).');
   return interval;
 }
 
