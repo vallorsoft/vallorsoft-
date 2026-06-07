@@ -139,17 +139,21 @@
 
     <!-- HERE API FUNKCIÓK -->
     <div class="dev-pane hidden" id="pane-here">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
-        <div class="section-title" style="margin:0;">⚡ HERE API Funkciók</div>
-        <div id="hereTotalCost" style="font-size:14px;font-weight:800;color:#c084fc;">—</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+        <div class="section-title" style="margin:0;">⚡ HERE Térkép szolgáltatások</div>
+        <div id="hereGrandTotal" style="font-size:14px;font-weight:800;color:#c084fc;">—</div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">
+        4 alap szolgáltatás, <b>közös 1000 ingyenes tranzakció / hó / cég</b> (időrendben fogy).
+        A pool feletti rész szolgáltatásonként, az alábbi <b>EUR / 1000 tranzakció</b> ár szerint kerül kiszámlázásra.
       </div>
       <div class="glass" style="padding:0; overflow:hidden;">
         <table class="table">
-          <thead><tr><th>Funkció</th><th>Státusz</th><th>Havi használat</th><th>Költség</th></tr></thead>
+          <thead><tr><th>Szolgáltatás</th><th>Ár (EUR / 1000)</th><th>ÁFA %</th><th></th></tr></thead>
           <tbody id="hereTbody"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
         </table>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:10px;">🔄 Automatikus frissítés 30 másodpercenként. A költség az ingyenes limit feletti használatból számolódik.</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:10px;">💶 Az árak EUR-ban, 1000 tranzakcióra értendők. A módosítás azonnal érvénybe lép minden cégre.</div>
 
       <div class="section-title" style="margin-top:26px;">Cégenkénti használat — felhasználói bontással (aktuális hónap)</div>
       <div id="hereByCompany"><div style="color:var(--muted);font-size:13px;">Betöltés...</div></div>
@@ -421,72 +425,81 @@ function confirmInvoice(){
   }).catch(function(){ b.innerHTML=_invErr('Hálózati hiba a kiállításnál.'); });
 }
 
-/* ── HERE API funkciók (developer) ── */
+/* ── HERE térkép-szolgáltatások (developer) — 4 szolgáltatás + árszerkesztő + közös pool ── */
 var _hereTimer=null;
-var HERE_ICONS={realtime_traffic:'🚦',destination_weather:'🌤',fuel_prices:'⛽',waypoints_sequence:'🔀',intermodal:'🔄'};
+var HERE_ICONS={autocomplete:'🔍',geocode:'📍',raster_tile:'🗺',routing_truck:'🚛'};
 function loadHerePane(){
   loadHereByCompany();
-  gas('getHereFeatures').then(function(r){
+  gas('getHereServices').then(function(r){
     var tb=document.getElementById('hereTbody'); if(!tb) return;
     if(!r||!r.ok){ tb.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--err);padding:20px;">Nem elérhető.</td></tr>'; return; }
-    tb.innerHTML=(r.features||[]).map(function(f){
-      var ic=HERE_ICONS[f.feature_key]||'⚡';
-      var pct=f.usage_percent||0;
-      var barColor=pct>=100?'#ef4444':pct>=80?'#f59e0b':'#22c55e';
-      var cost=Number(f.cost_usd)||0;
-      var costStr=cost>0?'<span style="color:var(--err);font-weight:700;">$'+cost.toFixed(2)+'</span>':'<span style="color:var(--ok);">$0.00</span>';
+    tb.innerHTML=(r.services||[]).map(function(s){
+      var ic=HERE_ICONS[s.feature_key]||'⚡';
+      var k=s.feature_key;
       return '<tr>'
-        +'<td><b style="color:#fff;">'+ic+' '+escHtml(f.display_name)+'</b><div style="font-size:11px;color:var(--muted);">'+escHtml(f.description||'')+'</div></td>'
-        +'<td><label class="fsw"><input type="checkbox" '+(f.enabled?'checked':'')+' onchange="toggleHereDev(\''+f.feature_key+'\',this.checked,this)"><span class="fsw-s"></span></label></td>'
-        +'<td style="min-width:150px;">'+f.used_this_month+' / '+f.free_limit
-          +'<div style="height:6px;border-radius:6px;background:rgba(255,255,255,0.1);overflow:hidden;margin-top:4px;"><i style="display:block;height:100%;width:'+Math.min(100,pct)+'%;background:'+barColor+';"></i></div></td>'
-        +'<td>'+costStr+'</td></tr>';
+        +'<td><b style="color:#fff;">'+ic+' '+escHtml(s.display_name)+'</b><div style="font-size:11px;color:var(--muted);">'+escHtml(s.description||'')+'</div></td>'
+        +'<td><input id="hp_'+k+'" type="number" step="0.01" min="0" value="'+(Number(s.price_eur)||0).toFixed(2)+'" style="width:90px;padding:5px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:#fff;"> €</td>'
+        +'<td><input id="hv_'+k+'" type="number" step="0.01" min="0" value="'+(Number(s.vat_percent)||21).toFixed(2)+'" style="width:70px;padding:5px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:#fff;"> %</td>'
+        +'<td><button class="btn-dev" style="padding:5px 12px;font-size:12px;" onclick="saveHerePrice(\''+k+'\',this)">💾 Mentés</button></td>'
+        +'</tr>';
     }).join('');
-    var tc=document.getElementById('hereTotalCost');
-    if(tc) tc.textContent='Összes becsült HERE költség: $'+(Number(r.total_cost)||0).toFixed(2)+' / hó';
   });
   if(!_hereTimer){
     _hereTimer=setInterval(function(){
       var pane=document.getElementById('pane-here');
-      if(pane && !pane.classList.contains('hidden')) loadHerePane();
+      if(pane && !pane.classList.contains('hidden')) loadHereByCompany();
     },30000);
   }
 }
-function toggleHereDev(key,enabled,inp){
-  inp.disabled=true;
-  gas('toggleHereFeature',[{feature_key:key,enabled:enabled}]).then(function(r){
-    inp.disabled=false;
-    if(r&&r.ok){ toast(enabled?'✅ Bekapcsolva':'⛔ Kikapcsolva','ok'); loadHerePane(); }
-    else { inp.checked=!enabled; toast((r&&r.err)||'Hiba','err'); }
-  }).catch(function(){ inp.disabled=false; inp.checked=!enabled; toast('Hiba','err'); });
+function saveHerePrice(key,btn){
+  var pi=document.getElementById('hp_'+key), vi=document.getElementById('hv_'+key);
+  if(!pi) return;
+  var price=parseFloat(pi.value), vat=parseFloat(vi.value);
+  if(!isFinite(price)||price<0){ toast('Érvénytelen ár','err'); return; }
+  btn.disabled=true;
+  gas('updateHereServicePrice',[{feature_key:key,price_eur:price,vat_percent:isFinite(vat)?vat:undefined}]).then(function(r){
+    btn.disabled=false;
+    if(r&&r.ok){ toast('✅ Ár mentve','ok'); loadHereByCompany(); }
+    else toast((r&&r.err)||'Hiba','err');
+  }).catch(function(){ btn.disabled=false; toast('Hiba','err'); });
 }
 function loadHereByCompany(){
   gas('getHereUsageByCompany').then(function(r){
     var el=document.getElementById('hereByCompany'); if(!el) return;
-    if(!r||!r.ok){ el.innerHTML='<div style="color:var(--err);font-size:13px;">Nem elérhető.</div>'; return; }
+    var gt=document.getElementById('hereGrandTotal');
+    if(!r||!r.ok){ el.innerHTML='<div style="color:var(--err);font-size:13px;">Nem elérhető.</div>'; if(gt)gt.textContent='—'; return; }
+    if(gt) gt.textContent='Összes (bruttó): €'+(r.grand_total_gross||'0.00')+' / hó';
     var comps=r.companies||[];
     if(!comps.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;padding:6px 0;">Ebben a hónapban nincs cégenkénti HERE használat.</div>'; return; }
     el.innerHTML=comps.map(function(c){
-      var feats=c.features.map(function(f){
+      var poolPct=c.free_pool_total?Math.min(100,Math.round((c.free_pool_used/c.free_pool_total)*100)):0;
+      var barColor=poolPct>=100?'#ef4444':poolPct>=80?'#f59e0b':'#22c55e';
+      var poolBar='<div style="font-size:11px;color:var(--muted);margin:2px 0 10px;">Közös ingyenes pool: <b style="color:#fff;">'+c.free_pool_used+'</b> / '+c.free_pool_total+' tranzakció ('+c.free_pool_remaining+' maradt)'
+        +'<div style="height:6px;border-radius:6px;background:rgba(255,255,255,0.1);overflow:hidden;margin-top:4px;"><i style="display:block;height:100%;width:'+poolPct+'%;background:'+barColor+';"></i></div></div>';
+      var feats=(c.services||[]).map(function(f){
         var uid=c.company_id+'_'+f.feature_key;
+        var ic=HERE_ICONS[f.feature_key]||'⚡';
         var users=(f.users||[]).map(function(u){
           return '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--soft);padding:3px 0 3px 14px;border-left:2px solid rgba(168,85,247,0.35);margin-bottom:2px;">'
             +'<span>'+escHtml(u.user_name)+' <span style="color:var(--muted);">('+escHtml(u.user_role)+')</span></span><span>'+u.used+' trz</span></div>';
         }).join('');
+        var billInfo=f.billable_trx>0
+          ? 'Számlázható: '+f.billable_trx+' trz = '+f.units+'×1000 egység'
+          : '<span style="color:var(--ok);">Pool alatt — nincs díj</span>';
         return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;background:rgba(255,255,255,0.02);">'
           +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
-          +'<div style="color:#fff;font-weight:600;font-size:13px;">'+escHtml(f.display_name)+'</div>'
+          +'<div style="color:#fff;font-weight:600;font-size:13px;">'+ic+' '+escHtml(f.display_name)+'</div>'
           +'<button class="btn-dev" style="padding:3px 10px;font-size:11px;" onclick="toggleFeatUsers(\''+uid+'\',this)">▼ Részletezés</button></div>'
-          +'<div style="font-size:12px;color:var(--muted);margin-top:4px;">Összesen: '+f.total_used+' trz = '+f.units+'×1000 egység</div>'
+          +'<div style="font-size:12px;color:var(--muted);margin-top:4px;">Összes: '+f.total_used+' trz &nbsp;·&nbsp; '+billInfo+'</div>'
           +'<div id="fu_'+uid+'" style="display:none;margin-top:8px;">'+users+'</div>'
-          +'<div style="font-size:12px;margin-top:8px;color:var(--muted);">Nettó: <b style="color:#fff;">$'+f.net_usd+'</b> &nbsp; ÁFA: <b style="color:#fff;">$'+f.vat_usd+'</b> &nbsp; Bruttó: <b style="color:#c084fc;">$'+f.gross_usd+'</b></div>'
+          +'<div style="font-size:12px;margin-top:8px;color:var(--muted);">Nettó: <b style="color:#fff;">€'+f.net_eur+'</b> &nbsp; ÁFA: <b style="color:#fff;">€'+f.vat_eur+'</b> &nbsp; Bruttó: <b style="color:#c084fc;">€'+f.gross_eur+'</b></div>'
           +'</div>';
       }).join('');
       return '<div class="ceg-card">'
-        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px;">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">'
         +'<div class="ceg-name">🏢 '+escHtml(c.company_name)+'</div>'
-        +'<div style="font-size:13px;color:#c084fc;font-weight:700;">Részösszeg (bruttó): $'+c.subtotal_gross+'</div></div>'
-        +feats+'</div>';
+        +'<div style="font-size:13px;color:#c084fc;font-weight:700;">Részösszeg (bruttó): €'+c.subtotal_gross+'</div></div>'
+        +poolBar+feats+'</div>';
     }).join('');
   });
 }

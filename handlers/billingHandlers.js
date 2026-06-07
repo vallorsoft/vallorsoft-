@@ -7,6 +7,7 @@
 const pool = require('../db');
 const billing = require('../services/billing');
 const { encrypt, decrypt } = require('../lib/crypto');
+const { computePool } = require('../lib/herePool');
 
 const handlers = {};
 
@@ -200,45 +201,25 @@ async function buildHereInvoice(companyId, monthYear) {
      FROM subscription_plans sp JOIN companies c ON c.subscription_plan_id = sp.id WHERE c.id = $1`, [companyId]);
   const plan = pR.rows[0] || null;
 
-  const hR = await pool.query(
-    `SELECT f.feature_key, f.display_name, f.price_per_1000, f.markup_per_1000, f.vat_percent,
-            COALESCE(SUM(u.transaction_count), 0)::int AS used
-     FROM here_feature_flags f
-     LEFT JOIN here_usage_log u ON u.feature_key = f.feature_key AND u.company_id = $1 AND u.month_year = $2
-     WHERE f.enabled = true
-     GROUP BY f.feature_key, f.display_name, f.price_per_1000, f.markup_per_1000, f.vat_percent
-     HAVING COALESCE(SUM(u.transaction_count), 0) > 0`, [companyId, month]);
-
-  // Felhasználónkénti bontás (a számla-tétel leírásához)
-  const uR = await pool.query(
-    `SELECT l.feature_key, COALESCE(usr.nume, 'Ismeretlen felhasználó') AS user_name,
-            COALESCE(usr.pozicio, '—') AS user_role, SUM(l.transaction_count)::int AS used
-     FROM here_usage_log l LEFT JOIN users usr ON usr.id = l.user_id
-     WHERE l.company_id = $1 AND l.month_year = $2
-     GROUP BY l.feature_key, l.user_id, usr.nume, usr.pozicio
-     ORDER BY used DESC`, [companyId, month]);
-  const usersByFeat = {};
-  uR.rows.forEach((r) => { (usersByFeat[r.feature_key] = usersByFeat[r.feature_key] || []).push(r); });
-
   const iR = await pool.query(
     `SELECT provider, display_name, credentials FROM billing_integrations WHERE company_id = $1 AND is_active = true LIMIT 1`, [companyId]);
   const integration = iR.rows[0] || null;
+
+  // HERE: a közös 1000-es pool feletti (fizetős) használat szolgáltatásonként (computePool).
+  const hp = await computePool(companyId, month);
+  const billableServices = hp.services.filter((s) => (s.billable_trx || 0) > 0);
 
   const label = monthLabelHu(month);
   const items = [];
   if (plan) {
     items.push({ name: 'VallorSoft ' + plan.name + ' csomag — ' + label, quantity: 1, unit: 'lună', price_net: round2(plan.price_net), vat_percent: parseFloat(plan.vat_percent) || 21 });
   }
-  hR.rows.forEach((f) => {
-    const used = f.used || 0;
-    const units = Math.ceil(used / 1000);
-    const unit_price = round2((parseFloat(f.price_per_1000) || 0) + (parseFloat(f.markup_per_1000) || 0));
-    const usersList = usersByFeat[f.feature_key] || [];
-    const description = usersList.map((u) => u.user_name + ' (' + u.user_role + '): ' + u.used + ' trz.').join(' | ');
+  billableServices.forEach((s) => {
+    const description = (s.users || []).map((u) => u.user_name + ' (' + u.user_role + '): ' + u.used + ' trz.').join(' | ');
     items.push({
-      name: 'HERE ' + f.display_name + ' — ' + label,
-      quantity: units, unit: '1000 tranzacții', price_net: unit_price, vat_percent: parseFloat(f.vat_percent) || 21,
-      used: used, description: description, users: usersList,
+      name: 'HERE ' + s.display_name + ' — ' + label,
+      quantity: s.units, unit: '1000 tranzacții', price_net: s.price_eur, vat_percent: s.vat_percent,
+      used: s.billable_trx, description: description, users: s.users,
     });
   });
 
@@ -251,7 +232,7 @@ async function buildHereInvoice(companyId, monthYear) {
     month, month_label: label,
     issue_date: addDaysISO(0), due_date: addDaysISO(30),
     notes: 'VallorSoft HERE API szolgáltatás — ' + label + '. Automatikusan generált számla.',
-    has_plan: !!plan, has_here: hR.rows.length > 0,
+    has_plan: !!plan, has_here: billableServices.length > 0,
   };
 }
 
@@ -307,56 +288,42 @@ handlers.generateHereInvoice = async function (req, res, args) {
   }
 };
 
-// ─── Cégenkénti HERE használat — felhasználó-szintű bontással (developer) ──
+// ─── Cégenkénti HERE használat — közös 1000-es pool, felhasználó-szintű bontással (developer) ──
 handlers.getHereUsageByCompany = async function (req, res, args) {
   try {
     if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Csak developer' } });
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const cid = a.company_id ? parseInt(a.company_id, 10) : null;
-    const params = []; let where = '';
-    if (cid) { where = 'WHERE c.id = $1'; params.push(cid); }
-    const r = await pool.query(`
-      SELECT c.id AS company_id, c.nev AS company_name,
-             l.feature_key, f.display_name, f.price_per_1000, f.markup_per_1000, f.vat_percent,
-             l.user_id, COALESCE(usr.nume, 'Ismeretlen felhasználó') AS user_name,
-             COALESCE(usr.pozicio, '—') AS user_role,
-             COALESCE(SUM(l.transaction_count), 0)::int AS user_used
-      FROM companies c
-      JOIN here_usage_log l ON l.company_id = c.id AND l.month_year = TO_CHAR(NOW(), 'YYYY-MM')
-      JOIN here_feature_flags f ON f.feature_key = l.feature_key
-      LEFT JOIN users usr ON usr.id = l.user_id
-      ${where}
-      GROUP BY c.id, c.nev, l.feature_key, f.display_name, f.price_per_1000, f.markup_per_1000, f.vat_percent, l.user_id, usr.nume, usr.pozicio
-      ORDER BY c.nev, l.feature_key, user_used DESC
-    `, params);
+    const month = (a.month_year && /^\d{4}-\d{2}$/.test(a.month_year)) ? a.month_year : null;
 
-    const companies = {};
-    r.rows.forEach((row) => {
-      if (!companies[row.company_id]) companies[row.company_id] = { company_id: row.company_id, company_name: row.company_name, features: {} };
-      const feat = companies[row.company_id].features;
-      if (!feat[row.feature_key]) feat[row.feature_key] = {
-        feature_key: row.feature_key, display_name: row.display_name,
-        price_per_1000: parseFloat(row.price_per_1000) || 0, markup_per_1000: parseFloat(row.markup_per_1000) || 0,
-        vat_percent: parseFloat(row.vat_percent) || 21, total_used: 0, users: [],
-      };
-      feat[row.feature_key].users.push({ user_id: row.user_id, user_name: row.user_name, user_role: row.user_role, used: parseInt(row.user_used, 10) });
-      feat[row.feature_key].total_used += parseInt(row.user_used, 10);
-    });
+    // Mely cégeknek volt HERE-használata az adott hónapban (vagy egy konkrét cég).
+    const params = []; let where = "l.month_year = COALESCE($1, TO_CHAR(NOW(), 'YYYY-MM'))";
+    params.push(month);
+    if (cid) { params.push(cid); where += ' AND l.company_id = $2'; }
+    const cr = await pool.query(
+      `SELECT DISTINCT c.id AS company_id, c.nev AS company_name
+       FROM here_usage_log l JOIN companies c ON c.id = l.company_id
+       WHERE ${where} ORDER BY c.nev`, params);
 
-    const out = Object.values(companies).map((comp) => {
-      const features = Object.values(comp.features).map((fe) => {
-        const units = Math.ceil(fe.total_used / 1000);
-        const net = units * (fe.price_per_1000 + fe.markup_per_1000);
-        const vat = net * (fe.vat_percent / 100);
-        fe.units = units; fe.net_usd = net.toFixed(2); fe.vat_usd = vat.toFixed(2); fe.gross_usd = (net + vat).toFixed(2);
-        return fe;
+    const monthYear = month || new Date().toISOString().slice(0, 7);
+    let gNet = 0, gVat = 0, gGross = 0;
+    const out = [];
+    for (const row of cr.rows) {
+      const hp = await computePool(row.company_id, monthYear);
+      // Csak a ténylegesen használt szolgáltatások (pool feletti + alatti egyaránt látszik)
+      const services = hp.services.filter((s) => (s.total_used || 0) > 0);
+      gNet += parseFloat(hp.total_net_eur); gVat += parseFloat(hp.total_vat_eur); gGross += parseFloat(hp.total_gross_eur);
+      out.push({
+        company_id: row.company_id, company_name: row.company_name,
+        free_pool_total: hp.free_pool_total, free_pool_used: hp.free_pool_used, free_pool_remaining: hp.free_pool_remaining,
+        services: services,
+        subtotal_net: hp.total_net_eur, subtotal_vat: hp.total_vat_eur, subtotal_gross: hp.total_gross_eur,
       });
-      const sNet = features.reduce((s, f) => s + parseFloat(f.net_usd), 0);
-      const sVat = features.reduce((s, f) => s + parseFloat(f.vat_usd), 0);
-      const sGross = features.reduce((s, f) => s + parseFloat(f.gross_usd), 0);
-      return { company_id: comp.company_id, company_name: comp.company_name, features: features, subtotal_net: sNet.toFixed(2), subtotal_vat: sVat.toFixed(2), subtotal_gross: sGross.toFixed(2) };
-    });
-    return res.json({ result: { ok: true, companies: out } });
+    }
+    return res.json({ result: {
+      ok: true, month: monthYear, companies: out,
+      grand_total_net: gNet.toFixed(2), grand_total_vat: gVat.toFixed(2), grand_total_gross: gGross.toFixed(2),
+    } });
   } catch (err) {
     console.error('getHereUsageByCompany hiba:', err);
     return res.json({ result: { ok: false, err: 'Szerver hiba' } });
