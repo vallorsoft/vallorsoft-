@@ -50,6 +50,7 @@
       </div>
       <div class="tab" data-tab="received-fuv">Fuvarlevelek</div>
             <div class="tab" data-tab="driver-docs-pane">Feltöltött Iratok & CMR-ek</div>
+      <a href="/utvonaltervezes" class="tab-link">🗺 Útvonaltervezés</a>
     </div>
     <div class="menu-group" id="userMenuGroup">
       <div class="menu-title">Adminisztráció</div>
@@ -616,6 +617,62 @@
     <div class="field"><label>Model</label><input class="input" id="vehEditModel"></div>
     <div class="field"><label>Év</label><input class="input" id="vehEditAn" type="number"></div>
     <div class="field"><label>Megjegyzés</label><input class="input" id="vehEditNota"></div>
+
+     <!-- Teherjármű paraméterek (útvonaltervezés) — alapból nyitva -->
+    <details class="veh-params" style="margin-top:8px;" open>
+      <summary>🚚 Teherjármű paraméterek (útvonaltervezés)</summary>
+      <div style="margin-top:12px;">
+        <div class="text-muted" style="font-size:12px;margin-bottom:8px;font-weight:600;">Fizikai méretek</div>
+        <div class="grid-3">
+          <div class="field"><label>Magasság (cm)</label><input class="input" id="vehEditHeight" type="number" placeholder="pl. 390"></div>
+          <div class="field"><label>Szélesség (cm)</label><input class="input" id="vehEditWidth" type="number" placeholder="pl. 255"></div>
+          <div class="field"><label>Hossz (cm)</label><input class="input" id="vehEditLength" type="number" placeholder="pl. 1350"></div>
+        </div>
+        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;">Tömeg adatok</div>
+        <div class="grid-2">
+          <div class="field"><label>Teljes tömeg (kg, rakománnyal)</label><input class="input" id="vehEditWeight" type="number" placeholder="pl. 40000"></div>
+          <div class="field"><label>Tengelyterhelés (kg)</label><input class="input" id="vehEditAxleWeight" type="number" placeholder="pl. 11500"></div>
+        </div>
+        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;">Konfiguráció</div>
+        <div class="grid-3">
+          <div class="field"><label>Tengelyek száma</label><input class="input" id="vehEditAxleCount" type="number" min="2" max="10" value="2"></div>
+          <div class="field"><label>Pótkocsi</label><input class="input" id="vehEditTrailerCount" type="number" min="0" max="3" value="0"></div>
+          <div class="field"><label>Jármű típus</label>
+            <select class="select" id="vehEditTruckType">
+              <option value="straight">Merevtengelyes teherautó</option>
+              <option value="tractor">Nyerges vontató</option>
+              <option value="lightTruck">Könnyű teherjármű</option>
+            </select>
+          </div>
+        </div>
+        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;">Speciális</div>
+        <div class="grid-2">
+          <div class="field"><label>Alagút kategória</label>
+            <select class="select" id="vehEditTunnel">
+              <option value="">Nincs korlátozás</option>
+              <option value="B">B kategória</option>
+              <option value="C">C kategória</option>
+              <option value="D">D kategória</option>
+              <option value="E">E kategória (legszigorúbb)</option>
+            </select>
+          </div>
+          <div class="field"><label>Veszélyes áru</label>
+            <select class="select" id="vehEditHazmat">
+              <option value="">Nincs</option>
+              <option value="explosive">Robbanóanyag</option>
+              <option value="gas">Gáz</option>
+              <option value="flammable">Gyúlékony</option>
+              <option value="combustible">Égőanyag</option>
+              <option value="organic">Szerves anyag</option>
+              <option value="poison">Méreg</option>
+              <option value="harmfulToWater">Vízszennyező</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" style="margin-top:8px;"><label>Fogyasztás (L/100km)</label><input class="input" id="vehEditFuel" type="number" step="0.1" placeholder="pl. 28.5"></div>
+      </div>
+    </details>
+
     <div class="row" style="margin-top:14px; display:flex; gap:10px;">
       <button class="btn ghost col" onclick="closeVehicleModal()">Mégse</button>
       <button class="btn primary col" onclick="saveVehicle()">Mentés</button>
@@ -805,6 +862,7 @@
 </div>
 
 
+<script src="/feature-catalog.js"></script>
 <script src="/console-shared.js"></script>
 <!-- ===== INTEGRACIOK (Ugyfelek / CargoTrack / Szamlazas) ===== -->
 <script src="/clients-page.js"></script>

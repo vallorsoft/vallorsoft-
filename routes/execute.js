@@ -17,6 +17,7 @@ const handlers = Object.assign(
   require('../handlers/documents'),
   require('../handlers/dashboard'),
   require('../handlers/developer'),
+  require('../handlers/routePlannerHandlers'),
 );
 
 router.post('/api/execute', requireLogin, async (req, res) => {

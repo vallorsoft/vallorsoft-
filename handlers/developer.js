@@ -117,13 +117,95 @@ handlers.devUserList = async function (req, res, args) {
     if (!isDev) return res.json({ result: [] });
     try {
       const r = await pool.query(`
-        SELECT u.id, u.nume, u.email, u.pozicio, u.company_id, c.nev AS ceg_nev
+        SELECT u.id, u.nume, u.email, u.pozicio, u.company_id, u.blocked,
+               (u.pozicio_dev IS TRUE) AS is_dev, c.nev AS ceg_nev
         FROM users u LEFT JOIN companies c ON c.id = u.company_id
         ORDER BY c.nev, u.pozicio
       `);
       return res.json({ result: r.rows });
     } catch (err) { return res.json({ result: [] }); }
   };
+
+// ─── Funkció-kapcsolók (előfizetés) cégenként ───────────────
+handlers.devGetCompanyFeatures = async function (req, res, args) {
+  const isDev = req.session.user && req.session.user.is_dev;
+  if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+  try {
+    const cid = parseInt(args[0], 10);
+    if (!cid) return res.json({ result: { ok: false, err: 'Hiányzó cég ID.' } });
+    const r = await pool.query('SELECT feature_key, enabled FROM company_features WHERE company_id = $1', [cid]);
+    const features = {};
+    r.rows.forEach((row) => { features[row.feature_key] = row.enabled; });
+    return res.json({ result: { ok: true, features } });
+  } catch (err) {
+    console.error('devGetCompanyFeatures hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
+handlers.devSetCompanyFeature = async function (req, res, args) {
+  const isDev = req.session.user && req.session.user.is_dev;
+  if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+  try {
+    const cid = parseInt(args[0], 10);
+    const key = String(args[1] || '').trim();
+    const enabled = !!args[2];
+    if (!cid || !key || key.length > 60) return res.json({ result: { ok: false, err: 'Hiányzó adat.' } });
+    await pool.query(
+      `INSERT INTO company_features (company_id, feature_key, enabled, updated_at)
+       VALUES ($1, $2, $3, now())
+       ON CONFLICT (company_id, feature_key) DO UPDATE SET enabled = $3, updated_at = now()`,
+      [cid, key, enabled]
+    );
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('devSetCompanyFeature hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
+// ─── Felhasználó tiltása / törlése (developer) ──────────────
+handlers.devUserSetBlocked = async function (req, res, args) {
+  const isDev = req.session.user && req.session.user.is_dev;
+  if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+  try {
+    const id = parseInt(args[0], 10);
+    const blocked = !!args[1];
+    if (!id) return res.json({ result: { ok: false, err: 'Hiányzó user ID.' } });
+    const u = await pool.query('SELECT pozicio_dev FROM users WHERE id = $1', [id]);
+    if (!u.rows.length) return res.json({ result: { ok: false, err: 'Felhasználó nem található.' } });
+    if (u.rows[0].pozicio_dev) return res.json({ result: { ok: false, err: 'Developer fiók nem tiltható.' } });
+    await pool.query('UPDATE users SET blocked = $1 WHERE id = $2', [blocked, id]);
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('devUserSetBlocked hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
+handlers.devUserDelete = async function (req, res, args) {
+  const isDev = req.session.user && req.session.user.is_dev;
+  if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+  try {
+    const id = parseInt(args[0], 10);
+    if (!id) return res.json({ result: { ok: false, err: 'Hiányzó user ID.' } });
+    const u = await pool.query('SELECT email, pozicio_dev FROM users WHERE id = $1', [id]);
+    if (!u.rows.length) return res.json({ result: { ok: false, err: 'Felhasználó nem található.' } });
+    if (u.rows[0].pozicio_dev) return res.json({ result: { ok: false, err: 'Developer fiók nem törölhető.' } });
+    if (id === req.session.user.id) return res.json({ result: { ok: false, err: 'Saját fiók nem törölhető.' } });
+    const email = u.rows[0].email;
+    // A felhasználó személyes adatainak takarítása (email alapján)
+    await pool.query('DELETE FROM border_crossings WHERE LOWER(email_sofer) = LOWER($1)', [email]);
+    await pool.query('DELETE FROM documents WHERE LOWER(email_sofer) = LOWER($1)', [email]);
+    await pool.query('DELETE FROM fuvarlevelek WHERE LOWER(email_sofer) = LOWER($1)', [email]);
+    await pool.query('DELETE FROM stamps WHERE LOWER(email) = LOWER($1)', [email]);
+    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('devUserDelete hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
 
 handlers.sendBugReport = async function (req, res, args) {
     try {

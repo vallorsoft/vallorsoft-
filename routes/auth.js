@@ -94,7 +94,7 @@ router.post('/api/login', async (req, res) => {
     }
 
     const result = await pool.query(
-      'SELECT id, nume, email, tel, pozicio, password_hash, company_id, pozicio_dev, totp_secret, totp_enabled FROM users WHERE email = $1',
+      'SELECT id, nume, email, tel, pozicio, password_hash, company_id, pozicio_dev, totp_secret, totp_enabled, blocked FROM users WHERE email = $1',
       [email]
     );
 
@@ -107,6 +107,11 @@ router.post('/api/login', async (req, res) => {
 
     if (!passwordMatch) {
       return res.json({ success: false, message: 'Hibas email vagy jelszo!' });
+    }
+
+    // Tiltott felhasznalo (developer nem tilthato)
+    if (user.blocked && !user.pozicio_dev) {
+      return res.json({ success: false, message: 'A fiókod le van tiltva. Kérjük vegye fel a kapcsolatot az adminisztrátorral.' });
     }
 
     // Ceg ellenorzese (ha nem developer)

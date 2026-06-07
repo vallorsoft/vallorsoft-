@@ -5,7 +5,18 @@
 const express = require('express');
 const path = require('path');
 const router = express.Router();
+const pool = require('../db');
 const { requirePageLogin, requirePageRole } = require('../middleware/pageGuard');
+
+// A funkció be van-e kapcsolva a cégnél (hiányzó sor = engedélyezett).
+async function featureEnabled(companyId, key) {
+  if (!companyId) return true;
+  try {
+    const r = await pool.query(
+      'SELECT enabled FROM company_features WHERE company_id = $1 AND feature_key = $2', [companyId, key]);
+    return r.rows.length ? r.rows[0].enabled !== false : true;
+  } catch (e) { return true; }
+}
 
 router.get('/', (req, res) => {
   if (req.session && req.session.user) {
@@ -42,6 +53,12 @@ router.get('/manager', requirePageLogin, requirePageRole('Manager', 'Admin'), fu
 });
 router.get('/sofer', requirePageLogin, requirePageRole('Sofer', 'Admin', 'Manager'), function(req, res) {
   res.sendFile(path.join(__dirname, '..', 'public', 'sofer.html'));
+});
+router.get('/utvonaltervezes', requirePageLogin, requirePageRole('Admin', 'Manager'), async function(req, res) {
+  // Előfizetés: ha a cégnél ki van kapcsolva, vissza a vezérlőpultra.
+  const ok = await featureEnabled(req.session.user.company_id, 'utvonaltervezes');
+  if (!ok) return res.redirect(req.session.user.pozicio === 'Manager' ? '/manager' : '/admin');
+  res.sendFile(path.join(__dirname, '..', 'public', 'utvonaltervezes.html'));
 });
 
 module.exports = router;

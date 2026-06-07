@@ -5,6 +5,39 @@
 //  Betoltes a HTML-ben: ELOBB ez, UTANA admin.js / manager.js.
 // ============================================================
 
+// ── Funkció-kapcsolók (előfizetés) — letiltott menük elrejtése ──
+// A cég kikapcsolt funkciói nem jelennek meg a sidebarban. Hiányzó kulcs = engedélyezett.
+function applyFeatureFlags(){
+  if(!window.gas) return;
+  gas('getMyFeatures').then(function(r){
+    if(!r||!r.ok) return;
+    var feats = r.features||{};
+    var cat = window.VS_FEATURES||[];
+    cat.forEach(function(f){
+      if(f.core) return;
+      if(feats[f.key]!==false) return; // csak az explicit false rejt
+      document.querySelectorAll('.sidebar [data-tab="'+f.key+'"]').forEach(function(el){ el.style.display='none'; });
+      if(f.key==='utvonaltervezes'){
+        document.querySelectorAll('.sidebar a.tab-link[href="/utvonaltervezes"]').forEach(function(el){ el.style.display='none'; });
+      }
+    });
+    // Üres almenük + szülő-fülek elrejtése
+    document.querySelectorAll('.sidebar .menu-group').forEach(function(grp){
+      var sub=grp.querySelector('.submenu');
+      if(!sub) return;
+      var vis=Array.prototype.filter.call(sub.querySelectorAll('.sub-tab'),function(s){return s.style.display!=='none';});
+      if(!vis.length){
+        var parent=grp.querySelector('.tab[id$="ParentTab"]');
+        if(parent) parent.style.display='none';
+        sub.style.display='none';
+      }
+    });
+    // Ha az aktív fül időközben rejtett lett -> ugrás a Vezérlőpultra
+    var active=document.querySelector('.sidebar .tab.active, .sidebar .sub-tab.active');
+    if(active && active.style.display==='none'){ activateTab('dash'); }
+  });
+}
+
 function activateTab(name){
   document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(x){x.classList.remove('active');});
   var tabEl=document.querySelector('.sidebar [data-tab="'+name+'"]');
@@ -258,6 +291,19 @@ function editVehicle(id){
   document.getElementById('vehEditModel').value=v.model||'';
   document.getElementById('vehEditAn').value=v.an||'';
   document.getElementById('vehEditNota').value=v.nota||'';
+  // Teherjármű paraméterek (útvonaltervezés)
+  var _vset=function(id,val){var el=document.getElementById(id);if(el)el.value=(val!=null?val:'');};
+  _vset('vehEditHeight', v.height_cm);
+  _vset('vehEditWidth', v.width_cm);
+  _vset('vehEditLength', v.length_cm);
+  _vset('vehEditWeight', v.weight_kg);
+  _vset('vehEditAxleWeight', v.weight_per_axle_kg);
+  _vset('vehEditAxleCount', v.axle_count!=null?v.axle_count:2);
+  _vset('vehEditTrailerCount', v.trailer_count!=null?v.trailer_count:0);
+  _vset('vehEditTruckType', v.truck_type||'straight');
+  _vset('vehEditTunnel', v.tunnel_category||'');
+  _vset('vehEditHazmat', v.hazardous_goods||'');
+  _vset('vehEditFuel', v.fuel_per_100km);
   document.getElementById('vehicleModal').classList.add('open');
 }
 
@@ -762,7 +808,26 @@ function saveQuickVehicle() {
 
 function saveVehicle(){
   const id=parseInt(document.getElementById('vehEditId').value,10);
-  const fields={rendszam:document.getElementById('vehEditRendszam').value.trim(),marca:document.getElementById('vehEditMarca').value.trim(),model:document.getElementById('vehEditModel').value.trim(),an:document.getElementById('vehEditAn').value,nota:document.getElementById('vehEditNota').value.trim()};
+  var _vget=function(idv){var el=document.getElementById(idv);return el?el.value:'';};
+  const fields={
+    rendszam:document.getElementById('vehEditRendszam').value.trim(),
+    marca:document.getElementById('vehEditMarca').value.trim(),
+    model:document.getElementById('vehEditModel').value.trim(),
+    an:document.getElementById('vehEditAn').value,
+    nota:document.getElementById('vehEditNota').value.trim(),
+    // Teherjármű paraméterek (útvonaltervezés) — a szerver parse-olja/null-ozza
+    height_cm:_vget('vehEditHeight'),
+    width_cm:_vget('vehEditWidth'),
+    length_cm:_vget('vehEditLength'),
+    weight_kg:_vget('vehEditWeight'),
+    weight_per_axle_kg:_vget('vehEditAxleWeight'),
+    axle_count:_vget('vehEditAxleCount'),
+    trailer_count:_vget('vehEditTrailerCount'),
+    truck_type:_vget('vehEditTruckType'),
+    tunnel_category:_vget('vehEditTunnel'),
+    hazardous_goods:_vget('vehEditHazmat'),
+    fuel_per_100km:_vget('vehEditFuel'),
+  };
   if(!fields.rendszam){toast('A rendszám kötelező!','err');return;}
   gas('vehicleUpdate',[id,fields]).then(r=>{if(r.ok){toast('Mentve!','ok');closeVehicleModal();loadVehicles();}else{toast(r.err||'Hiba történt','err');}});
 }
@@ -945,6 +1010,27 @@ function uploadOrderDoc(){
 //  Mind az admin, mind a manager konzol ezt használja.
 // ============================================================
 
+/* ── HERE Maps konfiguráció + csempe-URL (a kulcs a szerverről jön) ── */
+function getHereConfig() {
+  if (window._hereCfgPromise) return window._hereCfgPromise;
+  window._hereCfgPromise = fetch('/api/here-config', { credentials: 'same-origin' })
+    .then(function (r) { return r.ok ? r.json() : {}; })
+    .catch(function () { return {}; });
+  return window._hereCfgPromise;
+}
+function hereTileUrl(theme, apiKey) {
+  // HERE Raster Tile API v3 (a v2.1 maptile API le lett kapcsolva).
+  var style = (theme === 'light') ? 'explore.day' : 'explore.night';
+  return 'https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png?style=' + style +
+    '&size=512&apiKey=' + apiKey;
+}
+// CartoDB tartalék, ha nincs HERE kulcs (a térkép ne maradjon üres)
+function cartoTileUrl(theme) {
+  return theme === 'light'
+    ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+}
+
 /* ── Téma (light/dark) — a .main-content[data-theme] attribútumon ── */
 function toggleTheme() {
   var mc = document.getElementById('mainContent');
@@ -953,11 +1039,11 @@ function toggleTheme() {
   mc.setAttribute('data-theme', next);
   try { localStorage.setItem('vs-theme', next); } catch (e) {}
   syncThemeToggleIcon();
-  // Térkép-csempék cseréje a témához
+  // Térkép-csempék cseréje a témához (HERE, vagy CartoDB tartalék)
   if (window._dashMap && window._dashTileLayer) {
-    window._dashTileLayer.setUrl(next === 'light'
-      ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png');
+    window._dashTileLayer.setUrl(window._hereApiKey
+      ? hereTileUrl(next, window._hereApiKey)
+      : cartoTileUrl(next));
   }
 }
 
@@ -1070,15 +1156,26 @@ function initDashMap() {
 
   var mc = document.getElementById('mainContent');
   var light = mc && mc.getAttribute('data-theme') === 'light';
-  window._dashMap = L.map(el, { zoomControl: true, attributionControl: false })
+  var theme = light ? 'light' : 'dark';
+  window._dashMap = L.map(el, { zoomControl: true })
     .setView([45.9432, 24.9668], 7);                  // Románia közepe
-  window._dashTileLayer = L.tileLayer(
-    light
-      ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    { maxZoom: 19, subdomains: 'abcd' }
-  ).addTo(window._dashMap);
   window._dashMarkers = L.layerGroup().addTo(window._dashMap);
+
+  // HERE csempék (a kulcs a /api/here-config-ról); ha nincs kulcs -> CartoDB tartalék.
+  getHereConfig().then(function (cfg) {
+    var key = (cfg && cfg.apiKey) || null;
+    window._hereApiKey = key;
+    if (window._dashTileLayer && window._dashMap) window._dashMap.removeLayer(window._dashTileLayer);
+    window._dashTileLayer = key
+      ? L.tileLayer(hereTileUrl(theme, key),
+          { attribution: '© HERE Technologies', maxZoom: 20, tileSize: 512, zoomOffset: -1 })
+      : L.tileLayer(cartoTileUrl(theme),
+          { attribution: '© CARTO', maxZoom: 19, subdomains: 'abcd' });
+    if (window._dashMap) {
+      window._dashTileLayer.addTo(window._dashMap);
+      window._dashMap.invalidateSize();
+    }
+  });
 
   // A térkép gyakran üresen marad, ha induláskor a konténer mérete még nem véglegesült.
   // Több ütemezett invalidateSize + ablakméret-figyelő biztosítja a csempék kirajzolását.

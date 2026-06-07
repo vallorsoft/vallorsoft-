@@ -394,6 +394,7 @@ gas('authMe').then(u=>{
   try{savedTab=sessionStorage.getItem('vs_admin_tab')||'dash';savedRoom=sessionStorage.getItem('vs_admin_chat_room')||'';}catch(e){}
   if(savedTab==='chat'&&savedRoom){window._restoreChatRoom=savedRoom;}
   activateTab(savedTab||'dash');
+  applyFeatureFlags();
 });
 let currentDocOrderId = null;
 let currentDocId      = null;

@@ -66,7 +66,16 @@
     .table th { text-align:left; padding:10px 12px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px; border-bottom:1px solid var(--border); }
     .table td { padding:10px 12px; border-bottom:1px solid rgba(255,255,255,0.04); color:var(--soft); }
     .table tr:hover td { background: rgba(255,255,255,0.02); }
+    /* Funkció toggle kapcsoló */
+    .fsw { position:relative; display:inline-block; width:42px; height:24px; cursor:pointer; }
+    .fsw input { opacity:0; width:0; height:0; }
+    .fsw-s { position:absolute; inset:0; background:rgba(255,255,255,0.12); border:1px solid var(--border-bright); border-radius:24px; transition:.2s; }
+    .fsw-s:before { content:''; position:absolute; height:18px; width:18px; left:3px; top:2px; background:#94a3b8; border-radius:50%; transition:.2s; }
+    .fsw input:checked + .fsw-s { background:rgba(34,197,94,0.3); border-color:rgba(34,197,94,0.6); }
+    .fsw input:checked + .fsw-s:before { transform:translateX(18px); background:var(--ok); }
+    .fsw input:disabled + .fsw-s { opacity:.5; }
   </style>
+  <script src="/feature-catalog.js"></script>
   <script src="/session-guard.js"></script>
 </head>
 <body>
@@ -119,7 +128,7 @@
       <div class="section-title">Összes felhasználó</div>
       <div class="glass" style="padding:0; overflow:hidden;">
         <table class="table">
-          <thead><tr><th>Név</th><th>Email</th><th>Pozíció</th><th>Cég</th></tr></thead>
+          <thead><tr><th>Név</th><th>Email</th><th>Pozíció</th><th>Cég</th><th>Státusz</th><th>Műveletek</th></tr></thead>
           <tbody id="devUserTbody"></tbody>
         </table>
       </div>
@@ -169,6 +178,10 @@
         style="padding:10px 18px;background:none;border:none;border-bottom:2px solid #a855f7;color:#fff;font-size:13px;font-weight:800;cursor:pointer;">
         📊 Aktivitás
       </button>
+      <button id="dtab-funkciok" onclick="switchDetailTab('funkciok')"
+        style="padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;">
+        ⚙️ Funkciók
+      </button>
       <button id="dtab-hibak" onclick="switchDetailTab('hibak')"
         style="padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;">
         🐛 Hibajelentések
@@ -176,6 +189,7 @@
     </div>
     <!-- Tab tartalom -->
     <div id="dpane-aktivitas" style="display:block;overflow-y:auto;max-height:60vh;">Betöltés...</div>
+    <div id="dpane-funkciok"  style="display:none;overflow-y:auto;max-height:60vh;">Betöltés...</div>
     <div id="dpane-hibak"     style="display:none;overflow-y:auto;max-height:60vh;">Betöltés...</div>
   </div>
 </div>
@@ -252,14 +266,49 @@ function closeDetailModal(){ document.getElementById('detailModal').classList.re
 
 function switchDetailTab(tab){
   _detailTab = tab;
-  ['aktivitas','hibak'].forEach(function(t){
+  ['aktivitas','funkciok','hibak'].forEach(function(t){
     document.getElementById('dtab-'+t).style.fontWeight = t===tab ? '800' : '500';
     document.getElementById('dtab-'+t).style.borderBottom = t===tab ? '2px solid #a855f7' : '2px solid transparent';
     document.getElementById('dtab-'+t).style.color = t===tab ? '#fff' : 'var(--muted)';
     document.getElementById('dpane-'+t).style.display = t===tab ? 'block' : 'none';
   });
   if(tab==='aktivitas') loadDetailAktivitas();
+  if(tab==='funkciok')  loadDetailFunkciok();
   if(tab==='hibak')     loadDetailHibak();
+}
+
+function loadDetailFunkciok(){
+  var el=document.getElementById('dpane-funkciok');
+  el.innerHTML='<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(168,85,247,0.2);border-top-color:#a855f7;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
+  gas('devGetCompanyFeatures',[_detailCegId]).then(function(r){
+    if(!r||!r.ok){ el.innerHTML='<div style="color:var(--err);padding:20px;">Hiba a betöltés során.</div>'; return; }
+    var feats=r.features||{};
+    var cat=window.VS_FEATURES||[];
+    var groups={}, order=[];
+    cat.forEach(function(f){ if(!groups[f.group]){groups[f.group]=[];order.push(f.group);} groups[f.group].push(f); });
+    var html='<div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5;">Kapcsold ki/be az egyes menüpontokat ennél a cégnél. A <b>kikapcsolt</b> funkció nem jelenik meg a cég felületén. Alapból minden be van kapcsolva.</div>';
+    order.forEach(function(g){
+      html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#c084fc;margin:16px 0 8px;">'+escHtml(g)+'</div>';
+      groups[g].forEach(function(f){
+        var enabled = f.core ? true : (feats[f.key]!==false);
+        var right = f.core
+          ? '<span style="font-size:11px;color:var(--muted);">mindig aktív</span>'
+          : '<label class="fsw"><input type="checkbox" '+(enabled?'checked':'')+' onchange="toggleFeature('+_detailCegId+',\''+f.key+'\',this.checked,this)"><span class="fsw-s"></span></label>';
+        html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:rgba(255,255,255,0.02);">'
+          +'<span style="font-size:13px;color:#fff;">'+escHtml(f.label)+(f.core?' <span style="color:var(--muted);font-size:11px;">(alap)</span>':'')+'</span>'
+          + right + '</div>';
+      });
+    });
+    el.innerHTML=html;
+  });
+}
+function toggleFeature(cid,key,enabled,inp){
+  inp.disabled=true;
+  gas('devSetCompanyFeature',[cid,key,enabled]).then(function(r){
+    inp.disabled=false;
+    if(r&&r.ok){ toast(enabled?'✅ Bekapcsolva':'⛔ Kikapcsolva','ok'); }
+    else { inp.checked=!enabled; toast((r&&r.err)||'Hiba','err'); }
+  }).catch(function(){ inp.disabled=false; inp.checked=!enabled; toast('Hiba','err'); });
 }
 
 function loadDetailAktivitas(){
@@ -356,11 +405,37 @@ function markRead(id){
 
 function loadUsers(){
   gas('devUserList').then(function(list){
-    if(!list||!list.length){document.getElementById('devUserTbody').innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Nincs felhasználó.</td></tr>';return;}
+    if(!list||!list.length){document.getElementById('devUserTbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">Nincs felhasználó.</td></tr>';return;}
     document.getElementById('devUserTbody').innerHTML = list.map(function(u){
-      return '<tr><td>'+u.nume+'</td><td>'+u.email+'</td><td><span class="status-badge active">'+u.pozicio+'</span></td><td>'+(u.ceg_nev||'—')+'</td></tr>';
+      var em = String(u.email||'').replace(/'/g,"\\'");
+      var statusBadge = u.is_dev ? '<span class="status-badge cancelled">Developer</span>'
+        : (u.blocked ? '<span class="status-badge inactive">Tiltva</span>' : '<span class="status-badge active">Aktív</span>');
+      var actions;
+      if(u.is_dev){ actions='<span style="color:var(--muted);font-size:11px;">— védett —</span>'; }
+      else {
+        actions = (u.blocked
+            ? '<button class="btn-ok-sm" onclick="devUnblock('+u.id+',\''+em+'\')">🔓 Feloldás</button>'
+            : '<button class="btn-danger-sm" onclick="devBlock('+u.id+',\''+em+'\')">🔒 Blokk</button>')
+          + ' <button class="btn-danger-sm" onclick="devDelUser('+u.id+',\''+em+'\')" style="background:rgba(239,68,68,0.18);">🗑 Töröl</button>';
+      }
+      return '<tr><td>'+escHtml(u.nume||'')+'</td><td>'+escHtml(u.email||'')+'</td>'
+        +'<td><span class="status-badge active">'+escHtml(u.pozicio||'')+'</span></td>'
+        +'<td>'+escHtml(u.ceg_nev||'—')+'</td><td>'+statusBadge+'</td><td>'+actions+'</td></tr>';
     }).join('');
   });
+}
+function devBlock(id,email){
+  if(!confirm('Biztosan LETILTOD ezt a felhasználót?\n\n'+email+'\n\nEzután nem fog tudni bejelentkezni.')) return;
+  gas('devUserSetBlocked',[id,true]).then(function(r){ if(r&&r.ok){toast('Felhasználó letiltva','ok');loadUsers();}else{toast((r&&r.err)||'Hiba','err');} });
+}
+function devUnblock(id,email){
+  if(!confirm('Feloldod a tiltást?\n\n'+email)) return;
+  gas('devUserSetBlocked',[id,false]).then(function(r){ if(r&&r.ok){toast('Tiltás feloldva','ok');loadUsers();}else{toast((r&&r.err)||'Hiba','err');} });
+}
+function devDelUser(id,email){
+  if(!confirm('⚠️ VÉGLEGES TÖRLÉS\n\n'+email+'\n\nA felhasználó és személyes adatai (menetlevelek, dokumentumok, aláírás) törlődnek. Biztos vagy benne?')) return;
+  if(!confirm('Utolsó megerősítés — ez NEM vonható vissza.\n\nTényleg törlöd: '+email+' ?')) return;
+  gas('devUserDelete',[id]).then(function(r){ if(r&&r.ok){toast('Felhasználó törölve','ok');loadUsers();}else{toast((r&&r.err)||'Hiba','err');} });
 }
 
 function openNewCeg(){

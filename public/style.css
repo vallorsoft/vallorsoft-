@@ -620,6 +620,15 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
 /* A sidebar MINDIG sötét — a theme toggle nem hat rá */
 .sidebar { background: var(--bg-deepest) !important; }
 
+/* Sidebar navigációs LINK (külön oldalra mutat, pl. /utvonaltervezes) —
+   úgy néz ki mint a .tab, de <a> és nem kapcsolódik a pane-váltó JS-hez. */
+.sidebar a.tab-link {
+  display: block; padding: 12px 14px; border-radius: var(--r-sm);
+  cursor: pointer; font-weight: 600; font-size: 14px; color: var(--soft);
+  text-decoration: none; border: 1px solid transparent; transition: all 0.15s ease;
+}
+.sidebar a.tab-link:hover { background: rgba(255, 255, 255, 0.03); color: #fff; }
+
 /* Téma-érzékeny szöveg-segédosztályok */
 .text-primary { color: var(--text-primary); }
 .text-muted { color: var(--text-muted); }
@@ -734,3 +743,22 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
   .dash-stats { grid-template-columns: repeat(2, 1fr); }
   #dashMap { height: 360px; }
 }
+
+/* ----- Jármű szerkesztő: összecsukható teherjármű-paraméterek ----- */
+.veh-params {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.veh-params > summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  color: #fff;
+  list-style: none;
+  user-select: none;
+}
+.veh-params > summary::-webkit-details-marker { display: none; }
+.veh-params > summary::before { content: '▸ '; color: var(--brand-red); }
+.veh-params[open] > summary::before { content: '▾ '; }

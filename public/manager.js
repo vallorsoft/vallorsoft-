@@ -427,6 +427,7 @@ gas('authMe').then(u => {
   try { savedTab = sessionStorage.getItem('vs_manager_tab') || 'dash'; savedRoom = sessionStorage.getItem('vs_manager_chat_room') || ''; } catch(e) {}
   if (savedTab === 'chat' && savedRoom) { window._restoreChatRoom = savedRoom; }
   activateTab(savedTab || 'dash');
+  applyFeatureFlags();
 });
 
 // ===== MEGRENDELO DOKUMENTUM FUGGVENYEK =====

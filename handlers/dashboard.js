@@ -187,4 +187,20 @@ handlers.getActiveVehiclePositions = async function (req, res, args) {
   }
 };
 
+// A saját cég funkció-kapcsolói (a sidebar elrejtéséhez). Hiányzó kulcs = engedélyezett.
+handlers.getMyFeatures = async function (req, res, args) {
+  try {
+    if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve' } });
+    const cid = req.session.user.company_id;
+    if (!cid) return res.json({ result: { ok: true, features: {} } });
+    const r = await pool.query('SELECT feature_key, enabled FROM company_features WHERE company_id = $1', [cid]);
+    const features = {};
+    r.rows.forEach((row) => { features[row.feature_key] = row.enabled; });
+    return res.json({ result: { ok: true, features } });
+  } catch (err) {
+    console.error('getMyFeatures hiba:', err);
+    return res.json({ result: { ok: true, features: {} } });
+  }
+};
+
 module.exports = handlers;
