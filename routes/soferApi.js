@@ -284,7 +284,8 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     </style>
   </head>
   <body>
-    <div class="no-print" style="margin-bottom:16px;">
+    <div class="no-print" style="margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;">
+      <button onclick="window.close();setTimeout(function(){if(!window.closed){if(history.length>1){history.back();}else{location.href='/';}}},150);" style="padding:10px 24px;background:#555;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">← Vissza</button>
       <button onclick="window.print()" style="padding:10px 24px;background:#000;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">🖨️ Nyomtatás / PDF mentés</button>
     </div>
     <div class="header-box">VALLOR TEAM SRL<br><span style="font-size:14px;">FIȘĂ DE CURSĂ SĂPTĂMÂNALĂ</span><br><span style="font-size:15px;color:#b00;letter-spacing:1px;">Serie / Nr.: ${f.numar_fisa || '—'}</span></div>
