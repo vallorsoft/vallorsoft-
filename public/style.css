@@ -302,7 +302,7 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
     transform: translateX(-100%);
     transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
     overflow-y: auto;
-    padding-top: calc(70px + env(safe-area-inset-top, 0px));
+    padding-top: calc(78px + env(safe-area-inset-top, 0px));
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 
@@ -492,7 +492,7 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
     transform: translateX(-100%);
     transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
     overflow-y: auto;
-    padding-top: calc(68px + env(safe-area-inset-top, 0px));
+    padding-top: calc(78px + env(safe-area-inset-top, 0px));
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
   .dev-sidebar.mob-open {
@@ -744,12 +744,16 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
 /* ----- Reszponzív ----- */
 @media (max-width: 1024px) {
   .dash-grid { grid-template-columns: 1fr 1fr; }
-  .dash-stats { grid-template-columns: repeat(2, 1fr); }
+  .dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 768px) {
   .dash-grid { grid-template-columns: 1fr; }
-  /* stat kártyák 2x2-ben maradnak kis képernyőn is */
-  .dash-stats { grid-template-columns: repeat(2, 1fr); }
+  /* stat kártyák 2x2-ben; minmax(0,1fr) + min-width:0 → nem lógnak ki vízszintesen */
+  .dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .stat-tile { min-width: 0; padding: 14px; gap: 10px; }
+  .stat-tile > div { min-width: 0; }
+  .stat-val { font-size: 22px; }
+  .stat-lbl { word-break: break-word; line-height: 1.25; }
   #dashMap { height: 360px; }
 }
 
