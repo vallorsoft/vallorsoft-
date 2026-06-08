@@ -724,30 +724,34 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
 
 /* ----- Fő tartalom: 2 oszlop (55% / 45%) ----- */
 .dash-grid {
-  display: grid; grid-template-columns: 55fr 45fr; gap: 16px; align-items: start;
+  display: grid; grid-template-columns: minmax(0, 55fr) minmax(0, 45fr); gap: 16px; align-items: start;
 }
-.dash-col-left { display: flex; flex-direction: column; gap: 16px; }
+.dash-col-left { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .dash-link { font-size: 12px; font-weight: 600; color: var(--status-info); cursor: pointer; }
 .dash-link:hover { text-decoration: underline; }
-.dash-veh-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.dash-mini { padding: 14px; text-align: center; border-radius: var(--radius-md); }
+.dash-veh-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.dash-mini { padding: 14px; text-align: center; border-radius: var(--radius-md); min-width: 0; }
 
 /* ----- Térkép panel ----- */
 /* A térkép-konténernek EXPLICIT magasság kell (a Leaflet a flex:1-et nem mindig
    méri be jól induláskor -> üres/szürke térkép). */
 .dash-map-wrap {
-  padding: 0; overflow: hidden; border-radius: var(--radius-lg);
+  padding: 0; overflow: hidden; border-radius: var(--radius-lg); min-width: 0;
 }
 #dashMap { height: 520px; width: 100%; border-radius: var(--radius-lg); }
 .leaflet-container { background: var(--bg-panel); font: inherit; }
 
 /* ----- Reszponzív ----- */
 @media (max-width: 1024px) {
-  .dash-grid { grid-template-columns: 1fr 1fr; }
+  .dash-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 768px) {
-  .dash-grid { grid-template-columns: 1fr; }
+  /* 1 oszlop, de minmax(0,1fr) hogy a 520px-es tábla NE szélesítse ki (belül görög) */
+  .dash-grid { grid-template-columns: minmax(0, 1fr); }
+  .dash-col-left, .dash-map-wrap { min-width: 0; }
+  /* Jármű státusz: mobilon 2 oszlop (eddig fixen 3 → kilógott) */
+  .dash-veh-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* stat kártyák 2x2-ben; minmax(0,1fr) + min-width:0 → nem lógnak ki vízszintesen */
   .dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .stat-tile { min-width: 0; padding: 14px; gap: 10px; }
