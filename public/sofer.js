@@ -71,7 +71,6 @@ function draftSave() {
     stateSave({
       draft: {
         fisa: document.getElementById('fFisa').value,
-        cursaSapt: document.getElementById('fCursaSapt').value,
         camion: document.getElementById('fCamion').value,
         remorca: document.getElementById('fRemorca').value,
         kmInc: document.getElementById('fKmInc').value,
@@ -92,7 +91,6 @@ function draftSave() {
 function draftRestore(draft) {
   if (!draft) return;
   document.getElementById('fFisa').value = draft.fisa || '';
-  document.getElementById('fCursaSapt').value = draft.cursaSapt || '';
   document.getElementById('fCamion').value = draft.camion || '';
   document.getElementById('fRemorca').value = draft.remorca || '';
   document.getElementById('fKmInc').value = draft.kmInc || '0';
@@ -315,7 +313,7 @@ function fuvarBackStep1() {
 
 // Input változások figyelése → piszkozat auto-mentés
 function attachDraftListeners() {
-  var ids = ['fCursaSapt','fCamion','fRemorca','fKmInc','fKmSf','fCantInc','fCantSf','fMentiuni'];
+  var ids = ['fCamion','fRemorca','fKmInc','fKmSf','fCantInc','fCantSf','fMentiuni'];
   ids.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) {
@@ -442,7 +440,6 @@ function submitFuvarlevel() {
 
   var payload = {
     numarFisa: fisa,
-    cursaSaptamanii: document.getElementById('fCursaSapt').value,
     numarCamion: document.getElementById('fCamion').value,
     numarRemorca: document.getElementById('fRemorca').value,
     kmInceput: document.getElementById('fKmInc').value,
