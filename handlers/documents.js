@@ -144,14 +144,14 @@ handlers.getFuvarlevelek = async function (req, res, args) {
         const emails = sofors.rows.map(u => u.email);
         if (!emails.length) return res.json({ result: [] });
         r = await pool.query(
-          `SELECT id, file_name, email_sofer, nume_sofer, data_completare, total_km, consum_100, order_ids
+          `SELECT id, file_name, numar_fisa, email_sofer, nume_sofer, data_completare, total_km, consum_100, order_ids
            FROM fuvarlevelek WHERE email_sofer = ANY($1)
            ORDER BY data_completare DESC LIMIT 200`,
           [emails]
         );
       } else {
         r = await pool.query(
-          `SELECT id, file_name, email_sofer, nume_sofer, data_completare, total_km, consum_100, order_ids
+          `SELECT id, file_name, numar_fisa, email_sofer, nume_sofer, data_completare, total_km, consum_100, order_ids
            FROM fuvarlevelek WHERE email_sofer = $1
            ORDER BY data_completare DESC`,
           [me.email]
@@ -161,6 +161,85 @@ handlers.getFuvarlevelek = async function (req, res, args) {
     } catch (err) {
       console.error('getFuvarlevelek hiba:', err);
       return res.json({ result: [] });
+    }
+  };
+
+// Egy menetlevél teljes adata — szerkesztéshez (Admin/Manager, cégre szűrve).
+handlers.getFuvarlevelDetail = async function (req, res, args) {
+    try {
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve' } });
+      const me = req.session.user;
+      if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: { ok: false, err: 'Nincs jogosultság' } });
+      const id = Array.isArray(args) ? args[0] : args;
+      if (!id) return res.json({ result: { ok: false, err: 'Hiányzó azonosító' } });
+      // Csak a saját cég sofőrjeinek menetlevele érhető el.
+      const r = await pool.query(
+        `SELECT * FROM fuvarlevelek
+         WHERE id = $1 AND email_sofer IN (SELECT email FROM users WHERE company_id = $2)`,
+        [id, me.company_id]
+      );
+      if (!r.rows.length) return res.json({ result: { ok: false, err: 'Nem található' } });
+      return res.json({ result: { ok: true, fuv: r.rows[0] } });
+    } catch (err) {
+      console.error('getFuvarlevelDetail hiba:', err);
+      return res.json({ result: { ok: false, err: err.message } });
+    }
+  };
+
+// Menetlevél szerkesztése (Admin/Manager, cégre szűrve). A derivált mezőket
+// (total_km, total_alim, motorina_folosit, consum_100) szerveroldalon számoljuk.
+handlers.fuvarlevelUpdate = async function (req, res, args) {
+    try {
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve' } });
+      const me = req.session.user;
+      if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: { ok: false, err: 'Nincs jogosultság' } });
+      const id = Array.isArray(args) ? args[0] : null;
+      const d = (Array.isArray(args) ? args[1] : null) || {};
+      if (!id) return res.json({ result: { ok: false, err: 'Hiányzó azonosító' } });
+
+      // Jogosultság + létezés: csak saját cég menetlevele.
+      const own = await pool.query(
+        `SELECT id FROM fuvarlevelek WHERE id = $1 AND email_sofer IN (SELECT email FROM users WHERE company_id = $2)`,
+        [id, me.company_id]
+      );
+      if (!own.rows.length) return res.json({ result: { ok: false, err: 'Nem található / nincs jogosultság' } });
+
+      const alimentari = Array.isArray(d.alimentari) ? d.alimentari : [];
+      const achizitii  = Array.isArray(d.achizitii)  ? d.achizitii  : [];
+      const puncte     = Array.isArray(d.puncte)      ? d.puncte      : [];
+
+      const kmInc = Number(d.km_inceput || 0);
+      const kmSf  = Number(d.km_sfarsit || 0);
+      const totalKm = Math.max(0, kmSf - kmInc);
+      let totalAlim = 0;
+      alimentari.forEach(a => { totalAlim += Number(a.litru || 0); });
+      const cantInc = Number(d.cant_inceput || 0);
+      const cantSf  = Number(d.cant_sfarsit || 0);
+      const motorinaFolosit = Math.max(0, cantInc + totalAlim - cantSf);
+      const consum100 = totalKm > 0 ? Math.round((motorinaFolosit / totalKm * 100) * 100) / 100 : 0;
+
+      await pool.query(
+        `UPDATE fuvarlevelek SET
+           nume_sofer = $2, numar_camion = $3, numar_remorca = $4, numar_fisa = $5,
+           km_inceput = $6, km_sfarsit = $7, total_km = $8,
+           diurna_externa = $9, diurna_interna = $10,
+           cant_inceput = $11, cant_sfarsit = $12, motorina_folosit = $13, total_alim = $14, consum_100 = $15,
+           alte_mentiuni = $16, alimentari = $17, achizitii = $18, puncte = $19
+         WHERE id = $1`,
+        [
+          id,
+          d.nume_sofer || null, d.numar_camion || null, d.numar_remorca || null, d.numar_fisa || null,
+          kmInc, kmSf, totalKm,
+          parseInt(d.diurna_externa || 0), parseInt(d.diurna_interna || 0),
+          cantInc, cantSf, motorinaFolosit, totalAlim, consum100,
+          d.alte_mentiuni || null,
+          JSON.stringify(alimentari), JSON.stringify(achizitii), JSON.stringify(puncte)
+        ]
+      );
+      return res.json({ result: { ok: true, total_km: totalKm, consum_100: consum100 } });
+    } catch (err) {
+      console.error('fuvarlevelUpdate hiba:', err);
+      return res.json({ result: { ok: false, err: err.message } });
     }
   };
 

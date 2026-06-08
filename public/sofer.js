@@ -459,7 +459,7 @@ function submitFuvarlevel() {
     body: JSON.stringify(payload) })
   .then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
-      toast('✅ Menetlevél elküldve!', 'ok');
+      toast(d.docNumber ? ('✅ Menetlevél elküldve — ' + d.docNumber) : '✅ Menetlevél elküldve!', 'ok');
       draftClear();
       _selectedOrderIds = [];
       goSec('dash');
