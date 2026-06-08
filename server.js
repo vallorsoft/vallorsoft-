@@ -60,7 +60,8 @@ if (helmet) {
           "wss://*.firebaseio.com",
           "https://api.brevo.com",
         ],
-        frameSrc: ["'none'"],
+        frameSrc: ["'self'"],            // menetlevél PDF in-app nézet (azonos eredetű iframe)
+        frameAncestors: ["'self'"],      // a PDF-oldal csak azonos eredetből ágyazható
         objectSrc: ["'none'"],
         upgradeInsecureRequests: [],
       },
@@ -73,7 +74,7 @@ if (helmet) {
     },
     noSniff: true,
     xssFilter: true,
-    frameguard: { action: 'deny' },
+    frameguard: { action: 'sameorigin' }, // azonos eredetű iframe engedett (PDF in-app nézet); idegen klikk-elrablás tiltva
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   }));
 }

@@ -331,6 +331,14 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       <div style="text-align:center;"><div style="border-top:1px solid #000;width:180px;margin:0 auto;padding-top:4px;">Semnătura șofer</div></div>
       <div style="text-align:center;"><div style="border-top:1px solid #000;width:180px;margin:0 auto;padding-top:4px;">Semnătura dispecer</div></div>
     </div>
+    <script>
+      // Ha in-app iframe-ben (PWA-nézet) nyílik meg, a beágyazó modal adja a
+      // Vissza/Nyomtatás vezérlést — rejtsük a saját gombsávot.
+      if (window.self !== window.top) {
+        var _tb = document.querySelector('.no-print');
+        if (_tb) _tb.style.display = 'none';
+      }
+    </script>
   </body>
   </html>`);
   } catch (err) {
