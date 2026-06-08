@@ -278,7 +278,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     <table class="grid-table">
       <tr><td width="50%"><b>Nume șofer:</b> ${f.nume_sofer || '—'}</td><td><b>Număr fișă:</b> ${f.numar_fisa || '—'}</td></tr>
       <tr><td><b>Număr camion:</b> ${f.numar_camion || '—'}</td><td><b>Număr remorcă:</b> ${f.numar_remorca || '—'}</td></tr>
-      <tr><td><b>Cursa săptămânii:</b> ${f.cursa_saptamanii || '—'}</td><td><b>Fuvar ID-k:</b> ${orderIdsStr}</td></tr>
+      <tr><td colspan="2"><b>Fuvar ID-k:</b> ${orderIdsStr}</td></tr>
       <tr><td><b>Km început:</b> ${f.km_inceput || 0} km</td><td><b>Km sfârșit:</b> ${f.km_sfarsit || 0} km</td></tr>
       <tr><td colspan="2"><b>Total kilometri parcurși: ${f.total_km || 0} km</b></td></tr>
       <tr><td><b>Diurnă externă:</b> ${f.diurna_externa || 0} nap</td><td><b>Diurnă internă:</b> ${f.diurna_interna || 0} nap</td></tr>
