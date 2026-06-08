@@ -145,7 +145,7 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
         JSON.stringify(orderIds)
       ]
     );
-    res.json({ success: true, id });
+    res.json({ success: true, id, docNumber: autoDocNumber });
   } catch (err) {
     console.error('fuvarlevel-save hiba:', err);
     res.json({ success: false, err: 'Szerver hiba: ' + (err.message || 'ismeretlen') });
@@ -287,10 +287,10 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     <div class="no-print" style="margin-bottom:16px;">
       <button onclick="window.print()" style="padding:10px 24px;background:#000;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">🖨️ Nyomtatás / PDF mentés</button>
     </div>
-    <div class="header-box">VALLOR TEAM SRL<br><span style="font-size:14px;">FIȘĂ DE CURSĂ SĂPTĂMÂNALĂ</span></div>
+    <div class="header-box">VALLOR TEAM SRL<br><span style="font-size:14px;">FIȘĂ DE CURSĂ SĂPTĂMÂNALĂ</span><br><span style="font-size:15px;color:#b00;letter-spacing:1px;">Serie / Nr.: ${f.numar_fisa || '—'}</span></div>
 
     <table class="grid-table">
-      <tr><td width="50%"><b>Nume șofer:</b> ${f.nume_sofer || '—'}</td><td><b>Număr fișă:</b> ${f.numar_fisa || '—'}</td></tr>
+      <tr><td width="50%"><b>Nume șofer:</b> ${f.nume_sofer || '—'}</td><td><b>Serie / Număr:</b> ${f.numar_fisa || '—'}</td></tr>
       <tr><td><b>Număr camion:</b> ${f.numar_camion || '—'}</td><td><b>Număr remorcă:</b> ${f.numar_remorca || '—'}</td></tr>
       <tr><td colspan="2"><b>Fuvar ID-k:</b> ${orderIdsStr}</td></tr>
       <tr><td><b>Km început:</b> ${f.km_inceput || 0} km</td><td><b>Km sfârșit:</b> ${f.km_sfarsit || 0} km</td></tr>

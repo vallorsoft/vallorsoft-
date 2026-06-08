@@ -514,8 +514,100 @@ function loadOrders(){
 function loadReceivedFuvarlevelek(){
   gas('getFuvarlevelek').then(list=>{
     var tb=document.querySelector('#tblReceivedFuv tbody');
-    if(!list||list.length===0){tb.innerHTML='<tr><td colspan="4">Nincs beküldött fuvarlevél.</td></tr>';return;}
-    tb.innerHTML=list.map(f=>`<tr><td><b style="color:var(--text-primary);">${f.file_name||'—'}</b></td><td>${f.nume_sofer||f.email_sofer||'—'}</td><td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td><td><a href="/api/pdf-download/${f.id}" target="_blank" class="btn primary" style="text-decoration:none;padding:5px 10px;">Letöltés</a></td></tr>`).join('');
+    if(!list||list.length===0){tb.innerHTML='<tr><td colspan="5">Nincs beküldött fuvarlevél.</td></tr>';return;}
+    tb.innerHTML=list.map(f=>`<tr>`
+      +`<td><b style="color:var(--brand-red);">${f.numar_fisa||'—'}</b></td>`
+      +`<td><b style="color:var(--text-primary);">${f.file_name||'—'}</b></td>`
+      +`<td>${f.nume_sofer||f.email_sofer||'—'}</td>`
+      +`<td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td>`
+      +`<td style="display:flex;gap:6px;flex-wrap:wrap;">`
+        +`<a href="/api/pdf-download/${f.id}" target="_blank" class="btn ghost" style="text-decoration:none;padding:5px 10px;">👁 PDF</a>`
+        +`<button class="btn primary" style="padding:5px 10px;" onclick="openFuvEdit('${f.id}')">✏️ Szerkeszt</button>`
+      +`</td></tr>`).join('');
+  });
+}
+
+// ===== Menetlevél megtekintés / szerkesztés (Admin/Manager) =====
+function feEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function feRowPunct(p){p=p||{};return '<div class="fe-row" style="display:grid;grid-template-columns:1fr 2fr 1.2fr auto;gap:6px;align-items:center;">'
+  +'<input class="input fe-p-tip" placeholder="Tip" value="'+feEsc(p.tip)+'">'
+  +'<input class="input fe-p-loc" placeholder="Localitate" value="'+feEsc(p.loc)+'">'
+  +'<input class="input fe-p-data" placeholder="Dată" value="'+feEsc(p.data)+'">'
+  +'<button class="btn ghost" style="padding:4px 9px;" onclick="this.parentNode.remove()">✕</button></div>';}
+
+function feRowAlim(a){a=a||{};return '<div class="fe-row" style="display:grid;grid-template-columns:1.4fr 1fr .7fr .7fr .8fr .8fr auto;gap:6px;align-items:center;">'
+  +'<input class="input fe-a-loc" placeholder="Loc" value="'+feEsc(a.loc)+'">'
+  +'<input class="input fe-a-tip" placeholder="Combustibil" value="'+feEsc(a.tip||'Motorină')+'">'
+  +'<input class="input fe-a-lit" type="number" placeholder="L" value="'+feEsc(a.litru)+'">'
+  +'<input class="input fe-a-km" type="number" placeholder="Km" value="'+feEsc(a.km)+'">'
+  +'<input class="input fe-a-plata" placeholder="Plată" value="'+feEsc(a.plata||'Card')+'">'
+  +'<input class="input fe-a-suma" type="number" placeholder="Sumă" value="'+feEsc(a.suma)+'">'
+  +'<button class="btn ghost" style="padding:4px 9px;" onclick="this.parentNode.remove()">✕</button></div>';}
+
+function feRowAch(c){c=c||{};return '<div class="fe-row" style="display:grid;grid-template-columns:1.4fr 1.4fr .8fr .8fr auto;gap:6px;align-items:center;">'
+  +'<input class="input fe-c-loc" placeholder="Loc" value="'+feEsc(c.loc)+'">'
+  +'<input class="input fe-c-prod" placeholder="Produs" value="'+feEsc(c.produs)+'">'
+  +'<input class="input fe-c-pret" type="number" placeholder="Preț" value="'+feEsc(c.pret)+'">'
+  +'<input class="input fe-c-plata" placeholder="Plată" value="'+feEsc(c.plata||'Card')+'">'
+  +'<button class="btn ghost" style="padding:4px 9px;" onclick="this.parentNode.remove()">✕</button></div>';}
+
+function feAddPunct(){document.getElementById('fePuncte').insertAdjacentHTML('beforeend', feRowPunct());}
+function feAddAlim(){document.getElementById('feAlim').insertAdjacentHTML('beforeend', feRowAlim());}
+function feAddAch(){document.getElementById('feAch').insertAdjacentHTML('beforeend', feRowAch());}
+
+function closeFuvEdit(){document.getElementById('fuvEditModal').classList.remove('open');}
+
+function openFuvEdit(id){
+  gas('getFuvarlevelDetail',[id]).then(function(r){
+    if(!r||!r.ok){toast(r&&r.err||'Nem tölthető be','err');return;}
+    var f=r.fuv;
+    document.getElementById('feId').value=f.id;
+    document.getElementById('feSeria').textContent=f.numar_fisa||'(nincs sorszám)';
+    document.getElementById('feNumeSofer').value=f.nume_sofer||'';
+    document.getElementById('feNumarFisa').value=f.numar_fisa||'';
+    document.getElementById('feCamion').value=f.numar_camion||'';
+    document.getElementById('feRemorca').value=f.numar_remorca||'';
+    document.getElementById('feKmInc').value=f.km_inceput||0;
+    document.getElementById('feKmSf').value=f.km_sfarsit||0;
+    document.getElementById('feDiurnaEx').value=f.diurna_externa||0;
+    document.getElementById('feDiurnaIn').value=f.diurna_interna||0;
+    document.getElementById('feCantInc').value=f.cant_inceput||0;
+    document.getElementById('feCantSf').value=f.cant_sfarsit||0;
+    document.getElementById('feMentiuni').value=f.alte_mentiuni||'';
+    document.getElementById('fePdfLink').href='/api/pdf-download/'+f.id;
+    var puncte=Array.isArray(f.puncte)?f.puncte:[];
+    var alim=Array.isArray(f.alimentari)?f.alimentari:[];
+    var ach=Array.isArray(f.achizitii)?f.achizitii:[];
+    document.getElementById('fePuncte').innerHTML=puncte.length?puncte.map(feRowPunct).join(''):'';
+    document.getElementById('feAlim').innerHTML=alim.length?alim.map(feRowAlim).join(''):'';
+    document.getElementById('feAch').innerHTML=ach.length?ach.map(feRowAch).join(''):'';
+    document.getElementById('fuvEditModal').classList.add('open');
+  });
+}
+
+function saveFuvEdit(){
+  var id=document.getElementById('feId').value;
+  var puncte=[].map.call(document.querySelectorAll('#fePuncte .fe-row'),function(r){return {tip:r.querySelector('.fe-p-tip').value,loc:r.querySelector('.fe-p-loc').value,data:r.querySelector('.fe-p-data').value};});
+  var alimentari=[].map.call(document.querySelectorAll('#feAlim .fe-row'),function(r){return {loc:r.querySelector('.fe-a-loc').value,tip:r.querySelector('.fe-a-tip').value,litru:parseFloat(r.querySelector('.fe-a-lit').value)||0,km:parseFloat(r.querySelector('.fe-a-km').value)||0,plata:r.querySelector('.fe-a-plata').value,suma:parseFloat(r.querySelector('.fe-a-suma').value)||0};});
+  var achizitii=[].map.call(document.querySelectorAll('#feAch .fe-row'),function(r){return {loc:r.querySelector('.fe-c-loc').value,produs:r.querySelector('.fe-c-prod').value,pret:parseFloat(r.querySelector('.fe-c-pret').value)||0,plata:r.querySelector('.fe-c-plata').value};});
+  var payload={
+    nume_sofer:document.getElementById('feNumeSofer').value,
+    numar_fisa:document.getElementById('feNumarFisa').value,
+    numar_camion:document.getElementById('feCamion').value,
+    numar_remorca:document.getElementById('feRemorca').value,
+    km_inceput:document.getElementById('feKmInc').value,
+    km_sfarsit:document.getElementById('feKmSf').value,
+    diurna_externa:document.getElementById('feDiurnaEx').value,
+    diurna_interna:document.getElementById('feDiurnaIn').value,
+    cant_inceput:document.getElementById('feCantInc').value,
+    cant_sfarsit:document.getElementById('feCantSf').value,
+    alte_mentiuni:document.getElementById('feMentiuni').value,
+    puncte:puncte, alimentari:alimentari, achizitii:achizitii
+  };
+  gas('fuvarlevelUpdate',[id,payload]).then(function(r){
+    if(r&&r.ok){toast('✅ Menetlevél mentve!','ok');closeFuvEdit();loadReceivedFuvarlevelek();}
+    else toast(r&&r.err||'Szerver hiba','err');
   });
 }
 
