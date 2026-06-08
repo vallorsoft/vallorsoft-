@@ -70,7 +70,6 @@ function draftSave() {
 
     stateSave({
       draft: {
-        fisa: document.getElementById('fFisa').value,
         camion: document.getElementById('fCamion').value,
         remorca: document.getElementById('fRemorca').value,
         kmInc: document.getElementById('fKmInc').value,
@@ -90,7 +89,6 @@ function draftSave() {
 
 function draftRestore(draft) {
   if (!draft) return;
-  document.getElementById('fFisa').value = draft.fisa || '';
   document.getElementById('fCamion').value = draft.camion || '';
   document.getElementById('fRemorca').value = draft.remorca || '';
   document.getElementById('fKmInc').value = draft.kmInc || '0';

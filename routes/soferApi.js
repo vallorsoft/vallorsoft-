@@ -84,15 +84,29 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     if (!req.session.user) return res.json({ success: false, err: 'Nincs bejelentkezve' });
     const d = req.body;
     const randId = Math.floor(1000 + Math.random() * 9000);
-    const soferNameClean = req.session.user.nume.replace(/\s+/g, '_');
+    const soferNameClean = (req.session.user.nume || 'Sofer').replace(/\s+/g, '_');
     const id = "FUV-" + randId;
     const fileName = `Menetlevel_${soferNameClean}_${randId}.pdf`;
     const cid = req.session.user.company_id;
     const year = new Date().getFullYear();
-    const seqR = await pool.query(`INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq) VALUES ($1,'MT','MT',$2,1) ON CONFLICT (company_id,doc_type,year) DO UPDATE SET current_seq=document_series.current_seq+1, updated_at=NOW() RETURNING prefix, current_seq`, [cid, year]);
-    const autoDocNumber = seqR.rows[0] ? `${seqR.rows[0].prefix}-${year}-${String(seqR.rows[0].current_seq).padStart(4,'0')}` : null;
-    const crossR = await pool.query(`SELECT CASE WHEN tip='Iesire' THEN 'OUT' WHEN tip='Intrare' THEN 'IN' ELSE tip END AS direction, created_at AS crossed_at FROM border_crossings WHERE email_sofer=$1 AND created_at >= NOW()-INTERVAL '90 days' ORDER BY created_at ASC`, [req.session.user.email]);
-    const diurnaCalc = calculateDiurna(crossR.rows);
+    // Automatikus, cégenkénti sorszám (MT-YYYY-XXXX). Ha bármiért elszáll
+    // (pl. hiányzó document_series tábla), a menetlevél mentése akkor is fusson.
+    let autoDocNumber = null;
+    try {
+      const seqR = await pool.query(`INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq) VALUES ($1,'MT','MT',$2,1) ON CONFLICT (company_id,doc_type,year) DO UPDATE SET current_seq=document_series.current_seq+1, updated_at=NOW() RETURNING prefix, current_seq`, [cid, year]);
+      autoDocNumber = seqR.rows[0] ? `${seqR.rows[0].prefix}-${year}-${String(seqR.rows[0].current_seq).padStart(4,'0')}` : null;
+    } catch (seqErr) {
+      console.error('document_series sorszám hiba (a mentés folytatódik):', seqErr.message);
+    }
+    // Diurna automatikus számítása a határátlépésekből. Hiba esetén 0/0,
+    // a menetlevél mentése akkor is fusson.
+    let diurnaCalc = { externDays: 0, internDays: 0, crossingLog: [] };
+    try {
+      const crossR = await pool.query(`SELECT CASE WHEN tip='Iesire' THEN 'OUT' WHEN tip='Intrare' THEN 'IN' ELSE tip END AS direction, created_at AS crossed_at FROM border_crossings WHERE email_sofer=$1 AND created_at >= NOW()-INTERVAL '90 days' ORDER BY created_at ASC`, [req.session.user.email]);
+      diurnaCalc = calculateDiurna(crossR.rows);
+    } catch (diurnaErr) {
+      console.error('diurna számítás hiba (a mentés folytatódik):', diurnaErr.message);
+    }
 
     const totalKm = Math.max(0, Number(d.kmSfarsit || 0) - Number(d.kmInceput || 0));
     let totalAlim = 0;
@@ -134,7 +148,7 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     res.json({ success: true, id });
   } catch (err) {
     console.error('fuvarlevel-save hiba:', err);
-    res.json({ success: false, err: 'Szerver hiba' });
+    res.json({ success: false, err: 'Szerver hiba: ' + (err.message || 'ismeretlen') });
   }
 });
 
