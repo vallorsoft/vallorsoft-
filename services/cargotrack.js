@@ -68,11 +68,13 @@ async function testConnection(apiKey) {
   return { ok: true, objectCount: objects.length };
 }
 
-// Aktuális állapot (v2): pozíció + üzemanyag + fogyasztás + km, az utolsó pár óra
-// előzményéből a legfrissebb rekord. (Nincs dedikált "latest" végpont.)
-async function getLatestStatus(apiKey, objectId, lookbackHours = 6) {
+// Egy adott időablak legfrissebb koordináta-rekordja.
+// FONTOS: a /coordinates végpont limitált (1000) és a rekordokat időrendben
+// (legrégebbi elöl) adhatja vissza. Sűrűn jelző járműnél a hosszú ablak így a
+// RÉGI rekordokat hozza → elavult pozíció. Ezért kis ablakokkal kérdezünk.
+async function fetchLatestInWindow(apiKey, objectId, hours) {
   const to = new Date();
-  const from = new Date(to.getTime() - lookbackHours * 3600 * 1000);
+  const from = new Date(to.getTime() - hours * 3600 * 1000);
   const data = await fmGet(
     `/objects/${encodeURIComponent(objectId)}/coordinates`,
     { from_datetime: from.toISOString(), to_datetime: to.toISOString(), limit: 1000 },
@@ -81,7 +83,17 @@ async function getLatestStatus(apiKey, objectId, lookbackHours = 6) {
   const items = data.items || [];
   if (!items.length) return null;
   // a sorrend nem garantált a doksiban -> a legfrissebb rekordot a datetime alapján választjuk
-  const last = items.reduce((a, b) => (new Date(b.datetime) > new Date(a.datetime) ? b : a));
+  return items.reduce((a, b) => (new Date(b.datetime) > new Date(a.datetime) ? b : a));
+}
+
+// Aktuális állapot (v2): pozíció + üzemanyag + fogyasztás + km — a LEGFRISSEBB rekord.
+// Előbb rövid, friss ablakot kérünk (hogy aktív járműnél tényleg az aktuális pozíció
+// jöjjön), és csak ha üres, tágítunk fokozatosan a teljes visszatekintésig.
+async function getLatestStatus(apiKey, objectId, lookbackHours = 6) {
+  let last = await fetchLatestInWindow(apiKey, objectId, 0.5);   // 30 perc (aktív jármű)
+  if (!last) last = await fetchLatestInWindow(apiKey, objectId, 2);            // 2 óra
+  if (!last) last = await fetchLatestInWindow(apiKey, objectId, lookbackHours); // 6 óra fallback
+  if (!last) return null;
   const pos = last.position || {};
   const calc = (last.inputs && last.inputs.calculated_inputs) || last.calculated_inputs || {};
   return {
