@@ -1,7 +1,7 @@
 # CLAUDE.md — VallorSoft
 
 Fuvarozási / flottakezelő webalkalmazás (Node.js + Express 5 + PostgreSQL).
-Magyar nyelvű felület, román (RO) piacra szabott integrációkkal (FGO számlázás, ANAF/UIT e-fuvarlevél). PWA + web push, Firebase, multi-tenant (cégenként elkülönített adat).
+Magyar nyelvű felület, román (RO) piacra szabott integrációkkal (**univerzális számlázó**: FGO/SmartBill/Oblio/iFactura/Facturis, ANAF/UIT e-fuvarlevél). PWA + web push, Firebase, multi-tenant (cégenként elkülönített adat).
 
 > **Aktuális fókusz:** kinézet (UI) és funkciók javítása. A „Felületek és kinézet” szekció a térkép ehhez — melyik oldal melyik fájlokból áll, hol a CSS, mi a dizájn-rendszer.
 
@@ -27,14 +27,14 @@ A `server.js` csak init + middleware + route-mount. Üzleti logika:
 |-------|--------|
 | `routes/` | Express route-modulok (REST endpointok + oldal-route-ok) |
 | `handlers/` | A `/api/execute` RPC-dispatcher függvényei (domain-logika) |
-| `services/` | Külső integrációk (FGO, GPS, e-mail, push, AI, scheduler) |
+| `services/` | Külső integrációk (számlázók, GPS, e-mail, push, AI, scheduler) |
 | `middleware/` | `auth.js` (API: requireLogin/requireRole), `pageGuard.js` (oldalak) |
-| `lib/` | `crypto.js` (AES-256-GCM), `diurna.js` |
+| `lib/` | `crypto.js` (AES-256-GCM), `diurna.js`, `herePool.js` (HERE pool-elszámolás), `hereUsage.js` (használat-naplózás) |
 | `public/` | HTML oldalak + kliens JS-ek + `style.css` |
 | `db/` | **Inkrementális migrációk** (külön a `schema.sql`-től) |
 
 ### Két API-minta
-1. **RPC dispatcher** — `POST /api/execute` `{ functionName, arguments }`. A `routes/execute.js` az összes `handlers/*` modult egy registry-be fűzi. Handler: `async (req,res,args)`, válasz `res.json({ result: { ok, err?, ... } })`. A kliensoldali `gas(fn,args)` ezt hívja és a `d.result`-ot adja vissza.
+1. **RPC dispatcher** — `POST /api/execute` `{ functionName, arguments }`. A `routes/execute.js` az összes `handlers/*` modult egy registry-be fűzi (`auth`, `orders`, `users`, `invites`, `fleet`, `documents`, `dashboard`, `developer`, `routePlannerHandlers`, `hereFeatureHandlers`, `billingHandlers`, `intakeHandlers`). Handler: `async (req,res,args)`, válasz `res.json({ result: { ok, err?, ... } })`. A kliensoldali `gas(fn,args)` ezt hívja és a `d.result`-ot adja vissza.
 2. **Klasszikus REST** — a többi `routes/*` (auth, soferApi, push, clients, cargotrack, invoices, uit, inbound-orders, client-mail, firebase, ordersRest). Válasz `{ success, message }`.
 
 ### Szerepkörök és védelem
@@ -74,10 +74,12 @@ Szinte minden lekérdezés `company_id`-re szűr. Új lekérdezésnél MINDIG sz
 | **Admin konzol** | `admin.html` | `console-shared.js` (közös) + `admin.js` | teljes vezérlőpult + összes admin fül |
 | **Manager konzol** | `manager.html` | `console-shared.js` + `manager.js` | mint az admin, kevesebb joggal (nincs Integrációk) |
 | **Sofőr** | `sofer.html` | `sofer.js`, `sofer.css` | mobil-first sofőr felület (alsó nav) |
-| **Developer** | `developer.html` | inline `<script>` | cégek/userek kezelése, **funkció-kapcsolók**, hibajelentések (lila `#a855f7` akcentus) |
+| **Developer** | `developer.html` | inline `<script>` | cégek/userek kezelése, **funkció-kapcsolók**, **számlázási áttekintés + előfizetési csomagok + HERE-szolgáltatás árak**, hibajelentések (lila `#a855f7` akcentus) |
 | **Útvonaltervezés** | `utvonaltervezes.html` | inline `<script>` | HERE térkép + teherjármű-routing (lásd lentebb) |
 
 **Admin/Manager felépítés:** bal `.sidebar` (sötét, menücsoportok `data-tab`-okkal) + `.main-content#mainContent` (panes, `.pane[data-pane="..."]`). A fül-váltás `activateTab(name)` (console-shared.js): elrejti az összes `.pane`-t, megmutatja a kiválasztottat, és `loadTab(name)`-et hív (a szerep-JS-ben). Mobilon a sidebar hamburger-drawer.
+
+**Moduláris kliens-kártyák (`public/*.js`):** az egyes fülek külön JS-fájlokból állnak, amiket a szerep-JS hív be — pl. számlázó-integráció (`billing-card.js`), számlázás/számla-modal (`invoicing-card.js`, `invoice-modal.js`), GPS (`cargotrack-card.js`, `cargotrack-map.js`, `cargotrack-pairing.js`), e-mail intake (`email-intake-card.js`), beérkező megrendelések (`inbound-orders.js`), UIT (`uit-panel.js`, `sofer-uit.js`), ügyfelek (`clients-page.js`, `client-picker.js`, `client-mail.js`), push (`push-client.js`), session-őrzés (`session-guard.js`).
 
 **Vezérlőpult (`dash` pane) — redesign:** felső sáv (cégnév + téma-kapcsoló), 4 stat-kártya (`.dash-stats`/`.stat-tile`: Összes/Aktív fuvar, Felhasználók, Menetlevelek), majd `.dash-grid` (55/45): bal = „Legutóbbi fuvarok” tábla + „Jármű státusz”, jobb = **Leaflet térkép** (élő GPS pozíciók, HERE v3 csempe). Renderelés: `loadDashboard()` (console-shared.js), adat: `getRecentOrders`, `getVehicleStatusSummary`, `getActiveVehiclePositions` (handlers/dashboard.js).
 
@@ -99,19 +101,21 @@ Szinte minden lekérdezés `company_id`-re szűr. Új lekérdezésnél MINDIG sz
 ## Adatbázis
 
 - **`schema.sql`** — teljes friss séma (`CREATE TABLE IF NOT EXISTS`).
-- **`db/*.sql`** — inkrementális migrációk, NEM részei a `schema.sql`-nek. Élesítés előtt mind lefuttatandó:
+- **`db/*.sql`** — inkrementális migrációk, NEM részei a `schema.sql`-nek. Élesítés előtt mind lefuttatandó (idempotensek):
   `integrations.sql`, `inbound-orders-migration.sql`, `uit-migration.sql`, `uit-anaf-confirm.sql`,
   `orders-client-link.sql`, `email-branding-migration.sql`, `remove-shift-compliance.sql`,
   **`vehicle-truck-params.sql`** (teherjármű routing-mezők a `vehicles`-hez),
-  **`feature-flags.sql`** (`company_features` tábla + `users.blocked`).
-- Fő táblák: `companies`, `users` (+`blocked`, `pozicio_dev`, `totp_*`), `vehicles` (+`height_cm/width_cm/length_cm/weight_kg/weight_per_axle_kg/axle_count/trailer_count/truck_type/tunnel_category/hazardous_goods/fuel_per_100km`), `orders` (+`tractor_id/trailer_id/client_id` — gyakran NULL, a rendszám a tényleges hivatkozás), `order_legs`, `order_documents`, `fuvarlevelek`, `clients`, `company_integrations`, `vehicle_gps_map` (**rendszam↔object_id, NINCS tárolt lat/lng** — a pozíció élőben jön), `order_uit_codes`, `inbound_orders`, `company_branding`, `email_templates`, `client_emails`, `push_subscriptions`, `bug_reports`, **`company_features`**, `driver_shifts` (használaton kívül), `session`.
+  **`feature-flags.sql`** (`company_features` tábla + `users.blocked`),
+  **`billing-integrations.sql`** (`billing_integrations` + `subscription_plans` + `companies.subscription_plan_id`),
+  **`here-usage.sql`** (`here_feature_flags` árazás + `here_usage_log` használat-mérés).
+- Fő táblák: `companies` (+`subscription_plan_id`), `users` (+`blocked`, `pozicio_dev`, `totp_*`), `vehicles` (+`height_cm/width_cm/length_cm/weight_kg/weight_per_axle_kg/axle_count/trailer_count/truck_type/tunnel_category/hazardous_goods/fuel_per_100km`), `orders` (+`tractor_id/trailer_id/client_id` — gyakran NULL, a rendszám a tényleges hivatkozás), `order_legs`, `order_documents`, `fuvarlevelek`, `clients`, `company_integrations` (GPS + `provider='email_intake'` IMAP-konfig is itt, titkosítva), `vehicle_gps_map` (**rendszam↔object_id, NINCS tárolt lat/lng** — a pozíció élőben jön), `order_uit_codes`, `inbound_orders`, `company_branding`, `email_templates`, `client_emails`, `push_subscriptions`, `bug_reports`, **`company_features`**, **`billing_integrations`** (cégenkénti számlázó, `credentials` JSONB AES-titkosítva), **`subscription_plans`**, **`here_feature_flags`** (HERE szolgáltatás-árak), **`here_usage_log`** (havi tranzakció-napló), `driver_shifts` (használaton kívül), `session`.
 
 ## Integrációk (services/)
 
-- **`fgo.js`** — román e-számlázás (FGO v7.1). `invoicing.js` + `invoiceAdapter.js`.
-- **`cargotrack.js` + `gps/`** + `gpsAdapter.js` — GPS (FM-Track/Ruptela), jármű↔GPS párosítás. `getLatestStatus(apiKey, objectId)` → élő pozíció (lat/lng/speed/datetime). Kulcs titkosítva a `company_integrations`-ban.
-- **HERE Maps** — térkép/routing/geocoding (lásd Útvonaltervezés). Kulcs: `HERE_API_KEY` (`.env`), csak szerver oldalon.
-- **`email-intake.js`** + `order-ai/` (gemini + heurisztika) + `pdf-extract.js` — IMAP megrendelés-feldolgozás.
+- **Univerzális számlázó — `services/billing/`** — provider-független keretrendszer (`index.js` → `PROVIDERS` katalógus + `getAdapter(provider, creds)` factory). Adapterek: `fgo-adapter.js`, `smartbill-adapter.js`, `oblio-adapter.js`, `ifactura-adapter.js`, `facturis-adapter.js` (közös `http.js`). A felület a `getAvailableProviders` alapján **dinamikus űrlapot** rajzol (provider-enkénti mezők). Cégenkénti beállítás a `billing_integrations` táblában, `credentials` JSONB **AES-256-GCM**-mel titkosítva. Handlerek: `billingHandlers.js`. (A régi `fgo.js`/`invoicing.js`/`invoiceAdapter.js` a korábbi, FGO-specifikus út.)
+- **HERE Maps szolgáltatás-pool** — térkép/routing/geocoding (lásd Útvonaltervezés). Kulcs: `HERE_API_KEY` (`.env`), csak szerver oldalon. **4 alap szolgáltatás** (`autocomplete`, `geocode`, `raster_tile`, `routing_truck`) közös **1000-es ingyenes pool/hó**, időrend szerint fogy; a fölötti rész EUR-ban számlázódik (`here_feature_flags.price_per_1000`, developer szerkeszti). Pool-elszámolás: `lib/herePool.js` (`computePool(companyId, month)`); minden valós kérés naplózása: `lib/hereUsage.js` (`logHereTransaction`). Handlerek: `hereFeatureHandlers.js` (developer árak + `getMyHereUsage`), számlagenerálás a `billingHandlers.js`-ben (`previewHereInvoice` / `generateHereInvoice`).
+- **`cargotrack.js` + `gps/`** (`cargotrack-et.js`, `fomco-et.js`) + `gpsAdapter.js` — GPS (FM-Track/Ruptela), jármű↔GPS párosítás. `getLatestStatus(apiKey, objectId)` → élő pozíció (lat/lng/speed/datetime). Kulcs titkosítva a `company_integrations`-ban.
+- **`email-intake.js`** + `order-ai/` (gemini + heurisztika) + `pdf-extract.js` — IMAP megrendelés-feldolgozás. **Cégenkénti IMAP-konfig a weboldalon** (`intakeHandlers.js`, tárolás `company_integrations` `provider='email_intake'`). A **`scheduler.js`** 2 percenként végigpörgeti az engedélyezett cégeket (`intake.pollOnce`); **csak az aktiválás (`since`) utáni leveleket** dolgozza fel. Feldolgozott megrendelések az `inbound_orders` táblában, egyszerre egy feldolgozatlan, lapozható nézetben.
 - **`email.js`** (Brevo), **`webpush.js`/`push.js`** (VAPID), **`firebase.js`** (chat, admin token).
 - Integrációs kulcsok AES-256-GCM titkosítva (`lib/crypto.js`, `INTEGRATION_ENC_KEY`), maszkolva jelennek meg.
 
@@ -137,9 +141,9 @@ Intake (opcionális): `INTAKE_IMAP_HOST/PORT/USER/PASS/TLS`, `INTAKE_COMPANY_ID`
 ## Élesítés (go-live) checklist
 
 1. ✅ `.env` minden kulccsal (`INTEGRATION_ENC_KEY`, `HERE_API_KEY`).
-2. ⬜ `db/*.sql` migrációk lefuttatva az éles DB-n (incl. `vehicle-truck-params.sql`, `feature-flags.sql`, `remove-shift-compliance.sql`).
+2. ⬜ `db/*.sql` migrációk lefuttatva az éles DB-n (incl. `vehicle-truck-params.sql`, `feature-flags.sql`, `remove-shift-compliance.sql`, `billing-integrations.sql`, `here-usage.sql`).
 3. ⬜ `npm install` az éles szerveren (`@here/flexpolyline` stb.).
-4. ⬜ FGO integráció `test` → `production`.
+4. ⬜ Számlázó-integráció (pl. FGO) `test` → `production` a cég Integrációk fülén.
 5. ⬜ Deploy: `NODE_ENV=production`, HTTPS, reverse proxy (trust proxy beállítva).
 
 ## Tesztelés
