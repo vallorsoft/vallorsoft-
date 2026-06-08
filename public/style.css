@@ -302,7 +302,7 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
     transform: translateX(-100%);
     transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
     overflow-y: auto;
-    padding-top: calc(78px + env(safe-area-inset-top, 0px));
+    padding-top: calc(84px + env(safe-area-inset-top, 0px));
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 
@@ -492,7 +492,7 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
     transform: translateX(-100%);
     transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
     overflow-y: auto;
-    padding-top: calc(78px + env(safe-area-inset-top, 0px));
+    padding-top: calc(84px + env(safe-area-inset-top, 0px));
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
   .dev-sidebar.mob-open {
