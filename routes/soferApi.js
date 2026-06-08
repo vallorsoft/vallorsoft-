@@ -53,7 +53,7 @@ router.get('/api/document-series', requireLogin, requireRole('Manager','Admin'),
   try {
     const r = await pool.query(`SELECT prefix, current_seq FROM document_series WHERE company_id=$1 AND doc_type=$2 AND year=$3`, [cid,docType,year]);
     return res.json({ ok:true, prefix: r.rows[0]?.prefix||docType, currentSeq: r.rows[0]?.current_seq||0 });
-  } catch(err) { return res.json({ok:false}); }
+  } catch(err) { console.error('document-series GET hiba:', err); return res.json({ok:false, err: err.message}); }
 });
 
 router.post('/api/document-series', requireLogin, requireRole('Manager','Admin'), async (req,res) => {
@@ -64,7 +64,7 @@ router.post('/api/document-series', requireLogin, requireRole('Manager','Admin')
   try {
     await pool.query(`INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq) VALUES ($1,$2,$3,$4,0) ON CONFLICT (company_id,doc_type,year) DO UPDATE SET prefix=$3, current_seq=0, updated_at=NOW()`, [cid, docType.toUpperCase(), prefix.toUpperCase(), year]);
     return res.json({ok:true});
-  } catch(err) { return res.json({ok:false}); }
+  } catch(err) { console.error('document-series POST hiba:', err); return res.json({ok:false, err: err.message}); }
 });
 
 router.post('/api/document-series/next', requireLogin, async (req,res) => {
@@ -76,7 +76,7 @@ router.post('/api/document-series/next', requireLogin, async (req,res) => {
     const {prefix, current_seq} = r.rows[0];
     const docNumber = `${prefix}-${year}-${String(current_seq).padStart(4,'0')}`;
     return res.json({ok:true, docNumber, seq:current_seq});
-  } catch(err) { return res.json({ok:false}); }
+  } catch(err) { console.error('document-series/next hiba:', err); return res.json({ok:false, err: err.message}); }
 });
 
 router.post('/api/fuvarlevel-save', async (req, res) => {
