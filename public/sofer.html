@@ -19,42 +19,39 @@
 <body>
 <div class="toast-wrap" id="toasts"></div>
 
-<div class="sofer-shell">
+<div class="sofer-wrap">
 
-  <!-- TOP BAR — logo kattintásra főoldal -->
-  <div class="sofer-top" onclick="goSec('dash')">
-    <div class="vs-logo sm"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
-    <span class="badge info" id="meBadge">...</span>
+  <!-- TOP BAR — logóra kattintva főoldal -->
+  <div class="sofer-header">
+    <a class="sofer-logo" onclick="goSec('dash')">vallor<span>Soft</span></a>
+    <span id="meBadge">...</span>
   </div>
-
-  <!-- SZEKCIÓ KONTÉNER — flex:1, tartja az összes panelt -->
-  <div class="sofer-content">
 
   <!-- ====== FŐOLDAL ====== -->
   <div class="pane-sofer" id="sec-dash">
-    <div class="sofer-grid">
-      <div class="big-card red" onclick="goSec('border')">
-        <span class="ico">🛂</span><span>Határátlépés</span>
+    <div class="sofer-nav-grid">
+      <div class="sofer-nav-card" onclick="goSec('border')">
+        <span class="nav-icon">🛂</span><span class="nav-label">Határátlépés</span>
       </div>
-      <div class="big-card red" onclick="goSec('fuvar')">
-        <span class="ico">📄</span><span>Menetlevél</span>
+      <div class="sofer-nav-card" onclick="goSec('fuvar')">
+        <span class="nav-icon">📄</span><span class="nav-label">Menetlevél</span>
       </div>
-      <div class="big-card" onclick="goSec('docs')">
-        <span class="ico">📷</span><span>Iratok / CMR</span>
+      <div class="sofer-nav-card" onclick="goSec('docs')">
+        <span class="nav-icon">📷</span><span class="nav-label">Iratok / CMR</span>
       </div>
-      <div class="big-card" onclick="goSec('chat')">
-        <span class="ico">💬</span><span>Chat</span>
+      <div class="sofer-nav-card" onclick="goSec('chat')">
+        <span class="nav-icon">💬</span><span class="nav-label">Chat</span>
       </div>
-      <div class="big-card logout" onclick="logoutSofer()" style="grid-column: span 2;">
-        <span class="ico">🚪</span><span style="color:var(--err);">Kilépés</span>
+      <div class="sofer-nav-card logout" onclick="logoutSofer()">
+        <span class="nav-icon">🚪</span><span class="nav-label" style="color:#e10b1a;">Kilépés</span>
       </div>
     </div>
 
     <!-- ── Kiosztott fuvarok ── -->
-    <div style="margin:16px 0 0;">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">📋 Kiosztott fuvarok</div>
+    <div class="kiosztott-section">
+      <div class="kiosztott-title">📋 Kiosztott fuvarok</div>
       <div id="dashOrderList">
-        <div style="text-align:center;padding:16px;color:var(--muted);font-size:13px;">Betöltés...</div>
+        <div class="kiosztott-empty">Betöltés...</div>
       </div>
     </div>
   </div>
@@ -79,10 +76,10 @@
   </div>
 
   <!-- ====== MENETLEVÉL ====== -->
-  <div class="pane-sofer hidden" id="sec-fuvar" style="padding:0;">
+  <div class="pane-sofer hidden" id="sec-fuvar">
 
     <!-- 1. LÉPÉS: Fuvar kiválasztás -->
-    <div id="fuvarStep1" style="padding:0 16px 16px;">
+    <div id="fuvarStep1">
       <div class="sec-title" style="padding-left:0;">
         <button class="back-btn" onclick="goSec('dash')">←</button>
         <h3>📄 Menetlevél</h3>
@@ -99,7 +96,7 @@
     </div>
 
     <!-- 2. LÉPÉS: Menetlevél kitöltés -->
-    <div id="fuvarStep2" style="display:none;padding:0 16px 16px;">
+    <div id="fuvarStep2" style="display:none;">
       <div class="sec-title" style="padding-left:0;">
         <button class="back-btn" onclick="fuvarBackStep1()">←</button>
         <h3>📄 Menetlevél kitöltése</h3>
@@ -175,7 +172,7 @@
   </div>
 
   <!-- ====== CHAT (Firebase - WhatsApp stílus) ====== -->
-  <div class="pane-sofer hidden" id="sec-chat" style="padding:0;">
+  <div class="pane-sofer hidden" id="sec-chat">
     <div id="chatInitMsg" style="padding:40px 16px; text-align:center; color:var(--muted); font-size:13px;">
       <div class="spinner" style="margin:0 auto 12px;"></div>Kapcsolódás a chathez...
     </div>
@@ -204,18 +201,13 @@
     </div>
   </div>
 
-  </div><!-- /sofer-content -->
-</div><!-- /sofer-shell -->
+</div><!-- /sofer-wrap -->
 
 <script src="/sofer-uit.js"></script>
 <script src="/sofer.js"></script>
 
-<!-- ── BUG REPORT FAB (top-right, a top bar fölött, notch-biztos) ── -->
-<button onclick="openBugReport()" title="Hibajelentés küldése"
-  style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:200;width:44px;height:44px;border-radius:50%;
-  border:1px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.12);color:#f59e0b;
-  font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;
-  box-shadow:0 4px 16px rgba(0,0,0,0.4);">🐛</button>
+<!-- ── BUG REPORT FAB (jobb alsó sarok; chat nézetben a JS elrejti) ── -->
+<button id="bugFab" onclick="openBugReport()" title="Hibajelentés küldése">🐛</button>
 
 <!-- ── BUG REPORT MODAL ── -->
 <div id="bugModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);

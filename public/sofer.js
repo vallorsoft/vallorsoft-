@@ -171,6 +171,10 @@ function goSec(id) {
   next.scrollTop = 0;            // a panel belül görget (nem a body) — tetejére
   window.scrollTo({ top: 0, behavior: 'instant' });
 
+  // A 🐛 FAB (jobb alsó sarok) ütközne a chat küldés gombbal → chat nézetben elrejtjük
+  var fab = document.getElementById('bugFab');
+  if (fab) fab.style.display = (id === 'chat') ? 'none' : 'flex';
+
   stateSave({ sec: id });
   if (id === 'border') loadBorderLog();
   if (id === 'fuvar')  loadSoferOrders();
@@ -816,10 +820,13 @@ function loadDashOrders() {
     var el = document.getElementById('dashOrderList');
     if (!el) return;
     var active = list.filter(function(o){ return o.status==='Alocat'||o.status==='In Curs'; });
+    var wrap = document.querySelector('.sofer-wrap');
     if (!active.length) {
-      el.innerHTML = '<div style="text-align:center;padding:12px 0;color:var(--muted);font-size:13px;">Nincs aktív kiosztott fuvar.</div>';
+      el.innerHTML = '<div class="kiosztott-empty">Nincs aktív kiosztott fuvar.</div>';
+      if (wrap) wrap.classList.remove('scrollable');  // nincs túlnyúló tartalom → fix kitöltés
       return;
     }
+    if (wrap) wrap.classList.add('scrollable');        // van fuvar → a dashboard görgethető
     el.innerHTML = active.map(function(o){
       var isAlocat = o.status === 'Alocat';
       var sc = isAlocat ? 'warn' : 'ok';
