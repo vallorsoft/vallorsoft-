@@ -651,6 +651,9 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
 .main-content[data-theme="light"] {
   background: #f0f4f8;
   color: #1a2332;
+  /* A redesign szöveg-tokenek light-módban sötétek legyenek (pl. integráció-kártyák) */
+  --text-primary: #1a2332;
+  --text-muted: #4a5568;
 }
 .main-content[data-theme="light"] .glass {
   background: var(--glass-bg-light);

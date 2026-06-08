@@ -515,7 +515,7 @@ function loadReceivedFuvarlevelek(){
   gas('getFuvarlevelek').then(list=>{
     var tb=document.querySelector('#tblReceivedFuv tbody');
     if(!list||list.length===0){tb.innerHTML='<tr><td colspan="4">Nincs beküldött fuvarlevél.</td></tr>';return;}
-    tb.innerHTML=list.map(f=>`<tr><td><b style="color:#fff;">${f.file_name||'—'}</b></td><td>${f.nume_sofer||f.email_sofer||'—'}</td><td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td><td><a href="/api/pdf-download/${f.id}" target="_blank" class="btn primary" style="text-decoration:none;padding:5px 10px;">Letöltés</a></td></tr>`).join('');
+    tb.innerHTML=list.map(f=>`<tr><td><b style="color:var(--text-primary);">${f.file_name||'—'}</b></td><td>${f.nume_sofer||f.email_sofer||'—'}</td><td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td><td><a href="/api/pdf-download/${f.id}" target="_blank" class="btn primary" style="text-decoration:none;padding:5px 10px;">Letöltés</a></td></tr>`).join('');
   });
 }
 
@@ -696,7 +696,7 @@ function renderDocGroups() {
   Object.values(groups).forEach(function(g) {
     html += '<div style="margin-bottom:24px;">';
     html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0 8px;border-bottom:1px solid var(--border);margin-bottom:12px;">';
-    html += '<span style="font-size:15px;font-weight:700;color:#fff;">👤 '+g.nev+'</span>';
+    html += '<span style="font-size:15px;font-weight:700;color:var(--text-primary);">👤 '+g.nev+'</span>';
     html += '<span style="font-size:12px;color:var(--muted);background:var(--bg-3);padding:3px 10px;border-radius:20px;border:1px solid var(--border);">📅 '+g.nap+'</span>';
     html += '<span style="font-size:12px;color:var(--muted);">'+g.docs.length+' fájl</span>';
     html += '</div>';

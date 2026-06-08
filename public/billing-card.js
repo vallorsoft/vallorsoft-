@@ -26,14 +26,14 @@ window.BillingCard = (function () {
   }
 
   function head(title) {
-    return '<div style="font-weight:800;font-size:15px;color:#fff;margin-bottom:4px;">💳 ' + title + '</div>';
+    return '<div style="font-weight:800;font-size:15px;color:var(--text-primary);margin-bottom:4px;">💳 ' + title + '</div>';
   }
 
   function renderActive() {
     var d = current.created_at ? new Date(current.created_at).toLocaleDateString('hu-HU') : '—';
     box.innerHTML =
       '<div class="glass" style="padding:18px;border:1px solid rgba(34,197,94,0.35);">'
-      + '<div style="font-weight:800;font-size:15px;color:#fff;">✅ ' + esc2(current.display_name) + ' — <span style="color:var(--ok);">Aktív</span></div>'
+      + '<div style="font-weight:800;font-size:15px;color:var(--text-primary);">✅ ' + esc2(current.display_name) + ' — <span style="color:var(--ok);">Aktív</span></div>'
       + '<div class="text-muted" style="font-size:12px;margin:6px 0 14px;">Beállítva: ' + d + ' &nbsp;·&nbsp; Mezők: ' + (current.fields || []).map(esc2).join(', ') + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn ghost" onclick="BillingCard._test()">🔌 Tesztelés</button>'
@@ -46,7 +46,7 @@ window.BillingCard = (function () {
     var grid = providers.map(function (p) {
       var sel = selected === p.provider;
       return '<button onclick="BillingCard._pick(\'' + p.provider + '\')" style="padding:14px 18px;border-radius:12px;cursor:pointer;font-weight:700;'
-        + 'border:1px solid ' + (sel ? ACCENT : 'var(--border-bright)') + ';background:' + (sel ? 'rgba(225,11,26,0.12)' : 'rgba(255,255,255,0.03)') + ';color:' + (sel ? '#fff' : 'var(--soft)') + ';">'
+        + 'border:1px solid ' + (sel ? ACCENT : 'var(--border-bright)') + ';background:' + (sel ? 'rgba(225,11,26,0.12)' : 'rgba(255,255,255,0.03)') + ';color:' + (sel ? 'var(--text-primary)' : 'var(--text-muted)') + ';">'
         + esc2(p.display_name) + (sel ? ' ✓' : '') + '</button>';
     }).join('');
     box.innerHTML =
