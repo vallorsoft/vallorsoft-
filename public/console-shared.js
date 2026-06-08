@@ -521,10 +521,30 @@ function loadReceivedFuvarlevelek(){
       +`<td>${f.nume_sofer||f.email_sofer||'—'}</td>`
       +`<td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td>`
       +`<td style="display:flex;gap:6px;flex-wrap:wrap;">`
-        +`<a href="/api/pdf-download/${f.id}" target="_blank" class="btn ghost" style="text-decoration:none;padding:5px 10px;">👁 PDF</a>`
+        +`<button class="btn ghost" style="padding:5px 10px;" onclick="openPdfView('${f.id}')">👁 PDF</button>`
         +`<button class="btn primary" style="padding:5px 10px;" onclick="openFuvEdit('${f.id}')">✏️ Szerkeszt</button>`
       +`</td></tr>`).join('');
   });
+}
+
+// ===== Menetlevél PDF in-app nézet (web + PWA: NEM új lap, hanem iframe modal) =====
+function openPdfView(id){
+  if(!id) return;
+  var fr=document.getElementById('pdfFrame');
+  if(fr) fr.src='/api/pdf-download/'+id;
+  var m=document.getElementById('pdfViewModal');
+  if(m) m.classList.add('open');
+}
+function closePdfView(){
+  var m=document.getElementById('pdfViewModal');
+  if(m) m.classList.remove('open');
+  var fr=document.getElementById('pdfFrame');
+  if(fr) fr.src='about:blank';
+}
+function printPdfView(){
+  var fr=document.getElementById('pdfFrame');
+  try{ fr.contentWindow.focus(); fr.contentWindow.print(); }
+  catch(e){ toast('A nyomtatás nem indítható el','err'); }
 }
 
 // ===== Menetlevél megtekintés / szerkesztés (Admin/Manager) =====
@@ -575,7 +595,6 @@ function openFuvEdit(id){
     document.getElementById('feCantInc').value=f.cant_inceput||0;
     document.getElementById('feCantSf').value=f.cant_sfarsit||0;
     document.getElementById('feMentiuni').value=f.alte_mentiuni||'';
-    document.getElementById('fePdfLink').href='/api/pdf-download/'+f.id;
     var puncte=Array.isArray(f.puncte)?f.puncte:[];
     var alim=Array.isArray(f.alimentari)?f.alimentari:[];
     var ach=Array.isArray(f.achizitii)?f.achizitii:[];
