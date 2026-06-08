@@ -248,7 +248,9 @@ function loadSoferOrders() {
   .then(function(r) { return r.json(); }).then(function(d) {
     // Minden kiosztott fuvar, DE amiről már mentett menetlevél készült, az a
     // mentéstől számított 3 nap után kiesik (waybill_visible — szerver számolja).
-    _soferOrdersCache = (d.result || []).filter(function(o) { return o.waybill_visible; });
+    // Defenzív: ha a mező hiányzik (pl. régi, újra nem indított szerver), MUTASSUK
+    // a fuvart (csak az explicit false rejt) — így nem tűnnek el a fuvarok.
+    _soferOrdersCache = (d.result || []).filter(function(o) { return o.waybill_visible !== false; });
     var el = document.getElementById('soferOrderList');
     if (!_soferOrdersCache.length) {
       el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Nincs menetlevélre váró fuvar.</div>';
@@ -860,7 +862,12 @@ function loadDashOrders() {
     var el = document.getElementById('kiosztottList');
     if (!el) return;
     // Dashboard: aktív (Alocat/In Curs) + Finalizat a teljesítéstől 3 napig (szerver számolja).
-    var active = list.filter(function(o){ return o.dash_visible; });
+    // Defenzív: ha a dash_visible mező hiányzik (régi, újra nem indított szerver),
+    // visszaesünk a státusz-alapú szűrésre — így a fuvarok nem tűnnek el.
+    var active = list.filter(function(o){
+      if (typeof o.dash_visible === 'boolean') return o.dash_visible;
+      return o.status === 'Alocat' || o.status === 'In Curs';
+    });
     updateScrollBehavior(active);
     if (!active.length) {
       el.innerHTML = '<div class="kiosztott-empty">Nincs aktív kiosztott fuvar.</div>';
