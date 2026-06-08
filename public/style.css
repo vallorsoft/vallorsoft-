@@ -756,6 +756,11 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
   .stat-lbl { word-break: break-word; line-height: 1.25; }
   #dashMap { height: 360px; }
 }
+/* Telefon: a stat-kártyák 1 oszlopban (teljes szélesség) — garantáltan nem lógnak ki */
+@media (max-width: 540px) {
+  .dash-stats { grid-template-columns: 1fr !important; gap: 10px; }
+  .stat-tile { width: 100%; }
+}
 
 /* ----- Jármű szerkesztő: összecsukható teherjármű-paraméterek ----- */
 .veh-params {

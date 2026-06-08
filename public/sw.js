@@ -1,4 +1,4 @@
-const CACHE = 'vallorsoft-v3';      // verzió bump → kényszeríti a frissülést
+const CACHE = 'vallorsoft-v4';      // verzió bump → kényszeríti a frissülést
 const PRECACHE = ['/style.css'];    // '/sofer' KIVÉVE (auth-védett, megbuktatja az install-t)
 
 self.addEventListener('install', e => {
