@@ -38,7 +38,7 @@ router.get('/api/diurna-stats', requireLogin, requireRole('Manager','Admin'), as
     const sofors = await pool.query(`SELECT id, nume, email FROM users WHERE company_id=$1 AND pozicio='Sofer' ORDER BY nume`, [cid]);
     const result = [];
     for (const s of sofors.rows) {
-      const cr = await pool.query(`SELECT direction, crossed_at FROM border_crossings WHERE email_sofer=$1 ORDER BY crossed_at ASC`, [s.email]);
+      const cr = await pool.query(`SELECT CASE WHEN tip='Iesire' THEN 'OUT' WHEN tip='Intrare' THEN 'IN' ELSE tip END AS direction, created_at AS crossed_at FROM border_crossings WHERE email_sofer=$1 ORDER BY created_at ASC`, [s.email]);
       const d = calculateDiurna(cr.rows);
       result.push({ driver_id:s.id, nume:s.nume, email:s.email, externDays:d.externDays, internDays:d.internDays, crossingLog:d.crossingLog });
     }
@@ -53,7 +53,7 @@ router.get('/api/document-series', requireLogin, requireRole('Manager','Admin'),
   try {
     const r = await pool.query(`SELECT prefix, current_seq FROM document_series WHERE company_id=$1 AND doc_type=$2 AND year=$3`, [cid,docType,year]);
     return res.json({ ok:true, prefix: r.rows[0]?.prefix||docType, currentSeq: r.rows[0]?.current_seq||0 });
-  } catch(err) { return res.json({ok:false}); }
+  } catch(err) { console.error('document-series GET hiba:', err); return res.json({ok:false, err: err.message}); }
 });
 
 router.post('/api/document-series', requireLogin, requireRole('Manager','Admin'), async (req,res) => {
@@ -64,7 +64,7 @@ router.post('/api/document-series', requireLogin, requireRole('Manager','Admin')
   try {
     await pool.query(`INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq) VALUES ($1,$2,$3,$4,0) ON CONFLICT (company_id,doc_type,year) DO UPDATE SET prefix=$3, current_seq=0, updated_at=NOW()`, [cid, docType.toUpperCase(), prefix.toUpperCase(), year]);
     return res.json({ok:true});
-  } catch(err) { return res.json({ok:false}); }
+  } catch(err) { console.error('document-series POST hiba:', err); return res.json({ok:false, err: err.message}); }
 });
 
 router.post('/api/document-series/next', requireLogin, async (req,res) => {
@@ -76,7 +76,7 @@ router.post('/api/document-series/next', requireLogin, async (req,res) => {
     const {prefix, current_seq} = r.rows[0];
     const docNumber = `${prefix}-${year}-${String(current_seq).padStart(4,'0')}`;
     return res.json({ok:true, docNumber, seq:current_seq});
-  } catch(err) { return res.json({ok:false}); }
+  } catch(err) { console.error('document-series/next hiba:', err); return res.json({ok:false, err: err.message}); }
 });
 
 router.post('/api/fuvarlevel-save', async (req, res) => {
@@ -84,15 +84,29 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     if (!req.session.user) return res.json({ success: false, err: 'Nincs bejelentkezve' });
     const d = req.body;
     const randId = Math.floor(1000 + Math.random() * 9000);
-    const soferNameClean = req.session.user.nume.replace(/\s+/g, '_');
+    const soferNameClean = (req.session.user.nume || 'Sofer').replace(/\s+/g, '_');
     const id = "FUV-" + randId;
     const fileName = `Menetlevel_${soferNameClean}_${randId}.pdf`;
     const cid = req.session.user.company_id;
     const year = new Date().getFullYear();
-    const seqR = await pool.query(`INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq) VALUES ($1,'MT','MT',$2,1) ON CONFLICT (company_id,doc_type,year) DO UPDATE SET current_seq=document_series.current_seq+1, updated_at=NOW() RETURNING prefix, current_seq`, [cid, year]);
-    const autoDocNumber = seqR.rows[0] ? `${seqR.rows[0].prefix}-${year}-${String(seqR.rows[0].current_seq).padStart(4,'0')}` : null;
-    const crossR = await pool.query(`SELECT direction, crossed_at FROM border_crossings WHERE email_sofer=$1 AND crossed_at >= NOW()-INTERVAL '90 days' ORDER BY crossed_at ASC`, [req.session.user.email]);
-    const diurnaCalc = calculateDiurna(crossR.rows);
+    // Automatikus, cégenkénti sorszám (MT-YYYY-XXXX). Ha bármiért elszáll
+    // (pl. hiányzó document_series tábla), a menetlevél mentése akkor is fusson.
+    let autoDocNumber = null;
+    try {
+      const seqR = await pool.query(`INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq) VALUES ($1,'MT','MT',$2,1) ON CONFLICT (company_id,doc_type,year) DO UPDATE SET current_seq=document_series.current_seq+1, updated_at=NOW() RETURNING prefix, current_seq`, [cid, year]);
+      autoDocNumber = seqR.rows[0] ? `${seqR.rows[0].prefix}-${year}-${String(seqR.rows[0].current_seq).padStart(4,'0')}` : null;
+    } catch (seqErr) {
+      console.error('document_series sorszám hiba (a mentés folytatódik):', seqErr.message);
+    }
+    // Diurna automatikus számítása a határátlépésekből. Hiba esetén 0/0,
+    // a menetlevél mentése akkor is fusson.
+    let diurnaCalc = { externDays: 0, internDays: 0, crossingLog: [] };
+    try {
+      const crossR = await pool.query(`SELECT CASE WHEN tip='Iesire' THEN 'OUT' WHEN tip='Intrare' THEN 'IN' ELSE tip END AS direction, created_at AS crossed_at FROM border_crossings WHERE email_sofer=$1 AND created_at >= NOW()-INTERVAL '90 days' ORDER BY created_at ASC`, [req.session.user.email]);
+      diurnaCalc = calculateDiurna(crossR.rows);
+    } catch (diurnaErr) {
+      console.error('diurna számítás hiba (a mentés folytatódik):', diurnaErr.message);
+    }
 
     const totalKm = Math.max(0, Number(d.kmSfarsit || 0) - Number(d.kmInceput || 0));
     let totalAlim = 0;
@@ -121,7 +135,7 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
         d.numarCamion || null, d.numarRemorca || null, autoDocNumber || d.numarFisa || null, d.cursaSaptamanii || null,
         Number(d.kmInceput || 0), Number(d.kmSfarsit || 0), totalKm,
         d.locPlecare || null, d.locSosire || null, d.locDescTUR || null, d.locIncRETUR || null,
-        diurnaCalc.externDays || parseInt(d.diurnaExterna || 0), diurnaCalc.internDays || parseInt(d.diurnaInterna || 0),
+        diurnaCalc.externDays, diurnaCalc.internDays,  // automatikusan a határátlépésekből
         cantInc, cantSf, motorinaFolosit, totalAlim, consum100,
         d.alteMentiuni || null,
         JSON.stringify(alimentari),
@@ -134,7 +148,7 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     res.json({ success: true, id });
   } catch (err) {
     console.error('fuvarlevel-save hiba:', err);
-    res.json({ success: false, err: 'Szerver hiba' });
+    res.json({ success: false, err: 'Szerver hiba: ' + (err.message || 'ismeretlen') });
   }
 });
 
@@ -278,7 +292,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     <table class="grid-table">
       <tr><td width="50%"><b>Nume șofer:</b> ${f.nume_sofer || '—'}</td><td><b>Număr fișă:</b> ${f.numar_fisa || '—'}</td></tr>
       <tr><td><b>Număr camion:</b> ${f.numar_camion || '—'}</td><td><b>Număr remorcă:</b> ${f.numar_remorca || '—'}</td></tr>
-      <tr><td><b>Cursa săptămânii:</b> ${f.cursa_saptamanii || '—'}</td><td><b>Fuvar ID-k:</b> ${orderIdsStr}</td></tr>
+      <tr><td colspan="2"><b>Fuvar ID-k:</b> ${orderIdsStr}</td></tr>
       <tr><td><b>Km început:</b> ${f.km_inceput || 0} km</td><td><b>Km sfârșit:</b> ${f.km_sfarsit || 0} km</td></tr>
       <tr><td colspan="2"><b>Total kilometri parcurși: ${f.total_km || 0} km</b></td></tr>
       <tr><td><b>Diurnă externă:</b> ${f.diurna_externa || 0} nap</td><td><b>Diurnă internă:</b> ${f.diurna_interna || 0} nap</td></tr>

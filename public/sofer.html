@@ -106,8 +106,7 @@
       <!-- Kiválasztott fuvarok összesítő -->
       <div id="selectedOrdersSummary" style="background:rgba(225,11,26,0.08);border:1px solid rgba(225,11,26,0.3);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--soft);"></div>
 
-      <!-- Număr fișă eltávolítva - rendszer generálja automatikusan (MT-YYYY-XXXX) -->
-      <div class="field"><label>Cursa Săptămânii</label><input class="input" id="fCursaSapt" placeholder="pl. BUD–BUC"></div>
+      <!-- Număr fișă + Cursa Săptămânii eltávolítva - rendszer generálja automatikusan, cégenként sorszámozva (MT-YYYY-XXXX) -->
       <div class="g2">
         <div class="field"><label>Număr camion</label><input class="input" id="fCamion"></div>
         <div class="field"><label>Număr remorcă</label><input class="input" id="fRemorca"></div>
@@ -116,9 +115,12 @@
         <div class="field"><label>Km început</label><input class="input" type="number" id="fKmInc" value="0" inputmode="numeric"></div>
         <div class="field"><label>Km sfârșit</label><input class="input" type="number" id="fKmSf" value="0" inputmode="numeric"></div>
       </div>
-      <div class="g2">
-        <div class="field"><label>Diurnă externă (nap)</label><input class="input" type="number" id="fDiurnaEx" value="0" inputmode="numeric"></div>
-        <div class="field"><label>Diurnă internă (nap)</label><input class="input" type="number" id="fDiurnaIn" value="0" inputmode="numeric"></div>
+      <!-- Diurnă: a rendszer automatikusan számolja a határátlépésekből (nincs kézi beírás) -->
+      <div class="field">
+        <label>Diurnă (kiküldetési napok)</label>
+        <div class="input" style="display:flex;align-items:center;gap:8px;color:var(--muted);background:transparent;border-style:dashed;">
+          🤖 Automatikusan számolva a rögzített határátlépésekből.
+        </div>
       </div>
 
       <!-- Dinamikus útvonal pontok -->

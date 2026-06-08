@@ -149,6 +149,23 @@ startIntakeScheduler();
 // (megtartva az eredetibol; jelenleg nincs hasznalatban)
 const getNowStr = () => new Date().toISOString().replace('T', ' ').substring(0, 19);
 
+// ===== DB SÉMA-ŐRZÉS (kritikus táblák megléte indításkor) =====
+// Managed DB-ken (Neon) a migrációk kézi futtatása könnyen kimarad. A
+// menetlevél cégenkénti sorszámozásához nélkülözhetetlen document_series
+// táblát ezért minden induláskor biztosítjuk az idempotens migrációból
+// (CREATE TABLE IF NOT EXISTS + UNIQUE constraint pótlás). A séma-őrzés
+// hibája NEM állítja meg a szervert — csak naplózódik.
+const fs = require('fs');
+(async () => {
+  try {
+    const sql = fs.readFileSync(path.join(__dirname, 'db', 'document-series.sql'), 'utf8');
+    await pool.query(sql);
+    console.log('document_series séma ellenőrizve/létrehozva.');
+  } catch (e) {
+    console.error('document_series séma-őrzés hiba (a szerver tovább indul):', e.message);
+  }
+})();
+
 // ===== SZERVER INDITAS =====
 var PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
