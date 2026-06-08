@@ -19,7 +19,7 @@
 <body>
 <div class="toast-wrap" id="toasts"></div>
 
-<div class="sofer-wrap">
+<div class="sofer-wrap" id="soferWrap">
 
   <!-- TOP BAR — logóra kattintva főoldal -->
   <div class="sofer-header">
@@ -29,29 +29,30 @@
 
   <!-- ====== FŐOLDAL ====== -->
   <div class="pane-sofer" id="sec-dash">
+
+    <!-- ── Kiosztott fuvarok (felül) ── -->
+    <div class="kiosztott-section">
+      <div class="kiosztott-title"><span>▪</span> Kiosztott fuvarok</div>
+      <div id="kiosztottList">
+        <div class="kiosztott-empty">Betöltés...</div>
+      </div>
+    </div>
+
     <div class="sofer-nav-grid">
       <div class="sofer-nav-card" onclick="goSec('border')">
-        <span class="nav-icon">🛂</span><span class="nav-label">Határátlépés</span>
+        <span class="nav-icon">🚛</span><span class="nav-label">Határátlépés</span>
       </div>
       <div class="sofer-nav-card" onclick="goSec('fuvar')">
         <span class="nav-icon">📄</span><span class="nav-label">Menetlevél</span>
       </div>
       <div class="sofer-nav-card" onclick="goSec('docs')">
-        <span class="nav-icon">📷</span><span class="nav-label">Iratok / CMR</span>
+        <span class="nav-icon">📁</span><span class="nav-label">Iratok / CMR</span>
       </div>
       <div class="sofer-nav-card" onclick="goSec('chat')">
         <span class="nav-icon">💬</span><span class="nav-label">Chat</span>
       </div>
       <div class="sofer-nav-card logout" onclick="logoutSofer()">
-        <span class="nav-icon">🚪</span><span class="nav-label" style="color:#e10b1a;">Kilépés</span>
-      </div>
-    </div>
-
-    <!-- ── Kiosztott fuvarok ── -->
-    <div class="kiosztott-section">
-      <div class="kiosztott-title">📋 Kiosztott fuvarok</div>
-      <div id="dashOrderList">
-        <div class="kiosztott-empty">Betöltés...</div>
+        <span class="nav-icon">🚪</span><span class="nav-label">Kilépés</span>
       </div>
     </div>
   </div>

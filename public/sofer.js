@@ -811,43 +811,53 @@ function submitBugReport(){
 }
 
 // ── Kiosztott fuvarok a főoldalon ────────────────────────
+// A dashboard görgetését CSAK a #soferWrap-en kapcsoljuk (a body marad
+// overflow:hidden — ez az app-shell alapja). Van fuvar → görgethető dashboard.
+function updateScrollBehavior(orders) {
+  var wrap = document.getElementById('soferWrap');
+  if (!wrap) return;
+  if (orders && orders.length > 0) wrap.classList.add('scrollable');
+  else wrap.classList.remove('scrollable');
+}
+
+// Egy kiosztott fuvar kártyája — új .fuvar-card kinézet + MEGŐRZÖTT akciógombok.
+function renderFuvarCard(o) {
+  var isAlocat  = o.status === 'Alocat';
+  var statusCls = isAlocat ? 'warn' : 'ok';
+  var truck = o.rendszam_camion ? ('🚛 ' + o.rendszam_camion + (o.rendszam_remorca ? ' / ' + o.rendszam_remorca : '')) : '';
+  return '' +
+    '<div class="fuvar-card">' +
+      '<div class="fuvar-destination">📍 ' + (o.loc_incarcare||'—') + ' → ' + (o.loc_descarcare||'—') + '</div>' +
+      '<div class="fuvar-meta">' +
+        '<span>#' + o.id + '</span>' +
+        (o.client ? '<span>' + o.client + '</span>' : '') +
+        (truck ? '<span>' + truck + '</span>' : '') +
+        '<span class="fuvar-status ' + statusCls + '">' + (o.status||'Alocat') + '</span>' +
+      '</div>' +
+      '<div class="fuvar-actions">' +
+        '<button class="sh-btn uit" onclick="SoferUit.open(\'' + o.id + '\')" title="UIT-kódok (RO e-Transport)">🚛 UIT</button>' +
+        (isAlocat
+          ? '<button class="sh-btn resume"  onclick="driverOrderStatus(\'' + o.id + '\',\'In Curs\')">✅ Elfogadom</button>'
+          : '<button class="sh-btn confirm" onclick="driverOrderStatus(\'' + o.id + '\',\'Finalizat\')">🏁 Elvégeztem</button>') +
+      '</div>' +
+    '</div>';
+}
+
 function loadDashOrders() {
   fetch('/api/execute', { method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ functionName:'getMySoferOrders' }) })
   .then(function(r){ return r.json(); })
   .then(function(d){
     var list = d.result || [];
-    var el = document.getElementById('dashOrderList');
+    var el = document.getElementById('kiosztottList');
     if (!el) return;
     var active = list.filter(function(o){ return o.status==='Alocat'||o.status==='In Curs'; });
-    var wrap = document.querySelector('.sofer-wrap');
+    updateScrollBehavior(active);
     if (!active.length) {
       el.innerHTML = '<div class="kiosztott-empty">Nincs aktív kiosztott fuvar.</div>';
-      if (wrap) wrap.classList.remove('scrollable');  // nincs túlnyúló tartalom → fix kitöltés
       return;
     }
-    if (wrap) wrap.classList.add('scrollable');        // van fuvar → a dashboard görgethető
-    el.innerHTML = active.map(function(o){
-      var isAlocat = o.status === 'Alocat';
-      var sc = isAlocat ? 'warn' : 'ok';
-      return '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;">'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'+
-          '<div style="font-weight:700;font-size:14px;color:#fff;">'+(o.client||'—')+
-            ' <span style="font-size:11px;color:var(--muted);">#'+o.id+'</span>'+
-          '</div>'+
-          '<span class="badge '+sc+'">'+o.status+'</span>'+
-        '</div>'+
-        '<div style="font-size:12px;color:var(--soft);margin-bottom:10px;">'+
-          '📍 '+(o.loc_incarcare||'—')+' → '+(o.loc_descarcare||'—')+
-        '</div>'+
-        (o.rendszam_camion ? '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">🚛 '+o.rendszam_camion+(o.rendszam_remorca?' / '+o.rendszam_remorca:'')+'</div>' : '')+
-        '<div style="display:flex;gap:8px;">'+
-          '<button class="sh-btn" style="flex:0 0 auto;padding:13px 12px;font-size:13px;background:rgba(255,255,255,.08);border:1px solid var(--border);color:#fff;" onclick="SoferUit.open(\''+o.id+'\')" title="UIT-kódok (RO e-Transport)">🚛 UIT</button>'+
-          (isAlocat ? '<button class="sh-btn resume" style="flex:1;padding:13px 8px;font-size:13px;" onclick="driverOrderStatus(\''+o.id+'\',\'In Curs\')">✅ Elfogadom</button>' : '')+
-          (!isAlocat ? '<button class="sh-btn confirm" style="flex:1;padding:13px 8px;font-size:13px;" onclick="driverOrderStatus(\''+o.id+'\',\'Finalizat\')">🏁 Elvégeztem</button>' : '')+
-        '</div>'+
-      '</div>';
-    }).join('');
+    el.innerHTML = active.map(renderFuvarCard).join('');
   });
 }
 
