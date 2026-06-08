@@ -1166,6 +1166,14 @@ function initDashMap() {
       if (window._dashMap) window._dashMap.invalidateSize();
     });
   }
+  // ResizeObserver: ha a konténer mérete utólag véglegesül (layout/téma/orientáció),
+  // a térkép újraméri magát → a csempék a TELJES felületet kitöltik (ne maradjon fekete sáv).
+  if (window.ResizeObserver && !window._dashRO) {
+    window._dashRO = new ResizeObserver(function () {
+      if (window._dashMap) window._dashMap.invalidateSize();
+    });
+    window._dashRO.observe(el);
+  }
 }
 
 function refreshDashVehicles() {
