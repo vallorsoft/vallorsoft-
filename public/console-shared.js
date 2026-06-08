@@ -51,6 +51,8 @@ function activateTab(name){
   if(pane)pane.classList.remove('hidden');
   try{sessionStorage.setItem('vs_admin_tab',name);}catch(e){}
   loadTab(name);
+  // Mobilon a menüpontra koppintás után zárjuk be a drawert, hogy látszódjon a tartalom
+  if(window.innerWidth<=768 && typeof closeSidebar==='function') closeSidebar();
 }
 
 function addStampToPage(){
@@ -170,6 +172,7 @@ function closeQuickVehicle() {
 function closeSidebar() {
   document.getElementById('mainSidebar').classList.remove('mob-open');
   document.getElementById('sidebarOverlay').classList.remove('open');
+  document.body.style.overflow = '';
 }
 
 function closeSignModal(){
@@ -958,6 +961,7 @@ function toggleSidebar() {
   var ov = document.getElementById('sidebarOverlay');
   sb.classList.toggle('mob-open');
   ov.classList.toggle('open');
+  document.body.style.overflow = sb.classList.contains('mob-open') ? 'hidden' : '';
 }
 
 function toggleUserMenu(){document.getElementById('userMenuGroup').classList.toggle('open');}

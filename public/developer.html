@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>VallorSoft — Developer Console</title>
   <link rel="stylesheet" href="/style.css">
   <style>
@@ -842,10 +842,12 @@ function devToggleSidebar() {
   var ov = document.getElementById('devSidebarOverlay');
   sb.classList.toggle('mob-open');
   ov.classList.toggle('open');
+  document.body.style.overflow = sb.classList.contains('mob-open') ? 'hidden' : '';
 }
 function devCloseSidebar() {
   document.getElementById('devSidebar').classList.remove('mob-open');
   document.getElementById('devSidebarOverlay').classList.remove('open');
+  document.body.style.overflow = '';
 }
 // Tab kattintasra bezarul
 document.querySelectorAll('.dev-tab').forEach(function(el) {
