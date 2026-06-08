@@ -107,7 +107,8 @@ Szinte minden lekérdezés `company_id`-re szűr. Új lekérdezésnél MINDIG sz
   **`vehicle-truck-params.sql`** (teherjármű routing-mezők a `vehicles`-hez),
   **`feature-flags.sql`** (`company_features` tábla + `users.blocked`),
   **`billing-integrations.sql`** (`billing_integrations` + `subscription_plans` + `companies.subscription_plan_id`),
-  **`here-usage.sql`** (`here_feature_flags` árazás + `here_usage_log` használat-mérés).
+  **`here-usage.sql`** (`here_feature_flags` árazás + `here_usage_log` használat-mérés),
+  **`orders-finalized-at.sql`** (`orders.finalized_at` + trigger — a sofőr-nézet 3-napos kiöregítéséhez).
 - Fő táblák: `companies` (+`subscription_plan_id`), `users` (+`blocked`, `pozicio_dev`, `totp_*`), `vehicles` (+`height_cm/width_cm/length_cm/weight_kg/weight_per_axle_kg/axle_count/trailer_count/truck_type/tunnel_category/hazardous_goods/fuel_per_100km`), `orders` (+`tractor_id/trailer_id/client_id` — gyakran NULL, a rendszám a tényleges hivatkozás), `order_legs`, `order_documents`, `fuvarlevelek`, `clients`, `company_integrations` (GPS + `provider='email_intake'` IMAP-konfig is itt, titkosítva), `vehicle_gps_map` (**rendszam↔object_id, NINCS tárolt lat/lng** — a pozíció élőben jön), `order_uit_codes`, `inbound_orders`, `company_branding`, `email_templates`, `client_emails`, `push_subscriptions`, `bug_reports`, **`company_features`**, **`billing_integrations`** (cégenkénti számlázó, `credentials` JSONB AES-titkosítva), **`subscription_plans`**, **`here_feature_flags`** (HERE szolgáltatás-árak), **`here_usage_log`** (havi tranzakció-napló), `driver_shifts` (használaton kívül), `session`.
 
 ## Integrációk (services/)
@@ -141,7 +142,7 @@ Intake (opcionális): `INTAKE_IMAP_HOST/PORT/USER/PASS/TLS`, `INTAKE_COMPANY_ID`
 ## Élesítés (go-live) checklist
 
 1. ✅ `.env` minden kulccsal (`INTEGRATION_ENC_KEY`, `HERE_API_KEY`).
-2. ⬜ `db/*.sql` migrációk lefuttatva az éles DB-n (incl. `vehicle-truck-params.sql`, `feature-flags.sql`, `remove-shift-compliance.sql`, `billing-integrations.sql`, `here-usage.sql`).
+2. ⬜ `db/*.sql` migrációk lefuttatva az éles DB-n (incl. `vehicle-truck-params.sql`, `feature-flags.sql`, `remove-shift-compliance.sql`, `billing-integrations.sql`, `here-usage.sql`, `orders-finalized-at.sql`).
 3. ⬜ `npm install` az éles szerveren (`@here/flexpolyline` stb.).
 4. ⬜ Számlázó-integráció (pl. FGO) `test` → `production` a cég Integrációk fülén.
 5. ⬜ Deploy: `NODE_ENV=production`, HTTPS, reverse proxy (trust proxy beállítva).

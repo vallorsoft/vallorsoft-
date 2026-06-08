@@ -92,11 +92,32 @@ handlers.getMySoferOrders = async function (req, res, args) {
     try {
       if (!req.session.user) return res.json({ result: [] });
       const me = req.session.user;
+      // finalized_at: a Finalizat időbélyege (3-napos dashboard-kiöregítés).
+      // waybill_at: a legkorábbi mentett menetlevél dátuma, amin szerepel a fuvar
+      //   (a fuvarlevelek.order_ids JSONB tömb tartalmazza-e a fuvar id-jét).
+      // dash_visible: aktív (Alocat/In Curs) VAGY Finalizat a teljesítéstől max 3 napig.
+      // waybill_visible: minden kiosztott fuvar, DE a mentett menetlevél után csak 3 napig.
       const r = await pool.query(
-        `SELECT id, client, ref, loc_incarcare, loc_descarcare, km, rendszam_camion, rendszam_remorca, status
-         FROM orders
-         WHERE company_id = $1 AND LOWER(email_sofer) = LOWER($2)
-         ORDER BY created_at DESC`,
+        `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare, o.km,
+                o.rendszam_camion, o.rendszam_remorca, o.status,
+                o.finalized_at, wb.waybill_at,
+                (
+                  o.status IN ('Alocat', 'In Curs')
+                  OR (o.status = 'Finalizat'
+                      AND COALESCE(o.finalized_at, o.updated_at) >= NOW() - INTERVAL '3 days')
+                ) AS dash_visible,
+                (
+                  wb.waybill_at IS NULL
+                  OR wb.waybill_at >= NOW() - INTERVAL '3 days'
+                ) AS waybill_visible
+           FROM orders o
+           LEFT JOIN LATERAL (
+             SELECT MIN(f.data_completare) AS waybill_at
+               FROM fuvarlevelek f
+              WHERE jsonb_exists(f.order_ids, o.id)
+           ) wb ON true
+          WHERE o.company_id = $1 AND LOWER(o.email_sofer) = LOWER($2)
+          ORDER BY o.created_at DESC`,
         [me.company_id, me.email]
       );
       return res.json({ result: r.rows });

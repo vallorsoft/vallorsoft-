@@ -246,10 +246,12 @@ function loadSoferOrders() {
   fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ functionName: 'getMySoferOrders' }) })
   .then(function(r) { return r.json(); }).then(function(d) {
-    _soferOrdersCache = d.result || [];
+    // Minden kiosztott fuvar, DE amiről már mentett menetlevél készült, az a
+    // mentéstől számított 3 nap után kiesik (waybill_visible — szerver számolja).
+    _soferOrdersCache = (d.result || []).filter(function(o) { return o.waybill_visible; });
     var el = document.getElementById('soferOrderList');
     if (!_soferOrdersCache.length) {
-      el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Nincs hozzárendelt fuvar.</div>';
+      el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Nincs menetlevélre váró fuvar.</div>';
       return;
     }
     el.innerHTML = _soferOrdersCache.map(function(o) {
@@ -821,10 +823,18 @@ function updateScrollBehavior(orders) {
 }
 
 // Egy kiosztott fuvar kártyája — új .fuvar-card kinézet + MEGŐRZÖTT akciógombok.
+// Alocat → Elfogadom, In Curs → Elvégeztem, Finalizat → nincs státuszváltó (csak UIT).
 function renderFuvarCard(o) {
-  var isAlocat  = o.status === 'Alocat';
+  var isAlocat = o.status === 'Alocat';
+  var isCurs   = o.status === 'In Curs';
+  var isFinal  = o.status === 'Finalizat';
   var statusCls = isAlocat ? 'warn' : 'ok';
+  var statusTxt = isFinal ? '✓ Teljesítve' : (o.status || 'Alocat');
   var truck = o.rendszam_camion ? ('🚛 ' + o.rendszam_camion + (o.rendszam_remorca ? ' / ' + o.rendszam_remorca : '')) : '';
+  var actionBtn =
+      isAlocat ? '<button class="sh-btn resume"  onclick="driverOrderStatus(\'' + o.id + '\',\'In Curs\')">✅ Elfogadom</button>' :
+      isCurs   ? '<button class="sh-btn confirm" onclick="driverOrderStatus(\'' + o.id + '\',\'Finalizat\')">🏁 Elvégeztem</button>' :
+                 '';
   return '' +
     '<div class="fuvar-card">' +
       '<div class="fuvar-destination">📍 ' + (o.loc_incarcare||'—') + ' → ' + (o.loc_descarcare||'—') + '</div>' +
@@ -832,13 +842,11 @@ function renderFuvarCard(o) {
         '<span>#' + o.id + '</span>' +
         (o.client ? '<span>' + o.client + '</span>' : '') +
         (truck ? '<span>' + truck + '</span>' : '') +
-        '<span class="fuvar-status ' + statusCls + '">' + (o.status||'Alocat') + '</span>' +
+        '<span class="fuvar-status ' + statusCls + '">' + statusTxt + '</span>' +
       '</div>' +
       '<div class="fuvar-actions">' +
         '<button class="sh-btn uit" onclick="SoferUit.open(\'' + o.id + '\')" title="UIT-kódok (RO e-Transport)">🚛 UIT</button>' +
-        (isAlocat
-          ? '<button class="sh-btn resume"  onclick="driverOrderStatus(\'' + o.id + '\',\'In Curs\')">✅ Elfogadom</button>'
-          : '<button class="sh-btn confirm" onclick="driverOrderStatus(\'' + o.id + '\',\'Finalizat\')">🏁 Elvégeztem</button>') +
+        actionBtn +
       '</div>' +
     '</div>';
 }
@@ -851,7 +859,8 @@ function loadDashOrders() {
     var list = d.result || [];
     var el = document.getElementById('kiosztottList');
     if (!el) return;
-    var active = list.filter(function(o){ return o.status==='Alocat'||o.status==='In Curs'; });
+    // Dashboard: aktív (Alocat/In Curs) + Finalizat a teljesítéstől 3 napig (szerver számolja).
+    var active = list.filter(function(o){ return o.dash_visible; });
     updateScrollBehavior(active);
     if (!active.length) {
       el.innerHTML = '<div class="kiosztott-empty">Nincs aktív kiosztott fuvar.</div>';
