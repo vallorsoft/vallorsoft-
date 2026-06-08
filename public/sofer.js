@@ -168,6 +168,7 @@ function goSec(id) {
   next.classList.remove('hidden');
   next.classList.add('sec-entering');
   setTimeout(function() { next.classList.remove('sec-entering'); }, 220);
+  next.scrollTop = 0;            // a panel belül görget (nem a body) — tetejére
   window.scrollTo({ top: 0, behavior: 'instant' });
 
   stateSave({ sec: id });

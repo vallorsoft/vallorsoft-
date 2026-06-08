@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>VallorSoft</title>
   <meta name="theme-color" content="#0a0f15">
   <meta name="mobile-web-app-capable" content="yes">
@@ -51,7 +51,7 @@
     </div>
 
     <!-- ── Kiosztott fuvarok ── -->
-    <div style="margin:16px 16px 80px;">
+    <div style="margin:16px 0 0;">
       <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;">📋 Kiosztott fuvarok</div>
       <div id="dashOrderList">
         <div style="text-align:center;padding:16px;color:var(--muted);font-size:13px;">Betöltés...</div>
@@ -181,7 +181,7 @@
     </div>
 
     <!-- Kontaktlista nézet -->
-    <div id="chatContactView" style="display:none; flex-direction:column; height:calc(100vh - 160px);">
+    <div id="chatContactView" style="display:none; flex-direction:column;">
       <div style="padding:12px 16px; font-size:16px; font-weight:700; color:#fff; border-bottom:1px solid var(--border);">
         💬 Üzenetek
       </div>
@@ -189,7 +189,7 @@
     </div>
 
     <!-- Chat szoba nézet -->
-    <div id="chatRoomView" style="display:none; flex-direction:column; height:calc(100vh - 160px);">
+    <div id="chatRoomView" style="display:none; flex-direction:column;">
       <div style="display:flex; align-items:center; gap:10px; padding:10px 16px; border-bottom:1px solid var(--border);">
         <button onclick="soferChatBack()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px;">←</button>
         <div id="chatHeadAv" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff;flex-shrink:0;"></div>
@@ -210,9 +210,9 @@
 <script src="/sofer-uit.js"></script>
 <script src="/sofer.js"></script>
 
-<!-- ── BUG REPORT FAB (top-right, a bottom nav fölé nem kerül) ── -->
+<!-- ── BUG REPORT FAB (top-right, a top bar fölött, notch-biztos) ── -->
 <button onclick="openBugReport()" title="Hibajelentés küldése"
-  style="position:fixed;top:14px;right:14px;z-index:200;width:40px;height:40px;border-radius:50%;
+  style="position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:14px;z-index:200;width:44px;height:44px;border-radius:50%;
   border:1px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.12);color:#f59e0b;
   font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;
   box-shadow:0 4px 16px rgba(0,0,0,0.4);">🐛</button>

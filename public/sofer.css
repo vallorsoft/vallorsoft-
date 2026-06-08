@@ -13,28 +13,30 @@
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
   }
-  html {
-    overflow-x: hidden;
-    background: var(--bg-1);
-  }
-  body {
-    overflow-x: hidden;
-    max-width: 100vw;
+  /* Teljes viewport, NINCS page-scroll — a panelek görgetnek belül.
+     Így minden nézet pontosan a képernyő magasságát tölti ki. */
+  html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
     background: var(--bg-1);
   }
 
-  /* ── App shell: normál folyam, görgetés ── */
+  /* ── App shell: a teljes viewportot kitöltő flex-oszlop ── */
   .sofer-shell {
+    display: flex;
+    flex-direction: column;
     width: 100%;
-    overflow-x: hidden;
-    min-height: 100dvh;
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+    height: 100vh;     /* fallback régi böngészőkhöz */
+    height: 100svh;
+    height: 100dvh;    /* dinamikus viewport — billentyűzet / böngészősáv követése */
+    overflow: hidden;
   }
 
-  /* ── Top bar: sticky, takarja a görgetett tartalmat ── */
+  /* ── Top bar: rögzített fejléc (flex header, nem sticky) ── */
   .sofer-top {
-    position: sticky;
-    top: 0;
+    flex-shrink: 0;
     z-index: 40;
     display: flex;
     align-items: center;
@@ -47,29 +49,38 @@
     cursor: pointer;
   }
 
-  /* ── Szekció konténer ── */
-  .sofer-content { width: 100%; overflow-x: hidden; }
+  /* ── Szekció konténer: a fejléc alatti teljes maradék teret kitölti ── */
+  .sofer-content {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
 
-  /* ── Szekciók: normál folyam, display:none alapon rejtett ── */
+  /* ── Szekciók: az aktív panel kitölti a konténert, és CSAK belül görget ── */
   .pane-sofer {
+    flex: 1;
+    min-height: 0;
     width: 100%;
     overflow-x: hidden;
-    padding: 10px 16px 24px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 20px);
   }
   .pane-sofer.hidden { display: none !important; }
 
-  /* ── Chat szekció: töltse ki a viewport maradék részét ── */
-  #sec-chat  { padding: 0; }
-  #sec-fuvar { padding: 0; }    /* step1/step2 saját paddingja van */
-  #chatContactView, #chatRoomView {
-    height: calc(100svh - 58px);
-    height: calc(100dvh - 58px);
+  /* ── Menetlevél: a step1/step2 saját vízszintes paddingot kap ── */
+  #sec-fuvar { padding-left: 0; padding-right: 0; }
+
+  /* ── Chat szekció: nincs panel-görgetés, a belső nézetek flexelnek ── */
+  #sec-chat {
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
-  #chatMsgs, #chatContactList {
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-  }
-  #chatInput { font-size: 16px; }
 
   /* ── Szekció belépési animáció ── */
   @keyframes secIn {
@@ -158,7 +169,7 @@
   }
   .back-btn {
     flex-shrink: 0;
-    width: 36px; height: 36px;
+    width: 44px; height: 44px;
     border-radius: 10px;
     border: 1px solid rgba(255,255,255,0.12);
     background: rgba(255,255,255,0.05);
@@ -243,7 +254,7 @@
     cursor: pointer;
     font-size: 20px;
     padding: 4px;
-    min-width: 32px; min-height: 32px;
+    min-width: 44px; min-height: 44px;
     display: flex; align-items: center; justify-content: center;
     touch-action: manipulation;
   }
@@ -374,6 +385,12 @@
     overscroll-behavior: contain;
   }
   #chatInput { font-size: 16px; }
+  /* Chat üzenetküldő sáv (a #chatRoomView utolsó gyermeke): alul safe-area,
+     hogy a beviteli mező ne kerüljön a home-indicator alá. */
+  #chatRoomView > div:last-child {
+    flex-shrink: 0;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 10px) !important;
+  }
 
   /* ── Badge ── */
   .badge {
