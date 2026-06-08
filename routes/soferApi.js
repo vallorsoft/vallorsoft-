@@ -121,7 +121,7 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
         d.numarCamion || null, d.numarRemorca || null, autoDocNumber || d.numarFisa || null, d.cursaSaptamanii || null,
         Number(d.kmInceput || 0), Number(d.kmSfarsit || 0), totalKm,
         d.locPlecare || null, d.locSosire || null, d.locDescTUR || null, d.locIncRETUR || null,
-        diurnaCalc.externDays || parseInt(d.diurnaExterna || 0), diurnaCalc.internDays || parseInt(d.diurnaInterna || 0),
+        diurnaCalc.externDays, diurnaCalc.internDays,  // automatikusan a határátlépésekből
         cantInc, cantSf, motorinaFolosit, totalAlim, consum100,
         d.alteMentiuni || null,
         JSON.stringify(alimentari),

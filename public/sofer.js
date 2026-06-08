@@ -76,8 +76,6 @@ function draftSave() {
         remorca: document.getElementById('fRemorca').value,
         kmInc: document.getElementById('fKmInc').value,
         kmSf: document.getElementById('fKmSf').value,
-        diurnaEx: document.getElementById('fDiurnaEx').value,
-        diurnaIn: document.getElementById('fDiurnaIn').value,
         cantInc: document.getElementById('fCantInc').value,
         cantSf: document.getElementById('fCantSf').value,
         mentiuni: document.getElementById('fMentiuni').value,
@@ -99,8 +97,6 @@ function draftRestore(draft) {
   document.getElementById('fRemorca').value = draft.remorca || '';
   document.getElementById('fKmInc').value = draft.kmInc || '0';
   document.getElementById('fKmSf').value = draft.kmSf || '0';
-  document.getElementById('fDiurnaEx').value = draft.diurnaEx || '0';
-  document.getElementById('fDiurnaIn').value = draft.diurnaIn || '0';
   document.getElementById('fCantInc').value = draft.cantInc || '0';
   document.getElementById('fCantSf').value = draft.cantSf || '0';
   document.getElementById('fMentiuni').value = draft.mentiuni || '';
@@ -319,7 +315,7 @@ function fuvarBackStep1() {
 
 // Input változások figyelése → piszkozat auto-mentés
 function attachDraftListeners() {
-  var ids = ['fCursaSapt','fCamion','fRemorca','fKmInc','fKmSf','fDiurnaEx','fDiurnaIn','fCantInc','fCantSf','fMentiuni'];
+  var ids = ['fCursaSapt','fCamion','fRemorca','fKmInc','fKmSf','fCantInc','fCantSf','fMentiuni'];
   ids.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) {
@@ -453,8 +449,7 @@ function submitFuvarlevel() {
     kmSfarsit: document.getElementById('fKmSf').value,
     locPlecare: locPlecare,
     locSosire: locSosire,
-    diurnaExterna: document.getElementById('fDiurnaEx').value,
-    diurnaInterna: document.getElementById('fDiurnaIn').value,
+    // Diurna nem megy a payloadban — a szerver számolja a határátlépésekből
     cantInceput: document.getElementById('fCantInc').value,
     cantSfarsit: document.getElementById('fCantSf').value,
     alteMentiuni: document.getElementById('fMentiuni').value,
