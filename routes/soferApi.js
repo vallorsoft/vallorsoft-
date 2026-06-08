@@ -38,7 +38,7 @@ router.get('/api/diurna-stats', requireLogin, requireRole('Manager','Admin'), as
     const sofors = await pool.query(`SELECT id, nume, email FROM users WHERE company_id=$1 AND pozicio='Sofer' ORDER BY nume`, [cid]);
     const result = [];
     for (const s of sofors.rows) {
-      const cr = await pool.query(`SELECT direction, crossed_at FROM border_crossings WHERE email_sofer=$1 ORDER BY crossed_at ASC`, [s.email]);
+      const cr = await pool.query(`SELECT CASE WHEN tip='Iesire' THEN 'OUT' WHEN tip='Intrare' THEN 'IN' ELSE tip END AS direction, created_at AS crossed_at FROM border_crossings WHERE email_sofer=$1 ORDER BY created_at ASC`, [s.email]);
       const d = calculateDiurna(cr.rows);
       result.push({ driver_id:s.id, nume:s.nume, email:s.email, externDays:d.externDays, internDays:d.internDays, crossingLog:d.crossingLog });
     }
@@ -91,7 +91,7 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     const year = new Date().getFullYear();
     const seqR = await pool.query(`INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq) VALUES ($1,'MT','MT',$2,1) ON CONFLICT (company_id,doc_type,year) DO UPDATE SET current_seq=document_series.current_seq+1, updated_at=NOW() RETURNING prefix, current_seq`, [cid, year]);
     const autoDocNumber = seqR.rows[0] ? `${seqR.rows[0].prefix}-${year}-${String(seqR.rows[0].current_seq).padStart(4,'0')}` : null;
-    const crossR = await pool.query(`SELECT direction, crossed_at FROM border_crossings WHERE email_sofer=$1 AND crossed_at >= NOW()-INTERVAL '90 days' ORDER BY crossed_at ASC`, [req.session.user.email]);
+    const crossR = await pool.query(`SELECT CASE WHEN tip='Iesire' THEN 'OUT' WHEN tip='Intrare' THEN 'IN' ELSE tip END AS direction, created_at AS crossed_at FROM border_crossings WHERE email_sofer=$1 AND created_at >= NOW()-INTERVAL '90 days' ORDER BY created_at ASC`, [req.session.user.email]);
     const diurnaCalc = calculateDiurna(crossR.rows);
 
     const totalKm = Math.max(0, Number(d.kmSfarsit || 0) - Number(d.kmInceput || 0));
