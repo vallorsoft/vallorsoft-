@@ -41,7 +41,6 @@ function loadTab(name){
   if(name==='clients' && window.ClientsPage) ClientsPage.mount('clientsBox');
   if(name==='billing'){
     if(window.EmailIntakeCard) EmailIntakeCard.mount('emailIntakeCardBox', {readOnly:true});
-    if(window.BillingCard) BillingCard.mount('billingCardBox');
   }
   }
 
