@@ -26,7 +26,8 @@ window.BillingCard = (function () {
   }
 
   function head(title) {
-    return '<div style="font-weight:800;font-size:15px;color:var(--text-primary);margin-bottom:4px;">💳 ' + title + '</div>';
+    return '<div style="font-weight:800;font-size:15px;color:var(--text-primary);margin-bottom:2px;">💳 ' + title + '</div>'
+      + '<div class="text-muted" style="font-size:11px;margin-bottom:10px;">VallorSoft előfizetés &amp; HERE-térkép számlázásához · <b>nem</b> a fuvar-számlázás</div>';
   }
 
   function renderActive() {
@@ -34,6 +35,7 @@ window.BillingCard = (function () {
     box.innerHTML =
       '<div class="glass" style="padding:18px;border:1px solid rgba(34,197,94,0.35);">'
       + '<div style="font-weight:800;font-size:15px;color:var(--text-primary);">✅ ' + esc2(current.display_name) + ' — <span style="color:var(--ok);">Aktív</span></div>'
+      + '<div class="text-muted" style="font-size:11px;margin:2px 0 0;">VallorSoft előfizetés &amp; HERE-térkép számlázásához · <b>nem</b> a fuvar-számlázás</div>'
       + '<div class="text-muted" style="font-size:12px;margin:6px 0 14px;">Beállítva: ' + d + ' &nbsp;·&nbsp; Mezők: ' + (current.fields || []).map(esc2).join(', ') + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
       + '<button class="btn ghost" onclick="BillingCard._test()">🔌 Tesztelés</button>'

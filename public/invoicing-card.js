@@ -18,7 +18,7 @@ window.InvoicingCard = (function () {
   @media(max-width:560px){.inv-grid{grid-template-columns:1fr}}`;
   const MARKUP = `
   <div class="inv-card">
-    <div class="inv-head"><div><div class="inv-title">Számlázás</div><div class="inv-sub">Számla a fuvarokból (e-Factura)</div></div>
+    <div class="inv-head"><div><div class="inv-title">Fuvar-számlázás — ügyfeleknek</div><div class="inv-sub">Ezt használja a fuvarok 🧾 gombja (számla + storno) · FGO</div></div>
       <span class="inv-badge inv-badge--off" id="invBadge">Nincs beállítva</span></div>
     <div class="inv-grid">
       <label class="inv-l">Szolgáltató<select id="invProvider" class="inv-in"><option value="fgo">FGO</option><option value="smartbill" disabled>SmartBill (hamarosan)</option><option value="oblio" disabled>Oblio (hamarosan)</option></select></label>
