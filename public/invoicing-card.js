@@ -33,7 +33,7 @@ window.InvoicingCard = (function () {
       <label class="inv-l inv-check"><input id="invVat" type="checkbox" checked> ÁFA-alany vagyunk</label>
     </div>
     <div class="inv-msg" id="invMsg"></div>
-    <div class="inv-actions"><button class="inv-btn inv-btn--primary" id="invSave">Mentés és bekapcsolás</button></div>
+    <div class="inv-actions"><button class="inv-btn inv-btn--primary" id="invSave">Mentés és bekapcsolás</button><button class="inv-btn inv-btn--ghost" id="invTest">🔌 Kapcsolat tesztelése</button></div>
   </div>`;
   function ensureStyle(){ if(!document.getElementById('inv-card-style')){const s=document.createElement('style');s.id='inv-card-style';s.textContent=STYLE;document.head.appendChild(s);} }
   async function api(m,u,b){const r=await fetch(u,{method:m,credentials:'same-origin',headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||('Hiba '+r.status));return d;}
@@ -45,6 +45,7 @@ window.InvoicingCard = (function () {
     const setMsg=(t,k)=>{$('invMsg').textContent=t||'';$('invMsg').className='inv-msg'+(k?' inv-msg--'+k:'');};
     const load=async()=>{ try{ const s=await api('GET','/api/integrations/invoicing'); if(s.connected){ $('invBadge').textContent='Bekapcsolva: '+(s.provider||'').toUpperCase(); $('invBadge').className='inv-badge inv-badge--ok'; const m=s.meta||{}; if(s.provider)$('invProvider').value=s.provider; if(m.environment)$('invEnv').value=m.environment; if(m.series)$('invSeries').value=(m.series||[]).join(', '); if(m.article_label)$('invLabel').value=m.article_label; if(m.currency)$('invCurrency').value=m.currency; if(m.default_tva!=null)$('invTva').value=m.default_tva; if(m.scadenta_days!=null)$('invScad').value=m.scadenta_days; $('invVat').checked=m.vat_payer!==false; if(s.masked_key)$('invKey').placeholder=s.masked_key; } }catch(e){setMsg(e.message,'err');} };
     $('invSave').addEventListener('click', async ()=>{ setMsg('Mentés…'); try{ await api('POST','/api/integrations/invoicing',{ provider:$('invProvider').value, environment:$('invEnv').value, cod_unic:$('invCod').value, private_key:$('invKey').value, series:$('invSeries').value, article_label:$('invLabel').value, currency:$('invCurrency').value, default_tva:$('invTva').value, scadenta_days:$('invScad').value, vat_payer:$('invVat').checked }); setMsg('Elmentve és bekapcsolva.','ok'); $('invKey').value=''; await load(); }catch(e){setMsg(e.message,'err');} });
+    $('invTest').addEventListener('click', async ()=>{ setMsg('FGO kapcsolat tesztelése… (a legutóbb mentett adatokkal)'); try{ const r=await api('POST','/api/integrations/invoicing/test'); setMsg(r.message||(r.ok?'Kapcsolat OK.':'Sikertelen.'), r.ok?'ok':'err'); }catch(e){ setMsg(e.message,'err'); } });
     load();
   }
   return { mount };
