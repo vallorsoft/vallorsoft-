@@ -69,6 +69,21 @@ function buildInvoiceFromOrder(order, client, cfg) {
 async function emitInvoice(pool, companyId, userId, orderId, payload) {
   const cfg = await getInvoiceConfig(pool, companyId);
   if (!cfg || !cfg.provider) { const e = new Error('Nincs bekapcsolt számlázó.'); e.status = 409; throw e; }
+
+  // Dupla-számla védelem: ha ehhez a fuvarhoz MÁR van kiállított számla, ne állítsunk ki újat
+  // (pl. dupla gombnyomás / újra megnyitott modal esetén). A kliens is tilt, ez a szerveroldali zár.
+  const existing = await pool.query(
+    `SELECT id, serie, numar, pdf_link FROM invoices
+     WHERE company_id=$1 AND order_id=$2 AND status='issued' ORDER BY created_at DESC LIMIT 1`,
+    [companyId, orderId]);
+  if (existing.rows.length) {
+    const ex = existing.rows[0];
+    const e = new Error('Ehhez a fuvarhoz már van kiállított számla (' +
+      [ex.serie, ex.numar].filter(Boolean).join('-') + '). Új számla nem készült.');
+    e.status = 409; e.existing = ex;
+    throw e;
+  }
+
   const result = await getAdapter(cfg.provider).emit(cfg.creds, payload);
   if (!result.ok) { const e = new Error(result.message || 'A számlázó hibát adott.'); e.status = 502; throw e; }
 

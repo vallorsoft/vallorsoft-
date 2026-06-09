@@ -41,11 +41,12 @@ window.InvoiceModal = (function () {
     try{
       const pv=await api('POST','/api/orders/'+encodeURIComponent(orderId)+'/invoice/preview');
       let lists={tipfactura:[],tva:[]}; try{ lists=await api('GET','/api/integrations/invoicing/nomenclator'); }catch(_){}
-      render(body, orderId, pv.invoice, lists);
+      let existing=null; try{ existing=(await api('GET','/api/orders/'+encodeURIComponent(orderId)+'/invoice')).invoice||null; }catch(_){}
+      render(body, orderId, pv.invoice, lists, existing);
     }catch(e){ body.textContent=e.message; }
   }
 
-  function render(body, orderId, inv, lists){
+  function render(body, orderId, inv, lists, existing){
     const tipList = (lists.tipfactura&&lists.tipfactura.length)?lists.tipfactura:['Factura','Proforma','Aviz'];
     const tvaList = (lists.tva&&lists.tva.length)?lists.tva:[21,11,9,5,0];
     const curList = [...new Set([inv.currency,'RON','EUR','USD'])];
@@ -95,7 +96,7 @@ window.InvoiceModal = (function () {
         <label class="im-l full">INFO 1<input class="im-in" id="f-text"></label>
         <label class="im-l full">INFO 2<input class="im-in" id="f-notes"></label>
       </div>
-      <div class="im-foot"><button class="im-btn im-btn--ghost" id="im-cancel">Mégse</button><button class="im-btn im-btn--primary" id="im-send">Számla kiállítása</button></div>`;
+      <div class="im-foot"><div class="im-msg" id="im-send-msg" style="flex:1;text-align:left;margin:0;align-self:center"></div><button class="im-btn im-btn--ghost" id="im-cancel">Mégse</button><button class="im-btn im-btn--primary" id="im-send">Számla kiállítása</button></div>`;
 
     const $=id=>body.querySelector('#'+id);
     const setMsg=(t,k)=>{$('im-msg').textContent=t||'';$('im-msg').className='im-msg'+(k?' im-msg--'+k:'');};
@@ -113,19 +114,44 @@ window.InvoiceModal = (function () {
 
     $('f-anaf').addEventListener('click', async ()=>{ const cui=$('f-cui').value.trim(); if(!cui)return setMsg('Írd be a CUI-t.','err'); setMsg('ANAF…'); try{ const r=await api('GET','/api/clients/anaf?cui='+encodeURIComponent(cui)); if(!r.found)return setMsg(r.error||'Nincs ilyen CUI.','err'); if(r.name)$('f-name').value=r.name; if(r.address)$('f-adr').value=r.address; if(r.judet)$('f-judet').value=r.judet; setMsg('Frissítve · '+(r.vatPayer?'ÁFA-alany':'NEM ÁFA-alany')+' · '+(r.active?'aktív':'INAKTÍV!'), r.active?'ok':'err'); }catch(e){setMsg(e.message,'err');} });
 
+    // Visszajelzés a GOMB MELLETT — a hosszú űrlap tetején lévő üzenet könnyen kimaradt a látómezőből.
+    const sendMsg=(t,k)=>{ const el=$('im-send-msg'); el.textContent=t||''; el.className='im-msg'+(k?' im-msg--'+k:''); };
+    let emitting=false, emitted=false;     // dupla-kiállítás elleni zár (folyamatban / már kész)
+
+    // Ha ehhez a fuvarhoz MÁR van kiállított számla, ne lehessen újat kiállítani.
+    if(existing && existing.status==='issued'){
+      emitted=true; const sb=$('im-send'); sb.disabled=true; sb.textContent='Már kiállítva';
+      const link=existing.pdf_link?` · <a class="im-link" href="${esc(existing.pdf_link)}" target="_blank">PDF</a>`:'';
+      $('im-send-msg').innerHTML=`ℹ️ Ehhez a fuvarhoz már van számla: <b>${esc(existing.serie||'')}-${esc(existing.numar||'')}</b>${link}`;
+      $('im-send-msg').className='im-msg im-msg--ok';
+    }
+
     $('im-send').addEventListener('click', async ()=>{
+      if(emitting||emitted)return;          // folyamatban / már kiállítva → nincs 2. számla
       const payload={ serie:$('f-serie').value, currency:$('f-cur').value, type:$('f-tip').value,
         issueDate:$('f-issue').value||undefined, dueDate:$('f-due').value||undefined,
         text:$('f-text').value||undefined, notes:$('f-notes').value||undefined, reverseCharge:$('f-rc').checked,
         client:{ name:$('f-name').value.trim(), cui:$('f-cui').value.trim(), type:$('f-tipc').value, country:$('f-tara').value.trim(), county:$('f-judet').value.trim(), address:$('f-adr').value.trim() },
         lines:[{ name:$('f-lname').value.trim(), description:$('f-desc').value.trim(), unit:$('f-um').value.trim(), qty:num('f-qty'), vatRate:num('f-tva'), unitPrice:num('f-price'), code:$('f-code').value.trim(), gestiune:$('f-gest').value.trim(), costCenter:$('f-cc').value.trim() }] };
-      if(!payload.serie)return setMsg('Hiányzik a serie.','err');
-      if(!payload.lines[0].name)return setMsg('Hiányzik a tétel megnevezése.','err');
-      setMsg('Számla kiállítása…'); $('im-send').disabled=true;
-      try{ const d=await api('POST','/api/orders/'+encodeURIComponent(orderId)+'/invoice/emit',{invoice:payload});
-        const link=d.pdf_link?` · <a class="im-link" href="${esc(d.pdf_link)}" target="_blank">PDF</a>`:'';
-        setMsg(`Számlázva: ${esc(d.serie||'')}-${esc(d.numar||'')}${link}`,'ok'); $('im-send').textContent='Kész';
-      }catch(e){ setMsg(e.message,'err'); $('im-send').disabled=false; }
+      if(!payload.serie)return sendMsg('Hiányzik a serie.','err');
+      if(!payload.lines[0].name)return sendMsg('Hiányzik a tétel megnevezése.','err');
+      emitting=true;
+      const btn=$('im-send'), orig=btn.textContent;
+      btn.disabled=true; $('im-cancel').disabled=true; btn.textContent='Kiállítás folyamatban…';
+      sendMsg('Számla kiállítása a szolgáltatónál…');
+      try{
+        const d=await api('POST','/api/orders/'+encodeURIComponent(orderId)+'/invoice/emit',{invoice:payload});
+        emitted=true;
+        const link=d.pdf_link?` · <a class="im-link" href="${esc(d.pdf_link)}" target="_blank">PDF megnyitása</a>`:'';
+        $('im-send-msg').innerHTML=`✅ Számla kiállítva: <b>${esc(d.serie||'')}-${esc(d.numar||'')}</b>${link}`;
+        $('im-send-msg').className='im-msg im-msg--ok';
+        btn.textContent='✅ Kész';            // letiltva marad → nem készülhet 2. számla
+        $('im-cancel').disabled=false; $('im-cancel').textContent='Bezárás';
+      }catch(e){
+        emitting=false;                        // hiba → újra lehet próbálni
+        btn.disabled=false; $('im-cancel').disabled=false; btn.textContent=orig;
+        sendMsg(e.message,'err');
+      }
     });
   }
   return { open, close };
