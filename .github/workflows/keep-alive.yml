@@ -1,0 +1,28 @@
+# Ébrentartó ping — megakadályozza, hogy a Render free instance elaludjon.
+# ~10 percenként meghívja a /healthz végpontot. (A GitHub cron időzítése
+# terheléstől függően csúszhat pár percet; ez itt bőven elég.)
+#
+# FONTOS: a GitHub a 60 napig commit nélküli repók ütemezett workflow-jait
+# automatikusan letiltja. Ha sokáig nincs commit, a workflow-t a repo
+# Actions fülén kézzel kell újra engedélyezni (vagy használj UptimeRobot-ot).
+name: keep-alive
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # minden 10. percben
+  workflow_dispatch:          # kézi indítás is lehetséges
+
+# Több párhuzamos futás ne torlódjon
+concurrency:
+  group: keep-alive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping /healthz (cold start miatt türelmes, újrapróbál)
+        run: |
+          curl -fsS --retry 5 --retry-all-errors --retry-delay 20 --max-time 90 \
+            "https://vallorsoft.onrender.com/healthz" && echo " — ok"
