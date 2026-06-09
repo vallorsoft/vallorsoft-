@@ -25,7 +25,7 @@ window.InvoiceModal = (function () {
   .im-link{color:#2563eb;font-weight:600}
   @media(max-width:560px){.im-row{grid-template-columns:1fr}}`;
   function ensureStyle(){ if(!document.getElementById('im-style')){const s=document.createElement('style');s.id='im-style';s.textContent=STYLE;document.head.appendChild(s);} }
-  function close(){ const o=document.getElementById('im-ov'); if(o)o.remove(); }
+  function close(){ const o=document.getElementById('im-ov'); if(o)o.remove(); if(typeof window.__invoiceRefresh==='function') window.__invoiceRefresh(); }
   async function api(m,u,b){const r=await fetch(u,{method:m,credentials:'same-origin',headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||('Hiba '+r.status));return d;}
   const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
   const opt=(v,sel)=>`<option value="${esc(v)}"${String(v)===String(sel)?' selected':''}>${esc(v)}</option>`;
@@ -41,11 +41,12 @@ window.InvoiceModal = (function () {
     try{
       const pv=await api('POST','/api/orders/'+encodeURIComponent(orderId)+'/invoice/preview');
       let lists={tipfactura:[],tva:[]}; try{ lists=await api('GET','/api/integrations/invoicing/nomenclator'); }catch(_){}
-      render(body, orderId, pv.invoice, lists);
+      let existing=null; try{ const s=await api('GET','/api/invoices/summary?order_ids='+encodeURIComponent(orderId)); existing=(s.summary||{})[orderId]||null; }catch(_){}
+      render(body, orderId, pv.invoice, lists, existing);
     }catch(e){ body.textContent=e.message; }
   }
 
-  function render(body, orderId, inv, lists){
+  function render(body, orderId, inv, lists, existing){
     const tipList = (lists.tipfactura&&lists.tipfactura.length)?lists.tipfactura:['Factura','Proforma','Aviz'];
     const tvaList = (lists.tva&&lists.tva.length)?lists.tva:[21,11,9,5,0];
     const curList = [...new Set([inv.currency,'RON','EUR','USD'])];
@@ -95,7 +96,7 @@ window.InvoiceModal = (function () {
         <label class="im-l full">INFO 1<input class="im-in" id="f-text"></label>
         <label class="im-l full">INFO 2<input class="im-in" id="f-notes"></label>
       </div>
-      <div class="im-foot"><button class="im-btn im-btn--ghost" id="im-cancel">Mégse</button><button class="im-btn im-btn--primary" id="im-send">Számla kiállítása</button></div>`;
+      <div class="im-foot"><div class="im-msg" id="im-send-msg" style="flex:1;text-align:left;margin:0;align-self:center"></div><button class="im-btn im-btn--ghost" id="im-cancel">Mégse</button><button class="im-btn im-btn--ghost" id="im-storno" style="display:none;border-color:#c0341a;color:#c0341a">↩️ Storno számla</button><button class="im-btn im-btn--primary" id="im-send">Számla kiállítása</button></div>`;
 
     const $=id=>body.querySelector('#'+id);
     const setMsg=(t,k)=>{$('im-msg').textContent=t||'';$('im-msg').className='im-msg'+(k?' im-msg--'+k:'');};
@@ -113,19 +114,71 @@ window.InvoiceModal = (function () {
 
     $('f-anaf').addEventListener('click', async ()=>{ const cui=$('f-cui').value.trim(); if(!cui)return setMsg('Írd be a CUI-t.','err'); setMsg('ANAF…'); try{ const r=await api('GET','/api/clients/anaf?cui='+encodeURIComponent(cui)); if(!r.found)return setMsg(r.error||'Nincs ilyen CUI.','err'); if(r.name)$('f-name').value=r.name; if(r.address)$('f-adr').value=r.address; if(r.judet)$('f-judet').value=r.judet; setMsg('Frissítve · '+(r.vatPayer?'ÁFA-alany':'NEM ÁFA-alany')+' · '+(r.active?'aktív':'INAKTÍV!'), r.active?'ok':'err'); }catch(e){setMsg(e.message,'err');} });
 
+    // Visszajelzés a GOMB MELLETT — a hosszú űrlap tetején lévő üzenet könnyen kimaradt a látómezőből.
+    const sendMsg=(t,k)=>{ const el=$('im-send-msg'); el.textContent=t||''; el.className='im-msg'+(k?' im-msg--'+k:''); };
+    let emitting=false, emitted=false;     // dupla-kiállítás elleni zár (folyamatban / már kész)
+
+    // Számla-állapot a fuvarnál: nincs / már kiállítva (storno lehetséges) / stornózva.
+    if(existing && existing.stornoed){
+      emitted=true; const sb=$('im-send'); sb.disabled=true; sb.textContent='Stornózva';
+      const link=existing.storno_pdf?` · <a class="im-link" href="${esc(existing.storno_pdf)}" target="_blank">PDF</a>`:'';
+      $('im-send-msg').innerHTML=`↩️ Ez a számla stornózva: <b>${esc(existing.storno_serie||'')}-${esc(existing.storno_numar||'')}</b>${link}`;
+      $('im-send-msg').className='im-msg im-msg--err';
+    } else if(existing && existing.invoiced){
+      emitted=true; const sb=$('im-send'); sb.disabled=true; sb.textContent='Már kiállítva';
+      $('im-storno').style.display='';     // storno csak a már kiállított számlánál
+      const link=existing.pdf_link?` · <a class="im-link" href="${esc(existing.pdf_link)}" target="_blank">PDF</a>`:'';
+      $('im-send-msg').innerHTML=`ℹ️ Ehhez a fuvarhoz már van számla: <b>${esc(existing.serie||'')}-${esc(existing.numar||'')}</b>${link}`;
+      $('im-send-msg').className='im-msg im-msg--ok';
+    }
+
+    // ── Storno (jóváíró) számla: a kiállított számla alapján, mennyiség negatív ──
+    $('im-storno').addEventListener('click', async ()=>{
+      if(emitting)return;
+      if(!confirm('Biztosan kiállítasz egy STORNO számlát a meglévő alapján (minden adat ugyanaz, a mennyiség negatív)? A művelet nem visszavonható.'))return;
+      emitting=true;
+      const stb=$('im-storno'), orig=stb.textContent;
+      stb.disabled=true; $('im-cancel').disabled=true; stb.textContent='Storno folyamatban…';
+      sendMsg('Storno számla kiállítása…');
+      try{
+        const d=await api('POST','/api/orders/'+encodeURIComponent(orderId)+'/invoice/storno');
+        const link=d.pdf_link?` · <a class="im-link" href="${esc(d.pdf_link)}" target="_blank">PDF megnyitása</a>`:'';
+        $('im-send-msg').innerHTML=`↩️ Storno számla kiállítva: <b>${esc(d.serie||'')}-${esc(d.numar||'')}</b>${link}`;
+        $('im-send-msg').className='im-msg im-msg--ok';
+        stb.textContent='✅ Stornózva'; stb.disabled=true; emitting=false;
+        $('im-cancel').disabled=false; $('im-cancel').textContent='Bezárás';
+      }catch(e){
+        emitting=false; stb.disabled=false; $('im-cancel').disabled=false; stb.textContent=orig;
+        sendMsg(e.message,'err');
+      }
+    });
+
     $('im-send').addEventListener('click', async ()=>{
+      if(emitting||emitted)return;          // folyamatban / már kiállítva → nincs 2. számla
       const payload={ serie:$('f-serie').value, currency:$('f-cur').value, type:$('f-tip').value,
         issueDate:$('f-issue').value||undefined, dueDate:$('f-due').value||undefined,
         text:$('f-text').value||undefined, notes:$('f-notes').value||undefined, reverseCharge:$('f-rc').checked,
         client:{ name:$('f-name').value.trim(), cui:$('f-cui').value.trim(), type:$('f-tipc').value, country:$('f-tara').value.trim(), county:$('f-judet').value.trim(), address:$('f-adr').value.trim() },
         lines:[{ name:$('f-lname').value.trim(), description:$('f-desc').value.trim(), unit:$('f-um').value.trim(), qty:num('f-qty'), vatRate:num('f-tva'), unitPrice:num('f-price'), code:$('f-code').value.trim(), gestiune:$('f-gest').value.trim(), costCenter:$('f-cc').value.trim() }] };
-      if(!payload.serie)return setMsg('Hiányzik a serie.','err');
-      if(!payload.lines[0].name)return setMsg('Hiányzik a tétel megnevezése.','err');
-      setMsg('Számla kiállítása…'); $('im-send').disabled=true;
-      try{ const d=await api('POST','/api/orders/'+encodeURIComponent(orderId)+'/invoice/emit',{invoice:payload});
-        const link=d.pdf_link?` · <a class="im-link" href="${esc(d.pdf_link)}" target="_blank">PDF</a>`:'';
-        setMsg(`Számlázva: ${esc(d.serie||'')}-${esc(d.numar||'')}${link}`,'ok'); $('im-send').textContent='Kész';
-      }catch(e){ setMsg(e.message,'err'); $('im-send').disabled=false; }
+      if(!payload.serie)return sendMsg('Hiányzik a serie.','err');
+      if(!payload.lines[0].name)return sendMsg('Hiányzik a tétel megnevezése.','err');
+      emitting=true;
+      const btn=$('im-send'), orig=btn.textContent;
+      btn.disabled=true; $('im-cancel').disabled=true; btn.textContent='Kiállítás folyamatban…';
+      sendMsg('Számla kiállítása a szolgáltatónál…');
+      try{
+        const d=await api('POST','/api/orders/'+encodeURIComponent(orderId)+'/invoice/emit',{invoice:payload});
+        emitted=true;
+        const link=d.pdf_link?` · <a class="im-link" href="${esc(d.pdf_link)}" target="_blank">PDF megnyitása</a>`:'';
+        $('im-send-msg').innerHTML=`✅ Számla kiállítva: <b>${esc(d.serie||'')}-${esc(d.numar||'')}</b>${link}`;
+        $('im-send-msg').className='im-msg im-msg--ok';
+        btn.textContent='✅ Kész';            // letiltva marad → nem készülhet 2. számla
+        $('im-cancel').disabled=false; $('im-cancel').textContent='Bezárás';
+      }catch(e){
+        emitting=false;                        // hiba → újra lehet próbálni
+        btn.disabled=false; $('im-cancel').disabled=false; btn.textContent=orig;
+        sendMsg(e.message,'err');
+      }
     });
   }
   return { open, close };

@@ -29,7 +29,19 @@ router.post('/api/integrations/invoicing', requireLogin, requireRole('Admin'), a
   if (!b.provider) return res.status(400).json({ error: 'provider kötelező.' });
   try {
     getAdapter(b.provider);
-    const creds = JSON.stringify({ CodUnic: (b.cod_unic || '').trim(), PrivateKey: (b.private_key || '').trim() });
+    const codUnic = (b.cod_unic || '').trim();
+    let privateKey = (b.private_key || '').trim();
+    // Ha a PrivateKey üresen jött (a jelszó-mezőt nem írták újra mentéskor), tartsuk meg a
+    // korábban mentettet — különben egy újra-mentés kitörölné a kulcsot és elromlana a hash.
+    if (!privateKey) {
+      const prev = await pool.query(
+        `SELECT credentials_enc FROM company_integrations WHERE company_id=$1 AND provider=$2 AND category=$3`,
+        [req.session.user.company_id, b.provider, CATEGORY]);
+      if (prev.rows.length && prev.rows[0].credentials_enc) {
+        try { privateKey = JSON.parse(decrypt(prev.rows[0].credentials_enc)).PrivateKey || ''; } catch (_) {}
+      }
+    }
+    const creds = JSON.stringify({ CodUnic: codUnic, PrivateKey: privateKey });
     const series = String(b.series || b.serie || '').split(',').map(s => s.trim()).filter(Boolean);
     const meta = {
       provider: b.provider, series, serie: series[0] || '',
@@ -76,11 +88,27 @@ router.post('/api/orders/:id/invoice/preview', requireLogin, async (req, res) =>
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/api/orders/:id/invoice/emit', requireLogin, requireRole('Admin'), async (req, res) => {
+router.post('/api/orders/:id/invoice/emit', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   try {
     const r = await svc.emitInvoice(pool, req.session.user.company_id, req.session.user.id, req.params.id, req.body.invoice);
     res.json({ ok: true, ...r });
   } catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message }); }
+});
+
+// Storno (jóváíró) számla — csak a már kiállított számla alapján, mennyiség negatív.
+router.post('/api/orders/:id/invoice/storno', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
+  try {
+    const r = await svc.emitStorno(pool, req.session.user.company_id, req.session.user.id, req.params.id);
+    res.json({ ok: true, ...r });
+  } catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message }); }
+});
+
+// Számla-állapot összesítő több fuvarra (fuvar-lista indikátor + modal).
+router.get('/api/invoices/summary', requireLogin, async (req, res) => {
+  try {
+    const ids = String(req.query.order_ids || '').split(',').map(s => s.trim()).filter(Boolean);
+    res.json({ summary: await svc.getInvoiceSummary(pool, req.session.user.company_id, ids) });
+  } catch (e) { res.status(500).json({ error: e.message, summary: {} }); }
 });
 
 router.get('/api/orders/:id/invoice', requireLogin, async (req, res) => {

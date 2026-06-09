@@ -216,7 +216,7 @@ function renderFilteredOrders(list) {
     }
     if (c.status==='Finalizat' && window.InvoiceModal) {
       integBtns += '<button class="btn primary" title="Számlázás" style="padding:4px 10px;font-size:12px;" '+
-        'onclick="InvoiceModal.open(\''+c.id+'\')">🧾</button>';
+        'onclick="InvoiceModal.open(\''+c.id+'\')">🧾<span class="inv-ind" data-inv-ind="'+c.id+'" style="margin-left:2px;"></span></button>';
     }
 
     return '<tr><td><b>'+c.id+'</b></td><td>'+esc(c.client||'—')+'</td>'+
@@ -237,7 +237,26 @@ function renderFilteredOrders(list) {
   }).join('');
   updateOrderSelBar();
   decorateUitIndicators(list);
+  decorateInvoiceIndicators(list);
 }
+
+// ── Számla-állapot jelzése a fuvar sorában (🧾 gomb melletti szimbólum) ──
+function decorateInvoiceIndicators(list){
+  if(!window.InvoiceModal) return;
+  var ids=(list||[]).map(function(c){return c.id;}).filter(Boolean);
+  if(!ids.length) return;
+  fetch('/api/invoices/summary?order_ids='+encodeURIComponent(ids.join(',')),{credentials:'same-origin'})
+    .then(function(r){return r.json();}).then(function(d){
+      var sum=(d&&d.summary)||{};
+      document.querySelectorAll('[data-inv-ind]').forEach(function(el){
+        var s=sum[el.getAttribute('data-inv-ind')]; var btn=el.closest('button');
+        if(!s||!s.invoiced){ el.textContent=''; el.title=''; return; }
+        if(s.stornoed){ el.textContent=' ↩️'; var t='Számla stornózva: '+(s.storno_serie||'')+'-'+(s.storno_numar||''); el.title=t; if(btn)btn.title=t; }
+        else { el.textContent=' ✅'; var t2='Számlázva: '+(s.serie||'')+'-'+(s.numar||''); el.title=t2; if(btn)btn.title=t2; }
+      });
+    }).catch(function(){});
+}
+window.__invoiceRefresh=function(){ try{ decorateInvoiceIndicators(_ordersAllCache); }catch(e){} };
 
 // ── UIT-állapot jelzése a fuvar sorában (+UIT gomb melletti szimbólum) ──
 // 1 kérés a látható fuvarokra; a domináns státusz szimbóluma kerül a gombra.
