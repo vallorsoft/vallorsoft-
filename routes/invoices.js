@@ -29,7 +29,19 @@ router.post('/api/integrations/invoicing', requireLogin, requireRole('Admin'), a
   if (!b.provider) return res.status(400).json({ error: 'provider kötelező.' });
   try {
     getAdapter(b.provider);
-    const creds = JSON.stringify({ CodUnic: (b.cod_unic || '').trim(), PrivateKey: (b.private_key || '').trim() });
+    const codUnic = (b.cod_unic || '').trim();
+    let privateKey = (b.private_key || '').trim();
+    // Ha a PrivateKey üresen jött (a jelszó-mezőt nem írták újra mentéskor), tartsuk meg a
+    // korábban mentettet — különben egy újra-mentés kitörölné a kulcsot és elromlana a hash.
+    if (!privateKey) {
+      const prev = await pool.query(
+        `SELECT credentials_enc FROM company_integrations WHERE company_id=$1 AND provider=$2 AND category=$3`,
+        [req.session.user.company_id, b.provider, CATEGORY]);
+      if (prev.rows.length && prev.rows[0].credentials_enc) {
+        try { privateKey = JSON.parse(decrypt(prev.rows[0].credentials_enc)).PrivateKey || ''; } catch (_) {}
+      }
+    }
+    const creds = JSON.stringify({ CodUnic: codUnic, PrivateKey: privateKey });
     const series = String(b.series || b.serie || '').split(',').map(s => s.trim()).filter(Boolean);
     const meta = {
       provider: b.provider, series, serie: series[0] || '',
