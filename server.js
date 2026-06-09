@@ -20,11 +20,6 @@ try { rateLimit = require('express-rate-limit'); } catch (e) { rateLimit = null;
 const app = express();
 app.set('trust proxy', 1); // Render / reverse proxy mogotti HTTPS session fix
 
-// ===== HEALTH CHECK (ebrentartashoz / Render healthCheck) =====
-// Konnyu, DB nelkuli 200 — kulso pinger (UptimeRobot / GitHub Actions cron)
-// ~10 percenkent meghivja, hogy a Render free instance ne aludjon el.
-app.get('/healthz', (req, res) => res.status(200).type('text').send('ok'));
-
 // ===== HELMET: HTTP biztonsagi fejlecek =====
 if (helmet) {
   app.use(helmet({
