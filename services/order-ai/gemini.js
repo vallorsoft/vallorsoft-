@@ -1,11 +1,34 @@
 // services/order-ai/gemini.js
 // Mező-kiolvasás Google Gemini-vel (ingyenes tier). Multimodális: ha van PDF, közvetlenül
 // azt olvassa (szöveges ÉS szkennelt is megy, OCR nélkül); különben a kinyert szöveget.
-// Kulcs: process.env.GEMINI_API_KEY. Modell felülírható: process.env.GEMINI_MODEL.
+// Kulcs: process.env.GEMINI_API_KEY.
+//
+// MODELL-LÁNC (a napi kvóta megkerülésére): minden Gemini-modellnek KÜLÖN napi ingyenes
+// kerete van. Ha az első modell 429-et ad (napi keret elfogyott / sebességkorlát), a
+// kiolvasás automatikusan a következő modellre vált. Így több modell napi kerete adódik
+// össze. Felülírható: GEMINI_MODEL (egy modell) vagy GEMINI_MODELS (vesszős lista).
 
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const DEFAULT_MODELS = [
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-8b',
+];
+
+// A lánc összeállítása: env-felülírások előre, majd a maradék alapértelmezett (duplikátum nélkül).
+const MODELS = (() => {
+  const fromEnv = (process.env.GEMINI_MODELS || process.env.GEMINI_MODEL || '')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  const seen = new Set();
+  const out = [];
+  for (const m of [...fromEnv, ...DEFAULT_MODELS]) { if (!seen.has(m)) { seen.add(m); out.push(m); } }
+  return out;
+})();
+
 const TIMEOUT_MS = 30000;
-const MAX_ATTEMPTS = 3;          // 1 eredeti + 2 újrapróba
+const MAX_ATTEMPTS = 3;          // modellenként: 1 eredeti + 2 újrapróba (perc-limitre)
 const RETRY_WAIT_CAP_MS = 15000; // egy várakozás felső határa (ne blokkolja sokáig az ütemezőt)
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -37,10 +60,10 @@ function friendlyError(status, body) {
   return 'Gemini hiba (' + status + ')' + (apiMsg ? ': ' + apiMsg : '') + '.';
 }
 
-async function callGemini(parts) {
+async function callGemini(model, parts) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) { const e = new Error('Hiányzik a GEMINI_API_KEY.'); e.code = 'NO_KEY'; throw e; }
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
   const payload = JSON.stringify({
     systemInstruction: { parts: [{ text: PROMPT }] },
     contents: [{ role: 'user', parts }],
@@ -68,12 +91,15 @@ async function callGemini(parts) {
       return JSON.parse(textOut.replace(/^```json\s*|\s*```$/g, ''));
     }
 
-    // Hibás válasz — átmeneti (429/503) esetén megpróbáljuk újra
+    // Hibás válasz.
+    // 429 (kvóta/sebességkorlát): NEM várunk a modellen belül — a hívó (extract) azonnal a
+    //   következő modellre vált, amelynek külön napi kerete van. Ez a leggyorsabb megoldás.
+    // 503/5xx (átmeneti szerver-túlterhelés): ugyanaz a modell jó, csak foglalt -> rövid újrapróba.
     let body = null; try { body = JSON.parse(txt); } catch (_) { /* nem JSON */ }
-    const transient = res.status === 429 || res.status === 503;
-    if (transient && attempt < MAX_ATTEMPTS) {
+    const serverBusy = res.status === 503 || res.status === 500 || res.status === 502 || res.status === 504;
+    if (serverBusy && attempt < MAX_ATTEMPTS) {
       const suggested = parseRetryDelayMs(body);
-      const wait = Math.min(suggested != null ? suggested : attempt * 4000, RETRY_WAIT_CAP_MS);
+      const wait = Math.min(suggested != null ? suggested : attempt * 3000, RETRY_WAIT_CAP_MS);
       await sleep(wait);
       continue;
     }
@@ -107,10 +133,27 @@ async function extract({ text, pdfBuffer, pdfName }) {
   } else {
     parts = [{ text: 'Comanda (text):\n\n' + (text || '').slice(0, 20000) }];
   }
-  const json = await callGemini(parts);
-  const confidence = typeof json.confidence === 'number' ? json.confidence : 0.7;
-  delete json.confidence;
-  return { fields: json, confidence };
+
+  // Végigmegyünk a modell-láncon: 429/503 (kvóta/túlterhelés) esetén a következő modell
+  // jön (külön napi keret); minden más hiba (pl. 400) azonnal megáll.
+  let lastErr;
+  for (const model of MODELS) {
+    try {
+      const json = await callGemini(model, parts);
+      const confidence = typeof json.confidence === 'number' ? json.confidence : 0.7;
+      delete json.confidence;
+      return { fields: json, confidence, model };
+    } catch (e) {
+      lastErr = e;
+      if (e.status === 429 || e.status === 503) continue; // próbáljuk a következő modellt
+      throw e;
+    }
+  }
+  // Minden modell kvótája elfogyott / túlterhelt.
+  const e = new Error('Minden Gemini-modell napi kerete elfogyott vagy túlterhelt (429/503). '
+    + 'A rendszer a beépített kiolvasásra váltott, kérlek ellenőrizd a mezőket kézzel.');
+  e.status = (lastErr && lastErr.status) || 429;
+  throw e;
 }
 
-module.exports = { extract, FIELDS, provider: 'gemini' };
+module.exports = { extract, FIELDS, MODELS, provider: 'gemini' };
