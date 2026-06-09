@@ -62,6 +62,18 @@ router.post('/api/integrations/invoicing', requireLogin, requireRole('Admin'), a
   } catch (e) { res.status(e.code === 'PROVIDER_NOT_IMPLEMENTED' ? 400 : 500).json({ error: e.message }); }
 });
 
+// ---- KAPCSOLAT TESZTELÉSE (a mentett konfiggal, valódi FGO-hívás) ----
+router.post('/api/integrations/invoicing/test', requireLogin, requireRole('Admin'), async (req, res) => {
+  try {
+    const cfg = await svc.getInvoiceConfig(pool, req.session.user.company_id);
+    if (!cfg || !cfg.provider) return res.status(409).json({ ok: false, error: 'Nincs mentett számlázó. Előbb add meg és mentsd el a CodUnic + kulcs adatokat.' });
+    const adapter = getAdapter(cfg.provider);
+    if (!adapter.testConnection) return res.json({ ok: true, message: 'Ehhez a szolgáltatóhoz nincs kapcsolat-teszt.' });
+    const r = await adapter.testConnection(cfg.creds);
+    res.json({ ok: !!r.ok, message: r.message });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
 // ---- PROXY: nomenklátorok (Tip, ÁFA) + mentett cikkek ----
 router.get('/api/integrations/invoicing/nomenclator', requireLogin, async (req, res) => {
   try { res.json(await svc.getProviderLists(pool, req.session.user.company_id)); }

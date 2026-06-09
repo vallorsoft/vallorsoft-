@@ -81,7 +81,25 @@ async function getStatus(creds, ref) {
 
 async function testConnection(creds) {
   if (!creds.CodUnic || !creds.PrivateKey) return { ok: false, message: 'Hiányzó CodUnic / PrivateKey.' };
-  return { ok: true, message: 'Adatok rögzítve. Az éles ellenőrzés az első kiállításnál történik.' };
+  const env = creds.environment === 'production' ? 'Éles' : 'Teszt';
+  try {
+    // Valódi, mellékhatás nélküli hívás: egy nem létező számla státuszának lekérése.
+    // Ha a CodUnic/kulcs/környezet rossz, az FGO erről panaszkodik; ha a hitelesítés jó,
+    // csak azt mondja, hogy a (kamu) számla nem létezik.
+    const data = await post(creds, '/factura/getstatus', {
+      CodUnic: creds.CodUnic,
+      Hash: sha1U(creds.CodUnic + creds.PrivateKey + '999999999'),
+      PlatformaUrl: creds.PlatformaUrl, Numar: '999999999', Serie: '',
+    });
+    const msg = String(data.Message || '');
+    if (/cod\w*\s*unic|asociat|hash|cheie\s*privat/i.test(msg)) {
+      return { ok: false, message: 'FGO (' + env + '): ' + msg };
+    }
+    // Bármi más (pl. „factura nu există") = a hitelesítés RENDBEN.
+    return { ok: true, message: 'Kapcsolat OK (' + env + ') — a CodUnic + kulcs + környezet hármas helyes.' };
+  } catch (e) {
+    return { ok: false, message: 'FGO (' + env + '): ' + e.message };
+  }
 }
 
 // Publikus nomenklátor (tipfactura, tva, ...) — GET, hash nélkül.
