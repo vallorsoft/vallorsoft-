@@ -76,11 +76,27 @@ router.post('/api/orders/:id/invoice/preview', requireLogin, async (req, res) =>
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/api/orders/:id/invoice/emit', requireLogin, requireRole('Admin'), async (req, res) => {
+router.post('/api/orders/:id/invoice/emit', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   try {
     const r = await svc.emitInvoice(pool, req.session.user.company_id, req.session.user.id, req.params.id, req.body.invoice);
     res.json({ ok: true, ...r });
   } catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message }); }
+});
+
+// Storno (jóváíró) számla — csak a már kiállított számla alapján, mennyiség negatív.
+router.post('/api/orders/:id/invoice/storno', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
+  try {
+    const r = await svc.emitStorno(pool, req.session.user.company_id, req.session.user.id, req.params.id);
+    res.json({ ok: true, ...r });
+  } catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message }); }
+});
+
+// Számla-állapot összesítő több fuvarra (fuvar-lista indikátor + modal).
+router.get('/api/invoices/summary', requireLogin, async (req, res) => {
+  try {
+    const ids = String(req.query.order_ids || '').split(',').map(s => s.trim()).filter(Boolean);
+    res.json({ summary: await svc.getInvoiceSummary(pool, req.session.user.company_id, ids) });
+  } catch (e) { res.status(500).json({ error: e.message, summary: {} }); }
 });
 
 router.get('/api/orders/:id/invoice', requireLogin, async (req, res) => {
