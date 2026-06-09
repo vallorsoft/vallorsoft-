@@ -43,7 +43,6 @@ function loadTab(name){
   if(name==='clients' && window.ClientsPage) ClientsPage.mount('clientsBox');
   if(name==='integrations'){
     if(window.EmailIntakeCard)  EmailIntakeCard.mount('emailIntakeCardBox', {readOnly:false});
-    if(window.BillingCard)      BillingCard.mount('billingCardBox');
     if(window.InvoicingCard)    InvoicingCard.mount('invCardBox');
     if(window.CargoTrackCard)   CargoTrackCard.mount('ctCardBox');
     if(window.CargoTrackPairing) CargoTrackPairing.mount('ctPairBox');
