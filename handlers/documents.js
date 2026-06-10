@@ -93,9 +93,13 @@ handlers.orderDocGet = async function (req, res, args) {
       const docId = parseInt(args[0], 10);
       const which = args[1] === 'signed' ? 'signed' : 'original';
       if (!docId) return res.json({ result: { ok: false, err: 'Hianyzo azonosito' } });
+      // Cégszűrés az orders-en keresztül (a régi sorokon a company_id NULL lehet)
       const r = await pool.query(
-        `SELECT file_name, original_base64, signed_base64 FROM order_documents WHERE id = $1`,
-        [docId]
+        `SELECT od.file_name, od.original_base64, od.signed_base64
+         FROM order_documents od
+         JOIN orders o ON o.id = od.order_id
+         WHERE od.id = $1 AND o.company_id = $2`,
+        [docId, req.session.user.company_id]
       );
       if (!r.rows.length) return res.json({ result: { ok: false, err: 'Nem talalhato' } });
       const row = r.rows[0];
@@ -116,10 +120,13 @@ handlers.orderDocSaveSigned = async function (req, res, args) {
       const docId = parseInt(args[0], 10);
       const b64 = args[1];
       if (!docId || !b64) return res.json({ result: { ok: false, err: 'Hianyzo adat' } });
+      // Cégszűrés az orders-en keresztül (a régi sorokon a company_id NULL lehet)
       const r = await pool.query(
-        `UPDATE order_documents SET signed_base64 = $1, updated_at = NOW()
-         WHERE id = $2 RETURNING id`,
-        [b64, docId]
+        `UPDATE order_documents od SET signed_base64 = $1, updated_at = NOW()
+         FROM orders o
+         WHERE od.id = $2 AND o.id = od.order_id AND o.company_id = $3
+         RETURNING od.id`,
+        [b64, docId, req.session.user.company_id]
       );
       if (!r.rows.length) return res.json({ result: { ok: false, err: 'Nem talalhato' } });
       return res.json({ result: { ok: true } });

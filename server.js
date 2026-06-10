@@ -20,6 +20,11 @@ try { rateLimit = require('express-rate-limit'); } catch (e) { rateLimit = null;
 const app = express();
 app.set('trust proxy', 1); // Render / reverse proxy mogotti HTTPS session fix
 
+// ===== GLOBÁLIS VÉDŐHÁLÓ: kezeletlen promise-hibák ne állítsák le a szervert =====
+process.on('unhandledRejection', (reason) => {
+  console.error('Kezeletlen promise-hiba (a szerver tovább fut):', reason);
+});
+
 // ===== HELMET: HTTP biztonsagi fejlecek =====
 if (helmet) {
   app.use(helmet({

@@ -303,6 +303,8 @@ handlers.devCompanyDetail = async function (req, res, args) {
   };
 
 handlers.devStats = async function (req, res, args) {
+      const isDev = req.session.user && req.session.user.is_dev;
+    if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
     try {
       const cegek = await pool.query('SELECT COUNT(*)::int AS db FROM companies');
       const userek = await pool.query('SELECT COUNT(*)::int AS db FROM users WHERE pozicio_dev IS NOT TRUE');

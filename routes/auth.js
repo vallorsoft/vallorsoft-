@@ -99,6 +99,9 @@ router.post('/api/login', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
+      // Időzítés-kiegyenlítés: nem létező emailnél is fusson egy bcrypt-összehasonlítás,
+      // hogy a válaszidőből ne lehessen fiókok létezésére következtetni.
+      await bcrypt.compare(password, '$2b$10$C6UzMDM.H6dfI/f/IKcEeO7ZdVdkPYqBkN1FW3sZBPq4P5l5l5l5l');
       return res.json({ success: false, message: 'Hibas email vagy jelszo!' });
     }
 

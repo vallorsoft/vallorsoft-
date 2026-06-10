@@ -208,10 +208,15 @@ router.get('/api/doc-download/:id', async (req, res) => {
   }
 });
 
-// PDF DOWNLOAD (DB-bol)
+// PDF DOWNLOAD (DB-bol) — csak bejelentkezve, csak a saját cég menetlevele
 router.get('/api/pdf-download/:id', async (req, res) => {
   try {
-    const r = await pool.query('SELECT * FROM fuvarlevelek WHERE id = $1', [req.params.id]);
+    if (!req.session.user) return res.status(401).send('Nincs bejelentkezve');
+    const r = await pool.query(
+      `SELECT * FROM fuvarlevelek
+       WHERE id = $1 AND email_sofer IN (SELECT email FROM users WHERE company_id = $2)`,
+      [req.params.id, req.session.user.company_id]
+    );
     if (!r.rows.length) return res.status(404).send('Nem található.');
     const f = r.rows[0];
 

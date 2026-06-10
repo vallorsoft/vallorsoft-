@@ -5,6 +5,32 @@
 
 ---
 
+## 📋 Javítási napló (élő státusz)
+
+A teljes hibalista **6 lépésben (6 commit)** kerül kijavításra. Állapot:
+
+| Lépés | Tartalom | Státusz |
+|-------|----------|---------|
+| **1. Kritikus biztonság + stabilitás** | K1, K2, K3 (adatszivárgó végpontok), K5 (pool error-handler + dispatcher try/catch + unhandledRejection), M9 (devStats guard), K22 (login timing-oracle) | ✅ **KÉSZ** |
+| **2. Azonosítók + DB-integritás** | K4 (CMD/FUV ütközés), K6 (sorszám-nullázás), M2 (dupla számla), M4 (push-index), M5 (FK ON DELETE), M6 (migráció-szinkron), M7 (GIN index) | ⏳ következik |
+| **3. Tranzakciók + szolgáltatás-robusztusság** | M1 (tranzakciók), M3 (scheduler-őr), M8 (2FA rate-limit), M10 (méretsapkák), M12 (OCR-út), K06–K08 (Brevo timeout, e-mail escape, intake-hibakezelés) | ⬜ |
+| **4. XSS-mentesítés + PWA-ikonok** | K7 (legacy render-függvények + soferApi HTML escape), M11 (ikonok) | ⬜ |
+| **5. Közepes szerver-javítások** | K01 (diurna időzóna), K02 (HERE-elszámolás), K03–K05 (cégszűrések), K10 (béta-adapterek), K12–K16, K23 | ⬜ |
+| **6. Frontend + maradék** | K11 (GPS-polling), K18 (feature-kulcsok), K19–K21, alacsony prioritású tételek | ⬜ |
+
+**1. lépésben elvégzett javítások (részletesen):**
+- **K1** — `routes/soferApi.js`: a `/api/pdf-download/:id` mostantól bejelentkezést követel és cégre szűr (`email_sofer IN (SELECT email FROM users WHERE company_id=$2)`).
+- **K2** — `handlers/documents.js` (`orderDocGet`): cégszűrés az `orders`-re joinolva (a régi sorok NULL `company_id`-ja miatt nem közvetlen oszlopszűréssel).
+- **K3** — `handlers/documents.js` (`orderDocSaveSigned`): az UPDATE `FROM orders o ... AND o.company_id=$3` szűréssel fut.
+- **K5** — `db.js`: pool-hangolás (`max:20`, timeoutok, keepAlive) + `pool.on('error')` kezelő; `routes/execute.js`: a dispatcher `await` + try/catch-ben hívja a handlereket; `server.js`: `process.on('unhandledRejection')` védőháló.
+- **M9** — `handlers/developer.js` (`devStats`): `is_dev` jogosultság-ellenőrzés pótolva.
+- **K22** — `routes/auth.js`: nem létező emailnél is fut dummy bcrypt-összehasonlítás (felhasználó-felsorolás időzítésből nem lehetséges).
+- ✅ Tesztek: 5 suite / 17 teszt zöld.
+
+**Következik (2. lépés):** a `CMD-xxxx`/`FUV-xxxx` azonosító-generálás cseréje ütközésbiztosra, a sorszám-prefix-mentés nullázásának megszüntetése, új idempotens migráció (push unique index, FK ON DELETE-ek, GIN index, dupla-számla elleni unique index) + indulási migráció-futtató a schema-drift ellen.
+
+---
+
 ## Vezetői összefoglaló
 
 A rendszer architektúrája (RPC dispatcher + REST, multi-tenant szűrés, titkosított integrációs kulcsok, dizájn-rendszer) **alapvetően jó és 300 felhasználóra méretezhető**. Az indulást azonban **3 kategória blokkolja**:
