@@ -62,12 +62,12 @@ handlers.invCreate = async function (req, res, args) {
         [kod, pozicio, email, 'Aktiv', req.session.user.company_id || null, invNume, invTel]
       );
 
-      // Email kuldese ha van email cim
+      // Email kuldese ha van email cim. A MEGHÍVOTT nevével köszönünk (invNume),
+      // NEM a cég igazgatójáéval — a meghívót a meghívott személy kapja.
       if (email) {
-        const cegRes = await pool.query('SELECT nev, igazgato_nev FROM companies WHERE id = $1', [req.session.user.company_id]);
+        const cegRes = await pool.query('SELECT nev FROM companies WHERE id = $1', [req.session.user.company_id]);
         const cegNev = cegRes.rows[0]?.nev || '';
-        const igazgatoNev = cegRes.rows[0]?.igazgato_nev || null;
-        sendInviteEmail(email, kod, pozicio, cegNev, igazgatoNev)
+        sendInviteEmail(email, kod, pozicio, cegNev, invNume)
           .catch(e => console.error('Email hatter hiba:', e.message));
       }
 

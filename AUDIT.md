@@ -7,7 +7,18 @@
 
 ## 📋 Javítási napló (élő státusz)
 
-A teljes hibalista **6 lépésben (6 commit)** kerül kijavításra. Állapot:
+### 7. lépés — felhasználói észrevételek (2026-06-10, külön kör) ✅ KÉSZ
+
+Két, képpel jelzett konkrét hiba javítása + automatizált teszt:
+
+- **Meghívó e-mail rossz nevet köszöntött** — a `sendInviteEmail` a cég **igazgatójának** nevével (`igazgato_nev`) köszönt, nem a **meghívott** nevével, pedig az ott van az `invites.nume`-ban. Javítva: `handlers/invites.js` mostantól az `invNume`-t adja át; a megszólítás a meghívottra szól (`services/email.js`). A developer-ági cégalapító meghívó címzettje maga az igazgató, ott az `igazgato_nev` átadása helyes maradt.
+- **Meghívó-sablon mobil/PC megjelenés** — a nyers URL-ek link-szövegként csúnyán (markdown-szerűen) renderelődtek a mobil kliensekben. Új, reszponzív sablon: kiemelt „Regisztráció megnyitása" CTA-gomb, a lépéslistából eltűntek a nyers URL-ek, a kód `word-break`-kel nem lóg ki kis kijelzőn, a teljes link külön (másolható) sorban. A HTML-építés kiemelve tiszta `buildInviteHtml()` függvénybe (tesztelhető).
+- **CargoTrack auto-rendszámfelismerés** — a párosítónál (`public/cargotrack-pairing.js`) a CargoTrack `plate`/`name` mezőjéből normalizált rendszám-**javaslat** előtöltődik a még nem párosított járműveknél („💡 Felismert javaslat" címke + kiemelt mező), a felhasználó egyetlen **„✓ Mind mentése"** gombbal jóváhagyhatja az összeset, vagy soronként, és szabadon javíthat. A normalizálás (`B 104 VLR → B104VLR`) közös szabály a szerver-oldali `lib/plate.js`-szel.
+- **Tesztek:** új `tests/unit/invite-email.test.js` (7 eset: meghívott neve, semleges fallback, cég/szerepkör, kód, CTA + nincs nyers URL-link, reszponzív, XSS-escape) és `tests/unit/plate.test.js` (4 eset: normalizálás). **Összesen: 7 suite / 28 teszt zöld.**
+
+---
+
+A teljes hibalista **6 lépésben (6 commit)** került kijavításra. Állapot:
 
 | Lépés | Tartalom | Státusz |
 |-------|----------|---------|
