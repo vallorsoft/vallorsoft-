@@ -7,6 +7,7 @@ const router = express.Router();
 const pool = require('../db');
 const { requireLogin, requireRole } = require('../middleware/auth');
 const { calculateDiurna } = require('../lib/diurna');
+const { genDocId } = require('../lib/ids');
 
 router.post('/api/border-cross', async (req, res) => {
   try {
@@ -62,7 +63,9 @@ router.post('/api/document-series', requireLogin, requireRole('Manager','Admin')
   const year = new Date().getFullYear();
   if (!prefix) return res.json({ok:false, err:'Prefix kötelező.'});
   try {
-    await pool.query(`INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq) VALUES ($1,$2,$3,$4,0) ON CONFLICT (company_id,doc_type,year) DO UPDATE SET prefix=$3, current_seq=0, updated_at=NOW()`, [cid, docType.toUpperCase(), prefix.toUpperCase(), year]);
+    // FONTOS: a prefix újramentése NEM nullázhatja a sorszámot — különben
+    // már kiadott hivatalos bizonylatszámok ismétlődnének meg.
+    await pool.query(`INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq) VALUES ($1,$2,$3,$4,0) ON CONFLICT (company_id,doc_type,year) DO UPDATE SET prefix=$3, updated_at=NOW()`, [cid, docType.toUpperCase(), prefix.toUpperCase(), year]);
     return res.json({ok:true});
   } catch(err) { console.error('document-series POST hiba:', err); return res.json({ok:false, err: err.message}); }
 });
@@ -83,10 +86,9 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
   try {
     if (!req.session.user) return res.json({ success: false, err: 'Nincs bejelentkezve' });
     const d = req.body;
-    const randId = Math.floor(1000 + Math.random() * 9000);
     const soferNameClean = (req.session.user.nume || 'Sofer').replace(/\s+/g, '_');
-    const id = "FUV-" + randId;
-    const fileName = `Menetlevel_${soferNameClean}_${randId}.pdf`;
+    const id = genDocId('FUV');
+    const fileName = `Menetlevel_${soferNameClean}_${id.slice(4)}.pdf`;
     const cid = req.session.user.company_id;
     const year = new Date().getFullYear();
     // Automatikus, cégenkénti sorszám (MT-YYYY-XXXX). Ha bármiért elszáll

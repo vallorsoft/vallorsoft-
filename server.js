@@ -155,20 +155,39 @@ startIntakeScheduler();
 // (megtartva az eredetibol; jelenleg nincs hasznalatban)
 const getNowStr = () => new Date().toISOString().replace('T', ' ').substring(0, 19);
 
-// ===== DB SÉMA-ŐRZÉS (kritikus táblák megléte indításkor) =====
-// Managed DB-ken (Neon) a migrációk kézi futtatása könnyen kimarad. A
-// menetlevél cégenkénti sorszámozásához nélkülözhetetlen document_series
-// táblát ezért minden induláskor biztosítjuk az idempotens migrációból
-// (CREATE TABLE IF NOT EXISTS + UNIQUE constraint pótlás). A séma-őrzés
-// hibája NEM állítja meg a szervert — csak naplózódik.
+// ===== DB MIGRÁCIÓ-FUTTATÓ (séma-drift ellen, indításkor) =====
+// Managed DB-ken (Neon) a migrációk kézi futtatása könnyen kimarad — ezért
+// minden db/*.sql migráció pontosan EGYSZER lefut, az eredményt a
+// schema_migrations tábla rögzíti. A migrációk idempotensek, de néhány
+// szándékosan destruktív lépést is tartalmaznak (pl. oszlop-eltávolítás),
+// ezért nem futtatjuk őket minden indulásnál újra. Két menet fut, hogy a
+// fájlnév-sorrendből adódó függőségek (pl. uit-anaf-confirm a uit-migration
+// előtt) ugyanazon induláson belül feloldódjanak. Hiba NEM állítja meg a
+// szervert — csak naplózódik, és a következő indulásnál újrapróbálódik.
 const fs = require('fs');
 (async () => {
   try {
-    const sql = fs.readFileSync(path.join(__dirname, 'db', 'document-series.sql'), 'utf8');
-    await pool.query(sql);
-    console.log('document_series séma ellenőrizve/létrehozva.');
+    await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
+      filename   TEXT PRIMARY KEY,
+      applied_at TIMESTAMP DEFAULT NOW()
+    )`);
+    const dir = path.join(__dirname, 'db');
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+    for (let pass = 1; pass <= 2; pass++) {
+      for (const f of files) {
+        const done = await pool.query('SELECT 1 FROM schema_migrations WHERE filename = $1', [f]);
+        if (done.rows.length) continue;
+        try {
+          await pool.query(fs.readFileSync(path.join(dir, f), 'utf8'));
+          await pool.query('INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING', [f]);
+          console.log(`Migráció lefuttatva: ${f}`);
+        } catch (e) {
+          if (pass === 2) console.error(`Migráció hiba (${f}) — kihagyva, a szerver tovább indul:`, e.message);
+        }
+      }
+    }
   } catch (e) {
-    console.error('document_series séma-őrzés hiba (a szerver tovább indul):', e.message);
+    console.error('Migráció-futtató hiba (a szerver tovább indul):', e.message);
   }
 })();
 

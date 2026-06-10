@@ -12,8 +12,8 @@ A teljes hibalista **6 lépésben (6 commit)** kerül kijavításra. Állapot:
 | Lépés | Tartalom | Státusz |
 |-------|----------|---------|
 | **1. Kritikus biztonság + stabilitás** | K1, K2, K3 (adatszivárgó végpontok), K5 (pool error-handler + dispatcher try/catch + unhandledRejection), M9 (devStats guard), K22 (login timing-oracle) | ✅ **KÉSZ** |
-| **2. Azonosítók + DB-integritás** | K4 (CMD/FUV ütközés), K6 (sorszám-nullázás), M2 (dupla számla), M4 (push-index), M5 (FK ON DELETE), M6 (migráció-szinkron), M7 (GIN index) | ⏳ következik |
-| **3. Tranzakciók + szolgáltatás-robusztusság** | M1 (tranzakciók), M3 (scheduler-őr), M8 (2FA rate-limit), M10 (méretsapkák), M12 (OCR-út), K06–K08 (Brevo timeout, e-mail escape, intake-hibakezelés) | ⬜ |
+| **2. Azonosítók + DB-integritás** | K4 (CMD/FUV ütközés), K6 (sorszám-nullázás), M2 (dupla számla), M4 (push-index), M5 (FK ON DELETE), M6 (migráció-szinkron), M7 (GIN index) | ✅ **KÉSZ** |
+| **3. Tranzakciók + szolgáltatás-robusztusság** | M1 (tranzakciók), M3 (scheduler-őr), M8 (2FA rate-limit), M10 (méretsapkák), M12 (OCR-út), K06–K08 (Brevo timeout, e-mail escape, intake-hibakezelés) | ⏳ következik |
 | **4. XSS-mentesítés + PWA-ikonok** | K7 (legacy render-függvények + soferApi HTML escape), M11 (ikonok) | ⬜ |
 | **5. Közepes szerver-javítások** | K01 (diurna időzóna), K02 (HERE-elszámolás), K03–K05 (cégszűrések), K10 (béta-adapterek), K12–K16, K23 | ⬜ |
 | **6. Frontend + maradék** | K11 (GPS-polling), K18 (feature-kulcsok), K19–K21, alacsony prioritású tételek | ⬜ |
@@ -27,7 +27,16 @@ A teljes hibalista **6 lépésben (6 commit)** kerül kijavításra. Állapot:
 - **K22** — `routes/auth.js`: nem létező emailnél is fut dummy bcrypt-összehasonlítás (felhasználó-felsorolás időzítésből nem lehetséges).
 - ✅ Tesztek: 5 suite / 17 teszt zöld.
 
-**Következik (2. lépés):** a `CMD-xxxx`/`FUV-xxxx` azonosító-generálás cseréje ütközésbiztosra, a sorszám-prefix-mentés nullázásának megszüntetése, új idempotens migráció (push unique index, FK ON DELETE-ek, GIN index, dupla-számla elleni unique index) + indulási migráció-futtató a schema-drift ellen.
+**2. lépésben elvégzett javítások (részletesen):**
+- **K4** — új `lib/ids.js` (`genDocId`): időbélyeg+random base36 azonosító (pl. `CMD-MQ8JYKJ4ZSE`, ≤20 karakter) a 9000 értékes véletlen helyett. Átírva: `handlers/orders.js` (comCreate), `routes/inbound-orders.js` (approve), `routes/soferApi.js` (fuvarlevel-save).
+- **K6** — `routes/soferApi.js`: a `POST /api/document-series` prefix-mentése többé NEM nullázza a `current_seq`-et (duplikált hivatalos bizonylatszám kizárva).
+- **M2** — `services/invoicing.js`: `emitInvoice` és `emitStorno` tranzakcióban, a fuvar sorára vett `FOR UPDATE` zárral fut — párhuzamos kérésnél sem készülhet dupla éles számla a szolgáltatónál; plusz DB-szintű részleges unique index.
+- **M4–M5–M7** — új `db/audit-hardening.sql` migráció: push `endpoint_hash` duplikátum-takarítás + unique index (az `ON CONFLICT` mostantól tényleg működik), `orders.client_id → ON DELETE SET NULL`, `billing_integrations.company_id → ON DELETE CASCADE`, `companies.subscription_plan_id → ON DELETE SET NULL`, GIN index a `fuvarlevelek.order_ids`-re.
+- **M7 (lekérdezés)** — `handlers/orders.js` (`getMySoferOrders`): `jsonb_exists()` → `?` operátor, hogy a GIN indexet ténylegesen használja a Postgres.
+- **M6** — `server.js`: indulási **migráció-futtató** `schema_migrations` nyilvántartással — minden `db/*.sql` pontosan egyszer fut le (két menetben a fájlnév-sorrendi függőségek miatt); az élesítési checklist 2. pontja (kézi migráció-futtatás) ezzel automatizálva.
+- ✅ Tesztek: 5 suite / 17 teszt zöld; `genDocId` füstteszt OK.
+
+**Következik (3. lépés):** tranzakciók a többlépéses írásokra (comCreate order+leg, inbound approve, devCompanyDelete), scheduler átfedés-őr, 2FA rate-limit, kérés/melléklet-méretsapkák, OCR-út javítása, Brevo timeout + e-mail HTML-escape, intake hibakezelés (levél ne vesszen el némán).
 
 ---
 

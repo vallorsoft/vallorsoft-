@@ -5,6 +5,7 @@
 //  Hívás: handlers.<funkcioNev>(req, res, args)
 // ============================================================
 const pool = require('../db');
+const { genDocId } = require('../lib/ids');
 
 const handlers = {};
 
@@ -114,7 +115,7 @@ handlers.getMySoferOrders = async function (req, res, args) {
            LEFT JOIN LATERAL (
              SELECT MIN(f.data_completare) AS waybill_at
                FROM fuvarlevelek f
-              WHERE jsonb_exists(f.order_ids, o.id)
+              WHERE f.order_ids ? o.id::text -- a ? operátor használja a GIN indexet (a jsonb_exists nem)
            ) wb ON true
           WHERE o.company_id = $1 AND LOWER(o.email_sofer) = LOWER($2)
           ORDER BY o.created_at DESC`,
@@ -134,7 +135,7 @@ handlers.comCreate = async function (req, res, args) {
       }
 
       const o = args[0] || {};
-      const id = "CMD-" + Math.floor(1000 + Math.random() * 9000);
+      const id = genDocId('CMD');
       const client = String(o.client || '').trim();
       const ref = String(o.ref || '').trim();
       const pret = Number(o.pret || 0);

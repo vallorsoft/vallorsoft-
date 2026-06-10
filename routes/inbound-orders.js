@@ -7,6 +7,7 @@ const pdfx = require('../services/pdf-extract');
 const orderAi = require('../services/order-ai');
 const intake = require('../services/email-intake');
 const { decrypt } = require('../lib/crypto');
+const { genDocId } = require('../lib/ids');
 
 const router = express.Router();
 
@@ -134,7 +135,7 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
     const ex = r0.rows[0].extracted || {};
     const a = req.body.assign || {};   // opcionális sofőr/jármű kiosztás
     const company_id = own(req);
-    const id = 'CMD-' + Math.floor(1000 + Math.random() * 9000);
+    const id = genDocId('CMD');
 
     const sofer_type = a.sofer_type || null;
     const email_sofer = a.email_sofer ? String(a.email_sofer).trim().toLowerCase() : null;
