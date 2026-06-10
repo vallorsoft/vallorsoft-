@@ -98,21 +98,26 @@ let myEmail = '';  // sajat email a connection-bol
 
 function loadUsers(){
   gas('userListAll').then(list => {
-    document.querySelector('#tblUsers tbody').innerHTML = list.map(u => {
+    // XSS-védelem: a sor-adatot gyorsítótárból (index alapján) adjuk át, NEM HTML-attribútumba ágyazva
+    window._vsUsersCache = list;
+    document.querySelector('#tblUsers tbody').innerHTML = list.map((u, i) => {
       const isSelf = u.email.toLowerCase() === myEmail.toLowerCase();
       // Manager csak Sofer mellett, vagy sajat magat szerkesztheti; Admint NEM
       const canEdit = u.pozicio !== 'Admin' || isSelf;
       const editBtn = canEdit
-        ? `<button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick='editUser(${JSON.stringify(u)})'>Szerk</button>`
+        ? `<button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editUserIdx(${i})">Szerk</button>`
         : '<span style="color:var(--muted);font-size:12px;">—</span>';
       // Torol gomb csak Sofer mellett (sajat magat se torolheti)
       const delBtn = (u.pozicio === 'Sofer' && !isSelf)
-        ? ` <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUser('${u.email}','${u.nume}')">Töröl</button>`
+        ? ` <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUserIdx(${i})">Töröl</button>`
         : '';
-      return `<tr><td>${u.nume}</td><td>${u.email}</td><td>${u.tel||'—'}</td><td><span class="badge info">${u.pozicio}</span></td><td>${editBtn}${delBtn}</td></tr>`;
+      return `<tr><td>${esc(u.nume)}</td><td>${esc(u.email)}</td><td>${esc(u.tel||'—')}</td><td><span class="badge info">${u.pozicio}</span></td><td>${editBtn}${delBtn}</td></tr>`;
     }).join('');
   });
 }
+// Gyorsítótár-alapú hívók (a felhasználói adat nem kerül HTML-attribútumba)
+window.editUserIdx = (i) => editUser(window._vsUsersCache[i]);
+window.deleteUserIdx = (i) => { const u = window._vsUsersCache[i]; deleteUser(u.email, u.nume); };
 
 function deleteUser(email, nev){
   if(!confirm('Biztosan törlöd: '+nev+' ('+email+')?\n\nEz a művelet nem visszavonható!'))return;

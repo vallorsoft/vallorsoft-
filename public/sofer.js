@@ -2,6 +2,12 @@
 //  VallorSoft — sofer.js
 //  Kivágva a sofer.html inline <script> blokkjaiból, BÁJTRA AZONOS.
 // ============================================================
+// HTML-escape a szerverről jövő adatokhoz (tárolt XSS ellen)
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                      .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
 // ============================================================
 // SESSION STATE — oldal frissítés utáni visszaállítás
 // sessionStorage: csak ugyanazon a fülön él, új fülön üres
@@ -253,9 +259,9 @@ function loadSoferOrders() {
       return '<label style="display:flex;align-items:flex-start;gap:12px;background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;">'
         + '<input type="checkbox" value="' + o.id + '" ' + (checked ? 'checked' : '') + ' onchange="toggleOrderSel(this)" style="margin-top:3px;width:18px;height:18px;accent-color:#e10b1a;flex-shrink:0;">'
         + '<div>'
-        + '<div style="font-weight:700;font-size:14px;color:#fff;">' + (o.client || '—') + ' <span style="font-size:11px;color:var(--muted);">#' + o.id + '</span> <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,0.1);">' + (o.status||'—') + '</span></div>'
-        + '<div style="font-size:12px;color:var(--soft);margin-top:3px;">📍 ' + (o.loc_incarcare || '—') + ' → ' + (o.loc_descarcare || '—') + '</div>'
-        + (o.rendszam_camion ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">🚛 ' + o.rendszam_camion + (o.rendszam_remorca ? ' / ' + o.rendszam_remorca : '') + '</div>' : '')
+        + '<div style="font-weight:700;font-size:14px;color:#fff;">' + esc(o.client || '—') + ' <span style="font-size:11px;color:var(--muted);">#' + o.id + '</span> <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,0.1);">' + esc(o.status||'—') + '</span></div>'
+        + '<div style="font-size:12px;color:var(--soft);margin-top:3px;">📍 ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—') + '</div>'
+        + (o.rendszam_camion ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">🚛 ' + esc(o.rendszam_camion) + (o.rendszam_remorca ? ' / ' + esc(o.rendszam_remorca) : '') + '</div>' : '')
         + '</div></label>';
     }).join('');
   });
@@ -276,7 +282,7 @@ function fuvarStep2() {
   var sumEl = document.getElementById('selectedOrdersSummary');
   sumEl.innerHTML = '<b style="color:#fff;">✅ ' + selected.length + ' fuvar kiválasztva:</b><br>'
     + selected.map(function(o) {
-        return '• ' + (o.client || '—') + ': ' + (o.loc_incarcare || '—') + ' → ' + (o.loc_descarcare || '—');
+        return '• ' + esc(o.client || '—') + ': ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—');
       }).join('<br>');
 
   var first = selected[0];
@@ -346,9 +352,9 @@ function addPunctRow(locVal, tipVal, dataVal) {
     + '<div class="field"><label>Tip punct</label><select class="input punct-tip" style="padding:10px 14px;" onchange="draftSave()">'
     + tipOptions.map(function(t) { return '<option' + (t === (tipVal || 'Încărcare') ? ' selected' : '') + '>' + t + '</option>'; }).join('')
     + '</select></div>'
-    + '<div class="field"><label>Dată</label><input class="input punct-data" type="date" value="' + (dataVal || today) + '" onchange="draftSave()"></div>'
+    + '<div class="field"><label>Dată</label><input class="input punct-data" type="date" value="' + esc(dataVal || today) + '" onchange="draftSave()"></div>'
     + '</div>'
-    + '<div class="field"><label>Localitate / Adresă</label><input class="input punct-loc" placeholder="pl. Budapest, Keleti pu." value="' + (locVal || '') + '" oninput="draftSave()"></div>';
+    + '<div class="field"><label>Localitate / Adresă</label><input class="input punct-loc" placeholder="pl. Budapest, Keleti pu." value="' + esc(locVal || '') + '" oninput="draftSave()"></div>';
   document.getElementById('puncteContainer').appendChild(d);
 }
 
@@ -821,18 +827,18 @@ function renderFuvarCard(o) {
   var isCurs   = o.status === 'In Curs';
   var isFinal  = o.status === 'Finalizat';
   var statusCls = isAlocat ? 'warn' : 'ok';
-  var statusTxt = isFinal ? '✓ Teljesítve' : (o.status || 'Alocat');
-  var truck = o.rendszam_camion ? ('🚛 ' + o.rendszam_camion + (o.rendszam_remorca ? ' / ' + o.rendszam_remorca : '')) : '';
+  var statusTxt = isFinal ? '✓ Teljesítve' : esc(o.status || 'Alocat');
+  var truck = o.rendszam_camion ? ('🚛 ' + esc(o.rendszam_camion) + (o.rendszam_remorca ? ' / ' + esc(o.rendszam_remorca) : '')) : '';
   var actionBtn =
       isAlocat ? '<button class="sh-btn resume"  onclick="driverOrderStatus(\'' + o.id + '\',\'In Curs\')">✅ Elfogadom</button>' :
       isCurs   ? '<button class="sh-btn confirm" onclick="driverOrderStatus(\'' + o.id + '\',\'Finalizat\')">🏁 Elvégeztem</button>' :
                  '';
   return '' +
     '<div class="fuvar-card">' +
-      '<div class="fuvar-destination">📍 ' + (o.loc_incarcare||'—') + ' → ' + (o.loc_descarcare||'—') + '</div>' +
+      '<div class="fuvar-destination">📍 ' + esc(o.loc_incarcare||'—') + ' → ' + esc(o.loc_descarcare||'—') + '</div>' +
       '<div class="fuvar-meta">' +
         '<span>#' + o.id + '</span>' +
-        (o.client ? '<span>' + o.client + '</span>' : '') +
+        (o.client ? '<span>' + esc(o.client) + '</span>' : '') +
         (truck ? '<span>' + truck + '</span>' : '') +
         '<span class="fuvar-status ' + statusCls + '">' + statusTxt + '</span>' +
       '</div>' +

@@ -210,6 +210,13 @@ router.get('/api/doc-download/:id', async (req, res) => {
   }
 });
 
+// HTML-escape a DB-ből jövő (felhasználó által beküldött) mezőkhöz — tárolt XSS ellen
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
 // PDF DOWNLOAD (DB-bol) — csak bejelentkezve, csak a saját cég menetlevele
 router.get('/api/pdf-download/:id', async (req, res) => {
   try {
@@ -231,12 +238,12 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     let puncteHtml = '';
     if (puncte.length > 0) {
       puncte.forEach((p, i) => {
-        puncteHtml += `<tr><td>${i+1}.</td><td>${p.tip || '—'}</td><td>${p.loc || '—'}</td><td>${p.data || '—'}</td></tr>`;
+        puncteHtml += `<tr><td>${i+1}.</td><td>${escHtml(p.tip || '—')}</td><td>${escHtml(p.loc || '—')}</td><td>${escHtml(p.data || '—')}</td></tr>`;
       });
     } else {
       // Ha nincs puncte, a régi loc_plecare/loc_sosire mutatjuk
-      if (f.loc_plecare) puncteHtml += `<tr><td>1.</td><td>Plecare</td><td>${f.loc_plecare}</td><td>—</td></tr>`;
-      if (f.loc_sosire)  puncteHtml += `<tr><td>2.</td><td>Sosire</td><td>${f.loc_sosire}</td><td>—</td></tr>`;
+      if (f.loc_plecare) puncteHtml += `<tr><td>1.</td><td>Plecare</td><td>${escHtml(f.loc_plecare)}</td><td>—</td></tr>`;
+      if (f.loc_sosire)  puncteHtml += `<tr><td>2.</td><td>Sosire</td><td>${escHtml(f.loc_sosire)}</td><td>—</td></tr>`;
       if (!puncteHtml)   puncteHtml  = '<tr><td colspan="4">—</td></tr>';
     }
 
@@ -245,12 +252,12 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     if (alimentari.length > 0) {
       alimentari.forEach((a, i) => {
         alimHtml += `<tr>
-          <td>${i+1}. ${a.loc || '—'}</td>
-          <td>${a.tip || 'Motorină'}</td>
-          <td>${a.litru || 0} L</td>
-          <td>${a.km || 0} km</td>
-          <td>${a.plata || '—'}</td>
-          <td>${a.suma ? a.suma + ' RON' : '—'}</td>
+          <td>${i+1}. ${escHtml(a.loc || '—')}</td>
+          <td>${escHtml(a.tip || 'Motorină')}</td>
+          <td>${escHtml(a.litru || 0)} L</td>
+          <td>${escHtml(a.km || 0)} km</td>
+          <td>${escHtml(a.plata || '—')}</td>
+          <td>${a.suma ? escHtml(a.suma) + ' RON' : '—'}</td>
         </tr>`;
       });
     } else {
@@ -262,10 +269,10 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     if (achizitii.length > 0) {
       achizitii.forEach((ach, i) => {
         achHtml += `<tr>
-          <td>${i+1}. ${ach.loc || '—'}</td>
-          <td>${ach.produs || '—'}</td>
-          <td>${ach.pret || 0} RON</td>
-          <td>${ach.plata || '—'}</td>
+          <td>${i+1}. ${escHtml(ach.loc || '—')}</td>
+          <td>${escHtml(ach.produs || '—')}</td>
+          <td>${escHtml(ach.pret || 0)} RON</td>
+          <td>${escHtml(ach.plata || '—')}</td>
         </tr>`;
       });
     } else {
@@ -273,12 +280,12 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     }
 
     // Fuvar ID-k
-    const orderIdsStr = orderIds.length ? orderIds.join(', ') : '—';
+    const orderIdsStr = orderIds.length ? escHtml(orderIds.join(', ')) : '—';
 
     res.send(`
   <html>
   <head>
-    <title>${f.file_name}</title>
+    <title>${escHtml(f.file_name)}</title>
     <meta charset="UTF-8">
     <style>
       body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.5; color:#000; font-size:13px; }
@@ -295,11 +302,11 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       <button onclick="window.close();setTimeout(function(){if(!window.closed){if(history.length>1){history.back();}else{location.href='/';}}},150);" style="padding:10px 24px;background:#555;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">← Vissza</button>
       <button onclick="window.print()" style="padding:10px 24px;background:#000;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">🖨️ Nyomtatás / PDF mentés</button>
     </div>
-    <div class="header-box">VALLOR TEAM SRL<br><span style="font-size:14px;">FIȘĂ DE CURSĂ SĂPTĂMÂNALĂ</span><br><span style="font-size:15px;color:#b00;letter-spacing:1px;">Serie / Nr.: ${f.numar_fisa || '—'}</span></div>
+    <div class="header-box">VALLOR TEAM SRL<br><span style="font-size:14px;">FIȘĂ DE CURSĂ SĂPTĂMÂNALĂ</span><br><span style="font-size:15px;color:#b00;letter-spacing:1px;">Serie / Nr.: ${escHtml(f.numar_fisa || '—')}</span></div>
 
     <table class="grid-table">
-      <tr><td width="50%"><b>Nume șofer:</b> ${f.nume_sofer || '—'}</td><td><b>Serie / Număr:</b> ${f.numar_fisa || '—'}</td></tr>
-      <tr><td><b>Număr camion:</b> ${f.numar_camion || '—'}</td><td><b>Număr remorcă:</b> ${f.numar_remorca || '—'}</td></tr>
+      <tr><td width="50%"><b>Nume șofer:</b> ${escHtml(f.nume_sofer || '—')}</td><td><b>Serie / Număr:</b> ${escHtml(f.numar_fisa || '—')}</td></tr>
+      <tr><td><b>Număr camion:</b> ${escHtml(f.numar_camion || '—')}</td><td><b>Număr remorcă:</b> ${escHtml(f.numar_remorca || '—')}</td></tr>
       <tr><td colspan="2"><b>Fuvar ID-k:</b> ${orderIdsStr}</td></tr>
       <tr><td><b>Km început:</b> ${f.km_inceput || 0} km</td><td><b>Km sfârșit:</b> ${f.km_sfarsit || 0} km</td></tr>
       <tr><td colspan="2"><b>Total kilometri parcurși: ${f.total_km || 0} km</b></td></tr>
@@ -332,7 +339,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     </table>
 
     <div class="sec-title">Alte mențiuni (Megjegyzések)</div>
-    <div style="border:1px solid #000;padding:10px;min-height:40px;">${f.alte_mentiuni || '—'}</div>
+    <div style="border:1px solid #000;padding:10px;min-height:40px;">${escHtml(f.alte_mentiuni || '—')}</div>
 
     <div style="margin-top:30px;display:flex;justify-content:space-between;">
       <div style="text-align:center;"><div style="border-top:1px solid #000;width:180px;margin:0 auto;padding-top:4px;">Semnătura șofer</div></div>

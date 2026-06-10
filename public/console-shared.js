@@ -400,7 +400,7 @@ function initFirebaseChatPanel(me){
 
 function loadAdminSigPreview(){gas('stampGet').then(r=>{if(r&&r.ok&&r.base64){document.getElementById('adminSigPreview').src=r.base64;document.getElementById('adminSigPreview').style.display='block';document.getElementById('noSigText').style.display='none';}});}
 
-function loadBorderLogs(){gas('getBorderLogs').then(list=>{document.querySelector('#tblBorderLogs tbody').innerHTML=list.map(l=>`<tr><td>${l.created_at?new Date(l.created_at).toLocaleString('hu-HU'):'—'}</td><td>${l.nume_sofer||l.email_sofer||'—'}</td><td><span class="badge warn">${l.tip||'—'}</span></td><td>${l.gps_lat?('📍 '+parseFloat(l.gps_lat).toFixed(4)+', '+parseFloat(l.gps_lng).toFixed(4)):'GPS n/a'}</td></tr>`).join('');});}
+function loadBorderLogs(){gas('getBorderLogs').then(list=>{document.querySelector('#tblBorderLogs tbody').innerHTML=list.map(l=>`<tr><td>${l.created_at?new Date(l.created_at).toLocaleString('hu-HU'):'—'}</td><td>${esc(l.nume_sofer||l.email_sofer||'—')}</td><td><span class="badge warn">${esc(l.tip||'—')}</span></td><td>${l.gps_lat?('📍 '+parseFloat(l.gps_lat).toFixed(4)+', '+parseFloat(l.gps_lng).toFixed(4)):'GPS n/a'}</td></tr>`).join('');});}
 
 
 function loadDocSeries() {
@@ -422,7 +422,7 @@ function loadDriverUploadedDocs() {
     var sel = document.getElementById('docFilterSofer');
     if (sel) {
       var sofors = [...new Set(_driverDocsCache.map(function(d){return d.nume_sofer||d.email_sofer;}).filter(Boolean))].sort();
-      sel.innerHTML = '<option value="">Összes sofőr</option>' + sofors.map(function(s){return '<option value="'+s+'">'+s+'</option>';}).join('');
+      sel.innerHTML = '<option value="">Összes sofőr</option>' + sofors.map(function(s){return '<option value="'+esc(s)+'">'+esc(s)+'</option>';}).join('');
     }
     renderDocGroups();
   });
@@ -434,7 +434,7 @@ function loadExtDrivers(){
     extDriverCache=list;
     const tb=document.querySelector('#tblExtDrivers tbody');
     if(list.length===0){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);">Nincs még külső sofőr felvéve.</td></tr>';return;}
-    tb.innerHTML=list.map(d=>`<tr><td>${d.nume||'—'}</td><td>${d.firma||'—'}</td><td>${d.telefon||'—'}</td><td>${d.email||'—'}</td><td>${d.rendszam_camion||'—'}</td><td>${d.rendszam_remorca||'—'}</td><td>${d.nota||'—'}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editExtDriver(${d.id})">Szerk</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteExtDriver(${d.id})">Töröl</button></td></tr>`).join('');
+    tb.innerHTML=list.map(d=>`<tr><td>${esc(d.nume||'—')}</td><td>${esc(d.firma||'—')}</td><td>${esc(d.telefon||'—')}</td><td>${esc(d.email||'—')}</td><td>${esc(d.rendszam_camion||'—')}</td><td>${esc(d.rendszam_remorca||'—')}</td><td>${esc(d.nota||'—')}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editExtDriver(${d.id})">Szerk</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteExtDriver(${d.id})">Töröl</button></td></tr>`).join('');
   });
 }
 
@@ -446,15 +446,16 @@ function loadInternalDrivers(){
       tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">Nincs regisztrált belső sofőr.</td></tr>';
       return;
     }
-    tbody.innerHTML = list.map(function(d){
-      var safeJson = JSON.stringify(d).replace(/"/g,'&quot;');
+    // XSS-védelem: a sor-adatot gyorsítótárból (index alapján) adjuk át, NEM HTML-attribútumba ágyazva
+    window._vsIntDrvCache = list;
+    tbody.innerHTML = list.map(function(d, i){
       return '<tr>'
-        +'<td>'+d.nume+'</td>'
-        +'<td>'+d.email+'</td>'
-        +'<td>'+(d.tel||'—')+'</td>'
+        +'<td>'+esc(d.nume)+'</td>'
+        +'<td>'+esc(d.email)+'</td>'
+        +'<td>'+esc(d.tel||'—')+'</td>'
         +'<td>'
-        +'<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="editUser('+safeJson+')">Szerkeszt</button> '
-        +'<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUser(\''+d.email+'\',\''+d.nume+'\')">Töröl</button>'
+        +'<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="editUser(window._vsIntDrvCache['+i+'])">Szerkeszt</button> '
+        +'<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUser(window._vsIntDrvCache['+i+'].email,window._vsIntDrvCache['+i+'].nume)">Töröl</button>'
         +'</td>'
         +'</tr>';
     }).join('');
@@ -467,13 +468,13 @@ function loadInvites(){
     document.querySelector('#tblInv tbody').innerHTML=list.map(i=>{
       var sc=i.status==='Aktiv'?'ok':i.status==='Felhasznalva'?'info':'err';
       return '<tr>'
-        +'<td><b style="color:#fff;">'+i.kod+'</b></td>'
+        +'<td><b style="color:#fff;">'+esc(i.kod)+'</b></td>'
         +'<td>'+i.pozicio+'</td>'
-        +'<td>'+(i.nume||'—')+'</td>'
-        +'<td>'+(i.email||'—')+'</td>'
-        +'<td>'+(i.tel||'—')+'</td>'
+        +'<td>'+esc(i.nume||'—')+'</td>'
+        +'<td>'+esc(i.email||'—')+'</td>'
+        +'<td>'+esc(i.tel||'—')+'</td>'
         +'<td><span class="badge '+sc+'">'+i.status+'</span></td>'
-        +'<td><button class="btn ghost" style="padding:3px 10px;font-size:12px;" onclick="revokeInv(\''+i.kod+'\')" '+(i.status!=='Aktiv'?'disabled':'')+'>Visszavon</button></td>'
+        +'<td><button class="btn ghost" style="padding:3px 10px;font-size:12px;" onclick="revokeInv(\''+esc(i.kod)+'\')" '+(i.status!=='Aktiv'?'disabled':'')+'>Visszavon</button></td>'
         +'</tr>';
     }).join('');
   });
@@ -516,9 +517,9 @@ function loadReceivedFuvarlevelek(){
     var tb=document.querySelector('#tblReceivedFuv tbody');
     if(!list||list.length===0){tb.innerHTML='<tr><td colspan="5">Nincs beküldött fuvarlevél.</td></tr>';return;}
     tb.innerHTML=list.map(f=>`<tr>`
-      +`<td><b style="color:var(--brand-red);">${f.numar_fisa||'—'}</b></td>`
-      +`<td><b style="color:var(--text-primary);">${f.file_name||'—'}</b></td>`
-      +`<td>${f.nume_sofer||f.email_sofer||'—'}</td>`
+      +`<td><b style="color:var(--brand-red);">${esc(f.numar_fisa||'—')}</b></td>`
+      +`<td><b style="color:var(--text-primary);">${esc(f.file_name||'—')}</b></td>`
+      +`<td>${esc(f.nume_sofer||f.email_sofer||'—')}</td>`
       +`<td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td>`
       +`<td style="display:flex;gap:6px;flex-wrap:wrap;">`
         +`<button class="btn ghost" style="padding:5px 10px;" onclick="openPdfView('${f.id}')">👁 PDF</button>`
@@ -782,7 +783,7 @@ function renderAdminRoomList(me){
   }).join('');
 }
 
-function renderCamions(list){const sel=document.getElementById('oCamionSelect');if(!sel)return;sel.innerHTML='<option value="">— Nincs megadva —</option>'+list.map(v=>`<option value="${v.rendszam}">${v.rendszam}${v.marca?' — '+v.marca:''}${v.model?' '+v.model:''}</option>`).join('');}
+function renderCamions(list){const sel=document.getElementById('oCamionSelect');if(!sel)return;sel.innerHTML='<option value="">— Nincs megadva —</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
 
 function renderDocGroups() {
   var container = document.getElementById('docGroupsContainer');
@@ -807,7 +808,7 @@ function renderDocGroups() {
   Object.values(groups).forEach(function(g) {
     html += '<div style="margin-bottom:24px;">';
     html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0 8px;border-bottom:1px solid var(--border);margin-bottom:12px;">';
-    html += '<span style="font-size:15px;font-weight:700;color:var(--text-primary);">👤 '+g.nev+'</span>';
+    html += '<span style="font-size:15px;font-weight:700;color:var(--text-primary);">👤 '+esc(g.nev)+'</span>';
     html += '<span style="font-size:12px;color:var(--muted);background:var(--bg-3);padding:3px 10px;border-radius:20px;border:1px solid var(--border);">📅 '+g.nap+'</span>';
     html += '<span style="font-size:12px;color:var(--muted);">'+g.docs.length+' fájl</span>';
     html += '</div>';
@@ -816,8 +817,8 @@ function renderDocGroups() {
       var bc = d.tip==='CMR'?'ok':d.tip==='Számla'?'info':'warn';
       var time = d.created_at ? new Date(d.created_at).toLocaleTimeString('hu-HU',{hour:'2-digit',minute:'2-digit'}) : '';
       html += '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px;">';
-      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span class="badge '+bc+'">'+(d.tip||'Egyéb')+'</span><span style="font-size:11px;color:var(--muted);">'+time+'</span></div>';
-      html += '<div style="font-size:12px;color:var(--soft);margin-bottom:10px;word-break:break-all;">'+(d.file_name||'—')+'</div>';
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span class="badge '+bc+'">'+esc(d.tip||'Egyéb')+'</span><span style="font-size:11px;color:var(--muted);">'+time+'</span></div>';
+      html += '<div style="font-size:12px;color:var(--soft);margin-bottom:10px;word-break:break-all;">'+esc(d.file_name||'—')+'</div>';
       html += '<div style="display:flex;gap:6px;">';
       html += '<a href="/api/doc-download/'+d.id+'" target="_blank" class="btn primary" style="flex:1;text-align:center;text-decoration:none;padding:8px 6px;font-size:12px;">👁 Megtekint</a>';
       html += '<a href="/api/doc-download/'+d.id+'" download class="btn ghost" style="flex:1;text-align:center;text-decoration:none;padding:8px 6px;font-size:12px;">⬇ Letölt</a>';
@@ -828,17 +829,17 @@ function renderDocGroups() {
   container.innerHTML = html;
 }
 
-function renderExternDrivers(list){const sel=document.getElementById('oExternSelect');if(!sel)return;sel.innerHTML='<option value="">— Új sofőr beírása kézzel —</option>'+list.map(d=>`<option value="${d.id}">${d.nume||''} ${d.firma?'/ '+d.firma:''}</option>`).join('');}
+function renderExternDrivers(list){const sel=document.getElementById('oExternSelect');if(!sel)return;sel.innerHTML='<option value="">— Új sofőr beírása kézzel —</option>'+list.map(d=>`<option value="${esc(d.id)}">${esc(d.nume||'')} ${d.firma?'/ '+esc(d.firma):''}</option>`).join('');}
 
-function renderInternDrivers(list){const sel=document.getElementById('oInternDriver');if(!sel)return;sel.innerHTML='<option value="">— Válassz sofőrt —</option>'+list.map(u=>`<option value="${u.email}">${u.nume} (${u.email})</option>`).join('');}
+function renderInternDrivers(list){const sel=document.getElementById('oInternDriver');if(!sel)return;sel.innerHTML='<option value="">— Válassz sofőrt —</option>'+list.map(u=>`<option value="${esc(u.email)}">${esc(u.nume)} (${esc(u.email)})</option>`).join('');}
 
-function renderRemorcas(list){const sel=document.getElementById('oRemorcaSelect');if(!sel)return;sel.innerHTML='<option value="">— Nincs megadva —</option>'+list.map(v=>`<option value="${v.rendszam}">${v.rendszam}${v.marca?' — '+v.marca:''}${v.model?' '+v.model:''}</option>`).join('');}
+function renderRemorcas(list){const sel=document.getElementById('oRemorcaSelect');if(!sel)return;sel.innerHTML='<option value="">— Nincs megadva —</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
 
 
 function renderVehicleTable(tableId,list){
   const tb=document.querySelector('#'+tableId+' tbody');
   if(!list||list.length===0){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);">Nincs még felvéve.</td></tr>';return;}
-  tb.innerHTML=list.map(v=>`<tr><td><b>${v.rendszam}</b></td><td>${v.marca||'—'}</td><td>${v.model||'—'}</td><td>${v.an||'—'}</td><td>${v.nota||'—'}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editVehicle(${v.id})">Szerk</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteVehicle(${v.id})">Töröl</button></td></tr>`).join('');
+  tb.innerHTML=list.map(v=>`<tr><td><b>${esc(v.rendszam)}</b></td><td>${esc(v.marca||'—')}</td><td>${esc(v.model||'—')}</td><td>${v.an||'—'}</td><td>${esc(v.nota||'—')}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editVehicle(${v.id})">Szerk</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteVehicle(${v.id})">Töröl</button></td></tr>`).join('');
 }
 
 function revokeInv(kod){

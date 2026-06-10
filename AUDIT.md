@@ -14,8 +14,8 @@ A teljes hibalista **6 lépésben (6 commit)** kerül kijavításra. Állapot:
 | **1. Kritikus biztonság + stabilitás** | K1, K2, K3 (adatszivárgó végpontok), K5 (pool error-handler + dispatcher try/catch + unhandledRejection), M9 (devStats guard), K22 (login timing-oracle) | ✅ **KÉSZ** |
 | **2. Azonosítók + DB-integritás** | K4 (CMD/FUV ütközés), K6 (sorszám-nullázás), M2 (dupla számla), M4 (push-index), M5 (FK ON DELETE), M6 (migráció-szinkron), M7 (GIN index) | ✅ **KÉSZ** |
 | **3. Tranzakciók + szolgáltatás-robusztusság** | M1 (tranzakciók), M3 (scheduler-őr), M8 (2FA rate-limit), M10 (méretsapkák), M12 (OCR-út), K06–K08 (Brevo timeout, e-mail escape, intake-hibakezelés) | ✅ **KÉSZ** |
-| **4. XSS-mentesítés + PWA-ikonok** | K7 (legacy render-függvények + soferApi HTML escape), M11 (ikonok) | ⏳ következik |
-| **5. Közepes szerver-javítások** | K01 (diurna időzóna), K02 (HERE-elszámolás), K03–K05 (cégszűrések), K10 (béta-adapterek), K12–K16, K23 | ⬜ |
+| **4. XSS-mentesítés + PWA-ikonok** | K7 (legacy render-függvények + soferApi HTML escape), M11 (ikonok) | ✅ **KÉSZ** |
+| **5. Közepes szerver-javítások** | K01 (diurna időzóna), K02 (HERE-elszámolás), K03–K05 (cégszűrések), K10 (béta-adapterek), K12–K16, K23 | ⏳ következik |
 | **6. Frontend + maradék** | K11 (GPS-polling), K18 (feature-kulcsok), K19–K21, alacsony prioritású tételek | ⬜ |
 
 **1. lépésben elvégzett javítások (részletesen):**
@@ -47,7 +47,17 @@ A teljes hibalista **6 lépésben (6 commit)** kerül kijavításra. Állapot:
 - **K08** — `services/email-intake.js`: levél-hiba ≠ DB-hiba — parse-hibánál naplózott kihagyás, DB-hibánál a levél NEM kerül olvasottra (következő körben újrapróbálódik); az olvasott-jelölés hibája is naplózódik (L7).
 - ✅ Tesztek: 5 suite / 17 teszt zöld.
 
-**Következik (4. lépés):** tárolt XSS felszámolása — escape a legacy render-függvényekben (`console-shared.js`, `admin.js`, `manager.js`, `sofer.js`, `developer.html`), az `editUser` attribútumba ágyazott JSON-jának kiváltása, szerver-oldali escape a soferApi menetlevél-HTML-jében; PWA-ikonok javítása (valódi PNG-k).
+**4. lépésben elvégzett javítások (részletesen):**
+- **K7 / console-shared.js** — `esc()` végigvezetve: loadBorderLogs, loadDriverUploadedDocs (option value+label), loadExtDrivers, loadInternalDrivers, loadInvites, loadReceivedFuvarlevelek, renderCamions/renderExternDrivers/renderInternDrivers/renderRemorcas (option-ok), renderDocGroups, renderVehicleTable. A belsős sofőrök attribútumba ágyazott JSON-ja (megkerülhető `&quot;`-escape) kiváltva index-alapú cache-re (`window._vsIntDrvCache`).
+- **K7 / admin.js + manager.js** — `loadUsers`: a sor-JSON többé nem HTML-attribútumban utazik — `window._vsUsersCache` + `editUserIdx(i)`/`deleteUserIdx(i)`; a megjelenített mezők escape-elve. Az `editUser` függvény változatlan.
+- **K7 / sofer.js** — saját `esc()` helper + escape a fuvar-kártyákon (ügyfél, helyek, rendszámok, státusz) és az útvonalpont-sorok value-attribútumain.
+- **K7 / developer.html** — a helyi `escHtml` mostantól a `"` és `'` karaktereket is escape-eli; `loadCegek` cégnév-injektálás kiváltva `_cegekCache` + id-alapú hívásokra; a hibajelentések user-mezői és az aktivitás-tábla escape-elve.
+- **K7 / routes/soferApi.js** — szerver-oldali `escHtml` helper + a menetlevél-HTML MINDEN szöveges DB-mezője escape-elve (sofőrnév, helyek, megjegyzések, tankolás/vásárlás/útvonalpont-bejegyzések); a séma szerint numerikus oszlopok (km, összegek) nyersen maradtak.
+- **M11** — a hivatkozott `icon192.png`/`icon512.png` mostantól valódi 192×192/512×512 PNG (eddig JPEG volt PNG-deklarációval); a használaton kívüli kötőjeles duplikátumok törölve. (Külön commitban: `4/6 (részlet)`.)
+- ⚠️ Ismert maradvány (6. lépésre): `developer.html` ~356 — a `viewCompBilling('...')` onclick JS-string kontextusa entity-escape-pel nem védhető; id-alapú kiváltás kell.
+- ✅ Tesztek: 5 suite / 17 teszt zöld; minden JS `node --check` OK.
+
+**Következik (5. lépés):** közepes szerver-javítások — diurna időzóna (Europe/Bucharest napi bontás), HERE raster-tile elszámolás (fix 20-as becslés helyett), maradék cégszűrések (userUpdate/userDelete/extDriverUpdate/invRevoke/utolsó-admin), comList LIMIT + lateral, diurna-stats N+1, sofőr-listák LIMIT, hibaüzenet-szivárgás, openOrderEdit dupla-fetch, parseInt-validálás, béta számlázó-adapterek jelölése.
 
 ---
 

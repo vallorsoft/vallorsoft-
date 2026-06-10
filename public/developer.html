@@ -532,10 +532,12 @@ function loadDash(){
   });
 }
 
+var _cegekCache = []; // betöltött cégek gyorsítótára — az onclick-ek id/index alapján hivatkoznak rá (XSS-védelem)
 function loadCegek(){
   gas('devCompanyList').then(function(list){
+    _cegekCache = list || [];
     if(!list||!list.length){document.getElementById('cegList').innerHTML='<div style="color:var(--muted);padding:20px;">Nincs cég.</div>';return;}
-    document.getElementById('cegList').innerHTML = list.map(function(c){
+    document.getElementById('cegList').innerHTML = list.map(function(c, idx){
       var sClass = c.subscription_status==='active' ? 'active' : c.subscription_status==='inactive' ? 'inactive' : 'cancelled';
       var sText  = c.subscription_status==='active' ? 'Aktív' : c.subscription_status==='inactive' ? 'Blokkolt' : 'Lemondva';
       var paid   = c.paid_until ? new Date(c.paid_until).toLocaleDateString('hu-HU') : '—';
@@ -545,22 +547,22 @@ function loadCegek(){
       return '<div class="ceg-card">'
         +'<div class="ceg-header">'
         +'<div>'
-        +'<div class="ceg-name">'+c.nev+'</div>'
+        +'<div class="ceg-name">'+escHtml(c.nev)+'</div>'
         +'<div class="ceg-meta" style="margin-top:6px;gap:8px;">'
         +'<span>👥 '+c.user_count+' user</span>'
         +'<span>🚚 '+c.order_count+' fuvar</span>'
         +'<span>📅 '+paid+'</span>'
-        +(c.email_contact?'<span>✉️ '+c.email_contact+'</span>':'')
+        +(c.email_contact?'<span>✉️ '+escHtml(c.email_contact)+'</span>':'')
         +(bugBadge ? '&nbsp;'+bugBadge : '')
         +'</div></div>'
         +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
         +'<span class="status-badge '+sClass+'">'+sText+'</span>'
-        +'<button class="btn-dev" onclick="openCegDetail('+c.id+',\''+c.nev.replace(/'/g,"\\'")+'\')">🔍 Részletek</button>'
-        +'<button class="btn-dev" onclick="openEditCeg('+JSON.stringify(c).replace(/"/g,"&quot;")+')" style="background:rgba(255,255,255,0.05);color:var(--soft);border-color:var(--border);">Szerkeszt</button>'
+        +'<button class="btn-dev" onclick="openCegDetail('+c.id+')">🔍 Részletek</button>'
+        +'<button class="btn-dev" onclick="openEditCeg(_cegekCache['+idx+'])" style="background:rgba(255,255,255,0.05);color:var(--soft);border-color:var(--border);">Szerkeszt</button>'
         +(c.subscription_status==='active'
           ? '<button class="btn-danger-sm" onclick="blockCeg('+c.id+')">🔒 Blokk</button>'
           : '<button class="btn-ok-sm" onclick="unblockCeg('+c.id+')">🔓 Aktív</button>')
-        +'<button class="btn-danger-sm" onclick="deleteCeg('+c.id+',\''+c.nev.replace(/'/g,"\\'")+'\')" style="background:rgba(239,68,68,0.1);">🗑</button>'
+        +'<button class="btn-danger-sm" onclick="deleteCeg('+c.id+')" style="background:rgba(239,68,68,0.1);">🗑</button>'
         +'</div></div>'
         +'</div>';
     }).join('');
@@ -572,6 +574,8 @@ var _detailCegId = null;
 var _detailTab   = 'aktivitas';
 
 function openCegDetail(id, nev){
+  // A cégnevet a gyorsítótárból keressük ki — nem HTML-attribútumból jön (XSS-védelem)
+  if(nev==null){ var c=_cegekCache.find(function(x){return x.id===id;}); nev=c?c.nev:''; }
   _detailCegId = id;
   document.getElementById('detailModalTitle').textContent = '🏢 ' + nev;
   document.getElementById('detailModal').classList.add('open');
@@ -651,8 +655,8 @@ function loadDetailAktivitas(){
         var total = (u.fuvarok_kezelt||0)+(u.menetlevelek||0)+(u.dokumentumok||0)+(u.hataratlepesek||0);
         var aktColor = total===0 ? 'color:var(--err)' : total<3 ? 'color:var(--warn)' : 'color:var(--ok)';
         return '<tr>'
-          +'<td style="font-weight:600;color:#fff;">'+u.nume+'</td>'
-          +'<td><span class="status-badge active" style="font-size:10px;">'+u.pozicio+'</span></td>'
+          +'<td style="font-weight:600;color:#fff;">'+escHtml(u.nume)+'</td>'
+          +'<td><span class="status-badge active" style="font-size:10px;">'+escHtml(u.pozicio)+'</span></td>'
           +'<td style="text-align:center;'+aktColor+'">'+u.fuvarok_kezelt+'</td>'
           +'<td style="text-align:center;'+aktColor+'">'+u.menetlevelek+'</td>'
           +'<td style="text-align:center;'+aktColor+'">'+u.dokumentumok+'</td>'
@@ -688,9 +692,9 @@ function loadDetailHibak(){
       var bdr = b.is_read ? 'var(--border)' : 'rgba(239,68,68,0.3)';
       return '<div id="bug-'+b.id+'" style="background:'+bg+';border:1px solid '+bdr+';border-radius:10px;padding:14px;margin-bottom:10px;">'
         +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">'
-        +'<div style="font-size:12px;color:var(--muted);">👤 <b style="color:var(--soft);">'+b.user_name+'</b> ('+b.user_role+')'
+        +'<div style="font-size:12px;color:var(--muted);">👤 <b style="color:var(--soft);">'+escHtml(b.user_name)+'</b> ('+escHtml(b.user_role)+')'
         +' &nbsp;·&nbsp; 🕐 '+dt
-        +(b.oldal?' &nbsp;·&nbsp; 📄 '+b.oldal:'')
+        +(b.oldal?' &nbsp;·&nbsp; 📄 '+escHtml(b.oldal):'')
         +'</div>'
         +(b.is_read ? '<span style="font-size:10px;color:var(--muted);">✓ olvasva</span>'
           : '<button onclick="markRead('+b.id+')" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.1);color:#c084fc;cursor:pointer;font-weight:600;">✓ Olvasott</button>')
@@ -701,7 +705,8 @@ function loadDetailHibak(){
   });
 }
 
-function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+// HTML-escape — idézőjeleket is escape-eli, hogy attribútumban is biztonságos legyen
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
 
 function markRead(id){
   gas('markBugRead',[id]).then(function(r){
@@ -815,6 +820,8 @@ function saveCeg(){
 }
 
 function deleteCeg(id, nev){
+  // A cégnevet a gyorsítótárból keressük ki — nem HTML-attribútumból jön (XSS-védelem)
+  if(nev==null){ var c=_cegekCache.find(function(x){return x.id===id;}); nev=c?c.nev:''; }
   var kod = prompt('⚠️ FIGYELEM: Ez törli a céget és MINDEN hozzátartozó adatot!\n\nCég: ' + nev + '\n\nA törlés megerősítéséhez írd be:\nvallorsoftcegtorlo1');
   if(kod === null) return;
   if(kod !== 'vallorsoftcegtorlo1'){toast('Helytelen megerősítő kód!','err');return;}
