@@ -27,44 +27,56 @@ async function fetchT(url, init, ms = 15000) {
   finally { clearTimeout(t); }
 }
 
-async function sendInviteEmail(toEmail, kod, pozicio, cegNev, igazgatoNev) {
+// A meghívó-e-mail HTML törzse — tiszta (mellékhatás nélküli) függvény, hogy
+// egységteszttel ellenőrizhető legyen (a MEGHÍVOTT nevével köszön, reszponzív).
+function buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl }) {
+  const udvozles = meghivottNev ? `Tisztelt ${escHtml(meghivottNev)}!` : 'Tisztelt Címzett!';
+  const regLink = `${registerUrl}/register`;
+  const loginLink = `${registerUrl}/login`;
+  return `
+        <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;background:#05070b;color:#e9eef5;padding:24px;border-radius:16px;">
+          <div style="font-size:24px;font-weight:800;margin-bottom:4px;">
+            <span style="color:#fff;">vallor</span><span style="color:#e10b1a;">Soft</span>
+          </div>
+          <div style="font-size:12px;color:#8a97a8;margin-bottom:24px;">Fuvarmenedzsment Platform</div>
+          <h2 style="font-size:20px;margin-bottom:8px;line-height:1.3;">${udvozles}</h2>
+          <p style="color:#b8c2d0;font-size:14px;line-height:1.6;margin-bottom:20px;">
+            ${cegNev
+              ? `A <b style="color:#fff;">${escHtml(cegNev)}</b> meghívta Önt a VallorSoft platformra`
+              : 'Meghívást kapott a VallorSoft platformra'}
+            <b style="color:#fff;">${escHtml(pozicio)}</b> szerepkörben.
+          </p>
+          <div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;margin-bottom:20px;text-align:center;">
+            <div style="font-size:11px;color:#8a97a8;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Meghívókódja</div>
+            <div style="font-size:28px;font-weight:800;letter-spacing:3px;color:#fff;word-break:break-word;">${escHtml(kod)}</div>
+          </div>
+          <div style="text-align:center;margin:24px 0;">
+            <a href="${regLink}" style="display:inline-block;background:#e10b1a;color:#fff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:10px;font-size:15px;">Regisztráció megnyitása</a>
+          </div>
+          <div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;margin-bottom:20px;">
+            <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;">📋 Regisztráció lépései</div>
+            <ol style="color:#b8c2d0;font-size:13px;line-height:1.8;padding-left:20px;margin:0;">
+              <li>Nyissa meg a fenti <b style="color:#fff;">Regisztráció</b> gombot.</li>
+              <li>Adja meg a nevét, e-mail címét és egy jelszót.</li>
+              <li>A meghívókód mezőbe írja be: <b style="color:#fff;">${escHtml(kod)}</b></li>
+              <li>A regisztráció után jelentkezzen be a platformon.</li>
+            </ol>
+          </div>
+          <p style="font-size:12px;color:#8a97a8;line-height:1.6;margin:0 0 6px;">Ha a gomb nem működik, másolja be ezt a linket a böngészőbe:</p>
+          <p style="word-break:break-all;font-size:12px;color:#3b82f6;margin:0 0 20px;">${escHtml(regLink)}</p>
+          <p style="font-size:11px;color:#6b7689;line-height:1.5;margin:0;">Ez az e-mail automatikusan lett elküldve a VallorSoft rendszer által. Ha nem várta ezt az üzenetet, kérjük hagyja figyelmen kívül. Bejelentkezés: ${escHtml(loginLink)}</p>
+        </div>
+      `;
+}
+
+async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev) {
   console.log('sendInviteEmail called:', toEmail, !!BREVO_API_KEY);
   if (!BREVO_API_KEY || !BREVO_SENDER || !toEmail) {
     console.log('early return - BREVO_API_KEY, BREVO_SENDER vagy toEmail hianyzik');
     return;
   }
   const registerUrl = process.env.APP_URL || 'http://localhost:3000';
-  const udvozles = igazgatoNev ? `Tisztelt ${escHtml(igazgatoNev)}!` : 'Tisztelt Partnerünk!';
-  const html = `
-        <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#05070b;color:#e9eef5;padding:32px;border-radius:16px;">
-          <div style="font-size:24px;font-weight:800;margin-bottom:4px;">
-            <span style="color:#fff;">vallor</span><span style="color:#e10b1a;">Soft</span>
-          </div>
-          <div style="font-size:12px;color:#8a97a8;margin-bottom:28px;">Fuvarmenedzsment Platform</div>
-          <h2 style="font-size:20px;margin-bottom:8px;">${udvozles}</h2>
-          <p style="color:#8a97a8;margin-bottom:16px;">
-            A <b style="color:#fff;">VallorSoft</b> cégtől kapta ezt az emailt, előfizetésére vonatkozó meghívóval.
-          </p>
-          <p style="color:#8a97a8;margin-bottom:24px;">
-            ${cegNev ? `A <b style="color:#fff;">${escHtml(cegNev)}</b> cég számára` : 'Az Ön számára'} aktiválva lett a VallorSoft platform hozzáférés <b style="color:#fff;">${escHtml(pozicio)}</b> szerepkörben.
-          </p>
-          <div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;margin-bottom:24px;text-align:center;">
-            <div style="font-size:12px;color:#8a97a8;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Meghívókódja</div>
-            <div style="font-size:32px;font-weight:800;letter-spacing:4px;color:#fff;">${kod}</div>
-          </div>
-          <div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;margin-bottom:24px;">
-            <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:12px;">📋 Regisztráció lépései:</div>
-            <ol style="color:#8a97a8;font-size:13px;line-height:1.8;padding-left:20px;margin:0;">
-              <li>Nyissa meg: <a href="${registerUrl}/register" style="color:#3b82f6;">${registerUrl}/register</a></li>
-              <li>Adja meg a nevét, email címét és egy jelszót</li>
-              <li>A meghívókód mezőbe írja be: <b style="color:#fff;">${kod}</b></li>
-              <li>Kattintson a <b style="color:#fff;">Regisztráció</b> gombra</li>
-              <li>Ezután bejelentkezhet a <a href="${registerUrl}/login" style="color:#3b82f6;">${registerUrl}/login</a> oldalon</li>
-            </ol>
-          </div>
-          <p style="font-size:11px;color:#8a97a8;margin:0;">Ez az email automatikusan lett elküldve a VallorSoft rendszer által. Ha nem várta ezt az üzenetet, kérjük hagyja figyelmen kívül.</p>
-        </div>
-      `;
+  const html = buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl });
   try {
     const resp = await fetchT('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -189,4 +201,4 @@ async function sendClientEmail(opts) {
   } catch (err) { return { ok: false, error: err.message }; }
 }
 
-module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail };
+module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml };
