@@ -122,9 +122,17 @@ const PROMPT =
   'valuta ca RON/EUR; rendszam = numere de înmatriculare; câmpurile necunoscute = null. ' +
   'Adaugă "confidence" (0..1) = cât de sigur ești în ansamblu. Răspunde STRICT cu JSON, fără text în plus.';
 
+// A Gemini inline kérés-limitje ~20 MB — a base64 ~33%-kal nagyobb a nyersnél,
+// ezért 10 MB fölötti PDF-et nem küldünk inline (a kinyert szövegre esünk vissza).
+const MAX_INLINE_PDF_BYTES = 10 * 1024 * 1024;
+
 // { text, pdfBuffer, pdfName } -> { fields, confidence }
 async function extract({ text, pdfBuffer, pdfName }) {
   let parts;
+  if (pdfBuffer && pdfBuffer.length > MAX_INLINE_PDF_BYTES) {
+    console.warn(`[Gemini] Túl nagy PDF az inline küldéshez (${Math.round(pdfBuffer.length / 1048576)} MB) — szöveges kinyerésre váltunk.`);
+    pdfBuffer = null;
+  }
   if (pdfBuffer && pdfBuffer.length) {
     parts = [
       { inlineData: { mimeType: 'application/pdf', data: pdfBuffer.toString('base64') } },

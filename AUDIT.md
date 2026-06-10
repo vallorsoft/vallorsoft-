@@ -13,8 +13,8 @@ A teljes hibalista **6 lépésben (6 commit)** kerül kijavításra. Állapot:
 |-------|----------|---------|
 | **1. Kritikus biztonság + stabilitás** | K1, K2, K3 (adatszivárgó végpontok), K5 (pool error-handler + dispatcher try/catch + unhandledRejection), M9 (devStats guard), K22 (login timing-oracle) | ✅ **KÉSZ** |
 | **2. Azonosítók + DB-integritás** | K4 (CMD/FUV ütközés), K6 (sorszám-nullázás), M2 (dupla számla), M4 (push-index), M5 (FK ON DELETE), M6 (migráció-szinkron), M7 (GIN index) | ✅ **KÉSZ** |
-| **3. Tranzakciók + szolgáltatás-robusztusság** | M1 (tranzakciók), M3 (scheduler-őr), M8 (2FA rate-limit), M10 (méretsapkák), M12 (OCR-út), K06–K08 (Brevo timeout, e-mail escape, intake-hibakezelés) | ⏳ következik |
-| **4. XSS-mentesítés + PWA-ikonok** | K7 (legacy render-függvények + soferApi HTML escape), M11 (ikonok) | ⬜ |
+| **3. Tranzakciók + szolgáltatás-robusztusság** | M1 (tranzakciók), M3 (scheduler-őr), M8 (2FA rate-limit), M10 (méretsapkák), M12 (OCR-út), K06–K08 (Brevo timeout, e-mail escape, intake-hibakezelés) | ✅ **KÉSZ** |
+| **4. XSS-mentesítés + PWA-ikonok** | K7 (legacy render-függvények + soferApi HTML escape), M11 (ikonok) | ⏳ következik |
 | **5. Közepes szerver-javítások** | K01 (diurna időzóna), K02 (HERE-elszámolás), K03–K05 (cégszűrések), K10 (béta-adapterek), K12–K16, K23 | ⬜ |
 | **6. Frontend + maradék** | K11 (GPS-polling), K18 (feature-kulcsok), K19–K21, alacsony prioritású tételek | ⬜ |
 
@@ -36,7 +36,18 @@ A teljes hibalista **6 lépésben (6 commit)** kerül kijavításra. Állapot:
 - **M6** — `server.js`: indulási **migráció-futtató** `schema_migrations` nyilvántartással — minden `db/*.sql` pontosan egyszer fut le (két menetben a fájlnév-sorrendi függőségek miatt); az élesítési checklist 2. pontja (kézi migráció-futtatás) ezzel automatizálva.
 - ✅ Tesztek: 5 suite / 17 teszt zöld; `genDocId` füstteszt OK.
 
-**Következik (3. lépés):** tranzakciók a többlépéses írásokra (comCreate order+leg, inbound approve, devCompanyDelete), scheduler átfedés-őr, 2FA rate-limit, kérés/melléklet-méretsapkák, OCR-út javítása, Brevo timeout + e-mail HTML-escape, intake hibakezelés (levél ne vesszen el némán).
+**3. lépésben elvégzett javítások (részletesen):**
+- **M1** — tranzakciók (BEGIN/COMMIT/ROLLBACK): `handlers/orders.js` (comCreate: fuvar+láb együtt), `routes/inbound-orders.js` (approve: fuvar+láb+státusz együtt — újrapróbálásos duplikáció kizárva), `handlers/developer.js` (devCompanyDelete: a teljes cég-kaszkád atomikus).
+- **M3** — `services/scheduler.js`: átfedés-őr (`running` flag) — futó kör alatt a következő ciklus kimarad, nincs dupla feldolgozás/Gemini-kvóta égetés.
+- **M8** — `server.js`: rate-limit a `/api/2fa/verify`, `/api/2fa/setup-verify`, `/api/2fa/settings-verify` végpontokon (15 perc / 10 próba) — TOTP brute-force kizárva.
+- **M10** — `server.js`: body-limit 50 MB → 20 MB; `services/email-intake.js`: 15 MB-os melléklet-sapka (fölötte a PDF kimarad, naplózva); `services/order-ai/gemini.js`: 10 MB fölötti PDF nem megy inline a Geminihez (szöveges fallback).
+- **M12** — `services/pdf-extract.js`: a soha nem működő Tesseract-PDF ág eltávolítva; a pdf-parse hibája és a szkennelt-PDF eset mostantól naplózódik (AI mód szükségességére figyelmeztet).
+- **K06** — `services/email.js`: mindhárom Brevo-hívás 15 mp-es AbortController-timeouttal fut (`fetchT`).
+- **K07** — `services/email.js`: minden interpolált felhasználói érték HTML-escape-elve (`escHtml`); a kliens-levél logó-URL-je séma-validált (`https://`/`data:image/`).
+- **K08** — `services/email-intake.js`: levél-hiba ≠ DB-hiba — parse-hibánál naplózott kihagyás, DB-hibánál a levél NEM kerül olvasottra (következő körben újrapróbálódik); az olvasott-jelölés hibája is naplózódik (L7).
+- ✅ Tesztek: 5 suite / 17 teszt zöld.
+
+**Következik (4. lépés):** tárolt XSS felszámolása — escape a legacy render-függvényekben (`console-shared.js`, `admin.js`, `manager.js`, `sofer.js`, `developer.html`), az `editUser` attribútumba ágyazott JSON-jának kiváltása, szerver-oldali escape a soferApi menetlevél-HTML-jében; PWA-ikonok javítása (valódi PNG-k).
 
 ---
 

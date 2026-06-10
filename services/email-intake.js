@@ -113,32 +113,46 @@ async function pollOnce(pool, creds, companyId, opts) {
   // ── 2) NEHÉZ fázis kapcsolat NÉLKÜL: parse + PDF/OCR + AI + DB beszúrás ──
   let processed = 0;
   const doneUids = [];
+  const MAX_PDF_BYTES = 15 * 1024 * 1024; // melléklet-sapka: e fölött nem dolgozzuk fel (memória/Gemini-limit)
   for (const m of collected) {
+    let insertData = null;
     try {
       const parsed = await simpleParser(m.source);
       const pdfAtt = (parsed.attachments || []).find(a => /pdf$/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
-      const pdfBuffer = pdfAtt ? pdfAtt.content : null;
+      let pdfBuffer = pdfAtt ? pdfAtt.content : null;
       const pdfName = pdfAtt ? pdfAtt.filename : null;
+      if (pdfBuffer && pdfBuffer.length > MAX_PDF_BYTES) {
+        console.warn(`[Intake] cég #${companyId} — túl nagy PDF melléklet kihagyva (${Math.round(pdfBuffer.length / 1048576)} MB, uid=${m.uid}): ${pdfName || '?'}`);
+        pdfBuffer = null;
+      }
 
       let text = (parsed.text || '').trim();
       if (pdfBuffer) { try { const ex = await pdfx.extractText(pdfBuffer); if (ex.text) text = ex.text; } catch (_) {} }
 
       const r = await orderAi.extractFields({ text, pdfBuffer, pdfName, aiEnabled });
 
+      insertData = [companyId, (parsed.from && parsed.from.text) || null, parsed.subject || null,
+        parsed.date || new Date(), m.uid, text.slice(0, 20000), pdfName, pdfBuffer,
+        JSON.stringify(r.fields || {}), r.confidence, r.ai_used];
+    } catch (e) {
+      // A LEVÉL maga hibás (parse/kinyerés) — olvasottra jelöljük, hogy ne
+      // ismétlődjön végtelenül, de hangosan naplózzuk, hogy nyoma legyen.
+      console.error(`[Intake] cég #${companyId} — levél-feldolgozási hiba (uid=${m.uid}), a levél kimarad:`, e.message);
+      doneUids.push(m.uid);
+      continue;
+    }
+    try {
       await pool.query(
         `INSERT INTO inbound_orders (company_id, source_email, subject, received_at, message_uid,
            raw_text, pdf_name, pdf_data, extracted, confidence, ai_used, status)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'parsed')
-         ON CONFLICT (company_id, message_uid) DO NOTHING`,
-        [companyId, (parsed.from && parsed.from.text) || null, parsed.subject || null,
-         parsed.date || new Date(), m.uid, text.slice(0, 20000), pdfName, pdfBuffer,
-         JSON.stringify(r.fields || {}), r.confidence, r.ai_used]);
-
+         ON CONFLICT (company_id, message_uid) DO NOTHING`, insertData);
       processed++;
       doneUids.push(m.uid);
     } catch (e) {
-      // egy levél hibája ne állítsa le a kört; de jelöljük olvasottnak, hogy ne ismétlődjön végtelenül
-      doneUids.push(m.uid);
+      // DB-hiba (pl. átmeneti kiesés): NE jelöljük olvasottnak — a következő
+      // körben újrapróbáljuk, a UNIQUE(company_id,message_uid) véd a duplikációtól.
+      console.error(`[Intake] cég #${companyId} — DB-beszúrási hiba (uid=${m.uid}), újrapróbáljuk a következő körben:`, e.message);
     }
   }
 
@@ -150,7 +164,11 @@ async function pollOnce(pool, creds, companyId, opts) {
       const lock = await c2.getMailboxLock(cfg.mailbox || 'INBOX');
       try { await c2.messageFlagsAdd({ uid: doneUids.join(',') }, ['\\Seen'], { uid: true }); }
       finally { lock.release(); }
-    } catch (_) { /* ha nem sikerül a jelölés, a UNIQUE(message_uid) így is megóv a duplikációtól */ }
+    } catch (e) {
+      // Ha a jelölés tartósan nem megy, a kör minden 2. percben újra letölti
+      // ugyanazokat a leveleket (a UNIQUE csak az adatot védi, a munkát nem) — naplózzuk.
+      console.error(`[Intake] cég #${companyId} — olvasott-jelölés hiba (${doneUids.length} levél):`, e.message);
+    }
     finally { await c2.logout().catch(() => {}); }
   }
 

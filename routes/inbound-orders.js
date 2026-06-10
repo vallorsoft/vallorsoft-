@@ -159,23 +159,35 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
     const data_incarcare = ex.data_incarcare || null;
     const data_descarcare = ex.data_descarcare || null;
 
-    await pool.query(
-      `INSERT INTO orders (id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
+    // Tranzakció: fuvar + láb + jóváhagyott státusz EGYÜTT — félbeszakadásnál
+    // ne maradjon létrejött fuvar 'feldolgozatlan' inbounddal (újrapróbálásnál
+    // az duplikált fuvart eredményezne).
+    const dbc = await pool.connect();
+    try {
+      await dbc.query('BEGIN');
+      await dbc.query(
+        `INSERT INTO orders (id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
+           pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
+           rendszam_camion, rendszam_remorca, status, company_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+        [id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
          pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
-         rendszam_camion, rendszam_remorca, status, company_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
-      [id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
-       pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
-       rendszam_camion, rendszam_remorca, status, company_id]);
-    await pool.query(
-      `INSERT INTO order_legs (order_id, leg_number, sofer_type, email_sofer, nume_sofer, firma_extern,
-         telefon_extern, external_driver_id, rendszam_camion, rendszam_remorca, loc_preluare, data_preluare, company_id)
-       VALUES ($1,1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-      [id, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
-       rendszam_camion, rendszam_remorca, loc_incarcare, data_incarcare, company_id]);
-
-    await pool.query(`UPDATE inbound_orders SET status='approved', created_order_id=$1, updated_at=now() WHERE id=$2 AND company_id=$3`,
-      [id, req.params.id, company_id]);
+         rendszam_camion, rendszam_remorca, status, company_id]);
+      await dbc.query(
+        `INSERT INTO order_legs (order_id, leg_number, sofer_type, email_sofer, nume_sofer, firma_extern,
+           telefon_extern, external_driver_id, rendszam_camion, rendszam_remorca, loc_preluare, data_preluare, company_id)
+         VALUES ($1,1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [id, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
+         rendszam_camion, rendszam_remorca, loc_incarcare, data_incarcare, company_id]);
+      await dbc.query(`UPDATE inbound_orders SET status='approved', created_order_id=$1, updated_at=now() WHERE id=$2 AND company_id=$3`,
+        [id, req.params.id, company_id]);
+      await dbc.query('COMMIT');
+    } catch (txErr) {
+      await dbc.query('ROLLBACK').catch(() => {});
+      throw txErr;
+    } finally {
+      dbc.release();
+    }
 
     // A beérkező megrendelő-PDF a fuvar dokumentumai közé (aláírható a meglévő flow-val)
     try {

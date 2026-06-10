@@ -100,12 +100,25 @@ if (rateLimit) {
     standardHeaders: true,
     legacyHeaders: false,
   });
+  const twofaLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 perc
+    max: 10,
+    message: { success: false, message: 'Tul sok 2FA-kod probalkozas. Probald ujra 15 perc mulva.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
   app.use('/api/login', loginLimiter);
   app.use('/api/forgot-password', forgotLimiter);
+  // A helyes jelszó utáni TOTP-kód másképp brute-force-olható lenne (6 számjegy, window:2)
+  app.use('/api/2fa/verify', twofaLimiter);
+  app.use('/api/2fa/setup-verify', twofaLimiter);
+  app.use('/api/2fa/settings-verify', twofaLimiter);
 }
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// 20 MB elég a dokumentum-feltöltésekhez (base64 ~15 MB-os fájl); az 50 MB-os
+// limit mellett pár párhuzamos kérés kifektethette volna az 512 MB-os példányt.
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ limit: '20mb', extended: true }));
 
 // Statikus fajlok CSAK a nem-vedett eleresi utakra (public mappan belul a HTML fajlok
 // nem szolgalhatoak ki kozvetlenul - a route-ok vedelme lejjebb tortenik)

@@ -16,7 +16,18 @@ function startIntakeScheduler() {
   let intake;
   try { intake = require('./email-intake'); } catch (_) { return null; }
 
+  // Átfedés-őr: egy kör (PDF + OCR + AI modell-lánc) 2 percnél tovább is
+  // tarthat — a setInterval ettől még elsülne, és a párhuzamos körök
+  // ugyanazokat a leveleket dolgoznák fel kétszer (Gemini-kvóta égetés).
+  let running = false;
+
   async function tick() {
+    if (running) { console.warn('[Intake] az előző kör még fut — ez a ciklus kimarad.'); return; }
+    running = true;
+    try { await tickBody(); } finally { running = false; }
+  }
+
+  async function tickBody() {
     let rows;
     try {
       ({ rows } = await pool.query(

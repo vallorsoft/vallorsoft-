@@ -86,25 +86,35 @@ handlers.devCompanyDelete = async function (req, res, args) {
       if (kod !== 'vallorsoftcegtorlo1') {
         return res.json({ result: { ok: false, err: 'Helytelen megerosito kod.' } });
       }
-      // Cascade torles
-      const users = await pool.query('SELECT email FROM users WHERE company_id = $1', [id]);
-      const emails = users.rows.map(u => u.email);
-      if (emails.length > 0) {
-        await pool.query('DELETE FROM border_crossings WHERE email_sofer = ANY($1)', [emails]);
-        await pool.query('DELETE FROM documents WHERE email_sofer = ANY($1)', [emails]);
-        await pool.query('DELETE FROM fuvarlevelek WHERE email_sofer = ANY($1)', [emails]);
-        await pool.query('DELETE FROM stamps WHERE email = ANY($1)', [emails]);
+      // Cascade torles — tranzakcióban: félbeszakadásnál ne maradjanak árva sorok
+      const dbc = await pool.connect();
+      try {
+        await dbc.query('BEGIN');
+        const users = await dbc.query('SELECT email FROM users WHERE company_id = $1', [id]);
+        const emails = users.rows.map(u => u.email);
+        if (emails.length > 0) {
+          await dbc.query('DELETE FROM border_crossings WHERE email_sofer = ANY($1)', [emails]);
+          await dbc.query('DELETE FROM documents WHERE email_sofer = ANY($1)', [emails]);
+          await dbc.query('DELETE FROM fuvarlevelek WHERE email_sofer = ANY($1)', [emails]);
+          await dbc.query('DELETE FROM stamps WHERE email = ANY($1)', [emails]);
+        }
+        const orderIds = await dbc.query('SELECT id FROM orders WHERE company_id = $1', [id]);
+        if (orderIds.rows.length > 0) {
+          const oids = orderIds.rows.map(o => o.id);
+          await dbc.query('DELETE FROM order_documents WHERE order_id = ANY($1)', [oids]);
+          await dbc.query('DELETE FROM order_legs WHERE order_id = ANY($1)', [oids]);
+        }
+        await dbc.query('DELETE FROM orders WHERE company_id = $1', [id]);
+        await dbc.query('DELETE FROM invites WHERE company_id = $1', [id]);
+        await dbc.query('DELETE FROM users WHERE company_id = $1', [id]);
+        await dbc.query('DELETE FROM companies WHERE id = $1', [id]);
+        await dbc.query('COMMIT');
+      } catch (txErr) {
+        await dbc.query('ROLLBACK').catch(() => {});
+        throw txErr;
+      } finally {
+        dbc.release();
       }
-      const orderIds = await pool.query('SELECT id FROM orders WHERE company_id = $1', [id]);
-      if (orderIds.rows.length > 0) {
-        const oids = orderIds.rows.map(o => o.id);
-        await pool.query('DELETE FROM order_documents WHERE order_id = ANY($1)', [oids]);
-        await pool.query('DELETE FROM order_legs WHERE order_id = ANY($1)', [oids]);
-      }
-      await pool.query('DELETE FROM orders WHERE company_id = $1', [id]);
-      await pool.query('DELETE FROM invites WHERE company_id = $1', [id]);
-      await pool.query('DELETE FROM users WHERE company_id = $1', [id]);
-      await pool.query('DELETE FROM companies WHERE id = $1', [id]);
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('devCompanyDelete hiba:', err);

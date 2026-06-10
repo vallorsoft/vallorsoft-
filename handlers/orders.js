@@ -158,39 +158,51 @@ handlers.comCreate = async function (req, res, args) {
       if (sofer_type === 'Intern' && email_sofer) status = 'Alocat';
       else if (sofer_type === 'Extern') status = 'Extern';
 
-      await pool.query(
-        `INSERT INTO orders (
-          id, client, ref, loc_incarcare, loc_descarcare,
-          data_incarcare, data_descarcare, pret, km,
-          sofer_type, email_sofer, nume_sofer,
-          firma_extern, telefon_extern, external_driver_id,
-          rendszam_camion, rendszam_remorca, status, company_id
-        ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
-        )`,
-        [
-          id, client, ref, loc_incarcare, loc_descarcare,
-          data_incarcare, data_descarcare, pret, km,
-          sofer_type, email_sofer, nume_sofer,
-          firma_extern, telefon_extern, external_driver_id,
-          rendszam_camion, rendszam_remorca, status, company_id
-        ]
-      );
+      // Tranzakció: a fuvar és az első láb együtt jöjjön létre — láb nélküli
+      // fuvar ne maradhasson, ha a második INSERT elszáll.
+      const dbc = await pool.connect();
+      try {
+        await dbc.query('BEGIN');
+        await dbc.query(
+          `INSERT INTO orders (
+            id, client, ref, loc_incarcare, loc_descarcare,
+            data_incarcare, data_descarcare, pret, km,
+            sofer_type, email_sofer, nume_sofer,
+            firma_extern, telefon_extern, external_driver_id,
+            rendszam_camion, rendszam_remorca, status, company_id
+          ) VALUES (
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
+          )`,
+          [
+            id, client, ref, loc_incarcare, loc_descarcare,
+            data_incarcare, data_descarcare, pret, km,
+            sofer_type, email_sofer, nume_sofer,
+            firma_extern, telefon_extern, external_driver_id,
+            rendszam_camion, rendszam_remorca, status, company_id
+          ]
+        );
 
-      await pool.query(
-        `INSERT INTO order_legs (
-          order_id, leg_number, sofer_type, email_sofer, nume_sofer,
-          firma_extern, telefon_extern, external_driver_id,
-          rendszam_camion, rendszam_remorca,
-          loc_preluare, data_preluare, company_id
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-        [
-          id, 1, sofer_type, email_sofer, nume_sofer,
-          firma_extern, telefon_extern, external_driver_id,
-          rendszam_camion, rendszam_remorca,
-          loc_incarcare, data_incarcare, company_id
-        ]
-      );
+        await dbc.query(
+          `INSERT INTO order_legs (
+            order_id, leg_number, sofer_type, email_sofer, nume_sofer,
+            firma_extern, telefon_extern, external_driver_id,
+            rendszam_camion, rendszam_remorca,
+            loc_preluare, data_preluare, company_id
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          [
+            id, 1, sofer_type, email_sofer, nume_sofer,
+            firma_extern, telefon_extern, external_driver_id,
+            rendszam_camion, rendszam_remorca,
+            loc_incarcare, data_incarcare, company_id
+          ]
+        );
+        await dbc.query('COMMIT');
+      } catch (txErr) {
+        await dbc.query('ROLLBACK').catch(() => {});
+        throw txErr;
+      } finally {
+        dbc.release();
+      }
 
       return res.json({ result: { ok: true, id: id } });
     } catch (err) {
