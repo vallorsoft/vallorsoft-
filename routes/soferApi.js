@@ -7,6 +7,7 @@ const router = express.Router();
 const pool = require('../db');
 const { requireLogin, requireRole } = require('../middleware/auth');
 const { calculateDiurna } = require('../lib/diurna');
+const { genDocId } = require('../lib/ids');
 
 router.post('/api/border-cross', async (req, res) => {
   try {
@@ -36,12 +37,21 @@ router.get('/api/diurna-stats', requireLogin, requireRole('Manager','Admin'), as
   const cid = req.session.user.company_id;
   try {
     const sofors = await pool.query(`SELECT id, nume, email FROM users WHERE company_id=$1 AND pozicio='Sofer' ORDER BY nume`, [cid]);
-    const result = [];
-    for (const s of sofors.rows) {
-      const cr = await pool.query(`SELECT direction, crossed_at FROM border_crossings WHERE email_sofer=$1 ORDER BY crossed_at ASC`, [s.email]);
-      const d = calculateDiurna(cr.rows);
-      result.push({ driver_id:s.id, nume:s.nume, email:s.email, externDays:d.externDays, internDays:d.internDays, crossingLog:d.crossingLog });
+    // Egyetlen lekérdezés az összes sofőrre (a korábbi sofőrönkénti, teljes
+    // történetes körök helyett) — 90 napos ablak, mint a fuvarlevel-save-nél.
+    const emails = sofors.rows.map(s => s.email);
+    const byEmail = {};
+    if (emails.length) {
+      const cr = await pool.query(
+        `SELECT email_sofer, CASE WHEN tip='Iesire' THEN 'OUT' WHEN tip='Intrare' THEN 'IN' ELSE tip END AS direction, created_at AS crossed_at
+         FROM border_crossings WHERE email_sofer = ANY($1) AND created_at >= NOW() - INTERVAL '90 days'
+         ORDER BY created_at ASC`, [emails]);
+      for (const row of cr.rows) (byEmail[row.email_sofer] = byEmail[row.email_sofer] || []).push(row);
     }
+    const result = sofors.rows.map(s => {
+      const d = calculateDiurna(byEmail[s.email] || []);
+      return { driver_id:s.id, nume:s.nume, email:s.email, externDays:d.externDays, internDays:d.internDays, crossingLog:d.crossingLog };
+    });
     return res.json({ ok:true, data:result });
   } catch(err) { return res.json({ ok:false }); }
 });
@@ -53,7 +63,7 @@ router.get('/api/document-series', requireLogin, requireRole('Manager','Admin'),
   try {
     const r = await pool.query(`SELECT prefix, current_seq FROM document_series WHERE company_id=$1 AND doc_type=$2 AND year=$3`, [cid,docType,year]);
     return res.json({ ok:true, prefix: r.rows[0]?.prefix||docType, currentSeq: r.rows[0]?.current_seq||0 });
-  } catch(err) { return res.json({ok:false}); }
+  } catch(err) { console.error('document-series GET hiba:', err); return res.json({ok:false, err: err.message}); }
 });
 
 router.post('/api/document-series', requireLogin, requireRole('Manager','Admin'), async (req,res) => {
@@ -62,9 +72,11 @@ router.post('/api/document-series', requireLogin, requireRole('Manager','Admin')
   const year = new Date().getFullYear();
   if (!prefix) return res.json({ok:false, err:'Prefix kötelező.'});
   try {
-    await pool.query(`INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq) VALUES ($1,$2,$3,$4,0) ON CONFLICT (company_id,doc_type,year) DO UPDATE SET prefix=$3, current_seq=0, updated_at=NOW()`, [cid, docType.toUpperCase(), prefix.toUpperCase(), year]);
+    // FONTOS: a prefix újramentése NEM nullázhatja a sorszámot — különben
+    // már kiadott hivatalos bizonylatszámok ismétlődnének meg.
+    await pool.query(`INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq) VALUES ($1,$2,$3,$4,0) ON CONFLICT (company_id,doc_type,year) DO UPDATE SET prefix=$3, updated_at=NOW()`, [cid, docType.toUpperCase(), prefix.toUpperCase(), year]);
     return res.json({ok:true});
-  } catch(err) { return res.json({ok:false}); }
+  } catch(err) { console.error('document-series POST hiba:', err); return res.json({ok:false, err: err.message}); }
 });
 
 router.post('/api/document-series/next', requireLogin, async (req,res) => {
@@ -76,23 +88,36 @@ router.post('/api/document-series/next', requireLogin, async (req,res) => {
     const {prefix, current_seq} = r.rows[0];
     const docNumber = `${prefix}-${year}-${String(current_seq).padStart(4,'0')}`;
     return res.json({ok:true, docNumber, seq:current_seq});
-  } catch(err) { return res.json({ok:false}); }
+  } catch(err) { console.error('document-series/next hiba:', err); return res.json({ok:false, err: err.message}); }
 });
 
 router.post('/api/fuvarlevel-save', async (req, res) => {
   try {
     if (!req.session.user) return res.json({ success: false, err: 'Nincs bejelentkezve' });
     const d = req.body;
-    const randId = Math.floor(1000 + Math.random() * 9000);
-    const soferNameClean = req.session.user.nume.replace(/\s+/g, '_');
-    const id = "FUV-" + randId;
-    const fileName = `Menetlevel_${soferNameClean}_${randId}.pdf`;
+    const soferNameClean = (req.session.user.nume || 'Sofer').replace(/\s+/g, '_');
+    const id = genDocId('FUV');
+    const fileName = `Menetlevel_${soferNameClean}_${id.slice(4)}.pdf`;
     const cid = req.session.user.company_id;
     const year = new Date().getFullYear();
-    const seqR = await pool.query(`INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq) VALUES ($1,'MT','MT',$2,1) ON CONFLICT (company_id,doc_type,year) DO UPDATE SET current_seq=document_series.current_seq+1, updated_at=NOW() RETURNING prefix, current_seq`, [cid, year]);
-    const autoDocNumber = seqR.rows[0] ? `${seqR.rows[0].prefix}-${year}-${String(seqR.rows[0].current_seq).padStart(4,'0')}` : null;
-    const crossR = await pool.query(`SELECT direction, crossed_at FROM border_crossings WHERE email_sofer=$1 AND crossed_at >= NOW()-INTERVAL '90 days' ORDER BY crossed_at ASC`, [req.session.user.email]);
-    const diurnaCalc = calculateDiurna(crossR.rows);
+    // Automatikus, cégenkénti sorszám (MT-YYYY-XXXX). Ha bármiért elszáll
+    // (pl. hiányzó document_series tábla), a menetlevél mentése akkor is fusson.
+    let autoDocNumber = null;
+    try {
+      const seqR = await pool.query(`INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq) VALUES ($1,'MT','MT',$2,1) ON CONFLICT (company_id,doc_type,year) DO UPDATE SET current_seq=document_series.current_seq+1, updated_at=NOW() RETURNING prefix, current_seq`, [cid, year]);
+      autoDocNumber = seqR.rows[0] ? `${seqR.rows[0].prefix}-${year}-${String(seqR.rows[0].current_seq).padStart(4,'0')}` : null;
+    } catch (seqErr) {
+      console.error('document_series sorszám hiba (a mentés folytatódik):', seqErr.message);
+    }
+    // Diurna automatikus számítása a határátlépésekből. Hiba esetén 0/0,
+    // a menetlevél mentése akkor is fusson.
+    let diurnaCalc = { externDays: 0, internDays: 0, crossingLog: [] };
+    try {
+      const crossR = await pool.query(`SELECT CASE WHEN tip='Iesire' THEN 'OUT' WHEN tip='Intrare' THEN 'IN' ELSE tip END AS direction, created_at AS crossed_at FROM border_crossings WHERE email_sofer=$1 AND created_at >= NOW()-INTERVAL '90 days' ORDER BY created_at ASC`, [req.session.user.email]);
+      diurnaCalc = calculateDiurna(crossR.rows);
+    } catch (diurnaErr) {
+      console.error('diurna számítás hiba (a mentés folytatódik):', diurnaErr.message);
+    }
 
     const totalKm = Math.max(0, Number(d.kmSfarsit || 0) - Number(d.kmInceput || 0));
     let totalAlim = 0;
@@ -121,7 +146,7 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
         d.numarCamion || null, d.numarRemorca || null, autoDocNumber || d.numarFisa || null, d.cursaSaptamanii || null,
         Number(d.kmInceput || 0), Number(d.kmSfarsit || 0), totalKm,
         d.locPlecare || null, d.locSosire || null, d.locDescTUR || null, d.locIncRETUR || null,
-        diurnaCalc.externDays || parseInt(d.diurnaExterna || 0), diurnaCalc.internDays || parseInt(d.diurnaInterna || 0),
+        diurnaCalc.externDays, diurnaCalc.internDays,  // automatikusan a határátlépésekből
         cantInc, cantSf, motorinaFolosit, totalAlim, consum100,
         d.alteMentiuni || null,
         JSON.stringify(alimentari),
@@ -131,10 +156,10 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
         JSON.stringify(orderIds)
       ]
     );
-    res.json({ success: true, id });
+    res.json({ success: true, id, docNumber: autoDocNumber });
   } catch (err) {
     console.error('fuvarlevel-save hiba:', err);
-    res.json({ success: false, err: 'Szerver hiba' });
+    res.json({ success: false, err: 'Szerver hiba: ' + (err.message || 'ismeretlen') });
   }
 });
 
@@ -194,10 +219,22 @@ router.get('/api/doc-download/:id', async (req, res) => {
   }
 });
 
-// PDF DOWNLOAD (DB-bol)
+// HTML-escape a DB-ből jövő (felhasználó által beküldött) mezőkhöz — tárolt XSS ellen
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+// PDF DOWNLOAD (DB-bol) — csak bejelentkezve, csak a saját cég menetlevele
 router.get('/api/pdf-download/:id', async (req, res) => {
   try {
-    const r = await pool.query('SELECT * FROM fuvarlevelek WHERE id = $1', [req.params.id]);
+    if (!req.session.user) return res.status(401).send('Nincs bejelentkezve');
+    const r = await pool.query(
+      `SELECT * FROM fuvarlevelek
+       WHERE id = $1 AND email_sofer IN (SELECT email FROM users WHERE company_id = $2)`,
+      [req.params.id, req.session.user.company_id]
+    );
     if (!r.rows.length) return res.status(404).send('Nem található.');
     const f = r.rows[0];
 
@@ -210,12 +247,12 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     let puncteHtml = '';
     if (puncte.length > 0) {
       puncte.forEach((p, i) => {
-        puncteHtml += `<tr><td>${i+1}.</td><td>${p.tip || '—'}</td><td>${p.loc || '—'}</td><td>${p.data || '—'}</td></tr>`;
+        puncteHtml += `<tr><td>${i+1}.</td><td>${escHtml(p.tip || '—')}</td><td>${escHtml(p.loc || '—')}</td><td>${escHtml(p.data || '—')}</td></tr>`;
       });
     } else {
       // Ha nincs puncte, a régi loc_plecare/loc_sosire mutatjuk
-      if (f.loc_plecare) puncteHtml += `<tr><td>1.</td><td>Plecare</td><td>${f.loc_plecare}</td><td>—</td></tr>`;
-      if (f.loc_sosire)  puncteHtml += `<tr><td>2.</td><td>Sosire</td><td>${f.loc_sosire}</td><td>—</td></tr>`;
+      if (f.loc_plecare) puncteHtml += `<tr><td>1.</td><td>Plecare</td><td>${escHtml(f.loc_plecare)}</td><td>—</td></tr>`;
+      if (f.loc_sosire)  puncteHtml += `<tr><td>2.</td><td>Sosire</td><td>${escHtml(f.loc_sosire)}</td><td>—</td></tr>`;
       if (!puncteHtml)   puncteHtml  = '<tr><td colspan="4">—</td></tr>';
     }
 
@@ -224,12 +261,12 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     if (alimentari.length > 0) {
       alimentari.forEach((a, i) => {
         alimHtml += `<tr>
-          <td>${i+1}. ${a.loc || '—'}</td>
-          <td>${a.tip || 'Motorină'}</td>
-          <td>${a.litru || 0} L</td>
-          <td>${a.km || 0} km</td>
-          <td>${a.plata || '—'}</td>
-          <td>${a.suma ? a.suma + ' RON' : '—'}</td>
+          <td>${i+1}. ${escHtml(a.loc || '—')}</td>
+          <td>${escHtml(a.tip || 'Motorină')}</td>
+          <td>${escHtml(a.litru || 0)} L</td>
+          <td>${escHtml(a.km || 0)} km</td>
+          <td>${escHtml(a.plata || '—')}</td>
+          <td>${a.suma ? escHtml(a.suma) + ' RON' : '—'}</td>
         </tr>`;
       });
     } else {
@@ -241,10 +278,10 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     if (achizitii.length > 0) {
       achizitii.forEach((ach, i) => {
         achHtml += `<tr>
-          <td>${i+1}. ${ach.loc || '—'}</td>
-          <td>${ach.produs || '—'}</td>
-          <td>${ach.pret || 0} RON</td>
-          <td>${ach.plata || '—'}</td>
+          <td>${i+1}. ${escHtml(ach.loc || '—')}</td>
+          <td>${escHtml(ach.produs || '—')}</td>
+          <td>${escHtml(ach.pret || 0)} RON</td>
+          <td>${escHtml(ach.plata || '—')}</td>
         </tr>`;
       });
     } else {
@@ -252,12 +289,12 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     }
 
     // Fuvar ID-k
-    const orderIdsStr = orderIds.length ? orderIds.join(', ') : '—';
+    const orderIdsStr = orderIds.length ? escHtml(orderIds.join(', ')) : '—';
 
     res.send(`
   <html>
   <head>
-    <title>${f.file_name}</title>
+    <title>${escHtml(f.file_name)}</title>
     <meta charset="UTF-8">
     <style>
       body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.5; color:#000; font-size:13px; }
@@ -270,15 +307,16 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     </style>
   </head>
   <body>
-    <div class="no-print" style="margin-bottom:16px;">
+    <div class="no-print" style="margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;">
+      <button onclick="window.close();setTimeout(function(){if(!window.closed){if(history.length>1){history.back();}else{location.href='/';}}},150);" style="padding:10px 24px;background:#555;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">← Vissza</button>
       <button onclick="window.print()" style="padding:10px 24px;background:#000;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">🖨️ Nyomtatás / PDF mentés</button>
     </div>
-    <div class="header-box">VALLOR TEAM SRL<br><span style="font-size:14px;">FIȘĂ DE CURSĂ SĂPTĂMÂNALĂ</span></div>
+    <div class="header-box">VALLOR TEAM SRL<br><span style="font-size:14px;">FIȘĂ DE CURSĂ SĂPTĂMÂNALĂ</span><br><span style="font-size:15px;color:#b00;letter-spacing:1px;">Serie / Nr.: ${escHtml(f.numar_fisa || '—')}</span></div>
 
     <table class="grid-table">
-      <tr><td width="50%"><b>Nume șofer:</b> ${f.nume_sofer || '—'}</td><td><b>Număr fișă:</b> ${f.numar_fisa || '—'}</td></tr>
-      <tr><td><b>Număr camion:</b> ${f.numar_camion || '—'}</td><td><b>Număr remorcă:</b> ${f.numar_remorca || '—'}</td></tr>
-      <tr><td><b>Cursa săptămânii:</b> ${f.cursa_saptamanii || '—'}</td><td><b>Fuvar ID-k:</b> ${orderIdsStr}</td></tr>
+      <tr><td width="50%"><b>Nume șofer:</b> ${escHtml(f.nume_sofer || '—')}</td><td><b>Serie / Număr:</b> ${escHtml(f.numar_fisa || '—')}</td></tr>
+      <tr><td><b>Număr camion:</b> ${escHtml(f.numar_camion || '—')}</td><td><b>Număr remorcă:</b> ${escHtml(f.numar_remorca || '—')}</td></tr>
+      <tr><td colspan="2"><b>Fuvar ID-k:</b> ${orderIdsStr}</td></tr>
       <tr><td><b>Km început:</b> ${f.km_inceput || 0} km</td><td><b>Km sfârșit:</b> ${f.km_sfarsit || 0} km</td></tr>
       <tr><td colspan="2"><b>Total kilometri parcurși: ${f.total_km || 0} km</b></td></tr>
       <tr><td><b>Diurnă externă:</b> ${f.diurna_externa || 0} nap</td><td><b>Diurnă internă:</b> ${f.diurna_interna || 0} nap</td></tr>
@@ -310,12 +348,20 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     </table>
 
     <div class="sec-title">Alte mențiuni (Megjegyzések)</div>
-    <div style="border:1px solid #000;padding:10px;min-height:40px;">${f.alte_mentiuni || '—'}</div>
+    <div style="border:1px solid #000;padding:10px;min-height:40px;">${escHtml(f.alte_mentiuni || '—')}</div>
 
     <div style="margin-top:30px;display:flex;justify-content:space-between;">
       <div style="text-align:center;"><div style="border-top:1px solid #000;width:180px;margin:0 auto;padding-top:4px;">Semnătura șofer</div></div>
       <div style="text-align:center;"><div style="border-top:1px solid #000;width:180px;margin:0 auto;padding-top:4px;">Semnătura dispecer</div></div>
     </div>
+    <script>
+      // Ha in-app iframe-ben (PWA-nézet) nyílik meg, a beágyazó modal adja a
+      // Vissza/Nyomtatás vezérlést — rejtsük a saját gombsávot.
+      if (window.self !== window.top) {
+        var _tb = document.querySelector('.no-print');
+        if (_tb) _tb.style.display = 'none';
+      }
+    </script>
   </body>
   </html>`);
   } catch (err) {

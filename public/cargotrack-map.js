@@ -2,7 +2,7 @@
 window.CargoTrackWhereIs = (function () {
   const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
   const LEAFLET_JS  = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
-  let map, marker;
+  let map, marker, ro;
 
   function ensureStyles() {
     if (document.getElementById('ctw-style')) return;
@@ -31,7 +31,7 @@ window.CargoTrackWhereIs = (function () {
   }
   function fmtTime(iso) { try { return new Date(iso).toLocaleString('hu-HU'); } catch (_) { return iso; } }
 
-  function close() { const o = document.getElementById('ctw-overlay'); if (o) o.remove(); map = null; marker = null; }
+  function close() { const o = document.getElementById('ctw-overlay'); if (o) o.remove(); if (ro) { ro.disconnect(); ro = null; } map = null; marker = null; }
 
   async function show(rendszam, label) {
     ensureStyles();
@@ -62,11 +62,18 @@ window.CargoTrackWhereIs = (function () {
       const mapEl = overlay.querySelector('#ctw-map'); mapEl.style.display = '';
       const infoEl = overlay.querySelector('#ctw-info'); infoEl.style.display = '';
 
+      // OpenStreetMap (CartoDB) csempe — ingyenes, NINCS HERE kulcs. A modal világos -> light_all.
       map = L.map(mapEl).setView([p.latitude, p.longitude], 13);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        { attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
       marker = L.marker([p.latitude, p.longitude]).addTo(map);
-      setTimeout(() => map.invalidateSize(), 100);
+      // A modál megnyitásakor a konténer mérete késve véglegesül → több ütemezett
+      // invalidateSize + ResizeObserver, hogy a csempék a teljes felületet kitöltsék.
+      [60, 200, 450, 800].forEach((d) => setTimeout(() => { if (map) map.invalidateSize(); }, d));
+      if (window.ResizeObserver) {
+        ro = new ResizeObserver(() => { if (map) map.invalidateSize(); });
+        ro.observe(mapEl);
+      }
 
       const fuel = (p.fuel_level != null) ? Math.round(p.fuel_level) + ' L' : '—';
       const speed = (p.speed != null) ? Math.round(p.speed) + ' km/h' : '—';

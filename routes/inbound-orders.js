@@ -6,8 +6,22 @@ const { requireLogin, requireRole } = require('../middleware/auth');
 const pdfx = require('../services/pdf-extract');
 const orderAi = require('../services/order-ai');
 const intake = require('../services/email-intake');
+const { decrypt } = require('../lib/crypto');
+const { genDocId } = require('../lib/ids');
 
 const router = express.Router();
+
+// A cég mentett (titkosított) e-mail intake beállítása -> { creds, since } (vagy null).
+async function loadIntakeCreds(companyId) {
+  const { rows } = await pool.query(
+    `SELECT credentials_enc, meta FROM company_integrations WHERE company_id=$1 AND provider='email_intake' AND enabled=true`, [companyId]);
+  if (!rows.length || !rows[0].credentials_enc) return null;
+  try {
+    const creds = JSON.parse(decrypt(rows[0].credentials_enc));
+    const since = rows[0].meta && rows[0].meta.since ? rows[0].meta.since : null;
+    return { creds, since };
+  } catch (_) { return null; }
+}
 const own = (req) => req.session.user.company_id;
 const LIST_COLS = `id, source_email, subject, received_at, raw_text, pdf_name, extracted,
                    confidence, ai_used, status, created_order_id, created_at`;
@@ -17,8 +31,10 @@ router.get('/api/inbound-orders/settings', requireLogin, requireRole('Admin', 'M
   try {
     const { rows } = await pool.query(
       `SELECT meta FROM company_integrations WHERE company_id=$1 AND provider='order_intake'`, [own(req)]);
-    res.json({ ai_enabled: !!(rows[0] && rows[0].meta && rows[0].meta.ai_enabled), intake_configured: intake.configured() });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    const cfg = await pool.query(
+      `SELECT 1 FROM company_integrations WHERE company_id=$1 AND provider='email_intake' AND enabled=true AND credentials_enc IS NOT NULL`, [own(req)]);
+    res.json({ ai_enabled: !!(rows[0] && rows[0].meta && rows[0].meta.ai_enabled), intake_configured: cfg.rows.length > 0 });
+  } catch (e) { console.error('GET /api/inbound-orders/settings hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 router.post('/api/inbound-orders/settings', requireLogin, requireRole('Admin'), async (req, res) => {
   const ai = req.body.ai_enabled === true || req.body.ai_enabled === 'true';
@@ -29,13 +45,21 @@ router.post('/api/inbound-orders/settings', requireLogin, requireRole('Admin'), 
        ON CONFLICT (company_id, provider) DO UPDATE SET meta=$2, updated_at=now()`,
       [own(req), JSON.stringify({ ai_enabled: ai })]);
     res.json({ ok: true, ai_enabled: ai });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/inbound-orders/settings hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- Kézi lekérdezés (teszthez, fiók beállítása után) ----
 router.post('/api/inbound-orders/poll', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
-  try { res.json(await intake.pollOnce(pool)); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    const cfg = await loadIntakeCreds(own(req));
+    if (!cfg) return res.json({ skipped: true });
+    const r = await intake.pollOnce(pool, cfg.creds, own(req), { since: cfg.since });
+    // Kézi lekérdezés is frissítse az utolsó lekérdezés idejét.
+    if (!r.skipped) {
+      await pool.query(`UPDATE company_integrations SET last_check=now() WHERE company_id=$1 AND provider='email_intake'`, [own(req)]).catch(() => {});
+    }
+    res.json(r);
+  } catch (e) { console.error('POST /api/inbound-orders/poll hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- Lista ----
@@ -48,7 +72,7 @@ router.get('/api/inbound-orders', requireLogin, requireRole('Admin', 'Manager'),
     sql += ` ORDER BY received_at DESC NULLS LAST, created_at DESC LIMIT 200`;
     const { rows } = await pool.query(sql, params);
     res.json({ items: rows });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('GET /api/inbound-orders hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- Eredeti PDF megnyitása ----
@@ -59,7 +83,7 @@ router.get('/api/inbound-orders/:id/pdf', requireLogin, requireRole('Admin', 'Ma
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${(rows[0].pdf_name || 'comanda.pdf').replace(/"/g, '')}"`);
     res.send(rows[0].pdf_data);
-  } catch (e) { res.status(500).send(e.message); }
+  } catch (e) { console.error('GET /api/inbound-orders/:id/pdf hiba:', e); res.status(500).send('Szerver hiba'); }
 });
 
 // ---- Kiolvasott mezők mentése (diszpécser javítja) ----
@@ -71,7 +95,7 @@ router.put('/api/inbound-orders/:id', requireLogin, requireRole('Admin', 'Manage
       [JSON.stringify(req.body.extracted || {}), req.params.id, own(req)]);
     if (!rows.length) return res.status(404).json({ error: 'Nem található vagy már jóváhagyott.' });
     res.json({ item: rows[0] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('PUT /api/inbound-orders/:id hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- Újrafeldolgozás (a tárolt PDF/szövegből) ----
@@ -90,7 +114,7 @@ router.post('/api/inbound-orders/:id/reparse', requireLogin, requireRole('Admin'
          WHERE id=$4 AND company_id=$5 RETURNING ${LIST_COLS}`,
       [JSON.stringify(r.fields), r.confidence, r.ai_used, req.params.id, own(req)]);
     res.json({ item: rows[0] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/inbound-orders/:id/reparse hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- Elvetés ----
@@ -98,7 +122,7 @@ router.post('/api/inbound-orders/:id/reject', requireLogin, requireRole('Admin',
   try {
     await pool.query(`UPDATE inbound_orders SET status='rejected', updated_at=now() WHERE id=$1 AND company_id=$2`, [req.params.id, own(req)]);
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/inbound-orders/:id/reject hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- Jóváhagyás -> valódi orders rekord (Disponibil / Alocat) ----
@@ -111,7 +135,7 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
     const ex = r0.rows[0].extracted || {};
     const a = req.body.assign || {};   // opcionális sofőr/jármű kiosztás
     const company_id = own(req);
-    const id = 'CMD-' + Math.floor(1000 + Math.random() * 9000);
+    const id = genDocId('CMD');
 
     const sofer_type = a.sofer_type || null;
     const email_sofer = a.email_sofer ? String(a.email_sofer).trim().toLowerCase() : null;
@@ -135,23 +159,35 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
     const data_incarcare = ex.data_incarcare || null;
     const data_descarcare = ex.data_descarcare || null;
 
-    await pool.query(
-      `INSERT INTO orders (id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
+    // Tranzakció: fuvar + láb + jóváhagyott státusz EGYÜTT — félbeszakadásnál
+    // ne maradjon létrejött fuvar 'feldolgozatlan' inbounddal (újrapróbálásnál
+    // az duplikált fuvart eredményezne).
+    const dbc = await pool.connect();
+    try {
+      await dbc.query('BEGIN');
+      await dbc.query(
+        `INSERT INTO orders (id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
+           pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
+           rendszam_camion, rendszam_remorca, status, company_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+        [id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
          pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
-         rendszam_camion, rendszam_remorca, status, company_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
-      [id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
-       pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
-       rendszam_camion, rendszam_remorca, status, company_id]);
-    await pool.query(
-      `INSERT INTO order_legs (order_id, leg_number, sofer_type, email_sofer, nume_sofer, firma_extern,
-         telefon_extern, external_driver_id, rendszam_camion, rendszam_remorca, loc_preluare, data_preluare, company_id)
-       VALUES ($1,1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-      [id, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
-       rendszam_camion, rendszam_remorca, loc_incarcare, data_incarcare, company_id]);
-
-    await pool.query(`UPDATE inbound_orders SET status='approved', created_order_id=$1, updated_at=now() WHERE id=$2 AND company_id=$3`,
-      [id, req.params.id, company_id]);
+         rendszam_camion, rendszam_remorca, status, company_id]);
+      await dbc.query(
+        `INSERT INTO order_legs (order_id, leg_number, sofer_type, email_sofer, nume_sofer, firma_extern,
+           telefon_extern, external_driver_id, rendszam_camion, rendszam_remorca, loc_preluare, data_preluare, company_id)
+         VALUES ($1,1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [id, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
+         rendszam_camion, rendszam_remorca, loc_incarcare, data_incarcare, company_id]);
+      await dbc.query(`UPDATE inbound_orders SET status='approved', created_order_id=$1, updated_at=now() WHERE id=$2 AND company_id=$3`,
+        [id, req.params.id, company_id]);
+      await dbc.query('COMMIT');
+    } catch (txErr) {
+      await dbc.query('ROLLBACK').catch(() => {});
+      throw txErr;
+    } finally {
+      dbc.release();
+    }
 
     // A beérkező megrendelő-PDF a fuvar dokumentumai közé (aláírható a meglévő flow-val)
     try {
@@ -166,7 +202,7 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
     } catch (e) { /* a dokumentum-csatolás hibája ne buktassa a jóváhagyást */ }
 
     res.json({ ok: true, order_id: id, status });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/inbound-orders/:id/approve hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 module.exports = router;

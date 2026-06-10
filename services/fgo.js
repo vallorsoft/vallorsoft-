@@ -13,6 +13,20 @@ const TIMEOUT_MS = 20000;
 const sha1U = (s) => crypto.createHash('sha1').update(s, 'utf8').digest('hex').toUpperCase();
 const base = (creds) => HOSTS[creds.environment === 'production' ? 'production' : 'test'];
 
+// Az FGO hibák gyakran teljes .NET stack trace-ként jönnek vissza
+// (System.Exception: <lényeg> at Fgo.PublicApi...). A felhasználónak csak a
+// lényegi üzenet kell — az első sor, a stack trace és a "System.Exception:" zaj nélkül.
+function cleanFgoMessage(msg) {
+  let s = String(msg || '').trim();
+  // a stack trace levágása ("   at ..." / "--- End of stack trace ...")
+  s = s.split(/\s+at\s+\S|---\s*End of stack/i)[0].trim();
+  // csak az első sor (ha többsoros)
+  s = s.split(/[\r\n]+/)[0].trim();
+  // a ".NET kivétel-típus:" prefix levágása (pl. "System.Exception: ")
+  s = s.replace(/^[A-Za-z][\w.]*Exception:\s*/i, '').trim();
+  return s || String(msg || '').trim();
+}
+
 async function call(url, opts) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -22,7 +36,7 @@ async function call(url, opts) {
     let data; try { data = JSON.parse(text); } catch (_) { data = { Success: false, Message: text }; }
     return data;
   } catch (e) {
-    if (e.name === 'AbortError') { const x = new Error('FGO időtúllépés (15 mp).'); x.status = 504; throw x; }
+    if (e.name === 'AbortError') { const x = new Error(`FGO időtúllépés (${Math.round(TIMEOUT_MS/1000)} mp).`); x.status = 504; throw x; }
     throw e;
   } finally { clearTimeout(t); }
 }
@@ -64,7 +78,7 @@ async function emit(creds, invoice) {
     })),
   };
   const data = await post(creds, '/factura/emitere', body);
-  if (!data.Success) return { ok: false, message: data.Message || 'Ismeretlen FGO hiba.' };
+  if (!data.Success) return { ok: false, message: cleanFgoMessage(data.Message) || 'Ismeretlen FGO hiba.' };
   const f = data.Factura || {};
   return { ok: true, serie: f.Serie || invoice.serie, numar: f.Numar, pdf_link: f.Link || null, pay_link: f.LinkPlata || null, raw: data };
 }
@@ -74,14 +88,44 @@ async function getStatus(creds, ref) {
     CodUnic: creds.CodUnic, Hash: sha1U(creds.CodUnic + creds.PrivateKey + String(ref.numar)),
     PlatformaUrl: creds.PlatformaUrl, Numar: ref.numar, Serie: ref.serie,
   });
-  if (!data.Success) return { ok: false, message: data.Message };
+  if (!data.Success) return { ok: false, message: cleanFgoMessage(data.Message) };
   const f = data.Factura || {};
   return { ok: true, value: f.Valoare, paid: f.ValoareAchitata, raw: data };
 }
 
 async function testConnection(creds) {
   if (!creds.CodUnic || !creds.PrivateKey) return { ok: false, message: 'Hiányzó CodUnic / PrivateKey.' };
-  return { ok: true, message: 'Adatok rögzítve. Az éles ellenőrzés az első kiállításnál történik.' };
+  const env = creds.environment === 'production' ? 'Éles' : 'Teszt';
+  try {
+    // Valódi, mellékhatás nélküli hívás: egy nem létező számla státuszának lekérése.
+    // Ha a CodUnic/kulcs/környezet rossz, az FGO erről panaszkodik; ha a hitelesítés jó,
+    // csak azt mondja, hogy a (kamu) számla nem létezik.
+    const data = await post(creds, '/factura/getstatus', {
+      CodUnic: creds.CodUnic,
+      Hash: sha1U(creds.CodUnic + creds.PrivateKey + '999999999'),
+      PlatformaUrl: creds.PlatformaUrl, Numar: '999999999', Serie: '',
+    });
+    const raw = String(data.Message || '');
+    const msg = cleanFgoMessage(raw);
+    // Hitelesítési hiba: rossz CodUnic / kulcs / KÖRNYEZET (teszt↔éles külön fiók).
+    if (/cod\w*\s*unic|asociat|hash|cheie\s*privat/i.test(raw)) {
+      let hint = '';
+      // A leggyakoribb buktató: éles CodUnic+kulcs, de „Teszt" környezetre állítva
+      // (vagy fordítva). A teszt (UAT) és az éles FGO külön rendszer, külön fiókkal.
+      if (/cod\w*\s*unic|asociat/i.test(raw)) {
+        hint = creds.environment === 'production'
+          ? ' — Ellenőrizd, hogy a CodUnic (CUI) és a PrivateKey ugyanabból az ÉLES FGO-fiókból való.'
+          : ' — A Teszt (UAT) és az Éles FGO külön rendszer, külön fiókkal és kulccsal. Ha ez éles CodUnic+kulcs, állítsd a környezetet „Éles"-re; teszteléshez külön UAT-fiók kell az FGO-tól.';
+      } else if (/hash|cheie\s*privat/i.test(raw)) {
+        hint = ' — A PrivateKey nem tartozik ehhez a CodUnic-hoz (vagy elgépelés). Ellenőrizd a kulcsot ugyanabban a környezetben.';
+      }
+      return { ok: false, message: 'FGO (' + env + '): ' + msg + hint };
+    }
+    // Bármi más (pl. „factura nu există") = a hitelesítés RENDBEN.
+    return { ok: true, message: 'Kapcsolat OK (' + env + ') — a CodUnic + kulcs + környezet hármas helyes.' };
+  } catch (e) {
+    return { ok: false, message: 'FGO (' + env + '): ' + e.message };
+  }
 }
 
 // Publikus nomenklátor (tipfactura, tva, ...) — GET, hash nélkül.

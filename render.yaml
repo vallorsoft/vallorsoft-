@@ -1,0 +1,64 @@
+# Render Blueprint (Infrastructure as Code) — VallorSoft
+# A meglévő, dashboardon beállított service-t NEM módosítja önmagában; ez a fájl
+# dokumentálja a deploy-t, és új Blueprint-deploynál (Render → New → Blueprint)
+# reprodukálható belőle a service. A main-re pusholás autoDeploy: true miatt
+# automatikusan újraépít + újraindít.
+#
+# A titkokat NEM tartalmazza (sync: false) — azokat a Render dashboard
+# Environment fülén kell megadni. PORT-ot a Render adja, a szerver process.env.PORT-ra köt.
+services:
+  - type: web
+    name: vallorsoft
+    runtime: node
+    branch: main
+    autoDeploy: true
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # ── Alap ──
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: INTEGRATION_ENC_KEY
+        sync: false
+      # ── Térkép (HERE) ──
+      - key: HERE_API_KEY
+        sync: false
+      # ── Web Push (VAPID) ──
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_EMAIL
+        sync: false
+      # ── E-mail (Brevo) ──
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER
+        sync: false
+      - key: MAIL_USER
+        sync: false
+      # ── Firebase ──
+      - key: FIREBASE_API_KEY
+        sync: false
+      - key: FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: FIREBASE_DB_URL
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_APP_ID
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+      # ── AI (megrendelés-feldolgozás) ──
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        sync: false

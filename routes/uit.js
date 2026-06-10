@@ -36,7 +36,7 @@ router.get('/api/orders/:id/uit', requireLogin, async (req, res) => {
          FROM order_uit_codes WHERE company_id=$1 AND order_id=$2 ORDER BY created_at`,
       [own(req), req.params.id]);
     res.json({ items: rows });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('GET /api/orders/:id/uit hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- ÖSSZESÍTŐ a fuvarlista gombjaihoz (1 kérés több fuvarra) ----
@@ -54,7 +54,7 @@ router.get('/api/uit/summary', requireLogin, async (req, res) => {
       s.total += r.n; if (s[r.status] != null) s[r.status] += r.n;
     });
     res.json({ summary });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('GET /api/uit/summary hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- HOZZÁADÁS ----
@@ -80,7 +80,7 @@ router.post('/api/orders/:id/uit', requireLogin, requireRole('Admin', 'Manager')
       [own(req), req.params.id, uit, rendszam || null, objectId, provider, validUntil, req.session.user.id]);
     if (!rows.length) return res.status(409).json({ error: 'Ez a UIT már rögzítve van ennél a fuvarnál.' });
     res.json({ item: rows[0] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/orders/:id/uit hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- TÖRLÉS ----
@@ -89,7 +89,7 @@ router.delete('/api/uit/:uid', requireLogin, requireRole('Admin', 'Manager'), as
     const r = await pool.query(`DELETE FROM order_uit_codes WHERE id=$1 AND company_id=$2`, [req.params.uid, own(req)]);
     if (!r.rowCount) return res.status(404).json({ error: 'Nem található.' });
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('DELETE /api/uit/:uid hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 async function loadUit(req) {
@@ -114,7 +114,7 @@ router.post('/api/uit/:uid/start', requireLogin, requireRole('Admin', 'Manager')
       `UPDATE order_uit_codes SET status=$1, last_message=$2, sent_at=COALESCE(sent_at, now()), updated_at=now()
          WHERE id=$3 AND company_id=$4 RETURNING *`, [status, msg, u.id, own(req)]);
     res.json({ item: rows[0], mode: result ? result.mode : 'error' });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/uit/:uid/start hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- KÜLDÉS LEÁLLÍTÁSA ----
@@ -134,7 +134,7 @@ router.post('/api/uit/:uid/stop', requireLogin, requireRole('Admin', 'Manager'),
       `UPDATE order_uit_codes SET status=$1, last_message=$2, stopped_at=now(), updated_at=now()
          WHERE id=$3 AND company_id=$4 RETURNING *`, [status, msg, u.id, own(req)]);
     res.json({ item: rows[0], mode: result ? result.mode : 'error' });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/uit/:uid/stop hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ============================================================
@@ -158,7 +158,7 @@ router.get('/api/sofer/orders/:id/uit', requireLogin, requireRole('Sofer'), asyn
          FROM order_uit_codes WHERE company_id=$1 AND order_id=$2 ORDER BY created_at`,
       [own(req), req.params.id]);
     res.json({ items: rows, canAdd: rows.length === 0 });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('GET /api/sofer/orders/:id/uit hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // HOZZÁADÁS — a sofőr CSAK akkor adhat UIT-ot, ha még EGY SINCS a fuvarnál.
@@ -182,7 +182,7 @@ router.post('/api/sofer/orders/:id/uit', requireLogin, requireRole('Sofer'), asy
       [own(req), req.params.id, uit, rendszam || null, objectId, provider, req.session.user.id]);
     if (!rows.length) return res.status(409).json({ error: 'Ez a UIT már rögzítve van.' });
     res.json({ item: rows[0] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/sofer/orders/:id/uit hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 module.exports = router;

@@ -17,12 +17,28 @@ const handlers = Object.assign(
   require('../handlers/documents'),
   require('../handlers/dashboard'),
   require('../handlers/developer'),
+  require('../handlers/routePlannerHandlers'),
+  require('../handlers/hereFeatureHandlers'),
+  require('../handlers/billingHandlers'),
+  require('../handlers/intakeHandlers'),
 );
 
 router.post('/api/execute', requireLogin, async (req, res) => {
   const { functionName, arguments: args } = req.body;
   const handler = handlers[functionName];
-  if (handler) return handler(req, res, args);
+  if (handler) {
+    // Védőháló: egy handler-en kívüli/elkapatlan hiba ne legyen
+    // unhandledRejection (process-leállás), hanem normál hibaválasz.
+    try {
+      return await handler(req, res, args);
+    } catch (err) {
+      console.error(`execute handler hiba (${functionName}):`, err);
+      if (!res.headersSent) {
+        return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      }
+      return;
+    }
+  }
   // Ismeretlen funkcio
   return res.json({ result: { ok: false, err: 'Ismeretlen funkcio: ' + functionName } });
 });

@@ -39,6 +39,10 @@ window.InboundOrders = (function () {
       .io-assign{border-top:1px dashed #e3e9f2;margin-top:10px;padding-top:10px;display:none;gap:8px;flex-wrap:wrap;align-items:end}
       .io-assign.open{display:flex}
       .io-empty{color:#6b7a90;padding:14px 2px}
+      .io-nav{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;background:#f4f7fb;border:1px solid #e3e9f2;border-radius:10px;padding:8px 12px}
+      .io-nav .io-count{font-weight:700;font-size:14px;color:#1f2d3d}
+      .io-nav .io-sub{font-size:12px;color:#6b7a90}
+      .io-done{background:#dff3e6;color:#0f7a3a;border:1px solid #bfe6cc;border-radius:10px;padding:14px;font-weight:600}
       @media(max-width:640px){.io-grid{grid-template-columns:1fr}}`;
     document.head.appendChild(s);
   }
@@ -72,7 +76,7 @@ window.InboundOrders = (function () {
       try {
         const s = await api('GET', '/api/inbound-orders/settings');
         $('ioAi').checked = !!s.ai_enabled;
-        if (!s.intake_configured) $('ioInfo').innerHTML = '<div class="io-warn">A postafiók még nincs beállítva (INTAKE_IMAP_* a .env-ben). Addig a lista üres marad; a „Lekérdezés most” gomb beállítás után működik.</div>';
+        if (!s.intake_configured) $('ioInfo').innerHTML = '<div class="io-warn">A megrendelés-postafiók még nincs beállítva. Állítsd be az <b>Integrációk</b> menüpontban (📧 Megrendelés email fiók). Addig a lista üres marad; a „Lekérdezés most” gomb beállítás után működik.</div>';
       } catch (e) {}
     }
     $('ioAi').addEventListener('change', async function () {
@@ -88,7 +92,7 @@ window.InboundOrders = (function () {
       try { const r = await api('POST', '/api/inbound-orders/poll'); await load(); if (r.skipped) alert('A postafiók még nincs beállítva.'); }
       catch (e) { alert(e.message); } finally { b.disabled = false; b.textContent = 'Lekérdezés most'; }
     });
-    $('ioRefresh').addEventListener('click', load);
+    $('ioRefresh').addEventListener('click', function () { load(); });
 
     function card(it) {
       const ex = it.extracted || {};
@@ -140,33 +144,74 @@ window.InboundOrders = (function () {
       return a;
     }
 
-    async function load() {
+    // ── Egyszerre EGY feldolgozatlan megrendelést mutatunk (a legutolsót), lapozható ──
+    let pending = [];   // feldolgozatlanok (új/feldolgozva/ellenőrizve), legújabb elöl
+    let idx = 0;        // aktuális mutatott elem indexe
+    let totalHandled = 0;
+    const isPending = (it) => ['new', 'parsed', 'reviewed'].indexOf(it.status) >= 0;
+
+    function renderCurrent() {
+      if (!pending.length) {
+        $('ioList').innerHTML = '<div class="io-done">✓ Nincs feldolgozatlan megrendelés.' +
+          (totalHandled ? ' <span style="font-weight:400;">(' + totalHandled + ' korábbi elintézve)</span>' : '') + '</div>';
+        return;
+      }
+      if (idx < 0) idx = 0;
+      if (idx > pending.length - 1) idx = pending.length - 1;
+      const it = pending[idx];
+      const nav =
+        '<div class="io-nav">' +
+          '<button class="io-btn io-btn--ghost" data-nav="prev"' + (idx === 0 ? ' disabled' : '') + '>◀ Előző</button>' +
+          '<div><span class="io-count">' + (idx + 1) + ' / ' + pending.length + ' feldolgozatlan megrendelés</span>' +
+            '<div class="io-sub">A legutóbb beérkezett megrendelés van elöl. Elintézés (elfogadás/elvetés) után automatikusan a következő jön.</div></div>' +
+          '<div class="io-spacer"></div>' +
+          '<button class="io-btn io-btn--red" data-nav="next"' + (idx >= pending.length - 1 ? ' disabled' : '') + '>Következő ▶</button>' +
+        '</div>';
+      $('ioList').innerHTML = nav + card(it);
+      bindCard();
+    }
+
+    function bindCard() {
+      root.querySelectorAll('#ioList [data-nav]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          if (b.dataset.nav === 'prev') idx--; else idx++;
+          renderCurrent();
+        });
+      });
+      const cardEl = root.querySelector('.io-card');
+      if (!cardEl) return;
+      cardEl.querySelectorAll('[data-act]').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+          const id = cardEl.dataset.id; const act = btn.dataset.act;
+          try {
+            if (act === 'assignToggle') { cardEl.querySelector('.io-assign').classList.toggle('open'); return; }
+            if (act === 'email') {
+              if (!window.ClientMail) { alert('Az e-mail modul nem töltött be.'); return; }
+              const ex = collect(cardEl);
+              ClientMail.open({ to: cardEl.dataset.email || '', inbound_order_id: id,
+                context: { client: ex.client, ref: ex.ref, loc_incarcare: ex.loc_incarcare, loc_descarcare: ex.loc_descarcare, pret: ex.pret, order_id: '' } });
+              return;
+            }
+            btn.disabled = true;
+            // save/reparse: maradunk az aktuális elemen; approve/reject: az elem kikerül → marad az index (a következő csúszik a helyére)
+            if (act === 'save') { await api('PUT', '/api/inbound-orders/' + id, { extracted: collect(cardEl) }); await load(true); }
+            else if (act === 'reparse') { await api('POST', '/api/inbound-orders/' + id + '/reparse'); await load(true); }
+            else if (act === 'reject') { if (confirm('Biztosan elveted?')) { await api('POST', '/api/inbound-orders/' + id + '/reject'); await load(true); } else btn.disabled = false; }
+            else if (act === 'approve') { await api('PUT', '/api/inbound-orders/' + id, { extracted: collect(cardEl) }); const r = await api('POST', '/api/inbound-orders/' + id + '/approve', {}); alert('Létrehozva: ' + r.order_id + ' (' + r.status + ')'); await load(true); }
+            else if (act === 'approveAssign') { await api('PUT', '/api/inbound-orders/' + id, { extracted: collect(cardEl) }); const r = await api('POST', '/api/inbound-orders/' + id + '/approve', { assign: assignData(cardEl) }); alert('Létrehozva: ' + r.order_id + ' (' + r.status + ')'); await load(true); }
+          } catch (e) { alert(e.message); btn.disabled = false; }
+        });
+      });
+    }
+
+    async function load(keepIdx) {
       try {
         const d = await api('GET', '/api/inbound-orders');
         const items = d.items || [];
-        if (!items.length) { $('ioList').innerHTML = '<div class="io-empty">Nincs beérkező megrendelés.</div>'; return; }
-        $('ioList').innerHTML = items.map(card).join('');
-        root.querySelectorAll('.io-card [data-act]').forEach(function (btn) {
-          btn.addEventListener('click', async function () {
-            const cardEl = btn.closest('.io-card'); const id = cardEl.dataset.id; const act = btn.dataset.act;
-            try {
-              if (act === 'assignToggle') { cardEl.querySelector('.io-assign').classList.toggle('open'); return; }
-              if (act === 'email') {
-                if (!window.ClientMail) { alert('Az e-mail modul nem töltött be.'); return; }
-                const ex = collect(cardEl);
-                ClientMail.open({ to: cardEl.dataset.email || '', inbound_order_id: id,
-                  context: { client: ex.client, ref: ex.ref, loc_incarcare: ex.loc_incarcare, loc_descarcare: ex.loc_descarcare, pret: ex.pret, order_id: '' } });
-                return;
-              }
-              btn.disabled = true;
-              if (act === 'save') { await api('PUT', '/api/inbound-orders/' + id, { extracted: collect(cardEl) }); await load(); }
-              else if (act === 'reparse') { await api('POST', '/api/inbound-orders/' + id + '/reparse'); await load(); }
-              else if (act === 'reject') { if (confirm('Biztosan elveted?')) { await api('POST', '/api/inbound-orders/' + id + '/reject'); await load(); } else btn.disabled = false; }
-              else if (act === 'approve') { await api('PUT', '/api/inbound-orders/' + id, { extracted: collect(cardEl) }); const r = await api('POST', '/api/inbound-orders/' + id + '/approve', {}); alert('Létrehozva: ' + r.order_id + ' (' + r.status + ')'); await load(); }
-              else if (act === 'approveAssign') { await api('PUT', '/api/inbound-orders/' + id, { extracted: collect(cardEl) }); const r = await api('POST', '/api/inbound-orders/' + id + '/approve', { assign: assignData(cardEl) }); alert('Létrehozva: ' + r.order_id + ' (' + r.status + ')'); await load(); }
-            } catch (e) { alert(e.message); btn.disabled = false; }
-          });
-        });
+        pending = items.filter(isPending);   // a szerver received_at DESC szerint adja → legújabb elöl
+        totalHandled = items.length - pending.length;
+        if (!keepIdx) idx = 0;               // friss betöltésnél a legutolsóval kezdünk
+        renderCurrent();
       } catch (e) { $('ioList').innerHTML = '<div class="io-empty">' + esc(e.message) + '</div>'; }
     }
 

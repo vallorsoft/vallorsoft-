@@ -17,7 +17,7 @@ router.get('/api/clients', requireLogin, async (req, res) => {
     if (q) { params.push('%' + q + '%'); sql += ` AND (denumire ILIKE $2 OR cui_cif ILIKE $2)`; }
     sql += ` ORDER BY denumire LIMIT 200`;
     res.json({ clients: (await pool.query(sql, params)).rows });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('GET /api/clients hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 router.get('/api/clients/anaf', requireLogin, async (req, res) => {
@@ -39,7 +39,7 @@ router.get('/api/clients/:id', requireLogin, async (req, res) => {
       [req.params.id, req.session.user.company_id]);
     if (!rows.length) return res.status(404).json({ error: 'Nem található.' });
     res.json({ client: rows[0] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('GET /api/clients/:id hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 router.post('/api/clients', requireLogin, requireRole('Admin','Manager'), async (req, res) => {
@@ -54,7 +54,7 @@ router.post('/api/clients', requireLogin, requireRole('Admin','Manager'), async 
       `INSERT INTO clients (${cols.join(',')}) VALUES (${ph}) RETURNING *`,
       [...vals, complet, req.session.user.company_id]);
     res.json({ client: rows[0] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/clients hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 router.put('/api/clients/:id', requireLogin, requireRole('Admin','Manager'), async (req, res) => {
@@ -69,7 +69,7 @@ router.put('/api/clients/:id', requireLogin, requireRole('Admin','Manager'), asy
       [...vals, complet, req.params.id, req.session.user.company_id]);
     if (!rows.length) return res.status(404).json({ error: 'Nem található.' });
     res.json({ client: rows[0] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('PUT /api/clients/:id hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 router.delete('/api/clients/:id', requireLogin, requireRole('Admin'), async (req, res) => {
@@ -77,7 +77,7 @@ router.delete('/api/clients/:id', requireLogin, requireRole('Admin'), async (req
     await pool.query(`DELETE FROM clients WHERE id=$1 AND company_id=$2`,
       [req.params.id, req.session.user.company_id]);
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('DELETE /api/clients/:id hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 module.exports = router;

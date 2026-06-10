@@ -94,11 +94,14 @@ router.post('/api/login', async (req, res) => {
     }
 
     const result = await pool.query(
-      'SELECT id, nume, email, tel, pozicio, password_hash, company_id, pozicio_dev, totp_secret, totp_enabled FROM users WHERE email = $1',
+      'SELECT id, nume, email, tel, pozicio, password_hash, company_id, pozicio_dev, totp_secret, totp_enabled, blocked FROM users WHERE email = $1',
       [email]
     );
 
     if (result.rows.length === 0) {
+      // Időzítés-kiegyenlítés: nem létező emailnél is fusson egy bcrypt-összehasonlítás,
+      // hogy a válaszidőből ne lehessen fiókok létezésére következtetni.
+      await bcrypt.compare(password, '$2b$10$C6UzMDM.H6dfI/f/IKcEeO7ZdVdkPYqBkN1FW3sZBPq4P5l5l5l5l');
       return res.json({ success: false, message: 'Hibas email vagy jelszo!' });
     }
 
@@ -107,6 +110,11 @@ router.post('/api/login', async (req, res) => {
 
     if (!passwordMatch) {
       return res.json({ success: false, message: 'Hibas email vagy jelszo!' });
+    }
+
+    // Tiltott felhasznalo (developer nem tilthato)
+    if (user.blocked && !user.pozicio_dev) {
+      return res.json({ success: false, message: 'A fiókod le van tiltva. Kérjük vegye fel a kapcsolatot az adminisztrátorral.' });
     }
 
     // Ceg ellenorzese (ha nem developer)

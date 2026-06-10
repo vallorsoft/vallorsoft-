@@ -8,6 +8,26 @@ const pool = require('../db');
 
 const handlers = {};
 
+// --- Segédfüggvények a teherjármű-paraméterekhez (HERE routing) ---
+function _intOrNull(x) {
+  if (x === '' || x === null || x === undefined) return null;
+  const n = parseInt(x, 10);
+  return Number.isFinite(n) ? n : null;
+}
+function _numOrNull(x) {
+  if (x === '' || x === null || x === undefined) return null;
+  const n = parseFloat(x);
+  return Number.isFinite(n) ? n : null;
+}
+function _enumOrNull(x, allowed) {
+  if (x === null || x === undefined) return null;
+  const s = String(x).trim();
+  return allowed.includes(s) ? s : null;
+}
+const TRUCK_TYPES = ['straight', 'tractor', 'lightTruck'];
+const TUNNEL_CATS = ['B', 'C', 'D', 'E'];
+const HAZMAT_KINDS = ['explosive', 'gas', 'flammable', 'combustible', 'organic', 'poison', 'harmfulToWater'];
+
 handlers.vehicleList = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
@@ -108,13 +128,28 @@ handlers.vehicleUpdate = async function (req, res, args) {
         values.push(!!f.activ);
       }
 
+      // --- Teherjármű paraméterek (HERE routing) ---
+      if (f.height_cm !== undefined)          { updates.push(`height_cm = $${i++}`);          values.push(_intOrNull(f.height_cm)); }
+      if (f.width_cm !== undefined)           { updates.push(`width_cm = $${i++}`);           values.push(_intOrNull(f.width_cm)); }
+      if (f.length_cm !== undefined)          { updates.push(`length_cm = $${i++}`);          values.push(_intOrNull(f.length_cm)); }
+      if (f.weight_kg !== undefined)          { updates.push(`weight_kg = $${i++}`);          values.push(_intOrNull(f.weight_kg)); }
+      if (f.weight_per_axle_kg !== undefined) { updates.push(`weight_per_axle_kg = $${i++}`); values.push(_intOrNull(f.weight_per_axle_kg)); }
+      if (f.axle_count !== undefined)         { updates.push(`axle_count = $${i++}`);         values.push(_intOrNull(f.axle_count)); }
+      if (f.trailer_count !== undefined)      { updates.push(`trailer_count = $${i++}`);      values.push(_intOrNull(f.trailer_count)); }
+      if (f.truck_type !== undefined)         { updates.push(`truck_type = $${i++}`);         values.push(_enumOrNull(f.truck_type, TRUCK_TYPES)); }
+      if (f.tunnel_category !== undefined)    { updates.push(`tunnel_category = $${i++}`);    values.push(_enumOrNull(f.tunnel_category, TUNNEL_CATS)); }
+      if (f.hazardous_goods !== undefined)    { updates.push(`hazardous_goods = $${i++}`);    values.push(_enumOrNull(f.hazardous_goods, HAZMAT_KINDS)); }
+      if (f.fuel_per_100km !== undefined)     { updates.push(`fuel_per_100km = $${i++}`);     values.push(_numOrNull(f.fuel_per_100km)); }
+
       if (updates.length === 0) {
         return res.json({ result: { ok: false, err: 'Nincs mit modositani.' } });
       }
 
       updates.push(`updated_at = NOW()`);
+      // Multi-tenant: a jármű csak a saját céghez tartozhat
       values.push(id);
-      const sql = `UPDATE vehicles SET ${updates.join(', ')} WHERE id = $${i}`;
+      values.push(req.session.user.company_id);
+      const sql = `UPDATE vehicles SET ${updates.join(', ')} WHERE id = $${i} AND company_id = $${i + 1}`;
       const r = await pool.query(sql, values);
 
       if (r.rowCount === 0) {
@@ -250,7 +285,8 @@ handlers.extDriverUpdate = async function (req, res, args) {
 
       updates.push(`updated_at = NOW()`);
       values.push(id);
-      const sql = `UPDATE external_drivers SET ${updates.join(', ')} WHERE id = $${i}`;
+      values.push(req.session.user.company_id);
+      const sql = `UPDATE external_drivers SET ${updates.join(', ')} WHERE id = $${i} AND company_id = $${i + 1}`;
       const r = await pool.query(sql, values);
 
       if (r.rowCount === 0) {

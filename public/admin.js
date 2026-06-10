@@ -38,11 +38,11 @@ function loadTab(name){
   if(name==='vehicles') loadVehicles();
   if(name==='external-drivers') loadExtDrivers();
   if(name==='signature') initAdminSigCanvas();
-  if(name==='shift-fleet') { loadShiftFleet(); loadDiurnaStats(); }
   if(name==='settings') loadSettingsPane();
   if(name==='internal-drivers') loadInternalDrivers();
   if(name==='clients' && window.ClientsPage) ClientsPage.mount('clientsBox');
   if(name==='integrations'){
+    if(window.EmailIntakeCard)  EmailIntakeCard.mount('emailIntakeCardBox', {readOnly:false});
     if(window.InvoicingCard)    InvoicingCard.mount('invCardBox');
     if(window.CargoTrackCard)   CargoTrackCard.mount('ctCardBox');
     if(window.CargoTrackPairing) CargoTrackPairing.mount('ctPairBox');
@@ -97,57 +97,24 @@ function loadSettingsPane(){
 
 // ── 2FA Settings bekapcsolás ──────────────────────────────
 
-function loadDash(){
-  gas('userListAll').then(u=>{ document.getElementById('cUsers').textContent=u.length; });
-  gas('getFuvarlevelek').then(d=>{ document.getElementById('countFuv').textContent=d.length; });
-  gas('dashStats').then(function(r){
-    if(!r||!r.ok) return;
-    document.getElementById('dashCegNev').textContent = r.ceg_nev;
-    const total = r.statuszok.reduce(function(s,x){return s+x.db;},0);
-    const aktiv = r.statuszok.filter(function(x){return x.status==='In Curs'||x.status==='Alocat';}).reduce(function(s,x){return s+x.db;},0);
-    document.getElementById('kpiTotal').textContent = total;
-    document.getElementById('kpiAktiv').textContent = aktiv;
-    const colors = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a855f7','#06b6d4'];
-    var ctx1 = document.getElementById('chartStatusz');
-    if(ctx1._chart) ctx1._chart.destroy();
-    ctx1._chart = new Chart(ctx1, { type:'doughnut', data:{
-      labels: r.statuszok.map(function(x){return x.status;}),
-      datasets:[{data: r.statuszok.map(function(x){return x.db;}), backgroundColor:colors, borderWidth:0}]
-    }, options:{plugins:{legend:{labels:{color:'#8a97a8'}}}}});
-    var ctx2 = document.getElementById('chartBevetel');
-    if(ctx2._chart) ctx2._chart.destroy();
-    ctx2._chart = new Chart(ctx2, { type:'bar', data:{
-      labels: r.havi_bevetel.map(function(x){return x.ho;}),
-      datasets:[{label:'EUR', data: r.havi_bevetel.map(function(x){return parseFloat(x.osszeg)||0;}),
-        backgroundColor:'rgba(59,130,246,0.6)', borderColor:'#3b82f6', borderWidth:1}]
-    }, options:{plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#8a97a8'}},y:{ticks:{color:'#8a97a8'}}}}});
-    var ctx3 = document.getElementById('chartKm');
-    if(ctx3._chart) ctx3._chart.destroy();
-    ctx3._chart = new Chart(ctx3, { type:'bar', data:{
-      labels: r.sofor_km.map(function(x){return x.nume_sofer;}),
-      datasets:[{label:'km', data: r.sofor_km.map(function(x){return parseFloat(x.total_km)||0;}),
-        backgroundColor:'rgba(34,197,94,0.6)', borderColor:'#22c55e', borderWidth:1}]
-    }, options:{indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#8a97a8'}},y:{ticks:{color:'#8a97a8'}}}}});
-    var ctx4 = document.getElementById('chartJarmu');
-    if(ctx4._chart) ctx4._chart.destroy();
-    ctx4._chart = new Chart(ctx4, { type:'bar', data:{
-      labels: r.jarmu_kihasznaltsag.map(function(x){return x.rendszam;}),
-      datasets:[{label:'Fuvarok', data: r.jarmu_kihasznaltsag.map(function(x){return x.fuvarok;}),
-        backgroundColor:'rgba(245,158,11,0.6)', borderColor:'#f59e0b', borderWidth:1}]
-    }, options:{plugins:{legend:{display:false}}, scales:{x:{ticks:{color:'#8a97a8'}},y:{ticks:{color:'#8a97a8'}}}}});
-  });
-}
+// A vezérlőpult-renderelés a console-shared.js loadDashboard()-jában él (közös admin/manager).
+function loadDash(){ loadDashboard(); }
 
 function loadUsers(){
   gas('userListAll').then(list=>{
-    document.querySelector('#tblUsers tbody').innerHTML=list.map(u=>{
+    // XSS-védelem: a sor-adatot gyorsítótárból (index alapján) adjuk át, NEM HTML-attribútumba ágyazva
+    window._vsUsersCache = list;
+    document.querySelector('#tblUsers tbody').innerHTML=list.map((u,i)=>{
       const isSelf = u.email.toLowerCase() === myEmail.toLowerCase();
       const canDel = !isSelf && u.pozicio !== 'Admin';
-      const delBtn = canDel ? `<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUser('${u.email}','${u.nume}')">Töröl</button>` : '';
-      return `<tr><td>${u.nume}</td><td>${u.email}</td><td>${u.tel||'—'}</td><td><span class="badge info">${u.pozicio}</span></td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick='editUser(${JSON.stringify(u)})'>Szerk</button> ${delBtn}</td></tr>`;
+      const delBtn = canDel ? `<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUserIdx(${i})">Töröl</button>` : '';
+      return `<tr><td>${esc(u.nume)}</td><td>${esc(u.email)}</td><td>${esc(u.tel||'—')}</td><td><span class="badge info">${u.pozicio}</span></td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editUserIdx(${i})">Szerk</button> ${delBtn}</td></tr>`;
     }).join('');
-  });
+  }).catch(function(e){ console.error('loadUsers hiba:', e); toast('Betöltési hiba','err'); });
 }
+// Gyorsítótár-alapú hívók (a felhasználói adat nem kerül HTML-attribútumba)
+window.editUserIdx = (i) => editUser(window._vsUsersCache[i]);
+window.deleteUserIdx = (i) => { const u = window._vsUsersCache[i]; deleteUser(u.email, u.nume); };
 
 function deleteUser(email, nev){
   if(!confirm('Biztosan törlöd: '+nev+' ('+email+')?\n\nEz a művelet nem visszavonható!'))return;
@@ -253,7 +220,7 @@ function renderFilteredOrders(list) {
     }
     if (c.status==='Finalizat' && window.InvoiceModal) {
       integBtns += '<button class="btn primary" title="Számlázás" style="padding:4px 10px;font-size:12px;" '+
-        'onclick="InvoiceModal.open(\''+c.id+'\')">🧾</button>';
+        'onclick="InvoiceModal.open(\''+c.id+'\')">🧾<span class="inv-ind" data-inv-ind="'+c.id+'" style="margin-left:2px;"></span></button>';
     }
 
     return '<tr><td><b>'+c.id+'</b></td><td>'+esc(c.client||'—')+'</td>'+
@@ -274,7 +241,26 @@ function renderFilteredOrders(list) {
   }).join('');
   updateOrderSelBar();
   decorateUitIndicators(list);
+  decorateInvoiceIndicators(list);
 }
+
+// ── Számla-állapot jelzése a fuvar sorában (🧾 gomb melletti szimbólum) ──
+function decorateInvoiceIndicators(list){
+  if(!window.InvoiceModal) return;
+  var ids=(list||[]).map(function(c){return c.id;}).filter(Boolean);
+  if(!ids.length) return;
+  fetch('/api/invoices/summary?order_ids='+encodeURIComponent(ids.join(',')),{credentials:'same-origin'})
+    .then(function(r){return r.json();}).then(function(d){
+      var sum=(d&&d.summary)||{};
+      document.querySelectorAll('[data-inv-ind]').forEach(function(el){
+        var s=sum[el.getAttribute('data-inv-ind')]; var btn=el.closest('button');
+        if(!s||!s.invoiced){ el.textContent=''; el.title=''; return; }
+        if(s.stornoed){ el.textContent=' ↩️'; var t='Számla stornózva: '+(s.storno_serie||'')+'-'+(s.storno_numar||''); el.title=t; if(btn)btn.title=t; }
+        else { el.textContent=' ✅'; var t2='Számlázva: '+(s.serie||'')+'-'+(s.numar||''); el.title=t2; if(btn)btn.title=t2; }
+      });
+    }).catch(function(){});
+}
+window.__invoiceRefresh=function(){ try{ decorateInvoiceIndicators(_ordersAllCache); }catch(e){} };
 
 // ── UIT-állapot jelzése a fuvar sorában (+UIT gomb melletti szimbólum) ──
 // 1 kérés a látható fuvarokra; a domináns státusz szimbóluma kerül a gombra.
@@ -433,6 +419,7 @@ gas('authMe').then(u=>{
   try{savedTab=sessionStorage.getItem('vs_admin_tab')||'dash';savedRoom=sessionStorage.getItem('vs_admin_chat_room')||'';}catch(e){}
   if(savedTab==='chat'&&savedRoom){window._restoreChatRoom=savedRoom;}
   activateTab(savedTab||'dash');
+  applyFeatureFlags();
 });
 let currentDocOrderId = null;
 let currentDocId      = null;
@@ -755,13 +742,13 @@ function openOrderEdit(id) {
   _oeOrderId = id;
   document.getElementById('oeModalId').textContent = id;
 
-  // Adatok betöltése
+  // Adatok betöltése. A getOrderById közvetlen fetch-csel megy, mert a gas()
+  // a d.result-ot adja vissza, itt viszont a d.legs is kell — ezért NEM kérjük
+  // le még egyszer a Promise.all-ban (korábban duplán futott).
   Promise.all([
-    gas('getOrderById', [id]),
     gas('userListAll'),
     gas('vehicleList')
   ]).then(function(results) {
-    // getOrderById result + legs
     fetch('/api/execute', {method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({functionName:'getOrderById',arguments:[id]})})
     .then(r=>r.json()).then(function(d) {
@@ -781,22 +768,22 @@ function openOrderEdit(id) {
       document.getElementById('oeSoferType').value = o.sofer_type||'';
 
       // Sofőr dropdown
-      var users = results[1] || [];
+      var users = results[0] || [];
       _oeSoferCache = users.filter(u => u.pozicio === 'Sofer');
       var sel = document.getElementById('oeEmailSofer');
       sel.innerHTML = '<option value="">— Válassz —</option>' +
-        _oeSoferCache.map(u => '<option value="'+u.email+'"'+(u.email===o.email_sofer?' selected':'')+'>'+u.nume+' ('+u.email+')</option>').join('');
+        _oeSoferCache.map(u => '<option value="'+esc(u.email)+'"'+(u.email===o.email_sofer?' selected':'')+'>'+esc(u.nume)+' ('+esc(u.email)+')</option>').join('');
 
       // Jármű dropdown
-      var vehicles = results[2] || [];
+      var vehicles = results[1] || [];
       _oeCamionCache = vehicles.filter(v => v.tip === 'Vontato');
       _oeRemorcaCache = vehicles.filter(v => v.tip === 'Potkocsi');
       var camSel = document.getElementById('oeCamion');
       camSel.innerHTML = '<option value="">— Nincs —</option>' +
-        _oeCamionCache.map(v => '<option value="'+v.rendszam+'"'+(v.rendszam===o.rendszam_camion?' selected':'')+'>'+v.rendszam+(v.marca?' — '+v.marca:'')+'</option>').join('');
+        _oeCamionCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_camion?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
       var remSel = document.getElementById('oeRemorca');
       remSel.innerHTML = '<option value="">— Nincs —</option>' +
-        _oeRemorcaCache.map(v => '<option value="'+v.rendszam+'"'+(v.rendszam===o.rendszam_remorca?' selected':'')+'>'+v.rendszam+(v.marca?' — '+v.marca:'')+'</option>').join('');
+        _oeRemorcaCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_remorca?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
 
       if (o.sofer_type === 'Extern') {
         document.getElementById('oeNumeSoferExtern').value = o.nume_sofer||'';
@@ -904,138 +891,12 @@ document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(e
   });
 });
 
-// ============================================================
-// MŰSZAK FLOTTA STATISZTIKA — Admin dashboard
-// ============================================================
-var _sfWeekOffset = 0;
-var _sfData = null;
-var _sfPollInterval = null;
- 
-function shiftFleetWeek(delta) {
-  var nw = _sfWeekOffset + delta;
-  if (nw < 0) return;
-  if (nw > 52) return;
-  _sfWeekOffset = nw;
-  loadShiftFleet();
-}
- 
- 
-function renderShiftFleet(d) {
-  var lbl = document.getElementById('sfWeekLabel');
-  if (lbl) {
-    if (_sfWeekOffset === 0) {
-      lbl.textContent = 'Aktuális hét';
-    } else {
-      var ws = new Date(d.week_start);
-      var we = new Date(ws); we.setDate(we.getDate() + 6);
-      var fmt = function(dt){ return dt.toLocaleDateString('hu-HU', {month:'short', day:'numeric'}); };
-      lbl.textContent = fmt(ws) + ' – ' + fmt(we);
-    }
-  }
-  document.getElementById('sfNextWeek').disabled = (_sfWeekOffset === 0);
-  var k = d.kpi || {};
-  document.getElementById('sfKpiActive').textContent    = k.active_count || 0;
-  document.getElementById('sfKpiPaused').textContent    = k.paused_count || 0;
-  document.getElementById('sfKpiRest').textContent      = k.rest_count || 0;
-  document.getElementById('sfKpiVacation').textContent  = k.vacation_count || 0;
-  document.getElementById('sfKpiActiveSub').textContent = (k.total_drivers || 0) + ' sofőrből';
-  document.getElementById('sfKpiRestSub').textContent   = (k.locked_count || 0) + ' zárolt';
-  renderComplianceChart(d.compliance || []);
-  renderRestChart(d.rest_avg || []);
-  renderFleetTable(d.fleet_status || []);
-  renderComplianceTable(d.compliance || []);
-  renderOvertimeAlerts(d.overtime_alerts || []);
-}
- 
-function renderComplianceChart(comp) {
-  var ctx = document.getElementById('sfChartCompliance');
-  if (!ctx || typeof Chart === 'undefined') return;
-  if (ctx._chart) ctx._chart.destroy();
-  var bgColors = comp.map(function(c){
-    var pct = parseFloat(c.weekly_hours) / 90 * 100;
-    return pct >= 80 ? 'rgba(239,68,68,0.7)' : pct >= 60 ? 'rgba(245,158,11,0.7)' : 'rgba(34,197,94,0.7)';
-  });
-  ctx._chart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: comp.map(function(c){ return c.nume; }),
-      datasets: [{ label:'óra', data: comp.map(function(c){ return parseFloat(c.weekly_hours)||0; }),
-        backgroundColor: bgColors, borderColor:'#1f2937', borderWidth:1 }]
-    },
-    options: {
-      indexAxis: 'y',
-      plugins: { legend:{display:false}, tooltip:{callbacks:{label:function(c){return c.parsed.x+' óra';}}} },
-      scales: { x:{ticks:{color:'#8a97a8'},title:{display:true,text:'óra (max 90)',color:'#8a97a8'},max:100},
-                y:{ticks:{color:'#8a97a8'}} }
-    }
-  });
-}
- 
- 
-function renderFleetTable(fleet) {
-  var tb = document.getElementById('sfFleetTblBody');
-  if (!fleet.length) { tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">Nincs sofőr.</td></tr>'; return; }
-  tb.innerHTML = fleet.map(function(f){
-    var statusBadge = renderStatusBadge(f.status, f.rest_type);
-    var current = f.current_active_hours
-      ? parseFloat(f.current_active_hours).toFixed(1)+' ó'
-      : (f.next_shift_start ? '↪ '+new Date(f.next_shift_start).toLocaleString('hu-HU',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—');
-    var weekIdx = f.shift_index_in_week || 0;
-    var weekH = parseFloat(f.weekly_hours_total||0).toFixed(1);
-    var note = '';
-    if (f.locked_until && new Date(f.locked_until) > new Date()) {
-      note = '🔒 zárolva '+new Date(f.locked_until).toLocaleString('hu-HU',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})+'-ig';
-    } else if (f.is_overtime) {
-      note = '<span style="color:#ef4444;">⚠️ túlóra</span>';
-    } else if (f.status==='PAUSED' && f.paused_at) {
-      var pmin = Math.floor((Date.now()-new Date(f.paused_at).getTime())/60000);
-      note = '⏰ '+pmin+' perce szünetel';
-    }
-    return '<tr>'+
-      '<td><b style="color:#fff;">'+esc(f.nume)+'</b><br><span style="font-size:11px;color:var(--muted);">'+esc(f.email)+'</span></td>'+
-      '<td>'+statusBadge+'</td><td>'+current+'</td>'+
-      '<td>'+(weekIdx ? weekIdx+'. nap' : '—')+'</td>'+
-      '<td>'+weekH+' ó</td><td style="font-size:12px;">'+note+'</td>'+
-    '</tr>';
-  }).join('');
-}
- 
- 
- 
-function renderOvertimeAlerts(alerts) {
-  var el = document.getElementById('sfOvertimeList');
-  if (!alerts.length) {
-    el.innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:14px;">Nincs túllépés az utolsó 14 napban. ✅</div>';
-    return;
-  }
-  el.innerHTML = alerts.map(function(a){
-    var day = new Date(a.day_started_at).toLocaleDateString('hu-HU');
-    var reason = a.overtime_reason ? esc(a.overtime_reason) : 'Indok nincs megadva';
-    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;'+
-           'padding:10px 14px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.3);'+
-           'border-radius:10px;margin-bottom:6px;flex-wrap:wrap;">'+
-             '<div>'+
-               '<b style="color:#fff;">'+esc(a.nume)+'</b> · '+
-               '<span style="color:var(--muted);font-size:12px;">'+day+'</span>'+
-               '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+reason+'</div>'+
-             '</div>'+
-             '<div style="color:#f87171;font-weight:800;font-size:15px;">'+parseFloat(a.active_hours).toFixed(1)+' ó</div>'+
-           '</div>';
-  }).join('');
-}
- 
-function sfDriverDrillDown(driverId, nume) {
-  toast('Részletes nézet ('+nume+') — fejlesztés alatt.', 'ok');
-}
  
  
 
-// ── Diurna statisztika ──────────────────────────────────────
-var _diurnaCache = [];
 
 // ── Dokumentum széria konfigurátor ───────────────────────
 
  
-window.addEventListener('load', function(){ sfStartPoll(); });
 
 

@@ -11,6 +11,22 @@ const BREVO_SENDER  = process.env.BREVO_SENDER || process.env.MAIL_USER;
 
 console.log('BREVO ready:', !!BREVO_API_KEY, '| sender:', BREVO_SENDER);
 
+// HTML-escape a sablonokba kerülő (felhasználó által megadható) értékekre —
+// egy cég-/usernév nem injektálhat markupot a VallorSoft-os levelekbe.
+function escHtml(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// fetch timeouttal — beragadt Brevo-kapcsolat ne tartsa fogva a user kérését.
+async function fetchT(url, init, ms = 15000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try { return await fetch(url, { ...init, signal: ctrl.signal }); }
+  finally { clearTimeout(t); }
+}
+
 async function sendInviteEmail(toEmail, kod, pozicio, cegNev, igazgatoNev) {
   console.log('sendInviteEmail called:', toEmail, !!BREVO_API_KEY);
   if (!BREVO_API_KEY || !BREVO_SENDER || !toEmail) {
@@ -18,7 +34,7 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, igazgatoNev) {
     return;
   }
   const registerUrl = process.env.APP_URL || 'http://localhost:3000';
-  const udvozles = igazgatoNev ? `Tisztelt ${igazgatoNev}!` : 'Tisztelt Partnerünk!';
+  const udvozles = igazgatoNev ? `Tisztelt ${escHtml(igazgatoNev)}!` : 'Tisztelt Partnerünk!';
   const html = `
         <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#05070b;color:#e9eef5;padding:32px;border-radius:16px;">
           <div style="font-size:24px;font-weight:800;margin-bottom:4px;">
@@ -30,7 +46,7 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, igazgatoNev) {
             A <b style="color:#fff;">VallorSoft</b> cégtől kapta ezt az emailt, előfizetésére vonatkozó meghívóval.
           </p>
           <p style="color:#8a97a8;margin-bottom:24px;">
-            ${cegNev ? `A <b style="color:#fff;">${cegNev}</b> cég számára` : 'Az Ön számára'} aktiválva lett a VallorSoft platform hozzáférés <b style="color:#fff;">${pozicio}</b> szerepkörben.
+            ${cegNev ? `A <b style="color:#fff;">${escHtml(cegNev)}</b> cég számára` : 'Az Ön számára'} aktiválva lett a VallorSoft platform hozzáférés <b style="color:#fff;">${escHtml(pozicio)}</b> szerepkörben.
           </p>
           <div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:20px;margin-bottom:24px;text-align:center;">
             <div style="font-size:12px;color:#8a97a8;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Meghívókódja</div>
@@ -50,7 +66,7 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, igazgatoNev) {
         </div>
       `;
   try {
-    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+    const resp = await fetchT('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
         'api-key': BREVO_API_KEY,
@@ -82,7 +98,7 @@ async function sendResetEmail(toEmail, nume, resetUrl) {
     console.log('early return - BREVO config vagy toEmail hianyzik');
     return;
   }
-  const udvozles = nume ? `Tisztelt ${nume}!` : 'Tisztelt Felhasználónk!';
+  const udvozles = nume ? `Tisztelt ${escHtml(nume)}!` : 'Tisztelt Felhasználónk!';
   const html = `
         <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#05070b;color:#e9eef5;padding:32px;border-radius:16px;">
           <div style="font-size:24px;font-weight:800;margin-bottom:4px;">
@@ -105,7 +121,7 @@ async function sendResetEmail(toEmail, nume, resetUrl) {
         </div>
       `;
   try {
-    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+    const resp = await fetchT('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
         'api-key': BREVO_API_KEY,
@@ -138,8 +154,10 @@ async function sendClientEmail(opts) {
   if (!BREVO_API_KEY || !BREVO_SENDER) return { ok: false, error: 'Nincs beállítva a BREVO_API_KEY / BREVO_SENDER (.env).' };
   if (!opts || !opts.to) return { ok: false, error: 'Hiányzik a címzett.' };
   const senderName = opts.senderName || 'VallorSoft';
-  const header = opts.logoUrl
-    ? `<img src="${opts.logoUrl}" alt="${senderName}" style="max-height:48px;max-width:220px;display:block;margin-bottom:16px;">`
+  // Logo csak biztonságos URL-sémával kerülhet a levélbe (markup-injektálás ellen)
+  const safeLogo = opts.logoUrl && /^(https?:\/\/|data:image\/)/i.test(String(opts.logoUrl)) ? String(opts.logoUrl) : null;
+  const header = safeLogo
+    ? `<img src="${escHtml(safeLogo)}" alt="${escHtml(senderName)}" style="max-height:48px;max-width:220px;display:block;margin-bottom:16px;">`
     : `<div style="font-size:24px;font-weight:800;margin-bottom:16px;"><span style="color:#0b0f14;">vallor</span><span style="color:#e10b1a;">Soft</span></div>`;
   const bodyHtml = (opts.html || '').trim();
   const html =
@@ -160,7 +178,7 @@ async function sendClientEmail(opts) {
       .map(a => ({ content: a.contentBase64, name: a.name }));
   }
   try {
-    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+    const resp = await fetchT('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
       body: JSON.stringify(payload),

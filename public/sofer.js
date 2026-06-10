@@ -2,6 +2,12 @@
 //  VallorSoft — sofer.js
 //  Kivágva a sofer.html inline <script> blokkjaiból, BÁJTRA AZONOS.
 // ============================================================
+// HTML-escape a szerverről jövő adatokhoz (tárolt XSS ellen)
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                      .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
 // ============================================================
 // SESSION STATE — oldal frissítés utáni visszaállítás
 // sessionStorage: csak ugyanazon a fülön él, új fülön üres
@@ -70,14 +76,10 @@ function draftSave() {
 
     stateSave({
       draft: {
-        fisa: document.getElementById('fFisa').value,
-        cursaSapt: document.getElementById('fCursaSapt').value,
         camion: document.getElementById('fCamion').value,
         remorca: document.getElementById('fRemorca').value,
         kmInc: document.getElementById('fKmInc').value,
         kmSf: document.getElementById('fKmSf').value,
-        diurnaEx: document.getElementById('fDiurnaEx').value,
-        diurnaIn: document.getElementById('fDiurnaIn').value,
         cantInc: document.getElementById('fCantInc').value,
         cantSf: document.getElementById('fCantSf').value,
         mentiuni: document.getElementById('fMentiuni').value,
@@ -93,14 +95,10 @@ function draftSave() {
 
 function draftRestore(draft) {
   if (!draft) return;
-  document.getElementById('fFisa').value = draft.fisa || '';
-  document.getElementById('fCursaSapt').value = draft.cursaSapt || '';
   document.getElementById('fCamion').value = draft.camion || '';
   document.getElementById('fRemorca').value = draft.remorca || '';
   document.getElementById('fKmInc').value = draft.kmInc || '0';
   document.getElementById('fKmSf').value = draft.kmSf || '0';
-  document.getElementById('fDiurnaEx').value = draft.diurnaEx || '0';
-  document.getElementById('fDiurnaIn').value = draft.diurnaIn || '0';
   document.getElementById('fCantInc').value = draft.cantInc || '0';
   document.getElementById('fCantSf').value = draft.cantSf || '0';
   document.getElementById('fMentiuni').value = draft.mentiuni || '';
@@ -157,23 +155,27 @@ function toast(m, k) {
 // ============================================================
 // NAVIGÁCIÓ
 // ============================================================
-var sections = ['dash','border','fuvar','docs','chat','shift'];;
+var sections = ['dash','border','fuvar','docs','chat'];
 
 function goSec(id) {
   sections.forEach(function(s) {
     document.getElementById('sec-' + s).classList.add('hidden');
   });
   var next = document.getElementById('sec-' + id);
+  if (!next) return;
   next.classList.remove('hidden');
   next.classList.add('sec-entering');
   setTimeout(function() { next.classList.remove('sec-entering'); }, 220);
+  next.scrollTop = 0;            // a panel belül görget (nem a body) — tetejére
   window.scrollTo({ top: 0, behavior: 'instant' });
+
+  // A 🐛 FAB (jobb alsó sarok) ütközne a chat küldés gombbal → chat nézetben elrejtjük
+  var fab = document.getElementById('bugFab');
+  if (fab) fab.style.display = (id === 'chat') ? 'none' : 'flex';
 
   stateSave({ sec: id });
   if (id === 'border') loadBorderLog();
   if (id === 'fuvar')  loadSoferOrders();
-  if (id === 'shift')  loadShiftState();
-  if (id !== 'shift' && _shiftTimer) { clearInterval(_shiftTimer); _shiftTimer = null; }
 }
 
 // ============================================================
@@ -242,10 +244,14 @@ function loadSoferOrders() {
   fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ functionName: 'getMySoferOrders' }) })
   .then(function(r) { return r.json(); }).then(function(d) {
-    _soferOrdersCache = d.result || [];
+    // Minden kiosztott fuvar, DE amiről már mentett menetlevél készült, az a
+    // mentéstől számított 3 nap után kiesik (waybill_visible — szerver számolja).
+    // Defenzív: ha a mező hiányzik (pl. régi, újra nem indított szerver), MUTASSUK
+    // a fuvart (csak az explicit false rejt) — így nem tűnnek el a fuvarok.
+    _soferOrdersCache = (d.result || []).filter(function(o) { return o.waybill_visible !== false; });
     var el = document.getElementById('soferOrderList');
     if (!_soferOrdersCache.length) {
-      el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Nincs hozzárendelt fuvar.</div>';
+      el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Nincs menetlevélre váró fuvar.</div>';
       return;
     }
     el.innerHTML = _soferOrdersCache.map(function(o) {
@@ -253,9 +259,9 @@ function loadSoferOrders() {
       return '<label style="display:flex;align-items:flex-start;gap:12px;background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;">'
         + '<input type="checkbox" value="' + o.id + '" ' + (checked ? 'checked' : '') + ' onchange="toggleOrderSel(this)" style="margin-top:3px;width:18px;height:18px;accent-color:#e10b1a;flex-shrink:0;">'
         + '<div>'
-        + '<div style="font-weight:700;font-size:14px;color:#fff;">' + (o.client || '—') + ' <span style="font-size:11px;color:var(--muted);">#' + o.id + '</span> <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,0.1);">' + (o.status||'—') + '</span></div>'
-        + '<div style="font-size:12px;color:var(--soft);margin-top:3px;">📍 ' + (o.loc_incarcare || '—') + ' → ' + (o.loc_descarcare || '—') + '</div>'
-        + (o.rendszam_camion ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">🚛 ' + o.rendszam_camion + (o.rendszam_remorca ? ' / ' + o.rendszam_remorca : '') + '</div>' : '')
+        + '<div style="font-weight:700;font-size:14px;color:#fff;">' + esc(o.client || '—') + ' <span style="font-size:11px;color:var(--muted);">#' + o.id + '</span> <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,0.1);">' + esc(o.status||'—') + '</span></div>'
+        + '<div style="font-size:12px;color:var(--soft);margin-top:3px;">📍 ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—') + '</div>'
+        + (o.rendszam_camion ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">🚛 ' + esc(o.rendszam_camion) + (o.rendszam_remorca ? ' / ' + esc(o.rendszam_remorca) : '') + '</div>' : '')
         + '</div></label>';
     }).join('');
   });
@@ -276,7 +282,7 @@ function fuvarStep2() {
   var sumEl = document.getElementById('selectedOrdersSummary');
   sumEl.innerHTML = '<b style="color:#fff;">✅ ' + selected.length + ' fuvar kiválasztva:</b><br>'
     + selected.map(function(o) {
-        return '• ' + (o.client || '—') + ': ' + (o.loc_incarcare || '—') + ' → ' + (o.loc_descarcare || '—');
+        return '• ' + esc(o.client || '—') + ': ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—');
       }).join('<br>');
 
   var first = selected[0];
@@ -311,7 +317,7 @@ function fuvarBackStep1() {
 
 // Input változások figyelése → piszkozat auto-mentés
 function attachDraftListeners() {
-  var ids = ['fCursaSapt','fCamion','fRemorca','fKmInc','fKmSf','fDiurnaEx','fDiurnaIn','fCantInc','fCantSf','fMentiuni'];
+  var ids = ['fCamion','fRemorca','fKmInc','fKmSf','fCantInc','fCantSf','fMentiuni'];
   ids.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) {
@@ -346,9 +352,9 @@ function addPunctRow(locVal, tipVal, dataVal) {
     + '<div class="field"><label>Tip punct</label><select class="input punct-tip" style="padding:10px 14px;" onchange="draftSave()">'
     + tipOptions.map(function(t) { return '<option' + (t === (tipVal || 'Încărcare') ? ' selected' : '') + '>' + t + '</option>'; }).join('')
     + '</select></div>'
-    + '<div class="field"><label>Dată</label><input class="input punct-data" type="date" value="' + (dataVal || today) + '" onchange="draftSave()"></div>'
+    + '<div class="field"><label>Dată</label><input class="input punct-data" type="date" value="' + esc(dataVal || today) + '" onchange="draftSave()"></div>'
     + '</div>'
-    + '<div class="field"><label>Localitate / Adresă</label><input class="input punct-loc" placeholder="pl. Budapest, Keleti pu." value="' + (locVal || '') + '" oninput="draftSave()"></div>';
+    + '<div class="field"><label>Localitate / Adresă</label><input class="input punct-loc" placeholder="pl. Budapest, Keleti pu." value="' + esc(locVal || '') + '" oninput="draftSave()"></div>';
   document.getElementById('puncteContainer').appendChild(d);
 }
 
@@ -438,15 +444,13 @@ function submitFuvarlevel() {
 
   var payload = {
     numarFisa: fisa,
-    cursaSaptamanii: document.getElementById('fCursaSapt').value,
     numarCamion: document.getElementById('fCamion').value,
     numarRemorca: document.getElementById('fRemorca').value,
     kmInceput: document.getElementById('fKmInc').value,
     kmSfarsit: document.getElementById('fKmSf').value,
     locPlecare: locPlecare,
     locSosire: locSosire,
-    diurnaExterna: document.getElementById('fDiurnaEx').value,
-    diurnaInterna: document.getElementById('fDiurnaIn').value,
+    // Diurna nem megy a payloadban — a szerver számolja a határátlépésekből
     cantInceput: document.getElementById('fCantInc').value,
     cantSfarsit: document.getElementById('fCantSf').value,
     alteMentiuni: document.getElementById('fMentiuni').value,
@@ -461,7 +465,7 @@ function submitFuvarlevel() {
     body: JSON.stringify(payload) })
   .then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
-      toast('✅ Menetlevél elküldve!', 'ok');
+      toast(d.docNumber ? ('✅ Menetlevél elküldve — ' + d.docNumber) : '✅ Menetlevél elküldve!', 'ok');
       draftClear();
       _selectedOrderIds = [];
       goSec('dash');
@@ -520,372 +524,6 @@ function uploadDoc() {
 
 
 // ============================================================
-// MŰSZAK (SHIFT) — STATE, TIMER, API
-// ============================================================
-var _shiftData        = null;   // legutolsó API adat
-var _shiftTimer       = null;   // setInterval: 1s timer a szekción
-var _shiftPoll        = null;   // setInterval: 30s polling
-var _showRestPicker   = false;  // lokális flag: nap zárása után REST picker látszik
- 
-// Polling indítása (szerver indítás után, és navigáció után)
-function startShiftPoll() {
-  if (_shiftPoll) clearInterval(_shiftPoll);
-  _shiftPoll = setInterval(loadShiftState, 30000);
-}
- 
-// ── Adatlekérés és renderelés ─────────────────────────────────
-function loadShiftState() {
-  fetch('/api/shift/current')
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if (!d.ok) return;
-      _shiftData = d.shift;
-      renderShiftBanner(d.shift, d.locked_until);
-      // Szekció csak akkor renderel, ha látható (vagy ha REST picker flag él)
-      var secVisible = !document.getElementById('sec-shift').classList.contains('hidden');
-      if (secVisible || _showRestPicker) {
-        renderShiftSection(d.shift, d.locked_until);
-      }
-    }).catch(function(){});
-}
- 
-// ── BANNER RENDERELÉS (főoldal kártya) ────────────────────────
-function renderShiftBanner(shift, lockedUntil) {
-  var banner  = document.getElementById('shiftBanner');
-  var label   = document.getElementById('scLabel');
-  var timer   = document.getElementById('scTimer');
-  var ico     = document.getElementById('scIco');
-  var sub     = document.getElementById('scSub');
-  var euWrap  = document.getElementById('scEuWrap');
-  var euFill  = document.getElementById('scEuFill');
-  if (!banner) return;
- 
-  // Osztályok reset
-  banner.className = 'shift-card';
- 
-  if (!shift) {
-    if (lockedUntil && new Date(lockedUntil) > new Date()) {
-      banner.classList.add('sc-locked');
-      label.textContent = '🔒 Heti zárolás';
-      timer.textContent = fmtCountdown(lockedUntil);
-      ico.textContent   = '🔒';
-      sub.textContent   = 'Koppints a részletekért';
-    } else {
-      label.textContent = 'Nincs aktív műszak';
-      timer.textContent = '▶ Indítás';
-      ico.textContent   = '🕐';
-      sub.textContent   = 'Koppints a nap kezdéséhez';
-    }
-    euWrap.style.display = 'none';
-    return;
-  }
- 
-  if (shift.status === 'ACTIVE') {
-    banner.classList.add('sc-active');
-    label.textContent = '🟢 Aktív műszak';
-    ico.textContent   = '🟢';
-    sub.textContent   = (shift.shift_index_in_week || 1) + '. nap · ' +
-                        parseFloat(shift.weekly_hours_total || 0).toFixed(1) + 'ó a héten';
-    euWrap.style.display = 'block';
-    updateEuFill(euFill, calcActiveH(shift));
-    timer.textContent = fmtSecs(calcActiveSecs(shift));
-  } else if (shift.status === 'PAUSED') {
-    banner.classList.add('sc-paused');
-    label.textContent = '⏸ Szünet';
-    ico.textContent   = '⏸';
-    sub.textContent   = 'Koppints a visszatéréshez';
-    timer.textContent = fmtSecs(calcPauseSecs(shift));
-    euWrap.style.display = 'none';
-  } else if (shift.status === 'REST') {
-    banner.classList.add('sc-rest');
-    label.textContent = '😴 Pihenő';
-    ico.textContent   = '😴';
-    timer.textContent = shift.rest_type === 'vacation' ? '🏖 Szabadság' : (shift.rest_type || '—');
-    sub.textContent   = shift.next_shift_start
-      ? 'Következő: ' + fmtDt(shift.next_shift_start)
-      : 'Koppints a részletekért';
-    euWrap.style.display = 'none';
-  }
-}
- 
-// ── SZEKCIÓ RENDERELÉS (sec-shift tartalom) ───────────────────
-function renderShiftSection(shift, lockedUntil) {
-  // Timer törlése (majd újra indul ha ACTIVE)
-  if (_shiftTimer) { clearInterval(_shiftTimer); _shiftTimer = null; }
- 
-  var actions     = document.getElementById('shiftActions');
-  var pausePanel  = document.getElementById('shiftPausePanel');
-  var restPanel   = document.getElementById('shiftRestPanel');
-  var lockedPanel = document.getElementById('shiftLockedPanel');
-  var statCard    = document.getElementById('shiftStatCard');
-  var secLabel    = document.getElementById('shiftSecLabel');
-  var secTimer    = document.getElementById('shiftSecTimer');
-  var weekLabel   = document.getElementById('shiftWeekLabel');
-  var weekVal     = document.getElementById('shiftWeekVal');
-  var euWrap      = document.getElementById('shiftSecEuWrap');
-  var euFill      = document.getElementById('shiftSecEuFill');
-  var euLegend    = document.getElementById('shiftEuLegend');
-  if (!actions) return;
- 
-  // Reset mindent
-  actions.innerHTML       = '';
-  pausePanel.style.display  = 'none';
-  restPanel.style.display   = 'none';
-  lockedPanel.style.display = 'none';
-  euWrap.style.display      = 'none';
-  euLegend.style.display    = 'none';
-  statCard.style.borderColor = 'var(--border-bright)';
- 
-  // ── LOCKED ─────────────────────────────────────────────────
-  if (!shift && lockedUntil && new Date(lockedUntil) > new Date()) {
-    secLabel.textContent = '🔒 HETI ZÁROLÁS';
-    secTimer.textContent = fmtCountdown(lockedUntil);
-    weekLabel.textContent = '';
-    weekVal.textContent   = '';
-    statCard.style.borderColor = 'rgba(239,68,68,0.45)';
-    lockedPanel.style.display  = 'block';
-    document.getElementById('shiftLockedText').textContent =
-      'Felszabadul: ' + fmtDt(lockedUntil);
-    _showRestPicker = false;
-    return;
-  }
- 
-  // ── REST PICKER — nap zárása után (lokális flag) ────────────
-  if (!shift && _showRestPicker) {
-    secLabel.textContent  = '⏹ NAP LEZÁRVA';
-    secTimer.textContent  = '😴';
-    weekLabel.textContent = 'Válassz pihenőt!';
-    weekVal.textContent   = '';
-    statCard.style.borderColor = 'rgba(59,130,246,0.45)';
-    restPanel.style.display    = 'block';
-    // Szabadság dátum default: holnap
-    var tom = new Date();
-    tom.setDate(tom.getDate() + 1);
-    document.getElementById('vacDate').value = tom.toISOString().split('T')[0];
-    return;
-  }
- 
-  // ── NINCS SHIFT ────────────────────────────────────────────
-  if (!shift) {
-    secLabel.textContent  = 'NINCS AKTÍV MŰSZAK';
-    secTimer.textContent  = '—';
-    weekLabel.textContent = '';
-    weekVal.textContent   = '';
-    actions.innerHTML =
-      '<button class="sh-btn start" style="width:100%;padding:22px;font-size:18px;" onclick="shiftStart()">' +
-      '▶ Nap kezdése</button>';
-    return;
-  }
- 
-  // Heti info (minden státusznál)
-  weekLabel.textContent = (shift.shift_index_in_week || 1) + '. nap a héten';
-  weekVal.textContent   = parseFloat(shift.weekly_hours_total || 0).toFixed(1) + ' ó';
- 
-  // ── ACTIVE ─────────────────────────────────────────────────
-  if (shift.status === 'ACTIVE') {
-    secLabel.textContent = '🟢 AKTÍV MŰSZAK';
-    statCard.style.borderColor = 'rgba(34,197,94,0.45)';
-    euWrap.style.display    = 'block';
-    euLegend.style.display  = 'flex';
-    updateEuFill(euFill, calcActiveH(shift));
-    // 1 mp-es timer
-    (function startT(){
-      secTimer.textContent = fmtSecs(calcActiveSecs(shift));
-      updateEuFill(euFill, calcActiveH(shift));
-      // banner timer is frissítése
-      var bt = document.getElementById('scTimer');
-      if (bt) bt.textContent = fmtSecs(calcActiveSecs(shift));
-      _shiftTimer = setInterval(function(){
-        secTimer.textContent = fmtSecs(calcActiveSecs(shift));
-        updateEuFill(euFill, calcActiveH(shift));
-        if (bt) bt.textContent = fmtSecs(calcActiveSecs(shift));
-      }, 1000);
-    })();
-    actions.innerHTML =
-      '<button class="sh-btn pause" onclick="shiftPause()">⏸ Szünet</button>' +
-      '<button class="sh-btn close" onclick="shiftCloseConfirm()">⏹ Nap zárása</button>';
-  }
- 
-  // ── PAUSED ─────────────────────────────────────────────────
-  else if (shift.status === 'PAUSED') {
-    secLabel.textContent = '⏸ SZÜNET';
-    statCard.style.borderColor = 'rgba(251,191,36,0.45)';
-    (function startPT(){
-      secTimer.textContent = fmtSecs(calcPauseSecs(shift));
-      _shiftTimer = setInterval(function(){
-        secTimer.textContent = fmtSecs(calcPauseSecs(shift));
-        var bt = document.getElementById('scTimer');
-        if (bt) bt.textContent = fmtSecs(calcPauseSecs(shift));
-      }, 1000);
-    })();
-    pausePanel.style.display = 'block';
-    actions.innerHTML =
-      '<button class="sh-btn close" style="width:100%;" onclick="shiftCloseConfirm()">' +
-      '⏹ Nap zárása szünetből</button>';
-  }
- 
-  // ── REST ───────────────────────────────────────────────────
-  else if (shift.status === 'REST') {
-    secLabel.textContent = '😴 PIHENŐ';
-    statCard.style.borderColor = 'rgba(59,130,246,0.45)';
-    secTimer.textContent = shift.next_shift_start ? fmtDt(shift.next_shift_start) : (shift.rest_type || '—');
-    weekLabel.textContent = (shift.shift_index_in_week || 1) + '. nap a héten';
-    actions.innerHTML = '<button class="sh-btn cancel" style="width:100%;margin-top:12px;" onclick="shiftCancelRest()">🗑 Pihenő megszüntetése</button>';
-  }
-}
- 
-// ── IDŐSZÁMÍTÁSOK ──────────────────────────────────────────────
-function calcActiveSecs(shift) {
-  if (!shift || !shift.day_started_at) return 0;
-  var elapsed = (Date.now() - new Date(shift.day_started_at).getTime()) / 1000;
-  var paused  = (shift.paused_total_minutes || 0) * 60;
-  if (shift.status === 'PAUSED' && shift.paused_at) {
-    paused += (Date.now() - new Date(shift.paused_at).getTime()) / 1000;
-  }
-  return Math.max(0, elapsed - paused);
-}
-function calcActiveH(shift)  { return calcActiveSecs(shift) / 3600; }
-function calcPauseSecs(shift) {
-  if (!shift || !shift.paused_at) return 0;
-  return Math.max(0, (Date.now() - new Date(shift.paused_at).getTime()) / 1000);
-}
- 
-// ── FORMÁZÓK ──────────────────────────────────────────────────
-function fmtSecs(s) {
-  var h = Math.floor(s/3600), m = Math.floor((s%3600)/60), ss = Math.floor(s%60);
-  return p2(h)+':'+p2(m)+':'+p2(ss);
-}
-function p2(n){ return n<10?'0'+n:''+n; }
-function fmtDt(iso) {
-  return new Date(iso).toLocaleString('hu-HU',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-}
-function fmtCountdown(iso) {
-  var diff = Math.max(0, new Date(iso).getTime() - Date.now());
-  var h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000);
-  return h+'ó '+m+'p';
-}
-function updateEuFill(el, h) {
-  if (!el) return;
-  var pct = Math.min(100, (h/15)*100);
-  el.style.width = pct+'%';
-  el.className = 'eu-fill' + (h>=13?' d':h>=11?' w':'');
-}
- 
-// ── API HÍVÁSOK ───────────────────────────────────────────────
-function shiftStart() {
-  fetch('/api/shift/start',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if (d.ok) {
-        toast('▶ Műszak elindítva!','ok');
-        _showRestPicker = false;
-        loadShiftState();
-      } else if (d.locked) {
-        toast('🔒 '+d.message,'err');
-        loadShiftState();
-      } else {
-        toast('Hiba: '+(d.message||'ismeretlen'),'err');
-      }
-    }).catch(function(){toast('Hálózati hiba','err');});
-}
- 
-function shiftPause() {
-  fetch('/api/shift/pause',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if (d.ok) { toast('⏸ Szünet elindítva','ok'); loadShiftState(); }
-      else { toast('Hiba: '+(d.message||''),'err'); }
-    });
-}
- 
-function shiftResume() {
-  fetch('/api/shift/resume',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if (d.ok) { toast('✅ Visszatértél a műszakba!','ok'); loadShiftState(); }
-      else { toast('Hiba: '+(d.message||''),'err'); }
-    });
-}
- 
-function shiftCloseConfirm() {
-  var a = document.getElementById('shiftActions');
-  if (!a) return;
-  a.innerHTML =
-    '<div style="width:100%;">' +
-    '<div style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:10px;">Biztosan lezárod a napot?</div>' +
-    '<div style="display:flex;gap:10px;">' +
-    '<button class="sh-btn confirm" style="flex:1;" onclick="shiftClose()">✅ Igen, lezárom</button>' +
-    '<button class="sh-btn cancel"  style="flex:1;" onclick="loadShiftState()">← Vissza</button>' +
-    '</div></div>';
-}
- 
-function shiftClose() {
-  fetch('/api/shift/close',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if (d.ok) {
-        if (d.is_overtime) toast('⚠️ Túllépte a 15 órás EU limitet!','err');
-        if (d.locked_until) toast('🔒 Heti zárolás aktív','err');
-        toast('⏹ Nap lezárva — válassz pihenőt!','ok');
-        _showRestPicker = true;
-        loadShiftState();
-      } else {
-        toast('Hiba: '+(d.message||''),'err');
-      }
-    });
-}
- 
-
-function shiftCancelRest() {
-  if (!confirm('Biztosan megszünteted a pihenőt? Ezután új műszakot indíthatsz.')) return;
-  fetch('/api/shift/cancel-rest', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if (d.ok) { toast('Pihenő törölve. Indíthatsz új műszakot.','ok'); loadShiftState(); }
-      else toast(d.message||'Hiba','err');
-    });
-}
-
-function shiftRest(type, hours) {
-  var body = {rest_type:type};
-  if (hours !== undefined) body.rest_hours = hours;
-  fetch('/api/shift/rest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if (d.ok) {
-        var ns = d.next_shift_start ? fmtDt(d.next_shift_start) : '—';
-        toast('😴 Pihenő beállítva. Értesítő: '+ns+' előtt.','ok');
-        _showRestPicker = false;
-        loadShiftState();
-      } else {
-        toast('Hiba: '+(d.message||''),'err');
-      }
-    });
-}
- 
-function shiftVacation() {
-  var dateVal = document.getElementById('vacDate').value;
-  var hourVal = parseInt(document.getElementById('vacHour').value);
-  if (!dateVal) { toast('Add meg a visszatérés dátumát!','err'); return; }
-  if (isNaN(hourVal)||hourVal<0||hourVal>23) { toast('Az óra 0–23 között legyen!','err'); return; }
-  var target = new Date(dateVal);
-  target.setHours(hourVal,0,0,0);
-  var hoursUntil = (target.getTime()-Date.now())/3600000;
-  if (hoursUntil<=0) { toast('A dátum a múltban van!','err'); return; }
-  shiftRest('vacation', parseFloat(hoursUntil.toFixed(1)));
-}
- 
-function shiftSnooze(hours) {
-  fetch('/api/shift/snooze-pause',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({snooze_hours:hours})})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if (d.ok) toast('⏰ Emlékeztető '+hours+' óra múlva.','ok');
-    });
-}
-
-
-// ============================================================
 // LOGOUT
 // ============================================================
 function logoutSofer() {
@@ -909,8 +547,6 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
   document.getElementById('meBadge').textContent = d.result.nume;
   if (window.VS_PUSH) VS_PUSH.init(d.result.email, d.result.pozicio);
     initFirebaseChat(d.result);
-    loadShiftState();
-    startShiftPoll();
     loadDashOrders();
 
   // ── Állapot visszaállítás ──
@@ -1175,40 +811,65 @@ function submitBugReport(){
 }
 
 // ── Kiosztott fuvarok a főoldalon ────────────────────────
+// A dashboard görgetését CSAK a #soferWrap-en kapcsoljuk (a body marad
+// overflow:hidden — ez az app-shell alapja). Van fuvar → görgethető dashboard.
+function updateScrollBehavior(orders) {
+  var wrap = document.getElementById('soferWrap');
+  if (!wrap) return;
+  if (orders && orders.length > 0) wrap.classList.add('scrollable');
+  else wrap.classList.remove('scrollable');
+}
+
+// Egy kiosztott fuvar kártyája — új .fuvar-card kinézet + MEGŐRZÖTT akciógombok.
+// Alocat → Elfogadom, In Curs → Elvégeztem, Finalizat → nincs státuszváltó (csak UIT).
+function renderFuvarCard(o) {
+  var isAlocat = o.status === 'Alocat';
+  var isCurs   = o.status === 'In Curs';
+  var isFinal  = o.status === 'Finalizat';
+  var statusCls = isAlocat ? 'warn' : 'ok';
+  var statusTxt = isFinal ? '✓ Teljesítve' : esc(o.status || 'Alocat');
+  var truck = o.rendszam_camion ? ('🚛 ' + esc(o.rendszam_camion) + (o.rendszam_remorca ? ' / ' + esc(o.rendszam_remorca) : '')) : '';
+  var actionBtn =
+      isAlocat ? '<button class="sh-btn resume"  onclick="driverOrderStatus(\'' + o.id + '\',\'In Curs\')">✅ Elfogadom</button>' :
+      isCurs   ? '<button class="sh-btn confirm" onclick="driverOrderStatus(\'' + o.id + '\',\'Finalizat\')">🏁 Elvégeztem</button>' :
+                 '';
+  return '' +
+    '<div class="fuvar-card">' +
+      '<div class="fuvar-destination">📍 ' + esc(o.loc_incarcare||'—') + ' → ' + esc(o.loc_descarcare||'—') + '</div>' +
+      '<div class="fuvar-meta">' +
+        '<span>#' + o.id + '</span>' +
+        (o.client ? '<span>' + esc(o.client) + '</span>' : '') +
+        (truck ? '<span>' + truck + '</span>' : '') +
+        '<span class="fuvar-status ' + statusCls + '">' + statusTxt + '</span>' +
+      '</div>' +
+      '<div class="fuvar-actions">' +
+        '<button class="sh-btn uit" onclick="SoferUit.open(\'' + o.id + '\')" title="UIT-kódok (RO e-Transport)">🚛 UIT</button>' +
+        actionBtn +
+      '</div>' +
+    '</div>';
+}
+
 function loadDashOrders() {
   fetch('/api/execute', { method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ functionName:'getMySoferOrders' }) })
   .then(function(r){ return r.json(); })
   .then(function(d){
     var list = d.result || [];
-    var el = document.getElementById('dashOrderList');
+    var el = document.getElementById('kiosztottList');
     if (!el) return;
-    var active = list.filter(function(o){ return o.status==='Alocat'||o.status==='In Curs'; });
+    // Dashboard: aktív (Alocat/In Curs) + Finalizat a teljesítéstől 3 napig (szerver számolja).
+    // Defenzív: ha a dash_visible mező hiányzik (régi, újra nem indított szerver),
+    // visszaesünk a státusz-alapú szűrésre — így a fuvarok nem tűnnek el.
+    var active = list.filter(function(o){
+      if (typeof o.dash_visible === 'boolean') return o.dash_visible;
+      return o.status === 'Alocat' || o.status === 'In Curs';
+    });
+    updateScrollBehavior(active);
     if (!active.length) {
-      el.innerHTML = '<div style="text-align:center;padding:12px 0;color:var(--muted);font-size:13px;">Nincs aktív kiosztott fuvar.</div>';
+      el.innerHTML = '<div class="kiosztott-empty">Nincs aktív kiosztott fuvar.</div>';
       return;
     }
-    el.innerHTML = active.map(function(o){
-      var isAlocat = o.status === 'Alocat';
-      var sc = isAlocat ? 'warn' : 'ok';
-      return '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;">'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'+
-          '<div style="font-weight:700;font-size:14px;color:#fff;">'+(o.client||'—')+
-            ' <span style="font-size:11px;color:var(--muted);">#'+o.id+'</span>'+
-          '</div>'+
-          '<span class="badge '+sc+'">'+o.status+'</span>'+
-        '</div>'+
-        '<div style="font-size:12px;color:var(--soft);margin-bottom:10px;">'+
-          '📍 '+(o.loc_incarcare||'—')+' → '+(o.loc_descarcare||'—')+
-        '</div>'+
-        (o.rendszam_camion ? '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">🚛 '+o.rendszam_camion+(o.rendszam_remorca?' / '+o.rendszam_remorca:'')+'</div>' : '')+
-        '<div style="display:flex;gap:8px;">'+
-          '<button class="sh-btn" style="flex:0 0 auto;padding:13px 12px;font-size:13px;background:rgba(255,255,255,.08);border:1px solid var(--border);color:#fff;" onclick="SoferUit.open(\''+o.id+'\')" title="UIT-kódok (RO e-Transport)">🚛 UIT</button>'+
-          (isAlocat ? '<button class="sh-btn resume" style="flex:1;padding:13px 8px;font-size:13px;" onclick="driverOrderStatus(\''+o.id+'\',\'In Curs\')">✅ Elfogadom</button>' : '')+
-          (!isAlocat ? '<button class="sh-btn confirm" style="flex:1;padding:13px 8px;font-size:13px;" onclick="driverOrderStatus(\''+o.id+'\',\'Finalizat\')">🏁 Elvégeztem</button>' : '')+
-        '</div>'+
-      '</div>';
-    }).join('');
+    el.innerHTML = active.map(renderFuvarCard).join('');
   });
 }
 

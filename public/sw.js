@@ -1,4 +1,4 @@
-const CACHE = 'vallorsoft-v3';      // verzió bump → kényszeríti a frissülést
+const CACHE = 'vallorsoft-v5';      // verzió bump → kényszeríti a frissülést
 const PRECACHE = ['/style.css'];    // '/sofer' KIVÉVE (auth-védett, megbuktatja az install-t)
 
 self.addEventListener('install', e => {
@@ -21,6 +21,12 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;     // POST/stb. nem cache-elhető
   if (e.request.url.includes('/api/')) return;
+  // CSAK azonos-eredetű kéréseket kezelünk. A külső csempék (CARTO/HERE),
+  // a Leaflet/pdf.js CDN (cdnjs) és a Firebase menjenek KÖZVETLENÜL a böngészőn
+  // keresztül — különben a SW elronthatja a térkép-csempék / CDN betöltését.
+  let sameOrigin = false;
+  try { sameOrigin = new URL(e.request.url).origin === self.location.origin; } catch (_) {}
+  if (!sameOrigin) return;
   e.respondWith(
     fetch(e.request).catch(() =>
       caches.match(e.request).then(c => c || Response.error())  // ne adjon vissza undefined-et

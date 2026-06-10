@@ -5,6 +5,7 @@
 //  Hívás: handlers.<funkcioNev>(req, res, args)
 // ============================================================
 const pool = require('../db');
+const { genDocId } = require('../lib/ids');
 
 const handlers = {};
 
@@ -39,22 +40,24 @@ handlers.comList = async function (req, res, args) {
       if (!req.session.user) return res.json({ result: [] });
       const me = req.session.user;
       const cid = me.company_id;
-      // Kozos subquery: order_legs aggregacio (szakaszok szama + reszletek)
+      // Kozos subquery: order_legs aggregacio (szakaszok szama + reszletek).
+      // LATERAL: csak az adott fuvar labait aggregalja (hasznalja az
+      // idx_order_legs_order indexet) — a korabbi valtozat a TELJES
+      // order_legs tablat aggregalta minden hivasnal.
       const legsSubquery = `
-        LEFT JOIN (
-          SELECT order_id,
-                 COUNT(*)::int AS leg_count,
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*)::int AS leg_count,
                  JSON_AGG(
                    JSON_BUILD_OBJECT(
-                     'leg_number',    leg_number,
-                     'sofer',         COALESCE(nume_sofer, email_sofer, firma_extern, '—'),
-                     'rendszam',      COALESCE(rendszam_camion, ''),
-                     'loc_preluare',  COALESCE(loc_preluare, '')
-                   ) ORDER BY leg_number
+                     'leg_number',    l.leg_number,
+                     'sofer',         COALESCE(l.nume_sofer, l.email_sofer, l.firma_extern, '—'),
+                     'rendszam',      COALESCE(l.rendszam_camion, ''),
+                     'loc_preluare',  COALESCE(l.loc_preluare, '')
+                   ) ORDER BY l.leg_number
                  ) AS legs_json
-          FROM order_legs
-          GROUP BY order_id
-        ) legs ON legs.order_id = o.id`;
+          FROM order_legs l
+          WHERE l.order_id = o.id
+        ) legs ON true`;
       let r;
       if (me.pozicio === 'Admin' || me.pozicio === 'Manager') {
         r = await pool.query(
@@ -64,7 +67,7 @@ handlers.comList = async function (req, res, args) {
                   COALESCE(legs.leg_count, 0) AS leg_count,
                   COALESCE(legs.legs_json, '[]'::json) AS legs_json
            FROM orders o ${legsSubquery}
-           WHERE o.company_id = $1 ORDER BY o.created_at DESC`,
+           WHERE o.company_id = $1 ORDER BY o.created_at DESC LIMIT 500`,
           [cid]
         );
       } else {
@@ -77,7 +80,7 @@ handlers.comList = async function (req, res, args) {
                   COALESCE(legs.legs_json, '[]'::json) AS legs_json
            FROM orders o ${legsSubquery}
            WHERE o.company_id = $1 AND LOWER(o.email_sofer) = LOWER($2)
-           ORDER BY o.created_at DESC`,
+           ORDER BY o.created_at DESC LIMIT 500`,
           [cid, me.email]
         );
       }
@@ -92,11 +95,32 @@ handlers.getMySoferOrders = async function (req, res, args) {
     try {
       if (!req.session.user) return res.json({ result: [] });
       const me = req.session.user;
+      // finalized_at: a Finalizat időbélyege (3-napos dashboard-kiöregítés).
+      // waybill_at: a legkorábbi mentett menetlevél dátuma, amin szerepel a fuvar
+      //   (a fuvarlevelek.order_ids JSONB tömb tartalmazza-e a fuvar id-jét).
+      // dash_visible: aktív (Alocat/In Curs) VAGY Finalizat a teljesítéstől max 3 napig.
+      // waybill_visible: minden kiosztott fuvar, DE a mentett menetlevél után csak 3 napig.
       const r = await pool.query(
-        `SELECT id, client, ref, loc_incarcare, loc_descarcare, km, rendszam_camion, rendszam_remorca, status
-         FROM orders
-         WHERE company_id = $1 AND LOWER(email_sofer) = LOWER($2)
-         ORDER BY created_at DESC`,
+        `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare, o.km,
+                o.rendszam_camion, o.rendszam_remorca, o.status,
+                o.finalized_at, wb.waybill_at,
+                (
+                  o.status IN ('Alocat', 'In Curs')
+                  OR (o.status = 'Finalizat'
+                      AND COALESCE(o.finalized_at, o.updated_at) >= NOW() - INTERVAL '3 days')
+                ) AS dash_visible,
+                (
+                  wb.waybill_at IS NULL
+                  OR wb.waybill_at >= NOW() - INTERVAL '3 days'
+                ) AS waybill_visible
+           FROM orders o
+           LEFT JOIN LATERAL (
+             SELECT MIN(f.data_completare) AS waybill_at
+               FROM fuvarlevelek f
+              WHERE f.order_ids ? o.id::text -- a ? operátor használja a GIN indexet (a jsonb_exists nem)
+           ) wb ON true
+          WHERE o.company_id = $1 AND LOWER(o.email_sofer) = LOWER($2)
+          ORDER BY o.created_at DESC`,
         [me.company_id, me.email]
       );
       return res.json({ result: r.rows });
@@ -113,7 +137,7 @@ handlers.comCreate = async function (req, res, args) {
       }
 
       const o = args[0] || {};
-      const id = "CMD-" + Math.floor(1000 + Math.random() * 9000);
+      const id = genDocId('CMD');
       const client = String(o.client || '').trim();
       const ref = String(o.ref || '').trim();
       const pret = Number(o.pret || 0);
@@ -136,39 +160,51 @@ handlers.comCreate = async function (req, res, args) {
       if (sofer_type === 'Intern' && email_sofer) status = 'Alocat';
       else if (sofer_type === 'Extern') status = 'Extern';
 
-      await pool.query(
-        `INSERT INTO orders (
-          id, client, ref, loc_incarcare, loc_descarcare,
-          data_incarcare, data_descarcare, pret, km,
-          sofer_type, email_sofer, nume_sofer,
-          firma_extern, telefon_extern, external_driver_id,
-          rendszam_camion, rendszam_remorca, status, company_id
-        ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
-        )`,
-        [
-          id, client, ref, loc_incarcare, loc_descarcare,
-          data_incarcare, data_descarcare, pret, km,
-          sofer_type, email_sofer, nume_sofer,
-          firma_extern, telefon_extern, external_driver_id,
-          rendszam_camion, rendszam_remorca, status, company_id
-        ]
-      );
+      // Tranzakció: a fuvar és az első láb együtt jöjjön létre — láb nélküli
+      // fuvar ne maradhasson, ha a második INSERT elszáll.
+      const dbc = await pool.connect();
+      try {
+        await dbc.query('BEGIN');
+        await dbc.query(
+          `INSERT INTO orders (
+            id, client, ref, loc_incarcare, loc_descarcare,
+            data_incarcare, data_descarcare, pret, km,
+            sofer_type, email_sofer, nume_sofer,
+            firma_extern, telefon_extern, external_driver_id,
+            rendszam_camion, rendszam_remorca, status, company_id
+          ) VALUES (
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
+          )`,
+          [
+            id, client, ref, loc_incarcare, loc_descarcare,
+            data_incarcare, data_descarcare, pret, km,
+            sofer_type, email_sofer, nume_sofer,
+            firma_extern, telefon_extern, external_driver_id,
+            rendszam_camion, rendszam_remorca, status, company_id
+          ]
+        );
 
-      await pool.query(
-        `INSERT INTO order_legs (
-          order_id, leg_number, sofer_type, email_sofer, nume_sofer,
-          firma_extern, telefon_extern, external_driver_id,
-          rendszam_camion, rendszam_remorca,
-          loc_preluare, data_preluare, company_id
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-        [
-          id, 1, sofer_type, email_sofer, nume_sofer,
-          firma_extern, telefon_extern, external_driver_id,
-          rendszam_camion, rendszam_remorca,
-          loc_incarcare, data_incarcare, company_id
-        ]
-      );
+        await dbc.query(
+          `INSERT INTO order_legs (
+            order_id, leg_number, sofer_type, email_sofer, nume_sofer,
+            firma_extern, telefon_extern, external_driver_id,
+            rendszam_camion, rendszam_remorca,
+            loc_preluare, data_preluare, company_id
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          [
+            id, 1, sofer_type, email_sofer, nume_sofer,
+            firma_extern, telefon_extern, external_driver_id,
+            rendszam_camion, rendszam_remorca,
+            loc_incarcare, data_incarcare, company_id
+          ]
+        );
+        await dbc.query('COMMIT');
+      } catch (txErr) {
+        await dbc.query('ROLLBACK').catch(() => {});
+        throw txErr;
+      } finally {
+        dbc.release();
+      }
 
       return res.json({ result: { ok: true, id: id } });
     } catch (err) {

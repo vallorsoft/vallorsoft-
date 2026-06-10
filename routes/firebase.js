@@ -6,6 +6,7 @@ const express = require('express');
 const router = express.Router();
 const { requireLogin } = require('../middleware/auth');
 const fbAdmin = require('../services/firebase');
+const { logHereTransaction } = require('../lib/hereUsage');
 
 router.get('/api/firebase-config', requireLogin, (req, res) => {
   const pozicio = req.session.user.pozicio;
@@ -22,6 +23,42 @@ router.get('/api/firebase-config', requireLogin, (req, res) => {
     projectId:     process.env.FIREBASE_PROJECT_ID     || null,
     appId:         process.env.FIREBASE_APP_ID         || null,
   });
+});
+
+// HERE Maps kliens-konfiguracio — csak az API kulcsot adja vissza a terkep-csempekhez.
+// A kulcs SOHA nem kerul kozvetlenul HTML-be/kliens JS-be, csak innen toltodik.
+// Térkép-betöltésenkénti BECSÜLT csempeszám. A csempéket a böngésző közvetlenül
+// a HERE-től tölti (a szerver nem proxyzza), ezért pontos szerveroldali mérés
+// nem lehetséges — a becslés env-ből hangolható (HERE_TILE_EST_PER_LOAD).
+// FIGYELEM: ebből EUR-számla készülhet, a developer-felületen az árazásnál
+// ezt becslésként kell kommunikálni.
+const TILE_EST_PER_LOAD = Math.max(0, parseInt(process.env.HERE_TILE_EST_PER_LOAD || '20', 10) || 0);
+
+router.get('/api/here-config', requireLogin, (req, res) => {
+  const apiKey = process.env.HERE_API_KEY || null;
+  if (apiKey && TILE_EST_PER_LOAD) logHereTransaction('raster_tile', TILE_EST_PER_LOAD, req.session.user.company_id, req.session.user.id);
+  res.json({ apiKey });
+});
+
+// HERE cim-autocomplete (proxy) — a kulcs szerver oldalon marad.
+router.get('/api/here-autocomplete', requireLogin, async (req, res) => {
+  const apiKey = process.env.HERE_API_KEY;
+  const q = (req.query.q || '').trim();
+  if (!apiKey || q.length < 3) return res.json({ items: [] });
+  try {
+    const url = 'https://autocomplete.search.hereapi.com/v1/autocomplete?q=' +
+      encodeURIComponent(q) + '&limit=6&lang=ro,hu,en&apiKey=' + encodeURIComponent(apiKey);
+    const r = await fetch(url);
+    const d = await r.json().catch(() => ({}));
+    const items = (d.items || []).map((it) => ({
+      label: (it.address && it.address.label) || it.title || '',
+      title: it.title || '',
+    })).filter((it) => it.label);
+    logHereTransaction('autocomplete', 1, req.session.user.company_id, req.session.user.id);
+    res.json({ items });
+  } catch (e) {
+    res.json({ items: [] });
+  }
 });
 
 // Firebase Custom Token - a chat hitelesiteshez (company_id custom claim)

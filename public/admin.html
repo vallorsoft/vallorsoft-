@@ -1,17 +1,24 @@
 <!DOCTYPE html>
-<html>
+<html lang="hu">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>vallorSoft - Admin Console</title>
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=20260610">
+   <!-- Inter betutipus (Google Fonts) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+   <!-- Leaflet (terkep) — cdnjs (CSP-kompatibilis; az unpkg nincs engedelyezve) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
    <!-- PDF megjelenites (PDF.js) es PDF keszites (pdf-lib) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-  <script src="/push-client.js"></script>
-  <script src="/session-guard.js"></script>
+  <script src="/push-client.js?v=20260610"></script>
+  <script src="/session-guard.js?v=20260610"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -43,7 +50,7 @@
       </div>
       <div class="tab" data-tab="received-fuv">Fuvarlevelek</div>
             <div class="tab" data-tab="driver-docs-pane">Feltöltött Iratok & CMR-ek</div>
-      <div class="tab" data-tab="shift-fleet">📊 Műszak & Munkaidő</div>
+      <a href="/utvonaltervezes" class="tab-link">Útvonaltervezés</a>
     </div>
     <div class="menu-group" id="userMenuGroup">
       <div class="menu-title">Adminisztráció</div>
@@ -55,8 +62,8 @@
         <div class="sub-tab" data-tab="external-drivers">Külső sofőrök</div>
         <div class="sub-tab" data-tab="vehicles">Járművek</div>
       </div>
-      <div class="tab" data-tab="clients">🏢 Ügyfelek</div>
-      <div class="tab" data-tab="integrations">🔌 Integrációk</div>
+      <div class="tab" data-tab="clients">Ügyfelek</div>
+      <div class="tab" data-tab="integrations">Integrációk</div>
       <div class="tab" data-tab="signature">Aláírás és Bélyegző</div>
     </div>
     <div class="menu-group">
@@ -64,7 +71,7 @@
       <div class="tab" data-tab="chat">Belső Chat</div>
     </div>
     <div class="menu-group" style="margin-top:auto;">
-      <div class="tab" data-tab="settings" style="display:flex;align-items:center;gap:8px;">⚙️ Beállítások</div>
+      <div class="tab" data-tab="settings">Beállítások</div>
     </div>
     <div style="padding:10px 12px; border-top:1px solid var(--border); margin-top:8px;">
       <div id="meBadge" style="font-size:12px; color:var(--muted); margin-bottom:10px;">—</div>
@@ -72,50 +79,68 @@
     </div>
   </div>
 
-  <div class="main-content">
+  <div class="main-content" id="mainContent" data-theme="dark">
+  <script>try{var _vsT=localStorage.getItem('vs-theme');if(_vsT==='light'||_vsT==='dark')document.getElementById('mainContent').setAttribute('data-theme',_vsT);}catch(e){}</script>
 
     <div class="pane" data-pane="dash">
-      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-      <div style="margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+       <!-- Felső sáv: cégnév + téma váltó -->
+      <div class="dash-topbar">
         <div>
-          <div style="font-size:22px; font-weight:800; color:#fff;" id="dashCegNev">—</div>
-          <div style="font-size:12px; color:var(--muted);">Cég dashboard</div>
+          <div class="text-primary" style="font-size:22px; font-weight:800;" id="dashCegNev">—</div>
+          <div class="text-muted" style="font-size:12px;">Cég dashboard</div>
+        </div>
+        <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Világos mód" aria-label="Téma váltása">🌙</button>
+      </div>
+
+       <!-- Stat kártyák -->
+      <div class="dash-stats" style="margin-bottom:20px;">
+        <div class="glass stat-tile">
+          <div class="stat-ico">📦</div>
+          <div><div class="stat-val text-primary" id="kpiTotal">—</div><div class="stat-lbl text-muted">Összes fuvar</div></div>
+        </div>
+        <div class="glass stat-tile">
+          <div class="stat-ico">🚚</div>
+          <div><div class="stat-val text-primary" id="kpiAktiv">—</div><div class="stat-lbl text-muted">Aktív fuvar</div></div>
+        </div>
+        <div class="glass stat-tile">
+          <div class="stat-ico">👥</div>
+          <div><div class="stat-val text-primary" id="cUsers">—</div><div class="stat-lbl text-muted">Felhasználók</div></div>
+        </div>
+        <div class="glass stat-tile">
+          <div class="stat-ico">📄</div>
+          <div><div class="stat-val text-primary" id="countFuv">—</div><div class="stat-lbl text-muted">Beérkezett menetlevelek</div></div>
         </div>
       </div>
-      <div class="grid-4" style="margin-bottom:20px;">
-        <div class="glass" style="padding:18px;">
-          <div style="font-size:12px;color:var(--muted);">Összes fuvar</div>
-          <div id="kpiTotal" style="font-size:32px;font-weight:800;">—</div>
+
+       <!-- Fő tartalom: 2 oszlop (lista + térkép) -->
+      <div class="dash-grid">
+        <div class="dash-col-left">
+           <!-- Legutóbbi fuvarok -->
+          <div class="glass" style="padding:18px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <div class="text-primary" style="font-size:15px;font-weight:700;">Legutóbbi fuvarok</div>
+              <span class="dash-link" onclick="activateTab('orders-list')">Összes fuvar →</span>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="table" id="dashRecentOrders">
+                <thead><tr><th>Fuvar</th><th>Úticél</th><th>Sofőr</th><th>Státusz</th><th>Dátum</th></tr></thead>
+                <tbody id="dashRecentOrdersBody">
+                  <tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">Betöltés...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+           <!-- Jármű státusz összesítő -->
+          <div class="glass" style="padding:18px;">
+            <div class="text-primary" style="font-size:15px;font-weight:700;margin-bottom:12px;">Jármű státusz</div>
+            <div class="dash-veh-grid" id="dashVehicleSummary">
+              <div class="dash-mini glass-soft"><div class="text-muted" style="font-size:11px;">Betöltés...</div></div>
+            </div>
+          </div>
         </div>
-        <div class="glass" style="padding:18px;">
-          <div style="font-size:12px;color:var(--muted);">Aktív fuvar</div>
-          <div id="kpiAktiv" style="font-size:32px;font-weight:800;color:var(--ok);">—</div>
-        </div>
-        <div class="glass" style="padding:18px;">
-          <div style="font-size:12px;color:var(--muted);">Felhasználók</div>
-          <div id="cUsers" style="font-size:32px;font-weight:800;">—</div>
-        </div>
-        <div class="glass" style="padding:18px;">
-          <div style="font-size:12px;color:var(--muted);">Beérkezett menetlevelek</div>
-          <div id="countFuv" style="font-size:32px;font-weight:800;">—</div>
-        </div>
-      </div>
-      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
-        <div class="glass" style="padding:16px;">
-          <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:10px;">Fuvarok státusz szerint</div>
-          <canvas id="chartStatusz" height="180"></canvas>
-        </div>
-        <div class="glass" style="padding:16px;">
-          <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:10px;">Havi bevétel (EUR)</div>
-          <canvas id="chartBevetel" height="180"></canvas>
-        </div>
-        <div class="glass" style="padding:16px;">
-          <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:10px;">Sofőrök km összesítő</div>
-          <canvas id="chartKm" height="180"></canvas>
-        </div>
-        <div class="glass" style="padding:16px;">
-          <div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:10px;">Járművek kihasználtsága</div>
-          <canvas id="chartJarmu" height="180"></canvas>
+         <!-- Térkép panel -->
+        <div class="glass dash-map-wrap">
+          <div id="dashMap"></div>
         </div>
       </div>
     </div>
@@ -240,133 +265,12 @@
       <div class="glass" style="padding:22px">
         <h2 class="h-title">Fuvarlevelek</h2>
         <table class="table" id="tblReceivedFuv">
-          <thead><tr><th>Fájlnév</th><th>Sofőr</th><th>Beküldés ideje</th><th>Művelet</th></tr></thead>
+          <thead><tr><th>Sorszám</th><th>Fájlnév</th><th>Sofőr</th><th>Beküldés ideje</th><th>Művelet</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
     </div>
 
-     <!-- ====== MŰSZAK & MUNKAIDŐ ====== -->
-    <div class="pane hidden" data-pane="shift-fleet">
- 
-       <!-- Fejléc + hét navigátor -->
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px;">
-        <div>
-          <h2 class="h-title" style="margin:0;">📊 Műszak & Munkaidő</h2>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">EU 561/2006 compliance + valós idejű flotta státusz</div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <button class="btn ghost" id="sfPrevWeek" onclick="shiftFleetWeek(1)" style="padding:6px 14px;">‹</button>
-          <span id="sfWeekLabel" style="font-size:13px;color:#fff;font-weight:600;min-width:160px;text-align:center;">—</span>
-          <button class="btn ghost" id="sfNextWeek" onclick="shiftFleetWeek(-1)" style="padding:6px 14px;">›</button>
-        </div>
-      </div>
- 
-       <!-- KPI kártyák -->
-      <div class="grid-4" style="margin-bottom:18px;">
-        <div class="glass" style="padding:18px;border-left:3px solid #22c55e;">
-          <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;">🟢 Aktív</div>
-          <div id="sfKpiActive" style="font-size:30px;font-weight:800;color:#22c55e;">—</div>
-          <div style="font-size:11px;color:var(--muted);" id="sfKpiActiveSub">most dolgozik</div>
-        </div>
-        <div class="glass" style="padding:18px;border-left:3px solid #fbbf24;">
-          <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;">⏸ Szünet</div>
-          <div id="sfKpiPaused" style="font-size:30px;font-weight:800;color:#fbbf24;">—</div>
-          <div style="font-size:11px;color:var(--muted);">éppen szünetel</div>
-        </div>
-        <div class="glass" style="padding:18px;border-left:3px solid #3b82f6;">
-          <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;">😴 Pihenő</div>
-          <div id="sfKpiRest" style="font-size:30px;font-weight:800;color:#3b82f6;">—</div>
-          <div style="font-size:11px;color:var(--muted);" id="sfKpiRestSub">pihenőben</div>
-        </div>
-        <div class="glass" style="padding:18px;border-left:3px solid #a855f7;">
-          <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;">🏖 Szabadság</div>
-          <div id="sfKpiVacation" style="font-size:30px;font-weight:800;color:#a855f7;">—</div>
-          <div style="font-size:11px;color:var(--muted);">szabadságon</div>
-        </div>
-      </div>
- 
-       <!-- Grafikonok -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-        <div class="glass" style="padding:16px;">
-          <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;">Heti munkaidő (compliance EU 561)</div>
-          <canvas id="sfChartCompliance" height="180"></canvas>
-        </div>
-        <div class="glass" style="padding:16px;">
-          <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;">Átlagos pihenő hossz (30 nap)</div>
-          <canvas id="sfChartRest" height="180"></canvas>
-        </div>
-      </div>
- 
-       <!-- Flotta státusz tábla -->
-      <div class="glass" style="padding:18px;margin-bottom:14px;">
-        <h3 style="margin:0 0 12px;font-size:15px;">🚛 Flotta valós idejű státusz</h3>
-        <div style="overflow-x:auto;">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Sofőr</th><th>Státusz</th><th>Aktuális</th>
-                <th>Heti nap</th><th>Heti óra</th><th>Megjegyzés</th>
-              </tr>
-            </thead>
-            <tbody id="sfFleetTblBody"></tbody>
-          </table>
-        </div>
-      </div>
- 
-       <!-- Heti compliance tábla -->
-      <div class="glass" style="padding:18px;margin-bottom:14px;">
-        <h3 style="margin:0 0 12px;font-size:15px;">📋 Heti munkaidő — minden sofőr</h3>
-        <div style="overflow-x:auto;">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Sofőr</th><th>Munkaórák</th><th>EU 561 %</th>
-                <th>Munkanapok</th><th>Túlóra</th><th>Művelet</th>
-              </tr>
-            </thead>
-            <tbody id="sfComplianceTblBody"></tbody>
-          </table>
-        </div>
-      </div>
- 
-       <!-- Túllépés riasztások -->
-      <div class="glass" style="padding:18px;">
-        <h3 style="margin:0 0 12px;font-size:15px;">⚠️ Túllépés riasztások (utolsó 14 nap)</h3>
-        <div id="sfOvertimeList"></div>
-      </div>
-
-      <!-- ── Diurna statisztika sofőrönként ── -->
-      <div class="glass" style="padding:18px;margin-top:14px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <h3 style="margin:0;font-size:15px;">🌍 Diurna összesítő — sofőrönként</h3>
-          <button class="btn ghost" style="padding:5px 12px;font-size:12px;" onclick="loadDiurnaStats()">🔄 Frissítés</button>
-        </div>
-        <div style="overflow-x:auto;">
-          <table class="table">
-            <thead><tr>
-              <th>Sofőr</th>
-              <th>Extern napok</th>
-              <th>Intern napok</th>
-              <th>Össz. külföldi nap</th>
-              <th>Részletek</th>
-            </tr></thead>
-            <tbody id="sfDiurnaTblBody">
-              <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <!-- ── Diurna részletek modal ── -->
-      <div class="modal-back" id="diurnaModal">
-        <div class="modal glass" style="width:min(600px,100%);max-height:80vh;overflow-y:auto;">
-          <h3 style="margin-top:0;" id="diurnaModalTitle">Diurna részletek</h3>
-          <div id="diurnaModalBody"></div>
-          <button class="btn ghost" style="margin-top:14px;" onclick="document.getElementById('diurnaModal').classList.remove('open')">Bezárás</button>
-        </div>
-      </div>
-
-    </div>
  
  
     <div class="pane hidden" data-pane="driver-docs-pane">
@@ -391,7 +295,6 @@
         </div>
       </div>
     </div>
-    <!-- GPS határnapló szekció eltávolítva - adatok a Műszak & Munkaidő / Diurna szekcióban -->
 
 
     <div class="pane hidden" data-pane="users">
@@ -588,7 +491,15 @@
       <div style="max-width:920px;">
         <h2 class="h-title" style="margin-top:0;">🔌 Integrációk</h2>
         <p style="color:var(--muted);font-size:13px;margin:0 0 16px;">Számlázó és GPS/flotta szolgáltatások. A hitelesítő kulcsokat a szerver titkosítva tárolja — sosem kerülnek vissza nyílt szövegként a böngészőbe.</p>
-        <div id="invCardBox" style="margin-bottom:20px;"></div>
+        <div id="emailIntakeCardBox" style="margin-bottom:28px;"></div>
+
+        <!-- ── SZÁMLÁZÁS (fuvar → ügyfél) ── -->
+        <h3 style="font-size:16px;margin:0 0 4px;color:var(--text-primary);">🧾 Fuvar-számlázás — ügyfeleknek</h3>
+        <p style="color:var(--muted);font-size:13px;margin:0 0 14px;">Ezt használja a fuvarok melletti <b>🧾</b> gomb: ezzel állítasz ki (és stornózol) számlát az ügyfeleidnek a fuvarokból. A hitelesítő adatokat a szerver titkosítva tárolja.</p>
+        <div id="invCardBox" style="margin-bottom:28px;"></div>
+
+        <!-- ── GPS / FLOTTA ── -->
+        <h3 style="font-size:16px;margin:0 0 12px;color:var(--text-primary);">🛰️ GPS / Flotta (CargoTrack)</h3>
         <div id="ctCardBox" style="margin-bottom:20px;"></div>
         <div id="ctPairBox"></div>
       </div>
@@ -714,6 +625,62 @@
     <div class="field"><label>Model</label><input class="input" id="vehEditModel"></div>
     <div class="field"><label>Év</label><input class="input" id="vehEditAn" type="number"></div>
     <div class="field"><label>Megjegyzés</label><input class="input" id="vehEditNota"></div>
+
+     <!-- Teherjármű paraméterek (útvonaltervezés) — alapból nyitva -->
+    <details class="veh-params" style="margin-top:8px;" open>
+      <summary>🚚 Teherjármű paraméterek (útvonaltervezés)</summary>
+      <div style="margin-top:12px;">
+        <div class="text-muted" style="font-size:12px;margin-bottom:8px;font-weight:600;">Fizikai méretek</div>
+        <div class="grid-3">
+          <div class="field"><label>Magasság (cm)</label><input class="input" id="vehEditHeight" type="number" placeholder="pl. 390"></div>
+          <div class="field"><label>Szélesség (cm)</label><input class="input" id="vehEditWidth" type="number" placeholder="pl. 255"></div>
+          <div class="field"><label>Hossz (cm)</label><input class="input" id="vehEditLength" type="number" placeholder="pl. 1350"></div>
+        </div>
+        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;">Tömeg adatok</div>
+        <div class="grid-2">
+          <div class="field"><label>Teljes tömeg (kg, rakománnyal)</label><input class="input" id="vehEditWeight" type="number" placeholder="pl. 40000"></div>
+          <div class="field"><label>Tengelyterhelés (kg)</label><input class="input" id="vehEditAxleWeight" type="number" placeholder="pl. 11500"></div>
+        </div>
+        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;">Konfiguráció</div>
+        <div class="grid-3">
+          <div class="field"><label>Tengelyek száma</label><input class="input" id="vehEditAxleCount" type="number" min="2" max="10" value="2"></div>
+          <div class="field"><label>Pótkocsi</label><input class="input" id="vehEditTrailerCount" type="number" min="0" max="3" value="0"></div>
+          <div class="field"><label>Jármű típus</label>
+            <select class="select" id="vehEditTruckType">
+              <option value="straight">Merevtengelyes teherautó</option>
+              <option value="tractor">Nyerges vontató</option>
+              <option value="lightTruck">Könnyű teherjármű</option>
+            </select>
+          </div>
+        </div>
+        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;">Speciális</div>
+        <div class="grid-2">
+          <div class="field"><label>Alagút kategória</label>
+            <select class="select" id="vehEditTunnel">
+              <option value="">Nincs korlátozás</option>
+              <option value="B">B kategória</option>
+              <option value="C">C kategória</option>
+              <option value="D">D kategória</option>
+              <option value="E">E kategória (legszigorúbb)</option>
+            </select>
+          </div>
+          <div class="field"><label>Veszélyes áru</label>
+            <select class="select" id="vehEditHazmat">
+              <option value="">Nincs</option>
+              <option value="explosive">Robbanóanyag</option>
+              <option value="gas">Gáz</option>
+              <option value="flammable">Gyúlékony</option>
+              <option value="combustible">Égőanyag</option>
+              <option value="organic">Szerves anyag</option>
+              <option value="poison">Méreg</option>
+              <option value="harmfulToWater">Vízszennyező</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" style="margin-top:8px;"><label>Fogyasztás (L/100km)</label><input class="input" id="vehEditFuel" type="number" step="0.1" placeholder="pl. 28.5"></div>
+      </div>
+    </details>
+
     <div class="row" style="margin-top:14px; display:flex; gap:10px;">
       <button class="btn ghost col" onclick="closeVehicleModal()">Mégse</button>
       <button class="btn primary col" onclick="saveVehicle()">Mentés</button>
@@ -902,20 +869,86 @@
   </div>
 </div>
 
+<!-- ── MENETLEVÉL SZERKESZTŐ MODAL ── -->
+<div class="modal-back" id="fuvEditModal">
+  <div class="modal glass" style="width:min(820px,100%);max-height:92vh;overflow-y:auto;">
+    <h3>✏️ Menetlevél szerkesztése — <span id="feSeria" style="color:var(--brand-red);font-size:14px;font-weight:800;letter-spacing:.5px;"></span></h3>
+    <input type="hidden" id="feId">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;">
+      <div class="field"><label>Sofőr neve</label><input class="input" id="feNumeSofer"></div>
+      <div class="field"><label>Serie / Sorszám</label><input class="input" id="feNumarFisa" placeholder="pl. B-2026-0001"></div>
+      <div class="field"><label>Vontató rendszám</label><input class="input" id="feCamion"></div>
+      <div class="field"><label>Pótkocsi rendszám</label><input class="input" id="feRemorca"></div>
+      <div class="field"><label>Km kezdés</label><input class="input" type="number" id="feKmInc"></div>
+      <div class="field"><label>Km vég</label><input class="input" type="number" id="feKmSf"></div>
+      <div class="field"><label>Diurnă externă (nap)</label><input class="input" type="number" id="feDiurnaEx"></div>
+      <div class="field"><label>Diurnă internă (nap)</label><input class="input" type="number" id="feDiurnaIn"></div>
+      <div class="field"><label>Üzemanyag kezdés (L)</label><input class="input" type="number" id="feCantInc"></div>
+      <div class="field"><label>Üzemanyag vég (L)</label><input class="input" type="number" id="feCantSf"></div>
+    </div>
 
-<script src="/console-shared.js"></script>
+    <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-weight:700;color:var(--text-primary);">📍 Útvonal pontok</div>
+        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddPunct()">+ Pont</button>
+      </div>
+      <div id="fePuncte" style="display:flex;flex-direction:column;gap:6px;"></div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-weight:700;color:var(--text-primary);">⛽ Tankolások</div>
+        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddAlim()">+ Tankolás</button>
+      </div>
+      <div id="feAlim" style="display:flex;flex-direction:column;gap:6px;"></div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-weight:700;color:var(--text-primary);">🛒 Kiadások</div>
+        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddAch()">+ Kiadás</button>
+      </div>
+      <div id="feAch" style="display:flex;flex-direction:column;gap:6px;"></div>
+    </div>
+
+    <div class="field" style="margin-top:10px;"><label>Megjegyzések</label><textarea class="textarea" id="feMentiuni" rows="2"></textarea></div>
+
+    <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+      <button class="btn ghost col" onclick="closeFuvEdit()">Mégse</button>
+      <button class="btn col" onclick="openPdfView(document.getElementById('feId').value)">👁 PDF nézet</button>
+      <button class="btn primary col" onclick="saveFuvEdit()">💾 Mentés</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MENETLEVÉL PDF NÉZET (in-app iframe, PWA-barát) ── -->
+<div class="modal-back" id="pdfViewModal" style="align-items:stretch;padding:0;">
+  <div class="modal glass" style="width:100%;max-width:100%;height:100vh;max-height:100vh;border-radius:0;margin:0;padding:0;display:flex;flex-direction:column;">
+    <div style="display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <button class="btn ghost" onclick="closePdfView()" style="padding:8px 16px;">← Vissza</button>
+      <button class="btn primary" onclick="printPdfView()" style="padding:8px 16px;">🖨️ Nyomtatás / PDF</button>
+      <div style="margin-left:auto;font-weight:700;color:var(--text-primary);">Menetlevél</div>
+    </div>
+    <iframe id="pdfFrame" title="Menetlevél PDF" style="flex:1;width:100%;border:0;background:#fff;"></iframe>
+  </div>
+</div>
+
+
+<script src="/feature-catalog.js?v=20260610"></script>
+<script src="/console-shared.js?v=20260610"></script>
 <!-- ===== INTEGRACIOK (Ugyfelek / CargoTrack / Szamlazas) ===== -->
-<script src="/clients-page.js"></script>
-<script src="/client-mail.js"></script>
-<script src="/inbound-orders.js"></script>
-<script src="/client-picker.js"></script>
-<script src="/cargotrack-card.js"></script>
-<script src="/cargotrack-pairing.js"></script>
-<script src="/cargotrack-map.js"></script>
-<script src="/invoicing-card.js"></script>
-<script src="/invoice-modal.js"></script>
-<script src="/uit-panel.js"></script>
-<script src="/admin.js"></script>
+<script src="/clients-page.js?v=20260610"></script>
+<script src="/client-mail.js?v=20260610"></script>
+<script src="/inbound-orders.js?v=20260610"></script>
+<script src="/client-picker.js?v=20260610"></script>
+<script src="/cargotrack-card.js?v=20260610"></script>
+<script src="/cargotrack-pairing.js?v=20260610"></script>
+<script src="/cargotrack-map.js?v=20260610"></script>
+<script src="/email-intake-card.js?v=20260610"></script>
+<script src="/invoicing-card.js?v=20260610"></script>
+<script src="/invoice-modal.js?v=20260610"></script>
+<script src="/uit-panel.js?v=20260610"></script>
+<script src="/admin.js?v=20260610"></script>
  <!-- ── BUG REPORT FAB ── -->
 <button onclick="openBugReport()" title="Hibajelentés küldése"
   style="position:fixed;bottom:24px;right:24px;z-index:500;width:48px;height:48px;border-radius:50%;

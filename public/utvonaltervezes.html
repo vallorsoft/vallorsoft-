@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vallorSoft - Útvonaltervezés</title>
+  <link rel="apple-touch-icon" href="/icon192.png">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/style.css?v=20260610">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="/session-guard.js?v=20260610"></script>
+  <style>
+    .rp-card { padding:16px; margin-bottom:16px; }
+    .rp-sec-title { font-size:13px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; margin-bottom:10px; }
+    .rp-veh-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    @media (max-width:760px){ .rp-veh-grid { grid-template-columns:1fr; } }
+    .rp-list { max-height:230px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+    .rp-veh { display:flex; align-items:center; gap:8px; padding:9px 11px; border-radius:var(--radius-sm);
+      border:1px solid var(--border); background:rgba(255,255,255,0.02); cursor:pointer; font-size:13px; }
+    .rp-veh:hover { border-color:var(--border-bright); }
+    .rp-veh.sel { border-color:#3b82f6; background:rgba(59,130,246,0.12); }
+    .rp-veh .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; background:transparent; }
+    .rp-veh .dot.gps { background:var(--status-ok); box-shadow:0 0 6px var(--status-ok); }
+    .rp-veh .nm { font-weight:700; }
+    .rp-veh .meta { color:var(--text-muted); font-size:12px; }
+    .rp-veh .chk { margin-left:auto; color:#3b82f6; font-weight:800; display:none; }
+    .rp-veh.sel .chk { display:inline; }
+    .rp-veh .warn { margin-left:auto; color:var(--status-warn); font-size:11px; white-space:nowrap; }
+    .rp-point { margin-bottom:12px; }
+    .rp-point > .lbl { font-size:13px; font-weight:600; margin-bottom:6px; }
+    .rp-ac-wrap { position:relative; }
+    .rp-ac-dd { position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:1200; background:var(--bg-panel-raised);
+      border:1px solid var(--border-bright); border-radius:var(--radius-md); overflow:hidden; display:none;
+      box-shadow:0 12px 30px rgba(0,0,0,0.5); }
+    .rp-ac-dd.open { display:block; }
+    .rp-ac-item { padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--border); }
+    .rp-ac-item:last-child { border-bottom:none; }
+    .rp-ac-item:hover { background:rgba(255,255,255,0.05); }
+    .rp-ac-item .ac-main { font-size:13px; font-weight:600; color:var(--text-primary); }
+    .rp-ac-item .ac-sub { font-size:11px; color:var(--text-muted); }
+    .rp-wp-row { display:flex; gap:8px; align-items:flex-start; margin-bottom:10px; }
+    .rp-wp-row .rp-ac-wrap { flex:1; }
+    .rp-wp-del { background:none; border:1px solid var(--border-bright); color:var(--status-danger);
+      border-radius:var(--radius-sm); cursor:pointer; padding:10px 12px; line-height:1; }
+    .rp-gps-box { padding:12px 14px; border-radius:var(--radius-md); border:1px solid var(--border); background:rgba(255,255,255,0.02); }
+    .main-content[data-theme="light"] .rp-veh,
+    .main-content[data-theme="light"] .rp-gps-box { background:rgba(0,0,0,0.02); }
+    .main-content[data-theme="light"] .rp-ac-dd { background:#fff; }
+    /* HERE prémium funkciók panel */
+    .here-panel-content { max-height:0; overflow:hidden; transition:max-height 0.3s ease; }
+    .here-panel-content.open { max-height:2000px; }
+    .rp-pf { border:1px solid var(--border); border-radius:var(--radius-md); padding:12px; margin-bottom:8px; background:rgba(255,255,255,0.02); }
+    .rp-pbar { height:7px; border-radius:6px; background:rgba(255,255,255,0.10); overflow:hidden; margin-top:8px; }
+    .rp-pbar > i { display:block; height:100%; border-radius:6px; }
+    .fsw { position:relative; display:inline-block; width:42px; height:24px; cursor:pointer; flex-shrink:0; }
+    .fsw input { opacity:0; width:0; height:0; }
+    .fsw-s { position:absolute; inset:0; background:rgba(255,255,255,0.12); border:1px solid var(--border-bright); border-radius:24px; transition:.2s; }
+    .fsw-s:before { content:''; position:absolute; height:18px; width:18px; left:3px; top:2px; background:#94a3b8; border-radius:50%; transition:.2s; }
+    .fsw input:checked + .fsw-s { background:rgba(34,197,94,0.3); border-color:rgba(34,197,94,0.6); }
+    .fsw input:checked + .fsw-s:before { transform:translateX(18px); background:var(--status-ok); }
+    .fsw input:disabled + .fsw-s { opacity:.5; cursor:not-allowed; }
+  </style>
+</head>
+<body>
+<div class="toast-wrap" id="toasts"></div>
+
+<div class="main-content" id="mainContent" data-theme="dark" style="min-height:100vh;">
+<script>try{var _vsT=localStorage.getItem('vs-theme');if(_vsT==='light'||_vsT==='dark')document.getElementById('mainContent').setAttribute('data-theme',_vsT);}catch(e){}</script>
+
+  <div class="dash-topbar">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <a href="/admin" id="backLink" class="btn ghost" style="text-decoration:none;padding:8px 14px;">← Vissza</a>
+      <div class="vs-logo sm"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
+      <div class="text-primary" style="font-size:18px;font-weight:800;">🗺 Útvonaltervezés</div>
+    </div>
+    <button class="theme-toggle" id="themeToggle" onclick="rpToggleTheme()" title="Téma váltása">🌙</button>
+  </div>
+
+  <!-- 1) FUVARFELADAT VÁLASZTÓ -->
+  <div class="glass rp-card">
+    <div class="rp-sec-title text-muted">Fuvarfeladat választó</div>
+    <input class="input" id="rpOrderSearch" placeholder="Keresés azonosító vagy ügyfél alapján..." oninput="rpRenderOrderOptions()" style="margin-bottom:8px;">
+    <select class="select" id="rpOrder" onchange="rpOrderChange()">
+      <option value="">Válassz fuvarfeladatot...</option>
+    </select>
+  </div>
+
+  <!-- 2) VONTATÓ + PÓTKOCSI -->
+  <div class="rp-veh-grid" style="margin-bottom:16px;">
+    <div class="glass rp-card" style="margin-bottom:0;">
+      <div class="rp-sec-title text-primary">Vontató</div>
+      <input class="input" id="rpTractorSearch" placeholder="Keresés rendszám / márka..." oninput="rpRenderTractorList()">
+      <div class="rp-list" id="rpTractorList"></div>
+    </div>
+    <div class="glass rp-card" style="margin-bottom:0;">
+      <div class="rp-sec-title text-primary">Pótkocsi</div>
+      <input class="input" id="rpTrailerSearch" placeholder="Keresés rendszám / márka..." oninput="rpRenderTrailerList()">
+      <div class="rp-list" id="rpTrailerList"></div>
+    </div>
+  </div>
+
+  <!-- 3) TRUCK PARAMÉTER ÖSSZESÍTŐ -->
+  <div class="glass rp-card" id="rpTruckSummary">
+    <div class="text-muted" style="font-size:13px;">Válassz vontatót a paraméterek megjelenítéséhez.</div>
+  </div>
+
+  <!-- 4) TÉRKÉP -->
+  <div class="glass" style="padding:0;overflow:hidden;border-radius:var(--radius-lg);margin-bottom:16px;position:relative;">
+    <div id="rpMap" style="width:100%;height:480px;min-height:450px;"></div>
+    <div id="rpSpinner" style="display:none;position:absolute;inset:0;z-index:1000;background:rgba(5,7,11,0.45);align-items:center;justify-content:center;backdrop-filter:blur(2px);">
+      <div style="text-align:center;color:#fff;"><div class="spinner" style="width:32px;height:32px;margin:0 auto 10px;"></div>Útvonal számítása...</div>
+    </div>
+  </div>
+
+  <!-- 5) ÚTVONAL PONTOK -->
+  <div class="glass rp-card">
+    <div class="rp-sec-title text-muted">Útvonal pontok</div>
+
+    <div class="rp-point">
+      <div class="lbl text-primary">📍 Kiindulópont</div>
+      <div id="rpGpsBlock" class="rp-gps-box text-muted" style="font-size:13px;">Válassz vontatót a GPS pozíció betöltéséhez.</div>
+    </div>
+
+    <div class="rp-point">
+      <div class="lbl text-primary">📦 Felrakó pont</div>
+      <div class="rp-ac-wrap">
+        <input class="input" id="rpLoading" placeholder="Felrakás címe" autocomplete="off" oninput="rpUpdatePlanBtn()">
+        <div class="rp-ac-dd" id="rpLoadingDD"></div>
+      </div>
+    </div>
+
+    <div class="rp-point">
+      <div class="lbl text-primary">🏁 Lerakó pont</div>
+      <div class="rp-ac-wrap">
+        <input class="input" id="rpUnloading" placeholder="Lerakás címe" autocomplete="off" oninput="rpUpdatePlanBtn()">
+        <div class="rp-ac-dd" id="rpUnloadingDD"></div>
+      </div>
+    </div>
+
+    <div id="rpWaypoints"></div>
+    <button class="btn ghost" id="rpAddWp" onclick="rpAddWaypoint()" style="margin-bottom:14px;">➕ Közbülső cél hozzáadása</button>
+
+    <button class="btn primary" id="rpPlanBtn" onclick="rpPlan()" style="width:100%;" disabled>🗺 Útvonal tervezése</button>
+  </div>
+
+  <!-- 6) EREDMÉNY PANEL -->
+  <div class="glass rp-card" id="rpResultPanel" style="display:none;">
+    <div class="rp-sec-title text-muted">Eredmény</div>
+    <div id="rpWarn" style="display:none;margin-bottom:14px;padding:12px 14px;border-radius:var(--radius-md);
+         background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);color:#fcd34d;font-size:13px;"></div>
+    <div class="grid-3" style="margin-bottom:14px;">
+      <div class="glass stat-tile"><div class="stat-ico">📏</div><div><div class="stat-val text-primary" id="rpDist">—</div><div class="stat-lbl text-muted">Teljes távolság</div></div></div>
+      <div class="glass stat-tile"><div class="stat-ico">⏱️</div><div><div class="stat-val text-primary" id="rpTime">—</div><div class="stat-lbl text-muted">Becsült menetidő</div></div></div>
+      <div class="glass stat-tile"><div class="stat-ico">⛽</div><div><div class="stat-val text-primary" id="rpFuel">—</div><div class="stat-lbl text-muted">Becsült fogyasztás</div></div></div>
+    </div>
+    <div id="rpLegs"></div>
+    <div id="rpPremiumResult" style="margin-top:6px;"></div>
+  </div>
+
+  <!-- HERE prémium funkciók — összecsukható, az oldal alján -->
+  <div class="glass rp-card" id="rpPremiumPanel">
+    <div class="here-panel-head" onclick="rpTogglePremiumPanel()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:10px;">
+      <div>
+        <div class="rp-sec-title" style="margin-bottom:2px;color:#a855f7;">🗺 HERE Térkép szolgáltatások</div>
+        <div class="text-muted" style="font-size:12px;">Havi használat és díjak</div>
+      </div>
+      <span id="rpPremiumChevron" style="color:#a855f7;font-size:16px;flex-shrink:0;">▼</span>
+    </div>
+    <div class="here-panel-content" id="rpPremiumContent">
+      <div id="rpPremiumList" style="padding-top:12px;"><div class="text-muted" style="font-size:12px;">Betöltés...</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ───────── Segéd ─────────
+function gas(fn, args){ return fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({functionName:fn,arguments:args||[]})}).then(function(r){return r.json();}).then(function(d){return d.result;}); }
+function toast(m,k){var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;
+  document.getElementById('toasts').appendChild(e);setTimeout(function(){e.remove();},4000);}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function val(id){var e=document.getElementById(id);return e?e.value.trim():'';}
+
+// ───────── Állapot ─────────
+var rpMap, rpTileLayer, rpLayer, rpHereKey=null;
+var _orders=[], _vehicles=[], _tractors=[], _trailers=[];
+var selTractor=null, selTrailer=null;     // teljes jármű-objektumok
+var gpsPos=null, gpsManualMode=false;
+var _wpSeq=0, _waypointIds=[];
+
+// ───────── Téma + HERE csempe (v3) ─────────
+function rpTheme(){ var mc=document.getElementById('mainContent'); return (mc&&mc.getAttribute('data-theme')==='light')?'light':'dark'; }
+function rpTileUrl(theme){
+  if(rpHereKey){ var style=(theme==='light')?'explore.day':'explore.night';
+    return 'https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png?style='+style+'&size=512&apiKey='+rpHereKey; }
+  return theme==='light' ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+                         : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+}
+function rpTileOpts(){ return rpHereKey ? {attribution:'© HERE Technologies',maxZoom:20,tileSize:512,zoomOffset:-1}
+                                        : {attribution:'© CARTO',maxZoom:19,subdomains:'abcd'}; }
+function rpSyncThemeIcon(){ var b=document.getElementById('themeToggle'); if(!b)return; var l=rpTheme()==='light'; b.textContent=l?'☀️':'🌙'; b.title=l?'Sötét mód':'Világos mód'; }
+function rpToggleTheme(){ var mc=document.getElementById('mainContent'); if(!mc)return; var n=(mc.getAttribute('data-theme')==='light')?'dark':'light';
+  mc.setAttribute('data-theme',n); try{localStorage.setItem('vs-theme',n);}catch(e){} rpSyncThemeIcon();
+  if(rpMap&&rpTileLayer) rpTileLayer.setUrl(rpTileUrl(n)); }
+function rpInitMap(){ rpMap=L.map('rpMap',{zoomControl:true}).setView([45.9432,24.9668],7);
+  rpTileLayer=L.tileLayer(rpTileUrl(rpTheme()),rpTileOpts()).addTo(rpMap);
+  rpLayer=L.layerGroup().addTo(rpMap); setTimeout(function(){rpMap.invalidateSize();},200); }
+
+// ───────── Fuvar választó ─────────
+function rpLoadOrders(){ gas('getOrdersForRoutePlanning').then(function(r){
+  if(!r||!r.ok){ toast((r&&r.err)||'A fuvarok betöltése sikertelen.','err'); return; }
+  _orders=r.orders||[]; rpRenderOrderOptions();
+}); }
+function rpRenderOrderOptions(){
+  var q=val('rpOrderSearch').toLowerCase();
+  var sel=document.getElementById('rpOrder'); var cur=sel.value;
+  var list=_orders.filter(function(o){ if(!q)return true;
+    return (String(o.id)+' '+(o.client||'')+' '+(o.loc_incarcare||'')+' '+(o.loc_descarcare||'')).toLowerCase().indexOf(q)!==-1; });
+  sel.innerHTML='<option value="">Válassz fuvarfeladatot...</option>'+list.map(function(o){
+    return '<option value="'+esc(o.id)+'">#'+esc(o.id)+' — '+esc(o.client||'—')+' | '+esc(o.loc_incarcare||'?')+' → '+esc(o.loc_descarcare||'?')+'</option>';
+  }).join('');
+  if(cur) sel.value=cur;
+}
+function rpOrderChange(){
+  var o=_orders.find(function(x){return String(x.id)===String(document.getElementById('rpOrder').value);});
+  if(!o)return;
+  document.getElementById('rpLoading').value=o.loc_incarcare||'';
+  document.getElementById('rpUnloading').value=o.loc_descarcare||'';
+  if(o.tractor_id){ var t=_tractors.find(function(v){return v.id===o.tractor_id;}); if(t) rpSelectTractor(t.id); }
+  if(o.trailer_id){ var p=_trailers.find(function(v){return v.id===o.trailer_id;}); if(p) rpSelectTrailer(p.id); }
+  rpUpdatePlanBtn();
+}
+
+// ───────── Jármű szelektorok ─────────
+function rpLoadVehicles(){ gas('getVehiclesForRouting').then(function(r){
+  if(!r||!r.ok){ toast((r&&r.err)||'A járművek betöltése sikertelen.','err'); return; }
+  _vehicles=r.vehicles||[];
+  _tractors=_vehicles.filter(function(v){return v.tip==='Vontato';});
+  _trailers=_vehicles.filter(function(v){return v.tip==='Potkocsi';});
+  rpRenderTractorList(); rpRenderTrailerList();
+}); }
+function rpVehItem(v, isSel){
+  var miss = (v.height_cm==null);
+  return '<div class="rp-veh'+(isSel?' sel':'')+'" onclick="'+(v.tip==='Vontato'?'rpSelectTractor':'rpSelectTrailer')+'('+v.id+')">'
+    + '<span class="dot'+(v.has_gps?' gps':'')+'"></span>'
+    + '<span><span class="nm">'+esc(v.rendszam)+'</span> <span class="meta">'+esc([v.marca,v.model].filter(Boolean).join(' ')||(v.nota||''))+'</span></span>'
+    + (miss?'<span class="warn">⚠ Hiányos adatok</span>':'<span class="chk">✓</span>')
+    + '</div>';
+}
+function rpRenderTractorList(){
+  var q=val('rpTractorSearch').toLowerCase();
+  var list=_tractors.filter(function(v){ if(!q)return true; return (v.rendszam+' '+(v.marca||'')+' '+(v.model||'')).toLowerCase().indexOf(q)!==-1; });
+  var box=document.getElementById('rpTractorList');
+  box.innerHTML = list.length ? list.map(function(v){return rpVehItem(v, selTractor&&selTractor.id===v.id);}).join('')
+    : '<div class="text-muted" style="font-size:12px;padding:8px;">Nincs aktív vontató.</div>';
+}
+function rpRenderTrailerList(){
+  var q=val('rpTrailerSearch').toLowerCase();
+  var list=_trailers.filter(function(v){ if(!q)return true; return (v.rendszam+' '+(v.marca||'')+' '+(v.model||'')).toLowerCase().indexOf(q)!==-1; });
+  var box=document.getElementById('rpTrailerList');
+  var none='<div class="rp-veh'+(!selTrailer?' sel':'')+'" onclick="rpSelectTrailer(null)">'
+    + '<span class="dot"></span><span class="nm">— Nincs pótkocsi —</span>'+(!selTrailer?'<span class="chk">✓</span>':'')+'</div>';
+  box.innerHTML = none + (list.map(function(v){return rpVehItem(v, selTrailer&&selTrailer.id===v.id);}).join(''));
+}
+function rpSelectTractor(id){
+  selTractor=_tractors.find(function(v){return v.id===id;})||null;
+  rpRenderTractorList(); rpRenderTruckSummary(); rpUpdatePlanBtn();
+  gpsPos=null; gpsManualMode=false;
+  if(selTractor){ rpRenderGps('loading'); rpLoadGps(selTractor.id); }
+  else rpRenderGps('none');
+}
+function rpSelectTrailer(id){
+  selTrailer = id==null ? null : (_trailers.find(function(v){return v.id===id;})||null);
+  rpRenderTrailerList(); rpRenderTruckSummary();
+}
+function rpOpts(list, sel){
+  return list.map(function(o){ return '<option value="'+o[0]+'"'+(String(sel||'')===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('');
+}
+function rpRenderTruckSummary(){
+  var box=document.getElementById('rpTruckSummary');
+  if(!selTractor){ box.innerHTML='<div class="text-muted" style="font-size:13px;">Válassz vontatót a tervezési paraméterekhez.</div>'; return; }
+  var t=selTractor, p=selTrailer;
+  if(t.height_cm==null){
+    box.innerHTML='<div style="color:var(--status-warn);font-size:13px;">⚠ Jármű adatok hiányosak — töltsd ki a Járművek menüben (legalább a magasság).</div>';
+    return;
+  }
+  var n=function(x){return (x==null||x==='')?0:Number(x);};
+  // Prefill — NEM ez a végső érték: a HERE a megadott összekapcsolt értékekből tervez.
+  var type = p ? 'tractor' : (t.truck_type==='tractor' ? 'tractor' : 'straightTruck');
+  var gwDef  = n(t.weight_kg) + (p?n(p.weight_kg):0);   // induló tipp, szerkeszthető
+  var lenDef = n(t.length_cm) + (p?n(p.length_cm):0);   // induló (felső becslés), szerkeszthető
+  var tunOpts=[['',"Nincs"],['B','B'],['C','C'],['D','D'],['E','E (legszigorúbb)']];
+  var hazOpts=[['',"Nincs"],['explosive','Robbanóanyag'],['gas','Gáz'],['flammable','Gyúlékony'],['combustible','Égőanyag'],['organic','Szerves anyag'],['poison','Méreg'],['harmfulToWater','Vízszennyező']];
+  var typeOpts=[['straightTruck','Merev teherautó'],['tractor','Nyerges szerelvény (vontató + félpótkocsi)']];
+
+  box.innerHTML =
+    '<div class="rp-sec-title text-muted" style="margin-bottom:8px;">Tervezési paraméterek (összekapcsolt jármű)</div>'
+    + '<div class="text-primary" style="font-weight:700;margin-bottom:10px;">🚛 '+esc(t.rendszam)+(p?(' + '+esc(p.rendszam)):'')+'</div>'
+    + '<div class="field" style="margin-bottom:10px;"><label>Jármű típus</label><select class="select" id="rpType" onchange="rpTypeChange()">'+rpOpts(typeOpts,type)+'</select></div>'
+    + '<div class="grid-2">'
+    +   '<div class="field"><label>Megengedett össztömeg (kg)</label><input class="input" id="rpGW" type="number" placeholder="pl. 40000" value="'+(gwDef||'')+'"></div>'
+    +   '<div class="field"><label>Teljes hosszúság összekapcsolva (cm)</label><input class="input" id="rpLen" type="number" placeholder="pl. 1650" value="'+(lenDef||'')+'"></div>'
+    + '</div>'
+    + '<div class="grid-2">'
+    +   '<div class="field"><label>Magasság (cm)</label><input class="input" id="rpH" type="number" value="'+(t.height_cm!=null?t.height_cm:'')+'"></div>'
+    +   '<div class="field"><label>Szélesség (cm)</label><input class="input" id="rpW" type="number" value="'+(t.width_cm!=null?t.width_cm:'')+'"></div>'
+    + '</div>'
+    + '<div class="grid-3">'
+    +   '<div class="field"><label>Tengelyterhelés (kg)</label><input class="input" id="rpWPA" type="number" value="'+(t.weight_per_axle_kg!=null?t.weight_per_axle_kg:'')+'"></div>'
+    +   '<div class="field"><label>Tengelyek száma</label><input class="input" id="rpAxle" type="number" min="2" max="12" value="'+(t.axle_count!=null?t.axle_count:'')+'"></div>'
+    +   '<div class="field"><label>Pótkocsik száma</label><input class="input" id="rpTrl" type="number" min="0" max="3" value="'+(p?1:0)+'"></div>'
+    + '</div>'
+    + '<div class="grid-2">'
+    +   '<div class="field"><label>Alagút kategória</label><select class="select" id="rpTun">'+rpOpts(tunOpts,t.tunnel_category)+'</select></div>'
+    +   '<div class="field"><label>Veszélyes áru</label><select class="select" id="rpHaz">'+rpOpts(hazOpts,t.hazardous_goods)+'</select></div>'
+    + '</div>'
+    + '<div class="text-muted" style="font-size:12px;margin-top:6px;line-height:1.6;">'
+    +   '⚠ Nyerges szerelvénynél a tényleges összekapcsolt hossz <b>kisebb</b>, mint a két jármű hosszának összege (a királycsap-átfedés miatt). Add meg a <b>valós összekapcsolt hosszt</b> és a <b>megengedett össztömeget</b> — a térkép ezekből tervez.'
+    + '</div>';
+}
+function rpTypeChange(){
+  var ty=(document.getElementById('rpType')||{}).value;
+  var trl=document.getElementById('rpTrl');
+  if(trl){ if(ty==='straightTruck') trl.value=0; else if(Number(trl.value)<1) trl.value=1; }
+}
+function rpCollectParams(){
+  var get=function(id){var e=document.getElementById(id);return e?e.value:'';};
+  return {
+    type: get('rpType'),
+    grossWeight: get('rpGW'),
+    length: get('rpLen'),
+    height: get('rpH'),
+    width: get('rpW'),
+    weightPerAxle: get('rpWPA'),
+    axleCount: get('rpAxle'),
+    trailerCount: get('rpTrl'),
+    tunnelCategory: get('rpTun'),
+    hazardousGoods: get('rpHaz')
+  };
+}
+
+// ───────── GPS kiindulópont ─────────
+function rpRelTime(iso){
+  if(!iso) return {txt:'', col:'var(--text-muted)'};
+  var diff=(Date.now()-new Date(iso).getTime())/1000;
+  if(isNaN(diff)) return {txt:'', col:'var(--text-muted)'};
+  var m=Math.round(diff/60);
+  if(m<5) return {txt:(m<=0?'most':m+' perce'), col:'var(--status-ok)'};
+  if(m<60) return {txt:m+' perce', col:'var(--status-warn)'};
+  var h=Math.round(m/60);
+  if(h<24) return {txt:h+' órája', col:'var(--status-danger)'};
+  return {txt:Math.round(h/24)+' napja', col:'var(--status-danger)'};
+}
+function rpRenderGps(state){
+  var box=document.getElementById('rpGpsBlock');
+  if(state==='none'||!selTractor){ box.innerHTML='Válassz vontatót a GPS pozíció betöltéséhez.'; box.className='rp-gps-box text-muted'; box.style.fontSize='13px'; return; }
+  if(state==='loading'){ box.innerHTML='<span class="spinner" style="width:14px;height:14px;vertical-align:middle;"></span> GPS pozíció lekérése…'; return; }
+  if(gpsPos){
+    var rt=rpRelTime(gpsPos.updated_at);
+    box.innerHTML='<div style="font-weight:600;color:var(--status-ok);">🟢 '+esc(gpsPos.rendszam)+'</div>'
+      + '<div class="text-muted" style="font-size:12px;margin:4px 0 8px;">utolsó pozíció: <span style="color:'+rt.col+';font-weight:600;">'+esc(rt.txt||'—')+'</span></div>'
+      + '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="rpRefreshGps()">🔄 GPS frissítése</button>';
+  } else {
+    box.innerHTML='<div style="color:var(--status-warn);">⚠ GPS pozíció nem elérhető</div>'
+      + '<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;cursor:pointer;" class="text-primary">'
+      + '<input type="checkbox" id="rpManualChk" onchange="rpToggleManual()" '+(gpsManualMode?'checked':'')+'> Manuális kiindulópont megadása</label>'
+      + '<div id="rpManualWrap" style="margin-top:8px;'+(gpsManualMode?'':'display:none;')+'">'
+      + '<div class="rp-ac-wrap"><input class="input" id="rpStartManual" placeholder="Kiindulási cím" autocomplete="off"><div class="rp-ac-dd" id="rpStartManualDD"></div></div>'
+      + '</div>';
+    if(gpsManualMode){ var i=document.getElementById('rpStartManual'); if(i) attachAutocomplete(i, document.getElementById('rpStartManualDD')); }
+  }
+}
+function rpToggleManual(){ gpsManualMode=document.getElementById('rpManualChk').checked;
+  var w=document.getElementById('rpManualWrap'); if(w) w.style.display=gpsManualMode?'':'none';
+  if(gpsManualMode){ var i=document.getElementById('rpStartManual'); if(i) attachAutocomplete(i, document.getElementById('rpStartManualDD')); } }
+function rpLoadGps(vehicleId){ gas('getVehicleGpsPosition',[{vehicleId:vehicleId}]).then(function(r){
+  if(!selTractor||selTractor.id!==vehicleId) return; // közben váltott
+  gpsPos = (r&&r.ok)?r:null; rpRenderGps('done');
+}); }
+function rpRefreshGps(){ if(selTractor){ rpRenderGps('loading'); rpLoadGps(selTractor.id); } }
+
+// ───────── Közbülső célok ─────────
+function rpAddWaypoint(){
+  if(_waypointIds.length>=5){ toast('Legfeljebb 5 közbülső cél adható meg.','err'); return; }
+  var id=++_wpSeq; _waypointIds.push(id);
+  var wrap=document.getElementById('rpWaypoints');
+  var row=document.createElement('div'); row.className='rp-point'; row.id='rpWpRow_'+id;
+  row.innerHTML='<div class="lbl text-primary">🔵 Közbülső cél #'+_waypointIds.length+'</div>'
+    + '<div class="rp-wp-row"><div class="rp-ac-wrap"><input class="input" id="rpWp_'+id+'" placeholder="Közbülső cím" autocomplete="off"><div class="rp-ac-dd" id="rpWpDD_'+id+'"></div></div>'
+    + '<button class="rp-wp-del" onclick="rpRemoveWaypoint('+id+')">✕</button></div>';
+  wrap.appendChild(row);
+  attachAutocomplete(document.getElementById('rpWp_'+id), document.getElementById('rpWpDD_'+id));
+  if(_waypointIds.length>=5){ document.getElementById('rpAddWp').style.display='none'; }
+}
+function rpRemoveWaypoint(id){
+  _waypointIds=_waypointIds.filter(function(x){return x!==id;});
+  var row=document.getElementById('rpWpRow_'+id); if(row) row.remove();
+  document.getElementById('rpAddWp').style.display='';
+  // sorszámok újraírása
+  _waypointIds.forEach(function(wid,i){ var r=document.getElementById('rpWpRow_'+wid); if(r){ var l=r.querySelector('.lbl'); if(l) l.textContent='🔵 Közbülső cél #'+(i+1); } });
+}
+
+// ───────── HERE Autocomplete ─────────
+function attachAutocomplete(input, dd){
+  if(input._acBound) return; input._acBound=true;
+  var timer=null;
+  input.addEventListener('input', function(){
+    var q=input.value.trim();
+    if(timer) clearTimeout(timer);
+    if(q.length<3){ dd.classList.remove('open'); dd.innerHTML=''; return; }
+    timer=setTimeout(function(){
+      fetch('/api/here-autocomplete?q='+encodeURIComponent(q),{credentials:'same-origin'})
+        .then(function(r){return r.json();}).then(function(d){
+          var items=(d&&d.items)||[];
+          if(!items.length){ dd.classList.remove('open'); dd.innerHTML=''; return; }
+          dd.innerHTML=items.map(function(it){
+            var label=it.label||it.title; var main=it.title||label; var sub=label;
+            return '<div class="rp-ac-item" data-label="'+esc(label)+'"><div class="ac-main">'+esc(main)+'</div><div class="ac-sub">'+esc(sub)+'</div></div>';
+          }).join('');
+          dd.classList.add('open');
+          Array.prototype.forEach.call(dd.querySelectorAll('.rp-ac-item'), function(el){
+            el.addEventListener('mousedown', function(e){ e.preventDefault();
+              input.value=el.getAttribute('data-label'); dd.classList.remove('open'); dd.innerHTML=''; rpUpdatePlanBtn(); });
+          });
+        }).catch(function(){ dd.classList.remove('open'); });
+    },300);
+  });
+  input.addEventListener('keydown', function(e){ if(e.key==='Escape'){ dd.classList.remove('open'); } });
+}
+document.addEventListener('click', function(e){
+  Array.prototype.forEach.call(document.querySelectorAll('.rp-ac-dd.open'), function(dd){
+    if(!dd.parentElement.contains(e.target)) dd.classList.remove('open');
+  });
+});
+
+// ───────── Plan gomb állapot ─────────
+function rpUpdatePlanBtn(){
+  var ok = selTractor && val('rpLoading') && val('rpUnloading');
+  document.getElementById('rpPlanBtn').disabled = !ok;
+}
+
+// ───────── Útvonal tervezése ─────────
+function rpFmtDur(sec){ sec=Math.round(sec||0); var h=Math.floor(sec/3600), m=Math.round((sec%3600)/60); return (h>0?(h+'ó '):'')+m+'p'; }
+function rpBuildWaypoints(){
+  var wps=[];
+  if(gpsPos && !gpsManualMode){ wps.push({type:'gps', lat:gpsPos.lat, lng:gpsPos.lng}); }
+  else if(gpsManualMode){ var mv=val('rpStartManual'); if(mv) wps.push({type:'gps', address:mv}); }
+  wps.push({type:'loading', address:val('rpLoading')});
+  wps.push({type:'unloading', address:val('rpUnloading')});
+  _waypointIds.forEach(function(id){ var v=val('rpWp_'+id); if(v) wps.push({type:'waypoint', address:v}); });
+  return wps;
+}
+function rpPlan(){
+  if(!selTractor){ toast('Válassz vontatót!','err'); return; }
+  if(!val('rpLoading')||!val('rpUnloading')){ toast('Add meg a felrakó és lerakó címet!','err'); return; }
+  var sp=document.getElementById('rpSpinner'); sp.style.display='flex';
+  var btn=document.getElementById('rpPlanBtn'); btn.disabled=true;
+  gas('calculateRoute',[{ tractorId:selTractor.id, trailerId:selTrailer?selTrailer.id:null, params:rpCollectParams(), waypoints:rpBuildWaypoints() }])
+  .then(function(r){
+    sp.style.display='none'; rpUpdatePlanBtn();
+    if(!r||!r.ok){
+      var m=(r&&r.err)||'Nem sikerült az útvonaltervezés';
+      if(/429|too many|limit/i.test(m)) m='HERE API limit elérve — funkció ideiglenesen nem elérhető';
+      toast(m,'err'); return;
+    }
+    rpDrawRoute(r);
+  }).catch(function(){ sp.style.display='none'; rpUpdatePlanBtn(); toast('Hálózati hiba az útvonaltervezésnél','err'); });
+}
+function rpMarkerColor(type){ return type==='gps'?'#22c55e':type==='loading'?'#3b82f6':type==='unloading'?'#e10b1a':'#f59e0b'; }
+function rpDrawRoute(r){
+  rpLayer.clearLayers();
+  var all=[];
+  // tiltott szakaszok kiemelése (halo a vonal ALATT)
+  (r.violations||[]).forEach(function(v){
+    if(v.polyline&&v.polyline.length){
+      L.polyline(v.polyline,{color:'#ff2d55',weight:11,opacity:0.45}).addTo(rpLayer);
+    }
+  });
+  // markerek
+  (r.waypoints||[]).forEach(function(w,i){
+    var col=rpMarkerColor(w.type);
+    var tip = w.type==='gps'?((selTractor?selTractor.rendszam:'')+' — jelenlegi pozíció')
+            : w.type==='loading'?('Felrakó: '+(w.label||''))
+            : w.type==='unloading'?('Lerakó: '+(w.label||''))
+            : ('Közbülső: '+(w.label||''));
+    L.circleMarker([w.lat,w.lng],{radius:8,color:col,fillColor:col,fillOpacity:0.9,weight:2}).bindTooltip(tip).addTo(rpLayer);
+    all.push([w.lat,w.lng]);
+  });
+  // szakaszok színezve
+  (r.legs||[]).forEach(function(leg){
+    if(!leg.polyline||!leg.polyline.length) return;
+    var style;
+    if(leg.fromType==='gps') style={color:'#8a97a8',weight:3,dashArray:'8,8',opacity:0.9};
+    else if(leg.fromType==='loading') style={color:'#e10b1a',weight:5,opacity:0.95};
+    else style={color:'#f59e0b',weight:4,opacity:0.95};
+    L.polyline(leg.polyline,style).addTo(rpLayer);
+    leg.polyline.forEach(function(p){all.push(p);});
+  });
+  // tiltott szakasz jelölők (a vonal FÖLÖTT)
+  (r.violations||[]).forEach(function(v){
+    if(!v.polyline||!v.polyline.length) return;
+    var mid=v.polyline[Math.floor(v.polyline.length/2)];
+    var icon=L.divIcon({className:'rp-viol-ico',html:'<div style="font-size:20px;line-height:1;text-shadow:0 0 3px #000;">⛔</div>',iconSize:[24,24],iconAnchor:[12,12]});
+    L.marker(mid,{icon:icon,zIndexOffset:1000}).bindTooltip('⛔ '+esc(v.label)).bindPopup('<b>⛔ Tiltott szakasz</b><br>'+esc(v.label)).addTo(rpLayer);
+  });
+  if(all.length) rpMap.fitBounds(all,{padding:[40,40]});
+
+  // eredmény panel
+  document.getElementById('rpResultPanel').style.display='';
+  document.getElementById('rpDist').textContent=(Math.round((r.distanceMeters||0)/100)/10)+' km';
+  document.getElementById('rpTime').textContent=rpFmtDur(r.durationSeconds);
+  document.getElementById('rpFuel').textContent=(r.fuelEstimateL!=null)?(r.fuelEstimateL+' L'):'—';
+
+  var typeName={gps:'Kiindulópont',loading:'Felrakó',unloading:'Lerakó',waypoint:'Közbülső'};
+  var legsHtml='';
+  if((r.legs||[]).length>1){
+    legsHtml='<div style="margin-top:6px;display:flex;flex-direction:column;gap:6px;">'+r.legs.map(function(leg){
+      var f=typeName[leg.fromType]||'Pont', t=typeName[leg.toType]||'Pont';
+      return '<div class="glass-soft" style="padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;" class="text-primary">'
+        + '<b>'+esc(f)+' → '+esc(t)+':</b> '+(Math.round((leg.distanceMeters||0)/100)/10)+' km — '+rpFmtDur(leg.durationSeconds)+'</div>';
+    }).join('')+'</div>';
+  }
+  document.getElementById('rpLegs').innerHTML=legsHtml;
+
+  var warn=document.getElementById('rpWarn');
+  var viol=r.violations||[];
+  if((r.notices&&r.notices.length)||viol.length){
+    warn.style.display='';
+    var detail = viol.length
+      ? viol.map(function(v){return esc(v.label);})
+      : (r.notices||[]).map(function(n){return esc(n.title);});
+    // egyedi címkék
+    detail = detail.filter(function(x,i){return detail.indexOf(x)===i;});
+    warn.innerHTML='⚠️ Figyelem: az útvonal '+(viol.length?('<b>'+viol.length+' tiltott szakaszt</b>'):'teherjármű korlátozást')
+      + ' tartalmaz — a térképen <span style="color:#ff2d55;font-weight:700;">pirossal kiemelve ⛔</span>. Csak indokolt esetben, engedéllyel közlekedj ott.<br>'
+      + '<span style="font-size:12px;opacity:.9;">'+detail.join(' · ')+'</span>';
+  } else { warn.style.display='none'; warn.innerHTML=''; }
+
+  // a HERE szolgáltatások panel frissítése (a geocode + routing tranzakciók most naplózódtak)
+  rpLoadPremium();
+}
+
+// ───────── HERE Térkép szolgáltatások panel (havi használat + díj) ─────────
+var HERE_ICONS={autocomplete:'🔍',geocode:'📍',raster_tile:'🗺',routing_truck:'🚛'};
+function rpLoadPremium(){
+  gas('getMyHereUsage').then(function(r){
+    var box=document.getElementById('rpPremiumList'); if(!box) return;
+    if(!r||!r.ok){ box.innerHTML='<div class="text-muted" style="font-size:12px;">Nem elérhető.</div>'; return; }
+    var used=r.free_pool_used||0, total=r.free_pool_total||1000, rem=r.free_pool_remaining||0;
+    var pct=Math.min(100, Math.round((used/total)*100));
+    var barColor=pct>=100?'#ef4444':pct>=80?'#f59e0b':'#22c55e';
+    var poolFoot = rem>0
+      ? '<div class="text-muted" style="font-size:11px;margin-top:4px;">Maradék: <b>'+rem+'</b> ingyenes tranzakció</div>'
+      : '<div style="font-size:11px;margin-top:4px;color:#ef4444;font-weight:700;">⚠ Ingyenes keret elfogyott — további használat díjköteles</div>';
+    var html='<div class="rp-pf">'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;"><span class="text-primary" style="font-weight:700;">🎁 Ingyenes keret</span><span class="text-muted">'+used+' / '+total+' trz</span></div>'
+      +'<div class="rp-pbar" style="margin-top:6px;"><i style="width:'+pct+'%;background:'+barColor+';"></i></div>'
+      +poolFoot+'</div>';
+    (r.services||[]).forEach(function(s){
+      var ic=HERE_ICONS[s.feature_key]||'⚡';
+      var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
+        +'<div><div class="text-primary" style="font-weight:700;font-size:13px;">'+ic+' '+esc(s.display_name)+'</div>'
+        +'<div class="text-muted" style="font-size:12px;">'+esc(s.description||'')+'</div></div>'
+        +'<span class="text-muted" style="font-size:12px;white-space:nowrap;">'+s.total_used+' trz</span></div>';
+      var body;
+      if((s.billable_trx||0)<=0){
+        body='<div style="margin-top:6px;font-size:12px;color:#22c55e;">✅ Ingyenes keretből fedezve &nbsp; €0.00</div>';
+      } else {
+        body='<div class="text-muted" style="margin-top:6px;font-size:12px;">'+Number(s.price_eur).toFixed(2)+' € / 1000 trz &nbsp;·&nbsp; '+s.billable_trx+' fizetős trz = '+s.units+'×1000 egység</div>'
+          +'<div style="font-size:12px;margin-top:2px;color:#ef4444;font-weight:700;">Nettó: €'+s.net_eur+' &nbsp; ÁFA(21%): €'+s.vat_eur+' &nbsp; Bruttó: €'+s.gross_eur+'</div>';
+      }
+      html+='<div class="rp-pf">'+head+body+'</div>';
+    });
+    var anyBillable=(r.services||[]).some(function(s){return (s.billable_trx||0)>0;});
+    if(!anyBillable){
+      html+='<div class="rp-pf" style="text-align:center;"><div class="text-primary" style="font-size:13px;">Ez a hónap: teljes használat <b style="color:#22c55e;">ingyenes</b></div><div class="text-muted" style="font-size:12px;margin-top:2px;">Becsült díj: €0.00</div></div>';
+    } else {
+      var rowsH=(r.services||[]).filter(function(s){return (s.billable_trx||0)>0;}).map(function(s){
+        return '<div class="text-muted" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;"><span>'+esc(s.display_name)+' ('+s.billable_trx+' trz)</span><span>€'+s.net_eur+' / €'+s.gross_eur+'</span></div>';
+      }).join('');
+      html+='<div class="rp-pf"><div class="text-primary" style="font-weight:700;font-size:12px;margin-bottom:4px;">Összesítő (nettó / bruttó)</div>'+rowsH
+        +'<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;color:#a855f7;"><span>VÉGÖSSZEG</span><span>€'+r.total_net_eur+' / €'+r.total_gross_eur+'</span></div></div>';
+    }
+    box.innerHTML=html;
+  });
+}
+function rpTogglePremiumPanel(){
+  var c=document.getElementById('rpPremiumContent');
+  var ch=document.getElementById('rpPremiumChevron');
+  if(!c) return;
+  var open=c.classList.toggle('open');
+  if(ch) ch.textContent=open?'▲':'▼';
+  try{ localStorage.setItem('vs-here-panel', open?'open':'closed'); }catch(e){}
+}
+function rpInitPremiumPanel(){
+  var c=document.getElementById('rpPremiumContent');
+  var ch=document.getElementById('rpPremiumChevron');
+  if(!c) return;
+  var saved='closed';
+  try{ saved=localStorage.getItem('vs-here-panel')||'closed'; }catch(e){}
+  if(saved==='open'){ c.classList.add('open'); if(ch) ch.textContent='▲'; }
+  else { c.classList.remove('open'); if(ch) ch.textContent='▼'; }
+}
+
+// ───────── Indítás ─────────
+rpSyncThemeIcon();
+rpInitPremiumPanel();
+attachAutocomplete(document.getElementById('rpLoading'), document.getElementById('rpLoadingDD'));
+attachAutocomplete(document.getElementById('rpUnloading'), document.getElementById('rpUnloadingDD'));
+gas('authMe').then(function(u){ if(!u){ window.location.href='/login'; return; }
+  var b=document.getElementById('backLink'); if(b) b.href=(u.pozicio==='Manager')?'/manager':'/admin'; });
+fetch('/api/here-config',{credentials:'same-origin'}).then(function(r){return r.ok?r.json():{};})
+  .then(function(cfg){ rpHereKey=(cfg&&cfg.apiKey)||null; })
+  .catch(function(){ rpHereKey=null; })
+  .finally(function(){ rpInitMap(); rpLoadOrders(); rpLoadVehicles(); rpLoadPremium(); });
+</script>
+</body>
+</html>
