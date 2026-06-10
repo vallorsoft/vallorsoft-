@@ -40,22 +40,24 @@ handlers.comList = async function (req, res, args) {
       if (!req.session.user) return res.json({ result: [] });
       const me = req.session.user;
       const cid = me.company_id;
-      // Kozos subquery: order_legs aggregacio (szakaszok szama + reszletek)
+      // Kozos subquery: order_legs aggregacio (szakaszok szama + reszletek).
+      // LATERAL: csak az adott fuvar labait aggregalja (hasznalja az
+      // idx_order_legs_order indexet) — a korabbi valtozat a TELJES
+      // order_legs tablat aggregalta minden hivasnal.
       const legsSubquery = `
-        LEFT JOIN (
-          SELECT order_id,
-                 COUNT(*)::int AS leg_count,
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*)::int AS leg_count,
                  JSON_AGG(
                    JSON_BUILD_OBJECT(
-                     'leg_number',    leg_number,
-                     'sofer',         COALESCE(nume_sofer, email_sofer, firma_extern, '—'),
-                     'rendszam',      COALESCE(rendszam_camion, ''),
-                     'loc_preluare',  COALESCE(loc_preluare, '')
-                   ) ORDER BY leg_number
+                     'leg_number',    l.leg_number,
+                     'sofer',         COALESCE(l.nume_sofer, l.email_sofer, l.firma_extern, '—'),
+                     'rendszam',      COALESCE(l.rendszam_camion, ''),
+                     'loc_preluare',  COALESCE(l.loc_preluare, '')
+                   ) ORDER BY l.leg_number
                  ) AS legs_json
-          FROM order_legs
-          GROUP BY order_id
-        ) legs ON legs.order_id = o.id`;
+          FROM order_legs l
+          WHERE l.order_id = o.id
+        ) legs ON true`;
       let r;
       if (me.pozicio === 'Admin' || me.pozicio === 'Manager') {
         r = await pool.query(
@@ -65,7 +67,7 @@ handlers.comList = async function (req, res, args) {
                   COALESCE(legs.leg_count, 0) AS leg_count,
                   COALESCE(legs.legs_json, '[]'::json) AS legs_json
            FROM orders o ${legsSubquery}
-           WHERE o.company_id = $1 ORDER BY o.created_at DESC`,
+           WHERE o.company_id = $1 ORDER BY o.created_at DESC LIMIT 500`,
           [cid]
         );
       } else {
@@ -78,7 +80,7 @@ handlers.comList = async function (req, res, args) {
                   COALESCE(legs.legs_json, '[]'::json) AS legs_json
            FROM orders o ${legsSubquery}
            WHERE o.company_id = $1 AND LOWER(o.email_sofer) = LOWER($2)
-           ORDER BY o.created_at DESC`,
+           ORDER BY o.created_at DESC LIMIT 500`,
           [cid, me.email]
         );
       }

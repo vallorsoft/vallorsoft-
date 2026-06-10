@@ -88,7 +88,7 @@ handlers.invRevoke = async function (req, res, args) {
 
       // 🔒 Manager csak Sofer meghivot vonhat vissza
       if (req.session.user.pozicio === 'Manager') {
-        const check = await pool.query('SELECT pozicio FROM invites WHERE kod = $1', [kod]);
+        const check = await pool.query('SELECT pozicio FROM invites WHERE kod = $1 AND company_id = $2', [kod, req.session.user.company_id]);
         if (check.rows.length === 0) {
           return res.json({ result: { ok: false, err: 'Nem talalhato.' } });
         }
@@ -98,8 +98,8 @@ handlers.invRevoke = async function (req, res, args) {
       }
 
       const r = await pool.query(
-        `UPDATE invites SET status = 'Visszavonva' WHERE kod = $1`,
-        [kod]
+        `UPDATE invites SET status = 'Visszavonva' WHERE kod = $1 AND company_id = $2`,
+        [kod, req.session.user.company_id]
       );
       if (r.rowCount === 0) {
         return res.json({ result: { ok: false, err: 'Nem talalhato.' } });

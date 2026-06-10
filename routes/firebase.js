@@ -27,10 +27,16 @@ router.get('/api/firebase-config', requireLogin, (req, res) => {
 
 // HERE Maps kliens-konfiguracio — csak az API kulcsot adja vissza a terkep-csempekhez.
 // A kulcs SOHA nem kerul kozvetlenul HTML-be/kliens JS-be, csak innen toltodik.
+// Térkép-betöltésenkénti BECSÜLT csempeszám. A csempéket a böngésző közvetlenül
+// a HERE-től tölti (a szerver nem proxyzza), ezért pontos szerveroldali mérés
+// nem lehetséges — a becslés env-ből hangolható (HERE_TILE_EST_PER_LOAD).
+// FIGYELEM: ebből EUR-számla készülhet, a developer-felületen az árazásnál
+// ezt becslésként kell kommunikálni.
+const TILE_EST_PER_LOAD = Math.max(0, parseInt(process.env.HERE_TILE_EST_PER_LOAD || '20', 10) || 0);
+
 router.get('/api/here-config', requireLogin, (req, res) => {
   const apiKey = process.env.HERE_API_KEY || null;
-  // Térkép betöltés -> becsült raster_tile használat (átlag 20 csempe / betöltés)
-  if (apiKey) logHereTransaction('raster_tile', 20, req.session.user.company_id, req.session.user.id);
+  if (apiKey && TILE_EST_PER_LOAD) logHereTransaction('raster_tile', TILE_EST_PER_LOAD, req.session.user.company_id, req.session.user.id);
   res.json({ apiKey });
 });
 

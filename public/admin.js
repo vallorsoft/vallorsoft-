@@ -742,13 +742,13 @@ function openOrderEdit(id) {
   _oeOrderId = id;
   document.getElementById('oeModalId').textContent = id;
 
-  // Adatok betöltése
+  // Adatok betöltése. A getOrderById közvetlen fetch-csel megy, mert a gas()
+  // a d.result-ot adja vissza, itt viszont a d.legs is kell — ezért NEM kérjük
+  // le még egyszer a Promise.all-ban (korábban duplán futott).
   Promise.all([
-    gas('getOrderById', [id]),
     gas('userListAll'),
     gas('vehicleList')
   ]).then(function(results) {
-    // getOrderById result + legs
     fetch('/api/execute', {method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({functionName:'getOrderById',arguments:[id]})})
     .then(r=>r.json()).then(function(d) {
@@ -768,22 +768,22 @@ function openOrderEdit(id) {
       document.getElementById('oeSoferType').value = o.sofer_type||'';
 
       // Sofőr dropdown
-      var users = results[1] || [];
+      var users = results[0] || [];
       _oeSoferCache = users.filter(u => u.pozicio === 'Sofer');
       var sel = document.getElementById('oeEmailSofer');
       sel.innerHTML = '<option value="">— Válassz —</option>' +
-        _oeSoferCache.map(u => '<option value="'+u.email+'"'+(u.email===o.email_sofer?' selected':'')+'>'+u.nume+' ('+u.email+')</option>').join('');
+        _oeSoferCache.map(u => '<option value="'+esc(u.email)+'"'+(u.email===o.email_sofer?' selected':'')+'>'+esc(u.nume)+' ('+esc(u.email)+')</option>').join('');
 
       // Jármű dropdown
-      var vehicles = results[2] || [];
+      var vehicles = results[1] || [];
       _oeCamionCache = vehicles.filter(v => v.tip === 'Vontato');
       _oeRemorcaCache = vehicles.filter(v => v.tip === 'Potkocsi');
       var camSel = document.getElementById('oeCamion');
       camSel.innerHTML = '<option value="">— Nincs —</option>' +
-        _oeCamionCache.map(v => '<option value="'+v.rendszam+'"'+(v.rendszam===o.rendszam_camion?' selected':'')+'>'+v.rendszam+(v.marca?' — '+v.marca:'')+'</option>').join('');
+        _oeCamionCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_camion?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
       var remSel = document.getElementById('oeRemorca');
       remSel.innerHTML = '<option value="">— Nincs —</option>' +
-        _oeRemorcaCache.map(v => '<option value="'+v.rendszam+'"'+(v.rendszam===o.rendszam_remorca?' selected':'')+'>'+v.rendszam+(v.marca?' — '+v.marca:'')+'</option>').join('');
+        _oeRemorcaCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_remorca?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
 
       if (o.sofer_type === 'Extern') {
         document.getElementById('oeNumeSoferExtern').value = o.nume_sofer||'';

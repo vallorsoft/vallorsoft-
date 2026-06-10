@@ -15,8 +15,8 @@ A teljes hibalista **6 lépésben (6 commit)** kerül kijavításra. Állapot:
 | **2. Azonosítók + DB-integritás** | K4 (CMD/FUV ütközés), K6 (sorszám-nullázás), M2 (dupla számla), M4 (push-index), M5 (FK ON DELETE), M6 (migráció-szinkron), M7 (GIN index) | ✅ **KÉSZ** |
 | **3. Tranzakciók + szolgáltatás-robusztusság** | M1 (tranzakciók), M3 (scheduler-őr), M8 (2FA rate-limit), M10 (méretsapkák), M12 (OCR-út), K06–K08 (Brevo timeout, e-mail escape, intake-hibakezelés) | ✅ **KÉSZ** |
 | **4. XSS-mentesítés + PWA-ikonok** | K7 (legacy render-függvények + soferApi HTML escape), M11 (ikonok) | ✅ **KÉSZ** |
-| **5. Közepes szerver-javítások** | K01 (diurna időzóna), K02 (HERE-elszámolás), K03–K05 (cégszűrések), K10 (béta-adapterek), K12–K16, K23 | ⏳ következik |
-| **6. Frontend + maradék** | K11 (GPS-polling), K18 (feature-kulcsok), K19–K21, alacsony prioritású tételek | ⬜ |
+| **5. Közepes szerver-javítások** | K01 (diurna időzóna), K02 (HERE-elszámolás), K03–K05 (cégszűrések), K10 (béta-adapterek), K12–K16, K23 | ✅ **KÉSZ** |
+| **6. Frontend + maradék** | K11 (GPS-polling), K18 (feature-kulcsok), K19–K21, alacsony prioritású tételek | ⏳ következik |
 
 **1. lépésben elvégzett javítások (részletesen):**
 - **K1** — `routes/soferApi.js`: a `/api/pdf-download/:id` mostantól bejelentkezést követel és cégre szűr (`email_sofer IN (SELECT email FROM users WHERE company_id=$2)`).
@@ -57,7 +57,22 @@ A teljes hibalista **6 lépésben (6 commit)** kerül kijavításra. Állapot:
 - ⚠️ Ismert maradvány (6. lépésre): `developer.html` ~356 — a `viewCompBilling('...')` onclick JS-string kontextusa entity-escape-pel nem védhető; id-alapú kiváltás kell.
 - ✅ Tesztek: 5 suite / 17 teszt zöld; minden JS `node --check` OK.
 
-**Következik (5. lépés):** közepes szerver-javítások — diurna időzóna (Europe/Bucharest napi bontás), HERE raster-tile elszámolás (fix 20-as becslés helyett), maradék cégszűrések (userUpdate/userDelete/extDriverUpdate/invRevoke/utolsó-admin), comList LIMIT + lateral, diurna-stats N+1, sofőr-listák LIMIT, hibaüzenet-szivárgás, openOrderEdit dupla-fetch, parseInt-validálás, béta számlázó-adapterek jelölése.
+**5. lépésben elvégzett javítások (részletesen):**
+- **K01** — `lib/diurna.js`: a napi bontás mostantól Europe/Bucharest naptári napok szerint történik (a korábbi UTC-bontás az éjfél körüli határátlépést rossz naphoz sorolta, ami a napidíj EXTERN/INTERN besorolását torzította). Füstteszttel igazolva, a meglévő tesztek zöldek.
+- **K02** — `routes/firebase.js`: a térkép-betöltésenkénti raster_tile becslés env-ből hangolható (`HERE_TILE_EST_PER_LOAD`, alap 20), kommentben dokumentálva, hogy ez BECSLÉS és számlázási tétel — a pontos mérés a kliens-oldali közvetlen HERE-letöltés miatt szerverről nem lehetséges.
+- **K03** — `handlers/users.js`: a `userUpdate` UPDATE-je és a `userDelete` DELETE-je mostantól maga is `company_id`-re szűr (nem csak az elő-ellenőrzés); `handlers/fleet.js` (`extDriverUpdate`): cégszűrés az UPDATE-en (tényleges cross-tenant rés zárva).
+- **K04** — `handlers/users.js`: az „utolsó Admin” védelem cégenként számol (két helyen).
+- **K05** — `handlers/invites.js` (`invRevoke`): cégszűrés az elő-ellenőrzésen és az UPDATE-en.
+- **K10** — `ifactura-adapter.js` / `facturis-adapter.js`: a testConnection hálózati hibánál `unverified:true` flaget és ⚠️ BÉTA figyelmeztetést ad a hamis zöld pipa helyett.
+- **K12** — `handlers/orders.js` (`comList`): a leg-aggregálás LATERAL-lá alakítva (a teljes `order_legs` tábla aggregálása helyett fuvaronként, indexszel) + `LIMIT 500` mindkét ágon.
+- **K13** — `routes/soferApi.js` (`/api/diurna-stats`): N+1 megszüntetve — egyetlen lekérdezés `ANY($1)`-gyel, 90 napos ablakkal, JS-csoportosítással.
+- **K14** — `handlers/documents.js`: LIMIT 200 a sofőr-ági listákon (menetlevelek, dokumentumok, határnapló).
+- **K15** — `routes/clients.js`, `routes/uit.js`, `routes/client-mail.js`, `routes/inbound-orders.js`: a nyers `e.message` válaszok generikus „Szerver hiba” üzenetre cserélve + szerver-oldali log; a szándékosan felszínre hozott üzleti hibák (ANAF/VIES/Brevo/UIT-szolgáltatói üzenetek) érintetlenek.
+- **K16** — `public/admin.js` (`openOrderEdit`): a duplikált `getOrderById` hívás megszüntetve (a manager.js-ben nem volt); BÓNUSZ: a modal sofőr/jármű-dropdownjai escape-elve mindkét fájlban (a 4. lépésből kimaradt XSS-sink).
+- **K23** — `handlers/developer.js` (`devCompanyUpdate`): `parseInt` NaN-védelemmel (`intOrNull`).
+- ✅ Tesztek: 5 suite / 17 teszt zöld.
+
+**Következik (6. lépés):** frontend + maradék — GPS-polling ritkítása/cache (K11), feature-kulcs összehangolás (K18), listabetöltők hibaága (K19), Firebase listener-leak (K20), asset-verziózás (K21), `viewCompBilling` onclick-injektálás (4. lépés maradványa), valamint az alacsony prioritású tételek (halott kód, `lang="hu"`, Gemini header-kulcs, stb.).
 
 ---
 

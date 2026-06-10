@@ -116,7 +116,8 @@ handlers.userUpdate = async function (req, res, args) {
         // - utolso Admin nem fokozhato le (rendszer mindig kell legyen egy Admin)
         if (targetUser.pozicio === 'Admin' && fields.pozicio !== 'Admin') {
           const adminCount = await pool.query(
-            "SELECT COUNT(*)::int AS db FROM users WHERE pozicio = 'Admin'"
+            "SELECT COUNT(*)::int AS db FROM users WHERE pozicio = 'Admin' AND company_id = $1",
+            [req.session.user.company_id]
           );
           if (adminCount.rows[0].db <= 1) {
             return res.json({ result: { ok: false, err: 'Nem maradhat a rendszer Admin nelkul.' } });
@@ -136,8 +137,10 @@ handlers.userUpdate = async function (req, res, args) {
         return res.json({ result: { ok: false, err: 'Nincs mit modositani.' } });
       }
 
+      // Az iras maga is cegre szurve fut — egy kesobbi refaktor ne nyithasson cross-tenant rest
       values.push(targetEmail);
-      const sql = `UPDATE users SET ${updates.join(', ')} WHERE email = $${i}`;
+      values.push(req.session.user.company_id);
+      const sql = `UPDATE users SET ${updates.join(', ')} WHERE email = $${i} AND company_id = $${i + 1}`;
       const r = await pool.query(sql, values);
 
       if (r.rowCount === 0) {
@@ -189,14 +192,15 @@ handlers.userDelete = async function (req, res, args) {
       // 🔒 KIEGESZITES: utolso Admin torlese sem engedett
       if (targetRes.rows[0].pozicio === 'Admin') {
         const adminCount = await pool.query(
-          "SELECT COUNT(*)::int AS db FROM users WHERE pozicio = 'Admin'"
+          "SELECT COUNT(*)::int AS db FROM users WHERE pozicio = 'Admin' AND company_id = $1",
+          [req.session.user.company_id]
         );
         if (adminCount.rows[0].db <= 1) {
           return res.json({ result: { ok: false, err: 'Az utolso Admin nem torolheto.' } });
         }
       }
 
-      const r = await pool.query('DELETE FROM users WHERE email = $1', [targetEmail]);
+      const r = await pool.query('DELETE FROM users WHERE email = $1 AND company_id = $2', [targetEmail, req.session.user.company_id]);
       if (r.rowCount === 0) {
         return res.json({ result: { ok: false, err: 'Felhasznalo nem talalhato.' } });
       }

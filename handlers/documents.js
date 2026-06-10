@@ -160,7 +160,7 @@ handlers.getFuvarlevelek = async function (req, res, args) {
         r = await pool.query(
           `SELECT id, file_name, numar_fisa, email_sofer, nume_sofer, data_completare, total_km, consum_100, order_ids
            FROM fuvarlevelek WHERE email_sofer = $1
-           ORDER BY data_completare DESC`,
+           ORDER BY data_completare DESC LIMIT 200`,
           [me.email]
         );
       }
@@ -257,7 +257,7 @@ handlers.getDriverDocs = async function (req, res, args) {
       const isAdmin = ['Admin', 'Manager'].includes(req.session.user.pozicio);
       const r = isAdmin
         ? await pool.query('SELECT d.id, d.email_sofer, d.nume_sofer, d.tip, d.file_name, d.created_at FROM documents d JOIN users u ON u.email = d.email_sofer WHERE u.company_id = $1 ORDER BY d.created_at DESC LIMIT 200', [cid])
-        : await pool.query('SELECT id, email_sofer, nume_sofer, tip, file_name, created_at FROM documents WHERE email_sofer = $1 ORDER BY created_at DESC', [req.session.user.email]);
+        : await pool.query('SELECT id, email_sofer, nume_sofer, tip, file_name, created_at FROM documents WHERE email_sofer = $1 ORDER BY created_at DESC LIMIT 200', [req.session.user.email]);
       return res.json({ result: r.rows });
     } catch (err) {
       console.error('getDriverDocs hiba:', err);
@@ -272,7 +272,7 @@ handlers.getBorderLogs = async function (req, res, args) {
       const isAdmin = ['Admin', 'Manager'].includes(req.session.user.pozicio);
       const r = isAdmin
         ? await pool.query('SELECT bc.* FROM border_crossings bc JOIN users u ON u.email = bc.email_sofer WHERE u.company_id = $1 ORDER BY bc.created_at DESC LIMIT 200', [cid])
-        : await pool.query('SELECT * FROM border_crossings WHERE email_sofer = $1 ORDER BY created_at DESC', [req.session.user.email]);
+        : await pool.query('SELECT * FROM border_crossings WHERE email_sofer = $1 ORDER BY created_at DESC LIMIT 200', [req.session.user.email]);
       return res.json({ result: r.rows });
     } catch (err) {
       console.error('getBorderLogs hiba:', err);

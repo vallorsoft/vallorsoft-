@@ -34,7 +34,7 @@ router.get('/api/inbound-orders/settings', requireLogin, requireRole('Admin', 'M
     const cfg = await pool.query(
       `SELECT 1 FROM company_integrations WHERE company_id=$1 AND provider='email_intake' AND enabled=true AND credentials_enc IS NOT NULL`, [own(req)]);
     res.json({ ai_enabled: !!(rows[0] && rows[0].meta && rows[0].meta.ai_enabled), intake_configured: cfg.rows.length > 0 });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('GET /api/inbound-orders/settings hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 router.post('/api/inbound-orders/settings', requireLogin, requireRole('Admin'), async (req, res) => {
   const ai = req.body.ai_enabled === true || req.body.ai_enabled === 'true';
@@ -45,7 +45,7 @@ router.post('/api/inbound-orders/settings', requireLogin, requireRole('Admin'), 
        ON CONFLICT (company_id, provider) DO UPDATE SET meta=$2, updated_at=now()`,
       [own(req), JSON.stringify({ ai_enabled: ai })]);
     res.json({ ok: true, ai_enabled: ai });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/inbound-orders/settings hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- Kézi lekérdezés (teszthez, fiók beállítása után) ----
@@ -59,7 +59,7 @@ router.post('/api/inbound-orders/poll', requireLogin, requireRole('Admin', 'Mana
       await pool.query(`UPDATE company_integrations SET last_check=now() WHERE company_id=$1 AND provider='email_intake'`, [own(req)]).catch(() => {});
     }
     res.json(r);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/inbound-orders/poll hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- Lista ----
@@ -72,7 +72,7 @@ router.get('/api/inbound-orders', requireLogin, requireRole('Admin', 'Manager'),
     sql += ` ORDER BY received_at DESC NULLS LAST, created_at DESC LIMIT 200`;
     const { rows } = await pool.query(sql, params);
     res.json({ items: rows });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('GET /api/inbound-orders hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- Eredeti PDF megnyitása ----
@@ -83,7 +83,7 @@ router.get('/api/inbound-orders/:id/pdf', requireLogin, requireRole('Admin', 'Ma
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${(rows[0].pdf_name || 'comanda.pdf').replace(/"/g, '')}"`);
     res.send(rows[0].pdf_data);
-  } catch (e) { res.status(500).send(e.message); }
+  } catch (e) { console.error('GET /api/inbound-orders/:id/pdf hiba:', e); res.status(500).send('Szerver hiba'); }
 });
 
 // ---- Kiolvasott mezők mentése (diszpécser javítja) ----
@@ -95,7 +95,7 @@ router.put('/api/inbound-orders/:id', requireLogin, requireRole('Admin', 'Manage
       [JSON.stringify(req.body.extracted || {}), req.params.id, own(req)]);
     if (!rows.length) return res.status(404).json({ error: 'Nem található vagy már jóváhagyott.' });
     res.json({ item: rows[0] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('PUT /api/inbound-orders/:id hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- Újrafeldolgozás (a tárolt PDF/szövegből) ----
@@ -114,7 +114,7 @@ router.post('/api/inbound-orders/:id/reparse', requireLogin, requireRole('Admin'
          WHERE id=$4 AND company_id=$5 RETURNING ${LIST_COLS}`,
       [JSON.stringify(r.fields), r.confidence, r.ai_used, req.params.id, own(req)]);
     res.json({ item: rows[0] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/inbound-orders/:id/reparse hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- Elvetés ----
@@ -122,7 +122,7 @@ router.post('/api/inbound-orders/:id/reject', requireLogin, requireRole('Admin',
   try {
     await pool.query(`UPDATE inbound_orders SET status='rejected', updated_at=now() WHERE id=$1 AND company_id=$2`, [req.params.id, own(req)]);
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/inbound-orders/:id/reject hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---- Jóváhagyás -> valódi orders rekord (Disponibil / Alocat) ----
@@ -202,7 +202,7 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
     } catch (e) { /* a dokumentum-csatolás hibája ne buktassa a jóváhagyást */ }
 
     res.json({ ok: true, order_id: id, status });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/inbound-orders/:id/approve hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 module.exports = router;

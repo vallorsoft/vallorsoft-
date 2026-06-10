@@ -26,7 +26,7 @@ router.get('/api/branding/logo', requireLogin, requireRole('Admin', 'Manager'), 
     const { rows } = await pool.query(`SELECT logo_base64, logo_mime, updated_at FROM company_branding WHERE company_id=$1`, [own(req)]);
     const has = !!(rows[0] && rows[0].logo_base64);
     res.json({ has, mime: has ? rows[0].logo_mime : null, dataUri: has ? `data:${rows[0].logo_mime};base64,${rows[0].logo_base64}` : null });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('GET /api/branding/logo hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 router.post('/api/branding/logo', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   let b64 = String(req.body.base64 || '');
@@ -41,11 +41,11 @@ router.post('/api/branding/logo', requireLogin, requireRole('Admin', 'Manager'),
        ON CONFLICT (company_id) DO UPDATE SET logo_base64=$2, logo_mime=$3, updated_at=now()`,
       [own(req), b64, mime]);
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/branding/logo hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 router.delete('/api/branding/logo', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   try { await pool.query(`DELETE FROM company_branding WHERE company_id=$1`, [own(req)]); res.json({ ok: true }); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  catch (e) { console.error('DELETE /api/branding/logo hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---------- E-mail sablonok (CRUD) ----------
@@ -53,7 +53,7 @@ router.get('/api/email-templates', requireLogin, requireRole('Admin', 'Manager')
   try {
     const { rows } = await pool.query(`SELECT id, name, subject, body, updated_at FROM email_templates WHERE company_id=$1 ORDER BY name`, [own(req)]);
     res.json({ items: rows });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('GET /api/email-templates hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 router.post('/api/email-templates', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   const name = String(req.body.name || '').trim();
@@ -64,7 +64,7 @@ router.post('/api/email-templates', requireLogin, requireRole('Admin', 'Manager'
        RETURNING id, name, subject, body, updated_at`,
       [own(req), name, String(req.body.subject || ''), String(req.body.body || ''), req.session.user.id]);
     res.json({ item: rows[0] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/email-templates hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 router.put('/api/email-templates/:id', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   try {
@@ -74,11 +74,11 @@ router.put('/api/email-templates/:id', requireLogin, requireRole('Admin', 'Manag
       [String(req.body.name || '').trim(), String(req.body.subject || ''), String(req.body.body || ''), req.params.id, own(req)]);
     if (!rows.length) return res.status(404).json({ error: 'Nem található.' });
     res.json({ item: rows[0] });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('PUT /api/email-templates/:id hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 router.delete('/api/email-templates/:id', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   try { await pool.query(`DELETE FROM email_templates WHERE id=$1 AND company_id=$2`, [req.params.id, own(req)]); res.json({ ok: true }); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  catch (e) { console.error('DELETE /api/email-templates/:id hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---------- Beszélgetés-előzmény ----------
@@ -91,7 +91,7 @@ router.get('/api/client-mail', requireLogin, requireRole('Admin', 'Manager'), as
     sql += ` ORDER BY sent_at DESC LIMIT 100`;
     const { rows } = await pool.query(sql, params);
     res.json({ items: rows });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('GET /api/client-mail hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 // ---------- Küldés (Brevo) + naplózás ----------
@@ -125,7 +125,7 @@ router.post('/api/client-mail/send', requireLogin, requireRole('Admin', 'Manager
 
     if (!result.ok) return res.status(502).json({ error: result.error });
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { console.error('POST /api/client-mail/send hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
 });
 
 module.exports = router;

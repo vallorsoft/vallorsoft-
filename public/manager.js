@@ -812,12 +812,12 @@ function openOrderEdit(id){
       document.getElementById('oeSoferType').value=o.sofer_type||'';
       _oeSoferCache=results[0].filter(u=>u.pozicio==='Sofer');
       var sel=document.getElementById('oeEmailSofer');
-      sel.innerHTML='<option value="">— Válassz —</option>'+_oeSoferCache.map(u=>'<option value="'+u.email+'"'+(u.email===o.email_sofer?' selected':'')+'>'+u.nume+' ('+u.email+')</option>').join('');
+      sel.innerHTML='<option value="">— Válassz —</option>'+_oeSoferCache.map(u=>'<option value="'+esc(u.email)+'"'+(u.email===o.email_sofer?' selected':'')+'>'+esc(u.nume)+' ('+esc(u.email)+')</option>').join('');
       var vehicles=results[1]||[];
       _oeCamionCache=vehicles.filter(v=>v.tip==='Vontato');
       _oeRemorcaCache=vehicles.filter(v=>v.tip==='Potkocsi');
-      document.getElementById('oeCamion').innerHTML='<option value="">— Nincs —</option>'+_oeCamionCache.map(v=>'<option value="'+v.rendszam+'"'+(v.rendszam===o.rendszam_camion?' selected':'')+'>'+v.rendszam+(v.marca?' — '+v.marca:'')+'</option>').join('');
-      document.getElementById('oeRemorca').innerHTML='<option value="">— Nincs —</option>'+_oeRemorcaCache.map(v=>'<option value="'+v.rendszam+'"'+(v.rendszam===o.rendszam_remorca?' selected':'')+'>'+v.rendszam+(v.marca?' — '+v.marca:'')+'</option>').join('');
+      document.getElementById('oeCamion').innerHTML='<option value="">— Nincs —</option>'+_oeCamionCache.map(v=>'<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_camion?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
+      document.getElementById('oeRemorca').innerHTML='<option value="">— Nincs —</option>'+_oeRemorcaCache.map(v=>'<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_remorca?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
       if(o.sofer_type==='Extern'){document.getElementById('oeNumeSoferExtern').value=o.nume_sofer||'';document.getElementById('oeFirmaExtern').value=o.firma_extern||'';}
       oeToggleSoferType();
       renderOeLegs(legs);

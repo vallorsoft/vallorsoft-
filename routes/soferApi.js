@@ -37,12 +37,21 @@ router.get('/api/diurna-stats', requireLogin, requireRole('Manager','Admin'), as
   const cid = req.session.user.company_id;
   try {
     const sofors = await pool.query(`SELECT id, nume, email FROM users WHERE company_id=$1 AND pozicio='Sofer' ORDER BY nume`, [cid]);
-    const result = [];
-    for (const s of sofors.rows) {
-      const cr = await pool.query(`SELECT CASE WHEN tip='Iesire' THEN 'OUT' WHEN tip='Intrare' THEN 'IN' ELSE tip END AS direction, created_at AS crossed_at FROM border_crossings WHERE email_sofer=$1 ORDER BY created_at ASC`, [s.email]);
-      const d = calculateDiurna(cr.rows);
-      result.push({ driver_id:s.id, nume:s.nume, email:s.email, externDays:d.externDays, internDays:d.internDays, crossingLog:d.crossingLog });
+    // Egyetlen lekérdezés az összes sofőrre (a korábbi sofőrönkénti, teljes
+    // történetes körök helyett) — 90 napos ablak, mint a fuvarlevel-save-nél.
+    const emails = sofors.rows.map(s => s.email);
+    const byEmail = {};
+    if (emails.length) {
+      const cr = await pool.query(
+        `SELECT email_sofer, CASE WHEN tip='Iesire' THEN 'OUT' WHEN tip='Intrare' THEN 'IN' ELSE tip END AS direction, created_at AS crossed_at
+         FROM border_crossings WHERE email_sofer = ANY($1) AND created_at >= NOW() - INTERVAL '90 days'
+         ORDER BY created_at ASC`, [emails]);
+      for (const row of cr.rows) (byEmail[row.email_sofer] = byEmail[row.email_sofer] || []).push(row);
     }
+    const result = sofors.rows.map(s => {
+      const d = calculateDiurna(byEmail[s.email] || []);
+      return { driver_id:s.id, nume:s.nume, email:s.email, externDays:d.externDays, internDays:d.internDays, crossingLog:d.crossingLog };
+    });
     return res.json({ ok:true, data:result });
   } catch(err) { return res.json({ ok:false }); }
 });

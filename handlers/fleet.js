@@ -285,7 +285,8 @@ handlers.extDriverUpdate = async function (req, res, args) {
 
       updates.push(`updated_at = NOW()`);
       values.push(id);
-      const sql = `UPDATE external_drivers SET ${updates.join(', ')} WHERE id = $${i}`;
+      values.push(req.session.user.company_id);
+      const sql = `UPDATE external_drivers SET ${updates.join(', ')} WHERE id = $${i} AND company_id = $${i + 1}`;
       const r = await pool.query(sql, values);
 
       if (r.rowCount === 0) {

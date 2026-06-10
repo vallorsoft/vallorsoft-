@@ -36,8 +36,10 @@ handlers.devCompanyUpdate = async function (req, res, args) {
       if (f.paid_until !== undefined) { updates.push(`paid_until=$${i++}`); values.push(f.paid_until || null); }
       if (f.email_contact !== undefined) { updates.push(`email_contact=$${i++}`); values.push(f.email_contact); }
       if (f.telefon !== undefined) { updates.push(`telefon=$${i++}`); values.push(f.telefon); }
-      if (f.max_users !== undefined) { updates.push(`max_users=$${i++}`); values.push(parseInt(f.max_users)); }
-      if (f.max_trucks !== undefined) { updates.push(`max_trucks=$${i++}`); values.push(parseInt(f.max_trucks)); }
+      // NaN-védelem: nem szám bemenetnél NULL kerül a DB-be (22P02 hiba helyett)
+      const intOrNull = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null; };
+      if (f.max_users !== undefined) { updates.push(`max_users=$${i++}`); values.push(intOrNull(f.max_users)); }
+      if (f.max_trucks !== undefined) { updates.push(`max_trucks=$${i++}`); values.push(intOrNull(f.max_trucks)); }
       if (f.igazgato_nev !== undefined) { updates.push(`igazgato_nev=$${i++}`); values.push(f.igazgato_nev); }
       if (!updates.length) return res.json({ result: { ok: false, err: 'Nincs mit modositani' } });
       values.push(id);

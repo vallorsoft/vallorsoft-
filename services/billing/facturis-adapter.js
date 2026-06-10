@@ -27,7 +27,8 @@ class FacturisAdapter {
       if (r.status === 429) return { ok: false, message: 'Facturis API limit elérve.' };
       return { ok: true, message: 'Facturis adatok rögzítve.' };
     } catch (e) {
-      return { ok: true, message: 'Facturis adatok rögzítve (a kapcsolat élesben ellenőrződik).' };
+      // BÉTA: a publikus API-séma nem megerősített — lásd ifactura-adapter.
+      return { ok: true, unverified: true, message: '⚠️ Facturis (BÉTA): a kapcsolat NEM ellenőrizhető (' + e.message + ') — az adatok rögzítve, de éles számlázás előtt kötelező a tesztelés.' };
     }
   }
 

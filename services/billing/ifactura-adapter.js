@@ -22,8 +22,9 @@ class IFacturaAdapter {
       if (r.status === 429) return { ok: false, message: 'iFactura API limit elérve.' };
       return { ok: true, message: 'iFactura adatok rögzítve.' };
     } catch (e) {
-      // Hálózati hiba esetén is elfogadjuk a rögzítést (a végpont változhat).
-      return { ok: true, message: 'iFactura adatok rögzítve (a kapcsolat élesben ellenőrződik).' };
+      // BÉTA: a publikus API-séma nem megerősített — a hibát nem rejtjük el,
+      // de jelezzük, hogy az adatok rögzíthetők (unverified flaggel).
+      return { ok: true, unverified: true, message: '⚠️ iFactura (BÉTA): a kapcsolat NEM ellenőrizhető (' + e.message + ') — az adatok rögzítve, de éles számlázás előtt kötelező a tesztelés.' };
     }
   }
 
