@@ -63,7 +63,7 @@ function friendlyError(status, body) {
 async function callGemini(model, parts) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) { const e = new Error('Hiányzik a GEMINI_API_KEY.'); e.code = 'NO_KEY'; throw e; }
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const payload = JSON.stringify({
     systemInstruction: { parts: [{ text: PROMPT }] },
     contents: [{ role: 'user', parts }],
@@ -77,7 +77,9 @@ async function callGemini(model, parts) {
     try {
       res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // A kulcs headerben megy (nem query stringben) — a query string
+        // proxy-/szerver-logokba kerülhetne.
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
         signal: ctrl.signal,
         body: payload,
       });

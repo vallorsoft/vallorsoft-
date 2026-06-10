@@ -113,7 +113,7 @@ function loadUsers(){
         : '';
       return `<tr><td>${esc(u.nume)}</td><td>${esc(u.email)}</td><td>${esc(u.tel||'—')}</td><td><span class="badge info">${u.pozicio}</span></td><td>${editBtn}${delBtn}</td></tr>`;
     }).join('');
-  });
+  }).catch(function(e){ console.error('loadUsers hiba:', e); toast('Betöltési hiba','err'); });
 }
 // Gyorsítótár-alapú hívók (a felhasználói adat nem kerül HTML-attribútumba)
 window.editUserIdx = (i) => editUser(window._vsUsersCache[i]);

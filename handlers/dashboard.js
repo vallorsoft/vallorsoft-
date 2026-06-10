@@ -132,12 +132,23 @@ handlers.getVehicleStatusSummary = async function (req, res, args) {
   }
 };
 
+// Rövid memória-cache a pozíciókra: több nyitott dashboard (vagy gyors
+// fülváltás) ne sokszorozza a GPS-szolgáltató felé menő hívásokat —
+// 300 felhasználónál ez a fő upstream-terhelés-csökkentő.
+const _posCache = new Map(); // company_id -> { ts, payload }
+const POS_CACHE_MS = 30 * 1000;
+
 handlers.getActiveVehiclePositions = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
       return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
     }
     const cid = req.session.user.company_id;
+
+    const cached = _posCache.get(cid);
+    if (cached && Date.now() - cached.ts < POS_CACHE_MS) {
+      return res.json({ result: cached.payload });
+    }
 
     // GPS (CargoTrack) kulcs — a pozíciók ÉLŐBEN jönnek a szolgáltatótól,
     // a vehicle_gps_map csak rendszám<->object_id párosítást tárol.
@@ -160,9 +171,14 @@ handlers.getActiveVehiclePositions = async function (req, res, args) {
       return res.json({ result: { ok: true, gps_configured: true, positions: [] } });
     }
 
+    // Azonos object_id-k összevonása (egy GPS-eszköz több rendszámhoz párosítva
+    // se kérdeződjön le többször).
+    const byObjectId = new Map();
+    for (const m of mapR.rows) if (!byObjectId.has(m.object_id)) byObjectId.set(m.object_id, m);
+
     // Párhuzamos lekérés, jármű-hibák ne döntsék el az egészet.
     const settled = await Promise.allSettled(
-      mapR.rows.map(async (m) => {
+      [...byObjectId.values()].map(async (m) => {
         const st = await ctSvc.getLatestStatus(apiKey, m.object_id);
         if (!st || st.latitude == null || st.longitude == null) return null;
         return {
@@ -180,7 +196,9 @@ handlers.getActiveVehiclePositions = async function (req, res, args) {
       .filter((r) => r.status === 'fulfilled' && r.value)
       .map((r) => r.value);
 
-    return res.json({ result: { ok: true, gps_configured: true, positions } });
+    const payload = { ok: true, gps_configured: true, positions };
+    _posCache.set(cid, { ts: Date.now(), payload });
+    return res.json({ result: payload });
   } catch (err) {
     console.error('getActiveVehiclePositions hiba:', err);
     return res.json({ result: { ok: false, err: 'Szerver hiba' } });

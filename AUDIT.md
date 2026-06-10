@@ -16,7 +16,7 @@ A teljes hibalista **6 lépésben (6 commit)** kerül kijavításra. Állapot:
 | **3. Tranzakciók + szolgáltatás-robusztusság** | M1 (tranzakciók), M3 (scheduler-őr), M8 (2FA rate-limit), M10 (méretsapkák), M12 (OCR-út), K06–K08 (Brevo timeout, e-mail escape, intake-hibakezelés) | ✅ **KÉSZ** |
 | **4. XSS-mentesítés + PWA-ikonok** | K7 (legacy render-függvények + soferApi HTML escape), M11 (ikonok) | ✅ **KÉSZ** |
 | **5. Közepes szerver-javítások** | K01 (diurna időzóna), K02 (HERE-elszámolás), K03–K05 (cégszűrések), K10 (béta-adapterek), K12–K16, K23 | ✅ **KÉSZ** |
-| **6. Frontend + maradék** | K11 (GPS-polling), K18 (feature-kulcsok), K19–K21, alacsony prioritású tételek | ⏳ következik |
+| **6. Frontend + maradék** | K11 (GPS-polling), K18 (feature-kulcsok), K19–K21, alacsony prioritású tételek | ✅ **KÉSZ** |
 
 **1. lépésben elvégzett javítások (részletesen):**
 - **K1** — `routes/soferApi.js`: a `/api/pdf-download/:id` mostantól bejelentkezést követel és cégre szűr (`email_sofer IN (SELECT email FROM users WHERE company_id=$2)`).
@@ -72,7 +72,30 @@ A teljes hibalista **6 lépésben (6 commit)** kerül kijavításra. Állapot:
 - **K23** — `handlers/developer.js` (`devCompanyUpdate`): `parseInt` NaN-védelemmel (`intOrNull`).
 - ✅ Tesztek: 5 suite / 17 teszt zöld.
 
-**Következik (6. lépés):** frontend + maradék — GPS-polling ritkítása/cache (K11), feature-kulcs összehangolás (K18), listabetöltők hibaága (K19), Firebase listener-leak (K20), asset-verziózás (K21), `viewCompBilling` onclick-injektálás (4. lépés maradványa), valamint az alacsony prioritású tételek (halott kód, `lang="hu"`, Gemini header-kulcs, stb.).
+**6. lépésben elvégzett javítások (részletesen):**
+- **K11** — `handlers/dashboard.js`: 30 mp-es cégenkénti memória-cache a GPS-pozíciókra + azonos `object_id`-k összevonása; `console-shared.js`: a kliens-polling 30 → 60 mp. Több nyitott dashboard sem sokszorozza az upstream CargoTrack-hívásokat.
+- **K18** — `feature-catalog.js`: a `billing` (csak Manager) és `integrations` (csak Admin) kulcsok címkéje és kommentje egyértelműsítve — a developer látja, melyik kapcsoló melyik felületre hat.
+- **K19** — `console-shared.js` (`loadExtDrivers/loadInternalDrivers/loadInvites/loadVehicles`) + `admin.js`/`manager.js` (`loadUsers`): `.catch` ág toast-tal — hálózati hiba többé nem néma.
+- **K20** — `console-shared.js` (`startRoomListListener`): a korábbi Firebase listener leválasztása újra-inicializálásnál (listener-halmozódás megszüntetve).
+- **K21** — mind a 8 HTML: a helyi JS/CSS hivatkozások `?v=20260610` verzió-paramétert kaptak (46 hivatkozás) — deploy után elavult asset nem ragad be. (Deploykor a verziót léptetni kell.)
+- **XSS-maradvány** — `developer.html` (`viewCompBilling`): a számlázó-név többé nem onclick JS-stringben utazik — index-alapú cache.
+- **Alacsony prioritású tételek:** `lang="hu"` minden oldalon; `user-scalable=no` eltávolítva (WCAG 1.4.4); halott `fetchJsonSafe` és a `loadOrders` elérhetetlen blokkja törölve; `services/clients.js` mindig-igaz feltétel egyszerűsítve; Gemini API-kulcs query string helyett `x-goog-api-key` headerben; FGO timeout-üzenet a konstansból; `push-client.js` debug-logok `VS_PUSH_DEBUG` kapcsoló mögött; `db/audit-hardening-2.sql` (redundáns `idx_users_email` törlése).
+- ✅ Tesztek: 5 suite / 17 teszt zöld.
+
+---
+
+### 🔭 Szándékosan NEM ebben a körben javított tételek (külön feladatok)
+
+| Tétel | Miért külön |
+|-------|-------------|
+| **K09** — a fuvar-számlázás átkötése a `services/billing/` keretrendszerre (SmartBill/Oblio fuvar-számla) | Élő számlázási folyamatot érint — éles provider-fiókkal való teszt nélkül kockázatos. A legacy FGO-út működik; a két rendszer együttélése dokumentálva. |
+| **K17** — az admin.js ↔ manager.js ~600 sornyi duplikációjának kiemelése a console-shared.js-be | Nagy mechanikus refaktor — futó felületen való kézi átkattintás nélkül nem biztonságos. Addig: minden javítást mindkét fájlban el kell végezni (ebben a körben így történt). |
+| `alert()/confirm()` → `toast()` csere (inbound-orders.js, invoice-modal.js) | UX-polír, viselkedés-változással; külön kör. |
+| Kártya-modulok hardcoded világos színpalettája (dark módban is fehér modálok) | Vizuális redesign-döntés — az `email-intake-card.js`/`billing-card.js` a követendő minta. |
+| bcrypt cost 10 → 12 | Login-CPU növekedéssel jár; 300 felhasználónál a 10 még elfogadható. |
+| `authRegister` a `requireLogin` mögött (publikus regisztráció nem működhet) | Termék-döntés kell: szándékos-e (csak meghívóval regisztrálás), vagy hiba. |
+| Blob-tárolás kihelyezése (base64 a DB-ben) + `compression()` middleware | Infrastruktúra-változás; a 20 MB-os limit egyelőre kordában tartja. |
+| `here_usage_log`/`bug_reports`/`border_crossings` éves archiválás | 300 felhasználónál évekig nem kritikus; ütemezett feladatként érdemes. |
 
 ---
 

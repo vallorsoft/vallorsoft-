@@ -110,7 +110,7 @@ function loadUsers(){
       const delBtn = canDel ? `<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUserIdx(${i})">Töröl</button>` : '';
       return `<tr><td>${esc(u.nume)}</td><td>${esc(u.email)}</td><td>${esc(u.tel||'—')}</td><td><span class="badge info">${u.pozicio}</span></td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editUserIdx(${i})">Szerk</button> ${delBtn}</td></tr>`;
     }).join('');
-  });
+  }).catch(function(e){ console.error('loadUsers hiba:', e); toast('Betöltési hiba','err'); });
 }
 // Gyorsítótár-alapú hívók (a felhasználói adat nem kerül HTML-attribútumba)
 window.editUserIdx = (i) => editUser(window._vsUsersCache[i]);

@@ -36,7 +36,7 @@ async function call(url, opts) {
     let data; try { data = JSON.parse(text); } catch (_) { data = { Success: false, Message: text }; }
     return data;
   } catch (e) {
-    if (e.name === 'AbortError') { const x = new Error('FGO időtúllépés (15 mp).'); x.status = 504; throw x; }
+    if (e.name === 'AbortError') { const x = new Error(`FGO időtúllépés (${Math.round(TIMEOUT_MS/1000)} mp).`); x.status = 504; throw x; }
     throw e;
   } finally { clearTimeout(t); }
 }

@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="hu">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>VallorSoft — Developer Console</title>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=20260610">
   <style>
     :root { --dev-accent: #a855f7; --dev-accent2: #7c3aed; }
     body { background: radial-gradient(1200px 600px at 10% -10%, rgba(168,85,247,0.08), transparent 60%),
@@ -75,9 +75,9 @@
     .fsw input:checked + .fsw-s:before { transform:translateX(18px); background:var(--ok); }
     .fsw input:disabled + .fsw-s { opacity:.5; }
   </style>
-  <script src="/feature-catalog.js"></script>
-  <script src="/session-guard.js"></script>
-  <script src="/billing-card.js"></script>
+  <script src="/feature-catalog.js?v=20260610"></script>
+  <script src="/session-guard.js?v=20260610"></script>
+  <script src="/billing-card.js?v=20260610"></script>
   <style>
     /* A számlázó-integrációs kártya (BillingCard) gombjai a developer felületen */
     #pane-integ .btn{padding:9px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:1px solid var(--border-bright);background:rgba(255,255,255,0.05);color:#fff;}
@@ -350,10 +350,13 @@ function loadCompBilling(){
   gas('getCompaniesBillingOverview').then(function(ov){
     var tb=document.getElementById('compBillingTbody'); if(!tb) return;
     if(!ov||!ov.ok){ tb.innerHTML='<tr><td colspan="3" style="text-align:center;color:var(--err);padding:20px;">Nem elérhető.</td></tr>'; return; }
-    tb.innerHTML=(ov.companies||[]).map(function(c){
+    // XSS: a számlázó-név NEM kerülhet onclick JS-stringbe (ott az entity-escape
+    // visszafejtődik) — index-alapú cache-ből olvassuk.
+    window._compBillingCache=(ov.companies||[]);
+    tb.innerHTML=(ov.companies||[]).map(function(c,idx){
       var since=c.billing_since?new Date(c.billing_since).toLocaleDateString('hu-HU'):'';
       var billing = c.provider
-        ? escHtml(c.billing_name||c.provider)+' <button class="btn-dev" style="padding:3px 9px;font-size:11px;" onclick="viewCompBilling(\''+escHtml(c.billing_name||c.provider)+'\',\''+since+'\')">megtekintés</button>'
+        ? escHtml(c.billing_name||c.provider)+' <button class="btn-dev" style="padding:3px 9px;font-size:11px;" onclick="viewCompBilling('+idx+')">megtekintés</button>'
         : '<span style="color:var(--muted);">—</span>';
       var invBtn = c.provider
         ? '<button class="btn-dev" onclick="openInvoiceModal('+c.id+')">🧾 Számla kiállítása</button>'
@@ -367,7 +370,10 @@ function loadCompBilling(){
 function setCompPlan(cid,planId){
   gas('setCompanyPlan',[{company_id:cid,plan_id:planId||null}]).then(function(r){ if(r&&r.ok){toast('Csomag módosítva','ok');}else{toast((r&&r.err)||'Hiba','err');} });
 }
-function viewCompBilling(name,since){
+function viewCompBilling(idx){
+  var c=(window._compBillingCache||[])[idx]||{};
+  var name=c.billing_name||c.provider||'—';
+  var since=c.billing_since?new Date(c.billing_since).toLocaleDateString('hu-HU'):'';
   alert('💳 '+name+'\n\nBeállítva: '+(since||'—')+'\n\nA hitelesítő adatok titkosítva tárolódnak — developer számára sem láthatók.');
 }
 

@@ -54,7 +54,7 @@ async function anafLookup(cui) {
   return {
     found: true,
     name: g.denumire || null,
-    cui: 'RO'.startsWith('RO') ? (g.cui ? String(g.cui) : n) : n,
+    cui: g.cui ? String(g.cui) : n, // (a korábbi 'RO'.startsWith('RO') feltétel mindig igaz volt)
     address: g.adresa || null,
     regCom: g.nrRegCom || null,
     phone: g.telefon || null,

@@ -17,8 +17,10 @@ window.VS_FEATURES = [
   { key: 'external-drivers', label: 'Külső sofőrök',               group: 'Adminisztráció' },
   { key: 'vehicles',         label: 'Járművek',                    group: 'Adminisztráció' },
   { key: 'clients',          label: 'Ügyfelek',                    group: 'Adminisztráció' },
-  { key: 'billing',          label: 'Számlázó integráció',         group: 'Adminisztráció' },
-  { key: 'integrations',     label: 'Integrációk (csak Admin)',    group: 'Adminisztráció' },
+  // FIGYELEM: a 'billing' fül CSAK a Manager felületen létezik, az
+  // 'integrations' CSAK az Adminon — a kapcsoló a másik szerepkörre nem hat.
+  { key: 'billing',          label: 'Számlázás fül (csak Manager)', group: 'Adminisztráció' },
+  { key: 'integrations',     label: 'Integrációk fül (csak Admin)', group: 'Adminisztráció' },
   { key: 'signature',        label: 'Aláírás és bélyegző',         group: 'Adminisztráció' },
   { key: 'chat',             label: 'Belső chat',                  group: 'Kommunikáció' },
   { key: 'settings',         label: 'Beállítások',                 group: 'Rendszer', core: true },

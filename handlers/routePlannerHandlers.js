@@ -67,17 +67,6 @@ async function hereGet(url) {
   }
 }
 
-// Opcionális HERE-hívás: hiba/429/megszűnt végpont esetén null (nem dob).
-async function fetchJsonSafe(url) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 8000);
-  try {
-    const r = await fetch(url, { signal: ctrl.signal });
-    if (!r.ok) return null;
-    return await r.json();
-  } catch (e) { return null; }
-  finally { clearTimeout(t); }
-}
 
 // --- CargoTrack kulcs + object_id feloldás (élő GPS-hez) ---
 async function getCargotrackKey(companyId) {

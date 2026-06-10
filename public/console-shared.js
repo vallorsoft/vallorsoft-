@@ -435,7 +435,7 @@ function loadExtDrivers(){
     const tb=document.querySelector('#tblExtDrivers tbody');
     if(list.length===0){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);">Nincs még külső sofőr felvéve.</td></tr>';return;}
     tb.innerHTML=list.map(d=>`<tr><td>${esc(d.nume||'—')}</td><td>${esc(d.firma||'—')}</td><td>${esc(d.telefon||'—')}</td><td>${esc(d.email||'—')}</td><td>${esc(d.rendszam_camion||'—')}</td><td>${esc(d.rendszam_remorca||'—')}</td><td>${esc(d.nota||'—')}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editExtDriver(${d.id})">Szerk</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteExtDriver(${d.id})">Töröl</button></td></tr>`).join('');
-  });
+  }).catch(function(e){ console.error('loadExtDrivers hiba:', e); toast('Betöltési hiba','err'); });
 }
 
 function loadInternalDrivers(){
@@ -459,7 +459,7 @@ function loadInternalDrivers(){
         +'</td>'
         +'</tr>';
     }).join('');
-  });
+  }).catch(function(e){ console.error('loadInternalDrivers hiba:', e); toast('Betöltési hiba','err'); });
 }
 
 function loadInvites(){
@@ -477,7 +477,7 @@ function loadInvites(){
         +'<td><button class="btn ghost" style="padding:3px 10px;font-size:12px;" onclick="revokeInv(\''+esc(i.kod)+'\')" '+(i.status!=='Aktiv'?'disabled':'')+'>Visszavon</button></td>'
         +'</tr>';
     }).join('');
-  });
+  }).catch(function(e){ console.error('loadInvites hiba:', e); toast('Betöltési hiba','err'); });
 }
 
 function loadOrderFormData(){
@@ -496,19 +496,6 @@ function loadOrders(){
     if(!Array.isArray(list))list=[];
     _ordersAllCache = list;
     renderFilteredOrders(list);
-    return; // legacy map lent törölve
-    list.map(c=>{
-      let soferInfo='—';
-      if(c.sofer_type==='Intern')soferInfo=c.nume_sofer||c.email_sofer||'—';
-      else if(c.sofer_type==='Extern')soferInfo=c.nume_sofer||c.firma_extern||'—';
-      let sc='info';
-      if(c.status==='Alocat')sc='warn';
-      if(c.status==='In Curs')sc='ok';
-      if(c.status==='Finalizat')sc='ok';
-      if(c.status==='Anulat')sc='err';
-      if(c.status==='Extern')sc='warn';
-     return`<tr><td><b>${c.id}</b></td><td>${c.client||'—'}</td><td>${c.loc_incarcare||'—'} → ${c.loc_descarcare||'—'}</td><td>${c.km||'—'}</td><td>${c.pret||'—'}</td><td>${soferInfo}</td><td>${c.rendszam_camion||'—'}</td><td><span class="badge ${sc}">${c.status}</span></td><td style="display:flex;gap:4px;"><button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="openDocModal('${c.id}')">📎</button><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="openOrderEdit('${c.id}')">✏️</button></td></tr>`;
-    }).join('');
   });
 }
 
@@ -638,7 +625,7 @@ function loadVehicles(){
     vehicleCache=list;
     renderVehicleTable('tblVontato',list.filter(v=>v.tip==='Vontato'));
     renderVehicleTable('tblPotkocsi',list.filter(v=>v.tip==='Potkocsi'));
-  });
+  }).catch(function(e){ console.error('loadVehicles hiba:', e); toast('Betöltési hiba','err'); });
 }
 
 function logout(){gas('authLogout').then(function(){window.location.href='/login';}).catch(function(){window.location.href='/login';});}
@@ -1044,6 +1031,10 @@ function signPrevPage(){
 function startRoomListListener(me){
   if(!_fbDb)return;
   var ref=_fbDb.ref('chats/'+_chatCompanyId+'/rooms');
+  // Korábbi listener leválasztása — újra-inicializálásnál (pl. újra-belépés
+  // ugyanabban a fülben) ne halmozódjanak a Firebase listenerek.
+  if(window._roomListRef){ try{ window._roomListRef.off('value'); }catch(_){} }
+  window._roomListRef=ref;
   ref.on('value',function(snap){
     _roomsSnapData={};
     snap.forEach(function(child){
@@ -1186,7 +1177,9 @@ function loadDashboard() {
   initDashMap();
   refreshDashVehicles();
   if (window._dashVehTimer) clearInterval(window._dashVehTimer);
-  window._dashVehTimer = setInterval(refreshDashVehicles, 30000);
+  // 60s kliens-polling + 30s szerver-cache: 300 felhasználónál is észszerű
+  // GPS-szolgáltatói terhelés (korábban 30s, cache nélkül).
+  window._dashVehTimer = setInterval(refreshDashVehicles, 60000);
 }
 
 /* ── Legutóbbi fuvarok ── */

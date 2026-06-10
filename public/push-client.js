@@ -30,7 +30,7 @@
     _myRole  = role;
 
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      console.log('[Push] Platform nem tamogatja a push ertesiteseket');
+      if (window.VS_PUSH_DEBUG) console.log('[Push] Platform nem tamogatja a push ertesiteseket');
       return;
     }
 
@@ -39,7 +39,7 @@
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (!d.ok || !d.key) {
-          console.log('[Push] VAPID kulcs nem elerheto - push kikapcsolva');
+          if (window.VS_PUSH_DEBUG) console.log('[Push] VAPID kulcs nem elerheto - push kikapcsolva');
           return;
         }
         _vapidKey = d.key;
@@ -48,21 +48,21 @@
         return navigator.serviceWorker.register('/sw.js')
           .then(function(reg) {
             _swReg = reg;
-            console.log('[Push] SW regisztralt');
+            if (window.VS_PUSH_DEBUG) console.log('[Push] SW regisztralt');
             return reg.pushManager.getSubscription();
           })
           .then(function(sub) {
             if (sub) {
               _subscription = sub;
               VS_PUSH._saveToServer(sub);
-              console.log('[Push] Meglevo subscription talalhato');
+              if (window.VS_PUSH_DEBUG) console.log('[Push] Meglevo subscription talalhato');
             } else {
               VS_PUSH._askPermission();
             }
           });
       })
       .catch(function(err) {
-        console.log('[Push] Init hiba:', err);
+        if (window.VS_PUSH_DEBUG) console.log('[Push] Init hiba:', err);
       });
   };
 
@@ -147,7 +147,7 @@
 
     Notification.requestPermission().then(function(perm) {
       if (perm !== 'granted') {
-        console.log('[Push] Engedely megtagadva');
+        if (window.VS_PUSH_DEBUG) console.log('[Push] Engedely megtagadva');
         return;
       }
       _swReg.pushManager.subscribe({
@@ -157,7 +157,7 @@
       .then(function(sub) {
         _subscription = sub;
         VS_PUSH._saveToServer(sub);
-        console.log('[Push] Sikeresen feliratkozva');
+        if (window.VS_PUSH_DEBUG) console.log('[Push] Sikeresen feliratkozva');
       })
       .catch(function(err) {
         console.error('[Push] Feliratkozasi hiba:', err);
