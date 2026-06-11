@@ -1,8 +1,12 @@
 // ============================================================
 //  VallorSoft — handlers/routePlannerHandlers.js
-//  Útvonaltervezés (HERE Maps) — szerver oldali handlerek.
-//  A HERE_API_KEY SOHA nem kerül a kliensre; a geocoding + routing
-//  hívások itt, szerver oldalon futnak.
+//  Útvonaltervezés — INGYENES szolgáltatásokkal (HERE lecserélve):
+//   - Geokódolás:  Photon (photon.komoot.io) — OpenStreetMap alapú, kulcs nélkül
+//   - Útvonal:     OSRM (router.project-osrm.org) — kulcs nélkül, autós profil
+//   - Csempék:     CartoDB/OSM (kliens oldalon, kulcs nélkül)
+//  FIGYELEM: az OSRM autós profillal számol — kamion-korlátozásokat
+//  (súly/magasság/szélesség) NEM vesz figyelembe. A jármű-paraméterek
+//  a fogyasztás-becsléshez használatosak.
 //
 //  Séma-jegyzetek (a valós DB-hez igazítva):
 //   - orders.tractor_id / trailer_id LÉTEZIK, de gyakran NULL -> a
@@ -13,60 +17,62 @@
 const pool = require('../db');
 const ctSvc = require('../services/cargotrack');
 const { decrypt } = require('../lib/crypto');
-const { logHereTransaction } = require('../lib/hereUsage');
 
-const HERE_TIMEOUT_MS = 15000;
+const GEO_TIMEOUT_MS = 15000;
+const UA = 'VallorSoft/1.0 (flottakezelo; kapcsolat: admin)';
 
-// --- HERE flexible polyline dekódolás a hivatalos @here/flexpolyline csomaggal ---
-// A decode() { precision, thirdDim, polyline:[[lat,lng(,z)],...] } objektumot ad,
-// helyes [lat,lng] sorrendben (a Leaflet is így várja).
-const flexpolyline = require('@here/flexpolyline');
-function decodeFlexPolyline(encoded) {
-  try {
-    const r = flexpolyline.decode(encoded);
-    if (!r || !Array.isArray(r.polyline)) return [];
-    // 3D esetén az elevation-t eldobjuk, csak [lat,lng] kell.
-    return r.polyline.map(function (p) { return [p[0], p[1]]; });
-  } catch (e) {
-    return [];
-  }
-}
-
-// HERE jármű-korlátozás emberi címkéje a notice.details alapján.
-function noticeLabel(n) {
-  if (!n) return 'Korlátozás';
-  const d = (n.details && n.details[0]) || {};
-  const gw = (d.maxGrossWeight != null) ? d.maxGrossWeight : (d.maxWeight && d.maxWeight.value);
-  if (gw != null) return 'Súlykorlátozás: max ' + gw + ' kg';
-  if (d.maxHeight != null) return 'Magasságkorlátozás: max ' + d.maxHeight + ' cm';
-  if (d.maxWidth != null) return 'Szélességkorlátozás: max ' + d.maxWidth + ' cm';
-  if (d.maxLength != null) return 'Hosszkorlátozás: max ' + d.maxLength + ' cm';
-  if (d.maxWeightPerAxle != null) return 'Tengelyterhelés-korlátozás: max ' + d.maxWeightPerAxle + ' kg';
-  return n.title || 'Jármű-korlátozás';
-}
-
-async function hereGet(url) {
+// Általános JSON GET időtúllépéssel + udvarias User-Agent (OSM-szabály).
+async function jsonGet(url) {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), HERE_TIMEOUT_MS);
+  const t = setTimeout(() => ctrl.abort(), GEO_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { signal: ctrl.signal });
+    const res = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': UA } });
     let body;
     try { body = await res.json(); } catch (_) { body = {}; }
     if (!res.ok) {
-      const msg = (body && (body.title || body.error_description || body.error)) || ('HERE hiba (' + res.status + ')');
-      const e = new Error(msg);
+      const e = new Error('Térkép-szolgáltatás hiba (' + res.status + ')');
       e.status = res.status;
       throw e;
     }
     return body;
   } catch (e) {
-    if (e.name === 'AbortError') throw new Error('A HERE szolgáltatás időtúllépés miatt nem válaszolt.');
+    if (e.name === 'AbortError') throw new Error('A térkép-szolgáltatás időtúllépés miatt nem válaszolt.');
     throw e;
   } finally {
     clearTimeout(t);
   }
 }
 
+// Cím -> koordináta (Photon / OpenStreetMap, ingyenes, kulcs nélkül)
+async function geocodeFree(addr) {
+  const url = 'https://photon.komoot.io/api/?q=' + encodeURIComponent(addr) + '&limit=1';
+  const data = await jsonGet(url);
+  const f = (data.features || [])[0];
+  if (!f || !f.geometry || !Array.isArray(f.geometry.coordinates)) {
+    throw new Error('Nem található koordináta ehhez a címhez: ' + addr);
+  }
+  const lng = f.geometry.coordinates[0];
+  const lat = f.geometry.coordinates[1];
+  const p = f.properties || {};
+  const label = [p.name, p.city, p.country].filter(Boolean).join(', ');
+  return { lat, lng, label: label || addr };
+}
+
+// Két pont közötti útvonal-szakasz (OSRM, ingyenes, kulcs nélkül).
+// Szakaszonként külön hívás -> minden szakasznak saját polyline-ja van
+// (a felület színezve rajzolja: GPS-ráhordás szaggatva, fő szakasz pirossal).
+async function osrmLeg(a, b) {
+  const url = 'https://router.project-osrm.org/route/v1/driving/'
+    + a.lng + ',' + a.lat + ';' + b.lng + ',' + b.lat
+    + '?overview=full&geometries=geojson&alternatives=false&steps=false';
+  const data = await jsonGet(url);
+  if (data.code !== 'Ok' || !(data.routes || []).length) {
+    throw new Error('Nem található útvonal a megadott pontok között.');
+  }
+  const r0 = data.routes[0];
+  const coords = ((r0.geometry && r0.geometry.coordinates) || []).map((c) => [c[1], c[0]]); // [lng,lat] -> [lat,lng]
+  return { distance: r0.distance || 0, duration: r0.duration || 0, polyline: coords };
+}
 
 // --- CargoTrack kulcs + object_id feloldás (élő GPS-hez) ---
 async function getCargotrackKey(companyId) {
@@ -189,28 +195,27 @@ handlers.getVehicleGpsPosition = async function (req, res, args) {
   }
 };
 
-// ─── Útvonal számítása (HERE Geocoding + Routing, waypointokkal) ──
+// ─── Útvonal számítása (Photon geokódolás + OSRM routing) ────
+// A válasz-formátum a korábbi HERE-s változattal kompatibilis
+// (polyline/legs/waypoints/notices/violations/fuelEstimateL), így a
+// kliens (utvonaltervezes.html) rajzoló-kódja változatlanul működik.
 handlers.calculateRoute = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
       return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
     }
-    const apiKey = process.env.HERE_API_KEY;
-    if (!apiKey) return res.json({ result: { ok: false, err: 'A HERE_API_KEY nincs beállítva a szerveren.' } });
-
     const cid = req.session.user.company_id;
-    const uid = req.session.user.id;
     if (await routeFeatureOff(cid)) {
       return res.json({ result: { ok: false, err: 'Az útvonaltervezés nincs előfizetve ennél a cégnél.' } });
     }
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const tractorId = parseInt(a.tractorId, 10) || null;
-    const trailerId = parseInt(a.trailerId, 10) || null;
     let waypoints = Array.isArray(a.waypoints) ? a.waypoints.slice() : [];
     waypoints = waypoints.filter((w) => w && (w.address || (w.lat != null && w.lng != null)));
     if (waypoints.length < 2) {
       return res.json({ result: { ok: false, err: 'Legalább a felrakó és lerakó pont szükséges.' } });
     }
+    if (waypoints.length > 9) waypoints = waypoints.slice(0, 9); // fair-use védelem
 
     // 1) Vontató (csak ellenőrzés + fogyasztás a becsléshez; multi-tenant)
     let fuelPer100 = null;
@@ -221,122 +226,46 @@ handlers.calculateRoute = async function (req, res, args) {
       fuelPer100 = tr.rows[0].fuel_per_100km;
     }
 
-    // 2) Jármű-paraméterek a KLIENSTŐL — a felhasználó által megadott, ÖSSZEKAPCSOLT
-    //    értékek (HERE v8 a végső kombinált méreteket/súlyt várja; nem összegzünk!).
-    const cp = (a.params && typeof a.params === 'object') ? a.params : {};
-
-    // 3) Geocoding a koordináta nélküli pontokra (minden hívás = 1 'geocode' tranzakció)
-    const geocode = async (addr) => {
-      const url = 'https://geocode.search.hereapi.com/v1/geocode?q=' +
-        encodeURIComponent(addr) + '&lang=ro&apiKey=' + encodeURIComponent(apiKey);
-      const data = await hereGet(url);
-      logHereTransaction('geocode', 1, cid, uid);
-      const item = (data.items || [])[0];
-      if (!item || !item.position) {
-        const e = new Error('Nem található koordináta ehhez a címhez: ' + addr);
-        throw e;
-      }
-      return { lat: item.position.lat, lng: item.position.lng, label: item.address && item.address.label };
-    };
+    // 2) Geokódolás a koordináta nélküli pontokra (Photon — ingyenes)
     const resolved = [];
     for (const w of waypoints) {
       if (w.lat != null && w.lng != null) {
-        resolved.push({ type: w.type || 'waypoint', lat: w.lat, lng: w.lng, label: w.address || (w.lat.toFixed(4) + ', ' + w.lng.toFixed(4)) });
+        resolved.push({ type: w.type || 'waypoint', lat: w.lat, lng: w.lng, label: w.address || (Number(w.lat).toFixed(4) + ', ' + Number(w.lng).toFixed(4)) });
       } else {
-        const g = await geocode(w.address);
+        const g = await geocodeFree(w.address);
         resolved.push({ type: w.type || 'waypoint', lat: g.lat, lng: g.lng, label: w.address || g.label });
       }
     }
 
-    // 4) Routing — origin/destination + via a közbülső pontokra
-    const params = [
-      'transportMode=truck',
-      'origin=' + resolved[0].lat + ',' + resolved[0].lng,
-      'destination=' + resolved[resolved.length - 1].lat + ',' + resolved[resolved.length - 1].lng,
-      // 'notices' NEM érvényes return-típus a v8-ban; a notices a section-ökben automatikusan jön.
-      // 'spans=notices' (KÜLÖN paraméter) adja meg, mely polyline-szakaszon sérül egy korlátozás.
-      'return=polyline,summary,typicalDuration',
-      'spans=notices',
-    ];
-    for (let k = 1; k < resolved.length - 1; k++) {
-      params.push('via=' + resolved[k].lat + ',' + resolved[k].lng);
-    }
-    // HERE v8 jármű-paraméterek a kliens (összekapcsolt) értékeiből.
-    const intOrNull = (x) => { const n = parseInt(x, 10); return Number.isFinite(n) ? n : null; };
-    const TYPES = ['tractor', 'straightTruck'];
-    const TUN = ['B', 'C', 'D', 'E'];
-    const HAZ = ['explosive', 'gas', 'flammable', 'combustible', 'organic', 'poison', 'harmfulToWater'];
-    const pushIf = (name, val) => { if (val !== null && val !== undefined && val !== '') params.push(name + '=' + encodeURIComponent(val)); };
-    if (TYPES.includes(cp.type)) params.push('vehicle[type]=' + cp.type);
-    pushIf('vehicle[height]', intOrNull(cp.height));
-    pushIf('vehicle[width]', intOrNull(cp.width));
-    pushIf('vehicle[length]', intOrNull(cp.length));
-    pushIf('vehicle[grossWeight]', intOrNull(cp.grossWeight));
-    pushIf('vehicle[weightPerAxle]', intOrNull(cp.weightPerAxle));
-    pushIf('vehicle[axleCount]', intOrNull(cp.axleCount));
-    pushIf('vehicle[trailerCount]', intOrNull(cp.trailerCount));
-    pushIf('vehicle[tunnelCategory]', TUN.includes(cp.tunnelCategory) ? cp.tunnelCategory : null);
-    pushIf('vehicle[shippedHazardousGoods]', HAZ.includes(cp.hazardousGoods) ? cp.hazardousGoods : null);
-    params.push('apiKey=' + encodeURIComponent(apiKey));
-
-    const routeData = await hereGet('https://router.hereapi.com/v8/routes?' + params.join('&'));
-    logHereTransaction('routing_truck', 1, cid, uid);
-    const route = (routeData.routes || [])[0];
-    if (!route || !route.sections || !route.sections.length) {
-      return res.json({ result: { ok: false, err: 'Nem található útvonal a megadott pontok között.' } });
-    }
-
-    // 5) Szakaszok -> legs (szakaszonkénti polyline), összesítés, notices, tiltott szakaszok
+    // 3) Routing szakaszonként (OSRM) — minden egymást követő pontpár külön
+    //    hívás, így szakaszonkénti polyline-t kapunk (a kliens színezve rajzolja).
     let polyline = [];
     let distanceMeters = 0;
     let durationSeconds = 0;
-    const notices = [];
     const legs = [];
-    const violations = [];   // térképen megjelölendő, korlátozást sértő szakaszok
-    route.sections.forEach((sec, idx) => {
-      const full = sec.polyline ? decodeFlexPolyline(sec.polyline) : [];
-      const legDist = sec.summary ? (sec.summary.length || 0) : 0;
-      const legDur = sec.summary ? (sec.summary.typicalDuration != null ? sec.summary.typicalDuration : (sec.summary.duration || 0)) : 0;
-      const from = resolved[idx] || {};
-      const to = resolved[idx + 1] || {};
+    for (let i = 0; i < resolved.length - 1; i++) {
+      const from = resolved[i];
+      const to = resolved[i + 1];
+      const leg = await osrmLeg(from, to);
       legs.push({
         fromType: from.type || null,
         toType: to.type || null,
         fromLabel: from.label || null,
         toLabel: to.label || null,
-        distanceMeters: legDist,
-        durationSeconds: legDur,
-        polyline: full,
+        distanceMeters: Math.round(leg.distance),
+        durationSeconds: Math.round(leg.duration),
+        polyline: leg.polyline,
       });
-      distanceMeters += legDist;
-      durationSeconds += legDur;
-
-      const secNotices = sec.notices || [];
-      secNotices.forEach((n) => {
-        notices.push({ title: n.title || n.code || 'Figyelmeztetés', code: n.code || null, severity: n.severity || null });
-      });
-      // spans=notices: a span.offset .. következő span.offset közötti szakasz a tiltott rész
-      const spans = sec.spans || [];
-      spans.forEach((sp, si) => {
-        if (sp.notices && sp.notices.length && full.length) {
-          const start = sp.offset || 0;
-          let end = (spans[si + 1] && spans[si + 1].offset != null) ? spans[si + 1].offset : full.length - 1;
-          if (end < start) end = start;
-          const sub = full.slice(start, Math.min(end + 1, full.length));
-          if (sub.length) {
-            const labels = sp.notices.map((ni) => noticeLabel(secNotices[ni])).filter(Boolean);
-            violations.push({ polyline: sub, label: (labels.join(' · ') || 'Tiltott szakasz') });
-          }
-        }
-      });
-
-      // összefűzött polyline (a szakaszhatáron a duplikált pontot kihagyjuk)
-      let dd = full;
-      if (polyline.length && dd.length) dd = dd.slice(1);
+      distanceMeters += leg.distance;
+      durationSeconds += leg.duration;
+      let dd = leg.polyline;
+      if (polyline.length && dd.length) dd = dd.slice(1); // szakaszhatáron duplikált pont
       polyline = polyline.concat(dd);
-    });
+    }
+    distanceMeters = Math.round(distanceMeters);
+    durationSeconds = Math.round(durationSeconds);
 
-    // 6) Fogyasztásbecslés
+    // 4) Fogyasztásbecslés a vontató L/100km értékéből
     let fuelEstimateL = null;
     if (fuelPer100 != null) {
       fuelEstimateL = Math.round((distanceMeters / 1000 / 100) * parseFloat(fuelPer100) * 10) / 10;
@@ -349,8 +278,10 @@ handlers.calculateRoute = async function (req, res, args) {
       durationSeconds,
       legs,
       waypoints: resolved,
-      notices,
-      violations,
+      // Ingyenes (autós profilú) tervezés — a kamion-korlátozás jelölés nem elérhető.
+      notices: [],
+      violations: [],
+      profile: 'car-free',
       fuelEstimateL,
     } });
   } catch (err) {

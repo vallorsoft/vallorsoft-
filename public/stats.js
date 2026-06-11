@@ -325,10 +325,7 @@
         + stPanel('📋 Kintlévő fuvarok', '<div style="overflow-x:auto;"><table class="table">'
             + '<thead><tr><th>Fuvar</th><th>Ügyfél</th><th style="text-align:right;">Ár (EUR)</th><th style="text-align:right;">Fizetve</th><th style="text-align:right;">Hátralék</th><th>Teljesítve</th><th style="text-align:center;">Eltelt</th><th>Státusz</th><th></th></tr></thead>'
             + '<tbody>' + listRows + '</tbody></table></div>',
-            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-finance\')">⬇️ CSV export</button>')
-        + '<div id="stHereBox"></div>';
-
-      loadHereCosts();
+            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-finance\')">⬇️ CSV export</button>');
 
       var months = stMonths([r.havi]);
       stChart('stChFinHavi', {
@@ -339,40 +336,6 @@
         ]}
       });
     });
-  }
-
-  // HERE térkép-szolgáltatás költségei a Pénzügy fülön — a meglévő
-  // getMyHereUsage handlerből (1000-es ingyenes pool + EUR díjak).
-  function loadHereCosts() {
-    var box = document.getElementById('stHereBox');
-    if (!box) return;
-    gas('getMyHereUsage').then(function (r) {
-      if (!r || !r.ok) { box.innerHTML = ''; return; }
-      var used = parseInt(r.free_pool_used, 10) || 0;
-      var total = parseInt(r.free_pool_total, 10) || 1000;
-      var pct = Math.min(Math.round((used / total) * 100), 100);
-      var rows = (r.services || []).filter(function (s) { return (parseInt(s.total_used, 10) || 0) > 0; })
-        .map(function (s) {
-          return '<tr><td>' + esc(s.display_name || s.feature_key) + '</td>'
-            + '<td style="text-align:right;">' + stNum(s.total_used, 0) + '</td>'
-            + '<td style="text-align:right;">' + stNum(s.billable_trx, 0) + '</td>'
-            + '<td style="text-align:right;">' + stNum(s.net_eur, 2) + '</td>'
-            + '<td style="text-align:right;font-weight:700;">' + stNum(s.gross_eur, 2) + '</td></tr>';
-        }).join('') || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:14px;">Nincs HERE-használat ebben a hónapban.</td></tr>';
-      box.innerHTML = stPanel('🛰️ HERE térkép-szolgáltatás költség — ' + esc(r.month || ''),
-        '<div style="margin-bottom:10px;">'
-        + '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">'
-        + '<span class="text-muted">Ingyenes keret: ' + stNum(used, 0) + ' / ' + stNum(total, 0) + ' tranzakció</span>'
-        + '<span style="font-weight:700;color:' + (pct >= 100 ? 'var(--status-danger)' : pct >= 80 ? 'var(--status-warn)' : 'var(--status-ok)') + ';">' + pct + '%</span></div>'
-        + '<div style="height:8px;background:rgba(138,151,168,0.15);border-radius:4px;overflow:hidden;">'
-        + '<div style="height:100%;width:' + pct + '%;background:' + (pct >= 100 ? 'var(--status-danger)' : pct >= 80 ? 'var(--status-warn)' : 'var(--status-ok)') + ';"></div></div></div>'
-        + '<div style="overflow-x:auto;"><table class="table">'
-        + '<thead><tr><th>Szolgáltatás</th><th style="text-align:right;">Használat</th><th style="text-align:right;">Számlázandó</th><th style="text-align:right;">Nettó (EUR)</th><th style="text-align:right;">Bruttó (EUR)</th></tr></thead>'
-        + '<tbody>' + rows + '</tbody></table></div>'
-        + (parseFloat(r.total_gross_eur) > 0
-          ? '<div style="text-align:right;margin-top:8px;font-weight:700;" class="text-primary">Havi összesen: ' + stNum(r.total_gross_eur, 2) + ' EUR (bruttó)</div>'
-          : ''));
-    }).catch(function () { box.innerHTML = ''; });
   }
 
   // ════════════════════════════════════════════════════════

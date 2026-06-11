@@ -94,11 +94,10 @@ Szinte minden lekérdezés `company_id`-re szűr. Új lekérdezésnél MINDIG sz
 - Developer felület: a cég **Részletek → ⚙️ Funkciók** fülén kapcsolók (`devGetCompanyFeatures` / `devSetCompanyFeature`).
 
 ### Útvonaltervezés — `public/utvonaltervezes.html` + `handlers/routePlannerHandlers.js`
-- HERE Maps: térkép-csempe **Raster Tile API v3** (`maps.hereapi.com/v3/base/mc/...`, `explore.day`/`explore.night`), útvonal **Routing API v8** (`router.hereapi.com/v8/routes`, `transportMode=truck`), cím-geocoding + autocomplete. **A HERE_API_KEY csak szerver oldalon** — a kliens a `/api/here-config` (csak tile-kulcs) és `/api/here-autocomplete` proxykat hívja; geocoding/routing teljesen szerveren.
-- Handlerek: `getOrdersForRoutePlanning`, `getVehiclesForRouting`, `getVehicleGpsPosition` (élő CargoTrack pozíció), `calculateRoute`.
-- **Jármű-paraméterek:** a HERE a **végső, összekapcsolt** értékeket kéri (egy `grossWeight`, egy `length`) — NINCS naiv összeadás. A felhasználó tervezés előtt szerkeszti az „összekapcsolt jármű” paramétereket (típus: nyerges/merev). v8 paraméternevek: `vehicle[grossWeight|length|height|width|weightPerAxle|axleCount|trailerCount|tunnelCategory|shippedHazardousGoods|type]`.
-- **Tiltott szakaszok:** `spans=notices` (külön query-param, NEM a `return`-ben) → a sértő polyline-szakaszok ⛔ pirossal a térképen + magyar korlát-leírás (`noticeLabel`). A `return`-ben a `notices`/`spans` ÉRVÉNYTELEN (400).
-- Polyline dekódolás: **`@here/flexpolyline`** csomag (`decode()` → `[lat,lng]`). A korábbi saját dekóder negálta a lat-ot → eltávolítva.
+- **TELJESEN INGYENES stack (a HERE le lett cserélve, nincs API-kulcs):** csempék **CartoDB/OSM** (kliens, light/dark), cím-autocomplete + geokódolás **Photon** (`photon.komoot.io`, proxy: `/api/here-autocomplete` = `/api/geo-autocomplete`), útvonal **OSRM** (`router.project-osrm.org`, autós profil, szakaszonként külön hívás → színezett leg-polyline-ok). Minden külső hívás szerver-oldali, udvarias User-Agenttel.
+- Handlerek: `getOrdersForRoutePlanning`, `getVehiclesForRouting`, `getVehicleGpsPosition` (élő CargoTrack pozíció), `calculateRoute` (válasz-formátum a régi HERE-s klienssel kompatibilis: `polyline/legs/waypoints/notices/violations/fuelEstimateL`).
+- **FIGYELEM:** az OSRM autós profil — kamion-korlátozásokat (súly/magasság) NEM vesz figyelembe; a jármű-paraméter űrlap a fogyasztás-becsléshez maradt, a felület jelzi ezt. A `violations`/`notices` üres. (Upgrade-út: OpenRouteService `driving-hgv` ingyenes kulccsal — lásd STATISTICS-NOTES.)
+- A `HERE_API_KEY` és a `@here/flexpolyline` már nem szükséges; a `lib/herePool.js`/`hereUsage.js` + developer árazás megmaradt (legacy, nem naplóz új tranzakciót).
 
 ---
 
@@ -122,7 +121,7 @@ Szinte minden lekérdezés `company_id`-re szűr. Új lekérdezésnél MINDIG sz
 ## Integrációk (services/)
 
 - **Univerzális számlázó — `services/billing/`** — provider-független keretrendszer (`index.js` → `PROVIDERS` katalógus + `getAdapter(provider, creds)` factory). Adapterek: `fgo-adapter.js`, `smartbill-adapter.js`, `oblio-adapter.js`, `ifactura-adapter.js`, `facturis-adapter.js` (közös `http.js`). A felület a `getAvailableProviders` alapján **dinamikus űrlapot** rajzol (provider-enkénti mezők + közös opcionális számla-beállítások: `serie`, `default_tva`, `currency`). Cégenkénti beállítás a `billing_integrations` táblában, `credentials` JSONB **AES-256-GCM**-mel titkosítva; mentésnél/tesztnél az üresen hagyott mezők a tárolt értéket öröklik (jelszó-megőrzés). Handlerek: `billingHandlers.js`. **A FUVAR-SZÁMLÁZÁS IS EZEN MEGY (K09):** a `services/invoicing.js` `getInvoiceConfig`-ja ELŐSZÖR a `billing_integrations`-t nézi (aktív provider → `emitViaProvider` + `toFrameworkInvoice` fordítja a legacy payloadot `createInvoice` formátumra), és csak utána esik vissza a régi FGO-útra (`company_integrations` category='invoicing', `invoiceAdapter.js`/`fgo.js`). Tesztek: `tests/unit/invoicing-bridge.test.js`.
-- **HERE Maps szolgáltatás-pool** — térkép/routing/geocoding (lásd Útvonaltervezés). Kulcs: `HERE_API_KEY` (`.env`), csak szerver oldalon. **4 alap szolgáltatás** (`autocomplete`, `geocode`, `raster_tile`, `routing_truck`) közös **1000-es ingyenes pool/hó**, időrend szerint fogy; a fölötti rész EUR-ban számlázódik (`here_feature_flags.price_per_1000`, developer szerkeszti). Pool-elszámolás: `lib/herePool.js` (`computePool(companyId, month)`); minden valós kérés naplózása: `lib/hereUsage.js` (`logHereTransaction`). Handlerek: `hereFeatureHandlers.js` (developer árak + `getMyHereUsage`), számlagenerálás a `billingHandlers.js`-ben (`previewHereInvoice` / `generateHereInvoice`).
+- **Térkép-szolgáltatások — INGYENES** (lásd Útvonaltervezés): OSM/CartoDB + Photon + OSRM, kulcs és díj nélkül. A korábbi HERE pool-elszámolás (`lib/herePool.js`, `lib/hereUsage.js`, `hereFeatureHandlers.js`, developer-árazás, `here_usage_log`) LEGACY — a kód megmaradt, de új tranzakció nem naplózódik.
 - **`cargotrack.js` + `gps/`** (`cargotrack-et.js`, `fomco-et.js`) + `gpsAdapter.js` — GPS (FM-Track/Ruptela), jármű↔GPS párosítás. `getLatestStatus(apiKey, objectId)` → élő pozíció (lat/lng/speed/datetime). Kulcs titkosítva a `company_integrations`-ban. **Auto-rendszámfelismerés:** a párosító (`public/cargotrack-pairing.js`) a CargoTrack `plate`/`name` mezőjéből normalizált rendszám-**javaslatot** tölt elő a még nem párosított járműveknél (`lib/plate.js` `normalizePlate`: nagybetű + csak betű/szám, pl. `B 104 VLR → B104VLR`). A felhasználó a „✓ Mind mentése" gombbal vagy soronként hagyja jóvá, és szabadon javíthatja. A pozíció-handler (`getActiveVehiclePositions`) 30 mp-es szerver-cache-t használ + azonos `object_id`-kat összevon.
 - **`email-intake.js`** + `order-ai/` (gemini + heurisztika) + `pdf-extract.js` — IMAP megrendelés-feldolgozás. **Cégenkénti IMAP-konfig a weboldalon** (`intakeHandlers.js`, tárolás `company_integrations` `provider='email_intake'`). A **`scheduler.js`** 2 percenként végigpörgeti az engedélyezett cégeket (`intake.pollOnce`); **csak az aktiválás (`since`) utáni leveleket** dolgozza fel. Feldolgozott megrendelések az `inbound_orders` táblában, egyszerre egy feldolgozatlan, lapozható nézetben.
 - **`email.js`** (Brevo), **`webpush.js`/`push.js`** (VAPID), **`firebase.js`** (chat, admin token). A meghívó-e-mail a **MEGHÍVOTT** nevével köszön (nem a cég igazgatójáéval) — `sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev)`; a HTML törzs a tesztelhető `buildInviteHtml()`-ben (reszponzív, CTA-gombos, nyers URL-ek nélkül). Minden Brevo-hívás 15 mp-es timeouttal (`fetchT`), az interpolált értékek `escHtml`-lel.
@@ -134,7 +133,7 @@ A sofőr-műszak funkció teljesen el lett távolítva mindhárom felületről. 
 ## Környezeti változók (.env)
 
 Lokálisan `.env` (gitignore-olt). Kötelező: `DATABASE_URL`, `SESSION_SECRET`, `NODE_ENV`, `APP_URL`, `INTEGRATION_ENC_KEY`.
-Térkép: **`HERE_API_KEY`** (REST API key — térkép + routing + geocoding).
+Térkép: nincs kulcs — ingyenes OSM/Photon/OSRM (a `HERE_API_KEY` már NEM kell).
 Push: `VAPID_PUBLIC_KEY/PRIVATE_KEY/EMAIL`. E-mail: `BREVO_API_KEY`, `BREVO_SENDER`, `MAIL_USER`.
 Firebase: `FIREBASE_API_KEY/AUTH_DOMAIN/DB_URL/PROJECT_ID/APP_ID/SERVICE_ACCOUNT`. AI: `GEMINI_API_KEY`, `GEMINI_MODEL` (egy modell) vagy `GEMINI_MODELS` (vesszős lista — modell-lánc). A kiolvasó (`order-ai/gemini.js`) egy **modell-láncon** megy végig: 429 (napi kvóta/sebességkorlát) esetén automatikusan a következő modellre vált, mert minden modellnek KÜLÖN napi ingyenes kerete van. Alap lánc: `gemini-2.0-flash → -flash-lite → 2.5-flash → 2.5-flash-lite → 1.5-flash → 1.5-flash-8b`.
 Intake (opcionális): `INTAKE_IMAP_HOST/PORT/USER/PASS/TLS`, `INTAKE_COMPANY_ID`, `INTAKE_MAILBOX`.
@@ -149,7 +148,7 @@ Intake (opcionális): `INTAKE_IMAP_HOST/PORT/USER/PASS/TLS`, `INTAKE_COMPANY_ID`
 
 ## Élesítés (go-live) checklist
 
-1. ✅ `.env` minden kulccsal (`INTEGRATION_ENC_KEY`, `HERE_API_KEY`).
+1. ✅ `.env` minden kulccsal (`INTEGRATION_ENC_KEY`; térkép-kulcs NEM kell).
 2. ⬜ `db/*.sql` migrációk lefuttatva az éles DB-n (incl. `vehicle-truck-params.sql`, `feature-flags.sql`, `remove-shift-compliance.sql`, `billing-integrations.sql`, `here-usage.sql`, `orders-finalized-at.sql`, `document-series.sql`, `order-payments.sql`, `invites-nume-tel.sql`, `company-eur-ron.sql`).
 3. ⬜ `npm install` az éles szerveren (`@here/flexpolyline` stb.).
 4. ⬜ Számlázó-integráció (pl. FGO) `test` → `production` a cég Integrációk fülén.
