@@ -30,8 +30,10 @@ CREATE TABLE IF NOT EXISTS companies (
   paid_until          DATE,
   max_users           INTEGER      NOT NULL DEFAULT 10,
   max_trucks          INTEGER      NOT NULL DEFAULT 10,
+  eur_ron_rate        NUMERIC(8,4),          -- statisztika: EUR↔RON árfolyam (NULL = nincs profit-számítás)
   created_at          TIMESTAMP    DEFAULT NOW()
 );
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS eur_ron_rate NUMERIC(8,4);
 
 -- ------------------------------------------------------------
 -- FELHASZNALOK

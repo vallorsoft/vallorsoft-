@@ -535,6 +535,35 @@ function logoutSofer() {
 }
 
 // ============================================================
+// SAJÁT HAVI MINI-STATISZTIKA (főoldal) — motivációs összegző
+// ============================================================
+function loadSoferMiniStats() {
+  var box = document.getElementById('soferMiniStats');
+  if (!box) return;
+  fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'getMySoferStats' }) })
+  .then(function(r) { return r.json(); }).then(function(d) {
+    var s = d.result;
+    if (!s || !s.ok) return;
+    function n(x) { var v = parseFloat(x); return isFinite(v) ? v.toLocaleString('hu-HU', { maximumFractionDigits: 0 }) : '0'; }
+    function tile(ico, val, lbl) {
+      return '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:10px 6px;text-align:center;">'
+        + '<div style="font-size:18px;">' + ico + '</div>'
+        + '<div style="font-size:16px;font-weight:800;color:#fff;margin-top:2px;">' + val + '</div>'
+        + '<div style="font-size:10px;color:#8a97a8;margin-top:2px;">' + lbl + '</div></div>';
+    }
+    box.innerHTML = '<div style="font-size:12px;font-weight:700;color:#8a97a8;margin:14px 0 8px;">📊 E havi teljesítményem</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">'
+      + tile('✅', n(s.lezart), 'Lezárt fuvar')
+      + tile('🛣️', n(s.km), 'Km')
+      + tile('🗓️', n(s.diurna_ext) + '+' + n(s.diurna_int), 'Diurna (K+B)')
+      + tile('⛽', n(s.tankolt_l) + ' L', 'Tankolva')
+      + '</div>';
+    box.style.display = '';
+  }).catch(function() {});
+}
+
+// ============================================================
 // INIT — authMe + állapot visszaállítás
 // ============================================================
 var _meData = null;
@@ -548,6 +577,7 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
   if (window.VS_PUSH) VS_PUSH.init(d.result.email, d.result.pozicio);
     initFirebaseChat(d.result);
     loadDashOrders();
+    loadSoferMiniStats();
 
   // ── Állapot visszaállítás ──
   var state = stateGet();
