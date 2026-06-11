@@ -440,20 +440,47 @@ function loadExtDrivers(){
 }
 
 function loadInternalDrivers(){
-  gas('getInternalDrivers').then(function(list){
+  // Sofőr-lista + jármű-hozzárendelés (a jármű mellett 🛰️ = GPS-re kötve)
+  gas('getDriverVehicleAssignments').then(function(r){
     var tbody = document.querySelector('#tblInternalDrivers tbody');
     if(!tbody) return;
-    if(!list||!list.length){
-      tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px;">Nincs regisztrált belső sofőr.</td></tr>';
+    if(!r || !r.ok){ tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Betöltési hiba.</td></tr>'; return; }
+    var list = r.drivers||[];
+    var vehicles = r.vehicles||[];
+    if(!list.length){
+      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Nincs regisztrált belső sofőr.</td></tr>';
       return;
+    }
+    // fejléc-frissítés (Jármű oszlop hozzáadása, ha még nincs)
+    var thead = document.querySelector('#tblInternalDrivers thead tr');
+    if(thead && thead.children.length === 4){
+      var th = document.createElement('th');
+      th.textContent = '🚛 Hozzárendelt jármű';
+      thead.insertBefore(th, thead.children[3]);
     }
     // XSS-védelem: a sor-adatot gyorsítótárból (index alapján) adjuk át, NEM HTML-attribútumba ágyazva
     window._vsIntDrvCache = list;
     tbody.innerHTML = list.map(function(d, i){
+      var myVeh = vehicles.find(function(v){ return (v.assigned_driver_email||'').toLowerCase() === d.email.toLowerCase(); });
+      var opts = '<option value="">— Nincs jármű —</option>' + vehicles.map(function(v){
+        var takenBy = v.assigned_driver_email && v.assigned_driver_email.toLowerCase() !== d.email.toLowerCase();
+        var lbl = v.rendszam + (v.has_gps ? ' 🛰️' : '') + (v.marca ? ' — ' + v.marca : '') + (takenBy ? ' (más sofőrnél)' : '');
+        return '<option value="'+v.id+'"'+(myVeh && myVeh.id===v.id ? ' selected':'')+'>'+esc(lbl)+'</option>';
+      }).join('');
+      var gpsBadge = myVeh
+        ? (myVeh.has_gps
+            ? ' <span class="badge ok" title="A jármű GPS-re van kötve (CargoTrack)">🛰️ GPS</span>'
+            : ' <span class="badge warn" title="A jármű nincs GPS-re kötve — párosítsd az Integrációk fülön">GPS nélkül</span>')
+        : '';
       return '<tr>'
         +'<td>'+esc(d.nume)+'</td>'
         +'<td>'+esc(d.email)+'</td>'
         +'<td>'+esc(d.tel||'—')+'</td>'
+        +'<td style="white-space:nowrap;">'
+        +'<select class="select" style="max-width:230px;padding:6px 8px;font-size:12.5px;display:inline-block;" '
+        +'onchange="assignDriverVehicleUi(window._vsIntDrvCache['+i+'].email, this.value)">'+opts+'</select>'
+        +gpsBadge
+        +'</td>'
         +'<td>'
         +'<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="editUser(window._vsIntDrvCache['+i+'])">Szerkeszt</button> '
         +'<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUser(window._vsIntDrvCache['+i+'].email,window._vsIntDrvCache['+i+'].nume)">Töröl</button>'
@@ -461,6 +488,14 @@ function loadInternalDrivers(){
         +'</tr>';
     }).join('');
   }).catch(function(e){ console.error('loadInternalDrivers hiba:', e); toast('Betöltési hiba','err'); });
+}
+
+// Jármű-hozzárendelés mentése a sofőr sorából
+function assignDriverVehicleUi(email, vehicleId){
+  gas('assignDriverVehicle', [email, vehicleId || null]).then(function(r){
+    if(r && r.ok){ toast(vehicleId ? '🚛 Jármű hozzárendelve' : 'Hozzárendelés törölve', 'ok'); loadInternalDrivers(); }
+    else { toast((r && r.err) || 'Hiba', 'err'); loadInternalDrivers(); }
+  });
 }
 
 function loadInvites(){

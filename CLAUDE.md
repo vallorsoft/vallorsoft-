@@ -123,7 +123,8 @@ Szinte minden lekérdezés `company_id`-re szűr. Új lekérdezésnél MINDIG sz
   **`phase3-modules.sql`** (flotta-modulok: `document_expiries` lejárat-figyelés + `driver_advances` decont + `vehicle_service_log` szerviz + `clients.payment_term_days` + `documents.order_id` POD + `companies.diurna_*_rate`),
   **`order-tracking.sql`** (`orders.tracking_token` — publikus ügyfél követő-link),
   **`phase4-modules.sql`** (`fuel_card_transactions` üzemanyagkártya-import + `monthly_report_log` havi e-mail riport + `gps_mileage_log` napi GPS km-óra snapshot),
-  **`geo-cache.sql`** (helységnév→koordináta cache a Visszfuvar-radarhoz).
+  **`geo-cache.sql`** (helységnév→koordináta cache a Visszfuvar-radarhoz),
+  **`driver-vehicle-assign.sql`** (`vehicles.assigned_driver_email` — sofőr↔jármű hozzárendelés a Belső sofőrök fülön, GPS-jelzéssel).
 - Fő táblák: `companies` (+`subscription_plan_id`), `users` (+`blocked`, `pozicio_dev`, `totp_*`), `vehicles` (+`height_cm/width_cm/length_cm/weight_kg/weight_per_axle_kg/axle_count/trailer_count/truck_type/tunnel_category/hazardous_goods/fuel_per_100km`), `orders` (+`tractor_id/trailer_id/client_id` — gyakran NULL, a rendszám a tényleges hivatkozás), `order_legs`, `order_documents`, `fuvarlevelek`, `clients`, `company_integrations` (GPS + `provider='email_intake'` IMAP-konfig is itt, titkosítva), `vehicle_gps_map` (**rendszam↔object_id, NINCS tárolt lat/lng** — a pozíció élőben jön), `order_uit_codes`, `inbound_orders`, `company_branding`, `email_templates`, `client_emails`, `push_subscriptions`, `bug_reports`, **`company_features`**, **`billing_integrations`** (cégenkénti számlázó, `credentials` JSONB AES-titkosítva), **`subscription_plans`**, **`here_feature_flags`** (HERE szolgáltatás-árak), **`here_usage_log`** (havi tranzakció-napló), `driver_shifts` (használaton kívül), `session`.
 
 ## Integrációk (services/)

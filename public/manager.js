@@ -38,6 +38,7 @@ function loadTab(name){
     if(name==='invites') loadInvites();
     if(name==='vehicles') loadVehicles();
     if(name==='external-drivers') loadExtDrivers();
+    if(name==='internal-drivers') loadInternalDrivers();
     if(name==='signature') initAdminSigCanvas();
   if(name==='clients' && window.ClientsPage) ClientsPage.mount('clientsBox');
   if(name && name.indexOf('stats-')===0 && window.VS_STATS) VS_STATS.load(name);

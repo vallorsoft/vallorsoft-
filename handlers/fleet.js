@@ -319,4 +319,66 @@ handlers.extDriverDelete = async function (req, res, args) {
     }
   };
 
+// ─── Sofőr ↔ jármű hozzárendelés (Belső sofőrök fül) ─────────
+// Egy vontatóhoz egy alapértelmezett sofőr; a jármű mellett látszik,
+// hogy GPS-re van-e kötve (vehicle_gps_map párosítás).
+handlers.getDriverVehicleAssignments = async function (req, res, args) {
+  try {
+    if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    }
+    const cid = req.session.user.company_id;
+    const dr = await pool.query(
+      `SELECT id, nume, email, tel FROM users
+       WHERE company_id = $1 AND pozicio = 'Sofer' ORDER BY nume`, [cid]);
+    const vr = await pool.query(
+      `SELECT v.id, v.rendszam, v.marca, v.model, v.assigned_driver_email,
+              EXISTS(SELECT 1 FROM vehicle_gps_map g
+                     WHERE g.company_id = v.company_id AND g.rendszam = v.rendszam) AS has_gps
+       FROM vehicles v
+       WHERE v.company_id = $1 AND v.tip = 'Vontato' AND v.activ = TRUE
+       ORDER BY v.rendszam`, [cid]);
+    return res.json({ result: { ok: true, drivers: dr.rows, vehicles: vr.rows } });
+  } catch (err) {
+    console.error('getDriverVehicleAssignments hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
+// args: [driverEmail, vehicleId|null] — null = a sofőr hozzárendelésének törlése.
+// Egy sofőr egy járművet kap: az előző hozzárendelése törlődik; ha a cél-
+// járművön másik sofőr volt, azt átvesszük (a felület jelzi).
+handlers.assignDriverVehicle = async function (req, res, args) {
+  try {
+    if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    }
+    const cid = req.session.user.company_id;
+    const email = String(args[0] || '').trim().toLowerCase();
+    const vehicleId = args[1] ? parseInt(args[1], 10) : null;
+
+    const ur = await pool.query(
+      `SELECT 1 FROM users WHERE company_id = $1 AND LOWER(email) = $2 AND pozicio = 'Sofer'`,
+      [cid, email]);
+    if (!ur.rows.length) return res.json({ result: { ok: false, err: 'A sofőr nem található.' } });
+
+    // a sofőr korábbi járművének felszabadítása
+    await pool.query(
+      `UPDATE vehicles SET assigned_driver_email = NULL
+       WHERE company_id = $1 AND LOWER(assigned_driver_email) = $2`, [cid, email]);
+
+    if (vehicleId) {
+      const r = await pool.query(
+        `UPDATE vehicles SET assigned_driver_email = $3
+         WHERE id = $1 AND company_id = $2 AND tip = 'Vontato'`,
+        [vehicleId, cid, email]);
+      if (!r.rowCount) return res.json({ result: { ok: false, err: 'A jármű nem található.' } });
+    }
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('assignDriverVehicle hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
 module.exports = handlers;
