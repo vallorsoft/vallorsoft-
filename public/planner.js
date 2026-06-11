@@ -39,6 +39,8 @@
     'Alocat':     { c: '#f59e0b', t: 'Kiosztva' },
     'Extern':     { c: '#a855f7', t: 'Külsős' },
     'In Curs':    { c: '#22c55e', t: 'Úton' },
+    'Parkolt':    { c: '#c026d3', t: 'Parkolt (áru pótkocsin)' },
+    'Raktarban':  { c: '#f97316', t: 'Raktárban' },
     'Finalizat':  { c: '#64748b', t: 'Kész' }
   };
   var DAYNAMES = ['V', 'H', 'K', 'Sze', 'Cs', 'P', 'Szo'];
@@ -342,6 +344,8 @@
       + esc(String(o.id).replace('CMD-', '#')) + ' · ' + esc(o.client || '—')
       + '<span class="sub">' + esc(o.loc_incarcare || '?') + ' → ' + esc(o.loc_descarcare || '?')
       + ' · ' + fmtD(o.data_incarcare) + (o.data_descarcare ? '–' + fmtD(o.data_descarcare) : '') + '</span>'
+      + (o.status === 'Parkolt' ? '<span class="sub">🅿️ áru a pótkocsin: ' + esc(o.rendszam_remorca || '?') + ' @ ' + esc(o.handover_loc || o.loc_incarcare || '') + '</span>' : '')
+      + (o.status === 'Raktarban' ? '<span class="sub">📦 raktárban: ' + esc(o.handover_loc || o.loc_incarcare || '') + '</span>' : '')
       + (best ? '<span class="hint">🎯 ' + esc(best.rendszam) + ' · ' + best.km + ' km üresjárat' + (best.atfedes ? ' ⚠️' : '') + '</span>' : '')
       + '</div>';
   }

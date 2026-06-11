@@ -10,6 +10,7 @@ window.VS_FEATURES = [
   { key: 'inbound',          label: 'Beérkező megrendelések',      group: 'Fuvarozás & Logisztika' },
   { key: 'orders-planner',   label: 'Tervezőtábla (diszpécser)',   group: 'Fuvarozás & Logisztika' },
   { key: 'received-fuv',     label: 'Fuvarlevelek',                group: 'Fuvarozás & Logisztika' },
+  { key: 'warehouse',        label: 'Raktár (leadott áru) 📦',     group: 'Fuvarozás & Logisztika' },
   { key: 'driver-docs-pane', label: 'Feltöltött iratok & CMR-ek',  group: 'Fuvarozás & Logisztika' },
   { key: 'utvonaltervezes',  label: 'Útvonaltervezés',             group: 'Fuvarozás & Logisztika' },
   { key: 'stats-overview',   label: 'Statisztika — Áttekintés',    group: 'Statisztika & Riport' },

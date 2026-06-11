@@ -45,6 +45,7 @@ function loadTab(name){
   if(name && name.indexOf('stats-')===0 && window.VS_STATS) VS_STATS.load(name);
   if(['expiries','service-log','decont','fuel-import'].indexOf(name)!==-1 && window.FleetExtra) FleetExtra.load(name);
   if(name==='orders-planner' && window.Planner) Planner.load();
+  if(name==='warehouse') loadWarehouseTab();
   if(name==='integrations'){
     if(window.EmailIntakeCard)  EmailIntakeCard.mount('emailIntakeCardBox', {readOnly:false});
     if(window.InvoicingCard)    InvoicingCard.mount('invCardBox');

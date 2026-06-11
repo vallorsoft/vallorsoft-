@@ -50,6 +50,7 @@
         <div class="sub-tab" data-tab="orders-planner">📅 Tervezőtábla</div>
       </div>
       <div class="tab" data-tab="received-fuv">Fuvarlevelek</div>
+      <div class="tab" data-tab="warehouse">📦 Raktár</div>
       <div class="tab" data-tab="decont">Sofőr-elszámolás</div>
             <div class="tab" data-tab="driver-docs-pane">Feltöltött Iratok & CMR-ek</div>
       <a href="/utvonaltervezes" class="tab-link">Útvonaltervezés</a>
@@ -414,6 +415,16 @@
           <div class="field"><label>Model</label><input class="input" id="ptModel" placeholder="—"></div>
           <div class="field"><label>Év</label><input class="input" id="ptAn" type="number" placeholder="2020"></div>
           <div class="field" style="grid-column:span 2;"><label>Megjegyzés</label><input class="input" id="ptNota" placeholder="opcionális"></div>
+          <!-- Rakodási felület (opcionális) — NEM a teljes méret; alapértelmezés előtöltve -->
+          <div class="field"><label>Típus (rakfelület)</label>
+            <select class="select" id="ptKind" onchange="ptKindChange()">
+              <option value="standard">Standard (260 cm)</option>
+              <option value="mega">Mega (305 cm)</option>
+            </select>
+          </div>
+          <div class="field"><label>Rakfelület hossz (cm)</label><input class="input" id="ptCargoLen" type="number" value="1360"></div>
+          <div class="field"><label>Rakfelület szélesség (cm)</label><input class="input" id="ptCargoWid" type="number" value="248"></div>
+          <div class="field"><label>Rakfelület magasság (cm)</label><input class="input" id="ptCargoHei" type="number" value="260"></div>
         </div>
         <button class="btn primary" onclick="createVehicle('Potkocsi')" style="margin-top:10px;">+ Pótkocsi hozzáadása</button>
         <table class="table" id="tblPotkocsi" style="margin-top:20px;">
@@ -497,6 +508,7 @@
 
     <!-- ── STATISZTIKA & RIPORT PANES (tartalom: stats.js rendereli) ── -->
     <div class="pane hidden" data-pane="orders-planner"><div id="plannerBox"></div></div>
+    <div class="pane hidden" data-pane="warehouse"><div id="warehouseBox"></div></div>
 
     <div class="pane hidden" data-pane="stats-overview"><div id="statsOverviewBox"></div></div>
     <div class="pane hidden" data-pane="stats-finance"><div id="statsFinanceBox"></div></div>
@@ -721,6 +733,24 @@
         <div class="field" style="margin-top:8px;"><label>Fogyasztás (L/100km)</label><input class="input" id="vehEditFuel" type="number" step="0.1" placeholder="pl. 28.5"></div>
       </div>
     </details>
+
+    <!-- Rakodási felület — csak pótkocsinál látszik (editVehicle kapcsolja) -->
+    <div id="vehTrailerCargoWrap" style="display:none;margin-top:10px;">
+      <div class="text-muted" style="font-size:12px;font-weight:600;margin-bottom:8px;">📦 Rakodási felület (nem a teljes méret!)</div>
+      <div class="grid-2">
+        <div class="field"><label>Típus</label>
+          <select class="select" id="vehEditTrailerKind" onchange="vehEditKindChange()">
+            <option value="standard">Standard (260 cm)</option>
+            <option value="mega">Mega (305 cm)</option>
+          </select>
+        </div>
+        <div class="field"><label>Hossz (cm)</label><input class="input" id="vehEditCargoLen" type="number" placeholder="1360"></div>
+      </div>
+      <div class="grid-2">
+        <div class="field"><label>Szélesség (cm)</label><input class="input" id="vehEditCargoWid" type="number" placeholder="248"></div>
+        <div class="field"><label>Magasság (cm)</label><input class="input" id="vehEditCargoHei" type="number" placeholder="260 / mega: 305"></div>
+      </div>
+    </div>
 
     <div class="row" style="margin-top:14px; display:flex; gap:10px;">
       <button class="btn ghost col" onclick="closeVehicleModal()">Mégse</button>

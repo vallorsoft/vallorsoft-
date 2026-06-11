@@ -881,6 +881,15 @@ function renderFuvarCard(o) {
       isAlocat ? '<button class="sh-btn resume"  onclick="driverOrderStatus(\'' + o.id + '\',\'In Curs\')">✅ Elfogadom</button>' :
       isCurs   ? '<button class="sh-btn confirm" onclick="driverOrderStatus(\'' + o.id + '\',\'Finalizat\')">🏁 Elvégeztem</button>' :
                  '';
+  // ⛔ Áru leadása (defekt / pótkocsi-csere) — a kérést a diszpécser igazolja vissza
+  var hoPending = o.handover_status === 'Fuggoben';
+  var hoBtn = '';
+  if (hoPending) {
+    hoBtn = '<span class="fuvar-status warn">⏳ Leadás visszaigazolásra vár' + (o.handover_loc ? ' @ ' + esc(o.handover_loc) : '') + '</span>';
+  } else if (isAlocat || isCurs) {
+    hoBtn = '<button class="sh-btn" style="border:1px solid rgba(192,38,211,0.5);color:#e879f9;background:rgba(192,38,211,0.12);" ' +
+      'onclick="openHandover(\'' + o.id + '\')" title="Áru leadása (pótkocsin parkol / raktárba kerül)">⛔ Áru leadása</button>';
+  }
   return '' +
     '<div class="fuvar-card">' +
       '<div class="fuvar-destination">📍 ' + esc(o.loc_incarcare||'—') + ' → ' + esc(o.loc_descarcare||'—') + '</div>' +
@@ -893,8 +902,67 @@ function renderFuvarCard(o) {
       '<div class="fuvar-actions">' +
         '<button class="sh-btn uit" onclick="SoferUit.open(\'' + o.id + '\')" title="UIT-kódok (RO e-Transport)">🚛 UIT</button>' +
         actionBtn +
+        hoBtn +
       '</div>' +
     '</div>';
+}
+
+// ── ⛔ Áru leadása (sofőr-kérés, a diszpécser igazolja vissza) ──
+var _hoOid = null;
+function openHandover(oid) {
+  _hoOid = oid;
+  ['hoLoc','hoQty','hoLen','hoWid','hoHei','hoWeight','hoDocPages','hoNote'].forEach(function(id){
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  var u = document.getElementById('hoQtyUnit'); if (u) u.value = 'paletta';
+  document.querySelectorAll('input[name="hoType"]').forEach(function(r){ r.checked = (r.value === 'trailer'); });
+  hoTypeChange();
+  document.getElementById('hoModal').style.display = 'flex';
+  setTimeout(function(){ var l = document.getElementById('hoLoc'); if (l) l.focus(); }, 150);
+}
+function closeHandover() { document.getElementById('hoModal').style.display = 'none'; }
+function hoTypeChange() {
+  var t = (document.querySelector('input[name="hoType"]:checked') || {}).value;
+  document.getElementById('hoWhBlock').style.display = t === 'warehouse' ? 'block' : 'none';
+}
+function submitHandover() {
+  var type = (document.querySelector('input[name="hoType"]:checked') || {}).value;
+  var loc = document.getElementById('hoLoc').value.trim();
+  if (!loc) { toast('Add meg, hol lett lerakva / hol parkol! (helység)', 'err'); return; }
+  var d = { type: type, location: loc, note: document.getElementById('hoNote').value.trim() || null };
+  if (type === 'warehouse') {
+    d.qty = document.getElementById('hoQty').value;
+    d.qty_unit = document.getElementById('hoQtyUnit').value;
+    d.length_cm = document.getElementById('hoLen').value;
+    d.width_cm = document.getElementById('hoWid').value;
+    d.height_cm = document.getElementById('hoHei').value;
+    d.weight_kg = document.getElementById('hoWeight').value;
+    d.doc_pages = document.getElementById('hoDocPages').value;
+  }
+  var btn = document.getElementById('hoSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Küldés...';
+  fetch('/api/execute', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ functionName:'driverHandoverRequest', arguments:[_hoOid, d] }) })
+  .then(function(r){ return r.json(); })
+  .then(function(resp){
+    btn.disabled = false; btn.textContent = '📤 Kérés küldése';
+    var r = resp.result;
+    if (r && r.ok) {
+      toast('✅ Kérés elküldve — a diszpécser visszaigazolja.', 'ok');
+      closeHandover();
+      loadDashOrders();
+      if (type === 'warehouse') {
+        // azonnali felszólítás: dokumentumok fotózása, a fuvarhoz kötve
+        var oid = _hoOid;
+        setTimeout(function(){
+          toast('📷 Fotózd le az áru dokumentumait most!', 'err');
+          goSec('docs');
+          var sel = document.getElementById('docOrderSel');
+          if (sel) sel.value = oid;
+        }, 600);
+      }
+    } else { toast((r && r.err) || 'Hiba történt', 'err'); }
+  });
 }
 
 function loadDashOrders() {

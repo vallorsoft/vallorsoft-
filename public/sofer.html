@@ -220,6 +220,50 @@
 <script src="/sofer-uit.js?v=20260611"></script>
 <script src="/sofer.js?v=20260611"></script>
 
+<!-- ── ÁRU LEADÁSA MODAL (sofőr-kérés — admin visszaigazolja) ── -->
+<div id="hoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);
+  backdrop-filter:blur(6px);align-items:center;justify-content:center;z-index:1000;padding:20px;">
+  <div style="width:min(460px,100%);background:var(--bg-2);border:1px solid var(--border-bright);
+    border-radius:18px;padding:24px;max-height:90vh;overflow-y:auto;">
+    <h3 style="margin:0 0 6px;font-size:17px;color:#fff;">⛔ Áru leadása</h3>
+    <p style="color:var(--muted);font-size:12.5px;margin-bottom:14px;" id="hoModalSub">
+      Add meg, mi történik az áruval. A kérést a diszpécser igazolja vissza — addig a fuvar nálad marad.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+      <label style="display:flex;align-items:center;gap:9px;color:var(--text);font-size:14px;cursor:pointer;">
+        <input type="radio" name="hoType" value="trailer" checked onchange="hoTypeChange()"> 🅿️ Pótkocsin parkol (megrakva)</label>
+      <label style="display:flex;align-items:center;gap:9px;color:var(--text);font-size:14px;cursor:pointer;">
+        <input type="radio" name="hoType" value="warehouse" onchange="hoTypeChange()"> 📦 Raktárba került (lerakva)</label>
+    </div>
+    <div class="field"><label>Hol lett lerakva / hol parkol? (helység) *</label>
+      <input class="input" id="hoLoc" placeholder="pl. Brașov"></div>
+    <div id="hoWhBlock" style="display:none;">
+      <div style="font-size:12px;color:var(--muted);font-weight:700;margin:6px 0 8px;">📦 Raktár-adatok (ha tudod, töltsd ki — a diszpécser véglegesíti)</div>
+      <div class="g2">
+        <div class="field"><label>Darabszám</label><input class="input" id="hoQty" type="number" inputmode="numeric" placeholder="pl. 33"></div>
+        <div class="field"><label>Egység</label>
+          <select class="input" id="hoQtyUnit"><option value="paletta">Paletta</option><option value="doboz">Doboz</option><option value="egyeb">Egyéb</option></select></div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Hossz (cm)</label><input class="input" id="hoLen" type="number" inputmode="numeric" placeholder="pl. 800"></div>
+        <div class="field"><label>Szélesség (cm)</label><input class="input" id="hoWid" type="number" inputmode="numeric" placeholder="pl. 248"></div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Magasság (cm)</label><input class="input" id="hoHei" type="number" inputmode="numeric" placeholder="pl. 220"></div>
+        <div class="field"><label>Súly (kg)</label><input class="input" id="hoWeight" type="number" inputmode="numeric" placeholder="pl. 12500"></div>
+      </div>
+      <div class="field"><label>Dokumentum lapszáma (pl. 10)</label><input class="input" id="hoDocPages" type="number" inputmode="numeric" placeholder="pl. 10"></div>
+      <div style="font-size:12px;color:var(--status-warn);margin-bottom:8px;">📷 Küldés után fotózd le a dokumentumokat az Iratok fülön!</div>
+    </div>
+    <div class="field"><label>Megjegyzés</label><input class="input" id="hoNote" placeholder="pl. defekt, pótkocsi-csere..."></div>
+    <div style="display:flex;gap:10px;margin-top:12px;">
+      <button onclick="closeHandover()" style="flex:1;padding:12px;border-radius:8px;border:1px solid var(--border-bright);
+        background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;">Mégse</button>
+      <button id="hoSubmitBtn" onclick="submitHandover()" style="flex:2;padding:12px;border-radius:8px;border:none;
+        background:linear-gradient(180deg,#c026d3,#a21caf);color:#fff;font-size:14px;font-weight:700;cursor:pointer;">📤 Kérés küldése</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── BUG REPORT FAB (jobb alsó sarok; chat nézetben a JS elrejti) ── -->
 <button id="bugFab" onclick="openBugReport()" title="Hibajelentés küldése">🐛</button>
 
