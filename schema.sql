@@ -55,7 +55,9 @@ CREATE TABLE IF NOT EXISTS invites (
   id         SERIAL PRIMARY KEY,
   kod        VARCHAR(20)  NOT NULL UNIQUE,
   pozicio    VARCHAR(20)  NOT NULL CHECK (pozicio IN ('Admin','Manager','Sofer')),
+  nume       VARCHAR(255),
   email      VARCHAR(255),
+  tel        VARCHAR(50),
   status     VARCHAR(20)  NOT NULL DEFAULT 'Aktiv'
                 CHECK (status IN ('Aktiv','Felhasznalva','Visszavonva')),
   used_by    VARCHAR(255),
@@ -284,6 +286,8 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS pozicio_dev BOOLEAN NOT NULL DEFAULT 
 -- invites
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS company_id INTEGER;
 ALTER TABLE invites ADD COLUMN IF NOT EXISTS used_by    VARCHAR(255);
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS nume       VARCHAR(255);
+ALTER TABLE invites ADD COLUMN IF NOT EXISTS tel        VARCHAR(50);
 
 -- external_drivers
 ALTER TABLE external_drivers ADD COLUMN IF NOT EXISTS company_id INTEGER;

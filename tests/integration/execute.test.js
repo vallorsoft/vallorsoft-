@@ -29,4 +29,42 @@ describe('POST /api/execute', () => {
     expect(res.body.result.ok).toBe(false);
     expect(res.body.result.err).toMatch(/Ismeretlen funkcio/i);
   });
+
+  // A regisztráció meghívókóddal NEM igényelhet bejelentkezést — a
+  // register.html a /api/execute-on hívja az authRegister-t (publikus
+  // whitelist); a requireLogin korábban 401-gyel blokkolta.
+  test('authRegister bejelentkezés nélkül is hívható (publikus)', async () => {
+    setUser(null);
+    const { rows } = require('../helpers/db-mock');
+    const pool = require('../../db');
+    pool.query
+      // invite lekérés a kód alapján
+      .mockResolvedValueOnce(rows([{ id: 1, pozicio: 'Sofer', email: null, status: 'Aktiv', company_id: 7 }]))
+      // létező user ellenőrzés — nincs ilyen email
+      .mockResolvedValueOnce(rows([]))
+      // user INSERT
+      .mockResolvedValueOnce(rows([]))
+      // invite státusz UPDATE
+      .mockResolvedValueOnce(rows([]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'authRegister',
+      arguments: [{ nume: 'Teszt Elek', email: 'teszt@pelda.hu', tel: '', jelszo: 'titok123', kod: 'VS-ABC123' }]
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.result.ok).toBe(true);
+  });
+
+  test('authRegister visszavont kóddal → hiba', async () => {
+    setUser(null);
+    const { rows } = require('../helpers/db-mock');
+    const pool = require('../../db');
+    pool.query.mockResolvedValueOnce(rows([{ id: 2, pozicio: 'Sofer', email: null, status: 'Visszavonva', company_id: 7 }]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'authRegister',
+      arguments: [{ nume: 'Teszt Elek', email: 'teszt2@pelda.hu', tel: '', jelszo: 'titok123', kod: 'VS-DEAD01' }]
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/visszavon/i);
+  });
 });
