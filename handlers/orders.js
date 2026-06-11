@@ -326,6 +326,14 @@ handlers.comUpdate = async function (req, res, args) {
       if (r.rowCount === 0) {
         return res.json({ result: { ok: false, err: 'Fuvar nem talalhato.' } });
       }
+      // ha a státusz elhagyja a Raktarban-t (kézi váltás is), az aktív
+      // raktári tétel kiadva — ne ragadjon bent a Raktár fülön
+      if (o.status !== undefined && o.status !== 'Raktarban') {
+        await pool.query(
+          `UPDATE warehouse_items SET status = 'Kiadva', released_at = NOW()
+           WHERE company_id = $1 AND order_id = $2 AND status = 'Raktarban'`,
+          [req.session.user.company_id, id]).catch((e) => console.error('warehouse release hiba:', e));
+      }
       return res.json({ result: { ok: true } });
 
     } catch (err) {
@@ -351,6 +359,8 @@ handlers.comDelete = async function (req, res, args) {
         return res.json({ result: { ok: false, err: 'Fuvar nem talalhato vagy nincs jogosultsag.' } });
       }
       await pool.query('DELETE FROM order_legs WHERE order_id = $1', [id]);
+      await pool.query('DELETE FROM warehouse_items WHERE order_id = $1 AND company_id = $2',
+        [id, req.session.user.company_id]).catch(() => {});
       const r = await pool.query('DELETE FROM orders WHERE id = $1 AND company_id = $2', [id, req.session.user.company_id]);
       if (r.rowCount === 0) {
         return res.json({ result: { ok: false, err: 'Fuvar nem talalhato.' } });
@@ -516,6 +526,7 @@ handlers.plannerAssign = async function (req, res, args) {
     const sets = ['updated_at = NOW()'];
     const params = [orderId, cid];
     let pairedDriver = null;
+    let releaseWarehouse = false;
     if (Object.prototype.hasOwnProperty.call(f, 'rendszam_camion')) {
       const rendszam = f.rendszam_camion ? String(f.rendszam_camion).trim().toUpperCase() : null;
       if (rendszam) {
@@ -543,15 +554,11 @@ handlers.plannerAssign = async function (req, res, args) {
             pairedDriver = p.nume_sofer || p.email_sofer;
           }
         }
-        // Leadott áru folytatása: kiosztással újra Alocat; raktári tétel kiadva
+        // Leadott áru folytatása: kiosztással újra Alocat; a raktári tétel
+        // kiadása a sikeres UPDATE UTÁN történik (lásd lentebb)
         if (['Parkolt', 'Raktarban'].includes(co.status)) {
           statusToAlocat = true;
-          if (co.status === 'Raktarban') {
-            await pool.query(
-              `UPDATE warehouse_items SET status = 'Kiadva', released_at = NOW()
-               WHERE company_id = $1 AND order_id = $2 AND status = 'Raktarban'`,
-              [cid, orderId]);
-          }
+          if (co.status === 'Raktarban') releaseWarehouse = true;
         }
         if (statusToAlocat) sets.push(`status = 'Alocat'`);
       }
@@ -566,6 +573,12 @@ handlers.plannerAssign = async function (req, res, args) {
       params
     );
     if (!r.rowCount) return res.json({ result: { ok: false, err: 'Fuvar nem található' } });
+    if (releaseWarehouse) {
+      await pool.query(
+        `UPDATE warehouse_items SET status = 'Kiadva', released_at = NOW()
+         WHERE company_id = $1 AND order_id = $2 AND status = 'Raktarban'`,
+        [cid, orderId]).catch((e) => console.error('warehouse release hiba:', e));
+    }
     return res.json({ result: { ok: true, paired_driver: pairedDriver } });
   } catch (err) {
     console.error('plannerAssign hiba:', err);

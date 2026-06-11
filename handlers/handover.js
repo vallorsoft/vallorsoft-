@@ -27,6 +27,10 @@ function _posNum(x) {
   const n = parseFloat(x);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
+function _str(x, max) {
+  const s = String(x || '').trim().slice(0, max);
+  return s || null;
+}
 
 // A leadási adatok validálása. Raktár esetén a méret/darabszám/súly/
 // lapszám KÖTELEZŐ; a dokumentum-feltöltés nem blokkol (csak folyamatos
@@ -35,14 +39,14 @@ function validateHandover(data) {
   const d = data || {};
   const type = d.type === 'trailer' || d.type === 'warehouse' ? d.type : null;
   if (!type) return { err: 'Add meg, mi történik az áruval (pótkocsin parkol / raktárba kerül).' };
-  const location = String(d.location || '').trim();
+  const location = _str(d.location, 200);
   if (!location) return { err: 'A leadás helye (helység) kötelező.' };
   const out = {
     type,
     location,
-    new_dest: d.new_dest ? String(d.new_dest).trim() : null,
-    note: d.note ? String(d.note).trim() : null,
-    rendszam_remorca: d.rendszam_remorca ? String(d.rendszam_remorca).trim().toUpperCase() : null,
+    new_dest: _str(d.new_dest, 200),
+    note: _str(d.note, 500),
+    rendszam_remorca: d.rendszam_remorca ? String(d.rendszam_remorca).trim().toUpperCase().slice(0, 20) : null,
   };
   if (type === 'warehouse') {
     out.qty = _posInt(d.qty);
@@ -84,6 +88,12 @@ async function applyHandover(cid, order, d, byEmail) {
       [order.id, cid, newStatus, d.location, d.new_dest, d.type, d.rendszam_remorca, byEmail]
     );
     if (d.type === 'warehouse') {
+      // ismételt leadásnál a korábbi aktív tétel lezárul — egy fuvarhoz
+      // egyszerre csak EGY aktív raktári tétel lehet
+      await dbc.query(
+        `UPDATE warehouse_items SET status = 'Kiadva', released_at = NOW()
+         WHERE company_id = $1 AND order_id = $2 AND status = 'Raktarban'`,
+        [cid, order.id]);
       await dbc.query(
         `INSERT INTO warehouse_items
            (company_id, order_id, location, qty, qty_unit,
@@ -145,9 +155,19 @@ handlers.driverHandoverRequest = async function (req, res, args) {
     const orderId = String(args[0] || '').trim();
     const d = args[1] || {};
     const type = d.type === 'trailer' || d.type === 'warehouse' ? d.type : null;
-    const location = String(d.location || '').trim();
+    const location = _str(d.location, 200);
     if (!type) return res.json({ result: { ok: false, err: 'Add meg, mi történik az áruval.' } });
     if (!location) return res.json({ result: { ok: false, err: 'A leadás helye (helység) kötelező.' } });
+
+    // Csak az ismert mezőket tároljuk (a kliens tetszőleges payloadot küldhetne)
+    const payload = {
+      type, location,
+      note: _str(d.note, 500),
+      new_dest: _str(d.new_dest, 200),
+      qty: _posInt(d.qty), qty_unit: QTY_UNITS.includes(d.qty_unit) ? d.qty_unit : null,
+      length_cm: _posInt(d.length_cm), width_cm: _posInt(d.width_cm), height_cm: _posInt(d.height_cm),
+      weight_kg: _posNum(d.weight_kg), doc_pages: _posInt(d.doc_pages),
+    };
 
     const r = await pool.query(
       `UPDATE orders SET
@@ -156,7 +176,7 @@ handlers.driverHandoverRequest = async function (req, res, args) {
        WHERE id = $1 AND company_id = $2
          AND LOWER(email_sofer) = LOWER($5)
          AND status IN ('Alocat', 'In Curs')`,
-      [orderId, cid, type, location, me.email, JSON.stringify(d)]
+      [orderId, cid, type, location, me.email, JSON.stringify(payload)]
     );
     if (!r.rowCount) {
       return res.json({ result: { ok: false, err: 'A fuvar nem található, nem a tiéd, vagy nem aktív.' } });
@@ -197,6 +217,10 @@ handlers.confirmHandover = async function (req, res, args) {
     const o = or.rows[0];
     if (o.handover_status !== 'Fuggoben') {
       return res.json({ result: { ok: false, err: 'Nincs függő leadás-kérés ezen a fuvaron.' } });
+    }
+    // időközben lezárt/törölt fuvar nem adható le (versenyhelyzet)
+    if (['Finalizat', 'Anulat'].includes(o.status)) {
+      return res.json({ result: { ok: false, err: 'A fuvar időközben lezárult — a kérés már nem igazolható vissza.' } });
     }
 
     // a sofőr payloadja az alap, az admin mezői felülírják
@@ -284,6 +308,13 @@ handlers.getPendingHandovers = async function (req, res, args) {
 handlers.getWarehouseItems = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+      return res.json({ result: [] });
+    }
+    // Előfizetés-kapcsoló (szerveroldali gate is, mint a trackingnél)
+    const fr = await pool.query(
+      "SELECT enabled FROM company_features WHERE company_id = $1 AND feature_key = 'warehouse'",
+      [req.session.user.company_id]);
+    if (fr.rows.length && fr.rows[0].enabled === false) {
       return res.json({ result: [] });
     }
     const r = await pool.query(
