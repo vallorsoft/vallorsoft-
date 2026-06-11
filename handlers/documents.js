@@ -256,8 +256,8 @@ handlers.getDriverDocs = async function (req, res, args) {
       const cid = req.session.user.company_id;
       const isAdmin = ['Admin', 'Manager'].includes(req.session.user.pozicio);
       const r = isAdmin
-        ? await pool.query('SELECT d.id, d.email_sofer, d.nume_sofer, d.tip, d.file_name, d.created_at FROM documents d JOIN users u ON u.email = d.email_sofer WHERE u.company_id = $1 ORDER BY d.created_at DESC LIMIT 200', [cid])
-        : await pool.query('SELECT id, email_sofer, nume_sofer, tip, file_name, created_at FROM documents WHERE email_sofer = $1 ORDER BY created_at DESC LIMIT 200', [req.session.user.email]);
+        ? await pool.query('SELECT d.id, d.email_sofer, d.nume_sofer, d.tip, d.file_name, d.order_id, d.created_at FROM documents d JOIN users u ON u.email = d.email_sofer WHERE u.company_id = $1 ORDER BY d.created_at DESC LIMIT 200', [cid])
+        : await pool.query('SELECT id, email_sofer, nume_sofer, tip, file_name, order_id, created_at FROM documents WHERE email_sofer = $1 ORDER BY created_at DESC LIMIT 200', [req.session.user.email]);
       return res.json({ result: r.rows });
     } catch (err) {
       console.error('getDriverDocs hiba:', err);

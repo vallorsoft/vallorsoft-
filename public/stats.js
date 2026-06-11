@@ -290,7 +290,6 @@
 
       var listRows = (r.kintlevo_lista || []).map(function (o) {
         var marad = (parseFloat(o.pret) || 0) - (parseFloat(o.paid_amount) || 0);
-        var sulyos = o.napok > 30;
         return '<tr>'
           + '<td><b class="text-primary">' + esc(String(o.id)) + '</b></td>'
           + '<td>' + esc(o.client || '—') + '</td>'
@@ -298,7 +297,8 @@
           + '<td style="text-align:right;">' + stNum(o.paid_amount, 0) + '</td>'
           + '<td style="text-align:right;font-weight:700;color:var(--status-danger);">' + stNum(marad, 0) + '</td>'
           + '<td>' + stDate(o.finalized_at) + '</td>'
-          + '<td style="text-align:center;"><span class="badge ' + (sulyos ? 'err' : 'warn') + '">' + stNum(o.napok, 0) + ' nap</span></td>'
+          + '<td style="text-align:center;">' + stDate(o.esedekes)
+          + (o.lejart ? ' <span class="badge err">Lejárt</span>' : ' <span class="badge warn">' + stNum(o.napok, 0) + ' nap</span>') + '</td>'
           + '<td>' + (PAY_BADGE[o.payment_status] || '') + '</td>'
           + '<td><button class="btn ok" style="padding:4px 10px;font-size:12px;" '
           + 'onclick="openPaymentModal(\'' + esc(String(o.id)) + '\',' + (parseFloat(o.pret) || 0) + ',' + (parseFloat(o.paid_amount) || 0) + ')">💰 Fizetés</button></td>'
@@ -323,7 +323,7 @@
             + '</div>')
         + '</div>'
         + stPanel('📋 Kintlévő fuvarok', '<div style="overflow-x:auto;"><table class="table">'
-            + '<thead><tr><th>Fuvar</th><th>Ügyfél</th><th style="text-align:right;">Ár (EUR)</th><th style="text-align:right;">Fizetve</th><th style="text-align:right;">Hátralék</th><th>Teljesítve</th><th style="text-align:center;">Eltelt</th><th>Státusz</th><th></th></tr></thead>'
+            + '<thead><tr><th>Fuvar</th><th>Ügyfél</th><th style="text-align:right;">Ár (EUR)</th><th style="text-align:right;">Fizetve</th><th style="text-align:right;">Hátralék</th><th>Teljesítve</th><th style="text-align:center;">Esedékes</th><th>Státusz</th><th></th></tr></thead>'
             + '<tbody>' + listRows + '</tbody></table></div>',
             '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-finance\')">⬇️ CSV export</button>');
 
@@ -593,21 +593,22 @@
           + '<td style="text-align:right;">' + stNum(v.bevetel_per_km, 2) + '</td>'
           + '<td style="text-align:right;">' + stNum(v.total_km, 0) + '</td>'
           + '<td style="text-align:right;">' + stNum(v.uzemanyag_ktg, 0) + '</td>'
+          + '<td style="text-align:right;">' + stNum(v.szerviz_ktg, 0) + '</td>'
           + (rate ? (function () {
-              var p = (parseFloat(v.bevetel) || 0) - (parseFloat(v.uzemanyag_ktg) || 0) / rate;
+              var p = (parseFloat(v.bevetel) || 0) - ((parseFloat(v.uzemanyag_ktg) || 0) + (parseFloat(v.szerviz_ktg) || 0)) / rate;
               return '<td style="text-align:right;font-weight:700;color:' + (p >= 0 ? 'var(--status-ok)' : 'var(--status-danger)') + ';">' + stNum(p, 0) + '</td>';
             })() : '')
           + '<td style="text-align:right;">' + (consum > 0 ? stNum(consum, 1) : '—') + '</td>'
           + '<td style="text-align:center;">' + diffBadge + '</td>'
           + '</tr>';
-      }).join('') || '<tr><td colspan="11" class="text-muted" style="text-align:center;padding:18px;">Nincs adat az időszakban.</td></tr>';
+      }).join('') || '<tr><td colspan="12" class="text-muted" style="text-align:center;padding:18px;">Nincs adat az időszakban.</td></tr>';
 
       box.innerHTML = stFilterBar('stats-vehicles')
         + '<div id="stGpsSnapshotBox"></div>'
         + stPanel('🏆 Top járművek bevétel szerint (EUR)', stChartCanvas('stChVehTop'))
         + stPanel('🚛 Jármű-tábla',
             '<div style="overflow-x:auto;"><table class="table">'
-            + '<thead><tr><th>Jármű</th><th style="text-align:center;">Állapot</th><th style="text-align:right;">Fuvar</th><th style="text-align:right;">Lezárt</th><th style="text-align:right;">Bevétel (EUR)</th><th style="text-align:right;">EUR/km</th><th style="text-align:right;">Km (menetlevél)</th><th style="text-align:right;">Üzemanyag (RON)</th>'
+            + '<thead><tr><th>Jármű</th><th style="text-align:center;">Állapot</th><th style="text-align:right;">Fuvar</th><th style="text-align:right;">Lezárt</th><th style="text-align:right;">Bevétel (EUR)</th><th style="text-align:right;">EUR/km</th><th style="text-align:right;">Km (menetlevél)</th><th style="text-align:right;">Üzemanyag (RON)</th><th style="text-align:right;">Szerviz (RON)</th>'
             + (rate ? '<th style="text-align:right;">Eredmény (EUR)</th>' : '')
             + '<th style="text-align:right;">L/100km</th><th style="text-align:center;">Eltérés</th></tr></thead>'
             + '<tbody>' + rows + '</tbody></table></div>',

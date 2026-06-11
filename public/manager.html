@@ -49,6 +49,7 @@
         <div class="sub-tab" data-tab="inbound">Megrendelések</div>
       </div>
       <div class="tab" data-tab="received-fuv">Fuvarlevelek</div>
+      <div class="tab" data-tab="decont">Sofőr-elszámolás</div>
             <div class="tab" data-tab="driver-docs-pane">Feltöltött Iratok & CMR-ek</div>
       <a href="/utvonaltervezes" class="tab-link">Útvonaltervezés</a>
     </div>
@@ -64,6 +65,11 @@
         <div class="sub-tab" data-tab="stats-vehicles">Jármű kihasználtság</div>
         <div class="sub-tab" data-tab="stats-clients">Ügyfél riport</div>
       </div>
+    </div>
+    <div class="menu-group">
+      <div class="menu-title">Flotta & Megfelelés</div>
+      <div class="tab" data-tab="expiries">⏰ Lejáratok</div>
+      <div class="tab" data-tab="service-log">🔧 Szerviz & karbantartás</div>
     </div>
     <div class="menu-group" id="userMenuGroup">
       <div class="menu-title">Adminisztráció</div>
@@ -106,6 +112,7 @@
       </div>
 
        <!-- Stat kártyák -->
+      <div id="dashExpiryAlert"></div>
       <div class="dash-stats" style="margin-bottom:20px;">
         <div class="glass stat-tile">
           <div class="stat-ico">📦</div>
@@ -479,6 +486,11 @@
     <div class="pane hidden" data-pane="stats-drivers"><div id="statsDriversBox"></div></div>
     <div class="pane hidden" data-pane="stats-vehicles"><div id="statsVehiclesBox"></div></div>
     <div class="pane hidden" data-pane="stats-clients"><div id="statsClientsBox"></div></div>
+
+    <!-- ── FLOTTA & MEGFELELÉS PANES (tartalom: fleet-extra.js) ── -->
+    <div class="pane hidden" data-pane="expiries"><div id="expiriesBox"></div></div>
+    <div class="pane hidden" data-pane="service-log"><div id="serviceLogBox"></div></div>
+    <div class="pane hidden" data-pane="decont"><div id="decontBox"></div></div>
 
      <!-- ═══════════════════════════════════════════════ -->
     <!-- MEGRENDELÉSEK PANE -->
@@ -958,6 +970,7 @@
 <script src="/uit-panel.js?v=20260611"></script>
 <script src="/invoice-modal.js?v=20260611"></script>
 <script src="/stats.js?v=20260611"></script>
+<script src="/fleet-extra.js?v=20260611"></script>
 <script src="/manager.js?v=20260611"></script>
 
  <!-- ── BUG REPORT FAB ── -->

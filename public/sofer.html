@@ -161,9 +161,17 @@
     </div>
     <div class="docs-grid" id="docTypeGrid">
       <div class="doc-type-btn sel" onclick="selDocType(this,'CMR')">📦 CMR</div>
+      <div class="doc-type-btn" onclick="selDocType(this,'POD')">✍️ POD (aláírt CMR)</div>
       <div class="doc-type-btn" onclick="selDocType(this,'Számla')">🧾 Számla</div>
       <div class="doc-type-btn" onclick="selDocType(this,'Vám')">🏛 Vám</div>
       <div class="doc-type-btn" onclick="selDocType(this,'Egyéb')">📎 Egyéb</div>
+    </div>
+    <!-- Fuvar-hozzárendelés (POD) — a sofőr saját fuvarjai közül -->
+    <div style="margin-top:10px;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Fuvar (opcionális — POD-nál ajánlott):</div>
+      <select id="docOrderSel" style="width:100%;padding:11px;border-radius:10px;background:var(--bg-2);border:1px solid var(--border);color:#fff;font-size:14px;">
+        <option value="">— Nincs fuvarhoz kötve —</option>
+      </select>
     </div>
     <div class="upload-area" onclick="document.getElementById('dFile').click()">
       <div style="font-size:40px;">📂</div>

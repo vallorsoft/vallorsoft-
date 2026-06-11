@@ -60,4 +60,68 @@ function startIntakeScheduler() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler };
+// ============================================================
+//  Lejárat-figyelő ütemező (document_expiries) — 12 óránként fut.
+//  A riasztási ablakba érő (expiry_date <= ma + alert_days) tételekről
+//  push-értesítést küld a cég Admin/Manager felhasználóinak.
+//  Ismétlés: hetente újra szól, amíg a tétel le nem jár / nem frissítik
+//  (last_alert_at dátum-őr — duplikált riasztás nélkül).
+// ============================================================
+function startExpiryScheduler() {
+  let push;
+  try { push = require('./push'); } catch (_) { return null; }
+
+  async function tick() {
+    let rows;
+    try {
+      ({ rows } = await pool.query(
+        `SELECT id, company_id, entity_type, entity_label, doc_type, expiry_date,
+                (expiry_date - CURRENT_DATE)::int AS days_left
+         FROM document_expiries
+         WHERE expiry_date <= CURRENT_DATE + alert_days * INTERVAL '1 day'
+           AND (last_alert_at IS NULL OR last_alert_at <= CURRENT_DATE - 7)
+         ORDER BY company_id, expiry_date
+         LIMIT 500`));
+    } catch (err) {
+      // A tábla még nem létezik (migráció előtt) -> csendben kihagyjuk.
+      return;
+    }
+    if (!rows.length) return;
+
+    // Cégenként csoportosítva EGY összefoglaló push (ne spammeljen tételenként)
+    const byCompany = new Map();
+    for (const r of rows) {
+      if (!byCompany.has(r.company_id)) byCompany.set(r.company_id, []);
+      byCompany.get(r.company_id).push(r);
+    }
+    for (const [cid, items] of byCompany) {
+      const lejart = items.filter((i) => i.days_left < 0).length;
+      const first = items[0];
+      const firstTxt = (first.entity_label ? first.entity_label + ' — ' : '') + first.doc_type
+        + (first.days_left < 0 ? ' LEJÁRT' : ' ' + first.days_left + ' nap múlva lejár');
+      const body = items.length === 1
+        ? firstTxt
+        : firstTxt + ' (+' + (items.length - 1) + ' további' + (lejart ? ', ebből ' + lejart + ' lejárt' : '') + ')';
+      try {
+        await push.sendPushToRole(cid, ['Admin', 'Manager'], {
+          title: '⏰ Lejáró dokumentumok',
+          body,
+          url: '/admin',
+        });
+        const ids = items.map((i) => i.id);
+        await pool.query(
+          'UPDATE document_expiries SET last_alert_at = CURRENT_DATE WHERE id = ANY($1)', [ids]);
+        console.log('[Expiry] cég #' + cid + ' — riasztás: ' + items.length + ' tétel');
+      } catch (err) {
+        console.error('[Expiry] cég #' + cid + ' riasztás hiba:', err.message);
+      }
+    }
+  }
+
+  setTimeout(tick, 30 * 1000);                       // indulás után fél perccel első kör
+  const interval = setInterval(tick, 12 * 60 * 60 * 1000);
+  console.log('[Expiry] Lejárat-figyelő elindítva — 12 órás ciklus.');
+  return interval;
+}
+
+module.exports = { startIntakeScheduler, startExpiryScheduler };

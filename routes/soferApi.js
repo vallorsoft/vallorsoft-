@@ -166,16 +166,18 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
 router.post('/api/doc-upload', async (req, res) => {
   try {
     if (!req.session.user) return res.json({ success: false, err: 'Nincs bejelentkezve' });
-    const { numeFisier, base64, tip } = req.body;
+    const { numeFisier, base64, tip, orderId } = req.body;
+    // POD: a fotó opcionálisan fuvarhoz köthető (a sofőr a sajátjai közül választ)
     await pool.query(
-      `INSERT INTO documents (email_sofer, nume_sofer, tip, file_name, storage_url)
-       VALUES ($1, $2, $3, $4, $5)`,
+      `INSERT INTO documents (email_sofer, nume_sofer, tip, file_name, storage_url, order_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         req.session.user.email,
         req.session.user.nume,
         tip || 'CMR',
         numeFisier || 'dokument',
-        base64 || null
+        base64 || null,
+        (orderId ? String(orderId).slice(0, 20) : null)
       ]
     );
     res.json({ success: true });
