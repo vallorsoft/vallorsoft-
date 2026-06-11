@@ -270,12 +270,14 @@ handlers.getStatsOverview = async function (req, res, args) {
       );
       finance = finR.rows[0];
 
-      // Riasztás: 30+ napja lejárt kintlévőség (időszaktól független pillanatkép)
+      // Riasztás: LEJÁRT kintlévőség — az ügyfél fizetési határideje szerint
+      // (clients.payment_term_days, alapért. 30 nap); időszaktól független pillanatkép
       const odR = await pool.query(
-        `SELECT COUNT(*)::int AS db, COALESCE(SUM(GREATEST(pret-paid_amount,0)),0)::numeric AS osszeg
-         FROM orders
-         WHERE company_id=$1 AND status='Finalizat' AND payment_status <> 'paid'
-           AND pret > 0 AND finalized_at < NOW() - INTERVAL '30 days'`,
+        `SELECT COUNT(*)::int AS db, COALESCE(SUM(GREATEST(o.pret-o.paid_amount,0)),0)::numeric AS osszeg
+         FROM orders o LEFT JOIN clients c ON c.id = o.client_id
+         WHERE o.company_id=$1 AND o.status='Finalizat' AND o.payment_status <> 'paid'
+           AND o.pret > 0
+           AND NOW() > o.finalized_at + COALESCE(c.payment_term_days, 30) * INTERVAL '1 day'`,
         [cid]
       );
       if (odR.rows[0].db > 0) {
@@ -362,11 +364,14 @@ handlers.getFinanceStats = async function (req, res, args) {
       [cid]
     );
 
-    // Kintlévő fuvarok listája (legrégebbi elöl)
+    // Kintlévő fuvarok listája (legrégebbi elöl) — esedékesség az ügyfél
+    // fizetési határidejéből (clients.payment_term_days, alapért. 30 nap)
     const listR = await pool.query(
       `SELECT o.id, COALESCE(c.denumire, o.client) AS client, o.pret, o.paid_amount,
               o.payment_status, o.finalized_at,
-              EXTRACT(DAY FROM NOW() - o.finalized_at)::int AS napok
+              EXTRACT(DAY FROM NOW() - o.finalized_at)::int AS napok,
+              (o.finalized_at + COALESCE(c.payment_term_days, 30) * INTERVAL '1 day')::date AS esedekes,
+              (NOW() > o.finalized_at + COALESCE(c.payment_term_days, 30) * INTERVAL '1 day') AS lejart
        FROM orders o LEFT JOIN clients c ON c.id = o.client_id
        WHERE o.company_id=$1 AND o.status='Finalizat' AND o.payment_status <> 'paid' AND o.pret > 0
        ORDER BY o.finalized_at ASC LIMIT 200`,
@@ -627,15 +632,29 @@ handlers.getVehicleStats = async function (req, res, args) {
 
     // Jármű-törzs (vontatók)
     const vehR = await pool.query(
-      `SELECT UPPER(rendszam) AS rendszam, rendszam AS rendszam_eredeti, marca, model, an, activ,
+      `SELECT id, UPPER(rendszam) AS rendszam, rendszam AS rendszam_eredeti, marca, model, an, activ,
               fuel_per_100km AS nevleges
        FROM vehicles WHERE company_id=$1 AND tip='Vontato' ORDER BY rendszam`,
       [cid]
     );
 
+    // Szerviz-költség az időszakban (vehicle_service_log — migráció előtt
+    // a tábla hiányozhat, ezért védve)
+    const szervizByVehId = new Map();
+    try {
+      const szR = await pool.query(
+        `SELECT vehicle_id, COALESCE(SUM(cost_ron),0)::numeric AS ktg
+         FROM vehicle_service_log
+         WHERE company_id=$1 AND service_date >= $2 AND service_date < $3
+         GROUP BY vehicle_id`, P
+      );
+      szR.rows.forEach((r) => szervizByVehId.set(r.vehicle_id, parseFloat(r.ktg) || 0));
+    } catch (_) { /* tábla még nincs migrálva */ }
+
     const map = new Map();
     vehR.rows.forEach((v) => map.set(v.rendszam, Object.assign({
-      fuvarok: 0, lezart: 0, bevetel: 0, km: 0, total_km: 0, motorina: 0, uzemanyag_ktg: 0
+      fuvarok: 0, lezart: 0, bevetel: 0, km: 0, total_km: 0, motorina: 0, uzemanyag_ktg: 0,
+      szerviz_ktg: szervizByVehId.get(v.id) || 0
     }, v)));
     ordR.rows.forEach((r) => {
       const cur = map.get(r.rendszam) || { rendszam: r.rendszam, rendszam_eredeti: r.rendszam, total_km: 0, motorina: 0, uzemanyag_ktg: 0 };

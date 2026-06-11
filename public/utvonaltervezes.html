@@ -161,17 +161,12 @@
     <div id="rpPremiumResult" style="margin-top:6px;"></div>
   </div>
 
-  <!-- HERE prémium funkciók — összecsukható, az oldal alján -->
-  <div class="glass rp-card" id="rpPremiumPanel">
-    <div class="here-panel-head" onclick="rpTogglePremiumPanel()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;gap:10px;">
-      <div>
-        <div class="rp-sec-title" style="margin-bottom:2px;color:#a855f7;">🗺 HERE Térkép szolgáltatások</div>
-        <div class="text-muted" style="font-size:12px;">Havi használat és díjak</div>
-      </div>
-      <span id="rpPremiumChevron" style="color:#a855f7;font-size:16px;flex-shrink:0;">▼</span>
-    </div>
-    <div class="here-panel-content" id="rpPremiumContent">
-      <div id="rpPremiumList" style="padding-top:12px;"><div class="text-muted" style="font-size:12px;">Betöltés...</div></div>
+  <!-- Térkép-szolgáltatás infó -->
+  <div class="glass rp-card" style="display:flex;align-items:center;gap:10px;">
+    <span style="font-size:20px;">🆓</span>
+    <div>
+      <div class="text-primary" style="font-size:13px;font-weight:700;">Ingyenes térkép és útvonaltervezés</div>
+      <div class="text-muted" style="font-size:12px;">OpenStreetMap csempék + OSRM útvonal + Photon címkereső — díjmentes, <b>autós profillal</b> (kamion-korlátozásokat nem vesz figyelembe).</div>
     </div>
   </div>
 
@@ -187,22 +182,19 @@ function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'
 function val(id){var e=document.getElementById(id);return e?e.value.trim():'';}
 
 // ───────── Állapot ─────────
-var rpMap, rpTileLayer, rpLayer, rpHereKey=null;
+var rpMap, rpTileLayer, rpLayer;
 var _orders=[], _vehicles=[], _tractors=[], _trailers=[];
 var selTractor=null, selTrailer=null;     // teljes jármű-objektumok
 var gpsPos=null, gpsManualMode=false;
 var _wpSeq=0, _waypointIds=[];
 
-// ───────── Téma + HERE csempe (v3) ─────────
+// ───────── Téma + INGYENES csempék (CartoDB / OpenStreetMap) ─────────
 function rpTheme(){ var mc=document.getElementById('mainContent'); return (mc&&mc.getAttribute('data-theme')==='light')?'light':'dark'; }
 function rpTileUrl(theme){
-  if(rpHereKey){ var style=(theme==='light')?'explore.day':'explore.night';
-    return 'https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png?style='+style+'&size=512&apiKey='+rpHereKey; }
   return theme==='light' ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
                          : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 }
-function rpTileOpts(){ return rpHereKey ? {attribution:'© HERE Technologies',maxZoom:20,tileSize:512,zoomOffset:-1}
-                                        : {attribution:'© CARTO',maxZoom:19,subdomains:'abcd'}; }
+function rpTileOpts(){ return {attribution:'© OpenStreetMap © CARTO',maxZoom:19,subdomains:'abcd'}; }
 function rpSyncThemeIcon(){ var b=document.getElementById('themeToggle'); if(!b)return; var l=rpTheme()==='light'; b.textContent=l?'☀️':'🌙'; b.title=l?'Sötét mód':'Világos mód'; }
 function rpToggleTheme(){ var mc=document.getElementById('mainContent'); if(!mc)return; var n=(mc.getAttribute('data-theme')==='light')?'dark':'light';
   mc.setAttribute('data-theme',n); try{localStorage.setItem('vs-theme',n);}catch(e){} rpSyncThemeIcon();
@@ -320,7 +312,7 @@ function rpRenderTruckSummary(){
     +   '<div class="field"><label>Veszélyes áru</label><select class="select" id="rpHaz">'+rpOpts(hazOpts,t.hazardous_goods)+'</select></div>'
     + '</div>'
     + '<div class="text-muted" style="font-size:12px;margin-top:6px;line-height:1.6;">'
-    +   '⚠ Nyerges szerelvénynél a tényleges összekapcsolt hossz <b>kisebb</b>, mint a két jármű hosszának összege (a királycsap-átfedés miatt). Add meg a <b>valós összekapcsolt hosszt</b> és a <b>megengedett össztömeget</b> — a térkép ezekből tervez.'
+    +   'ℹ️ Az <b>ingyenes útvonaltervezés autós profillal</b> számol — a fenti jármű-paraméterek (súly/magasság) korlátozásait az útvonal NEM veszi figyelembe, a fogyasztás-becsléshez és a dokumentáláshoz szolgálnak.'
     + '</div>';
 }
 function rpTypeChange(){
@@ -465,7 +457,7 @@ function rpPlan(){
     sp.style.display='none'; rpUpdatePlanBtn();
     if(!r||!r.ok){
       var m=(r&&r.err)||'Nem sikerült az útvonaltervezés';
-      if(/429|too many|limit/i.test(m)) m='HERE API limit elérve — funkció ideiglenesen nem elérhető';
+      if(/429|too many|limit/i.test(m)) m='A térkép-szolgáltatás túlterhelt — próbáld újra pár másodperc múlva';
       toast(m,'err'); return;
     }
     rpDrawRoute(r);
@@ -541,83 +533,16 @@ function rpDrawRoute(r){
       + '<span style="font-size:12px;opacity:.9;">'+detail.join(' · ')+'</span>';
   } else { warn.style.display='none'; warn.innerHTML=''; }
 
-  // a HERE szolgáltatások panel frissítése (a geocode + routing tranzakciók most naplózódtak)
-  rpLoadPremium();
-}
-
-// ───────── HERE Térkép szolgáltatások panel (havi használat + díj) ─────────
-var HERE_ICONS={autocomplete:'🔍',geocode:'📍',raster_tile:'🗺',routing_truck:'🚛'};
-function rpLoadPremium(){
-  gas('getMyHereUsage').then(function(r){
-    var box=document.getElementById('rpPremiumList'); if(!box) return;
-    if(!r||!r.ok){ box.innerHTML='<div class="text-muted" style="font-size:12px;">Nem elérhető.</div>'; return; }
-    var used=r.free_pool_used||0, total=r.free_pool_total||1000, rem=r.free_pool_remaining||0;
-    var pct=Math.min(100, Math.round((used/total)*100));
-    var barColor=pct>=100?'#ef4444':pct>=80?'#f59e0b':'#22c55e';
-    var poolFoot = rem>0
-      ? '<div class="text-muted" style="font-size:11px;margin-top:4px;">Maradék: <b>'+rem+'</b> ingyenes tranzakció</div>'
-      : '<div style="font-size:11px;margin-top:4px;color:#ef4444;font-weight:700;">⚠ Ingyenes keret elfogyott — további használat díjköteles</div>';
-    var html='<div class="rp-pf">'
-      +'<div style="display:flex;justify-content:space-between;font-size:12px;"><span class="text-primary" style="font-weight:700;">🎁 Ingyenes keret</span><span class="text-muted">'+used+' / '+total+' trz</span></div>'
-      +'<div class="rp-pbar" style="margin-top:6px;"><i style="width:'+pct+'%;background:'+barColor+';"></i></div>'
-      +poolFoot+'</div>';
-    (r.services||[]).forEach(function(s){
-      var ic=HERE_ICONS[s.feature_key]||'⚡';
-      var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
-        +'<div><div class="text-primary" style="font-weight:700;font-size:13px;">'+ic+' '+esc(s.display_name)+'</div>'
-        +'<div class="text-muted" style="font-size:12px;">'+esc(s.description||'')+'</div></div>'
-        +'<span class="text-muted" style="font-size:12px;white-space:nowrap;">'+s.total_used+' trz</span></div>';
-      var body;
-      if((s.billable_trx||0)<=0){
-        body='<div style="margin-top:6px;font-size:12px;color:#22c55e;">✅ Ingyenes keretből fedezve &nbsp; €0.00</div>';
-      } else {
-        body='<div class="text-muted" style="margin-top:6px;font-size:12px;">'+Number(s.price_eur).toFixed(2)+' € / 1000 trz &nbsp;·&nbsp; '+s.billable_trx+' fizetős trz = '+s.units+'×1000 egység</div>'
-          +'<div style="font-size:12px;margin-top:2px;color:#ef4444;font-weight:700;">Nettó: €'+s.net_eur+' &nbsp; ÁFA(21%): €'+s.vat_eur+' &nbsp; Bruttó: €'+s.gross_eur+'</div>';
-      }
-      html+='<div class="rp-pf">'+head+body+'</div>';
-    });
-    var anyBillable=(r.services||[]).some(function(s){return (s.billable_trx||0)>0;});
-    if(!anyBillable){
-      html+='<div class="rp-pf" style="text-align:center;"><div class="text-primary" style="font-size:13px;">Ez a hónap: teljes használat <b style="color:#22c55e;">ingyenes</b></div><div class="text-muted" style="font-size:12px;margin-top:2px;">Becsült díj: €0.00</div></div>';
-    } else {
-      var rowsH=(r.services||[]).filter(function(s){return (s.billable_trx||0)>0;}).map(function(s){
-        return '<div class="text-muted" style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;"><span>'+esc(s.display_name)+' ('+s.billable_trx+' trz)</span><span>€'+s.net_eur+' / €'+s.gross_eur+'</span></div>';
-      }).join('');
-      html+='<div class="rp-pf"><div class="text-primary" style="font-weight:700;font-size:12px;margin-bottom:4px;">Összesítő (nettó / bruttó)</div>'+rowsH
-        +'<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:800;border-top:1px solid var(--border);margin-top:6px;padding-top:6px;color:#a855f7;"><span>VÉGÖSSZEG</span><span>€'+r.total_net_eur+' / €'+r.total_gross_eur+'</span></div></div>';
-    }
-    box.innerHTML=html;
-  });
-}
-function rpTogglePremiumPanel(){
-  var c=document.getElementById('rpPremiumContent');
-  var ch=document.getElementById('rpPremiumChevron');
-  if(!c) return;
-  var open=c.classList.toggle('open');
-  if(ch) ch.textContent=open?'▲':'▼';
-  try{ localStorage.setItem('vs-here-panel', open?'open':'closed'); }catch(e){}
-}
-function rpInitPremiumPanel(){
-  var c=document.getElementById('rpPremiumContent');
-  var ch=document.getElementById('rpPremiumChevron');
-  if(!c) return;
-  var saved='closed';
-  try{ saved=localStorage.getItem('vs-here-panel')||'closed'; }catch(e){}
-  if(saved==='open'){ c.classList.add('open'); if(ch) ch.textContent='▲'; }
-  else { c.classList.remove('open'); if(ch) ch.textContent='▼'; }
 }
 
 // ───────── Indítás ─────────
 rpSyncThemeIcon();
-rpInitPremiumPanel();
 attachAutocomplete(document.getElementById('rpLoading'), document.getElementById('rpLoadingDD'));
 attachAutocomplete(document.getElementById('rpUnloading'), document.getElementById('rpUnloadingDD'));
 gas('authMe').then(function(u){ if(!u){ window.location.href='/login'; return; }
   var b=document.getElementById('backLink'); if(b) b.href=(u.pozicio==='Manager')?'/manager':'/admin'; });
-fetch('/api/here-config',{credentials:'same-origin'}).then(function(r){return r.ok?r.json():{};})
-  .then(function(cfg){ rpHereKey=(cfg&&cfg.apiKey)||null; })
-  .catch(function(){ rpHereKey=null; })
-  .finally(function(){ rpInitMap(); rpLoadOrders(); rpLoadVehicles(); rpLoadPremium(); });
+// Ingyenes csempék — nincs kulcs-betöltés, azonnal indulhat a térkép.
+rpInitMap(); rpLoadOrders(); rpLoadVehicles();
 </script>
 </body>
 </html>

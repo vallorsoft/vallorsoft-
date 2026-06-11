@@ -7,7 +7,7 @@ const svc = require('../services/clients');
 
 const router = express.Router();
 const FIELDS = ['denumire','tip','cui_cif','reg_com','tara','judet','localitate','adresa',
-                'email','telefon','iban','banca','default_tva','valuta','nota'];
+                'email','telefon','iban','banca','default_tva','valuta','nota','payment_term_days'];
 
 router.get('/api/clients', requireLogin, async (req, res) => {
   const q = (req.query.q || '').trim();

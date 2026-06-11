@@ -176,6 +176,7 @@ function goSec(id) {
   stateSave({ sec: id });
   if (id === 'border') loadBorderLog();
   if (id === 'fuvar')  loadSoferOrders();
+  if (id === 'docs')   loadDocOrderOptions();
 }
 
 // ============================================================
@@ -510,16 +511,33 @@ function previewFile(input) {
 function uploadDoc() {
   var file = document.getElementById('dFile').files[0];
   if (!file) { toast('Válassz fájlt!', 'err'); return; }
+  var orderId = (document.getElementById('docOrderSel') || {}).value || null;
   var fr = new FileReader();
   fr.onload = function(e) {
     fetch('/api/doc-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ base64: e.target.result, numeFisier: file.name, tip: selDocTip }) })
+      body: JSON.stringify({ base64: e.target.result, numeFisier: file.name, tip: selDocTip, orderId: orderId }) })
     .then(function(r) { return r.json(); }).then(function(d) {
       if (d.success) { toast('✅ Feltöltve!', 'ok'); goSec('dash'); }
       else { toast('Hiba: ' + (d.err || 'ismeretlen'), 'err'); }
     });
   };
   fr.readAsDataURL(file);
+}
+
+// A fuvar-választó feltöltése a sofőr saját (aktív + friss) fuvarjaival
+function loadDocOrderOptions() {
+  var sel = document.getElementById('docOrderSel');
+  if (!sel) return;
+  fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'getMySoferOrders' }) })
+  .then(function(r) { return r.json(); }).then(function(d) {
+    var list = (d.result || []).filter(function(o) { return o.dash_visible !== false; });
+    sel.innerHTML = '<option value="">— Nincs fuvarhoz kötve —</option>'
+      + list.map(function(o) {
+          return '<option value="' + o.id + '">' + o.id + ' — '
+            + (o.loc_incarcare || '?') + ' → ' + (o.loc_descarcare || '?') + '</option>';
+        }).join('');
+  }).catch(function() {});
 }
 
 

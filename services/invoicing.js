@@ -280,12 +280,12 @@ async function getInvoiceSummary(pool, companyId, orderIds) {
   const ids = (orderIds || []).filter(Boolean);
   if (!ids.length) return {};
   const { rows } = await pool.query(
-    `SELECT order_id, serie, numar, pdf_link, status FROM invoices
+    `SELECT order_id, serie, numar, pdf_link, status, efactura_status FROM invoices
      WHERE company_id=$1 AND order_id = ANY($2) ORDER BY created_at ASC`, [companyId, ids]);
   const out = {};
   for (const r of rows) {
-    const o = out[r.order_id] || (out[r.order_id] = { invoiced: false, stornoed: false, serie: null, numar: null, pdf_link: null, status: null });
-    if (r.status === 'issued') { o.invoiced = true; o.serie = r.serie; o.numar = r.numar; o.pdf_link = r.pdf_link; o.status = 'issued'; }
+    const o = out[r.order_id] || (out[r.order_id] = { invoiced: false, stornoed: false, serie: null, numar: null, pdf_link: null, status: null, efactura: null });
+    if (r.status === 'issued') { o.invoiced = true; o.serie = r.serie; o.numar = r.numar; o.pdf_link = r.pdf_link; o.status = 'issued'; o.efactura = r.efactura_status || null; }
     if (r.status === 'storno') { o.stornoed = true; o.storno_serie = r.serie; o.storno_numar = r.numar; o.storno_pdf = r.pdf_link; o.status = 'storno'; }
   }
   return out;

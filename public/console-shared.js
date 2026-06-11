@@ -804,7 +804,9 @@ function renderDocGroups() {
       var bc = d.tip==='CMR'?'ok':d.tip==='Számla'?'info':'warn';
       var time = d.created_at ? new Date(d.created_at).toLocaleTimeString('hu-HU',{hour:'2-digit',minute:'2-digit'}) : '';
       html += '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px;">';
-      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span class="badge '+bc+'">'+esc(d.tip||'Egyéb')+'</span><span style="font-size:11px;color:var(--muted);">'+time+'</span></div>';
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;"><span class="badge '+bc+'">'+esc(d.tip||'Egyéb')+'</span>'
+        +(d.order_id?'<span class="badge info" title="Fuvarhoz kötve">🔗 '+esc(d.order_id)+'</span>':'')
+        +'<span style="font-size:11px;color:var(--muted);">'+time+'</span></div>';
       html += '<div style="font-size:12px;color:var(--soft);margin-bottom:10px;word-break:break-all;">'+esc(d.file_name||'—')+'</div>';
       html += '<div style="display:flex;gap:6px;">';
       html += '<a href="/api/doc-download/'+d.id+'" target="_blank" class="btn primary" style="flex:1;text-align:center;text-decoration:none;padding:8px 6px;font-size:12px;">👁 Megtekint</a>';
@@ -1173,6 +1175,8 @@ function loadDashboard() {
 
   loadDashRecentOrders();
   loadDashVehicleSummary();
+  // ⏰ Lejáró dokumentumok riasztás-sáv (fleet-extra.js)
+  if (window.FleetExtra) FleetExtra.dashExpiryAlert();
   syncThemeToggleIcon();
   initDashMap();
   refreshDashVehicles();
@@ -1337,7 +1341,14 @@ function decorateInvoiceIndicators(list){
         var s=sum[el.getAttribute('data-inv-ind')]; var btn=el.closest('button');
         if(!s||!s.invoiced){ el.textContent=''; el.title=''; return; }
         if(s.stornoed){ el.textContent=' ↩️'; var t='Számla stornózva: '+(s.storno_serie||'')+'-'+(s.storno_numar||''); el.title=t; if(btn)btn.title=t; }
-        else { el.textContent=' ✅'; var t2='Számlázva: '+(s.serie||'')+'-'+(s.numar||''); el.title=t2; if(btn)btn.title=t2; }
+        else {
+          // e-Factura (ANAF SPV) státusz-jelzés a pipán: 📨 = beküldve/folyamatban
+          var ef=(s.efactura||'').toLowerCase();
+          var efSym = ef ? (/(valid|ok|accept)/.test(ef)?' 📨✓' : /(err|invalid|resp)/.test(ef)?' 📨✗' : ' 📨') : '';
+          el.textContent=' ✅'+efSym;
+          var t2='Számlázva: '+(s.serie||'')+'-'+(s.numar||'')+(s.efactura?(' · e-Factura: '+s.efactura):'');
+          el.title=t2; if(btn)btn.title=t2;
+        }
       });
     }).catch(function(){});
 }
@@ -1664,6 +1675,11 @@ function renderFilteredOrders(list) {
     if (c.status==='Finalizat' && window.InvoiceModal) {
       integBtns += '<button class="btn primary" title="Számlázás" style="padding:4px 10px;font-size:12px;" '+
         'onclick="InvoiceModal.open(\''+c.id+'\')">🧾<span class="inv-ind" data-inv-ind="'+c.id+'" style="margin-left:2px;"></span></button>';
+    }
+    // 📷 POD-jelző: a sofőr által ehhez a fuvarhoz csatolt fotók (aláírt CMR stb.)
+    if (parseInt(c.pod_count, 10) > 0) {
+      integBtns += '<span title="'+c.pod_count+' sofőr-fotó / POD csatolva (Feltöltött Iratok fül)" '+
+        'style="font-size:12px;align-self:center;color:var(--status-ok);white-space:nowrap;">📷'+c.pod_count+'</span>';
     }
     // 💰 Fizetés rögzítése — CSAK Finalizat fuvaron jelenik meg.
     // Szín a fizetési állapot szerint: fizetve=zöld, részben=sárga, kintlévő=piros keret.

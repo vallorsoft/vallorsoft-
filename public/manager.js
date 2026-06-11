@@ -41,6 +41,7 @@ function loadTab(name){
     if(name==='signature') initAdminSigCanvas();
   if(name==='clients' && window.ClientsPage) ClientsPage.mount('clientsBox');
   if(name && name.indexOf('stats-')===0 && window.VS_STATS) VS_STATS.load(name);
+  if(['expiries','service-log','decont'].indexOf(name)!==-1 && window.FleetExtra) FleetExtra.load(name);
   if(name==='billing'){
     if(window.EmailIntakeCard) EmailIntakeCard.mount('emailIntakeCardBox', {readOnly:true});
   }

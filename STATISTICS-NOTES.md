@@ -1,6 +1,17 @@
-# Statisztika & Riport modul — fejlesztési jegyzet
+# Statisztika & Riport + Flotta-modulok — fejlesztési jegyzet
 
-> Állapot: **1. + 2. fázis KÉSZ** (2026-06-11). Ez a jegyzet rögzíti, mi épült be és mi van hátra.
+> Állapot: **1–3. fázis KÉSZ** (2026-06-11). Ez a jegyzet rögzíti, mi épült be és mi van hátra.
+
+## ✅ Beépítve (3. fázis — flotta & megfelelés modulok)
+
+0. **HERE → ingyenes térkép-stack**: csempék CartoDB/OSM, címkereső+geokódolás Photon, útvonal OSRM (autós profil, kulcs és díj nélkül). `HERE_API_KEY` nem kell többé; a HERE pool/árazás kód legacy.
+1. **⏰ Lejáratok & riasztások** (`expiries` fül, Flotta & Megfelelés csoport) — ITP/RCA/CASCO/rovinietă/CMR-bizt./tahográf/ADR/jogosítvány/atestat lejáratok jármű- vagy sofőr-szinten (`document_expiries`). A scheduler 12 óránként ellenőriz, és **push-riasztást** küld az Admin/Manager-eknek (hetente ismételve); a Vezérlőpulton riasztás-sáv (`dashExpiryAlert`).
+2. **🔧 Szerviz & karbantartás** (`service-log` fül) — szerviz-napló (`vehicle_service_log`): dátum, km, kategória (olaj/gumi/javítás), költség RON, következő esedékesség (dátum/km). A költség beépül a Statisztika → Jármű kihasználtság riportba (Szerviz oszlop + Eredmény-számítás).
+3. **💶 Sofőr-elszámolás / decont** (`decont` fül, Fuvarozás csoport) — előleg-kiadás (`driver_advances`) vs. készpénzes menetlevél-költések = **kassza-egyenleg**; diurna-járandóság (napok × cég-ráta, `companies.diurna_ext_rate/int_rate`, admin állítja a felületen); fizetési mód szerinti bontás; nyomtatható.
+4. **Fizetési határidő** (`clients.payment_term_days`, ügyfél-űrlapon) — a kintlévőség „Esedékes/Lejárt" számítása ügyfelenként pontos; az Áttekintés lejárt-riasztása is ezt használja.
+5. **e-Factura státusz-jelzés** — a fuvarlista 🧾 pipáján 📨 szimbólum + tooltip az ANAF SPV státusszal (`invoices.efactura_status`).
+6. **📷 POD (proof of delivery)** — a sofőr a fotót (új „POD" típus) **fuvarhoz kötheti**; a fuvarlistában 📷N jelző, az Iratok fülön 🔗 fuvar-badge (`documents.order_id`).
+7. Minden új fül a **feature-katalógusban** (`decont`, `expiries`, `service-log`) — a developer cégenként/előfizetés szerint kapcsolja.
 
 ## ✅ Beépítve (2. fázis)
 
@@ -52,16 +63,20 @@ Közös szűrősáv minden fülön: elmúlt 12 hónap (alap) / idei év / 3 hón
 - Fuvar-ár: **EUR** (a meglévő felülettel konzisztensen), sofőr-költségek (tankolás/vásárlás): **RON**.
 - A kettőt **nem vonjuk össze** egy profit-számba — mindenhol kiírjuk az egységet.
 
-## ⬜ Hátralévő ötletek (3. fázis)
-1. **Havi PDF/e-mail összefoglaló** az adminnak (Brevo már be van kötve; scheduler.js-be havi job).
-2. **Ügyfél fizetési határidő** (`clients.payment_term_days`) → „lejárt" kintlévőség ügyfelenként pontosabb számítása (az ügyfél-űrlap bővítése is kell: clients-page.js).
-3. **GPS-km napi snapshot-naplózás** (új tábla + scheduler-job) → GPS-km vs. sofőr által beírt km automatikus összevetés, eltérés-riasztás.
-4. **Fuvar-szintű profit** — a fuvarlevelek `order_ids` mezője alapján a költségek fuvarra osztása → profit/fuvar lista.
-5. **BNR árfolyam-API** — a kézi árfolyam helyett napi automatikus frissítés.
-6. **CSV-exportban Eredmény-oszlop** (most a táblában látszik, az exportban nem).
+## ⬜ Hátralévő ötletek (4. fázis — prémium)
+1. **📅 Diszpécser-tervezőtábla** — jármű×nap idővonal, húzd-rá kiosztás.
+2. **🌍 Ügyfél-portál / tracking link** — publikus token-link: fuvar-státusz + GPS-pozíció + POD.
+3. **⛽ Üzemanyagkártya-import** (OMV/MOL/DKV/Eurowag CSV) → egyeztetés a sofőr-tankolásokkal, eltérés-riport.
+4. **Bursă-integráció** (Trans.eu / Timocom) — külső API-szerződés kell.
+5. **Havi PDF/e-mail összefoglaló** az adminnak (Brevo + scheduler havi job).
+6. **GPS-km napi snapshot-naplózás** → GPS-km vs. beírt km eltérés-riasztás.
+7. **Fuvar-szintű profit** (fuvarlevelek `order_ids` alapján költség-szétosztás) + **BNR árfolyam-API**.
+8. **Kamionos routing visszahozása ingyen**: OpenRouteService `driving-hgv` profil (ingyenes API-kulcs, 2000 kérés/nap) — a `calculateRoute` váltható lenne ORS-re, ha van `ORS_API_KEY`.
+9. CSV-exportokban Eredmény/Szerviz oszlopok.
 
 ## Élesítési teendők
-1. `db/order-payments.sql`, `db/invites-nume-tel.sql`, `db/company-eur-ron.sql` lefuttatása az éles DB-n (idempotensek).
-2. Szerver-újraindítás (új/módosult handler-modulok).
-3. Böngészőben hard refresh (`Ctrl+Shift+R`) — az új JS/HTML statikus.
-4. Admin: 🔐 Jogosultságok fülön Manager-engedélyek kiosztása + 💱 árfolyam beállítása az Áttekintésen.
+1. Migrációk az éles DB-n (idempotensek): `order-payments.sql`, `invites-nume-tel.sql`, `company-eur-ron.sql`, **`phase3-modules.sql`**.
+2. Szerver-újraindítás (új handler-modulok + scheduler).
+3. Böngészőben hard refresh (`Ctrl+Shift+R`).
+4. Admin: 🔐 jogosultságok + 💱 árfolyam + diurna-ráták beállítása; developer: új funkciók (decont/expiries/service-log) csomag-hozzárendelése.
+5. A `HERE_API_KEY` törölhető az `.env`-ből.

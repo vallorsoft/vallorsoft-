@@ -65,6 +65,7 @@ handlers.comList = async function (req, res, args) {
                   o.pret, o.km, o.status, o.sofer_type, o.email_sofer, o.nume_sofer,
                   o.firma_extern, o.telefon_extern, o.rendszam_camion, o.rendszam_remorca,
                   o.payment_status, o.paid_amount,
+                  (SELECT COUNT(*)::int FROM documents d WHERE d.order_id = o.id) AS pod_count,
                   COALESCE(legs.leg_count, 0) AS leg_count,
                   COALESCE(legs.legs_json, '[]'::json) AS legs_json
            FROM orders o ${legsSubquery}

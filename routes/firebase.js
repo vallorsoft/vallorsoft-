@@ -6,7 +6,6 @@ const express = require('express');
 const router = express.Router();
 const { requireLogin } = require('../middleware/auth');
 const fbAdmin = require('../services/firebase');
-const { logHereTransaction } = require('../lib/hereUsage');
 
 router.get('/api/firebase-config', requireLogin, (req, res) => {
   const pozicio = req.session.user.pozicio;
@@ -25,41 +24,39 @@ router.get('/api/firebase-config', requireLogin, (req, res) => {
   });
 });
 
-// HERE Maps kliens-konfiguracio — csak az API kulcsot adja vissza a terkep-csempekhez.
-// A kulcs SOHA nem kerul kozvetlenul HTML-be/kliens JS-be, csak innen toltodik.
-// Térkép-betöltésenkénti BECSÜLT csempeszám. A csempéket a böngésző közvetlenül
-// a HERE-től tölti (a szerver nem proxyzza), ezért pontos szerveroldali mérés
-// nem lehetséges — a becslés env-ből hangolható (HERE_TILE_EST_PER_LOAD).
-// FIGYELEM: ebből EUR-számla készülhet, a developer-felületen az árazásnál
-// ezt becslésként kell kommunikálni.
-const TILE_EST_PER_LOAD = Math.max(0, parseInt(process.env.HERE_TILE_EST_PER_LOAD || '20', 10) || 0);
-
+// Térkép-konfiguráció — a HERE le lett cserélve INGYENES szolgáltatásokra
+// (CartoDB/OSM csempék + Photon geokódolás + OSRM routing), ezért API-kulcs
+// nincs. A végpont kompatibilitásból megmaradt: a kliens kulcs hiányában
+// automatikusan az ingyenes csempékre vált.
 router.get('/api/here-config', requireLogin, (req, res) => {
-  const apiKey = process.env.HERE_API_KEY || null;
-  if (apiKey && TILE_EST_PER_LOAD) logHereTransaction('raster_tile', TILE_EST_PER_LOAD, req.session.user.company_id, req.session.user.id);
-  res.json({ apiKey });
+  res.json({ apiKey: null });
 });
 
-// HERE cim-autocomplete (proxy) — a kulcs szerver oldalon marad.
-router.get('/api/here-autocomplete', requireLogin, async (req, res) => {
-  const apiKey = process.env.HERE_API_KEY;
+// Cím-autocomplete (proxy) — Photon (photon.komoot.io), OpenStreetMap alapú,
+// INGYENES, kulcs nélkül. A régi /api/here-autocomplete útvonal megmaradt,
+// hogy a kliens-hívások ne törjenek.
+async function geoAutocomplete(req, res) {
   const q = (req.query.q || '').trim();
-  if (!apiKey || q.length < 3) return res.json({ items: [] });
+  if (q.length < 3) return res.json({ items: [] });
   try {
-    const url = 'https://autocomplete.search.hereapi.com/v1/autocomplete?q=' +
-      encodeURIComponent(q) + '&limit=6&lang=ro,hu,en&apiKey=' + encodeURIComponent(apiKey);
-    const r = await fetch(url);
+    const url = 'https://photon.komoot.io/api/?q=' + encodeURIComponent(q) + '&limit=6';
+    const r = await fetch(url, { headers: { 'User-Agent': 'VallorSoft/1.0 (flottakezelo)' } });
     const d = await r.json().catch(() => ({}));
-    const items = (d.items || []).map((it) => ({
-      label: (it.address && it.address.label) || it.title || '',
-      title: it.title || '',
-    })).filter((it) => it.label);
-    logHereTransaction('autocomplete', 1, req.session.user.company_id, req.session.user.id);
+    const items = ((d && d.features) || []).map((f) => {
+      const p = f.properties || {};
+      const main = p.name || p.street || '';
+      const sub = [p.street && p.name !== p.street ? p.street : null, p.postcode, p.city, p.state, p.country]
+        .filter(Boolean).join(', ');
+      const label = [main, sub].filter(Boolean).join(', ');
+      return { label, title: main || label };
+    }).filter((it) => it.label);
     res.json({ items });
   } catch (e) {
     res.json({ items: [] });
   }
-});
+}
+router.get('/api/here-autocomplete', requireLogin, geoAutocomplete);
+router.get('/api/geo-autocomplete', requireLogin, geoAutocomplete);
 
 // Firebase Custom Token - a chat hitelesiteshez (company_id custom claim)
 router.get('/api/firebase-token', requireLogin, async (req, res) => {
