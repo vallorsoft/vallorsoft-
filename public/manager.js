@@ -22,6 +22,7 @@ document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(t
   t.onclick=function(e){
     if(t.id==='userParentTab'){toggleUserMenu();return;}
     if(t.id==='ordersParentTab'){toggleOrdersMenu();return;}
+    if(t.id==='statsParentTab'){toggleStatsMenu();return;}
     activateTab(t.dataset.tab);
   };
 });
@@ -39,6 +40,7 @@ function loadTab(name){
     if(name==='external-drivers') loadExtDrivers();
     if(name==='signature') initAdminSigCanvas();
   if(name==='clients' && window.ClientsPage) ClientsPage.mount('clientsBox');
+  if(name && name.indexOf('stats-')===0 && window.VS_STATS) VS_STATS.load(name);
   if(name==='billing'){
     if(window.EmailIntakeCard) EmailIntakeCard.mount('emailIntakeCardBox', {readOnly:true});
   }
@@ -241,7 +243,7 @@ var _oeOrderId=null,_oeSoferCache=[],_oeCamionCache=[],_oeRemorcaCache=[];
 /* ── Mobil sidebar (hamburger) ── */
 document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(el) {
   el.addEventListener('click', function() {
-    if (window.innerWidth <= 768 && el.id !== 'userParentTab' && el.id !== 'ordersParentTab') {
+    if (window.innerWidth <= 768 && el.id !== 'userParentTab' && el.id !== 'ordersParentTab' && el.id !== 'statsParentTab') {
       setTimeout(function() { closeSidebar(); }, 120);
     }
   });

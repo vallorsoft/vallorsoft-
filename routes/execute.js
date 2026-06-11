@@ -21,6 +21,7 @@ const handlers = Object.assign(
   require('../handlers/hereFeatureHandlers'),
   require('../handlers/billingHandlers'),
   require('../handlers/intakeHandlers'),
+  require('../handlers/statisticsHandlers'),
 );
 
 router.post('/api/execute', requireLogin, async (req, res) => {

@@ -1665,6 +1665,18 @@ function renderFilteredOrders(list) {
       integBtns += '<button class="btn primary" title="Számlázás" style="padding:4px 10px;font-size:12px;" '+
         'onclick="InvoiceModal.open(\''+c.id+'\')">🧾<span class="inv-ind" data-inv-ind="'+c.id+'" style="margin-left:2px;"></span></button>';
     }
+    // 💰 Fizetés rögzítése — CSAK Finalizat fuvaron jelenik meg.
+    // Szín a fizetési állapot szerint: fizetve=zöld, részben=sárga, kintlévő=piros keret.
+    if (c.status==='Finalizat') {
+      var _ps = c.payment_status || 'unpaid';
+      var _pTitle = _ps==='paid' ? 'Fizetve ('+(c.paid_amount||0)+')' :
+                    _ps==='partial' ? 'Részben fizetve — fizetés rögzítése' : 'Kintlévő — fizetés rögzítése';
+      var _pStyle = _ps==='paid' ? 'border-color:rgba(34,197,94,0.5);color:#4ade80;' :
+                    _ps==='partial' ? 'border-color:rgba(245,158,11,0.5);color:#fbbf24;' :
+                    'border-color:rgba(239,68,68,0.5);color:#f87171;';
+      integBtns += '<button class="btn ghost" title="'+_pTitle+'" style="padding:4px 10px;font-size:12px;'+_pStyle+'" '+
+        'onclick="openPaymentModal(\''+c.id+'\')">💰'+(_ps==='paid'?'✓':'')+'</button>';
+    }
 
     return '<tr><td><b>'+c.id+'</b></td><td>'+esc(c.client||'—')+'</td>'+
       '<td>'+routeCell+'</td>'+
@@ -2022,4 +2034,78 @@ function chatSend(){
       companyId:_chatCompanyId
     });
   }
+}
+
+/* ════════════════════════════════════════════════════════════
+   FIZETÉS RÖGZÍTÉSE (💰 gomb a Finalizat fuvarokon) — közös
+   admin/manager kód. Részfizetés kézzel, teljes hátralék egy
+   gombnyomásra. Backend: markOrderPayment (statisticsHandlers).
+   ════════════════════════════════════════════════════════════ */
+var _payOrderId=null, _payPret=0, _payPaid=0;
+
+// pret/paid opcionális — ha nincs megadva (fuvarlistából hívva),
+// a _ordersAllCache-ből vesszük; a Pénzügy riport átadja közvetlenül.
+function openPaymentModal(id, pret, paid){
+  _payOrderId=id;
+  if(pret==null){
+    var c=(window._ordersAllCache||[]).find(function(x){return String(x.id)===String(id);});
+    pret=c?parseFloat(c.pret)||0:0;
+    paid=c?parseFloat(c.paid_amount)||0:0;
+  }
+  _payPret=parseFloat(pret)||0;
+  _payPaid=parseFloat(paid)||0;
+  var marad=Math.max(_payPret-_payPaid,0);
+  document.getElementById('payOrderId').textContent=id;
+  document.getElementById('payPretLbl').textContent=_payPret.toLocaleString('hu-HU');
+  document.getElementById('payPaidLbl').textContent=_payPaid.toLocaleString('hu-HU');
+  document.getElementById('payRemainLbl').textContent=marad.toLocaleString('hu-HU');
+  document.getElementById('payAmount').value='';
+  document.getElementById('payNote').value='';
+  var rb=document.getElementById('payResetBtn');
+  if(rb) rb.style.display=_payPaid>0?'':'none';
+  document.getElementById('payModal').classList.add('open');
+  setTimeout(function(){document.getElementById('payAmount').focus();},150);
+}
+
+function closePaymentModal(){ document.getElementById('payModal').classList.remove('open'); }
+
+// „Teljes hátralék” gomb — a maradék összeget tölti az input-ba
+function payFillFull(){
+  var marad=Math.max(_payPret-_payPaid,0);
+  document.getElementById('payAmount').value=marad>0?marad:_payPret;
+}
+
+function savePayment(){
+  var amount=parseFloat(document.getElementById('payAmount').value);
+  if(!isFinite(amount)||amount<=0){ toast('Adj meg érvényes összeget!','err'); return; }
+  var p={
+    amount:amount,
+    method:document.getElementById('payMethod').value,
+    note:document.getElementById('payNote').value.trim()
+  };
+  gas('markOrderPayment',[_payOrderId,p]).then(function(r){
+    if(r&&r.ok){
+      toast(r.payment_status==='paid'?'✅ Fuvar teljesen kifizetve!':'💰 Részfizetés rögzítve','ok');
+      closePaymentModal();
+      _afterPaymentRefresh();
+    } else toast((r&&r.err)||'Hiba','err');
+  });
+}
+
+function resetPayment(){
+  if(!confirm('Biztosan nullázod a rögzített fizetéseket ennél a fuvarnál?')) return;
+  gas('markOrderPayment',[_payOrderId,{reset:true}]).then(function(r){
+    if(r&&r.ok){ toast('Fizetés visszaállítva (kintlévő)','ok'); closePaymentModal(); _afterPaymentRefresh(); }
+    else toast((r&&r.err)||'Hiba','err');
+  });
+}
+
+// Frissítés mentés után: fuvarlista, ha nyitva + Pénzügy riport, ha nyitva
+function _afterPaymentRefresh(){
+  var ordersPane=document.querySelector('.pane[data-pane="orders-list"]');
+  if(ordersPane && !ordersPane.classList.contains('hidden') && typeof loadOrders==='function') loadOrders();
+  var finPane=document.querySelector('.pane[data-pane="stats-finance"]');
+  if(finPane && !finPane.classList.contains('hidden') && window.VS_STATS) VS_STATS.load('stats-finance');
+  var ovPane=document.querySelector('.pane[data-pane="stats-overview"]');
+  if(ovPane && !ovPane.classList.contains('hidden') && window.VS_STATS) VS_STATS.load('stats-overview');
 }
