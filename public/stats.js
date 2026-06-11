@@ -326,7 +326,10 @@
         + stPanel('📋 Kintlévő fuvarok', '<div style="overflow-x:auto;"><table class="table">'
             + '<thead><tr><th>Fuvar</th><th>Ügyfél</th><th style="text-align:right;">Ár (EUR)</th><th style="text-align:right;">Fizetve</th><th style="text-align:right;">Hátralék</th><th>Teljesítve</th><th style="text-align:center;">Esedékes</th><th>Státusz</th><th></th></tr></thead>'
             + '<tbody>' + listRows + '</tbody></table></div>',
-            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-finance\')">⬇️ CSV export</button>');
+            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-finance\')">⬇️ CSV export</button>')
+        + '<div id="stProfitBox"></div>';
+
+      loadOrderProfit();
 
       var months = stMonths([r.havi]);
       stChart('stChFinHavi', {
@@ -337,6 +340,38 @@
         ]}
       });
     });
+  }
+
+  // Fuvar-szintű eredmény (a menetlevél-költségek fuvarokra osztva)
+  function loadOrderProfit() {
+    var box = document.getElementById('stProfitBox');
+    if (!box) return;
+    gas('getOrderProfit', stRangeDates()).then(function (r) {
+      if (!r || !r.ok || !(r.rows || []).length) { box.innerHTML = ''; return; }
+      var rate = parseFloat(r.eur_ron_rate) || null;
+      var rows = r.rows.map(function (o) {
+        var ktg = parseFloat(o.koltseg_ron) || 0;
+        var profitCell = '';
+        if (rate) {
+          var p = (parseFloat(o.pret) || 0) - ktg / rate;
+          profitCell = '<td style="text-align:right;font-weight:700;color:' + (p >= 0 ? 'var(--status-ok)' : 'var(--status-danger)') + ';">' + stNum(p, 0) + '</td>';
+        }
+        return '<tr><td><b class="text-primary">' + esc(String(o.id)) + '</b></td>'
+          + '<td>' + esc(o.client || '—') + '</td>'
+          + '<td>' + stDate(o.finalized_at) + '</td>'
+          + '<td style="text-align:right;">' + stNum(o.km, 0) + '</td>'
+          + '<td style="text-align:right;font-weight:700;">' + stNum(o.pret, 0) + '</td>'
+          + '<td style="text-align:right;">' + stNum(ktg, 0) + '</td>'
+          + profitCell + '</tr>';
+      }).join('');
+      box.innerHTML = stPanel('🎯 Fuvar-szintű eredmény (a menetlevél-költségek fuvaronként szétosztva)',
+        '<p class="text-muted" style="font-size:12px;margin:0 0 10px;">A tankolás/vásárlás-költség a menetlevélen szereplő fuvarok között egyenlően oszlik — közelítő érték.'
+        + (rate ? '' : ' <b>Állíts be árfolyamot az Áttekintésen az Eredmény-oszlophoz.</b>') + '</p>'
+        + '<div style="overflow-x:auto;"><table class="table">'
+        + '<thead><tr><th>Fuvar</th><th>Ügyfél</th><th>Teljesítve</th><th style="text-align:right;">Km</th><th style="text-align:right;">Bevétel (EUR)</th><th style="text-align:right;">Költség (RON)</th>'
+        + (rate ? '<th style="text-align:right;">Eredmény (EUR)</th>' : '') + '</tr></thead>'
+        + '<tbody>' + rows + '</tbody></table></div>');
+    }).catch(function () { box.innerHTML = ''; });
   }
 
   // ════════════════════════════════════════════════════════
@@ -606,6 +641,7 @@
 
       box.innerHTML = stFilterBar('stats-vehicles')
         + '<div id="stGpsSnapshotBox"></div>'
+        + '<div id="stGpsKmBox"></div>'
         + stPanel('🏆 Top járművek bevétel szerint (EUR)', stChartCanvas('stChVehTop'))
         + stPanel('🚛 Jármű-tábla',
             '<div style="overflow-x:auto;"><table class="table">'
@@ -626,7 +662,31 @@
       });
 
       loadGpsSnapshot();
+      loadGpsKmCompare();
     });
+  }
+
+  // GPS-km (napi snapshot-napló) vs. a sofőr által beírt menetlevél-km
+  function loadGpsKmCompare() {
+    var box = document.getElementById('stGpsKmBox');
+    if (!box) return;
+    gas('getGpsKmComparison', stRangeDates()).then(function (r) {
+      if (!r || !r.ok || !(r.rows || []).length) { box.innerHTML = ''; return; }
+      var rows = r.rows.map(function (x) {
+        var warn = x.diff_pct != null && Math.abs(x.diff_pct) > 10;
+        return '<tr><td><b class="text-primary">' + esc(x.rendszam) + '</b></td>'
+          + '<td style="text-align:right;">' + stNum(x.gps_km, 0) + '</td>'
+          + '<td style="text-align:right;">' + stNum(x.drv_km, 0) + '</td>'
+          + '<td style="text-align:right;font-weight:700;color:' + (warn ? 'var(--status-danger)' : 'inherit') + ';">' + (x.diff_km > 0 ? '+' : '') + stNum(x.diff_km, 0) + '</td>'
+          + '<td style="text-align:center;">' + (x.diff_pct != null ? '<span class="badge ' + (warn ? 'err' : 'ok') + '">' + (x.diff_pct > 0 ? '+' : '') + stNum(x.diff_pct, 1) + '%</span>' : '—') + '</td>'
+          + '<td class="text-muted" style="text-align:right;font-size:12px;">' + stNum(x.napok, 0) + ' nap</td></tr>';
+      }).join('');
+      box.innerHTML = stPanel('🛰️ GPS-km vs. menetlevél-km (napi km-óra naplóból)',
+        '<div style="overflow-x:auto;"><table class="table">'
+        + '<thead><tr><th>Rendszám</th><th style="text-align:right;">GPS-km</th><th style="text-align:right;">Sofőr beírta</th><th style="text-align:right;">Eltérés</th><th style="text-align:center;">%</th><th style="text-align:right;">Mérési napok</th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table></div>'
+        + '<div class="text-muted" style="font-size:11px;margin-top:6px;">A GPS-km a napi automatikus km-óra snapshotokból számolódik — az első adatok a bekapcsolás utáni 2. naptól jelennek meg.</div>');
+    }).catch(function () { box.innerHTML = ''; });
   }
 
   // CargoTrack élő flotta-adatok (üzemanyag-szint, km-óra, gyújtás) — ha a
@@ -759,13 +819,21 @@
         ['Dátum', 'Sofőr', 'Jármű', 'Termék', 'Hely', 'Ár (RON)', 'Fizetés'],
         (r.lista || []).map(function (c) { return [stDate(c.data_completare), c.nume_sofer, c.numar_camion, c.produs, c.loc, c.pret, c.plata]; }));
     } else if (pane === 'stats-drivers') {
+      var dRate = parseFloat(r.eur_ron_rate) || null;
       stCsv('sofor-teljesitmeny-' + stamp + '.csv',
-        ['Sofőr', 'E-mail', 'Fuvar', 'Lezárt', 'Bevétel (EUR)', 'Km (menetlevél)', 'L/100km', 'Üzemanyag (RON)', 'Vásárlás (RON)', 'Diurna külső', 'Diurna belső', 'Menetlevél'],
-        (r.soforok || []).map(function (s) { return [s.nume, s.email, s.fuvarok, s.lezart, s.bevetel, s.total_km, s.consum_100, s.uzemanyag_ktg, s.vasarlas_ktg, s.diurna_ext, s.diurna_int, s.menetlevelek]; }));
+        ['Sofőr', 'E-mail', 'Fuvar', 'Lezárt', 'Bevétel (EUR)', 'Km (menetlevél)', 'L/100km', 'Üzemanyag (RON)', 'Vásárlás (RON)', 'Eredmény (EUR)', 'Diurna külső', 'Diurna belső', 'Menetlevél'],
+        (r.soforok || []).map(function (s) {
+          var p = dRate ? Math.round((parseFloat(s.bevetel) || 0) - ((parseFloat(s.uzemanyag_ktg) || 0) + (parseFloat(s.vasarlas_ktg) || 0)) / dRate) : '';
+          return [s.nume, s.email, s.fuvarok, s.lezart, s.bevetel, s.total_km, s.consum_100, s.uzemanyag_ktg, s.vasarlas_ktg, p, s.diurna_ext, s.diurna_int, s.menetlevelek];
+        }));
     } else if (pane === 'stats-vehicles') {
+      var vRate = parseFloat(r.eur_ron_rate) || null;
       stCsv('jarmu-kihasznaltsag-' + stamp + '.csv',
-        ['Rendszám', 'Márka', 'Fuvar', 'Lezárt', 'Bevétel (EUR)', 'EUR/km', 'Km (menetlevél)', 'Üzemanyag (RON)', 'L/100km', 'Névleges'],
-        (r.jarmuvek || []).map(function (v) { return [v.rendszam_eredeti || v.rendszam, (v.marca || '') + ' ' + (v.model || ''), v.fuvarok, v.lezart, v.bevetel, v.bevetel_per_km, v.total_km, v.uzemanyag_ktg, v.consum_100, v.nevleges]; }));
+        ['Rendszám', 'Márka', 'Fuvar', 'Lezárt', 'Bevétel (EUR)', 'EUR/km', 'Km (menetlevél)', 'Üzemanyag (RON)', 'Szerviz (RON)', 'Eredmény (EUR)', 'L/100km', 'Névleges'],
+        (r.jarmuvek || []).map(function (v) {
+          var p = vRate ? Math.round((parseFloat(v.bevetel) || 0) - ((parseFloat(v.uzemanyag_ktg) || 0) + (parseFloat(v.szerviz_ktg) || 0)) / vRate) : '';
+          return [v.rendszam_eredeti || v.rendszam, (v.marca || '') + ' ' + (v.model || ''), v.fuvarok, v.lezart, v.bevetel, v.bevetel_per_km, v.total_km, v.uzemanyag_ktg, v.szerviz_ktg, p, v.consum_100, v.nevleges];
+        }));
     } else if (pane === 'stats-clients') {
       stCsv('ugyfel-riport-' + stamp + '.csv',
         ['Ügyfél', 'CUI', 'Fuvar', 'Lezárt', 'Bevétel (EUR)', 'Km', 'Kintlévő (EUR)', 'Átl. fizetési nap'],

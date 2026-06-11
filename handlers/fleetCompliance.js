@@ -351,4 +351,165 @@ handlers.getDriverSettlement = async function (req, res, args) {
   }
 };
 
+// ════════════════════════════════════════════════════════════
+//  4) ÜZEMANYAGKÁRTYA-IMPORT (OMV/MOL/DKV/Eurowag CSV)
+// ════════════════════════════════════════════════════════════
+const _fcCrypto = require('crypto');
+
+// args: [{source, rows:[{rendszam, tx_date, product, qty_l, amount_ron}]}]
+// Dedup: hash(forrás|rendszám|dátum|liter|összeg) — kétszeri import nem duplikál.
+handlers.fuelImportRows = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const f = _arg(args);
+    const source = String(f.source || 'egyeb').toLowerCase().slice(0, 30);
+    const rows = Array.isArray(f.rows) ? f.rows.slice(0, 2000) : [];
+    if (!rows.length) return res.json({ result: { ok: false, err: 'Nincs importálható sor.' } });
+
+    let inserted = 0, skipped = 0;
+    for (const r of rows) {
+      const rendszam = String(r.rendszam || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 50);
+      const qty = parseFloat(r.qty_l);
+      const amount = parseFloat(r.amount_ron);
+      const date = r.tx_date;
+      if (!date || !Number.isFinite(qty) || !Number.isFinite(amount)) { skipped++; continue; }
+      const hash = _fcCrypto.createHash('sha256')
+        .update([source, rendszam, date, qty.toFixed(2), amount.toFixed(2)].join('|'))
+        .digest('hex');
+      const ins = await pool.query(
+        `INSERT INTO fuel_card_transactions (company_id, source, rendszam, tx_date, product, qty_l, amount_ron, dedup_hash)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         ON CONFLICT (company_id, dedup_hash) DO NOTHING`,
+        [cid, source, rendszam || null, date, String(r.product || '').slice(0, 100) || null, qty, amount, hash]
+      );
+      if (ins.rowCount) inserted++; else skipped++;
+    }
+    return res.json({ result: { ok: true, inserted, skipped } });
+  } catch (err) {
+    console.error('fuelImportRows hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba (lefutott a phase4 migráció?)' } });
+  }
+};
+
+handlers.fuelCardList = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const a = _arg(args);
+    const cid = req.session.user.company_id;
+    const params = [cid];
+    let where = 'company_id = $1';
+    if (a.from) { params.push(a.from); where += ` AND tx_date >= $${params.length}`; }
+    if (a.to)   { params.push(a.to);   where += ` AND tx_date <= $${params.length}`; }
+    const r = await pool.query(
+      `SELECT id, source, rendszam, tx_date, product, qty_l, amount_ron
+       FROM fuel_card_transactions WHERE ${where}
+       ORDER BY tx_date DESC, id DESC LIMIT 200`, params);
+    const sumR = await pool.query(
+      `SELECT COUNT(*)::int AS db, COALESCE(SUM(qty_l),0)::numeric AS litru, COALESCE(SUM(amount_ron),0)::numeric AS suma
+       FROM fuel_card_transactions WHERE ${where}`, params);
+    return res.json({ result: { ok: true, items: r.rows, total: sumR.rows[0] } });
+  } catch (err) {
+    console.error('fuelCardList hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba (lefutott a phase4 migráció?)' } });
+  }
+};
+
+// Kártya-tranzakciók vs. a sofőr által beírt tankolások (Motorină),
+// rendszámonként — a >10% eltérés gyanús (elírás vagy visszaélés).
+handlers.fuelCompare = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const a = _arg(args);
+    const cid = req.session.user.company_id;
+    const from = a.from || '1970-01-01';
+    const to = a.to || '2999-12-31';
+
+    const cardR = await pool.query(
+      `SELECT rendszam, COALESCE(SUM(qty_l),0)::numeric AS litru, COALESCE(SUM(amount_ron),0)::numeric AS suma
+       FROM fuel_card_transactions
+       WHERE company_id=$1 AND tx_date >= $2 AND tx_date <= $3 AND rendszam IS NOT NULL
+       GROUP BY rendszam`, [cid, from, to]);
+
+    const drvR = await pool.query(
+      `SELECT UPPER(REGEXP_REPLACE(f.numar_camion,'[^A-Za-z0-9]','','g')) AS rendszam,
+              COALESCE(SUM((a.elem->>'litru')::numeric),0) AS litru,
+              COALESCE(SUM((a.elem->>'suma')::numeric),0) AS suma
+       FROM fuvarlevelek f
+       JOIN users u ON LOWER(u.email)=LOWER(f.email_sofer) AND u.company_id=$1,
+            jsonb_array_elements(f.alimentari) a(elem)
+       WHERE f.data_completare >= $2::date AND f.data_completare < ($3::date + 1)
+         AND COALESCE(a.elem->>'tip','Motorină') <> 'AdBlue'
+         AND COALESCE(f.numar_camion,'') <> ''
+       GROUP BY 1`, [cid, from, to]);
+
+    const map = new Map();
+    cardR.rows.forEach((r) => map.set(r.rendszam, { rendszam: r.rendszam, card_l: parseFloat(r.litru), card_ron: parseFloat(r.suma), drv_l: 0, drv_ron: 0 }));
+    drvR.rows.forEach((r) => {
+      const cur = map.get(r.rendszam) || { rendszam: r.rendszam, card_l: 0, card_ron: 0 };
+      cur.drv_l = parseFloat(r.litru); cur.drv_ron = parseFloat(r.suma);
+      map.set(r.rendszam, cur);
+    });
+    const rows = [...map.values()].map((x) => {
+      x.diff_l = Math.round((x.drv_l - x.card_l) * 10) / 10;
+      x.diff_pct = x.card_l > 0 ? Math.round(((x.drv_l - x.card_l) / x.card_l) * 1000) / 10 : null;
+      return x;
+    }).sort((a2, b2) => Math.abs(b2.diff_l) - Math.abs(a2.diff_l));
+
+    return res.json({ result: { ok: true, rows } });
+  } catch (err) {
+    console.error('fuelCompare hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
+// ════════════════════════════════════════════════════════════
+//  5) GPS-KM vs. MENETLEVÉL-KM (a napi gps_mileage_log snapshotból)
+// ════════════════════════════════════════════════════════════
+handlers.getGpsKmComparison = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const a = _arg(args);
+    const cid = req.session.user.company_id;
+    const from = a.from || '1970-01-01';
+    const to = a.to || '2999-12-31';
+
+    const gpsR = await pool.query(
+      `SELECT rendszam,
+              (MAX(mileage) - MIN(mileage))::numeric AS gps_km,
+              COUNT(*)::int AS napok
+       FROM gps_mileage_log
+       WHERE company_id=$1 AND logged_on >= $2::date AND logged_on <= $3::date
+       GROUP BY rendszam HAVING COUNT(*) >= 2`, [cid, from, to]);
+    if (!gpsR.rows.length) return res.json({ result: { ok: true, rows: [] } });
+
+    const drvR = await pool.query(
+      `SELECT UPPER(REGEXP_REPLACE(f.numar_camion,'[^A-Za-z0-9]','','g')) AS rendszam,
+              COALESCE(SUM(f.total_km),0)::numeric AS drv_km
+       FROM fuvarlevelek f
+       JOIN users u ON LOWER(u.email)=LOWER(f.email_sofer) AND u.company_id=$1
+       WHERE f.data_completare >= $2::date AND f.data_completare < ($3::date + 1)
+         AND COALESCE(f.numar_camion,'') <> ''
+       GROUP BY 1`, [cid, from, to]);
+    const drvMap = new Map();
+    drvR.rows.forEach((r) => drvMap.set(r.rendszam, parseFloat(r.drv_km) || 0));
+
+    const rows = gpsR.rows.map((g) => {
+      const norm = String(g.rendszam || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const drvKm = drvMap.get(norm) || 0;
+      const gpsKm = parseFloat(g.gps_km) || 0;
+      return {
+        rendszam: g.rendszam, gps_km: Math.round(gpsKm), drv_km: Math.round(drvKm),
+        diff_km: Math.round(drvKm - gpsKm),
+        diff_pct: gpsKm > 0 ? Math.round(((drvKm - gpsKm) / gpsKm) * 1000) / 10 : null,
+        napok: g.napok,
+      };
+    }).sort((a2, b2) => Math.abs(b2.diff_km) - Math.abs(a2.diff_km));
+    return res.json({ result: { ok: true, rows } });
+  } catch (err) {
+    console.error('getGpsKmComparison hiba:', err);
+    return res.json({ result: { ok: true, rows: [] } }); // migráció előtt: üres
+  }
+};
+
 module.exports = handlers;

@@ -163,9 +163,11 @@ app.use(require('./routes/inbound-orders'));
 app.use(require('./routes/client-mail'));
 
 // E-mail intake (beérkező megrendelések) — csak akkor fut, ha az INTAKE_IMAP_* be van állítva.
-const { startIntakeScheduler, startExpiryScheduler } = require('./services/scheduler');
+const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler } = require('./services/scheduler');
 startIntakeScheduler();
 startExpiryScheduler();
+startGpsMileageScheduler();
+startMonthlyReportScheduler();
 
 // (megtartva az eredetibol; jelenleg nincs hasznalatban)
 const getNowStr = () => new Date().toISOString().replace('T', ' ').substring(0, 19);

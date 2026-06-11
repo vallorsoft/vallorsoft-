@@ -401,4 +401,78 @@ handlers.getTrackingLink = async function (req, res, args) {
   }
 };
 
+// ─── Diszpécser-tervezőtábla (jármű×nap rács) ────────────────
+// getPlannerData: vontatók + a látható időablakba eső fuvarok.
+// plannerAssign: drag&drop kiosztás — jármű és/vagy felrakó-dátum állítása.
+handlers.getPlannerData = async function (req, res, args) {
+  try {
+    if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    }
+    const cid = req.session.user.company_id;
+    const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
+    const from = a.from || new Date().toISOString().slice(0, 10);
+    const to = a.to || from;
+
+    const vehR = await pool.query(
+      `SELECT id, rendszam, marca, model FROM vehicles
+       WHERE company_id = $1 AND tip = 'Vontato' AND activ = TRUE ORDER BY rendszam`,
+      [cid]
+    );
+    // Az ablakot érintő fuvarok + a dátum nélküli aktívak (kiosztásra várnak)
+    const ordR = await pool.query(
+      `SELECT id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
+              status, rendszam_camion, nume_sofer, email_sofer
+       FROM orders
+       WHERE company_id = $1 AND status <> 'Anulat'
+         AND (
+           (data_incarcare IS NOT NULL AND data_incarcare <= $3::date
+              AND COALESCE(data_descarcare, data_incarcare) >= $2::date)
+           OR (data_incarcare IS NULL AND status IN ('Disponibil','Alocat','In Curs','Extern'))
+         )
+       ORDER BY data_incarcare NULLS LAST, created_at DESC
+       LIMIT 400`,
+      [cid, from, to]
+    );
+    return res.json({ result: { ok: true, vehicles: vehR.rows, orders: ordR.rows } });
+  } catch (err) {
+    console.error('getPlannerData hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
+// args: [orderId, {rendszam_camion|null, data_incarcare?}]
+handlers.plannerAssign = async function (req, res, args) {
+  try {
+    if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    }
+    const cid = req.session.user.company_id;
+    const orderId = String(args[0] || '').trim();
+    const f = args[1] || {};
+    const rendszam = f.rendszam_camion ? String(f.rendszam_camion).trim().toUpperCase() : null;
+
+    if (rendszam) {
+      // a jármű a saját cégé legyen
+      const vr = await pool.query(
+        `SELECT id FROM vehicles WHERE company_id = $1 AND UPPER(rendszam) = $2 AND tip = 'Vontato'`,
+        [cid, rendszam]);
+      if (!vr.rows.length) return res.json({ result: { ok: false, err: 'A jármű nem található.' } });
+    }
+
+    const sets = ['rendszam_camion = $3', 'updated_at = NOW()'];
+    const params = [orderId, cid, rendszam];
+    if (f.data_incarcare) { params.push(f.data_incarcare); sets.push('data_incarcare = $' + params.length); }
+    const r = await pool.query(
+      `UPDATE orders SET ${sets.join(', ')} WHERE id = $1 AND company_id = $2`,
+      params
+    );
+    if (!r.rowCount) return res.json({ result: { ok: false, err: 'Fuvar nem található' } });
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('plannerAssign hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
 module.exports = handlers;

@@ -150,6 +150,7 @@
   <!-- 6) EREDMÉNY PANEL -->
   <div class="glass rp-card" id="rpResultPanel" style="display:none;">
     <div class="rp-sec-title text-muted">Eredmény</div>
+    <div id="rpProfileNote" class="text-muted" style="font-size:12px;margin-bottom:10px;"></div>
     <div id="rpWarn" style="display:none;margin-bottom:14px;padding:12px 14px;border-radius:var(--radius-md);
          background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);color:#fcd34d;font-size:13px;"></div>
     <div class="grid-3" style="margin-bottom:14px;">
@@ -166,7 +167,7 @@
     <span style="font-size:20px;">🆓</span>
     <div>
       <div class="text-primary" style="font-size:13px;font-weight:700;">Ingyenes térkép és útvonaltervezés</div>
-      <div class="text-muted" style="font-size:12px;">OpenStreetMap csempék + OSRM útvonal + Photon címkereső — díjmentes, <b>autós profillal</b> (kamion-korlátozásokat nem vesz figyelembe).</div>
+      <div class="text-muted" style="font-size:12px;">OpenStreetMap csempék + Photon címkereső + OSRM/OpenRouteService útvonal — díjmentes. <b>Autós profil</b>; ha a szerveren ORS-kulcs van beállítva, <b>kamionos profillal</b> (súly/magasság-korlátokkal) tervez.</div>
     </div>
   </div>
 
@@ -504,6 +505,13 @@ function rpDrawRoute(r){
 
   // eredmény panel
   document.getElementById('rpResultPanel').style.display='';
+  // Profil-jelzés: kamionos (ORS) vagy autós (OSRM) tervezés történt
+  var profEl=document.getElementById('rpProfileNote');
+  if(profEl){
+    profEl.innerHTML = r.profile==='truck-ors'
+      ? '🚛 <b>Kamionos profil</b> (OpenRouteService) — a megadott súly/méret-korlátokkal tervezve.'
+      : 'ℹ️ <b>Autós profil</b> (OSRM) — kamion-korlátozások nélkül.';
+  }
   document.getElementById('rpDist').textContent=(Math.round((r.distanceMeters||0)/100)/10)+' km';
   document.getElementById('rpTime').textContent=rpFmtDur(r.durationSeconds);
   document.getElementById('rpFuel').textContent=(r.fuelEstimateL!=null)?(r.fuelEstimateL+' L'):'—';

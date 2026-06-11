@@ -8,6 +8,7 @@ window.VS_FEATURES = [
   { key: 'orders-form',      label: 'Fuvar kiírás',                group: 'Fuvarozás & Logisztika' },
   { key: 'orders-list',      label: 'Fuvar kezelés',               group: 'Fuvarozás & Logisztika' },
   { key: 'inbound',          label: 'Beérkező megrendelések',      group: 'Fuvarozás & Logisztika' },
+  { key: 'orders-planner',   label: 'Tervezőtábla (diszpécser)',   group: 'Fuvarozás & Logisztika' },
   { key: 'received-fuv',     label: 'Fuvarlevelek',                group: 'Fuvarozás & Logisztika' },
   { key: 'driver-docs-pane', label: 'Feltöltött iratok & CMR-ek',  group: 'Fuvarozás & Logisztika' },
   { key: 'utvonaltervezes',  label: 'Útvonaltervezés',             group: 'Fuvarozás & Logisztika' },
@@ -24,6 +25,9 @@ window.VS_FEATURES = [
   { key: 'tracking',         label: 'Ügyfél tracking-link (🌍)',   group: 'Fuvarozás & Logisztika' },
   { key: 'expiries',         label: 'Lejáratok & riasztások',      group: 'Flotta & Megfelelés' },
   { key: 'service-log',      label: 'Szerviz & karbantartás',      group: 'Flotta & Megfelelés' },
+  { key: 'fuel-import',      label: 'Üzemanyagkártya-import (⛽)',  group: 'Flotta & Megfelelés' },
+  // 'monthly-report': nem menüpont — a havi e-mail összefoglalót kapcsolja (scheduler).
+  { key: 'monthly-report',   label: 'Havi e-mail összefoglaló (📧)', group: 'Flotta & Megfelelés' },
   { key: 'users',            label: 'Munkatársak kezelése',        group: 'Adminisztráció' },
   { key: 'invites',          label: 'Meghívókódok',                group: 'Adminisztráció' },
   { key: 'internal-drivers', label: 'Belső sofőrök',               group: 'Adminisztráció' },

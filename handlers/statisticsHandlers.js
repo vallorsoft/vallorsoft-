@@ -435,6 +435,49 @@ handlers.getFinanceStats = async function (req, res, args) {
   }
 };
 
+// ── Fuvar-szintű eredmény (Pénzügy fül) — JOGOSULTSÁGHOZ KÖTÖTT ──
+// A menetlevél-költségeket (tankolás+vásárlás) a menetlevélen szereplő
+// fuvarok között EGYENLŐEN osztjuk szét (fuvarlevelek.order_ids), így
+// fuvaronként becsült költség és — árfolyammal — eredmény adódik.
+handlers.getOrderProfit = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    if (!(await _canSeeFinance(req))) {
+      return res.json({ result: { ok: false, err: 'Nincs jogosultság a pénzügyi riporthoz', forbidden: true } });
+    }
+    const cid = req.session.user.company_id;
+    const { from, to } = _range(args);
+
+    const r = await pool.query(
+      `SELECT o.id, COALESCE(c.denumire, o.client) AS client, o.pret, o.km, o.finalized_at,
+              COALESCE(SUM(fl.ktg / NULLIF(fl.cnt, 0)), 0)::numeric AS koltseg_ron
+       FROM orders o
+       LEFT JOIN clients c ON c.id = o.client_id
+       LEFT JOIN LATERAL (
+         SELECT ((SELECT COALESCE(SUM((a->>'suma')::numeric),0) FROM jsonb_array_elements(f.alimentari) a)
+               + (SELECT COALESCE(SUM((x->>'pret')::numeric),0) FROM jsonb_array_elements(f.achizitii) x)) AS ktg,
+                jsonb_array_length(f.order_ids) AS cnt
+         FROM fuvarlevelek f
+         WHERE f.order_ids ? o.id::text
+       ) fl ON true
+       WHERE o.company_id = $1 AND o.status = 'Finalizat'
+         AND o.finalized_at >= $2 AND o.finalized_at < $3
+       GROUP BY o.id, c.denumire, o.client, o.pret, o.km, o.finalized_at
+       ORDER BY o.finalized_at DESC LIMIT 100`,
+      [cid, from, to]
+    );
+
+    const rateR = await pool.query('SELECT eur_ron_rate FROM companies WHERE id = $1', [cid]);
+    const eurRonRate = rateR.rows.length && rateR.rows[0].eur_ron_rate != null
+      ? parseFloat(rateR.rows[0].eur_ron_rate) : null;
+
+    return res.json({ result: { ok: true, rows: r.rows, eur_ron_rate: eurRonRate } });
+  } catch (err) {
+    console.error('getOrderProfit hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
 // ── Fogyasztás (stats-fuel) ──────────────────────────────────
 handlers.getFuelStats = async function (req, res, args) {
   try {

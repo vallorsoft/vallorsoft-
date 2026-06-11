@@ -68,18 +68,20 @@ Közös szűrősáv minden fülön: elmúlt 12 hónap (alap) / idei év / 3 hón
 2. **🏦 BNR árfolyam-gomb** a 💱 mezőnél (`getBnrRate` — a BNR napi XML-jéből, 1 órás cache).
 3. **e-Factura státusz TÉNYLEGES bekötése**: a számla-modal 🔄 gombja a szolgáltatótól (FGO getstatus) lekéri és eltárolja az `invoices.efactura_status`-t — ezt mutatja a 📨 jelző.
 
-## ⬜ Hátralévő ötletek (4. fázis — második kör)
-1. **📅 Diszpécser-tervezőtábla** — jármű×nap idővonal, húzd-rá kiosztás.
-2. **⛽ Üzemanyagkártya-import** (OMV/MOL/DKV/Eurowag CSV) → egyeztetés a sofőr-tankolásokkal, eltérés-riport.
-3. **Bursă-integráció** (Trans.eu / Timocom) — külső API-szerződés kell.
-4. **Havi PDF/e-mail összefoglaló** az adminnak (Brevo + scheduler havi job).
-5. **GPS-km napi snapshot-naplózás** → GPS-km vs. beírt km eltérés-riasztás.
-6. **Fuvar-szintű profit** (fuvarlevelek `order_ids` alapján költség-szétosztás).
-7. **Kamionos routing visszahozása ingyen**: OpenRouteService `driving-hgv` profil (ingyenes API-kulcs, 2000 kérés/nap) — a `calculateRoute` váltható lenne ORS-re, ha van `ORS_API_KEY`.
-8. CSV-exportokban Eredmény/Szerviz oszlopok.
+## ✅ Beépítve (4. fázis — második kör)
+1. **📅 Diszpécser-tervezőtábla** (`orders-planner` fül, Fuvarfeladatok almenü) — jármű×nap rács 2 hétre: a fuvar-chipek a felrakó-napjukon, a kiosztott vontató sorában; **drag&drop kiosztás** (jármű + felrakó-dátum), visszahúzás = kiosztás törlése; kattintás = fuvar-szerkesztő; hét-lapozás.
+2. **⛽ Üzemanyagkártya-import** (`fuel-import` fül, Flotta csoport) — generikus CSV-import **oszlop-párosítóval** (automatikus oszlop-tippek, román/magyar számformátum + többféle dátumformátum), duplikáció-védelem (hash); **kártya vs. sofőr-tankolás eltérés-riport** (>10% piros).
+3. **📧 Havi e-mail összefoglaló** — a hónap első napjaiban automatikusan kiküldi az előző hónap riportját (lezárt fuvar, bevétel, km, üzemanyag, kintlévőség) a cég admin(jai)nak Brevo-n; küldés-napló (nincs dupla); cégenként kikapcsolható (`monthly-report` kapcsoló).
+4. **🛰️ Napi GPS km-óra snapshot** (`gps_mileage_log`, napi scheduler) → a Jármű kihasználtság fülön **GPS-km vs. menetlevél-km** összevetés (>10% eltérés piros).
+5. **🎯 Fuvar-szintű eredmény** a Pénzügy fülön — a menetlevél-költségek a `order_ids` szerint fuvarokra osztva; árfolyammal Eredmény (EUR) oszlop.
+6. **🚛 Kamionos routing ingyen**: ha az `.env`-ben van `ORS_API_KEY` (OpenRouteService, ingyenes regisztráció), az útvonaltervező `driving-hgv` profillal, a megadott súly/méret-korlátokkal tervez (OSRM-fallback); az eredmény-panel jelzi a használt profilt.
+7. CSV-exportokban Eredmény + Szerviz oszlopok.
+
+## ⬜ Hátralévő (csak külső függéssel)
+1. **Bursă-integráció** (Trans.eu / Timocom) — partneri API-szerződés és kulcsok kellenek a szolgáltatóktól; ha megvannak, a Megrendelések fül mintájára köthető be.
 
 ## Élesítési teendők
-1. Migrációk az éles DB-n (idempotensek): `order-payments.sql`, `invites-nume-tel.sql`, `company-eur-ron.sql`, **`phase3-modules.sql`**.
+1. Migrációk az éles DB-n (idempotensek): `order-payments.sql`, `invites-nume-tel.sql`, `company-eur-ron.sql`, `phase3-modules.sql`, `order-tracking.sql`, **`phase4-modules.sql`**.
 2. Szerver-újraindítás (új handler-modulok + scheduler).
 3. Böngészőben hard refresh (`Ctrl+Shift+R`).
 4. Admin: 🔐 jogosultságok + 💱 árfolyam + diurna-ráták beállítása; developer: új funkciók (decont/expiries/service-log) csomag-hozzárendelése.

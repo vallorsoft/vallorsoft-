@@ -47,6 +47,7 @@
         <div class="sub-tab" data-tab="orders-form">Kiírás</div>
         <div class="sub-tab" data-tab="orders-list">Kezelés</div>
         <div class="sub-tab" data-tab="inbound">Megrendelések</div>
+        <div class="sub-tab" data-tab="orders-planner">📅 Tervezőtábla</div>
       </div>
       <div class="tab" data-tab="received-fuv">Fuvarlevelek</div>
       <div class="tab" data-tab="decont">Sofőr-elszámolás</div>
@@ -71,6 +72,7 @@
       <div class="menu-title">Flotta & Megfelelés</div>
       <div class="tab" data-tab="expiries">⏰ Lejáratok</div>
       <div class="tab" data-tab="service-log">🔧 Szerviz & karbantartás</div>
+      <div class="tab" data-tab="fuel-import">⛽ Üzemanyagkártya</div>
     </div>
     <div class="menu-group" id="userMenuGroup">
       <div class="menu-title">Adminisztráció</div>
@@ -494,6 +496,8 @@
     </div>
 
     <!-- ── STATISZTIKA & RIPORT PANES (tartalom: stats.js rendereli) ── -->
+    <div class="pane hidden" data-pane="orders-planner"><div id="plannerBox"></div></div>
+
     <div class="pane hidden" data-pane="stats-overview"><div id="statsOverviewBox"></div></div>
     <div class="pane hidden" data-pane="stats-finance"><div id="statsFinanceBox"></div></div>
     <div class="pane hidden" data-pane="stats-fuel"><div id="statsFuelBox"></div></div>
@@ -506,6 +510,7 @@
     <div class="pane hidden" data-pane="expiries"><div id="expiriesBox"></div></div>
     <div class="pane hidden" data-pane="service-log"><div id="serviceLogBox"></div></div>
     <div class="pane hidden" data-pane="decont"><div id="decontBox"></div></div>
+    <div class="pane hidden" data-pane="fuel-import"><div id="fuelImportBox"></div></div>
     <div class="pane hidden" data-pane="stats-permissions"><div id="statsPermissionsBox"></div></div>
 
      <!-- ═══════════════════════════════════════════════ -->
@@ -1018,6 +1023,7 @@
 <script src="/uit-panel.js?v=20260611"></script>
 <script src="/stats.js?v=20260611"></script>
 <script src="/fleet-extra.js?v=20260611"></script>
+<script src="/planner.js?v=20260611"></script>
 <script src="/admin.js?v=20260611"></script>
  <!-- ── BUG REPORT FAB ── -->
 <button onclick="openBugReport()" title="Hibajelentés küldése"

@@ -58,6 +58,48 @@ async function geocodeFree(addr) {
   return { lat, lng, label: label || addr };
 }
 
+// OPCIONÁLIS kamionos routing: OpenRouteService driving-hgv profil
+// (INGYENES API-kulccsal, ~2000 kérés/nap). Ha az ORS_API_KEY be van
+// állítva, a jármű-paraméterekkel (súly/magasság) tervezünk; hiba esetén
+// automatikus visszaesés az OSRM autós profilra.
+async function orsLeg(a, b, cp) {
+  const key = process.env.ORS_API_KEY;
+  const num = (x) => { const n = parseFloat(x); return Number.isFinite(n) && n > 0 ? n : null; };
+  const restrictions = {};
+  if (num(cp.height)) restrictions.height = num(cp.height) / 100;            // cm -> m
+  if (num(cp.width)) restrictions.width = num(cp.width) / 100;
+  if (num(cp.length)) restrictions.length = num(cp.length) / 100;
+  if (num(cp.grossWeight)) restrictions.weight = num(cp.grossWeight) / 1000; // kg -> t
+  if (num(cp.weightPerAxle)) restrictions.axleload = num(cp.weightPerAxle) / 1000;
+  const body = {
+    coordinates: [[a.lng, a.lat], [b.lng, b.lat]],
+    ...(Object.keys(restrictions).length ? { options: { profile_params: { restrictions } } } : {}),
+  };
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), GEO_TIMEOUT_MS);
+  try {
+    const res = await fetch('https://api.openrouteservice.org/v2/directions/driving-hgv/geojson', {
+      method: 'POST', signal: ctrl.signal,
+      headers: { 'Authorization': key, 'Content-Type': 'application/json', 'User-Agent': UA },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const e = new Error((data.error && data.error.message) || ('ORS hiba (' + res.status + ')'));
+      e.status = res.status;
+      throw e;
+    }
+    const feat = (data.features || [])[0];
+    if (!feat || !feat.geometry) throw new Error('Nem található kamionos útvonal a pontok között.');
+    const sum = (feat.properties && feat.properties.summary) || {};
+    return {
+      distance: sum.distance || 0,
+      duration: sum.duration || 0,
+      polyline: (feat.geometry.coordinates || []).map((c) => [c[1], c[0]]),
+    };
+  } finally { clearTimeout(t); }
+}
+
 // Két pont közötti útvonal-szakasz (OSRM, ingyenes, kulcs nélkül).
 // Szakaszonként külön hívás -> minden szakasznak saját polyline-ja van
 // (a felület színezve rajzolja: GPS-ráhordás szaggatva, fő szakasz pirossal).
@@ -237,8 +279,12 @@ handlers.calculateRoute = async function (req, res, args) {
       }
     }
 
-    // 3) Routing szakaszonként (OSRM) — minden egymást követő pontpár külön
-    //    hívás, így szakaszonkénti polyline-t kapunk (a kliens színezve rajzolja).
+    // 3) Routing szakaszonként — ORS driving-hgv (kamionos), ha van kulcs;
+    //    különben / hiba esetén OSRM (autós). Minden pontpár külön hívás,
+    //    így szakaszonkénti polyline-t kapunk (a kliens színezve rajzolja).
+    const cp = (a.params && typeof a.params === 'object') ? a.params : {};
+    const useOrs = !!process.env.ORS_API_KEY;
+    let profile = useOrs ? 'truck-ors' : 'car-free';
     let polyline = [];
     let distanceMeters = 0;
     let durationSeconds = 0;
@@ -246,7 +292,13 @@ handlers.calculateRoute = async function (req, res, args) {
     for (let i = 0; i < resolved.length - 1; i++) {
       const from = resolved[i];
       const to = resolved[i + 1];
-      const leg = await osrmLeg(from, to);
+      let leg;
+      if (useOrs && profile === 'truck-ors') {
+        try { leg = await orsLeg(from, to, cp); }
+        catch (e) { profile = 'car-free'; leg = await osrmLeg(from, to); } // fallback
+      } else {
+        leg = await osrmLeg(from, to);
+      }
       legs.push({
         fromType: from.type || null,
         toType: to.type || null,
@@ -278,10 +330,10 @@ handlers.calculateRoute = async function (req, res, args) {
       durationSeconds,
       legs,
       waypoints: resolved,
-      // Ingyenes (autós profilú) tervezés — a kamion-korlátozás jelölés nem elérhető.
+      // A tiltott-szakasz jelölés (violations) egyik ingyenes profilban sem elérhető.
       notices: [],
       violations: [],
-      profile: 'car-free',
+      profile,   // 'truck-ors' (ORS_API_KEY-jel, kamion-paraméterekkel) vagy 'car-free' (OSRM)
       fuelEstimateL,
     } });
   } catch (err) {

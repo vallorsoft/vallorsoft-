@@ -366,6 +366,150 @@
     });
   }
 
+  // ════════════════════════════════════════════════════════
+  //  4) ÜZEMANYAGKÁRTYA-IMPORT (generikus CSV + oszlop-párosítás)
+  // ════════════════════════════════════════════════════════
+  var _fcRows = [], _fcHeader = [];
+
+  function loadFuelImport() {
+    var box = document.getElementById('fuelImportBox');
+    if (!box) return;
+    var mr = monthRange();
+    box.innerHTML =
+      panel('⛽ Üzemanyagkártya-kivonat importálása (OMV / MOL / DKV / Eurowag / egyéb CSV)',
+        '<p class="text-muted" style="font-size:12px;margin:0 0 12px;">Töltsd fel a kártya-szolgáltató CSV-kivonatát, párosítsd az oszlopokat, és importálj. A kétszeri import nem duplikál (tranzakció-azonosítás). Az összevetés megmutatja, hol tér el a kártyás tankolás a sofőr által beírttól.</p>'
+        + '<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;">'
+        + '<div class="field" style="margin:0;"><label>Forrás</label><select class="select" id="fcSource" style="max-width:140px;">'
+        + '<option value="omv">OMV/Petrom</option><option value="mol">MOL</option><option value="dkv">DKV</option><option value="eurowag">Eurowag</option><option value="egyeb">Egyéb</option></select></div>'
+        + '<div class="field" style="margin:0;flex:1;min-width:200px;"><label>CSV fájl</label><input class="input" type="file" id="fcFile" accept=".csv,.txt" onchange="FleetExtra.fcParse()"></div>'
+        + '</div>'
+        + '<div id="fcMapping" style="margin-top:12px;"></div>')
+      + '<div id="fcCompareBox"></div>'
+      + '<div id="fcListBox"></div>';
+    fcLoadData(mr.from, mr.to);
+  }
+
+  function fcLoadData(from, to) {
+    Promise.all([gas('fuelCompare', [{ from: from, to: to }]), gas('fuelCardList', [{ from: from, to: to }])]).then(function (rs) {
+      var cmpBox = document.getElementById('fcCompareBox');
+      var listBox = document.getElementById('fcListBox');
+      if (!cmpBox || !listBox) return;
+      var cmp = rs[0], lst = rs[1];
+
+      if (cmp && cmp.ok && (cmp.rows || []).length) {
+        var rows = cmp.rows.map(function (x) {
+          var warn = x.diff_pct != null && Math.abs(x.diff_pct) > 10;
+          return '<tr><td><b class="text-primary">' + esc(x.rendszam || '—') + '</b></td>'
+            + '<td style="text-align:right;">' + n2(x.card_l, 0) + '</td>'
+            + '<td style="text-align:right;">' + n2(x.drv_l, 0) + '</td>'
+            + '<td style="text-align:right;font-weight:700;color:' + (warn ? 'var(--status-danger)' : 'inherit') + ';">' + (x.diff_l > 0 ? '+' : '') + n2(x.diff_l, 0) + '</td>'
+            + '<td style="text-align:center;">' + (x.diff_pct != null
+              ? '<span class="badge ' + (warn ? 'err' : 'ok') + '">' + (x.diff_pct > 0 ? '+' : '') + n2(x.diff_pct, 1) + '%</span>' : '—') + '</td>'
+            + '<td style="text-align:right;">' + n2(x.card_ron, 0) + '</td></tr>';
+        }).join('');
+        cmpBox.innerHTML = panel('⚖️ Kártya vs. sofőr-tankolás (e hónap, liter)',
+          '<div style="overflow-x:auto;"><table class="table">'
+          + '<thead><tr><th>Rendszám</th><th style="text-align:right;">Kártya (L)</th><th style="text-align:right;">Sofőr beírta (L)</th><th style="text-align:right;">Eltérés (L)</th><th style="text-align:center;">%</th><th style="text-align:right;">Kártya-költség (RON)</th></tr></thead>'
+          + '<tbody>' + rows + '</tbody></table></div>'
+          + '<div class="text-muted" style="font-size:11px;margin-top:6px;">🔴 = 10%-nál nagyobb eltérés — érdemes ellenőrizni (elírás vagy hiányzó menetlevél).</div>');
+      } else { cmpBox.innerHTML = ''; }
+
+      if (lst && lst.ok) {
+        var t = lst.total || {};
+        var rows2 = (lst.items || []).map(function (it) {
+          return '<tr><td>' + d2(it.tx_date) + '</td><td>' + esc(it.source || '—') + '</td>'
+            + '<td><b class="text-primary">' + esc(it.rendszam || '—') + '</b></td>'
+            + '<td>' + esc(it.product || '—') + '</td>'
+            + '<td style="text-align:right;">' + n2(it.qty_l, 1) + '</td>'
+            + '<td style="text-align:right;font-weight:700;">' + n2(it.amount_ron, 0) + '</td></tr>';
+        }).join('') || '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:14px;">Még nincs importált tranzakció ebben a hónapban.</td></tr>';
+        listBox.innerHTML = panel('🧾 Importált kártya-tranzakciók (e hónap: ' + n2(t.db, 0) + ' db · ' + n2(t.litru, 0) + ' L · ' + n2(t.suma, 0) + ' RON)',
+          '<div style="overflow-x:auto;"><table class="table">'
+          + '<thead><tr><th>Dátum</th><th>Forrás</th><th>Rendszám</th><th>Termék</th><th style="text-align:right;">Liter</th><th style="text-align:right;">Összeg (RON)</th></tr></thead>'
+          + '<tbody>' + rows2 + '</tbody></table></div>');
+      }
+    });
+  }
+
+  // CSV beolvasás + elválasztó-felismerés + oszlop-párosító UI
+  function fcParse() {
+    var f = (document.getElementById('fcFile') || {}).files;
+    if (!f || !f[0]) return;
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var text = String(e.target.result || '');
+      var lines = text.split(/\r?\n/).filter(function (l) { return l.trim(); });
+      if (lines.length < 2) { toast('A CSV üres vagy csak fejléc.', 'err'); return; }
+      var delim = [';', ',', '\t'].sort(function (a, b) {
+        return lines[0].split(b).length - lines[0].split(a).length;
+      })[0];
+      var split = function (l) { return l.split(delim).map(function (c) { return c.replace(/^"|"$/g, '').trim(); }); };
+      _fcHeader = split(lines[0]);
+      _fcRows = lines.slice(1).map(split);
+
+      var opts = '<option value="">—</option>' + _fcHeader.map(function (h, i) { return '<option value="' + i + '">' + esc(h) + '</option>'; }).join('');
+      var sel = function (id, lbl) {
+        return '<div class="field" style="margin:0;"><label>' + lbl + '</label><select class="select" id="' + id + '">' + opts + '</select></div>';
+      };
+      // automatikus oszlop-tippek a fejléc-nevek alapján
+      var guess = function (re) { var i = _fcHeader.findIndex(function (h) { return re.test(h); }); return i >= 0 ? String(i) : ''; };
+      document.getElementById('fcMapping').innerHTML =
+        '<div class="glass-soft" style="padding:12px;">'
+        + '<div class="text-primary" style="font-size:13px;font-weight:700;margin-bottom:8px;">Oszlop-párosítás (' + _fcRows.length + ' sor)</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end;">'
+        + sel('fcColDate', 'Dátum *') + sel('fcColPlate', 'Rendszám *') + sel('fcColQty', 'Liter *')
+        + sel('fcColAmount', 'Összeg (RON) *') + sel('fcColProduct', 'Termék')
+        + '<button class="btn primary" style="height:42px;" onclick="FleetExtra.fcImport()">📥 Import</button>'
+        + '</div>'
+        + '<div class="text-muted" style="font-size:11px;margin-top:8px;">Előnézet: ' + esc(_fcRows[0].slice(0, 6).join(' | ').slice(0, 140)) + '</div>'
+        + '</div>';
+      var setSel = function (id, v) { var el = document.getElementById(id); if (el && v) el.value = v; };
+      setSel('fcColDate', guess(/dat|date|nap/i));
+      setSel('fcColPlate', guess(/rendsz|plate|inmatric|nr\.?\s*auto|vehic|kfz/i));
+      setSel('fcColQty', guess(/liter|litru|cantit|qty|menny/i));
+      setSel('fcColAmount', guess(/suma|amount|brutto|total|ertek|érték|valoare/i));
+      setSel('fcColProduct', guess(/produs|product|termek|termék|aru|áru/i));
+    };
+    reader.readAsText(f[0], 'utf-8');
+  }
+
+  function fcNum(s) {
+    // román/magyar tizedesvessző + ezres-elválasztók kezelése
+    s = String(s == null ? '' : s).replace(/\s/g, '');
+    if (/,\d{1,2}$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
+    else s = s.replace(/,/g, '');
+    return parseFloat(s);
+  }
+  function fcDate(s) {
+    s = String(s || '').trim();
+    var m = s.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);          // yyyy-mm-dd
+    if (m) return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
+    m = s.match(/^(\d{1,2})[-./](\d{1,2})[-./](\d{4})/);              // dd.mm.yyyy
+    if (m) return m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2);
+    return null;
+  }
+
+  function fcImport() {
+    var col = function (id) { var v = (document.getElementById(id) || {}).value; return v === '' ? -1 : parseInt(v, 10); };
+    var ci = { d: col('fcColDate'), p: col('fcColPlate'), q: col('fcColQty'), a: col('fcColAmount'), pr: col('fcColProduct') };
+    if (ci.d < 0 || ci.p < 0 || ci.q < 0 || ci.a < 0) { toast('Párosítsd a kötelező (*) oszlopokat!', 'err'); return; }
+    var rows = _fcRows.map(function (r) {
+      return {
+        tx_date: fcDate(r[ci.d]), rendszam: r[ci.p],
+        qty_l: fcNum(r[ci.q]), amount_ron: fcNum(r[ci.a]),
+        product: ci.pr >= 0 ? r[ci.pr] : null,
+      };
+    }).filter(function (r) { return r.tx_date && isFinite(r.qty_l) && isFinite(r.amount_ron); });
+    if (!rows.length) { toast('Egy érvényes sor sem állt össze — ellenőrizd a párosítást!', 'err'); return; }
+    gas('fuelImportRows', [{ source: (document.getElementById('fcSource') || {}).value, rows: rows }]).then(function (r) {
+      if (r && r.ok) {
+        toast('📥 Import kész: ' + r.inserted + ' új, ' + r.skipped + ' kihagyva (duplikált/hibás)', 'ok');
+        document.getElementById('fcMapping').innerHTML = '';
+        var mr = monthRange(); fcLoadData(mr.from, mr.to);
+      } else toast((r && r.err) || 'Hiba', 'err');
+    });
+  }
+
   // ── Vezérlőpult lejárat-riasztás kártya (loadDashboard hívja) ──
   function renderDashExpiryAlert() {
     var box = document.getElementById('dashExpiryAlert');
@@ -395,10 +539,12 @@
       if (name === 'expiries') loadExpiries();
       else if (name === 'service-log') loadServiceLog();
       else if (name === 'decont') loadDecont();
+      else if (name === 'fuel-import') loadFuelImport();
     },
     dashExpiryAlert: renderDashExpiryAlert,
     expEntityChange: expEntityChange, expSave: expSave, expEdit: expEdit, expDelete: expDelete,
     svSave: svSave, svDelete: svDelete,
     dcLoad: dcLoad, dcSaveRates: dcSaveRates, advSave: advSave, advDelete: advDelete,
+    fcParse: fcParse, fcImport: fcImport,
   };
 })();
