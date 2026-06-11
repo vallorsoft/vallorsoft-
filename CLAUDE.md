@@ -108,7 +108,7 @@ Szinte minden lekérdezés `company_id`-re szűr. Új lekérdezésnél MINDIG sz
 ## Adatbázis
 
 - **`schema.sql`** — teljes friss séma (`CREATE TABLE IF NOT EXISTS`).
-- **`db/*.sql`** — inkrementális migrációk, NEM részei a `schema.sql`-nek. Élesítés előtt mind lefuttatandó (idempotensek):
+- **`db/*.sql`** — inkrementális migrációk, NEM részei a `schema.sql`-nek. **AUTOMATIKUSAN lefutnak a szerver indulásakor** (server.js migráció-futtató: minden fájl pontosan egyszer, `schema_migrations` könyveléssel) — kézi futtatás NEM kell, csak restart/deploy. A lista (idempotensek):
   `integrations.sql`, `inbound-orders-migration.sql`, `uit-migration.sql`, `uit-anaf-confirm.sql`,
   `orders-client-link.sql`, `email-branding-migration.sql`, `remove-shift-compliance.sql`,
   **`vehicle-truck-params.sql`** (teherjármű routing-mezők a `vehicles`-hez),
@@ -156,7 +156,7 @@ Intake (opcionális): `INTAKE_IMAP_HOST/PORT/USER/PASS/TLS`, `INTAKE_COMPANY_ID`
 ## Élesítés (go-live) checklist
 
 1. ✅ `.env` minden kulccsal (`INTEGRATION_ENC_KEY`; térkép-kulcs NEM kell).
-2. ⬜ `db/*.sql` migrációk lefuttatva az éles DB-n (incl. `vehicle-truck-params.sql`, `feature-flags.sql`, `remove-shift-compliance.sql`, `billing-integrations.sql`, `here-usage.sql`, `orders-finalized-at.sql`, `document-series.sql`, `order-payments.sql`, `invites-nume-tel.sql`, `company-eur-ron.sql`, `phase3-modules.sql`, `order-tracking.sql`, `phase4-modules.sql`).
+2. ⬜ Szerver-restart/deploy → a `db/*.sql` migrációk AUTOMATIKUSAN lefutnak (log: „Migráció lefuttatva: …"); ellenőrzés a `schema_migrations` táblában (incl. `vehicle-truck-params.sql`, `feature-flags.sql`, `remove-shift-compliance.sql`, `billing-integrations.sql`, `here-usage.sql`, `orders-finalized-at.sql`, `document-series.sql`, `order-payments.sql`, `invites-nume-tel.sql`, `company-eur-ron.sql`, `phase3-modules.sql`, `order-tracking.sql`, `phase4-modules.sql`).
 3. ⬜ `npm install` az éles szerveren (`@here/flexpolyline` stb.).
 4. ⬜ Számlázó-integráció (pl. FGO) `test` → `production` a cég Integrációk fülén.
 5. ⬜ Deploy: `NODE_ENV=production`, HTTPS, reverse proxy (trust proxy beállítva).

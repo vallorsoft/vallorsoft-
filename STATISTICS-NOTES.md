@@ -81,7 +81,7 @@ Közös szűrősáv minden fülön: elmúlt 12 hónap (alap) / idei év / 3 hón
 1. **Bursă-integráció** (Trans.eu / Timocom) — partneri API-szerződés és kulcsok kellenek a szolgáltatóktól; ha megvannak, a Megrendelések fül mintájára köthető be.
 
 ## Élesítési teendők
-1. Migrációk az éles DB-n (idempotensek): `order-payments.sql`, `invites-nume-tel.sql`, `company-eur-ron.sql`, `phase3-modules.sql`, `order-tracking.sql`, **`phase4-modules.sql`**.
+1. **Semmi kézi DB-munka:** a migrációk (order-payments, invites-nume-tel, company-eur-ron, phase3-modules, order-tracking, phase4-modules) a szerver következő indulásakor AUTOMATIKUSAN lefutnak (server.js beépített futtató, `schema_migrations` könyvelés — a log mutatja: „Migráció lefuttatva: …").
 2. Szerver-újraindítás (új handler-modulok + scheduler).
 3. Böngészőben hard refresh (`Ctrl+Shift+R`).
 4. Admin: 🔐 jogosultságok + 💱 árfolyam + diurna-ráták beállítása; developer: új funkciók (decont/expiries/service-log) csomag-hozzárendelése.
