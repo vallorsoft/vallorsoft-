@@ -1,6 +1,14 @@
 # Statisztika & Riport modul — fejlesztési jegyzet
 
-> Állapot: **1. fázis KÉSZ** (2026-06-11). Ez a jegyzet rögzíti, mi épült be és mi van hátra.
+> Állapot: **1. + 2. fázis KÉSZ** (2026-06-11). Ez a jegyzet rögzíti, mi épült be és mi van hátra.
+
+## ✅ Beépítve (2. fázis)
+
+1. **EUR↔RON árfolyam + Eredmény (profit)** — az admin az Áttekintés tetején állítja az árfolyamot (💱, `setEurRonRate`, `companies.eur_ron_rate`, migráció: `db/company-eur-ron.sql`). Ha be van állítva: Eredmény-KPI + havi eredmény oszlopdiagram (zöld/piros) az Áttekintésen, „Eredmény (EUR)" oszlop a Sofőr- és Jármű-táblákban. Árfolyam nélkül a profit-elemek nem jelennek meg.
+2. **Top útvonalak** — az Áttekintésen: leggyakoribb felrakó→lerakó párok (fuvarszám, átlag km, átlagár, bevétel).
+3. **Riasztások az Áttekintésen** — ⛽ túlfogyasztó jármű (tényleges > névleges +15%, min. 300 km) és ⏰ 30+ napja lejárt kintlévőség (csak pénzügy-jogosultsággal; kattintásra a Pénzügy fülre visz).
+4. **HERE-költség a Pénzügy fülön** — ingyenes pool kihasználtság (progress-sáv) + szolgáltatásonkénti havi költség (a meglévő `getMyHereUsage`-ből).
+5. **Sofőr mini-statisztika** — a sofőr mobilfelület főoldalán „📊 E havi teljesítményem": lezárt fuvar, km, diurna, tankolt liter (`getMySoferStats` — csak a SAJÁT adatait látja).
 
 ## ✅ Beépítve (1. fázis)
 
@@ -44,18 +52,16 @@ Közös szűrősáv minden fülön: elmúlt 12 hónap (alap) / idei év / 3 hón
 - Fuvar-ár: **EUR** (a meglévő felülettel konzisztensen), sofőr-költségek (tankolás/vásárlás): **RON**.
 - A kettőt **nem vonjuk össze** egy profit-számba — mindenhol kiírjuk az egységet.
 
-## ⬜ Hátralévő ötletek (2. fázis)
-1. **Fuvar-jövedelmezőség egy pénznemben** — EUR↔RON árfolyam-beállítás (cégenként vagy BNR API), utána profit/fuvar és profit/km számítható (a fuvarlevelek `order_ids` mezője már összeköti a költségeket a fuvarokkal).
-2. **Top útvonalak** — leggyakoribb felrakó→lerakó párok átlagárral.
-3. **Riasztások az Áttekintésen** — túlfogyasztó jármű (>15% a névleges felett), 30+ napos kintlévőség badge.
-4. **Havi PDF/e-mail összefoglaló** az adminnak (Brevo már be van kötve).
-5. **Sofőr mini-statisztika** a sofőr mobilfelületén (saját km / fuvar / diurna e hónapban).
-6. **Ügyfél fizetési határidő** (`clients.payment_term_days`) → „lejárt" kintlévőség pontosabb számítása.
-7. **GPS-km napi snapshot-naplózás** (új tábla) → GPS-km vs. sofőr által beírt km automatikus összevetés, eltérés-riasztás.
-8. **HERE-költség sor a Pénzügy fülön** (a meglévő `getMyHereUsage` handlerből).
+## ⬜ Hátralévő ötletek (3. fázis)
+1. **Havi PDF/e-mail összefoglaló** az adminnak (Brevo már be van kötve; scheduler.js-be havi job).
+2. **Ügyfél fizetési határidő** (`clients.payment_term_days`) → „lejárt" kintlévőség ügyfelenként pontosabb számítása (az ügyfél-űrlap bővítése is kell: clients-page.js).
+3. **GPS-km napi snapshot-naplózás** (új tábla + scheduler-job) → GPS-km vs. sofőr által beírt km automatikus összevetés, eltérés-riasztás.
+4. **Fuvar-szintű profit** — a fuvarlevelek `order_ids` mezője alapján a költségek fuvarra osztása → profit/fuvar lista.
+5. **BNR árfolyam-API** — a kézi árfolyam helyett napi automatikus frissítés.
+6. **CSV-exportban Eredmény-oszlop** (most a táblában látszik, az exportban nem).
 
 ## Élesítési teendők
-1. `db/order-payments.sql` lefuttatása az éles DB-n (idempotens).
-2. Szerver-újraindítás (új handler-modul).
+1. `db/order-payments.sql`, `db/invites-nume-tel.sql`, `db/company-eur-ron.sql` lefuttatása az éles DB-n (idempotensek).
+2. Szerver-újraindítás (új/módosult handler-modulok).
 3. Böngészőben hard refresh (`Ctrl+Shift+R`) — az új JS/HTML statikus.
-4. Admin: 🔐 Jogosultságok fülön Manager-engedélyek kiosztása.
+4. Admin: 🔐 Jogosultságok fülön Manager-engedélyek kiosztása + 💱 árfolyam beállítása az Áttekintésen.

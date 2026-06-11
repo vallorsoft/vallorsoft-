@@ -216,6 +216,48 @@ handlers.getStatsOverview = async function (req, res, args) {
        WHERE f.data_completare >= $2 AND f.data_completare < $3`, P
     );
 
+    // EUR↔RON árfolyam (admin állítja) — ezzel számolható eredmény (profit)
+    const rateR = await pool.query('SELECT eur_ron_rate FROM companies WHERE id = $1', [cid]);
+    const eurRonRate = rateR.rows.length && rateR.rows[0].eur_ron_rate != null
+      ? parseFloat(rateR.rows[0].eur_ron_rate) : null;
+
+    // Top útvonalak (lezárt fuvarok felrakó → lerakó párjai)
+    const utvR = await pool.query(
+      `SELECT loc_incarcare, loc_descarcare, COUNT(*)::int AS db,
+              COALESCE(AVG(pret),0)::numeric AS atlag_ar,
+              COALESCE(SUM(pret),0)::numeric AS bevetel,
+              COALESCE(AVG(km),0)::numeric AS atlag_km
+       FROM orders
+       WHERE company_id=$1 AND status='Finalizat' AND finalized_at >= $2 AND finalized_at < $3
+         AND COALESCE(loc_incarcare,'') <> '' AND COALESCE(loc_descarcare,'') <> ''
+       GROUP BY loc_incarcare, loc_descarcare
+       ORDER BY db DESC, bevetel DESC LIMIT 10`, P
+    );
+
+    // Riasztások — túlfogyasztó járművek: tényleges > névleges * 1.15 (min. 300 km,
+    // hogy egy-egy rövid menetlevél ne riasszon feleslegesen)
+    const alerts = [];
+    const overR = await pool.query(
+      `SELECT f.numar_camion AS rendszam,
+              SUM(f.total_km)::numeric AS km,
+              SUM(f.motorina_folosit)::numeric AS motorina,
+              MAX(v.fuel_per_100km)::numeric AS nevleges
+       ${FUV_FROM}
+       JOIN vehicles v ON v.company_id = $1 AND UPPER(v.rendszam) = UPPER(f.numar_camion)
+            AND v.fuel_per_100km > 0
+       WHERE f.data_completare >= $2 AND f.data_completare < $3
+       GROUP BY f.numar_camion
+       HAVING SUM(f.total_km) >= 300
+          AND (SUM(f.motorina_folosit) / NULLIF(SUM(f.total_km),0)) * 100 > MAX(v.fuel_per_100km) * 1.15`, P
+    );
+    overR.rows.forEach((v) => {
+      const c = (parseFloat(v.motorina) / parseFloat(v.km)) * 100;
+      alerts.push({
+        type: 'fuel', rendszam: v.rendszam,
+        consum: Math.round(c * 10) / 10, nevleges: parseFloat(v.nevleges)
+      });
+    });
+
     // Pénzügyi KPI-k csak jogosultsággal (beszedett / kintlévő)
     let finance = null;
     if (await _canSeeFinance(req)) {
@@ -227,6 +269,18 @@ handlers.getStatsOverview = async function (req, res, args) {
          WHERE company_id=$1 AND status='Finalizat' AND finalized_at >= $2 AND finalized_at < $3`, P
       );
       finance = finR.rows[0];
+
+      // Riasztás: 30+ napja lejárt kintlévőség (időszaktól független pillanatkép)
+      const odR = await pool.query(
+        `SELECT COUNT(*)::int AS db, COALESCE(SUM(GREATEST(pret-paid_amount,0)),0)::numeric AS osszeg
+         FROM orders
+         WHERE company_id=$1 AND status='Finalizat' AND payment_status <> 'paid'
+           AND pret > 0 AND finalized_at < NOW() - INTERVAL '30 days'`,
+        [cid]
+      );
+      if (odR.rows[0].db > 0) {
+        alerts.push({ type: 'overdue', db: odR.rows[0].db, osszeg: odR.rows[0].osszeg });
+      }
     }
 
     const k = kpiR.rows[0];
@@ -243,11 +297,36 @@ handlers.getStatsOverview = async function (req, res, args) {
         diurna_ext: fv.diurna_ext, diurna_int: fv.diurna_int
       },
       finance,
+      eur_ron_rate: eurRonRate,
+      top_utvonalak: utvR.rows,
+      alerts,
       havi_bevetel: bevR.rows,
       havi_koltseg: ktgR.rows
     }});
   } catch (err) {
     console.error('getStatsOverview hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
+// ── EUR↔RON árfolyam beállítása (csak Admin) ─────────────────
+// args: [rate] — szám (pl. 4.97) vagy null/üres = törlés (nincs profit-számítás)
+handlers.setEurRonRate = async function (req, res, args) {
+  try {
+    if (!req.session.user || req.session.user.pozicio !== 'Admin') return _deny(res);
+    const cid = req.session.user.company_id;
+    const raw = Array.isArray(args) ? args[0] : args;
+    let rate = null;
+    if (raw !== null && raw !== undefined && String(raw).trim() !== '') {
+      rate = parseFloat(raw);
+      if (!Number.isFinite(rate) || rate < 0.5 || rate > 20) {
+        return res.json({ result: { ok: false, err: 'Érvénytelen árfolyam (0.5–20 között adható meg)' } });
+      }
+    }
+    await pool.query('UPDATE companies SET eur_ron_rate = $1 WHERE id = $2', [rate, cid]);
+    return res.json({ result: { ok: true, eur_ron_rate: rate } });
+  } catch (err) {
+    console.error('setEurRonRate hiba:', err);
     return res.json({ result: { ok: false, err: 'Szerver hiba' } });
   }
 };
@@ -501,7 +580,12 @@ handlers.getDriverStats = async function (req, res, args) {
       return s;
     }).sort((a, b) => (parseFloat(b.bevetel) || 0) - (parseFloat(a.bevetel) || 0));
 
-    return res.json({ result: { ok: true, soforok } });
+    // Árfolyam — a kliens ezzel számol Eredmény (EUR) oszlopot
+    const rateR = await pool.query('SELECT eur_ron_rate FROM companies WHERE id = $1', [cid]);
+    const eurRonRate = rateR.rows.length && rateR.rows[0].eur_ron_rate != null
+      ? parseFloat(rateR.rows[0].eur_ron_rate) : null;
+
+    return res.json({ result: { ok: true, soforok, eur_ron_rate: eurRonRate } });
   } catch (err) {
     console.error('getDriverStats hiba:', err);
     return res.json({ result: { ok: false, err: 'Szerver hiba' } });
@@ -572,7 +656,12 @@ handlers.getVehicleStats = async function (req, res, args) {
       return v;
     }).sort((a, b) => (parseFloat(b.bevetel) || 0) - (parseFloat(a.bevetel) || 0));
 
-    return res.json({ result: { ok: true, jarmuvek } });
+    // Árfolyam — a kliens ezzel számol Eredmény (EUR) oszlopot
+    const rateR = await pool.query('SELECT eur_ron_rate FROM companies WHERE id = $1', [cid]);
+    const eurRonRate = rateR.rows.length && rateR.rows[0].eur_ron_rate != null
+      ? parseFloat(rateR.rows[0].eur_ron_rate) : null;
+
+    return res.json({ result: { ok: true, jarmuvek, eur_ron_rate: eurRonRate } });
   } catch (err) {
     console.error('getVehicleStats hiba:', err);
     return res.json({ result: { ok: false, err: 'Szerver hiba' } });
@@ -613,6 +702,51 @@ handlers.getClientStats = async function (req, res, args) {
     return res.json({ result: { ok: true, finance, ugyfelek } });
   } catch (err) {
     console.error('getClientStats hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
+// ── Sofőr mini-statisztika (a sofőr SAJÁT, e havi adatai) ────
+// A sofőr mobilfelület főoldalán jelenik meg — motivációs összegző.
+handlers.getMySoferStats = async function (req, res, args) {
+  try {
+    if (!req.session.user || req.session.user.pozicio !== 'Sofer') return _deny(res);
+    const me = req.session.user;
+
+    // Lezárt fuvarok e hónapban (a sofőr saját email-jére kiosztottak)
+    const ordR = await pool.query(
+      `SELECT COUNT(*) FILTER (WHERE status='Finalizat' AND finalized_at >= DATE_TRUNC('month', NOW()))::int AS lezart,
+              COUNT(*) FILTER (WHERE status IN ('Alocat','In Curs'))::int AS aktiv
+       FROM orders
+       WHERE company_id = $1 AND LOWER(email_sofer) = LOWER($2)`,
+      [me.company_id, me.email]
+    );
+
+    // Saját menetlevelek e hónapban: km, diurna, tankolt liter
+    const fuvR = await pool.query(
+      `SELECT COUNT(*)::int AS menetlevelek,
+              COALESCE(SUM(total_km),0)::numeric AS km,
+              COALESCE(SUM(diurna_externa),0)::int AS diurna_ext,
+              COALESCE(SUM(diurna_interna),0)::int AS diurna_int,
+              COALESCE(SUM((SELECT COALESCE(SUM((a->>'litru')::numeric),0)
+                            FROM jsonb_array_elements(alimentari) a)),0) AS tankolt_l
+       FROM fuvarlevelek
+       WHERE LOWER(email_sofer) = LOWER($1)
+         AND data_completare >= DATE_TRUNC('month', NOW())`,
+      [me.email]
+    );
+
+    const o = ordR.rows[0], f = fuvR.rows[0];
+    return res.json({ result: {
+      ok: true,
+      honap: new Date().toISOString().slice(0, 7),
+      lezart: o.lezart, aktiv: o.aktiv,
+      km: f.km, menetlevelek: f.menetlevelek,
+      diurna_ext: f.diurna_ext, diurna_int: f.diurna_int,
+      tankolt_l: f.tankolt_l
+    }});
+  } catch (err) {
+    console.error('getMySoferStats hiba:', err);
     return res.json({ result: { ok: false, err: 'Szerver hiba' } });
   }
 };
