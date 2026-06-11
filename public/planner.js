@@ -128,6 +128,29 @@
       '.p2-skel{height:34px;border-radius:8px;background:linear-gradient(90deg,rgba(255,255,255,0.04),rgba(255,255,255,0.10),rgba(255,255,255,0.04));' +
         'background-size:200% 100%;animation:p2sh 1.2s infinite;margin-bottom:8px;}',
       '@keyframes p2sh{0%{background-position:200% 0}100%{background-position:-200% 0}}',
+      // ── VILÁGOS TÉMA — kontraszt-felülírások (a --bg-panel sötét marad,
+      //    ezért a fejléc/bal sáv/popover hátterét explicit világosítjuk) ──
+      '.main-content[data-theme="light"] .p2-corner,' +
+      '.main-content[data-theme="light"] .p2-day,' +
+      '.main-content[data-theme="light"] .p2-utilcorner,' +
+      '.main-content[data-theme="light"] .p2-rail{background:#fff;border-color:rgba(0,0,0,0.12);}',
+      '.main-content[data-theme="light"] .p2-day.we{background:rgba(0,0,0,0.06);}',
+      '.main-content[data-theme="light"] .p2-day.today{color:#1a2332;background:rgba(225,11,26,0.14);}',
+      '.main-content[data-theme="light"] .p2-dcell{border-color:rgba(0,0,0,0.08);}',
+      '.main-content[data-theme="light"] .p2-dcell.we{background:rgba(0,0,0,0.045);}',
+      '.main-content[data-theme="light"] .p2-dcell.today{background:rgba(225,11,26,0.07);}',
+      '.main-content[data-theme="light"] .p2-row{border-color:rgba(0,0,0,0.10);}',
+      '.main-content[data-theme="light"] .p2-util{border-color:rgba(0,0,0,0.10);color:#1a2332;}',
+      '.main-content[data-theme="light"] .p2-pop{background:#fff;border-color:rgba(0,0,0,0.18);box-shadow:0 18px 50px rgba(0,0,0,0.25);}',
+      '.main-content[data-theme="light"] .p2-stripd{background:#fff;border-color:rgba(0,0,0,0.14);}',
+      '.main-content[data-theme="light"] .p2-stripd.sel{background:rgba(225,11,26,0.10);}',
+      '.main-content[data-theme="light"] .p2-vcard{border-color:rgba(0,0,0,0.12);}',
+      '.main-content[data-theme="light"] .p2-pool{border-color:rgba(0,0,0,0.25);}',
+      '.main-content[data-theme="light"] .p2-skel{background:linear-gradient(90deg,rgba(0,0,0,0.05),rgba(0,0,0,0.12),rgba(0,0,0,0.05));background-size:200% 100%;}',
+      '.main-content[data-theme="light"] .p2-dot{background:#94a3b8;}',
+      '.main-content[data-theme="light"] .p2-dot.on{background:var(--status-ok);}',
+      '.main-content[data-theme="light"] .p2-radar{background:rgba(34,197,94,0.08);border-color:rgba(34,197,94,0.45);}',
+      '.main-content[data-theme="light"] .p2-radar .rrow{border-color:rgba(0,0,0,0.10);}',
     ].join('');
     var st = document.createElement('style'); st.id = 'plannerCss2'; st.textContent = css;
     document.head.appendChild(st);
