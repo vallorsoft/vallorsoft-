@@ -63,16 +63,20 @@ Közös szűrősáv minden fülön: elmúlt 12 hónap (alap) / idei év / 3 hón
 - Fuvar-ár: **EUR** (a meglévő felülettel konzisztensen), sofőr-költségek (tankolás/vásárlás): **RON**.
 - A kettőt **nem vonjuk össze** egy profit-számba — mindenhol kiírjuk az egységet.
 
-## ⬜ Hátralévő ötletek (4. fázis — prémium)
+## ✅ Beépítve (4. fázis — első kör)
+1. **🌍 Ügyfél tracking-link** (prémium, `tracking` kapcsoló): a fuvarlistán 🌍 gomb → publikus, tokenes román nyelvű követő-oldal (`/t/<token>`, `public/track.html`, `routes/track.js`): útvonal, státusz, rendszám + **élő GPS-pozíció** térképen (60s szerver-cache, 2 perces auto-frissítés). Migráció: `db/order-tracking.sql`. Szerveroldali feature-gate is.
+2. **🏦 BNR árfolyam-gomb** a 💱 mezőnél (`getBnrRate` — a BNR napi XML-jéből, 1 órás cache).
+3. **e-Factura státusz TÉNYLEGES bekötése**: a számla-modal 🔄 gombja a szolgáltatótól (FGO getstatus) lekéri és eltárolja az `invoices.efactura_status`-t — ezt mutatja a 📨 jelző.
+
+## ⬜ Hátralévő ötletek (4. fázis — második kör)
 1. **📅 Diszpécser-tervezőtábla** — jármű×nap idővonal, húzd-rá kiosztás.
-2. **🌍 Ügyfél-portál / tracking link** — publikus token-link: fuvar-státusz + GPS-pozíció + POD.
-3. **⛽ Üzemanyagkártya-import** (OMV/MOL/DKV/Eurowag CSV) → egyeztetés a sofőr-tankolásokkal, eltérés-riport.
-4. **Bursă-integráció** (Trans.eu / Timocom) — külső API-szerződés kell.
-5. **Havi PDF/e-mail összefoglaló** az adminnak (Brevo + scheduler havi job).
-6. **GPS-km napi snapshot-naplózás** → GPS-km vs. beírt km eltérés-riasztás.
-7. **Fuvar-szintű profit** (fuvarlevelek `order_ids` alapján költség-szétosztás) + **BNR árfolyam-API**.
-8. **Kamionos routing visszahozása ingyen**: OpenRouteService `driving-hgv` profil (ingyenes API-kulcs, 2000 kérés/nap) — a `calculateRoute` váltható lenne ORS-re, ha van `ORS_API_KEY`.
-9. CSV-exportokban Eredmény/Szerviz oszlopok.
+2. **⛽ Üzemanyagkártya-import** (OMV/MOL/DKV/Eurowag CSV) → egyeztetés a sofőr-tankolásokkal, eltérés-riport.
+3. **Bursă-integráció** (Trans.eu / Timocom) — külső API-szerződés kell.
+4. **Havi PDF/e-mail összefoglaló** az adminnak (Brevo + scheduler havi job).
+5. **GPS-km napi snapshot-naplózás** → GPS-km vs. beírt km eltérés-riasztás.
+6. **Fuvar-szintű profit** (fuvarlevelek `order_ids` alapján költség-szétosztás).
+7. **Kamionos routing visszahozása ingyen**: OpenRouteService `driving-hgv` profil (ingyenes API-kulcs, 2000 kérés/nap) — a `calculateRoute` váltható lenne ORS-re, ha van `ORS_API_KEY`.
+8. CSV-exportokban Eredmény/Szerviz oszlopok.
 
 ## Élesítési teendők
 1. Migrációk az éles DB-n (idempotensek): `order-payments.sql`, `invites-nume-tel.sql`, `company-eur-ron.sql`, **`phase3-modules.sql`**.

@@ -157,6 +157,7 @@ app.use(require('./routes/ordersRest'));
 app.use(require('./routes/clients'));
 app.use(require('./routes/cargotrack'));
 app.use(require('./routes/invoices'));
+app.use(require('./routes/track'));
 app.use(require('./routes/uit'));
 app.use(require('./routes/inbound-orders'));
 app.use(require('./routes/client-mail'));

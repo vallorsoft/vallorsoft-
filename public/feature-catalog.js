@@ -19,6 +19,9 @@ window.VS_FEATURES = [
   { key: 'stats-vehicles',   label: 'Statisztika — Jármű kihasználtság', group: 'Statisztika & Riport' },
   { key: 'stats-clients',    label: 'Statisztika — Ügyfél riport', group: 'Statisztika & Riport' },
   { key: 'decont',           label: 'Sofőr-elszámolás (decont)',   group: 'Fuvarozás & Logisztika' },
+  // 'tracking': nem menüpont, hanem a fuvarlista 🌍 gombja (publikus ügyfél
+  // követő-link) — a kapcsoló a gombot és a link-generálást tiltja.
+  { key: 'tracking',         label: 'Ügyfél tracking-link (🌍)',   group: 'Fuvarozás & Logisztika' },
   { key: 'expiries',         label: 'Lejáratok & riasztások',      group: 'Flotta & Megfelelés' },
   { key: 'service-log',      label: 'Szerviz & karbantartás',      group: 'Flotta & Megfelelés' },
   { key: 'users',            label: 'Munkatársak kezelése',        group: 'Adminisztráció' },

@@ -12,6 +12,7 @@ function applyFeatureFlags(){
   gas('getMyFeatures').then(function(r){
     if(!r||!r.ok) return;
     var feats = r.features||{};
+    window._vsFeatures = feats;   // nem-menü funkciók (pl. tracking gomb) ellenőrzéséhez
     var cat = window.VS_FEATURES||[];
     cat.forEach(function(f){
       if(f.core) return;
@@ -1676,6 +1677,11 @@ function renderFilteredOrders(list) {
       integBtns += '<button class="btn primary" title="Számlázás" style="padding:4px 10px;font-size:12px;" '+
         'onclick="InvoiceModal.open(\''+c.id+'\')">🧾<span class="inv-ind" data-inv-ind="'+c.id+'" style="margin-left:2px;"></span></button>';
     }
+    // 🌍 Ügyfél tracking-link (prémium funkció-kapcsoló: 'tracking')
+    if (!(window._vsFeatures && window._vsFeatures['tracking']===false)) {
+      integBtns += '<button class="btn ghost" title="Ügyfél követő-link másolása (publikus oldal)" style="padding:4px 10px;font-size:12px;" '+
+        'onclick="copyTrackingLink(\''+c.id+'\')">🌍</button>';
+    }
     // 📷 POD-jelző: a sofőr által ehhez a fuvarhoz csatolt fotók (aláírt CMR stb.)
     if (parseInt(c.pod_count, 10) > 0) {
       integBtns += '<span title="'+c.pod_count+' sofőr-fotó / POD csatolva (Feltöltött Iratok fül)" '+
@@ -2113,6 +2119,18 @@ function resetPayment(){
   gas('markOrderPayment',[_payOrderId,{reset:true}]).then(function(r){
     if(r&&r.ok){ toast('Fizetés visszaállítva (kintlévő)','ok'); closePaymentModal(); _afterPaymentRefresh(); }
     else toast((r&&r.err)||'Hiba','err');
+  });
+}
+
+/* ── 🌍 Ügyfél tracking-link másolása (publikus /t/<token> oldal) ── */
+function copyTrackingLink(orderId){
+  gas('getTrackingLink',[orderId]).then(function(r){
+    if(!r||!r.ok){ toast((r&&r.err)||'Hiba a link generálásánál','err'); return; }
+    var url=location.origin+'/t/'+r.token;
+    function done(){ toast('🌍 Követő-link a vágólapon — küldd el az ügyfélnek!','ok'); }
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(url).then(done).catch(function(){ prompt('Másold ki a linket:',url); });
+    } else { prompt('Másold ki a linket:',url); }
   });
 }
 

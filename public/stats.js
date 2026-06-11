@@ -192,6 +192,7 @@
         rateRow = '<div class="glass" style="padding:10px 16px;margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
           + '<span class="text-muted" style="font-size:12px;font-weight:700;">💱 Árfolyam (1 EUR = ? RON):</span>'
           + '<input class="input" id="stEurRon" type="number" step="0.0001" min="0" value="' + (rate || '') + '" placeholder="pl. 4.97" style="max-width:120px;padding:7px 10px;font-size:13px;">'
+          + '<button class="btn ghost" style="padding:7px 12px;font-size:12px;" title="A BNR hivatalos napi árfolyamának betöltése" onclick="VS_STATS.fetchBnr()">🏦 BNR</button>'
           + '<button class="btn primary" style="padding:7px 14px;font-size:12px;" onclick="VS_STATS.saveRate()">Mentés</button>'
           + '<span class="text-muted" style="font-size:11px;">Eredmény-számításhoz (EUR bevétel − RON költség). Üresen = nincs profit-számítás.</span>'
           + '</div>';
@@ -810,6 +811,15 @@
       gas('setEurRonRate', [v === '' ? null : v]).then(function (r) {
         if (r && r.ok) { toast('💱 Árfolyam mentve', 'ok'); VS_STATS.load('stats-overview'); }
         else toast((r && r.err) || 'Hiba', 'err');
+      });
+    },
+    fetchBnr: function () {
+      gas('getBnrRate').then(function (r) {
+        if (r && r.ok) {
+          var inp = document.getElementById('stEurRon');
+          if (inp) inp.value = r.rate;
+          toast('🏦 BNR árfolyam (' + (r.date || 'ma') + '): ' + r.rate + ' — kattints a Mentésre!', 'ok');
+        } else toast((r && r.err) || 'A BNR nem elérhető', 'err');
       });
     }
   };

@@ -365,4 +365,40 @@ handlers.deleteOrderLeg = async function (req, res, args) {
     }
   };
 
+// ─── Ügyfél tracking-link (publikus követő-oldal tokenje) ───
+// A token kérésre generálódik és újrafelhasználódik. Funkció-kapcsoló:
+// company_features 'tracking' (hiányzó sor = engedélyezett).
+const _trkCrypto = require('crypto');
+handlers.getTrackingLink = async function (req, res, args) {
+  try {
+    if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    }
+    const cid = req.session.user.company_id;
+    const orderId = String(args[0] || '').trim();
+
+    // Előfizetés-kapcsoló (szerveroldali gate is, mint az útvonaltervezésnél)
+    const fr = await pool.query(
+      "SELECT enabled FROM company_features WHERE company_id = $1 AND feature_key = 'tracking'", [cid]);
+    if (fr.rows.length && fr.rows[0].enabled === false) {
+      return res.json({ result: { ok: false, err: 'Az ügyfél tracking-link nincs előfizetve ennél a cégnél.' } });
+    }
+
+    const or = await pool.query(
+      'SELECT id, tracking_token FROM orders WHERE id = $1 AND company_id = $2', [orderId, cid]);
+    if (!or.rows.length) return res.json({ result: { ok: false, err: 'Fuvar nem található' } });
+
+    let token = or.rows[0].tracking_token;
+    if (!token) {
+      token = _trkCrypto.randomBytes(16).toString('hex');
+      await pool.query('UPDATE orders SET tracking_token = $1 WHERE id = $2 AND company_id = $3',
+        [token, orderId, cid]);
+    }
+    return res.json({ result: { ok: true, token } });
+  } catch (err) {
+    console.error('getTrackingLink hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
 module.exports = handlers;
