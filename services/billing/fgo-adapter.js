@@ -42,7 +42,7 @@ class FgoAdapter {
       };
       const r = await fgo.emit(creds, invoice);
       if (!r.ok) return { ok: false, message: r.message };
-      return { ok: true, invoice_number: (r.serie || '') + (r.numar || ''), pdf_url: r.pdf_link || null, raw: r.raw };
+      return { ok: true, serie: r.serie || null, numar: r.numar || null, invoice_number: (r.serie || '') + (r.numar || ''), pdf_url: r.pdf_link || null, raw: r.raw };
     } catch (e) { return { ok: false, message: 'FGO hiba: ' + e.message }; }
   }
 

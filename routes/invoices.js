@@ -4,6 +4,7 @@ const pool = require('../db');
 const { requireLogin, requireRole } = require('../middleware/auth');
 const svc = require('../services/invoicing');
 const { getAdapter, listProviders } = require('../services/invoiceAdapter');
+const billing = require('../services/billing');
 const { encrypt, decrypt, mask } = require('../lib/crypto');
 
 const router = express.Router();
@@ -16,10 +17,17 @@ router.get('/api/integrations/invoicing', requireLogin, async (req, res) => {
       `SELECT provider, enabled, status, meta, credentials_enc FROM company_integrations
        WHERE company_id=$1 AND category=$2`, [req.session.user.company_id, CATEGORY]);
     const a = rows.find(r => r.enabled) || rows[0] || null;
+    // Ha az univerzális számlázó-keretrendszer (billing_integrations) aktív,
+    // a fuvar-számlázás AZON megy — a kártya ezt jelezni tudja.
+    const fw = await pool.query(
+      `SELECT provider FROM billing_integrations WHERE company_id=$1 AND is_active=true LIMIT 1`,
+      [req.session.user.company_id]);
     res.json({
       providers: listProviders(), connected: !!a, provider: a ? a.provider : null,
       enabled: a ? a.enabled : false, meta: a ? a.meta : {},
       masked_key: a && a.credentials_enc ? mask(JSON.parse(decrypt(a.credentials_enc)).PrivateKey || '') : null,
+      framework_active: fw.rows.length > 0,
+      framework_provider: fw.rows.length ? fw.rows[0].provider : null,
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -67,6 +75,10 @@ router.post('/api/integrations/invoicing/test', requireLogin, requireRole('Admin
   try {
     const cfg = await svc.getInvoiceConfig(pool, req.session.user.company_id);
     if (!cfg || !cfg.provider) return res.status(409).json({ ok: false, error: 'Nincs mentett számlázó. Előbb add meg és mentsd el a CodUnic + kulcs adatokat.' });
+    if (cfg.source === 'framework') {
+      const r = await billing.getAdapter(cfg.provider, cfg.creds).testConnection();
+      return res.json({ ok: !!r.ok, message: (r.message || '') + ' (univerzális számlázó: ' + billing.displayName(cfg.provider) + ')' });
+    }
     const adapter = getAdapter(cfg.provider);
     if (!adapter.testConnection) return res.json({ ok: true, message: 'Ehhez a szolgáltatóhoz nincs kapcsolat-teszt.' });
     const r = await adapter.testConnection(cfg.creds);
@@ -133,7 +145,12 @@ router.post('/api/invoices/:id/status', requireLogin, async (req, res) => {
     const inv = await pool.query(`SELECT * FROM invoices WHERE id=$1 AND company_id=$2`, [req.params.id, req.session.user.company_id]);
     if (!inv.rows.length) return res.status(404).json({ error: 'Számla nem található.' });
     const cfg = await svc.getInvoiceConfig(pool, req.session.user.company_id);
-    res.json(await getAdapter(inv.rows[0].provider).getStatus(cfg.creds, { numar: inv.rows[0].numar, serie: inv.rows[0].serie }));
+    let legacyAdapter = null;
+    try { legacyAdapter = getAdapter(inv.rows[0].provider); } catch (_) { /* framework-provider */ }
+    if (!legacyAdapter || !legacyAdapter.getStatus) {
+      return res.json({ ok: false, message: 'Ehhez a szolgáltatóhoz nincs számla-státusz lekérdezés.' });
+    }
+    res.json(await legacyAdapter.getStatus(cfg.creds, { numar: inv.rows[0].numar, serie: inv.rows[0].serie }));
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
 

@@ -47,7 +47,7 @@ class SmartBillAdapter {
       const r = await jsonT(BASE + '/invoice', { method: 'POST', headers: this._auth(), body: JSON.stringify(body) });
       if (r.status === 429) return { ok: false, message: 'SmartBill API limit elérve.' };
       if (!r.ok) return { ok: false, message: (r.data && (r.data.errorText || r.data.message)) || ('SmartBill hiba (' + r.status + ')') };
-      return { ok: true, invoice_number: (r.data.series || '') + (r.data.number || ''), pdf_url: r.data.url || null, raw: r.data };
+      return { ok: true, serie: r.data.series || null, numar: r.data.number || null, invoice_number: (r.data.series || '') + (r.data.number || ''), pdf_url: r.data.url || null, raw: r.data };
     } catch (e) { return { ok: false, message: 'SmartBill hiba: ' + e.message }; }
   }
 

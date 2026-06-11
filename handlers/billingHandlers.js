@@ -14,6 +14,17 @@ const handlers = {};
 function isDev(u) { return !!(u && (u.is_dev || u.pozicio === 'Developer')); }
 function isAdminOrDev(u) { return !!(u && (u.pozicio === 'Admin' || u.is_dev || u.pozicio === 'Developer')); }
 
+// Üresen hagyott mezők (pl. a jelszó, amit újramentéskor nem írnak be újra)
+// megtartják a korábban tárolt értéküket — különben pl. a számlasorozat
+// átírása kitörölné az API-kulcsot.
+function mergeWithStored(stored, incoming) {
+  const merged = { ...(stored || {}) };
+  for (const [k, v] of Object.entries(incoming || {})) {
+    if (v !== '' && v != null) merged[k] = v;
+  }
+  return merged;
+}
+
 // Tárolt credentials visszafejtése objektummá ({enc:"..."} formátum).
 function decodeStoredCreds(credentialsJsonb) {
   try {
@@ -62,7 +73,10 @@ handlers.saveBillingIntegration = async function (req, res, args) {
 
     const cid = req.session.user.company_id;
     const display_name = billing.displayName(provider);
-    const encrypted = encrypt(JSON.stringify(credentials));
+    // Üres mezők nem törlik a tárolt értéket (jelszó-megőrzés újramentéskor).
+    const prev = await pool.query('SELECT credentials FROM billing_integrations WHERE company_id = $1 AND provider = $2', [cid, provider]);
+    const stored = prev.rows.length ? decodeStoredCreds(prev.rows[0].credentials) : {};
+    const encrypted = encrypt(JSON.stringify(mergeWithStored(stored, credentials)));
     const credJson = JSON.stringify({ enc: encrypted });
 
     // Csak egy aktív integráció / cég: a többit inaktiváljuk.
@@ -91,11 +105,11 @@ handlers.testBillingIntegration = async function (req, res, args) {
     if (!billing.isValidProvider(provider)) return res.json({ result: { ok: false, message: 'Ismeretlen számlázó.' } });
 
     let creds = (a.credentials && typeof a.credentials === 'object') ? a.credentials : null;
-    if (!creds) {
-      const r = await pool.query('SELECT credentials FROM billing_integrations WHERE company_id = $1 AND provider = $2', [req.session.user.company_id, provider]);
-      if (!r.rows.length) return res.json({ result: { ok: false, message: 'Nincs mentett integráció ehhez a számlázóhoz.' } });
-      creds = decodeStoredCreds(r.rows[0].credentials);
-    }
+    const r = await pool.query('SELECT credentials FROM billing_integrations WHERE company_id = $1 AND provider = $2', [req.session.user.company_id, provider]);
+    const stored = r.rows.length ? decodeStoredCreds(r.rows[0].credentials) : null;
+    if (!creds && !stored) return res.json({ result: { ok: false, message: 'Nincs mentett integráció ehhez a számlázóhoz.' } });
+    // Részben kitöltött űrlap tesztelésénél az üres mezők a tároltból jönnek.
+    creds = creds ? mergeWithStored(stored || {}, creds) : stored;
     const adapter = billing.getAdapter(provider, creds);
     const result = await adapter.testConnection();
     return res.json({ result: { ok: !!result.ok, message: result.message || (result.ok ? 'Kapcsolat sikeres.' : 'Sikertelen.') } });
