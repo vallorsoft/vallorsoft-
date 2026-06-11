@@ -19,7 +19,8 @@ const PROVIDERS = [
   {
     provider: 'fgo', display_name: 'FGO', logo_url: null,
     fields: [
-      { key: 'api_key', label: 'API kulcs', type: 'password' },
+      { key: 'api_key', label: 'API kulcs (PrivateKey)', type: 'password' },
+      { key: 'cod_unic', label: 'CodUnic (cég adószáma)', type: 'text' },
       { key: 'environment', label: 'Környezet', type: 'select', options: ['test', 'production'] },
     ],
   },
@@ -55,6 +56,16 @@ const PROVIDERS = [
     ],
   },
 ];
+
+// Közös, OPCIONÁLIS számla-beállítás mezők — minden provider űrlapján
+// megjelennek; a fuvar-számlázás (services/invoicing.js) ezekből olvassa a
+// sorozatot/ÁFÁ-t/pénznemet (hiányukra alapértékek: serie '', 21%, RON).
+const INVOICE_SETTINGS_FIELDS = [
+  { key: 'serie', label: 'Számlasorozat (serie) — opcionális', type: 'text' },
+  { key: 'default_tva', label: 'Alapértelmezett ÁFA % (alap: 21)', type: 'text' },
+  { key: 'currency', label: 'Pénznem (alap: RON)', type: 'text' },
+];
+for (const p of PROVIDERS) p.fields = [...p.fields, ...INVOICE_SETTINGS_FIELDS];
 
 function getAdapter(provider, credentials) {
   const A = ADAPTERS[provider];

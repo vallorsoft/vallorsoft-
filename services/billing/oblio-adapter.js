@@ -56,7 +56,7 @@ class OblioAdapter {
         return { ok: false, message: (r.data && (r.data.statusMessage || r.data.message)) || ('Oblio hiba (' + r.status + ')') };
       }
       const dt = (r.data && r.data.data) || r.data || {};
-      return { ok: true, invoice_number: (dt.seriesName || '') + (dt.number || ''), pdf_url: dt.link || null, raw: r.data };
+      return { ok: true, serie: dt.seriesName || null, numar: dt.number || null, invoice_number: (dt.seriesName || '') + (dt.number || ''), pdf_url: dt.link || null, raw: r.data };
     } catch (e) { return { ok: false, message: 'Oblio hiba: ' + e.message }; }
   }
 

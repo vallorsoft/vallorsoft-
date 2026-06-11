@@ -7,6 +7,27 @@
 
 ## 📋 Javítási napló (élő státusz)
 
+### 8. lépés — a két nagy refaktor: K09 + K17 (2026-06-11) ✅ KÉSZ
+
+**K09 — fuvar-számlázás átkötve az univerzális számlázó-keretrendszerre:**
+- `services/invoicing.js` (`getInvoiceConfig`): **elsőként a `billing_integrations`-t nézi** (aktív univerzális provider: FGO/SmartBill/Oblio/iFactura/Facturis) és csak utána esik vissza a régi FGO-útra (`company_integrations` category='invoicing') — a meglévő FGO-s cégek változatlanul működnek, az új felületen beállított SmartBill/Oblio mostantól **fuvar-számlát is kiállít**.
+- Új híd: `toFrameworkInvoice()` (legacy payload → `createInvoice` formátum, fordított adózásnál ÁFA 0 + „Taxare inversă" megjegyzés) és `emitViaProvider()` (egységes eredmény: serie/numar/pdf_link); az `emitInvoice`/`emitStorno` tranzakciós dupla-számla védelme érintetlen.
+- Mind az 5 adapter `createInvoice`-a mostantól **külön `serie`/`numar`** mezőt is visszaad (az `invoices` tábla külön oszlopaihoz) — additív bővítés.
+- `services/billing/index.js`: minden provider űrlapja **közös opcionális számla-beállítás mezőket** kapott (`serie`, `default_tva`, `currency`) + az FGO-hoz `cod_unic` (a kiállításhoz kötelező).
+- `handlers/billingHandlers.js`: **jelszó-megőrző merge** mentésnél/tesztnél — üresen hagyott mező nem törli a tárolt API-kulcsot (eddig egy sorozat-átírás kitörölte volna).
+- `routes/invoices.js`: a `/test` az aktív (akár framework-) konfigot teszteli; a `/api/invoices/:id/status` framework-providernél kecses üzenetet ad 502 helyett; a GET jelzi a kliensnek a `framework_active` állapotot — a régi FGO-kártya (`invoicing-card.js`) tájékoztat, ha az univerzális integráció az aktív.
+- **Tesztek:** új `tests/unit/invoicing-bridge.test.js` (8 eset: payload-fordítás, fordított adózás, konfig-elsőbbség, alapértékek, legacy-fallback, null-eset, hálózat nélküli FGO-hibaág).
+
+**K17 — admin.js ↔ manager.js duplikáció felszámolva:**
+- **19 függvény** (fuvar-szerkesztő modal: openOrderEdit/renderOeLegs/oeAddLeg/saveOrderEdit; aláíró-motor: openSignModal/renderSignPage/buildSignedPdf/initAdminSigCanvas/addSignatureToPage/createDraggableItem/downloadDoc; chatSend; renderFilteredOrders; downloadSelectedOrders; decorateUitIndicators/decorateInvoiceIndicators; loadSettingsPane; mountClientPicker; loadDash) átköltözött a `console-shared.js` végi **„KÖZÖS ADMIN/MANAGER KÓD"** szekcióba — minden javítás mostantól EGY helyen történik.
+- Méret: admin.js 902→206 sor, manager.js 851→260 sor (−1287 sor duplikáció; console-shared +707).
+- Az egyesítés az admin-verziókra történt (a legfrissebb javításokkal); a chatSend-ben a manager így megkapta a hiányzó `admin_manager` szoba push-értesítés ágat is.
+- **Szándékosan duplán maradt** (eltérő jogosultság/viselkedés): loadTab, loadUsers, editUser/saveUser/deleteUser, loadDocList, submitBugReport.
+- Ellenőrzés: minden mozgatott függvény pontosan 1× definiált; a 39 hivatkozott DOM-id mindkét HTML-ben megvan; `node --check` mindhárom fájlon; asset-verzió léptetve (`?v=20260611`).
+- ✅ **Tesztek: 8 suite / 36 teszt zöld.**
+
+---
+
 ### 7. lépés — felhasználói észrevételek (2026-06-10, külön kör) ✅ KÉSZ
 
 Két, képpel jelzett konkrét hiba javítása + automatizált teszt:
@@ -99,8 +120,8 @@ A teljes hibalista **6 lépésben (6 commit)** került kijavításra. Állapot:
 
 | Tétel | Miért külön |
 |-------|-------------|
-| **K09** — a fuvar-számlázás átkötése a `services/billing/` keretrendszerre (SmartBill/Oblio fuvar-számla) | Élő számlázási folyamatot érint — éles provider-fiókkal való teszt nélkül kockázatos. A legacy FGO-út működik; a két rendszer együttélése dokumentálva. |
-| **K17** — az admin.js ↔ manager.js ~600 sornyi duplikációjának kiemelése a console-shared.js-be | Nagy mechanikus refaktor — futó felületen való kézi átkattintás nélkül nem biztonságos. Addig: minden javítást mindkét fájlban el kell végezni (ebben a körben így történt). |
+| ~~**K09**~~ — fuvar-számlázás átkötése a `services/billing/` keretrendszerre | ✅ **ELKÉSZÜLT a 8. lépésben** (lásd a napló tetejét). Éles SmartBill/Oblio fiókkal való első kiállítás előtt teszt-környezeti próba ajánlott. |
+| ~~**K17**~~ — admin.js ↔ manager.js duplikáció kiemelése | ✅ **ELKÉSZÜLT a 8. lépésben** — 19 közös függvény a console-shared.js-ben; élesítés után kézi átkattintás ajánlott mindkét konzolon (fuvar-szerkesztés, aláírás, chat, letöltés). |
 | `alert()/confirm()` → `toast()` csere (inbound-orders.js, invoice-modal.js) | UX-polír, viselkedés-változással; külön kör. |
 | Kártya-modulok hardcoded világos színpalettája (dark módban is fehér modálok) | Vizuális redesign-döntés — az `email-intake-card.js`/`billing-card.js` a követendő minta. |
 | bcrypt cost 10 → 12 | Login-CPU növekedéssel jár; 300 felhasználónál a 10 még elfogadható. |

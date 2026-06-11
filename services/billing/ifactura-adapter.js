@@ -39,7 +39,7 @@ class IFacturaAdapter {
       const r = await jsonT(BASE + '/v1/invoices', { method: 'POST', headers: this._headers(), body: JSON.stringify(body) });
       if (r.status === 429) return { ok: false, message: 'iFactura API limit elérve.' };
       if (!r.ok) return { ok: false, message: (r.data && (r.data.message || r.data.error)) || ('iFactura hiba (' + r.status + ')') };
-      return { ok: true, invoice_number: r.data.number || r.data.invoice_number || null, pdf_url: r.data.pdf_url || r.data.url || null, raw: r.data };
+      return { ok: true, serie: r.data.series || null, numar: r.data.number || r.data.invoice_number || null, invoice_number: r.data.number || r.data.invoice_number || null, pdf_url: r.data.pdf_url || r.data.url || null, raw: r.data };
     } catch (e) { return { ok: false, message: 'iFactura hiba: ' + e.message }; }
   }
 

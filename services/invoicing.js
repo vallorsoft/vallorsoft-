@@ -1,11 +1,43 @@
 // services/invoicing.js
 // Számlázás üzleti logika: fuvar+ügyfél -> szerkeszthető számla; kiállítás az aktív szolgáltatóval.
+//
+// KÉT KONFIG-FORRÁS (K09 átkötés):
+//   1. ÚJ (elsőbbség): billing_integrations — az univerzális számlázó-keretrendszer
+//      (services/billing/, 5 provider). Aki itt állít be számlázót (SmartBill,
+//      Oblio, FGO, ...), az ezzel állít ki fuvar-számlát is.
+//   2. RÉGI (fallback): company_integrations category='invoicing' — a korábbi
+//      FGO-specifikus út. A meglévő FGO-s cégek változatlanul működnek.
 const { getAdapter } = require('./invoiceAdapter');
+const billing = require('./billing');
 const { decrypt } = require('../lib/crypto');
 
 const DEFAULT_LABEL = 'Transport marfă conform contractului/comenzii';
 
 async function getInvoiceConfig(pool, companyId) {
+  // 1) ÚJ keretrendszer (billing_integrations) — ha van aktív, az nyer.
+  const fw = await pool.query(
+    `SELECT provider, credentials FROM billing_integrations
+     WHERE company_id=$1 AND is_active=true LIMIT 1`, [companyId]);
+  if (fw.rows.length && billing.isValidProvider(fw.rows[0].provider)) {
+    let creds = {};
+    try { creds = fw.rows[0].credentials && fw.rows[0].credentials.enc ? JSON.parse(decrypt(fw.rows[0].credentials.enc)) : {}; }
+    catch (e) { console.error('billing_integrations credentials dekódolás hiba:', e.message); }
+    // A számla-beállítások (sorozat, ÁFA, pénznem) a credentials-ben tárolódnak
+    // (a provider-űrlap opcionális mezői) — hiányukra észszerű alapértékek.
+    return {
+      source: 'framework',
+      provider: fw.rows[0].provider,
+      creds,
+      series: creds.serie ? [String(creds.serie).trim()] : [],
+      vatPayer: creds.vat_payer !== false,
+      defaultTva: creds.default_tva != null && creds.default_tva !== '' ? Number(creds.default_tva) : 21,
+      currency: (creds.currency || 'RON').toUpperCase(),
+      articleLabel: (creds.article_label || '').trim() || DEFAULT_LABEL,
+      scadentaDays: creds.scadenta_days != null && creds.scadenta_days !== '' ? Number(creds.scadenta_days) : null,
+    };
+  }
+
+  // 2) Régi (FGO-specifikus) konfig — visszafelé kompatibilitás.
   const { rows } = await pool.query(
     `SELECT credentials_enc, enabled, meta FROM company_integrations
      WHERE company_id=$1 AND category='invoicing' AND enabled=true LIMIT 1`, [companyId]);
@@ -14,6 +46,7 @@ async function getInvoiceConfig(pool, companyId) {
   const creds = r.credentials_enc ? JSON.parse(decrypt(r.credentials_enc)) : {};
   const m = r.meta || {};
   return {
+    source: 'legacy',
     provider: m.provider,
     creds: { ...creds, PlatformaUrl: m.platform_url, environment: m.environment || 'test' },
     series: Array.isArray(m.series) && m.series.length ? m.series : (m.serie ? [m.serie] : []),
@@ -23,6 +56,51 @@ async function getInvoiceConfig(pool, companyId) {
     articleLabel: m.article_label || DEFAULT_LABEL,
     scadentaDays: m.scadenta_days != null ? Number(m.scadenta_days) : null,
   };
+}
+
+// A legacy számla-payload ({serie, issueDate, client:{cui,...}, lines:[{qty,vatRate,unitPrice,...}]})
+// átfordítása az univerzális keretrendszer createInvoice() formátumára.
+function toFrameworkInvoice(payload) {
+  const rc = !!payload.reverseCharge;
+  return {
+    serie: payload.serie || undefined,
+    issue_date: payload.issueDate,
+    due_date: payload.dueDate || payload.issueDate,
+    currency: payload.currency || 'RON',
+    notes: [payload.notes, rc ? 'Taxare inversă' : ''].filter(Boolean).join(' · '),
+    client: {
+      name: payload.client && payload.client.name,
+      vat_code: payload.client && payload.client.cui,
+      address: payload.client && payload.client.address,
+      email: payload.client && payload.client.email,
+    },
+    items: (payload.lines || []).map((l) => ({
+      name: l.name,
+      description: l.description || undefined,
+      unit: l.unit || 'BUC',
+      quantity: l.qty,
+      price_net: l.unitPrice,
+      vat_percent: rc ? 0 : l.vatRate,
+    })),
+  };
+}
+
+// Kiállítás az aktív konfig szerinti úton. Egységes eredmény:
+//   { ok, serie, numar, pdf_link, raw } | { ok:false, message }
+async function emitViaProvider(cfg, payload) {
+  if (cfg.source === 'framework') {
+    const adapter = billing.getAdapter(cfg.provider, cfg.creds);
+    const r = await adapter.createInvoice(toFrameworkInvoice(payload));
+    if (!r.ok) return { ok: false, message: r.message };
+    return {
+      ok: true,
+      serie: r.serie || payload.serie || null,
+      numar: r.numar || r.invoice_number || null,
+      pdf_link: r.pdf_url || null,
+      raw: r.raw,
+    };
+  }
+  return getAdapter(cfg.provider).emit(cfg.creds, payload);
 }
 
 function ymd(d) { return d.toISOString().slice(0, 10); }
@@ -89,7 +167,7 @@ async function emitInvoice(pool, companyId, userId, orderId, payload) {
       throw e;
     }
 
-    const result = await getAdapter(cfg.provider).emit(cfg.creds, payload);
+    const result = await emitViaProvider(cfg, payload);
     if (!result.ok) { const e = new Error(result.message || 'A számlázó hibát adott.'); e.status = 502; throw e; }
 
     const net = (payload.lines || []).reduce((s, l) => s + l.qty * l.unitPrice, 0);
@@ -122,6 +200,9 @@ async function getStoredInvoice(pool, companyId, orderId) {
 async function getProviderLists(pool, companyId) {
   const cfg = await getInvoiceConfig(pool, companyId);
   if (!cfg) return { tipfactura: [], tva: [] };
+  // A keretrendszer-adaptereknek nincs nomenklátor-API-juk — a modal a
+  // beépített alapértékeire esik vissza (Factura / 21-11-9-5-0).
+  if (cfg.source === 'framework') return { tipfactura: [], tva: [] };
   const a = getAdapter(cfg.provider);
   const [tipfactura, tva] = await Promise.all([
     a.getNomenclator ? a.getNomenclator(cfg.creds, 'tipfactura').catch(() => []) : [],
@@ -132,6 +213,7 @@ async function getProviderLists(pool, companyId) {
 async function getProviderArticles(pool, companyId) {
   const cfg = await getInvoiceConfig(pool, companyId);
   if (!cfg) return [];
+  if (cfg.source === 'framework') return [];
   const a = getAdapter(cfg.provider);
   return a.listArticles ? a.listArticles(cfg.creds).catch(() => []) : [];
 }
@@ -170,7 +252,7 @@ async function emitStorno(pool, companyId, userId, orderId) {
       lines: (base.lines || []).map((l) => ({ ...l, qty: -Math.abs(Number(l.qty) || 0) })),
     };
 
-    const result = await getAdapter(cfg.provider).emit(cfg.creds, stornoPayload);
+    const result = await emitViaProvider(cfg, stornoPayload);
     if (!result.ok) { const e = new Error(result.message || 'A számlázó hibát adott.'); e.status = 502; throw e; }
 
     const net = (stornoPayload.lines || []).reduce((s, l) => s + l.qty * l.unitPrice, 0);
@@ -209,4 +291,4 @@ async function getInvoiceSummary(pool, companyId, orderIds) {
   return out;
 }
 
-module.exports = { getInvoiceConfig, buildInvoiceFromOrder, emitInvoice, emitStorno, getStoredInvoice, getInvoiceSummary, getProviderLists, getProviderArticles };
+module.exports = { getInvoiceConfig, buildInvoiceFromOrder, emitInvoice, emitStorno, getStoredInvoice, getInvoiceSummary, getProviderLists, getProviderArticles, toFrameworkInvoice, emitViaProvider };
