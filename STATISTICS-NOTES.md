@@ -77,6 +77,10 @@ Közös szűrősáv minden fülön: elmúlt 12 hónap (alap) / idei év / 3 hón
 6. **🚛 Kamionos routing ingyen**: ha az `.env`-ben van `ORS_API_KEY` (OpenRouteService, ingyenes regisztráció), az útvonaltervező `driving-hgv` profillal, a megadott súly/méret-korlátokkal tervez (OSRM-fallback); az eredmény-panel jelzi a használt profilt.
 7. CSV-exportokban Eredmény + Szerviz oszlopok.
 
+## ✅ Beépítve (Tervezőtábla 2.0 + adu-ász)
+1. **📅 Tervezőtábla 2.0** — teljes újraírás: asztali **Gantt-idővonal** (a fuvar sáv a felrakástól a lerakásig; sáv-húzás = mozgatás, jobb-szél húzás = lerakó-dátum átméretezés), ⚠️ ütközés-jelzés (dupla-foglalás), ma-vonal, hétvége-satír, kihasználtság-hősor, szűrők (keresés/státusz/sofőr/csak fuvaros), 1-2-4 hetes zoom, sűrű/kényelmes nézet, GPS-pont a jármű-sávban; **mobilon napi nézet** (dátum-szalag + jármű-kártyák, koppintásos kiosztás); fuvar-popover gyors dátum-/kiosztás-műveletekkel.
+2. **💡 VISSZFUVAR-RADAR (adu-ász — másnak nincs):** a cég SAJÁT kiosztatlan fuvarjainak felrakóit párosítja a kamionok várható pozíciójával (az előző fuvar lerakója, Photon-geokódolás + `geo_cache`, haversine km) — rangsorolt javaslatok üresjárat-km-rel, foglaltság-ellenőrzéssel, **egy koppintásos kiosztással** (radar-panel + a fuvar-kártyákon 🎯 jelzés). Üresjárat ↓, profit ↑ — a 10–30 kamionos szegmensben egyedülálló.
+
 ## ⬜ Hátralévő (csak külső függéssel)
 1. **Bursă-integráció** (Trans.eu / Timocom) — partneri API-szerződés és kulcsok kellenek a szolgáltatóktól; ha megvannak, a Megrendelések fül mintájára köthető be.
 

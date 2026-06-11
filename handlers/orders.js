@@ -441,7 +441,9 @@ handlers.getPlannerData = async function (req, res, args) {
   }
 };
 
-// args: [orderId, {rendszam_camion|null, data_incarcare?}]
+// args: [orderId, fields] — csak a megadott mezők változnak:
+//   rendszam_camion: string = kiosztás, null = kiosztás törlése, HIÁNYZIK = marad
+//   data_incarcare / data_descarcare: sáv-mozgatás, -átméretezés (Gantt)
 handlers.plannerAssign = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
@@ -450,19 +452,24 @@ handlers.plannerAssign = async function (req, res, args) {
     const cid = req.session.user.company_id;
     const orderId = String(args[0] || '').trim();
     const f = args[1] || {};
-    const rendszam = f.rendszam_camion ? String(f.rendszam_camion).trim().toUpperCase() : null;
 
-    if (rendszam) {
-      // a jármű a saját cégé legyen
-      const vr = await pool.query(
-        `SELECT id FROM vehicles WHERE company_id = $1 AND UPPER(rendszam) = $2 AND tip = 'Vontato'`,
-        [cid, rendszam]);
-      if (!vr.rows.length) return res.json({ result: { ok: false, err: 'A jármű nem található.' } });
+    const sets = ['updated_at = NOW()'];
+    const params = [orderId, cid];
+    if (Object.prototype.hasOwnProperty.call(f, 'rendszam_camion')) {
+      const rendszam = f.rendszam_camion ? String(f.rendszam_camion).trim().toUpperCase() : null;
+      if (rendszam) {
+        // a jármű a saját cégé legyen
+        const vr = await pool.query(
+          `SELECT id FROM vehicles WHERE company_id = $1 AND UPPER(rendszam) = $2 AND tip = 'Vontato'`,
+          [cid, rendszam]);
+        if (!vr.rows.length) return res.json({ result: { ok: false, err: 'A jármű nem található.' } });
+      }
+      params.push(rendszam); sets.push('rendszam_camion = $' + params.length);
     }
-
-    const sets = ['rendszam_camion = $3', 'updated_at = NOW()'];
-    const params = [orderId, cid, rendszam];
     if (f.data_incarcare) { params.push(f.data_incarcare); sets.push('data_incarcare = $' + params.length); }
+    if (f.data_descarcare) { params.push(f.data_descarcare); sets.push('data_descarcare = $' + params.length); }
+    if (sets.length === 1) return res.json({ result: { ok: false, err: 'Nincs módosítandó mező.' } });
+
     const r = await pool.query(
       `UPDATE orders SET ${sets.join(', ')} WHERE id = $1 AND company_id = $2`,
       params
@@ -472,6 +479,119 @@ handlers.plannerAssign = async function (req, res, args) {
   } catch (err) {
     console.error('plannerAssign hiba:', err);
     return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
+// ─── 💡 VISSZFUVAR-RADAR (a tervezőtábla adu-ász funkciója) ──
+// A cég SAJÁT kiosztatlan fuvarjait párosítja a kamionok VÁRHATÓ
+// pozíciójával: minden kiosztatlan fuvar felrakójához megkeresi, melyik
+// kamion végez a legközelebb (az utolsó, a felrakó-dátum ELŐTT záruló
+// fuvarjának lerakója alapján), és mikor szabadul. Távolság: légvonal
+// (haversine) az ingyenes Photon-geokódolásból (geo_cache tábla).
+function _haversineKm(a, b) {
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
+  const x = Math.sin(dLat / 2) ** 2
+    + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(x)));
+}
+
+// Geokódolás cache-eléssel; kérésenként legfeljebb `budget` ÚJ Photon-hívás
+// (fair-use) — ami kimarad, a következő betöltéskor pótlódik.
+async function _geocodeCached(label, budget) {
+  const norm = String(label || '').trim().toLowerCase().slice(0, 200);
+  if (!norm) return null;
+  const c = await pool.query('SELECT lat, lng FROM geo_cache WHERE label = $1', [norm]);
+  if (c.rows.length) return c.rows[0].lat != null ? { lat: c.rows[0].lat, lng: c.rows[0].lng } : null;
+  if (budget.left <= 0) { budget.skipped++; return null; }
+  budget.left--;
+  let lat = null, lng = null;
+  try {
+    const r = await fetch('https://photon.komoot.io/api/?q=' + encodeURIComponent(norm) + '&limit=1',
+      { headers: { 'User-Agent': 'VallorSoft/1.0 (flottakezelo)' } });
+    const d = await r.json().catch(() => ({}));
+    const fe = (d.features || [])[0];
+    if (fe && fe.geometry && Array.isArray(fe.geometry.coordinates)) {
+      lng = fe.geometry.coordinates[0]; lat = fe.geometry.coordinates[1];
+    }
+  } catch (_) { /* sikertelen geokódolás is cache-elődik (NULL) */ }
+  await pool.query(
+    'INSERT INTO geo_cache (label, lat, lng) VALUES ($1,$2,$3) ON CONFLICT (label) DO NOTHING',
+    [norm, lat, lng]).catch(() => {});
+  return lat != null ? { lat, lng } : null;
+}
+
+handlers.getPlannerMatches = async function (req, res, args) {
+  try {
+    if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    }
+    const cid = req.session.user.company_id;
+
+    // Aktív fuvarok (kiosztott: pozíció-becsléshez és foglaltsághoz;
+    // kiosztatlan: ezekhez keresünk kamiont)
+    const or = await pool.query(
+      `SELECT id, client, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
+              status, rendszam_camion
+       FROM orders
+       WHERE company_id = $1 AND status NOT IN ('Anulat','Finalizat')
+       ORDER BY data_incarcare NULLS LAST LIMIT 300`, [cid]);
+    const orders = or.rows;
+    const unassigned = orders.filter((o) => !o.rendszam_camion && o.loc_incarcare);
+    if (!unassigned.length) return res.json({ result: { ok: true, matches: [], pending: 0 } });
+
+    // Kamiononként az ütemterv (kiosztott fuvarok idő szerint)
+    const byVeh = new Map();
+    orders.filter((o) => o.rendszam_camion).forEach((o) => {
+      const k = o.rendszam_camion.toUpperCase();
+      if (!byVeh.has(k)) byVeh.set(k, []);
+      byVeh.get(k).push(o);
+    });
+    byVeh.forEach((list) => list.sort((a, b) =>
+      String(a.data_incarcare || '9999') < String(b.data_incarcare || '9999') ? -1 : 1));
+
+    const budget = { left: 12, skipped: 0 };   // max. 12 új geokódolás / kérés
+    const day = (d) => (d ? String(d).slice(0, 10) : null);
+    const overlaps = (o, from, to) => {
+      const s = day(o.data_incarcare), e = day(o.data_descarcare) || s;
+      if (!s || !from) return false;
+      return s <= (to || from) && (e || s) >= from;
+    };
+
+    const matches = [];
+    for (const u of unassigned.slice(0, 20)) {            // a 20 legkorábbi kiosztatlan
+      const uGeo = await _geocodeCached(u.loc_incarcare, budget);
+      if (!uGeo) continue;
+      const uFrom = day(u.data_incarcare);
+      const uTo = day(u.data_descarcare) || uFrom;
+      const sugg = [];
+      for (const [rendszam, list] of byVeh) {
+        // foglaltság: ha a kamionnak átfedő fuvarja van, nem javasoljuk
+        if (uFrom && list.some((o) => overlaps(o, uFrom, uTo))) continue;
+        // az utolsó, a felrakás ELŐTT (vagy dátum nélkül: bármikor) záruló fuvar lerakója
+        const before = uFrom ? list.filter((o) => (day(o.data_descarcare) || day(o.data_incarcare) || '') <= uFrom) : list;
+        const last = before[before.length - 1];
+        if (!last || !last.loc_descarcare) continue;
+        const vGeo = await _geocodeCached(last.loc_descarcare, budget);
+        if (!vGeo) continue;
+        sugg.push({
+          rendszam,
+          km: _haversineKm(uGeo, vGeo),
+          honnan: last.loc_descarcare,
+          szabad_tol: day(last.data_descarcare) || day(last.data_incarcare),
+          utolso_fuvar: last.id,
+        });
+      }
+      sugg.sort((a, b) => a.km - b.km);
+      if (sugg.length) matches.push({ order_id: u.id, loc_incarcare: u.loc_incarcare,
+        data_incarcare: day(u.data_incarcare), client: u.client, suggestions: sugg.slice(0, 3) });
+    }
+    // legjobb találatok elöl (legkisebb üresjárat)
+    matches.sort((a, b) => a.suggestions[0].km - b.suggestions[0].km);
+    return res.json({ result: { ok: true, matches, pending: budget.skipped } });
+  } catch (err) {
+    console.error('getPlannerMatches hiba:', err);
+    return res.json({ result: { ok: true, matches: [], pending: 0 } }); // radar-hiba ne törje a táblát
   }
 };
 
