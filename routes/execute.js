@@ -23,6 +23,7 @@ const handlers = Object.assign(
   require('../handlers/intakeHandlers'),
   require('../handlers/statisticsHandlers'),
   require('../handlers/fleetCompliance'),
+  require('../handlers/handover'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a

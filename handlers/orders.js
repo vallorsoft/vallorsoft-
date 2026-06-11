@@ -107,11 +107,15 @@ handlers.comList = async function (req, res, args) {
                   o.pret, o.km, o.status, o.sofer_type, o.email_sofer, o.nume_sofer,
                   o.firma_extern, o.telefon_extern, o.rendszam_camion, o.rendszam_remorca,
                   o.payment_status, o.paid_amount,
+                  o.handover_status, o.handover_type, o.handover_loc, o.handover_at,
                   (SELECT COUNT(*)::int FROM documents d WHERE d.order_id = o.id) AS pod_count,
                   COALESCE(legs.leg_count, 0) AS leg_count,
                   COALESCE(legs.legs_json, '[]'::json) AS legs_json
            FROM orders o ${legsSubquery}
-           WHERE o.company_id = $1 ORDER BY o.created_at DESC LIMIT 500`,
+           WHERE o.company_id = $1
+           ORDER BY (o.status IN ('Parkolt','Raktarban') OR o.handover_status = 'Fuggoben') DESC,
+                    o.created_at DESC
+           LIMIT 500`,
           [cid]
         );
       } else {
@@ -147,6 +151,7 @@ handlers.getMySoferOrders = async function (req, res, args) {
       const r = await pool.query(
         `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare, o.km,
                 o.rendszam_camion, o.rendszam_remorca, o.status,
+                o.handover_status, o.handover_type, o.handover_loc,
                 o.finalized_at, wb.waybill_at,
                 (
                   o.status IN ('Alocat', 'In Curs')
@@ -295,7 +300,7 @@ handlers.comUpdate = async function (req, res, args) {
       if (o.pret !== undefined) { updates.push(`pret = $${i++}`); values.push(Number(o.pret || 0)); }
       if (o.km !== undefined) { updates.push(`km = $${i++}`); values.push(Number(o.km || 0)); }
       if (o.status !== undefined) {
-        if (!['Disponibil','Alocat','Extern','In Curs','Finalizat','Anulat'].includes(o.status)) {
+        if (!['Disponibil','Alocat','Extern','In Curs','Finalizat','Anulat','Parkolt','Raktarban'].includes(o.status)) {
           return res.json({ result: { ok: false, err: 'Ervenytelen statusz.' } });
         }
         updates.push(`status = $${i++}`); values.push(o.status);
@@ -476,13 +481,14 @@ handlers.getPlannerData = async function (req, res, args) {
     // Az ablakot érintő fuvarok + a dátum nélküli aktívak (kiosztásra várnak)
     const ordR = await pool.query(
       `SELECT id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
-              status, rendszam_camion, nume_sofer, email_sofer
+              status, rendszam_camion, rendszam_remorca, nume_sofer, email_sofer,
+              handover_type, handover_loc
        FROM orders
        WHERE company_id = $1 AND status <> 'Anulat'
          AND (
            (data_incarcare IS NOT NULL AND data_incarcare <= $3::date
               AND COALESCE(data_descarcare, data_incarcare) >= $2::date)
-           OR (data_incarcare IS NULL AND status IN ('Disponibil','Alocat','In Curs','Extern'))
+           OR (data_incarcare IS NULL AND status IN ('Disponibil','Alocat','In Curs','Extern','Parkolt','Raktarban'))
          )
        ORDER BY data_incarcare NULLS LAST, created_at DESC
        LIMIT 400`,
@@ -526,16 +532,28 @@ handlers.plannerAssign = async function (req, res, args) {
           [orderId, cid]);
         if (!cur.rows.length) return res.json({ result: { ok: false, err: 'Fuvar nem található' } });
         const co = cur.rows[0];
+        let statusToAlocat = false;
         if (!co.email_sofer && co.sofer_type !== 'Extern') {
           const p = await autoPairDriverVehicle(cid, { rendszam_camion: rendszam, sofer_type: co.sofer_type });
           if (p.autoPaired === 'driver') {
             params.push('Intern'); sets.push('sofer_type = $' + params.length);
             params.push(p.email_sofer); sets.push('email_sofer = $' + params.length);
             params.push(p.nume_sofer); sets.push('nume_sofer = $' + params.length);
-            if (co.status === 'Disponibil') sets.push(`status = 'Alocat'`);
+            if (co.status === 'Disponibil') statusToAlocat = true;
             pairedDriver = p.nume_sofer || p.email_sofer;
           }
         }
+        // Leadott áru folytatása: kiosztással újra Alocat; raktári tétel kiadva
+        if (['Parkolt', 'Raktarban'].includes(co.status)) {
+          statusToAlocat = true;
+          if (co.status === 'Raktarban') {
+            await pool.query(
+              `UPDATE warehouse_items SET status = 'Kiadva', released_at = NOW()
+               WHERE company_id = $1 AND order_id = $2 AND status = 'Raktarban'`,
+              [cid, orderId]);
+          }
+        }
+        if (statusToAlocat) sets.push(`status = 'Alocat'`);
       }
       params.push(rendszam); sets.push('rendszam_camion = $' + params.length);
     }

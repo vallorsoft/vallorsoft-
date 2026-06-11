@@ -27,6 +27,7 @@ function _enumOrNull(x, allowed) {
 const TRUCK_TYPES = ['straight', 'tractor', 'lightTruck'];
 const TUNNEL_CATS = ['B', 'C', 'D', 'E'];
 const HAZMAT_KINDS = ['explosive', 'gas', 'flammable', 'combustible', 'organic', 'poison', 'harmfulToWater'];
+const TRAILER_KINDS = ['standard', 'mega'];
 
 handlers.vehicleList = async function (req, res, args) {
     try {
@@ -65,10 +66,19 @@ handlers.vehicleCreate = async function (req, res, args) {
         return res.json({ result: { ok: false, err: 'Ervenytelen tipus.' } });
       }
 
+      // Rakodási felület (pótkocsi) — NEM a teljes járműméret, az a routingé.
+      // Az alapértelmezést (1360×248, std 260 / mega 305 cm) a UI tölti elő.
+      const trailer_kind = _enumOrNull(v.trailer_kind, TRAILER_KINDS);
+      const cargo_length_cm = _intOrNull(v.cargo_length_cm);
+      const cargo_width_cm = _intOrNull(v.cargo_width_cm);
+      const cargo_height_cm = _intOrNull(v.cargo_height_cm);
+
       await pool.query(
-        `INSERT INTO vehicles (rendszam, tip, marca, model, an, nota, company_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [rendszam, tip, marca, model, an, nota, req.session.user.company_id]
+        `INSERT INTO vehicles (rendszam, tip, marca, model, an, nota, company_id,
+                               trailer_kind, cargo_length_cm, cargo_width_cm, cargo_height_cm)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [rendszam, tip, marca, model, an, nota, req.session.user.company_id,
+         trailer_kind, cargo_length_cm, cargo_width_cm, cargo_height_cm]
       );
       return res.json({ result: { ok: true } });
     } catch (err) {
@@ -140,6 +150,12 @@ handlers.vehicleUpdate = async function (req, res, args) {
       if (f.tunnel_category !== undefined)    { updates.push(`tunnel_category = $${i++}`);    values.push(_enumOrNull(f.tunnel_category, TUNNEL_CATS)); }
       if (f.hazardous_goods !== undefined)    { updates.push(`hazardous_goods = $${i++}`);    values.push(_enumOrNull(f.hazardous_goods, HAZMAT_KINDS)); }
       if (f.fuel_per_100km !== undefined)     { updates.push(`fuel_per_100km = $${i++}`);     values.push(_numOrNull(f.fuel_per_100km)); }
+
+      // --- Pótkocsi rakodási felület (NEM a teljes járműméret) ---
+      if (f.trailer_kind !== undefined)       { updates.push(`trailer_kind = $${i++}`);       values.push(_enumOrNull(f.trailer_kind, TRAILER_KINDS)); }
+      if (f.cargo_length_cm !== undefined)    { updates.push(`cargo_length_cm = $${i++}`);    values.push(_intOrNull(f.cargo_length_cm)); }
+      if (f.cargo_width_cm !== undefined)     { updates.push(`cargo_width_cm = $${i++}`);     values.push(_intOrNull(f.cargo_width_cm)); }
+      if (f.cargo_height_cm !== undefined)    { updates.push(`cargo_height_cm = $${i++}`);    values.push(_intOrNull(f.cargo_height_cm)); }
 
       if (updates.length === 0) {
         return res.json({ result: { ok: false, err: 'Nincs mit modositani.' } });
