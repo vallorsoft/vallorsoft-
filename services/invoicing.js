@@ -276,19 +276,46 @@ async function emitStorno(pool, companyId, userId, orderId) {
 
 // Több fuvar számla-állapota egy kérésben (fuvar-lista indikátorhoz + modalhoz).
 // Visszaad: { orderId: { invoiced, serie, numar, pdf_link, stornoed, storno_serie, storno_numar, storno_pdf, status } }
+// A szolgáltató nyers válaszából defenzíven kinyerjük az e-Factura (ANAF SPV)
+// státuszt. Az FGO /factura/getstatus a Factura objektumban adja (pl.
+// StareEFactura / IndexIncarcare) — a mezőnevet kulcs-mintával keressük,
+// hogy provider-verziók közti eltérés ne törje el.
+function extractEFacturaStatus(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const scan = (obj, depth) => {
+    if (!obj || typeof obj !== 'object' || depth > 3) return null;
+    for (const k of Object.keys(obj)) {
+      const v = obj[k];
+      if (/efactura|e_factura/i.test(k) && v != null && String(v).trim() !== '') {
+        return String(v).trim().slice(0, 120);
+      }
+      if (v && typeof v === 'object') {
+        const sub = scan(v, depth + 1);
+        if (sub) return sub;
+      }
+    }
+    // IndexIncarcare: az ANAF SPV feltöltési index — ha van, a számla be lett küldve
+    for (const k of Object.keys(obj)) {
+      if (/indexincarcare/i.test(k) && obj[k]) return 'trimisă (index: ' + obj[k] + ')';
+    }
+    return null;
+  };
+  return scan(raw, 0);
+}
+
 async function getInvoiceSummary(pool, companyId, orderIds) {
   const ids = (orderIds || []).filter(Boolean);
   if (!ids.length) return {};
   const { rows } = await pool.query(
-    `SELECT order_id, serie, numar, pdf_link, status, efactura_status FROM invoices
+    `SELECT id, order_id, serie, numar, pdf_link, status, efactura_status FROM invoices
      WHERE company_id=$1 AND order_id = ANY($2) ORDER BY created_at ASC`, [companyId, ids]);
   const out = {};
   for (const r of rows) {
-    const o = out[r.order_id] || (out[r.order_id] = { invoiced: false, stornoed: false, serie: null, numar: null, pdf_link: null, status: null, efactura: null });
-    if (r.status === 'issued') { o.invoiced = true; o.serie = r.serie; o.numar = r.numar; o.pdf_link = r.pdf_link; o.status = 'issued'; o.efactura = r.efactura_status || null; }
+    const o = out[r.order_id] || (out[r.order_id] = { invoiced: false, stornoed: false, serie: null, numar: null, pdf_link: null, status: null, efactura: null, inv_id: null });
+    if (r.status === 'issued') { o.invoiced = true; o.inv_id = r.id; o.serie = r.serie; o.numar = r.numar; o.pdf_link = r.pdf_link; o.status = 'issued'; o.efactura = r.efactura_status || null; }
     if (r.status === 'storno') { o.stornoed = true; o.storno_serie = r.serie; o.storno_numar = r.numar; o.storno_pdf = r.pdf_link; o.status = 'storno'; }
   }
   return out;
 }
 
-module.exports = { getInvoiceConfig, buildInvoiceFromOrder, emitInvoice, emitStorno, getStoredInvoice, getInvoiceSummary, getProviderLists, getProviderArticles, toFrameworkInvoice, emitViaProvider };
+module.exports = { getInvoiceConfig, buildInvoiceFromOrder, emitInvoice, emitStorno, getStoredInvoice, getInvoiceSummary, getProviderLists, getProviderArticles, toFrameworkInvoice, emitViaProvider, extractEFacturaStatus };

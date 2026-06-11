@@ -128,8 +128,31 @@ window.InvoiceModal = (function () {
       emitted=true; const sb=$('im-send'); sb.disabled=true; sb.textContent='Már kiállítva';
       $('im-storno').style.display='';     // storno csak a már kiállított számlánál
       const link=existing.pdf_link?` · <a class="im-link" href="${esc(existing.pdf_link)}" target="_blank">PDF</a>`:'';
-      $('im-send-msg').innerHTML=`ℹ️ Ehhez a fuvarhoz már van számla: <b>${esc(existing.serie||'')}-${esc(existing.numar||'')}</b>${link}`;
+      const efTxt=existing.efactura?` · 📨 e-Factura: <b>${esc(existing.efactura)}</b>`:'';
+      const efBtn=existing.inv_id?` <button class="im-btn im-btn--ghost" id="im-efstat" type="button" style="padding:2px 10px;font-size:11px;margin-left:6px" title="Számla- és e-Factura státusz lekérése a szolgáltatótól">🔄 e-Factura státusz</button>`:'';
+      $('im-send-msg').innerHTML=`ℹ️ Ehhez a fuvarhoz már van számla: <b>${esc(existing.serie||'')}-${esc(existing.numar||'')}</b>${link}${efTxt}${efBtn}`;
       $('im-send-msg').className='im-msg im-msg--ok';
+      // 🔄 e-Factura / számla-státusz frissítése a szolgáltatótól (FGO: getstatus)
+      const efb=$('im-efstat');
+      if(efb) efb.addEventListener('click', async ()=>{
+        efb.disabled=true; efb.textContent='Lekérdezés…';
+        try{
+          const d=await api('POST','/api/invoices/'+existing.inv_id+'/status');
+          if(d && d.ok){
+            const parts=[];
+            if(d.efactura) parts.push('📨 e-Factura: <b>'+esc(d.efactura)+'</b>');
+            if(d.paid!=null) parts.push('fizetve a szolgáltatónál: <b>'+esc(String(d.paid))+'</b>');
+            efb.outerHTML=' · '+(parts.length?parts.join(' · '):'<span class="im-msg--ok">státusz rendben, e-Factura adat még nincs</span>');
+            if(window.__invoiceRefresh) window.__invoiceRefresh();   // fuvarlista 📨 jelző frissítése
+          } else {
+            efb.disabled=false; efb.textContent='🔄 e-Factura státusz';
+            sendMsg((d&&d.message)||'A státusz nem kérdezhető le.','err');
+          }
+        }catch(e){
+          efb.disabled=false; efb.textContent='🔄 e-Factura státusz';
+          sendMsg(e.message,'err');
+        }
+      });
     }
 
     // ── Storno (jóváíró) számla: a kiállított számla alapján, mennyiség negatív ──

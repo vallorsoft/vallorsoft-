@@ -142,15 +142,38 @@ router.get('/api/orders/:id/invoice', requireLogin, async (req, res) => {
 
 router.post('/api/invoices/:id/status', requireLogin, async (req, res) => {
   try {
-    const inv = await pool.query(`SELECT * FROM invoices WHERE id=$1 AND company_id=$2`, [req.params.id, req.session.user.company_id]);
+    const cid = req.session.user.company_id;
+    const inv = await pool.query(`SELECT * FROM invoices WHERE id=$1 AND company_id=$2`, [req.params.id, cid]);
     if (!inv.rows.length) return res.status(404).json({ error: 'Számla nem található.' });
-    const cfg = await svc.getInvoiceConfig(pool, req.session.user.company_id);
+    const row = inv.rows[0];
+    const cfg = await svc.getInvoiceConfig(pool, cid);
+    if (!cfg) return res.json({ ok: false, message: 'Nincs számlázó-integráció beállítva.' });
+
+    // 1) Legacy adapter (pl. fgo) getStatus; 2) keretrendszer-adapter getInvoice.
+    let st = null;
     let legacyAdapter = null;
-    try { legacyAdapter = getAdapter(inv.rows[0].provider); } catch (_) { /* framework-provider */ }
-    if (!legacyAdapter || !legacyAdapter.getStatus) {
-      return res.json({ ok: false, message: 'Ehhez a szolgáltatóhoz nincs számla-státusz lekérdezés.' });
+    try { legacyAdapter = getAdapter(row.provider); } catch (_) { /* framework-provider */ }
+    if (legacyAdapter && legacyAdapter.getStatus) {
+      st = await legacyAdapter.getStatus(cfg.creds, { numar: row.numar, serie: row.serie });
+    } else {
+      try {
+        const fw = billing.getAdapter(row.provider, cfg.creds);
+        if (fw && typeof fw.getInvoice === 'function') {
+          const r2 = await fw.getInvoice((row.serie || '') + (row.numar || ''));
+          st = r2.ok ? Object.assign({ ok: true }, r2.invoice) : r2;
+        }
+      } catch (_) {}
     }
-    res.json(await legacyAdapter.getStatus(cfg.creds, { numar: inv.rows[0].numar, serie: inv.rows[0].serie }));
+    if (!st) return res.json({ ok: false, message: 'Ehhez a szolgáltatóhoz nincs számla-státusz lekérdezés.' });
+    if (!st.ok) return res.json(st);
+
+    // e-Factura (ANAF SPV) státusz kinyerése + tárolása — ezt mutatja a
+    // fuvarlista 📨 jelzője és a számla-modal.
+    const ef = svc.extractEFacturaStatus(st.raw);
+    if (ef && ef !== row.efactura_status) {
+      await pool.query('UPDATE invoices SET efactura_status=$1 WHERE id=$2 AND company_id=$3', [ef, row.id, cid]);
+    }
+    res.json({ ok: true, value: st.value, paid: st.paid, efactura: ef || row.efactura_status || null });
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
 
