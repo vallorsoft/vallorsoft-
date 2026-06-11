@@ -24,7 +24,15 @@ const handlers = Object.assign(
   require('../handlers/statisticsHandlers'),
 );
 
-router.post('/api/execute', requireLogin, async (req, res) => {
+// Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a
+// /api/execute-on hívja az authRegister-t, amit a requireLogin korábban
+// 401-gyel blokkolt → meghívókóddal nem lehetett regisztrálni.
+const PUBLIC_FUNCTIONS = new Set(['authRegister']);
+
+router.post('/api/execute', function (req, res, next) {
+  if (PUBLIC_FUNCTIONS.has((req.body || {}).functionName)) return next();
+  return requireLogin(req, res, next);
+}, async (req, res) => {
   const { functionName, arguments: args } = req.body;
   const handler = handlers[functionName];
   if (handler) {

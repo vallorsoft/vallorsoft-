@@ -15,11 +15,14 @@ handlers.invListAll = async function (req, res, args) {
         return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
       }
       const r = await pool.query(
-        `SELECT kod, pozicio, email, status FROM invites WHERE company_id = $1 ORDER BY id DESC`,
+        `SELECT kod, pozicio, nume, email, tel, status FROM invites WHERE company_id = $1 ORDER BY id DESC`,
         [req.session.user.company_id]
       );
+      // A kliens (loadInvites) a `status` mezőt olvassa — a korábbi `statusz`
+      // kulcs miatt a táblázatban "undefined" státusz jelent meg.
       const list = r.rows.map(row => ({
-        kod: row.kod, pozicio: row.pozicio, email: row.email, statusz: row.status,
+        kod: row.kod, pozicio: row.pozicio, nume: row.nume,
+        email: row.email, tel: row.tel, status: row.status,
       }));
       return res.json({ result: list });
     } catch (err) {

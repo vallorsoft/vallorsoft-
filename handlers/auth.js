@@ -54,6 +54,9 @@ handlers.authRegister = async function (req, res, args) {
       if (invite.status && invite.status.toLowerCase().startsWith('felhaszn')) {
         return res.json({ result: { ok: false, err: 'Ezt a meghivokodot mar felhasznaltak.' } });
       }
+      if (invite.status && invite.status.toLowerCase().startsWith('visszavon')) {
+        return res.json({ result: { ok: false, err: 'Ezt a meghivot visszavontak.' } });
+      }
       if (invite.email && invite.email.toLowerCase() !== email) {
         return res.json({ result: { ok: false, err: 'A meghivo nem ehhez az email-cimhez tartozik.' } });
       }
