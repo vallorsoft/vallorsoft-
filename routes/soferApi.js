@@ -167,7 +167,15 @@ router.post('/api/doc-upload', async (req, res) => {
   try {
     if (!req.session.user) return res.json({ success: false, err: 'Nincs bejelentkezve' });
     const { numeFisier, base64, tip, orderId } = req.body;
-    // POD: a fotó opcionálisan fuvarhoz köthető (a sofőr a sajátjai közül választ)
+    // POD: a fotó opcionálisan fuvarhoz köthető — de CSAK a sofőr SAJÁT
+    // cégének fuvarjához (idegen cég fuvar-ID-jára ne lehessen csatolni).
+    let safeOrderId = null;
+    if (orderId && req.session.user.company_id) {
+      const oc = await pool.query(
+        'SELECT id FROM orders WHERE id = $1 AND company_id = $2',
+        [String(orderId).slice(0, 20), req.session.user.company_id]);
+      if (oc.rows.length) safeOrderId = oc.rows[0].id;
+    }
     await pool.query(
       `INSERT INTO documents (email_sofer, nume_sofer, tip, file_name, storage_url, order_id)
        VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -177,7 +185,7 @@ router.post('/api/doc-upload', async (req, res) => {
         tip || 'CMR',
         numeFisier || 'dokument',
         base64 || null,
-        (orderId ? String(orderId).slice(0, 20) : null)
+        safeOrderId
       ]
     );
     res.json({ success: true });

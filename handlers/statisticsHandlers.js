@@ -459,6 +459,10 @@ handlers.getOrderProfit = async function (req, res, args) {
                 jsonb_array_length(f.order_ids) AS cnt
          FROM fuvarlevelek f
          WHERE f.order_ids ? o.id::text
+           -- tenant-szűrés: csak a SAJÁT cég sofőrjének menetlevele számítson
+           -- (idegen cég sofőrje által beírt azonos fuvar-ID ne szivárogjon be)
+           AND EXISTS (SELECT 1 FROM users u2
+                       WHERE LOWER(u2.email) = LOWER(f.email_sofer) AND u2.company_id = o.company_id)
        ) fl ON true
        WHERE o.company_id = $1 AND o.status = 'Finalizat'
          AND o.finalized_at >= $2 AND o.finalized_at < $3
