@@ -223,7 +223,10 @@ function createOrder(){
   if(!p.client){toast('Az ügyfél neve kötelező!','err');return;}
   gas('comCreate',[p]).then(r=>{
     if(r&&r.ok){
-      toast('Fuvar mentve! ID: '+r.id,'ok');
+      let extra='';
+      if(r.paired_driver)extra=' · 👤 párosított sofőr: '+r.paired_driver;
+      else if(r.paired_vehicle)extra=' · 🚛 párosított jármű: '+r.paired_vehicle;
+      toast('Fuvar mentve! ID: '+r.id+extra,'ok');
       loadOrders();
       ['oClient','oRef','oPret','oKm','oLoad','oUnload','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
       document.querySelectorAll('input[name="oSoferType"]').forEach(r=>{if(r.value==='None')r.checked=true;});
@@ -525,6 +528,9 @@ function loadOrderFormData(){
     remorcaCache=list.filter(v=>v.tip==='Potkocsi');
     renderCamions(camionCache);renderRemorcas(remorcaCache);
   });
+  // jármű/sofőr választásra a párja automatikusan kitöltődik (ha üres)
+  const cs=document.getElementById('oCamionSelect');if(cs)cs.onchange=orderFormPairFromVehicle;
+  const ds=document.getElementById('oInternDriver');if(ds)ds.onchange=orderFormPairFromDriver;
 }
 
 function loadOrders(){
@@ -674,6 +680,38 @@ function oeToggleSoferType() {
 }
 
 function onSoferTypeChange(type){document.getElementById('oInternBlock').style.display=type==='Intern'?'block':'none';document.getElementById('oExternBlock').style.display=type==='Extern'?'block':'none';}
+
+// ── Sofőr↔jármű auto-párosítás a fuvar-kiíró űrlapon ──
+// (vehicles.assigned_driver_email — a Belső sofőrök fülön rögzített pár.)
+// Csak ÜRES mezőt tölt ki, látható és szabadon átírható.
+function orderFormPairFromVehicle(){
+  const plate=document.getElementById('oCamionSelect').value;if(!plate)return;
+  const v=camionCache.find(x=>x.rendszam===plate);
+  if(!v||!v.assigned_driver_email)return;
+  const st=document.querySelector('input[name="oSoferType"]:checked');
+  if(st&&st.value==='Extern')return;
+  const drvSel=document.getElementById('oInternDriver');
+  if(!drvSel||drvSel.value)return;
+  const email=String(v.assigned_driver_email).toLowerCase();
+  const opt=[...drvSel.options].find(o=>o.value.toLowerCase()===email);
+  if(!opt)return;
+  document.querySelectorAll('input[name="oSoferType"]').forEach(r=>{r.checked=(r.value==='Intern');});
+  onSoferTypeChange('Intern');
+  drvSel.value=opt.value;
+  toast('👤 Párosított sofőr kitöltve: '+opt.text.split(' (')[0]+' (módosítható)','ok');
+}
+function orderFormPairFromDriver(){
+  const drvSel=document.getElementById('oInternDriver');
+  const email=String(drvSel&&drvSel.value||'').toLowerCase();if(!email)return;
+  const camSel=document.getElementById('oCamionSelect');
+  if(!camSel||camSel.value)return;
+  const v=camionCache.find(x=>String(x.assigned_driver_email||'').toLowerCase()===email);
+  if(!v)return;
+  const opt=[...camSel.options].find(o=>o.value===v.rendszam);
+  if(!opt)return;
+  camSel.value=v.rendszam;
+  toast('🚛 Párosított jármű kitöltve: '+v.rendszam+' (módosítható)','ok');
+}
 
 function openBugReport(){
   document.getElementById('bugText').value='';
@@ -1947,6 +1985,31 @@ function openOrderEdit(id) {
       var remSel = document.getElementById('oeRemorca');
       remSel.innerHTML = '<option value="">— Nincs —</option>' +
         _oeRemorcaCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_remorca?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
+
+      // Auto-párosítás a szerkesztőben (vehicles.assigned_driver_email):
+      // jármű-választásra a párosított sofőr töltődik (és fordítva) —
+      // csak ÜRES mezőbe, láthatóan, szabadon átírhatóan.
+      camSel.onchange = function(){
+        if (!camSel.value || sel.value) return;
+        if (document.getElementById('oeSoferType').value === 'Extern') return;
+        var v = _oeCamionCache.find(function(x){ return x.rendszam === camSel.value; });
+        var email = v && v.assigned_driver_email ? String(v.assigned_driver_email).toLowerCase() : '';
+        if (!email) return;
+        var u = _oeSoferCache.find(function(x){ return String(x.email).toLowerCase() === email; });
+        if (!u) return;
+        document.getElementById('oeSoferType').value = 'Intern';
+        oeToggleSoferType();
+        sel.value = u.email;
+        toast('👤 Párosított sofőr kitöltve: '+u.nume+' (módosítható)','ok');
+      };
+      sel.onchange = function(){
+        if (!sel.value || camSel.value) return;
+        var email = String(sel.value).toLowerCase();
+        var v = _oeCamionCache.find(function(x){ return String(x.assigned_driver_email||'').toLowerCase() === email; });
+        if (!v) return;
+        camSel.value = v.rendszam;
+        toast('🚛 Párosított jármű kitöltve: '+v.rendszam+' (módosítható)','ok');
+      };
 
       if (o.sofer_type === 'Extern') {
         document.getElementById('oeNumeSoferExtern').value = o.nume_sofer||'';

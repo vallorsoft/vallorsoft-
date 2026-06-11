@@ -94,7 +94,7 @@
         'padding:3px 16px 3px 8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;z-index:2;' +
         'border:1px solid rgba(255,255,255,0.3);box-shadow:0 2px 6px rgba(0,0,0,0.35);transition:filter .12s;}',
       '.p2-bar:hover{filter:brightness(1.15);z-index:3;}',
-      '.p2-bar.conflict{border:2px solid var(--status-danger);box-shadow:0 0 0 2px rgba(239,68,68,0.35);}',
+      '.p2-bar.conflict{border:2px solid var(--status-warn);box-shadow:0 0 0 2px rgba(245,158,11,0.35);}',
       '.p2-bar.dim{opacity:.22;pointer-events:none;}',
       '.p2-bar.picked{outline:2px solid #fff;box-shadow:0 0 0 3px rgba(59,130,246,0.8);}',
       '.p2-bar .sub{font-size:9.5px;font-weight:400;opacity:.85;}',
@@ -199,7 +199,10 @@
   function assign(orderId, fields, msg) {
     _selOid = null; _popOid = null;
     gas('plannerAssign', [orderId, fields]).then(function (r) {
-      if (r && r.ok) { toast(msg || ('✅ ' + orderId + ' frissítve'), 'ok'); load(); }
+      if (r && r.ok) {
+        var extra = r.paired_driver ? ' · 👤 ' + r.paired_driver + ' (párosított sofőr)' : '';
+        toast((msg || ('✅ ' + orderId + ' frissítve')) + extra, 'ok'); load();
+      }
       else toast((r && r.err) || 'Hiba', 'err');
     });
   }
@@ -248,8 +251,14 @@
       if (li === -1) { li = lanes.length; lanes.push(b.e); } else lanes[li] = b.e;
       b.lane = li;
     });
+    // Átfedés-jelzés (nem hiba — részrakomány is lehet). Az él-érintkezés
+    // (az egyik lerakó napja a másik felrakó napja) NEM számít átfedésnek.
     for (var i = 0; i < bars.length; i++) for (var j = i + 1; j < bars.length; j++) {
-      if (bars[j].s <= bars[i].e && bars[j].e >= bars[i].s) { bars[i].conflict = bars[j].conflict = true; }
+      var ss = Math.max(bars[i].s, bars[j].s), ee = Math.min(bars[i].e, bars[j].e);
+      if (ss > ee) continue;
+      var edgeTouch = (ee === ss) && bars[i].s !== bars[j].s
+        && (bars[j].s === bars[i].e || bars[i].s === bars[j].e);
+      if (!edgeTouch) { bars[i].conflict = bars[j].conflict = true; }
     }
     return { bars: bars, laneCount: Math.max(1, lanes.length) };
   }
@@ -333,7 +342,7 @@
       + esc(String(o.id).replace('CMD-', '#')) + ' · ' + esc(o.client || '—')
       + '<span class="sub">' + esc(o.loc_incarcare || '?') + ' → ' + esc(o.loc_descarcare || '?')
       + ' · ' + fmtD(o.data_incarcare) + (o.data_descarcare ? '–' + fmtD(o.data_descarcare) : '') + '</span>'
-      + (best ? '<span class="hint">🎯 ' + esc(best.rendszam) + ' · ' + best.km + ' km üresjárat</span>' : '')
+      + (best ? '<span class="hint">🎯 ' + esc(best.rendszam) + ' · ' + best.km + ' km üresjárat' + (best.atfedes ? ' ⚠️' : '') + '</span>' : '')
       + '</div>';
   }
 
@@ -401,7 +410,7 @@
         html += '<div class="p2-bar' + (b.conflict ? ' conflict' : '') + (dim ? ' dim' : '') + (String(_selOid) === String(o.id) ? ' picked' : '') + '" '
           + 'draggable="true" data-oid="' + esc(String(o.id)) + '" '
           + 'style="left:' + left + 'px;width:' + width + 'px;top:' + (b.lane * laneH() + 4) + 'px;height:' + (laneH() - 7) + 'px;background:' + st.c + 'cc;" '
-          + 'title="' + esc(String(o.id) + ' · ' + (o.client || '') + '\n' + (o.loc_incarcare || '?') + ' → ' + (o.loc_descarcare || '?') + '\n' + (o.nume_sofer || 'NINCS SOFŐR') + ' · ' + o.status + (b.conflict ? '\n⚠️ ÜTKÖZÉS: átfedő fuvar ezen a járművön!' : '')) + '" '
+          + 'title="' + esc(String(o.id) + ' · ' + (o.client || '') + '\n' + (o.loc_incarcare || '?') + ' → ' + (o.loc_descarcare || '?') + '\n' + (o.nume_sofer || 'NINCS SOFŐR') + ' · ' + o.status + (b.conflict ? '\n⚠️ Átfedés: több fuvar ugyanazon a járművön (részrakomány is lehet)' : '')) + '" '
           + 'ondragstart="Planner._ds(event)" onclick="Planner.openPop(\'' + esc(String(o.id)) + '\',event)">'
           + (b.conflict ? '⚠️ ' : '') + icons + esc(String(o.id).replace('CMD-', '#')) + ' ' + esc((o.loc_descarcare || o.client || '').slice(0, 22))
           + (width > 150 ? ' <span class="sub">' + esc(o.nume_sofer || '') + '</span>' : '')
@@ -469,8 +478,9 @@
         + '<span>💡 <b class="text-primary">' + esc(String(m.order_id).replace('CMD-', '#')) + '</b> '
         + '<span class="text-muted">(' + esc(m.loc_incarcare) + ' felrakó' + (m.data_incarcare ? ', ' + fmtD(m.data_incarcare) : '') + ')</span>'
         + ' ↔ <b class="text-primary">' + esc(s.rendszam) + '</b> '
-        + '<b style="color:var(--status-ok);">' + s.km + ' km</b><span class="text-muted"> üresjárattal (' + esc(s.honnan) + ' lerakó után'
-        + (s.szabad_tol ? ', szabad: ' + fmtD(s.szabad_tol) : '') + ')</span></span>'
+        + '<b style="color:var(--status-ok);">' + s.km + ' km</b><span class="text-muted"> üresjárattal (' + esc(s.honnan) + (s.atfedes ? ' körül' : ' lerakó után')
+        + (s.szabad_tol ? ', szabad: ' + fmtD(s.szabad_tol) : '') + ')</span>'
+        + (s.atfedes ? ' <span class="badge warn" title="A kamionnak átfedő fuvarja van ekkor — részrakományként még felférhet">⚠️ átfedéssel</span>' : '') + '</span>'
         + '<button class="btn ok" style="margin-left:auto;padding:4px 12px;font-size:12px;" '
         + 'onclick="Planner.acceptMatch(\'' + esc(String(m.order_id)) + '\',\'' + esc(s.rendszam) + '\')">✓ Kioszt</button>'
         + '</div>';
@@ -503,7 +513,8 @@
       + '<button class="btn primary" style="padding:8px 12px;font-size:12px;" onclick="Planner.popSaveDates(\'' + esc(String(o.id)) + '\')">💾</button></div>'
       + (sugg.length ? '<div style="margin-bottom:10px;">' + sugg.map(function (s) {
           return '<div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;">'
-            + '<span>🎯 <b>' + esc(s.rendszam) + '</b> · <b style="color:var(--status-ok);">' + s.km + ' km</b> üresjárat</span>'
+            + '<span>🎯 <b>' + esc(s.rendszam) + '</b> · <b style="color:var(--status-ok);">' + s.km + ' km</b> üresjárat'
+            + (s.atfedes ? ' <span class="badge warn" title="Átfedő fuvar — részrakományként még felférhet">⚠️</span>' : '') + '</span>'
             + '<button class="btn ok" style="margin-left:auto;padding:3px 10px;font-size:11px;" onclick="Planner.acceptMatch(\'' + esc(String(o.id)) + '\',\'' + esc(s.rendszam) + '\')">✓ Kioszt</button></div>';
         }).join('') + '</div>' : '')
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'

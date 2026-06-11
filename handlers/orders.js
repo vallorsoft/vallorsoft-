@@ -9,6 +9,48 @@ const { genDocId } = require('../lib/ids');
 
 const handlers = {};
 
+// ─── Sofőr↔jármű auto-párosítás ──────────────────────────────
+// A Belső sofőrök fülön rögzített hozzárendelés (vehicles.assigned_driver_email)
+// alapján: ha a fuvaron csak a jármű VAGY csak a belső sofőr van megadva,
+// a hiányzó párját kitöltjük. Csak üres mezőt töltünk, felül nem írunk;
+// külsős (Extern) fuvarba nem nyúlunk. A talált párt o.autoPaired jelzi.
+async function autoPairDriverVehicle(cid, o) {
+  try {
+    const hasVeh = !!o.rendszam_camion;
+    const hasDrv = !!o.email_sofer;
+    if (hasVeh === hasDrv || o.sofer_type === 'Extern') return o;
+    if (hasVeh) {
+      const r = await pool.query(
+        `SELECT u.email, u.nume FROM vehicles v
+         JOIN users u ON u.company_id = v.company_id
+                     AND LOWER(u.email) = LOWER(v.assigned_driver_email)
+         WHERE v.company_id = $1 AND UPPER(v.rendszam) = $2 AND v.tip = 'Vontato'
+           AND v.assigned_driver_email IS NOT NULL
+           AND u.pozicio = 'Sofer' AND u.blocked IS NOT TRUE
+         LIMIT 1`,
+        [cid, String(o.rendszam_camion).toUpperCase()]);
+      if (r.rows.length) {
+        o.sofer_type = 'Intern';
+        o.email_sofer = String(r.rows[0].email).toLowerCase();
+        o.nume_sofer = o.nume_sofer || r.rows[0].nume;
+        o.autoPaired = 'driver';
+      }
+    } else {
+      const r = await pool.query(
+        `SELECT rendszam FROM vehicles
+         WHERE company_id = $1 AND LOWER(assigned_driver_email) = LOWER($2)
+           AND tip = 'Vontato' AND activ = TRUE
+         ORDER BY rendszam LIMIT 1`,
+        [cid, o.email_sofer]);
+      if (r.rows.length) {
+        o.rendszam_camion = r.rows[0].rendszam;
+        o.autoPaired = 'vehicle';
+      }
+    }
+  } catch (e) { console.error('autoPairDriverVehicle hiba:', e); }
+  return o;
+}
+
 handlers.getOrderById = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin','Manager'].includes(req.session.user.pozicio))
@@ -148,15 +190,23 @@ handlers.comCreate = async function (req, res, args) {
       const loc_descarcare = String(o.loc_descarcare || '').trim();
       const data_incarcare = o.data_incarcare || null;
       const data_descarcare = o.data_descarcare || null;
-      const sofer_type = o.sofer_type || null;
-      const email_sofer = o.email_sofer ? String(o.email_sofer).trim().toLowerCase() : null;
-      const nume_sofer = o.nume_sofer ? String(o.nume_sofer).trim() : null;
       const firma_extern = o.firma_extern ? String(o.firma_extern).trim() : null;
       const telefon_extern = o.telefon_extern ? String(o.telefon_extern).trim() : null;
       const external_driver_id = o.external_driver_id ? parseInt(o.external_driver_id, 10) : null;
-      const rendszam_camion = o.rendszam_camion ? String(o.rendszam_camion).trim().toUpperCase() : null;
       const rendszam_remorca = o.rendszam_remorca ? String(o.rendszam_remorca).trim().toUpperCase() : null;
       const company_id = req.session.user.company_id;
+
+      // Auto-párosítás: csak jármű VAGY csak belső sofőr esetén a pár kitöltése
+      const pair = await autoPairDriverVehicle(company_id, {
+        sofer_type: o.sofer_type || null,
+        email_sofer: o.email_sofer ? String(o.email_sofer).trim().toLowerCase() : null,
+        nume_sofer: o.nume_sofer ? String(o.nume_sofer).trim() : null,
+        rendszam_camion: o.rendszam_camion ? String(o.rendszam_camion).trim().toUpperCase() : null,
+      });
+      const sofer_type = pair.sofer_type;
+      const email_sofer = pair.email_sofer;
+      const nume_sofer = pair.nume_sofer;
+      const rendszam_camion = pair.rendszam_camion ? String(pair.rendszam_camion).toUpperCase() : null;
 
       let status = 'Disponibil';
       if (sofer_type === 'Intern' && email_sofer) status = 'Alocat';
@@ -208,7 +258,11 @@ handlers.comCreate = async function (req, res, args) {
         dbc.release();
       }
 
-      return res.json({ result: { ok: true, id: id } });
+      return res.json({ result: {
+        ok: true, id: id,
+        paired_driver: pair.autoPaired === 'driver' ? (nume_sofer || email_sofer) : null,
+        paired_vehicle: pair.autoPaired === 'vehicle' ? rendszam_camion : null,
+      } });
     } catch (err) {
       console.error('comCreate hiba:', err);
       return res.json({ result: { ok: false, err: 'Szerver hiba' } });
@@ -455,6 +509,7 @@ handlers.plannerAssign = async function (req, res, args) {
 
     const sets = ['updated_at = NOW()'];
     const params = [orderId, cid];
+    let pairedDriver = null;
     if (Object.prototype.hasOwnProperty.call(f, 'rendszam_camion')) {
       const rendszam = f.rendszam_camion ? String(f.rendszam_camion).trim().toUpperCase() : null;
       if (rendszam) {
@@ -463,6 +518,24 @@ handlers.plannerAssign = async function (req, res, args) {
           `SELECT id FROM vehicles WHERE company_id = $1 AND UPPER(rendszam) = $2 AND tip = 'Vontato'`,
           [cid, rendszam]);
         if (!vr.rows.length) return res.json({ result: { ok: false, err: 'A jármű nem található.' } });
+
+        // Auto-párosítás: ha a fuvaron még nincs sofőr, a járműhöz rendelt
+        // belső sofőr is rákerül (státusz: Disponibil → Alocat).
+        const cur = await pool.query(
+          `SELECT email_sofer, sofer_type, status FROM orders WHERE id = $1 AND company_id = $2`,
+          [orderId, cid]);
+        if (!cur.rows.length) return res.json({ result: { ok: false, err: 'Fuvar nem található' } });
+        const co = cur.rows[0];
+        if (!co.email_sofer && co.sofer_type !== 'Extern') {
+          const p = await autoPairDriverVehicle(cid, { rendszam_camion: rendszam, sofer_type: co.sofer_type });
+          if (p.autoPaired === 'driver') {
+            params.push('Intern'); sets.push('sofer_type = $' + params.length);
+            params.push(p.email_sofer); sets.push('email_sofer = $' + params.length);
+            params.push(p.nume_sofer); sets.push('nume_sofer = $' + params.length);
+            if (co.status === 'Disponibil') sets.push(`status = 'Alocat'`);
+            pairedDriver = p.nume_sofer || p.email_sofer;
+          }
+        }
       }
       params.push(rendszam); sets.push('rendszam_camion = $' + params.length);
     }
@@ -475,7 +548,7 @@ handlers.plannerAssign = async function (req, res, args) {
       params
     );
     if (!r.rowCount) return res.json({ result: { ok: false, err: 'Fuvar nem található' } });
-    return res.json({ result: { ok: true } });
+    return res.json({ result: { ok: true, paired_driver: pairedDriver } });
   } catch (err) {
     console.error('plannerAssign hiba:', err);
     return res.json({ result: { ok: false, err: 'Szerver hiba' } });
@@ -552,10 +625,19 @@ handlers.getPlannerMatches = async function (req, res, args) {
 
     const budget = { left: 12, skipped: 0 };   // max. 12 új geokódolás / kérés
     const day = (d) => (d ? String(d).slice(0, 10) : null);
-    const overlaps = (o, from, to) => {
+    const dms = (s) => new Date(s + 'T12:00:00').getTime();
+    // Valódi átfedés — az él-érintkezés NEM az: ha a kamion aznap lerak,
+    // amikor az új fuvar felrakója van (vagy fordítva), az belefér.
+    const overlapsStrict = (o, from, to) => {
       const s = day(o.data_incarcare), e = day(o.data_descarcare) || s;
       if (!s || !from) return false;
-      return s <= (to || from) && (e || s) >= from;
+      const end = to || from;
+      const shFrom = s > from ? s : from;
+      const shTo = e < end ? e : end;
+      if (shFrom > shTo) return false;                              // nincs közös nap
+      const days = Math.round((dms(shTo) - dms(shFrom)) / 86400000) + 1;
+      if (days === 1 && s !== from && (e === from || s === end)) return false; // él-érintkezés
+      return true;
     };
 
     const matches = [];
@@ -566,28 +648,36 @@ handlers.getPlannerMatches = async function (req, res, args) {
       const uTo = day(u.data_descarcare) || uFrom;
       const sugg = [];
       for (const [rendszam, list] of byVeh) {
-        // foglaltság: ha a kamionnak átfedő fuvarja van, nem javasoljuk
-        if (uFrom && list.some((o) => overlaps(o, uFrom, uTo))) continue;
-        // az utolsó, a felrakás ELŐTT (vagy dátum nélkül: bármikor) záruló fuvar lerakója
+        // Az átfedő fuvar NEM kizáró ok (lehet részrakomány) — csak jelezzük
+        const ovl = uFrom ? list.filter((o) => overlapsStrict(o, uFrom, uTo)) : [];
+        // pozíció-becslés: az utolsó, a felrakás ELŐTT (vagy dátum nélkül:
+        // bármikor) záruló fuvar lerakója; ha csak átfedő fuvarja van,
+        // annak felrakója a viszonyítási pont
         const before = uFrom ? list.filter((o) => (day(o.data_descarcare) || day(o.data_incarcare) || '') <= uFrom) : list;
-        const last = before[before.length - 1];
-        if (!last || !last.loc_descarcare) continue;
-        const vGeo = await _geocodeCached(last.loc_descarcare, budget);
+        let last = before[before.length - 1];
+        let honnan = last ? last.loc_descarcare : null;
+        if (!honnan && ovl.length && ovl[0].loc_incarcare) { last = ovl[0]; honnan = last.loc_incarcare; }
+        if (!last || !honnan) continue;
+        const vGeo = await _geocodeCached(honnan, budget);
         if (!vGeo) continue;
         sugg.push({
           rendszam,
           km: _haversineKm(uGeo, vGeo),
-          honnan: last.loc_descarcare,
+          honnan,
           szabad_tol: day(last.data_descarcare) || day(last.data_incarcare),
           utolso_fuvar: last.id,
+          atfedes: ovl.length,        // hány fuvarja fedi az időablakot
         });
       }
-      sugg.sort((a, b) => a.km - b.km);
+      // átfedés nélküli javaslatok elöl, azon belül a legkisebb üresjárat
+      sugg.sort((a, b) => (a.atfedes ? 1 : 0) - (b.atfedes ? 1 : 0) || a.km - b.km);
       if (sugg.length) matches.push({ order_id: u.id, loc_incarcare: u.loc_incarcare,
         data_incarcare: day(u.data_incarcare), client: u.client, suggestions: sugg.slice(0, 3) });
     }
-    // legjobb találatok elöl (legkisebb üresjárat)
-    matches.sort((a, b) => a.suggestions[0].km - b.suggestions[0].km);
+    // legjobb találatok elöl (átfedés nélkül, legkisebb üresjárat)
+    matches.sort((a, b) =>
+      (a.suggestions[0].atfedes ? 1 : 0) - (b.suggestions[0].atfedes ? 1 : 0)
+      || a.suggestions[0].km - b.suggestions[0].km);
     return res.json({ result: { ok: true, matches, pending: budget.skipped } });
   } catch (err) {
     console.error('getPlannerMatches hiba:', err);
