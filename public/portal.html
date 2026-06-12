@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VallorSoft — Ügyfélportál</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --bg-deepest:#05070b;--bg-panel-raised:#141c25;--text-primary:#e9eef5;--text-muted:#8a97a8;
+    --brand-red:#e10b1a;--ok:#22c55e;--warn:#f59e0b;--danger:#ef4444;--info:#3b82f6;
+    --border:rgba(255,255,255,.08);--radius:18px;--radius-md:12px;--radius-sm:8px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,rgba(225,11,26,.10),transparent),var(--bg-deepest);
+    color:var(--text-primary);font-family:Inter,Segoe UI,Roboto,sans-serif;font-size:14px;line-height:1.5}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px}
+  .glass{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));border:1px solid var(--border);border-radius:var(--radius)}
+  .muted{color:var(--text-muted)}.hidden{display:none!important}
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid}
+  .b-ok{background:rgba(34,197,94,.16);color:#4ade80;border-color:rgba(34,197,94,.4)}
+  .b-warn{background:rgba(245,158,11,.16);color:#fbbf24;border-color:rgba(245,158,11,.4)}
+  .b-info{background:rgba(59,130,246,.16);color:#60a5fa;border-color:rgba(59,130,246,.4)}
+  .b-red{background:rgba(225,11,26,.16);color:#ff6b75;border-color:rgba(225,11,26,.45)}
+  .btn{border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text-primary);border-radius:var(--radius-sm);padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  .btn:hover{border-color:rgba(255,255,255,.22)}
+  .btn.primary{background:var(--brand-red);border-color:var(--brand-red);color:#fff}
+  .btn.ok{background:rgba(34,197,94,.18);border-color:rgba(34,197,94,.45);color:#4ade80}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:999px;padding:6px 11px;font-size:12px;color:var(--text-muted);cursor:pointer;text-decoration:none}
+  .chip:hover{color:#fff;border-color:rgba(255,255,255,.22)}
+  .field{margin-bottom:10px}.field label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:5px;font-weight:600}
+  .inp{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;color:var(--text-primary);font-family:inherit;font-size:13px}
+  .logo{font-weight:800;letter-spacing:.3px}.logo b{color:#fff}.logo span{color:var(--brand-red)}
+  .top{display:flex;align-items:center;gap:14px;padding:14px 20px;margin-bottom:18px}
+  .av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--brand-red),#7a0710);display:grid;place-items:center;font-weight:800;color:#fff}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+  .tile{padding:16px 18px}.tile .k{font-size:12px;color:var(--text-muted);font-weight:600}.tile .v{font-size:26px;font-weight:800;margin-top:4px}
+  .ord{padding:14px 16px;border:1px solid var(--border);border-radius:var(--radius-md);background:rgba(255,255,255,.02);margin-bottom:12px}
+  .ord .row1{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+  .ord .id{font-weight:800;color:#fff}.ord .route{font-weight:700}
+  .ord .meta{font-size:12px;color:var(--text-muted);display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+  .ord .docs{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+  .grid{display:grid;grid-template-columns:1.55fr 1fr;gap:16px}
+  .h{font-size:15px;font-weight:800;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .center{min-height:100vh;display:grid;place-items:center;padding:20px}
+  .card{width:100%;max-width:380px;padding:28px}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#141c25;border:1px solid var(--border);color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:.25s;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+  .toast.show{opacity:1}.toast.err{border-color:rgba(239,68,68,.5)}.toast.ok{border-color:rgba(34,197,94,.5)}
+  #mapModal{position:fixed;inset:0;background:rgba(3,6,10,.72);z-index:5000;display:none;align-items:center;justify-content:center;padding:16px}
+  #mapModal.open{display:flex}
+  #mapModal .mc{width:min(820px,100%);background:var(--bg-panel-raised);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+  #mapModal .mh{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)}
+  #pmap{height:420px;background:#e8eef3}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<!-- ① LOGIN -->
+<div id="viewLogin" class="center hidden">
+  <div class="glass card">
+    <div class="logo" style="text-align:center;font-size:24px;margin-bottom:4px"><b>Vallor</b><span>Soft</span></div>
+    <div class="muted" style="text-align:center;margin-bottom:20px">Ügyfélportál</div>
+    <div class="field"><label>E-mail</label><input class="inp" id="liEmail" type="email" autocomplete="username"></div>
+    <div class="field"><label>Jelszó</label><input class="inp" id="liPass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')Portal.login()"></div>
+    <button class="btn primary" style="width:100%;margin-top:6px" onclick="Portal.login()">Belépés</button>
+    <div class="muted" style="text-align:center;margin-top:14px;font-size:11px">A hozzáférést a fuvarozód adja meghívóval.<br>Csak a saját céged fuvarjait látod.</div>
+  </div>
+</div>
+
+<!-- ② JELSZÓ BEÁLLÍTÁSA (meghívó) -->
+<div id="viewSet" class="center hidden">
+  <div class="glass card">
+    <div class="logo" style="text-align:center;font-size:24px;margin-bottom:4px"><b>Vallor</b><span>Soft</span></div>
+    <div class="muted" style="text-align:center;margin-bottom:20px">Állítsd be a jelszavad</div>
+    <div class="field"><label>Új jelszó (min. 6 karakter)</label><input class="inp" id="spPass" type="password"></div>
+    <div class="field"><label>Jelszó újra</label><input class="inp" id="spPass2" type="password" onkeydown="if(event.key==='Enter')Portal.setPw()"></div>
+    <button class="btn primary" style="width:100%;margin-top:6px" onclick="Portal.setPw()">Mentés és belépés</button>
+  </div>
+</div>
+
+<!-- ③ VEZÉRLŐPULT -->
+<div id="viewDash" class="wrap hidden">
+  <div class="glass top">
+    <div class="logo" style="font-size:20px"><b>Vallor</b><span>Soft</span> <span class="muted" style="font-size:13px;font-weight:500">· Ügyfélportál</span></div>
+    <div style="margin-left:auto;text-align:right">
+      <div id="dClient" style="font-weight:700"></div>
+      <div id="dCeg" class="muted" style="font-size:12px"></div>
+    </div>
+    <div class="av" id="dAv">·</div>
+    <button class="btn" style="padding:7px 12px" onclick="Portal.logout()">Kilépés</button>
+  </div>
+
+  <div class="stats" id="dStats"></div>
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+    <button class="btn primary" onclick="Portal.openRequest()">＋ Új fuvar igénylése</button>
+    <span class="muted" style="font-size:12px">Az igénylést a diszpécser hagyja jóvá, és bekerül a fuvarok közé.</span>
+  </div>
+
+  <div class="grid">
+    <div><div class="glass" style="padding:16px 18px"><div class="h">📦 A te fuvarjaid</div><div id="dOrders"></div></div></div>
+    <div>
+      <div class="glass hidden" id="reqBox" style="padding:16px 18px">
+        <div class="h">＋ Új fuvar igénylése</div>
+        <div class="field"><label>Felrakó címe *</label><input class="inp" id="rqFrom"></div>
+        <div class="field"><label>Lerakó címe *</label><input class="inp" id="rqTo"></div>
+        <div style="display:flex;gap:10px">
+          <div class="field" style="flex:1"><label>Súly (kg)</label><input class="inp" id="rqW" type="number"></div>
+          <div class="field" style="flex:1"><label>Típus</label><select class="inp" id="rqType"><option value="">—</option><option>FTL</option><option>LTL</option></select></div>
+        </div>
+        <div class="field"><label>Felrakás dátuma</label><input class="inp" id="rqDate" type="date"></div>
+        <div class="field"><label>Megjegyzés</label><input class="inp" id="rqNote"></div>
+        <button class="btn ok" style="width:100%" onclick="Portal.sendRequest()">Igénylés elküldése →</button>
+      </div>
+      <div class="glass" id="reqHint" style="padding:16px 18px">
+        <div class="h">ℹ️ Hogyan működik</div>
+        <div class="muted" style="font-size:12.5px;line-height:1.6">
+          Itt a saját fuvarjaidat látod élőben. A <b>🗺️ Követés</b> gombbal megnézed, hol a kamion;
+          a dokumentumokat (visszaigazolás, számla, aláírt CMR/POD) letöltöd. Új fuvart az
+          <b>＋ Új fuvar igénylése</b> gombbal kérhetsz.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TÉRKÉP MODAL -->
+<div id="mapModal"><div class="mc">
+  <div class="mh"><b id="mTitle">🗺️ Követés</b><button class="btn" style="margin-left:auto;padding:5px 12px" onclick="Portal.closeMap()">✕ Bezár</button></div>
+  <div id="pmap"></div>
+  <div id="mInfo" class="muted" style="padding:10px 16px;font-size:12px"></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/portal.js?v=20260612"></script>
+</body>
+</html>
