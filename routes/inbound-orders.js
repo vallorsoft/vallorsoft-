@@ -8,6 +8,7 @@ const orderAi = require('../services/order-ai');
 const intake = require('../services/email-intake');
 const { decrypt } = require('../lib/crypto');
 const { genDocId } = require('../lib/ids');
+const { estimateRoute } = require('../lib/routeEstimate');
 
 const router = express.Router();
 
@@ -188,6 +189,31 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
     } finally {
       dbc.release();
     }
+
+    // Automata útvonal-km a fuvarlistára — CSAK ha az 'order-route-map' kapcsoló
+    // be van kapcsolva a cégnél (opt-in). A beolvasott km-et NEM írja felül; az
+    // automata km a route_geo-ban tárolódik, a fuvarlista a beolvasott mellett mutatja.
+    // Tranzakción KÍVÜL, best-effort: lassú/hibás geokódolás ne buktassa a jóváhagyást.
+    try {
+      if (loc_incarcare && loc_descarcare) {
+        const fr = await pool.query(
+          "SELECT enabled FROM company_features WHERE company_id=$1 AND feature_key='order-route-map'", [company_id]);
+        if (fr.rows.length && fr.rows[0].enabled === true) {
+          const est = await estimateRoute([
+            { type: 'loading', address: loc_incarcare },
+            { type: 'unloading', address: loc_descarcare },
+          ]);
+          if (est && est.km != null) {
+            const rg = {
+              waypoints: est.waypoints.map((w) => ({ type: w.type, address: w.label, lat: w.lat, lng: w.lng })),
+              km: est.km, durationSeconds: est.durationSeconds,
+            };
+            await pool.query('UPDATE orders SET route_geo=$1 WHERE id=$2 AND company_id=$3',
+              [JSON.stringify(rg), id, company_id]);
+          }
+        }
+      }
+    } catch (e) { /* az automata km hibája ne buktassa a jóváhagyást */ }
 
     // A beérkező megrendelő-PDF a fuvar dokumentumai közé (aláírható a meglévő flow-val)
     try {

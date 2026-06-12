@@ -150,7 +150,7 @@ handlers.comList = async function (req, res, args) {
           `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare,
                   o.pret, o.km, o.status, o.sofer_type, o.email_sofer, o.nume_sofer,
                   o.firma_extern, o.telefon_extern, o.rendszam_camion, o.rendszam_remorca,
-                  o.load_type, o.payment_status, o.paid_amount,
+                  o.load_type, (o.route_geo->>'km')::int AS route_km, o.payment_status, o.paid_amount,
                   o.handover_status, o.handover_type, o.handover_loc, o.handover_at,
                   (SELECT COUNT(*)::int FROM documents d WHERE d.order_id = o.id) AS pod_count,
                   COALESCE(legs.leg_count, 0) AS leg_count,
