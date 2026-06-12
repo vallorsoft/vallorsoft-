@@ -86,6 +86,53 @@
   'cs.chooseDash':      { hu:'— Válassz —', ro:'— Alege —' },
   'cs.noneDash':        { hu:'— Nincs —', ro:'— Niciun —' },
   'cs.noSwap':          { hu:'Nincs rögzített váltás.', ro:'Niciun schimb înregistrat.' },
+  'cs.confirmDeleteSwap':{ hu:'Törlöd ezt a váltást?', ro:'Ștergi acest schimb?' },
+  'cs.pairedDriverLbl': { hu:'párosított sofőr: ', ro:'șofer asociat: ' },
+  'cs.pairedVehicleLbl':{ hu:'párosított jármű: ', ro:'vehicul asociat: ' },
+  'cs.pairedTrailerLbl':{ hu:'párosított pótkocsi: ', ro:'semiremorcă asociată: ' },
+  'cs.tractorWord':     { hu:'Vontató', ro:'Cap tractor' },
+  'cs.trailerWord':     { hu:'Pótkocsi', ro:'Semiremorcă' },
+  'cs.addedSuffix':     { hu:' hozzáadva!', ro:' adăugat!' },
+  // ── Fuvar CSV-import ──
+  'cs.oiClient':        { hu:'Ügyfél', ro:'Client' },
+  'cs.oiRef':           { hu:'Referencia', ro:'Referință' },
+  'cs.oiLoad':          { hu:'Felrakó', ro:'Încărcare' },
+  'cs.oiUnload':        { hu:'Lerakó', ro:'Descărcare' },
+  'cs.oiLoadDate':      { hu:'Felrakás dátuma', ro:'Data încărcării' },
+  'cs.oiUnloadDate':    { hu:'Lerakás dátuma', ro:'Data descărcării' },
+  'cs.oiPrice':         { hu:'Ár', ro:'Preț' },
+  'cs.oiKm':            { hu:'Km', ro:'Km' },
+  'cs.oiWeight':        { hu:'Súly (kg)', ro:'Greutate (kg)' },
+  'cs.oiLoadType':      { hu:'FTL/LTL típus', ro:'Tip FTL/LTL' },
+  'cs.oiLength':        { hu:'Hossz (cm)', ro:'Lungime (cm)' },
+  'cs.oiWidth':         { hu:'Szélesség (cm)', ro:'Lățime (cm)' },
+  'cs.oiHeight':        { hu:'Magasság (cm)', ro:'Înălțime (cm)' },
+  'cs.oiTractor':       { hu:'Vontató rendszám', ro:'Nr. înmatriculare cap tractor' },
+  'cs.oiTrailer':       { hu:'Pótkocsi rendszám', ro:'Nr. înmatriculare semiremorcă' },
+  'cs.oiDriverName':    { hu:'Sofőr neve', ro:'Numele șoferului' },
+  'cs.oiDriverEmail':   { hu:'Sofőr e-mail', ro:'E-mail șofer' },
+  'cs.oiExtCompany':    { hu:'Külsős cég', ro:'Firmă externă' },
+  'cs.oiExtPhone':      { hu:'Külsős telefon', ro:'Telefon extern' },
+  'cs.oiCardTitle':     { hu:'📥 Fuvar-CSV import', ro:'📥 Import CSV curse' },
+  'cs.oiClose':         { hu:'✕ Bezár', ro:'✕ Închide' },
+  'cs.oiIntro':         { hu:'Töltsd fel a gyári/szállítói fuvarlistát (.csv). A rendszer felismeri az elválasztót, és fejléc-név alapján automatikusan párosítja az oszlopokat — ellenőrizd/javítsd, majd importálj. <b>A nem párosított oszlopok nem vesznek el:</b> a fuvar „Importált extra adatok" mezőjébe kerülnek (a szerkesztőben megnézhető).', ro:'Încarcă lista de curse a fabricii/transportatorului (.csv). Sistemul recunoaște separatorul și potrivește automat coloanele după numele antetului — verifică/corectează, apoi importă. <b>Coloanele nepotrivite nu se pierd:</b> ajung în câmpul „Date suplimentare importate" al cursei (vizibil în editor).' },
+  'cs.oiFile':          { hu:'CSV fájl', ro:'Fișier CSV' },
+  'cs.oiNoneExtra':     { hu:'— (nincs / extra) —', ro:'— (niciun / extra) —' },
+  'cs.oiColumn':        { hu:'oszlop ', ro:'coloana ' },
+  'cs.oiMapTitle':      { hu:'Oszlop-párosítás — ', ro:'Potrivire coloane — ' },
+  'cs.oiRowsSep':       { hu:' sor (elválasztó: ', ro:' rânduri (separator: ' },
+  'cs.oiImportBtn':     { hu:' fuvar importálása', ro:' curse de importat' },
+  'cs.oiUnmappedCol':   { hu:'⚠️ Nem párosított oszlop (', ro:'⚠️ Coloane nepotrivite (' },
+  'cs.oiUnmappedToExtra':{ hu:') → a fuvar „Importált extra adatok" mezőjébe kerül.', ro:') → ajung în câmpul „Date suplimentare importate" al cursei.' },
+  'cs.oiAllMapped':     { hu:'✓ Minden oszlop párosítva.', ro:'✓ Toate coloanele potrivite.' },
+  'cs.oiExtraCol':      { hu:'+ extra', ro:'+ extra' },
+  'cs.oiFieldsWord':    { hu:' mező', ro:' câmpuri' },
+  'cs.oiPreview':       { hu:'Előnézet (első 3 sor):', ro:'Previzualizare (primele 3 rânduri):' },
+  'cs.oiImporting':     { hu:'Importálás…', ro:'Se importă…' },
+  'cs.oiCreated':       { hu:' fuvar létrehozva', ro:' curse create' },
+  'cs.oiSkipped':       { hu:' kihagyva', ro:' omise' },
+  'cs.oiCreatedOk':     { hu:' fuvar létrehozva.', ro:' curse create.' },
+  'cs.oiSkippedRows':   { hu:' sor kihagyva (üres/hibás).', ro:' rânduri omise (goale/eronate).' },
   'cs.legSection':      { hu:'. szakasz', ro:'. segment' },
   'cs.margin':          { hu:'Árrés: ', ro:'Marjă: ' },
   // ── Fizetés modal ──
@@ -665,18 +712,18 @@ function ensureRouteMapModal(){
   if(document.getElementById('routeMapModal')) return;
   var d=document.createElement('div'); d.id='routeMapModal';
   d.innerHTML='<div class="rmm-card">'
-    +'<div class="rmm-head"><b class="text-primary" style="font-size:15px;">🗺️ Útvonal-előnézet</b>'
+    +'<div class="rmm-head"><b class="text-primary" style="font-size:15px;">'+esc(T('cs.rmTitle'))+'</b>'
     +'<span id="rmmKm" class="badge info" style="margin-left:6px;">—</span>'
-    +'<button class="btn ghost" style="margin-left:auto;padding:5px 12px;" onclick="closeRouteMap()">✕ Bezár</button></div>'
+    +'<button class="btn ghost" style="margin-left:auto;padding:5px 12px;" onclick="closeRouteMap()">'+esc(T('cs.oiClose'))+'</button></div>'
     +'<div class="rmm-body">'
     +'<div class="rmm-map" id="rmmMap"></div>'
     +'<div class="rmm-side">'
-      +'<div class="text-muted" style="font-size:12px;margin-bottom:10px;line-height:1.45;">A köztespontok <b>csak a km-számításhoz és az útvonal-előnézethez</b> kellenek — NEM megállók. Add hozzá címmel, vagy kapcsold be a térkép-kattintást.</div>'
+      +'<div class="text-muted" style="font-size:12px;margin-bottom:10px;line-height:1.45;">'+T('cs.rmIntro')+'</div>'
       +'<div id="rmmViaList"></div>'
-      +'<div class="rmm-via"><div class="vs-ac-wrap"><input class="input" id="rmmViaInput" placeholder="Köztespont címe" autocomplete="off"><div class="vs-ac-dd" id="rmmViaInputDD"></div></div>'
+      +'<div class="rmm-via"><div class="vs-ac-wrap"><input class="input" id="rmmViaInput" placeholder="'+esc(T('cs.rmViaPh'))+'" autocomplete="off"><div class="vs-ac-dd" id="rmmViaInputDD"></div></div>'
       +'<button class="btn ok" style="padding:9px 11px;" onclick="routeMapAddViaFromInput()">➕</button></div>'
-      +'<label style="display:flex;align-items:center;gap:7px;font-size:12px;margin-top:10px;cursor:pointer;"><input type="checkbox" id="rmmClickAdd" onchange="_rmClickAdds=this.checked;"> Térképre kattintás = köztespont</label>'
-      +'<button class="btn ghost" style="width:100%;margin-top:10px;padding:8px;font-size:12px;" onclick="routeMapClearVia()">Köztespontok törlése</button>'
+      +'<label style="display:flex;align-items:center;gap:7px;font-size:12px;margin-top:10px;cursor:pointer;"><input type="checkbox" id="rmmClickAdd" onchange="_rmClickAdds=this.checked;"> '+esc(T('cs.rmClickAdd'))+'</label>'
+      +'<button class="btn ghost" style="width:100%;margin-top:10px;padding:8px;font-size:12px;" onclick="routeMapClearVia()">'+esc(T('cs.rmClearVia'))+'</button>'
     +'</div></div></div>';
   document.body.appendChild(d);
   vsAttachAutocomplete('rmmViaInput','rmmViaInputDD',null);
@@ -780,28 +827,31 @@ function dimStr(h,w,m){ return (h&&w&&m)?(h+'×'+w+'×'+m):''; }
 //  import_extra mezőjébe kerülnek (nem vész el adat).
 // ════════════════════════════════════════════════════════════
 var _oiHeader = [], _oiRows = [];
-// minden importálható fuvar-mező + fejléc-felismerő regex
+// minden importálható fuvar-mező + fejléc-felismerő regex.
+// A label-eket render-időben fordítjuk (lk = i18n-kulcs).
 var OI_FIELDS = [
-  { k:'client',          label:'Ügyfél',            re:/client|ugyfel|ügyf|customer|beneficiar|megrend/i },
-  { k:'ref',             label:'Referencia',        re:/\bref|rendel|order\s*(no|nr|id)|comand|hivatk/i },
-  { k:'loc_incarcare',   label:'Felrakó',           re:/felrak|incarc|loading|^load|pickup|origin|honnan|berak/i },
-  { k:'loc_descarcare',  label:'Lerakó',            re:/lerak|descarc|unload|deliver|dest|hova|kirak/i },
-  { k:'data_incarcare',  label:'Felrakás dátuma',   re:/(felrak|incarc|load|pickup).*(dat|date|nap)/i },
-  { k:'data_descarcare', label:'Lerakás dátuma',    re:/(lerak|descarc|unload|deliv).*(dat|date|nap)/i },
-  { k:'pret',            label:'Ár',                re:/\bar\b|ár|pret|price|fuvardij|díj|tarif|fee|amount/i },
-  { k:'km',              label:'Km',                re:/\bkm\b|távol|distan|distanta/i },
-  { k:'suly_kg',         label:'Súly (kg)',         re:/suly|súly|weight|greutate|\bkg\b|tonna|massa/i },
-  { k:'load_type',       label:'FTL/LTL típus',     re:/ftl|ltl|rakomany|rakomány|load.?type|tip.*marf/i },
-  { k:'hossz_cm',        label:'Hossz (cm)',        re:/hossz|length|lungim|\blung/i },
-  { k:'szel_cm',         label:'Szélesség (cm)',    re:/szel|width|latim|\blat\b/i },
-  { k:'mag_cm',          label:'Magasság (cm)',     re:/magas|height|inalt|\bmag\b/i },
-  { k:'rendszam_camion', label:'Vontató rendszám',  re:/vontat|camion|truck|tractor|kamion/i },
-  { k:'rendszam_remorca',label:'Pótkocsi rendszám', re:/potkocs|pótkocs|remorc|trailer|utánf/i },
-  { k:'nume_sofer',      label:'Sofőr neve',        re:/sofer|sofőr|driver|conducator/i },
-  { k:'email_sofer',     label:'Sofőr e-mail',      re:/e-?mail/i },
-  { k:'firma_extern',    label:'Külsős cég',        re:/extern|subcontr|transportator|alváll/i },
-  { k:'telefon_extern',  label:'Külsős telefon',    re:/tel|phone|telefon|mobil/i },
+  { k:'client',          lk:'cs.oiClient',      re:/client|ugyfel|ügyf|customer|beneficiar|megrend/i },
+  { k:'ref',             lk:'cs.oiRef',         re:/\bref|rendel|order\s*(no|nr|id)|comand|hivatk/i },
+  { k:'loc_incarcare',   lk:'cs.oiLoad',        re:/felrak|incarc|loading|^load|pickup|origin|honnan|berak/i },
+  { k:'loc_descarcare',  lk:'cs.oiUnload',      re:/lerak|descarc|unload|deliver|dest|hova|kirak/i },
+  { k:'data_incarcare',  lk:'cs.oiLoadDate',    re:/(felrak|incarc|load|pickup).*(dat|date|nap)/i },
+  { k:'data_descarcare', lk:'cs.oiUnloadDate',  re:/(lerak|descarc|unload|deliv).*(dat|date|nap)/i },
+  { k:'pret',            lk:'cs.oiPrice',       re:/\bar\b|ár|pret|price|fuvardij|díj|tarif|fee|amount/i },
+  { k:'km',              lk:'cs.oiKm',          re:/\bkm\b|távol|distan|distanta/i },
+  { k:'suly_kg',         lk:'cs.oiWeight',      re:/suly|súly|weight|greutate|\bkg\b|tonna|massa/i },
+  { k:'load_type',       lk:'cs.oiLoadType',    re:/ftl|ltl|rakomany|rakomány|load.?type|tip.*marf/i },
+  { k:'hossz_cm',        lk:'cs.oiLength',      re:/hossz|length|lungim|\blung/i },
+  { k:'szel_cm',         lk:'cs.oiWidth',       re:/szel|width|latim|\blat\b/i },
+  { k:'mag_cm',          lk:'cs.oiHeight',      re:/magas|height|inalt|\bmag\b/i },
+  { k:'rendszam_camion', lk:'cs.oiTractor',     re:/vontat|camion|truck|tractor|kamion/i },
+  { k:'rendszam_remorca',lk:'cs.oiTrailer',     re:/potkocs|pótkocs|remorc|trailer|utánf/i },
+  { k:'nume_sofer',      lk:'cs.oiDriverName',  re:/sofer|sofőr|driver|conducator/i },
+  { k:'email_sofer',     lk:'cs.oiDriverEmail', re:/e-?mail/i },
+  { k:'firma_extern',    lk:'cs.oiExtCompany',  re:/extern|subcontr|transportator|alváll/i },
+  { k:'telefon_extern',  lk:'cs.oiExtPhone',    re:/tel|phone|telefon|mobil/i },
 ];
+// label getter: a régi .label helyett mindig render-időben fordít
+function oiLabel(fl){ return fl.lk ? T(fl.lk) : (fl.label||fl.k); }
 
 function openOrderImport(){
   ensureOrderImportModal();
@@ -816,11 +866,11 @@ function ensureOrderImportModal(){
   if(document.getElementById('orderImportModal')) return;
   var d=document.createElement('div'); d.id='orderImportModal';
   d.innerHTML='<div class="oi-card">'
-    +'<div class="oi-head"><b class="text-primary" style="font-size:15px;">📥 Fuvar-CSV import</b>'
-    +'<button class="btn ghost" style="margin-left:auto;padding:5px 12px;" onclick="closeOrderImport()">✕ Bezár</button></div>'
+    +'<div class="oi-head"><b class="text-primary" style="font-size:15px;">'+esc(T('cs.oiCardTitle'))+'</b>'
+    +'<button class="btn ghost" style="margin-left:auto;padding:5px 12px;" onclick="closeOrderImport()">'+esc(T('cs.oiClose'))+'</button></div>'
     +'<div class="oi-body">'
-    +'<div class="text-muted" style="font-size:12px;margin-bottom:10px;line-height:1.5;">Töltsd fel a gyári/szállítói fuvarlistát (.csv). A rendszer felismeri az elválasztót, és fejléc-név alapján automatikusan párosítja az oszlopokat — ellenőrizd/javítsd, majd importálj. <b>A nem párosított oszlopok nem vesznek el:</b> a fuvar „Importált extra adatok" mezőjébe kerülnek (a szerkesztőben megnézhető).</div>'
-    +'<div class="field" style="max-width:420px;"><label>CSV fájl</label><input class="input" type="file" id="oiFile" accept=".csv,.txt" onchange="orderImportParse()"></div>'
+    +'<div class="text-muted" style="font-size:12px;margin-bottom:10px;line-height:1.5;">'+T('cs.oiIntro')+'</div>'
+    +'<div class="field" style="max-width:420px;"><label>'+esc(T('cs.oiFile'))+'</label><input class="input" type="file" id="oiFile" accept=".csv,.txt" onchange="orderImportParse()"></div>'
     +'<div id="oiMapping" style="margin-top:14px;"></div>'
     +'<div id="oiResult" style="margin-top:12px;"></div>'
     +'</div></div>';
@@ -840,17 +890,17 @@ function orderImportParse(){
     _oiHeader=split(lines[0]);
     _oiRows=lines.slice(1).map(split);
 
-    var opts='<option value="">— (nincs / extra) —</option>'+_oiHeader.map(function(h,i){ return '<option value="'+i+'">'+esc(h||('oszlop '+(i+1)))+'</option>'; }).join('');
+    var opts='<option value="">'+esc(T('cs.oiNoneExtra'))+'</option>'+_oiHeader.map(function(h,i){ return '<option value="'+i+'">'+esc(h||(T('cs.oiColumn')+(i+1)))+'</option>'; }).join('');
     var cells=OI_FIELDS.map(function(fl){
-      return '<div class="field" style="margin:0;"><label>'+esc(fl.label)+'</label>'
+      return '<div class="field" style="margin:0;"><label>'+esc(oiLabel(fl))+'</label>'
         +'<select class="select" id="oiCol_'+fl.k+'" onchange="orderImportPreview()">'+opts+'</select></div>';
     }).join('');
     document.getElementById('oiMapping').innerHTML=
       '<div class="glass-soft" style="padding:14px;">'
-      +'<div class="text-primary" style="font-size:13px;font-weight:700;margin-bottom:10px;">Oszlop-párosítás — '+_oiRows.length+' sor (elválasztó: <code>'+(delim==='\t'?'TAB':esc(delim))+'</code>)</div>'
+      +'<div class="text-primary" style="font-size:13px;font-weight:700;margin-bottom:10px;">'+esc(T('cs.oiMapTitle'))+_oiRows.length+esc(T('cs.oiRowsSep'))+'<code>'+(delim==='\t'?'TAB':esc(delim))+'</code>)</div>'
       +'<div class="oi-map-grid">'+cells+'</div>'
       +'<div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap;">'
-      +'<button class="btn primary" onclick="orderImportRun(this)">📥 '+_oiRows.length+' fuvar importálása</button>'
+      +'<button class="btn primary" onclick="orderImportRun(this)">📥 '+_oiRows.length+esc(T('cs.oiImportBtn'))+'</button>'
       +'<span id="oiUnmapped" class="text-muted" style="font-size:11.5px;"></span>'
       +'</div>'
       +'<div id="oiPreview" style="margin-top:12px;"></div>'
@@ -908,30 +958,30 @@ function orderImportPreview(){
   var used={}; OI_FIELDS.forEach(function(fl){ var ci=oiColIndex(fl.k); if(ci>=0) used[ci]=true; });
   var unmapped=_oiHeader.filter(function(h,i){ return !used[i]; });
   if(un) un.innerHTML = unmapped.length
-    ? '⚠️ Nem párosított oszlop ('+unmapped.length+'): <b>'+esc(unmapped.join(', ').slice(0,120))+'</b> → a fuvar „Importált extra adatok" mezőjébe kerül.'
-    : '✓ Minden oszlop párosítva.';
+    ? T('cs.oiUnmappedCol')+unmapped.length+'): <b>'+esc(unmapped.join(', ').slice(0,120))+'</b>'+T('cs.oiUnmappedToExtra')
+    : T('cs.oiAllMapped');
   // előnézet: első 3 sor a párosítás szerint
   var cols=OI_FIELDS.filter(function(fl){ return oiColIndex(fl.k)>=0; });
-  var head='<tr>'+cols.map(function(fl){ return '<th>'+esc(fl.label)+'</th>'; }).join('')+(unmapped.length?'<th>+ extra</th>':'')+'</tr>';
+  var head='<tr>'+cols.map(function(fl){ return '<th>'+esc(oiLabel(fl))+'</th>'; }).join('')+(unmapped.length?'<th>'+esc(T('cs.oiExtraCol'))+'</th>':'')+'</tr>';
   var body=_oiRows.slice(0,3).map(function(r){
     var o=oiBuildRow(r);
     return '<tr>'+cols.map(function(fl){ var v=o[fl.k]; return '<td>'+esc(v==null||v===''?'—':String(v))+'</td>'; }).join('')
-      +(unmapped.length?'<td class="text-muted">'+esc(o.import_extra?Object.keys(o.import_extra).length+' mező':'—')+'</td>':'')+'</tr>';
+      +(unmapped.length?'<td class="text-muted">'+esc(o.import_extra?Object.keys(o.import_extra).length+T('cs.oiFieldsWord'):'—')+'</td>':'')+'</tr>';
   }).join('');
-  if(pv) pv.innerHTML='<div class="text-muted" style="font-size:11px;margin-bottom:4px;">Előnézet (első 3 sor):</div><div class="oi-prev"><table><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>';
+  if(pv) pv.innerHTML='<div class="text-muted" style="font-size:11px;margin-bottom:4px;">'+esc(T('cs.oiPreview'))+'</div><div class="oi-prev"><table><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>';
 }
 function orderImportRun(btn){
   if(!_oiRows.length){ toast(t('am.uploadCsvFirst'),'err'); return; }
   var rows=_oiRows.map(oiBuildRow);
-  if(btn){ btn.disabled=true; btn.textContent='Importálás…'; }
+  if(btn){ btn.disabled=true; btn.textContent=T('cs.oiImporting'); }
   gas('bulkCreateOrders',[{rows:rows}]).then(function(r){
-    if(btn){ btn.disabled=false; btn.textContent='📥 '+_oiRows.length+' fuvar importálása'; }
+    if(btn){ btn.disabled=false; btn.textContent='📥 '+_oiRows.length+T('cs.oiImportBtn'); }
     var res=document.getElementById('oiResult');
     if(r&&r.ok){
-      toast(t('am.importDone')+r.inserted+' fuvar létrehozva'+(r.skipped?(' · '+r.skipped+' kihagyva'):''),'ok');
+      toast(t('am.importDone')+r.inserted+T('cs.oiCreated')+(r.skipped?(' · '+r.skipped+T('cs.oiSkipped')):''),'ok');
       if(res) res.innerHTML='<div class="glass-soft" style="padding:12px;border:1px solid rgba(34,197,94,0.4);">'
-        +'<b style="color:var(--status-ok);">✅ '+r.inserted+' fuvar létrehozva.</b>'
-        +(r.skipped?(' <span class="text-muted">'+r.skipped+' sor kihagyva (üres/hibás).</span>'):'')
+        +'<b style="color:var(--status-ok);">✅ '+r.inserted+T('cs.oiCreatedOk')+'</b>'
+        +(r.skipped?(' <span class="text-muted">'+r.skipped+T('cs.oiSkippedRows')+'</span>'):'')
         +'</div>';
       if(typeof loadOrders==='function') loadOrders();
     } else { toast((r&&r.err)||'Import hiba','err'); }
@@ -968,9 +1018,9 @@ function createOrder(){
   gas('comCreate',[p]).then(r=>{
     if(r&&r.ok){
       let extra='';
-      if(r.paired_driver)extra=' · 👤 párosított sofőr: '+r.paired_driver;
-      else if(r.paired_vehicle)extra=' · 🚛 párosított jármű: '+r.paired_vehicle;
-      if(r.paired_trailer)extra+=' · 🚚 párosított pótkocsi: '+r.paired_trailer;
+      if(r.paired_driver)extra=' · 👤 '+T('cs.pairedDriverLbl')+r.paired_driver;
+      else if(r.paired_vehicle)extra=' · 🚛 '+T('cs.pairedVehicleLbl')+r.paired_vehicle;
+      if(r.paired_trailer)extra+=' · 🚚 '+T('cs.pairedTrailerLbl')+r.paired_trailer;
       toast(t('am.orderSaved')+r.id+extra,'ok');
       loadOrders();
       ['oClient','oRef','oPret','oKm','oSuly','oHossz','oSzel','oMag','oLoad','oUnload','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -994,18 +1044,18 @@ function createVehicle(tip){
     v.cargo_height_cm=(document.getElementById('ptCargoHei')||{}).value||null;
   }
   if(!v.rendszam){toast(t('am.plateReq'),'err');return;}
-  gas('vehicleCreate',[v]).then(r=>{if(r.ok){toast((tip==='Vontato'?'Vontató':'Pótkocsi')+' hozzáadva!','ok');['Rendszam','Marca','Model','An','Nota'].forEach(f=>{document.getElementById(prefix+f).value='';});if(tip==='Potkocsi'&&typeof resetTrailerFormDefaults==='function')resetTrailerFormDefaults();loadVehicles();}else{toast(r.err||'Hiba történt','err');}});
+  gas('vehicleCreate',[v]).then(r=>{if(r.ok){toast((tip==='Vontato'?T('cs.tractorWord'):T('cs.trailerWord'))+T('cs.addedSuffix'),'ok');['Rendszam','Marca','Model','An','Nota'].forEach(f=>{document.getElementById(prefix+f).value='';});if(tip==='Potkocsi'&&typeof resetTrailerFormDefaults==='function')resetTrailerFormDefaults();loadVehicles();}else{toast(r.err||T('cs.errorOccurred'),'err');}});
 }
 
 function deleteExtDriver(id){
   const d=extDriverCache.find(x=>x.id===id);
   const nev=d?(d.nume||d.firma||'?'):'?';
-  if(!confirm('Biztosan törlöd: '+nev+'?'))return;
+  if(!confirm(T('cs.confirmDelete',{name:nev})))return;
   gas('extDriverDelete',[id]).then(r=>{if(r.ok){toast(t('am.deletedX'),'ok');loadExtDrivers();}else{toast(r.err||'Hiba történt','err');}});
 }
 
 function deleteLeg(legId) {
-  if (!confirm('Törlöd ezt a váltást?')) return;
+  if (!confirm(T('cs.confirmDeleteSwap'))) return;
   gas('deleteOrderLeg', [legId]).then(function(r) {
     if (r && r.ok) {
       toast(t('am.deleted'),'ok');
@@ -1019,7 +1069,7 @@ function deleteLeg(legId) {
 function deleteVehicle(id){
   const v=vehicleCache.find(x=>x.id===id);
   const rendszam=v?v.rendszam:'?';
-  if(!confirm('Biztosan törlöd a(z) '+rendszam+' rendszámú járművet?'))return;
+  if(!confirm(T('cs.confirmDeleteVehicle',{plate:rendszam})))return;
   gas('vehicleDelete',[id]).then(r=>{if(r.ok){toast(t('am.deletedX'),'ok');loadVehicles();}else{toast(r.err||'Hiba történt','err');}});
 }
 
@@ -1297,25 +1347,25 @@ function loadClientPortalAccess(){
   var box=document.getElementById('clientPortalAccessBox'); if(!box) return;
   // OPT-IN funkció: csak ha a developer bekapcsolta ennél a cégnél
   if(!(window._vsFeatures && window._vsFeatures['client-portal']===true)){
-    box.innerHTML='<div class="glass" style="padding:14px 18px;"><div class="text-muted" style="font-size:12.5px;">🔑 <b>Ügyfél-portál</b> — a megrendelőid saját belépéssel látnák a fuvarjaikat, dokumentumaikat, és új fuvart igényelhetnének. Ez a funkció jelenleg nincs bekapcsolva (a developer a Funkciók fülön engedélyezi).</div></div>';
+    box.innerHTML='<div class="glass" style="padding:14px 18px;"><div class="text-muted" style="font-size:12.5px;">'+T('cs.cpDisabled')+'</div></div>';
     return;
   }
-  box.innerHTML='<div class="glass" style="padding:18px 20px;"><div style="font-size:16px;font-weight:800;margin-bottom:4px;">👥 Ügyfél-portál hozzáférések</div>'
-    +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">Meghívhatod az ügyfél kapcsolattartóját, hogy belépjen a <b>/portal</b> oldalon, és csak a SAJÁT cége fuvarjait lássa (státusz, élő követés, dokumentumok), illetve új fuvart igényeljen (jóváhagyással).</div>'
+  box.innerHTML='<div class="glass" style="padding:18px 20px;"><div style="font-size:16px;font-weight:800;margin-bottom:4px;">'+esc(T('cs.cpTitle'))+'</div>'
+    +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">'+T('cs.cpSub')+'</div>'
     +'<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:16px;">'
-    +'<div class="field" style="margin:0;min-width:200px;"><label>Ügyfél</label><select class="select" id="cpClientSel"><option value="">— Válassz ügyfelet —</option></select></div>'
-    +'<div class="field" style="margin:0;min-width:200px;"><label>Kapcsolattartó e-mail</label><input class="input" id="cpEmail" placeholder="pl. logisztika@gyar.ro"></div>'
-    +'<div class="field" style="margin:0;min-width:150px;"><label>Név (opcionális)</label><input class="input" id="cpNev"></div>'
-    +'<button class="btn ok" style="height:42px;" onclick="cpInvite()">＋ Meghívó küldése</button>'
+    +'<div class="field" style="margin:0;min-width:200px;"><label>'+esc(T('cs.cpClient'))+'</label><select class="select" id="cpClientSel"><option value="">'+esc(T('cs.cpChooseClient'))+'</option></select></div>'
+    +'<div class="field" style="margin:0;min-width:200px;"><label>'+esc(T('cs.cpContactEmail'))+'</label><input class="input" id="cpEmail" placeholder="pl. logisztika@gyar.ro"></div>'
+    +'<div class="field" style="margin:0;min-width:150px;"><label>'+esc(T('cs.cpName'))+'</label><input class="input" id="cpNev"></div>'
+    +'<button class="btn ok" style="height:42px;" onclick="cpInvite()">'+esc(T('cs.cpSendInvite'))+'</button>'
     +'</div>'
     +'<div id="cpInviteLink"></div>'
-    +'<div id="cpList"><div class="text-muted" style="font-size:12px;">Betöltés…</div></div>'
+    +'<div id="cpList"><div class="text-muted" style="font-size:12px;">'+esc(T('cs.loading'))+'</div></div>'
     +'</div>';
   // ügyfél-lista a választóhoz
   fetch('/api/clients',{credentials:'same-origin'}).then(function(r){return r.json();}).then(function(list){
     _cpClients=Array.isArray(list)?list:(list&&list.rows)||[];
     var sel=document.getElementById('cpClientSel'); if(!sel) return;
-    sel.innerHTML='<option value="">— Válassz ügyfelet —</option>'+_cpClients.map(function(c){
+    sel.innerHTML='<option value="">'+esc(T('cs.cpChooseClient'))+'</option>'+_cpClients.map(function(c){
       return '<option value="'+c.id+'">'+esc(c.nev||('#'+c.id))+'</option>'; }).join('');
   }).catch(function(){});
   cpRefresh();
@@ -1323,19 +1373,19 @@ function loadClientPortalAccess(){
 function cpRefresh(){
   gas('clientPortalList').then(function(r){
     var el=document.getElementById('cpList'); if(!el) return;
-    if(!r||!r.ok){ el.innerHTML='<div class="text-muted" style="font-size:12px;">Betöltési hiba.</div>'; return; }
+    if(!r||!r.ok){ el.innerHTML='<div class="text-muted" style="font-size:12px;">'+esc(T('cs.loadErr2'))+'</div>'; return; }
     var items=r.items||[];
-    if(!items.length){ el.innerHTML='<div class="text-muted" style="font-size:12px;padding:6px 0;">Még nincs portál-hozzáférés.</div>'; return; }
+    if(!items.length){ el.innerHTML='<div class="text-muted" style="font-size:12px;padding:6px 0;">'+esc(T('cs.cpNoAccess'))+'</div>'; return; }
     window._cpItems=items;
     el.innerHTML=items.map(function(it,i){
-      var status = it.pending_invite ? '<span class="badge warn">Meghívó kiküldve</span>'
-        : (it.activ ? '<span class="badge ok">Aktív</span>' : '<span class="badge err">Letiltva</span>');
-      var last = it.last_login ? ('utolsó belépés: '+String(it.last_login).replace('T',' ').slice(0,16)) : 'még nem lépett be';
+      var status = it.pending_invite ? '<span class="badge warn">'+esc(T('cs.cpInviteSentBadge'))+'</span>'
+        : (it.activ ? '<span class="badge ok">'+esc(T('cs.cpActive'))+'</span>' : '<span class="badge err">'+esc(T('cs.cpBlocked'))+'</span>');
+      var last = it.last_login ? (T('cs.cpLastLogin')+String(it.last_login).replace('T',' ').slice(0,16)) : T('cs.cpNeverLoggedIn');
       return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border,rgba(255,255,255,.08));border-radius:10px;margin-bottom:6px;background:rgba(255,255,255,.02);">'
         +'<div style="flex:1;min-width:0;"><div style="font-weight:700;">'+esc(it.email)+'</div>'
         +'<div class="text-muted" style="font-size:12px;">'+esc(it.client_nev||'')+' · '+esc(last)+'</div></div>'
         +status
-        +'<button class="btn ghost" style="padding:6px 10px;font-size:12px;" onclick="cpToggle('+i+')">'+(it.activ?'Letiltás':'Aktiválás')+'</button>'
+        +'<button class="btn ghost" style="padding:6px 10px;font-size:12px;" onclick="cpToggle('+i+')">'+(it.activ?esc(T('cs.cpBlock')):esc(T('cs.cpActivate')))+'</button>'
         +'</div>';
     }).join('');
   });
@@ -1348,10 +1398,10 @@ function cpInvite(){
   if(!email){ toast(t('am.giveContactEmail'),'err'); return; }
   gas('clientPortalInvite',[{client_id:cid, email:email, nev:nev}]).then(function(r){
     if(r&&r.ok){
-      toast(r.emailed?'✉️ Meghívó elküldve e-mailben':'Meghívó létrehozva — másold ki a linket','ok');
+      toast(r.emailed?T('cs.cpInviteSent'):T('cs.cpInviteCreated'),'ok');
       var lb=document.getElementById('cpInviteLink');
       if(lb) lb.innerHTML='<div class="glass-soft" style="padding:10px 12px;margin-bottom:12px;border:1px solid rgba(34,197,94,.4);font-size:12px;">'
-        +(r.emailed?'✉️ A meghívót elküldtük e-mailben. ':'')+'Jelszó-beállító link (másolható): <br><code style="word-break:break-all;color:var(--text-primary);">'+esc(r.link)+'</code></div>';
+        +(r.emailed?T('cs.cpInviteSentMail'):'')+T('cs.cpPwLinkCopy')+'<br><code style="word-break:break-all;color:var(--text-primary);">'+esc(r.link)+'</code></div>';
       document.getElementById('cpEmail').value=''; document.getElementById('cpNev').value='';
       cpRefresh();
     } else toast((r&&r.err)||'Hiba','err');
@@ -1360,7 +1410,7 @@ function cpInvite(){
 function cpToggle(i){
   var it=(window._cpItems||[])[i]; if(!it) return;
   gas('clientPortalSetActive',[it.id, !it.activ]).then(function(r){
-    if(r&&r.ok){ toast(it.activ?'Letiltva':'Aktiválva','ok'); cpRefresh(); }
+    if(r&&r.ok){ toast(it.activ?T('cs.cpBlockedWord'):T('cs.cpActivatedWord'),'ok'); cpRefresh(); }
     else toast((r&&r.err)||'Hiba','err');
   });
 }
@@ -1616,40 +1666,40 @@ function loadMapsProvider(){
       var m=usage.month||0;
       usageHtml='<div class="glass-soft" style="padding:12px 14px;margin-top:14px;">'
         +'<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
-        +'<span style="font-size:12px;color:var(--muted);font-weight:700;">📊 E havi használat ('+vendor.toUpperCase()+')</span>'
-        +'<span style="font-size:18px;font-weight:800;">'+m.toLocaleString('hu')+' <span style="font-size:12px;color:var(--muted);font-weight:500;">hívás</span></span>'
-        +'<span style="margin-left:auto;font-size:12px;color:var(--muted);">Fizetendő:</span>'
+        +'<span style="font-size:12px;color:var(--muted);font-weight:700;">'+esc(T('cs.mpUsageMonth'))+' ('+vendor.toUpperCase()+')</span>'
+        +'<span style="font-size:18px;font-weight:800;">'+m.toLocaleString('hu')+' <span style="font-size:12px;color:var(--muted);font-weight:500;">'+esc(T('cs.mpCalls'))+'</span></span>'
+        +'<span style="margin-left:auto;font-size:12px;color:var(--muted);">'+esc(T('cs.mpToPay'))+'</span>'
         +'<span style="font-size:22px;font-weight:800;color:#fbbf24;">'+costM.toFixed(2)+' €</span></div>'
-        +(costP?'<div style="font-size:11px;color:var(--muted);margin-top:4px;">Előző hó: '+(usage.prev||0).toLocaleString('hu')+' hívás · '+costP.toFixed(2)+' €</div>':'')
-        +'<div style="font-size:10.5px;color:var(--muted);margin-top:6px;">⚠️ <b>Nincs ingyenes keret</b> — az első hívástól fizetsz (hivatalos ár + '+marginPct+'% árrés). Csak a fizetős (keyes) geokódolás/keresés számít, a cache-találat nem.</div>'
+        +(costP?'<div style="font-size:11px;color:var(--muted);margin-top:4px;">'+esc(T('cs.mpPrevMonth'))+(usage.prev||0).toLocaleString('hu')+esc(T('cs.mpCallsWord'))+costP.toFixed(2)+' €</div>':'')
+        +'<div style="font-size:10.5px;color:var(--muted);margin-top:6px;">⚠️ '+T('cs.mpNoFreeQuota',{pct:marginPct})+'</div>'
         +'</div>';
     }
     box.innerHTML='<div class="glass" style="padding:18px 20px;border:1px solid rgba(59,130,246,.35);">'
-      +'<h3 style="font-size:16px;margin:0 0 4px;">🗺️ Térkép-szolgáltató (cím-keresés + geokódolás)</h3>'
-      +'<p style="color:var(--muted);font-size:12.5px;margin:0 0 14px;line-height:1.5;">Minden cégen elérhető az <b>ingyenes</b> szolgáltató (kulcs és díj nélkül). Megbízhatóbb keresésért kapcsold ki az ingyeneset, és válassz <b>HERE</b>/<b>Google</b> szolgáltatót a saját kulcsoddal — ekkor az első hívástól fizetsz (hivatalos ár + árrés). A routing/útdíj továbbra is az OSRM/ORS stacken megy.</p>'
+      +'<h3 style="font-size:16px;margin:0 0 4px;">'+esc(T('cs.mpTitle'))+'</h3>'
+      +'<p style="color:var(--muted);font-size:12.5px;margin:0 0 14px;line-height:1.5;">'+T('cs.mpDesc')+'</p>'
       +'<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;font-weight:600;margin-bottom:6px;">'
-      +'<input type="checkbox" id="mpFree" '+(vendor==='free'?'checked':'')+' onchange="mpToggleFree()" style="width:18px;height:18px;cursor:pointer;accent-color:#22c55e;"> 🆓 Ingyenes térkép használata (Photon/OSM) — díjmentes</label>'
+      +'<input type="checkbox" id="mpFree" '+(vendor==='free'?'checked':'')+' onchange="mpToggleFree()" style="width:18px;height:18px;cursor:pointer;accent-color:#22c55e;"> '+esc(T('cs.mpUseFree'))+'</label>'
       +'<div id="mpPaidWrap" style="'+(vendor==='free'?'display:none;':'')+'margin-top:10px;border-top:1px solid var(--border,rgba(255,255,255,.08));padding-top:12px;">'
       +'<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;">'
-      +'<div class="field" style="margin:0;min-width:170px;"><label>Fizetős szolgáltató</label><select class="select" id="mpVendor">'
-      +'<option value="here"'+(vendor==='here'?' selected':'')+'>HERE (ajánlott)</option>'
-      +'<option value="google"'+(vendor==='google'?' selected':'')+'>Google Maps</option></select></div>'
-      +'<div class="field" style="margin:0;flex:1;min-width:240px;"><label>API-kulcs '+(hasKey?'<span class="badge ok" style="font-size:10px;">tárolva</span>':'')+'</label><input class="input" id="mpKey" type="password" placeholder="'+(hasKey?'(változatlan, ha üresen hagyod)':'a szolgáltató API-kulcsa')+'"></div>'
-      +'<button class="btn ghost" style="height:42px;" onclick="mpTest()">🔌 Teszt</button>'
+      +'<div class="field" style="margin:0;min-width:170px;"><label>'+esc(T('cs.mpPaidProvider'))+'</label><select class="select" id="mpVendor">'
+      +'<option value="here"'+(vendor==='here'?' selected':'')+'>'+esc(T('cs.mpHereRec'))+'</option>'
+      +'<option value="google"'+(vendor==='google'?' selected':'')+'>'+esc(T('cs.mpGoogle'))+'</option></select></div>'
+      +'<div class="field" style="margin:0;flex:1;min-width:240px;"><label>'+esc(T('cs.mpApiKey'))+(hasKey?'<span class="badge ok" style="font-size:10px;">'+esc(T('cs.mpStored'))+'</span>':'')+'</label><input class="input" id="mpKey" type="password" placeholder="'+(hasKey?esc(T('cs.mpKeyUnchanged')):esc(T('cs.mpProviderKey')))+'"></div>'
+      +'<button class="btn ghost" style="height:42px;" onclick="mpTest()">'+esc(T('cs.mpTest'))+'</button>'
       +'</div><div id="mpMsg" style="margin-top:8px;font-size:12px;"></div>'+usageHtml+'</div>'
-      +'<button class="btn primary" style="margin-top:14px;" onclick="mpSave()">Mentés</button>'
+      +'<button class="btn primary" style="margin-top:14px;" onclick="mpSave()">'+esc(T('cs.save'))+'</button>'
       +'</div>';
   });
 }
 function mpToggleFree(){ var f=document.getElementById('mpFree'); var w=document.getElementById('mpPaidWrap'); if(w) w.style.display=(f&&f.checked)?'none':'block'; }
 function mpTest(){
   var vendor=(document.getElementById('mpVendor')||{}).value; var key=(document.getElementById('mpKey')||{}).value;
-  var m=document.getElementById('mpMsg'); if(m) m.innerHTML='<span class="text-muted">Tesztelés…</span>';
+  var m=document.getElementById('mpMsg'); if(m) m.innerHTML='<span class="text-muted">'+esc(T('cs.mpTesting'))+'</span>';
   gas('mapsTestProvider',[{vendor:vendor, key:key}]).then(function(r){
     if(!m) return;
-    if(r&&r.ok&&r.valid) m.innerHTML='<span style="color:var(--status-ok);">✅ A kulcs működik.</span>';
-    else if(r&&r.ok&&!r.valid) m.innerHTML='<span style="color:var(--status-danger);">❌ A kulcs nem érvényes / nem válaszolt.</span>';
-    else m.innerHTML='<span style="color:var(--status-danger);">'+esc((r&&r.err)||'Teszt hiba')+'</span>';
+    if(r&&r.ok&&r.valid) m.innerHTML='<span style="color:var(--status-ok);">'+esc(T('cs.mpKeyWorks'))+'</span>';
+    else if(r&&r.ok&&!r.valid) m.innerHTML='<span style="color:var(--status-danger);">'+esc(T('cs.mpKeyInvalid'))+'</span>';
+    else m.innerHTML='<span style="color:var(--status-danger);">'+esc((r&&r.err)||T('cs.mpTestErr'))+'</span>';
   });
 }
 function mpSave(){
@@ -1657,24 +1707,25 @@ function mpSave(){
   var vendor=free?'free':((document.getElementById('mpVendor')||{}).value||'here');
   var key=(document.getElementById('mpKey')||{}).value||'';
   gas('mapsSaveProvider',[{vendor:vendor, key:key}]).then(function(r){
-    if(r&&r.ok){ toast(free?'🆓 Ingyenes térkép bekapcsolva':'🗺️ Térkép-szolgáltató mentve','ok'); loadMapsProvider(); }
+    if(r&&r.ok){ toast(free?T('cs.mpFreeOn'):T('cs.mpSaved'),'ok'); loadMapsProvider(); }
     else toast((r&&r.err)||'Hiba','err');
   });
 }
 
 function loadInvites(){
   gas('invListAll').then(list=>{
-    if(!Array.isArray(list)){document.querySelector('#tblInv tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);">Nincs meghívókód.</td></tr>';return;}
+    if(!Array.isArray(list)){document.querySelector('#tblInv tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);">'+esc(T('cs.noInviteCode'))+'</td></tr>';return;}
     document.querySelector('#tblInv tbody').innerHTML=list.map(i=>{
       var sc=i.status==='Aktiv'?'ok':i.status==='Felhasznalva'?'info':'err';
+      var stLabel=i.status==='Aktiv'?T('cs.invAktiv'):i.status==='Felhasznalva'?T('cs.invUsed'):i.status;
       return '<tr>'
         +'<td><b style="color:#fff;">'+esc(i.kod)+'</b></td>'
         +'<td>'+i.pozicio+'</td>'
         +'<td>'+esc(i.nume||'—')+'</td>'
         +'<td>'+esc(i.email||'—')+'</td>'
         +'<td>'+esc(i.tel||'—')+'</td>'
-        +'<td><span class="badge '+sc+'">'+i.status+'</span></td>'
-        +'<td><button class="btn ghost" style="padding:3px 10px;font-size:12px;" onclick="revokeInv(\''+esc(i.kod)+'\')" '+(i.status!=='Aktiv'?'disabled':'')+'>Visszavon</button></td>'
+        +'<td><span class="badge '+sc+'">'+esc(stLabel)+'</span></td>'
+        +'<td><button class="btn ghost" style="padding:3px 10px;font-size:12px;" onclick="revokeInv(\''+esc(i.kod)+'\')" '+(i.status!=='Aktiv'?'disabled':'')+'>'+esc(T('cs.revoke'))+'</button></td>'
         +'</tr>';
     }).join('');
   }).catch(function(e){ console.error('loadInvites hiba:', e); toast(t('am.loadErr'),'err'); });
@@ -1855,7 +1906,7 @@ function orderFormPairFromVehicle(){
   if(remSel&&!remSel.value&&v.default_trailer_id){
     const t=remorcaCache.find(x=>String(x.id)===String(v.default_trailer_id));
     if(t){const ropt=[...remSel.options].find(o=>o.value===t.rendszam);
-      if(ropt){remSel.value=t.rendszam;toast(t('am.pairedTrailer')+t.rendszam+' (módosítható)','ok');}}
+      if(ropt){remSel.value=t.rendszam;toast(t('am.pairedTrailer')+t.rendszam+T('cs.modifiable'),'ok');}}
   }
   // sofőr auto-kitöltés a vontatóhoz rendelt belső sofőrből
   if(!v.assigned_driver_email)return;
@@ -1869,7 +1920,7 @@ function orderFormPairFromVehicle(){
   document.querySelectorAll('input[name="oSoferType"]').forEach(r=>{r.checked=(r.value==='Intern');});
   onSoferTypeChange('Intern');
   drvSel.value=opt.value;
-  toast(t('am.pairedDriver')+opt.text.split(' (')[0]+' (módosítható)','ok');
+  toast(t('am.pairedDriver')+opt.text.split(' (')[0]+T('cs.modifiable'),'ok');
 }
 function orderFormPairFromDriver(){
   const drvSel=document.getElementById('oInternDriver');
@@ -1881,7 +1932,7 @@ function orderFormPairFromDriver(){
   const opt=[...camSel.options].find(o=>o.value===v.rendszam);
   if(!opt)return;
   camSel.value=v.rendszam;
-  toast(t('am.pairedVehicle')+v.rendszam+' (módosítható)','ok');
+  toast(t('am.pairedVehicle')+v.rendszam+T('cs.modifiable'),'ok');
 }
 
 function openBugReport(){
@@ -1943,7 +1994,7 @@ function openDocModal(orderId){
 
 function openQuickVehicle(tip) {
   document.getElementById('qvTip').value = tip;
-  document.getElementById('quickVehicleTitle').textContent = tip === 'Vontato' ? 'Új vontató hozzáadása' : 'Új pótkocsi hozzáadása';
+  document.getElementById('quickVehicleTitle').textContent = tip === 'Vontato' ? T('cs.newTractor') : T('cs.newTrailer');
   document.getElementById('qvRendszam').value = '';
   document.getElementById('qvMarca').value = '';
   document.getElementById('qvModel').value = '';
@@ -2077,7 +2128,7 @@ function renderVehicleTable(tableId,list){
 }
 
 function revokeInv(kod){
-  if(!confirm('Biztosan visszavonod a(z) '+kod+' kodot?'))return;
+  if(!confirm(T('cs.confirmRevoke',{kod:kod})))return;
   gas('invRevoke',[kod]).then(r=>{if(r.ok){toast(t('am.revoked'),'ok');loadInvites();}else{toast(r.err||'Hiba','err');}});
 }
 
@@ -2119,7 +2170,7 @@ function saveQuickVehicle() {
   }
   gas('vehicleCreate', [v]).then(r => {
     if (r.ok) {
-      toast((tip === 'Vontato' ? 'Vontató' : 'Pótkocsi') + ' hozzáadva!', 'ok');
+      toast((tip === 'Vontato' ? T('cs.tractorWord') : T('cs.trailerWord')) + T('cs.addedSuffix'), 'ok');
       closeQuickVehicle();
       // frissitjuk a dropdown-t es automatikusan kivalasztjuk az ujat
       gas('vehicleList').then(list => {
@@ -2211,7 +2262,7 @@ function settings2faConfirm() {
 function settings2faDisable(){
   var pwd = document.getElementById('st2faDisablePwd').value;
   if(!pwd){ toast(t('am.givePw'),'err'); return; }
-  if(!confirm('Biztosan kikapcsolod a kétlépéses hitelesítést? Ez csökkenti a fiókod biztonságát.')) return;
+  if(!confirm(T('cs.confirmDisable2fa'))) return;
   gas('settings2faDisable',[{currentPwd:pwd}]).then(function(r){
     if(r&&r.ok){
       toast(t('am.twofaOff'),'ok');
