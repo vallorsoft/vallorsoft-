@@ -60,6 +60,17 @@ function activateTab(name){
   if(window.innerWidth<=768 && typeof closeSidebar==='function') closeSidebar();
 }
 
+// Nyelvváltáskor: a JS-ből generált (nem data-i18n) tartalom nem frissül magától,
+// ezért az aktívan látszó fül betöltőjét újrafuttatjuk az új nyelven.
+// (A statikus data-i18n elemeket az I18N motor már frissítette.)
+window.onLangChange = function(){
+  try {
+    var active = document.querySelector('.pane:not(.hidden)');
+    var name = active && active.getAttribute('data-pane');
+    if(name && typeof loadTab === 'function') loadTab(name);
+  } catch(e){}
+};
+
 function addStampToPage(){
   if(!pdfDocProxy){ toast('Előbb töltsd be a PDF-et!','err'); return; }
   if(!savedStampBase64){ toast('Nincs mentett pecsét!','err'); return; }
@@ -2094,36 +2105,37 @@ function loadDashboard() {
 /* ── Legutóbbi fuvarok ── */
 // A DB román státuszokat tárol — magyar címke + szín-leképezés.
 var DASH_STATUS_MAP = {
-  'Finalizat':  { c: 'ok',   t: 'Teljesítve' },
-  'In Curs':    { c: 'warn', t: 'Folyamatban' },
-  'Alocat':     { c: 'info', t: 'Várakozik' },
-  'Disponibil': { c: 'err',  t: 'Tervezetlen' },
-  'Extern':     { c: 'info', t: 'Külső' },
-  'Anulat':     { c: 'err',  t: 'Törölve' }
+  'Finalizat':  { c: 'ok',   k: 'status.Finalizat' },
+  'In Curs':    { c: 'warn', k: 'status.InCurs' },
+  'Alocat':     { c: 'info', k: 'status.Alocat' },
+  'Disponibil': { c: 'err',  k: 'status.Disponibil' },
+  'Extern':     { c: 'info', k: 'status.Extern' },
+  'Anulat':     { c: 'err',  k: 'status.Anulat' }
 };
 function loadDashRecentOrders() {
   var tb = document.getElementById('dashRecentOrdersBody');
   if (!tb) return;
   gas('getRecentOrders', [8]).then(function (r) {
     if (!r || !r.ok) {
-      tb.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">Nem sikerült betölteni.</td></tr>';
+      tb.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">' + t('dash.loadFail') + '</td></tr>';
       return;
     }
     var list = r.orders || [];
     if (!list.length) {
-      tb.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">Nincs fuvar.</td></tr>';
+      tb.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">' + t('dash.noOrders') + '</td></tr>';
       return;
     }
     tb.innerHTML = list.map(function (o) {
       var drv = o.nume_sofer || o.driver_user_name || o.email_sofer || '—';
       var dest = o.loc_descarcare || '—';
-      var sm = DASH_STATUS_MAP[o.status] || { c: 'info', t: o.status || '—' };
+      var sm = DASH_STATUS_MAP[o.status] || { c: 'info' };
+      var smt = sm.k ? t(sm.k) : (o.status || '—');
       var dt = o.created_at ? new Date(o.created_at).toLocaleDateString('hu-HU') : '—';
       return '<tr>'
         + '<td><b class="text-primary">' + esc(String(o.id)) + '</b></td>'
         + '<td>' + esc(dest) + '</td>'
         + '<td>' + esc(drv) + '</td>'
-        + '<td><span class="badge ' + sm.c + '">' + esc(sm.t) + '</span></td>'
+        + '<td><span class="badge ' + sm.c + '">' + esc(smt) + '</span></td>'
         + '<td class="text-muted">' + dt + '</td>'
         + '</tr>';
     }).join('');
@@ -2137,9 +2149,9 @@ function loadDashVehicleSummary() {
   gas('getVehicleStatusSummary').then(function (r) {
     if (!r || !r.ok) { box.innerHTML = ''; return; }
     var cards = [
-      { l: 'Aktív járművek', v: r.active || 0,   col: (r.active > 0 ? 'var(--status-ok)' : 'var(--text-muted)'), ico: '🟢' },
-      { l: 'Álló járművek',  v: r.inactive || 0, col: 'var(--text-muted)', ico: '⚪' },
-      { l: 'Ismeretlen',     v: r.unknown || 0,  col: 'var(--text-muted)', ico: '❔' }
+      { l: t('dash.vehActive'),  v: r.active || 0,   col: (r.active > 0 ? 'var(--status-ok)' : 'var(--text-muted)'), ico: '🟢' },
+      { l: t('dash.vehIdle'),    v: r.inactive || 0, col: 'var(--text-muted)', ico: '⚪' },
+      { l: t('dash.vehUnknown'), v: r.unknown || 0,  col: 'var(--text-muted)', ico: '❔' }
     ];
     box.innerHTML = cards.map(function (c) {
       return '<div class="dash-mini glass-soft">'
@@ -2205,7 +2217,7 @@ function refreshDashVehicles() {
       var ph = L.circleMarker([45.9432, 24.9668], {
         radius: 9, color: '#8a97a8', fillColor: '#8a97a8', fillOpacity: 0.6, weight: 2
       });
-      ph.bindTooltip(r.gps_configured ? 'Nincs aktív GPS adat' : 'GPS integráció nincs beállítva');
+      ph.bindTooltip(r.gps_configured ? t('dash.noGpsData') : t('dash.noGpsSetup'));
       ph.addTo(window._dashMarkers);
       return;
     }
@@ -2216,7 +2228,7 @@ function refreshDashVehicles() {
         radius: 8, color: '#e10b1a', fillColor: '#e10b1a', fillOpacity: 0.85, weight: 2
       });
       m.bindTooltip('🚛 ' + (p.object_name || p.rendszam) + ' · ' + spd);
-      m.bindPopup('<b>' + esc(p.object_name || p.rendszam) + '</b><br>Sebesség: ' + spd
+      m.bindPopup('<b>' + esc(p.object_name || p.rendszam) + '</b><br>' + t('dash.speed') + ': ' + spd
         + (p.datetime ? '<br>' + new Date(p.datetime).toLocaleString('hu-HU') : ''));
       m.addTo(window._dashMarkers);
       bounds.push([p.lat, p.lng]);

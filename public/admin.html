@@ -111,7 +111,7 @@
       <div class="dash-topbar">
         <div>
           <div class="text-primary" style="font-size:22px; font-weight:800;" id="dashCegNev">—</div>
-          <div class="text-muted" style="font-size:12px;">Cég dashboard</div>
+          <div class="text-muted" style="font-size:12px;" data-i18n="dash.subtitle">Cég dashboard</div>
         </div>
         <div id="langSwitch" style="display:inline-flex;gap:4px;margin-right:8px;vertical-align:middle;"></div>
         <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Világos mód" aria-label="Téma váltása">🌙</button>
@@ -122,19 +122,19 @@
       <div class="dash-stats" style="margin-bottom:20px;">
         <div class="glass stat-tile">
           <div class="stat-ico">📦</div>
-          <div><div class="stat-val text-primary" id="kpiTotal">—</div><div class="stat-lbl text-muted">Összes fuvar</div></div>
+          <div><div class="stat-val text-primary" id="kpiTotal">—</div><div class="stat-lbl text-muted" data-i18n="dash.kpiTotal">Összes fuvar</div></div>
         </div>
         <div class="glass stat-tile">
           <div class="stat-ico">🚚</div>
-          <div><div class="stat-val text-primary" id="kpiAktiv">—</div><div class="stat-lbl text-muted">Aktív fuvar</div></div>
+          <div><div class="stat-val text-primary" id="kpiAktiv">—</div><div class="stat-lbl text-muted" data-i18n="dash.kpiActive">Aktív fuvar</div></div>
         </div>
         <div class="glass stat-tile">
           <div class="stat-ico">👥</div>
-          <div><div class="stat-val text-primary" id="cUsers">—</div><div class="stat-lbl text-muted">Felhasználók</div></div>
+          <div><div class="stat-val text-primary" id="cUsers">—</div><div class="stat-lbl text-muted" data-i18n="dash.kpiUsers">Felhasználók</div></div>
         </div>
         <div class="glass stat-tile">
           <div class="stat-ico">📄</div>
-          <div><div class="stat-val text-primary" id="countFuv">—</div><div class="stat-lbl text-muted">Beérkezett menetlevelek</div></div>
+          <div><div class="stat-val text-primary" id="countFuv">—</div><div class="stat-lbl text-muted" data-i18n="dash.kpiWaybills">Beérkezett menetlevelek</div></div>
         </div>
       </div>
 
@@ -144,23 +144,23 @@
            <!-- Legutóbbi fuvarok -->
           <div class="glass" style="padding:18px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-              <div class="text-primary" style="font-size:15px;font-weight:700;">Legutóbbi fuvarok</div>
-              <span class="dash-link" onclick="activateTab('orders-list')">Összes fuvar →</span>
+              <div class="text-primary" style="font-size:15px;font-weight:700;" data-i18n="dash.recentOrders">Legutóbbi fuvarok</div>
+              <span class="dash-link" onclick="activateTab('orders-list')" data-i18n="dash.allOrders">Összes fuvar →</span>
             </div>
             <div style="overflow-x:auto;">
               <table class="table" id="dashRecentOrders">
-                <thead><tr><th>Fuvar</th><th>Úticél</th><th>Sofőr</th><th>Státusz</th><th>Dátum</th></tr></thead>
+                <thead><tr><th data-i18n="dash.colOrder">Fuvar</th><th data-i18n="dash.colDest">Úticél</th><th data-i18n="dash.colDriver">Sofőr</th><th data-i18n="dash.colStatus">Státusz</th><th data-i18n="dash.colDate">Dátum</th></tr></thead>
                 <tbody id="dashRecentOrdersBody">
-                  <tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">Betöltés...</td></tr>
+                  <tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;" data-i18n="dash.loading">Betöltés...</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
            <!-- Jármű státusz összesítő -->
           <div class="glass" style="padding:18px;">
-            <div class="text-primary" style="font-size:15px;font-weight:700;margin-bottom:12px;">Jármű státusz</div>
+            <div class="text-primary" style="font-size:15px;font-weight:700;margin-bottom:12px;" data-i18n="dash.vehStatus">Jármű státusz</div>
             <div class="dash-veh-grid" id="dashVehicleSummary">
-              <div class="dash-mini glass-soft"><div class="text-muted" style="font-size:11px;">Betöltés...</div></div>
+              <div class="dash-mini glass-soft"><div class="text-muted" style="font-size:11px;" data-i18n="dash.loading">Betöltés...</div></div>
             </div>
           </div>
         </div>
@@ -1105,7 +1105,7 @@
 </div>
 
 <script src="/feature-catalog.js?v=20260611"></script>
-<script src="/console-shared.js?v=20260611"></script>
+<script src="/console-shared.js?v=20260612"></script>
 <!-- ===== INTEGRACIOK (Ugyfelek / CargoTrack / Szamlazas) ===== -->
 <script src="/clients-page.js?v=20260611"></script>
 <script src="/client-mail.js?v=20260611"></script>
