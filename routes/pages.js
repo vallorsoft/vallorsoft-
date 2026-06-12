@@ -54,6 +54,9 @@ router.get('/manager', requirePageLogin, requirePageRole('Manager', 'Admin'), fu
 router.get('/sofer', requirePageLogin, requirePageRole('Sofer', 'Admin', 'Manager'), function(req, res) {
   res.sendFile(path.join(__dirname, '..', 'public', 'sofer.html'));
 });
+router.get('/konyvelo', requirePageLogin, requirePageRole('Konyvelo', 'Admin'), function(req, res) {
+  res.sendFile(path.join(__dirname, '..', 'public', 'konyvelo.html'));
+});
 router.get('/utvonaltervezes', requirePageLogin, requirePageRole('Admin', 'Manager'), async function(req, res) {
   // Előfizetés: ha a cégnél ki van kapcsolva, vissza a vezérlőpultra.
   const ok = await featureEnabled(req.session.user.company_id, 'utvonaltervezes');
