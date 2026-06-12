@@ -2438,7 +2438,8 @@ function saveOrderEdit() {
     rendszam_camion:  document.getElementById('oeCamion').value||null,
     rendszam_remorca: document.getElementById('oeRemorca').value||null,
   };
-  if(!payload.load_type){toast('Válaszd ki a rakomány típusát (FTL / LTL)!','err');return;}
+  // A már létező fuvart nem blokkoljuk: a típus üresen maradhat.
+  // Csak ha LTL-re állítják, akkor kötelezők a méretek.
   if(payload.load_type==='LTL' && (!payload.hossz_cm||!payload.szel_cm||!payload.mag_cm)){toast('Részrakománynál (LTL) a méretek (hossz/szél./mag.) kötelezők!','err');return;}
 
   gas('comUpdate', [_oeOrderId, payload]).then(function(r) {

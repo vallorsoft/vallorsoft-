@@ -400,15 +400,19 @@ handlers.comUpdate = async function (req, res, args) {
       if (o.rendszam_camion !== undefined) { updates.push(`rendszam_camion = $${i++}`); values.push(o.rendszam_camion ? o.rendszam_camion.toUpperCase() : null); }
       if (o.rendszam_remorca !== undefined) { updates.push(`rendszam_remorca = $${i++}`); values.push(o.rendszam_remorca ? o.rendszam_remorca.toUpperCase() : null); }
       if (o.suly_kg !== undefined) { updates.push(`suly_kg = $${i++}`); values.push((o.suly_kg === '' || o.suly_kg === null) ? null : Number(o.suly_kg)); }
-      // Rakomány-típus (FTL/LTL kötelező) + méretek (LTL-nél kötelezők) — a
-      // szerkesztő mindig küldi mindhárom méretet a load_type mellé.
+      // Rakomány-típus + méretek a szerkesztőn. A MÁR LÉTEZŐ fuvarokat NEM
+      // blokkoljuk: a típus üresen (null) maradhat. Csak ha LTL-re állítják,
+      // akkor kötelezők a méretek. (Új fuvarnál — comCreate — a típus kötelező.)
       if (o.load_type !== undefined) {
-        const ld = validateLoadTypeDims(o);
-        if (ld.err) return res.json({ result: { ok: false, err: ld.err } });
-        updates.push(`load_type = $${i++}`); values.push(ld.load_type);
-        updates.push(`hossz_cm = $${i++}`); values.push(ld.hossz_cm);
-        updates.push(`szel_cm = $${i++}`);  values.push(ld.szel_cm);
-        updates.push(`mag_cm = $${i++}`);   values.push(ld.mag_cm);
+        const lt = ['FTL', 'LTL'].includes(o.load_type) ? o.load_type : null;
+        if (lt === 'LTL') {
+          const ld = validateLoadTypeDims(o);
+          if (ld.err) return res.json({ result: { ok: false, err: ld.err } });
+        }
+        updates.push(`load_type = $${i++}`); values.push(lt);
+        updates.push(`hossz_cm = $${i++}`); values.push(_posIntCm(o.hossz_cm));
+        updates.push(`szel_cm = $${i++}`);  values.push(_posIntCm(o.szel_cm));
+        updates.push(`mag_cm = $${i++}`);   values.push(_posIntCm(o.mag_cm));
       }
       if (o.route_geo !== undefined) { const rg = sanitizeRouteGeo(o.route_geo); updates.push(`route_geo = $${i++}`); values.push(rg ? JSON.stringify(rg) : null); }
 
