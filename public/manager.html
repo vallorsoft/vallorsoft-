@@ -182,10 +182,17 @@
           <div class="field"><label>Ár / Preț</label><input class="input" id="oPret" type="number" placeholder="0"></div>
           <div class="field"><label>Távolság / Km</label><div class="vs-km-row"><input class="input" id="oKm" type="number" placeholder="0"><button type="button" class="btn ghost vs-map-btn" id="oMapBtn" title="Útvonal-előnézet térképen" style="display:none;">🗺️</button></div></div>
           <div class="field"><label>Súly / kg <span style="color:var(--muted);font-weight:400;">(részrakomány-ellenőrzéshez)</span></label><input class="input" id="oSuly" type="number" min="0" placeholder="pl. 12000"></div>
-          <div class="field"><label>Rakomány típusa</label>
+          <div class="field"><label>Rakomány típusa <span style="color:var(--brand-red);">*</span></label>
             <div style="display:flex;gap:18px;align-items:center;padding:10px 2px;">
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;" title="Full Truck Load — teljes rakomány"><input type="checkbox" id="oFtl" onchange="loadTypeExclusive(this,'oLtl')" style="width:16px;height:16px;cursor:pointer;accent-color:#3b82f6;"> FTL <span style="color:var(--muted);font-size:11px;">(teljes áru)</span></label>
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;" title="Less Than Truckload — részrakomány"><input type="checkbox" id="oLtl" onchange="loadTypeExclusive(this,'oFtl')" style="width:16px;height:16px;cursor:pointer;accent-color:#f59e0b;"> LTL <span style="color:var(--muted);font-size:11px;">(részrakomány)</span></label>
+            </div>
+          </div>
+          <div class="field"><label>Méretek (cm) <span id="oDimReq" style="color:var(--muted);font-weight:400;font-size:11px;">— LTL-nél kötelező</span></label>
+            <div style="display:flex;gap:8px;">
+              <input class="input" id="oHossz" type="number" min="0" placeholder="Hossz">
+              <input class="input" id="oSzel" type="number" min="0" placeholder="Szél.">
+              <input class="input" id="oMag" type="number" min="0" placeholder="Mag.">
             </div>
           </div>
           <div class="field"><label>Felrakás helye</label><div class="vs-ac-wrap"><input class="input" id="oLoad" placeholder="pl. Budapest (HU)" autocomplete="off"><div class="vs-ac-dd" id="oLoadDD"></div></div></div>
@@ -860,10 +867,17 @@
       <div class="field"><label>Ár (EUR)</label><input class="input" id="oePret" type="number"></div>
       <div class="field"><label>Km</label><div class="vs-km-row"><input class="input" id="oeKm" type="number"><button type="button" class="btn ghost vs-map-btn" id="oeMapBtn" title="Útvonal-előnézet térképen" style="display:none;">🗺️</button></div></div>
       <div class="field"><label>Súly (kg)</label><input class="input" id="oeSuly" type="number" min="0"></div>
-      <div class="field"><label>Rakomány típusa</label>
+      <div class="field"><label>Rakomány típusa <span style="color:var(--brand-red);">*</span></label>
         <div style="display:flex;gap:16px;align-items:center;padding:9px 2px;">
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;" title="Full Truck Load — teljes rakomány"><input type="checkbox" id="oeFtl" onchange="loadTypeExclusive(this,'oeLtl')" style="width:16px;height:16px;cursor:pointer;accent-color:#3b82f6;"> FTL</label>
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;" title="Less Than Truckload — részrakomány"><input type="checkbox" id="oeLtl" onchange="loadTypeExclusive(this,'oeFtl')" style="width:16px;height:16px;cursor:pointer;accent-color:#f59e0b;"> LTL</label>
+        </div>
+      </div>
+      <div class="field"><label>Méretek (cm) <span id="oeDimReq" style="color:var(--muted);font-weight:400;font-size:11px;">— LTL-nél kötelező</span></label>
+        <div style="display:flex;gap:8px;">
+          <input class="input" id="oeHossz" type="number" min="0" placeholder="Hossz">
+          <input class="input" id="oeSzel" type="number" min="0" placeholder="Szél.">
+          <input class="input" id="oeMag" type="number" min="0" placeholder="Mag.">
         </div>
       </div>
     </div>

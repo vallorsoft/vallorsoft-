@@ -72,6 +72,28 @@ async function autoPairTrailer(cid, rendszamCamion) {
   } catch (e) { console.error('autoPairTrailer hiba:', e); return null; }
 }
 
+// Pozitív egész (cm) vagy null — a rakomány-méretekhez.
+function _posIntCm(x) {
+  if (x === '' || x === null || x === undefined) return null;
+  const n = parseInt(x, 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// Rakomány-típus + méret validáció. Az FTL/LTL kötelező; LTL (részrakomány)
+// esetén a hossz/szélesség/magasság is kötelező (FTL-nél opcionális).
+// → { err } hibával, vagy { load_type, hossz_cm, szel_cm, mag_cm }.
+function validateLoadTypeDims(o) {
+  const load_type = ['FTL', 'LTL'].includes(o.load_type) ? o.load_type : null;
+  if (!load_type) return { err: 'Válaszd ki a rakomány típusát (FTL teljes / LTL részrakomány).' };
+  const hossz_cm = _posIntCm(o.hossz_cm);
+  const szel_cm = _posIntCm(o.szel_cm);
+  const mag_cm = _posIntCm(o.mag_cm);
+  if (load_type === 'LTL' && (!hossz_cm || !szel_cm || !mag_cm)) {
+    return { err: 'Részrakománynál (LTL) a méretek (hossz/szélesség/magasság cm) kötelezők.' };
+  }
+  return { load_type, hossz_cm, szel_cm, mag_cm };
+}
+
 // Az útvonal-előnézet metaadatának tisztítása (orders.route_geo). A
 // köztespontok CSAK a km-számításhoz/előnézethez vannak — NEM megállók.
 // A nagy polyline-t NEM tároljuk (újraszámolható a waypointokból).
@@ -150,7 +172,8 @@ handlers.comList = async function (req, res, args) {
           `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare,
                   o.pret, o.km, o.status, o.sofer_type, o.email_sofer, o.nume_sofer,
                   o.firma_extern, o.telefon_extern, o.rendszam_camion, o.rendszam_remorca,
-                  o.load_type, (o.route_geo->>'km')::int AS route_km, o.payment_status, o.paid_amount,
+                  o.load_type, o.hossz_cm, o.szel_cm, o.mag_cm,
+                  (o.route_geo->>'km')::int AS route_km, o.payment_status, o.paid_amount,
                   o.handover_status, o.handover_type, o.handover_loc, o.handover_at,
                   (SELECT COUNT(*)::int FROM documents d WHERE d.order_id = o.id) AS pod_count,
                   COALESCE(legs.leg_count, 0) AS leg_count,
@@ -245,8 +268,11 @@ handlers.comCreate = async function (req, res, args) {
       const external_driver_id = o.external_driver_id ? parseInt(o.external_driver_id, 10) : null;
       let rendszam_remorca = o.rendszam_remorca ? String(o.rendszam_remorca).trim().toUpperCase() : null;
       const suly_kg = (o.suly_kg === '' || o.suly_kg == null) ? null : Number(o.suly_kg);
-      // rakomány-típus: FTL = teljes rakomány, LTL = részrakomány
-      const load_type = ['FTL', 'LTL'].includes(o.load_type) ? o.load_type : null;
+      // rakomány-típus (FTL/LTL kötelező) + méretek (LTL-nél kötelezők)
+      const ld = validateLoadTypeDims(o);
+      if (ld.err) return res.json({ result: { ok: false, err: ld.err } });
+      const load_type = ld.load_type;
+      const hossz_cm = ld.hossz_cm, szel_cm = ld.szel_cm, mag_cm = ld.mag_cm;
       const route_geo = sanitizeRouteGeo(o.route_geo);
       const company_id = req.session.user.company_id;
 
@@ -285,9 +311,10 @@ handlers.comCreate = async function (req, res, args) {
             data_incarcare, data_descarcare, pret, km,
             sofer_type, email_sofer, nume_sofer,
             firma_extern, telefon_extern, external_driver_id,
-            rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type, route_geo
+            rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type, route_geo,
+            hossz_cm, szel_cm, mag_cm
           ) VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
           )`,
           [
             id, client, ref, loc_incarcare, loc_descarcare,
@@ -295,7 +322,8 @@ handlers.comCreate = async function (req, res, args) {
             sofer_type, email_sofer, nume_sofer,
             firma_extern, telefon_extern, external_driver_id,
             rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type,
-            route_geo ? JSON.stringify(route_geo) : null
+            route_geo ? JSON.stringify(route_geo) : null,
+            hossz_cm, szel_cm, mag_cm
           ]
         );
 
@@ -372,7 +400,16 @@ handlers.comUpdate = async function (req, res, args) {
       if (o.rendszam_camion !== undefined) { updates.push(`rendszam_camion = $${i++}`); values.push(o.rendszam_camion ? o.rendszam_camion.toUpperCase() : null); }
       if (o.rendszam_remorca !== undefined) { updates.push(`rendszam_remorca = $${i++}`); values.push(o.rendszam_remorca ? o.rendszam_remorca.toUpperCase() : null); }
       if (o.suly_kg !== undefined) { updates.push(`suly_kg = $${i++}`); values.push((o.suly_kg === '' || o.suly_kg === null) ? null : Number(o.suly_kg)); }
-      if (o.load_type !== undefined) { updates.push(`load_type = $${i++}`); values.push(['FTL','LTL'].includes(o.load_type) ? o.load_type : null); }
+      // Rakomány-típus (FTL/LTL kötelező) + méretek (LTL-nél kötelezők) — a
+      // szerkesztő mindig küldi mindhárom méretet a load_type mellé.
+      if (o.load_type !== undefined) {
+        const ld = validateLoadTypeDims(o);
+        if (ld.err) return res.json({ result: { ok: false, err: ld.err } });
+        updates.push(`load_type = $${i++}`); values.push(ld.load_type);
+        updates.push(`hossz_cm = $${i++}`); values.push(ld.hossz_cm);
+        updates.push(`szel_cm = $${i++}`);  values.push(ld.szel_cm);
+        updates.push(`mag_cm = $${i++}`);   values.push(ld.mag_cm);
+      }
       if (o.route_geo !== undefined) { const rg = sanitizeRouteGeo(o.route_geo); updates.push(`route_geo = $${i++}`); values.push(rg ? JSON.stringify(rg) : null); }
 
       if (updates.length === 0) {
