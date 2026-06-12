@@ -11,6 +11,7 @@
     return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function show(view) { ['viewLogin', 'viewSet', 'viewDash'].forEach(function (v) { $(v).classList.toggle('hidden', v !== view); }); }
   function toast(msg, kind) {
+    msg = (typeof window.tx === 'function') ? window.tx(msg) : msg;
     var t = $('toast'); t.textContent = msg; t.className = 'toast show ' + (kind || '');
     clearTimeout(window.__tt); window.__tt = setTimeout(function () { t.className = 'toast ' + (kind || ''); }, 2600);
   }

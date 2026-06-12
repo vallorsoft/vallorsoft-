@@ -8,7 +8,7 @@
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function show(v) { ['viewLogin', 'viewSet', 'viewDash'].forEach(function (x) { $(x).classList.toggle('hidden', x !== v); }); }
-  function toast(m, k) { var t = $('toast'); t.textContent = m; t.className = 'toast show ' + (k || ''); clearTimeout(window.__tt); window.__tt = setTimeout(function () { t.className = 'toast ' + (k || ''); }, 2600); }
+  function toast(m, k) { m = (typeof window.tx === 'function') ? window.tx(m) : m; var t = $('toast'); t.textContent = m; t.className = 'toast show ' + (k || ''); clearTimeout(window.__tt); window.__tt = setTimeout(function () { t.className = 'toast ' + (k || ''); }, 2600); }
   function api(method, url, body) { return fetch(url, { method: method, credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined }).then(function (r) { return r.json(); }); }
   function fmtD(d) { if (!d) return '—'; var p = String(d).slice(0, 10).split('-'); return p.length === 3 ? (p[2] + '.' + p[1] + '.') : d; }
   function T(k, v) { return (typeof window.t === 'function') ? window.t(k, v) : k; }

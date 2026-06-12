@@ -3,7 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Urmărire transport</title>
+  <title data-i18n="trk.title">Urmărire transport</title>
+  <script src="/i18n.js?v=20260612"></script>
+  <script src="/i18n-srv.js?v=20260612"></script>
+  <script>(window.registerI18n||function(d){(window.__i18nQueue=window.__i18nQueue||[]).push(d);})({
+    'trk.title':        { hu:'Fuvarkövetés', ro:'Urmărire transport' },
+    'trk.headerSuffix': { hu:'fuvarkövetés', ro:'urmărire transport' },
+    'trk.loading':      { hu:'Betöltés…', ro:'Se încarcă…' },
+    'trk.foot':         { hu:'A követőoldalt a fuvarozó generálja. · VallorSoft', ro:'Pagina de urmărire este generată de transportator. · VallorSoft' },
+    'trk.invalidTitle': { hu:'Érvénytelen vagy lejárt link', ro:'Link invalid sau expirat' },
+    'trk.invalidBody':  { hu:'Új linkért vegye fel a kapcsolatot a fuvarozóval.', ro:'Contactați transportatorul pentru un link nou.' },
+    'trk.netError':     { hu:'Hálózati hiba — próbálja újra.', ro:'Eroare de rețea — reîncercați.' },
+    'trk.transport':    { hu:'Fuvar', ro:'Transport' },
+    'trk.loadDate':     { hu:'Felrakás dátuma', ro:'Data încărcării' },
+    'trk.unloadDate':   { hu:'Lerakás dátuma', ro:'Data descărcării' },
+    'trk.vehicle':      { hu:'Jármű', ro:'Vehicul' },
+    'trk.posUpdated':   { hu:'Pozíció frissítve:', ro:'Poziție actualizată:' },
+    'trk.autoReload':   { hu:'Az oldal 2 percenként automatikusan frissül.', ro:'Pagina se reîncarcă automat la 2 minute.' },
+    'trk.noGps':        { hu:'📍 A GPS-pozíció jelenleg nem érhető el', ro:'📍 Poziția GPS nu este disponibilă momentan' },
+    'trk.deliveredNote':{ hu:' — a fuvar leszállítva. ✅', ro:' — transportul a fost livrat. ✅' },
+    'trk.st.registered':{ hu:'Rögzítve', ro:'Înregistrat' },
+    'trk.st.scheduled': { hu:'Ütemezve', ro:'Programat' },
+    'trk.st.transit':   { hu:'🚛 Úton', ro:'🚛 În tranzit' },
+    'trk.st.delivered': { hu:'✅ Leszállítva', ro:'✅ Livrat' },
+    'trk.st.cancelled': { hu:'Törölve', ro:'Anulat' }
+  });</script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>
@@ -33,69 +57,81 @@
 <body>
 <div class="wrap">
   <div class="logo">vallor<span class="red">Soft</span></div>
-  <div class="ceg" id="ceg">Urmărire transport</div>
-  <div id="content"><div class="card muted" style="text-align:center;">Se încarcă…</div></div>
-  <div class="foot">Pagina de urmărire este generată de transportator. · VallorSoft</div>
+  <div class="ceg" id="ceg" data-i18n="trk.title">Urmărire transport</div>
+  <div id="content"><div class="card muted" style="text-align:center;" data-i18n="trk.loading">Se încarcă…</div></div>
+  <div class="foot" data-i18n="trk.foot">Pagina de urmărire este generată de transportator. · VallorSoft</div>
 </div>
 <script>
 (function () {
+  function T(k, v) { return (typeof window.t === 'function') ? window.t(k, v) : k; }
   var token = location.pathname.split('/').pop();
+  // status-kód → [badge-osztály, i18n-kulcs] (a felirat render-időben fordul)
   var STATUS = {
-    'Disponibil': ['b-info', 'Înregistrat'],
-    'Alocat':     ['b-warn', 'Programat'],
-    'Extern':     ['b-warn', 'Programat'],
-    'In Curs':    ['b-info', '🚛 În tranzit'],
-    'Finalizat':  ['b-ok',   '✅ Livrat'],
-    'Anulat':     ['b-warn', 'Anulat']
+    'Disponibil': ['b-info', 'trk.st.registered'],
+    'Alocat':     ['b-warn', 'trk.st.scheduled'],
+    'Extern':     ['b-warn', 'trk.st.scheduled'],
+    'In Curs':    ['b-info', 'trk.st.transit'],
+    'Finalizat':  ['b-ok',   'trk.st.delivered'],
+    'Anulat':     ['b-warn', 'trk.st.cancelled']
   };
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   function d(x) { return x ? new Date(x).toLocaleDateString('ro-RO') : '—'; }
 
+  var lastData = null; // utolsó sikeres válasz — nyelvváltáskor újrarendereléshez
+
+  function render(r) {
+    var box = document.getElementById('content');
+    if (!r || !r.ok) {
+      box.innerHTML = '<div class="card err"><div style="font-size:40px;margin-bottom:12px;">🔍</div>'
+        + '<b>' + esc(T('trk.invalidTitle')) + '</b><div class="muted" style="margin-top:6px;">' + esc(T('trk.invalidBody')) + '</div></div>';
+      return;
+    }
+    var t = r.transport;
+    document.getElementById('ceg').textContent = (t.ceg || '') + ' — ' + T('trk.headerSuffix');
+    var st = STATUS[t.status] || ['b-info', t.status];
+    var stLabel = STATUS[t.status] ? T(st[1]) : t.status;
+    box.innerHTML =
+      '<div class="card">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">'
+      + '<span class="muted">' + esc(T('trk.transport')) + ' <b style="color:#e9eef5;">' + esc(t.ref) + '</b></span>'
+      + '<span class="badge ' + st[0] + '">' + esc(stLabel) + '</span></div>'
+      + '<div class="route"><span>📦 ' + esc(t.loc_incarcare || '—') + '</span><span class="arrow">→</span><span>🏁 ' + esc(t.loc_descarcare || '—') + '</span></div>'
+      + '<div class="meta">'
+      + '<div><div class="l">' + esc(T('trk.loadDate')) + '</div><div class="v">' + d(t.data_incarcare) + '</div></div>'
+      + '<div><div class="l">' + esc(T('trk.unloadDate')) + '</div><div class="v">' + d(t.data_descarcare) + '</div></div>'
+      + '<div><div class="l">' + esc(T('trk.vehicle')) + '</div><div class="v">' + esc(t.rendszam || '—') + '</div></div>'
+      + '</div></div>'
+      + (r.position ? '<div id="map"></div><div class="muted" style="margin-top:8px;text-align:right;">' + esc(T('trk.posUpdated')) + ' '
+          + (r.position.datetime ? new Date(r.position.datetime).toLocaleString('ro-RO') : '—')
+          + ' · ' + esc(T('trk.autoReload')) + '</div>'
+        : '<div class="card muted" style="text-align:center;">' + esc(T('trk.noGps'))
+          + (t.status === 'Finalizat' ? esc(T('trk.deliveredNote')) : '.') + '</div>');
+
+    if (r.position && typeof L !== 'undefined') {
+      var map = L.map('map').setView([r.position.lat, r.position.lng], 9);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        { attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
+      var m = L.circleMarker([r.position.lat, r.position.lng],
+        { radius: 10, color: '#e10b1a', fillColor: '#e10b1a', fillOpacity: 0.9, weight: 3 }).addTo(map);
+      m.bindTooltip('🚛 ' + (t.rendszam || '') + (r.position.speed != null ? ' · ' + Math.round(r.position.speed) + ' km/h' : '')).openTooltip();
+    }
+  }
+
   function load() {
     fetch('/api/track/' + encodeURIComponent(token))
       .then(function (r) { return r.json(); })
-      .then(function (r) {
-        var box = document.getElementById('content');
-        if (!r || !r.ok) {
-          box.innerHTML = '<div class="card err"><div style="font-size:40px;margin-bottom:12px;">🔍</div>'
-            + '<b>Link invalid sau expirat</b><div class="muted" style="margin-top:6px;">Contactați transportatorul pentru un link nou.</div></div>';
-          return;
-        }
-        var t = r.transport;
-        document.getElementById('ceg').textContent = (t.ceg || '') + ' — urmărire transport';
-        var st = STATUS[t.status] || ['b-info', t.status];
-        box.innerHTML =
-          '<div class="card">'
-          + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">'
-          + '<span class="muted">Transport <b style="color:#e9eef5;">' + esc(t.ref) + '</b></span>'
-          + '<span class="badge ' + st[0] + '">' + esc(st[1]) + '</span></div>'
-          + '<div class="route"><span>📦 ' + esc(t.loc_incarcare || '—') + '</span><span class="arrow">→</span><span>🏁 ' + esc(t.loc_descarcare || '—') + '</span></div>'
-          + '<div class="meta">'
-          + '<div><div class="l">Data încărcării</div><div class="v">' + d(t.data_incarcare) + '</div></div>'
-          + '<div><div class="l">Data descărcării</div><div class="v">' + d(t.data_descarcare) + '</div></div>'
-          + '<div><div class="l">Vehicul</div><div class="v">' + esc(t.rendszam || '—') + '</div></div>'
-          + '</div></div>'
-          + (r.position ? '<div id="map"></div><div class="muted" style="margin-top:8px;text-align:right;">Poziție actualizată: '
-              + (r.position.datetime ? new Date(r.position.datetime).toLocaleString('ro-RO') : '—')
-              + ' · Pagina se reîncarcă automat la 2 minute.</div>'
-            : '<div class="card muted" style="text-align:center;">📍 Poziția GPS nu este disponibilă momentan'
-              + (t.status === 'Finalizat' ? ' — transportul a fost livrat. ✅' : '.') + '</div>');
-
-        if (r.position && typeof L !== 'undefined') {
-          var map = L.map('map').setView([r.position.lat, r.position.lng], 9);
-          L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-            { attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
-          var m = L.circleMarker([r.position.lat, r.position.lng],
-            { radius: 10, color: '#e10b1a', fillColor: '#e10b1a', fillOpacity: 0.9, weight: 3 }).addTo(map);
-          m.bindTooltip('🚛 ' + (t.rendszam || '') + (r.position.speed != null ? ' · ' + Math.round(r.position.speed) + ' km/h' : '')).openTooltip();
-        }
-      })
+      .then(function (r) { lastData = r; render(r); })
       .catch(function () {
-        document.getElementById('content').innerHTML = '<div class="card err">Eroare de rețea — reîncercați.</div>';
+        document.getElementById('content').innerHTML = '<div class="card err">' + esc(T('trk.netError')) + '</div>';
       });
   }
   load();
   setInterval(load, 2 * 60 * 1000); // 2 percenként frissül (a szerver 60s-ig cache-el)
+
+  // Nyelvváltáskor a dinamikusan renderelt tartalom újrarajzolása (a statikus DOM-ot az i18n.js intézi)
+  if (window.I18N && typeof window.I18N.onLang === 'function') {
+    window.I18N.onLang(function () { if (lastData) render(lastData); });
+  }
 })();
 </script>
 </body>

@@ -7,7 +7,7 @@
   var _docs = [];
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  function toast(m, k) { var t = $('toast'); t.textContent = m; t.style.opacity = '1'; t.style.borderColor = k === 'err' ? 'rgba(239,68,68,.6)' : k === 'ok' ? 'rgba(34,197,94,.6)' : 'rgba(255,255,255,.08)'; clearTimeout(window.__t); window.__t = setTimeout(function () { t.style.opacity = '0'; }, 2600); }
+  function toast(m, k) { m = (typeof window.tx === 'function') ? window.tx(m) : m; var t = $('toast'); t.textContent = m; t.style.opacity = '1'; t.style.borderColor = k === 'err' ? 'rgba(239,68,68,.6)' : k === 'ok' ? 'rgba(34,197,94,.6)' : 'rgba(255,255,255,.08)'; clearTimeout(window.__t); window.__t = setTimeout(function () { t.style.opacity = '0'; }, 2600); }
   function gas(fn, args) { return fetch('/api/execute', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ functionName: fn, arguments: args || [] }) }).then(function (r) { return r.json(); }).then(function (d) { return d.result; }); }
   function dstr(d) { return d ? String(d).slice(0, 10) : ''; }
   function T(k, v) { return (typeof window.t === 'function') ? window.t(k, v) : k; }
