@@ -192,8 +192,8 @@ var _wpSeq=0, _waypointIds=[];
 // ───────── Téma + INGYENES csempék (CartoDB / OpenStreetMap) ─────────
 function rpTheme(){ var mc=document.getElementById('mainContent'); return (mc&&mc.getAttribute('data-theme')==='light')?'light':'dark'; }
 function rpTileUrl(theme){
-  return theme==='light' ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-                         : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  // A térkép MINDIG világos csempével jelenik meg (a felület témájától függetlenül).
+  return 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
 }
 function rpTileOpts(){ return {attribution:'© OpenStreetMap © CARTO',maxZoom:19,subdomains:'abcd'}; }
 function rpSyncThemeIcon(){ var b=document.getElementById('themeToggle'); if(!b)return; var l=rpTheme()==='light'; b.textContent=l?'☀️':'🌙'; b.title=l?'Sötét mód':'Világos mód'; }

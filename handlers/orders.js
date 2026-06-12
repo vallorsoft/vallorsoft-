@@ -72,6 +72,24 @@ async function autoPairTrailer(cid, rendszamCamion) {
   } catch (e) { console.error('autoPairTrailer hiba:', e); return null; }
 }
 
+// Az útvonal-előnézet metaadatának tisztítása (orders.route_geo). A
+// köztespontok CSAK a km-számításhoz/előnézethez vannak — NEM megállók.
+// A nagy polyline-t NEM tároljuk (újraszámolható a waypointokból).
+function sanitizeRouteGeo(rg) {
+  if (!rg || typeof rg !== 'object') return null;
+  let wps = Array.isArray(rg.waypoints) ? rg.waypoints : [];
+  wps = wps.slice(0, 9).map((w) => ({
+    type: ['loading', 'unloading', 'waypoint'].includes(w && w.type) ? w.type : 'waypoint',
+    address: (w && w.address != null) ? String(w.address).slice(0, 200) : null,
+    lat: (w && w.lat != null && Number.isFinite(Number(w.lat))) ? Number(w.lat) : null,
+    lng: (w && w.lng != null && Number.isFinite(Number(w.lng))) ? Number(w.lng) : null,
+  })).filter((w) => w.address || (w.lat != null && w.lng != null));
+  if (wps.length < 2) return null;
+  const km = (rg.km != null && Number.isFinite(Number(rg.km))) ? Math.round(Number(rg.km)) : null;
+  const dur = (rg.durationSeconds != null && Number.isFinite(Number(rg.durationSeconds))) ? Math.round(Number(rg.durationSeconds)) : null;
+  return { waypoints: wps, km, durationSeconds: dur };
+}
+
 // A radar a részrakomány-súly ellenőrzéséhez: egy standard/mega ponyvás
 // pótkocsi tipikus rakható tömege (kg). A vontató–pótkocsi össztömeg-
 // korlát NEM jármű-szintű mező; ez a gyakorlati felső határ a riasztáshoz.
@@ -229,6 +247,7 @@ handlers.comCreate = async function (req, res, args) {
       const suly_kg = (o.suly_kg === '' || o.suly_kg == null) ? null : Number(o.suly_kg);
       // rakomány-típus: FTL = teljes rakomány, LTL = részrakomány
       const load_type = ['FTL', 'LTL'].includes(o.load_type) ? o.load_type : null;
+      const route_geo = sanitizeRouteGeo(o.route_geo);
       const company_id = req.session.user.company_id;
 
       // Auto-párosítás: csak jármű VAGY csak belső sofőr esetén a pár kitöltése
@@ -266,16 +285,17 @@ handlers.comCreate = async function (req, res, args) {
             data_incarcare, data_descarcare, pret, km,
             sofer_type, email_sofer, nume_sofer,
             firma_extern, telefon_extern, external_driver_id,
-            rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type
+            rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type, route_geo
           ) VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22
           )`,
           [
             id, client, ref, loc_incarcare, loc_descarcare,
             data_incarcare, data_descarcare, pret, km,
             sofer_type, email_sofer, nume_sofer,
             firma_extern, telefon_extern, external_driver_id,
-            rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type
+            rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type,
+            route_geo ? JSON.stringify(route_geo) : null
           ]
         );
 
@@ -353,6 +373,7 @@ handlers.comUpdate = async function (req, res, args) {
       if (o.rendszam_remorca !== undefined) { updates.push(`rendszam_remorca = $${i++}`); values.push(o.rendszam_remorca ? o.rendszam_remorca.toUpperCase() : null); }
       if (o.suly_kg !== undefined) { updates.push(`suly_kg = $${i++}`); values.push((o.suly_kg === '' || o.suly_kg === null) ? null : Number(o.suly_kg)); }
       if (o.load_type !== undefined) { updates.push(`load_type = $${i++}`); values.push(['FTL','LTL'].includes(o.load_type) ? o.load_type : null); }
+      if (o.route_geo !== undefined) { const rg = sanitizeRouteGeo(o.route_geo); updates.push(`route_geo = $${i++}`); values.push(rg ? JSON.stringify(rg) : null); }
 
       if (updates.length === 0) {
         return res.json({ result: { ok: false, err: 'Nincs mit modositani.' } });

@@ -784,3 +784,48 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
 .veh-params > summary::-webkit-details-marker { display: none; }
 .veh-params > summary::before { content: '▸ '; color: var(--brand-red); }
 .veh-params[open] > summary::before { content: '▾ '; }
+/* ── Cím-autocomplete (fuvar-kiírás térképes mód) ─────────── */
+.vs-ac-wrap { position: relative; }
+.vs-ac-dd {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 1300;
+  background: var(--bg-panel-raised); border: 1px solid var(--glass-border-dark);
+  border-radius: var(--radius-md); overflow: hidden; display: none;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.5); max-height: 260px; overflow-y: auto;
+}
+.vs-ac-dd.open { display: block; }
+.vs-ac-item { padding: 9px 12px; cursor: pointer; border-bottom: 1px solid var(--glass-border-dark); }
+.vs-ac-item:last-child { border-bottom: none; }
+.vs-ac-item:hover { background: rgba(255,255,255,0.06); }
+.vs-ac-item .ac-main { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.vs-ac-item .ac-sub { font-size: 11px; color: var(--text-muted); }
+.main-content[data-theme="light"] .vs-ac-dd { background: #fff; border-color: rgba(0,0,0,0.12); }
+.main-content[data-theme="light"] .vs-ac-item:hover { background: rgba(0,0,0,0.04); }
+
+/* km mező + 🗺️ térkép-előnézet gomb */
+.vs-km-row { display: flex; gap: 8px; align-items: center; }
+.vs-km-row .input { flex: 1; }
+.btn.vs-map-btn { padding: 8px 12px; font-size: 15px; line-height: 1; }
+
+/* ── Útvonal-előnézet modal (mindig VILÁGOS térkép) ───────── */
+#routeMapModal {
+  position: fixed; inset: 0; z-index: 4000; display: none;
+  background: rgba(3,6,10,0.72); backdrop-filter: blur(3px);
+  align-items: center; justify-content: center; padding: 16px;
+}
+#routeMapModal.open { display: flex; }
+#routeMapModal .rmm-card {
+  width: min(960px, 100%); max-height: 92vh; display: flex; flex-direction: column;
+  background: var(--bg-panel-raised); border: 1px solid var(--glass-border-dark);
+  border-radius: var(--radius-lg); overflow: hidden;
+}
+#routeMapModal .rmm-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--glass-border-dark); }
+#routeMapModal .rmm-body { display: flex; gap: 0; min-height: 0; flex: 1; }
+#routeMapModal .rmm-map { flex: 1; min-height: 380px; background: #e8eef3; }
+#routeMapModal .rmm-side { width: 290px; border-left: 1px solid var(--glass-border-dark); padding: 12px; overflow-y: auto; }
+#routeMapModal .rmm-via { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+#routeMapModal .rmm-via .vs-ac-wrap { flex: 1; }
+@media (max-width: 760px) {
+  #routeMapModal .rmm-body { flex-direction: column; }
+  #routeMapModal .rmm-side { width: auto; border-left: none; border-top: 1px solid var(--glass-border-dark); max-height: 38vh; }
+  #routeMapModal .rmm-map { min-height: 300px; }
+}
