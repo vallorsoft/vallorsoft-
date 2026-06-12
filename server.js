@@ -162,6 +162,7 @@ app.use(require('./routes/invoices'));
 app.use(require('./routes/track'));
 app.use(require('./routes/portal'));
 app.use(require('./routes/carrier-portal'));
+app.use(require('./routes/accounting'));
 app.use(require('./routes/uit'));
 app.use(require('./routes/inbound-orders'));
 app.use(require('./routes/client-mail'));

@@ -19,6 +19,7 @@ function requirePageRole(...roles) {
       const p = req.session.user.pozicio;
       if (p === 'Admin') return res.redirect('/admin');
       if (p === 'Manager') return res.redirect('/manager');
+      if (p === 'Konyvelo') return res.redirect('/konyvelo');
       return res.redirect('/sofer');
     }
     next();

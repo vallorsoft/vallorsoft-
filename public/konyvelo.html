@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="hu"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VallorSoft — Könyvelői felület</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#05070b;--panel:#141c25;--tx:#e9eef5;--mut:#8a97a8;--red:#e10b1a;--ok:#22c55e;--warn:#f59e0b;--info:#3b82f6;--bd:rgba(255,255,255,.08);--r:16px;--rs:8px}
+  *{box-sizing:border-box}body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,rgba(225,11,26,.10),transparent),var(--bg);color:var(--tx);font-family:Inter,sans-serif;font-size:14px;line-height:1.5}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px}
+  .glass{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));border:1px solid var(--bd);border-radius:var(--r)}
+  .mut{color:var(--mut)}.hidden{display:none!important}
+  .btn{border:1px solid var(--bd);background:rgba(255,255,255,.04);color:var(--tx);border-radius:var(--rs);padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-block}
+  .btn:hover{border-color:rgba(255,255,255,.22)}.btn.primary{background:var(--red);border-color:var(--red);color:#fff}.btn.ok{background:rgba(34,197,94,.18);border-color:rgba(34,197,94,.45);color:#4ade80}
+  .inp{background:rgba(255,255,255,.04);border:1px solid var(--bd);border-radius:var(--rs);padding:9px 11px;color:var(--tx);font-family:inherit;font-size:13px}
+  .logo{font-weight:800}.logo b{color:#fff}.logo span{color:var(--red)}
+  .top{display:flex;align-items:center;gap:14px;padding:14px 20px;margin-bottom:18px}
+  .av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--red),#7a0710);display:grid;place-items:center;font-weight:800;color:#fff}
+  .badge{display:inline-flex;gap:5px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid;background:rgba(59,130,246,.16);color:#60a5fa;border-color:rgba(59,130,246,.4)}
+  .tabs{display:flex;gap:8px;margin-bottom:16px}.tab{padding:9px 16px;border:1px solid var(--bd);border-radius:999px;cursor:pointer;font-weight:600;font-size:13px}.tab.active{background:var(--red);border-color:var(--red);color:#fff}
+  .bar{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:14px;padding:14px 16px}
+  .grp{margin-bottom:14px}.ghead{display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(255,255,255,.03);border:1px solid var(--bd);border-radius:10px 10px 0 0;font-weight:700}
+  .drow{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--bd);border-top:none;font-size:13px}
+  .drow:last-child{border-radius:0 0 10px 10px}
+  .ck{width:16px;height:16px;accent-color:#e10b1a;cursor:pointer}
+  .h{font-size:16px;font-weight:800;margin:0 0 6px}
+  @media(max-width:760px){.drow{flex-wrap:wrap}}
+</style></head><body>
+<div class="wrap">
+  <div class="glass top">
+    <div class="logo" style="font-size:20px"><b>Vallor</b><span>Soft</span> <span class="mut" style="font-size:13px;font-weight:500">· Könyvelői felület</span></div>
+    <div style="margin-left:auto;text-align:right"><div id="kName" style="font-weight:700"></div><div id="kCeg" class="mut" style="font-size:12px"></div></div>
+    <div class="av" id="kAv">·</div>
+    <button class="btn" onclick="Konyv.logout()" style="padding:7px 12px">Kilépés</button>
+  </div>
+
+  <div class="glass bar">
+    <div><div class="mut" style="font-size:12px;font-weight:600;margin-bottom:5px">Hónap</div><input class="inp" id="fMonth" type="month"></div>
+    <div><div class="mut" style="font-size:12px;font-weight:600;margin-bottom:5px">vagy -tól</div><input class="inp" id="fFrom" type="date"></div>
+    <div><div class="mut" style="font-size:12px;font-weight:600;margin-bottom:5px">-ig</div><input class="inp" id="fTo" type="date"></div>
+    <button class="btn primary" onclick="Konyv.reload()">Frissítés</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tabDocs" onclick="Konyv.tab('docs')">📄 Dokumentumok</div>
+    <div class="tab" id="tabInv" onclick="Konyv.tab('inv')">🧾 Számla-export (SAGA/WinMentor)</div>
+  </div>
+
+  <div id="viewDocs">
+    <div class="glass" style="padding:14px 18px;margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px"><input type="checkbox" class="ck" id="ckAll" onchange="Konyv.toggleAll(this.checked)"> Mind kijelölése</label>
+      <span id="kSel" class="mut" style="font-size:12px"></span>
+      <button class="btn ok" style="margin-left:auto" onclick="Konyv.zipSelected()">⬇️ Kijelöltek letöltése (ZIP)</button>
+      <button class="btn primary" onclick="Konyv.zipMonth()">📦 Teljes időszak letöltése (ZIP)</button>
+    </div>
+    <div id="docList"></div>
+  </div>
+
+  <div id="viewInv" class="hidden">
+    <div class="glass" style="padding:20px">
+      <div class="h">🧾 Számla-export könyvelőnek (SAGA / WinMentor)</div>
+      <div class="mut" style="font-size:12.5px;margin-bottom:14px">A választott időszak számláit CSV-ben töltöd le (UTF-8, pontosvessző — Excel/SAGA/WinMentor importálható). A könyvelőnek nem kell kézzel átírnia semmit.</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <div class="glass" style="padding:16px;flex:1;min-width:240px">
+          <div style="font-weight:700;margin-bottom:6px">Kimenő számlák (ügyfél)</div>
+          <div class="mut" style="font-size:12px;margin-bottom:10px"><span id="kSales">0</span> számla az időszakban</div>
+          <a class="btn primary" id="dlSales">⬇️ Kimenő számlák CSV</a>
+        </div>
+        <div class="glass" style="padding:16px;flex:1;min-width:240px">
+          <div style="font-weight:700;margin-bottom:6px">Bejövő számlák (alvállalkozói)</div>
+          <div class="mut" style="font-size:12px;margin-bottom:10px"><span id="kPur">0</span> számla az időszakban</div>
+          <a class="btn primary" id="dlPur">⬇️ Bejövő számlák CSV</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="toast" style="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#141c25;border:1px solid var(--bd);color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:.25s"></div>
+<script src="/konyvelo.js?v=20260612"></script>
+</body></html>

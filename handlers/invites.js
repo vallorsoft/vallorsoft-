@@ -49,7 +49,7 @@ handlers.invCreate = async function (req, res, args) {
       const invNume = String(args[2] || '').trim() || null;
       const invTel  = String(args[3] || '').trim() || null;
 
-      if (!['Admin', 'Manager', 'Sofer'].includes(pozicio)) {
+      if (!['Admin', 'Manager', 'Sofer', 'Konyvelo'].includes(pozicio)) {
         return res.json({ result: { ok: false, err: 'Ervenytelen pozicio.' } });
       }
 

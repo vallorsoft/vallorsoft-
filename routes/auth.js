@@ -164,6 +164,7 @@ router.post('/api/login', async (req, res) => {
     if (user.pozicio_dev) redirect = '/developer';
     else if (user.pozicio === 'Admin') redirect = '/admin';
     else if (user.pozicio === 'Manager') redirect = '/manager';
+    else if (user.pozicio === 'Konyvelo') redirect = '/konyvelo';
 
     return res.json({
       success: true,
@@ -182,6 +183,7 @@ function calc2faRedirect(u) {
   if (u.is_dev) return '/developer';
   if (u.pozicio === 'Admin') return '/admin';
   if (u.pozicio === 'Manager') return '/manager';
+  if (u.pozicio === 'Konyvelo') return '/konyvelo';
   return '/sofer';
 }
 
