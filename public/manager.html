@@ -8,6 +8,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260611">
   <script src="/i18n.js?v=20260612"></script>
+  <script src="/i18n-srv.js?v=20260612"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -469,7 +470,7 @@
     <div class="pane hidden" data-pane="chat" id="chatPane">
       <div id="chatLoadMsg" style="padding:60px; text-align:center; color:var(--muted);">
         <div class="spinner" style="margin:0 auto 12px; width:24px; height:24px;"></div>
-        Firebase kapcsolódás...
+        <span data-i18n="mh.firebaseConnecting">Firebase kapcsolódás...</span>
       </div>
       <div class="chat-app" id="chatApp" style="display:none;">
         <div class="chat-side">
@@ -793,13 +794,13 @@
   <div class="modal glass" style="width:min(700px,100%); max-height:90vh; overflow-y:auto;">
     <h3>📎 Megrendelő — <span id="docModalOrderId"></span></h3>
     <div class="glass-soft" style="padding:16px; margin-bottom:16px;">
-      <div style="font-weight:600; margin-bottom:10px; color:#fff;">Új megrendelő feltöltése (PDF)</div>
+      <div style="font-weight:600; margin-bottom:10px; color:#fff;" data-i18n="mh.uploadOrderDoc">Új megrendelő feltöltése (PDF)</div>
       <input type="file" id="docUploadInput" class="input" accept="application/pdf">
-      <button class="btn primary" onclick="uploadOrderDoc()" style="margin-top:10px; width:100%;">Feltöltés és megnyitás szerkesztőben</button>
+      <button class="btn primary" onclick="uploadOrderDoc()" style="margin-top:10px; width:100%;" data-i18n="mh.uploadAndOpen">Feltöltés és megnyitás szerkesztőben</button>
     </div>
-    <div id="docListWrap"><div style="color:var(--muted);font-size:13px;">Betöltés...</div></div>
+    <div id="docListWrap"><div style="color:var(--muted);font-size:13px;" data-i18n="mh.loading">Betöltés...</div></div>
     <div style="margin-top:16px;text-align:right;">
-      <button class="btn ghost" onclick="closeDocModal()">Bezárás</button>
+      <button class="btn ghost" onclick="closeDocModal()" data-i18n="mh.close">Bezárás</button>
     </div>
   </div>
 </div>
@@ -810,36 +811,36 @@
 
      <!-- Fejléc — sticky, bezárás gomb mindig látható -->
     <div style="position:sticky;top:0;z-index:10;background:var(--bg-2);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
-      <h3 style="margin:0;font-size:16px;">✍️ Aláírás / Pecsét</h3>
-      <button class="btn ghost" onclick="closeSignModal()" style="padding:8px 16px;font-size:14px;min-width:80px;">✕ Bezárás</button>
+      <h3 style="margin:0;font-size:16px;" data-i18n="mh.signStamp">✍️ Aláírás / Pecsét</h3>
+      <button class="btn ghost" onclick="closeSignModal()" style="padding:8px 16px;font-size:14px;min-width:80px;" data-i18n="mh.closeX">✕ Bezárás</button>
     </div>
 
     <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
 
        <!-- 1. Aláírás rajzolás -->
       <div class="glass-soft" style="padding:14px;">
-        <div style="font-weight:600;color:#fff;margin-bottom:8px;">1. Aláírás rajzolása</div>
+        <div style="font-weight:600;color:#fff;margin-bottom:8px;" data-i18n="mh.step1Sign">1. Aláírás rajzolása</div>
         <canvas id="signCanvas" style="width:100%;height:140px;background:#fff;border-radius:8px;border:2px solid var(--border-bright);cursor:crosshair;touch-action:none;display:block;"></canvas>
         <div style="display:flex;gap:8px;margin-top:8px;">
-          <button class="btn ghost" style="flex:1;padding:10px;" onclick="clearSignCanvas()">Törlés</button>
-          <button class="btn ok" style="flex:1;padding:10px;" onclick="addSignatureToPage()">➕ Hozzáad</button>
+          <button class="btn ghost" style="flex:1;padding:10px;" onclick="clearSignCanvas()" data-i18n="mh.clear">Törlés</button>
+          <button class="btn ok" style="flex:1;padding:10px;" onclick="addSignatureToPage()" data-i18n="mh.addPlus">➕ Hozzáad</button>
         </div>
       </div>
 
        <!-- 2. Pecsét -->
       <div class="glass-soft" style="padding:14px;">
-        <div style="font-weight:600;color:#fff;margin-bottom:8px;">2. Pecsét (mentett PNG)</div>
+        <div style="font-weight:600;color:#fff;margin-bottom:8px;" data-i18n="mh.step2Stamp">2. Pecsét (mentett PNG)</div>
         <div id="stampPreviewWrap" style="background:#fff;padding:8px;border-radius:8px;text-align:center;min-height:60px;">
           <img id="signStampImg" style="max-height:70px;display:none;">
-          <span id="signNoStamp" style="color:#999;font-size:12px;">Nincs mentett pecsét.</span>
+          <span id="signNoStamp" style="color:#999;font-size:12px;" data-i18n="mh.noStamp">Nincs mentett pecsét.</span>
         </div>
-        <button class="btn primary" style="width:100%;margin-top:8px;padding:10px;" onclick="addStampToPage()">➕ Pecsét hozzáadása</button>
+        <button class="btn primary" style="width:100%;margin-top:8px;padding:10px;" onclick="addStampToPage()" data-i18n="mh.addStamp">➕ Pecsét hozzáadása</button>
       </div>
 
        <!-- 3. PDF előnézet -->
       <div class="glass-soft" style="padding:14px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
-          <span style="font-size:13px;color:var(--muted);">PDF előnézet — húzd a helyére az elemeket</span>
+          <span style="font-size:13px;color:var(--muted);" data-i18n="mh.pdfPreviewDrag">PDF előnézet — húzd a helyére az elemeket</span>
           <span style="display:flex;align-items:center;gap:6px;">
             <button class="btn ghost" style="padding:4px 12px;" onclick="signPrevPage()">◀</button>
             <span id="signPageInfo" style="font-size:13px;color:#fff;min-width:50px;text-align:center;">– / –</span>
@@ -849,14 +850,14 @@
         <div id="signPdfStage" style="position:relative;width:100%;background:#555;border:1px solid var(--border-bright);border-radius:var(--r-md);overflow:hidden;display:flex;justify-content:center;min-height:200px;">
           <canvas id="signPdfCanvas" style="max-width:100%;display:block;"></canvas>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:8px;">💡 Az elhelyezett elemeket ujjal húzhatod, a zöld sarokkal átméretezheted.</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;" data-i18n="mh.signDragHint">💡 Az elhelyezett elemeket ujjal húzhatod, a zöld sarokkal átméretezheted.</div>
       </div>
 
        <!-- 4. Véglegesítés -->
       <div class="glass-soft" style="padding:14px;">
-        <div style="font-weight:600;color:#fff;margin-bottom:10px;">3. Véglegesítés</div>
-        <button class="btn ok" style="width:100%;margin-bottom:8px;padding:14px;" onclick="burnAndSaveDoc()">🔥 Ráégetés és mentés</button>
-        <button class="btn primary" style="width:100%;padding:14px;" onclick="burnAndDownloadDoc()">⬇️ Ráégetés és letöltés (PDF)</button>
+        <div style="font-weight:600;color:#fff;margin-bottom:10px;" data-i18n="mh.step3Finalize">3. Véglegesítés</div>
+        <button class="btn ok" style="width:100%;margin-bottom:8px;padding:14px;" onclick="burnAndSaveDoc()" data-i18n="mh.burnSave">🔥 Ráégetés és mentés</button>
+        <button class="btn primary" style="width:100%;padding:14px;" onclick="burnAndDownloadDoc()" data-i18n="mh.burnDownload">⬇️ Ráégetés és letöltés (PDF)</button>
       </div>
 
     </div>
@@ -956,47 +957,47 @@
     <input type="hidden" id="feId">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;">
       <div class="field"><label data-i18n="form.driverName">Sofőr neve</label><input class="input" id="feNumeSofer"></div>
-      <div class="field"><label>Serie / Sorszám</label><input class="input" id="feNumarFisa" placeholder="pl. B-2026-0001"></div>
-      <div class="field"><label>Vontató rendszám</label><input class="input" id="feCamion"></div>
-      <div class="field"><label>Pótkocsi rendszám</label><input class="input" id="feRemorca"></div>
-      <div class="field"><label>Km kezdés</label><input class="input" type="number" id="feKmInc"></div>
-      <div class="field"><label>Km vég</label><input class="input" type="number" id="feKmSf"></div>
-      <div class="field"><label>Diurnă externă (nap)</label><input class="input" type="number" id="feDiurnaEx"></div>
-      <div class="field"><label>Diurnă internă (nap)</label><input class="input" type="number" id="feDiurnaIn"></div>
-      <div class="field"><label>Üzemanyag kezdés (L)</label><input class="input" type="number" id="feCantInc"></div>
-      <div class="field"><label>Üzemanyag vég (L)</label><input class="input" type="number" id="feCantSf"></div>
+      <div class="field"><label data-i18n="mh.serieSeq">Serie / Sorszám</label><input class="input" id="feNumarFisa" placeholder="pl. B-2026-0001" data-i18n-ph="mh.phSerieEg"></div>
+      <div class="field"><label data-i18n="mh.tractorPlate">Vontató rendszám</label><input class="input" id="feCamion"></div>
+      <div class="field"><label data-i18n="mh.trailerPlate">Pótkocsi rendszám</label><input class="input" id="feRemorca"></div>
+      <div class="field"><label data-i18n="mh.kmStart">Km kezdés</label><input class="input" type="number" id="feKmInc"></div>
+      <div class="field"><label data-i18n="mh.kmEnd">Km vég</label><input class="input" type="number" id="feKmSf"></div>
+      <div class="field"><label data-i18n="mh.diurnaExt">Diurnă externă (nap)</label><input class="input" type="number" id="feDiurnaEx"></div>
+      <div class="field"><label data-i18n="mh.diurnaInt">Diurnă internă (nap)</label><input class="input" type="number" id="feDiurnaIn"></div>
+      <div class="field"><label data-i18n="mh.fuelStart">Üzemanyag kezdés (L)</label><input class="input" type="number" id="feCantInc"></div>
+      <div class="field"><label data-i18n="mh.fuelEnd">Üzemanyag vég (L)</label><input class="input" type="number" id="feCantSf"></div>
     </div>
 
     <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-weight:700;color:var(--text-primary);">📍 Útvonal pontok</div>
-        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddPunct()">+ Pont</button>
+        <div style="font-weight:700;color:var(--text-primary);" data-i18n="mh.routePoints">📍 Útvonal pontok</div>
+        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddPunct()" data-i18n="mh.addPoint">+ Pont</button>
       </div>
       <div id="fePuncte" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
 
     <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-weight:700;color:var(--text-primary);">⛽ Tankolások</div>
-        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddAlim()">+ Tankolás</button>
+        <div style="font-weight:700;color:var(--text-primary);" data-i18n="mh.refuelings">⛽ Tankolások</div>
+        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddAlim()" data-i18n="mh.addRefuel">+ Tankolás</button>
       </div>
       <div id="feAlim" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
 
     <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-weight:700;color:var(--text-primary);">🛒 Kiadások</div>
-        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddAch()">+ Kiadás</button>
+        <div style="font-weight:700;color:var(--text-primary);" data-i18n="mh.expenses">🛒 Kiadások</div>
+        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddAch()" data-i18n="mh.addExpense">+ Kiadás</button>
       </div>
       <div id="feAch" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
 
-    <div class="field" style="margin-top:10px;"><label>Megjegyzések</label><textarea class="textarea" id="feMentiuni" rows="2"></textarea></div>
+    <div class="field" style="margin-top:10px;"><label data-i18n="mh.notes">Megjegyzések</label><textarea class="textarea" id="feMentiuni" rows="2"></textarea></div>
 
     <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
-      <button class="btn ghost col" onclick="closeFuvEdit()">Mégse</button>
-      <button class="btn col" onclick="openPdfView(document.getElementById('feId').value)">👁 PDF nézet</button>
-      <button class="btn primary col" onclick="saveFuvEdit()">💾 Mentés</button>
+      <button class="btn ghost col" onclick="closeFuvEdit()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn col" onclick="openPdfView(document.getElementById('feId').value)" data-i18n="mh.pdfView">👁 PDF nézet</button>
+      <button class="btn primary col" onclick="saveFuvEdit()" data-i18n="mh.save">💾 Mentés</button>
     </div>
   </div>
 </div>
@@ -1005,11 +1006,11 @@
 <div class="modal-back" id="pdfViewModal" style="align-items:stretch;padding:0;">
   <div class="modal glass" style="width:100%;max-width:100%;height:100vh;max-height:100vh;border-radius:0;margin:0;padding:0;display:flex;flex-direction:column;">
     <div style="display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;">
-      <button class="btn ghost" onclick="closePdfView()" style="padding:8px 16px;">← Vissza</button>
-      <button class="btn primary" onclick="printPdfView()" style="padding:8px 16px;">🖨️ Nyomtatás / PDF</button>
-      <div style="margin-left:auto;font-weight:700;color:var(--text-primary);">Menetlevél</div>
+      <button class="btn ghost" onclick="closePdfView()" style="padding:8px 16px;" data-i18n="mh.back">← Vissza</button>
+      <button class="btn primary" onclick="printPdfView()" style="padding:8px 16px;" data-i18n="mh.printPdf">🖨️ Nyomtatás / PDF</button>
+      <div style="margin-left:auto;font-weight:700;color:var(--text-primary);" data-i18n="mh.waybill">Menetlevél</div>
     </div>
-    <iframe id="pdfFrame" title="Menetlevél PDF" style="flex:1;width:100%;border:0;background:#fff;"></iframe>
+    <iframe id="pdfFrame" title="Menetlevél PDF" data-i18n-title="mh.waybillPdf" style="flex:1;width:100%;border:0;background:#fff;"></iframe>
   </div>
 </div>
 
@@ -1018,31 +1019,31 @@
   <div class="modal glass" style="width:min(440px,100%);">
     <h3 style="margin-top:0;">💰 Fizetés rögzítése — <span id="payOrderId" style="color:var(--brand-red);"></span></h3>
     <div class="glass-soft" style="padding:12px 14px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
-      <div><div style="font-size:11px;color:var(--muted);">Fuvar ára</div><div style="font-size:17px;font-weight:800;color:#fff;"><span id="payPretLbl">—</span></div></div>
-      <div><div style="font-size:11px;color:var(--muted);">Eddig fizetve</div><div style="font-size:17px;font-weight:800;color:var(--status-ok);"><span id="payPaidLbl">—</span></div></div>
-      <div><div style="font-size:11px;color:var(--muted);">Hátralék</div><div style="font-size:17px;font-weight:800;color:var(--status-danger);"><span id="payRemainLbl">—</span></div></div>
+      <div><div style="font-size:11px;color:var(--muted);" data-i18n="mh.orderPrice">Fuvar ára</div><div style="font-size:17px;font-weight:800;color:#fff;"><span id="payPretLbl">—</span></div></div>
+      <div><div style="font-size:11px;color:var(--muted);" data-i18n="mh.paidSoFar">Eddig fizetve</div><div style="font-size:17px;font-weight:800;color:var(--status-ok);"><span id="payPaidLbl">—</span></div></div>
+      <div><div style="font-size:11px;color:var(--muted);" data-i18n="mh.remaining">Hátralék</div><div style="font-size:17px;font-weight:800;color:var(--status-danger);"><span id="payRemainLbl">—</span></div></div>
     </div>
     <div class="field">
-      <label>Beérkezett összeg (részfizetés is lehet)</label>
+      <label data-i18n="mh.receivedAmount">Beérkezett összeg (részfizetés is lehet)</label>
       <div style="display:flex;gap:8px;">
         <input class="input" id="payAmount" type="number" step="0.01" min="0" placeholder="0" style="flex:1;">
-        <button class="btn ok" style="white-space:nowrap;padding:8px 14px;" onclick="payFillFull()">Teljes hátralék</button>
+        <button class="btn ok" style="white-space:nowrap;padding:8px 14px;" onclick="payFillFull()" data-i18n="mh.fullRemaining">Teljes hátralék</button>
       </div>
     </div>
-    <div class="field"><label>Fizetés módja</label>
+    <div class="field"><label data-i18n="mh.payMethod">Fizetés módja</label>
       <select class="select" id="payMethod">
-        <option value="Átutalás">Átutalás</option>
-        <option value="Készpénz">Készpénz</option>
-        <option value="Kompenzáció">Kompenzáció</option>
-        <option value="Egyéb">Egyéb</option>
+        <option value="Átutalás" data-i18n="mh.payTransfer">Átutalás</option>
+        <option value="Készpénz" data-i18n="mh.payCash">Készpénz</option>
+        <option value="Kompenzáció" data-i18n="mh.payCompensation">Kompenzáció</option>
+        <option value="Egyéb" data-i18n="mh.optOther">Egyéb</option>
       </select>
     </div>
-    <div class="field"><label>Megjegyzés (opcionális)</label><input class="input" id="payNote" placeholder="pl. banki referencia"></div>
+    <div class="field"><label data-i18n="mh.noteOptional">Megjegyzés (opcionális)</label><input class="input" id="payNote" placeholder="pl. banki referencia" data-i18n-ph="mh.phBankRef"></div>
     <div style="display:flex;gap:10px;margin-top:14px;">
-      <button class="btn ghost col" onclick="closePaymentModal()">Mégse</button>
-      <button class="btn primary col" onclick="savePayment()">💾 Rögzítés</button>
+      <button class="btn ghost col" onclick="closePaymentModal()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn primary col" onclick="savePayment()" data-i18n="mh.record">💾 Rögzítés</button>
     </div>
-    <button class="btn ghost" id="payResetBtn" onclick="resetPayment()" style="width:100%;margin-top:10px;padding:7px;font-size:12px;color:var(--status-danger);display:none;">↩️ Téves rögzítés — fizetések nullázása</button>
+    <button class="btn ghost" id="payResetBtn" onclick="resetPayment()" style="width:100%;margin-top:10px;padding:7px;font-size:12px;color:var(--status-danger);display:none;" data-i18n="mh.resetPayments">↩️ Téves rögzítés — fizetések nullázása</button>
   </div>
 </div>
 
@@ -1063,7 +1064,7 @@
 <script src="/manager.js?v=20260611"></script>
 
  <!-- ── BUG REPORT FAB ── -->
-<button onclick="openBugReport()" title="Hibajelentés küldése"
+<button onclick="openBugReport()" title="Hibajelentés küldése" data-i18n-title="mh.sendBugReport"
   style="position:fixed;bottom:24px;right:24px;z-index:500;width:48px;height:48px;border-radius:50%;
   border:1px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.12);color:#f59e0b;
   font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;
@@ -1074,19 +1075,224 @@
  <!-- ── BUG REPORT MODAL ── -->
 <div class="modal-back" id="bugModal">
   <div class="modal glass" style="width:min(480px,100%);max-height:90vh;">
-    <h3 style="margin-top:0;">🐛 Hibajelentés</h3>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">Írd le pontosan mi történt, mit csináltál, és mi nem működött megfelelően. A fejlesztőhöz kerül.</p>
+    <h3 style="margin-top:0;" data-i18n="mh.bugReport">🐛 Hibajelentés</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;" data-i18n="mh.bugReportHint">Írd le pontosan mi történt, mit csináltál, és mi nem működött megfelelően. A fejlesztőhöz kerül.</p>
     <div class="field">
-      <label>Leírás *</label>
+      <label data-i18n="mh.description">Leírás *</label>
       <textarea id="bugText" class="input" style="min-height:130px;resize:vertical;font-family:inherit;line-height:1.5;"
-        placeholder="pl. A Beérkezett Fuvarlevelek fülön kattintottam a letöltés gombra, de semmi sem történt..."></textarea>
+        placeholder="pl. A Beérkezett Fuvarlevelek fülön kattintottam a letöltés gombra, de semmi sem történt..." data-i18n-ph="mh.phBugEg"></textarea>
     </div>
     <div style="display:flex;gap:10px;margin-top:6px;">
-      <button class="btn ghost col" onclick="closeBugReport()">Mégse</button>
-      <button class="btn primary col" id="bugSubmitBtn" onclick="submitBugReport()">📤 Küldés</button>
+      <button class="btn ghost col" onclick="closeBugReport()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn primary col" id="bugSubmitBtn" onclick="submitBugReport()" data-i18n="mh.send">📤 Küldés</button>
     </div>
   </div>
 </div>
+
+<script>(window.registerI18n||function(d){(window.__i18nQueue=window.__i18nQueue||[]).push(d);})({
+  'mh.companyDashboard': { hu:'Cég dashboard', ro:'Panou firmă' },
+  'mh.lightMode': { hu:'Világos mód', ro:'Mod luminos' },
+  'mh.totalOrders': { hu:'Összes fuvar', ro:'Total transporturi' },
+  'mh.activeOrders': { hu:'Aktív fuvar', ro:'Transporturi active' },
+  'mh.users': { hu:'Felhasználók', ro:'Utilizatori' },
+  'mh.receivedWaybills': { hu:'Beérkezett menetlevelek', ro:'Foi de parcurs primite' },
+  'mh.recentOrders': { hu:'Legutóbbi fuvarok', ro:'Transporturi recente' },
+  'mh.allOrders': { hu:'Összes fuvar →', ro:'Toate transporturile →' },
+  'mh.colOrder': { hu:'Fuvar', ro:'Transport' },
+  'mh.colDest': { hu:'Úticél', ro:'Destinație' },
+  'mh.colDate': { hu:'Dátum', ro:'Dată' },
+  'mh.loading': { hu:'Betöltés...', ro:'Se încarcă...' },
+  'mh.vehicleStatus': { hu:'Jármű státusz', ro:'Stare vehicule' },
+  'mh.phClientEg': { hu:'pl. Vallor Logistics', ro:'ex. Vallor Logistics' },
+  'mh.routePreview': { hu:'Útvonal-előnézet térképen', ro:'Previzualizare rută pe hartă' },
+  'mh.phWeightEg': { hu:'pl. 12000', ro:'ex. 12000' },
+  'mh.phLoadCity': { hu:'pl. Budapest (HU)', ro:'ex. Budapesta (HU)' },
+  'mh.phUnloadCity': { hu:'pl. Bucharest (RO)', ro:'ex. București (RO)' },
+  'mh.phSearch': { hu:'Keresés...', ro:'Căutare...' },
+  'mh.phSearchNameFirm': { hu:'Keresés névben / cégben...', ro:'Căutare după nume / firmă...' },
+  'mh.phDriverName': { hu:'Nagy János', ro:'Ion Popescu' },
+  'mh.phCompanyName': { hu:'XY Trans Kft', ro:'XY Trans SRL' },
+  'mh.phPhone': { hu:'+40 ...', ro:'+40 ...' },
+  'mh.notGiven': { hu:'— Nincs megadva —', ro:'— Neprecizat —' },
+  'mh.docSeriesHint': { hu:'Sorszám: [Prefix]-[Év]-[0001]. Új prefix esetén a számozás 1-ről indul.', ro:'Număr: [Prefix]-[An]-[0001]. La un prefix nou numerotarea începe de la 1.' },
+  'mh.waybillPrefix': { hu:'Menetlevél prefix', ro:'Prefix foaie de parcurs' },
+  'mh.currentSeq': { hu:'Aktuális sorszám', ro:'Număr curent' },
+  'mh.save': { hu:'💾 Mentés', ro:'💾 Salvare' },
+  'mh.colSeq': { hu:'Sorszám', ro:'Număr' },
+  'mh.colFilename': { hu:'Fájlnév', ro:'Nume fișier' },
+  'mh.colSubmitted': { hu:'Beküldés ideje', ro:'Data trimiterii' },
+  'mh.colAction': { hu:'Művelet', ro:'Acțiune' },
+  'mh.allDrivers': { hu:'Összes sofőr', ro:'Toți șoferii' },
+  'mh.allTypes': { hu:'Összes típus', ro:'Toate tipurile' },
+  'mh.optInvoice': { hu:'Számla', ro:'Factură' },
+  'mh.optCustoms': { hu:'Vám', ro:'Vamă' },
+  'mh.optOther': { hu:'Egyéb', ro:'Altele' },
+  'mh.colName': { hu:'Név', ro:'Nume' },
+  'mh.colEmail': { hu:'E-mail', ro:'E-mail' },
+  'mh.colPosition': { hu:'Pozíció', ro:'Funcție' },
+  'mh.phBindEmail': { hu:'Kötés e-mailhez (opcionális)', ro:'Asociere la e-mail (opțional)' },
+  'mh.genCode': { hu:'+ Kód generálása', ro:'+ Generare cod' },
+  'mh.colCode': { hu:'Kód', ro:'Cod' },
+  'mh.internalDriversSub': { hu:'Sofőr pozíciójú regisztrált felhasználók', ro:'Utilizatori înregistrați cu funcția de șofer' },
+  'mh.externalDriversSub': { hu:'Cégen kívüli sofőrök és cégek címjegyzéke', ro:'Agendă cu șoferi și firme externe' },
+  'mh.addExtDriver': { hu:'Új külső sofőr / cég hozzáadása', ro:'Adăugare șofer / firmă externă' },
+  'mh.phDriverNameEg': { hu:'pl. Nagy János', ro:'ex. Ion Popescu' },
+  'mh.phCompanyNameEg': { hu:'pl. XY Trans Kft', ro:'ex. XY Trans SRL' },
+  'mh.phEmailEg': { hu:'nev@pelda.hu', ro:'nume@exemplu.ro' },
+  'mh.tractorPlate': { hu:'Vontató rendszám', ro:'Nr. înmatriculare cap tractor' },
+  'mh.trailerPlate': { hu:'Pótkocsi rendszám', ro:'Nr. înmatriculare remorcă' },
+  'mh.note': { hu:'Megjegyzés', ro:'Observație' },
+  'mh.addDriver': { hu:'+ Sofőr hozzáadása', ro:'+ Adăugare șofer' },
+  'mh.trailer': { hu:'Pótkocsi', ro:'Remorcă' },
+  'mh.vehiclesSub': { hu:'Vontatók és pótkocsik nyilvántartása', ro:'Evidența capurilor tractoare și remorcilor' },
+  'mh.tractors': { hu:'Vontatók', ro:'Capuri tractoare' },
+  'mh.plateReq': { hu:'Rendszám *', ro:'Nr. înmatriculare *' },
+  'mh.brand': { hu:'Márka', ro:'Marcă' },
+  'mh.model': { hu:'Model', ro:'Model' },
+  'mh.year': { hu:'Év', ro:'An' },
+  'mh.addTractor': { hu:'+ Vontató hozzáadása', ro:'+ Adăugare cap tractor' },
+  'mh.plate': { hu:'Rendszám', ro:'Nr. înmatriculare' },
+  'mh.trailers': { hu:'Pótkocsik', ro:'Remorci' },
+  'mh.cargoKind': { hu:'Típus (rakfelület)', ro:'Tip (suprafață de încărcare)' },
+  'mh.standard260': { hu:'Standard (260 cm)', ro:'Standard (260 cm)' },
+  'mh.mega305': { hu:'Mega (305 cm)', ro:'Mega (305 cm)' },
+  'mh.cargoLen': { hu:'Rakfelület hossz (cm)', ro:'Lungime suprafață încărcare (cm)' },
+  'mh.cargoWid': { hu:'Rakfelület szélesség (cm)', ro:'Lățime suprafață încărcare (cm)' },
+  'mh.cargoHei': { hu:'Rakfelület magasság (cm)', ro:'Înălțime suprafață încărcare (cm)' },
+  'mh.addTrailer': { hu:'+ Pótkocsi hozzáadása', ro:'+ Adăugare remorcă' },
+  'mh.drawSignature': { hu:'Digitális Aláírás Rajzolása', ro:'Desenare semnătură digitală' },
+  'mh.clear': { hu:'Törlés', ro:'Ștergere' },
+  'mh.save2': { hu:'Mentés', ro:'Salvare' },
+  'mh.uploadStamp': { hu:'Bélyegző feltöltése (PNG)', ro:'Încărcare ștampilă (PNG)' },
+  'mh.saveStamp': { hu:'Bélyegző mentése', ro:'Salvare ștampilă' },
+  'mh.currentStampPreview': { hu:'Aktuális bélyegző előnézete', ro:'Previzualizare ștampilă curentă' },
+  'mh.notSaved': { hu:'Nincs mentve.', ro:'Nesalvat.' },
+  'mh.firebaseConnecting': { hu:'Firebase kapcsolódás...', ro:'Conectare Firebase...' },
+  'mh.chats': { hu:'Csevegések', ro:'Conversații' },
+  'mh.newChat': { hu:'Új chat', ro:'Conversație nouă' },
+  'mh.phWriteMessage': { hu:'Üzenet írása...', ro:'Scrie un mesaj...' },
+  'mh.startNewChat': { hu:'Új chat indítása', ro:'Pornire conversație nouă' },
+  'mh.selectUser': { hu:'Felhasználó kiválasztása', ro:'Selectare utilizator' },
+  'mh.loadingDash': { hu:'— Betöltés... —', ro:'— Se încarcă... —' },
+  'mh.startChat': { hu:'Chat indítása', ro:'Pornire conversație' },
+  'mh.emailIntakeTitle': { hu:'📥 E-mail megrendelés-feldolgozás', ro:'📥 Procesare comenzi din e-mail' },
+  'mh.emailIntakeHint': { hu:'A beérkező megrendelő e-mailek automatikus feldolgozásának beállításai (megtekintés).', ro:'Setări pentru procesarea automată a e-mailurilor de comandă primite (vizualizare).' },
+  'mh.fullName': { hu:'Teljes név', ro:'Nume complet' },
+  'mh.emailReadonly': { hu:'E-mail cím (nem módosítható)', ro:'Adresă e-mail (nemodificabilă)' },
+  'mh.phoneNumber': { hu:'Telefonszám', ro:'Număr de telefon' },
+  'mh.saveProfile': { hu:'💾 Profil mentése', ro:'💾 Salvare profil' },
+  'mh.currentPw': { hu:'Jelenlegi jelszó', ro:'Parola curentă' },
+  'mh.newPw': { hu:'Új jelszó', ro:'Parolă nouă' },
+  'mh.phMin6': { hu:'Legalább 6 karakter', ro:'Minim 6 caractere' },
+  'mh.confirmNewPw': { hu:'Új jelszó megerősítése', ro:'Confirmare parolă nouă' },
+  'mh.changePwBtn': { hu:'🔒 Jelszó módosítása', ro:'🔒 Schimbare parolă' },
+  'mh.2faDisableWarn': { hu:'⚠️ A 2FA kikapcsolása csökkenti a fiókod biztonságát. Csak akkor tedd, ha indokolt.', ro:'⚠️ Dezactivarea 2FA reduce securitatea contului tău. Fă acest lucru doar dacă este justificat.' },
+  'mh.currentPwConfirm': { hu:'Jelenlegi jelszó a megerősítéshez', ro:'Parola curentă pentru confirmare' },
+  'mh.disable2fa': { hu:'🔓 2FA kikapcsolása', ro:'🔓 Dezactivare 2FA' },
+  'mh.2faEnableHint': { hu:'A 2FA bekapcsolásával minden belépésnél kódbevitel szükséges (Google Authenticator vagy hasonló app).', ro:'Cu 2FA activat, la fiecare autentificare este necesar un cod (Google Authenticator sau aplicație similară).' },
+  'mh.enable2fa': { hu:'🔐 2FA bekapcsolása', ro:'🔐 Activare 2FA' },
+  'mh.2faQrHint': { hu:'Olvasd be a QR kódot Google Authenticator vagy Authy appban, majd add meg az első kódot a megerősítéshez.', ro:'Scanează codul QR în Google Authenticator sau Authy, apoi introdu primul cod pentru confirmare.' },
+  'mh.confirmCode': { hu:'Megerősítő kód (6 jegy)', ro:'Cod de confirmare (6 cifre)' },
+  'mh.confirm': { hu:'✅ Megerősítés', ro:'✅ Confirmare' },
+  'mh.editData': { hu:'Adatok szerkesztése', ro:'Editare date' },
+  'mh.phLeaveEmpty': { hu:'Hagyja üresen, ha nem változik', ro:'Lăsați gol dacă nu se modifică' },
+  'mh.editVehicle': { hu:'Jármű szerkesztése', ro:'Editare vehicul' },
+  'mh.truckParams': { hu:'🚚 Teherjármű paraméterek (útvonaltervezés)', ro:'🚚 Parametri camion (planificare rută)' },
+  'mh.physicalDims': { hu:'Fizikai méretek', ro:'Dimensiuni fizice' },
+  'mh.heightCm': { hu:'Magasság (cm)', ro:'Înălțime (cm)' },
+  'mh.phEg390': { hu:'pl. 390', ro:'ex. 390' },
+  'mh.widthCm': { hu:'Szélesség (cm)', ro:'Lățime (cm)' },
+  'mh.phEg255': { hu:'pl. 255', ro:'ex. 255' },
+  'mh.lengthCm': { hu:'Hossz (cm)', ro:'Lungime (cm)' },
+  'mh.phEg1350': { hu:'pl. 1350', ro:'ex. 1350' },
+  'mh.weightData': { hu:'Tömeg adatok', ro:'Date masă' },
+  'mh.totalWeight': { hu:'Teljes tömeg (kg, rakománnyal)', ro:'Masă totală (kg, cu marfă)' },
+  'mh.phEg40000': { hu:'pl. 40000', ro:'ex. 40000' },
+  'mh.axleWeight': { hu:'Tengelyterhelés (kg)', ro:'Sarcină pe osie (kg)' },
+  'mh.phEg11500': { hu:'pl. 11500', ro:'ex. 11500' },
+  'mh.configuration': { hu:'Konfiguráció', ro:'Configurație' },
+  'mh.axleCount': { hu:'Tengelyek száma', ro:'Număr de osii' },
+  'mh.vehicleType': { hu:'Jármű típus', ro:'Tip vehicul' },
+  'mh.truckStraight': { hu:'Merevtengelyes teherautó', ro:'Camion cu osie rigidă' },
+  'mh.truckTractor': { hu:'Nyerges vontató', ro:'Cap tractor' },
+  'mh.truckLight': { hu:'Könnyű teherjármű', ro:'Vehicul utilitar ușor' },
+  'mh.special': { hu:'Speciális', ro:'Special' },
+  'mh.tunnelCat': { hu:'Alagút kategória', ro:'Categorie tunel' },
+  'mh.noRestriction': { hu:'Nincs korlátozás', ro:'Fără restricție' },
+  'mh.catB': { hu:'B kategória', ro:'Categoria B' },
+  'mh.catC': { hu:'C kategória', ro:'Categoria C' },
+  'mh.catD': { hu:'D kategória', ro:'Categoria D' },
+  'mh.catE': { hu:'E kategória (legszigorúbb)', ro:'Categoria E (cea mai strictă)' },
+  'mh.hazmat': { hu:'Veszélyes áru', ro:'Marfă periculoasă' },
+  'mh.hazNone': { hu:'Nincs', ro:'Niciuna' },
+  'mh.hazExplosive': { hu:'Robbanóanyag', ro:'Exploziv' },
+  'mh.hazGas': { hu:'Gáz', ro:'Gaz' },
+  'mh.hazFlammable': { hu:'Gyúlékony', ro:'Inflamabil' },
+  'mh.hazCombustible': { hu:'Égőanyag', ro:'Combustibil' },
+  'mh.hazOrganic': { hu:'Szerves anyag', ro:'Substanță organică' },
+  'mh.hazPoison': { hu:'Méreg', ro:'Otravă' },
+  'mh.hazWater': { hu:'Vízszennyező', ro:'Poluant pentru apă' },
+  'mh.fuelConsumption': { hu:'Fogyasztás (L/100km)', ro:'Consum (L/100km)' },
+  'mh.phEg285': { hu:'pl. 28.5', ro:'ex. 28.5' },
+  'mh.cargoSurface': { hu:'📦 Rakodási felület (nem a teljes méret!)', ro:'📦 Suprafață de încărcare (nu dimensiunea totală!)' },
+  'mh.kind': { hu:'Típus', ro:'Tip' },
+  'mh.editExtDriver': { hu:'Külső sofőr szerkesztése', ro:'Editare șofer extern' },
+  'mh.add': { hu:'Hozzáadás', ro:'Adăugare' },
+  'mh.uploadOrderDoc': { hu:'Új megrendelő feltöltése (PDF)', ro:'Încărcare comandă nouă (PDF)' },
+  'mh.uploadAndOpen': { hu:'Feltöltés és megnyitás szerkesztőben', ro:'Încărcare și deschidere în editor' },
+  'mh.close': { hu:'Bezárás', ro:'Închidere' },
+  'mh.signStamp': { hu:'✍️ Aláírás / Pecsét', ro:'✍️ Semnătură / Ștampilă' },
+  'mh.closeX': { hu:'✕ Bezárás', ro:'✕ Închidere' },
+  'mh.step1Sign': { hu:'1. Aláírás rajzolása', ro:'1. Desenare semnătură' },
+  'mh.addPlus': { hu:'➕ Hozzáad', ro:'➕ Adăugare' },
+  'mh.step2Stamp': { hu:'2. Pecsét (mentett PNG)', ro:'2. Ștampilă (PNG salvat)' },
+  'mh.noStamp': { hu:'Nincs mentett pecsét.', ro:'Nicio ștampilă salvată.' },
+  'mh.addStamp': { hu:'➕ Pecsét hozzáadása', ro:'➕ Adăugare ștampilă' },
+  'mh.pdfPreviewDrag': { hu:'PDF előnézet — húzd a helyére az elemeket', ro:'Previzualizare PDF — trage elementele la poziție' },
+  'mh.signDragHint': { hu:'💡 Az elhelyezett elemeket ujjal húzhatod, a zöld sarokkal átméretezheted.', ro:'💡 Elementele plasate pot fi mutate cu degetul, redimensionate cu colțul verde.' },
+  'mh.step3Finalize': { hu:'3. Véglegesítés', ro:'3. Finalizare' },
+  'mh.burnSave': { hu:'🔥 Ráégetés és mentés', ro:'🔥 Aplicare și salvare' },
+  'mh.burnDownload': { hu:'⬇️ Ráégetés és letöltés (PDF)', ro:'⬇️ Aplicare și descărcare (PDF)' },
+  'mh.serieSeq': { hu:'Serie / Sorszám', ro:'Serie / Număr' },
+  'mh.phSerieEg': { hu:'pl. B-2026-0001', ro:'ex. B-2026-0001' },
+  'mh.kmStart': { hu:'Km kezdés', ro:'Km început' },
+  'mh.kmEnd': { hu:'Km vég', ro:'Km sfârșit' },
+  'mh.diurnaExt': { hu:'Diurnă externă (nap)', ro:'Diurnă externă (zile)' },
+  'mh.diurnaInt': { hu:'Diurnă internă (nap)', ro:'Diurnă internă (zile)' },
+  'mh.fuelStart': { hu:'Üzemanyag kezdés (L)', ro:'Combustibil început (L)' },
+  'mh.fuelEnd': { hu:'Üzemanyag vég (L)', ro:'Combustibil sfârșit (L)' },
+  'mh.routePoints': { hu:'📍 Útvonal pontok', ro:'📍 Puncte de rută' },
+  'mh.addPoint': { hu:'+ Pont', ro:'+ Punct' },
+  'mh.refuelings': { hu:'⛽ Tankolások', ro:'⛽ Alimentări' },
+  'mh.addRefuel': { hu:'+ Tankolás', ro:'+ Alimentare' },
+  'mh.expenses': { hu:'🛒 Kiadások', ro:'🛒 Cheltuieli' },
+  'mh.addExpense': { hu:'+ Kiadás', ro:'+ Cheltuială' },
+  'mh.notes': { hu:'Megjegyzések', ro:'Observații' },
+  'mh.pdfView': { hu:'👁 PDF nézet', ro:'👁 Vizualizare PDF' },
+  'mh.back': { hu:'← Vissza', ro:'← Înapoi' },
+  'mh.printPdf': { hu:'🖨️ Nyomtatás / PDF', ro:'🖨️ Tipărire / PDF' },
+  'mh.waybill': { hu:'Menetlevél', ro:'Foaie de parcurs' },
+  'mh.waybillPdf': { hu:'Menetlevél PDF', ro:'PDF foaie de parcurs' },
+  'mh.orderPrice': { hu:'Fuvar ára', ro:'Preț transport' },
+  'mh.paidSoFar': { hu:'Eddig fizetve', ro:'Plătit până acum' },
+  'mh.remaining': { hu:'Hátralék', ro:'Rest de plată' },
+  'mh.receivedAmount': { hu:'Beérkezett összeg (részfizetés is lehet)', ro:'Sumă încasată (poate fi plată parțială)' },
+  'mh.fullRemaining': { hu:'Teljes hátralék', ro:'Tot restul' },
+  'mh.payMethod': { hu:'Fizetés módja', ro:'Metodă de plată' },
+  'mh.payTransfer': { hu:'Átutalás', ro:'Transfer bancar' },
+  'mh.payCash': { hu:'Készpénz', ro:'Numerar' },
+  'mh.payCompensation': { hu:'Kompenzáció', ro:'Compensare' },
+  'mh.noteOptional': { hu:'Megjegyzés (opcionális)', ro:'Observație (opțional)' },
+  'mh.phBankRef': { hu:'pl. banki referencia', ro:'ex. referință bancară' },
+  'mh.record': { hu:'💾 Rögzítés', ro:'💾 Înregistrare' },
+  'mh.resetPayments': { hu:'↩️ Téves rögzítés — fizetések nullázása', ro:'↩️ Înregistrare greșită — resetare plăți' },
+  'mh.sendBugReport': { hu:'Hibajelentés küldése', ro:'Trimitere raport de eroare' },
+  'mh.bugReport': { hu:'🐛 Hibajelentés', ro:'🐛 Raport de eroare' },
+  'mh.bugReportHint': { hu:'Írd le pontosan mi történt, mit csináltál, és mi nem működött megfelelően. A fejlesztőhöz kerül.', ro:'Descrie exact ce s-a întâmplat, ce ai făcut și ce nu a funcționat corect. Va ajunge la dezvoltator.' },
+  'mh.description': { hu:'Leírás *', ro:'Descriere *' },
+  'mh.phBugEg': { hu:'pl. A Beérkezett Fuvarlevelek fülön kattintottam a letöltés gombra, de semmi sem történt...', ro:'ex. Pe fila Foi de parcurs primite am apăsat butonul de descărcare, dar nu s-a întâmplat nimic...' },
+  'mh.send': { hu:'📤 Küldés', ro:'📤 Trimitere' }
+});</script>
 
 </body>
 </html>

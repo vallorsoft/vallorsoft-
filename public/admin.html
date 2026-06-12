@@ -8,6 +8,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260611">
   <script src="/i18n.js?v=20260612"></script>
+  <script src="/i18n-srv.js?v=20260612"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -831,15 +832,15 @@
  <!-- MEGRENDELO MODAL -->
 <div class="modal-back" id="docModal">
   <div class="modal glass" style="width:min(700px,100%); max-height:90vh; overflow-y:auto;">
-    <h3>📎 Megrendelő — <span id="docModalOrderId"></span></h3>
+    <h3><span data-i18n="ah.orderDash">📎 Megrendelő —</span> <span id="docModalOrderId"></span></h3>
     <div class="glass-soft" style="padding:16px; margin-bottom:16px;">
-      <div style="font-weight:600; margin-bottom:10px; color:#fff;">Új megrendelő feltöltése (PDF)</div>
+      <div style="font-weight:600; margin-bottom:10px; color:#fff;" data-i18n="ah.uploadOrderPdf">Új megrendelő feltöltése (PDF)</div>
       <input type="file" id="docUploadInput" class="input" accept="application/pdf">
-      <button class="btn primary" onclick="uploadOrderDoc()" style="margin-top:10px; width:100%;">Feltöltés és megnyitás szerkesztőben</button>
+      <button class="btn primary" onclick="uploadOrderDoc()" style="margin-top:10px; width:100%;" data-i18n="ah.uploadAndOpen">Feltöltés és megnyitás szerkesztőben</button>
     </div>
     <div id="docListWrap"><div style="color:var(--muted);font-size:13px;">Betöltés...</div></div>
     <div style="margin-top:16px;text-align:right;">
-      <button class="btn ghost" onclick="closeDocModal()">Bezárás</button>
+      <button class="btn ghost" onclick="closeDocModal()" data-i18n="ah.close">Bezárás</button>
     </div>
   </div>
 </div>
@@ -850,36 +851,36 @@
 
      <!-- Fejléc — sticky, bezárás gomb mindig látható -->
     <div style="position:sticky;top:0;z-index:10;background:var(--bg-2);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
-      <h3 style="margin:0;font-size:16px;">✍️ Aláírás / Pecsét</h3>
-      <button class="btn ghost" onclick="closeSignModal()" style="padding:8px 16px;font-size:14px;min-width:80px;">✕ Bezárás</button>
+      <h3 style="margin:0;font-size:16px;" data-i18n="ah.signStamp">✍️ Aláírás / Pecsét</h3>
+      <button class="btn ghost" onclick="closeSignModal()" style="padding:8px 16px;font-size:14px;min-width:80px;" data-i18n="ah.closeX">✕ Bezárás</button>
     </div>
 
     <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
 
        <!-- 1. Aláírás rajzolás -->
       <div class="glass-soft" style="padding:14px;">
-        <div style="font-weight:600;color:#fff;margin-bottom:8px;">1. Aláírás rajzolása</div>
+        <div style="font-weight:600;color:#fff;margin-bottom:8px;" data-i18n="ah.signStep1">1. Aláírás rajzolása</div>
         <canvas id="signCanvas" style="width:100%;height:140px;background:#fff;border-radius:8px;border:2px solid var(--border-bright);cursor:crosshair;touch-action:none;display:block;"></canvas>
         <div style="display:flex;gap:8px;margin-top:8px;">
-          <button class="btn ghost" style="flex:1;padding:10px;" onclick="clearSignCanvas()">Törlés</button>
-          <button class="btn ok" style="flex:1;padding:10px;" onclick="addSignatureToPage()">➕ Hozzáad</button>
+          <button class="btn ghost" style="flex:1;padding:10px;" onclick="clearSignCanvas()" data-i18n="ah.clear">Törlés</button>
+          <button class="btn ok" style="flex:1;padding:10px;" onclick="addSignatureToPage()" data-i18n="ah.addPlus">➕ Hozzáad</button>
         </div>
       </div>
 
        <!-- 2. Pecsét -->
       <div class="glass-soft" style="padding:14px;">
-        <div style="font-weight:600;color:#fff;margin-bottom:8px;">2. Pecsét (mentett PNG)</div>
+        <div style="font-weight:600;color:#fff;margin-bottom:8px;" data-i18n="ah.signStep2">2. Pecsét (mentett PNG)</div>
         <div id="stampPreviewWrap" style="background:#fff;padding:8px;border-radius:8px;text-align:center;min-height:60px;">
           <img id="signStampImg" style="max-height:70px;display:none;">
-          <span id="signNoStamp" style="color:#999;font-size:12px;">Nincs mentett pecsét.</span>
+          <span id="signNoStamp" style="color:#999;font-size:12px;" data-i18n="ah.noStamp">Nincs mentett pecsét.</span>
         </div>
-        <button class="btn primary" style="width:100%;margin-top:8px;padding:10px;" onclick="addStampToPage()">➕ Pecsét hozzáadása</button>
+        <button class="btn primary" style="width:100%;margin-top:8px;padding:10px;" onclick="addStampToPage()" data-i18n="ah.addStamp">➕ Pecsét hozzáadása</button>
       </div>
 
        <!-- 3. PDF előnézet -->
       <div class="glass-soft" style="padding:14px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
-          <span style="font-size:13px;color:var(--muted);">PDF előnézet — húzd a helyére az elemeket</span>
+          <span style="font-size:13px;color:var(--muted);" data-i18n="ah.pdfPreviewDrag">PDF előnézet — húzd a helyére az elemeket</span>
           <span style="display:flex;align-items:center;gap:6px;">
             <button class="btn ghost" style="padding:4px 12px;" onclick="signPrevPage()">◀</button>
             <span id="signPageInfo" style="font-size:13px;color:#fff;min-width:50px;text-align:center;">– / –</span>
@@ -889,14 +890,14 @@
         <div id="signPdfStage" style="position:relative;width:100%;background:#555;border:1px solid var(--border-bright);border-radius:var(--r-md);overflow:hidden;display:flex;justify-content:center;min-height:200px;">
           <canvas id="signPdfCanvas" style="max-width:100%;display:block;"></canvas>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:8px;">💡 Az elhelyezett elemeket ujjal húzhatod, a zöld sarokkal átméretezheted.</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;" data-i18n="ah.signDragHint">💡 Az elhelyezett elemeket ujjal húzhatod, a zöld sarokkal átméretezheted.</div>
       </div>
 
        <!-- 4. Véglegesítés -->
       <div class="glass-soft" style="padding:14px;">
-        <div style="font-weight:600;color:#fff;margin-bottom:10px;">3. Véglegesítés</div>
-        <button class="btn ok" style="width:100%;margin-bottom:8px;padding:14px;" onclick="burnAndSaveDoc()">🔥 Ráégetés és mentés</button>
-        <button class="btn primary" style="width:100%;padding:14px;" onclick="burnAndDownloadDoc()">⬇️ Ráégetés és letöltés (PDF)</button>
+        <div style="font-weight:600;color:#fff;margin-bottom:10px;" data-i18n="ah.signStep3">3. Véglegesítés</div>
+        <button class="btn ok" style="width:100%;margin-bottom:8px;padding:14px;" onclick="burnAndSaveDoc()" data-i18n="ah.burnSave">🔥 Ráégetés és mentés</button>
+        <button class="btn primary" style="width:100%;padding:14px;" onclick="burnAndDownloadDoc()" data-i18n="ah.burnDownload">⬇️ Ráégetés és letöltés (PDF)</button>
       </div>
 
     </div>
@@ -1010,51 +1011,51 @@
 <!-- ── MENETLEVÉL SZERKESZTŐ MODAL ── -->
 <div class="modal-back" id="fuvEditModal">
   <div class="modal glass" style="width:min(820px,100%);max-height:92vh;overflow-y:auto;">
-    <h3>✏️ Menetlevél szerkesztése — <span id="feSeria" style="color:var(--brand-red);font-size:14px;font-weight:800;letter-spacing:.5px;"></span></h3>
+    <h3><span data-i18n="ah.editWaybill">✏️ Menetlevél szerkesztése —</span> <span id="feSeria" style="color:var(--brand-red);font-size:14px;font-weight:800;letter-spacing:.5px;"></span></h3>
     <input type="hidden" id="feId">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;">
       <div class="field"><label data-i18n="form.driverName">Sofőr neve</label><input class="input" id="feNumeSofer"></div>
-      <div class="field"><label>Serie / Sorszám</label><input class="input" id="feNumarFisa" placeholder="pl. B-2026-0001"></div>
-      <div class="field"><label>Vontató rendszám</label><input class="input" id="feCamion"></div>
-      <div class="field"><label>Pótkocsi rendszám</label><input class="input" id="feRemorca"></div>
-      <div class="field"><label>Km kezdés</label><input class="input" type="number" id="feKmInc"></div>
-      <div class="field"><label>Km vég</label><input class="input" type="number" id="feKmSf"></div>
-      <div class="field"><label>Diurnă externă (nap)</label><input class="input" type="number" id="feDiurnaEx"></div>
-      <div class="field"><label>Diurnă internă (nap)</label><input class="input" type="number" id="feDiurnaIn"></div>
-      <div class="field"><label>Üzemanyag kezdés (L)</label><input class="input" type="number" id="feCantInc"></div>
-      <div class="field"><label>Üzemanyag vég (L)</label><input class="input" type="number" id="feCantSf"></div>
+      <div class="field"><label data-i18n="ah.serieSeq">Serie / Sorszám</label><input class="input" id="feNumarFisa" placeholder="pl. B-2026-0001"></div>
+      <div class="field"><label data-i18n="ah.tractorPlate">Vontató rendszám</label><input class="input" id="feCamion"></div>
+      <div class="field"><label data-i18n="ah.trailerPlate">Pótkocsi rendszám</label><input class="input" id="feRemorca"></div>
+      <div class="field"><label data-i18n="ah.kmStart">Km kezdés</label><input class="input" type="number" id="feKmInc"></div>
+      <div class="field"><label data-i18n="ah.kmEnd">Km vég</label><input class="input" type="number" id="feKmSf"></div>
+      <div class="field"><label data-i18n="ah.diurnaExt">Diurnă externă (nap)</label><input class="input" type="number" id="feDiurnaEx"></div>
+      <div class="field"><label data-i18n="ah.diurnaInt">Diurnă internă (nap)</label><input class="input" type="number" id="feDiurnaIn"></div>
+      <div class="field"><label data-i18n="ah.fuelStart">Üzemanyag kezdés (L)</label><input class="input" type="number" id="feCantInc"></div>
+      <div class="field"><label data-i18n="ah.fuelEnd">Üzemanyag vég (L)</label><input class="input" type="number" id="feCantSf"></div>
     </div>
 
     <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-weight:700;color:var(--text-primary);">📍 Útvonal pontok</div>
-        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddPunct()">+ Pont</button>
+        <div style="font-weight:700;color:var(--text-primary);" data-i18n="ah.routePoints">📍 Útvonal pontok</div>
+        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddPunct()" data-i18n="ah.addPoint">+ Pont</button>
       </div>
       <div id="fePuncte" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
 
     <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-weight:700;color:var(--text-primary);">⛽ Tankolások</div>
-        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddAlim()">+ Tankolás</button>
+        <div style="font-weight:700;color:var(--text-primary);" data-i18n="ah.refuelings">⛽ Tankolások</div>
+        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddAlim()" data-i18n="ah.addRefuel">+ Tankolás</button>
       </div>
       <div id="feAlim" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
 
     <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-weight:700;color:var(--text-primary);">🛒 Kiadások</div>
-        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddAch()">+ Kiadás</button>
+        <div style="font-weight:700;color:var(--text-primary);" data-i18n="ah.expenses">🛒 Kiadások</div>
+        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddAch()" data-i18n="ah.addExpense">+ Kiadás</button>
       </div>
       <div id="feAch" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
 
-    <div class="field" style="margin-top:10px;"><label>Megjegyzések</label><textarea class="textarea" id="feMentiuni" rows="2"></textarea></div>
+    <div class="field" style="margin-top:10px;"><label data-i18n="ah.notes">Megjegyzések</label><textarea class="textarea" id="feMentiuni" rows="2"></textarea></div>
 
     <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
-      <button class="btn ghost col" onclick="closeFuvEdit()">Mégse</button>
-      <button class="btn col" onclick="openPdfView(document.getElementById('feId').value)">👁 PDF nézet</button>
-      <button class="btn primary col" onclick="saveFuvEdit()">💾 Mentés</button>
+      <button class="btn ghost col" onclick="closeFuvEdit()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn col" onclick="openPdfView(document.getElementById('feId').value)" data-i18n="ah.pdfView">👁 PDF nézet</button>
+      <button class="btn primary col" onclick="saveFuvEdit()" data-i18n="common.save">💾 Mentés</button>
     </div>
   </div>
 </div>
@@ -1063,44 +1064,44 @@
 <div class="modal-back" id="pdfViewModal" style="align-items:stretch;padding:0;">
   <div class="modal glass" style="width:100%;max-width:100%;height:100vh;max-height:100vh;border-radius:0;margin:0;padding:0;display:flex;flex-direction:column;">
     <div style="display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;">
-      <button class="btn ghost" onclick="closePdfView()" style="padding:8px 16px;">← Vissza</button>
-      <button class="btn primary" onclick="printPdfView()" style="padding:8px 16px;">🖨️ Nyomtatás / PDF</button>
-      <div style="margin-left:auto;font-weight:700;color:var(--text-primary);">Menetlevél</div>
+      <button class="btn ghost" onclick="closePdfView()" style="padding:8px 16px;" data-i18n="ah.back">← Vissza</button>
+      <button class="btn primary" onclick="printPdfView()" style="padding:8px 16px;" data-i18n="ah.printPdf">🖨️ Nyomtatás / PDF</button>
+      <div style="margin-left:auto;font-weight:700;color:var(--text-primary);" data-i18n="ah.waybill">Menetlevél</div>
     </div>
-    <iframe id="pdfFrame" title="Menetlevél PDF" style="flex:1;width:100%;border:0;background:#fff;"></iframe>
+    <iframe id="pdfFrame" title="Menetlevél PDF" data-i18n-title="ah.waybillPdf" style="flex:1;width:100%;border:0;background:#fff;"></iframe>
   </div>
 </div>
 
 <!-- ── FIZETÉS RÖGZÍTÉSE MODAL (💰 a Finalizat fuvarokon) ── -->
 <div class="modal-back" id="payModal">
   <div class="modal glass" style="width:min(440px,100%);">
-    <h3 style="margin-top:0;">💰 Fizetés rögzítése — <span id="payOrderId" style="color:var(--brand-red);"></span></h3>
+    <h3 style="margin-top:0;"><span data-i18n="ah.recordPayment">💰 Fizetés rögzítése —</span> <span id="payOrderId" style="color:var(--brand-red);"></span></h3>
     <div class="glass-soft" style="padding:12px 14px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
-      <div><div style="font-size:11px;color:var(--muted);">Fuvar ára</div><div style="font-size:17px;font-weight:800;color:#fff;"><span id="payPretLbl">—</span></div></div>
-      <div><div style="font-size:11px;color:var(--muted);">Eddig fizetve</div><div style="font-size:17px;font-weight:800;color:var(--status-ok);"><span id="payPaidLbl">—</span></div></div>
-      <div><div style="font-size:11px;color:var(--muted);">Hátralék</div><div style="font-size:17px;font-weight:800;color:var(--status-danger);"><span id="payRemainLbl">—</span></div></div>
+      <div><div style="font-size:11px;color:var(--muted);" data-i18n="ah.orderPrice">Fuvar ára</div><div style="font-size:17px;font-weight:800;color:#fff;"><span id="payPretLbl">—</span></div></div>
+      <div><div style="font-size:11px;color:var(--muted);" data-i18n="ah.paidSoFar">Eddig fizetve</div><div style="font-size:17px;font-weight:800;color:var(--status-ok);"><span id="payPaidLbl">—</span></div></div>
+      <div><div style="font-size:11px;color:var(--muted);" data-i18n="ah.remaining">Hátralék</div><div style="font-size:17px;font-weight:800;color:var(--status-danger);"><span id="payRemainLbl">—</span></div></div>
     </div>
     <div class="field">
-      <label>Beérkezett összeg (részfizetés is lehet)</label>
+      <label data-i18n="ah.receivedAmount">Beérkezett összeg (részfizetés is lehet)</label>
       <div style="display:flex;gap:8px;">
         <input class="input" id="payAmount" type="number" step="0.01" min="0" placeholder="0" style="flex:1;">
-        <button class="btn ok" style="white-space:nowrap;padding:8px 14px;" onclick="payFillFull()">Teljes hátralék</button>
+        <button class="btn ok" style="white-space:nowrap;padding:8px 14px;" onclick="payFillFull()" data-i18n="ah.fullRemaining">Teljes hátralék</button>
       </div>
     </div>
-    <div class="field"><label>Fizetés módja</label>
+    <div class="field"><label data-i18n="ah.paymentMethod">Fizetés módja</label>
       <select class="select" id="payMethod">
-        <option value="Átutalás">Átutalás</option>
-        <option value="Készpénz">Készpénz</option>
-        <option value="Kompenzáció">Kompenzáció</option>
-        <option value="Egyéb">Egyéb</option>
+        <option value="Átutalás" data-i18n="ah.payTransfer">Átutalás</option>
+        <option value="Készpénz" data-i18n="ah.payCash">Készpénz</option>
+        <option value="Kompenzáció" data-i18n="ah.payCompensation">Kompenzáció</option>
+        <option value="Egyéb" data-i18n="ah.optOther">Egyéb</option>
       </select>
     </div>
-    <div class="field"><label>Megjegyzés (opcionális)</label><input class="input" id="payNote" placeholder="pl. banki referencia"></div>
+    <div class="field"><label data-i18n="ah.noteOptional">Megjegyzés (opcionális)</label><input class="input" id="payNote" placeholder="pl. banki referencia" data-i18n-ph="ah.phBankRef"></div>
     <div style="display:flex;gap:10px;margin-top:14px;">
-      <button class="btn ghost col" onclick="closePaymentModal()">Mégse</button>
-      <button class="btn primary col" onclick="savePayment()">💾 Rögzítés</button>
+      <button class="btn ghost col" onclick="closePaymentModal()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn primary col" onclick="savePayment()" data-i18n="ah.record">💾 Rögzítés</button>
     </div>
-    <button class="btn ghost" id="payResetBtn" onclick="resetPayment()" style="width:100%;margin-top:10px;padding:7px;font-size:12px;color:var(--status-danger);display:none;">↩️ Téves rögzítés — fizetések nullázása</button>
+    <button class="btn ghost" id="payResetBtn" onclick="resetPayment()" style="width:100%;margin-top:10px;padding:7px;font-size:12px;color:var(--status-danger);display:none;" data-i18n="ah.paymentReset">↩️ Téves rögzítés — fizetések nullázása</button>
   </div>
 </div>
 
@@ -1123,7 +1124,7 @@
 <script src="/planner.js?v=20260611"></script>
 <script src="/admin.js?v=20260611"></script>
  <!-- ── BUG REPORT FAB ── -->
-<button onclick="openBugReport()" title="Hibajelentés küldése"
+<button onclick="openBugReport()" title="Hibajelentés küldése" data-i18n-title="ah.bugReportTitle"
   style="position:fixed;bottom:24px;right:24px;z-index:500;width:48px;height:48px;border-radius:50%;
   border:1px solid rgba(245,158,11,0.4);background:rgba(245,158,11,0.12);color:#f59e0b;
   font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;
@@ -1134,19 +1135,218 @@
  <!-- ── BUG REPORT MODAL ── -->
 <div class="modal-back" id="bugModal">
   <div class="modal glass" style="width:min(480px,100%);max-height:90vh;">
-    <h3 style="margin-top:0;">🐛 Hibajelentés</h3>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">Írd le pontosan mi történt, mit csináltál, és mi nem működött megfelelően. A fejlesztőhöz kerül.</p>
+    <h3 style="margin-top:0;" data-i18n="ah.bugReport">🐛 Hibajelentés</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;" data-i18n="ah.bugReportHint">Írd le pontosan mi történt, mit csináltál, és mi nem működött megfelelően. A fejlesztőhöz kerül.</p>
     <div class="field">
-      <label>Leírás *</label>
+      <label data-i18n="ah.descriptionReq">Leírás *</label>
       <textarea id="bugText" class="input" style="min-height:130px;resize:vertical;font-family:inherit;line-height:1.5;"
-        placeholder="pl. A Beérkezett Fuvarlevelek fülön kattintottam a letöltés gombra, de semmi sem történt..."></textarea>
+        placeholder="pl. A Beérkezett Fuvarlevelek fülön kattintottam a letöltés gombra, de semmi sem történt..." data-i18n-ph="ah.bugPlaceholder"></textarea>
     </div>
     <div style="display:flex;gap:10px;margin-top:6px;">
-      <button class="btn ghost col" onclick="closeBugReport()">Mégse</button>
-      <button class="btn primary col" id="bugSubmitBtn" onclick="submitBugReport()">📤 Küldés</button>
+      <button class="btn ghost col" onclick="closeBugReport()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn primary col" id="bugSubmitBtn" onclick="submitBugReport()" data-i18n="ah.send">📤 Küldés</button>
     </div>
   </div>
 </div>
+
+<!-- ── admin.html STATIKUS szövegek i18n-regisztrációja (RO alap / HU) ── -->
+<script>(window.registerI18n||function(d){(window.__i18nQueue=window.__i18nQueue||[]).push(d);})({
+  'ah.companyDashboard': { hu:'Cég dashboard', ro:'Panou companie' },
+  'ah.lightMode': { hu:'Világos mód', ro:'Mod luminos' },
+  'ah.totalOrders': { hu:'Összes fuvar', ro:'Total transporturi' },
+  'ah.activeOrders': { hu:'Aktív fuvar', ro:'Transporturi active' },
+  'ah.users': { hu:'Felhasználók', ro:'Utilizatori' },
+  'ah.receivedWaybills': { hu:'Beérkezett menetlevelek', ro:'Foi de parcurs primite' },
+  'ah.recentOrders': { hu:'Legutóbbi fuvarok', ro:'Transporturi recente' },
+  'ah.allOrders': { hu:'Összes fuvar →', ro:'Toate transporturile →' },
+  'ah.thOrder': { hu:'Fuvar', ro:'Transport' },
+  'ah.thDest': { hu:'Úticél', ro:'Destinație' },
+  'ah.thDriver': { hu:'Sofőr', ro:'Șofer' },
+  'ah.thStatus': { hu:'Státusz', ro:'Status' },
+  'ah.thDate': { hu:'Dátum', ro:'Dată' },
+  'ah.vehicleStatus': { hu:'Jármű státusz', ro:'Status vehicule' },
+  'ah.phClientExample': { hu:'pl. Vallor Logistics', ro:'ex. Vallor Logistics' },
+  'ah.phBudapest': { hu:'pl. Budapest (HU)', ro:'ex. Budapesta (HU)' },
+  'ah.phBucharest': { hu:'pl. Bucharest (RO)', ro:'ex. București (RO)' },
+  'ah.phSearch': { hu:'Keresés...', ro:'Căutare...' },
+  'ah.phSearchNameCompany': { hu:'Keresés névben / cégben...', ro:'Căutare după nume / firmă...' },
+  'ah.optNotGiven': { hu:'— Nincs megadva —', ro:'— Neprecizat —' },
+  'ah.docSeriesHint': { hu:'Sorszám: [Prefix]-[Év]-[0001]. Új prefix esetén a számozás 1-ről indul.', ro:'Număr: [Prefix]-[An]-[0001]. La un prefix nou, numerotarea începe de la 1.' },
+  'ah.waybillPrefix': { hu:'Menetlevél prefix', ro:'Prefix foaie de parcurs' },
+  'ah.currentSeq': { hu:'Aktuális sorszám', ro:'Număr curent' },
+  'ah.btnSave': { hu:'💾 Mentés', ro:'💾 Salvează' },
+  'ah.thSeq': { hu:'Sorszám', ro:'Număr' },
+  'ah.thFilename': { hu:'Fájlnév', ro:'Nume fișier' },
+  'ah.thSubmitTime': { hu:'Beküldés ideje', ro:'Data trimiterii' },
+  'ah.thAction': { hu:'Művelet', ro:'Acțiune' },
+  'ah.allDrivers': { hu:'Összes sofőr', ro:'Toți șoferii' },
+  'ah.allTypes': { hu:'Összes típus', ro:'Toate tipurile' },
+  'ah.optInvoice': { hu:'Számla', ro:'Factură' },
+  'ah.optCustoms': { hu:'Vám', ro:'Vamă' },
+  'ah.optOther': { hu:'Egyéb', ro:'Altele' },
+  'ah.thName': { hu:'Név', ro:'Nume' },
+  'ah.thEmail': { hu:'E-mail', ro:'E-mail' },
+  'ah.thPosition': { hu:'Pozíció', ro:'Funcție' },
+  'ah.emailOptional': { hu:'E-mail <span style="font-weight:400;">(opcionális)</span>', ro:'E-mail <span style="font-weight:400;">(opțional)</span>' },
+  'ah.nameOptional': { hu:'Név <span style="font-weight:400;">(opcionális)</span>', ro:'Nume <span style="font-weight:400;">(opțional)</span>' },
+  'ah.phoneOptional': { hu:'Telefon <span style="font-weight:400;">(opcionális)</span>', ro:'Telefon <span style="font-weight:400;">(opțional)</span>' },
+  'ah.btnGenCode': { hu:'+ Kód generálása', ro:'+ Generează cod' },
+  'ah.thCode': { hu:'Kód', ro:'Cod' },
+  'ah.internDriversSub': { hu:'Sofőr pozíciójú regisztrált felhasználók', ro:'Utilizatori înregistrați cu funcția de șofer' },
+  'ah.externDriversSub': { hu:'Cégen kívüli sofőrök és cégek címjegyzéke', ro:'Agenda șoferilor și firmelor externe' },
+  'ah.addExternDriver': { hu:'Új külső sofőr / cég hozzáadása', ro:'Adăugare șofer / firmă externă' },
+  'ah.tractorPlate': { hu:'Vontató rendszám', ro:'Număr înmatriculare cap tractor' },
+  'ah.trailerPlate': { hu:'Pótkocsi rendszám', ro:'Număr înmatriculare remorcă' },
+  'ah.tractor': { hu:'Vontató', ro:'Cap tractor' },
+  'ah.trailer': { hu:'Pótkocsi', ro:'Remorcă' },
+  'ah.note': { hu:'Megjegyzés', ro:'Observație' },
+  'ah.phOptional': { hu:'opcionális', ro:'opțional' },
+  'ah.btnAddDriver': { hu:'+ Sofőr hozzáadása', ro:'+ Adaugă șofer' },
+  'ah.vehiclesSub': { hu:'Vontatók és pótkocsik nyilvántartása', ro:'Evidența capetelor tractoare și remorcilor' },
+  'ah.tractors': { hu:'Vontatók', ro:'Capete tractoare' },
+  'ah.trailers': { hu:'Pótkocsik', ro:'Remorci' },
+  'ah.plate': { hu:'Rendszám', ro:'Număr înmatriculare' },
+  'ah.plateReq': { hu:'Rendszám *', ro:'Număr înmatriculare *' },
+  'ah.brand': { hu:'Márka', ro:'Marcă' },
+  'ah.model': { hu:'Model', ro:'Model' },
+  'ah.year': { hu:'Év', ro:'An' },
+  'ah.btnAddTractor': { hu:'+ Vontató hozzáadása', ro:'+ Adaugă cap tractor' },
+  'ah.btnAddTrailer': { hu:'+ Pótkocsi hozzáadása', ro:'+ Adaugă remorcă' },
+  'ah.cargoKind': { hu:'Típus (rakfelület)', ro:'Tip (suprafață de încărcare)' },
+  'ah.standard260': { hu:'Standard (260 cm)', ro:'Standard (260 cm)' },
+  'ah.mega305': { hu:'Mega (305 cm)', ro:'Mega (305 cm)' },
+  'ah.cargoLen': { hu:'Rakfelület hossz (cm)', ro:'Lungime suprafață încărcare (cm)' },
+  'ah.cargoWid': { hu:'Rakfelület szélesség (cm)', ro:'Lățime suprafață încărcare (cm)' },
+  'ah.cargoHei': { hu:'Rakfelület magasság (cm)', ro:'Înălțime suprafață încărcare (cm)' },
+  'ah.drawSignature': { hu:'Digitális Aláírás Rajzolása', ro:'Desenare semnătură digitală' },
+  'ah.clear': { hu:'Törlés', ro:'Șterge' },
+  'ah.uploadStamp': { hu:'Bélyegző feltöltése (PNG)', ro:'Încărcare ștampilă (PNG)' },
+  'ah.saveStamp': { hu:'Bélyegző mentése', ro:'Salvează ștampila' },
+  'ah.currentStampPreview': { hu:'Aktuális bélyegző előnézete', ro:'Previzualizare ștampilă curentă' },
+  'ah.notSaved': { hu:'Nincs mentve.', ro:'Nesalvat.' },
+  'ah.firebaseConnecting': { hu:'Firebase kapcsolódás...', ro:'Conectare Firebase...' },
+  'ah.chats': { hu:'Csevegések', ro:'Conversații' },
+  'ah.newChat': { hu:'Új chat indítása', ro:'Pornește un chat nou' },
+  'ah.pickChat': { hu:'← Válassz egy csevegést a listából', ro:'← Alege o conversație din listă' },
+  'ah.phMessage': { hu:'Üzenet írása...', ro:'Scrie un mesaj...' },
+  'ah.selectUser': { hu:'Felhasználó kiválasztása', ro:'Selectează utilizator' },
+  'ah.startChat': { hu:'Chat indítása', ro:'Pornește chat' },
+  'ah.integrationsHint': { hu:'Számlázó és GPS/flotta szolgáltatások. A hitelesítő kulcsokat a szerver titkosítva tárolja — sosem kerülnek vissza nyílt szövegként a böngészőbe.', ro:'Servicii de facturare și GPS/flotă. Cheile de autentificare sunt stocate criptat de server — nu revin niciodată în clar în browser.' },
+  'ah.orderInvoicing': { hu:'🧾 Fuvar-számlázás — ügyfeleknek', ro:'🧾 Facturare transporturi — către clienți' },
+  'ah.orderInvoicingHint': { hu:'Ezt használja a fuvarok melletti <b>🧾</b> gomb: ezzel állítasz ki (és stornózol) számlát az ügyfeleidnek a fuvarokból. A hitelesítő adatokat a szerver titkosítva tárolja.', ro:'Aceasta o folosește butonul <b>🧾</b> de lângă transporturi: emiți (și stornezi) facturi către clienții tăi din transporturi. Datele de autentificare sunt stocate criptat de server.' },
+  'ah.gpsFleet': { hu:'🛰️ GPS / Flotta (CargoTrack)', ro:'🛰️ GPS / Flotă (CargoTrack)' },
+  'ah.fullName': { hu:'Teljes név', ro:'Nume complet' },
+  'ah.emailReadonly': { hu:'E-mail cím (nem módosítható)', ro:'Adresă e-mail (nemodificabilă)' },
+  'ah.phoneNumber': { hu:'Telefonszám', ro:'Număr de telefon' },
+  'ah.saveProfile': { hu:'💾 Profil mentése', ro:'💾 Salvează profilul' },
+  'ah.currentPw': { hu:'Jelenlegi jelszó', ro:'Parola curentă' },
+  'ah.newPw': { hu:'Új jelszó', ro:'Parolă nouă' },
+  'ah.min6chars': { hu:'Legalább 6 karakter', ro:'Minim 6 caractere' },
+  'ah.newPwConfirm': { hu:'Új jelszó megerősítése', ro:'Confirmă parola nouă' },
+  'ah.changePw': { hu:'🔒 Jelszó módosítása', ro:'🔒 Schimbă parola' },
+  'ah.2faDisableWarn': { hu:'⚠️ A 2FA kikapcsolása csökkenti a fiókod biztonságát. Csak akkor tedd, ha indokolt.', ro:'⚠️ Dezactivarea 2FA reduce securitatea contului. Fă-o doar dacă este justificat.' },
+  'ah.currentPwConfirm': { hu:'Jelenlegi jelszó a megerősítéshez', ro:'Parola curentă pentru confirmare' },
+  'ah.2faDisable': { hu:'🔓 2FA kikapcsolása', ro:'🔓 Dezactivează 2FA' },
+  'ah.2faEnableHint': { hu:'A 2FA bekapcsolásával minden belépésnél kódbevitel szükséges (Google Authenticator vagy hasonló app).', ro:'Prin activarea 2FA, la fiecare autentificare este necesar un cod (Google Authenticator sau o aplicație similară).' },
+  'ah.2faEnable': { hu:'🔐 2FA bekapcsolása', ro:'🔐 Activează 2FA' },
+  'ah.2faSetupHint': { hu:'Olvasd be a QR kódot Google Authenticator vagy Authy appban, majd add meg az első kódot a megerősítéshez.', ro:'Scanează codul QR în Google Authenticator sau Authy, apoi introdu primul cod pentru confirmare.' },
+  'ah.confirmCode6': { hu:'Megerősítő kód (6 jegy)', ro:'Cod de confirmare (6 cifre)' },
+  'ah.confirm': { hu:'✅ Megerősítés', ro:'✅ Confirmă' },
+  'ah.editData': { hu:'Adatok szerkesztése', ro:'Editare date' },
+  'ah.phLeaveEmpty': { hu:'Hagyja üresen, ha nem változik', ro:'Lăsați gol dacă nu se schimbă' },
+  'ah.editVehicle': { hu:'Jármű szerkesztése', ro:'Editare vehicul' },
+  'ah.truckParams': { hu:'🚚 Teherjármű paraméterek (útvonaltervezés)', ro:'🚚 Parametri vehicul de marfă (planificare rută)' },
+  'ah.physicalDims': { hu:'Fizikai méretek', ro:'Dimensiuni fizice' },
+  'ah.heightCm': { hu:'Magasság (cm)', ro:'Înălțime (cm)' },
+  'ah.widthCm': { hu:'Szélesség (cm)', ro:'Lățime (cm)' },
+  'ah.lengthCm': { hu:'Hossz (cm)', ro:'Lungime (cm)' },
+  'ah.weightData': { hu:'Tömeg adatok', ro:'Date masă' },
+  'ah.totalWeight': { hu:'Teljes tömeg (kg, rakománnyal)', ro:'Masă totală (kg, cu marfă)' },
+  'ah.axleWeight': { hu:'Tengelyterhelés (kg)', ro:'Sarcină pe axă (kg)' },
+  'ah.configuration': { hu:'Konfiguráció', ro:'Configurație' },
+  'ah.axleCount': { hu:'Tengelyek száma', ro:'Număr axe' },
+  'ah.truckType': { hu:'Jármű típus', ro:'Tip vehicul' },
+  'ah.straightTruck': { hu:'Merevtengelyes teherautó', ro:'Camion cu șasiu rigid' },
+  'ah.tractorUnit': { hu:'Nyerges vontató', ro:'Cap tractor cu semiremorcă' },
+  'ah.lightTruck': { hu:'Könnyű teherjármű', ro:'Vehicul ușor de marfă' },
+  'ah.special': { hu:'Speciális', ro:'Special' },
+  'ah.tunnelCat': { hu:'Alagút kategória', ro:'Categorie tunel' },
+  'ah.noRestriction': { hu:'Nincs korlátozás', ro:'Fără restricție' },
+  'ah.catB': { hu:'B kategória', ro:'Categoria B' },
+  'ah.catC': { hu:'C kategória', ro:'Categoria C' },
+  'ah.catD': { hu:'D kategória', ro:'Categoria D' },
+  'ah.catE': { hu:'E kategória (legszigorúbb)', ro:'Categoria E (cea mai strictă)' },
+  'ah.hazmat': { hu:'Veszélyes áru', ro:'Marfă periculoasă' },
+  'ah.hazNone': { hu:'Nincs', ro:'Niciuna' },
+  'ah.hazExplosive': { hu:'Robbanóanyag', ro:'Materii explozive' },
+  'ah.hazGas': { hu:'Gáz', ro:'Gaz' },
+  'ah.hazFlammable': { hu:'Gyúlékony', ro:'Inflamabil' },
+  'ah.hazCombustible': { hu:'Égőanyag', ro:'Combustibil' },
+  'ah.hazOrganic': { hu:'Szerves anyag', ro:'Materii organice' },
+  'ah.hazPoison': { hu:'Méreg', ro:'Otravă' },
+  'ah.hazWater': { hu:'Vízszennyező', ro:'Poluant pentru apă' },
+  'ah.fuelConsum': { hu:'Fogyasztás (L/100km)', ro:'Consum (L/100km)' },
+  'ah.cargoArea': { hu:'📦 Rakodási felület (nem a teljes méret!)', ro:'📦 Suprafață de încărcare (nu dimensiunea totală!)' },
+  'ah.kind': { hu:'Típus', ro:'Tip' },
+  'ah.editExternDriver': { hu:'Külső sofőr szerkesztése', ro:'Editare șofer extern' },
+  'ah.add': { hu:'Hozzáadás', ro:'Adaugă' },
+  'ah.orderDash': { hu:'📎 Megrendelő —', ro:'📎 Comandă —' },
+  'ah.uploadOrderPdf': { hu:'Új megrendelő feltöltése (PDF)', ro:'Încărcare comandă nouă (PDF)' },
+  'ah.uploadAndOpen': { hu:'Feltöltés és megnyitás szerkesztőben', ro:'Încarcă și deschide în editor' },
+  'ah.close': { hu:'Bezárás', ro:'Închide' },
+  'ah.signStamp': { hu:'✍️ Aláírás / Pecsét', ro:'✍️ Semnătură / Ștampilă' },
+  'ah.closeX': { hu:'✕ Bezárás', ro:'✕ Închide' },
+  'ah.signStep1': { hu:'1. Aláírás rajzolása', ro:'1. Desenare semnătură' },
+  'ah.addPlus': { hu:'➕ Hozzáad', ro:'➕ Adaugă' },
+  'ah.signStep2': { hu:'2. Pecsét (mentett PNG)', ro:'2. Ștampilă (PNG salvat)' },
+  'ah.noStamp': { hu:'Nincs mentett pecsét.', ro:'Nu există ștampilă salvată.' },
+  'ah.addStamp': { hu:'➕ Pecsét hozzáadása', ro:'➕ Adaugă ștampilă' },
+  'ah.pdfPreviewDrag': { hu:'PDF előnézet — húzd a helyére az elemeket', ro:'Previzualizare PDF — trage elementele la locul lor' },
+  'ah.signDragHint': { hu:'💡 Az elhelyezett elemeket ujjal húzhatod, a zöld sarokkal átméretezheted.', ro:'💡 Elementele plasate pot fi trase cu degetul, redimensionate din colțul verde.' },
+  'ah.signStep3': { hu:'3. Véglegesítés', ro:'3. Finalizare' },
+  'ah.burnSave': { hu:'🔥 Ráégetés és mentés', ro:'🔥 Aplicare și salvare' },
+  'ah.burnDownload': { hu:'⬇️ Ráégetés és letöltés (PDF)', ro:'⬇️ Aplicare și descărcare (PDF)' },
+  'ah.editWaybill': { hu:'✏️ Menetlevél szerkesztése —', ro:'✏️ Editare foaie de parcurs —' },
+  'ah.serieSeq': { hu:'Serie / Sorszám', ro:'Serie / Număr' },
+  'ah.kmStart': { hu:'Km kezdés', ro:'Km început' },
+  'ah.kmEnd': { hu:'Km vég', ro:'Km sfârșit' },
+  'ah.diurnaExt': { hu:'Diurnă externă (nap)', ro:'Diurnă externă (zile)' },
+  'ah.diurnaInt': { hu:'Diurnă internă (nap)', ro:'Diurnă internă (zile)' },
+  'ah.fuelStart': { hu:'Üzemanyag kezdés (L)', ro:'Combustibil început (L)' },
+  'ah.fuelEnd': { hu:'Üzemanyag vég (L)', ro:'Combustibil sfârșit (L)' },
+  'ah.routePoints': { hu:'📍 Útvonal pontok', ro:'📍 Puncte de traseu' },
+  'ah.addPoint': { hu:'+ Pont', ro:'+ Punct' },
+  'ah.refuelings': { hu:'⛽ Tankolások', ro:'⛽ Alimentări' },
+  'ah.addRefuel': { hu:'+ Tankolás', ro:'+ Alimentare' },
+  'ah.expenses': { hu:'🛒 Kiadások', ro:'🛒 Cheltuieli' },
+  'ah.addExpense': { hu:'+ Kiadás', ro:'+ Cheltuială' },
+  'ah.notes': { hu:'Megjegyzések', ro:'Observații' },
+  'ah.pdfView': { hu:'👁 PDF nézet', ro:'👁 Vizualizare PDF' },
+  'ah.back': { hu:'← Vissza', ro:'← Înapoi' },
+  'ah.printPdf': { hu:'🖨️ Nyomtatás / PDF', ro:'🖨️ Tipărire / PDF' },
+  'ah.waybill': { hu:'Menetlevél', ro:'Foaie de parcurs' },
+  'ah.waybillPdf': { hu:'Menetlevél PDF', ro:'Foaie de parcurs PDF' },
+  'ah.recordPayment': { hu:'💰 Fizetés rögzítése —', ro:'💰 Înregistrare plată —' },
+  'ah.orderPrice': { hu:'Fuvar ára', ro:'Preț transport' },
+  'ah.paidSoFar': { hu:'Eddig fizetve', ro:'Plătit până acum' },
+  'ah.remaining': { hu:'Hátralék', ro:'Rest de plată' },
+  'ah.receivedAmount': { hu:'Beérkezett összeg (részfizetés is lehet)', ro:'Sumă încasată (poate fi plată parțială)' },
+  'ah.fullRemaining': { hu:'Teljes hátralék', ro:'Tot restul' },
+  'ah.paymentMethod': { hu:'Fizetés módja', ro:'Metodă de plată' },
+  'ah.payTransfer': { hu:'Átutalás', ro:'Transfer bancar' },
+  'ah.payCash': { hu:'Készpénz', ro:'Numerar' },
+  'ah.payCompensation': { hu:'Kompenzáció', ro:'Compensare' },
+  'ah.noteOptional': { hu:'Megjegyzés (opcionális)', ro:'Observație (opțional)' },
+  'ah.phBankRef': { hu:'pl. banki referencia', ro:'ex. referință bancară' },
+  'ah.record': { hu:'💾 Rögzítés', ro:'💾 Înregistrează' },
+  'ah.paymentReset': { hu:'↩️ Téves rögzítés — fizetések nullázása', ro:'↩️ Înregistrare greșită — resetare plăți' },
+  'ah.bugReportTitle': { hu:'Hibajelentés küldése', ro:'Trimite raport de eroare' },
+  'ah.bugReport': { hu:'🐛 Hibajelentés', ro:'🐛 Raport de eroare' },
+  'ah.bugReportHint': { hu:'Írd le pontosan mi történt, mit csináltál, és mi nem működött megfelelően. A fejlesztőhöz kerül.', ro:'Descrie exact ce s-a întâmplat, ce ai făcut și ce nu a funcționat corect. Va ajunge la dezvoltator.' },
+  'ah.descriptionReq': { hu:'Leírás *', ro:'Descriere *' },
+  'ah.bugPlaceholder': { hu:'pl. A Beérkezett Fuvarlevelek fülön kattintottam a letöltés gombra, de semmi sem történt...', ro:'ex. Pe fila Foi de parcurs primite am apăsat butonul de descărcare, dar nu s-a întâmplat nimic...' },
+  'ah.send': { hu:'📤 Küldés', ro:'📤 Trimite' }
+});</script>
 
 </body>
 </html>
