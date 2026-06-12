@@ -10,7 +10,7 @@
     "test:coverage": "jest --coverage"
   },
   "engines": {
-    "node": ">=18"
+    "node": "22.x"
   },
   "jest": {
     "testEnvironment": "node",
