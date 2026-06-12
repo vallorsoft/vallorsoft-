@@ -486,6 +486,7 @@
         + ' ↔ <b class="text-primary">' + esc(s.rendszam) + '</b> '
         + '<b style="color:var(--status-ok);">' + s.km + ' km</b><span class="text-muted"> üresjárattal (' + origin + ')</span>'
         + (s.atfedes ? ' <span class="badge warn" title="A kamionnak átfedő fuvarja van ekkor — részrakományként még felférhet">⚠️ átfedéssel</span>' : '')
+        + (s.ftl_conflict ? ' <span class="badge err" title="Az átfedő fuvar FTL (teljes rakomány) — részrakomány nem fér fel">🚫 FTL</span>' : '')
         + (s.weight_warn ? ' <span class="badge err" title="A részrakományok együttes súlya túllépi a pótkocsi rakható tömegét">⚖️ ' + Math.round(s.suly_kg/1000) + 't túlsúly</span>' : '') + '</span>'
         + '<button class="btn ok" style="margin-left:auto;padding:4px 12px;font-size:12px;" '
         + 'onclick="Planner.acceptMatch(\'' + esc(String(m.order_id)) + '\',\'' + esc(s.rendszam) + '\')">✓ Kioszt</button>'
@@ -522,6 +523,7 @@
             + '<span>🎯 <b>' + esc(s.rendszam) + '</b> · <b style="color:var(--status-ok);">' + s.km + ' km</b> üresjárat'
             + (s.live ? ' <span class="badge info" title="Élő GPS-pozícióból">📍</span>' : '')
             + (s.atfedes ? ' <span class="badge warn" title="Átfedő fuvar — részrakományként még felférhet">⚠️</span>' : '')
+            + (s.ftl_conflict ? ' <span class="badge err" title="Átfedő FTL fuvar — részrakomány nem fér fel">🚫</span>' : '')
             + (s.weight_warn ? ' <span class="badge err" title="Részrakomány-túlsúly">⚖️</span>' : '') + '</span>'
             + '<button class="btn ok" style="margin-left:auto;padding:3px 10px;font-size:11px;" onclick="Planner.acceptMatch(\'' + esc(String(o.id)) + '\',\'' + esc(s.rendszam) + '\')">✓ Kioszt</button></div>';
         }).join('') + '</div>' : '')

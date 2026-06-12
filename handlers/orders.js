@@ -132,7 +132,7 @@ handlers.comList = async function (req, res, args) {
           `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare,
                   o.pret, o.km, o.status, o.sofer_type, o.email_sofer, o.nume_sofer,
                   o.firma_extern, o.telefon_extern, o.rendszam_camion, o.rendszam_remorca,
-                  o.payment_status, o.paid_amount,
+                  o.load_type, o.payment_status, o.paid_amount,
                   o.handover_status, o.handover_type, o.handover_loc, o.handover_at,
                   (SELECT COUNT(*)::int FROM documents d WHERE d.order_id = o.id) AS pod_count,
                   COALESCE(legs.leg_count, 0) AS leg_count,
@@ -150,6 +150,7 @@ handlers.comList = async function (req, res, args) {
           `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare,
                   o.pret, o.km, o.status, o.sofer_type, o.email_sofer, o.nume_sofer,
                   o.firma_extern, o.telefon_extern, o.rendszam_camion, o.rendszam_remorca,
+                  o.load_type,
                   COALESCE(legs.leg_count, 0) AS leg_count,
                   COALESCE(legs.legs_json, '[]'::json) AS legs_json
            FROM orders o ${legsSubquery}
@@ -226,6 +227,8 @@ handlers.comCreate = async function (req, res, args) {
       const external_driver_id = o.external_driver_id ? parseInt(o.external_driver_id, 10) : null;
       let rendszam_remorca = o.rendszam_remorca ? String(o.rendszam_remorca).trim().toUpperCase() : null;
       const suly_kg = (o.suly_kg === '' || o.suly_kg == null) ? null : Number(o.suly_kg);
+      // rakomány-típus: FTL = teljes rakomány, LTL = részrakomány
+      const load_type = ['FTL', 'LTL'].includes(o.load_type) ? o.load_type : null;
       const company_id = req.session.user.company_id;
 
       // Auto-párosítás: csak jármű VAGY csak belső sofőr esetén a pár kitöltése
@@ -263,16 +266,16 @@ handlers.comCreate = async function (req, res, args) {
             data_incarcare, data_descarcare, pret, km,
             sofer_type, email_sofer, nume_sofer,
             firma_extern, telefon_extern, external_driver_id,
-            rendszam_camion, rendszam_remorca, status, company_id, suly_kg
+            rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type
           ) VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
           )`,
           [
             id, client, ref, loc_incarcare, loc_descarcare,
             data_incarcare, data_descarcare, pret, km,
             sofer_type, email_sofer, nume_sofer,
             firma_extern, telefon_extern, external_driver_id,
-            rendszam_camion, rendszam_remorca, status, company_id, suly_kg
+            rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type
           ]
         );
 
@@ -349,6 +352,7 @@ handlers.comUpdate = async function (req, res, args) {
       if (o.rendszam_camion !== undefined) { updates.push(`rendszam_camion = $${i++}`); values.push(o.rendszam_camion ? o.rendszam_camion.toUpperCase() : null); }
       if (o.rendszam_remorca !== undefined) { updates.push(`rendszam_remorca = $${i++}`); values.push(o.rendszam_remorca ? o.rendszam_remorca.toUpperCase() : null); }
       if (o.suly_kg !== undefined) { updates.push(`suly_kg = $${i++}`); values.push((o.suly_kg === '' || o.suly_kg === null) ? null : Number(o.suly_kg)); }
+      if (o.load_type !== undefined) { updates.push(`load_type = $${i++}`); values.push(['FTL','LTL'].includes(o.load_type) ? o.load_type : null); }
 
       if (updates.length === 0) {
         return res.json({ result: { ok: false, err: 'Nincs mit modositani.' } });
@@ -680,7 +684,7 @@ handlers.getPlannerMatches = async function (req, res, args) {
     // kiosztatlan: ezekhez keresünk kamiont)
     const or = await pool.query(
       `SELECT id, client, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
-              status, rendszam_camion, suly_kg
+              status, rendszam_camion, suly_kg, load_type
        FROM orders
        WHERE company_id = $1 AND status NOT IN ('Anulat','Finalizat')
        ORDER BY data_incarcare NULLS LAST LIMIT 300`, [cid]);
@@ -775,6 +779,8 @@ handlers.getPlannerMatches = async function (req, res, args) {
           atfedes: ovl.length,        // hány fuvarja fedi az időablakot
           suly_kg: totalW || null,    // együttes részrakomány-súly (kg)
           weight_warn: ovl.length > 0 && totalW > MAX_PARTIAL_PAYLOAD_KG,
+          // az átfedő fuvar FTL (teljes rakomány) — részrakomány NEM fér fel
+          ftl_conflict: ovl.some((o) => o.load_type === 'FTL'),
         });
       }
       // átfedés nélküli javaslatok elöl, azon belül a legkisebb üresjárat

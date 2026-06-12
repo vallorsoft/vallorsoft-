@@ -202,6 +202,24 @@ function createInv(){
   });
 }
 
+// ── Rakomány-típus (FTL/LTL) segédek ──
+// Két pipa, de egymást kizárják: ha az egyiket bepipálod, a másik lekerül.
+function loadTypeExclusive(me, otherId){
+  if(me.checked){const o=document.getElementById(otherId);if(o)o.checked=false;}
+}
+// a két checkbox állapota → 'FTL' | 'LTL' | null
+function loadTypeValue(ftlId, ltlId){
+  if((document.getElementById(ftlId)||{}).checked)return 'FTL';
+  if((document.getElementById(ltlId)||{}).checked)return 'LTL';
+  return null;
+}
+// fuvarlista-badge: FTL = teljes áru (kék), LTL = részrakomány (sárga)
+function loadTypeBadge(t){
+  if(t==='FTL')return ' <span class="badge info" title="Full Truck Load — teljes rakomány" style="font-size:10px;padding:1px 6px;">FTL</span>';
+  if(t==='LTL')return ' <span class="badge warn" title="Less Than Truckload — részrakomány" style="font-size:10px;padding:1px 6px;">LTL</span>';
+  return '';
+}
+
 function createOrder(){
   const st=document.querySelector('input[name="oSoferType"]:checked');
   const type=st?st.value:'None';
@@ -211,6 +229,7 @@ function createOrder(){
     pret:document.getElementById('oPret').value,
     km:document.getElementById('oKm').value,
     suly_kg:(document.getElementById('oSuly')||{}).value||null,
+    load_type:loadTypeValue('oFtl','oLtl'),
     loc_incarcare:document.getElementById('oLoad').value.trim(),
     loc_descarcare:document.getElementById('oUnload').value.trim(),
     data_incarcare:document.getElementById('oLoadDate').value||null,
@@ -231,6 +250,7 @@ function createOrder(){
       toast('Fuvar mentve! ID: '+r.id+extra,'ok');
       loadOrders();
       ['oClient','oRef','oPret','oKm','oSuly','oLoad','oUnload','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+      ['oFtl','oLtl'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
       document.querySelectorAll('input[name="oSoferType"]').forEach(r=>{if(r.value==='None')r.checked=true;});
       onSoferTypeChange('None');
     }else{toast((r&&r.err)||'Hiba történt','err');}
@@ -1773,8 +1793,8 @@ function renderFilteredOrders(list) {
     } catch(e) { legs = []; }
     var legCount = legs.length;
 
-    // Útvonal cella: alap útvonal + szakasz közbülső pontok
-    var routeCell = esc(c.loc_incarcare||'—')+' → '+esc(c.loc_descarcare||'—');
+    // Útvonal cella: alap útvonal + FTL/LTL jelzés + szakasz közbülső pontok
+    var routeCell = esc(c.loc_incarcare||'—')+' → '+esc(c.loc_descarcare||'—')+loadTypeBadge(c.load_type);
     // Leadott áru jelzései (folytatásra váró fuvar — a lista tetején)
     if (c.status==='Parkolt') {
       routeCell += '<div style="margin-top:4px;"><span class="badge" style="background:rgba(192,38,211,0.18);color:#e879f9;border:1px solid rgba(192,38,211,0.4);">'+
@@ -2051,6 +2071,8 @@ function openOrderEdit(id) {
       document.getElementById('oePret').value = o.pret||0;
       document.getElementById('oeKm').value = o.km||0;
       var oeSulyEl = document.getElementById('oeSuly'); if(oeSulyEl) oeSulyEl.value = (o.suly_kg==null?'':o.suly_kg);
+      var oeFtlEl = document.getElementById('oeFtl'); if(oeFtlEl) oeFtlEl.checked = (o.load_type==='FTL');
+      var oeLtlEl = document.getElementById('oeLtl'); if(oeLtlEl) oeLtlEl.checked = (o.load_type==='LTL');
       document.getElementById('oeStatus').value = o.status||'Disponibil';
       document.getElementById('oeSoferType').value = o.sofer_type||'';
 
@@ -2175,6 +2197,7 @@ function saveOrderEdit() {
     pret:             document.getElementById('oePret').value,
     km:               document.getElementById('oeKm').value,
     suly_kg:          (document.getElementById('oeSuly')||{}).value||null,
+    load_type:        loadTypeValue('oeFtl','oeLtl'),
     status:           document.getElementById('oeStatus').value,
     sofer_type:       soferType||null,
     email_sofer:      soferType==='Intern' ? soferSel.value : null,
