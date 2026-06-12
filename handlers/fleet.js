@@ -348,13 +348,18 @@ handlers.getDriverVehicleAssignments = async function (req, res, args) {
       `SELECT id, nume, email, tel FROM users
        WHERE company_id = $1 AND pozicio = 'Sofer' ORDER BY nume`, [cid]);
     const vr = await pool.query(
-      `SELECT v.id, v.rendszam, v.marca, v.model, v.assigned_driver_email,
+      `SELECT v.id, v.rendszam, v.marca, v.model, v.assigned_driver_email, v.default_trailer_id,
               EXISTS(SELECT 1 FROM vehicle_gps_map g
                      WHERE g.company_id = v.company_id AND g.rendszam = v.rendszam) AS has_gps
        FROM vehicles v
        WHERE v.company_id = $1 AND v.tip = 'Vontato' AND v.activ = TRUE
        ORDER BY v.rendszam`, [cid]);
-    return res.json({ result: { ok: true, drivers: dr.rows, vehicles: vr.rows } });
+    // pótkocsik az alapértelmezett-pár választóhoz
+    const tr = await pool.query(
+      `SELECT id, rendszam, marca, model FROM vehicles
+       WHERE company_id = $1 AND tip = 'Potkocsi' AND activ = TRUE
+       ORDER BY rendszam`, [cid]);
+    return res.json({ result: { ok: true, drivers: dr.rows, vehicles: vr.rows, trailers: tr.rows } });
   } catch (err) {
     console.error('getDriverVehicleAssignments hiba:', err);
     return res.json({ result: { ok: false, err: 'Szerver hiba' } });
@@ -393,6 +398,39 @@ handlers.assignDriverVehicle = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('assignDriverVehicle hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
+// ─── Vontató↔pótkocsi alapértelmezett pár (Belső sofőrök fül) ───
+// args: [vehicleId(vontató), trailerId(pótkocsi)|null] — null = a pár törlése.
+// A vontatóhoz rendelt pótkocsi fuvar-kiíráskor / radaros kiosztáskor
+// automatikusan kitöltődik (autoPairTrailer), ha a fuvaron nincs pótkocsi.
+handlers.assignDefaultTrailer = async function (req, res, args) {
+  try {
+    if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    }
+    const cid = req.session.user.company_id;
+    const vehicleId = parseInt(args[0], 10);
+    const trailerId = args[1] ? parseInt(args[1], 10) : null;
+    if (!vehicleId) return res.json({ result: { ok: false, err: 'Jármű ID kötelező.' } });
+
+    // a pótkocsi a saját cégé és tényleg pótkocsi legyen
+    if (trailerId) {
+      const tr = await pool.query(
+        `SELECT 1 FROM vehicles WHERE id = $1 AND company_id = $2 AND tip = 'Potkocsi'`,
+        [trailerId, cid]);
+      if (!tr.rows.length) return res.json({ result: { ok: false, err: 'A pótkocsi nem található.' } });
+    }
+    const r = await pool.query(
+      `UPDATE vehicles SET default_trailer_id = $3, updated_at = NOW()
+       WHERE id = $1 AND company_id = $2 AND tip = 'Vontato'`,
+      [vehicleId, cid, trailerId]);
+    if (!r.rowCount) return res.json({ result: { ok: false, err: 'A vontató nem található.' } });
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('assignDefaultTrailer hiba:', err);
     return res.json({ result: { ok: false, err: 'Szerver hiba' } });
   }
 };

@@ -6,6 +6,7 @@
 // ============================================================
 const pool = require('../db');
 const { genDocId } = require('../lib/ids');
+const { getPositions } = require('../lib/vehiclePositions');
 
 const handlers = {};
 
@@ -50,6 +51,31 @@ async function autoPairDriverVehicle(cid, o) {
   } catch (e) { console.error('autoPairDriverVehicle hiba:', e); }
   return o;
 }
+
+// ─── Vontató↔pótkocsi auto-párosítás ─────────────────────────
+// A vontatóhoz rendelt alapértelmezett pótkocsi (vehicles.default_trailer_id,
+// a Belső sofőrök fülön állítható) rendszáma — fuvar-kiíráskor / radaros
+// kiosztáskor a hiányzó pótkocsit ebből töltjük (csak ÜRES mezőbe).
+// → a párosított pótkocsi rendszáma, vagy null.
+async function autoPairTrailer(cid, rendszamCamion) {
+  try {
+    if (!rendszamCamion) return null;
+    const r = await pool.query(
+      `SELECT t.rendszam FROM vehicles v
+       JOIN vehicles t ON t.id = v.default_trailer_id AND t.company_id = v.company_id
+       WHERE v.company_id = $1 AND UPPER(v.rendszam) = $2 AND v.tip = 'Vontato'
+         AND v.default_trailer_id IS NOT NULL
+         AND t.tip = 'Potkocsi' AND t.activ = TRUE
+       LIMIT 1`,
+      [cid, String(rendszamCamion).toUpperCase()]);
+    return r.rows.length ? r.rows[0].rendszam : null;
+  } catch (e) { console.error('autoPairTrailer hiba:', e); return null; }
+}
+
+// A radar a részrakomány-súly ellenőrzéséhez: egy standard/mega ponyvás
+// pótkocsi tipikus rakható tömege (kg). A vontató–pótkocsi össztömeg-
+// korlát NEM jármű-szintű mező; ez a gyakorlati felső határ a riasztáshoz.
+const MAX_PARTIAL_PAYLOAD_KG = 24000;
 
 handlers.getOrderById = async function (req, res, args) {
     try {
@@ -106,7 +132,7 @@ handlers.comList = async function (req, res, args) {
           `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare,
                   o.pret, o.km, o.status, o.sofer_type, o.email_sofer, o.nume_sofer,
                   o.firma_extern, o.telefon_extern, o.rendszam_camion, o.rendszam_remorca,
-                  o.payment_status, o.paid_amount,
+                  o.load_type, o.payment_status, o.paid_amount,
                   o.handover_status, o.handover_type, o.handover_loc, o.handover_at,
                   (SELECT COUNT(*)::int FROM documents d WHERE d.order_id = o.id) AS pod_count,
                   COALESCE(legs.leg_count, 0) AS leg_count,
@@ -124,6 +150,7 @@ handlers.comList = async function (req, res, args) {
           `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare,
                   o.pret, o.km, o.status, o.sofer_type, o.email_sofer, o.nume_sofer,
                   o.firma_extern, o.telefon_extern, o.rendszam_camion, o.rendszam_remorca,
+                  o.load_type,
                   COALESCE(legs.leg_count, 0) AS leg_count,
                   COALESCE(legs.legs_json, '[]'::json) AS legs_json
            FROM orders o ${legsSubquery}
@@ -198,7 +225,10 @@ handlers.comCreate = async function (req, res, args) {
       const firma_extern = o.firma_extern ? String(o.firma_extern).trim() : null;
       const telefon_extern = o.telefon_extern ? String(o.telefon_extern).trim() : null;
       const external_driver_id = o.external_driver_id ? parseInt(o.external_driver_id, 10) : null;
-      const rendszam_remorca = o.rendszam_remorca ? String(o.rendszam_remorca).trim().toUpperCase() : null;
+      let rendszam_remorca = o.rendszam_remorca ? String(o.rendszam_remorca).trim().toUpperCase() : null;
+      const suly_kg = (o.suly_kg === '' || o.suly_kg == null) ? null : Number(o.suly_kg);
+      // rakomány-típus: FTL = teljes rakomány, LTL = részrakomány
+      const load_type = ['FTL', 'LTL'].includes(o.load_type) ? o.load_type : null;
       const company_id = req.session.user.company_id;
 
       // Auto-párosítás: csak jármű VAGY csak belső sofőr esetén a pár kitöltése
@@ -212,6 +242,14 @@ handlers.comCreate = async function (req, res, args) {
       const email_sofer = pair.email_sofer;
       const nume_sofer = pair.nume_sofer;
       const rendszam_camion = pair.rendszam_camion ? String(pair.rendszam_camion).toUpperCase() : null;
+
+      // Vontató↔pótkocsi auto-párosítás: ha van vontató, de nincs pótkocsi,
+      // a vontató alapértelmezett pótkocsiját töltjük (csak üres mezőbe).
+      let pairedTrailer = null;
+      if (rendszam_camion && !rendszam_remorca) {
+        const t = await autoPairTrailer(company_id, rendszam_camion);
+        if (t) { rendszam_remorca = t; pairedTrailer = t; }
+      }
 
       let status = 'Disponibil';
       if (sofer_type === 'Intern' && email_sofer) status = 'Alocat';
@@ -228,16 +266,16 @@ handlers.comCreate = async function (req, res, args) {
             data_incarcare, data_descarcare, pret, km,
             sofer_type, email_sofer, nume_sofer,
             firma_extern, telefon_extern, external_driver_id,
-            rendszam_camion, rendszam_remorca, status, company_id
+            rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type
           ) VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21
           )`,
           [
             id, client, ref, loc_incarcare, loc_descarcare,
             data_incarcare, data_descarcare, pret, km,
             sofer_type, email_sofer, nume_sofer,
             firma_extern, telefon_extern, external_driver_id,
-            rendszam_camion, rendszam_remorca, status, company_id
+            rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type
           ]
         );
 
@@ -267,6 +305,7 @@ handlers.comCreate = async function (req, res, args) {
         ok: true, id: id,
         paired_driver: pair.autoPaired === 'driver' ? (nume_sofer || email_sofer) : null,
         paired_vehicle: pair.autoPaired === 'vehicle' ? rendszam_camion : null,
+        paired_trailer: pairedTrailer,
       } });
     } catch (err) {
       console.error('comCreate hiba:', err);
@@ -312,6 +351,8 @@ handlers.comUpdate = async function (req, res, args) {
       if (o.telefon_extern !== undefined) { updates.push(`telefon_extern = $${i++}`); values.push(o.telefon_extern || null); }
       if (o.rendszam_camion !== undefined) { updates.push(`rendszam_camion = $${i++}`); values.push(o.rendszam_camion ? o.rendszam_camion.toUpperCase() : null); }
       if (o.rendszam_remorca !== undefined) { updates.push(`rendszam_remorca = $${i++}`); values.push(o.rendszam_remorca ? o.rendszam_remorca.toUpperCase() : null); }
+      if (o.suly_kg !== undefined) { updates.push(`suly_kg = $${i++}`); values.push((o.suly_kg === '' || o.suly_kg === null) ? null : Number(o.suly_kg)); }
+      if (o.load_type !== undefined) { updates.push(`load_type = $${i++}`); values.push(['FTL','LTL'].includes(o.load_type) ? o.load_type : null); }
 
       if (updates.length === 0) {
         return res.json({ result: { ok: false, err: 'Nincs mit modositani.' } });
@@ -526,6 +567,7 @@ handlers.plannerAssign = async function (req, res, args) {
     const sets = ['updated_at = NOW()'];
     const params = [orderId, cid];
     let pairedDriver = null;
+    let pairedTrailer = null;
     let releaseWarehouse = false;
     if (Object.prototype.hasOwnProperty.call(f, 'rendszam_camion')) {
       const rendszam = f.rendszam_camion ? String(f.rendszam_camion).trim().toUpperCase() : null;
@@ -539,7 +581,7 @@ handlers.plannerAssign = async function (req, res, args) {
         // Auto-párosítás: ha a fuvaron még nincs sofőr, a járműhöz rendelt
         // belső sofőr is rákerül (státusz: Disponibil → Alocat).
         const cur = await pool.query(
-          `SELECT email_sofer, sofer_type, status FROM orders WHERE id = $1 AND company_id = $2`,
+          `SELECT email_sofer, sofer_type, status, rendszam_remorca FROM orders WHERE id = $1 AND company_id = $2`,
           [orderId, cid]);
         if (!cur.rows.length) return res.json({ result: { ok: false, err: 'Fuvar nem található' } });
         const co = cur.rows[0];
@@ -553,6 +595,12 @@ handlers.plannerAssign = async function (req, res, args) {
             if (co.status === 'Disponibil') statusToAlocat = true;
             pairedDriver = p.nume_sofer || p.email_sofer;
           }
+        }
+        // Vontató↔pótkocsi auto-párosítás: ha a fuvaron nincs pótkocsi,
+        // a vontató alapértelmezett pótkocsiját töltjük.
+        if (!co.rendszam_remorca) {
+          const t = await autoPairTrailer(cid, rendszam);
+          if (t) { params.push(t); sets.push('rendszam_remorca = $' + params.length); pairedTrailer = t; }
         }
         // Leadott áru folytatása: kiosztással újra Alocat; a raktári tétel
         // kiadása a sikeres UPDATE UTÁN történik (lásd lentebb)
@@ -579,7 +627,7 @@ handlers.plannerAssign = async function (req, res, args) {
          WHERE company_id = $1 AND order_id = $2 AND status = 'Raktarban'`,
         [cid, orderId]).catch((e) => console.error('warehouse release hiba:', e));
     }
-    return res.json({ result: { ok: true, paired_driver: pairedDriver } });
+    return res.json({ result: { ok: true, paired_driver: pairedDriver, paired_trailer: pairedTrailer } });
   } catch (err) {
     console.error('plannerAssign hiba:', err);
     return res.json({ result: { ok: false, err: 'Szerver hiba' } });
@@ -636,13 +684,24 @@ handlers.getPlannerMatches = async function (req, res, args) {
     // kiosztatlan: ezekhez keresünk kamiont)
     const or = await pool.query(
       `SELECT id, client, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
-              status, rendszam_camion
+              status, rendszam_camion, suly_kg, load_type
        FROM orders
        WHERE company_id = $1 AND status NOT IN ('Anulat','Finalizat')
        ORDER BY data_incarcare NULLS LAST LIMIT 300`, [cid]);
     const orders = or.rows;
     const unassigned = orders.filter((o) => !o.rendszam_camion && o.loc_incarcare);
     if (!unassigned.length) return res.json({ result: { ok: true, matches: [], pending: 0 } });
+
+    // Élő GPS-pozíciók (ha be van kötve a CargoTrack) — a kamion VÁRHATÓ
+    // pozíciójának pontosabb becslése, ha nincs (vagy már lezárult) az
+    // utolsó fuvarja. A közös 30 mp-es cache-ből jön (Vezérlőpulttal osztva).
+    const livePos = {};
+    try {
+      const pos = await getPositions(cid);
+      (pos.positions || []).forEach((p) => {
+        if (p.lat != null && p.lng != null) livePos[String(p.rendszam).toUpperCase()] = p;
+      });
+    } catch (e) { console.error('radar GPS hiba:', e); }
 
     // Kamiononként az ütemterv (kiosztott fuvarok idő szerint)
     const byVeh = new Map();
@@ -671,12 +730,14 @@ handlers.getPlannerMatches = async function (req, res, args) {
       return true;
     };
 
+    const today = new Date().toISOString().slice(0, 10);
     const matches = [];
     for (const u of unassigned.slice(0, 20)) {            // a 20 legkorábbi kiosztatlan
       const uGeo = await _geocodeCached(u.loc_incarcare, budget);
       if (!uGeo) continue;
       const uFrom = day(u.data_incarcare);
       const uTo = day(u.data_descarcare) || uFrom;
+      const uW = Number(u.suly_kg) || 0;
       const sugg = [];
       for (const [rendszam, list] of byVeh) {
         // Az átfedő fuvar NEM kizáró ok (lehet részrakomány) — csak jelezzük
@@ -688,16 +749,38 @@ handlers.getPlannerMatches = async function (req, res, args) {
         let last = before[before.length - 1];
         let honnan = last ? last.loc_descarcare : null;
         if (!honnan && ovl.length && ovl[0].loc_incarcare) { last = ovl[0]; honnan = last.loc_incarcare; }
-        if (!last || !honnan) continue;
-        const vGeo = await _geocodeCached(honnan, budget);
+
+        // Élő GPS preferálása: ha a kamionnak nincs viszonyítási fuvarja,
+        // VAGY az utolsó fuvara már (a mai napig) lezárult, a valós GPS-
+        // pozíció a legjobb becslés — és nem fogyaszt geokódolási keretet.
+        const lp = livePos[rendszam];
+        const lastDrop = last ? (day(last.data_descarcare) || day(last.data_incarcare)) : null;
+        const useLive = lp && (!last || !honnan || (lastDrop && lastDrop <= today));
+        let vGeo = null, live = false, honnanLabel = honnan;
+        if (useLive) {
+          vGeo = { lat: Number(lp.lat), lng: Number(lp.lng) };
+          live = true; honnanLabel = '📍 élő GPS';
+        } else if (honnan) {
+          vGeo = await _geocodeCached(honnan, budget);
+        }
         if (!vGeo) continue;
+
+        // Részrakomány-súly: az átfedő fuvarok + az új fuvar együttes súlya;
+        // ha túllépi a pótkocsi rakható tömegét, figyelmeztetünk (NEM zárjuk ki).
+        let ovlW = 0; ovl.forEach((o) => { ovlW += Number(o.suly_kg) || 0; });
+        const totalW = uW + ovlW;
         sugg.push({
           rendszam,
           km: _haversineKm(uGeo, vGeo),
-          honnan,
-          szabad_tol: day(last.data_descarcare) || day(last.data_incarcare),
-          utolso_fuvar: last.id,
+          honnan: honnanLabel,
+          live,
+          szabad_tol: live ? null : (last ? (day(last.data_descarcare) || day(last.data_incarcare)) : null),
+          utolso_fuvar: last ? last.id : null,
           atfedes: ovl.length,        // hány fuvarja fedi az időablakot
+          suly_kg: totalW || null,    // együttes részrakomány-súly (kg)
+          weight_warn: ovl.length > 0 && totalW > MAX_PARTIAL_PAYLOAD_KG,
+          // az átfedő fuvar FTL (teljes rakomány) — részrakomány NEM fér fel
+          ftl_conflict: ovl.some((o) => o.load_type === 'FTL'),
         });
       }
       // átfedés nélküli javaslatok elöl, azon belül a legkisebb üresjárat
