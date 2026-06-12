@@ -7,6 +7,7 @@
 const pool = require('../db');
 const crypto = require('crypto');
 const portal = require('../routes/portal');
+const { emailLang } = require('../lib/companyLang');
 
 const handlers = {};
 
@@ -80,7 +81,7 @@ handlers.clientPortalInvite = async function (req, res, args) {
 
     const link = APP_URL + '/portal?token=' + token;
     let emailed = false;
-    try { emailed = await portal._sendInvite(email, nev, link); } catch (_) { emailed = false; }
+    try { emailed = await portal._sendInvite(email, nev, link, await emailLang(cid)); } catch (_) { emailed = false; }
     return res.json({ result: { ok: true, link, emailed } });
   } catch (err) {
     console.error('clientPortalInvite hiba:', err);

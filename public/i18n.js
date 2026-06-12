@@ -170,6 +170,9 @@
     'pane.staff': { hu: 'Munkatársak kezelése', ro: 'Gestionare angajați' },
     'pane.clients': { hu: 'Ügyfelek', ro: 'Clienți' },
     'pane.settings': { hu: 'Beállítások', ro: 'Setări' },
+    'set.emailLangTitle': { hu: '✉️ Kimenő e-mailek nyelve', ro: '✉️ Limba e-mailurilor trimise' },
+    'set.emailLangHint': { hu: 'A meghívó- és jelszó-e-mailek ezen a nyelven mennek ki. Alapértelmezés: román.', ro: 'E-mailurile de invitație și de resetare parolă se trimit în această limbă. Implicit: română.' },
+    'set.emailLangLabel': { hu: 'E-mail nyelve', ro: 'Limba e-mailului' },
 
     // ── Login ──
     'login.subtitle': { hu: 'Fuvarmenedzsment Rendszer', ro: 'Sistem de management transport' },
@@ -207,8 +210,8 @@
 
   function getLang() {
     try { var l = localStorage.getItem('vs-lang'); if (l === 'hu' || l === 'ro') return l; } catch (e) {}
-    try { if ((navigator.language || '').toLowerCase().indexOf('ro') === 0) return 'ro'; } catch (e) {}
-    return 'hu';
+    // Alapértelmezés MINDENHOL: román. (Csak akkor más, ha a felhasználó kézzel HU-ra vált.)
+    return 'ro';
   }
   function t(key, vars) {
     var e = DICT[key];

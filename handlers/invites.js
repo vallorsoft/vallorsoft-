@@ -68,9 +68,10 @@ handlers.invCreate = async function (req, res, args) {
       // Email kuldese ha van email cim. A MEGHÍVOTT nevével köszönünk (invNume),
       // NEM a cég igazgatójáéval — a meghívót a meghívott személy kapja.
       if (email) {
-        const cegRes = await pool.query('SELECT nev FROM companies WHERE id = $1', [req.session.user.company_id]);
+        const cegRes = await pool.query('SELECT nev, email_lang FROM companies WHERE id = $1', [req.session.user.company_id]);
         const cegNev = cegRes.rows[0]?.nev || '';
-        sendInviteEmail(email, kod, pozicio, cegNev, invNume)
+        const lang = cegRes.rows[0]?.email_lang === 'hu' ? 'hu' : 'ro';
+        sendInviteEmail(email, kod, pozicio, cegNev, invNume, lang)
           .catch(e => console.error('Email hatter hiba:', e.message));
       }
 

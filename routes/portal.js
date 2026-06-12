@@ -289,8 +289,8 @@ router.post('/api/portal/request', requireClient, async (req, res) => {
 });
 
 module.exports = router;
-// segéd a meghívó-e-mailhez (a clientPortal handler használja)
-module.exports._sendInvite = async function (toEmail, nev, link) {
+// segéd a meghívó-e-mailhez (a clientPortal handler használja) — lang: 'ro' alap
+module.exports._sendInvite = async function (toEmail, nev, link, lang) {
   if (!sendResetEmail) return false;
-  try { await sendResetEmail(toEmail, nev || toEmail, link); return true; } catch (_) { return false; }
+  try { await sendResetEmail(toEmail, nev || toEmail, link, lang === 'hu' ? 'hu' : 'ro'); return true; } catch (_) { return false; }
 };

@@ -1,7 +1,13 @@
 const { buildInviteHtml } = require('../../services/email');
 
 describe('buildInviteHtml — meghívó e-mail sablon', () => {
-  const base = { kod: 'VS-3M9PQC', pozicio: 'Sofer', cegNev: 'Vallor Team SRL', registerUrl: 'https://vallorsoft.onrender.com' };
+  const base = { kod: 'VS-3M9PQC', pozicio: 'Sofer', cegNev: 'Vallor Team SRL', registerUrl: 'https://vallorsoft.onrender.com', lang: 'hu' };
+
+  test('alapértelmezett nyelv ROMÁN (lang nélkül)', () => {
+    const html = buildInviteHtml({ kod: 'VS-1', pozicio: 'Sofer', registerUrl: 'https://x', meghivottNev: 'Ion' });
+    expect(html).toContain('Stimate Ion!');
+    expect(html).toContain('Deschide înregistrarea');
+  });
 
   test('a MEGHÍVOTT nevével köszön (nem a cég igazgatójáéval)', () => {
     const html = buildInviteHtml({ ...base, meghivottNev: 'Kovács István' });
