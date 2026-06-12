@@ -290,20 +290,20 @@
     var range = days[0].toLocaleDateString('hu-HU') + ' – ' + days[days.length - 1].toLocaleDateString('hu-HU');
     return '<div class="glass p2-toolbar" style="padding:12px 14px;margin-bottom:12px;">'
       + '<button class="btn ghost" style="padding:6px 11px;" onclick="Planner.shift(-7)">◀</button>'
-      + '<button class="btn ghost" style="padding:6px 11px;" onclick="Planner.today()">Ma</button>'
+      + '<button class="btn ghost" style="padding:6px 11px;" onclick="Planner.today()">' + t('pl.today') + '</button>'
       + '<button class="btn ghost" style="padding:6px 11px;" onclick="Planner.shift(7)">▶</button>'
       + '<b class="text-primary" style="font-size:13.5px;white-space:nowrap;">' + range + '</b>'
       + (isMobile() ? '' :
         '<select class="select" id="p2Zoom" style="max-width:96px;padding:6px 8px;font-size:12px;">'
-        + [[7, '1 hét'], [14, '2 hét'], [28, '4 hét']].map(function (z) { return '<option value="' + z[0] + '"' + (_days === z[0] ? ' selected' : '') + '>' + z[1] + '</option>'; }).join('') + '</select>'
-        + '<button class="btn ghost" style="padding:6px 11px;font-size:12px;" onclick="Planner.density()" title="Sűrű / kényelmes nézet">' + (_dense ? '🔍 Kényelmes' : '🗜 Sűrű') + '</button>')
+        + [[7, t('pl.week1')], [14, t('pl.week2')], [28, t('pl.week4')]].map(function (z) { return '<option value="' + z[0] + '"' + (_days === z[0] ? ' selected' : '') + '>' + z[1] + '</option>'; }).join('') + '</select>'
+        + '<button class="btn ghost" style="padding:6px 11px;font-size:12px;" onclick="Planner.density()" title="' + t('pl.densityTitle') + '">' + (_dense ? t('pl.comfy') : t('pl.dense')) + '</button>')
       + '<span style="flex:1;"></span>'
-      + '<input class="input" id="p2Q" value="' + esc(_f.q) + '" placeholder="🔍 Ügyfél, ID, város..." style="max-width:170px;padding:7px 10px;font-size:12px;">'
-      + '<select class="select" id="p2St" style="max-width:120px;padding:6px 8px;font-size:12px;"><option value="">Státusz</option>'
+      + '<input class="input" id="p2Q" value="' + esc(_f.q) + '" placeholder="' + t('pl.searchPh') + '" style="max-width:170px;padding:7px 10px;font-size:12px;">'
+      + '<select class="select" id="p2St" style="max-width:120px;padding:6px 8px;font-size:12px;"><option value="">' + t('pl.status') + '</option>'
       + Object.keys(ST).map(function (s) { return '<option' + (_f.status === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>'
-      + '<select class="select" id="p2Drv" style="max-width:130px;padding:6px 8px;font-size:12px;"><option value="">Sofőr</option></select>'
+      + '<select class="select" id="p2Drv" style="max-width:130px;padding:6px 8px;font-size:12px;"><option value="">' + t('pl.driver') + '</option></select>'
       + (isMobile() ? '' : '<label class="text-muted" style="font-size:11.5px;display:flex;align-items:center;gap:5px;cursor:pointer;">'
-        + '<input type="checkbox" id="p2Busy"' + (_f.onlyBusy ? ' checked' : '') + ' style="accent-color:#e10b1a;"> csak fuvaros</label>')
+        + '<input type="checkbox" id="p2Busy"' + (_f.onlyBusy ? ' checked' : '') + ' style="accent-color:#e10b1a;"> ' + t('pl.onlyBusy') + '</label>')
       + '</div>';
   }
 
@@ -314,7 +314,7 @@
     if (st) st.onchange = function () { _f.status = st.value; render(); };
     var dv = document.getElementById('p2Drv');
     if (dv) {
-      dv.innerHTML = '<option value="">Sofőr</option>' + drivers.map(function (d) {
+      dv.innerHTML = '<option value="">' + t('pl.driver') + '</option>' + drivers.map(function (d) {
         return '<option' + (_f.driver === d ? ' selected' : '') + '>' + esc(d) + '</option>'; }).join('');
       dv.onchange = function () { _f.driver = dv.value; render(); };
     }
@@ -329,10 +329,10 @@
   // ── Kiosztatlan fuvarok (pool) ──────────────────────────
   function poolHtml(pool) {
     return '<div class="glass" style="padding:12px 14px;margin-bottom:12px;">'
-      + '<div class="text-primary" style="font-size:13px;font-weight:700;margin-bottom:8px;">📥 Kiosztásra vár (' + pool.length + ')'
-      + ' <span class="text-muted" style="font-weight:400;font-size:11px;">— koppints rá, majd válassz járművet/napot (gépen húzható is)</span></div>'
+      + '<div class="text-primary" style="font-size:13px;font-weight:700;margin-bottom:8px;">' + t('pl.poolTitle') + ' (' + pool.length + ')'
+      + ' <span class="text-muted" style="font-weight:400;font-size:11px;">' + t('pl.poolHint') + '</span></div>'
       + '<div class="p2-pool" ondragover="Planner._dov(event)" ondragleave="Planner._dlv(event)" ondrop="Planner._dpPool(event)" onclick="Planner.poolTap(event)">'
-      + (pool.map(cardHtml).join('') || '<span class="text-muted" style="font-size:12px;">Minden fuvar ki van osztva. ✅</span>')
+      + (pool.map(cardHtml).join('') || '<span class="text-muted" style="font-size:12px;">' + t('pl.poolEmpty') + '</span>')
       + '</div></div>';
   }
 
@@ -344,9 +344,9 @@
       + esc(String(o.id).replace('CMD-', '#')) + ' · ' + esc(o.client || '—')
       + '<span class="sub">' + esc(o.loc_incarcare || '?') + ' → ' + esc(o.loc_descarcare || '?')
       + ' · ' + fmtD(o.data_incarcare) + (o.data_descarcare ? '–' + fmtD(o.data_descarcare) : '') + '</span>'
-      + (o.status === 'Parkolt' ? '<span class="sub">🅿️ áru a pótkocsin: ' + esc(o.rendszam_remorca || '?') + ' @ ' + esc(o.handover_loc || o.loc_incarcare || '') + '</span>' : '')
-      + (o.status === 'Raktarban' ? '<span class="sub">📦 raktárban: ' + esc(o.handover_loc || o.loc_incarcare || '') + '</span>' : '')
-      + (best ? '<span class="hint">🎯 ' + esc(best.rendszam) + ' · ' + best.km + ' km üresjárat' + (best.atfedes ? ' ⚠️' : '') + '</span>' : '')
+      + (o.status === 'Parkolt' ? '<span class="sub">' + t('pl.cargoOnTrailer') + ' ' + esc(o.rendszam_remorca || '?') + ' @ ' + esc(o.handover_loc || o.loc_incarcare || '') + '</span>' : '')
+      + (o.status === 'Raktarban' ? '<span class="sub">' + t('pl.inWarehouse') + ' ' + esc(o.handover_loc || o.loc_incarcare || '') + '</span>' : '')
+      + (best ? '<span class="hint">🎯 ' + esc(best.rendszam) + ' · ' + best.km + ' ' + t('pl.emptyKm') + (best.atfedes ? ' ⚠️' : '') + '</span>' : '')
       + '</div>';
   }
 
@@ -358,7 +358,7 @@
       + '<div class="p2-board"><div class="p2-inner" style="width:' + (RAIL + _days * W) + 'px;">';
 
     // fejléc
-    html += '<div class="p2-headrow"><div class="p2-corner">JÁRMŰ</div>'
+    html += '<div class="p2-headrow"><div class="p2-corner">' + t('pl.vehicleCol') + '</div>'
       + days.map(function (d) {
           var y = ymd(d), we = d.getDay() === 0 || d.getDay() === 6;
           return '<div class="p2-day' + (we ? ' we' : '') + (y === today ? ' today' : '') + '" style="width:' + W + 'px;">'
@@ -367,7 +367,7 @@
 
     // kihasználtság-sor
     var total = vehs.length || 1;
-    html += '<div class="p2-utilrow"><div class="p2-utilcorner">KIHASZNÁLTSÁG</div>'
+    html += '<div class="p2-utilrow"><div class="p2-utilcorner">' + t('pl.utilization') + '</div>'
       + days.map(function (d) {
           var y = ymd(d);
           var busy = vehs.filter(function (v) {
@@ -493,8 +493,8 @@
         + '</div>';
     }).join('');
     box.innerHTML = '<div class="p2-radar">'
-      + '<div class="text-primary" style="font-size:13px;font-weight:800;margin-bottom:4px;">💡 Visszfuvar-radar '
-      + '<span class="text-muted" style="font-weight:400;font-size:11px;">— kiosztatlan fuvarok a legközelebb végző kamionokkal párosítva (üresjárat-minimalizálás)</span></div>'
+      + '<div class="text-primary" style="font-size:13px;font-weight:800;margin-bottom:4px;">' + t('pl.radarTitle') + ' '
+      + '<span class="text-muted" style="font-weight:400;font-size:11px;">' + t('pl.radarSub') + '</span></div>'
       + rows + '</div>';
   }
 
@@ -513,10 +513,10 @@
       + '<button class="btn ghost" style="margin-left:auto;padding:3px 10px;" onclick="Planner.closePop()">✕</button></div>'
       + '<div class="text-primary" style="font-size:13px;font-weight:700;">' + esc(o.loc_incarcare || '?') + ' → ' + esc(o.loc_descarcare || '?') + '</div>'
       + '<div class="text-muted" style="font-size:12px;margin:3px 0 10px;">' + esc(o.client || '—')
-      + ' · ' + esc(o.nume_sofer || '⚠️ nincs sofőr') + ' · 🚛 ' + esc(o.rendszam_camion || 'nincs jármű') + '</div>'
+      + ' · ' + esc(o.nume_sofer || t('pl.noDriver')) + ' · 🚛 ' + esc(o.rendszam_camion || t('pl.noVehicle')) + '</div>'
       + '<div style="display:flex;gap:8px;align-items:end;margin-bottom:10px;">'
-      + '<div class="field" style="margin:0;flex:1;"><label>Felrakás</label><input class="input" type="date" id="p2pInc" value="' + (dstr(o.data_incarcare) || '') + '" style="padding:7px;font-size:12.5px;"></div>'
-      + '<div class="field" style="margin:0;flex:1;"><label>Lerakás</label><input class="input" type="date" id="p2pDesc" value="' + (dstr(o.data_descarcare) || '') + '" style="padding:7px;font-size:12.5px;"></div>'
+      + '<div class="field" style="margin:0;flex:1;"><label>' + t('pl.loadAt') + '</label><input class="input" type="date" id="p2pInc" value="' + (dstr(o.data_incarcare) || '') + '" style="padding:7px;font-size:12.5px;"></div>'
+      + '<div class="field" style="margin:0;flex:1;"><label>' + t('pl.unloadAt') + '</label><input class="input" type="date" id="p2pDesc" value="' + (dstr(o.data_descarcare) || '') + '" style="padding:7px;font-size:12.5px;"></div>'
       + '<button class="btn primary" style="padding:8px 12px;font-size:12px;" onclick="Planner.popSaveDates(\'' + esc(String(o.id)) + '\')">💾</button></div>'
       + (sugg.length ? '<div style="margin-bottom:10px;">' + sugg.map(function (s) {
           return '<div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;">'
@@ -525,12 +525,12 @@
             + (s.atfedes ? ' <span class="badge warn" title="Átfedő fuvar — részrakományként még felférhet">⚠️</span>' : '')
             + (s.ftl_conflict ? ' <span class="badge err" title="Átfedő FTL fuvar — részrakomány nem fér fel">🚫</span>' : '')
             + (s.weight_warn ? ' <span class="badge err" title="Részrakomány-túlsúly">⚖️</span>' : '') + '</span>'
-            + '<button class="btn ok" style="margin-left:auto;padding:3px 10px;font-size:11px;" onclick="Planner.acceptMatch(\'' + esc(String(o.id)) + '\',\'' + esc(s.rendszam) + '\')">✓ Kioszt</button></div>';
+            + '<button class="btn ok" style="margin-left:auto;padding:3px 10px;font-size:11px;" onclick="Planner.acceptMatch(\'' + esc(String(o.id)) + '\',\'' + esc(s.rendszam) + '\')">' + t('pl.assignDo') + '</button></div>';
         }).join('') + '</div>' : '')
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
-      + '<button class="btn primary" style="flex:1;padding:9px;font-size:12.5px;" onclick="Planner.startMove(\'' + esc(String(o.id)) + '\')">🔄 ' + (o.rendszam_camion ? 'Áthelyezés' : 'Kiosztás') + '</button>'
-      + '<button class="btn ghost" style="flex:1;padding:9px;font-size:12.5px;" onclick="Planner.closePop();openOrderEdit(\'' + esc(String(o.id)) + '\')">✏️ Szerkesztés</button>'
-      + (o.rendszam_camion ? '<button class="btn danger" style="padding:9px 12px;font-size:12.5px;" onclick="Planner.unassign(\'' + esc(String(o.id)) + '\')">✕ Kiosztás törlése</button>' : '')
+      + '<button class="btn primary" style="flex:1;padding:9px;font-size:12.5px;" onclick="Planner.startMove(\'' + esc(String(o.id)) + '\')">' + (o.rendszam_camion ? t('pl.reassign') : t('pl.assign')) + '</button>'
+      + '<button class="btn ghost" style="flex:1;padding:9px;font-size:12.5px;" onclick="Planner.closePop();openOrderEdit(\'' + esc(String(o.id)) + '\')">' + t('pl.edit') + '</button>'
+      + (o.rendszam_camion ? '<button class="btn danger" style="padding:9px 12px;font-size:12.5px;" onclick="Planner.unassign(\'' + esc(String(o.id)) + '\')">' + t('pl.unassign') + '</button>' : '')
       + '</div></div>';
   }
 
@@ -538,9 +538,9 @@
     if (!_selOid) return '';
     return '<div class="p2-actionbar">'
       + '<span style="font-size:13px;color:#fff;">📌 <b>' + esc(String(_selOid)) + '</b> — '
-      + (isMobile() ? 'koppints a cél-jármű kártyájára (a kiválasztott napra kerül)' : 'koppints/ejtsd egy jármű napjára')
-      + ', vagy a „Kiosztásra vár” sávra a törléshez</span>'
-      + '<button class="btn primary" style="margin-left:auto;padding:6px 14px;font-size:12px;" onclick="Planner.pick(null)">✕ Mégse</button>'
+      + (isMobile() ? t('pl.abMobile') : t('pl.abDesktop'))
+      + t('pl.abPoolNote') + '</span>'
+      + '<button class="btn primary" style="margin-left:auto;padding:6px 14px;font-size:12px;" onclick="Planner.pick(null)">' + t('pl.cancel') + '</button>'
       + '</div>';
   }
 
