@@ -26,6 +26,7 @@ const handlers = Object.assign(
   require('../handlers/handover'),
   require('../handlers/clientPortal'),
   require('../handlers/toll'),
+  require('../handlers/carriers'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a

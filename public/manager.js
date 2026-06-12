@@ -37,7 +37,7 @@ function loadTab(name){
       if(name==='users') loadUsers();
     if(name==='invites') loadInvites();
     if(name==='vehicles') loadVehicles();
-    if(name==='external-drivers') loadExtDrivers();
+    if(name==='external-drivers'){ loadExtDrivers(); if(typeof loadCarriers==='function') loadCarriers(); if(typeof loadCarrierAp==='function') loadCarrierAp(); }
     if(name==='internal-drivers') loadInternalDrivers();
     if(name==='signature') initAdminSigCanvas();
   if(name==='clients' && window.ClientsPage){ ClientsPage.mount('clientsBox'); if(typeof loadClientPortalAccess==='function') loadClientPortalAccess(); }

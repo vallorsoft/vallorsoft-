@@ -449,7 +449,7 @@ handlers.getOrderProfit = async function (req, res, args) {
     const { from, to } = _range(args);
 
     const r = await pool.query(
-      `SELECT o.id, COALESCE(c.denumire, o.client) AS client, o.pret, o.km, o.toll_cost, o.finalized_at,
+      `SELECT o.id, COALESCE(c.denumire, o.client) AS client, o.pret, o.km, o.toll_cost, o.carrier_cost, o.sofer_type, o.finalized_at,
               COALESCE(SUM(fl.ktg / NULLIF(fl.cnt, 0)), 0)::numeric AS koltseg_ron
        FROM orders o
        LEFT JOIN clients c ON c.id = o.client_id
@@ -466,7 +466,7 @@ handlers.getOrderProfit = async function (req, res, args) {
        ) fl ON true
        WHERE o.company_id = $1 AND o.status = 'Finalizat'
          AND o.finalized_at >= $2 AND o.finalized_at < $3
-       GROUP BY o.id, c.denumire, o.client, o.pret, o.km, o.toll_cost, o.finalized_at
+       GROUP BY o.id, c.denumire, o.client, o.pret, o.km, o.toll_cost, o.carrier_cost, o.sofer_type, o.finalized_at
        ORDER BY o.finalized_at DESC LIMIT 100`,
       [cid, from, to]
     );

@@ -403,6 +403,8 @@
           <tbody></tbody>
         </table>
       </div>
+      <div id="carriersBox" style="margin-top:16px;"></div>
+      <div id="carrierApBox" style="margin-top:16px;"></div>
     </div>
 
     <div class="pane hidden" data-pane="vehicles">
@@ -924,6 +926,14 @@
         <button type="button" class="btn ghost" style="padding:8px 12px;" onclick="openTollRates()">⚙️ Ráták</button>
       </div>
       <div id="oeTollBreak" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="field"><label>🚚 Alvállalkozó (Extern fuvarnál)</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select class="select" id="oeCarrier" style="min-width:200px;"><option value="">— nincs —</option></select>
+        <input class="input" id="oeCarrierCost" type="number" min="0" step="0.01" placeholder="Alvállalkozói díj (EUR)" style="max-width:200px;" oninput="oeUpdateMargin()">
+        <span id="oeMargin" class="text-muted" style="font-size:12px;"></span>
+      </div>
     </div>
 
     <div class="field"><label>Státusz</label>

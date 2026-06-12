@@ -1097,6 +1097,166 @@ function saveTollRatesUi(){
 // a modal .open class kezelése (display)
 (function(){ var s=document.createElement('style'); s.textContent='#tollRatesModal.open{display:flex!important;}'; document.head.appendChild(s); })();
 
+// ════════════════════════════════════════════════════════════
+//  Alvállalkozó (carrier) + szállítói számla (AP) — admin oldal
+// ════════════════════════════════════════════════════════════
+window._carriersCache = null;
+function ensureCarriers(cb){
+  if(window._carriersCache){ if(cb)cb(); return; }
+  gas('carrierList').then(function(r){ window._carriersCache=(r&&r.ok&&r.items)||[]; if(cb)cb(); });
+}
+function fillCarrierSelect(selId, selectedId){
+  var sel=document.getElementById(selId); if(!sel) return;
+  var list=window._carriersCache||[];
+  sel.innerHTML='<option value="">— nincs —</option>'+list.map(function(c){
+    return '<option value="'+c.id+'"'+(String(selectedId)===String(c.id)?' selected':'')+'>'+esc(c.nev)+(c.cui?' ('+esc(c.cui)+')':'')+'</option>';
+  }).join('');
+}
+function oeUpdateMargin(){
+  var pret=parseFloat((document.getElementById('oePret')||{}).value)||0;
+  var cost=parseFloat((document.getElementById('oeCarrierCost')||{}).value)||0;
+  var el=document.getElementById('oeMargin'); if(!el) return;
+  if(cost>0){ var m=pret-cost; el.innerHTML='Árrés: <b style="color:'+(m>=0?'var(--status-ok)':'var(--status-danger)')+';">'+(m>=0?'+':'')+Math.round(m)+' €</b>'; }
+  else el.textContent='';
+}
+
+function loadCarriers(){
+  var box=document.getElementById('carriersBox'); if(!box) return;
+  window._carriersCache=null;
+  gas('carrierList').then(function(r){
+    window._carriersCache=(r&&r.ok&&r.items)||[];
+    var items=window._carriersCache;
+    var rows=items.map(function(c,i){
+      var cmr='—';
+      if(c.cmr_insurance_expiry){ var d=new Date(c.cmr_insurance_expiry); var days=Math.round((d-new Date())/86400000);
+        cmr = days<0 ? '<span class="badge err">lejárt</span>' : days<30 ? '<span class="badge warn">'+days+' nap</span>' : '<span class="badge ok">'+String(c.cmr_insurance_expiry).slice(0,7)+'</span>'; }
+      var ob=Math.round(parseFloat(c.open_balance)||0);
+      return '<tr style="'+(!c.aktiv?'opacity:.5;':'')+'">'
+        +'<td><b class="text-primary">'+esc(c.nev)+'</b>'+(c.portal_users?' <span class="badge ok" style="font-size:9px;">🔑 portál</span>':'')+'</td>'
+        +'<td>'+esc(c.cui||'—')+'</td><td>'+(c.payment_term_days||30)+' nap</td><td>'+cmr+'</td>'
+        +'<td style="text-align:right;color:'+(ob>0?'#ff6b75':'inherit')+';font-weight:700;">'+ob+' €</td>'
+        +'<td style="white-space:nowrap;">'
+        +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierEditUi('+i+')">Szerk</button> '
+        +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierInvitePrompt('+c.id+')" title="Alvállalkozói portál meghívó">🔑</button> '
+        +'<button class="btn danger" style="padding:4px 9px;font-size:12px;" onclick="carrierDeleteUi('+c.id+')">✕</button></td></tr>';
+    }).join('');
+    box.innerHTML='<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:4px;">🚚 Alvállalkozók</div>'
+      +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">Külsős fuvarozó-cégek törzse — fizetési határidő, CMR-biztosítás, nyitott tartozás. A 🔑 gombbal portál-hozzáférést adsz nekik.</div>'
+      +'<div class="grid-3" style="margin-bottom:12px;">'
+      +'<div class="field"><label>Cégnév *</label><input class="input" id="caNev"></div>'
+      +'<div class="field"><label>CUI / adószám</label><input class="input" id="caCui"></div>'
+      +'<div class="field"><label>E-mail</label><input class="input" id="caEmail"></div>'
+      +'<div class="field"><label>Telefon</label><input class="input" id="caTel"></div>'
+      +'<div class="field"><label>Fizetési határidő (nap)</label><input class="input" id="caTerm" type="number" value="30"></div>'
+      +'<div class="field"><label>CMR-biztosítás lejár</label><input class="input" id="caCmr" type="date"></div>'
+      +'<div class="field"><label>IBAN</label><input class="input" id="caIban"></div>'
+      +'<div class="field" style="grid-column:span 2;"><label>Megjegyzés</label><input class="input" id="caNota"></div>'
+      +'</div>'
+      +'<input type="hidden" id="caId"><button class="btn primary" onclick="carrierSaveUi()">＋ Alvállalkozó mentése</button> <button class="btn ghost" onclick="carrierFormReset()">Új/üres</button>'
+      +'<div id="carrierInviteLink" style="margin-top:12px;"></div>'
+      +'<table class="table" style="margin-top:16px;"><thead><tr><th>Cég</th><th>CUI</th><th>Fiz.hat.</th><th>CMR-bizt.</th><th style="text-align:right;">Nyitott tartozás</th><th>Művelet</th></tr></thead>'
+      +'<tbody>'+(rows||'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px;">Nincs alvállalkozó.</td></tr>')+'</tbody></table></div>';
+  });
+}
+function carrierFormReset(){ ['caNev','caCui','caEmail','caTel','caIban','caNota'].forEach(function(i){var e=document.getElementById(i);if(e)e.value='';}); var t=document.getElementById('caTerm');if(t)t.value='30'; var c=document.getElementById('caCmr');if(c)c.value=''; var id=document.getElementById('caId');if(id)id.value=''; }
+function carrierEditUi(i){
+  var c=(window._carriersCache||[])[i]; if(!c) return;
+  document.getElementById('caId').value=c.id;
+  document.getElementById('caNev').value=c.nev||''; document.getElementById('caCui').value=c.cui||'';
+  document.getElementById('caEmail').value=c.email||''; document.getElementById('caTel').value=c.telefon||'';
+  document.getElementById('caTerm').value=c.payment_term_days||30; document.getElementById('caCmr').value=c.cmr_insurance_expiry?String(c.cmr_insurance_expiry).slice(0,10):'';
+  document.getElementById('caIban').value=c.iban||''; document.getElementById('caNota').value=c.nota||'';
+  document.getElementById('carriersBox').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function carrierSaveUi(){
+  var p={ id:document.getElementById('caId').value||null, nev:document.getElementById('caNev').value.trim(),
+    cui:document.getElementById('caCui').value.trim(), email:document.getElementById('caEmail').value.trim(),
+    telefon:document.getElementById('caTel').value.trim(), payment_term_days:document.getElementById('caTerm').value,
+    cmr_insurance_expiry:document.getElementById('caCmr').value||null, iban:document.getElementById('caIban').value.trim(),
+    nota:document.getElementById('caNota').value.trim() };
+  if(!p.nev){ toast('A cégnév kötelező!','err'); return; }
+  gas('carrierSave',[p]).then(function(r){ if(r&&r.ok){ toast('🚚 Alvállalkozó mentve','ok'); carrierFormReset(); loadCarriers(); loadCarrierAp(); } else toast((r&&r.err)||'Hiba','err'); });
+}
+function carrierDeleteUi(id){
+  if(!confirm('Biztosan törlöd ezt az alvállalkozót?')) return;
+  gas('carrierDelete',[id]).then(function(r){ if(r&&r.ok){ toast('Törölve','ok'); loadCarriers(); } else toast((r&&r.err)||'Nem törölhető','err'); });
+}
+function carrierInvitePrompt(carrierId){
+  var email=prompt('Az alvállalkozó kapcsolattartójának e-mail címe (portál-meghívó):'); if(!email) return;
+  gas('carrierPortalInvite',[{carrier_id:carrierId, email:email.trim()}]).then(function(r){
+    if(r&&r.ok){ toast(r.emailed?'✉️ Portál-meghívó elküldve':'Meghívó kész — másold a linket','ok');
+      var lb=document.getElementById('carrierInviteLink');
+      if(lb) lb.innerHTML='<div class="glass-soft" style="padding:10px 12px;border:1px solid rgba(34,197,94,.4);font-size:12px;">'+(r.emailed?'✉️ Elküldve e-mailben. ':'')+'Jelszó-beállító link: <br><code style="word-break:break-all;color:var(--text-primary);">'+esc(r.link)+'</code></div>';
+      loadCarriers();
+    } else toast((r&&r.err)||'Hiba','err');
+  });
+}
+
+// ── Szállítói számlák (AP) ──
+function loadCarrierAp(){
+  var box=document.getElementById('carrierApBox'); if(!box) return;
+  gas('carrierInvoiceList').then(function(r){
+    if(!r||!r.ok){ box.innerHTML=''; return; }
+    var s=r.summary||{}; var items=r.items||[];
+    var rows=items.map(function(it){
+      var rem=Math.round((parseFloat(it.amount)||0)-(parseFloat(it.paid_amount)||0));
+      var due='—', dueCls='';
+      if(it.due_date){ var days=Math.round((new Date(it.due_date)-new Date())/86400000);
+        due = days<0?('<span class="badge err">lejárt '+(-days)+' nap</span>'):days<=7?('<span class="badge warn">'+days+' nap</span>'):String(it.due_date).slice(0,10); }
+      var stB = it.status==='paid'?'<span class="badge ok">Fizetve</span>':it.status==='partial'?'<span class="badge warn">Részben ('+Math.round(it.paid_amount)+')</span>':'<span class="badge err">Fizetendő</span>';
+      var orderIds=(function(){ try{ return Array.isArray(it.order_ids)?it.order_ids:JSON.parse(it.order_ids||'[]'); }catch(e){ return []; } })();
+      return '<tr><td>'+esc(it.carrier_nev||'')+'</td><td>'+esc(it.invoice_number||'—')+'</td>'
+        +'<td style="font-size:11px;color:var(--muted);">'+esc(orderIds.join(', ')||'—')+'</td>'
+        +'<td style="text-align:right;">'+Math.round(it.amount)+' '+esc(it.currency||'EUR')+'</td><td>'+due+'</td><td>'+stB+'</td>'
+        +'<td style="white-space:nowrap;">'+(it.status!=='paid'?'<button class="btn ok" style="padding:4px 9px;font-size:12px;" onclick="carrierInvoicePayUi('+it.id+','+rem+')">Fizetve</button> ':'')
+        +'<button class="btn danger" style="padding:4px 9px;font-size:12px;" onclick="carrierInvoiceDeleteUi('+it.id+')">✕</button></td></tr>';
+    }).join('');
+    box.innerHTML='<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:10px;">💸 Szállítói számlák / Tartozások (AP)</div>'
+      +'<div class="dash-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;">'
+      +apTile('Nyitott összesen', Math.round(s.open_total||0)+' €', '#ff6b75')+apTile('Esedékes 7 napon belül', Math.round(s.due_soon||0)+' €', '#fbbf24')
+      +apTile('Lejárt', Math.round(s.overdue||0)+' €', (s.overdue>0?'#ff6b75':''))+apTile('Nyitott számla', (s.open_cnt||0)+' db','')+'</div>'
+      +'<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:10px;">'
+      +'<div class="field" style="margin:0;min-width:170px;"><label>Alvállalkozó</label><select class="select" id="ciCarrier" onchange="apLoadOrders()"><option value="">—</option></select></div>'
+      +'<div class="field" style="margin:0;"><label>Számlaszám</label><input class="input" id="ciNum" style="max-width:140px;"></div>'
+      +'<div class="field" style="margin:0;"><label>Kelt</label><input class="input" id="ciIssue" type="date" style="max-width:150px;"></div>'
+      +'<div class="field" style="margin:0;"><label>Fiz. határidő</label><input class="input" id="ciDue" type="date" style="max-width:150px;"></div>'
+      +'<div class="field" style="margin:0;"><label>Összeg</label><input class="input" id="ciAmount" type="number" style="max-width:110px;"></div>'
+      +'<div class="field" style="margin:0;"><label>Pénznem</label><select class="select" id="ciCurr" style="max-width:90px;"><option>EUR</option><option>RON</option><option>HUF</option><option>PLN</option></select></div>'
+      +'<button class="btn primary" style="height:42px;" onclick="carrierInvoiceSaveUi()">Számla rögzítése</button>'
+      +'</div>'
+      +'<div class="field" id="ciOrdersWrap" style="display:none;"><label>Mely fuvar(ok)hoz (Extern)</label><select class="select" id="ciOrders" multiple size="3" style="height:auto;"></select></div>'
+      +'<table class="table" style="margin-top:12px;"><thead><tr><th>Alvállalkozó</th><th>Számla</th><th>Fuvar(ok)</th><th style="text-align:right;">Összeg</th><th>Esedékes</th><th>Állapot</th><th>Művelet</th></tr></thead>'
+      +'<tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px;">Nincs szállítói számla.</td></tr>')+'</tbody></table></div>';
+    ensureCarriers(function(){ fillCarrierSelect('ciCarrier',''); });
+  });
+}
+function apTile(k,v,col){ return '<div class="glass-soft" style="padding:12px 14px;"><div style="font-size:11px;color:var(--muted);">'+esc(k)+'</div><div style="font-size:20px;font-weight:800;margin-top:3px;'+(col?'color:'+col:'')+'">'+v+'</div></div>'; }
+function apLoadOrders(){
+  var cid=(document.getElementById('ciCarrier')||{}).value;
+  var wrap=document.getElementById('ciOrdersWrap'), sel=document.getElementById('ciOrders');
+  if(!cid){ if(wrap)wrap.style.display='none'; return; }
+  gas('carrierAssignableOrders',[cid]).then(function(r){
+    if(!sel) return; var items=(r&&r.ok&&r.items)||[];
+    sel.innerHTML=items.map(function(o){ return '<option value="'+esc(o.id)+'">'+esc(o.id)+' · '+esc(o.loc_incarcare||'')+'→'+esc(o.loc_descarcare||'')+(o.pret?' · '+Math.round(o.pret)+'€':'')+'</option>'; }).join('');
+    if(wrap)wrap.style.display=items.length?'block':'none';
+  });
+}
+function carrierInvoiceSaveUi(){
+  var orderIds=[]; var sel=document.getElementById('ciOrders');
+  if(sel) Array.prototype.forEach.call(sel.selectedOptions||[],function(o){ orderIds.push(o.value); });
+  var p={ carrier_id:(document.getElementById('ciCarrier')||{}).value, invoice_number:(document.getElementById('ciNum')||{}).value.trim(),
+    issue_date:(document.getElementById('ciIssue')||{}).value||null, due_date:(document.getElementById('ciDue')||{}).value||null,
+    amount:(document.getElementById('ciAmount')||{}).value||0, currency:(document.getElementById('ciCurr')||{}).value||'EUR', order_ids:orderIds };
+  if(!p.carrier_id){ toast('Válassz alvállalkozót!','err'); return; }
+  gas('carrierInvoiceSave',[p]).then(function(r){ if(r&&r.ok){ toast('🧾 Számla rögzítve','ok'); ['ciNum','ciAmount'].forEach(function(i){document.getElementById(i).value='';}); loadCarrierAp(); loadCarriers(); } else toast((r&&r.err)||'Hiba','err'); });
+}
+function carrierInvoicePayUi(id, rem){
+  var v=prompt('Fizetett összeg (üres = teljes hátralék '+rem+'):'); if(v===null) return;
+  var arg = v.trim()===''?'full':v.trim();
+  gas('carrierInvoicePayment',[id, arg]).then(function(r){ if(r&&r.ok){ toast('💸 Fizetés rögzítve','ok'); loadCarrierAp(); loadCarriers(); } else toast((r&&r.err)||'Hiba','err'); });
+}
+function carrierInvoiceDeleteUi(id){ if(!confirm('Törlöd ezt a számlát?')) return; gas('carrierInvoiceDelete',[id]).then(function(r){ if(r&&r.ok){ toast('Törölve','ok'); loadCarrierAp(); loadCarriers(); } }); }
+
 function loadInvites(){
   gas('invListAll').then(list=>{
     if(!Array.isArray(list)){document.querySelector('#tblInv tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);">Nincs meghívókód.</td></tr>';return;}
@@ -2624,6 +2784,8 @@ function openOrderEdit(id) {
       var oeTollEl = document.getElementById('oeToll'); if(oeTollEl) oeTollEl.value = (o.toll_cost==null?'':o.toll_cost);
       var tg=o.toll_geo; if(typeof tg==='string'){ try{ tg=JSON.parse(tg); }catch(e){ tg=null; } }
       if(typeof renderTollBreak==='function') renderTollBreak(tg);
+      var oeCcEl=document.getElementById('oeCarrierCost'); if(oeCcEl) oeCcEl.value=(o.carrier_cost==null?'':o.carrier_cost);
+      if(typeof ensureCarriers==='function') ensureCarriers(function(){ fillCarrierSelect('oeCarrier', o.carrier_id); oeUpdateMargin(); });
       document.getElementById('oeStatus').value = o.status||'Disponibil';
       document.getElementById('oeSoferType').value = o.sofer_type||'';
 
@@ -2761,6 +2923,8 @@ function saveOrderEdit() {
     km:               document.getElementById('oeKm').value,
     suly_kg:          (document.getElementById('oeSuly')||{}).value||null,
     toll_cost:        (document.getElementById('oeToll')||{}).value||null,
+    carrier_id:       (document.getElementById('oeCarrier')||{}).value||null,
+    carrier_cost:     (document.getElementById('oeCarrierCost')||{}).value||null,
     load_type:        loadTypeValue('oeFtl','oeLtl'),
     hossz_cm:         (document.getElementById('oeHossz')||{}).value||null,
     szel_cm:          (document.getElementById('oeSzel')||{}).value||null,
