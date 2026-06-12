@@ -530,6 +530,7 @@ handlers.comUpdate = async function (req, res, args) {
         updates.push(`mag_cm = $${i++}`);   values.push(_posIntCm(o.mag_cm));
       }
       if (o.route_geo !== undefined) { const rg = sanitizeRouteGeo(o.route_geo); updates.push(`route_geo = $${i++}`); values.push(rg ? JSON.stringify(rg) : null); }
+      if (o.toll_cost !== undefined) { updates.push(`toll_cost = $${i++}`); values.push((o.toll_cost === '' || o.toll_cost === null) ? null : Number(o.toll_cost)); }
 
       if (updates.length === 0) {
         return res.json({ result: { ok: false, err: 'Nincs mit modositani.' } });

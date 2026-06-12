@@ -1018,6 +1018,85 @@ function cpToggle(i){
   });
 }
 
+// ════════════════════════════════════════════════════════════
+//  Útdíj (toll) — becslés a fuvar útvonalából + ráta-szerkesztő
+// ════════════════════════════════════════════════════════════
+var CC_FLAG = { DE:'🇩🇪',AT:'🇦🇹',HU:'🇭🇺',FR:'🇫🇷',IT:'🇮🇹',PL:'🇵🇱',CZ:'🇨🇿',SK:'🇸🇰',SI:'🇸🇮',BE:'🇧🇪',NL:'🇳🇱',RO:'🇷🇴',BG:'🇧🇬',HR:'🇭🇷',ES:'🇪🇸',CH:'🇨🇭' };
+function renderTollBreak(tg){
+  var box=document.getElementById('oeTollBreak'); if(!box) return;
+  if(!tg || !Array.isArray(tg.byCountry) || !tg.byCountry.length){ box.innerHTML=''; return; }
+  var rows=tg.byCountry.map(function(c){
+    return '<tr><td>'+(CC_FLAG[c.cc]||'')+' '+esc(c.name||c.cc)+'</td><td style="text-align:right;">'+c.km+' km</td>'
+      +'<td style="text-align:right;color:var(--muted);">'+(c.mode==='vignette'?'matrica':((c.eur_per_km!=null?c.eur_per_km:'')+' €/km'))+'</td>'
+      +'<td style="text-align:right;font-weight:700;">'+c.cost+' €</td></tr>';
+  }).join('');
+  box.innerHTML='<div class="glass-soft" style="padding:10px 12px;border:1px solid rgba(245,158,11,.35);">'
+    +'<div class="text-muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px;">Országonkénti bontás (a tervezett útvonalból)'+(tg.pending?' · ⚠️ részleges (geokódolás-keret)':'')+'</div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+    +'<tbody>'+rows+'<tr><td style="font-weight:800;border-top:1px solid var(--border,rgba(255,255,255,.1));padding-top:6px;">Összesen</td><td colspan="2" style="border-top:1px solid var(--border,rgba(255,255,255,.1));"></td>'
+    +'<td style="text-align:right;font-weight:800;color:#fbbf24;border-top:1px solid var(--border,rgba(255,255,255,.1));">'+(tg.total||0)+' €</td></tr></tbody></table></div>';
+}
+function estimateOrderToll(){
+  if(!_oeOrderId){ toast('Előbb mentsd a fuvart.','err'); return; }
+  toast('🛣️ Útdíj becslése az útvonalból…','ok');
+  gas('estimateToll',[_oeOrderId]).then(function(r){
+    if(r&&r.ok){
+      var el=document.getElementById('oeToll'); if(el) el.value=(r.toll&&r.toll.total!=null?r.toll.total:'');
+      renderTollBreak(r.toll);
+      toast('🛣️ Becsült útdíj: '+(r.toll?r.toll.total:0)+' € (módosítható)','ok');
+    } else toast((r&&r.err)||'Becslés hiba','err');
+  });
+}
+// ── Ráta-szerkesztő modal ──
+function openTollRates(){
+  ensureTollRatesModal();
+  document.getElementById('tollRatesModal').classList.add('open');
+  gas('getTollRates').then(function(r){
+    var body=document.getElementById('trBody'); if(!body) return;
+    if(!r||!r.ok){ body.innerHTML='<div class="text-muted" style="padding:14px;">Betöltési hiba.</div>'; return; }
+    window._trRates=r.rates||[];
+    body.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr>'
+      +'<th style="text-align:left;padding:6px 8px;color:var(--muted);">Ország</th><th style="text-align:left;padding:6px 8px;color:var(--muted);">Típus</th>'
+      +'<th style="text-align:left;padding:6px 8px;color:var(--muted);">€/km</th><th style="text-align:left;padding:6px 8px;color:var(--muted);">matrica €</th></tr></thead><tbody>'
+      +window._trRates.map(function(rt,i){
+        return '<tr style="border-top:1px solid var(--border,rgba(255,255,255,.08));">'
+          +'<td style="padding:6px 8px;">'+(CC_FLAG[rt.cc]||'')+' '+esc(rt.name)+(rt.custom?' <span class="badge ok" style="font-size:9px;">egyedi</span>':'')+'</td>'
+          +'<td style="padding:6px 8px;"><select class="select" id="tr_mode_'+i+'" style="padding:5px 6px;font-size:12px;"><option value="perkm"'+(rt.mode==='perkm'?' selected':'')+'>km-alapú</option><option value="vignette"'+(rt.mode==='vignette'?' selected':'')+'>matrica</option></select></td>'
+          +'<td style="padding:6px 8px;"><input class="input" id="tr_km_'+i+'" type="number" step="0.01" value="'+(rt.eur_per_km||0)+'" style="width:90px;padding:5px 7px;font-size:12px;"></td>'
+          +'<td style="padding:6px 8px;"><input class="input" id="tr_vig_'+i+'" type="number" step="0.01" value="'+(rt.vignette_eur||0)+'" style="width:90px;padding:5px 7px;font-size:12px;"></td></tr>';
+      }).join('')+'</tbody></table>';
+  });
+}
+function ensureTollRatesModal(){
+  if(document.getElementById('tollRatesModal')) return;
+  var d=document.createElement('div'); d.id='tollRatesModal';
+  d.style.cssText='position:fixed;inset:0;z-index:5200;display:none;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;background:rgba(3,6,10,.72);';
+  d.innerHTML='<div class="glass" style="width:min(680px,100%);background:var(--bg-panel-raised,#141c25);">'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border,rgba(255,255,255,.08));">'
+    +'<b class="text-primary" style="font-size:15px;">🛣️ Útdíj-ráták (kamion, &gt;12 t)</b>'
+    +'<button class="btn ghost" style="margin-left:auto;padding:5px 12px;" onclick="closeTollRates()">✕</button></div>'
+    +'<div style="padding:14px 18px;"><div class="text-muted" style="font-size:12px;margin-bottom:10px;">EU-alapértékekkel indul; itt cégre szabhatod. A „km-alapú" ország díja km×€/km, a „matrica" fix €/fuvar.</div>'
+    +'<div id="trBody"></div>'
+    +'<div style="margin-top:14px;display:flex;gap:8px;"><button class="btn primary" onclick="saveTollRatesUi()">Ráták mentése</button>'
+    +'<button class="btn ghost" onclick="closeTollRates()">Mégse</button></div></div></div>';
+  d.addEventListener('mousedown',function(e){ if(e.target===d) closeTollRates(); });
+  document.body.appendChild(d);
+}
+function closeTollRates(){ var m=document.getElementById('tollRatesModal'); if(m) m.classList.remove('open'); }
+function saveTollRatesUi(){
+  var rates=(window._trRates||[]).map(function(rt,i){
+    return { cc:rt.cc, mode:(document.getElementById('tr_mode_'+i)||{}).value||'perkm',
+      eur_per_km:(document.getElementById('tr_km_'+i)||{}).value||0,
+      vignette_eur:(document.getElementById('tr_vig_'+i)||{}).value||0 };
+  });
+  gas('saveTollRates',[rates]).then(function(r){
+    if(r&&r.ok){ toast('🛣️ Ráták mentve','ok'); closeTollRates(); }
+    else toast((r&&r.err)||'Hiba','err');
+  });
+}
+// a modal .open class kezelése (display)
+(function(){ var s=document.createElement('style'); s.textContent='#tollRatesModal.open{display:flex!important;}'; document.head.appendChild(s); })();
+
 function loadInvites(){
   gas('invListAll').then(list=>{
     if(!Array.isArray(list)){document.querySelector('#tblInv tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);">Nincs meghívókód.</td></tr>';return;}
@@ -2542,6 +2621,9 @@ function openOrderEdit(id) {
       var oeSzEl = document.getElementById('oeSzel');  if(oeSzEl) oeSzEl.value = (o.szel_cm==null?'':o.szel_cm);
       var oeMaEl = document.getElementById('oeMag');   if(oeMaEl) oeMaEl.value = (o.mag_cm==null?'':o.mag_cm);
       if(typeof refreshDimReq==='function') refreshDimReq();
+      var oeTollEl = document.getElementById('oeToll'); if(oeTollEl) oeTollEl.value = (o.toll_cost==null?'':o.toll_cost);
+      var tg=o.toll_geo; if(typeof tg==='string'){ try{ tg=JSON.parse(tg); }catch(e){ tg=null; } }
+      if(typeof renderTollBreak==='function') renderTollBreak(tg);
       document.getElementById('oeStatus').value = o.status||'Disponibil';
       document.getElementById('oeSoferType').value = o.sofer_type||'';
 
@@ -2678,6 +2760,7 @@ function saveOrderEdit() {
     pret:             document.getElementById('oePret').value,
     km:               document.getElementById('oeKm').value,
     suly_kg:          (document.getElementById('oeSuly')||{}).value||null,
+    toll_cost:        (document.getElementById('oeToll')||{}).value||null,
     load_type:        loadTypeValue('oeFtl','oeLtl'),
     hossz_cm:         (document.getElementById('oeHossz')||{}).value||null,
     szel_cm:          (document.getElementById('oeSzel')||{}).value||null,
