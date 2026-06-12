@@ -1279,19 +1279,22 @@ function loadMapsProvider(){
     }
     box.innerHTML='<div class="glass" style="padding:18px 20px;border:1px solid rgba(59,130,246,.35);">'
       +'<h3 style="font-size:16px;margin:0 0 4px;">🗺️ Térkép-szolgáltató (cím-keresés + geokódolás)</h3>'
-      +'<p style="color:var(--muted);font-size:12.5px;margin:0 0 14px;line-height:1.5;">Alapból az <b>ingyenes</b> szolgáltató megy (kulcs nélkül). Megbízhatóbb keresésért kapcsolj <b>HERE</b>-re vagy <b>Google</b>-re, és add meg a saját API-kulcsod (titkosítva tároljuk, sosem jön vissza nyíltan). A routing/útdíj továbbra is az OSRM/ORS stacken megy.</p>'
+      +'<p style="color:var(--muted);font-size:12.5px;margin:0 0 14px;line-height:1.5;">Minden cégen elérhető az <b>ingyenes</b> szolgáltató (kulcs és díj nélkül). Megbízhatóbb keresésért kapcsold ki az ingyeneset, és válassz <b>HERE</b>/<b>Google</b> szolgáltatót a saját kulcsoddal — ekkor az első hívástól fizetsz (hivatalos ár + árrés). A routing/útdíj továbbra is az OSRM/ORS stacken megy.</p>'
+      +'<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;font-weight:600;margin-bottom:6px;">'
+      +'<input type="checkbox" id="mpFree" '+(vendor==='free'?'checked':'')+' onchange="mpToggleFree()" style="width:18px;height:18px;cursor:pointer;accent-color:#22c55e;"> 🆓 Ingyenes térkép használata (Photon/OSM) — díjmentes</label>'
+      +'<div id="mpPaidWrap" style="'+(vendor==='free'?'display:none;':'')+'margin-top:10px;border-top:1px solid var(--border,rgba(255,255,255,.08));padding-top:12px;">'
       +'<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;">'
-      +'<div class="field" style="margin:0;min-width:180px;"><label>Szolgáltató</label><select class="select" id="mpVendor" onchange="mpToggleKey()">'
-      +'<option value="free"'+(vendor==='free'?' selected':'')+'>Ingyenes (Photon/OSM)</option>'
+      +'<div class="field" style="margin:0;min-width:170px;"><label>Fizetős szolgáltató</label><select class="select" id="mpVendor">'
       +'<option value="here"'+(vendor==='here'?' selected':'')+'>HERE (ajánlott)</option>'
       +'<option value="google"'+(vendor==='google'?' selected':'')+'>Google Maps</option></select></div>'
-      +'<div class="field" id="mpKeyWrap" style="margin:0;flex:1;min-width:240px;'+(vendor==='free'?'display:none;':'')+'"><label>API-kulcs '+(hasKey?'<span class="badge ok" style="font-size:10px;">tárolva</span>':'')+'</label><input class="input" id="mpKey" type="password" placeholder="'+(hasKey?'(változatlan, ha üresen hagyod)':'a szolgáltató API-kulcsa')+'"></div>'
+      +'<div class="field" style="margin:0;flex:1;min-width:240px;"><label>API-kulcs '+(hasKey?'<span class="badge ok" style="font-size:10px;">tárolva</span>':'')+'</label><input class="input" id="mpKey" type="password" placeholder="'+(hasKey?'(változatlan, ha üresen hagyod)':'a szolgáltató API-kulcsa')+'"></div>'
       +'<button class="btn ghost" style="height:42px;" onclick="mpTest()">🔌 Teszt</button>'
-      +'<button class="btn primary" style="height:42px;" onclick="mpSave()">Mentés</button>'
-      +'</div><div id="mpMsg" style="margin-top:8px;font-size:12px;"></div>'+usageHtml+'</div>';
+      +'</div><div id="mpMsg" style="margin-top:8px;font-size:12px;"></div>'+usageHtml+'</div>'
+      +'<button class="btn primary" style="margin-top:14px;" onclick="mpSave()">Mentés</button>'
+      +'</div>';
   });
 }
-function mpToggleKey(){ var v=(document.getElementById('mpVendor')||{}).value; var w=document.getElementById('mpKeyWrap'); if(w) w.style.display=(v==='free')?'none':'block'; }
+function mpToggleFree(){ var f=document.getElementById('mpFree'); var w=document.getElementById('mpPaidWrap'); if(w) w.style.display=(f&&f.checked)?'none':'block'; }
 function mpTest(){
   var vendor=(document.getElementById('mpVendor')||{}).value; var key=(document.getElementById('mpKey')||{}).value;
   var m=document.getElementById('mpMsg'); if(m) m.innerHTML='<span class="text-muted">Tesztelés…</span>';
@@ -1303,9 +1306,11 @@ function mpTest(){
   });
 }
 function mpSave(){
-  var vendor=(document.getElementById('mpVendor')||{}).value; var key=(document.getElementById('mpKey')||{}).value;
+  var free=(document.getElementById('mpFree')||{}).checked;
+  var vendor=free?'free':((document.getElementById('mpVendor')||{}).value||'here');
+  var key=(document.getElementById('mpKey')||{}).value||'';
   gas('mapsSaveProvider',[{vendor:vendor, key:key}]).then(function(r){
-    if(r&&r.ok){ toast('🗺️ Térkép-szolgáltató mentve','ok'); loadMapsProvider(); }
+    if(r&&r.ok){ toast(free?'🆓 Ingyenes térkép bekapcsolva':'🗺️ Térkép-szolgáltató mentve','ok'); loadMapsProvider(); }
     else toast((r&&r.err)||'Hiba','err');
   });
 }
