@@ -78,6 +78,275 @@
   <script src="/feature-catalog.js?v=20260611"></script>
   <script src="/session-guard.js?v=20260611"></script>
   <script src="/billing-card.js?v=20260611"></script>
+  <script src="/i18n.js?v=20260612"></script>
+  <script>(window.registerI18n||function(d){(window.__i18nQueue=window.__i18nQueue||[]).push(d);})({
+    // ── Oldalsáv / fejléc ──
+    'dev.console':        { hu: 'Developer Console', ro: 'Consolă Developer' },
+    'dev.nav.dash':       { hu: '📊 Áttekintés', ro: '📊 Prezentare generală' },
+    'dev.nav.cegek':      { hu: '🏢 Cégek', ro: '🏢 Firme' },
+    'dev.nav.userek':     { hu: '👥 Felhasználók', ro: '👥 Utilizatori' },
+    'dev.nav.here':       { hu: '⚡ HERE API', ro: '⚡ HERE API' },
+    'dev.nav.integ':      { hu: '💳 Integrációk', ro: '💳 Integrări' },
+    'dev.nav.elofiz':     { hu: '📦 Előfizetések', ro: '📦 Abonamente' },
+    'dev.logout':         { hu: 'Kilépés', ro: 'Ieșire' },
+    // ── Áttekintés ──
+    'dev.sysOverview':    { hu: 'Rendszer áttekintés', ro: 'Prezentare generală sistem' },
+    'dev.kpi.cegek':      { hu: 'Cégek', ro: 'Firme' },
+    'dev.kpi.aktiv':      { hu: 'Aktív cégek', ro: 'Firme active' },
+    'dev.kpi.users':      { hu: 'Felhasználók', ro: 'Utilizatori' },
+    'dev.kpi.fuvar':      { hu: 'Összes fuvar', ro: 'Total curse' },
+    // ── Cégek ──
+    'dev.cegManage':      { hu: 'Cégek kezelése', ro: 'Gestionare firme' },
+    'dev.newCeg':         { hu: '+ Új cég', ro: '+ Firmă nouă' },
+    'dev.loadingDots':    { hu: 'Betöltés...', ro: 'Se încarcă...' },
+    'dev.noCeg':          { hu: 'Nincs cég.', ro: 'Nicio firmă.' },
+    'dev.userCount':      { hu: 'user', ro: 'utilizatori' },
+    'dev.orderCount':     { hu: 'fuvar', ro: 'curse' },
+    'dev.newBugs':        { hu: 'új hiba', ro: 'erori noi' },
+    'dev.st.active':      { hu: 'Aktív', ro: 'Activ' },
+    'dev.st.blocked':     { hu: 'Blokkolt', ro: 'Blocat' },
+    'dev.st.cancelled':   { hu: 'Lemondva', ro: 'Anulat' },
+    'dev.details':        { hu: '🔍 Részletek', ro: '🔍 Detalii' },
+    'dev.editBtn':        { hu: 'Szerkeszt', ro: 'Editează' },
+    'dev.blockBtn':       { hu: '🔒 Blokk', ro: '🔒 Blochează' },
+    'dev.activeBtn':      { hu: '🔓 Aktív', ro: '🔓 Activează' },
+    // ── Felhasználók ──
+    'dev.allUsers':       { hu: 'Összes felhasználó', ro: 'Toți utilizatorii' },
+    'dev.col.name':       { hu: 'Név', ro: 'Nume' },
+    'dev.col.email':      { hu: 'Email', ro: 'Email' },
+    'dev.col.pozicio':    { hu: 'Pozíció', ro: 'Funcție' },
+    'dev.col.ceg':        { hu: 'Cég', ro: 'Firmă' },
+    'dev.col.status':     { hu: 'Státusz', ro: 'Status' },
+    'dev.col.actions':    { hu: 'Műveletek', ro: 'Acțiuni' },
+    'dev.noUsers':        { hu: 'Nincs felhasználó.', ro: 'Niciun utilizator.' },
+    'dev.uStDeveloper':   { hu: 'Developer', ro: 'Developer' },
+    'dev.uStBlocked':     { hu: 'Tiltva', ro: 'Blocat' },
+    'dev.uStActive':      { hu: 'Aktív', ro: 'Activ' },
+    'dev.protected':      { hu: '— védett —', ro: '— protejat —' },
+    'dev.unblockBtn':     { hu: '🔓 Feloldás', ro: '🔓 Deblochează' },
+    'dev.delBtn':         { hu: '🗑 Töröl', ro: '🗑 Șterge' },
+    // ── HERE pane ──
+    'dev.mapsPriceTitle': { hu: '🗺️ Térkép-szolgáltatás árazása (cégeknek továbbszámlázva)', ro: '🗺️ Tarifare serviciu hartă (refacturat firmelor)' },
+    'dev.mapsPriceHint':  { hu: 'A cégeknek <b>NINCS ingyenes keret</b> — az <b>első hívástól</b> fizetnek. A díj a <b>hivatalos ár + árrés%</b>. Add meg a hivatalos egységárat (EUR / 1000 hívás) és az árrést szolgáltatónként.', ro: 'Firmele <b>NU au plafon gratuit</b> — plătesc de la <b>primul apel</b>. Tariful este <b>prețul oficial + adaos%</b>. Introdu prețul unitar oficial (EUR / 1000 apeluri) și adaosul pe furnizor.' },
+    'dev.mapsUsageTitle': { hu: 'Cégenkénti térkép-használat és fizetendő (aktuális hónap)', ro: 'Utilizare hartă pe firme și de plată (luna curentă)' },
+    'dev.hereTitle':      { hu: '⚡ HERE Térkép szolgáltatások (legacy)', ro: '⚡ Servicii hartă HERE (legacy)' },
+    'dev.hereHint':       { hu: '4 alap szolgáltatás, <b>közös 1000 ingyenes tranzakció / hó / cég</b> (időrendben fogy). A pool feletti rész szolgáltatásonként, az alábbi <b>EUR / 1000 tranzakció</b> ár szerint kerül kiszámlázásra.', ro: '4 servicii de bază, <b>1000 tranzacții gratuite comune / lună / firmă</b> (se consumă cronologic). Partea peste plafon se facturează pe serviciu, conform prețului de mai jos <b>EUR / 1000 tranzacții</b>.' },
+    'dev.hereCol.svc':    { hu: 'Szolgáltatás', ro: 'Serviciu' },
+    'dev.hereCol.price':  { hu: 'Ár (EUR / 1000)', ro: 'Preț (EUR / 1000)' },
+    'dev.hereCol.vat':    { hu: 'ÁFA %', ro: 'TVA %' },
+    'dev.hereFootnote':   { hu: '💶 Az árak EUR-ban, 1000 tranzakcióra értendők. A módosítás azonnal érvénybe lép minden cégre.', ro: '💶 Prețurile sunt în EUR, pentru 1000 tranzacții. Modificarea intră în vigoare imediat pentru toate firmele.' },
+    'dev.hereByComp':     { hu: 'Cégenkénti használat — felhasználói bontással (aktuális hónap)', ro: 'Utilizare pe firme — defalcat pe utilizatori (luna curentă)' },
+    // ── Integrációk pane ──
+    'dev.billOwnTitle':   { hu: '💳 Számlázó integráció (a te céged)', ro: '💳 Integrare facturare (firma ta)' },
+    'dev.billOwnHint':    { hu: 'A developer (oldal-üzemeltető) céges FGO-/számlázó-fiókja. A hitelesítő adatok titkosítva tárolódnak.', ro: 'Contul de facturare FGO/facturator al developerului (operatorul platformei). Datele de autentificare sunt stocate criptat.' },
+    'dev.billSupported':  { hu: '💳 Támogatott számlázó programok', ro: '💳 Programe de facturare suportate' },
+    'dev.billCompTitle':  { hu: 'Cégek számlázó integrációi', ro: 'Integrările de facturare ale firmelor' },
+    'dev.billCol.ceg':    { hu: 'Cég', ro: 'Firmă' },
+    'dev.billCol.prov':   { hu: 'Számlázó', ro: 'Facturator' },
+    'dev.billCol.inv':    { hu: 'Számlázás', ro: 'Facturare' },
+    // ── Előfizetések pane ──
+    'dev.plansTitle':     { hu: '📦 Előfizetési csomagok', ro: '📦 Pachete de abonament' },
+    'dev.compPlansTitle': { hu: 'Cégek előfizetése', ro: 'Abonamentele firmelor' },
+    'dev.planCol.ceg':    { hu: 'Cég', ro: 'Firmă' },
+    'dev.planCol.plan':   { hu: 'Hozzárendelt csomag', ro: 'Pachet atribuit' },
+    // ── Cég modal ──
+    'dev.cegEditTitle':   { hu: 'Cég szerkesztése', ro: 'Editare firmă' },
+    'dev.cegNewTitle':    { hu: 'Új cég létrehozása', ro: 'Creare firmă nouă' },
+    'dev.f.cegNev':       { hu: 'Cég neve *', ro: 'Nume firmă *' },
+    'dev.f.igazgato':     { hu: 'Igazgató neve', ro: 'Nume director' },
+    'dev.f.igazgatoPh':   { hu: 'pl. Nagy János', ro: 'ex. Ion Popescu' },
+    'dev.f.email':        { hu: 'Kapcsolattartó email', ro: 'Email persoană de contact' },
+    'dev.f.emailPh':      { hu: 'pl. info@ceg.hu', ro: 'ex. info@firma.ro' },
+    'dev.f.tel':          { hu: 'Telefon', ro: 'Telefon' },
+    'dev.f.maxUsers':     { hu: 'Max felhasználók', ro: 'Max utilizatori' },
+    'dev.f.maxTrucks':    { hu: 'Max járművek', ro: 'Max vehicule' },
+    'dev.f.subStatus':    { hu: 'Előfizetés státusz', ro: 'Status abonament' },
+    'dev.opt.active':     { hu: 'Aktív', ro: 'Activ' },
+    'dev.opt.inactive':   { hu: 'Inaktív (blokkolt)', ro: 'Inactiv (blocat)' },
+    'dev.opt.cancelled':  { hu: 'Lemondva', ro: 'Anulat' },
+    'dev.f.paidUntil':    { hu: 'Fizetve eddig', ro: 'Plătit până la' },
+    'dev.save':           { hu: '💾 Mentés', ro: '💾 Salvează' },
+    'dev.cancel':         { hu: 'Mégse', ro: 'Anulează' },
+    // ── Detail modal ──
+    'dev.dCeg':           { hu: '🏢 Cég', ro: '🏢 Firmă' },
+    'dev.dTab.akt':       { hu: '📊 Aktivitás', ro: '📊 Activitate' },
+    'dev.dTab.func':      { hu: '⚙️ Funkciók', ro: '⚙️ Funcții' },
+    'dev.dTab.bugs':      { hu: '🐛 Hibajelentések', ro: '🐛 Rapoarte erori' },
+    // ── Detail: aktivitás ──
+    'dev.kpiAllOrders':   { hu: 'Összes fuvar', ro: 'Total curse' },
+    'dev.kpiActiveOrders':{ hu: 'Aktív fuvar', ro: 'Curse active' },
+    'dev.kpiWaybills':    { hu: 'Menetlevelek', ro: 'Foi de parcurs' },
+    'dev.kpiDocs':        { hu: 'Dokumentumok', ro: 'Documente' },
+    'dev.kpiAllBugs':     { hu: 'Összes hiba', ro: 'Total erori' },
+    'dev.kpiUnreadBugs':  { hu: 'Olvasatlan hiba', ro: 'Erori necitite' },
+    'dev.usersActivity':  { hu: 'Felhasználók aktivitása', ro: 'Activitatea utilizatorilor' },
+    'dev.noUsersShort':   { hu: 'Nincs felhasználó.', ro: 'Niciun utilizator.' },
+    'dev.aCol.name':      { hu: 'Név', ro: 'Nume' },
+    'dev.aCol.pozicio':   { hu: 'Pozíció', ro: 'Funcție' },
+    'dev.aCol.order':     { hu: 'Fuvar', ro: 'Cursă' },
+    'dev.aCol.waybill':   { hu: 'Menetlevél', ro: 'Foaie de parcurs' },
+    'dev.aCol.doc':       { hu: 'Dok', ro: 'Doc' },
+    'dev.aCol.border':    { hu: 'Határátlépés', ro: 'Trecere frontieră' },
+    'dev.aCol.lastAct':   { hu: 'Utolsó aktivitás', ro: 'Ultima activitate' },
+    'dev.actLegend':      { hu: '🟢 aktív &nbsp; 🟡 kevés aktivitás &nbsp; 🔴 nincs adat', ro: '🟢 activ &nbsp; 🟡 activitate redusă &nbsp; 🔴 fără date' },
+    'dev.loadError':      { hu: 'Hiba a betöltés során.', ro: 'Eroare la încărcare.' },
+    // ── Detail: funkciók ──
+    'dev.featIntro':      { hu: 'Kapcsold ki/be az egyes menüpontokat ennél a cégnél. A <b>kikapcsolt</b> funkció nem jelenik meg a cég felületén. Alapból minden be van kapcsolva.', ro: 'Activează/dezactivează fiecare opțiune de meniu pentru această firmă. Funcția <b>dezactivată</b> nu apare în interfața firmei. Implicit totul este activat.' },
+    'dev.featAlwaysOn':   { hu: 'mindig aktív', ro: 'mereu activ' },
+    'dev.featCore':       { hu: '(alap)', ro: '(de bază)' },
+    // feature group labels (a feature-catalog.js group mezőihez)
+    'dev.grp.Áttekintés':                { hu: 'Áttekintés', ro: 'Prezentare generală' },
+    'dev.grp.Fuvarozás & Logisztika':    { hu: 'Fuvarozás & Logisztika', ro: 'Transport & Logistică' },
+    'dev.grp.Statisztika & Riport':      { hu: 'Statisztika & Riport', ro: 'Statistici & Rapoarte' },
+    'dev.grp.Flotta & Megfelelés':       { hu: 'Flotta & Megfelelés', ro: 'Flotă & Conformitate' },
+    'dev.grp.Adminisztráció':            { hu: 'Adminisztráció', ro: 'Administrare' },
+    'dev.grp.Kommunikáció':              { hu: 'Kommunikáció', ro: 'Comunicare' },
+    'dev.grp.Rendszer':                  { hu: 'Rendszer', ro: 'Sistem' },
+    // feature labels (a feature-catalog.js label mezőihez — dev.feat.<key>)
+    'dev.feat.dash':             { hu: 'Vezérlőpult', ro: 'Panou de control' },
+    'dev.feat.orders-form':      { hu: 'Fuvar kiírás', ro: 'Creare cursă' },
+    'dev.feat.orders-list':      { hu: 'Fuvar kezelés', ro: 'Gestionare curse' },
+    'dev.feat.orders-import':    { hu: 'Fuvar CSV-import (📥)', ro: 'Import CSV curse (📥)' },
+    'dev.feat.client-portal':    { hu: 'Ügyfél-portál (🔑)', ro: 'Portal client (🔑)' },
+    'dev.feat.carrier-portal':   { hu: 'Alvállalkozói portál (🔑)', ro: 'Portal subcontractant (🔑)' },
+    'dev.feat.inbound':          { hu: 'Beérkező megrendelések', ro: 'Comenzi primite' },
+    'dev.feat.orders-planner':   { hu: 'Tervezőtábla (diszpécser)', ro: 'Planificator (dispecer)' },
+    'dev.feat.received-fuv':     { hu: 'Fuvarlevelek', ro: 'Foi de parcurs' },
+    'dev.feat.warehouse':        { hu: 'Raktár (leadott áru) 📦', ro: 'Depozit (marfă predată) 📦' },
+    'dev.feat.driver-docs-pane': { hu: 'Feltöltött iratok & CMR-ek', ro: 'Documente încărcate & CMR-uri' },
+    'dev.feat.utvonaltervezes':  { hu: 'Útvonaltervezés', ro: 'Planificare rută' },
+    'dev.feat.order-route-map':  { hu: 'Térképes km + útvonal-előnézet (fuvar-kiírás) 🗺️', ro: 'Km pe hartă + previzualizare rută (creare cursă) 🗺️' },
+    'dev.feat.stats-overview':   { hu: 'Statisztika — Áttekintés', ro: 'Statistici — Prezentare generală' },
+    'dev.feat.stats-finance':    { hu: 'Statisztika — Pénzügy', ro: 'Statistici — Financiar' },
+    'dev.feat.stats-fuel':       { hu: 'Statisztika — Fogyasztás', ro: 'Statistici — Consum' },
+    'dev.feat.stats-purchases':  { hu: 'Statisztika — Vásárlások', ro: 'Statistici — Achiziții' },
+    'dev.feat.stats-drivers':    { hu: 'Statisztika — Sofőr teljesítmény', ro: 'Statistici — Performanță șoferi' },
+    'dev.feat.stats-vehicles':   { hu: 'Statisztika — Jármű kihasználtság', ro: 'Statistici — Utilizare vehicule' },
+    'dev.feat.stats-clients':    { hu: 'Statisztika — Ügyfél riport', ro: 'Statistici — Raport clienți' },
+    'dev.feat.decont':           { hu: 'Sofőr-elszámolás (decont)', ro: 'Decont șofer' },
+    'dev.feat.tracking':         { hu: 'Ügyfél tracking-link (🌍)', ro: 'Link urmărire client (🌍)' },
+    'dev.feat.expiries':         { hu: 'Lejáratok & riasztások', ro: 'Expirări & alerte' },
+    'dev.feat.service-log':      { hu: 'Szerviz & karbantartás', ro: 'Service & întreținere' },
+    'dev.feat.fuel-import':      { hu: 'Üzemanyagkártya-import (⛽)', ro: 'Import card carburant (⛽)' },
+    'dev.feat.monthly-report':   { hu: 'Havi e-mail összefoglaló (📧)', ro: 'Sumar lunar pe e-mail (📧)' },
+    'dev.feat.users':            { hu: 'Munkatársak kezelése', ro: 'Gestionare angajați' },
+    'dev.feat.invites':          { hu: 'Meghívókódok', ro: 'Coduri de invitație' },
+    'dev.feat.internal-drivers': { hu: 'Belső sofőrök', ro: 'Șoferi interni' },
+    'dev.feat.external-drivers': { hu: 'Külső sofőrök', ro: 'Șoferi externi' },
+    'dev.feat.vehicles':         { hu: 'Járművek', ro: 'Vehicule' },
+    'dev.feat.clients':          { hu: 'Ügyfelek', ro: 'Clienți' },
+    'dev.feat.billing':          { hu: 'Számlázás fül (csak Manager)', ro: 'Tab Facturare (doar Manager)' },
+    'dev.feat.integrations':     { hu: 'Integrációk fül (csak Admin)', ro: 'Tab Integrări (doar Admin)' },
+    'dev.feat.signature':        { hu: 'Aláírás és bélyegző', ro: 'Semnătură și ștampilă' },
+    'dev.feat.chat':             { hu: 'Belső chat', ro: 'Chat intern' },
+    'dev.feat.settings':         { hu: 'Beállítások', ro: 'Setări' },
+    // ── Detail: hibák ──
+    'dev.noBugs':         { hu: '✅ Nincs beküldött hibajelentés.', ro: '✅ Niciun raport de eroare trimis.' },
+    'dev.bugRead':        { hu: '✓ olvasva', ro: '✓ citit' },
+    'dev.bugMarkRead':    { hu: '✓ Olvasott', ro: '✓ Citit' },
+    // ── Számla modal ──
+    'dev.invPreviewLoad': { hu: 'Előnézet betöltése...', ro: 'Se încarcă previzualizarea...' },
+    'dev.invErrTitle':    { hu: '❌ Hiba', ro: '❌ Eroare' },
+    'dev.invPreviewFail': { hu: 'Nem sikerült az előnézet.', ro: 'Previzualizarea a eșuat.' },
+    'dev.netErr':         { hu: 'Hálózati hiba.', ro: 'Eroare de rețea.' },
+    'dev.close':          { hu: 'Bezárás', ro: 'Închide' },
+    'dev.invNoPlan':      { hu: '⚠ Nincs előfizetési csomag beállítva ehhez a céghez. Csak HERE tételek kerülnek a számlára.', ro: '⚠ Nu este setat niciun pachet de abonament pentru această firmă. Pe factură apar doar pozițiile HERE.' },
+    'dev.invNoHere':      { hu: 'ℹ Nincs HERE API használat ebben a hónapban.', ro: 'ℹ Nicio utilizare HERE API în această lună.' },
+    'dev.invPreviewTitle':{ hu: '🧾 Számla előnézet', ro: '🧾 Previzualizare factură' },
+    'dev.invProvider':    { hu: 'Számlázó: ', ro: 'Facturator: ' },
+    'dev.invNoItems':     { hu: 'Nincs számlázható tétel.', ro: 'Nicio poziție facturabilă.' },
+    'dev.invTotNet':      { hu: 'Végösszeg nettó:', ro: 'Total net:' },
+    'dev.invTotVat':      { hu: 'Végösszeg ÁFA:', ro: 'Total TVA:' },
+    'dev.invTotGross':    { hu: 'Végösszeg bruttó:', ro: 'Total brut:' },
+    'dev.invDue':         { hu: 'Fizetési határidő: ', ro: 'Termen de plată: ' },
+    'dev.invWillIssue1':  { hu: '⚠ Ez a számla a ', ro: '⚠ Această factură va fi emisă în sistemul ' },
+    'dev.invWillIssue2':  { hu: ' rendszerben kerül kiállításra. A művelet nem visszavonható.', ro: '. Operațiunea nu poate fi anulată.' },
+    'dev.invNoActive':    { hu: '❌ Nincs aktív számlázó vagy tétel — a kiállítás nem lehetséges.', ro: '❌ Niciun facturator activ sau poziție — emiterea nu este posibilă.' },
+    'dev.invCancel':      { hu: '❌ Mégsem', ro: '❌ Anulează' },
+    'dev.invConfirm':     { hu: '✅ Kiállítás megerősítése', ro: '✅ Confirmă emiterea' },
+    'dev.invIssuing':     { hu: 'Számla kiállítása folyamatban...', ro: 'Se emite factura...' },
+    'dev.invIssued':      { hu: '✅ Számla sikeresen kiállítva!', ro: '✅ Factură emisă cu succes!' },
+    'dev.invNumber':      { hu: 'Számlaszám: ', ro: 'Număr factură: ' },
+    'dev.invProvider2':   { hu: 'Számlázó: ', ro: 'Facturator: ' },
+    'dev.invOpenPdf':     { hu: '📄 PDF megnyitása', ro: '📄 Deschide PDF' },
+    'dev.invCloseX':      { hu: '❌ Bezárás', ro: '❌ Închide' },
+    'dev.invFail':        { hu: '❌ Számla kiállítása sikertelen', ro: '❌ Emiterea facturii a eșuat' },
+    'dev.invErrLine':     { hu: 'Hiba: ', ro: 'Eroare: ' },
+    'dev.invCheckInteg':  { hu: 'Ellenőrizd a számlázó integrációt az Integrációk fülön.', ro: 'Verifică integrarea de facturare în tab-ul Integrări.' },
+    'dev.invUnknown':     { hu: 'ismeretlen', ro: 'necunoscut' },
+    'dev.invNetErr':      { hu: 'Hálózati hiba a kiállításnál.', ro: 'Eroare de rețea la emitere.' },
+    // ── HERE providers / usage ──
+    'dev.noProvider':     { hu: 'Nincs elérhető számlázó.', ro: 'Niciun facturator disponibil.' },
+    'dev.notAvail':       { hu: 'Nem elérhető.', ro: 'Indisponibil.' },
+    'dev.mapsCol.vendor': { hu: 'Szolgáltató', ro: 'Furnizor' },
+    'dev.mapsCol.price':  { hu: 'Hivatalos ár (EUR / 1000)', ro: 'Preț oficial (EUR / 1000)' },
+    'dev.mapsCol.margin': { hu: 'Árrés %', ro: 'Adaos %' },
+    'dev.mapsCol.toComp': { hu: 'Cégnek (1000)', ro: 'Pentru firmă (1000)' },
+    'dev.mapsPriceNote':  { hu: 'A „Cégnek" oszlop = hivatalos ár × (1 + árrés%) — ennyit fizet a cég 1000 hívásért, az első hívástól.', ro: 'Coloana „Pentru firmă" = preț oficial × (1 + adaos%) — atât plătește firma pentru 1000 apeluri, de la primul apel.' },
+    'dev.mapsNoUsage':    { hu: 'Nincs fizetős térkép-használat ebben a hónapban.', ro: 'Nicio utilizare plătită a hărții în această lună.' },
+    'dev.uCol.ceg':       { hu: 'Cég', ro: 'Firmă' },
+    'dev.uCol.vendor':    { hu: 'Szolgáltató', ro: 'Furnizor' },
+    'dev.uCol.calls':     { hu: 'Hívás', ro: 'Apeluri' },
+    'dev.uCol.payable':   { hu: 'Fizetendő (EUR)', ro: 'De plată (EUR)' },
+    'dev.total':          { hu: 'Összesen', ro: 'Total' },
+    'dev.hereNoCompUsage':{ hu: 'Ebben a hónapban nincs cégenkénti HERE használat.', ro: 'În această lună nu există utilizare HERE pe firme.' },
+    'dev.hereGrandTotal': { hu: 'Összes (bruttó): €', ro: 'Total (brut): €' },
+    'dev.herePerMonth':   { hu: ' / hó', ro: ' / lună' },
+    'dev.hereFreePool':   { hu: 'Közös ingyenes pool: ', ro: 'Plafon gratuit comun: ' },
+    'dev.hereTrx':        { hu: ' tranzakció (', ro: ' tranzacții (' },
+    'dev.hereRemaining':  { hu: ' maradt)', ro: ' rămase)' },
+    'dev.hereBillable':   { hu: 'Számlázható: ', ro: 'Facturabil: ' },
+    'dev.hereUnits':      { hu: ' egység', ro: ' unități' },
+    'dev.hereUnderPool':  { hu: 'Pool alatt — nincs díj', ro: 'Sub plafon — fără tarif' },
+    'dev.hereDetails':    { hu: '▼ Részletezés', ro: '▼ Detaliere' },
+    'dev.hereCollapse':   { hu: '▲ Bezárás', ro: '▲ Închide' },
+    'dev.hereTotal':      { hu: 'Összes: ', ro: 'Total: ' },
+    'dev.hereTrxShort':   { hu: ' trz', ro: ' trz' },
+    'dev.hereNet':        { hu: 'Nettó: ', ro: 'Net: ' },
+    'dev.hereVat':        { hu: 'ÁFA: ', ro: 'TVA: ' },
+    'dev.hereGross':      { hu: 'Bruttó: ', ro: 'Brut: ' },
+    'dev.hereSubtotal':   { hu: 'Részösszeg (bruttó): €', ro: 'Subtotal (brut): €' },
+    // ── Csomagok (plan editor) ──
+    'dev.plName':         { hu: 'Név', ro: 'Nume' },
+    'dev.plDesc':         { hu: 'Leírás', ro: 'Descriere' },
+    'dev.plPriceNet':     { hu: 'Nettó ár (EUR/hó)', ro: 'Preț net (EUR/lună)' },
+    'dev.plVatLbl':       { hu: 'ÁFA', ro: 'TVA' },
+    'dev.plGrossLbl':     { hu: 'Bruttó: ', ro: 'Brut: ' },
+    'dev.planNone':       { hu: '— Nincs —', ro: '— Niciunul —' },
+    // ── Toast / alert / confirm ──
+    'dev.tPlanSaved':     { hu: 'Csomag mentve', ro: 'Pachet salvat' },
+    'dev.tPlanChanged':   { hu: 'Csomag módosítva', ro: 'Pachet modificat' },
+    'dev.tError':         { hu: 'Hiba', ro: 'Eroare' },
+    'dev.tBadPrice':      { hu: 'Érvénytelen ár', ro: 'Preț invalid' },
+    'dev.tPriceSaved':    { hu: '✅ Ár mentve', ro: '✅ Preț salvat' },
+    'dev.tFeatOn':        { hu: '✅ Bekapcsolva', ro: '✅ Activat' },
+    'dev.tFeatOff':       { hu: '⛔ Kikapcsolva', ro: '⛔ Dezactivat' },
+    'dev.tUserBlocked':   { hu: 'Felhasználó letiltva', ro: 'Utilizator blocat' },
+    'dev.tUserUnblocked': { hu: 'Tiltás feloldva', ro: 'Blocare ridicată' },
+    'dev.tUserDeleted':   { hu: 'Felhasználó törölve', ro: 'Utilizator șters' },
+    'dev.tBadEmail':      { hu: 'Érvénytelen email cím!', ro: 'Adresă de email invalidă!' },
+    'dev.tCegNameReq':    { hu: 'A cég neve kötelező!', ro: 'Numele firmei este obligatoriu!' },
+    'dev.tSaved':         { hu: 'Mentve!', ro: 'Salvat!' },
+    'dev.tBadDelCode':    { hu: 'Helytelen megerősítő kód!', ro: 'Cod de confirmare incorect!' },
+    'dev.tCegDeleted':    { hu: 'Cég törölve!', ro: 'Firmă ștearsă!' },
+    'dev.tCegBlocked':    { hu: 'Cég blokkolva!', ro: 'Firmă blocată!' },
+    'dev.tCegActivated':  { hu: 'Cég aktiválva!', ro: 'Firmă activată!' },
+    'dev.cfBlockUser':    { hu: 'Biztosan LETILTOD ezt a felhasználót?\n\n{email}\n\nEzután nem fog tudni bejelentkezni.', ro: 'Sigur BLOCHEZI acest utilizator?\n\n{email}\n\nDupă aceea nu se va mai putea autentifica.' },
+    'dev.cfUnblockUser':  { hu: 'Feloldod a tiltást?\n\n{email}', ro: 'Ridici blocarea?\n\n{email}' },
+    'dev.cfDelUser1':     { hu: '⚠️ VÉGLEGES TÖRLÉS\n\n{email}\n\nA felhasználó és személyes adatai (menetlevelek, dokumentumok, aláírás) törlődnek. Biztos vagy benne?', ro: '⚠️ ȘTERGERE DEFINITIVĂ\n\n{email}\n\nUtilizatorul și datele sale personale (foi de parcurs, documente, semnătură) vor fi șterse. Ești sigur?' },
+    'dev.cfDelUser2':     { hu: 'Utolsó megerősítés — ez NEM vonható vissza.\n\nTényleg törlöd: {email} ?', ro: 'Ultima confirmare — aceasta NU poate fi anulată.\n\nChiar ștergi: {email} ?' },
+    'dev.alCegCreated':   { hu: '✅ Cég létrehozva!\n\nAdmin meghívókód: {kod}\n\n{tail}', ro: '✅ Firmă creată!\n\nCod de invitație admin: {kod}\n\n{tail}' },
+    'dev.alEmailSent':    { hu: 'Az email el lett küldve: {email}', ro: 'E-mailul a fost trimis la: {email}' },
+    'dev.alGiveCode':     { hu: 'Add át az ügyfélnek ezt a kódot.', ro: 'Transmite acest cod clientului.' },
+    'dev.cfDelCeg':       { hu: '⚠️ FIGYELEM: Ez törli a céget és MINDEN hozzátartozó adatot!\n\nCég: {nev}\n\nA törlés megerősítéséhez írd be:\nvallorsoftcegtorlo1', ro: '⚠️ ATENȚIE: Aceasta șterge firma și TOATE datele asociate!\n\nFirmă: {nev}\n\nPentru confirmarea ștergerii scrie:\nvallorsoftcegtorlo1' },
+    'dev.cfBlockCeg':     { hu: 'Biztosan blokkolod ezt a céget? A felhasználók nem tudnak bejelentkezni.', ro: 'Sigur blochezi această firmă? Utilizatorii nu se vor putea autentifica.' },
+    'dev.alBillTitle':    { hu: '💳 {name}\n\nBeállítva: {since}\n\nA hitelesítő adatok titkosítva tárolódnak — developer számára sem láthatók.', ro: '💳 {name}\n\nConfigurat: {since}\n\nDatele de autentificare sunt stocate criptat — invizibile chiar și pentru developer.' },
+    // ── Egyebek (inline gomb/feliratok) ──
+    'dev.viewBtn':        { hu: 'megtekintés', ro: 'vizualizare' },
+    'dev.issueInvoice':   { hu: '🧾 Számla kiállítása', ro: '🧾 Emite factură' },
+    'dev.noBillingBtn':   { hu: '🧾 nincs számlázó', ro: '🧾 fără facturator' },
+    'dev.noBillingTip':   { hu: 'Nincs beállítva számlázó (Admin/Manager állítja be)', ro: 'Niciun facturator setat (configurat de Admin/Manager)' }
+  });
   <style>
     /* A számlázó-integrációs kártya (BillingCard) gombjai a developer felületen */
     #pane-integ .btn{padding:9px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:1px solid var(--border-bright);background:rgba(255,255,255,0.05);color:#fff;}
@@ -99,16 +368,16 @@
 <div class="dev-layout">
   <div class="dev-sidebar" id="devSidebar">
     <div class="dev-logo">vallor<span>Dev</span></div>
-    <div class="dev-subtitle">Developer Console</div>
-    <div class="dev-tab active" onclick="showPane('dash')">📊 Áttekintés</div>
-    <div class="dev-tab" onclick="showPane('cegek')">🏢 Cégek</div>
-    <div class="dev-tab" onclick="showPane('userek')">👥 Felhasználók</div>
-    <div class="dev-tab" onclick="showPane('here')">⚡ HERE API</div>
-    <div class="dev-tab" onclick="showPane('integ')">💳 Integrációk</div>
-    <div class="dev-tab" onclick="showPane('elofiz')">📦 Előfizetések</div>
+    <div class="dev-subtitle" data-i18n="dev.console">Developer Console</div>
+    <div class="dev-tab active" onclick="showPane('dash')" data-i18n="dev.nav.dash">📊 Áttekintés</div>
+    <div class="dev-tab" onclick="showPane('cegek')" data-i18n="dev.nav.cegek">🏢 Cégek</div>
+    <div class="dev-tab" onclick="showPane('userek')" data-i18n="dev.nav.userek">👥 Felhasználók</div>
+    <div class="dev-tab" onclick="showPane('here')" data-i18n="dev.nav.here">⚡ HERE API</div>
+    <div class="dev-tab" onclick="showPane('integ')" data-i18n="dev.nav.integ">💳 Integrációk</div>
+    <div class="dev-tab" onclick="showPane('elofiz')" data-i18n="dev.nav.elofiz">📦 Előfizetések</div>
     <div style="margin-top:auto; padding-top:20px; border-top:1px solid var(--border);">
       <div id="devBadge" style="font-size:12px; color:var(--muted); margin-bottom:10px;">—</div>
-      <button class="btn-danger-sm" style="width:100%;" onclick="logout()">Kilépés</button>
+      <button class="btn-danger-sm" style="width:100%;" onclick="logout()" data-i18n="dev.logout">Kilépés</button>
     </div>
   </div>
 
@@ -116,30 +385,30 @@
 
     <!-- ÁTTEKINTÉS -->
     <div class="dev-pane" id="pane-dash">
-      <div class="section-title">Rendszer áttekintés</div>
+      <div class="section-title" data-i18n="dev.sysOverview">Rendszer áttekintés</div>
       <div class="kpi-grid">
-        <div class="kpi purple"><div class="label">Cégek</div><div class="val" id="kCegek">—</div></div>
-        <div class="kpi"><div class="label">Aktív cégek</div><div class="val" id="kAktiv" style="color:var(--ok);">—</div></div>
-        <div class="kpi"><div class="label">Felhasználók</div><div class="val" id="kUsers">—</div></div>
-        <div class="kpi"><div class="label">Összes fuvar</div><div class="val" id="kFuvar">—</div></div>
+        <div class="kpi purple"><div class="label" data-i18n="dev.kpi.cegek">Cégek</div><div class="val" id="kCegek">—</div></div>
+        <div class="kpi"><div class="label" data-i18n="dev.kpi.aktiv">Aktív cégek</div><div class="val" id="kAktiv" style="color:var(--ok);">—</div></div>
+        <div class="kpi"><div class="label" data-i18n="dev.kpi.users">Felhasználók</div><div class="val" id="kUsers">—</div></div>
+        <div class="kpi"><div class="label" data-i18n="dev.kpi.fuvar">Összes fuvar</div><div class="val" id="kFuvar">—</div></div>
       </div>
     </div>
 
     <!-- CÉGEK -->
     <div class="dev-pane hidden" id="pane-cegek">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-        <div class="section-title" style="margin:0;">Cégek kezelése</div>
-        <button class="btn-dev" onclick="openNewCeg()">+ Új cég</button>
+        <div class="section-title" style="margin:0;" data-i18n="dev.cegManage">Cégek kezelése</div>
+        <button class="btn-dev" onclick="openNewCeg()" data-i18n="dev.newCeg">+ Új cég</button>
       </div>
-      <div id="cegList">Betöltés...</div>
+      <div id="cegList" data-i18n="dev.loadingDots">Betöltés...</div>
     </div>
 
     <!-- FELHASZNÁLÓK -->
     <div class="dev-pane hidden" id="pane-userek">
-      <div class="section-title">Összes felhasználó</div>
+      <div class="section-title" data-i18n="dev.allUsers">Összes felhasználó</div>
       <div class="glass" style="padding:0; overflow:hidden;">
         <table class="table">
-          <thead><tr><th>Név</th><th>Email</th><th>Pozíció</th><th>Cég</th><th>Státusz</th><th>Műveletek</th></tr></thead>
+          <thead><tr><th data-i18n="dev.col.name">Név</th><th data-i18n="dev.col.email">Email</th><th data-i18n="dev.col.pozicio">Pozíció</th><th data-i18n="dev.col.ceg">Cég</th><th data-i18n="dev.col.status">Státusz</th><th data-i18n="dev.col.actions">Műveletek</th></tr></thead>
           <tbody id="devUserTbody"></tbody>
         </table>
       </div>
@@ -147,63 +416,63 @@
 
     <!-- HERE API FUNKCIÓK -->
     <div class="dev-pane hidden" id="pane-here">
-      <div class="section-title" style="margin:0 0 8px;">🗺️ Térkép-szolgáltatás árazása (cégeknek továbbszámlázva)</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+      <div class="section-title" style="margin:0 0 8px;" data-i18n="dev.mapsPriceTitle">🗺️ Térkép-szolgáltatás árazása (cégeknek továbbszámlázva)</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;" data-i18n-html="dev.mapsPriceHint">
         A cégeknek <b>NINCS ingyenes keret</b> — az <b>első hívástól</b> fizetnek. A díj a <b>hivatalos ár + árrés%</b>.
         Add meg a hivatalos egységárat (EUR / 1000 hívás) és az árrést szolgáltatónként.
       </div>
-      <div id="mapsPricingBox" class="glass" style="padding:14px;margin-bottom:12px;">Betöltés...</div>
-      <div class="section-title" style="margin-top:18px;">Cégenkénti térkép-használat és fizetendő (aktuális hónap)</div>
-      <div id="mapsUsageBox" style="margin-bottom:26px;"><div style="color:var(--muted);font-size:13px;">Betöltés...</div></div>
+      <div id="mapsPricingBox" class="glass" style="padding:14px;margin-bottom:12px;" data-i18n="dev.loadingDots">Betöltés...</div>
+      <div class="section-title" style="margin-top:18px;" data-i18n="dev.mapsUsageTitle">Cégenkénti térkép-használat és fizetendő (aktuális hónap)</div>
+      <div id="mapsUsageBox" style="margin-bottom:26px;"><div style="color:var(--muted);font-size:13px;" data-i18n="dev.loadingDots">Betöltés...</div></div>
 
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
-        <div class="section-title" style="margin:0;">⚡ HERE Térkép szolgáltatások (legacy)</div>
+        <div class="section-title" style="margin:0;" data-i18n="dev.hereTitle">⚡ HERE Térkép szolgáltatások (legacy)</div>
         <div id="hereGrandTotal" style="font-size:14px;font-weight:800;color:#c084fc;">—</div>
       </div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px;" data-i18n-html="dev.hereHint">
         4 alap szolgáltatás, <b>közös 1000 ingyenes tranzakció / hó / cég</b> (időrendben fogy).
         A pool feletti rész szolgáltatásonként, az alábbi <b>EUR / 1000 tranzakció</b> ár szerint kerül kiszámlázásra.
       </div>
       <div class="glass" style="padding:0; overflow:hidden;">
         <table class="table">
-          <thead><tr><th>Szolgáltatás</th><th>Ár (EUR / 1000)</th><th>ÁFA %</th><th></th></tr></thead>
-          <tbody id="hereTbody"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
+          <thead><tr><th data-i18n="dev.hereCol.svc">Szolgáltatás</th><th data-i18n="dev.hereCol.price">Ár (EUR / 1000)</th><th data-i18n="dev.hereCol.vat">ÁFA %</th><th></th></tr></thead>
+          <tbody id="hereTbody"><tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;" data-i18n="dev.loadingDots">Betöltés...</td></tr></tbody>
         </table>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:10px;">💶 Az árak EUR-ban, 1000 tranzakcióra értendők. A módosítás azonnal érvénybe lép minden cégre.</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:10px;" data-i18n="dev.hereFootnote">💶 Az árak EUR-ban, 1000 tranzakcióra értendők. A módosítás azonnal érvénybe lép minden cégre.</div>
 
-      <div class="section-title" style="margin-top:26px;">Cégenkénti használat — felhasználói bontással (aktuális hónap)</div>
-      <div id="hereByCompany"><div style="color:var(--muted);font-size:13px;">Betöltés...</div></div>
+      <div class="section-title" style="margin-top:26px;" data-i18n="dev.hereByComp">Cégenkénti használat — felhasználói bontással (aktuális hónap)</div>
+      <div id="hereByCompany"><div style="color:var(--muted);font-size:13px;" data-i18n="dev.loadingDots">Betöltés...</div></div>
     </div>
 
     <!-- INTEGRÁCIÓK (számlázó programok) -->
     <div class="dev-pane hidden" id="pane-integ">
-      <div class="section-title">💳 Számlázó integráció (a te céged)</div>
-      <p style="color:var(--muted);font-size:13px;margin:0 0 12px;">A developer (oldal-üzemeltető) céges FGO-/számlázó-fiókja. A hitelesítő adatok titkosítva tárolódnak.</p>
+      <div class="section-title" data-i18n="dev.billOwnTitle">💳 Számlázó integráció (a te céged)</div>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 12px;" data-i18n="dev.billOwnHint">A developer (oldal-üzemeltető) céges FGO-/számlázó-fiókja. A hitelesítő adatok titkosítva tárolódnak.</p>
       <div id="devBillingCardBox" style="margin-bottom:26px;"></div>
 
-      <div class="section-title">💳 Támogatott számlázó programok</div>
-      <div id="providerList" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;"><div style="color:var(--muted);font-size:13px;">Betöltés...</div></div>
+      <div class="section-title" data-i18n="dev.billSupported">💳 Támogatott számlázó programok</div>
+      <div id="providerList" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;"><div style="color:var(--muted);font-size:13px;" data-i18n="dev.loadingDots">Betöltés...</div></div>
 
-      <div class="section-title">Cégek számlázó integrációi</div>
+      <div class="section-title" data-i18n="dev.billCompTitle">Cégek számlázó integrációi</div>
       <div class="glass" style="padding:0; overflow:hidden;">
         <table class="table">
-          <thead><tr><th>Cég</th><th>Számlázó</th><th>Számlázás</th></tr></thead>
-          <tbody id="compBillingTbody"><tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
+          <thead><tr><th data-i18n="dev.billCol.ceg">Cég</th><th data-i18n="dev.billCol.prov">Számlázó</th><th data-i18n="dev.billCol.inv">Számlázás</th></tr></thead>
+          <tbody id="compBillingTbody"><tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px;" data-i18n="dev.loadingDots">Betöltés...</td></tr></tbody>
         </table>
       </div>
     </div>
 
     <!-- ELŐFIZETÉSEK (csomagok + cég-hozzárendelés) -->
     <div class="dev-pane hidden" id="pane-elofiz">
-      <div class="section-title">📦 Előfizetési csomagok</div>
-      <div id="planEditor"><div style="color:var(--muted);">Betöltés...</div></div>
+      <div class="section-title" data-i18n="dev.plansTitle">📦 Előfizetési csomagok</div>
+      <div id="planEditor"><div style="color:var(--muted);" data-i18n="dev.loadingDots">Betöltés...</div></div>
 
-      <div class="section-title" style="margin-top:26px;">Cégek előfizetése</div>
+      <div class="section-title" style="margin-top:26px;" data-i18n="dev.compPlansTitle">Cégek előfizetése</div>
       <div class="glass" style="padding:0; overflow:hidden;">
         <table class="table">
-          <thead><tr><th>Cég</th><th>Hozzárendelt csomag</th></tr></thead>
-          <tbody id="compPlanTbody"><tr><td colspan="2" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
+          <thead><tr><th data-i18n="dev.planCol.ceg">Cég</th><th data-i18n="dev.planCol.plan">Hozzárendelt csomag</th></tr></thead>
+          <tbody id="compPlanTbody"><tr><td colspan="2" style="text-align:center;color:var(--muted);padding:20px;" data-i18n="dev.loadingDots">Betöltés...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -214,27 +483,27 @@
 <!-- CEG MODAL -->
 <div class="modal-back" id="cegModal">
   <div class="dev-modal">
-    <h3 id="cegModalTitle">Cég szerkesztése</h3>
+    <h3 id="cegModalTitle" data-i18n="dev.cegEditTitle">Cég szerkesztése</h3>
     <input type="hidden" id="cegId">
-    <div class="field"><label>Cég neve *</label><input class="input" id="cegNev"></div>
-    <div class="field"><label>Igazgató neve</label><input class="input" id="cegIgazgato" placeholder="pl. Nagy János"></div>
-    <div class="field"><label>Kapcsolattartó email</label><input class="input" id="cegEmail" type="email" placeholder="pl. info@ceg.hu"></div>
-    <div class="field"><label>Telefon</label><input class="input" id="cegTel"></div>
+    <div class="field"><label data-i18n="dev.f.cegNev">Cég neve *</label><input class="input" id="cegNev"></div>
+    <div class="field"><label data-i18n="dev.f.igazgato">Igazgató neve</label><input class="input" id="cegIgazgato" placeholder="pl. Nagy János" data-i18n-ph="dev.f.igazgatoPh"></div>
+    <div class="field"><label data-i18n="dev.f.email">Kapcsolattartó email</label><input class="input" id="cegEmail" type="email" placeholder="pl. info@ceg.hu" data-i18n-ph="dev.f.emailPh"></div>
+    <div class="field"><label data-i18n="dev.f.tel">Telefon</label><input class="input" id="cegTel"></div>
     <div class="grid-2">
-      <div class="field"><label>Max felhasználók</label><input class="input" id="cegMaxUsers" type="number" value="10"></div>
-      <div class="field"><label>Max járművek</label><input class="input" id="cegMaxTrucks" type="number" value="10"></div>
+      <div class="field"><label data-i18n="dev.f.maxUsers">Max felhasználók</label><input class="input" id="cegMaxUsers" type="number" value="10"></div>
+      <div class="field"><label data-i18n="dev.f.maxTrucks">Max járművek</label><input class="input" id="cegMaxTrucks" type="number" value="10"></div>
     </div>
-    <div class="field"><label>Előfizetés státusz</label>
+    <div class="field"><label data-i18n="dev.f.subStatus">Előfizetés státusz</label>
       <select class="select" id="cegStatus">
-        <option value="active">Aktív</option>
-        <option value="inactive">Inaktív (blokkolt)</option>
-        <option value="cancelled">Lemondva</option>
+        <option value="active" data-i18n="dev.opt.active">Aktív</option>
+        <option value="inactive" data-i18n="dev.opt.inactive">Inaktív (blokkolt)</option>
+        <option value="cancelled" data-i18n="dev.opt.cancelled">Lemondva</option>
       </select>
     </div>
-    <div class="field"><label>Fizetve eddig</label><input class="input" id="cegPaidUntil" type="date"></div>
+    <div class="field"><label data-i18n="dev.f.paidUntil">Fizetve eddig</label><input class="input" id="cegPaidUntil" type="date"></div>
     <div class="row-btns">
-      <button class="btn-danger-sm" style="flex:1;" onclick="closeCegModal()">Mégse</button>
-      <button class="btn-dev" style="flex:2;" onclick="saveCeg()">💾 Mentés</button>
+      <button class="btn-danger-sm" style="flex:1;" onclick="closeCegModal()" data-i18n="dev.cancel">Mégse</button>
+      <button class="btn-dev" style="flex:2;" onclick="saveCeg()" data-i18n="dev.save">💾 Mentés</button>
     </div>
   </div>
 </div>
@@ -243,28 +512,28 @@
 <div class="modal-back" id="detailModal">
   <div class="dev-modal" style="width:min(780px,100%);max-height:92vh;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-      <h3 id="detailModalTitle" style="margin:0;font-size:17px;">🏢 Cég</h3>
+      <h3 id="detailModalTitle" style="margin:0;font-size:17px;" data-i18n="dev.dCeg">🏢 Cég</h3>
       <button onclick="closeDetailModal()" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;">✕</button>
     </div>
     <!-- Tab sáv -->
     <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;">
-      <button id="dtab-aktivitas" onclick="switchDetailTab('aktivitas')"
+      <button id="dtab-aktivitas" onclick="switchDetailTab('aktivitas')" data-i18n="dev.dTab.akt"
         style="padding:10px 18px;background:none;border:none;border-bottom:2px solid #a855f7;color:#fff;font-size:13px;font-weight:800;cursor:pointer;">
         📊 Aktivitás
       </button>
-      <button id="dtab-funkciok" onclick="switchDetailTab('funkciok')"
+      <button id="dtab-funkciok" onclick="switchDetailTab('funkciok')" data-i18n="dev.dTab.func"
         style="padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;">
         ⚙️ Funkciók
       </button>
-      <button id="dtab-hibak" onclick="switchDetailTab('hibak')"
+      <button id="dtab-hibak" onclick="switchDetailTab('hibak')" data-i18n="dev.dTab.bugs"
         style="padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;">
         🐛 Hibajelentések
       </button>
     </div>
     <!-- Tab tartalom -->
-    <div id="dpane-aktivitas" style="display:block;overflow-y:auto;max-height:60vh;">Betöltés...</div>
-    <div id="dpane-funkciok"  style="display:none;overflow-y:auto;max-height:60vh;">Betöltés...</div>
-    <div id="dpane-hibak"     style="display:none;overflow-y:auto;max-height:60vh;">Betöltés...</div>
+    <div id="dpane-aktivitas" style="display:block;overflow-y:auto;max-height:60vh;" data-i18n="dev.loadingDots">Betöltés...</div>
+    <div id="dpane-funkciok"  style="display:none;overflow-y:auto;max-height:60vh;" data-i18n="dev.loadingDots">Betöltés...</div>
+    <div id="dpane-hibak"     style="display:none;overflow-y:auto;max-height:60vh;" data-i18n="dev.loadingDots">Betöltés...</div>
   </div>
 </div>
 
@@ -276,6 +545,11 @@
 </div>
 
 <script>
+function T(k,v){return (typeof window.t==='function')?window.t(k,v):k;}
+// A feature-catalog.js label-jei magyarul vannak — ezeket 'dev.feat.<key>' kulcson
+// fordítjuk; ha nincs kulcs, marad a nyers label. A group-okat 'dev.grp.<group>'.
+function featLabel(f){ var key='dev.feat.'+f.key; var tr=T(key); return (tr===key)?f.label:tr; }
+function grpLabel(g){ var key='dev.grp.'+g; var tr=T(key); return (tr===key)?g:tr; }
 function toast(m,k){var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(function(){e.remove();},3000);}
 function gas(fn,args){return new Promise(function(res,rej){fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({functionName:fn,arguments:args||[]})}).then(r=>r.json()).then(d=>{res(d.result);}).catch(rej);});}
 
@@ -300,7 +574,7 @@ function loadProviders(){
   gas('getAvailableProviders').then(function(list){
     var el=document.getElementById('providerList'); if(!el) return;
     list=list||[];
-    if(!list.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;">Nincs elérhető számlázó.</div>'; return; }
+    if(!list.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;">'+T('dev.noProvider')+'</div>'; return; }
     el.innerHTML=list.map(function(p){
       var fields=(p.fields||[]).map(function(f){return f.label;}).join(', ');
       return '<div style="border:1px solid rgba(168,85,247,0.3);background:rgba(168,85,247,0.06);border-radius:12px;padding:12px 16px;min-width:160px;">'
@@ -312,10 +586,10 @@ function loadProviders(){
 function loadCompPlans(){
   Promise.all([gas('getCompaniesBillingOverview'),gas('getSubscriptionPlans')]).then(function(res){
     var ov=res[0], pl=res[1]; var tb=document.getElementById('compPlanTbody'); if(!tb) return;
-    if(!ov||!ov.ok){ tb.innerHTML='<tr><td colspan="2" style="text-align:center;color:var(--err);padding:20px;">Nem elérhető.</td></tr>'; return; }
+    if(!ov||!ov.ok){ tb.innerHTML='<tr><td colspan="2" style="text-align:center;color:var(--err);padding:20px;">'+T('dev.notAvail')+'</td></tr>'; return; }
     var plans=(pl&&pl.plans)||[];
     tb.innerHTML=(ov.companies||[]).map(function(c){
-      var opts='<option value="">— Nincs —</option>'+plans.map(function(p){return '<option value="'+p.id+'"'+(c.subscription_plan_id===p.id?' selected':'')+'>'+escHtml(p.name)+'</option>';}).join('');
+      var opts='<option value="">'+T('dev.planNone')+'</option>'+plans.map(function(p){return '<option value="'+p.id+'"'+(c.subscription_plan_id===p.id?' selected':'')+'>'+escHtml(p.name)+'</option>';}).join('');
       return '<tr><td><b style="color:#fff;">'+escHtml(c.nev)+'</b></td>'
         +'<td><select class="select" style="max-width:200px;" onchange="setCompPlan('+c.id+',this.value)">'+opts+'</select></td></tr>';
     }).join('');

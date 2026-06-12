@@ -562,41 +562,41 @@
           <h2 class="h-title" style="margin-top:0;" data-i18n="pane.profile">👤 Profil adatok</h2>
           <div class="grid-2">
             <div class="field">
-              <label>Teljes név</label>
-              <input class="input" id="stNume" placeholder="Teljes név">
+              <label data-i18n="mh.fullName">Teljes név</label>
+              <input class="input" id="stNume" placeholder="Teljes név" data-i18n-ph="mh.fullName">
             </div>
             <div class="field">
-              <label>E-mail cím (nem módosítható)</label>
+              <label data-i18n="mh.emailReadonly">E-mail cím (nem módosítható)</label>
               <input class="input" id="stEmail" disabled style="opacity:0.5;">
             </div>
             <div class="field">
-              <label>Telefonszám</label>
-              <input class="input" id="stTel" placeholder="+40 ...">
+              <label data-i18n="mh.phoneNumber">Telefonszám</label>
+              <input class="input" id="stTel" placeholder="+40 ..." data-i18n-ph="mh.phPhone">
             </div>
             <div class="field">
-              <label>Pozíció</label>
+              <label data-i18n="mh.colPosition">Pozíció</label>
               <input class="input" id="stPozicio" disabled style="opacity:0.5;">
             </div>
           </div>
-          <button class="btn primary" style="margin-top:14px;" onclick="settingsSaveProfile()">💾 Profil mentése</button>
+          <button class="btn primary" style="margin-top:14px;" onclick="settingsSaveProfile()" data-i18n="mh.saveProfile">💾 Profil mentése</button>
         </div>
 
          <!-- JELSZÓ MÓDOSÍTÁS -->
         <div class="glass" style="padding:24px;">
           <h2 class="h-title" style="margin-top:0;" data-i18n="pane.changePw">🔑 Jelszó módosítása</h2>
           <div class="field">
-            <label>Jelenlegi jelszó</label>
+            <label data-i18n="mh.currentPw">Jelenlegi jelszó</label>
             <input class="input" type="password" id="stPwdCurrent" placeholder="••••••••" autocomplete="current-password">
           </div>
           <div class="field">
-            <label>Új jelszó</label>
-            <input class="input" type="password" id="stPwdNew" placeholder="Legalább 6 karakter" autocomplete="new-password">
+            <label data-i18n="mh.newPw">Új jelszó</label>
+            <input class="input" type="password" id="stPwdNew" placeholder="Legalább 6 karakter" data-i18n-ph="mh.phMin6" autocomplete="new-password">
           </div>
           <div class="field">
-            <label>Új jelszó megerősítése</label>
+            <label data-i18n="mh.confirmNewPw">Új jelszó megerősítése</label>
             <input class="input" type="password" id="stPwdNew2" placeholder="••••••••" autocomplete="new-password">
           </div>
-          <button class="btn primary" style="margin-top:6px;" onclick="settingsChangePassword()">🔒 Jelszó módosítása</button>
+          <button class="btn primary" style="margin-top:6px;" onclick="settingsChangePassword()" data-i18n="mh.changePwBtn">🔒 Jelszó módosítása</button>
         </div>
 
          <!-- BIZTONSÁG (2FA) -->
@@ -611,35 +611,35 @@
           </div>
           <div id="st2faDisableWrap" style="display:none;">
             <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); border-radius:var(--r-sm); padding:12px 14px; margin-bottom:12px;">
-              <div style="font-size:12px;color:var(--warn);">⚠️ A 2FA kikapcsolása csökkenti a fiókod biztonságát. Csak akkor tedd, ha indokolt.</div>
+              <div style="font-size:12px;color:var(--warn);" data-i18n="mh.2faDisableWarn">⚠️ A 2FA kikapcsolása csökkenti a fiókod biztonságát. Csak akkor tedd, ha indokolt.</div>
             </div>
             <div class="field">
-              <label>Jelenlegi jelszó a megerősítéshez</label>
+              <label data-i18n="mh.currentPwConfirm">Jelenlegi jelszó a megerősítéshez</label>
               <input class="input" type="password" id="st2faDisablePwd" placeholder="••••••••">
             </div>
-            <button class="btn danger" onclick="settings2faDisable()">🔓 2FA kikapcsolása</button>
+            <button class="btn danger" onclick="settings2faDisable()" data-i18n="mh.disable2fa">🔓 2FA kikapcsolása</button>
           </div>
 
           <div id="st2faEnableWrap" style="display:none;">
-            <p style="color:var(--muted);font-size:13px;margin:0 0 14px;">A 2FA bekapcsolásával minden belépésnél kódbevitel szükséges (Google Authenticator vagy hasonló app).</p>
-            <button class="btn primary" type="button" id="btn2faStart" onclick="settings2faStart()">🔐 2FA bekapcsolása</button>
+            <p style="color:var(--muted);font-size:13px;margin:0 0 14px;" data-i18n="mh.2faEnableHint">A 2FA bekapcsolásával minden belépésnél kódbevitel szükséges (Google Authenticator vagy hasonló app).</p>
+            <button class="btn primary" type="button" id="btn2faStart" onclick="settings2faStart()" data-i18n="mh.enable2fa">🔐 2FA bekapcsolása</button>
           </div>
 
           <!-- 2FA setup modal (settings-ből) -->
           <div class="modal-back" id="modal2faSetup">
             <div class="modal glass" style="width:min(420px,100%);text-align:center;">
-              <h3 style="margin-top:0;">🔐 2FA bekapcsolása</h3>
-              <p style="color:var(--muted);font-size:13px;">Olvasd be a QR kódot Google Authenticator vagy Authy appban, majd add meg az első kódot a megerősítéshez.</p>
+              <h3 style="margin-top:0;" data-i18n="mh.enable2fa">🔐 2FA bekapcsolása</h3>
+              <p style="color:var(--muted);font-size:13px;" data-i18n="mh.2faQrHint">Olvasd be a QR kódot Google Authenticator vagy Authy appban, majd add meg az első kódot a megerősítéshez.</p>
               <div id="setup2faQrWrap" style="margin:16px 0;">
                 <div class="spinner" style="margin:0 auto;"></div>
               </div>
               <div class="field" style="text-align:left;">
-                <label>Megerősítő kód (6 jegy)</label>
+                <label data-i18n="mh.confirmCode">Megerősítő kód (6 jegy)</label>
                 <input class="input" type="tel" id="setup2faCode" maxlength="6" placeholder="000000" style="font-size:22px;letter-spacing:6px;text-align:center;">
               </div>
               <div style="display:flex;gap:10px;margin-top:14px;">
-                <button class="btn ghost col" type="button" onclick="close2faSetupModal()">Mégse</button>
-                <button class="btn primary col" type="button" id="btn2faConfirm" onclick="settings2faConfirm()">✅ Megerősítés</button>
+                <button class="btn ghost col" type="button" onclick="close2faSetupModal()" data-i18n="common.cancel">Mégse</button>
+                <button class="btn primary col" type="button" id="btn2faConfirm" onclick="settings2faConfirm()" data-i18n="mh.confirm">✅ Megerősítés</button>
               </div>
             </div>
           </div>
@@ -653,121 +653,121 @@
 
 <div class="modal-back" id="userModal">
   <div class="modal glass">
-    <h3>Adatok szerkesztése</h3>
-    <div class="field"><label>Név</label><input class="input" id="uNume"></div>
-    <div class="field"><label>E-mail</label><input class="input" id="uEmail" disabled></div>
+    <h3 data-i18n="mh.editData">Adatok szerkesztése</h3>
+    <div class="field"><label data-i18n="mh.colName">Név</label><input class="input" id="uNume"></div>
+    <div class="field"><label data-i18n="mh.colEmail">E-mail</label><input class="input" id="uEmail" disabled></div>
     <div class="field"><label data-i18n="form.phone">Telefon</label><input class="input" id="uTel"></div>
-    <div class="field"><label>Pozíció</label><select class="select" id="uPoz"><option>Admin</option><option>Manager</option><option>Sofer</option></select></div>
-    <div class="field"><label>Új jelszó</label><input class="input" id="uPwd" type="password" placeholder="Hagyja üresen, ha nem változik"></div>
-    <div class="row" style="margin-top:14px; display:flex; gap:10px;"><button class="btn ghost col" onclick="closeModal()">Mégse</button><button class="btn primary col" onclick="saveUser()">Mentés</button></div>
+    <div class="field"><label data-i18n="mh.colPosition">Pozíció</label><select class="select" id="uPoz"><option>Admin</option><option>Manager</option><option>Sofer</option></select></div>
+    <div class="field"><label data-i18n="mh.newPw">Új jelszó</label><input class="input" id="uPwd" type="password" placeholder="Hagyja üresen, ha nem változik" data-i18n-ph="mh.phLeaveEmpty"></div>
+    <div class="row" style="margin-top:14px; display:flex; gap:10px;"><button class="btn ghost col" onclick="closeModal()" data-i18n="common.cancel">Mégse</button><button class="btn primary col" onclick="saveUser()" data-i18n="mh.save2">Mentés</button></div>
   </div>
 </div>
 
 <div class="modal-back" id="vehicleModal">
   <div class="modal glass">
-    <h3>Jármű szerkesztése</h3>
+    <h3 data-i18n="mh.editVehicle">Jármű szerkesztése</h3>
     <input type="hidden" id="vehEditId">
     <input type="hidden" id="vehEditTip">
-    <div class="field"><label>Rendszám</label><input class="input" id="vehEditRendszam"></div>
-    <div class="field"><label>Márka</label><input class="input" id="vehEditMarca"></div>
-    <div class="field"><label>Model</label><input class="input" id="vehEditModel"></div>
-    <div class="field"><label>Év</label><input class="input" id="vehEditAn" type="number"></div>
-    <div class="field"><label>Megjegyzés</label><input class="input" id="vehEditNota"></div>
+    <div class="field"><label data-i18n="mh.plate">Rendszám</label><input class="input" id="vehEditRendszam"></div>
+    <div class="field"><label data-i18n="mh.brand">Márka</label><input class="input" id="vehEditMarca"></div>
+    <div class="field"><label data-i18n="mh.model">Model</label><input class="input" id="vehEditModel"></div>
+    <div class="field"><label data-i18n="mh.year">Év</label><input class="input" id="vehEditAn" type="number"></div>
+    <div class="field"><label data-i18n="mh.note">Megjegyzés</label><input class="input" id="vehEditNota"></div>
 
      <!-- Teherjármű paraméterek (útvonaltervezés) — alapból nyitva -->
     <details class="veh-params" style="margin-top:8px;" open>
-      <summary>🚚 Teherjármű paraméterek (útvonaltervezés)</summary>
+      <summary data-i18n="mh.truckParams">🚚 Teherjármű paraméterek (útvonaltervezés)</summary>
       <div style="margin-top:12px;">
-        <div class="text-muted" style="font-size:12px;margin-bottom:8px;font-weight:600;">Fizikai méretek</div>
+        <div class="text-muted" style="font-size:12px;margin-bottom:8px;font-weight:600;" data-i18n="mh.physicalDims">Fizikai méretek</div>
         <div class="grid-3">
-          <div class="field"><label>Magasság (cm)</label><input class="input" id="vehEditHeight" type="number" placeholder="pl. 390"></div>
-          <div class="field"><label>Szélesség (cm)</label><input class="input" id="vehEditWidth" type="number" placeholder="pl. 255"></div>
-          <div class="field"><label>Hossz (cm)</label><input class="input" id="vehEditLength" type="number" placeholder="pl. 1350"></div>
+          <div class="field"><label data-i18n="mh.heightCm">Magasság (cm)</label><input class="input" id="vehEditHeight" type="number" placeholder="pl. 390" data-i18n-ph="mh.phEg390"></div>
+          <div class="field"><label data-i18n="mh.widthCm">Szélesség (cm)</label><input class="input" id="vehEditWidth" type="number" placeholder="pl. 255" data-i18n-ph="mh.phEg255"></div>
+          <div class="field"><label data-i18n="mh.lengthCm">Hossz (cm)</label><input class="input" id="vehEditLength" type="number" placeholder="pl. 1350" data-i18n-ph="mh.phEg1350"></div>
         </div>
-        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;">Tömeg adatok</div>
+        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;" data-i18n="mh.weightData">Tömeg adatok</div>
         <div class="grid-2">
-          <div class="field"><label>Teljes tömeg (kg, rakománnyal)</label><input class="input" id="vehEditWeight" type="number" placeholder="pl. 40000"></div>
-          <div class="field"><label>Tengelyterhelés (kg)</label><input class="input" id="vehEditAxleWeight" type="number" placeholder="pl. 11500"></div>
+          <div class="field"><label data-i18n="mh.totalWeight">Teljes tömeg (kg, rakománnyal)</label><input class="input" id="vehEditWeight" type="number" placeholder="pl. 40000" data-i18n-ph="mh.phEg40000"></div>
+          <div class="field"><label data-i18n="mh.axleWeight">Tengelyterhelés (kg)</label><input class="input" id="vehEditAxleWeight" type="number" placeholder="pl. 11500" data-i18n-ph="mh.phEg11500"></div>
         </div>
-        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;">Konfiguráció</div>
+        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;" data-i18n="mh.configuration">Konfiguráció</div>
         <div class="grid-3">
-          <div class="field"><label>Tengelyek száma</label><input class="input" id="vehEditAxleCount" type="number" min="2" max="10" value="2"></div>
-          <div class="field"><label>Pótkocsi</label><input class="input" id="vehEditTrailerCount" type="number" min="0" max="3" value="0"></div>
-          <div class="field"><label>Jármű típus</label>
+          <div class="field"><label data-i18n="mh.axleCount">Tengelyek száma</label><input class="input" id="vehEditAxleCount" type="number" min="2" max="10" value="2"></div>
+          <div class="field"><label data-i18n="mh.trailer">Pótkocsi</label><input class="input" id="vehEditTrailerCount" type="number" min="0" max="3" value="0"></div>
+          <div class="field"><label data-i18n="mh.vehicleType">Jármű típus</label>
             <select class="select" id="vehEditTruckType">
-              <option value="straight">Merevtengelyes teherautó</option>
-              <option value="tractor">Nyerges vontató</option>
-              <option value="lightTruck">Könnyű teherjármű</option>
+              <option value="straight" data-i18n="mh.truckStraight">Merevtengelyes teherautó</option>
+              <option value="tractor" data-i18n="mh.truckTractor">Nyerges vontató</option>
+              <option value="lightTruck" data-i18n="mh.truckLight">Könnyű teherjármű</option>
             </select>
           </div>
         </div>
-        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;">Speciális</div>
+        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;" data-i18n="mh.special">Speciális</div>
         <div class="grid-2">
-          <div class="field"><label>Alagút kategória</label>
+          <div class="field"><label data-i18n="mh.tunnelCat">Alagút kategória</label>
             <select class="select" id="vehEditTunnel">
-              <option value="">Nincs korlátozás</option>
-              <option value="B">B kategória</option>
-              <option value="C">C kategória</option>
-              <option value="D">D kategória</option>
-              <option value="E">E kategória (legszigorúbb)</option>
+              <option value="" data-i18n="mh.noRestriction">Nincs korlátozás</option>
+              <option value="B" data-i18n="mh.catB">B kategória</option>
+              <option value="C" data-i18n="mh.catC">C kategória</option>
+              <option value="D" data-i18n="mh.catD">D kategória</option>
+              <option value="E" data-i18n="mh.catE">E kategória (legszigorúbb)</option>
             </select>
           </div>
-          <div class="field"><label>Veszélyes áru</label>
+          <div class="field"><label data-i18n="mh.hazmat">Veszélyes áru</label>
             <select class="select" id="vehEditHazmat">
-              <option value="">Nincs</option>
-              <option value="explosive">Robbanóanyag</option>
-              <option value="gas">Gáz</option>
-              <option value="flammable">Gyúlékony</option>
-              <option value="combustible">Égőanyag</option>
-              <option value="organic">Szerves anyag</option>
-              <option value="poison">Méreg</option>
-              <option value="harmfulToWater">Vízszennyező</option>
+              <option value="" data-i18n="mh.hazNone">Nincs</option>
+              <option value="explosive" data-i18n="mh.hazExplosive">Robbanóanyag</option>
+              <option value="gas" data-i18n="mh.hazGas">Gáz</option>
+              <option value="flammable" data-i18n="mh.hazFlammable">Gyúlékony</option>
+              <option value="combustible" data-i18n="mh.hazCombustible">Égőanyag</option>
+              <option value="organic" data-i18n="mh.hazOrganic">Szerves anyag</option>
+              <option value="poison" data-i18n="mh.hazPoison">Méreg</option>
+              <option value="harmfulToWater" data-i18n="mh.hazWater">Vízszennyező</option>
             </select>
           </div>
         </div>
-        <div class="field" style="margin-top:8px;"><label>Fogyasztás (L/100km)</label><input class="input" id="vehEditFuel" type="number" step="0.1" placeholder="pl. 28.5"></div>
+        <div class="field" style="margin-top:8px;"><label data-i18n="mh.fuelConsumption">Fogyasztás (L/100km)</label><input class="input" id="vehEditFuel" type="number" step="0.1" placeholder="pl. 28.5" data-i18n-ph="mh.phEg285"></div>
       </div>
     </details>
 
     <!-- Rakodási felület — csak pótkocsinál látszik (editVehicle kapcsolja) -->
     <div id="vehTrailerCargoWrap" style="display:none;margin-top:10px;">
-      <div class="text-muted" style="font-size:12px;font-weight:600;margin-bottom:8px;">📦 Rakodási felület (nem a teljes méret!)</div>
+      <div class="text-muted" style="font-size:12px;font-weight:600;margin-bottom:8px;" data-i18n="mh.cargoSurface">📦 Rakodási felület (nem a teljes méret!)</div>
       <div class="grid-2">
-        <div class="field"><label>Típus</label>
+        <div class="field"><label data-i18n="mh.kind">Típus</label>
           <select class="select" id="vehEditTrailerKind" onchange="vehEditKindChange()">
-            <option value="standard">Standard (260 cm)</option>
-            <option value="mega">Mega (305 cm)</option>
+            <option value="standard" data-i18n="mh.standard260">Standard (260 cm)</option>
+            <option value="mega" data-i18n="mh.mega305">Mega (305 cm)</option>
           </select>
         </div>
-        <div class="field"><label>Hossz (cm)</label><input class="input" id="vehEditCargoLen" type="number" placeholder="1360"></div>
+        <div class="field"><label data-i18n="mh.lengthCm">Hossz (cm)</label><input class="input" id="vehEditCargoLen" type="number" placeholder="1360"></div>
       </div>
       <div class="grid-2">
-        <div class="field"><label>Szélesség (cm)</label><input class="input" id="vehEditCargoWid" type="number" placeholder="248"></div>
-        <div class="field"><label>Magasság (cm)</label><input class="input" id="vehEditCargoHei" type="number" placeholder="260 / mega: 305"></div>
+        <div class="field"><label data-i18n="mh.widthCm">Szélesség (cm)</label><input class="input" id="vehEditCargoWid" type="number" placeholder="248"></div>
+        <div class="field"><label data-i18n="mh.heightCm">Magasság (cm)</label><input class="input" id="vehEditCargoHei" type="number" placeholder="260 / mega: 305"></div>
       </div>
     </div>
 
     <div class="row" style="margin-top:14px; display:flex; gap:10px;">
-      <button class="btn ghost col" onclick="closeVehicleModal()">Mégse</button>
-      <button class="btn primary col" onclick="saveVehicle()">Mentés</button>
+      <button class="btn ghost col" onclick="closeVehicleModal()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn primary col" onclick="saveVehicle()" data-i18n="mh.save2">Mentés</button>
     </div>
   </div>
 </div>
 
 <div class="modal-back" id="extDriverModal">
   <div class="modal glass">
-    <h3>Külső sofőr szerkesztése</h3>
+    <h3 data-i18n="mh.editExtDriver">Külső sofőr szerkesztése</h3>
     <input type="hidden" id="edEditId">
     <div class="field"><label data-i18n="form.driverName">Sofőr neve</label><input class="input" id="edEditNume"></div>
     <div class="field"><label data-i18n="form.companyName">Cég neve</label><input class="input" id="edEditFirma"></div>
     <div class="field"><label data-i18n="form.phone">Telefon</label><input class="input" id="edEditTelefon"></div>
-    <div class="field"><label>E-mail</label><input class="input" id="edEditEmail" type="email"></div>
-    <div class="field"><label>Vontató rendszám</label><input class="input" id="edEditCamion"></div>
-    <div class="field"><label>Pótkocsi rendszám</label><input class="input" id="edEditRemorca"></div>
-    <div class="field"><label>Megjegyzés</label><input class="input" id="edEditNota"></div>
+    <div class="field"><label data-i18n="mh.colEmail">E-mail</label><input class="input" id="edEditEmail" type="email"></div>
+    <div class="field"><label data-i18n="mh.tractorPlate">Vontató rendszám</label><input class="input" id="edEditCamion"></div>
+    <div class="field"><label data-i18n="mh.trailerPlate">Pótkocsi rendszám</label><input class="input" id="edEditRemorca"></div>
+    <div class="field"><label data-i18n="mh.note">Megjegyzés</label><input class="input" id="edEditNota"></div>
     <div class="row" style="margin-top:14px; display:flex; gap:10px;">
-      <button class="btn ghost col" onclick="closeExtDriverModal()">Mégse</button>
-      <button class="btn primary col" onclick="saveExtDriver()">Mentés</button>
+      <button class="btn ghost col" onclick="closeExtDriverModal()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn primary col" onclick="saveExtDriver()" data-i18n="mh.save2">Mentés</button>
     </div>
   </div>
 </div>
@@ -776,14 +776,14 @@
   <div class="modal glass">
     <h3 id="quickVehicleTitle">Új jármű hozzáadása</h3>
     <input type="hidden" id="qvTip">
-    <div class="field"><label>Rendszám *</label><input class="input" id="qvRendszam" placeholder="BV-12-XYZ"></div>
-    <div class="field"><label>Márka</label><input class="input" id="qvMarca" placeholder="Volvo"></div>
-    <div class="field"><label>Model</label><input class="input" id="qvModel" placeholder="FH16"></div>
-    <div class="field"><label>Év</label><input class="input" id="qvAn" type="number" placeholder="2022"></div>
-    <div class="field"><label>Megjegyzés</label><input class="input" id="qvNota"></div>
+    <div class="field"><label data-i18n="mh.plateReq">Rendszám *</label><input class="input" id="qvRendszam" placeholder="BV-12-XYZ"></div>
+    <div class="field"><label data-i18n="mh.brand">Márka</label><input class="input" id="qvMarca" placeholder="Volvo"></div>
+    <div class="field"><label data-i18n="mh.model">Model</label><input class="input" id="qvModel" placeholder="FH16"></div>
+    <div class="field"><label data-i18n="mh.year">Év</label><input class="input" id="qvAn" type="number" placeholder="2022"></div>
+    <div class="field"><label data-i18n="mh.note">Megjegyzés</label><input class="input" id="qvNota"></div>
     <div class="row" style="margin-top:14px; display:flex; gap:10px;">
-      <button class="btn ghost col" onclick="closeQuickVehicle()">Mégse</button>
-      <button class="btn primary col" onclick="saveQuickVehicle()">Hozzáadás</button>
+      <button class="btn ghost col" onclick="closeQuickVehicle()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn primary col" onclick="saveQuickVehicle()" data-i18n="mh.add">Hozzáadás</button>
     </div>
   </div>
 </div>
