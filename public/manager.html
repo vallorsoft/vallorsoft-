@@ -290,7 +290,7 @@
     <div class="pane hidden" data-pane="received-fuv">
       <!-- Dokumentum széria konfigurátor -->
       <div class="glass" style="padding:22px;margin-bottom:16px;">
-        <h2 class="h-title" style="margin-top:0;">📋 Dokumentum szériák</h2>
+        <h2 class="h-title" style="margin-top:0;" data-i18n="pane.docSeries">📋 Dokumentum szériák</h2>
         <p style="color:var(--muted);font-size:13px;margin:0 0 14px;">Sorszám: [Prefix]-[Év]-[0001]. Új prefix esetén a számozás 1-ről indul.</p>
         <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
           <div class="field" style="flex:1;min-width:140px;margin:0;">
@@ -306,7 +306,7 @@
         <div style="margin-top:10px;font-size:12px;color:var(--muted);" id="docSeriesPreview">Előnézet: MT-2025-0001</div>
       </div>
       <div class="glass" style="padding:22px">
-        <h2 class="h-title">Fuvarlevelek</h2>
+        <h2 class="h-title" data-i18n="nav.waybills">Fuvarlevelek</h2>
         <table class="table" id="tblReceivedFuv">
           <thead><tr><th>Sorszám</th><th>Fájlnév</th><th>Sofőr</th><th>Beküldés ideje</th><th>Művelet</th></tr></thead>
           <tbody></tbody>
@@ -317,7 +317,7 @@
     <div class="pane hidden" data-pane="driver-docs-pane">
       <div class="glass" style="padding:22px">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
-          <h2 class="h-title" style="margin:0;">📷 Feltöltött iratok és CMR-ek</h2>
+          <h2 class="h-title" style="margin:0;" data-i18n="pane.docs">📷 Feltöltött iratok és CMR-ek</h2>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <select class="select" id="docFilterSofer" style="max-width:180px;padding:8px 10px;font-size:13px;" onchange="renderDocGroups()">
               <option value="">Összes sofőr</option>
@@ -350,7 +350,7 @@
 
     <div class="pane hidden" data-pane="invites">
       <div class="glass" style="padding:22px">
-        <h2 class="h-title">Meghívókódok generálása</h2>
+        <h2 class="h-title" data-i18n="pane.invites">Meghívókódok generálása</h2>
         <div class="row" style="margin-bottom:16px; display:flex; gap:10px;">
           <select class="select" id="invPoz" style="max-width:200px"><option>Sofer</option></select>
           <input class="input" id="invEmail" placeholder="Kötés e-mailhez (opcionális)">
@@ -365,7 +365,7 @@
 
     <div class="pane hidden" data-pane="internal-drivers">
       <div class="glass" style="padding:22px;">
-        <h2 class="h-title">Belső sofőrök</h2>
+        <h2 class="h-title" data-i18n="nav.internalDrivers">Belső sofőrök</h2>
         <div class="h-sub" style="margin-bottom:18px;">Sofőr pozíciójú regisztrált felhasználók</div>
         <table class="table" id="tblInternalDrivers">
           <thead><tr><th>Név</th><th>E-mail</th><th>Telefon</th><th>Műveletek</th></tr></thead>
@@ -376,7 +376,7 @@
 
     <div class="pane hidden" data-pane="external-drivers">
       <div class="glass" style="padding:22px;">
-        <h2 class="h-title">Külső sofőrök</h2>
+        <h2 class="h-title" data-i18n="nav.externalDrivers">Külső sofőrök</h2>
         <div class="h-sub">Cégen kívüli sofőrök és cégek címjegyzéke</div>
       </div>
       <div class="glass" style="padding:22px; margin-top:16px;">
@@ -402,7 +402,7 @@
 
     <div class="pane hidden" data-pane="vehicles">
       <div class="glass" style="padding:22px;">
-        <h2 class="h-title">Járművek kezelése</h2>
+        <h2 class="h-title" data-i18n="pane.vehicles">Járművek kezelése</h2>
         <div class="h-sub">Vontatók és pótkocsik nyilvántartása</div>
       </div>
       <div class="glass" style="padding:22px; margin-top:16px;">
@@ -559,7 +559,7 @@
 
          <!-- PROFIL -->
         <div class="glass" style="padding:24px;">
-          <h2 class="h-title" style="margin-top:0;">👤 Profil adatok</h2>
+          <h2 class="h-title" style="margin-top:0;" data-i18n="pane.profile">👤 Profil adatok</h2>
           <div class="grid-2">
             <div class="field">
               <label>Teljes név</label>
@@ -583,7 +583,7 @@
 
          <!-- JELSZÓ MÓDOSÍTÁS -->
         <div class="glass" style="padding:24px;">
-          <h2 class="h-title" style="margin-top:0;">🔑 Jelszó módosítása</h2>
+          <h2 class="h-title" style="margin-top:0;" data-i18n="pane.changePw">🔑 Jelszó módosítása</h2>
           <div class="field">
             <label>Jelenlegi jelszó</label>
             <input class="input" type="password" id="stPwdCurrent" placeholder="••••••••" autocomplete="current-password">
@@ -601,7 +601,7 @@
 
          <!-- BIZTONSÁG (2FA) -->
         <div class="glass" style="padding:24px;">
-          <h2 class="h-title" style="margin-top:0;">🛡️ Kétlépéses hitelesítés (2FA)</h2>
+          <h2 class="h-title" style="margin-top:0;" data-i18n="pane.2fa">🛡️ Kétlépéses hitelesítés (2FA)</h2>
           <div id="st2faStatus" style="display:flex; align-items:center; gap:12px; margin-bottom:16px; padding:12px 14px; background:rgba(255,255,255,0.04); border-radius:var(--r-sm); border:1px solid var(--border);">
             <div id="st2faDot" style="width:10px;height:10px;border-radius:50%;background:var(--muted);flex-shrink:0;"></div>
             <div>

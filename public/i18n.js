@@ -158,6 +158,19 @@
     'edit.addLeg': { hu: '+ Váltás hozzáadása', ro: '+ Adaugă schimbare' },
     'edit.save': { hu: '💾 Mentés', ro: '💾 Salvează' },
 
+    // ── Pane-címek (admin/manager fülek) ──
+    'pane.vehicles': { hu: 'Járművek kezelése', ro: 'Gestionare vehicule' },
+    'pane.invites': { hu: 'Meghívókódok generálása', ro: 'Generare coduri de invitație' },
+    'pane.profile': { hu: '👤 Profil adatok', ro: '👤 Date profil' },
+    'pane.docSeries': { hu: '📋 Dokumentum szériák', ro: '📋 Serii documente' },
+    'pane.docs': { hu: '📷 Feltöltött iratok és CMR-ek', ro: '📷 Documente încărcate și CMR-uri' },
+    'pane.integrations': { hu: '🔌 Integrációk', ro: '🔌 Integrări' },
+    'pane.changePw': { hu: '🔑 Jelszó módosítása', ro: '🔑 Schimbare parolă' },
+    'pane.2fa': { hu: '🛡️ Kétlépéses hitelesítés (2FA)', ro: '🛡️ Autentificare în doi pași (2FA)' },
+    'pane.staff': { hu: 'Munkatársak kezelése', ro: 'Gestionare angajați' },
+    'pane.clients': { hu: 'Ügyfelek', ro: 'Clienți' },
+    'pane.settings': { hu: 'Beállítások', ro: 'Setări' },
+
     // ── Login ──
     'login.subtitle': { hu: 'Fuvarmenedzsment Rendszer', ro: 'Sistem de management transport' },
     'login.email': { hu: 'E-mail cím', ro: 'Adresă de e-mail' },
