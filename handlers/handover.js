@@ -14,10 +14,18 @@
 // ============================================================
 const pool = require('../db');
 const { sendPushToRole, sendPushToEmail } = require('../services/push');
+const { createSlidingWindowLimiter } = require('../lib/slidingWindow');
 
 const handlers = {};
 
 const QTY_UNITS = ['paletta', 'doboz', 'egyeb'];
+
+// ─── Sofőr-oldali leadás-kérés rate-limit ────────────────────
+// A sofőr ne tudja push-spammelni az adminokat (véletlen dupla koppintás
+// vagy rosszhiszemű ismétlés). Csúszóablak: max 5 kérés / 10 perc,
+// driver-emailenként. A confirm/reject szerveroldali, ez csak a sofőr-
+// kezdeményezést korlátozza.
+const _handoverLimiter = createSlidingWindowLimiter({ windowMs: 10 * 60 * 1000, max: 5 });
 
 function _posInt(x) {
   const n = parseInt(x, 10);
@@ -158,6 +166,13 @@ handlers.driverHandoverRequest = async function (req, res, args) {
     const location = _str(d.location, 200);
     if (!type) return res.json({ result: { ok: false, err: 'Add meg, mi történik az áruval.' } });
     if (!location) return res.json({ result: { ok: false, err: 'A leadás helye (helység) kötelező.' } });
+
+    // Rate-limit: a sofőr ne tudja push-spammelni az adminokat
+    const rl = _handoverLimiter.check(String(me.email || '').toLowerCase());
+    if (!rl.ok) {
+      const perc = Math.ceil(rl.retryAfterSec / 60);
+      return res.json({ result: { ok: false, err: 'Túl sok leadás-kérés rövid időn belül. Próbáld újra kb. ' + perc + ' perc múlva, vagy hívd a diszpécsert.' } });
+    }
 
     // Csak az ismert mezőket tároljuk (a kliens tetszőleges payloadot küldhetne)
     const payload = {

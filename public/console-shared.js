@@ -210,6 +210,7 @@ function createOrder(){
     ref:document.getElementById('oRef').value.trim(),
     pret:document.getElementById('oPret').value,
     km:document.getElementById('oKm').value,
+    suly_kg:(document.getElementById('oSuly')||{}).value||null,
     loc_incarcare:document.getElementById('oLoad').value.trim(),
     loc_descarcare:document.getElementById('oUnload').value.trim(),
     data_incarcare:document.getElementById('oLoadDate').value||null,
@@ -226,9 +227,10 @@ function createOrder(){
       let extra='';
       if(r.paired_driver)extra=' · 👤 párosított sofőr: '+r.paired_driver;
       else if(r.paired_vehicle)extra=' · 🚛 párosított jármű: '+r.paired_vehicle;
+      if(r.paired_trailer)extra+=' · 🚚 párosított pótkocsi: '+r.paired_trailer;
       toast('Fuvar mentve! ID: '+r.id+extra,'ok');
       loadOrders();
-      ['oClient','oRef','oPret','oKm','oLoad','oUnload','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+      ['oClient','oRef','oPret','oKm','oSuly','oLoad','oUnload','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
       document.querySelectorAll('input[name="oSoferType"]').forEach(r=>{if(r.value==='None')r.checked=true;});
       onSoferTypeChange('None');
     }else{toast((r&&r.err)||'Hiba történt','err');}
@@ -469,6 +471,7 @@ function loadInternalDrivers(){
     if(!r || !r.ok){ tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Betöltési hiba.</td></tr>'; return; }
     var list = r.drivers||[];
     var vehicles = r.vehicles||[];
+    var trailers = r.trailers||[];
     if(!list.length){
       tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Nincs regisztrált belső sofőr.</td></tr>';
       return;
@@ -494,6 +497,19 @@ function loadInternalDrivers(){
             ? ' <span class="badge ok" title="A jármű GPS-re van kötve (CargoTrack)">🛰️ GPS</span>'
             : ' <span class="badge warn" title="A jármű nincs GPS-re kötve — párosítsd az Integrációk fülön">GPS nélkül</span>')
         : '';
+      // Alapértelmezett pótkocsi a hozzárendelt vontatóhoz (auto-párosítás
+      // fuvar-kiíráskor) — csak ha a sofőrnek van vontatója.
+      var trailerSel = '';
+      if(myVeh){
+        var topts = '<option value="">— Nincs alapért. pótkocsi —</option>' + trailers.map(function(t){
+          var lbl = t.rendszam + (t.marca ? ' — ' + t.marca : '');
+          return '<option value="'+t.id+'"'+(String(myVeh.default_trailer_id)===String(t.id)?' selected':'')+'>'+esc(lbl)+'</option>';
+        }).join('');
+        trailerSel = '<div style="margin-top:5px;">'
+          +'<select class="select" style="max-width:230px;padding:6px 8px;font-size:12px;display:inline-block;" '
+          +'title="🚚 Alapértelmezett pótkocsi — fuvar-kiíráskor automatikusan kitöltődik (módosítható)" '
+          +'onchange="assignDefaultTrailerUi('+myVeh.id+', this.value)">'+topts+'</select></div>';
+      }
       return '<tr>'
         +'<td>'+esc(d.nume)+'</td>'
         +'<td>'+esc(d.email)+'</td>'
@@ -502,6 +518,7 @@ function loadInternalDrivers(){
         +'<select class="select" style="max-width:230px;padding:6px 8px;font-size:12.5px;display:inline-block;" '
         +'onchange="assignDriverVehicleUi(window._vsIntDrvCache['+i+'].email, this.value)">'+opts+'</select>'
         +gpsBadge
+        +trailerSel
         +'</td>'
         +'<td>'
         +'<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="editUser(window._vsIntDrvCache['+i+'])">Szerkeszt</button> '
@@ -516,6 +533,14 @@ function loadInternalDrivers(){
 function assignDriverVehicleUi(email, vehicleId){
   gas('assignDriverVehicle', [email, vehicleId || null]).then(function(r){
     if(r && r.ok){ toast(vehicleId ? '🚛 Jármű hozzárendelve' : 'Hozzárendelés törölve', 'ok'); loadInternalDrivers(); }
+    else { toast((r && r.err) || 'Hiba', 'err'); loadInternalDrivers(); }
+  });
+}
+
+// Alapértelmezett pótkocsi mentése a vontatóhoz (Belső sofőrök fül)
+function assignDefaultTrailerUi(vehicleId, trailerId){
+  gas('assignDefaultTrailer', [vehicleId, trailerId || null]).then(function(r){
+    if(r && r.ok){ toast(trailerId ? '🚚 Pótkocsi-pár mentve' : 'Pótkocsi-pár törölve', 'ok'); }
     else { toast((r && r.err) || 'Hiba', 'err'); loadInternalDrivers(); }
   });
 }
@@ -707,7 +732,16 @@ function onSoferTypeChange(type){document.getElementById('oInternBlock').style.d
 function orderFormPairFromVehicle(){
   const plate=document.getElementById('oCamionSelect').value;if(!plate)return;
   const v=camionCache.find(x=>x.rendszam===plate);
-  if(!v||!v.assigned_driver_email)return;
+  if(!v)return;
+  // pótkocsi auto-kitöltés a vontató alapértelmezett pótkocsijából (csak üres mezőbe)
+  const remSel=document.getElementById('oRemorcaSelect');
+  if(remSel&&!remSel.value&&v.default_trailer_id){
+    const t=remorcaCache.find(x=>String(x.id)===String(v.default_trailer_id));
+    if(t){const ropt=[...remSel.options].find(o=>o.value===t.rendszam);
+      if(ropt){remSel.value=t.rendszam;toast('🚚 Párosított pótkocsi kitöltve: '+t.rendszam+' (módosítható)','ok');}}
+  }
+  // sofőr auto-kitöltés a vontatóhoz rendelt belső sofőrből
+  if(!v.assigned_driver_email)return;
   const st=document.querySelector('input[name="oSoferType"]:checked');
   if(st&&st.value==='Extern')return;
   const drvSel=document.getElementById('oInternDriver');
@@ -2016,6 +2050,7 @@ function openOrderEdit(id) {
       document.getElementById('oeDataDesc').value = o.data_descarcare ? o.data_descarcare.split('T')[0] : '';
       document.getElementById('oePret').value = o.pret||0;
       document.getElementById('oeKm').value = o.km||0;
+      var oeSulyEl = document.getElementById('oeSuly'); if(oeSulyEl) oeSulyEl.value = (o.suly_kg==null?'':o.suly_kg);
       document.getElementById('oeStatus').value = o.status||'Disponibil';
       document.getElementById('oeSoferType').value = o.sofer_type||'';
 
@@ -2139,6 +2174,7 @@ function saveOrderEdit() {
     data_descarcare:  document.getElementById('oeDataDesc').value||null,
     pret:             document.getElementById('oePret').value,
     km:               document.getElementById('oeKm').value,
+    suly_kg:          (document.getElementById('oeSuly')||{}).value||null,
     status:           document.getElementById('oeStatus').value,
     sofer_type:       soferType||null,
     email_sofer:      soferType==='Intern' ? soferSel.value : null,

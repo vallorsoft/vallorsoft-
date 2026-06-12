@@ -86,5 +86,5 @@ Minden új fül/funkció a feature-katalógusban, a developer cégenként kapcso
 2. **e-Factura státusz automatikus (időzített) frissítése** — most a számla-modal 🔄 gombjával kézi; egy óránkénti scheduler-job rátehető, ha kell.
 3. **HERE prémium funkciók UI-ja** (valós idejű forgalom, időjárás, üzemanyagárak, megálló-optimalizáló) — a kapcsolók léteznek a katalógusban, de a HERE lecserélése után ezek inaktívak; ORS/más ingyenes forrásból részben pótolhatók, ha igény van rá.
 4. **Tervezőtábla finomságok** (későbbre): óránkénti felbontás, sofőr-szabadság/elérhetőség réteg, sáv bal-szélének húzása (felrakó-dátum), nyomtatható heti terv.
-5. **Visszfuvar-radar v2**: élő GPS-pozíció bevonása a párosításba (most az előző fuvar lerakója), OSRM-mel valós közúti km a légvonal helyett, radar push-értesítés új találatnál.
+5. **Visszfuvar-radar v2**: ✅ élő GPS-pozíció már bevonva (ha nincs/lezárult az utolsó fuvar — `lib/vehiclePositions.js`, közös cache a Vezérlőpulttal); ✅ részrakomány-súly ellenőrzés (`orders.suly_kg` + `⚖️ túlsúly` badge). HÁTRA: OSRM-mel valós közúti km a légvonal helyett, radar push-értesítés új találatnál, fuvar-szintű rak-dimenziók a pótkocsi `cargo_*_cm` rakfelülettel összevetve.
 6. **Demo-adatok törlő migrációja** — igény szerint, egy szavadba kerül.

@@ -478,13 +478,15 @@
     if (!_matches.length) { box.innerHTML = ''; return; }
     var rows = _matches.slice(0, 5).map(function (m) {
       var s = m.suggestions[0];
+      var origin = s.live ? esc(s.honnan)
+        : esc(s.honnan) + (s.atfedes ? ' körül' : ' lerakó után') + (s.szabad_tol ? ', szabad: ' + fmtD(s.szabad_tol) : '');
       return '<div class="rrow">'
         + '<span>💡 <b class="text-primary">' + esc(String(m.order_id).replace('CMD-', '#')) + '</b> '
         + '<span class="text-muted">(' + esc(m.loc_incarcare) + ' felrakó' + (m.data_incarcare ? ', ' + fmtD(m.data_incarcare) : '') + ')</span>'
         + ' ↔ <b class="text-primary">' + esc(s.rendszam) + '</b> '
-        + '<b style="color:var(--status-ok);">' + s.km + ' km</b><span class="text-muted"> üresjárattal (' + esc(s.honnan) + (s.atfedes ? ' körül' : ' lerakó után')
-        + (s.szabad_tol ? ', szabad: ' + fmtD(s.szabad_tol) : '') + ')</span>'
-        + (s.atfedes ? ' <span class="badge warn" title="A kamionnak átfedő fuvarja van ekkor — részrakományként még felférhet">⚠️ átfedéssel</span>' : '') + '</span>'
+        + '<b style="color:var(--status-ok);">' + s.km + ' km</b><span class="text-muted"> üresjárattal (' + origin + ')</span>'
+        + (s.atfedes ? ' <span class="badge warn" title="A kamionnak átfedő fuvarja van ekkor — részrakományként még felférhet">⚠️ átfedéssel</span>' : '')
+        + (s.weight_warn ? ' <span class="badge err" title="A részrakományok együttes súlya túllépi a pótkocsi rakható tömegét">⚖️ ' + Math.round(s.suly_kg/1000) + 't túlsúly</span>' : '') + '</span>'
         + '<button class="btn ok" style="margin-left:auto;padding:4px 12px;font-size:12px;" '
         + 'onclick="Planner.acceptMatch(\'' + esc(String(m.order_id)) + '\',\'' + esc(s.rendszam) + '\')">✓ Kioszt</button>'
         + '</div>';
@@ -518,7 +520,9 @@
       + (sugg.length ? '<div style="margin-bottom:10px;">' + sugg.map(function (s) {
           return '<div style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;">'
             + '<span>🎯 <b>' + esc(s.rendszam) + '</b> · <b style="color:var(--status-ok);">' + s.km + ' km</b> üresjárat'
-            + (s.atfedes ? ' <span class="badge warn" title="Átfedő fuvar — részrakományként még felférhet">⚠️</span>' : '') + '</span>'
+            + (s.live ? ' <span class="badge info" title="Élő GPS-pozícióból">📍</span>' : '')
+            + (s.atfedes ? ' <span class="badge warn" title="Átfedő fuvar — részrakományként még felférhet">⚠️</span>' : '')
+            + (s.weight_warn ? ' <span class="badge err" title="Részrakomány-túlsúly">⚖️</span>' : '') + '</span>'
             + '<button class="btn ok" style="margin-left:auto;padding:3px 10px;font-size:11px;" onclick="Planner.acceptMatch(\'' + esc(String(o.id)) + '\',\'' + esc(s.rendszam) + '\')">✓ Kioszt</button></div>';
         }).join('') + '</div>' : '')
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;">'
