@@ -330,6 +330,9 @@
   'cs.noSeqNumber':     { hu:'(nincs sorszám)', ro:'(fără număr de ordine)' },
   // ── Járművek ──
   'cs.noVehicle':       { hu:'Nincs még felvéve.', ro:'Niciun vehicul adăugat încă.' },
+  'cs.notSpecified':    { hu:'— Nincs megadva —', ro:'— Nespecificat —' },
+  'cs.chooseDriver':    { hu:'— Válassz sofőrt —', ro:'— Alege șofer —' },
+  'cs.newDriverManual': { hu:'— Új sofőr beírása kézzel —', ro:'— Introdu manual un șofer nou —' },
   'cs.tractorAdded':    { hu:'Vontató hozzáadva!', ro:'Cap tractor adăugat!' },
   'cs.trailerAdded':    { hu:'Pótkocsi hozzáadva!', ro:'Semiremorcă adăugată!' },
   'cs.newTractor':      { hu:'Új vontató hozzáadása', ro:'Adăugare cap tractor nou' },
@@ -374,6 +377,11 @@
   'cs.waypointUnload':  { hu:'Lerakó', ro:'Descărcare' },
   'cs.waypointMid':     { hu:'Köztes', ro:'Intermediar' },
   'cs.noWaypoint':      { hu:'Nincs köztespont.', ro:'Niciun punct intermediar.' },
+  'cs.rmTitle':         { hu:'🗺️ Útvonal-előnézet', ro:'🗺️ Previzualizare rută' },
+  'cs.rmIntro':         { hu:'A köztespontok <b>csak a km-számításhoz és az útvonal-előnézethez</b> kellenek — NEM megállók. Add hozzá címmel, vagy kapcsold be a térkép-kattintást.', ro:'Punctele intermediare sunt necesare <b>doar pentru calculul km și previzualizarea rutei</b> — NU sunt opriri. Adaugă-le prin adresă sau activează clic pe hartă.' },
+  'cs.rmViaPh':         { hu:'Köztespont címe', ro:'Adresa punctului intermediar' },
+  'cs.rmClickAdd':      { hu:'Térképre kattintás = köztespont', ro:'Clic pe hartă = punct intermediar' },
+  'cs.rmClearVia':      { hu:'Köztespontok törlése', ro:'Șterge punctele intermediare' },
   // ── Beérkezett fuvarlevelek ──
   'cs.noWaybillReceived':{ hu:'Nincs beküldött fuvarlevél.', ro:'Nicio foaie de parcurs trimisă.' },
   // ── Határátlépés-naplók ──
@@ -751,7 +759,7 @@ function routeMapDraw(which){
   (st.waypoints||[]).forEach(function(w){
     if(w.lat==null) return;
     var color=w.type==='loading'?'#22c55e':w.type==='unloading'?'#ef4444':'#3b82f6';
-    var lbl=w.type==='loading'?'Felrakó':w.type==='unloading'?'Lerakó':'Köztes';
+    var lbl=w.type==='loading'?T('cs.waypointPlace'):w.type==='unloading'?T('cs.waypointUnload'):T('cs.waypointMid');
     L.circleMarker([w.lat,w.lng],{radius:7,color:'#fff',weight:2,fillColor:color,fillOpacity:1})
       .addTo(_rmLayers).bindTooltip(lbl+(w.label?': '+w.label:''),{direction:'top'});
   });
@@ -759,7 +767,7 @@ function routeMapDraw(which){
 function renderRouteVia(which){
   var box=document.getElementById('rmmViaList'); if(!box) return;
   var st=_rmState[which];
-  if(!st.via.length){ box.innerHTML='<div class="text-muted" style="font-size:12px;margin-bottom:8px;">Nincs köztespont.</div>'; return; }
+  if(!st.via.length){ box.innerHTML='<div class="text-muted" style="font-size:12px;margin-bottom:8px;">'+esc(T('cs.noWaypoint'))+'</div>'; return; }
   box.innerHTML=st.via.map(function(v,i){
     var lbl=v.address||(v.lat!=null?(Number(v.lat).toFixed(3)+', '+Number(v.lng).toFixed(3)):'?');
     return '<div class="rmm-via"><span class="badge info" style="flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🔵 '+esc(lbl)+'</span>'
@@ -2066,7 +2074,7 @@ function renderAdminRoomList(me){
   }).join('');
 }
 
-function renderCamions(list){const sel=document.getElementById('oCamionSelect');if(!sel)return;sel.innerHTML='<option value="">— Nincs megadva —</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
+function renderCamions(list){const sel=document.getElementById('oCamionSelect');if(!sel)return;sel.innerHTML='<option value="">'+esc(T('cs.notSpecified'))+'</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
 
 function renderDocGroups() {
   var container = document.getElementById('docGroupsContainer');
@@ -2114,17 +2122,17 @@ function renderDocGroups() {
   container.innerHTML = html;
 }
 
-function renderExternDrivers(list){const sel=document.getElementById('oExternSelect');if(!sel)return;sel.innerHTML='<option value="">— Új sofőr beírása kézzel —</option>'+list.map(d=>`<option value="${esc(d.id)}">${esc(d.nume||'')} ${d.firma?'/ '+esc(d.firma):''}</option>`).join('');}
+function renderExternDrivers(list){const sel=document.getElementById('oExternSelect');if(!sel)return;sel.innerHTML='<option value="">'+esc(T('cs.newDriverManual'))+'</option>'+list.map(d=>`<option value="${esc(d.id)}">${esc(d.nume||'')} ${d.firma?'/ '+esc(d.firma):''}</option>`).join('');}
 
-function renderInternDrivers(list){const sel=document.getElementById('oInternDriver');if(!sel)return;sel.innerHTML='<option value="">— Válassz sofőrt —</option>'+list.map(u=>`<option value="${esc(u.email)}">${esc(u.nume)} (${esc(u.email)})</option>`).join('');}
+function renderInternDrivers(list){const sel=document.getElementById('oInternDriver');if(!sel)return;sel.innerHTML='<option value="">'+esc(T('cs.chooseDriver'))+'</option>'+list.map(u=>`<option value="${esc(u.email)}">${esc(u.nume)} (${esc(u.email)})</option>`).join('');}
 
-function renderRemorcas(list){const sel=document.getElementById('oRemorcaSelect');if(!sel)return;sel.innerHTML='<option value="">— Nincs megadva —</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
+function renderRemorcas(list){const sel=document.getElementById('oRemorcaSelect');if(!sel)return;sel.innerHTML='<option value="">'+esc(T('cs.notSpecified'))+'</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
 
 
 function renderVehicleTable(tableId,list){
   const tb=document.querySelector('#'+tableId+' tbody');
-  if(!list||list.length===0){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);">Nincs még felvéve.</td></tr>';return;}
-  tb.innerHTML=list.map(v=>`<tr><td><b>${esc(v.rendszam)}</b></td><td>${esc(v.marca||'—')}</td><td>${esc(v.model||'—')}</td><td>${v.an||'—'}</td><td>${esc(v.nota||'—')}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editVehicle(${v.id})">Szerk</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteVehicle(${v.id})">Töröl</button></td></tr>`).join('');
+  if(!list||list.length===0){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);">'+esc(T('cs.noVehicle'))+'</td></tr>';return;}
+  tb.innerHTML=list.map(v=>`<tr><td><b>${esc(v.rendszam)}</b></td><td>${esc(v.marca||'—')}</td><td>${esc(v.model||'—')}</td><td>${v.an||'—'}</td><td>${esc(v.nota||'—')}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editVehicle(${v.id})">${esc(T('cs.editShort'))}</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteVehicle(${v.id})">${esc(T('cs.delete'))}</button></td></tr>`).join('');
 }
 
 function revokeInv(kod){
