@@ -21,11 +21,13 @@ router.post('/api/forgot-password', async (req, res) => {
     const genericMsg = { success: true, message: 'Ha létezik fiók ezzel az email címmel, elküldtük a visszaállítási linket.' };
     if (!email) return res.json(genericMsg);
 
-    const result = await pool.query('SELECT id, nume FROM users WHERE email = $1', [email]);
+    const result = await pool.query(
+      'SELECT u.id, u.nume, c.email_lang FROM users u LEFT JOIN companies c ON c.id = u.company_id WHERE u.email = $1', [email]);
     if (result.rows.length === 0) {
       return res.json(genericMsg); // nem letezik - de ugyanazt valaszoljuk (biztonsag)
     }
     const user = result.rows[0];
+    const lang = user.email_lang === 'hu' ? 'hu' : 'ro';
 
     const token = crypto.randomBytes(32).toString('hex');
     const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 ora
@@ -36,7 +38,7 @@ router.post('/api/forgot-password', async (req, res) => {
     );
 
     const resetUrl = (process.env.APP_URL || 'http://localhost:3000') + '/reset-password?token=' + token;
-    sendResetEmail(email, user.nume, resetUrl).catch(e => console.error('Reset email hatter hiba:', e.message));
+    sendResetEmail(email, user.nume, resetUrl, lang).catch(e => console.error('Reset email hatter hiba:', e.message));
 
     return res.json(genericMsg);
   } catch (err) {

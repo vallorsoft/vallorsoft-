@@ -8,6 +8,7 @@ const crypto = require('crypto');
 
 let sendResetEmail = null;
 try { ({ sendResetEmail } = require('../services/email')); } catch (_) { /* opcionális */ }
+const { emailLang } = require('../lib/companyLang');
 
 const handlers = {};
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
@@ -229,7 +230,7 @@ handlers.carrierPortalInvite = async function (req, res, args) {
     }
     const link = APP_URL + '/carrier?token=' + token;
     let emailed = false;
-    if (sendResetEmail) { try { await sendResetEmail(email, nev || email, link); emailed = true; } catch (_) { emailed = false; } }
+    if (sendResetEmail) { try { await sendResetEmail(email, nev || email, link, await emailLang(cid)); emailed = true; } catch (_) { emailed = false; } }
     return res.json({ result: { ok: true, link, emailed } });
   } catch (err) { console.error('carrierPortalInvite hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
 };

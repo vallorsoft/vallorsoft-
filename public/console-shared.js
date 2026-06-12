@@ -2374,7 +2374,19 @@ function initAdminSigCanvas(){
   loadAdminSigPreview();
 }
 
+function loadEmailLang(){
+  var sel=document.getElementById('stEmailLang'); if(!sel) return;
+  gas('getEmailLang').then(function(r){ if(r&&r.ok&&r.lang) sel.value=r.lang; });
+}
+function saveEmailLang(){
+  var sel=document.getElementById('stEmailLang'); if(!sel) return;
+  gas('setEmailLang',[sel.value]).then(function(r){
+    if(r&&r.ok) toast(typeof t==='function'?'✉️ '+t('common.save'):'✉️ Mentve','ok');
+    else toast((r&&r.err)||'Hiba','err');
+  });
+}
 function loadSettingsPane(){
+  loadEmailLang();
   gas('authMe').then(function(u){
     if(!u) return;
     document.getElementById('stNume').value    = u.nume  || '';

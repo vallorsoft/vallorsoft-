@@ -9,6 +9,23 @@ const bcrypt = require('bcrypt');
 
 const handlers = {};
 
+// ── Cég e-mail nyelve (meghívó/jelszó-e-mailek) — admin állítja, alap 'ro' ──
+handlers.getEmailLang = async function (req, res, args) {
+  try {
+    if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) return res.json({ result: { ok: false } });
+    const r = await pool.query('SELECT email_lang FROM companies WHERE id = $1', [req.session.user.company_id]);
+    return res.json({ result: { ok: true, lang: (r.rows[0] && r.rows[0].email_lang === 'hu') ? 'hu' : 'ro' } });
+  } catch (e) { return res.json({ result: { ok: false } }); }
+};
+handlers.setEmailLang = async function (req, res, args) {
+  try {
+    if (!req.session.user || req.session.user.pozicio !== 'Admin') return res.json({ result: { ok: false, err: 'Csak admin állíthatja.' } });
+    const lang = (args && args[0] === 'hu') ? 'hu' : 'ro';
+    await pool.query('UPDATE companies SET email_lang = $1 WHERE id = $2', [lang, req.session.user.company_id]);
+    return res.json({ result: { ok: true } });
+  } catch (e) { console.error('setEmailLang hiba:', e); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+};
+
 handlers.userListAll = async function (req, res, args) {
     try {
       if (!['Admin', 'Manager'].includes(req.session.user.pozicio)) {

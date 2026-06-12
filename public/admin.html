@@ -609,6 +609,17 @@
           <button class="btn primary" style="margin-top:14px;" onclick="settingsSaveProfile()">💾 Profil mentése</button>
         </div>
 
+         <!-- E-MAIL NYELVE -->
+        <div class="glass" style="padding:24px;">
+          <h2 class="h-title" style="margin-top:0;" data-i18n="set.emailLangTitle">✉️ Kimenő e-mailek nyelve</h2>
+          <p style="color:var(--muted);font-size:13px;margin:0 0 12px;" data-i18n="set.emailLangHint">A meghívó- és jelszó-e-mailek ezen a nyelven mennek ki. Alapértelmezés: román.</p>
+          <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;">
+            <div class="field" style="margin:0;min-width:160px;"><label data-i18n="set.emailLangLabel">E-mail nyelve</label>
+              <select class="select" id="stEmailLang"><option value="ro">🇷🇴 Română</option><option value="hu">🇭🇺 Magyar</option></select></div>
+            <button class="btn primary" style="height:42px;" onclick="saveEmailLang()" data-i18n="common.save">Mentés</button>
+          </div>
+        </div>
+
          <!-- JELSZÓ MÓDOSÍTÁS -->
         <div class="glass" style="padding:24px;">
           <h2 class="h-title" style="margin-top:0;" data-i18n="pane.changePw">🔑 Jelszó módosítása</h2>

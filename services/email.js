@@ -29,54 +29,72 @@ async function fetchT(url, init, ms = 15000) {
 
 // A meghívó-e-mail HTML törzse — tiszta (mellékhatás nélküli) függvény, hogy
 // egységteszttel ellenőrizhető legyen (a MEGHÍVOTT nevével köszön, reszponzív).
-function buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl }) {
-  const udvozles = meghivottNev ? `Tisztelt ${escHtml(meghivottNev)}!` : 'Tisztelt Címzett!';
+// lang: 'ro' (alap) | 'hu' — a cég e-mail-nyelve (admin állítja).
+function buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl, lang }) {
+  const L = lang === 'hu' ? 'hu' : 'ro';
   const regLink = `${registerUrl}/register`;
   const loginLink = `${registerUrl}/login`;
+  const nm = escHtml(meghivottNev), cg = escHtml(cegNev), pz = escHtml(pozicio), kd = escHtml(kod);
+  const S = {
+    platform: { hu: 'Fuvarmenedzsment Platform', ro: 'Platformă de management transport' }[L],
+    greet: meghivottNev ? ({ hu: 'Tisztelt ', ro: 'Stimate ' }[L] + nm + '!') : ({ hu: 'Tisztelt Címzett!', ro: 'Stimate destinatar!' }[L]),
+    invited: cegNev
+      ? ({ hu: `A <b style="color:#fff;">${cg}</b> meghívta Önt a VallorSoft platformra`, ro: `<b style="color:#fff;">${cg}</b> v-a invitat pe platforma VallorSoft` }[L])
+      : ({ hu: 'Meghívást kapott a VallorSoft platformra', ro: 'Ați primit o invitație pe platforma VallorSoft' }[L]),
+    inRole: { hu: ` <b style="color:#fff;">${pz}</b> szerepkörben.`, ro: ` în rolul de <b style="color:#fff;">${pz}</b>.` }[L],
+    yourCode: { hu: 'Meghívókódja', ro: 'Codul dvs. de invitație' }[L],
+    openReg: { hu: 'Regisztráció megnyitása', ro: 'Deschide înregistrarea' }[L],
+    stepsTitle: { hu: '📋 Regisztráció lépései', ro: '📋 Pașii înregistrării' }[L],
+    step1: { hu: 'Nyissa meg a fenti <b style="color:#fff;">Regisztráció</b> gombot.', ro: 'Deschideți butonul <b style="color:#fff;">Înregistrare</b> de mai sus.' }[L],
+    step2: { hu: 'Adja meg a nevét, e-mail címét és egy jelszót.', ro: 'Introduceți numele, adresa de e-mail și o parolă.' }[L],
+    step3: { hu: `A meghívókód mezőbe írja be: <b style="color:#fff;">${kd}</b>`, ro: `În câmpul cod de invitație introduceți: <b style="color:#fff;">${kd}</b>` }[L],
+    step4: { hu: 'A regisztráció után jelentkezzen be a platformon.', ro: 'După înregistrare, autentificați-vă pe platformă.' }[L],
+    ifBtn: { hu: 'Ha a gomb nem működik, másolja be ezt a linket a böngészőbe:', ro: 'Dacă butonul nu funcționează, copiați acest link în browser:' }[L],
+    footer: { hu: `Ez az e-mail automatikusan lett elküldve a VallorSoft rendszer által. Ha nem várta ezt az üzenetet, kérjük hagyja figyelmen kívül. Bejelentkezés: ${escHtml(loginLink)}`, ro: `Acest e-mail a fost trimis automat de sistemul VallorSoft. Dacă nu așteptați acest mesaj, ignorați-l. Autentificare: ${escHtml(loginLink)}` }[L],
+  };
   return `
         <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;background:#05070b;color:#e9eef5;padding:24px;border-radius:16px;">
           <div style="font-size:24px;font-weight:800;margin-bottom:4px;">
             <span style="color:#fff;">vallor</span><span style="color:#e10b1a;">Soft</span>
           </div>
-          <div style="font-size:12px;color:#8a97a8;margin-bottom:24px;">Fuvarmenedzsment Platform</div>
-          <h2 style="font-size:20px;margin-bottom:8px;line-height:1.3;">${udvozles}</h2>
+          <div style="font-size:12px;color:#8a97a8;margin-bottom:24px;">${S.platform}</div>
+          <h2 style="font-size:20px;margin-bottom:8px;line-height:1.3;">${S.greet}</h2>
           <p style="color:#b8c2d0;font-size:14px;line-height:1.6;margin-bottom:20px;">
-            ${cegNev
-              ? `A <b style="color:#fff;">${escHtml(cegNev)}</b> meghívta Önt a VallorSoft platformra`
-              : 'Meghívást kapott a VallorSoft platformra'}
-            <b style="color:#fff;">${escHtml(pozicio)}</b> szerepkörben.
+            ${S.invited}${S.inRole}
           </p>
           <div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;margin-bottom:20px;text-align:center;">
-            <div style="font-size:11px;color:#8a97a8;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Meghívókódja</div>
-            <div style="font-size:28px;font-weight:800;letter-spacing:3px;color:#fff;word-break:break-word;">${escHtml(kod)}</div>
+            <div style="font-size:11px;color:#8a97a8;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">${S.yourCode}</div>
+            <div style="font-size:28px;font-weight:800;letter-spacing:3px;color:#fff;word-break:break-word;">${kd}</div>
           </div>
           <div style="text-align:center;margin:24px 0;">
-            <a href="${regLink}" style="display:inline-block;background:#e10b1a;color:#fff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:10px;font-size:15px;">Regisztráció megnyitása</a>
+            <a href="${regLink}" style="display:inline-block;background:#e10b1a;color:#fff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:10px;font-size:15px;">${S.openReg}</a>
           </div>
           <div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;margin-bottom:20px;">
-            <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;">📋 Regisztráció lépései</div>
+            <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;">${S.stepsTitle}</div>
             <ol style="color:#b8c2d0;font-size:13px;line-height:1.8;padding-left:20px;margin:0;">
-              <li>Nyissa meg a fenti <b style="color:#fff;">Regisztráció</b> gombot.</li>
-              <li>Adja meg a nevét, e-mail címét és egy jelszót.</li>
-              <li>A meghívókód mezőbe írja be: <b style="color:#fff;">${escHtml(kod)}</b></li>
-              <li>A regisztráció után jelentkezzen be a platformon.</li>
+              <li>${S.step1}</li>
+              <li>${S.step2}</li>
+              <li>${S.step3}</li>
+              <li>${S.step4}</li>
             </ol>
           </div>
-          <p style="font-size:12px;color:#8a97a8;line-height:1.6;margin:0 0 6px;">Ha a gomb nem működik, másolja be ezt a linket a böngészőbe:</p>
+          <p style="font-size:12px;color:#8a97a8;line-height:1.6;margin:0 0 6px;">${S.ifBtn}</p>
           <p style="word-break:break-all;font-size:12px;color:#3b82f6;margin:0 0 20px;">${escHtml(regLink)}</p>
-          <p style="font-size:11px;color:#6b7689;line-height:1.5;margin:0;">Ez az e-mail automatikusan lett elküldve a VallorSoft rendszer által. Ha nem várta ezt az üzenetet, kérjük hagyja figyelmen kívül. Bejelentkezés: ${escHtml(loginLink)}</p>
+          <p style="font-size:11px;color:#6b7689;line-height:1.5;margin:0;">${S.footer}</p>
         </div>
       `;
 }
 
-async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev) {
+async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev, lang) {
   console.log('sendInviteEmail called:', toEmail, !!BREVO_API_KEY);
   if (!BREVO_API_KEY || !BREVO_SENDER || !toEmail) {
     console.log('early return - BREVO_API_KEY, BREVO_SENDER vagy toEmail hianyzik');
     return;
   }
+  const L = lang === 'hu' ? 'hu' : 'ro';
   const registerUrl = process.env.APP_URL || 'http://localhost:3000';
-  const html = buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl });
+  const html = buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl, lang: L });
+  const subject = (L === 'hu' ? 'VallorSoft — Meghívó' : 'VallorSoft — Invitație') + ` (${cegNev || 'VallorSoft'})`;
   try {
     const resp = await fetchT('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -88,7 +106,7 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev) {
       body: JSON.stringify({
         sender: { name: 'VallorSoft', email: BREVO_SENDER },
         to: [{ email: toEmail }],
-        subject: `VallorSoft — Meghívó (${cegNev || 'VallorSoft'})`,
+        subject: subject,
         htmlContent: html,
       }),
     });
@@ -104,32 +122,40 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev) {
 }
 
 // ============ JELSZO-VISSZAALLITO EMAIL ============
-async function sendResetEmail(toEmail, nume, resetUrl) {
+async function sendResetEmail(toEmail, nume, resetUrl, lang) {
   console.log('sendResetEmail called:', toEmail, !!BREVO_API_KEY);
   if (!BREVO_API_KEY || !BREVO_SENDER || !toEmail) {
     console.log('early return - BREVO config vagy toEmail hianyzik');
     return;
   }
-  const udvozles = nume ? `Tisztelt ${escHtml(nume)}!` : 'Tisztelt Felhasználónk!';
+  const L = lang === 'hu' ? 'hu' : 'ro';
+  const nm = escHtml(nume);
+  const S = {
+    platform: { hu: 'Fuvarmenedzsment Platform', ro: 'Platformă de management transport' }[L],
+    greet: nume ? ({ hu: 'Tisztelt ', ro: 'Stimate ' }[L] + nm + '!') : ({ hu: 'Tisztelt Felhasználónk!', ro: 'Stimate utilizator!' }[L]),
+    intro: { hu: 'Jelszó-visszaállítási kérelmet kaptunk a fiókjához. Ha Ön kérte, kattintson az alábbi gombra egy új jelszó beállításához.', ro: 'Am primit o cerere de resetare a parolei pentru contul dvs. Dacă ați solicitat-o, apăsați butonul de mai jos pentru a seta o parolă nouă.' }[L],
+    btn: { hu: 'Új jelszó beállítása', ro: 'Setează parolă nouă' }[L],
+    or: { hu: 'Vagy másolja be ezt a linket a böngészőbe:', ro: 'Sau copiați acest link în browser:' }[L],
+    valid: { hu: '⏱️ Ez a link <b style="color:#fff;">1 óráig</b> érvényes. Ha nem Ön kérte a visszaállítást, hagyja figyelmen kívül ezt az emailt — a jelszava változatlan marad.', ro: '⏱️ Acest link este valabil <b style="color:#fff;">1 oră</b>. Dacă nu ați solicitat resetarea, ignorați acest e-mail — parola rămâne neschimbată.' }[L],
+    footer: { hu: 'Ez az email automatikusan lett elküldve a VallorSoft rendszer által.', ro: 'Acest e-mail a fost trimis automat de sistemul VallorSoft.' }[L],
+  };
   const html = `
         <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#05070b;color:#e9eef5;padding:32px;border-radius:16px;">
           <div style="font-size:24px;font-weight:800;margin-bottom:4px;">
             <span style="color:#fff;">vallor</span><span style="color:#e10b1a;">Soft</span>
           </div>
-          <div style="font-size:12px;color:#8a97a8;margin-bottom:28px;">Fuvarmenedzsment Platform</div>
-          <h2 style="font-size:20px;margin-bottom:8px;">${udvozles}</h2>
-          <p style="color:#8a97a8;margin-bottom:16px;">
-            Jelszó-visszaállítási kérelmet kaptunk a fiókjához. Ha Ön kérte, kattintson az alábbi gombra egy új jelszó beállításához.
-          </p>
+          <div style="font-size:12px;color:#8a97a8;margin-bottom:28px;">${S.platform}</div>
+          <h2 style="font-size:20px;margin-bottom:8px;">${S.greet}</h2>
+          <p style="color:#8a97a8;margin-bottom:16px;">${S.intro}</p>
           <div style="text-align:center;margin:28px 0;">
-            <a href="${resetUrl}" style="display:inline-block;background:#e10b1a;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">Új jelszó beállítása</a>
+            <a href="${resetUrl}" style="display:inline-block;background:#e10b1a;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">${S.btn}</a>
           </div>
-          <p style="color:#8a97a8;font-size:13px;margin-bottom:8px;">Vagy másolja be ezt a linket a böngészőbe:</p>
+          <p style="color:#8a97a8;font-size:13px;margin-bottom:8px;">${S.or}</p>
           <p style="word-break:break-all;font-size:12px;color:#3b82f6;margin-bottom:24px;">${resetUrl}</p>
           <div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;margin-bottom:24px;">
-            <p style="font-size:12px;color:#8a97a8;margin:0;">⏱️ Ez a link <b style="color:#fff;">1 óráig</b> érvényes. Ha nem Ön kérte a visszaállítást, hagyja figyelmen kívül ezt az emailt — a jelszava változatlan marad.</p>
+            <p style="font-size:12px;color:#8a97a8;margin:0;">${S.valid}</p>
           </div>
-          <p style="font-size:11px;color:#8a97a8;margin:0;">Ez az email automatikusan lett elküldve a VallorSoft rendszer által.</p>
+          <p style="font-size:11px;color:#8a97a8;margin:0;">${S.footer}</p>
         </div>
       `;
   try {
@@ -143,7 +169,7 @@ async function sendResetEmail(toEmail, nume, resetUrl) {
       body: JSON.stringify({
         sender: { name: 'VallorSoft', email: BREVO_SENDER },
         to: [{ email: toEmail }],
-        subject: 'VallorSoft — Jelszó visszaállítás',
+        subject: L === 'hu' ? 'VallorSoft — Jelszó visszaállítás' : 'VallorSoft — Resetare parolă',
         htmlContent: html,
       }),
     });
