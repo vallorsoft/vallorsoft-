@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="hu"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VallorSoft — Alvállalkozó & szállítói számla (látványterv)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#05070b;--panel:#141c25;--tx:#e9eef5;--mut:#8a97a8;--red:#e10b1a;--ok:#22c55e;--warn:#f59e0b;--danger:#ef4444;--info:#3b82f6;--bd:rgba(255,255,255,.08)}
+  *{box-sizing:border-box}body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,rgba(225,11,26,.10),transparent),var(--bg);color:var(--tx);font-family:Inter,sans-serif;font-size:14px}
+  .wrap{max-width:1040px;margin:0 auto;padding:24px}
+  .glass{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));border:1px solid var(--bd);border-radius:16px}
+  .mut{color:var(--mut)}.sect{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:#c084fc;font-weight:800;margin:26px 0 10px}
+  .field label{display:block;font-size:12px;color:var(--mut);margin-bottom:5px;font-weight:600}
+  .inp{background:rgba(255,255,255,.04);border:1px solid var(--bd);border-radius:8px;padding:9px 11px;color:var(--tx);font-family:inherit;font-size:13px}
+  .btn{border:1px solid var(--bd);background:rgba(255,255,255,.04);color:var(--tx);border-radius:8px;padding:9px 13px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn.red{background:var(--red);border-color:var(--red);color:#fff}.btn.ok{background:rgba(34,197,94,.18);border-color:rgba(34,197,94,.45);color:#4ade80}
+  .badge{display:inline-flex;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid}
+  .b-ok{background:rgba(34,197,94,.16);color:#4ade80;border-color:rgba(34,197,94,.4)}
+  .b-warn{background:rgba(245,158,11,.16);color:#fbbf24;border-color:rgba(245,158,11,.4)}
+  .b-red{background:rgba(225,11,26,.16);color:#ff6b75;border-color:rgba(225,11,26,.45)}
+  table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 10px;border-bottom:1px solid var(--bd);text-align:left}th{color:var(--mut);font-weight:600;font-size:12px}
+  .h{font-size:16px;font-weight:800;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .tile{padding:14px 16px}.tile .k{font-size:12px;color:var(--mut)}.tile .v{font-size:22px;font-weight:800;margin-top:3px}
+</style></head><body>
+<div class="wrap">
+
+  <div class="sect">① Extern fuvar — most már a KÖLTSÉG (amit az alvállalkozónak fizetsz) is</div>
+  <div class="glass" style="padding:18px 20px">
+    <div class="h">✏️ CMD-2055 · Arad (RO) → Milánó (IT) · 🚚 Extern</div>
+    <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+      <div class="field"><label>Alvállalkozó</label><select class="inp" style="min-width:200px"><option>SpeedCargo SRL (RO12345678)</option></select></div>
+      <div class="field"><label>Bevétel — ügyfél fizet (EUR)</label><input class="inp" style="width:160px" value="2 100"></div>
+      <div class="field"><label>Alvállalkozói díj (EUR)</label><input class="inp" style="width:160px;border-color:rgba(225,11,26,.45)" value="1 750"></div>
+      <div class="field"><label>Árrés</label><input class="inp" style="width:120px;color:#4ade80" value="+350 €" disabled></div>
+    </div>
+    <div class="mut" style="font-size:12px;margin-top:8px">A különbözet a te árrésed. A díjhoz tartozó szállítói számlát lent rögzíted; addig „nyitott kötelezettség".</div>
+  </div>
+
+  <div class="sect">② Alvállalkozó-törzs (Külső fuvarozók) — dokumentumokkal, fizetési határidővel</div>
+  <div class="glass" style="padding:18px 20px">
+    <div class="h">🚚 Alvállalkozók</div>
+    <table>
+      <tr><th>Cég</th><th>CUI / adószám</th><th>Fiz. határidő</th><th>CMR-biztosítás</th><th>Nyitott tartozás</th><th></th></tr>
+      <tr><td><b>SpeedCargo SRL</b></td><td>RO12345678</td><td>30 nap</td><td><span class="badge b-ok">érvényes · 2026-11</span></td><td style="color:#ff6b75;font-weight:700">3 500 €</td><td><button class="btn" style="padding:5px 10px">Részletek</button></td></tr>
+      <tr><td><b>Proba Trans KFT</b></td><td>HU88776655</td><td>45 nap</td><td><span class="badge b-warn">lejár 18 nap múlva</span></td><td style="color:#ff6b75;font-weight:700">1 750 €</td><td><button class="btn" style="padding:5px 10px">Részletek</button></td></tr>
+      <tr><td><b>Mircea PFA</b></td><td>RO45611223</td><td>14 nap</td><td><span class="badge b-red">hiányzik!</span></td><td>0 €</td><td><button class="btn" style="padding:5px 10px">Részletek</button></td></tr>
+    </table>
+    <div class="mut" style="font-size:11px;margin-top:8px">⚠️ Lejáró/hiányzó CMR-biztosítás → a Vezérlőpult lejárat-sávjában is megjelenik (mint a járműveknél).</div>
+  </div>
+
+  <div class="sect">③ Szállítói számla rögzítése (AP) — egy vagy több fuvarhoz kötve</div>
+  <div class="glass" style="padding:18px 20px">
+    <div class="h">🧾 Új szállítói számla</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+      <div class="field"><label>Alvállalkozó</label><select class="inp" style="min-width:180px"><option>SpeedCargo SRL</option></select></div>
+      <div class="field"><label>Számlaszám</label><input class="inp" style="width:130px" value="SC-2025-0188"></div>
+      <div class="field"><label>Kelt</label><input class="inp" style="width:130px" value="2026-06-10"></div>
+      <div class="field"><label>Fiz. határidő</label><input class="inp" style="width:130px;border-color:rgba(245,158,11,.5)" value="2026-07-10"></div>
+      <div class="field"><label>Összeg (EUR)</label><input class="inp" style="width:120px" value="1 750"></div>
+    </div>
+    <div class="field" style="margin-top:8px"><label>Mely fuvar(ok)hoz</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="badge b-ok">✓ CMD-2055 · 1 750 €</span><span class="badge" style="border-color:var(--bd);color:var(--mut)">＋ fuvar hozzáadása</span></div>
+    </div>
+    <button class="btn red" style="margin-top:10px">Számla rögzítése</button>
+    <div class="mut" style="font-size:11px;margin-top:8px">A számlát a fuvar(ok)hoz kötöd → a fuvar-eredmény pontos, és a tartozás bekerül a határidő-figyelésbe.</div>
+  </div>
+
+  <div class="sect">④ Tartozások (AP) — fizetendő, lejárat szerint öregítve</div>
+  <div class="glass" style="padding:18px 20px">
+    <div class="h">💸 Szállítói tartozások</div>
+    <div class="stats">
+      <div class="glass tile"><div class="k">Nyitott összesen</div><div class="v" style="color:#ff6b75">5 250 €</div></div>
+      <div class="glass tile"><div class="k">Esedékes 7 napon belül</div><div class="v" style="color:#fbbf24">1 750 €</div></div>
+      <div class="glass tile"><div class="k">Lejárt</div><div class="v" style="color:#ff6b75">0 €</div></div>
+      <div class="glass tile"><div class="k">Számlák</div><div class="v">4 db</div></div>
+    </div>
+    <table>
+      <tr><th>Alvállalkozó</th><th>Számla</th><th>Fuvar</th><th>Összeg</th><th>Esedékes</th><th>Állapot</th><th></th></tr>
+      <tr><td>SpeedCargo SRL</td><td>SC-2025-0188</td><td>CMD-2055</td><td>1 750 €</td><td><span class="badge b-warn">7 nap múlva</span></td><td><span class="badge b-red">Fizetendő</span></td><td><button class="btn ok" style="padding:5px 10px">Fizetve</button></td></tr>
+      <tr><td>SpeedCargo SRL</td><td>SC-2025-0170</td><td>CMD-2031, CMD-2042</td><td>3 500 €</td><td>2026-07-20</td><td><span class="badge b-red">Fizetendő</span></td><td><button class="btn ok" style="padding:5px 10px">Fizetve</button></td></tr>
+      <tr><td>Proba Trans KFT</td><td>PT-118</td><td>CMD-2049</td><td>1 750 €</td><td>2026-07-28</td><td><span class="badge b-warn">Részben (900 €)</span></td><td><button class="btn ok" style="padding:5px 10px">Fizetés</button></td></tr>
+    </table>
+  </div>
+
+</div></body></html>
