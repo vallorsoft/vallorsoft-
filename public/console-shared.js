@@ -2528,7 +2528,7 @@ async function renderSignPage(num){
 function renderFilteredOrders(list) {
   var tbody = document.getElementById('tblOrdersBody');
   if (!tbody) return;
-  if (!list.length) { tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px;">Nincs találat.</td></tr>'; return; }
+  if (!list.length) { tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px;">'+t('cs.noMatch')+'</td></tr>'; return; }
   tbody.innerHTML = list.map(function(c){
     var soferInfo='—';
     if(c.sofer_type==='Intern')soferInfo=c.nume_sofer||c.email_sofer||'—';
@@ -2572,15 +2572,15 @@ function renderFilteredOrders(list) {
     // Leadott áru jelzései (folytatásra váró fuvar — a lista tetején)
     if (c.status==='Parkolt') {
       routeCell += '<div style="margin-top:4px;"><span class="badge" style="background:rgba(192,38,211,0.18);color:#e879f9;border:1px solid rgba(192,38,211,0.4);">'+
-        '🅿️ Áru a pótkocsin'+(c.rendszam_remorca?': '+esc(c.rendszam_remorca):'')+(c.handover_loc?' @ '+esc(c.handover_loc):'')+' — vontató+sofőr kell!</span></div>';
+        t('cs.ol.cargoOnTrailer')+(c.rendszam_remorca?': '+esc(c.rendszam_remorca):'')+(c.handover_loc?' @ '+esc(c.handover_loc):'')+t('cs.ol.needTractor')+'</span></div>';
     }
     if (c.status==='Raktarban') {
       routeCell += '<div style="margin-top:4px;"><span class="badge" style="background:rgba(249,115,22,0.18);color:#fb923c;border:1px solid rgba(249,115,22,0.4);">'+
-        '📦 Raktárban'+(c.handover_loc?' @ '+esc(c.handover_loc):'')+' — kiosztásra vár!</span>'+
-        (parseInt(c.pod_count,10)>0?'':' <span class="badge err">⚠️ Dokumentum hiányzik!</span>')+'</div>';
+        t('cs.ol.inWarehouse')+(c.handover_loc?' @ '+esc(c.handover_loc):'')+t('cs.ol.waitAlloc')+'</span>'+
+        (parseInt(c.pod_count,10)>0?'':' <span class="badge err">'+t('cs.ol.docMissing')+'</span>')+'</div>';
     }
     if (c.handover_status==='Fuggoben') {
-      routeCell += '<div style="margin-top:4px;"><span class="badge warn">⏳ Sofőr leadás-kérése visszaigazolásra vár'+
+      routeCell += '<div style="margin-top:4px;"><span class="badge warn">'+t('cs.ol.handoverPending')+
         (c.handover_loc?' @ '+esc(c.handover_loc):'')+'</span></div>';
     }
     if (legCount > 0) {
@@ -2598,7 +2598,7 @@ function renderFilteredOrders(list) {
     // Sofőr cella: alap sofőr + váltások badge-del
     var soferCell = esc(soferInfo);
     if (legCount > 0) {
-      soferCell += ' <span style="font-size:10px;background:rgba(225,11,26,0.15);color:#f87171;border:1px solid rgba(225,11,26,0.3);border-radius:6px;padding:1px 6px;white-space:nowrap;">+'+legCount+' váltás</span>';
+      soferCell += ' <span style="font-size:10px;background:rgba(225,11,26,0.15);color:#f87171;border:1px solid rgba(225,11,26,0.3);border-radius:6px;padding:1px 6px;white-space:nowrap;">+'+legCount+t('cs.ol.legBadge')+'</span>';
       soferCell += '<div style="margin-top:4px;">';
       legs.forEach(function(l){
         soferCell += '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+
@@ -2611,34 +2611,34 @@ function renderFilteredOrders(list) {
     // ── Integrációs gombok (CargoTrack térkép + UIT + Számlázás) ──
     var integBtns = '';
     if (c.rendszam_camion && window.CargoTrackWhereIs) {
-      integBtns += '<button class="btn ghost" title="Hol a kocsi? (térkép)" style="padding:4px 10px;font-size:12px;" '+
+      integBtns += '<button class="btn ghost" title="'+t('cs.ol.whereIs')+'" style="padding:4px 10px;font-size:12px;" '+
         'onclick="CargoTrackWhereIs.show(\''+esc(c.rendszam_camion)+'\',\''+c.id+'\')">🗺️</button>';
     }
     if (window.UitPanel) {
-      integBtns += '<button class="btn ghost uit-btn" title="UIT-kódok (RO e-Transport)" style="padding:4px 10px;font-size:12px;" '+
+      integBtns += '<button class="btn ghost uit-btn" title="'+t('cs.ol.uitCodes')+'" style="padding:4px 10px;font-size:12px;" '+
         'data-uit-oid="'+c.id+'" onclick="UitPanel.open(\''+c.id+'\',\''+esc(c.rendszam_camion||'')+'\')">'+
         '+UIT<span class="uit-ind" data-uit-ind="'+c.id+'" style="margin-left:3px;"></span></button>';
     }
     if (c.status==='Finalizat' && window.InvoiceModal) {
-      integBtns += '<button class="btn primary" title="Számlázás" style="padding:4px 10px;font-size:12px;" '+
+      integBtns += '<button class="btn primary" title="'+t('cs.ol.invoicing')+'" style="padding:4px 10px;font-size:12px;" '+
         'onclick="InvoiceModal.open(\''+c.id+'\')">🧾<span class="inv-ind" data-inv-ind="'+c.id+'" style="margin-left:2px;"></span></button>';
     }
     // 🌍 Ügyfél tracking-link (prémium funkció-kapcsoló: 'tracking')
     if (!(window._vsFeatures && window._vsFeatures['tracking']===false)) {
-      integBtns += '<button class="btn ghost" title="Ügyfél követő-link másolása (publikus oldal)" style="padding:4px 10px;font-size:12px;" '+
+      integBtns += '<button class="btn ghost" title="'+t('cs.ol.copyTrack')+'" style="padding:4px 10px;font-size:12px;" '+
         'onclick="copyTrackingLink(\''+c.id+'\')">🌍</button>';
     }
     // 📷 POD-jelző: a sofőr által ehhez a fuvarhoz csatolt fotók (aláírt CMR stb.)
     if (parseInt(c.pod_count, 10) > 0) {
-      integBtns += '<span title="'+c.pod_count+' sofőr-fotó / POD csatolva (Feltöltött Iratok fül)" '+
+      integBtns += '<span title="'+c.pod_count+t('cs.ol.podAttached')+'" '+
         'style="font-size:12px;align-self:center;color:var(--status-ok);white-space:nowrap;">📷'+c.pod_count+'</span>';
     }
     // 💰 Fizetés rögzítése — CSAK Finalizat fuvaron jelenik meg.
     // Szín a fizetési állapot szerint: fizetve=zöld, részben=sárga, kintlévő=piros keret.
     if (c.status==='Finalizat') {
       var _ps = c.payment_status || 'unpaid';
-      var _pTitle = _ps==='paid' ? 'Fizetve ('+(c.paid_amount||0)+')' :
-                    _ps==='partial' ? 'Részben fizetve — fizetés rögzítése' : 'Kintlévő — fizetés rögzítése';
+      var _pTitle = _ps==='paid' ? t('cs.ol.paidAmt',{n:(c.paid_amount||0)}) :
+                    _ps==='partial' ? t('cs.ol.partialPay') : t('cs.ol.unpaidPay');
       var _pStyle = _ps==='paid' ? 'border-color:rgba(34,197,94,0.5);color:#4ade80;' :
                     _ps==='partial' ? 'border-color:rgba(245,158,11,0.5);color:#fbbf24;' :
                     'border-color:rgba(239,68,68,0.5);color:#f87171;';
@@ -2647,7 +2647,7 @@ function renderFilteredOrders(list) {
     }
     // ⛔ Áru leadása (megszakítás) — aktív fuvaron; függő sofőr-kérésnél a banner kezeli
     if ((c.status==='Alocat'||c.status==='In Curs') && c.handover_status!=='Fuggoben') {
-      integBtns += '<button class="btn ghost" title="Áru leadása (pótkocsin parkol / raktárba kerül)" '+
+      integBtns += '<button class="btn ghost" title="'+t('cs.ol.handoverTitle')+'" '+
         'style="padding:4px 10px;font-size:12px;border-color:rgba(192,38,211,0.5);color:#e879f9;" '+
         'onclick="openHandoverModal(\''+c.id+'\')">⛔</button>';
     }
@@ -2705,7 +2705,7 @@ function downloadSelectedOrders() {
       '<td style="text-align:right;vertical-align:top;">'+esc(String(c.km||'—'))+'</td>'+
       '<td style="text-align:right;vertical-align:top;">'+esc(String(c.pret||'—'))+'</td>'+
       '<td style="vertical-align:top;">'+esc(soferInfo)+
-        (legCount > 0 ? ' <b style="color:#c00;font-size:10px;">(+'+legCount+' váltás)</b>' : '')+
+        (legCount > 0 ? ' <b style="color:#c00;font-size:10px;">(+'+legCount+t('cs.pr.legCount')+')</b>' : '')+
       '</td>'+
       '<td style="vertical-align:top;">'+esc(c.rendszam_camion||'—')+(c.rendszam_remorca?' / '+esc(c.rendszam_remorca):'')+'</td>'+
       '<td style="text-align:center;vertical-align:top;font-weight:700;">'+esc(c.status||'—')+'</td>'+
@@ -2714,8 +2714,8 @@ function downloadSelectedOrders() {
     // Váltás / szakasz alsorok
     legs.forEach(function(l, idx){
       out += '<tr style="background:#eef3ff;">'+
-        '<td style="padding-left:18px;font-size:11px;color:#444;border-left:3px solid #2563eb;">↳ '+(idx+1)+'. váltás</td>'+
-        '<td colspan="2" style="font-size:11px;color:#666;font-style:italic;">Sofőrváltás / szakasz</td>'+
+        '<td style="padding-left:18px;font-size:11px;color:#444;border-left:3px solid #2563eb;">↳ '+(idx+1)+t('cs.pr.legRow')+'</td>'+
+        '<td colspan="2" style="font-size:11px;color:#666;font-style:italic;">'+t('cs.pr.legSection')+'</td>'+
         '<td style="font-size:11px;font-weight:700;color:#1a3a6b;">'+esc(l.loc_preluare||'—')+'</td>'+
         '<td style="font-size:11px;color:#aaa;">—</td>'+
         '<td></td><td></td>'+
@@ -2731,7 +2731,7 @@ function downloadSelectedOrders() {
   var hasLegs = selected.some(function(c){ return parselegs(c).length > 0; });
 
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
-    '<title>Fuvarfeladatok — '+now+'</title>'+
+    '<title>'+t('cs.pr.docTitle')+now+'</title>'+
     '<style>'+
     'body{font-family:Arial,sans-serif;padding:24px;font-size:13px;color:#000;}'+
     'h1{font-size:18px;text-align:center;margin:0 0 2px;}'+
@@ -2744,15 +2744,15 @@ function downloadSelectedOrders() {
     '.no-print{margin-bottom:16px;}'+
     '@media print{.no-print{display:none;}body{padding:10px;}}'+
     '</style></head><body>'+
-    '<div class="no-print"><button onclick="window.print()" style="padding:10px 24px;background:#0f172a;color:#fff;font-weight:bold;border:none;border-radius:6px;font-size:14px;cursor:pointer;">🖨️ Nyomtatás / PDF mentés</button></div>'+
-    '<h1>VALLOR TEAM SRL — Fuvarfeladatok</h1>'+
-    '<div class="sub">Nyomtatva: '+now+' &nbsp;·&nbsp; '+selected.length+' fuvar'+(hasLegs?' &nbsp;·&nbsp; <span style="color:#2563eb;font-weight:700;">kék sorok = váltások</span>':'')+'</div>'+
+    '<div class="no-print"><button onclick="window.print()" style="padding:10px 24px;background:#0f172a;color:#fff;font-weight:bold;border:none;border-radius:6px;font-size:14px;cursor:pointer;">'+t('cs.pr.printBtn')+'</button></div>'+
+    '<h1>'+t('cs.pr.heading')+'</h1>'+
+    '<div class="sub">'+t('cs.pr.printedAt')+now+' &nbsp;·&nbsp; '+selected.length+t('cs.pr.orders')+(hasLegs?' &nbsp;·&nbsp; <span style="color:#2563eb;font-weight:700;">'+t('cs.pr.blueLegs')+'</span>':'')+'</div>'+
     '<table><thead><tr>'+
-    '<th>#ID</th><th>Ügyfél</th><th>Ref</th><th>Felrakás / Átvétel</th><th>Lerakás</th>'+
-    '<th>KM</th><th>Ár (EUR)</th><th>Sofőr / Váltó sofőr</th><th>Vontató / Pótkocsi</th><th>Státusz</th>'+
+    '<th>#ID</th><th>'+t('st.cClient')+'</th><th>'+t('cs.pr.colRef')+'</th><th>'+t('cs.pr.colLoad')+'</th><th>'+t('cs.pr.colUnload')+'</th>'+
+    '<th>KM</th><th>'+t('cs.pr.colPrice')+'</th><th>'+t('cs.pr.colDriver')+'</th><th>'+t('cs.pr.colVehicle')+'</th><th>'+t('st.cStatus')+'</th>'+
     '</tr></thead><tbody>'+rows+'</tbody></table>'+
-    (hasLegs ? '<div class="legend">ℹ️ Kék háttérrel: utólag hozzáadott váltások (order_legs) — sofőrcsere, átvételi hely, jármű adatokkal.</div>' : '')+
-    '<div class="footer">VallorSoft fuvarmenedzsment · Generálva: '+now+'</div>'+
+    (hasLegs ? '<div class="legend">'+t('cs.pr.legend')+'</div>' : '')+
+    '<div class="footer">'+t('cs.pr.footer')+now+'</div>'+
     '</body></html>';
 
   var blob = new Blob([html], {type:'text/html;charset=utf-8'});
