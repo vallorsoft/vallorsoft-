@@ -1280,40 +1280,40 @@ function loadMapsProvider(){
       var m=usage.month||0;
       usageHtml='<div class="glass-soft" style="padding:12px 14px;margin-top:14px;">'
         +'<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
-        +'<span style="font-size:12px;color:var(--muted);font-weight:700;">📊 E havi használat ('+vendor.toUpperCase()+')</span>'
-        +'<span style="font-size:18px;font-weight:800;">'+m.toLocaleString('hu')+' <span style="font-size:12px;color:var(--muted);font-weight:500;">hívás</span></span>'
-        +'<span style="margin-left:auto;font-size:12px;color:var(--muted);">Fizetendő:</span>'
+        +'<span style="font-size:12px;color:var(--muted);font-weight:700;">'+t('cs.mp.usageMonth',{v:vendor.toUpperCase()})+'</span>'
+        +'<span style="font-size:18px;font-weight:800;">'+m.toLocaleString('hu')+' <span style="font-size:12px;color:var(--muted);font-weight:500;">'+t('cs.mp.calls')+'</span></span>'
+        +'<span style="margin-left:auto;font-size:12px;color:var(--muted);">'+t('cs.mp.toPay')+'</span>'
         +'<span style="font-size:22px;font-weight:800;color:#fbbf24;">'+costM.toFixed(2)+' €</span></div>'
-        +(costP?'<div style="font-size:11px;color:var(--muted);margin-top:4px;">Előző hó: '+(usage.prev||0).toLocaleString('hu')+' hívás · '+costP.toFixed(2)+' €</div>':'')
-        +'<div style="font-size:10.5px;color:var(--muted);margin-top:6px;">⚠️ <b>Nincs ingyenes keret</b> — az első hívástól fizetsz (hivatalos ár + '+marginPct+'% árrés). Csak a fizetős (keyes) geokódolás/keresés számít, a cache-találat nem.</div>'
+        +(costP?'<div style="font-size:11px;color:var(--muted);margin-top:4px;">'+t('cs.mp.prevMonth',{n:(usage.prev||0).toLocaleString('hu'),c:costP.toFixed(2)})+'</div>':'')
+        +'<div style="font-size:10.5px;color:var(--muted);margin-top:6px;">'+t('cs.mp.noFreeQuota',{m:marginPct})+'</div>'
         +'</div>';
     }
     box.innerHTML='<div class="glass" style="padding:18px 20px;border:1px solid rgba(59,130,246,.35);">'
-      +'<h3 style="font-size:16px;margin:0 0 4px;">🗺️ Térkép-szolgáltató (cím-keresés + geokódolás)</h3>'
-      +'<p style="color:var(--muted);font-size:12.5px;margin:0 0 14px;line-height:1.5;">Minden cégen elérhető az <b>ingyenes</b> szolgáltató (kulcs és díj nélkül). Megbízhatóbb keresésért kapcsold ki az ingyeneset, és válassz <b>HERE</b>/<b>Google</b> szolgáltatót a saját kulcsoddal — ekkor az első hívástól fizetsz (hivatalos ár + árrés). A routing/útdíj továbbra is az OSRM/ORS stacken megy.</p>'
+      +'<h3 style="font-size:16px;margin:0 0 4px;">'+t('cs.mp.title')+'</h3>'
+      +'<p style="color:var(--muted);font-size:12.5px;margin:0 0 14px;line-height:1.5;">'+t('cs.mp.hint')+'</p>'
       +'<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;font-weight:600;margin-bottom:6px;">'
-      +'<input type="checkbox" id="mpFree" '+(vendor==='free'?'checked':'')+' onchange="mpToggleFree()" style="width:18px;height:18px;cursor:pointer;accent-color:#22c55e;"> 🆓 Ingyenes térkép használata (Photon/OSM) — díjmentes</label>'
+      +'<input type="checkbox" id="mpFree" '+(vendor==='free'?'checked':'')+' onchange="mpToggleFree()" style="width:18px;height:18px;cursor:pointer;accent-color:#22c55e;"> '+t('cs.mp.useFree')+'</label>'
       +'<div id="mpPaidWrap" style="'+(vendor==='free'?'display:none;':'')+'margin-top:10px;border-top:1px solid var(--border,rgba(255,255,255,.08));padding-top:12px;">'
       +'<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;">'
-      +'<div class="field" style="margin:0;min-width:170px;"><label>Fizetős szolgáltató</label><select class="select" id="mpVendor">'
-      +'<option value="here"'+(vendor==='here'?' selected':'')+'>HERE (ajánlott)</option>'
+      +'<div class="field" style="margin:0;min-width:170px;"><label>'+t('cs.mp.paidProvider')+'</label><select class="select" id="mpVendor">'
+      +'<option value="here"'+(vendor==='here'?' selected':'')+'>'+t('cs.mp.hereRec')+'</option>'
       +'<option value="google"'+(vendor==='google'?' selected':'')+'>Google Maps</option></select></div>'
-      +'<div class="field" style="margin:0;flex:1;min-width:240px;"><label>API-kulcs '+(hasKey?'<span class="badge ok" style="font-size:10px;">tárolva</span>':'')+'</label><input class="input" id="mpKey" type="password" placeholder="'+(hasKey?'(változatlan, ha üresen hagyod)':'a szolgáltató API-kulcsa')+'"></div>'
+      +'<div class="field" style="margin:0;flex:1;min-width:240px;"><label>'+t('cs.mp.apiKey')+(hasKey?'<span class="badge ok" style="font-size:10px;">'+t('cs.mp.stored')+'</span>':'')+'</label><input class="input" id="mpKey" type="password" placeholder="'+(hasKey?t('cs.mp.keyPhUnchanged'):t('cs.mp.keyPh'))+'"></div>'
       +'<button class="btn ghost" style="height:42px;" onclick="mpTest()">🔌 Teszt</button>'
       +'</div><div id="mpMsg" style="margin-top:8px;font-size:12px;"></div>'+usageHtml+'</div>'
-      +'<button class="btn primary" style="margin-top:14px;" onclick="mpSave()">Mentés</button>'
+      +'<button class="btn primary" style="margin-top:14px;" onclick="mpSave()">'+t('common.save')+'</button>'
       +'</div>';
   });
 }
 function mpToggleFree(){ var f=document.getElementById('mpFree'); var w=document.getElementById('mpPaidWrap'); if(w) w.style.display=(f&&f.checked)?'none':'block'; }
 function mpTest(){
   var vendor=(document.getElementById('mpVendor')||{}).value; var key=(document.getElementById('mpKey')||{}).value;
-  var m=document.getElementById('mpMsg'); if(m) m.innerHTML='<span class="text-muted">Tesztelés…</span>';
+  var m=document.getElementById('mpMsg'); if(m) m.innerHTML='<span class="text-muted">'+t('cs.mp.testing')+'</span>';
   gas('mapsTestProvider',[{vendor:vendor, key:key}]).then(function(r){
     if(!m) return;
-    if(r&&r.ok&&r.valid) m.innerHTML='<span style="color:var(--status-ok);">✅ A kulcs működik.</span>';
-    else if(r&&r.ok&&!r.valid) m.innerHTML='<span style="color:var(--status-danger);">❌ A kulcs nem érvényes / nem válaszolt.</span>';
-    else m.innerHTML='<span style="color:var(--status-danger);">'+esc((r&&r.err)||'Teszt hiba')+'</span>';
+    if(r&&r.ok&&r.valid) m.innerHTML='<span style="color:var(--status-ok);">'+t('cs.mp.keyWorks')+'</span>';
+    else if(r&&r.ok&&!r.valid) m.innerHTML='<span style="color:var(--status-danger);">'+t('cs.mp.keyInvalid')+'</span>';
+    else m.innerHTML='<span style="color:var(--status-danger);">'+esc((r&&r.err)||t('cs.mp.testError'))+'</span>';
   });
 }
 function mpSave(){
@@ -1321,14 +1321,14 @@ function mpSave(){
   var vendor=free?'free':((document.getElementById('mpVendor')||{}).value||'here');
   var key=(document.getElementById('mpKey')||{}).value||'';
   gas('mapsSaveProvider',[{vendor:vendor, key:key}]).then(function(r){
-    if(r&&r.ok){ toast(free?'🆓 Ingyenes térkép bekapcsolva':'🗺️ Térkép-szolgáltató mentve','ok'); loadMapsProvider(); }
-    else toast((r&&r.err)||'Hiba','err');
+    if(r&&r.ok){ toast(free?t('cs.mp.freeOn'):t('cs.mp.savedProvider'),'ok'); loadMapsProvider(); }
+    else toast((r&&r.err)||t('common.error'),'err');
   });
 }
 
 function loadInvites(){
   gas('invListAll').then(list=>{
-    if(!Array.isArray(list)){document.querySelector('#tblInv tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);">Nincs meghívókód.</td></tr>';return;}
+    if(!Array.isArray(list)){document.querySelector('#tblInv tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);">'+t('cs.noInvites')+'</td></tr>';return;}
     document.querySelector('#tblInv tbody').innerHTML=list.map(i=>{
       var sc=i.status==='Aktiv'?'ok':i.status==='Felhasznalva'?'info':'err';
       return '<tr>'
@@ -1338,7 +1338,7 @@ function loadInvites(){
         +'<td>'+esc(i.email||'—')+'</td>'
         +'<td>'+esc(i.tel||'—')+'</td>'
         +'<td><span class="badge '+sc+'">'+i.status+'</span></td>'
-        +'<td><button class="btn ghost" style="padding:3px 10px;font-size:12px;" onclick="revokeInv(\''+esc(i.kod)+'\')" '+(i.status!=='Aktiv'?'disabled':'')+'>Visszavon</button></td>'
+        +'<td><button class="btn ghost" style="padding:3px 10px;font-size:12px;" onclick="revokeInv(\''+esc(i.kod)+'\')" '+(i.status!=='Aktiv'?'disabled':'')+'>'+t('cs.revoke')+'</button></td>'
         +'</tr>';
     }).join('');
   }).catch(function(e){ console.error('loadInvites hiba:', e); toast(t('common.loadError'),'err'); });
@@ -1370,7 +1370,7 @@ function loadOrders(){
 function loadReceivedFuvarlevelek(){
   gas('getFuvarlevelek').then(list=>{
     var tb=document.querySelector('#tblReceivedFuv tbody');
-    if(!list||list.length===0){tb.innerHTML='<tr><td colspan="5">Nincs beküldött fuvarlevél.</td></tr>';return;}
+    if(!list||list.length===0){tb.innerHTML='<tr><td colspan="5">'+t('cs.noWaybills')+'</td></tr>';return;}
     tb.innerHTML=list.map(f=>`<tr>`
       +`<td><b style="color:var(--brand-red);">${esc(f.numar_fisa||'—')}</b></td>`
       +`<td><b style="color:var(--text-primary);">${esc(f.file_name||'—')}</b></td>`
@@ -1378,7 +1378,7 @@ function loadReceivedFuvarlevelek(){
       +`<td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td>`
       +`<td style="display:flex;gap:6px;flex-wrap:wrap;">`
         +`<button class="btn ghost" style="padding:5px 10px;" onclick="openPdfView('${f.id}')">👁 PDF</button>`
-        +`<button class="btn primary" style="padding:5px 10px;" onclick="openFuvEdit('${f.id}')">✏️ Szerkeszt</button>`
+        +`<button class="btn primary" style="padding:5px 10px;" onclick="openFuvEdit('${f.id}')">${t('cs.editLong')}</button>`
       +`</td></tr>`).join('');
   });
 }
