@@ -1262,6 +1262,19 @@ function loadMapsProvider(){
   var box=document.getElementById('mapsProviderBox'); if(!box) return;
   gas('mapsGetProvider').then(function(r){
     var vendor=(r&&r.ok&&r.vendor)||'free'; var hasKey=!!(r&&r.has_key);
+    var usage=(r&&r.usage)||{month:0,prev:0}; var freeTier=(r&&r.free_tier)||0;
+    var usageHtml='';
+    if(vendor!=='free'){
+      var m=usage.month||0; var pct=freeTier?Math.min(100,Math.round(m/freeTier*100)):0;
+      var col=pct>=100?'#ff6b75':pct>=80?'#fbbf24':'#4ade80';
+      usageHtml='<div class="glass-soft" style="padding:12px 14px;margin-top:14px;">'
+        +'<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;"><span style="font-size:12px;color:var(--muted);font-weight:700;">📊 E havi használat ('+vendor.toUpperCase()+')</span>'
+        +'<span style="font-size:20px;font-weight:800;color:'+col+';">'+m.toLocaleString('hu')+'</span><span style="font-size:12px;color:var(--muted);">hívás'+(freeTier?(' / '+freeTier.toLocaleString('hu')+' ingyenes keret'):'')+'</span>'
+        +(usage.prev?'<span style="font-size:11px;color:var(--muted);margin-left:auto;">előző hó: '+usage.prev.toLocaleString('hu')+'</span>':'')+'</div>'
+        +(freeTier?('<div style="height:7px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:8px;"><i style="display:block;height:100%;width:'+pct+'%;background:'+col+';border-radius:6px;"></i></div>'):'')
+        +'<div style="font-size:10.5px;color:var(--muted);margin-top:6px;">A számláló 0-ról indul, és csak a fizetős (keyes) geokódolás/keresés-hívásokat számolja — az ingyenes hívások nem. A pontos kvótát/árat a szolgáltatónál ellenőrizd.</div>'
+        +'</div>';
+    }
     box.innerHTML='<div class="glass" style="padding:18px 20px;border:1px solid rgba(59,130,246,.35);">'
       +'<h3 style="font-size:16px;margin:0 0 4px;">🗺️ Térkép-szolgáltató (cím-keresés + geokódolás)</h3>'
       +'<p style="color:var(--muted);font-size:12.5px;margin:0 0 14px;line-height:1.5;">Alapból az <b>ingyenes</b> szolgáltató megy (kulcs nélkül). Megbízhatóbb keresésért kapcsolj <b>HERE</b>-re vagy <b>Google</b>-re, és add meg a saját API-kulcsod (titkosítva tároljuk, sosem jön vissza nyíltan). A routing/útdíj továbbra is az OSRM/ORS stacken megy.</p>'
@@ -1273,7 +1286,7 @@ function loadMapsProvider(){
       +'<div class="field" id="mpKeyWrap" style="margin:0;flex:1;min-width:240px;'+(vendor==='free'?'display:none;':'')+'"><label>API-kulcs '+(hasKey?'<span class="badge ok" style="font-size:10px;">tárolva</span>':'')+'</label><input class="input" id="mpKey" type="password" placeholder="'+(hasKey?'(változatlan, ha üresen hagyod)':'a szolgáltató API-kulcsa')+'"></div>'
       +'<button class="btn ghost" style="height:42px;" onclick="mpTest()">🔌 Teszt</button>'
       +'<button class="btn primary" style="height:42px;" onclick="mpSave()">Mentés</button>'
-      +'</div><div id="mpMsg" style="margin-top:8px;font-size:12px;"></div></div>';
+      +'</div><div id="mpMsg" style="margin-top:8px;font-size:12px;"></div>'+usageHtml+'</div>';
   });
 }
 function mpToggleKey(){ var v=(document.getElementById('mpVendor')||{}).value; var w=document.getElementById('mpKeyWrap'); if(w) w.style.display=(v==='free')?'none':'block'; }

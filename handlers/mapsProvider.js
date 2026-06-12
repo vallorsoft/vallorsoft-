@@ -6,7 +6,10 @@
 // ============================================================
 const pool = require('../db');
 const { encrypt } = require('../lib/crypto');
-const { clearConfigCache, testProvider } = require('../lib/mapsProvider');
+const { clearConfigCache, testProvider, getUsage } = require('../lib/mapsProvider');
+
+// Tájékoztató ingyenes havi keret szolgáltatónként (a pontosat a szolgáltatónál nézd)
+const FREE_TIER = { here: 30000, google: 10000 };
 
 const handlers = {};
 function _admin(req) { return req.session.user && (req.session.user.pozicio === 'Admin'); }
@@ -17,10 +20,11 @@ handlers.mapsGetProvider = async function (req, res, args) {
     if (!_admin(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
     const cid = req.session.user.company_id;
     const r = await pool.query("SELECT enabled, meta, (credentials_enc IS NOT NULL) AS has_key FROM company_integrations WHERE company_id=$1 AND provider='maps'", [cid]);
-    if (!r.rows.length) return res.json({ result: { ok: true, vendor: 'free', has_key: false } });
+    if (!r.rows.length) return res.json({ result: { ok: true, vendor: 'free', has_key: false, usage: { month: 0, prev: 0 }, free_tier: 0 } });
     const meta = r.rows[0].meta || {};
     const vendor = r.rows[0].enabled && VENDORS.includes(meta.vendor) ? meta.vendor : 'free';
-    return res.json({ result: { ok: true, vendor, has_key: !!r.rows[0].has_key } });
+    const usage = vendor === 'free' ? { month: 0, prev: 0 } : await getUsage(cid, vendor);
+    return res.json({ result: { ok: true, vendor, has_key: !!r.rows[0].has_key, usage, free_tier: FREE_TIER[vendor] || 0 } });
   } catch (err) { console.error('mapsGetProvider hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
 };
 

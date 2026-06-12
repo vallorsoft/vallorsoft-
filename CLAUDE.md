@@ -11,6 +11,7 @@ Tesztek zöldek (41 Jest). Deploy-teendő: szerver-restart (a `db/*.sql` migrác
 
 **Legújabb kör (cserélhető térkép-szolgáltató — megbízhatóság):**
 1. **Cserélhető geokódolás + cím-autocomplete** (`lib/mapsProvider.js`) — cégenként **HERE** vagy **Google** kulcsos szolgáltató, VAGY az alap **ingyenes** (Photon/OSM). Minden keyes hívás **biztonságosan visszaesik az ingyenesre** hiba/kulcs-hiány esetén (sosem rosszabb a mostaninál). Tárolás: `company_integrations` `provider='maps'` (`meta.vendor`, `credentials_enc` AES). Beállítás: az **admin Integrációk fülén** „🗺️ Térkép-szolgáltató" kártya (`loadMapsProvider`, handlerek `mapsGetProvider`/`mapsSaveProvider`/`mapsTestProvider`). Bekötve: `/api/geo-autocomplete` (firebase.js) + `estimateRoute(waypoints, companyId)` geokódolása (`routeEstimate.js` → orderRouteEstimate/toll/inbound). **A routing/útdíj továbbra is OSRM/ORS** — HERE-routing+toll a következő lépcső.
+2. **Használat-számláló** (`maps_usage` tábla, `db/maps-usage.sql`) — a fizetős (HERE/Google) hívásokat cégenként/havonta számolja (0-ról; csak a keyes geokódolás/keresés, az ingyenes nem). A kártyán e havi/előző havi számláló + ingyenes-keret sáv (`getUsage`, `bump` a `lib/mapsProvider.js`-ben).
 
 **Korábbi kör (könyvelői felület — dokumentum-hub + SAGA/WinMentor export):**
 1. **Könyvelő szerepkör** (`pozicio='Konyvelo'`) — **csak az admin hívhatja meg** (a meghívó-rendszeren át; Manager nem). A `/konyvelo` oldalra jut be. Migráció: `db/role-konyvelo.sql` (a users/invites CHECK-constraint bővítése).
