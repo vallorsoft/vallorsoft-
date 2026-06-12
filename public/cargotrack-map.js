@@ -1,4 +1,17 @@
 // public/cargotrack-map.js  (a cargotrack-where-is.html-ből rendezve)
+(window.registerI18n||function(d){(window.__i18nQueue=window.__i18nQueue||[]).push(d);})({
+  'gps.map.title':       { hu: 'Hol a kocsi?', ro: 'Unde este vehiculul?' },
+  'gps.map.close':       { hu: 'Bezár', ro: 'Închide' },
+  'gps.map.loading':     { hu: 'Pozíció lekérése…', ro: 'Se preia poziția…' },
+  'gps.map.errN':        { hu: 'Hiba ({n})', ro: 'Eroare ({n})' },
+  'gps.map.noPosition':  { hu: 'Nincs friss pozícióadat.', ro: 'Nu există date de poziție recente.' },
+  'gps.map.fuel':        { hu: 'Üzemanyag', ro: 'Carburant' },
+  'gps.map.speed':       { hu: 'Sebesség', ro: 'Viteză' },
+  'gps.map.ignition':    { hu: 'Gyújtás', ro: 'Contact' },
+  'gps.map.lastSignal':  { hu: 'Utolsó jel', ro: 'Ultimul semnal' },
+  'gps.map.error':       { hu: 'Hiba: {m}', ro: 'Eroare: {m}' },
+});
+function T(k,v){return (typeof window.t==='function')?window.t(k,v):k;}
 window.CargoTrackWhereIs = (function () {
   const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
   const LEAFLET_JS  = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
@@ -39,11 +52,11 @@ window.CargoTrackWhereIs = (function () {
     overlay.className = 'ctw-overlay'; overlay.id = 'ctw-overlay';
     overlay.innerHTML =
       '<div class="ctw-box">' +
-        '<div class="ctw-head"><div class="ctw-h-title">Hol a kocsi? — ' + (label ? label + ' · ' : '') + rendszam + '</div>' +
-        '<button class="ctw-close" aria-label="Bezár">×</button></div>' +
+        '<div class="ctw-head"><div class="ctw-h-title">' + T('gps.map.title') + ' — ' + (label ? label + ' · ' : '') + rendszam + '</div>' +
+        '<button class="ctw-close" aria-label="' + T('gps.map.close') + '">×</button></div>' +
         '<div class="ctw-map" id="ctw-map" style="display:none"></div>' +
         '<div class="ctw-info" id="ctw-info" style="display:none"></div>' +
-        '<div class="ctw-state" id="ctw-state">Pozíció lekérése…</div>' +
+        '<div class="ctw-state" id="ctw-state">' + T('gps.map.loading') + '</div>' +
       '</div>';
     document.body.appendChild(overlay);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
@@ -53,9 +66,9 @@ window.CargoTrackWhereIs = (function () {
     try {
       const res = await fetch('/api/cargotrack/position?rendszam=' + encodeURIComponent(rendszam), { credentials: 'same-origin' });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) { stateEl.textContent = data.error || ('Hiba (' + res.status + ')'); return; }
+      if (!res.ok) { stateEl.textContent = data.error || T('gps.map.errN', { n: res.status }); return; }
       const p = data.position;
-      if (!p || p.latitude == null) { stateEl.textContent = data.message || 'Nincs friss pozícióadat.'; return; }
+      if (!p || p.latitude == null) { stateEl.textContent = data.message || T('gps.map.noPosition'); return; }
 
       await loadLeaflet();
       stateEl.style.display = 'none';
@@ -78,12 +91,12 @@ window.CargoTrackWhereIs = (function () {
       const fuel = (p.fuel_level != null) ? Math.round(p.fuel_level) + ' L' : '—';
       const speed = (p.speed != null) ? Math.round(p.speed) + ' km/h' : '—';
       infoEl.innerHTML =
-        '<div><b>Üzemanyag</b>' + fuel + '</div>' +
-        '<div><b>Sebesség</b>' + speed + '</div>' +
-        '<div><b>Gyújtás</b>' + (p.ignition || '—') + '</div>' +
-        '<div><b>Utolsó jel</b>' + fmtTime(p.datetime) + '</div>';
+        '<div><b>' + T('gps.map.fuel') + '</b>' + fuel + '</div>' +
+        '<div><b>' + T('gps.map.speed') + '</b>' + speed + '</div>' +
+        '<div><b>' + T('gps.map.ignition') + '</b>' + (p.ignition || '—') + '</div>' +
+        '<div><b>' + T('gps.map.lastSignal') + '</b>' + fmtTime(p.datetime) + '</div>';
     } catch (e) {
-      stateEl.textContent = 'Hiba: ' + e.message;
+      stateEl.textContent = T('gps.map.error', { m: e.message });
     }
   }
 

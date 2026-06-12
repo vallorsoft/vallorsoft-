@@ -3,6 +3,25 @@
 //  - a sofőr CSAK a saját fuvarja UIT-jait látja (a backend ellenőrzi);
 //  - státusz + ANAF-visszaigazolás látszik kódonként;
 //  - ÚJ UIT-ot CSAK akkor adhat hozzá, ha még egy sincs (a backend is védi).
+(window.registerI18n||function(d){(window.__i18nQueue=window.__i18nQueue||[]).push(d);})({
+  'sof.uit.errStatus': { hu: 'Hiba ({s})', ro: 'Eroare ({s})' },
+  'sof.uit.anafConfirmed': { hu: '✔ ANAF visszaigazolva', ro: '✔ Confirmat de ANAF' },
+  'sof.uit.anafError': { hu: 'ANAF: hiba', ro: 'ANAF: eroare' },
+  'sof.uit.anafWaiting': { hu: 'ANAF: megerősítésre vár', ro: 'ANAF: în așteptarea confirmării' },
+  'sof.uit.stopped': { hu: 'Leállítva', ro: 'Oprit' },
+  'sof.uit.notSent': { hu: 'Nincs még elküldve', ro: 'Încă netrimis' },
+  'sof.uit.csTitle': { hu: 'UIT — hamarosan', ro: 'UIT — în curând' },
+  'sof.uit.csBody': { hu: 'A UIT / RO e-Transport funkció fejlesztés alatt áll. Addig is használd a GPS-szolgáltatód (pl. CargoTrack) saját e-Transport lehetőségét.', ro: 'Funcția UIT / RO e-Transport este în dezvoltare. Până atunci, folosește opțiunea proprie e-Transport a furnizorului tău GPS (ex. CargoTrack).' },
+  'sof.uit.csOk': { hu: 'Rendben', ro: 'În regulă' },
+  'sof.uit.title': { hu: '🚛 UIT-kódok — #{id}', ro: '🚛 Coduri UIT — #{id}' },
+  'sof.uit.sub': { hu: 'RO e-Transport · csak a te fuvarodhoz tartozó kódok.', ro: 'RO e-Transport · doar codurile aferente transportului tău.' },
+  'sof.uit.loading': { hu: 'Betöltés…', ro: 'Se încarcă…' },
+  'sof.uit.note': { hu: 'A „✔ ANAF visszaigazolva" jelzés azt jelenti, hogy az ANAF megerősítette a fogadást. Amíg ez nincs meg, a kód még nincs hitelesítve.', ro: 'Indicatorul „✔ Confirmat de ANAF" înseamnă că ANAF a confirmat recepția. Până atunci, codul nu este încă validat.' },
+  'sof.uit.empty': { hu: 'Még nincs UIT-kód ehhez a fuvarhoz.', ro: 'Încă nu există coduri UIT pentru acest transport.' },
+  'sof.uit.placeholder': { hu: 'UIT-kód beírása…', ro: 'Introdu codul UIT…' },
+  'sof.uit.save': { hu: '+ Mentés', ro: '+ Salvează' }
+});
+function T(k,v){return (typeof window.t==='function')?window.t(k,v):k;}
 window.SoferUit = (function () {
   // FUNKCIÓ IDEIGLENESEN KIKAPCSOLVA — visszakapcsolás: window.UIT_COMING_SOON = false.
   window.UIT_COMING_SOON = true;
@@ -37,16 +56,16 @@ window.SoferUit = (function () {
   async function api(method, url, body) {
     var r = await fetch(url, { method:method, credentials:'same-origin', headers:{'Content-Type':'application/json'}, body: body?JSON.stringify(body):undefined });
     var d = await r.json().catch(function(){return {};});
-    if (!r.ok) throw new Error(d.error || ('Hiba ('+r.status+')'));
+    if (!r.ok) throw new Error(d.error || T('sof.uit.errStatus', { s: r.status }));
     return d;
   }
   // ANAF-hitelesítési badge — ZÖLD csak valódi ANAF-visszaigazolásra.
   function verif(u){
-    if (u.anaf_confirmed) return { cls:'ok', txt:'✔ ANAF visszaigazolva' };
-    if (u.status === 'error') return { cls:'err', txt:'ANAF: hiba' };
-    if (u.status === 'active') return { cls:'wait', txt:'ANAF: megerősítésre vár' };
-    if (u.status === 'stopped') return { cls:'wait', txt:'Leállítva' };
-    return { cls:'wait', txt:'Nincs még elküldve' };
+    if (u.anaf_confirmed) return { cls:'ok', txt:T('sof.uit.anafConfirmed') };
+    if (u.status === 'error') return { cls:'err', txt:T('sof.uit.anafError') };
+    if (u.status === 'active') return { cls:'wait', txt:T('sof.uit.anafWaiting') };
+    if (u.status === 'stopped') return { cls:'wait', txt:T('sof.uit.stopped') };
+    return { cls:'wait', txt:T('sof.uit.notSent') };
   }
   function symbol(u){
     if (u.anaf_confirmed) return '✅';
@@ -62,10 +81,9 @@ window.SoferUit = (function () {
     ov.innerHTML =
       '<div class="su-box" style="text-align:center;">' +
         '<div style="font-size:34px;margin:6px 0;">🚧</div>' +
-        '<h3 style="margin:0 0 8px;">UIT — hamarosan</h3>' +
-        '<p class="su-sub" style="margin-bottom:16px;">A UIT / RO e-Transport funkció fejlesztés alatt áll. ' +
-          'Addig is használd a GPS-szolgáltatód (pl. CargoTrack) saját e-Transport lehetőségét.</p>' +
-        '<button class="su-save" id="suCsOk" style="width:100%;">Rendben</button>' +
+        '<h3 style="margin:0 0 8px;">' + esc(T('sof.uit.csTitle')) + '</h3>' +
+        '<p class="su-sub" style="margin-bottom:16px;">' + esc(T('sof.uit.csBody')) + '</p>' +
+        '<button class="su-save" id="suCsOk" style="width:100%;">' + esc(T('sof.uit.csOk')) + '</button>' +
       '</div>';
     document.body.appendChild(ov);
     var close = function () { ov.remove(); };
@@ -79,12 +97,11 @@ window.SoferUit = (function () {
     var ov = document.createElement('div'); ov.className = 'su-ov';
     ov.innerHTML =
       '<div class="su-box">' +
-        '<div class="su-h"><h3>🚛 UIT-kódok — #' + esc(orderId) + '</h3><button class="su-x" id="suX">&times;</button></div>' +
-        '<p class="su-sub">RO e-Transport · csak a te fuvarodhoz tartozó kódok.</p>' +
-        '<div id="suList"><div class="su-empty">Betöltés…</div></div>' +
+        '<div class="su-h"><h3>' + esc(T('sof.uit.title', { id: orderId })) + '</h3><button class="su-x" id="suX">&times;</button></div>' +
+        '<p class="su-sub">' + esc(T('sof.uit.sub')) + '</p>' +
+        '<div id="suList"><div class="su-empty">' + esc(T('sof.uit.loading')) + '</div></div>' +
         '<div id="suAddWrap"></div>' +
-        '<p class="su-note">A „✔ ANAF visszaigazolva" jelzés azt jelenti, hogy az ANAF megerősítette a fogadást. ' +
-          'Amíg ez nincs meg, a kód még nincs hitelesítve.</p>' +
+        '<p class="su-note">' + esc(T('sof.uit.note')) + '</p>' +
       '</div>';
     document.body.appendChild(ov);
     var $ = function(id){ return ov.querySelector('#'+id); };
@@ -95,7 +112,7 @@ window.SoferUit = (function () {
     function render(data){
       var items = data.items || [];
       if (!items.length) {
-        $('suList').innerHTML = '<div class="su-empty">Még nincs UIT-kód ehhez a fuvarhoz.</div>';
+        $('suList').innerHTML = '<div class="su-empty">' + esc(T('sof.uit.empty')) + '</div>';
       } else {
         $('suList').innerHTML = items.map(function(u){
           var v = verif(u);
@@ -112,7 +129,7 @@ window.SoferUit = (function () {
       // Hozzáadás CSAK akkor, ha nincs még UIT (a backend is ezt nézi).
       if (data.canAdd) {
         $('suAddWrap').innerHTML =
-          '<div class="su-add"><input class="su-in" id="suNew" placeholder="UIT-kód beírása…"><button class="su-save" id="suSave">+ Mentés</button></div>';
+          '<div class="su-add"><input class="su-in" id="suNew" placeholder="' + esc(T('sof.uit.placeholder')) + '"><button class="su-save" id="suSave">' + esc(T('sof.uit.save')) + '</button></div>';
         var add = async function(){
           var code = $('suNew').value.trim(); if (!code) return;
           var b = $('suSave'); b.disabled = true;

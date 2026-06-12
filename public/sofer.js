@@ -2,6 +2,76 @@
 //  VallorSoft — sofer.js
 //  Kivágva a sofer.html inline <script> blokkjaiból, BÁJTRA AZONOS.
 // ============================================================
+(window.registerI18n||function(d){(window.__i18nQueue=window.__i18nQueue||[]).push(d);})({
+  'sof.gps.fetching': { hu: 'GPS lekérés...', ro: 'Se obține GPS...' },
+  'sof.border.inRec': { hu: '🇷🇴 Románia BE rögzítve!', ro: '🇷🇴 Intrare România înregistrată!' },
+  'sof.border.outRec': { hu: '🇷🇴 Románia KI rögzítve!', ro: '🇷🇴 Ieșire România înregistrată!' },
+  'sof.border.gpsNo': { hu: '⚠️ GPS nélkül rögzítve', ro: '⚠️ Înregistrat fără GPS' },
+  'sof.border.empty': { hu: 'Nincs rögzített átlépés.', ro: 'Nicio trecere înregistrată.' },
+  'sof.border.in': { hu: '🇷🇴 BE', ro: '🇷🇴 INTRARE' },
+  'sof.border.out': { hu: '🇷🇴 KI', ro: '🇷🇴 IEȘIRE' },
+  'sof.err.unknown': { hu: 'ismeretlen', ro: 'necunoscut' },
+  'sof.err.prefix': { hu: 'Hiba: {m}', ro: 'Eroare: {m}' },
+  'sof.err.network': { hu: 'Hálózati hiba', ro: 'Eroare de rețea' },
+  'sof.err.generic': { hu: 'Hiba történt', ro: 'A apărut o eroare' },
+  'sof.orders.empty': { hu: 'Nincs menetlevélre váró fuvar.', ro: 'Niciun transport în așteptare pentru foaie de parcurs.' },
+  'sof.fuvar.pickOne': { hu: 'Jelölj be legalább egy fuvart!', ro: 'Selectează cel puțin un transport!' },
+  'sof.fuvar.selected': { hu: '✅ {n} fuvar kiválasztva:', ro: '✅ {n} transport(uri) selectat(e):' },
+  'sof.field.tipPunct': { hu: 'Tip punct', ro: 'Tip punct' },
+  'sof.field.data': { hu: 'Dată', ro: 'Dată' },
+  'sof.field.locAddr': { hu: 'Localitate / Adresă', ro: 'Localitate / Adresă' },
+  'sof.ph.locExample': { hu: 'pl. Budapest, Keleti pu.', ro: 'ex. Budapesta, Gara Keleti' },
+  'sof.field.locDate': { hu: 'Helyszín & Dátum', ro: 'Locație & Dată' },
+  'sof.ph.alimLoc': { hu: 'pl. Győr, 2025-01-15', ro: 'ex. Győr, 2025-01-15' },
+  'sof.field.tipComb': { hu: 'Tip combustibil', ro: 'Tip combustibil' },
+  'sof.field.litri': { hu: 'Litri', ro: 'Litri' },
+  'sof.field.km': { hu: 'Km', ro: 'Km' },
+  'sof.field.plata': { hu: 'Plată', ro: 'Plată' },
+  'sof.field.sumaRon': { hu: 'Sumă (RON)', ro: 'Sumă (RON)' },
+  'sof.field.produs': { hu: 'Produs / Serviciu', ro: 'Produs / Serviciu' },
+  'sof.ph.produs': { hu: 'pl. Autostrăzi vigneta', ro: 'ex. vinietă autostrăzi' },
+  'sof.field.loc': { hu: 'Helyszín', ro: 'Locație' },
+  'sof.ph.locCity': { hu: 'pl. Győr', ro: 'ex. Győr' },
+  'sof.wb.sent': { hu: '✅ Menetlevél elküldve!', ro: '✅ Foaia de parcurs a fost trimisă!' },
+  'sof.wb.sentNum': { hu: '✅ Menetlevél elküldve — {num}', ro: '✅ Foaia de parcurs a fost trimisă — {num}' },
+  'sof.doc.pickFile': { hu: 'Válassz fájlt!', ro: 'Alege un fișier!' },
+  'sof.doc.uploaded': { hu: '✅ Feltöltve!', ro: '✅ Încărcat!' },
+  'sof.doc.noOrder': { hu: '— Nincs fuvarhoz kötve —', ro: '— Fără transport asociat —' },
+  'sof.stats.title': { hu: '📊 E havi teljesítményem', ro: '📊 Performanța mea din luna aceasta' },
+  'sof.stats.closed': { hu: 'Lezárt fuvar', ro: 'Transporturi finalizate' },
+  'sof.stats.km': { hu: 'Km', ro: 'Km' },
+  'sof.stats.diurna': { hu: 'Diurna (K+B)', ro: 'Diurnă (E+I)' },
+  'sof.stats.fueled': { hu: 'Tankolva', ro: 'Alimentat' },
+  'sof.draft.restored': { hu: '📝 Piszkozat visszaállítva', ro: '📝 Schiță restaurată' },
+  'sof.chat.cfgMissing': { hu: '⚠️ Chat konfiguráció hiányzik.', ro: '⚠️ Configurarea chatului lipsește.' },
+  'sof.chat.unavailable': { hu: '⚠️ Chat nem elérhető.', ro: '⚠️ Chat indisponibil.' },
+  'sof.chat.noManager': { hu: 'Nincs elérhető manager.', ro: 'Niciun manager disponibil.' },
+  'sof.chat.loading': { hu: 'Betöltés...', ro: 'Se încarcă...' },
+  'sof.chat.driver': { hu: 'Sofőr', ro: 'Șofer' },
+  'sof.bug.minChars': { hu: 'Írj le legalább 5 karaktert!', ro: 'Scrie cel puțin 5 caractere!' },
+  'sof.bug.sending': { hu: 'Küldés...', ro: 'Se trimite...' },
+  'sof.bug.send': { hu: '📤 Küldés', ro: '📤 Trimite' },
+  'sof.bug.sent': { hu: 'Hibajelentés elküldve, köszönjük!', ro: 'Raportul de eroare a fost trimis, mulțumim!' },
+  'sof.card.done': { hu: '✓ Teljesítve', ro: '✓ Finalizat' },
+  'sof.card.accept': { hu: '✅ Elfogadom', ro: '✅ Accept' },
+  'sof.card.complete': { hu: '🏁 Elvégeztem', ro: '🏁 Am finalizat' },
+  'sof.card.handoverWait': { hu: '⏳ Leadás visszaigazolásra vár', ro: '⏳ Predarea așteaptă confirmarea' },
+  'sof.card.handover': { hu: '⛔ Áru leadása', ro: '⛔ Predare marfă' },
+  'sof.card.handoverTitle': { hu: 'Áru leadása (pótkocsin parkol / raktárba kerül)', ro: 'Predare marfă (rămâne pe remorcă / intră în depozit)' },
+  'sof.card.uitTitle': { hu: 'UIT-kódok (RO e-Transport)', ro: 'Coduri UIT (RO e-Transport)' },
+  'sof.ho.needLoc': { hu: 'Add meg, hol lett lerakva / hol parkol! (helység)', ro: 'Indică unde a fost descărcată / unde staționează! (localitatea)' },
+  'sof.ho.sending': { hu: 'Küldés...', ro: 'Se trimite...' },
+  'sof.ho.send': { hu: '📤 Kérés küldése', ro: '📤 Trimite cererea' },
+  'sof.ho.sent': { hu: '✅ Kérés elküldve — a diszpécser visszaigazolja.', ro: '✅ Cererea a fost trimisă — dispecerul o confirmă.' },
+  'sof.ho.photoDocs': { hu: '📷 Fotózd le az áru dokumentumait most!', ro: '📷 Fotografiază documentele mărfii acum!' },
+  'sof.dash.empty': { hu: 'Nincs aktív kiosztott fuvar.', ro: 'Niciun transport activ alocat.' },
+  'sof.status.accepted': { hu: '✅ Fuvar elfogadva!', ro: '✅ Transport acceptat!' },
+  'sof.status.completed': { hu: '🏁 Fuvar teljesítve! Manager értesítve.', ro: '🏁 Transport finalizat! Managerul a fost notificat.' },
+  'sof.status.err': { hu: 'Hiba', ro: 'Eroare' },
+  'sof.driverName': { hu: 'Sofőr', ro: 'Șofer' },
+  'sof.card.statusAlocat': { hu: 'Alocat', ro: 'Alocat' }
+});
+function T(k,v){return (typeof window.t==='function')?window.t(k,v):k;}
 // HTML-escape a szerverről jövő adatokhoz (tárolt XSS ellen)
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
@@ -184,7 +254,7 @@ function goSec(id) {
 // ============================================================
 function sendBorderCross(tip, tara) {
   var statusEl = document.getElementById('gpsStatus');
-  statusEl.innerHTML = '<div class="gps-badge"><span class="spinner"></span> GPS lekérés...</div>';
+  statusEl.innerHTML = '<div class="gps-badge"><span class="spinner"></span> ' + T('sof.gps.fetching') + '</div>';
 
   function doSend(lat, lng) {
     fetch('/api/border-cross', {
@@ -194,13 +264,13 @@ function sendBorderCross(tip, tara) {
         locatie: lat ? (lat.toFixed(4) + ', ' + lng.toFixed(4)) : null })
     }).then(function(r) { return r.json(); }).then(function(d) {
       if (d.success) {
-        toast(tip === 'Intrare' ? '🇷🇴 Románia BE rögzítve!' : '🇷🇴 Románia KI rögzítve!', 'ok');
+        toast(tip === 'Intrare' ? T('sof.border.inRec') : T('sof.border.outRec'), 'ok');
         statusEl.innerHTML = lat
           ? '<div class="gps-badge">📍 GPS: ' + lat.toFixed(4) + ', ' + lng.toFixed(4) + '</div>'
-          : '<div class="gps-badge">⚠️ GPS nélkül rögzítve</div>';
+          : '<div class="gps-badge">' + T('sof.border.gpsNo') + '</div>';
         loadBorderLog();
       } else {
-        toast('Hiba: ' + (d.err || 'ismeretlen'), 'err');
+        toast(T('sof.err.prefix', { m: d.err || T('sof.err.unknown') }), 'err');
         statusEl.innerHTML = '';
       }
     });
@@ -223,11 +293,11 @@ function loadBorderLog() {
   .then(function(r) { return r.json(); }).then(function(d) {
     var list = d.result || [];
     var el = document.getElementById('borderLogList');
-    if (!list.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;">Nincs rögzített átlépés.</div>'; return; }
+    if (!list.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;">' + T('sof.border.empty') + '</div>'; return; }
     el.innerHTML = list.slice(0, 20).map(function(l) {
       var dt = l.created_at ? new Date(l.created_at).toLocaleString('hu-HU') : '—';
       return '<div class="border-log-item">'
-        + '<strong>' + (l.tip === 'Intrare' ? '🇷🇴 BE' : '🇷🇴 KI') + '</strong>'
+        + '<strong>' + (l.tip === 'Intrare' ? T('sof.border.in') : T('sof.border.out')) + '</strong>'
         + ' — ' + dt
         + (l.locatie ? '<br><span style="font-size:11px;color:var(--muted);">📍 ' + l.locatie + '</span>' : '')
         + '</div>';
@@ -252,7 +322,7 @@ function loadSoferOrders() {
     _soferOrdersCache = (d.result || []).filter(function(o) { return o.waybill_visible !== false; });
     var el = document.getElementById('soferOrderList');
     if (!_soferOrdersCache.length) {
-      el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Nincs menetlevélre váró fuvar.</div>';
+      el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">' + T('sof.orders.empty') + '</div>';
       return;
     }
     el.innerHTML = _soferOrdersCache.map(function(o) {
@@ -278,10 +348,10 @@ function toggleOrderSel(cb) {
 }
 
 function fuvarStep2() {
-  if (!_selectedOrderIds.length) { toast('Jelölj be legalább egy fuvart!', 'err'); return; }
+  if (!_selectedOrderIds.length) { toast(T('sof.fuvar.pickOne'), 'err'); return; }
   var selected = _soferOrdersCache.filter(function(o) { return _selectedOrderIds.indexOf(o.id) !== -1; });
   var sumEl = document.getElementById('selectedOrdersSummary');
-  sumEl.innerHTML = '<b style="color:#fff;">✅ ' + selected.length + ' fuvar kiválasztva:</b><br>'
+  sumEl.innerHTML = '<b style="color:#fff;">' + T('sof.fuvar.selected', { n: selected.length }) + '</b><br>'
     + selected.map(function(o) {
         return '• ' + esc(o.client || '—') + ': ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—');
       }).join('<br>');
@@ -350,12 +420,12 @@ function addPunctRow(locVal, tipVal, dataVal) {
   var today = new Date().toISOString().split('T')[0];
   d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
     + '<div class="g2">'
-    + '<div class="field"><label>Tip punct</label><select class="input punct-tip" style="padding:10px 14px;" onchange="draftSave()">'
+    + '<div class="field"><label>' + T('sof.field.tipPunct') + '</label><select class="input punct-tip" style="padding:10px 14px;" onchange="draftSave()">'
     + tipOptions.map(function(t) { return '<option' + (t === (tipVal || 'Încărcare') ? ' selected' : '') + '>' + t + '</option>'; }).join('')
     + '</select></div>'
-    + '<div class="field"><label>Dată</label><input class="input punct-data" type="date" value="' + esc(dataVal || today) + '" onchange="draftSave()"></div>'
+    + '<div class="field"><label>' + T('sof.field.data') + '</label><input class="input punct-data" type="date" value="' + esc(dataVal || today) + '" onchange="draftSave()"></div>'
     + '</div>'
-    + '<div class="field"><label>Localitate / Adresă</label><input class="input punct-loc" placeholder="pl. Budapest, Keleti pu." value="' + esc(locVal || '') + '" oninput="draftSave()"></div>';
+    + '<div class="field"><label>' + T('sof.field.locAddr') + '</label><input class="input punct-loc" placeholder="' + esc(T('sof.ph.locExample')) + '" value="' + esc(locVal || '') + '" oninput="draftSave()"></div>';
   document.getElementById('puncteContainer').appendChild(d);
 }
 
@@ -365,15 +435,15 @@ function addAlimRow(a) {
   var d = document.createElement('div');
   d.className = 'dyn-row';
   d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
-    + '<div class="field"><label>Helyszín & Dátum</label><input class="input alim-loc" placeholder="pl. Győr, 2025-01-15" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + T('sof.field.locDate') + '</label><input class="input alim-loc" placeholder="' + esc(T('sof.ph.alimLoc')) + '" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
     + '<div class="g2">'
-    + '<div class="field"><label>Tip combustibil</label><select class="input alim-tip" style="padding:10px 14px;" onchange="draftSave()"><option' + (a.tip === 'AdBlue' ? '' : ' selected') + '>Motorină</option><option' + (a.tip === 'AdBlue' ? ' selected' : '') + '>AdBlue</option></select></div>'
-    + '<div class="field"><label>Litri</label><input class="input alim-lit" type="number" value="' + (a.litru || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + T('sof.field.tipComb') + '</label><select class="input alim-tip" style="padding:10px 14px;" onchange="draftSave()"><option' + (a.tip === 'AdBlue' ? '' : ' selected') + '>Motorină</option><option' + (a.tip === 'AdBlue' ? ' selected' : '') + '>AdBlue</option></select></div>'
+    + '<div class="field"><label>' + T('sof.field.litri') + '</label><input class="input alim-lit" type="number" value="' + (a.litru || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
     + '</div>'
     + '<div class="g3">'
-    + '<div class="field"><label>Km</label><input class="input alim-km" type="number" value="' + (a.km || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
-    + '<div class="field"><label>Plată</label><select class="input alim-plata" style="padding:10px 14px;" onchange="draftSave()"><option>Card</option><option>Cash</option><option>Flota Card</option><option>DKV</option></select></div>'
-    + '<div class="field"><label>Sumă (RON)</label><input class="input alim-suma" type="number" value="' + (a.suma || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + T('sof.field.km') + '</label><input class="input alim-km" type="number" value="' + (a.km || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + T('sof.field.plata') + '</label><select class="input alim-plata" style="padding:10px 14px;" onchange="draftSave()"><option>Card</option><option>Cash</option><option>Flota Card</option><option>DKV</option></select></div>'
+    + '<div class="field"><label>' + T('sof.field.sumaRon') + '</label><input class="input alim-suma" type="number" value="' + (a.suma || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
     + '</div>';
   document.getElementById('alimentariContainer').appendChild(d);
   // Plată visszaállítás
@@ -389,12 +459,12 @@ function addAchRow(a) {
   var d = document.createElement('div');
   d.className = 'dyn-row';
   d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
-    + '<div class="field"><label>Produs / Serviciu</label><input class="input ach-prod" placeholder="pl. Autostrăzi vigneta" value="' + (a.produs || '') + '" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + T('sof.field.produs') + '</label><input class="input ach-prod" placeholder="' + esc(T('sof.ph.produs')) + '" value="' + (a.produs || '') + '" oninput="draftSave()"></div>'
     + '<div class="g2">'
-    + '<div class="field"><label>Helyszín</label><input class="input ach-loc" placeholder="pl. Győr" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
-    + '<div class="field"><label>Sumă (RON)</label><input class="input ach-pret" type="number" value="' + (a.pret || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + T('sof.field.loc') + '</label><input class="input ach-loc" placeholder="' + esc(T('sof.ph.locCity')) + '" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + T('sof.field.sumaRon') + '</label><input class="input ach-pret" type="number" value="' + (a.pret || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
     + '</div>'
-    + '<div class="field"><label>Plată</label><select class="input ach-plata" style="padding:10px 14px;" onchange="draftSave()"><option>Card</option><option>Cash</option><option>Flota Card</option><option>DKV</option></select></div>';
+    + '<div class="field"><label>' + T('sof.field.plata') + '</label><select class="input ach-plata" style="padding:10px 14px;" onchange="draftSave()"><option>Card</option><option>Cash</option><option>Flota Card</option><option>DKV</option></select></div>';
   document.getElementById('achizitiiContainer').appendChild(d);
   if (a.plata) {
     var sel = d.querySelector('.ach-plata');
@@ -466,7 +536,7 @@ function submitFuvarlevel() {
     body: JSON.stringify(payload) })
   .then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
-      toast(d.docNumber ? ('✅ Menetlevél elküldve — ' + d.docNumber) : '✅ Menetlevél elküldve!', 'ok');
+      toast(d.docNumber ? T('sof.wb.sentNum', { num: d.docNumber }) : T('sof.wb.sent'), 'ok');
       draftClear();
       _selectedOrderIds = [];
       goSec('dash');
@@ -488,9 +558,9 @@ function submitFuvarlevel() {
         loadSoferOrders();
       }, 500);
     } else {
-      toast('Hiba: ' + (d.err || 'ismeretlen'), 'err');
+      toast(T('sof.err.prefix', { m: d.err || T('sof.err.unknown') }), 'err');
     }
-  }).catch(function() { toast('Hálózati hiba', 'err'); });
+  }).catch(function() { toast(T('sof.err.network'), 'err'); });
 }
 
 // ============================================================
@@ -510,15 +580,15 @@ function previewFile(input) {
 }
 function uploadDoc() {
   var file = document.getElementById('dFile').files[0];
-  if (!file) { toast('Válassz fájlt!', 'err'); return; }
+  if (!file) { toast(T('sof.doc.pickFile'), 'err'); return; }
   var orderId = (document.getElementById('docOrderSel') || {}).value || null;
   var fr = new FileReader();
   fr.onload = function(e) {
     fetch('/api/doc-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ base64: e.target.result, numeFisier: file.name, tip: selDocTip, orderId: orderId }) })
     .then(function(r) { return r.json(); }).then(function(d) {
-      if (d.success) { toast('✅ Feltöltve!', 'ok'); goSec('dash'); }
-      else { toast('Hiba: ' + (d.err || 'ismeretlen'), 'err'); }
+      if (d.success) { toast(T('sof.doc.uploaded'), 'ok'); goSec('dash'); }
+      else { toast(T('sof.err.prefix', { m: d.err || T('sof.err.unknown') }), 'err'); }
     });
   };
   fr.readAsDataURL(file);
@@ -532,7 +602,7 @@ function loadDocOrderOptions() {
     body: JSON.stringify({ functionName: 'getMySoferOrders' }) })
   .then(function(r) { return r.json(); }).then(function(d) {
     var list = (d.result || []).filter(function(o) { return o.dash_visible !== false; });
-    sel.innerHTML = '<option value="">— Nincs fuvarhoz kötve —</option>'
+    sel.innerHTML = '<option value="">' + esc(T('sof.doc.noOrder')) + '</option>'
       + list.map(function(o) {
           return '<option value="' + o.id + '">' + o.id + ' — '
             + (o.loc_incarcare || '?') + ' → ' + (o.loc_descarcare || '?') + '</option>';
@@ -570,12 +640,12 @@ function loadSoferMiniStats() {
         + '<div style="font-size:16px;font-weight:800;color:#fff;margin-top:2px;">' + val + '</div>'
         + '<div style="font-size:10px;color:#8a97a8;margin-top:2px;">' + lbl + '</div></div>';
     }
-    box.innerHTML = '<div style="font-size:12px;font-weight:700;color:#8a97a8;margin:14px 0 8px;">📊 E havi teljesítményem</div>'
+    box.innerHTML = '<div style="font-size:12px;font-weight:700;color:#8a97a8;margin:14px 0 8px;">' + esc(T('sof.stats.title')) + '</div>'
       + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">'
-      + tile('✅', n(s.lezart), 'Lezárt fuvar')
-      + tile('🛣️', n(s.km), 'Km')
-      + tile('🗓️', n(s.diurna_ext) + '+' + n(s.diurna_int), 'Diurna (K+B)')
-      + tile('⛽', n(s.tankolt_l) + ' L', 'Tankolva')
+      + tile('✅', n(s.lezart), esc(T('sof.stats.closed')))
+      + tile('🛣️', n(s.km), esc(T('sof.stats.km')))
+      + tile('🗓️', n(s.diurna_ext) + '+' + n(s.diurna_int), esc(T('sof.stats.diurna')))
+      + tile('⛽', n(s.tankolt_l) + ' L', esc(T('sof.stats.fueled')))
       + '</div>';
     box.style.display = '';
   }).catch(function() {});
@@ -613,7 +683,7 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
       document.getElementById('fuvarStep2').style.display = 'block';
       draftRestore(state.draft);
       attachDraftListeners();
-      toast('📝 Piszkozat visszaállítva', 'ok');
+      toast(T('sof.draft.restored'), 'ok');
     });
     return;
   }
@@ -642,7 +712,7 @@ function initFirebaseChat(me) {
     .then(function(r) { return r.json(); })
     .then(function(cfg) {
       if (!cfg || !cfg.apiKey) {
-        document.getElementById('chatInitMsg').textContent = '⚠️ Chat konfiguráció hiányzik.';
+        document.getElementById('chatInitMsg').textContent = T('sof.chat.cfgMissing');
         return;
       }
       var s1 = document.createElement('script');
@@ -694,7 +764,7 @@ function initFirebaseChat(me) {
         }; // sAuth.onload vege
       };
     })
-    .catch(function() { document.getElementById('chatInitMsg').textContent = '⚠️ Chat nem elérhető.'; });
+    .catch(function() { document.getElementById('chatInitMsg').textContent = T('sof.chat.unavailable'); });
 }
 
 function soferShowContactList(me) {
@@ -704,7 +774,7 @@ function soferShowContactList(me) {
 
   var listEl = document.getElementById('chatContactList');
   if (!_chatManagers.length) {
-    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">Nincs elérhető manager.</div>';
+    listEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">' + esc(T('sof.chat.noManager')) + '</div>';
     return;
   }
 
@@ -745,7 +815,7 @@ function soferOpenRoom(me, manager) {
   _chatCurrentRoom = roomId;
 
   var msgsEl = document.getElementById('chatMsgs');
-  msgsEl.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px;">Betöltés...</div>';
+  msgsEl.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px;">' + esc(T('sof.chat.loading')) + '</div>';
 
   var ref = _fbDb.ref('chats/' + _chatCompanyId + '/rooms/' + roomId + '/messages');
   var query = ref.orderByChild('ts').limitToLast(100);
@@ -790,7 +860,7 @@ function chatSend() {
   input.value = '';
   _fbDb.ref('chats/' + _chatCompanyId + '/rooms/' + _chatCurrentRoom + '/messages').push({
     fromEmail: _meData.email || '',
-    fromName: _meData.nume || 'Sofőr',
+    fromName: _meData.nume || T('sof.driverName'),
     fromRole: 'Sofer',
     text: text,
     ts: firebase.database.ServerValue.TIMESTAMP
@@ -819,7 +889,7 @@ function chatSend() {
     VS_PUSH.notifyChat({
       toEmails: toEmails,
       toRoles:  toRoles,
-      fromName: _meData.nume || 'Sofőr',
+      fromName: _meData.nume || T('sof.driverName'),
       text:     text,
       room:     roomId,
       companyId: _chatCompanyId
@@ -845,16 +915,16 @@ function openBugReport(){
 function closeBugReport(){ document.getElementById('bugModal').style.display='none'; }
 function submitBugReport(){
   var txt = document.getElementById('bugText').value.trim();
-  if(!txt || txt.length<5){ toast('Írj le legalább 5 karaktert!','err'); return; }
+  if(!txt || txt.length<5){ toast(T('sof.bug.minChars'),'err'); return; }
   var btn = document.getElementById('bugSubmitBtn');
-  btn.disabled=true; btn.textContent='Küldés...';
+  btn.disabled=true; btn.textContent=T('sof.bug.sending');
   fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({functionName:'sendBugReport',arguments:[txt,'sofer']})})
   .then(function(r){return r.json();}).then(function(d){
-    btn.disabled=false; btn.textContent='📤 Küldés';
+    btn.disabled=false; btn.textContent=T('sof.bug.send');
     var r=d.result;
-    if(r&&r.ok){ toast('Hibajelentés elküldve, köszönjük!','ok'); closeBugReport(); }
-    else { toast((r&&r.err)||'Hiba történt','err'); }
+    if(r&&r.ok){ toast(T('sof.bug.sent'),'ok'); closeBugReport(); }
+    else { toast((r&&r.err)||T('sof.err.generic'),'err'); }
   });
 }
 
@@ -875,20 +945,20 @@ function renderFuvarCard(o) {
   var isCurs   = o.status === 'In Curs';
   var isFinal  = o.status === 'Finalizat';
   var statusCls = isAlocat ? 'warn' : 'ok';
-  var statusTxt = isFinal ? '✓ Teljesítve' : esc(o.status || 'Alocat');
+  var statusTxt = isFinal ? T('sof.card.done') : esc(o.status || T('sof.card.statusAlocat'));
   var truck = o.rendszam_camion ? ('🚛 ' + esc(o.rendszam_camion) + (o.rendszam_remorca ? ' / ' + esc(o.rendszam_remorca) : '')) : '';
   var actionBtn =
-      isAlocat ? '<button class="sh-btn resume"  onclick="driverOrderStatus(\'' + o.id + '\',\'In Curs\')">✅ Elfogadom</button>' :
-      isCurs   ? '<button class="sh-btn confirm" onclick="driverOrderStatus(\'' + o.id + '\',\'Finalizat\')">🏁 Elvégeztem</button>' :
+      isAlocat ? '<button class="sh-btn resume"  onclick="driverOrderStatus(\'' + o.id + '\',\'In Curs\')">' + T('sof.card.accept') + '</button>' :
+      isCurs   ? '<button class="sh-btn confirm" onclick="driverOrderStatus(\'' + o.id + '\',\'Finalizat\')">' + T('sof.card.complete') + '</button>' :
                  '';
   // ⛔ Áru leadása (defekt / pótkocsi-csere) — a kérést a diszpécser igazolja vissza
   var hoPending = o.handover_status === 'Fuggoben';
   var hoBtn = '';
   if (hoPending) {
-    hoBtn = '<span class="fuvar-status warn">⏳ Leadás visszaigazolásra vár' + (o.handover_loc ? ' @ ' + esc(o.handover_loc) : '') + '</span>';
+    hoBtn = '<span class="fuvar-status warn">' + T('sof.card.handoverWait') + (o.handover_loc ? ' @ ' + esc(o.handover_loc) : '') + '</span>';
   } else if (isAlocat || isCurs) {
     hoBtn = '<button class="sh-btn" style="border:1px solid rgba(192,38,211,0.5);color:#e879f9;background:rgba(192,38,211,0.12);" ' +
-      'onclick="openHandover(\'' + o.id + '\')" title="Áru leadása (pótkocsin parkol / raktárba kerül)">⛔ Áru leadása</button>';
+      'onclick="openHandover(\'' + o.id + '\')" title="' + esc(T('sof.card.handoverTitle')) + '">' + T('sof.card.handover') + '</button>';
   }
   return '' +
     '<div class="fuvar-card">' +
@@ -900,7 +970,7 @@ function renderFuvarCard(o) {
         '<span class="fuvar-status ' + statusCls + '">' + statusTxt + '</span>' +
       '</div>' +
       '<div class="fuvar-actions">' +
-        '<button class="sh-btn uit" onclick="SoferUit.open(\'' + o.id + '\')" title="UIT-kódok (RO e-Transport)">🚛 UIT</button>' +
+        '<button class="sh-btn uit" onclick="SoferUit.open(\'' + o.id + '\')" title="' + esc(T('sof.card.uitTitle')) + '">🚛 UIT</button>' +
         actionBtn +
         hoBtn +
       '</div>' +
@@ -928,7 +998,7 @@ function hoTypeChange() {
 function submitHandover() {
   var type = (document.querySelector('input[name="hoType"]:checked') || {}).value;
   var loc = document.getElementById('hoLoc').value.trim();
-  if (!loc) { toast('Add meg, hol lett lerakva / hol parkol! (helység)', 'err'); return; }
+  if (!loc) { toast(T('sof.ho.needLoc'), 'err'); return; }
   var d = { type: type, location: loc, note: document.getElementById('hoNote').value.trim() || null };
   if (type === 'warehouse') {
     d.qty = document.getElementById('hoQty').value;
@@ -940,28 +1010,28 @@ function submitHandover() {
     d.doc_pages = document.getElementById('hoDocPages').value;
   }
   var btn = document.getElementById('hoSubmitBtn');
-  btn.disabled = true; btn.textContent = 'Küldés...';
+  btn.disabled = true; btn.textContent = T('sof.ho.sending');
   fetch('/api/execute', { method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ functionName:'driverHandoverRequest', arguments:[_hoOid, d] }) })
   .then(function(r){ return r.json(); })
   .then(function(resp){
-    btn.disabled = false; btn.textContent = '📤 Kérés küldése';
+    btn.disabled = false; btn.textContent = T('sof.ho.send');
     var r = resp.result;
     if (r && r.ok) {
-      toast('✅ Kérés elküldve — a diszpécser visszaigazolja.', 'ok');
+      toast(T('sof.ho.sent'), 'ok');
       closeHandover();
       loadDashOrders();
       if (type === 'warehouse') {
         // azonnali felszólítás: dokumentumok fotózása, a fuvarhoz kötve
         var oid = _hoOid;
         setTimeout(function(){
-          toast('📷 Fotózd le az áru dokumentumait most!', 'err');
+          toast(T('sof.ho.photoDocs'), 'err');
           goSec('docs');
           var sel = document.getElementById('docOrderSel');
           if (sel) sel.value = oid;
         }, 600);
       }
-    } else { toast((r && r.err) || 'Hiba történt', 'err'); }
+    } else { toast((r && r.err) || T('sof.err.generic'), 'err'); }
   });
 }
 
@@ -982,7 +1052,7 @@ function loadDashOrders() {
     });
     updateScrollBehavior(active);
     if (!active.length) {
-      el.innerHTML = '<div class="kiosztott-empty">Nincs aktív kiosztott fuvar.</div>';
+      el.innerHTML = '<div class="kiosztott-empty">' + esc(T('sof.dash.empty')) + '</div>';
       return;
     }
     el.innerHTML = active.map(renderFuvarCard).join('');
@@ -997,10 +1067,20 @@ function driverOrderStatus(id, status) {
   .then(function(r){ return r.json(); })
   .then(function(d){
     if (d.ok) {
-      toast(status==='In Curs' ? '✅ Fuvar elfogadva!' : '🏁 Fuvar teljesítve! Manager értesítve.', 'ok');
+      toast(status==='In Curs' ? T('sof.status.accepted') : T('sof.status.completed'), 'ok');
       loadDashOrders();
     } else {
-      toast(d.err||'Hiba', 'err');
+      toast(d.err||T('sof.status.err'), 'err');
     }
+  });
+}
+
+// Nyelvváltáskor a dinamikusan renderelt nézetek frissítése
+if (window.I18N && typeof window.I18N.onLang === 'function') {
+  window.I18N.onLang(function() {
+    try { loadDashOrders(); } catch(e) {}
+    try { loadSoferMiniStats(); } catch(e) {}
+    try { var bs = document.getElementById('sec-border'); if (bs && !bs.classList.contains('hidden')) loadBorderLog(); } catch(e) {}
+    try { loadDocOrderOptions(); } catch(e) {}
   });
 }

@@ -3,18 +3,48 @@
 //  Csak az admin-egyedi fuggvenyek + oldal-init.
 //  Kozos fuggvenyek: console-shared.js (elobb toltodik).
 // ============================================================
+
+// ── i18n szotar (RO alap / HU) — 'mg.' namespace ──
+(window.registerI18n||function(d){(window.__i18nQueue=window.__i18nQueue||[]).push(d);})({
+  'mg.bug.min': { hu: 'Írj le legalább 5 karaktert!', ro: 'Scrie cel puțin 5 caractere!' },
+  'mg.bug.sending': { hu: 'Küldés...', ro: 'Se trimite...' },
+  'mg.bug.submit': { hu: '📤 Küldés', ro: '📤 Trimite' },
+  'mg.bug.sent': { hu: 'Hibajelentés elküldve, köszönjük!', ro: 'Raportul a fost trimis, mulțumim!' },
+  'mg.err.generic': { hu: 'Hiba történt', ro: 'A apărut o eroare' },
+  'mg.err.load': { hu: 'Betöltési hiba', ro: 'Eroare la încărcare' },
+  'mg.user.del': { hu: 'Töröl', ro: 'Șterge' },
+  'mg.user.edit': { hu: 'Szerk', ro: 'Editează' },
+  'mg.user.confirmDel': { hu: 'Biztosan törlöd: {nev} ({email})?\n\nEz a művelet nem visszavonható!', ro: 'Sigur ștergi: {nev} ({email})?\n\nAceastă acțiune este ireversibilă!' },
+  'mg.user.deleted': { hu: 'Felhasználó törölve!', ro: 'Utilizator șters!' },
+  'mg.user.saved': { hu: 'Sikeresen mentve!', ro: 'Salvat cu succes!' },
+  'mg.doc.loading': { hu: 'Betöltés...', ro: 'Se încarcă...' },
+  'mg.doc.empty': { hu: 'Nincs még feltöltve megrendelő ehhez a fuvarhoz.', ro: 'Nu există încă comandă încărcată pentru acest transport.' },
+  'mg.doc.th.name': { hu: 'Fájlnév', ro: 'Nume fișier' },
+  'mg.doc.th.by': { hu: 'Feltöltő', ro: 'Încărcat de' },
+  'mg.doc.th.date': { hu: 'Dátum', ro: 'Dată' },
+  'mg.doc.th.status': { hu: 'Státusz', ro: 'Stare' },
+  'mg.doc.th.actions': { hu: 'Műveletek', ro: 'Acțiuni' },
+  'mg.doc.signed': { hu: 'Aláírt', ro: 'Semnat' },
+  'mg.doc.unsigned': { hu: 'Aláíratlan', ro: 'Nesemnat' },
+  'mg.doc.btnEdit': { hu: '✍️ Szerkeszt', ro: '✍️ Editează' },
+  'mg.doc.btnSigned': { hu: '⬇️ Aláírt', ro: '⬇️ Semnat' },
+  'mg.doc.btnOriginal': { hu: '⬇️ Eredeti', ro: '⬇️ Original' }
+});
+
+function T(k,v){return (typeof window.t==='function')?window.t(k,v):k;}
+
 const VS_ROLE = 'admin';
 
 /* ── Bug report ── */
 function submitBugReport(){
   var txt = document.getElementById('bugText').value.trim();
-  if(!txt || txt.length<5){ toast('Írj le legalább 5 karaktert!','err'); return; }
+  if(!txt || txt.length<5){ toast(T('mg.bug.min'),'err'); return; }
   var btn = document.getElementById('bugSubmitBtn');
-  btn.disabled=true; btn.textContent='Küldés...';
+  btn.disabled=true; btn.textContent=T('mg.bug.sending');
   gas('sendBugReport',[txt,'admin']).then(function(r){
-    btn.disabled=false; btn.textContent='📤 Küldés';
-    if(r&&r.ok){ toast('Hibajelentés elküldve, köszönjük!','ok'); closeBugReport(); }
-    else { toast((r&&r.err)||'Hiba történt','err'); }
+    btn.disabled=false; btn.textContent=T('mg.bug.submit');
+    if(r&&r.ok){ toast(T('mg.bug.sent'),'ok'); closeBugReport(); }
+    else { toast((r&&r.err)||T('mg.err.generic'),'err'); }
   });
 }
 
@@ -69,31 +99,33 @@ function loadUsers(){
     document.querySelector('#tblUsers tbody').innerHTML=list.map((u,i)=>{
       const isSelf = u.email.toLowerCase() === myEmail.toLowerCase();
       const canDel = !isSelf && u.pozicio !== 'Admin';
-      const delBtn = canDel ? `<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUserIdx(${i})">Töröl</button>` : '';
-      return `<tr><td>${esc(u.nume)}</td><td>${esc(u.email)}</td><td>${esc(u.tel||'—')}</td><td><span class="badge info">${u.pozicio}</span></td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editUserIdx(${i})">Szerk</button> ${delBtn}</td></tr>`;
+      const delBtn = canDel ? `<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUserIdx(${i})">${T('mg.user.del')}</button>` : '';
+      return `<tr><td>${esc(u.nume)}</td><td>${esc(u.email)}</td><td>${esc(u.tel||'—')}</td><td><span class="badge info">${u.pozicio}</span></td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editUserIdx(${i})">${T('mg.user.edit')}</button> ${delBtn}</td></tr>`;
     }).join('');
-  }).catch(function(e){ console.error('loadUsers hiba:', e); toast('Betöltési hiba','err'); });
+  }).catch(function(e){ console.error('loadUsers hiba:', e); toast(T('mg.err.load'),'err'); });
 }
+// Nyelvvaltaskor a felhasznalo-lista ujrarenderelese (csak ha mar betoltottuk)
+if(window.I18N&&window.I18N.onLang) window.I18N.onLang(function(){ if(window._vsUsersCache) loadUsers(); });
 // Gyorsítótár-alapú hívók (a felhasználói adat nem kerül HTML-attribútumba)
 window.editUserIdx = (i) => editUser(window._vsUsersCache[i]);
 window.deleteUserIdx = (i) => { const u = window._vsUsersCache[i]; deleteUser(u.email, u.nume); };
 
 function deleteUser(email, nev){
-  if(!confirm('Biztosan törlöd: '+nev+' ('+email+')?\n\nEz a művelet nem visszavonható!'))return;
+  if(!confirm(T('mg.user.confirmDel',{nev:nev,email:email})))return;
   gas('userDelete',[email]).then(r=>{
     if(r.ok){
-      toast('Felhasználó törölve!','ok');
+      toast(T('mg.user.deleted'),'ok');
       loadUsers();
       loadDash();
     }else{
-      toast(r.err||'Hiba történt','err');
+      toast(r.err||T('mg.err.generic'),'err');
     }
   });
 }
 function editUser(u){uNume.value=u.nume;uEmail.value=u.email;uTel.value=u.tel||'';uPoz.value=u.pozicio;uPwd.value='';document.getElementById('userModal').classList.add('open');}
 function saveUser(){
   var f={nume:uNume.value,tel:uTel.value,pozicio:uPoz.value};if(uPwd.value)f.jelszo=uPwd.value;
-  gas('userUpdate',[uEmail.value,f]).then(()=>{toast('Sikeresen mentve!','ok');closeModal();loadUsers();loadDash();});
+  gas('userUpdate',[uEmail.value,f]).then(()=>{toast(T('mg.user.saved'),'ok');closeModal();loadUsers();loadDash();});
 }
 
 var _driverDocsCache = [];
@@ -154,22 +186,22 @@ let placedItems   = [];
 
 function loadDocList(orderId){
   const wrap = document.getElementById('docListWrap');
-  wrap.innerHTML = '<div style="color:var(--muted);font-size:13px;">Betöltés...</div>';
+  wrap.innerHTML = '<div style="color:var(--muted);font-size:13px;">'+T('mg.doc.loading')+'</div>';
   gas('orderDocList',[orderId]).then(list => {
     if(!list||list.length===0){
-      wrap.innerHTML='<div style="color:var(--muted);font-size:13px;">Nincs még feltöltve megrendelő ehhez a fuvarhoz.</div>';
+      wrap.innerHTML='<div style="color:var(--muted);font-size:13px;">'+T('mg.doc.empty')+'</div>';
       return;
     }
-    wrap.innerHTML='<table class="table"><thead><tr><th>Fájlnév</th><th>Feltöltő</th><th>Dátum</th><th>Státusz</th><th>Műveletek</th></tr></thead><tbody>'
+    wrap.innerHTML='<table class="table"><thead><tr><th>'+T('mg.doc.th.name')+'</th><th>'+T('mg.doc.th.by')+'</th><th>'+T('mg.doc.th.date')+'</th><th>'+T('mg.doc.th.status')+'</th><th>'+T('mg.doc.th.actions')+'</th></tr></thead><tbody>'
       +list.map(d=>`<tr>
         <td><b>${d.file_name}</b></td>
         <td>${d.uploaded_by}</td>
         <td>${d.created_at?d.created_at.toString().substring(0,16).replace('T',' '):'—'}</td>
-        <td>${d.has_signed?'<span class="badge ok">Aláírt</span>':'<span class="badge warn">Aláíratlan</span>'}</td>
+        <td>${d.has_signed?'<span class="badge ok">'+T('mg.doc.signed')+'</span>':'<span class="badge warn">'+T('mg.doc.unsigned')+'</span>'}</td>
         <td style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="openSignModal(${d.id},'original')">✍️ Szerkeszt</button>
-          ${d.has_signed?`<button class="btn ok" style="padding:4px 10px;font-size:12px;" onclick="downloadDoc(${d.id},'signed')">⬇️ Aláírt</button>`:''}
-          <button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="downloadDoc(${d.id},'original')">⬇️ Eredeti</button>
+          <button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="openSignModal(${d.id},'original')">${T('mg.doc.btnEdit')}</button>
+          ${d.has_signed?`<button class="btn ok" style="padding:4px 10px;font-size:12px;" onclick="downloadDoc(${d.id},'signed')">${T('mg.doc.btnSigned')}</button>`:''}
+          <button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="downloadDoc(${d.id},'original')">${T('mg.doc.btnOriginal')}</button>
         </td>
       </tr>`).join('')
       +'</tbody></table>';

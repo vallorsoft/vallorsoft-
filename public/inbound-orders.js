@@ -1,15 +1,69 @@
 // public/inbound-orders.js — „Megrendelések" fül: beérkező fuvar-megrendelések kezelése.
 // Globál: window.InboundOrders.mount(targetIdOrEl)
+(window.registerI18n||function(d){(window.__i18nQueue=window.__i18nQueue||[]).push(d);})({
+  'in.io.title': { hu: '📥 Megrendelések', ro: '📥 Comenzi' },
+  'in.io.aiRead': { hu: 'AI-kiolvasás', ro: 'Extragere AI' },
+  'in.io.pollNow': { hu: 'Lekérdezés most', ro: 'Interoghează acum' },
+  'in.io.polling': { hu: 'Lekérdezés…', ro: 'Se interoghează…' },
+  'in.io.refresh': { hu: 'Frissítés', ro: 'Reîmprospătare' },
+  'in.io.loading': { hu: 'Betöltés…', ro: 'Se încarcă…' },
+  'in.io.intakeWarn': { hu: 'A megrendelés-postafiók még nincs beállítva. Állítsd be az <b>Integrációk</b> menüpontban (📧 Megrendelés email fiók). Addig a lista üres marad; a „Lekérdezés most" gomb beállítás után működik.', ro: 'Căsuța de comenzi nu este încă configurată. Configureaz-o în meniul <b>Integrări</b> (📧 Cont email comenzi). Până atunci lista rămâne goală; butonul „Interoghează acum" funcționează după configurare.' },
+  'in.io.aiConsent': { hu: 'Adatkezelési figyelmeztetés: bekapcsolva a megrendelők szövege/PDF-je egy külső AI-szolgáltatóhoz (Google Gemini) kerül feldolgozásra. Csak akkor kapcsold be, ha ezt az adatkezelést elfogadod. Bekapcsolod?', ro: 'Avertisment privind prelucrarea datelor: activat, textul/PDF-ul comenzilor este procesat de un furnizor AI extern (Google Gemini). Activează doar dacă accepți această prelucrare. Activezi?' },
+  'in.io.mailboxNotSet': { hu: 'A postafiók még nincs beállítva.', ro: 'Căsuța poștală nu este încă configurată.' },
+  'in.io.fld.client': { hu: 'Ügyfél', ro: 'Client' },
+  'in.io.fld.cui': { hu: 'CUI', ro: 'CUI' },
+  'in.io.fld.ref': { hu: 'Referencia', ro: 'Referință' },
+  'in.io.fld.loadLoc': { hu: 'Felrakó', ro: 'Loc încărcare' },
+  'in.io.fld.unloadLoc': { hu: 'Lerakó', ro: 'Loc descărcare' },
+  'in.io.fld.loadDate': { hu: 'Felrakás dátuma', ro: 'Data încărcării' },
+  'in.io.fld.unloadDate': { hu: 'Lerakás dátuma', ro: 'Data descărcării' },
+  'in.io.fld.price': { hu: 'Ár', ro: 'Preț' },
+  'in.io.fld.currency': { hu: 'Pénznem', ro: 'Monedă' },
+  'in.io.fld.km': { hu: 'Km', ro: 'Km' },
+  'in.io.fld.weight': { hu: 'Súly', ro: 'Greutate' },
+  'in.io.fld.tractorPlate': { hu: 'Vontató rendszám', ro: 'Nr. înmatriculare cap tractor' },
+  'in.io.fld.trailerPlate': { hu: 'Pótkocsi rendszám', ro: 'Nr. înmatriculare remorcă' },
+  'in.io.fld.note': { hu: 'Megjegyzés', ro: 'Observații' },
+  'in.io.st.new': { hu: 'Új', ro: 'Nou' },
+  'in.io.st.parsed': { hu: 'Feldolgozva', ro: 'Procesat' },
+  'in.io.st.reviewed': { hu: 'Ellenőrizve', ro: 'Verificat' },
+  'in.io.st.approved': { hu: 'Jóváhagyva', ro: 'Aprobat' },
+  'in.io.st.rejected': { hu: 'Elvetve', ro: 'Respins' },
+  'in.io.confidence': { hu: 'Megbízhatóság', ro: 'Fiabilitate' },
+  'in.io.ai': { hu: 'AI', ro: 'AI' },
+  'in.io.manual': { hu: 'kézi/heurisztika', ro: 'manual/euristică' },
+  'in.io.origPdf': { hu: '📎 Eredeti PDF', ro: '📎 PDF original' },
+  'in.io.act.save': { hu: '💾 Mentés', ro: '💾 Salvare' },
+  'in.io.act.reply': { hu: '✉️ Válasz', ro: '✉️ Răspuns' },
+  'in.io.act.reparse': { hu: '↻ Újrafeldolgozás', ro: '↻ Reprocesare' },
+  'in.io.act.approve': { hu: '✓ Elfogadás → Disponibil', ro: '✓ Acceptare → Disponibil' },
+  'in.io.act.assignDriver': { hu: '+ Sofőr kiosztása', ro: '+ Alocare șofer' },
+  'in.io.act.reject': { hu: '✕ Elvetés', ro: '✕ Respingere' },
+  'in.io.asg.driverEmail': { hu: 'Sofőr e-mail (belső)', ro: 'Email șofer (intern)' },
+  'in.io.asg.driverName': { hu: 'Sofőr neve', ro: 'Nume șofer' },
+  'in.io.asg.approveAssign': { hu: '✓ Elfogadás + sofőr → Alocat', ro: '✓ Acceptare + șofer → Alocat' },
+  'in.io.emailModuleMissing': { hu: 'Az e-mail modul nem töltött be.', ro: 'Modulul de email nu s-a încărcat.' },
+  'in.io.confirmReject': { hu: 'Biztosan elveted?', ro: 'Sigur respingi?' },
+  'in.io.created': { hu: 'Létrehozva: {id} ({status})', ro: 'Creat: {id} ({status})' },
+  'in.io.noPending': { hu: '✓ Nincs feldolgozatlan megrendelés.', ro: '✓ Nicio comandă neprocesată.' },
+  'in.io.handledBefore': { hu: '({n} korábbi elintézve)', ro: '({n} rezolvate anterior)' },
+  'in.io.prev': { hu: '◀ Előző', ro: '◀ Anterior' },
+  'in.io.next': { hu: 'Következő ▶', ro: 'Următor ▶' },
+  'in.io.countPending': { hu: '{i} / {n} feldolgozatlan megrendelés', ro: '{i} / {n} comenzi neprocesate' },
+  'in.io.navHint': { hu: 'A legutóbb beérkezett megrendelés van elöl. Elintézés (elfogadás/elvetés) után automatikusan a következő jön.', ro: 'Cea mai recentă comandă este prima. După rezolvare (acceptare/respingere) urmează automat următoarea.' },
+  'in.io.errPrefix': { hu: 'Hiba', ro: 'Eroare' },
+});
+function T(k,v){return (typeof window.t==='function')?window.t(k,v):k;}
 window.InboundOrders = (function () {
   const FIELDS = [
-    ['client', 'Ügyfél'], ['client_cui', 'CUI'], ['ref', 'Referencia'],
-    ['loc_incarcare', 'Felrakó'], ['loc_descarcare', 'Lerakó'],
-    ['data_incarcare', 'Felrakás dátuma'], ['data_descarcare', 'Lerakás dátuma'],
-    ['pret', 'Ár'], ['valuta', 'Pénznem'], ['km', 'Km'], ['greutate', 'Súly'],
-    ['rendszam_camion', 'Vontató rendszám'], ['rendszam_remorca', 'Pótkocsi rendszám'],
-    ['observatii', 'Megjegyzés'],
+    ['client', 'in.io.fld.client'], ['client_cui', 'in.io.fld.cui'], ['ref', 'in.io.fld.ref'],
+    ['loc_incarcare', 'in.io.fld.loadLoc'], ['loc_descarcare', 'in.io.fld.unloadLoc'],
+    ['data_incarcare', 'in.io.fld.loadDate'], ['data_descarcare', 'in.io.fld.unloadDate'],
+    ['pret', 'in.io.fld.price'], ['valuta', 'in.io.fld.currency'], ['km', 'in.io.fld.km'], ['greutate', 'in.io.fld.weight'],
+    ['rendszam_camion', 'in.io.fld.tractorPlate'], ['rendszam_remorca', 'in.io.fld.trailerPlate'],
+    ['observatii', 'in.io.fld.note'],
   ];
-  const STATUS = { new: 'Új', parsed: 'Feldolgozva', reviewed: 'Ellenőrizve', approved: 'Jóváhagyva', rejected: 'Elvetve' };
+  const STATUS = { new: 'in.io.st.new', parsed: 'in.io.st.parsed', reviewed: 'in.io.st.reviewed', approved: 'in.io.st.approved', rejected: 'in.io.st.rejected' };
 
   function ensureStyle() {
     if (document.getElementById('io-style')) return;
@@ -49,7 +103,7 @@ window.InboundOrders = (function () {
   async function api(method, url, body) {
     const r = await fetch(url, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || ('Hiba (' + r.status + ')'));
+    if (!r.ok) throw new Error(d.error || (T('in.io.errPrefix') + ' (' + r.status + ')'));
     return d;
   }
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
@@ -61,14 +115,14 @@ window.InboundOrders = (function () {
     if (!root) return;
     root.innerHTML =
       '<div class="io-head">' +
-        '<h2>📥 Megrendelések</h2>' +
-        '<label class="io-toggle"><input type="checkbox" id="ioAi"> AI-kiolvasás</label>' +
+        '<h2>' + T('in.io.title') + '</h2>' +
+        '<label class="io-toggle"><input type="checkbox" id="ioAi"> ' + T('in.io.aiRead') + '</label>' +
         '<div class="io-spacer"></div>' +
-        '<button class="io-btn io-btn--ghost" id="ioPoll">Lekérdezés most</button>' +
-        '<button class="io-btn io-btn--ghost" id="ioRefresh">Frissítés</button>' +
+        '<button class="io-btn io-btn--ghost" id="ioPoll">' + T('in.io.pollNow') + '</button>' +
+        '<button class="io-btn io-btn--ghost" id="ioRefresh">' + T('in.io.refresh') + '</button>' +
       '</div>' +
       '<div id="ioInfo"></div>' +
-      '<div id="ioList"><div class="io-empty">Betöltés…</div></div>';
+      '<div id="ioList"><div class="io-empty">' + T('in.io.loading') + '</div></div>';
     const $ = (id) => root.querySelector('#' + id);
 
     // AI ki/be + adatkezelési figyelmeztetés bekapcsoláskor
@@ -76,21 +130,21 @@ window.InboundOrders = (function () {
       try {
         const s = await api('GET', '/api/inbound-orders/settings');
         $('ioAi').checked = !!s.ai_enabled;
-        if (!s.intake_configured) $('ioInfo').innerHTML = '<div class="io-warn">A megrendelés-postafiók még nincs beállítva. Állítsd be az <b>Integrációk</b> menüpontban (📧 Megrendelés email fiók). Addig a lista üres marad; a „Lekérdezés most” gomb beállítás után működik.</div>';
+        if (!s.intake_configured) $('ioInfo').innerHTML = '<div class="io-warn">' + T('in.io.intakeWarn') + '</div>';
       } catch (e) {}
     }
     $('ioAi').addEventListener('change', async function () {
       const on = $('ioAi').checked;
-      if (on && !confirm('Adatkezelési figyelmeztetés: bekapcsolva a megrendelők szövege/PDF-je egy külső AI-szolgáltatóhoz (Google Gemini) kerül feldolgozásra. Csak akkor kapcsold be, ha ezt az adatkezelést elfogadod. Bekapcsolod?')) {
+      if (on && !confirm(T('in.io.aiConsent'))) {
         $('ioAi').checked = false; return;
       }
       try { await api('POST', '/api/inbound-orders/settings', { ai_enabled: on }); }
       catch (e) { alert(e.message); $('ioAi').checked = !on; }
     });
     $('ioPoll').addEventListener('click', async function () {
-      const b = $('ioPoll'); b.disabled = true; b.textContent = 'Lekérdezés…';
-      try { const r = await api('POST', '/api/inbound-orders/poll'); await load(); if (r.skipped) alert('A postafiók még nincs beállítva.'); }
-      catch (e) { alert(e.message); } finally { b.disabled = false; b.textContent = 'Lekérdezés most'; }
+      const b = $('ioPoll'); b.disabled = true; b.textContent = T('in.io.polling');
+      try { const r = await api('POST', '/api/inbound-orders/poll'); await load(); if (r.skipped) alert(T('in.io.mailboxNotSet')); }
+      catch (e) { alert(e.message); } finally { b.disabled = false; b.textContent = T('in.io.pollNow'); }
     });
     $('ioRefresh').addEventListener('click', function () { load(); });
 
@@ -98,36 +152,36 @@ window.InboundOrders = (function () {
       const ex = it.extracted || {};
       const fieldsHtml = FIELDS.map(function (f) {
         const v = ex[f[0]] == null ? '' : ex[f[0]];
-        return '<div class="io-f"><label>' + f[1] + '</label>' +
+        return '<div class="io-f"><label>' + esc(T(f[1])) + '</label>' +
           '<input data-k="' + f[0] + '" class="' + (v === '' ? 'empty' : '') + '" value="' + esc(v) + '"></div>';
       }).join('');
       const st = it.status, badge = 'io-b-' + st;
       const done = (st === 'approved' || st === 'rejected');
       return '<div class="io-card" data-id="' + it.id + '" data-email="' + esc(it.source_email || '') + '">' +
         '<div class="io-meta">' +
-          '<span class="io-badge ' + badge + '">' + (STATUS[st] || st) + '</span>' +
-          '<span class="io-conf ' + confClass(it.confidence) + '">Megbízhatóság: ' + Math.round((it.confidence || 0) * 100) + '%</span>' +
-          (it.ai_used ? '<span>· AI</span>' : '<span>· kézi/heurisztika</span>') +
+          '<span class="io-badge ' + badge + '">' + esc(STATUS[st] ? T(STATUS[st]) : st) + '</span>' +
+          '<span class="io-conf ' + confClass(it.confidence) + '">' + esc(T('in.io.confidence')) + ': ' + Math.round((it.confidence || 0) * 100) + '%</span>' +
+          (it.ai_used ? '<span>· ' + esc(T('in.io.ai')) + '</span>' : '<span>· ' + esc(T('in.io.manual')) + '</span>') +
           '<span>· ' + esc(it.source_email || '—') + '</span>' +
           '<span>· ' + esc(it.subject || '') + '</span>' +
-          (it.pdf_name ? '<a href="/api/inbound-orders/' + it.id + '/pdf" target="_blank">📎 Eredeti PDF</a>' : '') +
+          (it.pdf_name ? '<a href="/api/inbound-orders/' + it.id + '/pdf" target="_blank">' + esc(T('in.io.origPdf')) + '</a>' : '') +
           (it.created_order_id ? '<span>→ <b>' + esc(it.created_order_id) + '</b></span>' : '') +
         '</div>' +
         (done ? '' :
           '<div class="io-grid">' + fieldsHtml + '</div>' +
           '<div class="io-acts">' +
-            '<button class="io-btn io-btn--ghost" data-act="save">💾 Mentés</button>' +
-            '<button class="io-btn io-btn--ghost" data-act="email">✉️ Válasz</button>' +
-            '<button class="io-btn io-btn--ghost" data-act="reparse">↻ Újrafeldolgozás</button>' +
-            '<button class="io-btn io-btn--green" data-act="approve">✓ Elfogadás → Disponibil</button>' +
-            '<button class="io-btn io-btn--ghost" data-act="assignToggle">+ Sofőr kiosztása</button>' +
-            '<button class="io-btn io-btn--red" data-act="reject">✕ Elvetés</button>' +
+            '<button class="io-btn io-btn--ghost" data-act="save">' + T('in.io.act.save') + '</button>' +
+            '<button class="io-btn io-btn--ghost" data-act="email">' + T('in.io.act.reply') + '</button>' +
+            '<button class="io-btn io-btn--ghost" data-act="reparse">' + T('in.io.act.reparse') + '</button>' +
+            '<button class="io-btn io-btn--green" data-act="approve">' + T('in.io.act.approve') + '</button>' +
+            '<button class="io-btn io-btn--ghost" data-act="assignToggle">' + T('in.io.act.assignDriver') + '</button>' +
+            '<button class="io-btn io-btn--red" data-act="reject">' + T('in.io.act.reject') + '</button>' +
           '</div>' +
           '<div class="io-assign">' +
-            '<div class="io-f"><label>Sofőr e-mail (belső)</label><input data-a="email_sofer"></div>' +
-            '<div class="io-f"><label>Sofőr neve</label><input data-a="nume_sofer"></div>' +
-            '<div class="io-f"><label>Vontató rendszám</label><input data-a="rendszam_camion" value="' + esc(ex.rendszam_camion || '') + '"></div>' +
-            '<button class="io-btn io-btn--green" data-act="approveAssign">✓ Elfogadás + sofőr → Alocat</button>' +
+            '<div class="io-f"><label>' + esc(T('in.io.asg.driverEmail')) + '</label><input data-a="email_sofer"></div>' +
+            '<div class="io-f"><label>' + esc(T('in.io.asg.driverName')) + '</label><input data-a="nume_sofer"></div>' +
+            '<div class="io-f"><label>' + esc(T('in.io.fld.tractorPlate')) + '</label><input data-a="rendszam_camion" value="' + esc(ex.rendszam_camion || '') + '"></div>' +
+            '<button class="io-btn io-btn--green" data-act="approveAssign">' + T('in.io.asg.approveAssign') + '</button>' +
           '</div>') +
       '</div>';
     }
@@ -152,8 +206,8 @@ window.InboundOrders = (function () {
 
     function renderCurrent() {
       if (!pending.length) {
-        $('ioList').innerHTML = '<div class="io-done">✓ Nincs feldolgozatlan megrendelés.' +
-          (totalHandled ? ' <span style="font-weight:400;">(' + totalHandled + ' korábbi elintézve)</span>' : '') + '</div>';
+        $('ioList').innerHTML = '<div class="io-done">' + T('in.io.noPending') +
+          (totalHandled ? ' <span style="font-weight:400;">' + T('in.io.handledBefore', { n: totalHandled }) + '</span>' : '') + '</div>';
         return;
       }
       if (idx < 0) idx = 0;
@@ -161,11 +215,11 @@ window.InboundOrders = (function () {
       const it = pending[idx];
       const nav =
         '<div class="io-nav">' +
-          '<button class="io-btn io-btn--ghost" data-nav="prev"' + (idx === 0 ? ' disabled' : '') + '>◀ Előző</button>' +
-          '<div><span class="io-count">' + (idx + 1) + ' / ' + pending.length + ' feldolgozatlan megrendelés</span>' +
-            '<div class="io-sub">A legutóbb beérkezett megrendelés van elöl. Elintézés (elfogadás/elvetés) után automatikusan a következő jön.</div></div>' +
+          '<button class="io-btn io-btn--ghost" data-nav="prev"' + (idx === 0 ? ' disabled' : '') + '>' + T('in.io.prev') + '</button>' +
+          '<div><span class="io-count">' + T('in.io.countPending', { i: idx + 1, n: pending.length }) + '</span>' +
+            '<div class="io-sub">' + T('in.io.navHint') + '</div></div>' +
           '<div class="io-spacer"></div>' +
-          '<button class="io-btn io-btn--red" data-nav="next"' + (idx >= pending.length - 1 ? ' disabled' : '') + '>Következő ▶</button>' +
+          '<button class="io-btn io-btn--red" data-nav="next"' + (idx >= pending.length - 1 ? ' disabled' : '') + '>' + T('in.io.next') + '</button>' +
         '</div>';
       $('ioList').innerHTML = nav + card(it);
       bindCard();
@@ -186,7 +240,7 @@ window.InboundOrders = (function () {
           try {
             if (act === 'assignToggle') { cardEl.querySelector('.io-assign').classList.toggle('open'); return; }
             if (act === 'email') {
-              if (!window.ClientMail) { alert('Az e-mail modul nem töltött be.'); return; }
+              if (!window.ClientMail) { alert(T('in.io.emailModuleMissing')); return; }
               const ex = collect(cardEl);
               ClientMail.open({ to: cardEl.dataset.email || '', inbound_order_id: id,
                 context: { client: ex.client, ref: ex.ref, loc_incarcare: ex.loc_incarcare, loc_descarcare: ex.loc_descarcare, pret: ex.pret, order_id: '' } });
@@ -196,9 +250,9 @@ window.InboundOrders = (function () {
             // save/reparse: maradunk az aktuális elemen; approve/reject: az elem kikerül → marad az index (a következő csúszik a helyére)
             if (act === 'save') { await api('PUT', '/api/inbound-orders/' + id, { extracted: collect(cardEl) }); await load(true); }
             else if (act === 'reparse') { await api('POST', '/api/inbound-orders/' + id + '/reparse'); await load(true); }
-            else if (act === 'reject') { if (confirm('Biztosan elveted?')) { await api('POST', '/api/inbound-orders/' + id + '/reject'); await load(true); } else btn.disabled = false; }
-            else if (act === 'approve') { await api('PUT', '/api/inbound-orders/' + id, { extracted: collect(cardEl) }); const r = await api('POST', '/api/inbound-orders/' + id + '/approve', {}); alert('Létrehozva: ' + r.order_id + ' (' + r.status + ')'); await load(true); }
-            else if (act === 'approveAssign') { await api('PUT', '/api/inbound-orders/' + id, { extracted: collect(cardEl) }); const r = await api('POST', '/api/inbound-orders/' + id + '/approve', { assign: assignData(cardEl) }); alert('Létrehozva: ' + r.order_id + ' (' + r.status + ')'); await load(true); }
+            else if (act === 'reject') { if (confirm(T('in.io.confirmReject'))) { await api('POST', '/api/inbound-orders/' + id + '/reject'); await load(true); } else btn.disabled = false; }
+            else if (act === 'approve') { await api('PUT', '/api/inbound-orders/' + id, { extracted: collect(cardEl) }); const r = await api('POST', '/api/inbound-orders/' + id + '/approve', {}); alert(T('in.io.created', { id: r.order_id, status: r.status })); await load(true); }
+            else if (act === 'approveAssign') { await api('PUT', '/api/inbound-orders/' + id, { extracted: collect(cardEl) }); const r = await api('POST', '/api/inbound-orders/' + id + '/approve', { assign: assignData(cardEl) }); alert(T('in.io.created', { id: r.order_id, status: r.status })); await load(true); }
           } catch (e) { alert(e.message); btn.disabled = false; }
         });
       });
@@ -217,6 +271,25 @@ window.InboundOrders = (function () {
 
     loadSettings();
     load();
+
+    // Nyelvváltáskor a teljes nézet újrarendelése (statikus fejléc + figyelmeztetés + lista)
+    _lastRerender = function () {
+      root.innerHTML =
+        '<div class="io-head">' +
+          '<h2>' + T('in.io.title') + '</h2>' +
+          '<label class="io-toggle"><input type="checkbox" id="ioAi"> ' + T('in.io.aiRead') + '</label>' +
+          '<div class="io-spacer"></div>' +
+          '<button class="io-btn io-btn--ghost" id="ioPoll">' + T('in.io.pollNow') + '</button>' +
+          '<button class="io-btn io-btn--ghost" id="ioRefresh">' + T('in.io.refresh') + '</button>' +
+        '</div>' +
+        '<div id="ioInfo"></div>' +
+        '<div id="ioList"><div class="io-empty">' + T('in.io.loading') + '</div></div>';
+      mount(root);
+    };
+  }
+  var _lastRerender = null;
+  if (window.I18N && typeof window.I18N.onLang === 'function') {
+    window.I18N.onLang(function () { if (typeof _lastRerender === 'function') _lastRerender(); });
   }
   return { mount };
 })();

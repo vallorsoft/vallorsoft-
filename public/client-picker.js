@@ -1,4 +1,18 @@
 // public/client-picker.js  (a client-picker.html-ből rendezve)
+(window.registerI18n||function(d){(window.__i18nQueue=window.__i18nQueue||[]).push(d);})({
+  'cl.pickSearchPlaceholder': { hu: 'Ügyfél keresése…', ro: 'Caută client…' },
+  'cl.pickNewTitle': { hu: 'Új ügyfél', ro: 'Client nou' },
+  'cl.pickSelected': { hu: '✓ Kiválasztva: ', ro: '✓ Selectat: ' },
+  'cl.pickNoResults': { hu: 'Nincs találat — használd a „+” gombot új ügyfélhez.', ro: 'Niciun rezultat — folosește butonul „+” pentru un client nou.' },
+  'cl.pickQuickTitle': { hu: 'Új ügyfél (gyors)', ro: 'Client nou (rapid)' },
+  'cl.pickNameReq': { hu: 'Név (kötelező)', ro: 'Nume (obligatoriu)' },
+  'cl.pickCuiOpt': { hu: 'CUI / CIF (opcionális)', ro: 'CUI / CIF (opțional)' },
+  'cl.cancel': { hu: 'Mégse', ro: 'Anulează' },
+  'cl.save': { hu: 'Mentés', ro: 'Salvează' },
+  'cl.nameRequired': { hu: 'A név kötelező.', ro: 'Numele este obligatoriu.' },
+  'cl.errPrefix': { hu: 'Hiba ', ro: 'Eroare ' },
+});
+function T(k,v){return (typeof window.t==='function')?window.t(k,v):k;}
 window.ClientPicker = (function () {
   function styles() {
     if (document.getElementById('cp-style')) return;
@@ -27,7 +41,7 @@ window.ClientPicker = (function () {
   }
   async function api(method, url, body) {
     const res = await fetch(url, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
-    const d = await res.json().catch(() => ({})); if (!res.ok) throw new Error(d.error || ('Hiba ' + res.status)); return d;
+    const d = await res.json().catch(() => ({})); if (!res.ok) throw new Error(d.error || (T('cl.errPrefix') + res.status)); return d;
   }
 
   function mount(container, opts) {
@@ -35,7 +49,7 @@ window.ClientPicker = (function () {
     opts = opts || {};
     container.classList.add('cp');
     container.innerHTML =
-      '<div class="cp-row"><input class="cp-in" placeholder="Ügyfél keresése…"><button class="cp-plus" title="Új ügyfél" type="button">+</button></div>' +
+      '<div class="cp-row"><input class="cp-in" placeholder="' + esc(T('cl.pickSearchPlaceholder')) + '"><button class="cp-plus" title="' + esc(T('cl.pickNewTitle')) + '" type="button">+</button></div>' +
       '<div class="cp-list"></div><div class="cp-sel"></div>';
     const input = container.querySelector('.cp-in');
     const list = container.querySelector('.cp-list');
@@ -44,7 +58,7 @@ window.ClientPicker = (function () {
 
     function setSelected(c) {
       if (opts.hiddenInputId) { const h = document.getElementById(opts.hiddenInputId); if (h) h.value = c.id; }
-      input.value = c.denumire; sel.textContent = '✓ Kiválasztva: ' + c.denumire + (c.cui_cif ? ' (' + c.cui_cif + ')' : '');
+      input.value = c.denumire; sel.textContent = T('cl.pickSelected') + c.denumire + (c.cui_cif ? ' (' + c.cui_cif + ')' : '');
       list.style.display = 'none';
       if (opts.onSelect) opts.onSelect(c);
     }
@@ -52,7 +66,7 @@ window.ClientPicker = (function () {
       const q = input.value.trim();
       try {
         const d = await api('GET', '/api/clients' + (q ? '?q=' + encodeURIComponent(q) : ''));
-        if (!d.clients.length) { list.innerHTML = '<div class="cp-none">Nincs találat — használd a „+” gombot új ügyfélhez.</div>'; }
+        if (!d.clients.length) { list.innerHTML = '<div class="cp-none">' + esc(T('cl.pickNoResults')) + '</div>'; }
         else list.innerHTML = d.clients.map(c =>
           '<div class="cp-item" data-id="' + c.id + '">' + esc(c.denumire) + (c.cui_cif ? ' <small>' + esc(c.cui_cif) + '</small>' : '') + '</div>').join('');
         list.style.display = 'block';
@@ -68,10 +82,10 @@ window.ClientPicker = (function () {
   function quickAdd(onSaved, prefillName) {
     const ov = document.createElement('div'); ov.className = 'cp-ov';
     ov.innerHTML =
-      '<div class="cp-box"><h4>Új ügyfél (gyors)</h4><div class="cp-msg"></div>' +
-      '<label class="cp-f">Név (kötelező)<input class="cp-in" id="qa_name"></label>' +
-      '<label class="cp-f">CUI / CIF (opcionális)<input class="cp-in" id="qa_cui"></label>' +
-      '<div class="cp-foot"><button class="cp-btn cp-btn--ghost" id="qa_cancel">Mégse</button><button class="cp-btn cp-btn--primary" id="qa_save">Mentés</button></div></div>';
+      '<div class="cp-box"><h4>' + esc(T('cl.pickQuickTitle')) + '</h4><div class="cp-msg"></div>' +
+      '<label class="cp-f">' + esc(T('cl.pickNameReq')) + '<input class="cp-in" id="qa_name"></label>' +
+      '<label class="cp-f">' + esc(T('cl.pickCuiOpt')) + '<input class="cp-in" id="qa_cui"></label>' +
+      '<div class="cp-foot"><button class="cp-btn cp-btn--ghost" id="qa_cancel">' + esc(T('cl.cancel')) + '</button><button class="cp-btn cp-btn--primary" id="qa_save">' + esc(T('cl.save')) + '</button></div></div>';
     document.body.appendChild(ov);
     const name = ov.querySelector('#qa_name'); name.value = prefillName || '';
     const msg = ov.querySelector('.cp-msg');
@@ -80,7 +94,7 @@ window.ClientPicker = (function () {
     ov.querySelector('#qa_cancel').addEventListener('click', close);
     ov.querySelector('#qa_save').addEventListener('click', async () => {
       const denumire = name.value.trim();
-      if (!denumire) { msg.textContent = 'A név kötelező.'; return; }
+      if (!denumire) { msg.textContent = T('cl.nameRequired'); return; }
       try {
         const d = await api('POST', '/api/clients', { denumire, cui_cif: ov.querySelector('#qa_cui').value.trim() });
         close(); onSaved(d.client);
