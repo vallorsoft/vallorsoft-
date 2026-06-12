@@ -256,11 +256,11 @@
     <!-- ── Fuvar kezelés pane ── -->
     <div class="pane hidden" data-pane="orders-list">
       <div class="glass" style="padding:22px;">
-        <h2 class="h-title" style="margin-bottom:14px;">Fuvarfeladatok kezelése</h2>
+        <h2 class="h-title" style="margin-bottom:14px;" data-i18n="list.title">Fuvarfeladatok kezelése</h2>
         <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-            <input class="input" id="orderSearch" placeholder="🔍 Ügyfél, sofőr, ID..." oninput="filterOrders()" style="flex:1;min-width:160px;">
+            <input class="input" id="orderSearch" placeholder="🔍 Ügyfél, sofőr, ID..." data-i18n-ph="list.searchPh" oninput="filterOrders()" style="flex:1;min-width:160px;">
             <select class="select" id="orderStatusFilter" onchange="filterOrders()" style="max-width:140px;">
-              <option value="">Minden státusz</option>
+              <option value="" data-i18n="list.allStatus">Minden státusz</option>
               <option value="Disponibil">Disponibil</option>
               <option value="Alocat">Alocat</option>
               <option value="In Curs">In Curs</option>
@@ -270,7 +270,7 @@
           </div>
           <div style="overflow-x:auto;">
             <table class="table" id="tblOrders">
-              <thead><tr><th>ID</th><th>Ügyfél</th><th>Útvonal</th><th>KM</th><th>Ár</th><th>Sofőr</th><th>Vontató</th><th>Státusz</th><th>Műveletek</th><th style="width:36px;text-align:center;"><input type="checkbox" id="selectAllOrders" title="Mind kijelöl" onchange="toggleAllOrders(this)" style="width:16px;height:16px;cursor:pointer;accent-color:#e10b1a;vertical-align:middle;"></th></tr></thead>
+              <thead><tr><th data-i18n="list.colId">ID</th><th data-i18n="list.colClient">Ügyfél</th><th data-i18n="list.colRoute">Útvonal</th><th data-i18n="list.colKm">KM</th><th data-i18n="list.colPrice">Ár</th><th data-i18n="list.colDriver">Sofőr</th><th data-i18n="list.colTractor">Vontató</th><th data-i18n="list.colStatus">Státusz</th><th data-i18n="list.colActions">Műveletek</th><th style="width:36px;text-align:center;"><input type="checkbox" id="selectAllOrders" title="Mind kijelöl" data-i18n-title="list.selectAll" onchange="toggleAllOrders(this)" style="width:16px;height:16px;cursor:pointer;accent-color:#e10b1a;vertical-align:middle;"></th></tr></thead>
               <tbody id="tblOrdersBody"></tbody>
             </table>
           </div>
@@ -279,8 +279,8 @@
             <div style="background:rgba(10,14,21,0.97);border:1px solid rgba(225,11,26,0.45);border-radius:12px;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
               <span id="orderSelCount" style="font-size:13px;font-weight:700;color:#fff;">0 fuvar kiválasztva</span>
               <div style="display:flex;gap:8px;">
-                <button class="btn ghost" style="padding:7px 14px;font-size:13px;" onclick="clearOrderSel()">✕ Törlés</button>
-                <button class="btn primary" style="padding:7px 16px;font-size:13px;" onclick="downloadSelectedOrders()">⬇️ Letöltés (nyomtatható)</button>
+                <button class="btn ghost" style="padding:7px 14px;font-size:13px;" onclick="clearOrderSel()" data-i18n="list.clearSel">✕ Törlés</button>
+                <button class="btn primary" style="padding:7px 16px;font-size:13px;" onclick="downloadSelectedOrders()" data-i18n="list.download">⬇️ Letöltés (nyomtatható)</button>
               </div>
             </div>
           </div>
@@ -865,86 +865,86 @@
 
 <div class="modal-back" id="orderEditModal">
   <div class="modal glass" style="width:min(700px,100%);max-height:92vh;overflow-y:auto;">
-    <h3>✏️ Fuvar szerkesztése — <span id="oeModalId" style="color:var(--muted);font-size:14px;font-weight:400;"></span></h3>
+    <h3><span data-i18n="edit.title">✏️ Fuvar szerkesztése —</span> <span id="oeModalId" style="color:var(--muted);font-size:14px;font-weight:400;"></span></h3>
     <div id="oeImportExtra" style="margin:8px 0;"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div class="field"><label>Ügyfél</label><input class="input" id="oeClient"></div>
-      <div class="field"><label>Referencia</label><input class="input" id="oeRef"></div>
-      <div class="field"><label>Rakodás helye</label><div class="vs-ac-wrap"><input class="input" id="oeLocInc" autocomplete="off"><div class="vs-ac-dd" id="oeLocIncDD"></div></div></div>
+      <div class="field"><label data-i18n="edit.client">Ügyfél</label><input class="input" id="oeClient"></div>
+      <div class="field"><label data-i18n="form.ref">Referencia</label><input class="input" id="oeRef"></div>
+      <div class="field"><label data-i18n="edit.loadLoc">Rakodás helye</label><div class="vs-ac-wrap"><input class="input" id="oeLocInc" autocomplete="off"><div class="vs-ac-dd" id="oeLocIncDD"></div></div></div>
       <div class="field"><label data-i18n="form.unloadLoc">Lerakás helye</label><div class="vs-ac-wrap"><input class="input" id="oeLocDesc" autocomplete="off"><div class="vs-ac-dd" id="oeLocDescDD"></div></div></div>
-      <div class="field"><label>Rakodás dátuma</label><input class="input" id="oeDataInc" type="date"></div>
-      <div class="field"><label>Lerakás dátuma</label><input class="input" id="oeDataDesc" type="date"></div>
-      <div class="field"><label>Ár (EUR)</label><input class="input" id="oePret" type="number"></div>
-      <div class="field"><label>Km</label><div class="vs-km-row"><input class="input" id="oeKm" type="number"><button type="button" class="btn ghost vs-map-btn" id="oeMapBtn" title="Útvonal-előnézet térképen" style="display:none;">🗺️</button></div></div>
-      <div class="field"><label>Súly (kg)</label><input class="input" id="oeSuly" type="number" min="0"></div>
+      <div class="field"><label data-i18n="edit.loadDate">Rakodás dátuma</label><input class="input" id="oeDataInc" type="date"></div>
+      <div class="field"><label data-i18n="edit.unloadDate">Lerakás dátuma</label><input class="input" id="oeDataDesc" type="date"></div>
+      <div class="field"><label data-i18n="edit.price">Ár (EUR)</label><input class="input" id="oePret" type="number"></div>
+      <div class="field"><label data-i18n="edit.km">Km</label><div class="vs-km-row"><input class="input" id="oeKm" type="number"><button type="button" class="btn ghost vs-map-btn" id="oeMapBtn" title="Útvonal-előnézet térképen" style="display:none;">🗺️</button></div></div>
+      <div class="field"><label data-i18n="edit.weight">Súly (kg)</label><input class="input" id="oeSuly" type="number" min="0"></div>
       <div class="field"><label><span data-i18n="form.loadType">Rakomány típusa</span> <span style="color:var(--brand-red);">*</span></label>
         <div style="display:flex;gap:16px;align-items:center;padding:9px 2px;">
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;" title="Full Truck Load — teljes rakomány"><input type="checkbox" id="oeFtl" onchange="loadTypeExclusive(this,'oeLtl')" style="width:16px;height:16px;cursor:pointer;accent-color:#3b82f6;"> FTL</label>
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;" title="Less Than Truckload — részrakomány"><input type="checkbox" id="oeLtl" onchange="loadTypeExclusive(this,'oeFtl')" style="width:16px;height:16px;cursor:pointer;accent-color:#f59e0b;"> LTL</label>
         </div>
       </div>
-      <div class="field"><label>Méretek (cm) <span id="oeDimReq" style="color:var(--muted);font-weight:400;font-size:11px;">— LTL-nél kötelező</span></label>
+      <div class="field"><label><span data-i18n="form.dims">Méretek (cm)</span> <span id="oeDimReq" style="color:var(--muted);font-weight:400;font-size:11px;" data-i18n="form.dimReq">— LTL-nél kötelező</span></label>
         <div style="display:flex;gap:8px;">
-          <input class="input" id="oeHossz" type="number" min="0" placeholder="Hossz">
-          <input class="input" id="oeSzel" type="number" min="0" placeholder="Szél.">
-          <input class="input" id="oeMag" type="number" min="0" placeholder="Mag.">
+          <input class="input" id="oeHossz" type="number" min="0" placeholder="Hossz" data-i18n-ph="form.phLen">
+          <input class="input" id="oeSzel" type="number" min="0" placeholder="Szél." data-i18n-ph="form.phWid">
+          <input class="input" id="oeMag" type="number" min="0" placeholder="Mag." data-i18n-ph="form.phHei">
         </div>
       </div>
     </div>
-    <div class="field"><label>🛣️ Útdíj (EUR) <span style="color:var(--muted);font-weight:400;font-size:11px;">— becsült, kézzel módosítható</span></label>
+    <div class="field"><label><span data-i18n="edit.toll">🛣️ Útdíj (EUR)</span> <span style="color:var(--muted);font-weight:400;font-size:11px;" data-i18n="edit.tollHint">— becsült, kézzel módosítható</span></label>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <input class="input" id="oeToll" type="number" min="0" step="0.01" style="max-width:140px;">
-        <button type="button" class="btn ok" style="padding:8px 12px;" onclick="estimateOrderToll()">🛣️ Becslés</button>
-        <button type="button" class="btn ghost" style="padding:8px 12px;" onclick="openTollRates()">⚙️ Ráták</button>
+        <button type="button" class="btn ok" style="padding:8px 12px;" onclick="estimateOrderToll()" data-i18n="edit.estimate">🛣️ Becslés</button>
+        <button type="button" class="btn ghost" style="padding:8px 12px;" onclick="openTollRates()" data-i18n="edit.rates">⚙️ Ráták</button>
       </div>
       <div id="oeTollBreak" style="margin-top:8px;"></div>
     </div>
-    <div class="field"><label>🚚 Alvállalkozó (Extern fuvarnál)</label>
+    <div class="field"><label data-i18n="edit.carrier">🚚 Alvállalkozó (Extern fuvarnál)</label>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <select class="select" id="oeCarrier" style="min-width:200px;"><option value="">— nincs —</option></select>
-        <input class="input" id="oeCarrierCost" type="number" min="0" step="0.01" placeholder="Alvállalkozói díj (EUR)" style="max-width:200px;" oninput="oeUpdateMargin()">
+        <select class="select" id="oeCarrier" style="min-width:200px;"><option value="" data-i18n="edit.none">— nincs —</option></select>
+        <input class="input" id="oeCarrierCost" type="number" min="0" step="0.01" placeholder="Alvállalkozói díj (EUR)" data-i18n-ph="edit.carrierCostPh" style="max-width:200px;" oninput="oeUpdateMargin()">
         <span id="oeMargin" class="text-muted" style="font-size:12px;"></span>
       </div>
     </div>
-    <div class="field"><label>Státusz</label>
+    <div class="field"><label data-i18n="edit.status">Státusz</label>
       <select class="select" id="oeStatus">
         <option>Disponibil</option><option>Alocat</option><option>In Curs</option>
         <option>Finalizat</option><option>Anulat</option><option>Extern</option>
       </select>
     </div>
     <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
-      <div style="font-weight:700;color:#fff;margin-bottom:10px;">🚛 Sofőr / Jármű</div>
+      <div style="font-weight:700;color:#fff;margin-bottom:10px;" data-i18n="edit.driverVehicle">🚛 Sofőr / Jármű</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="field"><label>Sofőr típus</label>
+        <div class="field"><label data-i18n="edit.soferType">Sofőr típus</label>
           <select class="select" id="oeSoferType" onchange="oeToggleSoferType()">
-            <option value="">— Nincs —</option>
+            <option value="" data-i18n="edit.noneDash">— Nincs —</option>
             <option value="Intern">Intern</option>
             <option value="Extern">Extern</option>
           </select>
         </div>
-        <div class="field" id="oeInternWrap"><label>Belső sofőr</label>
-          <select class="select" id="oeEmailSofer"><option value="">— Válassz —</option></select>
+        <div class="field" id="oeInternWrap"><label data-i18n="form.internDriver">Belső sofőr</label>
+          <select class="select" id="oeEmailSofer"><option value="" data-i18n="edit.choose">— Válassz —</option></select>
         </div>
-        <div class="field" id="oeExternWrap" style="display:none;"><label>Extern sofőr neve</label><input class="input" id="oeNumeSoferExtern"></div>
-        <div class="field" id="oeExternFirmaWrap" style="display:none;"><label>Extern cég</label><input class="input" id="oeFirmaExtern"></div>
-        <div class="field"><label>Vontató rendszám</label>
-          <select class="select" id="oeCamion"><option value="">— Nincs —</option></select>
+        <div class="field" id="oeExternWrap" style="display:none;"><label data-i18n="edit.externName">Extern sofőr neve</label><input class="input" id="oeNumeSoferExtern"></div>
+        <div class="field" id="oeExternFirmaWrap" style="display:none;"><label data-i18n="edit.externFirm">Extern cég</label><input class="input" id="oeFirmaExtern"></div>
+        <div class="field"><label data-i18n="form.tractorPlate">Vontató rendszám</label>
+          <select class="select" id="oeCamion"><option value="" data-i18n="edit.noneDash">— Nincs —</option></select>
         </div>
-        <div class="field"><label>Pótkocsi rendszám</label>
-          <select class="select" id="oeRemorca"><option value="">— Nincs —</option></select>
+        <div class="field"><label data-i18n="form.trailerPlate">Pótkocsi rendszám</label>
+          <select class="select" id="oeRemorca"><option value="" data-i18n="edit.noneDash">— Nincs —</option></select>
         </div>
       </div>
     </div>
     <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div style="font-weight:700;color:#fff;">🔄 Jármű / Sofőr váltások</div>
-        <button class="btn primary" style="padding:6px 14px;font-size:12px;" onclick="oeAddLeg()">+ Váltás hozzáadása</button>
+        <div style="font-weight:700;color:#fff;" data-i18n="edit.legsTitle">🔄 Jármű / Sofőr váltások</div>
+        <button class="btn primary" style="padding:6px 14px;font-size:12px;" onclick="oeAddLeg()" data-i18n="edit.addLeg">+ Váltás hozzáadása</button>
       </div>
       <div id="oeLegsList" style="display:flex;flex-direction:column;gap:8px;"></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:16px;">
-      <button class="btn ghost col" onclick="closeOrderEditModal()">Mégse</button>
-      <button class="btn primary col" onclick="saveOrderEdit()">💾 Mentés</button>
+      <button class="btn ghost col" onclick="closeOrderEditModal()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn primary col" onclick="saveOrderEdit()" data-i18n="edit.save">💾 Mentés</button>
     </div>
   </div>
 </div>
