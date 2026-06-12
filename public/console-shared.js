@@ -2075,7 +2075,7 @@ function renderFilteredOrders(list) {
 
     return '<tr><td><b>'+c.id+'</b></td><td>'+esc(c.client||'—')+'</td>'+
       '<td>'+routeCell+'</td>'+
-      '<td>'+(c.km||'—')+'</td><td>'+(c.pret||'—')+'</td>'+
+      '<td>'+(c.km||'—')+(c.route_km!=null&&c.route_km!==''?' <span class="badge info" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="Automata útvonal-km (térkép szerint) — összevetésre">🗺️ '+c.route_km+'</span>':'')+'</td><td>'+(c.pret||'—')+'</td>'+
       '<td>'+soferCell+'</td><td>'+esc(c.rendszam_camion||'—')+'</td>'+
       '<td>'+statusSel+'</td>'+
       '<td style="display:flex;gap:4px;flex-wrap:wrap;">'+

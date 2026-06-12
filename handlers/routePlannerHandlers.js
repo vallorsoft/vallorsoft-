@@ -357,24 +357,9 @@ async function routeMapFeatureOn(companyId) {
   } catch (e) { return false; }
 }
 
-// Geokódolás geo_cache-sel (a Visszfuvar-radarral közös tábla) — kíméli a
-// Photont és gyorsabb. Sikertelen geokódolás is cache-elődik (NULL).
-async function geocodeCachedFree(addr) {
-  const norm = String(addr || '').trim().toLowerCase().slice(0, 200);
-  if (!norm) throw new Error('Üres cím.');
-  const c = await pool.query('SELECT lat, lng FROM geo_cache WHERE label = $1', [norm]);
-  if (c.rows.length) {
-    if (c.rows[0].lat == null) throw new Error('Nem található koordináta ehhez a címhez: ' + addr);
-    return { lat: Number(c.rows[0].lat), lng: Number(c.rows[0].lng), label: addr };
-  }
-  let g = null;
-  try { g = await geocodeFree(addr); } catch (_) { g = null; }
-  await pool.query(
-    'INSERT INTO geo_cache (label, lat, lng) VALUES ($1,$2,$3) ON CONFLICT (label) DO NOTHING',
-    [norm, g ? g.lat : null, g ? g.lng : null]).catch(() => {});
-  if (!g) throw new Error('Nem található koordináta ehhez a címhez: ' + addr);
-  return g;
-}
+// Geokódolás geo_cache-sel — a közös lib/routeEstimate.js-ben él (a beérkező
+// megrendelés jóváhagyása is onnan számol automata km-et a fuvarlistára).
+const { estimateRoute } = require('../lib/routeEstimate');
 
 // args: [{ waypoints:[{type, address?, lat?, lng?}] }]
 // → { ok, km, durationSeconds, polyline:[[lat,lng]], waypoints:[{type,lat,lng,label}] }
@@ -389,45 +374,9 @@ handlers.orderRouteEstimate = async function (req, res, args) {
       return res.json({ result: { ok: false, err: 'A térképes útvonal-számítás nincs engedélyezve ennél a cégnél.' } });
     }
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
-    let waypoints = Array.isArray(a.waypoints) ? a.waypoints.slice() : [];
-    waypoints = waypoints.filter((w) => w && (w.address || (w.lat != null && w.lng != null)));
-    if (waypoints.length < 2) {
-      return res.json({ result: { ok: false, err: 'A felrakó és a lerakó cím is szükséges.' } });
-    }
-    if (waypoints.length > 9) waypoints = waypoints.slice(0, 9); // fair-use
-
-    // Koordináta-feloldás (cache-elt geokódolás)
-    const resolved = [];
-    for (const w of waypoints) {
-      if (w.lat != null && w.lng != null) {
-        resolved.push({ type: w.type || 'waypoint', lat: Number(w.lat), lng: Number(w.lng),
-          label: w.address || (Number(w.lat).toFixed(4) + ', ' + Number(w.lng).toFixed(4)) });
-      } else {
-        const g = await geocodeCachedFree(w.address);
-        resolved.push({ type: w.type || 'waypoint', lat: g.lat, lng: g.lng, label: w.address || g.label });
-      }
-    }
-
-    // Szakaszonkénti OSRM-routing (ingyenes autós profil)
-    let polyline = [];
-    let distanceMeters = 0;
-    let durationSeconds = 0;
-    for (let i = 0; i < resolved.length - 1; i++) {
-      const leg = await osrmLeg(resolved[i], resolved[i + 1]);
-      distanceMeters += leg.distance;
-      durationSeconds += leg.duration;
-      let dd = leg.polyline;
-      if (polyline.length && dd.length) dd = dd.slice(1); // duplikált szakaszhatár-pont
-      polyline = polyline.concat(dd);
-    }
-
-    return res.json({ result: {
-      ok: true,
-      km: Math.round(distanceMeters / 1000),
-      durationSeconds: Math.round(durationSeconds),
-      polyline,
-      waypoints: resolved,
-    } });
+    const est = await estimateRoute(a.waypoints);
+    return res.json({ result: { ok: true, km: est.km, durationSeconds: est.durationSeconds,
+      polyline: est.polyline, waypoints: est.waypoints } });
   } catch (err) {
     console.error('orderRouteEstimate hiba:', err);
     return res.json({ result: { ok: false, err: (err && err.message) || 'Szerver hiba az útvonal-számításnál.' } });
