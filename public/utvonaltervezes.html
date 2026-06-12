@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="/i18n.js?v=20260612"></script>
+  <script src="/i18n-srv.js?v=20260612"></script>
   <script src="/session-guard.js?v=20260611"></script>
   <script>(window.registerI18n||function(d){(window.__i18nQueue=window.__i18nQueue||[]).push(d);})({
     'rp.back': { hu:'← Vissza', ro:'← Înapoi' },
@@ -636,9 +637,8 @@ function rpDrawRoute(r){
       : (r.notices||[]).map(function(n){return esc(n.title);});
     // egyedi címkék
     detail = detail.filter(function(x,i){return detail.indexOf(x)===i;});
-    warn.innerHTML='⚠️ Figyelem: az útvonal '+(viol.length?('<b>'+viol.length+' tiltott szakaszt</b>'):'teherjármű korlátozást')
-      + ' tartalmaz — a térképen <span style="color:#ff2d55;font-weight:700;">pirossal kiemelve ⛔</span>. Csak indokolt esetben, engedéllyel közlekedj ott.<br>'
-      + '<span style="font-size:12px;opacity:.9;">'+detail.join(' · ')+'</span>';
+    warn.innerHTML=T('rp.warn.body',{what:(viol.length?T('rp.warn.forbidden.n',{n:viol.length}):T('rp.warn.restriction'))})
+      + '<br><span style="font-size:12px;opacity:.9;">'+detail.join(' · ')+'</span>';
   } else { warn.style.display='none'; warn.innerHTML=''; }
 
 }
@@ -651,6 +651,19 @@ gas('authMe').then(function(u){ if(!u){ window.location.href='/login'; return; }
   var b=document.getElementById('backLink'); if(b) b.href=(u.pozicio==='Manager')?'/manager':'/admin'; });
 // Ingyenes csempék — nincs kulcs-betöltés, azonnal indulhat a térkép.
 rpInitMap(); rpLoadOrders(); rpLoadVehicles();
+
+// ───────── Nyelvváltás: dinamikusan renderelt részek frissítése ─────────
+if(window.I18N && typeof window.I18N.onLang==='function'){
+  window.I18N.onLang(function(){
+    rpSyncThemeIcon();
+    rpRenderOrderOptions();
+    rpRenderTractorList(); rpRenderTrailerList();
+    rpRenderTruckSummary();
+    rpRenderGps(gpsPos?'done':(selTractor?'done':'none'));
+    _waypointIds.forEach(function(wid,i){ var r=document.getElementById('rpWpRow_'+wid); if(r){ var l=r.querySelector('.lbl'); if(l) l.textContent=T('rp.wp.label',{n:i+1}); } });
+    if(_lastRoute) rpDrawRoute(_lastRoute);
+  });
+}
 </script>
 </body>
 </html>
