@@ -1262,17 +1262,19 @@ function loadMapsProvider(){
   var box=document.getElementById('mapsProviderBox'); if(!box) return;
   gas('mapsGetProvider').then(function(r){
     var vendor=(r&&r.ok&&r.vendor)||'free'; var hasKey=!!(r&&r.has_key);
-    var usage=(r&&r.usage)||{month:0,prev:0}; var freeTier=(r&&r.free_tier)||0;
+    var usage=(r&&r.usage)||{month:0,prev:0};
+    var costM=(r&&r.cost_month)||0; var costP=(r&&r.cost_prev)||0; var marginPct=(r&&r.margin_pct)||25;
     var usageHtml='';
     if(vendor!=='free'){
-      var m=usage.month||0; var pct=freeTier?Math.min(100,Math.round(m/freeTier*100)):0;
-      var col=pct>=100?'#ff6b75':pct>=80?'#fbbf24':'#4ade80';
+      var m=usage.month||0;
       usageHtml='<div class="glass-soft" style="padding:12px 14px;margin-top:14px;">'
-        +'<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;"><span style="font-size:12px;color:var(--muted);font-weight:700;">📊 E havi használat ('+vendor.toUpperCase()+')</span>'
-        +'<span style="font-size:20px;font-weight:800;color:'+col+';">'+m.toLocaleString('hu')+'</span><span style="font-size:12px;color:var(--muted);">hívás'+(freeTier?(' / '+freeTier.toLocaleString('hu')+' ingyenes keret'):'')+'</span>'
-        +(usage.prev?'<span style="font-size:11px;color:var(--muted);margin-left:auto;">előző hó: '+usage.prev.toLocaleString('hu')+'</span>':'')+'</div>'
-        +(freeTier?('<div style="height:7px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:8px;"><i style="display:block;height:100%;width:'+pct+'%;background:'+col+';border-radius:6px;"></i></div>'):'')
-        +'<div style="font-size:10.5px;color:var(--muted);margin-top:6px;">A számláló 0-ról indul, és csak a fizetős (keyes) geokódolás/keresés-hívásokat számolja — az ingyenes hívások nem. A pontos kvótát/árat a szolgáltatónál ellenőrizd.</div>'
+        +'<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
+        +'<span style="font-size:12px;color:var(--muted);font-weight:700;">📊 E havi használat ('+vendor.toUpperCase()+')</span>'
+        +'<span style="font-size:18px;font-weight:800;">'+m.toLocaleString('hu')+' <span style="font-size:12px;color:var(--muted);font-weight:500;">hívás</span></span>'
+        +'<span style="margin-left:auto;font-size:12px;color:var(--muted);">Fizetendő:</span>'
+        +'<span style="font-size:22px;font-weight:800;color:#fbbf24;">'+costM.toFixed(2)+' €</span></div>'
+        +(costP?'<div style="font-size:11px;color:var(--muted);margin-top:4px;">Előző hó: '+(usage.prev||0).toLocaleString('hu')+' hívás · '+costP.toFixed(2)+' €</div>':'')
+        +'<div style="font-size:10.5px;color:var(--muted);margin-top:6px;">⚠️ <b>Nincs ingyenes keret</b> — az első hívástól fizetsz (hivatalos ár + '+marginPct+'% árrés). Csak a fizetős (keyes) geokódolás/keresés számít, a cache-találat nem.</div>'
         +'</div>';
     }
     box.innerHTML='<div class="glass" style="padding:18px 20px;border:1px solid rgba(59,130,246,.35);">'
