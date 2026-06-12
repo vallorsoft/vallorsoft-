@@ -468,6 +468,10 @@
     root.querySelectorAll('[data-i18n-html]').forEach(function (el) { el.innerHTML = t(el.getAttribute('data-i18n-html')); });
     root.querySelectorAll('[data-i18n-title]').forEach(function (el) { el.setAttribute('title', t(el.getAttribute('data-i18n-title'))); });
   }
+  // Több feliratkozó a nyelvváltásra (egy oldalon sok kártya-JS fut együtt, ezért
+  // a window.onLangChange egyetlen globális nem elég — itt egy lista van).
+  var LANG_SUBS = [];
+  function onLang(cb) { if (typeof cb === 'function') LANG_SUBS.push(cb); }
   function setLang(l) {
     if (l !== 'hu' && l !== 'ro') return;
     try { localStorage.setItem('vs-lang', l); } catch (e) {}
@@ -475,6 +479,7 @@
     applyI18n(document);
     syncSwitcher();
     if (typeof window.onLangChange === 'function') { try { window.onLangChange(l); } catch (e) {} }
+    LANG_SUBS.forEach(function (cb) { try { cb(l); } catch (e) {} });
   }
   function syncSwitcher() {
     var lang = getLang();
@@ -516,7 +521,7 @@
   window.t = t;
   window.tx = tx;
   window.registerI18n = register;
-  window.I18N = { t: t, tx: tx, set: setLang, get: getLang, apply: applyI18n, dict: DICT, mountSwitcher: injectSwitcher, register: register };
+  window.I18N = { t: t, tx: tx, set: setLang, get: getLang, apply: applyI18n, dict: DICT, mountSwitcher: injectSwitcher, register: register, onLang: onLang };
   // A még i18n.js betöltése ELŐTT sorba állított szótárak feldolgozása.
   if (window.__i18nQueue && window.__i18nQueue.length) { window.__i18nQueue.forEach(register); window.__i18nQueue = []; }
 
