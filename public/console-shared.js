@@ -94,7 +94,7 @@ async function burnAndSaveDoc(){
   if(!dataUrl) return;
   gas('orderDocSaveSigned',[currentDocId,dataUrl]).then(r=>{
     if(r.ok){ toast(t('cs.savedToSystem'),'ok'); loadDocList(currentDocOrderId); closeSignModal(); }
-    else{ toast(r.err||'Mentési hiba','err'); }
+    else{ toast(r.err||t('cs.saveError'),'err'); }
   });
 }
 
@@ -200,7 +200,7 @@ function closeVehicleModal(){document.getElementById('vehicleModal').classList.r
 function createExtDriver(){
   const d={nume:document.getElementById('edNume').value.trim(),firma:document.getElementById('edFirma').value.trim(),telefon:document.getElementById('edTelefon').value.trim(),email:document.getElementById('edEmail').value.trim(),rendszam_camion:document.getElementById('edCamion').value.trim(),rendszam_remorca:document.getElementById('edRemorca').value.trim(),nota:document.getElementById('edNota').value.trim()};
   if(!d.nume&&!d.firma){toast(t('cs.driverOrCompanyReq'),'err');return;}
-  gas('extDriverCreate',[d]).then(r=>{if(r.ok){toast(t('cs.driverAdded'),'ok');['edNume','edFirma','edTelefon','edEmail','edCamion','edRemorca','edNota'].forEach(id=>{document.getElementById(id).value='';});loadExtDrivers();}else{toast(r.err||'Hiba történt','err');}});
+  gas('extDriverCreate',[d]).then(r=>{if(r.ok){toast(t('cs.driverAdded'),'ok');['edNume','edFirma','edTelefon','edEmail','edCamion','edRemorca','edNota'].forEach(id=>{document.getElementById(id).value='';});loadExtDrivers();}else{toast(r.err||t('common.error'),'err');}});
 }
 
 function createInv(){
@@ -329,18 +329,18 @@ function ensureRouteMapModal(){
   if(document.getElementById('routeMapModal')) return;
   var d=document.createElement('div'); d.id='routeMapModal';
   d.innerHTML='<div class="rmm-card">'
-    +'<div class="rmm-head"><b class="text-primary" style="font-size:15px;">🗺️ Útvonal-előnézet</b>'
+    +'<div class="rmm-head"><b class="text-primary" style="font-size:15px;">'+t('cs.rm.title')+'</b>'
     +'<span id="rmmKm" class="badge info" style="margin-left:6px;">—</span>'
-    +'<button class="btn ghost" style="margin-left:auto;padding:5px 12px;" onclick="closeRouteMap()">✕ Bezár</button></div>'
+    +'<button class="btn ghost" style="margin-left:auto;padding:5px 12px;" onclick="closeRouteMap()">'+t('cs.rm.close')+'</button></div>'
     +'<div class="rmm-body">'
     +'<div class="rmm-map" id="rmmMap"></div>'
     +'<div class="rmm-side">'
-      +'<div class="text-muted" style="font-size:12px;margin-bottom:10px;line-height:1.45;">A köztespontok <b>csak a km-számításhoz és az útvonal-előnézethez</b> kellenek — NEM megállók. Add hozzá címmel, vagy kapcsold be a térkép-kattintást.</div>'
+      +'<div class="text-muted" style="font-size:12px;margin-bottom:10px;line-height:1.45;">'+t('cs.rm.viaHint')+'</div>'
       +'<div id="rmmViaList"></div>'
-      +'<div class="rmm-via"><div class="vs-ac-wrap"><input class="input" id="rmmViaInput" placeholder="Köztespont címe" autocomplete="off"><div class="vs-ac-dd" id="rmmViaInputDD"></div></div>'
+      +'<div class="rmm-via"><div class="vs-ac-wrap"><input class="input" id="rmmViaInput" placeholder="'+t('cs.rm.viaPh')+'" autocomplete="off"><div class="vs-ac-dd" id="rmmViaInputDD"></div></div>'
       +'<button class="btn ok" style="padding:9px 11px;" onclick="routeMapAddViaFromInput()">➕</button></div>'
-      +'<label style="display:flex;align-items:center;gap:7px;font-size:12px;margin-top:10px;cursor:pointer;"><input type="checkbox" id="rmmClickAdd" onchange="_rmClickAdds=this.checked;"> Térképre kattintás = köztespont</label>'
-      +'<button class="btn ghost" style="width:100%;margin-top:10px;padding:8px;font-size:12px;" onclick="routeMapClearVia()">Köztespontok törlése</button>'
+      +'<label style="display:flex;align-items:center;gap:7px;font-size:12px;margin-top:10px;cursor:pointer;"><input type="checkbox" id="rmmClickAdd" onchange="_rmClickAdds=this.checked;"> '+t('cs.rm.clickAdd')+'</label>'
+      +'<button class="btn ghost" style="width:100%;margin-top:10px;padding:8px;font-size:12px;" onclick="routeMapClearVia()">'+t('cs.rm.clearVia')+'</button>'
     +'</div></div></div>';
   document.body.appendChild(d);
   vsAttachAutocomplete('rmmViaInput','rmmViaInputDD',null);
@@ -376,7 +376,7 @@ function routeMapDraw(which){
 function renderRouteVia(which){
   var box=document.getElementById('rmmViaList'); if(!box) return;
   var st=_rmState[which];
-  if(!st.via.length){ box.innerHTML='<div class="text-muted" style="font-size:12px;margin-bottom:8px;">Nincs köztespont.</div>'; return; }
+  if(!st.via.length){ box.innerHTML='<div class="text-muted" style="font-size:12px;margin-bottom:8px;">'+t('cs.rm.noVia')+'</div>'; return; }
   box.innerHTML=st.via.map(function(v,i){
     var lbl=v.address||(v.lat!=null?(Number(v.lat).toFixed(3)+', '+Number(v.lng).toFixed(3)):'?');
     return '<div class="rmm-via"><span class="badge info" style="flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🔵 '+esc(lbl)+'</span>'
@@ -429,10 +429,10 @@ function refreshDimReq(){
   });
 }
 // fuvarlista-badge: FTL = teljes áru (kék), LTL = részrakomány (sárga) + méret
-function loadTypeBadge(t, dims){
-  var d = dims ? ' <span class="badge" style="font-size:10px;padding:1px 6px;background:rgba(255,255,255,0.06);color:var(--text-muted);" title="Rakomány-méret (h×sz×m cm)">📐 '+dims+'</span>' : '';
-  if(t==='FTL')return ' <span class="badge info" title="Full Truck Load — teljes rakomány" style="font-size:10px;padding:1px 6px;">FTL</span>'+d;
-  if(t==='LTL')return ' <span class="badge warn" title="Less Than Truckload — részrakomány" style="font-size:10px;padding:1px 6px;">LTL</span>'+d;
+function loadTypeBadge(lt, dims){
+  var d = dims ? ' <span class="badge" style="font-size:10px;padding:1px 6px;background:rgba(255,255,255,0.06);color:var(--text-muted);" title="'+t('cs.tt.cargoSize')+'">📐 '+dims+'</span>' : '';
+  if(lt==='FTL')return ' <span class="badge info" title="'+t('cs.tt.ftl')+'" style="font-size:10px;padding:1px 6px;">FTL</span>'+d;
+  if(lt==='LTL')return ' <span class="badge warn" title="'+t('cs.tt.ltl')+'" style="font-size:10px;padding:1px 6px;">LTL</span>'+d;
   return d;
 }
 // h×sz×m cm string a méretekből (vagy üres)
@@ -480,11 +480,11 @@ function ensureOrderImportModal(){
   if(document.getElementById('orderImportModal')) return;
   var d=document.createElement('div'); d.id='orderImportModal';
   d.innerHTML='<div class="oi-card">'
-    +'<div class="oi-head"><b class="text-primary" style="font-size:15px;">📥 Fuvar-CSV import</b>'
-    +'<button class="btn ghost" style="margin-left:auto;padding:5px 12px;" onclick="closeOrderImport()">✕ Bezár</button></div>'
+    +'<div class="oi-head"><b class="text-primary" style="font-size:15px;">'+t('cs.oi.title')+'</b>'
+    +'<button class="btn ghost" style="margin-left:auto;padding:5px 12px;" onclick="closeOrderImport()">'+t('cs.oi.close')+'</button></div>'
     +'<div class="oi-body">'
-    +'<div class="text-muted" style="font-size:12px;margin-bottom:10px;line-height:1.5;">Töltsd fel a gyári/szállítói fuvarlistát (.csv). A rendszer felismeri az elválasztót, és fejléc-név alapján automatikusan párosítja az oszlopokat — ellenőrizd/javítsd, majd importálj. <b>A nem párosított oszlopok nem vesznek el:</b> a fuvar „Importált extra adatok" mezőjébe kerülnek (a szerkesztőben megnézhető).</div>'
-    +'<div class="field" style="max-width:420px;"><label>CSV fájl</label><input class="input" type="file" id="oiFile" accept=".csv,.txt" onchange="orderImportParse()"></div>'
+    +'<div class="text-muted" style="font-size:12px;margin-bottom:10px;line-height:1.5;">'+t('cs.oi.hint')+'</div>'
+    +'<div class="field" style="max-width:420px;"><label>'+t('cs.oi.csvFile')+'</label><input class="input" type="file" id="oiFile" accept=".csv,.txt" onchange="orderImportParse()"></div>'
     +'<div id="oiMapping" style="margin-top:14px;"></div>'
     +'<div id="oiResult" style="margin-top:12px;"></div>'
     +'</div></div>';
@@ -504,17 +504,17 @@ function orderImportParse(){
     _oiHeader=split(lines[0]);
     _oiRows=lines.slice(1).map(split);
 
-    var opts='<option value="">— (nincs / extra) —</option>'+_oiHeader.map(function(h,i){ return '<option value="'+i+'">'+esc(h||('oszlop '+(i+1)))+'</option>'; }).join('');
+    var opts='<option value="">'+t('cs.oi.noneExtra')+'</option>'+_oiHeader.map(function(h,i){ return '<option value="'+i+'">'+esc(h||(t('cs.oi.col')+(i+1)))+'</option>'; }).join('');
     var cells=OI_FIELDS.map(function(fl){
       return '<div class="field" style="margin:0;"><label>'+esc(fl.label)+'</label>'
         +'<select class="select" id="oiCol_'+fl.k+'" onchange="orderImportPreview()">'+opts+'</select></div>';
     }).join('');
     document.getElementById('oiMapping').innerHTML=
       '<div class="glass-soft" style="padding:14px;">'
-      +'<div class="text-primary" style="font-size:13px;font-weight:700;margin-bottom:10px;">Oszlop-párosítás — '+_oiRows.length+' sor (elválasztó: <code>'+(delim==='\t'?'TAB':esc(delim))+'</code>)</div>'
+      +'<div class="text-primary" style="font-size:13px;font-weight:700;margin-bottom:10px;">'+t('cs.oi.mapTitle')+_oiRows.length+t('cs.oi.rowsSep')+'<code>'+(delim==='\t'?'TAB':esc(delim))+'</code>)</div>'
       +'<div class="oi-map-grid">'+cells+'</div>'
       +'<div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap;">'
-      +'<button class="btn primary" onclick="orderImportRun(this)">📥 '+_oiRows.length+' fuvar importálása</button>'
+      +'<button class="btn primary" onclick="orderImportRun(this)">📥 '+_oiRows.length+t('cs.oi.importBtn')+'</button>'
       +'<span id="oiUnmapped" class="text-muted" style="font-size:11.5px;"></span>'
       +'</div>'
       +'<div id="oiPreview" style="margin-top:12px;"></div>'
@@ -572,33 +572,33 @@ function orderImportPreview(){
   var used={}; OI_FIELDS.forEach(function(fl){ var ci=oiColIndex(fl.k); if(ci>=0) used[ci]=true; });
   var unmapped=_oiHeader.filter(function(h,i){ return !used[i]; });
   if(un) un.innerHTML = unmapped.length
-    ? '⚠️ Nem párosított oszlop ('+unmapped.length+'): <b>'+esc(unmapped.join(', ').slice(0,120))+'</b> → a fuvar „Importált extra adatok" mezőjébe kerül.'
-    : '✓ Minden oszlop párosítva.';
+    ? t('cs.oi.unmapped',{n:unmapped.length, cols:esc(unmapped.join(', ').slice(0,120))})
+    : t('cs.oi.allMapped');
   // előnézet: első 3 sor a párosítás szerint
   var cols=OI_FIELDS.filter(function(fl){ return oiColIndex(fl.k)>=0; });
-  var head='<tr>'+cols.map(function(fl){ return '<th>'+esc(fl.label)+'</th>'; }).join('')+(unmapped.length?'<th>+ extra</th>':'')+'</tr>';
+  var head='<tr>'+cols.map(function(fl){ return '<th>'+esc(fl.label)+'</th>'; }).join('')+(unmapped.length?'<th>'+t('cs.oi.extraCol')+'</th>':'')+'</tr>';
   var body=_oiRows.slice(0,3).map(function(r){
     var o=oiBuildRow(r);
     return '<tr>'+cols.map(function(fl){ var v=o[fl.k]; return '<td>'+esc(v==null||v===''?'—':String(v))+'</td>'; }).join('')
-      +(unmapped.length?'<td class="text-muted">'+esc(o.import_extra?Object.keys(o.import_extra).length+' mező':'—')+'</td>':'')+'</tr>';
+      +(unmapped.length?'<td class="text-muted">'+esc(o.import_extra?Object.keys(o.import_extra).length+t('cs.oi.fields'):'—')+'</td>':'')+'</tr>';
   }).join('');
-  if(pv) pv.innerHTML='<div class="text-muted" style="font-size:11px;margin-bottom:4px;">Előnézet (első 3 sor):</div><div class="oi-prev"><table><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>';
+  if(pv) pv.innerHTML='<div class="text-muted" style="font-size:11px;margin-bottom:4px;">'+t('cs.oi.preview')+'</div><div class="oi-prev"><table><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>';
 }
 function orderImportRun(btn){
   if(!_oiRows.length){ toast(t('cs.csvFirst'),'err'); return; }
   var rows=_oiRows.map(oiBuildRow);
-  if(btn){ btn.disabled=true; btn.textContent='Importálás…'; }
+  if(btn){ btn.disabled=true; btn.textContent=t('cs.oi.importing'); }
   gas('bulkCreateOrders',[{rows:rows}]).then(function(r){
-    if(btn){ btn.disabled=false; btn.textContent='📥 '+_oiRows.length+' fuvar importálása'; }
+    if(btn){ btn.disabled=false; btn.textContent='📥 '+_oiRows.length+t('cs.oi.importBtn'); }
     var res=document.getElementById('oiResult');
     if(r&&r.ok){
-      toast(t('cs.importDone')+r.inserted+' fuvar létrehozva'+(r.skipped?(' · '+r.skipped+' kihagyva'):''),'ok');
+      toast(t('cs.importDone')+r.inserted+t('cs.oi.created')+(r.skipped?(' · '+r.skipped+t('cs.oi.skipped')):''),'ok');
       if(res) res.innerHTML='<div class="glass-soft" style="padding:12px;border:1px solid rgba(34,197,94,0.4);">'
-        +'<b style="color:var(--status-ok);">✅ '+r.inserted+' fuvar létrehozva.</b>'
-        +(r.skipped?(' <span class="text-muted">'+r.skipped+' sor kihagyva (üres/hibás).</span>'):'')
+        +'<b style="color:var(--status-ok);">✅ '+r.inserted+t('cs.oi.created')+'</b>'
+        +(r.skipped?(' <span class="text-muted">'+r.skipped+t('cs.oi.skipped')+'</span>'):'')
         +'</div>';
       if(typeof loadOrders==='function') loadOrders();
-    } else { toast((r&&r.err)||'Import hiba','err'); }
+    } else { toast((r&&r.err)||t('cs.importError'),'err'); }
   }).catch(function(){ if(btn){btn.disabled=false;} toast(t('cs.importError'),'err'); });
 }
 
@@ -643,7 +643,7 @@ function createOrder(){
       if(typeof resetRouteState==='function')resetRouteState('create');
       document.querySelectorAll('input[name="oSoferType"]').forEach(r=>{if(r.value==='None')r.checked=true;});
       onSoferTypeChange('None');
-    }else{toast((r&&r.err)||'Hiba történt','err');}
+    }else{toast((r&&r.err)||t('common.error'),'err');}
   });
 }
 
@@ -658,18 +658,18 @@ function createVehicle(tip){
     v.cargo_height_cm=(document.getElementById('ptCargoHei')||{}).value||null;
   }
   if(!v.rendszam){toast(t('cs.plateReq'),'err');return;}
-  gas('vehicleCreate',[v]).then(r=>{if(r.ok){toast((tip==='Vontato'?'Vontató':'Pótkocsi')+' hozzáadva!','ok');['Rendszam','Marca','Model','An','Nota'].forEach(f=>{document.getElementById(prefix+f).value='';});if(tip==='Potkocsi'&&typeof resetTrailerFormDefaults==='function')resetTrailerFormDefaults();loadVehicles();}else{toast(r.err||'Hiba történt','err');}});
+  gas('vehicleCreate',[v]).then(r=>{if(r.ok){toast((tip==='Vontato'?t('cs.vtractor'):t('cs.vtrailer'))+t('cs.added'),'ok');['Rendszam','Marca','Model','An','Nota'].forEach(f=>{document.getElementById(prefix+f).value='';});if(tip==='Potkocsi'&&typeof resetTrailerFormDefaults==='function')resetTrailerFormDefaults();loadVehicles();}else{toast(r.err||t('common.error'),'err');}});
 }
 
 function deleteExtDriver(id){
   const d=extDriverCache.find(x=>x.id===id);
   const nev=d?(d.nume||d.firma||'?'):'?';
-  if(!confirm('Biztosan törlöd: '+nev+'?'))return;
-  gas('extDriverDelete',[id]).then(r=>{if(r.ok){toast(t('common.deletedX'),'ok');loadExtDrivers();}else{toast(r.err||'Hiba történt','err');}});
+  if(!confirm(t('cs.cf.delConfirmName')+nev+'?'))return;
+  gas('extDriverDelete',[id]).then(r=>{if(r.ok){toast(t('common.deletedX'),'ok');loadExtDrivers();}else{toast(r.err||t('common.error'),'err');}});
 }
 
 function deleteLeg(legId) {
-  if (!confirm('Törlöd ezt a váltást?')) return;
+  if (!confirm(t('cs.cf.delLeg'))) return;
   gas('deleteOrderLeg', [legId]).then(function(r) {
     if (r && r.ok) {
       toast(t('common.deleted'),'ok');
@@ -683,8 +683,8 @@ function deleteLeg(legId) {
 function deleteVehicle(id){
   const v=vehicleCache.find(x=>x.id===id);
   const rendszam=v?v.rendszam:'?';
-  if(!confirm('Biztosan törlöd a(z) '+rendszam+' rendszámú járművet?'))return;
-  gas('vehicleDelete',[id]).then(r=>{if(r.ok){toast(t('common.deletedX'),'ok');loadVehicles();}else{toast(r.err||'Hiba történt','err');}});
+  if(!confirm(t('cs.cf.delVehicle',{plate:rendszam})))return;
+  gas('vehicleDelete',[id]).then(r=>{if(r.ok){toast(t('common.deletedX'),'ok');loadVehicles();}else{toast(r.err||t('common.error'),'err');}});
 }
 
 function dmRoomId(emailA,emailB){
@@ -793,7 +793,7 @@ function initFirebaseChatPanel(me){
     .then(function(cfg){
       if(!cfg||!cfg.apiKey){
         var el=document.getElementById('chatLoadMsg');
-        if(el)el.textContent='⚠️ Chat konfiguráció hiányzik. Állítsd be a Firebase env változókat!';
+        if(el)el.textContent=t('cs.chatMissing');
         return;
       }
       var s1=document.createElement('script');
@@ -829,7 +829,7 @@ function initFirebaseChatPanel(me){
     })
     .catch(function(){
       var el=document.getElementById('chatLoadMsg');
-      if(el)el.textContent='⚠️ Chat nem elérhető.';
+      if(el)el.textContent=t('cs.chatUnavail');
     });
 }
 
@@ -851,13 +851,13 @@ function loadDocSeries() {
 
 function loadDriverUploadedDocs() {
   var container = document.getElementById('docGroupsContainer');
-  if (container) container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;"><div class="spinner" style="margin:0 auto 10px;"></div>Betöltés...</div>';
+  if (container) container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:40px;"><div class="spinner" style="margin:0 auto 10px;"></div>'+t('fe.loading')+'</div>';
   gas('getDriverDocs').then(function(list) {
     _driverDocsCache = list || [];
     var sel = document.getElementById('docFilterSofer');
     if (sel) {
       var sofors = [...new Set(_driverDocsCache.map(function(d){return d.nume_sofer||d.email_sofer;}).filter(Boolean))].sort();
-      sel.innerHTML = '<option value="">Összes sofőr</option>' + sofors.map(function(s){return '<option value="'+esc(s)+'">'+esc(s)+'</option>';}).join('');
+      sel.innerHTML = '<option value="">'+t('cs.allDrivers')+'</option>' + sofors.map(function(s){return '<option value="'+esc(s)+'">'+esc(s)+'</option>';}).join('');
     }
     renderDocGroups();
   });
@@ -868,8 +868,8 @@ function loadExtDrivers(){
     if(!Array.isArray(list))list=[];
     extDriverCache=list;
     const tb=document.querySelector('#tblExtDrivers tbody');
-    if(list.length===0){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);">Nincs még külső sofőr felvéve.</td></tr>';return;}
-    tb.innerHTML=list.map(d=>`<tr><td>${esc(d.nume||'—')}</td><td>${esc(d.firma||'—')}</td><td>${esc(d.telefon||'—')}</td><td>${esc(d.email||'—')}</td><td>${esc(d.rendszam_camion||'—')}</td><td>${esc(d.rendszam_remorca||'—')}</td><td>${esc(d.nota||'—')}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editExtDriver(${d.id})">Szerk</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteExtDriver(${d.id})">Töröl</button></td></tr>`).join('');
+    if(list.length===0){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);">'+t('cs.noExtDriver')+'</td></tr>';return;}
+    tb.innerHTML=list.map(d=>`<tr><td>${esc(d.nume||'—')}</td><td>${esc(d.firma||'—')}</td><td>${esc(d.telefon||'—')}</td><td>${esc(d.email||'—')}</td><td>${esc(d.rendszam_camion||'—')}</td><td>${esc(d.rendszam_remorca||'—')}</td><td>${esc(d.nota||'—')}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editExtDriver(${d.id})">${t('cs.editShort')}</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteExtDriver(${d.id})">${t('cs.del')}</button></td></tr>`).join('');
   }).catch(function(e){ console.error('loadExtDrivers hiba:', e); toast(t('common.loadError'),'err'); });
 }
 
@@ -878,46 +878,46 @@ function loadInternalDrivers(){
   gas('getDriverVehicleAssignments').then(function(r){
     var tbody = document.querySelector('#tblInternalDrivers tbody');
     if(!tbody) return;
-    if(!r || !r.ok){ tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Betöltési hiba.</td></tr>'; return; }
+    if(!r || !r.ok){ tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">'+t('common.loadError')+'</td></tr>'; return; }
     var list = r.drivers||[];
     var vehicles = r.vehicles||[];
     var trailers = r.trailers||[];
     if(!list.length){
-      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">Nincs regisztrált belső sofőr.</td></tr>';
+      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">'+t('cs.noIntDriver')+'</td></tr>';
       return;
     }
     // fejléc-frissítés (Jármű oszlop hozzáadása, ha még nincs)
     var thead = document.querySelector('#tblInternalDrivers thead tr');
     if(thead && thead.children.length === 4){
       var th = document.createElement('th');
-      th.textContent = '🚛 Hozzárendelt jármű';
+      th.textContent = t('cs.assignedVehicle');
       thead.insertBefore(th, thead.children[3]);
     }
     // XSS-védelem: a sor-adatot gyorsítótárból (index alapján) adjuk át, NEM HTML-attribútumba ágyazva
     window._vsIntDrvCache = list;
     tbody.innerHTML = list.map(function(d, i){
       var myVeh = vehicles.find(function(v){ return (v.assigned_driver_email||'').toLowerCase() === d.email.toLowerCase(); });
-      var opts = '<option value="">— Nincs jármű —</option>' + vehicles.map(function(v){
+      var opts = '<option value="">'+t('cs.noVehicleDash')+'</option>' + vehicles.map(function(v){
         var takenBy = v.assigned_driver_email && v.assigned_driver_email.toLowerCase() !== d.email.toLowerCase();
-        var lbl = v.rendszam + (v.has_gps ? ' 🛰️' : '') + (v.marca ? ' — ' + v.marca : '') + (takenBy ? ' (más sofőrnél)' : '');
+        var lbl = v.rendszam + (v.has_gps ? ' 🛰️' : '') + (v.marca ? ' — ' + v.marca : '') + (takenBy ? t('cs.atOtherDriver') : '');
         return '<option value="'+v.id+'"'+(myVeh && myVeh.id===v.id ? ' selected':'')+'>'+esc(lbl)+'</option>';
       }).join('');
       var gpsBadge = myVeh
         ? (myVeh.has_gps
-            ? ' <span class="badge ok" title="A jármű GPS-re van kötve (CargoTrack)">🛰️ GPS</span>'
-            : ' <span class="badge warn" title="A jármű nincs GPS-re kötve — párosítsd az Integrációk fülön">GPS nélkül</span>')
+            ? ' <span class="badge ok" title="'+t('cs.tt.gpsLinked')+'">🛰️ GPS</span>'
+            : ' <span class="badge warn" title="'+t('cs.tt.gpsNotLinked')+'">'+t('cs.noGps')+'</span>')
         : '';
       // Alapértelmezett pótkocsi a hozzárendelt vontatóhoz (auto-párosítás
       // fuvar-kiíráskor) — csak ha a sofőrnek van vontatója.
       var trailerSel = '';
       if(myVeh){
-        var topts = '<option value="">— Nincs alapért. pótkocsi —</option>' + trailers.map(function(t){
+        var topts = '<option value="">'+t('cs.noDefaultTrailer')+'</option>' + trailers.map(function(t){
           var lbl = t.rendszam + (t.marca ? ' — ' + t.marca : '');
           return '<option value="'+t.id+'"'+(String(myVeh.default_trailer_id)===String(t.id)?' selected':'')+'>'+esc(lbl)+'</option>';
         }).join('');
         trailerSel = '<div style="margin-top:5px;">'
           +'<select class="select" style="max-width:230px;padding:6px 8px;font-size:12px;display:inline-block;" '
-          +'title="🚚 Alapértelmezett pótkocsi — fuvar-kiíráskor automatikusan kitöltődik (módosítható)" '
+          +'title="'+t('cs.tt.defaultTrailer')+'" '
           +'onchange="assignDefaultTrailerUi('+myVeh.id+', this.value)">'+topts+'</select></div>';
       }
       return '<tr>'
@@ -931,8 +931,8 @@ function loadInternalDrivers(){
         +trailerSel
         +'</td>'
         +'<td>'
-        +'<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="editUser(window._vsIntDrvCache['+i+'])">Szerkeszt</button> '
-        +'<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUser(window._vsIntDrvCache['+i+'].email,window._vsIntDrvCache['+i+'].nume)">Töröl</button>'
+        +'<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="editUser(window._vsIntDrvCache['+i+'])">'+t('cs.edit')+'</button> '
+        +'<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUser(window._vsIntDrvCache['+i+'].email,window._vsIntDrvCache['+i+'].nume)">'+t('cs.del')+'</button>'
         +'</td>'
         +'</tr>';
     }).join('');
@@ -942,16 +942,16 @@ function loadInternalDrivers(){
 // Jármű-hozzárendelés mentése a sofőr sorából
 function assignDriverVehicleUi(email, vehicleId){
   gas('assignDriverVehicle', [email, vehicleId || null]).then(function(r){
-    if(r && r.ok){ toast(vehicleId ? '🚛 Jármű hozzárendelve' : 'Hozzárendelés törölve', 'ok'); loadInternalDrivers(); }
-    else { toast((r && r.err) || 'Hiba', 'err'); loadInternalDrivers(); }
+    if(r && r.ok){ toast(vehicleId ? t('cs.vehAssigned') : t('cs.assignRemoved'), 'ok'); loadInternalDrivers(); }
+    else { toast((r && r.err) || t('common.error'), 'err'); loadInternalDrivers(); }
   });
 }
 
 // Alapértelmezett pótkocsi mentése a vontatóhoz (Belső sofőrök fül)
 function assignDefaultTrailerUi(vehicleId, trailerId){
   gas('assignDefaultTrailer', [vehicleId, trailerId || null]).then(function(r){
-    if(r && r.ok){ toast(trailerId ? '🚚 Pótkocsi-pár mentve' : 'Pótkocsi-pár törölve', 'ok'); }
-    else { toast((r && r.err) || 'Hiba', 'err'); loadInternalDrivers(); }
+    if(r && r.ok){ toast(trailerId ? t('cs.trailerPairSaved') : t('cs.trailerPairRemoved'), 'ok'); }
+    else { toast((r && r.err) || t('common.error'), 'err'); loadInternalDrivers(); }
   });
 }
 
@@ -961,25 +961,25 @@ function loadClientPortalAccess(){
   var box=document.getElementById('clientPortalAccessBox'); if(!box) return;
   // OPT-IN funkció: csak ha a developer bekapcsolta ennél a cégnél
   if(!(window._vsFeatures && window._vsFeatures['client-portal']===true)){
-    box.innerHTML='<div class="glass" style="padding:14px 18px;"><div class="text-muted" style="font-size:12.5px;">🔑 <b>Ügyfél-portál</b> — a megrendelőid saját belépéssel látnák a fuvarjaikat, dokumentumaikat, és új fuvart igényelhetnének. Ez a funkció jelenleg nincs bekapcsolva (a developer a Funkciók fülön engedélyezi).</div></div>';
+    box.innerHTML='<div class="glass" style="padding:14px 18px;"><div class="text-muted" style="font-size:12.5px;">'+t('cs.cp.offHint')+'</div></div>';
     return;
   }
-  box.innerHTML='<div class="glass" style="padding:18px 20px;"><div style="font-size:16px;font-weight:800;margin-bottom:4px;">👥 Ügyfél-portál hozzáférések</div>'
-    +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">Meghívhatod az ügyfél kapcsolattartóját, hogy belépjen a <b>/portal</b> oldalon, és csak a SAJÁT cége fuvarjait lássa (státusz, élő követés, dokumentumok), illetve új fuvart igényeljen (jóváhagyással).</div>'
+  box.innerHTML='<div class="glass" style="padding:18px 20px;"><div style="font-size:16px;font-weight:800;margin-bottom:4px;">'+t('cs.cp.title')+'</div>'
+    +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">'+t('cs.cp.hint')+'</div>'
     +'<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:16px;">'
-    +'<div class="field" style="margin:0;min-width:200px;"><label>Ügyfél</label><select class="select" id="cpClientSel"><option value="">— Válassz ügyfelet —</option></select></div>'
-    +'<div class="field" style="margin:0;min-width:200px;"><label>Kapcsolattartó e-mail</label><input class="input" id="cpEmail" placeholder="pl. logisztika@gyar.ro"></div>'
-    +'<div class="field" style="margin:0;min-width:150px;"><label>Név (opcionális)</label><input class="input" id="cpNev"></div>'
-    +'<button class="btn ok" style="height:42px;" onclick="cpInvite()">＋ Meghívó küldése</button>'
+    +'<div class="field" style="margin:0;min-width:200px;"><label>'+t('cs.cp.client')+'</label><select class="select" id="cpClientSel"><option value="">'+t('cs.cp.pickClient')+'</option></select></div>'
+    +'<div class="field" style="margin:0;min-width:200px;"><label>'+t('cs.cp.contactEmail')+'</label><input class="input" id="cpEmail" placeholder="pl. logisztika@gyar.ro"></div>'
+    +'<div class="field" style="margin:0;min-width:150px;"><label>'+t('cs.cp.nameOpt')+'</label><input class="input" id="cpNev"></div>'
+    +'<button class="btn ok" style="height:42px;" onclick="cpInvite()">'+t('cs.cp.sendInvite')+'</button>'
     +'</div>'
     +'<div id="cpInviteLink"></div>'
-    +'<div id="cpList"><div class="text-muted" style="font-size:12px;">Betöltés…</div></div>'
+    +'<div id="cpList"><div class="text-muted" style="font-size:12px;">'+t('fe.loading')+'</div></div>'
     +'</div>';
   // ügyfél-lista a választóhoz
   fetch('/api/clients',{credentials:'same-origin'}).then(function(r){return r.json();}).then(function(list){
     _cpClients=Array.isArray(list)?list:(list&&list.rows)||[];
     var sel=document.getElementById('cpClientSel'); if(!sel) return;
-    sel.innerHTML='<option value="">— Válassz ügyfelet —</option>'+_cpClients.map(function(c){
+    sel.innerHTML='<option value="">'+t('cs.cp.pickClient')+'</option>'+_cpClients.map(function(c){
       return '<option value="'+c.id+'">'+esc(c.nev||('#'+c.id))+'</option>'; }).join('');
   }).catch(function(){});
   cpRefresh();
@@ -987,19 +987,19 @@ function loadClientPortalAccess(){
 function cpRefresh(){
   gas('clientPortalList').then(function(r){
     var el=document.getElementById('cpList'); if(!el) return;
-    if(!r||!r.ok){ el.innerHTML='<div class="text-muted" style="font-size:12px;">Betöltési hiba.</div>'; return; }
+    if(!r||!r.ok){ el.innerHTML='<div class="text-muted" style="font-size:12px;">'+t('common.loadError')+'</div>'; return; }
     var items=r.items||[];
-    if(!items.length){ el.innerHTML='<div class="text-muted" style="font-size:12px;padding:6px 0;">Még nincs portál-hozzáférés.</div>'; return; }
+    if(!items.length){ el.innerHTML='<div class="text-muted" style="font-size:12px;padding:6px 0;">'+t('cs.cp.noAccess')+'</div>'; return; }
     window._cpItems=items;
     el.innerHTML=items.map(function(it,i){
-      var status = it.pending_invite ? '<span class="badge warn">Meghívó kiküldve</span>'
-        : (it.activ ? '<span class="badge ok">Aktív</span>' : '<span class="badge err">Letiltva</span>');
-      var last = it.last_login ? ('utolsó belépés: '+String(it.last_login).replace('T',' ').slice(0,16)) : 'még nem lépett be';
+      var status = it.pending_invite ? '<span class="badge warn">'+t('cs.cp.inviteSent')+'</span>'
+        : (it.activ ? '<span class="badge ok">'+t('st.bActive')+'</span>' : '<span class="badge err">'+t('cs.cp.disabled')+'</span>');
+      var last = it.last_login ? (t('cs.cp.lastLogin')+String(it.last_login).replace('T',' ').slice(0,16)) : t('cs.cp.neverLogin');
       return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border,rgba(255,255,255,.08));border-radius:10px;margin-bottom:6px;background:rgba(255,255,255,.02);">'
         +'<div style="flex:1;min-width:0;"><div style="font-weight:700;">'+esc(it.email)+'</div>'
         +'<div class="text-muted" style="font-size:12px;">'+esc(it.client_nev||'')+' · '+esc(last)+'</div></div>'
         +status
-        +'<button class="btn ghost" style="padding:6px 10px;font-size:12px;" onclick="cpToggle('+i+')">'+(it.activ?'Letiltás':'Aktiválás')+'</button>'
+        +'<button class="btn ghost" style="padding:6px 10px;font-size:12px;" onclick="cpToggle('+i+')">'+(it.activ?t('cs.cp.disable'):t('cs.cp.enable'))+'</button>'
         +'</div>';
     }).join('');
   });
@@ -1012,7 +1012,7 @@ function cpInvite(){
   if(!email){ toast(t('cs.contactEmailReq'),'err'); return; }
   gas('clientPortalInvite',[{client_id:cid, email:email, nev:nev}]).then(function(r){
     if(r&&r.ok){
-      toast(r.emailed?'✉️ Meghívó elküldve e-mailben':'Meghívó létrehozva — másold ki a linket','ok');
+      toast(r.emailed?t('cs.inviteSentMail2'):t('cs.inviteCreated'),'ok');
       var lb=document.getElementById('cpInviteLink');
       if(lb) lb.innerHTML='<div class="glass-soft" style="padding:10px 12px;margin-bottom:12px;border:1px solid rgba(34,197,94,.4);font-size:12px;">'
         +(r.emailed?'✉️ A meghívót elküldtük e-mailben. ':'')+'Jelszó-beállító link (másolható): <br><code style="word-break:break-all;color:var(--text-primary);">'+esc(r.link)+'</code></div>';
@@ -1024,7 +1024,7 @@ function cpInvite(){
 function cpToggle(i){
   var it=(window._cpItems||[])[i]; if(!it) return;
   gas('clientPortalSetActive',[it.id, !it.activ]).then(function(r){
-    if(r&&r.ok){ toast(it.activ?'Letiltva':'Aktiválva','ok'); cpRefresh(); }
+    if(r&&r.ok){ toast(it.activ?t('cs.disabled2'):t('cs.activated'),'ok'); cpRefresh(); }
     else toast((r&&r.err)||'Hiba','err');
   });
 }
@@ -1038,13 +1038,13 @@ function renderTollBreak(tg){
   if(!tg || !Array.isArray(tg.byCountry) || !tg.byCountry.length){ box.innerHTML=''; return; }
   var rows=tg.byCountry.map(function(c){
     return '<tr><td>'+(CC_FLAG[c.cc]||'')+' '+esc(c.name||c.cc)+'</td><td style="text-align:right;">'+c.km+' km</td>'
-      +'<td style="text-align:right;color:var(--muted);">'+(c.mode==='vignette'?'matrica':((c.eur_per_km!=null?c.eur_per_km:'')+' €/km'))+'</td>'
+      +'<td style="text-align:right;color:var(--muted);">'+(c.mode==='vignette'?t('cs.toll.vignette'):((c.eur_per_km!=null?c.eur_per_km:'')+' €/km'))+'</td>'
       +'<td style="text-align:right;font-weight:700;">'+c.cost+' €</td></tr>';
   }).join('');
   box.innerHTML='<div class="glass-soft" style="padding:10px 12px;border:1px solid rgba(245,158,11,.35);">'
-    +'<div class="text-muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px;">Országonkénti bontás (a tervezett útvonalból)'+(tg.pending?' · ⚠️ részleges (geokódolás-keret)':'')+'</div>'
+    +'<div class="text-muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px;">'+t('cs.toll.breakdown')+(tg.pending?t('cs.toll.partial'):'')+'</div>'
     +'<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-    +'<tbody>'+rows+'<tr><td style="font-weight:800;border-top:1px solid var(--border,rgba(255,255,255,.1));padding-top:6px;">Összesen</td><td colspan="2" style="border-top:1px solid var(--border,rgba(255,255,255,.1));"></td>'
+    +'<tbody>'+rows+'<tr><td style="font-weight:800;border-top:1px solid var(--border,rgba(255,255,255,.1));padding-top:6px;">'+t('cs.toll.total')+'</td><td colspan="2" style="border-top:1px solid var(--border,rgba(255,255,255,.1));"></td>'
     +'<td style="text-align:right;font-weight:800;color:#fbbf24;border-top:1px solid var(--border,rgba(255,255,255,.1));">'+(tg.total||0)+' €</td></tr></tbody></table></div>';
 }
 function estimateOrderToll(){
@@ -1054,8 +1054,8 @@ function estimateOrderToll(){
     if(r&&r.ok){
       var el=document.getElementById('oeToll'); if(el) el.value=(r.toll&&r.toll.total!=null?r.toll.total:'');
       renderTollBreak(r.toll);
-      toast(t('cs.tollEstimated')+(r.toll?r.toll.total:0)+' € (módosítható)','ok');
-    } else toast((r&&r.err)||'Becslés hiba','err');
+      toast(t('cs.tollEstimated')+(r.toll?r.toll.total:0)+t('cs.tollModifiable'),'ok');
+    } else toast((r&&r.err)||t('cs.toll.estError'),'err');
   });
 }
 // ── Ráta-szerkesztő modal ──
@@ -1064,15 +1064,15 @@ function openTollRates(){
   document.getElementById('tollRatesModal').classList.add('open');
   gas('getTollRates').then(function(r){
     var body=document.getElementById('trBody'); if(!body) return;
-    if(!r||!r.ok){ body.innerHTML='<div class="text-muted" style="padding:14px;">Betöltési hiba.</div>'; return; }
+    if(!r||!r.ok){ body.innerHTML='<div class="text-muted" style="padding:14px;">'+t('common.loadError')+'</div>'; return; }
     window._trRates=r.rates||[];
     body.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr>'
-      +'<th style="text-align:left;padding:6px 8px;color:var(--muted);">Ország</th><th style="text-align:left;padding:6px 8px;color:var(--muted);">Típus</th>'
-      +'<th style="text-align:left;padding:6px 8px;color:var(--muted);">€/km</th><th style="text-align:left;padding:6px 8px;color:var(--muted);">matrica €</th></tr></thead><tbody>'
+      +'<th style="text-align:left;padding:6px 8px;color:var(--muted);">'+t('cs.toll.country')+'</th><th style="text-align:left;padding:6px 8px;color:var(--muted);">'+t('cs.toll.type')+'</th>'
+      +'<th style="text-align:left;padding:6px 8px;color:var(--muted);">€/km</th><th style="text-align:left;padding:6px 8px;color:var(--muted);">'+t('cs.toll.vignetteEur')+'</th></tr></thead><tbody>'
       +window._trRates.map(function(rt,i){
         return '<tr style="border-top:1px solid var(--border,rgba(255,255,255,.08));">'
-          +'<td style="padding:6px 8px;">'+(CC_FLAG[rt.cc]||'')+' '+esc(rt.name)+(rt.custom?' <span class="badge ok" style="font-size:9px;">egyedi</span>':'')+'</td>'
-          +'<td style="padding:6px 8px;"><select class="select" id="tr_mode_'+i+'" style="padding:5px 6px;font-size:12px;"><option value="perkm"'+(rt.mode==='perkm'?' selected':'')+'>km-alapú</option><option value="vignette"'+(rt.mode==='vignette'?' selected':'')+'>matrica</option></select></td>'
+          +'<td style="padding:6px 8px;">'+(CC_FLAG[rt.cc]||'')+' '+esc(rt.name)+(rt.custom?' <span class="badge ok" style="font-size:9px;">'+t('cs.toll.custom')+'</span>':'')+'</td>'
+          +'<td style="padding:6px 8px;"><select class="select" id="tr_mode_'+i+'" style="padding:5px 6px;font-size:12px;"><option value="perkm"'+(rt.mode==='perkm'?' selected':'')+'>'+t('cs.toll.perKm')+'</option><option value="vignette"'+(rt.mode==='vignette'?' selected':'')+'>'+t('cs.toll.vignette')+'</option></select></td>'
           +'<td style="padding:6px 8px;"><input class="input" id="tr_km_'+i+'" type="number" step="0.01" value="'+(rt.eur_per_km||0)+'" style="width:90px;padding:5px 7px;font-size:12px;"></td>'
           +'<td style="padding:6px 8px;"><input class="input" id="tr_vig_'+i+'" type="number" step="0.01" value="'+(rt.vignette_eur||0)+'" style="width:90px;padding:5px 7px;font-size:12px;"></td></tr>';
       }).join('')+'</tbody></table>';
@@ -1084,12 +1084,12 @@ function ensureTollRatesModal(){
   d.style.cssText='position:fixed;inset:0;z-index:5200;display:none;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;background:rgba(3,6,10,.72);';
   d.innerHTML='<div class="glass" style="width:min(680px,100%);background:var(--bg-panel-raised,#141c25);">'
     +'<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border,rgba(255,255,255,.08));">'
-    +'<b class="text-primary" style="font-size:15px;">🛣️ Útdíj-ráták (kamion, &gt;12 t)</b>'
+    +'<b class="text-primary" style="font-size:15px;">'+t('cs.toll.modalTitle')+'</b>'
     +'<button class="btn ghost" style="margin-left:auto;padding:5px 12px;" onclick="closeTollRates()">✕</button></div>'
-    +'<div style="padding:14px 18px;"><div class="text-muted" style="font-size:12px;margin-bottom:10px;">EU-alapértékekkel indul; itt cégre szabhatod. A „km-alapú" ország díja km×€/km, a „matrica" fix €/fuvar.</div>'
+    +'<div style="padding:14px 18px;"><div class="text-muted" style="font-size:12px;margin-bottom:10px;">'+t('cs.toll.modalHint')+'</div>'
     +'<div id="trBody"></div>'
-    +'<div style="margin-top:14px;display:flex;gap:8px;"><button class="btn primary" onclick="saveTollRatesUi()">Ráták mentése</button>'
-    +'<button class="btn ghost" onclick="closeTollRates()">Mégse</button></div></div></div>';
+    +'<div style="margin-top:14px;display:flex;gap:8px;"><button class="btn primary" onclick="saveTollRatesUi()">'+t('cs.toll.save')+'</button>'
+    +'<button class="btn ghost" onclick="closeTollRates()">'+t('common.cancel')+'</button></div></div></div>';
   d.addEventListener('mousedown',function(e){ if(e.target===d) closeTollRates(); });
   document.body.appendChild(d);
 }
@@ -1127,7 +1127,7 @@ function oeUpdateMargin(){
   var pret=parseFloat((document.getElementById('oePret')||{}).value)||0;
   var cost=parseFloat((document.getElementById('oeCarrierCost')||{}).value)||0;
   var el=document.getElementById('oeMargin'); if(!el) return;
-  if(cost>0){ var m=pret-cost; el.innerHTML='Árrés: <b style="color:'+(m>=0?'var(--status-ok)':'var(--status-danger)')+';">'+(m>=0?'+':'')+Math.round(m)+' €</b>'; }
+  if(cost>0){ var m=pret-cost; el.innerHTML=t('cs.ca.margin')+'<b style="color:'+(m>=0?'var(--status-ok)':'var(--status-danger)')+';">'+(m>=0?'+':'')+Math.round(m)+' €</b>'; }
   else el.textContent='';
 }
 
@@ -1140,33 +1140,33 @@ function loadCarriers(){
     var rows=items.map(function(c,i){
       var cmr='—';
       if(c.cmr_insurance_expiry){ var d=new Date(c.cmr_insurance_expiry); var days=Math.round((d-new Date())/86400000);
-        cmr = days<0 ? '<span class="badge err">lejárt</span>' : days<30 ? '<span class="badge warn">'+days+' nap</span>' : '<span class="badge ok">'+String(c.cmr_insurance_expiry).slice(0,7)+'</span>'; }
+        cmr = days<0 ? '<span class="badge err">'+t('cs.ca.expired')+'</span>' : days<30 ? '<span class="badge warn">'+days+t('cs.ca.days')+'</span>' : '<span class="badge ok">'+String(c.cmr_insurance_expiry).slice(0,7)+'</span>'; }
       var ob=Math.round(parseFloat(c.open_balance)||0);
       return '<tr style="'+(!c.aktiv?'opacity:.5;':'')+'">'
-        +'<td><b class="text-primary">'+esc(c.nev)+'</b>'+(c.portal_users?' <span class="badge ok" style="font-size:9px;">🔑 portál</span>':'')+'</td>'
-        +'<td>'+esc(c.cui||'—')+'</td><td>'+(c.payment_term_days||30)+' nap</td><td>'+cmr+'</td>'
+        +'<td><b class="text-primary">'+esc(c.nev)+'</b>'+(c.portal_users?' <span class="badge ok" style="font-size:9px;">'+t('cs.ca.portal')+'</span>':'')+'</td>'
+        +'<td>'+esc(c.cui||'—')+'</td><td>'+(c.payment_term_days||30)+t('cs.ca.days')+'</td><td>'+cmr+'</td>'
         +'<td style="text-align:right;color:'+(ob>0?'#ff6b75':'inherit')+';font-weight:700;">'+ob+' €</td>'
         +'<td style="white-space:nowrap;">'
-        +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierEditUi('+i+')">Szerk</button> '
-        +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierInvitePrompt('+c.id+')" title="Alvállalkozói portál meghívó">🔑</button> '
+        +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierEditUi('+i+')">'+t('cs.editShort')+'</button> '
+        +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierInvitePrompt('+c.id+')" title="'+t('cs.tt.carrierInvite')+'">🔑</button> '
         +'<button class="btn danger" style="padding:4px 9px;font-size:12px;" onclick="carrierDeleteUi('+c.id+')">✕</button></td></tr>';
     }).join('');
-    box.innerHTML='<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:4px;">🚚 Alvállalkozók</div>'
-      +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">Külsős fuvarozó-cégek törzse — fizetési határidő, CMR-biztosítás, nyitott tartozás. A 🔑 gombbal portál-hozzáférést adsz nekik.</div>'
+    box.innerHTML='<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:4px;">'+t('cs.ca.title')+'</div>'
+      +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">'+t('cs.ca.hint')+'</div>'
       +'<div class="grid-3" style="margin-bottom:12px;">'
-      +'<div class="field"><label>Cégnév *</label><input class="input" id="caNev"></div>'
-      +'<div class="field"><label>CUI / adószám</label><input class="input" id="caCui"></div>'
-      +'<div class="field"><label>E-mail</label><input class="input" id="caEmail"></div>'
-      +'<div class="field"><label>Telefon</label><input class="input" id="caTel"></div>'
-      +'<div class="field"><label>Fizetési határidő (nap)</label><input class="input" id="caTerm" type="number" value="30"></div>'
-      +'<div class="field"><label>CMR-biztosítás lejár</label><input class="input" id="caCmr" type="date"></div>'
+      +'<div class="field"><label>'+t('cs.ca.companyName')+'</label><input class="input" id="caNev"></div>'
+      +'<div class="field"><label>'+t('cs.ca.cui')+'</label><input class="input" id="caCui"></div>'
+      +'<div class="field"><label>'+t('common.email')+'</label><input class="input" id="caEmail"></div>'
+      +'<div class="field"><label>'+t('form.phone')+'</label><input class="input" id="caTel"></div>'
+      +'<div class="field"><label>'+t('cs.ca.payTerm')+'</label><input class="input" id="caTerm" type="number" value="30"></div>'
+      +'<div class="field"><label>'+t('cs.ca.cmrExpiry')+'</label><input class="input" id="caCmr" type="date"></div>'
       +'<div class="field"><label>IBAN</label><input class="input" id="caIban"></div>'
-      +'<div class="field" style="grid-column:span 2;"><label>Megjegyzés</label><input class="input" id="caNota"></div>'
+      +'<div class="field" style="grid-column:span 2;"><label>'+t('fld.note')+'</label><input class="input" id="caNota"></div>'
       +'</div>'
-      +'<input type="hidden" id="caId"><button class="btn primary" onclick="carrierSaveUi()">＋ Alvállalkozó mentése</button> <button class="btn ghost" onclick="carrierFormReset()">Új/üres</button>'
+      +'<input type="hidden" id="caId"><button class="btn primary" onclick="carrierSaveUi()">'+t('cs.ca.saveBtn')+'</button> <button class="btn ghost" onclick="carrierFormReset()">'+t('cs.ca.newEmpty')+'</button>'
       +'<div id="carrierInviteLink" style="margin-top:12px;"></div>'
-      +'<table class="table" style="margin-top:16px;"><thead><tr><th>Cég</th><th>CUI</th><th>Fiz.hat.</th><th>CMR-bizt.</th><th style="text-align:right;">Nyitott tartozás</th><th>Művelet</th></tr></thead>'
-      +'<tbody>'+(rows||'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px;">Nincs alvállalkozó.</td></tr>')+'</tbody></table></div>';
+      +'<table class="table" style="margin-top:16px;"><thead><tr><th>'+t('cs.ca.colCompany')+'</th><th>CUI</th><th>'+t('cs.ca.colPayTerm')+'</th><th>'+t('cs.ca.colCmr')+'</th><th style="text-align:right;">'+t('cs.ca.colOpenDebt')+'</th><th>'+t('col.action')+'</th></tr></thead>'
+      +'<tbody>'+(rows||'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px;">'+t('cs.ca.none')+'</td></tr>')+'</tbody></table></div>';
   });
 }
 function carrierFormReset(){ ['caNev','caCui','caEmail','caTel','caIban','caNota'].forEach(function(i){var e=document.getElementById(i);if(e)e.value='';}); var t=document.getElementById('caTerm');if(t)t.value='30'; var c=document.getElementById('caCmr');if(c)c.value=''; var id=document.getElementById('caId');if(id)id.value=''; }
@@ -1186,20 +1186,20 @@ function carrierSaveUi(){
     cmr_insurance_expiry:document.getElementById('caCmr').value||null, iban:document.getElementById('caIban').value.trim(),
     nota:document.getElementById('caNota').value.trim() };
   if(!p.nev){ toast(t('cs.companyNameReq'),'err'); return; }
-  gas('carrierSave',[p]).then(function(r){ if(r&&r.ok){ toast(t('cs.carrierSaved'),'ok'); carrierFormReset(); loadCarriers(); loadCarrierAp(); } else toast((r&&r.err)||'Hiba','err'); });
+  gas('carrierSave',[p]).then(function(r){ if(r&&r.ok){ toast(t('cs.carrierSaved'),'ok'); carrierFormReset(); loadCarriers(); loadCarrierAp(); } else toast((r&&r.err)||t('common.error'),'err'); });
 }
 function carrierDeleteUi(id){
-  if(!confirm('Biztosan törlöd ezt az alvállalkozót?')) return;
-  gas('carrierDelete',[id]).then(function(r){ if(r&&r.ok){ toast(t('common.deleted'),'ok'); loadCarriers(); } else toast((r&&r.err)||'Nem törölhető','err'); });
+  if(!confirm(t('cs.ca.delConfirm'))) return;
+  gas('carrierDelete',[id]).then(function(r){ if(r&&r.ok){ toast(t('common.deleted'),'ok'); loadCarriers(); } else toast((r&&r.err)||t('cs.ca.notDeletable'),'err'); });
 }
 function carrierInvitePrompt(carrierId){
-  var email=prompt('Az alvállalkozó kapcsolattartójának e-mail címe (portál-meghívó):'); if(!email) return;
+  var email=prompt(t('cs.ca.invitePrompt')); if(!email) return;
   gas('carrierPortalInvite',[{carrier_id:carrierId, email:email.trim()}]).then(function(r){
-    if(r&&r.ok){ toast(r.emailed?'✉️ Portál-meghívó elküldve':'Meghívó kész — másold a linket','ok');
+    if(r&&r.ok){ toast(r.emailed?t('cs.ca.inviteSentMail'):t('cs.ca.inviteCopy'),'ok');
       var lb=document.getElementById('carrierInviteLink');
-      if(lb) lb.innerHTML='<div class="glass-soft" style="padding:10px 12px;border:1px solid rgba(34,197,94,.4);font-size:12px;">'+(r.emailed?'✉️ Elküldve e-mailben. ':'')+'Jelszó-beállító link: <br><code style="word-break:break-all;color:var(--text-primary);">'+esc(r.link)+'</code></div>';
+      if(lb) lb.innerHTML='<div class="glass-soft" style="padding:10px 12px;border:1px solid rgba(34,197,94,.4);font-size:12px;">'+(r.emailed?t('cs.ca.sentByMail'):'')+t('cs.ca.pwLink')+'<br><code style="word-break:break-all;color:var(--text-primary);">'+esc(r.link)+'</code></div>';
       loadCarriers();
-    } else toast((r&&r.err)||'Hiba','err');
+    } else toast((r&&r.err)||t('common.error'),'err');
   });
 }
 
@@ -1213,31 +1213,31 @@ function loadCarrierAp(){
       var rem=Math.round((parseFloat(it.amount)||0)-(parseFloat(it.paid_amount)||0));
       var due='—', dueCls='';
       if(it.due_date){ var days=Math.round((new Date(it.due_date)-new Date())/86400000);
-        due = days<0?('<span class="badge err">lejárt '+(-days)+' nap</span>'):days<=7?('<span class="badge warn">'+days+' nap</span>'):String(it.due_date).slice(0,10); }
-      var stB = it.status==='paid'?'<span class="badge ok">Fizetve</span>':it.status==='partial'?'<span class="badge warn">Részben ('+Math.round(it.paid_amount)+')</span>':'<span class="badge err">Fizetendő</span>';
+        due = days<0?('<span class="badge err">'+t('cs.ap.expiredDays',{n:(-days)})+'</span>'):days<=7?('<span class="badge warn">'+days+t('cs.ca.days')+'</span>'):String(it.due_date).slice(0,10); }
+      var stB = it.status==='paid'?'<span class="badge ok">'+t('pay.paid')+'</span>':it.status==='partial'?'<span class="badge warn">'+t('cs.ap.partialAmt',{n:Math.round(it.paid_amount)})+'</span>':'<span class="badge err">'+t('cs.ap.toPay')+'</span>';
       var orderIds=(function(){ try{ return Array.isArray(it.order_ids)?it.order_ids:JSON.parse(it.order_ids||'[]'); }catch(e){ return []; } })();
       return '<tr><td>'+esc(it.carrier_nev||'')+'</td><td>'+esc(it.invoice_number||'—')+'</td>'
         +'<td style="font-size:11px;color:var(--muted);">'+esc(orderIds.join(', ')||'—')+'</td>'
         +'<td style="text-align:right;">'+Math.round(it.amount)+' '+esc(it.currency||'EUR')+'</td><td>'+due+'</td><td>'+stB+'</td>'
-        +'<td style="white-space:nowrap;">'+(it.status!=='paid'?'<button class="btn ok" style="padding:4px 9px;font-size:12px;" onclick="carrierInvoicePayUi('+it.id+','+rem+')">Fizetve</button> ':'')
+        +'<td style="white-space:nowrap;">'+(it.status!=='paid'?'<button class="btn ok" style="padding:4px 9px;font-size:12px;" onclick="carrierInvoicePayUi('+it.id+','+rem+')">'+t('cs.ap.payBtn')+'</button> ':'')
         +'<button class="btn danger" style="padding:4px 9px;font-size:12px;" onclick="carrierInvoiceDeleteUi('+it.id+')">✕</button></td></tr>';
     }).join('');
-    box.innerHTML='<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:10px;">💸 Szállítói számlák / Tartozások (AP)</div>'
+    box.innerHTML='<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:10px;">'+t('cs.ap.title')+'</div>'
       +'<div class="dash-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;">'
-      +apTile('Nyitott összesen', Math.round(s.open_total||0)+' €', '#ff6b75')+apTile('Esedékes 7 napon belül', Math.round(s.due_soon||0)+' €', '#fbbf24')
-      +apTile('Lejárt', Math.round(s.overdue||0)+' €', (s.overdue>0?'#ff6b75':''))+apTile('Nyitott számla', (s.open_cnt||0)+' db','')+'</div>'
+      +apTile(t('cs.ap.openTotal'), Math.round(s.open_total||0)+' €', '#ff6b75')+apTile(t('cs.ap.dueSoon'), Math.round(s.due_soon||0)+' €', '#fbbf24')
+      +apTile(t('cs.ap.overdue'), Math.round(s.overdue||0)+' €', (s.overdue>0?'#ff6b75':''))+apTile(t('cs.ap.openInvoices'), (s.open_cnt||0)+t('cs.ap.pcs'),'')+'</div>'
       +'<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:10px;">'
-      +'<div class="field" style="margin:0;min-width:170px;"><label>Alvállalkozó</label><select class="select" id="ciCarrier" onchange="apLoadOrders()"><option value="">—</option></select></div>'
-      +'<div class="field" style="margin:0;"><label>Számlaszám</label><input class="input" id="ciNum" style="max-width:140px;"></div>'
-      +'<div class="field" style="margin:0;"><label>Kelt</label><input class="input" id="ciIssue" type="date" style="max-width:150px;"></div>'
-      +'<div class="field" style="margin:0;"><label>Fiz. határidő</label><input class="input" id="ciDue" type="date" style="max-width:150px;"></div>'
-      +'<div class="field" style="margin:0;"><label>Összeg</label><input class="input" id="ciAmount" type="number" style="max-width:110px;"></div>'
-      +'<div class="field" style="margin:0;"><label>Pénznem</label><select class="select" id="ciCurr" style="max-width:90px;"><option>EUR</option><option>RON</option><option>HUF</option><option>PLN</option></select></div>'
-      +'<button class="btn primary" style="height:42px;" onclick="carrierInvoiceSaveUi()">Számla rögzítése</button>'
+      +'<div class="field" style="margin:0;min-width:170px;"><label>'+t('cs.ap.carrier')+'</label><select class="select" id="ciCarrier" onchange="apLoadOrders()"><option value="">—</option></select></div>'
+      +'<div class="field" style="margin:0;"><label>'+t('cs.ap.invNum')+'</label><input class="input" id="ciNum" style="max-width:140px;"></div>'
+      +'<div class="field" style="margin:0;"><label>'+t('cs.ap.issueDate')+'</label><input class="input" id="ciIssue" type="date" style="max-width:150px;"></div>'
+      +'<div class="field" style="margin:0;"><label>'+t('cs.ap.dueDate')+'</label><input class="input" id="ciDue" type="date" style="max-width:150px;"></div>'
+      +'<div class="field" style="margin:0;"><label>'+t('cs.ap.amount')+'</label><input class="input" id="ciAmount" type="number" style="max-width:110px;"></div>'
+      +'<div class="field" style="margin:0;"><label>'+t('cs.ap.currency')+'</label><select class="select" id="ciCurr" style="max-width:90px;"><option>EUR</option><option>RON</option><option>HUF</option><option>PLN</option></select></div>'
+      +'<button class="btn primary" style="height:42px;" onclick="carrierInvoiceSaveUi()">'+t('cs.ap.saveInvoice')+'</button>'
       +'</div>'
-      +'<div class="field" id="ciOrdersWrap" style="display:none;"><label>Mely fuvar(ok)hoz (Extern)</label><select class="select" id="ciOrders" multiple size="3" style="height:auto;"></select></div>'
-      +'<table class="table" style="margin-top:12px;"><thead><tr><th>Alvállalkozó</th><th>Számla</th><th>Fuvar(ok)</th><th style="text-align:right;">Összeg</th><th>Esedékes</th><th>Állapot</th><th>Művelet</th></tr></thead>'
-      +'<tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px;">Nincs szállítói számla.</td></tr>')+'</tbody></table></div>';
+      +'<div class="field" id="ciOrdersWrap" style="display:none;"><label>'+t('cs.ap.whichOrders')+'</label><select class="select" id="ciOrders" multiple size="3" style="height:auto;"></select></div>'
+      +'<table class="table" style="margin-top:12px;"><thead><tr><th>'+t('cs.ap.carrier')+'</th><th>'+t('cs.ap.colInvoice')+'</th><th>'+t('cs.ap.colOrders')+'</th><th style="text-align:right;">'+t('cs.ap.amount')+'</th><th>'+t('cs.ap.colDue')+'</th><th>'+t('cs.ap.colState')+'</th><th>'+t('col.action')+'</th></tr></thead>'
+      +'<tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px;">'+t('cs.ap.none')+'</td></tr>')+'</tbody></table></div>';
     ensureCarriers(function(){ fillCarrierSelect('ciCarrier',''); });
   });
 }
@@ -1262,11 +1262,11 @@ function carrierInvoiceSaveUi(){
   gas('carrierInvoiceSave',[p]).then(function(r){ if(r&&r.ok){ toast(t('cs.invoiceSaved'),'ok'); ['ciNum','ciAmount'].forEach(function(i){document.getElementById(i).value='';}); loadCarrierAp(); loadCarriers(); } else toast((r&&r.err)||'Hiba','err'); });
 }
 function carrierInvoicePayUi(id, rem){
-  var v=prompt('Fizetett összeg (üres = teljes hátralék '+rem+'):'); if(v===null) return;
+  var v=prompt(t('cs.cf.paidAmount')+rem+'):'); if(v===null) return;
   var arg = v.trim()===''?'full':v.trim();
-  gas('carrierInvoicePayment',[id, arg]).then(function(r){ if(r&&r.ok){ toast(t('cs.paymentSaved'),'ok'); loadCarrierAp(); loadCarriers(); } else toast((r&&r.err)||'Hiba','err'); });
+  gas('carrierInvoicePayment',[id, arg]).then(function(r){ if(r&&r.ok){ toast(t('cs.paymentSaved'),'ok'); loadCarrierAp(); loadCarriers(); } else toast((r&&r.err)||t('common.error'),'err'); });
 }
-function carrierInvoiceDeleteUi(id){ if(!confirm('Törlöd ezt a számlát?')) return; gas('carrierInvoiceDelete',[id]).then(function(r){ if(r&&r.ok){ toast(t('common.deleted'),'ok'); loadCarrierAp(); loadCarriers(); } }); }
+function carrierInvoiceDeleteUi(id){ if(!confirm(t('cs.cf.delInvoice'))) return; gas('carrierInvoiceDelete',[id]).then(function(r){ if(r&&r.ok){ toast(t('common.deleted'),'ok'); loadCarrierAp(); loadCarriers(); } }); }
 
 // ── Térkép-szolgáltató (geokódolás + autocomplete) — admin Integrációk ──
 function loadMapsProvider(){
@@ -1280,40 +1280,40 @@ function loadMapsProvider(){
       var m=usage.month||0;
       usageHtml='<div class="glass-soft" style="padding:12px 14px;margin-top:14px;">'
         +'<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">'
-        +'<span style="font-size:12px;color:var(--muted);font-weight:700;">📊 E havi használat ('+vendor.toUpperCase()+')</span>'
-        +'<span style="font-size:18px;font-weight:800;">'+m.toLocaleString('hu')+' <span style="font-size:12px;color:var(--muted);font-weight:500;">hívás</span></span>'
-        +'<span style="margin-left:auto;font-size:12px;color:var(--muted);">Fizetendő:</span>'
+        +'<span style="font-size:12px;color:var(--muted);font-weight:700;">'+t('cs.mp.usageMonth',{v:vendor.toUpperCase()})+'</span>'
+        +'<span style="font-size:18px;font-weight:800;">'+m.toLocaleString('hu')+' <span style="font-size:12px;color:var(--muted);font-weight:500;">'+t('cs.mp.calls')+'</span></span>'
+        +'<span style="margin-left:auto;font-size:12px;color:var(--muted);">'+t('cs.mp.toPay')+'</span>'
         +'<span style="font-size:22px;font-weight:800;color:#fbbf24;">'+costM.toFixed(2)+' €</span></div>'
-        +(costP?'<div style="font-size:11px;color:var(--muted);margin-top:4px;">Előző hó: '+(usage.prev||0).toLocaleString('hu')+' hívás · '+costP.toFixed(2)+' €</div>':'')
-        +'<div style="font-size:10.5px;color:var(--muted);margin-top:6px;">⚠️ <b>Nincs ingyenes keret</b> — az első hívástól fizetsz (hivatalos ár + '+marginPct+'% árrés). Csak a fizetős (keyes) geokódolás/keresés számít, a cache-találat nem.</div>'
+        +(costP?'<div style="font-size:11px;color:var(--muted);margin-top:4px;">'+t('cs.mp.prevMonth',{n:(usage.prev||0).toLocaleString('hu'),c:costP.toFixed(2)})+'</div>':'')
+        +'<div style="font-size:10.5px;color:var(--muted);margin-top:6px;">'+t('cs.mp.noFreeQuota',{m:marginPct})+'</div>'
         +'</div>';
     }
     box.innerHTML='<div class="glass" style="padding:18px 20px;border:1px solid rgba(59,130,246,.35);">'
-      +'<h3 style="font-size:16px;margin:0 0 4px;">🗺️ Térkép-szolgáltató (cím-keresés + geokódolás)</h3>'
-      +'<p style="color:var(--muted);font-size:12.5px;margin:0 0 14px;line-height:1.5;">Minden cégen elérhető az <b>ingyenes</b> szolgáltató (kulcs és díj nélkül). Megbízhatóbb keresésért kapcsold ki az ingyeneset, és válassz <b>HERE</b>/<b>Google</b> szolgáltatót a saját kulcsoddal — ekkor az első hívástól fizetsz (hivatalos ár + árrés). A routing/útdíj továbbra is az OSRM/ORS stacken megy.</p>'
+      +'<h3 style="font-size:16px;margin:0 0 4px;">'+t('cs.mp.title')+'</h3>'
+      +'<p style="color:var(--muted);font-size:12.5px;margin:0 0 14px;line-height:1.5;">'+t('cs.mp.hint')+'</p>'
       +'<label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;font-weight:600;margin-bottom:6px;">'
-      +'<input type="checkbox" id="mpFree" '+(vendor==='free'?'checked':'')+' onchange="mpToggleFree()" style="width:18px;height:18px;cursor:pointer;accent-color:#22c55e;"> 🆓 Ingyenes térkép használata (Photon/OSM) — díjmentes</label>'
+      +'<input type="checkbox" id="mpFree" '+(vendor==='free'?'checked':'')+' onchange="mpToggleFree()" style="width:18px;height:18px;cursor:pointer;accent-color:#22c55e;"> '+t('cs.mp.useFree')+'</label>'
       +'<div id="mpPaidWrap" style="'+(vendor==='free'?'display:none;':'')+'margin-top:10px;border-top:1px solid var(--border,rgba(255,255,255,.08));padding-top:12px;">'
       +'<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;">'
-      +'<div class="field" style="margin:0;min-width:170px;"><label>Fizetős szolgáltató</label><select class="select" id="mpVendor">'
-      +'<option value="here"'+(vendor==='here'?' selected':'')+'>HERE (ajánlott)</option>'
+      +'<div class="field" style="margin:0;min-width:170px;"><label>'+t('cs.mp.paidProvider')+'</label><select class="select" id="mpVendor">'
+      +'<option value="here"'+(vendor==='here'?' selected':'')+'>'+t('cs.mp.hereRec')+'</option>'
       +'<option value="google"'+(vendor==='google'?' selected':'')+'>Google Maps</option></select></div>'
-      +'<div class="field" style="margin:0;flex:1;min-width:240px;"><label>API-kulcs '+(hasKey?'<span class="badge ok" style="font-size:10px;">tárolva</span>':'')+'</label><input class="input" id="mpKey" type="password" placeholder="'+(hasKey?'(változatlan, ha üresen hagyod)':'a szolgáltató API-kulcsa')+'"></div>'
+      +'<div class="field" style="margin:0;flex:1;min-width:240px;"><label>'+t('cs.mp.apiKey')+(hasKey?'<span class="badge ok" style="font-size:10px;">'+t('cs.mp.stored')+'</span>':'')+'</label><input class="input" id="mpKey" type="password" placeholder="'+(hasKey?t('cs.mp.keyPhUnchanged'):t('cs.mp.keyPh'))+'"></div>'
       +'<button class="btn ghost" style="height:42px;" onclick="mpTest()">🔌 Teszt</button>'
       +'</div><div id="mpMsg" style="margin-top:8px;font-size:12px;"></div>'+usageHtml+'</div>'
-      +'<button class="btn primary" style="margin-top:14px;" onclick="mpSave()">Mentés</button>'
+      +'<button class="btn primary" style="margin-top:14px;" onclick="mpSave()">'+t('common.save')+'</button>'
       +'</div>';
   });
 }
 function mpToggleFree(){ var f=document.getElementById('mpFree'); var w=document.getElementById('mpPaidWrap'); if(w) w.style.display=(f&&f.checked)?'none':'block'; }
 function mpTest(){
   var vendor=(document.getElementById('mpVendor')||{}).value; var key=(document.getElementById('mpKey')||{}).value;
-  var m=document.getElementById('mpMsg'); if(m) m.innerHTML='<span class="text-muted">Tesztelés…</span>';
+  var m=document.getElementById('mpMsg'); if(m) m.innerHTML='<span class="text-muted">'+t('cs.mp.testing')+'</span>';
   gas('mapsTestProvider',[{vendor:vendor, key:key}]).then(function(r){
     if(!m) return;
-    if(r&&r.ok&&r.valid) m.innerHTML='<span style="color:var(--status-ok);">✅ A kulcs működik.</span>';
-    else if(r&&r.ok&&!r.valid) m.innerHTML='<span style="color:var(--status-danger);">❌ A kulcs nem érvényes / nem válaszolt.</span>';
-    else m.innerHTML='<span style="color:var(--status-danger);">'+esc((r&&r.err)||'Teszt hiba')+'</span>';
+    if(r&&r.ok&&r.valid) m.innerHTML='<span style="color:var(--status-ok);">'+t('cs.mp.keyWorks')+'</span>';
+    else if(r&&r.ok&&!r.valid) m.innerHTML='<span style="color:var(--status-danger);">'+t('cs.mp.keyInvalid')+'</span>';
+    else m.innerHTML='<span style="color:var(--status-danger);">'+esc((r&&r.err)||t('cs.mp.testError'))+'</span>';
   });
 }
 function mpSave(){
@@ -1321,14 +1321,14 @@ function mpSave(){
   var vendor=free?'free':((document.getElementById('mpVendor')||{}).value||'here');
   var key=(document.getElementById('mpKey')||{}).value||'';
   gas('mapsSaveProvider',[{vendor:vendor, key:key}]).then(function(r){
-    if(r&&r.ok){ toast(free?'🆓 Ingyenes térkép bekapcsolva':'🗺️ Térkép-szolgáltató mentve','ok'); loadMapsProvider(); }
-    else toast((r&&r.err)||'Hiba','err');
+    if(r&&r.ok){ toast(free?t('cs.mp.freeOn'):t('cs.mp.savedProvider'),'ok'); loadMapsProvider(); }
+    else toast((r&&r.err)||t('common.error'),'err');
   });
 }
 
 function loadInvites(){
   gas('invListAll').then(list=>{
-    if(!Array.isArray(list)){document.querySelector('#tblInv tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);">Nincs meghívókód.</td></tr>';return;}
+    if(!Array.isArray(list)){document.querySelector('#tblInv tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);">'+t('cs.noInvites')+'</td></tr>';return;}
     document.querySelector('#tblInv tbody').innerHTML=list.map(i=>{
       var sc=i.status==='Aktiv'?'ok':i.status==='Felhasznalva'?'info':'err';
       return '<tr>'
@@ -1338,7 +1338,7 @@ function loadInvites(){
         +'<td>'+esc(i.email||'—')+'</td>'
         +'<td>'+esc(i.tel||'—')+'</td>'
         +'<td><span class="badge '+sc+'">'+i.status+'</span></td>'
-        +'<td><button class="btn ghost" style="padding:3px 10px;font-size:12px;" onclick="revokeInv(\''+esc(i.kod)+'\')" '+(i.status!=='Aktiv'?'disabled':'')+'>Visszavon</button></td>'
+        +'<td><button class="btn ghost" style="padding:3px 10px;font-size:12px;" onclick="revokeInv(\''+esc(i.kod)+'\')" '+(i.status!=='Aktiv'?'disabled':'')+'>'+t('cs.revoke')+'</button></td>'
         +'</tr>';
     }).join('');
   }).catch(function(e){ console.error('loadInvites hiba:', e); toast(t('common.loadError'),'err'); });
@@ -1370,7 +1370,7 @@ function loadOrders(){
 function loadReceivedFuvarlevelek(){
   gas('getFuvarlevelek').then(list=>{
     var tb=document.querySelector('#tblReceivedFuv tbody');
-    if(!list||list.length===0){tb.innerHTML='<tr><td colspan="5">Nincs beküldött fuvarlevél.</td></tr>';return;}
+    if(!list||list.length===0){tb.innerHTML='<tr><td colspan="5">'+t('cs.noWaybills')+'</td></tr>';return;}
     tb.innerHTML=list.map(f=>`<tr>`
       +`<td><b style="color:var(--brand-red);">${esc(f.numar_fisa||'—')}</b></td>`
       +`<td><b style="color:var(--text-primary);">${esc(f.file_name||'—')}</b></td>`
@@ -1378,7 +1378,7 @@ function loadReceivedFuvarlevelek(){
       +`<td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td>`
       +`<td style="display:flex;gap:6px;flex-wrap:wrap;">`
         +`<button class="btn ghost" style="padding:5px 10px;" onclick="openPdfView('${f.id}')">👁 PDF</button>`
-        +`<button class="btn primary" style="padding:5px 10px;" onclick="openFuvEdit('${f.id}')">✏️ Szerkeszt</button>`
+        +`<button class="btn primary" style="padding:5px 10px;" onclick="openFuvEdit('${f.id}')">${t('cs.editLong')}</button>`
       +`</td></tr>`).join('');
   });
 }
@@ -1436,10 +1436,10 @@ function closeFuvEdit(){document.getElementById('fuvEditModal').classList.remove
 
 function openFuvEdit(id){
   gas('getFuvarlevelDetail',[id]).then(function(r){
-    if(!r||!r.ok){toast(r&&r.err||'Nem tölthető be','err');return;}
+    if(!r||!r.ok){toast(r&&r.err||t('cs.cannotLoad'),'err');return;}
     var f=r.fuv;
     document.getElementById('feId').value=f.id;
-    document.getElementById('feSeria').textContent=f.numar_fisa||'(nincs sorszám)';
+    document.getElementById('feSeria').textContent=f.numar_fisa||t('cs.noSerial');
     document.getElementById('feNumeSofer').value=f.nume_sofer||'';
     document.getElementById('feNumarFisa').value=f.numar_fisa||'';
     document.getElementById('feCamion').value=f.numar_camion||'';
@@ -1517,9 +1517,9 @@ function orderFormPairFromVehicle(){
   // pótkocsi auto-kitöltés a vontató alapértelmezett pótkocsijából (csak üres mezőbe)
   const remSel=document.getElementById('oRemorcaSelect');
   if(remSel&&!remSel.value&&v.default_trailer_id){
-    const t=remorcaCache.find(x=>String(x.id)===String(v.default_trailer_id));
-    if(t){const ropt=[...remSel.options].find(o=>o.value===t.rendszam);
-      if(ropt){remSel.value=t.rendszam;toast(t('cs.pairedTrailer')+t.rendszam+' (módosítható)','ok');}}
+    const tr=remorcaCache.find(x=>String(x.id)===String(v.default_trailer_id));
+    if(tr){const ropt=[...remSel.options].find(o=>o.value===tr.rendszam);
+      if(ropt){remSel.value=tr.rendszam;toast(t('cs.pairedTrailer')+tr.rendszam+t('cs.oe.modifiable'),'ok');}}
   }
   // sofőr auto-kitöltés a vontatóhoz rendelt belső sofőrből
   if(!v.assigned_driver_email)return;
@@ -1570,7 +1570,7 @@ function openChatRoom(roomId){
   if(ha)ha.textContent=(label.replace(/[^a-zA-Z\u00C0-\u024F]/g,'')||'?').charAt(0).toUpperCase();
 
   var msgsEl=document.getElementById('chatMsgs');
-  if(msgsEl)msgsEl.innerHTML='<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px;">Betöltés...</div>';
+  if(msgsEl)msgsEl.innerHTML='<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px;">'+t('fe.loading')+'</div>';
 
   var ref=_fbDb.ref('chats/'+_chatCompanyId+'/rooms/'+roomId+'/messages');
   var query=ref.orderByChild('ts').limitToLast(100);
@@ -1607,7 +1607,7 @@ function openDocModal(orderId){
 
 function openQuickVehicle(tip) {
   document.getElementById('qvTip').value = tip;
-  document.getElementById('quickVehicleTitle').textContent = tip === 'Vontato' ? 'Új vontató hozzáadása' : 'Új pótkocsi hozzáadása';
+  document.getElementById('quickVehicleTitle').textContent = tip === 'Vontato' ? t('cs.newTractor') : t('cs.newTrailer');
   document.getElementById('qvRendszam').value = '';
   document.getElementById('qvMarca').value = '';
   document.getElementById('qvModel').value = '';
@@ -1642,7 +1642,7 @@ function quickStatusChange(id, sel) {
       _ordersAllCache.forEach(function(c,i){ if(String(c.id)===String(id)) idx=i; });
       if (idx !== -1) _ordersAllCache[idx].status = newStatus;
     } else {
-      toast(d.err || 'Hiba', 'err');
+      toast(d.err || t('common.error'), 'err');
       loadOrders();
     }
   }).catch(function(){ toast(t('common.connError'), 'err'); loadOrders(); });
@@ -1661,7 +1661,7 @@ function renderAdminRoomList(me){
     return((_roomsSnapData[b]||{}).lastTime||0)-((_roomsSnapData[a]||{}).lastTime||0);
   });
   if(!myRooms.length){
-    listEl.innerHTML='<div style="padding:16px 12px;font-size:12px;color:var(--muted);">Még nincs csevegés.<br>Kattints a + gombra!</div>';
+    listEl.innerHTML='<div style="padding:16px 12px;font-size:12px;color:var(--muted);">'+t('cs.noChat')+'</div>';
     return;
   }
   listEl.innerHTML=myRooms.map(function(rId){
@@ -1679,7 +1679,7 @@ function renderAdminRoomList(me){
   }).join('');
 }
 
-function renderCamions(list){const sel=document.getElementById('oCamionSelect');if(!sel)return;sel.innerHTML='<option value="">— Nincs megadva —</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
+function renderCamions(list){const sel=document.getElementById('oCamionSelect');if(!sel)return;sel.innerHTML='<option value="">'+t('cs.notSetDash')+'</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
 
 function renderDocGroups() {
   var container = document.getElementById('docGroupsContainer');
@@ -1691,7 +1691,7 @@ function renderDocGroups() {
     if (filterTip   && d.tip !== filterTip) return false;
     return true;
   });
-  if (!list.length) { container.innerHTML='<div style="text-align:center;color:var(--muted);padding:40px;">Nincs találat.</div>'; return; }
+  if (!list.length) { container.innerHTML='<div style="text-align:center;color:var(--muted);padding:40px;">'+t('cs.noMatch')+'</div>'; return; }
   var groups = {};
   list.forEach(function(d) {
     var nev = d.nume_sofer||d.email_sofer||'—';
@@ -1706,20 +1706,20 @@ function renderDocGroups() {
     html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0 8px;border-bottom:1px solid var(--border);margin-bottom:12px;">';
     html += '<span style="font-size:15px;font-weight:700;color:var(--text-primary);">👤 '+esc(g.nev)+'</span>';
     html += '<span style="font-size:12px;color:var(--muted);background:var(--bg-3);padding:3px 10px;border-radius:20px;border:1px solid var(--border);">📅 '+g.nap+'</span>';
-    html += '<span style="font-size:12px;color:var(--muted);">'+g.docs.length+' fájl</span>';
+    html += '<span style="font-size:12px;color:var(--muted);">'+g.docs.length+t('cs.files')+'</span>';
     html += '</div>';
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;">';
     g.docs.forEach(function(d) {
       var bc = d.tip==='CMR'?'ok':d.tip==='Számla'?'info':'warn';
       var time = d.created_at ? new Date(d.created_at).toLocaleTimeString('hu-HU',{hour:'2-digit',minute:'2-digit'}) : '';
       html += '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px;">';
-      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;"><span class="badge '+bc+'">'+esc(d.tip||'Egyéb')+'</span>'
-        +(d.order_id?'<span class="badge info" title="Fuvarhoz kötve">🔗 '+esc(d.order_id)+'</span>':'')
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;"><span class="badge '+bc+'">'+esc(d.tip||t('cs.other'))+'</span>'
+        +(d.order_id?'<span class="badge info" title="'+t('cs.tt.linkedToOrder')+'">🔗 '+esc(d.order_id)+'</span>':'')
         +'<span style="font-size:11px;color:var(--muted);">'+time+'</span></div>';
       html += '<div style="font-size:12px;color:var(--soft);margin-bottom:10px;word-break:break-all;">'+esc(d.file_name||'—')+'</div>';
       html += '<div style="display:flex;gap:6px;">';
-      html += '<a href="/api/doc-download/'+d.id+'" target="_blank" class="btn primary" style="flex:1;text-align:center;text-decoration:none;padding:8px 6px;font-size:12px;">👁 Megtekint</a>';
-      html += '<a href="/api/doc-download/'+d.id+'" download class="btn ghost" style="flex:1;text-align:center;text-decoration:none;padding:8px 6px;font-size:12px;">⬇ Letölt</a>';
+      html += '<a href="/api/doc-download/'+d.id+'" target="_blank" class="btn primary" style="flex:1;text-align:center;text-decoration:none;padding:8px 6px;font-size:12px;">'+t('cs.view')+'</a>';
+      html += '<a href="/api/doc-download/'+d.id+'" download class="btn ghost" style="flex:1;text-align:center;text-decoration:none;padding:8px 6px;font-size:12px;">'+t('cs.download')+'</a>';
       html += '</div></div>';
     });
     html += '</div></div>';
@@ -1727,22 +1727,22 @@ function renderDocGroups() {
   container.innerHTML = html;
 }
 
-function renderExternDrivers(list){const sel=document.getElementById('oExternSelect');if(!sel)return;sel.innerHTML='<option value="">— Új sofőr beírása kézzel —</option>'+list.map(d=>`<option value="${esc(d.id)}">${esc(d.nume||'')} ${d.firma?'/ '+esc(d.firma):''}</option>`).join('');}
+function renderExternDrivers(list){const sel=document.getElementById('oExternSelect');if(!sel)return;sel.innerHTML='<option value="">'+t('cs.manualDriver')+'</option>'+list.map(d=>`<option value="${esc(d.id)}">${esc(d.nume||'')} ${d.firma?'/ '+esc(d.firma):''}</option>`).join('');}
 
-function renderInternDrivers(list){const sel=document.getElementById('oInternDriver');if(!sel)return;sel.innerHTML='<option value="">— Válassz sofőrt —</option>'+list.map(u=>`<option value="${esc(u.email)}">${esc(u.nume)} (${esc(u.email)})</option>`).join('');}
+function renderInternDrivers(list){const sel=document.getElementById('oInternDriver');if(!sel)return;sel.innerHTML='<option value="">'+t('cs.pickDriverDash')+'</option>'+list.map(u=>`<option value="${esc(u.email)}">${esc(u.nume)} (${esc(u.email)})</option>`).join('');}
 
-function renderRemorcas(list){const sel=document.getElementById('oRemorcaSelect');if(!sel)return;sel.innerHTML='<option value="">— Nincs megadva —</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
+function renderRemorcas(list){const sel=document.getElementById('oRemorcaSelect');if(!sel)return;sel.innerHTML='<option value="">'+t('cs.notSetDash')+'</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
 
 
 function renderVehicleTable(tableId,list){
   const tb=document.querySelector('#'+tableId+' tbody');
-  if(!list||list.length===0){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);">Nincs még felvéve.</td></tr>';return;}
-  tb.innerHTML=list.map(v=>`<tr><td><b>${esc(v.rendszam)}</b></td><td>${esc(v.marca||'—')}</td><td>${esc(v.model||'—')}</td><td>${v.an||'—'}</td><td>${esc(v.nota||'—')}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editVehicle(${v.id})">Szerk</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteVehicle(${v.id})">Töröl</button></td></tr>`).join('');
+  if(!list||list.length===0){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);">'+t('cs.noneAdded')+'</td></tr>';return;}
+  tb.innerHTML=list.map(v=>`<tr><td><b>${esc(v.rendszam)}</b></td><td>${esc(v.marca||'—')}</td><td>${esc(v.model||'—')}</td><td>${v.an||'—'}</td><td>${esc(v.nota||'—')}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editVehicle(${v.id})">${t('cs.editShort')}</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteVehicle(${v.id})">${t('cs.del')}</button></td></tr>`).join('');
 }
 
 function revokeInv(kod){
-  if(!confirm('Biztosan visszavonod a(z) '+kod+' kodot?'))return;
-  gas('invRevoke',[kod]).then(r=>{if(r.ok){toast(t('cs.revoked'),'ok');loadInvites();}else{toast(r.err||'Hiba','err');}});
+  if(!confirm(t('cs.revokeConfirm',{kod:kod})))return;
+  gas('invRevoke',[kod]).then(r=>{if(r.ok){toast(t('cs.revoked'),'ok');loadInvites();}else{toast(r.err||t('common.error'),'err');}});
 }
 
 function saveAdminSigDraw(){var dataUrl=sigCanvas.toDataURL('image/png');gas('stampSave',[dataUrl]).then(()=>{toast(t('cs.sigSaved'),'ok');loadAdminSigPreview();});}
@@ -1764,7 +1764,7 @@ function saveExtDriver(){
   const id=parseInt(document.getElementById('edEditId').value,10);
   const fields={nume:document.getElementById('edEditNume').value.trim(),firma:document.getElementById('edEditFirma').value.trim(),telefon:document.getElementById('edEditTelefon').value.trim(),email:document.getElementById('edEditEmail').value.trim(),rendszam_camion:document.getElementById('edEditCamion').value.trim(),rendszam_remorca:document.getElementById('edEditRemorca').value.trim(),nota:document.getElementById('edEditNota').value.trim()};
   if(!fields.nume&&!fields.firma){toast(t('cs.driverOrCompanyReq'),'err');return;}
-  gas('extDriverUpdate',[id,fields]).then(r=>{if(r.ok){toast(t('common.saved'),'ok');closeExtDriverModal();loadExtDrivers();}else{toast(r.err||'Hiba történt','err');}});
+  gas('extDriverUpdate',[id,fields]).then(r=>{if(r.ok){toast(t('common.saved'),'ok');closeExtDriverModal();loadExtDrivers();}else{toast(r.err||t('common.error'),'err');}});
 }
 
 function saveQuickVehicle() {
@@ -1783,7 +1783,7 @@ function saveQuickVehicle() {
   }
   gas('vehicleCreate', [v]).then(r => {
     if (r.ok) {
-      toast((tip === 'Vontato' ? 'Vontató' : 'Pótkocsi') + ' hozzáadva!', 'ok');
+      toast((tip === 'Vontato' ? t('cs.vtractor') : t('cs.vtrailer')) + t('cs.added'), 'ok');
       closeQuickVehicle();
       // frissitjuk a dropdown-t es automatikusan kivalasztjuk az ujat
       gas('vehicleList').then(list => {
@@ -1814,7 +1814,7 @@ function saveQuickVehicle() {
         if (vehicleCache.length > 0) loadVehicles();
       });
     } else {
-      toast(r.err || 'Hiba történt', 'err');
+      toast(r.err || t('common.error'), 'err');
     }
   });
 }
@@ -1849,7 +1849,7 @@ function saveVehicle(){
     fields.cargo_height_cm=_vget('vehEditCargoHei');
   }
   if(!fields.rendszam){toast(t('cs.plateReq'),'err');return;}
-  gas('vehicleUpdate',[id,fields]).then(r=>{if(r.ok){toast(t('common.saved'),'ok');closeVehicleModal();loadVehicles();}else{toast(r.err||'Hiba történt','err');}});
+  gas('vehicleUpdate',[id,fields]).then(r=>{if(r.ok){toast(t('common.saved'),'ok');closeVehicleModal();loadVehicles();}else{toast(r.err||t('common.error'),'err');}});
 }
 
 function settings2faConfirm() {
@@ -1861,13 +1861,13 @@ function settings2faConfirm() {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ token: code })
   }).then(function(r){ return r.json(); }).then(function(d){
-    btn.disabled = false; btn.textContent = '✅ Megerősítés';
+    btn.disabled = false; btn.textContent = t('cs.confirm');
     if (d.success) {
       document.getElementById('modal2faSetup').classList.remove('open');
       toast(t('cs.2faOn'),'ok');
       loadSettingsPane();
     } else {
-      toast(d.message||'Helytelen kód','err');
+      toast(d.message||t('cs.wrongCode'),'err');
     }
   });
 }
@@ -1875,7 +1875,7 @@ function settings2faConfirm() {
 function settings2faDisable(){
   var pwd = document.getElementById('st2faDisablePwd').value;
   if(!pwd){ toast(t('cs.givePassword'),'err'); return; }
-  if(!confirm('Biztosan kikapcsolod a kétlépéses hitelesítést? Ez csökkenti a fiókod biztonságát.')) return;
+  if(!confirm(t('cs.cf.disable2fa'))) return;
   gas('settings2faDisable',[{currentPwd:pwd}]).then(function(r){
     if(r&&r.ok){
       toast(t('cs.2faOff'),'ok');
@@ -1932,7 +1932,7 @@ function settingsSaveProfile(){
       toast(t('cs.profileSaved'),'ok');
       document.getElementById('meBadge').textContent = nume;
     } else {
-      toast((r&&r.err)||'Hiba történt','err');
+      toast((r&&r.err)||t('common.error'),'err');
     }
   });
 }
@@ -1991,7 +1991,7 @@ function updateDocSeriesPreview() {
   var p = (document.getElementById('docSeriesPrefix')||{}).value||'MT';
   var y = new Date().getFullYear();
   var el = document.getElementById('docSeriesPreview');
-  if (el) el.textContent = 'Előnézet: '+p+'-'+y+'-0001 (új prefix esetén 1-től)';
+  if (el) el.textContent = t('cs.previewPrefix')+p+'-'+y+'-0001'+t('cs.seriesPreviewSuffix');
 }
 
 function updateOrderSelBar() {
@@ -2023,7 +2023,7 @@ function uploadOrderDoc(){
         loadDocList(currentDocOrderId);
         openSignModal(r.docId,'original');
       }else{
-        toast(r.err||'Feltöltési hiba','err');
+        toast(r.err||t('cs.uploadError'),'err');
       }
     });
   };
@@ -2257,14 +2257,14 @@ function decorateInvoiceIndicators(list){
       document.querySelectorAll('[data-inv-ind]').forEach(function(el){
         var s=sum[el.getAttribute('data-inv-ind')]; var btn=el.closest('button');
         if(!s||!s.invoiced){ el.textContent=''; el.title=''; return; }
-        if(s.stornoed){ el.textContent=' ↩️'; var t='Számla stornózva: '+(s.storno_serie||'')+'-'+(s.storno_numar||''); el.title=t; if(btn)btn.title=t; }
+        if(s.stornoed){ el.textContent=' ↩️'; var ttl=t('cs.invStornoed')+(s.storno_serie||'')+'-'+(s.storno_numar||''); el.title=ttl; if(btn)btn.title=ttl; }
         else {
           // e-Factura (ANAF SPV) státusz-jelzés a pipán: 📨 = beküldve/folyamatban
           var ef=(s.efactura||'').toLowerCase();
           var efSym = ef ? (/(valid|ok|accept)/.test(ef)?' 📨✓' : /(err|invalid|resp)/.test(ef)?' 📨✗' : ' 📨') : '';
           el.textContent=' ✅'+efSym;
-          var t2='Számlázva: '+(s.serie||'')+'-'+(s.numar||'')+(s.efactura?(' · e-Factura: '+s.efactura):'');
-          el.title=t2; if(btn)btn.title=t2;
+          var ttl2=t('cs.invInvoiced')+(s.serie||'')+'-'+(s.numar||'')+(s.efactura?(t('cs.invEfactura')+s.efactura):'');
+          el.title=ttl2; if(btn)btn.title=ttl2;
         }
       });
     }).catch(function(){});
@@ -2354,7 +2354,7 @@ async function buildSignedPdf(){
 
 function downloadDoc(docId,which){
   gas('orderDocGet',[docId,which]).then(r=>{
-    if(!r.ok||!r.base64){toast(r.err||'Letöltési hiba','err');return;}
+    if(!r.ok||!r.base64){toast(r.err||t('cs.downloadError'),'err');return;}
     let ext='.pdf';
     if(r.base64.indexOf('data:image/png')===0) ext='.png';
     else if(r.base64.indexOf('data:image/jpeg')===0) ext='.jpg';
@@ -2415,14 +2415,14 @@ function loadSettingsPane(){
     var enW   = document.getElementById('st2faEnableWrap');
     if(r && r.totp_enabled){
       dot.style.background   = 'var(--ok)';
-      label.textContent      = 'Aktív — fiókod védett';
-      desc.textContent       = 'A kétlépéses hitelesítés be van kapcsolva.';
+      label.textContent      = t('cs.2fa.activeProtected');
+      desc.textContent       = t('cs.2fa.onDesc');
       disW.style.display     = '';
       enW.style.display      = 'none';
     } else {
       dot.style.background   = 'var(--warn)';
-      label.textContent      = 'Nincs bekapcsolva';
-      desc.textContent       = 'Javasolt a 2FA aktiválása a fiókod védelméhez.';
+      label.textContent      = t('cs.2fa.notOn');
+      desc.textContent       = t('cs.2fa.suggest');
       disW.style.display     = 'none';
       enW.style.display      = '';
     }
@@ -2436,7 +2436,7 @@ function openSignModal(docId,which){
   placedItems.forEach(it=>{ if(it.el) it.el.remove(); });
   placedItems=[];
   pdfDocProxy=null; pdfRawBytes=null; signCurrentPage=1; signTotalPages=1;
-  document.getElementById('signPageInfo').textContent='betöltés...';
+  document.getElementById('signPageInfo').textContent=t('cs.loadingLower');
 
   document.getElementById('signStampImg').style.display='none';
   document.getElementById('signNoStamp').style.display='inline';
@@ -2485,7 +2485,7 @@ function openSignModal(docId,which){
   },300);
 
   gas('orderDocGet',[docId,which]).then(async r=>{
-    if(!r.ok||!r.base64){ toast(r.err||'PDF betöltési hiba','err'); return; }
+    if(!r.ok||!r.base64){ toast(r.err||t('cs.pdfLoadError'),'err'); return; }
     try{
       const b64 = r.base64.indexOf(',')>=0 ? r.base64.split(',')[1] : r.base64;
       const bin = atob(b64);
@@ -2528,7 +2528,7 @@ async function renderSignPage(num){
 function renderFilteredOrders(list) {
   var tbody = document.getElementById('tblOrdersBody');
   if (!tbody) return;
-  if (!list.length) { tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px;">Nincs találat.</td></tr>'; return; }
+  if (!list.length) { tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px;">'+t('cs.noMatch')+'</td></tr>'; return; }
   tbody.innerHTML = list.map(function(c){
     var soferInfo='—';
     if(c.sofer_type==='Intern')soferInfo=c.nume_sofer||c.email_sofer||'—';
@@ -2572,15 +2572,15 @@ function renderFilteredOrders(list) {
     // Leadott áru jelzései (folytatásra váró fuvar — a lista tetején)
     if (c.status==='Parkolt') {
       routeCell += '<div style="margin-top:4px;"><span class="badge" style="background:rgba(192,38,211,0.18);color:#e879f9;border:1px solid rgba(192,38,211,0.4);">'+
-        '🅿️ Áru a pótkocsin'+(c.rendszam_remorca?': '+esc(c.rendszam_remorca):'')+(c.handover_loc?' @ '+esc(c.handover_loc):'')+' — vontató+sofőr kell!</span></div>';
+        t('cs.ol.cargoOnTrailer')+(c.rendszam_remorca?': '+esc(c.rendszam_remorca):'')+(c.handover_loc?' @ '+esc(c.handover_loc):'')+t('cs.ol.needTractor')+'</span></div>';
     }
     if (c.status==='Raktarban') {
       routeCell += '<div style="margin-top:4px;"><span class="badge" style="background:rgba(249,115,22,0.18);color:#fb923c;border:1px solid rgba(249,115,22,0.4);">'+
-        '📦 Raktárban'+(c.handover_loc?' @ '+esc(c.handover_loc):'')+' — kiosztásra vár!</span>'+
-        (parseInt(c.pod_count,10)>0?'':' <span class="badge err">⚠️ Dokumentum hiányzik!</span>')+'</div>';
+        t('cs.ol.inWarehouse')+(c.handover_loc?' @ '+esc(c.handover_loc):'')+t('cs.ol.waitAlloc')+'</span>'+
+        (parseInt(c.pod_count,10)>0?'':' <span class="badge err">'+t('cs.ol.docMissing')+'</span>')+'</div>';
     }
     if (c.handover_status==='Fuggoben') {
-      routeCell += '<div style="margin-top:4px;"><span class="badge warn">⏳ Sofőr leadás-kérése visszaigazolásra vár'+
+      routeCell += '<div style="margin-top:4px;"><span class="badge warn">'+t('cs.ol.handoverPending')+
         (c.handover_loc?' @ '+esc(c.handover_loc):'')+'</span></div>';
     }
     if (legCount > 0) {
@@ -2598,7 +2598,7 @@ function renderFilteredOrders(list) {
     // Sofőr cella: alap sofőr + váltások badge-del
     var soferCell = esc(soferInfo);
     if (legCount > 0) {
-      soferCell += ' <span style="font-size:10px;background:rgba(225,11,26,0.15);color:#f87171;border:1px solid rgba(225,11,26,0.3);border-radius:6px;padding:1px 6px;white-space:nowrap;">+'+legCount+' váltás</span>';
+      soferCell += ' <span style="font-size:10px;background:rgba(225,11,26,0.15);color:#f87171;border:1px solid rgba(225,11,26,0.3);border-radius:6px;padding:1px 6px;white-space:nowrap;">+'+legCount+t('cs.ol.legBadge')+'</span>';
       soferCell += '<div style="margin-top:4px;">';
       legs.forEach(function(l){
         soferCell += '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+
@@ -2611,34 +2611,34 @@ function renderFilteredOrders(list) {
     // ── Integrációs gombok (CargoTrack térkép + UIT + Számlázás) ──
     var integBtns = '';
     if (c.rendszam_camion && window.CargoTrackWhereIs) {
-      integBtns += '<button class="btn ghost" title="Hol a kocsi? (térkép)" style="padding:4px 10px;font-size:12px;" '+
+      integBtns += '<button class="btn ghost" title="'+t('cs.ol.whereIs')+'" style="padding:4px 10px;font-size:12px;" '+
         'onclick="CargoTrackWhereIs.show(\''+esc(c.rendszam_camion)+'\',\''+c.id+'\')">🗺️</button>';
     }
     if (window.UitPanel) {
-      integBtns += '<button class="btn ghost uit-btn" title="UIT-kódok (RO e-Transport)" style="padding:4px 10px;font-size:12px;" '+
+      integBtns += '<button class="btn ghost uit-btn" title="'+t('cs.ol.uitCodes')+'" style="padding:4px 10px;font-size:12px;" '+
         'data-uit-oid="'+c.id+'" onclick="UitPanel.open(\''+c.id+'\',\''+esc(c.rendszam_camion||'')+'\')">'+
         '+UIT<span class="uit-ind" data-uit-ind="'+c.id+'" style="margin-left:3px;"></span></button>';
     }
     if (c.status==='Finalizat' && window.InvoiceModal) {
-      integBtns += '<button class="btn primary" title="Számlázás" style="padding:4px 10px;font-size:12px;" '+
+      integBtns += '<button class="btn primary" title="'+t('cs.ol.invoicing')+'" style="padding:4px 10px;font-size:12px;" '+
         'onclick="InvoiceModal.open(\''+c.id+'\')">🧾<span class="inv-ind" data-inv-ind="'+c.id+'" style="margin-left:2px;"></span></button>';
     }
     // 🌍 Ügyfél tracking-link (prémium funkció-kapcsoló: 'tracking')
     if (!(window._vsFeatures && window._vsFeatures['tracking']===false)) {
-      integBtns += '<button class="btn ghost" title="Ügyfél követő-link másolása (publikus oldal)" style="padding:4px 10px;font-size:12px;" '+
+      integBtns += '<button class="btn ghost" title="'+t('cs.ol.copyTrack')+'" style="padding:4px 10px;font-size:12px;" '+
         'onclick="copyTrackingLink(\''+c.id+'\')">🌍</button>';
     }
     // 📷 POD-jelző: a sofőr által ehhez a fuvarhoz csatolt fotók (aláírt CMR stb.)
     if (parseInt(c.pod_count, 10) > 0) {
-      integBtns += '<span title="'+c.pod_count+' sofőr-fotó / POD csatolva (Feltöltött Iratok fül)" '+
+      integBtns += '<span title="'+c.pod_count+t('cs.ol.podAttached')+'" '+
         'style="font-size:12px;align-self:center;color:var(--status-ok);white-space:nowrap;">📷'+c.pod_count+'</span>';
     }
     // 💰 Fizetés rögzítése — CSAK Finalizat fuvaron jelenik meg.
     // Szín a fizetési állapot szerint: fizetve=zöld, részben=sárga, kintlévő=piros keret.
     if (c.status==='Finalizat') {
       var _ps = c.payment_status || 'unpaid';
-      var _pTitle = _ps==='paid' ? 'Fizetve ('+(c.paid_amount||0)+')' :
-                    _ps==='partial' ? 'Részben fizetve — fizetés rögzítése' : 'Kintlévő — fizetés rögzítése';
+      var _pTitle = _ps==='paid' ? t('cs.ol.paidAmt',{n:(c.paid_amount||0)}) :
+                    _ps==='partial' ? t('cs.ol.partialPay') : t('cs.ol.unpaidPay');
       var _pStyle = _ps==='paid' ? 'border-color:rgba(34,197,94,0.5);color:#4ade80;' :
                     _ps==='partial' ? 'border-color:rgba(245,158,11,0.5);color:#fbbf24;' :
                     'border-color:rgba(239,68,68,0.5);color:#f87171;';
@@ -2647,14 +2647,14 @@ function renderFilteredOrders(list) {
     }
     // ⛔ Áru leadása (megszakítás) — aktív fuvaron; függő sofőr-kérésnél a banner kezeli
     if ((c.status==='Alocat'||c.status==='In Curs') && c.handover_status!=='Fuggoben') {
-      integBtns += '<button class="btn ghost" title="Áru leadása (pótkocsin parkol / raktárba kerül)" '+
+      integBtns += '<button class="btn ghost" title="'+t('cs.ol.handoverTitle')+'" '+
         'style="padding:4px 10px;font-size:12px;border-color:rgba(192,38,211,0.5);color:#e879f9;" '+
         'onclick="openHandoverModal(\''+c.id+'\')">⛔</button>';
     }
 
     return '<tr><td><b>'+c.id+'</b></td><td>'+esc(c.client||'—')+'</td>'+
       '<td>'+routeCell+'</td>'+
-      '<td>'+(c.km||'—')+(c.route_km!=null&&c.route_km!==''?' <span class="badge info" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="Automata útvonal-km (térkép szerint) — összevetésre">🗺️ '+c.route_km+'</span>':'')+'</td><td>'+(c.pret||'—')+'</td>'+
+      '<td>'+(c.km||'—')+(c.route_km!=null&&c.route_km!==''?' <span class="badge info" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="'+t('cs.tt.autoRouteKm')+'">🗺️ '+c.route_km+'</span>':'')+'</td><td>'+(c.pret||'—')+'</td>'+
       '<td>'+soferCell+'</td><td>'+esc(c.rendszam_camion||'—')+'</td>'+
       '<td>'+statusSel+'</td>'+
       '<td style="display:flex;gap:4px;flex-wrap:wrap;">'+
@@ -2705,7 +2705,7 @@ function downloadSelectedOrders() {
       '<td style="text-align:right;vertical-align:top;">'+esc(String(c.km||'—'))+'</td>'+
       '<td style="text-align:right;vertical-align:top;">'+esc(String(c.pret||'—'))+'</td>'+
       '<td style="vertical-align:top;">'+esc(soferInfo)+
-        (legCount > 0 ? ' <b style="color:#c00;font-size:10px;">(+'+legCount+' váltás)</b>' : '')+
+        (legCount > 0 ? ' <b style="color:#c00;font-size:10px;">(+'+legCount+t('cs.pr.legCount')+')</b>' : '')+
       '</td>'+
       '<td style="vertical-align:top;">'+esc(c.rendszam_camion||'—')+(c.rendszam_remorca?' / '+esc(c.rendszam_remorca):'')+'</td>'+
       '<td style="text-align:center;vertical-align:top;font-weight:700;">'+esc(c.status||'—')+'</td>'+
@@ -2714,8 +2714,8 @@ function downloadSelectedOrders() {
     // Váltás / szakasz alsorok
     legs.forEach(function(l, idx){
       out += '<tr style="background:#eef3ff;">'+
-        '<td style="padding-left:18px;font-size:11px;color:#444;border-left:3px solid #2563eb;">↳ '+(idx+1)+'. váltás</td>'+
-        '<td colspan="2" style="font-size:11px;color:#666;font-style:italic;">Sofőrváltás / szakasz</td>'+
+        '<td style="padding-left:18px;font-size:11px;color:#444;border-left:3px solid #2563eb;">↳ '+(idx+1)+t('cs.pr.legRow')+'</td>'+
+        '<td colspan="2" style="font-size:11px;color:#666;font-style:italic;">'+t('cs.pr.legSection')+'</td>'+
         '<td style="font-size:11px;font-weight:700;color:#1a3a6b;">'+esc(l.loc_preluare||'—')+'</td>'+
         '<td style="font-size:11px;color:#aaa;">—</td>'+
         '<td></td><td></td>'+
@@ -2731,7 +2731,7 @@ function downloadSelectedOrders() {
   var hasLegs = selected.some(function(c){ return parselegs(c).length > 0; });
 
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
-    '<title>Fuvarfeladatok — '+now+'</title>'+
+    '<title>'+t('cs.pr.docTitle')+now+'</title>'+
     '<style>'+
     'body{font-family:Arial,sans-serif;padding:24px;font-size:13px;color:#000;}'+
     'h1{font-size:18px;text-align:center;margin:0 0 2px;}'+
@@ -2744,15 +2744,15 @@ function downloadSelectedOrders() {
     '.no-print{margin-bottom:16px;}'+
     '@media print{.no-print{display:none;}body{padding:10px;}}'+
     '</style></head><body>'+
-    '<div class="no-print"><button onclick="window.print()" style="padding:10px 24px;background:#0f172a;color:#fff;font-weight:bold;border:none;border-radius:6px;font-size:14px;cursor:pointer;">🖨️ Nyomtatás / PDF mentés</button></div>'+
-    '<h1>VALLOR TEAM SRL — Fuvarfeladatok</h1>'+
-    '<div class="sub">Nyomtatva: '+now+' &nbsp;·&nbsp; '+selected.length+' fuvar'+(hasLegs?' &nbsp;·&nbsp; <span style="color:#2563eb;font-weight:700;">kék sorok = váltások</span>':'')+'</div>'+
+    '<div class="no-print"><button onclick="window.print()" style="padding:10px 24px;background:#0f172a;color:#fff;font-weight:bold;border:none;border-radius:6px;font-size:14px;cursor:pointer;">'+t('cs.pr.printBtn')+'</button></div>'+
+    '<h1>'+t('cs.pr.heading')+'</h1>'+
+    '<div class="sub">'+t('cs.pr.printedAt')+now+' &nbsp;·&nbsp; '+selected.length+t('cs.pr.orders')+(hasLegs?' &nbsp;·&nbsp; <span style="color:#2563eb;font-weight:700;">'+t('cs.pr.blueLegs')+'</span>':'')+'</div>'+
     '<table><thead><tr>'+
-    '<th>#ID</th><th>Ügyfél</th><th>Ref</th><th>Felrakás / Átvétel</th><th>Lerakás</th>'+
-    '<th>KM</th><th>Ár (EUR)</th><th>Sofőr / Váltó sofőr</th><th>Vontató / Pótkocsi</th><th>Státusz</th>'+
+    '<th>#ID</th><th>'+t('st.cClient')+'</th><th>'+t('cs.pr.colRef')+'</th><th>'+t('cs.pr.colLoad')+'</th><th>'+t('cs.pr.colUnload')+'</th>'+
+    '<th>KM</th><th>'+t('cs.pr.colPrice')+'</th><th>'+t('cs.pr.colDriver')+'</th><th>'+t('cs.pr.colVehicle')+'</th><th>'+t('st.cStatus')+'</th>'+
     '</tr></thead><tbody>'+rows+'</tbody></table>'+
-    (hasLegs ? '<div class="legend">ℹ️ Kék háttérrel: utólag hozzáadott váltások (order_legs) — sofőrcsere, átvételi hely, jármű adatokkal.</div>' : '')+
-    '<div class="footer">VallorSoft fuvarmenedzsment · Generálva: '+now+'</div>'+
+    (hasLegs ? '<div class="legend">'+t('cs.pr.legend')+'</div>' : '')+
+    '<div class="footer">'+t('cs.pr.footer')+now+'</div>'+
     '</body></html>';
 
   var blob = new Blob([html], {type:'text/html;charset=utf-8'});
@@ -2844,7 +2844,7 @@ function openOrderEdit(id) {
         var ie=o.import_extra; if(typeof ie==='string'){ try{ ie=JSON.parse(ie); }catch(e){ ie=null; } }
         if(ie && typeof ie==='object' && Object.keys(ie).length){
           oeIe.innerHTML='<div class="glass-soft" style="padding:10px 12px;border:1px solid rgba(59,130,246,0.35);">'
-            +'<div class="text-primary" style="font-size:12px;font-weight:700;margin-bottom:6px;">📋 Importált extra adatok <span class="text-muted" style="font-weight:400;">(CSV-ből, nem párosított oszlopok)</span></div>'
+            +'<div class="text-primary" style="font-size:12px;font-weight:700;margin-bottom:6px;">'+t('cs.oe.importExtra')+'<span class="text-muted" style="font-weight:400;">'+t('cs.oe.importExtraSub')+'</span></div>'
             +'<div style="display:flex;flex-wrap:wrap;gap:6px;">'
             +Object.keys(ie).map(function(k){ return '<span class="badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted);font-size:11px;">'+esc(k)+': <b class="text-primary">'+esc(String(ie[k]))+'</b></span>'; }).join('')
             +'</div></div>';
@@ -2887,7 +2887,7 @@ function openOrderEdit(id) {
       var users = results[0] || [];
       _oeSoferCache = users.filter(u => u.pozicio === 'Sofer');
       var sel = document.getElementById('oeEmailSofer');
-      sel.innerHTML = '<option value="">— Válassz —</option>' +
+      sel.innerHTML = '<option value="">'+t('edit.choose')+'</option>' +
         _oeSoferCache.map(u => '<option value="'+esc(u.email)+'"'+(u.email===o.email_sofer?' selected':'')+'>'+esc(u.nume)+' ('+esc(u.email)+')</option>').join('');
 
       // Jármű dropdown
@@ -2895,10 +2895,10 @@ function openOrderEdit(id) {
       _oeCamionCache = vehicles.filter(v => v.tip === 'Vontato');
       _oeRemorcaCache = vehicles.filter(v => v.tip === 'Potkocsi');
       var camSel = document.getElementById('oeCamion');
-      camSel.innerHTML = '<option value="">— Nincs —</option>' +
+      camSel.innerHTML = '<option value="">'+t('edit.noneDash')+'</option>' +
         _oeCamionCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_camion?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
       var remSel = document.getElementById('oeRemorca');
-      remSel.innerHTML = '<option value="">— Nincs —</option>' +
+      remSel.innerHTML = '<option value="">'+t('edit.noneDash')+'</option>' +
         _oeRemorcaCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_remorca?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
 
       // Auto-párosítás a szerkesztőben (vehicles.assigned_driver_email):
@@ -2915,7 +2915,7 @@ function openOrderEdit(id) {
         document.getElementById('oeSoferType').value = 'Intern';
         oeToggleSoferType();
         sel.value = u.email;
-        toast(t('cs.pairedDriver')+u.nume+' (módosítható)','ok');
+        toast(t('cs.pairedDriver')+u.nume+t('cs.oe.modifiable'),'ok');
       };
       sel.onchange = function(){
         if (!sel.value || camSel.value) return;
@@ -2923,7 +2923,7 @@ function openOrderEdit(id) {
         var v = _oeCamionCache.find(function(x){ return String(x.assigned_driver_email||'').toLowerCase() === email; });
         if (!v) return;
         camSel.value = v.rendszam;
-        toast(t('cs.pairedVehicle')+v.rendszam+' (módosítható)','ok');
+        toast(t('cs.pairedVehicle')+v.rendszam+t('cs.oe.modifiable'),'ok');
       };
 
       if (o.sofer_type === 'Extern') {
@@ -2943,13 +2943,13 @@ function openOrderEdit(id) {
 function renderOeLegs(legs) {
   var el = document.getElementById('oeLegsList');
   if (!legs.length) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px;">Nincs rögzített váltás.</div>';
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px;">'+t('cs.oe.noLeg')+'</div>';
     return;
   }
   el.innerHTML = legs.map(function(leg) {
     return '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;display:flex;justify-content:space-between;align-items:center;">'
       + '<div>'
-      + '<b style="color:#fff;">' + leg.leg_number + '. szakasz</b>'
+      + '<b style="color:#fff;">' + leg.leg_number + t('cs.oe.legSection') + '</b>'
       + (leg.rendszam_camion ? ' &nbsp;🚛 ' + leg.rendszam_camion : '')
       + (leg.rendszam_remorca ? ' + ' + leg.rendszam_remorca : '')
       + (leg.nume_sofer ? ' &nbsp;👤 ' + leg.nume_sofer : '')
@@ -3132,7 +3132,7 @@ function savePayment(){
   };
   gas('markOrderPayment',[_payOrderId,p]).then(function(r){
     if(r&&r.ok){
-      toast(r.payment_status==='paid'?'✅ Fuvar teljesen kifizetve!':'💰 Részfizetés rögzítve','ok');
+      toast(r.payment_status==='paid'?t('cs.fullyPaid'):t('cs.partialPaySaved'),'ok');
       closePaymentModal();
       _afterPaymentRefresh();
     } else toast((r&&r.err)||'Hiba','err');
@@ -3140,7 +3140,7 @@ function savePayment(){
 }
 
 function resetPayment(){
-  if(!confirm('Biztosan nullázod a rögzített fizetéseket ennél a fuvarnál?')) return;
+  if(!confirm(t('cs.cf.resetPay'))) return;
   gas('markOrderPayment',[_payOrderId,{reset:true}]).then(function(r){
     if(r&&r.ok){ toast(t('cs.payReset'),'ok'); closePaymentModal(); _afterPaymentRefresh(); }
     else toast((r&&r.err)||'Hiba','err');
@@ -3154,8 +3154,8 @@ function copyTrackingLink(orderId){
     var url=location.origin+'/t/'+r.token;
     function done(){ toast(t('cs.trackLinkCopied'),'ok'); }
     if(navigator.clipboard&&navigator.clipboard.writeText){
-      navigator.clipboard.writeText(url).then(done).catch(function(){ prompt('Másold ki a linket:',url); });
-    } else { prompt('Másold ki a linket:',url); }
+      navigator.clipboard.writeText(url).then(done).catch(function(){ prompt(t('cs.cf.copyLink'),url); });
+    } else { prompt(t('cs.cf.copyLink'),url); }
   });
 }
 
@@ -3181,36 +3181,36 @@ function ensureHandoverModal(){
   d.id='handoverModal'; d.className='modal-back';
   d.innerHTML=
     '<div class="modal glass" style="max-width:520px;">'+
-    '<h3 id="hoTitle">⛔ Áru leadása</h3>'+
+    '<h3 id="hoTitle">'+t('cs.ho.title')+'</h3>'+
     '<div class="text-muted" id="hoSub" style="font-size:12.5px;margin-bottom:12px;"></div>'+
-    '<div class="field"><label>Mi történik az áruval? *</label>'+
+    '<div class="field"><label>'+t('cs.ho.whatHappens')+'</label>'+
       '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px;">'+
-      '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;"><input type="radio" name="hoType" value="trailer" checked onchange="hoTypeChange()"> 🅿️ Pótkocsin parkol (megrakva)</label>'+
-      '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;"><input type="radio" name="hoType" value="warehouse" onchange="hoTypeChange()"> 📦 Raktárba kerül</label>'+
+      '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;"><input type="radio" name="hoType" value="trailer" checked onchange="hoTypeChange()"> '+t('cs.ho.parkTrailer')+'</label>'+
+      '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;"><input type="radio" name="hoType" value="warehouse" onchange="hoTypeChange()"> '+t('cs.ho.toWarehouse')+'</label>'+
       '</div></div>'+
-    '<div class="field"><label>Hol van az áru? (helység) *</label><input class="input" id="hoLoc" placeholder="pl. Brașov"></div>'+
-    '<div class="field"><label>Változik a végső cél? (üresen marad a régi)</label><input class="input" id="hoNewDest" placeholder="pl. Constanța — csak ha módosul"></div>'+
+    '<div class="field"><label>'+t('cs.ho.whereCargo')+'</label><input class="input" id="hoLoc" placeholder="pl. Brașov"></div>'+
+    '<div class="field"><label>'+t('cs.ho.newDest')+'</label><input class="input" id="hoNewDest" placeholder="'+t('cs.ho.newDestPh')+'"></div>'+
     '<div id="hoWhBlock" style="display:none;">'+
-      '<div class="text-muted" style="font-size:12px;font-weight:700;margin:6px 0 8px;">📦 Raktár-adatok (kötelező)</div>'+
+      '<div class="text-muted" style="font-size:12px;font-weight:700;margin:6px 0 8px;">'+t('cs.ho.whData')+'</div>'+
       '<div class="grid-2">'+
-      '<div class="field"><label>Darabszám *</label><input class="input" id="hoQty" type="number" min="1" placeholder="pl. 33"></div>'+
-      '<div class="field"><label>Egység *</label><select class="select" id="hoQtyUnit"><option value="paletta">Paletta</option><option value="doboz">Doboz</option><option value="egyeb">Egyéb</option></select></div>'+
+      '<div class="field"><label>'+t('cs.ho.qty')+'</label><input class="input" id="hoQty" type="number" min="1" placeholder="pl. 33"></div>'+
+      '<div class="field"><label>'+t('cs.ho.unit')+'</label><select class="select" id="hoQtyUnit"><option value="paletta">'+t('cs.ho.uPallet')+'</option><option value="doboz">'+t('cs.ho.uBox')+'</option><option value="egyeb">'+t('cs.ho.uOther')+'</option></select></div>'+
       '</div>'+
       '<div class="grid-3">'+
-      '<div class="field"><label>Hossz (cm) *</label><input class="input" id="hoLen" type="number" min="1" placeholder="pl. 800"></div>'+
-      '<div class="field"><label>Szélesség (cm) *</label><input class="input" id="hoWid" type="number" min="1" placeholder="pl. 248"></div>'+
-      '<div class="field"><label>Magasság (cm) *</label><input class="input" id="hoHei" type="number" min="1" placeholder="pl. 220"></div>'+
+      '<div class="field"><label>'+t('cs.ho.len')+'</label><input class="input" id="hoLen" type="number" min="1" placeholder="pl. 800"></div>'+
+      '<div class="field"><label>'+t('cs.ho.wid')+'</label><input class="input" id="hoWid" type="number" min="1" placeholder="pl. 248"></div>'+
+      '<div class="field"><label>'+t('cs.ho.hei')+'</label><input class="input" id="hoHei" type="number" min="1" placeholder="pl. 220"></div>'+
       '</div>'+
       '<div class="grid-2">'+
-      '<div class="field"><label>Súly (kg) *</label><input class="input" id="hoWeight" type="number" min="1" step="0.01" placeholder="pl. 12500"></div>'+
-      '<div class="field"><label>Dokumentum lapszáma *</label><input class="input" id="hoDocPages" type="number" min="1" placeholder="pl. 10"></div>'+
+      '<div class="field"><label>'+t('cs.ho.weight')+'</label><input class="input" id="hoWeight" type="number" min="1" step="0.01" placeholder="pl. 12500"></div>'+
+      '<div class="field"><label>'+t('cs.ho.docPages')+'</label><input class="input" id="hoDocPages" type="number" min="1" placeholder="pl. 10"></div>'+
       '</div>'+
-      '<div class="text-muted" style="font-size:11.5px;margin-bottom:8px;">📷 Mentés után töltsd fel / fotózd le a dokumentumokat — amíg nincs feltöltve, a rendszer folyamatosan figyelmeztet.</div>'+
+      '<div class="text-muted" style="font-size:11.5px;margin-bottom:8px;">'+t('cs.ho.uploadHint')+'</div>'+
     '</div>'+
-    '<div class="field"><label>Megjegyzés</label><input class="input" id="hoNote" placeholder="opcionális"></div>'+
+    '<div class="field"><label>'+t('fld.note')+'</label><input class="input" id="hoNote" placeholder="'+t('fld.notePh')+'"></div>'+
     '<div class="row" style="margin-top:14px;display:flex;gap:10px;">'+
-    '<button class="btn ghost col" onclick="closeHandoverModal()">Mégse</button>'+
-    '<button class="btn primary col" id="hoSubmitBtn" onclick="submitHandover()">⛔ Leadás mentése</button>'+
+    '<button class="btn ghost col" onclick="closeHandoverModal()">'+t('common.cancel')+'</button>'+
+    '<button class="btn primary col" id="hoSubmitBtn" onclick="submitHandover()">'+t('cs.ho.saveBtn')+'</button>'+
     '</div></div>';
   document.body.appendChild(d);
 }
@@ -3224,11 +3224,10 @@ function openHandoverModal(orderId, prefill, mode){
   ensureHandoverModal();
   _hoOrderId=orderId; _hoMode=mode||'direct';
   var p=prefill||{};
-  document.getElementById('hoTitle').textContent = _hoMode==='confirm' ? '✅ Sofőr-leadás visszaigazolása' : '⛔ Áru leadása';
-  document.getElementById('hoSub').textContent = 'Fuvar: '+orderId+
-    (_hoMode==='confirm' ? ' — a sofőr adatai előtöltve, javíthatod/kiegészítheted.' :
-     ' — a fuvar felrakója a leadás helye lesz, és kiosztásra vár.');
-  document.getElementById('hoSubmitBtn').textContent = _hoMode==='confirm' ? '✅ Visszaigazolás' : '⛔ Leadás mentése';
+  document.getElementById('hoTitle').textContent = _hoMode==='confirm' ? t('cs.ho.confirmTitle') : t('cs.ho.title');
+  document.getElementById('hoSub').textContent = t('cs.ho.orderPrefix')+orderId+
+    (_hoMode==='confirm' ? t('cs.ho.subConfirm') : t('cs.ho.subDirect'));
+  document.getElementById('hoSubmitBtn').textContent = _hoMode==='confirm' ? t('cs.ho.confirmBtn') : t('cs.ho.saveBtn');
   document.querySelectorAll('input[name="hoType"]').forEach(function(r){ r.checked=(r.value===(p.type||'trailer')); });
   document.getElementById('hoLoc').value=p.location||'';
   document.getElementById('hoNewDest').value=p.new_dest||'';
@@ -3268,7 +3267,7 @@ function submitHandover(){
   var oid=_hoOrderId;
   gas(fn,[oid,data]).then(function(r){
     if(r&&r.ok){
-      toast(type==='trailer'?'🅿️ Áru leadva — pótkocsin parkol, kiosztásra vár.':'📦 Áru raktárba adva — kiosztásra vár.','ok');
+      toast(type==='trailer'?t('cs.ho.savedTrailer'):t('cs.ho.savedWh'),'ok');
       closeHandoverModal();
       if(typeof loadOrders==='function')loadOrders();
       loadPendingHandovers();
@@ -3276,7 +3275,7 @@ function submitHandover(){
       if(type==='warehouse'&&typeof openDocModal==='function'){
         setTimeout(function(){ toast(t('cs.uploadDocsNow'),'err'); openDocModal(oid); },400);
       }
-    } else toast((r&&r.err)||'Hiba','err');
+    } else toast((r&&r.err)||t('common.error'),'err');
   });
 }
 
@@ -3291,16 +3290,16 @@ function loadPendingHandovers(){
     _hoPendingCache=Array.isArray(list)?list:[];
     if(!_hoPendingCache.length){ box.innerHTML=''; return; }
     box.innerHTML='<div class="glass" style="padding:12px 16px;margin-bottom:14px;border:1px solid rgba(245,158,11,0.5);">'+
-      '<div class="text-primary" style="font-weight:800;font-size:13.5px;margin-bottom:6px;">⏳ Sofőr áru-leadás kérések — visszaigazolásra várnak ('+_hoPendingCache.length+')</div>'+
+      '<div class="text-primary" style="font-weight:800;font-size:13.5px;margin-bottom:6px;">'+t('cs.ho.pendingTitle',{n:_hoPendingCache.length})+'</div>'+
       _hoPendingCache.map(function(o,i){
         return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--border);font-size:12.5px;">'+
           '<b class="text-primary">'+esc(String(o.id))+'</b>'+
           '<span class="text-muted">'+esc(o.nume_sofer||o.handover_by||'?')+' · '+
-          (o.handover_type==='trailer'?'🅿️ pótkocsin parkol':'📦 raktárba került')+' @ <b>'+esc(o.handover_loc||'?')+'</b>'+
-          (o.rendszam_remorca?' · pótkocsi: '+esc(o.rendszam_remorca):'')+'</span>'+
+          (o.handover_type==='trailer'?t('cs.ho.parkShort'):t('cs.ho.whShort'))+' @ <b>'+esc(o.handover_loc||'?')+'</b>'+
+          (o.rendszam_remorca?t('cs.ho.trailerInfo')+esc(o.rendszam_remorca):'')+'</span>'+
           '<span style="margin-left:auto;display:flex;gap:6px;">'+
-          '<button class="btn ok" style="padding:4px 12px;font-size:12px;" onclick="hoConfirmIdx('+i+')">✓ Visszaigazol</button>'+
-          '<button class="btn danger" style="padding:4px 12px;font-size:12px;" onclick="hoRejectIdx('+i+')">✕ Elutasít</button>'+
+          '<button class="btn ok" style="padding:4px 12px;font-size:12px;" onclick="hoConfirmIdx('+i+')">'+t('cs.ho.confirmShort')+'</button>'+
+          '<button class="btn danger" style="padding:4px 12px;font-size:12px;" onclick="hoRejectIdx('+i+')">'+t('cs.ho.rejectShort')+'</button>'+
           '</span></div>';
       }).join('')+'</div>';
   });
@@ -3314,10 +3313,10 @@ window.hoConfirmIdx=function(i){
 };
 window.hoRejectIdx=function(i){
   var o=_hoPendingCache[i]; if(!o)return;
-  if(!confirm('Elutasítod a(z) '+o.id+' leadás-kérését? A sofőr push-értesítést kap.'))return;
+  if(!confirm(t('cs.ho.rejectConfirm',{id:o.id})))return;
   gas('rejectHandover',[o.id]).then(function(r){
     if(r&&r.ok){ toast(t('cs.requestRejected'),'ok'); loadPendingHandovers(); if(typeof loadOrders==='function')loadOrders(); }
-    else toast((r&&r.err)||'Hiba','err');
+    else toast((r&&r.err)||t('common.error'),'err');
   });
 };
 
@@ -3325,43 +3324,42 @@ window.hoRejectIdx=function(i){
 function loadWarehouseTab(){
   var box=document.getElementById('warehouseBox');
   if(!box)return;
-  box.innerHTML='<div class="glass" style="padding:20px;color:var(--text-muted);">Betöltés...</div>';
+  box.innerHTML='<div class="glass" style="padding:20px;color:var(--text-muted);">'+t('fe.loading')+'</div>';
   gas('getWarehouseItems').then(function(list){
     list=Array.isArray(list)?list:[];
     var act=list.filter(function(w){return w.status==='Raktarban';});
     var noDocs=act.filter(function(w){return !parseInt(w.doc_count,10);}).length;
     var html='<div class="glass" style="padding:22px;">'+
-      '<h2 class="h-title">📦 Raktár — leadott áruk</h2>'+
-      '<div class="h-sub">Raktárba adott fuvarok: a felrakó a betárolás helye, kiosztással mennek tovább. '+
-      'Jelenleg raktárban: <b>'+act.length+'</b>'+
-      (noDocs?' · <span style="color:var(--status-danger);font-weight:700;">⚠️ '+noDocs+' tételnél hiányzik a dokumentum!</span>':'')+'</div></div>';
+      '<h2 class="h-title">'+t('cs.wh.title')+'</h2>'+
+      '<div class="h-sub">'+t('cs.wh.sub',{n:act.length})+
+      (noDocs?t('cs.wh.docMissingCount',{n:noDocs}):'')+'</div></div>';
     if(!list.length){
-      html+='<div class="glass text-muted" style="padding:22px;margin-top:16px;">Nincs raktárban lévő áru. A fuvarlistán a ⛔ gombbal adhatsz le árut raktárba.</div>';
+      html+='<div class="glass text-muted" style="padding:22px;margin-top:16px;">'+t('cs.wh.empty')+'</div>';
       box.innerHTML=html; return;
     }
     html+='<div class="glass" style="padding:22px;margin-top:16px;overflow-x:auto;">'+
-      '<table class="table"><thead><tr><th>Fuvar</th><th>Ügyfél</th><th>Raktár helye</th><th>Mennyiség</th>'+
-      '<th>Foglalt hely (h×sz×m cm)</th><th>Súly (kg)</th><th>Dok. lapszám</th><th>Dokumentumok</th><th>Betárolva</th><th>Státusz</th><th>Művelet</th></tr></thead><tbody>'+
+      '<table class="table"><thead><tr><th>'+t('st.cOrder')+'</th><th>'+t('st.cClient')+'</th><th>'+t('cs.wh.colWhLoc')+'</th><th>'+t('cs.wh.colQty')+'</th>'+
+      '<th>'+t('cs.wh.colSpace')+'</th><th>'+t('cs.wh.colWeight')+'</th><th>'+t('cs.wh.colDocPages')+'</th><th>'+t('cs.wh.colDocs')+'</th><th>'+t('cs.wh.colStored')+'</th><th>'+t('st.cStatus')+'</th><th>'+t('col.action')+'</th></tr></thead><tbody>'+
       list.map(function(w){
         var docs=parseInt(w.doc_count,10)||0;
         var inWh=w.status==='Raktarban';
         var docCell=docs>0
-          ?'<span style="color:var(--status-ok);">📷 '+docs+' db</span>'
-          :(inWh?'<span class="badge err">⚠️ Hiányzik — tölts fel!</span>':'<span class="text-muted">—</span>');
+          ?'<span style="color:var(--status-ok);">📷 '+docs+t('cs.wh.pcs')+'</span>'
+          :(inWh?'<span class="badge err">'+t('cs.wh.docMissingUpload')+'</span>':'<span class="text-muted">—</span>');
         return '<tr'+(inWh&&!docs?' style="background:rgba(239,68,68,0.06);"':'')+'>'+
           '<td><b>'+esc(String(w.order_id))+'</b></td>'+
           '<td>'+esc(w.client||'—')+'</td>'+
-          '<td>'+esc(w.location||'—')+'<div class="text-muted" style="font-size:11px;">→ végcél: '+esc(w.loc_descarcare||'—')+'</div></td>'+
+          '<td>'+esc(w.location||'—')+'<div class="text-muted" style="font-size:11px;">'+t('cs.wh.finalDest')+esc(w.loc_descarcare||'—')+'</div></td>'+
           '<td>'+(w.qty||'—')+' '+esc(w.qty_unit||'')+'</td>'+
           '<td>'+(w.length_cm||'—')+' × '+(w.width_cm||'—')+' × '+(w.height_cm||'—')+'</td>'+
           '<td>'+(w.weight_kg||'—')+'</td>'+
           '<td>'+(w.doc_pages||'—')+'</td>'+
           '<td>'+docCell+'</td>'+
           '<td>'+(w.created_at?new Date(w.created_at).toLocaleDateString('hu-HU'):'—')+'</td>'+
-          '<td><span class="badge '+(inWh?'warn':'info')+'">'+(inWh?'📦 Raktárban':'✓ Kiadva')+'</span></td>'+
+          '<td><span class="badge '+(inWh?'warn':'info')+'">'+(inWh?t('cs.wh.inWh'):t('cs.wh.released'))+'</span></td>'+
           '<td style="display:flex;gap:4px;flex-wrap:wrap;">'+
-            '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" title="Dokumentum feltöltése" onclick="openDocModal(\''+esc(String(w.order_id))+'\')">📎</button>'+
-            '<button class="btn primary" style="padding:4px 10px;font-size:12px;" title="Fuvar szerkesztése / kiosztása" onclick="openOrderEdit(\''+esc(String(w.order_id))+'\')">✏️</button>'+
+            '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" title="'+t('cs.wh.uploadDocTitle')+'" onclick="openDocModal(\''+esc(String(w.order_id))+'\')">📎</button>'+
+            '<button class="btn primary" style="padding:4px 10px;font-size:12px;" title="'+t('cs.wh.editAllocTitle')+'" onclick="openOrderEdit(\''+esc(String(w.order_id))+'\')">✏️</button>'+
           '</td></tr>';
       }).join('')+'</tbody></table></div>';
     box.innerHTML=html;
