@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>vallorSoft - Bejelentkezés</title>
   <link rel="stylesheet" href="/style.css?v=20260611">
+  <script src="/i18n.js?v=20260612"></script>
 </head>
 <body>
   <div class="toast-wrap" id="toasts"></div>
@@ -14,26 +15,26 @@
     <div class="login-card glass" id="loginStep">
       <div class="head">
         <div class="vs-logo lg"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
-        <div class="sub">Fuvarmenedzsment Rendszer</div>
+        <div class="sub" data-i18n="login.subtitle">Fuvarmenedzsment Rendszer</div>
       </div>
-      
+
       <div class="field">
-        <label>E-mail cím</label>
+        <label data-i18n="login.email">E-mail cím</label>
         <input class="input" type="email" id="email" placeholder="nev@vallorsoft.hu" required>
       </div>
-      
+
       <div class="field">
-        <label>Jelszó</label>
+        <label data-i18n="login.password">Jelszó</label>
         <input class="input" type="password" id="jelszo" placeholder="••••••••" required>
       </div>
-      
-      <button class="btn primary block xl" type="button" id="btnLog">Bejelentkezés</button>
-      
+
+      <button class="btn primary block xl" type="button" id="btnLog" data-i18n="login.signin">Bejelentkezés</button>
+
       <div class="switch-link" style="margin-bottom:8px;">
-        <a href="#" onclick="forgotPassword();return false;">Elfelejtette a jelszavát?</a>
+        <a href="#" onclick="forgotPassword();return false;" data-i18n="login.forgot">Elfelejtette a jelszavát?</a>
       </div>
       <div class="switch-link">
-        Nincs még fiókja? <a href="/register">Regisztráció kóddal</a>
+        <span data-i18n="login.noAccount">Nincs még fiókja?</span> <a href="/register" data-i18n="login.register">Regisztráció kóddal</a>
       </div>
     </div>
 
@@ -42,27 +43,27 @@
     <div class="login-card glass" id="verify2faStep" style="display:none;">
       <div class="head">
         <div class="vs-logo lg"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
-        <div class="sub">Kétlépéses hitelesítés</div>
+        <div class="sub" data-i18n="login.2faTitle">Kétlépéses hitelesítés</div>
       </div>
-      <p style="color:#8a97a8;font-size:14px;margin-bottom:18px;text-align:center;">
+      <p style="color:#8a97a8;font-size:14px;margin-bottom:18px;text-align:center;" data-i18n="login.2faHelp">
         Add meg a hitelesítő alkalmazásban (Google Authenticator) megjelenő 6 jegyű kódot.
       </p>
       <div class="field">
-        <label>6 jegyű kód</label>
+        <label data-i18n="login.6digit">6 jegyű kód</label>
         <input class="input" type="text" id="totpCode" inputmode="numeric" autocomplete="one-time-code"
           maxlength="9" placeholder="123456" style="text-align:center;font-size:22px;letter-spacing:4px;">
       </div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:12px;background:rgba(255,255,255,0.05);border-radius:10px;">
         <input type="checkbox" id="trustDevice" style="width:18px;height:18px;cursor:pointer;accent-color:#6366f1;flex-shrink:0;">
-        <label for="trustDevice" style="font-size:13px;color:#8a97a8;cursor:pointer;line-height:1.4;">
+        <label for="trustDevice" style="font-size:13px;color:#8a97a8;cursor:pointer;line-height:1.4;" data-i18n="login.trust30">
           30 napig ne kérjen kódot ezen az eszközön
         </label>
       </div>
-      <button class="btn primary block xl" onclick="verify2fa()" id="btn2fa">Belépés</button>
+      <button class="btn primary block xl" onclick="verify2fa()" id="btn2fa" data-i18n="login.enter">Belépés</button>
       <div class="switch-link" style="margin-top:10px;">
-        <a href="#" onclick="cancelLogin();return false;">← Vissza</a>
+        <a href="#" onclick="cancelLogin();return false;" data-i18n="common.back">← Vissza</a>
       </div>
-      <p style="color:#6b7280;font-size:12px;margin-top:14px;text-align:center;">
+      <p style="color:#6b7280;font-size:12px;margin-top:14px;text-align:center;" data-i18n="login.lostPhone">
         Elveszett a telefonod? Használd valamelyik tartalék kódot.
       </p>
     </div>
@@ -71,27 +72,27 @@
     <div class="login-card glass" id="setup2faStep" style="display:none; max-width:440px;">
       <div class="head">
         <div class="vs-logo lg"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
-        <div class="sub">Biztonsági beállítás kötelező</div>
+        <div class="sub" data-i18n="login.setupTitle">Biztonsági beállítás kötelező</div>
       </div>
-      <p style="color:#8a97a8;font-size:14px;margin-bottom:16px;text-align:center;">
+      <p style="color:#8a97a8;font-size:14px;margin-bottom:16px;text-align:center;" data-i18n="login.setupHelp">
         A fiókod védelmében kétlépéses hitelesítést kell beállítanod.
-        Olvasd be a QR-kódot a <b style="color:#fff;">Google Authenticator</b> (vagy hasonló) alkalmazással.
+        Olvasd be a QR-kódot a Google Authenticator (vagy hasonló) alkalmazással.
       </p>
       <div style="background:#fff;padding:16px;border-radius:14px;text-align:center;margin-bottom:14px;">
         <img id="qrImg" style="width:200px;height:200px;display:block;margin:0 auto;" alt="QR kód">
       </div>
       <div style="font-size:12px;color:#8a97a8;text-align:center;margin-bottom:14px;">
-        Nem tudod beolvasni? Írd be kézzel ezt a kulcsot:<br>
+        <span data-i18n="login.cantScan">Nem tudod beolvasni? Írd be kézzel ezt a kulcsot:</span><br>
         <code id="manualSecret" style="color:#fff;font-size:13px;word-break:break-all;background:rgba(255,255,255,0.06);padding:6px 10px;border-radius:6px;display:inline-block;margin-top:6px;"></code>
       </div>
       <div class="field">
-        <label>Írd be a generált 6 jegyű kódot a megerősítéshez</label>
+        <label data-i18n="login.enterGenerated">Írd be a generált 6 jegyű kódot a megerősítéshez</label>
         <input class="input" type="text" id="setupCode" inputmode="numeric" maxlength="6"
           placeholder="123456" style="text-align:center;font-size:22px;letter-spacing:4px;">
       </div>
-      <button class="btn primary block xl" onclick="verifySetup2fa()" id="btnSetup2fa">Megerősítés és belépés</button>
+      <button class="btn primary block xl" onclick="verifySetup2fa()" id="btnSetup2fa" data-i18n="login.confirmEnter">Megerősítés és belépés</button>
       <div class="switch-link" style="margin-top:10px;">
-        <a href="#" onclick="cancelLogin();return false;">← Vissza</a>
+        <a href="#" onclick="cancelLogin();return false;" data-i18n="common.back">← Vissza</a>
       </div>
     </div>
 
@@ -99,14 +100,14 @@
     <div class="login-card glass" id="backupStep" style="display:none; max-width:440px;">
       <div class="head">
         <div class="vs-logo lg"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
-        <div class="sub">Tartalék kódok — mentsd el!</div>
+        <div class="sub" data-i18n="login.backupTitle">Tartalék kódok — mentsd el!</div>
       </div>
-      <p style="color:#f59e0b;font-size:14px;margin-bottom:14px;text-align:center;font-weight:600;">
+      <p style="color:#f59e0b;font-size:14px;margin-bottom:14px;text-align:center;font-weight:600;" data-i18n="login.backupWarn">
         ⚠️ Ezeket a kódokat csak MOST látod. Mentsd el biztonságos helyre!
         Ha elveszted a telefonod, ezekkel tudsz belépni.
       </p>
       <div id="backupCodesList" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;"></div>
-      <button class="btn primary block xl" onclick="finishBackup()">Elmentettem, tovább</button>
+      <button class="btn primary block xl" onclick="finishBackup()" data-i18n="login.savedNext">Elmentettem, tovább</button>
     </div>
   </div>
 
@@ -124,13 +125,13 @@
       var pwdVal = document.getElementById('jelszo').value;
       
       if(!emailVal || !pwdVal) {
-        toast('Minden mező kitöltése kötelező!', 'err');
+        toast(t('login.allFields'), 'err');
         return;
       }
       
       var btn = document.getElementById('btnLog');
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Ellenőrzés...';
+      btn.innerHTML = '<span class="spinner"></span> '+t('login.checking');
       
       fetch('/api/login', {
         method: 'POST',
@@ -140,7 +141,7 @@
       .then(res => res.json())
       .then(data => {
         btn.disabled = false;
-        btn.textContent = 'Bejelentkezés';
+        btn.textContent = t('login.signin');
         
         if(data.need2fa) {
           // 2FA kod kerese
@@ -152,13 +153,13 @@
         } else if(data.success && data.redirect) {
           window.location.href = data.redirect;
         } else {
-          toast(data.message || 'Hibás belépési adatok!', 'err');
+          toast(data.message || t('login.badCreds'), 'err');
         }
       })
       .catch(err => {
         btn.disabled = false;
-        btn.textContent = 'Bejelentkezés';
-        toast('Szerver kommunikációs hiba!', 'err');
+        btn.textContent = t('login.signin');
+        toast(t('login.commErr'), 'err');
       });
     }
 
@@ -177,10 +178,10 @@
     // ===== 2FA: bejelentkezeskori kod ellenorzes =====
     function verify2fa() {
       var code = document.getElementById('totpCode').value.trim();
-      if(!code) { toast('Add meg a kódot!', 'err'); return; }
+      if(!code) { toast(t('login.needCode'), 'err'); return; }
       var btn = document.getElementById('btn2fa');
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Ellenőrzés...';
+      btn.innerHTML = '<span class="spinner"></span> '+t('login.checking');
       var trustCb = document.getElementById('trustDevice');
       var trustDevice = trustCb ? trustCb.checked : false;
       fetch('/api/2fa/verify', {
@@ -191,17 +192,17 @@
       .then(r => r.json())
       .then(data => {
         btn.disabled = false;
-        btn.textContent = 'Belépés';
+        btn.textContent = t('login.enter');
         if(data.success && data.redirect) {
           window.location.href = data.redirect;
         } else {
-          toast(data.message || 'Helytelen kód', 'err');
+          toast(data.message || t('login.wrongCode'), 'err');
         }
       })
       .catch(() => {
         btn.disabled = false;
-        btn.textContent = 'Belépés';
-        toast('Szerver hiba', 'err');
+        btn.textContent = t('login.enter');
+        toast(t('common.serverError'), 'err');
       });
     }
 
@@ -215,7 +216,7 @@
             document.getElementById('qrImg').src = data.qr;
             document.getElementById('manualSecret').textContent = data.secret;
           } else {
-            toast(data.message || 'Hiba a 2FA beállításnál', 'err');
+            toast(data.message || t('login.setupErr'), 'err');
           }
         })
         .catch(() => toast('Szerver hiba', 'err'));
@@ -224,10 +225,10 @@
     // ===== 2FA: setup megerosites =====
     function verifySetup2fa() {
       var code = document.getElementById('setupCode').value.trim();
-      if(!code) { toast('Add meg a kódot!', 'err'); return; }
+      if(!code) { toast(t('login.needCode'), 'err'); return; }
       var btn = document.getElementById('btnSetup2fa');
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Ellenőrzés...';
+      btn.innerHTML = '<span class="spinner"></span> '+t('login.checking');
       fetch('/api/2fa/setup-verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -236,7 +237,7 @@
       .then(r => r.json())
       .then(data => {
         btn.disabled = false;
-        btn.textContent = 'Megerősítés és belépés';
+        btn.textContent = t('login.confirmEnter');
         if(data.success) {
           // Backup kodok megjelenitese
           window._redirectAfterBackup = data.redirect;
@@ -246,13 +247,13 @@
           }).join('');
           showStep('backupStep');
         } else {
-          toast(data.message || 'Helytelen kód', 'err');
+          toast(data.message || t('login.wrongCode'), 'err');
         }
       })
       .catch(() => {
         btn.disabled = false;
-        btn.textContent = 'Megerősítés és belépés';
-        toast('Szerver hiba', 'err');
+        btn.textContent = t('login.confirmEnter');
+        toast(t('common.serverError'), 'err');
       });
     }
 
@@ -263,7 +264,7 @@
     function forgotPassword(){
       var emailVal = document.getElementById('email').value.trim();
       if(!emailVal){
-        toast('Adja meg az email címét a mezőben, majd kattintson újra!', 'err');
+        toast(t('login.enterEmailFirst'), 'err');
         return;
       }
       fetch('/api/forgot-password', {
@@ -273,10 +274,10 @@
       })
       .then(res => res.json())
       .then(data => {
-        toast(data.message || 'Ha létezik a fiók, elküldtük a linket.', 'ok');
+        toast(data.message || t('login.forgotSent'), 'ok');
       })
       .catch(err => {
-        toast('Szerver kommunikációs hiba!', 'err');
+        toast(t('login.commErr'), 'err');
       });
     }
     
@@ -300,7 +301,7 @@
       var params = new URLSearchParams(window.location.search);
       if (params.get('timeout') === '1') {
         setTimeout(function() {
-          toast('Biztonsági okból kiléptettünk inaktivitás miatt. Jelentkezz be újra.', 'err');
+          toast(t('login.timeout'), 'err');
         }, 300);
       }
     })();
