@@ -173,6 +173,10 @@
     'set.emailLangTitle': { hu: '✉️ Kimenő e-mailek nyelve', ro: '✉️ Limba e-mailurilor trimise' },
     'set.emailLangHint': { hu: 'A meghívó- és jelszó-e-mailek ezen a nyelven mennek ki. Alapértelmezés: román.', ro: 'E-mailurile de invitație și de resetare parolă se trimit în această limbă. Implicit: română.' },
     'set.emailLangLabel': { hu: 'E-mail nyelve', ro: 'Limba e-mailului' },
+    'sofer.navBorder': { hu: 'Határátlépés', ro: 'Trecere frontieră' },
+    'sofer.navWaybill': { hu: 'Menetlevél', ro: 'Foaie de parcurs' },
+    'sofer.navDocs': { hu: 'Iratok / CMR', ro: 'Documente / CMR' },
+    'sofer.navChat': { hu: 'Chat', ro: 'Chat' },
 
     // ── Login ──
     'login.subtitle': { hu: 'Fuvarmenedzsment Rendszer', ro: 'Sistem de management transport' },
