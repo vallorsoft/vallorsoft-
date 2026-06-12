@@ -202,7 +202,7 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
           const est = await estimateRoute([
             { type: 'loading', address: loc_incarcare },
             { type: 'unloading', address: loc_descarcare },
-          ]);
+          ], company_id);
           if (est && est.km != null) {
             const rg = {
               waypoints: est.waypoints.map((w) => ({ type: w.type, address: w.label, lat: w.lat, lng: w.lng })),

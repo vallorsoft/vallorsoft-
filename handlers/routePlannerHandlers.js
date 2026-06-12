@@ -374,7 +374,7 @@ handlers.orderRouteEstimate = async function (req, res, args) {
       return res.json({ result: { ok: false, err: 'A térképes útvonal-számítás nincs engedélyezve ennél a cégnél.' } });
     }
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
-    const est = await estimateRoute(a.waypoints);
+    const est = await estimateRoute(a.waypoints, cid);
     return res.json({ result: { ok: true, km: est.km, durationSeconds: est.durationSeconds,
       polyline: est.polyline, waypoints: est.waypoints } });
   } catch (err) {

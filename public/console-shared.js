@@ -1257,6 +1257,44 @@ function carrierInvoicePayUi(id, rem){
 }
 function carrierInvoiceDeleteUi(id){ if(!confirm('Törlöd ezt a számlát?')) return; gas('carrierInvoiceDelete',[id]).then(function(r){ if(r&&r.ok){ toast('Törölve','ok'); loadCarrierAp(); loadCarriers(); } }); }
 
+// ── Térkép-szolgáltató (geokódolás + autocomplete) — admin Integrációk ──
+function loadMapsProvider(){
+  var box=document.getElementById('mapsProviderBox'); if(!box) return;
+  gas('mapsGetProvider').then(function(r){
+    var vendor=(r&&r.ok&&r.vendor)||'free'; var hasKey=!!(r&&r.has_key);
+    box.innerHTML='<div class="glass" style="padding:18px 20px;border:1px solid rgba(59,130,246,.35);">'
+      +'<h3 style="font-size:16px;margin:0 0 4px;">🗺️ Térkép-szolgáltató (cím-keresés + geokódolás)</h3>'
+      +'<p style="color:var(--muted);font-size:12.5px;margin:0 0 14px;line-height:1.5;">Alapból az <b>ingyenes</b> szolgáltató megy (kulcs nélkül). Megbízhatóbb keresésért kapcsolj <b>HERE</b>-re vagy <b>Google</b>-re, és add meg a saját API-kulcsod (titkosítva tároljuk, sosem jön vissza nyíltan). A routing/útdíj továbbra is az OSRM/ORS stacken megy.</p>'
+      +'<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;">'
+      +'<div class="field" style="margin:0;min-width:180px;"><label>Szolgáltató</label><select class="select" id="mpVendor" onchange="mpToggleKey()">'
+      +'<option value="free"'+(vendor==='free'?' selected':'')+'>Ingyenes (Photon/OSM)</option>'
+      +'<option value="here"'+(vendor==='here'?' selected':'')+'>HERE (ajánlott)</option>'
+      +'<option value="google"'+(vendor==='google'?' selected':'')+'>Google Maps</option></select></div>'
+      +'<div class="field" id="mpKeyWrap" style="margin:0;flex:1;min-width:240px;'+(vendor==='free'?'display:none;':'')+'"><label>API-kulcs '+(hasKey?'<span class="badge ok" style="font-size:10px;">tárolva</span>':'')+'</label><input class="input" id="mpKey" type="password" placeholder="'+(hasKey?'(változatlan, ha üresen hagyod)':'a szolgáltató API-kulcsa')+'"></div>'
+      +'<button class="btn ghost" style="height:42px;" onclick="mpTest()">🔌 Teszt</button>'
+      +'<button class="btn primary" style="height:42px;" onclick="mpSave()">Mentés</button>'
+      +'</div><div id="mpMsg" style="margin-top:8px;font-size:12px;"></div></div>';
+  });
+}
+function mpToggleKey(){ var v=(document.getElementById('mpVendor')||{}).value; var w=document.getElementById('mpKeyWrap'); if(w) w.style.display=(v==='free')?'none':'block'; }
+function mpTest(){
+  var vendor=(document.getElementById('mpVendor')||{}).value; var key=(document.getElementById('mpKey')||{}).value;
+  var m=document.getElementById('mpMsg'); if(m) m.innerHTML='<span class="text-muted">Tesztelés…</span>';
+  gas('mapsTestProvider',[{vendor:vendor, key:key}]).then(function(r){
+    if(!m) return;
+    if(r&&r.ok&&r.valid) m.innerHTML='<span style="color:var(--status-ok);">✅ A kulcs működik.</span>';
+    else if(r&&r.ok&&!r.valid) m.innerHTML='<span style="color:var(--status-danger);">❌ A kulcs nem érvényes / nem válaszolt.</span>';
+    else m.innerHTML='<span style="color:var(--status-danger);">'+esc((r&&r.err)||'Teszt hiba')+'</span>';
+  });
+}
+function mpSave(){
+  var vendor=(document.getElementById('mpVendor')||{}).value; var key=(document.getElementById('mpKey')||{}).value;
+  gas('mapsSaveProvider',[{vendor:vendor, key:key}]).then(function(r){
+    if(r&&r.ok){ toast('🗺️ Térkép-szolgáltató mentve','ok'); loadMapsProvider(); }
+    else toast((r&&r.err)||'Hiba','err');
+  });
+}
+
 function loadInvites(){
   gas('invListAll').then(list=>{
     if(!Array.isArray(list)){document.querySelector('#tblInv tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);">Nincs meghívókód.</td></tr>';return;}

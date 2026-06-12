@@ -35,21 +35,14 @@ router.get('/api/here-config', requireLogin, (req, res) => {
 // Cím-autocomplete (proxy) — Photon (photon.komoot.io), OpenStreetMap alapú,
 // INGYENES, kulcs nélkül. A régi /api/here-autocomplete útvonal megmaradt,
 // hogy a kliens-hívások ne törjenek.
+const mapsProvider = require('../lib/mapsProvider');
 async function geoAutocomplete(req, res) {
   const q = (req.query.q || '').trim();
   if (q.length < 3) return res.json({ items: [] });
   try {
-    const url = 'https://photon.komoot.io/api/?q=' + encodeURIComponent(q) + '&limit=6';
-    const r = await fetch(url, { headers: { 'User-Agent': 'VallorSoft/1.0 (flottakezelo)' } });
-    const d = await r.json().catch(() => ({}));
-    const items = ((d && d.features) || []).map((f) => {
-      const p = f.properties || {};
-      const main = p.name || p.street || '';
-      const sub = [p.street && p.name !== p.street ? p.street : null, p.postcode, p.city, p.state, p.country]
-        .filter(Boolean).join(', ');
-      const label = [main, sub].filter(Boolean).join(', ');
-      return { label, title: main || label };
-    }).filter((it) => it.label);
+    // Cégenkénti szolgáltató (HERE/Google), ha be van állítva — különben ingyenes (Photon).
+    const cid = req.session && req.session.user ? req.session.user.company_id : null;
+    const items = await mapsProvider.autocomplete(cid, q);
     res.json({ items });
   } catch (e) {
     res.json({ items: [] });
