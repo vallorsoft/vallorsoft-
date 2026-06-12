@@ -944,6 +944,80 @@ function assignDefaultTrailerUi(vehicleId, trailerId){
   });
 }
 
+// ── Ügyfél-portál hozzáférések (az Ügyfelek fülön) ──
+var _cpClients = [];
+function loadClientPortalAccess(){
+  var box=document.getElementById('clientPortalAccessBox'); if(!box) return;
+  // OPT-IN funkció: csak ha a developer bekapcsolta ennél a cégnél
+  if(!(window._vsFeatures && window._vsFeatures['client-portal']===true)){
+    box.innerHTML='<div class="glass" style="padding:14px 18px;"><div class="text-muted" style="font-size:12.5px;">🔑 <b>Ügyfél-portál</b> — a megrendelőid saját belépéssel látnák a fuvarjaikat, dokumentumaikat, és új fuvart igényelhetnének. Ez a funkció jelenleg nincs bekapcsolva (a developer a Funkciók fülön engedélyezi).</div></div>';
+    return;
+  }
+  box.innerHTML='<div class="glass" style="padding:18px 20px;"><div style="font-size:16px;font-weight:800;margin-bottom:4px;">👥 Ügyfél-portál hozzáférések</div>'
+    +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">Meghívhatod az ügyfél kapcsolattartóját, hogy belépjen a <b>/portal</b> oldalon, és csak a SAJÁT cége fuvarjait lássa (státusz, élő követés, dokumentumok), illetve új fuvart igényeljen (jóváhagyással).</div>'
+    +'<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:16px;">'
+    +'<div class="field" style="margin:0;min-width:200px;"><label>Ügyfél</label><select class="select" id="cpClientSel"><option value="">— Válassz ügyfelet —</option></select></div>'
+    +'<div class="field" style="margin:0;min-width:200px;"><label>Kapcsolattartó e-mail</label><input class="input" id="cpEmail" placeholder="pl. logisztika@gyar.ro"></div>'
+    +'<div class="field" style="margin:0;min-width:150px;"><label>Név (opcionális)</label><input class="input" id="cpNev"></div>'
+    +'<button class="btn ok" style="height:42px;" onclick="cpInvite()">＋ Meghívó küldése</button>'
+    +'</div>'
+    +'<div id="cpInviteLink"></div>'
+    +'<div id="cpList"><div class="text-muted" style="font-size:12px;">Betöltés…</div></div>'
+    +'</div>';
+  // ügyfél-lista a választóhoz
+  fetch('/api/clients',{credentials:'same-origin'}).then(function(r){return r.json();}).then(function(list){
+    _cpClients=Array.isArray(list)?list:(list&&list.rows)||[];
+    var sel=document.getElementById('cpClientSel'); if(!sel) return;
+    sel.innerHTML='<option value="">— Válassz ügyfelet —</option>'+_cpClients.map(function(c){
+      return '<option value="'+c.id+'">'+esc(c.nev||('#'+c.id))+'</option>'; }).join('');
+  }).catch(function(){});
+  cpRefresh();
+}
+function cpRefresh(){
+  gas('clientPortalList').then(function(r){
+    var el=document.getElementById('cpList'); if(!el) return;
+    if(!r||!r.ok){ el.innerHTML='<div class="text-muted" style="font-size:12px;">Betöltési hiba.</div>'; return; }
+    var items=r.items||[];
+    if(!items.length){ el.innerHTML='<div class="text-muted" style="font-size:12px;padding:6px 0;">Még nincs portál-hozzáférés.</div>'; return; }
+    window._cpItems=items;
+    el.innerHTML=items.map(function(it,i){
+      var status = it.pending_invite ? '<span class="badge warn">Meghívó kiküldve</span>'
+        : (it.activ ? '<span class="badge ok">Aktív</span>' : '<span class="badge err">Letiltva</span>');
+      var last = it.last_login ? ('utolsó belépés: '+String(it.last_login).replace('T',' ').slice(0,16)) : 'még nem lépett be';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border,rgba(255,255,255,.08));border-radius:10px;margin-bottom:6px;background:rgba(255,255,255,.02);">'
+        +'<div style="flex:1;min-width:0;"><div style="font-weight:700;">'+esc(it.email)+'</div>'
+        +'<div class="text-muted" style="font-size:12px;">'+esc(it.client_nev||'')+' · '+esc(last)+'</div></div>'
+        +status
+        +'<button class="btn ghost" style="padding:6px 10px;font-size:12px;" onclick="cpToggle('+i+')">'+(it.activ?'Letiltás':'Aktiválás')+'</button>'
+        +'</div>';
+    }).join('');
+  });
+}
+function cpInvite(){
+  var cid=(document.getElementById('cpClientSel')||{}).value;
+  var email=(document.getElementById('cpEmail')||{}).value.trim();
+  var nev=(document.getElementById('cpNev')||{}).value.trim();
+  if(!cid){ toast('Válassz ügyfelet!','err'); return; }
+  if(!email){ toast('Add meg a kapcsolattartó e-mailjét!','err'); return; }
+  gas('clientPortalInvite',[{client_id:cid, email:email, nev:nev}]).then(function(r){
+    if(r&&r.ok){
+      toast(r.emailed?'✉️ Meghívó elküldve e-mailben':'Meghívó létrehozva — másold ki a linket','ok');
+      var lb=document.getElementById('cpInviteLink');
+      if(lb) lb.innerHTML='<div class="glass-soft" style="padding:10px 12px;margin-bottom:12px;border:1px solid rgba(34,197,94,.4);font-size:12px;">'
+        +(r.emailed?'✉️ A meghívót elküldtük e-mailben. ':'')+'Jelszó-beállító link (másolható): <br><code style="word-break:break-all;color:var(--text-primary);">'+esc(r.link)+'</code></div>';
+      document.getElementById('cpEmail').value=''; document.getElementById('cpNev').value='';
+      cpRefresh();
+    } else toast((r&&r.err)||'Hiba','err');
+  });
+}
+function cpToggle(i){
+  var it=(window._cpItems||[])[i]; if(!it) return;
+  gas('clientPortalSetActive',[it.id, !it.activ]).then(function(r){
+    if(r&&r.ok){ toast(it.activ?'Letiltva':'Aktiválva','ok'); cpRefresh(); }
+    else toast((r&&r.err)||'Hiba','err');
+  });
+}
+
 function loadInvites(){
   gas('invListAll').then(list=>{
     if(!Array.isArray(list)){document.querySelector('#tblInv tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);">Nincs meghívókód.</td></tr>';return;}

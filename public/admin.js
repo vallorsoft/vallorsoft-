@@ -41,7 +41,7 @@ function loadTab(name){
   if(name==='signature') initAdminSigCanvas();
   if(name==='settings') loadSettingsPane();
   if(name==='internal-drivers') loadInternalDrivers();
-  if(name==='clients' && window.ClientsPage) ClientsPage.mount('clientsBox');
+  if(name==='clients' && window.ClientsPage){ ClientsPage.mount('clientsBox'); if(typeof loadClientPortalAccess==='function') loadClientPortalAccess(); }
   if(name && name.indexOf('stats-')===0 && window.VS_STATS) VS_STATS.load(name);
   if(['expiries','service-log','decont','fuel-import'].indexOf(name)!==-1 && window.FleetExtra) FleetExtra.load(name);
   if(name==='orders-planner' && window.Planner) Planner.load();

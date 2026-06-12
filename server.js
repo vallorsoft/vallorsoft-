@@ -108,6 +108,7 @@ if (rateLimit) {
     legacyHeaders: false,
   });
   app.use('/api/login', loginLimiter);
+  app.use('/api/portal/login', loginLimiter);
   app.use('/api/forgot-password', forgotLimiter);
   // A helyes jelszó utáni TOTP-kód másképp brute-force-olható lenne (6 számjegy, window:2)
   app.use('/api/2fa/verify', twofaLimiter);
@@ -158,6 +159,7 @@ app.use(require('./routes/clients'));
 app.use(require('./routes/cargotrack'));
 app.use(require('./routes/invoices'));
 app.use(require('./routes/track'));
+app.use(require('./routes/portal'));
 app.use(require('./routes/uit'));
 app.use(require('./routes/inbound-orders'));
 app.use(require('./routes/client-mail'));
