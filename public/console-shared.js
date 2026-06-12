@@ -395,10 +395,11 @@ function routeMapClearVia(which){
   var st=_rmState[which]; st.via=[]; st.lastKey=null; renderRouteVia(which); orderRouteRecalc(which);
 }
 
-// ── Rakomány-típus (FTL/LTL) segédek ──
+// ── Rakomány-típus (FTL/LTL) + méretek segédek ──
 // Két pipa, de egymást kizárják: ha az egyiket bepipálod, a másik lekerül.
 function loadTypeExclusive(me, otherId){
   if(me.checked){const o=document.getElementById(otherId);if(o)o.checked=false;}
+  refreshDimReq();
 }
 // a két checkbox állapota → 'FTL' | 'LTL' | null
 function loadTypeValue(ftlId, ltlId){
@@ -406,12 +407,22 @@ function loadTypeValue(ftlId, ltlId){
   if((document.getElementById(ltlId)||{}).checked)return 'LTL';
   return null;
 }
-// fuvarlista-badge: FTL = teljes áru (kék), LTL = részrakomány (sárga)
-function loadTypeBadge(t){
-  if(t==='FTL')return ' <span class="badge info" title="Full Truck Load — teljes rakomány" style="font-size:10px;padding:1px 6px;">FTL</span>';
-  if(t==='LTL')return ' <span class="badge warn" title="Less Than Truckload — részrakomány" style="font-size:10px;padding:1px 6px;">LTL</span>';
-  return '';
+// LTL kiválasztásakor a „méretek kötelező" jelzés pirossá vált (kiíró + szerkesztő)
+function refreshDimReq(){
+  [['oLtl','oDimReq'],['oeLtl','oeDimReq']].forEach(function(p){
+    var ltl=document.getElementById(p[0]), hint=document.getElementById(p[1]);
+    if(hint) hint.style.color = (ltl&&ltl.checked) ? 'var(--status-danger)' : 'var(--text-muted)';
+  });
 }
+// fuvarlista-badge: FTL = teljes áru (kék), LTL = részrakomány (sárga) + méret
+function loadTypeBadge(t, dims){
+  var d = dims ? ' <span class="badge" style="font-size:10px;padding:1px 6px;background:rgba(255,255,255,0.06);color:var(--text-muted);" title="Rakomány-méret (h×sz×m cm)">📐 '+dims+'</span>' : '';
+  if(t==='FTL')return ' <span class="badge info" title="Full Truck Load — teljes rakomány" style="font-size:10px;padding:1px 6px;">FTL</span>'+d;
+  if(t==='LTL')return ' <span class="badge warn" title="Less Than Truckload — részrakomány" style="font-size:10px;padding:1px 6px;">LTL</span>'+d;
+  return d;
+}
+// h×sz×m cm string a méretekből (vagy üres)
+function dimStr(h,w,m){ return (h&&w&&m)?(h+'×'+w+'×'+m):''; }
 
 function createOrder(){
   const st=document.querySelector('input[name="oSoferType"]:checked');
@@ -423,6 +434,9 @@ function createOrder(){
     km:document.getElementById('oKm').value,
     suly_kg:(document.getElementById('oSuly')||{}).value||null,
     load_type:loadTypeValue('oFtl','oLtl'),
+    hossz_cm:(document.getElementById('oHossz')||{}).value||null,
+    szel_cm:(document.getElementById('oSzel')||{}).value||null,
+    mag_cm:(document.getElementById('oMag')||{}).value||null,
     route_geo:buildRouteGeo('create'),
     loc_incarcare:document.getElementById('oLoad').value.trim(),
     loc_descarcare:document.getElementById('oUnload').value.trim(),
@@ -435,6 +449,8 @@ function createOrder(){
   if(type==='Intern'){const sel=document.getElementById('oInternDriver');p.email_sofer=sel.value;p.nume_sofer=sel.options[sel.selectedIndex]?sel.options[sel.selectedIndex].text.split(' (')[0]:'';}
   else if(type==='Extern'){p.nume_sofer=document.getElementById('oExternNume').value.trim();p.firma_extern=document.getElementById('oExternFirma').value.trim();p.telefon_extern=document.getElementById('oExternTelefon').value.trim();const eid=document.getElementById('oExternSelect').value;p.external_driver_id=eid?parseInt(eid,10):null;}
   if(!p.client){toast('Az ügyfél neve kötelező!','err');return;}
+  if(!p.load_type){toast('Válaszd ki a rakomány típusát (FTL / LTL)!','err');return;}
+  if(p.load_type==='LTL' && (!p.hossz_cm||!p.szel_cm||!p.mag_cm)){toast('Részrakománynál (LTL) a méretek (hossz/szél./mag.) kötelezők!','err');return;}
   gas('comCreate',[p]).then(r=>{
     if(r&&r.ok){
       let extra='';
@@ -443,8 +459,9 @@ function createOrder(){
       if(r.paired_trailer)extra+=' · 🚚 párosított pótkocsi: '+r.paired_trailer;
       toast('Fuvar mentve! ID: '+r.id+extra,'ok');
       loadOrders();
-      ['oClient','oRef','oPret','oKm','oSuly','oLoad','oUnload','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+      ['oClient','oRef','oPret','oKm','oSuly','oHossz','oSzel','oMag','oLoad','oUnload','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
       ['oFtl','oLtl'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
+      refreshDimReq();
       if(typeof resetRouteState==='function')resetRouteState('create');
       document.querySelectorAll('input[name="oSoferType"]').forEach(r=>{if(r.value==='None')r.checked=true;});
       onSoferTypeChange('None');
@@ -1988,8 +2005,8 @@ function renderFilteredOrders(list) {
     } catch(e) { legs = []; }
     var legCount = legs.length;
 
-    // Útvonal cella: alap útvonal + FTL/LTL jelzés + szakasz közbülső pontok
-    var routeCell = esc(c.loc_incarcare||'—')+' → '+esc(c.loc_descarcare||'—')+loadTypeBadge(c.load_type);
+    // Útvonal cella: alap útvonal + FTL/LTL jelzés (+ méret) + szakasz közbülső pontok
+    var routeCell = esc(c.loc_incarcare||'—')+' → '+esc(c.loc_descarcare||'—')+loadTypeBadge(c.load_type, dimStr(c.hossz_cm,c.szel_cm,c.mag_cm));
     // Leadott áru jelzései (folytatásra váró fuvar — a lista tetején)
     if (c.status==='Parkolt') {
       routeCell += '<div style="margin-top:4px;"><span class="badge" style="background:rgba(192,38,211,0.18);color:#e879f9;border:1px solid rgba(192,38,211,0.4);">'+
@@ -2268,6 +2285,10 @@ function openOrderEdit(id) {
       var oeSulyEl = document.getElementById('oeSuly'); if(oeSulyEl) oeSulyEl.value = (o.suly_kg==null?'':o.suly_kg);
       var oeFtlEl = document.getElementById('oeFtl'); if(oeFtlEl) oeFtlEl.checked = (o.load_type==='FTL');
       var oeLtlEl = document.getElementById('oeLtl'); if(oeLtlEl) oeLtlEl.checked = (o.load_type==='LTL');
+      var oeHoEl = document.getElementById('oeHossz'); if(oeHoEl) oeHoEl.value = (o.hossz_cm==null?'':o.hossz_cm);
+      var oeSzEl = document.getElementById('oeSzel');  if(oeSzEl) oeSzEl.value = (o.szel_cm==null?'':o.szel_cm);
+      var oeMaEl = document.getElementById('oeMag');   if(oeMaEl) oeMaEl.value = (o.mag_cm==null?'':o.mag_cm);
+      if(typeof refreshDimReq==='function') refreshDimReq();
       document.getElementById('oeStatus').value = o.status||'Disponibil';
       document.getElementById('oeSoferType').value = o.sofer_type||'';
 
@@ -2405,6 +2426,9 @@ function saveOrderEdit() {
     km:               document.getElementById('oeKm').value,
     suly_kg:          (document.getElementById('oeSuly')||{}).value||null,
     load_type:        loadTypeValue('oeFtl','oeLtl'),
+    hossz_cm:         (document.getElementById('oeHossz')||{}).value||null,
+    szel_cm:          (document.getElementById('oeSzel')||{}).value||null,
+    mag_cm:           (document.getElementById('oeMag')||{}).value||null,
     route_geo:        buildRouteGeo('edit'),
     status:           document.getElementById('oeStatus').value,
     sofer_type:       soferType||null,
@@ -2414,6 +2438,8 @@ function saveOrderEdit() {
     rendszam_camion:  document.getElementById('oeCamion').value||null,
     rendszam_remorca: document.getElementById('oeRemorca').value||null,
   };
+  if(!payload.load_type){toast('Válaszd ki a rakomány típusát (FTL / LTL)!','err');return;}
+  if(payload.load_type==='LTL' && (!payload.hossz_cm||!payload.szel_cm||!payload.mag_cm)){toast('Részrakománynál (LTL) a méretek (hossz/szél./mag.) kötelezők!','err');return;}
 
   gas('comUpdate', [_oeOrderId, payload]).then(function(r) {
     if (r && r.ok) {
