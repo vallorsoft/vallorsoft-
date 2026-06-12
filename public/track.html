@@ -83,7 +83,7 @@
 
         if (r.position && typeof L !== 'undefined') {
           var map = L.map('map').setView([r.position.lat, r.position.lng], 9);
-          L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
             { attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
           var m = L.circleMarker([r.position.lat, r.position.lng],
             { radius: 10, color: '#e10b1a', fillColor: '#e10b1a', fillOpacity: 0.9, weight: 3 }).addTo(map);

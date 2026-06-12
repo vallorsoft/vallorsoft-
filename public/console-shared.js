@@ -13,6 +13,7 @@ function applyFeatureFlags(){
     if(!r||!r.ok) return;
     var feats = r.features||{};
     window._vsFeatures = feats;   // nem-menü funkciók (pl. tracking gomb) ellenőrzéséhez
+    if(typeof initOrderMapFeature==='function') initOrderMapFeature();   // térképes km/előnézet (opt-in)
     var cat = window.VS_FEATURES||[];
     cat.forEach(function(f){
       if(f.core) return;
@@ -202,6 +203,198 @@ function createInv(){
   });
 }
 
+// ════════════════════════════════════════════════════════════
+//  Térképes cím-kiegészítés + auto-km + útvonal-előnézet (OPT-IN)
+//  Funkció-kapcsoló: 'order-route-map' (a developer kapcsolja cégenként).
+//  A köztespontok CSAK a km-számításhoz/előnézethez vannak — NEM megállók.
+// ════════════════════════════════════════════════════════════
+var _orderMapOn = false;
+var RM_CFG = {
+  create: { load:'oLoad',    loadDD:'oLoadDD',     unload:'oUnload',   unloadDD:'oUnloadDD',   km:'oKm',  btn:'oMapBtn'  },
+  edit:   { load:'oeLocInc', loadDD:'oeLocIncDD',  unload:'oeLocDesc', unloadDD:'oeLocDescDD', km:'oeKm', btn:'oeMapBtn' },
+};
+function _rmFresh(){ return { via:[], km:null, dur:null, polyline:[], waypoints:[], kmAuto:true, lastKey:null }; }
+var _rmState = { create:_rmFresh(), edit:_rmFresh() };
+var _rmLeaflet=null, _rmLayers=null, _rmWhich=null, _rmClickAdds=false;
+
+// Általános cím-autocomplete (Photon proxy). onPick(): a kiválasztás után fut.
+function vsAttachAutocomplete(inputId, ddId, onPick){
+  var input=document.getElementById(inputId), dd=document.getElementById(ddId);
+  if(!input||!dd||input._vsAcBound) return; input._vsAcBound=true;
+  var timer=null;
+  input.addEventListener('input', function(){
+    var q=input.value.trim(); if(timer)clearTimeout(timer);
+    if(q.length<3){ dd.classList.remove('open'); dd.innerHTML=''; return; }
+    timer=setTimeout(function(){
+      fetch('/api/geo-autocomplete?q='+encodeURIComponent(q),{credentials:'same-origin'})
+        .then(function(r){return r.json();}).then(function(d){
+          var items=(d&&d.items)||[];
+          if(!items.length){ dd.classList.remove('open'); dd.innerHTML=''; return; }
+          dd.innerHTML=items.map(function(it){ var label=it.label||it.title; var main=it.title||label;
+            return '<div class="vs-ac-item" data-label="'+esc(label)+'"><div class="ac-main">'+esc(main)+'</div><div class="ac-sub">'+esc(label)+'</div></div>'; }).join('');
+          dd.classList.add('open');
+          Array.prototype.forEach.call(dd.querySelectorAll('.vs-ac-item'), function(el){
+            el.addEventListener('mousedown', function(e){ e.preventDefault();
+              input.value=el.getAttribute('data-label'); dd.classList.remove('open'); dd.innerHTML='';
+              if(onPick) onPick(); });
+          });
+        }).catch(function(){ dd.classList.remove('open'); });
+    },300);
+  });
+  input.addEventListener('keydown', function(e){ if(e.key==='Escape') dd.classList.remove('open'); });
+}
+
+// Bekötés a fuvar-kiíró + szerkesztő mezőkre (csak ha a kapcsoló BE van).
+function initOrderMapFeature(){
+  _orderMapOn = !!(window._vsFeatures && window._vsFeatures['order-route-map']===true);
+  if(!_orderMapOn) return;
+  if(!window._vsAcCloseBound){ window._vsAcCloseBound=true;
+    document.addEventListener('click', function(e){
+      Array.prototype.forEach.call(document.querySelectorAll('.vs-ac-dd.open'), function(dd){
+        if(!dd.parentElement.contains(e.target)) dd.classList.remove('open'); });
+    });
+  }
+  ['create','edit'].forEach(function(which){
+    var c=RM_CFG[which];
+    vsAttachAutocomplete(c.load, c.loadDD, function(){ orderRouteRecalc(which); });
+    vsAttachAutocomplete(c.unload, c.unloadDD, function(){ orderRouteRecalc(which); });
+    var li=document.getElementById(c.load), ui=document.getElementById(c.unload);
+    if(li&&!li._vsBlur){ li._vsBlur=true; li.addEventListener('blur', function(){ setTimeout(function(){ orderRouteRecalc(which); },150); }); }
+    if(ui&&!ui._vsBlur){ ui._vsBlur=true; ui.addEventListener('blur', function(){ setTimeout(function(){ orderRouteRecalc(which); },150); }); }
+    var km=document.getElementById(c.km);
+    if(km&&!km._vsKm){ km._vsKm=true; km.addEventListener('input', function(){ _rmState[which].kmAuto=false; }); }
+    var btn=document.getElementById(c.btn);
+    if(btn&&!btn._vsBtn){ btn._vsBtn=true; btn.addEventListener('click', function(){ openRouteMap(which); }); }
+  });
+}
+
+function _rmBuildWps(which){
+  var c=RM_CFG[which], st=_rmState[which];
+  var load=((document.getElementById(c.load)||{}).value||'').trim();
+  var unload=((document.getElementById(c.unload)||{}).value||'').trim();
+  if(!load||!unload) return null;
+  var wps=[{type:'loading',address:load}];
+  st.via.forEach(function(v){ wps.push(v.lat!=null?{type:'waypoint',lat:v.lat,lng:v.lng,address:v.address||null}:{type:'waypoint',address:v.address}); });
+  wps.push({type:'unloading',address:unload});
+  return wps;
+}
+
+// Felrakó+lerakó(+köztespontok) → km + polyline. A km mezőt csak akkor tölti,
+// ha üres VAGY korábban is automata volt (kézi érték nyer).
+function orderRouteRecalc(which){
+  if(!_orderMapOn) return;
+  var c=RM_CFG[which], st=_rmState[which];
+  var wps=_rmBuildWps(which); if(!wps) return;
+  var key=JSON.stringify(wps);
+  if(key===st.lastKey && st.polyline.length){ if(_rmWhich===which) routeMapDraw(which); return; }
+  st.lastKey=key;
+  gas('orderRouteEstimate',[{waypoints:wps}]).then(function(r){
+    if(!r||!r.ok){ return; }  // csendben — a kézi km marad
+    st.km=r.km; st.dur=r.durationSeconds; st.polyline=r.polyline||[]; st.waypoints=r.waypoints||[];
+    var kmEl=document.getElementById(c.km);
+    if(kmEl && (st.kmAuto || !String(kmEl.value||'').trim())){ kmEl.value=r.km; st.kmAuto=true; }
+    var btn=document.getElementById(c.btn); if(btn) btn.style.display='';
+    if(_rmWhich===which){ routeMapDraw(which); renderRouteVia(which); }
+  }).catch(function(){});
+}
+
+// A fuvarra mentendő útvonal-metaadat (NEM tartalmaz megállókat).
+function buildRouteGeo(which){
+  var st=_rmState[which];
+  if(!_orderMapOn || !st || !st.waypoints || st.waypoints.length<2) return undefined;
+  return { waypoints: st.waypoints.map(function(w){ return { type:w.type, address:(w.label||w.address||null), lat:w.lat, lng:w.lng }; }),
+           km: st.km, durationSeconds: st.dur };
+}
+function resetRouteState(which){
+  _rmState[which]=_rmFresh();
+  var b=document.getElementById(RM_CFG[which].btn); if(b) b.style.display='none';
+}
+
+// ── Útvonal-előnézet modal (mindig VILÁGOS térkép) ──
+function ensureRouteMapModal(){
+  if(document.getElementById('routeMapModal')) return;
+  var d=document.createElement('div'); d.id='routeMapModal';
+  d.innerHTML='<div class="rmm-card">'
+    +'<div class="rmm-head"><b class="text-primary" style="font-size:15px;">🗺️ Útvonal-előnézet</b>'
+    +'<span id="rmmKm" class="badge info" style="margin-left:6px;">—</span>'
+    +'<button class="btn ghost" style="margin-left:auto;padding:5px 12px;" onclick="closeRouteMap()">✕ Bezár</button></div>'
+    +'<div class="rmm-body">'
+    +'<div class="rmm-map" id="rmmMap"></div>'
+    +'<div class="rmm-side">'
+      +'<div class="text-muted" style="font-size:12px;margin-bottom:10px;line-height:1.45;">A köztespontok <b>csak a km-számításhoz és az útvonal-előnézethez</b> kellenek — NEM megállók. Add hozzá címmel, vagy kapcsold be a térkép-kattintást.</div>'
+      +'<div id="rmmViaList"></div>'
+      +'<div class="rmm-via"><div class="vs-ac-wrap"><input class="input" id="rmmViaInput" placeholder="Köztespont címe" autocomplete="off"><div class="vs-ac-dd" id="rmmViaInputDD"></div></div>'
+      +'<button class="btn ok" style="padding:9px 11px;" onclick="routeMapAddViaFromInput()">➕</button></div>'
+      +'<label style="display:flex;align-items:center;gap:7px;font-size:12px;margin-top:10px;cursor:pointer;"><input type="checkbox" id="rmmClickAdd" onchange="_rmClickAdds=this.checked;"> Térképre kattintás = köztespont</label>'
+      +'<button class="btn ghost" style="width:100%;margin-top:10px;padding:8px;font-size:12px;" onclick="routeMapClearVia()">Köztespontok törlése</button>'
+    +'</div></div></div>';
+  document.body.appendChild(d);
+  vsAttachAutocomplete('rmmViaInput','rmmViaInputDD',null);
+}
+function initRouteLeaflet(){
+  if(typeof L==='undefined'){ toast('A térkép nem töltődött be.','err'); return; }
+  if(_rmLeaflet){ setTimeout(function(){ _rmLeaflet.invalidateSize(); },50); return; }
+  _rmLeaflet=L.map('rmmMap',{zoomControl:true}).setView([46,25],5);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    { subdomains:'abcd', maxZoom:19, attribution:'© OpenStreetMap, © CARTO' }).addTo(_rmLeaflet);
+  _rmLayers=L.layerGroup().addTo(_rmLeaflet);
+  _rmLeaflet.on('click', function(e){ if(_rmClickAdds && _rmWhich){ routeMapAddVia(_rmWhich,{lat:e.latlng.lat,lng:e.latlng.lng}); } });
+  setTimeout(function(){ _rmLeaflet.invalidateSize(); },80);
+}
+function rmFmtDur(sec){ sec=Math.round(sec||0); var h=Math.floor(sec/3600), m=Math.round((sec%3600)/60); return (h>0?(h+'ó '):'')+m+'p'; }
+function routeMapDraw(which){
+  if(!_rmLeaflet||!_rmLayers) return;
+  _rmLayers.clearLayers();
+  var st=_rmState[which];
+  var km=document.getElementById('rmmKm'); if(km) km.textContent=(st.km!=null?(st.km+' km'):'—')+(st.dur?(' · '+rmFmtDur(st.dur)):'');
+  if(st.polyline && st.polyline.length){
+    var line=L.polyline(st.polyline,{color:'#e10b1a',weight:5,opacity:0.85}).addTo(_rmLayers);
+    try{ _rmLeaflet.fitBounds(line.getBounds(),{padding:[30,30]}); }catch(e){}
+  }
+  (st.waypoints||[]).forEach(function(w){
+    if(w.lat==null) return;
+    var color=w.type==='loading'?'#22c55e':w.type==='unloading'?'#ef4444':'#3b82f6';
+    var lbl=w.type==='loading'?'Felrakó':w.type==='unloading'?'Lerakó':'Köztes';
+    L.circleMarker([w.lat,w.lng],{radius:7,color:'#fff',weight:2,fillColor:color,fillOpacity:1})
+      .addTo(_rmLayers).bindTooltip(lbl+(w.label?': '+w.label:''),{direction:'top'});
+  });
+}
+function renderRouteVia(which){
+  var box=document.getElementById('rmmViaList'); if(!box) return;
+  var st=_rmState[which];
+  if(!st.via.length){ box.innerHTML='<div class="text-muted" style="font-size:12px;margin-bottom:8px;">Nincs köztespont.</div>'; return; }
+  box.innerHTML=st.via.map(function(v,i){
+    var lbl=v.address||(v.lat!=null?(Number(v.lat).toFixed(3)+', '+Number(v.lng).toFixed(3)):'?');
+    return '<div class="rmm-via"><span class="badge info" style="flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">🔵 '+esc(lbl)+'</span>'
+      +'<button class="btn danger" style="padding:6px 10px;" onclick="routeMapRemoveVia(\''+which+'\','+i+')">✕</button></div>';
+  }).join('');
+}
+function openRouteMap(which){
+  _rmWhich=which; ensureRouteMapModal();
+  document.getElementById('routeMapModal').classList.add('open');
+  var cb=document.getElementById('rmmClickAdd'); if(cb){ cb.checked=false; } _rmClickAdds=false;
+  setTimeout(function(){ initRouteLeaflet(); renderRouteVia(which); routeMapDraw(which);
+    // ha nincs még vonal (pl. szerkesztőből nyitva), számoljuk újra
+    if(!_rmState[which].polyline.length){ _rmState[which].lastKey=null; orderRouteRecalc(which); }
+  },60);
+}
+function closeRouteMap(){ var m=document.getElementById('routeMapModal'); if(m) m.classList.remove('open'); _rmWhich=null; }
+function routeMapAddViaFromInput(){
+  var inp=document.getElementById('rmmViaInput'); var v=(inp&&inp.value||'').trim();
+  if(!v||!_rmWhich) return; routeMapAddVia(_rmWhich,{address:v}); if(inp) inp.value='';
+}
+function routeMapAddVia(which, pt){
+  var st=_rmState[which]; if(st.via.length>=7){ toast('Legfeljebb 7 köztespont.','err'); return; }
+  st.via.push(pt); st.lastKey=null; renderRouteVia(which); orderRouteRecalc(which);
+}
+function routeMapRemoveVia(which, i){
+  var st=_rmState[which]; st.via.splice(i,1); st.lastKey=null; renderRouteVia(which); orderRouteRecalc(which);
+}
+function routeMapClearVia(which){
+  which=which||_rmWhich; if(!which) return;
+  var st=_rmState[which]; st.via=[]; st.lastKey=null; renderRouteVia(which); orderRouteRecalc(which);
+}
+
 // ── Rakomány-típus (FTL/LTL) segédek ──
 // Két pipa, de egymást kizárják: ha az egyiket bepipálod, a másik lekerül.
 function loadTypeExclusive(me, otherId){
@@ -230,6 +423,7 @@ function createOrder(){
     km:document.getElementById('oKm').value,
     suly_kg:(document.getElementById('oSuly')||{}).value||null,
     load_type:loadTypeValue('oFtl','oLtl'),
+    route_geo:buildRouteGeo('create'),
     loc_incarcare:document.getElementById('oLoad').value.trim(),
     loc_descarcare:document.getElementById('oUnload').value.trim(),
     data_incarcare:document.getElementById('oLoadDate').value||null,
@@ -251,6 +445,7 @@ function createOrder(){
       loadOrders();
       ['oClient','oRef','oPret','oKm','oSuly','oLoad','oUnload','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
       ['oFtl','oLtl'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
+      if(typeof resetRouteState==='function')resetRouteState('create');
       document.querySelectorAll('input[name="oSoferType"]').forEach(r=>{if(r.value==='None')r.checked=true;});
       onSoferTypeChange('None');
     }else{toast((r&&r.err)||'Hiba történt','err');}
@@ -1278,9 +1473,9 @@ function uploadOrderDoc(){
 // A vezérlőpult térképe nem használ HERE-t és nem hívja a /api/here-config-ot.
 // HERE Maps csak a külön Útvonaltervező oldalon (utvonaltervezes.html) van.
 function cartoTileUrl(theme) {
-  return theme === 'light'
-    ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  // Minden térkép MINDIG világos csempével jelenik meg (kérésre) — a téma
+  // (light/dark) nem befolyásolja a térkép-csempéket.
+  return 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
 }
 
 /* ── Téma (light/dark) — a .main-content[data-theme] attribútumon ── */
@@ -2076,6 +2271,18 @@ function openOrderEdit(id) {
       document.getElementById('oeStatus').value = o.status||'Disponibil';
       document.getElementById('oeSoferType').value = o.sofer_type||'';
 
+      // Térképes útvonal-előnézet állapota a mentett route_geo-ból (ha van + a kapcsoló be)
+      if(typeof resetRouteState==='function') resetRouteState('edit');
+      if(_orderMapOn){
+        var rg=o.route_geo; if(typeof rg==='string'){ try{ rg=JSON.parse(rg); }catch(e){ rg=null; } }
+        if(rg && Array.isArray(rg.waypoints) && rg.waypoints.length>=2){
+          _rmState.edit={ via: rg.waypoints.filter(function(w){return w.type==='waypoint';})
+                              .map(function(w){ return { address:w.address, lat:w.lat, lng:w.lng }; }),
+            km:rg.km, dur:rg.durationSeconds, polyline:[], waypoints:rg.waypoints, kmAuto:false, lastKey:null };
+          var oeBtn=document.getElementById('oeMapBtn'); if(oeBtn) oeBtn.style.display='';
+        }
+      }
+
       // Sofőr dropdown
       var users = results[0] || [];
       _oeSoferCache = users.filter(u => u.pozicio === 'Sofer');
@@ -2198,6 +2405,7 @@ function saveOrderEdit() {
     km:               document.getElementById('oeKm').value,
     suly_kg:          (document.getElementById('oeSuly')||{}).value||null,
     load_type:        loadTypeValue('oeFtl','oeLtl'),
+    route_geo:        buildRouteGeo('edit'),
     status:           document.getElementById('oeStatus').value,
     sofer_type:       soferType||null,
     email_sofer:      soferType==='Intern' ? soferSel.value : null,

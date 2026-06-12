@@ -615,7 +615,9 @@ function loadDetailFunkciok(){
     order.forEach(function(g){
       html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#c084fc;margin:16px 0 8px;">'+escHtml(g)+'</div>';
       groups[g].forEach(function(f){
-        var enabled = f.core ? true : (feats[f.key]!==false);
+        // optIn kulcs: alapból KI (csak explicit enabled=true kapcsol be);
+        // a többi a hagyományos „hiányzó sor = bekapcsolva" logikát követi.
+        var enabled = f.core ? true : (f.optIn ? (feats[f.key]===true) : (feats[f.key]!==false));
         var right = f.core
           ? '<span style="font-size:11px;color:var(--muted);">mindig aktív</span>'
           : '<label class="fsw"><input type="checkbox" '+(enabled?'checked':'')+' onchange="toggleFeature('+_detailCegId+',\''+f.key+'\',this.checked,this)"><span class="fsw-s"></span></label>';
