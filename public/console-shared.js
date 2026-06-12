@@ -3181,36 +3181,36 @@ function ensureHandoverModal(){
   d.id='handoverModal'; d.className='modal-back';
   d.innerHTML=
     '<div class="modal glass" style="max-width:520px;">'+
-    '<h3 id="hoTitle">⛔ Áru leadása</h3>'+
+    '<h3 id="hoTitle">'+t('cs.ho.title')+'</h3>'+
     '<div class="text-muted" id="hoSub" style="font-size:12.5px;margin-bottom:12px;"></div>'+
-    '<div class="field"><label>Mi történik az áruval? *</label>'+
+    '<div class="field"><label>'+t('cs.ho.whatHappens')+'</label>'+
       '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px;">'+
-      '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;"><input type="radio" name="hoType" value="trailer" checked onchange="hoTypeChange()"> 🅿️ Pótkocsin parkol (megrakva)</label>'+
-      '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;"><input type="radio" name="hoType" value="warehouse" onchange="hoTypeChange()"> 📦 Raktárba kerül</label>'+
+      '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;"><input type="radio" name="hoType" value="trailer" checked onchange="hoTypeChange()"> '+t('cs.ho.parkTrailer')+'</label>'+
+      '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;"><input type="radio" name="hoType" value="warehouse" onchange="hoTypeChange()"> '+t('cs.ho.toWarehouse')+'</label>'+
       '</div></div>'+
-    '<div class="field"><label>Hol van az áru? (helység) *</label><input class="input" id="hoLoc" placeholder="pl. Brașov"></div>'+
-    '<div class="field"><label>Változik a végső cél? (üresen marad a régi)</label><input class="input" id="hoNewDest" placeholder="pl. Constanța — csak ha módosul"></div>'+
+    '<div class="field"><label>'+t('cs.ho.whereCargo')+'</label><input class="input" id="hoLoc" placeholder="pl. Brașov"></div>'+
+    '<div class="field"><label>'+t('cs.ho.newDest')+'</label><input class="input" id="hoNewDest" placeholder="'+t('cs.ho.newDestPh')+'"></div>'+
     '<div id="hoWhBlock" style="display:none;">'+
-      '<div class="text-muted" style="font-size:12px;font-weight:700;margin:6px 0 8px;">📦 Raktár-adatok (kötelező)</div>'+
+      '<div class="text-muted" style="font-size:12px;font-weight:700;margin:6px 0 8px;">'+t('cs.ho.whData')+'</div>'+
       '<div class="grid-2">'+
-      '<div class="field"><label>Darabszám *</label><input class="input" id="hoQty" type="number" min="1" placeholder="pl. 33"></div>'+
-      '<div class="field"><label>Egység *</label><select class="select" id="hoQtyUnit"><option value="paletta">Paletta</option><option value="doboz">Doboz</option><option value="egyeb">Egyéb</option></select></div>'+
+      '<div class="field"><label>'+t('cs.ho.qty')+'</label><input class="input" id="hoQty" type="number" min="1" placeholder="pl. 33"></div>'+
+      '<div class="field"><label>'+t('cs.ho.unit')+'</label><select class="select" id="hoQtyUnit"><option value="paletta">'+t('cs.ho.uPallet')+'</option><option value="doboz">'+t('cs.ho.uBox')+'</option><option value="egyeb">'+t('cs.ho.uOther')+'</option></select></div>'+
       '</div>'+
       '<div class="grid-3">'+
-      '<div class="field"><label>Hossz (cm) *</label><input class="input" id="hoLen" type="number" min="1" placeholder="pl. 800"></div>'+
-      '<div class="field"><label>Szélesség (cm) *</label><input class="input" id="hoWid" type="number" min="1" placeholder="pl. 248"></div>'+
-      '<div class="field"><label>Magasság (cm) *</label><input class="input" id="hoHei" type="number" min="1" placeholder="pl. 220"></div>'+
+      '<div class="field"><label>'+t('cs.ho.len')+'</label><input class="input" id="hoLen" type="number" min="1" placeholder="pl. 800"></div>'+
+      '<div class="field"><label>'+t('cs.ho.wid')+'</label><input class="input" id="hoWid" type="number" min="1" placeholder="pl. 248"></div>'+
+      '<div class="field"><label>'+t('cs.ho.hei')+'</label><input class="input" id="hoHei" type="number" min="1" placeholder="pl. 220"></div>'+
       '</div>'+
       '<div class="grid-2">'+
-      '<div class="field"><label>Súly (kg) *</label><input class="input" id="hoWeight" type="number" min="1" step="0.01" placeholder="pl. 12500"></div>'+
-      '<div class="field"><label>Dokumentum lapszáma *</label><input class="input" id="hoDocPages" type="number" min="1" placeholder="pl. 10"></div>'+
+      '<div class="field"><label>'+t('cs.ho.weight')+'</label><input class="input" id="hoWeight" type="number" min="1" step="0.01" placeholder="pl. 12500"></div>'+
+      '<div class="field"><label>'+t('cs.ho.docPages')+'</label><input class="input" id="hoDocPages" type="number" min="1" placeholder="pl. 10"></div>'+
       '</div>'+
-      '<div class="text-muted" style="font-size:11.5px;margin-bottom:8px;">📷 Mentés után töltsd fel / fotózd le a dokumentumokat — amíg nincs feltöltve, a rendszer folyamatosan figyelmeztet.</div>'+
+      '<div class="text-muted" style="font-size:11.5px;margin-bottom:8px;">'+t('cs.ho.uploadHint')+'</div>'+
     '</div>'+
-    '<div class="field"><label>Megjegyzés</label><input class="input" id="hoNote" placeholder="opcionális"></div>'+
+    '<div class="field"><label>'+t('fld.note')+'</label><input class="input" id="hoNote" placeholder="'+t('fld.notePh')+'"></div>'+
     '<div class="row" style="margin-top:14px;display:flex;gap:10px;">'+
-    '<button class="btn ghost col" onclick="closeHandoverModal()">Mégse</button>'+
-    '<button class="btn primary col" id="hoSubmitBtn" onclick="submitHandover()">⛔ Leadás mentése</button>'+
+    '<button class="btn ghost col" onclick="closeHandoverModal()">'+t('common.cancel')+'</button>'+
+    '<button class="btn primary col" id="hoSubmitBtn" onclick="submitHandover()">'+t('cs.ho.saveBtn')+'</button>'+
     '</div></div>';
   document.body.appendChild(d);
 }
@@ -3224,11 +3224,10 @@ function openHandoverModal(orderId, prefill, mode){
   ensureHandoverModal();
   _hoOrderId=orderId; _hoMode=mode||'direct';
   var p=prefill||{};
-  document.getElementById('hoTitle').textContent = _hoMode==='confirm' ? '✅ Sofőr-leadás visszaigazolása' : '⛔ Áru leadása';
-  document.getElementById('hoSub').textContent = 'Fuvar: '+orderId+
-    (_hoMode==='confirm' ? ' — a sofőr adatai előtöltve, javíthatod/kiegészítheted.' :
-     ' — a fuvar felrakója a leadás helye lesz, és kiosztásra vár.');
-  document.getElementById('hoSubmitBtn').textContent = _hoMode==='confirm' ? '✅ Visszaigazolás' : '⛔ Leadás mentése';
+  document.getElementById('hoTitle').textContent = _hoMode==='confirm' ? t('cs.ho.confirmTitle') : t('cs.ho.title');
+  document.getElementById('hoSub').textContent = t('cs.ho.orderPrefix')+orderId+
+    (_hoMode==='confirm' ? t('cs.ho.subConfirm') : t('cs.ho.subDirect'));
+  document.getElementById('hoSubmitBtn').textContent = _hoMode==='confirm' ? t('cs.ho.confirmBtn') : t('cs.ho.saveBtn');
   document.querySelectorAll('input[name="hoType"]').forEach(function(r){ r.checked=(r.value===(p.type||'trailer')); });
   document.getElementById('hoLoc').value=p.location||'';
   document.getElementById('hoNewDest').value=p.new_dest||'';
@@ -3268,7 +3267,7 @@ function submitHandover(){
   var oid=_hoOrderId;
   gas(fn,[oid,data]).then(function(r){
     if(r&&r.ok){
-      toast(type==='trailer'?'🅿️ Áru leadva — pótkocsin parkol, kiosztásra vár.':'📦 Áru raktárba adva — kiosztásra vár.','ok');
+      toast(type==='trailer'?t('cs.ho.savedTrailer'):t('cs.ho.savedWh'),'ok');
       closeHandoverModal();
       if(typeof loadOrders==='function')loadOrders();
       loadPendingHandovers();
@@ -3276,7 +3275,7 @@ function submitHandover(){
       if(type==='warehouse'&&typeof openDocModal==='function'){
         setTimeout(function(){ toast(t('cs.uploadDocsNow'),'err'); openDocModal(oid); },400);
       }
-    } else toast((r&&r.err)||'Hiba','err');
+    } else toast((r&&r.err)||t('common.error'),'err');
   });
 }
 
@@ -3291,16 +3290,16 @@ function loadPendingHandovers(){
     _hoPendingCache=Array.isArray(list)?list:[];
     if(!_hoPendingCache.length){ box.innerHTML=''; return; }
     box.innerHTML='<div class="glass" style="padding:12px 16px;margin-bottom:14px;border:1px solid rgba(245,158,11,0.5);">'+
-      '<div class="text-primary" style="font-weight:800;font-size:13.5px;margin-bottom:6px;">⏳ Sofőr áru-leadás kérések — visszaigazolásra várnak ('+_hoPendingCache.length+')</div>'+
+      '<div class="text-primary" style="font-weight:800;font-size:13.5px;margin-bottom:6px;">'+t('cs.ho.pendingTitle',{n:_hoPendingCache.length})+'</div>'+
       _hoPendingCache.map(function(o,i){
         return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--border);font-size:12.5px;">'+
           '<b class="text-primary">'+esc(String(o.id))+'</b>'+
           '<span class="text-muted">'+esc(o.nume_sofer||o.handover_by||'?')+' · '+
-          (o.handover_type==='trailer'?'🅿️ pótkocsin parkol':'📦 raktárba került')+' @ <b>'+esc(o.handover_loc||'?')+'</b>'+
-          (o.rendszam_remorca?' · pótkocsi: '+esc(o.rendszam_remorca):'')+'</span>'+
+          (o.handover_type==='trailer'?t('cs.ho.parkShort'):t('cs.ho.whShort'))+' @ <b>'+esc(o.handover_loc||'?')+'</b>'+
+          (o.rendszam_remorca?t('cs.ho.trailerInfo')+esc(o.rendszam_remorca):'')+'</span>'+
           '<span style="margin-left:auto;display:flex;gap:6px;">'+
-          '<button class="btn ok" style="padding:4px 12px;font-size:12px;" onclick="hoConfirmIdx('+i+')">✓ Visszaigazol</button>'+
-          '<button class="btn danger" style="padding:4px 12px;font-size:12px;" onclick="hoRejectIdx('+i+')">✕ Elutasít</button>'+
+          '<button class="btn ok" style="padding:4px 12px;font-size:12px;" onclick="hoConfirmIdx('+i+')">'+t('cs.ho.confirmShort')+'</button>'+
+          '<button class="btn danger" style="padding:4px 12px;font-size:12px;" onclick="hoRejectIdx('+i+')">'+t('cs.ho.rejectShort')+'</button>'+
           '</span></div>';
       }).join('')+'</div>';
   });
@@ -3314,10 +3313,10 @@ window.hoConfirmIdx=function(i){
 };
 window.hoRejectIdx=function(i){
   var o=_hoPendingCache[i]; if(!o)return;
-  if(!confirm('Elutasítod a(z) '+o.id+' leadás-kérését? A sofőr push-értesítést kap.'))return;
+  if(!confirm(t('cs.ho.rejectConfirm',{id:o.id})))return;
   gas('rejectHandover',[o.id]).then(function(r){
     if(r&&r.ok){ toast(t('cs.requestRejected'),'ok'); loadPendingHandovers(); if(typeof loadOrders==='function')loadOrders(); }
-    else toast((r&&r.err)||'Hiba','err');
+    else toast((r&&r.err)||t('common.error'),'err');
   });
 };
 
@@ -3325,43 +3324,42 @@ window.hoRejectIdx=function(i){
 function loadWarehouseTab(){
   var box=document.getElementById('warehouseBox');
   if(!box)return;
-  box.innerHTML='<div class="glass" style="padding:20px;color:var(--text-muted);">Betöltés...</div>';
+  box.innerHTML='<div class="glass" style="padding:20px;color:var(--text-muted);">'+t('fe.loading')+'</div>';
   gas('getWarehouseItems').then(function(list){
     list=Array.isArray(list)?list:[];
     var act=list.filter(function(w){return w.status==='Raktarban';});
     var noDocs=act.filter(function(w){return !parseInt(w.doc_count,10);}).length;
     var html='<div class="glass" style="padding:22px;">'+
-      '<h2 class="h-title">📦 Raktár — leadott áruk</h2>'+
-      '<div class="h-sub">Raktárba adott fuvarok: a felrakó a betárolás helye, kiosztással mennek tovább. '+
-      'Jelenleg raktárban: <b>'+act.length+'</b>'+
-      (noDocs?' · <span style="color:var(--status-danger);font-weight:700;">⚠️ '+noDocs+' tételnél hiányzik a dokumentum!</span>':'')+'</div></div>';
+      '<h2 class="h-title">'+t('cs.wh.title')+'</h2>'+
+      '<div class="h-sub">'+t('cs.wh.sub',{n:act.length})+
+      (noDocs?t('cs.wh.docMissingCount',{n:noDocs}):'')+'</div></div>';
     if(!list.length){
-      html+='<div class="glass text-muted" style="padding:22px;margin-top:16px;">Nincs raktárban lévő áru. A fuvarlistán a ⛔ gombbal adhatsz le árut raktárba.</div>';
+      html+='<div class="glass text-muted" style="padding:22px;margin-top:16px;">'+t('cs.wh.empty')+'</div>';
       box.innerHTML=html; return;
     }
     html+='<div class="glass" style="padding:22px;margin-top:16px;overflow-x:auto;">'+
-      '<table class="table"><thead><tr><th>Fuvar</th><th>Ügyfél</th><th>Raktár helye</th><th>Mennyiség</th>'+
-      '<th>Foglalt hely (h×sz×m cm)</th><th>Súly (kg)</th><th>Dok. lapszám</th><th>Dokumentumok</th><th>Betárolva</th><th>Státusz</th><th>Művelet</th></tr></thead><tbody>'+
+      '<table class="table"><thead><tr><th>'+t('st.cOrder')+'</th><th>'+t('st.cClient')+'</th><th>'+t('cs.wh.colWhLoc')+'</th><th>'+t('cs.wh.colQty')+'</th>'+
+      '<th>'+t('cs.wh.colSpace')+'</th><th>'+t('cs.wh.colWeight')+'</th><th>'+t('cs.wh.colDocPages')+'</th><th>'+t('cs.wh.colDocs')+'</th><th>'+t('cs.wh.colStored')+'</th><th>'+t('st.cStatus')+'</th><th>'+t('col.action')+'</th></tr></thead><tbody>'+
       list.map(function(w){
         var docs=parseInt(w.doc_count,10)||0;
         var inWh=w.status==='Raktarban';
         var docCell=docs>0
-          ?'<span style="color:var(--status-ok);">📷 '+docs+' db</span>'
-          :(inWh?'<span class="badge err">⚠️ Hiányzik — tölts fel!</span>':'<span class="text-muted">—</span>');
+          ?'<span style="color:var(--status-ok);">📷 '+docs+t('cs.wh.pcs')+'</span>'
+          :(inWh?'<span class="badge err">'+t('cs.wh.docMissingUpload')+'</span>':'<span class="text-muted">—</span>');
         return '<tr'+(inWh&&!docs?' style="background:rgba(239,68,68,0.06);"':'')+'>'+
           '<td><b>'+esc(String(w.order_id))+'</b></td>'+
           '<td>'+esc(w.client||'—')+'</td>'+
-          '<td>'+esc(w.location||'—')+'<div class="text-muted" style="font-size:11px;">→ végcél: '+esc(w.loc_descarcare||'—')+'</div></td>'+
+          '<td>'+esc(w.location||'—')+'<div class="text-muted" style="font-size:11px;">'+t('cs.wh.finalDest')+esc(w.loc_descarcare||'—')+'</div></td>'+
           '<td>'+(w.qty||'—')+' '+esc(w.qty_unit||'')+'</td>'+
           '<td>'+(w.length_cm||'—')+' × '+(w.width_cm||'—')+' × '+(w.height_cm||'—')+'</td>'+
           '<td>'+(w.weight_kg||'—')+'</td>'+
           '<td>'+(w.doc_pages||'—')+'</td>'+
           '<td>'+docCell+'</td>'+
           '<td>'+(w.created_at?new Date(w.created_at).toLocaleDateString('hu-HU'):'—')+'</td>'+
-          '<td><span class="badge '+(inWh?'warn':'info')+'">'+(inWh?'📦 Raktárban':'✓ Kiadva')+'</span></td>'+
+          '<td><span class="badge '+(inWh?'warn':'info')+'">'+(inWh?t('cs.wh.inWh'):t('cs.wh.released'))+'</span></td>'+
           '<td style="display:flex;gap:4px;flex-wrap:wrap;">'+
-            '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" title="Dokumentum feltöltése" onclick="openDocModal(\''+esc(String(w.order_id))+'\')">📎</button>'+
-            '<button class="btn primary" style="padding:4px 10px;font-size:12px;" title="Fuvar szerkesztése / kiosztása" onclick="openOrderEdit(\''+esc(String(w.order_id))+'\')">✏️</button>'+
+            '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" title="'+t('cs.wh.uploadDocTitle')+'" onclick="openDocModal(\''+esc(String(w.order_id))+'\')">📎</button>'+
+            '<button class="btn primary" style="padding:4px 10px;font-size:12px;" title="'+t('cs.wh.editAllocTitle')+'" onclick="openOrderEdit(\''+esc(String(w.order_id))+'\')">✏️</button>'+
           '</td></tr>';
       }).join('')+'</tbody></table></div>';
     box.innerHTML=html;
