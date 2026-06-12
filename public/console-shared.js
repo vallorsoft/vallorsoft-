@@ -1957,7 +1957,7 @@ function startRoomListListener(me){
   });
 }
 
-function toast(m,k){var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(function(){e.remove();},3000);}
+function toast(m,k){m=(typeof window.tx==='function')?window.tx(m):m;var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(function(){e.remove();},3000);}
 
 function toggleAllOrders(cb) {
   document.querySelectorAll('.orderRowCb').forEach(function(c){ c.checked = cb.checked; });

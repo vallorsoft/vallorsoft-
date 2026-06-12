@@ -445,6 +445,22 @@
     if (vars) Object.keys(vars).forEach(function (k) { s = String(s).replace(new RegExp('\\{' + k + '\\}', 'g'), vars[k]); });
     return s;
   }
+  // Fordított keresés: a szerver által visszaadott NYERS magyar üzenetet
+  // (srv.* namespace) lefordítja az aktuális nyelvre. Ismeretlen szöveget
+  // változatlanul ad vissza. Csak az 'srv.' kulcsokat indexeli (nincs ütközés).
+  var REV = null;
+  function buildRev() {
+    REV = {};
+    Object.keys(DICT).forEach(function (k) {
+      if (k.indexOf('srv.') === 0 && DICT[k] && DICT[k].hu) REV[DICT[k].hu] = DICT[k];
+    });
+  }
+  function tx(s) {
+    if (s == null) return s;
+    if (!REV) buildRev();
+    var e = REV[String(s)];
+    return e ? (e[getLang()] || e.hu || s) : s;
+  }
   function applyI18n(root) {
     root = root || document;
     root.querySelectorAll('[data-i18n]').forEach(function (el) { el.textContent = t(el.getAttribute('data-i18n')); });
@@ -488,8 +504,21 @@
     syncSwitcher();
   }
 
+  // Extra szótár-regisztráció: külön dict-fájlok (pl. i18n-cards.js) bővíthetik a
+  // DICT-et ütközés nélkül. window.registerI18n({ 'ns.kulcs': {hu,ro}, ... }).
+  function register(extra) {
+    if (!extra || typeof extra !== 'object') return;
+    Object.keys(extra).forEach(function (k) { DICT[k] = extra[k]; });
+    REV = null; // újraépítjük a fordított indexet a következő tx()-nél
+    try { applyI18n(document); } catch (e) {}
+  }
+
   window.t = t;
-  window.I18N = { t: t, set: setLang, get: getLang, apply: applyI18n, dict: DICT, mountSwitcher: injectSwitcher };
+  window.tx = tx;
+  window.registerI18n = register;
+  window.I18N = { t: t, tx: tx, set: setLang, get: getLang, apply: applyI18n, dict: DICT, mountSwitcher: injectSwitcher, register: register };
+  // A még i18n.js betöltése ELŐTT sorba állított szótárak feldolgozása.
+  if (window.__i18nQueue && window.__i18nQueue.length) { window.__i18nQueue.forEach(register); window.__i18nQueue = []; }
 
   function boot() {
     document.documentElement.setAttribute('lang', getLang());
