@@ -94,7 +94,7 @@ async function burnAndSaveDoc(){
   if(!dataUrl) return;
   gas('orderDocSaveSigned',[currentDocId,dataUrl]).then(r=>{
     if(r.ok){ toast(t('cs.savedToSystem'),'ok'); loadDocList(currentDocOrderId); closeSignModal(); }
-    else{ toast(r.err||'Mentési hiba','err'); }
+    else{ toast(r.err||t('cs.saveError'),'err'); }
   });
 }
 
@@ -200,7 +200,7 @@ function closeVehicleModal(){document.getElementById('vehicleModal').classList.r
 function createExtDriver(){
   const d={nume:document.getElementById('edNume').value.trim(),firma:document.getElementById('edFirma').value.trim(),telefon:document.getElementById('edTelefon').value.trim(),email:document.getElementById('edEmail').value.trim(),rendszam_camion:document.getElementById('edCamion').value.trim(),rendszam_remorca:document.getElementById('edRemorca').value.trim(),nota:document.getElementById('edNota').value.trim()};
   if(!d.nume&&!d.firma){toast(t('cs.driverOrCompanyReq'),'err');return;}
-  gas('extDriverCreate',[d]).then(r=>{if(r.ok){toast(t('cs.driverAdded'),'ok');['edNume','edFirma','edTelefon','edEmail','edCamion','edRemorca','edNota'].forEach(id=>{document.getElementById(id).value='';});loadExtDrivers();}else{toast(r.err||'Hiba történt','err');}});
+  gas('extDriverCreate',[d]).then(r=>{if(r.ok){toast(t('cs.driverAdded'),'ok');['edNume','edFirma','edTelefon','edEmail','edCamion','edRemorca','edNota'].forEach(id=>{document.getElementById(id).value='';});loadExtDrivers();}else{toast(r.err||t('common.error'),'err');}});
 }
 
 function createInv(){
@@ -429,10 +429,10 @@ function refreshDimReq(){
   });
 }
 // fuvarlista-badge: FTL = teljes áru (kék), LTL = részrakomány (sárga) + méret
-function loadTypeBadge(t, dims){
-  var d = dims ? ' <span class="badge" style="font-size:10px;padding:1px 6px;background:rgba(255,255,255,0.06);color:var(--text-muted);" title="Rakomány-méret (h×sz×m cm)">📐 '+dims+'</span>' : '';
-  if(t==='FTL')return ' <span class="badge info" title="Full Truck Load — teljes rakomány" style="font-size:10px;padding:1px 6px;">FTL</span>'+d;
-  if(t==='LTL')return ' <span class="badge warn" title="Less Than Truckload — részrakomány" style="font-size:10px;padding:1px 6px;">LTL</span>'+d;
+function loadTypeBadge(lt, dims){
+  var d = dims ? ' <span class="badge" style="font-size:10px;padding:1px 6px;background:rgba(255,255,255,0.06);color:var(--text-muted);" title="'+t('cs.tt.cargoSize')+'">📐 '+dims+'</span>' : '';
+  if(lt==='FTL')return ' <span class="badge info" title="'+t('cs.tt.ftl')+'" style="font-size:10px;padding:1px 6px;">FTL</span>'+d;
+  if(lt==='LTL')return ' <span class="badge warn" title="'+t('cs.tt.ltl')+'" style="font-size:10px;padding:1px 6px;">LTL</span>'+d;
   return d;
 }
 // h×sz×m cm string a méretekből (vagy üres)
@@ -643,7 +643,7 @@ function createOrder(){
       if(typeof resetRouteState==='function')resetRouteState('create');
       document.querySelectorAll('input[name="oSoferType"]').forEach(r=>{if(r.value==='None')r.checked=true;});
       onSoferTypeChange('None');
-    }else{toast((r&&r.err)||'Hiba történt','err');}
+    }else{toast((r&&r.err)||t('common.error'),'err');}
   });
 }
 
@@ -658,18 +658,18 @@ function createVehicle(tip){
     v.cargo_height_cm=(document.getElementById('ptCargoHei')||{}).value||null;
   }
   if(!v.rendszam){toast(t('cs.plateReq'),'err');return;}
-  gas('vehicleCreate',[v]).then(r=>{if(r.ok){toast((tip==='Vontato'?'Vontató':'Pótkocsi')+' hozzáadva!','ok');['Rendszam','Marca','Model','An','Nota'].forEach(f=>{document.getElementById(prefix+f).value='';});if(tip==='Potkocsi'&&typeof resetTrailerFormDefaults==='function')resetTrailerFormDefaults();loadVehicles();}else{toast(r.err||'Hiba történt','err');}});
+  gas('vehicleCreate',[v]).then(r=>{if(r.ok){toast((tip==='Vontato'?t('cs.vtractor'):t('cs.vtrailer'))+t('cs.added'),'ok');['Rendszam','Marca','Model','An','Nota'].forEach(f=>{document.getElementById(prefix+f).value='';});if(tip==='Potkocsi'&&typeof resetTrailerFormDefaults==='function')resetTrailerFormDefaults();loadVehicles();}else{toast(r.err||t('common.error'),'err');}});
 }
 
 function deleteExtDriver(id){
   const d=extDriverCache.find(x=>x.id===id);
   const nev=d?(d.nume||d.firma||'?'):'?';
-  if(!confirm('Biztosan törlöd: '+nev+'?'))return;
-  gas('extDriverDelete',[id]).then(r=>{if(r.ok){toast(t('common.deletedX'),'ok');loadExtDrivers();}else{toast(r.err||'Hiba történt','err');}});
+  if(!confirm(t('cs.cf.delConfirmName')+nev+'?'))return;
+  gas('extDriverDelete',[id]).then(r=>{if(r.ok){toast(t('common.deletedX'),'ok');loadExtDrivers();}else{toast(r.err||t('common.error'),'err');}});
 }
 
 function deleteLeg(legId) {
-  if (!confirm('Törlöd ezt a váltást?')) return;
+  if (!confirm(t('cs.cf.delLeg'))) return;
   gas('deleteOrderLeg', [legId]).then(function(r) {
     if (r && r.ok) {
       toast(t('common.deleted'),'ok');
@@ -683,8 +683,8 @@ function deleteLeg(legId) {
 function deleteVehicle(id){
   const v=vehicleCache.find(x=>x.id===id);
   const rendszam=v?v.rendszam:'?';
-  if(!confirm('Biztosan törlöd a(z) '+rendszam+' rendszámú járművet?'))return;
-  gas('vehicleDelete',[id]).then(r=>{if(r.ok){toast(t('common.deletedX'),'ok');loadVehicles();}else{toast(r.err||'Hiba történt','err');}});
+  if(!confirm(t('cs.cf.delVehicle',{plate:rendszam})))return;
+  gas('vehicleDelete',[id]).then(r=>{if(r.ok){toast(t('common.deletedX'),'ok');loadVehicles();}else{toast(r.err||t('common.error'),'err');}});
 }
 
 function dmRoomId(emailA,emailB){
@@ -793,7 +793,7 @@ function initFirebaseChatPanel(me){
     .then(function(cfg){
       if(!cfg||!cfg.apiKey){
         var el=document.getElementById('chatLoadMsg');
-        if(el)el.textContent='⚠️ Chat konfiguráció hiányzik. Állítsd be a Firebase env változókat!';
+        if(el)el.textContent=t('cs.chatMissing');
         return;
       }
       var s1=document.createElement('script');
@@ -829,7 +829,7 @@ function initFirebaseChatPanel(me){
     })
     .catch(function(){
       var el=document.getElementById('chatLoadMsg');
-      if(el)el.textContent='⚠️ Chat nem elérhető.';
+      if(el)el.textContent=t('cs.chatUnavail');
     });
 }
 
@@ -904,8 +904,8 @@ function loadInternalDrivers(){
       }).join('');
       var gpsBadge = myVeh
         ? (myVeh.has_gps
-            ? ' <span class="badge ok" title="A jármű GPS-re van kötve (CargoTrack)">🛰️ GPS</span>'
-            : ' <span class="badge warn" title="A jármű nincs GPS-re kötve — párosítsd az Integrációk fülön">'+t('cs.noGps')+'</span>')
+            ? ' <span class="badge ok" title="'+t('cs.tt.gpsLinked')+'">🛰️ GPS</span>'
+            : ' <span class="badge warn" title="'+t('cs.tt.gpsNotLinked')+'">'+t('cs.noGps')+'</span>')
         : '';
       // Alapértelmezett pótkocsi a hozzárendelt vontatóhoz (auto-párosítás
       // fuvar-kiíráskor) — csak ha a sofőrnek van vontatója.
@@ -917,7 +917,7 @@ function loadInternalDrivers(){
         }).join('');
         trailerSel = '<div style="margin-top:5px;">'
           +'<select class="select" style="max-width:230px;padding:6px 8px;font-size:12px;display:inline-block;" '
-          +'title="🚚 Alapértelmezett pótkocsi — fuvar-kiíráskor automatikusan kitöltődik (módosítható)" '
+          +'title="'+t('cs.tt.defaultTrailer')+'" '
           +'onchange="assignDefaultTrailerUi('+myVeh.id+', this.value)">'+topts+'</select></div>';
       }
       return '<tr>'
@@ -1012,7 +1012,7 @@ function cpInvite(){
   if(!email){ toast(t('cs.contactEmailReq'),'err'); return; }
   gas('clientPortalInvite',[{client_id:cid, email:email, nev:nev}]).then(function(r){
     if(r&&r.ok){
-      toast(r.emailed?'✉️ Meghívó elküldve e-mailben':'Meghívó létrehozva — másold ki a linket','ok');
+      toast(r.emailed?t('cs.inviteSentMail2'):t('cs.inviteCreated'),'ok');
       var lb=document.getElementById('cpInviteLink');
       if(lb) lb.innerHTML='<div class="glass-soft" style="padding:10px 12px;margin-bottom:12px;border:1px solid rgba(34,197,94,.4);font-size:12px;">'
         +(r.emailed?'✉️ A meghívót elküldtük e-mailben. ':'')+'Jelszó-beállító link (másolható): <br><code style="word-break:break-all;color:var(--text-primary);">'+esc(r.link)+'</code></div>';
@@ -1024,7 +1024,7 @@ function cpInvite(){
 function cpToggle(i){
   var it=(window._cpItems||[])[i]; if(!it) return;
   gas('clientPortalSetActive',[it.id, !it.activ]).then(function(r){
-    if(r&&r.ok){ toast(it.activ?'Letiltva':'Aktiválva','ok'); cpRefresh(); }
+    if(r&&r.ok){ toast(it.activ?t('cs.disabled2'):t('cs.activated'),'ok'); cpRefresh(); }
     else toast((r&&r.err)||'Hiba','err');
   });
 }
@@ -1054,7 +1054,7 @@ function estimateOrderToll(){
     if(r&&r.ok){
       var el=document.getElementById('oeToll'); if(el) el.value=(r.toll&&r.toll.total!=null?r.toll.total:'');
       renderTollBreak(r.toll);
-      toast(t('cs.tollEstimated')+(r.toll?r.toll.total:0)+' € (módosítható)','ok');
+      toast(t('cs.tollEstimated')+(r.toll?r.toll.total:0)+t('cs.tollModifiable'),'ok');
     } else toast((r&&r.err)||t('cs.toll.estError'),'err');
   });
 }
@@ -1148,7 +1148,7 @@ function loadCarriers(){
         +'<td style="text-align:right;color:'+(ob>0?'#ff6b75':'inherit')+';font-weight:700;">'+ob+' €</td>'
         +'<td style="white-space:nowrap;">'
         +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierEditUi('+i+')">'+t('cs.editShort')+'</button> '
-        +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierInvitePrompt('+c.id+')" title="Alvállalkozói portál meghívó">🔑</button> '
+        +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierInvitePrompt('+c.id+')" title="'+t('cs.tt.carrierInvite')+'">🔑</button> '
         +'<button class="btn danger" style="padding:4px 9px;font-size:12px;" onclick="carrierDeleteUi('+c.id+')">✕</button></td></tr>';
     }).join('');
     box.innerHTML='<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:4px;">'+t('cs.ca.title')+'</div>'
@@ -1262,11 +1262,11 @@ function carrierInvoiceSaveUi(){
   gas('carrierInvoiceSave',[p]).then(function(r){ if(r&&r.ok){ toast(t('cs.invoiceSaved'),'ok'); ['ciNum','ciAmount'].forEach(function(i){document.getElementById(i).value='';}); loadCarrierAp(); loadCarriers(); } else toast((r&&r.err)||'Hiba','err'); });
 }
 function carrierInvoicePayUi(id, rem){
-  var v=prompt('Fizetett összeg (üres = teljes hátralék '+rem+'):'); if(v===null) return;
+  var v=prompt(t('cs.cf.paidAmount')+rem+'):'); if(v===null) return;
   var arg = v.trim()===''?'full':v.trim();
-  gas('carrierInvoicePayment',[id, arg]).then(function(r){ if(r&&r.ok){ toast(t('cs.paymentSaved'),'ok'); loadCarrierAp(); loadCarriers(); } else toast((r&&r.err)||'Hiba','err'); });
+  gas('carrierInvoicePayment',[id, arg]).then(function(r){ if(r&&r.ok){ toast(t('cs.paymentSaved'),'ok'); loadCarrierAp(); loadCarriers(); } else toast((r&&r.err)||t('common.error'),'err'); });
 }
-function carrierInvoiceDeleteUi(id){ if(!confirm('Törlöd ezt a számlát?')) return; gas('carrierInvoiceDelete',[id]).then(function(r){ if(r&&r.ok){ toast(t('common.deleted'),'ok'); loadCarrierAp(); loadCarriers(); } }); }
+function carrierInvoiceDeleteUi(id){ if(!confirm(t('cs.cf.delInvoice'))) return; gas('carrierInvoiceDelete',[id]).then(function(r){ if(r&&r.ok){ toast(t('common.deleted'),'ok'); loadCarrierAp(); loadCarriers(); } }); }
 
 // ── Térkép-szolgáltató (geokódolás + autocomplete) — admin Integrációk ──
 function loadMapsProvider(){
@@ -1436,10 +1436,10 @@ function closeFuvEdit(){document.getElementById('fuvEditModal').classList.remove
 
 function openFuvEdit(id){
   gas('getFuvarlevelDetail',[id]).then(function(r){
-    if(!r||!r.ok){toast(r&&r.err||'Nem tölthető be','err');return;}
+    if(!r||!r.ok){toast(r&&r.err||t('cs.cannotLoad'),'err');return;}
     var f=r.fuv;
     document.getElementById('feId').value=f.id;
-    document.getElementById('feSeria').textContent=f.numar_fisa||'(nincs sorszám)';
+    document.getElementById('feSeria').textContent=f.numar_fisa||t('cs.noSerial');
     document.getElementById('feNumeSofer').value=f.nume_sofer||'';
     document.getElementById('feNumarFisa').value=f.numar_fisa||'';
     document.getElementById('feCamion').value=f.numar_camion||'';
@@ -1517,9 +1517,9 @@ function orderFormPairFromVehicle(){
   // pótkocsi auto-kitöltés a vontató alapértelmezett pótkocsijából (csak üres mezőbe)
   const remSel=document.getElementById('oRemorcaSelect');
   if(remSel&&!remSel.value&&v.default_trailer_id){
-    const t=remorcaCache.find(x=>String(x.id)===String(v.default_trailer_id));
-    if(t){const ropt=[...remSel.options].find(o=>o.value===t.rendszam);
-      if(ropt){remSel.value=t.rendszam;toast(t('cs.pairedTrailer')+t.rendszam+' (módosítható)','ok');}}
+    const tr=remorcaCache.find(x=>String(x.id)===String(v.default_trailer_id));
+    if(tr){const ropt=[...remSel.options].find(o=>o.value===tr.rendszam);
+      if(ropt){remSel.value=tr.rendszam;toast(t('cs.pairedTrailer')+tr.rendszam+t('cs.oe.modifiable'),'ok');}}
   }
   // sofőr auto-kitöltés a vontatóhoz rendelt belső sofőrből
   if(!v.assigned_driver_email)return;
@@ -1714,7 +1714,7 @@ function renderDocGroups() {
       var time = d.created_at ? new Date(d.created_at).toLocaleTimeString('hu-HU',{hour:'2-digit',minute:'2-digit'}) : '';
       html += '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px;">';
       html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;"><span class="badge '+bc+'">'+esc(d.tip||t('cs.other'))+'</span>'
-        +(d.order_id?'<span class="badge info" title="Fuvarhoz kötve">🔗 '+esc(d.order_id)+'</span>':'')
+        +(d.order_id?'<span class="badge info" title="'+t('cs.tt.linkedToOrder')+'">🔗 '+esc(d.order_id)+'</span>':'')
         +'<span style="font-size:11px;color:var(--muted);">'+time+'</span></div>';
       html += '<div style="font-size:12px;color:var(--soft);margin-bottom:10px;word-break:break-all;">'+esc(d.file_name||'—')+'</div>';
       html += '<div style="display:flex;gap:6px;">';
@@ -1764,7 +1764,7 @@ function saveExtDriver(){
   const id=parseInt(document.getElementById('edEditId').value,10);
   const fields={nume:document.getElementById('edEditNume').value.trim(),firma:document.getElementById('edEditFirma').value.trim(),telefon:document.getElementById('edEditTelefon').value.trim(),email:document.getElementById('edEditEmail').value.trim(),rendszam_camion:document.getElementById('edEditCamion').value.trim(),rendszam_remorca:document.getElementById('edEditRemorca').value.trim(),nota:document.getElementById('edEditNota').value.trim()};
   if(!fields.nume&&!fields.firma){toast(t('cs.driverOrCompanyReq'),'err');return;}
-  gas('extDriverUpdate',[id,fields]).then(r=>{if(r.ok){toast(t('common.saved'),'ok');closeExtDriverModal();loadExtDrivers();}else{toast(r.err||'Hiba történt','err');}});
+  gas('extDriverUpdate',[id,fields]).then(r=>{if(r.ok){toast(t('common.saved'),'ok');closeExtDriverModal();loadExtDrivers();}else{toast(r.err||t('common.error'),'err');}});
 }
 
 function saveQuickVehicle() {
@@ -1783,7 +1783,7 @@ function saveQuickVehicle() {
   }
   gas('vehicleCreate', [v]).then(r => {
     if (r.ok) {
-      toast((tip === 'Vontato' ? 'Vontató' : 'Pótkocsi') + ' hozzáadva!', 'ok');
+      toast((tip === 'Vontato' ? t('cs.vtractor') : t('cs.vtrailer')) + t('cs.added'), 'ok');
       closeQuickVehicle();
       // frissitjuk a dropdown-t es automatikusan kivalasztjuk az ujat
       gas('vehicleList').then(list => {
@@ -1814,7 +1814,7 @@ function saveQuickVehicle() {
         if (vehicleCache.length > 0) loadVehicles();
       });
     } else {
-      toast(r.err || 'Hiba történt', 'err');
+      toast(r.err || t('common.error'), 'err');
     }
   });
 }
@@ -1849,7 +1849,7 @@ function saveVehicle(){
     fields.cargo_height_cm=_vget('vehEditCargoHei');
   }
   if(!fields.rendszam){toast(t('cs.plateReq'),'err');return;}
-  gas('vehicleUpdate',[id,fields]).then(r=>{if(r.ok){toast(t('common.saved'),'ok');closeVehicleModal();loadVehicles();}else{toast(r.err||'Hiba történt','err');}});
+  gas('vehicleUpdate',[id,fields]).then(r=>{if(r.ok){toast(t('common.saved'),'ok');closeVehicleModal();loadVehicles();}else{toast(r.err||t('common.error'),'err');}});
 }
 
 function settings2faConfirm() {
@@ -1861,13 +1861,13 @@ function settings2faConfirm() {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ token: code })
   }).then(function(r){ return r.json(); }).then(function(d){
-    btn.disabled = false; btn.textContent = '✅ Megerősítés';
+    btn.disabled = false; btn.textContent = t('cs.confirm');
     if (d.success) {
       document.getElementById('modal2faSetup').classList.remove('open');
       toast(t('cs.2faOn'),'ok');
       loadSettingsPane();
     } else {
-      toast(d.message||'Helytelen kód','err');
+      toast(d.message||t('cs.wrongCode'),'err');
     }
   });
 }
@@ -1875,7 +1875,7 @@ function settings2faConfirm() {
 function settings2faDisable(){
   var pwd = document.getElementById('st2faDisablePwd').value;
   if(!pwd){ toast(t('cs.givePassword'),'err'); return; }
-  if(!confirm('Biztosan kikapcsolod a kétlépéses hitelesítést? Ez csökkenti a fiókod biztonságát.')) return;
+  if(!confirm(t('cs.cf.disable2fa'))) return;
   gas('settings2faDisable',[{currentPwd:pwd}]).then(function(r){
     if(r&&r.ok){
       toast(t('cs.2faOff'),'ok');
@@ -1932,7 +1932,7 @@ function settingsSaveProfile(){
       toast(t('cs.profileSaved'),'ok');
       document.getElementById('meBadge').textContent = nume;
     } else {
-      toast((r&&r.err)||'Hiba történt','err');
+      toast((r&&r.err)||t('common.error'),'err');
     }
   });
 }
@@ -1991,7 +1991,7 @@ function updateDocSeriesPreview() {
   var p = (document.getElementById('docSeriesPrefix')||{}).value||'MT';
   var y = new Date().getFullYear();
   var el = document.getElementById('docSeriesPreview');
-  if (el) el.textContent = 'Előnézet: '+p+'-'+y+'-0001 (új prefix esetén 1-től)';
+  if (el) el.textContent = t('cs.previewPrefix')+p+'-'+y+'-0001'+t('cs.seriesPreviewSuffix');
 }
 
 function updateOrderSelBar() {
@@ -2023,7 +2023,7 @@ function uploadOrderDoc(){
         loadDocList(currentDocOrderId);
         openSignModal(r.docId,'original');
       }else{
-        toast(r.err||'Feltöltési hiba','err');
+        toast(r.err||t('cs.uploadError'),'err');
       }
     });
   };
@@ -2257,14 +2257,14 @@ function decorateInvoiceIndicators(list){
       document.querySelectorAll('[data-inv-ind]').forEach(function(el){
         var s=sum[el.getAttribute('data-inv-ind')]; var btn=el.closest('button');
         if(!s||!s.invoiced){ el.textContent=''; el.title=''; return; }
-        if(s.stornoed){ el.textContent=' ↩️'; var t='Számla stornózva: '+(s.storno_serie||'')+'-'+(s.storno_numar||''); el.title=t; if(btn)btn.title=t; }
+        if(s.stornoed){ el.textContent=' ↩️'; var ttl=t('cs.invStornoed')+(s.storno_serie||'')+'-'+(s.storno_numar||''); el.title=ttl; if(btn)btn.title=ttl; }
         else {
           // e-Factura (ANAF SPV) státusz-jelzés a pipán: 📨 = beküldve/folyamatban
           var ef=(s.efactura||'').toLowerCase();
           var efSym = ef ? (/(valid|ok|accept)/.test(ef)?' 📨✓' : /(err|invalid|resp)/.test(ef)?' 📨✗' : ' 📨') : '';
           el.textContent=' ✅'+efSym;
-          var t2='Számlázva: '+(s.serie||'')+'-'+(s.numar||'')+(s.efactura?(' · e-Factura: '+s.efactura):'');
-          el.title=t2; if(btn)btn.title=t2;
+          var ttl2=t('cs.invInvoiced')+(s.serie||'')+'-'+(s.numar||'')+(s.efactura?(t('cs.invEfactura')+s.efactura):'');
+          el.title=ttl2; if(btn)btn.title=ttl2;
         }
       });
     }).catch(function(){});
@@ -2354,7 +2354,7 @@ async function buildSignedPdf(){
 
 function downloadDoc(docId,which){
   gas('orderDocGet',[docId,which]).then(r=>{
-    if(!r.ok||!r.base64){toast(r.err||'Letöltési hiba','err');return;}
+    if(!r.ok||!r.base64){toast(r.err||t('cs.downloadError'),'err');return;}
     let ext='.pdf';
     if(r.base64.indexOf('data:image/png')===0) ext='.png';
     else if(r.base64.indexOf('data:image/jpeg')===0) ext='.jpg';
@@ -2415,14 +2415,14 @@ function loadSettingsPane(){
     var enW   = document.getElementById('st2faEnableWrap');
     if(r && r.totp_enabled){
       dot.style.background   = 'var(--ok)';
-      label.textContent      = 'Aktív — fiókod védett';
-      desc.textContent       = 'A kétlépéses hitelesítés be van kapcsolva.';
+      label.textContent      = t('cs.2fa.activeProtected');
+      desc.textContent       = t('cs.2fa.onDesc');
       disW.style.display     = '';
       enW.style.display      = 'none';
     } else {
       dot.style.background   = 'var(--warn)';
-      label.textContent      = 'Nincs bekapcsolva';
-      desc.textContent       = 'Javasolt a 2FA aktiválása a fiókod védelméhez.';
+      label.textContent      = t('cs.2fa.notOn');
+      desc.textContent       = t('cs.2fa.suggest');
       disW.style.display     = 'none';
       enW.style.display      = '';
     }
@@ -2436,7 +2436,7 @@ function openSignModal(docId,which){
   placedItems.forEach(it=>{ if(it.el) it.el.remove(); });
   placedItems=[];
   pdfDocProxy=null; pdfRawBytes=null; signCurrentPage=1; signTotalPages=1;
-  document.getElementById('signPageInfo').textContent='betöltés...';
+  document.getElementById('signPageInfo').textContent=t('cs.loadingLower');
 
   document.getElementById('signStampImg').style.display='none';
   document.getElementById('signNoStamp').style.display='inline';
@@ -2485,7 +2485,7 @@ function openSignModal(docId,which){
   },300);
 
   gas('orderDocGet',[docId,which]).then(async r=>{
-    if(!r.ok||!r.base64){ toast(r.err||'PDF betöltési hiba','err'); return; }
+    if(!r.ok||!r.base64){ toast(r.err||t('cs.pdfLoadError'),'err'); return; }
     try{
       const b64 = r.base64.indexOf(',')>=0 ? r.base64.split(',')[1] : r.base64;
       const bin = atob(b64);
@@ -2654,7 +2654,7 @@ function renderFilteredOrders(list) {
 
     return '<tr><td><b>'+c.id+'</b></td><td>'+esc(c.client||'—')+'</td>'+
       '<td>'+routeCell+'</td>'+
-      '<td>'+(c.km||'—')+(c.route_km!=null&&c.route_km!==''?' <span class="badge info" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="Automata útvonal-km (térkép szerint) — összevetésre">🗺️ '+c.route_km+'</span>':'')+'</td><td>'+(c.pret||'—')+'</td>'+
+      '<td>'+(c.km||'—')+(c.route_km!=null&&c.route_km!==''?' <span class="badge info" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="'+t('cs.tt.autoRouteKm')+'">🗺️ '+c.route_km+'</span>':'')+'</td><td>'+(c.pret||'—')+'</td>'+
       '<td>'+soferCell+'</td><td>'+esc(c.rendszam_camion||'—')+'</td>'+
       '<td>'+statusSel+'</td>'+
       '<td style="display:flex;gap:4px;flex-wrap:wrap;">'+
@@ -3132,7 +3132,7 @@ function savePayment(){
   };
   gas('markOrderPayment',[_payOrderId,p]).then(function(r){
     if(r&&r.ok){
-      toast(r.payment_status==='paid'?'✅ Fuvar teljesen kifizetve!':'💰 Részfizetés rögzítve','ok');
+      toast(r.payment_status==='paid'?t('cs.fullyPaid'):t('cs.partialPaySaved'),'ok');
       closePaymentModal();
       _afterPaymentRefresh();
     } else toast((r&&r.err)||'Hiba','err');
@@ -3140,7 +3140,7 @@ function savePayment(){
 }
 
 function resetPayment(){
-  if(!confirm('Biztosan nullázod a rögzített fizetéseket ennél a fuvarnál?')) return;
+  if(!confirm(t('cs.cf.resetPay'))) return;
   gas('markOrderPayment',[_payOrderId,{reset:true}]).then(function(r){
     if(r&&r.ok){ toast(t('cs.payReset'),'ok'); closePaymentModal(); _afterPaymentRefresh(); }
     else toast((r&&r.err)||'Hiba','err');
@@ -3154,8 +3154,8 @@ function copyTrackingLink(orderId){
     var url=location.origin+'/t/'+r.token;
     function done(){ toast(t('cs.trackLinkCopied'),'ok'); }
     if(navigator.clipboard&&navigator.clipboard.writeText){
-      navigator.clipboard.writeText(url).then(done).catch(function(){ prompt('Másold ki a linket:',url); });
-    } else { prompt('Másold ki a linket:',url); }
+      navigator.clipboard.writeText(url).then(done).catch(function(){ prompt(t('cs.cf.copyLink'),url); });
+    } else { prompt(t('cs.cf.copyLink'),url); }
   });
 }
 
