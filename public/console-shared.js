@@ -1463,7 +1463,7 @@ function oeUpdateMargin(){
   var pret=parseFloat((document.getElementById('oePret')||{}).value)||0;
   var cost=parseFloat((document.getElementById('oeCarrierCost')||{}).value)||0;
   var el=document.getElementById('oeMargin'); if(!el) return;
-  if(cost>0){ var m=pret-cost; el.innerHTML='Árrés: <b style="color:'+(m>=0?'var(--status-ok)':'var(--status-danger)')+';">'+(m>=0?'+':'')+Math.round(m)+' €</b>'; }
+  if(cost>0){ var m=pret-cost; el.innerHTML=esc(T('cs.margin'))+'<b style="color:'+(m>=0?'var(--status-ok)':'var(--status-danger)')+';">'+(m>=0?'+':'')+Math.round(m)+' €</b>'; }
   else el.textContent='';
 }
 
@@ -3253,7 +3253,7 @@ function openOrderEdit(id) {
         document.getElementById('oeSoferType').value = 'Intern';
         oeToggleSoferType();
         sel.value = u.email;
-        toast(t('am.pairedDriver')+u.nume+' (módosítható)','ok');
+        toast(t('am.pairedDriver')+u.nume+T('cs.modifiable'),'ok');
       };
       sel.onchange = function(){
         if (!sel.value || camSel.value) return;
@@ -3261,7 +3261,7 @@ function openOrderEdit(id) {
         var v = _oeCamionCache.find(function(x){ return String(x.assigned_driver_email||'').toLowerCase() === email; });
         if (!v) return;
         camSel.value = v.rendszam;
-        toast(t('am.pairedVehicle')+v.rendszam+' (módosítható)','ok');
+        toast(t('am.pairedVehicle')+v.rendszam+T('cs.modifiable'),'ok');
       };
 
       if (o.sofer_type === 'Extern') {
@@ -3281,13 +3281,13 @@ function openOrderEdit(id) {
 function renderOeLegs(legs) {
   var el = document.getElementById('oeLegsList');
   if (!legs.length) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px;">Nincs rögzített váltás.</div>';
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px;">'+esc(T('cs.noSwap'))+'</div>';
     return;
   }
   el.innerHTML = legs.map(function(leg) {
     return '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;display:flex;justify-content:space-between;align-items:center;">'
       + '<div>'
-      + '<b style="color:#fff;">' + leg.leg_number + '. szakasz</b>'
+      + '<b style="color:#fff;">' + leg.leg_number + T('cs.legSection') + '</b>'
       + (leg.rendszam_camion ? ' &nbsp;🚛 ' + leg.rendszam_camion : '')
       + (leg.rendszam_remorca ? ' + ' + leg.rendszam_remorca : '')
       + (leg.nume_sofer ? ' &nbsp;👤 ' + leg.nume_sofer : '')
@@ -3470,7 +3470,7 @@ function savePayment(){
   };
   gas('markOrderPayment',[_payOrderId,p]).then(function(r){
     if(r&&r.ok){
-      toast(r.payment_status==='paid'?'✅ Fuvar teljesen kifizetve!':'💰 Részfizetés rögzítve','ok');
+      toast(r.payment_status==='paid'?T('cs.fullyPaid'):T('cs.partialRecorded'),'ok');
       closePaymentModal();
       _afterPaymentRefresh();
     } else toast((r&&r.err)||'Hiba','err');
@@ -3478,7 +3478,7 @@ function savePayment(){
 }
 
 function resetPayment(){
-  if(!confirm('Biztosan nullázod a rögzített fizetéseket ennél a fuvarnál?')) return;
+  if(!confirm(T('cs.confirmResetPay'))) return;
   gas('markOrderPayment',[_payOrderId,{reset:true}]).then(function(r){
     if(r&&r.ok){ toast(t('am.payReset'),'ok'); closePaymentModal(); _afterPaymentRefresh(); }
     else toast((r&&r.err)||'Hiba','err');
@@ -3488,12 +3488,12 @@ function resetPayment(){
 /* ── 🌍 Ügyfél tracking-link másolása (publikus /t/<token> oldal) ── */
 function copyTrackingLink(orderId){
   gas('getTrackingLink',[orderId]).then(function(r){
-    if(!r||!r.ok){ toast((r&&r.err)||'Hiba a link generálásánál','err'); return; }
+    if(!r||!r.ok){ toast((r&&r.err)||T('cs.linkGenErr'),'err'); return; }
     var url=location.origin+'/t/'+r.token;
     function done(){ toast(t('am.trackLinkCopied'),'ok'); }
     if(navigator.clipboard&&navigator.clipboard.writeText){
-      navigator.clipboard.writeText(url).then(done).catch(function(){ prompt('Másold ki a linket:',url); });
-    } else { prompt('Másold ki a linket:',url); }
+      navigator.clipboard.writeText(url).then(done).catch(function(){ prompt(T('cs.copyLink'),url); });
+    } else { prompt(T('cs.copyLink'),url); }
   });
 }
 
@@ -3519,36 +3519,36 @@ function ensureHandoverModal(){
   d.id='handoverModal'; d.className='modal-back';
   d.innerHTML=
     '<div class="modal glass" style="max-width:520px;">'+
-    '<h3 id="hoTitle">⛔ Áru leadása</h3>'+
+    '<h3 id="hoTitle">'+esc(T('cs.handoverGiveTitle'))+'</h3>'+
     '<div class="text-muted" id="hoSub" style="font-size:12.5px;margin-bottom:12px;"></div>'+
-    '<div class="field"><label>Mi történik az áruval? *</label>'+
+    '<div class="field"><label>'+esc(T('cs.whatHappens'))+'</label>'+
       '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:4px;">'+
-      '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;"><input type="radio" name="hoType" value="trailer" checked onchange="hoTypeChange()"> 🅿️ Pótkocsin parkol (megrakva)</label>'+
-      '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;"><input type="radio" name="hoType" value="warehouse" onchange="hoTypeChange()"> 📦 Raktárba kerül</label>'+
+      '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;"><input type="radio" name="hoType" value="trailer" checked onchange="hoTypeChange()"> '+esc(T('cs.parkTrailer'))+'</label>'+
+      '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;"><input type="radio" name="hoType" value="warehouse" onchange="hoTypeChange()"> '+esc(T('cs.goesWarehouse'))+'</label>'+
       '</div></div>'+
-    '<div class="field"><label>Hol van az áru? (helység) *</label><input class="input" id="hoLoc" placeholder="pl. Brașov"></div>'+
-    '<div class="field"><label>Változik a végső cél? (üresen marad a régi)</label><input class="input" id="hoNewDest" placeholder="pl. Constanța — csak ha módosul"></div>'+
+    '<div class="field"><label>'+esc(T('cs.whereCargo'))+'</label><input class="input" id="hoLoc" placeholder="pl. Brașov"></div>'+
+    '<div class="field"><label>'+esc(T('cs.destChanges'))+'</label><input class="input" id="hoNewDest" placeholder="'+esc(T('cs.destChangesPh'))+'"></div>'+
     '<div id="hoWhBlock" style="display:none;">'+
-      '<div class="text-muted" style="font-size:12px;font-weight:700;margin:6px 0 8px;">📦 Raktár-adatok (kötelező)</div>'+
+      '<div class="text-muted" style="font-size:12px;font-weight:700;margin:6px 0 8px;">'+esc(T('cs.whDataReq'))+'</div>'+
       '<div class="grid-2">'+
-      '<div class="field"><label>Darabszám *</label><input class="input" id="hoQty" type="number" min="1" placeholder="pl. 33"></div>'+
-      '<div class="field"><label>Egység *</label><select class="select" id="hoQtyUnit"><option value="paletta">Paletta</option><option value="doboz">Doboz</option><option value="egyeb">Egyéb</option></select></div>'+
+      '<div class="field"><label>'+esc(T('cs.qty'))+'</label><input class="input" id="hoQty" type="number" min="1" placeholder="pl. 33"></div>'+
+      '<div class="field"><label>'+esc(T('cs.unit'))+'</label><select class="select" id="hoQtyUnit"><option value="paletta">'+esc(T('cs.unitPallet'))+'</option><option value="doboz">'+esc(T('cs.unitBox'))+'</option><option value="egyeb">'+esc(T('cs.unitOther'))+'</option></select></div>'+
       '</div>'+
       '<div class="grid-3">'+
-      '<div class="field"><label>Hossz (cm) *</label><input class="input" id="hoLen" type="number" min="1" placeholder="pl. 800"></div>'+
-      '<div class="field"><label>Szélesség (cm) *</label><input class="input" id="hoWid" type="number" min="1" placeholder="pl. 248"></div>'+
-      '<div class="field"><label>Magasság (cm) *</label><input class="input" id="hoHei" type="number" min="1" placeholder="pl. 220"></div>'+
+      '<div class="field"><label>'+esc(T('cs.lengthCm'))+'</label><input class="input" id="hoLen" type="number" min="1" placeholder="pl. 800"></div>'+
+      '<div class="field"><label>'+esc(T('cs.widthCm'))+'</label><input class="input" id="hoWid" type="number" min="1" placeholder="pl. 248"></div>'+
+      '<div class="field"><label>'+esc(T('cs.heightCm'))+'</label><input class="input" id="hoHei" type="number" min="1" placeholder="pl. 220"></div>'+
       '</div>'+
       '<div class="grid-2">'+
-      '<div class="field"><label>Súly (kg) *</label><input class="input" id="hoWeight" type="number" min="1" step="0.01" placeholder="pl. 12500"></div>'+
-      '<div class="field"><label>Dokumentum lapszáma *</label><input class="input" id="hoDocPages" type="number" min="1" placeholder="pl. 10"></div>'+
+      '<div class="field"><label>'+esc(T('cs.weightKg'))+'</label><input class="input" id="hoWeight" type="number" min="1" step="0.01" placeholder="pl. 12500"></div>'+
+      '<div class="field"><label>'+esc(T('cs.docPages'))+'</label><input class="input" id="hoDocPages" type="number" min="1" placeholder="pl. 10"></div>'+
       '</div>'+
-      '<div class="text-muted" style="font-size:11.5px;margin-bottom:8px;">📷 Mentés után töltsd fel / fotózd le a dokumentumokat — amíg nincs feltöltve, a rendszer folyamatosan figyelmeztet.</div>'+
+      '<div class="text-muted" style="font-size:11.5px;margin-bottom:8px;">'+esc(T('cs.whUploadHint'))+'</div>'+
     '</div>'+
-    '<div class="field"><label>Megjegyzés</label><input class="input" id="hoNote" placeholder="opcionális"></div>'+
+    '<div class="field"><label>'+esc(T('cs.note'))+'</label><input class="input" id="hoNote" placeholder="'+esc(T('cs.optional'))+'"></div>'+
     '<div class="row" style="margin-top:14px;display:flex;gap:10px;">'+
-    '<button class="btn ghost col" onclick="closeHandoverModal()">Mégse</button>'+
-    '<button class="btn primary col" id="hoSubmitBtn" onclick="submitHandover()">⛔ Leadás mentése</button>'+
+    '<button class="btn ghost col" onclick="closeHandoverModal()">'+esc(T('cs.cancel'))+'</button>'+
+    '<button class="btn primary col" id="hoSubmitBtn" onclick="submitHandover()">'+esc(T('cs.saveHandover'))+'</button>'+
     '</div></div>';
   document.body.appendChild(d);
 }
@@ -3562,11 +3562,10 @@ function openHandoverModal(orderId, prefill, mode){
   ensureHandoverModal();
   _hoOrderId=orderId; _hoMode=mode||'direct';
   var p=prefill||{};
-  document.getElementById('hoTitle').textContent = _hoMode==='confirm' ? '✅ Sofőr-leadás visszaigazolása' : '⛔ Áru leadása';
-  document.getElementById('hoSub').textContent = 'Fuvar: '+orderId+
-    (_hoMode==='confirm' ? ' — a sofőr adatai előtöltve, javíthatod/kiegészítheted.' :
-     ' — a fuvar felrakója a leadás helye lesz, és kiosztásra vár.');
-  document.getElementById('hoSubmitBtn').textContent = _hoMode==='confirm' ? '✅ Visszaigazolás' : '⛔ Leadás mentése';
+  document.getElementById('hoTitle').textContent = _hoMode==='confirm' ? T('cs.handoverConfirmTitle') : T('cs.handoverGiveTitle');
+  document.getElementById('hoSub').textContent = T('cs.orderColon')+orderId+
+    (_hoMode==='confirm' ? T('cs.handoverConfirmSub') : T('cs.handoverDirectSub'));
+  document.getElementById('hoSubmitBtn').textContent = _hoMode==='confirm' ? T('cs.confirmHandover') : T('cs.saveHandover');
   document.querySelectorAll('input[name="hoType"]').forEach(function(r){ r.checked=(r.value===(p.type||'trailer')); });
   document.getElementById('hoLoc').value=p.location||'';
   document.getElementById('hoNewDest').value=p.new_dest||'';
@@ -3606,13 +3605,13 @@ function submitHandover(){
   var oid=_hoOrderId;
   gas(fn,[oid,data]).then(function(r){
     if(r&&r.ok){
-      toast(type==='trailer'?'🅿️ Áru leadva — pótkocsin parkol, kiosztásra vár.':'📦 Áru raktárba adva — kiosztásra vár.','ok');
+      toast(type==='trailer'?T('cs.cargoParked'):T('cs.cargoWarehoused'),'ok');
       closeHandoverModal();
       if(typeof loadOrders==='function')loadOrders();
       loadPendingHandovers();
       // Raktárnál azonnali felszólítás a dokumentum-feltöltésre
       if(type==='warehouse'&&typeof openDocModal==='function'){
-        setTimeout(function(){ toast('📷 Töltsd fel az áru dokumentumait most!','err'); openDocModal(oid); },400);
+        setTimeout(function(){ toast(T('cs.uploadDocsNow'),'err'); openDocModal(oid); },400);
       }
     } else toast((r&&r.err)||'Hiba','err');
   });
