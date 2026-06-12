@@ -1038,13 +1038,13 @@ function renderTollBreak(tg){
   if(!tg || !Array.isArray(tg.byCountry) || !tg.byCountry.length){ box.innerHTML=''; return; }
   var rows=tg.byCountry.map(function(c){
     return '<tr><td>'+(CC_FLAG[c.cc]||'')+' '+esc(c.name||c.cc)+'</td><td style="text-align:right;">'+c.km+' km</td>'
-      +'<td style="text-align:right;color:var(--muted);">'+(c.mode==='vignette'?'matrica':((c.eur_per_km!=null?c.eur_per_km:'')+' €/km'))+'</td>'
+      +'<td style="text-align:right;color:var(--muted);">'+(c.mode==='vignette'?t('cs.toll.vignette'):((c.eur_per_km!=null?c.eur_per_km:'')+' €/km'))+'</td>'
       +'<td style="text-align:right;font-weight:700;">'+c.cost+' €</td></tr>';
   }).join('');
   box.innerHTML='<div class="glass-soft" style="padding:10px 12px;border:1px solid rgba(245,158,11,.35);">'
-    +'<div class="text-muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px;">Országonkénti bontás (a tervezett útvonalból)'+(tg.pending?' · ⚠️ részleges (geokódolás-keret)':'')+'</div>'
+    +'<div class="text-muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px;">'+t('cs.toll.breakdown')+(tg.pending?t('cs.toll.partial'):'')+'</div>'
     +'<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-    +'<tbody>'+rows+'<tr><td style="font-weight:800;border-top:1px solid var(--border,rgba(255,255,255,.1));padding-top:6px;">Összesen</td><td colspan="2" style="border-top:1px solid var(--border,rgba(255,255,255,.1));"></td>'
+    +'<tbody>'+rows+'<tr><td style="font-weight:800;border-top:1px solid var(--border,rgba(255,255,255,.1));padding-top:6px;">'+t('cs.toll.total')+'</td><td colspan="2" style="border-top:1px solid var(--border,rgba(255,255,255,.1));"></td>'
     +'<td style="text-align:right;font-weight:800;color:#fbbf24;border-top:1px solid var(--border,rgba(255,255,255,.1));">'+(tg.total||0)+' €</td></tr></tbody></table></div>';
 }
 function estimateOrderToll(){
@@ -1055,7 +1055,7 @@ function estimateOrderToll(){
       var el=document.getElementById('oeToll'); if(el) el.value=(r.toll&&r.toll.total!=null?r.toll.total:'');
       renderTollBreak(r.toll);
       toast(t('cs.tollEstimated')+(r.toll?r.toll.total:0)+' € (módosítható)','ok');
-    } else toast((r&&r.err)||'Becslés hiba','err');
+    } else toast((r&&r.err)||t('cs.toll.estError'),'err');
   });
 }
 // ── Ráta-szerkesztő modal ──
@@ -1064,15 +1064,15 @@ function openTollRates(){
   document.getElementById('tollRatesModal').classList.add('open');
   gas('getTollRates').then(function(r){
     var body=document.getElementById('trBody'); if(!body) return;
-    if(!r||!r.ok){ body.innerHTML='<div class="text-muted" style="padding:14px;">Betöltési hiba.</div>'; return; }
+    if(!r||!r.ok){ body.innerHTML='<div class="text-muted" style="padding:14px;">'+t('common.loadError')+'</div>'; return; }
     window._trRates=r.rates||[];
     body.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr>'
-      +'<th style="text-align:left;padding:6px 8px;color:var(--muted);">Ország</th><th style="text-align:left;padding:6px 8px;color:var(--muted);">Típus</th>'
-      +'<th style="text-align:left;padding:6px 8px;color:var(--muted);">€/km</th><th style="text-align:left;padding:6px 8px;color:var(--muted);">matrica €</th></tr></thead><tbody>'
+      +'<th style="text-align:left;padding:6px 8px;color:var(--muted);">'+t('cs.toll.country')+'</th><th style="text-align:left;padding:6px 8px;color:var(--muted);">'+t('cs.toll.type')+'</th>'
+      +'<th style="text-align:left;padding:6px 8px;color:var(--muted);">€/km</th><th style="text-align:left;padding:6px 8px;color:var(--muted);">'+t('cs.toll.vignetteEur')+'</th></tr></thead><tbody>'
       +window._trRates.map(function(rt,i){
         return '<tr style="border-top:1px solid var(--border,rgba(255,255,255,.08));">'
-          +'<td style="padding:6px 8px;">'+(CC_FLAG[rt.cc]||'')+' '+esc(rt.name)+(rt.custom?' <span class="badge ok" style="font-size:9px;">egyedi</span>':'')+'</td>'
-          +'<td style="padding:6px 8px;"><select class="select" id="tr_mode_'+i+'" style="padding:5px 6px;font-size:12px;"><option value="perkm"'+(rt.mode==='perkm'?' selected':'')+'>km-alapú</option><option value="vignette"'+(rt.mode==='vignette'?' selected':'')+'>matrica</option></select></td>'
+          +'<td style="padding:6px 8px;">'+(CC_FLAG[rt.cc]||'')+' '+esc(rt.name)+(rt.custom?' <span class="badge ok" style="font-size:9px;">'+t('cs.toll.custom')+'</span>':'')+'</td>'
+          +'<td style="padding:6px 8px;"><select class="select" id="tr_mode_'+i+'" style="padding:5px 6px;font-size:12px;"><option value="perkm"'+(rt.mode==='perkm'?' selected':'')+'>'+t('cs.toll.perKm')+'</option><option value="vignette"'+(rt.mode==='vignette'?' selected':'')+'>'+t('cs.toll.vignette')+'</option></select></td>'
           +'<td style="padding:6px 8px;"><input class="input" id="tr_km_'+i+'" type="number" step="0.01" value="'+(rt.eur_per_km||0)+'" style="width:90px;padding:5px 7px;font-size:12px;"></td>'
           +'<td style="padding:6px 8px;"><input class="input" id="tr_vig_'+i+'" type="number" step="0.01" value="'+(rt.vignette_eur||0)+'" style="width:90px;padding:5px 7px;font-size:12px;"></td></tr>';
       }).join('')+'</tbody></table>';
@@ -1084,12 +1084,12 @@ function ensureTollRatesModal(){
   d.style.cssText='position:fixed;inset:0;z-index:5200;display:none;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;background:rgba(3,6,10,.72);';
   d.innerHTML='<div class="glass" style="width:min(680px,100%);background:var(--bg-panel-raised,#141c25);">'
     +'<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border,rgba(255,255,255,.08));">'
-    +'<b class="text-primary" style="font-size:15px;">🛣️ Útdíj-ráták (kamion, &gt;12 t)</b>'
+    +'<b class="text-primary" style="font-size:15px;">'+t('cs.toll.modalTitle')+'</b>'
     +'<button class="btn ghost" style="margin-left:auto;padding:5px 12px;" onclick="closeTollRates()">✕</button></div>'
-    +'<div style="padding:14px 18px;"><div class="text-muted" style="font-size:12px;margin-bottom:10px;">EU-alapértékekkel indul; itt cégre szabhatod. A „km-alapú" ország díja km×€/km, a „matrica" fix €/fuvar.</div>'
+    +'<div style="padding:14px 18px;"><div class="text-muted" style="font-size:12px;margin-bottom:10px;">'+t('cs.toll.modalHint')+'</div>'
     +'<div id="trBody"></div>'
-    +'<div style="margin-top:14px;display:flex;gap:8px;"><button class="btn primary" onclick="saveTollRatesUi()">Ráták mentése</button>'
-    +'<button class="btn ghost" onclick="closeTollRates()">Mégse</button></div></div></div>';
+    +'<div style="margin-top:14px;display:flex;gap:8px;"><button class="btn primary" onclick="saveTollRatesUi()">'+t('cs.toll.save')+'</button>'
+    +'<button class="btn ghost" onclick="closeTollRates()">'+t('common.cancel')+'</button></div></div></div>';
   d.addEventListener('mousedown',function(e){ if(e.target===d) closeTollRates(); });
   document.body.appendChild(d);
 }
@@ -1127,7 +1127,7 @@ function oeUpdateMargin(){
   var pret=parseFloat((document.getElementById('oePret')||{}).value)||0;
   var cost=parseFloat((document.getElementById('oeCarrierCost')||{}).value)||0;
   var el=document.getElementById('oeMargin'); if(!el) return;
-  if(cost>0){ var m=pret-cost; el.innerHTML='Árrés: <b style="color:'+(m>=0?'var(--status-ok)':'var(--status-danger)')+';">'+(m>=0?'+':'')+Math.round(m)+' €</b>'; }
+  if(cost>0){ var m=pret-cost; el.innerHTML=t('cs.ca.margin')+'<b style="color:'+(m>=0?'var(--status-ok)':'var(--status-danger)')+';">'+(m>=0?'+':'')+Math.round(m)+' €</b>'; }
   else el.textContent='';
 }
 
@@ -1140,33 +1140,33 @@ function loadCarriers(){
     var rows=items.map(function(c,i){
       var cmr='—';
       if(c.cmr_insurance_expiry){ var d=new Date(c.cmr_insurance_expiry); var days=Math.round((d-new Date())/86400000);
-        cmr = days<0 ? '<span class="badge err">lejárt</span>' : days<30 ? '<span class="badge warn">'+days+' nap</span>' : '<span class="badge ok">'+String(c.cmr_insurance_expiry).slice(0,7)+'</span>'; }
+        cmr = days<0 ? '<span class="badge err">'+t('cs.ca.expired')+'</span>' : days<30 ? '<span class="badge warn">'+days+t('cs.ca.days')+'</span>' : '<span class="badge ok">'+String(c.cmr_insurance_expiry).slice(0,7)+'</span>'; }
       var ob=Math.round(parseFloat(c.open_balance)||0);
       return '<tr style="'+(!c.aktiv?'opacity:.5;':'')+'">'
-        +'<td><b class="text-primary">'+esc(c.nev)+'</b>'+(c.portal_users?' <span class="badge ok" style="font-size:9px;">🔑 portál</span>':'')+'</td>'
-        +'<td>'+esc(c.cui||'—')+'</td><td>'+(c.payment_term_days||30)+' nap</td><td>'+cmr+'</td>'
+        +'<td><b class="text-primary">'+esc(c.nev)+'</b>'+(c.portal_users?' <span class="badge ok" style="font-size:9px;">'+t('cs.ca.portal')+'</span>':'')+'</td>'
+        +'<td>'+esc(c.cui||'—')+'</td><td>'+(c.payment_term_days||30)+t('cs.ca.days')+'</td><td>'+cmr+'</td>'
         +'<td style="text-align:right;color:'+(ob>0?'#ff6b75':'inherit')+';font-weight:700;">'+ob+' €</td>'
         +'<td style="white-space:nowrap;">'
-        +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierEditUi('+i+')">Szerk</button> '
+        +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierEditUi('+i+')">'+t('cs.editShort')+'</button> '
         +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierInvitePrompt('+c.id+')" title="Alvállalkozói portál meghívó">🔑</button> '
         +'<button class="btn danger" style="padding:4px 9px;font-size:12px;" onclick="carrierDeleteUi('+c.id+')">✕</button></td></tr>';
     }).join('');
-    box.innerHTML='<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:4px;">🚚 Alvállalkozók</div>'
-      +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">Külsős fuvarozó-cégek törzse — fizetési határidő, CMR-biztosítás, nyitott tartozás. A 🔑 gombbal portál-hozzáférést adsz nekik.</div>'
+    box.innerHTML='<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:4px;">'+t('cs.ca.title')+'</div>'
+      +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">'+t('cs.ca.hint')+'</div>'
       +'<div class="grid-3" style="margin-bottom:12px;">'
-      +'<div class="field"><label>Cégnév *</label><input class="input" id="caNev"></div>'
-      +'<div class="field"><label>CUI / adószám</label><input class="input" id="caCui"></div>'
-      +'<div class="field"><label>E-mail</label><input class="input" id="caEmail"></div>'
-      +'<div class="field"><label>Telefon</label><input class="input" id="caTel"></div>'
-      +'<div class="field"><label>Fizetési határidő (nap)</label><input class="input" id="caTerm" type="number" value="30"></div>'
-      +'<div class="field"><label>CMR-biztosítás lejár</label><input class="input" id="caCmr" type="date"></div>'
+      +'<div class="field"><label>'+t('cs.ca.companyName')+'</label><input class="input" id="caNev"></div>'
+      +'<div class="field"><label>'+t('cs.ca.cui')+'</label><input class="input" id="caCui"></div>'
+      +'<div class="field"><label>'+t('common.email')+'</label><input class="input" id="caEmail"></div>'
+      +'<div class="field"><label>'+t('form.phone')+'</label><input class="input" id="caTel"></div>'
+      +'<div class="field"><label>'+t('cs.ca.payTerm')+'</label><input class="input" id="caTerm" type="number" value="30"></div>'
+      +'<div class="field"><label>'+t('cs.ca.cmrExpiry')+'</label><input class="input" id="caCmr" type="date"></div>'
       +'<div class="field"><label>IBAN</label><input class="input" id="caIban"></div>'
-      +'<div class="field" style="grid-column:span 2;"><label>Megjegyzés</label><input class="input" id="caNota"></div>'
+      +'<div class="field" style="grid-column:span 2;"><label>'+t('fld.note')+'</label><input class="input" id="caNota"></div>'
       +'</div>'
-      +'<input type="hidden" id="caId"><button class="btn primary" onclick="carrierSaveUi()">＋ Alvállalkozó mentése</button> <button class="btn ghost" onclick="carrierFormReset()">Új/üres</button>'
+      +'<input type="hidden" id="caId"><button class="btn primary" onclick="carrierSaveUi()">'+t('cs.ca.saveBtn')+'</button> <button class="btn ghost" onclick="carrierFormReset()">'+t('cs.ca.newEmpty')+'</button>'
       +'<div id="carrierInviteLink" style="margin-top:12px;"></div>'
-      +'<table class="table" style="margin-top:16px;"><thead><tr><th>Cég</th><th>CUI</th><th>Fiz.hat.</th><th>CMR-bizt.</th><th style="text-align:right;">Nyitott tartozás</th><th>Művelet</th></tr></thead>'
-      +'<tbody>'+(rows||'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px;">Nincs alvállalkozó.</td></tr>')+'</tbody></table></div>';
+      +'<table class="table" style="margin-top:16px;"><thead><tr><th>'+t('cs.ca.colCompany')+'</th><th>CUI</th><th>'+t('cs.ca.colPayTerm')+'</th><th>'+t('cs.ca.colCmr')+'</th><th style="text-align:right;">'+t('cs.ca.colOpenDebt')+'</th><th>'+t('col.action')+'</th></tr></thead>'
+      +'<tbody>'+(rows||'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px;">'+t('cs.ca.none')+'</td></tr>')+'</tbody></table></div>';
   });
 }
 function carrierFormReset(){ ['caNev','caCui','caEmail','caTel','caIban','caNota'].forEach(function(i){var e=document.getElementById(i);if(e)e.value='';}); var t=document.getElementById('caTerm');if(t)t.value='30'; var c=document.getElementById('caCmr');if(c)c.value=''; var id=document.getElementById('caId');if(id)id.value=''; }
@@ -1186,20 +1186,20 @@ function carrierSaveUi(){
     cmr_insurance_expiry:document.getElementById('caCmr').value||null, iban:document.getElementById('caIban').value.trim(),
     nota:document.getElementById('caNota').value.trim() };
   if(!p.nev){ toast(t('cs.companyNameReq'),'err'); return; }
-  gas('carrierSave',[p]).then(function(r){ if(r&&r.ok){ toast(t('cs.carrierSaved'),'ok'); carrierFormReset(); loadCarriers(); loadCarrierAp(); } else toast((r&&r.err)||'Hiba','err'); });
+  gas('carrierSave',[p]).then(function(r){ if(r&&r.ok){ toast(t('cs.carrierSaved'),'ok'); carrierFormReset(); loadCarriers(); loadCarrierAp(); } else toast((r&&r.err)||t('common.error'),'err'); });
 }
 function carrierDeleteUi(id){
-  if(!confirm('Biztosan törlöd ezt az alvállalkozót?')) return;
-  gas('carrierDelete',[id]).then(function(r){ if(r&&r.ok){ toast(t('common.deleted'),'ok'); loadCarriers(); } else toast((r&&r.err)||'Nem törölhető','err'); });
+  if(!confirm(t('cs.ca.delConfirm'))) return;
+  gas('carrierDelete',[id]).then(function(r){ if(r&&r.ok){ toast(t('common.deleted'),'ok'); loadCarriers(); } else toast((r&&r.err)||t('cs.ca.notDeletable'),'err'); });
 }
 function carrierInvitePrompt(carrierId){
-  var email=prompt('Az alvállalkozó kapcsolattartójának e-mail címe (portál-meghívó):'); if(!email) return;
+  var email=prompt(t('cs.ca.invitePrompt')); if(!email) return;
   gas('carrierPortalInvite',[{carrier_id:carrierId, email:email.trim()}]).then(function(r){
-    if(r&&r.ok){ toast(r.emailed?'✉️ Portál-meghívó elküldve':'Meghívó kész — másold a linket','ok');
+    if(r&&r.ok){ toast(r.emailed?t('cs.ca.inviteSentMail'):t('cs.ca.inviteCopy'),'ok');
       var lb=document.getElementById('carrierInviteLink');
-      if(lb) lb.innerHTML='<div class="glass-soft" style="padding:10px 12px;border:1px solid rgba(34,197,94,.4);font-size:12px;">'+(r.emailed?'✉️ Elküldve e-mailben. ':'')+'Jelszó-beállító link: <br><code style="word-break:break-all;color:var(--text-primary);">'+esc(r.link)+'</code></div>';
+      if(lb) lb.innerHTML='<div class="glass-soft" style="padding:10px 12px;border:1px solid rgba(34,197,94,.4);font-size:12px;">'+(r.emailed?t('cs.ca.sentByMail'):'')+t('cs.ca.pwLink')+'<br><code style="word-break:break-all;color:var(--text-primary);">'+esc(r.link)+'</code></div>';
       loadCarriers();
-    } else toast((r&&r.err)||'Hiba','err');
+    } else toast((r&&r.err)||t('common.error'),'err');
   });
 }
 
@@ -1213,31 +1213,31 @@ function loadCarrierAp(){
       var rem=Math.round((parseFloat(it.amount)||0)-(parseFloat(it.paid_amount)||0));
       var due='—', dueCls='';
       if(it.due_date){ var days=Math.round((new Date(it.due_date)-new Date())/86400000);
-        due = days<0?('<span class="badge err">lejárt '+(-days)+' nap</span>'):days<=7?('<span class="badge warn">'+days+' nap</span>'):String(it.due_date).slice(0,10); }
-      var stB = it.status==='paid'?'<span class="badge ok">Fizetve</span>':it.status==='partial'?'<span class="badge warn">Részben ('+Math.round(it.paid_amount)+')</span>':'<span class="badge err">Fizetendő</span>';
+        due = days<0?('<span class="badge err">'+t('cs.ap.expiredDays',{n:(-days)})+'</span>'):days<=7?('<span class="badge warn">'+days+t('cs.ca.days')+'</span>'):String(it.due_date).slice(0,10); }
+      var stB = it.status==='paid'?'<span class="badge ok">'+t('pay.paid')+'</span>':it.status==='partial'?'<span class="badge warn">'+t('cs.ap.partialAmt',{n:Math.round(it.paid_amount)})+'</span>':'<span class="badge err">'+t('cs.ap.toPay')+'</span>';
       var orderIds=(function(){ try{ return Array.isArray(it.order_ids)?it.order_ids:JSON.parse(it.order_ids||'[]'); }catch(e){ return []; } })();
       return '<tr><td>'+esc(it.carrier_nev||'')+'</td><td>'+esc(it.invoice_number||'—')+'</td>'
         +'<td style="font-size:11px;color:var(--muted);">'+esc(orderIds.join(', ')||'—')+'</td>'
         +'<td style="text-align:right;">'+Math.round(it.amount)+' '+esc(it.currency||'EUR')+'</td><td>'+due+'</td><td>'+stB+'</td>'
-        +'<td style="white-space:nowrap;">'+(it.status!=='paid'?'<button class="btn ok" style="padding:4px 9px;font-size:12px;" onclick="carrierInvoicePayUi('+it.id+','+rem+')">Fizetve</button> ':'')
+        +'<td style="white-space:nowrap;">'+(it.status!=='paid'?'<button class="btn ok" style="padding:4px 9px;font-size:12px;" onclick="carrierInvoicePayUi('+it.id+','+rem+')">'+t('cs.ap.payBtn')+'</button> ':'')
         +'<button class="btn danger" style="padding:4px 9px;font-size:12px;" onclick="carrierInvoiceDeleteUi('+it.id+')">✕</button></td></tr>';
     }).join('');
-    box.innerHTML='<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:10px;">💸 Szállítói számlák / Tartozások (AP)</div>'
+    box.innerHTML='<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:10px;">'+t('cs.ap.title')+'</div>'
       +'<div class="dash-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;">'
-      +apTile('Nyitott összesen', Math.round(s.open_total||0)+' €', '#ff6b75')+apTile('Esedékes 7 napon belül', Math.round(s.due_soon||0)+' €', '#fbbf24')
-      +apTile('Lejárt', Math.round(s.overdue||0)+' €', (s.overdue>0?'#ff6b75':''))+apTile('Nyitott számla', (s.open_cnt||0)+' db','')+'</div>'
+      +apTile(t('cs.ap.openTotal'), Math.round(s.open_total||0)+' €', '#ff6b75')+apTile(t('cs.ap.dueSoon'), Math.round(s.due_soon||0)+' €', '#fbbf24')
+      +apTile(t('cs.ap.overdue'), Math.round(s.overdue||0)+' €', (s.overdue>0?'#ff6b75':''))+apTile(t('cs.ap.openInvoices'), (s.open_cnt||0)+t('cs.ap.pcs'),'')+'</div>'
       +'<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:10px;">'
-      +'<div class="field" style="margin:0;min-width:170px;"><label>Alvállalkozó</label><select class="select" id="ciCarrier" onchange="apLoadOrders()"><option value="">—</option></select></div>'
-      +'<div class="field" style="margin:0;"><label>Számlaszám</label><input class="input" id="ciNum" style="max-width:140px;"></div>'
-      +'<div class="field" style="margin:0;"><label>Kelt</label><input class="input" id="ciIssue" type="date" style="max-width:150px;"></div>'
-      +'<div class="field" style="margin:0;"><label>Fiz. határidő</label><input class="input" id="ciDue" type="date" style="max-width:150px;"></div>'
-      +'<div class="field" style="margin:0;"><label>Összeg</label><input class="input" id="ciAmount" type="number" style="max-width:110px;"></div>'
-      +'<div class="field" style="margin:0;"><label>Pénznem</label><select class="select" id="ciCurr" style="max-width:90px;"><option>EUR</option><option>RON</option><option>HUF</option><option>PLN</option></select></div>'
-      +'<button class="btn primary" style="height:42px;" onclick="carrierInvoiceSaveUi()">Számla rögzítése</button>'
+      +'<div class="field" style="margin:0;min-width:170px;"><label>'+t('cs.ap.carrier')+'</label><select class="select" id="ciCarrier" onchange="apLoadOrders()"><option value="">—</option></select></div>'
+      +'<div class="field" style="margin:0;"><label>'+t('cs.ap.invNum')+'</label><input class="input" id="ciNum" style="max-width:140px;"></div>'
+      +'<div class="field" style="margin:0;"><label>'+t('cs.ap.issueDate')+'</label><input class="input" id="ciIssue" type="date" style="max-width:150px;"></div>'
+      +'<div class="field" style="margin:0;"><label>'+t('cs.ap.dueDate')+'</label><input class="input" id="ciDue" type="date" style="max-width:150px;"></div>'
+      +'<div class="field" style="margin:0;"><label>'+t('cs.ap.amount')+'</label><input class="input" id="ciAmount" type="number" style="max-width:110px;"></div>'
+      +'<div class="field" style="margin:0;"><label>'+t('cs.ap.currency')+'</label><select class="select" id="ciCurr" style="max-width:90px;"><option>EUR</option><option>RON</option><option>HUF</option><option>PLN</option></select></div>'
+      +'<button class="btn primary" style="height:42px;" onclick="carrierInvoiceSaveUi()">'+t('cs.ap.saveInvoice')+'</button>'
       +'</div>'
-      +'<div class="field" id="ciOrdersWrap" style="display:none;"><label>Mely fuvar(ok)hoz (Extern)</label><select class="select" id="ciOrders" multiple size="3" style="height:auto;"></select></div>'
-      +'<table class="table" style="margin-top:12px;"><thead><tr><th>Alvállalkozó</th><th>Számla</th><th>Fuvar(ok)</th><th style="text-align:right;">Összeg</th><th>Esedékes</th><th>Állapot</th><th>Művelet</th></tr></thead>'
-      +'<tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px;">Nincs szállítói számla.</td></tr>')+'</tbody></table></div>';
+      +'<div class="field" id="ciOrdersWrap" style="display:none;"><label>'+t('cs.ap.whichOrders')+'</label><select class="select" id="ciOrders" multiple size="3" style="height:auto;"></select></div>'
+      +'<table class="table" style="margin-top:12px;"><thead><tr><th>'+t('cs.ap.carrier')+'</th><th>'+t('cs.ap.colInvoice')+'</th><th>'+t('cs.ap.colOrders')+'</th><th style="text-align:right;">'+t('cs.ap.amount')+'</th><th>'+t('cs.ap.colDue')+'</th><th>'+t('cs.ap.colState')+'</th><th>'+t('col.action')+'</th></tr></thead>'
+      +'<tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px;">'+t('cs.ap.none')+'</td></tr>')+'</tbody></table></div>';
     ensureCarriers(function(){ fillCarrierSelect('ciCarrier',''); });
   });
 }
