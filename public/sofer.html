@@ -12,6 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css?v=20260611">
+  <script src="/i18n.js?v=20260612"></script>
   <link rel="stylesheet" href="/sofer.css?v=20260611">
   <script src="/push-client.js?v=20260611"></script>
   <script src="/session-guard.js?v=20260611"></script>
@@ -43,19 +44,19 @@
 
     <div class="sofer-nav-grid">
       <div class="sofer-nav-card" onclick="goSec('border')">
-        <span class="nav-icon">🚛</span><span class="nav-label">Határátlépés</span>
+        <span class="nav-icon">🚛</span><span class="nav-label" data-i18n="sofer.navBorder">Határátlépés</span>
       </div>
       <div class="sofer-nav-card" onclick="goSec('fuvar')">
-        <span class="nav-icon">📄</span><span class="nav-label">Menetlevél</span>
+        <span class="nav-icon">📄</span><span class="nav-label" data-i18n="sofer.navWaybill">Menetlevél</span>
       </div>
       <div class="sofer-nav-card" onclick="goSec('docs')">
-        <span class="nav-icon">📁</span><span class="nav-label">Iratok / CMR</span>
+        <span class="nav-icon">📁</span><span class="nav-label" data-i18n="sofer.navDocs">Iratok / CMR</span>
       </div>
       <div class="sofer-nav-card" onclick="goSec('chat')">
-        <span class="nav-icon">💬</span><span class="nav-label">Chat</span>
+        <span class="nav-icon">💬</span><span class="nav-label" data-i18n="sofer.navChat">Chat</span>
       </div>
       <div class="sofer-nav-card logout" onclick="logoutSofer()">
-        <span class="nav-icon">🚪</span><span class="nav-label">Kilépés</span>
+        <span class="nav-icon">🚪</span><span class="nav-label" data-i18n="common.logout">Kilépés</span>
       </div>
     </div>
   </div>
