@@ -498,6 +498,13 @@
     'cs.pr.legend': { hu: 'ℹ️ Kék háttérrel: utólag hozzáadott váltások (order_legs) — sofőrcsere, átvételi hely, jármű adatokkal.', ro: 'ℹ️ Pe fond albastru: schimbări adăugate ulterior (order_legs) — schimbare șofer, loc preluare, date vehicul.' },
     'cs.pr.footer': { hu: 'VallorSoft fuvarmenedzsment · Generálva: ', ro: 'VallorSoft management transport · Generat: ' },
 
+    // Fuvar-szerkesztő modal (dinamikus részek)
+    'cs.oe.importExtra': { hu: '📋 Importált extra adatok ', ro: '📋 Date extra importate ' },
+    'cs.oe.importExtraSub': { hu: '(CSV-ből, nem párosított oszlopok)', ro: '(din CSV, coloane nepotrivite)' },
+    'cs.oe.modifiable': { hu: ' (módosítható)', ro: ' (modificabil)' },
+    'cs.oe.noLeg': { hu: 'Nincs rögzített váltás.', ro: 'Nicio schimbare înregistrată.' },
+    'cs.oe.legSection': { hu: '. szakasz', ro: '. segment' },
+
     // ── console-shared.js toast-üzenetek ──
     'cs.pdfFirst': { hu: 'Előbb töltsd be a PDF-et!', ro: 'Încarcă mai întâi PDF-ul!' },
     'cs.noStamp': { hu: 'Nincs mentett pecsét!', ro: 'Nu există ștampilă salvată!' },

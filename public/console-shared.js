@@ -2844,7 +2844,7 @@ function openOrderEdit(id) {
         var ie=o.import_extra; if(typeof ie==='string'){ try{ ie=JSON.parse(ie); }catch(e){ ie=null; } }
         if(ie && typeof ie==='object' && Object.keys(ie).length){
           oeIe.innerHTML='<div class="glass-soft" style="padding:10px 12px;border:1px solid rgba(59,130,246,0.35);">'
-            +'<div class="text-primary" style="font-size:12px;font-weight:700;margin-bottom:6px;">📋 Importált extra adatok <span class="text-muted" style="font-weight:400;">(CSV-ből, nem párosított oszlopok)</span></div>'
+            +'<div class="text-primary" style="font-size:12px;font-weight:700;margin-bottom:6px;">'+t('cs.oe.importExtra')+'<span class="text-muted" style="font-weight:400;">'+t('cs.oe.importExtraSub')+'</span></div>'
             +'<div style="display:flex;flex-wrap:wrap;gap:6px;">'
             +Object.keys(ie).map(function(k){ return '<span class="badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted);font-size:11px;">'+esc(k)+': <b class="text-primary">'+esc(String(ie[k]))+'</b></span>'; }).join('')
             +'</div></div>';
@@ -2887,7 +2887,7 @@ function openOrderEdit(id) {
       var users = results[0] || [];
       _oeSoferCache = users.filter(u => u.pozicio === 'Sofer');
       var sel = document.getElementById('oeEmailSofer');
-      sel.innerHTML = '<option value="">— Válassz —</option>' +
+      sel.innerHTML = '<option value="">'+t('edit.choose')+'</option>' +
         _oeSoferCache.map(u => '<option value="'+esc(u.email)+'"'+(u.email===o.email_sofer?' selected':'')+'>'+esc(u.nume)+' ('+esc(u.email)+')</option>').join('');
 
       // Jármű dropdown
@@ -2895,10 +2895,10 @@ function openOrderEdit(id) {
       _oeCamionCache = vehicles.filter(v => v.tip === 'Vontato');
       _oeRemorcaCache = vehicles.filter(v => v.tip === 'Potkocsi');
       var camSel = document.getElementById('oeCamion');
-      camSel.innerHTML = '<option value="">— Nincs —</option>' +
+      camSel.innerHTML = '<option value="">'+t('edit.noneDash')+'</option>' +
         _oeCamionCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_camion?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
       var remSel = document.getElementById('oeRemorca');
-      remSel.innerHTML = '<option value="">— Nincs —</option>' +
+      remSel.innerHTML = '<option value="">'+t('edit.noneDash')+'</option>' +
         _oeRemorcaCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_remorca?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
 
       // Auto-párosítás a szerkesztőben (vehicles.assigned_driver_email):
@@ -2915,7 +2915,7 @@ function openOrderEdit(id) {
         document.getElementById('oeSoferType').value = 'Intern';
         oeToggleSoferType();
         sel.value = u.email;
-        toast(t('cs.pairedDriver')+u.nume+' (módosítható)','ok');
+        toast(t('cs.pairedDriver')+u.nume+t('cs.oe.modifiable'),'ok');
       };
       sel.onchange = function(){
         if (!sel.value || camSel.value) return;
@@ -2923,7 +2923,7 @@ function openOrderEdit(id) {
         var v = _oeCamionCache.find(function(x){ return String(x.assigned_driver_email||'').toLowerCase() === email; });
         if (!v) return;
         camSel.value = v.rendszam;
-        toast(t('cs.pairedVehicle')+v.rendszam+' (módosítható)','ok');
+        toast(t('cs.pairedVehicle')+v.rendszam+t('cs.oe.modifiable'),'ok');
       };
 
       if (o.sofer_type === 'Extern') {
@@ -2943,13 +2943,13 @@ function openOrderEdit(id) {
 function renderOeLegs(legs) {
   var el = document.getElementById('oeLegsList');
   if (!legs.length) {
-    el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px;">Nincs rögzített váltás.</div>';
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px;">'+t('cs.oe.noLeg')+'</div>';
     return;
   }
   el.innerHTML = legs.map(function(leg) {
     return '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;display:flex;justify-content:space-between;align-items:center;">'
       + '<div>'
-      + '<b style="color:#fff;">' + leg.leg_number + '. szakasz</b>'
+      + '<b style="color:#fff;">' + leg.leg_number + t('cs.oe.legSection') + '</b>'
       + (leg.rendszam_camion ? ' &nbsp;🚛 ' + leg.rendszam_camion : '')
       + (leg.rendszam_remorca ? ' + ' + leg.rendszam_remorca : '')
       + (leg.nume_sofer ? ' &nbsp;👤 ' + leg.nume_sofer : '')
