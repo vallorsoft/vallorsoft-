@@ -173,6 +173,10 @@
       <div class="glass" style="padding:22px;">
         <h2 class="h-title">Új fuvarfeladat kiírása</h2>
         <h2 class="h-title">Új fuvarfeladat</h2>
+        <div id="ordersImportBtnBox" style="margin:-6px 0 14px;">
+          <button class="btn ok" onclick="openOrderImport()" style="padding:8px 14px;font-size:13px;">📥 CSV import — több fuvar egyszerre</button>
+          <span class="text-muted" style="font-size:11px;margin-left:8px;">pl. gyári fuvarlista (.csv) — oszlop-párosítással</span>
+        </div>
         <div class="grid-3">
           <div class="field"><label>Ügyfél / Client</label><input class="input" id="oClient" placeholder="pl. Vallor Logistics">
             <div style="margin-top:6px;"><div id="clientPickerBox"></div><input type="hidden" id="orderClientId" name="client_id"></div>
@@ -857,6 +861,7 @@
 <div class="modal-back" id="orderEditModal">
   <div class="modal glass" style="width:min(700px,100%);max-height:92vh;overflow-y:auto;">
     <h3>✏️ Fuvar szerkesztése — <span id="oeModalId" style="color:var(--muted);font-size:14px;font-weight:400;"></span></h3>
+    <div id="oeImportExtra" style="margin:8px 0;"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
       <div class="field"><label>Ügyfél</label><input class="input" id="oeClient"></div>
       <div class="field"><label>Referencia</label><input class="input" id="oeRef"></div>

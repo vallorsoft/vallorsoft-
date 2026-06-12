@@ -7,6 +7,7 @@ window.VS_FEATURES = [
   { key: 'dash',             label: 'Vezérlőpult',                 group: 'Áttekintés' },
   { key: 'orders-form',      label: 'Fuvar kiírás',                group: 'Fuvarozás & Logisztika' },
   { key: 'orders-list',      label: 'Fuvar kezelés',               group: 'Fuvarozás & Logisztika' },
+  { key: 'orders-import',    label: 'Fuvar CSV-import (📥)',        group: 'Fuvarozás & Logisztika' },
   { key: 'inbound',          label: 'Beérkező megrendelések',      group: 'Fuvarozás & Logisztika' },
   { key: 'orders-planner',   label: 'Tervezőtábla (diszpécser)',   group: 'Fuvarozás & Logisztika' },
   { key: 'received-fuv',     label: 'Fuvarlevelek',                group: 'Fuvarozás & Logisztika' },

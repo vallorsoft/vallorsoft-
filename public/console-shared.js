@@ -14,6 +14,9 @@ function applyFeatureFlags(){
     var feats = r.features||{};
     window._vsFeatures = feats;   // nem-menü funkciók (pl. tracking gomb) ellenőrzéséhez
     if(typeof initOrderMapFeature==='function') initOrderMapFeature();   // térképes km/előnézet (opt-in)
+    // Fuvar CSV-import gomb elrejtése, ha a developer kikapcsolta (alapból be)
+    var _impBtn=document.getElementById('ordersImportBtnBox');
+    if(_impBtn) _impBtn.style.display = (feats['orders-import']===false) ? 'none' : '';
     var cat = window.VS_FEATURES||[];
     cat.forEach(function(f){
       if(f.core) return;
@@ -423,6 +426,170 @@ function loadTypeBadge(t, dims){
 }
 // h×sz×m cm string a méretekből (vagy üres)
 function dimStr(h,w,m){ return (h&&w&&m)?(h+'×'+w+'×'+m):''; }
+
+// ════════════════════════════════════════════════════════════
+//  Fuvar-CSV import (tömeges) — oszlop-párosítóval, mint az
+//  üzemanyagkártya-importnál. A nem párosított oszlopok a fuvar
+//  import_extra mezőjébe kerülnek (nem vész el adat).
+// ════════════════════════════════════════════════════════════
+var _oiHeader = [], _oiRows = [];
+// minden importálható fuvar-mező + fejléc-felismerő regex
+var OI_FIELDS = [
+  { k:'client',          label:'Ügyfél',            re:/client|ugyfel|ügyf|customer|beneficiar|megrend/i },
+  { k:'ref',             label:'Referencia',        re:/\bref|rendel|order\s*(no|nr|id)|comand|hivatk/i },
+  { k:'loc_incarcare',   label:'Felrakó',           re:/felrak|incarc|loading|^load|pickup|origin|honnan|berak/i },
+  { k:'loc_descarcare',  label:'Lerakó',            re:/lerak|descarc|unload|deliver|dest|hova|kirak/i },
+  { k:'data_incarcare',  label:'Felrakás dátuma',   re:/(felrak|incarc|load|pickup).*(dat|date|nap)/i },
+  { k:'data_descarcare', label:'Lerakás dátuma',    re:/(lerak|descarc|unload|deliv).*(dat|date|nap)/i },
+  { k:'pret',            label:'Ár',                re:/\bar\b|ár|pret|price|fuvardij|díj|tarif|fee|amount/i },
+  { k:'km',              label:'Km',                re:/\bkm\b|távol|distan|distanta/i },
+  { k:'suly_kg',         label:'Súly (kg)',         re:/suly|súly|weight|greutate|\bkg\b|tonna|massa/i },
+  { k:'load_type',       label:'FTL/LTL típus',     re:/ftl|ltl|rakomany|rakomány|load.?type|tip.*marf/i },
+  { k:'hossz_cm',        label:'Hossz (cm)',        re:/hossz|length|lungim|\blung/i },
+  { k:'szel_cm',         label:'Szélesség (cm)',    re:/szel|width|latim|\blat\b/i },
+  { k:'mag_cm',          label:'Magasság (cm)',     re:/magas|height|inalt|\bmag\b/i },
+  { k:'rendszam_camion', label:'Vontató rendszám',  re:/vontat|camion|truck|tractor|kamion/i },
+  { k:'rendszam_remorca',label:'Pótkocsi rendszám', re:/potkocs|pótkocs|remorc|trailer|utánf/i },
+  { k:'nume_sofer',      label:'Sofőr neve',        re:/sofer|sofőr|driver|conducator/i },
+  { k:'email_sofer',     label:'Sofőr e-mail',      re:/e-?mail/i },
+  { k:'firma_extern',    label:'Külsős cég',        re:/extern|subcontr|transportator|alváll/i },
+  { k:'telefon_extern',  label:'Külsős telefon',    re:/tel|phone|telefon|mobil/i },
+];
+
+function openOrderImport(){
+  ensureOrderImportModal();
+  document.getElementById('orderImportModal').classList.add('open');
+  _oiHeader=[]; _oiRows=[];
+  document.getElementById('oiMapping').innerHTML='';
+  document.getElementById('oiResult').innerHTML='';
+  var f=document.getElementById('oiFile'); if(f) f.value='';
+}
+function closeOrderImport(){ var m=document.getElementById('orderImportModal'); if(m) m.classList.remove('open'); }
+function ensureOrderImportModal(){
+  if(document.getElementById('orderImportModal')) return;
+  var d=document.createElement('div'); d.id='orderImportModal';
+  d.innerHTML='<div class="oi-card">'
+    +'<div class="oi-head"><b class="text-primary" style="font-size:15px;">📥 Fuvar-CSV import</b>'
+    +'<button class="btn ghost" style="margin-left:auto;padding:5px 12px;" onclick="closeOrderImport()">✕ Bezár</button></div>'
+    +'<div class="oi-body">'
+    +'<div class="text-muted" style="font-size:12px;margin-bottom:10px;line-height:1.5;">Töltsd fel a gyári/szállítói fuvarlistát (.csv). A rendszer felismeri az elválasztót, és fejléc-név alapján automatikusan párosítja az oszlopokat — ellenőrizd/javítsd, majd importálj. <b>A nem párosított oszlopok nem vesznek el:</b> a fuvar „Importált extra adatok" mezőjébe kerülnek (a szerkesztőben megnézhető).</div>'
+    +'<div class="field" style="max-width:420px;"><label>CSV fájl</label><input class="input" type="file" id="oiFile" accept=".csv,.txt" onchange="orderImportParse()"></div>'
+    +'<div id="oiMapping" style="margin-top:14px;"></div>'
+    +'<div id="oiResult" style="margin-top:12px;"></div>'
+    +'</div></div>';
+  document.body.appendChild(d);
+}
+
+function orderImportParse(){
+  var f=(document.getElementById('oiFile')||{}).files;
+  if(!f||!f[0]) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var text=String(e.target.result||'');
+    var lines=text.split(/\r?\n/).filter(function(l){return l.trim();});
+    if(lines.length<2){ toast('A CSV üres vagy csak fejléc.','err'); return; }
+    var delim=[';',',','\t','|'].sort(function(a,b){ return lines[0].split(b).length - lines[0].split(a).length; })[0];
+    var split=function(l){ return l.split(delim).map(function(c){ return c.replace(/^"|"$/g,'').trim(); }); };
+    _oiHeader=split(lines[0]);
+    _oiRows=lines.slice(1).map(split);
+
+    var opts='<option value="">— (nincs / extra) —</option>'+_oiHeader.map(function(h,i){ return '<option value="'+i+'">'+esc(h||('oszlop '+(i+1)))+'</option>'; }).join('');
+    var cells=OI_FIELDS.map(function(fl){
+      return '<div class="field" style="margin:0;"><label>'+esc(fl.label)+'</label>'
+        +'<select class="select" id="oiCol_'+fl.k+'" onchange="orderImportPreview()">'+opts+'</select></div>';
+    }).join('');
+    document.getElementById('oiMapping').innerHTML=
+      '<div class="glass-soft" style="padding:14px;">'
+      +'<div class="text-primary" style="font-size:13px;font-weight:700;margin-bottom:10px;">Oszlop-párosítás — '+_oiRows.length+' sor (elválasztó: <code>'+(delim==='\t'?'TAB':esc(delim))+'</code>)</div>'
+      +'<div class="oi-map-grid">'+cells+'</div>'
+      +'<div style="display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap;">'
+      +'<button class="btn primary" onclick="orderImportRun(this)">📥 '+_oiRows.length+' fuvar importálása</button>'
+      +'<span id="oiUnmapped" class="text-muted" style="font-size:11.5px;"></span>'
+      +'</div>'
+      +'<div id="oiPreview" style="margin-top:12px;"></div>'
+      +'</div>';
+    // a guess-értékek beállítása (a fenti inline <script> nem fut innerHTML-ből)
+    var taken2={};
+    OI_FIELDS.forEach(function(fl){
+      var sel=document.getElementById('oiCol_'+fl.k); if(!sel) return;
+      for(var i=0;i<_oiHeader.length;i++){ if(!taken2[i] && fl.re.test(_oiHeader[i]||'')){ sel.value=String(i); taken2[i]=true; break; } }
+    });
+    orderImportPreview();
+  };
+  reader.readAsText(f[0],'utf-8');
+}
+
+function oiColIndex(k){ var v=(document.getElementById('oiCol_'+k)||{}).value; return v===''||v==null?-1:parseInt(v,10); }
+function oiNum(s){
+  s=String(s==null?'':s).replace(/\s/g,'');
+  if(/,\d{1,2}$/.test(s)) s=s.replace(/\./g,'').replace(',','.'); else s=s.replace(/,/g,'');
+  var n=parseFloat(s); return isFinite(n)?n:null;
+}
+function oiDate(s){
+  s=String(s||'').trim(); var m;
+  m=s.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/); if(m) return m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2);
+  m=s.match(/^(\d{1,2})[-./](\d{1,2})[-./](\d{4})/); if(m) return m[3]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[1]).slice(-2);
+  return null;
+}
+function oiLoadType(s){
+  s=String(s||'').toLowerCase();
+  if(/ftl|teljes|full|complet/.test(s)) return 'FTL';
+  if(/ltl|rész|resz|part|grup/.test(s)) return 'LTL';
+  return null;
+}
+// egy CSV-sor → fuvar-objektum (+ import_extra a nem párosított oszlopokból)
+function oiBuildRow(r){
+  var used={}, o={};
+  OI_FIELDS.forEach(function(fl){
+    var ci=oiColIndex(fl.k); if(ci<0||ci>=r.length) return; used[ci]=true;
+    var v=r[ci];
+    if(fl.k==='pret'||fl.k==='km'||fl.k==='suly_kg'||/_cm$/.test(fl.k)) o[fl.k]=oiNum(v);
+    else if(fl.k.indexOf('data_')===0) o[fl.k]=oiDate(v);
+    else if(fl.k==='load_type') o[fl.k]=oiLoadType(v);
+    else o[fl.k]=(v||'').trim();
+  });
+  if(o.email_sofer) o.sofer_type='Intern';
+  else if(o.firma_extern) o.sofer_type='Extern';
+  var extra={};
+  _oiHeader.forEach(function(h,i){ if(!used[i] && (r[i]||'').trim()!=='') extra[h||('oszlop'+(i+1))]=String(r[i]).trim(); });
+  if(Object.keys(extra).length) o.import_extra=extra;
+  return o;
+}
+function orderImportPreview(){
+  var un=document.getElementById('oiUnmapped'); var pv=document.getElementById('oiPreview');
+  if(!_oiHeader.length){ if(un)un.textContent=''; if(pv)pv.innerHTML=''; return; }
+  var used={}; OI_FIELDS.forEach(function(fl){ var ci=oiColIndex(fl.k); if(ci>=0) used[ci]=true; });
+  var unmapped=_oiHeader.filter(function(h,i){ return !used[i]; });
+  if(un) un.innerHTML = unmapped.length
+    ? '⚠️ Nem párosított oszlop ('+unmapped.length+'): <b>'+esc(unmapped.join(', ').slice(0,120))+'</b> → a fuvar „Importált extra adatok" mezőjébe kerül.'
+    : '✓ Minden oszlop párosítva.';
+  // előnézet: első 3 sor a párosítás szerint
+  var cols=OI_FIELDS.filter(function(fl){ return oiColIndex(fl.k)>=0; });
+  var head='<tr>'+cols.map(function(fl){ return '<th>'+esc(fl.label)+'</th>'; }).join('')+(unmapped.length?'<th>+ extra</th>':'')+'</tr>';
+  var body=_oiRows.slice(0,3).map(function(r){
+    var o=oiBuildRow(r);
+    return '<tr>'+cols.map(function(fl){ var v=o[fl.k]; return '<td>'+esc(v==null||v===''?'—':String(v))+'</td>'; }).join('')
+      +(unmapped.length?'<td class="text-muted">'+esc(o.import_extra?Object.keys(o.import_extra).length+' mező':'—')+'</td>':'')+'</tr>';
+  }).join('');
+  if(pv) pv.innerHTML='<div class="text-muted" style="font-size:11px;margin-bottom:4px;">Előnézet (első 3 sor):</div><div class="oi-prev"><table><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>';
+}
+function orderImportRun(btn){
+  if(!_oiRows.length){ toast('Előbb tölts fel egy CSV-t!','err'); return; }
+  var rows=_oiRows.map(oiBuildRow);
+  if(btn){ btn.disabled=true; btn.textContent='Importálás…'; }
+  gas('bulkCreateOrders',[{rows:rows}]).then(function(r){
+    if(btn){ btn.disabled=false; btn.textContent='📥 '+_oiRows.length+' fuvar importálása'; }
+    var res=document.getElementById('oiResult');
+    if(r&&r.ok){
+      toast('📥 Import kész: '+r.inserted+' fuvar létrehozva'+(r.skipped?(' · '+r.skipped+' kihagyva'):''),'ok');
+      if(res) res.innerHTML='<div class="glass-soft" style="padding:12px;border:1px solid rgba(34,197,94,0.4);">'
+        +'<b style="color:var(--status-ok);">✅ '+r.inserted+' fuvar létrehozva.</b>'
+        +(r.skipped?(' <span class="text-muted">'+r.skipped+' sor kihagyva (üres/hibás).</span>'):'')
+        +'</div>';
+      if(typeof loadOrders==='function') loadOrders();
+    } else { toast((r&&r.err)||'Import hiba','err'); }
+  }).catch(function(){ if(btn){btn.disabled=false;} toast('Import hiba','err'); });
+}
 
 function createOrder(){
   const st=document.querySelector('input[name="oSoferType"]:checked');
@@ -2276,6 +2443,18 @@ function openOrderEdit(id) {
 
       document.getElementById('oeClient').value = o.client||'';
       document.getElementById('oeRef').value = o.ref||'';
+      // Importált extra adatok (CSV-import nem párosított oszlopai) — csak nézet
+      var oeIe = document.getElementById('oeImportExtra');
+      if(oeIe){
+        var ie=o.import_extra; if(typeof ie==='string'){ try{ ie=JSON.parse(ie); }catch(e){ ie=null; } }
+        if(ie && typeof ie==='object' && Object.keys(ie).length){
+          oeIe.innerHTML='<div class="glass-soft" style="padding:10px 12px;border:1px solid rgba(59,130,246,0.35);">'
+            +'<div class="text-primary" style="font-size:12px;font-weight:700;margin-bottom:6px;">📋 Importált extra adatok <span class="text-muted" style="font-weight:400;">(CSV-ből, nem párosított oszlopok)</span></div>'
+            +'<div style="display:flex;flex-wrap:wrap;gap:6px;">'
+            +Object.keys(ie).map(function(k){ return '<span class="badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted);font-size:11px;">'+esc(k)+': <b class="text-primary">'+esc(String(ie[k]))+'</b></span>'; }).join('')
+            +'</div></div>';
+        } else { oeIe.innerHTML=''; }
+      }
       document.getElementById('oeLocInc').value = o.loc_incarcare||'';
       document.getElementById('oeLocDesc').value = o.loc_descarcare||'';
       document.getElementById('oeDataInc').value = o.data_incarcare ? o.data_incarcare.split('T')[0] : '';
