@@ -215,6 +215,79 @@
     'sofer.messages': { hu: '💬 Üzenetek', ro: '💬 Mesaje' },
     'sofer.msgPh': { hu: 'Üzenet...', ro: 'Mesaj...' },
 
+    // ── Közös tábla-fejlécek / mezők ──
+    'col.name': { hu: 'Név', ro: 'Nume' },
+    'col.phone': { hu: 'Telefon', ro: 'Telefon' },
+    'col.position': { hu: 'Pozíció', ro: 'Poziție' },
+    'col.action': { hu: 'Művelet', ro: 'Acțiune' },
+    'col.actions': { hu: 'Műveletek', ro: 'Acțiuni' },
+    'col.note': { hu: 'Megjegyzés', ro: 'Mențiune' },
+    'col.status': { hu: 'Státusz', ro: 'Status' },
+    'col.plate': { hu: 'Rendszám', ro: 'Nr. înmatriculare' },
+    'col.brand': { hu: 'Márka', ro: 'Marcă' },
+    'col.model': { hu: 'Model', ro: 'Model' },
+    'col.year': { hu: 'Év', ro: 'An' },
+    'col.code': { hu: 'Kód', ro: 'Cod' },
+    'fld.optional': { hu: '(opcionális)', ro: '(opțional)' },
+    'fld.note': { hu: 'Megjegyzés', ro: 'Mențiune' },
+    'fld.notePh': { hu: 'opcionális', ro: 'opțional' },
+
+    // ── Munkatársak (users) ──
+    'users.title': { hu: 'Munkatársak kezelése', ro: 'Gestionare angajați' },
+
+    // ── Meghívók (invites) ──
+    'inv.position': { hu: 'Pozíció', ro: 'Poziție' },
+    'inv.email': { hu: 'E-mail', ro: 'E-mail' },
+    'inv.name': { hu: 'Név', ro: 'Nume' },
+    'inv.phone': { hu: 'Telefon', ro: 'Telefon' },
+    'inv.generate': { hu: '+ Kód generálása', ro: '+ Generează cod' },
+
+    // ── Belső sofőrök ──
+    'intern.sub': { hu: 'Sofőr pozíciójú regisztrált felhasználók', ro: 'Utilizatori înregistrați cu rol de șofer' },
+
+    // ── Külső sofőrök ──
+    'extern.sub': { hu: 'Cégen kívüli sofőrök és cégek címjegyzéke', ro: 'Agendă șoferi și firme externe' },
+    'extern.addTitle': { hu: 'Új külső sofőr / cég hozzáadása', ro: 'Adăugare șofer / firmă externă' },
+    'extern.tractorPlate': { hu: 'Vontató rendszám', ro: 'Nr. cap tractor' },
+    'extern.trailerPlate': { hu: 'Pótkocsi rendszám', ro: 'Nr. remorcă' },
+    'extern.addBtn': { hu: '+ Sofőr hozzáadása', ro: '+ Adaugă șofer' },
+    'extern.colTractor': { hu: 'Vontató', ro: 'Cap tractor' },
+    'extern.colTrailer': { hu: 'Pótkocsi', ro: 'Remorcă' },
+
+    // ── Járművek ──
+    'veh.sub': { hu: 'Vontatók és pótkocsik nyilvántartása', ro: 'Evidența capetelor tractoare și remorcilor' },
+    'veh.tractors': { hu: 'Vontatók', ro: 'Capete tractoare' },
+    'veh.trailers': { hu: 'Pótkocsik', ro: 'Remorci' },
+    'veh.plateReq': { hu: 'Rendszám *', ro: 'Nr. înmatriculare *' },
+    'veh.addTractor': { hu: '+ Vontató hozzáadása', ro: '+ Adaugă cap tractor' },
+    'veh.addTrailer': { hu: '+ Pótkocsi hozzáadása', ro: '+ Adaugă remorcă' },
+    'veh.kind': { hu: 'Típus (rakfelület)', ro: 'Tip (suprafață încărcare)' },
+    'veh.kindStandard': { hu: 'Standard (260 cm)', ro: 'Standard (260 cm)' },
+    'veh.kindMega': { hu: 'Mega (305 cm)', ro: 'Mega (305 cm)' },
+    'veh.cargoLen': { hu: 'Rakfelület hossz (cm)', ro: 'Lungime utilă (cm)' },
+    'veh.cargoWid': { hu: 'Rakfelület szélesség (cm)', ro: 'Lățime utilă (cm)' },
+    'veh.cargoHei': { hu: 'Rakfelület magasság (cm)', ro: 'Înălțime utilă (cm)' },
+
+    // ── Aláírás / bélyegző ──
+    'sig.drawTitle': { hu: 'Digitális Aláírás Rajzolása', ro: 'Desenare semnătură digitală' },
+    'sig.clear': { hu: 'Törlés', ro: 'Șterge' },
+    'sig.save': { hu: 'Mentés', ro: 'Salvează' },
+    'sig.stampTitle': { hu: 'Bélyegző feltöltése (PNG)', ro: 'Încărcare ștampilă (PNG)' },
+    'sig.stampSave': { hu: 'Bélyegző mentése', ro: 'Salvează ștampila' },
+    'sig.previewTitle': { hu: 'Aktuális bélyegző előnézete', ro: 'Previzualizare ștampilă curentă' },
+    'sig.notSaved': { hu: 'Nincs mentve.', ro: 'Nesalvat.' },
+
+    // ── Chat ──
+    'chat.connecting': { hu: 'Firebase kapcsolódás...', ro: 'Conectare Firebase...' },
+    'chat.chats': { hu: 'Csevegések', ro: 'Conversații' },
+    'chat.newChat': { hu: 'Új chat indítása', ro: 'Începe o conversație nouă' },
+    'chat.loading': { hu: 'Betöltés...', ro: 'Se încarcă...' },
+    'chat.pickChat': { hu: 'Válassz csevegést', ro: 'Alege o conversație' },
+    'chat.pickFromList': { hu: '← Válassz egy csevegést a listából', ro: '← Alege o conversație din listă' },
+    'chat.msgPh': { hu: 'Üzenet írása...', ro: 'Scrie un mesaj...' },
+    'chat.pickUser': { hu: 'Felhasználó kiválasztása', ro: 'Selectare utilizator' },
+    'chat.start': { hu: 'Chat indítása', ro: 'Începe conversația' },
+
     // ── Vezérlőpult (dashboard) ──
     'dash.subtitle': { hu: 'Cég dashboard', ro: 'Panou firmă' },
     'dash.kpiTotal': { hu: 'Összes fuvar', ro: 'Total curse' },
