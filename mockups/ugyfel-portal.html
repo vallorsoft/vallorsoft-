@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VallorSoft — Ügyfélportál (látványterv)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deepest:#05070b; --bg-panel:#0c1218; --bg-panel-raised:#141c25;
+    --text-primary:#e9eef5; --text-muted:#8a97a8;
+    --brand-red:#e10b1a; --ok:#22c55e; --warn:#f59e0b; --danger:#ef4444; --info:#3b82f6;
+    --border:rgba(255,255,255,.08); --radius:18px; --radius-md:12px; --radius-sm:8px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,rgba(225,11,26,.10),transparent),var(--bg-deepest);
+    color:var(--text-primary);font-family:Inter,Segoe UI,Roboto,sans-serif;font-size:14px;line-height:1.5;}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px;}
+  .glass{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));
+    border:1px solid var(--border);border-radius:var(--radius);backdrop-filter:blur(8px);}
+  .muted{color:var(--text-muted)}
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;
+    padding:3px 9px;border-radius:999px;border:1px solid;}
+  .b-ok{background:rgba(34,197,94,.16);color:#4ade80;border-color:rgba(34,197,94,.4)}
+  .b-warn{background:rgba(245,158,11,.16);color:#fbbf24;border-color:rgba(245,158,11,.4)}
+  .b-info{background:rgba(59,130,246,.16);color:#60a5fa;border-color:rgba(59,130,246,.4)}
+  .b-red{background:rgba(225,11,26,.16);color:#ff6b75;border-color:rgba(225,11,26,.45)}
+  .btn{border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text-primary);
+    border-radius:var(--radius-sm);padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .btn.primary{background:var(--brand-red);border-color:var(--brand-red);color:#fff}
+  .btn.ok{background:rgba(34,197,94,.18);border-color:rgba(34,197,94,.45);color:#4ade80}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);
+    border:1px solid var(--border);border-radius:999px;padding:5px 11px;font-size:12px;color:var(--text-muted);cursor:pointer}
+  .chip:hover{color:#fff;border-color:rgba(255,255,255,.2)}
+
+  /* top bar */
+  .top{display:flex;align-items:center;gap:14px;padding:14px 20px;margin-bottom:18px;}
+  .logo{font-weight:800;font-size:20px;letter-spacing:.3px}
+  .logo b{color:#fff}.logo span{color:var(--brand-red)}
+  .who{margin-left:auto;text-align:right}
+  .who .n{font-weight:700}.who .c{font-size:12px;color:var(--text-muted)}
+  .av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--brand-red),#7a0710);
+    display:grid;place-items:center;font-weight:800;color:#fff}
+
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+  .tile{padding:16px 18px}
+  .tile .k{font-size:12px;color:var(--text-muted);font-weight:600}
+  .tile .v{font-size:26px;font-weight:800;margin-top:4px}
+  .tile .v.red{color:#ff6b75}
+
+  .grid{display:grid;grid-template-columns:1.55fr 1fr;gap:16px}
+  .h{font-size:15px;font-weight:800;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+
+  /* order card */
+  .ord{padding:14px 16px;border:1px solid var(--border);border-radius:var(--radius-md);
+    background:rgba(255,255,255,.02);margin-bottom:12px}
+  .ord .row1{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .ord .id{font-weight:800;color:#fff}
+  .ord .route{font-weight:700}
+  .ord .meta{font-size:12px;color:var(--text-muted);display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+  .ord .docs{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+
+  /* map */
+  .map{height:230px;border-radius:var(--radius-md);overflow:hidden;border:1px solid var(--border);background:#e8eef3;position:relative}
+  .map .lbl{position:absolute;left:10px;top:10px;background:#fff;color:#0c1218;font-size:11px;font-weight:700;
+    padding:4px 9px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+  .pin{position:absolute;transform:translate(-50%,-100%);font-size:22px}
+  .ptag{position:absolute;transform:translate(-50%,-140%);background:#0c1218;color:#fff;font-size:10px;
+    padding:2px 6px;border-radius:5px;white-space:nowrap}
+
+  /* request form preview */
+  .field{margin-bottom:10px}
+  .field label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:5px;font-weight:600}
+  .inp{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--radius-sm);
+    padding:9px 11px;color:var(--text-primary);font-family:inherit;font-size:13px}
+
+  /* login inset */
+  .login{max-width:360px;margin:0 auto;padding:26px}
+  .note{font-size:11px;color:var(--text-muted)}
+  .sect-label{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:#c084fc;font-weight:800;margin:30px 0 10px}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="sect-label">① Belépés (publikus — /portal/login)</div>
+  <div class="glass login">
+    <div class="logo" style="text-align:center;font-size:24px;margin-bottom:4px"><b>Vallor</b><span>Soft</span></div>
+    <div class="muted" style="text-align:center;margin-bottom:18px">Ügyfélportál</div>
+    <div class="field"><label>E-mail</label><input class="inp" value="logisztika@gyar-kft.ro"></div>
+    <div class="field"><label>Jelszó</label><input class="inp" type="password" value="••••••••"></div>
+    <button class="btn primary" style="width:100%;margin-top:6px">Belépés</button>
+    <div class="note" style="text-align:center;margin-top:12px">A hozzáférést a fuvarozó (VallorSoft-ügyfél) adja meghívóval.<br>Csak a SAJÁT céged fuvarjait látod.</div>
+  </div>
+
+  <div class="sect-label">② Ügyfél-vezérlőpult (/portal) — így látja a gyár</div>
+
+  <div class="glass top">
+    <div class="logo"><b>Vallor</b><span>Soft</span> <span class="muted" style="font-size:13px;font-weight:500">· Ügyfélportál</span></div>
+    <div class="who">
+      <div class="n">Gyár Logisztika KFT</div>
+      <div class="c">Fuvarozó: Vallor Logistics SRL</div>
+    </div>
+    <div class="av">G</div>
+  </div>
+
+  <div class="stats">
+    <div class="glass tile"><div class="k">Aktív fuvar</div><div class="v">7</div></div>
+    <div class="glass tile"><div class="k">Úton most</div><div class="v" style="color:#4ade80">3</div></div>
+    <div class="glass tile"><div class="k">Teljesített (hó)</div><div class="v">41</div></div>
+    <div class="glass tile"><div class="k">Kintlévő számla</div><div class="v red">2&nbsp;<span style="font-size:14px">db · 8 400 €</span></div></div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+    <button class="btn primary">＋ Új fuvar igénylése</button>
+    <span class="muted" style="font-size:12px">vagy tölts fel egy CSV-listát — a diszpécser jóváhagyja, és bekerül a fuvarok közé.</span>
+  </div>
+
+  <div class="grid">
+    <!-- bal: fuvarok -->
+    <div>
+      <div class="glass" style="padding:16px 18px">
+        <div class="h">📦 A te fuvarjaid</div>
+
+        <div class="ord">
+          <div class="row1">
+            <span class="id">CMD-2041</span>
+            <span class="badge b-ok">● Úton</span>
+            <span class="badge b-info">FTL</span>
+            <span class="muted" style="margin-left:auto;font-size:12px">Ref: PO-88231</span>
+          </div>
+          <div class="route">Temesvár (RO) → München (DE)</div>
+          <div class="meta">
+            <span>🚛 TM-12-VLR</span><span>📅 Felrakva: jún. 12.</span>
+            <span>⏱️ Várható érkezés: <b style="color:#4ade80">jún. 14. 09:00</b></span><span>📍 most: Graz közelében</span>
+          </div>
+          <div class="docs">
+            <span class="chip">📄 Megrendelés-visszaigazolás</span>
+            <span class="chip">🗺️ Élő követés</span>
+            <span class="chip">📷 POD (2)</span>
+          </div>
+        </div>
+
+        <div class="ord">
+          <div class="row1">
+            <span class="id">CMD-2038</span>
+            <span class="badge b-warn">● Felrakásra vár</span>
+            <span class="badge b-info">LTL · 📐 240×120×160</span>
+            <span class="muted" style="margin-left:auto;font-size:12px">Ref: PO-88204</span>
+          </div>
+          <div class="route">Arad (RO) → Bécs (AT)</div>
+          <div class="meta"><span>🚛 kiosztás alatt</span><span>📅 Tervezett felrakás: jún. 13.</span><span>⚖️ 4 200 kg</span></div>
+          <div class="docs"><span class="chip">📄 Megrendelés-visszaigazolás</span></div>
+        </div>
+
+        <div class="ord" style="opacity:.92">
+          <div class="row1">
+            <span class="id">CMD-1990</span>
+            <span class="badge b-info">● Teljesített</span>
+            <span class="muted" style="margin-left:auto;font-size:12px">Ref: PO-87990</span>
+          </div>
+          <div class="route">Kolozsvár (RO) → Budapest (HU)</div>
+          <div class="meta"><span>📅 Lerakva: jún. 8.</span><span>🧾 Számla: VLR-2025-0417</span><span class="badge b-red" style="margin-left:2px">Fizetésre vár · 4 200 €</span></div>
+          <div class="docs">
+            <span class="chip">🧾 Számla letöltése (PDF)</span>
+            <span class="chip">📷 Aláírt CMR / POD</span>
+          </div>
+        </div>
+
+        <div style="text-align:center;margin-top:6px"><span class="muted" style="font-size:12px">… további 4 fuvar</span></div>
+      </div>
+    </div>
+
+    <!-- jobb: élő térkép + új igény -->
+    <div>
+      <div class="glass" style="padding:16px 18px;margin-bottom:16px">
+        <div class="h">🗺️ CMD-2041 — élő pozíció</div>
+        <div class="map">
+          <div class="lbl">Élő GPS · 12 perce</div>
+          <svg width="100%" height="100%" viewBox="0 0 400 230" preserveAspectRatio="none">
+            <rect width="400" height="230" fill="#e8eef3"/>
+            <path d="M0 60 H400 M0 120 H400 M0 180 H400 M90 0 V230 M210 0 V230 M320 0 V230" stroke="#d4dde6" stroke-width="1"/>
+            <path d="M60 175 C 150 150, 180 90, 330 55" fill="none" stroke="#e10b1a" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+          <div class="pin" style="left:15%;top:78%">🟢</div><div class="ptag" style="left:15%;top:78%">Temesvár</div>
+          <div class="pin" style="left:55%;top:55%">🚛</div><div class="ptag" style="left:55%;top:55%">most itt</div>
+          <div class="pin" style="left:82%;top:26%">🔴</div><div class="ptag" style="left:82%;top:26%">München</div>
+        </div>
+        <div class="muted" style="font-size:11px;margin-top:8px">A térkép mindig világos. Ár-/sofőr-adat nem látszik — csak útvonal, státusz, pozíció.</div>
+      </div>
+
+      <div class="glass" style="padding:16px 18px">
+        <div class="h">＋ Új fuvar igénylése</div>
+        <div class="field"><label>Felrakó címe</label><input class="inp" value="Temesvár, Calea Aradului 12"></div>
+        <div class="field"><label>Lerakó címe</label><input class="inp" value="München, Dachauer Str. 9"></div>
+        <div style="display:flex;gap:10px">
+          <div class="field" style="flex:1"><label>Súly (kg)</label><input class="inp" value="6 000"></div>
+          <div class="field" style="flex:1"><label>Típus</label><input class="inp" value="FTL"></div>
+        </div>
+        <button class="btn ok" style="width:100%;margin-top:4px">Igénylés elküldése a diszpécsernek →</button>
+        <div class="note" style="margin-top:8px">Az igénylés a fuvarozó „Beérkező megrendelések" listájába kerül; jóváhagyás után válik élő fuvarrá. (Az ügyfél nem hoz létre közvetlenül élő fuvart.)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sect-label">③ Fuvarozó oldalán (admin) — Ügyfél-hozzáférések (az Ügyfelek fülön)</div>
+  <div class="glass" style="padding:16px 18px">
+    <div class="h">👥 Ügyfél-portál hozzáférések</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <input class="inp" style="max-width:260px" value="logisztika@gyar-kft.ro">
+      <select class="inp" style="max-width:220px"><option>Gyár Logisztika KFT</option></select>
+      <button class="btn ok">＋ Meghívó küldése</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.02)">
+      <span class="av" style="width:30px;height:30px;font-size:13px">G</span>
+      <div><div style="font-weight:700">logisztika@gyar-kft.ro</div><div class="muted" style="font-size:12px">Gyár Logisztika KFT · utolsó belépés: ma 08:14</div></div>
+      <span class="badge b-ok" style="margin-left:auto">Aktív</span>
+      <button class="btn" style="padding:6px 10px">Letiltás</button>
+    </div>
+    <div class="note" style="margin-top:10px">A meghívott e-mailben kap egy jelszó-beállító linket (mint a munkatárs-meghívó). Egy ügyfélhez több kapcsolattartó is tartozhat.</div>
+  </div>
+
+</div>
+</body>
+</html>
