@@ -447,6 +447,21 @@
     'cs.noWaybills': { hu: 'Nincs beküldött fuvarlevél.', ro: 'Nicio foaie de parcurs trimisă.' },
     'cs.editLong': { hu: '✏️ Szerkeszt', ro: '✏️ Editează' },
 
+    // Chat + dokumentum-csoportok + jármű-választók
+    'cs.noChat': { hu: 'Még nincs csevegés.<br>Kattints a + gombra!', ro: 'Încă nicio conversație.<br>Apasă butonul +!' },
+    'cs.newTractor': { hu: 'Új vontató hozzáadása', ro: 'Adăugare cap tractor nou' },
+    'cs.newTrailer': { hu: 'Új pótkocsi hozzáadása', ro: 'Adăugare remorcă nouă' },
+    'cs.notSetDash': { hu: '— Nincs megadva —', ro: '— Neselectat —' },
+    'cs.noMatch': { hu: 'Nincs találat.', ro: 'Niciun rezultat.' },
+    'cs.files': { hu: ' fájl', ro: ' fișiere' },
+    'cs.other': { hu: 'Egyéb', ro: 'Altele' },
+    'cs.view': { hu: '👁 Megtekint', ro: '👁 Vizualizare' },
+    'cs.download': { hu: '⬇ Letölt', ro: '⬇ Descarcă' },
+    'cs.manualDriver': { hu: '— Új sofőr beírása kézzel —', ro: '— Introdu manual un șofer nou —' },
+    'cs.pickDriverDash': { hu: '— Válassz sofőrt —', ro: '— Alege un șofer —' },
+    'cs.noneAdded': { hu: 'Nincs még felvéve.', ro: 'Niciunul adăugat încă.' },
+    'cs.revokeConfirm': { hu: 'Biztosan visszavonod a(z) {kod} kodot?', ro: 'Sigur revoci codul {kod}?' },
+
     // ── console-shared.js toast-üzenetek ──
     'cs.pdfFirst': { hu: 'Előbb töltsd be a PDF-et!', ro: 'Încarcă mai întâi PDF-ul!' },
     'cs.noStamp': { hu: 'Nincs mentett pecsét!', ro: 'Nu există ștampilă salvată!' },

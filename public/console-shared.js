@@ -1570,7 +1570,7 @@ function openChatRoom(roomId){
   if(ha)ha.textContent=(label.replace(/[^a-zA-Z\u00C0-\u024F]/g,'')||'?').charAt(0).toUpperCase();
 
   var msgsEl=document.getElementById('chatMsgs');
-  if(msgsEl)msgsEl.innerHTML='<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px;">Betöltés...</div>';
+  if(msgsEl)msgsEl.innerHTML='<div style="text-align:center;color:var(--muted);font-size:12px;padding:20px;">'+t('fe.loading')+'</div>';
 
   var ref=_fbDb.ref('chats/'+_chatCompanyId+'/rooms/'+roomId+'/messages');
   var query=ref.orderByChild('ts').limitToLast(100);
@@ -1607,7 +1607,7 @@ function openDocModal(orderId){
 
 function openQuickVehicle(tip) {
   document.getElementById('qvTip').value = tip;
-  document.getElementById('quickVehicleTitle').textContent = tip === 'Vontato' ? 'Új vontató hozzáadása' : 'Új pótkocsi hozzáadása';
+  document.getElementById('quickVehicleTitle').textContent = tip === 'Vontato' ? t('cs.newTractor') : t('cs.newTrailer');
   document.getElementById('qvRendszam').value = '';
   document.getElementById('qvMarca').value = '';
   document.getElementById('qvModel').value = '';
@@ -1642,7 +1642,7 @@ function quickStatusChange(id, sel) {
       _ordersAllCache.forEach(function(c,i){ if(String(c.id)===String(id)) idx=i; });
       if (idx !== -1) _ordersAllCache[idx].status = newStatus;
     } else {
-      toast(d.err || 'Hiba', 'err');
+      toast(d.err || t('common.error'), 'err');
       loadOrders();
     }
   }).catch(function(){ toast(t('common.connError'), 'err'); loadOrders(); });
@@ -1661,7 +1661,7 @@ function renderAdminRoomList(me){
     return((_roomsSnapData[b]||{}).lastTime||0)-((_roomsSnapData[a]||{}).lastTime||0);
   });
   if(!myRooms.length){
-    listEl.innerHTML='<div style="padding:16px 12px;font-size:12px;color:var(--muted);">Még nincs csevegés.<br>Kattints a + gombra!</div>';
+    listEl.innerHTML='<div style="padding:16px 12px;font-size:12px;color:var(--muted);">'+t('cs.noChat')+'</div>';
     return;
   }
   listEl.innerHTML=myRooms.map(function(rId){
@@ -1679,7 +1679,7 @@ function renderAdminRoomList(me){
   }).join('');
 }
 
-function renderCamions(list){const sel=document.getElementById('oCamionSelect');if(!sel)return;sel.innerHTML='<option value="">— Nincs megadva —</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
+function renderCamions(list){const sel=document.getElementById('oCamionSelect');if(!sel)return;sel.innerHTML='<option value="">'+t('cs.notSetDash')+'</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
 
 function renderDocGroups() {
   var container = document.getElementById('docGroupsContainer');
@@ -1691,7 +1691,7 @@ function renderDocGroups() {
     if (filterTip   && d.tip !== filterTip) return false;
     return true;
   });
-  if (!list.length) { container.innerHTML='<div style="text-align:center;color:var(--muted);padding:40px;">Nincs találat.</div>'; return; }
+  if (!list.length) { container.innerHTML='<div style="text-align:center;color:var(--muted);padding:40px;">'+t('cs.noMatch')+'</div>'; return; }
   var groups = {};
   list.forEach(function(d) {
     var nev = d.nume_sofer||d.email_sofer||'—';
@@ -1706,20 +1706,20 @@ function renderDocGroups() {
     html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0 8px;border-bottom:1px solid var(--border);margin-bottom:12px;">';
     html += '<span style="font-size:15px;font-weight:700;color:var(--text-primary);">👤 '+esc(g.nev)+'</span>';
     html += '<span style="font-size:12px;color:var(--muted);background:var(--bg-3);padding:3px 10px;border-radius:20px;border:1px solid var(--border);">📅 '+g.nap+'</span>';
-    html += '<span style="font-size:12px;color:var(--muted);">'+g.docs.length+' fájl</span>';
+    html += '<span style="font-size:12px;color:var(--muted);">'+g.docs.length+t('cs.files')+'</span>';
     html += '</div>';
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;">';
     g.docs.forEach(function(d) {
       var bc = d.tip==='CMR'?'ok':d.tip==='Számla'?'info':'warn';
       var time = d.created_at ? new Date(d.created_at).toLocaleTimeString('hu-HU',{hour:'2-digit',minute:'2-digit'}) : '';
       html += '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px;">';
-      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;"><span class="badge '+bc+'">'+esc(d.tip||'Egyéb')+'</span>'
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;"><span class="badge '+bc+'">'+esc(d.tip||t('cs.other'))+'</span>'
         +(d.order_id?'<span class="badge info" title="Fuvarhoz kötve">🔗 '+esc(d.order_id)+'</span>':'')
         +'<span style="font-size:11px;color:var(--muted);">'+time+'</span></div>';
       html += '<div style="font-size:12px;color:var(--soft);margin-bottom:10px;word-break:break-all;">'+esc(d.file_name||'—')+'</div>';
       html += '<div style="display:flex;gap:6px;">';
-      html += '<a href="/api/doc-download/'+d.id+'" target="_blank" class="btn primary" style="flex:1;text-align:center;text-decoration:none;padding:8px 6px;font-size:12px;">👁 Megtekint</a>';
-      html += '<a href="/api/doc-download/'+d.id+'" download class="btn ghost" style="flex:1;text-align:center;text-decoration:none;padding:8px 6px;font-size:12px;">⬇ Letölt</a>';
+      html += '<a href="/api/doc-download/'+d.id+'" target="_blank" class="btn primary" style="flex:1;text-align:center;text-decoration:none;padding:8px 6px;font-size:12px;">'+t('cs.view')+'</a>';
+      html += '<a href="/api/doc-download/'+d.id+'" download class="btn ghost" style="flex:1;text-align:center;text-decoration:none;padding:8px 6px;font-size:12px;">'+t('cs.download')+'</a>';
       html += '</div></div>';
     });
     html += '</div></div>';
@@ -1727,22 +1727,22 @@ function renderDocGroups() {
   container.innerHTML = html;
 }
 
-function renderExternDrivers(list){const sel=document.getElementById('oExternSelect');if(!sel)return;sel.innerHTML='<option value="">— Új sofőr beírása kézzel —</option>'+list.map(d=>`<option value="${esc(d.id)}">${esc(d.nume||'')} ${d.firma?'/ '+esc(d.firma):''}</option>`).join('');}
+function renderExternDrivers(list){const sel=document.getElementById('oExternSelect');if(!sel)return;sel.innerHTML='<option value="">'+t('cs.manualDriver')+'</option>'+list.map(d=>`<option value="${esc(d.id)}">${esc(d.nume||'')} ${d.firma?'/ '+esc(d.firma):''}</option>`).join('');}
 
-function renderInternDrivers(list){const sel=document.getElementById('oInternDriver');if(!sel)return;sel.innerHTML='<option value="">— Válassz sofőrt —</option>'+list.map(u=>`<option value="${esc(u.email)}">${esc(u.nume)} (${esc(u.email)})</option>`).join('');}
+function renderInternDrivers(list){const sel=document.getElementById('oInternDriver');if(!sel)return;sel.innerHTML='<option value="">'+t('cs.pickDriverDash')+'</option>'+list.map(u=>`<option value="${esc(u.email)}">${esc(u.nume)} (${esc(u.email)})</option>`).join('');}
 
-function renderRemorcas(list){const sel=document.getElementById('oRemorcaSelect');if(!sel)return;sel.innerHTML='<option value="">— Nincs megadva —</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
+function renderRemorcas(list){const sel=document.getElementById('oRemorcaSelect');if(!sel)return;sel.innerHTML='<option value="">'+t('cs.notSetDash')+'</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
 
 
 function renderVehicleTable(tableId,list){
   const tb=document.querySelector('#'+tableId+' tbody');
-  if(!list||list.length===0){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);">Nincs még felvéve.</td></tr>';return;}
-  tb.innerHTML=list.map(v=>`<tr><td><b>${esc(v.rendszam)}</b></td><td>${esc(v.marca||'—')}</td><td>${esc(v.model||'—')}</td><td>${v.an||'—'}</td><td>${esc(v.nota||'—')}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editVehicle(${v.id})">Szerk</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteVehicle(${v.id})">Töröl</button></td></tr>`).join('');
+  if(!list||list.length===0){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);">'+t('cs.noneAdded')+'</td></tr>';return;}
+  tb.innerHTML=list.map(v=>`<tr><td><b>${esc(v.rendszam)}</b></td><td>${esc(v.marca||'—')}</td><td>${esc(v.model||'—')}</td><td>${v.an||'—'}</td><td>${esc(v.nota||'—')}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editVehicle(${v.id})">${t('cs.editShort')}</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteVehicle(${v.id})">${t('cs.del')}</button></td></tr>`).join('');
 }
 
 function revokeInv(kod){
-  if(!confirm('Biztosan visszavonod a(z) '+kod+' kodot?'))return;
-  gas('invRevoke',[kod]).then(r=>{if(r.ok){toast(t('cs.revoked'),'ok');loadInvites();}else{toast(r.err||'Hiba','err');}});
+  if(!confirm(t('cs.revokeConfirm',{kod:kod})))return;
+  gas('invRevoke',[kod]).then(r=>{if(r.ok){toast(t('cs.revoked'),'ok');loadInvites();}else{toast(r.err||t('common.error'),'err');}});
 }
 
 function saveAdminSigDraw(){var dataUrl=sigCanvas.toDataURL('image/png');gas('stampSave',[dataUrl]).then(()=>{toast(t('cs.sigSaved'),'ok');loadAdminSigPreview();});}
