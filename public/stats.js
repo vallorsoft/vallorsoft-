@@ -46,12 +46,12 @@
   // Közös szűrősáv (időszak) — minden stats-pane tetején
   function stFilterBar(pane) {
     var presets = [
-      ['12m', 'Elmúlt 12 hónap'], ['year', 'Idei év'], ['3m', 'Elmúlt 3 hónap'],
-      ['month', 'E hónap'], ['prev', 'Előző hónap'], ['custom', 'Egyedi időszak']
+      ['12m', t('st.r12m')], ['year', t('st.rYear')], ['3m', t('st.r3m')],
+      ['month', t('st.rMonth')], ['prev', t('st.rPrev')], ['custom', t('st.rCustom')]
     ];
     var r = stRangeDates();
     return '<div class="glass" style="padding:12px 16px;margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
-      + '<span class="text-muted" style="font-size:12px;font-weight:700;">📅 Időszak:</span>'
+      + '<span class="text-muted" style="font-size:12px;font-weight:700;">' + t('st.periodLbl') + '</span>'
       + '<select class="select" style="max-width:190px;padding:8px 10px;font-size:13px;" onchange="VS_STATS.setPreset(this.value,\'' + pane + '\')">'
       + presets.map(function (p) { return '<option value="' + p[0] + '"' + (_stRange.preset === p[0] ? ' selected' : '') + '>' + p[1] + '</option>'; }).join('')
       + '</select>'
@@ -59,10 +59,10 @@
       + '<input class="input" type="date" id="stFrom" value="' + (r.from || '') + '" style="padding:7px 10px;font-size:13px;max-width:150px;">'
       + '<span class="text-muted">→</span>'
       + '<input class="input" type="date" id="stTo" value="' + (r.to || '') + '" style="padding:7px 10px;font-size:13px;max-width:150px;">'
-      + '<button class="btn primary" style="padding:7px 14px;font-size:12px;" onclick="VS_STATS.applyCustom(\'' + pane + '\')">Alkalmaz</button>'
+      + '<button class="btn primary" style="padding:7px 14px;font-size:12px;" onclick="VS_STATS.applyCustom(\'' + pane + '\')">' + t('st.apply') + '</button>'
       + '</span>'
       + '<span style="margin-left:auto;"></span>'
-      + '<button class="btn ghost" style="padding:7px 14px;font-size:12px;" onclick="VS_STATS.load(\'' + pane + '\')">🔄 Frissítés</button>'
+      + '<button class="btn ghost" style="padding:7px 14px;font-size:12px;" onclick="VS_STATS.load(\'' + pane + '\')">' + t('st.refresh') + '</button>'
       + '</div>';
   }
 
@@ -132,11 +132,12 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 800);
   }
 
-  var PAY_BADGE = {
-    paid:    '<span class="badge ok">Fizetve</span>',
-    partial: '<span class="badge warn">Részben</span>',
-    unpaid:  '<span class="badge err">Kintlévő</span>'
-  };
+  function payBadge(status) {
+    if (status === 'paid') return '<span class="badge ok">' + t('pay.paid') + '</span>';
+    if (status === 'partial') return '<span class="badge warn">' + t('pay.partial') + '</span>';
+    if (status === 'unpaid') return '<span class="badge err">' + t('pay.unpaid') + '</span>';
+    return '';
+  }
 
   // ── Jogosultság: a Pénzügy fül láthatósága (admin adja) ──
   function applyPerms(cb) {
@@ -158,9 +159,9 @@
   function loadOverview() {
     var box = document.getElementById('statsOverviewBox');
     if (!box) return;
-    box.innerHTML = stFilterBar('stats-overview') + '<div class="text-muted" style="padding:30px;text-align:center;">Betöltés...</div>';
+    box.innerHTML = stFilterBar('stats-overview') + '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
     gas('getStatsOverview', stRangeDates()).then(function (r) {
-      if (!r || !r.ok) { box.innerHTML = stFilterBar('stats-overview') + '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || 'Hiba') + '</div>'; return; }
+      if (!r || !r.ok) { box.innerHTML = stFilterBar('stats-overview') + '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || t('common.error')) + '</div>'; return; }
       _stData['stats-overview'] = r;
       var k = r.kpi, fin = r.finance;
       var rate = parseFloat(r.eur_ron_rate) || null;
@@ -176,12 +177,10 @@
       (r.alerts || []).forEach(function (a) {
         if (a.type === 'fuel') {
           alertsHtml += '<div style="display:flex;gap:8px;align-items:center;padding:8px 12px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.35);border-radius:10px;font-size:13px;">'
-            + '⛽ <b class="text-primary">' + esc(a.rendszam) + '</b>&nbsp;túlfogyasztás: <b style="color:var(--status-warn);">'
-            + stNum(a.consum, 1) + ' L/100km</b>&nbsp;<span class="text-muted">(névleges: ' + stNum(a.nevleges, 1) + ')</span></div>';
+            + t('st.ov.fuelAlert', { plate: esc(a.rendszam), c: stNum(a.consum, 1), n: stNum(a.nevleges, 1) }) + '</div>';
         } else if (a.type === 'overdue') {
           alertsHtml += '<div style="display:flex;gap:8px;align-items:center;padding:8px 12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.35);border-radius:10px;font-size:13px;cursor:pointer;" onclick="activateTab(\'stats-finance\')">'
-            + '⏰ <b style="color:var(--status-danger);">' + stNum(a.db, 0) + ' fuvar</b>&nbsp;30+ napja kintlévő — összesen <b style="color:var(--status-danger);">'
-            + stNum(a.osszeg, 0) + ' EUR</b>&nbsp;<span class="text-muted">→ Pénzügy</span></div>';
+            + t('st.ov.overdueAlert', { db: stNum(a.db, 0), sum: stNum(a.osszeg, 0) }) + '</div>';
         }
       });
       if (alertsHtml) alertsHtml = '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">' + alertsHtml + '</div>';
@@ -190,11 +189,11 @@
       var rateRow = '';
       if (typeof VS_ROLE !== 'undefined' && VS_ROLE === 'admin') {
         rateRow = '<div class="glass" style="padding:10px 16px;margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
-          + '<span class="text-muted" style="font-size:12px;font-weight:700;">💱 Árfolyam (1 EUR = ? RON):</span>'
+          + '<span class="text-muted" style="font-size:12px;font-weight:700;">' + t('st.ov.rateLbl') + '</span>'
           + '<input class="input" id="stEurRon" type="number" step="0.0001" min="0" value="' + (rate || '') + '" placeholder="pl. 4.97" style="max-width:120px;padding:7px 10px;font-size:13px;">'
-          + '<button class="btn ghost" style="padding:7px 12px;font-size:12px;" title="A BNR hivatalos napi árfolyamának betöltése" onclick="VS_STATS.fetchBnr()">🏦 BNR</button>'
-          + '<button class="btn primary" style="padding:7px 14px;font-size:12px;" onclick="VS_STATS.saveRate()">Mentés</button>'
-          + '<span class="text-muted" style="font-size:11px;">Eredmény-számításhoz (EUR bevétel − RON költség). Üresen = nincs profit-számítás.</span>'
+          + '<button class="btn ghost" style="padding:7px 12px;font-size:12px;" title="' + t('st.ov.bnrTitle') + '" onclick="VS_STATS.fetchBnr()">🏦 BNR</button>'
+          + '<button class="btn primary" style="padding:7px 14px;font-size:12px;" onclick="VS_STATS.saveRate()">' + t('common.save') + '</button>'
+          + '<span class="text-muted" style="font-size:11px;">' + t('st.ov.rateHint') + '</span>'
           + '</div>';
       }
 
@@ -205,21 +204,21 @@
           + '<td style="text-align:right;">' + stNum(u.atlag_km, 0) + '</td>'
           + '<td style="text-align:right;">' + stNum(u.atlag_ar, 0) + '</td>'
           + '<td style="text-align:right;font-weight:700;">' + stNum(u.bevetel, 0) + '</td></tr>';
-      }).join('') || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:14px;">Nincs lezárt fuvar az időszakban.</td></tr>';
+      }).join('') || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:14px;">' + t('st.ov.noClosedRoute') + '</td></tr>';
 
       var tiles =
-        stTile('💶', stNum(k.bevetel, 0) + ' <span style="font-size:13px;">EUR</span>', 'Bevétel (lezárt fuvarok)')
-        + stTile('📦', stNum(k.lezart, 0), 'Lezárt fuvar (' + stNum(k.osszes, 0) + ' kiírt, ' + stNum(k.torolt, 0) + ' törölt)')
-        + stTile('🛣️', stNum(k.fuvarlevel_km, 0) + ' km', 'Megtett km (menetlevelek)')
-        + stTile('⛽', stNum(k.consum_100, 1) + ' L/100km', 'Flotta átlagfogyasztás')
-        + stTile('🗓️', stNum(k.diurna_ext, 0) + ' / ' + stNum(k.diurna_int, 0), 'Diurna napok (külső / belső)');
+        stTile('💶', stNum(k.bevetel, 0) + ' <span style="font-size:13px;">EUR</span>', t('st.ov.revClosed'))
+        + stTile('📦', stNum(k.lezart, 0), t('st.ov.closedOrder', { a: stNum(k.osszes, 0), b: stNum(k.torolt, 0) }))
+        + stTile('🛣️', stNum(k.fuvarlevel_km, 0) + ' km', t('st.ov.kmDone'))
+        + stTile('⛽', stNum(k.consum_100, 1) + ' L/100km', t('st.ov.fleetAvg'))
+        + stTile('🗓️', stNum(k.diurna_ext, 0) + ' / ' + stNum(k.diurna_int, 0), t('st.ov.diurnaDays'));
       if (fin) {
-        tiles += stTile('💰', stNum(fin.beszedett, 0) + ' <span style="font-size:13px;">EUR</span>', 'Beszedett összeg', 'var(--status-ok)')
-          + stTile('⏳', stNum(fin.kintlevo, 0) + ' <span style="font-size:13px;">EUR</span>', 'Kintlévőség (' + stNum(fin.kintlevo_db, 0) + ' fuvar)', 'var(--status-danger)');
+        tiles += stTile('💰', stNum(fin.beszedett, 0) + ' <span style="font-size:13px;">EUR</span>', t('st.ov.collected'), 'var(--status-ok)')
+          + stTile('⏳', stNum(fin.kintlevo, 0) + ' <span style="font-size:13px;">EUR</span>', t('st.ov.outstanding', { n: stNum(fin.kintlevo_db, 0) }), 'var(--status-danger)');
       }
       if (eredmeny != null) {
         tiles += stTile('🎯', stNum(eredmeny, 0) + ' <span style="font-size:13px;">EUR</span>',
-          'Eredmény (bevétel − sofőr-költségek, ' + stNum(rate, 2) + ' árfolyamon)',
+          t('st.ov.result', { r: stNum(rate, 2) }),
           eredmeny >= 0 ? 'var(--status-ok)' : 'var(--status-danger)');
       }
       box.innerHTML = stFilterBar('stats-overview')
@@ -227,12 +226,12 @@
         + rateRow
         + '<div class="dash-stats" style="margin-bottom:16px;">' + tiles + '</div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;">'
-        + stPanel('📈 Havi bevétel (EUR)', stChartCanvas('stChOvBevetel'))
-        + stPanel('💸 Havi költségek (RON) — tankolás + vásárlás', stChartCanvas('stChOvKoltseg'))
-        + (rate ? stPanel('🎯 Havi eredmény (EUR, ' + stNum(rate, 2) + ' árfolyamon)', stChartCanvas('stChOvEredmeny')) : '')
-        + stPanel('🗺️ Top útvonalak (lezárt fuvarok)',
+        + stPanel(t('st.ov.pRevenue'), stChartCanvas('stChOvBevetel'))
+        + stPanel(t('st.ov.pCost'), stChartCanvas('stChOvKoltseg'))
+        + (rate ? stPanel(t('st.ov.pResult', { r: stNum(rate, 2) }), stChartCanvas('stChOvEredmeny')) : '')
+        + stPanel(t('st.ov.pRoutes'),
             '<div style="overflow-x:auto;"><table class="table">'
-            + '<thead><tr><th>Útvonal</th><th style="text-align:right;">Fuvar</th><th style="text-align:right;">Átlag km</th><th style="text-align:right;">Átlagár (EUR)</th><th style="text-align:right;">Bevétel (EUR)</th></tr></thead>'
+            + '<thead><tr><th>' + t('st.ov.cRoute') + '</th><th style="text-align:right;">' + t('st.cOrder') + '</th><th style="text-align:right;">' + t('st.ov.cAvgKm') + '</th><th style="text-align:right;">' + t('st.ov.cAvgPrice') + '</th><th style="text-align:right;">' + t('st.cRevenue') + '</th></tr></thead>'
             + '<tbody>' + utvRows + '</tbody></table></div>')
         + '</div>';
 
@@ -240,15 +239,15 @@
       stChart('stChOvBevetel', {
         type: 'line',
         data: { labels: months, datasets: [{
-          label: 'Bevétel (EUR)', data: stSeries(months, r.havi_bevetel, 'osszeg'),
+          label: t('st.cRevenue'), data: stSeries(months, r.havi_bevetel, 'osszeg'),
           borderColor: '#e10b1a', backgroundColor: 'rgba(225,11,26,0.15)', fill: true, tension: 0.3
         }]}
       });
       stChart('stChOvKoltseg', {
         type: 'bar',
         data: { labels: months, datasets: [
-          { label: 'Üzemanyag (RON)', data: stSeries(months, r.havi_koltseg, 'uzemanyag'), backgroundColor: 'rgba(245,158,11,0.7)', stack: 'k' },
-          { label: 'Vásárlások (RON)', data: stSeries(months, r.havi_koltseg, 'vasarlas'), backgroundColor: 'rgba(59,130,246,0.7)', stack: 'k' }
+          { label: t('st.ds.fuel'), data: stSeries(months, r.havi_koltseg, 'uzemanyag'), backgroundColor: 'rgba(245,158,11,0.7)', stack: 'k' },
+          { label: t('st.ds.purchases'), data: stSeries(months, r.havi_koltseg, 'vasarlas'), backgroundColor: 'rgba(59,130,246,0.7)', stack: 'k' }
         ]},
         options: { scales: { x: { stacked: true }, y: { stacked: true } } }
       });
@@ -260,7 +259,7 @@
         stChart('stChOvEredmeny', {
           type: 'bar',
           data: { labels: months, datasets: [{
-            label: 'Eredmény (EUR)', data: profit,
+            label: t('st.cResult'), data: profit,
             backgroundColor: profit.map(function (v) { return v >= 0 ? 'rgba(34,197,94,0.7)' : 'rgba(239,68,68,0.7)'; })
           }]}
         });
@@ -274,14 +273,14 @@
   function loadFinance() {
     var box = document.getElementById('statsFinanceBox');
     if (!box) return;
-    box.innerHTML = stFilterBar('stats-finance') + '<div class="text-muted" style="padding:30px;text-align:center;">Betöltés...</div>';
+    box.innerHTML = stFilterBar('stats-finance') + '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
     gas('getFinanceStats', stRangeDates()).then(function (r) {
       if (!r || !r.ok) {
         box.innerHTML = stFilterBar('stats-finance')
           + '<div class="glass" style="padding:40px;text-align:center;">'
           + '<div style="font-size:36px;margin-bottom:10px;">🔒</div>'
-          + '<div class="text-primary" style="font-weight:700;margin-bottom:6px;">Nincs hozzáférésed a pénzügyi riporthoz</div>'
-          + '<div class="text-muted" style="font-size:13px;">' + esc((r && r.err) || 'Hiba történt') + '</div></div>';
+          + '<div class="text-primary" style="font-weight:700;margin-bottom:6px;">' + t('st.fin.noAccess') + '</div>'
+          + '<div class="text-muted" style="font-size:13px;">' + esc((r && r.err) || t('common.error')) + '</div></div>';
         return;
       }
       _stData['stats-finance'] = r;
@@ -299,34 +298,34 @@
           + '<td style="text-align:right;font-weight:700;color:var(--status-danger);">' + stNum(marad, 0) + '</td>'
           + '<td>' + stDate(o.finalized_at) + '</td>'
           + '<td style="text-align:center;">' + stDate(o.esedekes)
-          + (o.lejart ? ' <span class="badge err">Lejárt</span>' : ' <span class="badge warn">' + stNum(o.napok, 0) + ' nap</span>') + '</td>'
-          + '<td>' + (PAY_BADGE[o.payment_status] || '') + '</td>'
+          + (o.lejart ? ' <span class="badge err">' + t('st.fin.overdue') + '</span>' : ' <span class="badge warn">' + t('st.fin.days', { n: stNum(o.napok, 0) }) + '</span>') + '</td>'
+          + '<td>' + payBadge(o.payment_status) + '</td>'
           + '<td><button class="btn ok" style="padding:4px 10px;font-size:12px;" '
-          + 'onclick="openPaymentModal(\'' + esc(String(o.id)) + '\',' + (parseFloat(o.pret) || 0) + ',' + (parseFloat(o.paid_amount) || 0) + ')">💰 Fizetés</button></td>'
+          + 'onclick="openPaymentModal(\'' + esc(String(o.id)) + '\',' + (parseFloat(o.pret) || 0) + ',' + (parseFloat(o.paid_amount) || 0) + ')">' + t('st.fin.payBtn') + '</button></td>'
           + '</tr>';
-      }).join('') || '<tr><td colspan="9" class="text-muted" style="text-align:center;padding:18px;">Nincs kintlévőség. 🎉</td></tr>';
+      }).join('') || '<tr><td colspan="9" class="text-muted" style="text-align:center;padding:18px;">' + t('st.fin.noOut') + '</td></tr>';
 
       box.innerHTML = stFilterBar('stats-finance')
         + '<div class="dash-stats" style="margin-bottom:16px;">'
-        + stTile('💶', stNum(m.bevetel, 0) + ' <span style="font-size:13px;">EUR</span>', 'Bevétel (lezárt)')
-        + stTile('💰', stNum(beszedett, 0) + ' <span style="font-size:13px;">EUR</span>', 'Beszedett', 'var(--status-ok)')
-        + stTile('⏳', stNum(kintlevoTotal, 0) + ' <span style="font-size:13px;">EUR</span>', 'Teljes kintlévőség', 'var(--status-danger)')
-        + stTile('📏', stNum(m.per_km, 2) + ' EUR/km', 'Átlag fuvardíj / km')
-        + stTile('⌛', m.atlag_fizetesi_nap != null ? stNum(m.atlag_fizetesi_nap, 0) + ' nap' : '—', 'Átlagos fizetési idő')
+        + stTile('💶', stNum(m.bevetel, 0) + ' <span style="font-size:13px;">EUR</span>', t('st.fin.revClosed'))
+        + stTile('💰', stNum(beszedett, 0) + ' <span style="font-size:13px;">EUR</span>', t('st.fin.collected'), 'var(--status-ok)')
+        + stTile('⏳', stNum(kintlevoTotal, 0) + ' <span style="font-size:13px;">EUR</span>', t('st.fin.totalOut'), 'var(--status-danger)')
+        + stTile('📏', stNum(m.per_km, 2) + ' EUR/km', t('st.fin.perKm'))
+        + stTile('⌛', m.atlag_fizetesi_nap != null ? t('st.fin.days', { n: stNum(m.atlag_fizetesi_nap, 0) }) : '—', t('st.fin.avgPayDays'))
         + '</div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;">'
-        + stPanel('📊 Bevétel vs. beszedett (EUR / hó)', stChartCanvas('stChFinHavi'))
-        + stPanel('⏰ Kintlévőség öregedése (a teljesítés óta)',
+        + stPanel(t('st.fin.pRevVsCol'), stChartCanvas('stChFinHavi'))
+        + stPanel(t('st.fin.pAging'),
             '<div class="dash-veh-grid">'
-            + '<div class="dash-mini glass-soft"><div style="font-size:20px;">🟢</div><div style="font-size:22px;font-weight:800;color:var(--status-warn);">' + stNum(ag.d0_30, 0) + '</div><div class="text-muted" style="font-size:11px;">0–30 nap (EUR)</div></div>'
-            + '<div class="dash-mini glass-soft"><div style="font-size:20px;">🟠</div><div style="font-size:22px;font-weight:800;color:var(--status-warn);">' + stNum(ag.d31_60, 0) + '</div><div class="text-muted" style="font-size:11px;">31–60 nap (EUR)</div></div>'
-            + '<div class="dash-mini glass-soft"><div style="font-size:20px;">🔴</div><div style="font-size:22px;font-weight:800;color:var(--status-danger);">' + stNum(ag.d60p, 0) + '</div><div class="text-muted" style="font-size:11px;">60+ nap (EUR)</div></div>'
+            + '<div class="dash-mini glass-soft"><div style="font-size:20px;">🟢</div><div style="font-size:22px;font-weight:800;color:var(--status-warn);">' + stNum(ag.d0_30, 0) + '</div><div class="text-muted" style="font-size:11px;">' + t('st.fin.a0_30') + '</div></div>'
+            + '<div class="dash-mini glass-soft"><div style="font-size:20px;">🟠</div><div style="font-size:22px;font-weight:800;color:var(--status-warn);">' + stNum(ag.d31_60, 0) + '</div><div class="text-muted" style="font-size:11px;">' + t('st.fin.a31_60') + '</div></div>'
+            + '<div class="dash-mini glass-soft"><div style="font-size:20px;">🔴</div><div style="font-size:22px;font-weight:800;color:var(--status-danger);">' + stNum(ag.d60p, 0) + '</div><div class="text-muted" style="font-size:11px;">' + t('st.fin.a60p') + '</div></div>'
             + '</div>')
         + '</div>'
-        + stPanel('📋 Kintlévő fuvarok', '<div style="overflow-x:auto;"><table class="table">'
-            + '<thead><tr><th>Fuvar</th><th>Ügyfél</th><th style="text-align:right;">Ár (EUR)</th><th style="text-align:right;">Fizetve</th><th style="text-align:right;">Hátralék</th><th>Teljesítve</th><th style="text-align:center;">Esedékes</th><th>Státusz</th><th></th></tr></thead>'
+        + stPanel(t('st.fin.pOutOrders'), '<div style="overflow-x:auto;"><table class="table">'
+            + '<thead><tr><th>' + t('st.cOrder') + '</th><th>' + t('st.cClient') + '</th><th style="text-align:right;">' + t('st.fin.cPrice') + '</th><th style="text-align:right;">' + t('st.cPaid') + '</th><th style="text-align:right;">' + t('st.fin.cRemain') + '</th><th>' + t('st.fin.cDone') + '</th><th style="text-align:center;">' + t('st.fin.cDue') + '</th><th>' + t('st.cStatus') + '</th><th></th></tr></thead>'
             + '<tbody>' + listRows + '</tbody></table></div>',
-            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-finance\')">⬇️ CSV export</button>')
+            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-finance\')">' + t('st.csvExport') + '</button>')
         + '<div id="stProfitBox"></div>';
 
       loadOrderProfit();
@@ -335,8 +334,8 @@
       stChart('stChFinHavi', {
         type: 'bar',
         data: { labels: months, datasets: [
-          { label: 'Bevétel (EUR)', data: stSeries(months, r.havi, 'bevetel'), backgroundColor: 'rgba(225,11,26,0.65)' },
-          { label: 'Beszedett (EUR)', data: stSeries(months, r.havi, 'beszedett'), backgroundColor: 'rgba(34,197,94,0.65)' }
+          { label: t('st.fin.dsRevenue'), data: stSeries(months, r.havi, 'bevetel'), backgroundColor: 'rgba(225,11,26,0.65)' },
+          { label: t('st.fin.dsCollected'), data: stSeries(months, r.havi, 'beszedett'), backgroundColor: 'rgba(34,197,94,0.65)' }
         ]}
       });
     });
@@ -368,12 +367,12 @@
           + '<td style="text-align:right;">' + stNum(ktg, 0) + '</td>'
           + profitCell + '</tr>';
       }).join('');
-      box.innerHTML = stPanel('🎯 Fuvar-szintű eredmény (a menetlevél-költségek fuvaronként szétosztva)',
-        '<p class="text-muted" style="font-size:12px;margin:0 0 10px;">A tankolás/vásárlás-költség a menetlevélen szereplő fuvarok között egyenlően oszlik; az <b style="color:#fbbf24;">útdíj</b> (EUR) is levonódik az eredményből — közelítő érték.'
-        + (rate ? '' : ' <b>Állíts be árfolyamot az Áttekintésen az Eredmény-oszlophoz.</b>') + '</p>'
+      box.innerHTML = stPanel(t('st.fin.pProfit'),
+        '<p class="text-muted" style="font-size:12px;margin:0 0 10px;">' + t('st.fin.profitHint')
+        + (rate ? '' : t('st.fin.profitHint2')) + '</p>'
         + '<div style="overflow-x:auto;"><table class="table">'
-        + '<thead><tr><th>Fuvar</th><th>Ügyfél</th><th>Teljesítve</th><th style="text-align:right;">Km</th><th style="text-align:right;">Bevétel (EUR)</th><th style="text-align:right;">Útdíj (EUR)</th><th style="text-align:right;">Alváll. (EUR)</th><th style="text-align:right;">Költség (RON)</th>'
-        + (rate ? '<th style="text-align:right;">Eredmény (EUR)</th>' : '') + '</tr></thead>'
+        + '<thead><tr><th>' + t('st.cOrder') + '</th><th>' + t('st.cClient') + '</th><th>' + t('st.fin.cDone') + '</th><th style="text-align:right;">' + t('st.cKm') + '</th><th style="text-align:right;">' + t('st.cRevenue') + '</th><th style="text-align:right;">' + t('st.fin.cToll') + '</th><th style="text-align:right;">' + t('st.fin.cCarrier') + '</th><th style="text-align:right;">' + t('st.fin.cCostRon') + '</th>'
+        + (rate ? '<th style="text-align:right;">' + t('st.cResult') + '</th>' : '') + '</tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>');
     }).catch(function () { box.innerHTML = ''; });
   }
@@ -384,9 +383,9 @@
   function loadFuel() {
     var box = document.getElementById('statsFuelBox');
     if (!box) return;
-    box.innerHTML = stFilterBar('stats-fuel') + '<div class="text-muted" style="padding:30px;text-align:center;">Betöltés...</div>';
+    box.innerHTML = stFilterBar('stats-fuel') + '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
     gas('getFuelStats', stRangeDates()).then(function (r) {
-      if (!r || !r.ok) { box.innerHTML = stFilterBar('stats-fuel') + '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || 'Hiba') + '</div>'; return; }
+      if (!r || !r.ok) { box.innerHTML = stFilterBar('stats-fuel') + '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || t('common.error')) + '</div>'; return; }
       _stData['stats-fuel'] = r;
 
       var totL = 0, totS = 0;
@@ -412,7 +411,7 @@
           + '<td style="text-align:right;">' + (nevleges > 0 ? stNum(nevleges, 1) : '—') + '</td>'
           + '<td style="text-align:center;">' + diffBadge + '</td>'
           + '<td style="text-align:right;">' + stNum(j.menetlevelek, 0) + '</td></tr>';
-      }).join('') || '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:18px;">Nincs adat az időszakban.</td></tr>';
+      }).join('') || '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:18px;">' + t('st.noData') + '</td></tr>';
 
       var fillRows = (r.lista || []).map(function (a) {
         return '<tr><td>' + stDate(a.data_completare) + '</td>'
@@ -423,28 +422,28 @@
           + '<td style="text-align:right;">' + stNum(a.litru, 0) + '</td>'
           + '<td style="text-align:right;font-weight:700;">' + stNum(a.suma, 0) + '</td>'
           + '<td>' + esc(a.plata || '—') + '</td></tr>';
-      }).join('') || '<tr><td colspan="8" class="text-muted" style="text-align:center;padding:18px;">Nincs tankolás az időszakban.</td></tr>';
+      }).join('') || '<tr><td colspan="8" class="text-muted" style="text-align:center;padding:18px;">' + t('st.fu.noFills') + '</td></tr>';
 
       box.innerHTML = stFilterBar('stats-fuel')
         + '<div class="dash-stats" style="margin-bottom:16px;">'
-        + stTile('⛽', stNum(totL, 0) + ' L', 'Tankolt motorină')
-        + stTile('💸', stNum(totS, 0) + ' RON', 'Üzemanyag-költség')
-        + stTile('🏷️', stNum(avgPrice, 2) + ' RON/L', 'Átlagár')
-        + stTile('📉', stNum(fleetAvg, 1) + ' L/100km', 'Flotta átlagfogyasztás')
+        + stTile('⛽', stNum(totL, 0) + ' L', t('st.fu.fuelL'))
+        + stTile('💸', stNum(totS, 0) + ' RON', t('st.fu.fuelCost'))
+        + stTile('🏷️', stNum(avgPrice, 2) + ' RON/L', t('st.fu.avgPrice'))
+        + stTile('📉', stNum(fleetAvg, 1) + ' L/100km', t('st.ov.fleetAvg'))
         + '</div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;">'
-        + stPanel('📊 Havi tankolás (RON)', stChartCanvas('stChFuelHavi'))
-        + stPanel('💳 Fizetési mód megoszlás (tankolás)', stChartCanvas('stChFuelPlata'))
+        + stPanel(t('st.fu.pMonthly'), stChartCanvas('stChFuelHavi'))
+        + stPanel(t('st.fu.pPay'), stChartCanvas('stChFuelPlata'))
         + '</div>'
-        + stPanel('🚛 Járművenkénti fogyasztás — tényleges vs. névleges',
+        + stPanel(t('st.fu.pPerVeh'),
             '<div style="overflow-x:auto;"><table class="table">'
-            + '<thead><tr><th>Rendszám</th><th style="text-align:right;">Km</th><th style="text-align:right;">Motorină (L)</th><th style="text-align:right;">Tényl. L/100km</th><th style="text-align:right;">Névleges</th><th style="text-align:center;">Eltérés</th><th style="text-align:right;">Menetlevél</th></tr></thead>'
+            + '<thead><tr><th>' + t('st.cPlate') + '</th><th style="text-align:right;">' + t('st.cKm') + '</th><th style="text-align:right;">' + t('st.fu.cMotorinaL') + '</th><th style="text-align:right;">' + t('st.fu.cReal100') + '</th><th style="text-align:right;">' + t('st.cNominal') + '</th><th style="text-align:center;">' + t('st.cDiff') + '</th><th style="text-align:right;">' + t('st.cWaybill') + '</th></tr></thead>'
             + '<tbody>' + vehRows + '</tbody></table></div>')
-        + stPanel('🧾 Tankolások (utolsó 100)',
+        + stPanel(t('st.fu.pFills'),
             '<div style="overflow-x:auto;"><table class="table">'
-            + '<thead><tr><th>Dátum</th><th>Sofőr</th><th>Jármű</th><th>Hely</th><th>Típus</th><th style="text-align:right;">Liter</th><th style="text-align:right;">Összeg (RON)</th><th>Fizetés</th></tr></thead>'
+            + '<thead><tr><th>' + t('st.cDate') + '</th><th>' + t('st.cDriver') + '</th><th>' + t('st.cVehicle') + '</th><th>' + t('st.cPlace') + '</th><th>' + t('st.cType') + '</th><th style="text-align:right;">' + t('st.cLiter') + '</th><th style="text-align:right;">' + t('st.cSumRon') + '</th><th>' + t('st.cPay') + '</th></tr></thead>'
             + '<tbody>' + fillRows + '</tbody></table></div>',
-            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-fuel\')">⬇️ CSV export</button>');
+            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-fuel\')">' + t('st.csvExport') + '</button>');
 
       var months = stMonths([r.havi]);
       var motorina = r.havi.filter(function (h) { return h.tip !== 'AdBlue'; });
@@ -452,8 +451,8 @@
       stChart('stChFuelHavi', {
         type: 'bar',
         data: { labels: months, datasets: [
-          { label: 'Motorină (RON)', data: stSeries(months, motorina, 'suma'), backgroundColor: 'rgba(245,158,11,0.7)', stack: 'f' },
-          { label: 'AdBlue (RON)', data: stSeries(months, adblue, 'suma'), backgroundColor: 'rgba(59,130,246,0.7)', stack: 'f' }
+          { label: t('st.fu.dsMotorina'), data: stSeries(months, motorina, 'suma'), backgroundColor: 'rgba(245,158,11,0.7)', stack: 'f' },
+          { label: t('st.fu.dsAdblue'), data: stSeries(months, adblue, 'suma'), backgroundColor: 'rgba(59,130,246,0.7)', stack: 'f' }
         ]},
         options: { scales: { x: { stacked: true }, y: { stacked: true } } }
       });
@@ -474,9 +473,9 @@
   function loadPurchases() {
     var box = document.getElementById('statsPurchasesBox');
     if (!box) return;
-    box.innerHTML = stFilterBar('stats-purchases') + '<div class="text-muted" style="padding:30px;text-align:center;">Betöltés...</div>';
+    box.innerHTML = stFilterBar('stats-purchases') + '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
     gas('getPurchaseStats', stRangeDates()).then(function (r) {
-      if (!r || !r.ok) { box.innerHTML = stFilterBar('stats-purchases') + '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || 'Hiba') + '</div>'; return; }
+      if (!r || !r.ok) { box.innerHTML = stFilterBar('stats-purchases') + '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || t('common.error')) + '</div>'; return; }
       _stData['stats-purchases'] = r;
 
       var totS = 0, totDb = 0;
@@ -491,45 +490,45 @@
           + '<td>' + esc(c.loc || '—') + '</td>'
           + '<td style="text-align:right;font-weight:700;">' + stNum(c.pret, 0) + '</td>'
           + '<td>' + esc(c.plata || '—') + '</td></tr>';
-      }).join('') || '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:18px;">Nincs vásárlás az időszakban.</td></tr>';
+      }).join('') || '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:18px;">' + t('st.pu.noBuy') + '</td></tr>';
 
       var soferRows = (r.soforok || []).map(function (s) {
         return '<tr><td>' + esc(s.sofer || '—') + '</td>'
           + '<td style="text-align:right;">' + stNum(s.db, 0) + '</td>'
           + '<td style="text-align:right;font-weight:700;">' + stNum(s.suma, 0) + '</td></tr>';
-      }).join('') || '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:14px;">Nincs adat.</td></tr>';
+      }).join('') || '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:14px;">' + t('st.noDataShort') + '</td></tr>';
 
       box.innerHTML = stFilterBar('stats-purchases')
         + '<div class="dash-stats" style="margin-bottom:16px;">'
-        + stTile('🛒', stNum(totS, 0) + ' RON', 'Összes sofőr-költés')
-        + stTile('🧾', stNum(totDb, 0), 'Tétel (vásárlás)')
-        + stTile('💵', cashRow ? stNum(cashRow.suma, 0) + ' RON' : '0 RON', 'Ebből készpénz (elszámolandó)', 'var(--status-warn)')
+        + stTile('🛒', stNum(totS, 0) + ' RON', t('st.pu.totalSpend'))
+        + stTile('🧾', stNum(totDb, 0), t('st.pu.items'))
+        + stTile('💵', cashRow ? stNum(cashRow.suma, 0) + ' RON' : '0 RON', t('st.pu.cash'), 'var(--status-warn)')
         + '</div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;">'
-        + stPanel('📊 Havi költés (RON)', stChartCanvas('stChPurHavi'))
-        + stPanel('🏷️ Top termékek / szolgáltatások', stChartCanvas('stChPurTermek'))
+        + stPanel(t('st.pu.pMonthly'), stChartCanvas('stChPurHavi'))
+        + stPanel(t('st.pu.pTopProd'), stChartCanvas('stChPurTermek'))
         + '</div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;">'
-        + stPanel('👤 Sofőrönkénti költés (RON)',
-            '<div style="overflow-x:auto;"><table class="table"><thead><tr><th>Sofőr</th><th style="text-align:right;">Tétel</th><th style="text-align:right;">Összeg (RON)</th></tr></thead><tbody>' + soferRows + '</tbody></table></div>')
-        + stPanel('💳 Fizetési mód', stChartCanvas('stChPurPlata'))
+        + stPanel(t('st.pu.pPerDriver'),
+            '<div style="overflow-x:auto;"><table class="table"><thead><tr><th>' + t('st.cDriver') + '</th><th style="text-align:right;">' + t('st.pu.cItem') + '</th><th style="text-align:right;">' + t('st.cSumRon') + '</th></tr></thead><tbody>' + soferRows + '</tbody></table></div>')
+        + stPanel(t('st.pu.pPay'), stChartCanvas('stChPurPlata'))
         + '</div>'
-        + stPanel('🧾 Vásárlások (utolsó 100)',
+        + stPanel(t('st.pu.pList'),
             '<div style="overflow-x:auto;"><table class="table">'
-            + '<thead><tr><th>Dátum</th><th>Sofőr</th><th>Jármű</th><th>Termék</th><th>Hely</th><th style="text-align:right;">Ár (RON)</th><th>Fizetés</th></tr></thead>'
+            + '<thead><tr><th>' + t('st.cDate') + '</th><th>' + t('st.cDriver') + '</th><th>' + t('st.cVehicle') + '</th><th>' + t('st.cProduct') + '</th><th>' + t('st.cPlace') + '</th><th style="text-align:right;">' + t('st.pu.cPriceRon') + '</th><th>' + t('st.cPay') + '</th></tr></thead>'
             + '<tbody>' + listRows + '</tbody></table></div>',
-            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-purchases\')">⬇️ CSV export</button>');
+            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-purchases\')">' + t('st.csvExport') + '</button>');
 
       var months = stMonths([r.havi]);
       stChart('stChPurHavi', {
         type: 'bar',
-        data: { labels: months, datasets: [{ label: 'Költés (RON)', data: stSeries(months, r.havi, 'suma'), backgroundColor: 'rgba(59,130,246,0.7)' }] }
+        data: { labels: months, datasets: [{ label: t('st.pu.dsSpend'), data: stSeries(months, r.havi, 'suma'), backgroundColor: 'rgba(59,130,246,0.7)' }] }
       });
       stChart('stChPurTermek', {
         type: 'bar',
         data: {
-          labels: (r.termekek || []).map(function (t) { return t.produs; }),
-          datasets: [{ label: 'Összeg (RON)', data: (r.termekek || []).map(function (t) { return parseFloat(t.suma) || 0; }), backgroundColor: 'rgba(168,85,247,0.7)' }]
+          labels: (r.termekek || []).map(function (p) { return p.produs; }),
+          datasets: [{ label: t('st.cSumRon'), data: (r.termekek || []).map(function (p) { return parseFloat(p.suma) || 0; }), backgroundColor: 'rgba(168,85,247,0.7)' }]
         },
         options: { indexAxis: 'y' }
       });
@@ -550,9 +549,9 @@
   function loadDrivers() {
     var box = document.getElementById('statsDriversBox');
     if (!box) return;
-    box.innerHTML = stFilterBar('stats-drivers') + '<div class="text-muted" style="padding:30px;text-align:center;">Betöltés...</div>';
+    box.innerHTML = stFilterBar('stats-drivers') + '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
     gas('getDriverStats', stRangeDates()).then(function (r) {
-      if (!r || !r.ok) { box.innerHTML = stFilterBar('stats-drivers') + '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || 'Hiba') + '</div>'; return; }
+      if (!r || !r.ok) { box.innerHTML = stFilterBar('stats-drivers') + '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || t('common.error')) + '</div>'; return; }
       _stData['stats-drivers'] = r;
       var list = r.soforok || [];
       var rate = parseFloat(r.eur_ron_rate) || null;
@@ -577,24 +576,24 @@
           + '<td style="text-align:center;">' + stNum(s.diurna_ext, 0) + ' / ' + stNum(s.diurna_int, 0) + '</td>'
           + '<td style="text-align:right;">' + stNum(s.menetlevelek, 0) + '</td>'
           + '</tr>';
-      }).join('') || '<tr><td colspan="11" class="text-muted" style="text-align:center;padding:18px;">Nincs adat az időszakban.</td></tr>';
+      }).join('') || '<tr><td colspan="11" class="text-muted" style="text-align:center;padding:18px;">' + t('st.noData') + '</td></tr>';
 
       box.innerHTML = stFilterBar('stats-drivers')
-        + stPanel('🏆 Top sofőrök bevétel szerint (EUR)', stChartCanvas('stChDrvTop'))
-        + stPanel('👤 Sofőr teljesítmény-tábla',
+        + stPanel(t('st.dr.pTop'), stChartCanvas('stChDrvTop'))
+        + stPanel(t('st.dr.pTable'),
             '<div style="overflow-x:auto;"><table class="table">'
-            + '<thead><tr><th>Sofőr</th><th style="text-align:right;">Fuvar</th><th style="text-align:right;">Lezárt</th><th style="text-align:right;">Bevétel (EUR)</th><th style="text-align:right;">Km (menetlevél)</th><th style="text-align:right;">L/100km</th><th style="text-align:right;">Üzemanyag (RON)</th><th style="text-align:right;">Vásárlás (RON)</th>'
-            + (rate ? '<th style="text-align:right;">Eredmény (EUR)</th>' : '')
-            + '<th style="text-align:center;">Diurna K/B</th><th style="text-align:right;">Menetlevél</th></tr></thead>'
+            + '<thead><tr><th>' + t('st.cDriver') + '</th><th style="text-align:right;">' + t('st.cOrder') + '</th><th style="text-align:right;">' + t('st.cClosed') + '</th><th style="text-align:right;">' + t('st.cRevenue') + '</th><th style="text-align:right;">' + t('st.cKmWb') + '</th><th style="text-align:right;">L/100km</th><th style="text-align:right;">' + t('st.cFuelRon') + '</th><th style="text-align:right;">' + t('st.cBuyRon') + '</th>'
+            + (rate ? '<th style="text-align:right;">' + t('st.cResult') + '</th>' : '')
+            + '<th style="text-align:center;">' + t('st.dr.cDiurna') + '</th><th style="text-align:right;">' + t('st.cWaybill') + '</th></tr></thead>'
             + '<tbody>' + rows + '</tbody></table></div>',
-            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-drivers\')">⬇️ CSV export</button>');
+            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-drivers\')">' + t('st.csvExport') + '</button>');
 
       var top = list.slice(0, 10);
       stChart('stChDrvTop', {
         type: 'bar',
         data: {
           labels: top.map(function (s) { return s.nume || s.email; }),
-          datasets: [{ label: 'Bevétel (EUR)', data: top.map(function (s) { return parseFloat(s.bevetel) || 0; }), backgroundColor: 'rgba(225,11,26,0.7)' }]
+          datasets: [{ label: t('st.cRevenue'), data: top.map(function (s) { return parseFloat(s.bevetel) || 0; }), backgroundColor: 'rgba(225,11,26,0.7)' }]
         },
         options: { indexAxis: 'y' }
       });
@@ -607,9 +606,9 @@
   function loadVehiclesStats() {
     var box = document.getElementById('statsVehiclesBox');
     if (!box) return;
-    box.innerHTML = stFilterBar('stats-vehicles') + '<div class="text-muted" style="padding:30px;text-align:center;">Betöltés...</div>';
+    box.innerHTML = stFilterBar('stats-vehicles') + '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
     gas('getVehicleStats', stRangeDates()).then(function (r) {
-      if (!r || !r.ok) { box.innerHTML = stFilterBar('stats-vehicles') + '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || 'Hiba') + '</div>'; return; }
+      if (!r || !r.ok) { box.innerHTML = stFilterBar('stats-vehicles') + '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || t('common.error')) + '</div>'; return; }
       _stData['stats-vehicles'] = r;
       var list = r.jarmuvek || [];
       var rate = parseFloat(r.eur_ron_rate) || null;
@@ -626,7 +625,7 @@
         return '<tr>'
           + '<td><b class="text-primary">' + esc(v.rendszam_eredeti || v.rendszam || '—') + '</b>'
           + (v.marca ? '<div class="text-muted" style="font-size:11px;">' + esc(v.marca) + (v.model ? ' ' + esc(v.model) : '') + (v.an ? ' · ' + v.an : '') + '</div>' : '') + '</td>'
-          + '<td style="text-align:center;">' + (v.activ === false ? '<span class="badge err">Álló</span>' : '<span class="badge ok">Aktív</span>') + '</td>'
+          + '<td style="text-align:center;">' + (v.activ === false ? '<span class="badge err">' + t('st.bIdle') + '</span>' : '<span class="badge ok">' + t('st.bActive') + '</span>') + '</td>'
           + '<td style="text-align:right;">' + stNum(v.fuvarok, 0) + '</td>'
           + '<td style="text-align:right;">' + stNum(v.lezart, 0) + '</td>'
           + '<td style="text-align:right;font-weight:700;">' + stNum(v.bevetel, 0) + '</td>'
@@ -641,26 +640,26 @@
           + '<td style="text-align:right;">' + (consum > 0 ? stNum(consum, 1) : '—') + '</td>'
           + '<td style="text-align:center;">' + diffBadge + '</td>'
           + '</tr>';
-      }).join('') || '<tr><td colspan="12" class="text-muted" style="text-align:center;padding:18px;">Nincs adat az időszakban.</td></tr>';
+      }).join('') || '<tr><td colspan="12" class="text-muted" style="text-align:center;padding:18px;">' + t('st.noData') + '</td></tr>';
 
       box.innerHTML = stFilterBar('stats-vehicles')
         + '<div id="stGpsSnapshotBox"></div>'
         + '<div id="stGpsKmBox"></div>'
-        + stPanel('🏆 Top járművek bevétel szerint (EUR)', stChartCanvas('stChVehTop'))
-        + stPanel('🚛 Jármű-tábla',
+        + stPanel(t('st.ve.pTop'), stChartCanvas('stChVehTop'))
+        + stPanel(t('st.ve.pTable'),
             '<div style="overflow-x:auto;"><table class="table">'
-            + '<thead><tr><th>Jármű</th><th style="text-align:center;">Állapot</th><th style="text-align:right;">Fuvar</th><th style="text-align:right;">Lezárt</th><th style="text-align:right;">Bevétel (EUR)</th><th style="text-align:right;">EUR/km</th><th style="text-align:right;">Km (menetlevél)</th><th style="text-align:right;">Üzemanyag (RON)</th><th style="text-align:right;">Szerviz (RON)</th>'
-            + (rate ? '<th style="text-align:right;">Eredmény (EUR)</th>' : '')
-            + '<th style="text-align:right;">L/100km</th><th style="text-align:center;">Eltérés</th></tr></thead>'
+            + '<thead><tr><th>' + t('st.cVehicle') + '</th><th style="text-align:center;">' + t('st.cState') + '</th><th style="text-align:right;">' + t('st.cOrder') + '</th><th style="text-align:right;">' + t('st.cClosed') + '</th><th style="text-align:right;">' + t('st.cRevenue') + '</th><th style="text-align:right;">' + t('st.ve.cEurKm') + '</th><th style="text-align:right;">' + t('st.cKmWb') + '</th><th style="text-align:right;">' + t('st.cFuelRon') + '</th><th style="text-align:right;">' + t('st.ve.cService') + '</th>'
+            + (rate ? '<th style="text-align:right;">' + t('st.cResult') + '</th>' : '')
+            + '<th style="text-align:right;">L/100km</th><th style="text-align:center;">' + t('st.cDiff') + '</th></tr></thead>'
             + '<tbody>' + rows + '</tbody></table></div>',
-            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-vehicles\')">⬇️ CSV export</button>');
+            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-vehicles\')">' + t('st.csvExport') + '</button>');
 
       var top = list.filter(function (v) { return (parseFloat(v.bevetel) || 0) > 0; }).slice(0, 10);
       stChart('stChVehTop', {
         type: 'bar',
         data: {
           labels: top.map(function (v) { return v.rendszam_eredeti || v.rendszam; }),
-          datasets: [{ label: 'Bevétel (EUR)', data: top.map(function (v) { return parseFloat(v.bevetel) || 0; }), backgroundColor: 'rgba(34,197,94,0.7)' }]
+          datasets: [{ label: t('st.cRevenue'), data: top.map(function (v) { return parseFloat(v.bevetel) || 0; }), backgroundColor: 'rgba(34,197,94,0.7)' }]
         },
         options: { indexAxis: 'y' }
       });
@@ -683,13 +682,13 @@
           + '<td style="text-align:right;">' + stNum(x.drv_km, 0) + '</td>'
           + '<td style="text-align:right;font-weight:700;color:' + (warn ? 'var(--status-danger)' : 'inherit') + ';">' + (x.diff_km > 0 ? '+' : '') + stNum(x.diff_km, 0) + '</td>'
           + '<td style="text-align:center;">' + (x.diff_pct != null ? '<span class="badge ' + (warn ? 'err' : 'ok') + '">' + (x.diff_pct > 0 ? '+' : '') + stNum(x.diff_pct, 1) + '%</span>' : '—') + '</td>'
-          + '<td class="text-muted" style="text-align:right;font-size:12px;">' + stNum(x.napok, 0) + ' nap</td></tr>';
+          + '<td class="text-muted" style="text-align:right;font-size:12px;">' + t('st.fin.days', { n: stNum(x.napok, 0) }) + '</td></tr>';
       }).join('');
-      box.innerHTML = stPanel('🛰️ GPS-km vs. menetlevél-km (napi km-óra naplóból)',
+      box.innerHTML = stPanel(t('st.ve.pGpsKm'),
         '<div style="overflow-x:auto;"><table class="table">'
-        + '<thead><tr><th>Rendszám</th><th style="text-align:right;">GPS-km</th><th style="text-align:right;">Sofőr beírta</th><th style="text-align:right;">Eltérés</th><th style="text-align:center;">%</th><th style="text-align:right;">Mérési napok</th></tr></thead>'
+        + '<thead><tr><th>' + t('st.cPlate') + '</th><th style="text-align:right;">' + t('st.ve.gpsKm') + '</th><th style="text-align:right;">' + t('st.ve.drvWrote') + '</th><th style="text-align:right;">' + t('st.cDiff') + '</th><th style="text-align:center;">%</th><th style="text-align:right;">' + t('st.ve.measDays') + '</th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>'
-        + '<div class="text-muted" style="font-size:11px;margin-top:6px;">A GPS-km a napi automatikus km-óra snapshotokból számolódik — az első adatok a bekapcsolás utáni 2. naptól jelennek meg.</div>');
+        + '<div class="text-muted" style="font-size:11px;margin-top:6px;">' + t('st.ve.gpsKmHint') + '</div>');
     }).catch(function () { box.innerHTML = ''; });
   }
 
@@ -703,18 +702,18 @@
       var rows = r.vehicles.map(function (v) {
         var ign = v.ignition === 'ON' || v.ignition === true || v.ignition === 'on';
         return '<tr><td><b class="text-primary">' + esc(v.rendszam || v.object_name || '—') + '</b></td>'
-          + '<td style="text-align:center;">' + (ign ? '<span class="badge ok">Jár</span>' : '<span class="badge info">Áll</span>') + '</td>'
+          + '<td style="text-align:center;">' + (ign ? '<span class="badge ok">' + t('st.ve.bRunning') + '</span>' : '<span class="badge info">' + t('st.ve.bStopped') + '</span>') + '</td>'
           + '<td style="text-align:right;">' + (v.speed != null ? stNum(v.speed, 0) + ' km/h' : '—') + '</td>'
           + '<td style="text-align:right;">' + (v.fuel_level != null ? stNum(v.fuel_level, 0) + ' L' : '—') + '</td>'
           + '<td style="text-align:right;">' + (v.mileage != null ? stNum(v.mileage, 0) + ' km' : '—') + '</td>'
           + '<td style="text-align:right;">' + (v.fuel_consumption != null ? stNum(v.fuel_consumption, 1) : '—') + '</td>'
           + '<td class="text-muted" style="font-size:12px;">' + (v.datetime ? new Date(v.datetime).toLocaleString('hu-HU') : '—') + '</td></tr>';
       }).join('');
-      box.innerHTML = stPanel('🛰️ Élő flotta-adatok (CargoTrack GPS)',
+      box.innerHTML = stPanel(t('st.ve.pLive'),
         '<div style="overflow-x:auto;"><table class="table">'
-        + '<thead><tr><th>Jármű</th><th style="text-align:center;">Gyújtás</th><th style="text-align:right;">Sebesség</th><th style="text-align:right;">Üzemanyag-szint</th><th style="text-align:right;">Km-óra (GPS)</th><th style="text-align:right;">Fogyasztás</th><th>Utolsó jel</th></tr></thead>'
+        + '<thead><tr><th>' + t('st.cVehicle') + '</th><th style="text-align:center;">' + t('st.ve.ignition') + '</th><th style="text-align:right;">' + t('st.ve.speed') + '</th><th style="text-align:right;">' + t('st.ve.fuelLevel') + '</th><th style="text-align:right;">' + t('st.ve.gpsOdo') + '</th><th style="text-align:right;">' + t('st.ve.consumption') + '</th><th>' + t('st.ve.lastSignal') + '</th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>'
-        + '<div class="text-muted" style="font-size:11px;margin-top:8px;">Az üzemanyag-szint / km-óra csak akkor jelenik meg, ha a GPS-eszköz méri (CAN-bus kapcsolat).</div>');
+        + '<div class="text-muted" style="font-size:11px;margin-top:8px;">' + t('st.ve.liveHint') + '</div>');
     }).catch(function () { box.innerHTML = ''; });
   }
 
@@ -724,16 +723,16 @@
   function loadClients() {
     var box = document.getElementById('statsClientsBox');
     if (!box) return;
-    box.innerHTML = stFilterBar('stats-clients') + '<div class="text-muted" style="padding:30px;text-align:center;">Betöltés...</div>';
+    box.innerHTML = stFilterBar('stats-clients') + '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
     gas('getClientStats', stRangeDates()).then(function (r) {
-      if (!r || !r.ok) { box.innerHTML = stFilterBar('stats-clients') + '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || 'Hiba') + '</div>'; return; }
+      if (!r || !r.ok) { box.innerHTML = stFilterBar('stats-clients') + '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || t('common.error')) + '</div>'; return; }
       _stData['stats-clients'] = r;
       var list = r.ugyfelek || [];
       var fin = !!r.finance;
 
       var rows = list.map(function (u) {
-        var anaf = u.anaf_status === 'activ' ? '<span class="badge ok">ANAF aktív</span>'
-          : u.anaf_status === 'inactiv' ? '<span class="badge err">ANAF inaktív</span>' : '';
+        var anaf = u.anaf_status === 'activ' ? '<span class="badge ok">' + t('st.cl.anafActive') + '</span>'
+          : u.anaf_status === 'inactiv' ? '<span class="badge err">' + t('st.cl.anafInactive') + '</span>' : '';
         return '<tr><td><b class="text-primary">' + esc(u.ugyfel || '—') + '</b>'
           + (u.cui_cif ? '<div class="text-muted" style="font-size:11px;">' + esc(u.cui_cif) + '</div>' : '') + '</td>'
           + '<td>' + anaf + '</td>'
@@ -744,23 +743,23 @@
           + (fin ? '<td style="text-align:right;color:' + ((parseFloat(u.kintlevo) || 0) > 0 ? 'var(--status-danger)' : 'inherit') + ';font-weight:700;">' + stNum(u.kintlevo, 0) + '</td>' : '')
           + (fin ? '<td style="text-align:center;">' + (u.atlag_fizetesi_nap != null ? stNum(u.atlag_fizetesi_nap, 0) + ' nap' : '—') + '</td>' : '')
           + '</tr>';
-      }).join('') || '<tr><td colspan="8" class="text-muted" style="text-align:center;padding:18px;">Nincs adat az időszakban.</td></tr>';
+      }).join('') || '<tr><td colspan="8" class="text-muted" style="text-align:center;padding:18px;">' + t('st.noData') + '</td></tr>';
 
       box.innerHTML = stFilterBar('stats-clients')
-        + stPanel('🏆 Top ügyfelek bevétel szerint (EUR)', stChartCanvas('stChCliTop'))
-        + stPanel('🤝 Ügyfél-tábla',
+        + stPanel(t('st.cl.pTop'), stChartCanvas('stChCliTop'))
+        + stPanel(t('st.cl.pTable'),
             '<div style="overflow-x:auto;"><table class="table">'
-            + '<thead><tr><th>Ügyfél</th><th>ANAF</th><th style="text-align:right;">Fuvar</th><th style="text-align:right;">Lezárt</th><th style="text-align:right;">Bevétel (EUR)</th><th style="text-align:right;">Km</th>'
-            + (fin ? '<th style="text-align:right;">Kintlévő (EUR)</th><th style="text-align:center;">Átl. fizetési idő</th>' : '')
+            + '<thead><tr><th>' + t('st.cClient') + '</th><th>ANAF</th><th style="text-align:right;">' + t('st.cOrder') + '</th><th style="text-align:right;">' + t('st.cClosed') + '</th><th style="text-align:right;">' + t('st.cRevenue') + '</th><th style="text-align:right;">' + t('st.cKm') + '</th>'
+            + (fin ? '<th style="text-align:right;">' + t('st.cl.cOutEur') + '</th><th style="text-align:center;">' + t('st.cl.cAvgPay') + '</th>' : '')
             + '</tr></thead><tbody>' + rows + '</tbody></table></div>',
-            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-clients\')">⬇️ CSV export</button>');
+            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-clients\')">' + t('st.csvExport') + '</button>');
 
       var top = list.slice(0, 10);
       stChart('stChCliTop', {
         type: 'bar',
         data: {
           labels: top.map(function (u) { return u.ugyfel; }),
-          datasets: [{ label: 'Bevétel (EUR)', data: top.map(function (u) { return parseFloat(u.bevetel) || 0; }), backgroundColor: 'rgba(59,130,246,0.7)' }]
+          datasets: [{ label: t('st.cRevenue'), data: top.map(function (u) { return parseFloat(u.bevetel) || 0; }), backgroundColor: 'rgba(59,130,246,0.7)' }]
         },
         options: { indexAxis: 'y' }
       });
@@ -773,9 +772,9 @@
   function loadPermissions() {
     var box = document.getElementById('statsPermissionsBox');
     if (!box) return;
-    box.innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">Betöltés...</div>';
+    box.innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
     gas('getStatsPermissions').then(function (r) {
-      if (!r || !r.ok) { box.innerHTML = '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || 'Hiba') + '</div>'; return; }
+      if (!r || !r.ok) { box.innerHTML = '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || t('common.error')) + '</div>'; return; }
       var rows = (r.users || []).map(function (u) {
         return '<tr><td><b class="text-primary">' + esc(u.nume || '—') + '</b></td>'
           + '<td>' + esc(u.email) + '</td>'
@@ -784,48 +783,48 @@
           + '<label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">'
           + '<input type="checkbox" ' + (u.finance_enabled ? 'checked' : '') + ' style="width:18px;height:18px;cursor:pointer;accent-color:#22c55e;" '
           + 'onchange="VS_STATS.setPerm(' + u.id + ', this.checked)">'
-          + '<span style="font-size:12px;" class="text-muted">Pénzügy látható</span></label>'
+          + '<span style="font-size:12px;" class="text-muted">' + t('st.pm.financeVisible') + '</span></label>'
           + '</td></tr>';
-      }).join('') || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:18px;">Nincs Manager felhasználó a cégben.</td></tr>';
+      }).join('') || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:18px;">' + t('st.pm.noManager') + '</td></tr>';
 
-      box.innerHTML = stPanel('🔐 Pénzügyi riport láthatósága',
-        '<p class="text-muted" style="font-size:13px;margin:0 0 14px;">Itt adhatsz engedélyt a Manager munkatársaknak a <b>Pénzügy</b> riport (bevétel, beszedett, kintlévőség) megtekintésére. Admin mindig lát mindent; engedély nélkül a Manager a Pénzügy fület és a pénzügyi oszlopokat nem látja.</p>'
+      box.innerHTML = stPanel(t('st.pm.pTitle'),
+        '<p class="text-muted" style="font-size:13px;margin:0 0 14px;">' + t('st.pm.desc') + '</p>'
         + '<div style="overflow-x:auto;"><table class="table">'
-        + '<thead><tr><th>Név</th><th>E-mail</th><th>Pozíció</th><th style="text-align:center;">Engedély</th></tr></thead>'
+        + '<thead><tr><th>' + t('col.name') + '</th><th>' + t('common.email') + '</th><th>' + t('col.position') + '</th><th style="text-align:center;">' + t('st.pm.permission') + '</th></tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>');
     });
   }
 
   function setPerm(userId, enabled) {
     gas('setStatsPermission', [userId, enabled]).then(function (r) {
-      if (r && r.ok) toast(enabled ? '✅ Engedély megadva' : 'Engedély visszavonva', 'ok');
-      else { toast((r && r.err) || 'Hiba', 'err'); loadPermissions(); }
+      if (r && r.ok) toast(enabled ? t('st.pm.granted') : t('st.pm.revoked'), 'ok');
+      else { toast((r && r.err) || t('common.error'), 'err'); loadPermissions(); }
     });
   }
 
   // ── CSV exportok (az utoljára betöltött adatból) ────────
   function csvExport(pane) {
     var r = _stData[pane];
-    if (!r) { toast('Előbb töltsd be az adatokat!', 'err'); return; }
+    if (!r) { toast(t('st.t.loadFirst'), 'err'); return; }
     var stamp = new Date().toISOString().slice(0, 10);
     if (pane === 'stats-finance') {
       stCsv('kintlevoseg-' + stamp + '.csv',
-        ['Fuvar', 'Ügyfél', 'Ár (EUR)', 'Fizetve', 'Hátralék', 'Teljesítve', 'Eltelt nap', 'Státusz'],
+        [t('st.cOrder'), t('st.cClient'), t('st.fin.cPrice'), t('st.cPaid'), t('st.fin.cRemain'), t('st.fin.cDone'), t('st.csv.elapsedDays'), t('st.cStatus')],
         (r.kintlevo_lista || []).map(function (o) {
           return [o.id, o.client, o.pret, o.paid_amount, (parseFloat(o.pret) || 0) - (parseFloat(o.paid_amount) || 0), stDate(o.finalized_at), o.napok, o.payment_status];
         }));
     } else if (pane === 'stats-fuel') {
       stCsv('tankolasok-' + stamp + '.csv',
-        ['Dátum', 'Sofőr', 'Jármű', 'Hely', 'Típus', 'Liter', 'Összeg (RON)', 'Fizetés'],
+        [t('st.cDate'), t('st.cDriver'), t('st.cVehicle'), t('st.cPlace'), t('st.cType'), t('st.cLiter'), t('st.cSumRon'), t('st.cPay')],
         (r.lista || []).map(function (a) { return [stDate(a.data_completare), a.nume_sofer, a.numar_camion, a.loc, a.tip, a.litru, a.suma, a.plata]; }));
     } else if (pane === 'stats-purchases') {
       stCsv('vasarlasok-' + stamp + '.csv',
-        ['Dátum', 'Sofőr', 'Jármű', 'Termék', 'Hely', 'Ár (RON)', 'Fizetés'],
+        [t('st.cDate'), t('st.cDriver'), t('st.cVehicle'), t('st.cProduct'), t('st.cPlace'), t('st.pu.cPriceRon'), t('st.cPay')],
         (r.lista || []).map(function (c) { return [stDate(c.data_completare), c.nume_sofer, c.numar_camion, c.produs, c.loc, c.pret, c.plata]; }));
     } else if (pane === 'stats-drivers') {
       var dRate = parseFloat(r.eur_ron_rate) || null;
       stCsv('sofor-teljesitmeny-' + stamp + '.csv',
-        ['Sofőr', 'E-mail', 'Fuvar', 'Lezárt', 'Bevétel (EUR)', 'Km (menetlevél)', 'L/100km', 'Üzemanyag (RON)', 'Vásárlás (RON)', 'Eredmény (EUR)', 'Diurna külső', 'Diurna belső', 'Menetlevél'],
+        [t('st.cDriver'), t('common.email'), t('st.cOrder'), t('st.cClosed'), t('st.cRevenue'), t('st.cKmWb'), 'L/100km', t('st.cFuelRon'), t('st.cBuyRon'), t('st.cResult'), t('st.csv.diurnaExt'), t('st.csv.diurnaInt'), t('st.cWaybill')],
         (r.soforok || []).map(function (s) {
           var p = dRate ? Math.round((parseFloat(s.bevetel) || 0) - ((parseFloat(s.uzemanyag_ktg) || 0) + (parseFloat(s.vasarlas_ktg) || 0)) / dRate) : '';
           return [s.nume, s.email, s.fuvarok, s.lezart, s.bevetel, s.total_km, s.consum_100, s.uzemanyag_ktg, s.vasarlas_ktg, p, s.diurna_ext, s.diurna_int, s.menetlevelek];
@@ -833,14 +832,14 @@
     } else if (pane === 'stats-vehicles') {
       var vRate = parseFloat(r.eur_ron_rate) || null;
       stCsv('jarmu-kihasznaltsag-' + stamp + '.csv',
-        ['Rendszám', 'Márka', 'Fuvar', 'Lezárt', 'Bevétel (EUR)', 'EUR/km', 'Km (menetlevél)', 'Üzemanyag (RON)', 'Szerviz (RON)', 'Eredmény (EUR)', 'L/100km', 'Névleges'],
+        [t('st.cPlate'), t('col.brand'), t('st.cOrder'), t('st.cClosed'), t('st.cRevenue'), t('st.ve.cEurKm'), t('st.cKmWb'), t('st.cFuelRon'), t('st.ve.cService'), t('st.cResult'), 'L/100km', t('st.cNominal')],
         (r.jarmuvek || []).map(function (v) {
           var p = vRate ? Math.round((parseFloat(v.bevetel) || 0) - ((parseFloat(v.uzemanyag_ktg) || 0) + (parseFloat(v.szerviz_ktg) || 0)) / vRate) : '';
           return [v.rendszam_eredeti || v.rendszam, (v.marca || '') + ' ' + (v.model || ''), v.fuvarok, v.lezart, v.bevetel, v.bevetel_per_km, v.total_km, v.uzemanyag_ktg, v.szerviz_ktg, p, v.consum_100, v.nevleges];
         }));
     } else if (pane === 'stats-clients') {
       stCsv('ugyfel-riport-' + stamp + '.csv',
-        ['Ügyfél', 'CUI', 'Fuvar', 'Lezárt', 'Bevétel (EUR)', 'Km', 'Kintlévő (EUR)', 'Átl. fizetési nap'],
+        [t('st.cClient'), 'CUI', t('st.cOrder'), t('st.cClosed'), t('st.cRevenue'), t('st.cKm'), t('st.cl.cOutEur'), t('st.csv.avgPayDay')],
         (r.ugyfelek || []).map(function (u) { return [u.ugyfel, u.cui_cif, u.fuvarok, u.lezart, u.bevetel, u.km, u.kintlevo, u.atlag_fizetesi_nap]; }));
     }
   }
@@ -870,9 +869,9 @@
     },
     applyCustom: function (pane) {
       var f = (document.getElementById('stFrom') || {}).value;
-      var t = (document.getElementById('stTo') || {}).value;
-      if (!f || !t) { toast('Add meg a kezdő és záró dátumot!', 'err'); return; }
-      _stRange.preset = 'custom'; _stRange.from = f; _stRange.to = t;
+      var to = (document.getElementById('stTo') || {}).value;
+      if (!f || !to) { toast(t('st.t.giveDates'), 'err'); return; }
+      _stRange.preset = 'custom'; _stRange.from = f; _stRange.to = to;
       VS_STATS.load(pane);
     },
     csv: csvExport,
@@ -881,8 +880,8 @@
     saveRate: function () {
       var v = (document.getElementById('stEurRon') || {}).value;
       gas('setEurRonRate', [v === '' ? null : v]).then(function (r) {
-        if (r && r.ok) { toast('💱 Árfolyam mentve', 'ok'); VS_STATS.load('stats-overview'); }
-        else toast((r && r.err) || 'Hiba', 'err');
+        if (r && r.ok) { toast(t('st.t.rateSaved'), 'ok'); VS_STATS.load('stats-overview'); }
+        else toast((r && r.err) || t('common.error'), 'err');
       });
     },
     fetchBnr: function () {
@@ -890,8 +889,8 @@
         if (r && r.ok) {
           var inp = document.getElementById('stEurRon');
           if (inp) inp.value = r.rate;
-          toast('🏦 BNR árfolyam (' + (r.date || 'ma') + '): ' + r.rate + ' — kattints a Mentésre!', 'ok');
-        } else toast((r && r.err) || 'A BNR nem elérhető', 'err');
+          toast(t('st.t.bnrRate', { date: (r.date || t('st.t.bnrToday')), rate: r.rate }), 'ok');
+        } else toast((r && r.err) || t('st.t.bnrUnavail'), 'err');
       });
     }
   };
