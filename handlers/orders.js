@@ -361,6 +361,121 @@ handlers.comCreate = async function (req, res, args) {
     }
   };
 
+// ─── Tömeges fuvar-import (CSV) ──────────────────────────────
+// args: [{ rows:[{ client, ref, pret, km, suly_kg, load_type, hossz_cm,
+//   szel_cm, mag_cm, loc_incarcare, loc_descarcare, data_incarcare,
+//   data_descarcare, sofer_type, email_sofer, nume_sofer, firma_extern,
+//   telefon_extern, rendszam_camion, rendszam_remorca, import_extra }] }]
+// Megengedő: minden nem üres sorból fuvar lesz (a hiányzók üresen maradnak),
+// a rendszer által nem ismert oszlopok az import_extra-ban őrződnek.
+// Auto-párosítás (sofőr/jármű/pótkocsi) soronként, mint a comCreate-nél.
+handlers.bulkCreateOrders = async function (req, res, args) {
+  try {
+    if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    }
+    const cid = req.session.user.company_id;
+    const a = (args && args[0]) || {};
+    let rows = Array.isArray(a.rows) ? a.rows : [];
+    if (!rows.length) return res.json({ result: { ok: false, err: 'Nincs importálható sor.' } });
+    if (rows.length > 1000) rows = rows.slice(0, 1000); // fair-use felső korlát
+
+    let inserted = 0;
+    const failed = [];
+    const ids = [];
+    for (let idx = 0; idx < rows.length; idx++) {
+      const o = rows[idx] || {};
+      try {
+        const client = String(o.client || '').trim();
+        const ref = String(o.ref || '').trim();
+        const pret = Number(o.pret || 0) || 0;
+        const km = Number(o.km || 0) || 0;
+        const loc_incarcare = String(o.loc_incarcare || '').trim();
+        const loc_descarcare = String(o.loc_descarcare || '').trim();
+        const data_incarcare = o.data_incarcare || null;
+        const data_descarcare = o.data_descarcare || null;
+        const firma_extern = o.firma_extern ? String(o.firma_extern).trim() : null;
+        const telefon_extern = o.telefon_extern ? String(o.telefon_extern).trim() : null;
+        const external_driver_id = o.external_driver_id ? parseInt(o.external_driver_id, 10) : null;
+        const suly_kg = (o.suly_kg === '' || o.suly_kg == null) ? null : Number(o.suly_kg);
+        const load_type = ['FTL', 'LTL'].includes(o.load_type) ? o.load_type : null;
+        const hossz_cm = _posIntCm(o.hossz_cm), szel_cm = _posIntCm(o.szel_cm), mag_cm = _posIntCm(o.mag_cm);
+        const import_extra = (o.import_extra && typeof o.import_extra === 'object' && Object.keys(o.import_extra).length)
+          ? o.import_extra : null;
+
+        // teljesen üres sor kihagyása (semmi értékelhető adat)
+        if (!client && !ref && !loc_incarcare && !loc_descarcare && !import_extra
+            && !o.email_sofer && !o.nume_sofer && !firma_extern && !o.rendszam_camion) {
+          failed.push({ row: idx + 1, err: 'üres sor' });
+          continue;
+        }
+
+        // auto-párosítás (sofőr↔jármű, majd vontató↔pótkocsi) — csak üres mezőbe
+        const pair = await autoPairDriverVehicle(cid, {
+          sofer_type: o.sofer_type || null,
+          email_sofer: o.email_sofer ? String(o.email_sofer).trim().toLowerCase() : null,
+          nume_sofer: o.nume_sofer ? String(o.nume_sofer).trim() : null,
+          rendszam_camion: o.rendszam_camion ? String(o.rendszam_camion).trim().toUpperCase() : null,
+        });
+        const sofer_type = pair.sofer_type;
+        const email_sofer = pair.email_sofer;
+        const nume_sofer = pair.nume_sofer;
+        const rendszam_camion = pair.rendszam_camion ? String(pair.rendszam_camion).toUpperCase() : null;
+        let rendszam_remorca = o.rendszam_remorca ? String(o.rendszam_remorca).trim().toUpperCase() : null;
+        if (rendszam_camion && !rendszam_remorca) {
+          const t = await autoPairTrailer(cid, rendszam_camion); if (t) rendszam_remorca = t;
+        }
+
+        let status = 'Disponibil';
+        if (sofer_type === 'Intern' && email_sofer) status = 'Alocat';
+        else if (sofer_type === 'Extern') status = 'Extern';
+
+        const id = genDocId('CMD');
+        const dbc = await pool.connect();
+        try {
+          await dbc.query('BEGIN');
+          await dbc.query(
+            `INSERT INTO orders (
+              id, client, ref, loc_incarcare, loc_descarcare,
+              data_incarcare, data_descarcare, pret, km,
+              sofer_type, email_sofer, nume_sofer,
+              firma_extern, telefon_extern, external_driver_id,
+              rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type,
+              hossz_cm, szel_cm, mag_cm, import_extra
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
+            [id, client, ref, loc_incarcare, loc_descarcare,
+             data_incarcare, data_descarcare, pret, km,
+             sofer_type, email_sofer, nume_sofer,
+             firma_extern, telefon_extern, external_driver_id,
+             rendszam_camion, rendszam_remorca, status, cid, suly_kg, load_type,
+             hossz_cm, szel_cm, mag_cm, import_extra ? JSON.stringify(import_extra) : null]);
+          await dbc.query(
+            `INSERT INTO order_legs (
+              order_id, leg_number, sofer_type, email_sofer, nume_sofer,
+              firma_extern, telefon_extern, external_driver_id,
+              rendszam_camion, rendszam_remorca, loc_preluare, data_preluare, company_id
+            ) VALUES ($1,1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+            [id, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
+             rendszam_camion, rendszam_remorca, loc_incarcare, data_incarcare, cid]);
+          await dbc.query('COMMIT');
+        } catch (txErr) {
+          await dbc.query('ROLLBACK').catch(() => {});
+          throw txErr;
+        } finally {
+          dbc.release();
+        }
+        inserted++; ids.push(id);
+      } catch (rowErr) {
+        failed.push({ row: idx + 1, err: (rowErr && rowErr.message) || 'hiba' });
+      }
+    }
+    return res.json({ result: { ok: true, inserted, skipped: failed.length, failed: failed.slice(0, 50), ids } });
+  } catch (err) {
+    console.error('bulkCreateOrders hiba:', err);
+    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+  }
+};
+
 handlers.comUpdate = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {

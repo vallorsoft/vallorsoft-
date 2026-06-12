@@ -829,3 +829,22 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
   #routeMapModal .rmm-side { width: auto; border-left: none; border-top: 1px solid var(--glass-border-dark); max-height: 38vh; }
   #routeMapModal .rmm-map { min-height: 300px; }
 }
+
+/* ── Fuvar-CSV import modal ───────────────────────────────── */
+#orderImportModal {
+  position: fixed; inset: 0; z-index: 4100; display: none;
+  background: rgba(3,6,10,0.72); backdrop-filter: blur(3px);
+  align-items: flex-start; justify-content: center; padding: 24px 16px; overflow-y: auto;
+}
+#orderImportModal.open { display: flex; }
+#orderImportModal .oi-card {
+  width: min(1040px, 100%); background: var(--bg-panel-raised);
+  border: 1px solid var(--glass-border-dark); border-radius: var(--radius-lg); overflow: hidden;
+}
+#orderImportModal .oi-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--glass-border-dark); }
+#orderImportModal .oi-body { padding: 16px 18px; }
+#orderImportModal .oi-map-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+#orderImportModal .oi-prev { overflow-x: auto; border: 1px solid var(--glass-border-dark); border-radius: var(--radius-md); }
+#orderImportModal .oi-prev table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#orderImportModal .oi-prev th, #orderImportModal .oi-prev td { padding: 5px 8px; border-bottom: 1px solid var(--glass-border-dark); white-space: nowrap; text-align: left; }
+#orderImportModal .oi-prev th { color: var(--text-muted); font-weight: 600; }
