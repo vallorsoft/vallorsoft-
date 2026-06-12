@@ -37,7 +37,7 @@ handlers.estimateToll = async function (req, res, args) {
     }
 
     let est;
-    try { est = await estimateRoute(waypoints); }
+    try { est = await estimateRoute(waypoints, cid); }
     catch (e) { return res.json({ result: { ok: false, err: 'Az útvonal nem számolható: ' + (e.message || '') } }); }
 
     const toll = await estimateFromPolyline(cid, est.polyline);
