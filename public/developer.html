@@ -147,8 +147,17 @@
 
     <!-- HERE API FUNKCIÓK -->
     <div class="dev-pane hidden" id="pane-here">
+      <div class="section-title" style="margin:0 0 8px;">🗺️ Térkép-szolgáltatás árazása (cégeknek továbbszámlázva)</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+        A cégeknek <b>NINCS ingyenes keret</b> — az <b>első hívástól</b> fizetnek. A díj a <b>hivatalos ár + árrés%</b>.
+        Add meg a hivatalos egységárat (EUR / 1000 hívás) és az árrést szolgáltatónként.
+      </div>
+      <div id="mapsPricingBox" class="glass" style="padding:14px;margin-bottom:12px;">Betöltés...</div>
+      <div class="section-title" style="margin-top:18px;">Cégenkénti térkép-használat és fizetendő (aktuális hónap)</div>
+      <div id="mapsUsageBox" style="margin-bottom:26px;"><div style="color:var(--muted);font-size:13px;">Betöltés...</div></div>
+
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
-        <div class="section-title" style="margin:0;">⚡ HERE Térkép szolgáltatások</div>
+        <div class="section-title" style="margin:0;">⚡ HERE Térkép szolgáltatások (legacy)</div>
         <div id="hereGrandTotal" style="font-size:14px;font-weight:800;color:#c084fc;">—</div>
       </div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">
@@ -447,6 +456,7 @@ function confirmInvoice(){
 var _hereTimer=null;
 var HERE_ICONS={autocomplete:'🔍',geocode:'📍',raster_tile:'🗺',routing_truck:'🚛'};
 function loadHerePane(){
+  loadMapsPricingDev(); loadMapsUsageDev();
   loadHereByCompany();
   gas('getHereServices').then(function(r){
     var tb=document.getElementById('hereTbody'); if(!tb) return;
@@ -480,6 +490,47 @@ function saveHerePrice(key,btn){
     if(r&&r.ok){ toast('✅ Ár mentve','ok'); loadHereByCompany(); }
     else toast((r&&r.err)||'Hiba','err');
   }).catch(function(){ btn.disabled=false; toast('Hiba','err'); });
+}
+var MAPS_VENDOR_LBL={here:'HERE',google:'Google Maps'};
+function loadMapsPricingDev(){
+  gas('devGetMapsPricing').then(function(r){
+    var box=document.getElementById('mapsPricingBox'); if(!box) return;
+    if(!r||!r.ok){ box.innerHTML='<div style="color:var(--err);font-size:13px;">Nem elérhető.</div>'; return; }
+    box.innerHTML='<table class="table" style="width:100%;"><thead><tr><th>Szolgáltató</th><th>Hivatalos ár (EUR / 1000)</th><th>Árrés %</th><th>Cégnek (1000)</th><th></th></tr></thead><tbody>'
+      +(r.rows||[]).map(function(p){
+        var per1000=(Number(p.eur_per_unit)||0)*1000; var withM=per1000*(1+(Number(p.margin_pct)||0)/100);
+        return '<tr><td><b style="color:#fff;">'+(MAPS_VENDOR_LBL[p.vendor]||p.vendor)+'</b></td>'
+          +'<td><input id="mp_u_'+p.vendor+'" type="number" step="0.01" min="0" value="'+per1000.toFixed(2)+'" style="width:100px;padding:5px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:#fff;"> €</td>'
+          +'<td><input id="mp_m_'+p.vendor+'" type="number" step="1" min="0" value="'+(Number(p.margin_pct)||25)+'" style="width:70px;padding:5px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:#fff;"> %</td>'
+          +'<td style="font-weight:800;color:#c084fc;">'+withM.toFixed(2)+' €</td>'
+          +'<td><button class="btn-dev" style="padding:5px 12px;font-size:12px;" onclick="saveMapsPricing(\''+p.vendor+'\',this)">💾</button></td></tr>';
+      }).join('')+'</tbody></table>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:8px;">A „Cégnek" oszlop = hivatalos ár × (1 + árrés%) — ennyit fizet a cég 1000 hívásért, az első hívástól.</div>';
+  });
+}
+function saveMapsPricing(vendor,btn){
+  var u=parseFloat((document.getElementById('mp_u_'+vendor)||{}).value)/1000;
+  var m=parseFloat((document.getElementById('mp_m_'+vendor)||{}).value);
+  if(!isFinite(u)||u<0){ toast('Érvénytelen ár','err'); return; }
+  btn.disabled=true;
+  gas('devSaveMapsPricing',[{vendor:vendor, eur_per_unit:u, margin_pct:isFinite(m)?m:25}]).then(function(r){
+    btn.disabled=false;
+    if(r&&r.ok){ toast('✅ Ár mentve','ok'); loadMapsPricingDev(); loadMapsUsageDev(); }
+    else toast((r&&r.err)||'Hiba','err');
+  }).catch(function(){ btn.disabled=false; });
+}
+function loadMapsUsageDev(){
+  gas('devMapsUsageOverview').then(function(r){
+    var el=document.getElementById('mapsUsageBox'); if(!el) return;
+    if(!r||!r.ok){ el.innerHTML='<div style="color:var(--err);font-size:13px;">Nem elérhető.</div>'; return; }
+    var rows=r.rows||[];
+    if(!rows.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;">Nincs fizetős térkép-használat ebben a hónapban.</div>'; return; }
+    var total=rows.reduce(function(s,x){return s+(Number(x.cost)||0);},0);
+    el.innerHTML='<table class="table" style="width:100%;"><thead><tr><th>Cég</th><th>Szolgáltató</th><th style="text-align:right;">Hívás</th><th style="text-align:right;">Fizetendő (EUR)</th></tr></thead><tbody>'
+      +rows.map(function(x){ return '<tr><td><b style="color:#fff;">'+escHtml(x.ceg_nev||('#'+x.company_id))+'</b></td><td>'+(MAPS_VENDOR_LBL[x.vendor]||x.vendor)+'</td>'
+        +'<td style="text-align:right;">'+(Number(x.cnt)||0).toLocaleString('hu')+'</td><td style="text-align:right;font-weight:800;color:#c084fc;">'+(Number(x.cost)||0).toFixed(2)+' €</td></tr>'; }).join('')
+      +'</tbody><tfoot><tr><td colspan="3" style="text-align:right;font-weight:800;">Összesen</td><td style="text-align:right;font-weight:800;color:#c084fc;">'+total.toFixed(2)+' €</td></tr></tfoot></table>';
+  });
 }
 function loadHereByCompany(){
   gas('getHereUsageByCompany').then(function(r){
