@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="hu"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VallorSoft — Útdíj-becslés (látványterv)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#05070b;--panel:#141c25;--tx:#e9eef5;--mut:#8a97a8;--red:#e10b1a;--ok:#22c55e;--warn:#f59e0b;--info:#3b82f6;--bd:rgba(255,255,255,.08)}
+  *{box-sizing:border-box}body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,rgba(225,11,26,.10),transparent),var(--bg);color:var(--tx);font-family:Inter,sans-serif;font-size:14px}
+  .wrap{max-width:980px;margin:0 auto;padding:24px}
+  .glass{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));border:1px solid var(--bd);border-radius:16px}
+  .mut{color:var(--mut)}.sect{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:#c084fc;font-weight:800;margin:26px 0 10px}
+  .field label{display:block;font-size:12px;color:var(--mut);margin-bottom:5px;font-weight:600}
+  .inp{background:rgba(255,255,255,.04);border:1px solid var(--bd);border-radius:8px;padding:9px 11px;color:var(--tx);font-family:inherit;font-size:13px}
+  .btn{border:1px solid var(--bd);background:rgba(255,255,255,.04);color:var(--tx);border-radius:8px;padding:9px 13px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn.red{background:var(--red);border-color:var(--red);color:#fff}.btn.ok{background:rgba(34,197,94,.18);border-color:rgba(34,197,94,.45);color:#4ade80}
+  .badge{display:inline-flex;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid}
+  .b-warn{background:rgba(245,158,11,.16);color:#fbbf24;border-color:rgba(245,158,11,.4)}
+  table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 10px;border-bottom:1px solid var(--bd);text-align:left}th{color:var(--mut);font-weight:600;font-size:12px}
+  .h{font-size:16px;font-weight:800;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  code{color:#fbbf24}
+</style></head><body>
+<div class="wrap">
+
+  <div class="sect">① A fuvar szerkesztőjében — Útdíj sor + 🛣️ Becslés</div>
+  <div class="glass" style="padding:18px 20px">
+    <div class="h">✏️ Fuvar — CMD-2041 · Temesvár (RO) → München (DE)</div>
+    <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+      <div class="field"><label>Ár (EUR)</label><input class="inp" style="width:120px" value="2 400"></div>
+      <div class="field"><label>Km</label><input class="inp" style="width:100px" value="1 180"></div>
+      <div class="field"><label>Útdíj (EUR)</label><input class="inp" style="width:120px;border-color:rgba(245,158,11,.5)" value="312"></div>
+      <button class="btn ok" style="height:40px">🛣️ Becslés</button>
+      <span class="badge b-warn">becsült · módosítható</span>
+    </div>
+    <div class="glass" style="padding:12px 14px;margin-top:14px;background:rgba(255,255,255,.02)">
+      <div class="mut" style="font-size:12px;font-weight:700;margin-bottom:8px">Országonkénti bontás (a tervezett útvonal alapján)</div>
+      <table>
+        <tr><th>Ország</th><th>Km</th><th>Ráta</th><th style="text-align:right">Útdíj</th></tr>
+        <tr><td>🇷🇴 Románia</td><td>120 km</td><td>matrica (rovinietă)</td><td style="text-align:right">~ 8 €</td></tr>
+        <tr><td>🇭🇺 Magyarország</td><td>430 km</td><td>0,28 €/km (HU-GO)</td><td style="text-align:right">120 €</td></tr>
+        <tr><td>🇦🇹 Ausztria</td><td>180 km</td><td>0,42 €/km (GO)</td><td style="text-align:right">76 €</td></tr>
+        <tr><td>🇩🇪 Németország</td><td>450 km</td><td>0,35 €/km (Maut)</td><td style="text-align:right">158 €</td></tr>
+        <tr><td colspan="3" style="font-weight:800">Összesen</td><td style="text-align:right;font-weight:800;color:#fbbf24">~ 362 €</td></tr>
+      </table>
+      <div class="mut" style="font-size:11px;margin-top:8px">A km-bontás a tervezett útvonalból; a ráták cégre szabhatók (lent). A becslést bármikor felülírhatod kézzel a valós díjjal.</div>
+    </div>
+  </div>
+
+  <div class="sect">② A fuvar-eredmény végre HITELES (Pénzügy / fuvar-profit)</div>
+  <div class="glass" style="padding:18px 20px">
+    <div class="h">🎯 CMD-2041 — eredmény</div>
+    <table style="max-width:460px">
+      <tr><td>Bevétel (fuvardíj)</td><td style="text-align:right;color:#4ade80;font-weight:700">+2 400 €</td></tr>
+      <tr><td>Üzemanyag (becsült)</td><td style="text-align:right">− 590 €</td></tr>
+      <tr><td>Sofőr-költség (diurna)</td><td style="text-align:right">− 210 €</td></tr>
+      <tr><td><b style="color:#fbbf24">Útdíj (új!)</b></td><td style="text-align:right;color:#fbbf24;font-weight:700">− 312 €</td></tr>
+      <tr><td style="font-weight:800">Eredmény</td><td style="text-align:right;font-weight:800">1 288 €</td></tr>
+    </table>
+    <div class="mut" style="font-size:12px;margin-top:8px">Eddig az útdíj kimaradt → a profit ~25%-kal túl szép volt. Most a szám valós.</div>
+  </div>
+
+  <div class="sect">③ Útdíj-ráták (cégre szabható — Beállítások / Pénzügy)</div>
+  <div class="glass" style="padding:18px 20px">
+    <div class="h">🛣️ Útdíj-ráták (kamion, &gt;12 t)</div>
+    <table style="max-width:620px">
+      <tr><th>Ország</th><th>Típus</th><th>€/km vagy matrica</th><th></th></tr>
+      <tr><td>🇩🇪 Németország</td><td>km-alapú (Maut)</td><td><input class="inp" style="width:90px" value="0,35"> €/km</td><td class="mut">Euro 6</td></tr>
+      <tr><td>🇦🇹 Ausztria</td><td>km-alapú (GO)</td><td><input class="inp" style="width:90px" value="0,42"> €/km</td><td class="mut">4 tengely</td></tr>
+      <tr><td>🇭🇺 Magyarország</td><td>km-alapú (HU-GO)</td><td><input class="inp" style="width:90px" value="0,28"> €/km</td><td class="mut">J4</td></tr>
+      <tr><td>🇷🇴 Románia</td><td>matrica (rovinietă)</td><td><input class="inp" style="width:90px" value="8"> € / fuvar</td><td class="mut">flat</td></tr>
+    </table>
+    <button class="btn red" style="margin-top:12px">Ráták mentése</button>
+    <div class="mut" style="font-size:11px;margin-top:8px">EU-alapértékekkel indul; a developer/admin finomítja. (Pontos, hivatalos díjkalkulátor partneri API-val köthető be később — addig ez stabil becslés.)</div>
+  </div>
+
+</div></body></html>

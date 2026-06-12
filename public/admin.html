@@ -917,6 +917,15 @@
       </div>
     </div>
 
+    <div class="field"><label>🛣️ Útdíj (EUR) <span style="color:var(--muted);font-weight:400;font-size:11px;">— becsült, kézzel módosítható</span></label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input class="input" id="oeToll" type="number" min="0" step="0.01" style="max-width:140px;">
+        <button type="button" class="btn ok" style="padding:8px 12px;" onclick="estimateOrderToll()">🛣️ Becslés</button>
+        <button type="button" class="btn ghost" style="padding:8px 12px;" onclick="openTollRates()">⚙️ Ráták</button>
+      </div>
+      <div id="oeTollBreak" style="margin-top:8px;"></div>
+    </div>
+
     <div class="field"><label>Státusz</label>
       <select class="select" id="oeStatus">
         <option>Disponibil</option>

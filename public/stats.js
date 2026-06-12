@@ -351,9 +351,10 @@
       var rate = parseFloat(r.eur_ron_rate) || null;
       var rows = r.rows.map(function (o) {
         var ktg = parseFloat(o.koltseg_ron) || 0;
+        var toll = parseFloat(o.toll_cost) || 0;
         var profitCell = '';
         if (rate) {
-          var p = (parseFloat(o.pret) || 0) - ktg / rate;
+          var p = (parseFloat(o.pret) || 0) - ktg / rate - toll;
           profitCell = '<td style="text-align:right;font-weight:700;color:' + (p >= 0 ? 'var(--status-ok)' : 'var(--status-danger)') + ';">' + stNum(p, 0) + '</td>';
         }
         return '<tr><td><b class="text-primary">' + esc(String(o.id)) + '</b></td>'
@@ -361,14 +362,15 @@
           + '<td>' + stDate(o.finalized_at) + '</td>'
           + '<td style="text-align:right;">' + stNum(o.km, 0) + '</td>'
           + '<td style="text-align:right;font-weight:700;">' + stNum(o.pret, 0) + '</td>'
+          + '<td style="text-align:right;color:' + (toll > 0 ? '#fbbf24' : 'inherit') + ';">' + (toll > 0 ? stNum(toll, 0) : '—') + '</td>'
           + '<td style="text-align:right;">' + stNum(ktg, 0) + '</td>'
           + profitCell + '</tr>';
       }).join('');
       box.innerHTML = stPanel('🎯 Fuvar-szintű eredmény (a menetlevél-költségek fuvaronként szétosztva)',
-        '<p class="text-muted" style="font-size:12px;margin:0 0 10px;">A tankolás/vásárlás-költség a menetlevélen szereplő fuvarok között egyenlően oszlik — közelítő érték.'
+        '<p class="text-muted" style="font-size:12px;margin:0 0 10px;">A tankolás/vásárlás-költség a menetlevélen szereplő fuvarok között egyenlően oszlik; az <b style="color:#fbbf24;">útdíj</b> (EUR) is levonódik az eredményből — közelítő érték.'
         + (rate ? '' : ' <b>Állíts be árfolyamot az Áttekintésen az Eredmény-oszlophoz.</b>') + '</p>'
         + '<div style="overflow-x:auto;"><table class="table">'
-        + '<thead><tr><th>Fuvar</th><th>Ügyfél</th><th>Teljesítve</th><th style="text-align:right;">Km</th><th style="text-align:right;">Bevétel (EUR)</th><th style="text-align:right;">Költség (RON)</th>'
+        + '<thead><tr><th>Fuvar</th><th>Ügyfél</th><th>Teljesítve</th><th style="text-align:right;">Km</th><th style="text-align:right;">Bevétel (EUR)</th><th style="text-align:right;">Útdíj (EUR)</th><th style="text-align:right;">Költség (RON)</th>'
         + (rate ? '<th style="text-align:right;">Eredmény (EUR)</th>' : '') + '</tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>');
     }).catch(function () { box.innerHTML = ''; });
