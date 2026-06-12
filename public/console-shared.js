@@ -3628,16 +3628,16 @@ function loadPendingHandovers(){
     _hoPendingCache=Array.isArray(list)?list:[];
     if(!_hoPendingCache.length){ box.innerHTML=''; return; }
     box.innerHTML='<div class="glass" style="padding:12px 16px;margin-bottom:14px;border:1px solid rgba(245,158,11,0.5);">'+
-      '<div class="text-primary" style="font-weight:800;font-size:13.5px;margin-bottom:6px;">⏳ Sofőr áru-leadás kérések — visszaigazolásra várnak ('+_hoPendingCache.length+')</div>'+
+      '<div class="text-primary" style="font-weight:800;font-size:13.5px;margin-bottom:6px;">'+esc(T('cs.driverHandoverReqs'))+' ('+_hoPendingCache.length+')</div>'+
       _hoPendingCache.map(function(o,i){
         return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--border);font-size:12.5px;">'+
           '<b class="text-primary">'+esc(String(o.id))+'</b>'+
           '<span class="text-muted">'+esc(o.nume_sofer||o.handover_by||'?')+' · '+
-          (o.handover_type==='trailer'?'🅿️ pótkocsin parkol':'📦 raktárba került')+' @ <b>'+esc(o.handover_loc||'?')+'</b>'+
-          (o.rendszam_remorca?' · pótkocsi: '+esc(o.rendszam_remorca):'')+'</span>'+
+          (o.handover_type==='trailer'?T('cs.parkedOnTrailer'):T('cs.movedToWarehouse'))+' @ <b>'+esc(o.handover_loc||'?')+'</b>'+
+          (o.rendszam_remorca?T('cs.trailerColon')+esc(o.rendszam_remorca):'')+'</span>'+
           '<span style="margin-left:auto;display:flex;gap:6px;">'+
-          '<button class="btn ok" style="padding:4px 12px;font-size:12px;" onclick="hoConfirmIdx('+i+')">✓ Visszaigazol</button>'+
-          '<button class="btn danger" style="padding:4px 12px;font-size:12px;" onclick="hoRejectIdx('+i+')">✕ Elutasít</button>'+
+          '<button class="btn ok" style="padding:4px 12px;font-size:12px;" onclick="hoConfirmIdx('+i+')">'+esc(T('cs.confirmBtn'))+'</button>'+
+          '<button class="btn danger" style="padding:4px 12px;font-size:12px;" onclick="hoRejectIdx('+i+')">'+esc(T('cs.rejectBtn'))+'</button>'+
           '</span></div>';
       }).join('')+'</div>';
   });
@@ -3651,7 +3651,7 @@ window.hoConfirmIdx=function(i){
 };
 window.hoRejectIdx=function(i){
   var o=_hoPendingCache[i]; if(!o)return;
-  if(!confirm('Elutasítod a(z) '+o.id+' leadás-kérését? A sofőr push-értesítést kap.'))return;
+  if(!confirm(T('cs.confirmRejectHandover',{id:o.id})))return;
   gas('rejectHandover',[o.id]).then(function(r){
     if(r&&r.ok){ toast(t('am.reqRejected'),'ok'); loadPendingHandovers(); if(typeof loadOrders==='function')loadOrders(); }
     else toast((r&&r.err)||'Hiba','err');
