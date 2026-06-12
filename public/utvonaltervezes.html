@@ -12,7 +12,104 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="/i18n.js?v=20260612"></script>
   <script src="/session-guard.js?v=20260611"></script>
+  <script>(window.registerI18n||function(d){(window.__i18nQueue=window.__i18nQueue||[]).push(d);})({
+    'rp.back': { hu:'← Vissza', ro:'← Înapoi' },
+    'rp.title': { hu:'🗺 Útvonaltervezés', ro:'🗺 Planificare rută' },
+    'rp.theme.toggle': { hu:'Téma váltása', ro:'Schimbă tema' },
+    'rp.theme.light': { hu:'Világos mód', ro:'Mod luminos' },
+    'rp.theme.dark': { hu:'Sötét mód', ro:'Mod întunecat' },
+    'rp.orderpicker.title': { hu:'Fuvarfeladat választó', ro:'Selectare comandă transport' },
+    'rp.order.search.ph': { hu:'Keresés azonosító vagy ügyfél alapján...', ro:'Căutare după ID sau client...' },
+    'rp.order.choose': { hu:'Válassz fuvarfeladatot...', ro:'Alege o comandă...' },
+    'rp.tractor.title': { hu:'Vontató', ro:'Cap tractor' },
+    'rp.trailer.title': { hu:'Pótkocsi', ro:'Remorcă' },
+    'rp.veh.search.ph': { hu:'Keresés rendszám / márka...', ro:'Căutare nr. înmatriculare / marcă...' },
+    'rp.truck.summary.prompt': { hu:'Válassz vontatót a paraméterek megjelenítéséhez.', ro:'Alege un cap tractor pentru afișarea parametrilor.' },
+    'rp.truck.summary.prompt2': { hu:'Válassz vontatót a tervezési paraméterekhez.', ro:'Alege un cap tractor pentru parametrii de planificare.' },
+    'rp.truck.incomplete': { hu:'⚠ Jármű adatok hiányosak — töltsd ki a Járművek menüben (legalább a magasság).', ro:'⚠ Date vehicul incomplete — completează în meniul Vehicule (cel puțin înălțimea).' },
+    'rp.spinner': { hu:'Útvonal számítása...', ro:'Se calculează ruta...' },
+    'rp.points.title': { hu:'Útvonal pontok', ro:'Puncte rută' },
+    'rp.point.start': { hu:'📍 Kiindulópont', ro:'📍 Punct de plecare' },
+    'rp.gps.prompt': { hu:'Válassz vontatót a GPS pozíció betöltéséhez.', ro:'Alege un cap tractor pentru încărcarea poziției GPS.' },
+    'rp.point.loading': { hu:'📦 Felrakó pont', ro:'📦 Punct de încărcare' },
+    'rp.loading.ph': { hu:'Felrakás címe', ro:'Adresa de încărcare' },
+    'rp.point.unloading': { hu:'🏁 Lerakó pont', ro:'🏁 Punct de descărcare' },
+    'rp.unloading.ph': { hu:'Lerakás címe', ro:'Adresa de descărcare' },
+    'rp.addwp': { hu:'➕ Közbülső cél hozzáadása', ro:'➕ Adaugă punct intermediar' },
+    'rp.planbtn': { hu:'🗺 Útvonal tervezése', ro:'🗺 Planifică ruta' },
+    'rp.result.title': { hu:'Eredmény', ro:'Rezultat' },
+    'rp.stat.dist': { hu:'Teljes távolság', ro:'Distanță totală' },
+    'rp.stat.time': { hu:'Becsült menetidő', ro:'Timp estimat de mers' },
+    'rp.stat.fuel': { hu:'Becsült fogyasztás', ro:'Consum estimat' },
+    'rp.free.title': { hu:'Ingyenes térkép és útvonaltervezés', ro:'Hartă și planificare rută gratuite' },
+    'rp.free.desc': { hu:'OpenStreetMap csempék + Photon címkereső + OSRM/OpenRouteService útvonal — díjmentes. <b>Autós profil</b>; ha a szerveren ORS-kulcs van beállítva, <b>kamionos profillal</b> (súly/magasság-korlátokkal) tervez.', ro:'Dale OpenStreetMap + căutare adrese Photon + rută OSRM/OpenRouteService — gratuit. <b>Profil auto</b>; dacă pe server este configurată o cheie ORS, planifică cu <b>profil de camion</b> (cu limite de greutate/înălțime).' },
+    // dinamikus
+    'rp.toast.orders.fail': { hu:'A fuvarok betöltése sikertelen.', ro:'Încărcarea comenzilor a eșuat.' },
+    'rp.toast.vehicles.fail': { hu:'A járművek betöltése sikertelen.', ro:'Încărcarea vehiculelor a eșuat.' },
+    'rp.veh.incomplete': { hu:'⚠ Hiányos adatok', ro:'⚠ Date incomplete' },
+    'rp.tractor.none': { hu:'Nincs aktív vontató.', ro:'Niciun cap tractor activ.' },
+    'rp.trailer.none': { hu:'— Nincs pótkocsi —', ro:'— Fără remorcă —' },
+    'rp.params.title': { hu:'Tervezési paraméterek (összekapcsolt jármű)', ro:'Parametri de planificare (vehicul cuplat)' },
+    'rp.param.type': { hu:'Jármű típus', ro:'Tip vehicul' },
+    'rp.param.gw': { hu:'Megengedett össztömeg (kg)', ro:'Masă totală admisă (kg)' },
+    'rp.param.len': { hu:'Teljes hosszúság összekapcsolva (cm)', ro:'Lungime totală cuplată (cm)' },
+    'rp.param.h': { hu:'Magasság (cm)', ro:'Înălțime (cm)' },
+    'rp.param.w': { hu:'Szélesség (cm)', ro:'Lățime (cm)' },
+    'rp.param.wpa': { hu:'Tengelyterhelés (kg)', ro:'Sarcină pe osie (kg)' },
+    'rp.param.axle': { hu:'Tengelyek száma', ro:'Număr de osii' },
+    'rp.param.trl': { hu:'Pótkocsik száma', ro:'Număr de remorci' },
+    'rp.param.tun': { hu:'Alagút kategória', ro:'Categorie tunel' },
+    'rp.param.haz': { hu:'Veszélyes áru', ro:'Marfă periculoasă' },
+    'rp.opt.none': { hu:'Nincs', ro:'Niciuna' },
+    'rp.tun.e': { hu:'E (legszigorúbb)', ro:'E (cea mai strictă)' },
+    'rp.haz.explosive': { hu:'Robbanóanyag', ro:'Exploziv' },
+    'rp.haz.gas': { hu:'Gáz', ro:'Gaz' },
+    'rp.haz.flammable': { hu:'Gyúlékony', ro:'Inflamabil' },
+    'rp.haz.combustible': { hu:'Égőanyag', ro:'Combustibil' },
+    'rp.haz.organic': { hu:'Szerves anyag', ro:'Substanță organică' },
+    'rp.haz.poison': { hu:'Méreg', ro:'Otravă' },
+    'rp.haz.water': { hu:'Vízszennyező', ro:'Poluant pentru apă' },
+    'rp.type.straight': { hu:'Merev teherautó', ro:'Camion rigid' },
+    'rp.type.tractor': { hu:'Nyerges szerelvény (vontató + félpótkocsi)', ro:'Ansamblu articulat (cap tractor + semiremorcă)' },
+    'rp.params.info': { hu:'ℹ️ Az <b>ingyenes útvonaltervezés autós profillal</b> számol — a fenti jármű-paraméterek (súly/magasság) korlátozásait az útvonal NEM veszi figyelembe, a fogyasztás-becsléshez és a dokumentáláshoz szolgálnak.', ro:'ℹ️ <b>Planificarea gratuită a rutei folosește profilul auto</b> — ruta NU ține cont de restricțiile parametrilor de mai sus (greutate/înălțime), aceștia servesc estimării consumului și documentării.' },
+    'rp.rel.now': { hu:'most', ro:'acum' },
+    'rp.rel.min': { hu:'{n} perce', ro:'acum {n} min' },
+    'rp.rel.hour': { hu:'{n} órája', ro:'acum {n} h' },
+    'rp.rel.day': { hu:'{n} napja', ro:'acum {n} zile' },
+    'rp.gps.loading': { hu:'GPS pozíció lekérése…', ro:'Se obține poziția GPS…' },
+    'rp.gps.last': { hu:'utolsó pozíció:', ro:'ultima poziție:' },
+    'rp.gps.refresh': { hu:'🔄 GPS frissítése', ro:'🔄 Reîmprospătează GPS' },
+    'rp.gps.unavailable': { hu:'⚠ GPS pozíció nem elérhető', ro:'⚠ Poziția GPS nu este disponibilă' },
+    'rp.gps.manual': { hu:'Manuális kiindulópont megadása', ro:'Introducere manuală a punctului de plecare' },
+    'rp.gps.manual.ph': { hu:'Kiindulási cím', ro:'Adresă de plecare' },
+    'rp.wp.max': { hu:'Legfeljebb 5 közbülső cél adható meg.', ro:'Se pot adăuga cel mult 5 puncte intermediare.' },
+    'rp.wp.label': { hu:'🔵 Közbülső cél #{n}', ro:'🔵 Punct intermediar #{n}' },
+    'rp.wp.ph': { hu:'Közbülső cím', ro:'Adresă intermediară' },
+    'rp.toast.choosetractor': { hu:'Válassz vontatót!', ro:'Alege un cap tractor!' },
+    'rp.toast.addaddr': { hu:'Add meg a felrakó és lerakó címet!', ro:'Introdu adresa de încărcare și de descărcare!' },
+    'rp.toast.routefail': { hu:'Nem sikerült az útvonaltervezés', ro:'Planificarea rutei a eșuat' },
+    'rp.toast.overload': { hu:'A térkép-szolgáltatás túlterhelt — próbáld újra pár másodperc múlva', ro:'Serviciul de hărți este supraîncărcat — încearcă din nou peste câteva secunde' },
+    'rp.toast.neterr': { hu:'Hálózati hiba az útvonaltervezésnél', ro:'Eroare de rețea la planificarea rutei' },
+    'rp.tip.current': { hu:'{p} — jelenlegi pozíció', ro:'{p} — poziția curentă' },
+    'rp.tip.loading': { hu:'Felrakó: {x}', ro:'Încărcare: {x}' },
+    'rp.tip.unloading': { hu:'Lerakó: {x}', ro:'Descărcare: {x}' },
+    'rp.tip.waypoint': { hu:'Közbülső: {x}', ro:'Intermediar: {x}' },
+    'rp.viol.forbidden': { hu:'⛔ Tiltott szakasz', ro:'⛔ Sector interzis' },
+    'rp.profile.truck': { hu:'🚛 <b>Kamionos profil</b> (OpenRouteService) — a megadott súly/méret-korlátokkal tervezve.', ro:'🚛 <b>Profil de camion</b> (OpenRouteService) — planificat cu limitele de greutate/dimensiuni indicate.' },
+    'rp.profile.car': { hu:'ℹ️ <b>Autós profil</b> (OSRM) — kamion-korlátozások nélkül.', ro:'ℹ️ <b>Profil auto</b> (OSRM) — fără restricții de camion.' },
+    'rp.type.gps': { hu:'Kiindulópont', ro:'Punct de plecare' },
+    'rp.type.loading': { hu:'Felrakó', ro:'Încărcare' },
+    'rp.type.unloading': { hu:'Lerakó', ro:'Descărcare' },
+    'rp.type.waypoint': { hu:'Közbülső', ro:'Intermediar' },
+    'rp.type.point': { hu:'Pont', ro:'Punct' },
+    'rp.warn.forbidden.n': { hu:'<b>{n} tiltott szakaszt</b>', ro:'<b>{n} sectoare interzise</b>' },
+    'rp.warn.restriction': { hu:'teherjármű korlátozást', ro:'restricție pentru vehicule grele' },
+    'rp.warn.body': { hu:'⚠️ Figyelem: az útvonal {what} tartalmaz — a térképen <span style="color:#ff2d55;font-weight:700;">pirossal kiemelve ⛔</span>. Csak indokolt esetben, engedéllyel közlekedj ott.', ro:'⚠️ Atenție: ruta conține {what} — evidențiat pe hartă <span style="color:#ff2d55;font-weight:700;">cu roșu ⛔</span>. Circulă acolo doar în caz justificat, cu autorizație.' },
+    'rp.dur.h': { hu:'ó', ro:'h' },
+    'rp.dur.m': { hu:'p', ro:'min' }
+  });</script>
   <style>
     .rp-card { padding:16px; margin-bottom:16px; }
     .rp-sec-title { font-size:13px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; margin-bottom:10px; }
@@ -73,90 +170,90 @@
 
   <div class="dash-topbar">
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-      <a href="/admin" id="backLink" class="btn ghost" style="text-decoration:none;padding:8px 14px;">← Vissza</a>
+      <a href="/admin" id="backLink" class="btn ghost" style="text-decoration:none;padding:8px 14px;" data-i18n="rp.back">← Vissza</a>
       <div class="vs-logo sm"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
-      <div class="text-primary" style="font-size:18px;font-weight:800;">🗺 Útvonaltervezés</div>
+      <div class="text-primary" style="font-size:18px;font-weight:800;" data-i18n="rp.title">🗺 Útvonaltervezés</div>
     </div>
-    <button class="theme-toggle" id="themeToggle" onclick="rpToggleTheme()" title="Téma váltása">🌙</button>
+    <button class="theme-toggle" id="themeToggle" onclick="rpToggleTheme()" title="Téma váltása" data-i18n-title="rp.theme.toggle">🌙</button>
   </div>
 
   <!-- 1) FUVARFELADAT VÁLASZTÓ -->
   <div class="glass rp-card">
-    <div class="rp-sec-title text-muted">Fuvarfeladat választó</div>
-    <input class="input" id="rpOrderSearch" placeholder="Keresés azonosító vagy ügyfél alapján..." oninput="rpRenderOrderOptions()" style="margin-bottom:8px;">
+    <div class="rp-sec-title text-muted" data-i18n="rp.orderpicker.title">Fuvarfeladat választó</div>
+    <input class="input" id="rpOrderSearch" placeholder="Keresés azonosító vagy ügyfél alapján..." data-i18n-ph="rp.order.search.ph" oninput="rpRenderOrderOptions()" style="margin-bottom:8px;">
     <select class="select" id="rpOrder" onchange="rpOrderChange()">
-      <option value="">Válassz fuvarfeladatot...</option>
+      <option value="" data-i18n="rp.order.choose">Válassz fuvarfeladatot...</option>
     </select>
   </div>
 
   <!-- 2) VONTATÓ + PÓTKOCSI -->
   <div class="rp-veh-grid" style="margin-bottom:16px;">
     <div class="glass rp-card" style="margin-bottom:0;">
-      <div class="rp-sec-title text-primary">Vontató</div>
-      <input class="input" id="rpTractorSearch" placeholder="Keresés rendszám / márka..." oninput="rpRenderTractorList()">
+      <div class="rp-sec-title text-primary" data-i18n="rp.tractor.title">Vontató</div>
+      <input class="input" id="rpTractorSearch" placeholder="Keresés rendszám / márka..." data-i18n-ph="rp.veh.search.ph" oninput="rpRenderTractorList()">
       <div class="rp-list" id="rpTractorList"></div>
     </div>
     <div class="glass rp-card" style="margin-bottom:0;">
-      <div class="rp-sec-title text-primary">Pótkocsi</div>
-      <input class="input" id="rpTrailerSearch" placeholder="Keresés rendszám / márka..." oninput="rpRenderTrailerList()">
+      <div class="rp-sec-title text-primary" data-i18n="rp.trailer.title">Pótkocsi</div>
+      <input class="input" id="rpTrailerSearch" placeholder="Keresés rendszám / márka..." data-i18n-ph="rp.veh.search.ph" oninput="rpRenderTrailerList()">
       <div class="rp-list" id="rpTrailerList"></div>
     </div>
   </div>
 
   <!-- 3) TRUCK PARAMÉTER ÖSSZESÍTŐ -->
   <div class="glass rp-card" id="rpTruckSummary">
-    <div class="text-muted" style="font-size:13px;">Válassz vontatót a paraméterek megjelenítéséhez.</div>
+    <div class="text-muted" style="font-size:13px;" data-i18n="rp.truck.summary.prompt">Válassz vontatót a paraméterek megjelenítéséhez.</div>
   </div>
 
   <!-- 4) TÉRKÉP -->
   <div class="glass" style="padding:0;overflow:hidden;border-radius:var(--radius-lg);margin-bottom:16px;position:relative;">
     <div id="rpMap" style="width:100%;height:480px;min-height:450px;"></div>
     <div id="rpSpinner" style="display:none;position:absolute;inset:0;z-index:1000;background:rgba(5,7,11,0.45);align-items:center;justify-content:center;backdrop-filter:blur(2px);">
-      <div style="text-align:center;color:#fff;"><div class="spinner" style="width:32px;height:32px;margin:0 auto 10px;"></div>Útvonal számítása...</div>
+      <div style="text-align:center;color:#fff;"><div class="spinner" style="width:32px;height:32px;margin:0 auto 10px;"></div><span data-i18n="rp.spinner">Útvonal számítása...</span></div>
     </div>
   </div>
 
   <!-- 5) ÚTVONAL PONTOK -->
   <div class="glass rp-card">
-    <div class="rp-sec-title text-muted">Útvonal pontok</div>
+    <div class="rp-sec-title text-muted" data-i18n="rp.points.title">Útvonal pontok</div>
 
     <div class="rp-point">
-      <div class="lbl text-primary">📍 Kiindulópont</div>
-      <div id="rpGpsBlock" class="rp-gps-box text-muted" style="font-size:13px;">Válassz vontatót a GPS pozíció betöltéséhez.</div>
+      <div class="lbl text-primary" data-i18n="rp.point.start">📍 Kiindulópont</div>
+      <div id="rpGpsBlock" class="rp-gps-box text-muted" style="font-size:13px;" data-i18n="rp.gps.prompt">Válassz vontatót a GPS pozíció betöltéséhez.</div>
     </div>
 
     <div class="rp-point">
-      <div class="lbl text-primary">📦 Felrakó pont</div>
+      <div class="lbl text-primary" data-i18n="rp.point.loading">📦 Felrakó pont</div>
       <div class="rp-ac-wrap">
-        <input class="input" id="rpLoading" placeholder="Felrakás címe" autocomplete="off" oninput="rpUpdatePlanBtn()">
+        <input class="input" id="rpLoading" placeholder="Felrakás címe" data-i18n-ph="rp.loading.ph" autocomplete="off" oninput="rpUpdatePlanBtn()">
         <div class="rp-ac-dd" id="rpLoadingDD"></div>
       </div>
     </div>
 
     <div class="rp-point">
-      <div class="lbl text-primary">🏁 Lerakó pont</div>
+      <div class="lbl text-primary" data-i18n="rp.point.unloading">🏁 Lerakó pont</div>
       <div class="rp-ac-wrap">
-        <input class="input" id="rpUnloading" placeholder="Lerakás címe" autocomplete="off" oninput="rpUpdatePlanBtn()">
+        <input class="input" id="rpUnloading" placeholder="Lerakás címe" data-i18n-ph="rp.unloading.ph" autocomplete="off" oninput="rpUpdatePlanBtn()">
         <div class="rp-ac-dd" id="rpUnloadingDD"></div>
       </div>
     </div>
 
     <div id="rpWaypoints"></div>
-    <button class="btn ghost" id="rpAddWp" onclick="rpAddWaypoint()" style="margin-bottom:14px;">➕ Közbülső cél hozzáadása</button>
+    <button class="btn ghost" id="rpAddWp" onclick="rpAddWaypoint()" style="margin-bottom:14px;" data-i18n="rp.addwp">➕ Közbülső cél hozzáadása</button>
 
-    <button class="btn primary" id="rpPlanBtn" onclick="rpPlan()" style="width:100%;" disabled>🗺 Útvonal tervezése</button>
+    <button class="btn primary" id="rpPlanBtn" onclick="rpPlan()" style="width:100%;" disabled data-i18n="rp.planbtn">🗺 Útvonal tervezése</button>
   </div>
 
   <!-- 6) EREDMÉNY PANEL -->
   <div class="glass rp-card" id="rpResultPanel" style="display:none;">
-    <div class="rp-sec-title text-muted">Eredmény</div>
+    <div class="rp-sec-title text-muted" data-i18n="rp.result.title">Eredmény</div>
     <div id="rpProfileNote" class="text-muted" style="font-size:12px;margin-bottom:10px;"></div>
     <div id="rpWarn" style="display:none;margin-bottom:14px;padding:12px 14px;border-radius:var(--radius-md);
          background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);color:#fcd34d;font-size:13px;"></div>
     <div class="grid-3" style="margin-bottom:14px;">
-      <div class="glass stat-tile"><div class="stat-ico">📏</div><div><div class="stat-val text-primary" id="rpDist">—</div><div class="stat-lbl text-muted">Teljes távolság</div></div></div>
-      <div class="glass stat-tile"><div class="stat-ico">⏱️</div><div><div class="stat-val text-primary" id="rpTime">—</div><div class="stat-lbl text-muted">Becsült menetidő</div></div></div>
-      <div class="glass stat-tile"><div class="stat-ico">⛽</div><div><div class="stat-val text-primary" id="rpFuel">—</div><div class="stat-lbl text-muted">Becsült fogyasztás</div></div></div>
+      <div class="glass stat-tile"><div class="stat-ico">📏</div><div><div class="stat-val text-primary" id="rpDist">—</div><div class="stat-lbl text-muted" data-i18n="rp.stat.dist">Teljes távolság</div></div></div>
+      <div class="glass stat-tile"><div class="stat-ico">⏱️</div><div><div class="stat-val text-primary" id="rpTime">—</div><div class="stat-lbl text-muted" data-i18n="rp.stat.time">Becsült menetidő</div></div></div>
+      <div class="glass stat-tile"><div class="stat-ico">⛽</div><div><div class="stat-val text-primary" id="rpFuel">—</div><div class="stat-lbl text-muted" data-i18n="rp.stat.fuel">Becsült fogyasztás</div></div></div>
     </div>
     <div id="rpLegs"></div>
     <div id="rpPremiumResult" style="margin-top:6px;"></div>
@@ -166,8 +263,8 @@
   <div class="glass rp-card" style="display:flex;align-items:center;gap:10px;">
     <span style="font-size:20px;">🆓</span>
     <div>
-      <div class="text-primary" style="font-size:13px;font-weight:700;">Ingyenes térkép és útvonaltervezés</div>
-      <div class="text-muted" style="font-size:12px;">OpenStreetMap csempék + Photon címkereső + OSRM/OpenRouteService útvonal — díjmentes. <b>Autós profil</b>; ha a szerveren ORS-kulcs van beállítva, <b>kamionos profillal</b> (súly/magasság-korlátokkal) tervez.</div>
+      <div class="text-primary" style="font-size:13px;font-weight:700;" data-i18n="rp.free.title">Ingyenes térkép és útvonaltervezés</div>
+      <div class="text-muted" style="font-size:12px;" data-i18n-html="rp.free.desc">OpenStreetMap csempék + Photon címkereső + OSRM/OpenRouteService útvonal — díjmentes. <b>Autós profil</b>; ha a szerveren ORS-kulcs van beállítva, <b>kamionos profillal</b> (súly/magasság-korlátokkal) tervez.</div>
     </div>
   </div>
 
@@ -175,6 +272,7 @@
 
 <script>
 // ───────── Segéd ─────────
+function T(k,v){ return (typeof window.t==='function') ? window.t(k,v) : k; }
 function gas(fn, args){ return fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},
   body:JSON.stringify({functionName:fn,arguments:args||[]})}).then(function(r){return r.json();}).then(function(d){return d.result;}); }
 function toast(m,k){var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;
@@ -196,7 +294,7 @@ function rpTileUrl(theme){
   return 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
 }
 function rpTileOpts(){ return {attribution:'© OpenStreetMap © CARTO',maxZoom:19,subdomains:'abcd'}; }
-function rpSyncThemeIcon(){ var b=document.getElementById('themeToggle'); if(!b)return; var l=rpTheme()==='light'; b.textContent=l?'☀️':'🌙'; b.title=l?'Sötét mód':'Világos mód'; }
+function rpSyncThemeIcon(){ var b=document.getElementById('themeToggle'); if(!b)return; var l=rpTheme()==='light'; b.textContent=l?'☀️':'🌙'; b.title=l?T('rp.theme.dark'):T('rp.theme.light'); }
 function rpToggleTheme(){ var mc=document.getElementById('mainContent'); if(!mc)return; var n=(mc.getAttribute('data-theme')==='light')?'dark':'light';
   mc.setAttribute('data-theme',n); try{localStorage.setItem('vs-theme',n);}catch(e){} rpSyncThemeIcon();
   if(rpMap&&rpTileLayer) rpTileLayer.setUrl(rpTileUrl(n)); }
@@ -206,7 +304,7 @@ function rpInitMap(){ rpMap=L.map('rpMap',{zoomControl:true}).setView([45.9432,2
 
 // ───────── Fuvar választó ─────────
 function rpLoadOrders(){ gas('getOrdersForRoutePlanning').then(function(r){
-  if(!r||!r.ok){ toast((r&&r.err)||'A fuvarok betöltése sikertelen.','err'); return; }
+  if(!r||!r.ok){ toast((r&&r.err)||T('rp.toast.orders.fail'),'err'); return; }
   _orders=r.orders||[]; rpRenderOrderOptions();
 }); }
 function rpRenderOrderOptions(){
@@ -214,7 +312,7 @@ function rpRenderOrderOptions(){
   var sel=document.getElementById('rpOrder'); var cur=sel.value;
   var list=_orders.filter(function(o){ if(!q)return true;
     return (String(o.id)+' '+(o.client||'')+' '+(o.loc_incarcare||'')+' '+(o.loc_descarcare||'')).toLowerCase().indexOf(q)!==-1; });
-  sel.innerHTML='<option value="">Válassz fuvarfeladatot...</option>'+list.map(function(o){
+  sel.innerHTML='<option value="">'+esc(T('rp.order.choose'))+'</option>'+list.map(function(o){
     return '<option value="'+esc(o.id)+'">#'+esc(o.id)+' — '+esc(o.client||'—')+' | '+esc(o.loc_incarcare||'?')+' → '+esc(o.loc_descarcare||'?')+'</option>';
   }).join('');
   if(cur) sel.value=cur;
@@ -231,7 +329,7 @@ function rpOrderChange(){
 
 // ───────── Jármű szelektorok ─────────
 function rpLoadVehicles(){ gas('getVehiclesForRouting').then(function(r){
-  if(!r||!r.ok){ toast((r&&r.err)||'A járművek betöltése sikertelen.','err'); return; }
+  if(!r||!r.ok){ toast((r&&r.err)||T('rp.toast.vehicles.fail'),'err'); return; }
   _vehicles=r.vehicles||[];
   _tractors=_vehicles.filter(function(v){return v.tip==='Vontato';});
   _trailers=_vehicles.filter(function(v){return v.tip==='Potkocsi';});
@@ -242,7 +340,7 @@ function rpVehItem(v, isSel){
   return '<div class="rp-veh'+(isSel?' sel':'')+'" onclick="'+(v.tip==='Vontato'?'rpSelectTractor':'rpSelectTrailer')+'('+v.id+')">'
     + '<span class="dot'+(v.has_gps?' gps':'')+'"></span>'
     + '<span><span class="nm">'+esc(v.rendszam)+'</span> <span class="meta">'+esc([v.marca,v.model].filter(Boolean).join(' ')||(v.nota||''))+'</span></span>'
-    + (miss?'<span class="warn">⚠ Hiányos adatok</span>':'<span class="chk">✓</span>')
+    + (miss?'<span class="warn">'+esc(T('rp.veh.incomplete'))+'</span>':'<span class="chk">✓</span>')
     + '</div>';
 }
 function rpRenderTractorList(){
@@ -250,14 +348,14 @@ function rpRenderTractorList(){
   var list=_tractors.filter(function(v){ if(!q)return true; return (v.rendszam+' '+(v.marca||'')+' '+(v.model||'')).toLowerCase().indexOf(q)!==-1; });
   var box=document.getElementById('rpTractorList');
   box.innerHTML = list.length ? list.map(function(v){return rpVehItem(v, selTractor&&selTractor.id===v.id);}).join('')
-    : '<div class="text-muted" style="font-size:12px;padding:8px;">Nincs aktív vontató.</div>';
+    : '<div class="text-muted" style="font-size:12px;padding:8px;">'+esc(T('rp.tractor.none'))+'</div>';
 }
 function rpRenderTrailerList(){
   var q=val('rpTrailerSearch').toLowerCase();
   var list=_trailers.filter(function(v){ if(!q)return true; return (v.rendszam+' '+(v.marca||'')+' '+(v.model||'')).toLowerCase().indexOf(q)!==-1; });
   var box=document.getElementById('rpTrailerList');
   var none='<div class="rp-veh'+(!selTrailer?' sel':'')+'" onclick="rpSelectTrailer(null)">'
-    + '<span class="dot"></span><span class="nm">— Nincs pótkocsi —</span>'+(!selTrailer?'<span class="chk">✓</span>':'')+'</div>';
+    + '<span class="dot"></span><span class="nm">'+esc(T('rp.trailer.none'))+'</span>'+(!selTrailer?'<span class="chk">✓</span>':'')+'</div>';
   box.innerHTML = none + (list.map(function(v){return rpVehItem(v, selTrailer&&selTrailer.id===v.id);}).join(''));
 }
 function rpSelectTractor(id){
@@ -276,10 +374,10 @@ function rpOpts(list, sel){
 }
 function rpRenderTruckSummary(){
   var box=document.getElementById('rpTruckSummary');
-  if(!selTractor){ box.innerHTML='<div class="text-muted" style="font-size:13px;">Válassz vontatót a tervezési paraméterekhez.</div>'; return; }
+  if(!selTractor){ box.innerHTML='<div class="text-muted" style="font-size:13px;">'+esc(T('rp.truck.summary.prompt2'))+'</div>'; return; }
   var t=selTractor, p=selTrailer;
   if(t.height_cm==null){
-    box.innerHTML='<div style="color:var(--status-warn);font-size:13px;">⚠ Jármű adatok hiányosak — töltsd ki a Járművek menüben (legalább a magasság).</div>';
+    box.innerHTML='<div style="color:var(--status-warn);font-size:13px;">'+esc(T('rp.truck.incomplete'))+'</div>';
     return;
   }
   var n=function(x){return (x==null||x==='')?0:Number(x);};
@@ -287,33 +385,33 @@ function rpRenderTruckSummary(){
   var type = p ? 'tractor' : (t.truck_type==='tractor' ? 'tractor' : 'straightTruck');
   var gwDef  = n(t.weight_kg) + (p?n(p.weight_kg):0);   // induló tipp, szerkeszthető
   var lenDef = n(t.length_cm) + (p?n(p.length_cm):0);   // induló (felső becslés), szerkeszthető
-  var tunOpts=[['',"Nincs"],['B','B'],['C','C'],['D','D'],['E','E (legszigorúbb)']];
-  var hazOpts=[['',"Nincs"],['explosive','Robbanóanyag'],['gas','Gáz'],['flammable','Gyúlékony'],['combustible','Égőanyag'],['organic','Szerves anyag'],['poison','Méreg'],['harmfulToWater','Vízszennyező']];
-  var typeOpts=[['straightTruck','Merev teherautó'],['tractor','Nyerges szerelvény (vontató + félpótkocsi)']];
+  var tunOpts=[['',T('rp.opt.none')],['B','B'],['C','C'],['D','D'],['E',T('rp.tun.e')]];
+  var hazOpts=[['',T('rp.opt.none')],['explosive',T('rp.haz.explosive')],['gas',T('rp.haz.gas')],['flammable',T('rp.haz.flammable')],['combustible',T('rp.haz.combustible')],['organic',T('rp.haz.organic')],['poison',T('rp.haz.poison')],['harmfulToWater',T('rp.haz.water')]];
+  var typeOpts=[['straightTruck',T('rp.type.straight')],['tractor',T('rp.type.tractor')]];
 
   box.innerHTML =
-    '<div class="rp-sec-title text-muted" style="margin-bottom:8px;">Tervezési paraméterek (összekapcsolt jármű)</div>'
+    '<div class="rp-sec-title text-muted" style="margin-bottom:8px;">'+esc(T('rp.params.title'))+'</div>'
     + '<div class="text-primary" style="font-weight:700;margin-bottom:10px;">🚛 '+esc(t.rendszam)+(p?(' + '+esc(p.rendszam)):'')+'</div>'
-    + '<div class="field" style="margin-bottom:10px;"><label>Jármű típus</label><select class="select" id="rpType" onchange="rpTypeChange()">'+rpOpts(typeOpts,type)+'</select></div>'
+    + '<div class="field" style="margin-bottom:10px;"><label>'+esc(T('rp.param.type'))+'</label><select class="select" id="rpType" onchange="rpTypeChange()">'+rpOpts(typeOpts,type)+'</select></div>'
     + '<div class="grid-2">'
-    +   '<div class="field"><label>Megengedett össztömeg (kg)</label><input class="input" id="rpGW" type="number" placeholder="pl. 40000" value="'+(gwDef||'')+'"></div>'
-    +   '<div class="field"><label>Teljes hosszúság összekapcsolva (cm)</label><input class="input" id="rpLen" type="number" placeholder="pl. 1650" value="'+(lenDef||'')+'"></div>'
+    +   '<div class="field"><label>'+esc(T('rp.param.gw'))+'</label><input class="input" id="rpGW" type="number" placeholder="pl. 40000" value="'+(gwDef||'')+'"></div>'
+    +   '<div class="field"><label>'+esc(T('rp.param.len'))+'</label><input class="input" id="rpLen" type="number" placeholder="pl. 1650" value="'+(lenDef||'')+'"></div>'
     + '</div>'
     + '<div class="grid-2">'
-    +   '<div class="field"><label>Magasság (cm)</label><input class="input" id="rpH" type="number" value="'+(t.height_cm!=null?t.height_cm:'')+'"></div>'
-    +   '<div class="field"><label>Szélesség (cm)</label><input class="input" id="rpW" type="number" value="'+(t.width_cm!=null?t.width_cm:'')+'"></div>'
+    +   '<div class="field"><label>'+esc(T('rp.param.h'))+'</label><input class="input" id="rpH" type="number" value="'+(t.height_cm!=null?t.height_cm:'')+'"></div>'
+    +   '<div class="field"><label>'+esc(T('rp.param.w'))+'</label><input class="input" id="rpW" type="number" value="'+(t.width_cm!=null?t.width_cm:'')+'"></div>'
     + '</div>'
     + '<div class="grid-3">'
-    +   '<div class="field"><label>Tengelyterhelés (kg)</label><input class="input" id="rpWPA" type="number" value="'+(t.weight_per_axle_kg!=null?t.weight_per_axle_kg:'')+'"></div>'
-    +   '<div class="field"><label>Tengelyek száma</label><input class="input" id="rpAxle" type="number" min="2" max="12" value="'+(t.axle_count!=null?t.axle_count:'')+'"></div>'
-    +   '<div class="field"><label>Pótkocsik száma</label><input class="input" id="rpTrl" type="number" min="0" max="3" value="'+(p?1:0)+'"></div>'
+    +   '<div class="field"><label>'+esc(T('rp.param.wpa'))+'</label><input class="input" id="rpWPA" type="number" value="'+(t.weight_per_axle_kg!=null?t.weight_per_axle_kg:'')+'"></div>'
+    +   '<div class="field"><label>'+esc(T('rp.param.axle'))+'</label><input class="input" id="rpAxle" type="number" min="2" max="12" value="'+(t.axle_count!=null?t.axle_count:'')+'"></div>'
+    +   '<div class="field"><label>'+esc(T('rp.param.trl'))+'</label><input class="input" id="rpTrl" type="number" min="0" max="3" value="'+(p?1:0)+'"></div>'
     + '</div>'
     + '<div class="grid-2">'
-    +   '<div class="field"><label>Alagút kategória</label><select class="select" id="rpTun">'+rpOpts(tunOpts,t.tunnel_category)+'</select></div>'
-    +   '<div class="field"><label>Veszélyes áru</label><select class="select" id="rpHaz">'+rpOpts(hazOpts,t.hazardous_goods)+'</select></div>'
+    +   '<div class="field"><label>'+esc(T('rp.param.tun'))+'</label><select class="select" id="rpTun">'+rpOpts(tunOpts,t.tunnel_category)+'</select></div>'
+    +   '<div class="field"><label>'+esc(T('rp.param.haz'))+'</label><select class="select" id="rpHaz">'+rpOpts(hazOpts,t.hazardous_goods)+'</select></div>'
     + '</div>'
     + '<div class="text-muted" style="font-size:12px;margin-top:6px;line-height:1.6;">'
-    +   'ℹ️ Az <b>ingyenes útvonaltervezés autós profillal</b> számol — a fenti jármű-paraméterek (súly/magasság) korlátozásait az útvonal NEM veszi figyelembe, a fogyasztás-becsléshez és a dokumentáláshoz szolgálnak.'
+    +   T('rp.params.info')
     + '</div>';
 }
 function rpTypeChange(){
@@ -343,27 +441,27 @@ function rpRelTime(iso){
   var diff=(Date.now()-new Date(iso).getTime())/1000;
   if(isNaN(diff)) return {txt:'', col:'var(--text-muted)'};
   var m=Math.round(diff/60);
-  if(m<5) return {txt:(m<=0?'most':m+' perce'), col:'var(--status-ok)'};
-  if(m<60) return {txt:m+' perce', col:'var(--status-warn)'};
+  if(m<5) return {txt:(m<=0?T('rp.rel.now'):T('rp.rel.min',{n:m})), col:'var(--status-ok)'};
+  if(m<60) return {txt:T('rp.rel.min',{n:m}), col:'var(--status-warn)'};
   var h=Math.round(m/60);
-  if(h<24) return {txt:h+' órája', col:'var(--status-danger)'};
-  return {txt:Math.round(h/24)+' napja', col:'var(--status-danger)'};
+  if(h<24) return {txt:T('rp.rel.hour',{n:h}), col:'var(--status-danger)'};
+  return {txt:T('rp.rel.day',{n:Math.round(h/24)}), col:'var(--status-danger)'};
 }
 function rpRenderGps(state){
   var box=document.getElementById('rpGpsBlock');
-  if(state==='none'||!selTractor){ box.innerHTML='Válassz vontatót a GPS pozíció betöltéséhez.'; box.className='rp-gps-box text-muted'; box.style.fontSize='13px'; return; }
-  if(state==='loading'){ box.innerHTML='<span class="spinner" style="width:14px;height:14px;vertical-align:middle;"></span> GPS pozíció lekérése…'; return; }
+  if(state==='none'||!selTractor){ box.innerHTML=esc(T('rp.gps.prompt')); box.className='rp-gps-box text-muted'; box.style.fontSize='13px'; return; }
+  if(state==='loading'){ box.innerHTML='<span class="spinner" style="width:14px;height:14px;vertical-align:middle;"></span> '+esc(T('rp.gps.loading')); return; }
   if(gpsPos){
     var rt=rpRelTime(gpsPos.updated_at);
     box.innerHTML='<div style="font-weight:600;color:var(--status-ok);">🟢 '+esc(gpsPos.rendszam)+'</div>'
-      + '<div class="text-muted" style="font-size:12px;margin:4px 0 8px;">utolsó pozíció: <span style="color:'+rt.col+';font-weight:600;">'+esc(rt.txt||'—')+'</span></div>'
-      + '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="rpRefreshGps()">🔄 GPS frissítése</button>';
+      + '<div class="text-muted" style="font-size:12px;margin:4px 0 8px;">'+esc(T('rp.gps.last'))+' <span style="color:'+rt.col+';font-weight:600;">'+esc(rt.txt||'—')+'</span></div>'
+      + '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="rpRefreshGps()">'+esc(T('rp.gps.refresh'))+'</button>';
   } else {
-    box.innerHTML='<div style="color:var(--status-warn);">⚠ GPS pozíció nem elérhető</div>'
+    box.innerHTML='<div style="color:var(--status-warn);">'+esc(T('rp.gps.unavailable'))+'</div>'
       + '<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;cursor:pointer;" class="text-primary">'
-      + '<input type="checkbox" id="rpManualChk" onchange="rpToggleManual()" '+(gpsManualMode?'checked':'')+'> Manuális kiindulópont megadása</label>'
+      + '<input type="checkbox" id="rpManualChk" onchange="rpToggleManual()" '+(gpsManualMode?'checked':'')+'> '+esc(T('rp.gps.manual'))+'</label>'
       + '<div id="rpManualWrap" style="margin-top:8px;'+(gpsManualMode?'':'display:none;')+'">'
-      + '<div class="rp-ac-wrap"><input class="input" id="rpStartManual" placeholder="Kiindulási cím" autocomplete="off"><div class="rp-ac-dd" id="rpStartManualDD"></div></div>'
+      + '<div class="rp-ac-wrap"><input class="input" id="rpStartManual" placeholder="'+esc(T('rp.gps.manual.ph'))+'" autocomplete="off"><div class="rp-ac-dd" id="rpStartManualDD"></div></div>'
       + '</div>';
     if(gpsManualMode){ var i=document.getElementById('rpStartManual'); if(i) attachAutocomplete(i, document.getElementById('rpStartManualDD')); }
   }
@@ -379,12 +477,12 @@ function rpRefreshGps(){ if(selTractor){ rpRenderGps('loading'); rpLoadGps(selTr
 
 // ───────── Közbülső célok ─────────
 function rpAddWaypoint(){
-  if(_waypointIds.length>=5){ toast('Legfeljebb 5 közbülső cél adható meg.','err'); return; }
+  if(_waypointIds.length>=5){ toast(T('rp.wp.max'),'err'); return; }
   var id=++_wpSeq; _waypointIds.push(id);
   var wrap=document.getElementById('rpWaypoints');
   var row=document.createElement('div'); row.className='rp-point'; row.id='rpWpRow_'+id;
-  row.innerHTML='<div class="lbl text-primary">🔵 Közbülső cél #'+_waypointIds.length+'</div>'
-    + '<div class="rp-wp-row"><div class="rp-ac-wrap"><input class="input" id="rpWp_'+id+'" placeholder="Közbülső cím" autocomplete="off"><div class="rp-ac-dd" id="rpWpDD_'+id+'"></div></div>'
+  row.innerHTML='<div class="lbl text-primary">'+esc(T('rp.wp.label',{n:_waypointIds.length}))+'</div>'
+    + '<div class="rp-wp-row"><div class="rp-ac-wrap"><input class="input" id="rpWp_'+id+'" placeholder="'+esc(T('rp.wp.ph'))+'" autocomplete="off"><div class="rp-ac-dd" id="rpWpDD_'+id+'"></div></div>'
     + '<button class="rp-wp-del" onclick="rpRemoveWaypoint('+id+')">✕</button></div>';
   wrap.appendChild(row);
   attachAutocomplete(document.getElementById('rpWp_'+id), document.getElementById('rpWpDD_'+id));
@@ -395,7 +493,7 @@ function rpRemoveWaypoint(id){
   var row=document.getElementById('rpWpRow_'+id); if(row) row.remove();
   document.getElementById('rpAddWp').style.display='';
   // sorszámok újraírása
-  _waypointIds.forEach(function(wid,i){ var r=document.getElementById('rpWpRow_'+wid); if(r){ var l=r.querySelector('.lbl'); if(l) l.textContent='🔵 Közbülső cél #'+(i+1); } });
+  _waypointIds.forEach(function(wid,i){ var r=document.getElementById('rpWpRow_'+wid); if(r){ var l=r.querySelector('.lbl'); if(l) l.textContent=T('rp.wp.label',{n:i+1}); } });
 }
 
 // ───────── HERE Autocomplete ─────────
@@ -438,7 +536,7 @@ function rpUpdatePlanBtn(){
 }
 
 // ───────── Útvonal tervezése ─────────
-function rpFmtDur(sec){ sec=Math.round(sec||0); var h=Math.floor(sec/3600), m=Math.round((sec%3600)/60); return (h>0?(h+'ó '):'')+m+'p'; }
+function rpFmtDur(sec){ sec=Math.round(sec||0); var h=Math.floor(sec/3600), m=Math.round((sec%3600)/60); return (h>0?(h+T('rp.dur.h')+' '):'')+m+T('rp.dur.m'); }
 function rpBuildWaypoints(){
   var wps=[];
   if(gpsPos && !gpsManualMode){ wps.push({type:'gps', lat:gpsPos.lat, lng:gpsPos.lng}); }
@@ -449,23 +547,25 @@ function rpBuildWaypoints(){
   return wps;
 }
 function rpPlan(){
-  if(!selTractor){ toast('Válassz vontatót!','err'); return; }
-  if(!val('rpLoading')||!val('rpUnloading')){ toast('Add meg a felrakó és lerakó címet!','err'); return; }
+  if(!selTractor){ toast(T('rp.toast.choosetractor'),'err'); return; }
+  if(!val('rpLoading')||!val('rpUnloading')){ toast(T('rp.toast.addaddr'),'err'); return; }
   var sp=document.getElementById('rpSpinner'); sp.style.display='flex';
   var btn=document.getElementById('rpPlanBtn'); btn.disabled=true;
   gas('calculateRoute',[{ tractorId:selTractor.id, trailerId:selTrailer?selTrailer.id:null, params:rpCollectParams(), waypoints:rpBuildWaypoints() }])
   .then(function(r){
     sp.style.display='none'; rpUpdatePlanBtn();
     if(!r||!r.ok){
-      var m=(r&&r.err)||'Nem sikerült az útvonaltervezés';
-      if(/429|too many|limit/i.test(m)) m='A térkép-szolgáltatás túlterhelt — próbáld újra pár másodperc múlva';
+      var m=(r&&r.err)||T('rp.toast.routefail');
+      if(/429|too many|limit/i.test(m)) m=T('rp.toast.overload');
       toast(m,'err'); return;
     }
     rpDrawRoute(r);
-  }).catch(function(){ sp.style.display='none'; rpUpdatePlanBtn(); toast('Hálózati hiba az útvonaltervezésnél','err'); });
+  }).catch(function(){ sp.style.display='none'; rpUpdatePlanBtn(); toast(T('rp.toast.neterr'),'err'); });
 }
 function rpMarkerColor(type){ return type==='gps'?'#22c55e':type==='loading'?'#3b82f6':type==='unloading'?'#e10b1a':'#f59e0b'; }
+var _lastRoute=null;
 function rpDrawRoute(r){
+  _lastRoute=r;
   rpLayer.clearLayers();
   var all=[];
   // tiltott szakaszok kiemelése (halo a vonal ALATT)
@@ -477,10 +577,10 @@ function rpDrawRoute(r){
   // markerek
   (r.waypoints||[]).forEach(function(w,i){
     var col=rpMarkerColor(w.type);
-    var tip = w.type==='gps'?((selTractor?selTractor.rendszam:'')+' — jelenlegi pozíció')
-            : w.type==='loading'?('Felrakó: '+(w.label||''))
-            : w.type==='unloading'?('Lerakó: '+(w.label||''))
-            : ('Közbülső: '+(w.label||''));
+    var tip = w.type==='gps'?T('rp.tip.current',{p:(selTractor?selTractor.rendszam:'')})
+            : w.type==='loading'?T('rp.tip.loading',{x:(w.label||'')})
+            : w.type==='unloading'?T('rp.tip.unloading',{x:(w.label||'')})
+            : T('rp.tip.waypoint',{x:(w.label||'')});
     L.circleMarker([w.lat,w.lng],{radius:8,color:col,fillColor:col,fillOpacity:0.9,weight:2}).bindTooltip(tip).addTo(rpLayer);
     all.push([w.lat,w.lng]);
   });
@@ -499,7 +599,7 @@ function rpDrawRoute(r){
     if(!v.polyline||!v.polyline.length) return;
     var mid=v.polyline[Math.floor(v.polyline.length/2)];
     var icon=L.divIcon({className:'rp-viol-ico',html:'<div style="font-size:20px;line-height:1;text-shadow:0 0 3px #000;">⛔</div>',iconSize:[24,24],iconAnchor:[12,12]});
-    L.marker(mid,{icon:icon,zIndexOffset:1000}).bindTooltip('⛔ '+esc(v.label)).bindPopup('<b>⛔ Tiltott szakasz</b><br>'+esc(v.label)).addTo(rpLayer);
+    L.marker(mid,{icon:icon,zIndexOffset:1000}).bindTooltip('⛔ '+esc(v.label)).bindPopup('<b>'+esc(T('rp.viol.forbidden'))+'</b><br>'+esc(v.label)).addTo(rpLayer);
   });
   if(all.length) rpMap.fitBounds(all,{padding:[40,40]});
 
@@ -509,18 +609,18 @@ function rpDrawRoute(r){
   var profEl=document.getElementById('rpProfileNote');
   if(profEl){
     profEl.innerHTML = r.profile==='truck-ors'
-      ? '🚛 <b>Kamionos profil</b> (OpenRouteService) — a megadott súly/méret-korlátokkal tervezve.'
-      : 'ℹ️ <b>Autós profil</b> (OSRM) — kamion-korlátozások nélkül.';
+      ? T('rp.profile.truck')
+      : T('rp.profile.car');
   }
   document.getElementById('rpDist').textContent=(Math.round((r.distanceMeters||0)/100)/10)+' km';
   document.getElementById('rpTime').textContent=rpFmtDur(r.durationSeconds);
   document.getElementById('rpFuel').textContent=(r.fuelEstimateL!=null)?(r.fuelEstimateL+' L'):'—';
 
-  var typeName={gps:'Kiindulópont',loading:'Felrakó',unloading:'Lerakó',waypoint:'Közbülső'};
+  var typeName={gps:T('rp.type.gps'),loading:T('rp.type.loading'),unloading:T('rp.type.unloading'),waypoint:T('rp.type.waypoint')};
   var legsHtml='';
   if((r.legs||[]).length>1){
     legsHtml='<div style="margin-top:6px;display:flex;flex-direction:column;gap:6px;">'+r.legs.map(function(leg){
-      var f=typeName[leg.fromType]||'Pont', t=typeName[leg.toType]||'Pont';
+      var f=typeName[leg.fromType]||T('rp.type.point'), t=typeName[leg.toType]||T('rp.type.point');
       return '<div class="glass-soft" style="padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;" class="text-primary">'
         + '<b>'+esc(f)+' → '+esc(t)+':</b> '+(Math.round((leg.distanceMeters||0)/100)/10)+' km — '+rpFmtDur(leg.durationSeconds)+'</div>';
     }).join('')+'</div>';

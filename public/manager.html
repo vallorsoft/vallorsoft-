@@ -110,10 +110,10 @@
       <div class="dash-topbar">
         <div>
           <div class="text-primary" style="font-size:22px; font-weight:800;" id="dashCegNev">—</div>
-          <div class="text-muted" style="font-size:12px;">Cég dashboard</div>
+          <div class="text-muted" style="font-size:12px;" data-i18n="mh.companyDashboard">Cég dashboard</div>
         </div>
         <div id="langSwitch" style="display:inline-flex;gap:4px;margin-right:8px;vertical-align:middle;"></div>
-        <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Világos mód" aria-label="Téma váltása">🌙</button>
+        <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Világos mód" data-i18n-title="mh.lightMode" aria-label="Téma váltása">🌙</button>
       </div>
 
        <!-- Stat kártyák -->
@@ -121,19 +121,19 @@
       <div class="dash-stats" style="margin-bottom:20px;">
         <div class="glass stat-tile">
           <div class="stat-ico">📦</div>
-          <div><div class="stat-val text-primary" id="kpiTotal">—</div><div class="stat-lbl text-muted">Összes fuvar</div></div>
+          <div><div class="stat-val text-primary" id="kpiTotal">—</div><div class="stat-lbl text-muted" data-i18n="mh.totalOrders">Összes fuvar</div></div>
         </div>
         <div class="glass stat-tile">
           <div class="stat-ico">🚚</div>
-          <div><div class="stat-val text-primary" id="kpiAktiv">—</div><div class="stat-lbl text-muted">Aktív fuvar</div></div>
+          <div><div class="stat-val text-primary" id="kpiAktiv">—</div><div class="stat-lbl text-muted" data-i18n="mh.activeOrders">Aktív fuvar</div></div>
         </div>
         <div class="glass stat-tile">
           <div class="stat-ico">👥</div>
-          <div><div class="stat-val text-primary" id="cUsers">—</div><div class="stat-lbl text-muted">Felhasználók</div></div>
+          <div><div class="stat-val text-primary" id="cUsers">—</div><div class="stat-lbl text-muted" data-i18n="mh.users">Felhasználók</div></div>
         </div>
         <div class="glass stat-tile">
           <div class="stat-ico">📄</div>
-          <div><div class="stat-val text-primary" id="countFuv">—</div><div class="stat-lbl text-muted">Beérkezett menetlevelek</div></div>
+          <div><div class="stat-val text-primary" id="countFuv">—</div><div class="stat-lbl text-muted" data-i18n="mh.receivedWaybills">Beérkezett menetlevelek</div></div>
         </div>
       </div>
 
@@ -143,23 +143,23 @@
            <!-- Legutóbbi fuvarok -->
           <div class="glass" style="padding:18px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-              <div class="text-primary" style="font-size:15px;font-weight:700;">Legutóbbi fuvarok</div>
-              <span class="dash-link" onclick="activateTab('orders-list')">Összes fuvar →</span>
+              <div class="text-primary" style="font-size:15px;font-weight:700;" data-i18n="mh.recentOrders">Legutóbbi fuvarok</div>
+              <span class="dash-link" onclick="activateTab('orders-list')" data-i18n="mh.allOrders">Összes fuvar →</span>
             </div>
             <div style="overflow-x:auto;">
               <table class="table" id="dashRecentOrders">
-                <thead><tr><th>Fuvar</th><th>Úticél</th><th>Sofőr</th><th>Státusz</th><th>Dátum</th></tr></thead>
+                <thead><tr><th data-i18n="mh.colOrder">Fuvar</th><th data-i18n="mh.colDest">Úticél</th><th data-i18n="list.colDriver">Sofőr</th><th data-i18n="list.colStatus">Státusz</th><th data-i18n="mh.colDate">Dátum</th></tr></thead>
                 <tbody id="dashRecentOrdersBody">
-                  <tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">Betöltés...</td></tr>
+                  <tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;" data-i18n="mh.loading">Betöltés...</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
            <!-- Jármű státusz összesítő -->
           <div class="glass" style="padding:18px;">
-            <div class="text-primary" style="font-size:15px;font-weight:700;margin-bottom:12px;">Jármű státusz</div>
+            <div class="text-primary" style="font-size:15px;font-weight:700;margin-bottom:12px;" data-i18n="mh.vehicleStatus">Jármű státusz</div>
             <div class="dash-veh-grid" id="dashVehicleSummary">
-              <div class="dash-mini glass-soft"><div class="text-muted" style="font-size:11px;">Betöltés...</div></div>
+              <div class="dash-mini glass-soft"><div class="text-muted" style="font-size:11px;" data-i18n="mh.loading">Betöltés...</div></div>
             </div>
           </div>
         </div>
@@ -180,14 +180,14 @@
           <span class="text-muted" style="font-size:11px;margin-left:8px;" data-i18n="form.csvImportHint">pl. gyári fuvarlista (.csv) — oszlop-párosítással</span>
         </div>
         <div class="grid-3">
-          <div class="field"><label data-i18n="form.client">Ügyfél / Client</label><input class="input" id="oClient" placeholder="pl. Vallor Logistics">
+          <div class="field"><label data-i18n="form.client">Ügyfél / Client</label><input class="input" id="oClient" placeholder="pl. Vallor Logistics" data-i18n-ph="mh.phClientEg">
             <div style="margin-top:6px;"><div id="clientPickerBox"></div><input type="hidden" id="orderClientId" name="client_id"></div>
             <div style="font-size:11px;color:var(--muted);margin-top:4px;" data-i18n="form.clientHint">Vagy válassz a mentett ügyfelek közül (ANAF-ellenőrzött adatok, számlázáshoz).</div>
           </div>
           <div class="field"><label data-i18n="form.ref">Referencia</label><input class="input" id="oRef" placeholder="opcionális" data-i18n-ph="form.refPh"></div>
           <div class="field"><label data-i18n="form.price">Ár / Preț</label><input class="input" id="oPret" type="number" placeholder="0"></div>
-          <div class="field"><label data-i18n="form.km">Távolság / Km</label><div class="vs-km-row"><input class="input" id="oKm" type="number" placeholder="0"><button type="button" class="btn ghost vs-map-btn" id="oMapBtn" title="Útvonal-előnézet térképen" style="display:none;">🗺️</button></div></div>
-          <div class="field"><label><span data-i18n="form.weight">Súly / kg</span> <span style="color:var(--muted);font-weight:400;" data-i18n="form.weightHint">(részrakomány-ellenőrzéshez)</span></label><input class="input" id="oSuly" type="number" min="0" placeholder="pl. 12000"></div>
+          <div class="field"><label data-i18n="form.km">Távolság / Km</label><div class="vs-km-row"><input class="input" id="oKm" type="number" placeholder="0"><button type="button" class="btn ghost vs-map-btn" id="oMapBtn" title="Útvonal-előnézet térképen" data-i18n-title="mh.routePreview" style="display:none;">🗺️</button></div></div>
+          <div class="field"><label><span data-i18n="form.weight">Súly / kg</span> <span style="color:var(--muted);font-weight:400;" data-i18n="form.weightHint">(részrakomány-ellenőrzéshez)</span></label><input class="input" id="oSuly" type="number" min="0" placeholder="pl. 12000" data-i18n-ph="mh.phWeightEg"></div>
           <div class="field"><label><span data-i18n="form.loadType">Rakomány típusa</span> <span style="color:var(--brand-red);">*</span></label>
             <div style="display:flex;gap:18px;align-items:center;padding:10px 2px;">
               <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;" title="Full Truck Load — teljes rakomány"><input type="checkbox" id="oFtl" onchange="loadTypeExclusive(this,'oLtl')" style="width:16px;height:16px;cursor:pointer;accent-color:#3b82f6;"> FTL <span style="color:var(--muted);font-size:11px;" data-i18n="form.ftlHint">(teljes áru)</span></label>
@@ -201,9 +201,9 @@
               <input class="input" id="oMag" type="number" min="0" placeholder="Mag." data-i18n-ph="form.phHei">
             </div>
           </div>
-          <div class="field"><label data-i18n="form.loadLoc">Felrakás helye</label><div class="vs-ac-wrap"><input class="input" id="oLoad" placeholder="pl. Budapest (HU)" autocomplete="off"><div class="vs-ac-dd" id="oLoadDD"></div></div></div>
+          <div class="field"><label data-i18n="form.loadLoc">Felrakás helye</label><div class="vs-ac-wrap"><input class="input" id="oLoad" placeholder="pl. Budapest (HU)" data-i18n-ph="mh.phLoadCity" autocomplete="off"><div class="vs-ac-dd" id="oLoadDD"></div></div></div>
           <div class="field"><label data-i18n="form.loadTime">Felrakás ideje</label><input class="input" id="oLoadDate" type="datetime-local"></div>
-          <div class="field"><label data-i18n="form.unloadLoc">Lerakás helye</label><div class="vs-ac-wrap"><input class="input" id="oUnload" placeholder="pl. Bucharest (RO)" autocomplete="off"><div class="vs-ac-dd" id="oUnloadDD"></div></div></div>
+          <div class="field"><label data-i18n="form.unloadLoc">Lerakás helye</label><div class="vs-ac-wrap"><input class="input" id="oUnload" placeholder="pl. Bucharest (RO)" data-i18n-ph="mh.phUnloadCity" autocomplete="off"><div class="vs-ac-dd" id="oUnloadDD"></div></div></div>
           <div class="field"><label data-i18n="form.unloadTime">Lerakás ideje</label><input class="input" id="oUnloadDate" type="datetime-local"></div>
         </div>
         <div style="margin-top:20px; margin-bottom:12px;">
@@ -217,35 +217,35 @@
         <div id="oInternBlock" style="display:none; margin-bottom:14px;">
           <div class="field">
             <label data-i18n="form.selectIntern">Belső sofőr kiválasztása</label>
-            <input class="input" id="oInternSearch" placeholder="Keresés..." oninput="filterInternDrivers()" style="margin-bottom:6px;">
+            <input class="input" id="oInternSearch" placeholder="Keresés..." data-i18n-ph="mh.phSearch" oninput="filterInternDrivers()" style="margin-bottom:6px;">
             <select class="select" id="oInternDriver" size="4" style="height:auto;"></select>
           </div>
         </div>
         <div id="oExternBlock" style="display:none; margin-bottom:14px;">
           <div class="field">
             <label data-i18n="form.prevExtern">Korábbi külső sofőr (opcionális)</label>
-            <input class="input" id="oExternSearch" placeholder="Keresés névben / cégben..." oninput="filterExternDrivers()" style="margin-bottom:6px;">
+            <input class="input" id="oExternSearch" placeholder="Keresés névben / cégben..." data-i18n-ph="mh.phSearchNameFirm" oninput="filterExternDrivers()" style="margin-bottom:6px;">
             <select class="select" id="oExternSelect" size="3" style="height:auto;" onchange="fillExternDriver()">
               <option value="" data-i18n="form.newDriverManual">— Új sofőr beírása kézzel —</option>
             </select>
           </div>
           <div class="grid-3" style="margin-top:10px;">
-            <div class="field"><label data-i18n="form.driverName">Sofőr neve</label><input class="input" id="oExternNume" placeholder="Nagy János"></div>
-            <div class="field"><label data-i18n="form.companyName">Cég neve</label><input class="input" id="oExternFirma" placeholder="XY Trans Kft"></div>
-            <div class="field"><label data-i18n="form.phone">Telefon</label><input class="input" id="oExternTelefon" placeholder="+40 ..."></div>
+            <div class="field"><label data-i18n="form.driverName">Sofőr neve</label><input class="input" id="oExternNume" placeholder="Nagy János" data-i18n-ph="mh.phDriverName"></div>
+            <div class="field"><label data-i18n="form.companyName">Cég neve</label><input class="input" id="oExternFirma" placeholder="XY Trans Kft" data-i18n-ph="mh.phCompanyName"></div>
+            <div class="field"><label data-i18n="form.phone">Telefon</label><input class="input" id="oExternTelefon" placeholder="+40 ..." data-i18n-ph="mh.phPhone"></div>
           </div>
         </div>
         <div style="margin-top:10px;">
           <div class="grid-2">
             <div class="field">
             <label><span data-i18n="form.tractorPlate">Vontató rendszám</span> <button class="btn ok" onclick="openQuickVehicle('Vontato')" style="padding:2px 8px;font-size:11px;margin-left:8px;" data-i18n="form.newShort">+ Új</button></label>
-<input class="input" id="oCamionSearch" placeholder="Keresés..." oninput="filterCamions()" style="margin-bottom:6px;">
-<select class="select" id="oCamionSelect" size="3" style="height:auto;"><option value="">— Nincs megadva —</option></select>  
+<input class="input" id="oCamionSearch" placeholder="Keresés..." data-i18n-ph="mh.phSearch" oninput="filterCamions()" style="margin-bottom:6px;">
+<select class="select" id="oCamionSelect" size="3" style="height:auto;"><option value="" data-i18n="mh.notGiven">— Nincs megadva —</option></select>
             </div>
             <div class="field">
             <label><span data-i18n="form.trailerPlate">Pótkocsi rendszám</span> <button class="btn ok" onclick="openQuickVehicle('Potkocsi')" style="padding:2px 8px;font-size:11px;margin-left:8px;" data-i18n="form.newShort">+ Új</button></label>
-<input class="input" id="oRemorcaSearch" placeholder="Keresés..." oninput="filterRemorcas()" style="margin-bottom:6px;">
-<select class="select" id="oRemorcaSelect" size="3" style="height:auto;"><option value="">— Nincs megadva —</option></select>  
+<input class="input" id="oRemorcaSearch" placeholder="Keresés..." data-i18n-ph="mh.phSearch" oninput="filterRemorcas()" style="margin-bottom:6px;">
+<select class="select" id="oRemorcaSelect" size="3" style="height:auto;"><option value="" data-i18n="mh.notGiven">— Nincs megadva —</option></select>
             </div>
           </div>
         </div>
@@ -291,24 +291,24 @@
       <!-- Dokumentum széria konfigurátor -->
       <div class="glass" style="padding:22px;margin-bottom:16px;">
         <h2 class="h-title" style="margin-top:0;" data-i18n="pane.docSeries">📋 Dokumentum szériák</h2>
-        <p style="color:var(--muted);font-size:13px;margin:0 0 14px;">Sorszám: [Prefix]-[Év]-[0001]. Új prefix esetén a számozás 1-ről indul.</p>
+        <p style="color:var(--muted);font-size:13px;margin:0 0 14px;" data-i18n="mh.docSeriesHint">Sorszám: [Prefix]-[Év]-[0001]. Új prefix esetén a számozás 1-ről indul.</p>
         <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
           <div class="field" style="flex:1;min-width:140px;margin:0;">
-            <label>Menetlevél prefix</label>
+            <label data-i18n="mh.waybillPrefix">Menetlevél prefix</label>
             <input class="input" id="docSeriesPrefix" placeholder="MT" maxlength="10" oninput="updateDocSeriesPreview()">
           </div>
           <div style="padding-bottom:2px;">
-            <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Aktuális sorszám</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px;" data-i18n="mh.currentSeq">Aktuális sorszám</div>
             <div id="docSeriesCurrentSeq" style="font-size:20px;font-weight:800;color:#fff;">—</div>
           </div>
-          <button class="btn primary" style="padding:10px 20px;" onclick="saveDocSeries()">💾 Mentés</button>
+          <button class="btn primary" style="padding:10px 20px;" onclick="saveDocSeries()" data-i18n="mh.save">💾 Mentés</button>
         </div>
         <div style="margin-top:10px;font-size:12px;color:var(--muted);" id="docSeriesPreview">Előnézet: MT-2025-0001</div>
       </div>
       <div class="glass" style="padding:22px">
         <h2 class="h-title" data-i18n="nav.waybills">Fuvarlevelek</h2>
         <table class="table" id="tblReceivedFuv">
-          <thead><tr><th>Sorszám</th><th>Fájlnév</th><th>Sofőr</th><th>Beküldés ideje</th><th>Művelet</th></tr></thead>
+          <thead><tr><th data-i18n="mh.colSeq">Sorszám</th><th data-i18n="mh.colFilename">Fájlnév</th><th data-i18n="list.colDriver">Sofőr</th><th data-i18n="mh.colSubmitted">Beküldés ideje</th><th data-i18n="mh.colAction">Művelet</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -320,19 +320,19 @@
           <h2 class="h-title" style="margin:0;" data-i18n="pane.docs">📷 Feltöltött iratok és CMR-ek</h2>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <select class="select" id="docFilterSofer" style="max-width:180px;padding:8px 10px;font-size:13px;" onchange="renderDocGroups()">
-              <option value="">Összes sofőr</option>
+              <option value="" data-i18n="mh.allDrivers">Összes sofőr</option>
             </select>
             <select class="select" id="docFilterTip" style="max-width:140px;padding:8px 10px;font-size:13px;" onchange="renderDocGroups()">
-              <option value="">Összes típus</option>
+              <option value="" data-i18n="mh.allTypes">Összes típus</option>
               <option value="CMR">CMR</option>
-              <option value="Számla">Számla</option>
-              <option value="Vám">Vám</option>
-              <option value="Egyéb">Egyéb</option>
+              <option value="Számla" data-i18n="mh.optInvoice">Számla</option>
+              <option value="Vám" data-i18n="mh.optCustoms">Vám</option>
+              <option value="Egyéb" data-i18n="mh.optOther">Egyéb</option>
             </select>
           </div>
         </div>
         <div id="docGroupsContainer">
-          <div style="text-align:center;color:var(--muted);padding:40px;">Betöltés...</div>
+          <div style="text-align:center;color:var(--muted);padding:40px;" data-i18n="mh.loading">Betöltés...</div>
         </div>
       </div>
     </div>
@@ -340,9 +340,9 @@
 
     <div class="pane hidden" data-pane="users">
       <div class="glass" style="padding:22px;">
-        <h2>Munkatársak kezelése</h2>
+        <h2 data-i18n="nav.staff">Munkatársak kezelése</h2>
         <table class="table" id="tblUsers">
-          <thead><tr><th>Név</th><th>E-mail</th><th>Telefon</th><th>Pozíció</th><th>Művelet</th></tr></thead>
+          <thead><tr><th data-i18n="mh.colName">Név</th><th data-i18n="mh.colEmail">E-mail</th><th data-i18n="form.phone">Telefon</th><th data-i18n="mh.colPosition">Pozíció</th><th data-i18n="mh.colAction">Művelet</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -353,11 +353,11 @@
         <h2 class="h-title" data-i18n="pane.invites">Meghívókódok generálása</h2>
         <div class="row" style="margin-bottom:16px; display:flex; gap:10px;">
           <select class="select" id="invPoz" style="max-width:200px"><option>Sofer</option></select>
-          <input class="input" id="invEmail" placeholder="Kötés e-mailhez (opcionális)">
-          <button class="btn primary" onclick="createInv()">+ Kód generálása</button>
+          <input class="input" id="invEmail" placeholder="Kötés e-mailhez (opcionális)" data-i18n-ph="mh.phBindEmail">
+          <button class="btn primary" onclick="createInv()" data-i18n="mh.genCode">+ Kód generálása</button>
         </div>
         <table class="table" id="tblInv">
-          <thead><tr><th>Kód</th><th>Pozíció</th><th>Név</th><th>E-mail</th><th>Telefon</th><th>Státusz</th><th>Művelet</th></tr></thead>
+          <thead><tr><th data-i18n="mh.colCode">Kód</th><th data-i18n="mh.colPosition">Pozíció</th><th data-i18n="mh.colName">Név</th><th data-i18n="mh.colEmail">E-mail</th><th data-i18n="form.phone">Telefon</th><th data-i18n="list.colStatus">Státusz</th><th data-i18n="mh.colAction">Művelet</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -366,9 +366,9 @@
     <div class="pane hidden" data-pane="internal-drivers">
       <div class="glass" style="padding:22px;">
         <h2 class="h-title" data-i18n="nav.internalDrivers">Belső sofőrök</h2>
-        <div class="h-sub" style="margin-bottom:18px;">Sofőr pozíciójú regisztrált felhasználók</div>
+        <div class="h-sub" style="margin-bottom:18px;" data-i18n="mh.internalDriversSub">Sofőr pozíciójú regisztrált felhasználók</div>
         <table class="table" id="tblInternalDrivers">
-          <thead><tr><th>Név</th><th>E-mail</th><th>Telefon</th><th>Műveletek</th></tr></thead>
+          <thead><tr><th data-i18n="mh.colName">Név</th><th data-i18n="mh.colEmail">E-mail</th><th data-i18n="form.phone">Telefon</th><th data-i18n="list.colActions">Műveletek</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -377,22 +377,22 @@
     <div class="pane hidden" data-pane="external-drivers">
       <div class="glass" style="padding:22px;">
         <h2 class="h-title" data-i18n="nav.externalDrivers">Külső sofőrök</h2>
-        <div class="h-sub">Cégen kívüli sofőrök és cégek címjegyzéke</div>
+        <div class="h-sub" data-i18n="mh.externalDriversSub">Cégen kívüli sofőrök és cégek címjegyzéke</div>
       </div>
       <div class="glass" style="padding:22px; margin-top:16px;">
-        <h3 style="margin-bottom:16px;">Új külső sofőr / cég hozzáadása</h3>
+        <h3 style="margin-bottom:16px;" data-i18n="mh.addExtDriver">Új külső sofőr / cég hozzáadása</h3>
         <div class="grid-3">
-          <div class="field"><label data-i18n="form.driverName">Sofőr neve</label><input class="input" id="edNume" placeholder="pl. Nagy János"></div>
-          <div class="field"><label data-i18n="form.companyName">Cég neve</label><input class="input" id="edFirma" placeholder="pl. XY Trans Kft"></div>
-          <div class="field"><label data-i18n="form.phone">Telefon</label><input class="input" id="edTelefon" placeholder="+40 ..."></div>
-          <div class="field"><label>E-mail</label><input class="input" id="edEmail" type="email" placeholder="nev@pelda.hu"></div>
-          <div class="field"><label>Vontató rendszám</label><input class="input" id="edCamion" placeholder="BV-12-XYZ"></div>
-          <div class="field"><label>Pótkocsi rendszám</label><input class="input" id="edRemorca" placeholder="CV-99-PRO"></div>
-          <div class="field" style="grid-column:span 3;"><label>Megjegyzés</label><input class="input" id="edNota" placeholder="opcionális"></div>
+          <div class="field"><label data-i18n="form.driverName">Sofőr neve</label><input class="input" id="edNume" placeholder="pl. Nagy János" data-i18n-ph="mh.phDriverNameEg"></div>
+          <div class="field"><label data-i18n="form.companyName">Cég neve</label><input class="input" id="edFirma" placeholder="pl. XY Trans Kft" data-i18n-ph="mh.phCompanyNameEg"></div>
+          <div class="field"><label data-i18n="form.phone">Telefon</label><input class="input" id="edTelefon" placeholder="+40 ..." data-i18n-ph="mh.phPhone"></div>
+          <div class="field"><label data-i18n="mh.colEmail">E-mail</label><input class="input" id="edEmail" type="email" placeholder="nev@pelda.hu" data-i18n-ph="mh.phEmailEg"></div>
+          <div class="field"><label data-i18n="mh.tractorPlate">Vontató rendszám</label><input class="input" id="edCamion" placeholder="BV-12-XYZ"></div>
+          <div class="field"><label data-i18n="mh.trailerPlate">Pótkocsi rendszám</label><input class="input" id="edRemorca" placeholder="CV-99-PRO"></div>
+          <div class="field" style="grid-column:span 3;"><label data-i18n="mh.note">Megjegyzés</label><input class="input" id="edNota" placeholder="opcionális" data-i18n-ph="form.refPh"></div>
         </div>
-        <button class="btn primary" onclick="createExtDriver()" style="margin-top:10px;">+ Sofőr hozzáadása</button>
+        <button class="btn primary" onclick="createExtDriver()" style="margin-top:10px;" data-i18n="mh.addDriver">+ Sofőr hozzáadása</button>
         <table class="table" id="tblExtDrivers" style="margin-top:24px;">
-          <thead><tr><th>Sofőr neve</th><th>Cég neve</th><th>Telefon</th><th>E-mail</th><th>Vontató</th><th>Pótkocsi</th><th>Megjegyzés</th><th>Művelet</th></tr></thead>
+          <thead><tr><th data-i18n="form.driverName">Sofőr neve</th><th data-i18n="form.companyName">Cég neve</th><th data-i18n="form.phone">Telefon</th><th data-i18n="mh.colEmail">E-mail</th><th data-i18n="list.colTractor">Vontató</th><th data-i18n="mh.trailer">Pótkocsi</th><th data-i18n="mh.note">Megjegyzés</th><th data-i18n="mh.colAction">Művelet</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -403,45 +403,45 @@
     <div class="pane hidden" data-pane="vehicles">
       <div class="glass" style="padding:22px;">
         <h2 class="h-title" data-i18n="pane.vehicles">Járművek kezelése</h2>
-        <div class="h-sub">Vontatók és pótkocsik nyilvántartása</div>
+        <div class="h-sub" data-i18n="mh.vehiclesSub">Vontatók és pótkocsik nyilvántartása</div>
       </div>
       <div class="glass" style="padding:22px; margin-top:16px;">
-        <h3 style="margin-bottom:16px;">Vontatók</h3>
+        <h3 style="margin-bottom:16px;" data-i18n="mh.tractors">Vontatók</h3>
         <div class="grid-3">
-          <div class="field"><label>Rendszám *</label><input class="input" id="vtRendszam" placeholder="BV-12-XYZ"></div>
-          <div class="field"><label>Márka</label><input class="input" id="vtMarca" placeholder="Volvo"></div>
-          <div class="field"><label>Model</label><input class="input" id="vtModel" placeholder="FH16"></div>
-          <div class="field"><label>Év</label><input class="input" id="vtAn" type="number" placeholder="2022"></div>
-          <div class="field" style="grid-column:span 2;"><label>Megjegyzés</label><input class="input" id="vtNota" placeholder="opcionális"></div>
+          <div class="field"><label data-i18n="mh.plateReq">Rendszám *</label><input class="input" id="vtRendszam" placeholder="BV-12-XYZ"></div>
+          <div class="field"><label data-i18n="mh.brand">Márka</label><input class="input" id="vtMarca" placeholder="Volvo"></div>
+          <div class="field"><label data-i18n="mh.model">Model</label><input class="input" id="vtModel" placeholder="FH16"></div>
+          <div class="field"><label data-i18n="mh.year">Év</label><input class="input" id="vtAn" type="number" placeholder="2022"></div>
+          <div class="field" style="grid-column:span 2;"><label data-i18n="mh.note">Megjegyzés</label><input class="input" id="vtNota" placeholder="opcionális" data-i18n-ph="form.refPh"></div>
         </div>
-        <button class="btn primary" onclick="createVehicle('Vontato')" style="margin-top:10px;">+ Vontató hozzáadása</button>
+        <button class="btn primary" onclick="createVehicle('Vontato')" style="margin-top:10px;" data-i18n="mh.addTractor">+ Vontató hozzáadása</button>
         <table class="table" id="tblVontato" style="margin-top:20px;">
-          <thead><tr><th>Rendszám</th><th>Márka</th><th>Model</th><th>Év</th><th>Megjegyzés</th><th>Művelet</th></tr></thead>
+          <thead><tr><th data-i18n="mh.plate">Rendszám</th><th data-i18n="mh.brand">Márka</th><th data-i18n="mh.model">Model</th><th data-i18n="mh.year">Év</th><th data-i18n="mh.note">Megjegyzés</th><th data-i18n="mh.colAction">Művelet</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
       <div class="glass" style="padding:22px; margin-top:16px;">
-        <h3 style="margin-bottom:16px;">Pótkocsik</h3>
+        <h3 style="margin-bottom:16px;" data-i18n="mh.trailers">Pótkocsik</h3>
         <div class="grid-3">
-          <div class="field"><label>Rendszám *</label><input class="input" id="ptRendszam" placeholder="CV-99-PRO"></div>
-          <div class="field"><label>Márka</label><input class="input" id="ptMarca" placeholder="Schwarzmüller"></div>
-          <div class="field"><label>Model</label><input class="input" id="ptModel" placeholder="—"></div>
-          <div class="field"><label>Év</label><input class="input" id="ptAn" type="number" placeholder="2020"></div>
-          <div class="field" style="grid-column:span 2;"><label>Megjegyzés</label><input class="input" id="ptNota" placeholder="opcionális"></div>
+          <div class="field"><label data-i18n="mh.plateReq">Rendszám *</label><input class="input" id="ptRendszam" placeholder="CV-99-PRO"></div>
+          <div class="field"><label data-i18n="mh.brand">Márka</label><input class="input" id="ptMarca" placeholder="Schwarzmüller"></div>
+          <div class="field"><label data-i18n="mh.model">Model</label><input class="input" id="ptModel" placeholder="—"></div>
+          <div class="field"><label data-i18n="mh.year">Év</label><input class="input" id="ptAn" type="number" placeholder="2020"></div>
+          <div class="field" style="grid-column:span 2;"><label data-i18n="mh.note">Megjegyzés</label><input class="input" id="ptNota" placeholder="opcionális" data-i18n-ph="form.refPh"></div>
           <!-- Rakodási felület (opcionális) — NEM a teljes méret; alapértelmezés előtöltve -->
-          <div class="field"><label>Típus (rakfelület)</label>
+          <div class="field"><label data-i18n="mh.cargoKind">Típus (rakfelület)</label>
             <select class="select" id="ptKind" onchange="ptKindChange()">
-              <option value="standard">Standard (260 cm)</option>
-              <option value="mega">Mega (305 cm)</option>
+              <option value="standard" data-i18n="mh.standard260">Standard (260 cm)</option>
+              <option value="mega" data-i18n="mh.mega305">Mega (305 cm)</option>
             </select>
           </div>
-          <div class="field"><label>Rakfelület hossz (cm)</label><input class="input" id="ptCargoLen" type="number" value="1360"></div>
-          <div class="field"><label>Rakfelület szélesség (cm)</label><input class="input" id="ptCargoWid" type="number" value="248"></div>
-          <div class="field"><label>Rakfelület magasság (cm)</label><input class="input" id="ptCargoHei" type="number" value="260"></div>
+          <div class="field"><label data-i18n="mh.cargoLen">Rakfelület hossz (cm)</label><input class="input" id="ptCargoLen" type="number" value="1360"></div>
+          <div class="field"><label data-i18n="mh.cargoWid">Rakfelület szélesség (cm)</label><input class="input" id="ptCargoWid" type="number" value="248"></div>
+          <div class="field"><label data-i18n="mh.cargoHei">Rakfelület magasság (cm)</label><input class="input" id="ptCargoHei" type="number" value="260"></div>
         </div>
-        <button class="btn primary" onclick="createVehicle('Potkocsi')" style="margin-top:10px;">+ Pótkocsi hozzáadása</button>
+        <button class="btn primary" onclick="createVehicle('Potkocsi')" style="margin-top:10px;" data-i18n="mh.addTrailer">+ Pótkocsi hozzáadása</button>
         <table class="table" id="tblPotkocsi" style="margin-top:20px;">
-          <thead><tr><th>Rendszám</th><th>Márka</th><th>Model</th><th>Év</th><th>Megjegyzés</th><th>Művelet</th></tr></thead>
+          <thead><tr><th data-i18n="mh.plate">Rendszám</th><th data-i18n="mh.brand">Márka</th><th data-i18n="mh.model">Model</th><th data-i18n="mh.year">Év</th><th data-i18n="mh.note">Megjegyzés</th><th data-i18n="mh.colAction">Művelet</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -450,19 +450,19 @@
     <div class="pane hidden" data-pane="signature">
       <div class="grid-2">
         <div class="glass" style="padding:22px;">
-          <h3>Digitális Aláírás Rajzolása</h3>
+          <h3 data-i18n="mh.drawSignature">Digitális Aláírás Rajzolása</h3>
           <canvas class="sig-pad" id="adminSigCanvas"></canvas>
-          <div class="row" style="margin-top:12px; display:flex; gap:10px;"><button class="btn ghost col" onclick="clearAdminSig()">Törlés</button><button class="btn ok col" onclick="saveAdminSigDraw()">Mentés</button></div>
+          <div class="row" style="margin-top:12px; display:flex; gap:10px;"><button class="btn ghost col" onclick="clearAdminSig()" data-i18n="mh.clear">Törlés</button><button class="btn ok col" onclick="saveAdminSigDraw()" data-i18n="mh.save2">Mentés</button></div>
         </div>
         <div class="glass" style="padding:22px;">
-          <h3>Bélyegző feltöltése (PNG)</h3>
+          <h3 data-i18n="mh.uploadStamp">Bélyegző feltöltése (PNG)</h3>
           <input type="file" id="sigFile" class="input" accept="image/png" style="margin-top:20px;">
-          <button class="btn primary block" onclick="saveAdminSigFile()" style="margin-top:24px;">Bélyegző mentése</button>
+          <button class="btn primary block" onclick="saveAdminSigFile()" style="margin-top:24px;" data-i18n="mh.saveStamp">Bélyegző mentése</button>
         </div>
       </div>
       <div class="glass" style="padding:22px; margin-top:16px; text-align:center;">
-        <h3>Aktuális bélyegző előnézete</h3>
-        <div style="background:#fff; display:inline-block; padding:10px; border-radius:12px; min-width:200px;"><img id="adminSigPreview" style="max-height:100px; display:none;"><span id="noSigText" style="color:#000;">Nincs mentve.</span></div>
+        <h3 data-i18n="mh.currentStampPreview">Aktuális bélyegző előnézete</h3>
+        <div style="background:#fff; display:inline-block; padding:10px; border-radius:12px; min-width:200px;"><img id="adminSigPreview" style="max-height:100px; display:none;"><span id="noSigText" style="color:#000;" data-i18n="mh.notSaved">Nincs mentve.</span></div>
       </div>
     </div>
 
@@ -474,10 +474,10 @@
       <div class="chat-app" id="chatApp" style="display:none;">
         <div class="chat-side">
           <div style="padding:14px 12px 10px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
-            <div style="font-weight:700; font-size:14px;">Csevegések</div>
-            <button onclick="chatOpenNewRoom()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;" title="Új chat">＋</button>
+            <div style="font-weight:700; font-size:14px;" data-i18n="mh.chats">Csevegések</div>
+            <button onclick="chatOpenNewRoom()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;" title="Új chat" data-i18n-title="mh.newChat">＋</button>
           </div>
-          <div id="chatRoomList"><div style="padding:16px 12px; font-size:12px; color:var(--muted);">Betöltés...</div></div>
+          <div id="chatRoomList"><div style="padding:16px 12px; font-size:12px; color:var(--muted);" data-i18n="mh.loading">Betöltés...</div></div>
         </div>
         <div class="chat-main">
           <div class="chat-head" id="chatHead">
@@ -493,7 +493,7 @@
             </div>
           </div>
           <div style="padding:12px 16px; border-top:1px solid var(--border); display:flex; gap:8px;">
-            <input class="input" id="chatInput" placeholder="Üzenet írása..." style="flex:1;"
+            <input class="input" id="chatInput" placeholder="Üzenet írása..." data-i18n-ph="mh.phWriteMessage" style="flex:1;"
               onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();chatSend();}">
             <button onclick="chatSend()" class="btn primary" style="padding:10px 16px;">➤</button>
           </div>
@@ -501,13 +501,13 @@
       </div>
       <div class="modal-back" id="newRoomModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:200; align-items:center; justify-content:center;">
         <div class="modal glass" style="min-width:320px;">
-          <h3>Új chat indítása</h3>
-          <div class="field"><label>Felhasználó kiválasztása</label>
-            <select class="select" id="newRoomUser"><option value="">— Betöltés... —</option></select>
+          <h3 data-i18n="mh.startNewChat">Új chat indítása</h3>
+          <div class="field"><label data-i18n="mh.selectUser">Felhasználó kiválasztása</label>
+            <select class="select" id="newRoomUser"><option value="" data-i18n="mh.loadingDash">— Betöltés... —</option></select>
           </div>
           <div style="display:flex; gap:10px; margin-top:14px;">
-            <button class="btn ghost col" onclick="document.getElementById('newRoomModal').style.display='none'">Mégse</button>
-            <button class="btn primary col" onclick="chatStartNewRoom()">Chat indítása</button>
+            <button class="btn ghost col" onclick="document.getElementById('newRoomModal').style.display='none'" data-i18n="common.cancel">Mégse</button>
+            <button class="btn primary col" onclick="chatStartNewRoom()" data-i18n="mh.startChat">Chat indítása</button>
           </div>
         </div>
       </div>
@@ -546,8 +546,8 @@
     <!-- SZÁMLÁZÓ PANE -->
     <div class="pane hidden" data-pane="billing">
       <div style="max-width:920px;">
-        <h2 class="h-title" style="margin-top:0;">📥 E-mail megrendelés-feldolgozás</h2>
-        <p style="color:var(--muted);font-size:13px;margin:0 0 16px;">A beérkező megrendelő e-mailek automatikus feldolgozásának beállításai (megtekintés).</p>
+        <h2 class="h-title" style="margin-top:0;" data-i18n="mh.emailIntakeTitle">📥 E-mail megrendelés-feldolgozás</h2>
+        <p style="color:var(--muted);font-size:13px;margin:0 0 16px;" data-i18n="mh.emailIntakeHint">A beérkező megrendelő e-mailek automatikus feldolgozásának beállításai (megtekintés).</p>
         <div id="emailIntakeCardBox"></div>
       </div>
     </div>

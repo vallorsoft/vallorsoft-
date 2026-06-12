@@ -5,6 +5,353 @@
 //  Betoltes a HTML-ben: ELOBB ez, UTANA admin.js / manager.js.
 // ============================================================
 
+// ── Kétnyelvűség (RO/HU): önregisztráló szótár + T() segéd ──
+// A toast(t('am.*')) hívások már korábban kétnyelvűek — itt a renderelt
+// HTML, modalok, badge-ek, confirm/prompt szövegei jönnek (cs.* namespace).
+(window.registerI18n||function(d){(window.__i18nQueue=window.__i18nQueue||[]).push(d);})({
+  // ── Általános / hibák ──
+  'cs.error':           { hu:'Hiba', ro:'Eroare' },
+  'cs.errorOccurred':   { hu:'Hiba történt', ro:'A apărut o eroare' },
+  'cs.serverErr':       { hu:'Szerver hiba', ro:'Eroare de server' },
+  'cs.saveErr':         { hu:'Mentési hiba', ro:'Eroare la salvare' },
+  'cs.loadErr2':        { hu:'Betöltési hiba', ro:'Eroare la încărcare' },
+  'cs.loading':         { hu:'Betöltés…', ro:'Se încarcă…' },
+  'cs.loadingDots':     { hu:'Betöltés...', ro:'Se încarcă...' },
+  'cs.cancel':          { hu:'Mégse', ro:'Anulează' },
+  'cs.save':            { hu:'Mentés', ro:'Salvează' },
+  'cs.saved':           { hu:'Mentve', ro:'Salvat' },
+  'cs.edit':            { hu:'Szerkeszt', ro:'Editează' },
+  'cs.editShort':       { hu:'Szerk', ro:'Editare' },
+  'cs.delete':          { hu:'Töröl', ro:'Șterge' },
+  'cs.revoke':          { hu:'Visszavon', ro:'Revocă' },
+  'cs.modifiable':      { hu:' (módosítható)', ro:' (modificabil)' },
+  'cs.noResult':        { hu:'Nincs találat.', ro:'Niciun rezultat.' },
+  'cs.couldNotLoad':    { hu:'Nem sikerült betölteni.', ro:'Încărcarea a eșuat.' },
+  // ── Vezérlőpult ──
+  'cs.stDone':          { hu:'Teljesítve', ro:'Finalizat' },
+  'cs.stInProgress':    { hu:'Folyamatban', ro:'În curs' },
+  'cs.stWaiting':       { hu:'Várakozik', ro:'În așteptare' },
+  'cs.stUnplanned':     { hu:'Tervezetlen', ro:'Neplanificat' },
+  'cs.stExternal':      { hu:'Külső', ro:'Extern' },
+  'cs.stCancelled':     { hu:'Törölve', ro:'Anulat' },
+  'cs.noOrder':         { hu:'Nincs fuvar.', ro:'Nicio cursă.' },
+  'cs.vehActive':       { hu:'Aktív járművek', ro:'Vehicule active' },
+  'cs.vehIdle':         { hu:'Álló járművek', ro:'Vehicule oprite' },
+  'cs.vehUnknown':      { hu:'Ismeretlen', ro:'Necunoscut' },
+  'cs.noGpsData':       { hu:'Nincs aktív GPS adat', ro:'Fără date GPS active' },
+  'cs.gpsNotSet':       { hu:'GPS integráció nincs beállítva', ro:'Integrarea GPS nu este configurată' },
+  'cs.speed':           { hu:'Sebesség', ro:'Viteză' },
+  // ── Fuvarlista (rendelési sorok) ──
+  'cs.cargoOnTrailer':  { hu:'🅿️ Áru a pótkocsin', ro:'🅿️ Marfa pe semiremorcă' },
+  'cs.needTractor':     { hu:' — vontató+sofőr kell!', ro:' — necesită cap tractor + șofer!' },
+  'cs.inWarehouse':     { hu:'📦 Raktárban', ro:'📦 În depozit' },
+  'cs.waitsAllocation': { hu:' — kiosztásra vár!', ro:' — așteaptă alocarea!' },
+  'cs.docMissing':      { hu:'⚠️ Dokumentum hiányzik!', ro:'⚠️ Lipsește documentul!' },
+  'cs.driverHandoverPending': { hu:'⏳ Sofőr leadás-kérése visszaigazolásra vár', ro:'⏳ Cererea de predare a șoferului așteaptă confirmarea' },
+  'cs.swapBadge':       { hu:' váltás', ro:' schimb' },
+  'cs.whereIsTruck':    { hu:'Hol a kocsi? (térkép)', ro:'Unde e camionul? (hartă)' },
+  'cs.uitCodes':        { hu:'UIT-kódok (RO e-Transport)', ro:'Coduri UIT (RO e-Transport)' },
+  'cs.invoicing':       { hu:'Számlázás', ro:'Facturare' },
+  'cs.copyTrackLink':   { hu:'Ügyfél követő-link másolása (publikus oldal)', ro:'Copiază linkul de urmărire client (pagină publică)' },
+  'cs.podAttached':     { hu:' sofőr-fotó / POD csatolva (Feltöltött Iratok fül)', ro:' poză șofer / POD atașat (tab Documente încărcate)' },
+  'cs.paid':            { hu:'Fizetve', ro:'Plătit' },
+  'cs.partlyPaid':      { hu:'Részben fizetve — fizetés rögzítése', ro:'Parțial plătit — înregistrează plata' },
+  'cs.outstanding':     { hu:'Kintlévő — fizetés rögzítése', ro:'Restant — înregistrează plata' },
+  'cs.handoverTitle':   { hu:'Áru leadása (pótkocsin parkol / raktárba kerül)', ro:'Predarea mărfii (parchează pe semiremorcă / în depozit)' },
+  'cs.autoRouteKm':     { hu:'Automata útvonal-km (térkép szerint) — összevetésre', ro:'Km automat al rutei (după hartă) — pentru comparație' },
+  // ── Fuvarfeladatok export (nyomtatható HTML) ──
+  'cs.orderTasks':      { hu:'Fuvarfeladatok', ro:'Sarcini de transport' },
+  'cs.printPdfSave':    { hu:'🖨️ Nyomtatás / PDF mentés', ro:'🖨️ Tipărire / Salvare PDF' },
+  'cs.orderTasksTitle': { hu:'VALLOR TEAM SRL — Fuvarfeladatok', ro:'VALLOR TEAM SRL — Sarcini de transport' },
+  'cs.printedAt':       { hu:'Nyomtatva: ', ro:'Tipărit: ' },
+  'cs.ordersWord':      { hu:' fuvar', ro:' curse' },
+  'cs.blueRowsSwaps':   { hu:'kék sorok = váltások', ro:'rândurile albastre = schimburi' },
+  'cs.exHashId':        { hu:'#ID', ro:'#ID' },
+  'cs.exClient':        { hu:'Ügyfél', ro:'Client' },
+  'cs.exRef':           { hu:'Ref', ro:'Ref' },
+  'cs.exLoadPickup':    { hu:'Felrakás / Átvétel', ro:'Încărcare / Preluare' },
+  'cs.exUnload':        { hu:'Lerakás', ro:'Descărcare' },
+  'cs.exKm':            { hu:'KM', ro:'KM' },
+  'cs.exPriceEur':      { hu:'Ár (EUR)', ro:'Preț (EUR)' },
+  'cs.exDriverSwap':    { hu:'Sofőr / Váltó sofőr', ro:'Șofer / Șofer schimb' },
+  'cs.exTractorTrailer':{ hu:'Vontató / Pótkocsi', ro:'Cap tractor / Semiremorcă' },
+  'cs.exStatus':        { hu:'Státusz', ro:'Status' },
+  'cs.exSwapNo':        { hu:'. váltás', ro:'. schimb' },
+  'cs.exSwapSection':   { hu:'Sofőrváltás / szakasz', ro:'Schimb șofer / segment' },
+  'cs.exLegend':        { hu:'ℹ️ Kék háttérrel: utólag hozzáadott váltások (order_legs) — sofőrcsere, átvételi hely, jármű adatokkal.', ro:'ℹ️ Pe fond albastru: schimburi adăugate ulterior (order_legs) — schimb șofer, loc de preluare, date vehicul.' },
+  'cs.exFooter':        { hu:'VallorSoft fuvarmenedzsment · Generálva: ', ro:'VallorSoft management transport · Generat: ' },
+  // ── Fuvar-szerkesztő modal ──
+  'cs.importExtra':     { hu:'📋 Importált extra adatok', ro:'📋 Date suplimentare importate' },
+  'cs.importExtraSub':  { hu:'(CSV-ből, nem párosított oszlopok)', ro:'(din CSV, coloane nepotrivite)' },
+  'cs.chooseDash':      { hu:'— Válassz —', ro:'— Alege —' },
+  'cs.noneDash':        { hu:'— Nincs —', ro:'— Niciun —' },
+  'cs.noSwap':          { hu:'Nincs rögzített váltás.', ro:'Niciun schimb înregistrat.' },
+  'cs.legSection':      { hu:'. szakasz', ro:'. segment' },
+  'cs.margin':          { hu:'Árrés: ', ro:'Marjă: ' },
+  // ── Fizetés modal ──
+  'cs.fullyPaid':       { hu:'✅ Fuvar teljesen kifizetve!', ro:'✅ Cursă achitată integral!' },
+  'cs.partialRecorded': { hu:'💰 Részfizetés rögzítve', ro:'💰 Plată parțială înregistrată' },
+  'cs.confirmResetPay': { hu:'Biztosan nullázod a rögzített fizetéseket ennél a fuvarnál?', ro:'Sigur resetezi plățile înregistrate pentru această cursă?' },
+  'cs.copyLink':        { hu:'Másold ki a linket:', ro:'Copiază linkul:' },
+  'cs.linkGenErr':      { hu:'Hiba a link generálásánál', ro:'Eroare la generarea linkului' },
+  // ── Áru-leadás / raktár modal ──
+  'cs.handoverGiveTitle':{ hu:'⛔ Áru leadása', ro:'⛔ Predarea mărfii' },
+  'cs.handoverConfirmTitle':{ hu:'✅ Sofőr-leadás visszaigazolása', ro:'✅ Confirmarea predării șoferului' },
+  'cs.whatHappens':     { hu:'Mi történik az áruval? *', ro:'Ce se întâmplă cu marfa? *' },
+  'cs.parkTrailer':     { hu:'🅿️ Pótkocsin parkol (megrakva)', ro:'🅿️ Parchează pe semiremorcă (încărcată)' },
+  'cs.goesWarehouse':   { hu:'📦 Raktárba kerül', ro:'📦 Intră în depozit' },
+  'cs.whereCargo':      { hu:'Hol van az áru? (helység) *', ro:'Unde este marfa? (localitate) *' },
+  'cs.destChanges':     { hu:'Változik a végső cél? (üresen marad a régi)', ro:'Se schimbă destinația finală? (rămâne cea veche dacă e gol)' },
+  'cs.destChangesPh':   { hu:'pl. Constanța — csak ha módosul', ro:'ex. Constanța — doar dacă se modifică' },
+  'cs.whDataReq':       { hu:'📦 Raktár-adatok (kötelező)', ro:'📦 Date depozit (obligatoriu)' },
+  'cs.qty':             { hu:'Darabszám *', ro:'Cantitate *' },
+  'cs.unit':            { hu:'Egység *', ro:'Unitate *' },
+  'cs.unitPallet':      { hu:'Paletta', ro:'Palet' },
+  'cs.unitBox':         { hu:'Doboz', ro:'Cutie' },
+  'cs.unitOther':       { hu:'Egyéb', ro:'Altele' },
+  'cs.lengthCm':        { hu:'Hossz (cm) *', ro:'Lungime (cm) *' },
+  'cs.widthCm':         { hu:'Szélesség (cm) *', ro:'Lățime (cm) *' },
+  'cs.heightCm':        { hu:'Magasság (cm) *', ro:'Înălțime (cm) *' },
+  'cs.weightKg':        { hu:'Súly (kg) *', ro:'Greutate (kg) *' },
+  'cs.docPages':        { hu:'Dokumentum lapszáma *', ro:'Nr. pagini document *' },
+  'cs.whUploadHint':    { hu:'📷 Mentés után töltsd fel / fotózd le a dokumentumokat — amíg nincs feltöltve, a rendszer folyamatosan figyelmeztet.', ro:'📷 După salvare încarcă / fotografiază documentele — până nu sunt încărcate, sistemul avertizează continuu.' },
+  'cs.note':            { hu:'Megjegyzés', ro:'Observație' },
+  'cs.optional':        { hu:'opcionális', ro:'opțional' },
+  'cs.saveHandover':    { hu:'⛔ Leadás mentése', ro:'⛔ Salvează predarea' },
+  'cs.confirmHandover': { hu:'✅ Visszaigazolás', ro:'✅ Confirmare' },
+  'cs.orderColon':      { hu:'Fuvar: ', ro:'Cursă: ' },
+  'cs.handoverConfirmSub':{ hu:' — a sofőr adatai előtöltve, javíthatod/kiegészítheted.', ro:' — datele șoferului sunt precompletate, le poți corecta/completa.' },
+  'cs.handoverDirectSub':{ hu:' — a fuvar felrakója a leadás helye lesz, és kiosztásra vár.', ro:' — locul de încărcare va deveni locul predării, și așteaptă alocarea.' },
+  'cs.cargoParked':     { hu:'🅿️ Áru leadva — pótkocsin parkol, kiosztásra vár.', ro:'🅿️ Marfă predată — parchează pe semiremorcă, așteaptă alocarea.' },
+  'cs.cargoWarehoused': { hu:'📦 Áru raktárba adva — kiosztásra vár.', ro:'📦 Marfă predată în depozit — așteaptă alocarea.' },
+  'cs.uploadDocsNow':   { hu:'📷 Töltsd fel az áru dokumentumait most!', ro:'📷 Încarcă acum documentele mărfii!' },
+  'cs.driverHandoverReqs':{ hu:'⏳ Sofőr áru-leadás kérések — visszaigazolásra várnak', ro:'⏳ Cereri predare marfă de la șoferi — așteaptă confirmarea' },
+  'cs.parkedOnTrailer': { hu:'🅿️ pótkocsin parkol', ro:'🅿️ parchează pe semiremorcă' },
+  'cs.movedToWarehouse':{ hu:'📦 raktárba került', ro:'📦 a intrat în depozit' },
+  'cs.trailerColon':    { hu:' · pótkocsi: ', ro:' · semiremorcă: ' },
+  'cs.confirmBtn':      { hu:'✓ Visszaigazol', ro:'✓ Confirmă' },
+  'cs.rejectBtn':       { hu:'✕ Elutasít', ro:'✕ Respinge' },
+  'cs.confirmRejectHandover':{ hu:'Elutasítod a(z) {id} leadás-kérését? A sofőr push-értesítést kap.', ro:'Respingi cererea de predare {id}? Șoferul va primi o notificare push.' },
+  // ── Raktár fül ──
+  'cs.whTitle':         { hu:'📦 Raktár — leadott áruk', ro:'📦 Depozit — mărfuri predate' },
+  'cs.whSub':           { hu:'Raktárba adott fuvarok: a felrakó a betárolás helye, kiosztással mennek tovább. Jelenleg raktárban: ', ro:'Curse predate în depozit: locul de încărcare este locul de stocare, merg mai departe prin alocare. În prezent în depozit: ' },
+  'cs.whMissingDoc':    { hu:' tételnél hiányzik a dokumentum!', ro:' poziții lipsesc documentul!' },
+  'cs.whEmpty':         { hu:'Nincs raktárban lévő áru. A fuvarlistán a ⛔ gombbal adhatsz le árut raktárba.', ro:'Nu există marfă în depozit. Poți preda marfă în depozit cu butonul ⛔ din lista de curse.' },
+  'cs.whColOrder':      { hu:'Fuvar', ro:'Cursă' },
+  'cs.whColClient':     { hu:'Ügyfél', ro:'Client' },
+  'cs.whColLocation':   { hu:'Raktár helye', ro:'Locația depozitului' },
+  'cs.whColQty':        { hu:'Mennyiség', ro:'Cantitate' },
+  'cs.whColSpace':      { hu:'Foglalt hely (h×sz×m cm)', ro:'Spațiu ocupat (L×l×î cm)' },
+  'cs.whColWeight':     { hu:'Súly (kg)', ro:'Greutate (kg)' },
+  'cs.whColDocPages':   { hu:'Dok. lapszám', ro:'Nr. pagini doc.' },
+  'cs.whColDocs':       { hu:'Dokumentumok', ro:'Documente' },
+  'cs.whColStored':     { hu:'Betárolva', ro:'Stocat la' },
+  'cs.whColStatus':     { hu:'Státusz', ro:'Status' },
+  'cs.whColAction':     { hu:'Művelet', ro:'Acțiune' },
+  'cs.whFinalDest':     { hu:'→ végcél: ', ro:'→ destinație finală: ' },
+  'cs.whDocsCount':     { hu:' db', ro:' buc' },
+  'cs.whDocMissing':    { hu:'⚠️ Hiányzik — tölts fel!', ro:'⚠️ Lipsește — încarcă!' },
+  'cs.whStatusIn':      { hu:'📦 Raktárban', ro:'📦 În depozit' },
+  'cs.whStatusOut':     { hu:'✓ Kiadva', ro:'✓ Eliberat' },
+  'cs.whUploadDoc':     { hu:'Dokumentum feltöltése', ro:'Încarcă document' },
+  'cs.whEditOrder':     { hu:'Fuvar szerkesztése / kiosztása', ro:'Editează / alocă cursa' },
+  // ── Útdíj (toll) ──
+  'cs.tollVignette':    { hu:'matrica', ro:'rovinietă' },
+  'cs.tollByCountry':   { hu:'Országonkénti bontás (a tervezett útvonalból)', ro:'Defalcare pe țări (din ruta planificată)' },
+  'cs.tollPartial':     { hu:' · ⚠️ részleges (geokódolás-keret)', ro:' · ⚠️ parțial (limită geocodare)' },
+  'cs.total':           { hu:'Összesen', ro:'Total' },
+  'cs.tollRatesTitle':  { hu:'🛣️ Útdíj-ráták (kamion, &gt;12 t)', ro:'🛣️ Tarife taxă drum (camion, &gt;12 t)' },
+  'cs.tollRatesHint':   { hu:'EU-alapértékekkel indul; itt cégre szabhatod. A „km-alapú" ország díja km×€/km, a „matrica" fix €/fuvar.', ro:'Pornește cu valori implicite UE; aici le poți personaliza. Țara „pe km" costă km×€/km, „rovinieta" este fix €/cursă.' },
+  'cs.colCountry':      { hu:'Ország', ro:'Țară' },
+  'cs.colType':         { hu:'Típus', ro:'Tip' },
+  'cs.colVignetteEur':  { hu:'matrica €', ro:'rovinietă €' },
+  'cs.modePerKm':       { hu:'km-alapú', ro:'pe km' },
+  'cs.custom':          { hu:'egyedi', ro:'personalizat' },
+  'cs.saveRates':       { hu:'Ráták mentése', ro:'Salvează tarifele' },
+  // ── Alvállalkozó (carrier) ──
+  'cs.carriers':        { hu:'🚚 Alvállalkozók', ro:'🚚 Subcontractanți' },
+  'cs.carriersSub':     { hu:'Külsős fuvarozó-cégek törzse — fizetési határidő, CMR-biztosítás, nyitott tartozás. A 🔑 gombbal portál-hozzáférést adsz nekik.', ro:'Registru firme transportatoare externe — termen de plată, asigurare CMR, sold restant. Cu butonul 🔑 le oferi acces la portal.' },
+  'cs.companyName':     { hu:'Cégnév *', ro:'Nume firmă *' },
+  'cs.cuiTax':          { hu:'CUI / adószám', ro:'CUI / cod fiscal' },
+  'cs.email':           { hu:'E-mail', ro:'E-mail' },
+  'cs.phone':           { hu:'Telefon', ro:'Telefon' },
+  'cs.paymentTermDays': { hu:'Fizetési határidő (nap)', ro:'Termen de plată (zile)' },
+  'cs.cmrExpiry':       { hu:'CMR-biztosítás lejár', ro:'Expiră asigurarea CMR' },
+  'cs.iban':            { hu:'IBAN', ro:'IBAN' },
+  'cs.saveCarrier':     { hu:'＋ Alvállalkozó mentése', ro:'＋ Salvează subcontractantul' },
+  'cs.newEmpty':        { hu:'Új/üres', ro:'Nou/gol' },
+  'cs.colCompany':      { hu:'Cég', ro:'Firmă' },
+  'cs.colPayTerm':      { hu:'Fiz.hat.', ro:'Term.plată' },
+  'cs.colCmr':          { hu:'CMR-bizt.', ro:'Asig. CMR' },
+  'cs.colOpenBalance':  { hu:'Nyitott tartozás', ro:'Sold restant' },
+  'cs.noCarrier':       { hu:'Nincs alvállalkozó.', ro:'Niciun subcontractant.' },
+  'cs.cmrExpired':      { hu:'lejárt', ro:'expirat' },
+  'cs.daysWord':        { hu:' nap', ro:' zile' },
+  'cs.portalBadge':     { hu:'🔑 portál', ro:'🔑 portal' },
+  'cs.carrierPortalInvite':{ hu:'Alvállalkozói portál meghívó', ro:'Invitație portal subcontractant' },
+  'cs.confirmDeleteCarrier':{ hu:'Biztosan törlöd ezt az alvállalkozót?', ro:'Sigur ștergi acest subcontractant?' },
+  'cs.cannotDelete':    { hu:'Nem törölhető', ro:'Nu poate fi șters' },
+  'cs.carrierEmailPrompt':{ hu:'Az alvállalkozó kapcsolattartójának e-mail címe (portál-meghívó):', ro:'Adresa de e-mail a persoanei de contact a subcontractantului (invitație portal):' },
+  'cs.portalInviteSent':{ hu:'✉️ Portál-meghívó elküldve', ro:'✉️ Invitație portal trimisă' },
+  'cs.inviteReadyCopy': { hu:'Meghívó kész — másold a linket', ro:'Invitație gata — copiază linkul' },
+  'cs.sentByEmail':     { hu:'✉️ Elküldve e-mailben. ', ro:'✉️ Trimis prin e-mail. ' },
+  'cs.pwSetLink':       { hu:'Jelszó-beállító link: ', ro:'Link de setare a parolei: ' },
+  // ── Szállítói számlák (AP) ──
+  'cs.apTitle':         { hu:'💸 Szállítói számlák / Tartozások (AP)', ro:'💸 Facturi furnizor / Datorii (AP)' },
+  'cs.apOpenTotal':     { hu:'Nyitott összesen', ro:'Total deschis' },
+  'cs.apDueSoon':       { hu:'Esedékes 7 napon belül', ro:'Scadent în 7 zile' },
+  'cs.apOverdue':       { hu:'Lejárt', ro:'Restant' },
+  'cs.apOpenInvoice':   { hu:'Nyitott számla', ro:'Factură deschisă' },
+  'cs.apPcs':           { hu:' db', ro:' buc' },
+  'cs.carrier':         { hu:'Alvállalkozó', ro:'Subcontractant' },
+  'cs.invoiceNo':       { hu:'Számlaszám', ro:'Nr. factură' },
+  'cs.issueDate':       { hu:'Kelt', ro:'Data emiterii' },
+  'cs.dueDateShort':    { hu:'Fiz. határidő', ro:'Scadență' },
+  'cs.amount':          { hu:'Összeg', ro:'Sumă' },
+  'cs.currency':        { hu:'Pénznem', ro:'Monedă' },
+  'cs.recordInvoice':   { hu:'Számla rögzítése', ro:'Înregistrează factura' },
+  'cs.whichOrders':     { hu:'Mely fuvar(ok)hoz (Extern)', ro:'Pentru ce cursă(e) (Extern)' },
+  'cs.colInvoice':      { hu:'Számla', ro:'Factură' },
+  'cs.colOrders':       { hu:'Fuvar(ok)', ro:'Cursă(e)' },
+  'cs.colDue':          { hu:'Esedékes', ro:'Scadent' },
+  'cs.colState':        { hu:'Állapot', ro:'Stare' },
+  'cs.noApInvoice':     { hu:'Nincs szállítói számla.', ro:'Nicio factură furnizor.' },
+  'cs.apOverdueBy':     { hu:'lejárt ', ro:'restant ' },
+  'cs.apPaid':          { hu:'Fizetve', ro:'Plătit' },
+  'cs.apPartial':       { hu:'Részben', ro:'Parțial' },
+  'cs.apToPay':         { hu:'Fizetendő', ro:'De plată' },
+  'cs.invoiceRecorded': { hu:'🧾 Számla rögzítve', ro:'🧾 Factură înregistrată' },
+  'cs.paidFullPrompt':  { hu:'Fizetett összeg (üres = teljes hátralék {rem}):', ro:'Sumă plătită (gol = tot restul {rem}):' },
+  'cs.confirmDeleteInvoice':{ hu:'Törlöd ezt a számlát?', ro:'Ștergi această factură?' },
+  // ── Térkép-szolgáltató ──
+  'cs.mpUsageMonth':    { hu:'📊 E havi használat', ro:'📊 Utilizare luna curentă' },
+  'cs.mpCalls':         { hu:'hívás', ro:'apeluri' },
+  'cs.mpToPay':         { hu:'Fizetendő:', ro:'De plată:' },
+  'cs.mpPrevMonth':     { hu:'Előző hó: ', ro:'Luna anterioară: ' },
+  'cs.mpCallsWord':     { hu:' hívás · ', ro:' apeluri · ' },
+  'cs.mpNoFreeQuota':   { hu:'<b>Nincs ingyenes keret</b> — az első hívástól fizetsz (hivatalos ár + {pct}% árrés). Csak a fizetős (keyes) geokódolás/keresés számít, a cache-találat nem.', ro:'<b>Fără plafon gratuit</b> — plătești de la primul apel (preț oficial + {pct}% marjă). Doar geocodarea/căutarea plătită (cu cheie) contează, nu și rezultatul din cache.' },
+  'cs.mpTitle':         { hu:'🗺️ Térkép-szolgáltató (cím-keresés + geokódolás)', ro:'🗺️ Furnizor hartă (căutare adresă + geocodare)' },
+  'cs.mpDesc':          { hu:'Minden cégen elérhető az <b>ingyenes</b> szolgáltató (kulcs és díj nélkül). Megbízhatóbb keresésért kapcsold ki az ingyeneset, és válassz <b>HERE</b>/<b>Google</b> szolgáltatót a saját kulcsoddal — ekkor az első hívástól fizetsz (hivatalos ár + árrés). A routing/útdíj továbbra is az OSRM/ORS stacken megy.', ro:'Furnizorul <b>gratuit</b> este disponibil pentru toate firmele (fără cheie și fără cost). Pentru căutare mai fiabilă dezactivează gratuitul și alege furnizorul <b>HERE</b>/<b>Google</b> cu cheia ta — atunci plătești de la primul apel (preț oficial + marjă). Rutarea/taxa de drum rămâne pe stiva OSRM/ORS.' },
+  'cs.mpUseFree':       { hu:'🆓 Ingyenes térkép használata (Photon/OSM) — díjmentes', ro:'🆓 Folosește harta gratuită (Photon/OSM) — fără taxă' },
+  'cs.mpPaidProvider':  { hu:'Fizetős szolgáltató', ro:'Furnizor plătit' },
+  'cs.mpHereRec':       { hu:'HERE (ajánlott)', ro:'HERE (recomandat)' },
+  'cs.mpGoogle':        { hu:'Google Maps', ro:'Google Maps' },
+  'cs.mpApiKey':        { hu:'API-kulcs ', ro:'Cheie API ' },
+  'cs.mpStored':        { hu:'tárolva', ro:'stocată' },
+  'cs.mpKeyUnchanged':  { hu:'(változatlan, ha üresen hagyod)', ro:'(nemodificată dacă o lași goală)' },
+  'cs.mpProviderKey':   { hu:'a szolgáltató API-kulcsa', ro:'cheia API a furnizorului' },
+  'cs.mpTest':          { hu:'🔌 Teszt', ro:'🔌 Test' },
+  'cs.mpTesting':       { hu:'Tesztelés…', ro:'Se testează…' },
+  'cs.mpKeyWorks':      { hu:'✅ A kulcs működik.', ro:'✅ Cheia funcționează.' },
+  'cs.mpKeyInvalid':    { hu:'❌ A kulcs nem érvényes / nem válaszolt.', ro:'❌ Cheia nu este validă / nu a răspuns.' },
+  'cs.mpTestErr':       { hu:'Teszt hiba', ro:'Eroare la test' },
+  'cs.mpFreeOn':        { hu:'🆓 Ingyenes térkép bekapcsolva', ro:'🆓 Hartă gratuită activată' },
+  'cs.mpSaved':         { hu:'🗺️ Térkép-szolgáltató mentve', ro:'🗺️ Furnizor hartă salvat' },
+  // ── Ügyfél-portál hozzáférések ──
+  'cs.cpDisabled':      { hu:'🔑 <b>Ügyfél-portál</b> — a megrendelőid saját belépéssel látnák a fuvarjaikat, dokumentumaikat, és új fuvart igényelhetnének. Ez a funkció jelenleg nincs bekapcsolva (a developer a Funkciók fülön engedélyezi).', ro:'🔑 <b>Portal client</b> — beneficiarii tăi ar putea vedea cu propriul cont cursele, documentele lor și ar putea solicita curse noi. Această funcție nu este activată momentan (developerul o activează din tabul Funcții).' },
+  'cs.cpTitle':         { hu:'👥 Ügyfél-portál hozzáférések', ro:'👥 Acces portal client' },
+  'cs.cpSub':           { hu:'Meghívhatod az ügyfél kapcsolattartóját, hogy belépjen a <b>/portal</b> oldalon, és csak a SAJÁT cége fuvarjait lássa (státusz, élő követés, dokumentumok), illetve új fuvart igényeljen (jóváhagyással).', ro:'Poți invita persoana de contact a clientului să se autentifice pe pagina <b>/portal</b> și să vadă DOAR cursele firmei sale (status, urmărire live, documente), respectiv să solicite curse noi (cu aprobare).' },
+  'cs.cpClient':        { hu:'Ügyfél', ro:'Client' },
+  'cs.cpChooseClient':  { hu:'— Válassz ügyfelet —', ro:'— Alege client —' },
+  'cs.cpContactEmail':  { hu:'Kapcsolattartó e-mail', ro:'E-mail persoană de contact' },
+  'cs.cpName':          { hu:'Név (opcionális)', ro:'Nume (opțional)' },
+  'cs.cpSendInvite':    { hu:'＋ Meghívó küldése', ro:'＋ Trimite invitația' },
+  'cs.cpInviteSent':    { hu:'✉️ Meghívó elküldve e-mailben', ro:'✉️ Invitație trimisă prin e-mail' },
+  'cs.cpInviteCreated': { hu:'Meghívó létrehozva — másold ki a linket', ro:'Invitație creată — copiază linkul' },
+  'cs.cpInviteSentMail':{ hu:'✉️ A meghívót elküldtük e-mailben. ', ro:'✉️ Invitația a fost trimisă prin e-mail. ' },
+  'cs.cpPwLinkCopy':    { hu:'Jelszó-beállító link (másolható): ', ro:'Link de setare a parolei (copiabil): ' },
+  'cs.cpInviteSentBadge':{ hu:'Meghívó kiküldve', ro:'Invitație trimisă' },
+  'cs.cpActive':        { hu:'Aktív', ro:'Activ' },
+  'cs.cpBlocked':       { hu:'Letiltva', ro:'Blocat' },
+  'cs.cpLastLogin':     { hu:'utolsó belépés: ', ro:'ultima autentificare: ' },
+  'cs.cpNeverLoggedIn': { hu:'még nem lépett be', ro:'nu s-a autentificat încă' },
+  'cs.cpBlock':         { hu:'Letiltás', ro:'Blochează' },
+  'cs.cpActivate':      { hu:'Aktiválás', ro:'Activează' },
+  'cs.cpBlockedWord':   { hu:'Letiltva', ro:'Blocat' },
+  'cs.cpActivatedWord': { hu:'Aktiválva', ro:'Activat' },
+  'cs.cpNoAccess':      { hu:'Még nincs portál-hozzáférés.', ro:'Încă nu există acces la portal.' },
+  // ── Meghívók ──
+  'cs.noInviteCode':    { hu:'Nincs meghívókód.', ro:'Niciun cod de invitație.' },
+  'cs.invAktiv':        { hu:'Aktív', ro:'Activ' },
+  'cs.invUsed':         { hu:'Felhasználva', ro:'Folosit' },
+  'cs.confirmRevoke':   { hu:'Biztosan visszavonod a(z) {kod} kodot?', ro:'Sigur revoci codul {kod}?' },
+  // ── Menetlevél / fuvarlevél ──
+  'cs.noWaybillSent':   { hu:'Nincs beküldött fuvarlevél.', ro:'Nicio foaie de parcurs trimisă.' },
+  'cs.viewPdf':         { hu:'👁 PDF', ro:'👁 PDF' },
+  'cs.editPdf':         { hu:'✏️ Szerkeszt', ro:'✏️ Editează' },
+  'cs.cannotLoad':      { hu:'Nem tölthető be', ro:'Nu poate fi încărcat' },
+  'cs.noSeqNumber':     { hu:'(nincs sorszám)', ro:'(fără număr de ordine)' },
+  // ── Járművek ──
+  'cs.noVehicle':       { hu:'Nincs még felvéve.', ro:'Niciun vehicul adăugat încă.' },
+  'cs.tractorAdded':    { hu:'Vontató hozzáadva!', ro:'Cap tractor adăugat!' },
+  'cs.trailerAdded':    { hu:'Pótkocsi hozzáadva!', ro:'Semiremorcă adăugată!' },
+  'cs.newTractor':      { hu:'Új vontató hozzáadása', ro:'Adăugare cap tractor nou' },
+  'cs.newTrailer':      { hu:'Új pótkocsi hozzáadása', ro:'Adăugare semiremorcă nouă' },
+  'cs.confirmDeleteVehicle':{ hu:'Biztosan törlöd a(z) {plate} rendszámú járművet?', ro:'Sigur ștergi vehiculul cu nr. {plate}?' },
+  // ── Külső sofőrök ──
+  'cs.noExtDriver':     { hu:'Nincs még külső sofőr felvéve.', ro:'Niciun șofer extern adăugat încă.' },
+  'cs.confirmDelete':   { hu:'Biztosan törlöd: {name}?', ro:'Sigur ștergi: {name}?' },
+  // ── Belső sofőrök ──
+  'cs.intDrvLoadErr':   { hu:'Betöltési hiba.', ro:'Eroare la încărcare.' },
+  'cs.noIntDriver':     { hu:'Nincs regisztrált belső sofőr.', ro:'Niciun șofer intern înregistrat.' },
+  'cs.assignedVehicle': { hu:'🚛 Hozzárendelt jármű', ro:'🚛 Vehicul atribuit' },
+  'cs.noVehicleDash':   { hu:'— Nincs jármű —', ro:'— Niciun vehicul —' },
+  'cs.atOtherDriver':   { hu:' (más sofőrnél)', ro:' (la alt șofer)' },
+  'cs.gpsLinked':       { hu:'A jármű GPS-re van kötve (CargoTrack)', ro:'Vehiculul este conectat la GPS (CargoTrack)' },
+  'cs.gpsBadge':        { hu:'🛰️ GPS', ro:'🛰️ GPS' },
+  'cs.noGpsLink':       { hu:'A jármű nincs GPS-re kötve — párosítsd az Integrációk fülön', ro:'Vehiculul nu este conectat la GPS — împerechează-l în tabul Integrări' },
+  'cs.noGps':           { hu:'GPS nélkül', ro:'Fără GPS' },
+  'cs.noDefTrailer':    { hu:'— Nincs alapért. pótkocsi —', ro:'— Fără semiremorcă implicită —' },
+  'cs.defTrailerTitle': { hu:'🚚 Alapértelmezett pótkocsi — fuvar-kiíráskor automatikusan kitöltődik (módosítható)', ro:'🚚 Semiremorcă implicită — se completează automat la crearea cursei (modificabil)' },
+  'cs.vehAssigned':     { hu:'🚛 Jármű hozzárendelve', ro:'🚛 Vehicul atribuit' },
+  'cs.assignRemoved':   { hu:'Hozzárendelés törölve', ro:'Atribuire ștearsă' },
+  'cs.trailerPairSaved':{ hu:'🚚 Pótkocsi-pár mentve', ro:'🚚 Pereche semiremorcă salvată' },
+  'cs.trailerPairRemoved':{ hu:'Pótkocsi-pár törölve', ro:'Pereche semiremorcă ștearsă' },
+  // ── Dokumentum-csoportok ──
+  'cs.filesWord':       { hu:' fájl', ro:' fișiere' },
+  'cs.docOther':        { hu:'Egyéb', ro:'Altele' },
+  'cs.linkedToOrder':   { hu:'Fuvarhoz kötve', ro:'Legat de cursă' },
+  'cs.docView':         { hu:'👁 Megtekint', ro:'👁 Vizualizează' },
+  'cs.docDownload':     { hu:'⬇ Letölt', ro:'⬇ Descarcă' },
+  'cs.allDrivers':      { hu:'Összes sofőr', ro:'Toți șoferii' },
+  // ── Csevegés ──
+  'cs.chatGroupDriverDisp':{ hu:'📡 Sofőrök → Diszpécser (csoport)', ro:'📡 Șoferi → Dispecer (grup)' },
+  'cs.chatAdminManager':{ hu:'🔐 Admin ↔ Manager', ro:'🔐 Admin ↔ Manager' },
+  'cs.chatLast':        { hu:'Utolsó: ', ro:'Ultimul: ' },
+  'cs.chatNoChat':      { hu:'Még nincs csevegés.<br>Kattints a + gombra!', ro:'Încă nicio conversație.<br>Apasă butonul +!' },
+  'cs.chatConfigMissing':{ hu:'⚠️ Chat konfiguráció hiányzik. Állítsd be a Firebase env változókat!', ro:'⚠️ Lipsește configurația de chat. Setează variabilele de mediu Firebase!' },
+  'cs.chatUnavailable': { hu:'⚠️ Chat nem elérhető.', ro:'⚠️ Chat indisponibil.' },
+  // ── Útvonal-előnézet ──
+  'cs.routeLoading':    { hu:'Betöltés...', ro:'Se încarcă...' },
+  'cs.waypointPlace':   { hu:'Felrakó', ro:'Încărcare' },
+  'cs.waypointUnload':  { hu:'Lerakó', ro:'Descărcare' },
+  'cs.waypointMid':     { hu:'Köztes', ro:'Intermediar' },
+  'cs.noWaypoint':      { hu:'Nincs köztespont.', ro:'Niciun punct intermediar.' },
+  // ── Beérkezett fuvarlevelek ──
+  'cs.noWaybillReceived':{ hu:'Nincs beküldött fuvarlevél.', ro:'Nicio foaie de parcurs trimisă.' },
+  // ── Határátlépés-naplók ──
+  'cs.gpsNa':           { hu:'GPS n/a', ro:'GPS indisp.' },
+  // ── Beállítások / 2FA ──
+  'cs.twofaActive':     { hu:'Aktív — fiókod védett', ro:'Activ — contul tău este protejat' },
+  'cs.twofaActiveDesc': { hu:'A kétlépéses hitelesítés be van kapcsolva.', ro:'Autentificarea în doi pași este activată.' },
+  'cs.twofaOff':        { hu:'Nincs bekapcsolva', ro:'Nu este activată' },
+  'cs.twofaOffDesc':    { hu:'Javasolt a 2FA aktiválása a fiókod védelméhez.', ro:'Se recomandă activarea 2FA pentru protecția contului.' },
+  'cs.confirmDisable2fa':{ hu:'Biztosan kikapcsolod a kétlépéses hitelesítést? Ez csökkenti a fiókod biztonságát.', ro:'Sigur dezactivezi autentificarea în doi pași? Aceasta reduce securitatea contului.' },
+  'cs.confirm2fa':      { hu:'✅ Megerősítés', ro:'✅ Confirmare' },
+  'cs.wrongCode':       { hu:'Helytelen kód', ro:'Cod incorect' },
+  'cs.emailSavedTxt':   { hu:'Mentve', ro:'Salvat' },
+  // ── Egyéb apró felirat ──
+  'cs.ordersSelected':  { hu:' fuvar kiválasztva', ro:' curse selectate' },
+  'cs.docSeriesPreview':{ hu:'Előnézet: ', ro:'Previzualizare: ' },
+  'cs.docSeriesPreviewSuf':{ hu:' (új prefix esetén 1-től)', ro:' (de la 1 pentru prefix nou)' },
+  'cs.seriesFrom':      { hu:'-től', ro:'' },
+  'cs.themeDark':       { hu:'Sötét mód', ro:'Mod întunecat' },
+  'cs.themeLight':      { hu:'Világos mód', ro:'Mod luminos' },
+  'cs.cannotLoadGeneric':{ hu:'Nem tölthető be', ro:'Nu poate fi încărcat' }
+});
+// T(): a window.t-t hívja, ha betöltött; különben a kulcs marad (boot előtt)
+function T(k,v){ return (typeof window.t==='function') ? window.t(k,v) : k; }
+
 // ── Funkció-kapcsolók (előfizetés) — letiltott menük elrejtése ──
 // A cég kikapcsolt funkciói nem jelennek meg a sidebarban. Hiányzó kulcs = engedélyezett.
 function applyFeatureFlags(){
@@ -2093,37 +2440,40 @@ function loadDashboard() {
 
 /* ── Legutóbbi fuvarok ── */
 // A DB román státuszokat tárol — magyar címke + szín-leképezés.
+// A status CODE (kulcs) szerver-adat — sosem fordítjuk; a megjelenítendő
+// címke render-időben fordul (k: i18n-kulcs).
 var DASH_STATUS_MAP = {
-  'Finalizat':  { c: 'ok',   t: 'Teljesítve' },
-  'In Curs':    { c: 'warn', t: 'Folyamatban' },
-  'Alocat':     { c: 'info', t: 'Várakozik' },
-  'Disponibil': { c: 'err',  t: 'Tervezetlen' },
-  'Extern':     { c: 'info', t: 'Külső' },
-  'Anulat':     { c: 'err',  t: 'Törölve' }
+  'Finalizat':  { c: 'ok',   k: 'cs.stDone' },
+  'In Curs':    { c: 'warn', k: 'cs.stInProgress' },
+  'Alocat':     { c: 'info', k: 'cs.stWaiting' },
+  'Disponibil': { c: 'err',  k: 'cs.stUnplanned' },
+  'Extern':     { c: 'info', k: 'cs.stExternal' },
+  'Anulat':     { c: 'err',  k: 'cs.stCancelled' }
 };
 function loadDashRecentOrders() {
   var tb = document.getElementById('dashRecentOrdersBody');
   if (!tb) return;
   gas('getRecentOrders', [8]).then(function (r) {
     if (!r || !r.ok) {
-      tb.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">Nem sikerült betölteni.</td></tr>';
+      tb.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">'+esc(T('cs.couldNotLoad'))+'</td></tr>';
       return;
     }
     var list = r.orders || [];
     if (!list.length) {
-      tb.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">Nincs fuvar.</td></tr>';
+      tb.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">'+esc(T('cs.noOrder'))+'</td></tr>';
       return;
     }
     tb.innerHTML = list.map(function (o) {
       var drv = o.nume_sofer || o.driver_user_name || o.email_sofer || '—';
       var dest = o.loc_descarcare || '—';
-      var sm = DASH_STATUS_MAP[o.status] || { c: 'info', t: o.status || '—' };
+      var sm = DASH_STATUS_MAP[o.status] || { c: 'info', k: null };
+      var smLabel = sm.k ? T(sm.k) : (o.status || '—');
       var dt = o.created_at ? new Date(o.created_at).toLocaleDateString('hu-HU') : '—';
       return '<tr>'
         + '<td><b class="text-primary">' + esc(String(o.id)) + '</b></td>'
         + '<td>' + esc(dest) + '</td>'
         + '<td>' + esc(drv) + '</td>'
-        + '<td><span class="badge ' + sm.c + '">' + esc(sm.t) + '</span></td>'
+        + '<td><span class="badge ' + sm.c + '">' + esc(smLabel) + '</span></td>'
         + '<td class="text-muted">' + dt + '</td>'
         + '</tr>';
     }).join('');
@@ -2137,9 +2487,9 @@ function loadDashVehicleSummary() {
   gas('getVehicleStatusSummary').then(function (r) {
     if (!r || !r.ok) { box.innerHTML = ''; return; }
     var cards = [
-      { l: 'Aktív járművek', v: r.active || 0,   col: (r.active > 0 ? 'var(--status-ok)' : 'var(--text-muted)'), ico: '🟢' },
-      { l: 'Álló járművek',  v: r.inactive || 0, col: 'var(--text-muted)', ico: '⚪' },
-      { l: 'Ismeretlen',     v: r.unknown || 0,  col: 'var(--text-muted)', ico: '❔' }
+      { l: T('cs.vehActive'), v: r.active || 0,   col: (r.active > 0 ? 'var(--status-ok)' : 'var(--text-muted)'), ico: '🟢' },
+      { l: T('cs.vehIdle'),   v: r.inactive || 0, col: 'var(--text-muted)', ico: '⚪' },
+      { l: T('cs.vehUnknown'),v: r.unknown || 0,  col: 'var(--text-muted)', ico: '❔' }
     ];
     box.innerHTML = cards.map(function (c) {
       return '<div class="dash-mini glass-soft">'
@@ -2205,7 +2555,7 @@ function refreshDashVehicles() {
       var ph = L.circleMarker([45.9432, 24.9668], {
         radius: 9, color: '#8a97a8', fillColor: '#8a97a8', fillOpacity: 0.6, weight: 2
       });
-      ph.bindTooltip(r.gps_configured ? 'Nincs aktív GPS adat' : 'GPS integráció nincs beállítva');
+      ph.bindTooltip(r.gps_configured ? T('cs.noGpsData') : T('cs.gpsNotSet'));
       ph.addTo(window._dashMarkers);
       return;
     }
@@ -2216,7 +2566,7 @@ function refreshDashVehicles() {
         radius: 8, color: '#e10b1a', fillColor: '#e10b1a', fillOpacity: 0.85, weight: 2
       });
       m.bindTooltip('🚛 ' + (p.object_name || p.rendszam) + ' · ' + spd);
-      m.bindPopup('<b>' + esc(p.object_name || p.rendszam) + '</b><br>Sebesség: ' + spd
+      m.bindPopup('<b>' + esc(p.object_name || p.rendszam) + '</b><br>' + esc(T('cs.speed')) + ': ' + spd
         + (p.datetime ? '<br>' + new Date(p.datetime).toLocaleString('hu-HU') : ''));
       m.addTo(window._dashMarkers);
       bounds.push([p.lat, p.lng]);
@@ -2516,7 +2866,7 @@ async function renderSignPage(num){
 function renderFilteredOrders(list) {
   var tbody = document.getElementById('tblOrdersBody');
   if (!tbody) return;
-  if (!list.length) { tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px;">Nincs találat.</td></tr>'; return; }
+  if (!list.length) { tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px;">'+esc(T('cs.noResult'))+'</td></tr>'; return; }
   tbody.innerHTML = list.map(function(c){
     var soferInfo='—';
     if(c.sofer_type==='Intern')soferInfo=c.nume_sofer||c.email_sofer||'—';
@@ -2560,15 +2910,15 @@ function renderFilteredOrders(list) {
     // Leadott áru jelzései (folytatásra váró fuvar — a lista tetején)
     if (c.status==='Parkolt') {
       routeCell += '<div style="margin-top:4px;"><span class="badge" style="background:rgba(192,38,211,0.18);color:#e879f9;border:1px solid rgba(192,38,211,0.4);">'+
-        '🅿️ Áru a pótkocsin'+(c.rendszam_remorca?': '+esc(c.rendszam_remorca):'')+(c.handover_loc?' @ '+esc(c.handover_loc):'')+' — vontató+sofőr kell!</span></div>';
+        T('cs.cargoOnTrailer')+(c.rendszam_remorca?': '+esc(c.rendszam_remorca):'')+(c.handover_loc?' @ '+esc(c.handover_loc):'')+T('cs.needTractor')+'</span></div>';
     }
     if (c.status==='Raktarban') {
       routeCell += '<div style="margin-top:4px;"><span class="badge" style="background:rgba(249,115,22,0.18);color:#fb923c;border:1px solid rgba(249,115,22,0.4);">'+
-        '📦 Raktárban'+(c.handover_loc?' @ '+esc(c.handover_loc):'')+' — kiosztásra vár!</span>'+
-        (parseInt(c.pod_count,10)>0?'':' <span class="badge err">⚠️ Dokumentum hiányzik!</span>')+'</div>';
+        T('cs.inWarehouse')+(c.handover_loc?' @ '+esc(c.handover_loc):'')+T('cs.waitsAllocation')+'</span>'+
+        (parseInt(c.pod_count,10)>0?'':' <span class="badge err">'+T('cs.docMissing')+'</span>')+'</div>';
     }
     if (c.handover_status==='Fuggoben') {
-      routeCell += '<div style="margin-top:4px;"><span class="badge warn">⏳ Sofőr leadás-kérése visszaigazolásra vár'+
+      routeCell += '<div style="margin-top:4px;"><span class="badge warn">'+T('cs.driverHandoverPending')+
         (c.handover_loc?' @ '+esc(c.handover_loc):'')+'</span></div>';
     }
     if (legCount > 0) {
@@ -2586,7 +2936,7 @@ function renderFilteredOrders(list) {
     // Sofőr cella: alap sofőr + váltások badge-del
     var soferCell = esc(soferInfo);
     if (legCount > 0) {
-      soferCell += ' <span style="font-size:10px;background:rgba(225,11,26,0.15);color:#f87171;border:1px solid rgba(225,11,26,0.3);border-radius:6px;padding:1px 6px;white-space:nowrap;">+'+legCount+' váltás</span>';
+      soferCell += ' <span style="font-size:10px;background:rgba(225,11,26,0.15);color:#f87171;border:1px solid rgba(225,11,26,0.3);border-radius:6px;padding:1px 6px;white-space:nowrap;">+'+legCount+T('cs.swapBadge')+'</span>';
       soferCell += '<div style="margin-top:4px;">';
       legs.forEach(function(l){
         soferCell += '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+
@@ -2599,34 +2949,34 @@ function renderFilteredOrders(list) {
     // ── Integrációs gombok (CargoTrack térkép + UIT + Számlázás) ──
     var integBtns = '';
     if (c.rendszam_camion && window.CargoTrackWhereIs) {
-      integBtns += '<button class="btn ghost" title="Hol a kocsi? (térkép)" style="padding:4px 10px;font-size:12px;" '+
+      integBtns += '<button class="btn ghost" title="'+esc(T('cs.whereIsTruck'))+'" style="padding:4px 10px;font-size:12px;" '+
         'onclick="CargoTrackWhereIs.show(\''+esc(c.rendszam_camion)+'\',\''+c.id+'\')">🗺️</button>';
     }
     if (window.UitPanel) {
-      integBtns += '<button class="btn ghost uit-btn" title="UIT-kódok (RO e-Transport)" style="padding:4px 10px;font-size:12px;" '+
+      integBtns += '<button class="btn ghost uit-btn" title="'+esc(T('cs.uitCodes'))+'" style="padding:4px 10px;font-size:12px;" '+
         'data-uit-oid="'+c.id+'" onclick="UitPanel.open(\''+c.id+'\',\''+esc(c.rendszam_camion||'')+'\')">'+
         '+UIT<span class="uit-ind" data-uit-ind="'+c.id+'" style="margin-left:3px;"></span></button>';
     }
     if (c.status==='Finalizat' && window.InvoiceModal) {
-      integBtns += '<button class="btn primary" title="Számlázás" style="padding:4px 10px;font-size:12px;" '+
+      integBtns += '<button class="btn primary" title="'+esc(T('cs.invoicing'))+'" style="padding:4px 10px;font-size:12px;" '+
         'onclick="InvoiceModal.open(\''+c.id+'\')">🧾<span class="inv-ind" data-inv-ind="'+c.id+'" style="margin-left:2px;"></span></button>';
     }
     // 🌍 Ügyfél tracking-link (prémium funkció-kapcsoló: 'tracking')
     if (!(window._vsFeatures && window._vsFeatures['tracking']===false)) {
-      integBtns += '<button class="btn ghost" title="Ügyfél követő-link másolása (publikus oldal)" style="padding:4px 10px;font-size:12px;" '+
+      integBtns += '<button class="btn ghost" title="'+esc(T('cs.copyTrackLink'))+'" style="padding:4px 10px;font-size:12px;" '+
         'onclick="copyTrackingLink(\''+c.id+'\')">🌍</button>';
     }
     // 📷 POD-jelző: a sofőr által ehhez a fuvarhoz csatolt fotók (aláírt CMR stb.)
     if (parseInt(c.pod_count, 10) > 0) {
-      integBtns += '<span title="'+c.pod_count+' sofőr-fotó / POD csatolva (Feltöltött Iratok fül)" '+
+      integBtns += '<span title="'+c.pod_count+esc(T('cs.podAttached'))+'" '+
         'style="font-size:12px;align-self:center;color:var(--status-ok);white-space:nowrap;">📷'+c.pod_count+'</span>';
     }
     // 💰 Fizetés rögzítése — CSAK Finalizat fuvaron jelenik meg.
     // Szín a fizetési állapot szerint: fizetve=zöld, részben=sárga, kintlévő=piros keret.
     if (c.status==='Finalizat') {
       var _ps = c.payment_status || 'unpaid';
-      var _pTitle = _ps==='paid' ? 'Fizetve ('+(c.paid_amount||0)+')' :
-                    _ps==='partial' ? 'Részben fizetve — fizetés rögzítése' : 'Kintlévő — fizetés rögzítése';
+      var _pTitle = _ps==='paid' ? T('cs.paid')+' ('+(c.paid_amount||0)+')' :
+                    _ps==='partial' ? T('cs.partlyPaid') : T('cs.outstanding');
       var _pStyle = _ps==='paid' ? 'border-color:rgba(34,197,94,0.5);color:#4ade80;' :
                     _ps==='partial' ? 'border-color:rgba(245,158,11,0.5);color:#fbbf24;' :
                     'border-color:rgba(239,68,68,0.5);color:#f87171;';
@@ -2635,14 +2985,14 @@ function renderFilteredOrders(list) {
     }
     // ⛔ Áru leadása (megszakítás) — aktív fuvaron; függő sofőr-kérésnél a banner kezeli
     if ((c.status==='Alocat'||c.status==='In Curs') && c.handover_status!=='Fuggoben') {
-      integBtns += '<button class="btn ghost" title="Áru leadása (pótkocsin parkol / raktárba kerül)" '+
+      integBtns += '<button class="btn ghost" title="'+esc(T('cs.handoverTitle'))+'" '+
         'style="padding:4px 10px;font-size:12px;border-color:rgba(192,38,211,0.5);color:#e879f9;" '+
         'onclick="openHandoverModal(\''+c.id+'\')">⛔</button>';
     }
 
     return '<tr><td><b>'+c.id+'</b></td><td>'+esc(c.client||'—')+'</td>'+
       '<td>'+routeCell+'</td>'+
-      '<td>'+(c.km||'—')+(c.route_km!=null&&c.route_km!==''?' <span class="badge info" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="Automata útvonal-km (térkép szerint) — összevetésre">🗺️ '+c.route_km+'</span>':'')+'</td><td>'+(c.pret||'—')+'</td>'+
+      '<td>'+(c.km||'—')+(c.route_km!=null&&c.route_km!==''?' <span class="badge info" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="'+esc(T('cs.autoRouteKm'))+'">🗺️ '+c.route_km+'</span>':'')+'</td><td>'+(c.pret||'—')+'</td>'+
       '<td>'+soferCell+'</td><td>'+esc(c.rendszam_camion||'—')+'</td>'+
       '<td>'+statusSel+'</td>'+
       '<td style="display:flex;gap:4px;flex-wrap:wrap;">'+
@@ -2693,7 +3043,7 @@ function downloadSelectedOrders() {
       '<td style="text-align:right;vertical-align:top;">'+esc(String(c.km||'—'))+'</td>'+
       '<td style="text-align:right;vertical-align:top;">'+esc(String(c.pret||'—'))+'</td>'+
       '<td style="vertical-align:top;">'+esc(soferInfo)+
-        (legCount > 0 ? ' <b style="color:#c00;font-size:10px;">(+'+legCount+' váltás)</b>' : '')+
+        (legCount > 0 ? ' <b style="color:#c00;font-size:10px;">(+'+legCount+T('cs.swapBadge')+')</b>' : '')+
       '</td>'+
       '<td style="vertical-align:top;">'+esc(c.rendszam_camion||'—')+(c.rendszam_remorca?' / '+esc(c.rendszam_remorca):'')+'</td>'+
       '<td style="text-align:center;vertical-align:top;font-weight:700;">'+esc(c.status||'—')+'</td>'+
@@ -2702,8 +3052,8 @@ function downloadSelectedOrders() {
     // Váltás / szakasz alsorok
     legs.forEach(function(l, idx){
       out += '<tr style="background:#eef3ff;">'+
-        '<td style="padding-left:18px;font-size:11px;color:#444;border-left:3px solid #2563eb;">↳ '+(idx+1)+'. váltás</td>'+
-        '<td colspan="2" style="font-size:11px;color:#666;font-style:italic;">Sofőrváltás / szakasz</td>'+
+        '<td style="padding-left:18px;font-size:11px;color:#444;border-left:3px solid #2563eb;">↳ '+(idx+1)+T('cs.exSwapNo')+'</td>'+
+        '<td colspan="2" style="font-size:11px;color:#666;font-style:italic;">'+esc(T('cs.exSwapSection'))+'</td>'+
         '<td style="font-size:11px;font-weight:700;color:#1a3a6b;">'+esc(l.loc_preluare||'—')+'</td>'+
         '<td style="font-size:11px;color:#aaa;">—</td>'+
         '<td></td><td></td>'+
@@ -2719,7 +3069,7 @@ function downloadSelectedOrders() {
   var hasLegs = selected.some(function(c){ return parselegs(c).length > 0; });
 
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
-    '<title>Fuvarfeladatok — '+now+'</title>'+
+    '<title>'+esc(T('cs.orderTasks'))+' — '+now+'</title>'+
     '<style>'+
     'body{font-family:Arial,sans-serif;padding:24px;font-size:13px;color:#000;}'+
     'h1{font-size:18px;text-align:center;margin:0 0 2px;}'+
@@ -2732,15 +3082,15 @@ function downloadSelectedOrders() {
     '.no-print{margin-bottom:16px;}'+
     '@media print{.no-print{display:none;}body{padding:10px;}}'+
     '</style></head><body>'+
-    '<div class="no-print"><button onclick="window.print()" style="padding:10px 24px;background:#0f172a;color:#fff;font-weight:bold;border:none;border-radius:6px;font-size:14px;cursor:pointer;">🖨️ Nyomtatás / PDF mentés</button></div>'+
-    '<h1>VALLOR TEAM SRL — Fuvarfeladatok</h1>'+
-    '<div class="sub">Nyomtatva: '+now+' &nbsp;·&nbsp; '+selected.length+' fuvar'+(hasLegs?' &nbsp;·&nbsp; <span style="color:#2563eb;font-weight:700;">kék sorok = váltások</span>':'')+'</div>'+
+    '<div class="no-print"><button onclick="window.print()" style="padding:10px 24px;background:#0f172a;color:#fff;font-weight:bold;border:none;border-radius:6px;font-size:14px;cursor:pointer;">'+esc(T('cs.printPdfSave'))+'</button></div>'+
+    '<h1>'+esc(T('cs.orderTasksTitle'))+'</h1>'+
+    '<div class="sub">'+esc(T('cs.printedAt'))+now+' &nbsp;·&nbsp; '+selected.length+esc(T('cs.ordersWord'))+(hasLegs?' &nbsp;·&nbsp; <span style="color:#2563eb;font-weight:700;">'+esc(T('cs.blueRowsSwaps'))+'</span>':'')+'</div>'+
     '<table><thead><tr>'+
-    '<th>#ID</th><th>Ügyfél</th><th>Ref</th><th>Felrakás / Átvétel</th><th>Lerakás</th>'+
-    '<th>KM</th><th>Ár (EUR)</th><th>Sofőr / Váltó sofőr</th><th>Vontató / Pótkocsi</th><th>Státusz</th>'+
+    '<th>'+esc(T('cs.exHashId'))+'</th><th>'+esc(T('cs.exClient'))+'</th><th>'+esc(T('cs.exRef'))+'</th><th>'+esc(T('cs.exLoadPickup'))+'</th><th>'+esc(T('cs.exUnload'))+'</th>'+
+    '<th>'+esc(T('cs.exKm'))+'</th><th>'+esc(T('cs.exPriceEur'))+'</th><th>'+esc(T('cs.exDriverSwap'))+'</th><th>'+esc(T('cs.exTractorTrailer'))+'</th><th>'+esc(T('cs.exStatus'))+'</th>'+
     '</tr></thead><tbody>'+rows+'</tbody></table>'+
-    (hasLegs ? '<div class="legend">ℹ️ Kék háttérrel: utólag hozzáadott váltások (order_legs) — sofőrcsere, átvételi hely, jármű adatokkal.</div>' : '')+
-    '<div class="footer">VallorSoft fuvarmenedzsment · Generálva: '+now+'</div>'+
+    (hasLegs ? '<div class="legend">'+esc(T('cs.exLegend'))+'</div>' : '')+
+    '<div class="footer">'+esc(T('cs.exFooter'))+now+'</div>'+
     '</body></html>';
 
   var blob = new Blob([html], {type:'text/html;charset=utf-8'});
@@ -2832,7 +3182,7 @@ function openOrderEdit(id) {
         var ie=o.import_extra; if(typeof ie==='string'){ try{ ie=JSON.parse(ie); }catch(e){ ie=null; } }
         if(ie && typeof ie==='object' && Object.keys(ie).length){
           oeIe.innerHTML='<div class="glass-soft" style="padding:10px 12px;border:1px solid rgba(59,130,246,0.35);">'
-            +'<div class="text-primary" style="font-size:12px;font-weight:700;margin-bottom:6px;">📋 Importált extra adatok <span class="text-muted" style="font-weight:400;">(CSV-ből, nem párosított oszlopok)</span></div>'
+            +'<div class="text-primary" style="font-size:12px;font-weight:700;margin-bottom:6px;">'+esc(T('cs.importExtra'))+' <span class="text-muted" style="font-weight:400;">'+esc(T('cs.importExtraSub'))+'</span></div>'
             +'<div style="display:flex;flex-wrap:wrap;gap:6px;">'
             +Object.keys(ie).map(function(k){ return '<span class="badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted);font-size:11px;">'+esc(k)+': <b class="text-primary">'+esc(String(ie[k]))+'</b></span>'; }).join('')
             +'</div></div>';
@@ -2875,7 +3225,7 @@ function openOrderEdit(id) {
       var users = results[0] || [];
       _oeSoferCache = users.filter(u => u.pozicio === 'Sofer');
       var sel = document.getElementById('oeEmailSofer');
-      sel.innerHTML = '<option value="">— Válassz —</option>' +
+      sel.innerHTML = '<option value="">'+esc(T('cs.chooseDash'))+'</option>' +
         _oeSoferCache.map(u => '<option value="'+esc(u.email)+'"'+(u.email===o.email_sofer?' selected':'')+'>'+esc(u.nume)+' ('+esc(u.email)+')</option>').join('');
 
       // Jármű dropdown
@@ -2883,10 +3233,10 @@ function openOrderEdit(id) {
       _oeCamionCache = vehicles.filter(v => v.tip === 'Vontato');
       _oeRemorcaCache = vehicles.filter(v => v.tip === 'Potkocsi');
       var camSel = document.getElementById('oeCamion');
-      camSel.innerHTML = '<option value="">— Nincs —</option>' +
+      camSel.innerHTML = '<option value="">'+esc(T('cs.noneDash'))+'</option>' +
         _oeCamionCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_camion?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
       var remSel = document.getElementById('oeRemorca');
-      remSel.innerHTML = '<option value="">— Nincs —</option>' +
+      remSel.innerHTML = '<option value="">'+esc(T('cs.noneDash'))+'</option>' +
         _oeRemorcaCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_remorca?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
 
       // Auto-párosítás a szerkesztőben (vehicles.assigned_driver_email):
