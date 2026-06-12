@@ -7,6 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260611">
+  <script src="/i18n.js?v=20260612"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,67 +38,67 @@
     <div class="vs-logo sidebar-logo" style="padding-left:12px; margin-bottom:10px;"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
     <div class="sidebar-subtitle" style="font-size:11px; color:var(--muted); padding-left:12px; margin-top:-15px; margin-bottom:15px; font-weight:600;">Manager Console</div>
     <div class="menu-group">
-      <div class="menu-title">Áttekintés</div>
-      <div class="tab active" data-tab="dash">Vezérlőpult</div>
+      <div class="menu-title" data-i18n="nav.grpOverview">Áttekintés</div>
+      <div class="tab active" data-tab="dash" data-i18n="nav.dash">Vezérlőpult</div>
     </div>
     <div class="menu-group">
-      <div class="menu-title">Fuvarozás & Logisztika</div>
-      <div class="tab" id="ordersParentTab" onclick="toggleOrdersMenu()">Fuvarfeladatok ▾</div>
+      <div class="menu-title" data-i18n="nav.grpLogistics">Fuvarozás & Logisztika</div>
+      <div class="tab" id="ordersParentTab" onclick="toggleOrdersMenu()" data-i18n="nav.orders">Fuvarfeladatok ▾</div>
       <div class="submenu" id="ordersSubmenu">
-        <div class="sub-tab" data-tab="orders-form">Kiírás</div>
-        <div class="sub-tab" data-tab="orders-list">Kezelés</div>
-        <div class="sub-tab" data-tab="inbound">Megrendelések</div>
-        <div class="sub-tab" data-tab="orders-planner">📅 Tervezőtábla</div>
+        <div class="sub-tab" data-tab="orders-form" data-i18n="nav.ordersForm">Kiírás</div>
+        <div class="sub-tab" data-tab="orders-list" data-i18n="nav.ordersList">Kezelés</div>
+        <div class="sub-tab" data-tab="inbound" data-i18n="nav.inbound">Megrendelések</div>
+        <div class="sub-tab" data-tab="orders-planner" data-i18n="nav.planner">📅 Tervezőtábla</div>
       </div>
-      <div class="tab" data-tab="received-fuv">Fuvarlevelek</div>
-      <div class="tab" data-tab="warehouse">📦 Raktár</div>
-      <div class="tab" data-tab="decont">Sofőr-elszámolás</div>
-            <div class="tab" data-tab="driver-docs-pane">Feltöltött Iratok & CMR-ek</div>
-      <a href="/utvonaltervezes" class="tab-link">Útvonaltervezés</a>
+      <div class="tab" data-tab="received-fuv" data-i18n="nav.waybills">Fuvarlevelek</div>
+      <div class="tab" data-tab="warehouse" data-i18n="nav.warehouse">📦 Raktár</div>
+      <div class="tab" data-tab="decont" data-i18n="nav.decont">Sofőr-elszámolás</div>
+            <div class="tab" data-tab="driver-docs-pane" data-i18n="nav.driverDocs">Feltöltött Iratok & CMR-ek</div>
+      <a href="/utvonaltervezes" class="tab-link" data-i18n="nav.routePlanning">Útvonaltervezés</a>
     </div>
     <div class="menu-group">
-      <div class="menu-title">Statisztika & Riport</div>
-      <div class="tab" id="statsParentTab" onclick="toggleStatsMenu()">📊 Statisztika ▾</div>
+      <div class="menu-title" data-i18n="nav.grpStats">Statisztika & Riport</div>
+      <div class="tab" id="statsParentTab" onclick="toggleStatsMenu()" data-i18n="nav.stats">📊 Statisztika ▾</div>
       <div class="submenu" id="statsSubmenu">
-        <div class="sub-tab" data-tab="stats-overview">Áttekintés</div>
-        <div class="sub-tab" data-tab="stats-finance">Pénzügy</div>
-        <div class="sub-tab" data-tab="stats-fuel">Fogyasztás</div>
-        <div class="sub-tab" data-tab="stats-purchases">Vásárlások</div>
-        <div class="sub-tab" data-tab="stats-drivers">Sofőr teljesítmény</div>
-        <div class="sub-tab" data-tab="stats-vehicles">Jármű kihasználtság</div>
-        <div class="sub-tab" data-tab="stats-clients">Ügyfél riport</div>
+        <div class="sub-tab" data-tab="stats-overview" data-i18n="nav.overview">Áttekintés</div>
+        <div class="sub-tab" data-tab="stats-finance" data-i18n="nav.finance">Pénzügy</div>
+        <div class="sub-tab" data-tab="stats-fuel" data-i18n="nav.consum">Fogyasztás</div>
+        <div class="sub-tab" data-tab="stats-purchases" data-i18n="nav.purchases">Vásárlások</div>
+        <div class="sub-tab" data-tab="stats-drivers" data-i18n="nav.driversPerf">Sofőr teljesítmény</div>
+        <div class="sub-tab" data-tab="stats-vehicles" data-i18n="nav.vehUsage">Jármű kihasználtság</div>
+        <div class="sub-tab" data-tab="stats-clients" data-i18n="nav.clientReport">Ügyfél riport</div>
       </div>
     </div>
     <div class="menu-group">
-      <div class="menu-title">Flotta & Megfelelés</div>
-      <div class="tab" data-tab="expiries">⏰ Lejáratok</div>
-      <div class="tab" data-tab="service-log">🔧 Szerviz & karbantartás</div>
-      <div class="tab" data-tab="fuel-import">⛽ Üzemanyagkártya</div>
+      <div class="menu-title" data-i18n="nav.grpFleet">Flotta & Megfelelés</div>
+      <div class="tab" data-tab="expiries" data-i18n="nav.expiries">⏰ Lejáratok</div>
+      <div class="tab" data-tab="service-log" data-i18n="nav.service">🔧 Szerviz & karbantartás</div>
+      <div class="tab" data-tab="fuel-import" data-i18n="nav.fuelCard">⛽ Üzemanyagkártya</div>
     </div>
     <div class="menu-group" id="userMenuGroup">
-      <div class="menu-title">Adminisztráció</div>
-      <div class="tab" id="userParentTab" onclick="toggleUserMenu()">Felhasználók ▾</div>
+      <div class="menu-title" data-i18n="nav.grpAdmin">Adminisztráció</div>
+      <div class="tab" id="userParentTab" onclick="toggleUserMenu()" data-i18n="nav.users">Felhasználók ▾</div>
       <div class="submenu">
-        <div class="sub-tab" data-tab="users">Munkatársak kezelése</div>
-        <div class="sub-tab" data-tab="invites">Meghívókódok</div>
-        <div class="sub-tab" data-tab="internal-drivers">Belső sofőrök</div>
-        <div class="sub-tab" data-tab="external-drivers">Külső sofőrök</div>
-        <div class="sub-tab" data-tab="vehicles">Járművek</div>
+        <div class="sub-tab" data-tab="users" data-i18n="nav.staff">Munkatársak kezelése</div>
+        <div class="sub-tab" data-tab="invites" data-i18n="nav.invites">Meghívókódok</div>
+        <div class="sub-tab" data-tab="internal-drivers" data-i18n="nav.internalDrivers">Belső sofőrök</div>
+        <div class="sub-tab" data-tab="external-drivers" data-i18n="nav.externalDrivers">Külső sofőrök</div>
+        <div class="sub-tab" data-tab="vehicles" data-i18n="nav.vehicles">Járművek</div>
       </div>
-      <div class="tab" data-tab="clients">Ügyfelek</div>
-      <div class="tab" data-tab="billing">📥 E-mail feldolgozás</div>
-      <div class="tab" data-tab="signature">Aláírás és Bélyegző</div>
+      <div class="tab" data-tab="clients" data-i18n="nav.clients">Ügyfelek</div>
+      <div class="tab" data-tab="billing" data-i18n="nav.billing">📥 E-mail feldolgozás</div>
+      <div class="tab" data-tab="signature" data-i18n="nav.signature">Aláírás és Bélyegző</div>
     </div>
     <div class="menu-group">
-      <div class="menu-title">Kommunikáció</div>
-      <div class="tab" data-tab="chat">Belső Chat</div>
+      <div class="menu-title" data-i18n="nav.grpComm">Kommunikáció</div>
+      <div class="tab" data-tab="chat" data-i18n="nav.chat">Belső Chat</div>
     </div>
     <div class="menu-group" style="margin-top:auto;">
-      <div class="tab" data-tab="settings">Beállítások</div>
+      <div class="tab" data-tab="settings" data-i18n="nav.settings">Beállítások</div>
     </div>
     <div style="padding:10px 12px; border-top:1px solid var(--border); margin-top:8px;">
       <div id="meBadge" style="font-size:12px; color:var(--muted); margin-bottom:10px;">—</div>
-      <button class="btn ghost block" onclick="logout()" style="padding:8px;">Kilépés</button>
+      <button class="btn ghost block" onclick="logout()" style="padding:8px;" data-i18n="common.logout">Kilépés</button>
     </div>
   </div>
 
@@ -111,6 +112,7 @@
           <div class="text-primary" style="font-size:22px; font-weight:800;" id="dashCegNev">—</div>
           <div class="text-muted" style="font-size:12px;">Cég dashboard</div>
         </div>
+        <div id="langSwitch" style="display:inline-flex;gap:4px;margin-right:8px;vertical-align:middle;"></div>
         <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Világos mód" aria-label="Téma váltása">🌙</button>
       </div>
 
