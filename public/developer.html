@@ -261,11 +261,16 @@
         style="padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;">
         🐛 Hibajelentések
       </button>
+      <button id="dtab-integ" onclick="switchDetailTab('integ')" data-i18n-html="dev.dtabInteg"
+        style="padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;">
+        🔌 Integrációk
+      </button>
     </div>
     <!-- Tab tartalom -->
     <div id="dpane-aktivitas" style="display:block;overflow-y:auto;max-height:60vh;" data-i18n="common.loading">Betöltés...</div>
     <div id="dpane-funkciok"  style="display:none;overflow-y:auto;max-height:60vh;" data-i18n="common.loading">Betöltés...</div>
     <div id="dpane-hibak"     style="display:none;overflow-y:auto;max-height:60vh;" data-i18n="common.loading">Betöltés...</div>
+    <div id="dpane-integ"     style="display:none;overflow-y:auto;max-height:60vh;" data-i18n="common.loading">Betöltés...</div>
   </div>
 </div>
 
@@ -643,7 +648,7 @@ function closeDetailModal(){ document.getElementById('detailModal').classList.re
 
 function switchDetailTab(tab){
   _detailTab = tab;
-  ['aktivitas','funkciok','hibak'].forEach(function(t){
+  ['aktivitas','funkciok','hibak','integ'].forEach(function(t){
     document.getElementById('dtab-'+t).style.fontWeight = t===tab ? '800' : '500';
     document.getElementById('dtab-'+t).style.borderBottom = t===tab ? '2px solid #a855f7' : '2px solid transparent';
     document.getElementById('dtab-'+t).style.color = t===tab ? '#fff' : 'var(--muted)';
@@ -652,6 +657,51 @@ function switchDetailTab(tab){
   if(tab==='aktivitas') loadDetailAktivitas();
   if(tab==='funkciok')  loadDetailFunkciok();
   if(tab==='hibak')     loadDetailHibak();
+  if(tab==='integ')     loadDetailInteg();
+}
+
+function loadDetailInteg(){
+  var el=document.getElementById('dpane-integ');
+  el.innerHTML='<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(168,85,247,0.2);border-top-color:#a855f7;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
+  gas('devGetCompanyIntegrations',[_detailCegId]).then(function(r){
+    if(!r||!r.ok){ el.innerHTML='<div style="color:var(--err);padding:20px;">'+escHtml((r&&r.err)||t('common.error'))+'</div>'; return; }
+    var vendor=(r.maps&&r.maps.vendor)||'free';
+    var hasKey=!!(r.maps&&r.maps.has_key);
+    var tpl=r.uit_template||'';
+    var card='border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;background:rgba(255,255,255,0.02);';
+    var inp='width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.25);color:#fff;font-size:13px;margin-bottom:8px;';
+    var btn='padding:8px 16px;border:none;border-radius:8px;background:#a855f7;color:#fff;font-size:13px;font-weight:700;cursor:pointer;';
+    function sel(v,l){ return '<option value="'+v+'"'+(vendor===v?' selected':'')+'>'+l+'</option>'; }
+    el.innerHTML=
+      '<div style="'+card+'">'
+        +'<div style="font-weight:700;color:#fff;margin-bottom:4px;">🗺️ '+escHtml(t('dev.integMapsTitle'))+'</div>'
+        +'<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">'+escHtml(t('dev.integMapsHint'))+'</div>'
+        +'<select id="devMapsVendor" style="'+inp+'">'+sel('free',t('dev.integFree'))+sel('here','HERE')+sel('google','Google')+'</select>'
+        +'<input id="devMapsKey" type="password" placeholder="'+(hasKey?escHtml(t('dev.integKeyStored')):'API key')+'" style="'+inp+'">'
+        +'<button onclick="devSaveMaps()" style="'+btn+'">💾 '+escHtml(t('dev.save'))+'</button>'
+      +'</div>'
+      +'<div style="'+card+'">'
+        +'<div style="font-weight:700;color:#fff;margin-bottom:4px;">🚚 '+escHtml(t('dev.integUitTitle'))+'</div>'
+        +'<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">'+escHtml(t('dev.integUitHint'))+'</div>'
+        +'<input id="devUitTpl" placeholder="https://cargotrack.ro/uit?plate={rendszam}&from={incarcare}&to={descarcare}" value="'+escHtml(tpl)+'" style="'+inp+'">'
+        +'<button onclick="devSaveUit()" style="'+btn+'">💾 '+escHtml(t('dev.save'))+'</button>'
+      +'</div>';
+  }).catch(function(){ el.innerHTML='<div style="color:var(--err);padding:20px;">'+escHtml(t('common.error'))+'</div>'; });
+}
+function devSaveMaps(){
+  var vendor=document.getElementById('devMapsVendor').value;
+  var key=document.getElementById('devMapsKey').value;
+  gas('devSaveCompanyMaps',[_detailCegId,{vendor:vendor,key:key}]).then(function(r){
+    if(r&&r.ok){ toast('✅ '+t('common.savedOk'),'ok'); loadDetailInteg(); }
+    else toast((r&&r.err)||t('common.error'),'err');
+  });
+}
+function devSaveUit(){
+  var tpl=document.getElementById('devUitTpl').value;
+  gas('devSaveCompanyUit',[_detailCegId,{template:tpl}]).then(function(r){
+    if(r&&r.ok){ toast('✅ '+t('common.savedOk'),'ok'); }
+    else toast((r&&r.err)||t('common.error'),'err');
+  });
 }
 
 function loadDetailFunkciok(){

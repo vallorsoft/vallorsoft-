@@ -47,8 +47,6 @@ function loadTab(name){
   if(name==='orders-planner' && window.Planner) Planner.load();
   if(name==='warehouse') loadWarehouseTab();
   if(name==='integrations'){
-    if(typeof loadMapsProvider==='function') loadMapsProvider();
-    if(typeof loadUitDeeplink==='function') loadUitDeeplink();
     if(typeof loadGdpr==='function') loadGdpr();
     if(window.EmailIntakeCard)  EmailIntakeCard.mount('emailIntakeCardBox', {readOnly:false});
     if(window.InvoicingCard)    InvoicingCard.mount('invCardBox');
