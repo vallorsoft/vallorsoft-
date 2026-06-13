@@ -18,7 +18,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 handlers.clientPortalList = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const clientId = args && args[0] ? parseInt(args[0], 10) : null;
@@ -37,7 +37,7 @@ handlers.clientPortalList = async function (req, res, args) {
     return res.json({ result: { ok: true, items: r.rows } });
   } catch (err) {
     console.error('clientPortalList hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -45,24 +45,24 @@ handlers.clientPortalList = async function (req, res, args) {
 handlers.clientPortalInvite = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const a = (args && args[0]) || {};
     const clientId = parseInt(a.client_id, 10);
     const email = String(a.email || '').trim().toLowerCase();
     const nev = a.nev ? String(a.nev).trim().slice(0, 120) : null;
-    if (!clientId) return res.json({ result: { ok: false, err: 'Válassz ügyfelet.' } });
-    if (!EMAIL_RE.test(email)) return res.json({ result: { ok: false, err: 'Érvénytelen e-mail cím.' } });
+    if (!clientId) return res.json({ result: { ok: false, err: 'Selectează un client.' } });
+    if (!EMAIL_RE.test(email)) return res.json({ result: { ok: false, err: 'Adresă de e-mail invalidă.' } });
 
     // az ügyfél a saját cégé legyen
     const cl = await pool.query('SELECT id, nev FROM clients WHERE id = $1 AND company_id = $2', [clientId, cid]);
-    if (!cl.rows.length) return res.json({ result: { ok: false, err: 'Az ügyfél nem található.' } });
+    if (!cl.rows.length) return res.json({ result: { ok: false, err: 'Clientul nu a fost găsit.' } });
 
     // foglalt-e az e-mail (globálisan egyedi)
     const ex = await pool.query('SELECT id, company_id FROM client_users WHERE LOWER(email) = $1', [email]);
     if (ex.rows.length && ex.rows[0].company_id !== cid) {
-      return res.json({ result: { ok: false, err: 'Ez az e-mail már egy másik fuvarozónál van regisztrálva.' } });
+      return res.json({ result: { ok: false, err: 'Acest e-mail este deja înregistrat la alt transportator.' } });
     }
 
     const token = crypto.randomBytes(24).toString('hex');
@@ -85,7 +85,7 @@ handlers.clientPortalInvite = async function (req, res, args) {
     return res.json({ result: { ok: true, link, emailed } });
   } catch (err) {
     console.error('clientPortalInvite hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -93,19 +93,19 @@ handlers.clientPortalInvite = async function (req, res, args) {
 handlers.clientPortalSetActive = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const id = parseInt(args && args[0], 10);
     const activ = !!(args && args[1]);
-    if (!id) return res.json({ result: { ok: false, err: 'ID kötelező.' } });
+    if (!id) return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
     const r = await pool.query(
       'UPDATE client_users SET activ = $1 WHERE id = $2 AND company_id = $3', [activ, id, cid]);
-    if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nem található.' } });
+    if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost găsit.' } });
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('clientPortalSetActive hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 

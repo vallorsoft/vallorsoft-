@@ -21,7 +21,7 @@ try { ({ sendResetEmail } = require('../services/email')); } catch (_) { /* e-ma
 
 // ─── Middleware: csak bejelentkezett portál-ügyfél ───────────
 function requireClient(req, res, next) {
-  if (!req.session || !req.session.clientUser) return res.status(401).json({ ok: false, err: 'Nincs bejelentkezve.' });
+  if (!req.session || !req.session.clientUser) return res.status(401).json({ ok: false, err: 'Nu sunteti autentificat.' });
   next();
 }
 
@@ -44,7 +44,7 @@ router.post('/api/portal/login', async (req, res) => {
   try {
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
-    if (!email || !password) return res.json({ ok: false, err: 'E-mail és jelszó kötelező.' });
+    if (!email || !password) return res.json({ ok: false, err: 'E-mailul si parola sunt obligatorii.' });
 
     const r = await pool.query(
       `SELECT cu.id, cu.company_id, cu.client_id, cu.email, cu.nev, cu.pass_hash, cu.activ,
@@ -56,13 +56,13 @@ router.post('/api/portal/login', async (req, res) => {
 
     if (!r.rows.length || !r.rows[0].pass_hash) {
       await bcrypt.compare(password, '$2b$10$C6UzMDM.H6dfI/f/IKcEeO7ZdVdkPYqBkN1FW3sZBPq4P5l5l5l5l');
-      return res.json({ ok: false, err: 'Hibás e-mail vagy jelszó.' });
+      return res.json({ ok: false, err: 'E-mail sau parola incorecta.' });
     }
     const cu = r.rows[0];
     const ok = await bcrypt.compare(password, cu.pass_hash);
-    if (!ok) return res.json({ ok: false, err: 'Hibás e-mail vagy jelszó.' });
-    if (!cu.activ) return res.json({ ok: false, err: 'A hozzáférésed le van tiltva. Egyeztess a fuvarozóval.' });
-    if (!(await portalFeatureOn(cu.company_id))) return res.json({ ok: false, err: 'Az ügyfél-portál jelenleg nem aktív. Egyeztess a fuvarozóval.' });
+    if (!ok) return res.json({ ok: false, err: 'E-mail sau parola incorecta.' });
+    if (!cu.activ) return res.json({ ok: false, err: 'Accesul dumneavoastra este blocat. Contactati transportatorul.' });
+    if (!(await portalFeatureOn(cu.company_id))) return res.json({ ok: false, err: 'Portalul de client nu este momentan activ. Contactati transportatorul.' });
 
     req.session.clientUser = {
       id: cu.id, company_id: cu.company_id, client_id: cu.client_id,
@@ -72,7 +72,7 @@ router.post('/api/portal/login', async (req, res) => {
     return res.json({ ok: true });
   } catch (err) {
     console.error('portal login hiba:', err);
-    return res.json({ ok: false, err: 'Szerver hiba' });
+    return res.json({ ok: false, err: 'Eroare de server' });
   }
 });
 
@@ -92,15 +92,15 @@ router.post('/api/portal/set-password', async (req, res) => {
   try {
     const token = String(req.body.token || '').trim();
     const password = String(req.body.password || '');
-    if (!token || password.length < 6) return res.json({ ok: false, err: 'A jelszó legalább 6 karakter legyen.' });
+    if (!token || password.length < 6) return res.json({ ok: false, err: 'Parola trebuie sa aiba cel putin 6 caractere.' });
 
     const r = await pool.query(
       `SELECT id, company_id, client_id, email, nev FROM client_users
        WHERE invite_token = $1 AND (invite_expires IS NULL OR invite_expires > NOW())`, [token]);
-    if (!r.rows.length) return res.json({ ok: false, err: 'A meghívó-link érvénytelen vagy lejárt. Kérj újat a fuvarozótól.' });
+    if (!r.rows.length) return res.json({ ok: false, err: 'Linkul de invitatie este invalid sau a expirat. Cereti unul nou de la transportator.' });
 
     const cu = r.rows[0];
-    if (!(await portalFeatureOn(cu.company_id))) return res.json({ ok: false, err: 'Az ügyfél-portál jelenleg nem aktív.' });
+    if (!(await portalFeatureOn(cu.company_id))) return res.json({ ok: false, err: 'Portalul de client nu este momentan activ.' });
     const hash = await bcrypt.hash(password, 10);
     await pool.query(
       `UPDATE client_users SET pass_hash = $1, invite_token = NULL, invite_expires = NULL, activ = TRUE WHERE id = $2`,
@@ -117,7 +117,7 @@ router.post('/api/portal/set-password', async (req, res) => {
     return res.json({ ok: true });
   } catch (err) {
     console.error('portal set-password hiba:', err);
-    return res.json({ ok: false, err: 'Szerver hiba' });
+    return res.json({ ok: false, err: 'Eroare de server' });
   }
 });
 
@@ -151,7 +151,7 @@ router.get('/api/portal/orders', requireClient, async (req, res) => {
          ORDER BY id`, [ids, cu.company_id]);
       dr.rows.forEach((d) => {
         (docsByOrder[d.order_id] = docsByOrder[d.order_id] || []).push(
-          { id: d.id, name: d.file_name || 'dokumentum.pdf', signed: d.signed });
+          { id: d.id, name: d.file_name || 'document.pdf', signed: d.signed });
       });
     }
     orders.forEach((o) => { o.documents = docsByOrder[o.id] || []; });
@@ -162,7 +162,7 @@ router.get('/api/portal/orders', requireClient, async (req, res) => {
       const pr = await pool.query(
         `SELECT id, order_id, file_name, tip FROM documents WHERE order_id = ANY($1::text[]) ORDER BY id`, [ids]);
       pr.rows.forEach((d) => {
-        (podByOrder[d.order_id] = podByOrder[d.order_id] || []).push({ id: d.id, name: d.file_name || 'fotó', tip: d.tip });
+        (podByOrder[d.order_id] = podByOrder[d.order_id] || []).push({ id: d.id, name: d.file_name || 'fotografie', tip: d.tip });
       });
     }
     orders.forEach((o) => { o.pods = podByOrder[o.id] || []; });
@@ -175,7 +175,7 @@ router.get('/api/portal/orders', requireClient, async (req, res) => {
     return res.json({ ok: true, orders, stats, client_nev: cu.client_nev });
   } catch (err) {
     console.error('portal orders hiba:', err);
-    return res.json({ ok: false, err: 'Szerver hiba' });
+    return res.json({ ok: false, err: 'Eroare de server' });
   }
 });
 
@@ -208,7 +208,7 @@ router.get('/api/portal/document/:docId', requireClient, async (req, res) => {
   try {
     const cu = req.session.clientUser;
     const docId = parseInt(req.params.docId, 10);
-    if (!docId) return res.status(404).send('Nem található.');
+    if (!docId) return res.status(404).send('Nu a fost gasit.');
     const r = await pool.query(
       `SELECT od.file_name, od.original_base64, od.signed_base64
        FROM order_documents od
@@ -216,17 +216,17 @@ router.get('/api/portal/document/:docId', requireClient, async (req, res) => {
        WHERE od.id = $1 AND od.company_id = $2
          AND ( o.client_id = $3 OR (o.client_id IS NULL AND LOWER(o.client) = LOWER($4)) )`,
       [docId, cu.company_id, cu.client_id, cu.client_nev || '']);
-    if (!r.rows.length) return res.status(404).send('Nem található.');
+    if (!r.rows.length) return res.status(404).send('Nu a fost gasit.');
     const doc = r.rows[0];
     const b64 = doc.signed_base64 || doc.original_base64;
-    if (!b64) return res.status(404).send('Nincs fájl.');
+    if (!b64) return res.status(404).send('Nu exista fisier.');
     const buf = Buffer.from(b64, 'base64');
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.file_name || 'dokumentum.pdf')}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(doc.file_name || 'document.pdf')}"`);
     return res.send(buf);
   } catch (err) {
     console.error('portal document hiba:', err);
-    return res.status(500).send('Szerver hiba');
+    return res.status(500).send('Eroare de server');
   }
 });
 
@@ -235,13 +235,13 @@ router.get('/api/portal/pod/:id', requireClient, async (req, res) => {
   try {
     const cu = req.session.clientUser;
     const id = parseInt(req.params.id, 10);
-    if (!id) return res.status(404).send('Nem található.');
+    if (!id) return res.status(404).send('Nu a fost gasit.');
     const r = await pool.query(
       `SELECT d.file_name, d.storage_url FROM documents d
        JOIN orders o ON o.id = d.order_id AND o.company_id = $2
        WHERE d.id = $1 AND ( o.client_id = $3 OR (o.client_id IS NULL AND LOWER(o.client) = LOWER($4)) )`,
       [id, cu.company_id, cu.client_id, cu.client_nev || '']);
-    if (!r.rows.length) return res.status(404).send('Nem található.');
+    if (!r.rows.length) return res.status(404).send('Nu a fost gasit.');
     const s = String(r.rows[0].storage_url || '');
     if (/^https?:\/\//i.test(s)) return res.redirect(s);
     let mime = 'image/jpeg', b64 = s;
@@ -255,7 +255,7 @@ router.get('/api/portal/pod/:id', requireClient, async (req, res) => {
     return res.send(buf);
   } catch (err) {
     console.error('portal pod hiba:', err);
-    return res.status(500).send('Szerver hiba');
+    return res.status(500).send('Eroare de server');
   }
 });
 
@@ -266,7 +266,7 @@ router.post('/api/portal/request', requireClient, async (req, res) => {
     const b = req.body || {};
     const loc_incarcare = String(b.loc_incarcare || '').trim().slice(0, 200);
     const loc_descarcare = String(b.loc_descarcare || '').trim().slice(0, 200);
-    if (!loc_incarcare || !loc_descarcare) return res.json({ ok: false, err: 'A felrakó és a lerakó cím kötelező.' });
+    if (!loc_incarcare || !loc_descarcare) return res.json({ ok: false, err: 'Adresa de incarcare si de descarcare sunt obligatorii.' });
     const extracted = {
       client: cu.client_nev || '',
       ref: String(b.ref || '').trim().slice(0, 100),
@@ -280,11 +280,11 @@ router.post('/api/portal/request', requireClient, async (req, res) => {
     await pool.query(
       `INSERT INTO inbound_orders (company_id, source, source_email, subject, received_at, message_uid, extracted, status)
        VALUES ($1, 'portal', $2, $3, NOW(), $4, $5, 'reviewed')`,
-      [cu.company_id, cu.email, 'Ügyfélportál igénylés — ' + (cu.client_nev || cu.email), uid, JSON.stringify(extracted)]);
+      [cu.company_id, cu.email, 'Solicitare portal client — ' + (cu.client_nev || cu.email), uid, JSON.stringify(extracted)]);
     return res.json({ ok: true });
   } catch (err) {
     console.error('portal request hiba:', err);
-    return res.json({ ok: false, err: 'Szerver hiba' });
+    return res.json({ ok: false, err: 'Eroare de server' });
   }
 });
 

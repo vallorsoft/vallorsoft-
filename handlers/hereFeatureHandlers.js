@@ -13,7 +13,7 @@ const handlers = {};
 // A SAJÁT cég havi HERE-használata + díja (route planner panel).
 handlers.getMyHereUsage = async function (req, res, args) {
   try {
-    if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve' } });
+    if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
     const p = await computePool(req.session.user.company_id);
     return res.json({ result: {
       ok: true,
@@ -28,31 +28,31 @@ handlers.getMyHereUsage = async function (req, res, args) {
     } });
   } catch (err) {
     console.error('getMyHereUsage hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 // Developer: a 4 szolgáltatás metaadata (árszerkesztőhöz).
 handlers.getHereServices = async function (req, res, args) {
   try {
-    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Csak developer' } });
+    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Doar developer' } });
     const meta = await getServiceMeta();
     return res.json({ result: { ok: true, free_pool_total: FREE_POOL, services: SERVICE_ORDER.map((k) => meta[k]) } });
   } catch (err) {
     console.error('getHereServices hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 // Developer: szolgáltatás-ár (EUR / 1000) + ÁFA módosítása.
 handlers.updateHereServicePrice = async function (req, res, args) {
   try {
-    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Csak developer' } });
+    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Doar developer' } });
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const key = String(a.feature_key || '').trim();
-    if (SERVICE_ORDER.indexOf(key) < 0) return res.json({ result: { ok: false, err: 'Ismeretlen szolgáltatás' } });
+    if (SERVICE_ORDER.indexOf(key) < 0) return res.json({ result: { ok: false, err: 'Serviciu necunoscut' } });
     const price = parseFloat(a.price_eur);
-    if (!Number.isFinite(price) || price < 0) return res.json({ result: { ok: false, err: 'Érvénytelen ár' } });
+    if (!Number.isFinite(price) || price < 0) return res.json({ result: { ok: false, err: 'Pret invalid' } });
     const vat = (a.vat_percent != null && Number.isFinite(parseFloat(a.vat_percent))) ? parseFloat(a.vat_percent) : null;
     if (vat != null) {
       await pool.query('UPDATE here_feature_flags SET price_per_1000 = $1, vat_percent = $2, updated_at = now() WHERE feature_key = $3', [price, vat, key]);
@@ -62,7 +62,7 @@ handlers.updateHereServicePrice = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('updateHereServicePrice hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 

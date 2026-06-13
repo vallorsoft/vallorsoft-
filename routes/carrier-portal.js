@@ -13,7 +13,7 @@ const router = express.Router();
 const pool = require('../db');
 
 function requireCarrier(req, res, next) {
-  if (!req.session || !req.session.carrierUser) return res.status(401).json({ ok: false, err: 'Nincs bejelentkezve.' });
+  if (!req.session || !req.session.carrierUser) return res.status(401).json({ ok: false, err: 'Nu sunteti autentificat.' });
   next();
 }
 async function featureOn(companyId) {
@@ -29,7 +29,7 @@ router.post('/api/carrier/login', async (req, res) => {
   try {
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
-    if (!email || !password) return res.json({ ok: false, err: 'E-mail és jelszó kötelező.' });
+    if (!email || !password) return res.json({ ok: false, err: 'E-mailul si parola sunt obligatorii.' });
     const r = await pool.query(
       `SELECT cu.id, cu.company_id, cu.carrier_id, cu.email, cu.nev, cu.pass_hash, cu.activ,
               c.nev AS carrier_nev, co.nev AS ceg_nev
@@ -37,16 +37,16 @@ router.post('/api/carrier/login', async (req, res) => {
        JOIN companies co ON co.id=cu.company_id WHERE LOWER(cu.email)=$1`, [email]);
     if (!r.rows.length || !r.rows[0].pass_hash) {
       await bcrypt.compare(password, '$2b$10$C6UzMDM.H6dfI/f/IKcEeO7ZdVdkPYqBkN1FW3sZBPq4P5l5l5l5l');
-      return res.json({ ok: false, err: 'Hibás e-mail vagy jelszó.' });
+      return res.json({ ok: false, err: 'E-mail sau parola incorecta.' });
     }
     const cu = r.rows[0];
-    if (!(await bcrypt.compare(password, cu.pass_hash))) return res.json({ ok: false, err: 'Hibás e-mail vagy jelszó.' });
-    if (!cu.activ) return res.json({ ok: false, err: 'A hozzáférésed le van tiltva.' });
-    if (!(await featureOn(cu.company_id))) return res.json({ ok: false, err: 'Az alvállalkozói portál jelenleg nem aktív.' });
+    if (!(await bcrypt.compare(password, cu.pass_hash))) return res.json({ ok: false, err: 'E-mail sau parola incorecta.' });
+    if (!cu.activ) return res.json({ ok: false, err: 'Accesul dumneavoastra este blocat.' });
+    if (!(await featureOn(cu.company_id))) return res.json({ ok: false, err: 'Portalul de subcontractor nu este momentan activ.' });
     req.session.carrierUser = { id: cu.id, company_id: cu.company_id, carrier_id: cu.carrier_id, email: cu.email, nev: cu.nev, carrier_nev: cu.carrier_nev, ceg_nev: cu.ceg_nev };
     await pool.query('UPDATE carrier_users SET last_login=NOW() WHERE id=$1', [cu.id]).catch(() => {});
     return res.json({ ok: true });
-  } catch (err) { console.error('carrier login hiba:', err); return res.json({ ok: false, err: 'Szerver hiba' }); }
+  } catch (err) { console.error('carrier login hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
 });
 
 router.post('/api/carrier/logout', (req, res) => { if (req.session) req.session.carrierUser = null; res.json({ ok: true }); });
@@ -60,19 +60,19 @@ router.post('/api/carrier/set-password', async (req, res) => {
   try {
     const token = String(req.body.token || '').trim();
     const password = String(req.body.password || '');
-    if (!token || password.length < 6) return res.json({ ok: false, err: 'A jelszó legalább 6 karakter legyen.' });
+    if (!token || password.length < 6) return res.json({ ok: false, err: 'Parola trebuie sa aiba cel putin 6 caractere.' });
     const r = await pool.query(
       `SELECT id, company_id, carrier_id, email, nev FROM carrier_users
        WHERE invite_token=$1 AND (invite_expires IS NULL OR invite_expires > NOW())`, [token]);
-    if (!r.rows.length) return res.json({ ok: false, err: 'A meghívó-link érvénytelen vagy lejárt.' });
+    if (!r.rows.length) return res.json({ ok: false, err: 'Linkul de invitatie este invalid sau a expirat.' });
     const cu = r.rows[0];
-    if (!(await featureOn(cu.company_id))) return res.json({ ok: false, err: 'Az alvállalkozói portál jelenleg nem aktív.' });
+    if (!(await featureOn(cu.company_id))) return res.json({ ok: false, err: 'Portalul de subcontractor nu este momentan activ.' });
     const hash = await bcrypt.hash(password, 10);
     await pool.query('UPDATE carrier_users SET pass_hash=$1, invite_token=NULL, invite_expires=NULL, activ=TRUE WHERE id=$2', [hash, cu.id]);
     const cR = await pool.query(`SELECT c.nev AS carrier_nev, co.nev AS ceg_nev FROM carriers c JOIN companies co ON co.id=c.company_id WHERE c.id=$1 AND c.company_id=$2`, [cu.carrier_id, cu.company_id]);
     req.session.carrierUser = { id: cu.id, company_id: cu.company_id, carrier_id: cu.carrier_id, email: cu.email, nev: cu.nev, carrier_nev: (cR.rows[0] || {}).carrier_nev, ceg_nev: (cR.rows[0] || {}).ceg_nev };
     return res.json({ ok: true });
-  } catch (err) { console.error('carrier set-password hiba:', err); return res.json({ ok: false, err: 'Szerver hiba' }); }
+  } catch (err) { console.error('carrier set-password hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
 });
 
 // A rá osztott fuvarok (Extern, carrier_id szerint) — a díjjal, amit ő kap
@@ -92,10 +92,10 @@ router.get('/api/carrier/orders', requireCarrier, async (req, res) => {
     if (ids.length) {
       // a diszpécser által a fuvarhoz csatolt dokumentumok (megrendelés-visszaigazolás stb.)
       const od = await pool.query(`SELECT id, order_id, file_name FROM order_documents WHERE order_id = ANY($1::text[]) AND company_id=$2 ORDER BY id`, [ids, cu.company_id]);
-      od.rows.forEach((d) => { (docsByOrder[d.order_id] = docsByOrder[d.order_id] || []).push({ id: d.id, name: d.file_name || 'dokumentum.pdf', src: 'order' }); });
+      od.rows.forEach((d) => { (docsByOrder[d.order_id] = docsByOrder[d.order_id] || []).push({ id: d.id, name: d.file_name || 'document.pdf', src: 'order' }); });
       // az alvállalkozó által feltöltött dokumentumok
       const cd = await pool.query(`SELECT id, order_id, file_name FROM carrier_documents WHERE carrier_id=$1 AND company_id=$2 AND order_id = ANY($3::text[]) ORDER BY id`, [cu.carrier_id, cu.company_id, ids]);
-      cd.rows.forEach((d) => { (docsByOrder[d.order_id] = docsByOrder[d.order_id] || []).push({ id: d.id, name: d.file_name || 'feltöltés', src: 'carrier' }); });
+      cd.rows.forEach((d) => { (docsByOrder[d.order_id] = docsByOrder[d.order_id] || []).push({ id: d.id, name: d.file_name || 'incarcare', src: 'carrier' }); });
     }
     orders.forEach((o) => { o.documents = docsByOrder[o.id] || []; });
     const stats = {
@@ -104,7 +104,7 @@ router.get('/api/carrier/orders', requireCarrier, async (req, res) => {
       payable: orders.reduce((s, o) => s + (Number(o.carrier_cost) || 0), 0),
     };
     return res.json({ ok: true, orders, stats });
-  } catch (err) { console.error('carrier orders hiba:', err); return res.json({ ok: false, err: 'Szerver hiba' }); }
+  } catch (err) { console.error('carrier orders hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
 });
 
 // Saját jármű(vek) — lista + felvitel + törlés
@@ -113,14 +113,14 @@ router.get('/api/carrier/vehicles', requireCarrier, async (req, res) => {
     const cu = req.session.carrierUser;
     const r = await pool.query('SELECT id, rendszam_camion, rendszam_remorca, marca, model, nota FROM carrier_vehicles WHERE company_id=$1 AND carrier_id=$2 ORDER BY created_at DESC', [cu.company_id, cu.carrier_id]);
     return res.json({ ok: true, items: r.rows });
-  } catch (err) { console.error('carrier vehicles hiba:', err); return res.json({ ok: false, err: 'Szerver hiba' }); }
+  } catch (err) { console.error('carrier vehicles hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
 });
 router.post('/api/carrier/vehicles', requireCarrier, async (req, res) => {
   try {
     const cu = req.session.carrierUser;
     const b = req.body || {};
     const cam = String(b.rendszam_camion || '').trim().toUpperCase().slice(0, 50);
-    if (!cam) return res.json({ ok: false, err: 'A vontató rendszáma kötelező.' });
+    if (!cam) return res.json({ ok: false, err: 'Numarul de inmatriculare al capului tractor este obligatoriu.' });
     await pool.query(
       `INSERT INTO carrier_vehicles (company_id, carrier_id, rendszam_camion, rendszam_remorca, marca, model, nota)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
@@ -129,14 +129,14 @@ router.post('/api/carrier/vehicles', requireCarrier, async (req, res) => {
        String(b.marca || '').trim().slice(0, 80) || null, String(b.model || '').trim().slice(0, 80) || null,
        String(b.nota || '').trim().slice(0, 500) || null]);
     return res.json({ ok: true });
-  } catch (err) { console.error('carrier vehicle add hiba:', err); return res.json({ ok: false, err: 'Szerver hiba' }); }
+  } catch (err) { console.error('carrier vehicle add hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
 });
 router.delete('/api/carrier/vehicles/:id', requireCarrier, async (req, res) => {
   try {
     const cu = req.session.carrierUser;
     const r = await pool.query('DELETE FROM carrier_vehicles WHERE id=$1 AND company_id=$2 AND carrier_id=$3', [parseInt(req.params.id, 10), cu.company_id, cu.carrier_id]);
     return res.json({ ok: !!r.rowCount });
-  } catch (err) { console.error('carrier vehicle del hiba:', err); return res.json({ ok: false, err: 'Szerver hiba' }); }
+  } catch (err) { console.error('carrier vehicle del hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
 });
 
 // Dokumentum feltöltése (base64 JSON) — opcionálisan fuvarhoz kötve
@@ -145,9 +145,9 @@ router.post('/api/carrier/upload', requireCarrier, async (req, res) => {
     const cu = req.session.carrierUser;
     const b = req.body || {};
     const data = String(b.data_base64 || '');
-    const fileName = String(b.file_name || 'feltoltes').slice(0, 200);
-    if (!data || data.length < 8) return res.json({ ok: false, err: 'Hiányzó fájl.' });
-    if (data.length > 14 * 1024 * 1024) return res.json({ ok: false, err: 'A fájl túl nagy (max ~10 MB).' });
+    const fileName = String(b.file_name || 'incarcare').slice(0, 200);
+    if (!data || data.length < 8) return res.json({ ok: false, err: 'Fisier lipsa.' });
+    if (data.length > 14 * 1024 * 1024) return res.json({ ok: false, err: 'Fisierul este prea mare (max ~10 MB).' });
     let orderId = b.order_id ? String(b.order_id).slice(0, 20) : null;
     if (orderId) {
       const chk = await pool.query('SELECT 1 FROM orders WHERE id=$1 AND company_id=$2 AND carrier_id=$3', [orderId, cu.company_id, cu.carrier_id]);
@@ -159,7 +159,7 @@ router.post('/api/carrier/upload', requireCarrier, async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
       [cu.company_id, cu.carrier_id, orderId, fileName, String(b.mime || 'application/octet-stream').slice(0, 100), data, kind, cu.email]);
     return res.json({ ok: true });
-  } catch (err) { console.error('carrier upload hiba:', err); return res.json({ ok: false, err: 'Szerver hiba' }); }
+  } catch (err) { console.error('carrier upload hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
 });
 
 // Saját feltöltött dokumentumok listája (cég-szintű + fuvar nélküli is)
@@ -168,7 +168,7 @@ router.get('/api/carrier/documents', requireCarrier, async (req, res) => {
     const cu = req.session.carrierUser;
     const r = await pool.query('SELECT id, order_id, file_name, kind, created_at FROM carrier_documents WHERE company_id=$1 AND carrier_id=$2 ORDER BY created_at DESC LIMIT 200', [cu.company_id, cu.carrier_id]);
     return res.json({ ok: true, items: r.rows });
-  } catch (err) { console.error('carrier documents hiba:', err); return res.json({ ok: false, err: 'Szerver hiba' }); }
+  } catch (err) { console.error('carrier documents hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
 });
 
 // Saját feltöltött dokumentum letöltése
@@ -176,9 +176,9 @@ router.get('/api/carrier/document/:id', requireCarrier, async (req, res) => {
   try {
     const cu = req.session.carrierUser;
     const r = await pool.query('SELECT file_name, mime, data_base64 FROM carrier_documents WHERE id=$1 AND company_id=$2 AND carrier_id=$3', [parseInt(req.params.id, 10), cu.company_id, cu.carrier_id]);
-    if (!r.rows.length) return res.status(404).send('Nem található.');
+    if (!r.rows.length) return res.status(404).send('Nu a fost gasit.');
     return _streamB64(res, r.rows[0].data_base64, r.rows[0].mime, r.rows[0].file_name);
-  } catch (err) { console.error('carrier doc dl hiba:', err); return res.status(500).send('Szerver hiba'); }
+  } catch (err) { console.error('carrier doc dl hiba:', err); return res.status(500).send('Eroare de server'); }
 });
 
 // A diszpécser által a fuvarhoz csatolt dokumentum letöltése (csak a saját fuvaré)
@@ -190,14 +190,14 @@ router.get('/api/carrier/order-doc/:id', requireCarrier, async (req, res) => {
        JOIN orders o ON o.id=od.order_id AND o.company_id=od.company_id
        WHERE od.id=$1 AND od.company_id=$2 AND o.carrier_id=$3`,
       [parseInt(req.params.id, 10), cu.company_id, cu.carrier_id]);
-    if (!r.rows.length) return res.status(404).send('Nem található.');
+    if (!r.rows.length) return res.status(404).send('Nu a fost gasit.');
     const b64 = r.rows[0].signed_base64 || r.rows[0].original_base64;
-    return _streamB64(res, b64, 'application/pdf', r.rows[0].file_name || 'dokumentum.pdf');
-  } catch (err) { console.error('carrier order-doc hiba:', err); return res.status(500).send('Szerver hiba'); }
+    return _streamB64(res, b64, 'application/pdf', r.rows[0].file_name || 'document.pdf');
+  } catch (err) { console.error('carrier order-doc hiba:', err); return res.status(500).send('Eroare de server'); }
 });
 
 function _streamB64(res, b64, mime, fileName) {
-  if (!b64) return res.status(404).send('Nincs fájl.');
+  if (!b64) return res.status(404).send('Nu exista fisier.');
   let m = String(mime || 'application/octet-stream'), data = String(b64);
   const dm = data.match(/^data:([^;]+);base64,(.*)$/);
   if (dm) { m = dm[1]; data = dm[2]; }
@@ -206,7 +206,7 @@ function _streamB64(res, b64, mime, fileName) {
     res.setHeader('Content-Type', m);
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName || 'fajl')}"`);
     return res.send(buf);
-  } catch (e) { return res.status(404).send('Hibás fájl.'); }
+  } catch (e) { return res.status(404).send('Fisier invalid.'); }
 }
 
 module.exports = router;

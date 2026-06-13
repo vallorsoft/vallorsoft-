@@ -18,7 +18,7 @@ try { qrcode = require('qrcode'); } catch (e) { qrcode = null; }
 router.post('/api/forgot-password', async (req, res) => {
   try {
     const email = (req.body.email || '').trim().toLowerCase();
-    const genericMsg = { success: true, message: 'Ha létezik fiók ezzel az email címmel, elküldtük a visszaállítási linket.' };
+    const genericMsg = { success: true, message: 'Dacă există un cont cu această adresă de email, am trimis linkul de resetare.' };
     if (!email) return res.json(genericMsg);
 
     const result = await pool.query(
@@ -43,7 +43,7 @@ router.post('/api/forgot-password', async (req, res) => {
     return res.json(genericMsg);
   } catch (err) {
     console.error('Forgot password hiba:', err);
-    return res.json({ success: false, message: 'Szerver hiba. Próbálja újra később.' });
+    return res.json({ success: false, message: 'Eroare de server. Încercați din nou mai târziu.' });
   }
 });
 
@@ -54,10 +54,10 @@ router.post('/api/reset-password', async (req, res) => {
     const newPassword = req.body.password || '';
 
     if (!token || !newPassword) {
-      return res.json({ success: false, message: 'Hiányzó adatok.' });
+      return res.json({ success: false, message: 'Date lipsă.' });
     }
     if (newPassword.length < 6) {
-      return res.json({ success: false, message: 'A jelszó legalább 6 karakter legyen.' });
+      return res.json({ success: false, message: 'Parola trebuie să aibă cel puțin 6 caractere.' });
     }
 
     const result = await pool.query(
@@ -65,12 +65,12 @@ router.post('/api/reset-password', async (req, res) => {
       [token]
     );
     if (result.rows.length === 0) {
-      return res.json({ success: false, message: 'Érvénytelen vagy már felhasznált link.' });
+      return res.json({ success: false, message: 'Link invalid sau deja folosit.' });
     }
     const user = result.rows[0];
 
     if (!user.reset_token_expiry || new Date(user.reset_token_expiry) < new Date()) {
-      return res.json({ success: false, message: 'A link lejárt. Kérjen új visszaállítási linket.' });
+      return res.json({ success: false, message: 'Linkul a expirat. Solicitați un nou link de resetare.' });
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
@@ -79,10 +79,10 @@ router.post('/api/reset-password', async (req, res) => {
       [passwordHash, user.id]
     );
 
-    return res.json({ success: true, message: 'Jelszó sikeresen megváltoztatva. Most már bejelentkezhet.' });
+    return res.json({ success: true, message: 'Parola a fost schimbată cu succes. Acum vă puteți autentifica.' });
   } catch (err) {
     console.error('Reset password hiba:', err);
-    return res.json({ success: false, message: 'Szerver hiba. Próbálja újra később.' });
+    return res.json({ success: false, message: 'Eroare de server. Încercați din nou mai târziu.' });
   }
 });
 
@@ -92,7 +92,7 @@ router.post('/api/login', async (req, res) => {
     const password = req.body.password || '';
 
     if (!email || !password) {
-      return res.json({ success: false, message: 'Email es jelszo kotelezo!' });
+      return res.json({ success: false, message: 'Emailul și parola sunt obligatorii!' });
     }
 
     const result = await pool.query(
@@ -104,19 +104,19 @@ router.post('/api/login', async (req, res) => {
       // Időzítés-kiegyenlítés: nem létező emailnél is fusson egy bcrypt-összehasonlítás,
       // hogy a válaszidőből ne lehessen fiókok létezésére következtetni.
       await bcrypt.compare(password, '$2b$10$C6UzMDM.H6dfI/f/IKcEeO7ZdVdkPYqBkN1FW3sZBPq4P5l5l5l5l');
-      return res.json({ success: false, message: 'Hibas email vagy jelszo!' });
+      return res.json({ success: false, message: 'Email sau parolă incorectă!' });
     }
 
     const user = result.rows[0];
     const passwordMatch = await bcrypt.compare(password, user.password_hash);
 
     if (!passwordMatch) {
-      return res.json({ success: false, message: 'Hibas email vagy jelszo!' });
+      return res.json({ success: false, message: 'Email sau parolă incorectă!' });
     }
 
     // Tiltott felhasznalo (developer nem tilthato)
     if (user.blocked && !user.pozicio_dev) {
-      return res.json({ success: false, message: 'A fiókod le van tiltva. Kérjük vegye fel a kapcsolatot az adminisztrátorral.' });
+      return res.json({ success: false, message: 'Contul tău este blocat. Vă rugăm să contactați administratorul.' });
     }
 
     // Ceg ellenorzese (ha nem developer)
@@ -125,10 +125,10 @@ router.post('/api/login', async (req, res) => {
       if (ceg.rows.length > 0) {
         const c = ceg.rows[0];
         if (c.subscription_status === 'inactive' || c.subscription_status === 'cancelled') {
-          return res.json({ success: false, message: 'A cég előfizetése lejárt vagy törölve lett. Kérjük vegye fel a kapcsolatot az adminisztrátorral.' });
+          return res.json({ success: false, message: 'Abonamentul firmei a expirat sau a fost anulat. Vă rugăm să contactați administratorul.' });
         }
         if (c.paid_until && new Date(c.paid_until) < new Date()) {
-          return res.json({ success: false, message: 'A cég előfizetése lejárt (' + new Date(c.paid_until).toLocaleDateString('hu-HU') + '). Kérjük fizesse meg a következő időszakot.' });
+          return res.json({ success: false, message: 'Abonamentul firmei a expirat (' + new Date(c.paid_until).toLocaleDateString('ro-RO') + '). Vă rugăm să achitați perioada următoare.' });
         }
       }
     }
@@ -176,7 +176,7 @@ router.post('/api/login', async (req, res) => {
 
   } catch (err) {
     console.error('Login hiba:', err);
-    return res.status(500).json({ success: false, message: 'Szerver hiba' });
+    return res.status(500).json({ success: false, message: 'Eroare de server' });
   }
 });
 
@@ -193,26 +193,26 @@ function calc2faRedirect(u) {
 // ===== 2FA SETTINGS-BŐL: QR generálás (már bejelentkezett user) =====
 router.post('/api/2fa/settings-setup', requireLogin, async (req, res) => {
   try {
-    if (!speakeasy || !qrcode) return res.json({ success: false, message: '2FA nem elérhető' });
+    if (!speakeasy || !qrcode) return res.json({ success: false, message: '2FA indisponibil' });
     const email = req.session.user.email;
     const secret = speakeasy.generateSecret({ name: 'VallorSoft (' + email + ')', length: 20 });
     req.session.pending2faSecret = secret.base32;
     const qrDataUrl = await qrcode.toDataURL(secret.otpauth_url);
     return res.json({ success: true, qr: qrDataUrl, secret: secret.base32 });
   } catch (err) {
-    return res.json({ success: false, message: 'Szerver hiba' });
+    return res.json({ success: false, message: 'Eroare de server' });
   }
 });
 
 // ===== 2FA SETTINGS-BŐL: Megerősítés + bekapcsolás =====
 router.post('/api/2fa/settings-verify', requireLogin, async (req, res) => {
   try {
-    if (!speakeasy) return res.json({ success: false, message: '2FA nem elérhető' });
+    if (!speakeasy) return res.json({ success: false, message: '2FA indisponibil' });
     const token = (req.body.token || '').trim().replace(/\s/g, '');
     const secret = req.session.pending2faSecret;
-    if (!secret) return res.json({ success: false, message: 'Nincs folyamatban 2FA beállítás. Kezdd újra.' });
+    if (!secret) return res.json({ success: false, message: 'Nu există o configurare 2FA în curs. Reia de la început.' });
     const verified = speakeasy.totp.verify({ secret, encoding: 'base32', token, window: 2 });
-    if (!verified) return res.json({ success: false, message: 'Helytelen kód. Próbáld újra.' });
+    if (!verified) return res.json({ success: false, message: 'Cod incorect. Încearcă din nou.' });
     const backupCodes = [];
     for (let i = 0; i < 8; i++) backupCodes.push(crypto.randomBytes(4).toString('hex').toUpperCase());
     const hashedBackup = await Promise.all(backupCodes.map(c => bcrypt.hash(c, 8)));
@@ -223,15 +223,15 @@ router.post('/api/2fa/settings-verify', requireLogin, async (req, res) => {
     delete req.session.pending2faSecret;
     return res.json({ success: true, backupCodes });
   } catch (err) {
-    return res.json({ success: false, message: 'Szerver hiba' });
+    return res.json({ success: false, message: 'Eroare de server' });
   }
 });
 
 // ===== 2FA SETUP: QR kod generalas (pre-auth session-bol) =====
 router.post('/api/2fa/setup', async (req, res) => {
   try {
-    if (!speakeasy || !qrcode) return res.json({ success: false, message: '2FA nem elerheto' });
-    if (!req.session.pendingUser) return res.json({ success: false, message: 'Nincs folyamatban bejelentkezes' });
+    if (!speakeasy || !qrcode) return res.json({ success: false, message: '2FA indisponibil' });
+    if (!req.session.pendingUser) return res.json({ success: false, message: 'Nu există o autentificare în curs' });
 
     const email = req.session.pendingUser.email;
     const secret = speakeasy.generateSecret({
@@ -252,16 +252,16 @@ router.post('/api/2fa/setup', async (req, res) => {
     });
   } catch (err) {
     console.error('2fa setup hiba:', err);
-    return res.json({ success: false, message: 'Szerver hiba' });
+    return res.json({ success: false, message: 'Eroare de server' });
   }
 });
 
 // ===== 2FA SETUP VERIFY: elso kod ellenorzese + mentes + bejelentkezes =====
 router.post('/api/2fa/setup-verify', async (req, res) => {
   try {
-    if (!speakeasy) return res.json({ success: false, message: '2FA nem elerheto' });
+    if (!speakeasy) return res.json({ success: false, message: '2FA indisponibil' });
     if (!req.session.pendingUser || !req.session.pending2faSecret) {
-      return res.json({ success: false, message: 'Nincs folyamatban 2FA beallitas' });
+      return res.json({ success: false, message: 'Nu există o configurare 2FA în curs' });
     }
     const token = (req.body.token || '').trim().replace(/\s/g, '');
     const secret = req.session.pending2faSecret;
@@ -274,7 +274,7 @@ router.post('/api/2fa/setup-verify', async (req, res) => {
     });
 
     if (!verified) {
-      return res.json({ success: false, message: 'Helytelen kod. Probald ujra.' });
+      return res.json({ success: false, message: 'Cod incorect. Încearcă din nou.' });
     }
 
     // Backup kodok generalasa (8 db)
@@ -302,23 +302,23 @@ router.post('/api/2fa/setup-verify', async (req, res) => {
     });
   } catch (err) {
     console.error('2fa setup-verify hiba:', err);
-    return res.json({ success: false, message: 'Szerver hiba' });
+    return res.json({ success: false, message: 'Eroare de server' });
   }
 });
 
 // ===== 2FA LOGIN VERIFY: bejelentkezeskor a kod ellenorzese =====
 router.post('/api/2fa/verify', async (req, res) => {
   try {
-    if (!speakeasy) return res.json({ success: false, message: '2FA nem elerheto' });
+    if (!speakeasy) return res.json({ success: false, message: '2FA indisponibil' });
     if (!req.session.pendingUser) {
-      return res.json({ success: false, message: 'Nincs folyamatban bejelentkezes' });
+      return res.json({ success: false, message: 'Nu există o autentificare în curs' });
     }
     const token = (req.body.token || '').trim().replace(/\s/g, '');
     const userId = req.session.pendingUser.id;
 
     const r = await pool.query('SELECT totp_secret, totp_backup_codes FROM users WHERE id = $1', [userId]);
     if (!r.rows.length || !r.rows[0].totp_secret) {
-      return res.json({ success: false, message: 'Hiba: nincs 2FA beallitva' });
+      return res.json({ success: false, message: 'Eroare: 2FA nu este configurat' });
     }
     const secret = r.rows[0].totp_secret;
 
@@ -349,7 +349,7 @@ router.post('/api/2fa/verify', async (req, res) => {
     }
 
     if (!verified) {
-      return res.json({ success: false, message: 'Helytelen kod.' });
+      return res.json({ success: false, message: 'Cod incorect.' });
     }
 
     // Sikeres -> vegleges bejelentkezes
@@ -362,7 +362,7 @@ router.post('/api/2fa/verify', async (req, res) => {
     });
   } catch (err) {
     console.error('2fa verify hiba:', err);
-    return res.json({ success: false, message: 'Szerver hiba' });
+    return res.json({ success: false, message: 'Eroare de server' });
   }
 });
 

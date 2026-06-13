@@ -50,13 +50,13 @@ router.post('/api/execute', function (req, res, next) {
     } catch (err) {
       console.error(`execute handler hiba (${functionName}):`, err);
       if (!res.headersSent) {
-        return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+        return res.json({ result: { ok: false, err: 'Eroare de server' } });
       }
       return;
     }
   }
   // Ismeretlen funkcio
-  return res.json({ result: { ok: false, err: 'Ismeretlen funkcio: ' + functionName } });
+  return res.json({ result: { ok: false, err: 'Functie necunoscuta: ' + functionName } });
 });
 
 module.exports = router;

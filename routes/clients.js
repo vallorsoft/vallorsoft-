@@ -17,34 +17,34 @@ router.get('/api/clients', requireLogin, async (req, res) => {
     if (q) { params.push('%' + q + '%'); sql += ` AND (denumire ILIKE $2 OR cui_cif ILIKE $2)`; }
     sql += ` ORDER BY denumire LIMIT 200`;
     res.json({ clients: (await pool.query(sql, params)).rows });
-  } catch (e) { console.error('GET /api/clients hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
+  } catch (e) { console.error('GET /api/clients hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 router.get('/api/clients/anaf', requireLogin, async (req, res) => {
   const cui = (req.query.cui || '').trim();
-  if (!cui) return res.status(400).json({ error: 'cui kötelező.' });
+  if (!cui) return res.status(400).json({ error: 'CUI este obligatoriu.' });
   const validChecksum = svc.validateCui(cui);
   try { res.json({ ...(await svc.anafLookup(cui)), validChecksum }); }
-  catch (e) { res.status(502).json({ error: 'ANAF nem elérhető: ' + e.message, validChecksum }); }
+  catch (e) { res.status(502).json({ error: 'ANAF indisponibil: ' + e.message, validChecksum }); }
 });
 
 router.get('/api/clients/vies', requireLogin, async (req, res) => {
   try { res.json(await svc.viesCheck(req.query.country, req.query.number)); }
-  catch (e) { res.status(502).json({ error: 'VIES nem elérhető: ' + e.message }); }
+  catch (e) { res.status(502).json({ error: 'VIES indisponibil: ' + e.message }); }
 });
 
 router.get('/api/clients/:id', requireLogin, async (req, res) => {
   try {
     const { rows } = await pool.query(`SELECT * FROM clients WHERE id=$1 AND company_id=$2`,
       [req.params.id, req.session.user.company_id]);
-    if (!rows.length) return res.status(404).json({ error: 'Nem található.' });
+    if (!rows.length) return res.status(404).json({ error: 'Nu a fost gasit.' });
     res.json({ client: rows[0] });
-  } catch (e) { console.error('GET /api/clients/:id hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
+  } catch (e) { console.error('GET /api/clients/:id hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 router.post('/api/clients', requireLogin, requireRole('Admin','Manager'), async (req, res) => {
   const b = req.body || {};
-  if (!b.denumire || !b.denumire.trim()) return res.status(400).json({ error: 'A név kötelező.' });
+  if (!b.denumire || !b.denumire.trim()) return res.status(400).json({ error: 'Denumirea este obligatorie.' });
   try {
     const vals = FIELDS.map(f => (b[f] === '' ? null : (b[f] ?? null)));
     const complet = !!(b.cui_cif && b.adresa);
@@ -54,7 +54,7 @@ router.post('/api/clients', requireLogin, requireRole('Admin','Manager'), async 
       `INSERT INTO clients (${cols.join(',')}) VALUES (${ph}) RETURNING *`,
       [...vals, complet, req.session.user.company_id]);
     res.json({ client: rows[0] });
-  } catch (e) { console.error('POST /api/clients hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
+  } catch (e) { console.error('POST /api/clients hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 router.put('/api/clients/:id', requireLogin, requireRole('Admin','Manager'), async (req, res) => {
@@ -67,9 +67,9 @@ router.put('/api/clients/:id', requireLogin, requireRole('Admin','Manager'), asy
       `UPDATE clients SET ${sets}, complet_facturare=$${FIELDS.length + 1}, updated_at=now()
        WHERE id=$${FIELDS.length + 2} AND company_id=$${FIELDS.length + 3} RETURNING *`,
       [...vals, complet, req.params.id, req.session.user.company_id]);
-    if (!rows.length) return res.status(404).json({ error: 'Nem található.' });
+    if (!rows.length) return res.status(404).json({ error: 'Nu a fost gasit.' });
     res.json({ client: rows[0] });
-  } catch (e) { console.error('PUT /api/clients/:id hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
+  } catch (e) { console.error('PUT /api/clients/:id hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 router.delete('/api/clients/:id', requireLogin, requireRole('Admin'), async (req, res) => {
@@ -77,7 +77,7 @@ router.delete('/api/clients/:id', requireLogin, requireRole('Admin'), async (req
     await pool.query(`DELETE FROM clients WHERE id=$1 AND company_id=$2`,
       [req.params.id, req.session.user.company_id]);
     res.json({ ok: true });
-  } catch (e) { console.error('DELETE /api/clients/:id hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
+  } catch (e) { console.error('DELETE /api/clients/:id hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 module.exports = router;

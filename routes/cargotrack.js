@@ -43,7 +43,7 @@ router.get('/api/integrations/cargotrack', requireLogin, async (req, res) => {
 
 router.post('/api/integrations/cargotrack/test', requireLogin, requireRole('Admin'), async (req, res) => {
   const apiKey = (req.body.api_key || '').trim();
-  if (!apiKey) return res.status(400).json({ ok: false, error: 'Hiányzik az API-kulcs.' });
+  if (!apiKey) return res.status(400).json({ ok: false, error: 'Lipsește cheia API.' });
   try { res.json({ ok: true, objectCount: (await svc.testConnection(apiKey)).objectCount }); }
   catch (e) { res.status(e.status === 401 ? 401 : 502).json({ ok: false, error: e.message }); }
 });
@@ -51,7 +51,7 @@ router.post('/api/integrations/cargotrack/test', requireLogin, requireRole('Admi
 router.post('/api/integrations/cargotrack', requireLogin, requireRole('Admin'), async (req, res) => {
   const apiKey = (req.body.api_key || '').trim();
   const enabled = req.body.enabled !== false;
-  if (!apiKey) return res.status(400).json({ ok: false, error: 'Hiányzik az API-kulcs.' });
+  if (!apiKey) return res.status(400).json({ ok: false, error: 'Lipsește cheia API.' });
   try {
     const test = await svc.testConnection(apiKey);
     await pool.query(
@@ -77,7 +77,7 @@ router.post('/api/integrations/cargotrack/etransport', requireLogin, requireRole
     const { rows } = await pool.query(
       `SELECT meta FROM company_integrations WHERE company_id=$1 AND provider=$2`,
       [req.session.user.company_id, PROVIDER]);
-    if (!rows.length) return res.status(409).json({ error: 'Előbb mentsd el a CargoTrack API-kulcsot.' });
+    if (!rows.length) return res.status(409).json({ error: 'Salvează mai întâi cheia API CargoTrack.' });
     const meta = Object.assign({}, rows[0].meta || {}, { etransport });
     await pool.query(
       `UPDATE company_integrations SET meta=$1, updated_at=now() WHERE company_id=$2 AND provider=$3`,
@@ -98,7 +98,7 @@ router.delete('/api/integrations/cargotrack', requireLogin, requireRole('Admin')
 router.get('/api/integrations/cargotrack/objects', requireLogin, async (req, res) => {
   try {
     const k = await getKey(req.session.user.company_id);
-    if (!k) return res.status(409).json({ error: 'Nincs beállított CargoTrack kulcs.' });
+    if (!k) return res.status(409).json({ error: 'Nu există o cheie CargoTrack configurată.' });
     res.json({ objects: await svc.listObjects(k.apiKey) });
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
@@ -117,7 +117,7 @@ router.post('/api/integrations/cargotrack/map', requireLogin, requireRole('Admin
   const rendszam = (req.body.rendszam || '').trim();
   const object_id = (req.body.object_id || '').trim();
   const object_name = (req.body.object_name || '').trim() || null;
-  if (!rendszam || !object_id) return res.status(400).json({ error: 'rendszam és object_id kötelező.' });
+  if (!rendszam || !object_id) return res.status(400).json({ error: 'Numărul de înmatriculare și object_id sunt obligatorii.' });
   try {
     await pool.query(
       `INSERT INTO vehicle_gps_map (company_id, provider, rendszam, object_id, object_name, updated_at)
@@ -130,7 +130,7 @@ router.post('/api/integrations/cargotrack/map', requireLogin, requireRole('Admin
 
 router.delete('/api/integrations/cargotrack/map', requireLogin, requireRole('Admin'), async (req, res) => {
   const rendszam = (req.query.rendszam || '').trim();
-  if (!rendszam) return res.status(400).json({ error: 'rendszam kötelező.' });
+  if (!rendszam) return res.status(400).json({ error: 'Numarul de inmatriculare este obligatoriu.' });
   try {
     await pool.query(`DELETE FROM vehicle_gps_map WHERE company_id=$1 AND provider=$2 AND rendszam=$3`,
       [req.session.user.company_id, PROVIDER, rendszam]);
@@ -144,14 +144,14 @@ router.get('/api/cargotrack/position', requireLogin, async (req, res) => {
   const rendszam = (req.query.rendszam || '').trim();
   try {
     const k = await getKey(req.session.user.company_id);
-    if (!k || !k.enabled) return res.status(409).json({ error: 'A CargoTrack nincs bekapcsolva.' });
+    if (!k || !k.enabled) return res.status(409).json({ error: 'CargoTrack nu este activat.' });
     if (!objectId && rendszam) {
       objectId = await objectIdForRendszam(req.session.user.company_id, rendszam);
-      if (!objectId) return res.status(404).json({ error: 'Ez a rendszám nincs összepárosítva GPS-szel.', code: 'NOT_MAPPED' });
+      if (!objectId) return res.status(404).json({ error: 'Acest numar de inmatriculare nu este asociat cu GPS.', code: 'NOT_MAPPED' });
     }
-    if (!objectId) return res.status(400).json({ error: 'rendszam vagy object_id kötelező.' });
+    if (!objectId) return res.status(400).json({ error: 'Numarul de inmatriculare sau object_id este obligatoriu.' });
     const status = await svc.getLatestStatus(k.apiKey, objectId);
-    if (!status) return res.json({ position: null, message: 'Nincs friss pozícióadat.' });
+    if (!status) return res.json({ position: null, message: 'Nu exista date de pozitie recente.' });
     res.json({ position: status });
   } catch (e) { res.status(502).json({ error: e.message }); }
 });

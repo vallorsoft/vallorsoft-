@@ -19,11 +19,11 @@ handlers.getEmailLang = async function (req, res, args) {
 };
 handlers.setEmailLang = async function (req, res, args) {
   try {
-    if (!req.session.user || req.session.user.pozicio !== 'Admin') return res.json({ result: { ok: false, err: 'Csak admin állíthatja.' } });
+    if (!req.session.user || req.session.user.pozicio !== 'Admin') return res.json({ result: { ok: false, err: 'Doar adminul poate seta.' } });
     const lang = (args && args[0] === 'hu') ? 'hu' : 'ro';
     await pool.query('UPDATE companies SET email_lang = $1 WHERE id = $2', [lang, req.session.user.company_id]);
     return res.json({ result: { ok: true } });
-  } catch (e) { console.error('setEmailLang hiba:', e); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (e) { console.error('setEmailLang hiba:', e); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 handlers.userListAll = async function (req, res, args) {
@@ -67,14 +67,14 @@ handlers.userUpdate = async function (req, res, args) {
     try {
       // Admin es Manager hivhatja, de a Manager korlatozott (lejjebb)
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
 
       const targetEmail = String(args[0] || '').trim().toLowerCase();
       const fields = args[1] || {};
 
       if (!targetEmail) {
-        return res.json({ result: { ok: false, err: 'Email kotelezo.' } });
+        return res.json({ result: { ok: false, err: 'E-mail obligatoriu.' } });
       }
 
       // Lekerjuk a cel-felhasznalot a DB-bol
@@ -83,7 +83,7 @@ handlers.userUpdate = async function (req, res, args) {
         [targetEmail]
       );
       if (targetRes.rows.length === 0) {
-        return res.json({ result: { ok: false, err: 'Felhasznalo nem talalhato.' } });
+        return res.json({ result: { ok: false, err: 'Utilizatorul nu a fost gasit.' } });
       }
       const targetUser = targetRes.rows[0];
       const isSelf = targetEmail === req.session.user.email.toLowerCase();
@@ -91,18 +91,18 @@ handlers.userUpdate = async function (req, res, args) {
 
       // 🔒 Ceg-szures: csak sajat ceg useret modosithatja
       if (targetUser.company_id !== req.session.user.company_id) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag.' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis.' } });
       }
 
       // 🔒 Manager nem modosithatja Admin vagy mas Manager adatait
       if (callerRole === 'Manager' && !isSelf && targetUser.pozicio !== 'Sofer') {
-        return res.json({ result: { ok: false, err: 'Manager csak Sofer adatait modosithatja.' } });
+        return res.json({ result: { ok: false, err: 'Managerul poate modifica doar datele Soferilor.' } });
       }
 
       // 🔒 Admin nem modosithatja mas Admin jelszavat vagy emailjet
       if (callerRole === 'Admin' && !isSelf && targetUser.pozicio === 'Admin') {
         if (fields.jelszo) {
-          return res.json({ result: { ok: false, err: 'Admin mas Admin jelszavat nem valtoztathatja.' } });
+          return res.json({ result: { ok: false, err: 'Un Admin nu poate schimba parola altui Admin.' } });
         }
       }
 
@@ -121,12 +121,12 @@ handlers.userUpdate = async function (req, res, args) {
       }
       if (fields.pozicio !== undefined) {
         if (!['Admin', 'Manager', 'Sofer'].includes(fields.pozicio)) {
-          return res.json({ result: { ok: false, err: 'Ervenytelen pozicio.' } });
+          return res.json({ result: { ok: false, err: 'Functie invalida.' } });
         }
 
         // 🔒 1. SZABALY: Admin ne tudja a SAJAT poziciojat megvaltoztatni (lefokozas tiltva)
         if (isSelf && fields.pozicio !== targetUser.pozicio) {
-          return res.json({ result: { ok: false, err: 'Sajat poziciodat nem modosithatod.' } });
+          return res.json({ result: { ok: false, err: 'Nu iti poti modifica propria functie.' } });
         }
 
         // 🔒 3. SZABALY: Manager / Sofer pozicio szerkezeti vedelme
@@ -137,7 +137,7 @@ handlers.userUpdate = async function (req, res, args) {
             [req.session.user.company_id]
           );
           if (adminCount.rows[0].db <= 1) {
-            return res.json({ result: { ok: false, err: 'Nem maradhat a rendszer Admin nelkul.' } });
+            return res.json({ result: { ok: false, err: 'Sistemul nu poate ramane fara Admin.' } });
           }
         }
 
@@ -151,7 +151,7 @@ handlers.userUpdate = async function (req, res, args) {
       }
 
       if (updates.length === 0) {
-        return res.json({ result: { ok: false, err: 'Nincs mit modositani.' } });
+        return res.json({ result: { ok: false, err: 'Nimic de modificat.' } });
       }
 
       // Az iras maga is cegre szurve fut — egy kesobbi refaktor ne nyithasson cross-tenant rest
@@ -161,30 +161,30 @@ handlers.userUpdate = async function (req, res, args) {
       const r = await pool.query(sql, values);
 
       if (r.rowCount === 0) {
-        return res.json({ result: { ok: false, err: 'Felhasznalo nem talalhato.' } });
+        return res.json({ result: { ok: false, err: 'Utilizatorul nu a fost gasit.' } });
       }
 
       return res.json({ result: { ok: true } });
 
     } catch (err) {
       console.error('userUpdate hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
 handlers.userDelete = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
       const targetEmail = String(args[0] || '').trim().toLowerCase();
       if (!targetEmail) {
-        return res.json({ result: { ok: false, err: 'Email kotelezo.' } });
+        return res.json({ result: { ok: false, err: 'E-mail obligatoriu.' } });
       }
 
       // 🔒 2. SZABALY: ne torolhesse sajat magat
       if (targetEmail === req.session.user.email.toLowerCase()) {
-        return res.json({ result: { ok: false, err: 'Sajat magadat nem torolheted.' } });
+        return res.json({ result: { ok: false, err: 'Nu te poti sterge pe tine insuti.' } });
       }
 
       // 🔒 Lekerjuk a cel-felhasznalo poziciojat es ceg-id-jet
@@ -193,17 +193,17 @@ handlers.userDelete = async function (req, res, args) {
         [targetEmail]
       );
       if (targetRes.rows.length === 0) {
-        return res.json({ result: { ok: false, err: 'Felhasznalo nem talalhato.' } });
+        return res.json({ result: { ok: false, err: 'Utilizatorul nu a fost gasit.' } });
       }
 
       // 🔒 Csak sajat ceg useret torolheti
       if (targetRes.rows[0].company_id !== req.session.user.company_id) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag.' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis.' } });
       }
 
       // 🔒 Manager csak Sofer felhasznalot torolhet
       if (req.session.user.pozicio === 'Manager' && targetRes.rows[0].pozicio !== 'Sofer') {
-        return res.json({ result: { ok: false, err: 'Manager csak Sofer felhasznalot torolhet.' } });
+        return res.json({ result: { ok: false, err: 'Managerul poate sterge doar utilizatori Sofer.' } });
       }
 
       // 🔒 KIEGESZITES: utolso Admin torlese sem engedett
@@ -213,48 +213,48 @@ handlers.userDelete = async function (req, res, args) {
           [req.session.user.company_id]
         );
         if (adminCount.rows[0].db <= 1) {
-          return res.json({ result: { ok: false, err: 'Az utolso Admin nem torolheto.' } });
+          return res.json({ result: { ok: false, err: 'Ultimul Admin nu poate fi sters.' } });
         }
       }
 
       const r = await pool.query('DELETE FROM users WHERE email = $1 AND company_id = $2', [targetEmail, req.session.user.company_id]);
       if (r.rowCount === 0) {
-        return res.json({ result: { ok: false, err: 'Felhasznalo nem talalhato.' } });
+        return res.json({ result: { ok: false, err: 'Utilizatorul nu a fost gasit.' } });
       }
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('userDelete hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
 handlers.settingsChangePassword = async function (req, res, args) {
     try {
-      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve.' } });
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat.' } });
       const { current, newPwd } = args[0] || {};
-      if (!current || !newPwd) return res.json({ result: { ok: false, err: 'Minden mező kötelező.' } });
-      if (newPwd.length < 6) return res.json({ result: { ok: false, err: 'Az új jelszó legalább 6 karakter legyen.' } });
+      if (!current || !newPwd) return res.json({ result: { ok: false, err: 'Toate campurile sunt obligatorii.' } });
+      if (newPwd.length < 6) return res.json({ result: { ok: false, err: 'Parola noua trebuie sa aiba cel putin 6 caractere.' } });
 
       const r = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.session.user.id]);
-      if (!r.rows.length) return res.json({ result: { ok: false, err: 'Felhasználó nem található.' } });
+      if (!r.rows.length) return res.json({ result: { ok: false, err: 'Utilizatorul nu a fost gasit.' } });
 
       const ok = await bcrypt.compare(current, r.rows[0].password_hash);
-      if (!ok) return res.json({ result: { ok: false, err: 'A jelenlegi jelszó helytelen.' } });
+      if (!ok) return res.json({ result: { ok: false, err: 'Parola actuala este incorecta.' } });
 
       const hash = await bcrypt.hash(newPwd, 10);
       await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.session.user.id]);
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('settingsChangePassword hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba.' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server.' } });
     }
   };
 
 handlers.settingsSaveProfile = async function (req, res, args) {
     try {
-      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve.' } });
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat.' } });
       const { nume, tel } = args[0] || {};
-      if (!nume || !String(nume).trim()) return res.json({ result: { ok: false, err: 'A név kötelező.' } });
+      if (!nume || !String(nume).trim()) return res.json({ result: { ok: false, err: 'Numele este obligatoriu.' } });
 
       const newNume = String(nume).trim();
       const newTel  = String(tel || '').trim();
@@ -266,27 +266,27 @@ handlers.settingsSaveProfile = async function (req, res, args) {
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('settingsSaveProfile hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba.' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server.' } });
     }
   };
 
 handlers.settings2faDisable = async function (req, res, args) {
     try {
-      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve.' } });
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat.' } });
       const { currentPwd } = args[0] || {};
-      if (!currentPwd) return res.json({ result: { ok: false, err: 'A jelszó megadása kötelező a 2FA kikapcsolásához.' } });
+      if (!currentPwd) return res.json({ result: { ok: false, err: 'Parola este obligatorie pentru dezactivarea 2FA.' } });
 
       const r = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.session.user.id]);
-      if (!r.rows.length) return res.json({ result: { ok: false, err: 'Felhasználó nem található.' } });
+      if (!r.rows.length) return res.json({ result: { ok: false, err: 'Utilizatorul nu a fost gasit.' } });
 
       const ok = await bcrypt.compare(currentPwd, r.rows[0].password_hash);
-      if (!ok) return res.json({ result: { ok: false, err: 'Helytelen jelszó.' } });
+      if (!ok) return res.json({ result: { ok: false, err: 'Parola incorecta.' } });
 
       await pool.query('UPDATE users SET totp_enabled = FALSE, totp_secret = NULL, totp_backup_codes = NULL WHERE id = $1', [req.session.user.id]);
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('settings2faDisable hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba.' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server.' } });
     }
   };
 

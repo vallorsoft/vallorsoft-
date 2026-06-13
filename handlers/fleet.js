@@ -48,7 +48,7 @@ handlers.vehicleList = async function (req, res, args) {
 handlers.vehicleCreate = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
 
       const v = args[0] || {};
@@ -60,10 +60,10 @@ handlers.vehicleCreate = async function (req, res, args) {
       const nota = v.nota ? String(v.nota).trim() : null;
 
       if (!rendszam) {
-        return res.json({ result: { ok: false, err: 'A rendszam kotelezo.' } });
+        return res.json({ result: { ok: false, err: 'Numarul de inmatriculare este obligatoriu.' } });
       }
       if (!['Vontato', 'Potkocsi'].includes(tip)) {
-        return res.json({ result: { ok: false, err: 'Ervenytelen tipus.' } });
+        return res.json({ result: { ok: false, err: 'Tip invalid.' } });
       }
 
       // Rakodási felület (pótkocsi) — NEM a teljes járműméret, az a routingé.
@@ -83,23 +83,23 @@ handlers.vehicleCreate = async function (req, res, args) {
       return res.json({ result: { ok: true } });
     } catch (err) {
       if (err.code === '23505') {
-        return res.json({ result: { ok: false, err: 'Ez a rendszam mar letezik.' } });
+        return res.json({ result: { ok: false, err: 'Acest numar de inmatriculare exista deja.' } });
       }
       console.error('vehicleCreate hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
 handlers.vehicleUpdate = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
 
       const id = parseInt(args[0], 10);
       const f = args[1] || {};
       if (!id) {
-        return res.json({ result: { ok: false, err: 'ID kotelezo.' } });
+        return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
       }
 
       const updates = [];
@@ -112,7 +112,7 @@ handlers.vehicleUpdate = async function (req, res, args) {
       }
       if (f.tip !== undefined) {
         if (!['Vontato', 'Potkocsi'].includes(f.tip)) {
-          return res.json({ result: { ok: false, err: 'Ervenytelen tipus.' } });
+          return res.json({ result: { ok: false, err: 'Tip invalid.' } });
         }
         updates.push(`tip = $${i++}`);
         values.push(f.tip);
@@ -158,7 +158,7 @@ handlers.vehicleUpdate = async function (req, res, args) {
       if (f.cargo_height_cm !== undefined)    { updates.push(`cargo_height_cm = $${i++}`);    values.push(_intOrNull(f.cargo_height_cm)); }
 
       if (updates.length === 0) {
-        return res.json({ result: { ok: false, err: 'Nincs mit modositani.' } });
+        return res.json({ result: { ok: false, err: 'Nu exista nimic de modificat.' } });
       }
 
       updates.push(`updated_at = NOW()`);
@@ -169,35 +169,35 @@ handlers.vehicleUpdate = async function (req, res, args) {
       const r = await pool.query(sql, values);
 
       if (r.rowCount === 0) {
-        return res.json({ result: { ok: false, err: 'Nem talalhato.' } });
+        return res.json({ result: { ok: false, err: 'Nu a fost gasit.' } });
       }
       return res.json({ result: { ok: true } });
     } catch (err) {
       if (err.code === '23505') {
-        return res.json({ result: { ok: false, err: 'Ez a rendszam mar letezik.' } });
+        return res.json({ result: { ok: false, err: 'Acest numar de inmatriculare exista deja.' } });
       }
       console.error('vehicleUpdate hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
 handlers.vehicleDelete = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
       const id = parseInt(args[0], 10);
       if (!id) {
-        return res.json({ result: { ok: false, err: 'ID kotelezo.' } });
+        return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
       }
       const r = await pool.query('DELETE FROM vehicles WHERE id = $1 AND company_id = $2', [id, req.session.user.company_id]);
       if (r.rowCount === 0) {
-        return res.json({ result: { ok: false, err: 'Nem talalhato.' } });
+        return res.json({ result: { ok: false, err: 'Nu a fost gasit.' } });
       }
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('vehicleDelete hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
@@ -221,7 +221,7 @@ handlers.extDriverList = async function (req, res, args) {
 handlers.extDriverCreate = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
 
       const d = args[0] || {};
@@ -235,7 +235,7 @@ handlers.extDriverCreate = async function (req, res, args) {
 
       // legalabb egy mezo kotelezo (nume vagy firma)
       if (!nume && !firma) {
-        return res.json({ result: { ok: false, err: 'A nev vagy a ceg neve kotelezo.' } });
+        return res.json({ result: { ok: false, err: 'Numele sau denumirea firmei este obligatoriu.' } });
       }
 
       const r = await pool.query(
@@ -246,20 +246,20 @@ handlers.extDriverCreate = async function (req, res, args) {
       return res.json({ result: { ok: true, id: r.rows[0].id } });
     } catch (err) {
       console.error('extDriverCreate hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
 handlers.extDriverUpdate = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
 
       const id = parseInt(args[0], 10);
       const f = args[1] || {};
       if (!id) {
-        return res.json({ result: { ok: false, err: 'ID kotelezo.' } });
+        return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
       }
 
       const updates = [];
@@ -296,7 +296,7 @@ handlers.extDriverUpdate = async function (req, res, args) {
       }
 
       if (updates.length === 0) {
-        return res.json({ result: { ok: false, err: 'Nincs mit modositani.' } });
+        return res.json({ result: { ok: false, err: 'Nu exista nimic de modificat.' } });
       }
 
       updates.push(`updated_at = NOW()`);
@@ -306,32 +306,32 @@ handlers.extDriverUpdate = async function (req, res, args) {
       const r = await pool.query(sql, values);
 
       if (r.rowCount === 0) {
-        return res.json({ result: { ok: false, err: 'Nem talalhato.' } });
+        return res.json({ result: { ok: false, err: 'Nu a fost gasit.' } });
       }
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('extDriverUpdate hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
 handlers.extDriverDelete = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
       const id = parseInt(args[0], 10);
       if (!id) {
-        return res.json({ result: { ok: false, err: 'ID kotelezo.' } });
+        return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
       }
       const r = await pool.query('DELETE FROM external_drivers WHERE id = $1 AND company_id = $2', [id, req.session.user.company_id]);
       if (r.rowCount === 0) {
-        return res.json({ result: { ok: false, err: 'Nem talalhato.' } });
+        return res.json({ result: { ok: false, err: 'Nu a fost gasit.' } });
       }
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('extDriverDelete hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
@@ -341,7 +341,7 @@ handlers.extDriverDelete = async function (req, res, args) {
 handlers.getDriverVehicleAssignments = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const dr = await pool.query(
@@ -362,7 +362,7 @@ handlers.getDriverVehicleAssignments = async function (req, res, args) {
     return res.json({ result: { ok: true, drivers: dr.rows, vehicles: vr.rows, trailers: tr.rows } });
   } catch (err) {
     console.error('getDriverVehicleAssignments hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -372,7 +372,7 @@ handlers.getDriverVehicleAssignments = async function (req, res, args) {
 handlers.assignDriverVehicle = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const email = String(args[0] || '').trim().toLowerCase();
@@ -381,7 +381,7 @@ handlers.assignDriverVehicle = async function (req, res, args) {
     const ur = await pool.query(
       `SELECT 1 FROM users WHERE company_id = $1 AND LOWER(email) = $2 AND pozicio = 'Sofer'`,
       [cid, email]);
-    if (!ur.rows.length) return res.json({ result: { ok: false, err: 'A sofőr nem található.' } });
+    if (!ur.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
 
     // a sofőr korábbi járművének felszabadítása
     await pool.query(
@@ -393,12 +393,12 @@ handlers.assignDriverVehicle = async function (req, res, args) {
         `UPDATE vehicles SET assigned_driver_email = $3
          WHERE id = $1 AND company_id = $2 AND tip = 'Vontato'`,
         [vehicleId, cid, email]);
-      if (!r.rowCount) return res.json({ result: { ok: false, err: 'A jármű nem található.' } });
+      if (!r.rowCount) return res.json({ result: { ok: false, err: 'Vehiculul nu a fost gasit.' } });
     }
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('assignDriverVehicle hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -409,29 +409,29 @@ handlers.assignDriverVehicle = async function (req, res, args) {
 handlers.assignDefaultTrailer = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const vehicleId = parseInt(args[0], 10);
     const trailerId = args[1] ? parseInt(args[1], 10) : null;
-    if (!vehicleId) return res.json({ result: { ok: false, err: 'Jármű ID kötelező.' } });
+    if (!vehicleId) return res.json({ result: { ok: false, err: 'ID-ul vehiculului este obligatoriu.' } });
 
     // a pótkocsi a saját cégé és tényleg pótkocsi legyen
     if (trailerId) {
       const tr = await pool.query(
         `SELECT 1 FROM vehicles WHERE id = $1 AND company_id = $2 AND tip = 'Potkocsi'`,
         [trailerId, cid]);
-      if (!tr.rows.length) return res.json({ result: { ok: false, err: 'A pótkocsi nem található.' } });
+      if (!tr.rows.length) return res.json({ result: { ok: false, err: 'Remorca nu a fost gasita.' } });
     }
     const r = await pool.query(
       `UPDATE vehicles SET default_trailer_id = $3, updated_at = NOW()
        WHERE id = $1 AND company_id = $2 AND tip = 'Vontato'`,
       [vehicleId, cid, trailerId]);
-    if (!r.rowCount) return res.json({ result: { ok: false, err: 'A vontató nem található.' } });
+    if (!r.rowCount) return res.json({ result: { ok: false, err: 'Capul tractor nu a fost gasit.' } });
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('assignDefaultTrailer hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 

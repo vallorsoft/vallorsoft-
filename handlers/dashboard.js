@@ -12,7 +12,7 @@ const handlers = {};
 handlers.dashStats = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
       const cid = req.session.user.company_id;
 
@@ -59,7 +59,7 @@ handlers.dashStats = async function (req, res, args) {
       }});
     } catch (err) {
       console.error('dashStats hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
@@ -81,7 +81,7 @@ function _argObj(args) {
 handlers.getRecentOrders = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const a = _argObj(args);
@@ -104,14 +104,14 @@ handlers.getRecentOrders = async function (req, res, args) {
     return res.json({ result: { ok: true, orders: rows } });
   } catch (err) {
     console.error('getRecentOrders hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 handlers.getVehicleStatusSummary = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     // A vehicles táblának `activ` BOOLEAN oszlopa van (nincs szöveges status).
@@ -127,7 +127,7 @@ handlers.getVehicleStatusSummary = async function (req, res, args) {
     return res.json({ result: { ok: true, active: r.active, inactive: r.inactive, unknown: r.unknown } });
   } catch (err) {
     console.error('getVehicleStatusSummary hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -137,20 +137,20 @@ handlers.getVehicleStatusSummary = async function (req, res, args) {
 handlers.getActiveVehiclePositions = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const payload = await getPositions(req.session.user.company_id);
     return res.json({ result: payload });
   } catch (err) {
     console.error('getActiveVehiclePositions hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 // A saját cég funkció-kapcsolói (a sidebar elrejtéséhez). Hiányzó kulcs = engedélyezett.
 handlers.getMyFeatures = async function (req, res, args) {
   try {
-    if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve' } });
+    if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
     const cid = req.session.user.company_id;
     if (!cid) return res.json({ result: { ok: true, features: {} } });
     const r = await pool.query('SELECT feature_key, enabled FROM company_features WHERE company_id = $1', [cid]);

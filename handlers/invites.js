@@ -12,7 +12,7 @@ const handlers = {};
 handlers.invListAll = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
       const r = await pool.query(
         `SELECT kod, pozicio, nume, email, tel, status FROM invites WHERE company_id = $1 ORDER BY id DESC`,
@@ -35,14 +35,14 @@ handlers.invCreate = async function (req, res, args) {
     try {
       // Admin barmit, Manager csak Sofer meghivot
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
 
       const pozicio = String(args[0] || '').trim();
 
       // 🔒 Manager csak Sofer meghivot kuldhet
       if (req.session.user.pozicio === 'Manager' && pozicio !== 'Sofer') {
-        return res.json({ result: { ok: false, err: 'Manager csak Sofer meghivot generalhat.' } });
+        return res.json({ result: { ok: false, err: 'Managerul poate genera doar invitatii de Sofer.' } });
       }
     
       const email = String(args[1] || '').trim().toLowerCase();
@@ -50,7 +50,7 @@ handlers.invCreate = async function (req, res, args) {
       const invTel  = String(args[3] || '').trim() || null;
 
       if (!['Admin', 'Manager', 'Sofer', 'Konyvelo'].includes(pozicio)) {
-        return res.json({ result: { ok: false, err: 'Ervenytelen pozicio.' } });
+        return res.json({ result: { ok: false, err: 'Functie invalida.' } });
       }
 
       // veletlen kod generalas - hasonloan a regi _genCode-hoz
@@ -79,14 +79,14 @@ handlers.invCreate = async function (req, res, args) {
 
     } catch (err) {
       console.error('invCreate hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
 handlers.invRevoke = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
       const kod = String(args[0] || '').trim().toUpperCase();
 
@@ -94,10 +94,10 @@ handlers.invRevoke = async function (req, res, args) {
       if (req.session.user.pozicio === 'Manager') {
         const check = await pool.query('SELECT pozicio FROM invites WHERE kod = $1 AND company_id = $2', [kod, req.session.user.company_id]);
         if (check.rows.length === 0) {
-          return res.json({ result: { ok: false, err: 'Nem talalhato.' } });
+          return res.json({ result: { ok: false, err: 'Nu a fost gasit.' } });
         }
         if (check.rows[0].pozicio !== 'Sofer') {
-          return res.json({ result: { ok: false, err: 'Manager csak Sofer meghivot vonhat vissza.' } });
+          return res.json({ result: { ok: false, err: 'Managerul poate retrage doar invitatii de Sofer.' } });
         }
       }
 
@@ -106,12 +106,12 @@ handlers.invRevoke = async function (req, res, args) {
         [kod, req.session.user.company_id]
       );
       if (r.rowCount === 0) {
-        return res.json({ result: { ok: false, err: 'Nem talalhato.' } });
+        return res.json({ result: { ok: false, err: 'Nu a fost gasit.' } });
       }
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('invRevoke hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 

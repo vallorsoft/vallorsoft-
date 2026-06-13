@@ -36,7 +36,7 @@ router.get('/api/orders/:id/uit', requireLogin, async (req, res) => {
          FROM order_uit_codes WHERE company_id=$1 AND order_id=$2 ORDER BY created_at`,
       [own(req), req.params.id]);
     res.json({ items: rows });
-  } catch (e) { console.error('GET /api/orders/:id/uit hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
+  } catch (e) { console.error('GET /api/orders/:id/uit hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 // ---- ÖSSZESÍTŐ a fuvarlista gombjaihoz (1 kérés több fuvarra) ----
@@ -54,13 +54,13 @@ router.get('/api/uit/summary', requireLogin, async (req, res) => {
       s.total += r.n; if (s[r.status] != null) s[r.status] += r.n;
     });
     res.json({ summary });
-  } catch (e) { console.error('GET /api/uit/summary hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
+  } catch (e) { console.error('GET /api/uit/summary hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 // ---- HOZZÁADÁS ----
 router.post('/api/orders/:id/uit', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   const uit = (req.body.uit_code || '').trim();
-  if (!uit) return res.status(400).json({ error: 'A UIT-kód kötelező.' });
+  if (!uit) return res.status(400).json({ error: 'Codul UIT este obligatoriu.' });
   try {
     // rendszám: a kérésből, vagy a fuvar vontatójából
     let rendszam = (req.body.rendszam || '').trim();
@@ -78,18 +78,18 @@ router.post('/api/orders/:id/uit', requireLogin, requireRole('Admin', 'Manager')
        ON CONFLICT (company_id, order_id, uit_code) DO NOTHING
        RETURNING id, uit_code, rendszam, object_id, status, valid_until, last_message, sent_at, stopped_at, created_at`,
       [own(req), req.params.id, uit, rendszam || null, objectId, provider, validUntil, req.session.user.id]);
-    if (!rows.length) return res.status(409).json({ error: 'Ez a UIT már rögzítve van ennél a fuvarnál.' });
+    if (!rows.length) return res.status(409).json({ error: 'Acest UIT este deja inregistrat la aceasta cursa.' });
     res.json({ item: rows[0] });
-  } catch (e) { console.error('POST /api/orders/:id/uit hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
+  } catch (e) { console.error('POST /api/orders/:id/uit hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 // ---- TÖRLÉS ----
 router.delete('/api/uit/:uid', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   try {
     const r = await pool.query(`DELETE FROM order_uit_codes WHERE id=$1 AND company_id=$2`, [req.params.uid, own(req)]);
-    if (!r.rowCount) return res.status(404).json({ error: 'Nem található.' });
+    if (!r.rowCount) return res.status(404).json({ error: 'Nu a fost gasit.' });
     res.json({ ok: true });
-  } catch (e) { console.error('DELETE /api/uit/:uid hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
+  } catch (e) { console.error('DELETE /api/uit/:uid hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 async function loadUit(req) {
@@ -101,9 +101,9 @@ async function loadUit(req) {
 router.post('/api/uit/:uid/start', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   try {
     const u = await loadUit(req);
-    if (!u) return res.status(404).json({ error: 'Nem található.' });
+    if (!u) return res.status(404).json({ error: 'Nu a fost gasit.' });
     const cfg = await getGpsCfg(own(req));
-    if (!cfg) return res.status(409).json({ error: 'Nincs bekapcsolt GPS-integráció (Integrációk fül).' });
+    if (!cfg) return res.status(409).json({ error: 'Nu exista integrare GPS activa (fila Integrari).' });
     let result, status = 'active', msg;
     try {
       const adapter = gps.getAdapter(u.provider || cfg.provider);
@@ -114,16 +114,16 @@ router.post('/api/uit/:uid/start', requireLogin, requireRole('Admin', 'Manager')
       `UPDATE order_uit_codes SET status=$1, last_message=$2, sent_at=COALESCE(sent_at, now()), updated_at=now()
          WHERE id=$3 AND company_id=$4 RETURNING *`, [status, msg, u.id, own(req)]);
     res.json({ item: rows[0], mode: result ? result.mode : 'error' });
-  } catch (e) { console.error('POST /api/uit/:uid/start hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
+  } catch (e) { console.error('POST /api/uit/:uid/start hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 // ---- KÜLDÉS LEÁLLÍTÁSA ----
 router.post('/api/uit/:uid/stop', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   try {
     const u = await loadUit(req);
-    if (!u) return res.status(404).json({ error: 'Nem található.' });
+    if (!u) return res.status(404).json({ error: 'Nu a fost gasit.' });
     const cfg = await getGpsCfg(own(req));
-    if (!cfg) return res.status(409).json({ error: 'Nincs bekapcsolt GPS-integráció (Integrációk fül).' });
+    if (!cfg) return res.status(409).json({ error: 'Nu exista integrare GPS activa (fila Integrari).' });
     let result, status = 'stopped', msg;
     try {
       const adapter = gps.getAdapter(u.provider || cfg.provider);
@@ -134,7 +134,7 @@ router.post('/api/uit/:uid/stop', requireLogin, requireRole('Admin', 'Manager'),
       `UPDATE order_uit_codes SET status=$1, last_message=$2, stopped_at=now(), updated_at=now()
          WHERE id=$3 AND company_id=$4 RETURNING *`, [status, msg, u.id, own(req)]);
     res.json({ item: rows[0], mode: result ? result.mode : 'error' });
-  } catch (e) { console.error('POST /api/uit/:uid/stop hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
+  } catch (e) { console.error('POST /api/uit/:uid/stop hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 // ============================================================
@@ -152,24 +152,24 @@ async function soferOwnsOrder(req) {
 // LISTA — a sofőr a saját fuvarja UIT-jait látja (állapot + ANAF-visszaigazolás).
 router.get('/api/sofer/orders/:id/uit', requireLogin, requireRole('Sofer'), async (req, res) => {
   try {
-    if (!(await soferOwnsOrder(req))) return res.status(403).json({ error: 'Nincs jogosultság ehhez a fuvarhoz.' });
+    if (!(await soferOwnsOrder(req))) return res.status(403).json({ error: 'Nu aveti permisiune pentru aceasta cursa.' });
     const { rows } = await pool.query(
       `SELECT id, uit_code, status, anaf_confirmed, anaf_confirmed_at, last_message, sent_at, created_at
          FROM order_uit_codes WHERE company_id=$1 AND order_id=$2 ORDER BY created_at`,
       [own(req), req.params.id]);
     res.json({ items: rows, canAdd: rows.length === 0 });
-  } catch (e) { console.error('GET /api/sofer/orders/:id/uit hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
+  } catch (e) { console.error('GET /api/sofer/orders/:id/uit hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 // HOZZÁADÁS — a sofőr CSAK akkor adhat UIT-ot, ha még EGY SINCS a fuvarnál.
 router.post('/api/sofer/orders/:id/uit', requireLogin, requireRole('Sofer'), async (req, res) => {
   const uit = (req.body.uit_code || '').trim();
-  if (!uit) return res.status(400).json({ error: 'A UIT-kód kötelező.' });
+  if (!uit) return res.status(400).json({ error: 'Codul UIT este obligatoriu.' });
   try {
     const order = await soferOwnsOrder(req);
-    if (!order) return res.status(403).json({ error: 'Nincs jogosultság ehhez a fuvarhoz.' });
+    if (!order) return res.status(403).json({ error: 'Nu aveti permisiune pentru aceasta cursa.' });
     const cnt = await pool.query(`SELECT COUNT(*)::int AS n FROM order_uit_codes WHERE company_id=$1 AND order_id=$2`, [own(req), req.params.id]);
-    if (cnt.rows[0].n > 0) return res.status(409).json({ error: 'Ehhez a fuvarhoz már van UIT-kód — sofőrként újat nem adhatsz hozzá.' });
+    if (cnt.rows[0].n > 0) return res.status(409).json({ error: 'Aceasta cursa are deja cod UIT — ca sofer nu puteti adauga unul nou.' });
     const rendszam = order.rendszam_camion || '';
     const gpsCfg = await getGpsCfg(own(req));
     const objectId = await objectIdForRendszam(own(req), gpsCfg ? gpsCfg.provider : null, rendszam);
@@ -180,9 +180,9 @@ router.post('/api/sofer/orders/:id/uit', requireLogin, requireRole('Sofer'), asy
        ON CONFLICT (company_id, order_id, uit_code) DO NOTHING
        RETURNING id, uit_code, status, anaf_confirmed, anaf_confirmed_at, last_message, sent_at, created_at`,
       [own(req), req.params.id, uit, rendszam || null, objectId, provider, req.session.user.id]);
-    if (!rows.length) return res.status(409).json({ error: 'Ez a UIT már rögzítve van.' });
+    if (!rows.length) return res.status(409).json({ error: 'Acest UIT este deja inregistrat.' });
     res.json({ item: rows[0] });
-  } catch (e) { console.error('POST /api/sofer/orders/:id/uit hiba:', e); res.status(500).json({ error: 'Szerver hiba' }); }
+  } catch (e) { console.error('POST /api/sofer/orders/:id/uit hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 module.exports = router;

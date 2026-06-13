@@ -22,7 +22,7 @@ router.post('/api/push-subscribe', requireLogin, async (req, res) => {
   try {
     const subscription = req.body.subscription;
     if (!subscription || !subscription.endpoint) {
-      return res.json({ ok: false, err: 'Ervenytelen subscription' });
+      return res.json({ ok: false, err: 'Subscription invalid' });
     }
     const email     = req.session.user.email;
     const companyId = req.session.user.company_id;
@@ -59,7 +59,7 @@ router.post('/api/push-subscribe', requireLogin, async (req, res) => {
       return res.json({ ok: true });
     } catch(err2) {
       console.error('push-subscribe hiba:', err2);
-      return res.json({ ok: false, err: 'Szerver hiba' });
+      return res.json({ ok: false, err: 'Eroare de server' });
     }
   }
 });
@@ -88,7 +88,7 @@ router.post('/api/chat-notify', requireLogin, async (req, res) => {
     
     // Csak sajat ceg felhasznaloinak kuldjuk
     if (companyId && companyId !== req.session.user.company_id) {
-      return res.json({ ok: false, err: 'Nincs jogosultsag' });
+      return res.json({ ok: false, err: 'Nu aveti permisiune' });
     }
     const cid = req.session.user.company_id;
     
