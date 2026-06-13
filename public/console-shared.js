@@ -1049,12 +1049,16 @@ function renderTollBreak(tg){
 }
 function estimateOrderToll(){
   if(!_oeOrderId){ toast(t('cs.saveOrderFirst'),'err'); return; }
+  var precise = !!((document.getElementById('oeTollPrecise')||{}).checked);
   toast(t('cs.tollEstimating'),'ok');
-  gas('estimateToll',[_oeOrderId]).then(function(r){
+  gas('estimateToll',[_oeOrderId, {precise:precise}]).then(function(r){
     if(r&&r.ok){
       var el=document.getElementById('oeToll'); if(el) el.value=(r.toll&&r.toll.total!=null?r.toll.total:'');
       renderTollBreak(r.toll);
-      toast(t('cs.tollEstimated')+(r.toll?r.toll.total:0)+t('cs.tollModifiable'),'ok');
+      var src = (r.source==='here') ? t('cs.toll.srcHere') : t('cs.toll.srcEstimate');
+      // ha pontosat kértek, de becslés jött (nincs HERE-kulcs), jelezzük
+      var note = (precise && r.source!=='here') ? ' '+t('cs.toll.preciseUnavail') : '';
+      toast(t('cs.tollEstimated')+(r.toll?r.toll.total:0)+' · '+src+note,'ok');
     } else toast((r&&r.err)||t('cs.toll.estError'),'err');
   });
 }
