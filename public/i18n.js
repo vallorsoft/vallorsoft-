@@ -445,6 +445,10 @@
     'cs.mp.keyInvalid': { hu: '❌ A kulcs nem érvényes / nem válaszolt.', ro: '❌ Cheia nu e validă / nu a răspuns.' },
     'cs.mp.testError': { hu: 'Teszt hiba', ro: 'Eroare test' },
     'cs.mp.freeOn': { hu: '🆓 Ingyenes térkép bekapcsolva', ro: '🆓 Hartă gratuită activată' },
+    'cs.uit.title': { hu: 'UIT deep-link (CargoTrack)', ro: 'UIT deep-link (CargoTrack)' },
+    'cs.uit.hint': { hu: 'A UIT-kódot a GPS-szolgáltató (pl. CargoTrack) e-Transport felületén generálod. Add meg a deep-link URL-sablont — a fuvar 🚛 UIT gombja a fuvar adataival előtöltve nyitja meg.', ro: 'Codul UIT se generează în interfața e-Transport a furnizorului GPS (ex. CargoTrack). Introdu șablonul URL deep-link — butonul 🚛 UIT al cursei îl deschide precompletat cu datele cursei.' },
+    'cs.uit.save': { hu: '💾 Mentés', ro: '💾 Salvează' },
+    'cs.uit.placeholders': { hu: 'Helyőrzők: {id} {rendszam} {remorca} {incarcare} {descarcare} {client} {km} {greutate} — URL-kódolva helyettesítődnek.', ro: 'Substituenți: {id} {rendszam} {remorca} {incarcare} {descarcare} {client} {km} {greutate} — se înlocuiesc URL-encodate.' },
     'cs.mp.savedProvider': { hu: '🗺️ Térkép-szolgáltató mentve', ro: '🗺️ Furnizor hartă salvat' },
     // Meghívók + menetlevelek
     'cs.noInvites': { hu: 'Nincs meghívókód.', ro: 'Niciun cod de invitație.' },

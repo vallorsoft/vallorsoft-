@@ -62,9 +62,9 @@ window.SoferUit = (function () {
     ov.innerHTML =
       '<div class="su-box" style="text-align:center;">' +
         '<div style="font-size:34px;margin:6px 0;">🚧</div>' +
-        '<h3 style="margin:0 0 8px;">UIT — hamarosan</h3>' +
-        '<p class="su-sub" style="margin-bottom:16px;">A UIT / RO e-Transport funkció fejlesztés alatt áll. ' +
-          'Addig is használd a GPS-szolgáltatód (pl. CargoTrack) saját e-Transport lehetőségét.</p>' +
+        '<h3 style="margin:0 0 8px;">UIT / RO e-Transport</h3>' +
+        '<p class="su-sub" style="margin-bottom:16px;">A UIT-kódot a GPS-szolgáltató (CargoTrack) e-Transport felületén generálod. ' +
+          'A gyors átléptetéshez a diszpécser állítsa be a deep-link sablont.</p>' +
         '<button class="su-save" id="suCsOk" style="width:100%;">Rendben</button>' +
       '</div>';
     document.body.appendChild(ov);
@@ -74,7 +74,16 @@ window.SoferUit = (function () {
   }
 
   function open(orderId) {
-    if (window.UIT_COMING_SOON) { comingSoon(); return; }
+    // UIT ANAF-integráció HELYETT: cégenkénti deep-link (CargoTrack stb.)
+    api('POST', '/api/execute', { functionName: 'getUitDeeplink', arguments: [orderId] })
+      .then(function (d) {
+        var r = d && d.result;
+        if (r && r.ok && r.url) { window.open(r.url, '_blank', 'noopener'); return; }
+        comingSoon();
+      })
+      .catch(function () { comingSoon(); });
+    return;
+    /* eslint-disable no-unreachable */
     ensureStyle();
     var ov = document.createElement('div'); ov.className = 'su-ov';
     ov.innerHTML =

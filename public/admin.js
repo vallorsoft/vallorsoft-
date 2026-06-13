@@ -48,6 +48,7 @@ function loadTab(name){
   if(name==='warehouse') loadWarehouseTab();
   if(name==='integrations'){
     if(typeof loadMapsProvider==='function') loadMapsProvider();
+    if(typeof loadUitDeeplink==='function') loadUitDeeplink();
     if(window.EmailIntakeCard)  EmailIntakeCard.mount('emailIntakeCardBox', {readOnly:false});
     if(window.InvoicingCard)    InvoicingCard.mount('invCardBox');
     if(window.CargoTrackCard)   CargoTrackCard.mount('ctCardBox');

@@ -57,9 +57,9 @@ window.UitPanel = (function () {
     ov.innerHTML =
       '<div class="uit-box" style="max-width:420px;text-align:center;">' +
         '<div style="font-size:34px;margin-bottom:6px;">🚧</div>' +
-        '<h3 style="margin:0 0 8px;">UIT / RO e-Transport — hamarosan</h3>' +
-        '<p style="color:#9fb0c3;font-size:14px;margin:0 0 16px;">Ez a funkció fejlesztés alatt áll. ' +
-          'Addig is kérjük, használd a GPS-szolgáltatód (pl. CargoTrack) saját e-Transport lehetőségét a UIT-kódok küldéséhez.</p>' +
+        '<h3 style="margin:0 0 8px;">UIT / RO e-Transport</h3>' +
+        '<p style="color:#9fb0c3;font-size:14px;margin:0 0 16px;">A UIT-kódot a GPS-szolgáltatód (pl. CargoTrack) e-Transport felületén generálod. ' +
+          'A gyors „átléptetéshez" az <b>Admin</b> állítsa be a CargoTrack deep-link sablont az <b>Integrációk</b> fülön.</p>' +
         '<div class="uit-foot" style="justify-content:center;"><button class="uit-close" id="csOk">Rendben</button></div>' +
       '</div>';
     document.body.appendChild(ov);
@@ -69,7 +69,17 @@ window.UitPanel = (function () {
   }
 
   function open(orderId, rendszam) {
-    if (window.UIT_COMING_SOON) { comingSoon(); return; }
+    // UIT ANAF-integráció HELYETT: cégenkénti deep-link (CargoTrack stb.) —
+    // a fuvar adataival előtöltve „átléptetjük" a UIT-generálóba.
+    api('POST', '/api/execute', { functionName: 'getUitDeeplink', arguments: [orderId] })
+      .then(function (d) {
+        var r = d && d.result;
+        if (r && r.ok && r.url) { window.open(r.url, '_blank', 'noopener'); return; }
+        comingSoon();
+      })
+      .catch(function () { comingSoon(); });
+    return;
+    /* eslint-disable no-unreachable */
     ensureStyle();
     const ov = document.createElement('div'); ov.className = 'uit-ov';
     ov.innerHTML =

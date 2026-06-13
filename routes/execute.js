@@ -30,6 +30,7 @@ const handlers = Object.assign(
   require('../handlers/accounting'),
   require('../handlers/mapsProvider'),
   require('../handlers/audit'),
+  require('../handlers/uitDeeplink'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a
