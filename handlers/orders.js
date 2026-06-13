@@ -178,6 +178,9 @@ handlers.comList = async function (req, res, args) {
                   (o.route_geo->>'km')::int AS route_km, o.payment_status, o.paid_amount,
                   o.handover_status, o.handover_type, o.handover_loc, o.handover_at,
                   (SELECT COUNT(*)::int FROM documents d WHERE d.order_id = o.id) AS pod_count,
+                  o.needs_uit,
+                  (SELECT COUNT(*)::int FROM order_uit_codes u
+                     WHERE u.order_id = o.id AND u.company_id = o.company_id AND u.status <> 'stopped') AS uit_active_count,
                   COALESCE(legs.leg_count, 0) AS leg_count,
                   COALESCE(legs.legs_json, '[]'::json) AS legs_json
            FROM orders o ${legsSubquery}
@@ -552,6 +555,11 @@ handlers.comUpdate = async function (req, res, args) {
       if (o.toll_cost !== undefined) { updates.push(`toll_cost = $${i++}`); values.push((o.toll_cost === '' || o.toll_cost === null) ? null : Number(o.toll_cost)); }
       if (o.carrier_id !== undefined) { updates.push(`carrier_id = $${i++}`); values.push(o.carrier_id ? parseInt(o.carrier_id, 10) : null); }
       if (o.carrier_cost !== undefined) { updates.push(`carrier_cost = $${i++}`); values.push((o.carrier_cost === '' || o.carrier_cost === null) ? null : Number(o.carrier_cost)); }
+      // RO e-Transport mezők (NC/HS-kód, áru-érték + pénznem, UIT-szükségesség) — opcionálisak
+      if (o.nc_code !== undefined) { updates.push(`nc_code = $${i++}`); values.push(o.nc_code ? String(o.nc_code).trim().slice(0, 20) : null); }
+      if (o.marfa_value !== undefined) { updates.push(`marfa_value = $${i++}`); values.push((o.marfa_value === '' || o.marfa_value === null) ? null : Number(o.marfa_value)); }
+      if (o.marfa_currency !== undefined) { updates.push(`marfa_currency = $${i++}`); values.push(['RON', 'EUR'].includes(o.marfa_currency) ? o.marfa_currency : 'RON'); }
+      if (o.needs_uit !== undefined) { updates.push(`needs_uit = $${i++}`); values.push(!!o.needs_uit); }
 
       if (updates.length === 0) {
         return res.json({ result: { ok: false, err: 'Nimic de modificat.' } });

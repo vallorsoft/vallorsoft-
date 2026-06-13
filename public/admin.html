@@ -936,6 +936,19 @@
           <input class="input" id="oeMag" type="number" min="0" placeholder="Mag." data-i18n-ph="form.phHei">
         </div>
       </div>
+      <div class="field" style="grid-column:1/-1;border-top:1px solid var(--glass-border-dark);padding-top:10px;margin-top:2px;">
+        <label style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span>📑 <span data-i18n="edit.etransport">RO e-Transport</span></span>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:400;color:var(--text-muted);" title="Necesită cod UIT (transport internațional ori marfă cu risc fiscal) / UIT szükséges">
+            <input type="checkbox" id="oeNeedsUit" style="width:15px;height:15px;cursor:pointer;accent-color:#e10b1a;"> <span data-i18n="edit.needsUit">UIT szükséges</span>
+          </label>
+        </label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input class="input" id="oeNcCode" type="text" maxlength="20" placeholder="Cod NC/HS" data-i18n-ph="edit.ncCodePh" style="max-width:150px;">
+          <input class="input" id="oeMarfaValue" type="number" min="0" step="0.01" placeholder="Valoare marfă" data-i18n-ph="edit.marfaValuePh" style="max-width:150px;">
+          <select class="select" id="oeMarfaCurrency" style="max-width:90px;"><option value="RON">RON</option><option value="EUR">EUR</option></select>
+        </div>
+      </div>
     </div>
 
     <div class="field"><label><span data-i18n="edit.toll">🛣️ Útdíj (EUR)</span> <span style="color:var(--muted);font-weight:400;font-size:11px;" data-i18n="edit.tollHint">— becsült, kézzel módosítható</span></label>
