@@ -6,6 +6,7 @@
 // ============================================================
 const pool = require('../db');
 const bcrypt = require('bcrypt');
+const planLimits = require('../lib/planLimits');
 
 const handlers = {};
 
@@ -64,6 +65,12 @@ handlers.authRegister = async function (req, res, args) {
       const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
       if (existing.rows.length > 0) {
         return res.json({ result: { ok: false, err: 'Acest e-mail este deja inregistrat.' } });
+      }
+
+      // Csomag-limit: felhasználó-darabszám (NULL = korlátlan)
+      const _lim = await planLimits.checkLimit(invite.company_id, 'users');
+      if (!_lim.ok) {
+        return res.json({ result: { ok: false, err: 'Limita de utilizatori a pachetului a fost atinsă (' + _lim.used + '/' + _lim.limit + ').' } });
       }
 
       const passwordHash = await bcrypt.hash(jelszo, 10);

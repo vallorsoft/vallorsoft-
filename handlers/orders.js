@@ -8,6 +8,7 @@ const pool = require('../db');
 const { genDocId } = require('../lib/ids');
 const { getPositions } = require('../lib/vehiclePositions');
 const audit = require('../lib/audit');
+const planLimits = require('../lib/planLimits');
 
 const handlers = {};
 
@@ -278,6 +279,12 @@ handlers.comCreate = async function (req, res, args) {
       const hossz_cm = ld.hossz_cm, szel_cm = ld.szel_cm, mag_cm = ld.mag_cm;
       const route_geo = sanitizeRouteGeo(o.route_geo);
       const company_id = req.session.user.company_id;
+
+      // Csomag-limit: havi fuvar-darabszám (NULL = korlátlan)
+      const _lim = await planLimits.checkLimit(company_id, 'orders_month');
+      if (!_lim.ok) {
+        return res.json({ result: { ok: false, err: 'Limita de comenzi/lună a pachetului a fost atinsă (' + _lim.used + '/' + _lim.limit + ').' } });
+      }
 
       // Auto-párosítás: csak jármű VAGY csak belső sofőr esetén a pár kitöltése
       const pair = await autoPairDriverVehicle(company_id, {

@@ -5,6 +5,7 @@
 //  Hívás: handlers.<funkcioNev>(req, res, args)
 // ============================================================
 const pool = require('../db');
+const planLimits = require('../lib/planLimits');
 
 const handlers = {};
 
@@ -64,6 +65,12 @@ handlers.vehicleCreate = async function (req, res, args) {
       }
       if (!['Vontato', 'Potkocsi'].includes(tip)) {
         return res.json({ result: { ok: false, err: 'Tip invalid.' } });
+      }
+
+      // Csomag-limit: jármű-darabszám (NULL = korlátlan)
+      const _lim = await planLimits.checkLimit(req.session.user.company_id, 'vehicles');
+      if (!_lim.ok) {
+        return res.json({ result: { ok: false, err: 'Limita de vehicule a pachetului a fost atinsă (' + _lim.used + '/' + _lim.limit + ').' } });
       }
 
       // Rakodási felület (pótkocsi) — NEM a teljes járműméret, az a routingé.
