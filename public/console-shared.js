@@ -1330,6 +1330,29 @@ function mpSave(){
   });
 }
 
+// ── UIT deep-link (CargoTrack stb.) sablon — admin Integrációk ──
+function loadUitDeeplink(){
+  var box=document.getElementById('uitDeeplinkBox'); if(!box) return;
+  gas('getUitDeeplinkConfig').then(function(r){
+    var tpl=(r&&r.ok&&r.template)?r.template:'';
+    box.innerHTML='<div class="glass-soft" style="padding:16px;">'
+      +'<div class="text-primary" style="font-weight:700;margin-bottom:6px;">🚚 '+t('cs.uit.title')+'</div>'
+      +'<div class="text-muted" style="font-size:12px;margin-bottom:10px;">'+t('cs.uit.hint')+'</div>'
+      +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+      +'<input class="input" id="uitTplInput" style="flex:1;min-width:260px;" placeholder="https://cargotrack.ro/uit?plate={rendszam}&from={incarcare}&to={descarcare}" value="'+esc(tpl)+'">'
+      +'<button class="btn primary" style="padding:8px 14px;" onclick="saveUitDeeplink()">'+t('cs.uit.save')+'</button>'
+      +'</div>'
+      +'<div class="text-muted" style="font-size:11px;margin-top:8px;">'+t('cs.uit.placeholders')+'</div>'
+      +'</div>';
+  });
+}
+function saveUitDeeplink(){
+  var el=document.getElementById('uitTplInput'); if(!el) return;
+  gas('setUitDeeplinkConfig',[{template:el.value}]).then(function(r){
+    if(r&&r.ok) toast(t('common.savedOk'),'ok'); else toast((r&&r.err)||t('common.error'),'err');
+  });
+}
+
 function loadInvites(){
   gas('invListAll').then(list=>{
     if(!Array.isArray(list)){document.querySelector('#tblInv tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);">'+t('cs.noInvites')+'</td></tr>';return;}
