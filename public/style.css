@@ -116,6 +116,10 @@ table.resizable th, table.resizable td { overflow-wrap: anywhere; }
 }
 .col-resizer:hover::after, .col-resizer.active::after { background: var(--brand-red); }
 .main-content[data-theme="light"] .col-resizer::after { background: rgba(0,0,0,0.18); }
+/* Oszlop-átrendezés (húzható fejléc) vizuális visszajelzése */
+table.resizable th[draggable="true"] { cursor: grab; }
+table.resizable th.col-dragging { opacity: .45; }
+table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red); }
 
 .toast-wrap { position: fixed; top: 18px; right: 18px; display: flex; flex-direction: column; gap: 10px; z-index: 1000; }
 .toast { padding: 12px 14px; border-radius: 12px; background: #1a2330; border: 1px solid var(--border-bright); color: var(--text); box-shadow: var(--shadow-lg); min-width: 240px; }

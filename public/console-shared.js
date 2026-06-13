@@ -1363,51 +1363,109 @@ function loadOrders(){
     if(!Array.isArray(list))list=[];
     _ordersAllCache = list;
     renderFilteredOrders(list);
-    // A fejléc statikus (a tbody cserélődik), így elég egyszer felfűzni a
-    // húzható oszlop-méretezőt — a szélességek a renderek közt megmaradnak.
-    requestAnimationFrame(function(){ makeTableResizable(document.getElementById('tblOrders'), 'vs-cols-orders'); });
+    // A fejléc statikus (a tbody cserélődik); a méretező/átrendező egyszer
+    // fűződik fel, az oszlop-SORREND viszont minden render után újra
+    // alkalmazódik a friss sorokra.
+    requestAnimationFrame(function(){ enhanceOrdersTable(); });
   });
   if(typeof loadPendingHandovers==='function')loadPendingHandovers();
 }
 
 // ───────────────────────────────────────────────────────────────
-//  Kézzel méretezhető táblázat-oszlopok (mint egy weboldalon)
-//  A fejléc-cellák jobb szélén húzható fogantyú; a szélességek
-//  localStorage-ban őrződnek (kulcsonként). table-layout:fixed →
-//  az oszlop szélessége a fejléctől jön, így a kiszabott fuvarok
-//  többsoros celláinak helye is arányosan nő/csökken.
+//  Méretezhető + átrendezhető táblázat-oszlopok (mint egy weboldalon)
+//  - Méretezés: a fejléc jobb szélén húzható fogantyú.
+//  - Átrendezés: a fejléc-cellát megfogva (HTML5 drag) más helyre húzható.
+//  Mindkettő localStorage-ban őrződik. A tárolt formátum kulcsonként:
+//    { widths: { <kanonikusOszlopIndex>: px }, order: [ <kanonikusIndex>, … ] }
+//  Minden th megkapja a kanonikus data-ci indexét; a body sorok mindig
+//  kanonikus sorrendben renderelődnek, ezért render után átrendezzük őket.
+//  table-layout:fixed → a kiszabott fuvarok többsoros cellái is arányosan
+//  kapnak helyet. Az utolsó (checkbox) oszlop fixen a végén marad.
 // ───────────────────────────────────────────────────────────────
-var _colDrag = null;
-function makeTableResizable(table, key){
-  if(!table || table._resizableInit) return;
+var _colDrag = null, _colDragSrc = null;
+function enhanceOrdersTable(){
+  var table = document.getElementById('tblOrders');
+  if(!table) return;
+  if(!table._colEnhanced){ _initColEnhance(table, 'vs-cols-orders'); table._colEnhanced = true; }
+  _applyColOrder(table, 'vs-cols-orders');
+}
+function _colState(key){
+  var s = {};
+  try { s = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch(e){ s = {}; }
+  if(!s.widths){                    // régi lapos formátum migrációja ({idx:px})
+    var flat = {}, hasFlat = false;
+    Object.keys(s).forEach(function(k){ if(/^\d+$/.test(k)){ flat[k] = s[k]; hasFlat = true; } });
+    s = { widths: hasFlat ? flat : {}, order: s.order || null };
+  }
+  if(!s.widths) s.widths = {};
+  return s;
+}
+function _saveColState(key, st){
+  try { localStorage.setItem(key, JSON.stringify({ widths: st.widths || {}, order: st.order || null })); } catch(e){}
+}
+function _initColEnhance(table, key){
   var head = table.tHead && table.tHead.rows[0];
   if(!head || !head.cells.length) return;
-  var cells = head.cells;
-  var saved = {};
-  try { saved = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch(e){}
+  var ths = head.cells, n = ths.length;
+  var st = _colState(key);
+  table._colKey = key;
   table.classList.add('resizable');
-  table.style.width = 'auto';                 // nőhet a konténeren túl → vízszintes görgetés
-  for(var i=0;i<cells.length;i++){
-    var th = cells[i];
-    var w = (saved[i]!=null) ? saved[i] : th.offsetWidth;   // jelenlegi szélesség rögzítése
-    if(w>0) th.style.width = w+'px';
+  table.style.width = 'auto';                  // nőhet a konténeren túl → vízszintes görgetés
+  for(var i=0;i<n;i++){
+    var th = ths[i];
+    th.dataset.ci = i;                          // kanonikus oszlop-index (a pristine HTML sorrend)
     th.style.minWidth = '40px';
-    if(i < cells.length-1){                   // az utolsó (checkbox) oszlopra nem teszünk fogantyút
+    var w = (st.widths[i] != null) ? st.widths[i] : (th.offsetWidth || 0);
+    if(w>0) th.style.width = w + 'px';
+    if(i < n-1){                                // az utolsó (checkbox) oszlop fix
       var grip = document.createElement('div');
       grip.className = 'col-resizer';
-      grip._ti = i; grip._table = table; grip._key = key;
+      grip.title = t('cs.colResizeHint');
       grip.addEventListener('mousedown', _colResizeStart);
       grip.addEventListener('touchstart', _colResizeStart, {passive:false});
-      grip.title = t('cs.colResizeHint');
       th.appendChild(grip);
+      th.setAttribute('draggable', 'true');     // átrendezés
+      th.title = t('cs.colMoveHint');
+      th.addEventListener('dragstart', _colDragStart);
+      th.addEventListener('dragover', _colDragOver);
+      th.addEventListener('dragleave', _colDragLeave);
+      th.addEventListener('drop', _colDrop);
+      th.addEventListener('dragend', _colDragEnd);
     }
   }
-  table._resizableInit = true;
+  if(st.order && st.order.length === n) _reorderThead(table, st.order);
 }
+function _reorderThead(table, order){
+  var head = table.tHead && table.tHead.rows[0];
+  if(!head) return;
+  var map = {};
+  [].forEach.call(head.cells, function(th){ map[th.dataset.ci] = th; });
+  order.forEach(function(ci){ if(map[ci]) head.appendChild(map[ci]); });
+}
+// A mentett oszlop-sorrend alkalmazása a fejlécre ÉS a (kanonikusan renderelt) body-sorokra
+function _applyColOrder(table, key){
+  var st = _colState(key);
+  var head = table.tHead && table.tHead.rows[0];
+  if(!head) return;
+  if(!st.order || !st.order.length) return;
+  if(st.order.length !== head.cells.length){    // oszlopszám változott → elavult sorrend eldobása
+    st.order = null; _saveColState(key, st); return;
+  }
+  _reorderThead(table, st.order);
+  var body = table.tBodies[0];
+  if(!body) return;
+  [].forEach.call(body.rows, function(row){
+    if(row.cells.length !== st.order.length) return;   // üres-állapot (colspan) sor → kihagyás
+    var cells = [].slice.call(row.cells);
+    st.order.forEach(function(ci){ row.appendChild(cells[+ci]); });
+  });
+}
+// ── Méretezés ──
 function _colResizeStart(e){
-  var grip = e.currentTarget;
+  var grip = e.currentTarget, th = grip.parentNode;
+  th.setAttribute('draggable', 'false');        // resize közben ne induljon oszlop-húzás
   var x = e.touches ? e.touches[0].clientX : e.clientX;
-  _colDrag = { grip:grip, th:grip.parentNode, startX:x, startW:grip.parentNode.offsetWidth };
+  _colDrag = { grip:grip, th:th, startX:x, startW:th.offsetWidth };
   grip.classList.add('active');
   document.body.style.cursor = 'col-resize';
   document.addEventListener('mousemove', _colResizeMove);
@@ -1420,38 +1478,80 @@ function _colResizeMove(e){
   if(!_colDrag) return;
   var x = e.touches ? e.touches[0].clientX : e.clientX;
   var w = Math.max(48, _colDrag.startW + (x - _colDrag.startX));
-  _colDrag.th.style.width = w+'px';
+  _colDrag.th.style.width = w + 'px';
   if(e.cancelable) e.preventDefault();
 }
 function _colResizeEnd(){
   if(!_colDrag) return;
-  var grip = _colDrag.grip;
-  grip.classList.remove('active');
+  var th = _colDrag.th, table = th.closest('table');
+  _colDrag.grip.classList.remove('active');
   document.body.style.cursor = '';
-  try {
-    var saved = JSON.parse(localStorage.getItem(grip._key) || '{}') || {};
-    saved[grip._ti] = Math.round(_colDrag.th.offsetWidth);
-    localStorage.setItem(grip._key, JSON.stringify(saved));
-  } catch(e){}
+  th.setAttribute('draggable', 'true');
+  if(table){
+    var key = table._colKey, st = _colState(key);
+    st.widths[th.dataset.ci] = Math.round(th.offsetWidth);
+    _saveColState(key, st);
+  }
   _colDrag = null;
   document.removeEventListener('mousemove', _colResizeMove);
   document.removeEventListener('mouseup', _colResizeEnd);
   document.removeEventListener('touchmove', _colResizeMove);
   document.removeEventListener('touchend', _colResizeEnd);
 }
-// Oszlopszélességek visszaállítása alaphelyzetbe (a fuvarlista fejlécében lévő gomb)
+// ── Átrendezés (HTML5 drag-and-drop a fejlécen) ──
+function _colDragStart(e){
+  _colDragSrc = e.currentTarget;
+  e.currentTarget.classList.add('col-dragging');
+  try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', e.currentTarget.dataset.ci); } catch(_){}
+}
+function _colDragOver(e){
+  if(!_colDragSrc || e.currentTarget === _colDragSrc) return;
+  e.preventDefault();
+  try { e.dataTransfer.dropEffect = 'move'; } catch(_){}
+  e.currentTarget.classList.add('col-drop-target');
+}
+function _colDragLeave(e){ e.currentTarget.classList.remove('col-drop-target'); }
+function _colDrop(e){
+  e.preventDefault();
+  var target = e.currentTarget;
+  target.classList.remove('col-drop-target');
+  if(!_colDragSrc || target === _colDragSrc) return;
+  var table = target.closest('table');
+  if(!table) return;
+  var key = table._colKey;
+  var head = table.tHead.rows[0];
+  var order = [].map.call(head.cells, function(th){ return th.dataset.ci; });  // jelenlegi látható sorrend
+  var srcCi = _colDragSrc.dataset.ci, tgtCi = target.dataset.ci;
+  order = order.filter(function(c){ return c !== srcCi; });
+  order.splice(order.indexOf(tgtCi), 0, srcCi);          // a forrást a cél elé szúrjuk
+  var st = _colState(key); st.order = order; _saveColState(key, st);
+  _applyColOrder(table, key);
+}
+function _colDragEnd(e){
+  e.currentTarget.classList.remove('col-dragging');
+  var table = e.currentTarget.closest('table');
+  if(table) [].forEach.call(table.querySelectorAll('.col-drop-target'), function(x){ x.classList.remove('col-drop-target'); });
+  _colDragSrc = null;
+}
+// Oszlopok visszaállítása alaphelyzetbe (szélesség + sorrend) — a lista fejléc-gombja
 function resetOrderColumns(){
-  var t = document.getElementById('tblOrders');
-  if(!t) return;
+  var table = document.getElementById('tblOrders');
+  if(!table) return;
   try { localStorage.removeItem('vs-cols-orders'); } catch(e){}
-  var cells = t.tHead && t.tHead.rows[0] ? t.tHead.rows[0].cells : [];
-  for(var i=0;i<cells.length;i++) cells[i].style.width = '';
-  t.classList.remove('resizable');
-  t.style.width = '';
-  t._resizableInit = false;
-  // a meglévő fogantyúk eltávolítása, majd újra-init a természetes szélességekből
-  [].forEach.call(t.querySelectorAll('.col-resizer'), function(g){ g.remove(); });
-  requestAnimationFrame(function(){ makeTableResizable(t, 'vs-cols-orders'); });
+  var head = table.tHead && table.tHead.rows[0];
+  if(head){
+    var cells = [].slice.call(head.cells);
+    cells.sort(function(a,b){ return (+a.dataset.ci) - (+b.dataset.ci); });   // kanonikus sorrend
+    cells.forEach(function(th){
+      th.style.width = ''; th.removeAttribute('draggable'); th.title = '';
+      var g = th.querySelector('.col-resizer'); if(g) g.remove();
+      head.appendChild(th);
+    });
+  }
+  table.classList.remove('resizable');
+  table.style.width = '';
+  table._colEnhanced = false;
+  loadOrders();   // kanonikus újrarenderelés + friss enhance a természetes szélességekből
 }
 
 function loadReceivedFuvarlevelek(){
@@ -2772,6 +2872,10 @@ function renderFilteredOrders(list) {
   updateOrderSelBar();
   decorateUitIndicators(list);
   decorateInvoiceIndicators(list);
+  // A friss sorokra (szűrés/keresés esetén is) alkalmazzuk a mentett
+  // oszlop-sorrendet — a sorok kanonikus sorrendben renderelődnek.
+  var _ot = document.getElementById('tblOrders');
+  if(_ot && _ot._colEnhanced) _applyColOrder(_ot, 'vs-cols-orders');
 }
 
 function downloadSelectedOrders() {
