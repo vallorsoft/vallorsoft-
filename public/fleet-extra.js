@@ -31,7 +31,7 @@
   function docTypes() {
     return ['fe.doc.itp', 'fe.doc.rca', 'fe.doc.casco', 'fe.doc.rovinieta',
       'fe.doc.cmrIns', 'fe.doc.tahoCalib', 'fe.doc.tahoCard', 'fe.doc.tahoDl',
-      'fe.doc.adr', 'fe.doc.community', 'fe.doc.license', 'fe.doc.atestat', 'fe.doc.medical', 'fe.doc.other'
+      'fe.doc.adr', 'fe.doc.community', 'fe.doc.copieConforma', 'fe.doc.license', 'fe.doc.atestat', 'fe.doc.medical', 'fe.doc.other'
     ].map(function (k) { return t(k); });
   }
 

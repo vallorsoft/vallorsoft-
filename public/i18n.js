@@ -902,6 +902,7 @@
     'fe.doc.tahoDl': { hu: 'Tahográf-letöltés (28 nap)', ro: 'Descărcare tahograf (28 zile)' },
     'fe.doc.adr': { hu: 'ADR-engedély', ro: 'Autorizație ADR' },
     'fe.doc.community': { hu: 'Közösségi engedély', ro: 'Licență comunitară' },
+    'fe.doc.copieConforma': { hu: 'Közösségi eng. másolat (copie conformă)', ro: 'Copie conformă' },
     'fe.doc.license': { hu: 'Jogosítvány', ro: 'Permis de conducere' },
     'fe.doc.atestat': { hu: 'Atestat (szakmai)', ro: 'Atestat (profesional)' },
     'fe.doc.medical': { hu: 'Orvosi/pszichológiai', ro: 'Medical/psihologic' },
