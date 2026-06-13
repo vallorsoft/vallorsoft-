@@ -2,6 +2,7 @@
 <html lang="hu"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VallorSoft — Könyvelői felület</title>
+<script src="/i18n.js?v=20260614"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{--bg:#05070b;--panel:#141c25;--tx:#e9eef5;--mut:#8a97a8;--red:#e10b1a;--ok:#22c55e;--warn:#f59e0b;--info:#3b82f6;--bd:rgba(255,255,255,.08);--r:16px;--rs:8px}
@@ -27,53 +28,53 @@
 </style></head><body>
 <div class="wrap">
   <div class="glass top">
-    <div class="logo" style="font-size:20px"><b>Vallor</b><span>Soft</span> <span class="mut" style="font-size:13px;font-weight:500">· Könyvelői felület</span></div>
+    <div class="logo" style="font-size:20px"><b>Vallor</b><span>Soft</span> <span class="mut" style="font-size:13px;font-weight:500" data-i18n="kon.topSub">· Könyvelői felület</span></div>
     <div style="margin-left:auto;text-align:right"><div id="kName" style="font-weight:700"></div><div id="kCeg" class="mut" style="font-size:12px"></div></div>
     <div class="av" id="kAv">·</div>
-    <button class="btn" onclick="Konyv.logout()" style="padding:7px 12px">Kilépés</button>
+    <button class="btn" onclick="Konyv.logout()" style="padding:7px 12px" data-i18n="common.logout">Kilépés</button>
   </div>
 
   <div class="glass bar">
-    <div><div class="mut" style="font-size:12px;font-weight:600;margin-bottom:5px">Hónap</div><input class="inp" id="fMonth" type="month"></div>
-    <div><div class="mut" style="font-size:12px;font-weight:600;margin-bottom:5px">vagy -tól</div><input class="inp" id="fFrom" type="date"></div>
-    <div><div class="mut" style="font-size:12px;font-weight:600;margin-bottom:5px">-ig</div><input class="inp" id="fTo" type="date"></div>
-    <button class="btn primary" onclick="Konyv.reload()">Frissítés</button>
+    <div><div class="mut" style="font-size:12px;font-weight:600;margin-bottom:5px" data-i18n="kon.month">Hónap</div><input class="inp" id="fMonth" type="month"></div>
+    <div><div class="mut" style="font-size:12px;font-weight:600;margin-bottom:5px" data-i18n="kon.orFrom">vagy -tól</div><input class="inp" id="fFrom" type="date"></div>
+    <div><div class="mut" style="font-size:12px;font-weight:600;margin-bottom:5px" data-i18n="kon.toDate">-ig</div><input class="inp" id="fTo" type="date"></div>
+    <button class="btn primary" onclick="Konyv.reload()" data-i18n="kon.refresh">Frissítés</button>
   </div>
 
   <div class="tabs">
-    <div class="tab active" id="tabDocs" onclick="Konyv.tab('docs')">📄 Dokumentumok</div>
-    <div class="tab" id="tabInv" onclick="Konyv.tab('inv')">🧾 Számla-export (SAGA/WinMentor)</div>
+    <div class="tab active" id="tabDocs" onclick="Konyv.tab('docs')" data-i18n="kon.tabDocs">📄 Dokumentumok</div>
+    <div class="tab" id="tabInv" onclick="Konyv.tab('inv')" data-i18n="kon.tabInv">🧾 Számla-export (SAGA/WinMentor)</div>
   </div>
 
   <div id="viewDocs">
     <div class="glass" style="padding:14px 18px;margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px"><input type="checkbox" class="ck" id="ckAll" onchange="Konyv.toggleAll(this.checked)"> Mind kijelölése</label>
+      <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px"><input type="checkbox" class="ck" id="ckAll" onchange="Konyv.toggleAll(this.checked)"> <span data-i18n="kon.selectAll">Mind kijelölése</span></label>
       <span id="kSel" class="mut" style="font-size:12px"></span>
-      <button class="btn ok" style="margin-left:auto" onclick="Konyv.zipSelected()">⬇️ Kijelöltek letöltése (ZIP)</button>
-      <button class="btn primary" onclick="Konyv.zipMonth()">📦 Teljes időszak letöltése (ZIP)</button>
+      <button class="btn ok" style="margin-left:auto" onclick="Konyv.zipSelected()" data-i18n="kon.zipSelected">⬇️ Kijelöltek letöltése (ZIP)</button>
+      <button class="btn primary" onclick="Konyv.zipMonth()" data-i18n="kon.zipPeriod">📦 Teljes időszak letöltése (ZIP)</button>
     </div>
     <div id="docList"></div>
   </div>
 
   <div id="viewInv" class="hidden">
     <div class="glass" style="padding:20px">
-      <div class="h">🧾 Számla-export könyvelőnek (SAGA / WinMentor)</div>
-      <div class="mut" style="font-size:12.5px;margin-bottom:14px">A választott időszak számláit CSV-ben töltöd le (UTF-8, pontosvessző — Excel/SAGA/WinMentor importálható). A könyvelőnek nem kell kézzel átírnia semmit.</div>
+      <div class="h" data-i18n="kon.invTitle">🧾 Számla-export könyvelőnek (SAGA / WinMentor)</div>
+      <div class="mut" style="font-size:12.5px;margin-bottom:14px" data-i18n="kon.invDesc">A választott időszak számláit CSV-ben töltöd le (UTF-8, pontosvessző — Excel/SAGA/WinMentor importálható). A könyvelőnek nem kell kézzel átírnia semmit.</div>
       <div style="display:flex;gap:12px;flex-wrap:wrap">
         <div class="glass" style="padding:16px;flex:1;min-width:240px">
-          <div style="font-weight:700;margin-bottom:6px">Kimenő számlák (ügyfél)</div>
-          <div class="mut" style="font-size:12px;margin-bottom:10px"><span id="kSales">0</span> számla az időszakban</div>
-          <a class="btn primary" id="dlSales">⬇️ Kimenő számlák CSV</a>
+          <div style="font-weight:700;margin-bottom:6px" data-i18n="kon.salesTitle">Kimenő számlák (ügyfél)</div>
+          <div class="mut" style="font-size:12px;margin-bottom:10px"><span id="kSales">0</span> <span data-i18n="kon.invInPeriod">számla az időszakban</span></div>
+          <a class="btn primary" id="dlSales" data-i18n="kon.salesCsv">⬇️ Kimenő számlák CSV</a>
         </div>
         <div class="glass" style="padding:16px;flex:1;min-width:240px">
-          <div style="font-weight:700;margin-bottom:6px">Bejövő számlák (alvállalkozói)</div>
-          <div class="mut" style="font-size:12px;margin-bottom:10px"><span id="kPur">0</span> számla az időszakban</div>
-          <a class="btn primary" id="dlPur">⬇️ Bejövő számlák CSV</a>
+          <div style="font-weight:700;margin-bottom:6px" data-i18n="kon.purTitle">Bejövő számlák (alvállalkozói)</div>
+          <div class="mut" style="font-size:12px;margin-bottom:10px"><span id="kPur">0</span> <span data-i18n="kon.invInPeriod">számla az időszakban</span></div>
+          <a class="btn primary" id="dlPur" data-i18n="kon.purCsv">⬇️ Bejövő számlák CSV</a>
         </div>
       </div>
     </div>
   </div>
 </div>
 <div id="toast" style="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#141c25;border:1px solid var(--bd);color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:.25s"></div>
-<script src="/konyvelo.js?v=20260612"></script>
+<script src="/konyvelo.js?v=20260614"></script>
 </body></html>
