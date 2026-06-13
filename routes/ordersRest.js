@@ -49,10 +49,10 @@ router.post('/api/orders/:id/driver-status', requireLogin, requireRole('Sofer'),
       [status, req.params.id]
     );
     // Push értesítés a Manager / Admin szerepkörűeknek
-    const label = status === 'In Curs' ? 'elfogadta' : 'teljesítette';
+    const label = status === 'In Curs' ? 'a acceptat / elfogadta' : 'a finalizat / teljesítette';
     const clientName = check.rows[0].client || ('#' + req.params.id);
     await sendPushToRole(driver.company_id, ['Manager', 'Admin'], {
-      title: '🚛 Fuvar státusz frissítve',
+      title: '🚛 Status cursă actualizat / Fuvar státusz frissítve',
       body: (driver.nume || driver.email) + ' ' + label + ': ' + clientName,
       icon: '/icon192.png',
       badge: '/icon192.png',

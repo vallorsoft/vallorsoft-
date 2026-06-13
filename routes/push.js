@@ -92,7 +92,7 @@ router.post('/api/chat-notify', requireLogin, async (req, res) => {
     }
     const cid = req.session.user.company_id;
     
-    const shortText = text ? text.substring(0, 100) : 'Uj uzenet';
+    const shortText = text ? text.substring(0, 100) : 'Mesaj nou / Új üzenet';
     const senderDisplay = fromName || req.session.user.nume || senderEmail;
     
     const payload = {
