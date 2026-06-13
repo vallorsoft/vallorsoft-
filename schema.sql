@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS orders (
   rendszam_camion    VARCHAR(50),
   rendszam_remorca   VARCHAR(50),
   status             VARCHAR(30) NOT NULL DEFAULT 'Disponibil'
-                       CHECK (status IN ('Disponibil','Alocat','Extern','In Curs','Finalizat','Anulat')),
+                       CHECK (status IN ('Disponibil','Alocat','Extern','In Curs','Finalizat','Anulat','Parkolt','Raktarban')),
   company_id         INTEGER REFERENCES companies(id) ON DELETE CASCADE,
   created_at         TIMESTAMP DEFAULT NOW(),
   updated_at         TIMESTAMP DEFAULT NOW()

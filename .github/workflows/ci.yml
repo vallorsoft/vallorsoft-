@@ -1,8 +1,8 @@
 name: CI
 
 # Minden PR-en és a main-be való push után lefuttatja a Jest-tesztcsomagot.
-# Cél: a néma regressziók (pl. egy fordítás elrontotta a teszteket) már a
-# PR-ben kibukjanak, ne élesben.
+# A DATABASE_URL beállításával a valódi-DB integrációs suite is fut (db-orders.test.js);
+# enélkül (helyben) az a suite kihagyódik, a mock-tesztek mennek.
 on:
   push:
     branches: [main]
@@ -14,8 +14,27 @@ concurrency:
 
 jobs:
   test:
-    name: Jest (Node 22)
+    name: Jest (Node 22 + Postgres 16)
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vstest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/vstest
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,5 +43,5 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
-      - name: Run tests
+      - name: Run tests (mock + valódi DB)
         run: npm test

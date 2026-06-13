@@ -7,7 +7,7 @@ Fuvarozási / flottakezelő webalkalmazás (Node.js + Express 5 + PostgreSQL).
 
 ## Fejlesztési állapot (2026-06-13)
 
-Tesztek zöldek (**42 Jest**, 9 suite — `npm install` után fut a 2 supertest-es integrációs suite is). Deploy-teendő: szerver-restart (a `db/*.sql` migrációk automatikusan lefutnak) + böngésző hard refresh.
+Tesztek zöldek (**60 Jest**, 12 suite). **CI: GitHub Actions** (`.github/workflows/ci.yml`) — minden PR-en és main-push után `npm ci && npm test` Node 22 + **Postgres 16 service**-szel; ha van `DATABASE_URL`, a valódi-DB integrációs suite is fut (54 mock + 6 valós-DB), enélkül a 6 valós-DB teszt kihagyódik. Deploy-teendő: szerver-restart (a `db/*.sql` migrációk automatikusan lefutnak) + böngésző hard refresh.
 
 > **Őszinte állapot / mi hiányzik az „egészhez" (2026-06-13):** a *funkciók* nagyrészt megvannak, a hiányok inkább megbízhatóság/üzemeltetés: **(1) CI + valódi tesztlefedettség** (ma a RO-fordítás némán elrontott 5 tesztet — nincs pusholáskori futtatás); **(2) teherautó-pontos routing + valós útdíj** (most OSRM autós profil = becslés); **(3) ANAF teljes bekötés** (e-Factura SPV-feltöltés; a sofőr-UIT `UIT_COMING_SOON`-nal KI); **(4) üzemeltetés**: hibamonitorozás, strukturált log, DB-backup, health-check; **(5) adat-konzisztencia**: `order_legs` vs `orders.email_sofer` igazságforrás rendezése; **(6) SaaS-vízvezeték**: csomag-limit kikényszerítés, önkiszolgáló fizetés, GDPR export/törlés, audit-napló.
 
@@ -206,7 +206,8 @@ Szinte minden lekérdezés `company_id`-re szűr. Új lekérdezésnél MINDIG sz
   **`client-portal.sql`** (`client_users` tábla — ügyfél-portál belépés; `inbound_orders.source` — a portálról érkező fuvar-igény forrás-jelzése),
   **`order-toll.sql`** (`orders.toll_cost/toll_geo` — fuvar-útdíj + országonkénti bontás; `toll_rates` cégenkénti ráták; `geo_country_cache` lat/lng-rács → ország-kód az útdíj km-bontáshoz),
   **`carriers-ap.sql`** (alvállalkozó-modul: `carriers` törzs + `carrier_invoices` szállítói számlák/AP + `orders.carrier_id/carrier_cost` + alvállalkozói portál `carrier_users`/`carrier_vehicles`/`carrier_documents`),
-  **`role-konyvelo.sql`** (a `users`/`invites.pozicio` CHECK-constraint bővítése a `Konyvelo` szerepkörrel — könyvelői felület).
+  **`role-konyvelo.sql`** (a `users`/`invites.pozicio` CHECK-constraint bővítése a `Konyvelo` szerepkörrel — könyvelői felület),
+  **`order-status-handover-check.sql`** (az `orders_status_check` bővítése `Parkolt`/`Raktarban`-nal — a `schema.sql` eredeti CHECK-je nem engedte ezeket, így friss DB-n az áru-leadás DB-szinten elhasalt volna; a valós-DB integrációs teszt tárta fel).
 - Fő táblák: `companies` (+`subscription_plan_id`), `users` (+`blocked`, `pozicio_dev`, `totp_*`), `vehicles` (+`height_cm/width_cm/length_cm/weight_kg/weight_per_axle_kg/axle_count/trailer_count/truck_type/tunnel_category/hazardous_goods/fuel_per_100km`), `orders` (+`tractor_id/trailer_id/client_id` — gyakran NULL, a rendszám a tényleges hivatkozás), `order_legs`, `order_documents`, `fuvarlevelek`, `clients`, `company_integrations` (GPS + `provider='email_intake'` IMAP-konfig is itt, titkosítva), `vehicle_gps_map` (**rendszam↔object_id, NINCS tárolt lat/lng** — a pozíció élőben jön), `order_uit_codes`, `inbound_orders`, `company_branding`, `email_templates`, `client_emails`, `push_subscriptions`, `bug_reports`, **`company_features`**, **`billing_integrations`** (cégenkénti számlázó, `credentials` JSONB AES-titkosítva), **`subscription_plans`**, **`here_feature_flags`** (HERE szolgáltatás-árak), **`here_usage_log`** (havi tranzakció-napló), **`warehouse_items`** (raktárba adott áru — méretek/darabszám/súly/lapszám), `driver_shifts` (használaton kívül), `session`.
 
 ## Integrációk (services/)

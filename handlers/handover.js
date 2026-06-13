@@ -89,7 +89,7 @@ async function applyHandover(cid, order, d, byEmail) {
          rendszam_camion = NULL,
          rendszam_remorca = CASE WHEN $6 = 'warehouse' THEN NULL
                                  ELSE COALESCE($7, rendszam_remorca) END,
-         handover_type = $6, handover_loc = $4, handover_at = NOW(),
+         handover_type = $6, handover_loc = $4::varchar, handover_at = NOW(),
          handover_status = NULL, handover_by = $8, handover_payload = NULL,
          updated_at = NOW()
        WHERE id = $1 AND company_id = $2`,
