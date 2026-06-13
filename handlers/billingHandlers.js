@@ -124,7 +124,7 @@ handlers.getSubscriptionPlans = async function (req, res, args) {
   try {
     if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
     const r = await pool.query(
-      'SELECT id, name, description, price_net, vat_percent, is_active, sort_order, max_users, max_vehicles, max_orders_per_month FROM subscription_plans ORDER BY sort_order'
+      'SELECT id, name, description, price_net, vat_percent, is_active, sort_order, max_users, max_vehicles, max_orders_per_month, stripe_price_id FROM subscription_plans ORDER BY sort_order'
     );
     return res.json({ result: { ok: true, plans: r.rows } });
   } catch (err) {
@@ -142,12 +142,13 @@ handlers.updateSubscriptionPlan = async function (req, res, args) {
     const price = parseFloat(a.price_net);
     // Csomag-limitek: üres/0 alatti = NULL (korlátlan).
     const lim = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) && n >= 0 ? n : null; };
+    const stripePrice = a.stripe_price_id != null ? (String(a.stripe_price_id).trim() || null) : null;
     await pool.query(
       `UPDATE subscription_plans SET name = $1, description = $2, price_net = $3, is_active = $4,
-              max_users = $5, max_vehicles = $6, max_orders_per_month = $7, updated_at = now()
-        WHERE id = $8`,
+              max_users = $5, max_vehicles = $6, max_orders_per_month = $7, stripe_price_id = $8, updated_at = now()
+        WHERE id = $9`,
       [String(a.name || '').trim() || 'Csomag', a.description || null, Number.isFinite(price) ? price : 0, a.is_active !== false,
-       lim(a.max_users), lim(a.max_vehicles), lim(a.max_orders_per_month), id]
+       lim(a.max_users), lim(a.max_vehicles), lim(a.max_orders_per_month), stripePrice, id]
     );
     return res.json({ result: { ok: true } });
   } catch (err) {
