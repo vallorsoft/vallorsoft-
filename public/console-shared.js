@@ -2616,6 +2616,19 @@ function loadSettingsPane(){
     document.getElementById('stEmail').value   = u.email || '';
     document.getElementById('stTel').value     = u.tel   || '';
     document.getElementById('stPozicio').value = u.pozicio || '';
+    // GDPR / Adatvédelem kártya — csak Adminnak
+    if (u.pozicio === 'Admin') {
+      var gcard = document.getElementById('gdprSettingsCard');
+      if (gcard) {
+        gcard.style.display = '';
+        gas('getGdprSettings').then(function(r){
+          var s = (r && r.ok && r.settings) || {};
+          var set=function(id,v){ var el=document.getElementById(id); if(el) el.value=v||''; };
+          set('gdprNotice', s.privacy_notice); set('gdprDpo', s.dpo_contact); set('gdprRetention', s.retention_note);
+          var cb=document.getElementById('gdprGpsBiz'); if(cb) cb.checked=!!s.gps_business_only;
+        });
+      }
+    }
   });
   // 2FA státusz
   gas('settings2faStatus').then(function(r){
@@ -2637,6 +2650,21 @@ function loadSettingsPane(){
       disW.style.display     = 'none';
       enW.style.display      = '';
     }
+  });
+}
+
+// GDPR adatvédelmi beállítások mentése (csak admin felületen jelenik meg)
+function gdprSaveSettings(){
+  var payload = {
+    privacy_notice:    (document.getElementById('gdprNotice')||{}).value||'',
+    dpo_contact:       (document.getElementById('gdprDpo')||{}).value||'',
+    retention_note:    (document.getElementById('gdprRetention')||{}).value||'',
+    gps_business_only: !!(document.getElementById('gdprGpsBiz')||{}).checked,
+  };
+  gas('saveGdprSettings',[payload]).then(function(r){
+    var msg=document.getElementById('gdprSaveMsg');
+    if(r&&r.ok){ if(msg){ msg.textContent='✓ '+t('common.saved'); setTimeout(function(){msg.textContent='';},2500); } toast(t('common.saved'),'ok'); }
+    else { toast((r&&r.err)||'Eroare',  'err'); }
   });
 }
 

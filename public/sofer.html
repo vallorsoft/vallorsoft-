@@ -28,6 +28,13 @@
     <span id="meBadge">...</span>
   </div>
 
+  <!-- GDPR adatvédelmi tájékoztató banner (visszaigazolásig) -->
+  <div id="gdprBanner" style="display:none;margin:10px 12px;padding:12px 14px;border:1px solid #f59e0b;border-radius:12px;background:rgba(245,158,11,0.12);font-size:13px;">
+    <div style="font-weight:700;margin-bottom:5px;">🔒 <span data-i18n="gdpr.driverTitle">Informare confidențialitate</span></div>
+    <div id="gdprBannerText" style="white-space:pre-wrap;opacity:.85;margin-bottom:9px;"></div>
+    <button onclick="gdprAck()" style="background:#e10b1a;color:#fff;border:0;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="gdpr.ackBtn">Am înțeles</button>
+  </div>
+
   <!-- ====== FŐOLDAL ====== -->
   <div class="pane-sofer" id="sec-dash">
 

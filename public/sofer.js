@@ -586,6 +586,27 @@ function loadSoferMiniStats() {
 // ============================================================
 var _meData = null;
 
+// ── GDPR adatvédelmi tájékoztató (informare) — visszaigazolásig banner ──
+function loadGdprNotice() {
+  fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'getMyPrivacyNotice', arguments: [] }) })
+  .then(function(r){ return r.json(); }).then(function(d){
+    var res = d && d.result;
+    if (!res || !res.ok || !res.notice || res.acknowledged) return;
+    var b = document.getElementById('gdprBanner');
+    var tx = document.getElementById('gdprBannerText');
+    if (tx) tx.textContent = res.notice + (res.dpo_contact ? ('\nDPO: ' + res.dpo_contact) : '');
+    if (b) b.style.display = '';
+  }).catch(function(){});
+}
+function gdprAck() {
+  fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'ackPrivacyNotice', arguments: [] }) })
+  .then(function(r){ return r.json(); }).then(function(d){
+    if (d && d.result && d.result.ok) { var b = document.getElementById('gdprBanner'); if (b) b.style.display = 'none'; }
+  }).catch(function(){});
+}
+
 fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ functionName: 'authMe' }) })
 .then(function(r) { return r.json(); }).then(function(d) {
@@ -596,6 +617,7 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
     initFirebaseChat(d.result);
     loadDashOrders();
     loadSoferMiniStats();
+    loadGdprNotice();
 
   // ── Állapot visszaállítás ──
   var state = stateGet();

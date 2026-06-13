@@ -625,6 +625,26 @@
           </div>
         </div>
 
+         <!-- GDPR / ADATVÉDELEM (csak admin) -->
+        <div class="glass" id="gdprSettingsCard" style="padding:24px;display:none;">
+          <h2 class="h-title" style="margin-top:0;" data-i18n="gdpr.title">🔒 GDPR / Adatvédelem</h2>
+          <p style="color:var(--muted);font-size:13px;margin:0 0 12px;" data-i18n="gdpr.hint">A munkavállalói GPS-követés csak előzetes tájékoztatás mellett jogszerű (Legea 190/2018). Itt megadhatod a sofőröknek megjelenő adatvédelmi tájékoztatót — belépéskor vissza kell igazolniuk.</p>
+          <div class="field">
+            <label data-i18n="gdpr.notice">Adatvédelmi tájékoztató (a sofőröknek)</label>
+            <textarea class="textarea" id="gdprNotice" rows="5" data-i18n-ph="gdpr.noticePh" placeholder="Pl.: Vehiculele sunt monitorizate GPS în scop de management al flotei, doar în interes de serviciu..."></textarea>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label data-i18n="gdpr.dpo">DPO / kapcsolat</label><input class="input" id="gdprDpo" data-i18n-ph="gdpr.dpoPh" placeholder="Nume + e-mail responsabil date"></div>
+            <div class="field"><label data-i18n="gdpr.retention">Megőrzési megjegyzés</label><input class="input" id="gdprRetention" data-i18n-ph="gdpr.retentionPh" placeholder="Pl.: facturi 10 ani, GPS live (nestocat)"></div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;margin:6px 0 14px;">
+            <input type="checkbox" id="gdprGpsBiz" style="width:16px;height:16px;accent-color:#e10b1a;cursor:pointer;">
+            <span data-i18n="gdpr.gpsBiz">A GPS-követés csak üzleti célra / munkaidőben történik</span>
+          </label>
+          <button class="btn primary" onclick="gdprSaveSettings()" data-i18n="common.save">Mentés</button>
+          <span id="gdprSaveMsg" style="margin-left:10px;font-size:12px;color:var(--status-ok);"></span>
+        </div>
+
          <!-- JELSZÓ MÓDOSÍTÁS -->
         <div class="glass" style="padding:24px;">
           <h2 class="h-title" style="margin-top:0;" data-i18n="pane.changePw">🔑 Jelszó módosítása</h2>
