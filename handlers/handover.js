@@ -200,9 +200,9 @@ handlers.driverHandoverRequest = async function (req, res, args) {
     // Push az adminoknak/managereknek — hiba esetén sem törjük a kérést
     try {
       await sendPushToRole(cid, ['Admin', 'Manager'], {
-        title: '⛔ Áru-leadás visszaigazolásra vár',
+        title: '⛔ Predare marfă — confirmare / Áru-leadás visszaigazolásra vár',
         body: (me.nume || me.email) + ' — ' + orderId + ': '
-          + (type === 'trailer' ? '🅿️ pótkocsin parkol' : '📦 raktárba került') + ' @ ' + location,
+          + (type === 'trailer' ? '🅿️ parchează pe remorcă / pótkocsin parkol' : '📦 intră în depozit / raktárba került') + ' @ ' + location,
         icon: '/icon192.png', badge: '/icon192.png',
         tag: 'handover-' + orderId, url: '/manager',
       });
@@ -250,8 +250,8 @@ handlers.confirmHandover = async function (req, res, args) {
     // visszajelzés a sofőrnek
     try {
       if (o.handover_by) await sendPushToEmail(o.handover_by, {
-        title: '✅ Áru-leadás visszaigazolva',
-        body: orderId + ' — ' + v.data.location + (v.data.type === 'trailer' ? ' (pótkocsin parkol)' : ' (raktárban)'),
+        title: '✅ Predare confirmată / Áru-leadás visszaigazolva',
+        body: orderId + ' — ' + v.data.location + (v.data.type === 'trailer' ? ' (parchează pe remorcă / pótkocsin parkol)' : ' (în depozit / raktárban)'),
         icon: '/icon192.png', badge: '/icon192.png',
         tag: 'handover-' + orderId, url: '/sofer',
       });
@@ -284,8 +284,8 @@ handlers.rejectHandover = async function (req, res, args) {
     try {
       const by = r.rows[0].handover_by;
       if (by) await sendPushToEmail(by, {
-        title: '❌ Áru-leadás elutasítva',
-        body: orderId + ' — egyeztess a diszpécserrel.',
+        title: '❌ Predare respinsă / Áru-leadás elutasítva',
+        body: orderId + ' — contactează dispecerul / egyeztess a diszpécserrel.',
         icon: '/icon192.png', badge: '/icon192.png',
         tag: 'handover-' + orderId, url: '/sofer',
       });

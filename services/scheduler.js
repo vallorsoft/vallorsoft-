@@ -98,13 +98,13 @@ function startExpiryScheduler() {
       const lejart = items.filter((i) => i.days_left < 0).length;
       const first = items[0];
       const firstTxt = (first.entity_label ? first.entity_label + ' — ' : '') + first.doc_type
-        + (first.days_left < 0 ? ' LEJÁRT' : ' ' + first.days_left + ' nap múlva lejár');
+        + (first.days_left < 0 ? ' EXPIRAT / LEJÁRT' : ' — expiră în ' + first.days_left + ' zile / ' + first.days_left + ' nap múlva');
       const body = items.length === 1
         ? firstTxt
-        : firstTxt + ' (+' + (items.length - 1) + ' további' + (lejart ? ', ebből ' + lejart + ' lejárt' : '') + ')';
+        : firstTxt + ' (+' + (items.length - 1) + ' altele / további' + (lejart ? ', din care ' + lejart + ' expirate / ebből ' + lejart + ' lejárt' : '') + ')';
       try {
         await push.sendPushToRole(cid, ['Admin', 'Manager'], {
-          title: '⏰ Lejáró dokumentumok',
+          title: '⏰ Documente care expiră / Lejáró dokumentumok',
           body,
           url: '/admin',
         });
@@ -226,21 +226,21 @@ function startMonthlyReportScheduler() {
         const row = (l, v) => '<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;color:#555;">' + l
           + '</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700;">' + v + '</td></tr>';
         const html =
-          '<p><b>' + c.nev + '</b> — havi összefoglaló: <b>' + month + '</b></p>'
+          '<p><b>' + c.nev + '</b> — raport lunar / havi összefoglaló: <b>' + month + '</b></p>'
           + '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
-          + row('Lezárt fuvarok', fmt(k.lezart) + ' db')
-          + row('Bevétel (lezárt)', fmt(k.bevetel) + ' EUR')
-          + row('Megtett km (menetlevelek)', fmt(fv.km) + ' km')
-          + row('Üzemanyag-költség', fmt(fv.uzemanyag) + ' RON')
-          + row('Egyéb sofőr-költés', fmt(fv.vasarlas) + ' RON')
-          + row('Aktuális kintlévőség', fmt(k.kintlevo) + ' EUR')
+          + row('Curse finalizate / Lezárt fuvarok', fmt(k.lezart) + ' buc / db')
+          + row('Venit (finalizate) / Bevétel (lezárt)', fmt(k.bevetel) + ' EUR')
+          + row('Km parcurși (foi de parcurs) / Megtett km (menetlevelek)', fmt(fv.km) + ' km')
+          + row('Cost combustibil / Üzemanyag-költség', fmt(fv.uzemanyag) + ' RON')
+          + row('Alte cheltuieli șofer / Egyéb sofőr-költés', fmt(fv.vasarlas) + ' RON')
+          + row('Restanțe curente / Aktuális kintlévőség', fmt(k.kintlevo) + ' EUR')
           + '</table>'
-          + '<p style="font-size:12px;color:#888;">Részletes riportok: a VallorSoft 📊 Statisztika menüjében.</p>';
+          + '<p style="font-size:12px;color:#888;">Rapoarte detaliate: în meniul 📊 Statistici al VallorSoft. / Részletes riportok: a VallorSoft 📊 Statisztika menüjében.</p>';
 
         let sentAny = false;
         for (const a of adminsR.rows) {
           const r = await email.sendClientEmail({
-            to: a.email, subject: '📊 VallorSoft havi összefoglaló — ' + month + ' (' + c.nev + ')', html,
+            to: a.email, subject: '📊 VallorSoft raport lunar / havi összefoglaló — ' + month + ' (' + c.nev + ')', html,
           });
           if (r && r.ok) sentAny = true;
         }
