@@ -6,6 +6,8 @@
 const pool = require('../db');
 const { estimateFromPolyline, getRates, DEFAULT_RATES, COUNTRY_NAME } = require('../lib/tollEstimate');
 const { estimateRoute } = require('../lib/routeEstimate');
+const tollProvider = require('../lib/tollProvider');
+const maps = require('../lib/mapsProvider');
 
 const handlers = {};
 
@@ -40,11 +42,31 @@ handlers.estimateToll = async function (req, res, args) {
     try { est = await estimateRoute(waypoints, cid); }
     catch (e) { return res.json({ result: { ok: false, err: 'Ruta nu poate fi calculata: ' + (e.message || '') } }); }
 
+    // ── „Pontos" mód (HERE): csak ha a kliens kérte ÉS van HERE-kulcs.
+    //    Bármilyen hiba/kulcs-hiány esetén visszaesünk az ingyenes becslésre.
+    const precise = !!(args && args[1] && args[1].precise);
+    let preciseError = null;
+    if (precise) {
+      try {
+        const cfg = await maps.getConfig(cid);
+        if (cfg.vendor === 'here' && cfg.key) {
+          const ht = await tollProvider.hereToll(est.waypoints, cfg.key);
+          maps.bump(cid, 'here');
+          await pool.query('UPDATE orders SET toll_cost = $1, toll_geo = $2, updated_at = NOW() WHERE id = $3 AND company_id = $4',
+            [ht.total, JSON.stringify(ht), orderId, cid]).catch((e) => console.error('toll mentés hiba:', e));
+          return res.json({ result: { ok: true, toll: ht, km: est.km, source: 'here' } });
+        }
+        preciseError = 'no-here-key';
+      } catch (e) {
+        preciseError = (e && e.message) || 'here-error';
+      }
+    }
+
     const toll = await estimateFromPolyline(cid, est.polyline);
     await pool.query('UPDATE orders SET toll_cost = $1, toll_geo = $2, updated_at = NOW() WHERE id = $3 AND company_id = $4',
       [toll.total, JSON.stringify(toll), orderId, cid]).catch((e) => console.error('toll mentés hiba:', e));
 
-    return res.json({ result: { ok: true, toll, km: est.km } });
+    return res.json({ result: { ok: true, toll, km: est.km, source: 'estimate', preciseRequested: precise, preciseError } });
   } catch (err) {
     console.error('estimateToll hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
