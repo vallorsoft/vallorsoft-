@@ -604,6 +604,33 @@ handlers.comDelete = async function (req, res, args) {
     }
   };
 
+// A fuvar top-szintű sofőr/jármű mezőit az AKTÍV (legutolsó leg_number) leghez
+// igazítja. Így a leg-szintű újraosztás (addOrderLeg) vagy egy leg törlése után
+// is a helyes sofőr marad az orders.email_sofer-ben — ez az IGAZSÁGFORRÁS a
+// sofőr-nézethez (getMySoferOrders) és a listához. A státuszt NEM mozgatja
+// (azt a dropdown / handover kezeli). Ha nincs leg, érintetlenül hagyja.
+async function syncOrderTopFromActiveLeg(cid, orderId, dbc) {
+  const q = dbc || pool;
+  const lr = await q.query(
+    `SELECT sofer_type, email_sofer, nume_sofer, firma_extern, rendszam_camion, rendszam_remorca
+       FROM order_legs WHERE order_id = $1 ORDER BY leg_number DESC LIMIT 1`,
+    [orderId]);
+  if (!lr.rows.length) return;
+  const l = lr.rows[0];
+  await q.query(
+    `UPDATE orders SET
+       sofer_type = $3, email_sofer = $4, nume_sofer = $5, firma_extern = $6,
+       rendszam_camion = $7, rendszam_remorca = $8, updated_at = NOW()
+     WHERE id = $1 AND company_id = $2`,
+    [orderId, cid,
+     l.sofer_type || null,
+     l.email_sofer ? String(l.email_sofer).trim().toLowerCase() : null,
+     l.nume_sofer || null,
+     l.firma_extern || null,
+     l.rendszam_camion || null,
+     l.rendszam_remorca || null]);
+}
+
 handlers.addOrderLeg = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
@@ -636,6 +663,9 @@ handlers.addOrderLeg = async function (req, res, args) {
           req.session.user.company_id
         ]
       );
+      // Az új leg az aktív szakasz → a fuvar top-szintű sofőr/jármű mezői
+      // kövessék (különben a sofőr-nézet a régi sofőrt mutatná).
+      await syncOrderTopFromActiveLeg(req.session.user.company_id, orderId);
       return res.json({ result: { ok: true, leg_number: legNum } });
     } catch (err) {
       console.error('addOrderLeg hiba:', err);
@@ -655,10 +685,13 @@ handlers.deleteOrderLeg = async function (req, res, args) {
          USING orders
          WHERE order_legs.id = $1
            AND order_legs.order_id = orders.id
-           AND orders.company_id = $2`,
+           AND orders.company_id = $2
+         RETURNING order_legs.order_id`,
         [legId, req.session.user.company_id]
       );
       if (r.rowCount === 0) return res.json({ result: { ok: false, err: 'Nu a fost gasit sau acces interzis.' } });
+      // A törlés után a megmaradó legutolsó leg lesz az aktív → top-szint igazítása.
+      await syncOrderTopFromActiveLeg(req.session.user.company_id, r.rows[0].order_id);
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('deleteOrderLeg hiba:', err);
