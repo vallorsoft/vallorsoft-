@@ -469,6 +469,16 @@
     'cs.ol.partialPay': { hu: 'Részben fizetve — fizetés rögzítése', ro: 'Plătit parțial — înregistrare plată' },
     'cs.ol.unpaidPay': { hu: 'Kintlévő — fizetés rögzítése', ro: 'Restant — înregistrare plată' },
     'cs.ol.handoverTitle': { hu: 'Áru leadása (pótkocsin parkol / raktárba kerül)', ro: 'Predare marfă (parchează pe remorcă / intră în depozit)' },
+    // ⋯ Kezelő-menü (fuvar-műveletek popover) — rövid címkék
+    'cs.ol.actMenu':   { hu: 'Műveletek', ro: 'Acțiuni' },
+    'cs.ol.mEdit':     { hu: 'Szerkesztés', ro: 'Editare' },
+    'cs.ol.mDocs':     { hu: 'Dokumentumok', ro: 'Documente' },
+    'cs.ol.mWhere':    { hu: 'Hol a kocsi?', ro: 'Unde e camionul?' },
+    'cs.ol.mUit':      { hu: 'UIT-kódok', ro: 'Coduri UIT' },
+    'cs.ol.mInvoice':  { hu: 'Számlázás', ro: 'Facturare' },
+    'cs.ol.mPay':      { hu: 'Fizetés', ro: 'Plată' },
+    'cs.ol.mTrack':    { hu: 'Követő-link', ro: 'Link urmărire' },
+    'cs.ol.mHandover': { hu: 'Áru leadása', ro: 'Predare marfă' },
     // Nyomtatás (fuvarlista PDF)
     'cs.pr.docTitle': { hu: 'Fuvarfeladatok — ', ro: 'Curse — ' },
     'cs.pr.printBtn': { hu: '🖨️ Nyomtatás / PDF mentés', ro: '🖨️ Tipărire / Salvare PDF' },

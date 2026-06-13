@@ -1,5 +1,31 @@
 # CLAUDE.md — VallorSoft
 
+> ## ⚠️ ELSŐ SZABÁLY — MINDEN ÚJÍTÁS ELŐTT OLVASD EL (mindig)
+> **A projekt ÉRETT, működő rendszer. Semmit nem építünk a vákuumba.** Bármilyen új funkció / módosítás / „újítás” előtt — akár új beszélgető-ablakban kérem, akár nem, ezt NEM kell külön kérnem:
+> 1. **Először keresd meg, létezik-e már** a kért dolog vagy egy közeli rokona (grep/Explore). Ami már megvan, azt **ahhoz igazítjuk / kibővítjük / javítjuk**, NEM építünk párhuzamos másodikat.
+> 2. **Illeszd a meglévő mintákhoz**: RPC `handlers/` + `routes/execute.js` registry VAGY klasszikus REST `routes/`; közös admin/manager kód a `console-shared.js` „KÖZÖS” szekciójában (ott javítsd, EGYSZER); dizájn-tokenek a `public/style.css` `:root`-jából; i18n `data-i18n` + RO-alap/HU-váltó; multi-tenant `company_id`-szűrés; paraméteres SQL.
+> 3. **Ne törj el kész dolgot.** Már KÉSZ és bekötött (ne építsd újra, csak igazítsd, ha kell): **audit-napló, GDPR export/anonimizálás, csomag-limit kikényszerítés, Stripe-váz, health-check, strukturált log, opcionális Sentry, pg_dump backup**, univerzális számlázó (5 provider), térkép-stack (OSM/Photon/OSRM + opc. HERE/Google), útdíj-becslés, áru-leadás/raktár, alvállalkozó/AP, ügyfél- és alvállalkozói portál, könyvelői hub, statisztika, tervezőtábla/radar.
+> 4. **Migráció = inkrementális `db/*.sql`** (auto-fut induláskor, `schema_migrations` könyvelés) — ne nyúlj a `schema.sql`-hez meglévő tábla módosításához.
+> 5. **A végén:** `npm test` zöld + (ha van) require-sweep, majd commit a megadott feature-branchre. **PR-t csak ha kérem.**
+>
+> Röviden: **igazíts, ne duplikálj; bővíts, ne törj.**
+>
+> ### Keresztmetsző KÖTELEZŐ kör — minden új funkcióra automatikusan alkalmazom (nem kell kérni)
+> **Infra (magától jár):** strukturált kérés-log + globális hibakezelő (nem szivárog stack-trace) + health-check + opc. Sentry; `db/*.sql` migráció-futtató; i18n/téma-betöltő; session/auth middleware; CSP/helmet/rate-limit.
+> **Konvenció (ezt én kötöm be minden új funkcióba):**
+> 1. **Multi-tenant**: minden SQL `WHERE company_id=$x` (`req.session.user.company_id`).
+> 2. **Paraméteres SQL** ($1,$2…), soha string-összefűzés.
+> 3. **Kétnyelvűség (RO-alap+HU)**: felület `data-i18n`/`t()` (RO+HU pár az `i18n.js`-ben); szerver-hibaüzenet/validáció/integráció-válasz **románul**; push/e-mail a usernek **kétnyelvű RO/HU**; belső `console.*`+komment magyarul.
+> 4. **Szerep-/jogvédelem**: API `requireLogin`+`requireRole`; oldal `requirePageLogin/Role`; RPC-nél a handlerben.
+> 5. **Audit-napló**: minden írásra (create/update/delete, státuszváltás, pénzügy/integráció) `audit.fromReq(req,'domain.action',entityType,entityId,detail)` — best-effort (`lib/audit.js`).
+> 6. **GDPR**: ha személyes adatot tárol (név/e-mail/tel/GPS) → bekötés `handlers/gdpr.js` `exportUserData` + `anonymizeUser` körébe.
+> 7. **Csomag-limit**: ha számolható erőforrást hoz létre → `planLimits.checkLimit(cid, kind)` a create-úton (NULL-limit = korlátlan; `lib/planLimits.js`).
+> 8. **Funkció-kapcsoló**: ha önálló menüpont/oldal → `public/feature-catalog.js` (`key=data-tab`) + szerver-kapu ha kell.
+> 9. **Titkosítás**: integrációs kulcs/jelszó AES-256-GCM (`lib/crypto.js`, `INTEGRATION_ENC_KEY`), maszkolva, kliensbe sosem (proxy endpoint).
+> 10. **Migráció**: séma-változás = új inkrementális `db/*.sql` (nem a `schema.sql`).
+>
+> *Megjegyzés: a 4–9 nem globális hook, hanem bevett konvenció — a `checkLimit`/`audit.fromReq`/`gdpr.js`/`crypto.js` segédek teszik egysorossá. A meglévő funkciók fokozatosan kapják meg (nem visszamenőleges tömegmunka), az ÚJ funkciók viszont mindig.*
+
 Fuvarozási / flottakezelő webalkalmazás (Node.js + Express 5 + PostgreSQL).
 **Kétnyelvű felület: román alap + magyar váltó** (`public/i18n.js`, `data-i18n`; téma-kapcsoló melletti nyelvváltó). A szerveroldali kifelé menő üzenetek románul (a push/e-mail kétnyelvű RO/HU). Román (RO) piacra szabott integrációkkal (**univerzális számlázó**: FGO/SmartBill/Oblio/iFactura/Facturis, ANAF/UIT e-fuvarlevél). PWA + web push, Firebase, multi-tenant (cégenként elkülönített adat).
 

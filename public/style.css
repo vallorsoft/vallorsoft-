@@ -870,3 +870,53 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 #orderImportModal .oi-prev table { width: 100%; border-collapse: collapse; font-size: 12px; }
 #orderImportModal .oi-prev th, #orderImportModal .oi-prev td { padding: 5px 8px; border-bottom: 1px solid var(--glass-border-dark); white-space: nowrap; text-align: left; }
 #orderImportModal .oi-prev th { color: var(--text-muted); font-weight: 600; }
+
+/* ════════════════════════════════════════════════════════════════════
+   Fuvarlista — művelet-cella újratervezés (✏️ + ⋯ kezelő-menü popover)
+   A sorban csak két fix gomb; a többi művelet a ⋯-re nyíló menüben,
+   ikon + rövid szöveggel. A menü <body>-ba portálva, position:fixed.
+   ════════════════════════════════════════════════════════════════════ */
+.vs-row-actions { white-space: nowrap; }
+.vs-row-actions .vs-act-edit,
+.vs-row-actions .vs-act-more {
+  padding: 5px 9px; font-size: 13px; line-height: 1; vertical-align: middle;
+}
+.vs-row-actions .vs-act-more { margin-left: 4px; font-weight: 700; letter-spacing: 1px; }
+
+/* A popover-menü (portálva a body-ra) */
+.vs-act-menu {
+  position: fixed; z-index: 4000; min-width: 196px; max-width: 260px;
+  padding: 6px; border-radius: var(--radius-md);
+  background: var(--bg-panel-raised, #141c25);
+  border: 1px solid var(--glass-border-dark, rgba(255,255,255,0.10));
+  box-shadow: 0 12px 34px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.35);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.vs-act-menu.open { animation: vsActIn .12s ease-out; }
+@keyframes vsActIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+.vs-act-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border: 0; background: transparent; cursor: pointer;
+  border-radius: var(--radius-sm); color: var(--text-primary, #e9eef5);
+  font-size: 13px; font-family: inherit; text-align: left; transition: background .12s;
+}
+.vs-act-item:hover, .vs-act-item:focus { background: rgba(255,255,255,0.07); outline: none; }
+.vs-act-item.danger { color: #f06b78; }
+.vs-act-item.danger:hover { background: rgba(225,11,26,0.12); }
+.vs-act-ico { flex: 0 0 18px; text-align: center; font-size: 15px; }
+.vs-act-lbl { flex: 1 1 auto; }
+.vs-act-ind { flex: 0 0 auto; margin-left: auto; font-size: 12px; opacity: .95; }
+.vs-act-sep { height: 1px; margin: 5px 4px; background: var(--glass-border-dark, rgba(255,255,255,0.10)); }
+
+/* Light téma */
+.main-content[data-theme="light"] .vs-act-menu {
+  background: #ffffff; border-color: rgba(0,0,0,0.10);
+  box-shadow: 0 12px 34px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.10);
+}
+.main-content[data-theme="light"] .vs-act-item { color: #1f2937; }
+.main-content[data-theme="light"] .vs-act-item:hover { background: rgba(0,0,0,0.05); }
+.main-content[data-theme="light"] .vs-act-item.danger { color: #c81e2b; }
+
+/* Fuvarsorok finomítás — olvashatóbb, kevésbé "zsúfolt" */
+#tblOrders tbody td { vertical-align: middle; }
