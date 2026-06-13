@@ -573,8 +573,12 @@
 
         <!-- ── SZÁMLÁZÁS (fuvar → ügyfél) ── -->
         <h3 style="font-size:16px;margin:0 0 4px;color:var(--text-primary);">🧾 Fuvar-számlázás — ügyfeleknek</h3>
-        <p style="color:var(--muted);font-size:13px;margin:0 0 14px;">Ezt használja a fuvarok melletti <b>🧾</b> gomb: ezzel állítasz ki (és stornózol) számlát az ügyfeleidnek a fuvarokból. A hitelesítő adatokat a szerver titkosítva tárolja.</p>
-        <div id="invCardBox" style="margin-bottom:28px;"></div>
+        <p style="color:var(--muted);font-size:13px;margin:0 0 14px;">Válaszd ki és kösd be a számlázódat (<b>FGO / SmartBill / Oblio / iFactura / Facturis</b>). Ezt használja a fuvarok melletti <b>🧾</b> gomb (számla + storno). A hitelesítő adatokat a szerver titkosítva tárolja.</p>
+        <div id="billingCardBox" style="margin-bottom:18px;"></div>
+        <details style="margin-bottom:28px;">
+          <summary style="cursor:pointer;color:var(--muted);font-size:12.5px;">Régi FGO-beállítás (legacy — csak ha korábban így kötötted be)</summary>
+          <div id="invCardBox" style="margin-top:12px;"></div>
+        </details>
 
         <!-- ── GPS / FLOTTA ── -->
         <h3 style="font-size:16px;margin:0 0 12px;color:var(--text-primary);">🛰️ GPS / Flotta (CargoTrack)</h3>
@@ -1117,6 +1121,7 @@
 <script src="/cargotrack-pairing.js?v=20260611"></script>
 <script src="/cargotrack-map.js?v=20260611"></script>
 <script src="/email-intake-card.js?v=20260611"></script>
+<script src="/billing-card.js?v=20260614"></script>
 <script src="/invoicing-card.js?v=20260611"></script>
 <script src="/invoice-modal.js?v=20260611"></script>
 <script src="/uit-panel.js?v=20260611"></script>
