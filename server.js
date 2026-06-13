@@ -11,6 +11,7 @@ const session      = require('express-session');
 const pgSession    = require('connect-pg-simple')(session);
 const cookieParser = require('cookie-parser');
 const pool         = require('./db');
+const log          = require('./lib/logger');
 
 // ===== BIZTONSAG: helmet + rate-limit (opcionalis) =====
 let helmet, rateLimit;
@@ -20,9 +21,14 @@ try { rateLimit = require('express-rate-limit'); } catch (e) { rateLimit = null;
 const app = express();
 app.set('trust proxy', 1); // Render / reverse proxy mogotti HTTPS session fix
 
-// ===== GLOBÁLIS VÉDŐHÁLÓ: kezeletlen promise-hibák ne állítsák le a szervert =====
+// ===== GLOBÁLIS VÉDŐHÁLÓ: kezeletlen hibák ne állítsák le némán a szervert =====
 process.on('unhandledRejection', (reason) => {
-  console.error('Kezeletlen promise-hiba (a szerver tovább fut):', reason);
+  log.error('unhandledRejection', { reason: reason && reason.message ? reason.message : String(reason) });
+});
+process.on('uncaughtException', (err) => {
+  // Strukturáltan naplózzuk; a folyamatot — a meglévő üzemeltetési elv szerint —
+  // nem állítjuk le (a process-manager úgyis újraindítaná, de a session/DB él).
+  log.error('uncaughtException', { err: err && err.message, stack: err && err.stack });
 });
 
 // ===== HELMET: HTTP biztonsagi fejlecek =====
@@ -122,9 +128,16 @@ if (rateLimit) {
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
 
+// Health-check végpontok — auth/session ELŐTT, könnyűek (load balancer / uptime).
+app.use(require('./routes/health'));
+
 // Statikus fajlok CSAK a nem-vedett eleresi utakra (public mappan belul a HTML fajlok
 // nem szolgalhatoak ki kozvetlenul - a route-ok vedelme lejjebb tortenik)
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Strukturált kérés-naplózás (a statikus fájlokat már a fenti static kiszolgálta,
+// így itt csak az API-/oldal-kérések naplózódnak).
+app.use(require('./middleware/requestLog'));
 
 // Cookie es session kezeles
 app.use(cookieParser());
@@ -166,6 +179,22 @@ app.use(require('./routes/accounting'));
 app.use(require('./routes/uit'));
 app.use(require('./routes/inbound-orders'));
 app.use(require('./routes/client-mail'));
+
+// ===== 404 az ismeretlen API-utakra + GLOBÁLIS HIBAKEZELŐ (végső védőháló) =====
+// A handlerek általában maguk kezelik a hibájukat; ez csak a réseket fogja be,
+// és sosem szivárogtat stack-trace-t a kliensnek.
+app.use('/api', (req, res) => {
+  res.status(404).json({ success: false, message: 'Endpoint necunoscut: ' + (req.originalUrl || req.path) });
+});
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  log.error('unhandled-route-error', { id: req.id, path: req.path, err: err && err.message, stack: err && err.stack });
+  if (res.headersSent) return next(err);
+  if (req.path && req.path.indexOf('/api') === 0) {
+    return res.status(500).json({ success: false, message: 'Eroare de server' });
+  }
+  res.status(500).send('Eroare de server');
+});
 
 // E-mail intake (beérkező megrendelések) — csak akkor fut, ha az INTAKE_IMAP_* be van állítva.
 const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler } = require('./services/scheduler');
