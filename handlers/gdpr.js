@@ -26,9 +26,13 @@ handlers.exportCompanyData = async function (req, res) {
       vehicles: await rows('SELECT * FROM vehicles WHERE company_id = $1'),
       orders: await rows('SELECT * FROM orders WHERE company_id = $1'),
       carriers: await rows('SELECT * FROM carriers WHERE company_id = $1'),
+      // Portál-belépők (személyes adat: e-mail/név) — jelszó-hash és invite-token KIZÁRVA.
+      client_portal_users: await rows('SELECT id, client_id, email, nev, activ, last_login, created_at FROM client_users WHERE company_id = $1'),
+      carrier_portal_users: await rows('SELECT id, carrier_id, email, nev, activ, last_login, created_at FROM carrier_users WHERE company_id = $1'),
     };
     audit.fromReq(req, 'gdpr.export', 'company', cid, { counts: {
       users: data.users.length, clients: data.clients.length, vehicles: data.vehicles.length, orders: data.orders.length,
+      client_portal_users: data.client_portal_users.length, carrier_portal_users: data.carrier_portal_users.length,
     } });
     return res.json({ result: { ok: true, generated_at: new Date().toISOString(), data } });
   } catch (err) {
