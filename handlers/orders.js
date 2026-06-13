@@ -7,6 +7,7 @@
 const pool = require('../db');
 const { genDocId } = require('../lib/ids');
 const { getPositions } = require('../lib/vehiclePositions');
+const audit = require('../lib/audit');
 
 const handlers = {};
 
@@ -597,6 +598,7 @@ handlers.comDelete = async function (req, res, args) {
       if (r.rowCount === 0) {
         return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit.' } });
       }
+      audit.fromReq(req, 'order.delete', 'order', id);   // best-effort audit
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('comDelete hiba:', err);
