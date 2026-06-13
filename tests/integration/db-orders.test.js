@@ -1,0 +1,131 @@
+// ============================================================
+//  VALÓDI DB integráció — a mock-kal NEM fedhető utak:
+//   - comCreate / orderHandover TRANZAKCIÓ (pool.connect)
+//   - finalized_at TRIGGER
+//   - getMySoferOrders dash_visible SQL-logika
+//   - plannerAssign: parkolt fuvar újraosztása → Alocat
+//  Csak akkor fut, ha van DATABASE_URL (CI Postgres service);
+//  helyben/DB nélkül a suite kihagyódik, a mock-tesztek mennek.
+// ============================================================
+const { loadSchema, truncateAll, hasDb } = require('../helpers/real-db');
+
+const pool = require('../../db');                 // VALÓDI pool (nincs jest.mock)
+const orders = require('../../handlers/orders');  // comCreate, comUpdate, getMySoferOrders, plannerAssign
+const handover = require('../../handlers/handover');
+
+function makeRes() {
+  const res = { body: null };
+  res.json = (o) => { res.body = o; return res; };
+  res.status = () => res;
+  return res;
+}
+function reqAs(user) { return { session: { user } }; }
+const admin = (companyId) => reqAs({ company_id: companyId, email: 'admin@x.hu', pozicio: 'Admin' });
+
+const d = hasDb() ? describe : describe.skip;
+
+d('Valódi DB integráció (orders / sofőr / handover / planner)', () => {
+  jest.setTimeout(40000);
+  let companyId;
+  const DRIVER = 'driver@x.hu';
+
+  beforeAll(async () => { await loadSchema(pool); });
+  afterAll(async () => { await pool.end(); });
+
+  beforeEach(async () => {
+    await truncateAll(pool);
+    const c = await pool.query("INSERT INTO companies (nev) VALUES ('Teszt Kft') RETURNING id");
+    companyId = c.rows[0].id;
+    await pool.query(
+      "INSERT INTO users (nume, email, pozicio, password_hash, company_id) VALUES ('Sofőr D', $1, 'Sofer', 'x', $2)",
+      [DRIVER, companyId]);
+  });
+
+  test('comCreate (tranzakció): Intern sofőr → Alocat, email kisbetűs, + 1 leg jön létre', async () => {
+    const res = makeRes();
+    await orders.comCreate(admin(companyId), res, [{
+      client: 'Ügyfél', loc_incarcare: 'A', loc_descarcare: 'B', load_type: 'FTL',
+      sofer_type: 'Intern', email_sofer: 'Driver@X.HU', nume_sofer: 'Sofőr D',
+    }]);
+    expect(res.body.result.ok).toBe(true);
+    const id = res.body.result.id;
+    const o = (await pool.query('SELECT * FROM orders WHERE id = $1', [id])).rows[0];
+    expect(o.status).toBe('Alocat');
+    expect(o.email_sofer).toBe('driver@x.hu');     // comCreate normalizál
+    expect(o.load_type).toBe('FTL');
+    const legs = await pool.query('SELECT * FROM order_legs WHERE order_id = $1', [id]);
+    expect(legs.rowCount).toBe(1);
+  });
+
+  test('comUpdate: Disponibil-ról belső sofőr hozzárendelése → DB-ben Alocat + kisbetűs email', async () => {
+    await pool.query("INSERT INTO orders (id, company_id, status) VALUES ('CMD-U1', $1, 'Disponibil')", [companyId]);
+    const res = makeRes();
+    await orders.comUpdate(admin(companyId), res, ['CMD-U1', {
+      status: 'Disponibil', sofer_type: 'Intern', email_sofer: 'Driver@X.HU',
+    }]);
+    expect(res.body.result.ok).toBe(true);
+    const o = (await pool.query("SELECT status, email_sofer FROM orders WHERE id = 'CMD-U1'")).rows[0];
+    expect(o.status).toBe('Alocat');
+    expect(o.email_sofer).toBe('driver@x.hu');
+  });
+
+  test('finalized_at TRIGGER: Finalizat-ra váltáskor beáll, egyébként null marad', async () => {
+    await pool.query("INSERT INTO orders (id, company_id, status) VALUES ('CMD-T1', $1, 'Alocat')", [companyId]);
+    await pool.query("UPDATE orders SET status = 'In Curs' WHERE id = 'CMD-T1'");
+    let o = (await pool.query("SELECT finalized_at FROM orders WHERE id = 'CMD-T1'")).rows[0];
+    expect(o.finalized_at).toBeNull();
+    await pool.query("UPDATE orders SET status = 'Finalizat' WHERE id = 'CMD-T1'");
+    o = (await pool.query("SELECT finalized_at FROM orders WHERE id = 'CMD-T1'")).rows[0];
+    expect(o.finalized_at).not.toBeNull();
+  });
+
+  test('getMySoferOrders dash_visible: Alocat/Parkolt/Raktarban/friss Finalizat látszik, régi Finalizat nem', async () => {
+    const mk = (id, status, fin) => pool.query(
+      'INSERT INTO orders (id, company_id, email_sofer, status, finalized_at) VALUES ($1,$2,$3,$4,$5)',
+      [id, companyId, DRIVER, status, fin]);
+    await mk('CMD-A', 'Alocat', null);
+    await mk('CMD-P', 'Parkolt', null);
+    await mk('CMD-R', 'Raktarban', null);
+    await mk('CMD-FN', 'Finalizat', new Date());
+    await mk('CMD-FO', 'Finalizat', new Date(Date.now() - 5 * 86400000));   // 5 napos
+    const res = makeRes();
+    await orders.getMySoferOrders(reqAs({ company_id: companyId, email: DRIVER, pozicio: 'Sofer' }), res, []);
+    const vis = {};
+    res.body.result.forEach((r) => { vis[r.id] = r.dash_visible; });
+    expect(vis['CMD-A']).toBe(true);
+    expect(vis['CMD-P']).toBe(true);     // regresszió-őr: leadott fuvar nem tűnik el
+    expect(vis['CMD-R']).toBe(true);
+    expect(vis['CMD-FN']).toBe(true);
+    expect(vis['CMD-FO']).toBe(false);
+  });
+
+  test('orderHandover (tranzakció): raktárba adás → Raktarban, email_sofer null, warehouse_items sor', async () => {
+    await pool.query(
+      "INSERT INTO orders (id, company_id, email_sofer, status, loc_incarcare) VALUES ('CMD-H1', $1, $2, 'In Curs', 'Start')",
+      [companyId, DRIVER]);
+    const res = makeRes();
+    await handover.orderHandover(admin(companyId), res, ['CMD-H1', {
+      type: 'warehouse', location: 'Cluj', qty: 5, qty_unit: 'paletta',
+      length_cm: 100, width_cm: 100, height_cm: 100, weight_kg: 500, doc_pages: 3,
+    }]);
+    expect(res.body.result.ok).toBe(true);
+    const o = (await pool.query("SELECT status, email_sofer FROM orders WHERE id = 'CMD-H1'")).rows[0];
+    expect(o.status).toBe('Raktarban');
+    expect(o.email_sofer).toBeNull();
+    const wi = await pool.query("SELECT * FROM warehouse_items WHERE order_id = 'CMD-H1' AND status = 'Raktarban'");
+    expect(wi.rowCount).toBe(1);
+  });
+
+  test('plannerAssign: parkolt fuvar jármű-kiosztása → Alocat (folytatás)', async () => {
+    await pool.query(
+      "INSERT INTO vehicles (tip, rendszam, company_id) VALUES ('Vontato', 'TEST01', $1)", [companyId]);
+    await pool.query(
+      "INSERT INTO orders (id, company_id, status, loc_incarcare) VALUES ('CMD-PK', $1, 'Parkolt', 'Depou')", [companyId]);
+    const res = makeRes();
+    await orders.plannerAssign(admin(companyId), res, ['CMD-PK', { rendszam_camion: 'TEST01' }]);
+    expect(res.body.result.ok).toBe(true);
+    const o = (await pool.query("SELECT status, rendszam_camion FROM orders WHERE id = 'CMD-PK'")).rows[0];
+    expect(o.status).toBe('Alocat');
+    expect(o.rendszam_camion).toBe('TEST01');
+  });
+});
