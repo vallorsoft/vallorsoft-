@@ -21,7 +21,7 @@ function _isAdminOrManager(req) {
 }
 
 function _deny(res) {
-  return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+  return res.json({ result: { ok: false, err: 'Acces interzis' } });
 }
 
 // args: {from:'YYYY-MM-DD', to:'YYYY-MM-DD'} — hiányzó érték esetén
@@ -67,7 +67,7 @@ handlers.getMyStatsPermissions = async function (req, res, args) {
     return res.json({ result: { ok: true, finance } });
   } catch (err) {
     console.error('getMyStatsPermissions hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -89,7 +89,7 @@ handlers.getStatsPermissions = async function (req, res, args) {
     return res.json({ result: { ok: true, users: r.rows } });
   } catch (err) {
     console.error('getStatsPermissions hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -99,13 +99,13 @@ handlers.setStatsPermission = async function (req, res, args) {
     const cid = req.session.user.company_id;
     const userId = parseInt(args[0], 10);
     const enabled = !!args[1];
-    if (!Number.isFinite(userId)) return res.json({ result: { ok: false, err: 'Hibás felhasználó' } });
+    if (!Number.isFinite(userId)) return res.json({ result: { ok: false, err: 'Utilizator incorect' } });
     // Csak a saját cég Manager-e kapcsolható
     const ur = await pool.query(
       `SELECT id FROM users WHERE id = $1 AND company_id = $2 AND pozicio = 'Manager'`,
       [userId, cid]
     );
-    if (!ur.rows.length) return res.json({ result: { ok: false, err: 'A felhasználó nem található' } });
+    if (!ur.rows.length) return res.json({ result: { ok: false, err: 'Utilizatorul nu a fost gasit' } });
     await pool.query(
       `INSERT INTO user_permissions (company_id, user_id, perm_key, enabled, updated_at)
        VALUES ($1, $2, 'stats_finance', $3, NOW())
@@ -116,7 +116,7 @@ handlers.setStatsPermission = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('setStatsPermission hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -134,10 +134,10 @@ handlers.markOrderPayment = async function (req, res, args) {
       `SELECT id, pret, paid_amount, status FROM orders WHERE id = $1 AND company_id = $2`,
       [orderId, cid]
     );
-    if (!or.rows.length) return res.json({ result: { ok: false, err: 'Fuvar nem található' } });
+    if (!or.rows.length) return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit' } });
     const o = or.rows[0];
     if (o.status !== 'Finalizat') {
-      return res.json({ result: { ok: false, err: 'Csak Finalizat fuvarhoz rögzíthető fizetés' } });
+      return res.json({ result: { ok: false, err: 'Plata poate fi inregistrata doar pentru un transport Finalizat' } });
     }
 
     if (p.reset) {
@@ -152,7 +152,7 @@ handlers.markOrderPayment = async function (req, res, args) {
 
     const amount = parseFloat(p.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      return res.json({ result: { ok: false, err: 'Érvénytelen összeg' } });
+      return res.json({ result: { ok: false, err: 'Suma invalida' } });
     }
     const pret = parseFloat(o.pret) || 0;
     const newPaid = Math.round(((parseFloat(o.paid_amount) || 0) + amount) * 100) / 100;
@@ -166,7 +166,7 @@ handlers.markOrderPayment = async function (req, res, args) {
     return res.json({ result: { ok: true, payment_status: status, paid_amount: newPaid } });
   } catch (err) {
     console.error('markOrderPayment hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -307,7 +307,7 @@ handlers.getStatsOverview = async function (req, res, args) {
     }});
   } catch (err) {
     console.error('getStatsOverview hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -322,14 +322,14 @@ handlers.setEurRonRate = async function (req, res, args) {
     if (raw !== null && raw !== undefined && String(raw).trim() !== '') {
       rate = parseFloat(raw);
       if (!Number.isFinite(rate) || rate < 0.5 || rate > 20) {
-        return res.json({ result: { ok: false, err: 'Érvénytelen árfolyam (0.5–20 között adható meg)' } });
+        return res.json({ result: { ok: false, err: 'Curs valutar invalid (se poate seta intre 0.5 si 20)' } });
       }
     }
     await pool.query('UPDATE companies SET eur_ron_rate = $1 WHERE id = $2', [rate, cid]);
     return res.json({ result: { ok: true, eur_ron_rate: rate } });
   } catch (err) {
     console.error('setEurRonRate hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -352,13 +352,13 @@ handlers.getBnrRate = async function (req, res, args) {
     } finally { clearTimeout(t); }
     const m = xml.match(/<Rate[^>]*currency="EUR"[^>]*>([\d.]+)<\/Rate>/i);
     const dm = xml.match(/<Cube[^>]*date="([\d-]+)"/i);
-    if (!m) return res.json({ result: { ok: false, err: 'A BNR árfolyam nem olvasható ki.' } });
+    if (!m) return res.json({ result: { ok: false, err: 'Cursul BNR nu poate fi citit.' } });
     const rate = parseFloat(m[1]);
     _bnrCache = { ts: Date.now(), rate, date: dm ? dm[1] : null };
     return res.json({ result: { ok: true, rate, date: _bnrCache.date } });
   } catch (err) {
     console.error('getBnrRate hiba:', err);
-    return res.json({ result: { ok: false, err: 'A BNR nem elérhető.' } });
+    return res.json({ result: { ok: false, err: 'BNR nu este disponibil.' } });
   }
 };
 
@@ -367,7 +367,7 @@ handlers.getFinanceStats = async function (req, res, args) {
   try {
     if (!_isAdminOrManager(req)) return _deny(res);
     if (!(await _canSeeFinance(req))) {
-      return res.json({ result: { ok: false, err: 'Az admin nem engedélyezte számodra a pénzügyi riportot', forbidden: true } });
+      return res.json({ result: { ok: false, err: 'Adminul nu ti-a permis accesul la raportul financiar', forbidden: true } });
     }
     const cid = req.session.user.company_id;
     const { from, to } = _range(args);
@@ -431,7 +431,7 @@ handlers.getFinanceStats = async function (req, res, args) {
     }});
   } catch (err) {
     console.error('getFinanceStats hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -443,7 +443,7 @@ handlers.getOrderProfit = async function (req, res, args) {
   try {
     if (!_isAdminOrManager(req)) return _deny(res);
     if (!(await _canSeeFinance(req))) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultság a pénzügyi riporthoz', forbidden: true } });
+      return res.json({ result: { ok: false, err: 'Nu aveti permisiune pentru raportul financiar', forbidden: true } });
     }
     const cid = req.session.user.company_id;
     const { from, to } = _range(args);
@@ -478,7 +478,7 @@ handlers.getOrderProfit = async function (req, res, args) {
     return res.json({ result: { ok: true, rows: r.rows, eur_ron_rate: eurRonRate } });
   } catch (err) {
     console.error('getOrderProfit hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -540,7 +540,7 @@ handlers.getFuelStats = async function (req, res, args) {
     }});
   } catch (err) {
     console.error('getFuelStats hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -599,7 +599,7 @@ handlers.getPurchaseStats = async function (req, res, args) {
     }});
   } catch (err) {
     console.error('getPurchaseStats hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -669,7 +669,7 @@ handlers.getDriverStats = async function (req, res, args) {
     return res.json({ result: { ok: true, soforok, eur_ron_rate: eurRonRate } });
   } catch (err) {
     console.error('getDriverStats hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -759,7 +759,7 @@ handlers.getVehicleStats = async function (req, res, args) {
     return res.json({ result: { ok: true, jarmuvek, eur_ron_rate: eurRonRate } });
   } catch (err) {
     console.error('getVehicleStats hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -797,7 +797,7 @@ handlers.getClientStats = async function (req, res, args) {
     return res.json({ result: { ok: true, finance, ugyfelek } });
   } catch (err) {
     console.error('getClientStats hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -842,7 +842,7 @@ handlers.getMySoferStats = async function (req, res, args) {
     }});
   } catch (err) {
     console.error('getMySoferStats hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -910,7 +910,7 @@ handlers.getGpsFleetSnapshot = async function (req, res, args) {
     return res.json({ result: payload });
   } catch (err) {
     console.error('getGpsFleetSnapshot hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 

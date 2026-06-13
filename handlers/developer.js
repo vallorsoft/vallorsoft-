@@ -11,7 +11,7 @@ const handlers = {};
 
 handlers.devCompanyList = async function (req, res, args) {
       const isDev = req.session.user && req.session.user.is_dev;
-    if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     try {
       const r = await pool.query(`
         SELECT c.*,
@@ -26,7 +26,7 @@ handlers.devCompanyList = async function (req, res, args) {
 
 handlers.devCompanyUpdate = async function (req, res, args) {
       const isDev = req.session.user && req.session.user.is_dev;
-    if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     try {
       const id = parseInt(args[0], 10);
       const f = args[1] || {};
@@ -41,16 +41,16 @@ handlers.devCompanyUpdate = async function (req, res, args) {
       if (f.max_users !== undefined) { updates.push(`max_users=$${i++}`); values.push(intOrNull(f.max_users)); }
       if (f.max_trucks !== undefined) { updates.push(`max_trucks=$${i++}`); values.push(intOrNull(f.max_trucks)); }
       if (f.igazgato_nev !== undefined) { updates.push(`igazgato_nev=$${i++}`); values.push(f.igazgato_nev); }
-      if (!updates.length) return res.json({ result: { ok: false, err: 'Nincs mit modositani' } });
+      if (!updates.length) return res.json({ result: { ok: false, err: 'Nimic de modificat' } });
       values.push(id);
       await pool.query(`UPDATE companies SET ${updates.join(',')} WHERE id=$${i}`, values);
       return res.json({ result: { ok: true } });
-    } catch (err) { return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+    } catch (err) { return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
   };
 
 handlers.devCompanyCreate = async function (req, res, args) {
       const isDev = req.session.user && req.session.user.is_dev;
-    if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     try {
       const f = args[0] || {};
       const r = await pool.query(
@@ -76,17 +76,17 @@ handlers.devCompanyCreate = async function (req, res, args) {
       }
 
       return res.json({ result: { ok: true, id: companyId, invite_kod: kod } });
-    } catch (err) { return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+    } catch (err) { return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
   };
 
 handlers.devCompanyDelete = async function (req, res, args) {
       const isDev = req.session.user && req.session.user.is_dev;
-    if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     try {
       const id = parseInt(args[0], 10);
       const kod = String(args[1] || '');
       if (kod !== 'vallorsoftcegtorlo1') {
-        return res.json({ result: { ok: false, err: 'Helytelen megerosito kod.' } });
+        return res.json({ result: { ok: false, err: 'Cod de confirmare incorect.' } });
       }
       // Cascade torles — tranzakcióban: félbeszakadásnál ne maradjanak árva sorok
       const dbc = await pool.connect();
@@ -120,7 +120,7 @@ handlers.devCompanyDelete = async function (req, res, args) {
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('devCompanyDelete hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
@@ -141,28 +141,28 @@ handlers.devUserList = async function (req, res, args) {
 // ─── Funkció-kapcsolók (előfizetés) cégenként ───────────────
 handlers.devGetCompanyFeatures = async function (req, res, args) {
   const isDev = req.session.user && req.session.user.is_dev;
-  if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+  if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
   try {
     const cid = parseInt(args[0], 10);
-    if (!cid) return res.json({ result: { ok: false, err: 'Hiányzó cég ID.' } });
+    if (!cid) return res.json({ result: { ok: false, err: 'ID-ul firmei lipseste.' } });
     const r = await pool.query('SELECT feature_key, enabled FROM company_features WHERE company_id = $1', [cid]);
     const features = {};
     r.rows.forEach((row) => { features[row.feature_key] = row.enabled; });
     return res.json({ result: { ok: true, features } });
   } catch (err) {
     console.error('devGetCompanyFeatures hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 handlers.devSetCompanyFeature = async function (req, res, args) {
   const isDev = req.session.user && req.session.user.is_dev;
-  if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+  if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
   try {
     const cid = parseInt(args[0], 10);
     const key = String(args[1] || '').trim();
     const enabled = !!args[2];
-    if (!cid || !key || key.length > 60) return res.json({ result: { ok: false, err: 'Hiányzó adat.' } });
+    if (!cid || !key || key.length > 60) return res.json({ result: { ok: false, err: 'Date lipsa.' } });
     await pool.query(
       `INSERT INTO company_features (company_id, feature_key, enabled, updated_at)
        VALUES ($1, $2, $3, now())
@@ -172,39 +172,39 @@ handlers.devSetCompanyFeature = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('devSetCompanyFeature hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 // ─── Felhasználó tiltása / törlése (developer) ──────────────
 handlers.devUserSetBlocked = async function (req, res, args) {
   const isDev = req.session.user && req.session.user.is_dev;
-  if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+  if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
   try {
     const id = parseInt(args[0], 10);
     const blocked = !!args[1];
-    if (!id) return res.json({ result: { ok: false, err: 'Hiányzó user ID.' } });
+    if (!id) return res.json({ result: { ok: false, err: 'ID-ul utilizatorului lipseste.' } });
     const u = await pool.query('SELECT pozicio_dev FROM users WHERE id = $1', [id]);
-    if (!u.rows.length) return res.json({ result: { ok: false, err: 'Felhasználó nem található.' } });
-    if (u.rows[0].pozicio_dev) return res.json({ result: { ok: false, err: 'Developer fiók nem tiltható.' } });
+    if (!u.rows.length) return res.json({ result: { ok: false, err: 'Utilizatorul nu a fost gasit.' } });
+    if (u.rows[0].pozicio_dev) return res.json({ result: { ok: false, err: 'Contul de developer nu poate fi blocat.' } });
     await pool.query('UPDATE users SET blocked = $1 WHERE id = $2', [blocked, id]);
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('devUserSetBlocked hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 handlers.devUserDelete = async function (req, res, args) {
   const isDev = req.session.user && req.session.user.is_dev;
-  if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+  if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
   try {
     const id = parseInt(args[0], 10);
-    if (!id) return res.json({ result: { ok: false, err: 'Hiányzó user ID.' } });
+    if (!id) return res.json({ result: { ok: false, err: 'ID-ul utilizatorului lipseste.' } });
     const u = await pool.query('SELECT email, pozicio_dev FROM users WHERE id = $1', [id]);
-    if (!u.rows.length) return res.json({ result: { ok: false, err: 'Felhasználó nem található.' } });
-    if (u.rows[0].pozicio_dev) return res.json({ result: { ok: false, err: 'Developer fiók nem törölhető.' } });
-    if (id === req.session.user.id) return res.json({ result: { ok: false, err: 'Saját fiók nem törölhető.' } });
+    if (!u.rows.length) return res.json({ result: { ok: false, err: 'Utilizatorul nu a fost gasit.' } });
+    if (u.rows[0].pozicio_dev) return res.json({ result: { ok: false, err: 'Contul de developer nu poate fi sters.' } });
+    if (id === req.session.user.id) return res.json({ result: { ok: false, err: 'Contul propriu nu poate fi sters.' } });
     const email = u.rows[0].email;
     // A felhasználó személyes adatainak takarítása (email alapján)
     await pool.query('DELETE FROM border_crossings WHERE LOWER(email_sofer) = LOWER($1)', [email]);
@@ -215,17 +215,17 @@ handlers.devUserDelete = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('devUserDelete hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 handlers.sendBugReport = async function (req, res, args) {
     try {
-      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve.' } });
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat.' } });
       const szoveg = String(args[0] || '').trim();
       const oldal  = String(args[1] || '').trim();
-      if (!szoveg || szoveg.length < 5) return res.json({ result: { ok: false, err: 'Írj le legalább 5 karaktert!' } });
-      if (szoveg.length > 2000) return res.json({ result: { ok: false, err: 'Túl hosszú szöveg (max 2000 karakter).' } });
+      if (!szoveg || szoveg.length < 5) return res.json({ result: { ok: false, err: 'Scrie cel putin 5 caractere!' } });
+      if (szoveg.length > 2000) return res.json({ result: { ok: false, err: 'Text prea lung (max 2000 caractere).' } });
       await pool.query(
         `INSERT INTO bug_reports (company_id, user_email, user_name, user_role, szoveg, oldal)
          VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -234,7 +234,7 @@ handlers.sendBugReport = async function (req, res, args) {
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('sendBugReport hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba.' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server.' } });
     }
   };
 
@@ -274,10 +274,10 @@ handlers.markBugRead = async function (req, res, args) {
 
 handlers.devCompanyDetail = async function (req, res, args) {
       const isDev = req.session.user && req.session.user.is_dev;
-    if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     try {
       const cid = parseInt(args[0]);
-      if (!cid) return res.json({ result: { ok: false, err: 'Hiányzó cég ID.' } });
+      if (!cid) return res.json({ result: { ok: false, err: 'ID-ul firmei lipseste.' } });
 
       const users = await pool.query(`
         SELECT
@@ -310,13 +310,13 @@ handlers.devCompanyDetail = async function (req, res, args) {
       return res.json({ result: { ok: true, users: users.rows, osszesito: osszesito.rows[0] }});
     } catch (err) {
       console.error('devCompanyDetail hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
 handlers.devStats = async function (req, res, args) {
       const isDev = req.session.user && req.session.user.is_dev;
-    if (!isDev) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     try {
       const cegek = await pool.query('SELECT COUNT(*)::int AS db FROM companies');
       const userek = await pool.query('SELECT COUNT(*)::int AS db FROM users WHERE pozicio_dev IS NOT TRUE');

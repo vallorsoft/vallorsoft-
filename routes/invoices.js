@@ -34,7 +34,7 @@ router.get('/api/integrations/invoicing', requireLogin, async (req, res) => {
 
 router.post('/api/integrations/invoicing', requireLogin, requireRole('Admin'), async (req, res) => {
   const b = req.body || {};
-  if (!b.provider) return res.status(400).json({ error: 'provider kötelező.' });
+  if (!b.provider) return res.status(400).json({ error: 'provider este obligatoriu.' });
   try {
     getAdapter(b.provider);
     const codUnic = (b.cod_unic || '').trim();
@@ -74,13 +74,13 @@ router.post('/api/integrations/invoicing', requireLogin, requireRole('Admin'), a
 router.post('/api/integrations/invoicing/test', requireLogin, requireRole('Admin'), async (req, res) => {
   try {
     const cfg = await svc.getInvoiceConfig(pool, req.session.user.company_id);
-    if (!cfg || !cfg.provider) return res.status(409).json({ ok: false, error: 'Nincs mentett számlázó. Előbb add meg és mentsd el a CodUnic + kulcs adatokat.' });
+    if (!cfg || !cfg.provider) return res.status(409).json({ ok: false, error: 'Nu exista facturator salvat. Introduceti si salvati mai intai datele CodUnic + cheie.' });
     if (cfg.source === 'framework') {
       const r = await billing.getAdapter(cfg.provider, cfg.creds).testConnection();
-      return res.json({ ok: !!r.ok, message: (r.message || '') + ' (univerzális számlázó: ' + billing.displayName(cfg.provider) + ')' });
+      return res.json({ ok: !!r.ok, message: (r.message || '') + ' (facturator universal: ' + billing.displayName(cfg.provider) + ')' });
     }
     const adapter = getAdapter(cfg.provider);
-    if (!adapter.testConnection) return res.json({ ok: true, message: 'Ehhez a szolgáltatóhoz nincs kapcsolat-teszt.' });
+    if (!adapter.testConnection) return res.json({ ok: true, message: 'Acest furnizor nu are test de conexiune.' });
     const r = await adapter.testConnection(cfg.creds);
     res.json({ ok: !!r.ok, message: r.message });
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
@@ -100,9 +100,9 @@ router.get('/api/integrations/invoicing/articles', requireLogin, async (req, res
 router.post('/api/orders/:id/invoice/preview', requireLogin, async (req, res) => {
   try {
     const cfg = await svc.getInvoiceConfig(pool, req.session.user.company_id);
-    if (!cfg) return res.status(409).json({ error: 'Nincs bekapcsolt számlázó.' });
+    if (!cfg) return res.status(409).json({ error: 'Nu exista facturator activat.' });
     const ord = await pool.query(`SELECT * FROM orders WHERE id=$1 AND company_id=$2`, [req.params.id, req.session.user.company_id]);
-    if (!ord.rows.length) return res.status(404).json({ error: 'Fuvar nem található.' });
+    if (!ord.rows.length) return res.status(404).json({ error: 'Cursa nu a fost gasita.' });
     let client = null;
     if (ord.rows[0].client_id) {
       const c = await pool.query(`SELECT * FROM clients WHERE id=$1 AND company_id=$2`, [ord.rows[0].client_id, req.session.user.company_id]);
@@ -144,10 +144,10 @@ router.post('/api/invoices/:id/status', requireLogin, async (req, res) => {
   try {
     const cid = req.session.user.company_id;
     const inv = await pool.query(`SELECT * FROM invoices WHERE id=$1 AND company_id=$2`, [req.params.id, cid]);
-    if (!inv.rows.length) return res.status(404).json({ error: 'Számla nem található.' });
+    if (!inv.rows.length) return res.status(404).json({ error: 'Factura nu a fost gasita.' });
     const row = inv.rows[0];
     const cfg = await svc.getInvoiceConfig(pool, cid);
-    if (!cfg) return res.json({ ok: false, message: 'Nincs számlázó-integráció beállítva.' });
+    if (!cfg) return res.json({ ok: false, message: 'Nu este configurata nicio integrare de facturare.' });
 
     // 1) Legacy adapter (pl. fgo) getStatus; 2) keretrendszer-adapter getInvoice.
     let st = null;
@@ -164,7 +164,7 @@ router.post('/api/invoices/:id/status', requireLogin, async (req, res) => {
         }
       } catch (_) {}
     }
-    if (!st) return res.json({ ok: false, message: 'Ehhez a szolgáltatóhoz nincs számla-státusz lekérdezés.' });
+    if (!st) return res.json({ ok: false, message: 'Acest furnizor nu are interogare de status factura.' });
     if (!st.ok) return res.json(st);
 
     // e-Factura (ANAF SPV) státusz kinyerése + tárolása — ezt mutatja a

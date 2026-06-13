@@ -14,17 +14,17 @@ class IFacturaAdapter {
   }
 
   async testConnection() {
-    if (!this.c.api_key || !this.c.company_id) return { ok: false, message: 'Hiányzó API kulcs / cég azonosító.' };
+    if (!this.c.api_key || !this.c.company_id) return { ok: false, message: 'Lipsește cheia API / identificatorul firmei.' };
     try {
       // Könnyű, hitelesített próbahívás; ha a végpont nem így viselkedik, a creds akkor is rögzül.
       const r = await jsonT(BASE + '/v1/companies/' + encodeURIComponent(this.c.company_id), { method: 'GET', headers: this._headers() }, 10000);
-      if (r.status === 401 || r.status === 403) return { ok: false, message: 'Érvénytelen API kulcs.' };
-      if (r.status === 429) return { ok: false, message: 'iFactura API limit elérve.' };
-      return { ok: true, message: 'iFactura adatok rögzítve.' };
+      if (r.status === 401 || r.status === 403) return { ok: false, message: 'Cheie API invalidă.' };
+      if (r.status === 429) return { ok: false, message: 'Limita API iFactura atinsă.' };
+      return { ok: true, message: 'Date iFactura salvate.' };
     } catch (e) {
       // BÉTA: a publikus API-séma nem megerősített — a hibát nem rejtjük el,
       // de jelezzük, hogy az adatok rögzíthetők (unverified flaggel).
-      return { ok: true, unverified: true, message: '⚠️ iFactura (BÉTA): a kapcsolat NEM ellenőrizhető (' + e.message + ') — az adatok rögzítve, de éles számlázás előtt kötelező a tesztelés.' };
+      return { ok: true, unverified: true, message: '⚠️ iFactura (BETA): conexiunea NU poate fi verificată (' + e.message + ') — datele sunt salvate, dar înainte de facturarea reală testarea este obligatorie.' };
     }
   }
 
@@ -37,16 +37,16 @@ class IFacturaAdapter {
         items: (d.items || []).map((it) => ({ name: it.name, unit: it.unit || 'buc', quantity: it.quantity, price_net: it.price_net, vat_percent: it.vat_percent })),
       };
       const r = await jsonT(BASE + '/v1/invoices', { method: 'POST', headers: this._headers(), body: JSON.stringify(body) });
-      if (r.status === 429) return { ok: false, message: 'iFactura API limit elérve.' };
-      if (!r.ok) return { ok: false, message: (r.data && (r.data.message || r.data.error)) || ('iFactura hiba (' + r.status + ')') };
+      if (r.status === 429) return { ok: false, message: 'Limita API iFactura atinsă.' };
+      if (!r.ok) return { ok: false, message: (r.data && (r.data.message || r.data.error)) || ('Eroare iFactura (' + r.status + ')') };
       return { ok: true, serie: r.data.series || null, numar: r.data.number || r.data.invoice_number || null, invoice_number: r.data.number || r.data.invoice_number || null, pdf_url: r.data.pdf_url || r.data.url || null, raw: r.data };
-    } catch (e) { return { ok: false, message: 'iFactura hiba: ' + e.message }; }
+    } catch (e) { return { ok: false, message: 'Eroare iFactura: ' + e.message }; }
   }
 
   async getInvoice(invoice_number) {
     try {
       const r = await jsonT(BASE + '/v1/invoices/' + encodeURIComponent(invoice_number), { method: 'GET', headers: this._headers() });
-      if (!r.ok) return { ok: false, message: 'Nem található (' + r.status + ').' };
+      if (!r.ok) return { ok: false, message: 'Nu a fost găsit (' + r.status + ').' };
       return { ok: true, invoice: r.data };
     } catch (e) { return { ok: false, message: e.message }; }
   }

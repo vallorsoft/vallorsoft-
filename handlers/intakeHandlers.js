@@ -37,11 +37,11 @@ async function loadCreds(companyId) {
 // A beküldött args -> credentials objektum a tárolt szolgáltató-formátum szerint. Hibát dob, ha érvénytelen.
 function buildCreds(a) {
   const provider = String(a.provider || '').trim().toLowerCase();
-  if (['gmail', 'outlook', 'custom'].indexOf(provider) < 0) throw new Error('Ismeretlen szolgáltató.');
+  if (['gmail', 'outlook', 'custom'].indexOf(provider) < 0) throw new Error('Furnizor necunoscut.');
   const email = String(a.email || '').trim();
-  if (!validEmail(email)) throw new Error('Érvénytelen e-mail cím.');
+  if (!validEmail(email)) throw new Error('Adresa de e-mail invalida.');
   const password = String(a.password || '');
-  if (password.length < 6) throw new Error('A jelszó legalább 6 karakter legyen.');
+  if (password.length < 6) throw new Error('Parola trebuie sa aiba cel putin 6 caractere.');
   const mailbox = String(a.mailbox || 'INBOX').trim() || 'INBOX';
 
   if (provider === 'gmail') return { provider, email, app_password: password, mailbox };
@@ -49,8 +49,8 @@ function buildCreds(a) {
   // custom
   const host = String(a.host || '').trim();
   const port = parseInt(a.port, 10);
-  if (!host) throw new Error('Egyedi IMAP esetén a szerver megadása kötelező.');
-  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Érvénytelen port.');
+  if (!host) throw new Error('Pentru IMAP personalizat, serverul este obligatoriu.');
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port invalid.');
   const tls = !(a.tls === false || String(a.tls) === 'false');
   return { provider, host, port, tls, email, password, mailbox };
 }
@@ -59,7 +59,7 @@ function buildCreds(a) {
 handlers.getEmailIntakeConfig = async function (req, res, args) {
   try {
     const u = req.session.user;
-    if (!u) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve' } });
+    if (!u) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
     const { rows } = await pool.query(
       `SELECT provider, enabled, meta, updated_at, last_check FROM company_integrations
        WHERE company_id=$1 AND provider='email_intake'`, [u.company_id]);
@@ -78,7 +78,7 @@ handlers.getEmailIntakeConfig = async function (req, res, args) {
     } });
   } catch (err) {
     console.error('getEmailIntakeConfig hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -86,7 +86,7 @@ handlers.getEmailIntakeConfig = async function (req, res, args) {
 handlers.saveEmailIntakeConfig = async function (req, res, args) {
   try {
     const u = req.session.user;
-    if (!isAdminOrDev(u)) return res.json({ result: { ok: false, err: 'Csak Admin módosíthatja.' } });
+    if (!isAdminOrDev(u)) return res.json({ result: { ok: false, err: 'Doar Adminul poate modifica.' } });
     let creds;
     try { creds = buildCreds(argOf(args)); } catch (e) { return res.json({ result: { ok: false, err: e.message } }); }
 
@@ -108,7 +108,7 @@ handlers.saveEmailIntakeConfig = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('saveEmailIntakeConfig hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -118,24 +118,24 @@ handlers.saveEmailIntakeConfig = async function (req, res, args) {
 handlers.testEmailIntakeConfig = async function (req, res, args) {
   try {
     const u = req.session.user;
-    if (!isAdminOrDev(u)) return res.json({ result: { ok: false, err: 'Csak Admin tesztelheti.' } });
+    if (!isAdminOrDev(u)) return res.json({ result: { ok: false, err: 'Doar Adminul poate testa.' } });
     const a = argOf(args);
     let creds;
     if (a && a.password) {
       try { creds = buildCreds(a); } catch (e) { return res.json({ result: { ok: false, err: e.message } }); }
     } else {
       creds = await loadCreds(u.company_id);
-      if (!creds) return res.json({ result: { ok: false, err: 'Nincs mentett beállítás. Add meg az adatokat és teszteld.' } });
+      if (!creds) return res.json({ result: { ok: false, err: 'Nu exista setari salvate. Introdu datele si testeaza.' } });
     }
     try {
       const r = await intake.testConnection(creds);
-      return res.json({ result: { ok: true, message: 'Kapcsolat sikeres! ' + (r.count || 0) + ' email található a postafiókban.' } });
+      return res.json({ result: { ok: true, message: 'Conexiune reusita! ' + (r.count || 0) + ' email-uri gasite in casuta postala.' } });
     } catch (e) {
-      return res.json({ result: { ok: false, err: 'Kapcsolódási hiba: ' + (e.message || 'ismeretlen') } });
+      return res.json({ result: { ok: false, err: 'Eroare de conectare: ' + (e.message || 'necunoscut') } });
     }
   } catch (err) {
     console.error('testEmailIntakeConfig hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -143,13 +143,13 @@ handlers.testEmailIntakeConfig = async function (req, res, args) {
 handlers.deleteEmailIntakeConfig = async function (req, res, args) {
   try {
     const u = req.session.user;
-    if (!isAdminOrDev(u)) return res.json({ result: { ok: false, err: 'Csak Admin törölheti.' } });
+    if (!isAdminOrDev(u)) return res.json({ result: { ok: false, err: 'Doar Adminul poate sterge.' } });
     await pool.query(
       `DELETE FROM company_integrations WHERE company_id=$1 AND provider='email_intake'`, [u.company_id]);
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('deleteEmailIntakeConfig hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 

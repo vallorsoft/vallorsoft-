@@ -46,9 +46,9 @@ function _str(x, max) {
 function validateHandover(data) {
   const d = data || {};
   const type = d.type === 'trailer' || d.type === 'warehouse' ? d.type : null;
-  if (!type) return { err: 'Add meg, mi történik az áruval (pótkocsin parkol / raktárba kerül).' };
+  if (!type) return { err: 'Specifica ce se intampla cu marfa (parcheaza pe remorca / intra in depozit).' };
   const location = _str(d.location, 200);
-  if (!location) return { err: 'A leadás helye (helység) kötelező.' };
+  if (!location) return { err: 'Locul predarii (localitatea) este obligatoriu.' };
   const out = {
     type,
     location,
@@ -64,10 +64,10 @@ function validateHandover(data) {
     out.height_cm = _posInt(d.height_cm);
     out.weight_kg = _posNum(d.weight_kg);
     out.doc_pages = _posInt(d.doc_pages);
-    if (!out.qty || !out.qty_unit) return { err: 'A darabszám és az egység (paletta/doboz/egyéb) kötelező.' };
-    if (!out.length_cm || !out.width_cm || !out.height_cm) return { err: 'A foglalt hely méretei (hossz/szélesség/magasság cm) kötelezők.' };
-    if (!out.weight_kg) return { err: 'A súly (kg) kötelező.' };
-    if (!out.doc_pages) return { err: 'Add meg, hány lapos a kísérő dokumentum (pl. 10).' };
+    if (!out.qty || !out.qty_unit) return { err: 'Numarul de bucati si unitatea (palet/cutie/altele) sunt obligatorii.' };
+    if (!out.length_cm || !out.width_cm || !out.height_cm) return { err: 'Dimensiunile spatiului ocupat (lungime/latime/inaltime cm) sunt obligatorii.' };
+    if (!out.weight_kg) return { err: 'Greutatea (kg) este obligatorie.' };
+    if (!out.doc_pages) return { err: 'Specifica din cate file este documentul insotitor (ex. 10).' };
   }
   return { data: out };
 }
@@ -127,7 +127,7 @@ async function applyHandover(cid, order, d, byEmail) {
 handlers.orderHandover = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const orderId = String(args[0] || '').trim();
@@ -136,16 +136,16 @@ handlers.orderHandover = async function (req, res, args) {
 
     const or = await pool.query(
       `SELECT id, status FROM orders WHERE id = $1 AND company_id = $2`, [orderId, cid]);
-    if (!or.rows.length) return res.json({ result: { ok: false, err: 'Fuvar nem található' } });
+    if (!or.rows.length) return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit' } });
     if (['Finalizat', 'Anulat'].includes(or.rows[0].status)) {
-      return res.json({ result: { ok: false, err: 'Lezárt/törölt fuvar nem adható le.' } });
+      return res.json({ result: { ok: false, err: 'Un transport inchis/sters nu poate fi predat.' } });
     }
 
     const newStatus = await applyHandover(cid, or.rows[0], v.data, req.session.user.email);
     return res.json({ result: { ok: true, status: newStatus } });
   } catch (err) {
     console.error('orderHandover hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -156,7 +156,7 @@ handlers.orderHandover = async function (req, res, args) {
 handlers.driverHandoverRequest = async function (req, res, args) {
   try {
     if (!req.session.user || req.session.user.pozicio !== 'Sofer') {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const me = req.session.user;
     const cid = me.company_id;
@@ -164,14 +164,14 @@ handlers.driverHandoverRequest = async function (req, res, args) {
     const d = args[1] || {};
     const type = d.type === 'trailer' || d.type === 'warehouse' ? d.type : null;
     const location = _str(d.location, 200);
-    if (!type) return res.json({ result: { ok: false, err: 'Add meg, mi történik az áruval.' } });
-    if (!location) return res.json({ result: { ok: false, err: 'A leadás helye (helység) kötelező.' } });
+    if (!type) return res.json({ result: { ok: false, err: 'Specifica ce se intampla cu marfa.' } });
+    if (!location) return res.json({ result: { ok: false, err: 'Locul predarii (localitatea) este obligatoriu.' } });
 
     // Rate-limit: a sofőr ne tudja push-spammelni az adminokat
     const rl = _handoverLimiter.check(String(me.email || '').toLowerCase());
     if (!rl.ok) {
       const perc = Math.ceil(rl.retryAfterSec / 60);
-      return res.json({ result: { ok: false, err: 'Túl sok leadás-kérés rövid időn belül. Próbáld újra kb. ' + perc + ' perc múlva, vagy hívd a diszpécsert.' } });
+      return res.json({ result: { ok: false, err: 'Prea multe cereri de predare intr-un timp scurt. Incearca din nou peste cca. ' + perc + ' minute sau suna dispecerul.' } });
     }
 
     // Csak az ismert mezőket tároljuk (a kliens tetszőleges payloadot küldhetne)
@@ -194,7 +194,7 @@ handlers.driverHandoverRequest = async function (req, res, args) {
       [orderId, cid, type, location, me.email, JSON.stringify(payload)]
     );
     if (!r.rowCount) {
-      return res.json({ result: { ok: false, err: 'A fuvar nem található, nem a tiéd, vagy nem aktív.' } });
+      return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit, nu este al tau sau nu este activ.' } });
     }
 
     // Push az adminoknak/managereknek — hiba esetén sem törjük a kérést
@@ -211,7 +211,7 @@ handlers.driverHandoverRequest = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('driverHandoverRequest hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -220,7 +220,7 @@ handlers.driverHandoverRequest = async function (req, res, args) {
 handlers.confirmHandover = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const orderId = String(args[0] || '').trim();
@@ -228,14 +228,14 @@ handlers.confirmHandover = async function (req, res, args) {
     const or = await pool.query(
       `SELECT id, status, handover_status, handover_payload, handover_by
        FROM orders WHERE id = $1 AND company_id = $2`, [orderId, cid]);
-    if (!or.rows.length) return res.json({ result: { ok: false, err: 'Fuvar nem található' } });
+    if (!or.rows.length) return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit' } });
     const o = or.rows[0];
     if (o.handover_status !== 'Fuggoben') {
-      return res.json({ result: { ok: false, err: 'Nincs függő leadás-kérés ezen a fuvaron.' } });
+      return res.json({ result: { ok: false, err: 'Nu exista cerere de predare in asteptare pentru acest transport.' } });
     }
     // időközben lezárt/törölt fuvar nem adható le (versenyhelyzet)
     if (['Finalizat', 'Anulat'].includes(o.status)) {
-      return res.json({ result: { ok: false, err: 'A fuvar időközben lezárult — a kérés már nem igazolható vissza.' } });
+      return res.json({ result: { ok: false, err: 'Transportul s-a inchis intre timp — cererea nu mai poate fi confirmata.' } });
     }
 
     // a sofőr payloadja az alap, az admin mezői felülírják
@@ -260,7 +260,7 @@ handlers.confirmHandover = async function (req, res, args) {
     return res.json({ result: { ok: true, status: newStatus } });
   } catch (err) {
     console.error('confirmHandover hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -268,7 +268,7 @@ handlers.confirmHandover = async function (req, res, args) {
 handlers.rejectHandover = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const orderId = String(args[0] || '').trim();
@@ -280,7 +280,7 @@ handlers.rejectHandover = async function (req, res, args) {
        RETURNING handover_by`,
       [orderId, cid]
     );
-    if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nincs függő leadás-kérés.' } });
+    if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu exista cerere de predare in asteptare.' } });
     try {
       const by = r.rows[0].handover_by;
       if (by) await sendPushToEmail(by, {
@@ -293,7 +293,7 @@ handlers.rejectHandover = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('rejectHandover hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 

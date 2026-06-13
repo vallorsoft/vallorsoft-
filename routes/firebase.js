@@ -13,7 +13,7 @@ router.get('/api/firebase-config', requireLogin, (req, res) => {
   // Minden bejelentkezett user kap config-ot (chat mindenkinek kell)
   // de csak HTTPS-rol, session utan
   if (!['Admin', 'Manager', 'Sofer'].includes(pozicio) && !isDev) {
-    return res.status(403).json({ error: 'Nincs jogosultsag' });
+    return res.status(403).json({ error: 'Nu aveti permisiune' });
   }
   res.json({
     apiKey:        process.env.FIREBASE_API_KEY        || null,
@@ -54,7 +54,7 @@ router.get('/api/geo-autocomplete', requireLogin, geoAutocomplete);
 // Firebase Custom Token - a chat hitelesiteshez (company_id custom claim)
 router.get('/api/firebase-token', requireLogin, async (req, res) => {
   try {
-    if (!fbAdmin) return res.json({ ok: false, err: 'Firebase Admin nincs konfiguralva' });
+    if (!fbAdmin) return res.json({ ok: false, err: 'Firebase Admin nu este configurat' });
     const uid = 'user_' + req.session.user.id;
     const customToken = await fbAdmin.auth().createCustomToken(uid, {
       company_id: String(req.session.user.company_id || 'global'),
@@ -64,7 +64,7 @@ router.get('/api/firebase-token', requireLogin, async (req, res) => {
     res.json({ ok: true, token: customToken });
   } catch (err) {
     console.error('firebase-token hiba:', err);
-    res.json({ ok: false, err: 'Szerver hiba' });
+    res.json({ ok: false, err: 'Eroare de server' });
   }
 });
 

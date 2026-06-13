@@ -26,7 +26,7 @@ const VENDORS = ['free', 'here', 'google'];
 
 handlers.mapsGetProvider = async function (req, res, args) {
   try {
-    if (!_admin(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_admin(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const r = await pool.query("SELECT enabled, meta, (credentials_enc IS NOT NULL) AS has_key FROM company_integrations WHERE company_id=$1 AND provider='maps'", [cid]);
     if (!r.rows.length) return res.json({ result: { ok: true, vendor: 'free', has_key: false, usage: { month: 0, prev: 0 }, cost_month: 0, cost_prev: 0 } });
@@ -37,13 +37,13 @@ handlers.mapsGetProvider = async function (req, res, args) {
     const p = VENDOR_PAID.includes(vendor) ? await _priceFor(vendor) : { unit: 0, margin: 0 };
     return res.json({ result: { ok: true, vendor, has_key: !!r.rows[0].has_key, usage,
       cost_month: _cost(usage.month, p), cost_prev: _cost(usage.prev, p), margin_pct: p.margin } });
-  } catch (err) { console.error('mapsGetProvider hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('mapsGetProvider hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 // args: [{ vendor, key? }] — üres kulcs = a tárolt kulcs megőrzése
 handlers.mapsSaveProvider = async function (req, res, args) {
   try {
-    if (!_admin(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_admin(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const a = (args && args[0]) || {};
     const vendor = VENDORS.includes(a.vendor) ? a.vendor : 'free';
@@ -62,7 +62,7 @@ handlers.mapsSaveProvider = async function (req, res, args) {
     // here/google: kulcs kell (vagy már van tárolt)
     const existing = await pool.query("SELECT credentials_enc FROM company_integrations WHERE company_id=$1 AND provider='maps'", [cid]);
     const hasStored = existing.rows.length && existing.rows[0].credentials_enc;
-    if (!key && !hasStored) return res.json({ result: { ok: false, err: 'Add meg az API-kulcsot.' } });
+    if (!key && !hasStored) return res.json({ result: { ok: false, err: 'Introdu cheia API.' } });
 
     const enc = key ? encrypt(key) : existing.rows[0].credentials_enc;
     await pool.query(
@@ -72,13 +72,13 @@ handlers.mapsSaveProvider = async function (req, res, args) {
       [cid, enc, JSON.stringify({ vendor })]);
     clearConfigCache(cid);
     return res.json({ result: { ok: true } });
-  } catch (err) { console.error('mapsSaveProvider hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('mapsSaveProvider hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 // args: [{ vendor, key? }] — gyors kulcs-teszt (a megadott VAGY a tárolt kulccsal)
 handlers.mapsTestProvider = async function (req, res, args) {
   try {
-    if (!_admin(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_admin(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const a = (args && args[0]) || {};
     const vendor = VENDORS.includes(a.vendor) ? a.vendor : 'free';
@@ -88,10 +88,10 @@ handlers.mapsTestProvider = async function (req, res, args) {
       const r = await pool.query("SELECT credentials_enc FROM company_integrations WHERE company_id=$1 AND provider='maps'", [cid]);
       if (r.rows.length && r.rows[0].credentials_enc) { try { key = require('../lib/crypto').decrypt(r.rows[0].credentials_enc); } catch (_) { key = ''; } }
     }
-    if (!key) return res.json({ result: { ok: false, err: 'Nincs kulcs a teszthez.' } });
+    if (!key) return res.json({ result: { ok: false, err: 'Nu exista cheie pentru test.' } });
     const valid = await testProvider(vendor, key);
     return res.json({ result: { ok: true, valid } });
-  } catch (err) { console.error('mapsTestProvider hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('mapsTestProvider hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 // ─── Developer: hivatalos árazás (cégeknek továbbszámlázva) ──
@@ -99,21 +99,21 @@ function _dev(req) { return req.session.user && req.session.user.is_dev; }
 
 handlers.devGetMapsPricing = async function (req, res, args) {
   try {
-    if (!_dev(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_dev(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const r = await pool.query('SELECT vendor, eur_per_unit, margin_pct FROM maps_pricing ORDER BY vendor');
     const have = {}; r.rows.forEach((x) => { have[x.vendor] = x; });
     const rows = VENDOR_PAID.map((v) => have[v] || { vendor: v, eur_per_unit: 0, margin_pct: 25 });
     return res.json({ result: { ok: true, rows } });
-  } catch (err) { console.error('devGetMapsPricing hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('devGetMapsPricing hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 // args: [{ vendor, eur_per_unit, margin_pct }]
 handlers.devSaveMapsPricing = async function (req, res, args) {
   try {
-    if (!_dev(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_dev(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const a = (args && args[0]) || {};
     const vendor = VENDOR_PAID.includes(a.vendor) ? a.vendor : null;
-    if (!vendor) return res.json({ result: { ok: false, err: 'Érvénytelen szolgáltató.' } });
+    if (!vendor) return res.json({ result: { ok: false, err: 'Furnizor invalid.' } });
     const unit = Math.max(0, Number(a.eur_per_unit) || 0);
     const margin = Math.max(0, Number(a.margin_pct) || 0);
     await pool.query(
@@ -121,13 +121,13 @@ handlers.devSaveMapsPricing = async function (req, res, args) {
        ON CONFLICT (vendor) DO UPDATE SET eur_per_unit=$2, margin_pct=$3, updated_at=NOW()`,
       [vendor, unit, margin]);
     return res.json({ result: { ok: true } });
-  } catch (err) { console.error('devSaveMapsPricing hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('devSaveMapsPricing hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 // Cégenkénti térkép-használat és fizetendő (aktuális hónap)
 handlers.devMapsUsageOverview = async function (req, res, args) {
   try {
-    if (!_dev(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_dev(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const ym = new Date().getFullYear() + '-' + ('0' + (new Date().getMonth() + 1)).slice(-2);
     const pr = await pool.query('SELECT vendor, eur_per_unit, margin_pct FROM maps_pricing');
     const price = {}; pr.rows.forEach((x) => { price[x.vendor] = { unit: Number(x.eur_per_unit) || 0, margin: Number(x.margin_pct) || 0 }; });
@@ -141,7 +141,7 @@ handlers.devMapsUsageOverview = async function (req, res, args) {
         cost: Math.round((x.cnt * p.unit * (1 + p.margin / 100)) * 100) / 100 };
     });
     return res.json({ result: { ok: true, rows } });
-  } catch (err) { console.error('devMapsUsageOverview hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('devMapsUsageOverview hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 module.exports = handlers;

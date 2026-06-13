@@ -19,7 +19,7 @@ function _range(a) {
 
 handlers.getAccountingDocs = async function (req, res, args) {
   try {
-    if (!_ok(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_ok(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const { from, to } = _range(args);
 
@@ -58,7 +58,7 @@ handlers.getAccountingDocs = async function (req, res, args) {
       nev: req.session.user.nume || req.session.user.email, ceg_nev: (co.rows[0] || {}).nev || '' } });
   } catch (err) {
     console.error('getAccountingDocs hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 

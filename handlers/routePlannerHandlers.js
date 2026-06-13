@@ -30,13 +30,13 @@ async function jsonGet(url) {
     let body;
     try { body = await res.json(); } catch (_) { body = {}; }
     if (!res.ok) {
-      const e = new Error('Térkép-szolgáltatás hiba (' + res.status + ')');
+      const e = new Error('Eroare serviciu de harti (' + res.status + ')');
       e.status = res.status;
       throw e;
     }
     return body;
   } catch (e) {
-    if (e.name === 'AbortError') throw new Error('A térkép-szolgáltatás időtúllépés miatt nem válaszolt.');
+    if (e.name === 'AbortError') throw new Error('Serviciul de harti nu a raspuns din cauza expirarii timpului.');
     throw e;
   } finally {
     clearTimeout(t);
@@ -49,7 +49,7 @@ async function geocodeFree(addr) {
   const data = await jsonGet(url);
   const f = (data.features || [])[0];
   if (!f || !f.geometry || !Array.isArray(f.geometry.coordinates)) {
-    throw new Error('Nem található koordináta ehhez a címhez: ' + addr);
+    throw new Error('Nu s-au gasit coordonate pentru aceasta adresa: ' + addr);
   }
   const lng = f.geometry.coordinates[0];
   const lat = f.geometry.coordinates[1];
@@ -90,7 +90,7 @@ async function orsLeg(a, b, cp) {
       throw e;
     }
     const feat = (data.features || [])[0];
-    if (!feat || !feat.geometry) throw new Error('Nem található kamionos útvonal a pontok között.');
+    if (!feat || !feat.geometry) throw new Error('Nu s-a gasit ruta pentru camion intre puncte.');
     const sum = (feat.properties && feat.properties.summary) || {};
     return {
       distance: sum.distance || 0,
@@ -109,7 +109,7 @@ async function osrmLeg(a, b) {
     + '?overview=full&geometries=geojson&alternatives=false&steps=false';
   const data = await jsonGet(url);
   if (data.code !== 'Ok' || !(data.routes || []).length) {
-    throw new Error('Nem található útvonal a megadott pontok között.');
+    throw new Error('Nu s-a gasit ruta intre punctele specificate.');
   }
   const r0 = data.routes[0];
   const coords = ((r0.geometry && r0.geometry.coordinates) || []).map((c) => [c[1], c[0]]); // [lng,lat] -> [lat,lng]
@@ -148,7 +148,7 @@ const handlers = {};
 handlers.getOrdersForRoutePlanning = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const r = await pool.query(
       `SELECT o.id, o.loc_incarcare, o.loc_descarcare, o.status, o.client,
@@ -168,7 +168,7 @@ handlers.getOrdersForRoutePlanning = async function (req, res, args) {
     return res.json({ result: { ok: true, orders: r.rows } });
   } catch (err) {
     console.error('getOrdersForRoutePlanning hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -177,7 +177,7 @@ handlers.getOrdersForRoutePlanning = async function (req, res, args) {
 handlers.getVehiclesForRouting = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const r = await pool.query(
       `SELECT id, rendszam, marca, model, tip,
@@ -199,7 +199,7 @@ handlers.getVehiclesForRouting = async function (req, res, args) {
     return res.json({ result: { ok: true, vehicles: r.rows } });
   } catch (err) {
     console.error('getVehiclesForRouting hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -207,25 +207,25 @@ handlers.getVehiclesForRouting = async function (req, res, args) {
 handlers.getVehicleGpsPosition = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, message: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, message: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const vehicleId = parseInt(a.vehicleId, 10);
-    if (!vehicleId) return res.json({ result: { ok: false, message: 'Hiányzó jármű azonosító' } });
+    if (!vehicleId) return res.json({ result: { ok: false, message: 'ID-ul vehiculului lipseste' } });
 
     const vr = await pool.query('SELECT rendszam FROM vehicles WHERE id = $1 AND company_id = $2', [vehicleId, cid]);
-    if (!vr.rows.length) return res.json({ result: { ok: false, message: 'Jármű nem található' } });
+    if (!vr.rows.length) return res.json({ result: { ok: false, message: 'Vehiculul nu a fost gasit' } });
     const rendszam = vr.rows[0].rendszam;
 
     const apiKey = await getCargotrackKey(cid);
-    if (!apiKey) return res.json({ result: { ok: false, message: 'GPS pozíció nem elérhető' } });
+    if (!apiKey) return res.json({ result: { ok: false, message: 'Pozitia GPS nu este disponibila' } });
     const objectId = await objectIdForRendszam(cid, rendszam);
-    if (!objectId) return res.json({ result: { ok: false, message: 'GPS pozíció nem elérhető' } });
+    if (!objectId) return res.json({ result: { ok: false, message: 'Pozitia GPS nu este disponibila' } });
 
     const st = await ctSvc.getLatestStatus(apiKey, objectId);
     if (!st || st.latitude == null || st.longitude == null) {
-      return res.json({ result: { ok: false, message: 'GPS pozíció nem elérhető' } });
+      return res.json({ result: { ok: false, message: 'Pozitia GPS nu este disponibila' } });
     }
     return res.json({ result: {
       ok: true, lat: st.latitude, lng: st.longitude, rendszam,
@@ -233,7 +233,7 @@ handlers.getVehicleGpsPosition = async function (req, res, args) {
     } });
   } catch (err) {
     console.error('getVehicleGpsPosition hiba:', err);
-    return res.json({ result: { ok: false, message: 'GPS pozíció nem elérhető' } });
+    return res.json({ result: { ok: false, message: 'Pozitia GPS nu este disponibila' } });
   }
 };
 
@@ -244,18 +244,18 @@ handlers.getVehicleGpsPosition = async function (req, res, args) {
 handlers.calculateRoute = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     if (await routeFeatureOff(cid)) {
-      return res.json({ result: { ok: false, err: 'Az útvonaltervezés nincs előfizetve ennél a cégnél.' } });
+      return res.json({ result: { ok: false, err: 'Planificarea rutei nu este abonata la aceasta firma.' } });
     }
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const tractorId = parseInt(a.tractorId, 10) || null;
     let waypoints = Array.isArray(a.waypoints) ? a.waypoints.slice() : [];
     waypoints = waypoints.filter((w) => w && (w.address || (w.lat != null && w.lng != null)));
     if (waypoints.length < 2) {
-      return res.json({ result: { ok: false, err: 'Legalább a felrakó és lerakó pont szükséges.' } });
+      return res.json({ result: { ok: false, err: 'Sunt necesare cel putin punctul de incarcare si cel de descarcare.' } });
     }
     if (waypoints.length > 9) waypoints = waypoints.slice(0, 9); // fair-use védelem
 
@@ -264,7 +264,7 @@ handlers.calculateRoute = async function (req, res, args) {
     if (tractorId) {
       const tr = await pool.query(
         'SELECT fuel_per_100km FROM vehicles WHERE id = $1 AND company_id = $2', [tractorId, cid]);
-      if (!tr.rows.length) return res.json({ result: { ok: false, err: 'A vontató nem található.' } });
+      if (!tr.rows.length) return res.json({ result: { ok: false, err: 'Capul tractor nu a fost gasit.' } });
       fuelPer100 = tr.rows[0].fuel_per_100km;
     }
 
@@ -338,7 +338,7 @@ handlers.calculateRoute = async function (req, res, args) {
     } });
   } catch (err) {
     console.error('calculateRoute hiba:', err);
-    const msg = err && err.message ? err.message : 'Szerver hiba az útvonaltervezésnél.';
+    const msg = err && err.message ? err.message : 'Eroare de server la planificarea rutei.';
     return res.json({ result: { ok: false, err: msg } });
   }
 };
@@ -367,11 +367,11 @@ const { estimateRoute } = require('../lib/routeEstimate');
 handlers.orderRouteEstimate = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     if (!(await routeMapFeatureOn(cid))) {
-      return res.json({ result: { ok: false, err: 'A térképes útvonal-számítás nincs engedélyezve ennél a cégnél.' } });
+      return res.json({ result: { ok: false, err: 'Calculul rutei pe harta nu este activat la aceasta firma.' } });
     }
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const est = await estimateRoute(a.waypoints, cid);
@@ -379,7 +379,7 @@ handlers.orderRouteEstimate = async function (req, res, args) {
       polyline: est.polyline, waypoints: est.waypoints } });
   } catch (err) {
     console.error('orderRouteEstimate hiba:', err);
-    return res.json({ result: { ok: false, err: (err && err.message) || 'Szerver hiba az útvonal-számításnál.' } });
+    return res.json({ result: { ok: false, err: (err && err.message) || 'Eroare de server la calculul rutei.' } });
   }
 };
 

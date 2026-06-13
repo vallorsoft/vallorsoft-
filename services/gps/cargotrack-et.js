@@ -28,34 +28,34 @@ async function fmSend(method, path, apiKey, body) {
       body: body ? JSON.stringify(body) : undefined, signal: ctrl.signal,
     });
     let txt = ''; try { txt = await res.text(); } catch (_) {}
-    if (!res.ok) { const e = new Error(`CargoTrack hiba (${res.status}). ${txt || ''}`.trim()); e.status = res.status; throw e; }
+    if (!res.ok) { const e = new Error(`Eroare CargoTrack (${res.status}). ${txt || ''}`.trim()); e.status = res.status; throw e; }
     try { return txt ? JSON.parse(txt) : {}; } catch (_) { return {}; }
   } catch (e) {
-    if (e.name === 'AbortError') { const err = new Error('Időtúllépés — a CargoTrack nem válaszolt.'); err.status = 504; throw err; }
+    if (e.name === 'AbortError') { const err = new Error('Timeout — CargoTrack nu a răspuns.'); err.status = 504; throw err; }
     throw e;
   } finally { clearTimeout(t); }
 }
 
 function manual(actionLabel) {
   return { ok: true, mode: 'manual',
-    message: 'Rögzítve. A tényleges ' + actionLabel + ' a CargoTrack/ANAF appból történik ' +
-             '(nincs még megerősített API-végpont az automatikus küldéshez).' };
+    message: 'Înregistrat. ' + actionLabel + ' efectivă se face din aplicația CargoTrack/ANAF ' +
+             '(nu există încă un endpoint API confirmat pentru trimiterea automată).' };
 }
 
 async function assignUit(cfg, { objectId, uit }) {
-  if (!cfg || !cfg.etransport || !cfg.etransport.enabled) return manual('indítás');
-  if (!ASSIGN_PATH) return manual('indítás');
-  if (!objectId) { const e = new Error('Nincs GPS object_id ehhez a járműhöz (előbb párosítsd a rendszámot).'); e.status = 409; throw e; }
+  if (!cfg || !cfg.etransport || !cfg.etransport.enabled) return manual('Pornirea');
+  if (!ASSIGN_PATH) return manual('Pornirea');
+  if (!objectId) { const e = new Error('Nu există GPS object_id pentru acest vehicul (asociază mai întâi numărul de înmatriculare).'); e.status = 409; throw e; }
   const r = await fmSend('POST', ASSIGN_PATH.replace('{objectId}', encodeURIComponent(objectId)), cfg.apiKey, { uit });
-  return { ok: true, mode: 'api', message: 'Küldés elindítva (GPS → ANAF).', raw: r };
+  return { ok: true, mode: 'api', message: 'Trimitere pornită (GPS → ANAF).', raw: r };
 }
 
 async function unassignUit(cfg, { objectId, uit }) {
-  if (!cfg || !cfg.etransport || !cfg.etransport.enabled) return manual('leállítás');
-  if (!UNASSIGN_PATH) return manual('leállítás');
-  if (!objectId) return manual('leállítás');
+  if (!cfg || !cfg.etransport || !cfg.etransport.enabled) return manual('Oprirea');
+  if (!UNASSIGN_PATH) return manual('Oprirea');
+  if (!objectId) return manual('Oprirea');
   const r = await fmSend('POST', UNASSIGN_PATH.replace('{objectId}', encodeURIComponent(objectId)), cfg.apiKey, { uit });
-  return { ok: true, mode: 'api', message: 'Küldés leállítva.', raw: r };
+  return { ok: true, mode: 'api', message: 'Trimitere oprită.', raw: r };
 }
 
 module.exports = { provider: 'cargotrack', label: 'CargoTrack (FM-Track)', assignUit, unassignUit };

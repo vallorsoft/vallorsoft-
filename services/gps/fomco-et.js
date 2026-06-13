@@ -9,11 +9,11 @@
 
 function manual(actionLabel) {
   return { ok: true, mode: 'manual',
-    message: 'Rögzítve. A Fomco e-Transport API még nincs bekötve (doksi: suport@fomcogps.ro). ' +
-             'A ' + actionLabel + ' a Fomco/ANAF appból történik.' };
+    message: 'Înregistrat. API-ul Fomco e-Transport încă nu este conectat (documentație: suport@fomcogps.ro). ' +
+             actionLabel + ' se face din aplicația Fomco/ANAF.' };
 }
 
-async function assignUit(_cfg, _args)   { return manual('indítás'); }
-async function unassignUit(_cfg, _args) { return manual('leállítás'); }
+async function assignUit(_cfg, _args)   { return manual('Pornirea'); }
+async function unassignUit(_cfg, _args) { return manual('Oprirea'); }
 
 module.exports = { provider: 'fomco', label: 'Fomco GPS', assignUit, unassignUit };

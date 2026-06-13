@@ -84,12 +84,12 @@ function _posIntCm(x) {
 // → { err } hibával, vagy { load_type, hossz_cm, szel_cm, mag_cm }.
 function validateLoadTypeDims(o) {
   const load_type = ['FTL', 'LTL'].includes(o.load_type) ? o.load_type : null;
-  if (!load_type) return { err: 'Válaszd ki a rakomány típusát (FTL teljes / LTL részrakomány).' };
+  if (!load_type) return { err: 'Selecteaza tipul de marfa (FTL incarcatura completa / LTL incarcatura partiala).' };
   const hossz_cm = _posIntCm(o.hossz_cm);
   const szel_cm = _posIntCm(o.szel_cm);
   const mag_cm = _posIntCm(o.mag_cm);
   if (load_type === 'LTL' && (!hossz_cm || !szel_cm || !mag_cm)) {
-    return { err: 'Részrakománynál (LTL) a méretek (hossz/szélesség/magasság cm) kötelezők.' };
+    return { err: 'La incarcatura partiala (LTL) dimensiunile (lungime/latime/inaltime cm) sunt obligatorii.' };
   }
   return { load_type, hossz_cm, szel_cm, mag_cm };
 }
@@ -250,7 +250,7 @@ handlers.getMySoferOrders = async function (req, res, args) {
 handlers.comCreate = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
 
       const o = args[0] || {};
@@ -357,7 +357,7 @@ handlers.comCreate = async function (req, res, args) {
       } });
     } catch (err) {
       console.error('comCreate hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
@@ -372,12 +372,12 @@ handlers.comCreate = async function (req, res, args) {
 handlers.bulkCreateOrders = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const a = (args && args[0]) || {};
     let rows = Array.isArray(a.rows) ? a.rows : [];
-    if (!rows.length) return res.json({ result: { ok: false, err: 'Nincs importálható sor.' } });
+    if (!rows.length) return res.json({ result: { ok: false, err: 'Nu exista randuri de importat.' } });
     if (rows.length > 1000) rows = rows.slice(0, 1000); // fair-use felső korlát
 
     let inserted = 0;
@@ -406,7 +406,7 @@ handlers.bulkCreateOrders = async function (req, res, args) {
         // teljesen üres sor kihagyása (semmi értékelhető adat)
         if (!client && !ref && !loc_incarcare && !loc_descarcare && !import_extra
             && !o.email_sofer && !o.nume_sofer && !firma_extern && !o.rendszam_camion) {
-          failed.push({ row: idx + 1, err: 'üres sor' });
+          failed.push({ row: idx + 1, err: 'rand gol' });
           continue;
         }
 
@@ -472,21 +472,21 @@ handlers.bulkCreateOrders = async function (req, res, args) {
     return res.json({ result: { ok: true, inserted, skipped: failed.length, failed: failed.slice(0, 50), ids } });
   } catch (err) {
     console.error('bulkCreateOrders hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 handlers.comUpdate = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
 
       const id = String(args[0] || '').trim();
       const o = args[1] || {};
 
       if (!id) {
-        return res.json({ result: { ok: false, err: 'ID kotelezo.' } });
+        return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
       }
 
       const updates = [];
@@ -503,7 +503,7 @@ handlers.comUpdate = async function (req, res, args) {
       if (o.km !== undefined) { updates.push(`km = $${i++}`); values.push(Number(o.km || 0)); }
       if (o.status !== undefined) {
         if (!['Disponibil','Alocat','Extern','In Curs','Finalizat','Anulat','Parkolt','Raktarban'].includes(o.status)) {
-          return res.json({ result: { ok: false, err: 'Ervenytelen statusz.' } });
+          return res.json({ result: { ok: false, err: 'Status invalid.' } });
         }
         updates.push(`status = $${i++}`); values.push(o.status);
       }
@@ -535,7 +535,7 @@ handlers.comUpdate = async function (req, res, args) {
       if (o.carrier_cost !== undefined) { updates.push(`carrier_cost = $${i++}`); values.push((o.carrier_cost === '' || o.carrier_cost === null) ? null : Number(o.carrier_cost)); }
 
       if (updates.length === 0) {
-        return res.json({ result: { ok: false, err: 'Nincs mit modositani.' } });
+        return res.json({ result: { ok: false, err: 'Nimic de modificat.' } });
       }
 
       updates.push(`updated_at = NOW()`);
@@ -545,7 +545,7 @@ handlers.comUpdate = async function (req, res, args) {
       const r = await pool.query(sql, values);
 
       if (r.rowCount === 0) {
-        return res.json({ result: { ok: false, err: 'Fuvar nem talalhato.' } });
+        return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit.' } });
       }
       // ha a státusz elhagyja a Raktarban-t (kézi váltás is), az aktív
       // raktári tétel kiadva — ne ragadjon bent a Raktár fülön
@@ -559,53 +559,53 @@ handlers.comUpdate = async function (req, res, args) {
 
     } catch (err) {
       console.error('comUpdate hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
 handlers.comDelete = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
       const id = String(args[0] || '').trim();
       if (!id) {
-        return res.json({ result: { ok: false, err: 'ID kotelezo.' } });
+        return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
       }
       const check = await pool.query(
         'SELECT id FROM orders WHERE id = $1 AND company_id = $2',
         [id, req.session.user.company_id]
       );
       if (!check.rows.length) {
-        return res.json({ result: { ok: false, err: 'Fuvar nem talalhato vagy nincs jogosultsag.' } });
+        return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit sau acces interzis.' } });
       }
       await pool.query('DELETE FROM order_legs WHERE order_id = $1', [id]);
       await pool.query('DELETE FROM warehouse_items WHERE order_id = $1 AND company_id = $2',
         [id, req.session.user.company_id]).catch(() => {});
       const r = await pool.query('DELETE FROM orders WHERE id = $1 AND company_id = $2', [id, req.session.user.company_id]);
       if (r.rowCount === 0) {
-        return res.json({ result: { ok: false, err: 'Fuvar nem talalhato.' } });
+        return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit.' } });
       }
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('comDelete hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
 handlers.addOrderLeg = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
       const orderId = String(args[0] || '').trim();
       const leg = args[1] || {};
-      if (!orderId) return res.json({ result: { ok: false, err: 'Fuvar ID kotelezo.' } });
+      if (!orderId) return res.json({ result: { ok: false, err: 'ID-ul transportului este obligatoriu.' } });
       const orderCheck = await pool.query(
         'SELECT id FROM orders WHERE id = $1 AND company_id = $2',
         [orderId, req.session.user.company_id]
       );
-      if (!orderCheck.rows.length) return res.json({ result: { ok: false, err: 'Fuvar nem talalhato vagy nincs jogosultsag.' } });
+      if (!orderCheck.rows.length) return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit sau acces interzis.' } });
       const legNumR = await pool.query(
         'SELECT COALESCE(MAX(leg_number), 0) + 1 AS next_num FROM order_legs WHERE order_id = $1',
         [orderId]
@@ -628,17 +628,17 @@ handlers.addOrderLeg = async function (req, res, args) {
       return res.json({ result: { ok: true, leg_number: legNum } });
     } catch (err) {
       console.error('addOrderLeg hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
 handlers.deleteOrderLeg = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
       const legId = parseInt(args[0], 10);
-      if (!legId) return res.json({ result: { ok: false, err: 'Leg ID kotelezo.' } });
+      if (!legId) return res.json({ result: { ok: false, err: 'ID-ul tronsonului este obligatoriu.' } });
       const r = await pool.query(
         `DELETE FROM order_legs
          USING orders
@@ -647,11 +647,11 @@ handlers.deleteOrderLeg = async function (req, res, args) {
            AND orders.company_id = $2`,
         [legId, req.session.user.company_id]
       );
-      if (r.rowCount === 0) return res.json({ result: { ok: false, err: 'Nem talalhato vagy nincs jogosultsag.' } });
+      if (r.rowCount === 0) return res.json({ result: { ok: false, err: 'Nu a fost gasit sau acces interzis.' } });
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('deleteOrderLeg hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
@@ -662,7 +662,7 @@ const _trkCrypto = require('crypto');
 handlers.getTrackingLink = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const orderId = String(args[0] || '').trim();
@@ -671,12 +671,12 @@ handlers.getTrackingLink = async function (req, res, args) {
     const fr = await pool.query(
       "SELECT enabled FROM company_features WHERE company_id = $1 AND feature_key = 'tracking'", [cid]);
     if (fr.rows.length && fr.rows[0].enabled === false) {
-      return res.json({ result: { ok: false, err: 'Az ügyfél tracking-link nincs előfizetve ennél a cégnél.' } });
+      return res.json({ result: { ok: false, err: 'Link-ul de urmarire pentru client nu este abonat la aceasta firma.' } });
     }
 
     const or = await pool.query(
       'SELECT id, tracking_token FROM orders WHERE id = $1 AND company_id = $2', [orderId, cid]);
-    if (!or.rows.length) return res.json({ result: { ok: false, err: 'Fuvar nem található' } });
+    if (!or.rows.length) return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit' } });
 
     let token = or.rows[0].tracking_token;
     if (!token) {
@@ -687,7 +687,7 @@ handlers.getTrackingLink = async function (req, res, args) {
     return res.json({ result: { ok: true, token } });
   } catch (err) {
     console.error('getTrackingLink hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -697,7 +697,7 @@ handlers.getTrackingLink = async function (req, res, args) {
 handlers.getPlannerData = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
@@ -728,7 +728,7 @@ handlers.getPlannerData = async function (req, res, args) {
     return res.json({ result: { ok: true, vehicles: vehR.rows, orders: ordR.rows } });
   } catch (err) {
     console.error('getPlannerData hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -738,7 +738,7 @@ handlers.getPlannerData = async function (req, res, args) {
 handlers.plannerAssign = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
     const orderId = String(args[0] || '').trim();
@@ -756,14 +756,14 @@ handlers.plannerAssign = async function (req, res, args) {
         const vr = await pool.query(
           `SELECT id FROM vehicles WHERE company_id = $1 AND UPPER(rendszam) = $2 AND tip = 'Vontato'`,
           [cid, rendszam]);
-        if (!vr.rows.length) return res.json({ result: { ok: false, err: 'A jármű nem található.' } });
+        if (!vr.rows.length) return res.json({ result: { ok: false, err: 'Vehiculul nu a fost gasit.' } });
 
         // Auto-párosítás: ha a fuvaron még nincs sofőr, a járműhöz rendelt
         // belső sofőr is rákerül (státusz: Disponibil → Alocat).
         const cur = await pool.query(
           `SELECT email_sofer, sofer_type, status, rendszam_remorca FROM orders WHERE id = $1 AND company_id = $2`,
           [orderId, cid]);
-        if (!cur.rows.length) return res.json({ result: { ok: false, err: 'Fuvar nem található' } });
+        if (!cur.rows.length) return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit' } });
         const co = cur.rows[0];
         let statusToAlocat = false;
         if (!co.email_sofer && co.sofer_type !== 'Extern') {
@@ -794,13 +794,13 @@ handlers.plannerAssign = async function (req, res, args) {
     }
     if (f.data_incarcare) { params.push(f.data_incarcare); sets.push('data_incarcare = $' + params.length); }
     if (f.data_descarcare) { params.push(f.data_descarcare); sets.push('data_descarcare = $' + params.length); }
-    if (sets.length === 1) return res.json({ result: { ok: false, err: 'Nincs módosítandó mező.' } });
+    if (sets.length === 1) return res.json({ result: { ok: false, err: 'Niciun camp de modificat.' } });
 
     const r = await pool.query(
       `UPDATE orders SET ${sets.join(', ')} WHERE id = $1 AND company_id = $2`,
       params
     );
-    if (!r.rowCount) return res.json({ result: { ok: false, err: 'Fuvar nem található' } });
+    if (!r.rowCount) return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit' } });
     if (releaseWarehouse) {
       await pool.query(
         `UPDATE warehouse_items SET status = 'Kiadva', released_at = NOW()
@@ -810,7 +810,7 @@ handlers.plannerAssign = async function (req, res, args) {
     return res.json({ result: { ok: true, paired_driver: pairedDriver, paired_trailer: pairedTrailer } });
   } catch (err) {
     console.error('plannerAssign hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -856,7 +856,7 @@ async function _geocodeCached(label, budget) {
 handlers.getPlannerMatches = async function (req, res, args) {
   try {
     if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-      return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
 

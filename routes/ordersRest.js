@@ -11,17 +11,17 @@ const { sendPushToRole } = require('../services/push');
 router.post('/api/orders/:id/quick-status', requireLogin, requireRole('Admin','Manager'), async (req, res) => {
   const { status } = req.body;
   const valid = ['Disponibil','Alocat','Extern','In Curs','Finalizat','Anulat'];
-  if (!valid.includes(status)) return res.json({ ok: false, err: 'Érvénytelen státusz' });
+  if (!valid.includes(status)) return res.json({ ok: false, err: 'Status invalid' });
   try {
     const r = await pool.query(
       'UPDATE orders SET status=$1, updated_at=NOW() WHERE id=$2 AND company_id=$3',
       [status, req.params.id, req.session.user.company_id]
     );
-    if (r.rowCount === 0) return res.json({ ok: false, err: 'Fuvar nem található' });
+    if (r.rowCount === 0) return res.json({ ok: false, err: 'Cursa nu a fost gasita' });
     return res.json({ ok: true });
   } catch(err) {
     console.error('quick-status hiba:', err);
-    return res.json({ ok: false, err: 'Szerver hiba' });
+    return res.json({ ok: false, err: 'Eroare de server' });
   }
 });
 
@@ -33,7 +33,7 @@ router.post('/api/orders/:id/driver-status', requireLogin, requireRole('Sofer'),
   const { status } = req.body;
   const driver = req.session.user;
   if (!['In Curs', 'Finalizat'].includes(status)) {
-    return res.json({ ok: false, err: 'Érvénytelen státusz' });
+    return res.json({ ok: false, err: 'Status invalid' });
   }
   try {
     const check = await pool.query(
@@ -42,7 +42,7 @@ router.post('/api/orders/:id/driver-status', requireLogin, requireRole('Sofer'),
       [req.params.id, driver.company_id, driver.email]
     );
     if (!check.rows.length) {
-      return res.json({ ok: false, err: 'Nem található vagy nincs jogosultság' });
+      return res.json({ ok: false, err: 'Nu a fost gasit sau nu aveti permisiune' });
     }
     await pool.query(
       'UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2',
@@ -62,7 +62,7 @@ router.post('/api/orders/:id/driver-status', requireLogin, requireRole('Sofer'),
     return res.json({ ok: true });
   } catch (err) {
     console.error('driver-status hiba:', err);
-    return res.json({ ok: false, err: 'Szerver hiba' });
+    return res.json({ ok: false, err: 'Eroare de server' });
   }
 });
 

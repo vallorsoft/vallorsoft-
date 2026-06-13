@@ -189,8 +189,8 @@ async function sendResetEmail(toEmail, nume, resetUrl, lang) {
 // különben a nagy „vallorSoft” felirat. opts: { to, subject, html, replyTo, senderName, logoUrl, attachments }
 //   attachments: [{ name, contentBase64 }]
 async function sendClientEmail(opts) {
-  if (!BREVO_API_KEY || !BREVO_SENDER) return { ok: false, error: 'Nincs beállítva a BREVO_API_KEY / BREVO_SENDER (.env).' };
-  if (!opts || !opts.to) return { ok: false, error: 'Hiányzik a címzett.' };
+  if (!BREVO_API_KEY || !BREVO_SENDER) return { ok: false, error: 'BREVO_API_KEY / BREVO_SENDER nu este configurat (.env).' };
+  if (!opts || !opts.to) return { ok: false, error: 'Lipsește destinatarul.' };
   const senderName = opts.senderName || 'VallorSoft';
   // Logo csak biztonságos URL-sémával kerülhet a levélbe (markup-injektálás ellen)
   const safeLogo = opts.logoUrl && /^(https?:\/\/|data:image\/)/i.test(String(opts.logoUrl)) ? String(opts.logoUrl) : null;

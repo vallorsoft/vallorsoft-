@@ -10,7 +10,7 @@ const handlers = {};
 
 handlers.stampGet = async function (req, res, args) {
     try {
-      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve' } });
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
       const email = req.session.user.email;
       const r = await pool.query('SELECT base64_png FROM stamps WHERE email = $1', [email]);
       if (r.rows.length && r.rows[0].base64_png) {
@@ -19,16 +19,16 @@ handlers.stampGet = async function (req, res, args) {
       return res.json({ result: { ok: true, base64: null } });
     } catch (err) {
       console.error('stampGet hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
 handlers.stampSave = async function (req, res, args) {
     try {
-      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve' } });
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
       const email = req.session.user.email;
       const b64 = args[0];
-      if (!b64) return res.json({ result: { ok: false, err: 'Hianyzo kep' } });
+      if (!b64) return res.json({ result: { ok: false, err: 'Imagine lipsa' } });
       await pool.query(
         `INSERT INTO stamps (email, base64_png, updated_at)
          VALUES ($1, $2, NOW())
@@ -39,7 +39,7 @@ handlers.stampSave = async function (req, res, args) {
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('stampSave hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
@@ -67,13 +67,13 @@ handlers.orderDocList = async function (req, res, args) {
 handlers.orderDocUpload = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
       const orderId = String(args[0] || '').trim();
       const fileName = String(args[1] || '').trim();
       const b64 = args[2];
       if (!orderId || !fileName || !b64) {
-        return res.json({ result: { ok: false, err: 'Hianyzo adat' } });
+        return res.json({ result: { ok: false, err: 'Date lipsa' } });
       }
       const r = await pool.query(
         `INSERT INTO order_documents (order_id, file_name, original_base64, uploaded_by, company_id)
@@ -83,16 +83,16 @@ handlers.orderDocUpload = async function (req, res, args) {
       return res.json({ result: { ok: true, docId: r.rows[0].id } });
     } catch (err) {
       console.error('orderDocUpload hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
 handlers.orderDocGet = async function (req, res, args) {
     try {
-      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Acces interzis' } });
       const docId = parseInt(args[0], 10);
       const which = args[1] === 'signed' ? 'signed' : 'original';
-      if (!docId) return res.json({ result: { ok: false, err: 'Hianyzo azonosito' } });
+      if (!docId) return res.json({ result: { ok: false, err: 'Identificator lipsa' } });
       // Cégszűrés az orders-en keresztül (a régi sorokon a company_id NULL lehet)
       const r = await pool.query(
         `SELECT od.file_name, od.original_base64, od.signed_base64
@@ -101,25 +101,25 @@ handlers.orderDocGet = async function (req, res, args) {
          WHERE od.id = $1 AND o.company_id = $2`,
         [docId, req.session.user.company_id]
       );
-      if (!r.rows.length) return res.json({ result: { ok: false, err: 'Nem talalhato' } });
+      if (!r.rows.length) return res.json({ result: { ok: false, err: 'Nu a fost gasit' } });
       const row = r.rows[0];
       const base64 = which === 'signed' ? row.signed_base64 : row.original_base64;
-      if (!base64) return res.json({ result: { ok: false, err: 'Nincs ilyen valtozat' } });
+      if (!base64) return res.json({ result: { ok: false, err: 'Nu exista aceasta varianta' } });
       return res.json({ result: { ok: true, base64, fileName: row.file_name } });
     } catch (err) {
       console.error('orderDocGet hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
 handlers.orderDocSaveSigned = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
-        return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
       const docId = parseInt(args[0], 10);
       const b64 = args[1];
-      if (!docId || !b64) return res.json({ result: { ok: false, err: 'Hianyzo adat' } });
+      if (!docId || !b64) return res.json({ result: { ok: false, err: 'Date lipsa' } });
       // Cégszűrés az orders-en keresztül (a régi sorokon a company_id NULL lehet)
       const r = await pool.query(
         `UPDATE order_documents od SET signed_base64 = $1, updated_at = NOW()
@@ -128,11 +128,11 @@ handlers.orderDocSaveSigned = async function (req, res, args) {
          RETURNING od.id`,
         [b64, docId, req.session.user.company_id]
       );
-      if (!r.rows.length) return res.json({ result: { ok: false, err: 'Nem talalhato' } });
+      if (!r.rows.length) return res.json({ result: { ok: false, err: 'Nu a fost gasit' } });
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('orderDocSaveSigned hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
@@ -174,18 +174,18 @@ handlers.getFuvarlevelek = async function (req, res, args) {
 // Egy menetlevél teljes adata — szerkesztéshez (Admin/Manager, cégre szűrve).
 handlers.getFuvarlevelDetail = async function (req, res, args) {
     try {
-      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve' } });
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
       const me = req.session.user;
-      if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: { ok: false, err: 'Nincs jogosultság' } });
+      if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
       const id = Array.isArray(args) ? args[0] : args;
-      if (!id) return res.json({ result: { ok: false, err: 'Hiányzó azonosító' } });
+      if (!id) return res.json({ result: { ok: false, err: 'Identificator lipsa' } });
       // Csak a saját cég sofőrjeinek menetlevele érhető el.
       const r = await pool.query(
         `SELECT * FROM fuvarlevelek
          WHERE id = $1 AND email_sofer IN (SELECT email FROM users WHERE company_id = $2)`,
         [id, me.company_id]
       );
-      if (!r.rows.length) return res.json({ result: { ok: false, err: 'Nem található' } });
+      if (!r.rows.length) return res.json({ result: { ok: false, err: 'Nu a fost gasit' } });
       return res.json({ result: { ok: true, fuv: r.rows[0] } });
     } catch (err) {
       console.error('getFuvarlevelDetail hiba:', err);
@@ -197,19 +197,19 @@ handlers.getFuvarlevelDetail = async function (req, res, args) {
 // (total_km, total_alim, motorina_folosit, consum_100) szerveroldalon számoljuk.
 handlers.fuvarlevelUpdate = async function (req, res, args) {
     try {
-      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve' } });
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
       const me = req.session.user;
-      if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: { ok: false, err: 'Nincs jogosultság' } });
+      if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
       const id = Array.isArray(args) ? args[0] : null;
       const d = (Array.isArray(args) ? args[1] : null) || {};
-      if (!id) return res.json({ result: { ok: false, err: 'Hiányzó azonosító' } });
+      if (!id) return res.json({ result: { ok: false, err: 'Identificator lipsa' } });
 
       // Jogosultság + létezés: csak saját cég menetlevele.
       const own = await pool.query(
         `SELECT id FROM fuvarlevelek WHERE id = $1 AND email_sofer IN (SELECT email FROM users WHERE company_id = $2)`,
         [id, me.company_id]
       );
-      if (!own.rows.length) return res.json({ result: { ok: false, err: 'Nem található / nincs jogosultság' } });
+      if (!own.rows.length) return res.json({ result: { ok: false, err: 'Nu a fost gasit / acces interzis' } });
 
       const alimentari = Array.isArray(d.alimentari) ? d.alimentari : [];
       const achizitii  = Array.isArray(d.achizitii)  ? d.achizitii  : [];

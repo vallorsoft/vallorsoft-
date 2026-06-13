@@ -42,7 +42,7 @@ handlers.getAvailableProviders = async function (req, res, args) {
 // ─── A cég aktív számlázó integrációja (credentials NÉLKÜL) ──
 handlers.getCompanyBillingIntegration = async function (req, res, args) {
   try {
-    if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve' } });
+    if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
     const cid = req.session.user.company_id;
     const r = await pool.query(
       'SELECT provider, display_name, is_active, created_at, updated_at, credentials FROM billing_integrations WHERE company_id = $1 AND is_active = TRUE LIMIT 1',
@@ -58,18 +58,18 @@ handlers.getCompanyBillingIntegration = async function (req, res, args) {
     } } });
   } catch (err) {
     console.error('getCompanyBillingIntegration hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 // ─── Integráció mentése (titkosítva) — Admin vagy developer ──
 handlers.saveBillingIntegration = async function (req, res, args) {
   try {
-    if (!isAdminOrDev(req.session.user)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!isAdminOrDev(req.session.user)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const provider = String(a.provider || '').trim();
     const credentials = (a.credentials && typeof a.credentials === 'object') ? a.credentials : {};
-    if (!billing.isValidProvider(provider)) return res.json({ result: { ok: false, err: 'Ismeretlen számlázó.' } });
+    if (!billing.isValidProvider(provider)) return res.json({ result: { ok: false, err: 'Furnizor de facturare necunoscut.' } });
 
     const cid = req.session.user.company_id;
     const display_name = billing.displayName(provider);
@@ -91,7 +91,7 @@ handlers.saveBillingIntegration = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('saveBillingIntegration hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -99,15 +99,15 @@ handlers.saveBillingIntegration = async function (req, res, args) {
 // args: { provider, credentials? }  (ha credentials adott, azt teszteli; különben a tároltat)
 handlers.testBillingIntegration = async function (req, res, args) {
   try {
-    if (!isAdminOrDev(req.session.user)) return res.json({ result: { ok: false, message: 'Nincs jogosultsag' } });
+    if (!isAdminOrDev(req.session.user)) return res.json({ result: { ok: false, message: 'Acces interzis' } });
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const provider = String(a.provider || '').trim();
-    if (!billing.isValidProvider(provider)) return res.json({ result: { ok: false, message: 'Ismeretlen számlázó.' } });
+    if (!billing.isValidProvider(provider)) return res.json({ result: { ok: false, message: 'Furnizor de facturare necunoscut.' } });
 
     let creds = (a.credentials && typeof a.credentials === 'object') ? a.credentials : null;
     const r = await pool.query('SELECT credentials FROM billing_integrations WHERE company_id = $1 AND provider = $2', [req.session.user.company_id, provider]);
     const stored = r.rows.length ? decodeStoredCreds(r.rows[0].credentials) : null;
-    if (!creds && !stored) return res.json({ result: { ok: false, message: 'Nincs mentett integráció ehhez a számlázóhoz.' } });
+    if (!creds && !stored) return res.json({ result: { ok: false, message: 'Nu exista integrare salvata pentru acest furnizor de facturare.' } });
     // Részben kitöltött űrlap tesztelésénél az üres mezők a tároltból jönnek.
     creds = creds ? mergeWithStored(stored || {}, creds) : stored;
     const adapter = billing.getAdapter(provider, creds);
@@ -115,30 +115,30 @@ handlers.testBillingIntegration = async function (req, res, args) {
     return res.json({ result: { ok: !!result.ok, message: result.message || (result.ok ? 'Kapcsolat sikeres.' : 'Sikertelen.') } });
   } catch (err) {
     console.error('testBillingIntegration hiba:', err);
-    return res.json({ result: { ok: false, message: 'Szerver hiba: ' + err.message } });
+    return res.json({ result: { ok: false, message: 'Eroare de server: ' + err.message } });
   }
 };
 
 // ─── Előfizetési csomagok ──────────────────────────────────
 handlers.getSubscriptionPlans = async function (req, res, args) {
   try {
-    if (!req.session.user) return res.json({ result: { ok: false, err: 'Nincs bejelentkezve' } });
+    if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
     const r = await pool.query(
       'SELECT id, name, description, price_net, vat_percent, is_active, sort_order FROM subscription_plans ORDER BY sort_order'
     );
     return res.json({ result: { ok: true, plans: r.rows } });
   } catch (err) {
     console.error('getSubscriptionPlans hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 handlers.updateSubscriptionPlan = async function (req, res, args) {
   try {
-    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Csak developer' } });
+    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Doar developer' } });
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const id = parseInt(a.id, 10);
-    if (!id) return res.json({ result: { ok: false, err: 'Hiányzó csomag ID' } });
+    if (!id) return res.json({ result: { ok: false, err: 'ID-ul pachetului lipseste' } });
     const price = parseFloat(a.price_net);
     await pool.query(
       `UPDATE subscription_plans SET name = $1, description = $2, price_net = $3, is_active = $4, updated_at = now() WHERE id = $5`,
@@ -147,29 +147,29 @@ handlers.updateSubscriptionPlan = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('updateSubscriptionPlan hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 handlers.setCompanyPlan = async function (req, res, args) {
   try {
-    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Csak developer' } });
+    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Doar developer' } });
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const companyId = parseInt(a.company_id, 10);
     const planId = a.plan_id ? parseInt(a.plan_id, 10) : null;
-    if (!companyId) return res.json({ result: { ok: false, err: 'Hiányzó cég ID' } });
+    if (!companyId) return res.json({ result: { ok: false, err: 'ID-ul firmei lipseste' } });
     await pool.query('UPDATE companies SET subscription_plan_id = $1 WHERE id = $2', [planId, companyId]);
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('setCompanyPlan hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 // ─── Developer: cégek + számlázójuk + csomagjuk (áttekintő tábla) ──
 handlers.getCompaniesBillingOverview = async function (req, res, args) {
   try {
-    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Csak developer' } });
+    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Doar developer' } });
     const r = await pool.query(`
       SELECT c.id, c.nev,
              c.subscription_plan_id,
@@ -183,7 +183,7 @@ handlers.getCompaniesBillingOverview = async function (req, res, args) {
     return res.json({ result: { ok: true, companies: r.rows } });
   } catch (err) {
     console.error('getCompaniesBillingOverview hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -207,7 +207,7 @@ async function buildHereInvoice(companyId, monthYear) {
     `SELECT c.id, c.nev AS name, c.subscription_plan_id,
             (SELECT u.email FROM users u WHERE u.company_id = c.id AND u.pozicio = 'Admin' ORDER BY u.id LIMIT 1) AS admin_email
      FROM companies c WHERE c.id = $1 LIMIT 1`, [companyId]);
-  if (!cR.rows.length) { const e = new Error('Cég nem található.'); e._user = true; throw e; }
+  if (!cR.rows.length) { const e = new Error('Firma nu a fost gasita.'); e._user = true; throw e; }
   const company = cR.rows[0];
 
   const pR = await pool.query(
@@ -253,10 +253,10 @@ async function buildHereInvoice(companyId, monthYear) {
 // Előnézet — NEM állít ki számlát.
 handlers.previewHereInvoice = async function (req, res, args) {
   try {
-    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Csak developer' } });
+    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Doar developer' } });
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const companyId = parseInt(a.company_id, 10);
-    if (!companyId) return res.json({ result: { ok: false, err: 'Hiányzó cég ID' } });
+    if (!companyId) return res.json({ result: { ok: false, err: 'ID-ul firmei lipseste' } });
     const d = await buildHereInvoice(companyId, a.month_year);
     return res.json({ result: {
       ok: true,
@@ -269,24 +269,24 @@ handlers.previewHereInvoice = async function (req, res, args) {
     } });
   } catch (err) {
     console.error('previewHereInvoice hiba:', err);
-    return res.json({ result: { ok: false, err: err._user ? err.message : 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: err._user ? err.message : 'Eroare de server' } });
   }
 };
 
 // Számla kiállítása a cég aktív számlázóján keresztül.
 handlers.generateHereInvoice = async function (req, res, args) {
   try {
-    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Csak developer' } });
+    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Doar developer' } });
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const companyId = parseInt(a.company_id, 10);
-    if (!companyId) return res.json({ result: { ok: false, err: 'Hiányzó cég ID' } });
+    if (!companyId) return res.json({ result: { ok: false, err: 'ID-ul firmei lipseste' } });
 
     const d = await buildHereInvoice(companyId, a.month_year);
-    if (!d.integration) return res.json({ result: { ok: false, err: 'Nincs aktív számlázó integráció ehhez a céghez.' } });
-    if (!d.items.length) return res.json({ result: { ok: false, err: 'Nincs számlázható tétel (nincs csomag és nincs HERE használat).' } });
+    if (!d.integration) return res.json({ result: { ok: false, err: 'Nu exista o integrare de facturare activa pentru aceasta firma.' } });
+    if (!d.items.length) return res.json({ result: { ok: false, err: 'Nu exista pozitii facturabile (niciun pachet si niciun consum HERE).' } });
 
     let creds = {};
-    try { creds = JSON.parse(decrypt(d.integration.credentials.enc)); } catch (e) { return res.json({ result: { ok: false, err: 'A számlázó hitelesítő adatai nem olvashatók.' } }); }
+    try { creds = JSON.parse(decrypt(d.integration.credentials.enc)); } catch (e) { return res.json({ result: { ok: false, err: 'Datele de autentificare ale furnizorului de facturare nu pot fi citite.' } }); }
 
     const adapter = billing.loadAdapter(d.integration.provider, creds);
     const result = await adapter.createInvoice({
@@ -294,18 +294,18 @@ handlers.generateHereInvoice = async function (req, res, args) {
       items: d.items.map((it) => ({ name: it.name, quantity: it.quantity, unit: it.unit, price_net: it.price_net, vat_percent: it.vat_percent, description: it.description || undefined })),
       currency: 'EUR', issue_date: d.issue_date, due_date: d.due_date, notes: d.notes,
     });
-    if (!result.ok) return res.json({ result: { ok: false, err: d.integration.provider + ': ' + (result.message || 'ismeretlen hiba') } });
+    if (!result.ok) return res.json({ result: { ok: false, err: d.integration.provider + ': ' + (result.message || 'eroare necunoscuta') } });
     return res.json({ result: { ok: true, invoice_number: result.invoice_number, pdf_url: result.pdf_url || null, provider: d.integration.provider } });
   } catch (err) {
     console.error('generateHereInvoice hiba:', err);
-    return res.json({ result: { ok: false, err: err._user ? err.message : ('Szerver hiba: ' + err.message) } });
+    return res.json({ result: { ok: false, err: err._user ? err.message : ('Eroare de server: ' + err.message) } });
   }
 };
 
 // ─── Cégenkénti HERE használat — közös 1000-es pool, felhasználó-szintű bontással (developer) ──
 handlers.getHereUsageByCompany = async function (req, res, args) {
   try {
-    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Csak developer' } });
+    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Doar developer' } });
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const cid = a.company_id ? parseInt(a.company_id, 10) : null;
     const month = (a.month_year && /^\d{4}-\d{2}$/.test(a.month_year)) ? a.month_year : null;
@@ -340,7 +340,7 @@ handlers.getHereUsageByCompany = async function (req, res, args) {
     } });
   } catch (err) {
     console.error('getHereUsageByCompany hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 

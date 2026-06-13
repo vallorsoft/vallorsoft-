@@ -11,13 +11,13 @@ const TIMEOUT_MS = 15000;
 
 function mapError(status, body) {
   switch (status) {
-    case 400: return 'Hibás kérés (400) — ellenőrizd a paramétereket.';
-    case 401: return 'Érvénytelen vagy hiányzó API-kulcs (401).';
-    case 403: return 'A kulcsnak nincs jogosultsága ehhez (403).';
-    case 404: return 'Nem található (404) — lehet, rossz az object ID.';
-    case 429: return 'Túl sok kérés (429) — várj (limit: 1000 kérés/perc).';
-    case 500: return 'CargoTrack szerverhiba (500) — próbáld később.';
-    default:  return `Ismeretlen hiba (${status}). ${body || ''}`.trim();
+    case 400: return 'Cerere greșită (400) — verifică parametrii.';
+    case 401: return 'Cheie API invalidă sau lipsă (401).';
+    case 403: return 'Cheia nu are permisiune pentru aceasta (403).';
+    case 404: return 'Nu a fost găsit (404) — poate object ID-ul este greșit.';
+    case 429: return 'Prea multe cereri (429) — așteaptă (limită: 1000 cereri/minut).';
+    case 500: return 'Eroare server CargoTrack (500) — încearcă mai târziu.';
+    default:  return `Eroare necunoscută (${status}). ${body || ''}`.trim();
   }
 }
 
@@ -44,7 +44,7 @@ async function fmGet(path, params, apiKey, version = '1') {
     return await res.json();
   } catch (e) {
     if (e.name === 'AbortError') {
-      const err = new Error('Időtúllépés — a CargoTrack nem válaszolt időben.'); err.status = 504; throw err;
+      const err = new Error('Timeout — CargoTrack nu a răspuns la timp.'); err.status = 504; throw err;
     }
     throw e;
   } finally { clearTimeout(t); }

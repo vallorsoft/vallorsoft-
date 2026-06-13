@@ -14,7 +14,7 @@ class OblioAdapter {
       method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' }, body: body.toString(),
     });
     if (!r.ok || !r.data || !r.data.access_token) {
-      const msg = (r.data && (r.data.error_description || r.data.message)) || ('hitelesítés sikertelen (' + r.status + ')');
+      const msg = (r.data && (r.data.error_description || r.data.message)) || ('autentificare eșuată (' + r.status + ')');
       const e = new Error(msg); e.status = r.status; throw e;
     }
     return r.data.access_token;
@@ -22,14 +22,14 @@ class OblioAdapter {
 
   async testConnection() {
     if (!this.c.email || !this.c.secret || !this.c.company_vat_code) {
-      return { ok: false, message: 'Hiányzó email / secret / CUI.' };
+      return { ok: false, message: 'Lipsește email / secret / CUI.' };
     }
     try {
       await this._token();
-      return { ok: true, message: 'Oblio kapcsolat sikeres.' };
+      return { ok: true, message: 'Conexiune Oblio reușită.' };
     } catch (e) {
-      if (e.status === 429) return { ok: false, message: 'Oblio API limit elérve — próbáld később.' };
-      return { ok: false, message: 'Oblio hiba: ' + e.message };
+      if (e.status === 429) return { ok: false, message: 'Limita API Oblio atinsă — încearcă mai târziu.' };
+      return { ok: false, message: 'Eroare Oblio: ' + e.message };
     }
   }
 
@@ -51,17 +51,17 @@ class OblioAdapter {
       const r = await jsonT(BASE + '/docs/invoice', {
         method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body),
       });
-      if (r.status === 429) return { ok: false, message: 'Oblio API limit elérve.' };
+      if (r.status === 429) return { ok: false, message: 'Limita API Oblio atinsă.' };
       if (!r.ok || (r.data && r.data.status && r.data.status >= 400)) {
-        return { ok: false, message: (r.data && (r.data.statusMessage || r.data.message)) || ('Oblio hiba (' + r.status + ')') };
+        return { ok: false, message: (r.data && (r.data.statusMessage || r.data.message)) || ('Eroare Oblio (' + r.status + ')') };
       }
       const dt = (r.data && r.data.data) || r.data || {};
       return { ok: true, serie: dt.seriesName || null, numar: dt.number || null, invoice_number: (dt.seriesName || '') + (dt.number || ''), pdf_url: dt.link || null, raw: r.data };
-    } catch (e) { return { ok: false, message: 'Oblio hiba: ' + e.message }; }
+    } catch (e) { return { ok: false, message: 'Eroare Oblio: ' + e.message }; }
   }
 
   async getInvoice(invoice_number) {
-    return { ok: false, message: 'Az Oblio számla-lekérés sorozat+szám paramétert igényel.' };
+    return { ok: false, message: 'Interogarea facturii Oblio necesită parametrii serie+număr.' };
   }
 }
 

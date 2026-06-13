@@ -20,7 +20,7 @@ function _str(x, n) { const s = x == null ? null : String(x).trim().slice(0, n |
 // ─── Alvállalkozó-törzs ──────────────────────────────────────
 handlers.carrierList = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const r = await pool.query(
       `SELECT c.*,
@@ -29,16 +29,16 @@ handlers.carrierList = async function (req, res, args) {
               (SELECT COUNT(*) FROM carrier_users cu WHERE cu.carrier_id = c.id AND cu.activ)::int AS portal_users
        FROM carriers c WHERE c.company_id = $1 ORDER BY c.aktiv DESC, c.nev`, [cid]);
     return res.json({ result: { ok: true, items: r.rows } });
-  } catch (err) { console.error('carrierList hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('carrierList hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 handlers.carrierSave = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const a = (args && args[0]) || {};
     const nev = _str(a.nev, 255);
-    if (!nev) return res.json({ result: { ok: false, err: 'A cégnév kötelező.' } });
+    if (!nev) return res.json({ result: { ok: false, err: 'Numele firmei este obligatoriu.' } });
     const f = {
       nev, cui: _str(a.cui, 40), email: _str(a.email, 255), telefon: _str(a.telefon, 50),
       iban: _str(a.iban, 40), nota: _str(a.nota, 1000),
@@ -52,7 +52,7 @@ handlers.carrierSave = async function (req, res, args) {
            payment_term_days=$7, cmr_insurance_expiry=$8, aktiv=$9
          WHERE id=$10 AND company_id=$11`,
         [f.nev, f.cui, f.email, f.telefon, f.iban, f.nota, f.payment_term_days, f.cmr_insurance_expiry, f.aktiv, parseInt(a.id, 10), cid]);
-      if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nem található.' } });
+      if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost găsit.' } });
       return res.json({ result: { ok: true, id: parseInt(a.id, 10) } });
     }
     const ins = await pool.query(
@@ -60,41 +60,41 @@ handlers.carrierSave = async function (req, res, args) {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
       [cid, f.nev, f.cui, f.email, f.telefon, f.iban, f.nota, f.payment_term_days, f.cmr_insurance_expiry, f.aktiv]);
     return res.json({ result: { ok: true, id: ins.rows[0].id } });
-  } catch (err) { console.error('carrierSave hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('carrierSave hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 handlers.carrierDelete = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const id = parseInt(args && args[0], 10);
-    if (!id) return res.json({ result: { ok: false, err: 'ID kötelező.' } });
+    if (!id) return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
     const inv = await pool.query('SELECT 1 FROM carrier_invoices WHERE carrier_id=$1 AND company_id=$2 LIMIT 1', [id, cid]);
-    if (inv.rows.length) return res.json({ result: { ok: false, err: 'Van hozzá szállítói számla — előbb inkább tedd inaktívvá.' } });
+    if (inv.rows.length) return res.json({ result: { ok: false, err: 'Are factură de furnizor asociată — mai bine dezactivează-l mai întâi.' } });
     await pool.query('DELETE FROM carrier_users WHERE carrier_id=$1 AND company_id=$2', [id, cid]);
     await pool.query('DELETE FROM carrier_vehicles WHERE carrier_id=$1 AND company_id=$2', [id, cid]);
     const r = await pool.query('DELETE FROM carriers WHERE id=$1 AND company_id=$2', [id, cid]);
     return res.json({ result: { ok: !!r.rowCount } });
-  } catch (err) { console.error('carrierDelete hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('carrierDelete hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 // Az alvállalkozó által felvitt jármű(vek) — a diszpécser is látja
 handlers.carrierVehicleList = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const carrierId = parseInt(args && args[0], 10) || null;
     const params = [cid]; let where = 'company_id=$1';
     if (carrierId) { params.push(carrierId); where += ' AND carrier_id=$2'; }
     const r = await pool.query(`SELECT * FROM carrier_vehicles WHERE ${where} ORDER BY created_at DESC`, params);
     return res.json({ result: { ok: true, items: r.rows } });
-  } catch (err) { console.error('carrierVehicleList hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('carrierVehicleList hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 // ─── Szállítói számlák (AP) ──────────────────────────────────
 handlers.carrierInvoiceList = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const r = await pool.query(
       `SELECT ci.*, c.nev AS carrier_nev
@@ -109,13 +109,13 @@ handlers.carrierInvoiceList = async function (req, res, args) {
          COUNT(*) FILTER (WHERE status<>'paid')::int AS open_cnt
        FROM carrier_invoices WHERE company_id=$1`, [cid]);
     return res.json({ result: { ok: true, items: r.rows, summary: sum.rows[0] } });
-  } catch (err) { console.error('carrierInvoiceList hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('carrierInvoiceList hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 // Extern fuvarok — a számlához köthető fuvarok választójához
 handlers.carrierAssignableOrders = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const carrierId = parseInt(args && args[0], 10) || null;
     const params = [cid];
@@ -125,18 +125,18 @@ handlers.carrierAssignableOrders = async function (req, res, args) {
     q += ` ORDER BY created_at DESC LIMIT 200`;
     const r = await pool.query(q, params);
     return res.json({ result: { ok: true, items: r.rows } });
-  } catch (err) { console.error('carrierAssignableOrders hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('carrierAssignableOrders hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 handlers.carrierInvoiceSave = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const a = (args && args[0]) || {};
     const carrierId = parseInt(a.carrier_id, 10);
-    if (!carrierId) return res.json({ result: { ok: false, err: 'Válassz alvállalkozót.' } });
+    if (!carrierId) return res.json({ result: { ok: false, err: 'Selectează un subcontractant.' } });
     const cc = await pool.query('SELECT id FROM carriers WHERE id=$1 AND company_id=$2', [carrierId, cid]);
-    if (!cc.rows.length) return res.json({ result: { ok: false, err: 'Alvállalkozó nem található.' } });
+    if (!cc.rows.length) return res.json({ result: { ok: false, err: 'Subcontractantul nu a fost găsit.' } });
     const orderIds = Array.isArray(a.order_ids) ? a.order_ids.map((x) => String(x)).slice(0, 100) : [];
     const amount = Number(a.amount) || 0;
     const currency = ['EUR', 'RON', 'HUF', 'PLN', 'USD'].includes(a.currency) ? a.currency : 'EUR';
@@ -152,18 +152,18 @@ handlers.carrierInvoiceSave = async function (req, res, args) {
         [carrierId, cid, orderIds]).catch(() => {});
     }
     return res.json({ result: { ok: true, id: ins.rows[0].id } });
-  } catch (err) { console.error('carrierInvoiceSave hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('carrierInvoiceSave hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 // args: [invoiceId, amount|'full']
 handlers.carrierInvoicePayment = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const id = parseInt(args && args[0], 10);
-    if (!id) return res.json({ result: { ok: false, err: 'ID kötelező.' } });
+    if (!id) return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
     const r = await pool.query('SELECT amount, paid_amount FROM carrier_invoices WHERE id=$1 AND company_id=$2', [id, cid]);
-    if (!r.rows.length) return res.json({ result: { ok: false, err: 'Nem található.' } });
+    if (!r.rows.length) return res.json({ result: { ok: false, err: 'Nu a fost găsit.' } });
     const amount = Number(r.rows[0].amount) || 0;
     let paid;
     if (args[1] === 'full') paid = amount;
@@ -172,23 +172,23 @@ handlers.carrierInvoicePayment = async function (req, res, args) {
     await pool.query('UPDATE carrier_invoices SET paid_amount=$1, status=$2, paid_at=CASE WHEN $2=$3 THEN NOW() ELSE paid_at END WHERE id=$4 AND company_id=$5',
       [paid, status, 'paid', id, cid]);
     return res.json({ result: { ok: true, status, paid_amount: paid } });
-  } catch (err) { console.error('carrierInvoicePayment hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('carrierInvoicePayment hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 handlers.carrierInvoiceDelete = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const id = parseInt(args && args[0], 10);
     const r = await pool.query('DELETE FROM carrier_invoices WHERE id=$1 AND company_id=$2', [id, cid]);
     return res.json({ result: { ok: !!r.rowCount } });
-  } catch (err) { console.error('carrierInvoiceDelete hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('carrierInvoiceDelete hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 // ─── Alvállalkozói portál-hozzáférések ───────────────────────
 handlers.carrierPortalList = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const carrierId = parseInt(args && args[0], 10) || null;
     const params = [cid]; let where = 'cu.company_id=$1';
@@ -200,24 +200,24 @@ handlers.carrierPortalList = async function (req, res, args) {
        FROM carrier_users cu JOIN carriers c ON c.id=cu.carrier_id AND c.company_id=cu.company_id
        WHERE ${where} ORDER BY cu.created_at DESC`, params);
     return res.json({ result: { ok: true, items: r.rows } });
-  } catch (err) { console.error('carrierPortalList hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('carrierPortalList hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 handlers.carrierPortalInvite = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const a = (args && args[0]) || {};
     const carrierId = parseInt(a.carrier_id, 10);
     const email = String(a.email || '').trim().toLowerCase();
     const nev = _str(a.nev, 120);
-    if (!carrierId) return res.json({ result: { ok: false, err: 'Válassz alvállalkozót.' } });
-    if (!EMAIL_RE.test(email)) return res.json({ result: { ok: false, err: 'Érvénytelen e-mail.' } });
+    if (!carrierId) return res.json({ result: { ok: false, err: 'Selectează un subcontractant.' } });
+    if (!EMAIL_RE.test(email)) return res.json({ result: { ok: false, err: 'E-mail invalid.' } });
     const cc = await pool.query('SELECT id FROM carriers WHERE id=$1 AND company_id=$2', [carrierId, cid]);
-    if (!cc.rows.length) return res.json({ result: { ok: false, err: 'Alvállalkozó nem található.' } });
+    if (!cc.rows.length) return res.json({ result: { ok: false, err: 'Subcontractantul nu a fost găsit.' } });
     const ex = await pool.query('SELECT id, company_id FROM carrier_users WHERE LOWER(email)=$1', [email]);
     if (ex.rows.length && ex.rows[0].company_id !== cid) {
-      return res.json({ result: { ok: false, err: 'Ez az e-mail már egy másik fuvarozónál van regisztrálva.' } });
+      return res.json({ result: { ok: false, err: 'Acest e-mail este deja înregistrat la alt transportator.' } });
     }
     const token = crypto.randomBytes(24).toString('hex');
     const expires = new Date(Date.now() + 7 * 24 * 3600 * 1000);
@@ -232,19 +232,19 @@ handlers.carrierPortalInvite = async function (req, res, args) {
     let emailed = false;
     if (sendResetEmail) { try { await sendResetEmail(email, nev || email, link, await emailLang(cid)); emailed = true; } catch (_) { emailed = false; } }
     return res.json({ result: { ok: true, link, emailed } });
-  } catch (err) { console.error('carrierPortalInvite hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('carrierPortalInvite hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 handlers.carrierPortalSetActive = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const id = parseInt(args && args[0], 10);
     const activ = !!(args && args[1]);
-    if (!id) return res.json({ result: { ok: false, err: 'ID kötelező.' } });
+    if (!id) return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
     const r = await pool.query('UPDATE carrier_users SET activ=$1 WHERE id=$2 AND company_id=$3', [activ, id, cid]);
     return res.json({ result: { ok: !!r.rowCount } });
-  } catch (err) { console.error('carrierPortalSetActive hiba:', err); return res.json({ result: { ok: false, err: 'Szerver hiba' } }); }
+  } catch (err) { console.error('carrierPortalSetActive hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 module.exports = handlers;

@@ -14,7 +14,7 @@ function _isAdminOrManager(req) {
   return req.session.user && ['Admin', 'Manager'].includes(req.session.user.pozicio);
 }
 function _deny(res) {
-  return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+  return res.json({ result: { ok: false, err: 'Acces interzis' } });
 }
 function _arg(args) {
   return Array.isArray(args) ? (args[0] || {}) : (args || {});
@@ -38,7 +38,7 @@ handlers.expiryList = async function (req, res, args) {
     return res.json({ result: { ok: true, items: r.rows } });
   } catch (err) {
     console.error('expiryList hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -55,7 +55,7 @@ handlers.expirySave = async function (req, res, args) {
     const expiry = f.expiry_date;
     let alertDays = parseInt(f.alert_days, 10);
     if (!Number.isFinite(alertDays) || alertDays < 0 || alertDays > 365) alertDays = 30;
-    if (!docType || !expiry) return res.json({ result: { ok: false, err: 'A dokumentum-típus és a lejárati dátum kötelező.' } });
+    if (!docType || !expiry) return res.json({ result: { ok: false, err: 'Tipul documentului si data expirarii sunt obligatorii.' } });
 
     if (id) {
       const r = await pool.query(
@@ -65,7 +65,7 @@ handlers.expirySave = async function (req, res, args) {
          WHERE id=$1 AND company_id=$2`,
         [id, cid, entityType, label || null, docType, expiry, alertDays, f.note || null]
       );
-      if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nem található.' } });
+      if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost gasit.' } });
     } else {
       await pool.query(
         `INSERT INTO document_expiries (company_id, entity_type, entity_label, doc_type, expiry_date, alert_days, note)
@@ -76,7 +76,7 @@ handlers.expirySave = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('expirySave hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -88,10 +88,10 @@ handlers.expiryDelete = async function (req, res, args) {
       'DELETE FROM document_expiries WHERE id = $1 AND company_id = $2',
       [id, req.session.user.company_id]
     );
-    return res.json({ result: { ok: !!r.rowCount, err: r.rowCount ? undefined : 'Nem található.' } });
+    return res.json({ result: { ok: !!r.rowCount, err: r.rowCount ? undefined : 'Nu a fost gasit.' } });
   } catch (err) {
     console.error('expiryDelete hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -110,7 +110,7 @@ handlers.getExpiryAlerts = async function (req, res, args) {
     return res.json({ result: { ok: true, items: r.rows } });
   } catch (err) {
     console.error('getExpiryAlerts hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -139,7 +139,7 @@ handlers.serviceList = async function (req, res, args) {
     return res.json({ result: { ok: true, items: r.rows } });
   } catch (err) {
     console.error('serviceList hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -150,10 +150,10 @@ handlers.serviceCreate = async function (req, res, args) {
     const cid = req.session.user.company_id;
     const f = _arg(args);
     const vehicleId = parseInt(f.vehicle_id, 10);
-    if (!Number.isFinite(vehicleId)) return res.json({ result: { ok: false, err: 'Válassz járművet!' } });
+    if (!Number.isFinite(vehicleId)) return res.json({ result: { ok: false, err: 'Selecteaza un vehicul!' } });
     // multi-tenant: a jármű a saját cégé legyen
     const vr = await pool.query('SELECT id FROM vehicles WHERE id=$1 AND company_id=$2', [vehicleId, cid]);
-    if (!vr.rows.length) return res.json({ result: { ok: false, err: 'A jármű nem található.' } });
+    if (!vr.rows.length) return res.json({ result: { ok: false, err: 'Vehiculul nu a fost gasit.' } });
     const num = (x) => { const n = parseFloat(x); return Number.isFinite(n) ? n : null; };
     await pool.query(
       `INSERT INTO vehicle_service_log
@@ -165,7 +165,7 @@ handlers.serviceCreate = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('serviceCreate hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -177,10 +177,10 @@ handlers.serviceDelete = async function (req, res, args) {
       'DELETE FROM vehicle_service_log WHERE id = $1 AND company_id = $2',
       [id, req.session.user.company_id]
     );
-    return res.json({ result: { ok: !!r.rowCount, err: r.rowCount ? undefined : 'Nem található.' } });
+    return res.json({ result: { ok: !!r.rowCount, err: r.rowCount ? undefined : 'Nu a fost gasit.' } });
   } catch (err) {
     console.error('serviceDelete hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -207,7 +207,7 @@ handlers.advanceList = async function (req, res, args) {
     return res.json({ result: { ok: true, items: r.rows } });
   } catch (err) {
     console.error('advanceList hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -218,8 +218,8 @@ handlers.advanceCreate = async function (req, res, args) {
     const f = _arg(args);
     const email = String(f.email_sofer || '').trim().toLowerCase();
     const amount = parseFloat(f.amount);
-    if (!email) return res.json({ result: { ok: false, err: 'Válassz sofőrt!' } });
-    if (!Number.isFinite(amount) || amount <= 0) return res.json({ result: { ok: false, err: 'Érvénytelen összeg.' } });
+    if (!email) return res.json({ result: { ok: false, err: 'Selecteaza un sofer!' } });
+    if (!Number.isFinite(amount) || amount <= 0) return res.json({ result: { ok: false, err: 'Suma invalida.' } });
     await pool.query(
       `INSERT INTO driver_advances (company_id, email_sofer, amount, currency, given_at, note, created_by)
        VALUES ($1,$2,$3,'RON',$4,$5,$6)`,
@@ -228,7 +228,7 @@ handlers.advanceCreate = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('advanceCreate hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -240,10 +240,10 @@ handlers.advanceDelete = async function (req, res, args) {
       'DELETE FROM driver_advances WHERE id = $1 AND company_id = $2',
       [id, req.session.user.company_id]
     );
-    return res.json({ result: { ok: !!r.rowCount, err: r.rowCount ? undefined : 'Nem található.' } });
+    return res.json({ result: { ok: !!r.rowCount, err: r.rowCount ? undefined : 'Nu a fost gasit.' } });
   } catch (err) {
     console.error('advanceDelete hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -260,7 +260,7 @@ handlers.setDiurnaRates = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('setDiurnaRates hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -275,14 +275,14 @@ handlers.getDriverSettlement = async function (req, res, args) {
     const a = _arg(args);
     const cid = req.session.user.company_id;
     const email = String(a.email || '').trim().toLowerCase();
-    if (!email) return res.json({ result: { ok: false, err: 'Válassz sofőrt!' } });
+    if (!email) return res.json({ result: { ok: false, err: 'Selecteaza un sofer!' } });
     const from = a.from || '1970-01-01';
     const to = a.to || '2999-12-31';
 
     // A sofőr a saját céghez tartozzon
     const ur = await pool.query(
       'SELECT nume FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2', [email, cid]);
-    if (!ur.rows.length) return res.json({ result: { ok: false, err: 'A sofőr nem található.' } });
+    if (!ur.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
 
     // Előlegek
     const advR = await pool.query(
@@ -347,7 +347,7 @@ handlers.getDriverSettlement = async function (req, res, args) {
     }});
   } catch (err) {
     console.error('getDriverSettlement hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
@@ -365,7 +365,7 @@ handlers.fuelImportRows = async function (req, res, args) {
     const f = _arg(args);
     const source = String(f.source || 'egyeb').toLowerCase().slice(0, 30);
     const rows = Array.isArray(f.rows) ? f.rows.slice(0, 2000) : [];
-    if (!rows.length) return res.json({ result: { ok: false, err: 'Nincs importálható sor.' } });
+    if (!rows.length) return res.json({ result: { ok: false, err: 'Nu exista randuri de importat.' } });
 
     let inserted = 0, skipped = 0;
     for (const r of rows) {
@@ -388,7 +388,7 @@ handlers.fuelImportRows = async function (req, res, args) {
     return res.json({ result: { ok: true, inserted, skipped } });
   } catch (err) {
     console.error('fuelImportRows hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba (lefutott a phase4 migráció?)' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server (a rulat migrarea phase4?)' } });
   }
 };
 
@@ -411,7 +411,7 @@ handlers.fuelCardList = async function (req, res, args) {
     return res.json({ result: { ok: true, items: r.rows, total: sumR.rows[0] } });
   } catch (err) {
     console.error('fuelCardList hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba (lefutott a phase4 migráció?)' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server (a rulat migrarea phase4?)' } });
   }
 };
 
@@ -459,7 +459,7 @@ handlers.fuelCompare = async function (req, res, args) {
     return res.json({ result: { ok: true, rows } });
   } catch (err) {
     console.error('fuelCompare hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 

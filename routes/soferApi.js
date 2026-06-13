@@ -11,7 +11,7 @@ const { genDocId } = require('../lib/ids');
 
 router.post('/api/border-cross', async (req, res) => {
   try {
-    if (!req.session.user) return res.json({ success: false, err: 'Nincs bejelentkezve' });
+    if (!req.session.user) return res.json({ success: false, err: 'Nu sunteti autentificat' });
     const { tip, tara, locatie, gps_lat, gps_lng } = req.body;
     await pool.query(
       `INSERT INTO border_crossings (email_sofer, nume_sofer, tip, tara, locatie, gps_lat, gps_lng)
@@ -29,7 +29,7 @@ router.post('/api/border-cross', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('border-cross hiba:', err);
-    res.json({ success: false, err: 'Szerver hiba' });
+    res.json({ success: false, err: 'Eroare de server' });
   }
 });
 
@@ -70,7 +70,7 @@ router.post('/api/document-series', requireLogin, requireRole('Manager','Admin')
   const cid = req.session.user.company_id;
   const { docType='MT', prefix } = req.body;
   const year = new Date().getFullYear();
-  if (!prefix) return res.json({ok:false, err:'Prefix kötelező.'});
+  if (!prefix) return res.json({ok:false, err:'Prefixul este obligatoriu.'});
   try {
     // FONTOS: a prefix újramentése NEM nullázhatja a sorszámot — különben
     // már kiadott hivatalos bizonylatszámok ismétlődnének meg.
@@ -93,7 +93,7 @@ router.post('/api/document-series/next', requireLogin, async (req,res) => {
 
 router.post('/api/fuvarlevel-save', async (req, res) => {
   try {
-    if (!req.session.user) return res.json({ success: false, err: 'Nincs bejelentkezve' });
+    if (!req.session.user) return res.json({ success: false, err: 'Nu sunteti autentificat' });
     const d = req.body;
     const soferNameClean = (req.session.user.nume || 'Sofer').replace(/\s+/g, '_');
     const id = genDocId('FUV');
@@ -159,13 +159,13 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     res.json({ success: true, id, docNumber: autoDocNumber });
   } catch (err) {
     console.error('fuvarlevel-save hiba:', err);
-    res.json({ success: false, err: 'Szerver hiba: ' + (err.message || 'ismeretlen') });
+    res.json({ success: false, err: 'Eroare de server: ' + (err.message || 'necunoscut') });
   }
 });
 
 router.post('/api/doc-upload', async (req, res) => {
   try {
-    if (!req.session.user) return res.json({ success: false, err: 'Nincs bejelentkezve' });
+    if (!req.session.user) return res.json({ success: false, err: 'Nu sunteti autentificat' });
     const { numeFisier, base64, tip, orderId } = req.body;
     // POD: a fotó opcionálisan fuvarhoz köthető — de CSAK a sofőr SAJÁT
     // cégének fuvarjához (idegen cég fuvar-ID-jára ne lehessen csatolni).
@@ -191,14 +191,14 @@ router.post('/api/doc-upload', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('doc-upload hiba:', err);
-    res.json({ success: false, err: 'Szerver hiba' });
+    res.json({ success: false, err: 'Eroare de server' });
   }
 });
 
 // SOFOR DOKUMENTUM MEGTEKINTES / LETOLTES
 router.get('/api/doc-download/:id', async (req, res) => {
   try {
-    if (!req.session.user) return res.status(401).send('Nincs bejelentkezve');
+    if (!req.session.user) return res.status(401).send('Nu sunteti autentificat');
     const r = await pool.query(
       `SELECT d.id, d.file_name, d.tip, d.storage_url
        FROM documents d
@@ -206,10 +206,10 @@ router.get('/api/doc-download/:id', async (req, res) => {
        WHERE d.id = $1 AND u.company_id = $2`,
       [req.params.id, req.session.user.company_id]
     );
-    if (!r.rows.length) return res.status(404).send('Nem talalhato');
+    if (!r.rows.length) return res.status(404).send('Nu a fost gasit');
     const doc = r.rows[0];
     const base64 = doc.storage_url || '';
-    if (!base64) return res.status(404).send('Nincs tartalom');
+    if (!base64) return res.status(404).send('Fara continut');
     const matches = base64.match(/^data:([^;]+);base64,(.+)$/s);
     if (matches) {
       const mime = matches[1];
@@ -225,7 +225,7 @@ router.get('/api/doc-download/:id', async (req, res) => {
     return res.send(data);
   } catch (err) {
     console.error('doc-download hiba:', err);
-    res.status(500).send('Szerver hiba');
+    res.status(500).send('Eroare de server');
   }
 });
 
@@ -239,13 +239,13 @@ function escHtml(s) {
 // PDF DOWNLOAD (DB-bol) — csak bejelentkezve, csak a saját cég menetlevele
 router.get('/api/pdf-download/:id', async (req, res) => {
   try {
-    if (!req.session.user) return res.status(401).send('Nincs bejelentkezve');
+    if (!req.session.user) return res.status(401).send('Nu sunteti autentificat');
     const r = await pool.query(
       `SELECT * FROM fuvarlevelek
        WHERE id = $1 AND email_sofer IN (SELECT email FROM users WHERE company_id = $2)`,
       [req.params.id, req.session.user.company_id]
     );
-    if (!r.rows.length) return res.status(404).send('Nem található.');
+    if (!r.rows.length) return res.status(404).send('Nu a fost gasit.');
     const f = r.rows[0];
 
     const alimentari = Array.isArray(f.alimentari) ? f.alimentari : [];
@@ -280,7 +280,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
         </tr>`;
       });
     } else {
-      alimHtml = '<tr><td colspan="6">Nem lett rögzítve tankolás.</td></tr>';
+      alimHtml = '<tr><td colspan="6">Nu a fost inregistrata nicio alimentare.</td></tr>';
     }
 
     // Kiadások HTML
@@ -295,7 +295,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
         </tr>`;
       });
     } else {
-      achHtml = '<tr><td colspan="4">Nem lett rögzítve kiadás.</td></tr>';
+      achHtml = '<tr><td colspan="4">Nu a fost inregistrata nicio cheltuiala.</td></tr>';
     }
 
     // Fuvar ID-k
@@ -318,8 +318,8 @@ router.get('/api/pdf-download/:id', async (req, res) => {
   </head>
   <body>
     <div class="no-print" style="margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;">
-      <button onclick="window.close();setTimeout(function(){if(!window.closed){if(history.length>1){history.back();}else{location.href='/';}}},150);" style="padding:10px 24px;background:#555;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">← Vissza</button>
-      <button onclick="window.print()" style="padding:10px 24px;background:#000;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">🖨️ Nyomtatás / PDF mentés</button>
+      <button onclick="window.close();setTimeout(function(){if(!window.closed){if(history.length>1){history.back();}else{location.href='/';}}},150);" style="padding:10px 24px;background:#555;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">← Inapoi</button>
+      <button onclick="window.print()" style="padding:10px 24px;background:#000;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">🖨️ Tipareste / Salveaza PDF</button>
     </div>
     <div class="header-box">VALLOR TEAM SRL<br><span style="font-size:14px;">FIȘĂ DE CURSĂ SĂPTĂMÂNALĂ</span><br><span style="font-size:15px;color:#b00;letter-spacing:1px;">Serie / Nr.: ${escHtml(f.numar_fisa || '—')}</span></div>
 
@@ -376,7 +376,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
   </html>`);
   } catch (err) {
     console.error('pdf-download hiba:', err);
-    res.status(500).send('Szerver hiba');
+    res.status(500).send('Eroare de server');
   }
 });
 

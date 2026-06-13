@@ -36,7 +36,7 @@ async function call(url, opts) {
     let data; try { data = JSON.parse(text); } catch (_) { data = { Success: false, Message: text }; }
     return data;
   } catch (e) {
-    if (e.name === 'AbortError') { const x = new Error(`FGO időtúllépés (${Math.round(TIMEOUT_MS/1000)} mp).`); x.status = 504; throw x; }
+    if (e.name === 'AbortError') { const x = new Error(`Timeout FGO (${Math.round(TIMEOUT_MS/1000)} sec).`); x.status = 504; throw x; }
     throw e;
   } finally { clearTimeout(t); }
 }
@@ -94,8 +94,8 @@ async function getStatus(creds, ref) {
 }
 
 async function testConnection(creds) {
-  if (!creds.CodUnic || !creds.PrivateKey) return { ok: false, message: 'Hiányzó CodUnic / PrivateKey.' };
-  const env = creds.environment === 'production' ? 'Éles' : 'Teszt';
+  if (!creds.CodUnic || !creds.PrivateKey) return { ok: false, message: 'CodUnic / PrivateKey lipsește.' };
+  const env = creds.environment === 'production' ? 'Real' : 'Test';
   try {
     // Valódi, mellékhatás nélküli hívás: egy nem létező számla státuszának lekérése.
     // Ha a CodUnic/kulcs/környezet rossz, az FGO erről panaszkodik; ha a hitelesítés jó,
@@ -114,15 +114,15 @@ async function testConnection(creds) {
       // (vagy fordítva). A teszt (UAT) és az éles FGO külön rendszer, külön fiókkal.
       if (/cod\w*\s*unic|asociat/i.test(raw)) {
         hint = creds.environment === 'production'
-          ? ' — Ellenőrizd, hogy a CodUnic (CUI) és a PrivateKey ugyanabból az ÉLES FGO-fiókból való.'
-          : ' — A Teszt (UAT) és az Éles FGO külön rendszer, külön fiókkal és kulccsal. Ha ez éles CodUnic+kulcs, állítsd a környezetet „Éles"-re; teszteléshez külön UAT-fiók kell az FGO-tól.';
+          ? ' — Verifică dacă CodUnic (CUI) și PrivateKey provin din același cont FGO REAL.'
+          : ' — Mediul Test (UAT) și FGO Real sunt sisteme separate, cu cont și cheie diferite. Dacă acesta este un CodUnic+cheie real, setează mediul pe „Real"; pentru testare ai nevoie de un cont UAT separat de la FGO.';
       } else if (/hash|cheie\s*privat/i.test(raw)) {
-        hint = ' — A PrivateKey nem tartozik ehhez a CodUnic-hoz (vagy elgépelés). Ellenőrizd a kulcsot ugyanabban a környezetben.';
+        hint = ' — PrivateKey nu corespunde acestui CodUnic (sau este o greșeală de tastare). Verifică cheia în același mediu.';
       }
       return { ok: false, message: 'FGO (' + env + '): ' + msg + hint };
     }
     // Bármi más (pl. „factura nu există") = a hitelesítés RENDBEN.
-    return { ok: true, message: 'Kapcsolat OK (' + env + ') — a CodUnic + kulcs + környezet hármas helyes.' };
+    return { ok: true, message: 'Conexiune OK (' + env + ') — combinația CodUnic + cheie + mediu este corectă.' };
   } catch (e) {
     return { ok: false, message: 'FGO (' + env + '): ' + e.message };
   }

@@ -14,13 +14,13 @@ function _am(req) { return req.session.user && ['Admin', 'Manager'].includes(req
 // args: [orderId] — a fuvar útvonalából becsli az útdíjat és elmenti.
 handlers.estimateToll = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const orderId = String(args && args[0] || '').trim();
     const r = await pool.query(
       'SELECT id, loc_incarcare, loc_descarcare, route_geo FROM orders WHERE id = $1 AND company_id = $2',
       [orderId, cid]);
-    if (!r.rows.length) return res.json({ result: { ok: false, err: 'Fuvar nem található' } });
+    if (!r.rows.length) return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit' } });
     const o = r.rows[0];
 
     // útvonal: a mentett route_geo waypointjaiból (ha van), különben felrakó→lerakó
@@ -31,14 +31,14 @@ handlers.estimateToll = async function (req, res, args) {
       waypoints = rg.waypoints.map((w) => ({ type: w.type, address: w.address, lat: w.lat, lng: w.lng }));
     } else {
       if (!o.loc_incarcare || !o.loc_descarcare) {
-        return res.json({ result: { ok: false, err: 'Add meg a felrakó és lerakó címet (vagy számolj térképes km-et) az útdíj-becsléshez.' } });
+        return res.json({ result: { ok: false, err: 'Introdu adresa de incarcare si descarcare (sau calculeaza km pe harta) pentru estimarea taxei de drum.' } });
       }
       waypoints = [{ type: 'loading', address: o.loc_incarcare }, { type: 'unloading', address: o.loc_descarcare }];
     }
 
     let est;
     try { est = await estimateRoute(waypoints, cid); }
-    catch (e) { return res.json({ result: { ok: false, err: 'Az útvonal nem számolható: ' + (e.message || '') } }); }
+    catch (e) { return res.json({ result: { ok: false, err: 'Ruta nu poate fi calculata: ' + (e.message || '') } }); }
 
     const toll = await estimateFromPolyline(cid, est.polyline);
     await pool.query('UPDATE orders SET toll_cost = $1, toll_geo = $2, updated_at = NOW() WHERE id = $3 AND company_id = $4',
@@ -47,14 +47,14 @@ handlers.estimateToll = async function (req, res, args) {
     return res.json({ result: { ok: true, toll, km: est.km } });
   } catch (err) {
     console.error('estimateToll hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 // A cég effektív rátái (alapértékek + felülírások) — a szerkesztő UI-hoz.
 handlers.getTollRates = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const rates = await getRates(cid);
     // jelöljük, mely országoknak van kézi felülírása
@@ -69,17 +69,17 @@ handlers.getTollRates = async function (req, res, args) {
     return res.json({ result: { ok: true, rates: list } });
   } catch (err) {
     console.error('getTollRates hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
 // args: [[{cc, mode, eur_per_km, vignette_eur}]] — ráták mentése (upsert).
 handlers.saveTollRates = async function (req, res, args) {
   try {
-    if (!_am(req)) return res.json({ result: { ok: false, err: 'Nincs jogosultsag' } });
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
     const rows = Array.isArray(args && args[0]) ? args[0] : [];
-    if (!rows.length) return res.json({ result: { ok: false, err: 'Nincs mentendő ráta.' } });
+    if (!rows.length) return res.json({ result: { ok: false, err: 'Nu exista tarife de salvat.' } });
     for (const row of rows) {
       const cc = String(row.cc || '').toUpperCase().slice(0, 2);
       if (!/^[A-Z]{2}$/.test(cc)) continue;
@@ -97,7 +97,7 @@ handlers.saveTollRates = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('saveTollRates hiba:', err);
-    return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 

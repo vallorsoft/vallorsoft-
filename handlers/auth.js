@@ -16,7 +16,7 @@ handlers.authMe = async function (req, res, args) {
 handlers.authLogout = async function (req, res, args) {
     req.session.destroy(function(err) {
       if (err) {
-        return res.json({ result: { ok: false, err: 'Logout hiba' } });
+        return res.json({ result: { ok: false, err: 'Eroare la deconectare' } });
       }
       res.clearCookie('connect.sid');
       return res.json({ result: { ok: true } });
@@ -34,10 +34,10 @@ handlers.authRegister = async function (req, res, args) {
       const kod = String(p.kod || '').trim().toUpperCase();
 
       if (!nume || !email || !jelszo || !kod) {
-        return res.json({ result: { ok: false, err: 'Minden mezo kotelezo.' } });
+        return res.json({ result: { ok: false, err: 'Toate campurile sunt obligatorii.' } });
       }
       if (jelszo.length < 6) {
-        return res.json({ result: { ok: false, err: 'A jelszo legalabb 6 karakter legyen.' } });
+        return res.json({ result: { ok: false, err: 'Parola trebuie sa aiba cel putin 6 caractere.' } });
       }
 
       const invResult = await pool.query(
@@ -46,24 +46,24 @@ handlers.authRegister = async function (req, res, args) {
       );
 
       if (invResult.rows.length === 0) {
-        return res.json({ result: { ok: false, err: 'Ismeretlen meghivokod.' } });
+        return res.json({ result: { ok: false, err: 'Cod de invitatie necunoscut.' } });
       }
 
       const invite = invResult.rows[0];
 
       if (invite.status && invite.status.toLowerCase().startsWith('felhaszn')) {
-        return res.json({ result: { ok: false, err: 'Ezt a meghivokodot mar felhasznaltak.' } });
+        return res.json({ result: { ok: false, err: 'Acest cod de invitatie a fost deja folosit.' } });
       }
       if (invite.status && invite.status.toLowerCase().startsWith('visszavon')) {
-        return res.json({ result: { ok: false, err: 'Ezt a meghivot visszavontak.' } });
+        return res.json({ result: { ok: false, err: 'Aceasta invitatie a fost retrasa.' } });
       }
       if (invite.email && invite.email.toLowerCase() !== email) {
-        return res.json({ result: { ok: false, err: 'A meghivo nem ehhez az email-cimhez tartozik.' } });
+        return res.json({ result: { ok: false, err: 'Invitatia nu apartine acestei adrese de e-mail.' } });
       }
 
       const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
       if (existing.rows.length > 0) {
-        return res.json({ result: { ok: false, err: 'Ez az email mar regisztralt.' } });
+        return res.json({ result: { ok: false, err: 'Acest e-mail este deja inregistrat.' } });
       }
 
       const passwordHash = await bcrypt.hash(jelszo, 10);
@@ -79,12 +79,12 @@ handlers.authRegister = async function (req, res, args) {
       );
 
       return res.json({
-        result: { ok: true, msg: 'Sikeres regisztracio. Most mar bejelentkezhet.', pozicio: invite.pozicio }
+        result: { ok: true, msg: 'Inregistrare reusita. Acum va puteti autentifica.', pozicio: invite.pozicio }
       });
 
     } catch (err) {
       console.error('Register hiba:', err);
-      return res.json({ result: { ok: false, err: 'Szerver hiba' } });
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
