@@ -61,10 +61,10 @@ function makeClient(cfg) {
 
 // Kapcsolat-teszt: csatlakozás + INBOX méret. Siker: {ok:true,count}. Hiba: dob.
 async function testConnection(creds) {
-  if (!ImapFlow) throw new Error('Az imapflow csomag nincs telepítve a szerveren.');
+  if (!ImapFlow) throw new Error('Pachetul imapflow nu este instalat pe server.');
   const cfg = resolveImap(creds);
-  if (!cfg.user || !cfg.pass) throw new Error('Hiányzó e-mail cím vagy jelszó.');
-  if (!cfg.host) throw new Error('Hiányzó IMAP szerver.');
+  if (!cfg.user || !cfg.pass) throw new Error('Lipsește adresa de e-mail sau parola.');
+  if (!cfg.host) throw new Error('Lipsește serverul IMAP.');
   const client = makeClient(cfg);
   await client.connect();
   let count = 0;

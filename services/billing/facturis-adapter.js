@@ -19,16 +19,16 @@ class FacturisAdapter {
 
   async testConnection() {
     if (!this.c.username || !this.c.api_key || !this.c.company_cui) {
-      return { ok: false, message: 'Hiányzó felhasználónév / API kulcs / CUI.' };
+      return { ok: false, message: 'Lipsește numele de utilizator / cheia API / CUI.' };
     }
     try {
       const r = await jsonT(BASE + '/v1/ping', { method: 'GET', headers: this._headers() }, 10000);
-      if (r.status === 401 || r.status === 403) return { ok: false, message: 'Érvénytelen hitelesítő adatok.' };
-      if (r.status === 429) return { ok: false, message: 'Facturis API limit elérve.' };
-      return { ok: true, message: 'Facturis adatok rögzítve.' };
+      if (r.status === 401 || r.status === 403) return { ok: false, message: 'Date de autentificare invalide.' };
+      if (r.status === 429) return { ok: false, message: 'Limita API Facturis atinsă.' };
+      return { ok: true, message: 'Date Facturis salvate.' };
     } catch (e) {
       // BÉTA: a publikus API-séma nem megerősített — lásd ifactura-adapter.
-      return { ok: true, unverified: true, message: '⚠️ Facturis (BÉTA): a kapcsolat NEM ellenőrizhető (' + e.message + ') — az adatok rögzítve, de éles számlázás előtt kötelező a tesztelés.' };
+      return { ok: true, unverified: true, message: '⚠️ Facturis (BETA): conexiunea NU poate fi verificată (' + e.message + ') — datele sunt salvate, dar înainte de facturarea reală testarea este obligatorie.' };
     }
   }
 
@@ -41,16 +41,16 @@ class FacturisAdapter {
         items: (d.items || []).map((it) => ({ name: it.name, unit: it.unit || 'buc', quantity: it.quantity, price_net: it.price_net, vat_percent: it.vat_percent })),
       };
       const r = await jsonT(BASE + '/v1/invoices', { method: 'POST', headers: this._headers(), body: JSON.stringify(body) });
-      if (r.status === 429) return { ok: false, message: 'Facturis API limit elérve.' };
-      if (!r.ok) return { ok: false, message: (r.data && (r.data.message || r.data.error)) || ('Facturis hiba (' + r.status + ')') };
+      if (r.status === 429) return { ok: false, message: 'Limita API Facturis atinsă.' };
+      if (!r.ok) return { ok: false, message: (r.data && (r.data.message || r.data.error)) || ('Eroare Facturis (' + r.status + ')') };
       return { ok: true, serie: r.data.series || null, numar: r.data.number || r.data.invoice_number || null, invoice_number: r.data.number || r.data.invoice_number || null, pdf_url: r.data.pdf_url || r.data.url || null, raw: r.data };
-    } catch (e) { return { ok: false, message: 'Facturis hiba: ' + e.message }; }
+    } catch (e) { return { ok: false, message: 'Eroare Facturis: ' + e.message }; }
   }
 
   async getInvoice(invoice_number) {
     try {
       const r = await jsonT(BASE + '/v1/invoices/' + encodeURIComponent(invoice_number), { method: 'GET', headers: this._headers() });
-      if (!r.ok) return { ok: false, message: 'Nem található (' + r.status + ').' };
+      if (!r.ok) return { ok: false, message: 'Nu a fost găsit (' + r.status + ').' };
       return { ok: true, invoice: r.data };
     } catch (e) { return { ok: false, message: e.message }; }
   }

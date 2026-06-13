@@ -15,17 +15,17 @@ class SmartBillAdapter {
 
   async testConnection() {
     if (!this.c.username || !this.c.token || !this.c.company_vat_code) {
-      return { ok: false, message: 'Hiányzó felhasználónév / token / CUI.' };
+      return { ok: false, message: 'Lipsește numele de utilizator / token / CUI.' };
     }
     try {
       // Sorozatok lekérése = könnyű, hitelesített hívás.
       const url = BASE + '/series?cif=' + encodeURIComponent(this.c.company_vat_code) + '&type=f';
       const r = await jsonT(url, { method: 'GET', headers: this._auth() });
-      if (r.status === 401 || r.status === 403) return { ok: false, message: 'Hibás felhasználónév vagy token.' };
-      if (r.status === 429) return { ok: false, message: 'SmartBill API limit elérve — próbáld később.' };
-      if (!r.ok) return { ok: false, message: (r.data && (r.data.errorText || r.data.message)) || ('SmartBill hiba (' + r.status + ')') };
-      return { ok: true, message: 'SmartBill kapcsolat sikeres.' };
-    } catch (e) { return { ok: false, message: 'SmartBill nem elérhető: ' + e.message }; }
+      if (r.status === 401 || r.status === 403) return { ok: false, message: 'Nume de utilizator sau token greșit.' };
+      if (r.status === 429) return { ok: false, message: 'Limita API SmartBill atinsă — încearcă mai târziu.' };
+      if (!r.ok) return { ok: false, message: (r.data && (r.data.errorText || r.data.message)) || ('Eroare SmartBill (' + r.status + ')') };
+      return { ok: true, message: 'Conexiune SmartBill reușită.' };
+    } catch (e) { return { ok: false, message: 'SmartBill indisponibil: ' + e.message }; }
   }
 
   async createInvoice(d) {
@@ -45,14 +45,14 @@ class SmartBillAdapter {
         })),
       };
       const r = await jsonT(BASE + '/invoice', { method: 'POST', headers: this._auth(), body: JSON.stringify(body) });
-      if (r.status === 429) return { ok: false, message: 'SmartBill API limit elérve.' };
-      if (!r.ok) return { ok: false, message: (r.data && (r.data.errorText || r.data.message)) || ('SmartBill hiba (' + r.status + ')') };
+      if (r.status === 429) return { ok: false, message: 'Limita API SmartBill atinsă.' };
+      if (!r.ok) return { ok: false, message: (r.data && (r.data.errorText || r.data.message)) || ('Eroare SmartBill (' + r.status + ')') };
       return { ok: true, serie: r.data.series || null, numar: r.data.number || null, invoice_number: (r.data.series || '') + (r.data.number || ''), pdf_url: r.data.url || null, raw: r.data };
-    } catch (e) { return { ok: false, message: 'SmartBill hiba: ' + e.message }; }
+    } catch (e) { return { ok: false, message: 'Eroare SmartBill: ' + e.message }; }
   }
 
   async getInvoice(invoice_number) {
-    return { ok: false, message: 'A SmartBill számla-lekérés sorozat+szám paramétert igényel — add meg a felületen.' };
+    return { ok: false, message: 'Interogarea facturii SmartBill necesită parametrii serie+număr — completează-i în interfață.' };
   }
 }
 

@@ -30,7 +30,7 @@ const ADAPTERS = {
 function getAdapter(provider) {
   const a = ADAPTERS[provider];
   if (!a) {
-    const e = new Error(`A(z) "${provider}" számlázó még nincs implementálva.`);
+    const e = new Error(`Furnizorul de facturare "${provider}" încă nu este implementat.`);
     e.code = 'PROVIDER_NOT_IMPLEMENTED';
     throw e;
   }

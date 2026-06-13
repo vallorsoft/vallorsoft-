@@ -21,7 +21,7 @@ const ADAPTERS = {
 function getAdapter(provider) {
   const a = ADAPTERS[provider];
   if (!a) {
-    const e = new Error(`A(z) "${provider}" GPS-szolgáltató e-Transport adaptere még nincs implementálva.`);
+    const e = new Error(`Adaptorul e-Transport al furnizorului GPS "${provider}" încă nu este implementat.`);
     e.code = 'PROVIDER_NOT_IMPLEMENTED';
     throw e;
   }

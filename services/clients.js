@@ -37,14 +37,14 @@ async function fetchJson(url, opts, timeoutMs = 12000) {
 // ANAF: hivatalos cégadatok CUI alapján. data = mai dátum (a státusz arra a napra).
 async function anafLookup(cui) {
   const n = normalizeCui(cui);
-  if (!n) return { found: false, error: 'Üres CUI.' };
+  if (!n) return { found: false, error: 'CUI gol.' };
   const data = new Date().toISOString().slice(0, 10);
   const r = await fetchJson(ANAF_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify([{ cui: Number(n), data }]),
   });
-  if (!r.ok || !r.data) return { found: false, error: `ANAF hiba (${r.status}).` };
+  if (!r.ok || !r.data) return { found: false, error: `Eroare ANAF (${r.status}).` };
   const rec = (r.data.found && r.data.found[0]) || null;
   if (!rec) return { found: false };
 
@@ -68,9 +68,9 @@ async function anafLookup(cui) {
 async function viesCheck(country, number) {
   const c = String(country || '').toUpperCase().slice(0, 2);
   const num = String(number || '').replace(/\s/g, '');
-  if (!c || !num) return { valid: false, error: 'Hiányzó ország/szám.' };
+  if (!c || !num) return { valid: false, error: 'Lipsește țara/numărul.' };
   const r = await fetchJson(`${VIES_URL}/${c}/vat/${encodeURIComponent(num)}`, { method: 'GET' });
-  if (!r.ok || !r.data) return { valid: false, error: `VIES hiba (${r.status}).` };
+  if (!r.ok || !r.data) return { valid: false, error: `Eroare VIES (${r.status}).` };
   return { valid: !!r.data.isValid, name: r.data.name || null, address: r.data.address || null, raw: r.data };
 }
 

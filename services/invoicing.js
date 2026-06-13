@@ -146,7 +146,7 @@ function buildInvoiceFromOrder(order, client, cfg) {
 
 async function emitInvoice(pool, companyId, userId, orderId, payload) {
   const cfg = await getInvoiceConfig(pool, companyId);
-  if (!cfg || !cfg.provider) { const e = new Error('Nincs bekapcsolt számlázó.'); e.status = 409; throw e; }
+  if (!cfg || !cfg.provider) { const e = new Error('Niciun furnizor de facturare activat.'); e.status = 409; throw e; }
 
   // Dupla-számla védelem TRANZAKCIÓBAN, a fuvar sorára vett zárral:
   // két párhuzamos kérés közül a második megvárja az elsőt, és már látja
@@ -161,14 +161,14 @@ async function emitInvoice(pool, companyId, userId, orderId, payload) {
       [companyId, orderId]);
     if (existing.rows.length) {
       const ex = existing.rows[0];
-      const e = new Error('Ehhez a fuvarhoz már van kiállított számla (' +
-        [ex.serie, ex.numar].filter(Boolean).join('-') + '). Új számla nem készült.');
+      const e = new Error('Pentru această cursă există deja o factură emisă (' +
+        [ex.serie, ex.numar].filter(Boolean).join('-') + '). Nu a fost emisă o factură nouă.');
       e.status = 409; e.existing = ex;
       throw e;
     }
 
     const result = await emitViaProvider(cfg, payload);
-    if (!result.ok) { const e = new Error(result.message || 'A számlázó hibát adott.'); e.status = 502; throw e; }
+    if (!result.ok) { const e = new Error(result.message || 'Furnizorul de facturare a returnat o eroare.'); e.status = 502; throw e; }
 
     const net = (payload.lines || []).reduce((s, l) => s + l.qty * l.unitPrice, 0);
     const tva = payload.reverseCharge ? 0 : (payload.lines || []).reduce((s, l) => s + l.qty * l.unitPrice * (l.vatRate / 100), 0);
@@ -222,7 +222,7 @@ async function getProviderArticles(pool, companyId) {
 // csak a mennyiség negatív. Egy fuvarhoz csak egy storno készülhet.
 async function emitStorno(pool, companyId, userId, orderId) {
   const cfg = await getInvoiceConfig(pool, companyId);
-  if (!cfg || !cfg.provider) { const e = new Error('Nincs bekapcsolt számlázó.'); e.status = 409; throw e; }
+  if (!cfg || !cfg.provider) { const e = new Error('Niciun furnizor de facturare activat.'); e.status = 409; throw e; }
 
   // Dupla-storno védelem tranzakcióban, a fuvar sorára vett zárral (mint emitInvoice).
   const client = await pool.connect();
@@ -233,12 +233,12 @@ async function emitStorno(pool, companyId, userId, orderId) {
     const issued = await client.query(
       `SELECT * FROM invoices WHERE company_id=$1 AND order_id=$2 AND status='issued'
        ORDER BY created_at DESC LIMIT 1`, [companyId, orderId]);
-    if (!issued.rows.length) { const e = new Error('Ehhez a fuvarhoz nincs kiállított számla, amit stornózni lehetne.'); e.status = 409; throw e; }
+    if (!issued.rows.length) { const e = new Error('Pentru această cursă nu există o factură emisă care să poată fi stornată.'); e.status = 409; throw e; }
     const orig = issued.rows[0];
 
     const st = await client.query(
       `SELECT id FROM invoices WHERE company_id=$1 AND order_id=$2 AND status='storno' LIMIT 1`, [companyId, orderId]);
-    if (st.rows.length) { const e = new Error('Ehhez a fuvarhoz már van storno számla.'); e.status = 409; throw e; }
+    if (st.rows.length) { const e = new Error('Pentru această cursă există deja o factură de stornare.'); e.status = 409; throw e; }
 
     const base = orig.payload || {};
     const origRef = [orig.serie, orig.numar].filter(Boolean).join('-');
@@ -253,7 +253,7 @@ async function emitStorno(pool, companyId, userId, orderId) {
     };
 
     const result = await emitViaProvider(cfg, stornoPayload);
-    if (!result.ok) { const e = new Error(result.message || 'A számlázó hibát adott.'); e.status = 502; throw e; }
+    if (!result.ok) { const e = new Error(result.message || 'Furnizorul de facturare a returnat o eroare.'); e.status = 502; throw e; }
 
     const net = (stornoPayload.lines || []).reduce((s, l) => s + l.qty * l.unitPrice, 0);
     const tva = stornoPayload.reverseCharge ? 0 : (stornoPayload.lines || []).reduce((s, l) => s + l.qty * l.unitPrice * (l.vatRate / 100), 0);

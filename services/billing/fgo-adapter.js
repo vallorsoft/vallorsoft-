@@ -19,14 +19,14 @@ class FgoAdapter {
   }
 
   async testConnection() {
-    if (!this.c.api_key) return { ok: false, message: 'Hiányzó API kulcs.' };
-    return { ok: true, message: 'FGO adatok rögzítve (a tényleges ellenőrzés az első kiállításnál történik).' };
+    if (!this.c.api_key) return { ok: false, message: 'Lipsește cheia API.' };
+    return { ok: true, message: 'Date FGO salvate (verificarea efectivă are loc la prima emitere).' };
   }
 
   async createInvoice(d) {
     const creds = this._fgoCreds();
     if (!creds.CodUnic || !creds.PrivateKey) {
-      return { ok: false, message: 'Az FGO számlakiállításhoz CodUnic és PrivateKey is szükséges.' };
+      return { ok: false, message: 'Pentru emiterea facturii FGO sunt necesare atât CodUnic, cât și PrivateKey.' };
     }
     try {
       const invoice = {

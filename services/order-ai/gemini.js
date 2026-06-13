@@ -52,17 +52,17 @@ function friendlyError(status, body) {
   const apiMsg = (body && body.error && body.error.message) || '';
   if (status === 429) {
     const daily = /per\s*day|RequestsPerDay|daily/i.test(JSON.stringify(body || {}));
-    return 'Gemini kvóta/sebességkorlát (429)'
-      + (daily ? ' — a napi ingyenes keret elfogyott, holnap áll vissza' : ' — túl sok kérés rövid idő alatt')
-      + '. A rendszer a beépített kiolvasásra váltott, kérlek ellenőrizd a mezőket kézzel.';
+    return 'Limită cotă/viteză Gemini (429)'
+      + (daily ? ' — cota gratuită zilnică s-a epuizat, revine mâine' : ' — prea multe cereri într-un timp scurt')
+      + '. Sistemul a comutat pe citirea integrată, te rog verifică manual câmpurile.';
   }
-  if (status === 503) return 'Gemini átmenetileg túlterhelt (503). A rendszer a beépített kiolvasásra váltott.';
-  return 'Gemini hiba (' + status + ')' + (apiMsg ? ': ' + apiMsg : '') + '.';
+  if (status === 503) return 'Gemini este temporar supraîncărcat (503). Sistemul a comutat pe citirea integrată.';
+  return 'Eroare Gemini (' + status + ')' + (apiMsg ? ': ' + apiMsg : '') + '.';
 }
 
 async function callGemini(model, parts) {
   const key = process.env.GEMINI_API_KEY;
-  if (!key) { const e = new Error('Hiányzik a GEMINI_API_KEY.'); e.code = 'NO_KEY'; throw e; }
+  if (!key) { const e = new Error('Lipsește GEMINI_API_KEY.'); e.code = 'NO_KEY'; throw e; }
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const payload = JSON.stringify({
     systemInstruction: { parts: [{ text: PROMPT }] },
@@ -160,8 +160,8 @@ async function extract({ text, pdfBuffer, pdfName }) {
     }
   }
   // Minden modell kvótája elfogyott / túlterhelt.
-  const e = new Error('Minden Gemini-modell napi kerete elfogyott vagy túlterhelt (429/503). '
-    + 'A rendszer a beépített kiolvasásra váltott, kérlek ellenőrizd a mezőket kézzel.');
+  const e = new Error('Cota zilnică a tuturor modelelor Gemini s-a epuizat sau sunt supraîncărcate (429/503). '
+    + 'Sistemul a comutat pe citirea integrată, te rog verifică manual câmpurile.');
   e.status = (lastErr && lastErr.status) || 429;
   throw e;
 }
