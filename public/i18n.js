@@ -449,6 +449,12 @@
     'cs.uit.hint': { hu: 'A UIT-kódot a GPS-szolgáltató (pl. CargoTrack) e-Transport felületén generálod. Add meg a deep-link URL-sablont — a fuvar 🚛 UIT gombja a fuvar adataival előtöltve nyitja meg.', ro: 'Codul UIT se generează în interfața e-Transport a furnizorului GPS (ex. CargoTrack). Introdu șablonul URL deep-link — butonul 🚛 UIT al cursei îl deschide precompletat cu datele cursei.' },
     'cs.uit.save': { hu: '💾 Mentés', ro: '💾 Salvează' },
     'cs.uit.placeholders': { hu: 'Helyőrzők: {id} {rendszam} {remorca} {incarcare} {descarcare} {client} {km} {greutate} — URL-kódolva helyettesítődnek.', ro: 'Substituenți: {id} {rendszam} {remorca} {incarcare} {descarcare} {client} {km} {greutate} — se înlocuiesc URL-encodate.' },
+    'cs.gdpr.title': { hu: 'GDPR — adatkezelés', ro: 'GDPR — gestionare date' },
+    'cs.gdpr.hint': { hu: 'A cég összes adatának letöltése (hozzáférés/hordozhatóság) JSON-ban — jelszó-hash és 2FA-titok nélkül. A felhasználók anonimizálása (törléshez való jog) a Felhasználók listában.', ro: 'Descărcarea tuturor datelor firmei (acces/portabilitate) în JSON — fără hash de parolă și secret 2FA. Anonimizarea utilizatorilor (dreptul la ștergere) în lista Utilizatori.' },
+    'cs.gdpr.export': { hu: '⬇️ Adat-export (JSON)', ro: '⬇️ Export date (JSON)' },
+    'cs.gdpr.exported': { hu: '✅ Export letöltve', ro: '✅ Export descărcat' },
+    'cs.gdpr.anonymize': { hu: 'Anonimizálás (GDPR)', ro: 'Anonimizare (GDPR)' },
+    'cs.gdpr.anonConfirm': { hu: 'Biztosan anonimizálod ezt a felhasználót? A neve/e-mailje/telefonja törlődik, és letiltódik. Ez NEM vonható vissza.', ro: 'Sigur anonimizezi acest utilizator? Numele/e-mailul/telefonul se șterg și va fi blocat. Acțiunea este IREVERSIBILĂ.' },
     'cs.mp.savedProvider': { hu: '🗺️ Térkép-szolgáltató mentve', ro: '🗺️ Furnizor hartă salvat' },
     // Meghívók + menetlevelek
     'cs.noInvites': { hu: 'Nincs meghívókód.', ro: 'Niciun cod de invitație.' },

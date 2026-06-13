@@ -1353,6 +1353,32 @@ function saveUitDeeplink(){
   });
 }
 
+// ── GDPR: adat-export + anonimizálás — admin Integrációk ──
+function loadGdpr(){
+  var box=document.getElementById('gdprBox'); if(!box) return;
+  box.innerHTML='<div class="glass-soft" style="padding:16px;">'
+    +'<div class="text-primary" style="font-weight:700;margin-bottom:6px;">🔐 '+t('cs.gdpr.title')+'</div>'
+    +'<div class="text-muted" style="font-size:12px;margin-bottom:10px;">'+t('cs.gdpr.hint')+'</div>'
+    +'<button class="btn primary" style="padding:8px 14px;" onclick="exportGdpr(this)">'+t('cs.gdpr.export')+'</button>'
+    +'</div>';
+}
+function exportGdpr(btn){
+  if(btn){ btn.disabled=true; }
+  gas('exportCompanyData').then(function(r){
+    if(btn){ btn.disabled=false; }
+    if(!r||!r.ok){ toast((r&&r.err)||t('common.error'),'err'); return; }
+    try{
+      var blob=new Blob([JSON.stringify(r,null,2)],{type:'application/json'});
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url; a.download='vallorsoft-gdpr-export-'+(new Date().toISOString().slice(0,10))+'.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); },1000);
+      toast(t('cs.gdpr.exported'),'ok');
+    }catch(e){ toast(t('common.error'),'err'); }
+  }).catch(function(){ if(btn){btn.disabled=false;} toast(t('common.error'),'err'); });
+}
+
 function loadInvites(){
   gas('invListAll').then(list=>{
     if(!Array.isArray(list)){document.querySelector('#tblInv tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);">'+t('cs.noInvites')+'</td></tr>';return;}
