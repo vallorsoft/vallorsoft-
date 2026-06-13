@@ -145,6 +145,16 @@
     <div id="rpWaypoints"></div>
     <button class="btn ghost" id="rpAddWp" onclick="rpAddWaypoint()" style="margin-bottom:14px;" data-i18n="rp.addWaypoint">➕ Közbülső cél hozzáadása</button>
 
+    <!-- Útvonal-mód váltó: alapból ingyenes autós, gombbal kamionos (pontos) -->
+    <div style="margin-bottom:12px;">
+      <div class="text-muted" style="font-size:11px;margin-bottom:5px;" data-i18n="rp.routingModeLabel">Útvonal-mód</div>
+      <div style="display:flex;gap:6px;">
+        <button type="button" id="rpModeCar" class="btn primary" onclick="rpSetTruck(false)" style="flex:1;padding:8px;font-size:12.5px;" data-i18n="rp.modeCar">🚗 Autós (ingyenes)</button>
+        <button type="button" id="rpModeTruck" class="btn ghost" onclick="rpSetTruck(true)" style="flex:1;padding:8px;font-size:12.5px;" data-i18n="rp.modeTruck">🚛 Kamion (pontos)</button>
+      </div>
+      <div id="rpModeHint" class="text-muted" style="font-size:11px;margin-top:5px;"></div>
+    </div>
+
     <button class="btn primary" id="rpPlanBtn" onclick="rpPlan()" style="width:100%;" disabled data-i18n="rp.planRoute">🗺 Útvonal tervezése</button>
   </div>
 
@@ -449,12 +459,22 @@ function rpBuildWaypoints(){
   _waypointIds.forEach(function(id){ var v=val('rpWp_'+id); if(v) wps.push({type:'waypoint', address:v}); });
   return wps;
 }
+// Útvonal-mód: false = ingyenes autós (OSRM, alapértelmezett), true = kamionos (ORS).
+var rpTruck = false;
+function rpSetTruck(on){
+  rpTruck = !!on;
+  var car=document.getElementById('rpModeCar'), tr=document.getElementById('rpModeTruck');
+  if(car) car.className = rpTruck ? 'btn ghost' : 'btn primary';
+  if(tr)  tr.className  = rpTruck ? 'btn primary' : 'btn ghost';
+  var hint=document.getElementById('rpModeHint');
+  if(hint) hint.innerHTML = rpTruck ? t('rp.modeTruckHint') : t('rp.modeCarHint');
+}
 function rpPlan(){
   if(!selTractor){ toast(t('rp.pickTractorErr'),'err'); return; }
   if(!val('rpLoading')||!val('rpUnloading')){ toast(t('rp.addAddrsErr'),'err'); return; }
   var sp=document.getElementById('rpSpinner'); sp.style.display='flex';
   var btn=document.getElementById('rpPlanBtn'); btn.disabled=true;
-  gas('calculateRoute',[{ tractorId:selTractor.id, trailerId:selTrailer?selTrailer.id:null, params:rpCollectParams(), waypoints:rpBuildWaypoints() }])
+  gas('calculateRoute',[{ tractorId:selTractor.id, trailerId:selTrailer?selTrailer.id:null, truck:rpTruck, params:rpCollectParams(), waypoints:rpBuildWaypoints() }])
   .then(function(r){
     sp.style.display='none'; rpUpdatePlanBtn();
     if(!r||!r.ok){
@@ -512,7 +532,7 @@ function rpDrawRoute(r){
   if(profEl){
     profEl.innerHTML = r.profile==='truck-ors'
       ? t('rp.profileTruck')
-      : t('rp.profileCar');
+      : (r.truckRequested ? t('rp.profileTruckUnavail') : t('rp.profileCar'));
   }
   document.getElementById('rpDist').textContent=(Math.round((r.distanceMeters||0)/100)/10)+' km';
   document.getElementById('rpTime').textContent=rpFmtDur(r.durationSeconds);
@@ -566,6 +586,7 @@ gas('authMe').then(function(u){ if(!u){ window.location.href='/login'; return; }
   var b=document.getElementById('backLink'); if(b) b.href=(u.pozicio==='Manager')?'/manager':'/admin'; });
 // Ingyenes csempék — nincs kulcs-betöltés, azonnal indulhat a térkép.
 rpInitMap(); rpLoadOrders(); rpLoadVehicles();
+rpSetTruck(false);   // alapértelmezett: ingyenes autós mód + hint beállítása
 </script>
 </body>
 </html>

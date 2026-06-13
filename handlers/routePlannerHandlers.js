@@ -283,7 +283,13 @@ handlers.calculateRoute = async function (req, res, args) {
     //    különben / hiba esetén OSRM (autós). Minden pontpár külön hívás,
     //    így szakaszonkénti polyline-t kapunk (a kliens színezve rajzolja).
     const cp = (a.params && typeof a.params === 'object') ? a.params : {};
-    const useOrs = !!process.env.ORS_API_KEY;
+    // ALAPÉRTELMEZÉS: ingyenes autós (OSRM). A kamionos (ORS driving-hgv) mód
+    // CSAK akkor fut, ha a felhasználó a váltóval bekapcsolta (a.truck) ÉS van
+    // ORS_API_KEY a szerveren. Ha kérik, de nincs kulcs → marad az autós, és a
+    // válasz jelzi (truckRequested), hogy a kliens tájékoztathasson.
+    const wantTruck = a.truck === true || a.truck === 'true';
+    const hasKey = !!process.env.ORS_API_KEY;
+    const useOrs = wantTruck && hasKey;
     let profile = useOrs ? 'truck-ors' : 'car-free';
     let polyline = [];
     let distanceMeters = 0;
@@ -333,7 +339,9 @@ handlers.calculateRoute = async function (req, res, args) {
       // A tiltott-szakasz jelölés (violations) egyik ingyenes profilban sem elérhető.
       notices: [],
       violations: [],
-      profile,   // 'truck-ors' (ORS_API_KEY-jel, kamion-paraméterekkel) vagy 'car-free' (OSRM)
+      profile,        // 'truck-ors' (kamionos, ORS) vagy 'car-free' (autós, OSRM)
+      truckRequested: wantTruck,   // a kliens jelzi, ha kértek kamionost, de nem futott (nincs kulcs)
+      truckAvailable: hasKey,
       fuelEstimateL,
     } });
   } catch (err) {
