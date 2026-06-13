@@ -1,5 +1,15 @@
 # CLAUDE.md — VallorSoft
 
+> ## ⚠️ ELSŐ SZABÁLY — MINDEN ÚJÍTÁS ELŐTT OLVASD EL (mindig)
+> **A projekt ÉRETT, működő rendszer. Semmit nem építünk a vákuumba.** Bármilyen új funkció / módosítás / „újítás” előtt — akár új beszélgető-ablakban kérem, akár nem, ezt NEM kell külön kérnem:
+> 1. **Először keresd meg, létezik-e már** a kért dolog vagy egy közeli rokona (grep/Explore). Ami már megvan, azt **ahhoz igazítjuk / kibővítjük / javítjuk**, NEM építünk párhuzamos másodikat.
+> 2. **Illeszd a meglévő mintákhoz**: RPC `handlers/` + `routes/execute.js` registry VAGY klasszikus REST `routes/`; közös admin/manager kód a `console-shared.js` „KÖZÖS” szekciójában (ott javítsd, EGYSZER); dizájn-tokenek a `public/style.css` `:root`-jából; i18n `data-i18n` + RO-alap/HU-váltó; multi-tenant `company_id`-szűrés; paraméteres SQL.
+> 3. **Ne törj el kész dolgot.** Már KÉSZ és bekötött (ne építsd újra, csak igazítsd, ha kell): **audit-napló, GDPR export/anonimizálás, csomag-limit kikényszerítés, Stripe-váz, health-check, strukturált log, opcionális Sentry, pg_dump backup**, univerzális számlázó (5 provider), térkép-stack (OSM/Photon/OSRM + opc. HERE/Google), útdíj-becslés, áru-leadás/raktár, alvállalkozó/AP, ügyfél- és alvállalkozói portál, könyvelői hub, statisztika, tervezőtábla/radar.
+> 4. **Migráció = inkrementális `db/*.sql`** (auto-fut induláskor, `schema_migrations` könyvelés) — ne nyúlj a `schema.sql`-hez meglévő tábla módosításához.
+> 5. **A végén:** `npm test` zöld + (ha van) require-sweep, majd commit a megadott feature-branchre. **PR-t csak ha kérem.**
+>
+> Röviden: **igazíts, ne duplikálj; bővíts, ne törj.**
+
 Fuvarozási / flottakezelő webalkalmazás (Node.js + Express 5 + PostgreSQL).
 **Kétnyelvű felület: román alap + magyar váltó** (`public/i18n.js`, `data-i18n`; téma-kapcsoló melletti nyelvváltó). A szerveroldali kifelé menő üzenetek románul (a push/e-mail kétnyelvű RO/HU). Román (RO) piacra szabott integrációkkal (**univerzális számlázó**: FGO/SmartBill/Oblio/iFactura/Facturis, ANAF/UIT e-fuvarlevél). PWA + web push, Firebase, multi-tenant (cégenként elkülönített adat).
 
