@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="/i18n.js?v=20260614"></script>
   <title>vallorSoft - Regisztráció</title>
   <link rel="stylesheet" href="/style.css?v=20260611">
 </head>
@@ -12,16 +13,16 @@
     <div class="login-card glass" style="width:min(460px,100%);padding:30px">
       <div style="text-align:center;margin-bottom:20px">
         <div class="vs-logo lg"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
-        <div style="color:var(--muted);font-size:14px;margin-top:6px">Regisztráció meghívókóddal</div>
+        <div style="color:var(--muted);font-size:14px;margin-top:6px" data-i18n="reg.subtitle">Regisztráció meghívókóddal</div>
       </div>
-      <div class="field"><label>Meghívókód</label><input class="input" id="kod" placeholder="VS-XXXXXX" style="text-transform:uppercase;letter-spacing:1.5px;font-weight:700"></div>
-      <div class="field"><label>Teljes név</label><input class="input" id="nume" placeholder="Példa János"></div>
-      <div class="field"><label>E-mail</label><input class="input" id="email" type="email" placeholder="nev@pelda.hu"></div>
-      <div class="field"><label>Telefon</label><input class="input" id="tel" placeholder="+40 ..."></div>
-      <div class="field"><label>Jelszó (min. 6 karakter)</label><input class="input" id="jelszo" type="password" placeholder="••••••••"></div>
-      <button class="btn primary block xl" id="btnReg">Regisztráció</button>
+      <div class="field"><label data-i18n="reg.inviteCode">Meghívókód</label><input class="input" id="kod" placeholder="VS-XXXXXX" style="text-transform:uppercase;letter-spacing:1.5px;font-weight:700"></div>
+      <div class="field"><label data-i18n="reg.fullName">Teljes név</label><input class="input" id="nume" data-i18n-ph="reg.fullNamePh" placeholder="Példa János"></div>
+      <div class="field"><label data-i18n="common.email">E-mail</label><input class="input" id="email" type="email" placeholder="nev@pelda.hu"></div>
+      <div class="field"><label data-i18n="reg.phone">Telefon</label><input class="input" id="tel" placeholder="+40 ..."></div>
+      <div class="field"><label data-i18n="reg.passwordMin">Jelszó (min. 6 karakter)</label><input class="input" id="jelszo" type="password" placeholder="••••••••"></div>
+      <button class="btn primary block xl" id="btnReg" data-i18n="reg.submit">Regisztráció</button>
       <div style="text-align:center;margin-top:14px;color:var(--muted);font-size:14px">
-        Van már fiókja? <a href="/login" id="goLogin" style="color:#fff;font-weight:600;text-decoration:none;border-bottom:1px dashed rgba(255,255,255,0.4)">Bejelentkezés</a>
+        <span data-i18n="reg.haveAccount">Van már fiókja?</span> <a href="/login" id="goLogin" style="color:#fff;font-weight:600;text-decoration:none;border-bottom:1px dashed rgba(255,255,255,0.4)" data-i18n="reg.login">Bejelentkezés</a>
       </div>
     </div>
   </div>
@@ -54,22 +55,22 @@
         jelszo: document.getElementById('jelszo').value, 
         kod: document.getElementById('kod').value
       };
-      var btn=this; 
-      btn.disabled=true; 
-      btn.innerHTML='<span class="spinner"></span> Regisztráció...';
-      
+      var btn=this;
+      btn.disabled=true;
+      btn.innerHTML='<span class="spinner"></span> '+t('reg.submitting');
+
       gas('authRegister',[p]).then(function(r){
-        btn.disabled=false; 
-        btn.textContent='Regisztráció';
-        if(!r.ok){ toast(r.err || 'Hiba történt','err'); return; }
-        toast(r.msg || 'Sikeres regisztráció!','ok');
+        btn.disabled=false;
+        btn.textContent=t('reg.submit');
+        if(!r.ok){ toast(r.err || t('reg.failed'),'err'); return; }
+        toast(r.msg || t('reg.success'),'ok');
         setTimeout(function(){
           window.location.href = '/login';
         }, 1200);
-      }).catch(function(e){ 
-        btn.disabled=false; 
-        btn.textContent='Regisztráció'; 
-        toast(String(e.message||e),'err'); 
+      }).catch(function(e){
+        btn.disabled=false;
+        btn.textContent=t('reg.submit');
+        toast(String(e.message||e),'err');
       });
     };
 

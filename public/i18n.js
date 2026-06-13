@@ -1104,7 +1104,34 @@
     'login.savedNext': { hu: 'Elmentettem, tovább', ro: 'Le-am salvat, continuă' },
     'login.forgotSent': { hu: 'Ha létezik a fiók, elküldtük a linket.', ro: 'Dacă contul există, am trimis linkul.' },
     'login.enterEmailFirst': { hu: 'Adja meg az email címét a mezőben, majd kattintson újra!', ro: 'Introduceți adresa de e-mail în câmp, apoi faceți clic din nou!' },
-    'login.timeout': { hu: 'Biztonsági okból kiléptettünk inaktivitás miatt. Jelentkezz be újra.', ro: 'Din motive de securitate v-am deconectat din cauza inactivității. Autentificați-vă din nou.' }
+    'login.timeout': { hu: 'Biztonsági okból kiléptettünk inaktivitás miatt. Jelentkezz be újra.', ro: 'Din motive de securitate v-am deconectat din cauza inactivității. Autentificați-vă din nou.' },
+
+    // ── Regisztráció + jelszó-visszaállítás ──
+    'reg.subtitle': { hu: 'Regisztráció meghívókóddal', ro: 'Înregistrare cu cod de invitație' },
+    'reg.inviteCode': { hu: 'Meghívókód', ro: 'Cod de invitație' },
+    'reg.fullName': { hu: 'Teljes név', ro: 'Nume complet' },
+    'reg.fullNamePh': { hu: 'Példa János', ro: 'Ion Popescu' },
+    'reg.phone': { hu: 'Telefon', ro: 'Telefon' },
+    'reg.passwordMin': { hu: 'Jelszó (min. 6 karakter)', ro: 'Parolă (min. 6 caractere)' },
+    'reg.submit': { hu: 'Regisztráció', ro: 'Înregistrare' },
+    'reg.submitting': { hu: 'Regisztráció...', ro: 'Se înregistrează...' },
+    'reg.haveAccount': { hu: 'Van már fiókja?', ro: 'Ai deja cont?' },
+    'reg.login': { hu: 'Bejelentkezés', ro: 'Autentificare' },
+    'reg.failed': { hu: 'Hiba történt', ro: 'A apărut o eroare' },
+    'reg.success': { hu: 'Sikeres regisztráció!', ro: 'Înregistrare reușită!' },
+    'rst.subtitle': { hu: 'Új jelszó beállítása', ro: 'Setarea unei parole noi' },
+    'rst.newPw': { hu: 'Új jelszó', ro: 'Parolă nouă' },
+    'rst.confirmPw': { hu: 'Új jelszó megerősítése', ro: 'Confirmă parola nouă' },
+    'rst.save': { hu: 'Jelszó mentése', ro: 'Salvează parola' },
+    'rst.saving': { hu: 'Mentés...', ro: 'Se salvează...' },
+    'rst.backToLogin': { hu: 'Vissza a bejelentkezéshez', ro: 'Înapoi la autentificare' },
+    'rst.invalidLink': { hu: 'Érvénytelen vagy hiányzó link. Kérjen új jelszó-visszaállítási linket a bejelentkezési oldalon.', ro: 'Link invalid sau lipsă. Solicitați un nou link de resetare a parolei pe pagina de autentificare.' },
+    'rst.fillBoth': { hu: 'Töltse ki mindkét mezőt!', ro: 'Completați ambele câmpuri!' },
+    'rst.minLen': { hu: 'A jelszó legalább 6 karakter legyen!', ro: 'Parola trebuie să aibă cel puțin 6 caractere!' },
+    'rst.mismatch': { hu: 'A két jelszó nem egyezik!', ro: 'Cele două parole nu coincid!' },
+    'rst.success': { hu: 'Sikeres jelszóváltás!', ro: 'Parolă schimbată cu succes!' },
+    'rst.failed': { hu: 'Hiba történt.', ro: 'A apărut o eroare.' },
+    'rst.commError': { hu: 'Szerver kommunikációs hiba!', ro: 'Eroare de comunicare cu serverul!' }
   };
 
   function getLang() {
