@@ -17,7 +17,7 @@ describe('POST /api/login', () => {
   test('hiányzó email/jelszó → hibaüzenet', async () => {
     const res = await express(app).post('/api/login').send({});
     expect(res.body.success).toBe(false);
-    expect(res.body.message).toMatch(/kotelezo/i);
+    expect(res.body.message).toMatch(/obligatori/i);
     // DB-t meg sem kérdezzük ilyenkor
     expect(pool.query).not.toHaveBeenCalled();
   });
@@ -26,7 +26,7 @@ describe('POST /api/login', () => {
     pool.query.mockResolvedValueOnce(rows([])); // users SELECT → 0 sor
     const res = await express(app).post('/api/login').send({ email: 'nincs@ceg.hu', password: 'akarmi' });
     expect(res.body.success).toBe(false);
-    expect(res.body.message).toMatch(/Hibas email vagy jelszo/i);
+    expect(res.body.message).toMatch(/incorect/i);
   });
 
   test('rossz jelszó → "Hibas email vagy jelszo"', async () => {
@@ -38,6 +38,6 @@ describe('POST /api/login', () => {
     }]));
     const res = await express(app).post('/api/login').send({ email: 'a@b.hu', password: 'rossz-jelszo' });
     expect(res.body.success).toBe(false);
-    expect(res.body.message).toMatch(/Hibas email vagy jelszo/i);
+    expect(res.body.message).toMatch(/incorect/i);
   });
 });

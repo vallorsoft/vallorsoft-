@@ -1436,6 +1436,8 @@
     'sof.sending': { hu: 'Küldés...', ro: 'Se trimite...' },
     'sof.errOccurred': { hu: 'Hiba történt', ro: 'A apărut o eroare' },
     'sof.statusDone': { hu: '✓ Teljesítve', ro: '✓ Finalizat' },
+    'sof.statusParked': { hu: '🅿️ Parkolt (áru a pótkocsin)', ro: '🅿️ Parcat (marfă pe remorcă)' },
+    'sof.statusWarehouse': { hu: '📦 Raktárban', ro: '📦 În depozit' },
     'sof.accept': { hu: '✅ Elfogadom', ro: '✅ Accept' },
     'sof.complete': { hu: '🏁 Elvégeztem', ro: '🏁 Finalizat' },
     'sof.handoverPending': { hu: '⏳ Leadás visszaigazolásra vár', ro: '⏳ Predare în așteptarea confirmării' },

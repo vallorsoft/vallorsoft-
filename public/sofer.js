@@ -874,8 +874,15 @@ function renderFuvarCard(o) {
   var isAlocat = o.status === 'Alocat';
   var isCurs   = o.status === 'In Curs';
   var isFinal  = o.status === 'Finalizat';
-  var statusCls = isAlocat ? 'warn' : 'ok';
-  var statusTxt = isFinal ? t('sof.statusDone') : esc(o.status || 'Alocat');
+  var isParked = o.status === 'Parkolt';
+  var isWh     = o.status === 'Raktarban';
+  // Parkolt/Raktarban: a fuvar a sofőrhöz van rendelve, de leadott áru —
+  // csak olvasható (a diszpécser intézi a folytatást), nincs gomb.
+  var statusCls = (isAlocat || isParked || isWh) ? 'warn' : 'ok';
+  var statusTxt = isFinal ? t('sof.statusDone')
+                : isParked ? (t('sof.statusParked') + (o.handover_loc ? ' @ ' + esc(o.handover_loc) : ''))
+                : isWh ? (t('sof.statusWarehouse') + (o.handover_loc ? ' @ ' + esc(o.handover_loc) : ''))
+                : esc(o.status || 'Alocat');
   var truck = o.rendszam_camion ? ('🚛 ' + esc(o.rendszam_camion) + (o.rendszam_remorca ? ' / ' + esc(o.rendszam_remorca) : '')) : '';
   var actionBtn =
       isAlocat ? '<button class="sh-btn resume"  onclick="driverOrderStatus(\'' + o.id + '\',\'In Curs\')">' + t('sof.accept') + '</button>' :
