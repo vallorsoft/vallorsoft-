@@ -129,6 +129,10 @@ if (rateLimit) {
   app.use('/api/2fa/settings-verify', twofaLimiter);
 }
 
+// Stripe webhook — RAW body kell a signature-ellenőrzéshez, ezért az
+// express.json ELŐTT mountoljuk (saját express.raw-val a route-on belül).
+app.use(require('./routes/stripe-webhook'));
+
 // 20 MB elég a dokumentum-feltöltésekhez (base64 ~15 MB-os fájl); az 50 MB-os
 // limit mellett pár párhuzamos kérés kifektethette volna az 512 MB-os példányt.
 app.use(express.json({ limit: '20mb' }));
