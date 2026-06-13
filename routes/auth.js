@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const pool = require('../db');
 const { requireLogin } = require('../middleware/auth');
 const { sendResetEmail } = require('../services/email');
+const audit = require('../lib/audit');
 
 // 2FA (TOTP) — opcionális csomagok, ahogy az eredeti server.js-ben
 let speakeasy = null, qrcode = null;
@@ -104,6 +105,7 @@ router.post('/api/login', async (req, res) => {
       // Időzítés-kiegyenlítés: nem létező emailnél is fusson egy bcrypt-összehasonlítás,
       // hogy a válaszidőből ne lehessen fiókok létezésére következtetni.
       await bcrypt.compare(password, '$2b$10$C6UzMDM.H6dfI/f/IKcEeO7ZdVdkPYqBkN1FW3sZBPq4P5l5l5l5l');
+      audit.fromReq(req, 'login.fail', 'user', null, { email: email, reason: 'no-user' });
       return res.json({ success: false, message: 'Email sau parolă incorectă!' });
     }
 
@@ -111,6 +113,7 @@ router.post('/api/login', async (req, res) => {
     const passwordMatch = await bcrypt.compare(password, user.password_hash);
 
     if (!passwordMatch) {
+      audit.fromReq(req, 'login.fail', 'user', user.id, { email: email, company_id: user.company_id, reason: 'bad-password' });
       return res.json({ success: false, message: 'Email sau parolă incorectă!' });
     }
 
@@ -161,6 +164,7 @@ router.post('/api/login', async (req, res) => {
       company_id: user.company_id,
       is_dev: user.pozicio_dev || false,
     };
+    audit.fromReq(req, 'login.success', 'user', user.id);   // best-effort audit
 
     let redirect = '/sofer';
     if (user.pozicio_dev) redirect = '/developer';
