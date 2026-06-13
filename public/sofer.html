@@ -68,16 +68,16 @@
       <h3 data-i18n="sofer.borderTitle">🛂 Határátlépés</h3>
     </div>
     <div class="border-btns">
-      <button class="border-btn in" onclick="sendBorderCross('Intrare','RO')">
+      <button class="border-btn in" onclick="sendBorderCross('Intrare','RO')" data-i18n-html="sof.borderInBtn">
         🇷🇴 ROMÁNIA BE<br><small style="font-size:14px; font-weight:500; opacity:.8;">Intrare în România</small>
       </button>
-      <button class="border-btn out" onclick="sendBorderCross('Iesire','RO')">
+      <button class="border-btn out" onclick="sendBorderCross('Iesire','RO')" data-i18n-html="sof.borderOutBtn">
         🇷🇴 ROMÁNIA KI<br><small style="font-size:14px; font-weight:500; opacity:.8;">Ieșire din România</small>
       </button>
     </div>
     <div id="gpsStatus"></div>
     <div class="section-head" style="margin-top:24px;" data-i18n="sofer.recentCross">Legutóbbi átlépések</div>
-    <div id="borderLogList"><div style="color:var(--muted); font-size:13px;">Betöltés...</div></div>
+    <div id="borderLogList"><div style="color:var(--muted); font-size:13px;" data-i18n="sofer.loadingDots">Betöltés...</div></div>
   </div>
 
   <!-- ====== MENETLEVÉL ====== -->
@@ -128,7 +128,7 @@
       </div>
 
       <!-- Dinamikus útvonal pontok -->
-      <div class="section-head">📍 Útvonal pontok (Puncte de traseu)</div>
+      <div class="section-head" data-i18n="sof.routePoints">📍 Útvonal pontok (Puncte de traseu)</div>
       <div id="puncteContainer"></div>
       <button class="add-row-btn" onclick="addPunctRow()" data-i18n="sofer.addPoint">➕ Pont hozzáadása</button>
 
@@ -138,11 +138,11 @@
         <div class="field"><label data-i18n="sofer.cantEnd">Cantitate sfârșit (L)</label><input class="input" type="number" id="fCantSf" value="0" inputmode="numeric"></div>
       </div>
 
-      <div class="section-head">⛽ Tankolások (Alimentări)</div>
+      <div class="section-head" data-i18n="sof.fuelings">⛽ Tankolások (Alimentări)</div>
       <div id="alimentariContainer"></div>
       <button class="add-row-btn" onclick="addAlimRow()" data-i18n="sofer.addAlim">➕ Tankolás hozzáadása</button>
 
-      <div class="section-head">🛒 Kiadások (Achiziții)</div>
+      <div class="section-head" data-i18n="sof.expenses">🛒 Kiadások (Achiziții)</div>
       <div id="achizitiiContainer"></div>
       <button class="add-row-btn" onclick="addAchRow()" data-i18n="sofer.addAch">➕ Kiadás hozzáadása</button>
 
@@ -226,64 +226,64 @@
   backdrop-filter:blur(6px);align-items:center;justify-content:center;z-index:1000;padding:20px;">
   <div style="width:min(460px,100%);background:var(--bg-2);border:1px solid var(--border-bright);
     border-radius:18px;padding:24px;max-height:90vh;overflow-y:auto;">
-    <h3 style="margin:0 0 6px;font-size:17px;color:#fff;">⛔ Áru leadása</h3>
-    <p style="color:var(--muted);font-size:12.5px;margin-bottom:14px;" id="hoModalSub">
+    <h3 style="margin:0 0 6px;font-size:17px;color:#fff;" data-i18n="sof.ho.title">⛔ Áru leadása</h3>
+    <p style="color:var(--muted);font-size:12.5px;margin-bottom:14px;" id="hoModalSub" data-i18n="sof.ho.sub">
       Add meg, mi történik az áruval. A kérést a diszpécser igazolja vissza — addig a fuvar nálad marad.</p>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
       <label style="display:flex;align-items:center;gap:9px;color:var(--text);font-size:14px;cursor:pointer;">
-        <input type="radio" name="hoType" value="trailer" checked onchange="hoTypeChange()"> 🅿️ Pótkocsin parkol (megrakva)</label>
+        <input type="radio" name="hoType" value="trailer" checked onchange="hoTypeChange()"> <span data-i18n="sof.ho.trailer">🅿️ Pótkocsin parkol (megrakva)</span></label>
       <label style="display:flex;align-items:center;gap:9px;color:var(--text);font-size:14px;cursor:pointer;">
-        <input type="radio" name="hoType" value="warehouse" onchange="hoTypeChange()"> 📦 Raktárba került (lerakva)</label>
+        <input type="radio" name="hoType" value="warehouse" onchange="hoTypeChange()"> <span data-i18n="sof.ho.warehouse">📦 Raktárba került (lerakva)</span></label>
     </div>
-    <div class="field"><label>Hol lett lerakva / hol parkol? (helység) *</label>
-      <input class="input" id="hoLoc" placeholder="pl. Brașov"></div>
+    <div class="field"><label data-i18n="sof.ho.locLabel">Hol lett lerakva / hol parkol? (helység) *</label>
+      <input class="input" id="hoLoc" placeholder="pl. Brașov" data-i18n-ph="sof.ho.locPh"></div>
     <div id="hoWhBlock" style="display:none;">
-      <div style="font-size:12px;color:var(--muted);font-weight:700;margin:6px 0 8px;">📦 Raktár-adatok (ha tudod, töltsd ki — a diszpécser véglegesíti)</div>
+      <div style="font-size:12px;color:var(--muted);font-weight:700;margin:6px 0 8px;" data-i18n="sof.ho.whData">📦 Raktár-adatok (ha tudod, töltsd ki — a diszpécser véglegesíti)</div>
       <div class="g2">
-        <div class="field"><label>Darabszám</label><input class="input" id="hoQty" type="number" inputmode="numeric" placeholder="pl. 33"></div>
-        <div class="field"><label>Egység</label>
-          <select class="input" id="hoQtyUnit"><option value="paletta">Paletta</option><option value="doboz">Doboz</option><option value="egyeb">Egyéb</option></select></div>
+        <div class="field"><label data-i18n="sof.ho.qty">Darabszám</label><input class="input" id="hoQty" type="number" inputmode="numeric" placeholder="pl. 33" data-i18n-ph="sof.ho.qtyPh"></div>
+        <div class="field"><label data-i18n="sof.ho.unit">Egység</label>
+          <select class="input" id="hoQtyUnit"><option value="paletta" data-i18n="sof.ho.unitPallet">Paletta</option><option value="doboz" data-i18n="sof.ho.unitBox">Doboz</option><option value="egyeb" data-i18n="sof.ho.unitOther">Egyéb</option></select></div>
       </div>
       <div class="g2">
-        <div class="field"><label>Hossz (cm)</label><input class="input" id="hoLen" type="number" inputmode="numeric" placeholder="pl. 800"></div>
-        <div class="field"><label>Szélesség (cm)</label><input class="input" id="hoWid" type="number" inputmode="numeric" placeholder="pl. 248"></div>
+        <div class="field"><label data-i18n="sof.ho.len">Hossz (cm)</label><input class="input" id="hoLen" type="number" inputmode="numeric" placeholder="pl. 800" data-i18n-ph="sof.ho.lenPh"></div>
+        <div class="field"><label data-i18n="sof.ho.wid">Szélesség (cm)</label><input class="input" id="hoWid" type="number" inputmode="numeric" placeholder="pl. 248" data-i18n-ph="sof.ho.widPh"></div>
       </div>
       <div class="g2">
-        <div class="field"><label>Magasság (cm)</label><input class="input" id="hoHei" type="number" inputmode="numeric" placeholder="pl. 220"></div>
-        <div class="field"><label>Súly (kg)</label><input class="input" id="hoWeight" type="number" inputmode="numeric" placeholder="pl. 12500"></div>
+        <div class="field"><label data-i18n="sof.ho.hei">Magasság (cm)</label><input class="input" id="hoHei" type="number" inputmode="numeric" placeholder="pl. 220" data-i18n-ph="sof.ho.heiPh"></div>
+        <div class="field"><label data-i18n="sof.ho.weight">Súly (kg)</label><input class="input" id="hoWeight" type="number" inputmode="numeric" placeholder="pl. 12500" data-i18n-ph="sof.ho.weightPh"></div>
       </div>
-      <div class="field"><label>Dokumentum lapszáma (pl. 10)</label><input class="input" id="hoDocPages" type="number" inputmode="numeric" placeholder="pl. 10"></div>
-      <div style="font-size:12px;color:var(--status-warn);margin-bottom:8px;">📷 Küldés után fotózd le a dokumentumokat az Iratok fülön!</div>
+      <div class="field"><label data-i18n="sof.ho.docPages">Dokumentum lapszáma (pl. 10)</label><input class="input" id="hoDocPages" type="number" inputmode="numeric" placeholder="pl. 10" data-i18n-ph="sof.ho.docPagesPh"></div>
+      <div style="font-size:12px;color:var(--status-warn);margin-bottom:8px;" data-i18n="sof.ho.photoWarn">📷 Küldés után fotózd le a dokumentumokat az Iratok fülön!</div>
     </div>
-    <div class="field"><label>Megjegyzés</label><input class="input" id="hoNote" placeholder="pl. defekt, pótkocsi-csere..."></div>
+    <div class="field"><label data-i18n="sof.ho.note">Megjegyzés</label><input class="input" id="hoNote" placeholder="pl. defekt, pótkocsi-csere..." data-i18n-ph="sof.ho.notePh"></div>
     <div style="display:flex;gap:10px;margin-top:12px;">
       <button onclick="closeHandover()" style="flex:1;padding:12px;border-radius:8px;border:1px solid var(--border-bright);
-        background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;">Mégse</button>
+        background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;" data-i18n="common.cancel">Mégse</button>
       <button id="hoSubmitBtn" onclick="submitHandover()" style="flex:2;padding:12px;border-radius:8px;border:none;
-        background:linear-gradient(180deg,#c026d3,#a21caf);color:#fff;font-size:14px;font-weight:700;cursor:pointer;">📤 Kérés küldése</button>
+        background:linear-gradient(180deg,#c026d3,#a21caf);color:#fff;font-size:14px;font-weight:700;cursor:pointer;" data-i18n="sof.ho.send">📤 Kérés küldése</button>
     </div>
   </div>
 </div>
 
 <!-- ── BUG REPORT FAB (jobb alsó sarok; chat nézetben a JS elrejti) ── -->
-<button id="bugFab" onclick="openBugReport()" title="Hibajelentés küldése">🐛</button>
+<button id="bugFab" onclick="openBugReport()" title="Hibajelentés küldése" data-i18n-title="sof.bug.fab">🐛</button>
 
 <!-- ── BUG REPORT MODAL ── -->
 <div id="bugModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);
   backdrop-filter:blur(6px);align-items:center;justify-content:center;z-index:1000;padding:20px;">
   <div style="width:min(440px,100%);background:var(--bg-2);border:1px solid var(--border-bright);
     border-radius:18px;padding:24px;max-height:90vh;overflow-y:auto;">
-    <h3 style="margin:0 0 8px;font-size:17px;color:#fff;">🐛 Hibajelentés</h3>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">Írd le mi nem működött. A fejlesztőhöz kerül.</p>
+    <h3 style="margin:0 0 8px;font-size:17px;color:#fff;" data-i18n="sof.bug.title">🐛 Hibajelentés</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;" data-i18n="sof.bug.sub">Írd le mi nem működött. A fejlesztőhöz kerül.</p>
     <textarea id="bugText" style="width:100%;min-height:120px;background:rgba(255,255,255,0.04);
       border:1px solid var(--border-bright);border-radius:8px;padding:12px;color:var(--text);
       font-size:14px;font-family:inherit;line-height:1.5;resize:vertical;outline:none;box-sizing:border-box;"
-      placeholder="pl. A határátlépés gombot nyomtam, de nem rögzítette..."></textarea>
+      placeholder="pl. A határátlépés gombot nyomtam, de nem rögzítette..." data-i18n-ph="sof.bug.ph"></textarea>
     <div style="display:flex;gap:10px;margin-top:12px;">
       <button onclick="closeBugReport()" style="flex:1;padding:12px;border-radius:8px;border:1px solid var(--border-bright);
-        background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;">Mégse</button>
+        background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;" data-i18n="common.cancel">Mégse</button>
       <button id="bugSubmitBtn" onclick="submitBugReport()" style="flex:2;padding:12px;border-radius:8px;border:none;
-        background:linear-gradient(180deg,#3b82f6,#2563eb);color:#fff;font-size:14px;font-weight:700;cursor:pointer;">📤 Küldés</button>
+        background:linear-gradient(180deg,#3b82f6,#2563eb);color:#fff;font-size:14px;font-weight:700;cursor:pointer;" data-i18n="sof.bug.send">📤 Küldés</button>
     </div>
   </div>
 </div>
