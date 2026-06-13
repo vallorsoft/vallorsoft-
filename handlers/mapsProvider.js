@@ -51,8 +51,8 @@ handlers.mapsSaveProvider = async function (req, res, args) {
 
     if (vendor === 'free') {
       await pool.query(
-        `INSERT INTO company_integrations (company_id, provider, enabled, meta)
-         VALUES ($1,'maps',false,$2)
+        `INSERT INTO company_integrations (company_id, provider, category, enabled, meta)
+         VALUES ($1,'maps','maps',false,$2)
          ON CONFLICT (company_id, provider) DO UPDATE SET enabled=false, meta=$2`,
         [cid, JSON.stringify({ vendor: 'free' })]);
       clearConfigCache(cid);
@@ -66,8 +66,8 @@ handlers.mapsSaveProvider = async function (req, res, args) {
 
     const enc = key ? encrypt(key) : existing.rows[0].credentials_enc;
     await pool.query(
-      `INSERT INTO company_integrations (company_id, provider, enabled, credentials_enc, meta)
-       VALUES ($1,'maps',true,$2,$3)
+      `INSERT INTO company_integrations (company_id, provider, category, enabled, credentials_enc, meta)
+       VALUES ($1,'maps','maps',true,$2,$3)
        ON CONFLICT (company_id, provider) DO UPDATE SET enabled=true, credentials_enc=$2, meta=$3`,
       [cid, enc, JSON.stringify({ vendor })]);
     clearConfigCache(cid);
@@ -142,6 +142,72 @@ handlers.devMapsUsageOverview = async function (req, res, args) {
     });
     return res.json({ result: { ok: true, rows } });
   } catch (err) { console.error('devMapsUsageOverview hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
+};
+
+// ─── Developer: per-cég térkép-szolgáltató + UIT deep-link beállítás ───
+// A fizetős HERE/Google kulcsot ÉS a CargoTrack deep-linket a developer
+// állítja cégenként (a cég-admin nem) — a cég-részletek „Integrációk" fülén.
+handlers.devGetCompanyIntegrations = async function (req, res, args) {
+  try {
+    if (!_dev(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = parseInt(args && args[0], 10);
+    if (!cid) return res.json({ result: { ok: false, err: 'company_id lipsește' } });
+    const m = await pool.query("SELECT enabled, meta, (credentials_enc IS NOT NULL) AS has_key FROM company_integrations WHERE company_id=$1 AND provider='maps'", [cid]);
+    let vendor = 'free', has_key = false;
+    if (m.rows.length) {
+      const meta = m.rows[0].meta || {};
+      if (m.rows[0].enabled && ['here', 'google'].includes(meta.vendor)) vendor = meta.vendor;
+      has_key = !!m.rows[0].has_key;
+    }
+    const u = await pool.query('SELECT uit_deeplink_template FROM companies WHERE id=$1', [cid]);
+    return res.json({ result: { ok: true, maps: { vendor, has_key }, uit_template: u.rows.length ? u.rows[0].uit_deeplink_template : null } });
+  } catch (err) { console.error('devGetCompanyIntegrations hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
+};
+
+handlers.devSaveCompanyMaps = async function (req, res, args) {
+  try {
+    if (!_dev(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = parseInt(args && args[0], 10);
+    if (!cid) return res.json({ result: { ok: false, err: 'company_id lipsește' } });
+    const a = (args && args[1]) || {};
+    const vendor = ['here', 'google'].includes(a.vendor) ? a.vendor : 'free';
+    const key = (a.key == null) ? '' : String(a.key).trim();
+
+    if (vendor === 'free') {
+      await pool.query(
+        `INSERT INTO company_integrations (company_id, provider, category, enabled, meta)
+         VALUES ($1,'maps','maps',false,$2)
+         ON CONFLICT (company_id, provider) DO UPDATE SET enabled=false, meta=$2`,
+        [cid, JSON.stringify({ vendor: 'free' })]);
+      clearConfigCache(cid);
+      return res.json({ result: { ok: true } });
+    }
+    const existing = await pool.query("SELECT credentials_enc FROM company_integrations WHERE company_id=$1 AND provider='maps'", [cid]);
+    const hasStored = existing.rows.length && existing.rows[0].credentials_enc;
+    if (!key && !hasStored) return res.json({ result: { ok: false, err: 'Introdu cheia API.' } });
+    const enc = key ? encrypt(key) : existing.rows[0].credentials_enc;
+    await pool.query(
+      `INSERT INTO company_integrations (company_id, provider, category, enabled, credentials_enc, meta)
+       VALUES ($1,'maps','maps',true,$2,$3)
+       ON CONFLICT (company_id, provider) DO UPDATE SET enabled=true, credentials_enc=$2, meta=$3`,
+      [cid, enc, JSON.stringify({ vendor })]);
+    clearConfigCache(cid);
+    return res.json({ result: { ok: true } });
+  } catch (err) { console.error('devSaveCompanyMaps hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
+};
+
+handlers.devSaveCompanyUit = async function (req, res, args) {
+  try {
+    if (!_dev(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = parseInt(args && args[0], 10);
+    if (!cid) return res.json({ result: { ok: false, err: 'company_id lipsește' } });
+    const a = (args && args[1]) || {};
+    let tpl = a.template != null ? String(a.template).trim().slice(0, 1000) : null;
+    if (tpl === '') tpl = null;
+    if (tpl && !/^https?:\/\//i.test(tpl)) return res.json({ result: { ok: false, err: 'Șablonul trebuie să înceapă cu http(s)://' } });
+    await pool.query('UPDATE companies SET uit_deeplink_template=$1 WHERE id=$2', [tpl, cid]);
+    return res.json({ result: { ok: true } });
+  } catch (err) { console.error('devSaveCompanyUit hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 module.exports = handlers;
