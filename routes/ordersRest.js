@@ -10,7 +10,9 @@ const { sendPushToRole } = require('../services/push');
 
 router.post('/api/orders/:id/quick-status', requireLogin, requireRole('Admin','Manager'), async (req, res) => {
   const { status } = req.body;
-  const valid = ['Disponibil','Alocat','Extern','In Curs','Finalizat','Anulat'];
+  // Ugyanaz a státusz-halmaz, mint a comUpdate-ben (a lista dropdownja
+  // Parkolt/Raktarban-t is kínál — különben „Status invalid" hibát adna).
+  const valid = ['Disponibil','Alocat','Extern','In Curs','Finalizat','Anulat','Parkolt','Raktarban'];
   if (!valid.includes(status)) return res.json({ ok: false, err: 'Status invalid' });
   try {
     const r = await pool.query(
@@ -18,6 +20,15 @@ router.post('/api/orders/:id/quick-status', requireLogin, requireRole('Admin','M
       [status, req.params.id, req.session.user.company_id]
     );
     if (r.rowCount === 0) return res.json({ ok: false, err: 'Cursa nu a fost gasita' });
+    // Ha a státusz elhagyja a Raktarban-t, az aktív raktári tétel kiadva —
+    // ne ragadjon bent a Raktár fülön (mint a comUpdate-ben).
+    if (status !== 'Raktarban') {
+      await pool.query(
+        `UPDATE warehouse_items SET status='Kiadva', released_at=NOW()
+         WHERE company_id=$1 AND order_id=$2 AND status='Raktarban'`,
+        [req.session.user.company_id, req.params.id]
+      ).catch((e) => console.error('warehouse release hiba:', e));
+    }
     return res.json({ ok: true });
   } catch(err) {
     console.error('quick-status hiba:', err);

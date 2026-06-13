@@ -653,6 +653,8 @@
     'cs.pairedDriver': { hu: '👤 Párosított sofőr kitöltve: ', ro: '👤 Șofer asociat completat: ' },
     'cs.pairedVehicle': { hu: '🚛 Párosított jármű kitöltve: ', ro: '🚛 Vehicul asociat completat: ' },
     'cs.statusPrefix': { hu: '✅ Státusz: ', ro: '✅ Status: ' },
+    'cs.colResizeHint': { hu: 'Húzd az oszlop átméretezéséhez', ro: 'Trage pentru a redimensiona coloana' },
+    'cs.colReset': { hu: '↔ Oszlopszélesség', ro: '↔ Lățime coloane' },
     'cs.revoked': { hu: 'Visszavonva!', ro: 'Revocat!' },
     'cs.sigSaved': { hu: 'Aláírás mentve!', ro: 'Semnătură salvată!' },
     'cs.stampSaved': { hu: 'Bélyegző elmentve!', ro: 'Ștampilă salvată!' },

@@ -632,9 +632,9 @@ function createOrder(){
   gas('comCreate',[p]).then(r=>{
     if(r&&r.ok){
       let extra='';
-      if(r.paired_driver)extra=' · 👤 párosított sofőr: '+r.paired_driver;
-      else if(r.paired_vehicle)extra=' · 🚛 párosított jármű: '+r.paired_vehicle;
-      if(r.paired_trailer)extra+=' · 🚚 párosított pótkocsi: '+r.paired_trailer;
+      if(r.paired_driver)extra=' · '+t('cs.pairedDriver')+r.paired_driver;
+      else if(r.paired_vehicle)extra=' · '+t('cs.pairedVehicle')+r.paired_vehicle;
+      if(r.paired_trailer)extra+=' · '+t('cs.pairedTrailer')+r.paired_trailer;
       toast(t('cs.orderSavedId')+r.id+extra,'ok');
       loadOrders();
       ['oClient','oRef','oPret','oKm','oSuly','oHossz','oSzel','oMag','oLoad','oUnload','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -1363,8 +1363,95 @@ function loadOrders(){
     if(!Array.isArray(list))list=[];
     _ordersAllCache = list;
     renderFilteredOrders(list);
+    // A fejléc statikus (a tbody cserélődik), így elég egyszer felfűzni a
+    // húzható oszlop-méretezőt — a szélességek a renderek közt megmaradnak.
+    requestAnimationFrame(function(){ makeTableResizable(document.getElementById('tblOrders'), 'vs-cols-orders'); });
   });
   if(typeof loadPendingHandovers==='function')loadPendingHandovers();
+}
+
+// ───────────────────────────────────────────────────────────────
+//  Kézzel méretezhető táblázat-oszlopok (mint egy weboldalon)
+//  A fejléc-cellák jobb szélén húzható fogantyú; a szélességek
+//  localStorage-ban őrződnek (kulcsonként). table-layout:fixed →
+//  az oszlop szélessége a fejléctől jön, így a kiszabott fuvarok
+//  többsoros celláinak helye is arányosan nő/csökken.
+// ───────────────────────────────────────────────────────────────
+var _colDrag = null;
+function makeTableResizable(table, key){
+  if(!table || table._resizableInit) return;
+  var head = table.tHead && table.tHead.rows[0];
+  if(!head || !head.cells.length) return;
+  var cells = head.cells;
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch(e){}
+  table.classList.add('resizable');
+  table.style.width = 'auto';                 // nőhet a konténeren túl → vízszintes görgetés
+  for(var i=0;i<cells.length;i++){
+    var th = cells[i];
+    var w = (saved[i]!=null) ? saved[i] : th.offsetWidth;   // jelenlegi szélesség rögzítése
+    if(w>0) th.style.width = w+'px';
+    th.style.minWidth = '40px';
+    if(i < cells.length-1){                   // az utolsó (checkbox) oszlopra nem teszünk fogantyút
+      var grip = document.createElement('div');
+      grip.className = 'col-resizer';
+      grip._ti = i; grip._table = table; grip._key = key;
+      grip.addEventListener('mousedown', _colResizeStart);
+      grip.addEventListener('touchstart', _colResizeStart, {passive:false});
+      grip.title = t('cs.colResizeHint');
+      th.appendChild(grip);
+    }
+  }
+  table._resizableInit = true;
+}
+function _colResizeStart(e){
+  var grip = e.currentTarget;
+  var x = e.touches ? e.touches[0].clientX : e.clientX;
+  _colDrag = { grip:grip, th:grip.parentNode, startX:x, startW:grip.parentNode.offsetWidth };
+  grip.classList.add('active');
+  document.body.style.cursor = 'col-resize';
+  document.addEventListener('mousemove', _colResizeMove);
+  document.addEventListener('mouseup', _colResizeEnd);
+  document.addEventListener('touchmove', _colResizeMove, {passive:false});
+  document.addEventListener('touchend', _colResizeEnd);
+  e.preventDefault(); e.stopPropagation();
+}
+function _colResizeMove(e){
+  if(!_colDrag) return;
+  var x = e.touches ? e.touches[0].clientX : e.clientX;
+  var w = Math.max(48, _colDrag.startW + (x - _colDrag.startX));
+  _colDrag.th.style.width = w+'px';
+  if(e.cancelable) e.preventDefault();
+}
+function _colResizeEnd(){
+  if(!_colDrag) return;
+  var grip = _colDrag.grip;
+  grip.classList.remove('active');
+  document.body.style.cursor = '';
+  try {
+    var saved = JSON.parse(localStorage.getItem(grip._key) || '{}') || {};
+    saved[grip._ti] = Math.round(_colDrag.th.offsetWidth);
+    localStorage.setItem(grip._key, JSON.stringify(saved));
+  } catch(e){}
+  _colDrag = null;
+  document.removeEventListener('mousemove', _colResizeMove);
+  document.removeEventListener('mouseup', _colResizeEnd);
+  document.removeEventListener('touchmove', _colResizeMove);
+  document.removeEventListener('touchend', _colResizeEnd);
+}
+// Oszlopszélességek visszaállítása alaphelyzetbe (a fuvarlista fejlécében lévő gomb)
+function resetOrderColumns(){
+  var t = document.getElementById('tblOrders');
+  if(!t) return;
+  try { localStorage.removeItem('vs-cols-orders'); } catch(e){}
+  var cells = t.tHead && t.tHead.rows[0] ? t.tHead.rows[0].cells : [];
+  for(var i=0;i<cells.length;i++) cells[i].style.width = '';
+  t.classList.remove('resizable');
+  t.style.width = '';
+  t._resizableInit = false;
+  // a meglévő fogantyúk eltávolítása, majd újra-init a természetes szélességekből
+  [].forEach.call(t.querySelectorAll('.col-resizer'), function(g){ g.remove(); });
+  requestAnimationFrame(function(){ makeTableResizable(t, 'vs-cols-orders'); });
 }
 
 function loadReceivedFuvarlevelek(){
@@ -1503,6 +1590,12 @@ function oeToggleSoferType() {
   document.getElementById('oeInternWrap').style.display = t === 'Intern' ? '' : 'none';
   document.getElementById('oeExternWrap').style.display = t === 'Extern' ? '' : 'none';
   document.getElementById('oeExternFirmaWrap').style.display = t === 'Extern' ? '' : 'none';
+  // Ha nem Extern, ürítsük az alvállalkozói mezőket — különben a mentés a
+  // korábbi (rejtett) értéket írná a nume_sofer/firma_extern oszlopba.
+  if (t !== 'Extern') {
+    var _n = document.getElementById('oeNumeSoferExtern'); if (_n) _n.value = '';
+    var _f = document.getElementById('oeFirmaExtern'); if (_f) _f.value = '';
+  }
 }
 
 function onSoferTypeChange(type){document.getElementById('oInternBlock').style.display=type==='Intern'?'block':'none';document.getElementById('oExternBlock').style.display=type==='Extern'?'block':'none';}
@@ -1620,12 +1713,16 @@ function quickStatusChange(id, sel) {
   var newStatus = sel.value;
   var sc = newStatus==='Alocat'||newStatus==='Extern'?'warn':
            newStatus==='In Curs'||newStatus==='Finalizat'?'ok':
-           newStatus==='Anulat'?'err':'info';
+           newStatus==='Anulat'?'err':
+           newStatus==='Parkolt'?'park':
+           newStatus==='Raktarban'?'wh':'info';
   var bgMap = {
     'info': 'background:rgba(59,130,246,0.18);color:#60a5fa;border-color:rgba(59,130,246,0.4);',
     'warn': 'background:rgba(245,158,11,0.18);color:#fbbf24;border-color:rgba(245,158,11,0.4);',
     'ok':   'background:rgba(34,197,94,0.18);color:#4ade80;border-color:rgba(34,197,94,0.4);',
-    'err':  'background:rgba(239,68,68,0.18);color:#f87171;border-color:rgba(239,68,68,0.4);'
+    'err':  'background:rgba(239,68,68,0.18);color:#f87171;border-color:rgba(239,68,68,0.4);',
+    'park': 'background:rgba(192,38,211,0.18);color:#e879f9;border-color:rgba(192,38,211,0.4);',
+    'wh':   'background:rgba(249,115,22,0.18);color:#fb923c;border-color:rgba(249,115,22,0.4);'
   };
   var base = 'cursor:pointer;font-size:11px;font-weight:700;border-radius:8px;padding:4px 20px 4px 8px;border:1px solid;appearance:auto;-webkit-appearance:auto;outline:none;min-width:80px;';
   sel.style.cssText = base + (bgMap[sc]||bgMap['info']);
@@ -2541,8 +2638,12 @@ function renderFilteredOrders(list) {
     if(c.status==='Parkolt')sc='park';
     if(c.status==='Raktarban')sc='wh';
 
-    // Státusz dropdown — gombszerű, színes, kattintható
-    var statuses = ['Disponibil','Alocat','In Curs','Parkolt','Raktarban','Finalizat','Anulat'];
+    // Státusz dropdown — gombszerű, színes, kattintható.
+    // 'Extern' is a listában van (különben az Extern fuvar tévesen az első
+    // opciót — Disponibil — mutatná); a fuvar AKTUÁLIS státuszát mindig
+    // beszúrjuk, ha valamiért nem szerepelne a kanonikus listában.
+    var statuses = ['Disponibil','Alocat','Extern','In Curs','Parkolt','Raktarban','Finalizat','Anulat'];
+    if (c.status && statuses.indexOf(c.status) === -1) statuses = [c.status].concat(statuses);
     var selStyle = 'cursor:pointer;font-size:11px;font-weight:700;border-radius:8px;padding:4px 20px 4px 8px;'+
       'border:1px solid;appearance:auto;-webkit-appearance:auto;outline:none;min-width:80px;';
     var bgMap = {
@@ -2985,7 +3086,7 @@ function oeAddLeg() {
       fetch('/api/execute', {method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({functionName:'getOrderById',arguments:[_oeOrderId]})})
       .then(r=>r.json()).then(d => renderOeLegs(d.legs||[]));
-    } else { toast(r&&r.err||'Hiba','err'); }
+    } else { toast(r&&r.err||t('common.error'),'err'); }
   });
 }
 
@@ -3015,11 +3116,15 @@ function saveOrderEdit() {
     status:           document.getElementById('oeStatus').value,
     sofer_type:       soferType||null,
     email_sofer:      soferType==='Intern' ? soferSel.value : null,
-    nume_sofer:       soferType==='Intern' ? (selectedUser ? selectedUser.nume : '') : document.getElementById('oeNumeSoferExtern').value,
+    nume_sofer:       soferType==='Intern' ? (selectedUser ? selectedUser.nume : '')
+                       : soferType==='Extern' ? document.getElementById('oeNumeSoferExtern').value : null,
     firma_extern:     soferType==='Extern' ? document.getElementById('oeFirmaExtern').value : null,
     rendszam_camion:  document.getElementById('oeCamion').value||null,
     rendszam_remorca: document.getElementById('oeRemorca').value||null,
   };
+  // Ha nem Extern a fuvar, az elavult alvállalkozói telefonszám/külső-sofőr-id
+  // törlődjön a DB-ből (a szerkesztő ezeket nem rögzíti, csak nullázza).
+  if (soferType !== 'Extern') { payload.telefon_extern = null; payload.external_driver_id = null; }
   // A már létező fuvart nem blokkoljuk: a típus üresen maradhat.
   // Csak ha LTL-re állítják, akkor kötelezők a méretek.
   if(payload.load_type==='LTL' && (!payload.hossz_cm||!payload.szel_cm||!payload.mag_cm)){toast(t('cs.ltlDimsReq'),'err');return;}
@@ -3029,7 +3134,7 @@ function saveOrderEdit() {
       toast(t('common.savedOk'), 'ok');
       closeOrderEditModal();
       loadOrders();
-    } else { toast(r&&r.err||'Szerver hiba','err'); }
+    } else { toast(r&&r.err||t('common.error'),'err'); }
   });
 }
 
