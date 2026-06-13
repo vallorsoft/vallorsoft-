@@ -12,6 +12,10 @@ const pgSession    = require('connect-pg-simple')(session);
 const cookieParser = require('cookie-parser');
 const pool         = require('./db');
 const log          = require('./lib/logger');
+const errorReporter = require('./lib/errorReporter');
+
+// Opcionális hibamonitorozás (Sentry) — csak ha @sentry/node + SENTRY_DSN van.
+errorReporter.init();
 
 // ===== BIZTONSAG: helmet + rate-limit (opcionalis) =====
 let helmet, rateLimit;
@@ -24,11 +28,13 @@ app.set('trust proxy', 1); // Render / reverse proxy mogotti HTTPS session fix
 // ===== GLOBÁLIS VÉDŐHÁLÓ: kezeletlen hibák ne állítsák le némán a szervert =====
 process.on('unhandledRejection', (reason) => {
   log.error('unhandledRejection', { reason: reason && reason.message ? reason.message : String(reason) });
+  errorReporter.capture(reason instanceof Error ? reason : new Error(String(reason)), { kind: 'unhandledRejection' });
 });
 process.on('uncaughtException', (err) => {
   // Strukturáltan naplózzuk; a folyamatot — a meglévő üzemeltetési elv szerint —
   // nem állítjuk le (a process-manager úgyis újraindítaná, de a session/DB él).
   log.error('uncaughtException', { err: err && err.message, stack: err && err.stack });
+  errorReporter.capture(err, { kind: 'uncaughtException' });
 });
 
 // ===== HELMET: HTTP biztonsagi fejlecek =====
@@ -189,6 +195,7 @@ app.use('/api', (req, res) => {
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   log.error('unhandled-route-error', { id: req.id, path: req.path, err: err && err.message, stack: err && err.stack });
+  errorReporter.capture(err, { id: req.id, path: req.path, method: req.method });
   if (res.headersSent) return next(err);
   if (req.path && req.path.indexOf('/api') === 0) {
     return res.status(500).json({ success: false, message: 'Eroare de server' });
@@ -202,6 +209,9 @@ startIntakeScheduler();
 startExpiryScheduler();
 startGpsMileageScheduler();
 startMonthlyReportScheduler();
+
+// Opcionális automatikus DB-mentés (alapból KI; BACKUP_ENABLED=true + BACKUP_DIR).
+require('./services/backup').startBackupScheduler();
 
 // (megtartva az eredetibol; jelenleg nincs hasznalatban)
 const getNowStr = () => new Date().toISOString().replace('T', ' ').substring(0, 19);

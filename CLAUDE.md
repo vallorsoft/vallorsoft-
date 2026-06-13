@@ -229,12 +229,14 @@ Térkép: nincs kulcs — ingyenes OSM/Photon/OSRM (a `HERE_API_KEY` már NEM ke
 Push: `VAPID_PUBLIC_KEY/PRIVATE_KEY/EMAIL`. E-mail: `BREVO_API_KEY`, `BREVO_SENDER`, `MAIL_USER`.
 Firebase: `FIREBASE_API_KEY/AUTH_DOMAIN/DB_URL/PROJECT_ID/APP_ID/SERVICE_ACCOUNT`. AI: `GEMINI_API_KEY`, `GEMINI_MODEL` (egy modell) vagy `GEMINI_MODELS` (vesszős lista — modell-lánc). A kiolvasó (`order-ai/gemini.js`) egy **modell-láncon** megy végig: 429 (napi kvóta/sebességkorlát) esetén automatikusan a következő modellre vált, mert minden modellnek KÜLÖN napi ingyenes kerete van. Alap lánc: `gemini-2.0-flash → -flash-lite → 2.5-flash → 2.5-flash-lite → 1.5-flash → 1.5-flash-8b`.
 Intake (opcionális): `INTAKE_IMAP_HOST/PORT/USER/PASS/TLS`, `INTAKE_COMPANY_ID`, `INTAKE_MAILBOX`.
-Routing (opcionális): **`ORS_API_KEY`** (OpenRouteService, ingyenes) — az útvonaltervező **kamionos váltója** (🚛) ezzel él; alapból ingyenes autós (OSRM). Üzemeltetés (opcionális): **`LOG_FORMAT=json`** (alapból production-ban; strukturált JSON-log a `lib/logger`-ből), **`LOG_LEVEL`** (`debug|info|warn|error`, alap `info`).
+Routing (opcionális): **`ORS_API_KEY`** (OpenRouteService, ingyenes) — az útvonaltervező **kamionos váltója** (🚛) ezzel él; alapból ingyenes autós (OSRM). Üzemeltetés (opcionális): **`LOG_FORMAT=json`** (alapból production-ban; strukturált JSON-log a `lib/logger`-ből), **`LOG_LEVEL`** (`debug|info|warn|error`, alap `info`), **`SENTRY_DSN`** (ha be van állítva ÉS a `@sentry/node` telepítve → hiba-jelentés; különben no-op), **DB-mentés**: `BACKUP_ENABLED=true` + `BACKUP_DIR` (+ opc. `BACKUP_INTERVAL_HOURS`=24, `BACKUP_RETENTION_DAYS`=14).
 
 ## Üzemeltetés (health-check + log)
 - **Health-check** (auth nélkül, `routes/health.js`): `GET /healthz` (liveness — a folyamat fut-e), `GET /readyz` (readiness — DB `SELECT 1`, 200/503). Load balancer / uptime-monitor / konténer ezeket pingeli.
 - **Strukturált kérés-naplózás** (`middleware/requestLog.js` + `lib/logger.js`): minden API-/oldal-kérésre egy sor (metódus/út/státusz/idő/`X-Request-Id`), a statikus fájlokat és a health-t kihagyva. `LOG_FORMAT=json` esetén egysoros JSON (aggregátor-barát).
 - **Globális védőháló** a `server.js`-ben: `unhandledRejection`/`uncaughtException` strukturált naplózással (a folyamat tovább fut), ismeretlen `/api` útra 404 JSON, és egy záró **hibakezelő** (sosem szivárogtat stack-trace-t a kliensnek).
+- **Opcionális hibamonitorozás** (`lib/errorReporter.js`): `SENTRY_DSN` + telepített `@sentry/node` esetén a process- és route-hibakezelők Sentry-be is jelentenek; enélkül no-op (a `@sentry/node` NEM kötelező függőség).
+- **Opcionális automatikus DB-mentés** (`services/backup.js`, `startBackupScheduler`): alapból KI; `BACKUP_ENABLED=true` + `BACKUP_DIR` esetén ütemezett `pg_dump | gzip` (PG\* env-en, a jelszó nem kerül a parancssorba), retencióval. Külső cron is használható helyette.
 
 ## Konvenciók
 
