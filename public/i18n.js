@@ -1654,7 +1654,20 @@
     'dev.cegDeleted': { hu: 'Cég törölve!', ro: 'Firmă ștearsă!' },
     'dev.confirmBlockCeg': { hu: 'Biztosan blokkolod ezt a céget? A felhasználók nem tudnak bejelentkezni.', ro: 'Sigur blochezi această firmă? Utilizatorii nu se vor putea autentifica.' },
     'dev.cegBlocked': { hu: 'Cég blokkolva!', ro: 'Firmă blocată!' },
-    'dev.cegActivated': { hu: 'Cég aktiválva!', ro: 'Firmă activată!' }
+    'dev.cegActivated': { hu: 'Cég aktiválva!', ro: 'Firmă activată!' },
+
+    // ── Oldal-címek (<title>) ──
+    'title.admin': { hu: 'VallorSoft – Admin konzol', ro: 'VallorSoft – Consolă admin' },
+    'title.manager': { hu: 'VallorSoft – Manager konzol', ro: 'VallorSoft – Consolă manager' },
+    'title.sofer': { hu: 'VallorSoft – Sofőr', ro: 'VallorSoft – Șofer' },
+    'title.login': { hu: 'VallorSoft – Bejelentkezés', ro: 'VallorSoft – Autentificare' },
+    'title.register': { hu: 'VallorSoft – Regisztráció', ro: 'VallorSoft – Înregistrare' },
+    'title.reset': { hu: 'VallorSoft – Új jelszó', ro: 'VallorSoft – Parolă nouă' },
+    'title.portal': { hu: 'VallorSoft – Ügyfélportál', ro: 'VallorSoft – Portal client' },
+    'title.carrier': { hu: 'VallorSoft – Alvállalkozói portál', ro: 'VallorSoft – Portal subcontractor' },
+    'title.konyvelo': { hu: 'VallorSoft – Könyvelői felület', ro: 'VallorSoft – Interfață contabilitate' },
+    'title.developer': { hu: 'VallorSoft – Developer Console', ro: 'VallorSoft – Consolă developer' },
+    'title.routePlanner': { hu: 'VallorSoft – Útvonaltervezés', ro: 'VallorSoft – Planificare rută' }
   };
 
   function getLang() {
