@@ -27,7 +27,7 @@ describe('POST /api/execute', () => {
     const res = await request(app).post('/api/execute').send({ functionName: 'nincsIlyenFunkcio' });
     expect(res.status).toBe(200);
     expect(res.body.result.ok).toBe(false);
-    expect(res.body.result.err).toMatch(/Ismeretlen funkcio/i);
+    expect(res.body.result.err).toMatch(/necunoscut/i);
   });
 
   // A regisztráció meghívókóddal NEM igényelhet bejelentkezést — a
@@ -65,6 +65,6 @@ describe('POST /api/execute', () => {
     });
     expect(res.status).toBe(200);
     expect(res.body.result.ok).toBe(false);
-    expect(res.body.result.err).toMatch(/visszavon/i);
+    expect(res.body.result.err).toMatch(/retras/i);
   });
 });

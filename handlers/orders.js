@@ -215,6 +215,8 @@ handlers.getMySoferOrders = async function (req, res, args) {
       // waybill_at: a legkorábbi mentett menetlevél dátuma, amin szerepel a fuvar
       //   (a fuvarlevelek.order_ids JSONB tömb tartalmazza-e a fuvar id-jét).
       // dash_visible: aktív (Alocat/In Curs) VAGY Finalizat a teljesítéstől max 3 napig.
+      //   Parkolt/Raktarban is látszik, ha a fuvar még a sofőrhöz van rendelve
+      //   (email_sofer) — különben „némán" eltűnne a kezéből (csak olvasható).
       // waybill_visible: minden kiosztott fuvar, DE a mentett menetlevél után csak 3 napig.
       const r = await pool.query(
         `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare, o.km,
@@ -222,7 +224,7 @@ handlers.getMySoferOrders = async function (req, res, args) {
                 o.handover_status, o.handover_type, o.handover_loc,
                 o.finalized_at, wb.waybill_at,
                 (
-                  o.status IN ('Alocat', 'In Curs')
+                  o.status IN ('Alocat', 'In Curs', 'Parkolt', 'Raktarban')
                   OR (o.status = 'Finalizat'
                       AND COALESCE(o.finalized_at, o.updated_at) >= NOW() - INTERVAL '3 days')
                 ) AS dash_visible,
@@ -516,7 +518,7 @@ handlers.comUpdate = async function (req, res, args) {
         updates.push(`status = $${i++}`); values.push(st);
       }
       if (o.sofer_type !== undefined) { updates.push(`sofer_type = $${i++}`); values.push(o.sofer_type || null); }
-      if (o.email_sofer !== undefined) { updates.push(`email_sofer = $${i++}`); values.push(o.email_sofer || null); }
+      if (o.email_sofer !== undefined) { updates.push(`email_sofer = $${i++}`); values.push(o.email_sofer ? String(o.email_sofer).trim().toLowerCase() : null); }
       if (o.nume_sofer !== undefined) { updates.push(`nume_sofer = $${i++}`); values.push(o.nume_sofer || null); }
       if (o.firma_extern !== undefined) { updates.push(`firma_extern = $${i++}`); values.push(o.firma_extern || null); }
       if (o.telefon_extern !== undefined) { updates.push(`telefon_extern = $${i++}`); values.push(o.telefon_extern || null); }

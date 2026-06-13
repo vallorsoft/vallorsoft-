@@ -30,9 +30,36 @@
   var _dense = false;
   var _resize = null;                   // sáv-átméretezés állapota
 
-  var RAIL = 168;
-  function colW() { return _dense ? 64 : 96; }
-  function laneH() { return _dense ? 26 : 32; }
+  var RAIL_BASE = 168;
+  // Nézet-testreszabás (localStorage-ban őrzött): arányos zoom (_scale) +
+  // táblán belüli oszlop-/sáv-méret felülírások (_colUser/_railUser) +
+  // jármű-sorok kézi sorrendje (_vehOrder, rendszám-lista, húzással).
+  var _scale = (function () { var v = parseFloat(localStorage.getItem('vs-planner-scale')); return (v >= 0.5 && v <= 2) ? v : 1; })();
+  var _railUser = parseInt(localStorage.getItem('vs-planner-rail'), 10) || 0;   // 0 = auto (a zoom szerint)
+  var _colUser = parseInt(localStorage.getItem('vs-planner-colw'), 10) || 0;    // 0 = auto
+  var _vehOrder = (function () { try { return JSON.parse(localStorage.getItem('vs-planner-veh-order') || '[]') || []; } catch (e) { return []; } })();
+  function baseColW() { return _dense ? 64 : 96; }
+  function colW() { return _colUser > 0 ? _colUser : Math.max(28, Math.round(baseColW() * _scale)); }
+  function baseLaneH() { return _dense ? 26 : 32; }
+  function laneH() { return Math.max(16, Math.round(baseLaneH() * _scale)); }
+  function rail() { return _railUser > 0 ? _railUser : Math.max(96, Math.round(RAIL_BASE * _scale)); }
+  function saveView() {
+    try {
+      localStorage.setItem('vs-planner-scale', String(_scale));
+      localStorage.setItem('vs-planner-rail', String(_railUser));
+      localStorage.setItem('vs-planner-colw', String(_colUser));
+      localStorage.setItem('vs-planner-veh-order', JSON.stringify(_vehOrder));
+    } catch (e) {}
+  }
+  // A jármű-lista rendezése a kézi sorrend szerint (ismeretlen a végére)
+  function orderVehicles(list) {
+    if (!_vehOrder.length) return list;
+    return list.slice().sort(function (a, b) {
+      var ia = _vehOrder.indexOf(a.rendszam.toUpperCase()); if (ia < 0) ia = 9999;
+      var ib = _vehOrder.indexOf(b.rendszam.toUpperCase()); if (ib < 0) ib = 9999;
+      return ia - ib;
+    });
+  }
 
   var ST = {
     'Disponibil': { c: '#3b82f6', t: 'Tervezett' },
@@ -63,25 +90,33 @@
       '.p2-board{overflow-x:auto;border-radius:var(--radius-md);}',
       '.p2-inner{position:relative;}',
       '.p2-headrow{display:flex;position:sticky;top:0;z-index:5;}',
-      '.p2-corner{flex:0 0 ' + RAIL + 'px;position:sticky;left:0;z-index:6;background:var(--bg-panel);' +
-        'border-bottom:1px solid var(--border);display:flex;align-items:flex-end;padding:4px 10px;font-size:10px;color:var(--text-muted);}',
-      '.p2-day{flex:0 0 auto;text-align:center;padding:5px 0 3px;font-size:11px;font-weight:700;color:var(--text-muted);' +
+      '.p2-corner{flex:0 0 var(--p2-rail,168px);position:sticky;left:0;z-index:6;background:var(--bg-panel);' +
+        'border-bottom:1px solid var(--border);display:flex;align-items:flex-end;padding:4px 10px;font-size:calc(10px*var(--p2-fs,1));color:var(--text-muted);}',
+      '.p2-railrz{position:absolute;right:0;top:0;bottom:0;width:7px;cursor:col-resize;z-index:8;}',
+      '.p2-railrz:hover{background:var(--brand-red);opacity:.5;}',
+      '.p2-day{position:relative;flex:0 0 auto;text-align:center;padding:5px 0 3px;font-size:calc(11px*var(--p2-fs,1));font-weight:700;color:var(--text-muted);' +
         'border-left:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--bg-panel);}',
-      '.p2-day .dn{font-size:10px;font-weight:400;opacity:.8;}',
+      '.p2-day .dn{font-size:calc(10px*var(--p2-fs,1));font-weight:400;opacity:.8;}',
+      '.p2-dayrz{position:absolute;right:0;top:0;bottom:0;width:7px;cursor:col-resize;z-index:7;}',
+      '.p2-dayrz:hover{background:var(--brand-red);opacity:.5;}',
       '.p2-day.we{background:rgba(255,255,255,0.04);}',
       '.p2-day.today{color:#fff;background:rgba(225,11,26,0.18);}',
       // — kihasználtság —
       '.p2-utilrow{display:flex;}',
-      '.p2-utilcorner{flex:0 0 ' + RAIL + 'px;position:sticky;left:0;z-index:4;background:var(--bg-panel);' +
+      '.p2-utilcorner{flex:0 0 var(--p2-rail,168px);position:sticky;left:0;z-index:4;background:var(--bg-panel);' +
         'font-size:9px;color:var(--text-muted);display:flex;align-items:center;padding:0 10px;border-bottom:1px solid var(--border);}',
       '.p2-util{flex:0 0 auto;height:16px;border-left:1px solid var(--border);border-bottom:1px solid var(--border);' +
         'font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;}',
       // — sorok —
       '.p2-row{display:flex;border-bottom:1px solid var(--border);}',
-      '.p2-rail{flex:0 0 ' + RAIL + 'px;position:sticky;left:0;z-index:3;background:var(--bg-panel);' +
+      '.p2-rail{flex:0 0 var(--p2-rail,168px);position:sticky;left:0;z-index:3;background:var(--bg-panel);' +
         'padding:6px 10px;display:flex;flex-direction:column;justify-content:center;gap:1px;border-right:1px solid var(--border);}',
-      '.p2-rail .rs{font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:6px;white-space:nowrap;}',
-      '.p2-rail .rd{font-size:10.5px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+      '.p2-rail .rs{font-size:calc(12.5px*var(--p2-fs,1));font-weight:800;display:flex;align-items:center;gap:6px;white-space:nowrap;}',
+      '.p2-rail .rd{font-size:calc(10.5px*var(--p2-fs,1));color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+      '.p2-vgrip{cursor:grab;opacity:.45;font-size:calc(11px*var(--p2-fs,1));letter-spacing:-2px;user-select:none;}',
+      '.p2-vgrip:hover{opacity:1;}',
+      '.p2-rail.vdrag-over{box-shadow:inset 0 3px 0 0 var(--brand-red);}',
+      '.p2-rail.vdragging{opacity:.45;}',
       '.p2-dot{width:7px;height:7px;border-radius:50%;background:#475569;flex-shrink:0;}',
       '.p2-dot.on{background:var(--status-ok);box-shadow:0 0 5px var(--status-ok);}',
       '.p2-lanes{position:relative;flex:0 0 auto;}',
@@ -92,14 +127,14 @@
       '.p2-picking .p2-dcell:hover,.p2-dcell.dragover{background:rgba(59,130,246,0.22)!important;outline:1px dashed #3b82f6;outline-offset:-1px;}',
       '.p2-todayline{position:absolute;top:0;bottom:0;width:2px;background:var(--brand-red);opacity:.7;z-index:1;pointer-events:none;}',
       // — sávok —
-      '.p2-bar{position:absolute;border-radius:7px;color:#fff;font-size:10.5px;font-weight:700;line-height:1.15;' +
-        'padding:3px 16px 3px 8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;z-index:2;' +
+      '.p2-bar{position:absolute;border-radius:7px;color:#fff;font-weight:700;line-height:1.15;' +
+        'padding:3px 16px 3px 8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;z-index:2;font-size:calc(10.5px*var(--p2-fs,1));' +
         'border:1px solid rgba(255,255,255,0.3);box-shadow:0 2px 6px rgba(0,0,0,0.35);transition:filter .12s;}',
       '.p2-bar:hover{filter:brightness(1.15);z-index:3;}',
       '.p2-bar.conflict{border:2px solid var(--status-warn);box-shadow:0 0 0 2px rgba(245,158,11,0.35);}',
       '.p2-bar.dim{opacity:.22;pointer-events:none;}',
       '.p2-bar.picked{outline:2px solid #fff;box-shadow:0 0 0 3px rgba(59,130,246,0.8);}',
-      '.p2-bar .sub{font-size:9.5px;font-weight:400;opacity:.85;}',
+      '.p2-bar .sub{font-size:calc(9.5px*var(--p2-fs,1));font-weight:400;opacity:.85;}',
       '.p2-rz{position:absolute;right:0;top:0;bottom:0;width:12px;cursor:ew-resize;border-radius:0 7px 7px 0;}',
       '.p2-rz:hover{background:rgba(255,255,255,0.3);}',
       // — pool / radar —
@@ -296,7 +331,10 @@
       + (isMobile() ? '' :
         '<select class="select" id="p2Zoom" style="max-width:96px;padding:6px 8px;font-size:12px;">'
         + [[7, t('pl.week1')], [14, t('pl.week2')], [28, t('pl.week4')]].map(function (z) { return '<option value="' + z[0] + '"' + (_days === z[0] ? ' selected' : '') + '>' + z[1] + '</option>'; }).join('') + '</select>'
-        + '<button class="btn ghost" style="padding:6px 11px;font-size:12px;" onclick="Planner.density()" title="' + t('pl.densityTitle') + '">' + (_dense ? t('pl.comfy') : t('pl.dense')) + '</button>')
+        + '<button class="btn ghost" style="padding:6px 11px;font-size:12px;" onclick="Planner.density()" title="' + t('pl.densityTitle') + '">' + (_dense ? t('pl.comfy') : t('pl.dense')) + '</button>'
+        + '<label class="text-muted" style="font-size:11.5px;display:flex;align-items:center;gap:5px;white-space:nowrap;" title="' + t('pl.scaleTitle') + '">🔎'
+        + '<input type="range" id="p2Scale" min="60" max="150" step="5" value="' + Math.round(_scale * 100) + '" style="width:84px;accent-color:#e10b1a;"></label>'
+        + '<button class="btn ghost" style="padding:6px 11px;font-size:12px;" onclick="Planner.resetView()" title="' + t('pl.viewResetTitle') + '">↺</button>')
       + '<span style="flex:1;"></span>'
       + '<input class="input" id="p2Q" value="' + esc(_f.q) + '" placeholder="' + t('pl.searchPh') + '" style="max-width:170px;padding:7px 10px;font-size:12px;">'
       + '<select class="select" id="p2St" style="max-width:120px;padding:6px 8px;font-size:12px;"><option value="">' + t('pl.status') + '</option>'
@@ -320,6 +358,21 @@
     }
     var z = document.getElementById('p2Zoom');
     if (z) z.onchange = function () { _days = parseInt(z.value, 10) || 14; load(); };
+    var sc = document.getElementById('p2Scale');
+    if (sc) {
+      // élő előnézet húzás közben (csak CSS-változó + inner szélesség, DOM-újraépítés
+      // NÉLKÜL — különben a csúszka elem eltűnne a húzás alatt); commit elengedéskor.
+      sc.oninput = function () {
+        var s = Math.min(2, Math.max(0.5, (parseInt(sc.value, 10) || 100) / 100));
+        var inner = document.querySelector('.p2-inner');
+        if (inner) { inner.style.setProperty('--p2-fs', s); var W = Math.max(28, Math.round(baseColW() * s)); var RW = Math.max(96, Math.round(RAIL_BASE * s)); inner.style.setProperty('--p2-rail', RW + 'px'); inner.style.width = (RW + _days * W) + 'px'; }
+      };
+      sc.onchange = function () {
+        _scale = Math.min(2, Math.max(0.5, (parseInt(sc.value, 10) || 100) / 100));
+        _colUser = 0; _railUser = 0;        // arányos zoom → a kézi felülírások törlődnek
+        saveView(); render();
+      };
+    }
     var b = document.getElementById('p2Busy');
     if (b) b.onchange = function () { _f.onlyBusy = b.checked; render(); };
   }
@@ -352,17 +405,21 @@
 
   // ── 🖥️ GANTT ────────────────────────────────────────────
   function ganttHtml(days, today) {
-    var W = colW();
-    var vehs = _veh.slice();
+    var W = colW(), RW = rail();
+    var vehs = orderVehicles(_veh.slice());
     var html = '<div class="glass' + (_selOid ? ' p2-picking' : '') + '" style="padding:0;overflow:hidden;">'
-      + '<div class="p2-board"><div class="p2-inner" style="width:' + (RAIL + _days * W) + 'px;">';
+      + '<div class="p2-board"><div class="p2-inner" style="--p2-rail:' + RW + 'px;--p2-fs:' + _scale + ';width:' + (RW + _days * W) + 'px;">';
 
-    // fejléc
-    html += '<div class="p2-headrow"><div class="p2-corner">' + t('pl.vehicleCol') + '</div>'
-      + days.map(function (d) {
+    // fejléc — a sarokban a jármű-oszlop méretező-fogantyúja (RAIL szélesség),
+    // a nap-fejlécek jobb szélén a nap-oszlop méretező (W).
+    html += '<div class="p2-headrow"><div class="p2-corner">' + t('pl.vehicleCol')
+      + '<span class="p2-railrz" onpointerdown="Planner.railRz(event)" title="' + t('pl.railResize') + '"></span></div>'
+      + days.map(function (d, di) {
           var y = ymd(d), we = d.getDay() === 0 || d.getDay() === 6;
           return '<div class="p2-day' + (we ? ' we' : '') + (y === today ? ' today' : '') + '" style="width:' + W + 'px;">'
-            + '<span class="dn">' + DAYNAMES[d.getDay()] + '</span><br>' + (d.getMonth() + 1) + '.' + d.getDate() + '.</div>';
+            + '<span class="dn">' + DAYNAMES[d.getDay()] + '</span><br>' + (d.getMonth() + 1) + '.' + d.getDate() + '.'
+            + (di === days.length - 1 ? '<span class="p2-dayrz" onpointerdown="Planner.colRz(event)" title="' + t('pl.colResize') + '"></span>' : '')
+            + '</div>';
         }).join('') + '</div>';
 
     // kihasználtság-sor
@@ -392,8 +449,11 @@
       var lay = layoutVehicle(mine);
       var H = Math.max(lay.laneCount * laneH() + 6, 40);
       var gpsOn = _gps[v.rendszam.toUpperCase()];
-      html += '<div class="p2-row"><div class="p2-rail" style="height:' + H + 'px;">'
-        + '<div class="rs text-primary"><span class="p2-dot' + (gpsOn ? ' on' : '') + '" title="' + (gpsOn ? 'Megy (GPS)' : 'Áll / nincs GPS') + '"></span>🚛 ' + esc(v.rendszam) + '</div>'
+      html += '<div class="p2-row"><div class="p2-rail" style="height:' + H + 'px;" data-rendszam="' + esc(v.rendszam) + '" '
+        + 'ondragover="Planner._vov(event)" ondragleave="Planner._vlv(event)" ondrop="Planner._vdp(event)">'
+        + '<div class="rs text-primary"><span class="p2-vgrip" draggable="true" data-rendszam="' + esc(v.rendszam) + '" '
+        + 'ondragstart="Planner._vds(event)" ondragend="Planner._vde(event)" title="' + t('pl.rowMove') + '">⋮⋮</span>'
+        + '<span class="p2-dot' + (gpsOn ? ' on' : '') + '" title="' + (gpsOn ? 'Megy (GPS)' : 'Áll / nincs GPS') + '"></span>🚛 ' + esc(v.rendszam) + '</div>'
         + '<div class="rd">' + esc([v.marca, v.model].filter(Boolean).join(' ') || '') + '</div></div>'
         + '<div class="p2-lanes" style="width:' + (_days * W) + 'px;height:' + H + 'px;">';
       // nap-cellák (drop + koppintás célpontok)
@@ -586,12 +646,65 @@
     _dp: function (e) {
       e.preventDefault(); e.currentTarget.classList.remove('dragover');
       var oid = e.dataTransfer.getData('text/plain');
-      if (oid) assignTo(oid, e.currentTarget.getAttribute('data-rendszam'), e.currentTarget.getAttribute('data-day'));
+      if (!oid || oid.indexOf('veh:') === 0) return;        // jármű-sor átrendezés nem kiosztás
+      assignTo(oid, e.currentTarget.getAttribute('data-rendszam'), e.currentTarget.getAttribute('data-day'));
     },
     _dpPool: function (e) {
       e.preventDefault(); e.currentTarget.classList.remove('dragover');
       var oid = e.dataTransfer.getData('text/plain');
-      if (oid) assign(oid, { rendszam_camion: null }, oid + ' kiosztása törölve');
+      if (oid && oid.indexOf('veh:') !== 0) assign(oid, { rendszam_camion: null }, oid + ' kiosztása törölve');
+    },
+
+    // ── Jármű-sorok átrendezése (húzás a ⋮⋮ fogantyúval) ──
+    _vds: function (e) {
+      e.stopPropagation();
+      try { e.dataTransfer.setData('text/plain', 'veh:' + e.target.getAttribute('data-rendszam')); e.dataTransfer.effectAllowed = 'move'; } catch (_) {}
+      var rail = e.target.closest('.p2-rail'); if (rail) rail.classList.add('vdragging');
+    },
+    _vde: function (e) {
+      var rail = e.target.closest('.p2-rail'); if (rail) rail.classList.remove('vdragging');
+      [].forEach.call(document.querySelectorAll('.p2-rail.vdrag-over'), function (x) { x.classList.remove('vdrag-over'); });
+    },
+    _vov: function (e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; e.currentTarget.classList.add('vdrag-over'); },
+    _vlv: function (e) { e.currentTarget.classList.remove('vdrag-over'); },
+    _vdp: function (e) {
+      e.preventDefault(); e.currentTarget.classList.remove('vdrag-over');
+      var d = e.dataTransfer.getData('text/plain');
+      if (!d || d.indexOf('veh:') !== 0) return;            // csak jármű-sor drop
+      var from = d.slice(4).toUpperCase();
+      var to = (e.currentTarget.getAttribute('data-rendszam') || '').toUpperCase();
+      if (!from || !to || from === to) return;
+      // teljes sorrend a jelenlegi (rendezett) listából, majd a forrást a cél elé
+      var order = orderVehicles(_veh.slice()).map(function (v) { return v.rendszam.toUpperCase(); });
+      order = order.filter(function (r) { return r !== from; });
+      order.splice(order.indexOf(to), 0, from);
+      _vehOrder = order; saveView(); render();
+    },
+
+    // ── Jármű-oszlop (RAIL) szélesség húzása ──
+    railRz: function (e) {
+      e.preventDefault(); e.stopPropagation();
+      var startX = e.clientX, startW = rail();
+      var mv = function (ev) { _railUser = Math.min(400, Math.max(96, startW + (ev.clientX - startX))); var inner = document.querySelector('.p2-inner'); if (inner) { inner.style.setProperty('--p2-rail', _railUser + 'px'); inner.style.width = (_railUser + _days * colW()) + 'px'; } };
+      var up = function () { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); saveView(); render(); };
+      window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+    },
+    // ── Nap-oszlop (W) szélesség húzása ──
+    colRz: function (e) {
+      e.preventDefault(); e.stopPropagation();
+      var startX = e.clientX, startW = colW();
+      var up = function (ev) {
+        window.removeEventListener('pointerup', up);
+        _colUser = Math.min(220, Math.max(28, startW + (ev.clientX - startX)));
+        saveView(); render();
+      };
+      window.addEventListener('pointerup', up);
+    },
+    // ── Nézet visszaállítása (zoom + oszlop/sáv méret + sorrend) ──
+    resetView: function () {
+      _scale = 1; _colUser = 0; _railUser = 0; _vehOrder = [];
+      saveView(); render();
+      toast(t('pl.viewReset'), 'ok');
     },
 
     // sáv-átméretezés (lerakó-dátum húzása a jobb szélen)
