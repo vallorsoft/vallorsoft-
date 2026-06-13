@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VallorSoft — Ügyfélportál</title>
+<script src="/i18n.js?v=20260614"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -63,11 +64,11 @@
 <div id="viewLogin" class="center hidden">
   <div class="glass card">
     <div class="logo" style="text-align:center;font-size:24px;margin-bottom:4px"><b>Vallor</b><span>Soft</span></div>
-    <div class="muted" style="text-align:center;margin-bottom:20px">Ügyfélportál</div>
-    <div class="field"><label>E-mail</label><input class="inp" id="liEmail" type="email" autocomplete="username"></div>
-    <div class="field"><label>Jelszó</label><input class="inp" id="liPass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')Portal.login()"></div>
-    <button class="btn primary" style="width:100%;margin-top:6px" onclick="Portal.login()">Belépés</button>
-    <div class="muted" style="text-align:center;margin-top:14px;font-size:11px">A hozzáférést a fuvarozód adja meghívóval.<br>Csak a saját céged fuvarjait látod.</div>
+    <div class="muted" style="text-align:center;margin-bottom:20px" data-i18n="por.clientPortal">Ügyfélportál</div>
+    <div class="field"><label data-i18n="common.email">E-mail</label><input class="inp" id="liEmail" type="email" autocomplete="username"></div>
+    <div class="field"><label data-i18n="common.password">Jelszó</label><input class="inp" id="liPass" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')Portal.login()"></div>
+    <button class="btn primary" style="width:100%;margin-top:6px" onclick="Portal.login()" data-i18n="por.login">Belépés</button>
+    <div class="muted" style="text-align:center;margin-top:14px;font-size:11px" data-i18n-html="por.loginHint">A hozzáférést a fuvarozód adja meghívóval.<br>Csak a saját céged fuvarjait látod.</div>
   </div>
 </div>
 
@@ -75,50 +76,50 @@
 <div id="viewSet" class="center hidden">
   <div class="glass card">
     <div class="logo" style="text-align:center;font-size:24px;margin-bottom:4px"><b>Vallor</b><span>Soft</span></div>
-    <div class="muted" style="text-align:center;margin-bottom:20px">Állítsd be a jelszavad</div>
-    <div class="field"><label>Új jelszó (min. 6 karakter)</label><input class="inp" id="spPass" type="password"></div>
-    <div class="field"><label>Jelszó újra</label><input class="inp" id="spPass2" type="password" onkeydown="if(event.key==='Enter')Portal.setPw()"></div>
-    <button class="btn primary" style="width:100%;margin-top:6px" onclick="Portal.setPw()">Mentés és belépés</button>
+    <div class="muted" style="text-align:center;margin-bottom:20px" data-i18n="por.setPwTitle">Állítsd be a jelszavad</div>
+    <div class="field"><label data-i18n="por.newPwMin">Új jelszó (min. 6 karakter)</label><input class="inp" id="spPass" type="password"></div>
+    <div class="field"><label data-i18n="por.pwAgain">Jelszó újra</label><input class="inp" id="spPass2" type="password" onkeydown="if(event.key==='Enter')Portal.setPw()"></div>
+    <button class="btn primary" style="width:100%;margin-top:6px" onclick="Portal.setPw()" data-i18n="por.saveLogin">Mentés és belépés</button>
   </div>
 </div>
 
 <!-- ③ VEZÉRLŐPULT -->
 <div id="viewDash" class="wrap hidden">
   <div class="glass top">
-    <div class="logo" style="font-size:20px"><b>Vallor</b><span>Soft</span> <span class="muted" style="font-size:13px;font-weight:500">· Ügyfélportál</span></div>
+    <div class="logo" style="font-size:20px"><b>Vallor</b><span>Soft</span> <span class="muted" style="font-size:13px;font-weight:500" data-i18n="por.dotClientPortal">· Ügyfélportál</span></div>
     <div style="margin-left:auto;text-align:right">
       <div id="dClient" style="font-weight:700"></div>
       <div id="dCeg" class="muted" style="font-size:12px"></div>
     </div>
     <div class="av" id="dAv">·</div>
-    <button class="btn" style="padding:7px 12px" onclick="Portal.logout()">Kilépés</button>
+    <button class="btn" style="padding:7px 12px" onclick="Portal.logout()" data-i18n="common.logout">Kilépés</button>
   </div>
 
   <div class="stats" id="dStats"></div>
 
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
-    <button class="btn primary" onclick="Portal.openRequest()">＋ Új fuvar igénylése</button>
-    <span class="muted" style="font-size:12px">Az igénylést a diszpécser hagyja jóvá, és bekerül a fuvarok közé.</span>
+    <button class="btn primary" onclick="Portal.openRequest()" data-i18n="por.newOrderReq">＋ Új fuvar igénylése</button>
+    <span class="muted" style="font-size:12px" data-i18n="por.reqApprovalHint">Az igénylést a diszpécser hagyja jóvá, és bekerül a fuvarok közé.</span>
   </div>
 
   <div class="grid">
-    <div><div class="glass" style="padding:16px 18px"><div class="h">📦 A te fuvarjaid</div><div id="dOrders"></div></div></div>
+    <div><div class="glass" style="padding:16px 18px"><div class="h" data-i18n="por.yourOrders">📦 A te fuvarjaid</div><div id="dOrders"></div></div></div>
     <div>
       <div class="glass hidden" id="reqBox" style="padding:16px 18px">
-        <div class="h">＋ Új fuvar igénylése</div>
-        <div class="field"><label>Felrakó címe *</label><input class="inp" id="rqFrom"></div>
-        <div class="field"><label>Lerakó címe *</label><input class="inp" id="rqTo"></div>
+        <div class="h" data-i18n="por.newOrderReq">＋ Új fuvar igénylése</div>
+        <div class="field"><label data-i18n="por.loadAddrReq">Felrakó címe *</label><input class="inp" id="rqFrom"></div>
+        <div class="field"><label data-i18n="por.unloadAddrReq">Lerakó címe *</label><input class="inp" id="rqTo"></div>
         <div style="display:flex;gap:10px">
-          <div class="field" style="flex:1"><label>Súly (kg)</label><input class="inp" id="rqW" type="number"></div>
-          <div class="field" style="flex:1"><label>Típus</label><select class="inp" id="rqType"><option value="">—</option><option>FTL</option><option>LTL</option></select></div>
+          <div class="field" style="flex:1"><label data-i18n="por.weightKg">Súly (kg)</label><input class="inp" id="rqW" type="number"></div>
+          <div class="field" style="flex:1"><label data-i18n="por.type">Típus</label><select class="inp" id="rqType"><option value="">—</option><option>FTL</option><option>LTL</option></select></div>
         </div>
-        <div class="field"><label>Felrakás dátuma</label><input class="inp" id="rqDate" type="date"></div>
-        <div class="field"><label>Megjegyzés</label><input class="inp" id="rqNote"></div>
-        <button class="btn ok" style="width:100%" onclick="Portal.sendRequest()">Igénylés elküldése →</button>
+        <div class="field"><label data-i18n="por.loadDate">Felrakás dátuma</label><input class="inp" id="rqDate" type="date"></div>
+        <div class="field"><label data-i18n="por.note">Megjegyzés</label><input class="inp" id="rqNote"></div>
+        <button class="btn ok" style="width:100%" onclick="Portal.sendRequest()" data-i18n="por.sendReq">Igénylés elküldése →</button>
       </div>
       <div class="glass" id="reqHint" style="padding:16px 18px">
-        <div class="h">ℹ️ Hogyan működik</div>
-        <div class="muted" style="font-size:12.5px;line-height:1.6">
+        <div class="h" data-i18n="por.howItWorks">ℹ️ Hogyan működik</div>
+        <div class="muted" style="font-size:12.5px;line-height:1.6" data-i18n-html="por.howItWorksBody">
           Itt a saját fuvarjaidat látod élőben. A <b>🗺️ Követés</b> gombbal megnézed, hol a kamion;
           a dokumentumokat (visszaigazolás, számla, aláírt CMR/POD) letöltöd. Új fuvart az
           <b>＋ Új fuvar igénylése</b> gombbal kérhetsz.
@@ -130,7 +131,7 @@
 
 <!-- TÉRKÉP MODAL -->
 <div id="mapModal"><div class="mc">
-  <div class="mh"><b id="mTitle">🗺️ Követés</b><button class="btn" style="margin-left:auto;padding:5px 12px" onclick="Portal.closeMap()">✕ Bezár</button></div>
+  <div class="mh"><b id="mTitle" data-i18n="por.tracking">🗺️ Követés</b><button class="btn" style="margin-left:auto;padding:5px 12px" onclick="Portal.closeMap()" data-i18n="por.closeX">✕ Bezár</button></div>
   <div id="pmap"></div>
   <div id="mInfo" class="muted" style="padding:10px 16px;font-size:12px"></div>
 </div></div>

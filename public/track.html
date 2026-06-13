@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Urmărire transport</title>
+  <script src="/i18n.js?v=20260614"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>
@@ -33,67 +34,74 @@
 <body>
 <div class="wrap">
   <div class="logo">vallor<span class="red">Soft</span></div>
-  <div class="ceg" id="ceg">Urmărire transport</div>
-  <div id="content"><div class="card muted" style="text-align:center;">Se încarcă…</div></div>
-  <div class="foot">Pagina de urmărire este generată de transportator. · VallorSoft</div>
+  <div class="ceg" id="ceg" data-i18n="trk.title">Urmărire transport</div>
+  <div id="content"><div class="card muted" style="text-align:center;" data-i18n="common.loading">Se încarcă…</div></div>
+  <div class="foot" data-i18n="trk.foot">Pagina de urmărire este generată de transportator. · VallorSoft</div>
 </div>
 <script>
 (function () {
   var token = location.pathname.split('/').pop();
+  // Státusz-kód → [css-osztály, fordítási kulcs]
   var STATUS = {
-    'Disponibil': ['b-info', 'Înregistrat'],
-    'Alocat':     ['b-warn', 'Programat'],
-    'Extern':     ['b-warn', 'Programat'],
-    'In Curs':    ['b-info', '🚛 În tranzit'],
-    'Finalizat':  ['b-ok',   '✅ Livrat'],
-    'Anulat':     ['b-warn', 'Anulat']
+    'Disponibil': ['b-info', 'trk.stRegistered'],
+    'Alocat':     ['b-warn', 'trk.stScheduled'],
+    'Extern':     ['b-warn', 'trk.stScheduled'],
+    'In Curs':    ['b-info', 'trk.stInTransit'],
+    'Finalizat':  ['b-ok',   'trk.stDelivered'],
+    'Anulat':     ['b-warn', 'trk.stCancelled']
   };
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   function d(x) { return x ? new Date(x).toLocaleDateString('ro-RO') : '—'; }
+  var _last = null; // utolsó válasz a nyelvváltáskori újrarendereléshez
+
+  function render(r) {
+    var box = document.getElementById('content');
+    if (!r || !r.ok) {
+      box.innerHTML = '<div class="card err"><div style="font-size:40px;margin-bottom:12px;">🔍</div>'
+        + '<b>' + esc(t('trk.invalidLink')) + '</b><div class="muted" style="margin-top:6px;">' + esc(t('trk.contactCarrier')) + '</div></div>';
+      return;
+    }
+    var tr = r.transport;
+    document.getElementById('ceg').textContent = (tr.ceg || '') + ' — ' + t('trk.titleLower');
+    var st = STATUS[tr.status] || ['b-info', null];
+    var stLabel = st[1] ? t(st[1]) : tr.status;
+    box.innerHTML =
+      '<div class="card">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">'
+      + '<span class="muted">' + esc(t('trk.transport')) + ' <b style="color:#e9eef5;">' + esc(tr.ref) + '</b></span>'
+      + '<span class="badge ' + st[0] + '">' + esc(stLabel) + '</span></div>'
+      + '<div class="route"><span>📦 ' + esc(tr.loc_incarcare || '—') + '</span><span class="arrow">→</span><span>🏁 ' + esc(tr.loc_descarcare || '—') + '</span></div>'
+      + '<div class="meta">'
+      + '<div><div class="l">' + esc(t('trk.loadDate')) + '</div><div class="v">' + d(tr.data_incarcare) + '</div></div>'
+      + '<div><div class="l">' + esc(t('trk.unloadDate')) + '</div><div class="v">' + d(tr.data_descarcare) + '</div></div>'
+      + '<div><div class="l">' + esc(t('trk.vehicle')) + '</div><div class="v">' + esc(tr.rendszam || '—') + '</div></div>'
+      + '</div></div>'
+      + (r.position ? '<div id="map"></div><div class="muted" style="margin-top:8px;text-align:right;">' + esc(t('trk.posUpdated')) + ' '
+          + (r.position.datetime ? new Date(r.position.datetime).toLocaleString('ro-RO') : '—')
+          + ' · ' + esc(t('trk.autoReload')) + '</div>'
+        : '<div class="card muted" style="text-align:center;">📍 ' + esc(t('trk.noGps'))
+          + (tr.status === 'Finalizat' ? ' — ' + esc(t('trk.deliveredNote')) + ' ✅' : '.') + '</div>');
+
+    if (r.position && typeof L !== 'undefined') {
+      var map = L.map('map').setView([r.position.lat, r.position.lng], 9);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        { attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
+      var m = L.circleMarker([r.position.lat, r.position.lng],
+        { radius: 10, color: '#e10b1a', fillColor: '#e10b1a', fillOpacity: 0.9, weight: 3 }).addTo(map);
+      m.bindTooltip('🚛 ' + (tr.rendszam || '') + (r.position.speed != null ? ' · ' + Math.round(r.position.speed) + ' km/h' : '')).openTooltip();
+    }
+  }
 
   function load() {
     fetch('/api/track/' + encodeURIComponent(token))
       .then(function (r) { return r.json(); })
-      .then(function (r) {
-        var box = document.getElementById('content');
-        if (!r || !r.ok) {
-          box.innerHTML = '<div class="card err"><div style="font-size:40px;margin-bottom:12px;">🔍</div>'
-            + '<b>Link invalid sau expirat</b><div class="muted" style="margin-top:6px;">Contactați transportatorul pentru un link nou.</div></div>';
-          return;
-        }
-        var t = r.transport;
-        document.getElementById('ceg').textContent = (t.ceg || '') + ' — urmărire transport';
-        var st = STATUS[t.status] || ['b-info', t.status];
-        box.innerHTML =
-          '<div class="card">'
-          + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">'
-          + '<span class="muted">Transport <b style="color:#e9eef5;">' + esc(t.ref) + '</b></span>'
-          + '<span class="badge ' + st[0] + '">' + esc(st[1]) + '</span></div>'
-          + '<div class="route"><span>📦 ' + esc(t.loc_incarcare || '—') + '</span><span class="arrow">→</span><span>🏁 ' + esc(t.loc_descarcare || '—') + '</span></div>'
-          + '<div class="meta">'
-          + '<div><div class="l">Data încărcării</div><div class="v">' + d(t.data_incarcare) + '</div></div>'
-          + '<div><div class="l">Data descărcării</div><div class="v">' + d(t.data_descarcare) + '</div></div>'
-          + '<div><div class="l">Vehicul</div><div class="v">' + esc(t.rendszam || '—') + '</div></div>'
-          + '</div></div>'
-          + (r.position ? '<div id="map"></div><div class="muted" style="margin-top:8px;text-align:right;">Poziție actualizată: '
-              + (r.position.datetime ? new Date(r.position.datetime).toLocaleString('ro-RO') : '—')
-              + ' · Pagina se reîncarcă automat la 2 minute.</div>'
-            : '<div class="card muted" style="text-align:center;">📍 Poziția GPS nu este disponibilă momentan'
-              + (t.status === 'Finalizat' ? ' — transportul a fost livrat. ✅' : '.') + '</div>');
-
-        if (r.position && typeof L !== 'undefined') {
-          var map = L.map('map').setView([r.position.lat, r.position.lng], 9);
-          L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-            { attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
-          var m = L.circleMarker([r.position.lat, r.position.lng],
-            { radius: 10, color: '#e10b1a', fillColor: '#e10b1a', fillOpacity: 0.9, weight: 3 }).addTo(map);
-          m.bindTooltip('🚛 ' + (t.rendszam || '') + (r.position.speed != null ? ' · ' + Math.round(r.position.speed) + ' km/h' : '')).openTooltip();
-        }
-      })
+      .then(function (r) { _last = r; render(r); })
       .catch(function () {
-        document.getElementById('content').innerHTML = '<div class="card err">Eroare de rețea — reîncercați.</div>';
+        document.getElementById('content').innerHTML = '<div class="card err">' + esc(t('common.connError')) + '</div>';
       });
   }
+  // Nyelvváltáskor az utolsó adatból újrarenderelünk
+  window.onLangChange = function () { if (_last) render(_last); };
   load();
   setInterval(load, 2 * 60 * 1000); // 2 percenként frissül (a szerver 60s-ig cache-el)
 })();

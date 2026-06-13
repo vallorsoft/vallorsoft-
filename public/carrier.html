@@ -2,6 +2,7 @@
 <html lang="hu"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VallorSoft — Alvállalkozói portál</title>
+<script src="/i18n.js?v=20260614"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{--bg:#05070b;--panel:#141c25;--tx:#e9eef5;--mut:#8a97a8;--red:#e10b1a;--ok:#22c55e;--warn:#f59e0b;--danger:#ef4444;--info:#3b82f6;--bd:rgba(255,255,255,.08);--r:18px;--rm:12px;--rs:8px}
@@ -37,54 +38,54 @@
 
 <div id="viewLogin" class="center hidden"><div class="glass card">
   <div class="logo" style="text-align:center;font-size:24px;margin-bottom:4px"><b>Vallor</b><span>Soft</span></div>
-  <div class="mut" style="text-align:center;margin-bottom:20px">Alvállalkozói portál</div>
-  <div class="field"><label>E-mail</label><input class="inp" id="liEmail" type="email"></div>
-  <div class="field"><label>Jelszó</label><input class="inp" id="liPass" type="password" onkeydown="if(event.key==='Enter')Carrier.login()"></div>
-  <button class="btn primary" style="width:100%;margin-top:6px" onclick="Carrier.login()">Belépés</button>
-  <div class="mut" style="text-align:center;margin-top:14px;font-size:11px">A hozzáférést a fuvarozód adja meghívóval.</div>
+  <div class="mut" style="text-align:center;margin-bottom:20px" data-i18n="car.portalSub">Alvállalkozói portál</div>
+  <div class="field"><label data-i18n="common.email">E-mail</label><input class="inp" id="liEmail" type="email"></div>
+  <div class="field"><label data-i18n="common.password">Jelszó</label><input class="inp" id="liPass" type="password" onkeydown="if(event.key==='Enter')Carrier.login()"></div>
+  <button class="btn primary" style="width:100%;margin-top:6px" onclick="Carrier.login()" data-i18n="car.loginBtn">Belépés</button>
+  <div class="mut" style="text-align:center;margin-top:14px;font-size:11px" data-i18n="car.loginHint">A hozzáférést a fuvarozód adja meghívóval.</div>
 </div></div>
 
 <div id="viewSet" class="center hidden"><div class="glass card">
   <div class="logo" style="text-align:center;font-size:24px;margin-bottom:4px"><b>Vallor</b><span>Soft</span></div>
-  <div class="mut" style="text-align:center;margin-bottom:20px">Állítsd be a jelszavad</div>
-  <div class="field"><label>Új jelszó (min. 6 karakter)</label><input class="inp" id="spPass" type="password"></div>
-  <div class="field"><label>Jelszó újra</label><input class="inp" id="spPass2" type="password" onkeydown="if(event.key==='Enter')Carrier.setPw()"></div>
-  <button class="btn primary" style="width:100%;margin-top:6px" onclick="Carrier.setPw()">Mentés és belépés</button>
+  <div class="mut" style="text-align:center;margin-bottom:20px" data-i18n="car.setPwSub">Állítsd be a jelszavad</div>
+  <div class="field"><label data-i18n="car.newPw">Új jelszó (min. 6 karakter)</label><input class="inp" id="spPass" type="password"></div>
+  <div class="field"><label data-i18n="car.pwAgain">Jelszó újra</label><input class="inp" id="spPass2" type="password" onkeydown="if(event.key==='Enter')Carrier.setPw()"></div>
+  <button class="btn primary" style="width:100%;margin-top:6px" onclick="Carrier.setPw()" data-i18n="car.saveLogin">Mentés és belépés</button>
 </div></div>
 
 <div id="viewDash" class="wrap hidden">
   <div class="glass top">
-    <div class="logo" style="font-size:20px"><b>Vallor</b><span>Soft</span> <span class="mut" style="font-size:13px;font-weight:500">· Alvállalkozói portál</span></div>
+    <div class="logo" style="font-size:20px"><b>Vallor</b><span>Soft</span> <span class="mut" style="font-size:13px;font-weight:500" data-i18n="car.topSub">· Alvállalkozói portál</span></div>
     <div style="margin-left:auto;text-align:right"><div id="dCarrier" style="font-weight:700"></div><div id="dCeg" class="mut" style="font-size:12px"></div></div>
     <div class="av" id="dAv">·</div>
-    <button class="btn" style="padding:7px 12px" onclick="Carrier.logout()">Kilépés</button>
+    <button class="btn" style="padding:7px 12px" onclick="Carrier.logout()" data-i18n="common.logout">Kilépés</button>
   </div>
 
   <div class="stats" id="dStats"></div>
 
   <div class="grid">
-    <div><div class="glass" style="padding:16px 18px"><div class="h">📦 Rád osztott fuvarok</div><div id="dOrders"></div></div></div>
+    <div><div class="glass" style="padding:16px 18px"><div class="h" data-i18n="car.assignedOrders">📦 Rád osztott fuvarok</div><div id="dOrders"></div></div></div>
     <div>
       <div class="glass" style="padding:16px 18px;margin-bottom:16px">
-        <div class="h">🚚 Járműveim</div>
+        <div class="h" data-i18n="car.myVehicles">🚚 Járműveim</div>
         <div id="dVehicles" style="margin-bottom:10px"></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <input class="inp" id="vCam" placeholder="Vontató rendszám *" style="flex:1;min-width:120px">
-          <input class="inp" id="vRem" placeholder="Pótkocsi" style="flex:1;min-width:100px">
+          <input class="inp" id="vCam" data-i18n-ph="car.phTractorReq" placeholder="Vontató rendszám *" style="flex:1;min-width:120px">
+          <input class="inp" id="vRem" data-i18n-ph="car.phTrailer" placeholder="Pótkocsi" style="flex:1;min-width:100px">
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-          <input class="inp" id="vMarca" placeholder="Márka" style="flex:1;min-width:100px">
-          <input class="inp" id="vModel" placeholder="Modell" style="flex:1;min-width:100px">
+          <input class="inp" id="vMarca" data-i18n-ph="car.phBrand" placeholder="Márka" style="flex:1;min-width:100px">
+          <input class="inp" id="vModel" data-i18n-ph="car.phModel" placeholder="Modell" style="flex:1;min-width:100px">
         </div>
-        <button class="btn ok" style="width:100%;margin-top:8px" onclick="Carrier.addVehicle()">＋ Jármű felvitele</button>
-        <div class="mut" style="font-size:11px;margin-top:6px">A felvitt járművet a diszpécser látja a kiosztásnál.</div>
+        <button class="btn ok" style="width:100%;margin-top:8px" onclick="Carrier.addVehicle()" data-i18n="car.addVehicle">＋ Jármű felvitele</button>
+        <div class="mut" style="font-size:11px;margin-top:6px" data-i18n="car.vehicleHint">A felvitt járművet a diszpécser látja a kiosztásnál.</div>
       </div>
       <div class="glass" style="padding:16px 18px">
-        <div class="h">📎 Dokumentum feltöltése</div>
-        <div class="field"><label>Típus</label><select class="inp" id="uKind"><option value="cmr">Aláírt CMR / POD</option><option value="invoice">Számla</option><option value="insurance">CMR-biztosítás</option><option value="contract">Szerződés</option><option value="other">Egyéb</option></select></div>
-        <div class="field"><label>Fuvarhoz (opcionális)</label><select class="inp" id="uOrder"><option value="">— általános —</option></select></div>
-        <div class="field"><label>Fájl (PDF/kép)</label><input class="inp" id="uFile" type="file" accept=".pdf,.jpg,.jpeg,.png"></div>
-        <button class="btn primary" style="width:100%" onclick="Carrier.upload()">Feltöltés</button>
+        <div class="h" data-i18n="car.uploadDoc">📎 Dokumentum feltöltése</div>
+        <div class="field"><label data-i18n="car.docKind">Típus</label><select class="inp" id="uKind"><option value="cmr" data-i18n="car.kindCmr">Aláírt CMR / POD</option><option value="invoice" data-i18n="car.kindInvoice">Számla</option><option value="insurance" data-i18n="car.kindInsurance">CMR-biztosítás</option><option value="contract" data-i18n="car.kindContract">Szerződés</option><option value="other" data-i18n="car.kindOther">Egyéb</option></select></div>
+        <div class="field"><label data-i18n="car.docOrder">Fuvarhoz (opcionális)</label><select class="inp" id="uOrder"><option value="" data-i18n="car.general">— általános —</option></select></div>
+        <div class="field"><label data-i18n="car.docFile">Fájl (PDF/kép)</label><input class="inp" id="uFile" type="file" accept=".pdf,.jpg,.jpeg,.png"></div>
+        <button class="btn primary" style="width:100%" onclick="Carrier.upload()" data-i18n="car.uploadBtn">Feltöltés</button>
         <div id="dMyDocs" style="margin-top:12px"></div>
       </div>
     </div>
