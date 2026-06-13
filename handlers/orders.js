@@ -505,13 +505,22 @@ handlers.comUpdate = async function (req, res, args) {
         if (!['Disponibil','Alocat','Extern','In Curs','Finalizat','Anulat','Parkolt','Raktarban'].includes(o.status)) {
           return res.json({ result: { ok: false, err: 'Status invalid.' } });
         }
-        updates.push(`status = $${i++}`); values.push(o.status);
+        // Auto-státusz: ha a szerkesztőben hozzárendelnek egy sofőrt, de a
+        // státusz még Disponibil, léptessük tovább (mint a comCreate/plannerAssign).
+        // Csak a Disponibil-t mozgatja — In Curs/Finalizat stb. érintetlen.
+        let st = o.status;
+        if (st === 'Disponibil') {
+          if (o.sofer_type === 'Intern' && o.email_sofer) st = 'Alocat';
+          else if (o.sofer_type === 'Extern') st = 'Extern';
+        }
+        updates.push(`status = $${i++}`); values.push(st);
       }
       if (o.sofer_type !== undefined) { updates.push(`sofer_type = $${i++}`); values.push(o.sofer_type || null); }
       if (o.email_sofer !== undefined) { updates.push(`email_sofer = $${i++}`); values.push(o.email_sofer || null); }
       if (o.nume_sofer !== undefined) { updates.push(`nume_sofer = $${i++}`); values.push(o.nume_sofer || null); }
       if (o.firma_extern !== undefined) { updates.push(`firma_extern = $${i++}`); values.push(o.firma_extern || null); }
       if (o.telefon_extern !== undefined) { updates.push(`telefon_extern = $${i++}`); values.push(o.telefon_extern || null); }
+      if (o.external_driver_id !== undefined) { updates.push(`external_driver_id = $${i++}`); values.push(o.external_driver_id ? parseInt(o.external_driver_id, 10) : null); }
       if (o.rendszam_camion !== undefined) { updates.push(`rendszam_camion = $${i++}`); values.push(o.rendszam_camion ? o.rendszam_camion.toUpperCase() : null); }
       if (o.rendszam_remorca !== undefined) { updates.push(`rendszam_remorca = $${i++}`); values.push(o.rendszam_remorca ? o.rendszam_remorca.toUpperCase() : null); }
       if (o.suly_kg !== undefined) { updates.push(`suly_kg = $${i++}`); values.push((o.suly_kg === '' || o.suly_kg === null) ? null : Number(o.suly_kg)); }

@@ -99,6 +99,24 @@ h1, h2, h3, h4 { margin: 0 0 10px 0; }
 .table th { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 600; }
 .table tr:hover td { background: rgba(255,255,255,0.02); }
 
+/* ── Kézzel méretezhető táblázat-oszlopok (mint egy weboldalon) ──
+   A .resizable táblán table-layout:fixed, az oszlopszélességek inline px-ben.
+   A fejléc jobb szélén húzható fogantyú; a tartalom (kiszabott fuvarok
+   többsoros cellái is) az oszloppal arányosan kap helyet. */
+table.resizable { table-layout: fixed; }
+table.resizable th { position: relative; overflow: hidden; }
+table.resizable th, table.resizable td { overflow-wrap: anywhere; }
+.col-resizer {
+  position: absolute; top: 0; right: 0; width: 8px; height: 100%;
+  cursor: col-resize; user-select: none; touch-action: none; z-index: 3;
+}
+.col-resizer::after {
+  content: ""; position: absolute; top: 22%; right: 3px; height: 56%; width: 2px;
+  border-radius: 2px; background: rgba(255,255,255,0.14); transition: background .15s;
+}
+.col-resizer:hover::after, .col-resizer.active::after { background: var(--brand-red); }
+.main-content[data-theme="light"] .col-resizer::after { background: rgba(0,0,0,0.18); }
+
 .toast-wrap { position: fixed; top: 18px; right: 18px; display: flex; flex-direction: column; gap: 10px; z-index: 1000; }
 .toast { padding: 12px 14px; border-radius: 12px; background: #1a2330; border: 1px solid var(--border-bright); color: var(--text); box-shadow: var(--shadow-lg); min-width: 240px; }
 .toast.ok { border-color: #22c55e; }
