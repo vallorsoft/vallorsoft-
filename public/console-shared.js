@@ -2457,6 +2457,48 @@ function decorateUitIndicators(list){
     }).catch(function(){});
 }
 
+// ── ⋯ Fuvar-műveletek kezelő-menü (popover) ──────────────────────────────
+// A menü a sor cellájában él (rejtve), nyitáskor a <body>-ba portáljuk és
+// position:fixed-del a ⋯ gomb mellé igazítjuk — így semmilyen overflow
+// (.main-content / .glass) nem vágja le. Záráskor visszakerül a cellájába.
+var _vsActOpenId = null;
+function closeOrderActions(){
+  if(_vsActOpenId==null) return;
+  var m=document.getElementById('actmenu-'+_vsActOpenId);
+  var cell=document.getElementById('actcell-'+_vsActOpenId);
+  if(m){ m.style.display='none'; m.classList.remove('open'); if(cell && m.parentNode!==cell) cell.appendChild(m); }
+  _vsActOpenId=null;
+}
+function toggleOrderActions(id, btn){
+  if(_vsActOpenId===id){ closeOrderActions(); return; }
+  closeOrderActions();
+  var m=document.getElementById('actmenu-'+id);
+  if(!m) return;
+  document.body.appendChild(m);
+  m.style.display='block'; m.style.visibility='hidden'; m.classList.add('open');
+  var r=btn.getBoundingClientRect(), mw=m.offsetWidth, mh=m.offsetHeight, pad=8;
+  var left=r.right-mw;
+  if(left<pad) left=pad;
+  if(left+mw>window.innerWidth-pad) left=window.innerWidth-mw-pad;
+  var top=r.bottom+6;
+  if(top+mh>window.innerHeight-pad){ var up=r.top-mh-6; top = up>pad ? up : Math.max(pad, window.innerHeight-mh-pad); }
+  m.style.left=Math.round(left)+'px'; m.style.top=Math.round(top)+'px'; m.style.visibility='visible';
+  _vsActOpenId=id;
+}
+if(!window._vsActInit){
+  window._vsActInit=true;
+  document.addEventListener('click', function(e){
+    if(_vsActOpenId==null) return;
+    if(e.target.closest && e.target.closest('[data-act-toggle]')) return; // a ⋯ gomb maga kezeli
+    var m=document.getElementById('actmenu-'+_vsActOpenId);
+    if(m && m.contains(e.target)) return; // menün belüli kattintás
+    closeOrderActions();
+  }, true);
+  window.addEventListener('scroll', function(){ closeOrderActions(); }, true);
+  window.addEventListener('resize', function(){ closeOrderActions(); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeOrderActions(); });
+}
+
 function loadDash(){ loadDashboard(); }
 
 function mountClientPicker(){
@@ -2697,6 +2739,10 @@ async function renderSignPage(num){
 function renderFilteredOrders(list) {
   var tbody = document.getElementById('tblOrdersBody');
   if (!tbody) return;
+  // Újrarendereléskor a korábban <body>-ba portált nyitott kezelő-menüt eltakarítjuk
+  // (különben árva, duplikált id-jú node marad a body-n).
+  if (window.closeOrderActions) closeOrderActions();
+  document.querySelectorAll('body > .vs-act-menu').forEach(function(n){ n.remove(); });
   if (!list.length) { tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px;">'+t('cs.noMatch')+'</td></tr>'; return; }
   tbody.innerHTML = list.map(function(c){
     var soferInfo='—';
@@ -2781,48 +2827,59 @@ function renderFilteredOrders(list) {
       soferCell += '</div>';
     }
 
-    // ── Integrációs gombok (CargoTrack térkép + UIT + Számlázás) ──
-    var integBtns = '';
+    // ── ⋯ Kezelő-menü tételei (a sorban csak ✏️ + ⋯ marad; a többi ide kerül) ──
+    // Minden tétel ikon + rövid szöveg; az állapot-indikátorok (UIT/számla/POD/fizetés)
+    // a tétel jobb szélén jelennek meg. A dekorátorok ugyanazokat a [data-*-ind]
+    // span-eket töltik, mint korábban — a menü a DOM-ban van (rejtve), így találják.
+    var menuItems = '';
+    // 📎 Dokumentumok (mindig) — jobb szélén a POD-fotó jelző
+    var podBadge = (parseInt(c.pod_count, 10) > 0)
+      ? '<span class="vs-act-ind" style="color:var(--status-ok);" title="'+c.pod_count+t('cs.ol.podAttached')+'">📷'+c.pod_count+'</span>' : '';
+    menuItems += '<button class="vs-act-item" role="menuitem" onclick="openDocModal(\''+c.id+'\');closeOrderActions()">'+
+      '<span class="vs-act-ico">📎</span><span class="vs-act-lbl">'+t('cs.ol.mDocs')+'</span>'+podBadge+'</button>';
+    // 🗺️ Hol a kocsi?
     if (c.rendszam_camion && window.CargoTrackWhereIs) {
-      integBtns += '<button class="btn ghost" title="'+t('cs.ol.whereIs')+'" style="padding:4px 10px;font-size:12px;" '+
-        'onclick="CargoTrackWhereIs.show(\''+esc(c.rendszam_camion)+'\',\''+c.id+'\')">🗺️</button>';
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.whereIs')+'" '+
+        'onclick="CargoTrackWhereIs.show(\''+esc(c.rendszam_camion)+'\',\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">🗺️</span><span class="vs-act-lbl">'+t('cs.ol.mWhere')+'</span></button>';
     }
+    // ＋ UIT-kódok
     if (window.UitPanel) {
-      integBtns += '<button class="btn ghost uit-btn" title="'+t('cs.ol.uitCodes')+'" style="padding:4px 10px;font-size:12px;" '+
-        'data-uit-oid="'+c.id+'" onclick="UitPanel.open(\''+c.id+'\',\''+esc(c.rendszam_camion||'')+'\')">'+
-        '+UIT<span class="uit-ind" data-uit-ind="'+c.id+'" style="margin-left:3px;"></span></button>';
+      menuItems += '<button class="vs-act-item uit-btn" role="menuitem" title="'+t('cs.ol.uitCodes')+'" data-uit-oid="'+c.id+'" '+
+        'onclick="UitPanel.open(\''+c.id+'\',\''+esc(c.rendszam_camion||'')+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">＋</span><span class="vs-act-lbl">'+t('cs.ol.mUit')+'</span>'+
+        '<span class="vs-act-ind uit-ind" data-uit-ind="'+c.id+'"></span></button>';
     }
+    // 🧾 Számlázás — CSAK Finalizat fuvaron
     if (c.status==='Finalizat' && window.InvoiceModal) {
-      integBtns += '<button class="btn primary" title="'+t('cs.ol.invoicing')+'" style="padding:4px 10px;font-size:12px;" '+
-        'onclick="InvoiceModal.open(\''+c.id+'\')">🧾<span class="inv-ind" data-inv-ind="'+c.id+'" style="margin-left:2px;"></span></button>';
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.invoicing')+'" '+
+        'onclick="InvoiceModal.open(\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">🧾</span><span class="vs-act-lbl">'+t('cs.ol.mInvoice')+'</span>'+
+        '<span class="vs-act-ind inv-ind" data-inv-ind="'+c.id+'"></span></button>';
     }
-    // 🌍 Ügyfél tracking-link (prémium funkció-kapcsoló: 'tracking')
-    if (!(window._vsFeatures && window._vsFeatures['tracking']===false)) {
-      integBtns += '<button class="btn ghost" title="'+t('cs.ol.copyTrack')+'" style="padding:4px 10px;font-size:12px;" '+
-        'onclick="copyTrackingLink(\''+c.id+'\')">🌍</button>';
-    }
-    // 📷 POD-jelző: a sofőr által ehhez a fuvarhoz csatolt fotók (aláírt CMR stb.)
-    if (parseInt(c.pod_count, 10) > 0) {
-      integBtns += '<span title="'+c.pod_count+t('cs.ol.podAttached')+'" '+
-        'style="font-size:12px;align-self:center;color:var(--status-ok);white-space:nowrap;">📷'+c.pod_count+'</span>';
-    }
-    // 💰 Fizetés rögzítése — CSAK Finalizat fuvaron jelenik meg.
-    // Szín a fizetési állapot szerint: fizetve=zöld, részben=sárga, kintlévő=piros keret.
+    // 💰 Fizetés rögzítése — CSAK Finalizat fuvaron; jobb szélén állapot-pötty (zöld/sárga/piros)
     if (c.status==='Finalizat') {
       var _ps = c.payment_status || 'unpaid';
       var _pTitle = _ps==='paid' ? t('cs.ol.paidAmt',{n:(c.paid_amount||0)}) :
                     _ps==='partial' ? t('cs.ol.partialPay') : t('cs.ol.unpaidPay');
-      var _pStyle = _ps==='paid' ? 'border-color:rgba(34,197,94,0.5);color:#4ade80;' :
-                    _ps==='partial' ? 'border-color:rgba(245,158,11,0.5);color:#fbbf24;' :
-                    'border-color:rgba(239,68,68,0.5);color:#f87171;';
-      integBtns += '<button class="btn ghost" title="'+_pTitle+'" style="padding:4px 10px;font-size:12px;'+_pStyle+'" '+
-        'onclick="openPaymentModal(\''+c.id+'\')">💰'+(_ps==='paid'?'✓':'')+'</button>';
+      var _pCol = _ps==='paid' ? '#4ade80' : _ps==='partial' ? '#fbbf24' : '#f87171';
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+_pTitle+'" '+
+        'onclick="openPaymentModal(\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">💰</span><span class="vs-act-lbl">'+t('cs.ol.mPay')+'</span>'+
+        '<span class="vs-act-ind" style="color:'+_pCol+';">'+(_ps==='paid'?'✓':'●')+'</span></button>';
     }
-    // ⛔ Áru leadása (megszakítás) — aktív fuvaron; függő sofőr-kérésnél a banner kezeli
+    // 🌍 Ügyfél tracking-link (prémium funkció-kapcsoló: 'tracking')
+    if (!(window._vsFeatures && window._vsFeatures['tracking']===false)) {
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.copyTrack')+'" '+
+        'onclick="copyTrackingLink(\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">🌍</span><span class="vs-act-lbl">'+t('cs.ol.mTrack')+'</span></button>';
+    }
+    // ⛔ Áru leadása (megszakítás) — elválasztó után, danger színnel; aktív fuvaron
     if ((c.status==='Alocat'||c.status==='In Curs') && c.handover_status!=='Fuggoben') {
-      integBtns += '<button class="btn ghost" title="'+t('cs.ol.handoverTitle')+'" '+
-        'style="padding:4px 10px;font-size:12px;border-color:rgba(192,38,211,0.5);color:#e879f9;" '+
-        'onclick="openHandoverModal(\''+c.id+'\')">⛔</button>';
+      menuItems += '<div class="vs-act-sep"></div>'+
+        '<button class="vs-act-item danger" role="menuitem" title="'+t('cs.ol.handoverTitle')+'" '+
+        'onclick="openHandoverModal(\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">⛔</span><span class="vs-act-lbl">'+t('cs.ol.mHandover')+'</span></button>';
     }
 
     return '<tr><td><b>'+c.id+'</b></td><td>'+esc(c.client||'—')+'</td>'+
@@ -2830,10 +2887,11 @@ function renderFilteredOrders(list) {
       '<td>'+(c.km||'—')+(c.route_km!=null&&c.route_km!==''?' <span class="badge info" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="'+t('cs.tt.autoRouteKm')+'">🗺️ '+c.route_km+'</span>':'')+'</td><td>'+(c.pret||'—')+'</td>'+
       '<td>'+soferCell+'</td><td>'+esc(c.rendszam_camion||'—')+'</td>'+
       '<td>'+statusSel+'</td>'+
-      '<td style="display:flex;gap:4px;flex-wrap:wrap;">'+
-        '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="openDocModal(\''+c.id+'\')">📎</button>'+
-        '<button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="openOrderEdit(\''+c.id+'\')">✏️</button>'+
-        integBtns+
+      '<td class="vs-row-actions" id="actcell-'+c.id+'">'+
+        '<button class="btn primary vs-act-edit" title="'+t('cs.ol.mEdit')+'" onclick="openOrderEdit(\''+c.id+'\')">✏️</button>'+
+        '<button class="btn ghost vs-act-more" data-act-toggle title="'+t('cs.ol.actMenu')+'" '+
+          'onclick="toggleOrderActions(\''+c.id+'\',this)">⋯</button>'+
+        '<div class="vs-act-menu" id="actmenu-'+c.id+'" role="menu" style="display:none;">'+menuItems+'</div>'+
       '</td>'+
       '<td style="text-align:center;vertical-align:middle;">'+
         '<input type="checkbox" class="orderRowCb" value="'+c.id+'" onchange="updateOrderSelBar()" '+
