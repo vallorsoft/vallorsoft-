@@ -9,6 +9,11 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 10. lépés — Jogi megfelelőség + Developer adatexport (2026-06-14) ✅ KÉSZ
+
+- **Jogi oldalak (GDPR/T&C):** terms.html / privacy.html / dpa.html / cookies.html / security.html kiegészítve a megadott RO-jogi szövegekkel (GPS-kizárás, e-Factura felelősség, adatmegőrzési idők, 30+60 napos GDPR-válaszidő, 72 órás breach-notifikáció). register.html-be kötelező checkbox pár (Terms + Privacy) — a regisztráció JS-validációval blokkolva elfogadás nélkül. A CLAUDE.md jogi/GDPR szekciója feltöltve (VALLOR TEAM SRL adatok, adatfeldolgozók, jogalapok, megőrzési idők).
+- **Developer cég-adatexport ZIP** (`routes/developer-export.js`): GDPR Art. 20 (adathordozhatóság) + szerződésbontási kötelezettség teljesítése. A developer egyetlen kattintással letöltheti az adott cég összes adatát (CSV + bináris dok). Endpoint is_dev gated, multi-tenant szűrés ($1 = cid), jelszó-hash NEM kerül a ZIP-be, 400 MB vészfék. A kötelező GDPR-táblák (users, orders, clients) érintve.
+
 ### 9. lépés — Ügyfelek oldal UX/hibajavítás + CI-zöldítés (2026-06-14) ✅ KÉSZ
 
 - **Ügyfél-portál meghívó 500-as hiba** (PR #74) — a `handlers/clientPortal.js` (`clientPortalInvite`/`clientPortalList`) és a `routes/portal.js` (portál-LOGIN + jelszó-BEÁLLÍTÁS) a NEM létező `clients.nev` oszlopra hivatkozott (a tábla név-oszlopa `denumire`). A 42703 hibát a catch-ág „Eroare de server"-ré nyelte. Mindhárom SELECT javítva `denumire`-re; multi-tenant szűrés és paraméteres SQL érintetlen. Plusz: `services/email.js` `sendResetEmail` mostantól boolean-t ad vissza (valódi kiküldés vs. nincs Brevo-konfig) → a meghívó **kecsesen leromlik** (set-password link + `emailed:false`), nem 500-az. Valós Postgres-szel reprodukálva + igazolva.
