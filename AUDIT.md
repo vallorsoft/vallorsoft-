@@ -9,6 +9,13 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 11. lépés — Multi-tenant adatszivárgás audit (2026-06-14) ✅ KÉSZ
+Átfogó multi-tenant izolációs átvizsgálás (3 agent: handlers / routes / services+lib — mind a ~87 fájl).
+- **1 KRITIKUS javítva:** `handlers/documents.js` `orderDocUpload` — a kliens-megadta `orderId`-t ownership-ellenőrzés nélkül szúrta be, így „A" cég dokumentumot fűzhetett „B" cég fuvarához (cross-tenant write). Javítás: INSERT előtt `SELECT 1 FROM orders WHERE id=$1 AND company_id=$2` ellenőrzés; idegen fuvarnál „Comanda nu a fost gasita." Élesben verifikálva (saját→OK, idegen→blokkolva).
+- **Defenzív megerősítés:** `services/push.js` `sendPushToRole` JOIN-ja most `AND u.company_id = ps.company_id`-t is köt (a `ps.company_id` eleve szűrt — nulla viselkedés-változás).
+- **Verifikált biztonságos minták:** a `routes/` réteg (portál `client_id`-re, alvállalkozó `carrier_id`-re is szűr; developer-export is_dev-gated), a `services/scheduler`/`invoicing`/`email-intake` cégenkénti ciklusai végigvezetik a `company_id`-t, a megosztott cache-ek (geo_cache, geo_country_cache) szándékosan cégfüggetlen publikus tények, a cég-specifikusak (`_cfgCache`, `_posCache`, maps/here usage) `company_id`-re kulcsoltak.
+- **Nem kihasználható INFO-tételek:** az e-mail-alapú joinok (push, stamps, fuvarlevelek/documents `email_sofer`→`users`) nem keverhetnek cégeket, mert a `users.email` globálisan UNIQUE (egy e-mail = egy cég). A `documents`/`fuvarlevelek` táblának nincs saját `company_id`-je — a jelenlegi útvonalak helyesen izolálnak az `orders.company_id`/`users.company_id` joinon át; jövőbeli új lekérdezésnél erre figyelni kell.
+
 ### 10. lépés — Jogi megfelelőség + Developer adatexport (2026-06-14) ✅ KÉSZ
 
 - **Jogi oldalak (GDPR/T&C):** terms.html / privacy.html / dpa.html / cookies.html / security.html kiegészítve a megadott RO-jogi szövegekkel (GPS-kizárás, e-Factura felelősség, adatmegőrzési idők, 30+60 napos GDPR-válaszidő, 72 órás breach-notifikáció). register.html-be kötelező checkbox pár (Terms + Privacy) — a regisztráció JS-validációval blokkolva elfogadás nélkül. A CLAUDE.md jogi/GDPR szekciója feltöltve (VALLOR TEAM SRL adatok, adatfeldolgozók, jogalapok, megőrzési idők).
