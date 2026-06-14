@@ -128,6 +128,7 @@ A teljes hibalista **6 lépésben (6 commit)** került kijavításra. Állapot:
 | `authRegister` a `requireLogin` mögött (publikus regisztráció nem működhet) | Termék-döntés kell: szándékos-e (csak meghívóval regisztrálás), vagy hiba. |
 | Blob-tárolás kihelyezése (base64 a DB-ben) + `compression()` middleware | Infrastruktúra-változás; a 20 MB-os limit egyelőre kordában tartja. |
 | `here_usage_log`/`bug_reports`/`border_crossings` éves archiválás | 300 felhasználónál évekig nem kritikus; ütemezett feladatként érdemes. |
+| **SAF-T D406 XML direkt generálás** | Jövőbeli javaslat — a jelenlegi folyamat (VallorSoft → SAGA/WinMentor CSV → könyvelő → könyvelőprogram generálja a D406-ot) megfelel a piacnak és a kötelezettségnek. Direkt D406-generálás csak akkor lenne indokolt, ha könyvelő nélküli önkiszolgáló módot akarunk, vagy ha a SmartBill/Oblio-integráció nem fedezi ezt az utat (ami jelenleg nem igaz). Hasonló szállítmányozási szoftverek (Cargolog, Freightsoft) szintén a könyvelőre hárítják; dedikált könyvelőprogramok (SAGA, WinMentor, Ciel) végzik a D406 beküldést. |
 
 ---
 
