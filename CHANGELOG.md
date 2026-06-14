@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-14 — Ügyfél kérések fül + lebegő fuvarkérés-értesítő
+
+- **Lebegő, oldalfüggetlen értesítő-sáv** (`console-shared.js` `startInboundWatcher`/`refreshInboundCount`) — minden admin/manager fülön látszik, amíg van feldolgozatlan beérkező (portál + e-mail intake); 45 mp-es polling (`GET /api/inbound-orders/count`), kattintásra a megfelelő fülre ugrik, sidebar-badge a „Megrendelések" (e-mail) és az „Ügyfél kérések" (portál) menüponton. Új beérkezésnél toast + web push az adminoknak/managereknek (`routes/portal.js` `sendPushToRole`, kétnyelvű RO/HU).
+- **Új „📋 Ügyfél kérések" fül** a Fuvarfeladatok menüben (`public/client-requests.js`, `data-tab=client-requests`) — az ügyfél-portálról érkezett kérések (`inbound_orders` `source='portal'`) **ügyfelenként lenyitható szekcióban**, a kérések **dátum szerint naplózva**. Minden kérés teljes, szerkeszthető áru-adatlap; ha van csatolt dokumentum: „📄 Kiolvasás" (AI-reparse) → „✓ Elfogadás" valódi fuvarrá (Disponibil) / „✕ Elvetés". A portál-kérések **többé nem a „Megrendelések" (e-mail intake) fülön** jelennek meg (`?source=`/`?exclude_source=` szűrő a list-endpointon).
+- **Bővített portál fuvar-igénylő űrlap** (`portal.html`/`portal.js`) — teljes áru-bevitel (referencia, fel-/lerakó, dátumok, súly, FTL/LTL, méretek, megjegyzés) **minden mező opcionális** + **opcionális dokumentum-feltöltés** (PDF/kép, max 10 MB, base64). Az approve a teljes áru-adatot átviszi a fuvarba (`suly_kg`/`load_type`/`hossz_cm`/`szel_cm`/`mag_cm`). Új i18n kulcsok (RO+HU).
+
+---
+
 ## 2026-06-14 — Developer export 500 teljes javítás (PR #81)
 
 - **PR #81 mergelt** — **`routes/developer-export.js` további 5 tábla oszlopnév-javítás + `lib/zip.js` mappa-struktúra.** A #80 csak az orders/order_legs lekérdezést igazította, de a clients (`cui`→`cui_cif`, `contact_person` törölve), vehicles (`marka`→`marca`, `tipus`→`tip`, `ev`→`an`), fuvarlevelek (`order_ids`/`data_completare`/`km_inceput` stb.), inbound_orders (`subject`/`confidence`/`source_email` stb.) és order_uit_codes (`valid_until`/`rendszam`/`provider`) is rossz neveket használt. A clients/vehicles nem volt `.catch`-elve → ezek dobták a tartós 500-at. `lib/zip.js` `uniqueName` mostantól megtartja a `/`-t mappa-elválasztóként (eddig `csv/orders.csv`→`csv_orders.csv` laposodott; a könyvelői hub is profitál). Valós Postgres 16-on verifikálva: mind a 14 export-lekérdezés hibamentes, a route 200-at ad érvényes ZIP-pel; 24 suite / 108 teszt zöld.

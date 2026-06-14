@@ -32,6 +32,7 @@ function loadTab(name){
   if(name==='orders-form'){loadOrderFormData(); mountClientPicker();}
   if(name==='orders-list'){loadOrders();}
   if(name==='inbound' && window.InboundOrders) InboundOrders.mount('inboundBox');
+  if(name==='client-requests' && window.ClientRequests) ClientRequests.mount('clientReqBox');
   if(name==='received-fuv'){loadReceivedFuvarlevelek();loadDocSeries();}
   if(name==='driver-docs-pane') loadDriverUploadedDocs();
   if(name==='users') loadUsers();
@@ -146,6 +147,7 @@ gas('authMe').then(u=>{
   if(savedTab==='chat'&&savedRoom){window._restoreChatRoom=savedRoom;}
   activateTab(savedTab||'dash');
   applyFeatureFlags();
+  if(typeof startInboundWatcher==='function') startInboundWatcher();  // lebegő fuvarkérés-figyelő
 });
 let currentDocOrderId = null;
 let currentDocId      = null;

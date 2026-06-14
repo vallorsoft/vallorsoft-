@@ -206,7 +206,8 @@ window.InboundOrders = (function () {
 
     async function load(keepIdx) {
       try {
-        const d = await api('GET', '/api/inbound-orders');
+        // A portál-kérések a külön „Ügyfél kérések" fülre mennek — itt csak e-mail intake.
+        const d = await api('GET', '/api/inbound-orders?exclude_source=portal');
         const items = d.items || [];
         pending = items.filter(isPending);   // a szerver received_at DESC szerint adja → legújabb elöl
         totalHandled = items.length - pending.length;

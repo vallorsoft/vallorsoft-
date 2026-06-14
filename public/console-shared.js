@@ -2212,6 +2212,112 @@ function startRoomListListener(me){
 
 function toast(m,k){var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(function(){e.remove();},3000);}
 
+// ============================================================
+//  BEÉRKEZŐ FUVARKÉRÉS-FIGYELŐ — lebegő, oldalfüggetlen értesítő-sáv
+//  Minden admin/manager fülön látszik, amíg van feldolgozatlan
+//  beérkező megrendelés (portál-kérés + e-mail intake). Kattintásra a
+//  „Megrendelések" fülre ugrik. Periodikus polling (45 mp).
+//  Kétnyelvű (RO-alap + HU), témaérzékeny. Közös admin/manager kód.
+// ============================================================
+function _inboundEnsureStyle(){
+  if(document.getElementById('inbound-watch-style')) return;
+  var s=document.createElement('style'); s.id='inbound-watch-style';
+  s.textContent=
+    '#inboundAlert{position:fixed;right:18px;bottom:18px;z-index:4000;max-width:330px;'+
+      'display:none;align-items:center;gap:10px;cursor:pointer;'+
+      'background:var(--bg-panel-raised,#141c25);color:var(--text-primary,#e9eef5);'+
+      'border:1px solid var(--status-warn,#f59e0b);border-left:5px solid var(--status-warn,#f59e0b);'+
+      'border-radius:var(--radius-md,12px);padding:12px 14px;'+
+      'box-shadow:0 10px 30px rgba(0,0,0,.35);font-size:13px;line-height:1.35;'+
+      'animation:inboundPulse 2s ease-in-out infinite}'+
+    '#inboundAlert .ia-ico{font-size:22px;flex:0 0 auto}'+
+    '#inboundAlert .ia-txt{flex:1}'+
+    '#inboundAlert .ia-cnt{font-weight:800;color:var(--status-warn,#f59e0b)}'+
+    '#inboundAlert .ia-sub{font-size:11px;color:var(--text-muted,#8a97a8);margin-top:2px}'+
+    '.main-content[data-theme="light"] #inboundAlert{background:#fff;color:#1f2d3d}'+
+    '@keyframes inboundPulse{0%,100%{box-shadow:0 10px 30px rgba(0,0,0,.35)}'+
+      '50%{box-shadow:0 0 0 4px rgba(245,158,11,.25),0 10px 30px rgba(0,0,0,.35)}}'+
+    '.sidebar [data-tab="inbound"] .ia-badge{display:inline-block;min-width:18px;'+
+      'text-align:center;background:var(--status-danger,#ef4444);color:#fff;font-size:11px;'+
+      'font-weight:800;border-radius:999px;padding:1px 6px;margin-left:6px}'+
+    '@media(max-width:768px){#inboundAlert{bottom:74px;right:12px;left:12px;max-width:none}}';
+  document.head.appendChild(s);
+}
+function _inboundEnsureBanner(){
+  var el=document.getElementById('inboundAlert');
+  if(el) return el;
+  _inboundEnsureStyle();
+  el=document.createElement('div');
+  el.id='inboundAlert';
+  el.setAttribute('role','button');
+  el.title='Cereri / Megrendelések';
+  el.innerHTML='<span class="ia-ico">🔔</span><div class="ia-txt"></div>';
+  // Ha van ügyfél (portál) kérés, oda ugrunk; különben az e-mail Megrendelésekre.
+  el.onclick=function(){
+    var go=(window._inboundPortalCount>0)?'client-requests':'inbound';
+    if(typeof activateTab==='function') activateTab(go);
+  };
+  document.body.appendChild(el);
+  return el;
+}
+function _inboundSetBadge(tabKey, n){
+  document.querySelectorAll('.sidebar [data-tab="'+tabKey+'"]').forEach(function(tab){
+    var b=tab.querySelector('.ia-badge');
+    if(n>0){
+      if(!b){ b=document.createElement('span'); b.className='ia-badge'; tab.appendChild(b); }
+      b.textContent=n;
+    } else if(b){ b.remove(); }
+  });
+}
+function _inboundUpdateUi(d){
+  var count=d.count||0, portal=d.portal||0, email=Math.max(0,count-portal);
+  window._inboundPortalCount=portal;
+  var el=_inboundEnsureBanner();
+  // Sidebar-badge-ek: az ügyfél-kérések a „client-requests", az e-mail intake az „inbound" fülön
+  _inboundSetBadge('client-requests', portal);
+  _inboundSetBadge('inbound', email);
+  // Lebegő sáv (csak ha van feldolgozatlan)
+  if(count>0){
+    var roTxt = portal>0
+      ? (portal+' cerere(ri) noi de la clienți')
+      : (count+' comand(ă/ri) noi de procesat');
+    var huTxt = portal>0
+      ? (portal+' új ügyfél-kérés — click pentru procesare / kattints')
+      : (count+' feldolgozatlan megrendelés — click / kattints');
+    el.querySelector('.ia-txt').innerHTML=
+      '<div><span class="ia-cnt">'+(portal>0?portal:count)+'</span> '+esc_(roTxt.replace(/^\d+\s/,''))+'</div>'+
+      '<div class="ia-sub">'+esc_(huTxt)+'</div>';
+    el.style.display='flex';
+  } else {
+    el.style.display='none';
+  }
+}
+// Mini HTML-escape a sáv-szöveghez (XSS-védelem — bár fix szöveg, biztos ami biztos)
+function esc_(s){return String(s==null?'':s).replace(/[&<>"]/g,function(m){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[m];});}
+function refreshInboundCount(){
+  // Csak admin/manager konzolon van értelme (a sidebar fül létezik)
+  if(!document.querySelector('.sidebar [data-tab="inbound"]')) return;
+  fetch('/api/inbound-orders/count',{credentials:'same-origin'})
+    .then(function(r){ return r.ok?r.json():null; })
+    .then(function(d){
+      if(!d) return;
+      var count=d.count||0;
+      var prev=(typeof window._inboundPrevCount==='number')?window._inboundPrevCount:null;
+      _inboundUpdateUi(d);
+      // Ha NŐTT a szám (és nem az első betöltés) — rövid toast is jelez
+      if(prev!==null && count>prev){
+        toast('🔔 '+(count-prev)+' nouă cerere de transport / új fuvarkérés','');
+      }
+      window._inboundPrevCount=count;
+    })
+    .catch(function(){});
+}
+function startInboundWatcher(){
+  if(window._inboundTimer) clearInterval(window._inboundTimer);
+  refreshInboundCount();
+  window._inboundTimer=setInterval(refreshInboundCount,45000);
+}
+
 function toggleAllOrders(cb) {
   document.querySelectorAll('.orderRowCb').forEach(function(c){ c.checked = cb.checked; });
   updateOrderSelBar();
