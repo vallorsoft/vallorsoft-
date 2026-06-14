@@ -95,26 +95,26 @@ router.get('/api/developer/export/:id', devGuard, async (req, res) => {
 
     // clients
     const clients = await pool.query(
-      `SELECT id,denumire,cui,reg_com,adresa,telefon,email,contact_person,
-              payment_term_days,created_at
+      `SELECT id,denumire,tip,cui_cif,reg_com,tara,judet,localitate,adresa,
+              email,telefon,iban,payment_term_days,created_at
        FROM clients WHERE company_id=$1 ORDER BY id`, [cid]);
     if (clients.rows.length) {
       files.push({ name: 'csv/clients.csv', buffer: buildCsv(
-        ['id','denumire','cui','reg_com','adresa','telefon','email','contact_person',
-         'payment_term_days','created_at'],
+        ['id','denumire','tip','cui_cif','reg_com','tara','judet','localitate','adresa',
+         'email','telefon','iban','payment_term_days','created_at'],
         clients.rows) });
     }
 
     // vehicles
     const vehicles = await pool.query(
-      `SELECT id,rendszam,marka,tipus,ev,trailer_kind,
+      `SELECT id,rendszam,marca,model,tip,an,trailer_kind,
               cargo_length_cm,cargo_width_cm,cargo_height_cm,
               length_cm,width_cm,height_cm,weight_kg,
               fuel_per_100km,default_trailer_id,assigned_driver_email,created_at
        FROM vehicles WHERE company_id=$1 ORDER BY id`, [cid]);
     if (vehicles.rows.length) {
       files.push({ name: 'csv/vehicles.csv', buffer: buildCsv(
-        ['id','rendszam','marka','tipus','ev','trailer_kind',
+        ['id','rendszam','marca','model','tip','an','trailer_kind',
          'cargo_length_cm','cargo_width_cm','cargo_height_cm',
          'length_cm','width_cm','height_cm','weight_kg',
          'fuel_per_100km','default_trailer_id','assigned_driver_email','created_at'],
@@ -172,37 +172,43 @@ router.get('/api/developer/export/:id', devGuard, async (req, res) => {
 
     // menetlevelek (email_sofer → users.company_id)
     const fl = await pool.query(
-      `SELECT f.id,f.email_sofer,f.order_id,f.doc_date,f.km_start,f.km_end,
-              f.felrako,f.lerako,f.megjegyzes,f.created_at
+      `SELECT f.id,f.email_sofer,f.nume_sofer,f.order_ids,f.data_completare,
+              f.numar_camion,f.numar_remorca,f.numar_fisa,
+              f.km_inceput,f.km_sfarsit,f.total_km,
+              f.loc_plecare,f.loc_sosire,f.total_alim,f.consum_100,f.alte_mentiuni
        FROM fuvarlevelek f
        JOIN users u ON LOWER(u.email)=LOWER(f.email_sofer) AND u.company_id=$1
        ORDER BY f.id`, [cid]).catch(() => ({ rows: [] }));
     if (fl.rows.length) {
       files.push({ name: 'csv/fuvarlevelek.csv', buffer: buildCsv(
-        ['id','email_sofer','order_id','doc_date','km_start','km_end',
-         'felrako','lerako','megjegyzes','created_at'],
+        ['id','email_sofer','nume_sofer','order_ids','data_completare',
+         'numar_camion','numar_remorca','numar_fisa',
+         'km_inceput','km_sfarsit','total_km',
+         'loc_plecare','loc_sosire','total_alim','consum_100','alte_mentiuni'],
         fl.rows) });
     }
 
     // beérkező (email/portal) megrendelések
     const inbound = await pool.query(
-      `SELECT id,source,status,felrako,lerako,indulas,erkezes,
-              raw_subject,ai_confidence,created_at
+      `SELECT id,source,source_email,subject,status,confidence,ai_used,
+              created_order_id,received_at,created_at
        FROM inbound_orders WHERE company_id=$1 ORDER BY id`, [cid]).catch(() => ({ rows: [] }));
     if (inbound.rows.length) {
       files.push({ name: 'csv/inbound_orders.csv', buffer: buildCsv(
-        ['id','source','status','felrako','lerako','indulas','erkezes',
-         'raw_subject','ai_confidence','created_at'],
+        ['id','source','source_email','subject','status','confidence','ai_used',
+         'created_order_id','received_at','created_at'],
         inbound.rows) });
     }
 
     // UIT kódok
     const uit = await pool.query(
-      `SELECT id,order_id,uit_code,status,valid_from,valid_to,created_at
+      `SELECT id,order_id,uit_code,rendszam,provider,status,valid_until,
+              anaf_confirmed,anaf_confirmed_at,created_at
        FROM order_uit_codes WHERE company_id=$1 ORDER BY id`, [cid]).catch(() => ({ rows: [] }));
     if (uit.rows.length) {
       files.push({ name: 'csv/order_uit_codes.csv', buffer: buildCsv(
-        ['id','order_id','uit_code','status','valid_from','valid_to','created_at'],
+        ['id','order_id','uit_code','rendszam','provider','status','valid_until',
+         'anaf_confirmed','anaf_confirmed_at','created_at'],
         uit.rows) });
     }
 
