@@ -159,8 +159,14 @@ handlers.devGetCompanyIntegrations = async function (req, res, args) {
       if (m.rows[0].enabled && ['here', 'google'].includes(meta.vendor)) vendor = meta.vendor;
       has_key = !!m.rows[0].has_key;
     }
-    const u = await pool.query('SELECT uit_deeplink_template FROM companies WHERE id=$1', [cid]);
-    return res.json({ result: { ok: true, maps: { vendor, has_key }, uit_template: u.rows.length ? u.rows[0].uit_deeplink_template : null } });
+    const u = await pool.query('SELECT uit_deeplink_templates, uit_deeplink_template FROM companies WHERE id=$1', [cid]);
+    const urow = u.rows.length ? u.rows[0] : {};
+    const { GPS_PROVIDERS } = require('../services/gpsAdapter');
+    return res.json({ result: { ok: true,
+      maps: { vendor, has_key },
+      uit_templates: urow.uit_deeplink_templates || {},
+      uit_template_legacy: urow.uit_deeplink_template || null,
+      gps_providers: GPS_PROVIDERS } });
   } catch (err) { console.error('devGetCompanyIntegrations hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
@@ -196,16 +202,38 @@ handlers.devSaveCompanyMaps = async function (req, res, args) {
   } catch (err) { console.error('devSaveCompanyMaps hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
+// args: [cid, { provider, template }]
+// Provider-szintű UIT deep-link sablon mentése a companies.uit_deeplink_templates JSONB-be.
+// Üres template = a provider-kulcs törlése a map-ből. Visszafelé kompat: ha nincs provider,
+// a régi egy-sablonos uit_deeplink_template oszlopra esik vissza.
 handlers.devSaveCompanyUit = async function (req, res, args) {
   try {
     if (!_dev(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = parseInt(args && args[0], 10);
     if (!cid) return res.json({ result: { ok: false, err: 'company_id lipsește' } });
     const a = (args && args[1]) || {};
-    let tpl = a.template != null ? String(a.template).trim().slice(0, 1000) : null;
-    if (tpl === '') tpl = null;
+    let tpl = a.template != null ? String(a.template).trim().slice(0, 1000) : '';
     if (tpl && !/^https?:\/\//i.test(tpl)) return res.json({ result: { ok: false, err: 'Șablonul trebuie să înceapă cu http(s)://' } });
-    await pool.query('UPDATE companies SET uit_deeplink_template=$1 WHERE id=$2', [tpl, cid]);
+
+    // Visszafelé kompat: provider nélkül a régi oszlopra megyünk.
+    if (a.provider == null) {
+      await pool.query('UPDATE companies SET uit_deeplink_template=$1 WHERE id=$2', [tpl || null, cid]);
+      return res.json({ result: { ok: true } });
+    }
+
+    // Provider validáció a GPS-katalógusból.
+    const { listProviders } = require('../services/gpsAdapter');
+    const provider = String(a.provider);
+    if (!listProviders().includes(provider)) {
+      return res.json({ result: { ok: false, err: 'Furnizor GPS invalid.' } });
+    }
+
+    // Aktuális map betöltése → kulcs beállítása vagy törlése → visszaírás.
+    const cur = await pool.query('SELECT uit_deeplink_templates FROM companies WHERE id=$1', [cid]);
+    if (!cur.rows.length) return res.json({ result: { ok: false, err: 'Compania nu a fost gasita.' } });
+    const map = cur.rows[0].uit_deeplink_templates || {};
+    if (tpl) map[provider] = tpl; else delete map[provider];
+    await pool.query('UPDATE companies SET uit_deeplink_templates=$1 WHERE id=$2', [JSON.stringify(map), cid]);
     return res.json({ result: { ok: true } });
   } catch (err) { console.error('devSaveCompanyUit hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };

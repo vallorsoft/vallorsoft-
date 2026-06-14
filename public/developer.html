@@ -667,11 +667,24 @@ function loadDetailInteg(){
     if(!r||!r.ok){ el.innerHTML='<div style="color:var(--err);padding:20px;">'+escHtml((r&&r.err)||t('common.error'))+'</div>'; return; }
     var vendor=(r.maps&&r.maps.vendor)||'free';
     var hasKey=!!(r.maps&&r.maps.has_key);
-    var tpl=r.uit_template||'';
+    var uitTpls=r.uit_templates||{};
+    var uitLegacy=r.uit_template_legacy||'';
+    var gpsProviders=(r.gps_providers&&r.gps_providers.length)?r.gps_providers:[{provider:'cargotrack',label:'CargoTrack'}];
     var card='border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;background:rgba(255,255,255,0.02);';
     var inp='width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.25);color:#fff;font-size:13px;margin-bottom:8px;';
     var btn='padding:8px 16px;border:none;border-radius:8px;background:#a855f7;color:#fff;font-size:13px;font-weight:700;cursor:pointer;';
     function sel(v,l){ return '<option value="'+v+'"'+(vendor===v?' selected':'')+'>'+l+'</option>'; }
+    // UIT deep-link mezők GPS-providerenként — minden providerhez külön input + Mentés gomb.
+    var uitRows=gpsProviders.map(function(gp){
+      var prov=gp.provider;
+      var val=(uitTpls&&uitTpls[prov]!=null)?uitTpls[prov]:(uitLegacy||'');
+      var ph='https://cargotrack.ro/uit?uit={uit}&plate={rendszam}&from={incarcare}&to={descarcare}';
+      return '<div style="margin-bottom:10px;">'
+        +'<div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:4px;">'+escHtml(gp.label||prov)+'</div>'
+        +'<input id="devUitTpl_'+escHtml(prov)+'" placeholder="'+ph+'" value="'+escHtml(val)+'" style="'+inp+'">'
+        +'<button onclick="devSaveUit(\''+escHtml(prov)+'\')" style="'+btn+'">💾 '+escHtml(t('dev.save'))+'</button>'
+      +'</div>';
+    }).join('');
     el.innerHTML=
       '<div style="'+card+'">'
         +'<div style="font-weight:700;color:#fff;margin-bottom:4px;">🗺️ '+escHtml(t('dev.integMapsTitle'))+'</div>'
@@ -682,9 +695,8 @@ function loadDetailInteg(){
       +'</div>'
       +'<div style="'+card+'">'
         +'<div style="font-weight:700;color:#fff;margin-bottom:4px;">🚚 '+escHtml(t('dev.integUitTitle'))+'</div>'
-        +'<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">'+escHtml(t('dev.integUitHint'))+'</div>'
-        +'<input id="devUitTpl" placeholder="https://cargotrack.ro/uit?plate={rendszam}&from={incarcare}&to={descarcare}" value="'+escHtml(tpl)+'" style="'+inp+'">'
-        +'<button onclick="devSaveUit()" style="'+btn+'">💾 '+escHtml(t('dev.save'))+'</button>'
+        +'<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">'+escHtml(t('dev.integUitHint'))+' ({uit}, {rendszam}, {incarcare}, {descarcare}…)</div>'
+        +uitRows
       +'</div>';
   }).catch(function(){ el.innerHTML='<div style="color:var(--err);padding:20px;">'+escHtml(t('common.error'))+'</div>'; });
 }
@@ -696,9 +708,11 @@ function devSaveMaps(){
     else toast((r&&r.err)||t('common.error'),'err');
   });
 }
-function devSaveUit(){
-  var tpl=document.getElementById('devUitTpl').value;
-  gas('devSaveCompanyUit',[_detailCegId,{template:tpl}]).then(function(r){
+function devSaveUit(prov){
+  var inputEl=document.getElementById('devUitTpl_'+prov);
+  if(!inputEl) return;
+  var tpl=inputEl.value;
+  gas('devSaveCompanyUit',[_detailCegId,{provider:prov,template:tpl}]).then(function(r){
     if(r&&r.ok){ toast('✅ '+t('common.savedOk'),'ok'); }
     else toast((r&&r.err)||t('common.error'),'err');
   });

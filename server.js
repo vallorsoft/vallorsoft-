@@ -208,11 +208,12 @@ app.use((err, req, res, next) => {
 });
 
 // E-mail intake (beérkező megrendelések) — csak akkor fut, ha az INTAKE_IMAP_* be van állítva.
-const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler } = require('./services/scheduler');
+const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler } = require('./services/scheduler');
 startIntakeScheduler();
 startExpiryScheduler();
 startGpsMileageScheduler();
 startMonthlyReportScheduler();
+startEFacturaStatusScheduler();
 
 // Opcionális automatikus DB-mentés (alapból KI; BACKUP_ENABLED=true + BACKUP_DIR).
 require('./services/backup').startBackupScheduler();

@@ -51,8 +51,22 @@ class SmartBillAdapter {
     } catch (e) { return { ok: false, message: 'Eroare SmartBill: ' + e.message }; }
   }
 
-  async getInvoice(invoice_number) {
-    return { ok: false, message: 'Interogarea facturii SmartBill necesită parametrii serie+număr — completează-i în interfață.' };
+  // serie + numar külön — SmartBill query paraméterként fogadja.
+  async getInvoice(serie, numar) {
+    if (!this.c.company_vat_code) return { ok: false, message: 'Lipsește CUI-ul firmei SmartBill.' };
+    if (!serie || !numar) return { ok: false, message: 'SmartBill necesită serie și număr separate.' };
+    try {
+      const url = BASE + '/invoice?cif=' + encodeURIComponent(this.c.company_vat_code)
+        + '&seriesName=' + encodeURIComponent(serie)
+        + '&number=' + encodeURIComponent(numar);
+      const r = await jsonT(url, { method: 'GET', headers: this._auth() });
+      if (r.status === 401 || r.status === 403) return { ok: false, message: 'Autentificare SmartBill eșuată.' };
+      if (r.status === 404) return { ok: false, message: 'Factura nu a fost găsită în SmartBill.' };
+      if (r.status === 429) return { ok: false, message: 'Limita API SmartBill atinsă.' };
+      if (!r.ok) return { ok: false, message: (r.data && (r.data.errorText || r.data.message)) || ('Eroare SmartBill (' + r.status + ')') };
+      const inv = (r.data && r.data.invoice) || r.data || {};
+      return { ok: true, invoice: inv, raw: r.data };
+    } catch (e) { return { ok: false, message: 'Eroare SmartBill: ' + e.message }; }
   }
 }
 

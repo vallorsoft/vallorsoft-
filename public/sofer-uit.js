@@ -1,11 +1,9 @@
 // public/sofer-uit.js — Sofőr UIT-nézet a kiosztott fuvarhoz.
 // Globál: window.SoferUit.open(orderId)
 //  - a sofőr CSAK a saját fuvarja UIT-jait látja (a backend ellenőrzi);
-//  - státusz + ANAF-visszaigazolás látszik kódonként;
+//  - a UIT-ügyintézés a GPS-szolgáltató saját portálján (deep-link) történik — nem küldünk ANAF-nak;
 //  - ÚJ UIT-ot CSAK akkor adhat hozzá, ha még egy sincs (a backend is védi).
 window.SoferUit = (function () {
-  // FUNKCIÓ IDEIGLENESEN KIKAPCSOLVA — visszakapcsolás: window.UIT_COMING_SOON = false.
-  window.UIT_COMING_SOON = true;
 
   function ensureStyle() {
     if (document.getElementById('sofer-uit-style')) return;
@@ -19,13 +17,8 @@ window.SoferUit = (function () {
       '.su-sub{color:#9fb0c3;font-size:12px;margin:0 0 14px}' +
       '.su-row{border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:11px 12px;margin-bottom:9px}' +
       '.su-top{display:flex;align-items:center;gap:9px}' +
-      '.su-sym{font-size:17px}' +
       '.su-code{font-family:ui-monospace,monospace;font-weight:700;letter-spacing:.5px;word-break:break-all;flex:1}' +
-      '.su-vf{font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;white-space:nowrap}' +
-      '.su-vf--ok{background:rgba(34,197,94,.18);color:#4ade80}' +
-      '.su-vf--wait{background:rgba(245,158,11,.18);color:#fbbf24}' +
-      '.su-vf--err{background:rgba(239,68,68,.18);color:#f87171}' +
-      '.su-msg{font-size:11px;color:#9fb0c3;margin-top:6px}' +
+      '.su-open{cursor:pointer;border:1px solid rgba(34,197,94,.5);color:#4ade80;border-radius:8px;padding:6px 11px;font-size:12px;font-weight:700;background:transparent;white-space:nowrap}' +
       '.su-add{display:flex;gap:7px;margin-top:6px}' +
       '.su-in{flex:1;background:#070d14;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:11px;color:#fff;font-family:ui-monospace,monospace;text-transform:uppercase;font-size:15px}' +
       '.su-save{background:#e10b1a;color:#fff;border:0;border-radius:10px;padding:11px 14px;font-weight:700}' +
@@ -40,50 +33,22 @@ window.SoferUit = (function () {
     if (!r.ok) throw new Error(d.error || ('Hiba ('+r.status+')'));
     return d;
   }
-  // ANAF-hitelesítési badge — ZÖLD csak valódi ANAF-visszaigazolásra.
-  function verif(u){
-    if (u.anaf_confirmed) return { cls:'ok', txt:'✔ ANAF visszaigazolva' };
-    if (u.status === 'error') return { cls:'err', txt:'ANAF: hiba' };
-    if (u.status === 'active') return { cls:'wait', txt:'ANAF: megerősítésre vár' };
-    if (u.status === 'stopped') return { cls:'wait', txt:'Leállítva' };
-    return { cls:'wait', txt:'Nincs még elküldve' };
-  }
-  function symbol(u){
-    if (u.anaf_confirmed) return '✅';
-    if (u.status === 'error') return '❌';
-    if (u.status === 'active') return '⏳';
-    if (u.status === 'stopped') return '⏹️';
-    return '⏳';
-  }
+  function notify(msg) { if (typeof window.toast === 'function') window.toast(msg); else alert(msg); }
 
-  function comingSoon() {
-    ensureStyle();
-    var ov = document.createElement('div'); ov.className = 'su-ov';
-    ov.innerHTML =
-      '<div class="su-box" style="text-align:center;">' +
-        '<div style="font-size:34px;margin:6px 0;">🚧</div>' +
-        '<h3 style="margin:0 0 8px;">UIT / RO e-Transport</h3>' +
-        '<p class="su-sub" style="margin-bottom:16px;">A UIT-kódot a GPS-szolgáltató (CargoTrack) e-Transport felületén generálod. ' +
-          'A gyors átléptetéshez a diszpécser állítsa be a deep-link sablont.</p>' +
-        '<button class="su-save" id="suCsOk" style="width:100%;">Rendben</button>' +
-      '</div>';
-    document.body.appendChild(ov);
-    var close = function () { ov.remove(); };
-    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
-    ov.querySelector('#suCsOk').addEventListener('click', close);
+  // A UIT-kód deep-linkjének megnyitása (a fuvar-adatok + UIT-kód előtöltve).
+  async function openLink(orderId, code) {
+    try {
+      var d = await api('POST', '/api/execute', { functionName: 'getUitDeeplink', arguments: [orderId, code] });
+      var r = d && d.result;
+      if (r && r.ok && r.url) { window.open(r.url, '_blank', 'noopener'); return true; }
+      notify('Linkul UIT nu este configurat de furnizor. / Nincs beállított deep-link.');
+    } catch (_) {
+      notify('Linkul UIT nu este configurat de furnizor. / Nincs beállított deep-link.');
+    }
+    return false;
   }
 
   function open(orderId) {
-    // UIT ANAF-integráció HELYETT: cégenkénti deep-link (CargoTrack stb.)
-    api('POST', '/api/execute', { functionName: 'getUitDeeplink', arguments: [orderId] })
-      .then(function (d) {
-        var r = d && d.result;
-        if (r && r.ok && r.url) { window.open(r.url, '_blank', 'noopener'); return; }
-        comingSoon();
-      })
-      .catch(function () { comingSoon(); });
-    return;
-    /* eslint-disable no-unreachable */
     ensureStyle();
     var ov = document.createElement('div'); ov.className = 'su-ov';
     ov.innerHTML =
@@ -92,8 +57,8 @@ window.SoferUit = (function () {
         '<p class="su-sub">RO e-Transport · csak a te fuvarodhoz tartozó kódok.</p>' +
         '<div id="suList"><div class="su-empty">Betöltés…</div></div>' +
         '<div id="suAddWrap"></div>' +
-        '<p class="su-note">A „✔ ANAF visszaigazolva" jelzés azt jelenti, hogy az ANAF megerősítette a fogadást. ' +
-          'Amíg ez nincs meg, a kód még nincs hitelesítve.</p>' +
+        '<p class="su-note">A UIT-ügyintézés a GPS-szolgáltató portálján (deep-link) történik — a „Megnyitás" gomb ' +
+          'a fuvar adataival előtöltve nyitja meg.</p>' +
       '</div>';
     document.body.appendChild(ov);
     var $ = function(id){ return ov.querySelector('#'+id); };
@@ -107,21 +72,26 @@ window.SoferUit = (function () {
         $('suList').innerHTML = '<div class="su-empty">Még nincs UIT-kód ehhez a fuvarhoz.</div>';
       } else {
         $('suList').innerHTML = items.map(function(u){
-          var v = verif(u);
-          return '<div class="su-row">' +
+          return '<div class="su-row" data-code="' + esc(u.uit_code) + '">' +
             '<div class="su-top">' +
-              '<span class="su-sym">' + symbol(u) + '</span>' +
               '<span class="su-code">' + esc(u.uit_code) + '</span>' +
-              '<span class="su-vf su-vf--' + v.cls + '">' + v.txt + '</span>' +
+              '<button class="su-open" data-act="open">🔗 Megnyitás</button>' +
             '</div>' +
-            (u.last_message ? '<div class="su-msg">' + esc(u.last_message) + '</div>' : '') +
           '</div>';
         }).join('');
+        ov.querySelectorAll('.su-row [data-act="open"]').forEach(function(btn){
+          btn.addEventListener('click', async function(){
+            var code = btn.closest('.su-row').dataset.code;
+            btn.disabled = true;
+            await openLink(orderId, code);
+            btn.disabled = false;
+          });
+        });
       }
       // Hozzáadás CSAK akkor, ha nincs még UIT (a backend is ezt nézi).
       if (data.canAdd) {
         $('suAddWrap').innerHTML =
-          '<div class="su-add"><input class="su-in" id="suNew" placeholder="UIT-kód beírása…"><button class="su-save" id="suSave">+ Mentés</button></div>';
+          '<div class="su-add"><input class="su-in" id="suNew" placeholder="UIT-kód beírása…"><button class="su-save" id="suSave">➤ Küldés</button></div>';
         var add = async function(){
           var code = $('suNew').value.trim(); if (!code) return;
           var b = $('suSave'); b.disabled = true;
@@ -129,7 +99,8 @@ window.SoferUit = (function () {
             await api('POST', '/api/sofer/orders/' + encodeURIComponent(orderId) + '/uit', { uit_code: code });
             await load();
             if (typeof window.__soferUitChanged === 'function') window.__soferUitChanged();
-          } catch (e) { alert(e.message); b.disabled = false; }
+            await openLink(orderId, code);
+          } catch (e) { notify(e.message); b.disabled = false; }
         };
         $('suSave').addEventListener('click', add);
         $('suNew').addEventListener('keydown', function(e){ if (e.key === 'Enter') add(); });

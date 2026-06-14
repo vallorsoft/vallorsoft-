@@ -60,8 +60,28 @@ class OblioAdapter {
     } catch (e) { return { ok: false, message: 'Eroare Oblio: ' + e.message }; }
   }
 
-  async getInvoice(invoice_number) {
-    return { ok: false, message: 'Interogarea facturii Oblio necesită parametrii serie+număr.' };
+  // serie + numar külön — Oblio query paraméterként fogadja.
+  async getInvoice(serie, numar) {
+    if (!this.c.company_vat_code) return { ok: false, message: 'Lipsește CUI-ul firmei Oblio.' };
+    if (!serie || !numar) return { ok: false, message: 'Oblio necesită serie și număr separate.' };
+    try {
+      const token = await this._token();
+      const url = BASE + '/api/docs?cif=' + encodeURIComponent(this.c.company_vat_code)
+        + '&seriesName=' + encodeURIComponent(serie)
+        + '&number=' + encodeURIComponent(numar)
+        + '&type=Factura';
+      const r = await jsonT(url, {
+        method: 'GET',
+        headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' },
+      });
+      if (r.status === 404) return { ok: false, message: 'Factura nu a fost găsită în Oblio.' };
+      if (r.status === 429) return { ok: false, message: 'Limita API Oblio atinsă.' };
+      if (!r.ok || (r.data && r.data.status && r.data.status >= 400)) {
+        return { ok: false, message: (r.data && (r.data.statusMessage || r.data.message)) || ('Eroare Oblio (' + r.status + ')') };
+      }
+      const inv = (r.data && r.data.data) || r.data || {};
+      return { ok: true, invoice: inv, raw: r.data };
+    } catch (e) { return { ok: false, message: 'Eroare Oblio: ' + e.message }; }
   }
 }
 

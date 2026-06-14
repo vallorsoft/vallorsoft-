@@ -43,11 +43,12 @@ class IFacturaAdapter {
     } catch (e) { return { ok: false, message: 'Eroare iFactura: ' + e.message }; }
   }
 
-  async getInvoice(invoice_number) {
+  async getInvoice(serie, numar) {
+    const inv_number = encodeURIComponent((serie || '') + (numar || serie || ''));
     try {
-      const r = await jsonT(BASE + '/v1/invoices/' + encodeURIComponent(invoice_number), { method: 'GET', headers: this._headers() });
+      const r = await jsonT(BASE + '/v1/invoices/' + inv_number, { method: 'GET', headers: this._headers() });
       if (!r.ok) return { ok: false, message: 'Nu a fost găsit (' + r.status + ').' };
-      return { ok: true, invoice: r.data };
+      return { ok: true, invoice: r.data, raw: r.data };
     } catch (e) { return { ok: false, message: e.message }; }
   }
 }

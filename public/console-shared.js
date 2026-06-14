@@ -2469,7 +2469,6 @@ function decorateInvoiceIndicators(list){
 }
 
 function decorateUitIndicators(list){
-  if(window.UIT_COMING_SOON) return;
   if(!window.UitPanel) return;
   var ids=(list||[]).map(function(c){return c.id;}).filter(Boolean);
   if(!ids.length) return;
