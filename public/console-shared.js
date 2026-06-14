@@ -996,17 +996,18 @@ function loadClientPortalAccess(){
     +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">'+t('cs.cp.hint')+'</div>'
     +'<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:16px;">'
     +'<div class="field" style="margin:0;min-width:200px;"><label>'+t('cs.cp.client')+'</label><select class="select" id="cpClientSel"><option value="">'+t('cs.cp.pickClient')+'</option></select></div>'
-    +'<div class="field" style="margin:0;min-width:200px;"><label>'+t('cs.cp.contactEmail')+'</label><input class="input" id="cpEmail" placeholder="pl. logisztika@gyar.ro"></div>'
+    +'<div class="field" style="margin:0;min-width:200px;"><label>'+t('cs.cp.contactEmail')+' <span style="color:var(--brand-red);">*</span></label><input class="input" id="cpEmail" type="email" required placeholder="pl. logisztika@gyar.ro"></div>'
     +'<div class="field" style="margin:0;min-width:150px;"><label>'+t('cs.cp.nameOpt')+'</label><input class="input" id="cpNev"></div>'
     +'<button class="btn ok" style="height:42px;" onclick="cpInvite()">'+t('cs.cp.sendInvite')+'</button>'
     +'</div>'
     +'<div id="cpInviteLink"></div>'
     +'<div id="cpList"><div class="text-muted" style="font-size:12px;">'+t('fe.loading')+'</div></div>'
     +'</div>';
-  // ügyfél-lista a választóhoz
+  // ügyfél-lista a választóhoz ( /api/clients válasza: { clients:[...] } )
   fetch('/api/clients',{credentials:'same-origin'}).then(function(r){return r.json();}).then(function(list){
-    _cpClients=Array.isArray(list)?list:(list&&list.rows)||[];
+    _cpClients=Array.isArray(list)?list:((list&&(list.clients||list.rows))||[]);
     var sel=document.getElementById('cpClientSel'); if(!sel) return;
+    if(!_cpClients.length){ sel.innerHTML='<option value="">'+t('cs.cp.noClients')+'</option>'; return; }
     sel.innerHTML='<option value="">'+t('cs.cp.pickClient')+'</option>'+_cpClients.map(function(c){
       return '<option value="'+c.id+'">'+esc(c.nev||('#'+c.id))+'</option>'; }).join('');
   }).catch(function(){});
