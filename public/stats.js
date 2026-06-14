@@ -240,7 +240,7 @@
         type: 'line',
         data: { labels: months, datasets: [{
           label: t('st.cRevenue'), data: stSeries(months, r.havi_bevetel, 'osszeg'),
-          borderColor: '#e10b1a', backgroundColor: 'rgba(225,11,26,0.15)', fill: true, tension: 0.3
+          borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.15)', fill: true, tension: 0.3
         }]}
       });
       stChart('stChOvKoltseg', {
@@ -461,7 +461,7 @@
         data: {
           labels: (r.fizetesi_mod || []).map(function (p) { return p.plata; }),
           datasets: [{ data: (r.fizetesi_mod || []).map(function (p) { return parseFloat(p.suma) || 0; }),
-            backgroundColor: ['#e10b1a', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#8a97a8'] }]
+            backgroundColor: ['#6366f1', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8a97a8'] }]
         }
       });
     });
@@ -537,7 +537,7 @@
         data: {
           labels: (r.fizetesi_mod || []).map(function (p) { return p.plata; }),
           datasets: [{ data: (r.fizetesi_mod || []).map(function (p) { return parseFloat(p.suma) || 0; }),
-            backgroundColor: ['#e10b1a', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#8a97a8'] }]
+            backgroundColor: ['#6366f1', '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8a97a8'] }]
         }
       });
     });

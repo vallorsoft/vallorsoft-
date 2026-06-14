@@ -610,7 +610,7 @@ function loadHereByCompany(){
         var billInfo=f.billable_trx>0
           ? t('dev.billable')+': '+f.billable_trx+' '+t('dev.trxShort')+' = '+f.units+'×1000 '+t('dev.units')
           : '<span style="color:var(--ok);">'+escHtml(t('dev.underPoolNoFee'))+'</span>';
-        return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;background:rgba(255,255,255,0.02);">'
+        return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;background:#f8fafc;">'
           +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
           +'<div style="color:#0f172a;font-weight:600;font-size:13px;">'+ic+' '+escHtml(f.display_name)+'</div>'
           +'<button class="btn-dev" style="padding:3px 10px;font-size:11px;" onclick="toggleFeatUsers(\''+uid+'\',this)">▼ '+escHtml(t('dev.details'))+'</button></div>'
@@ -785,7 +785,7 @@ function loadDetailInteg(){
     var uitTpls=r.uit_templates||{};
     var uitLegacy=r.uit_template_legacy||'';
     var gpsProviders=(r.gps_providers&&r.gps_providers.length)?r.gps_providers:[{provider:'cargotrack',label:'CargoTrack'}];
-    var card='border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;background:rgba(255,255,255,0.02);';
+    var card='border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;background:#f8fafc;';
     var inp='width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#0f172a;font-size:13px;margin-bottom:8px;';
     var btn='padding:8px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;';
     function sel(v,l){ return '<option value="'+v+'"'+(vendor===v?' selected':'')+'>'+l+'</option>'; }
@@ -852,7 +852,7 @@ function loadDetailFunkciok(){
         var right = f.core
           ? '<span style="font-size:11px;color:var(--muted);">'+escHtml(t('dev.alwaysActive'))+'</span>'
           : '<label class="fsw"><input type="checkbox" '+(enabled?'checked':'')+' onchange="toggleFeature('+_detailCegId+',\''+f.key+'\',this.checked,this)"><span class="fsw-s"></span></label>';
-        html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:rgba(255,255,255,0.02);">'
+        html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:#f8fafc;">'
           +'<span style="font-size:13px;color:#0f172a;">'+escHtml(f.label)+(f.core?' <span style="color:var(--muted);font-size:11px;">('+escHtml(t('dev.coreLabel'))+')</span>':'')+'</span>'
           + right + '</div>';
       });
@@ -927,7 +927,7 @@ function loadDetailHibak(){
     }
     el.innerHTML = list.map(function(b){
       var dt  = b.created_at ? new Date(b.created_at).toLocaleString('hu-HU') : '—';
-      var bg  = b.is_read ? 'rgba(255,255,255,0.02)' : 'rgba(239,68,68,0.06)';
+      var bg  = b.is_read ? '#f8fafc' : 'rgba(239,68,68,0.06)';
       var bdr = b.is_read ? 'var(--border)' : 'rgba(239,68,68,0.3)';
       return '<div id="bug-'+b.id+'" style="background:'+bg+';border:1px solid '+bdr+';border-radius:10px;padding:14px;margin-bottom:10px;">'
         +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">'
@@ -952,7 +952,7 @@ function markRead(id){
     if(r&&r.ok){
       var el=document.getElementById('bug-'+id);
       if(el){
-        el.style.background='rgba(255,255,255,0.02)';
+        el.style.background='#f8fafc';
         el.style.border='1px solid var(--border)';
         var btn=el.querySelector('button');
         if(btn){ btn.outerHTML='<span style="font-size:10px;color:var(--muted);">✓ '+escHtml(t('dev.read'))+'</span>'; }
