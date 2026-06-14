@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-06-14 — FGO-menü ikonjavítás + átfogó átvilágítás (PR #92–#93)
+
+- **FGO-menü javítás (PR #92):** a közvetlen menüpontoknál (Vezérlőpult/Ügyfelek/Belső Chat/Beállítások) a `data-i18n` a `.tab`-on volt → az i18n felülírta a teljes tartalmat és kitörölte az SVG ikont; a `data-i18n` a belső `<span>`-ra került (ikon megmarad). A sidebar 20px-es menü-rése 3px-re szűkítve (FGO-tömör).
+- **Átfogó átvilágítás + élesben tesztelés (PR #93):** 3 agentes teljes átvizsgálás (HTML / kliens-JS / szerver) + futó szerveres tesztelés. Javítva: `cookies.html` olvashatatlan `.cookie-pref-btn` → indigó; login 2FA-hint kontraszt (WCAG-AA); jogi oldalak maradék márka-pirosa → indigó; kliens-JS szín-maradékok (email-intake/billing/client-mail/uit-panel/sofer/planner/console-shared) → landing kék/indigó/teal; cache-bust bump. **Élesben verifikálva:** publikus oldalak 200, védettek 302→login, nincs 500, `globalSearch`/`comList`/`dashStats` autentikáltan működik; require-sweep 82 modul 0 hiba; i18n teljes; 24 suite / 108 teszt zöld.
+
+---
+
 ## 2026-06-14 — Fix felső sáv + ikonos FGO-menü + globális kereső (admin, PR #91)
 
 - **Ikonos FGO-stílusú navigáció** az admin konzolon (`admin.html`): 10 főmenü / 32 menüpont, monokróm vonalas (Feather) inline SVG ikonokkal, generikus lenyitással (`toggleGroup`). Csoportosítás: Vezérlőpult · Fuvarok ▾ · Megrendelések ▾ · Dokumentumok ▾ · Flotta ▾ · Statisztika & Pénzügy ▾ · Ügyfelek · Kommunikáció · Adminisztráció ▾ · Beállítások. Üzemanyagkártya átkerült a Flottából az Adminisztrációba. A `data-tab` kulcsok/funkciók változatlanok.
