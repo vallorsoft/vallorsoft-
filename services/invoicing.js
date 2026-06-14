@@ -282,12 +282,29 @@ async function emitStorno(pool, companyId, userId, orderId) {
 // hogy provider-verziók közti eltérés ne törje el.
 function extractEFacturaStatus(raw) {
   if (!raw || typeof raw !== 'object') return null;
+
+  // Ha az érték egy nem-üres primitív: visszaadjuk stringként.
+  // Ha objektum: az objektumot rekurzívan bejárjuk és összefűzzük a releváns mezőket.
+  function valToStr(v) {
+    if (v == null) return null;
+    if (typeof v !== 'object') { const s = String(v).trim(); return s || null; }
+    // Objektum: keresünk benne stare/status/mesaj/message kulcsot
+    const s = v.stare || v.status || v.stareDescarcare || v.mesaj || v.message || v.description;
+    if (s != null && typeof s !== 'object' && String(s).trim()) {
+      const idx = v.indexIncarcare || v.IndexIncarcare || v.index_incarcare;
+      return String(s).trim() + (idx ? ' (index: ' + idx + ')' : '');
+    }
+    return null;
+  }
+
   const scan = (obj, depth) => {
-    if (!obj || typeof obj !== 'object' || depth > 3) return null;
+    if (!obj || typeof obj !== 'object' || depth > 4) return null;
     for (const k of Object.keys(obj)) {
       const v = obj[k];
-      if (/efactura|e_factura/i.test(k) && v != null && String(v).trim() !== '') {
-        return String(v).trim().slice(0, 120);
+      // e-Factura / StareEFactura / efactura_status / eFactura / e_factura — provider-függetlenül
+      if (/efactura|e_factura|starefactura/i.test(k) && v != null) {
+        const s = valToStr(v);
+        if (s) return s.slice(0, 120);
       }
       if (v && typeof v === 'object') {
         const sub = scan(v, depth + 1);
@@ -296,7 +313,7 @@ function extractEFacturaStatus(raw) {
     }
     // IndexIncarcare: az ANAF SPV feltöltési index — ha van, a számla be lett küldve
     for (const k of Object.keys(obj)) {
-      if (/indexincarcare/i.test(k) && obj[k]) return 'trimisă (index: ' + obj[k] + ')';
+      if (/indexincarcare/i.test(k) && obj[k]) return ('trimisă (index: ' + obj[k] + ')').slice(0, 120);
     }
     return null;
   };

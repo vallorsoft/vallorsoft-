@@ -149,7 +149,7 @@ router.post('/api/invoices/:id/status', requireLogin, async (req, res) => {
     const cfg = await svc.getInvoiceConfig(pool, cid);
     if (!cfg) return res.json({ ok: false, message: 'Nu este configurata nicio integrare de facturare.' });
 
-    // 1) Legacy adapter (pl. fgo) getStatus; 2) keretrendszer-adapter getInvoice.
+    // 1) Legacy adapter (pl. fgo) getStatus; 2) keretrendszer-adapter getInvoice(serie, numar).
     let st = null;
     let legacyAdapter = null;
     try { legacyAdapter = getAdapter(row.provider); } catch (_) { /* framework-provider */ }
@@ -159,8 +159,8 @@ router.post('/api/invoices/:id/status', requireLogin, async (req, res) => {
       try {
         const fw = billing.getAdapter(row.provider, cfg.creds);
         if (fw && typeof fw.getInvoice === 'function') {
-          const r2 = await fw.getInvoice((row.serie || '') + (row.numar || ''));
-          st = r2.ok ? Object.assign({ ok: true }, r2.invoice) : r2;
+          const r2 = await fw.getInvoice(row.serie || '', row.numar || '');
+          st = r2.ok ? Object.assign({ ok: true }, r2.invoice, { raw: r2.raw }) : r2;
         }
       } catch (_) {}
     }
@@ -170,9 +170,16 @@ router.post('/api/invoices/:id/status', requireLogin, async (req, res) => {
     // e-Factura (ANAF SPV) státusz kinyerése + tárolása — ezt mutatja a
     // fuvarlista 📨 jelzője és a számla-modal.
     const ef = svc.extractEFacturaStatus(st.raw);
-    if (ef && ef !== row.efactura_status) {
-      await pool.query('UPDATE invoices SET efactura_status=$1 WHERE id=$2 AND company_id=$3', [ef, row.id, cid]);
-    }
+    const updateFields = [];
+    const updateVals = [];
+    let p = 1;
+    if (ef && ef !== row.efactura_status) { updateFields.push('efactura_status=$' + p++); updateVals.push(ef); }
+    if (st.raw) { updateFields.push('efactura_last_raw=$' + p++); updateVals.push(JSON.stringify(st.raw)); }
+    updateFields.push('efactura_checked_at=$' + p++); updateVals.push(new Date());
+    updateVals.push(row.id, cid);
+    await pool.query(
+      'UPDATE invoices SET ' + updateFields.join(', ') + ' WHERE id=$' + p++ + ' AND company_id=$' + p++,
+      updateVals);
     res.json({ ok: true, value: st.value, paid: st.paid, efactura: ef || row.efactura_status || null });
   } catch (e) { res.status(502).json({ error: e.message }); }
 });

@@ -262,4 +262,141 @@ function startMonthlyReportScheduler() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler };
+// ============================================================
+//  e-Factura státusz automatikus lekérdező (3 óránként).
+//  Minden kiadott számla esetén, amelyhez még nincs ANAF SPV státusz,
+//  lekérdezi a számlázó-providertől (FGO/SmartBill/Oblio/iFactura/Facturis)
+//  és elmenti az invoices.efactura_status + efactura_last_raw oszlopokba.
+//  Retry-logika: ha a státusz üres maradt, 6 óra múlva újra próbálkozik;
+//  60 nap után hagyja abba (az ANAF általában 3 napon belül válaszol).
+// ============================================================
+function startEFacturaStatusScheduler() {
+  let billing;
+  try { billing = require('./billing'); } catch (_) { return null; }
+  let svc;
+  try { svc = require('./invoicing'); } catch (_) { return null; }
+  const { decrypt } = require('../lib/crypto');
+
+  let running = false;
+
+  async function tick() {
+    if (running) { console.warn('[eFactura] az előző kör még fut — ez a ciklus kimarad.'); return; }
+    running = true;
+    try { await tickBody(); } finally { running = false; }
+  }
+
+  async function tickBody() {
+    // Azok a kiadott számlák, amelyeket még soha nem ellenőriztünk VAGY
+    // 6+ órája ellenőriztük de státusz nélkül maradtak — legfeljebb 60 naposak.
+    let invoices;
+    try {
+      ({ rows: invoices } = await pool.query(
+        `SELECT i.id, i.company_id, i.provider, i.serie, i.numar, i.efactura_status, i.efactura_checked_at
+         FROM invoices i
+         WHERE i.status = 'issued'
+           AND i.created_at > now() - interval '60 days'
+           AND (
+             i.efactura_checked_at IS NULL
+             OR (i.efactura_status IS NULL AND i.efactura_checked_at < now() - interval '6 hours')
+           )
+         ORDER BY i.company_id, i.created_at DESC
+         LIMIT 100`));
+    } catch (err) {
+      // A migráció (efactura-status-poll.sql) még nem futott le — csendben kihagyjuk.
+      if (/column.*efactura_checked_at/i.test(err.message)) return;
+      console.error('[eFactura] számlák lekérése hiba:', err.message);
+      return;
+    }
+    if (!invoices.length) return;
+
+    // Konfig-cache: cégenként csak egyszer kérdezzük le a billing beállítást.
+    const cfgCache = new Map();
+    async function getCfg(cid) {
+      if (cfgCache.has(cid)) return cfgCache.get(cid);
+      try {
+        const cfg = await svc.getInvoiceConfig(pool, cid);
+        cfgCache.set(cid, cfg || null);
+        return cfg || null;
+      } catch (_) { cfgCache.set(cid, null); return null; }
+    }
+
+    for (const inv of invoices) {
+      // Kis szünet API rate-limit elkerülésére
+      await new Promise(r => setTimeout(r, 200));
+
+      let cfg;
+      try { cfg = await getCfg(inv.company_id); } catch (_) { continue; }
+      if (!cfg) continue;
+
+      let adapterCreds = cfg.creds;
+      // Ha a számla providere eltér az aktív konfigtól (pl. korábban FGO, most SmartBill),
+      // a saját provider-konfigját próbáljuk meg betölteni.
+      if (inv.provider && inv.provider !== cfg.provider) {
+        try {
+          const pr = await pool.query(
+            `SELECT credentials FROM billing_integrations WHERE company_id=$1 AND provider=$2`,
+            [inv.company_id, inv.provider]);
+          if (pr.rows.length && pr.rows[0].credentials && pr.rows[0].credentials.enc) {
+            adapterCreds = JSON.parse(decrypt(pr.rows[0].credentials.enc));
+          } else {
+            // Fallback: legacy konfig
+            const leg = await pool.query(
+              `SELECT credentials_enc FROM company_integrations
+               WHERE company_id=$1 AND category='invoicing' AND enabled=true LIMIT 1`,
+              [inv.company_id]);
+            if (leg.rows.length) adapterCreds = JSON.parse(decrypt(leg.rows[0].credentials_enc));
+          }
+        } catch (_) { /* maradjon az aktív konfig */ }
+      }
+
+      let st = null;
+      try {
+        const adapter = billing.getAdapter(inv.provider || cfg.provider, adapterCreds);
+        if (!adapter || typeof adapter.getInvoice !== 'function') continue;
+        st = await adapter.getInvoice(inv.serie || '', inv.numar || '');
+      } catch (err) {
+        console.error('[eFactura] számlaazonosító #' + inv.id + ' lekérés hiba:', err.message);
+        // efactura_checked_at-t frissítjük, hogy ne pörögjünk rá azonnal
+        try {
+          await pool.query(
+            'UPDATE invoices SET efactura_checked_at=$1 WHERE id=$2 AND company_id=$3',
+            [new Date(), inv.id, inv.company_id]);
+        } catch (_) {}
+        continue;
+      }
+
+      if (!st || !st.ok) {
+        // Hiba: frissítjük a checked_at-t (6 óra múlva újra próbál)
+        try {
+          await pool.query(
+            'UPDATE invoices SET efactura_checked_at=$1 WHERE id=$2 AND company_id=$3',
+            [new Date(), inv.id, inv.company_id]);
+        } catch (_) {}
+        continue;
+      }
+
+      const ef = svc.extractEFacturaStatus(st.raw);
+      const now = new Date();
+      try {
+        await pool.query(
+          `UPDATE invoices
+           SET efactura_status      = COALESCE($1, efactura_status),
+               efactura_last_raw    = COALESCE($2::jsonb, efactura_last_raw),
+               efactura_checked_at  = $3
+           WHERE id=$4 AND company_id=$5`,
+          [ef || null, st.raw ? JSON.stringify(st.raw) : null, now, inv.id, inv.company_id]);
+        if (ef) console.log('[eFactura] #' + inv.id + ' (cég ' + inv.company_id + '): ' + ef);
+      } catch (err) {
+        console.error('[eFactura] mentés hiba #' + inv.id + ':', err.message);
+      }
+    }
+  }
+
+  // Indulás után 5 perccel (a szerver teljesen beáll), majd 3 óránként.
+  setTimeout(tick, 5 * 60 * 1000);
+  const interval = setInterval(tick, 3 * 60 * 60 * 1000);
+  console.log('[eFactura] Státusz-lekérdező ütemező elindítva — 3 órás ciklus.');
+  return interval;
+}
+
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler };

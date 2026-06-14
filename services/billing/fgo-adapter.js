@@ -46,12 +46,13 @@ class FgoAdapter {
     } catch (e) { return { ok: false, message: 'FGO hiba: ' + e.message }; }
   }
 
-  async getInvoice(invoice_number) {
+  // serie + numar külön; FGO a serie+numar kombinációból számolja a hash-t.
+  async getInvoice(serie, numar) {
     const creds = this._fgoCreds();
     try {
-      const r = await fgo.getStatus(creds, { numar: invoice_number });
+      const r = await fgo.getStatus(creds, { serie: serie || null, numar: numar || serie });
       if (!r.ok) return { ok: false, message: r.message };
-      return { ok: true, invoice: r };
+      return { ok: true, invoice: r, raw: r.raw };
     } catch (e) { return { ok: false, message: e.message }; }
   }
 }
