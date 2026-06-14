@@ -55,6 +55,11 @@ function activateTab(name){
   var pane=document.querySelector('.pane[data-pane="'+name+'"]');
   if(pane)pane.classList.remove('hidden');
   try{sessionStorage.setItem('vs_admin_tab',name);}catch(e){}
+  // Fix felső sáv breadcrumb frissítése az aktív menüpont címkéjével
+  try{
+    var bc=document.getElementById('vsBreadCurrent');
+    if(bc && tabEl){ var sp=tabEl.querySelector('span'); bc.textContent=(sp?sp.textContent:tabEl.textContent||'').trim(); }
+  }catch(e){}
   loadTab(name);
   // Mobilon a menüpontra koppintás után zárjuk be a drawert, hogy látszódjon a tartalom
   if(window.innerWidth<=768 && typeof closeSidebar==='function') closeSidebar();
@@ -2324,6 +2329,8 @@ function toggleAllOrders(cb) {
 }
 
 function toggleOrdersMenu(){document.getElementById('ordersSubmenu').parentElement.classList.toggle('open');}
+// Generikus lenyitó az ikonos FGO-menühöz: a kattintott fejléc .menu-group-ját nyitja/zárja.
+function toggleGroup(el){ var g = el.closest('.menu-group'); if(g) g.classList.toggle('open'); }
 
 function toggleSidebar() {
   var sb = document.getElementById('mainSidebar');

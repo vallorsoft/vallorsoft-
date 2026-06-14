@@ -1022,3 +1022,70 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 .badge.warn { background: linear-gradient(180deg, rgba(245,158,11,.18), rgba(245,158,11,.08)); }
 .badge.err  { background: linear-gradient(180deg, rgba(239,68,68,.18),  rgba(239,68,68,.08)); }
 .badge.info { background: linear-gradient(180deg, rgba(59,130,246,.18), rgba(59,130,246,.08)); }
+
+/* ============================================================
+   FELSŐ SÁV (fix) + IKONOS FGO-MENÜ + GLOBÁLIS KERESŐ (command palette)
+   ============================================================ */
+
+/* ── Fix felső sáv (a .main-content görgető-konténer tetején ragad) ── */
+.vs-topbar{
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 16px;
+  margin: -24px -24px 18px -24px; padding: 11px 24px;
+  border-bottom: 1px solid var(--glass-border-light);
+  background: rgba(255,255,255,.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+.main-content[data-theme="dark"] .vs-topbar{
+  background: rgba(8,15,26,.85); border-bottom-color: rgba(255,255,255,.08);
+}
+.vs-tb-left{ display: flex; align-items: center; gap: 10px; min-width: 0; }
+.vs-bread{ display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+.vs-bread-sep{ color: var(--text-muted); }
+.vs-bread #vsBreadCurrent{ color: var(--text-muted); font-weight: 600; }
+/* Kereső-trigger (gomb, ami megnyitja a palette-et) */
+.vs-tb-search{
+  flex: 1; max-width: 560px; margin: 0 auto;
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px; border-radius: 10px; cursor: text;
+  background: var(--glass-bg-light); border: 1px solid var(--glass-border-light);
+  color: var(--text-muted); font: inherit; transition: border-color .15s, box-shadow .15s;
+}
+.main-content[data-theme="dark"] .vs-tb-search{ background: #0d1526; border-color: rgba(255,255,255,.10); }
+.vs-tb-search:hover{ border-color: var(--primary); box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+.vs-tb-search-ico{ width: 18px; height: 18px; flex: 0 0 auto; opacity: .7; }
+.vs-tb-search-ph{ flex: 1; text-align: left; font-size: 13.5px; }
+.vs-tb-kbd{ font-size: 11px; font-weight: 700; color: var(--text-muted); border: 1px solid var(--glass-border-light); border-radius: 6px; padding: 2px 7px; background: rgba(0,0,0,.03); }
+.main-content[data-theme="dark"] .vs-tb-kbd{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); }
+.vs-tb-right{ display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+@media (max-width: 768px){
+  .vs-topbar{ margin: -16px -16px 14px -16px; padding: 10px 14px; gap: 10px; }
+  .vs-tb-kbd{ display: none; } .vs-bread{ font-size: 12.5px; }
+}
+
+/* ── Ikonos sidebar (FGO) ── */
+.sidebar .tab{ display: flex; align-items: center; gap: 11px; }
+.sidebar .nav-ico{ width: 18px; height: 18px; flex: 0 0 auto; opacity: .9; }
+.sidebar .tab span{ flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar .nav-head .nav-chev{ width: 15px; height: 15px; flex: 0 0 auto; opacity: .6; transition: transform .18s ease; margin-left: 0; }
+.sidebar .menu-group.open .nav-head .nav-chev{ transform: rotate(180deg); }
+.sidebar .nav-head{ cursor: pointer; }
+
+/* ── Globális kereső — command palette (body-ra rakva, világos) ── */
+.vs-cmdk-back{ position: fixed; inset: 0; z-index: 5000; display: none; align-items: flex-start; justify-content: center; padding-top: 12vh; background: rgba(8,15,26,.45); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.vs-cmdk-back.open{ display: flex; }
+.vs-cmdk{ width: min(640px, 92vw); max-height: 70vh; display: flex; flex-direction: column; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 24px 60px rgba(8,15,26,.35); overflow: hidden; }
+.vs-cmdk-top{ display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid #eef2f7; }
+.vs-cmdk-top svg{ width: 19px; height: 19px; color: #64748b; flex: 0 0 auto; }
+.vs-cmdk-input{ flex: 1; border: none; outline: none; font: inherit; font-size: 15px; color: #0f172a; background: transparent; }
+.vs-cmdk-input::placeholder{ color: #94a3b8; }
+.vs-cmdk-esc{ font-size: 11px; font-weight: 700; color: #64748b; border: 1px solid #e2e8f0; border-radius: 6px; padding: 2px 7px; }
+.vs-cmdk-results{ overflow-y: auto; padding: 8px; }
+.vs-cmdk-group-t{ font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #94a3b8; padding: 10px 10px 4px; }
+.vs-cmdk-item{ display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: 9px; cursor: pointer; }
+.vs-cmdk-item.active, .vs-cmdk-item:hover{ background: #f1f5f9; }
+.vs-cmdk-item .vs-cmdk-ic{ width: 18px; height: 18px; flex: 0 0 auto; color: #6366f1; opacity: .9; }
+.vs-cmdk-item .vs-cmdk-tt{ font-size: 14px; color: #0f172a; font-weight: 600; }
+.vs-cmdk-item .vs-cmdk-st{ font-size: 12px; color: #64748b; }
+.vs-cmdk-item .vs-cmdk-tx{ min-width: 0; flex: 1; overflow: hidden; }
+.vs-cmdk-item .vs-cmdk-tt, .vs-cmdk-item .vs-cmdk-st{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vs-cmdk-empty{ padding: 28px 16px; text-align: center; color: #94a3b8; font-size: 13.5px; }
