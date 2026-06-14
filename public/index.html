@@ -68,9 +68,6 @@
     <a href="/" class="logo">
       <span class="logo-vallor">Vallor</span><span class="logo-soft">Soft</span>
     </a>
-    <button class="hamburger" id="hamburger" aria-label="Meniu">
-      <span></span><span></span><span></span>
-    </button>
     <nav class="nav-menu" id="navMenu">
       <ul class="nav-links">
         <li><a href="#features" data-i18n="navFeatures">Funcționalități</a></li>
@@ -79,12 +76,15 @@
         <li><a href="#blog" data-i18n="navBlog">Blog</a></li>
         <li><a href="#contact" data-i18n="navContact">Contact</a></li>
       </ul>
-      <div class="nav-actions">
-        <button id="languageToggle" class="lang-btn" title="Váltás magyarra / Schimbă în română">HU</button>
-        <a href="/login" class="btn-glass" data-i18n="loginBtn">Autentificare</a>
-        <a href="#register" class="btn-primary" data-i18n="startBtn">Începe gratuit</a>
-      </div>
     </nav>
+    <div class="nav-actions">
+      <button id="languageToggle" class="lang-btn" title="Váltás magyarra / Schimbă în română">HU</button>
+      <a href="/login" class="btn-nav-ghost" data-i18n="loginBtn">Autentificare</a>
+      <a href="#register" class="btn-nav-primary" data-i18n="startBtn">Începe gratuit</a>
+    </div>
+    <button class="hamburger" id="hamburger" aria-label="Meniu">
+      <span></span><span></span><span></span>
+    </button>
   </div>
 </header>
 
@@ -103,30 +103,113 @@
       <p class="trial-note" data-i18n="trialNote">✓ Fără card bancar &nbsp;·&nbsp; ✓ Anulare oricând &nbsp;·&nbsp; ✓ Suport inclus</p>
     </div>
     <div class="hero-visual reveal">
-      <div class="dashboard-preview glass">
-        <div class="preview-topbar">
-          <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
-          <span class="preview-title">VallorSoft Dashboard</span>
-        </div>
-        <div class="stat-row">
-          <div class="stat-card">
-            <span class="stat-val">127</span>
-            <span class="stat-label" data-i18n="statTrips">Curse active</span>
+      <div class="hero-monitor-wrap">
+        <div class="hero-monitor-frame">
+          <div class="hero-monitor-bar">
+            <span class="hm-dot"></span><span class="hm-dot"></span><span class="hm-dot"></span>
+            <span class="hm-url">VallorSoft — GPS Live Tracking</span>
+            <span class="hm-live">⬤ LIVE</span>
           </div>
-          <div class="stat-card">
-            <span class="stat-val">98%</span>
-            <span class="stat-label" data-i18n="statGps">GPS acoperire</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-val">€42K</span>
-            <span class="stat-label" data-i18n="statRevenue">Venituri lunare</span>
+          <div class="hero-monitor-screen">
+            <svg viewBox="0 0 520 300" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:100%">
+              <defs>
+                <pattern id="mapgrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                  <path d="M40 0L0 0 0 40" fill="none" stroke="rgba(255,255,255,.035)" stroke-width=".6"/>
+                </pattern>
+                <radialGradient id="vig" cx="50%" cy="50%" r="50%">
+                  <stop offset="55%" stop-color="transparent"/>
+                  <stop offset="100%" stop-color="rgba(5,7,11,.55)"/>
+                </radialGradient>
+                <filter id="glow-g"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                <filter id="glow-r"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              </defs>
+              <!-- Háttér -->
+              <rect width="520" height="300" fill="#080f1a"/>
+              <rect width="520" height="300" fill="url(#mapgrid)"/>
+              <!-- Autóutak (vastagabb) -->
+              <line x1="0" y1="150" x2="520" y2="150" stroke="#1e3048" stroke-width="7"/>
+              <line x1="0" y1="153" x2="520" y2="153" stroke="#162438" stroke-width="4"/>
+              <!-- Mellékutak vízszintes -->
+              <line x1="30" y1="78" x2="490" y2="78" stroke="#172535" stroke-width="3"/>
+              <line x1="20" y1="222" x2="500" y2="222" stroke="#172535" stroke-width="3"/>
+              <!-- Mellékutak függőleges -->
+              <line x1="260" y1="0" x2="260" y2="300" stroke="#172535" stroke-width="3"/>
+              <line x1="130" y1="20" x2="130" y2="280" stroke="#132030" stroke-width="2"/>
+              <line x1="390" y1="20" x2="390" y2="280" stroke="#132030" stroke-width="2"/>
+              <!-- Kisebb utak -->
+              <line x1="65" y1="0" x2="65" y2="300" stroke="#0f1c2a" stroke-width="1.5"/>
+              <line x1="195" y1="0" x2="195" y2="300" stroke="#0f1c2a" stroke-width="1.5"/>
+              <line x1="325" y1="0" x2="325" y2="300" stroke="#0f1c2a" stroke-width="1.5"/>
+              <line x1="455" y1="0" x2="455" y2="300" stroke="#0f1c2a" stroke-width="1.5"/>
+              <line x1="0" y1="40" x2="520" y2="40" stroke="#0f1c2a" stroke-width="1.5"/>
+              <line x1="0" y1="110" x2="520" y2="110" stroke="#0f1c2a" stroke-width="1.5"/>
+              <line x1="0" y1="190" x2="520" y2="190" stroke="#0f1c2a" stroke-width="1.5"/>
+              <line x1="0" y1="260" x2="520" y2="260" stroke="#0f1c2a" stroke-width="1.5"/>
+              <!-- Átlós utak -->
+              <line x1="20" y1="240" x2="200" y2="60" stroke="#132030" stroke-width="2"/>
+              <line x1="320" y1="60" x2="500" y2="240" stroke="#132030" stroke-width="2"/>
+              <!-- Útvonal nyomok -->
+              <polyline points="45,78 93,78 130,110 160,150" stroke="#22c55e" stroke-width="1.5" fill="none" opacity=".28"/>
+              <polyline points="260,42 260,110 325,150" stroke="#22c55e" stroke-width="1.5" fill="none" opacity=".28"/>
+              <polyline points="390,78 390,150 455,150" stroke="#f59e0b" stroke-width="1.5" fill="none" opacity=".28"/>
+              <!-- === JÁRMŰVEK (31 db) === -->
+              <!-- Zöld - mozgásban (25 db) -->
+              <circle cx="45" cy="150" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="45" cy="150" r="9" fill="none" stroke="#22c55e" stroke-width="1.2" opacity=".35"/>
+              <circle cx="93" cy="78" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="148" cy="150" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="178" cy="222" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="200" cy="110" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="235" cy="78" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <!-- Főjármű - animált pulse -->
+              <circle cx="260" cy="150" r="5.5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="260" cy="150" r="11" fill="none" stroke="#22c55e" stroke-width="1.5" opacity=".5">
+                <animate attributeName="r" values="9;18" dur="1.8s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values=".5;0" dur="1.8s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="295" cy="222" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="325" cy="150" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="350" cy="78" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="390" cy="222" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="415" cy="150" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="455" cy="78" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="480" cy="150" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="510" cy="222" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="65" cy="40" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="165" cy="40" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="325" cy="40" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="455" cy="40" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="65" cy="260" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="195" cy="260" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="325" cy="260" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="455" cy="260" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="128" cy="192" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="390" cy="110" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <!-- Sárga - megállva (5 db) -->
+              <circle cx="115" cy="110" r="5" fill="#f59e0b"/>
+              <circle cx="195" cy="190" r="5" fill="#f59e0b"/>
+              <circle cx="325" cy="192" r="5" fill="#f59e0b"/>
+              <circle cx="455" cy="192" r="5" fill="#f59e0b"/>
+              <circle cx="340" cy="110" r="5" fill="#f59e0b"/>
+              <!-- Piros - figyelmeztetés (1 db, animált) -->
+              <circle cx="130" cy="260" r="6" fill="#ef4444" filter="url(#glow-r)"/>
+              <circle cx="130" cy="260" r="12" fill="none" stroke="#ef4444" stroke-width="1.5" opacity=".4">
+                <animate attributeName="r" values="9;18" dur="1.2s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values=".4;0" dur="1.2s" repeatCount="indefinite"/>
+              </circle>
+              <!-- Vignette -->
+              <rect width="520" height="300" fill="url(#vig)"/>
+            </svg>
+            <!-- Státusz overlay -->
+            <div class="hm-status">
+              <span class="hm-s-dot" style="background:#22c55e"></span>25 în mișcare
+              <span class="hm-s-dot" style="background:#f59e0b;margin-left:10px"></span>5 oprit
+              <span class="hm-s-dot" style="background:#ef4444;margin-left:10px"></span>1 alertă
+            </div>
           </div>
         </div>
-        <div class="preview-map">
-          <div class="map-dot" style="top:30%;left:40%"></div>
-          <div class="map-dot" style="top:55%;left:65%"></div>
-          <div class="map-dot pulse" style="top:45%;left:50%"></div>
-        </div>
+        <div class="hero-monitor-neck"></div>
+        <div class="hero-monitor-base"></div>
       </div>
     </div>
   </div>
