@@ -947,3 +947,78 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 
 /* Fuvarsorok finomítás — olvashatóbb, kevésbé "zsúfolt" */
 #tblOrders tbody td { vertical-align: middle; }
+
+/* ============================================================
+   VIZUÁLIS MÉLYSÉG — gradiensek, fény-csillanás (sheen), ragyogás (glow)
+   A konzol (admin/manager) kártyáira/gombjaira, MINDKÉT témában. A fájl
+   végén áll, hogy felülírja a sík (flat) alap-színeket. Funkció nincs érintve.
+   ============================================================ */
+
+/* Lágy radiális háttér-fények (mint a landing hero) */
+.main-content[data-theme="light"]{
+  background:
+    radial-gradient(900px 520px at 12% -8%, rgba(99,102,241,.06), transparent 60%),
+    radial-gradient(820px 480px at 108% 2%, rgba(59,130,246,.05), transparent 60%),
+    #f7f9fc;
+}
+.main-content[data-theme="dark"]{
+  background:
+    radial-gradient(900px 520px at 12% -8%, rgba(99,102,241,.16), transparent 60%),
+    radial-gradient(820px 480px at 108% 2%, rgba(59,130,246,.11), transparent 60%),
+    linear-gradient(180deg, #080f1a 0%, #0d1526 100%);
+}
+
+/* Kártyák: finom gradiens + felső fény-vonal (sheen) + réteges, lágy árnyék */
+.main-content .glass{ position: relative; transition: box-shadow .2s ease, transform .15s ease; }
+.main-content[data-theme="light"] .glass{
+  background: linear-gradient(180deg, #ffffff, #fbfcfe);
+  box-shadow: 0 1px 2px rgba(15,23,42,.05), 0 6px 20px rgba(15,23,42,.06);
+}
+.main-content[data-theme="dark"] .glass{
+  background: linear-gradient(180deg, #111c30, #0d1526);
+  box-shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+}
+.main-content .glass::before{
+  content:""; position:absolute; left:0; right:0; top:0; height:1px; border-radius:inherit;
+  pointer-events:none; z-index:1;
+}
+.main-content[data-theme="light"] .glass::before{ background: linear-gradient(90deg, transparent, rgba(255,255,255,.95), transparent); }
+.main-content[data-theme="dark"]  .glass::before{ background: linear-gradient(90deg, transparent, rgba(255,255,255,.16), transparent); }
+.main-content .glass:hover{ transform: translateY(-1px); }
+.main-content[data-theme="light"] .glass:hover{ box-shadow: 0 8px 26px rgba(15,23,42,.11), 0 2px 6px rgba(15,23,42,.06); }
+.main-content[data-theme="dark"]  .glass:hover{ box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+
+/* Elsődleges gomb: kék gradiens + ragyogás + belső felső fény */
+.main-content .btn.primary{
+  background: linear-gradient(180deg, #3b82f6, #2563eb) !important;
+  border-color: #2563eb !important;
+  box-shadow: 0 2px 8px rgba(59,130,246,.35), inset 0 1px 0 rgba(255,255,255,.25) !important;
+}
+.main-content .btn.primary:hover{
+  background: linear-gradient(180deg, #4a8bf7, #2563eb) !important;
+  box-shadow: 0 6px 18px rgba(59,130,246,.45), inset 0 1px 0 rgba(255,255,255,.30) !important;
+  transform: translateY(-1px);
+}
+
+/* KPI-szám: gradiens szöveg (kék → indigó) */
+.main-content .stat-val{
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: #3b82f6;
+}
+
+/* Stat-ikon korong: kék→indigó gradiens + belső fény */
+.main-content .stat-ico{
+  background: linear-gradient(135deg, rgba(59,130,246,.18), rgba(99,102,241,.20)) !important;
+  border: 1px solid rgba(99,102,241,.30) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.30);
+}
+
+/* Sidebar aktív elem: indigó ragyogás */
+.sidebar .tab.active{ box-shadow: 0 4px 14px rgba(99,102,241,.45); }
+
+/* Badge-ek: finom függőleges gradiens-tinta (mélységérzet) */
+.badge.ok   { background: linear-gradient(180deg, rgba(34,197,94,.18),  rgba(34,197,94,.08)); }
+.badge.warn { background: linear-gradient(180deg, rgba(245,158,11,.18), rgba(245,158,11,.08)); }
+.badge.err  { background: linear-gradient(180deg, rgba(239,68,68,.18),  rgba(239,68,68,.08)); }
+.badge.info { background: linear-gradient(180deg, rgba(59,130,246,.18), rgba(59,130,246,.08)); }
