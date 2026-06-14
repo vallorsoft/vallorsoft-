@@ -7,6 +7,14 @@
 
 ## 📋 Javítási napló (élő státusz)
 
+> **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
+
+### 9. lépés — Ügyfelek oldal UX/hibajavítás + CI-zöldítés (2026-06-14) ✅ KÉSZ
+
+- **Ügyfél-portál meghívó 500-as hiba** (PR #74) — a `handlers/clientPortal.js` (`clientPortalInvite`/`clientPortalList`) és a `routes/portal.js` (portál-LOGIN + jelszó-BEÁLLÍTÁS) a NEM létező `clients.nev` oszlopra hivatkozott (a tábla név-oszlopa `denumire`). A 42703 hibát a catch-ág „Eroare de server"-ré nyelte. Mindhárom SELECT javítva `denumire`-re; multi-tenant szűrés és paraméteres SQL érintetlen. Plusz: `services/email.js` `sendResetEmail` mostantól boolean-t ad vissza (valódi kiküldés vs. nincs Brevo-konfig) → a meghívó **kecsesen leromlik** (set-password link + `emailed:false`), nem 500-az. Valós Postgres-szel reprodukálva + igazolva.
+- **CI-zöldítés** (PR #71, #72) — a per-provider UIT deeplink átállás (8. lépés utáni kör) után: (a) a `dev-integrations` valódi-DB teszt a régi `uit_template` mező helyett a `uit_templates` map + `uit_template_legacy` + `gps_providers` API-ra igazítva — a teszt csak `DATABASE_URL` mellett fut, ezért lokálisan kimaradt, a CI-ben piros volt; (b) a `db/uit-deeplink-per-provider.sql` migráció `DO $$ IF EXISTS … $$` guardot kapott a friss DB-n nem létező `uit_deeplink_template` oszlopra. Verifikáció valós Postgres 16-tal: **24 suite / 108 teszt zöld**.
+- **ALACSONY-lista tétel részben lezárva** — az `clients-page.js` mentett-ügyfelek táblája (és az „Ügyfél-portál hozzáférések" legördülője) mostantól téma-érzékeny (sötét módban sötét háttér + világos betű, világos módban fordítva). Ügyfél-választó kereshető legördülővel + `denumire` névvel (PR #69, #73, `f83126e`). A többi kártya-modul (invoice-modal.js, cargotrack-*.js) hardcoded színe továbbra is nyitott.
+
 ### 8. lépés — a két nagy refaktor: K09 + K17 (2026-06-11) ✅ KÉSZ
 
 **K09 — fuvar-számlázás átkötve az univerzális számlázó-keretrendszerre:**
@@ -303,7 +311,7 @@ A `manifest.json` és minden hivatkozás az `/icon192.png`, `/icon512.png` fájl
 - **Növekedés-higiénia:** `here_usage_log` (autocomplete-onként 1 sor), `bug_reports`, `border_crossings`, `client_emails` korlátlanul nőnek — éves archiválás/összegzés elég.
 - **Redundáns index:** `idx_users_email` duplikálja a UNIQUE-ot — törölhető.
 - **`fuvarlevelek`-en nincs `company_id`** — email-joinon át megy a cégszűrés; email-váltásnál törik. Oszlop + backfill megfontolandó.
-- **Frontend apróságok:** hiányzó `lang="hu"` (a route-tervezőn kívül mindenhol), `user-scalable=no` (WCAG-ellenes), hardcoded színek a kártya-modulok saját `<style>`-jaiban (dark módban is fehér modálok — `clients-page.js`, `invoice-modal.js`, `cargotrack-*.js` stb.; az `email-intake-card.js` és `billing-card.js` a jó minta), `alert()/confirm()` a `toast()` helyett (`inbound-orders.js`, `invoice-modal.js`), 9 db `console.log` a `push-client.js`-ben, a developer-oldal saját gyengébb `escHtml`-je (nem escape-eli a `"`-t).
+- **Frontend apróságok:** hiányzó `lang="hu"` (a route-tervezőn kívül mindenhol), `user-scalable=no` (WCAG-ellenes), hardcoded színek a kártya-modulok saját `<style>`-jaiban (dark módban is fehér modálok — `invoice-modal.js`, `cargotrack-*.js` stb.; az `email-intake-card.js` és `billing-card.js` a jó minta; a `clients-page.js` ügyfél-tábla **2026-06-14-én témafüggővé téve**), `alert()/confirm()` a `toast()` helyett (`inbound-orders.js`, `invoice-modal.js`), 9 db `console.log` a `push-client.js`-ben, a developer-oldal saját gyengébb `escHtml`-je (nem escape-eli a `"`-t).
 - **FGO timeout-üzenet** 15 mp-et mond, a konstans 20s (`services/fgo.js:11,39`).
 - **Oblio token-cache** hiánya (műveletenként új OAuth-token) — volumen-növekedésnél érdemes.
 - **render.yaml:** nincs explicit `plan` — Starter (512 MB) az alapértelmezés; OCR + nagy bodyk mellett memóriafigyelés kell, vagy az OCR kivétele a kérés-útvonalból.
