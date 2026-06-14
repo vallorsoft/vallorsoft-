@@ -75,6 +75,15 @@ handlers.orderDocUpload = async function (req, res, args) {
       if (!orderId || !fileName || !b64) {
         return res.json({ result: { ok: false, err: 'Date lipsa' } });
       }
+      // Tenant-ellenőrzés: a fuvar a hívó cégéhez tartozik-e (cross-tenant write védelem) —
+      // különben „A" cég dokumentumot fűzhetne „B" cég fuvarához a fuvar-id megadásával.
+      const own = await pool.query(
+        'SELECT 1 FROM orders WHERE id = $1 AND company_id = $2',
+        [orderId, req.session.user.company_id]
+      );
+      if (!own.rows.length) {
+        return res.json({ result: { ok: false, err: 'Comanda nu a fost gasita.' } });
+      }
       const r = await pool.query(
         `INSERT INTO order_documents (order_id, file_name, original_base64, uploaded_by, company_id)
          VALUES ($1, $2, $3, $4, $5) RETURNING id`,

@@ -48,7 +48,7 @@ async function sendPushToRole(companyId, roles, payload) {
   try {
     const r = await pool.query(
       `SELECT ps.id, ps.subscription FROM push_subscriptions ps
-       JOIN users u ON u.email = ps.email
+       JOIN users u ON u.email = ps.email AND u.company_id = ps.company_id
        WHERE ps.company_id = $1 AND u.pozicio = ANY($2)`,
       [companyId, roles]
     );
