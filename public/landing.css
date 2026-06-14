@@ -469,60 +469,6 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   line-height: 1.55;
 }
 
-/* ── Integrations ───────────────────────────────────────────── */
-.lp-int-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
-.lp-int-group {}
-.lp-int-group-label {
-  display: inline-block;
-  font-size: .72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--lp-muted);
-  margin-bottom: .75rem;
-}
-.lp-int-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .75rem;
-}
-.lp-int-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: .4rem;
-  background: var(--lp-white);
-  border: 1px solid var(--lp-border);
-  border-radius: var(--lp-radius);
-  padding: .9rem 1.2rem;
-  min-width: 100px;
-  box-shadow: var(--lp-card-shadow);
-  transition: transform .15s, box-shadow .15s;
-}
-.lp-int-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0,0,0,.1);
-}
-.lp-int-logo {
-  height: 32px;
-  object-fit: contain;
-  max-width: 100px;
-}
-.lp-int-logo-fallback {
-  font-weight: 700;
-  color: var(--lp-text);
-  font-size: 15px;
-}
-.lp-int-name {
-  font-size: .75rem;
-  font-weight: 600;
-  color: var(--lp-muted);
-}
-
 /* ── Stats ──────────────────────────────────────────────────── */
 .lp-stats-grid {
   display: grid;
@@ -771,11 +717,20 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 .lp-footer-bottom .lp-container {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: .8rem 1.5rem;
+  flex-wrap: wrap;
+}
+.lp-footer-integrations {
+  color: rgba(255,255,255,.42);
+  font-size: .78rem;
+  line-height: 1.5;
 }
 .lp-lang-switch {
   color: rgba(255,255,255,.3);
   font-size: .75rem;
   letter-spacing: .08em;
+  white-space: nowrap;
 }
 
 /* ── Cookie Banner (kept from original) ─────────────────────── */
