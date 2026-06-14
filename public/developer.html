@@ -625,6 +625,7 @@ function loadCegek(){
         +(c.subscription_status==='active'
           ? '<button class="btn-danger-sm" onclick="blockCeg('+c.id+')">🔒 '+escHtml(t('dev.block'))+'</button>'
           : '<button class="btn-ok-sm" onclick="unblockCeg('+c.id+')">🔓 '+escHtml(t('dev.activate'))+'</button>')
+        +'<button class="btn-dev" onclick="exportCeg('+c.id+','+JSON.stringify(c.nev)+')" title="Összes adat letöltése ZIP-ben" style="background:rgba(168,85,247,0.12);color:#c084fc;border-color:rgba(168,85,247,0.3);">📦</button>'
         +'<button class="btn-danger-sm" onclick="deleteCeg('+c.id+')" style="background:rgba(239,68,68,0.1);">🗑</button>'
         +'</div></div>'
         +'</div>';
@@ -941,6 +942,11 @@ function saveCeg(){
       }
     } else { toast(r&&r.err||t('common.error'),'err'); }
   });
+}
+
+function exportCeg(id, nev){
+  if(!confirm('📦 Teljes adatexport ZIP-ben\n\nCég: ' + nev + '\n\nEz letölti az összes fuvar, ügyfél, jármű, felhasználó, számla és dokumentum adatot.\n\nFolytatja?')) return;
+  window.location.href = '/api/developer/export/' + id;
 }
 
 function deleteCeg(id, nev){

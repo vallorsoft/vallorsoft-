@@ -38,7 +38,11 @@ Tesztek zöldek (**106 Jest**, 24 suite). **CI: GitHub Actions** (`.github/workf
 
 > **Hiánylista — a 2026-06-13-i ütemterv LEZÁRVA:** **(1) ✅ CI + valódi tesztek** (mock + valós-DB, 106 teszt); **(2) ✅ teherautó-routing váltó** (ORS `driving-hgv`, alap ingyenes OSRM) **+ ✅ valós útdíj váltó** (HERE „Pontos", alap becslés); **(3) ✅ UIT CargoTrack deep-link** (ANAF-integráció helyett, providerkénti URL-sablon — `uit_deeplink_templates` JSONB; `cargotrack-et.js`/`fomco-et.js` törölve); **(4) ✅ üzemeltetés** (health-check `/healthz`+`/readyz`, strukturált log, opcionális Sentry, opcionális pg_dump backup); **(5) ✅ leg ↔ `orders.email_sofer` szinkron**; **(6) ✅ SaaS-vízvezeték** (csomag-limit kikényszerítés, audit-napló, GDPR export/anonimizálás, Stripe-váz); **(7) ✅ e-Factura státusz automatikus lekérdezés** (3 órás scheduler, SmartBill/Oblio `getInvoice` implementálva, `efactura_last_raw`/`efactura_checked_at` tárolás); **(8) ✅ ANAF CUI strukturált cím** (utca/helység/megye külön mezők, `adresa_sediu_social` alapján). **Nyitott jövőbeli munka:** Stripe éles bekötés (kulcsok + price_xxx — utolsó lépés, nem sürgős), SAF-T D406 XML (jövőbeli javaslat, a könyvelő SAGA/WinMentor CSV-ből generál egyelőre). **RO megfelelőség:** a rendszer megfelel — minden ANAF-kommunikáció (e-Factura SPV-beküldés) a számlázó-providereken (FGO/SmartBill/Oblio stb.) keresztül történik, saját ANAF-kapcsolat NEM kell és NEM is akarunk. Az UIT-kódot sem mi generáljuk — a sofőr/cég a CargoTrack/Fomco deep-linken keresztül intézi. A GPS→ANAF élő e-Transport-transzmisszió NEM feladatunk.
 
-**Legújabb kör (2026-06-14 — Ügyfelek oldal UX/hibajavítás + CI-zöldítés):** *(részletes kész-lista: `CHANGELOG.md`)*
+**Legújabb kör (2026-06-14 — Jogi megfelelőség + Developer cég-adatexport ZIP):** *(részletes kész-lista: `CHANGELOG.md`)*
+1. **Jogi oldalak kiegészítése (GDPR/T&C)** — terms.html / privacy.html / dpa.html / cookies.html / security.html-be a megadott RO-jogi szövegek (GPS-kizárás, e-Factura felelősség, adatmegőrzési idők, 72 órás breach-notifikáció). register.html kötelező checkbox pár (Terms + Privacy accept) JS-validációval. CLAUDE.md jogi/GDPR szekció (VALLOR TEAM SRL adatok, adatfeldolgozók, jogalapok, megőrzési idők).
+2. **Developer cég-adatexport ZIP** (`routes/developer-export.js`) — 📦 gomb minden cégkártyán; `GET /api/developer/export/:id` (is_dev gated); CSV (orders, order_legs, clients, vehicles, carriers, users, invoices, carrier_invoices, fuvarlevelek, inbound_orders, uit_codes) + bináris dok (order_documents, POD, carrier_docs) egyetlen ZIP-ben. 400 MB vészfék, jelszó-hash kizárva.
+
+**Korábbi kör (2026-06-14 — Ügyfelek oldal UX/hibajavítás + CI-zöldítés):** *(részletes kész-lista: `CHANGELOG.md`)*
 1. **Ügyfél-portál meghívó szerver-hiba javítva** (PR #74) — a „Meghívó küldése" `Eroare de server`-t dobott: a `handlers/clientPortal.js` + `routes/portal.js` (belépés/jelszó-beállítás) a NEM létező `clients.nev` oszlopra hivatkozott (a tábla név-oszlopa `denumire`). Mindhárom helyen javítva; a meghívó kecsesen leromlik e-mail-konfig nélkül is (set-password link + `emailed:false`).
 2. **Kereshető ügyfél-választó + világos/sötét szín-javítás** (PR #69, #73, `f83126e`) — az „👥 Ügyfél-portál hozzáférések" meghívó-sávban a sima `<select>` helyett kereső mezős legördülő (a hozzáadott ügyfelekből, `denumire` névvel); téma-érzékeny `.cp-client-drop` (világos: világos háttér+sötét betű, sötét: fordítva) és a mentett-ügyfelek tábla (`clients-page.js`) sötét-módú felülírásai.
 3. **CI-zöldítés** (PR #71, #72) — a per-provider UIT-átállás után a `dev-integrations` valódi-DB teszt a `uit_templates` map + `uit_template_legacy` + `gps_providers` API-ra igazítva (a teszt csak `DATABASE_URL` mellett fut → lokálisan kimaradt, CI-ben piros volt); a `db/uit-deeplink-per-provider.sql` migráció `IF EXISTS` guardot kapott a régi `uit_deeplink_template` oszlopra. Valós Postgres 16-tal verifikálva: **24 suite / 108 teszt zöld**.
@@ -308,3 +312,55 @@ Routing (opcionális): **`ORS_API_KEY`** (OpenRouteService, ingyenes) — az út
 - Jest + supertest: `npm test`, `npm run test:watch`, `npm run test:coverage`.
 - `tests/unit/` (crypto, diurna, invoiceAdapter), `tests/integration/` (auth, execute), `tests/helpers/` (db/session mock — éles DB nem kell).
 - Szerveroldali handler gyors kézi tesztje: kis `node` script `require('dotenv').config()` + handler hívás mock `req`/`res`-szel (a fejlesztés során így ellenőriztük a route-tervezőt és a feature-kapcsolókat a valós DB-n).
+
+---
+
+## Jogi / GDPR adatok (privacy policy + terms alapanyag)
+
+### Adatkezelő (Operator)
+- **Denumire:** VALLOR TEAM SRL
+- **CUI:** 47859317
+- **Nr. Reg. Com.:** J2023000114142 (EUID: ROONRC.J2023000114142)
+- **Sediu:** Sat Arcus, Cart. Poiana Arcusului nr. 102, cod 527166, jud. Covasna
+- **Tel:** 0769532015 · **E-mail:** vallorsoft@gmail.com
+- **Administrator:** Pető-Lőrincz Imre-Norbert
+- **Înființată:** 2023-03-22
+
+### Adatfeldolgozók (Împuterniciți / Sub-processors)
+
+| Szolgáltató | Szerep | Székhely | Megjegyzés |
+|---|---|---|---|
+| **Brevo (Sendinblue SAS)** | e-mail (meghívók, értesítések) | Párizs, Franciaország 🇫🇷 | EU → nincs extra dokumentáció |
+| **Stripe Payments Europe, Ltd** | online fizetés | Dublin, Írország 🇮🇪 | EU entitás → EU adatkezelés |
+| **Google Firebase (Google LLC)** | chat, push értesítések | USA → EU DPF + SCCs | EU–US Data Privacy Framework (2023) alapján legális; Google DPA szükséges |
+| **CargoTrack / Fomco** | GPS helyadat (sofőrök) | Románia 🇷🇴 | EU → nincs extra |
+| **[HOSTING — KITÖLTENDŐ]** | szerverszolgáltatás | [ország] | Ha EU → ok; ha USA → SCCs kell |
+
+> **Google Firebase jogi alap:** az EU–US Data Privacy Framework (Európai Bizottság 2023/1795 határozata) alapján az USA megfelelő védelmi szintűnek minősül; emellett Google Standard Contractual Clauses (SCCs) és DPA elérhető a [Google Cloud DPA](https://cloud.google.com/terms/data-processing-addendum) oldalán. Privacy policy-ban fel kell tüntetni: *„Adattovábbítás harmadik országba (USA) az EU–US Data Privacy Framework és SCCs alapján."*
+
+### Kezelt személyes adatok
+- **Sofőrök:** név, e-mail, telefonszám, valós idejű GPS pozíció
+- **Ügyfelek (client portal):** név, e-mail, kapcsolattartó adatok
+- **Alvállalkozók (carrier portal):** név, e-mail
+- **GDPR-visszaigazolás:** IP-cím, időbélyeg (`gdpr_consents` tábla)
+- **Regisztrációkor:** cégnév, e-mail, jelszó (bcrypt hash)
+- **Fuvarlevelek:** feladó/átvevő személyes adatai
+
+### Jogi alapok (Temei legal — GDPR Art. 6)
+- **(1)(b) Szerződés teljesítése** — fuvar- és ügyfél-adatok kezelése
+- **(1)(c) Törvényi kötelezettség** — számlák, könyvelés (Legea 82/1991)
+- **(1)(a) Hozzájárulás** — GPS-megfigyelés (Legea 190/2018 — sofőr belépéskor visszaigazolja, `gdpr_consents`)
+- **(1)(f) Jogos érdek** — biztonsági naplók, audit trail
+
+### Megőrzési idők
+- Számlák: **5 év** (Legea 82/1991)
+- Alkalmazotti GPS-adatok: **foglalkoztatás + 1 év**
+- Session adatok: **kijelentkezésig**
+- GDPR-visszaigazolások: **3 év**
+- Audit log: **1 év**
+
+### Alkalmazandó jogszabályok
+- **GDPR** (Regulamentul UE 2016/679)
+- **Legea 190/2018** — GDPR romániai implementációja; GPS-megfigyelésnél előzetes tájékoztatás kötelező (a rendszerben `gdpr_settings` + sofőr-banner bekötve)
+- **Legea 82/1991** — könyvelési megőrzési kötelezettség (5 év)
+- **EU–US Data Privacy Framework** (2023) — US adatfeldolgozók jogalapja
