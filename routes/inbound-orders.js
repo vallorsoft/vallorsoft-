@@ -190,15 +190,15 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
       dbc.release();
     }
 
-    // Automata útvonal-km a fuvarlistára — CSAK ha az 'order-route-map' kapcsoló
-    // be van kapcsolva a cégnél (opt-in). A beolvasott km-et NEM írja felül; az
-    // automata km a route_geo-ban tárolódik, a fuvarlista a beolvasott mellett mutatja.
-    // Tranzakción KÍVÜL, best-effort: lassú/hibás geokódolás ne buktassa a jóváhagyást.
+    // Automata útvonal-km a fuvarlistára — ha az 'order-route-map' kapcsoló be van
+    // (alapból BE; csak explicit enabled=false kapcsolja ki). A beolvasott km-et NEM
+    // írja felül; az automata km a route_geo-ban tárolódik, a fuvarlista a beolvasott
+    // mellett mutatja. Tranzakción KÍVÜL, best-effort: lassú/hibás geokódolás ne buktassa a jóváhagyást.
     try {
       if (loc_incarcare && loc_descarcare) {
         const fr = await pool.query(
           "SELECT enabled FROM company_features WHERE company_id=$1 AND feature_key='order-route-map'", [company_id]);
-        if (fr.rows.length && fr.rows[0].enabled === true) {
+        if (!(fr.rows.length && fr.rows[0].enabled === false)) {
           const est = await estimateRoute([
             { type: 'loading', address: loc_incarcare },
             { type: 'unloading', address: loc_descarcare },

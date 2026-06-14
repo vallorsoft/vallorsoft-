@@ -20,7 +20,7 @@ window.VS_FEATURES = [
   { key: 'utvonaltervezes',  label: 'Útvonaltervezés',             group: 'Fuvarozás & Logisztika' },
   // OPT-IN (alapból KI): a fuvar-kiírón térképes cím-kiegészítés + auto-km
   // + útvonal-előnézet köztespontokkal. A developer kapcsolja be cégenként.
-  { key: 'order-route-map',  label: 'Térképes km + útvonal-előnézet (fuvar-kiírás) 🗺️', group: 'Fuvarozás & Logisztika', optIn: true },
+  { key: 'order-route-map',  label: 'Térképes km + útvonal-előnézet (fuvar-kiírás) 🗺️', group: 'Fuvarozás & Logisztika' },
   { key: 'stats-overview',   label: 'Statisztika — Áttekintés',    group: 'Statisztika & Riport' },
   { key: 'stats-finance',    label: 'Statisztika — Pénzügy',       group: 'Statisztika & Riport' },
   { key: 'stats-fuel',       label: 'Statisztika — Fogyasztás',    group: 'Statisztika & Riport' },

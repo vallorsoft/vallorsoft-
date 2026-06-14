@@ -352,16 +352,17 @@ handlers.calculateRoute = async function (req, res, args) {
 };
 
 // ─── Térképes km-becslés a FUVAR-KIÍRÓHOZ (külön az útvonaltervezőtől) ──
-// OPT-IN funkció-kapcsoló: 'order-route-map' — a developer cégenként
-// engedélyezi (hiányzó sor = KI; csak az explicit enabled=true kapcsol be).
-// NEM keverendő az 'utvonaltervezes' prémium menüvel: ez alap km-segéd.
+// Funkció-kapcsoló: 'order-route-map' — alapból BE (a kódbázis „hiányzó sor =
+// bekapcsolva" konvenciója szerint); a developer cégenként KI tudja kapcsolni
+// (explicit enabled=false). NEM keverendő az 'utvonaltervezes' prémium menüvel:
+// ez alap km-/útvonal-segéd a fuvar-kiíráshoz.
 async function routeMapFeatureOn(companyId) {
   if (!companyId) return false;
   try {
     const r = await pool.query(
       "SELECT enabled FROM company_features WHERE company_id = $1 AND feature_key = 'order-route-map'",
       [companyId]);
-    return r.rows.length ? r.rows[0].enabled === true : false;
+    return r.rows.length ? r.rows[0].enabled === true : true;
   } catch (e) { return false; }
 }
 

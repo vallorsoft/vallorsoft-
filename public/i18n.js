@@ -149,6 +149,7 @@
     'edit.km': { hu: 'Km', ro: 'Km' },
     'edit.weight': { hu: 'Súly (kg)', ro: 'Greutate (kg)' },
     'edit.toll': { hu: '🛣️ Útdíj (EUR)', ro: '🛣️ Taxă drum (EUR)' },
+    'edit.tollMap': { hu: 'Útvonal a térképen + köztespont', ro: 'Ruta pe hartă + punct intermediar' },
     'edit.tollHint': { hu: '— becsült, kézzel módosítható', ro: '— estimat, modificabil manual' },
     'edit.estimate': { hu: '🛣️ Becslés', ro: '🛣️ Estimare' },
     'edit.tollPrecise': { hu: '🎯 Pontos (HERE)', ro: '🎯 Precis (HERE)' },

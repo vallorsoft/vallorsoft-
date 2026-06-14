@@ -260,7 +260,9 @@ function vsAttachAutocomplete(inputId, ddId, onPick){
 
 // Bekötés a fuvar-kiíró + szerkesztő mezőkre (csak ha a kapcsoló BE van).
 function initOrderMapFeature(){
-  _orderMapOn = !!(window._vsFeatures && window._vsFeatures['order-route-map']===true);
+  // Alapból BE (a kódbázis „hiányzó sor = bekapcsolva" konvenciója szerint);
+  // a developer cégenként KI tudja kapcsolni (explicit enabled=false).
+  _orderMapOn = !(window._vsFeatures && window._vsFeatures['order-route-map']===false);
   if(!_orderMapOn) return;
   if(!window._vsAcCloseBound){ window._vsAcCloseBound=true;
     document.addEventListener('click', function(e){
@@ -3146,6 +3148,8 @@ function openOrderEdit(id) {
       // Térképes útvonal-előnézet állapota a mentett route_geo-ból (ha van + a kapcsoló be)
       if(typeof resetRouteState==='function') resetRouteState('edit');
       if(_orderMapOn){
+        // Az útdíj-sori 🗺️ gomb mindig elérhető a szerkesztőben (a térkép nyitásakor számol)
+        var oeTmb=document.getElementById('oeTollMapBtn'); if(oeTmb) oeTmb.style.display='';
         var rg=o.route_geo; if(typeof rg==='string'){ try{ rg=JSON.parse(rg); }catch(e){ rg=null; } }
         if(rg && Array.isArray(rg.waypoints) && rg.waypoints.length>=2){
           _rmState.edit={ via: rg.waypoints.filter(function(w){return w.type==='waypoint';})
