@@ -995,7 +995,14 @@ function loadClientPortalAccess(){
   box.innerHTML='<div class="glass" style="padding:18px 20px;"><div style="font-size:16px;font-weight:800;margin-bottom:4px;">'+t('cs.cp.title')+'</div>'
     +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">'+t('cs.cp.hint')+'</div>'
     +'<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:16px;">'
-    +'<div class="field" style="margin:0;min-width:200px;"><label>'+t('cs.cp.client')+'</label><select class="select" id="cpClientSel"><option value="">'+t('cs.cp.pickClient')+'</option></select></div>'
+    +'<div class="field" style="margin:0;min-width:220px;position:relative;" id="cpClientWrap">'
+    +'<label>'+t('cs.cp.client')+'</label>'
+    +'<input class="input" id="cpClientDisplay" readonly placeholder="'+t('cs.cp.pickClient')+'" style="cursor:pointer;background:var(--bg-panel-raised,#141c25);" onclick="cpDropToggle(event)" autocomplete="off">'
+    +'<input type="hidden" id="cpClientSel">'
+    +'<div id="cpClientDrop" style="display:none;position:absolute;z-index:9999;left:0;right:0;top:100%;margin-top:3px;background:var(--bg-panel-raised,#141c25);border:1px solid rgba(255,255,255,.13);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.45);overflow:hidden;">'
+    +'<div style="padding:8px 8px 4px;"><input class="input" id="cpClientSearch" placeholder="Keresés..." style="margin:0;font-size:13px;" oninput="cpDropFilter()" onclick="event.stopPropagation()"></div>'
+    +'<div id="cpClientList" style="max-height:220px;overflow-y:auto;padding:4px 6px 6px;"></div>'
+    +'</div></div>'
     +'<div class="field" style="margin:0;min-width:200px;"><label>'+t('cs.cp.contactEmail')+' <span style="color:var(--brand-red);">*</span></label><input class="input" id="cpEmail" type="email" required placeholder="pl. logisztika@gyar.ro"></div>'
     +'<div class="field" style="margin:0;min-width:150px;"><label>'+t('cs.cp.nameOpt')+'</label><input class="input" id="cpNev"></div>'
     +'<button class="btn ok" style="height:42px;" onclick="cpInvite()">'+t('cs.cp.sendInvite')+'</button>'
@@ -1003,13 +1010,13 @@ function loadClientPortalAccess(){
     +'<div id="cpInviteLink"></div>'
     +'<div id="cpList"><div class="text-muted" style="font-size:12px;">'+t('fe.loading')+'</div></div>'
     +'</div>';
+  // bezárás külső kattintásra (idempotens — removeEventListener után add)
+  document.removeEventListener('click', cpDropClose);
+  document.addEventListener('click', cpDropClose);
   // ügyfél-lista a választóhoz ( /api/clients válasza: { clients:[...] } )
   fetch('/api/clients',{credentials:'same-origin'}).then(function(r){return r.json();}).then(function(list){
     _cpClients=Array.isArray(list)?list:((list&&(list.clients||list.rows))||[]);
-    var sel=document.getElementById('cpClientSel'); if(!sel) return;
-    if(!_cpClients.length){ sel.innerHTML='<option value="">'+t('cs.cp.noClients')+'</option>'; return; }
-    sel.innerHTML='<option value="">'+t('cs.cp.pickClient')+'</option>'+_cpClients.map(function(c){
-      return '<option value="'+c.id+'">'+esc(c.nev||('#'+c.id))+'</option>'; }).join('');
+    cpDropRender('');
   }).catch(function(){});
   cpRefresh();
 }
@@ -1033,6 +1040,40 @@ function cpRefresh(){
     }).join('');
   });
 }
+function cpDropToggle(e){
+  e.stopPropagation();
+  var d=document.getElementById('cpClientDrop'); if(!d) return;
+  var open=d.style.display==='none';
+  d.style.display=open?'block':'none';
+  if(open){ var s=document.getElementById('cpClientSearch'); if(s){ s.value=''; s.focus(); cpDropRender(''); } }
+}
+function cpDropClose(e){
+  var wrap=document.getElementById('cpClientWrap');
+  if(wrap&&!wrap.contains(e.target)){
+    var d=document.getElementById('cpClientDrop'); if(d) d.style.display='none';
+  }
+}
+function cpDropFilter(){
+  var q=(document.getElementById('cpClientSearch')||{}).value||'';
+  cpDropRender(q);
+}
+function cpDropRender(q){
+  var el=document.getElementById('cpClientList'); if(!el) return;
+  var lower=q.toLowerCase();
+  var list=_cpClients.filter(function(c){ return !q||((c.nev||'').toLowerCase().indexOf(lower)>=0); });
+  if(!list.length){
+    el.innerHTML='<div class="text-muted" style="font-size:12px;padding:6px 4px;">'+(_cpClients.length?'Nincs találat.':t('cs.cp.noClients'))+'</div>';
+    return;
+  }
+  el.innerHTML=list.map(function(c){
+    return '<div onclick="cpDropPick('+c.id+',\''+esc(c.nev||('#'+c.id))+'\')" style="padding:7px 8px;border-radius:7px;cursor:pointer;font-size:13.5px;" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'\'">'+esc(c.nev||('#'+c.id))+'</div>';
+  }).join('');
+}
+function cpDropPick(id, nev){
+  var h=document.getElementById('cpClientSel'); if(h) h.value=id;
+  var d=document.getElementById('cpClientDisplay'); if(d) d.value=nev;
+  var drop=document.getElementById('cpClientDrop'); if(drop) drop.style.display='none';
+}
 function cpInvite(){
   var cid=(document.getElementById('cpClientSel')||{}).value;
   var email=(document.getElementById('cpEmail')||{}).value.trim();
@@ -1046,6 +1087,8 @@ function cpInvite(){
       if(lb) lb.innerHTML='<div class="glass-soft" style="padding:10px 12px;margin-bottom:12px;border:1px solid rgba(34,197,94,.4);font-size:12px;">'
         +(r.emailed?'✉️ A meghívót elküldtük e-mailben. ':'')+'Jelszó-beállító link (másolható): <br><code style="word-break:break-all;color:var(--text-primary);">'+esc(r.link)+'</code></div>';
       document.getElementById('cpEmail').value=''; document.getElementById('cpNev').value='';
+      var hid=document.getElementById('cpClientSel'); if(hid) hid.value='';
+      var disp=document.getElementById('cpClientDisplay'); if(disp) disp.value='';
       cpRefresh();
     } else toast((r&&r.err)||'Hiba','err');
   });
