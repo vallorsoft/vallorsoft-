@@ -314,6 +314,81 @@ handlers.devCompanyDetail = async function (req, res, args) {
     }
   };
 
+// devCompanyAccess: cégenkénti HOZZÁFÉRÉS-statisztika (developer) —
+// felhasználók + alvállalkozók + ügyfelek: meghívott / aktív / inaktív
+// számok + ki mikor lépett be utoljára. A portál-userek (client_users/
+// carrier_users) pass_hash NULL = még nem aktiválta a meghívót (meghívott).
+handlers.devCompanyAccess = async function (req, res, args) {
+  const isDev = req.session.user && req.session.user.is_dev;
+  if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  try {
+    const cid = parseInt(Array.isArray(args) ? args[0] : args, 10);
+    if (!cid) return res.json({ result: { ok: false, err: 'ID-ul firmei lipseste.' } });
+
+    // ── Fő felhasználók (Admin/Manager/Sofer/Konyvelo) ──
+    const usersR = await pool.query(
+      `SELECT id, nume, email, pozicio, COALESCE(blocked,false) AS blocked, last_login
+         FROM users WHERE company_id = $1 AND pozicio_dev IS NOT TRUE
+         ORDER BY last_login DESC NULLS LAST, pozicio, nume`, [cid]);
+    // Meghívott, még nem regisztrált fő-userek (aktív meghívók)
+    const invR = await pool.query(
+      `SELECT COUNT(*)::int AS db FROM invites WHERE company_id = $1 AND status = 'Aktiv'`, [cid]);
+
+    // ── Alvállalkozó-portál userek (carrier_users) ──
+    const carrierUsersR = await pool.query(
+      `SELECT cu.nev AS nume, cu.email, c.nev AS carrier_nev, COALESCE(cu.activ,true) AS activ,
+              (cu.pass_hash IS NOT NULL) AS activated, cu.last_login
+         FROM carrier_users cu
+         LEFT JOIN carriers c ON c.id = cu.carrier_id AND c.company_id = cu.company_id
+        WHERE cu.company_id = $1
+        ORDER BY cu.last_login DESC NULLS LAST, cu.nev`, [cid]).catch(() => ({ rows: [] }));
+    const carriersCntR = await pool.query(
+      `SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE COALESCE(aktiv,true)) ::int AS active
+         FROM carriers WHERE company_id = $1`, [cid]).catch(() => ({ rows: [{ total: 0, active: 0 }] }));
+
+    // ── Ügyfél-portál userek (client_users) ──
+    const clientUsersR = await pool.query(
+      `SELECT cu.nev AS nume, cu.email, c.denumire AS client_nev, COALESCE(cu.activ,true) AS activ,
+              (cu.pass_hash IS NOT NULL) AS activated, cu.last_login
+         FROM client_users cu
+         LEFT JOIN clients c ON c.id = cu.client_id AND c.company_id = cu.company_id
+        WHERE cu.company_id = $1
+        ORDER BY cu.last_login DESC NULLS LAST, cu.nev`, [cid]).catch(() => ({ rows: [] }));
+    const clientsCntR = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM clients WHERE company_id = $1`, [cid]).catch(() => ({ rows: [{ total: 0 }] }));
+
+    // Aggregátumok kiszámítása (aktív = bekapcsolt + aktiválta a belépést;
+    // meghívott = portál-usernél pass_hash NULL; inaktív = activ=false).
+    const portalAgg = (rows) => {
+      let active = 0, invited = 0, inactive = 0;
+      rows.forEach((r) => {
+        if (!r.activ) inactive++;
+        else if (!r.activated) invited++;
+        else active++;
+      });
+      return { total: rows.length, active, invited, inactive };
+    };
+    const users = usersR.rows;
+    const usersAgg = {
+      total: users.length,
+      active: users.filter((u) => !u.blocked).length,
+      inactive: users.filter((u) => u.blocked).length,
+      invited: invR.rows[0].db,   // aktív (még fel nem használt) meghívók
+    };
+
+    return res.json({ result: { ok: true,
+      users: { list: users, agg: usersAgg },
+      carriers: { total: carriersCntR.rows[0].total, active: carriersCntR.rows[0].active,
+                  users: { list: carrierUsersR.rows, agg: portalAgg(carrierUsersR.rows) } },
+      clients: { total: clientsCntR.rows[0].total,
+                 users: { list: clientUsersR.rows, agg: portalAgg(clientUsersR.rows) } },
+    } });
+  } catch (err) {
+    console.error('devCompanyAccess hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 handlers.devStats = async function (req, res, args) {
       const isDev = req.session.user && req.session.user.is_dev;
     if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });

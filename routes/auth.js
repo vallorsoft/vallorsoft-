@@ -165,6 +165,7 @@ router.post('/api/login', async (req, res) => {
       is_dev: user.pozicio_dev || false,
     };
     audit.fromReq(req, 'login.success', 'user', user.id);   // best-effort audit
+    pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]).catch(() => {}); // utolsó belépés
 
     let redirect = '/sofer';
     if (user.pozicio_dev) redirect = '/developer';
@@ -359,6 +360,9 @@ router.post('/api/2fa/verify', async (req, res) => {
     // Sikeres -> vegleges bejelentkezes
     req.session.user = req.session.pendingUser;
     delete req.session.pendingUser;
+    if (req.session.user && req.session.user.id) {
+      pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [req.session.user.id]).catch(() => {}); // utolsó belépés
+    }
 
     return res.json({
       success: true,

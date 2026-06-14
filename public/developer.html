@@ -257,6 +257,10 @@
         style="padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;">
         ⚙️ Funkciók
       </button>
+      <button id="dtab-hozzaferes" onclick="switchDetailTab('hozzaferes')" data-i18n-html="dev.dtabAccess"
+        style="padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;">
+        👥 Hozzáférések
+      </button>
       <button id="dtab-hibak" onclick="switchDetailTab('hibak')" data-i18n-html="dev.dtabBugs"
         style="padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;">
         🐛 Hibajelentések
@@ -269,6 +273,7 @@
     <!-- Tab tartalom -->
     <div id="dpane-aktivitas" style="display:block;overflow-y:auto;max-height:60vh;" data-i18n="common.loading">Betöltés...</div>
     <div id="dpane-funkciok"  style="display:none;overflow-y:auto;max-height:60vh;" data-i18n="common.loading">Betöltés...</div>
+    <div id="dpane-hozzaferes" style="display:none;overflow-y:auto;max-height:60vh;" data-i18n="common.loading">Betöltés...</div>
     <div id="dpane-hibak"     style="display:none;overflow-y:auto;max-height:60vh;" data-i18n="common.loading">Betöltés...</div>
     <div id="dpane-integ"     style="display:none;overflow-y:auto;max-height:60vh;" data-i18n="common.loading">Betöltés...</div>
   </div>
@@ -649,16 +654,81 @@ function closeDetailModal(){ document.getElementById('detailModal').classList.re
 
 function switchDetailTab(tab){
   _detailTab = tab;
-  ['aktivitas','funkciok','hibak','integ'].forEach(function(t){
+  ['aktivitas','funkciok','hozzaferes','hibak','integ'].forEach(function(t){
     document.getElementById('dtab-'+t).style.fontWeight = t===tab ? '800' : '500';
     document.getElementById('dtab-'+t).style.borderBottom = t===tab ? '2px solid #a855f7' : '2px solid transparent';
     document.getElementById('dtab-'+t).style.color = t===tab ? '#fff' : 'var(--muted)';
     document.getElementById('dpane-'+t).style.display = t===tab ? 'block' : 'none';
   });
-  if(tab==='aktivitas') loadDetailAktivitas();
-  if(tab==='funkciok')  loadDetailFunkciok();
-  if(tab==='hibak')     loadDetailHibak();
-  if(tab==='integ')     loadDetailInteg();
+  if(tab==='aktivitas')  loadDetailAktivitas();
+  if(tab==='funkciok')   loadDetailFunkciok();
+  if(tab==='hozzaferes') loadDetailHozzaferes();
+  if(tab==='hibak')      loadDetailHibak();
+  if(tab==='integ')      loadDetailInteg();
+}
+
+// 👥 Hozzáférések: cégenkénti felhasználó/alvállalkozó/ügyfél statisztika —
+// meghívott / aktív / inaktív + ki mikor lépett be utoljára.
+function fmtDT(d){ if(!d) return '—'; try{ return new Date(d).toLocaleString('hu-HU',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return String(d).slice(0,16).replace('T',' '); } }
+function loadDetailHozzaferes(){
+  var el = document.getElementById('dpane-hozzaferes');
+  el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(168,85,247,0.2);border-top-color:#a855f7;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
+  gas('devCompanyAccess',[_detailCegId]).then(function(r){
+    if(!r||!r.ok){ el.innerHTML='<div style="color:var(--err);padding:20px;">'+escHtml((r&&r.err)||t('common.error'))+'</div>'; return; }
+    var html='';
+    // ── Felhasználók (fő app) ──
+    var ua=r.users.agg;
+    html += '<div style="font-weight:800;color:#fff;margin:4px 0 8px;">👥 '+escHtml(t('dev.accUsers'))+'</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">'
+      + kpiBox(t('dev.accTotal'), ua.total, '#3b82f6') + kpiBox(t('dev.accActive'), ua.active, '#22c55e')
+      + kpiBox(t('dev.accInactive'), ua.inactive, '#ef4444') + kpiBox(t('dev.accInvited'), ua.invited, '#f59e0b') + '</div>';
+    html += accTable([['dev.accName','nume'],['dev.accRole','pozicio'],['dev.accStatus','_ustatus'],['dev.accLastLogin','last_login']],
+      r.users.list.map(function(u){ u._ustatus = u.blocked ? '<span style="color:#ef4444">'+escHtml(t('dev.accBlocked'))+'</span>' : '<span style="color:#22c55e">'+escHtml(t('dev.accActiveOne'))+'</span>'; return u; }));
+
+    // ── Alvállalkozók ──
+    var ca=r.carriers.users.agg;
+    html += '<div style="font-weight:800;color:#fff;margin:18px 0 8px;">🚚 '+escHtml(t('dev.accCarriers'))
+      + ' <span style="font-weight:500;color:var(--muted);font-size:12px;">('+r.carriers.active+'/'+r.carriers.total+' '+escHtml(t('dev.accActivePl'))+')</span></div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">'
+      + kpiBox(t('dev.accUsersTotal'), ca.total, '#3b82f6') + kpiBox(t('dev.accActive'), ca.active, '#22c55e')
+      + kpiBox(t('dev.accInactive'), ca.inactive, '#ef4444') + kpiBox(t('dev.accInvited'), ca.invited, '#f59e0b') + '</div>';
+    html += accTable([['dev.accName','nume'],['dev.accCarrier','carrier_nev'],['dev.accStatus','_pstatus'],['dev.accLastLogin','last_login']],
+      r.carriers.users.list.map(decoratePortal));
+
+    // ── Ügyfelek ──
+    var cl=r.clients.users.agg;
+    html += '<div style="font-weight:800;color:#fff;margin:18px 0 8px;">🤝 '+escHtml(t('dev.accClients'))
+      + ' <span style="font-weight:500;color:var(--muted);font-size:12px;">('+r.clients.total+' '+escHtml(t('dev.accTotalLc'))+')</span></div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">'
+      + kpiBox(t('dev.accUsersTotal'), cl.total, '#3b82f6') + kpiBox(t('dev.accActive'), cl.active, '#22c55e')
+      + kpiBox(t('dev.accInactive'), cl.inactive, '#ef4444') + kpiBox(t('dev.accInvited'), cl.invited, '#f59e0b') + '</div>';
+    html += accTable([['dev.accName','nume'],['dev.accClient','client_nev'],['dev.accStatus','_pstatus'],['dev.accLastLogin','last_login']],
+      r.clients.users.list.map(decoratePortal));
+
+    el.innerHTML = html;
+  }).catch(function(){ el.innerHTML='<div style="color:var(--err);padding:20px;">'+escHtml(t('common.error'))+'</div>'; });
+}
+function decoratePortal(u){
+  // portál-user státusz: inaktív / meghívott (még nem aktiválta) / aktív
+  if(!u.activ) u._pstatus = '<span style="color:#ef4444">'+escHtml(t('dev.accInactiveOne'))+'</span>';
+  else if(!u.activated) u._pstatus = '<span style="color:#f59e0b">'+escHtml(t('dev.accInvitedOne'))+'</span>';
+  else u._pstatus = '<span style="color:#22c55e">'+escHtml(t('dev.accActiveOne'))+'</span>';
+  return u;
+}
+function accTable(cols, rows){
+  if(!rows.length) return '<div style="color:var(--muted);font-size:12px;padding:6px 2px 10px;">— '+escHtml(t('dev.accNone'))+'</div>';
+  var th = cols.map(function(c){ return '<th style="text-align:left;padding:6px 8px;color:var(--muted);font-weight:600;">'+escHtml(t(c[0]))+'</th>'; }).join('');
+  var tr = rows.map(function(row){
+    var tds = cols.map(function(c){
+      var k=c[1], v=row[k];
+      if(k==='last_login') v = fmtDT(v);
+      else if(k==='_ustatus'||k==='_pstatus') return '<td style="padding:6px 8px;">'+(v||'')+'</td>';  // már esc-elt HTML
+      else v = escHtml(v==null||v===''?'—':String(v));
+      return '<td style="padding:6px 8px;color:#fff;">'+v+'</td>';
+    }).join('');
+    return '<tr style="border-top:1px solid var(--border);">'+tds+'</tr>';
+  }).join('');
+  return '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px;"><thead><tr>'+th+'</tr></thead><tbody>'+tr+'</tbody></table>';
 }
 
 function loadDetailInteg(){
