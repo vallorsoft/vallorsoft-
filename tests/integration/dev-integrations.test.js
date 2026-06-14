@@ -29,7 +29,11 @@ d('Developer per-cég integrációk (valódi DB)', () => {
     expect(res.body.result.ok).toBe(true);
     expect(res.body.result.maps.vendor).toBe('free');
     expect(res.body.result.maps.has_key).toBe(false);
-    expect(res.body.result.uit_template).toBeNull();
+    // Új API: provider-szintű sablon-map (üres) + legacy oszlop (null) + GPS-katalógus.
+    expect(res.body.result.uit_templates).toEqual({});
+    expect(res.body.result.uit_template_legacy).toBeNull();
+    expect(Array.isArray(res.body.result.gps_providers)).toBe(true);
+    expect(res.body.result.gps_providers.length).toBeGreaterThan(0);
   });
 
   test('devSaveCompanyMaps HERE+kulcs → vendor=here, has_key=true; üres újra-mentés megőrzi', async () => {
@@ -52,14 +56,46 @@ d('Developer per-cég integrációk (valódi DB)', () => {
     expect(res.body.result.maps.vendor).toBe('free');
   });
 
-  test('devSaveCompanyUit ment + http-validáció', async () => {
-    await h.devSaveCompanyUit(dev(), makeRes(), [cid, { template: 'https://ct.ro/{rendszam}' }]);
+  test('devSaveCompanyUit provider-szintű mentés + olvasás vissza', async () => {
+    // CargoTrack sablon mentése a provider-map-be.
+    const s = makeRes();
+    await h.devSaveCompanyUit(dev(), s, [cid, { provider: 'cargotrack', template: 'https://ct.ro/{rendszam}' }]);
+    expect(s.body.result.ok).toBe(true);
     const res = makeRes();
     await h.devGetCompanyIntegrations(dev(), res, [cid]);
-    expect(res.body.result.uit_template).toBe('https://ct.ro/{rendszam}');
+    expect(res.body.result.uit_templates.cargotrack).toBe('https://ct.ro/{rendszam}');
+
+    // Második provider (fomco) — a két sablon egymás mellett él meg.
+    await h.devSaveCompanyUit(dev(), makeRes(), [cid, { provider: 'fomco', template: 'https://fomco.ro/{uit}' }]);
+    const res2 = makeRes();
+    await h.devGetCompanyIntegrations(dev(), res2, [cid]);
+    expect(res2.body.result.uit_templates.cargotrack).toBe('https://ct.ro/{rendszam}');
+    expect(res2.body.result.uit_templates.fomco).toBe('https://fomco.ro/{uit}');
+
+    // Üres sablon → a provider-kulcs törlődik a map-ből.
+    await h.devSaveCompanyUit(dev(), makeRes(), [cid, { provider: 'fomco', template: '' }]);
+    const res3 = makeRes();
+    await h.devGetCompanyIntegrations(dev(), res3, [cid]);
+    expect(res3.body.result.uit_templates.fomco).toBeUndefined();
+    expect(res3.body.result.uit_templates.cargotrack).toBe('https://ct.ro/{rendszam}');
+  });
+
+  test('devSaveCompanyUit validációk: http-séma + GPS-provider', async () => {
+    // Nem http(s) séma → elutasít.
     const bad = makeRes();
-    await h.devSaveCompanyUit(dev(), bad, [cid, { template: 'ftp://x' }]);
+    await h.devSaveCompanyUit(dev(), bad, [cid, { provider: 'cargotrack', template: 'ftp://x' }]);
     expect(bad.body.result.ok).toBe(false);
+    // Ismeretlen GPS-provider → elutasít.
+    const badProv = makeRes();
+    await h.devSaveCompanyUit(dev(), badProv, [cid, { provider: 'nincs_ilyen', template: 'https://x.ro' }]);
+    expect(badProv.body.result.ok).toBe(false);
+  });
+
+  test('devSaveCompanyUit legacy (provider nélküli) út a régi oszlopra', async () => {
+    await h.devSaveCompanyUit(dev(), makeRes(), [cid, { template: 'https://legacy.ro/{rendszam}' }]);
+    const res = makeRes();
+    await h.devGetCompanyIntegrations(dev(), res, [cid]);
+    expect(res.body.result.uit_template_legacy).toBe('https://legacy.ro/{rendszam}');
   });
 
   test('nem-dev tiltva', async () => {
