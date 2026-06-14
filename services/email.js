@@ -126,7 +126,7 @@ async function sendResetEmail(toEmail, nume, resetUrl, lang) {
   console.log('sendResetEmail called:', toEmail, !!BREVO_API_KEY);
   if (!BREVO_API_KEY || !BREVO_SENDER || !toEmail) {
     console.log('early return - BREVO config vagy toEmail hianyzik');
-    return;
+    return false; // nincs e-mail-konfig → a hívó kecsesen kezeli (emailed:false)
   }
   const L = lang === 'hu' ? 'hu' : 'ro';
   const nm = escHtml(nume);
@@ -176,11 +176,13 @@ async function sendResetEmail(toEmail, nume, resetUrl, lang) {
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
       console.error('Reset email Brevo hiba:', resp.status, JSON.stringify(data));
-    } else {
-      console.log('Reset email elkulve, messageId:', data.messageId);
+      return false; // Brevo elutasította → nem ment ki e-mail
     }
+    console.log('Reset email elkulve, messageId:', data.messageId);
+    return true; // sikeres kiküldés
   } catch (err) {
     console.error('Reset email hiba:', err.message);
+    return false; // hálózati/egyéb hiba → nem ment ki e-mail
   }
 }
 

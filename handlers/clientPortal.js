@@ -29,7 +29,7 @@ handlers.clientPortalList = async function (req, res, args) {
       `SELECT cu.id, cu.email, cu.nev, cu.activ, cu.last_login, cu.client_id,
               (cu.pass_hash IS NOT NULL) AS has_password,
               (cu.invite_token IS NOT NULL) AS pending_invite,
-              c.nev AS client_nev
+              c.denumire AS client_nev
        FROM client_users cu
        JOIN clients c ON c.id = cu.client_id AND c.company_id = cu.company_id
        WHERE ${where}
@@ -56,7 +56,7 @@ handlers.clientPortalInvite = async function (req, res, args) {
     if (!EMAIL_RE.test(email)) return res.json({ result: { ok: false, err: 'Adresă de e-mail invalidă.' } });
 
     // az ügyfél a saját cégé legyen
-    const cl = await pool.query('SELECT id, nev FROM clients WHERE id = $1 AND company_id = $2', [clientId, cid]);
+    const cl = await pool.query('SELECT id, denumire FROM clients WHERE id = $1 AND company_id = $2', [clientId, cid]);
     if (!cl.rows.length) return res.json({ result: { ok: false, err: 'Clientul nu a fost găsit.' } });
 
     // foglalt-e az e-mail (globálisan egyedi)

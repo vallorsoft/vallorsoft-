@@ -48,7 +48,7 @@ router.post('/api/portal/login', async (req, res) => {
 
     const r = await pool.query(
       `SELECT cu.id, cu.company_id, cu.client_id, cu.email, cu.nev, cu.pass_hash, cu.activ,
-              c.nev AS client_nev, co.nev AS ceg_nev
+              c.denumire AS client_nev, co.nev AS ceg_nev
        FROM client_users cu
        JOIN clients c ON c.id = cu.client_id AND c.company_id = cu.company_id
        JOIN companies co ON co.id = cu.company_id
@@ -108,7 +108,7 @@ router.post('/api/portal/set-password', async (req, res) => {
 
     // rögtön belépés
     const cR = await pool.query(
-      `SELECT c.nev AS client_nev, co.nev AS ceg_nev FROM clients c JOIN companies co ON co.id = c.company_id
+      `SELECT c.denumire AS client_nev, co.nev AS ceg_nev FROM clients c JOIN companies co ON co.id = c.company_id
        WHERE c.id = $1 AND c.company_id = $2`, [cu.client_id, cu.company_id]);
     req.session.clientUser = {
       id: cu.id, company_id: cu.company_id, client_id: cu.client_id, email: cu.email, nev: cu.nev,
@@ -292,5 +292,7 @@ module.exports = router;
 // segéd a meghívó-e-mailhez (a clientPortal handler használja) — lang: 'ro' alap
 module.exports._sendInvite = async function (toEmail, nev, link, lang) {
   if (!sendResetEmail) return false;
-  try { await sendResetEmail(toEmail, nev || toEmail, link, lang === 'hu' ? 'hu' : 'ro'); return true; } catch (_) { return false; }
+  // a tényleges kiküldés eredményét adjuk vissza (false, ha nincs e-mail-konfig
+  // vagy a Brevo elutasította) — így a meghívó kecsesen jelez emailed:false-t
+  try { return (await sendResetEmail(toEmail, nev || toEmail, link, lang === 'hu' ? 'hu' : 'ro')) === true; } catch (_) { return false; }
 };
