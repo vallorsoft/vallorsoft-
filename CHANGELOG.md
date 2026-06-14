@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-06-14 — Single-open accordion menü + fix sidebar/fejléc (app-shell)
+
+- **Accordion (single-open)** (`console-shared.js`): a `toggleGroup` mostantól bezárja a többi nyitott főmenüt, mielőtt a kattintottat nyitja — egyszerre csak egy főmenü van nyitva, és ha másik főmenüre kattintasz, az előző becsukódik (ugyanarra a fejlécre 2. kattintás becsuk). Az `activateTab` is bezárja a többi csoportot a navigált elem szülő-csoportjának nyitása előtt (globális keresőből/visszaállításból is konzisztens).
+- **Fix sidebar + fix fejléc** (`style.css`, `@media min-width:769px` — app-shell): a bal panel (főmenük) ÉS a felső sáv (fejléc + kereső) **fixen marad görgetéskor**, csak a tartalom görgödik. `app-layout` height:100vh+overflow:hidden, `sidebar` height:100vh+overflow-y:auto (hosszú menü a sidebaron belül görgödik), `main-content` height:100vh (a `vs-topbar` sticky a tetején). A mobil (≤768px) drawer-elrendezés érintetlen + explicit `height:auto;overflow:visible` védelem. node --check zöld, CSS zárójel-egyensúly OK.
+
+---
+
 ## 2026-06-14 — FGO-menü kattintás-regresszió javítva (admin + manager)
 
 - **Hiba:** a sidebar kattintás-kötése (`admin.js`/`manager.js`) felülírta az új `.nav-head` fejlécek inline `toggleGroup`-ját, és csak a RÉGI parent-id-ket (orders/stats/userParentTab) kezelte → az új FGO-fejlécek (Megrendelések/Dokumentumok/Flotta) `data-tab` nélkül `activateTab(undefined)`-ot hívtak: **nem nyíltak le az almenük, és a tartalom kiürült**.
