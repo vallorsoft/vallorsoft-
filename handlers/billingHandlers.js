@@ -125,7 +125,7 @@ handlers.getSubscriptionPlans = async function (req, res, args) {
   try {
     if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
     const r = await pool.query(
-      'SELECT id, name, description, price_net, vat_percent, is_active, sort_order, max_users, max_vehicles, max_orders_per_month, stripe_price_id FROM subscription_plans ORDER BY sort_order'
+      'SELECT id, name, description, price_net, vat_percent, is_active, sort_order, max_users, max_vehicles, max_orders_per_month, max_sofors, stripe_price_id FROM subscription_plans ORDER BY sort_order'
     );
     return res.json({ result: { ok: true, plans: r.rows } });
   } catch (err) {
@@ -141,15 +141,17 @@ handlers.updateSubscriptionPlan = async function (req, res, args) {
     const id = parseInt(a.id, 10);
     if (!id) return res.json({ result: { ok: false, err: 'ID-ul pachetului lipseste' } });
     const price = parseFloat(a.price_net);
-    // Csomag-limitek: üres/0 alatti = NULL (korlátlan).
+    // 0 = TILTOTT (nincs engedély); NULL = korlátlan; negatív/üres = NULL (korlátlan)
     const lim = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) && n >= 0 ? n : null; };
     const stripePrice = a.stripe_price_id != null ? (String(a.stripe_price_id).trim() || null) : null;
     await pool.query(
-      `UPDATE subscription_plans SET name = $1, description = $2, price_net = $3, is_active = $4,
-              max_users = $5, max_vehicles = $6, max_orders_per_month = $7, stripe_price_id = $8, updated_at = now()
-        WHERE id = $9`,
+      `UPDATE subscription_plans SET name=$1, description=$2, price_net=$3, is_active=$4,
+              max_users=$5, max_vehicles=$6, max_orders_per_month=$7, stripe_price_id=$8,
+              max_sofors=$9, updated_at=now()
+        WHERE id=$10`,
       [String(a.name || '').trim() || 'Csomag', a.description || null, Number.isFinite(price) ? price : 0, a.is_active !== false,
-       lim(a.max_users), lim(a.max_vehicles), lim(a.max_orders_per_month), stripePrice, id]
+       lim(a.max_users), lim(a.max_vehicles), lim(a.max_orders_per_month), stripePrice,
+       lim(a.max_sofors), id]
     );
     return res.json({ result: { ok: true } });
   } catch (err) {
@@ -347,6 +349,49 @@ handlers.getHereUsageByCompany = async function (req, res, args) {
     } });
   } catch (err) {
     console.error('getHereUsageByCompany hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ─── Csomag-szintű funkció-kapcsolók (plan_features) — developer ──
+handlers.getPlanFeatures = async function (req, res, args) {
+  try {
+    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Doar developer' } });
+    const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
+    const planId = parseInt(a.plan_id, 10);
+    if (!planId) return res.json({ result: { ok: false, err: 'ID-ul pachetului lipseste' } });
+    const r = await pool.query('SELECT feature_key, enabled FROM plan_features WHERE plan_id = $1', [planId]);
+    const features = {};
+    r.rows.forEach((row) => { features[row.feature_key] = row.enabled; });
+    return res.json({ result: { ok: true, features } });
+  } catch (err) {
+    console.error('getPlanFeatures hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.setPlanFeature = async function (req, res, args) {
+  try {
+    if (!isDev(req.session.user)) return res.json({ result: { ok: false, err: 'Doar developer' } });
+    const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
+    const planId = parseInt(a.plan_id, 10);
+    const key = String(a.feature_key || '').trim();
+    if (!planId || !key) return res.json({ result: { ok: false, err: 'Parametri lipsa' } });
+    if (a.enabled === null || a.enabled === undefined) {
+      // törlés: vissza az alapértelmezett (true) állapotba
+      await pool.query('DELETE FROM plan_features WHERE plan_id = $1 AND feature_key = $2', [planId, key]);
+    } else {
+      const enabled = a.enabled !== false && a.enabled !== 0;
+      await pool.query(
+        `INSERT INTO plan_features (plan_id, feature_key, enabled, updated_at)
+         VALUES ($1, $2, $3, now())
+         ON CONFLICT (plan_id, feature_key) DO UPDATE SET enabled = $3, updated_at = now()`,
+        [planId, key, enabled]
+      );
+    }
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('setPlanFeature hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };

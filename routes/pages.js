@@ -8,13 +8,22 @@ const router = express.Router();
 const pool = require('../db');
 const { requirePageLogin, requirePageRole } = require('../middleware/pageGuard');
 
-// A funkció be van-e kapcsolva a cégnél (hiányzó sor = engedélyezett).
+// Hierarchia: company_features (override) > plan_features (csomag default) > true
 async function featureEnabled(companyId, key) {
   if (!companyId) return true;
   try {
-    const r = await pool.query(
-      'SELECT enabled FROM company_features WHERE company_id = $1 AND feature_key = $2', [companyId, key]);
-    return r.rows.length ? r.rows[0].enabled !== false : true;
+    // 1. Cég-szintű override (felülírja a plan-t)
+    const cr = await pool.query(
+      'SELECT enabled FROM company_features WHERE company_id=$1 AND feature_key=$2', [companyId, key]);
+    if (cr.rows.length) return cr.rows[0].enabled !== false;
+    // 2. Csomag-szintű alapértelmezés
+    const pr = await pool.query(
+      `SELECT pf.enabled FROM plan_features pf
+         JOIN companies c ON c.subscription_plan_id = pf.plan_id
+        WHERE c.id=$1 AND pf.feature_key=$2`, [companyId, key]);
+    if (pr.rows.length) return pr.rows[0].enabled !== false;
+    // 3. Default: engedélyezett
+    return true;
   } catch (e) { return true; }
 }
 

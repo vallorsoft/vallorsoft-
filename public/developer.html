@@ -383,15 +383,29 @@ function loadPlanEditor(){
     el.innerHTML=(r.plans||[]).map(function(p){
       var net=parseFloat(p.price_net)||0, vat=parseFloat(p.vat_percent)||21;
       var brutto=net*(1+vat/100), afa=brutto-net;
+      var limVal=function(v){ return (v===null||v===undefined)?'':''+v; };
       return '<div class="ceg-card">'
         +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
         +'<div class="ceg-name">'+p.id+' — '+escHtml(p.name)+'</div>'
         +'<label class="fsw"><input type="checkbox" id="plActive_'+p.id+'" '+(p.is_active?'checked':'')+'><span class="fsw-s"></span></label></div>'
-        +'<div class="field"><label>'+escHtml(t('dev.fName'))+'</label><input class="input" id="plName_'+p.id+'" value="'+escHtml(p.name)+'"></div>'
-        +'<div class="field"><label>'+escHtml(t('dev.fDesc'))+'</label><input class="input" id="plDesc_'+p.id+'" value="'+escHtml(p.description||'')+'"></div>'
-        +'<div class="field"><label>'+escHtml(t('dev.fNetPrice'))+'</label><input class="input" id="plPrice_'+p.id+'" type="number" step="0.01" value="'+net.toFixed(2)+'" oninput="recalcPlan('+p.id+','+vat+')"></div>'
-        +'<div style="font-size:13px;color:var(--muted);margin-bottom:12px;">'+escHtml(t('dev.vat'))+' ('+vat+'%): <span id="plVat_'+p.id+'">'+afa.toFixed(2)+'</span> EUR &nbsp;·&nbsp; '+escHtml(t('dev.gross'))+': <b style="color:#6366f1;" id="plGross_'+p.id+'">'+brutto.toFixed(2)+'</b> EUR</div>'
-        +'<button class="btn-dev" onclick="savePlan('+p.id+')">💾 '+escHtml(t('common.save'))+'</button>'
+        +'<div class="field"><label>Csomag neve</label><input class="input" id="plName_'+p.id+'" value="'+escHtml(p.name)+'"></div>'
+        +'<div class="field"><label>Leírás</label><input class="input" id="plDesc_'+p.id+'" value="'+escHtml(p.description||'')+'"></div>'
+        +'<div class="field"><label>Nettó ár (EUR/hó)</label><input class="input" id="plPrice_'+p.id+'" type="number" step="0.01" value="'+net.toFixed(2)+'" oninput="recalcPlan('+p.id+','+vat+')"></div>'
+        +'<div style="font-size:13px;color:var(--muted);margin-bottom:12px;">ÁFA ('+vat+'%): <span id="plVat_'+p.id+'">'+afa.toFixed(2)+'</span> EUR &nbsp;·&nbsp; Bruttó: <b style="color:#6366f1;" id="plGross_'+p.id+'">'+brutto.toFixed(2)+'</b> EUR</div>'
+        // Limitek
+        +'<div style="background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:14px;margin-bottom:14px;">'
+        +'<div style="font-size:12px;font-weight:700;color:#6366f1;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em;">📊 Limitek (0=tiltott, üres=korlátlan)</div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+        +'<div class="field" style="margin:0"><label style="font-size:11px;">Max. felhasználó</label><input class="input" id="plMaxU_'+p.id+'" type="number" min="0" placeholder="∞" value="'+limVal(p.max_users)+'"></div>'
+        +'<div class="field" style="margin:0"><label style="font-size:11px;">Max. jármű</label><input class="input" id="plMaxV_'+p.id+'" type="number" min="0" placeholder="∞" value="'+limVal(p.max_vehicles)+'"></div>'
+        +'<div class="field" style="margin:0"><label style="font-size:11px;">Max. fuvar/hó</label><input class="input" id="plMaxO_'+p.id+'" type="number" min="0" placeholder="∞" value="'+limVal(p.max_orders_per_month)+'"></div>'
+        +'<div class="field" style="margin:0"><label style="font-size:11px;">Max. sofőr</label><input class="input" id="plMaxS_'+p.id+'" type="number" min="0" placeholder="∞" value="'+limVal(p.max_sofors)+'"></div>'
+        +'</div></div>'
+        // Stripe
+        +'<div class="field"><label>Stripe Price ID <span style="font-size:11px;color:var(--muted);">(price_xxx)</span></label><input class="input" id="plStripe_'+p.id+'" placeholder="price_..." value="'+escHtml(p.stripe_price_id||'')+'"></div>'
+        +'<button class="btn-dev" onclick="savePlan('+p.id+')">💾 Mentés</button>'
+        +' <button class="btn-dev" onclick="loadPlanFeatures('+p.id+')" style="margin-left:8px;">⚙️ Funkció-kapcsolók</button>'
+        +'<div id="planFeatDiv_'+p.id+'" style="display:none;margin-top:14px;"></div>'
         +'</div>';
     }).join('');
   });
@@ -403,12 +417,63 @@ function recalcPlan(id,vat){
   if(v) v.textContent=afa.toFixed(2); if(g) g.textContent=brutto.toFixed(2);
 }
 function savePlan(id){
+  var lim=function(elId){ var v=document.getElementById(elId).value.trim(); if(v==='') return null; var n=parseInt(v,10); return isNaN(n)||n<0?null:n; };
   var f={id:id,
     name:document.getElementById('plName_'+id).value.trim(),
     description:document.getElementById('plDesc_'+id).value.trim(),
     price_net:document.getElementById('plPrice_'+id).value,
-    is_active:document.getElementById('plActive_'+id).checked};
-  gas('updateSubscriptionPlan',[f]).then(function(r){ if(r&&r.ok){toast(t('dev.planSaved'),'ok');loadPlanEditor();}else{toast((r&&r.err)||t('common.error'),'err');} });
+    is_active:document.getElementById('plActive_'+id).checked,
+    max_users:lim('plMaxU_'+id),
+    max_vehicles:lim('plMaxV_'+id),
+    max_orders_per_month:lim('plMaxO_'+id),
+    max_sofors:lim('plMaxS_'+id),
+    stripe_price_id:document.getElementById('plStripe_'+id).value.trim()||null};
+  gas('updateSubscriptionPlan',[f]).then(function(r){ if(r&&r.ok){toast('Csomag mentve','ok');loadPlanEditor();}else{toast((r&&r.err)||t('common.error'),'err');} });
+}
+// Csomag funkció-kapcsolói
+var _planFeatOpen={};
+function loadPlanFeatures(planId){
+  var div=document.getElementById('planFeatDiv_'+planId); if(!div) return;
+  if(_planFeatOpen[planId]){ div.style.display='none'; _planFeatOpen[planId]=false; return; }
+  _planFeatOpen[planId]=true; div.style.display='block';
+  div.innerHTML='<div style="color:var(--muted);font-size:13px;">Betöltés...</div>';
+  gas('getPlanFeatures',[{plan_id:planId}]).then(function(r){
+    if(!r||!r.ok){ div.innerHTML='<div style="color:var(--err);">Hiba</div>'; return; }
+    var feats=r.features||{};
+    var cat={}, order=[];
+    (window.VS_FEATURES||[]).forEach(function(f){
+      if(f.core) return;
+      if(!cat[f.group]){ cat[f.group]=[]; order.push(f.group); }
+      cat[f.group].push(f);
+    });
+    var html='<div style="border:1px solid rgba(99,102,241,.25);border-radius:10px;padding:14px;">'
+      +'<div style="font-size:12px;font-weight:700;color:#6366f1;margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em;">⚙️ Csomag funkció-kapcsolók <span style="font-weight:400;color:var(--muted);font-size:11px;">(hiányzó = alapból BE)</span></div>';
+    order.forEach(function(grp){
+      html+='<div style="font-size:11px;font-weight:600;color:var(--muted);margin:10px 0 4px;">'+escHtml(grp)+'</div>';
+      cat[grp].forEach(function(f){
+        var cur=feats[f.key]; // true/false/undefined
+        var isOn=cur===undefined?null:(cur===true?true:false);
+        // három állapot: BE (true), KI (false), alapértelmezett (null=hiányzó sor=BE)
+        html+='<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);">'
+          +'<select class="input" style="width:110px;padding:3px 7px;font-size:12px;" onchange="setPlanFeat('+planId+',\''+escHtml(f.key)+'\',this.value)">'
+          +'<option value="default"'+(isOn===null?' selected':'')+'>⬜ Alap (BE)</option>'
+          +'<option value="true"'+(isOn===true?' selected':'')+'>✅ Bekapcsolva</option>'
+          +'<option value="false"'+(isOn===false?' selected':'')+'>🚫 Letiltva</option>'
+          +'</select>'
+          +'<span style="font-size:13px;">'+escHtml(f.label)+'</span>'
+          +(f.optIn?'<span style="font-size:10px;color:#f59e0b;margin-left:4px;">(opt-in)</span>':'')
+          +'</div>';
+      });
+    });
+    html+='</div>';
+    div.innerHTML=html;
+  });
+}
+function setPlanFeat(planId, key, val){
+  var enabled=val==='true'?true:(val==='false'?false:null);
+  gas('setPlanFeature',[{plan_id:planId,feature_key:key,enabled:enabled}]).then(function(r){
+    if(r&&r.ok) toast('Módosítva','ok'); else toast((r&&r.err)||t('common.error'),'err');
+  });
 }
 function loadCompBilling(){
   gas('getCompaniesBillingOverview').then(function(ov){
