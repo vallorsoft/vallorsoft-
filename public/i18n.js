@@ -368,6 +368,7 @@
     'cs.cp.hint': { hu: 'Meghívhatod az ügyfél kapcsolattartóját, hogy belépjen a <b>/portal</b> oldalon, és csak a SAJÁT cége fuvarjait lássa (státusz, élő követés, dokumentumok), illetve új fuvart igényeljen (jóváhagyással).', ro: 'Poți invita persoana de contact a clientului să se autentifice pe <b>/portal</b> și să vadă doar cursele PROPRIEI firme (status, urmărire live, documente) și să solicite curse noi (cu aprobare).' },
     'cs.cp.client': { hu: 'Ügyfél', ro: 'Client' },
     'cs.cp.pickClient': { hu: '— Válassz ügyfelet —', ro: '— Alege un client —' },
+    'cs.cp.noClients': { hu: '— Nincs még ügyfél (előbb vegyél fel egyet) —', ro: '— Niciun client încă (adaugă mai întâi unul) —' },
     'cs.cp.contactEmail': { hu: 'Kapcsolattartó e-mail', ro: 'E-mail persoană de contact' },
     'cs.cp.nameOpt': { hu: 'Név (opcionális)', ro: 'Nume (opțional)' },
     'cs.cp.sendInvite': { hu: '＋ Meghívó küldése', ro: '＋ Trimite invitație' },
