@@ -111,6 +111,7 @@ const translations = {
     footerTagline: 'Platformă SaaS pentru transport rutier & management flotă — România',
     footerTerms: 'Termeni și Condiții',
     footerPrivacy: 'Politica de Confidențialitate',
+    footerCookiePolicy: 'Politica Cookie',
     footerCookies: 'Setări Cookie',
     footerRights: 'Toate drepturile rezervate.',
   },
@@ -221,6 +222,7 @@ const translations = {
     footerTagline: 'SaaS platform közúti fuvarozáshoz és flottakezeléshez — Románia',
     footerTerms: 'Általános Szerződési Feltételek',
     footerPrivacy: 'Adatvédelmi nyilatkozat',
+    footerCookiePolicy: 'Cookie-szabályzat',
     footerCookies: 'Cookie beállítások',
     footerRights: 'Minden jog fenntartva.',
   }
