@@ -43,7 +43,12 @@ body {
 
 /* 🖥️ DASHBOARD LAYOUT (ADMIN & MANAGER) */
 .app-layout { display: flex; min-height: 100vh; }
-.sidebar { width: 260px; background: linear-gradient(180deg, rgba(12,18,24,0.95), rgba(5,7,11,0.98)); border-right: 1px solid var(--border); padding: 24px 16px; display: flex; flex-direction: column; gap: 20px; flex-shrink: 0; }
+.sidebar { width: 260px; background: linear-gradient(180deg, rgba(12,18,24,0.95), rgba(5,7,11,0.98)); border-right: 1px solid var(--border); padding: 24px 16px; display: flex; flex-direction: column; gap: 3px; flex-shrink: 0; }
+/* A logó/alcím kapja vissza a levegőt (a szűk menü-rés ne érintse őket) */
+.sidebar .sidebar-logo { margin-bottom: 2px; }
+.sidebar .sidebar-subtitle { margin-bottom: 12px; }
+/* A régi (manager) szekció-feliratos elrendezésnél a csoportok közé kis tér */
+.sidebar .menu-group + .menu-group .menu-title { margin-top: 10px; }
 .main-content { flex: 1; padding: 24px; overflow-y: auto; }
 
 .menu-group { display: flex; flex-direction: column; gap: 4px; }
