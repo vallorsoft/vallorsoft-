@@ -31,6 +31,19 @@ Fuvarozási / flottakezelő webalkalmazás (Node.js + Express 5 + PostgreSQL).
 **Kétnyelvű felület: román alap + magyar váltó** (`public/i18n.js`, `data-i18n`; téma-kapcsoló melletti nyelvváltó). A szerveroldali kifelé menő üzenetek románul (a push/e-mail kétnyelvű RO/HU). Román (RO) piacra szabott integrációkkal (**univerzális számlázó**: FGO/SmartBill/Oblio/iFactura/Facturis, ANAF/UIT e-fuvarlevél). PWA + web push, Firebase, multi-tenant (cégenként elkülönített adat).
 
 > **Aktuális fókusz:** kinézet (UI) és funkciók javítása. A „Felületek és kinézet” szekció a térkép ehhez — melyik oldal melyik fájlokból áll, hol a CSS, mi a dizájn-rendszer.
+>
+> ### 📍 Hol tartunk (2026-06-14 vége) — állapot + következő fókusz
+> **KÉSZ ebben a nagy körben (PR #87–#94, mind mergelve + élesítve):**
+> - **Teljes frontend-redesign** a landing prémium kék/indigó palettájára (világos-alap + dark navy; gradiens kártyák, felső sheen, kék glow gombok, gradiens KPI) — MINDEN oldal (admin/manager konzol, auth, jogi, sofőr `sofer.css`, developer, útvonaltervezés, ügyfél-portál, követés, alvállalkozó, könyvelő). Csak megjelenés, funkció érintetlen.
+> - **Admin konzol FGO-elrendezés:** ikonos (monokróm vonalas SVG) 10-főmenüs sidebar (32 menüpont), **fix felső sáv** (breadcrumb + nyelv/téma), **globális kereső** (`Ctrl+K` command palette: menü-navigáció + élő adatkeresés `handlers/globalSearch.js`-en át — fuvar/ügyfél/jármű/sofőr, `company_id`-szűrt).
+> - **Átfogó átvilágítás** (3 agent: HTML/JS/szerver) + élesben (futó szerver) tesztelés: olvashatóság/kontraszt-javítások, szín-maradékok rendezése, 108 teszt zöld, require-sweep 82 modul 0 hiba.
+> - **Multi-tenant adatszivárgás-audit** (`AUDIT.md` 11. lépés): 1 KRITIKUS cross-tenant write (`orderDocUpload`) javítva, defenzív push.js megerősítés; a többi réteg verifikáltan izolált.
+>
+> **MÉG NINCS / nyitott (következő alkalmakra):**
+> - **KÖVETKEZŐ FÓKUSZ: a LANDING PAGE** (`index.html` + `landing.css` + `landing.js`) — finomítás/bővítés. Ötlet a lezárt #77-ből: „showcase" szekció (3 monitor + 2 telefon mockup, `public/img/` képekkel) átemelése a JELENLEGI prémium landingre (a régi verzió visszahozása nélkül). A #77 PR lezárva (elavult volt), a tartalmát NEM mergeltük.
+> - **Manager + többi konzol FGO-menüsítése:** az ikonos főmenü + fix felső sáv + globális kereső EGYELŐRE CSAK az adminon van; a `manager.html` még a régi szöveges-szekciós sidebart használja (működik, de nem ikonos) — következő kör ugyanaz a recept.
+> - **Globális kereső bővítés (opc.):** számlák / menetlevelek / megrendelések is a `globalSearch`-be.
+> - Lásd még lent a „Nyitott jövőbeli munka" (Stripe éles, SAF-T) — nem sürgős.
 
 ## Fejlesztési állapot (2026-06-14)
 
