@@ -153,9 +153,20 @@ handlers.getMyFeatures = async function (req, res, args) {
     if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
     const cid = req.session.user.company_id;
     if (!cid) return res.json({ result: { ok: true, features: {} } });
-    const r = await pool.query('SELECT feature_key, enabled FROM company_features WHERE company_id = $1', [cid]);
+
+    // 1. Csomag-szintű alapértelmezések (plan_features)
+    const planR = await pool.query(
+      `SELECT pf.feature_key, pf.enabled FROM plan_features pf
+         JOIN companies c ON c.subscription_plan_id = pf.plan_id
+        WHERE c.id = $1`, [cid]).catch(() => ({ rows: [] }));
     const features = {};
-    r.rows.forEach((row) => { features[row.feature_key] = row.enabled; });
+    planR.rows.forEach((row) => { features[row.feature_key] = row.enabled; });
+
+    // 2. Cég-szintű override (company_features) — felülírja a plan-t
+    const compR = await pool.query(
+      'SELECT feature_key, enabled FROM company_features WHERE company_id = $1', [cid]);
+    compR.rows.forEach((row) => { features[row.feature_key] = row.enabled; });
+
     return res.json({ result: { ok: true, features } });
   } catch (err) {
     console.error('getMyFeatures hiba:', err);
