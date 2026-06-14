@@ -156,18 +156,33 @@
   function openRequest() { $('reqBox').classList.toggle('hidden'); $('reqHint').classList.toggle('hidden'); }
   function sendRequest() {
     var p = {
+      ref: $('rqRef').value.trim(),
       loc_incarcare: $('rqFrom').value.trim(), loc_descarcare: $('rqTo').value.trim(),
+      data_incarcare: $('rqDate').value || null, data_descarcare: $('rqDate2').value || null,
       suly_kg: $('rqW').value || null, load_type: $('rqType').value || null,
-      data_incarcare: $('rqDate').value || null, megjegyzes: $('rqNote').value.trim(),
+      hossz_cm: $('rqLen').value || null, szel_cm: $('rqWid').value || null, mag_cm: $('rqHei').value || null,
+      megjegyzes: $('rqNote').value.trim(),
     };
-    if (!p.loc_incarcare || !p.loc_descarcare) { toast(t('por.addrRequired'), 'err'); return; }
-    api('POST', '/api/portal/request', p).then(function (r) {
-      if (r && r.ok) {
-        toast(t('por.reqSent'), 'ok');
-        ['rqFrom', 'rqTo', 'rqW', 'rqDate', 'rqNote'].forEach(function (i) { $(i).value = ''; }); $('rqType').value = '';
-        openRequest();
-      } else toast((r && r.err) || t('common.error'), 'err');
-    });
+    var clearAll = function () {
+      ['rqRef', 'rqFrom', 'rqTo', 'rqW', 'rqDate', 'rqDate2', 'rqLen', 'rqWid', 'rqHei', 'rqNote', 'rqDoc']
+        .forEach(function (i) { if ($(i)) $(i).value = ''; });
+      $('rqType').value = '';
+    };
+    var submit = function () {
+      api('POST', '/api/portal/request', p).then(function (r) {
+        if (r && r.ok) { toast(t('por.reqSent'), 'ok'); clearAll(); openRequest(); }
+        else toast((r && r.err) || t('common.error'), 'err');
+      });
+    };
+    // Opcionális dokumentum beolvasása base64-be (max ~10 MB), majd küldés.
+    var f = $('rqDoc') && $('rqDoc').files && $('rqDoc').files[0];
+    if (f) {
+      if (f.size > 10 * 1024 * 1024) { toast(t('por.docTooLarge'), 'err'); return; }
+      var rd = new FileReader();
+      rd.onload = function (e) { p.doc_base64 = e.target.result; p.doc_name = f.name; submit(); };
+      rd.onerror = function () { toast(t('common.error'), 'err'); };
+      rd.readAsDataURL(f);
+    } else { submit(); }
   }
 
   window.Portal = { login: login, setPw: setPw, logout: logout, track: track, closeMap: closeMap, openRequest: openRequest, sendRequest: sendRequest };

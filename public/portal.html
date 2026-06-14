@@ -107,14 +107,25 @@
     <div>
       <div class="glass hidden" id="reqBox" style="padding:16px 18px">
         <div class="h" data-i18n="por.newOrderReq">＋ Új fuvar igénylése</div>
-        <div class="field"><label data-i18n="por.loadAddrReq">Felrakó címe *</label><input class="inp" id="rqFrom"></div>
-        <div class="field"><label data-i18n="por.unloadAddrReq">Lerakó címe *</label><input class="inp" id="rqTo"></div>
+        <div class="muted" style="font-size:12px;margin-bottom:8px" data-i18n="por.reqAllOptional">Toate câmpurile sunt opționale — completați ce știți, sau atașați un document. / Minden mező opcionális — töltsd ki amit tudsz, vagy csatolj dokumentumot.</div>
+        <div class="field"><label data-i18n="por.refField">Referință / Referencia</label><input class="inp" id="rqRef"></div>
+        <div class="field"><label data-i18n="por.loadAddr">Felrakó címe</label><input class="inp" id="rqFrom"></div>
+        <div class="field"><label data-i18n="por.unloadAddr">Lerakó címe</label><input class="inp" id="rqTo"></div>
+        <div style="display:flex;gap:10px">
+          <div class="field" style="flex:1"><label data-i18n="por.loadDate">Felrakás dátuma</label><input class="inp" id="rqDate" type="date"></div>
+          <div class="field" style="flex:1"><label data-i18n="por.unloadDate">Lerakás dátuma</label><input class="inp" id="rqDate2" type="date"></div>
+        </div>
         <div style="display:flex;gap:10px">
           <div class="field" style="flex:1"><label data-i18n="por.weightKg">Súly (kg)</label><input class="inp" id="rqW" type="number"></div>
           <div class="field" style="flex:1"><label data-i18n="por.type">Típus</label><select class="inp" id="rqType"><option value="">—</option><option>FTL</option><option>LTL</option></select></div>
         </div>
-        <div class="field"><label data-i18n="por.loadDate">Felrakás dátuma</label><input class="inp" id="rqDate" type="date"></div>
+        <div style="display:flex;gap:10px">
+          <div class="field" style="flex:1"><label data-i18n="por.lenCm">Hossz (cm)</label><input class="inp" id="rqLen" type="number"></div>
+          <div class="field" style="flex:1"><label data-i18n="por.widthCm">Szél. (cm)</label><input class="inp" id="rqWid" type="number"></div>
+          <div class="field" style="flex:1"><label data-i18n="por.heightCm">Mag. (cm)</label><input class="inp" id="rqHei" type="number"></div>
+        </div>
         <div class="field"><label data-i18n="por.note">Megjegyzés</label><input class="inp" id="rqNote"></div>
+        <div class="field"><label data-i18n="por.attachDoc">📎 Dokumentum (PDF/kép) — opcionális</label><input class="inp" id="rqDoc" type="file" accept=".pdf,image/*"></div>
         <button class="btn ok" style="width:100%" onclick="Portal.sendRequest()" data-i18n="por.sendReq">Igénylés elküldése →</button>
       </div>
       <div class="glass" id="reqHint" style="padding:16px 18px">

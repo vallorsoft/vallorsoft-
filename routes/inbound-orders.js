@@ -64,16 +64,35 @@ router.post('/api/inbound-orders/poll', requireLogin, requireRole('Admin', 'Mana
 });
 
 // ---- Lista ----
+// Szűrhető: ?status=, ?source= (csak ez a forrás), ?exclude_source= (ezt a forrást kihagyja).
+// A portál-kérések a külön „Ügyfél kérések" fülre mennek (source=portal); az e-mail
+// intake „Megrendelések" füle a portált kihagyja (exclude_source=portal).
 router.get('/api/inbound-orders', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
-  const status = req.query.status;
+  const { status, source, exclude_source } = req.query;
   try {
     const params = [own(req)];
-    let sql = `SELECT ${LIST_COLS} FROM inbound_orders WHERE company_id=$1`;
-    if (status) { params.push(status); sql += ` AND status=$2`; }
-    sql += ` ORDER BY received_at DESC NULLS LAST, created_at DESC LIMIT 200`;
+    let sql = `SELECT ${LIST_COLS}, source FROM inbound_orders WHERE company_id=$1`;
+    if (status) { params.push(status); sql += ` AND status=$${params.length}`; }
+    if (source) { params.push(source); sql += ` AND source=$${params.length}`; }
+    if (exclude_source) { params.push(exclude_source); sql += ` AND (source IS NULL OR source<>$${params.length})`; }
+    sql += ` ORDER BY received_at DESC NULLS LAST, created_at DESC LIMIT 300`;
     const { rows } = await pool.query(sql, params);
     res.json({ items: rows });
   } catch (e) { console.error('GET /api/inbound-orders hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
+});
+
+// ---- Feldolgozatlan beérkezők száma (lebegő értesítő-sávhoz, sidebar-badge) ----
+// Feldolgozatlan = minden, ami még nincs jóváhagyva/elvetve (portál-kérés + e-mail intake).
+router.get('/api/inbound-orders/count', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT COUNT(*)::int AS count,
+              COUNT(*) FILTER (WHERE source='portal')::int AS portal,
+              MAX(received_at) AS latest
+       FROM inbound_orders
+       WHERE company_id=$1 AND status NOT IN ('approved','rejected')`, [own(req)]);
+    res.json({ count: rows[0].count || 0, portal: rows[0].portal || 0, latest: rows[0].latest });
+  } catch (e) { console.error('GET /api/inbound-orders/count hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 // ---- Eredeti PDF megnyitása ----
@@ -159,6 +178,13 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
     const loc_descarcare = String(ex.loc_descarcare || '').trim();
     const data_incarcare = ex.data_incarcare || null;
     const data_descarcare = ex.data_descarcare || null;
+    // Áru-adatok (a portál-kérés / kiolvasás teljes áru-bevitele → kész fuvar)
+    const suly_kg = (ex.suly_kg != null && ex.suly_kg !== '') ? (Number(ex.suly_kg) || null)
+                  : (ex.greutate != null && ex.greutate !== '' ? (Number(ex.greutate) || null) : null);
+    const load_type = ['FTL', 'LTL'].includes(ex.load_type) ? ex.load_type : null;
+    const hossz_cm = (ex.hossz_cm != null && ex.hossz_cm !== '') ? (parseInt(ex.hossz_cm, 10) || null) : null;
+    const szel_cm = (ex.szel_cm != null && ex.szel_cm !== '') ? (parseInt(ex.szel_cm, 10) || null) : null;
+    const mag_cm = (ex.mag_cm != null && ex.mag_cm !== '') ? (parseInt(ex.mag_cm, 10) || null) : null;
 
     // Tranzakció: fuvar + láb + jóváhagyott státusz EGYÜTT — félbeszakadásnál
     // ne maradjon létrejött fuvar 'feldolgozatlan' inbounddal (újrapróbálásnál
@@ -169,11 +195,13 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
       await dbc.query(
         `INSERT INTO orders (id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
            pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
-           rendszam_camion, rendszam_remorca, status, company_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
+           rendszam_camion, rendszam_remorca, status, company_id,
+           suly_kg, load_type, hossz_cm, szel_cm, mag_cm)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
         [id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
          pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
-         rendszam_camion, rendszam_remorca, status, company_id]);
+         rendszam_camion, rendszam_remorca, status, company_id,
+         suly_kg, load_type, hossz_cm, szel_cm, mag_cm]);
       await dbc.query(
         `INSERT INTO order_legs (order_id, leg_number, sofer_type, email_sofer, nume_sofer, firma_extern,
            telefon_extern, external_driver_id, rendszam_camion, rendszam_remorca, loc_preluare, data_preluare, company_id)

@@ -13,6 +13,7 @@ window.VS_FEATURES = [
   { key: 'client-portal',    label: 'Ügyfél-portál (🔑)',          group: 'Fuvarozás & Logisztika', optIn: true },
   { key: 'carrier-portal',   label: 'Alvállalkozói portál (🔑)',   group: 'Fuvarozás & Logisztika', optIn: true },
   { key: 'inbound',          label: 'Beérkező megrendelések',      group: 'Fuvarozás & Logisztika' },
+  { key: 'client-requests',  label: 'Ügyfél kérések (📋)',         group: 'Fuvarozás & Logisztika' },
   { key: 'orders-planner',   label: 'Tervezőtábla (diszpécser)',   group: 'Fuvarozás & Logisztika' },
   { key: 'received-fuv',     label: 'Fuvarlevelek',                group: 'Fuvarozás & Logisztika' },
   { key: 'warehouse',        label: 'Raktár (leadott áru) 📦',     group: 'Fuvarozás & Logisztika' },

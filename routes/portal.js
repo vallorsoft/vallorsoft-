@@ -19,6 +19,9 @@ const { getPositions } = require('../lib/vehiclePositions');
 let sendResetEmail = null;
 try { ({ sendResetEmail } = require('../services/email')); } catch (_) { /* e-mail opcionális */ }
 
+let sendPushToRole = null;
+try { ({ sendPushToRole } = require('../services/push')); } catch (_) { /* push opcionális */ }
+
 // ─── Middleware: csak bejelentkezett portál-ügyfél ───────────
 function requireClient(req, res, next) {
   if (!req.session || !req.session.clientUser) return res.status(401).json({ ok: false, err: 'Nu sunteti autentificat.' });
@@ -259,28 +262,73 @@ router.get('/api/portal/pod/:id', requireClient, async (req, res) => {
   }
 });
 
-// ─── Új fuvar-igény (a diszpécser jóváhagyó listájába kerül) ──
+// ─── Új fuvar-igény (a diszpécser „Ügyfél kérések" fülére kerül) ──
+// Teljes áru-bevitel (minden mező opcionális) + opcionális dokumentum (PDF/kép),
+// amit a diszpécser a „📄 Kiolvasás" gombbal AI-val feldolgozhat.
 router.post('/api/portal/request', requireClient, async (req, res) => {
   try {
     const cu = req.session.clientUser;
     const b = req.body || {};
-    const loc_incarcare = String(b.loc_incarcare || '').trim().slice(0, 200);
-    const loc_descarcare = String(b.loc_descarcare || '').trim().slice(0, 200);
-    if (!loc_incarcare || !loc_descarcare) return res.json({ ok: false, err: 'Adresa de incarcare si de descarcare sunt obligatorii.' });
+    const trim = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
+    const numOrNull = (v) => (v !== '' && v != null && !isNaN(Number(v))) ? Number(v) : null;
+    const intOrNull = (v) => (v !== '' && v != null && !isNaN(parseInt(v, 10))) ? parseInt(v, 10) : null;
+
+    // Az áru-mezők az inbound kártya/approve kulcsaival egyeznek (greutate=súly, observatii=megjegyzés).
     const extracted = {
       client: cu.client_nev || '',
-      ref: String(b.ref || '').trim().slice(0, 100),
-      loc_incarcare, loc_descarcare,
-      suly_kg: b.suly_kg ? Number(b.suly_kg) || null : null,
+      ref: trim(b.ref, 100),
+      loc_incarcare: trim(b.loc_incarcare, 200),
+      loc_descarcare: trim(b.loc_descarcare, 200),
+      data_incarcare: trim(b.data_incarcare, 10) || null,
+      data_descarcare: trim(b.data_descarcare, 10) || null,
+      suly_kg: numOrNull(b.suly_kg),
+      greutate: numOrNull(b.suly_kg),
       load_type: ['FTL', 'LTL'].includes(b.load_type) ? b.load_type : null,
-      data_incarcare: String(b.data_incarcare || '').slice(0, 10) || null,
-      megjegyzes: String(b.megjegyzes || '').trim().slice(0, 500),
+      hossz_cm: intOrNull(b.hossz_cm),
+      szel_cm: intOrNull(b.szel_cm),
+      mag_cm: intOrNull(b.mag_cm),
+      observatii: trim(b.megjegyzes, 800),
     };
+
+    // Opcionális dokumentum (data:URL base64 PDF vagy kép) — max ~10 MB.
+    let pdfBuf = null, pdfName = null;
+    if (b.doc_base64) {
+      const m = String(b.doc_base64).match(/^data:([^;]+);base64,(.*)$/);
+      const raw = m ? m[2] : String(b.doc_base64);
+      if (raw && raw.length < 14 * 1024 * 1024) {
+        try {
+          const buf = Buffer.from(raw, 'base64');
+          if (buf.length && buf.length <= 10 * 1024 * 1024) { pdfBuf = buf; pdfName = trim(b.doc_name, 200) || 'document.pdf'; }
+        } catch (_) { /* érvénytelen base64 — dokumentum nélkül megy tovább */ }
+      }
+    }
+
+    // Legalább EGY érdemi adat vagy dokumentum kell (üres spam ellen).
+    const hasAny = extracted.loc_incarcare || extracted.loc_descarcare || extracted.ref ||
+      extracted.suly_kg || extracted.observatii || pdfBuf;
+    if (!hasAny) return res.json({ ok: false, err: 'Completati cel putin o informatie sau atasati un document.' });
+
     const uid = 'portal-' + Date.now() + '-' + crypto.randomBytes(4).toString('hex');
     await pool.query(
-      `INSERT INTO inbound_orders (company_id, source, source_email, subject, received_at, message_uid, extracted, status)
-       VALUES ($1, 'portal', $2, $3, NOW(), $4, $5, 'reviewed')`,
-      [cu.company_id, cu.email, 'Solicitare portal client — ' + (cu.client_nev || cu.email), uid, JSON.stringify(extracted)]);
+      `INSERT INTO inbound_orders (company_id, source, source_email, subject, received_at, message_uid,
+         extracted, status, pdf_name, pdf_data)
+       VALUES ($1, 'portal', $2, $3, NOW(), $4, $5, 'reviewed', $6, $7)`,
+      [cu.company_id, cu.email, 'Solicitare portal client — ' + (cu.client_nev || cu.email), uid,
+       JSON.stringify(extracted), pdfName, pdfBuf]);
+    const loc_incarcare = extracted.loc_incarcare, loc_descarcare = extracted.loc_descarcare;
+
+    // Push az adminoknak/managereknek (kétnyelvű RO/HU) — best-effort, ne buktassa a kérést.
+    // A diszpécser azonnal értesül; a böngészőn belüli lebegő sáv is jelez (getMyFeatures polling).
+    if (sendPushToRole) {
+      const route = (loc_incarcare && loc_descarcare) ? (loc_incarcare + ' → ' + loc_descarcare)
+                  : (loc_incarcare || loc_descarcare || (pdfBuf ? '📎 document atasat / csatolt dokumentum' : ''));
+      sendPushToRole(cu.company_id, ['Admin', 'Manager'], {
+        title: '🔔 Cerere nouă de transport / Új fuvarkérés',
+        body: (cu.client_nev || cu.email) + (route ? ': ' + route : ''),
+        icon: '/icon192.png', badge: '/icon192.png',
+        tag: 'inbound-portal', url: '/admin',
+      }).catch(() => {});
+    }
     return res.json({ ok: true });
   } catch (err) {
     console.error('portal request hiba:', err);
