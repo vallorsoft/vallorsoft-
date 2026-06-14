@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-06-14 — Landing: sofőr-hét timeline + hero USP + „Hogyan működik" + brand-indigo (PR #97)
+
+- **Brand szín frissítés** (`style.css`, `CLAUDE.md`) — a „Soft" logo betűje pirosról (`--brand-red #e10b1a`) indigóra (`--brand-indigo #6366f1`) váltott; `.vs-logo .soft` és `.chat-side .av` gradiens frissítve. `landing.css`-ben már helyes volt (`--lp-indigo`).
+- **Hero jobb oldal: GPS monitor ki, sofőr-hét timeline be** (`index.html`, `landing.css`, `landing.js`) — animált glassmorphism kártya, 7 nap: fuvar rögzítés (dátum → diurna auto) · határátlépés → `🤖 +1 nap auto` · tankolás 📷 · vásárlás · visszalépés → `🤖 4 nap lezárva` · pótkocsi csere/raktározás push → diszpécser · menetlevél ① fuvar kijelölés → ② küldés → `MT-2026-0042 · Nyomtatható ✓`. JS-renderelt, RO+HU i18n.
+- **Hero bal oldal: sofőr-centrikus USP szöveg** — badge/H1/alcím + 3 ✕ bullet (papíros menetlevél / napidíj / bizonylat) + heroNote CTA; RO+HU.
+- **Showcase monitor ki → „Hogyan működik" szekció** — dashboard mockup törölve, helyette 3 lépéses `#how` szekció (meglévő i18n kulcsok: howTitle/step1-3). Navbar 3. link: `#about` → `#how`.
+- **CSS nettó: −187 sor** (hero monitor + showcase + lp-dash-* CSS törölve; timeline + how + hero bullets hozzáadva).
+
+---
+
 ## 2026-06-14 — Landing showcase finomítás: 1 monitor + valósághű Vezérlőpult + arányosabb hero/sáv
 
 - **Showcase egyetlen monitorra egyszerűsítve** (`index.html`/`landing.css`) — a korábbi 3 monitor + 2 telefon zsúfolt összkép helyett **egy kiemelt monitor**, rajta **valósághű Vezérlőpult-mockup**: sötét sidebar (menü-csíkok + aktív kiemelés) · 4 KPI-kártya (27/5/4/7, kék/zöld/indigó/borostyán) · „Curse recente" fuvar-tábla státusz-pillákkal · **világos OSM-szerű térkép** élő piros pulse-marker-rel · jármű-státusz sor. Világos „képernyő" a sötét szekció-háttéren → screenshot-hatás. A holt mockup/telefon CSS (`.lp-shot-row*`, `.lp-phone*`, `.lp-mock-*`, `.lp-monitor-sm`) törölve. `<img onerror>` továbbra is a `/img/sc-dashboard.png`-re (friss képpel auto-csere).
