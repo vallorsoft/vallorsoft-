@@ -41,8 +41,8 @@ Fuvarozási / flottakezelő webalkalmazás (Node.js + Express 5 + PostgreSQL).
 >
 > **MÉG NINCS / nyitott (következő alkalmakra):**
 > - **KÖVETKEZŐ FÓKUSZ: a LANDING PAGE** (`index.html` + `landing.css` + `landing.js`) — finomítás/bővítés. Ötlet a lezárt #77-ből: „showcase" szekció (3 monitor + 2 telefon mockup, `public/img/` képekkel) átemelése a JELENLEGI prémium landingre (a régi verzió visszahozása nélkül). A #77 PR lezárva (elavult volt), a tartalmát NEM mergeltük.
-> - **Manager + többi konzol FGO-menüsítése:** az ikonos főmenü + fix felső sáv + globális kereső EGYELŐRE CSAK az adminon van; a `manager.html` még a régi szöveges-szekciós sidebart használja (működik, de nem ikonos) — következő kör ugyanaz a recept.
-> - **Globális kereső bővítés (opc.):** számlák / menetlevelek / megrendelések is a `globalSearch`-be.
+> - **✅ KÉSZ — Manager FGO-menüsítés:** az ikonos főmenü + fix felső sáv + globális kereső már a **manageren is** (a manager tényleges menüpontjaival). A **developer** (`developer.html`, saját inline-nav) és a **könyvelő** (`konyvelo.html`, egylapos dok-hub) szándékosan más szerkezetű — ezek NEM kaptak FGO-sidebart (nem console-shared.js-alapúak); ha kell, külön kör.
+> - **✅ KÉSZ — Globális kereső bővítés:** a `globalSearch` már keres fuvar/ügyfél/jármű/sofőr + **megrendelések/menetlevelek/számlák** közt is.
 > - Lásd még lent a „Nyitott jövőbeli munka" (Stripe éles, SAF-T) — nem sürgős.
 
 ## Fejlesztési állapot (2026-06-14)
@@ -51,7 +51,11 @@ Tesztek zöldek (**106 Jest**, 24 suite). **CI: GitHub Actions** (`.github/workf
 
 > **Hiánylista — a 2026-06-13-i ütemterv LEZÁRVA:** **(1) ✅ CI + valódi tesztek** (mock + valós-DB, 106 teszt); **(2) ✅ teherautó-routing váltó** (ORS `driving-hgv`, alap ingyenes OSRM) **+ ✅ valós útdíj váltó** (HERE „Pontos", alap becslés); **(3) ✅ UIT CargoTrack deep-link** (ANAF-integráció helyett, providerkénti URL-sablon — `uit_deeplink_templates` JSONB; `cargotrack-et.js`/`fomco-et.js` törölve); **(4) ✅ üzemeltetés** (health-check `/healthz`+`/readyz`, strukturált log, opcionális Sentry, opcionális pg_dump backup); **(5) ✅ leg ↔ `orders.email_sofer` szinkron**; **(6) ✅ SaaS-vízvezeték** (csomag-limit kikényszerítés, audit-napló, GDPR export/anonimizálás, Stripe-váz); **(7) ✅ e-Factura státusz automatikus lekérdezés** (3 órás scheduler, SmartBill/Oblio `getInvoice` implementálva, `efactura_last_raw`/`efactura_checked_at` tárolás); **(8) ✅ ANAF CUI strukturált cím** (utca/helység/megye külön mezők, `adresa_sediu_social` alapján). **Nyitott jövőbeli munka:** Stripe éles bekötés (kulcsok + price_xxx — utolsó lépés, nem sürgős), SAF-T D406 XML (jövőbeli javaslat, a könyvelő SAGA/WinMentor CSV-ből generál egyelőre). **RO megfelelőség:** a rendszer megfelel — minden ANAF-kommunikáció (e-Factura SPV-beküldés) a számlázó-providereken (FGO/SmartBill/Oblio stb.) keresztül történik, saját ANAF-kapcsolat NEM kell és NEM is akarunk. Az UIT-kódot sem mi generáljuk — a sofőr/cég a CargoTrack/Fomco deep-linken keresztül intézi. A GPS→ANAF élő e-Transport-transzmisszió NEM feladatunk.
 
-**Legújabb kör (2026-06-14 — Multi-tenant adatszivárgás audit, PR #94):** *(részletes kész-lista: `CHANGELOG.md`; biztonsági napló: `AUDIT.md` 11. lépés)*
+**Legújabb kör (2026-06-14 — Manager FGO-menü + globális kereső bővítés):** *(részletes kész-lista: `CHANGELOG.md`)*
+1. **Manager konzol FGO-elrendezés** (`manager.html`) — ikonos 10-főmenüs sidebar + fix felső sáv (breadcrumb + `Ctrl+K` kereső + nyelv/téma) + `global-search.js`, a manager tényleges menüpontjaival (Integrációk/Jogosultságok kihagyva). 30 data-tab ↔ 30 pane.
+2. **Globális kereső bővítés** (`handlers/globalSearch.js`) — +Megrendelések (`inbound_orders`), +Menetlevelek (`fuvarlevelek`, users-emailen át tenant-szűrt), +Számlák (`invoices`); paraméteres, `company_id`-szűrt, role-gated. Élesben verifikálva, 108 teszt zöld.
+
+**Korábbi kör (2026-06-14 — Multi-tenant adatszivárgás audit, PR #94):** *(részletes kész-lista: `CHANGELOG.md`; biztonsági napló: `AUDIT.md` 11. lépés)*
 1. **Tenant-izolációs átvizsgálás (3 agent, ~87 fájl) + 1 KRITIKUS fix:** `handlers/documents.js` `orderDocUpload` a kliens-megadta `orderId`-t ownership-ellenőrzés nélkül szúrta be (cross-tenant write) → INSERT előtt `orders WHERE id=$1 AND company_id=$2` ellenőrzés. `services/push.js` defenzív `u.company_id=ps.company_id` JOIN. A routes/services réteg egyébként erős izolációval; az e-mail-joinok nem kihasználhatók (`users.email` UNIQUE). 108 teszt zöld.
 
 **Korábbi kör (2026-06-14 — FGO-menü ikonjavítás + átfogó átvilágítás, PR #92–#93):** *(részletes kész-lista: `CHANGELOG.md`)*

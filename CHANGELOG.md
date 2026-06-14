@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-06-14 — Manager FGO-menü + globális kereső bővítés
+
+- **Manager konzol FGO-elrendezés** (`manager.html`) — az admin mintájára: ikonos (monokróm vonalas SVG) 10-főmenüs sidebar a manager TÉNYLEGES menüpontjaival (Integrációk + Jogosultságok kihagyva — nincs pane-jük; a manager-specifikus „📥 E-mail feldolgozás" megtartva), **fix felső sáv** (breadcrumb + `Ctrl+K` kereső + nyelv/téma a dash-topbarból áthelyezve), `global-search.js` bekötve. 30 `data-tab` ↔ 30 pane 1:1. Csak megjelenés, funkció változatlan.
+- **Globális kereső bővítés** (`handlers/globalSearch.js`) — 3 új kategória a meglévő 5 mellé: **Megrendelések** (`inbound_orders`, portál→`client-requests`/e-mail→`inbound` tab), **Menetlevelek** (`fuvarlevelek`, tenant-szűrés a sofőr-e-mailen át a `users.company_id`-vel), **Számlák** (`invoices`, →`orders-list`). Paraméteres SQL, `company_id`-szűrt, role-gated (Admin/Manager), kategóriánként LIMIT 6. Élesben verifikálva: manager belépés → /manager 200; `globalSearch('MARFA')` mindhárom új kategóriát visszaadja; idegen tenant menetlevele kiszűrve; 108 teszt zöld. **Hátralévő:** landing page (következő fókusz); developer/könyvelő külön nézet.
+
+---
+
 ## 2026-06-14 — Multi-tenant adatszivárgás audit + javítás (PR #94)
 
 - **3 agentes tenant-izolációs átvizsgálás** (handlers / routes / services+lib, ~87 fájl): hogy minden cég adata a saját `company_id`-jén belül maradjon.
