@@ -823,6 +823,18 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 .main-content[data-theme="light"] .vs-ac-dd { background: #fff; border-color: rgba(0,0,0,0.12); }
 .main-content[data-theme="light"] .vs-ac-item:hover { background: rgba(0,0,0,0.04); }
 
+/* ── Ügyfél-portál meghívó: kereshető ügyfél-választó legördülő ── */
+.cp-client-drop {
+  position: absolute; z-index: 9999; left: 0; right: 0; top: 100%; margin-top: 3px;
+  background: var(--bg-panel-raised); color: var(--text-primary);
+  border: 1px solid var(--glass-border-dark); border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.45); overflow: hidden;
+}
+.main-content[data-theme="light"] .cp-client-drop {
+  background: #fff; color: #1a2332; border-color: rgba(0,0,0,0.12);
+  box-shadow: 0 8px 28px rgba(0,0,0,.16);
+}
+
 /* km mező + 🗺️ térkép-előnézet gomb */
 .vs-km-row { display: flex; gap: 8px; align-items: center; }
 .vs-km-row .input { flex: 1; }
