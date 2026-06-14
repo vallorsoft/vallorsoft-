@@ -770,7 +770,10 @@ handlers.getPlannerData = async function (req, res, args) {
        WHERE company_id = $1 AND tip = 'Vontato' AND activ = TRUE ORDER BY rendszam`,
       [cid]
     );
-    // Az ablakot érintő fuvarok + a dátum nélküli aktívak (kiosztásra várnak)
+    // MINDEN aktív (nem Finalizat/Anulat) fuvar — függetlenül a dátumtól, hogy a
+    // korábbi/jövőbeli vagy dátum nélküli, még folyamatban lévő fuvar se tűnjön el
+    // az ablakból (a kiosztatlanok a pool-ba, a kiosztottak a járműsorba kerülnek).
+    // Plusz a dátumozott fuvarok (beleértve a Finalizat-ot is) az aktuális ablakban.
     const ordR = await pool.query(
       `SELECT id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
               status, rendszam_camion, rendszam_remorca, nume_sofer, email_sofer,
@@ -778,9 +781,9 @@ handlers.getPlannerData = async function (req, res, args) {
        FROM orders
        WHERE company_id = $1 AND status <> 'Anulat'
          AND (
-           (data_incarcare IS NOT NULL AND data_incarcare <= $3::date
-              AND COALESCE(data_descarcare, data_incarcare) >= $2::date)
-           OR (data_incarcare IS NULL AND status IN ('Disponibil','Alocat','In Curs','Extern','Parkolt','Raktarban'))
+           status IN ('Disponibil','Alocat','In Curs','Extern','Parkolt','Raktarban')
+           OR (data_incarcare IS NOT NULL AND data_incarcare <= $3::date
+               AND COALESCE(data_descarcare, data_incarcare) >= $2::date)
          )
        ORDER BY data_incarcare NULLS LAST, created_at DESC
        LIMIT 400`,

@@ -96,6 +96,7 @@ window.ClientRequests = (function () {
     const root = typeof target === 'string' ? document.getElementById(target) : target;
     if (!root) return;
     const expanded = new Set();   // lenyitott kérések id-jei (újratöltéskor megőrizve)
+    const itemsById = {};         // id → eredeti inbound elem (a rejtett extracted-kulcsok megőrzéséhez)
     let aiEnabled = false;
 
     root.innerHTML =
@@ -177,7 +178,10 @@ window.ClientRequests = (function () {
     }
 
     function collect(reqEl) {
-      const ex = {};
+      // Az eredeti extracted-ből indulunk, hogy a NEM látható kulcsok (pl. `client`
+      // = az ügyfél neve) ne vesszenek el mentéskor/elfogadáskor.
+      const orig = (itemsById[String(reqEl.dataset.id)] || {}).extracted || {};
+      const ex = Object.assign({}, orig);
       reqEl.querySelectorAll('[data-k]').forEach(function (i) { ex[i.getAttribute('data-k')] = i.value.trim() || null; });
       if (ex.suly_kg != null) ex.greutate = ex.suly_kg;   // az approve mindkét kulcsot nézi
       return ex;
@@ -239,6 +243,8 @@ window.ClientRequests = (function () {
       try {
         const d = await api('GET', '/api/inbound-orders?source=portal');
         const items = d.items || [];
+        Object.keys(itemsById).forEach(k => delete itemsById[k]);
+        items.forEach(function (it) { itemsById[String(it.id)] = it; });
         if (!items.length) { $('crInfo').innerHTML = ''; $('crList').innerHTML = '<div class="cr-empty">Nu există cereri de la clienți. / Nincs ügyfél-kérés.</div>'; return; }
         // Sorszám: beérkezés sorrendjében (legrégebbi = #1), stabil az egyes kérésekre
         const byDateAsc = items.slice().sort((a, b) =>
