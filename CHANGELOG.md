@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-06-14 — FGO-menü kattintás-regresszió javítva (admin + manager)
+
+- **Hiba:** a sidebar kattintás-kötése (`admin.js`/`manager.js`) felülírta az új `.nav-head` fejlécek inline `toggleGroup`-ját, és csak a RÉGI parent-id-ket (orders/stats/userParentTab) kezelte → az új FGO-fejlécek (Megrendelések/Dokumentumok/Flotta) `data-tab` nélkül `activateTab(undefined)`-ot hívtak: **nem nyíltak le az almenük, és a tartalom kiürült**.
+- **Javítás:** a kötés generikus lett — bármely `.nav-head` → `toggleGroup` (lenyit), levél (`data-tab`) → `activateTab` (pane nyit); a mobil-sidebar-záró kötés is a `.nav-head`-et zárja ki. Determinisztikus szimulációval verifikálva mind a 4 eset (fejléc/levél/almenü/link); a többi oldal nem érintett (nincs `.nav-head`). node --check zöld, cache-bust bump.
+
+---
+
 ## 2026-06-14 — Manager FGO-menü + globális kereső bővítés
 
 - **Manager konzol FGO-elrendezés** (`manager.html`) — az admin mintájára: ikonos (monokróm vonalas SVG) 10-főmenüs sidebar a manager TÉNYLEGES menüpontjaival (Integrációk + Jogosultságok kihagyva — nincs pane-jük; a manager-specifikus „📥 E-mail feldolgozás" megtartva), **fix felső sáv** (breadcrumb + `Ctrl+K` kereső + nyelv/téma a dash-topbarból áthelyezve), `global-search.js` bekötve. 30 `data-tab` ↔ 30 pane 1:1. Csak megjelenés, funkció változatlan.
