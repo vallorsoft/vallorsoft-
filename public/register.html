@@ -20,6 +20,16 @@
       <div class="field"><label data-i18n="common.email">E-mail</label><input class="input" id="email" type="email" placeholder="nev@pelda.hu"></div>
       <div class="field"><label data-i18n="reg.phone">Telefon</label><input class="input" id="tel" placeholder="+40 ..."></div>
       <div class="field"><label data-i18n="reg.passwordMin">Jelszó (min. 6 karakter)</label><input class="input" id="jelszo" type="password" placeholder="••••••••"></div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin:16px 0;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text-muted);line-height:1.5;">
+          <input type="checkbox" id="chkTerms" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#6366f1;cursor:pointer;">
+          <span data-i18n="reg.acceptTerms">Accept <a href="/terms" target="_blank" style="color:var(--text-primary);text-decoration:underline;" data-i18n="reg.terms">Termenii și Condițiile</a></span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text-muted);line-height:1.5;">
+          <input type="checkbox" id="chkPrivacy" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#6366f1;cursor:pointer;">
+          <span data-i18n="reg.acceptPrivacy">Am citit <a href="/privacy" target="_blank" style="color:var(--text-primary);text-decoration:underline;" data-i18n="reg.privacy">Politica de Confidențialitate</a></span>
+        </label>
+      </div>
       <button class="btn primary block xl" id="btnReg" data-i18n="reg.submit">Regisztráció</button>
       <div style="text-align:center;margin-top:14px;color:var(--muted);font-size:14px">
         <span data-i18n="reg.haveAccount">Van már fiókja?</span> <a href="/login" id="goLogin" style="color:#fff;font-weight:600;text-decoration:none;border-bottom:1px dashed rgba(255,255,255,0.4)" data-i18n="reg.login">Bejelentkezés</a>
@@ -48,11 +58,17 @@
     }
 
     document.getElementById('btnReg').onclick=function(){
+      if (!document.getElementById('chkTerms').checked) {
+        toast(t('reg.mustAcceptTerms') || 'Trebuie să accepți Termenii și Condițiile.', 'err'); return;
+      }
+      if (!document.getElementById('chkPrivacy').checked) {
+        toast(t('reg.mustAcceptPrivacy') || 'Trebuie să confirmi că ai citit Politica de Confidențialitate.', 'err'); return;
+      }
       var p={
-        nume: document.getElementById('nume').value, 
-        email: document.getElementById('email').value, 
+        nume: document.getElementById('nume').value,
+        email: document.getElementById('email').value,
         tel: document.getElementById('tel').value,
-        jelszo: document.getElementById('jelszo').value, 
+        jelszo: document.getElementById('jelszo').value,
         kod: document.getElementById('kod').value
       };
       var btn=this;

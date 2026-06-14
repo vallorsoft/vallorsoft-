@@ -40,6 +40,8 @@ router.get('/login', (req, res) => {
 });
 router.get('/register', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'register.html')));
 router.get('/reset-password', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'reset-password.html')));
+router.get('/privacy', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'privacy.html')));
+router.get('/terms', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'terms.html')));
 
 router.get('/developer', requirePageLogin, function(req, res) {
   if (!req.session.user.is_dev) return res.redirect('/login');
