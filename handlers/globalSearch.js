@@ -95,9 +95,55 @@ handlers.globalSearch = async function (req, res, args) {
       [cid, like]
     ).catch(() => ({ rows: [] }));
 
-    const [orders, clients, vehicles, users, externals] = await Promise.all([
-      ordersP, clientsP, vehiclesP, usersP, externalP,
-    ]);
+    // ── Beérkező megrendelések (csak Admin/Manager, nem lezárt) ─
+    const inboundP = isStaff
+      ? pool.query(
+          `SELECT id, source_email, subject, status, source
+             FROM inbound_orders
+            WHERE company_id = $1
+              AND status NOT IN ('approved','rejected')
+              AND (source_email ILIKE '%'||$2||'%' OR subject ILIKE '%'||$2||'%')
+            ORDER BY received_at DESC NULLS LAST, created_at DESC
+            LIMIT 6`,
+          [cid, like]
+        ).catch(() => ({ rows: [] }))
+      : Promise.resolve({ rows: [] });
+
+    // ── Menetlevelek (csak Admin/Manager; tenant a sofőr e-mailjén át) ─
+    // FIGYELEM: a fuvarlevelek táblának NINCS company_id-je → users-joinnal szűrünk.
+    const waybillsP = isStaff
+      ? pool.query(
+          `SELECT f.id, f.numar_fisa, f.nume_sofer, f.numar_camion,
+                  f.loc_plecare, f.loc_sosire
+             FROM fuvarlevelek f
+             JOIN users u ON LOWER(u.email) = LOWER(f.email_sofer) AND u.company_id = $1
+            WHERE (f.numar_fisa ILIKE '%'||$2||'%' OR f.nume_sofer ILIKE '%'||$2||'%'
+                   OR f.numar_camion ILIKE '%'||$2||'%' OR f.loc_plecare ILIKE '%'||$2||'%'
+                   OR f.loc_sosire ILIKE '%'||$2||'%')
+            ORDER BY f.data_completare DESC
+            LIMIT 6`,
+          [cid, like]
+        ).catch(() => ({ rows: [] }))
+      : Promise.resolve({ rows: [] });
+
+    // ── Számlák (csak Admin/Manager) ──────────────────────────
+    const invoicesP = isStaff
+      ? pool.query(
+          `SELECT id, serie, numar, client_name, client_cui, total, valuta, status
+             FROM invoices
+            WHERE company_id = $1
+              AND (serie ILIKE '%'||$2||'%' OR numar::text ILIKE '%'||$2||'%'
+                   OR client_name ILIKE '%'||$2||'%' OR client_cui ILIKE '%'||$2||'%')
+            ORDER BY created_at DESC
+            LIMIT 6`,
+          [cid, like]
+        ).catch(() => ({ rows: [] }))
+      : Promise.resolve({ rows: [] });
+
+    const [orders, clients, vehicles, users, externals, inbound, waybills, invoices] =
+      await Promise.all([
+        ordersP, clientsP, vehiclesP, usersP, externalP, inboundP, waybillsP, invoicesP,
+      ]);
 
     const groups = [];
 
@@ -111,6 +157,21 @@ handlers.globalSearch = async function (req, res, args) {
       ].filter(Boolean).join(' · '),
     }));
 
+    // Beérkező megrendelések — portál-forrás a client-requests fülre megy,
+    // a többi az inbound fülre (item-szintű tab, egyetlen csoportban).
+    if (inbound.rows.length) {
+      groups.push({
+        key: 'inbound',
+        label: 'Megrendelések',
+        items: inbound.rows.map((r) => ({
+          tab: r.source === 'portal' ? 'client-requests' : 'inbound',
+          id: r.id,
+          title: r.subject || r.source_email || ('#' + r.id),
+          subtitle: [r.source_email || '', r.status || ''].filter(Boolean).join(' · '),
+        })),
+      });
+    }
+
     pushGroup(groups, 'clients', 'Ügyfelek', 'clients', clients.rows, (r) => ({
       id: r.id,
       title: r.denumire,
@@ -123,6 +184,15 @@ handlers.globalSearch = async function (req, res, args) {
       subtitle: r.marca || '',
     }));
 
+    pushGroup(groups, 'waybills', 'Menetlevelek', 'received-fuv', waybills.rows, (r) => ({
+      id: r.id,
+      title: r.numar_fisa || ('Menetlevél #' + r.id),
+      subtitle: [
+        r.nume_sofer || '',
+        (r.loc_plecare || '') + '→' + (r.loc_sosire || ''),
+      ].filter(Boolean).join(' · '),
+    }));
+
     pushGroup(groups, 'users', 'Sofőrök', 'users', users.rows, (r) => ({
       id: r.id,
       title: r.nume,
@@ -133,6 +203,16 @@ handlers.globalSearch = async function (req, res, args) {
       id: r.id,
       title: r.nume,
       subtitle: r.telefon || r.email || '',
+    }));
+
+    // Számlák — nincs külön számla-pane, a fuvarlistára navigál.
+    pushGroup(groups, 'invoices', 'Számlák', 'orders-list', invoices.rows, (r) => ({
+      id: r.id,
+      title: ((r.serie || '') + ' ' + (r.numar || '')).trim() || ('#' + r.id),
+      subtitle: [
+        r.client_name || '',
+        ((r.total != null ? r.total : '') + ' ' + (r.valuta || '')).trim(),
+      ].filter(Boolean).join(' · '),
     }));
 
     return res.json({ result: { ok: true, groups } });
