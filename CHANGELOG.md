@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-06-14 — Tervezőtábla minden aktív fuvar + ügyfél automatikus (PR #84)
+
+- **Tervezőtábla — minden aktív fuvar behozása** (`handlers/orders.js` `getPlannerData`) — eddig csak a dátum-ablakba eső fuvarokat hozta be, így egy aktív (nem Finalizat/Anulat) fuvar, aminek a dátuma a látott héten kívül esett (pl. múlt heti, még `In Curs`), eltűnt a nézetből és a pool-ból is. Mostantól minden aktív státuszú fuvar (`Disponibil`/`Alocat`/`In Curs`/`Extern`/`Parkolt`/`Raktarban`) bekerül a dátumtól függetlenül; a dátumozott (akár Finalizat) az ablakban marad; `Anulat` kizárva.
+- **Ügyfél kérés → fuvar: a megrendelő automatikus** — a diszpécsernek nem kell külön beírnia az ügyfelet. `client-requests.js` `collect()` az eredeti `extracted`-ből indul (a nem látható `client` kulcs nem vész el mentés/elfogadáskor); az `approve` szerver-oldalon a portál forrás-e-mailjéből (`client_users → clients.denumire`) feloldja az ügyfél nevét **és linkeli** a fuvart a meglévő ügyfél-rekordhoz (`orders.client_id`).
+
+---
+
 ## 2026-06-14 — Ügyfél kérések fül + lebegő fuvarkérés-értesítő
 
 - **Lebegő, oldalfüggetlen értesítő-sáv** (`console-shared.js` `startInboundWatcher`/`refreshInboundCount`) — minden admin/manager fülön látszik, amíg van feldolgozatlan beérkező (portál + e-mail intake); 45 mp-es polling (`GET /api/inbound-orders/count`), kattintásra a megfelelő fülre ugrik, sidebar-badge a „Megrendelések" (e-mail) és az „Ügyfél kérések" (portál) menüponton. Új beérkezésnél toast + web push az adminoknak/managereknek (`routes/portal.js` `sendPushToRole`, kétnyelvű RO/HU).
