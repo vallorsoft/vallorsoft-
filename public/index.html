@@ -63,46 +63,46 @@
 </div>
 
 <!-- NAVBAR -->
-<header class="navbar" id="navbar">
-  <div class="container nav-inner">
-    <a href="/" class="logo">
-      <span class="logo-vallor">Vallor</span><span class="logo-soft">Soft</span>
+<header class="lp-navbar" id="navbar">
+  <div class="lp-container lp-nav-inner">
+    <a href="/" class="lp-logo">
+      <span class="lp-logo-vallor">Vallor</span><span class="lp-logo-soft">Soft</span>
     </a>
-    <nav class="nav-menu" id="navMenu">
-      <ul class="nav-links">
-        <li><a href="#features" data-i18n="navFeatures">Funcționalități</a></li>
-        <li><a href="#how" data-i18n="navHow">Cum funcționează</a></li>
-        <li><a href="#pricing" data-i18n="navPricing">Prețuri</a></li>
-        <li><a href="#blog" data-i18n="navBlog">Blog</a></li>
-        <li><a href="#contact" data-i18n="navContact">Contact</a></li>
+    <nav class="lp-nav-menu" id="navMenu">
+      <ul class="lp-nav-links">
+        <li><a href="#features" data-i18n="navFeatures">Funkciók</a></li>
+        <li><a href="#integrations" data-i18n="navIntegrations">Integrációk</a></li>
+        <li><a href="#pricing" data-i18n="navPricing">Árak</a></li>
+        <li><a href="#about" data-i18n="navAbout">Rólunk</a></li>
+        <li><a href="#contact" data-i18n="navContact">Kapcsolat</a></li>
       </ul>
     </nav>
-    <div class="nav-actions">
-      <button id="languageToggle" class="lang-btn" title="Váltás magyarra / Schimbă în română">HU</button>
-      <a href="/login" class="btn-nav-ghost" data-i18n="loginBtn">Autentificare</a>
-      <a href="#register" class="btn-nav-primary" data-i18n="startBtn">Începe gratuit</a>
+    <div class="lp-nav-actions">
+      <button id="languageToggle" class="lp-lang-btn" title="Váltás magyarra / Schimbă în română">HU</button>
+      <a href="/login" class="lp-btn-ghost" data-i18n="loginBtn">Bejelentkezés</a>
+      <a href="/register" class="lp-btn-primary" data-i18n="startBtn">Ingyenes próba</a>
     </div>
-    <button class="hamburger" id="hamburger" aria-label="Meniu">
+    <button class="lp-hamburger" id="hamburger" aria-label="Menü">
       <span></span><span></span><span></span>
     </button>
   </div>
 </header>
 
 <!-- HERO -->
-<section class="hero">
-  <div class="hero-bg-gradient"></div>
-  <div class="container hero-grid">
-    <div class="hero-content reveal">
-      <span class="badge" data-i18n="heroBadge">SaaS · Fleet Management · România</span>
-      <h1 data-i18n="heroTitle">Platformă inteligentă pentru transport și management flotă</h1>
-      <p class="hero-sub" data-i18n="heroSubtitle">Gestionați cursele, vehiculele, documentele și clienții într-o singură aplicație. Conformă cu ANAF e-Factura și RO e-Transport.</p>
-      <div class="hero-cta">
-        <a href="#register" class="btn-primary btn-lg" data-i18n="startFreeBtn">Începe gratuit — 14 zile</a>
-        <a href="/login" class="btn-glass btn-lg" data-i18n="loginBtn">Autentificare</a>
+<section class="lp-hero">
+  <div class="lp-hero-bg-glow"></div>
+  <div class="lp-container lp-hero-grid">
+    <div class="lp-hero-content reveal">
+      <span class="lp-badge" data-i18n="heroBadge">SaaS · Fuvarozás · Románia</span>
+      <h1 data-i18n="heroTitle">Minden, amire egy modern fuvarozási vállalkozásnak szüksége van</h1>
+      <p class="lp-hero-sub" data-i18n="heroSubtitle">Teljes körű fuvarmenedzsment, GPS követés, automatizált számlázás és e-Factura integráció egyetlen rendszerben.</p>
+      <div class="lp-hero-cta">
+        <a href="/register" class="lp-btn-primary lp-btn-lg" data-i18n="startFreeBtn">Ingyenes próba</a>
+        <a href="#contact" class="lp-btn-outline lp-btn-lg" data-i18n="demoBtn">Bemutató kérése</a>
       </div>
-      <p class="trial-note" data-i18n="trialNote">✓ Fără card bancar &nbsp;·&nbsp; ✓ Anulare oricând &nbsp;·&nbsp; ✓ Suport inclus</p>
+      <p class="lp-trial-note" data-i18n="trialNote">✓ Bankkártya nélkül &nbsp;·&nbsp; ✓ 14 nap ingyenesen &nbsp;·&nbsp; ✓ Azonnali hozzáférés</p>
     </div>
-    <div class="hero-visual reveal">
+    <div class="lp-hero-visual reveal">
       <div class="hero-monitor-wrap">
         <div class="hero-monitor-frame">
           <div class="hero-monitor-bar">
@@ -213,191 +213,243 @@
       </div>
     </div>
   </div>
-  <div class="hero-wave">
-    <svg viewBox="0 0 1440 80" preserveAspectRatio="none"><path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#0c1218"/></svg>
-  </div>
 </section>
 
-<!-- LOGOS / TRUST -->
-<section class="trust-bar">
-  <div class="container">
-    <p class="trust-label" data-i18n="trustLabel">Integrat cu</p>
-    <div class="trust-logos">
-      <span class="trust-logo">ANAF e-Factura</span>
-      <span class="trust-logo">SmartBill</span>
-      <span class="trust-logo">Oblio</span>
-      <span class="trust-logo">CargoTrack</span>
-      <span class="trust-logo">RO e-Transport</span>
-      <span class="trust-logo">Brevo</span>
-    </div>
-  </div>
-</section>
-
-<!-- SHOWCASE -->
-<section id="showcase" class="section showcase-section">
-  <div class="container">
-    <div class="section-header reveal">
-      <h2 data-i18n="showcaseTitle">Platforma în acțiune</h2>
-      <p data-i18n="showcaseSubtitle">Interfață modernă, accesibilă de pe orice dispozitiv</p>
-    </div>
-
-    <!-- 3 monitoare desktop -->
-    <div class="showcase-monitors">
-      <div class="monitor-wrap reveal">
-        <div class="monitor-frame">
-          <div class="monitor-topbar">
-            <span class="m-dot"></span><span class="m-dot"></span><span class="m-dot"></span>
-            <span class="m-url">vallorsoft.ro/admin</span>
-          </div>
-          <div class="monitor-screen" id="ms1">
-            <img src="/img/monitor1.png" alt="VallorSoft Dashboard" loading="lazy" onerror="this.parentElement.setAttribute('data-empty','1')">
-          </div>
+<!-- FEATURE STRIP -->
+<section class="lp-feature-strip">
+  <div class="lp-container">
+    <div class="lp-strip-grid">
+      <div class="lp-strip-item reveal">
+        <span class="lp-strip-icon">🚚</span>
+        <div>
+          <h4 data-i18n="strip1Title">Fuvarkezelés</h4>
+          <p data-i18n="strip1Desc">Fuvarok, menetlevelek, tervezőtábla</p>
         </div>
-        <div class="monitor-neck"></div>
-        <div class="monitor-base"></div>
-        <p class="monitor-label" data-i18n="mon1Label">Dashboard</p>
       </div>
-
-      <div class="monitor-wrap reveal">
-        <div class="monitor-frame">
-          <div class="monitor-topbar">
-            <span class="m-dot"></span><span class="m-dot"></span><span class="m-dot"></span>
-            <span class="m-url">vallorsoft.ro/admin</span>
-          </div>
-          <div class="monitor-screen" id="ms2">
-            <img src="/img/monitor2.png" alt="VallorSoft Curse" loading="lazy" onerror="this.parentElement.setAttribute('data-empty','1')">
-          </div>
+      <div class="lp-strip-item reveal">
+        <span class="lp-strip-icon">📍</span>
+        <div>
+          <h4 data-i18n="strip2Title">Valós idejű GPS</h4>
+          <p data-i18n="strip2Desc">Élő pozíció, útvonal, snapshot km</p>
         </div>
-        <div class="monitor-neck"></div>
-        <div class="monitor-base"></div>
-        <p class="monitor-label" data-i18n="mon2Label">Managementul curselor</p>
       </div>
-
-      <div class="monitor-wrap reveal">
-        <div class="monitor-frame">
-          <div class="monitor-topbar">
-            <span class="m-dot"></span><span class="m-dot"></span><span class="m-dot"></span>
-            <span class="m-url">vallorsoft.ro/admin</span>
-          </div>
-          <div class="monitor-screen" id="ms3">
-            <img src="/img/monitor3.png" alt="VallorSoft Statistici" loading="lazy" onerror="this.parentElement.setAttribute('data-empty','1')">
-          </div>
+      <div class="lp-strip-item reveal">
+        <span class="lp-strip-icon">💶</span>
+        <div>
+          <h4 data-i18n="strip3Title">Automatizált számlázás</h4>
+          <p data-i18n="strip3Desc">e-Factura, 5 számlázó-adapter</p>
         </div>
-        <div class="monitor-neck"></div>
-        <div class="monitor-base"></div>
-        <p class="monitor-label" data-i18n="mon3Label">Statistici & rapoarte</p>
       </div>
-    </div>
-
-    <!-- 2 telefon -->
-    <div class="showcase-phones">
-      <div class="phone-wrap reveal">
-        <div class="phone-frame">
-          <div class="phone-island"></div>
-          <div class="phone-screen" id="ps1">
-            <img src="/img/phone1.png" alt="VallorSoft mobil sofőr" loading="lazy" onerror="this.parentElement.setAttribute('data-empty','1')">
-          </div>
-          <div class="phone-home-bar"></div>
+      <div class="lp-strip-item reveal">
+        <span class="lp-strip-icon">📁</span>
+        <div>
+          <h4 data-i18n="strip4Title">e-Factura integráció</h4>
+          <p data-i18n="strip4Desc">ANAF SPV, automatikus státusz</p>
         </div>
-        <p class="monitor-label" data-i18n="phone1Label">Aplicație șofer</p>
       </div>
-
-      <div class="phone-wrap reveal">
-        <div class="phone-frame">
-          <div class="phone-island"></div>
-          <div class="phone-screen" id="ps2">
-            <img src="/img/phone2.png" alt="VallorSoft mobil GPS" loading="lazy" onerror="this.parentElement.setAttribute('data-empty','1')">
-          </div>
-          <div class="phone-home-bar"></div>
+      <div class="lp-strip-item reveal">
+        <span class="lp-strip-icon">📊</span>
+        <div>
+          <h4 data-i18n="strip5Title">Részletes riportok</h4>
+          <p data-i18n="strip5Desc">Pénzügy, sofőrök, ügyfelek, járművek</p>
         </div>
-        <p class="monitor-label" data-i18n="phone2Label">Urmărire GPS</p>
       </div>
-    </div>
-
-  </div>
-</section>
-
-<!-- FEATURES -->
-<section id="features" class="section">
-  <div class="container">
-    <div class="section-header reveal">
-      <h2 data-i18n="featuresTitle">Funcționalități principale</h2>
-      <p data-i18n="featuresSubtitle">Tot ce aveți nevoie pentru a gestiona o flotă modernă de transport</p>
-    </div>
-    <div class="feature-grid">
-      <article class="feature-card glass reveal">
-        <div class="feat-icon">🚚</div>
-        <h3 data-i18n="feat1Title">Managementul curselor</h3>
-        <p data-i18n="feat1Desc">Creare, planificare și monitorizare curse. Import CSV, board Gantt, radar de întoarcere.</p>
-      </article>
-      <article class="feature-card glass reveal">
-        <div class="feat-icon">📍</div>
-        <h3 data-i18n="feat2Title">Urmărire GPS live</h3>
-        <p data-i18n="feat2Desc">Poziție în timp real, hartă interactivă, istoric traseu și snapshot km zilnic.</p>
-      </article>
-      <article class="feature-card glass reveal">
-        <div class="feat-icon">💶</div>
-        <h3 data-i18n="feat3Title">Facturare automată</h3>
-        <p data-i18n="feat3Desc">Emitere factură direct din cursă. Suport FGO, SmartBill, Oblio, iFactura, Facturis.</p>
-      </article>
-      <article class="feature-card glass reveal">
-        <div class="feat-icon">👥</div>
-        <h3 data-i18n="feat4Title">Portal clienți</h3>
-        <p data-i18n="feat4Desc">Clientul vede statusul curselor, descarcă documente și poate solicita transport nou.</p>
-      </article>
-      <article class="feature-card glass reveal">
-        <div class="feat-icon">📊</div>
-        <h3 data-i18n="feat5Title">Statistici & rapoarte</h3>
-        <p data-i18n="feat5Desc">7 tab-uri de analiză: financiar, combustibil, șoferi, vehicule, clienți. Export CSV.</p>
-      </article>
-      <article class="feature-card glass reveal">
-        <div class="feat-icon">🗓️</div>
-        <h3 data-i18n="feat6Title">Tabelă de planificare</h3>
-        <p data-i18n="feat6Desc">Vizualizare Gantt cu drag &amp; drop, zoom, reordonare vehicule și radar de întoarcere.</p>
-      </article>
-      <article class="feature-card glass reveal">
-        <div class="feat-icon">📁</div>
-        <h3 data-i18n="feat7Title">Documente &amp; CMR</h3>
-        <p data-i18n="feat7Desc">Generare scrisoare de trăsură, POD foto, ZIP masiv pentru contabilitate.</p>
-      </article>
-      <article class="feature-card glass reveal">
-        <div class="feat-icon">🤝</div>
-        <h3 data-i18n="feat8Title">Subcontractori</h3>
-        <p data-i18n="feat8Desc">Gestiune parteneri externi cu portal propriu, facturi furnizori și urmărire datorii.</p>
-      </article>
     </div>
   </div>
 </section>
 
-<!-- HOW IT WORKS -->
-<section id="how" class="section section-dark">
-  <div class="container">
-    <div class="section-header reveal">
-      <h2 data-i18n="howTitle">Cum funcționează</h2>
-      <p data-i18n="howSubtitle">Sunteți operațional în mai puțin de 30 de minute</p>
+<!-- MODULES SECTION -->
+<section id="features" class="lp-section lp-section-light">
+  <div class="lp-container">
+    <div class="lp-section-header reveal">
+      <h2 data-i18n="modulesTitle">Egy rendszer, minden feladatra</h2>
+      <p data-i18n="modulesSubtitle">Moduláris felépítés — csak azt fizeted, amit használsz.</p>
     </div>
-    <div class="steps">
-      <div class="step reveal">
-        <div class="step-num">01</div>
-        <div class="step-body glass">
-          <h3 data-i18n="step1Title">Înregistrare</h3>
-          <p data-i18n="step1Desc">Creați un cont gratuit în 2 minute. Fără card bancar, fără contracte.</p>
+    <div class="lp-modules-grid">
+      <div class="lp-module-card reveal">
+        <span class="lp-module-icon">🚚</span>
+        <h3 data-i18n="mod1Title">Fuvarmenedzsment</h3>
+        <p data-i18n="mod1Desc">Fuvarok, ügyfelek, járművek, alvállalkozók kezelése</p>
+      </div>
+      <div class="lp-module-card reveal">
+        <span class="lp-module-icon">📍</span>
+        <h3 data-i18n="mod2Title">GPS Követés</h3>
+        <p data-i18n="mod2Desc">Valós idejű pozíció, CargoTrack/Fomco integráció</p>
+      </div>
+      <div class="lp-module-card reveal">
+        <span class="lp-module-icon">💶</span>
+        <h3 data-i18n="mod3Title">Számlázás</h3>
+        <p data-i18n="mod3Desc">Automatikus számla-kiállítás 5 provideren keresztül</p>
+      </div>
+      <div class="lp-module-card reveal">
+        <span class="lp-module-icon">📋</span>
+        <h3 data-i18n="mod4Title">e-Factura</h3>
+        <p data-i18n="mod4Desc">ANAF SPV-beküldés, automatikus státusz-lekérdezés</p>
+      </div>
+      <div class="lp-module-card reveal">
+        <span class="lp-module-icon">📁</span>
+        <h3 data-i18n="mod5Title">Dokumentumok</h3>
+        <p data-i18n="mod5Desc">CMR/fuvarlevél, POD-fotó, könyvelői ZIP export</p>
+      </div>
+      <div class="lp-module-card reveal">
+        <span class="lp-module-icon">👥</span>
+        <h3 data-i18n="mod6Title">Portálok</h3>
+        <p data-i18n="mod6Desc">Ügyfél-portál és alvállalkozói portál elkülönítve</p>
+      </div>
+      <div class="lp-module-card reveal">
+        <span class="lp-module-icon">📊</span>
+        <h3 data-i18n="mod7Title">Statisztika</h3>
+        <p data-i18n="mod7Desc">7 füles elemzés: pénzügy, üzemanyag, sofőrök, ügyfelek</p>
+      </div>
+      <div class="lp-module-card reveal">
+        <span class="lp-module-icon">🗓️</span>
+        <h3 data-i18n="mod8Title">Tervezőtábla</h3>
+        <p data-i18n="mod8Desc">Gantt-nézet, visszfuvar-radar, drag &amp; drop</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- INTEGRATIONS SECTION -->
+<section id="integrations" class="lp-section lp-section-white">
+  <div class="lp-container">
+    <div class="lp-section-header reveal">
+      <h2 data-i18n="intTitle">Integrációk, amelyek összekötnek</h2>
+      <p data-i18n="intSubtitle">Könnyen integrálható a már használt rendszerekkel.</p>
+    </div>
+    <div class="lp-int-groups">
+      <div class="lp-int-group reveal">
+        <span class="lp-int-group-label" data-i18n="intGroupBilling">Számlázás</span>
+        <div class="lp-int-row">
+          <div class="lp-int-item">
+            <img src="/fgologo.png" alt="FGO" class="lp-int-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <span class="lp-int-logo-fallback" style="display:none">FGO</span>
+            <span class="lp-int-name">FGO</span>
+          </div>
+          <div class="lp-int-item">
+            <img src="/smartbilllogo.png" alt="SmartBill" class="lp-int-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <span class="lp-int-logo-fallback" style="display:none">SmartBill</span>
+            <span class="lp-int-name">SmartBill</span>
+          </div>
+          <div class="lp-int-item">
+            <img src="/obliologo.png" alt="Oblio" class="lp-int-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <span class="lp-int-logo-fallback" style="display:none">Oblio</span>
+            <span class="lp-int-name">Oblio</span>
+          </div>
+          <div class="lp-int-item">
+            <img src="/ifacturalogo.png" alt="iFactura" class="lp-int-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <span class="lp-int-logo-fallback" style="display:none">iFactura</span>
+            <span class="lp-int-name">iFactura</span>
+          </div>
+          <div class="lp-int-item">
+            <img src="/facturislogo.png" alt="Facturis" class="lp-int-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <span class="lp-int-logo-fallback" style="display:none">Facturis</span>
+            <span class="lp-int-name">Facturis</span>
+          </div>
         </div>
       </div>
-      <div class="step-arrow">→</div>
-      <div class="step reveal">
-        <div class="step-num">02</div>
-        <div class="step-body glass">
-          <h3 data-i18n="step2Title">Configurare</h3>
-          <p data-i18n="step2Desc">Adăugați vehicule, șoferi și integrați GPS-ul și sistemul de facturare.</p>
+      <div class="lp-int-group reveal">
+        <span class="lp-int-group-label" data-i18n="intGroupAuth">Hatóság</span>
+        <div class="lp-int-row">
+          <div class="lp-int-item">
+            <img src="/anaflogo.png" alt="ANAF" class="lp-int-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <span class="lp-int-logo-fallback" style="display:none">ANAF</span>
+            <span class="lp-int-name">ANAF</span>
+          </div>
         </div>
       </div>
-      <div class="step-arrow">→</div>
-      <div class="step reveal">
-        <div class="step-num">03</div>
-        <div class="step-body glass">
-          <h3 data-i18n="step3Title">Începeți activitatea</h3>
-          <p data-i18n="step3Desc">Creați prima cursă, urmăriți flota în timp real și emiteți factura automat.</p>
+      <div class="lp-int-group reveal">
+        <span class="lp-int-group-label" data-i18n="intGroupGPS">GPS</span>
+        <div class="lp-int-row">
+          <div class="lp-int-item">
+            <img src="/cargotracklogo.png" alt="CargoTrack" class="lp-int-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <span class="lp-int-logo-fallback" style="display:none">CargoTrack</span>
+            <span class="lp-int-name">CargoTrack</span>
+          </div>
+          <div class="lp-int-item">
+            <img src="/fomcologo.png" alt="Fomco" class="lp-int-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <span class="lp-int-logo-fallback" style="display:none">Fomco</span>
+            <span class="lp-int-name">Fomco</span>
+          </div>
+        </div>
+      </div>
+      <div class="lp-int-group reveal">
+        <span class="lp-int-group-label" data-i18n="intGroupPayment">Fizetés</span>
+        <div class="lp-int-row">
+          <div class="lp-int-item">
+            <img src="/stripelogo.png" alt="Stripe" class="lp-int-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <span class="lp-int-logo-fallback" style="display:none">Stripe</span>
+            <span class="lp-int-name">Stripe</span>
+          </div>
+        </div>
+      </div>
+      <div class="lp-int-group reveal">
+        <span class="lp-int-group-label" data-i18n="intGroupEmail">E-mail</span>
+        <div class="lp-int-row">
+          <div class="lp-int-item">
+            <img src="/brevologo.png" alt="Brevo" class="lp-int-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <span class="lp-int-logo-fallback" style="display:none">Brevo</span>
+            <span class="lp-int-name">Brevo</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS SECTION -->
+<section class="lp-section lp-section-dark">
+  <div class="lp-container">
+    <div class="lp-section-header reveal">
+      <h2 class="lp-white-title" data-i18n="statsTitle">Számok, amelyek magukért beszélnek</h2>
+    </div>
+    <div class="lp-stats-grid">
+      <div class="lp-stat reveal">
+        <span class="lp-stat-num">98%</span>
+        <span class="lp-stat-label" data-i18n="stat1">Ügyfél elégedettség</span>
+      </div>
+      <div class="lp-stat reveal">
+        <span class="lp-stat-num">50+</span>
+        <span class="lp-stat-label" data-i18n="stat2">Aktív integráció</span>
+      </div>
+      <div class="lp-stat reveal">
+        <span class="lp-stat-num">1000+</span>
+        <span class="lp-stat-label" data-i18n="stat3">Kezelt jármű</span>
+      </div>
+      <div class="lp-stat reveal">
+        <span class="lp-stat-num">24/7</span>
+        <span class="lp-stat-label" data-i18n="stat4">Támogatás</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="lp-section lp-section-white">
+  <div class="lp-container">
+    <div class="lp-section-header reveal">
+      <h2 data-i18n="testimonialTitle">Ügyfeleink mondták</h2>
+    </div>
+    <div class="lp-testimonials-grid">
+      <div class="lp-testimonial reveal">
+        <p class="lp-testimonial-text" data-i18n="t1Text">"A VallorSoft teljesen átalakította a munkánkat. Minden átlátható, minden helyen van, idő és pénz spórolunk."</p>
+        <div class="lp-testimonial-author">
+          <span class="lp-testimonial-name">Popescu Andrei</span>
+          <span class="lp-testimonial-company">Trans SRL</span>
+        </div>
+      </div>
+      <div class="lp-testimonial reveal">
+        <p class="lp-testimonial-text" data-i18n="t2Text">"Az e-Factura integráció és a GPS követés kifogástalanul működik. Mindenkinek ajánlom."</p>
+        <div class="lp-testimonial-author">
+          <span class="lp-testimonial-name">Kovács László</span>
+          <span class="lp-testimonial-company">SpeedTrans Kft.</span>
+        </div>
+      </div>
+      <div class="lp-testimonial reveal">
+        <p class="lp-testimonial-text" data-i18n="t3Text">"Végre egy rendszer, ami érti a fuvarozás valódi igényeit."</p>
+        <div class="lp-testimonial-author">
+          <span class="lp-testimonial-name">Muresan Ioan</span>
+          <span class="lp-testimonial-company">LogiNext SRL</span>
         </div>
       </div>
     </div>
@@ -405,175 +457,118 @@
 </section>
 
 <!-- PRICING -->
-<section id="pricing" class="section">
-  <div class="container">
-    <div class="section-header reveal">
-      <h2 data-i18n="pricingTitle">Planuri și prețuri</h2>
-      <p data-i18n="pricingSubtitle">Prețuri transparente, fără costuri ascunse</p>
+<section id="pricing" class="lp-section lp-section-light">
+  <div class="lp-container">
+    <div class="lp-section-header reveal">
+      <h2 data-i18n="pricingTitle">Egyszerű árazás, rejtett költségek nélkül</h2>
     </div>
-    <div class="billing-toggle reveal">
-      <button class="toggle-btn active" id="toggleMonthly" data-i18n="monthly">Lunar</button>
-      <button class="toggle-btn" id="toggleYearly" data-i18n="yearly">Anual <span class="save-badge">-20%</span></button>
-    </div>
-    <div class="pricing-grid">
-      <div class="pricing-card glass reveal">
-        <div class="plan-name" data-i18n="planBasic">Basic</div>
-        <div class="plan-price">
-          <span class="price-val" data-monthly="19" data-yearly="15">€19</span>
-          <span class="price-period" data-i18n="perMonth">/lună</span>
+    <div class="lp-pricing-grid">
+      <div class="lp-pricing-card reveal">
+        <div class="lp-plan-name" data-i18n="planBasic">Basic</div>
+        <div class="lp-plan-price">
+          <span class="lp-price-val">€49</span>
+          <span class="lp-price-period" data-i18n="perMonth">/hó</span>
         </div>
-        <ul class="plan-features">
-          <li data-i18n="pf1">până la 5 vehicule</li>
-          <li data-i18n="pf2">Managementul curselor</li>
-          <li data-i18n="pf3">Urmărire GPS</li>
-          <li data-i18n="pf4">Facturare (1 provider)</li>
-          <li data-i18n="pf5">Suport e-mail</li>
+        <ul class="lp-plan-features">
+          <li data-i18n="bp1">Alap funkciók</li>
+          <li data-i18n="bp2">GPS követés</li>
+          <li data-i18n="bp3">Számlázás</li>
+          <li data-i18n="bp4">E-mail támogatás</li>
         </ul>
-        <a href="#register" class="btn-glass" data-i18n="startTrial">Testează gratuit</a>
+        <a href="/register" class="lp-btn-outline lp-btn-full" data-i18n="startNow">Kezdés most</a>
       </div>
-      <div class="pricing-card featured reveal">
-        <div class="plan-badge" data-i18n="popular">Popular</div>
-        <div class="plan-name">Pro</div>
-        <div class="plan-price">
-          <span class="price-val" data-monthly="49" data-yearly="39">€49</span>
-          <span class="price-period" data-i18n="perMonth">/lună</span>
+      <div class="lp-pricing-card lp-pricing-featured reveal">
+        <div class="lp-plan-badge" data-i18n="popular">Legnépszerűbb</div>
+        <div class="lp-plan-name">Professional</div>
+        <div class="lp-plan-price">
+          <span class="lp-price-val">€99</span>
+          <span class="lp-price-period" data-i18n="perMonth">/hó</span>
         </div>
-        <ul class="plan-features">
-          <li data-i18n="pp1">Vehicule nelimitate</li>
-          <li data-i18n="pp2">Toate funcționalitățile Basic</li>
-          <li data-i18n="pp3">Portal clienți &amp; subcontractori</li>
-          <li data-i18n="pp4">Statistici avansate</li>
-          <li data-i18n="pp5">Tabelă de planificare Gantt</li>
-          <li data-i18n="pp6">Toate providerele de facturare</li>
-          <li data-i18n="pp7">Suport prioritar</li>
+        <ul class="lp-plan-features">
+          <li data-i18n="pp1">Minden a Basic-ből</li>
+          <li data-i18n="pp2">e-Factura integráció</li>
+          <li data-i18n="pp3">Ügyfél-portál</li>
+          <li data-i18n="pp4">Alvállalkozói portál</li>
+          <li data-i18n="pp5">Fejlett statisztika</li>
+          <li data-i18n="pp6">Prioritásos támogatás</li>
+          <li data-i18n="pp7">SLA garancia</li>
         </ul>
-        <a href="#register" class="btn-primary" data-i18n="startTrial">Testează gratuit</a>
+        <a href="/register" class="lp-btn-primary lp-btn-full" data-i18n="startNow">Kezdés most</a>
       </div>
-      <div class="pricing-card glass reveal">
-        <div class="plan-name">Enterprise</div>
-        <div class="plan-price">
-          <span class="price-val" data-i18n="custom">Personalizat</span>
+      <div class="lp-pricing-card reveal">
+        <div class="lp-plan-name">Enterprise</div>
+        <div class="lp-plan-price">
+          <span class="lp-price-val lp-price-custom" data-i18n="customPrice">Egyedi ár</span>
         </div>
-        <ul class="plan-features">
-          <li data-i18n="ep1">Tot din Pro</li>
-          <li data-i18n="ep2">SLA dedicat</li>
-          <li data-i18n="ep3">Integrări personalizate</li>
-          <li data-i18n="ep4">Onboarding asistat</li>
-          <li data-i18n="ep5">Contract anual</li>
+        <ul class="lp-plan-features">
+          <li data-i18n="ep1">Minden a Professional-ból</li>
+          <li data-i18n="ep2">Dedikált szerver</li>
+          <li data-i18n="ep3">Egyedi fejlesztés</li>
+          <li data-i18n="ep4">Onboarding asszisztens</li>
+          <li data-i18n="ep5">Éves szerződés</li>
         </ul>
-        <a href="#contact" class="btn-glass" data-i18n="contactUs">Contactați-ne</a>
+        <a href="#contact" class="lp-btn-outline lp-btn-full" data-i18n="contactUs">Kapcsolatfelvétel</a>
       </div>
     </div>
   </div>
 </section>
 
-<!-- BLOG -->
-<section id="blog" class="section section-dark">
-  <div class="container">
-    <div class="section-header reveal">
-      <h2 data-i18n="blogTitle">Resurse &amp; Noutăți</h2>
-    </div>
-    <div class="blog-grid">
-      <article class="blog-card glass reveal">
-        <div class="blog-tag" data-i18n="tagDigital">Digitalizare</div>
-        <h3 data-i18n="blog1Title">Digitalizarea transportului rutier în România</h3>
-        <p data-i18n="blog1Desc">Cum ajută tehnologia la eficientizarea flotelor și reducerea costurilor operaționale.</p>
-        <span class="blog-date">2026-06-10</span>
-      </article>
-      <article class="blog-card glass reveal">
-        <div class="blog-tag">ANAF</div>
-        <h3 data-i18n="blog2Title">e-Factura 2026 — tot ce trebuie să știți</h3>
-        <p data-i18n="blog2Desc">Ghid complet privind obligațiile e-Factura pentru transportatori și cum VallorSoft automatizează procesul.</p>
-        <span class="blog-date">2026-05-28</span>
-      </article>
-      <article class="blog-card glass reveal">
-        <div class="blog-tag">RO e-Transport</div>
-        <h3 data-i18n="blog3Title">Codul UIT și RO e-Transport — ghid practic</h3>
-        <p data-i18n="blog3Desc">Ce este codul UIT, când este obligatoriu și cum gestionați declarațiile prin CargoTrack.</p>
-        <span class="blog-date">2026-05-15</span>
-      </article>
-    </div>
-  </div>
-</section>
-
-<!-- REGISTER -->
-<section id="register" class="section">
-  <div class="container narrow">
-    <div class="register-card glass reveal">
-      <h2 data-i18n="registerTitle">Începeți testarea gratuită</h2>
-      <p class="trial-highlight" data-i18n="registerSub">14 zile gratuite — fără card bancar, anulare oricând.</p>
-      <form id="registerForm" action="" method="post" novalidate>
-        <div class="form-group">
-          <label for="reg-company" data-i18n="labelCompany">Denumire companie</label>
-          <input type="text" id="reg-company" name="company" placeholder="Ex: Trans SRL" required autocomplete="organization">
-        </div>
-        <div class="form-group">
-          <label for="reg-email" data-i18n="labelEmail">Adresă e-mail</label>
-          <input type="email" id="reg-email" name="email" placeholder="admin@companie.ro" required autocomplete="email">
-        </div>
-        <div class="form-group">
-          <label for="reg-password" data-i18n="labelPassword">Parolă</label>
-          <input type="password" id="reg-password" name="password" placeholder="Minim 8 caractere" minlength="8" required autocomplete="new-password">
-        </div>
-        <div class="form-check">
-          <label class="check-label">
-            <input type="checkbox" id="termsAccepted" name="termsAccepted" required>
-            <span data-i18n="termsCheck">Accept <a href="/terms" target="_blank" rel="noopener">Termenii și Condițiile</a></span>
-          </label>
-        </div>
-        <div class="form-check">
-          <label class="check-label">
-            <input type="checkbox" id="privacyAccepted" name="privacyAccepted" required>
-            <span data-i18n="privacyCheck">Accept <a href="/privacy" target="_blank" rel="noopener">Politica de Confidențialitate</a></span>
-          </label>
-        </div>
-        <button type="submit" class="btn-primary btn-full" id="registerSubmit" data-i18n="submitRegister">Creați cont gratuit</button>
-      </form>
-    </div>
-  </div>
-</section>
-
-<!-- CONTACT -->
-<section id="contact" class="section section-dark">
-  <div class="container">
-    <div class="contact-grid">
-      <div class="contact-info reveal">
-        <h2 data-i18n="contactTitle">Contact</h2>
-        <p data-i18n="contactDesc">Suntem disponibili pentru întrebări, demonstrații și oferte personalizate.</p>
-        <ul class="contact-list">
-          <li>📧 <a href="mailto:contact@vallorsoft.ro">contact@vallorsoft.ro</a></li>
-          <li>🛠️ <a href="mailto:support@vallorsoft.ro">support@vallorsoft.ro</a></li>
-          <li>📍 România</li>
-        </ul>
-      </div>
-      <div class="contact-form-wrap reveal">
-        <form class="contact-form glass" id="contactForm">
-          <input type="text" name="name" placeholder="Nume" data-i18n-ph="contactName" required>
-          <input type="email" name="email" placeholder="Email" required>
-          <textarea name="message" rows="4" placeholder="Mesaj" data-i18n-ph="contactMessage" required></textarea>
-          <button type="submit" class="btn-primary" data-i18n="sendBtn">Trimite mesaj</button>
-        </form>
+<!-- FINAL CTA -->
+<section class="lp-section lp-cta-section">
+  <div class="lp-container">
+    <div class="lp-cta-inner reveal">
+      <h2 data-i18n="ctaTitle">Készen állsz a hatékonyabb működésre?</h2>
+      <p data-i18n="ctaSubtitle">Próbáld ki a VallorSoft-ot 14 napig ingyen, kötelezettségek nélkül.</p>
+      <div class="lp-cta-actions">
+        <a href="/register" class="lp-btn-primary lp-btn-lg" data-i18n="ctaBtn">Ingyenes próba indítása</a>
+        <a href="/login" class="lp-cta-login" data-i18n="loginBtn">Bejelentkezés</a>
       </div>
     </div>
   </div>
 </section>
 
 <!-- FOOTER -->
-<footer class="footer">
-  <div class="container footer-inner">
-    <div class="footer-brand">
-      <span class="logo-vallor">Vallor</span><span class="logo-soft">Soft</span>
-      <p data-i18n="footerTagline">Platformă SaaS pentru transport rutier &amp; management flotă — România</p>
+<footer class="lp-footer" id="about">
+  <div class="lp-container lp-footer-grid">
+    <div class="lp-footer-brand">
+      <a href="/" class="lp-logo">
+        <span class="lp-logo-vallor">Vallor</span><span class="lp-logo-soft">Soft</span>
+      </a>
+      <p data-i18n="footerTagline">Modern fuvarmenedzsment rendszer szállítmányozóknak és fuvarozóknak.</p>
+      <p class="lp-footer-copy">© 2024 VallorSoft. <span data-i18n="footerRights">Minden jog fenntartva.</span></p>
     </div>
-    <div class="footer-links">
-      <a href="/terms" data-i18n="footerTerms">Termeni și Condiții</a>
-      <a href="/privacy" data-i18n="footerPrivacy">Politica de Confidențialitate</a>
-      <a href="/cookies" data-i18n="footerCookiePolicy">Politica Cookie</a>
-      <a href="/dpa" data-i18n="footerDpa">DPA</a>
-      <a href="/security" data-i18n="footerSecurity">Securitate</a>
-      <button id="footerCookieBtn" class="footer-link-btn" data-i18n="footerCookies">Setări Cookie</button>
+    <div class="lp-footer-col">
+      <h4 data-i18n="footerProduct">Termék</h4>
+      <ul>
+        <li><a href="#features" data-i18n="navFeatures">Funkciók</a></li>
+        <li><a href="#integrations" data-i18n="navIntegrations">Integrációk</a></li>
+        <li><a href="#pricing" data-i18n="navPricing">Árak</a></li>
+        <li><a href="/login" data-i18n="loginBtn">Bejelentkezés</a></li>
+      </ul>
     </div>
-    <p class="footer-copy">© 2026 VallorSoft. <span data-i18n="footerRights">Toate drepturile rezervate.</span></p>
+    <div class="lp-footer-col" id="contact">
+      <h4 data-i18n="footerCompany">Cég</h4>
+      <ul>
+        <li><a href="#about" data-i18n="footerAbout">Rólunk</a></li>
+        <li><a href="mailto:vallorsoft@gmail.com" data-i18n="footerContact">Kapcsolat</a></li>
+      </ul>
+    </div>
+    <div class="lp-footer-col">
+      <h4 data-i18n="footerLegal">Jog</h4>
+      <ul>
+        <li><a href="/privacy" data-i18n="footerPrivacy">Adatvédelem</a></li>
+        <li><a href="/terms" data-i18n="footerTerms">Általános Szerz. Feltételek</a></li>
+        <li><a href="/cookies" data-i18n="footerCookiePolicy">Cookie szabályzat</a></li>
+        <li><a href="/dpa" data-i18n="footerDpa">DPA</a></li>
+        <li><a href="/security" data-i18n="footerSecurity">Biztonsági irányelvek</a></li>
+        <li><button id="footerCookieBtn" class="lp-footer-link-btn" data-i18n="footerCookies">Cookie beállítások</button></li>
+      </ul>
+    </div>
+  </div>
+  <div class="lp-footer-bottom">
+    <div class="lp-container">
+      <span class="lp-lang-switch">RO | HU | EN</span>
+    </div>
   </div>
 </footer>
 
