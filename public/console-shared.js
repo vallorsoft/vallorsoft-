@@ -1604,7 +1604,7 @@ function loadReceivedFuvarlevelek(){
     var tb=document.querySelector('#tblReceivedFuv tbody');
     if(!list||list.length===0){tb.innerHTML='<tr><td colspan="5">'+t('cs.noWaybills')+'</td></tr>';return;}
     tb.innerHTML=list.map(f=>`<tr>`
-      +`<td><b style="color:var(--brand-red);">${esc(f.numar_fisa||'—')}</b></td>`
+      +`<td><b style="color:#6366f1;">${esc(f.numar_fisa||'—')}</b></td>`
       +`<td><b style="color:var(--text-primary);">${esc(f.file_name||'—')}</b></td>`
       +`<td>${esc(f.nume_sofer||f.email_sofer||'—')}</td>`
       +`<td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td>`
@@ -3016,7 +3016,7 @@ function renderFilteredOrders(list) {
       routeCell += '<div style="margin-top:4px;">';
       legs.forEach(function(l){
         if (l.loc_preluare) {
-          routeCell += '<div style="font-size:11px;color:var(--muted);padding-left:8px;border-left:2px solid rgba(225,11,26,0.4);margin-top:2px;">'+
+          routeCell += '<div style="font-size:11px;color:var(--muted);padding-left:8px;border-left:2px solid rgba(99,102,241,0.4);margin-top:2px;">'+
             '↳ '+esc(l.loc_preluare)+
           '</div>';
         }
@@ -3027,7 +3027,7 @@ function renderFilteredOrders(list) {
     // Sofőr cella: alap sofőr + váltások badge-del
     var soferCell = esc(soferInfo);
     if (legCount > 0) {
-      soferCell += ' <span style="font-size:10px;background:rgba(225,11,26,0.15);color:#f87171;border:1px solid rgba(225,11,26,0.3);border-radius:6px;padding:1px 6px;white-space:nowrap;">+'+legCount+t('cs.ol.legBadge')+'</span>';
+      soferCell += ' <span style="font-size:10px;background:rgba(99,102,241,0.15);color:#4f46e5;border:1px solid rgba(99,102,241,0.3);border-radius:6px;padding:1px 6px;white-space:nowrap;">+'+legCount+t('cs.ol.legBadge')+'</span>';
       soferCell += '<div style="margin-top:4px;">';
       legs.forEach(function(l){
         soferCell += '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+
