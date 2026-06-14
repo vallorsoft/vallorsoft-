@@ -18,6 +18,8 @@ async function featureEnabled(companyId, key) {
   } catch (e) { return true; }
 }
 
+router.get('/index.html', (req, res) => res.redirect(301, '/'));
+
 router.get('/', (req, res) => {
   if (req.session && req.session.user) {
     const p = req.session.user.pozicio;
