@@ -58,16 +58,22 @@ router.get('/api/developer/export/:id', devGuard, async (req, res) => {
 
     // orders
     const orders = await pool.query(
-      `SELECT id,status,email_sofer,rendszam,felrako,lerako,indulas,erkezes,
-              ar,ar_valuta,megjegyzes,load_type,suly_kg,km,toll_cost,
+      `SELECT id,status,client,ref,
+              loc_incarcare,loc_descarcare,data_incarcare,data_descarcare,
+              pret,km,sofer_type,email_sofer,nume_sofer,
+              firma_extern,telefon_extern,rendszam_camion,rendszam_remorca,
+              load_type,suly_kg,hossz_cm,szel_cm,mag_cm,toll_cost,
               client_id,carrier_id,carrier_cost,payment_status,paid_amount,
               nc_code,marfa_value,marfa_currency,needs_uit,
               created_at,finalized_at
        FROM orders WHERE company_id=$1 ORDER BY id`, [cid]);
     if (orders.rows.length) {
       files.push({ name: 'csv/orders.csv', buffer: buildCsv(
-        ['id','status','email_sofer','rendszam','felrako','lerako','indulas','erkezes',
-         'ar','ar_valuta','megjegyzes','load_type','suly_kg','km','toll_cost',
+        ['id','status','client','ref',
+         'loc_incarcare','loc_descarcare','data_incarcare','data_descarcare',
+         'pret','km','sofer_type','email_sofer','nume_sofer',
+         'firma_extern','telefon_extern','rendszam_camion','rendszam_remorca',
+         'load_type','suly_kg','hossz_cm','szel_cm','mag_cm','toll_cost',
          'client_id','carrier_id','carrier_cost','payment_status','paid_amount',
          'nc_code','marfa_value','marfa_currency','needs_uit','created_at','finalized_at'],
         orders.rows) });
@@ -75,11 +81,15 @@ router.get('/api/developer/export/:id', devGuard, async (req, res) => {
 
     // order_legs
     const legs = await pool.query(
-      `SELECT id,order_id,cim,lat,lng,sorrend,email_sofer,tipus,megjegyzes,created_at
-       FROM order_legs WHERE company_id=$1 ORDER BY order_id,sorrend`, [cid]);
+      `SELECT id,order_id,leg_number,sofer_type,email_sofer,nume_sofer,
+              firma_extern,telefon_extern,rendszam_camion,rendszam_remorca,
+              loc_preluare,data_preluare,loc_predare,data_predare,created_at
+       FROM order_legs WHERE company_id=$1 ORDER BY order_id,leg_number`, [cid]);
     if (legs.rows.length) {
       files.push({ name: 'csv/order_legs.csv', buffer: buildCsv(
-        ['id','order_id','cim','lat','lng','sorrend','email_sofer','tipus','megjegyzes','created_at'],
+        ['id','order_id','leg_number','sofer_type','email_sofer','nume_sofer',
+         'firma_extern','telefon_extern','rendszam_camion','rendszam_remorca',
+         'loc_preluare','data_preluare','loc_predare','data_predare','created_at'],
         legs.rows) });
     }
 

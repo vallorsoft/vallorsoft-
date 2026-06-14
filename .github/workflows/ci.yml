@@ -3,6 +3,8 @@ name: CI
 # Minden PR-en és a main-be való push után lefuttatja a Jest-tesztcsomagot.
 # A DATABASE_URL beállításával a valódi-DB integrációs suite is fut (db-orders.test.js);
 # enélkül (helyben) az a suite kihagyódik, a mock-tesztek mennek.
+# Main-push után sikeres tesztek esetén automatikusan élesít Render-re
+# (RENDER_DEPLOY_HOOK_URL GitHub Secret szükséges — Render → Service → Settings → Deploy Hooks).
 on:
   push:
     branches: [main]
@@ -45,3 +47,15 @@ jobs:
         run: npm ci
       - name: Run tests (mock + valódi DB)
         run: npm test
+
+  deploy:
+    name: Deploy to Render
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Trigger Render deploy hook
+        run: |
+          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+          echo "Deploy triggered."
