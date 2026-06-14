@@ -99,15 +99,43 @@ handlers.expiryDelete = async function (req, res, args) {
 handlers.getExpiryAlerts = async function (req, res, args) {
   try {
     if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
     const r = await pool.query(
       `SELECT id, entity_type, entity_label, doc_type, expiry_date,
               (expiry_date - CURRENT_DATE)::int AS days_left
        FROM document_expiries
        WHERE company_id = $1 AND expiry_date <= CURRENT_DATE + alert_days * INTERVAL '1 day'
        ORDER BY expiry_date ASC LIMIT 20`,
-      [req.session.user.company_id]
+      [cid]
     );
-    return res.json({ result: { ok: true, items: r.rows } });
+    let items = r.rows;
+    // UIT (RO e-Transport) lejáró kódok beolvasztása — a 5/15 napos érvényesség
+    // végéhez közeledő AKTÍV kódok (még nem leállított), max 2 nappal lejárat előtt
+    // vagy már lejárt, de még nem leállítva. Best-effort (ha nincs tábla, kihagyjuk).
+    try {
+      const u = await pool.query(
+        `SELECT order_id, uit_code, valid_until AS expiry_date,
+                (valid_until - CURRENT_DATE)::int AS days_left
+         FROM order_uit_codes
+         WHERE company_id = $1 AND valid_until IS NOT NULL
+           AND status <> 'stopped'
+           AND valid_until <= CURRENT_DATE + 2
+         ORDER BY valid_until ASC LIMIT 20`,
+        [cid]
+      );
+      const uitItems = u.rows.map(function (x) {
+        return {
+          id: 'uit-' + x.order_id,
+          entity_type: 'uit',
+          entity_label: x.order_id,
+          doc_type: 'Cod UIT ' + String(x.uit_code || '').slice(0, 10),
+          expiry_date: x.expiry_date,
+          days_left: x.days_left,
+        };
+      });
+      items = items.concat(uitItems).sort(function (a, b) { return a.days_left - b.days_left; });
+    } catch (e) { /* order_uit_codes hiányában csendben kihagyjuk */ }
+    return res.json({ result: { ok: true, items: items } });
   } catch (err) {
     console.error('getExpiryAlerts hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });

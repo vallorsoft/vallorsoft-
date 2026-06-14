@@ -31,7 +31,7 @@
   function docTypes() {
     return ['fe.doc.itp', 'fe.doc.rca', 'fe.doc.casco', 'fe.doc.rovinieta',
       'fe.doc.cmrIns', 'fe.doc.tahoCalib', 'fe.doc.tahoCard', 'fe.doc.tahoDl',
-      'fe.doc.adr', 'fe.doc.community', 'fe.doc.license', 'fe.doc.atestat', 'fe.doc.medical', 'fe.doc.other'
+      'fe.doc.adr', 'fe.doc.community', 'fe.doc.copieConforma', 'fe.doc.license', 'fe.doc.atestat', 'fe.doc.medical', 'fe.doc.other'
     ].map(function (k) { return t(k); });
   }
 
@@ -523,7 +523,7 @@
       if (!r || !r.ok || !(r.items || []).length) { box.innerHTML = ''; return; }
       var lejart = r.items.filter(function (i) { return i.days_left < 0; });
       var rows = r.items.slice(0, 6).map(function (i) {
-        var ico = i.entity_type === 'driver' ? '👤' : '🚛';
+        var ico = i.entity_type === 'driver' ? '👤' : i.entity_type === 'uit' ? '🛣️' : '🚛';
         var col = i.days_left < 0 ? 'var(--status-danger)' : 'var(--status-warn)';
         return '<span style="white-space:nowrap;font-size:12px;">' + ico + ' <b>' + esc(i.entity_label || '') + '</b> '
           + esc(i.doc_type) + ' <span style="color:' + col + ';font-weight:700;">'

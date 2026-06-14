@@ -2616,6 +2616,19 @@ function loadSettingsPane(){
     document.getElementById('stEmail').value   = u.email || '';
     document.getElementById('stTel').value     = u.tel   || '';
     document.getElementById('stPozicio').value = u.pozicio || '';
+    // GDPR / Adatvédelem kártya — csak Adminnak
+    if (u.pozicio === 'Admin') {
+      var gcard = document.getElementById('gdprSettingsCard');
+      if (gcard) {
+        gcard.style.display = '';
+        gas('getGdprSettings').then(function(r){
+          var s = (r && r.ok && r.settings) || {};
+          var set=function(id,v){ var el=document.getElementById(id); if(el) el.value=v||''; };
+          set('gdprNotice', s.privacy_notice); set('gdprDpo', s.dpo_contact); set('gdprRetention', s.retention_note);
+          var cb=document.getElementById('gdprGpsBiz'); if(cb) cb.checked=!!s.gps_business_only;
+        });
+      }
+    }
   });
   // 2FA státusz
   gas('settings2faStatus').then(function(r){
@@ -2637,6 +2650,21 @@ function loadSettingsPane(){
       disW.style.display     = 'none';
       enW.style.display      = '';
     }
+  });
+}
+
+// GDPR adatvédelmi beállítások mentése (csak admin felületen jelenik meg)
+function gdprSaveSettings(){
+  var payload = {
+    privacy_notice:    (document.getElementById('gdprNotice')||{}).value||'',
+    dpo_contact:       (document.getElementById('gdprDpo')||{}).value||'',
+    retention_note:    (document.getElementById('gdprRetention')||{}).value||'',
+    gps_business_only: !!(document.getElementById('gdprGpsBiz')||{}).checked,
+  };
+  gas('saveGdprSettings',[payload]).then(function(r){
+    var msg=document.getElementById('gdprSaveMsg');
+    if(r&&r.ok){ if(msg){ msg.textContent='✓ '+t('common.saved'); setTimeout(function(){msg.textContent='';},2500); } toast(t('common.saved'),'ok'); }
+    else { toast((r&&r.err)||'Eroare',  'err'); }
   });
 }
 
@@ -2788,6 +2816,10 @@ function renderFilteredOrders(list) {
 
     // Útvonal cella: alap útvonal + FTL/LTL jelzés (+ méret) + szakasz közbülső pontok
     var routeCell = esc(c.loc_incarcare||'—')+' → '+esc(c.loc_descarcare||'—')+loadTypeBadge(c.load_type, dimStr(c.hossz_cm,c.szel_cm,c.mag_cm));
+    // RO e-Transport: ha a fuvar UIT-kötelezettnek jelölt, de nincs aktív UIT-kódja → figyelmeztetés
+    if (c.needs_uit && !(parseInt(c.uit_active_count,10)>0)) {
+      routeCell += ' <span class="badge err" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="'+t('cs.ol.uitMissingTitle')+'">⚠️ '+t('cs.ol.uitMissing')+'</span>';
+    }
     // Leadott áru jelzései (folytatásra váró fuvar — a lista tetején)
     if (c.status==='Parkolt') {
       routeCell += '<div style="margin-top:4px;"><span class="badge" style="background:rgba(192,38,211,0.18);color:#e879f9;border:1px solid rgba(192,38,211,0.4);">'+
@@ -3103,6 +3135,11 @@ function openOrderEdit(id) {
       if(typeof renderTollBreak==='function') renderTollBreak(tg);
       var oeCcEl=document.getElementById('oeCarrierCost'); if(oeCcEl) oeCcEl.value=(o.carrier_cost==null?'':o.carrier_cost);
       if(typeof ensureCarriers==='function') ensureCarriers(function(){ fillCarrierSelect('oeCarrier', o.carrier_id); oeUpdateMargin(); });
+      // RO e-Transport mezők feltöltése
+      var oeNcEl=document.getElementById('oeNcCode'); if(oeNcEl) oeNcEl.value=(o.nc_code||'');
+      var oeMvEl=document.getElementById('oeMarfaValue'); if(oeMvEl) oeMvEl.value=(o.marfa_value==null?'':o.marfa_value);
+      var oeMcEl=document.getElementById('oeMarfaCurrency'); if(oeMcEl) oeMcEl.value=(o.marfa_currency||'RON');
+      var oeNuEl=document.getElementById('oeNeedsUit'); if(oeNuEl) oeNuEl.checked=!!o.needs_uit;
       document.getElementById('oeStatus').value = o.status||'Disponibil';
       document.getElementById('oeSoferType').value = o.sofer_type||'';
 
@@ -3242,6 +3279,10 @@ function saveOrderEdit() {
     toll_cost:        (document.getElementById('oeToll')||{}).value||null,
     carrier_id:       (document.getElementById('oeCarrier')||{}).value||null,
     carrier_cost:     (document.getElementById('oeCarrierCost')||{}).value||null,
+    nc_code:          (document.getElementById('oeNcCode')||{}).value||null,
+    marfa_value:      (document.getElementById('oeMarfaValue')||{}).value||null,
+    marfa_currency:   (document.getElementById('oeMarfaCurrency')||{}).value||'RON',
+    needs_uit:        !!(document.getElementById('oeNeedsUit')||{}).checked,
     load_type:        loadTypeValue('oeFtl','oeLtl'),
     hossz_cm:         (document.getElementById('oeHossz')||{}).value||null,
     szel_cm:          (document.getElementById('oeSzel')||{}).value||null,
