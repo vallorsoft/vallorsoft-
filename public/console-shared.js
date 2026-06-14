@@ -997,9 +997,9 @@ function loadClientPortalAccess(){
     +'<div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:16px;">'
     +'<div class="field" style="margin:0;min-width:220px;position:relative;" id="cpClientWrap">'
     +'<label>'+t('cs.cp.client')+'</label>'
-    +'<input class="input" id="cpClientDisplay" readonly placeholder="'+t('cs.cp.pickClient')+'" style="cursor:pointer;background:var(--bg-panel-raised,#141c25);" onclick="cpDropToggle(event)" autocomplete="off">'
+    +'<input class="input" id="cpClientDisplay" readonly placeholder="'+t('cs.cp.pickClient')+'" style="cursor:pointer;" onclick="cpDropToggle(event)" autocomplete="off">'
     +'<input type="hidden" id="cpClientSel">'
-    +'<div id="cpClientDrop" style="display:none;position:absolute;z-index:9999;left:0;right:0;top:100%;margin-top:3px;background:var(--bg-panel-raised,#141c25);border:1px solid rgba(255,255,255,.13);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.45);overflow:hidden;">'
+    +'<div id="cpClientDrop" style="display:none;position:absolute;z-index:9999;left:0;right:0;top:100%;margin-top:3px;background:var(--bg-panel-raised,#141c25);color:var(--text-primary,#e9eef5);border:1px solid var(--glass-border-dark,rgba(255,255,255,.13));border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.45);overflow:hidden;">'
     +'<div style="padding:8px 8px 4px;"><input class="input" id="cpClientSearch" placeholder="Keresés..." style="margin:0;font-size:13px;" oninput="cpDropFilter()" onclick="event.stopPropagation()"></div>'
     +'<div id="cpClientList" style="max-height:220px;overflow-y:auto;padding:4px 6px 6px;"></div>'
     +'</div></div>'
@@ -1060,13 +1060,14 @@ function cpDropFilter(){
 function cpDropRender(q){
   var el=document.getElementById('cpClientList'); if(!el) return;
   var lower=q.toLowerCase();
-  var list=_cpClients.filter(function(c){ return !q||((c.nev||'').toLowerCase().indexOf(lower)>=0); });
+  var list=_cpClients.filter(function(c){ return !q||((c.denumire||'').toLowerCase().indexOf(lower)>=0); });
   if(!list.length){
     el.innerHTML='<div class="text-muted" style="font-size:12px;padding:6px 4px;">'+(_cpClients.length?'Nincs találat.':t('cs.cp.noClients'))+'</div>';
     return;
   }
   el.innerHTML=list.map(function(c){
-    return '<div onclick="cpDropPick('+c.id+',\''+esc(c.nev||('#'+c.id))+'\')" style="padding:7px 8px;border-radius:7px;cursor:pointer;font-size:13.5px;" onmouseover="this.style.background=\'rgba(255,255,255,.07)\'" onmouseout="this.style.background=\'\'">'+esc(c.nev||('#'+c.id))+'</div>';
+    var label=esc(c.denumire||('#'+c.id));
+    return '<div data-cpid="'+c.id+'" data-cpnev="'+label+'" onclick="cpDropPick(+this.dataset.cpid,this.dataset.cpnev)" style="padding:7px 8px;border-radius:7px;cursor:pointer;font-size:13.5px;" onmouseover="this.style.background=\'rgba(128,128,128,.12)\'" onmouseout="this.style.background=\'\'">'+label+'</div>';
   }).join('');
 }
 function cpDropPick(id, nev){
