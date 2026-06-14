@@ -32,7 +32,7 @@
     api('GET', '/api/carrier/orders').then(function (r) {
       if (!r || !r.ok) { $('dOrders').innerHTML = '<div class="mut" style="text-align:center;padding:20px">' + esc(t('common.loadError')) + '.</div>'; return; }
       _orders = r.orders || []; var s = r.stats || {};
-      $('dStats').innerHTML = tile(t('car.statActive'), s.active || 0) + tile(t('car.statOnRoad'), s.onroad || 0, '#4ade80') + tile(t('car.statPayable'), (Math.round(s.payable || 0)) + ' €', '#fbbf24');
+      $('dStats').innerHTML = tile(t('car.statActive'), s.active || 0) + tile(t('car.statOnRoad'), s.onroad || 0, '#15803d') + tile(t('car.statPayable'), (Math.round(s.payable || 0)) + ' €', '#b45309');
       // a fuvar-választó az upload-hoz
       var sel = $('uOrder'); if (sel) sel.innerHTML = '<option value="">' + esc(t('car.general')) + '</option>' + _orders.map(function (o) { return '<option value="' + esc(o.id) + '">' + esc(o.id) + ' · ' + esc(o.loc_incarcare || '') + '→' + esc(o.loc_descarcare || '') + '</option>'; }).join('');
       if (!_orders.length) { $('dOrders').innerHTML = '<div class="mut" style="text-align:center;padding:24px">' + esc(t('car.noOrders')) + '</div>'; return; }

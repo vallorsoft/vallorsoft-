@@ -80,8 +80,8 @@
       _requests = r.requests || [];
       var s = r.stats || {};
       $('dStats').innerHTML =
-        tile(t('por.tileActive'), s.active || 0) + tile(t('por.tileOnroad'), s.onroad || 0, '#4ade80') +
-        tile(t('por.tileTotal'), _orders.length) + tile(t('por.tileUnpaid'), s.unpaid || 0, (s.unpaid ? '#ff6b75' : ''));
+        tile(t('por.tileActive'), s.active || 0) + tile(t('por.tileOnroad'), s.onroad || 0, '#16a34a') +
+        tile(t('por.tileTotal'), _orders.length) + tile(t('por.tileUnpaid'), s.unpaid || 0, (s.unpaid ? '#dc2626' : ''));
       var html = '';
       if (_orders.length) html += _orders.map(orderCard).join('');
       else if (!_requests.length) html += '<div class="muted" style="text-align:center;padding:24px">' + esc(t('por.noOrdersYet')) + '</div>';
@@ -157,7 +157,7 @@
       if (_mLayer) _mLayer.clearLayers();
       if (r && r.ok && r.position) {
         var ll = [r.position.lat, r.position.lng];
-        L.circleMarker(ll, { radius: 10, color: '#fff', weight: 3, fillColor: '#e10b1a', fillOpacity: .95 }).addTo(_mLayer)
+        L.circleMarker(ll, { radius: 10, color: '#fff', weight: 3, fillColor: '#6366f1', fillOpacity: .95 }).addTo(_mLayer)
           .bindTooltip('🚛 ' + (o ? (o.rendszam_camion || '') : ''), { permanent: false }).openTooltip();
         _map.setView(ll, 8);
         $('mInfo').textContent = t('por.livePos') + (r.position.speed != null ? ' · ' + Math.round(r.position.speed) + ' km/h' : '')
