@@ -258,7 +258,7 @@ function loadSoferOrders() {
     el.innerHTML = _soferOrdersCache.map(function(o) {
       var checked = _selectedOrderIds.indexOf(o.id) !== -1;
       return '<label style="display:flex;align-items:flex-start;gap:12px;background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;">'
-        + '<input type="checkbox" value="' + o.id + '" ' + (checked ? 'checked' : '') + ' onchange="toggleOrderSel(this)" style="margin-top:3px;width:18px;height:18px;accent-color:#e10b1a;flex-shrink:0;">'
+        + '<input type="checkbox" value="' + o.id + '" ' + (checked ? 'checked' : '') + ' onchange="toggleOrderSel(this)" style="margin-top:3px;width:18px;height:18px;accent-color:#3b82f6;flex-shrink:0;">'
         + '<div>'
         + '<div style="font-weight:700;font-size:14px;color:#fff;">' + esc(o.client || '—') + ' <span style="font-size:11px;color:var(--muted);">#' + o.id + '</span> <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,0.1);">' + esc(o.status||'—') + '</span></div>'
         + '<div style="font-size:12px;color:var(--soft);margin-top:3px;">📍 ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—') + '</div>'
@@ -916,7 +916,7 @@ function renderFuvarCard(o) {
   if (hoPending) {
     hoBtn = '<span class="fuvar-status warn">' + t('sof.handoverPending') + (o.handover_loc ? ' @ ' + esc(o.handover_loc) : '') + '</span>';
   } else if (isAlocat || isCurs) {
-    hoBtn = '<button class="sh-btn" style="border:1px solid rgba(192,38,211,0.5);color:#e879f9;background:rgba(192,38,211,0.12);" ' +
+    hoBtn = '<button class="sh-btn" style="border:1px solid rgba(99,102,241,0.5);color:#a5b4fc;background:rgba(99,102,241,0.12);" ' +
       'onclick="openHandover(\'' + o.id + '\')" title="' + t('sof.handoverBtnTitle') + '">' + t('sof.ho.title') + '</button>';
   }
   return '' +
