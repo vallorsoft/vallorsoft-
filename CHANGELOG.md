@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-14 — Fix felső sáv + ikonos FGO-menü + globális kereső (admin, PR #91)
+
+- **Ikonos FGO-stílusú navigáció** az admin konzolon (`admin.html`): 10 főmenü / 32 menüpont, monokróm vonalas (Feather) inline SVG ikonokkal, generikus lenyitással (`toggleGroup`). Csoportosítás: Vezérlőpult · Fuvarok ▾ · Megrendelések ▾ · Dokumentumok ▾ · Flotta ▾ · Statisztika & Pénzügy ▾ · Ügyfelek · Kommunikáció · Adminisztráció ▾ · Beállítások. Üzemanyagkártya átkerült a Flottából az Adminisztrációba. A `data-tab` kulcsok/funkciók változatlanok.
+- **Fix felső sáv** (a landing mintájára, sticky + elmosott háttér): breadcrumb (az `activateTab` frissíti) + globális kereső-trigger (`Ctrl+K`) + nyelv/téma kapcsoló; light + dark.
+- **Globális kereső — command palette** (`public/global-search.js`, `Ctrl+K`): menü/navigáció (32 menüpont) + ÉLŐ adatkeresés (`handlers/globalSearch.js` RPC — fuvarok/ügyfelek/járművek/sofőrök, `company_id`-szűrt paraméteres `ILIKE`, kategóriánként LIMIT 6); billentyű-navigáció. Valós Postgres-en cross-kategóriás találat verifikálva; 108 teszt zöld. (Egyelőre csak admin; manager + többi konzol következő kör.)
+
+---
+
 ## 2026-06-14 — Teljes weboldal redesign: landing prémium kék/indigó (PR #87–#90)
 
 - **Teljes frontend-átszabás** a landing letisztult, prémium dizájnjára (világos alap, kék #3b82f6 / indigó #6366f1 paletta, mélység-effektek: gradiens kártyák + felső fény-csillanás + kék glow gombok + lágy radiális háttér-fény + gradiens KPI). **Csak megjelenés — funkció/JS/ID/data-i18n/route/RPC változatlan.** 6 agenttel párhuzamosan.
