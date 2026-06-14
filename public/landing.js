@@ -112,6 +112,8 @@ const translations = {
     footerTerms: 'Termeni și Condiții',
     footerPrivacy: 'Politica de Confidențialitate',
     footerCookiePolicy: 'Politica Cookie',
+    footerDpa: 'DPA',
+    footerSecurity: 'Securitate',
     footerCookies: 'Setări Cookie',
     footerRights: 'Toate drepturile rezervate.',
   },

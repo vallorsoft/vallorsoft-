@@ -67,6 +67,7 @@ router.get('/utvonaltervezes', requirePageLogin, requirePageRole('Admin', 'Manag
 router.get('/privacy',  (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'privacy.html')));
 router.get('/terms',    (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'terms.html')));
 router.get('/cookies',  (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'cookies.html')));
-router.get('/terms',   (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'terms.html')));
+router.get('/dpa',      (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dpa.html')));
+router.get('/security', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'security.html')));
 
 module.exports = router;
