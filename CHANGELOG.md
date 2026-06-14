@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-06-14 — Developer cégenkénti hozzáférés-statisztika (PR #86)
+
+- **Developer „👥 Hozzáférések" fül** (`handlers/developer.js` `devCompanyAccess` + `public/developer.html` + i18n) — a cég részletek-modaljában cégenként: felhasználók + alvállalkozók + ügyfelek bontásban összes / aktív / inaktív / meghívott számok + ki mikor lépett be utoljára (last_login táblázat). A fő userek aktív=nem tiltott, meghívott=aktív (fel nem használt) invite; a portál-belépők (carrier_users/client_users) aktív=aktivált+bekapcsolt, meghívott=`pass_hash` NULL, inaktív=`activ`=false.
+- **`users.last_login`** (`db/user-last-login.sql`) — a fő belépés (`routes/auth.js` `/api/login` + 2FA verify) mostantól frissíti (a portál-usereknek már volt last_login).
+
+---
+
 ## 2026-06-14 — Ügyfél-portál: beküldött kérések megjelenítése (PR #85)
 
 - **Ügyfél-portál mutatja a beküldött kéréseket** (`routes/portal.js` `/api/portal/orders` + `public/portal.js`) — a „📦 Transporturile tale" eddig csak a valódi fuvarokat mutatta, a kliens által beküldött, még el nem fogadott (függő) vagy **elutasított** kérések sehol nem látszottak. Mostantól a portál egy „📋 Beküldött kéréseid" szekcióban jeleníti meg a kliens portál-kéréseit státusszal (feldolgozás alatt / elutasítva); az elfogadott kihagyva (az már fuvarként látszik, nincs duplikálás). Új i18n kulcsok (RO+HU).
