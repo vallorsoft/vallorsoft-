@@ -1871,7 +1871,7 @@ function quickStatusChange(id, sel) {
     'warn': 'background:rgba(245,158,11,0.18);color:#d97706;border-color:rgba(245,158,11,0.45);',
     'ok':   'background:rgba(34,197,94,0.18);color:#16a34a;border-color:rgba(34,197,94,0.4);',
     'err':  'background:rgba(239,68,68,0.18);color:#dc2626;border-color:rgba(239,68,68,0.4);',
-    'park': 'background:rgba(99,102,241,0.18);color:#4f46e5;border-color:rgba(99,102,241,0.4);',
+    'park': 'background:rgba(20,184,166,0.18);color:#0f766e;border-color:rgba(20,184,166,0.4);',
     'wh':   'background:rgba(249,115,22,0.18);color:#c2410c;border-color:rgba(249,115,22,0.45);'
   };
   var base = 'cursor:pointer;font-size:11px;font-weight:700;border-radius:8px;padding:4px 20px 4px 8px;border:1px solid;appearance:auto;-webkit-appearance:auto;outline:none;min-width:80px;';
@@ -2982,7 +2982,7 @@ function renderFilteredOrders(list) {
       'warn': 'background:rgba(245,158,11,0.18);color:#d97706;border-color:rgba(245,158,11,0.45);',
       'ok':   'background:rgba(34,197,94,0.18);color:#16a34a;border-color:rgba(34,197,94,0.4);',
       'err':  'background:rgba(239,68,68,0.18);color:#dc2626;border-color:rgba(239,68,68,0.4);',
-      'park': 'background:rgba(99,102,241,0.18);color:#4f46e5;border-color:rgba(99,102,241,0.4);',
+      'park': 'background:rgba(20,184,166,0.18);color:#0f766e;border-color:rgba(20,184,166,0.4);',
       'wh':   'background:rgba(249,115,22,0.18);color:#c2410c;border-color:rgba(249,115,22,0.45);'
     };
     var statusSel = '<select onchange="quickStatusChange(\''+c.id+'\',this)" '+
@@ -3007,7 +3007,7 @@ function renderFilteredOrders(list) {
     }
     // Leadott áru jelzései (folytatásra váró fuvar — a lista tetején)
     if (c.status==='Parkolt') {
-      routeCell += '<div style="margin-top:4px;"><span class="badge" style="background:rgba(192,38,211,0.18);color:#e879f9;border:1px solid rgba(192,38,211,0.4);">'+
+      routeCell += '<div style="margin-top:4px;"><span class="badge" style="background:rgba(20,184,166,0.18);color:#2dd4bf;border:1px solid rgba(20,184,166,0.4);">'+
         t('cs.ol.cargoOnTrailer')+(c.rendszam_remorca?': '+esc(c.rendszam_remorca):'')+(c.handover_loc?' @ '+esc(c.handover_loc):'')+t('cs.ol.needTractor')+'</span></div>';
     }
     if (c.status==='Raktarban') {
@@ -3157,7 +3157,7 @@ function downloadSelectedOrders() {
       '<td style="text-align:right;vertical-align:top;">'+esc(String(c.km||'—'))+'</td>'+
       '<td style="text-align:right;vertical-align:top;">'+esc(String(c.pret||'—'))+'</td>'+
       '<td style="vertical-align:top;">'+esc(soferInfo)+
-        (legCount > 0 ? ' <b style="color:#c00;font-size:10px;">(+'+legCount+t('cs.pr.legCount')+')</b>' : '')+
+        (legCount > 0 ? ' <b style="color:#6366f1;font-size:10px;">(+'+legCount+t('cs.pr.legCount')+')</b>' : '')+
       '</td>'+
       '<td style="vertical-align:top;">'+esc(c.rendszam_camion||'—')+(c.rendszam_remorca?' / '+esc(c.rendszam_remorca):'')+'</td>'+
       '<td style="text-align:center;vertical-align:top;font-weight:700;">'+esc(c.status||'—')+'</td>'+

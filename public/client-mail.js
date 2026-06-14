@@ -14,7 +14,7 @@ window.ClientMail = (function () {
       .cm-in,.cm-sel,.cm-ta{width:100%;border:1px solid #d3dded;border-radius:8px;padding:9px;font-size:14px;box-sizing:border-box}
       .cm-ta{min-height:150px;resize:vertical;font-family:inherit}
       .cm-btn{cursor:pointer;border:1px solid #cdd6e4;border-radius:8px;padding:9px 13px;font-size:13px;font-weight:600;background:#fff}
-      .cm-btn--red{background:#e10b1a;color:#fff;border-color:#e10b1a}.cm-btn--ghost{background:#f4f7fb}
+      .cm-btn--red{background:#3b82f6;color:#fff;border-color:#3b82f6}.cm-btn--ghost{background:#f4f7fb}
       .cm-hint{font-size:11px;color:#8a97a8;margin-top:4px}
       .cm-sec{border-top:1px solid #eef2f7;margin-top:14px;padding-top:12px}
       .cm-logo img{max-height:46px;max-width:200px;border:1px solid #eef2f7;border-radius:6px;padding:4px;background:#fff}

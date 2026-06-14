@@ -21,7 +21,7 @@ window.SoferUit = (function () {
       '.su-open{cursor:pointer;border:1px solid rgba(34,197,94,.5);color:#4ade80;border-radius:8px;padding:6px 11px;font-size:12px;font-weight:700;background:transparent;white-space:nowrap}' +
       '.su-add{display:flex;gap:7px;margin-top:6px}' +
       '.su-in{flex:1;background:#070d14;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:11px;color:#fff;font-family:ui-monospace,monospace;text-transform:uppercase;font-size:15px}' +
-      '.su-save{background:#e10b1a;color:#fff;border:0;border-radius:10px;padding:11px 14px;font-weight:700}' +
+      '.su-save{background:#3b82f6;color:#fff;border:0;border-radius:10px;padding:11px 14px;font-weight:700}' +
       '.su-note{font-size:11px;color:#9fb0c3;margin:12px 0 0;border-top:1px dashed rgba(255,255,255,.12);padding-top:10px}' +
       '.su-empty{color:#9fb0c3;font-size:13px;padding:8px 2px}';
     document.head.appendChild(s);

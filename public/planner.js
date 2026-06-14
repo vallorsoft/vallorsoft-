@@ -64,9 +64,9 @@
   var ST = {
     'Disponibil': { c: '#3b82f6', t: 'Tervezett' },
     'Alocat':     { c: '#f59e0b', t: 'Kiosztva' },
-    'Extern':     { c: '#a855f7', t: 'Külsős' },
+    'Extern':     { c: '#6366f1', t: 'Külsős' },
     'In Curs':    { c: '#22c55e', t: 'Úton' },
-    'Parkolt':    { c: '#c026d3', t: 'Parkolt (áru pótkocsin)' },
+    'Parkolt':    { c: '#14b8a6', t: 'Parkolt (áru pótkocsin)' },
     'Raktarban':  { c: '#f97316', t: 'Raktárban' },
     'Finalizat':  { c: '#64748b', t: 'Kész' }
   };
@@ -93,14 +93,14 @@
       '.p2-corner{flex:0 0 var(--p2-rail,168px);position:sticky;left:0;z-index:6;background:var(--bg-panel);' +
         'border-bottom:1px solid var(--border);display:flex;align-items:flex-end;padding:4px 10px;font-size:calc(10px*var(--p2-fs,1));color:var(--text-muted);}',
       '.p2-railrz{position:absolute;right:0;top:0;bottom:0;width:7px;cursor:col-resize;z-index:8;}',
-      '.p2-railrz:hover{background:var(--brand-red);opacity:.5;}',
+      '.p2-railrz:hover{background:#6366f1;opacity:.5;}',
       '.p2-day{position:relative;flex:0 0 auto;text-align:center;padding:5px 0 3px;font-size:calc(11px*var(--p2-fs,1));font-weight:700;color:var(--text-muted);' +
         'border-left:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--bg-panel);}',
       '.p2-day .dn{font-size:calc(10px*var(--p2-fs,1));font-weight:400;opacity:.8;}',
       '.p2-dayrz{position:absolute;right:0;top:0;bottom:0;width:7px;cursor:col-resize;z-index:7;}',
-      '.p2-dayrz:hover{background:var(--brand-red);opacity:.5;}',
+      '.p2-dayrz:hover{background:#6366f1;opacity:.5;}',
       '.p2-day.we{background:rgba(255,255,255,0.04);}',
-      '.p2-day.today{color:#fff;background:rgba(225,11,26,0.18);}',
+      '.p2-day.today{color:#fff;background:rgba(99,102,241,0.18);}',
       // — kihasználtság —
       '.p2-utilrow{display:flex;}',
       '.p2-utilcorner{flex:0 0 var(--p2-rail,168px);position:sticky;left:0;z-index:4;background:var(--bg-panel);' +
@@ -115,17 +115,17 @@
       '.p2-rail .rd{font-size:calc(10.5px*var(--p2-fs,1));color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
       '.p2-vgrip{cursor:grab;opacity:.45;font-size:calc(11px*var(--p2-fs,1));letter-spacing:-2px;user-select:none;}',
       '.p2-vgrip:hover{opacity:1;}',
-      '.p2-rail.vdrag-over{box-shadow:inset 0 3px 0 0 var(--brand-red);}',
+      '.p2-rail.vdrag-over{box-shadow:inset 0 3px 0 0 #6366f1;}',
       '.p2-rail.vdragging{opacity:.45;}',
       '.p2-dot{width:7px;height:7px;border-radius:50%;background:#475569;flex-shrink:0;}',
       '.p2-dot.on{background:var(--status-ok);box-shadow:0 0 5px var(--status-ok);}',
       '.p2-lanes{position:relative;flex:0 0 auto;}',
       '.p2-dcell{position:absolute;top:0;bottom:0;border-left:1px solid var(--border);}',
       '.p2-dcell.we{background:rgba(255,255,255,0.035);}',
-      '.p2-dcell.today{background:rgba(225,11,26,0.07);}',
+      '.p2-dcell.today{background:rgba(99,102,241,0.07);}',
       '.p2-picking .p2-dcell{cursor:copy;}',
       '.p2-picking .p2-dcell:hover,.p2-dcell.dragover{background:rgba(59,130,246,0.22)!important;outline:1px dashed #3b82f6;outline-offset:-1px;}',
-      '.p2-todayline{position:absolute;top:0;bottom:0;width:2px;background:var(--brand-red);opacity:.7;z-index:1;pointer-events:none;}',
+      '.p2-todayline{position:absolute;top:0;bottom:0;width:2px;background:#6366f1;opacity:.7;z-index:1;pointer-events:none;}',
       // — sávok —
       '.p2-bar{position:absolute;border-radius:7px;color:#fff;font-weight:700;line-height:1.15;' +
         'padding:3px 16px 3px 8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer;z-index:2;font-size:calc(10.5px*var(--p2-fs,1));' +
@@ -156,7 +156,7 @@
       // — mobil napi nézet —
       '.p2-strip{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;}',
       '.p2-stripd{flex:0 0 auto;min-width:52px;text-align:center;padding:7px 6px;border-radius:10px;border:1px solid var(--border);cursor:pointer;}',
-      '.p2-stripd.sel{border-color:var(--brand-red);background:rgba(225,11,26,0.14);}',
+      '.p2-stripd.sel{border-color:#6366f1;background:rgba(99,102,241,0.14);}',
       '.p2-stripd .dn{font-size:10px;color:var(--text-muted);}',
       '.p2-stripd .dd{font-size:14px;font-weight:800;}',
       '.p2-stripd .ct{font-size:9px;color:var(--status-warn);}',
@@ -172,15 +172,15 @@
       '.main-content[data-theme="light"] .p2-utilcorner,' +
       '.main-content[data-theme="light"] .p2-rail{background:#fff;border-color:rgba(0,0,0,0.12);}',
       '.main-content[data-theme="light"] .p2-day.we{background:rgba(0,0,0,0.06);}',
-      '.main-content[data-theme="light"] .p2-day.today{color:#1a2332;background:rgba(225,11,26,0.14);}',
+      '.main-content[data-theme="light"] .p2-day.today{color:#1a2332;background:rgba(99,102,241,0.14);}',
       '.main-content[data-theme="light"] .p2-dcell{border-color:rgba(0,0,0,0.08);}',
       '.main-content[data-theme="light"] .p2-dcell.we{background:rgba(0,0,0,0.045);}',
-      '.main-content[data-theme="light"] .p2-dcell.today{background:rgba(225,11,26,0.07);}',
+      '.main-content[data-theme="light"] .p2-dcell.today{background:rgba(99,102,241,0.07);}',
       '.main-content[data-theme="light"] .p2-row{border-color:rgba(0,0,0,0.10);}',
       '.main-content[data-theme="light"] .p2-util{border-color:rgba(0,0,0,0.10);color:#1a2332;}',
       '.main-content[data-theme="light"] .p2-pop{background:#fff;border-color:rgba(0,0,0,0.18);box-shadow:0 18px 50px rgba(0,0,0,0.25);}',
       '.main-content[data-theme="light"] .p2-stripd{background:#fff;border-color:rgba(0,0,0,0.14);}',
-      '.main-content[data-theme="light"] .p2-stripd.sel{background:rgba(225,11,26,0.10);}',
+      '.main-content[data-theme="light"] .p2-stripd.sel{background:rgba(99,102,241,0.10);}',
       '.main-content[data-theme="light"] .p2-vcard{border-color:rgba(0,0,0,0.12);}',
       '.main-content[data-theme="light"] .p2-pool{border-color:rgba(0,0,0,0.25);}',
       '.main-content[data-theme="light"] .p2-skel{background:linear-gradient(90deg,rgba(0,0,0,0.05),rgba(0,0,0,0.12),rgba(0,0,0,0.05));background-size:200% 100%;}',
@@ -333,7 +333,7 @@
         + [[7, t('pl.week1')], [14, t('pl.week2')], [28, t('pl.week4')]].map(function (z) { return '<option value="' + z[0] + '"' + (_days === z[0] ? ' selected' : '') + '>' + z[1] + '</option>'; }).join('') + '</select>'
         + '<button class="btn ghost" style="padding:6px 11px;font-size:12px;" onclick="Planner.density()" title="' + t('pl.densityTitle') + '">' + (_dense ? t('pl.comfy') : t('pl.dense')) + '</button>'
         + '<label class="text-muted" style="font-size:11.5px;display:flex;align-items:center;gap:5px;white-space:nowrap;" title="' + t('pl.scaleTitle') + '">🔎'
-        + '<input type="range" id="p2Scale" min="60" max="150" step="5" value="' + Math.round(_scale * 100) + '" style="width:84px;accent-color:#e10b1a;"></label>'
+        + '<input type="range" id="p2Scale" min="60" max="150" step="5" value="' + Math.round(_scale * 100) + '" style="width:84px;accent-color:#3b82f6;"></label>'
         + '<button class="btn ghost" style="padding:6px 11px;font-size:12px;" onclick="Planner.resetView()" title="' + t('pl.viewResetTitle') + '">↺</button>')
       + '<span style="flex:1;"></span>'
       + '<input class="input" id="p2Q" value="' + esc(_f.q) + '" placeholder="' + t('pl.searchPh') + '" style="max-width:170px;padding:7px 10px;font-size:12px;">'
@@ -341,7 +341,7 @@
       + Object.keys(ST).map(function (s) { return '<option' + (_f.status === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>'
       + '<select class="select" id="p2Drv" style="max-width:130px;padding:6px 8px;font-size:12px;"><option value="">' + t('pl.driver') + '</option></select>'
       + (isMobile() ? '' : '<label class="text-muted" style="font-size:11.5px;display:flex;align-items:center;gap:5px;cursor:pointer;">'
-        + '<input type="checkbox" id="p2Busy"' + (_f.onlyBusy ? ' checked' : '') + ' style="accent-color:#e10b1a;"> ' + t('pl.onlyBusy') + '</label>')
+        + '<input type="checkbox" id="p2Busy"' + (_f.onlyBusy ? ' checked' : '') + ' style="accent-color:#3b82f6;"> ' + t('pl.onlyBusy') + '</label>')
       + '</div>';
   }
 
@@ -497,7 +497,7 @@
         var s = dstr(o.data_incarcare), e = dstr(o.data_descarcare) || s;
         return o.rendszam_camion && s && s <= y && e >= y;
       }).length;
-      return '<div class="p2-stripd' + (y === _mDay ? ' sel' : '') + (y === today ? '" style="border-color:var(--brand-red);' : '"') + ' onclick="Planner.mday(\'' + y + '\')">'
+      return '<div class="p2-stripd' + (y === _mDay ? ' sel' : '') + (y === today ? '" style="border-color:#6366f1;' : '"') + ' onclick="Planner.mday(\'' + y + '\')">'
         + '<div class="dn">' + DAYNAMES[d.getDay()] + '</div><div class="dd">' + d.getDate() + '</div>'
         + (cnt ? '<div class="ct">' + cnt + ' fuvar</div>' : '<div class="ct">&nbsp;</div>') + '</div>';
     }).join('') + '</div>';

@@ -21,7 +21,7 @@ window.UitPanel = (function () {
       .uit-b--del{color:#f87171;border-color:rgba(239,68,68,.5)}
       .uit-add{display:flex;gap:6px;margin-top:6px}
       .uit-in{flex:1;background:#070b10;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 10px;color:#e9eef5;font-family:ui-monospace,monospace;text-transform:uppercase}
-      .uit-save{cursor:pointer;background:#e10b1a;color:#fff;border:0;border-radius:8px;padding:9px 14px;font-weight:700}
+      .uit-save{cursor:pointer;background:#3b82f6;color:#fff;border:0;border-radius:8px;padding:9px 14px;font-weight:700}
       .uit-foot{display:flex;justify-content:flex-end;margin-top:14px}
       .uit-close{cursor:pointer;background:transparent;color:#9fb0c3;border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:8px 14px}
       .uit-note{font-size:11px;color:#9fb0c3;margin:10px 0 0;border-top:1px dashed rgba(255,255,255,.12);padding-top:10px}
