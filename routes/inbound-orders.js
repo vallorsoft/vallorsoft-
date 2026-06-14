@@ -186,6 +186,26 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
     const szel_cm = (ex.szel_cm != null && ex.szel_cm !== '') ? (parseInt(ex.szel_cm, 10) || null) : null;
     const mag_cm = (ex.mag_cm != null && ex.mag_cm !== '') ? (parseInt(ex.mag_cm, 10) || null) : null;
 
+    // Megrendelő (ügyfél) automatikus kitöltése + linkelése: a portál-kérés
+    // forrás-e-mailjéből (client_users → clients) — így a diszpécsernek nem kell
+    // külön beírnia, és a fuvar a meglévő ügyfél-rekordhoz kötődik (orders.client_id).
+    let clientName = client;
+    let clientId = null;
+    try {
+      const srcEmail = r0.rows[0].source_email;
+      if (srcEmail) {
+        const cl = await pool.query(
+          `SELECT c.id, c.denumire FROM client_users cu
+             JOIN clients c ON c.id = cu.client_id AND c.company_id = cu.company_id
+            WHERE cu.company_id = $1 AND LOWER(cu.email) = LOWER($2) LIMIT 1`,
+          [company_id, srcEmail]);
+        if (cl.rows.length) {
+          clientId = cl.rows[0].id;
+          if (!clientName) clientName = (cl.rows[0].denumire || '').trim();
+        }
+      }
+    } catch (_) { /* a megrendelő-feloldás hibája ne buktassa a jóváhagyást */ }
+
     // Tranzakció: fuvar + láb + jóváhagyott státusz EGYÜTT — félbeszakadásnál
     // ne maradjon létrejött fuvar 'feldolgozatlan' inbounddal (újrapróbálásnál
     // az duplikált fuvart eredményezne).
@@ -196,12 +216,12 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
         `INSERT INTO orders (id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
            pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
            rendszam_camion, rendszam_remorca, status, company_id,
-           suly_kg, load_type, hossz_cm, szel_cm, mag_cm)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
-        [id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
+           suly_kg, load_type, hossz_cm, szel_cm, mag_cm, client_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
+        [id, clientName, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
          pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
          rendszam_camion, rendszam_remorca, status, company_id,
-         suly_kg, load_type, hossz_cm, szel_cm, mag_cm]);
+         suly_kg, load_type, hossz_cm, szel_cm, mag_cm, clientId]);
       await dbc.query(
         `INSERT INTO order_legs (order_id, leg_number, sofer_type, email_sofer, nume_sofer, firma_extern,
            telefon_extern, external_driver_id, rendszam_camion, rendszam_remorca, loc_preluare, data_preluare, company_id)
