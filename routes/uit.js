@@ -4,7 +4,6 @@ const express = require('express');
 const pool = require('../db');
 const { requireLogin, requireRole } = require('../middleware/auth');
 const { decrypt } = require('../lib/crypto');
-const gps = require('../services/gpsAdapter');
 
 const router = express.Router();
 
@@ -90,51 +89,6 @@ router.delete('/api/uit/:uid', requireLogin, requireRole('Admin', 'Manager'), as
     if (!r.rowCount) return res.status(404).json({ error: 'Nu a fost gasit.' });
     res.json({ ok: true });
   } catch (e) { console.error('DELETE /api/uit/:uid hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
-});
-
-async function loadUit(req) {
-  const { rows } = await pool.query(`SELECT * FROM order_uit_codes WHERE id=$1 AND company_id=$2`, [req.params.uid, own(req)]);
-  return rows[0] || null;
-}
-
-// ---- KÜLDÉS INDÍTÁSA (UIT → jármű GPS-eszköz → ANAF) ----
-router.post('/api/uit/:uid/start', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
-  try {
-    const u = await loadUit(req);
-    if (!u) return res.status(404).json({ error: 'Nu a fost gasit.' });
-    const cfg = await getGpsCfg(own(req));
-    if (!cfg) return res.status(409).json({ error: 'Nu exista integrare GPS activa (fila Integrari).' });
-    let result, status = 'active', msg;
-    try {
-      const adapter = gps.getAdapter(u.provider || cfg.provider);
-      result = await adapter.assignUit(cfg, { objectId: u.object_id, uit: u.uit_code });
-      msg = result.message;
-    } catch (e) { status = 'error'; msg = e.message; }
-    const { rows } = await pool.query(
-      `UPDATE order_uit_codes SET status=$1, last_message=$2, sent_at=COALESCE(sent_at, now()), updated_at=now()
-         WHERE id=$3 AND company_id=$4 RETURNING *`, [status, msg, u.id, own(req)]);
-    res.json({ item: rows[0], mode: result ? result.mode : 'error' });
-  } catch (e) { console.error('POST /api/uit/:uid/start hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
-});
-
-// ---- KÜLDÉS LEÁLLÍTÁSA ----
-router.post('/api/uit/:uid/stop', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
-  try {
-    const u = await loadUit(req);
-    if (!u) return res.status(404).json({ error: 'Nu a fost gasit.' });
-    const cfg = await getGpsCfg(own(req));
-    if (!cfg) return res.status(409).json({ error: 'Nu exista integrare GPS activa (fila Integrari).' });
-    let result, status = 'stopped', msg;
-    try {
-      const adapter = gps.getAdapter(u.provider || cfg.provider);
-      result = await adapter.unassignUit(cfg, { objectId: u.object_id, uit: u.uit_code });
-      msg = result.message;
-    } catch (e) { status = 'error'; msg = e.message; }
-    const { rows } = await pool.query(
-      `UPDATE order_uit_codes SET status=$1, last_message=$2, stopped_at=now(), updated_at=now()
-         WHERE id=$3 AND company_id=$4 RETURNING *`, [status, msg, u.id, own(req)]);
-    res.json({ item: rows[0], mode: result ? result.mode : 'error' });
-  } catch (e) { console.error('POST /api/uit/:uid/stop hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
 // ============================================================

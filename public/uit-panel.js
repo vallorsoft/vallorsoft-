@@ -1,20 +1,9 @@
-// public/uit-panel.js  —  RO e-Transport UIT-kezelő modal egy fuvarhoz.
+// public/uit-panel.js  —  RO e-Transport UIT-kezelő modal egy fuvarhoz (admin/manager).
 // Globál: window.UitPanel.open(orderId, rendszam)
-//  - egy fuvarhoz több UIT, egymás alatt
-//  - kódonként: státusz-szimbólum (⏳ mentve / ✅ aktív / ⏹️ leállítva / ❌ hiba)
-//    + „Küldés" és „Leállítás" gomb + törlés
+//  - a UIT-ügyintézést a GPS-szolgáltató saját portálján (deep-link) végezzük; itt nem küldünk ANAF-nak.
+//  - a felhasználó beír egy UIT-kódot → mentés (order_uit_codes) → a deep-link új ablakban kinyílik,
+//    a fuvar-adatokkal + a beírt UIT-kóddal előtöltve.
 window.UitPanel = (function () {
-  // ── FUNKCIÓ IDEIGLENESEN KIKAPCSOLVA ──
-  // A teljes UIT/e-Transport pipeline kész és bent van; egyelőre csak a felület van letiltva.
-  // Visszakapcsolás: állítsd window.UIT_COMING_SOON = false (itt és a sofer-uit.js-ben).
-  window.UIT_COMING_SOON = true;
-
-  const SYM = {
-    new:     { i: '⏳', t: 'Mentve — küldés még nem indítva', c: '#fbbf24' },
-    active:  { i: '✅', t: 'Küldés aktív (GPS → ANAF)',        c: '#4ade80' },
-    stopped: { i: '⏹️', t: 'Küldés leállítva',                c: '#94a3b8' },
-    error:   { i: '❌', t: 'Hiba — lásd az üzenetet',          c: '#f87171' },
-  };
 
   function ensureStyle() {
     if (document.getElementById('uit-style')) return;
@@ -26,12 +15,9 @@ window.UitPanel = (function () {
       .uit-h h3{margin:0;font-size:17px}
       .uit-sub{color:#9fb0c3;font-size:12px;margin:0 0 14px}
       .uit-row{display:flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:8px 10px;margin-bottom:8px;flex-wrap:wrap}
-      .uit-sym{font-size:16px;width:22px;text-align:center}
       .uit-code{font-family:ui-monospace,monospace;font-weight:700;letter-spacing:.5px;flex:1;min-width:120px;word-break:break-all}
-      .uit-msg{flex-basis:100%;font-size:11px;color:#9fb0c3;margin-left:30px}
       .uit-b{cursor:pointer;border:1px solid;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;background:transparent}
       .uit-b--go{color:#4ade80;border-color:rgba(34,197,94,.5)}
-      .uit-b--stop{color:#fbbf24;border-color:rgba(245,158,11,.5)}
       .uit-b--del{color:#f87171;border-color:rgba(239,68,68,.5)}
       .uit-add{display:flex;gap:6px;margin-top:6px}
       .uit-in{flex:1;background:#070b10;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 10px;color:#e9eef5;font-family:ui-monospace,monospace;text-transform:uppercase}
@@ -50,36 +36,23 @@ window.UitPanel = (function () {
     return d;
   }
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+  function notify(msg) { if (typeof window.toast === 'function') window.toast(msg); else alert(msg); }
 
-  function comingSoon() {
-    ensureStyle();
-    var ov = document.createElement('div'); ov.className = 'uit-ov';
-    ov.innerHTML =
-      '<div class="uit-box" style="max-width:420px;text-align:center;">' +
-        '<div style="font-size:34px;margin-bottom:6px;">🚧</div>' +
-        '<h3 style="margin:0 0 8px;">UIT / RO e-Transport</h3>' +
-        '<p style="color:#9fb0c3;font-size:14px;margin:0 0 16px;">A UIT-kódot a GPS-szolgáltatód (pl. CargoTrack) e-Transport felületén generálod. ' +
-          'A gyors „átléptetéshez" az <b>Admin</b> állítsa be a CargoTrack deep-link sablont az <b>Integrációk</b> fülön.</p>' +
-        '<div class="uit-foot" style="justify-content:center;"><button class="uit-close" id="csOk">Rendben</button></div>' +
-      '</div>';
-    document.body.appendChild(ov);
-    var close = function () { ov.remove(); };
-    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
-    ov.querySelector('#csOk').addEventListener('click', close);
+  // A UIT-kódhoz tartozó deep-link megnyitása új ablakban (a fuvar-adatok + UIT-kód előtöltve).
+  async function openLink(orderId, code) {
+    try {
+      const d = await api('POST', '/api/execute', { functionName: 'getUitDeeplink', arguments: [orderId, code] });
+      const r = d && d.result;
+      if (r && r.ok && r.url) { window.open(r.url, '_blank', 'noopener'); return true; }
+      // Linkul UIT nu este configurat de furnizor.
+      notify('A developer még nem állított be deep-link sablont ehhez a GPS-szolgáltatóhoz. (Linkul UIT nu este configurat de furnizor.)');
+    } catch (_) {
+      notify('A developer még nem állított be deep-link sablont ehhez a GPS-szolgáltatóhoz. (Linkul UIT nu este configurat de furnizor.)');
+    }
+    return false;
   }
 
   function open(orderId, rendszam) {
-    // UIT ANAF-integráció HELYETT: cégenkénti deep-link (CargoTrack stb.) —
-    // a fuvar adataival előtöltve „átléptetjük" a UIT-generálóba.
-    api('POST', '/api/execute', { functionName: 'getUitDeeplink', arguments: [orderId] })
-      .then(function (d) {
-        var r = d && d.result;
-        if (r && r.ok && r.url) { window.open(r.url, '_blank', 'noopener'); return; }
-        comingSoon();
-      })
-      .catch(function () { comingSoon(); });
-    return;
-    /* eslint-disable no-unreachable */
     ensureStyle();
     const ov = document.createElement('div'); ov.className = 'uit-ov';
     ov.innerHTML =
@@ -87,9 +60,9 @@ window.UitPanel = (function () {
         '<div class="uit-h"><h3>🚛 UIT-kódok — ' + esc(orderId) + '</h3></div>' +
         '<p class="uit-sub">Jármű: <b>' + (esc(rendszam) || '—') + '</b> · RO e-Transport. Egy fuvarhoz több UIT is rögzíthető.</p>' +
         '<div id="uit-list"><div class="uit-empty">Betöltés…</div></div>' +
-        '<div class="uit-add"><input class="uit-in" id="uit-new" placeholder="Új UIT-kód beírása…"><button class="uit-save" id="uit-savebtn">+ Mentés</button></div>' +
-        '<p class="uit-note">A UIT-ot az ANAF adja a megbízó deklarációjára — ide a <b>kapott</b> kód kerül. ' +
-          'A „Küldés" a kódot a jármű GPS-eszközéhez rendeli (ANAF felé); a transport végén „Leállítás".</p>' +
+        '<div class="uit-add"><input class="uit-in" id="uit-new" placeholder="Új UIT-kód beírása…"><button class="uit-save" id="uit-savebtn">➤ Trimite / Küldés</button></div>' +
+        '<p class="uit-note">A UIT-ot a megbízó deklarációjára kapod — ide a <b>kapott</b> kód kerül. ' +
+          'A „Küldés" elmenti a kódot, majd megnyitja a GPS-szolgáltató portálját (deep-link) a fuvar adataival előtöltve.</p>' +
         '<div class="uit-foot"><button class="uit-close" id="uit-closebtn">Bezárás</button></div>' +
       '</div>';
     document.body.appendChild(ov);
@@ -104,26 +77,20 @@ window.UitPanel = (function () {
       catch (e) { $('uit-list').innerHTML = '<div class="uit-empty">' + esc(e.message) + '</div>'; return; }
       if (!items.length) { $('uit-list').innerHTML = '<div class="uit-empty">Még nincs UIT-kód ehhez a fuvarhoz.</div>'; return; }
       $('uit-list').innerHTML = items.map(function (u) {
-        const sym = SYM[u.status] || SYM.new;
-        return '<div class="uit-row" data-id="' + u.id + '">' +
-          '<span class="uit-sym" title="' + sym.t + '" style="color:' + sym.c + '">' + sym.i + '</span>' +
+        return '<div class="uit-row" data-id="' + esc(u.id) + '" data-code="' + esc(u.uit_code) + '">' +
           '<span class="uit-code">' + esc(u.uit_code) + '</span>' +
-          (u.status === 'active'
-            ? '<button class="uit-b uit-b--stop" data-act="stop">Leállítás</button>'
-            : '<button class="uit-b uit-b--go" data-act="start">Küldés</button>') +
+          '<button class="uit-b uit-b--go" data-act="open">🔗 Deschide / Megnyitás</button>' +
           '<button class="uit-b uit-b--del" data-act="del" title="Törlés">✕</button>' +
-          (u.last_message ? '<span class="uit-msg">' + esc(u.last_message) + '</span>' : '') +
         '</div>';
       }).join('');
       ov.querySelectorAll('.uit-row [data-act]').forEach(function (btn) {
         btn.addEventListener('click', async function () {
-          const row = btn.closest('.uit-row'); const id = row.dataset.id; const act = btn.dataset.act;
+          const row = btn.closest('.uit-row'); const id = row.dataset.id; const code = row.dataset.code; const act = btn.dataset.act;
           btn.disabled = true;
           try {
-            if (act === 'del') { await api('DELETE', '/api/uit/' + id); }
-            else { await api('POST', '/api/uit/' + id + '/' + act); }
-            await render();
-          } catch (e) { alert(e.message); btn.disabled = false; }
+            if (act === 'del') { await api('DELETE', '/api/uit/' + encodeURIComponent(id)); await render(); }
+            else { await openLink(orderId, code); btn.disabled = false; }
+          } catch (e) { notify(e.message); btn.disabled = false; }
         });
       });
     }
@@ -133,9 +100,13 @@ window.UitPanel = (function () {
       if (!code) return;
       const b = $('uit-savebtn'); b.disabled = true;
       try {
+        // 1) mentés
         await api('POST', '/api/orders/' + encodeURIComponent(orderId) + '/uit', { uit_code: code, rendszam: rendszam });
-        $('uit-new').value = ''; await render();
-      } catch (e) { alert(e.message); }
+        $('uit-new').value = '';
+        await render();
+        // 2) deep-link megnyitása az új kóddal
+        await openLink(orderId, code);
+      } catch (e) { notify(e.message); }
       finally { b.disabled = false; }
     }
     $('uit-savebtn').addEventListener('click', add);

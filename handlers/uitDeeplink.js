@@ -38,8 +38,21 @@ handlers.getUitDeeplink = async function (req, res, args) {
     if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
     const cid = req.session.user.company_id;
     const orderId = String(args && args[0] || '').trim();
-    const cr = await pool.query('SELECT uit_deeplink_template FROM companies WHERE id = $1', [cid]);
-    const tpl = cr.rows.length ? cr.rows[0].uit_deeplink_template : null;
+    const uitCode = args && args[1] != null ? String(args[1]).trim() : '';
+
+    // A cég AKTÍV GPS-providere (ugyanaz a logika, mint a routes/uit.js getGpsCfg-ben).
+    // Ha nincs aktív GPS-integráció, a cargotrack a default provider.
+    const gp = await pool.query(
+      `SELECT provider FROM company_integrations
+         WHERE company_id=$1 AND category='gps' AND enabled=true
+         ORDER BY (provider='cargotrack') DESC, updated_at DESC LIMIT 1`, [cid]);
+    const provider = gp.rows.length ? gp.rows[0].provider : 'cargotrack';
+
+    // Provider-szintű sablon, fallback a régi egy-sablonos oszlopra.
+    const cr = await pool.query('SELECT uit_deeplink_templates, uit_deeplink_template FROM companies WHERE id = $1', [cid]);
+    const row = cr.rows.length ? cr.rows[0] : {};
+    const map = row.uit_deeplink_templates || {};
+    const tpl = (map && map[provider]) || row.uit_deeplink_template || null;
     if (!tpl) return res.json({ result: { ok: false, reason: 'not-configured' } });
 
     const r = await pool.query(
@@ -52,7 +65,7 @@ handlers.getUitDeeplink = async function (req, res, args) {
       && String(o.email_sofer || '').toLowerCase() !== String(req.session.user.email || '').toLowerCase()) {
       return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
-    return res.json({ result: { ok: true, url: buildUrl(tpl, o) } });
+    return res.json({ result: { ok: true, url: buildUrl(tpl, o, uitCode) } });
   } catch (err) {
     console.error('getUitDeeplink hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });

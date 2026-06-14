@@ -51,17 +51,49 @@ async function anafLookup(cui) {
   const g = rec.date_generale || {};
   const tva = rec.inregistrare_scop_Tva || {};
   const inactiv = rec.stare_inactiv || {};
-  return {
+
+  // Strukturált székhely-cím az ANAF v9 válaszból (adresa_sediu_social, 's' prefix).
+  // Ebből építünk egy teljes, jól formázott címet, amely KÜLÖN tartalmazza
+  // a helységet (város/falu) ÉS a megyét (județ) — a panaszolt összemosódás ellen.
+  const sediu = rec.adresa_sediu_social || {};
+  // Megye: tegyük elé a 'Jud. ' előtagot, ha még nincs benne.
+  const judetRaw = String(sediu.sdenumire_Judet || '').trim();
+  const judet = judetRaw
+    ? (/^jud(\.|ețul|etul)?\b/i.test(judetRaw) ? judetRaw : `Jud. ${judetRaw}`)
+    : '';
+  // Utca + házszám egy darabban (csak ha van utcanév).
+  const strada = String(sediu.sdenumire_Strada || '').trim();
+  const numar = String(sediu.snumar_Strada || '').trim();
+  const utca = strada
+    ? (numar ? `${strada} nr. ${numar}` : strada)
+    : '';
+  // A meglévő részeket sorrendben, üreseket kihagyva, vesszővel fűzzük össze.
+  const parts = [
+    utca,
+    String(sediu.sdetalii_Adresa || '').trim(),     // pl. bloc/scară/apartament
+    String(sediu.sdenumire_Localitate || '').trim(), // helység (város/falu)
+    judet,
+    String(sediu.scod_Postal || '').trim(),          // irányítószám
+  ];
+  const fullAddress = parts.filter(Boolean).join(', ');
+  // Fallback: ha a strukturált székhely-cím üres, marad a régi összefűzött string.
+  const address = fullAddress || g.adresa || null;
+
+  const out = {
     found: true,
     name: g.denumire || null,
     cui: g.cui ? String(g.cui) : n, // (a korábbi 'RO'.startsWith('RO') feltétel mindig igaz volt)
-    address: g.adresa || null,
+    address,
     regCom: g.nrRegCom || null,
     phone: g.telefon || null,
     vatPayer: !!tva.scpTVA,                 // ÁFA-alany?
     active: !inactiv.statusInactivi,         // aktív (nem radiált/inaktív)?
     raw: rec,
   };
+  // Additívan: külön megye/helység mezők, ha jelen vannak (a kliens külön is megjelenítheti).
+  if (sediu.sdenumire_Judet) out.county = String(sediu.sdenumire_Judet).trim();
+  if (sediu.sdenumire_Localitate) out.locality = String(sediu.sdenumire_Localitate).trim();
+  return out;
 }
 
 // VIES: EU-s ÁFA-szám érvényessége (külföldi, EU-s ügyfélhez). pl. country='DE', number='123456789'
