@@ -14,6 +14,17 @@
 
 ---
 
+## 2026-06-14 — Önkiszolgáló SaaS regisztráció + trial előfizetés-kezelés (PR #98)
+
+- **Nyilvános cég-regisztráció** (`routes/public-register.js`, `POST /api/public-register`) — bárki létrehozhat céget meghívókód nélkül; 14 napos trial (`subscription_status='trial'`, `paid_until=NOW+14`), Admin user automatikus létrehozás, üdvözlő e-mail (RO/HU), IP-alapú rate-limit (3/óra).
+- **`register.html` dual-mode** — URL paraméter alapján automatikusan vált: nincs `?kod=` → ingyenes cég-regisztráció (Cégnév + adatok + T&C + „14 napos ingyenes próba indítása" gomb); `?kod=VS-XXXX` → meglévő meghívókódos flow (változatlan). Toggle-link a két mód között.
+- **Trial lejárat ütemező** (`startTrialExpiryScheduler`, `services/scheduler.js`) — naponta (60s késleltetés majd 24h ciklus) ellenőrzi az aznap lejáró trial-okat (`paid_until=CURRENT_DATE`), RO/HU e-mailt küld `/subscription` linkkel; `companies.trial_email_sent` flag megakadályozza a dupla küldést.
+- **`/subscription` oldal** (`public/subscription.html`) — standalone, landing-skin oldalon 4 csomag a DB-ből (`GET /api/public-plans`), Stripe Checkout ha konfigurálva (`gas('createSubscriptionCheckout')`), fallback e-mail/banki kapcsolat ha nem; bejelentkezett Adminnak trial státusz banner.
+- **`getMySubscription` RPC** (`handlers/billingHandlers.js`) — Admin saját előfizetési státusz: státusz, hátralévő napok, csomagnév, Stripe konfigurált-e.
+- **Admin Beállítások → 💳 Előfizetés kártya** (`admin.html`, `console-shared.js` `loadSubscriptionCard`) — státusz + hátralévő napok megjelenítés, „Csomag választása" gomb trial/inaktív esetén.
+- **Landing árazás** (`index.html`, `landing.js`) — `#lpPricingGrid` JS tölti be `/api/public-plans`-ból (4 csomag DB-ből, 2. kiemelt); statikus fallback megmarad hiba esetén.
+- **Migráció** (`db/saas-trial.sql`) — `companies.trial_email_sent BOOLEAN DEFAULT false`.
+
 ## 2026-06-14 — Landing: sofőr-hét timeline + hero USP + „Hogyan működik" + brand-indigo (PR #97)
 
 - **Brand szín frissítés** (`style.css`, `CLAUDE.md`) — a „Soft" logo betűje pirosról (`--brand-red #e10b1a`) indigóra (`--brand-indigo #6366f1`) váltott; `.vs-logo .soft` és `.chat-side .av` gradiens frissítve. `landing.css`-ben már helyes volt (`--lp-indigo`).

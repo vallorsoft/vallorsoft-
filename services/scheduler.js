@@ -399,4 +399,69 @@ function startEFacturaStatusScheduler() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler };
+// ============================================================
+//  Trial lejárat ütemező — 24 órás ciklus, indulás után 60s.
+//  Azoknak a cégeknek küld e-mailt, amelyek trial-ja ÉPPEN MA jár le,
+//  és még nem kaptak erről értesítést (trial_email_sent = false).
+// ============================================================
+function startTrialExpiryScheduler() {
+  const { sendClientEmail } = require('./email');
+  const appUrl = process.env.APP_URL || 'https://app.vallorsoft.com';
+
+  async function tick() {
+    try {
+      const res = await pool.query(
+        `SELECT id, nev, email_contact
+         FROM companies
+         WHERE subscription_status='trial'
+           AND paid_until::date = CURRENT_DATE
+           AND (trial_email_sent IS NULL OR trial_email_sent = false)`
+      );
+      for (const ceg of res.rows) {
+        try {
+          await sendClientEmail({
+            to: ceg.email_contact,
+            subject: 'Perioada de probă a expirat / Próbaidőszak lejárt — VallorSoft',
+            html: `
+<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
+  <div style="background:linear-gradient(135deg,#6366f1,#3b82f6);padding:28px 32px;border-radius:12px 12px 0 0;">
+    <h1 style="margin:0;color:#fff;font-size:22px;">vallor<span style="color:#c7d2fe;">Soft</span></h1>
+  </div>
+  <div style="background:#fff;padding:28px 32px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
+    <p style="margin:0 0 12px;font-size:16px;font-weight:600;">Perioada de probă a expirat / Próbaidőszak lejárt</p>
+    <p style="margin:0 0 12px;color:#475569;">
+      <strong>RO:</strong> Perioada de probă de 14 zile pentru <em>${ceg.nev}</em> a expirat astăzi.
+      Pentru a continua să utilizați VallorSoft, vă rugăm să alegeți un pachet de abonament.
+    </p>
+    <p style="margin:0 0 20px;color:#475569;">
+      <strong>HU:</strong> A(z) <em>${ceg.nev}</em> cég 14 napos próbaidőszaka ma lejárt.
+      A VallorSoft folyamatos használatához kérjük, válasszon előfizetési csomagot.
+    </p>
+    <a href="${appUrl}/subscription" style="display:inline-block;background:linear-gradient(180deg,#3b82f6,#2563eb);color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">
+      📦 Alege pachet / Csomag választása
+    </a>
+    <p style="margin:24px 0 0;font-size:12px;color:#94a3b8;">
+      Întrebări? / Kérdés? <a href="mailto:vallorsoft@gmail.com" style="color:#6366f1;">vallorsoft@gmail.com</a>
+    </p>
+  </div>
+</div>`,
+          });
+          await pool.query('UPDATE companies SET trial_email_sent=true WHERE id=$1', [ceg.id]);
+          console.log('[Trial] cég #' + ceg.id + ' — trial lejárat email elküldve (' + ceg.nev + ')');
+        } catch (mailErr) {
+          console.error('[Trial] e-mail hiba cég #' + ceg.id + ':', mailErr.message);
+        }
+      }
+    } catch (err) {
+      console.error('[Trial] ütemező hiba:', err.message);
+    }
+  }
+
+  // Indulás után 60s-vel az első futás, majd 24 óránként
+  setTimeout(tick, 60 * 1000);
+  const interval = setInterval(tick, 24 * 60 * 60 * 1000);
+  console.log('[Trial] Trial lejárat-értesítő ütemező elindítva — 24 órás ciklus.');
+  return interval;
+}
+
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler };

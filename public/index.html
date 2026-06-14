@@ -301,7 +301,8 @@
     <div class="lp-section-header reveal">
       <h2 data-i18n="pricingTitle">Egyszerű árazás, rejtett költségek nélkül</h2>
     </div>
-    <div class="lp-pricing-grid">
+    <div class="lp-pricing-grid" id="lpPricingGrid">
+      <!-- JS tölti be a /api/public-plans alapján; fallback statikus kártyák: -->
       <div class="lp-pricing-card reveal">
         <div class="lp-plan-name" data-i18n="planBasic">Basic</div>
         <div class="lp-plan-price">

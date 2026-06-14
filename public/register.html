@@ -78,41 +78,76 @@
       border:1px solid var(--lp-border) !important;
       box-shadow:0 6px 20px rgba(15,23,42,.12) !important;
     }
+    .reg-toggle-link{ color:var(--lp-blue) !important; font-weight:600; cursor:pointer; text-decoration:none; border-bottom:1px dashed rgba(59,130,246,.45); }
   </style>
 </head>
 <body>
   <div class="toast-wrap" id="toasts"></div>
   <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px">
-    <div class="login-card glass" style="width:min(460px,100%);padding:30px">
+    <div class="login-card glass" style="width:min(480px,100%);padding:30px">
       <div style="text-align:center;margin-bottom:20px">
         <div class="vs-logo lg"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
-        <div style="color:var(--muted);font-size:14px;margin-top:6px" data-i18n="reg.subtitle">Regisztráció meghívókóddal</div>
+        <div style="color:var(--lp-muted);font-size:14px;margin-top:6px" id="regSubtitle">Regisztráció</div>
       </div>
-      <div class="field"><label data-i18n="reg.inviteCode">Meghívókód</label><input class="input" id="kod" placeholder="VS-XXXXXX" style="text-transform:uppercase;letter-spacing:1.5px;font-weight:700"></div>
-      <div class="field"><label data-i18n="reg.fullName">Teljes név</label><input class="input" id="nume" data-i18n-ph="reg.fullNamePh" placeholder="Példa János"></div>
-      <div class="field"><label data-i18n="common.email">E-mail</label><input class="input" id="email" type="email" placeholder="nev@pelda.hu"></div>
-      <div class="field"><label data-i18n="reg.phone">Telefon</label><input class="input" id="tel" placeholder="+40 ..."></div>
-      <div class="field"><label data-i18n="reg.passwordMin">Jelszó (min. 6 karakter)</label><input class="input" id="jelszo" type="password" placeholder="••••••••"></div>
-      <div class="lp-consent" style="display:flex;flex-direction:column;gap:10px;margin:14px 0;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
-        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text-muted,#8a97a8);line-height:1.5;">
-          <input type="checkbox" id="chkTerms" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#6366f1;cursor:pointer;">
-          <span>Accept <a href="/terms" target="_blank" class="lp-link" style="color:#fff;text-decoration:underline;">Termenii și Condițiile</a></span>
-        </label>
-        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text-muted,#8a97a8);line-height:1.5;">
-          <input type="checkbox" id="chkPrivacy" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#6366f1;cursor:pointer;">
-          <span>Am citit <a href="/privacy" target="_blank" class="lp-link" style="color:#fff;text-decoration:underline;">Politica de Confidențialitate</a></span>
-        </label>
+
+      <!-- ── INGYENES REGISZTRÁCIÓS ŰR LAP (trial) ── -->
+      <div id="freeForm">
+        <div class="field"><label>Cégnév / Numele companiei</label><input class="input" id="freeCegNev" placeholder="Transport SRL / Logistică KFT" autocomplete="organization"></div>
+        <div class="field"><label>Teljes név / Nume complet</label><input class="input" id="freeNume" placeholder="Példa János / Ion Exemplu" autocomplete="name"></div>
+        <div class="field"><label>E-mail</label><input class="input" id="freeEmail" type="email" placeholder="nev@pelda.hu" autocomplete="email"></div>
+        <div class="field"><label>Telefon (opcionális)</label><input class="input" id="freeTel" placeholder="+40 ..." autocomplete="tel"></div>
+        <div class="field"><label>Jelszó / Parolă (min. 6 karakter)</label><input class="input" id="freeJelszo" type="password" placeholder="••••••••" autocomplete="new-password"></div>
+        <div class="lp-consent" style="display:flex;flex-direction:column;gap:10px;margin:14px 0;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--lp-muted);line-height:1.5;">
+            <input type="checkbox" id="freeChkTerms" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#6366f1;cursor:pointer;">
+            <span>Accept <a href="/terms" target="_blank" class="lp-link">Termenii și Condițiile</a></span>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--lp-muted);line-height:1.5;">
+            <input type="checkbox" id="freeChkPrivacy" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#6366f1;cursor:pointer;">
+            <span>Am citit <a href="/privacy" target="_blank" class="lp-link">Politica de Confidențialitate</a></span>
+          </label>
+        </div>
+        <button class="btn primary block xl" id="btnFreeReg">🚀 14 napos ingyenes próba indítása</button>
+        <div style="text-align:center;margin-top:14px;font-size:13px;color:var(--lp-muted);">
+          Van meghívókódja? → <a class="reg-toggle-link" id="switchToInvite">Belépés kóddal</a>
+        </div>
+        <div style="text-align:center;margin-top:8px;font-size:13px;color:var(--lp-muted);">
+          Van már fiókja? <a href="/login" class="lp-link">Bejelentkezés</a>
+        </div>
       </div>
-      <button class="btn primary block xl" id="btnReg" data-i18n="reg.submit">Regisztráció</button>
-      <div style="text-align:center;margin-top:14px;color:var(--muted);font-size:14px">
-        <span data-i18n="reg.haveAccount">Van már fiókja?</span> <a href="/login" id="goLogin" class="lp-link" style="color:#fff;font-weight:600;text-decoration:none;border-bottom:1px dashed rgba(255,255,255,0.4)" data-i18n="reg.login">Bejelentkezés</a>
+
+      <!-- ── MEGHÍVÓKÓDOS ŰR LAP (meglévő logika) ── -->
+      <div id="inviteForm" style="display:none;">
+        <div class="field"><label data-i18n="reg.inviteCode">Meghívókód</label><input class="input" id="kod" placeholder="VS-XXXXXX" style="text-transform:uppercase;letter-spacing:1.5px;font-weight:700"></div>
+        <div class="field"><label data-i18n="reg.fullName">Teljes név</label><input class="input" id="nume" data-i18n-ph="reg.fullNamePh" placeholder="Példa János"></div>
+        <div class="field"><label data-i18n="common.email">E-mail</label><input class="input" id="email" type="email" placeholder="nev@pelda.hu"></div>
+        <div class="field"><label data-i18n="reg.phone">Telefon</label><input class="input" id="tel" placeholder="+40 ..."></div>
+        <div class="field"><label data-i18n="reg.passwordMin">Jelszó (min. 6 karakter)</label><input class="input" id="jelszo" type="password" placeholder="••••••••"></div>
+        <div class="lp-consent" style="display:flex;flex-direction:column;gap:10px;margin:14px 0;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--lp-muted);line-height:1.5;">
+            <input type="checkbox" id="chkTerms" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#6366f1;cursor:pointer;">
+            <span>Accept <a href="/terms" target="_blank" class="lp-link" style="color:#fff;text-decoration:underline;">Termenii și Condițiile</a></span>
+          </label>
+          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--lp-muted);line-height:1.5;">
+            <input type="checkbox" id="chkPrivacy" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#6366f1;cursor:pointer;">
+            <span>Am citit <a href="/privacy" target="_blank" class="lp-link" style="color:#fff;text-decoration:underline;">Politica de Confidențialitate</a></span>
+          </label>
+        </div>
+        <button class="btn primary block xl" id="btnReg" data-i18n="reg.submit">Regisztráció</button>
+        <div style="text-align:center;margin-top:14px;font-size:13px;color:var(--lp-muted);">
+          Nincs meghívókód? → <a class="reg-toggle-link" id="switchToFree">Ingyenes regisztráció</a>
+        </div>
+        <div style="text-align:center;margin-top:8px;color:var(--lp-muted);font-size:14px">
+          <span data-i18n="reg.haveAccount">Van már fiókja?</span> <a href="/login" id="goLogin" class="lp-link" style="color:#fff;font-weight:600;text-decoration:none;border-bottom:1px dashed rgba(255,255,255,0.4)" data-i18n="reg.login">Bejelentkezés</a>
+        </div>
       </div>
+
     </div>
   </div>
-  
+
   <script>
     function toast(m,k){var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;document.getElementById('toasts').appendChild(e);setTimeout(function(){e.remove();},3000);}
-    
+
     // 🚀 UNIVERZÁLIS NODE.JS FETCH ENGINE A RÉGI GOOGLE MEGHÍVÁSOKHOZ
     function gas(fn, args){
       return new Promise(function(res, rej){
@@ -121,15 +156,82 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ functionName: fn, arguments: args || [] })
         })
-        .then(response => response.json())
-        .then(data => {
+        .then(function(response){ return response.json(); })
+        .then(function(data){
           if (data.error) { rej(data.error); }
           else { res(data.result); }
         })
-        .catch(err => rej(err));
+        .catch(function(err){ rej(err); });
       });
     }
 
+    // ── Mód-váltás logika ─────────────────────────────────────
+    var urlKod = new URLSearchParams(location.search).get('kod');
+    var isFreeMode = !urlKod; // nincs kod param → ingyenes regisztráció
+
+    function showFreeMode() {
+      document.getElementById('freeForm').style.display = '';
+      document.getElementById('inviteForm').style.display = 'none';
+      document.getElementById('regSubtitle').textContent = '14 napos ingyenes próba — bankkártya nem kell';
+    }
+
+    function showInviteMode() {
+      document.getElementById('freeForm').style.display = 'none';
+      document.getElementById('inviteForm').style.display = '';
+      document.getElementById('regSubtitle').textContent = 'Regisztráció meghívókóddal';
+      if (urlKod) {
+        var el = document.getElementById('kod');
+        if (el) el.value = urlKod.toUpperCase();
+      }
+    }
+
+    // Inicializálás
+    if (isFreeMode) { showFreeMode(); } else { showInviteMode(); }
+
+    // Váltó linkek
+    document.getElementById('switchToInvite').onclick = function(e){ e.preventDefault(); showInviteMode(); };
+    document.getElementById('switchToFree').onclick   = function(e){ e.preventDefault(); showFreeMode(); };
+
+    // ── INGYENES REGISZTRÁCIÓS LOGIKA ────────────────────────
+    document.getElementById('btnFreeReg').onclick = function() {
+      if (!document.getElementById('freeChkTerms').checked) {
+        toast('Trebuie să accepți Termenii și Condițiile.', 'err'); return;
+      }
+      if (!document.getElementById('freeChkPrivacy').checked) {
+        toast('Trebuie să confirmi că ai citit Politica de Confidențialitate.', 'err'); return;
+      }
+      var payload = {
+        cegNev:  document.getElementById('freeCegNev').value.trim(),
+        nume:    document.getElementById('freeNume').value.trim(),
+        email:   document.getElementById('freeEmail').value.trim(),
+        tel:     document.getElementById('freeTel').value.trim(),
+        jelszo:  document.getElementById('freeJelszo').value,
+      };
+      var btn = this;
+      btn.disabled = true;
+      btn.textContent = '⏳ Létrehozás...';
+
+      fetch('/api/public-register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(r){
+        btn.disabled = false;
+        btn.textContent = '🚀 14 napos ingyenes próba indítása';
+        if (!r.ok) { toast(r.err || 'Eroare / Hiba', 'err'); return; }
+        toast(r.msg || 'Cont creat!', 'ok');
+        setTimeout(function(){ window.location.href = '/login'; }, 1500);
+      })
+      .catch(function(e){
+        btn.disabled = false;
+        btn.textContent = '🚀 14 napos ingyenes próba indítása';
+        toast(String(e.message || e), 'err');
+      });
+    };
+
+    // ── MEGHÍVÓKÓDOS REGISZTRÁCIÓS LOGIKA (változatlan) ──────
     document.getElementById('btnReg').onclick=function(){
       if (!document.getElementById('chkTerms').checked) {
         toast('Trebuie să accepți Termenii și Condițiile.', 'err'); return;
@@ -138,10 +240,10 @@
         toast('Trebuie să confirmi că ai citit Politica de Confidențialitate.', 'err'); return;
       }
       var p={
-        nume: document.getElementById('nume').value, 
-        email: document.getElementById('email').value, 
+        nume: document.getElementById('nume').value,
+        email: document.getElementById('email').value,
         tel: document.getElementById('tel').value,
-        jelszo: document.getElementById('jelszo').value, 
+        jelszo: document.getElementById('jelszo').value,
         kod: document.getElementById('kod').value
       };
       var btn=this;
@@ -163,10 +265,13 @@
       });
     };
 
-    document.getElementById('goLogin').onclick=function(e){
-      e.preventDefault();
-      window.location.href = '/login';
-    };
+    var goLoginEl = document.getElementById('goLogin');
+    if (goLoginEl) {
+      goLoginEl.onclick=function(e){
+        e.preventDefault();
+        window.location.href = '/login';
+      };
+    }
   </script>
 </body>
 </html>

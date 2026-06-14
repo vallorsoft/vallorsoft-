@@ -2806,8 +2806,33 @@ function saveEmailLang(){
     else toast((r&&r.err)||'Hiba','err');
   });
 }
+// ── Előfizetés kártya betöltése (csak Admin, settings pane-ben) ──
+function loadSubscriptionCard() {
+  var card = document.getElementById('subscriptionCard');
+  if (!card) return;
+  gas('authMe').then(function(u) {
+    if (!u || u.pozicio !== 'Admin') return;
+    card.style.display = '';
+    gas('getMySubscription').then(function(r) {
+      if (!r || !r.ok) return;
+      var block = document.getElementById('subStatusText');
+      var btn   = document.getElementById('subUpgradeBtn');
+      if (!block) return;
+      var statusMap = { active: '✅ Aktív', trial: '⏳ Próbaidőszak', inactive: '❌ Inaktív', cancelled: '🚫 Lemondott' };
+      var txt = (statusMap[r.status] || r.status || '—');
+      if (r.days_left !== null && r.days_left !== undefined) {
+        txt += ' — ' + (r.days_left > 0 ? r.days_left + ' nap van hátra' : 'lejárt');
+      }
+      if (r.plan_name) txt += ' (' + r.plan_name + ')';
+      block.textContent = txt;
+      if (r.status === 'trial' || r.status === 'inactive') { if (btn) btn.style.display = ''; }
+    });
+  });
+}
+
 function loadSettingsPane(){
   loadEmailLang();
+  loadSubscriptionCard();
   gas('authMe').then(function(u){
     if(!u) return;
     document.getElementById('stNume').value    = u.nume  || '';
