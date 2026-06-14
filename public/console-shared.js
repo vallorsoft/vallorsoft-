@@ -999,7 +999,7 @@ function loadClientPortalAccess(){
     +'<label>'+t('cs.cp.client')+'</label>'
     +'<input class="input" id="cpClientDisplay" readonly placeholder="'+t('cs.cp.pickClient')+'" style="cursor:pointer;" onclick="cpDropToggle(event)" autocomplete="off">'
     +'<input type="hidden" id="cpClientSel">'
-    +'<div id="cpClientDrop" style="display:none;position:absolute;z-index:9999;left:0;right:0;top:100%;margin-top:3px;background:var(--bg-panel-raised,#141c25);color:var(--text-primary,#e9eef5);border:1px solid var(--glass-border-dark,rgba(255,255,255,.13));border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.45);overflow:hidden;">'
+    +'<div id="cpClientDrop" class="cp-client-drop" style="display:none;">'
     +'<div style="padding:8px 8px 4px;"><input class="input" id="cpClientSearch" placeholder="Keresés..." style="margin:0;font-size:13px;" oninput="cpDropFilter()" onclick="event.stopPropagation()"></div>'
     +'<div id="cpClientList" style="max-height:220px;overflow-y:auto;padding:4px 6px 6px;"></div>'
     +'</div></div>'
