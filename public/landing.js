@@ -116,6 +116,13 @@ const translations = {
     footerSecurity: 'Securitate',
     footerCookies: 'Setări Cookie',
     footerRights: 'Toate drepturile rezervate.',
+    showcaseTitle: 'Platforma în acțiune',
+    showcaseSubtitle: 'Interfață modernă, accesibilă de pe orice dispozitiv',
+    mon1Label: 'Dashboard',
+    mon2Label: 'Managementul curselor',
+    mon3Label: 'Statistici & rapoarte',
+    phone1Label: 'Aplicație șofer',
+    phone2Label: 'Urmărire GPS',
   },
   hu: {
     cookieTitle: 'Cookie-k és adatvédelem',
@@ -225,8 +232,17 @@ const translations = {
     footerTerms: 'Általános Szerződési Feltételek',
     footerPrivacy: 'Adatvédelmi nyilatkozat',
     footerCookiePolicy: 'Cookie-szabályzat',
+    footerDpa: 'DPA',
+    footerSecurity: 'Biztonság',
     footerCookies: 'Cookie beállítások',
     footerRights: 'Minden jog fenntartva.',
+    showcaseTitle: 'A platform működés közben',
+    showcaseSubtitle: 'Modern felület, bármilyen eszközről elérhető',
+    mon1Label: 'Vezérlőpult',
+    mon2Label: 'Fuvarkezelés',
+    mon3Label: 'Statisztikák',
+    phone1Label: 'Sofőr alkalmazás',
+    phone2Label: 'GPS követés',
   }
 };
 
