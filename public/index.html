@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VallorSoft | Platformă Modernă pentru Transport și Management Flotă</title>
+<meta name="description" content="VallorSoft - Platformă SaaS pentru transportatori și administratori de flotă. Gestionare curse, GPS, facturare, documente și raportare într-un singur sistem.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="landing.css">
+</head>
+<body>
+
+<!-- COOKIE BANNER -->
+<div id="cookieBanner" class="cookie-banner hidden">
+  <div class="cookie-content">
+    <h3 data-i18n="cookieTitle">Cookie-uri și confidențialitate</h3>
+    <p data-i18n="cookieText">Folosim doar cookie-uri necesare în mod implicit. Cookie-urile analitice și de marketing sunt activate doar după acordul dvs.</p>
+    <div class="cookie-actions">
+      <button id="acceptNecessary" class="btn-glass" data-i18n="cookieNecessary">Doar necesare</button>
+      <button id="openCookieSettings" class="btn-glass" data-i18n="cookieSettings">Setări</button>
+      <button id="acceptAllCookies" class="btn-primary" data-i18n="cookieAcceptAll">Accept toate</button>
+    </div>
+  </div>
+</div>
+
+<!-- COOKIE SETTINGS MODAL -->
+<div id="cookieModal" class="modal-overlay hidden">
+  <div class="modal-card glass">
+    <h2 data-i18n="cookieSettingsTitle">Setări Cookie</h2>
+    <div class="cookie-category">
+      <label class="category-label">
+        <span>
+          <strong data-i18n="cookieFunctional">Cookie-uri necesare</strong>
+          <small data-i18n="cookieFunctionalDesc">Necesare pentru autentificare, limbă și securitate. Nu pot fi dezactivate.</small>
+        </span>
+        <input type="checkbox" checked disabled>
+      </label>
+    </div>
+    <div class="cookie-category">
+      <label class="category-label">
+        <span>
+          <strong data-i18n="cookieAnalytics">Cookie-uri analitice</strong>
+          <small data-i18n="cookieAnalyticsDesc">Ne ajută să înțelegem cum utilizați platforma.</small>
+        </span>
+        <input id="analyticsCookies" type="checkbox">
+      </label>
+    </div>
+    <div class="cookie-category">
+      <label class="category-label">
+        <span>
+          <strong data-i18n="cookieMarketing">Cookie-uri de marketing</strong>
+          <small data-i18n="cookieMarketingDesc">Utilizate pentru reclame personalizate.</small>
+        </span>
+        <input id="marketingCookies" type="checkbox">
+      </label>
+    </div>
+    <div class="cookie-actions">
+      <button id="saveCookieSettings" class="btn-primary" data-i18n="cookieSave">Salvează preferințele</button>
+    </div>
+  </div>
+</div>
+
+<!-- NAVBAR -->
+<header class="navbar" id="navbar">
+  <div class="container nav-inner">
+    <a href="/" class="logo">
+      <span class="logo-vallor">Vallor</span><span class="logo-soft">Soft</span>
+    </a>
+    <nav class="nav-menu" id="navMenu">
+      <ul class="nav-links">
+        <li><a href="#features" data-i18n="navFeatures">Funcționalități</a></li>
+        <li><a href="#how" data-i18n="navHow">Cum funcționează</a></li>
+        <li><a href="#pricing" data-i18n="navPricing">Prețuri</a></li>
+        <li><a href="#blog" data-i18n="navBlog">Blog</a></li>
+        <li><a href="#contact" data-i18n="navContact">Contact</a></li>
+      </ul>
+    </nav>
+    <div class="nav-actions">
+      <button id="languageToggle" class="lang-btn" title="Váltás magyarra / Schimbă în română">HU</button>
+      <a href="/login" class="btn-nav-ghost" data-i18n="loginBtn">Autentificare</a>
+      <a href="#register" class="btn-nav-primary" data-i18n="startBtn">Începe gratuit</a>
+    </div>
+    <button class="hamburger" id="hamburger" aria-label="Meniu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg-gradient"></div>
+  <div class="container hero-grid">
+    <div class="hero-content reveal">
+      <span class="badge" data-i18n="heroBadge">SaaS · Fleet Management · România</span>
+      <h1 data-i18n="heroTitle">Platformă inteligentă pentru transport și management flotă</h1>
+      <p class="hero-sub" data-i18n="heroSubtitle">Gestionați cursele, vehiculele, documentele și clienții într-o singură aplicație. Conformă cu ANAF e-Factura și RO e-Transport.</p>
+      <div class="hero-cta">
+        <a href="#register" class="btn-primary btn-lg" data-i18n="startFreeBtn">Începe gratuit — 14 zile</a>
+        <a href="/login" class="btn-glass btn-lg" data-i18n="loginBtn">Autentificare</a>
+      </div>
+      <p class="trial-note" data-i18n="trialNote">✓ Fără card bancar &nbsp;·&nbsp; ✓ Anulare oricând &nbsp;·&nbsp; ✓ Suport inclus</p>
+    </div>
+    <div class="hero-visual reveal">
+      <div class="hero-monitor-wrap">
+        <div class="hero-monitor-frame">
+          <div class="hero-monitor-bar">
+            <span class="hm-dot"></span><span class="hm-dot"></span><span class="hm-dot"></span>
+            <span class="hm-url">VallorSoft — GPS Live Tracking</span>
+            <span class="hm-live">⬤ LIVE</span>
+          </div>
+          <div class="hero-monitor-screen">
+            <svg viewBox="0 0 520 300" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:100%">
+              <defs>
+                <pattern id="mapgrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                  <path d="M40 0L0 0 0 40" fill="none" stroke="rgba(255,255,255,.035)" stroke-width=".6"/>
+                </pattern>
+                <radialGradient id="vig" cx="50%" cy="50%" r="50%">
+                  <stop offset="55%" stop-color="transparent"/>
+                  <stop offset="100%" stop-color="rgba(5,7,11,.55)"/>
+                </radialGradient>
+                <filter id="glow-g"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                <filter id="glow-r"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              </defs>
+              <!-- Háttér -->
+              <rect width="520" height="300" fill="#080f1a"/>
+              <rect width="520" height="300" fill="url(#mapgrid)"/>
+              <!-- Autóutak (vastagabb) -->
+              <line x1="0" y1="150" x2="520" y2="150" stroke="#1e3048" stroke-width="7"/>
+              <line x1="0" y1="153" x2="520" y2="153" stroke="#162438" stroke-width="4"/>
+              <!-- Mellékutak vízszintes -->
+              <line x1="30" y1="78" x2="490" y2="78" stroke="#172535" stroke-width="3"/>
+              <line x1="20" y1="222" x2="500" y2="222" stroke="#172535" stroke-width="3"/>
+              <!-- Mellékutak függőleges -->
+              <line x1="260" y1="0" x2="260" y2="300" stroke="#172535" stroke-width="3"/>
+              <line x1="130" y1="20" x2="130" y2="280" stroke="#132030" stroke-width="2"/>
+              <line x1="390" y1="20" x2="390" y2="280" stroke="#132030" stroke-width="2"/>
+              <!-- Kisebb utak -->
+              <line x1="65" y1="0" x2="65" y2="300" stroke="#0f1c2a" stroke-width="1.5"/>
+              <line x1="195" y1="0" x2="195" y2="300" stroke="#0f1c2a" stroke-width="1.5"/>
+              <line x1="325" y1="0" x2="325" y2="300" stroke="#0f1c2a" stroke-width="1.5"/>
+              <line x1="455" y1="0" x2="455" y2="300" stroke="#0f1c2a" stroke-width="1.5"/>
+              <line x1="0" y1="40" x2="520" y2="40" stroke="#0f1c2a" stroke-width="1.5"/>
+              <line x1="0" y1="110" x2="520" y2="110" stroke="#0f1c2a" stroke-width="1.5"/>
+              <line x1="0" y1="190" x2="520" y2="190" stroke="#0f1c2a" stroke-width="1.5"/>
+              <line x1="0" y1="260" x2="520" y2="260" stroke="#0f1c2a" stroke-width="1.5"/>
+              <!-- Átlós utak -->
+              <line x1="20" y1="240" x2="200" y2="60" stroke="#132030" stroke-width="2"/>
+              <line x1="320" y1="60" x2="500" y2="240" stroke="#132030" stroke-width="2"/>
+              <!-- Útvonal nyomok -->
+              <polyline points="45,78 93,78 130,110 160,150" stroke="#22c55e" stroke-width="1.5" fill="none" opacity=".28"/>
+              <polyline points="260,42 260,110 325,150" stroke="#22c55e" stroke-width="1.5" fill="none" opacity=".28"/>
+              <polyline points="390,78 390,150 455,150" stroke="#f59e0b" stroke-width="1.5" fill="none" opacity=".28"/>
+              <!-- === JÁRMŰVEK (31 db) === -->
+              <!-- Zöld - mozgásban (25 db) -->
+              <circle cx="45" cy="150" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="45" cy="150" r="9" fill="none" stroke="#22c55e" stroke-width="1.2" opacity=".35"/>
+              <circle cx="93" cy="78" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="148" cy="150" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="178" cy="222" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="200" cy="110" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="235" cy="78" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <!-- Főjármű - animált pulse -->
+              <circle cx="260" cy="150" r="5.5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="260" cy="150" r="11" fill="none" stroke="#22c55e" stroke-width="1.5" opacity=".5">
+                <animate attributeName="r" values="9;18" dur="1.8s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values=".5;0" dur="1.8s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="295" cy="222" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="325" cy="150" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="350" cy="78" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="390" cy="222" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="415" cy="150" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="455" cy="78" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="480" cy="150" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="510" cy="222" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="65" cy="40" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="165" cy="40" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="325" cy="40" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="455" cy="40" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="65" cy="260" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="195" cy="260" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="325" cy="260" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="455" cy="260" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="128" cy="192" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <circle cx="390" cy="110" r="5" fill="#22c55e" filter="url(#glow-g)"/>
+              <!-- Sárga - megállva (5 db) -->
+              <circle cx="115" cy="110" r="5" fill="#f59e0b"/>
+              <circle cx="195" cy="190" r="5" fill="#f59e0b"/>
+              <circle cx="325" cy="192" r="5" fill="#f59e0b"/>
+              <circle cx="455" cy="192" r="5" fill="#f59e0b"/>
+              <circle cx="340" cy="110" r="5" fill="#f59e0b"/>
+              <!-- Piros - figyelmeztetés (1 db, animált) -->
+              <circle cx="130" cy="260" r="6" fill="#ef4444" filter="url(#glow-r)"/>
+              <circle cx="130" cy="260" r="12" fill="none" stroke="#ef4444" stroke-width="1.5" opacity=".4">
+                <animate attributeName="r" values="9;18" dur="1.2s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values=".4;0" dur="1.2s" repeatCount="indefinite"/>
+              </circle>
+              <!-- Vignette -->
+              <rect width="520" height="300" fill="url(#vig)"/>
+            </svg>
+            <!-- Státusz overlay -->
+            <div class="hm-status">
+              <span class="hm-s-dot" style="background:#22c55e"></span>25 în mișcare
+              <span class="hm-s-dot" style="background:#f59e0b;margin-left:10px"></span>5 oprit
+              <span class="hm-s-dot" style="background:#ef4444;margin-left:10px"></span>1 alertă
+            </div>
+          </div>
+        </div>
+        <div class="hero-monitor-neck"></div>
+        <div class="hero-monitor-base"></div>
+      </div>
+    </div>
+  </div>
+  <div class="hero-wave">
+    <svg viewBox="0 0 1440 80" preserveAspectRatio="none"><path d="M0,40 C360,80 1080,0 1440,40 L1440,80 L0,80 Z" fill="#0c1218"/></svg>
+  </div>
+</section>
+
+<!-- LOGOS / TRUST -->
+<section class="trust-bar">
+  <div class="container">
+    <p class="trust-label" data-i18n="trustLabel">Integrat cu</p>
+    <div class="trust-logos">
+      <span class="trust-logo">ANAF e-Factura</span>
+      <span class="trust-logo">SmartBill</span>
+      <span class="trust-logo">Oblio</span>
+      <span class="trust-logo">CargoTrack</span>
+      <span class="trust-logo">RO e-Transport</span>
+      <span class="trust-logo">Brevo</span>
+    </div>
+  </div>
+</section>
+
+<!-- SHOWCASE -->
+<section id="showcase" class="section showcase-section">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2 data-i18n="showcaseTitle">Platforma în acțiune</h2>
+      <p data-i18n="showcaseSubtitle">Interfață modernă, accesibilă de pe orice dispozitiv</p>
+    </div>
+
+    <!-- 3 monitoare desktop -->
+    <div class="showcase-monitors">
+      <div class="monitor-wrap reveal">
+        <div class="monitor-frame">
+          <div class="monitor-topbar">
+            <span class="m-dot"></span><span class="m-dot"></span><span class="m-dot"></span>
+            <span class="m-url">vallorsoft.ro/admin</span>
+          </div>
+          <div class="monitor-screen" id="ms1">
+            <img src="/img/monitor1.png" alt="VallorSoft Dashboard" loading="lazy" onerror="this.parentElement.setAttribute('data-empty','1')">
+          </div>
+        </div>
+        <div class="monitor-neck"></div>
+        <div class="monitor-base"></div>
+        <p class="monitor-label" data-i18n="mon1Label">Dashboard</p>
+      </div>
+
+      <div class="monitor-wrap reveal">
+        <div class="monitor-frame">
+          <div class="monitor-topbar">
+            <span class="m-dot"></span><span class="m-dot"></span><span class="m-dot"></span>
+            <span class="m-url">vallorsoft.ro/admin</span>
+          </div>
+          <div class="monitor-screen" id="ms2">
+            <img src="/img/monitor2.png" alt="VallorSoft Curse" loading="lazy" onerror="this.parentElement.setAttribute('data-empty','1')">
+          </div>
+        </div>
+        <div class="monitor-neck"></div>
+        <div class="monitor-base"></div>
+        <p class="monitor-label" data-i18n="mon2Label">Managementul curselor</p>
+      </div>
+
+      <div class="monitor-wrap reveal">
+        <div class="monitor-frame">
+          <div class="monitor-topbar">
+            <span class="m-dot"></span><span class="m-dot"></span><span class="m-dot"></span>
+            <span class="m-url">vallorsoft.ro/admin</span>
+          </div>
+          <div class="monitor-screen" id="ms3">
+            <img src="/img/monitor3.png" alt="VallorSoft Statistici" loading="lazy" onerror="this.parentElement.setAttribute('data-empty','1')">
+          </div>
+        </div>
+        <div class="monitor-neck"></div>
+        <div class="monitor-base"></div>
+        <p class="monitor-label" data-i18n="mon3Label">Statistici & rapoarte</p>
+      </div>
+    </div>
+
+    <!-- 2 telefon -->
+    <div class="showcase-phones">
+      <div class="phone-wrap reveal">
+        <div class="phone-frame">
+          <div class="phone-island"></div>
+          <div class="phone-screen" id="ps1">
+            <img src="/img/phone1.png" alt="VallorSoft mobil sofőr" loading="lazy" onerror="this.parentElement.setAttribute('data-empty','1')">
+          </div>
+          <div class="phone-home-bar"></div>
+        </div>
+        <p class="monitor-label" data-i18n="phone1Label">Aplicație șofer</p>
+      </div>
+
+      <div class="phone-wrap reveal">
+        <div class="phone-frame">
+          <div class="phone-island"></div>
+          <div class="phone-screen" id="ps2">
+            <img src="/img/phone2.png" alt="VallorSoft mobil GPS" loading="lazy" onerror="this.parentElement.setAttribute('data-empty','1')">
+          </div>
+          <div class="phone-home-bar"></div>
+        </div>
+        <p class="monitor-label" data-i18n="phone2Label">Urmărire GPS</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2 data-i18n="featuresTitle">Funcționalități principale</h2>
+      <p data-i18n="featuresSubtitle">Tot ce aveți nevoie pentru a gestiona o flotă modernă de transport</p>
+    </div>
+    <div class="feature-grid">
+      <article class="feature-card glass reveal">
+        <div class="feat-icon">🚚</div>
+        <h3 data-i18n="feat1Title">Managementul curselor</h3>
+        <p data-i18n="feat1Desc">Creare, planificare și monitorizare curse. Import CSV, board Gantt, radar de întoarcere.</p>
+      </article>
+      <article class="feature-card glass reveal">
+        <div class="feat-icon">📍</div>
+        <h3 data-i18n="feat2Title">Urmărire GPS live</h3>
+        <p data-i18n="feat2Desc">Poziție în timp real, hartă interactivă, istoric traseu și snapshot km zilnic.</p>
+      </article>
+      <article class="feature-card glass reveal">
+        <div class="feat-icon">💶</div>
+        <h3 data-i18n="feat3Title">Facturare automată</h3>
+        <p data-i18n="feat3Desc">Emitere factură direct din cursă. Suport FGO, SmartBill, Oblio, iFactura, Facturis.</p>
+      </article>
+      <article class="feature-card glass reveal">
+        <div class="feat-icon">👥</div>
+        <h3 data-i18n="feat4Title">Portal clienți</h3>
+        <p data-i18n="feat4Desc">Clientul vede statusul curselor, descarcă documente și poate solicita transport nou.</p>
+      </article>
+      <article class="feature-card glass reveal">
+        <div class="feat-icon">📊</div>
+        <h3 data-i18n="feat5Title">Statistici & rapoarte</h3>
+        <p data-i18n="feat5Desc">7 tab-uri de analiză: financiar, combustibil, șoferi, vehicule, clienți. Export CSV.</p>
+      </article>
+      <article class="feature-card glass reveal">
+        <div class="feat-icon">🗓️</div>
+        <h3 data-i18n="feat6Title">Tabelă de planificare</h3>
+        <p data-i18n="feat6Desc">Vizualizare Gantt cu drag &amp; drop, zoom, reordonare vehicule și radar de întoarcere.</p>
+      </article>
+      <article class="feature-card glass reveal">
+        <div class="feat-icon">📁</div>
+        <h3 data-i18n="feat7Title">Documente &amp; CMR</h3>
+        <p data-i18n="feat7Desc">Generare scrisoare de trăsură, POD foto, ZIP masiv pentru contabilitate.</p>
+      </article>
+      <article class="feature-card glass reveal">
+        <div class="feat-icon">🤝</div>
+        <h3 data-i18n="feat8Title">Subcontractori</h3>
+        <p data-i18n="feat8Desc">Gestiune parteneri externi cu portal propriu, facturi furnizori și urmărire datorii.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how" class="section section-dark">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2 data-i18n="howTitle">Cum funcționează</h2>
+      <p data-i18n="howSubtitle">Sunteți operațional în mai puțin de 30 de minute</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="step-num">01</div>
+        <div class="step-body glass">
+          <h3 data-i18n="step1Title">Înregistrare</h3>
+          <p data-i18n="step1Desc">Creați un cont gratuit în 2 minute. Fără card bancar, fără contracte.</p>
+        </div>
+      </div>
+      <div class="step-arrow">→</div>
+      <div class="step reveal">
+        <div class="step-num">02</div>
+        <div class="step-body glass">
+          <h3 data-i18n="step2Title">Configurare</h3>
+          <p data-i18n="step2Desc">Adăugați vehicule, șoferi și integrați GPS-ul și sistemul de facturare.</p>
+        </div>
+      </div>
+      <div class="step-arrow">→</div>
+      <div class="step reveal">
+        <div class="step-num">03</div>
+        <div class="step-body glass">
+          <h3 data-i18n="step3Title">Începeți activitatea</h3>
+          <p data-i18n="step3Desc">Creați prima cursă, urmăriți flota în timp real și emiteți factura automat.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing" class="section">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2 data-i18n="pricingTitle">Planuri și prețuri</h2>
+      <p data-i18n="pricingSubtitle">Prețuri transparente, fără costuri ascunse</p>
+    </div>
+    <div class="billing-toggle reveal">
+      <button class="toggle-btn active" id="toggleMonthly" data-i18n="monthly">Lunar</button>
+      <button class="toggle-btn" id="toggleYearly" data-i18n="yearly">Anual <span class="save-badge">-20%</span></button>
+    </div>
+    <div class="pricing-grid">
+      <div class="pricing-card glass reveal">
+        <div class="plan-name" data-i18n="planBasic">Basic</div>
+        <div class="plan-price">
+          <span class="price-val" data-monthly="19" data-yearly="15">€19</span>
+          <span class="price-period" data-i18n="perMonth">/lună</span>
+        </div>
+        <ul class="plan-features">
+          <li data-i18n="pf1">până la 5 vehicule</li>
+          <li data-i18n="pf2">Managementul curselor</li>
+          <li data-i18n="pf3">Urmărire GPS</li>
+          <li data-i18n="pf4">Facturare (1 provider)</li>
+          <li data-i18n="pf5">Suport e-mail</li>
+        </ul>
+        <a href="#register" class="btn-glass" data-i18n="startTrial">Testează gratuit</a>
+      </div>
+      <div class="pricing-card featured reveal">
+        <div class="plan-badge" data-i18n="popular">Popular</div>
+        <div class="plan-name">Pro</div>
+        <div class="plan-price">
+          <span class="price-val" data-monthly="49" data-yearly="39">€49</span>
+          <span class="price-period" data-i18n="perMonth">/lună</span>
+        </div>
+        <ul class="plan-features">
+          <li data-i18n="pp1">Vehicule nelimitate</li>
+          <li data-i18n="pp2">Toate funcționalitățile Basic</li>
+          <li data-i18n="pp3">Portal clienți &amp; subcontractori</li>
+          <li data-i18n="pp4">Statistici avansate</li>
+          <li data-i18n="pp5">Tabelă de planificare Gantt</li>
+          <li data-i18n="pp6">Toate providerele de facturare</li>
+          <li data-i18n="pp7">Suport prioritar</li>
+        </ul>
+        <a href="#register" class="btn-primary" data-i18n="startTrial">Testează gratuit</a>
+      </div>
+      <div class="pricing-card glass reveal">
+        <div class="plan-name">Enterprise</div>
+        <div class="plan-price">
+          <span class="price-val" data-i18n="custom">Personalizat</span>
+        </div>
+        <ul class="plan-features">
+          <li data-i18n="ep1">Tot din Pro</li>
+          <li data-i18n="ep2">SLA dedicat</li>
+          <li data-i18n="ep3">Integrări personalizate</li>
+          <li data-i18n="ep4">Onboarding asistat</li>
+          <li data-i18n="ep5">Contract anual</li>
+        </ul>
+        <a href="#contact" class="btn-glass" data-i18n="contactUs">Contactați-ne</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BLOG -->
+<section id="blog" class="section section-dark">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2 data-i18n="blogTitle">Resurse &amp; Noutăți</h2>
+    </div>
+    <div class="blog-grid">
+      <article class="blog-card glass reveal">
+        <div class="blog-tag" data-i18n="tagDigital">Digitalizare</div>
+        <h3 data-i18n="blog1Title">Digitalizarea transportului rutier în România</h3>
+        <p data-i18n="blog1Desc">Cum ajută tehnologia la eficientizarea flotelor și reducerea costurilor operaționale.</p>
+        <span class="blog-date">2026-06-10</span>
+      </article>
+      <article class="blog-card glass reveal">
+        <div class="blog-tag">ANAF</div>
+        <h3 data-i18n="blog2Title">e-Factura 2026 — tot ce trebuie să știți</h3>
+        <p data-i18n="blog2Desc">Ghid complet privind obligațiile e-Factura pentru transportatori și cum VallorSoft automatizează procesul.</p>
+        <span class="blog-date">2026-05-28</span>
+      </article>
+      <article class="blog-card glass reveal">
+        <div class="blog-tag">RO e-Transport</div>
+        <h3 data-i18n="blog3Title">Codul UIT și RO e-Transport — ghid practic</h3>
+        <p data-i18n="blog3Desc">Ce este codul UIT, când este obligatoriu și cum gestionați declarațiile prin CargoTrack.</p>
+        <span class="blog-date">2026-05-15</span>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- REGISTER -->
+<section id="register" class="section">
+  <div class="container narrow">
+    <div class="register-card glass reveal">
+      <h2 data-i18n="registerTitle">Începeți testarea gratuită</h2>
+      <p class="trial-highlight" data-i18n="registerSub">14 zile gratuite — fără card bancar, anulare oricând.</p>
+      <form id="registerForm" action="" method="post" novalidate>
+        <div class="form-group">
+          <label for="reg-company" data-i18n="labelCompany">Denumire companie</label>
+          <input type="text" id="reg-company" name="company" placeholder="Ex: Trans SRL" required autocomplete="organization">
+        </div>
+        <div class="form-group">
+          <label for="reg-email" data-i18n="labelEmail">Adresă e-mail</label>
+          <input type="email" id="reg-email" name="email" placeholder="admin@companie.ro" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="reg-password" data-i18n="labelPassword">Parolă</label>
+          <input type="password" id="reg-password" name="password" placeholder="Minim 8 caractere" minlength="8" required autocomplete="new-password">
+        </div>
+        <div class="form-check">
+          <label class="check-label">
+            <input type="checkbox" id="termsAccepted" name="termsAccepted" required>
+            <span data-i18n="termsCheck">Accept <a href="/terms" target="_blank" rel="noopener">Termenii și Condițiile</a></span>
+          </label>
+        </div>
+        <div class="form-check">
+          <label class="check-label">
+            <input type="checkbox" id="privacyAccepted" name="privacyAccepted" required>
+            <span data-i18n="privacyCheck">Accept <a href="/privacy" target="_blank" rel="noopener">Politica de Confidențialitate</a></span>
+          </label>
+        </div>
+        <button type="submit" class="btn-primary btn-full" id="registerSubmit" data-i18n="submitRegister">Creați cont gratuit</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact" class="section section-dark">
+  <div class="container">
+    <div class="contact-grid">
+      <div class="contact-info reveal">
+        <h2 data-i18n="contactTitle">Contact</h2>
+        <p data-i18n="contactDesc">Suntem disponibili pentru întrebări, demonstrații și oferte personalizate.</p>
+        <ul class="contact-list">
+          <li>📧 <a href="mailto:contact@vallorsoft.ro">contact@vallorsoft.ro</a></li>
+          <li>🛠️ <a href="mailto:support@vallorsoft.ro">support@vallorsoft.ro</a></li>
+          <li>📍 România</li>
+        </ul>
+      </div>
+      <div class="contact-form-wrap reveal">
+        <form class="contact-form glass" id="contactForm">
+          <input type="text" name="name" placeholder="Nume" data-i18n-ph="contactName" required>
+          <input type="email" name="email" placeholder="Email" required>
+          <textarea name="message" rows="4" placeholder="Mesaj" data-i18n-ph="contactMessage" required></textarea>
+          <button type="submit" class="btn-primary" data-i18n="sendBtn">Trimite mesaj</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <span class="logo-vallor">Vallor</span><span class="logo-soft">Soft</span>
+      <p data-i18n="footerTagline">Platformă SaaS pentru transport rutier &amp; management flotă — România</p>
+    </div>
+    <div class="footer-links">
+      <a href="/terms" data-i18n="footerTerms">Termeni și Condiții</a>
+      <a href="/privacy" data-i18n="footerPrivacy">Politica de Confidențialitate</a>
+      <a href="/cookies" data-i18n="footerCookiePolicy">Politica Cookie</a>
+      <a href="/dpa" data-i18n="footerDpa">DPA</a>
+      <a href="/security" data-i18n="footerSecurity">Securitate</a>
+      <button id="footerCookieBtn" class="footer-link-btn" data-i18n="footerCookies">Setări Cookie</button>
+    </div>
+    <p class="footer-copy">© 2026 VallorSoft. <span data-i18n="footerRights">Toate drepturile rezervate.</span></p>
+  </div>
+</footer>
+
+<div id="toastContainer" class="toast-container"></div>
+
+<script src="landing.js"></script>
+</body>
+</html>

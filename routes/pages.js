@@ -18,6 +18,8 @@ async function featureEnabled(companyId, key) {
   } catch (e) { return true; }
 }
 
+router.get('/index.html', (req, res) => res.redirect(301, '/'));
+
 router.get('/', (req, res) => {
   if (req.session && req.session.user) {
     const p = req.session.user.pozicio;
@@ -26,7 +28,7 @@ router.get('/', (req, res) => {
     if (p === 'Manager') return res.redirect('/manager');
     return res.redirect('/sofer');
   }
-  res.sendFile(path.join(__dirname, '..', 'public', 'login.html'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 router.get('/login', (req, res) => {
   if (req.session && req.session.user) {
@@ -63,5 +65,11 @@ router.get('/utvonaltervezes', requirePageLogin, requirePageRole('Admin', 'Manag
   if (!ok) return res.redirect(req.session.user.pozicio === 'Manager' ? '/manager' : '/admin');
   res.sendFile(path.join(__dirname, '..', 'public', 'utvonaltervezes.html'));
 });
+
+router.get('/privacy',  (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'privacy.html')));
+router.get('/terms',    (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'terms.html')));
+router.get('/cookies',  (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'cookies.html')));
+router.get('/dpa',      (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dpa.html')));
+router.get('/security', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'security.html')));
 
 module.exports = router;
