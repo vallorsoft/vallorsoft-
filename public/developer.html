@@ -359,7 +359,7 @@ function loadProviders(){
     el.innerHTML=list.map(function(p){
       var fields=(p.fields||[]).map(function(f){return f.label;}).join(', ');
       return '<div style="border:1px solid rgba(99,102,241,0.3);background:rgba(99,102,241,0.06);border-radius:12px;padding:12px 16px;min-width:160px;">'
-        +'<div style="font-weight:800;color:#fff;font-size:14px;">'+escHtml(p.display_name)+'</div>'
+        +'<div style="font-weight:800;color:#0f172a;font-size:14px;">'+escHtml(p.display_name)+'</div>'
         +'<div style="font-size:11px;color:var(--muted);margin-top:4px;">'+escHtml(fields)+'</div></div>';
     }).join('');
   });
@@ -371,7 +371,7 @@ function loadCompPlans(){
     var plans=(pl&&pl.plans)||[];
     tb.innerHTML=(ov.companies||[]).map(function(c){
       var opts='<option value="">'+escHtml(t('dev.noneOpt'))+'</option>'+plans.map(function(p){return '<option value="'+p.id+'"'+(c.subscription_plan_id===p.id?' selected':'')+'>'+escHtml(p.name)+'</option>';}).join('');
-      return '<tr><td><b style="color:#fff;">'+escHtml(c.nev)+'</b></td>'
+      return '<tr><td><b style="color:#0f172a;">'+escHtml(c.nev)+'</b></td>'
         +'<td><select class="select" style="max-width:200px;" onchange="setCompPlan('+c.id+',this.value)">'+opts+'</select></td></tr>';
     }).join('');
   });
@@ -425,7 +425,7 @@ function loadCompBilling(){
       var invBtn = c.provider
         ? '<button class="btn-dev" onclick="openInvoiceModal('+c.id+')">🧾 '+escHtml(t('dev.issueInvoice'))+'</button>'
         : '<button class="btn-dev" disabled title="'+escHtml(t('dev.noBillingSetTip'))+'" style="opacity:.5;cursor:not-allowed;">🧾 '+escHtml(t('dev.noBilling'))+'</button>';
-      return '<tr><td><b style="color:#fff;">'+escHtml(c.nev)+'</b></td>'
+      return '<tr><td><b style="color:#0f172a;">'+escHtml(c.nev)+'</b></td>'
         +'<td>'+billing+'</td>'
         +'<td>'+invBtn+'</td></tr>';
     }).join('');
@@ -461,7 +461,7 @@ function renderInvoicePreview(r){
   var rows=(r.items||[]).map(function(it,i){
     var lineNet=it.quantity*it.price_net, afa=lineNet*(it.vat_percent/100), brutto=lineNet+afa;
     return '<div style="padding:8px 0;border-bottom:1px solid var(--border);">'
-      +'<div style="color:#fff;font-size:13px;">'+(i+1)+'. '+escHtml(it.name)+'</div>'
+      +'<div style="color:#0f172a;font-size:13px;">'+(i+1)+'. '+escHtml(it.name)+'</div>'
       +'<div style="font-size:12px;color:var(--muted);">'+it.quantity+' × '+it.price_net.toFixed(2)+' = '+lineNet.toFixed(2)+' '+escHtml(t('dev.net'))+' &nbsp;·&nbsp; '+escHtml(t('dev.vat'))+' ('+it.vat_percent+'%): '+afa.toFixed(2)+' &nbsp;·&nbsp; '+escHtml(t('dev.gross'))+': '+brutto.toFixed(2)+'</div></div>';
   }).join('');
   var warn='';
@@ -492,7 +492,7 @@ function confirmInvoice(){
     if(r&&r.ok){
       _invLastPdf=r.pdf_url||null;
       b.innerHTML='<h3>✅ '+escHtml(t('dev.invoiceIssued'))+'</h3>'
-        +'<div style="font-size:14px;margin-bottom:6px;">'+escHtml(t('dev.invoiceNumber'))+': <b style="color:#fff;">'+escHtml(r.invoice_number||'—')+'</b></div>'
+        +'<div style="font-size:14px;margin-bottom:6px;">'+escHtml(t('dev.invoiceNumber'))+': <b style="color:#0f172a;">'+escHtml(r.invoice_number||'—')+'</b></div>'
         +'<div style="font-size:14px;margin-bottom:16px;">'+escHtml(t('dev.billingLabel'))+': <b>'+escHtml(r.provider)+'</b></div>'
         +'<div class="row-btns">'
         +(_invLastPdf?'<button class="btn-dev" style="flex:1;" onclick="window.open(_invLastPdf,\'_blank\')">📄 '+escHtml(t('dev.openPdf'))+'</button>':'')
@@ -520,9 +520,9 @@ function loadHerePane(){
       var ic=HERE_ICONS[s.feature_key]||'⚡';
       var k=s.feature_key;
       return '<tr>'
-        +'<td><b style="color:#fff;">'+ic+' '+escHtml(s.display_name)+'</b><div style="font-size:11px;color:var(--muted);">'+escHtml(s.description||'')+'</div></td>'
-        +'<td><input id="hp_'+k+'" type="number" step="0.01" min="0" value="'+(Number(s.price_eur)||0).toFixed(2)+'" style="width:90px;padding:5px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:#fff;"> €</td>'
-        +'<td><input id="hv_'+k+'" type="number" step="0.01" min="0" value="'+(Number(s.vat_percent)||21).toFixed(2)+'" style="width:70px;padding:5px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:#fff;"> %</td>'
+        +'<td><b style="color:#0f172a;">'+ic+' '+escHtml(s.display_name)+'</b><div style="font-size:11px;color:var(--muted);">'+escHtml(s.description||'')+'</div></td>'
+        +'<td><input id="hp_'+k+'" type="number" step="0.01" min="0" value="'+(Number(s.price_eur)||0).toFixed(2)+'" style="width:90px;padding:5px 8px;background:#fff;border:1px solid var(--border-bright);border-radius:8px;color:#0f172a;"> €</td>'
+        +'<td><input id="hv_'+k+'" type="number" step="0.01" min="0" value="'+(Number(s.vat_percent)||21).toFixed(2)+'" style="width:70px;padding:5px 8px;background:#fff;border:1px solid var(--border-bright);border-radius:8px;color:#0f172a;"> %</td>'
         +'<td><button class="btn-dev" style="padding:5px 12px;font-size:12px;" onclick="saveHerePrice(\''+k+'\',this)">💾 '+escHtml(t('common.save'))+'</button></td>'
         +'</tr>';
     }).join('');
@@ -554,9 +554,9 @@ function loadMapsPricingDev(){
     box.innerHTML='<table class="table" style="width:100%;"><thead><tr><th>'+escHtml(t('dev.thProvider'))+'</th><th>'+escHtml(t('dev.thOfficialPrice1000'))+'</th><th>'+escHtml(t('dev.thMargin'))+'</th><th>'+escHtml(t('dev.thForCompany1000'))+'</th><th></th></tr></thead><tbody>'
       +(r.rows||[]).map(function(p){
         var per1000=(Number(p.eur_per_unit)||0)*1000; var withM=per1000*(1+(Number(p.margin_pct)||0)/100);
-        return '<tr><td><b style="color:#fff;">'+(MAPS_VENDOR_LBL[p.vendor]||p.vendor)+'</b></td>'
-          +'<td><input id="mp_u_'+p.vendor+'" type="number" step="0.01" min="0" value="'+per1000.toFixed(2)+'" style="width:100px;padding:5px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:#fff;"> €</td>'
-          +'<td><input id="mp_m_'+p.vendor+'" type="number" step="1" min="0" value="'+(Number(p.margin_pct)||25)+'" style="width:70px;padding:5px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:#fff;"> %</td>'
+        return '<tr><td><b style="color:#0f172a;">'+(MAPS_VENDOR_LBL[p.vendor]||p.vendor)+'</b></td>'
+          +'<td><input id="mp_u_'+p.vendor+'" type="number" step="0.01" min="0" value="'+per1000.toFixed(2)+'" style="width:100px;padding:5px 8px;background:#fff;border:1px solid var(--border-bright);border-radius:8px;color:#0f172a;"> €</td>'
+          +'<td><input id="mp_m_'+p.vendor+'" type="number" step="1" min="0" value="'+(Number(p.margin_pct)||25)+'" style="width:70px;padding:5px 8px;background:#fff;border:1px solid var(--border-bright);border-radius:8px;color:#0f172a;"> %</td>'
           +'<td style="font-weight:800;color:#6366f1;">'+withM.toFixed(2)+' €</td>'
           +'<td><button class="btn-dev" style="padding:5px 12px;font-size:12px;" onclick="saveMapsPricing(\''+p.vendor+'\',this)">💾</button></td></tr>';
       }).join('')+'</tbody></table>'
@@ -582,7 +582,7 @@ function loadMapsUsageDev(){
     if(!rows.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;">'+escHtml(t('dev.noPaidMapsUsage'))+'</div>'; return; }
     var total=rows.reduce(function(s,x){return s+(Number(x.cost)||0);},0);
     el.innerHTML='<table class="table" style="width:100%;"><thead><tr><th>'+escHtml(t('dev.thCompany'))+'</th><th>'+escHtml(t('dev.thProvider'))+'</th><th style="text-align:right;">'+escHtml(t('dev.thCalls'))+'</th><th style="text-align:right;">'+escHtml(t('dev.thPayable'))+'</th></tr></thead><tbody>'
-      +rows.map(function(x){ return '<tr><td><b style="color:#fff;">'+escHtml(x.ceg_nev||('#'+x.company_id))+'</b></td><td>'+(MAPS_VENDOR_LBL[x.vendor]||x.vendor)+'</td>'
+      +rows.map(function(x){ return '<tr><td><b style="color:#0f172a;">'+escHtml(x.ceg_nev||('#'+x.company_id))+'</b></td><td>'+(MAPS_VENDOR_LBL[x.vendor]||x.vendor)+'</td>'
         +'<td style="text-align:right;">'+(Number(x.cnt)||0).toLocaleString('hu')+'</td><td style="text-align:right;font-weight:800;color:#6366f1;">'+(Number(x.cost)||0).toFixed(2)+' €</td></tr>'; }).join('')
       +'</tbody><tfoot><tr><td colspan="3" style="text-align:right;font-weight:800;">'+escHtml(t('dev.total'))+'</td><td style="text-align:right;font-weight:800;color:#6366f1;">'+total.toFixed(2)+' €</td></tr></tfoot></table>';
   });
@@ -598,7 +598,7 @@ function loadHereByCompany(){
     el.innerHTML=comps.map(function(c){
       var poolPct=c.free_pool_total?Math.min(100,Math.round((c.free_pool_used/c.free_pool_total)*100)):0;
       var barColor=poolPct>=100?'#ef4444':poolPct>=80?'#f59e0b':'#22c55e';
-      var poolBar='<div style="font-size:11px;color:var(--muted);margin:2px 0 10px;">'+escHtml(t('dev.sharedFreePool'))+': <b style="color:#fff;">'+c.free_pool_used+'</b> / '+c.free_pool_total+' '+escHtml(t('dev.trx'))+' ('+t('dev.poolRemaining',{n:c.free_pool_remaining})+')'
+      var poolBar='<div style="font-size:11px;color:var(--muted);margin:2px 0 10px;">'+escHtml(t('dev.sharedFreePool'))+': <b style="color:#0f172a;">'+c.free_pool_used+'</b> / '+c.free_pool_total+' '+escHtml(t('dev.trx'))+' ('+t('dev.poolRemaining',{n:c.free_pool_remaining})+')'
         +'<div style="height:6px;border-radius:6px;background:rgba(255,255,255,0.1);overflow:hidden;margin-top:4px;"><i style="display:block;height:100%;width:'+poolPct+'%;background:'+barColor+';"></i></div></div>';
       var feats=(c.services||[]).map(function(f){
         var uid=c.company_id+'_'+f.feature_key;
@@ -612,11 +612,11 @@ function loadHereByCompany(){
           : '<span style="color:var(--ok);">'+escHtml(t('dev.underPoolNoFee'))+'</span>';
         return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;background:rgba(255,255,255,0.02);">'
           +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
-          +'<div style="color:#fff;font-weight:600;font-size:13px;">'+ic+' '+escHtml(f.display_name)+'</div>'
+          +'<div style="color:#0f172a;font-weight:600;font-size:13px;">'+ic+' '+escHtml(f.display_name)+'</div>'
           +'<button class="btn-dev" style="padding:3px 10px;font-size:11px;" onclick="toggleFeatUsers(\''+uid+'\',this)">▼ '+escHtml(t('dev.details'))+'</button></div>'
           +'<div style="font-size:12px;color:var(--muted);margin-top:4px;">'+escHtml(t('dev.totalLabel'))+': '+f.total_used+' '+escHtml(t('dev.trxShort'))+' &nbsp;·&nbsp; '+billInfo+'</div>'
           +'<div id="fu_'+uid+'" style="display:none;margin-top:8px;">'+users+'</div>'
-          +'<div style="font-size:12px;margin-top:8px;color:var(--muted);">'+escHtml(t('dev.net'))+': <b style="color:#fff;">€'+f.net_eur+'</b> &nbsp; '+escHtml(t('dev.vat'))+': <b style="color:#fff;">€'+f.vat_eur+'</b> &nbsp; '+escHtml(t('dev.gross'))+': <b style="color:#6366f1;">€'+f.gross_eur+'</b></div>'
+          +'<div style="font-size:12px;margin-top:8px;color:var(--muted);">'+escHtml(t('dev.net'))+': <b style="color:#0f172a;">€'+f.net_eur+'</b> &nbsp; '+escHtml(t('dev.vat'))+': <b style="color:#0f172a;">€'+f.vat_eur+'</b> &nbsp; '+escHtml(t('dev.gross'))+': <b style="color:#6366f1;">€'+f.gross_eur+'</b></div>'
           +'</div>';
       }).join('');
       return '<div class="ceg-card">'
@@ -722,7 +722,7 @@ function loadDetailHozzaferes(){
     var html='';
     // ── Felhasználók (fő app) ──
     var ua=r.users.agg;
-    html += '<div style="font-weight:800;color:#fff;margin:4px 0 8px;">👥 '+escHtml(t('dev.accUsers'))+'</div>';
+    html += '<div style="font-weight:800;color:#0f172a;margin:4px 0 8px;">👥 '+escHtml(t('dev.accUsers'))+'</div>';
     html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">'
       + kpiBox(t('dev.accTotal'), ua.total, '#3b82f6') + kpiBox(t('dev.accActive'), ua.active, '#22c55e')
       + kpiBox(t('dev.accInactive'), ua.inactive, '#ef4444') + kpiBox(t('dev.accInvited'), ua.invited, '#f59e0b') + '</div>';
@@ -731,7 +731,7 @@ function loadDetailHozzaferes(){
 
     // ── Alvállalkozók ──
     var ca=r.carriers.users.agg;
-    html += '<div style="font-weight:800;color:#fff;margin:18px 0 8px;">🚚 '+escHtml(t('dev.accCarriers'))
+    html += '<div style="font-weight:800;color:#0f172a;margin:18px 0 8px;">🚚 '+escHtml(t('dev.accCarriers'))
       + ' <span style="font-weight:500;color:var(--muted);font-size:12px;">('+r.carriers.active+'/'+r.carriers.total+' '+escHtml(t('dev.accActivePl'))+')</span></div>';
     html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">'
       + kpiBox(t('dev.accUsersTotal'), ca.total, '#3b82f6') + kpiBox(t('dev.accActive'), ca.active, '#22c55e')
@@ -741,7 +741,7 @@ function loadDetailHozzaferes(){
 
     // ── Ügyfelek ──
     var cl=r.clients.users.agg;
-    html += '<div style="font-weight:800;color:#fff;margin:18px 0 8px;">🤝 '+escHtml(t('dev.accClients'))
+    html += '<div style="font-weight:800;color:#0f172a;margin:18px 0 8px;">🤝 '+escHtml(t('dev.accClients'))
       + ' <span style="font-weight:500;color:var(--muted);font-size:12px;">('+r.clients.total+' '+escHtml(t('dev.accTotalLc'))+')</span></div>';
     html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">'
       + kpiBox(t('dev.accUsersTotal'), cl.total, '#3b82f6') + kpiBox(t('dev.accActive'), cl.active, '#22c55e')
@@ -768,7 +768,7 @@ function accTable(cols, rows){
       if(k==='last_login') v = fmtDT(v);
       else if(k==='_ustatus'||k==='_pstatus') return '<td style="padding:6px 8px;">'+(v||'')+'</td>';  // már esc-elt HTML
       else v = escHtml(v==null||v===''?'—':String(v));
-      return '<td style="padding:6px 8px;color:#fff;">'+v+'</td>';
+      return '<td style="padding:6px 8px;color:#0f172a;">'+v+'</td>';
     }).join('');
     return '<tr style="border-top:1px solid var(--border);">'+tds+'</tr>';
   }).join('');
@@ -786,7 +786,7 @@ function loadDetailInteg(){
     var uitLegacy=r.uit_template_legacy||'';
     var gpsProviders=(r.gps_providers&&r.gps_providers.length)?r.gps_providers:[{provider:'cargotrack',label:'CargoTrack'}];
     var card='border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;background:rgba(255,255,255,0.02);';
-    var inp='width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.25);color:#fff;font-size:13px;margin-bottom:8px;';
+    var inp='width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#0f172a;font-size:13px;margin-bottom:8px;';
     var btn='padding:8px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;';
     function sel(v,l){ return '<option value="'+v+'"'+(vendor===v?' selected':'')+'>'+l+'</option>'; }
     // UIT deep-link mezők GPS-providerenként — minden providerhez külön input + Mentés gomb.
@@ -795,21 +795,21 @@ function loadDetailInteg(){
       var val=(uitTpls&&uitTpls[prov]!=null)?uitTpls[prov]:(uitLegacy||'');
       var ph='https://cargotrack.ro/uit?uit={uit}&plate={rendszam}&from={incarcare}&to={descarcare}';
       return '<div style="margin-bottom:10px;">'
-        +'<div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:4px;">'+escHtml(gp.label||prov)+'</div>'
+        +'<div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:4px;">'+escHtml(gp.label||prov)+'</div>'
         +'<input id="devUitTpl_'+escHtml(prov)+'" placeholder="'+ph+'" value="'+escHtml(val)+'" style="'+inp+'">'
         +'<button onclick="devSaveUit(\''+escHtml(prov)+'\')" style="'+btn+'">💾 '+escHtml(t('dev.save'))+'</button>'
       +'</div>';
     }).join('');
     el.innerHTML=
       '<div style="'+card+'">'
-        +'<div style="font-weight:700;color:#fff;margin-bottom:4px;">🗺️ '+escHtml(t('dev.integMapsTitle'))+'</div>'
+        +'<div style="font-weight:700;color:#0f172a;margin-bottom:4px;">🗺️ '+escHtml(t('dev.integMapsTitle'))+'</div>'
         +'<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">'+escHtml(t('dev.integMapsHint'))+'</div>'
         +'<select id="devMapsVendor" style="'+inp+'">'+sel('free',t('dev.integFree'))+sel('here','HERE')+sel('google','Google')+'</select>'
         +'<input id="devMapsKey" type="password" placeholder="'+(hasKey?escHtml(t('dev.integKeyStored')):'API key')+'" style="'+inp+'">'
         +'<button onclick="devSaveMaps()" style="'+btn+'">💾 '+escHtml(t('dev.save'))+'</button>'
       +'</div>'
       +'<div style="'+card+'">'
-        +'<div style="font-weight:700;color:#fff;margin-bottom:4px;">🚚 '+escHtml(t('dev.integUitTitle'))+'</div>'
+        +'<div style="font-weight:700;color:#0f172a;margin-bottom:4px;">🚚 '+escHtml(t('dev.integUitTitle'))+'</div>'
         +'<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">'+escHtml(t('dev.integUitHint'))+' ({uit}, {rendszam}, {incarcare}, {descarcare}…)</div>'
         +uitRows
       +'</div>';
@@ -853,7 +853,7 @@ function loadDetailFunkciok(){
           ? '<span style="font-size:11px;color:var(--muted);">'+escHtml(t('dev.alwaysActive'))+'</span>'
           : '<label class="fsw"><input type="checkbox" '+(enabled?'checked':'')+' onchange="toggleFeature('+_detailCegId+',\''+f.key+'\',this.checked,this)"><span class="fsw-s"></span></label>';
         html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:rgba(255,255,255,0.02);">'
-          +'<span style="font-size:13px;color:#fff;">'+escHtml(f.label)+(f.core?' <span style="color:var(--muted);font-size:11px;">('+escHtml(t('dev.coreLabel'))+')</span>':'')+'</span>'
+          +'<span style="font-size:13px;color:#0f172a;">'+escHtml(f.label)+(f.core?' <span style="color:var(--muted);font-size:11px;">('+escHtml(t('dev.coreLabel'))+')</span>':'')+'</span>'
           + right + '</div>';
       });
     });
@@ -894,7 +894,7 @@ function loadDetailAktivitas(){
         var total = (u.fuvarok_kezelt||0)+(u.menetlevelek||0)+(u.dokumentumok||0)+(u.hataratlepesek||0);
         var aktColor = total===0 ? 'color:var(--err)' : total<3 ? 'color:var(--warn)' : 'color:var(--ok)';
         return '<tr>'
-          +'<td style="font-weight:600;color:#fff;">'+escHtml(u.nume)+'</td>'
+          +'<td style="font-weight:600;color:#0f172a;">'+escHtml(u.nume)+'</td>'
           +'<td><span class="status-badge active" style="font-size:10px;">'+escHtml(u.pozicio)+'</span></td>'
           +'<td style="text-align:center;'+aktColor+'">'+u.fuvarok_kezelt+'</td>'
           +'<td style="text-align:center;'+aktColor+'">'+u.menetlevelek+'</td>'
@@ -911,7 +911,7 @@ function loadDetailAktivitas(){
 }
 
 function kpiBox(label, val, color){
-  return '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;">'
+  return '<div style="background:linear-gradient(180deg,#ffffff,#f8fafc);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;box-shadow:0 1px 2px rgba(15,23,42,0.04);">'
     +'<div style="font-size:10px;color:var(--muted);margin-bottom:4px;">'+label+'</div>'
     +'<div style="font-size:24px;font-weight:800;color:'+color+';">'+(val||0)+'</div>'
     +'</div>';

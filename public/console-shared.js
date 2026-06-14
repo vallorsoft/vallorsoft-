@@ -2573,7 +2573,7 @@ function refreshDashVehicles() {
     pts.forEach(function (p) {
       var spd = (p.speed != null) ? Math.round(p.speed) + ' km/h' : '—';
       var m = L.circleMarker([p.lat, p.lng], {
-        radius: 8, color: '#e10b1a', fillColor: '#e10b1a', fillOpacity: 0.85, weight: 2
+        radius: 8, color: '#6366f1', fillColor: '#6366f1', fillOpacity: 0.85, weight: 2
       });
       m.bindTooltip('🚛 ' + (p.object_name || p.rendszam) + ' · ' + spd);
       m.bindPopup('<b>' + esc(p.object_name || p.rendszam) + '</b><br>' + t('dash.speed') + ': ' + spd
@@ -3105,7 +3105,7 @@ function renderFilteredOrders(list) {
       '</td>'+
       '<td style="text-align:center;vertical-align:middle;">'+
         '<input type="checkbox" class="orderRowCb" value="'+c.id+'" onchange="updateOrderSelBar()" '+
-        'style="width:16px;height:16px;cursor:pointer;accent-color:#e10b1a;">'+
+        'style="width:16px;height:16px;cursor:pointer;accent-color:#6366f1;">'+
       '</td>'+
       '</tr>';
   }).join('');
@@ -3401,7 +3401,7 @@ function renderOeLegs(legs) {
   el.innerHTML = legs.map(function(leg) {
     return '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;display:flex;justify-content:space-between;align-items:center;">'
       + '<div>'
-      + '<b style="color:#fff;">' + leg.leg_number + t('cs.oe.legSection') + '</b>'
+      + '<b style="color:var(--text-primary,#e9eef5);">' + leg.leg_number + t('cs.oe.legSection') + '</b>'
       + (leg.rendszam_camion ? ' &nbsp;🚛 ' + leg.rendszam_camion : '')
       + (leg.rendszam_remorca ? ' + ' + leg.rendszam_remorca : '')
       + (leg.nume_sofer ? ' &nbsp;👤 ' + leg.nume_sofer : '')
