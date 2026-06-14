@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-14 — Developer csomag-limitek + plan_features funkció-kapcsolók (PR #99)
+
+- **`plan_features` tábla** (`db/plan-features.sql`) — csomag-szintű funkció-kapcsolók: `plan_id + feature_key + enabled`; auto-migráció induláskor. `subscription_plans.max_sofors` új limit-oszlop.
+- **Hierarchia**: `company_features` (cég-szintű dev override) > `plan_features` (csomag default) > `true` (alapból minden engedélyezett). `getMyFeatures` (dashboard.js) és `featureEnabled` (pages.js) egységesen.
+- **Limit mezők a plan editorban** (`developer.html`) — `max_users`, `max_vehicles`, `max_orders_per_month`, `max_sofors`, `stripe_price_id`; 0=tiltott, üres=korlátlan (`planLimits.checkLimit` logika).
+- **⚙️ Funkció-kapcsolók per csomag** — VS_FEATURES katalógus csoportosítva, három állapot (BE / KI / Alapértelmezett=BE); `getPlanFeatures` + `setPlanFeature` developer RPC-ek (`handlers/billingHandlers.js`).
+- **`planLimits.js`** — `sofors` kind hozzáadva (`MAX(Sofer poziciójú userek)`).
+
 ## 2026-06-14 — Önkiszolgáló SaaS regisztráció + trial előfizetés-kezelés (PR #98)
 
 - **Nyilvános cég-regisztráció** (`routes/public-register.js`, `POST /api/public-register`) — bárki létrehozhat céget meghívókód nélkül; 14 napos trial (`subscription_status='trial'`, `paid_until=NOW+14`), Admin user automatikus létrehozás, üdvözlő e-mail (RO/HU), IP-alapú rate-limit (3/óra).
