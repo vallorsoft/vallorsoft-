@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-14 — Landing: showcase szekció + integráció-felirat a footerbe
+
+- **Új „A platform működés közben" showcase szekció** (`index.html`, `landing.css`) a hero után: **3 monitor + 2 telefon** eszköz-mockup, a `landing.js`-ben **már létező, de sosem beépített** i18n-kulcsokra (`showcaseTitle`/`showcaseSubtitle`, `mon1-3Label`, `phone1-2Label`). Tartalom: márka-konzisztens **CSS/SVG mockup** (Vezérlőpult-kártyák, fuvar-tábla státusz-pillákkal, statisztika-oszlopdiagram, sofőr-app trip-kártya, GPS mini-térkép animált pulse-szal) a hero-monitor stílusában, **sötét háttéren** (fehér→sötét→világos ritmus, hero-glow rímmel). Minden eszköz `<img onerror>`-ral a `/img/sc-*.png` útra mutat → **friss, aktuális képpel automatikusan lecserélődik** (a régi `monitor1.png`-t NEM használjuk, az elavult). Reszponzív (1024/640px), `.reveal` animáció, JS-módosítás nélkül.
+- **Integrációs logó-szekció kivéve, egysoros felirattá alakítva** — a logós `#integrations` blokk (FGO/SmartBill/Oblio/iFactura/Facturis/ANAF/CargoTrack/Fomco/Stripe/Brevo) eltávolítva a nav- és footer-linkjeivel + a most árván maradt `.lp-int-*` CSS-sel együtt; helyette a **footer alsó sorában** (a nyelvváltó mellett) egy szépen megfogalmazott, **kétnyelvű (RO/HU)** felirat a GPS- és számlázó-integrációkról (`footerIntegrations` i18n-kulcs).
+- CSS kiegyensúlyozott, `landing.js` érvényes, **108 teszt zöld**.
+
+---
+
 ## 2026-06-14 — Single-open accordion menü + fix sidebar/fejléc (app-shell)
 
 - **Accordion (single-open)** (`console-shared.js`): a `toggleGroup` mostantól bezárja a többi nyitott főmenüt, mielőtt a kattintottat nyitja — egyszerre csak egy főmenü van nyitva, és ha másik főmenüre kattintasz, az előző becsukódik (ugyanarra a fejlécre 2. kattintás becsuk). Az `activateTab` is bezárja a többi csoportot a navigált elem szülő-csoportjának nyitása előtt (globális keresőből/visszaállításból is konzisztens).
