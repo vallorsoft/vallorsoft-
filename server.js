@@ -189,6 +189,7 @@ app.use(require('./routes/accounting'));
 app.use(require('./routes/uit'));
 app.use(require('./routes/inbound-orders'));
 app.use(require('./routes/client-mail'));
+app.use(require('./routes/developer-export'));
 
 // ===== 404 az ismeretlen API-utakra + GLOBÁLIS HIBAKEZELŐ (végső védőháló) =====
 // A handlerek általában maguk kezelik a hibájukat; ez csak a réseket fogja be,
