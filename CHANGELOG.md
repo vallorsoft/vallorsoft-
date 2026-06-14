@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-14 — Landing showcase finomítás: 1 monitor + valósághű Vezérlőpult + arányosabb hero/sáv
+
+- **Showcase egyetlen monitorra egyszerűsítve** (`index.html`/`landing.css`) — a korábbi 3 monitor + 2 telefon zsúfolt összkép helyett **egy kiemelt monitor**, rajta **valósághű Vezérlőpult-mockup**: sötét sidebar (menü-csíkok + aktív kiemelés) · 4 KPI-kártya (27/5/4/7, kék/zöld/indigó/borostyán) · „Curse recente" fuvar-tábla státusz-pillákkal · **világos OSM-szerű térkép** élő piros pulse-marker-rel · jármű-státusz sor. Világos „képernyő" a sötét szekció-háttéren → screenshot-hatás. A holt mockup/telefon CSS (`.lp-shot-row*`, `.lp-phone*`, `.lp-mock-*`, `.lp-monitor-sm`) törölve. `<img onerror>` továbbra is a `/img/sc-dashboard.png`-re (friss képpel auto-csere).
+- **Arányosabb felső blokk** — a **feature-strip** (felső világos sáv) megnagyobbítva (padding 40→76px, ikon 1.6→2.4rem, nagyobb cím/leírás), és **arányosan visszavéve a hero-ból** (`min-height` 100→80vh, kisebb padding) → kiegyensúlyozottabb oldal-összkép.
+- CSS kiegyensúlyozott, `landing.js` érvényes, **108 teszt zöld**.
+
+---
+
 ## 2026-06-14 — Landing: showcase szekció + integráció-felirat a footerbe
 
 - **Új „A platform működés közben" showcase szekció** (`index.html`, `landing.css`) a hero után: **3 monitor + 2 telefon** eszköz-mockup, a `landing.js`-ben **már létező, de sosem beépített** i18n-kulcsokra (`showcaseTitle`/`showcaseSubtitle`, `mon1-3Label`, `phone1-2Label`). Tartalom: márka-konzisztens **CSS/SVG mockup** (Vezérlőpult-kártyák, fuvar-tábla státusz-pillákkal, statisztika-oszlopdiagram, sofőr-app trip-kártya, GPS mini-térkép animált pulse-szal) a hero-monitor stílusában, **sötét háttéren** (fehér→sötét→világos ritmus, hero-glow rímmel). Minden eszköz `<img onerror>`-ral a `/img/sc-*.png` útra mutat → **friss, aktuális képpel automatikusan lecserélődik** (a régi `monitor1.png`-t NEM használjuk, az elavult). Reszponzív (1024/640px), `.reveal` animáció, JS-módosítás nélkül.
