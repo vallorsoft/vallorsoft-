@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-06-14 — Ügyfél-portál: beküldött kérések megjelenítése (PR #85)
+
+- **Ügyfél-portál mutatja a beküldött kéréseket** (`routes/portal.js` `/api/portal/orders` + `public/portal.js`) — a „📦 Transporturile tale" eddig csak a valódi fuvarokat mutatta, a kliens által beküldött, még el nem fogadott (függő) vagy **elutasított** kérések sehol nem látszottak. Mostantól a portál egy „📋 Beküldött kéréseid" szekcióban jeleníti meg a kliens portál-kéréseit státusszal (feldolgozás alatt / elutasítva); az elfogadott kihagyva (az már fuvarként látszik, nincs duplikálás). Új i18n kulcsok (RO+HU).
+
+---
+
 ## 2026-06-14 — Tervezőtábla minden aktív fuvar + ügyfél automatikus (PR #84)
 
 - **Tervezőtábla — minden aktív fuvar behozása** (`handlers/orders.js` `getPlannerData`) — eddig csak a dátum-ablakba eső fuvarokat hozta be, így egy aktív (nem Finalizat/Anulat) fuvar, aminek a dátuma a látott héten kívül esett (pl. múlt heti, még `In Curs`), eltűnt a nézetből és a pool-ból is. Mostantól minden aktív státuszú fuvar (`Disponibil`/`Alocat`/`In Curs`/`Extern`/`Parkolt`/`Raktarban`) bekerül a dátumtól függetlenül; a dátumozott (akár Finalizat) az ablakban marad; `Anulat` kizárva.
