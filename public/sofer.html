@@ -16,6 +16,123 @@
   <link rel="stylesheet" href="/sofer.css?v=20260611">
   <script src="/push-client.js?v=20260611"></script>
   <script src="/session-guard.js?v=20260611"></script>
+  <!-- ── Page-scoped prémium világos skin: az inline (hardcodolt sötét) stílusok olvashatóvá tétele.
+       CSAK megjelenés — semmilyen ID/JS/data-i18n nem változik. ── -->
+  <style>
+    /* GDPR banner — világos warn-kártya */
+    #gdprBanner {
+      border-color: rgba(245,158,11,0.45) !important;
+      background: linear-gradient(180deg, rgba(245,158,11,0.10), rgba(245,158,11,0.05)) !important;
+      color: #0f172a !important;
+      border-radius: 16px !important;
+      box-shadow: 0 6px 18px rgba(15,23,42,0.06);
+    }
+    #gdprBanner button {
+      background: linear-gradient(135deg,#3b82f6,#6366f1) !important;
+      box-shadow: 0 6px 16px rgba(59,130,246,0.30);
+      border-radius: 10px !important;
+    }
+
+    /* Modal-hátterek (áru-leadás + bug report): világosabb fátyol + világos lap */
+    #hoModal, #bugModal {
+      background: rgba(15,23,42,0.45) !important;
+      backdrop-filter: blur(5px);
+    }
+    #hoModal > div, #bugModal > div {
+      background: #ffffff !important;
+      border: 1px solid #e2e8f0 !important;
+      border-radius: 20px !important;
+      box-shadow: 0 24px 60px rgba(15,23,42,0.22);
+    }
+    /* A modalokban hardcodolt #fff fejlécek sötétre */
+    #hoModal h3, #bugModal h3 { color: #0f172a !important; }
+    /* Modal mégse/küldés gombok */
+    #hoModal button[onclick="closeHandover()"],
+    #bugModal button[onclick="closeBugReport()"] {
+      border: 1px solid #e2e8f0 !important;
+      background: #fff !important;
+      color: #64748b !important;
+      border-radius: 12px !important;
+    }
+    #hoSubmitBtn {
+      background: linear-gradient(135deg,#6366f1,#4f46e5) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 8px 20px rgba(99,102,241,0.32);
+    }
+    #bugSubmitBtn {
+      background: linear-gradient(135deg,#3b82f6,#6366f1) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 8px 20px rgba(59,130,246,0.30);
+    }
+    #bugText {
+      background: #fff !important;
+      border: 1px solid #e2e8f0 !important;
+      color: #0f172a !important;
+      border-radius: 12px !important;
+    }
+    #bugText::placeholder { color: #94a3b8; }
+    /* Áru-leadás radio-sorok + sub-szöveg */
+    #hoModal label { color: #1e293b !important; }
+    #hoModalSub { color: #64748b !important; }
+
+    /* Menetlevél: kiválasztott fuvarok összesítő — kék tinta a piros helyett */
+    #selectedOrdersSummary {
+      background: linear-gradient(180deg, rgba(59,130,246,0.08), rgba(99,102,241,0.05)) !important;
+      border-color: rgba(59,130,246,0.30) !important;
+      color: #1e293b !important;
+      border-radius: 14px !important;
+    }
+
+    /* Menetlevél fő gombok: az inline piros gradiens → kék/indigó */
+    button.submit-btn[onclick="fuvarStep2()"],
+    button.submit-btn[onclick="submitFuvarlevel()"] {
+      background: linear-gradient(135deg,#3b82f6,#6366f1) !important;
+      color: #fff !important;
+      box-shadow: 0 12px 26px rgba(59,130,246,0.34) !important;
+    }
+
+    /* Iratok: fuvar-választó legördülő — világos */
+    #docOrderSel {
+      background: #fff !important;
+      border: 1px solid #e2e8f0 !important;
+      color: #0f172a !important;
+      border-radius: 12px !important;
+      box-shadow: 0 1px 2px rgba(15,23,42,0.03);
+    }
+    #filePreviewName {
+      background: #fff !important;
+      border: 1px solid #e2e8f0 !important;
+      color: #1e293b !important;
+      border-radius: 12px !important;
+    }
+
+    /* Chat: a hardcodolt #fff fejléc/név sötétre, elválasztók világosra */
+    #chatContactView > div:first-child,
+    #chatHeadName { color: #0f172a !important; }
+    #chatContactView > div:first-child { border-bottom: 1px solid #e2e8f0 !important; }
+    #chatRoomView > div:first-child { border-bottom: 1px solid #e2e8f0 !important; }
+    #chatRoomView > div:last-child { border-top: 1px solid #e2e8f0 !important; }
+    #chatInitMsg { color: #64748b !important; }
+    /* Chat fejléc-avatar + küldés gomb: kék→indigó */
+    #chatHeadAv {
+      background: linear-gradient(135deg,#3b82f6,#6366f1) !important;
+      box-shadow: 0 4px 12px rgba(59,130,246,0.30);
+    }
+    #chatRoomView > div:last-child button {
+      background: linear-gradient(135deg,#3b82f6,#6366f1) !important;
+      box-shadow: 0 6px 14px rgba(59,130,246,0.30);
+    }
+    #chatRoomView > div:last-child button,
+    #chatRoomView > div:first-child button { color: #fff; }
+    /* Chat vissza-gomb a szobában (muted szürke marad, de világos kontraszt) */
+    #chatRoomView > div:first-child button[onclick="soferChatBack()"] {
+      background: none !important; color: #64748b !important;
+    }
+
+    /* Menetlevél: határátlépés/diurnă jelző-mezők muted szövege */
+    #sec-fuvar .field .input[style*="dashed"],
+    #sec-fuvar .field .input span { color: #64748b; }
+  </style>
 </head>
 <body>
 <div class="toast-wrap" id="toasts"></div>

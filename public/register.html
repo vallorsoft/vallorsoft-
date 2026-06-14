@@ -10,32 +10,74 @@
        A közös style.css-t NEM módosítja; kizárólag ezen az oldalon írja felül a
        színeket/kártyát/gombot a landing palettájára. Funkció változatlan. -->
   <style>
-    body{ background:#f7f9fc !important; color:#0f172a; }
+    :root{
+      --lp-blue:#3b82f6; --lp-blue-hover:#2563eb; --lp-indigo:#6366f1;
+      --lp-bg:#f7f9fc; --lp-card:#ffffff; --lp-border:#e2e8f0;
+      --lp-text:#0f172a; --lp-muted:#64748b;
+    }
+    body{
+      background:
+        radial-gradient(900px 520px at 12% -8%, rgba(99,102,241,.07), transparent 70%),
+        radial-gradient(760px 460px at 92% 0%, rgba(59,130,246,.06), transparent 70%),
+        var(--lp-bg) !important;
+      color:var(--lp-text) !important;
+    }
+    /* Kártya — tömör fehér + finom gradiens + felső fény-csillanás + réteges lágy árnyék */
     .login-card.glass{
-      background:#ffffff !important;
-      border:1px solid #e2e8f0 !important;
+      position:relative;
+      background:linear-gradient(180deg,#ffffff,#fbfcfe) !important;
+      border:1px solid var(--lp-border) !important;
       border-radius:16px !important;
-      box-shadow:0 1px 3px rgba(0,0,0,.08), 0 10px 30px rgba(0,0,0,.07) !important;
+      box-shadow:0 1px 2px rgba(15,23,42,.05), 0 6px 20px rgba(15,23,42,.06) !important;
       backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+      overflow:hidden;
     }
-    .vs-logo .vallor{ color:#0f172a !important; }
-    .vs-logo .soft{ color:#6366f1 !important; text-shadow:none !important; }
-    .login-card .field label{ color:#64748b !important; }
+    .login-card.glass::before{
+      content:""; position:absolute; inset:0 0 auto 0; height:1px;
+      background:linear-gradient(90deg, transparent, rgba(255,255,255,.9), transparent);
+      pointer-events:none;
+    }
+    .vs-logo .vallor{ color:var(--lp-text) !important; }
+    .vs-logo .soft{ color:var(--lp-indigo) !important; text-shadow:none !important; }
+    .login-card .field label{ color:var(--lp-muted) !important; }
     .login-card .input{
-      background:#fff !important; border:1px solid #e2e8f0 !important;
-      color:#0f172a !important; border-radius:8px !important;
+      background:#ffffff !important; border:1px solid var(--lp-border) !important;
+      color:var(--lp-text) !important; border-radius:8px !important;
     }
-    .login-card .input::placeholder{ color:#94a3b8; }
-    .login-card .input:focus{ border-color:#3b82f6 !important; box-shadow:0 0 0 3px rgba(59,130,246,.15) !important; }
+    .login-card .input::placeholder{ color:#94a3b8 !important; }
+    .login-card .input:focus{
+      border-color:var(--lp-blue) !important;
+      box-shadow:0 0 0 3px rgba(59,130,246,.15) !important; outline:none !important;
+    }
+    /* Elsődleges gomb — kék gradiens + ragyogás + belső felső fény */
     .login-card .btn.primary{
-      background:#3b82f6 !important; border:2px solid #3b82f6 !important; color:#fff !important;
-      border-radius:8px !important; box-shadow:none !important;
+      background:linear-gradient(180deg,#3b82f6,#2563eb) !important;
+      border:1px solid #2563eb !important; color:#fff !important;
+      border-radius:8px !important;
+      box-shadow:0 2px 8px rgba(59,130,246,.35), inset 0 1px 0 rgba(255,255,255,.25) !important;
+      transition:transform .15s ease, box-shadow .15s ease, background .15s ease !important;
     }
-    .login-card .btn.primary:hover{ background:#2563eb !important; border-color:#2563eb !important; }
-    .lp-consent{ background:#f7f9fc !important; border:1px solid #e2e8f0 !important; }
-    .lp-consent label{ color:#64748b !important; }
-    .lp-link{ color:#3b82f6 !important; border-bottom-color:rgba(59,130,246,.45) !important; }
-    .login-card .h-sub, .login-card [data-i18n="reg.subtitle"]{ color:#64748b !important; }
+    .login-card .btn.primary:hover{
+      background:linear-gradient(180deg,#3f86f8,#2563eb) !important;
+      box-shadow:0 4px 14px rgba(59,130,246,.45), inset 0 1px 0 rgba(255,255,255,.3) !important;
+      transform:translateY(-1px);
+    }
+    /* Beleegyezés-doboz + linkek — olvashatóra a világos háttéren (felülírja az inline #fff-et) */
+    .lp-consent{ background:#f7f9fc !important; border:1px solid var(--lp-border) !important; }
+    .lp-consent label{ color:var(--lp-muted) !important; }
+    .login-card a.lp-link, .login-card .lp-consent a{
+      color:var(--lp-blue) !important;
+      border-bottom-color:rgba(59,130,246,.45) !important;
+      text-decoration-color:rgba(59,130,246,.45) !important;
+    }
+    .login-card [data-i18n="reg.subtitle"]{ color:var(--lp-muted) !important; }
+    .login-card [data-i18n="reg.haveAccount"]{ color:var(--lp-muted) !important; }
+    /* Toast — világos, finom */
+    .toast{
+      background:#ffffff !important; color:var(--lp-text) !important;
+      border:1px solid var(--lp-border) !important;
+      box-shadow:0 6px 20px rgba(15,23,42,.12) !important;
+    }
   </style>
 </head>
 <body>

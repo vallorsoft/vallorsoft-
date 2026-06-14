@@ -7,73 +7,117 @@
   <script src="/i18n.js?v=20260614"></script>
   <link rel="stylesheet" href="/style.css?v=20260611">
   <style>
-    :root { --dev-accent: #a855f7; --dev-accent2: #7c3aed; }
-    body { background: radial-gradient(1200px 600px at 10% -10%, rgba(168,85,247,0.08), transparent 60%),
-      radial-gradient(900px 500px at 110% 10%, rgba(59,130,246,0.06), transparent 60%),
-      linear-gradient(180deg, #05070b 0%, #0a0f15 100%); }
+    /* ── VallorSoft DEVELOPER — prémium landing-paletta (kék/indigó, világos) ──
+       FONTOS: csak megjelenés. A felülírások a /style.css fölött, scoping nélkül,
+       de a developer felület saját, izolált oldal (nincs admin/manager UI itt). */
+    :root {
+      --dev-accent: #3b82f6;        /* elsődleges kék */
+      --dev-accent2: #6366f1;       /* akcent indigó */
+      --dev-accent-hover: #2563eb;  /* kék hover */
+      /* landing világos paletta — itt felülírjuk a style.css tokenjeit erre az oldalra */
+      --bg: #f7f9fc; --bg-2: #ffffff;
+      --text: #0f172a; --soft: #334155; --muted: #64748b;
+      --border: #e2e8f0; --border-bright: #cbd5e1;
+      --ok: #22c55e; --warn: #f59e0b; --err: #ef4444;
+    }
+    body {
+      color: #0f172a;
+      background:
+        radial-gradient(1100px 560px at 8% -8%, rgba(59,130,246,0.10), transparent 60%),
+        radial-gradient(900px 520px at 108% 4%, rgba(99,102,241,0.09), transparent 62%),
+        linear-gradient(180deg, #f7f9fc 0%, #eef2f8 100%);
+      background-attachment: fixed;
+    }
     .dev-layout { display: flex; min-height: 100vh; }
-    .dev-sidebar { width: 240px; background: linear-gradient(180deg, rgba(12,18,24,0.98), rgba(5,7,11,0.99));
-      border-right: 1px solid rgba(168,85,247,0.15); padding: 24px 16px;
-      display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
-    .dev-logo { font-weight: 800; font-size: 18px; margin-bottom: 4px; }
-    .dev-logo span { color: var(--dev-accent); }
-    .dev-subtitle { font-size: 11px; color: var(--muted); margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
-    .dev-tab { padding: 10px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600;
-      color: var(--muted); transition: all .15s; border: 1px solid transparent; }
-    .dev-tab:hover { background: rgba(168,85,247,0.05); color: #fff; }
-    .dev-tab.active { background: linear-gradient(180deg, rgba(168,85,247,0.2), rgba(168,85,247,0.05));
-      color: #fff; border-color: rgba(168,85,247,0.3); }
+    /* Sidebar — letisztult sötét-indigó panel, prémium mélységgel */
+    .dev-sidebar { width: 240px;
+      background: linear-gradient(180deg, #0f1729 0%, #0b1220 100%);
+      border-right: 1px solid rgba(99,102,241,0.22); padding: 24px 16px;
+      display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
+      box-shadow: 1px 0 0 rgba(255,255,255,0.02), 18px 0 40px -28px rgba(15,23,42,0.55); }
+    .dev-logo { font-weight: 800; font-size: 18px; margin-bottom: 4px; color: #fff; }
+    .dev-logo span { color: #818cf8; }
+    .dev-subtitle { font-size: 11px; color: #94a3b8; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
+    .dev-tab { padding: 10px 14px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 600;
+      color: #cbd5e1; transition: all .15s; border: 1px solid transparent; }
+    .dev-tab:hover { background: rgba(99,102,241,0.12); color: #fff; }
+    .dev-tab.active { background: linear-gradient(180deg, rgba(59,130,246,0.30), rgba(99,102,241,0.16));
+      color: #fff; border-color: rgba(99,102,241,0.5);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 6px 18px -10px rgba(59,130,246,0.6); }
     .dev-main { flex: 1; padding: 28px; overflow-y: auto; }
     .dev-pane { display: block; }
     .dev-pane.hidden { display: none !important; }
     .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
-    .kpi { padding: 20px; border-radius: 14px; background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.3));
-      border: 1px solid var(--border); }
+    /* Prémium kártyák: finom gradiens + felső sheen + réteges lágy árnyék + hover-emelkedés */
+    .kpi { position: relative; padding: 20px; border-radius: 16px;
+      background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+      border: 1px solid var(--border); overflow: hidden;
+      box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 10px 28px -18px rgba(15,23,42,0.20);
+      transition: transform .18s ease, box-shadow .18s ease; }
+    .kpi:before { content:''; position:absolute; inset:0 0 auto 0; height:1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent); }
+    .kpi:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(15,23,42,0.05), 0 18px 40px -20px rgba(59,130,246,0.30); }
     .kpi .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
-    .kpi .val { font-size: 36px; font-weight: 800; color: #fff; }
-    .kpi.purple .val { color: var(--dev-accent); }
-    .section-title { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 14px; }
-    .ceg-card { background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.2));
-      border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 12px; }
+    .kpi .val { font-size: 36px; font-weight: 800; color: #0f172a; letter-spacing: -.5px; }
+    .kpi.purple .val { background: linear-gradient(120deg, #3b82f6, #6366f1);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: #3b82f6; }
+    .section-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 14px; }
+    .ceg-card { position: relative; background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+      border: 1px solid var(--border); border-radius: 16px; padding: 18px; margin-bottom: 12px; overflow: hidden;
+      box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 10px 26px -18px rgba(15,23,42,0.18);
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+    .ceg-card:before { content:''; position:absolute; inset:0 0 auto 0; height:1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent); }
+    .ceg-card:hover { transform: translateY(-2px); border-color: rgba(99,102,241,0.35);
+      box-shadow: 0 2px 4px rgba(15,23,42,0.05), 0 18px 40px -22px rgba(59,130,246,0.28); }
     .ceg-card .ceg-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-    .ceg-card .ceg-name { font-size: 16px; font-weight: 700; color: #fff; }
+    .ceg-card .ceg-name { font-size: 16px; font-weight: 700; color: #0f172a; }
     .ceg-card .ceg-meta { display: flex; gap: 10px; flex-wrap: wrap; }
     .ceg-card .ceg-meta span { font-size: 12px; color: var(--muted); }
     .status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
-    .status-badge.active { background: rgba(34,197,94,0.15); color: var(--ok); border: 1px solid rgba(34,197,94,0.3); }
-    .status-badge.inactive { background: rgba(239,68,68,0.15); color: var(--err); border: 1px solid rgba(239,68,68,0.3); }
-    .status-badge.cancelled { background: rgba(107,114,128,0.15); color: var(--muted); border: 1px solid rgba(107,114,128,0.3); }
-    .btn-dev { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; border: none;
-      background: linear-gradient(180deg, rgba(168,85,247,0.3), rgba(168,85,247,0.1)); color: #c084fc;
-      border: 1px solid rgba(168,85,247,0.3); transition: all .15s; }
-    .btn-dev:hover { background: linear-gradient(180deg, rgba(168,85,247,0.5), rgba(168,85,247,0.2)); color: #fff; }
-    .btn-danger-sm { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
-      background: rgba(239,68,68,0.1); color: var(--err); border: 1px solid rgba(239,68,68,0.3); }
-    .btn-ok-sm { padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
-      background: rgba(34,197,94,0.1); color: var(--ok); border: 1px solid rgba(34,197,94,0.3); }
-    .modal-back { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px);
+    .status-badge.active { background: rgba(34,197,94,0.12); color: #15803d; border: 1px solid rgba(34,197,94,0.35); }
+    .status-badge.inactive { background: rgba(239,68,68,0.10); color: #dc2626; border: 1px solid rgba(239,68,68,0.32); }
+    .status-badge.cancelled { background: rgba(100,116,139,0.10); color: #475569; border: 1px solid rgba(100,116,139,0.30); }
+    /* Elsődleges / akció gomb — kék gradiens + kék glow */
+    .btn-dev { padding: 7px 14px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; border: none;
+      background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%); color: #fff;
+      box-shadow: 0 1px 1px rgba(15,23,42,0.04), 0 8px 20px -10px rgba(59,130,246,0.65); transition: all .15s; }
+    .btn-dev:hover { background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+      box-shadow: 0 2px 3px rgba(15,23,42,0.06), 0 12px 26px -10px rgba(59,130,246,0.8); transform: translateY(-1px); }
+    .btn-danger-sm { padding: 7px 14px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer;
+      background: #fff; color: #dc2626; border: 1px solid rgba(239,68,68,0.40); transition: all .15s; }
+    .btn-danger-sm:hover { background: rgba(239,68,68,0.06); }
+    .btn-ok-sm { padding: 7px 14px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer;
+      background: #fff; color: #15803d; border: 1px solid rgba(34,197,94,0.40); transition: all .15s; }
+    .btn-ok-sm:hover { background: rgba(34,197,94,0.06); }
+    .modal-back { display:none; position:fixed; inset:0; background:rgba(15,23,42,0.45); backdrop-filter:blur(6px);
       align-items:center; justify-content:center; z-index:1000; padding:20px; }
     .modal-back.open { display:flex; }
     .dev-modal { width: min(520px,100%); max-height: 90vh; overflow-y: auto; padding: 28px;
-      border-radius: 18px; background: var(--bg-2); border: 1px solid rgba(168,85,247,0.3); }
-    .dev-modal h3 { font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 20px; }
+      border-radius: 18px; background: #ffffff; border: 1px solid var(--border);
+      box-shadow: 0 30px 80px -30px rgba(15,23,42,0.45), 0 0 0 1px rgba(99,102,241,0.06); }
+    .dev-modal h3 { font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 20px; }
     .field { margin-bottom: 12px; }
     .field label { display:block; font-size:11px; color:var(--muted); margin-bottom:5px; font-weight:700; text-transform:uppercase; }
-    .input, .select { width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border-bright);
-      border-radius:8px; padding:10px 14px; color:var(--text); font-size:14px; outline:none; }
-    .select option { background: var(--bg-2); }
+    .input, .select { width:100%; background:#fff; border:1px solid var(--border-bright);
+      border-radius:9px; padding:10px 14px; color:var(--text); font-size:14px; outline:none; transition: border-color .15s, box-shadow .15s; }
+    .input:focus, .select:focus { border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,0.15); }
+    .select option { background: #fff; color: #0f172a; }
     .row-btns { display:flex; gap:10px; margin-top:16px; }
     .table { width:100%; border-collapse:collapse; font-size:13px; }
     .table th { text-align:left; padding:10px 12px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.5px; border-bottom:1px solid var(--border); }
-    .table td { padding:10px 12px; border-bottom:1px solid rgba(255,255,255,0.04); color:var(--soft); }
-    .table tr:hover td { background: rgba(255,255,255,0.02); }
-    /* Funkció toggle kapcsoló */
+    .table td { padding:10px 12px; border-bottom:1px solid var(--border); color:var(--soft); }
+    .table tr:hover td { background: rgba(59,130,246,0.04); }
+    /* glass override → világos kártya az e felületen */
+    .glass { background:#fff !important; border:1px solid var(--border) !important; border-radius:16px;
+      box-shadow:0 1px 2px rgba(15,23,42,0.04), 0 10px 28px -20px rgba(15,23,42,0.18); }
+    /* Funkció toggle kapcsoló — bekapcsolva indigó/kék */
     .fsw { position:relative; display:inline-block; width:42px; height:24px; cursor:pointer; }
     .fsw input { opacity:0; width:0; height:0; }
-    .fsw-s { position:absolute; inset:0; background:rgba(255,255,255,0.12); border:1px solid var(--border-bright); border-radius:24px; transition:.2s; }
-    .fsw-s:before { content:''; position:absolute; height:18px; width:18px; left:3px; top:2px; background:#94a3b8; border-radius:50%; transition:.2s; }
-    .fsw input:checked + .fsw-s { background:rgba(34,197,94,0.3); border-color:rgba(34,197,94,0.6); }
-    .fsw input:checked + .fsw-s:before { transform:translateX(18px); background:var(--ok); }
+    .fsw-s { position:absolute; inset:0; background:#e2e8f0; border:1px solid var(--border-bright); border-radius:24px; transition:.2s; }
+    .fsw-s:before { content:''; position:absolute; height:18px; width:18px; left:3px; top:2px; background:#94a3b8; border-radius:50%; transition:.2s; box-shadow:0 1px 2px rgba(15,23,42,0.2); }
+    .fsw input:checked + .fsw-s { background:linear-gradient(135deg,#3b82f6,#6366f1); border-color:rgba(99,102,241,0.6); }
+    .fsw input:checked + .fsw-s:before { transform:translateX(18px); background:#fff; }
     .fsw input:disabled + .fsw-s { opacity:.5; }
   </style>
   <script src="/feature-catalog.js?v=20260611"></script>
@@ -81,9 +125,9 @@
   <script src="/billing-card.js?v=20260611"></script>
   <style>
     /* A számlázó-integrációs kártya (BillingCard) gombjai a developer felületen */
-    #pane-integ .btn{padding:9px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:1px solid var(--border-bright);background:rgba(255,255,255,0.05);color:#fff;}
-    #pane-integ .btn.primary{background:linear-gradient(180deg,rgba(168,85,247,0.45),rgba(168,85,247,0.18));border-color:rgba(168,85,247,0.45);}
-    #pane-integ .btn.ghost{background:rgba(255,255,255,0.04);}
+    #pane-integ .btn{padding:9px 14px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;border:1px solid var(--border-bright);background:#fff;color:#0f172a;}
+    #pane-integ .btn.primary{background:linear-gradient(135deg,#3b82f6,#6366f1);border-color:rgba(99,102,241,0.5);color:#fff;box-shadow:0 8px 20px -10px rgba(59,130,246,0.6);}
+    #pane-integ .btn.ghost{background:#fff;}
     #pane-integ .text-muted{color:var(--muted);}
   </style>
 </head>
@@ -93,7 +137,7 @@
 <!-- Developer mobil top bar -->
 <div class="dev-mob-topbar">
   <div class="dev-logo-sm">vallor<span>Dev</span></div>
-  <button class="hamburger" onclick="devToggleSidebar()" aria-label="Menü" data-i18n-title="dev.menu" title="Menü" style="border-color:rgba(168,85,247,0.4);color:#c084fc;">☰</button>
+  <button class="hamburger" onclick="devToggleSidebar()" aria-label="Menü" data-i18n-title="dev.menu" title="Menü" style="border-color:rgba(99,102,241,0.4);color:#6366f1;">☰</button>
 </div>
 <div class="dev-sidebar-overlay" id="devSidebarOverlay" onclick="devCloseSidebar()"></div>
 
@@ -159,7 +203,7 @@
 
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
         <div class="section-title" style="margin:0;" data-i18n="dev.hereServicesTitle">⚡ HERE Térkép szolgáltatások (legacy)</div>
-        <div id="hereGrandTotal" style="font-size:14px;font-weight:800;color:#c084fc;">—</div>
+        <div id="hereGrandTotal" style="font-size:14px;font-weight:800;color:#6366f1;">—</div>
       </div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:14px;" data-i18n-html="dev.hereServicesDesc">
         4 alap szolgáltatás, <b>közös 1000 ingyenes tranzakció / hó / cég</b> (időrendben fogy).
@@ -250,7 +294,7 @@
     <!-- Tab sáv -->
     <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;">
       <button id="dtab-aktivitas" onclick="switchDetailTab('aktivitas')" data-i18n-html="dev.dtabActivity"
-        style="padding:10px 18px;background:none;border:none;border-bottom:2px solid #a855f7;color:#fff;font-size:13px;font-weight:800;cursor:pointer;">
+        style="padding:10px 18px;background:none;border:none;border-bottom:2px solid #6366f1;color:#0f172a;font-size:13px;font-weight:800;cursor:pointer;">
         📊 Aktivitás
       </button>
       <button id="dtab-funkciok" onclick="switchDetailTab('funkciok')" data-i18n-html="dev.dtabFeatures"
@@ -314,8 +358,8 @@ function loadProviders(){
     if(!list.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;">'+escHtml(t('dev.noProviders'))+'</div>'; return; }
     el.innerHTML=list.map(function(p){
       var fields=(p.fields||[]).map(function(f){return f.label;}).join(', ');
-      return '<div style="border:1px solid rgba(168,85,247,0.3);background:rgba(168,85,247,0.06);border-radius:12px;padding:12px 16px;min-width:160px;">'
-        +'<div style="font-weight:800;color:#fff;font-size:14px;">'+escHtml(p.display_name)+'</div>'
+      return '<div style="border:1px solid rgba(99,102,241,0.3);background:rgba(99,102,241,0.06);border-radius:12px;padding:12px 16px;min-width:160px;">'
+        +'<div style="font-weight:800;color:#0f172a;font-size:14px;">'+escHtml(p.display_name)+'</div>'
         +'<div style="font-size:11px;color:var(--muted);margin-top:4px;">'+escHtml(fields)+'</div></div>';
     }).join('');
   });
@@ -327,7 +371,7 @@ function loadCompPlans(){
     var plans=(pl&&pl.plans)||[];
     tb.innerHTML=(ov.companies||[]).map(function(c){
       var opts='<option value="">'+escHtml(t('dev.noneOpt'))+'</option>'+plans.map(function(p){return '<option value="'+p.id+'"'+(c.subscription_plan_id===p.id?' selected':'')+'>'+escHtml(p.name)+'</option>';}).join('');
-      return '<tr><td><b style="color:#fff;">'+escHtml(c.nev)+'</b></td>'
+      return '<tr><td><b style="color:#0f172a;">'+escHtml(c.nev)+'</b></td>'
         +'<td><select class="select" style="max-width:200px;" onchange="setCompPlan('+c.id+',this.value)">'+opts+'</select></td></tr>';
     }).join('');
   });
@@ -346,7 +390,7 @@ function loadPlanEditor(){
         +'<div class="field"><label>'+escHtml(t('dev.fName'))+'</label><input class="input" id="plName_'+p.id+'" value="'+escHtml(p.name)+'"></div>'
         +'<div class="field"><label>'+escHtml(t('dev.fDesc'))+'</label><input class="input" id="plDesc_'+p.id+'" value="'+escHtml(p.description||'')+'"></div>'
         +'<div class="field"><label>'+escHtml(t('dev.fNetPrice'))+'</label><input class="input" id="plPrice_'+p.id+'" type="number" step="0.01" value="'+net.toFixed(2)+'" oninput="recalcPlan('+p.id+','+vat+')"></div>'
-        +'<div style="font-size:13px;color:var(--muted);margin-bottom:12px;">'+escHtml(t('dev.vat'))+' ('+vat+'%): <span id="plVat_'+p.id+'">'+afa.toFixed(2)+'</span> EUR &nbsp;·&nbsp; '+escHtml(t('dev.gross'))+': <b style="color:#c084fc;" id="plGross_'+p.id+'">'+brutto.toFixed(2)+'</b> EUR</div>'
+        +'<div style="font-size:13px;color:var(--muted);margin-bottom:12px;">'+escHtml(t('dev.vat'))+' ('+vat+'%): <span id="plVat_'+p.id+'">'+afa.toFixed(2)+'</span> EUR &nbsp;·&nbsp; '+escHtml(t('dev.gross'))+': <b style="color:#6366f1;" id="plGross_'+p.id+'">'+brutto.toFixed(2)+'</b> EUR</div>'
         +'<button class="btn-dev" onclick="savePlan('+p.id+')">💾 '+escHtml(t('common.save'))+'</button>'
         +'</div>';
     }).join('');
@@ -381,7 +425,7 @@ function loadCompBilling(){
       var invBtn = c.provider
         ? '<button class="btn-dev" onclick="openInvoiceModal('+c.id+')">🧾 '+escHtml(t('dev.issueInvoice'))+'</button>'
         : '<button class="btn-dev" disabled title="'+escHtml(t('dev.noBillingSetTip'))+'" style="opacity:.5;cursor:not-allowed;">🧾 '+escHtml(t('dev.noBilling'))+'</button>';
-      return '<tr><td><b style="color:#fff;">'+escHtml(c.nev)+'</b></td>'
+      return '<tr><td><b style="color:#0f172a;">'+escHtml(c.nev)+'</b></td>'
         +'<td>'+billing+'</td>'
         +'<td>'+invBtn+'</td></tr>';
     }).join('');
@@ -417,7 +461,7 @@ function renderInvoicePreview(r){
   var rows=(r.items||[]).map(function(it,i){
     var lineNet=it.quantity*it.price_net, afa=lineNet*(it.vat_percent/100), brutto=lineNet+afa;
     return '<div style="padding:8px 0;border-bottom:1px solid var(--border);">'
-      +'<div style="color:#fff;font-size:13px;">'+(i+1)+'. '+escHtml(it.name)+'</div>'
+      +'<div style="color:#0f172a;font-size:13px;">'+(i+1)+'. '+escHtml(it.name)+'</div>'
       +'<div style="font-size:12px;color:var(--muted);">'+it.quantity+' × '+it.price_net.toFixed(2)+' = '+lineNet.toFixed(2)+' '+escHtml(t('dev.net'))+' &nbsp;·&nbsp; '+escHtml(t('dev.vat'))+' ('+it.vat_percent+'%): '+afa.toFixed(2)+' &nbsp;·&nbsp; '+escHtml(t('dev.gross'))+': '+brutto.toFixed(2)+'</div></div>';
   }).join('');
   var warn='';
@@ -426,13 +470,13 @@ function renderInvoicePreview(r){
   var canIssue = r.provider && (r.items||[]).length;
   b.innerHTML='<h3>🧾 '+escHtml(t('dev.invoicePreview'))+'</h3>'
     +'<div style="color:var(--muted);font-size:13px;margin-bottom:6px;">'+escHtml(r.company_name)+' — '+escHtml(r.month_label)+'</div>'
-    +'<div style="font-size:13px;margin-bottom:10px;">'+escHtml(t('dev.billingLabel'))+': <b style="color:#c084fc;">'+escHtml(r.provider_name||r.provider||'—')+'</b> '+(r.provider?'✅':'❌')+'</div>'
+    +'<div style="font-size:13px;margin-bottom:10px;">'+escHtml(t('dev.billingLabel'))+': <b style="color:#6366f1;">'+escHtml(r.provider_name||r.provider||'—')+'</b> '+(r.provider?'✅':'❌')+'</div>'
     +warn
     +((r.items||[]).length?rows:'<div style="color:var(--muted);padding:10px 0;">'+escHtml(t('dev.noBillableItem'))+'</div>')
     +'<div style="margin-top:12px;padding-top:10px;border-top:2px solid var(--border);font-size:13px;">'
     +'<div style="display:flex;justify-content:space-between;"><span>'+escHtml(t('dev.totalNet'))+':</span><b>'+r.totals.net.toFixed(2)+' EUR</b></div>'
     +'<div style="display:flex;justify-content:space-between;"><span>'+escHtml(t('dev.totalVat'))+':</span><b>'+r.totals.vat.toFixed(2)+' EUR</b></div>'
-    +'<div style="display:flex;justify-content:space-between;font-size:15px;color:#c084fc;font-weight:800;margin-top:4px;"><span>'+escHtml(t('dev.totalGross'))+':</span><span>'+r.totals.gross.toFixed(2)+' EUR</span></div>'
+    +'<div style="display:flex;justify-content:space-between;font-size:15px;color:#6366f1;font-weight:800;margin-top:4px;"><span>'+escHtml(t('dev.totalGross'))+':</span><span>'+r.totals.gross.toFixed(2)+' EUR</span></div>'
     +'</div>'
     +'<div style="color:var(--muted);font-size:12px;margin-top:10px;">'+escHtml(t('dev.dueDate'))+': '+escHtml(r.due_date)+'</div>'
     +(canIssue
@@ -448,7 +492,7 @@ function confirmInvoice(){
     if(r&&r.ok){
       _invLastPdf=r.pdf_url||null;
       b.innerHTML='<h3>✅ '+escHtml(t('dev.invoiceIssued'))+'</h3>'
-        +'<div style="font-size:14px;margin-bottom:6px;">'+escHtml(t('dev.invoiceNumber'))+': <b style="color:#fff;">'+escHtml(r.invoice_number||'—')+'</b></div>'
+        +'<div style="font-size:14px;margin-bottom:6px;">'+escHtml(t('dev.invoiceNumber'))+': <b style="color:#0f172a;">'+escHtml(r.invoice_number||'—')+'</b></div>'
         +'<div style="font-size:14px;margin-bottom:16px;">'+escHtml(t('dev.billingLabel'))+': <b>'+escHtml(r.provider)+'</b></div>'
         +'<div class="row-btns">'
         +(_invLastPdf?'<button class="btn-dev" style="flex:1;" onclick="window.open(_invLastPdf,\'_blank\')">📄 '+escHtml(t('dev.openPdf'))+'</button>':'')
@@ -476,9 +520,9 @@ function loadHerePane(){
       var ic=HERE_ICONS[s.feature_key]||'⚡';
       var k=s.feature_key;
       return '<tr>'
-        +'<td><b style="color:#fff;">'+ic+' '+escHtml(s.display_name)+'</b><div style="font-size:11px;color:var(--muted);">'+escHtml(s.description||'')+'</div></td>'
-        +'<td><input id="hp_'+k+'" type="number" step="0.01" min="0" value="'+(Number(s.price_eur)||0).toFixed(2)+'" style="width:90px;padding:5px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:#fff;"> €</td>'
-        +'<td><input id="hv_'+k+'" type="number" step="0.01" min="0" value="'+(Number(s.vat_percent)||21).toFixed(2)+'" style="width:70px;padding:5px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:#fff;"> %</td>'
+        +'<td><b style="color:#0f172a;">'+ic+' '+escHtml(s.display_name)+'</b><div style="font-size:11px;color:var(--muted);">'+escHtml(s.description||'')+'</div></td>'
+        +'<td><input id="hp_'+k+'" type="number" step="0.01" min="0" value="'+(Number(s.price_eur)||0).toFixed(2)+'" style="width:90px;padding:5px 8px;background:#fff;border:1px solid var(--border-bright);border-radius:8px;color:#0f172a;"> €</td>'
+        +'<td><input id="hv_'+k+'" type="number" step="0.01" min="0" value="'+(Number(s.vat_percent)||21).toFixed(2)+'" style="width:70px;padding:5px 8px;background:#fff;border:1px solid var(--border-bright);border-radius:8px;color:#0f172a;"> %</td>'
         +'<td><button class="btn-dev" style="padding:5px 12px;font-size:12px;" onclick="saveHerePrice(\''+k+'\',this)">💾 '+escHtml(t('common.save'))+'</button></td>'
         +'</tr>';
     }).join('');
@@ -510,10 +554,10 @@ function loadMapsPricingDev(){
     box.innerHTML='<table class="table" style="width:100%;"><thead><tr><th>'+escHtml(t('dev.thProvider'))+'</th><th>'+escHtml(t('dev.thOfficialPrice1000'))+'</th><th>'+escHtml(t('dev.thMargin'))+'</th><th>'+escHtml(t('dev.thForCompany1000'))+'</th><th></th></tr></thead><tbody>'
       +(r.rows||[]).map(function(p){
         var per1000=(Number(p.eur_per_unit)||0)*1000; var withM=per1000*(1+(Number(p.margin_pct)||0)/100);
-        return '<tr><td><b style="color:#fff;">'+(MAPS_VENDOR_LBL[p.vendor]||p.vendor)+'</b></td>'
-          +'<td><input id="mp_u_'+p.vendor+'" type="number" step="0.01" min="0" value="'+per1000.toFixed(2)+'" style="width:100px;padding:5px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:#fff;"> €</td>'
-          +'<td><input id="mp_m_'+p.vendor+'" type="number" step="1" min="0" value="'+(Number(p.margin_pct)||25)+'" style="width:70px;padding:5px 8px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:#fff;"> %</td>'
-          +'<td style="font-weight:800;color:#c084fc;">'+withM.toFixed(2)+' €</td>'
+        return '<tr><td><b style="color:#0f172a;">'+(MAPS_VENDOR_LBL[p.vendor]||p.vendor)+'</b></td>'
+          +'<td><input id="mp_u_'+p.vendor+'" type="number" step="0.01" min="0" value="'+per1000.toFixed(2)+'" style="width:100px;padding:5px 8px;background:#fff;border:1px solid var(--border-bright);border-radius:8px;color:#0f172a;"> €</td>'
+          +'<td><input id="mp_m_'+p.vendor+'" type="number" step="1" min="0" value="'+(Number(p.margin_pct)||25)+'" style="width:70px;padding:5px 8px;background:#fff;border:1px solid var(--border-bright);border-radius:8px;color:#0f172a;"> %</td>'
+          +'<td style="font-weight:800;color:#6366f1;">'+withM.toFixed(2)+' €</td>'
           +'<td><button class="btn-dev" style="padding:5px 12px;font-size:12px;" onclick="saveMapsPricing(\''+p.vendor+'\',this)">💾</button></td></tr>';
       }).join('')+'</tbody></table>'
       +'<div style="font-size:11px;color:var(--muted);margin-top:8px;">'+escHtml(t('dev.mapsPricingFootnote'))+'</div>';
@@ -538,9 +582,9 @@ function loadMapsUsageDev(){
     if(!rows.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px;">'+escHtml(t('dev.noPaidMapsUsage'))+'</div>'; return; }
     var total=rows.reduce(function(s,x){return s+(Number(x.cost)||0);},0);
     el.innerHTML='<table class="table" style="width:100%;"><thead><tr><th>'+escHtml(t('dev.thCompany'))+'</th><th>'+escHtml(t('dev.thProvider'))+'</th><th style="text-align:right;">'+escHtml(t('dev.thCalls'))+'</th><th style="text-align:right;">'+escHtml(t('dev.thPayable'))+'</th></tr></thead><tbody>'
-      +rows.map(function(x){ return '<tr><td><b style="color:#fff;">'+escHtml(x.ceg_nev||('#'+x.company_id))+'</b></td><td>'+(MAPS_VENDOR_LBL[x.vendor]||x.vendor)+'</td>'
-        +'<td style="text-align:right;">'+(Number(x.cnt)||0).toLocaleString('hu')+'</td><td style="text-align:right;font-weight:800;color:#c084fc;">'+(Number(x.cost)||0).toFixed(2)+' €</td></tr>'; }).join('')
-      +'</tbody><tfoot><tr><td colspan="3" style="text-align:right;font-weight:800;">'+escHtml(t('dev.total'))+'</td><td style="text-align:right;font-weight:800;color:#c084fc;">'+total.toFixed(2)+' €</td></tr></tfoot></table>';
+      +rows.map(function(x){ return '<tr><td><b style="color:#0f172a;">'+escHtml(x.ceg_nev||('#'+x.company_id))+'</b></td><td>'+(MAPS_VENDOR_LBL[x.vendor]||x.vendor)+'</td>'
+        +'<td style="text-align:right;">'+(Number(x.cnt)||0).toLocaleString('hu')+'</td><td style="text-align:right;font-weight:800;color:#6366f1;">'+(Number(x.cost)||0).toFixed(2)+' €</td></tr>'; }).join('')
+      +'</tbody><tfoot><tr><td colspan="3" style="text-align:right;font-weight:800;">'+escHtml(t('dev.total'))+'</td><td style="text-align:right;font-weight:800;color:#6366f1;">'+total.toFixed(2)+' €</td></tr></tfoot></table>';
   });
 }
 function loadHereByCompany(){
@@ -554,31 +598,31 @@ function loadHereByCompany(){
     el.innerHTML=comps.map(function(c){
       var poolPct=c.free_pool_total?Math.min(100,Math.round((c.free_pool_used/c.free_pool_total)*100)):0;
       var barColor=poolPct>=100?'#ef4444':poolPct>=80?'#f59e0b':'#22c55e';
-      var poolBar='<div style="font-size:11px;color:var(--muted);margin:2px 0 10px;">'+escHtml(t('dev.sharedFreePool'))+': <b style="color:#fff;">'+c.free_pool_used+'</b> / '+c.free_pool_total+' '+escHtml(t('dev.trx'))+' ('+t('dev.poolRemaining',{n:c.free_pool_remaining})+')'
+      var poolBar='<div style="font-size:11px;color:var(--muted);margin:2px 0 10px;">'+escHtml(t('dev.sharedFreePool'))+': <b style="color:#0f172a;">'+c.free_pool_used+'</b> / '+c.free_pool_total+' '+escHtml(t('dev.trx'))+' ('+t('dev.poolRemaining',{n:c.free_pool_remaining})+')'
         +'<div style="height:6px;border-radius:6px;background:rgba(255,255,255,0.1);overflow:hidden;margin-top:4px;"><i style="display:block;height:100%;width:'+poolPct+'%;background:'+barColor+';"></i></div></div>';
       var feats=(c.services||[]).map(function(f){
         var uid=c.company_id+'_'+f.feature_key;
         var ic=HERE_ICONS[f.feature_key]||'⚡';
         var users=(f.users||[]).map(function(u){
-          return '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--soft);padding:3px 0 3px 14px;border-left:2px solid rgba(168,85,247,0.35);margin-bottom:2px;">'
+          return '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--soft);padding:3px 0 3px 14px;border-left:2px solid rgba(99,102,241,0.35);margin-bottom:2px;">'
             +'<span>'+escHtml(u.user_name)+' <span style="color:var(--muted);">('+escHtml(u.user_role)+')</span></span><span>'+u.used+' '+escHtml(t('dev.trxShort'))+'</span></div>';
         }).join('');
         var billInfo=f.billable_trx>0
           ? t('dev.billable')+': '+f.billable_trx+' '+t('dev.trxShort')+' = '+f.units+'×1000 '+t('dev.units')
           : '<span style="color:var(--ok);">'+escHtml(t('dev.underPoolNoFee'))+'</span>';
-        return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;background:rgba(255,255,255,0.02);">'
+        return '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;background:#f8fafc;">'
           +'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
-          +'<div style="color:#fff;font-weight:600;font-size:13px;">'+ic+' '+escHtml(f.display_name)+'</div>'
+          +'<div style="color:#0f172a;font-weight:600;font-size:13px;">'+ic+' '+escHtml(f.display_name)+'</div>'
           +'<button class="btn-dev" style="padding:3px 10px;font-size:11px;" onclick="toggleFeatUsers(\''+uid+'\',this)">▼ '+escHtml(t('dev.details'))+'</button></div>'
           +'<div style="font-size:12px;color:var(--muted);margin-top:4px;">'+escHtml(t('dev.totalLabel'))+': '+f.total_used+' '+escHtml(t('dev.trxShort'))+' &nbsp;·&nbsp; '+billInfo+'</div>'
           +'<div id="fu_'+uid+'" style="display:none;margin-top:8px;">'+users+'</div>'
-          +'<div style="font-size:12px;margin-top:8px;color:var(--muted);">'+escHtml(t('dev.net'))+': <b style="color:#fff;">€'+f.net_eur+'</b> &nbsp; '+escHtml(t('dev.vat'))+': <b style="color:#fff;">€'+f.vat_eur+'</b> &nbsp; '+escHtml(t('dev.gross'))+': <b style="color:#c084fc;">€'+f.gross_eur+'</b></div>'
+          +'<div style="font-size:12px;margin-top:8px;color:var(--muted);">'+escHtml(t('dev.net'))+': <b style="color:#0f172a;">€'+f.net_eur+'</b> &nbsp; '+escHtml(t('dev.vat'))+': <b style="color:#0f172a;">€'+f.vat_eur+'</b> &nbsp; '+escHtml(t('dev.gross'))+': <b style="color:#6366f1;">€'+f.gross_eur+'</b></div>'
           +'</div>';
       }).join('');
       return '<div class="ceg-card">'
         +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">'
         +'<div class="ceg-name">🏢 '+escHtml(c.company_name)+'</div>'
-        +'<div style="font-size:13px;color:#c084fc;font-weight:700;">'+escHtml(t('dev.subtotalGross'))+': €'+c.subtotal_gross+'</div></div>'
+        +'<div style="font-size:13px;color:#6366f1;font-weight:700;">'+escHtml(t('dev.subtotalGross'))+': €'+c.subtotal_gross+'</div></div>'
         +poolBar+feats+'</div>';
     }).join('');
   });
@@ -626,11 +670,11 @@ function loadCegek(){
         +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
         +'<span class="status-badge '+sClass+'">'+sText+'</span>'
         +'<button class="btn-dev" onclick="openCegDetail('+c.id+')">🔍 '+escHtml(t('dev.detailsBtn'))+'</button>'
-        +'<button class="btn-dev" onclick="openEditCeg(_cegekCache['+idx+'])" style="background:rgba(255,255,255,0.05);color:var(--soft);border-color:var(--border);">'+escHtml(t('dev.edit'))+'</button>'
+        +'<button class="btn-dev" onclick="openEditCeg(_cegekCache['+idx+'])" style="background:#fff;color:var(--soft);border:1px solid var(--border-bright);box-shadow:none;">'+escHtml(t('dev.edit'))+'</button>'
         +(c.subscription_status==='active'
           ? '<button class="btn-danger-sm" onclick="blockCeg('+c.id+')">🔒 '+escHtml(t('dev.block'))+'</button>'
           : '<button class="btn-ok-sm" onclick="unblockCeg('+c.id+')">🔓 '+escHtml(t('dev.activate'))+'</button>')
-        +'<button class="btn-dev" onclick="exportCeg('+c.id+')" title="Összes adat letöltése ZIP-ben" style="background:rgba(168,85,247,0.12);color:#c084fc;border-color:rgba(168,85,247,0.3);">📦</button>'
+        +'<button class="btn-dev" onclick="exportCeg('+c.id+')" title="Összes adat letöltése ZIP-ben" style="background:rgba(99,102,241,0.12);color:#6366f1;border-color:rgba(99,102,241,0.3);">📦</button>'
         +'<button class="btn-danger-sm" onclick="deleteCeg('+c.id+')" style="background:rgba(239,68,68,0.1);">🗑</button>'
         +'</div></div>'
         +'</div>';
@@ -656,8 +700,8 @@ function switchDetailTab(tab){
   _detailTab = tab;
   ['aktivitas','funkciok','hozzaferes','hibak','integ'].forEach(function(t){
     document.getElementById('dtab-'+t).style.fontWeight = t===tab ? '800' : '500';
-    document.getElementById('dtab-'+t).style.borderBottom = t===tab ? '2px solid #a855f7' : '2px solid transparent';
-    document.getElementById('dtab-'+t).style.color = t===tab ? '#fff' : 'var(--muted)';
+    document.getElementById('dtab-'+t).style.borderBottom = t===tab ? '2px solid #6366f1' : '2px solid transparent';
+    document.getElementById('dtab-'+t).style.color = t===tab ? '#0f172a' : 'var(--muted)';
     document.getElementById('dpane-'+t).style.display = t===tab ? 'block' : 'none';
   });
   if(tab==='aktivitas')  loadDetailAktivitas();
@@ -672,13 +716,13 @@ function switchDetailTab(tab){
 function fmtDT(d){ if(!d) return '—'; try{ return new Date(d).toLocaleString('hu-HU',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return String(d).slice(0,16).replace('T',' '); } }
 function loadDetailHozzaferes(){
   var el = document.getElementById('dpane-hozzaferes');
-  el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(168,85,247,0.2);border-top-color:#a855f7;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
+  el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(59,130,246,0.2);border-top-color:#3b82f6;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
   gas('devCompanyAccess',[_detailCegId]).then(function(r){
     if(!r||!r.ok){ el.innerHTML='<div style="color:var(--err);padding:20px;">'+escHtml((r&&r.err)||t('common.error'))+'</div>'; return; }
     var html='';
     // ── Felhasználók (fő app) ──
     var ua=r.users.agg;
-    html += '<div style="font-weight:800;color:#fff;margin:4px 0 8px;">👥 '+escHtml(t('dev.accUsers'))+'</div>';
+    html += '<div style="font-weight:800;color:#0f172a;margin:4px 0 8px;">👥 '+escHtml(t('dev.accUsers'))+'</div>';
     html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">'
       + kpiBox(t('dev.accTotal'), ua.total, '#3b82f6') + kpiBox(t('dev.accActive'), ua.active, '#22c55e')
       + kpiBox(t('dev.accInactive'), ua.inactive, '#ef4444') + kpiBox(t('dev.accInvited'), ua.invited, '#f59e0b') + '</div>';
@@ -687,7 +731,7 @@ function loadDetailHozzaferes(){
 
     // ── Alvállalkozók ──
     var ca=r.carriers.users.agg;
-    html += '<div style="font-weight:800;color:#fff;margin:18px 0 8px;">🚚 '+escHtml(t('dev.accCarriers'))
+    html += '<div style="font-weight:800;color:#0f172a;margin:18px 0 8px;">🚚 '+escHtml(t('dev.accCarriers'))
       + ' <span style="font-weight:500;color:var(--muted);font-size:12px;">('+r.carriers.active+'/'+r.carriers.total+' '+escHtml(t('dev.accActivePl'))+')</span></div>';
     html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">'
       + kpiBox(t('dev.accUsersTotal'), ca.total, '#3b82f6') + kpiBox(t('dev.accActive'), ca.active, '#22c55e')
@@ -697,7 +741,7 @@ function loadDetailHozzaferes(){
 
     // ── Ügyfelek ──
     var cl=r.clients.users.agg;
-    html += '<div style="font-weight:800;color:#fff;margin:18px 0 8px;">🤝 '+escHtml(t('dev.accClients'))
+    html += '<div style="font-weight:800;color:#0f172a;margin:18px 0 8px;">🤝 '+escHtml(t('dev.accClients'))
       + ' <span style="font-weight:500;color:var(--muted);font-size:12px;">('+r.clients.total+' '+escHtml(t('dev.accTotalLc'))+')</span></div>';
     html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">'
       + kpiBox(t('dev.accUsersTotal'), cl.total, '#3b82f6') + kpiBox(t('dev.accActive'), cl.active, '#22c55e')
@@ -724,7 +768,7 @@ function accTable(cols, rows){
       if(k==='last_login') v = fmtDT(v);
       else if(k==='_ustatus'||k==='_pstatus') return '<td style="padding:6px 8px;">'+(v||'')+'</td>';  // már esc-elt HTML
       else v = escHtml(v==null||v===''?'—':String(v));
-      return '<td style="padding:6px 8px;color:#fff;">'+v+'</td>';
+      return '<td style="padding:6px 8px;color:#0f172a;">'+v+'</td>';
     }).join('');
     return '<tr style="border-top:1px solid var(--border);">'+tds+'</tr>';
   }).join('');
@@ -733,7 +777,7 @@ function accTable(cols, rows){
 
 function loadDetailInteg(){
   var el=document.getElementById('dpane-integ');
-  el.innerHTML='<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(168,85,247,0.2);border-top-color:#a855f7;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
+  el.innerHTML='<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(59,130,246,0.2);border-top-color:#3b82f6;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
   gas('devGetCompanyIntegrations',[_detailCegId]).then(function(r){
     if(!r||!r.ok){ el.innerHTML='<div style="color:var(--err);padding:20px;">'+escHtml((r&&r.err)||t('common.error'))+'</div>'; return; }
     var vendor=(r.maps&&r.maps.vendor)||'free';
@@ -741,9 +785,9 @@ function loadDetailInteg(){
     var uitTpls=r.uit_templates||{};
     var uitLegacy=r.uit_template_legacy||'';
     var gpsProviders=(r.gps_providers&&r.gps_providers.length)?r.gps_providers:[{provider:'cargotrack',label:'CargoTrack'}];
-    var card='border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;background:rgba(255,255,255,0.02);';
-    var inp='width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:rgba(0,0,0,0.25);color:#fff;font-size:13px;margin-bottom:8px;';
-    var btn='padding:8px 16px;border:none;border-radius:8px;background:#a855f7;color:#fff;font-size:13px;font-weight:700;cursor:pointer;';
+    var card='border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;background:#f8fafc;';
+    var inp='width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:#fff;color:#0f172a;font-size:13px;margin-bottom:8px;';
+    var btn='padding:8px 16px;border:none;border-radius:8px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;';
     function sel(v,l){ return '<option value="'+v+'"'+(vendor===v?' selected':'')+'>'+l+'</option>'; }
     // UIT deep-link mezők GPS-providerenként — minden providerhez külön input + Mentés gomb.
     var uitRows=gpsProviders.map(function(gp){
@@ -751,21 +795,21 @@ function loadDetailInteg(){
       var val=(uitTpls&&uitTpls[prov]!=null)?uitTpls[prov]:(uitLegacy||'');
       var ph='https://cargotrack.ro/uit?uit={uit}&plate={rendszam}&from={incarcare}&to={descarcare}';
       return '<div style="margin-bottom:10px;">'
-        +'<div style="font-size:12px;font-weight:700;color:#fff;margin-bottom:4px;">'+escHtml(gp.label||prov)+'</div>'
+        +'<div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:4px;">'+escHtml(gp.label||prov)+'</div>'
         +'<input id="devUitTpl_'+escHtml(prov)+'" placeholder="'+ph+'" value="'+escHtml(val)+'" style="'+inp+'">'
         +'<button onclick="devSaveUit(\''+escHtml(prov)+'\')" style="'+btn+'">💾 '+escHtml(t('dev.save'))+'</button>'
       +'</div>';
     }).join('');
     el.innerHTML=
       '<div style="'+card+'">'
-        +'<div style="font-weight:700;color:#fff;margin-bottom:4px;">🗺️ '+escHtml(t('dev.integMapsTitle'))+'</div>'
+        +'<div style="font-weight:700;color:#0f172a;margin-bottom:4px;">🗺️ '+escHtml(t('dev.integMapsTitle'))+'</div>'
         +'<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">'+escHtml(t('dev.integMapsHint'))+'</div>'
         +'<select id="devMapsVendor" style="'+inp+'">'+sel('free',t('dev.integFree'))+sel('here','HERE')+sel('google','Google')+'</select>'
         +'<input id="devMapsKey" type="password" placeholder="'+(hasKey?escHtml(t('dev.integKeyStored')):'API key')+'" style="'+inp+'">'
         +'<button onclick="devSaveMaps()" style="'+btn+'">💾 '+escHtml(t('dev.save'))+'</button>'
       +'</div>'
       +'<div style="'+card+'">'
-        +'<div style="font-weight:700;color:#fff;margin-bottom:4px;">🚚 '+escHtml(t('dev.integUitTitle'))+'</div>'
+        +'<div style="font-weight:700;color:#0f172a;margin-bottom:4px;">🚚 '+escHtml(t('dev.integUitTitle'))+'</div>'
         +'<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">'+escHtml(t('dev.integUitHint'))+' ({uit}, {rendszam}, {incarcare}, {descarcare}…)</div>'
         +uitRows
       +'</div>';
@@ -791,7 +835,7 @@ function devSaveUit(prov){
 
 function loadDetailFunkciok(){
   var el=document.getElementById('dpane-funkciok');
-  el.innerHTML='<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(168,85,247,0.2);border-top-color:#a855f7;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
+  el.innerHTML='<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(59,130,246,0.2);border-top-color:#3b82f6;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
   gas('devGetCompanyFeatures',[_detailCegId]).then(function(r){
     if(!r||!r.ok){ el.innerHTML='<div style="color:var(--err);padding:20px;">'+escHtml(t('dev.loadErrorDuring'))+'</div>'; return; }
     var feats=r.features||{};
@@ -800,7 +844,7 @@ function loadDetailFunkciok(){
     cat.forEach(function(f){ if(!groups[f.group]){groups[f.group]=[];order.push(f.group);} groups[f.group].push(f); });
     var html='<div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5;" data-i18n-html-skip>'+t('dev.featuresIntro')+'</div>';
     order.forEach(function(g){
-      html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#c084fc;margin:16px 0 8px;">'+escHtml(g)+'</div>';
+      html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6366f1;margin:16px 0 8px;">'+escHtml(g)+'</div>';
       groups[g].forEach(function(f){
         // optIn kulcs: alapból KI (csak explicit enabled=true kapcsol be);
         // a többi a hagyományos „hiányzó sor = bekapcsolva" logikát követi.
@@ -808,8 +852,8 @@ function loadDetailFunkciok(){
         var right = f.core
           ? '<span style="font-size:11px;color:var(--muted);">'+escHtml(t('dev.alwaysActive'))+'</span>'
           : '<label class="fsw"><input type="checkbox" '+(enabled?'checked':'')+' onchange="toggleFeature('+_detailCegId+',\''+f.key+'\',this.checked,this)"><span class="fsw-s"></span></label>';
-        html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:rgba(255,255,255,0.02);">'
-          +'<span style="font-size:13px;color:#fff;">'+escHtml(f.label)+(f.core?' <span style="color:var(--muted);font-size:11px;">('+escHtml(t('dev.coreLabel'))+')</span>':'')+'</span>'
+        html+='<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:#f8fafc;">'
+          +'<span style="font-size:13px;color:#0f172a;">'+escHtml(f.label)+(f.core?' <span style="color:var(--muted);font-size:11px;">('+escHtml(t('dev.coreLabel'))+')</span>':'')+'</span>'
           + right + '</div>';
       });
     });
@@ -827,14 +871,14 @@ function toggleFeature(cid,key,enabled,inp){
 
 function loadDetailAktivitas(){
   var el = document.getElementById('dpane-aktivitas');
-  el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(168,85,247,0.2);border-top-color:#a855f7;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
+  el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(59,130,246,0.2);border-top-color:#3b82f6;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
   gas('devCompanyDetail',[_detailCegId]).then(function(r){
     if(!r||!r.ok){ el.innerHTML='<div style="color:var(--err);padding:20px;">'+escHtml(t('dev.loadErrorDuring'))+'</div>'; return; }
     var o = r.osszesito;
     var html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;">';
     html += kpiBox(t('dev.kpiAllOrders'), o.osszes_fuvar, '#3b82f6');
     html += kpiBox(t('dev.kpiActiveOrders'), o.aktiv_fuvar, '#22c55e');
-    html += kpiBox(t('dev.kpiWaybills'), o.osszes_menetlevel, '#a855f7');
+    html += kpiBox(t('dev.kpiWaybills'), o.osszes_menetlevel, '#6366f1');
     html += kpiBox(t('dev.kpiDocuments'), o.osszes_dok, '#f59e0b');
     html += kpiBox(t('dev.kpiAllBugs'), o.osszes_hiba, '#ef4444');
     html += kpiBox(t('dev.kpiUnreadBugs'), o.olvasatlan_hiba, '#ef4444');
@@ -850,7 +894,7 @@ function loadDetailAktivitas(){
         var total = (u.fuvarok_kezelt||0)+(u.menetlevelek||0)+(u.dokumentumok||0)+(u.hataratlepesek||0);
         var aktColor = total===0 ? 'color:var(--err)' : total<3 ? 'color:var(--warn)' : 'color:var(--ok)';
         return '<tr>'
-          +'<td style="font-weight:600;color:#fff;">'+escHtml(u.nume)+'</td>'
+          +'<td style="font-weight:600;color:#0f172a;">'+escHtml(u.nume)+'</td>'
           +'<td><span class="status-badge active" style="font-size:10px;">'+escHtml(u.pozicio)+'</span></td>'
           +'<td style="text-align:center;'+aktColor+'">'+u.fuvarok_kezelt+'</td>'
           +'<td style="text-align:center;'+aktColor+'">'+u.menetlevelek+'</td>'
@@ -867,7 +911,7 @@ function loadDetailAktivitas(){
 }
 
 function kpiBox(label, val, color){
-  return '<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center;">'
+  return '<div style="background:linear-gradient(180deg,#ffffff,#f8fafc);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;box-shadow:0 1px 2px rgba(15,23,42,0.04);">'
     +'<div style="font-size:10px;color:var(--muted);margin-bottom:4px;">'+label+'</div>'
     +'<div style="font-size:24px;font-weight:800;color:'+color+';">'+(val||0)+'</div>'
     +'</div>';
@@ -875,7 +919,7 @@ function kpiBox(label, val, color){
 
 function loadDetailHibak(){
   var el = document.getElementById('dpane-hibak');
-  el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(168,85,247,0.2);border-top-color:#a855f7;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
+  el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;"><span class="spinner" style="width:18px;height:18px;display:inline-block;border:2px solid rgba(59,130,246,0.2);border-top-color:#3b82f6;border-radius:50%;animation:spin .6s linear infinite;"></span></div>';
   gas('getBugReports',[_detailCegId]).then(function(list){
     if(!list||!list.length){
       el.innerHTML='<div style="color:var(--muted);padding:24px;text-align:center;">✅ '+escHtml(t('dev.noBugReports'))+'</div>';
@@ -883,7 +927,7 @@ function loadDetailHibak(){
     }
     el.innerHTML = list.map(function(b){
       var dt  = b.created_at ? new Date(b.created_at).toLocaleString('hu-HU') : '—';
-      var bg  = b.is_read ? 'rgba(255,255,255,0.02)' : 'rgba(239,68,68,0.06)';
+      var bg  = b.is_read ? '#f8fafc' : 'rgba(239,68,68,0.06)';
       var bdr = b.is_read ? 'var(--border)' : 'rgba(239,68,68,0.3)';
       return '<div id="bug-'+b.id+'" style="background:'+bg+';border:1px solid '+bdr+';border-radius:10px;padding:14px;margin-bottom:10px;">'
         +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;">'
@@ -892,7 +936,7 @@ function loadDetailHibak(){
         +(b.oldal?' &nbsp;·&nbsp; 📄 '+escHtml(b.oldal):'')
         +'</div>'
         +(b.is_read ? '<span style="font-size:10px;color:var(--muted);">✓ '+escHtml(t('dev.read'))+'</span>'
-          : '<button onclick="markRead('+b.id+')" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(168,85,247,0.4);background:rgba(168,85,247,0.1);color:#c084fc;cursor:pointer;font-weight:600;">✓ '+escHtml(t('dev.markRead'))+'</button>')
+          : '<button onclick="markRead('+b.id+')" style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid rgba(99,102,241,0.4);background:rgba(99,102,241,0.1);color:#6366f1;cursor:pointer;font-weight:600;">✓ '+escHtml(t('dev.markRead'))+'</button>')
         +'</div>'
         +'<div style="font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap;">'+escHtml(b.szoveg)+'</div>'
         +'</div>';
@@ -908,7 +952,7 @@ function markRead(id){
     if(r&&r.ok){
       var el=document.getElementById('bug-'+id);
       if(el){
-        el.style.background='rgba(255,255,255,0.02)';
+        el.style.background='#f8fafc';
         el.style.border='1px solid var(--border)';
         var btn=el.querySelector('button');
         if(btn){ btn.outerHTML='<span style="font-size:10px;color:var(--muted);">✓ '+escHtml(t('dev.read'))+'</span>'; }

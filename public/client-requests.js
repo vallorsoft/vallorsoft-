@@ -33,7 +33,7 @@ window.ClientRequests = (function () {
       .cr-toggle{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;cursor:pointer}
       .cr-btn{cursor:pointer;border:1px solid var(--glass-border-dark,#2a3744);border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;background:var(--bg-panel-raised,#141c25);color:var(--text-primary,#e9eef5)}
       .cr-btn--green{background:#16a34a;color:#fff;border-color:#16a34a}
-      .cr-btn--red{background:#e10b1a;color:#fff;border-color:#e10b1a}
+      .cr-btn--red{background:#ef4444;color:#fff;border-color:#ef4444}
       .cr-btn--ghost{opacity:.92}
       .cr-empty{color:var(--text-muted,#8a97a8);padding:16px 2px}
       .cr-warn{background:#fdf0d8;color:#8a5a00;border:1px solid #f0d9a8;border-radius:8px;padding:8px 10px;font-size:12px;margin-bottom:12px}
@@ -58,7 +58,7 @@ window.ClientRequests = (function () {
       .cr-req.done .cr-rhead{cursor:default}
       .cr-rarrow{font-size:12px;color:var(--text-muted,#8a97a8);transition:transform .15s;width:12px}
       .cr-req.open .cr-rarrow{transform:rotate(90deg)}
-      .cr-seq{font-weight:800;color:var(--brand-red,#e10b1a);min-width:42px}
+      .cr-seq{font-weight:800;color:#6366f1;min-width:42px}
       .cr-file{font-size:12px}
       .cr-file.has{color:var(--status-info,#3b82f6);font-weight:700}
       .cr-file.no{color:var(--text-muted,#8a97a8)}

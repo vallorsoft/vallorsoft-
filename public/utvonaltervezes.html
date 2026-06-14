@@ -15,7 +15,39 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="/session-guard.js?v=20260611"></script>
   <style>
-    .rp-card { padding:16px; margin-bottom:16px; }
+    /* ── Útvonaltervezés — prémium landing-akcentus (kék/indigó). Csak megjelenés.
+       A térkép-csempe (Leaflet) MARAD világos — nem nyúlunk hozzá. ── */
+    .rp-card { padding:18px; margin-bottom:16px; }
+    /* Lágy radiális háttér-fény világos módban (mint a landing hero) */
+    .main-content[data-theme="light"] {
+      background:
+        radial-gradient(1100px 560px at 6% -6%, rgba(59,130,246,0.10), transparent 60%),
+        radial-gradient(900px 520px at 106% 2%, rgba(99,102,241,0.08), transparent 62%),
+        linear-gradient(180deg, #f7f9fc 0%, #eef2f8 100%);
+    }
+    /* Prémium kártya-mélység (világos témában): finom gradiens + felső sheen + lágy árnyék */
+    .main-content[data-theme="light"] .glass {
+      background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%) !important;
+      border: 1px solid #e2e8f0 !important;
+      box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 12px 30px -20px rgba(15,23,42,0.18) !important;
+    }
+    .main-content[data-theme="light"] .glass.rp-card { position: relative; overflow: hidden; }
+    .main-content[data-theme="light"] .glass.rp-card:before {
+      content:''; position:absolute; inset:0 0 auto 0; height:1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+    }
+    /* Elsődleges / akció gomb — kék gradiens + kék glow (mindkét témában) */
+    .rp-card .btn.primary, #rpPlanBtn.btn.primary, #rpModeCar.btn.primary, #rpModeTruck.btn.primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+      border: none; color: #fff;
+      box-shadow: 0 1px 1px rgba(15,23,42,0.05), 0 10px 24px -12px rgba(59,130,246,0.7);
+      transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+    }
+    .rp-card .btn.primary:hover, #rpPlanBtn.btn.primary:hover, #rpModeCar.btn.primary:hover, #rpModeTruck.btn.primary:hover {
+      filter: brightness(1.04); transform: translateY(-1px);
+      box-shadow: 0 2px 3px rgba(15,23,42,0.06), 0 14px 30px -12px rgba(59,130,246,0.85);
+    }
+    #rpPlanBtn.btn.primary:disabled { background: #cbd5e1; box-shadow: none; transform: none; filter: none; color: #fff; }
     .rp-sec-title { font-size:13px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; margin-bottom:10px; }
     .rp-veh-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     @media (max-width:760px){ .rp-veh-grid { grid-template-columns:1fr; } }
@@ -69,7 +101,7 @@
 <body>
 <div class="toast-wrap" id="toasts"></div>
 
-<div class="main-content" id="mainContent" data-theme="dark" style="min-height:100vh;">
+<div class="main-content" id="mainContent" data-theme="light" style="min-height:100vh;">
 <script>try{var _vsT=localStorage.getItem('vs-theme');if(_vsT==='light'||_vsT==='dark')document.getElementById('mainContent').setAttribute('data-theme',_vsT);}catch(e){}</script>
 
   <div class="dash-topbar">

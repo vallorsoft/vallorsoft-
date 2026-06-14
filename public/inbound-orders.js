@@ -19,7 +19,7 @@ window.InboundOrders = (function () {
       .io-head h2{margin:0;font-size:20px}
       .io-spacer{flex:1}
       .io-btn{cursor:pointer;border:1px solid #cdd6e4;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;background:#fff}
-      .io-btn--red{background:#e10b1a;color:#fff;border-color:#e10b1a}
+      .io-btn--red{background:#ef4444;color:#fff;border-color:#ef4444}
       .io-btn--green{background:#16a34a;color:#fff;border-color:#16a34a}
       .io-btn--ghost{background:#f4f7fb}
       .io-toggle{display:flex;align-items:center;gap:8px;font-size:13px}

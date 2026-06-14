@@ -367,7 +367,7 @@ function routeMapDraw(which){
   var st=_rmState[which];
   var km=document.getElementById('rmmKm'); if(km) km.textContent=(st.km!=null?(st.km+' km'):'—')+(st.dur?(' · '+rmFmtDur(st.dur)):'');
   if(st.polyline && st.polyline.length){
-    var line=L.polyline(st.polyline,{color:'#e10b1a',weight:5,opacity:0.85}).addTo(_rmLayers);
+    var line=L.polyline(st.polyline,{color:'#6366f1',weight:5,opacity:0.85}).addTo(_rmLayers);
     try{ _rmLeaflet.fitBounds(line.getBounds(),{padding:[30,30]}); }catch(e){}
   }
   (st.waypoints||[]).forEach(function(w){
@@ -1377,7 +1377,7 @@ function loadInvites(){
     document.querySelector('#tblInv tbody').innerHTML=list.map(i=>{
       var sc=i.status==='Aktiv'?'ok':i.status==='Felhasznalva'?'info':'err';
       return '<tr>'
-        +'<td><b style="color:#fff;">'+esc(i.kod)+'</b></td>'
+        +'<td><b style="color:var(--text-primary,#e9eef5);">'+esc(i.kod)+'</b></td>'
         +'<td>'+i.pozicio+'</td>'
         +'<td>'+esc(i.nume||'—')+'</td>'
         +'<td>'+esc(i.email||'—')+'</td>'
@@ -1604,7 +1604,7 @@ function loadReceivedFuvarlevelek(){
     var tb=document.querySelector('#tblReceivedFuv tbody');
     if(!list||list.length===0){tb.innerHTML='<tr><td colspan="5">'+t('cs.noWaybills')+'</td></tr>';return;}
     tb.innerHTML=list.map(f=>`<tr>`
-      +`<td><b style="color:var(--brand-red);">${esc(f.numar_fisa||'—')}</b></td>`
+      +`<td><b style="color:#6366f1;">${esc(f.numar_fisa||'—')}</b></td>`
       +`<td><b style="color:var(--text-primary);">${esc(f.file_name||'—')}</b></td>`
       +`<td>${esc(f.nume_sofer||f.email_sofer||'—')}</td>`
       +`<td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td>`
@@ -1862,12 +1862,12 @@ function quickStatusChange(id, sel) {
            newStatus==='Parkolt'?'park':
            newStatus==='Raktarban'?'wh':'info';
   var bgMap = {
-    'info': 'background:rgba(59,130,246,0.18);color:#60a5fa;border-color:rgba(59,130,246,0.4);',
-    'warn': 'background:rgba(245,158,11,0.18);color:#fbbf24;border-color:rgba(245,158,11,0.4);',
-    'ok':   'background:rgba(34,197,94,0.18);color:#4ade80;border-color:rgba(34,197,94,0.4);',
-    'err':  'background:rgba(239,68,68,0.18);color:#f87171;border-color:rgba(239,68,68,0.4);',
-    'park': 'background:rgba(192,38,211,0.18);color:#e879f9;border-color:rgba(192,38,211,0.4);',
-    'wh':   'background:rgba(249,115,22,0.18);color:#fb923c;border-color:rgba(249,115,22,0.4);'
+    'info': 'background:rgba(59,130,246,0.18);color:#2563eb;border-color:rgba(59,130,246,0.4);',
+    'warn': 'background:rgba(245,158,11,0.18);color:#d97706;border-color:rgba(245,158,11,0.45);',
+    'ok':   'background:rgba(34,197,94,0.18);color:#16a34a;border-color:rgba(34,197,94,0.4);',
+    'err':  'background:rgba(239,68,68,0.18);color:#dc2626;border-color:rgba(239,68,68,0.4);',
+    'park': 'background:rgba(99,102,241,0.18);color:#4f46e5;border-color:rgba(99,102,241,0.4);',
+    'wh':   'background:rgba(249,115,22,0.18);color:#c2410c;border-color:rgba(249,115,22,0.45);'
   };
   var base = 'cursor:pointer;font-size:11px;font-weight:700;border-radius:8px;padding:4px 20px 4px 8px;border:1px solid;appearance:auto;-webkit-appearance:auto;outline:none;min-width:80px;';
   sel.style.cssText = base + (bgMap[sc]||bgMap['info']);
@@ -2573,7 +2573,7 @@ function refreshDashVehicles() {
     pts.forEach(function (p) {
       var spd = (p.speed != null) ? Math.round(p.speed) + ' km/h' : '—';
       var m = L.circleMarker([p.lat, p.lng], {
-        radius: 8, color: '#e10b1a', fillColor: '#e10b1a', fillOpacity: 0.85, weight: 2
+        radius: 8, color: '#6366f1', fillColor: '#6366f1', fillOpacity: 0.85, weight: 2
       });
       m.bindTooltip('🚛 ' + (p.object_name || p.rendszam) + ' · ' + spd);
       m.bindPopup('<b>' + esc(p.object_name || p.rendszam) + '</b><br>' + t('dash.speed') + ': ' + spd
@@ -2971,12 +2971,12 @@ function renderFilteredOrders(list) {
     var selStyle = 'cursor:pointer;font-size:11px;font-weight:700;border-radius:8px;padding:4px 20px 4px 8px;'+
       'border:1px solid;appearance:auto;-webkit-appearance:auto;outline:none;min-width:80px;';
     var bgMap = {
-      'info': 'background:rgba(59,130,246,0.18);color:#60a5fa;border-color:rgba(59,130,246,0.4);',
-      'warn': 'background:rgba(245,158,11,0.18);color:#fbbf24;border-color:rgba(245,158,11,0.4);',
-      'ok':   'background:rgba(34,197,94,0.18);color:#4ade80;border-color:rgba(34,197,94,0.4);',
-      'err':  'background:rgba(239,68,68,0.18);color:#f87171;border-color:rgba(239,68,68,0.4);',
-      'park': 'background:rgba(192,38,211,0.18);color:#e879f9;border-color:rgba(192,38,211,0.4);',
-      'wh':   'background:rgba(249,115,22,0.18);color:#fb923c;border-color:rgba(249,115,22,0.4);'
+      'info': 'background:rgba(59,130,246,0.18);color:#2563eb;border-color:rgba(59,130,246,0.4);',
+      'warn': 'background:rgba(245,158,11,0.18);color:#d97706;border-color:rgba(245,158,11,0.45);',
+      'ok':   'background:rgba(34,197,94,0.18);color:#16a34a;border-color:rgba(34,197,94,0.4);',
+      'err':  'background:rgba(239,68,68,0.18);color:#dc2626;border-color:rgba(239,68,68,0.4);',
+      'park': 'background:rgba(99,102,241,0.18);color:#4f46e5;border-color:rgba(99,102,241,0.4);',
+      'wh':   'background:rgba(249,115,22,0.18);color:#c2410c;border-color:rgba(249,115,22,0.45);'
     };
     var statusSel = '<select onchange="quickStatusChange(\''+c.id+'\',this)" '+
       'style="'+selStyle+(bgMap[sc]||bgMap['info'])+'">'+
@@ -3016,7 +3016,7 @@ function renderFilteredOrders(list) {
       routeCell += '<div style="margin-top:4px;">';
       legs.forEach(function(l){
         if (l.loc_preluare) {
-          routeCell += '<div style="font-size:11px;color:var(--muted);padding-left:8px;border-left:2px solid rgba(225,11,26,0.4);margin-top:2px;">'+
+          routeCell += '<div style="font-size:11px;color:var(--muted);padding-left:8px;border-left:2px solid rgba(99,102,241,0.4);margin-top:2px;">'+
             '↳ '+esc(l.loc_preluare)+
           '</div>';
         }
@@ -3027,7 +3027,7 @@ function renderFilteredOrders(list) {
     // Sofőr cella: alap sofőr + váltások badge-del
     var soferCell = esc(soferInfo);
     if (legCount > 0) {
-      soferCell += ' <span style="font-size:10px;background:rgba(225,11,26,0.15);color:#f87171;border:1px solid rgba(225,11,26,0.3);border-radius:6px;padding:1px 6px;white-space:nowrap;">+'+legCount+t('cs.ol.legBadge')+'</span>';
+      soferCell += ' <span style="font-size:10px;background:rgba(99,102,241,0.15);color:#4f46e5;border:1px solid rgba(99,102,241,0.3);border-radius:6px;padding:1px 6px;white-space:nowrap;">+'+legCount+t('cs.ol.legBadge')+'</span>';
       soferCell += '<div style="margin-top:4px;">';
       legs.forEach(function(l){
         soferCell += '<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+
@@ -3105,7 +3105,7 @@ function renderFilteredOrders(list) {
       '</td>'+
       '<td style="text-align:center;vertical-align:middle;">'+
         '<input type="checkbox" class="orderRowCb" value="'+c.id+'" onchange="updateOrderSelBar()" '+
-        'style="width:16px;height:16px;cursor:pointer;accent-color:#e10b1a;">'+
+        'style="width:16px;height:16px;cursor:pointer;accent-color:#6366f1;">'+
       '</td>'+
       '</tr>';
   }).join('');
@@ -3401,7 +3401,7 @@ function renderOeLegs(legs) {
   el.innerHTML = legs.map(function(leg) {
     return '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:13px;display:flex;justify-content:space-between;align-items:center;">'
       + '<div>'
-      + '<b style="color:#fff;">' + leg.leg_number + t('cs.oe.legSection') + '</b>'
+      + '<b style="color:var(--text-primary,#e9eef5);">' + leg.leg_number + t('cs.oe.legSection') + '</b>'
       + (leg.rendszam_camion ? ' &nbsp;🚛 ' + leg.rendszam_camion : '')
       + (leg.rendszam_remorca ? ' + ' + leg.rendszam_remorca : '')
       + (leg.nume_sofer ? ' &nbsp;👤 ' + leg.nume_sofer : '')
