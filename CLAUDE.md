@@ -308,3 +308,55 @@ Routing (opcionális): **`ORS_API_KEY`** (OpenRouteService, ingyenes) — az út
 - Jest + supertest: `npm test`, `npm run test:watch`, `npm run test:coverage`.
 - `tests/unit/` (crypto, diurna, invoiceAdapter), `tests/integration/` (auth, execute), `tests/helpers/` (db/session mock — éles DB nem kell).
 - Szerveroldali handler gyors kézi tesztje: kis `node` script `require('dotenv').config()` + handler hívás mock `req`/`res`-szel (a fejlesztés során így ellenőriztük a route-tervezőt és a feature-kapcsolókat a valós DB-n).
+
+---
+
+## Jogi / GDPR adatok (privacy policy + terms alapanyag)
+
+### Adatkezelő (Operator)
+- **Denumire:** VALLOR TEAM SRL
+- **CUI:** 47859317
+- **Nr. Reg. Com.:** J2023000114142 (EUID: ROONRC.J2023000114142)
+- **Sediu:** Sat Arcus, Cart. Poiana Arcusului nr. 102, cod 527166, jud. Covasna
+- **Tel:** 0769532015 · **E-mail:** vallorsoft@gmail.com
+- **Administrator:** Pető-Lőrincz Imre-Norbert
+- **Înființată:** 2023-03-22
+
+### Adatfeldolgozók (Împuterniciți / Sub-processors)
+
+| Szolgáltató | Szerep | Székhely | Megjegyzés |
+|---|---|---|---|
+| **Brevo (Sendinblue SAS)** | e-mail (meghívók, értesítések) | Párizs, Franciaország 🇫🇷 | EU → nincs extra dokumentáció |
+| **Stripe Payments Europe, Ltd** | online fizetés | Dublin, Írország 🇮🇪 | EU entitás → EU adatkezelés |
+| **Google Firebase (Google LLC)** | chat, push értesítések | USA → EU DPF + SCCs | EU–US Data Privacy Framework (2023) alapján legális; Google DPA szükséges |
+| **CargoTrack / Fomco** | GPS helyadat (sofőrök) | Románia 🇷🇴 | EU → nincs extra |
+| **[HOSTING — KITÖLTENDŐ]** | szerverszolgáltatás | [ország] | Ha EU → ok; ha USA → SCCs kell |
+
+> **Google Firebase jogi alap:** az EU–US Data Privacy Framework (Európai Bizottság 2023/1795 határozata) alapján az USA megfelelő védelmi szintűnek minősül; emellett Google Standard Contractual Clauses (SCCs) és DPA elérhető a [Google Cloud DPA](https://cloud.google.com/terms/data-processing-addendum) oldalán. Privacy policy-ban fel kell tüntetni: *„Adattovábbítás harmadik országba (USA) az EU–US Data Privacy Framework és SCCs alapján."*
+
+### Kezelt személyes adatok
+- **Sofőrök:** név, e-mail, telefonszám, valós idejű GPS pozíció
+- **Ügyfelek (client portal):** név, e-mail, kapcsolattartó adatok
+- **Alvállalkozók (carrier portal):** név, e-mail
+- **GDPR-visszaigazolás:** IP-cím, időbélyeg (`gdpr_consents` tábla)
+- **Regisztrációkor:** cégnév, e-mail, jelszó (bcrypt hash)
+- **Fuvarlevelek:** feladó/átvevő személyes adatai
+
+### Jogi alapok (Temei legal — GDPR Art. 6)
+- **(1)(b) Szerződés teljesítése** — fuvar- és ügyfél-adatok kezelése
+- **(1)(c) Törvényi kötelezettség** — számlák, könyvelés (Legea 82/1991)
+- **(1)(a) Hozzájárulás** — GPS-megfigyelés (Legea 190/2018 — sofőr belépéskor visszaigazolja, `gdpr_consents`)
+- **(1)(f) Jogos érdek** — biztonsági naplók, audit trail
+
+### Megőrzési idők
+- Számlák: **5 év** (Legea 82/1991)
+- Alkalmazotti GPS-adatok: **foglalkoztatás + 1 év**
+- Session adatok: **kijelentkezésig**
+- GDPR-visszaigazolások: **3 év**
+- Audit log: **1 év**
+
+### Alkalmazandó jogszabályok
+- **GDPR** (Regulamentul UE 2016/679)
+- **Legea 190/2018** — GDPR romániai implementációja; GPS-megfigyelésnél előzetes tájékoztatás kötelező (a rendszerben `gdpr_settings` + sofőr-banner bekötve)
+- **Legea 82/1991** — könyvelési megőrzési kötelezettség (5 év)
+- **EU–US Data Privacy Framework** (2023) — US adatfeldolgozók jogalapja
