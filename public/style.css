@@ -51,6 +51,16 @@ body {
 .sidebar .menu-group + .menu-group .menu-title { margin-top: 10px; }
 .main-content { flex: 1; padding: 24px; overflow-y: auto; }
 
+/* 🖥️ APP-SHELL (csak asztali, >768px): a sidebar és a felső sáv (fejléc+kereső)
+   FIXEN marad görgetéskor — csak a tartalom görgödik. A viewport-magasság a
+   keret, az oldal maga NEM görgödik; a sidebar és a main-content külön-külön
+   belül görgethető. A mobil drawer-elrendezést (≤768px) NEM érinti. */
+@media (min-width: 769px) {
+  .app-layout { height: 100vh; overflow: hidden; }
+  .sidebar { height: 100vh; overflow-y: auto; }
+  .main-content { height: 100vh; }
+}
+
 .menu-group { display: flex; flex-direction: column; gap: 4px; }
 .menu-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); padding-left: 12px; margin-bottom: 6px; font-weight: 700; }
 
@@ -317,8 +327,13 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
   .mob-topbar { display: flex; }
 
   /* --- App layout: sidebar slide-in drawer --- */
+  /* Mobilon az oldal NORMÁLISAN görgödjön (nem app-shell): a desktop
+     height:100vh/overflow:hidden itt nincs érvényben (min-width:769px mögött),
+     de a biztonság kedvéért explicit visszaállítjuk. */
   .app-layout {
     flex-direction: column;
+    height: auto;
+    overflow: visible;
   }
 
   .sidebar {
@@ -342,7 +357,9 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
   .main-content {
     padding: calc(72px + env(safe-area-inset-top, 0px)) 12px calc(24px + env(safe-area-inset-bottom, 0px));
     width: 100%;
+    height: auto;
     overflow-x: hidden;
+    overflow-y: visible;
   }
 
   /* --- Gridek egyoszloposak mobilon --- */

@@ -49,7 +49,11 @@ function activateTab(name){
   if(tabEl){
     tabEl.classList.add('active');
     var sub=tabEl.closest?tabEl.closest('.submenu'):null;
-    if(sub){var grp=sub.closest?sub.closest('.menu-group'):null;if(grp)grp.classList.add('open');}
+    if(sub){var grp=sub.closest?sub.closest('.menu-group'):null;if(grp){
+      // Single-open accordion: a cél csoport kinyitása előtt a többi nyitott csoport becsukása
+      document.querySelectorAll('.sidebar .menu-group.open').forEach(function(o){ if(o!==grp) o.classList.remove('open'); });
+      grp.classList.add('open');
+    }}
   }
   document.querySelectorAll('.pane').forEach(function(p){p.classList.add('hidden');});
   var pane=document.querySelector('.pane[data-pane="'+name+'"]');
@@ -2330,7 +2334,16 @@ function toggleAllOrders(cb) {
 
 function toggleOrdersMenu(){document.getElementById('ordersSubmenu').parentElement.classList.toggle('open');}
 // Generikus lenyitó az ikonos FGO-menühöz: a kattintott fejléc .menu-group-ját nyitja/zárja.
-function toggleGroup(el){ var g = el.closest('.menu-group'); if(g) g.classList.toggle('open'); }
+function toggleGroup(el){
+  var g = el.closest('.menu-group');
+  if(!g) return;
+  // Single-open accordion: a kattintott csoport nyitni fog-e
+  var willOpen = !g.classList.contains('open');
+  // Az összes többi nyitott csoport becsukása
+  document.querySelectorAll('.sidebar .menu-group.open').forEach(function(o){ if(o!==g) o.classList.remove('open'); });
+  // A kattintott csoport beállítása (második kattintás be is csukja)
+  g.classList.toggle('open', willOpen);
+}
 
 function toggleSidebar() {
   var sb = document.getElementById('mainSidebar');
