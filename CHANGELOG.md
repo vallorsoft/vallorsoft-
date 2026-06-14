@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-06-14 — Teljes weboldal redesign: landing prémium kék/indigó (PR #87–#90)
+
+- **Teljes frontend-átszabás** a landing letisztult, prémium dizájnjára (világos alap, kék #3b82f6 / indigó #6366f1 paletta, mélység-effektek: gradiens kártyák + felső fény-csillanás + kék glow gombok + lágy radiális háttér-fény + gradiens KPI). **Csak megjelenés — funkció/JS/ID/data-i18n/route/RPC változatlan.** 6 agenttel párhuzamosan.
+  - **Konzol (admin/manager)** — `style.css` redesign-`:root` + light/dark téma a landing palettán (light alapértelmezett, dark navy #080f1a→#0d1526), vizuális mélység-réteg; sidebar aktív elem indigó (PR #88, #89).
+  - **Auth + jogi** (login/register/reset/terms/privacy/dpa/cookies/security), **sofőr** (`sofer.css` teljes re-skin), **developer + útvonaltervezés** (lila→kék/indigó), **ügyfél-portál + követés**, **alvállalkozó + könyvelő** — page-scoped skin, a közös `style.css`-t nem törve (PR #90).
+  - **Konzol-JS szín-takarítás** — státusz-badge-ek világos-olvashatóra, Chart.js paletta kék/indigó, márka-piros → indigó (piros csak danger); térkép-csempék végig világosak maradnak (PR #90).
+  - Verifikáció: 8 JS `node --check` ✅, CSS zárójel-egyensúly ✅, 15 HTML tag-balansz ✅, 24 suite / 108 teszt zöld.
+
+---
+
 ## 2026-06-14 — Developer cégenkénti hozzáférés-statisztika (PR #86)
 
 - **Developer „👥 Hozzáférések" fül** (`handlers/developer.js` `devCompanyAccess` + `public/developer.html` + i18n) — a cég részletek-modaljában cégenként: felhasználók + alvállalkozók + ügyfelek bontásban összes / aktív / inaktív / meghívott számok + ki mikor lépett be utoljára (last_login táblázat). A fő userek aktív=nem tiltott, meghívott=aktív (fel nem használt) invite; a portál-belépők (carrier_users/client_users) aktív=aktivált+bekapcsolt, meghívott=`pass_hash` NULL, inaktív=`activ`=false.
