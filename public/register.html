@@ -6,6 +6,37 @@
   <script src="/i18n.js?v=20260614"></script>
   <title data-i18n="title.register">vallorSoft - Regisztráció</title>
   <link rel="stylesheet" href="/style.css?v=20260611">
+  <!-- Landing-skin (IZOLÁLT — csak ez az oldal): világos, letisztult, kék/indigó.
+       A közös style.css-t NEM módosítja; kizárólag ezen az oldalon írja felül a
+       színeket/kártyát/gombot a landing palettájára. Funkció változatlan. -->
+  <style>
+    body{ background:#f7f9fc !important; color:#0f172a; }
+    .login-card.glass{
+      background:#ffffff !important;
+      border:1px solid #e2e8f0 !important;
+      border-radius:16px !important;
+      box-shadow:0 1px 3px rgba(0,0,0,.08), 0 10px 30px rgba(0,0,0,.07) !important;
+      backdrop-filter:none !important; -webkit-backdrop-filter:none !important;
+    }
+    .vs-logo .vallor{ color:#0f172a !important; }
+    .vs-logo .soft{ color:#6366f1 !important; text-shadow:none !important; }
+    .login-card .field label{ color:#64748b !important; }
+    .login-card .input{
+      background:#fff !important; border:1px solid #e2e8f0 !important;
+      color:#0f172a !important; border-radius:8px !important;
+    }
+    .login-card .input::placeholder{ color:#94a3b8; }
+    .login-card .input:focus{ border-color:#3b82f6 !important; box-shadow:0 0 0 3px rgba(59,130,246,.15) !important; }
+    .login-card .btn.primary{
+      background:#3b82f6 !important; border:2px solid #3b82f6 !important; color:#fff !important;
+      border-radius:8px !important; box-shadow:none !important;
+    }
+    .login-card .btn.primary:hover{ background:#2563eb !important; border-color:#2563eb !important; }
+    .lp-consent{ background:#f7f9fc !important; border:1px solid #e2e8f0 !important; }
+    .lp-consent label{ color:#64748b !important; }
+    .lp-link{ color:#3b82f6 !important; border-bottom-color:rgba(59,130,246,.45) !important; }
+    .login-card .h-sub, .login-card [data-i18n="reg.subtitle"]{ color:#64748b !important; }
+  </style>
 </head>
 <body>
   <div class="toast-wrap" id="toasts"></div>
@@ -20,19 +51,19 @@
       <div class="field"><label data-i18n="common.email">E-mail</label><input class="input" id="email" type="email" placeholder="nev@pelda.hu"></div>
       <div class="field"><label data-i18n="reg.phone">Telefon</label><input class="input" id="tel" placeholder="+40 ..."></div>
       <div class="field"><label data-i18n="reg.passwordMin">Jelszó (min. 6 karakter)</label><input class="input" id="jelszo" type="password" placeholder="••••••••"></div>
-      <div style="display:flex;flex-direction:column;gap:10px;margin:14px 0;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
+      <div class="lp-consent" style="display:flex;flex-direction:column;gap:10px;margin:14px 0;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
         <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text-muted,#8a97a8);line-height:1.5;">
           <input type="checkbox" id="chkTerms" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#6366f1;cursor:pointer;">
-          <span>Accept <a href="/terms" target="_blank" style="color:#fff;text-decoration:underline;">Termenii și Condițiile</a></span>
+          <span>Accept <a href="/terms" target="_blank" class="lp-link" style="color:#fff;text-decoration:underline;">Termenii și Condițiile</a></span>
         </label>
         <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text-muted,#8a97a8);line-height:1.5;">
           <input type="checkbox" id="chkPrivacy" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#6366f1;cursor:pointer;">
-          <span>Am citit <a href="/privacy" target="_blank" style="color:#fff;text-decoration:underline;">Politica de Confidențialitate</a></span>
+          <span>Am citit <a href="/privacy" target="_blank" class="lp-link" style="color:#fff;text-decoration:underline;">Politica de Confidențialitate</a></span>
         </label>
       </div>
       <button class="btn primary block xl" id="btnReg" data-i18n="reg.submit">Regisztráció</button>
       <div style="text-align:center;margin-top:14px;color:var(--muted);font-size:14px">
-        <span data-i18n="reg.haveAccount">Van már fiókja?</span> <a href="/login" id="goLogin" style="color:#fff;font-weight:600;text-decoration:none;border-bottom:1px dashed rgba(255,255,255,0.4)" data-i18n="reg.login">Bejelentkezés</a>
+        <span data-i18n="reg.haveAccount">Van már fiókja?</span> <a href="/login" id="goLogin" class="lp-link" style="color:#fff;font-weight:600;text-decoration:none;border-bottom:1px dashed rgba(255,255,255,0.4)" data-i18n="reg.login">Bejelentkezés</a>
       </div>
     </div>
   </div>
