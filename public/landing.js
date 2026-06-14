@@ -25,11 +25,31 @@ const translations = {
     navContact: 'Contact',
     loginBtn: 'Autentificare',
     startBtn: 'Începe gratuit',
-    heroBadge: 'SaaS · Fleet Management · România',
-    heroTitle: 'Platformă inteligentă pentru transport și management flotă',
-    heroSubtitle: 'Gestionați cursele, vehiculele, documentele și clienții într-o singură aplicație. Conformă cu ANAF e-Factura și RO e-Transport.',
+    heroBadge: 'Orientat pe șofer · Fără hârtii · Automatizat',
+    heroTitle: 'Cele mai multe softuri de transport sunt create pentru management. Noi am început cu șoferul.',
+    heroSubtitle: 'Pentru că în transport, cel mai valoros dat se naște întotdeauna la șofer.',
     startFreeBtn: 'Începe gratuit — 14 zile',
-    trialNote: '✓ Fără card bancar · ✓ Anulare oricând · ✓ Suport inclus',
+    trialNote: '✓ Fără card bancar  ·  ✓ Anulare oricând  ·  ✓ Acces imediat',
+    heroBullet1: 'Nicio foaie de parcurs scrisă de mână',
+    heroBullet2: 'Niciun calcul manual de diurnă',
+    heroBullet3: 'Niciun bon fiscal pierdut',
+    heroNote: 'Mai puțin birocrație pentru șofer · Mai mult control pentru firmă',
+    sfWeek: {
+      title: 'Șofer — săptămâna curentă',
+      dateRange: 'Iun. 14–20',
+      route: 'Cluj-Napoca → Budapest → Timișoara · 1 240 km',
+      days: ['L','Ma','Mi','J','V','S','D'],
+      events: [
+        { label: 'Cursă înregistrată', sub: 'Data de start notată pe foaia de parcurs — diurna pornește automat' },
+        { label: '🛂 Trecere frontieră — Ungaria', sub: '🤖 Diurnă: +1 zi — automat', auto: true },
+        { label: '⛽ Alimentare — 120 L', sub: '📷 Bon fotografiat' },
+        { label: '🛒 Achiziție — 45 €', sub: 'Vignietă autostradă' },
+        { label: '🛂 Retur frontieră — România', sub: '🤖 Diurnă finalizată: 4 zile', auto: true },
+        { label: '📦 Schimb remorcă · Depozitare', sub: 'Notificare push → dispecer' },
+        { label: '📄 Generare foaie de parcurs', steps: '① Selectare cursă  →  ② Trimitere', result: 'MT-2026-0042 · Tipăribilă ✓', final: true },
+      ],
+      footer: ['4 zile diurnă', '1 240 km', '1 click PDF'],
+    },
     statTrips: 'Curse active',
     statGps: 'GPS acoperire',
     statRevenue: 'Venituri lunare',
@@ -146,11 +166,31 @@ const translations = {
     navContact: 'Kapcsolat',
     loginBtn: 'Bejelentkezés',
     startBtn: 'Kezdem',
-    heroBadge: 'SaaS · Flottakezelés · Románia',
-    heroTitle: 'Intelligens fuvarozási és flottakezelő platform',
-    heroSubtitle: 'Fuvarok, járművek, dokumentumok és ügyfelek kezelése egyetlen rendszerben. Megfelel az ANAF e-Factura és RO e-Transport követelményeinek.',
+    heroBadge: 'Sofőr-centrikus · Papírmentes · Automatizált',
+    heroTitle: 'A legtöbb fuvarozási szoftver a vezetőségnek készült. Mi a sofőrrel kezdtük.',
+    heroSubtitle: 'Mert a fuvarozásban a legértékesebb adat mindig a sofőrnél keletkezik.',
     startFreeBtn: 'Kezdem ingyen — 14 nap',
-    trialNote: '✓ Bankkártya nélkül · ✓ Bármikor lemondható · ✓ Támogatás beleértve',
+    trialNote: '✓ Bankkártya nélkül  ·  ✓ Bármikor lemondható  ·  ✓ Azonnali hozzáférés',
+    heroBullet1: 'Nincs több papíros menetlevél',
+    heroBullet2: 'Nincs több napidíj-számolgatás',
+    heroBullet3: 'Nincs több elveszett tankolási bizonylat',
+    heroNote: 'Kevesebb adminisztráció a sofőrnek · Több kontroll a cégnek',
+    sfWeek: {
+      title: 'Sofőr — aktuális hét',
+      dateRange: 'Jún. 14–20',
+      route: 'Kolozsvár → Budapest → Temesvár · 1 240 km',
+      days: ['H','K','Sze','Cs','P','Szo','V'],
+      events: [
+        { label: 'Fuvar rögzítve', sub: 'Kezdő dátum a menetlevélen — diurna automatikusan elindul' },
+        { label: '🛂 Határátlépés — Magyarország', sub: '🤖 Diurna: +1 nap — automatikus', auto: true },
+        { label: '⛽ Tankolás — 120 L', sub: '📷 Bizonylat lefotózva' },
+        { label: '🛒 Vásárlás — 45 €', sub: 'Autópálya-matrica' },
+        { label: '🛂 Visszalépés — Románia', sub: '🤖 Diurna lezárva: 4 nap', auto: true },
+        { label: '📦 Pótkocsi csere · Raktározás', sub: 'Push értesítés → diszpécser' },
+        { label: '📄 Menetlevél generálás', steps: '① Fuvar kijelölés  →  ② Küldés', result: 'MT-2026-0042 · Nyomtatható ✓', final: true },
+      ],
+      footer: ['4 nap diurna', '1 240 km', '1 kattintás PDF'],
+    },
     statTrips: 'Aktív fuvarok',
     statGps: 'GPS lefedettség',
     statRevenue: 'Havi bevétel',
@@ -248,6 +288,42 @@ const translations = {
   }
 };
 
+/* ── Sofőr hét timeline ─────────────────────────────────────── */
+function renderSoferTimeline() {
+  const lang = localStorage.getItem('vs-landing-lang') || 'ro';
+  const t = translations[lang] || translations.ro;
+  const w = t.sfWeek;
+  const el = document.getElementById('soferTimeline');
+  if (!w || !el) return;
+
+  const dotTypes = ['lp-dot-active','lp-dot-done','lp-dot-done','lp-dot-done','lp-dot-done','lp-dot-done','lp-dot-final'];
+
+  const items = w.events.map((ev, i) => {
+    const isLast = i === w.events.length - 1;
+    let content = `<span class="lp-sw-label">${ev.label}</span>`;
+    if (ev.sub) content += `<span class="lp-sw-sub${ev.auto ? ' lp-sw-auto' : ''}">${ev.sub}</span>`;
+    if (ev.steps) content += `<span class="lp-sw-steps">${ev.steps}</span>`;
+    if (ev.result) content += `<span class="lp-sw-result">${ev.result}</span>`;
+    return `<div class="lp-sw-item">
+      <div class="lp-sw-day">${w.days[i]}</div>
+      <div class="lp-sw-dot-col">
+        <div class="lp-sw-dot ${dotTypes[i] || 'lp-dot-done'}"></div>
+        ${!isLast ? '<div class="lp-sw-line"></div>' : ''}
+      </div>
+      <div class="lp-sw-content">${content}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="lp-sw-header">
+      <span class="lp-sw-title">📱 ${w.title}</span>
+      <span class="lp-sw-range">${w.dateRange}</span>
+    </div>
+    <div class="lp-sw-trip">${w.route}</div>
+    <div class="lp-sw-timeline">${items}</div>
+    <div class="lp-sw-footer">${w.footer.map(f => `<span>${f}</span>`).join('')}</div>`;
+}
+
 /* ── Apply language ─────────────────────────────────────────── */
 function applyLanguage(lang) {
   localStorage.setItem('vs-landing-lang', lang);
@@ -263,6 +339,7 @@ function applyLanguage(lang) {
   const toggle = document.getElementById('languageToggle');
   if (toggle) toggle.textContent = lang === 'ro' ? 'HU' : 'RO';
   document.documentElement.lang = lang;
+  renderSoferTimeline();
 }
 
 document.getElementById('languageToggle')?.addEventListener('click', () => {

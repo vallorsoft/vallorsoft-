@@ -14,7 +14,8 @@
   --soft:#c7d1de;
 
   --accent:#f5f7fa;
-  --brand-red:#e10b1a;       /* "Soft" piros */
+  --brand-red:#e10b1a;       /* piros akcent (col-resizer, tábla drop, veh-params) */
+  --brand-indigo:#6366f1;    /* "Soft" indigó — logo és gomb-akcent */
   --brand-white:#ffffff;     /* "Vallor" fehér */
 
   --ok:#22c55e;
@@ -80,7 +81,7 @@ body {
 .glass-soft { background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.2)), var(--bg-2); border: 1px solid var(--border); border-radius: var(--r-md); }
 .vs-logo { font-weight: 800; letter-spacing: .5px; font-size: 24px; display: inline-flex; align-items: center; gap: 0; }
 .vs-logo .vallor { color: var(--brand-white); }
-.vs-logo .soft { color: var(--brand-red); text-shadow: 0 0 18px rgba(225,11,26,0.45); }
+.vs-logo .soft { color: var(--brand-indigo); text-shadow: 0 0 18px rgba(99,102,241,0.45); }
 .vs-logo.lg { font-size: 44px; }
 .vs-logo.sm { font-size: 20px; }
 
@@ -148,7 +149,7 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 .chat-side { background: #0c1218; border-right: 1px solid var(--border); overflow-y: auto; }
 .chat-side .contact { display: flex; gap: 10px; align-items: center; padding: 12px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03); }
 .chat-side .contact:hover { background: rgba(255,255,255,0.02); }
-.chat-side .av { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg,#e10b1a,#3b82f6); display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; }
+.chat-side .av { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg,#6366f1,#3b82f6); display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; }
 .chat-side .meta { flex: 1; min-width: 0; }
 .chat-side .nm { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chat-side .lst { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

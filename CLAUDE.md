@@ -51,7 +51,14 @@ Tesztek zöldek (**106 Jest**, 24 suite). **CI: GitHub Actions** (`.github/workf
 
 > **Hiánylista — a 2026-06-13-i ütemterv LEZÁRVA:** **(1) ✅ CI + valódi tesztek** (mock + valós-DB, 106 teszt); **(2) ✅ teherautó-routing váltó** (ORS `driving-hgv`, alap ingyenes OSRM) **+ ✅ valós útdíj váltó** (HERE „Pontos", alap becslés); **(3) ✅ UIT CargoTrack deep-link** (ANAF-integráció helyett, providerkénti URL-sablon — `uit_deeplink_templates` JSONB; `cargotrack-et.js`/`fomco-et.js` törölve); **(4) ✅ üzemeltetés** (health-check `/healthz`+`/readyz`, strukturált log, opcionális Sentry, opcionális pg_dump backup); **(5) ✅ leg ↔ `orders.email_sofer` szinkron**; **(6) ✅ SaaS-vízvezeték** (csomag-limit kikényszerítés, audit-napló, GDPR export/anonimizálás, Stripe-váz); **(7) ✅ e-Factura státusz automatikus lekérdezés** (3 órás scheduler, SmartBill/Oblio `getInvoice` implementálva, `efactura_last_raw`/`efactura_checked_at` tárolás); **(8) ✅ ANAF CUI strukturált cím** (utca/helység/megye külön mezők, `adresa_sediu_social` alapján). **Nyitott jövőbeli munka:** Stripe éles bekötés (kulcsok + price_xxx — utolsó lépés, nem sürgős), SAF-T D406 XML (jövőbeli javaslat, a könyvelő SAGA/WinMentor CSV-ből generál egyelőre). **RO megfelelőség:** a rendszer megfelel — minden ANAF-kommunikáció (e-Factura SPV-beküldés) a számlázó-providereken (FGO/SmartBill/Oblio stb.) keresztül történik, saját ANAF-kapcsolat NEM kell és NEM is akarunk. Az UIT-kódot sem mi generáljuk — a sofőr/cég a CargoTrack/Fomco deep-linken keresztül intézi. A GPS→ANAF élő e-Transport-transzmisszió NEM feladatunk.
 
-**Legújabb kör (2026-06-14 — Landing showcase finomítás: 1 monitor + valósághű Vezérlőpult + arányosabb hero/sáv):** *(részletes kész-lista: `CHANGELOG.md`)*
+**Legújabb kör (2026-06-14 — Landing: sofőr-hét timeline + hero USP + „Hogyan működik" + brand-indigo, PR #97):** *(részletes kész-lista: `CHANGELOG.md`)*
+1. **Brand szín frissítés** — „Soft" logo: piros (#e10b1a) → indigó (#6366f1); `--brand-indigo` token bevezetve a `style.css`-ben; `.vs-logo .soft` és `.chat-side .av` gradiens frissítve; CLAUDE.md Márka szekció frissítve.
+2. **Hero sofőr-hét timeline** (`index.html`/`landing.css`/`landing.js`) — GPS monitor ki; 7 napos animált glassmorphism kártya (határátlépés → diurna auto, tankolás, vásárlás, visszalépés, pótkocsi csere/raktározás, menetlevél generálás); JS-renderelt RO+HU i18n.
+3. **Hero USP szöveg** — badge/H1/alcím + 3 ✕ bullet + heroNote; sofőr-centrikus marketing szöveg (user által megadott).
+4. **Showcase → „Hogyan működik"** — dashboard monitor mockup ki; 3 lépéses `#how` szekció; navbar link frissítve.
+5. CSS nettó −187 sor.
+
+**Korábbi kör (2026-06-14 — Landing showcase finomítás: 1 monitor + valósághű Vezérlőpult + arányosabb hero/sáv):** *(részletes kész-lista: `CHANGELOG.md`)*
 1. **Showcase egyetlen monitorra** (`index.html`/`landing.css`) — a korábbi 3 monitor + 2 telefon zsúfolt összkép helyett egy kiemelt monitor, rajta valósághű Vezérlőpult-mockup (sötét sidebar + 4 KPI-kártya 27/5/4/7 + fuvar-tábla státusz-pillákkal + világos OSM-szerű térkép élő pulse-szal + jármű-státusz sor); a holt mockup/telefon CSS törölve. `<img onerror>` a `/img/sc-dashboard.png`-re (friss képpel auto-csere).
 2. **Arányosabb felső blokk** — feature-strip (felső világos sáv) megnagyobbítva (padding 40→76px, ikon 1.6→2.4rem), arányosan visszavéve a hero-ból (`min-height` 100→80vh). 108 teszt zöld.
 
@@ -242,7 +249,7 @@ Szinte minden lekérdezés `company_id`-re szűr. Új lekérdezésnél MINDIG sz
 **Glassmorphism, sötét alap.** A `:root`-ban CSS-változók (dizájn-tokenek):
 - Háttér: `--bg-deepest #05070b`, `--bg-panel #0c1218`, `--bg-panel-raised #141c25`.
 - Szöveg: `--text-primary #e9eef5`, `--text-muted #8a97a8`.
-- Márka: `--brand-red #e10b1a` (a „Soft”), `--brand-white #fff` (a „Vallor”).
+- Márka: `--brand-indigo #6366f1` (a „Soft” — indigó/lila), `--brand-white #fff` (a „Vallor”), `--brand-red #e10b1a` (piros akcent: col-resizer, tábla drop-target, veh-params — NEM a logóban).
 - Státusz: `--status-ok #22c55e`, `--status-warn #f59e0b`, `--status-danger #ef4444`, `--status-info #3b82f6`.
 - Üveg: `--glass-bg-dark/--glass-border-dark` (sötét), `--glass-bg-light/--glass-border-light` (világos).
 - Sarkok: `--radius-lg 18px`, `--radius-md 12px`, `--radius-sm 8px`. (Régebbi alias: `--r-lg/--r-md/--r-sm`.)
