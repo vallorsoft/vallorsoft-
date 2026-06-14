@@ -8,6 +8,7 @@ const pool = require('../db');
 const billing = require('../services/billing');
 const { encrypt, decrypt } = require('../lib/crypto');
 const { computePool } = require('../lib/herePool');
+const stripe = require('../lib/stripe');
 
 const handlers = {};
 
@@ -346,6 +347,40 @@ handlers.getHereUsageByCompany = async function (req, res, args) {
     } });
   } catch (err) {
     console.error('getHereUsageByCompany hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── getMySubscription — saját cég előfizetési státusza (Admin) ──
+handlers.getMySubscription = async function(req, res) {
+  if (!req.session || !req.session.user || req.session.user.pozicio !== 'Admin')
+    return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const cid = req.session.user.company_id;
+  try {
+    const r = await pool.query(
+      `SELECT c.subscription_status, c.paid_until, c.subscription_plan_id,
+              sp.name AS plan_name, sp.price_net, sp.stripe_price_id
+       FROM companies c
+       LEFT JOIN subscription_plans sp ON sp.id = c.subscription_plan_id
+       WHERE c.id = $1`,
+      [cid]
+    );
+    if (!r.rows.length) return res.json({ result: { ok: false } });
+    const row = r.rows[0];
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const paidUntil = row.paid_until ? new Date(row.paid_until) : null;
+    const daysLeft = paidUntil ? Math.ceil((paidUntil - today) / 86400000) : null;
+    return res.json({ result: {
+      ok: true,
+      status:            row.subscription_status,
+      paid_until:        row.paid_until,
+      days_left:         daysLeft,
+      plan_name:         row.plan_name || null,
+      plan_id:           row.subscription_plan_id,
+      stripe_configured: stripe.isConfigured(),
+    }});
+  } catch (err) {
+    console.error('getMySubscription hiba:', err.message);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };

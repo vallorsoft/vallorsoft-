@@ -482,3 +482,40 @@ document.getElementById('contactForm')?.addEventListener('submit', async e => {
   showToast(lang === 'hu' ? 'Üzenet elküldve!' : 'Mesaj trimis!', 'success');
   e.target.reset();
 });
+
+/* ── Dinamikus árazási kártyák (/api/public-plans alapján) ─── */
+function renderPricingGrid(plans) {
+  const grid = document.getElementById('lpPricingGrid');
+  if (!grid || !plans || !plans.length) return; // fallback statikus
+  const lang = window._lang || localStorage.getItem('vs-landing-lang') || 'ro';
+  const periodLabel = lang === 'hu' ? '/hó' : '/lună';
+  const startLabel  = lang === 'hu' ? 'Kezdés most' : 'Începeți acum';
+  const popLabel    = lang === 'hu' ? 'Legnépszerűbb' : 'Cel mai popular';
+
+  grid.innerHTML = plans.map(function(p, i) {
+    const featured = i === 1; // a második kártya kiemelt
+    const price = p.price_net > 0 ? '€' + Math.round(p.price_net) : (lang === 'hu' ? 'Egyedi' : 'Personalizat');
+    return '<div class="lp-pricing-card' + (featured ? ' lp-pricing-featured' : '') + ' reveal">'
+      + (featured ? '<div class="lp-plan-badge">' + popLabel + '</div>' : '')
+      + '<div class="lp-plan-name">' + escHtmlLp(p.name) + '</div>'
+      + '<div class="lp-plan-price">'
+      +   '<span class="lp-price-val">' + escHtmlLp(price) + '</span>'
+      +   (p.price_net > 0 ? '<span class="lp-price-period">' + periodLabel + '</span>' : '')
+      + '</div>'
+      + '<ul class="lp-plan-features"><li>' + escHtmlLp(p.description || (lang === 'hu' ? 'Minden funkció' : 'Toate funcțiile')) + '</li></ul>'
+      + '<a href="/register" class="' + (featured ? 'lp-btn-primary' : 'lp-btn-outline') + ' lp-btn-full">' + startLabel + '</a>'
+      + '</div>';
+  }).join('');
+}
+
+function escHtmlLp(v) {
+  return String(v || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Betöltés induláskor — ha hiba van, a statikus fallback marad
+(function fetchPlans() {
+  fetch('/api/public-plans')
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if (d.ok && d.plans && d.plans.length) renderPricingGrid(d.plans); })
+    .catch(function(){}); // csendben megőrzi a statikus fallback-et
+})();

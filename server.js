@@ -173,6 +173,7 @@ app.use(session({
 app.use(require('./routes/firebase'));
 app.use(require('./routes/pages'));
 app.use(require('./routes/auth'));
+app.use(require('./routes/public-register')); // nyilvános regisztráció + trial
 app.use(require('./routes/soferApi'));
 app.use(require('./routes/execute'));
 app.use(require('./routes/push'));
@@ -209,12 +210,13 @@ app.use((err, req, res, next) => {
 });
 
 // E-mail intake (beérkező megrendelések) — csak akkor fut, ha az INTAKE_IMAP_* be van állítva.
-const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler } = require('./services/scheduler');
+const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler } = require('./services/scheduler');
 startIntakeScheduler();
 startExpiryScheduler();
 startGpsMileageScheduler();
 startMonthlyReportScheduler();
 startEFacturaStatusScheduler();
+startTrialExpiryScheduler(); // trial lejárat e-mail értesítő
 
 // Opcionális automatikus DB-mentés (alapból KI; BACKUP_ENABLED=true + BACKUP_DIR).
 require('./services/backup').startBackupScheduler();

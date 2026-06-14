@@ -66,6 +66,8 @@ router.get('/utvonaltervezes', requirePageLogin, requirePageRole('Admin', 'Manag
   res.sendFile(path.join(__dirname, '..', 'public', 'utvonaltervezes.html'));
 });
 
+router.get('/subscription', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'subscription.html')));
+
 router.get('/privacy',  (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'privacy.html')));
 router.get('/terms',    (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'terms.html')));
 router.get('/cookies',  (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'cookies.html')));

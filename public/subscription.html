@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VallorSoft — Előfizetés / Abonament</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  :root{
+    --lp-blue:#3b82f6;--lp-blue-hover:#2563eb;--lp-indigo:#6366f1;
+    --lp-bg:#f7f9fc;--lp-card:#ffffff;--lp-border:#e2e8f0;
+    --lp-text:#0f172a;--lp-muted:#64748b;
+  }
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    background:
+      radial-gradient(900px 520px at 12% -8%, rgba(99,102,241,.07), transparent 70%),
+      radial-gradient(760px 460px at 92% 0%, rgba(59,130,246,.06), transparent 70%),
+      var(--lp-bg);
+    color:var(--lp-text);
+    min-height:100vh;
+  }
+
+  /* Header */
+  .sub-header{
+    text-align:center;padding:48px 20px 32px;
+  }
+  .sub-logo{font-size:26px;font-weight:800;text-decoration:none;display:inline-block;margin-bottom:18px;}
+  .sub-logo .v{color:var(--lp-text);}
+  .sub-logo .s{color:var(--lp-indigo);}
+  .sub-header h1{font-size:clamp(22px,4vw,32px);font-weight:700;color:var(--lp-text);margin-bottom:10px;}
+  .sub-header p{font-size:15px;color:var(--lp-muted);max-width:480px;margin:0 auto;}
+
+  /* Trial warning banner */
+  .sub-trial-banner{
+    max-width:720px;margin:0 auto 28px;padding:14px 20px;
+    background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(59,130,246,.08));
+    border:1px solid rgba(99,102,241,.25);border-radius:12px;
+    font-size:14px;color:var(--lp-text);text-align:center;
+    display:none;
+  }
+
+  /* Cards */
+  .sub-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:20px;
+    max-width:920px;
+    margin:0 auto;
+    padding:0 20px 48px;
+  }
+  .sub-card{
+    background:var(--lp-card);
+    border:1.5px solid var(--lp-border);
+    border-radius:16px;
+    padding:28px 24px;
+    display:flex;flex-direction:column;
+    box-shadow:0 1px 3px rgba(15,23,42,.05),0 4px 16px rgba(15,23,42,.06);
+    transition:transform .15s ease,box-shadow .15s ease;
+  }
+  .sub-card:hover{transform:translateY(-2px);box-shadow:0 4px 24px rgba(15,23,42,.1);}
+  .sub-card.featured{
+    border-color:var(--lp-indigo);
+    background:linear-gradient(180deg,#fdfcff,var(--lp-card));
+    box-shadow:0 0 0 3px rgba(99,102,241,.12),0 4px 24px rgba(99,102,241,.08);
+  }
+  .sub-badge{
+    display:inline-block;font-size:11px;font-weight:700;letter-spacing:.5px;
+    background:linear-gradient(135deg,var(--lp-indigo),var(--lp-blue));
+    color:#fff;border-radius:20px;padding:3px 10px;margin-bottom:12px;
+    width:fit-content;
+  }
+  .sub-plan-name{font-size:18px;font-weight:700;color:var(--lp-text);margin-bottom:6px;}
+  .sub-price{font-size:32px;font-weight:800;color:var(--lp-text);line-height:1;}
+  .sub-price span{font-size:15px;font-weight:500;color:var(--lp-muted);}
+  .sub-desc{font-size:13px;color:var(--lp-muted);margin:10px 0 18px;line-height:1.5;flex-grow:1;}
+  .sub-btn{
+    display:block;text-align:center;padding:11px 18px;border-radius:10px;
+    font-size:14px;font-weight:600;cursor:pointer;border:none;
+    text-decoration:none;transition:all .15s ease;
+  }
+  .sub-btn-primary{
+    background:linear-gradient(180deg,var(--lp-blue),var(--lp-blue-hover));
+    color:#fff;
+    box-shadow:0 2px 8px rgba(59,130,246,.3),inset 0 1px 0 rgba(255,255,255,.2);
+  }
+  .sub-btn-primary:hover{box-shadow:0 4px 14px rgba(59,130,246,.4);transform:translateY(-1px);}
+  .sub-btn-outline{
+    background:transparent;color:var(--lp-blue);
+    border:1.5px solid rgba(59,130,246,.35);
+  }
+  .sub-btn-outline:hover{border-color:var(--lp-blue);background:rgba(59,130,246,.05);}
+
+  /* Contact fallback */
+  .sub-contact{
+    max-width:720px;margin:0 auto 40px;padding:20px 24px;text-align:center;
+    border-top:1px solid var(--lp-border);display:none;
+  }
+  .sub-contact p{font-size:13px;color:var(--lp-muted);margin-bottom:6px;}
+  .sub-contact a{color:var(--lp-indigo);font-weight:600;text-decoration:none;}
+
+  /* Loading */
+  .sub-loading{text-align:center;padding:48px 20px;color:var(--lp-muted);font-size:15px;}
+
+  /* Toast */
+  .toast-wrap{position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;}
+  .toast{padding:10px 16px;border-radius:8px;font-size:14px;font-weight:500;
+    background:#fff;color:var(--lp-text);border:1px solid var(--lp-border);
+    box-shadow:0 4px 16px rgba(15,23,42,.1);animation:toastIn .2s ease;}
+  .toast.ok{border-color:#22c55e;background:#f0fdf4;color:#166534;}
+  .toast.err{border-color:#ef4444;background:#fef2f2;color:#991b1b;}
+  @keyframes toastIn{from{opacity:0;transform:translateY(-8px);}to{opacity:1;transform:none;}}
+
+  /* Footer */
+  .sub-footer{text-align:center;padding:24px 20px;font-size:12px;color:var(--lp-muted);border-top:1px solid var(--lp-border);}
+  .sub-footer a{color:var(--lp-muted);text-decoration:none;margin:0 8px;}
+  .sub-footer a:hover{color:var(--lp-indigo);}
+</style>
+</head>
+<body>
+<div class="toast-wrap" id="toasts"></div>
+
+<div class="sub-header">
+  <a href="/" class="sub-logo"><span class="v">vallor</span><span class="s">Soft</span></a>
+  <h1>Előfizetési csomagok / Pachete de abonament</h1>
+  <p>Válassz a szükségleteidnek megfelelő csomagot. Kérdés esetén írj nekünk!</p>
+</div>
+
+<div class="sub-trial-banner" id="trialBanner"></div>
+
+<div id="subContent" class="sub-loading">Betöltés... / Se încarcă...</div>
+
+<div class="sub-contact" id="subContact">
+  <p>Stripe fizetés nincs konfigurálva. Előfizetéshez vedd fel velünk a kapcsolatot:</p>
+  <p><a href="mailto:vallorsoft@gmail.com">vallorsoft@gmail.com</a></p>
+  <p style="margin-top:8px;font-size:12px;">Vagy utalással: VALLOR TEAM SRL · CUI: 47859317</p>
+</div>
+
+<footer class="sub-footer">
+  <a href="/">VallorSoft</a>
+  <a href="/terms">Termeni / Feltételek</a>
+  <a href="/privacy">Confidențialitate / Adatvédelem</a>
+</footer>
+
+<script>
+function toast(m, k) {
+  var e = document.createElement('div');
+  e.className = 'toast ' + (k || '');
+  e.textContent = m;
+  document.getElementById('toasts').appendChild(e);
+  setTimeout(function() { e.remove(); }, 3500);
+}
+
+function gas(fn, args) {
+  return fetch('/api/execute', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: fn, arguments: args || [] })
+  }).then(function(r) { return r.json(); }).then(function(d) { return d.result || d; });
+}
+
+var _plans = [];
+var _stripeConfigured = false;
+var _currentUser = null;
+
+// Session ellenőrzés
+fetch('/api/me', { credentials: 'same-origin' })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.ok) {
+      _currentUser = d.user;
+      // Trial státusz lekérése (csak admin)
+      if (d.user.pozicio === 'Admin') {
+        gas('getMySubscription').then(function(r) {
+          if (!r || !r.ok) return;
+          var banner = document.getElementById('trialBanner');
+          if (r.status === 'trial' && r.days_left !== null) {
+            banner.style.display = '';
+            banner.textContent = r.days_left > 0
+              ? '⏳ A próbaidőszakodból ' + r.days_left + ' nap van hátra. / Mai ai ' + r.days_left + ' zile de probă.'
+              : '❌ A próbaidőszak lejárt. Válassz csomagot a folytatáshoz! / Perioada de probă a expirat.';
+          }
+          _stripeConfigured = !!r.stripe_configured;
+          renderPlans();
+        });
+      }
+    }
+  }).catch(function() {});
+
+// Csomagok betöltése
+fetch('/api/public-plans', { credentials: 'same-origin' })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    _plans = (d.plans || []);
+    renderPlans();
+  })
+  .catch(function() {
+    document.getElementById('subContent').innerHTML = '<p style="color:#ef4444;text-align:center;">Hiba a csomagok betöltésekor. / Eroare la încărcarea pachetelor.</p>';
+  });
+
+function renderPlans() {
+  if (!_plans.length) return;
+  var grid = document.createElement('div');
+  grid.className = 'sub-grid';
+
+  _plans.forEach(function(p, i) {
+    var featured = i === 1; // 2. csomag kiemelt
+    var price = parseFloat(p.price_net) || 0;
+    var priceHtml = price > 0
+      ? '<span class="sub-price">€' + Math.round(price) + '</span><br><small style="color:var(--lp-muted);font-size:12px;">/hó · /lună</small>'
+      : '<span class="sub-price" style="font-size:22px;">—</span><br><small style="color:var(--lp-muted);font-size:12px;">Egyéni ár / Preț negociat</small>';
+
+    var card = document.createElement('div');
+    card.className = 'sub-card' + (featured ? ' featured' : '');
+    card.innerHTML =
+      (featured ? '<div class="sub-badge">⭐ Legnépszerűbb</div>' : '') +
+      '<div class="sub-plan-name">' + escHtml(p.name) + '</div>' +
+      '<div style="margin:8px 0 4px;">' + priceHtml + '</div>' +
+      '<div class="sub-desc">' + escHtml(p.description || 'Teljes hozzáférés a VallorSoft minden funkciójához.') + '</div>' +
+      '<button class="sub-btn ' + (featured ? 'sub-btn-primary' : 'sub-btn-outline') + '" onclick="selectPlan(' + p.id + ',\'' + escHtml(p.name) + '\')">' +
+      '📦 Csomag választása</button>';
+    grid.appendChild(card);
+  });
+
+  var content = document.getElementById('subContent');
+  content.innerHTML = '';
+  content.className = '';
+  content.appendChild(grid);
+
+  // Ha Stripe nincs konfigurálva, megmutatjuk a kapcsolat-szekciót
+  if (!_stripeConfigured) {
+    document.getElementById('subContact').style.display = '';
+  }
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function selectPlan(planId, planName) {
+  if (!_currentUser) {
+    // Nem bejelentkezett → átirányítás a bejelentkezésre
+    window.location.href = '/login?next=/subscription';
+    return;
+  }
+  if (!_stripeConfigured) {
+    toast('Stripe nincs konfigurálva. Kérjük, vedd fel a kapcsolatot: vallorsoft@gmail.com', 'err');
+    return;
+  }
+  // Stripe Checkout indítása
+  toast('Átirányítás a fizetési oldalra... / Se redirecționează...', '');
+  gas('createSubscriptionCheckout', [{ plan_id: planId }]).then(function(r) {
+    if (r && r.ok && r.url) {
+      window.location.href = r.url;
+    } else if (r && r.reason === 'not-configured') {
+      toast('Stripe nincs konfigurálva — lépj kapcsolatba velünk.', 'err');
+    } else {
+      toast((r && r.err) || 'Hiba a fizetési folyamat indításakor.', 'err');
+    }
+  }).catch(function() {
+    toast('Szerver hiba / Eroare de server', 'err');
+  });
+}
+</script>
+</body>
+</html>
