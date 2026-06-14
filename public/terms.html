@@ -9,16 +9,52 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/landing.css">
   <style>
-    .policy-content { max-width: 780px; margin: 0 auto; padding: 120px 24px 80px; }
-    .policy-content h1 { margin-bottom: 2rem; font-size: 2rem; }
-    .policy-content h2 { margin: 2.5rem 0 .8rem; font-size: 1.2rem; color: #e10b1a; }
-    .policy-content p, .policy-content li { color: #9ca6b5; font-size: .92rem; line-height: 1.7; margin-bottom: .6rem; }
-    .policy-content ul { padding-left: 1.2rem; margin-bottom: 1rem; }
+    .policy-content { max-width: 820px; margin: 0 auto; padding: 120px 24px 80px; }
+    .policy-content h1 { margin-bottom: .4rem; font-size: 2rem; }
+    .policy-content .last-update { color: #9ca6b5; font-size: .85rem; margin-bottom: 2.5rem; }
+    .policy-content h2 { margin: 2.5rem 0 .8rem; font-size: 1.1rem; color: #e10b1a; font-weight: 700; }
+    .policy-content h3 { margin: 1.5rem 0 .5rem; font-size: .95rem; color: #f5f7fa; font-weight: 600; }
+    .policy-content p, .policy-content li { color: #9ca6b5; font-size: .9rem; line-height: 1.75; margin-bottom: .5rem; }
+    .policy-content ul { padding-left: 1.4rem; margin-bottom: .8rem; }
+    .policy-content ul li { list-style: disc; }
     .policy-content a { color: #e10b1a; }
-    .policy-content .hu-summary { border-top: 1px solid rgba(255,255,255,.1); margin-top: 3rem; padding-top: 2rem; }
+    .policy-content a:hover { text-decoration: underline; }
+    .policy-content strong { color: #e9eef5; }
+    .policy-content .info-box {
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 12px;
+      padding: 1.2rem 1.4rem;
+      margin: 1rem 0 1.5rem;
+    }
+    .policy-content .info-box p { margin-bottom: .3rem; }
+    .policy-content .toc {
+      background: rgba(225,11,26,.06);
+      border: 1px solid rgba(225,11,26,.2);
+      border-radius: 12px;
+      padding: 1.2rem 1.4rem;
+      margin-bottom: 2.5rem;
+    }
+    .policy-content .toc p { font-size: .82rem; color: #9ca6b5; margin-bottom: .3rem; }
+    .policy-content .toc a { color: #ff9aa1; font-size: .82rem; }
+    .policy-content .version-note {
+      text-align: center;
+      color: #9ca6b5;
+      font-size: .8rem;
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    .policy-content .hu-summary {
+      border-top: 1px solid rgba(255,255,255,.1);
+      margin-top: 3.5rem;
+      padding-top: 2.5rem;
+    }
+    .policy-content .hu-summary h2 { color: #a78bfa; }
   </style>
 </head>
 <body>
+
   <!-- Navbar -->
   <nav class="navbar" id="navbar">
     <div class="container">
@@ -27,7 +63,8 @@
           <span class="logo-vallor">Vallor</span><span class="logo-soft">Soft</span>
         </a>
         <div class="nav-actions">
-          <a href="/login" class="btn-glass">Autentificare</a>
+          <a href="/" class="btn-glass">← Acasă</a>
+          <a href="/login" class="btn-primary">Autentificare</a>
         </div>
       </div>
     </div>
@@ -35,189 +72,480 @@
 
   <!-- Content -->
   <main class="policy-content">
-    <h1>Termeni și Condiții</h1>
-    <p><em>Ultima actualizare: 14 iunie 2026</em></p>
 
-    <h2>1. Obiectul contractului</h2>
-    <p>
-      Prezentul document stabilește termenii și condițiile de utilizare a platformei <strong>VallorSoft</strong>,
-      un serviciu SaaS (Software as a Service) dedicat managementului transportului rutier și al flotei de vehicule,
-      disponibil la adresa <a href="https://vallorsoft.ro">vallorsoft.ro</a>.
-    </p>
-    <p>
-      Prin crearea unui cont și utilizarea platformei, utilizatorul (denumit în continuare „Client") acceptă în
-      totalitate prezenții termeni și condiții. Dacă nu sunteți de acord cu acești termeni, vă rugăm să nu utilizați
-      serviciul.
-    </p>
+    <h1>Termeni și Condiții de Utilizare VallorSoft</h1>
+    <p class="last-update">Ultima actualizare: 14.06.2026 · Versiune: 1.0</p>
 
-    <h2>2. Servicii oferite</h2>
-    <p>VallorSoft oferă, în funcție de planul de abonament selectat, următoarele servicii:</p>
+    <!-- TOC -->
+    <div class="toc">
+      <p><strong>Cuprins rapid:</strong></p>
+      <p>
+        <a href="#art1">1. Informații generale</a> ·
+        <a href="#art2">2. Definiții</a> ·
+        <a href="#art3">3. Obiectul serviciului</a> ·
+        <a href="#art4">4. Crearea conturilor</a> ·
+        <a href="#art5">5. Sistemul de invitații</a> ·
+        <a href="#art6">6. Roluri și permisiuni</a>
+      </p>
+      <p>
+        <a href="#art7">7. Perioada de probă</a> ·
+        <a href="#art8">8. Abonamente și facturare</a> ·
+        <a href="#art9">9. Procesarea plăților</a> ·
+        <a href="#art10">10. Integrarea cu servicii terțe</a> ·
+        <a href="#art11">11. Obligațiile utilizatorilor</a> ·
+        <a href="#art12">12. Utilizări interzise</a>
+      </p>
+      <p>
+        <a href="#art13">13. Datele introduse în platformă</a> ·
+        <a href="#art14">14. Date GPS și telematică</a> ·
+        <a href="#art15">15. Facturare și servicii fiscale</a> ·
+        <a href="#art16">16. Proprietatea intelectuală</a> ·
+        <a href="#art17">17. Licența de utilizare</a> ·
+        <a href="#art18">18. Disponibilitatea serviciului</a>
+      </p>
+      <p>
+        <a href="#art19">19. Limitarea răspunderii</a> ·
+        <a href="#art20">20. Forță majoră</a> ·
+        <a href="#art21">21. Suspendarea și restricționarea accesului</a> ·
+        <a href="#art22">22. Încetarea serviciului</a> ·
+        <a href="#art23">23. Exportul și ștergerea datelor</a> ·
+        <a href="#art24">24. Modificarea serviciului</a>
+      </p>
+      <p>
+        <a href="#art25">25. Modificarea Termenilor</a> ·
+        <a href="#art26">26. Confidențialitate și GDPR</a> ·
+        <a href="#art27">27. Legea aplicabilă</a> ·
+        <a href="#art28">28. Soluționarea litigiilor</a> ·
+        <a href="#art29">29. Contact</a> ·
+        <a href="#art30">30. Dispoziții finale</a>
+      </p>
+    </div>
+
+    <!-- 1 -->
+    <h2 id="art1">1. Informații generale</h2>
+    <p>
+      Prezentele Termene și Condiții reglementează utilizarea platformei software VallorSoft
+      și relația contractuală dintre utilizator și <strong>VALLOR TEAM SRL</strong>.
+    </p>
+    <div class="info-box">
+      <p><strong>Denumire:</strong> VALLOR TEAM SRL</p>
+      <p><strong>CUI:</strong> 47859317</p>
+      <p><strong>Nr. Reg. Com.:</strong> J2023000114142</p>
+      <p><strong>Sediu:</strong> Sat Arcus, Cart. Poiana Arcusului nr. 102, cod 527166, jud. Covasna, România</p>
+      <p><strong>Telefon:</strong> <a href="tel:0769532015">0769532015</a></p>
+      <p><strong>E-mail:</strong> <a href="mailto:vallorsoft@gmail.com">vallorsoft@gmail.com</a></p>
+    </div>
+    <p>Prin accesarea sau utilizarea platformei, utilizatorul acceptă integral prezentele Termene și Condiții.</p>
+
+    <!-- 2 -->
+    <h2 id="art2">2. Definiții</h2>
+    <p>În sensul prezentului document:</p>
     <ul>
-      <li>Managementul curselor de transport (creare, planificare, monitorizare, raportare).</li>
-      <li>Urmărire GPS în timp real și istoric trasee.</li>
-      <li>Facturare electronică integrată cu furnizori autorizați (FGO, SmartBill, Oblio, iFactura, Facturis).</li>
-      <li>Generare și arhivare documente de transport (CMR, scrisori de trăsură, POD).</li>
-      <li>Portal pentru clienți și subcontractori.</li>
-      <li>Statistici, rapoarte și export date.</li>
-      <li>Integrare cu sisteme GPS externe (CargoTrack, Fomco și altele).</li>
-      <li>Conformitate cu reglementările românești: e-Factura ANAF, RO e-Transport (UIT).</li>
+      <li><strong>Platforma</strong> reprezintă aplicația software VallorSoft.</li>
+      <li><strong>Clientul</strong> reprezintă persoana juridică ce utilizează serviciile VallorSoft.</li>
+      <li><strong>Utilizatorul</strong> reprezintă orice persoană autorizată să acceseze platforma.</li>
+      <li><strong>Administratorul</strong> reprezintă utilizatorul cu drepturi complete asupra contului companiei.</li>
+      <li><strong>Managerul</strong> reprezintă utilizatorul desemnat de Administrator pentru gestionarea operațională.</li>
+      <li><strong>Șoferul</strong> reprezintă utilizatorul care are acces exclusiv la informațiile și cursele atribuite.</li>
+      <li><strong>Contabilul</strong> reprezintă utilizatorul cu acces la documente și exporturi financiare.</li>
+      <li><strong>Portal Client</strong> reprezintă interfața destinată clienților companiei.</li>
+      <li><strong>Portal Transportator</strong> reprezintă interfața destinată subcontractorilor și transportatorilor colaboratori.</li>
+    </ul>
+
+    <!-- 3 -->
+    <h2 id="art3">3. Obiectul serviciului</h2>
+    <p>VallorSoft este o platformă SaaS destinată companiilor de transport și logistică.</p>
+    <p>Platforma poate oferi:</p>
+    <ul>
+      <li>management curse;</li>
+      <li>management flotă;</li>
+      <li>management documente;</li>
+      <li>management șoferi;</li>
+      <li>management subcontractori;</li>
+      <li>portal client;</li>
+      <li>portal transportator;</li>
+      <li>rapoarte și statistici;</li>
+      <li>integrare GPS;</li>
+      <li>integrare servicii de facturare;</li>
+      <li>export date și documente.</li>
+    </ul>
+    <p>Serviciul este furnizat exclusiv în format electronic.</p>
+
+    <!-- 4 -->
+    <h2 id="art4">4. Crearea conturilor</h2>
+
+    <h3>4.1 Contul inițial</h3>
+    <p>Primul cont de Administrator poate fi creat:</p>
+    <ul>
+      <li>de către VallorSoft;</li>
+      <li>prin proces automatizat de înregistrare;</li>
+      <li>prin configurare inițială efectuată la solicitarea clientului.</li>
+    </ul>
+
+    <h3>4.2 Înregistrarea utilizatorilor</h3>
+    <p>Platforma poate utiliza:</p>
+    <ul>
+      <li>sistem de invitații;</li>
+      <li>înregistrare directă online;</li>
+      <li>creare manuală de către Administrator.</li>
+    </ul>
+    <p>VallorSoft își rezervă dreptul de a modifica metodele de înregistrare.</p>
+
+    <!-- 5 -->
+    <h2 id="art5">5. Sistemul de invitații</h2>
+    <p>Administratorii și Managerii pot invita utilizatori noi în limitele drepturilor acordate.</p>
+    <p>Invitațiile pot conține:</p>
+    <ul>
+      <li>adresa de e-mail;</li>
+      <li>rolul utilizatorului;</li>
+      <li>perioada de valabilitate;</li>
+      <li>alte restricții configurate de Administrator.</li>
+    </ul>
+    <p>Clientul este responsabil pentru legalitatea furnizării datelor persoanelor invitate.</p>
+
+    <!-- 6 -->
+    <h2 id="art6">6. Roluri și permisiuni</h2>
+
+    <h3>Administrator</h3>
+    <p>Poate: administra compania, configura integrațiile, crea și elimina utilizatori, gestiona abonamentul, accesa toate funcționalitățile.</p>
+
+    <h3>Manager</h3>
+    <p>Poate: administra curse, administra șoferi, administra documente, vizualiza rapoarte și statistici. Accesul la anumite funcții poate fi limitat de Administrator.</p>
+
+    <h3>Șofer</h3>
+    <p>Poate accesa exclusiv informațiile atribuite contului său.</p>
+
+    <h3>Contabil</h3>
+    <p>Poate accesa: documente, exporturi, informații financiare autorizate.</p>
+
+    <h3>Utilizator Portal Client</h3>
+    <p>Poate vizualiza exclusiv informațiile asociate propriilor comenzi sau transporturi.</p>
+
+    <h3>Utilizator Portal Transportator</h3>
+    <p>Poate vizualiza exclusiv informațiile asociate activității sale contractuale.</p>
+
+    <!-- 7 -->
+    <h2 id="art7">7. Perioada de probă</h2>
+    <p>VallorSoft poate oferi o perioadă gratuită de testare. Perioada standard este de <strong>14 zile calendaristice</strong>.</p>
+    <p>Pe durata perioadei de probă:</p>
+    <ul>
+      <li>anumite funcționalități pot fi limitate;</li>
+      <li>utilizatorul nu este obligat să efectueze plăți;</li>
+      <li>nu este necesară introducerea unui card bancar, dacă nu se specifică altfel.</li>
+    </ul>
+    <p>La expirarea perioadei de probă, utilizarea platformei poate necesita activarea unui abonament valid.</p>
+
+    <!-- 8 -->
+    <h2 id="art8">8. Abonamente și facturare</h2>
+    <p>Accesul la anumite funcționalități poate fi condiționat de existența unui abonament activ.</p>
+    <p>Abonamentele pot fi:</p>
+    <ul>
+      <li>lunare;</li>
+      <li>anuale;</li>
+      <li>personalizate (Enterprise).</li>
+    </ul>
+    <p>Prețurile afișate pe website pot fi modificate în orice moment pentru abonamentele viitoare. Modificările nu afectează perioadele deja achitate.</p>
+
+    <!-- 9 -->
+    <h2 id="art9">9. Procesarea plăților</h2>
+    <p>Plățile online pot fi procesate prin intermediul furnizorilor autorizați de servicii de plată.</p>
+    <p>În prezent, VallorSoft poate utiliza:</p>
+    <ul>
+      <li>Stripe Payments Europe Ltd.;</li>
+      <li>alți procesatori autorizați.</li>
+    </ul>
+    <p>Datele cardurilor bancare nu sunt stocate pe infrastructura VallorSoft. Aceste date sunt procesate exclusiv de către procesatorii de plăți autorizați.</p>
+
+    <!-- 10 -->
+    <h2 id="art10">10. Integrarea cu servicii terțe</h2>
+    <p>Platforma poate integra servicii externe, inclusiv:</p>
+    <ul>
+      <li>sisteme GPS;</li>
+      <li>sisteme de facturare;</li>
+      <li>servicii e-mail;</li>
+      <li>servicii cloud;</li>
+      <li>servicii de notificare.</li>
+    </ul>
+    <p>VallorSoft nu garantează disponibilitatea permanentă a serviciilor furnizate de terți. Funcționarea anumitor module poate depinde de disponibilitatea și performanța acestor servicii externe.</p>
+
+    <!-- 11 -->
+    <h2 id="art11">11. Obligațiile utilizatorilor</h2>
+    <p>Utilizatorii platformei se obligă să:</p>
+    <ul>
+      <li>furnizeze informații corecte și actualizate;</li>
+      <li>păstreze confidențialitatea datelor de autentificare;</li>
+      <li>utilizeze platforma exclusiv în scopuri legale;</li>
+      <li>respecte legislația aplicabilă;</li>
+      <li>respecte drepturile altor utilizatori și ale terților;</li>
+      <li>utilizeze platforma conform documentației și instrucțiunilor disponibile.</li>
+    </ul>
+    <p>Utilizatorul este responsabil pentru toate activitățile efectuate prin intermediul contului său.</p>
+    <p>În cazul în care utilizatorul suspectează acces neautorizat la cont, acesta trebuie să informeze imediat VallorSoft.</p>
+
+    <!-- 12 -->
+    <h2 id="art12">12. Utilizări interzise</h2>
+    <p>Este strict interzisă utilizarea platformei pentru:</p>
+    <ul>
+      <li>activități ilegale;</li>
+      <li>fraudă;</li>
+      <li>distribuirea de malware;</li>
+      <li>acces neautorizat la date;</li>
+      <li>încercarea de a compromite securitatea sistemului;</li>
+      <li>transmiterea de conținut abuziv, defăimător sau ilegal;</li>
+      <li>încălcarea drepturilor de proprietate intelectuală;</li>
+      <li>colectarea neautorizată a datelor altor utilizatori;</li>
+      <li>testarea vulnerabilităților fără acordul scris al VallorSoft;</li>
+      <li>copierea, revânzarea sau redistribuirea neautorizată a serviciului.</li>
+    </ul>
+    <p>Orice încălcare poate conduce la suspendarea imediată a accesului.</p>
+
+    <!-- 13 -->
+    <h2 id="art13">13. Datele introduse în platformă</h2>
+    <p>Clientul este responsabil pentru:</p>
+    <ul>
+      <li>legalitatea datelor introduse;</li>
+      <li>exactitatea informațiilor furnizate;</li>
+      <li>obținerea tuturor consimțămintelor necesare;</li>
+      <li>respectarea obligațiilor GDPR față de propriii angajați, clienți și colaboratori.</li>
+    </ul>
+    <p>VallorSoft nu verifică în mod sistematic exactitatea informațiilor introduse de utilizatori.</p>
+    <p>Clientul rămâne proprietarul datelor introduse în platformă.</p>
+
+    <!-- 14 -->
+    <h2 id="art14">14. Date GPS și telematică</h2>
+    <p>Platforma poate integra servicii externe de telematică și localizare GPS.</p>
+    <p>VallorSoft:</p>
+    <ul>
+      <li>nu furnizează servicii GPS proprii;</li>
+      <li>nu instalează dispozitive GPS;</li>
+      <li>nu garantează acuratețea datelor furnizate de terți;</li>
+      <li>nu este responsabilă pentru întreruperile serviciilor GPS externe.</li>
+    </ul>
+    <p>Datele furnizate prin integrare pot fi utilizate pentru: monitorizare operațională, planificare, raportare, statistici, optimizarea activității.</p>
+    <p>Responsabilitatea legală privind utilizarea sistemelor GPS revine clientului și furnizorului GPS utilizat.</p>
+
+    <!-- 15 -->
+    <h2 id="art15">15. Facturare și integrarea serviciilor fiscale</h2>
+    <p>Platforma poate integra servicii externe de facturare și servicii fiscale electronice.</p>
+    <p>VallorSoft facilitează transmiterea informațiilor către sistemele integrate.</p>
+    <p>VallorSoft nu garantează:</p>
+    <ul>
+      <li>funcționarea neîntreruptă a serviciilor terțe;</li>
+      <li>disponibilitatea sistemelor ANAF;</li>
+      <li>disponibilitatea furnizorilor externi de facturare;</li>
+      <li>lipsa erorilor generate de sisteme externe.</li>
+    </ul>
+    <p>Clientul este responsabil pentru verificarea documentelor fiscale generate și pentru respectarea obligațiilor fiscale aplicabile.</p>
+
+    <!-- 16 -->
+    <h2 id="art16">16. Proprietatea intelectuală</h2>
+    <p>Toate drepturile asupra platformei VallorSoft aparțin exclusiv <strong>VALLOR TEAM SRL</strong>.</p>
+    <p>Aceste drepturi includ, fără limitare:</p>
+    <ul>
+      <li>codul sursă și codul obiect;</li>
+      <li>interfața grafică și designul;</li>
+      <li>baza de date și documentația;</li>
+      <li>logo-urile, mărcile și conținutul publicat pe website.</li>
+    </ul>
+    <p>Utilizatorii nu dobândesc niciun drept de proprietate intelectuală asupra platformei.</p>
+
+    <!-- 17 -->
+    <h2 id="art17">17. Licența de utilizare</h2>
+    <p>VallorSoft acordă clientului o licență <strong>limitată, neexclusivă, netransferabilă, revocabilă</strong>.</p>
+    <p>Licența permite utilizarea platformei exclusiv în scopul desfășurării activității proprii a clientului.</p>
+    <p>Este interzisă: revânzarea serviciului, sublicențierea, distribuirea către terți fără acordul scris al VallorSoft.</p>
+
+    <!-- 18 -->
+    <h2 id="art18">18. Disponibilitatea serviciului</h2>
+    <p>VallorSoft depune toate eforturile rezonabile pentru asigurarea funcționării continue a platformei.</p>
+    <p>Cu toate acestea, utilizatorul înțelege și acceptă că pot exista: lucrări de mentenanță, actualizări software, întreruperi neplanificate, probleme ale furnizorilor externi, incidente tehnice.</p>
+    <p>Nu se garantează funcționarea neîntreruptă sau lipsită de erori. În lipsa unui contract SLA separat, nu există garanții privind un anumit procent de disponibilitate.</p>
+
+    <!-- 19 -->
+    <h2 id="art19">19. Limitarea răspunderii</h2>
+    <p>În măsura maximă permisă de lege, VallorSoft nu răspunde pentru:</p>
+    <ul>
+      <li>pierderi indirecte sau pierderi comerciale;</li>
+      <li>pierderea profitului sau a oportunităților de afaceri;</li>
+      <li>pierderea datelor cauzată de terți;</li>
+      <li>indisponibilitatea serviciilor externe;</li>
+      <li>erori provenite din integrații externe (GPS, facturare, ANAF);</li>
+      <li>utilizarea necorespunzătoare a platformei de către client.</li>
     </ul>
     <p>
-      VallorSoft își rezervă dreptul de a modifica, îmbunătăți sau retrage funcționalități, cu notificare
-      prealabilă de minimum 14 zile în cazul modificărilor semnificative.
+      Răspunderea totală a VallorSoft, indiferent de temeiul juridic invocat, este limitată la
+      valoarea abonamentelor achitate de client în ultimele <strong>12 luni</strong> anterioare
+      producerii prejudiciului.
     </p>
 
-    <h2>3. Înregistrare și cont</h2>
-    <p>
-      Pentru utilizarea platformei este necesară crearea unui cont cu date exacte și actualizate. Clientul
-      este responsabil de:
-    </p>
+    <!-- 20 -->
+    <h2 id="art20">20. Forță majoră</h2>
+    <p>VallorSoft nu poate fi considerată responsabilă pentru neexecutarea obligațiilor cauzată de evenimente de forță majoră, inclusiv: dezastre naturale, incendii, război, atacuri cibernetice de amploare, întreruperi majore ale rețelelor de comunicații, decizii ale autorităților publice, pene extinse de energie electrică.</p>
+    <p>În astfel de situații obligațiile afectate se suspendă pe durata evenimentului de forță majoră.</p>
+
+    <!-- 21 -->
+    <h2 id="art21">21. Suspendarea și restricționarea accesului</h2>
+    <p>VALLOR TEAM SRL își rezervă dreptul de a suspenda temporar sau permanent accesul la platformă în următoarele situații:</p>
     <ul>
-      <li>Confidențialitatea credențialelor de acces (parolă, 2FA).</li>
-      <li>Toate activitățile desfășurate în contul său.</li>
-      <li>Notificarea imediată a VallorSoft în cazul unui acces neautorizat.</li>
+      <li>încălcarea prezentelor Termene și Condiții;</li>
+      <li>utilizarea abuzivă a platformei;</li>
+      <li>activități care pot afecta securitatea sistemului;</li>
+      <li>tentativă de acces neautorizat la date sau resurse;</li>
+      <li>utilizarea serviciului în scopuri ilegale;</li>
+      <li>neplata abonamentului;</li>
+      <li>solicitarea expresă a autorităților competente.</li>
     </ul>
-    <p>
-      VallorSoft poate suspenda sau șterge conturile care încalcă prezenții termeni, folosesc platforma
-      în scopuri ilegale sau frauduloase, ori nu achită abonamentul în termenul stabilit.
-    </p>
+    <p>Suspendarea poate fi aplicată fără notificare prealabilă în situațiile care afectează securitatea platformei sau a altor utilizatori.</p>
 
-    <h2>4. Prețuri și plată</h2>
-    <p>
-      Tarifele sunt afișate pe pagina de prețuri și se exprimă în EUR, fără TVA. TVA-ul aplicabil
-      se calculează conform legislației române în vigoare.
-    </p>
+    <!-- 22 -->
+    <h2 id="art22">22. Încetarea serviciului și închiderea contului</h2>
+    <p>Clientul poate solicita în orice moment închiderea contului și încetarea utilizării serviciului.</p>
+    <p>Solicitarea poate fi transmisă la: <a href="mailto:vallorsoft@gmail.com">vallorsoft@gmail.com</a></p>
+    <p>Încetarea serviciului nu exonerează clientul de obligațiile financiare deja scadente.</p>
+    <p>VALLOR TEAM SRL poate înceta furnizarea serviciului în următoarele situații:</p>
     <ul>
-      <li>Abonamentele se facturează anticipat (lunar sau anual, în funcție de opțiunea aleasă).</li>
-      <li>Plata se efectuează prin card bancar sau transfer bancar.</li>
-      <li>Neplata la termen atrage suspendarea accesului după un preaviz de 7 zile calendaristice.</li>
-      <li>Prețurile pot fi modificate cu notificare prealabilă de 30 de zile. Modificarea nu afectează
-          perioadele deja facturate.</li>
+      <li>încălcarea gravă a Termenilor și Condițiilor;</li>
+      <li>utilizare frauduloasă;</li>
+      <li>neplata abonamentelor;</li>
+      <li>imposibilitatea continuării relației contractuale;</li>
+      <li>motive legale sau de conformitate.</li>
     </ul>
 
-    <h2>5. Perioadă de probă gratuită</h2>
-    <p>
-      Noii clienți beneficiază de o perioadă de probă gratuită de <strong>14 zile calendaristice</strong>,
-      fără obligația furnizării datelor de card bancar. La expirarea perioadei de probă, contul este
-      automat trecut în plan gratuit limitat sau suspendat, dacă nu se selectează un abonament plătit.
-    </p>
-
-    <h2>6. Anulare și rambursare</h2>
-    <p>
-      Clientul poate anula abonamentul oricând, din panoul de setări al contului sau prin e-mail la
-      <a href="mailto:vallorsoft@gmail.com">vallorsoft@gmail.com</a>. Anularea produce efecte la
-      sfârșitul perioadei de facturare curente — accesul rămâne activ până la data expirării.
-    </p>
-    <p>
-      Conform legislației UE privind protecția consumatorilor (Directiva 2011/83/UE, transpusă în
-      România prin OUG 34/2014), persoanele fizice au drept de retragere de <strong>14 zile</strong>
-      de la data primei facturări, cu drept la rambursare integrală, cu condiția să nu fi utilizat
-      activ serviciul în această perioadă.
-    </p>
-    <p>
-      Nu se acordă rambursări pro-rata pentru perioadele neconsumate din abonamentele anuale, cu excepția
-      cazurilor prevăzute de lege.
-    </p>
-
-    <h2>7. Răspundere limitată</h2>
-    <p>
-      VallorSoft furnizează platforma „ca atare" și depune eforturi rezonabile pentru a asigura
-      disponibilitatea și securitatea serviciului, fără a garanta funcționarea neîntreruptă.
-    </p>
-    <p>
-      VallorSoft nu răspunde pentru:
-    </p>
+    <!-- 23 -->
+    <h2 id="art23">23. Exportul și ștergerea datelor</h2>
+    <p>La încetarea relației contractuale, clientul poate solicita exportul datelor sale într-un format rezonabil disponibil. Cererea trebuie transmisă înainte de ștergerea definitivă a contului.</p>
+    <p>După încetarea serviciului, datele pot fi păstrate pentru perioadele necesare:</p>
     <ul>
-      <li>Pierderi de date cauzate de utilizatorul însuși sau de factori externi (forță majoră, atacuri cibernetice).</li>
-      <li>Decizii de afaceri luate pe baza datelor din platformă.</li>
-      <li>Inexactitățile din datele furnizate de sisteme terțe (GPS, ANAF, furnizori de facturare).</li>
-      <li>Indisponibilitatea serviciilor terțe integrate (ANAF SPV, CargoTrack, furnizorii de facturare).</li>
+      <li>respectării obligațiilor legale;</li>
+      <li>soluționării litigiilor;</li>
+      <li>exercitării sau apărării drepturilor legale;</li>
+      <li>obligațiilor fiscale și contabile.</li>
     </ul>
-    <p>
-      Răspunderea totală a VallorSoft față de un Client nu poate depăși valoarea abonamentului plătit
-      în ultimele 3 luni anterioare evenimentului generator de daune.
-    </p>
+    <p>După expirarea acestor perioade, datele vor fi șterse sau anonimizate în mod securizat.</p>
+    <p>Copiile de siguranță (backup) pot continua să existe pentru o perioadă limitată conform politicilor interne de securitate și recuperare în caz de dezastru.</p>
 
-    <h2>8. Proprietate intelectuală</h2>
-    <p>
-      Toate drepturile de proprietate intelectuală asupra platformei VallorSoft (cod sursă, design,
-      documentație, logo, mărci) aparțin exclusiv VallorSoft. Clientul nu dobândește niciun drept
-      de proprietate intelectuală prin utilizarea platformei.
-    </p>
-    <p>
-      Clientul acordă VallorSoft o licență neexclusivă de utilizare a datelor introduse în platformă,
-      exclusiv în scopul furnizării serviciilor contractate.
-    </p>
+    <!-- 24 -->
+    <h2 id="art24">24. Modificarea serviciului</h2>
+    <p>VALLOR TEAM SRL își rezervă dreptul de a modifica, actualiza, suspenda sau elimina funcționalități ale platformei în orice moment.</p>
+    <p>Aceste modificări pot include:</p>
+    <ul>
+      <li>funcționalități noi;</li>
+      <li>modificări ale interfeței;</li>
+      <li>integrații noi;</li>
+      <li>eliminarea funcțiilor învechite;</li>
+      <li>optimizări tehnice;</li>
+      <li>măsuri de securitate.</li>
+    </ul>
+    <p>Actualizările efectuate pentru îmbunătățirea serviciului nu generează dreptul la despăgubiri.</p>
 
-    <h2>9. Confidențialitate și protecția datelor</h2>
-    <p>
-      Prelucrarea datelor cu caracter personal este reglementată de
-      <a href="/privacy">Politica de Confidențialitate</a>, care face parte integrantă din prezentul contract.
-      VallorSoft acționează în calitate de operator de date pentru datele propriilor angajați și,
-      respectiv, de persoană împuternicită de operator pentru datele introduse de Client.
-    </p>
+    <!-- 25 -->
+    <h2 id="art25">25. Modificarea Termenilor și Condițiilor</h2>
+    <p>VALLOR TEAM SRL poate modifica periodic prezentele Termene și Condiții.</p>
+    <p>Versiunea actualizată va fi publicată pe website-ul VallorSoft și va include data ultimei actualizări.</p>
+    <p>În cazul modificărilor semnificative, utilizatorii pot fi informați prin:</p>
+    <ul>
+      <li>e-mail;</li>
+      <li>notificări în platformă;</li>
+      <li>afișare pe website.</li>
+    </ul>
+    <p>Continuarea utilizării serviciului după intrarea în vigoare a modificărilor reprezintă acceptarea acestora.</p>
 
-    <h2>10. Legea aplicabilă și soluționarea litigiilor</h2>
+    <!-- 26 -->
+    <h2 id="art26">26. Confidențialitate și protecția datelor</h2>
     <p>
-      Prezentul contract este guvernat de <strong>legea română</strong>. Orice litigiu apărut în
-      legătură cu interpretarea sau executarea prezentului contract va fi supus, în primă instanță,
-      soluționării pe cale amiabilă. În lipsa unui acord amiabil, litigiul va fi soluționat de
-      <strong>instanțele judecătorești române competente</strong>.
+      Prelucrarea datelor cu caracter personal se realizează conform
+      <a href="/privacy">Politicii de Confidențialitate</a> publicate pe website-ul VallorSoft.
     </p>
-    <p>
-      Consumatorii din UE pot utiliza platforma de soluționare online a litigiilor (ODR) la
-      <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener">ec.europa.eu/consumers/odr</a>.
-    </p>
+    <p>Utilizatorii sunt obligați să respecte legislația privind protecția datelor și să utilizeze platforma în conformitate cu normele GDPR aplicabile.</p>
+    <p>Clientul este responsabil pentru legalitatea datelor introduse și pentru informarea persoanelor vizate atunci când acest lucru este necesar.</p>
 
-    <h2>11. Modificări ale termenilor</h2>
-    <p>
-      VallorSoft poate modifica prezenții termeni, cu notificarea Clientului cu minimum <strong>14 zile</strong>
-      înainte de intrarea în vigoare a modificărilor, prin e-mail sau prin notificare în platformă.
-      Continuarea utilizării platformei după data intrării în vigoare constituie acceptarea noilor termeni.
-      Dacă nu sunteți de acord cu modificările, aveți dreptul să reziliați abonamentul fără penalități.
-    </p>
+    <!-- 27 -->
+    <h2 id="art27">27. Legea aplicabilă</h2>
+    <p>Prezentele Termene și Condiții sunt guvernate și interpretate în conformitate cu <strong>legislația din România</strong>.</p>
+    <p>În măsura permisă de lege, se aplică:</p>
+    <ul>
+      <li>Codul Civil Român;</li>
+      <li>legislația comercială română;</li>
+      <li>legislația fiscală aplicabilă;</li>
+      <li>Regulamentul (UE) 2016/679 (GDPR);</li>
+      <li>alte acte normative relevante.</li>
+    </ul>
 
-    <h2>12. Forță majoră</h2>
-    <p>
-      Niciuna dintre părți nu răspunde pentru neexecutarea obligațiilor contractuale cauzată de
-      evenimente de forță majoră (calamități naturale, acte ale autorităților, greve, atacuri cibernetice
-      de amploare) notificate în termen de 5 zile lucrătoare.
-    </p>
+    <!-- 28 -->
+    <h2 id="art28">28. Soluționarea litigiilor</h2>
+    <p>Părțile vor încerca soluționarea pe cale amiabilă a oricărui litigiu rezultat din utilizarea serviciului.</p>
+    <p>În cazul în care soluționarea amiabilă nu este posibilă, competența revine instanțelor judecătorești din România.</p>
+    <p>Dacă legea nu prevede altfel, litigiile vor fi soluționate de instanțele competente din <strong>județul Covasna</strong>.</p>
+
+    <!-- 29 -->
+    <h2 id="art29">29. Contact</h2>
+    <p>Pentru întrebări privind serviciul, contractul, protecția datelor sau exercitarea drepturilor legale:</p>
+    <div class="info-box">
+      <p><strong>VALLOR TEAM SRL</strong></p>
+      <p>CUI: 47859317 · Nr. Reg. Com.: J2023000114142</p>
+      <p>Sat Arcus, Cart. Poiana Arcusului nr. 102, cod 527166, județul Covasna, România</p>
+      <p>Telefon: <a href="tel:0769532015">0769532015</a></p>
+      <p>E-mail: <a href="mailto:vallorsoft@gmail.com">vallorsoft@gmail.com</a></p>
+    </div>
+
+    <!-- 30 -->
+    <h2 id="art30">30. Dispoziții finale</h2>
+    <p>Dacă una sau mai multe prevederi ale prezentului document sunt declarate nule, ilegale sau inaplicabile, celelalte prevederi rămân valabile și produc efecte juridice.</p>
+    <p>Neexercitarea unui drept de către VALLOR TEAM SRL nu constituie renunțare la acel drept.</p>
+    <p>Prezentele Termene și Condiții reprezintă acordul complet dintre utilizator și VALLOR TEAM SRL cu privire la utilizarea platformei VallorSoft.</p>
+
+    <div class="version-note">
+      Ultima actualizare: <strong>14.06.2026</strong> · Versiune: <strong>1.0</strong>
+    </div>
 
     <!-- Hungarian summary -->
     <div class="hu-summary">
-      <h2>Magyar összefoglaló</h2>
+      <h2>Magyar összefoglaló — Általános Szerződési Feltételek</h2>
       <p>
-        Ez a dokumentum tartalmazza a <strong>VallorSoft</strong> SaaS platform használatának általános
-        szerződési feltételeit.
+        A jelen ÁSZF a <strong>VALLOR TEAM SRL</strong> (CUI: 47859317, székhely: Arcus,
+        Covasna megye, Románia; e-mail: <a href="mailto:vallorsoft@gmail.com">vallorsoft@gmail.com</a>)
+        által üzemeltetett <strong>VallorSoft</strong> SaaS platform használatát szabályozza.
       </p>
       <p>
-        <strong>A szolgáltatás:</strong> fuvarkezelő, GPS-követő, elektronikus számlázó (ANAF SPV-kompatibilis),
-        dokumentum- és flottakezelő webalkalmazás romániai közúti fuvarozóknak.
+        <strong>A szolgáltatás:</strong> fuvar-, flotta- és dokumentumkezelő szoftver romániai
+        fuvarozó és logisztikai cégek számára (GPS- és számlázási integrációkkal,
+        ügyfélportállal, alvállalkozói portállal).
       </p>
       <p>
-        <strong>Ingyenes próbaidő:</strong> 14 naptári nap, bankkártya nélkül. A próbaidő lejárta után
-        az előfizetés aktiválása szükséges a teljes hozzáférés megtartásához.
+        <strong>Próbaidőszak:</strong> 14 naptári nap, ingyenesen, bankkártya nélkül.
+        A próbaidő lejárta után érvényes előfizetés szükséges (havi / éves / egyedi Enterprise csomag).
       </p>
       <p>
-        <strong>Lemondás és visszatérítés:</strong> Az előfizetés bármikor lemondható; a hozzáférés
-        a számlázási időszak végéig aktív marad. Az első számlázástól számított 14 napon belül —
-        ha a szolgáltatást nem vette aktívan igénybe — teljes visszatérítés igényelhető (EU fogyasztói jog).
+        <strong>Fizetés:</strong> Stripe Payments Europe Ltd. (Írország) dolgozza fel.
+        A VallorSoft kártyaadatokat nem tárol.
       </p>
       <p>
-        <strong>Felelősség:</strong> A VallorSoft felelőssége az utolsó 3 havi előfizetési díj összegére
-        korlátozódik. Harmadik fél rendszerek (ANAF, GPS-szolgáltatók) meghibásodásáért nem felelünk.
+        <strong>Szellemi tulajdon:</strong> a platform minden joga a VALLOR TEAM SRL-t illeti.
+        A felhasználó korlátozott, nem kizárólagos, nem átruházható, visszavonható
+        használati jogot kap — kizárólag saját üzleti célokra.
+        Viszonteladás és továbblicencelés tilos.
       </p>
       <p>
-        <strong>Alkalmazandó jog:</strong> román jog; vitás kérdések esetén román bíróságok illetékesek.
-        EU-s fogyasztók az ODR-platformot is igénybe vehetik:
-        <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener">ec.europa.eu/consumers/odr</a>.
+        <strong>Felelősségkorlátozás:</strong> a VallorSoft közvetett károkért nem felel;
+        teljes felelőssége az utolsó 12 hónapban kifizetett előfizetési díj összegére korlátozott.
       </p>
       <p>
-        <strong>Módosítások:</strong> A feltételek módosításáról legalább 14 nappal korábban értesítjük
-        e-mailben. Ha nem ért egyet a változásokkal, az előfizetés büntetés nélkül felmondható.
+        <strong>Felmondás:</strong> az ügyfél bármikor felmondhatja a szerződést e-mailben
+        (<a href="mailto:vallorsoft@gmail.com">vallorsoft@gmail.com</a>);
+        a már esedékes díjak visszafizetésre nem kerülnek.
+        Az adatok a szerződés megszűnése után jogszabályi kötelezettségek teljesítéséig megőrződnek,
+        majd biztonságosan törlődnek.
+      </p>
+      <p>
+        <strong>Irányadó jog:</strong> román jog (Polgári Törvénykönyv, kereskedelmi jog, GDPR).
+        Vitás kérdésekben a Covasna megyei illetékes román bíróság jár el.
+      </p>
+      <p>
+        <strong>ÁSZF módosítása:</strong> lényeges változásokról e-mailben vagy platformon belüli
+        értesítéssel tájékoztatunk; a módosítás utáni további használat elfogadásnak minősül.
       </p>
     </div>
+
   </main>
 
   <!-- Footer -->
@@ -231,9 +559,10 @@
           <a href="/">Acasă</a>
           <a href="/privacy">Politica de Confidențialitate</a>
         </nav>
-        <p class="footer-copy">&copy; 2026 VallorSoft. Toate drepturile rezervate.</p>
+        <p class="footer-copy">&copy; 2026 VALLOR TEAM SRL. Toate drepturile rezervate.</p>
       </div>
     </div>
   </footer>
+
 </body>
 </html>
