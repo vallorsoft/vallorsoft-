@@ -175,7 +175,28 @@ router.get('/api/portal/orders', requireClient, async (req, res) => {
       onroad: orders.filter((o) => o.status === 'In Curs').length,
       unpaid: orders.filter((o) => o.status === 'Finalizat' && o.payment_status !== 'paid').length,
     };
-    return res.json({ ok: true, orders, stats, client_nev: cu.client_nev });
+
+    // A kliens beküldött portál-kérései (még feldolgozás alatt VAGY elutasítva) —
+    // az ELFOGADOTT kérés már valódi fuvarként megjelenik fent, ezért azt itt kihagyjuk.
+    // Így a kliens MINDENT lát, amit beküldött (semmi nem „tűnik el").
+    const reqR = await pool.query(
+      `SELECT id, status, extracted, pdf_name, received_at
+       FROM inbound_orders
+       WHERE company_id = $1 AND source = 'portal'
+         AND LOWER(source_email) = LOWER($2)
+         AND status <> 'approved'
+       ORDER BY received_at DESC LIMIT 100`,
+      [cu.company_id, cu.email]);
+    const requests = reqR.rows.map((q) => {
+      const ex = q.extracted || {};
+      return {
+        id: q.id, status: q.status, received_at: q.received_at,
+        ref: ex.ref || '', loc_incarcare: ex.loc_incarcare || '', loc_descarcare: ex.loc_descarcare || '',
+        suly_kg: ex.suly_kg || ex.greutate || null, load_type: ex.load_type || null,
+        has_doc: !!q.pdf_name,
+      };
+    });
+    return res.json({ ok: true, orders, stats, requests, client_nev: cu.client_nev });
   } catch (err) {
     console.error('portal orders hiba:', err);
     return res.json({ ok: false, err: 'Eroare de server' });

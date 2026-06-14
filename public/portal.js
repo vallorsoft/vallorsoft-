@@ -4,7 +4,7 @@
 //  letöltés + új-fuvar igénylés. Minden adat a /api/portal/* végpontokról.
 // ============================================================
 (function () {
-  var _orders = [], _map = null, _mLayer = null, _setToken = null;
+  var _orders = [], _requests = [], _map = null, _mLayer = null, _setToken = null;
 
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -77,13 +77,39 @@
     api('GET', '/api/portal/orders').then(function (r) {
       if (!r || !r.ok) { $('dOrders').innerHTML = '<div class="muted" style="text-align:center;padding:20px">' + esc(t('common.loadError')) + '.</div>'; return; }
       _orders = r.orders || [];
+      _requests = r.requests || [];
       var s = r.stats || {};
       $('dStats').innerHTML =
         tile(t('por.tileActive'), s.active || 0) + tile(t('por.tileOnroad'), s.onroad || 0, '#4ade80') +
         tile(t('por.tileTotal'), _orders.length) + tile(t('por.tileUnpaid'), s.unpaid || 0, (s.unpaid ? '#ff6b75' : ''));
-      if (!_orders.length) { $('dOrders').innerHTML = '<div class="muted" style="text-align:center;padding:24px">' + esc(t('por.noOrdersYet')) + '</div>'; return; }
-      $('dOrders').innerHTML = _orders.map(orderCard).join('');
+      var html = '';
+      if (_orders.length) html += _orders.map(orderCard).join('');
+      else if (!_requests.length) html += '<div class="muted" style="text-align:center;padding:24px">' + esc(t('por.noOrdersYet')) + '</div>';
+      // Beküldött kérések (feldolgozás alatt / elutasítva) — semmi ne „tűnjön el"
+      if (_requests.length) {
+        html += '<div class="muted" style="font-size:12.5px;font-weight:700;margin:14px 2px 8px">' + esc(t('por.reqSectionTitle')) + ' (' + _requests.length + ')</div>';
+        html += _requests.map(requestCard).join('');
+      }
+      $('dOrders').innerHTML = html;
     });
+  }
+  function reqST(status) {
+    if (status === 'rejected') return { c: 'b-red', t: t('por.reqRejected') };
+    return { c: 'b-warn', t: t('por.reqPending') };   // new / parsed / reviewed
+  }
+  function requestCard(q) {
+    var st = reqST(q.status);
+    return '<div class="ord">'
+      + '<div class="row1"><span class="id">📋 ' + esc(t('por.reqLabel')) + '</span>'
+      + '<span class="badge ' + st.c + '">● ' + esc(st.t) + '</span>'
+      + (q.load_type ? '<span class="badge b-info">' + esc(q.load_type) + '</span>' : '')
+      + (q.has_doc ? '<span class="badge b-info">📎</span>' : '')
+      + (q.ref ? '<span class="muted" style="margin-left:auto;font-size:12px">' + esc(t('por.refLabel')) + ' ' + esc(q.ref) + '</span>' : '') + '</div>'
+      + '<div class="route">' + esc(q.loc_incarcare || '—') + ' → ' + esc(q.loc_descarcare || '—') + '</div>'
+      + '<div class="meta">'
+      + '<span>🕒 ' + fmtD(q.received_at) + '</span>'
+      + (q.suly_kg ? '<span>⚖️ ' + q.suly_kg + ' kg</span>' : '')
+      + '</div></div>';
   }
   function tile(k, v, col) {
     return '<div class="glass tile"><div class="k">' + esc(k) + '</div><div class="v" style="' + (col ? 'color:' + col : '') + '">' + v + '</div></div>';
