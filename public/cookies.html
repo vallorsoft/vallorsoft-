@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Politica privind Cookie-urile — VallorSoft</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/landing.css">
+  <style>
+    .policy-content { max-width: 820px; margin: 0 auto; padding: 120px 24px 80px; }
+    .policy-content h1 { margin-bottom: .4rem; font-size: 2rem; }
+    .policy-content .last-update { color: #9ca6b5; font-size: .85rem; margin-bottom: 2.5rem; }
+    .policy-content h2 { margin: 2.5rem 0 .8rem; font-size: 1.1rem; color: #e10b1a; font-weight: 700; }
+    .policy-content h3 { margin: 1.5rem 0 .5rem; font-size: .95rem; color: #f5f7fa; font-weight: 600; }
+    .policy-content p, .policy-content li { color: #9ca6b5; font-size: .9rem; line-height: 1.75; margin-bottom: .5rem; }
+    .policy-content ul { padding-left: 1.4rem; margin-bottom: .8rem; }
+    .policy-content ul li { list-style: disc; }
+    .policy-content a { color: #e10b1a; }
+    .policy-content a:hover { text-decoration: underline; }
+    .policy-content strong { color: #e9eef5; }
+    .policy-content .info-box {
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 12px;
+      padding: 1.2rem 1.4rem;
+      margin: 1rem 0 1.5rem;
+    }
+    .policy-content .info-box p { margin-bottom: .3rem; }
+    .policy-content .cookie-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0 1.5rem;
+      font-size: .85rem;
+    }
+    .policy-content .cookie-table th {
+      text-align: left;
+      padding: .6rem .8rem;
+      background: rgba(225,11,26,.1);
+      color: #e9eef5;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(255,255,255,.12);
+    }
+    .policy-content .cookie-table td {
+      padding: .6rem .8rem;
+      color: #9ca6b5;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      vertical-align: top;
+    }
+    .policy-content .cookie-table tr:hover td { background: rgba(255,255,255,.03); }
+    .policy-content .badge-necessary {
+      display: inline-block;
+      background: rgba(34,197,94,.15);
+      border: 1px solid rgba(34,197,94,.35);
+      color: #22c55e;
+      font-size: .72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 99px;
+    }
+    .policy-content .badge-analytics {
+      display: inline-block;
+      background: rgba(59,130,246,.15);
+      border: 1px solid rgba(59,130,246,.35);
+      color: #60a5fa;
+      font-size: .72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 99px;
+    }
+    .policy-content .badge-marketing {
+      display: inline-block;
+      background: rgba(245,158,11,.15);
+      border: 1px solid rgba(245,158,11,.35);
+      color: #f59e0b;
+      font-size: .72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 99px;
+    }
+    .policy-content .version-note {
+      text-align: center;
+      color: #9ca6b5;
+      font-size: .8rem;
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+    .policy-content .hu-summary {
+      border-top: 1px solid rgba(255,255,255,.1);
+      margin-top: 3.5rem;
+      padding-top: 2.5rem;
+    }
+    .policy-content .hu-summary h2 { color: #a78bfa; }
+    .cookie-pref-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(225,11,26,.12);
+      border: 1px solid rgba(225,11,26,.35);
+      color: #ff9aa1;
+      padding: .6rem 1.2rem;
+      border-radius: 10px;
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      margin: .5rem 0 1rem;
+      transition: background .2s;
+    }
+    .cookie-pref-btn:hover { background: rgba(225,11,26,.2); }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar" id="navbar">
+    <div class="container">
+      <div class="nav-inner">
+        <a href="/" class="logo">
+          <span class="logo-vallor">Vallor</span><span class="logo-soft">Soft</span>
+        </a>
+        <div class="nav-actions">
+          <a href="/" class="btn-glass">← Acasă</a>
+          <a href="/login" class="btn-primary">Autentificare</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Content -->
+  <main class="policy-content">
+
+    <h1>Politica privind modulele Cookie</h1>
+    <p class="last-update">Ultima actualizare: 14.06.2026 · Versiune: 1.0</p>
+
+    <p>
+      Prezenta Politică privind modulele Cookie explică modul în care platforma VallorSoft
+      utilizează cookie-uri și tehnologii similare atunci când vizitați website-ul sau
+      utilizați serviciile noastre.
+    </p>
+    <p>Această politică trebuie citită împreună cu:
+      <a href="/privacy">Politica de Confidențialitate</a> și
+      <a href="/terms">Termenii și Condițiile VallorSoft</a>.
+    </p>
+
+    <!-- 1 -->
+    <h2>1. Operatorul website-ului</h2>
+    <div class="info-box">
+      <p><strong>VALLOR TEAM SRL</strong></p>
+      <p>CUI: 47859317 · Nr. Reg. Com.: J2023000114142</p>
+      <p>Sat Arcus, Cart. Poiana Arcusului nr. 102, Cod 527166, Jud. Covasna, România</p>
+      <p>E-mail: <a href="mailto:vallorsoft@gmail.com">vallorsoft@gmail.com</a></p>
+    </div>
+
+    <!-- 2 -->
+    <h2>2. Ce sunt cookie-urile?</h2>
+    <p>
+      Cookie-urile sunt fișiere text de mici dimensiuni stocate pe dispozitivul utilizatorului
+      atunci când acesta accesează un website.
+    </p>
+    <p>Aceste fișiere permit website-ului să:</p>
+    <ul>
+      <li>funcționeze corect;</li>
+      <li>rețină anumite preferințe;</li>
+      <li>îmbunătățească experiența utilizatorului;</li>
+      <li>genereze statistici privind utilizarea serviciului.</li>
+    </ul>
+    <p>Cookie-urile nu execută cod și nu pot accesa în mod independent alte informații de pe dispozitiv.</p>
+
+    <!-- 3 -->
+    <h2>3. Tipuri de cookie-uri utilizate</h2>
+
+    <h3>3.1 Cookie-uri strict necesare <span class="badge-necessary">Necesare</span></h3>
+    <p>Aceste cookie-uri sunt indispensabile funcționării website-ului și platformei. Nu necesită consimțământ conform legislației aplicabile.</p>
+    <table class="cookie-table">
+      <thead>
+        <tr>
+          <th>Cookie</th>
+          <th>Scop</th>
+          <th>Durată</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>connect.sid</code></td>
+          <td>Sesiunea utilizatorului autentificat</td>
+          <td>Sesiune / 24h</td>
+        </tr>
+        <tr>
+          <td><code>vs-cookie-consent</code></td>
+          <td>Memorarea preferințelor cookie (Local Storage)</td>
+          <td>12 luni</td>
+        </tr>
+        <tr>
+          <td><code>vs-landing-lang</code></td>
+          <td>Preferința de limbă (RO/HU) — Local Storage</td>
+          <td>Persistent</td>
+        </tr>
+        <tr>
+          <td><code>vs-theme</code></td>
+          <td>Preferința de temă (light/dark) — Local Storage</td>
+          <td>Persistent</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>3.2 Cookie-uri de analiză (Analytics) <span class="badge-analytics">Analytics</span></h3>
+    <p>Aceste cookie-uri permit măsurarea și analiza modului în care utilizatorii folosesc website-ul. Sunt activate <strong>exclusiv după acordul explicit</strong> al utilizatorului.</p>
+    <p>Exemple de date colectate: pagini vizitate, durata sesiunilor, surse de trafic, performanța conținutului.</p>
+
+    <h3>3.3 Cookie-uri de marketing <span class="badge-marketing">Marketing</span></h3>
+    <p>Aceste cookie-uri pot fi utilizate pentru campanii publicitare, remarketing, măsurarea performanței reclamelor și integrarea cu platforme externe de promovare.</p>
+    <p>Sunt activate <strong>exclusiv după acordul explicit</strong> al utilizatorului.</p>
+
+    <!-- 4 -->
+    <h2>4. Consimțământul utilizatorului</h2>
+    <p>La prima accesare a website-ului, utilizatorul vede un banner privind cookie-urile cu trei opțiuni:</p>
+    <ul>
+      <li><strong>Accept toate</strong> — activează cookie-urile necesare, de analiză și de marketing.</li>
+      <li><strong>Doar necesare</strong> — activează exclusiv cookie-urile strict necesare funcționării.</li>
+      <li><strong>Setări personalizate</strong> — utilizatorul selectează individual fiecare categorie.</li>
+    </ul>
+    <p>Puteți modifica preferințele în orice moment:</p>
+    <button class="cookie-pref-btn" onclick="openCookiePrefs()">⚙️ Modifică preferințele cookie</button>
+
+    <!-- 5 -->
+    <h2>5. Respectarea GDPR și ePrivacy</h2>
+    <p>VallorSoft respectă:</p>
+    <ul>
+      <li>Regulamentul (UE) 2016/679 (GDPR);</li>
+      <li>Directiva ePrivacy (2002/58/CE);</li>
+      <li>Legea nr. 190/2018;</li>
+      <li>legislația română aplicabilă.</li>
+    </ul>
+    <p>Cookie-urile care nu sunt strict necesare nu sunt încărcate înainte de obținerea consimțământului explicit. Nu sunt utilizate mecanisme de tip pre-bifare automată, acceptare implicită, dark patterns sau consimțământ forțat.</p>
+
+    <!-- 6 -->
+    <h2>6. Local Storage și tehnologii similare</h2>
+    <p>Platforma utilizează Local Storage (stocare locală în browser) pentru:</p>
+    <ul>
+      <li>memorarea limbii selectate (RO/HU);</li>
+      <li>preferințe de interfață și temă;</li>
+      <li>starea bannerului cookie;</li>
+      <li>setări tehnice necesare funcționării aplicației.</li>
+    </ul>
+    <p>Aceste date sunt stocate exclusiv local în browserul utilizatorului și nu sunt transmise la server.</p>
+
+    <!-- 7 -->
+    <h2>7. Durata de stocare</h2>
+
+    <h3>Cookie-uri de sesiune</h3>
+    <p>Sunt șterse automat la închiderea browserului.</p>
+
+    <h3>Cookie-uri persistente</h3>
+    <p>Pot fi păstrate pentru perioade cuprinse între 30 de zile și maximum <strong>24 de luni</strong>, în funcție de scopul utilizării.</p>
+
+    <!-- 8 -->
+    <h2>8. Gestionarea preferințelor</h2>
+    <p>Utilizatorul poate modifica în orice moment preferințele privind cookie-urile prin:</p>
+    <ul>
+      <li>butonul „Setări Cookie" disponibil în subsolul website-ului;</li>
+      <li>setările browserului utilizat;</li>
+      <li>ștergerea cookie-urilor existente din browser.</li>
+    </ul>
+    <p>Retragerea consimțământului nu afectează legalitatea prelucrării efectuate înainte de retragere.</p>
+    <p>Dezactivarea anumitor cookie-uri poate afecta funcționarea website-ului și a platformei.</p>
+
+    <!-- 9 -->
+    <h2>9. Cookie-uri utilizate de terți</h2>
+    <p>În funcție de serviciile activate, website-ul poate integra servicii furnizate de terți, care pot utiliza propriile cookie-uri:</p>
+
+    <table class="cookie-table">
+      <thead>
+        <tr>
+          <th>Furnizor</th>
+          <th>Scop</th>
+          <th>Categorie</th>
+          <th>Politică</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Google Firebase</strong></td>
+          <td>Notificări push, funcționalități tehnice</td>
+          <td><span class="badge-necessary">Necesare</span></td>
+          <td><a href="https://policies.google.com/privacy" target="_blank" rel="noopener">google.com</a></td>
+        </tr>
+        <tr>
+          <td><strong>Stripe</strong></td>
+          <td>Procesare plăți, antifraudă</td>
+          <td><span class="badge-necessary">Necesare</span></td>
+          <td><a href="https://stripe.com/privacy" target="_blank" rel="noopener">stripe.com</a></td>
+        </tr>
+        <tr>
+          <td><strong>Brevo (Sendinblue)</strong></td>
+          <td>E-mail transacțional, notificări</td>
+          <td><span class="badge-necessary">Necesare</span></td>
+          <td><a href="https://www.brevo.com/legal/privacypolicy" target="_blank" rel="noopener">brevo.com</a></td>
+        </tr>
+        <tr>
+          <td><strong>Google Analytics</strong> (opțional)</td>
+          <td>Statistici utilizare website</td>
+          <td><span class="badge-analytics">Analytics</span></td>
+          <td><a href="https://policies.google.com/privacy" target="_blank" rel="noopener">google.com</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- 10 -->
+    <h2>10. Dezactivarea cookie-urilor din browser</h2>
+    <p>Majoritatea browserelor permit blocarea, ștergerea sau limitarea cookie-urilor:</p>
+    <ul>
+      <li><strong>Chrome:</strong> Setări → Confidențialitate și securitate → Cookie-uri</li>
+      <li><strong>Firefox:</strong> Opțiuni → Confidențialitate și securitate → Cookie-uri</li>
+      <li><strong>Safari:</strong> Preferințe → Confidențialitate → Cookie-uri</li>
+      <li><strong>Edge:</strong> Setări → Cookie-uri și permisiuni de site</li>
+    </ul>
+    <p>Dezactivarea cookie-urilor necesare poate împiedica autentificarea și funcționarea normală a platformei.</p>
+
+    <!-- 11 -->
+    <h2>11. Actualizarea politicii</h2>
+    <p>
+      VALLOR TEAM SRL poate modifica periodic această Politică privind Cookie-urile.
+      Versiunea actualizată va fi publicată pe website-ul VallorSoft împreună cu data ultimei actualizări.
+    </p>
+
+    <!-- 12 -->
+    <h2>12. Contact</h2>
+    <div class="info-box">
+      <p><strong>VALLOR TEAM SRL</strong></p>
+      <p>CUI: 47859317 · Nr. Reg. Com.: J2023000114142</p>
+      <p>Sat Arcus, Cart. Poiana Arcusului nr. 102, Cod 527166, Jud. Covasna, România</p>
+      <p>Telefon: <a href="tel:0769532015">0769532015</a></p>
+      <p>E-mail: <a href="mailto:vallorsoft@gmail.com">vallorsoft@gmail.com</a></p>
+    </div>
+
+    <div class="version-note">
+      Ultima actualizare: <strong>14.06.2026</strong> · Versiune: <strong>1.0</strong>
+    </div>
+
+    <!-- Hungarian summary -->
+    <div class="hu-summary">
+      <h2>Magyar összefoglaló — Cookie-szabályzat</h2>
+      <p>
+        A <strong>VALLOR TEAM SRL</strong> (CUI: 47859317, Arcus, Covasna megye, Románia)
+        által üzemeltetett VallorSoft platform cookie-szabályzata.
+      </p>
+      <p>
+        <strong>Szükséges cookie-k</strong> (hozzájárulás nélkül): munkamenet-azonosító
+        (<code>connect.sid</code>), cookie-beállítások tárolása, nyelv- és témapreferencia
+        (Local Storage-ban).
+      </p>
+      <p>
+        <strong>Analitikai cookie-k</strong> (csak hozzájárulással): weboldal-látogatottsági
+        statisztikák. Aktiválás: csak az „Összes elfogadása" vagy az „Analitika" engedélyezése után.
+      </p>
+      <p>
+        <strong>Marketing cookie-k</strong> (csak hozzájárulással): remarketing, hirdetési
+        teljesítménymérés. Aktiválás: csak az „Összes elfogadása" vagy a „Marketing" engedélyezése után.
+      </p>
+      <p>
+        <strong>Beállítások módosítása:</strong> az oldal alján a „Cookie beállítások" gombbal
+        bármikor módosítható. A visszavonás nem érinti a korábbi adatkezelés jogszerűségét.
+      </p>
+      <p>
+        <strong>Harmadik felek:</strong> Google Firebase (push értesítések), Stripe (fizetés),
+        Brevo (e-mail), opcionálisan Google Analytics — mindegyik saját adatvédelmi szabályzat
+        szerint jár el.
+      </p>
+      <p>
+        <strong>Irányadó jogszabályok:</strong> GDPR (EU) 2016/679, ePrivacy irányelv,
+        román 190/2018. tv.
+      </p>
+    </div>
+
+  </main>
+
+  <!-- Cookie modal trigger (reuses landing.js logic if loaded) -->
+  <script>
+    function openCookiePrefs() {
+      const modal = document.getElementById('cookieModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+      } else {
+        alert('Preferințele cookie pot fi gestionate din pagina principală → butonul „Setări Cookie" din subsol.');
+      }
+    }
+    window.addEventListener('scroll', () => {
+      document.getElementById('navbar')?.classList.toggle('scrolled', window.scrollY > 40);
+    }, { passive: true });
+  </script>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <span class="logo-vallor">Vallor</span><span class="logo-soft">Soft</span>
+        </div>
+        <nav class="footer-links">
+          <a href="/">Acasă</a>
+          <a href="/privacy">Confidențialitate</a>
+          <a href="/terms">Termeni</a>
+          <a href="/dpa">DPA</a>
+          <a href="/security">Securitate</a>
+        </nav>
+        <p class="footer-copy">&copy; 2026 VALLOR TEAM SRL. Toate drepturile rezervate.</p>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
