@@ -33,6 +33,7 @@ const handlers = Object.assign(
   require('../handlers/uitDeeplink'),
   require('../handlers/gdpr'),
   require('../handlers/stripe'),
+  require('../handlers/globalSearch'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a
