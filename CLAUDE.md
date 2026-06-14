@@ -242,7 +242,7 @@ Szinte minden lekérdezés `company_id`-re szűr. Új lekérdezésnél MINDIG sz
 **Glassmorphism, sötét alap.** A `:root`-ban CSS-változók (dizájn-tokenek):
 - Háttér: `--bg-deepest #05070b`, `--bg-panel #0c1218`, `--bg-panel-raised #141c25`.
 - Szöveg: `--text-primary #e9eef5`, `--text-muted #8a97a8`.
-- Márka: `--brand-red #e10b1a` (a „Soft”), `--brand-white #fff` (a „Vallor”).
+- Márka: `--brand-indigo #6366f1` (a „Soft” — indigó/lila), `--brand-white #fff` (a „Vallor”), `--brand-red #e10b1a` (piros akcent: col-resizer, tábla drop-target, veh-params — NEM a logóban).
 - Státusz: `--status-ok #22c55e`, `--status-warn #f59e0b`, `--status-danger #ef4444`, `--status-info #3b82f6`.
 - Üveg: `--glass-bg-dark/--glass-border-dark` (sötét), `--glass-bg-light/--glass-border-light` (világos).
 - Sarkok: `--radius-lg 18px`, `--radius-md 12px`, `--radius-sm 8px`. (Régebbi alias: `--r-lg/--r-md/--r-sm`.)
