@@ -319,6 +319,10 @@
     // Útvonal-előnézet modal
     'cs.rm.title': { hu: '🗺️ Útvonal-előnézet', ro: '🗺️ Previzualizare rută' },
     'cs.rm.close': { hu: '✕ Bezár', ro: '✕ Închide' },
+    'cs.rm.save': { hu: 'Útvonal mentése', ro: 'Salvează ruta' },
+    'cs.rm.saved': { hu: 'Útvonal elmentve a fuvarra', ro: 'Ruta a fost salvată pe transport' },
+    'cs.rm.saveOnlyEdit': { hu: 'Mentés csak meglévő fuvar szerkesztésekor lehetséges.', ro: 'Salvarea este posibilă doar la editarea unui transport existent.' },
+    'cs.rm.saveNoRoute': { hu: 'Nincs még kiszámolt útvonal a mentéshez.', ro: 'Nu există încă o rută calculată pentru salvare.' },
     'cs.rm.viaHint': { hu: 'A köztespontok <b>csak a km-számításhoz és az útvonal-előnézethez</b> kellenek — NEM megállók. Add hozzá címmel, vagy kapcsold be a térkép-kattintást.', ro: 'Punctele intermediare sunt <b>doar pentru calcul km și previzualizare</b> — NU sunt opriri. Adaugă cu adresă sau activează clic pe hartă.' },
     'cs.rm.viaPh': { hu: 'Köztespont címe', ro: 'Adresă punct intermediar' },
     'cs.rm.clickAdd': { hu: 'Térképre kattintás = köztespont', ro: 'Clic pe hartă = punct intermediar' },

@@ -333,7 +333,10 @@ function ensureRouteMapModal(){
   d.innerHTML='<div class="rmm-card">'
     +'<div class="rmm-head"><b class="text-primary" style="font-size:15px;">'+t('cs.rm.title')+'</b>'
     +'<span id="rmmKm" class="badge info" style="margin-left:6px;">—</span>'
-    +'<button class="btn ghost" style="margin-left:auto;padding:5px 12px;" onclick="closeRouteMap()">'+t('cs.rm.close')+'</button></div>'
+    +'<span style="margin-left:auto;display:flex;gap:8px;">'
+      +'<button id="rmmSaveBtn" class="btn primary" style="padding:5px 12px;display:none;" onclick="routeMapSave()">💾 '+t('cs.rm.save')+'</button>'
+      +'<button class="btn ghost" style="padding:5px 12px;" onclick="closeRouteMap()">'+t('cs.rm.close')+'</button>'
+    +'</span></div>'
     +'<div class="rmm-body">'
     +'<div class="rmm-map" id="rmmMap"></div>'
     +'<div class="rmm-side">'
@@ -378,6 +381,9 @@ function routeMapDraw(which){
 function renderRouteVia(which){
   var box=document.getElementById('rmmViaList'); if(!box) return;
   var st=_rmState[which];
+  // 💾 mentés gomb: csak a SZERKESZTŐBŐL (létező fuvar) + ha van köztespont — a térképen menthető
+  var sb=document.getElementById('rmmSaveBtn');
+  if(sb){ sb.style.display = (which==='edit' && typeof _oeOrderId!=='undefined' && _oeOrderId && st.via.length>0) ? '' : 'none'; }
   if(!st.via.length){ box.innerHTML='<div class="text-muted" style="font-size:12px;margin-bottom:8px;">'+t('cs.rm.noVia')+'</div>'; return; }
   box.innerHTML=st.via.map(function(v,i){
     var lbl=v.address||(v.lat!=null?(Number(v.lat).toFixed(3)+', '+Number(v.lng).toFixed(3)):'?');
@@ -395,6 +401,26 @@ function openRouteMap(which){
   },60);
 }
 function closeRouteMap(){ var m=document.getElementById('routeMapModal'); if(m) m.classList.remove('open'); _rmWhich=null; }
+// Az aktuális útvonalat (köztespontokkal) a fuvarra menti — a térkép NYITVA marad,
+// folytatható tovább. Csak a szerkesztőből (létező fuvar). A km + route_geo mentődik,
+// így a 🛣️ útdíj-becslés is már ezt a finomított útvonalat használja.
+function routeMapSave(){
+  if(_rmWhich!=='edit' || typeof _oeOrderId==='undefined' || !_oeOrderId){ toast(t('cs.rm.saveOnlyEdit'),'err'); return; }
+  var st=_rmState['edit'];
+  var rg=buildRouteGeo('edit');
+  if(!rg){ toast(t('cs.rm.saveNoRoute'),'err'); return; }
+  var payload={ route_geo: rg };
+  if(st && st.km!=null) payload.km=st.km;
+  var btn=document.getElementById('rmmSaveBtn'); if(btn) btn.disabled=true;
+  gas('comUpdate',[_oeOrderId, payload]).then(function(r){
+    if(btn) btn.disabled=false;
+    if(r&&r.ok){
+      toast(t('cs.rm.saved'),'ok');
+      // a szerkesztő km mezőjét is szinkronban tartjuk (de a térkép nyitva marad)
+      var kmEl=document.getElementById(RM_CFG.edit.km); if(kmEl && st && st.km!=null){ kmEl.value=st.km; _rmState.edit.kmAuto=true; }
+    } else { toast((r&&r.err)||'Eroare la salvare','err'); }
+  }).catch(function(){ if(btn) btn.disabled=false; toast('Eroare la salvare','err'); });
+}
 function routeMapAddViaFromInput(){
   var inp=document.getElementById('rmmViaInput'); var v=(inp&&inp.value||'').trim();
   if(!v||!_rmWhich) return; routeMapAddVia(_rmWhich,{address:v}); if(inp) inp.value='';
