@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-14 — Multi-tenant adatszivárgás audit + javítás (PR #94)
+
+- **3 agentes tenant-izolációs átvizsgálás** (handlers / routes / services+lib, ~87 fájl): hogy minden cég adata a saját `company_id`-jén belül maradjon.
+- **1 KRITIKUS javítva** — `handlers/documents.js` `orderDocUpload`: a kliens-megadta `orderId`-t ownership-ellenőrzés nélkül szúrta be → „A" cég dokumentumot fűzhetett „B" cég fuvarához (cross-tenant write). Fix: INSERT előtt `SELECT 1 FROM orders WHERE id=$1 AND company_id=$2`; élesben verifikálva (saját→OK, idegen→blokkolva).
+- **Defenzív:** `services/push.js` `sendPushToRole` JOIN köti a `u.company_id = ps.company_id`-t is.
+- **Verifikált biztonságos:** routes (portál `client_id`, alvállalkozó `carrier_id`, developer-export is_dev-gated), services cégenkénti ciklusai + cache-kulcsai; az e-mail-alapú joinok nem kihasználhatók (`users.email` globálisan UNIQUE). 108 teszt zöld. Részletek: `AUDIT.md` 11. lépés.
+
+---
+
 ## 2026-06-14 — FGO-menü ikonjavítás + átfogó átvilágítás (PR #92–#93)
 
 - **FGO-menü javítás (PR #92):** a közvetlen menüpontoknál (Vezérlőpult/Ügyfelek/Belső Chat/Beállítások) a `data-i18n` a `.tab`-on volt → az i18n felülírta a teljes tartalmat és kitörölte az SVG ikont; a `data-i18n` a belső `<span>`-ra került (ikon megmarad). A sidebar 20px-es menü-rése 3px-re szűkítve (FGO-tömör).
