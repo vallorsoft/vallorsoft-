@@ -670,7 +670,7 @@ function loadCegek(){
         +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
         +'<span class="status-badge '+sClass+'">'+sText+'</span>'
         +'<button class="btn-dev" onclick="openCegDetail('+c.id+')">🔍 '+escHtml(t('dev.detailsBtn'))+'</button>'
-        +'<button class="btn-dev" onclick="openEditCeg(_cegekCache['+idx+'])" style="background:rgba(255,255,255,0.05);color:var(--soft);border-color:var(--border);">'+escHtml(t('dev.edit'))+'</button>'
+        +'<button class="btn-dev" onclick="openEditCeg(_cegekCache['+idx+'])" style="background:#fff;color:var(--soft);border:1px solid var(--border-bright);box-shadow:none;">'+escHtml(t('dev.edit'))+'</button>'
         +(c.subscription_status==='active'
           ? '<button class="btn-danger-sm" onclick="blockCeg('+c.id+')">🔒 '+escHtml(t('dev.block'))+'</button>'
           : '<button class="btn-ok-sm" onclick="unblockCeg('+c.id+')">🔓 '+escHtml(t('dev.activate'))+'</button>')

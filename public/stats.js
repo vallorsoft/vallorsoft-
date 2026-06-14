@@ -334,7 +334,7 @@
       stChart('stChFinHavi', {
         type: 'bar',
         data: { labels: months, datasets: [
-          { label: t('st.fin.dsRevenue'), data: stSeries(months, r.havi, 'bevetel'), backgroundColor: 'rgba(225,11,26,0.65)' },
+          { label: t('st.fin.dsRevenue'), data: stSeries(months, r.havi, 'bevetel'), backgroundColor: 'rgba(99,102,241,0.65)' },
           { label: t('st.fin.dsCollected'), data: stSeries(months, r.havi, 'beszedett'), backgroundColor: 'rgba(34,197,94,0.65)' }
         ]}
       });
@@ -528,7 +528,7 @@
         type: 'bar',
         data: {
           labels: (r.termekek || []).map(function (p) { return p.produs; }),
-          datasets: [{ label: t('st.cSumRon'), data: (r.termekek || []).map(function (p) { return parseFloat(p.suma) || 0; }), backgroundColor: 'rgba(168,85,247,0.7)' }]
+          datasets: [{ label: t('st.cSumRon'), data: (r.termekek || []).map(function (p) { return parseFloat(p.suma) || 0; }), backgroundColor: 'rgba(99,102,241,0.7)' }]
         },
         options: { indexAxis: 'y' }
       });
@@ -593,7 +593,7 @@
         type: 'bar',
         data: {
           labels: top.map(function (s) { return s.nume || s.email; }),
-          datasets: [{ label: t('st.cRevenue'), data: top.map(function (s) { return parseFloat(s.bevetel) || 0; }), backgroundColor: 'rgba(225,11,26,0.7)' }]
+          datasets: [{ label: t('st.cRevenue'), data: top.map(function (s) { return parseFloat(s.bevetel) || 0; }), backgroundColor: 'rgba(99,102,241,0.7)' }]
         },
         options: { indexAxis: 'y' }
       });
