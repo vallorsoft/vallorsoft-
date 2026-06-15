@@ -370,6 +370,69 @@ router.post('/api/portal/request', requireClient, async (req, res) => {
   }
 });
 
+// ─── Tömeges fuvar-igény CSV-ből ──────────────────────────────
+// Elfogad max 200 sort, mindegyikből inbound_orders rekordot szúr be.
+router.post('/api/portal/bulk-request', requireClient, async (req, res) => {
+  try {
+    const cu = req.session.clientUser;
+    const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
+    if (!rows.length) return res.json({ ok: false, err: 'Nu exista randuri de importat.' });
+    if (rows.length > 200) return res.json({ ok: false, err: 'Maximum 200 randuri per import.' });
+
+    const trim = (v, n) => String(v == null ? '' : v).trim().slice(0, n);
+    const numOrNull = (v) => (v !== '' && v != null && !isNaN(Number(v))) ? Number(v) : null;
+    const intOrNull = (v) => (v !== '' && v != null && !isNaN(parseInt(v, 10))) ? parseInt(v, 10) : null;
+
+    let inserted = 0;
+    for (const r of rows) {
+      const extracted = {
+        client: cu.client_nev || '',
+        ref: trim(r.ref, 100),
+        loc_incarcare: trim(r.loc_incarcare, 200),
+        loc_descarcare: trim(r.loc_descarcare, 200),
+        data_incarcare: trim(r.data_incarcare, 10) || null,
+        data_descarcare: trim(r.data_descarcare, 10) || null,
+        suly_kg: numOrNull(r.suly_kg),
+        greutate: numOrNull(r.suly_kg),
+        load_type: ['FTL', 'LTL'].includes(r.load_type) ? r.load_type : null,
+        hossz_cm: intOrNull(r.hossz_cm),
+        szel_cm: intOrNull(r.szel_cm),
+        mag_cm: intOrNull(r.mag_cm),
+        observatii: trim(r.megjegyzes, 800),
+      };
+      const hasAny = extracted.loc_incarcare || extracted.loc_descarcare || extracted.ref || extracted.suly_kg;
+      if (!hasAny) continue;
+
+      const uid = 'portal-csv-' + Date.now() + '-' + crypto.randomBytes(4).toString('hex');
+      await pool.query(
+        `INSERT INTO inbound_orders (company_id, source, source_email, subject, received_at, message_uid,
+           extracted, status)
+         VALUES ($1, 'portal', $2, $3, NOW(), $4, $5, 'reviewed')`,
+        [cu.company_id, cu.email,
+         'CSV import — ' + rows.length + ' sor — ' + (cu.client_nev || cu.email),
+         uid, JSON.stringify(extracted)]
+      );
+      inserted++;
+    }
+
+    if (inserted === 0) return res.json({ ok: false, err: 'Nu au fost gasite randuri valide (lipseste adresa).' });
+
+    if (sendPushToRole) {
+      sendPushToRole(cu.company_id, ['Admin', 'Manager'], {
+        title: '📥 CSV import: ' + inserted + ' cereri noi / ' + inserted + ' új fuvarkérés',
+        body: (cu.client_nev || cu.email) + ': ' + inserted + ' cereri importate din CSV / fuvar importálva',
+        icon: '/icon192.png', badge: '/icon192.png',
+        tag: 'inbound-csv', url: '/admin',
+      }).catch(() => {});
+    }
+
+    return res.json({ ok: true, count: inserted });
+  } catch (err) {
+    console.error('portal bulk-request hiba:', err);
+    return res.json({ ok: false, err: 'Eroare de server' });
+  }
+});
+
 module.exports = router;
 // segéd a meghívó-e-mailhez (a clientPortal handler használja) — lang: 'ro' alap
 module.exports._sendInvite = async function (toEmail, nev, link, lang) {
