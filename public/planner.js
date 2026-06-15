@@ -22,7 +22,7 @@
   // ── Állapot ─────────────────────────────────────────────
   var _start = monday(new Date());
   var _days = 14;                       // 7 / 14 / 28
-  var _veh = [], _orders = [], _gps = {}, _matches = [], _matchByOrder = {};
+  var _veh = [], _carrierVeh = [], _orders = [], _gps = {}, _matches = [], _matchByOrder = {};
   var _selOid = null;                   // áthelyezés / kiosztás mód
   var _popOid = null;                   // nyitott popover fuvarja
   var _mDay = ymd(new Date());          // mobil: kiválasztott nap
@@ -210,7 +210,7 @@
     ]).then(function (rs) {
       var r = rs[0];
       if (!r || !r.ok) { box.innerHTML = '<div class="glass text-muted" style="padding:20px;">' + esc((r && r.err) || 'Hiba') + '</div>'; return; }
-      _veh = r.vehicles || []; _orders = r.orders || [];
+      _veh = r.vehicles || []; _carrierVeh = r.carrierVehicles || []; _orders = r.orders || [];
       _gps = {};
       if (rs[1] && rs[1].ok) (rs[1].vehicles || []).forEach(function (v) {
         _gps[String(v.rendszam || '').toUpperCase()] = (v.ignition === 'ON' || v.ignition === true || v.ignition === 'on');
@@ -484,6 +484,59 @@
       html += '</div></div>';
     });
     if (!vehs.length) html += '<div class="text-muted" style="padding:20px;text-align:center;">Nincs aktív vontató.</div>';
+
+    // Alvállalkozói (carrier) járművek — elválasztóval a belső járművek ALJÁN
+    if (_carrierVeh.length) {
+      html += '<div class="p2-row" style="border-top:2px solid rgba(99,102,241,0.4);">'
+        + '<div class="p2-rail" style="background:rgba(99,102,241,0.06);">'
+        + '<div class="rd" style="font-size:11px;font-weight:700;color:#a5b4fc;text-transform:uppercase;letter-spacing:.5px;">🚚 Extern / Alvállalkozó</div>'
+        + '</div>'
+        + '<div class="p2-lanes" style="width:' + (_days * W) + 'px;height:28px;">'
+        + days.map(function (d, i) { return '<div class="p2-dcell" style="left:' + (i * W) + 'px;width:' + W + 'px;background:rgba(99,102,241,0.04);"></div>'; }).join('')
+        + '</div></div>';
+      _carrierVeh.forEach(function (v) {
+        // carrier jármű rendszáma: rendszam mezőben tárolva (alias a lekérdezésből)
+        var rszam = String(v.rendszam || '').toUpperCase();
+        var mine = _orders.filter(function (o) {
+          return o.rendszam_camion && o.rendszam_camion.toUpperCase() === rszam;
+        });
+        if (_f.onlyBusy && !mine.length) return;
+        var lay = layoutVehicle(mine);
+        var H = Math.max(lay.laneCount * laneH() + 6, 40);
+        html += '<div class="p2-row"><div class="p2-rail" data-rendszam="' + esc(rszam) + '" style="height:' + H + 'px;background:rgba(99,102,241,0.04);" '
+          + 'ondragover="Planner._vov(event)" ondragleave="Planner._vlv(event)" ondrop="Planner._vdp(event)">'
+          + '<div class="rs text-primary"><span class="p2-dot" style="background:#a5b4fc;" title="Alvállalkozói jármű"></span>'
+          + '🚚 ' + esc(rszam) + '</div>'
+          + '<div class="rd" style="color:#a5b4fc;font-size:10px;">' + esc(v.carrier_nev || '') + (v.marca ? ' · ' + esc([v.marca, v.model].filter(Boolean).join(' ')) : '') + '</div>'
+          + '</div>'
+          + '<div class="p2-lanes" style="width:' + (_days * W) + 'px;height:' + H + 'px;">';
+        days.forEach(function (d, i) {
+          var y = ymd(d), we = d.getDay() === 0 || d.getDay() === 6;
+          html += '<div class="p2-dcell' + (we ? ' we' : '') + (y === today ? ' today' : '') + '" style="left:' + (i * W) + 'px;width:' + W + 'px;background:rgba(99,102,241,0.04);" '
+            + 'data-rendszam="' + esc(rszam) + '" data-day="' + y + '" '
+            + 'ondragover="Planner._dov(event)" ondragleave="Planner._dlv(event)" ondrop="Planner._dp(event)" onclick="Planner.cellTap(event)"></div>';
+        });
+        if (todayIdx >= 0 && todayIdx < _days) html += '<div class="p2-todayline" style="left:' + (todayIdx * W + Math.round(W / 2)) + 'px;"></div>';
+        lay.bars.forEach(function (b) {
+          var o = b.o, st = ST[o.status] || { c: '#6366f1' };
+          var s = Math.max(b.s, 0), e = Math.min(b.e, _days - 1);
+          var left = s * W + 2, width = (e - s + 1) * W - 6;
+          var dim = !passes(o);
+          var icons = (!o.nume_sofer ? '⚠️' : '');
+          html += '<div class="p2-bar' + (b.conflict ? ' conflict' : '') + (dim ? ' dim' : '') + (String(_selOid) === String(o.id) ? ' picked' : '') + '" '
+            + 'draggable="true" data-oid="' + esc(String(o.id)) + '" '
+            + 'style="left:' + left + 'px;width:' + width + 'px;top:' + (b.lane * laneH() + 4) + 'px;height:' + (laneH() - 7) + 'px;background:' + st.c + 'cc;border-color:rgba(165,180,252,0.5);" '
+            + 'title="' + esc(String(o.id) + ' · ' + (o.client || '') + '\n' + (o.loc_incarcare || '?') + ' → ' + (o.loc_descarcare || '?') + '\n' + (o.nume_sofer || 'NINCS SOFŐR') + ' · ' + o.status) + '" '
+            + 'ondragstart="Planner._ds(event)" onclick="Planner.openPop(\'' + esc(String(o.id)) + '\',event)">'
+            + icons + esc(String(o.id).replace('CMD-', '#')) + ' ' + esc((o.loc_descarcare || o.client || '').slice(0, 22))
+            + (width > 150 ? ' <span class="sub">' + esc(o.nume_sofer || '') + '</span>' : '')
+            + '<span class="p2-rz" data-oid="' + esc(String(o.id)) + '" onpointerdown="Planner.rzStart(event)" title="Húzd a lerakó-dátum módosításához"></span>'
+            + '</div>';
+        });
+        html += '</div></div>';
+      });
+    }
+
     html += '</div></div></div>';
     return html;
   }
@@ -528,7 +581,42 @@
         + '</div>';
     }).join('');
 
-    return '<div class="glass" style="padding:12px;margin-bottom:12px;">' + strip + '</div>' + (cards || '<div class="glass text-muted" style="padding:18px;text-align:center;">Nincs jármű.</div>');
+    // Carrier járművek a mobilnézet ALJÁN
+    var carrierCards = '';
+    if (_carrierVeh.length) {
+      carrierCards = '<div style="border-top:2px solid rgba(99,102,241,0.4);margin-top:8px;padding-top:8px;">'
+        + '<div style="font-size:11px;font-weight:700;color:#a5b4fc;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">🚚 Extern / Alvállalkozó</div>'
+        + _carrierVeh.map(function (v) {
+            var rszam = String(v.rendszam || '').toUpperCase();
+            var dayOrders = _orders.filter(function (o) {
+              if (!o.rendszam_camion || o.rendszam_camion.toUpperCase() !== rszam) return false;
+              var s = dstr(o.data_incarcare), e = dstr(o.data_descarcare) || s;
+              return s && s <= _mDay && e >= _mDay && passes(o);
+            });
+            if (_f.onlyBusy && !dayOrders.length) return '';
+            return '<div class="p2-vcard' + (_selOid ? ' picking' : '') + '" style="border-color:rgba(99,102,241,0.35);background:rgba(99,102,241,0.04);" '
+              + (_selOid ? 'onclick="Planner.vcardTap(\'' + esc(rszam) + '\')"' : '') + '>'
+              + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:' + (dayOrders.length ? '7px' : '0') + ';">'
+              + '<span class="p2-dot" style="background:#a5b4fc;"></span>'
+              + '<b class="text-primary" style="font-size:13px;">🚚 ' + esc(rszam) + '</b>'
+              + '<span style="font-size:10px;color:#a5b4fc;">' + esc(v.carrier_nev || '') + '</span>'
+              + (_selOid ? '<span style="margin-left:auto;color:#3b82f6;font-weight:800;font-size:12px;">+ IDE</span>' : '')
+              + '</div>'
+              + dayOrders.map(function (o) {
+                  var st = ST[o.status] || { c: '#6366f1' };
+                  return '<div class="p2-card" style="background:' + st.c + 'cc;border-color:rgba(165,180,252,0.5);max-width:none;margin-bottom:5px;" '
+                    + 'onclick="Planner.openPop(\'' + esc(String(o.id)) + '\',event)">'
+                    + esc(String(o.id).replace('CMD-', '#')) + ' · ' + esc(o.client || '—')
+                    + '<span class="sub">' + esc(o.loc_incarcare || '?') + ' → ' + esc(o.loc_descarcare || '?') + ' · ' + esc(o.nume_sofer || '⚠️ nincs sofőr') + '</span></div>';
+                }).join('')
+              + '</div>';
+          }).join('')
+        + '</div>';
+    }
+
+    return '<div class="glass" style="padding:12px;margin-bottom:12px;">' + strip + '</div>'
+      + (cards || '<div class="glass text-muted" style="padding:18px;text-align:center;">Nincs jármű.</div>')
+      + carrierCards;
   }
 
   // ── 💡 Visszfuvar-radar panel ───────────────────────────
