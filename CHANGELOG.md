@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-15 — Carrier járművek megjelenítése a planificatorban (PR #114)
+
+- **`handlers/orders.js`** — `getPlannerData`: `carrier_vehicles JOIN carriers` lekérés (`company_id`-szűrt), `carrierVehicles` tömbként visszaadva
+- **`public/planner.js`** — `_carrierVeh` állapot-változó; Gantt-nézetben elválasztó-fejléccel vizuálisan megkülönböztetett sorok (indigó szín, 🚚 ikon, `carrier_nev` felirat, fuvar-sávok drag&drop-pal); mobil napi nézetben szintén megjelenik a carrier-lista
+- **`routes/carrier-portal.js`** — ellenőrizve: GET/POST/DELETE `/api/carrier/vehicles` mindhárom végpont `company_id AND carrier_id` szűrést tartalmaz (javítás nem volt szükséges)
+
+---
+
 ## 2026-06-15 — Menetlevél form: indulás/érkezés + határátlépések + diurna (PR #113)
 
 - **`db/fuvarlevel-trip-times.sql`** — új migráció: `fuvarlevelek.indulas_dt TIMESTAMPTZ`, `erkezes_dt TIMESTAMPTZ`, `hataratok JSONB DEFAULT '[]'` oszlopok
