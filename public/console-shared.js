@@ -1307,7 +1307,7 @@ function loadCarrierAp(){
 
     var accordionHtml = Object.values(groups).sort(function(a,b){ return (a.carrier_nev||'').localeCompare(b.carrier_nev||''); }).map(function(g){
       var cnt = g.invoices.length;
-      var openStr = g.total_open > 0 ? Math.round(g.total_open) + ' EUR nyitott' : 'Rendezett';
+      var openStr = g.total_open > 0 ? Math.round(g.total_open) + ' EUR ' + t('cs.ap.open') : t('cs.ap.settled');
       var gid = 'cg_' + g.carrier_id;
 
       // Számla sorok
@@ -1315,8 +1315,8 @@ function loadCarrierAp(){
         var rem = Math.round((parseFloat(it.amount)||0)-(parseFloat(it.paid_amount)||0));
         var due='—';
         if(it.due_date){ var days=Math.round((new Date(it.due_date)-new Date())/86400000);
-          due = days<0?('<span class="badge err">'+(-days)+'n lejárt</span>'):days<=7?('<span class="badge warn">'+days+' nap</span>'):String(it.due_date).slice(0,10); }
-        var stB = it.status==='paid'?'<span class="badge ok">'+t('pay.paid')+'</span>':it.status==='partial'?'<span class="badge warn">Részfizetés ('+Math.round(it.paid_amount||0)+')</span>':'<span class="badge err">'+t('cs.ap.toPay')+'</span>';
+          due = days<0?('<span class="badge err">'+t('cs.ap.expiredDays',{n:-days})+'</span>'):days<=7?('<span class="badge warn">'+days+' '+t('cs.ap.days')+'</span>'):String(it.due_date).slice(0,10); }
+        var stB = it.status==='paid'?'<span class="badge ok">'+t('pay.paid')+'</span>':it.status==='partial'?'<span class="badge warn">'+t('cs.ap.partialAmt',{n:Math.round(it.paid_amount||0)})+'</span>':'<span class="badge err">'+t('cs.ap.toPay')+'</span>';
         var orderIds=(function(){ try{ return Array.isArray(it.order_ids)?it.order_ids:JSON.parse(it.order_ids||'[]'); }catch(e){ return []; } })();
         return '<div style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
           +'<span style="font-weight:600;">📄 '+esc(it.invoice_number||'—')+'</span>'
@@ -1333,18 +1333,18 @@ function loadCarrierAp(){
       // Accordion kártya
       return '<div class="glass-soft" style="margin-bottom:8px;border-radius:12px;overflow:hidden;">'
         // Fejléc (accordion header)
-        +'<div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;background:rgba(99,102,241,0.07);border-bottom:2px solid rgba(99,102,241,0.18);" onclick="carrierApToggle(\''+gid+'\')">'
-        +'<span style="font-size:15px;font-weight:800;color:#e2e8f0;flex:1;">🚚 '+esc(g.carrier_nev)+'</span>'
-        +'<span style="font-size:12px;color:#a5b4fc;">'+cnt+' számla · '+esc(openStr)+'</span>'
-        +'<button class="btn ghost" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();carrierApDocs('+g.carrier_id+')">📎 Dok.</button>'
-        +'<span id="'+gid+'_arr" style="color:#818cf8;font-size:14px;transition:transform .2s;">▼</span>'
+        +'<div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;background:rgba(99,102,241,0.10);border-bottom:2px solid rgba(99,102,241,0.22);" onclick="carrierApToggle(\''+gid+'\')">'
+        +'<span style="font-size:15px;font-weight:800;color:var(--text-primary);flex:1;">🚚 '+esc(g.carrier_nev)+'</span>'
+        +'<span style="font-size:12px;color:#6366f1;font-weight:600;">'+cnt+' '+t('cs.ap.invoiceCount')+' · '+esc(openStr)+'</span>'
+        +'<button class="btn ghost" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();carrierApDocs('+g.carrier_id+')">📎 '+t('cs.ap.docsBtn')+'</button>'
+        +'<span id="'+gid+'_arr" style="color:#6366f1;font-size:14px;transition:transform .2s;">▼</span>'
         +'</div>'
         // Lenyíló rész (alapból NYITVA)
         +'<div id="'+gid+'">'
         // Dokumentumok szekció
-        +'<div id="'+gid+'_docs" style="background:rgba(0,0,0,0.15);padding:8px 12px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);">📎 Betöltés...</div>'
+        +'<div id="'+gid+'_docs" style="background:rgba(99,102,241,0.05);padding:8px 12px;font-size:12px;color:var(--text-muted);border-bottom:1px solid var(--border);">📎 '+t('cs.ap.docsLoading')+'</div>'
         // Számlák szekció
-        +(invoiceRows || '<div style="padding:10px 12px;font-size:12px;color:var(--muted);">Nincs számla.</div>')
+        +(invoiceRows || '<div style="padding:10px 12px;font-size:12px;color:var(--text-muted);">'+t('cs.ap.noInvoices')+'</div>')
         +'</div>'
         +'</div>';
     }).join('');
@@ -1394,7 +1394,7 @@ function carrierApLoadDocs(carrierId, targetId){
   var el = document.getElementById(targetId); if(!el) return;
   gas('carrierGetDocs', { carrierId: carrierId }).then(function(d){
     if(!d || !d.ok || !d.docs || !d.docs.length){
-      el.innerHTML = '<em style="font-size:12px;color:var(--muted);">Nincs feltöltött dokumentum.</em>';
+      el.innerHTML = '<em style="font-size:12px;color:var(--text-muted);">'+t('cs.ap.noDocs')+'</em>';
       return;
     }
     // Csoportosítás order_id szerint
@@ -1408,8 +1408,8 @@ function carrierApLoadDocs(carrierId, targetId){
     Object.keys(byOrder).sort().forEach(function(orderId){
       var docs = byOrder[orderId];
       html += '<div style="padding:6px 0;border-bottom:1px solid var(--border);">'
-        +'<div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px;">'
-        +(orderId==='__none__'?'📁 Fuvar nélkül':'📦 Fuvar: '+esc(orderId))+'</div>'
+        +'<div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:4px;">'
+        +(orderId==='__none__'?'📁 '+t('cs.ap.docNoOrder'):'📦 '+t('cs.ap.docByOrder')+': '+esc(orderId))+'</div>'
         +docs.map(function(doc){
           var icon = (doc.mime||'').indexOf('pdf')>=0 ? '📄' : '🖼';
           return '<div style="display:flex;align-items:center;gap:6px;padding:2px 0;">'

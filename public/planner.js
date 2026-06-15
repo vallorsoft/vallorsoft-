@@ -520,7 +520,7 @@
             + 'ondragover="Planner._vov(event)" ondragleave="Planner._vlv(event)" ondrop="Planner._vdp(event)">'
             + '<div class="rs text-primary"><span class="p2-dot" style="background:#a5b4fc;" title="Alvállalkozói jármű"></span>'
             + '🚚 ' + esc(rszam) + '</div>'
-            + '<div class="rd" style="color:#a5b4fc;font-size:10px;">' + esc(v.marca ? [v.marca, v.model].filter(Boolean).join(' ') : '') + '</div>'
+            + '<div class="rd" style="color:#a5b4fc;font-size:10px;">' + esc(v.marca ? [v.marca, v.model].filter(Boolean).join(' ') : '') + (v.sofer_nev ? ' · 👤 ' + esc(v.sofer_nev) : '') + '</div>'
             + '</div>'
             + '<div class="p2-lanes" style="width:' + (_days * W) + 'px;height:' + H + 'px;">';
           days.forEach(function (d, i) {
