@@ -613,4 +613,110 @@ handlers.devSaveLegalPage = async function (req, res, args) {
   }
 };
 
+/* ── Landing szövegek CRUD ── */
+
+handlers.devGetLandingTexts = async function(req, res, args) {
+  const isDev = req.session.user && req.session.user.is_dev;
+  if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  try {
+    const r = await pool.query(
+      `SELECT value FROM developer_settings WHERE key='landing_content'`
+    );
+    if (!r.rows.length) {
+      return res.json({ result: { ok: true, ro: {}, hu: {}, has_db: false } });
+    }
+    const val = r.rows[0].value;
+    return res.json({ result: { ok: true, ro: (val && val.ro) || {}, hu: (val && val.hu) || {}, has_db: true } });
+  } catch (err) {
+    console.error('devGetLandingTexts hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.devSaveLandingTexts = async function(req, res, args) {
+  const isDev = req.session.user && req.session.user.is_dev;
+  if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  try {
+    const ro = (args && typeof args.ro === 'object' && args.ro !== null) ? args.ro : {};
+    const hu = (args && typeof args.hu === 'object' && args.hu !== null) ? args.hu : {};
+    await pool.query(
+      `INSERT INTO developer_settings(key, value, updated_at) VALUES($1,$2,now())
+       ON CONFLICT(key) DO UPDATE SET value=$2, updated_at=now()`,
+      ['landing_content', JSON.stringify({ ro, hu })]
+    );
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('devSaveLandingTexts hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ============================================================
+//  Rendszer-email sablonok (devGetSystemEmailTemplate / devSaveSystemEmailTemplate)
+//  Kulcsok: email_sys_welcome, email_sys_trial_expiry, email_sys_invite, email_sys_reset
+// ============================================================
+
+handlers.devGetSystemEmailTemplate = async function(req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const { key } = args || {};
+  if (!key || !key.startsWith('email_sys_')) return res.json({ result: { ok: false, err: 'Cheie invalidă' } });
+  try {
+    const r = await pool.query('SELECT value FROM developer_settings WHERE key=$1', [key]);
+    return res.json({ result: { ok: true, data: r.rows.length ? r.rows[0].value : null } });
+  } catch (err) {
+    console.error('devGetSystemEmailTemplate hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Push értesítés sablonok ──────────────────────────────────
+handlers.devGetPushTemplates = async function(req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  try {
+    const r = await pool.query("SELECT value FROM developer_settings WHERE key='push_templates'");
+    return res.json({ result: { ok: true, data: r.rows.length ? r.rows[0].value : null } });
+  } catch (err) {
+    console.error('devGetPushTemplates hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.devSavePushTemplates = async function(req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const { templates } = args || {};
+  if (!templates || typeof templates !== 'object' || Array.isArray(templates)) {
+    return res.json({ result: { ok: false, err: 'Date invalide' } });
+  }
+  try {
+    await pool.query(
+      `INSERT INTO developer_settings(key, value, updated_at) VALUES('push_templates',$1,NOW())
+       ON CONFLICT(key) DO UPDATE SET value=$1, updated_at=NOW()`,
+      [JSON.stringify(templates)]
+    );
+    try { require('../lib/pushTemplates').invalidateCache(); } catch (_) {}
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('devSavePushTemplates hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.devSaveSystemEmailTemplate = async function(req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const { key, subject, body_ro, body_hu } = args || {};
+  if (!key || !key.startsWith('email_sys_')) return res.json({ result: { ok: false, err: 'Cheie invalidă' } });
+  if (!subject || !subject.trim()) return res.json({ result: { ok: false, err: 'Subiectul este obligatoriu' } });
+  try {
+    await pool.query(
+      `INSERT INTO developer_settings(key, value, updated_at) VALUES($1,$2,NOW())
+       ON CONFLICT(key) DO UPDATE SET value=$2, updated_at=NOW()`,
+      [key, JSON.stringify({ subject: subject.trim(), body_ro: body_ro || '', body_hu: body_hu || '' })]
+    );
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('devSaveSystemEmailTemplate hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 module.exports = handlers;

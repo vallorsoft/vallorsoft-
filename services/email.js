@@ -11,6 +11,36 @@ const BREVO_SENDER  = process.env.BREVO_SENDER || process.env.MAIL_USER;
 
 console.log('BREVO ready:', !!BREVO_API_KEY, '| sender:', BREVO_SENDER);
 
+// Pool import a developer_settings sablon-lekéréshez
+// (lazy require: csak ha szükséges, elkerüli a körkörös függőséget)
+let _pool = null;
+function getPool() {
+  if (!_pool) _pool = require('../db');
+  return _pool;
+}
+
+// Rendszer-email sablon lekérése DB-ből — async, best-effort.
+// Ha nincs sablon, null-t ad vissza (a hívó a hardcoded szöveget használja).
+async function getEmailTemplate(key) {
+  try {
+    const r = await getPool().query(
+      'SELECT value FROM developer_settings WHERE key=$1', [key]
+    );
+    return r.rows.length ? r.rows[0].value : null;
+  } catch (e) {
+    console.warn('[email] sablon lekérés hiba (' + key + '):', e.message);
+    return null;
+  }
+}
+
+// Változókat ({{kulcs}}) biztonságosan cseréli le a sablon szövegben (XSS-védelem).
+function applyTemplateVars(text, vars) {
+  if (!text) return '';
+  return text.replace(/\{\{(\w+)\}\}/g, function(_, k) {
+    return k in vars ? escHtml(String(vars[k])) : '';
+  });
+}
+
 // HTML-escape a sablonokba kerülő (felhasználó által megadható) értékekre —
 // egy cég-/usernév nem injektálhat markupot a VallorSoft-os levelekbe.
 function escHtml(v) {
@@ -93,8 +123,20 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev, lang
   }
   const L = lang === 'hu' ? 'hu' : 'ro';
   const registerUrl = process.env.APP_URL || 'http://localhost:3000';
-  const html = buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl, lang: L });
-  const subject = (L === 'hu' ? 'VallorSoft — Meghívó' : 'VallorSoft — Invitație') + ` (${cegNev || 'VallorSoft'})`;
+
+  // DB sablon felülírja a hardcoded-ot, ha be van állítva
+  let html, subject;
+  const tpl = await getEmailTemplate('email_sys_invite');
+  if (tpl && tpl.subject && (tpl.body_ro || tpl.body_hu)) {
+    const bodyText = L === 'hu' ? (tpl.body_hu || tpl.body_ro) : (tpl.body_ro || tpl.body_hu);
+    const vars = { nev: meghivottNev || '', ceg_nev: cegNev || '', pozicio: pozicio || '', register_url: registerUrl + '/register' };
+    subject = applyTemplateVars(tpl.subject, vars);
+    html = applyTemplateVars(bodyText, vars);
+  } else {
+    html = buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl, lang: L });
+    subject = (L === 'hu' ? 'VallorSoft — Meghívó' : 'VallorSoft — Invitație') + ` (${cegNev || 'VallorSoft'})`;
+  }
+
   try {
     const resp = await fetchT('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -129,6 +171,30 @@ async function sendResetEmail(toEmail, nume, resetUrl, lang) {
     return false; // nincs e-mail-konfig → a hívó kecsesen kezeli (emailed:false)
   }
   const L = lang === 'hu' ? 'hu' : 'ro';
+
+  // DB sablon ellenőrzés — ha van, azt küldjük
+  const tpl = await getEmailTemplate('email_sys_reset');
+  if (tpl && tpl.subject && (tpl.body_ro || tpl.body_hu)) {
+    const bodyText = L === 'hu' ? (tpl.body_hu || tpl.body_ro) : (tpl.body_ro || tpl.body_hu);
+    const vars = { nev: nume || '', reset_url: resetUrl || '' };
+    const subject = applyTemplateVars(tpl.subject, vars);
+    const htmlContent = applyTemplateVars(bodyText, vars);
+    try {
+      const resp = await fetchT('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
+        body: JSON.stringify({ sender: { name: 'VallorSoft', email: BREVO_SENDER }, to: [{ email: toEmail }], subject, htmlContent }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) { console.error('Reset email (tpl) Brevo hiba:', resp.status, JSON.stringify(data)); return false; }
+      console.log('Reset email (tpl) elküldve, messageId:', data.messageId);
+      return true;
+    } catch (err) {
+      console.error('Reset email (tpl) hiba:', err.message);
+      return false;
+    }
+  }
+
   const nm = escHtml(nume);
   const S = {
     platform: { hu: 'Fuvarmenedzsment Platform', ro: 'Platformă de management transport' }[L],
@@ -269,4 +335,4 @@ async function sendDeveloperEmail(toEmail, companyName, subject, htmlBody) {
   }
 }
 
-module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail };
+module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate };

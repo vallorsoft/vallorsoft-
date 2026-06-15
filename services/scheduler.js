@@ -405,24 +405,35 @@ function startEFacturaStatusScheduler() {
 //  és még nem kaptak erről értesítést (trial_email_sent = false).
 // ============================================================
 function startTrialExpiryScheduler() {
-  const { sendClientEmail } = require('./email');
+  const { sendClientEmail, getEmailTemplate } = require('./email');
   const appUrl = process.env.APP_URL || 'https://app.vallorsoft.com';
+  const escV = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  const replVars = (t, v) => t.replace(/\{\{(\w+)\}\}/g, (_, k) => k in v ? escV(v[k]) : '');
 
   async function tick() {
     try {
       const res = await pool.query(
-        `SELECT id, nev, email_contact
+        `SELECT id, nev, email_contact, paid_until
          FROM companies
          WHERE subscription_status='trial'
            AND paid_until::date = CURRENT_DATE
            AND (trial_email_sent IS NULL OR trial_email_sent = false)`
       );
+      // Sablon egyszer kérjük le (minden cégre ugyanaz)
+      const tpl = await getEmailTemplate('email_sys_trial_expiry');
       for (const ceg of res.rows) {
         try {
-          await sendClientEmail({
-            to: ceg.email_contact,
-            subject: 'Perioada de probă a expirat / Próbaidőszak lejárt — VallorSoft',
-            html: `
+          let emailSubject, emailHtml;
+          if (tpl && tpl.subject && (tpl.body_ro || tpl.body_hu)) {
+            const paidStr = ceg.paid_until ? new Date(ceg.paid_until).toLocaleDateString('ro-RO') : '';
+            const vars = { ceg_nev: ceg.nev, paid_until: paidStr, subscription_url: appUrl + '/subscription' };
+            const bodyRo = tpl.body_ro ? replVars(tpl.body_ro, vars) : '';
+            const bodyHu = tpl.body_hu ? replVars(tpl.body_hu, vars) : '';
+            emailSubject = replVars(tpl.subject, vars);
+            emailHtml = bodyRo + (bodyHu && bodyRo ? '<hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;">' : '') + bodyHu;
+          } else {
+            emailSubject = 'Perioada de probă a expirat / Próbaidőszak lejárt — VallorSoft';
+            emailHtml = `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
   <div style="background:linear-gradient(135deg,#6366f1,#3b82f6);padding:28px 32px;border-radius:12px 12px 0 0;">
     <h1 style="margin:0;color:#fff;font-size:22px;">vallor<span style="color:#c7d2fe;">Soft</span></h1>
@@ -444,8 +455,9 @@ function startTrialExpiryScheduler() {
       Întrebări? / Kérdés? <a href="mailto:vallorsoft@gmail.com" style="color:#6366f1;">vallorsoft@gmail.com</a>
     </p>
   </div>
-</div>`,
-          });
+</div>`;
+          }
+          await sendClientEmail({ to: ceg.email_contact, subject: emailSubject, html: emailHtml });
           await pool.query('UPDATE companies SET trial_email_sent=true WHERE id=$1', [ceg.id]);
           console.log('[Trial] cég #' + ceg.id + ' — trial lejárat email elküldve (' + ceg.nev + ')');
         } catch (mailErr) {

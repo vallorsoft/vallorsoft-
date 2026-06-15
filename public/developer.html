@@ -153,7 +153,10 @@
     <div class="dev-tab" onclick="showPane('here')" data-i18n-html="dev.tabHere">⚡ HERE API</div>
     <div class="dev-tab" onclick="showPane('integ')" data-i18n-html="dev.tabInteg">💳 Integrációk</div>
     <div class="dev-tab" onclick="showPane('regisztraciok')">📥 Regisztrációk</div>
+    <div class="dev-tab" onclick="showPane('landing')">🌐 Landing szövegek</div>
     <div class="dev-tab" onclick="showPane('legal')">📋 Jogi oldalak</div>
+    <div class="dev-tab" onclick="showPane('sysemails')">✉️ Rendszer-emailek</div>
+    <div class="dev-tab" onclick="showPane('pushtempl')">🔔 Push értesítések</div>
     <div class="dev-tab" onclick="showPane('elofiz')" data-i18n-html="dev.tabElofiz">📦 Előfizetések</div>
     <div style="margin-top:auto; padding-top:20px; border-top:1px solid var(--border);">
       <div id="devBadge" style="font-size:12px; color:var(--muted); margin-bottom:10px;">—</div>
@@ -276,6 +279,35 @@
       </div>
     </div>
 
+    <!-- LANDING SZÖVEGEK szerkesztő -->
+    <div class="dev-pane hidden" id="pane-landing">
+      <div class="section-title">🌐 Landing page szövegek</div>
+      <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);border-radius:10px;padding:12px 16px;font-size:12px;color:#334155;margin-bottom:16px;">
+        Szerkesztés után <b>Mentés</b> → a landing oldal azonnal frissül (deploy nélkül). Az üres mezőkre az alapértelmezett szöveg érvényes.
+      </div>
+
+      <!-- Szekció-választó -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="landingSecBtns">
+        <button class="landing-sec-btn active" data-sec="hero"     onclick="selectLandingSection('hero')">🦸 Hero</button>
+        <button class="landing-sec-btn"        data-sec="strip"    onclick="selectLandingSection('strip')">⚡ Strip</button>
+        <button class="landing-sec-btn"        data-sec="features" onclick="selectLandingSection('features')">🔧 Funkciók</button>
+        <button class="landing-sec-btn"        data-sec="how"      onclick="selectLandingSection('how')">📋 Hogyan</button>
+        <button class="landing-sec-btn"        data-sec="modules"  onclick="selectLandingSection('modules')">📦 Modulok</button>
+        <button class="landing-sec-btn"        data-sec="blog"     onclick="selectLandingSection('blog')">📰 Blog</button>
+        <button class="landing-sec-btn"        data-sec="other"    onclick="selectLandingSection('other')">🔖 Egyéb</button>
+      </div>
+
+      <div id="landingKeysForm" style="max-height:520px;overflow-y:auto;padding-right:4px;">
+        <!-- JS generálja dinamikusan -->
+      </div>
+
+      <div style="margin-top:14px;display:flex;align-items:center;gap:12px;">
+        <button onclick="saveLandingTexts()" style="background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;border:none;border-radius:10px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;">💾 Mentés</button>
+        <a href="/" target="_blank" style="color:#6366f1;font-size:12px;text-decoration:none;">🔗 Landing megtekintése →</a>
+      </div>
+      <div id="landingMsg" style="min-height:20px;font-size:12px;margin-top:8px;"></div>
+    </div>
+
     <!-- JOGI OLDALAK szerkesztő -->
     <div class="dev-pane hidden" id="pane-legal">
       <div class="section-title">📋 Jogi oldalak szerkesztése</div>
@@ -325,6 +357,80 @@
         </a>
       </div>
       <div id="legalSaveMsg" style="min-height:20px;font-size:12px;margin-top:8px;"></div>
+    </div>
+
+    <!-- RENDSZER-EMAILEK szerkesztő -->
+    <div class="dev-pane hidden" id="pane-sysemails">
+      <div class="section-title">✉️ Rendszer-email sablonok</div>
+      <p style="font-size:12px;color:#8a97a8;margin:0 0 14px;">
+        Ha itt mentesz sablont, az felülírja a hardcoded szöveget. Üresen hagyva az alapértelmezett HTML fut.
+        Változók: <code>{{változónév}}</code> — HTML-escape-elve kerülnek be.
+      </p>
+
+      <!-- típusválasztó -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;" id="sysEmailTypeBtns">
+        <button class="legal-page-btn active" data-key="email_sys_welcome"       onclick="selectSysEmailType('email_sys_welcome')">Üdvözlő (regisztráció)</button>
+        <button class="legal-page-btn"        data-key="email_sys_trial_expiry"  onclick="selectSysEmailType('email_sys_trial_expiry')">Trial lejárat</button>
+        <button class="legal-page-btn"        data-key="email_sys_invite"        onclick="selectSysEmailType('email_sys_invite')">Meghívó</button>
+        <button class="legal-page-btn"        data-key="email_sys_reset"         onclick="selectSysEmailType('email_sys_reset')">Jelszó-visszaállítás</button>
+      </div>
+
+      <!-- változólista -->
+      <div id="sysEmailVarList" style="margin-bottom:14px;font-size:12px;color:#8a97a8;display:flex;gap:6px;flex-wrap:wrap;"></div>
+
+      <!-- szerkesztő -->
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Tárgy (subject)</label>
+        <input id="sysEmailSubject" type="text" style="width:100%;padding:9px 11px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:#141c25;color:#e9eef5;font-family:inherit;font-size:13px;" placeholder="Email tárgy…">
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:240px;">
+          <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Törzs — RO (HTML)</label>
+          <textarea id="sysEmailBodyRo" rows="10" style="width:100%;padding:9px 11px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:#141c25;color:#e9eef5;font-family:monospace;font-size:12px;resize:vertical;" placeholder="<p>Bun venit…</p>"></textarea>
+        </div>
+        <div style="flex:1;min-width:240px;">
+          <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Törzs — HU (HTML)</label>
+          <textarea id="sysEmailBodyHu" rows="10" style="width:100%;padding:9px 11px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:#141c25;color:#e9eef5;font-family:monospace;font-size:12px;resize:vertical;" placeholder="<p>Üdvözöljük…</p>"></textarea>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:12px;">
+        <button onclick="saveSysEmailTemplate()" style="
+          padding:9px 22px;background:linear-gradient(135deg,#3b82f6,#6366f1);
+          color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;
+          cursor:pointer;box-shadow:0 6px 18px -8px rgba(59,130,246,.6);">
+          💾 Mentés
+        </button>
+        <button onclick="clearSysEmailTemplate()" style="
+          padding:9px 16px;background:transparent;border:1px solid rgba(255,255,255,0.15);
+          color:#8a97a8;border-radius:10px;font-size:13px;cursor:pointer;">
+          🗑️ Sablon törlése (alapértelmezett visszaállítás)
+        </button>
+      </div>
+      <div id="sysEmailMsg" style="min-height:20px;font-size:12px;margin-top:8px;"></div>
+    </div>
+
+    <!-- PUSH ÉRTESÍTÉS SABLONOK -->
+    <div class="dev-pane hidden" id="pane-pushtempl">
+      <div class="section-title">🔔 Push értesítés szövegek</div>
+      <p style="font-size:12px;color:#8a97a8;margin:0 0 14px;">
+        Szerkeszd a push értesítések szövegét. <code>{{változónév}}</code> értékek automatikusan helyettesítődnek.<br>
+        Minden típusnál: <b>title_ro</b> / <b>title_hu</b> (cím) és <b>body_ro</b> / <b>body_hu</b> (szöveg).
+      </p>
+      <div id="pushTemplCards" style="display:flex;flex-direction:column;gap:14px;"></div>
+      <div style="margin-top:16px;display:flex;gap:10px;align-items:center;">
+        <button onclick="savePushTemplates()" style="
+          padding:9px 22px;background:linear-gradient(135deg,#3b82f6,#6366f1);
+          color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;
+          cursor:pointer;box-shadow:0 6px 18px -8px rgba(59,130,246,.6);">
+          💾 Összes mentése
+        </button>
+        <button onclick="resetPushTemplates()" style="
+          padding:9px 16px;background:transparent;border:1px solid rgba(255,255,255,0.15);
+          color:#8a97a8;border-radius:10px;font-size:13px;cursor:pointer;">
+          🗑️ Alapértelmezések visszaállítása
+        </button>
+      </div>
+      <div id="pushTemplMsg" style="min-height:20px;font-size:12px;margin-top:8px;"></div>
     </div>
 
     <!-- ELŐFIZETÉSEK (csomagok + cég-hozzárendelés) -->
@@ -433,7 +539,10 @@ function showPane(id) {
   if(id==='integ') loadIntegPane();
   if(id==='elofiz') loadElofizPane();
   if(id==='regisztraciok') loadRegPane();
+  if(id==='landing') loadLandingTextsPane();
   if(id==='legal') loadLegalPane();
+  if(id==='sysemails') loadSysEmailsPane();
+  if(id==='pushtempl') loadPushTemplPane();
 }
 
 /* ── Integrációk: számlázó programok + cégek számlázói ── */
@@ -493,6 +602,9 @@ function loadPlanEditor(){
         +'</div></div>'
         // Stripe
         +'<div class="field"><label>Stripe Price ID <span style="font-size:11px;color:var(--muted);">(price_xxx)</span></label><input class="input" id="plStripe_'+p.id+'" placeholder="price_..." value="'+escHtml(p.stripe_price_id||'')+'"></div>'
+        // Marketing bullet-pontok
+        +'<div class="field"><label>Marketing bullet-pontok <span style="font-size:11px;color:var(--muted);">(soronként 1 pont — /subscription és #pricing oldalon jelenik meg)</span></label>'
+        +'<textarea class="input" id="plFeatures_'+p.id+'" rows="4" style="resize:vertical;" placeholder="pl. 10 jármű&#10;Sofőr-portál&#10;GPS integráció">'+escHtml((Array.isArray(p.features)?p.features:[]).join('\n'))+'</textarea></div>'
         +'<button class="btn-dev" onclick="savePlan('+p.id+')">💾 Mentés</button>'
         +' <button class="btn-dev" onclick="loadPlanFeatures('+p.id+')" style="margin-left:8px;">⚙️ Funkció-kapcsolók</button>'
         +'<div id="planFeatDiv_'+p.id+'" style="display:none;margin-top:14px;"></div>'
@@ -517,7 +629,8 @@ function savePlan(id){
     max_vehicles:lim('plMaxV_'+id),
     max_orders_per_month:lim('plMaxO_'+id),
     max_sofors:lim('plMaxS_'+id),
-    stripe_price_id:document.getElementById('plStripe_'+id).value.trim()||null};
+    stripe_price_id:document.getElementById('plStripe_'+id).value.trim()||null,
+    features:(document.getElementById('plFeatures_'+id).value||'').split('\n').map(function(s){return s.trim();}).filter(Boolean)};
   gas('updateSubscriptionPlan',[f]).then(function(r){ if(r&&r.ok){toast('Csomag mentve','ok');loadPlanEditor();}else{toast((r&&r.err)||t('common.error'),'err');} });
 }
 // Csomag funkció-kapcsolói
@@ -871,6 +984,113 @@ function loadDash(){
     document.getElementById('kAktiv').textContent = r.aktiv_cegek;
     document.getElementById('kUsers').textContent = r.userek;
     document.getElementById('kFuvar').textContent = r.fuvarok;
+  });
+}
+
+/* ── Landing szövegek szerkesztő ── */
+
+var LANDING_SECTIONS = {
+  hero: {
+    label: '🦸 Hero szekció',
+    keys: ['heroTitle','heroSubtitle','heroBadge','startFreeBtn','trialNote','heroBullet1','heroBullet2','heroBullet3','heroNote']
+  },
+  strip: {
+    label: '⚡ Feature strip',
+    keys: ['strip1Title','strip1Desc','strip2Title','strip2Desc','strip3Title','strip3Desc','strip4Title','strip4Desc','strip5Title','strip5Desc']
+  },
+  features: {
+    label: '🔧 Főbb funkciók',
+    keys: ['featuresTitle','featuresSubtitle','feat1Title','feat1Desc','feat2Title','feat2Desc','feat3Title','feat3Desc','feat4Title','feat4Desc','feat5Title','feat5Desc','feat6Title','feat6Desc','feat7Title','feat7Desc','feat8Title','feat8Desc']
+  },
+  how: {
+    label: '📋 Hogyan működik',
+    keys: ['howTitle','howSubtitle','step1Title','step1Desc','step2Title','step2Desc','step3Title','step3Desc']
+  },
+  modules: {
+    label: '📦 Modulok',
+    keys: ['modulesTitle','modulesSubtitle','mod1Title','mod1Desc','mod2Title','mod2Desc','mod3Title','mod3Desc','mod4Title','mod4Desc','mod5Title','mod5Desc','mod6Title','mod6Desc','mod7Title','mod7Desc','mod8Title','mod8Desc']
+  },
+  blog: {
+    label: '📰 Blog / Hírek',
+    keys: ['blogTitle','blog1Title','blog1Desc','blog2Title','blog2Desc','blog3Title','blog3Desc']
+  },
+  other: {
+    label: '🔖 Egyéb',
+    keys: ['statsTitle','stat1','stat2','stat3','stat4','registerTitle','registerSub','contactTitle','contactDesc','footerTagline','footerIntegrations','pricingTitle','pricingSubtitle']
+  }
+};
+
+var _landingCurrentSec = 'hero';
+var _landingDbTexts = { ro: {}, hu: {} };
+
+function loadLandingTextsPane() {
+  gas('devGetLandingTexts').then(function(r) {
+    if (r && r.ok) {
+      _landingDbTexts = { ro: r.ro || {}, hu: r.hu || {} };
+    }
+    selectLandingSection(_landingCurrentSec);
+  });
+}
+
+function selectLandingSection(sec) {
+  _landingCurrentSec = sec;
+  document.querySelectorAll('.landing-sec-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.sec === sec);
+  });
+  renderLandingForm(sec);
+}
+
+function renderLandingForm(sec) {
+  var secDef = LANDING_SECTIONS[sec];
+  var formEl = document.getElementById('landingKeysForm');
+  if (!secDef || !formEl) return;
+
+  var html = '<div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:12px;">' + escHtml(secDef.label) + '</div>';
+  html += '<div style="display:grid;grid-template-columns:160px 1fr 1fr;gap:8px;align-items:center;margin-bottom:6px;">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--muted)">Kulcs</div>'
+    + '<div style="font-size:11px;font-weight:700;color:#1e40af">🇷🇴 Román</div>'
+    + '<div style="font-size:11px;font-weight:700;color:#166534">🇭🇺 Magyar</div>'
+    + '</div>';
+
+  secDef.keys.forEach(function(key) {
+    var roVal = escHtml(_landingDbTexts.ro[key] || '');
+    var huVal = escHtml(_landingDbTexts.hu[key] || '');
+    html += '<div style="display:grid;grid-template-columns:160px 1fr 1fr;gap:8px;align-items:start;margin-bottom:8px;">'
+      + '<div style="font-size:11px;color:var(--muted);font-weight:600;padding-top:9px;">' + escHtml(key) + '</div>'
+      + '<textarea data-key="' + escHtml(key) + '" data-lang="ro" rows="2" style="width:100%;box-sizing:border-box;background:#fff;border:1px solid var(--border-bright,#e2e8f0);border-radius:8px;padding:8px;font-size:12px;resize:vertical;" placeholder="(alapértelmezett)">' + roVal + '</textarea>'
+      + '<textarea data-key="' + escHtml(key) + '" data-lang="hu" rows="2" style="width:100%;box-sizing:border-box;background:#fff;border:1px solid var(--border-bright,#e2e8f0);border-radius:8px;padding:8px;font-size:12px;resize:vertical;" placeholder="(alapértelmezett)">' + huVal + '</textarea>'
+      + '</div>';
+  });
+
+  formEl.innerHTML = html;
+}
+
+function saveLandingTexts() {
+  // Az aktuális szekció textarea értékeit + a többi szekció tárolt értékeit összegyűjtjük
+  var newRo = Object.assign({}, _landingDbTexts.ro);
+  var newHu = Object.assign({}, _landingDbTexts.hu);
+
+  document.querySelectorAll('#landingKeysForm textarea').forEach(function(ta) {
+    var key = ta.dataset.key;
+    var lang = ta.dataset.lang;
+    var val = ta.value.trim();
+    if (lang === 'ro') { if (val) newRo[key] = val; else delete newRo[key]; }
+    if (lang === 'hu') { if (val) newHu[key] = val; else delete newHu[key]; }
+  });
+
+  var msgEl = document.getElementById('landingMsg');
+  msgEl.style.color = '#64748b';
+  msgEl.textContent = 'Mentés...';
+
+  gas('devSaveLandingTexts', { ro: newRo, hu: newHu }).then(function(r) {
+    if (r && r.ok) {
+      _landingDbTexts = { ro: newRo, hu: newHu };
+      msgEl.style.color = '#22c55e';
+      msgEl.textContent = '✓ Elmentve';
+    } else {
+      msgEl.style.color = '#ef4444';
+      msgEl.textContent = '✕ Hiba: ' + ((r && r.err) || 'ismeretlen');
+    }
   });
 }
 
@@ -1425,6 +1645,127 @@ document.querySelectorAll('.dev-tab').forEach(function(el) {
     if (window.innerWidth <= 768) devCloseSidebar();
   });
 });
+
+/* ── Push értesítés sablonok ── */
+var PUSH_TEMPL_META = [
+  { key: 'push_inbound_new',       label: 'Új fuvarkérés (portál)',      vars: ['client', 'route'] },
+  { key: 'push_handover_request',  label: 'Áru-leadás kérés (sofőr)',    vars: ['sofor', 'rendszam', 'tipus', 'helyszin'] },
+  { key: 'push_handover_confirmed',label: 'Áru-leadás visszaigazolva',   vars: ['rendszam', 'helyszin', 'tipus'] },
+  { key: 'push_handover_rejected', label: 'Áru-leadás elutasítva',       vars: ['rendszam'] },
+  { key: 'push_order_status',      label: 'Fuvar státusz (sofőr frissít)',vars: ['sofor', 'label', 'client'] },
+];
+var _pushTplData = {};
+
+async function loadPushTemplPane() {
+  var container = document.getElementById('pushTemplCards');
+  container.innerHTML = '<p style="color:#8a97a8;font-size:12px;">Betöltés…</p>';
+  var d = await gas('devGetPushTemplates');
+  _pushTplData = (d && d.ok && d.data) ? d.data : {};
+  container.innerHTML = PUSH_TEMPL_META.map(function(m) {
+    var cur = _pushTplData[m.key] || {};
+    var varHints = m.vars.map(function(v){ return '<code style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 5px;font-size:11px;">{{'+v+'}}</code>'; }).join(' ');
+    return '<div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;" data-pkey="'+m.key+'">' +
+      '<div style="font-weight:700;font-size:13px;margin-bottom:6px;">'+m.label+'</div>' +
+      '<div style="font-size:11px;color:#8a97a8;margin-bottom:10px;">Változók: '+varHints+'</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+        '<div><label style="font-size:11px;color:#8a97a8;">Cím RO</label><input class="pt-inp" data-f="title_ro" value="'+esc(cur.title_ro||'')+'" style="width:100%;margin-top:3px;padding:7px 9px;border:1px solid rgba(255,255,255,0.1);border-radius:7px;background:#0c1218;color:#e9eef5;font-size:12px;"></div>' +
+        '<div><label style="font-size:11px;color:#8a97a8;">Cím HU</label><input class="pt-inp" data-f="title_hu" value="'+esc(cur.title_hu||'')+'" style="width:100%;margin-top:3px;padding:7px 9px;border:1px solid rgba(255,255,255,0.1);border-radius:7px;background:#0c1218;color:#e9eef5;font-size:12px;"></div>' +
+        '<div><label style="font-size:11px;color:#8a97a8;">Szöveg RO</label><textarea class="pt-inp" data-f="body_ro" rows="2" style="width:100%;margin-top:3px;padding:7px 9px;border:1px solid rgba(255,255,255,0.1);border-radius:7px;background:#0c1218;color:#e9eef5;font-size:12px;resize:vertical;">'+esc(cur.body_ro||'')+'</textarea></div>' +
+        '<div><label style="font-size:11px;color:#8a97a8;">Szöveg HU</label><textarea class="pt-inp" data-f="body_hu" rows="2" style="width:100%;margin-top:3px;padding:7px 9px;border:1px solid rgba(255,255,255,0.1);border-radius:7px;background:#0c1218;color:#e9eef5;font-size:12px;resize:vertical;">'+esc(cur.body_hu||'')+'</textarea></div>' +
+      '</div></div>';
+  }).join('');
+}
+
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+async function savePushTemplates() {
+  var msg = document.getElementById('pushTemplMsg');
+  var templates = {};
+  document.querySelectorAll('#pushTemplCards [data-pkey]').forEach(function(card) {
+    var key = card.dataset.pkey;
+    templates[key] = {};
+    card.querySelectorAll('.pt-inp').forEach(function(inp) { templates[key][inp.dataset.f] = inp.value; });
+  });
+  msg.textContent = 'Mentés…'; msg.style.color = '#8a97a8';
+  var d = await gas('devSavePushTemplates', { templates });
+  if (d && d.ok) { msg.textContent = '✅ Mentve!'; msg.style.color = '#22c55e'; _pushTplData = templates; }
+  else { msg.textContent = '❌ ' + (d && d.err || 'Hiba'); msg.style.color = '#ef4444'; }
+}
+
+async function resetPushTemplates() {
+  if (!confirm('Biztosan törlöd az összes push sablont? Az alapértelmezett szövegek futnak ezután.')) return;
+  var msg = document.getElementById('pushTemplMsg');
+  var d = await gas('devSavePushTemplates', { templates: {} });
+  if (d && d.ok) { msg.textContent = '✅ Visszaállítva az alapértelmezettekre.'; msg.style.color = '#22c55e'; loadPushTemplPane(); }
+  else { msg.textContent = '❌ ' + (d && d.err || 'Hiba'); msg.style.color = '#ef4444'; }
+}
+
+/* ── Rendszer-email sablonok ── */
+var SYS_EMAIL_TYPES = {
+  email_sys_welcome:      { label: 'Üdvözlő (regisztráció)', vars: ['ceg_nev'] },
+  email_sys_trial_expiry: { label: 'Trial lejárat', vars: ['ceg_nev', 'paid_until', 'subscription_url'] },
+  email_sys_invite:       { label: 'Meghívó', vars: ['nev', 'ceg_nev', 'pozicio', 'register_url'] },
+  email_sys_reset:        { label: 'Jelszó-visszaállítás', vars: ['nev', 'reset_url'] },
+};
+var _curSysEmailKey = 'email_sys_welcome';
+
+function loadSysEmailsPane() {
+  selectSysEmailType(_curSysEmailKey);
+}
+
+async function selectSysEmailType(key) {
+  _curSysEmailKey = key;
+  document.querySelectorAll('#sysEmailTypeBtns .legal-page-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.key === key);
+  });
+  // Változólista megjelenítése
+  var info = SYS_EMAIL_TYPES[key] || {};
+  var varList = document.getElementById('sysEmailVarList');
+  varList.innerHTML = (info.vars || []).map(function(v) {
+    return '<span onclick="copySysEmailVar(\'{{'+v+'}}\')" title="Kattints a másoláshoz" style="cursor:pointer;background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:2px 8px;font-family:monospace;">{{'+v+'}}</span>';
+  }).join('');
+  // Sablon betöltése
+  document.getElementById('sysEmailMsg').textContent = '';
+  var d = await gas('devGetSystemEmailTemplate', { key: key });
+  if (d && d.ok) {
+    var tpl = d.data || {};
+    document.getElementById('sysEmailSubject').value = tpl.subject || '';
+    document.getElementById('sysEmailBodyRo').value = tpl.body_ro || '';
+    document.getElementById('sysEmailBodyHu').value = tpl.body_hu || '';
+  }
+}
+
+function copySysEmailVar(v) {
+  if (navigator.clipboard) navigator.clipboard.writeText(v).then(function() { toast('Másolva: ' + v); }).catch(function() {});
+  else toast(v);
+}
+
+async function saveSysEmailTemplate() {
+  var key     = _curSysEmailKey;
+  var subject = document.getElementById('sysEmailSubject').value.trim();
+  var body_ro = document.getElementById('sysEmailBodyRo').value;
+  var body_hu = document.getElementById('sysEmailBodyHu').value;
+  var msg = document.getElementById('sysEmailMsg');
+  if (!subject) { msg.textContent = '⚠️ A tárgy megadása kötelező.'; msg.style.color='#f59e0b'; return; }
+  msg.textContent = 'Mentés…'; msg.style.color='#8a97a8';
+  var d = await gas('devSaveSystemEmailTemplate', { key, subject, body_ro, body_hu });
+  if (d && d.ok) { msg.textContent = '✅ Elmentve!'; msg.style.color='#22c55e'; }
+  else { msg.textContent = '❌ ' + (d && d.err || 'Hiba'); msg.style.color='#ef4444'; }
+}
+
+async function clearSysEmailTemplate() {
+  if (!confirm('Biztosan törlöd a sablont? Az alapértelmezett hardcoded szöveg fog futni.')) return;
+  var key = _curSysEmailKey;
+  var msg = document.getElementById('sysEmailMsg');
+  // Üres értékkel mentjük → a szerver nem talál subject-et → email.js fallbackre esik
+  var d = await gas('devSaveSystemEmailTemplate', { key, subject: ' ', body_ro: '', body_hu: '' });
+  if (d && d.ok) {
+    document.getElementById('sysEmailSubject').value = '';
+    document.getElementById('sysEmailBodyRo').value = '';
+    document.getElementById('sysEmailBodyHu').value = '';
+    msg.textContent = '✅ Sablon törölve — alapértelmezett fut.'; msg.style.color='#22c55e';
+  } else { msg.textContent = '❌ ' + (d && d.err || 'Hiba'); msg.style.color='#ef4444'; }
+}
 
 </script>
 </body>

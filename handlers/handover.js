@@ -199,10 +199,13 @@ handlers.driverHandoverRequest = async function (req, res, args) {
 
     // Push az adminoknak/managereknek — hiba esetén sem törjük a kérést
     try {
+      const { getTemplate, applyVars } = require('../lib/pushTemplates');
+      const htpl = await getTemplate('push_handover_request');
+      const tipusStr = type === 'trailer' ? '🅿️ parchează pe remorcă / pótkocsin parkol' : '📦 intră în depozit / raktárba került';
+      const vars = { sofor: me.nume || me.email, rendszam: orderId, tipus: tipusStr, helyszin: location };
       await sendPushToRole(cid, ['Admin', 'Manager'], {
-        title: '⛔ Predare marfă — confirmare / Áru-leadás visszaigazolásra vár',
-        body: (me.nume || me.email) + ' — ' + orderId + ': '
-          + (type === 'trailer' ? '🅿️ parchează pe remorcă / pótkocsin parkol' : '📦 intră în depozit / raktárba került') + ' @ ' + location,
+        title: (htpl.title_ro || '⛔ Predare marfă — confirmare') + ' / ' + (htpl.title_hu || 'Áru-leadás visszaigazolásra vár'),
+        body: applyVars(htpl.body_ro || '{{sofor}} — {{rendszam}}: {{tipus}} @ {{helyszin}}', vars),
         icon: '/icon192.png', badge: '/icon192.png',
         tag: 'handover-' + orderId, url: '/manager',
       });
@@ -249,12 +252,18 @@ handlers.confirmHandover = async function (req, res, args) {
 
     // visszajelzés a sofőrnek
     try {
-      if (o.handover_by) await sendPushToEmail(o.handover_by, {
-        title: '✅ Predare confirmată / Áru-leadás visszaigazolva',
-        body: orderId + ' — ' + v.data.location + (v.data.type === 'trailer' ? ' (parchează pe remorcă / pótkocsin parkol)' : ' (în depozit / raktárban)'),
-        icon: '/icon192.png', badge: '/icon192.png',
-        tag: 'handover-' + orderId, url: '/sofer',
-      });
+      if (o.handover_by) {
+        const { getTemplate, applyVars } = require('../lib/pushTemplates');
+        const ctpl = await getTemplate('push_handover_confirmed');
+        const tipusStr = v.data.type === 'trailer' ? ' (parchează pe remorcă / pótkocsin parkol)' : ' (în depozit / raktárban)';
+        const vars = { rendszam: orderId, helyszin: v.data.location, tipus: tipusStr };
+        await sendPushToEmail(o.handover_by, {
+          title: (ctpl.title_ro || '✅ Predare confirmată') + ' / ' + (ctpl.title_hu || 'Áru-leadás visszaigazolva'),
+          body: applyVars(ctpl.body_ro || '{{rendszam}} — {{helyszin}}{{tipus}}', vars),
+          icon: '/icon192.png', badge: '/icon192.png',
+          tag: 'handover-' + orderId, url: '/sofer',
+        });
+      }
     } catch (e) { console.error('handover confirm push hiba:', e); }
 
     return res.json({ result: { ok: true, status: newStatus } });
@@ -283,12 +292,17 @@ handlers.rejectHandover = async function (req, res, args) {
     if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu exista cerere de predare in asteptare.' } });
     try {
       const by = r.rows[0].handover_by;
-      if (by) await sendPushToEmail(by, {
-        title: '❌ Predare respinsă / Áru-leadás elutasítva',
-        body: orderId + ' — contactează dispecerul / egyeztess a diszpécserrel.',
-        icon: '/icon192.png', badge: '/icon192.png',
-        tag: 'handover-' + orderId, url: '/sofer',
-      });
+      if (by) {
+        const { getTemplate, applyVars } = require('../lib/pushTemplates');
+        const rtpl = await getTemplate('push_handover_rejected');
+        const vars = { rendszam: orderId };
+        await sendPushToEmail(by, {
+          title: (rtpl.title_ro || '❌ Predare respinsă') + ' / ' + (rtpl.title_hu || 'Áru-leadás elutasítva'),
+          body: applyVars(rtpl.body_ro || '{{rendszam}} — contactează dispecerul', vars),
+          icon: '/icon192.png', badge: '/icon192.png',
+          tag: 'handover-' + orderId, url: '/sofer',
+        });
+      }
     } catch (e) { console.error('handover reject push hiba:', e); }
     return res.json({ result: { ok: true } });
   } catch (err) {
