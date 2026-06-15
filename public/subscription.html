@@ -204,11 +204,13 @@ fetch('/api/public-plans', { credentials: 'same-origin' })
 function buildFeaturesList(features) {
   var list = Array.isArray(features) ? features : [];
   if (!list.length) return '';
+  var lang = (document.documentElement.lang || 'ro');
   return '<ul style="list-style:none;padding:0;margin:0 0 16px;display:flex;flex-direction:column;gap:6px;">'
     + list.map(function(f) {
+      var text = (f && typeof f === 'object') ? (f[lang] || f.ro || f.hu || '') : String(f);
       return '<li style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--lp-text);">'
         + '<span style="color:#22c55e;font-size:14px;flex-shrink:0;margin-top:1px;">✓</span>'
-        + '<span>' + escHtml(String(f)) + '</span></li>';
+        + '<span>' + escHtml(text) + '</span></li>';
     }).join('')
     + '</ul>';
 }
