@@ -403,6 +403,50 @@ function addAchRow(a) {
 }
 
 // ============================================================
+// HATÁRÁTLÉPÉS SOROK
+// ============================================================
+function addHatarRow(dt, dir) {
+  dt = dt || '';
+  dir = dir || 'OUT';
+  var c = document.getElementById('hatarContainer');
+  var row = document.createElement('div');
+  row.className = 'dynamic-row';
+  row.innerHTML = '<input class="input" type="datetime-local" value="' + dt + '" style="flex:2;" placeholder="Dátum + óra">'
+    + '<select class="select" style="flex:1;">'
+    + '<option value="OUT"' + (dir === 'OUT' ? ' selected' : '') + '>' + t('sofer.crossOut') + '</option>'
+    + '<option value="IN"' + (dir === 'IN' ? ' selected' : '') + '>' + t('sofer.crossIn') + '</option>'
+    + '</select>'
+    + '<button class="del-row-btn" onclick="this.parentElement.remove();updateDiurnaPreview()">✕</button>';
+  c.appendChild(row);
+  row.querySelector('input[type=datetime-local]').addEventListener('change', updateDiurnaPreview);
+  row.querySelector('select').addEventListener('change', updateDiurnaPreview);
+}
+
+function collectHataratok() {
+  var rows = document.querySelectorAll('#hatarContainer .dynamic-row');
+  var result = [];
+  rows.forEach(function(row) {
+    var dt = row.querySelector('input[type=datetime-local]').value;
+    var dir = row.querySelector('select').value;
+    if (dt) result.push({ datetime: dt, direction: dir });
+  });
+  return result.sort(function(a, b) { return a.datetime.localeCompare(b.datetime); });
+}
+
+function updateDiurnaPreview() {
+  var dep = document.getElementById('fIndulasDt').value;
+  var arr = document.getElementById('fErkezesDt').value;
+  var el = document.getElementById('diurnaPreview');
+  if (!dep || !arr) { el.style.display = 'none'; return; }
+  // Kliens oldali gyors előnézet (szerver a mentéskor számol véglegesen)
+  var depD = dep.slice(0, 10), arrD = arr.slice(0, 10);
+  var crossings = collectHataratok();
+  var days = Math.ceil((new Date(arr) - new Date(dep)) / 86400000) + 1;
+  el.style.display = 'block';
+  el.textContent = '🕐 Út: ' + depD + ' → ' + arrD + ' · ' + days + ' nap · ' + crossings.length + ' határátlépés rögzítve';
+}
+
+// ============================================================
 // MENETLEVÉL BEKÜLDÉS
 // ============================================================
 function submitFuvarlevel() {
@@ -451,7 +495,9 @@ function submitFuvarlevel() {
     kmSfarsit: document.getElementById('fKmSf').value,
     locPlecare: locPlecare,
     locSosire: locSosire,
-    // Diurna nem megy a payloadban — a szerver számolja a határátlépésekből
+    indulasDt: document.getElementById('fIndulasDt').value || null,
+    erkezesDt: document.getElementById('fErkezesDt').value || null,
+    hataratok: collectHataratok(),
     cantInceput: document.getElementById('fCantInc').value,
     cantSfarsit: document.getElementById('fCantSf').value,
     alteMentiuni: document.getElementById('fMentiuni').value,
@@ -484,6 +530,10 @@ function submitFuvarlevel() {
         document.getElementById('fCantInc').value = '0';
         document.getElementById('fCantSf').value = '0';
         document.getElementById('fMentiuni').value = '';
+        document.getElementById('fIndulasDt').value = '';
+        document.getElementById('fErkezesDt').value = '';
+        document.getElementById('hatarContainer').innerHTML = '';
+        document.getElementById('diurnaPreview').style.display = 'none';
         alimIdx = 0; achIdx = 0; punctIdx = 0;
         loadSoferOrders();
       }, 500);
@@ -1033,6 +1083,14 @@ function driverOrderStatus(id, status) {
     }
   });
 }
+
+// ── Indulás/Érkezés mezők: change-listener a diurna előnézethez ──
+document.addEventListener('DOMContentLoaded', function() {
+  var depEl = document.getElementById('fIndulasDt');
+  var arrEl = document.getElementById('fErkezesDt');
+  if (depEl) depEl.addEventListener('change', updateDiurnaPreview);
+  if (arrEl) arrEl.addEventListener('change', updateDiurnaPreview);
+});
 
 // ── Nyelvváltáskor a JS-ből renderelt részek újrarajzolása ──
 // (a static data-i18n elemeket a motor magától frissíti; itt a dinamikus
