@@ -1,9 +1,9 @@
 const { buildInviteHtml } = require('../../services/email');
 
 describe('buildInviteHtml — meghívó e-mail sablon', () => {
-  const base = { kod: 'VS-3M9PQC', pozicio: 'Sofer', cegNev: 'Vallor Team SRL', registerUrl: 'https://vallorsoft.onrender.com', lang: 'hu' };
+  const base = { kod: 'VS-3M9PQC', pozicio: 'Sofer', cegNev: 'Vallor Team SRL', registerUrl: 'https://vallorsoft.onrender.com' };
 
-  test('alapértelmezett nyelv ROMÁN (lang nélkül)', () => {
+  test('alapértelmezett nyelv ROMÁN (mindig RO)', () => {
     const html = buildInviteHtml({ kod: 'VS-1', pozicio: 'Sofer', registerUrl: 'https://x', meghivottNev: 'Ion' });
     expect(html).toContain('Stimate Ion!');
     expect(html).toContain('Deschide înregistrarea');
@@ -11,12 +11,12 @@ describe('buildInviteHtml — meghívó e-mail sablon', () => {
 
   test('a MEGHÍVOTT nevével köszön (nem a cég igazgatójáéval)', () => {
     const html = buildInviteHtml({ ...base, meghivottNev: 'Kovács István' });
-    expect(html).toContain('Tisztelt Kovács István!');
+    expect(html).toContain('Stimate Kovács István!');
   });
 
   test('név nélkül semleges megszólítás', () => {
     const html = buildInviteHtml({ ...base, meghivottNev: null });
-    expect(html).toContain('Tisztelt Címzett!');
+    expect(html).toContain('Stimate destinatar!');
   });
 
   test('a cég neve és a szerepkör megjelenik', () => {
@@ -32,7 +32,7 @@ describe('buildInviteHtml — meghívó e-mail sablon', () => {
 
   test('CTA gomb + tiszta link (nincs nyers URL link-szövegként az ol-ben)', () => {
     const html = buildInviteHtml({ ...base, meghivottNev: 'X' });
-    expect(html).toContain('Regisztráció megnyitása');
+    expect(html).toContain('Deschide înregistrarea');
     expect(html).toContain('https://vallorsoft.onrender.com/register');
     // A lépések listája NE tartalmazzon nyers URL-t link-szövegként (a mobil
     // kliensek ezt csúnyán, markdown-szerűen renderelték).

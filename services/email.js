@@ -61,8 +61,8 @@ async function fetchT(url, init, ms = 15000) {
 // A meghívó-e-mail HTML törzse — tiszta (mellékhatás nélküli) függvény, hogy
 // egységteszttel ellenőrizhető legyen (a MEGHÍVOTT nevével köszön, reszponzív).
 // lang: 'ro' (alap) | 'hu' — a cég e-mail-nyelve (admin állítja).
-function buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl, lang }) {
-  const L = lang === 'hu' ? 'hu' : 'ro';
+function buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl }) {
+  const L = 'ro';
   const regLink = `${registerUrl}/register`;
   const loginLink = `${registerUrl}/login`;
   const nm = escHtml(meghivottNev), cg = escHtml(cegNev), pz = escHtml(pozicio), kd = escHtml(kod);
@@ -122,26 +122,24 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev, lang
     console.log('early return - BREVO_API_KEY, BREVO_SENDER vagy toEmail hianyzik');
     return;
   }
-  const L = lang === 'hu' ? 'hu' : 'ro';
   const registerUrl = process.env.APP_URL || 'http://localhost:3000';
 
   // DB sablon felülírja a hardcoded-ot, ha be van állítva
   let html, subject;
   const tpl = await getEmailTemplate('email_sys_invite');
   if (tpl && tpl.subject && (tpl.body_ro || tpl.body_hu)) {
-    const bodyText = L === 'hu' ? (tpl.body_hu || tpl.body_ro) : (tpl.body_ro || tpl.body_hu);
+    const bodyText = tpl.body_ro || tpl.body_hu;
     const inviteHref = escHtml(registerUrl + '/register?kod=' + encodeURIComponent(kod || '')).replace(/"/g, '%22');
-    const inviteBtnLabel = L === 'hu' ? 'Regisztráció' : 'Înregistrare';
     const vars    = { nev: meghivottNev || '', ceg_nev: cegNev || '', pozicio: pozicio || '', register_url: registerUrl + '/register' };
     const rawVars = {
-      invite_url_btn: `<a href="${inviteHref}" style="display:inline-block;background:#6366f1;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">${inviteBtnLabel}</a>`,
+      invite_url_btn: `<a href="${inviteHref}" style="display:inline-block;background:#6366f1;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">Înregistrare</a>`,
       invite_url_link: `<a href="${inviteHref}" style="color:#3b82f6;word-break:break-all;">${escHtml(registerUrl + '/register')}</a>`,
     };
     subject = applyTemplateVars(tpl.subject, vars, rawVars);
     html = applyTemplateVars(bodyText, vars, rawVars);
   } else {
-    html = buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl, lang: L });
-    subject = (L === 'hu' ? 'VallorSoft — Meghívó' : 'VallorSoft — Invitație') + ` (${cegNev || 'VallorSoft'})`;
+    html = buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl });
+    subject = `VallorSoft — Invitație (${cegNev || 'VallorSoft'})`;
   }
 
   try {
@@ -171,23 +169,22 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev, lang
 }
 
 // ============ JELSZO-VISSZAALLITO EMAIL ============
-async function sendResetEmail(toEmail, nume, resetUrl, lang) {
+async function sendResetEmail(toEmail, nume, resetUrl) {
   console.log('sendResetEmail called:', toEmail, !!BREVO_API_KEY);
   if (!BREVO_API_KEY || !BREVO_SENDER || !toEmail) {
     console.log('early return - BREVO config vagy toEmail hianyzik');
     return false; // nincs e-mail-konfig → a hívó kecsesen kezeli (emailed:false)
   }
-  const L = lang === 'hu' ? 'hu' : 'ro';
+  const L = 'ro';
 
   // DB sablon ellenőrzés — ha van, azt küldjük
   const tpl = await getEmailTemplate('email_sys_reset');
   if (tpl && tpl.subject && (tpl.body_ro || tpl.body_hu)) {
-    const bodyText = L === 'hu' ? (tpl.body_hu || tpl.body_ro) : (tpl.body_ro || tpl.body_hu);
-    const btnLabel = L === 'hu' ? 'Új jelszó beállítása' : 'Setează parolă nouă';
+    const bodyText = tpl.body_ro || tpl.body_hu;
     const safeUrl  = (resetUrl || '').replace(/"/g, '%22');
     const vars    = { nev: escHtml(nume || ''), reset_url: resetUrl || '' };
     const rawVars = {
-      reset_url_btn:  `<a href="${safeUrl}" style="display:inline-block;background:#e10b1a;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">${btnLabel}</a>`,
+      reset_url_btn:  `<a href="${safeUrl}" style="display:inline-block;background:#e10b1a;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">Setează parolă nouă</a>`,
       reset_url_link: `<a href="${safeUrl}" style="color:#3b82f6;word-break:break-all;">${escHtml(resetUrl || '')}</a>`,
     };
     const subject = applyTemplateVars(tpl.subject, vars, rawVars);
@@ -248,7 +245,7 @@ async function sendResetEmail(toEmail, nume, resetUrl, lang) {
       body: JSON.stringify({
         sender: { name: 'VallorSoft', email: BREVO_SENDER },
         to: [{ email: toEmail }],
-        subject: L === 'hu' ? 'VallorSoft — Jelszó visszaállítás' : 'VallorSoft — Resetare parolă',
+        subject: 'VallorSoft — Resetare parolă',
         htmlContent: html,
       }),
     });
