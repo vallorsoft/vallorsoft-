@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-15 — Menetlevél form: indulás/érkezés + határátlépések + diurna (PR #113)
+
+- **`db/fuvarlevel-trip-times.sql`** — új migráció: `fuvarlevelek.indulas_dt TIMESTAMPTZ`, `erkezes_dt TIMESTAMPTZ`, `hataratok JSONB DEFAULT '[]'` oszlopok
+- **`lib/diurna.js`** — `calculateDiurna(departureDt, arrivalDt, crossings)`: menetlevél-alapú diurna számítás (12:00 szabály, Europe/Bucharest DST-biztos, nap EXTERN ha a sofőr 12:00-kor Románián kívül volt); visszafelé kompatibilis: ha az első arg tömb → régi `border_crossings` alapú legacy ág
+- **`routes/soferApi.js`** — ha `indulasDt`+`erkezesDt` megvan → új form-alapú diurna; ha hiányzik → `border_crossings` GPS fallback; INSERT +3 paraméter (`$29`–`$31`)
+- **`public/sofer.html`** — az auto-diurna üzenet helyett `🕐 Út időpontjai` (2 datetime-local mező) + `🛂 Határátlépések` dinamikus sor-szekció + `diurnaPreview` előnézet
+- **`public/sofer.js`** — `addHatarRow()`, `collectHataratok()`, `updateDiurnaPreview()`; payload + reset kibővítve; DOMContentLoaded hallgatók
+- **`public/i18n.js`** — 11 új i18n kulcs RO+HU párokkal (tripTimes, departureTime, arrivalTime, borderCrossings, addCrossing, crossingDate, crossingDir, crossOut, crossIn, days, crossingCount)
+
 ## 2026-06-15 — Vizuális landing szerkesztő + blog cikkek (PR #111)
 
 - **🌐 `public/landing-editor.html`** — teljes képernyős vizuális szerkesztő: bal sidebar (szekciólista ▲▼ sorrendmozgatás + 👁 láthatóság-toggle, blog cikk szerkesztők), jobb oldal iframe az élő landing page-gel. Iframe-betöltés után injektált overlay: minden `[data-i18n]` elem duplaklikkel szerkeszthető (lebegő input/textarea → `editorTextChange(key, value)` a parent ablakba). RO/HU nyelv-toggle reloadolja az iframe-t a `vs-lang` localStorage kulccsal. Mentés: `devSaveLandingTexts` + `devSaveSectionOrder` egyszerre.
