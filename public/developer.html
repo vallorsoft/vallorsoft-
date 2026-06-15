@@ -449,6 +449,24 @@
         <button class="btn primary" style="margin-top:18px;" onclick="saveBankDetails()">💾 Mentés</button>
         <span id="bankSaveMsg" style="font-size:13px;margin-left:10px;color:#22c55e;display:none;">Mentve ✓</span>
       </div>
+
+      <div class="section-title" style="margin-top:32px;">💸 Add-on árak (landing oldalon megjelenik)</div>
+      <div class="glass" style="padding:24px;max-width:520px;">
+        <p style="font-size:13px;color:var(--muted);margin:0 0 18px;">Ezek az árak jelennek meg a landing oldalon a „Kiegészítők" szekciónál.</p>
+        <div style="display:grid;gap:12px;">
+          <label style="font-size:13px;font-weight:600;">+1 jármű (€/hó)
+            <input id="addonVehicle" class="input" type="number" min="0" step="0.5" style="margin-top:4px;width:140px;" placeholder="3" />
+          </label>
+          <label style="font-size:13px;font-weight:600;">+1 munkatárs (€/hó)
+            <input id="addonUser" class="input" type="number" min="0" step="0.5" style="margin-top:4px;width:140px;" placeholder="2" />
+          </label>
+          <label style="font-size:13px;font-weight:600;">+1 sofőr (€/hó)
+            <input id="addonDriver" class="input" type="number" min="0" step="0.5" style="margin-top:4px;width:140px;" placeholder="1" />
+          </label>
+        </div>
+        <button class="btn primary" style="margin-top:18px;" onclick="saveAddonPrices()">💾 Mentés</button>
+        <span id="addonSaveMsg" style="font-size:13px;margin-left:10px;color:#22c55e;display:none;">Mentve ✓</span>
+      </div>
     </div>
 
     <!-- FIZETÉSI KÉRELMEK -->
@@ -1744,15 +1762,39 @@ async function clearSysEmailTemplate() {
   } else { msg.textContent = '❌ ' + (d && d.err || 'Hiba'); msg.style.color='#ef4444'; }
 }
 
-// ── Banki adatok ────────────────────────────────────────────────────────────
+// ── Banki adatok + Add-on árak betöltése ───────────────────────────────────
 async function loadBankDetails() {
   const d = await gas('devGetBankDetails');
-  if (!d || !d.ok) return;
-  const det = d.details || {};
-  document.getElementById('bankHolder').value = det.holder || '';
-  document.getElementById('bankIban').value   = det.iban   || '';
-  document.getElementById('bankName').value   = det.bank   || '';
-  document.getElementById('bankSwift').value  = det.swift  || '';
+  if (d && d.ok) {
+    const det = d.details || {};
+    document.getElementById('bankHolder').value = det.holder || '';
+    document.getElementById('bankIban').value   = det.iban   || '';
+    document.getElementById('bankName').value   = det.bank   || '';
+    document.getElementById('bankSwift').value  = det.swift  || '';
+  }
+  const a = await gas('devGetAddonPrices');
+  if (a && a.ok) {
+    const p = a.prices || {};
+    document.getElementById('addonVehicle').value = p.vehicle ?? 3;
+    document.getElementById('addonUser').value    = p.user    ?? 2;
+    document.getElementById('addonDriver').value  = p.driver  ?? 1;
+  }
+}
+
+async function saveAddonPrices() {
+  const prices = {
+    vehicle: parseFloat(document.getElementById('addonVehicle').value) || 3,
+    user:    parseFloat(document.getElementById('addonUser').value)    || 2,
+    driver:  parseFloat(document.getElementById('addonDriver').value)  || 1,
+  };
+  const d = await gas('devSaveAddonPrices', [prices]);
+  const msg = document.getElementById('addonSaveMsg');
+  if (d && d.ok) {
+    msg.textContent = 'Mentve ✓'; msg.style.color = '#22c55e'; msg.style.display = '';
+    setTimeout(() => { msg.style.display = 'none'; }, 2500);
+  } else {
+    msg.textContent = '❌ Hiba'; msg.style.color = '#ef4444'; msg.style.display = '';
+  }
 }
 
 async function saveBankDetails() {

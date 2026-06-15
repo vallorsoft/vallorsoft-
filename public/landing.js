@@ -223,6 +223,7 @@ const translations = {
     billingMonthly: 'Lunar / Havonta',
     billingAnnual: 'Anual / Éves',
     billingAnnualBadge: '−1 lună / −1 hó',
+    addonTitle: 'Resurse suplimentare / Kiegészítők',
   },
   hu: {
     cookieTitle: 'Cookie-k és adatvédelem',
@@ -443,6 +444,7 @@ const translations = {
     billingMonthly: 'Havonta',
     billingAnnual: 'Éves',
     billingAnnualBadge: '−1 hónap ingyen',
+    addonTitle: 'Kiegészítők',
   }
 };
 
@@ -499,6 +501,7 @@ function applyLanguage(lang) {
   document.documentElement.lang = lang;
   renderSoferTimeline();
   if (_cachedPlans) renderPricingGrid(_cachedPlans);
+  if (_cachedAddonPrices) renderAddonPrices(_cachedAddonPrices);
 }
 
 document.getElementById('languageToggle')?.addEventListener('click', () => {
@@ -684,8 +687,9 @@ document.getElementById('contactForm')?.addEventListener('submit', async e => {
 });
 
 /* ── Dinamikus árazási kártyák (/api/public-plans alapján) ─── */
-var _cachedPlans   = null;
-var _billingMode   = 'monthly'; // 'monthly' | 'annual'
+var _cachedPlans        = null;
+var _cachedAddonPrices  = null;
+var _billingMode        = 'monthly'; // 'monthly' | 'annual'
 
 var _planColorClasses = ['lp-plan-green', 'lp-plan-blue', 'lp-plan-indigo', 'lp-plan-dark'];
 var _planAudienceKeys = ['planAlapAudience', 'planStandardAudience', 'planProAudience', 'planBusinessAudience'];
@@ -779,6 +783,41 @@ function escHtmlLp(v) {
     .then(function(d){ if (d.ok && d.plans && d.plans.length) renderPricingGrid(d.plans); })
     .catch(function(){}); // csendben megőrzi a statikus fallback-et
 })();
+
+// Add-on árak betöltése (best-effort)
+(function fetchAddons() {
+  fetch('/api/execute', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'devGetAddonPrices', arguments: [] })
+  }).then(function(r) { return r.json(); })
+    .then(function(d) {
+      var prices = d && d.result && d.result.prices;
+      if (prices) renderAddonPrices(prices);
+    }).catch(function(){});
+})();
+
+function renderAddonPrices(prices) {
+  _cachedAddonPrices = prices;
+  var section = document.getElementById('lpAddonSection');
+  var grid    = document.getElementById('lpAddonGrid');
+  if (!section || !grid) return;
+  var lang = localStorage.getItem('vs-landing-lang') || 'ro';
+  var perMonth = lang === 'hu' ? '/hó' : '/lună';
+  var items = [
+    { icon: '🚛', ro: '+1 vehicul',    hu: '+1 jármű',     price: prices.vehicle },
+    { icon: '👤', ro: '+1 angajat',    hu: '+1 munkatárs', price: prices.user },
+    { icon: '🧑‍✈️', ro: '+1 șofer',   hu: '+1 sofőr',     price: prices.driver },
+  ];
+  grid.innerHTML = items.map(function(it) {
+    var label = lang === 'hu' ? it.hu : it.ro;
+    return '<div class="lp-addon-chip">'
+      + it.icon + ' ' + escHtmlLp(label)
+      + ' — <strong>€' + (parseFloat(it.price) || 0).toFixed(0) + perMonth + '</strong>'
+      + '</div>';
+  }).join('');
+  section.style.display = '';
+}
 
 /* ── Landing szövegek DB override (best-effort, dev által szerkeszthető) ─── */
 (function() {

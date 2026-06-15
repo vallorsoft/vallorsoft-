@@ -809,4 +809,23 @@ handlers.devGetPaymentRequests = async function (req, res) {
   res.json({ result: { ok: true, requests: r.rows } });
 };
 
+// ── Add-on árak lekérdezése / mentése ──────────────────────────────────────
+handlers.devGetAddonPrices = async function (req, res) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const r = await pool.query("SELECT value FROM developer_settings WHERE key='addon_prices'");
+  const defaults = { vehicle: 3, user: 2, driver: 1 };
+  res.json({ result: { ok: true, prices: r.rows[0]?.value || defaults } });
+};
+
+handlers.devSaveAddonPrices = async function (req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const [prices] = args || [{}];
+  await pool.query(
+    `INSERT INTO developer_settings(key, value, updated_at) VALUES('addon_prices',$1::jsonb, NOW())
+     ON CONFLICT(key) DO UPDATE SET value=$1::jsonb, updated_at=NOW()`,
+    [JSON.stringify(prices)]
+  );
+  res.json({ result: { ok: true } });
+};
+
 module.exports = handlers;
