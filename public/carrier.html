@@ -105,7 +105,7 @@
       </div>
       <div class="glass" style="padding:16px 18px">
         <div class="h" data-i18n="car.uploadDoc">📎 Dokumentum feltöltése</div>
-        <div class="field"><label data-i18n="car.docKind">Típus</label><select class="inp" id="uKind"><option value="cmr" data-i18n="car.kindCmr">Aláírt CMR / POD</option><option value="invoice" data-i18n="car.kindInvoice">Számla</option><option value="insurance" data-i18n="car.kindInsurance">CMR-biztosítás</option><option value="contract" data-i18n="car.kindContract">Szerződés</option><option value="other" data-i18n="car.kindOther">Egyéb</option></select></div>
+        <div class="field"><label data-i18n="car.docKind">Típus</label><select class="inp" id="uKind"><option value="invoice" selected data-i18n="car.kindInvoice">Számla / Factură</option><option value="cmr" data-i18n="car.kindCmr">Aláírt CMR / POD</option><option value="insurance" data-i18n="car.kindInsurance">CMR-biztosítás</option><option value="contract" data-i18n="car.kindContract">Szerződés</option><option value="other" data-i18n="car.kindOther">Egyéb</option></select></div>
         <div class="field"><label data-i18n="car.docOrder">Fuvarhoz (opcionális)</label><select class="inp" id="uOrder"><option value="" data-i18n="car.general">— általános —</option></select></div>
         <div class="field"><label data-i18n="car.docFile">Fájl (PDF/kép)</label><input class="inp" id="uFile" type="file" accept=".pdf,.jpg,.jpeg,.png"></div>
         <button class="btn primary" style="width:100%" onclick="Carrier.upload()" data-i18n="car.uploadBtn">Feltöltés</button>
