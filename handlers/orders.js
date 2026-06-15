@@ -9,6 +9,7 @@ const { genDocId } = require('../lib/ids');
 const { getPositions } = require('../lib/vehiclePositions');
 const audit = require('../lib/audit');
 const planLimits = require('../lib/planLimits');
+const { featureEnabled } = require('../lib/featureEnabled');
 
 const handlers = {};
 
@@ -960,6 +961,8 @@ handlers.getPlannerMatches = async function (req, res, args) {
       return res.json({ result: { ok: false, err: 'Acces interzis' } });
     }
     const cid = req.session.user.company_id;
+    if (!(await featureEnabled(cid, 'visszfuvar-radar')))
+      return res.json({ result: { ok: true, matches: [], pending: 0, _disabled: true } });
 
     // Aktív fuvarok (kiosztott: pozíció-becsléshez és foglaltsághoz;
     // kiosztatlan: ezekhez keresünk kamiont)

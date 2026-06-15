@@ -6,6 +6,7 @@
 const pool = require('../db');
 const { estimateFromPolyline, getRates, DEFAULT_RATES, COUNTRY_NAME } = require('../lib/tollEstimate');
 const { estimateRoute } = require('../lib/routeEstimate');
+const { featureEnabled } = require('../lib/featureEnabled');
 const tollProvider = require('../lib/tollProvider');
 const maps = require('../lib/mapsProvider');
 
@@ -18,6 +19,8 @@ handlers.estimateToll = async function (req, res, args) {
   try {
     if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
+    if (!(await featureEnabled(cid, 'toll-becsles')))
+      return res.json({ result: { ok: false, err: 'Functie nedisponibila in pachetul curent.' } });
     const orderId = String(args && args[0] || '').trim();
     const r = await pool.query(
       'SELECT id, loc_incarcare, loc_descarcare, route_geo FROM orders WHERE id = $1 AND company_id = $2',

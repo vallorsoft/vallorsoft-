@@ -9,6 +9,7 @@ const intake = require('../services/email-intake');
 const { decrypt } = require('../lib/crypto');
 const { genDocId } = require('../lib/ids');
 const { estimateRoute } = require('../lib/routeEstimate');
+const { featureEnabled } = require('../lib/featureEnabled');
 
 const router = express.Router();
 
@@ -121,6 +122,8 @@ router.put('/api/inbound-orders/:id', requireLogin, requireRole('Admin', 'Manage
 // ---- Újrafeldolgozás (a tárolt PDF/szövegből) ----
 router.post('/api/inbound-orders/:id/reparse', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   try {
+    if (!(await featureEnabled(own(req), 'ai-kiolvasas')))
+      return res.status(403).json({ error: 'Functie nedisponibila in pachetul curent.' });
     const r0 = await pool.query(`SELECT raw_text, pdf_data, pdf_name FROM inbound_orders WHERE id=$1 AND company_id=$2`, [req.params.id, own(req)]);
     if (!r0.rows.length) return res.status(404).json({ error: 'Nu a fost gasit.' });
     const set = await pool.query(`SELECT meta FROM company_integrations WHERE company_id=$1 AND provider='order_intake'`, [own(req)]);
