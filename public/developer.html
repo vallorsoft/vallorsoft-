@@ -1113,6 +1113,106 @@ var LANDING_KEY_HELP = {
   pricingSubtitle:     { label:'Árazás alcím',            where:'Csomagok blokk alcíme' },
 };
 
+/* Jelenlegi éles szövegek — landing.js alapértelmezésekből */
+var LANDING_DEFAULTS = {
+  ro: {
+    heroBadge:'Orientat pe șofer · Fără hârtii · Automatizat',
+    heroTitle:'Cele mai multe softuri de transport sunt create pentru management. Noi am început cu șoferul.',
+    heroSubtitle:'Pentru că în transport, cel mai valoros dat se naște întotdeauna la șofer.',
+    startFreeBtn:'Începe gratuit — 14 zile',
+    trialNote:'✓ Fără card bancar  ·  ✓ Anulare oricând  ·  ✓ Acces imediat',
+    heroBullet1:'Nicio foaie de parcurs scrisă de mână',
+    heroBullet2:'Niciun calcul manual de diurnă',
+    heroBullet3:'Niciun bon fiscal pierdut',
+    heroNote:'Mai puțin birocrație pentru șofer · Mai mult control pentru firmă',
+    strip1Title:'Management curse',strip1Desc:'Curse, foi de parcurs, tablă de planificare',
+    strip2Title:'GPS în timp real',strip2Desc:'Poziție live, traseu, snapshot km',
+    strip3Title:'Facturare automată',strip3Desc:'e-Factura, 5 adaptoare de facturare',
+    strip4Title:'Integrare e-Factura',strip4Desc:'ANAF SPV, status automat',
+    strip5Title:'Rapoarte detaliate',strip5Desc:'Financiar, șoferi, clienți, vehicule',
+    featuresTitle:'Funcționalități principale',featuresSubtitle:'Tot ce aveți nevoie pentru a gestiona o flotă modernă de transport',
+    feat1Title:'Managementul curselor',feat1Desc:'Creare, planificare și monitorizare curse. Import CSV, board Gantt, radar de întoarcere.',
+    feat2Title:'Urmărire GPS live',feat2Desc:'Poziție în timp real, hartă interactivă, istoric traseu și snapshot km zilnic.',
+    feat3Title:'Facturare automată',feat3Desc:'Emitere factură direct din cursă. Suport FGO, SmartBill, Oblio, iFactura, Facturis.',
+    feat4Title:'Portal clienți',feat4Desc:'Clientul vede statusul curselor, descarcă documente și poate solicita transport nou.',
+    feat5Title:'Statistici & rapoarte',feat5Desc:'7 tab-uri de analiză: financiar, combustibil, șoferi, vehicule, clienți. Export CSV.',
+    feat6Title:'Tabelă de planificare',feat6Desc:'Vizualizare Gantt cu drag & drop, zoom, reordonare vehicule și radar de întoarcere.',
+    feat7Title:'Documente & CMR',feat7Desc:'Generare scrisoare de trăsură, POD foto, ZIP masiv pentru contabilitate.',
+    feat8Title:'Subcontractori',feat8Desc:'Gestiune parteneri externi cu portal propriu, facturi furnizori și urmărire datorii.',
+    howTitle:'Cum funcționează',howSubtitle:'Sunteți operațional în mai puțin de 30 de minute',
+    step1Title:'Înregistrare',step1Desc:'Creați un cont gratuit în 2 minute. Fără card bancar, fără contracte.',
+    step2Title:'Configurare',step2Desc:'Adăugați vehicule, șoferi și integrați GPS-ul și sistemul de facturare.',
+    step3Title:'Începeți activitatea',step3Desc:'Creați prima cursă, urmăriți flota în timp real și emiteți factura automat.',
+    modulesTitle:'Un sistem, pentru toate sarcinile',modulesSubtitle:'Structură modulară — plătești doar ce folosești.',
+    mod1Title:'Management curse',mod1Desc:'Gestiunea curselor, clienților, vehiculelor și subcontractorilor',
+    mod2Title:'Urmărire GPS',mod2Desc:'Poziție în timp real, integrare CargoTrack/Fomco',
+    mod3Title:'Facturare',mod3Desc:'Emitere automată facturi prin 5 furnizori',
+    mod4Title:'e-Factura',mod4Desc:'Transmitere ANAF SPV, interogare automată status',
+    mod5Title:'Documente & CMR',mod5Desc:'Scrisoare trăsură, POD foto, export ZIP contabilitate',
+    mod6Title:'Portaluri',mod6Desc:'Portal clienți și subcontractori separate',
+    mod7Title:'Statistici',mod7Desc:'Analiză pe 7 tab-uri: financiar, combustibil, șoferi, clienți',
+    mod8Title:'Tablă de planificare',mod8Desc:'Vizualizare Gantt, radar întoarcere, drag & drop',
+    blogTitle:'Resurse & Noutăți',
+    blog1Title:'Digitalizarea transportului rutier în România',blog1Desc:'Cum ajută tehnologia la eficientizarea flotelor și reducerea costurilor operaționale.',
+    blog2Title:'e-Factura 2026 — tot ce trebuie să știți',blog2Desc:'Ghid complet privind obligațiile e-Factura pentru transportatori și cum VallorSoft automatizează procesul.',
+    blog3Title:'Codul UIT și RO e-Transport — ghid practic',blog3Desc:'Ce este codul UIT, când este obligatoriu și cum gestionați declarațiile prin CargoTrack.',
+    statsTitle:'Cifre care vorbesc de la sine',stat1:'Satisfacție clienți',stat2:'Integrări active',stat3:'Vehicule gestionate',stat4:'Suport',
+    registerTitle:'Începeți testarea gratuită',registerSub:'14 zile gratuite — fără card bancar, anulare oricând.',
+    contactTitle:'Contact',contactDesc:'Suntem disponibili pentru întrebări, demonstrații și oferte personalizate.',
+    footerTagline:'Platformă SaaS pentru transport rutier & management flotă — România',
+    footerIntegrations:'Integrat nativ cu sisteme GPS și programe de facturare — FGO, SmartBill, Oblio, iFactura, Facturis, CargoTrack, Fomco, ANAF și Stripe.',
+    pricingTitle:'Planuri și prețuri',pricingSubtitle:'Prețuri transparente, fără costuri ascunse',
+  },
+  hu: {
+    heroBadge:'Sofőr-centrikus · Papírmentes · Automatizált',
+    heroTitle:'A legtöbb fuvarozási szoftver a vezetőségnek készült. Mi a sofőrrel kezdtük.',
+    heroSubtitle:'Mert a fuvarozásban a legértékesebb adat mindig a sofőrnél keletkezik.',
+    startFreeBtn:'Kezdem ingyen — 14 nap',
+    trialNote:'✓ Bankkártya nélkül  ·  ✓ Bármikor lemondható  ·  ✓ Azonnali hozzáférés',
+    heroBullet1:'Nincs több papíros menetlevél',
+    heroBullet2:'Nincs több napidíj-számolgatás',
+    heroBullet3:'Nincs több elveszett tankolási bizonylat',
+    heroNote:'Kevesebb adminisztráció a sofőrnek · Több kontroll a cégnek',
+    strip1Title:'Fuvarkezelés',strip1Desc:'Fuvarok, menetlevelek, tervezőtábla',
+    strip2Title:'Valós idejű GPS',strip2Desc:'Élő pozíció, útvonal, snapshot km',
+    strip3Title:'Automatizált számlázás',strip3Desc:'e-Factura, 5 számlázó-adapter',
+    strip4Title:'e-Factura integráció',strip4Desc:'ANAF SPV, automatikus státusz',
+    strip5Title:'Részletes riportok',strip5Desc:'Pénzügy, sofőrök, ügyfelek, járművek',
+    featuresTitle:'Főbb funkciók',featuresSubtitle:'Minden, amire szüksége van egy modern fuvarpark kezeléséhez',
+    feat1Title:'Fuvarkezelés',feat1Desc:'Fuvarok létrehozása, tervezése és nyomon követése. CSV-import, Gantt-tábla, visszfuvar-radar.',
+    feat2Title:'Élő GPS-követés',feat2Desc:'Valós idejű pozíció, interaktív térkép, útvonal-előzmény és napi km-snapshot.',
+    feat3Title:'Automatikus számlázás',feat3Desc:'Számla kiállítása közvetlenül a fuvarból. FGO, SmartBill, Oblio, iFactura, Facturis.',
+    feat4Title:'Ügyfélportál',feat4Desc:'Az ügyfél látja a fuvar státuszát, letöltheti a dokumentumokat, és új fuvart igényelhet.',
+    feat5Title:'Statisztikák és riportok',feat5Desc:'7 elemző tab: pénzügy, üzemanyag, sofőrök, járművek, ügyfelek. CSV-export.',
+    feat6Title:'Tervezőtábla',feat6Desc:'Gantt-nézet drag & drop-pal, zoom, jármű-átrendezés és visszfuvar-radar.',
+    feat7Title:'Dokumentumok és CMR',feat7Desc:'Fuvarlevél generálás, POD-fotó, tömeges ZIP letöltés könyveléshez.',
+    feat8Title:'Alvállalkozók',feat8Desc:'Külső partnerek kezelése saját portállal, szállítói számlák és tartozáskövetés.',
+    howTitle:'Hogyan működik',howSubtitle:'30 percen belül működőképes a rendszer',
+    step1Title:'Regisztráció',step1Desc:'2 perc alatt ingyenes fiók létrehozása. Bankkártya és szerződés nélkül.',
+    step2Title:'Beállítás',step2Desc:'Járművek, sofőrök hozzáadása, GPS és számlázó integrálása.',
+    step3Title:'Indulás',step3Desc:'Az első fuvar létrehozása, a flotta valós idejű követése és az automatikus számlázás.',
+    modulesTitle:'Egy rendszer, minden feladatra',modulesSubtitle:'Moduláris felépítés — csak azt fizeted, amit használsz.',
+    mod1Title:'Fuvarmenedzsment',mod1Desc:'Fuvarok, ügyfelek, járművek, alvállalkozók kezelése',
+    mod2Title:'GPS Követés',mod2Desc:'Valós idejű pozíció, CargoTrack/Fomco integráció',
+    mod3Title:'Számlázás',mod3Desc:'Automatikus számla-kiállítás 5 provideren keresztül',
+    mod4Title:'e-Factura',mod4Desc:'ANAF SPV-beküldés, automatikus státusz-lekérdezés',
+    mod5Title:'Dokumentumok & CMR',mod5Desc:'CMR/fuvarlevél, POD-fotó, könyvelői ZIP export',
+    mod6Title:'Portálok',mod6Desc:'Ügyfél-portál és alvállalkozói portál elkülönítve',
+    mod7Title:'Statisztika',mod7Desc:'7 füles elemzés: pénzügy, üzemanyag, sofőrök, ügyfelek',
+    mod8Title:'Tervezőtábla',mod8Desc:'Gantt-nézet, visszfuvar-radar, drag & drop',
+    blogTitle:'Cikkek és újdonságok',
+    blog1Title:'A közúti fuvarozás digitalizálása Romániában',blog1Desc:'Hogyan segít a technológia a flottahatékonyság növelésében és az üzemeltetési költségek csökkentésében.',
+    blog2Title:'e-Factura 2026 — amit tudni kell',blog2Desc:'Teljes útmutató a fuvarozókra vonatkozó e-Factura kötelezettségekről és a VallorSoft automatizálásáról.',
+    blog3Title:'UIT-kód és RO e-Transport — gyakorlati útmutató',blog3Desc:'Mi az UIT-kód, mikor kötelező, és hogyan intézze a CargoTrack segítségével.',
+    statsTitle:'Számok, amelyek magukért beszélnek',stat1:'Ügyfél elégedettség',stat2:'Aktív integráció',stat3:'Kezelt jármű',stat4:'Támogatás',
+    registerTitle:'Ingyenes próba indítása',registerSub:'14 nap ingyenesen — bankkártya nélkül, bármikor lemondható.',
+    contactTitle:'Kapcsolat',contactDesc:'Elérhetők vagyunk kérdések, bemutatók és egyedi ajánlatok esetén.',
+    footerTagline:'SaaS platform közúti fuvarozáshoz és flottakezeléshez — Románia',
+    footerIntegrations:'Natívan integrálva GPS-rendszerekkel és számlázó programokkal — FGO, SmartBill, Oblio, iFactura, Facturis, CargoTrack, Fomco, ANAF és Stripe.',
+    pricingTitle:'Csomagok és árak',pricingSubtitle:'Átlátható árak, rejtett költségek nélkül',
+  }
+};
+
 var LANDING_SECTIONS = {
   hero: {
     label: '🦸 Hero szekció',
@@ -1177,14 +1277,19 @@ function renderLandingForm(sec) {
     + '</div>';
 
   secDef.keys.forEach(function(key) {
-    var roVal = escHtml(_landingDbTexts.ro[key] || '');
-    var huVal = escHtml(_landingDbTexts.hu[key] || '');
-    var hint = LANDING_KEY_HELP[key];
+    var roVal  = _landingDbTexts.ro[key] || '';
+    var huVal  = _landingDbTexts.hu[key] || '';
+    var roDef  = LANDING_DEFAULTS.ro[key] || '';
+    var huDef  = LANDING_DEFAULTS.hu[key] || '';
+    var hint   = LANDING_KEY_HELP[key];
     var hintBtn = hint ? fhBtn('<b>' + hint.label + '</b><span class="fh-where">' + hint.where + '</span>') : '';
-    html += '<div style="display:grid;grid-template-columns:160px 1fr 1fr;gap:8px;align-items:start;margin-bottom:8px;">'
+    // "betöltés" gomb: kattintásra az alapértelmezett szöveget tölti be
+    var roLoadBtn = roDef ? '<button type="button" onclick="this.closest(\'div\').querySelector(\'textarea\').value='+JSON.stringify(roDef)+'" title="Éles szöveg betöltése" style="font-size:10px;padding:2px 6px;border:1px solid #cbd5e1;border-radius:5px;background:#f8fafc;color:#475569;cursor:pointer;margin-top:3px;display:block;">⬆ éles szöveg</button>' : '';
+    var huLoadBtn = huDef ? '<button type="button" onclick="this.closest(\'div\').querySelector(\'textarea\').value='+JSON.stringify(huDef)+'" title="Éles szöveg betöltése" style="font-size:10px;padding:2px 6px;border:1px solid #cbd5e1;border-radius:5px;background:#f8fafc;color:#475569;cursor:pointer;margin-top:3px;display:block;">⬆ éles szöveg</button>' : '';
+    html += '<div style="display:grid;grid-template-columns:160px 1fr 1fr;gap:8px;align-items:start;margin-bottom:10px;">'
       + '<div style="font-size:11px;color:var(--muted);font-weight:600;padding-top:9px;">' + escHtml(key) + hintBtn + '</div>'
-      + '<textarea data-key="' + escHtml(key) + '" data-lang="ro" rows="2" style="width:100%;box-sizing:border-box;background:#fff;border:1px solid var(--border-bright,#e2e8f0);border-radius:8px;padding:8px;font-size:12px;resize:vertical;" placeholder="(alapértelmezett)">' + roVal + '</textarea>'
-      + '<textarea data-key="' + escHtml(key) + '" data-lang="hu" rows="2" style="width:100%;box-sizing:border-box;background:#fff;border:1px solid var(--border-bright,#e2e8f0);border-radius:8px;padding:8px;font-size:12px;resize:vertical;" placeholder="(alapértelmezett)">' + huVal + '</textarea>'
+      + '<div><textarea data-key="' + escHtml(key) + '" data-lang="ro" rows="2" style="width:100%;box-sizing:border-box;background:#fff;border:1px solid var(--border-bright,#e2e8f0);border-radius:8px;padding:8px;font-size:12px;resize:vertical;" placeholder="' + escHtml(roDef || '(alapértelmezett)') + '">' + escHtml(roVal) + '</textarea>' + roLoadBtn + '</div>'
+      + '<div><textarea data-key="' + escHtml(key) + '" data-lang="hu" rows="2" style="width:100%;box-sizing:border-box;background:#fff;border:1px solid var(--border-bright,#e2e8f0);border-radius:8px;padding:8px;font-size:12px;resize:vertical;" placeholder="' + escHtml(huDef || '(alapértelmezett)') + '">' + escHtml(huVal) + '</textarea>' + huLoadBtn + '</div>'
       + '</div>';
   });
 
