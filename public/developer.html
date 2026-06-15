@@ -132,12 +132,12 @@
     #pane-integ .btn.ghost{background:#fff;}
     #pane-integ .text-muted{color:var(--muted);}
     /* Mező-súgó tooltip */
-    .fh-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);color:#818cf8;font-size:10px;font-weight:700;cursor:pointer;margin-left:5px;flex-shrink:0;line-height:1;vertical-align:middle;padding:0;}
-    .fh-btn:hover{background:rgba(99,102,241,0.3);}
-    .fh-popup{position:fixed;z-index:9999;max-width:280px;background:#1e293b;border:1px solid rgba(99,102,241,0.4);border-radius:10px;padding:10px 14px;font-size:12px;color:#cbd5e1;box-shadow:0 8px 24px rgba(0,0,0,0.5);line-height:1.6;}
-    .fh-popup b{color:#a5b4fc;}
-    .fh-popup .fh-where{display:block;margin-top:5px;color:#94a3b8;font-size:11px;border-top:1px solid rgba(255,255,255,0.08);padding-top:5px;}
-    .fh-popup .fh-where::before{content:'📍 ';font-size:11px;}
+    .fh-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);color:#6366f1;font-size:10px;font-weight:700;cursor:pointer;margin-left:5px;flex-shrink:0;line-height:1;vertical-align:middle;padding:0;}
+    .fh-btn:hover{background:rgba(99,102,241,0.25);color:#4f46e5;}
+    .fh-popup{position:fixed;z-index:9999;max-width:290px;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:11px 15px;font-size:12px;color:#1e293b;box-shadow:0 4px 20px rgba(0,0,0,0.15);line-height:1.6;visibility:hidden;}
+    .fh-popup b{color:#4f46e5;display:block;margin-bottom:3px;font-size:12px;}
+    .fh-popup .fh-where{display:block;margin-top:6px;color:#475569;font-size:11px;border-top:1px solid #e2e8f0;padding-top:6px;}
+    .fh-popup .fh-where::before{content:'📍 ';}
   </style>
 </head>
 <body>
@@ -997,21 +997,28 @@ function loadDash(){
 /* ── Mező-súgó tooltip ── */
 var _fhPopup = null;
 function showHint(btn, html) {
-  if (_fhPopup) { _fhPopup.remove(); _fhPopup = null; if (_fhPopup === null && btn._fhOpen) { btn._fhOpen = false; return; } }
-  btn._fhOpen = true;
+  if (_fhPopup) { _fhPopup.remove(); _fhPopup = null; return; }
   var p = document.createElement('div'); p.className = 'fh-popup'; p.innerHTML = html;
   document.body.appendChild(p); _fhPopup = p;
-  var r = btn.getBoundingClientRect();
-  var pw = Math.min(280, window.innerWidth - 20);
-  p.style.width = pw + 'px';
-  p.style.left = Math.max(10, Math.min(r.left, window.innerWidth - pw - 10)) + 'px';
-  var top = r.bottom + 6;
-  p.style.top = top + 'px';
-  setTimeout(function() {
-    document.addEventListener('click', function cl(e) {
-      if (!p.contains(e.target)) { p.remove(); _fhPopup = null; btn._fhOpen = false; document.removeEventListener('click', cl); }
-    });
-  }, 10);
+  requestAnimationFrame(function() {
+    var r = btn.getBoundingClientRect();
+    var pr = p.getBoundingClientRect();
+    var pw = pr.width, ph = pr.height;
+    var left = r.left;
+    if (left + pw > window.innerWidth - 10) left = window.innerWidth - pw - 10;
+    left = Math.max(10, left);
+    var top = r.bottom + 6;
+    if (top + ph > window.innerHeight - 10) top = r.top - ph - 6;
+    top = Math.max(10, top);
+    p.style.left = left + 'px';
+    p.style.top = top + 'px';
+    p.style.visibility = 'visible';
+    setTimeout(function() {
+      document.addEventListener('click', function cl(e) {
+        if (!p.contains(e.target) && e.target !== btn) { p.remove(); _fhPopup = null; document.removeEventListener('click', cl); }
+      });
+    }, 0);
+  });
 }
 function fhBtn(html) { return '<button type="button" class="fh-btn" onclick="showHint(this,'+JSON.stringify(html)+')">!</button>'; }
 
