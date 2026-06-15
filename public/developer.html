@@ -131,6 +131,13 @@
     #pane-integ .btn.primary{background:linear-gradient(135deg,#3b82f6,#6366f1);border-color:rgba(99,102,241,0.5);color:#fff;box-shadow:0 8px 20px -10px rgba(59,130,246,0.6);}
     #pane-integ .btn.ghost{background:#fff;}
     #pane-integ .text-muted{color:var(--muted);}
+    /* Mező-súgó tooltip */
+    .fh-btn{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);color:#818cf8;font-size:10px;font-weight:700;cursor:pointer;margin-left:5px;flex-shrink:0;line-height:1;vertical-align:middle;padding:0;}
+    .fh-btn:hover{background:rgba(99,102,241,0.3);}
+    .fh-popup{position:fixed;z-index:9999;max-width:280px;background:#1e293b;border:1px solid rgba(99,102,241,0.4);border-radius:10px;padding:10px 14px;font-size:12px;color:#cbd5e1;box-shadow:0 8px 24px rgba(0,0,0,0.5);line-height:1.6;}
+    .fh-popup b{color:#a5b4fc;}
+    .fh-popup .fh-where{display:block;margin-top:5px;color:#94a3b8;font-size:11px;border-top:1px solid rgba(255,255,255,0.08);padding-top:5px;}
+    .fh-popup .fh-where::before{content:'📍 ';font-size:11px;}
   </style>
 </head>
 <body>
@@ -380,16 +387,16 @@
 
       <!-- szerkesztő -->
       <div style="margin-bottom:10px;">
-        <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Tárgy (subject)</label>
+        <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Tárgy (subject) <button type="button" class="fh-btn" onclick="showHint(this,'<b>Email tárgy sora</b><span class=\'fh-where\'>Ez jelenik meg a levélfiókban a feladó neve mellett. Rövid, egyértelmű legyen. {{változók}} itt is működnek.</span>')">!</button></label>
         <input id="sysEmailSubject" type="text" style="width:100%;padding:9px 11px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:#141c25;color:#e9eef5;font-family:inherit;font-size:13px;" placeholder="Email tárgy…">
       </div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;">
         <div style="flex:1;min-width:240px;">
-          <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Törzs — RO (HTML)</label>
+          <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Törzs — RO (HTML) <button type="button" class="fh-btn" onclick="showHint(this,'<b>Email törzse — románul (HTML)</b><span class=\'fh-where\'>HTML formátum: &lt;p&gt;, &lt;b&gt;, &lt;a href=...&gt; stb. is használható. {{változónév}} automatikusan behelyettesítve. Ha üresen hagyod, az alapértelmezett VallorSoft-sablonos email megy ki.</span>')">!</button></label>
           <textarea id="sysEmailBodyRo" rows="10" style="width:100%;padding:9px 11px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:#141c25;color:#e9eef5;font-family:monospace;font-size:12px;resize:vertical;" placeholder="<p>Bun venit…</p>"></textarea>
         </div>
         <div style="flex:1;min-width:240px;">
-          <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Törzs — HU (HTML)</label>
+          <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Törzs — HU (HTML) <button type="button" class="fh-btn" onclick="showHint(this,'<b>Email törzse — magyarul (HTML)</b><span class=\'fh-where\'>HTML formátum — ugyanolyan, mint a RO törzs. A rendszer mindkét nyelvű törzsöt elküldi egymás után (RO+HU kétnyelvű email). Ha üresen hagyod, csak a RO változat megy ki, vagy az alapértelmezett szöveg.</span>')">!</button></label>
           <textarea id="sysEmailBodyHu" rows="10" style="width:100%;padding:9px 11px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:#141c25;color:#e9eef5;font-family:monospace;font-size:12px;resize:vertical;" placeholder="<p>Üdvözöljük…</p>"></textarea>
         </div>
       </div>
@@ -587,23 +594,23 @@ function loadPlanEditor(){
         +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
         +'<div class="ceg-name">'+p.id+' — '+escHtml(p.name)+'</div>'
         +'<label class="fsw"><input type="checkbox" id="plActive_'+p.id+'" '+(p.is_active?'checked':'')+'><span class="fsw-s"></span></label></div>'
-        +'<div class="field"><label>Csomag neve</label><input class="input" id="plName_'+p.id+'" value="'+escHtml(p.name)+'"></div>'
-        +'<div class="field"><label>Leírás</label><input class="input" id="plDesc_'+p.id+'" value="'+escHtml(p.description||'')+'"></div>'
-        +'<div class="field"><label>Nettó ár (EUR/hó)</label><input class="input" id="plPrice_'+p.id+'" type="number" step="0.01" value="'+net.toFixed(2)+'" oninput="recalcPlan('+p.id+','+vat+')"></div>'
+        +'<div class="field"><label>Csomag neve '+fhBtn('<b>Csomag neve</b><span class="fh-where">Megjelenik: előfizetési oldal (/subscription), árazás szekció (#pricing), developer cég-kiosztó táblázat, cégek Beállítások → Előfizetés kártyáján.</span>')+'</label><input class="input" id="plName_'+p.id+'" value="'+escHtml(p.name)+'"></div>'
+        +'<div class="field"><label>Leírás '+fhBtn('<b>Csomag leírása</b><span class="fh-where">Rövid 1-2 soros szöveg az előfizetési oldalon a csomag neve alatt.</span>')+'</label><input class="input" id="plDesc_'+p.id+'" value="'+escHtml(p.description||'')+'"></div>'
+        +'<div class="field"><label>Nettó ár (EUR/hó) '+fhBtn('<b>Nettó ár EUR-ban</b><span class="fh-where">Előfizetési oldalon bruttó (nettó + ÁFA) áron jelenik meg. 0 = ingyenes. Stripe Checkout is ezt veszi alapul (ha price_id be van állítva).</span>')+'</label><input class="input" id="plPrice_'+p.id+'" type="number" step="0.01" value="'+net.toFixed(2)+'" oninput="recalcPlan('+p.id+','+vat+')"></div>'
         +'<div style="font-size:13px;color:var(--muted);margin-bottom:12px;">ÁFA ('+vat+'%): <span id="plVat_'+p.id+'">'+afa.toFixed(2)+'</span> EUR &nbsp;·&nbsp; Bruttó: <b style="color:#6366f1;" id="plGross_'+p.id+'">'+brutto.toFixed(2)+'</b> EUR</div>'
         // Limitek
         +'<div style="background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.2);border-radius:10px;padding:14px;margin-bottom:14px;">'
         +'<div style="font-size:12px;font-weight:700;color:#6366f1;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em;">📊 Limitek (0=tiltott, üres=korlátlan)</div>'
         +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
-        +'<div class="field" style="margin:0"><label style="font-size:11px;">Max. felhasználó</label><input class="input" id="plMaxU_'+p.id+'" type="number" min="0" placeholder="∞" value="'+limVal(p.max_users)+'"></div>'
-        +'<div class="field" style="margin:0"><label style="font-size:11px;">Max. jármű</label><input class="input" id="plMaxV_'+p.id+'" type="number" min="0" placeholder="∞" value="'+limVal(p.max_vehicles)+'"></div>'
-        +'<div class="field" style="margin:0"><label style="font-size:11px;">Max. fuvar/hó</label><input class="input" id="plMaxO_'+p.id+'" type="number" min="0" placeholder="∞" value="'+limVal(p.max_orders_per_month)+'"></div>'
-        +'<div class="field" style="margin:0"><label style="font-size:11px;">Max. sofőr</label><input class="input" id="plMaxS_'+p.id+'" type="number" min="0" placeholder="∞" value="'+limVal(p.max_sofors)+'"></div>'
+        +'<div class="field" style="margin:0"><label style="font-size:11px;">Max. felhasználó '+fhBtn('<b>Max. Admin + Manager felhasználók</b><span class="fh-where">Ha a cég eléri ezt a számot, új meghívó küldésekor „limit elérve" hibát kap. 0 = nem hozhat létre. Üres = korlátlan.</span>')+'</label><input class="input" id="plMaxU_'+p.id+'" type="number" min="0" placeholder="∞" value="'+limVal(p.max_users)+'"></div>'
+        +'<div class="field" style="margin:0"><label style="font-size:11px;">Max. jármű '+fhBtn('<b>Max. regisztrálható jármű</b><span class="fh-where">Ha a cég eléri ezt a számot, új jármű rögzítésekor „limit elérve" hibát kap. 0 = nem hozhat létre. Üres = korlátlan.</span>')+'</label><input class="input" id="plMaxV_'+p.id+'" type="number" min="0" placeholder="∞" value="'+limVal(p.max_vehicles)+'"></div>'
+        +'<div class="field" style="margin:0"><label style="font-size:11px;">Max. fuvar/hó '+fhBtn('<b>Max. fuvar rögzítés havonta</b><span class="fh-where">Naptári hónapra számítva. Ha eléri, új fuvar kiíráskor „limit elérve" hibát kap. 0 = nem rögzíthet. Üres = korlátlan.</span>')+'</label><input class="input" id="plMaxO_'+p.id+'" type="number" min="0" placeholder="∞" value="'+limVal(p.max_orders_per_month)+'"></div>'
+        +'<div class="field" style="margin:0"><label style="font-size:11px;">Max. sofőr '+fhBtn('<b>Max. Sofőr szerepkörű felhasználó</b><span class="fh-where">Ha a cég eléri ezt a számot, új sofőr meghívójakor „limit elérve" hibát kap. 0 = nem hívhat meg sofőrt. Üres = korlátlan.</span>')+'</label><input class="input" id="plMaxS_'+p.id+'" type="number" min="0" placeholder="∞" value="'+limVal(p.max_sofors)+'"></div>'
         +'</div></div>'
         // Stripe
-        +'<div class="field"><label>Stripe Price ID <span style="font-size:11px;color:var(--muted);">(price_xxx)</span></label><input class="input" id="plStripe_'+p.id+'" placeholder="price_..." value="'+escHtml(p.stripe_price_id||'')+'"></div>'
+        +'<div class="field"><label>Stripe Price ID '+fhBtn('<b>Stripe Price ID</b><span class="fh-where">A Stripe dashboardon (Products) megtalálod: price_xxxxxxxxxxxxxxxx formátum. Ide írd be, hogy az „Előfizetek" gomb Stripe Checkout-ra vigyen. Nélküle a gomb kapcsolatfelvétel-linkre mutat.</span>')+' <span style="font-size:11px;color:var(--muted);">(price_xxx)</span></label><input class="input" id="plStripe_'+p.id+'" placeholder="price_..." value="'+escHtml(p.stripe_price_id||'')+'"></div>'
         // Marketing bullet-pontok
-        +'<div class="field"><label>Marketing bullet-pontok <span style="font-size:11px;color:var(--muted);">(soronként 1 pont — /subscription és #pricing oldalon jelenik meg)</span></label>'
+        +'<div class="field"><label>Marketing bullet-pontok '+fhBtn('<b>Funkció-lista az előfizetési oldalon</b><span class="fh-where">Soronként 1 bullet pont. ✓ jelölt listaként jelenik meg a /subscription és a landing #pricing szekciójában. Pl.: „GPS követés valós időben", „Korlátlan fuvar", „E-Factura integráció"</span>')+'</label>'
         +'<textarea class="input" id="plFeatures_'+p.id+'" rows="4" style="resize:vertical;" placeholder="pl. 10 jármű&#10;Sofőr-portál&#10;GPS integráció">'+escHtml((Array.isArray(p.features)?p.features:[]).join('\n'))+'</textarea></div>'
         +'<button class="btn-dev" onclick="savePlan('+p.id+')">💾 Mentés</button>'
         +' <button class="btn-dev" onclick="loadPlanFeatures('+p.id+')" style="margin-left:8px;">⚙️ Funkció-kapcsolók</button>'
@@ -987,7 +994,114 @@ function loadDash(){
   });
 }
 
+/* ── Mező-súgó tooltip ── */
+var _fhPopup = null;
+function showHint(btn, html) {
+  if (_fhPopup) { _fhPopup.remove(); _fhPopup = null; if (_fhPopup === null && btn._fhOpen) { btn._fhOpen = false; return; } }
+  btn._fhOpen = true;
+  var p = document.createElement('div'); p.className = 'fh-popup'; p.innerHTML = html;
+  document.body.appendChild(p); _fhPopup = p;
+  var r = btn.getBoundingClientRect();
+  var pw = Math.min(280, window.innerWidth - 20);
+  p.style.width = pw + 'px';
+  p.style.left = Math.max(10, Math.min(r.left, window.innerWidth - pw - 10)) + 'px';
+  var top = r.bottom + 6;
+  p.style.top = top + 'px';
+  setTimeout(function() {
+    document.addEventListener('click', function cl(e) {
+      if (!p.contains(e.target)) { p.remove(); _fhPopup = null; btn._fhOpen = false; document.removeEventListener('click', cl); }
+    });
+  }, 10);
+}
+function fhBtn(html) { return '<button type="button" class="fh-btn" onclick="showHint(this,'+JSON.stringify(html)+')">!</button>'; }
+
 /* ── Landing szövegek szerkesztő ── */
+
+var LANDING_KEY_HELP = {
+  heroTitle:     { label:'Főcím (H1)',               where:'Landing hero bal oldal — legnagyobb szöveg' },
+  heroSubtitle:  { label:'Alcím',                    where:'H1 alatt, 1-2 soros leíró mondat' },
+  heroBadge:     { label:'Badge szöveg',             where:'H1 felett kis pill-badge, pl. „🚀 Platformă completă"' },
+  startFreeBtn:  { label:'Fő CTA gomb',              where:'Hero nagy kék gomb szövege, pl. „Încearcă gratuit"' },
+  trialNote:     { label:'Trial megjegyzés',         where:'CTA gomb alatt apró szürke szöveg, pl. „14 zile gratuit, fără card"' },
+  heroBullet1:   { label:'1. bullet pont',           where:'Hero ✓ lista — 1. sor' },
+  heroBullet2:   { label:'2. bullet pont',           where:'Hero ✓ lista — 2. sor' },
+  heroBullet3:   { label:'3. bullet pont',           where:'Hero ✓ lista — 3. sor' },
+  heroNote:      { label:'Hero megjegyzés',          where:'Bullet lista alatt apró szöveg' },
+  strip1Title:   { label:'1. strip cím',             where:'Feature strip (sötét sáv hero alatt) — 1. ikon szövege' },
+  strip1Desc:    { label:'1. strip leírás',          where:'Feature strip — 1. ikon alatt kis szöveg' },
+  strip2Title:   { label:'2. strip cím',             where:'Feature strip — 2. ikon szövege' },
+  strip2Desc:    { label:'2. strip leírás',          where:'Feature strip — 2. ikon alatt' },
+  strip3Title:   { label:'3. strip cím',             where:'Feature strip — 3. ikon szövege' },
+  strip3Desc:    { label:'3. strip leírás',          where:'Feature strip — 3. ikon alatt' },
+  strip4Title:   { label:'4. strip cím',             where:'Feature strip — 4. ikon szövege' },
+  strip4Desc:    { label:'4. strip leírás',          where:'Feature strip — 4. ikon alatt' },
+  strip5Title:   { label:'5. strip cím',             where:'Feature strip — 5. ikon szövege' },
+  strip5Desc:    { label:'5. strip leírás',          where:'Feature strip — 5. ikon alatt' },
+  featuresTitle:    { label:'Funkciók szekció főcím',   where:'„Főbb funkciók" szekció H2 felirata' },
+  featuresSubtitle: { label:'Funkciók alcím',           where:'Főcím alatt kis leíró sor' },
+  feat1Title:  { label:'1. funkció neve',   where:'Funkciók — 1. kártya cím' },
+  feat1Desc:   { label:'1. funkció leírás', where:'Funkciók — 1. kártya szöveg' },
+  feat2Title:  { label:'2. funkció neve',   where:'Funkciók — 2. kártya cím' },
+  feat2Desc:   { label:'2. funkció leírás', where:'Funkciók — 2. kártya szöveg' },
+  feat3Title:  { label:'3. funkció neve',   where:'Funkciók — 3. kártya cím' },
+  feat3Desc:   { label:'3. funkció leírás', where:'Funkciók — 3. kártya szöveg' },
+  feat4Title:  { label:'4. funkció neve',   where:'Funkciók — 4. kártya cím' },
+  feat4Desc:   { label:'4. funkció leírás', where:'Funkciók — 4. kártya szöveg' },
+  feat5Title:  { label:'5. funkció neve',   where:'Funkciók — 5. kártya cím' },
+  feat5Desc:   { label:'5. funkció leírás', where:'Funkciók — 5. kártya szöveg' },
+  feat6Title:  { label:'6. funkció neve',   where:'Funkciók — 6. kártya cím' },
+  feat6Desc:   { label:'6. funkció leírás', where:'Funkciók — 6. kártya szöveg' },
+  feat7Title:  { label:'7. funkció neve',   where:'Funkciók — 7. kártya cím' },
+  feat7Desc:   { label:'7. funkció leírás', where:'Funkciók — 7. kártya szöveg' },
+  feat8Title:  { label:'8. funkció neve',   where:'Funkciók — 8. kártya cím' },
+  feat8Desc:   { label:'8. funkció leírás', where:'Funkciók — 8. kártya szöveg' },
+  howTitle:    { label:'„Hogyan működik" főcím',  where:'3-lépéses szekció H2 felirata' },
+  howSubtitle: { label:'„Hogyan működik" alcím',  where:'Főcím alatt kis leíró sor' },
+  step1Title:  { label:'1. lépés neve',   where:'Hogyan — 1. lépés kártya cím' },
+  step1Desc:   { label:'1. lépés leírás', where:'Hogyan — 1. lépés kártya szöveg' },
+  step2Title:  { label:'2. lépés neve',   where:'Hogyan — 2. lépés kártya cím' },
+  step2Desc:   { label:'2. lépés leírás', where:'Hogyan — 2. lépés kártya szöveg' },
+  step3Title:  { label:'3. lépés neve',   where:'Hogyan — 3. lépés kártya cím' },
+  step3Desc:   { label:'3. lépés leírás', where:'Hogyan — 3. lépés kártya szöveg' },
+  modulesTitle:    { label:'Modulok szekció főcím', where:'Modulok blokk H2 felirata' },
+  modulesSubtitle: { label:'Modulok alcím',         where:'Főcím alatt kis leíró sor' },
+  mod1Title:  { label:'1. modul neve',   where:'Modulok — 1. kártya cím' },
+  mod1Desc:   { label:'1. modul leírás', where:'Modulok — 1. kártya szöveg' },
+  mod2Title:  { label:'2. modul neve',   where:'Modulok — 2. kártya cím' },
+  mod2Desc:   { label:'2. modul leírás', where:'Modulok — 2. kártya szöveg' },
+  mod3Title:  { label:'3. modul neve',   where:'Modulok — 3. kártya cím' },
+  mod3Desc:   { label:'3. modul leírás', where:'Modulok — 3. kártya szöveg' },
+  mod4Title:  { label:'4. modul neve',   where:'Modulok — 4. kártya cím' },
+  mod4Desc:   { label:'4. modul leírás', where:'Modulok — 4. kártya szöveg' },
+  mod5Title:  { label:'5. modul neve',   where:'Modulok — 5. kártya cím' },
+  mod5Desc:   { label:'5. modul leírás', where:'Modulok — 5. kártya szöveg' },
+  mod6Title:  { label:'6. modul neve',   where:'Modulok — 6. kártya cím' },
+  mod6Desc:   { label:'6. modul leírás', where:'Modulok — 6. kártya szöveg' },
+  mod7Title:  { label:'7. modul neve',   where:'Modulok — 7. kártya cím' },
+  mod7Desc:   { label:'7. modul leírás', where:'Modulok — 7. kártya szöveg' },
+  mod8Title:  { label:'8. modul neve',   where:'Modulok — 8. kártya cím' },
+  mod8Desc:   { label:'8. modul leírás', where:'Modulok — 8. kártya szöveg' },
+  blogTitle:  { label:'Blog szekció főcím', where:'Blog/Hírek blokk H2 felirata' },
+  blog1Title: { label:'1. bejegyzés cím',   where:'Blog — 1. kártya cím' },
+  blog1Desc:  { label:'1. bejegyzés összefoglaló', where:'Blog — 1. kártya szöveg' },
+  blog2Title: { label:'2. bejegyzés cím',   where:'Blog — 2. kártya cím' },
+  blog2Desc:  { label:'2. bejegyzés összefoglaló', where:'Blog — 2. kártya szöveg' },
+  blog3Title: { label:'3. bejegyzés cím',   where:'Blog — 3. kártya cím' },
+  blog3Desc:  { label:'3. bejegyzés összefoglaló', where:'Blog — 3. kártya szöveg' },
+  statsTitle:          { label:'Statisztika főcím',    where:'Számok szekció H2 felirata, pl. „Platformă de încredere"' },
+  stat1:               { label:'1. statisztika',       where:'Nagy számok blokk — 1. elem, pl. „500+ cég / vállalat"' },
+  stat2:               { label:'2. statisztika',       where:'Nagy számok blokk — 2. elem' },
+  stat3:               { label:'3. statisztika',       where:'Nagy számok blokk — 3. elem' },
+  stat4:               { label:'4. statisztika',       where:'Nagy számok blokk — 4. elem' },
+  registerTitle:       { label:'Regisztrációs CTA cím',   where:'Alsó CTA szekció H2 felirata (regisztrálj most blokk)' },
+  registerSub:         { label:'Regisztrációs CTA alcím', where:'CTA szekció alcíme' },
+  contactTitle:        { label:'Kapcsolat szekció főcím', where:'Chat/kapcsolat blokk H2 felirata' },
+  contactDesc:         { label:'Kapcsolat szekció szöveg',where:'Chat/kapcsolat blokk leíró szövege' },
+  footerTagline:       { label:'Footer szlogen',          where:'Footer bal oldal, logó alatt rövid szlogen' },
+  footerIntegrations:  { label:'Footer integráció-sor',   where:'Footer alsó sor — pl. „GPS · SmartBill · ANAF e-Factura"' },
+  pricingTitle:        { label:'Árazás szekció főcím',    where:'Csomagok blokk H2 felirata' },
+  pricingSubtitle:     { label:'Árazás alcím',            where:'Csomagok blokk alcíme' },
+};
 
 var LANDING_SECTIONS = {
   hero: {
@@ -1055,8 +1169,10 @@ function renderLandingForm(sec) {
   secDef.keys.forEach(function(key) {
     var roVal = escHtml(_landingDbTexts.ro[key] || '');
     var huVal = escHtml(_landingDbTexts.hu[key] || '');
+    var hint = LANDING_KEY_HELP[key];
+    var hintBtn = hint ? fhBtn('<b>' + hint.label + '</b><span class="fh-where">' + hint.where + '</span>') : '';
     html += '<div style="display:grid;grid-template-columns:160px 1fr 1fr;gap:8px;align-items:start;margin-bottom:8px;">'
-      + '<div style="font-size:11px;color:var(--muted);font-weight:600;padding-top:9px;">' + escHtml(key) + '</div>'
+      + '<div style="font-size:11px;color:var(--muted);font-weight:600;padding-top:9px;">' + escHtml(key) + hintBtn + '</div>'
       + '<textarea data-key="' + escHtml(key) + '" data-lang="ro" rows="2" style="width:100%;box-sizing:border-box;background:#fff;border:1px solid var(--border-bright,#e2e8f0);border-radius:8px;padding:8px;font-size:12px;resize:vertical;" placeholder="(alapértelmezett)">' + roVal + '</textarea>'
       + '<textarea data-key="' + escHtml(key) + '" data-lang="hu" rows="2" style="width:100%;box-sizing:border-box;background:#fff;border:1px solid var(--border-bright,#e2e8f0);border-radius:8px;padding:8px;font-size:12px;resize:vertical;" placeholder="(alapértelmezett)">' + huVal + '</textarea>'
       + '</div>';
@@ -1668,10 +1784,10 @@ async function loadPushTemplPane() {
       '<div style="font-weight:700;font-size:13px;margin-bottom:6px;">'+m.label+'</div>' +
       '<div style="font-size:11px;color:#8a97a8;margin-bottom:10px;">Változók: '+varHints+'</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
-        '<div><label style="font-size:11px;color:#8a97a8;">Cím RO</label><input class="pt-inp" data-f="title_ro" value="'+esc(cur.title_ro||'')+'" style="width:100%;margin-top:3px;padding:7px 9px;border:1px solid rgba(255,255,255,0.1);border-radius:7px;background:#0c1218;color:#e9eef5;font-size:12px;"></div>' +
-        '<div><label style="font-size:11px;color:#8a97a8;">Cím HU</label><input class="pt-inp" data-f="title_hu" value="'+esc(cur.title_hu||'')+'" style="width:100%;margin-top:3px;padding:7px 9px;border:1px solid rgba(255,255,255,0.1);border-radius:7px;background:#0c1218;color:#e9eef5;font-size:12px;"></div>' +
-        '<div><label style="font-size:11px;color:#8a97a8;">Szöveg RO</label><textarea class="pt-inp" data-f="body_ro" rows="2" style="width:100%;margin-top:3px;padding:7px 9px;border:1px solid rgba(255,255,255,0.1);border-radius:7px;background:#0c1218;color:#e9eef5;font-size:12px;resize:vertical;">'+esc(cur.body_ro||'')+'</textarea></div>' +
-        '<div><label style="font-size:11px;color:#8a97a8;">Szöveg HU</label><textarea class="pt-inp" data-f="body_hu" rows="2" style="width:100%;margin-top:3px;padding:7px 9px;border:1px solid rgba(255,255,255,0.1);border-radius:7px;background:#0c1218;color:#e9eef5;font-size:12px;resize:vertical;">'+esc(cur.body_hu||'')+'</textarea></div>' +
+        '<div><label style="font-size:11px;color:#8a97a8;">Cím RO'+fhBtn('<b>Értesítés főcím — román</b><span class="fh-where">A push értesítés fejléce románul. Félkövér, max ~50 karakter. Pl. „🔔 Cerere nouă de transport"</span>')+'</label><input class="pt-inp" data-f="title_ro" value="'+esc(cur.title_ro||'')+'" style="width:100%;margin-top:3px;padding:7px 9px;border:1px solid rgba(255,255,255,0.1);border-radius:7px;background:#0c1218;color:#e9eef5;font-size:12px;"></div>' +
+        '<div><label style="font-size:11px;color:#8a97a8;">Cím HU'+fhBtn('<b>Értesítés főcím — magyar</b><span class="fh-where">A push értesítés fejléce magyarul. Félkövér, max ~50 karakter. Pl. „🔔 Új fuvarkérés"</span>')+'</label><input class="pt-inp" data-f="title_hu" value="'+esc(cur.title_hu||'')+'" style="width:100%;margin-top:3px;padding:7px 9px;border:1px solid rgba(255,255,255,0.1);border-radius:7px;background:#0c1218;color:#e9eef5;font-size:12px;"></div>' +
+        '<div><label style="font-size:11px;color:#8a97a8;">Szöveg RO'+fhBtn('<b>Értesítés törzs — román</b><span class="fh-where">A cím alatt megjelenő szöveg románul. Max ~100 karakter. Változók: {{változónév}} — automatikusan helyettesítve.</span>')+'</label><textarea class="pt-inp" data-f="body_ro" rows="2" style="width:100%;margin-top:3px;padding:7px 9px;border:1px solid rgba(255,255,255,0.1);border-radius:7px;background:#0c1218;color:#e9eef5;font-size:12px;resize:vertical;">'+esc(cur.body_ro||'')+'</textarea></div>' +
+        '<div><label style="font-size:11px;color:#8a97a8;">Szöveg HU'+fhBtn('<b>Értesítés törzs — magyar</b><span class="fh-where">A cím alatt megjelenő szöveg magyarul. Max ~100 karakter. Változók: {{változónév}} — automatikusan helyettesítve.</span>')+'</label><textarea class="pt-inp" data-f="body_hu" rows="2" style="width:100%;margin-top:3px;padding:7px 9px;border:1px solid rgba(255,255,255,0.1);border-radius:7px;background:#0c1218;color:#e9eef5;font-size:12px;resize:vertical;">'+esc(cur.body_hu||'')+'</textarea></div>' +
       '</div></div>';
   }).join('');
 }
