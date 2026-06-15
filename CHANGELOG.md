@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-06-15 — Vizuális landing szerkesztő + blog cikkek (PR #111)
+
+- **🌐 `public/landing-editor.html`** — teljes képernyős vizuális szerkesztő: bal sidebar (szekciólista ▲▼ sorrendmozgatás + 👁 láthatóság-toggle, blog cikk szerkesztők), jobb oldal iframe az élő landing page-gel. Iframe-betöltés után injektált overlay: minden `[data-i18n]` elem duplaklikkel szerkeszthető (lebegő input/textarea → `editorTextChange(key, value)` a parent ablakba). RO/HU nyelv-toggle reloadolja az iframe-t a `vs-lang` localStorage kulccsal. Mentés: `devSaveLandingTexts` + `devSaveSectionOrder` egyszerre.
+- **📰 Blog cikk részletes oldal** — `public/blog-post.html` (publikus, landing.css), `/blog/1|2|3` route (`routes/pages.js`); cikk tartalom (`GET /api/blog/:id`, `routes/blog.js`) a `developer_settings`-ből töltődik; RO+HU cím + HTML tartalom; landing blog kártyák „Citeste mai mult →" / „Tovább olvasom →" linkeket kaptak (`data-i18n="blogReadMore"`).
+- **⚙️ Backend** — `GET /api/landing-texts` kibővítve: visszaadja a `sectionOrder` + `sectionVisibility` mezőket is; `handlers/developer.js`: `devSaveSectionOrder`, `devGetBlogPost`, `devSaveBlogPost`; új `routes/blog.js`; `/developer/landing-editor` + `/blog/:id` page route-ok.
+- **🗂️ `public/index.html`** — minden fő szekció `data-vs-section` attribútumot kapott (hero/strip/how/features/stats/testimonials/pricing/blog/contact/cta).
+- **🔄 `public/landing.js`** — `applySectionOrder()` + `applySectionVisibility()` funkciók; `blogReadMore` i18n kulcs (RO+HU).
+- **🧹 `public/developer.html`** — régi `🌐 Landing szövegek` fül + pane + ~305 sor JS (`LANDING_KEY_HELP`, `LANDING_DEFAULTS`, `LANDING_SECTIONS` stb.) eltávolítva; helyette `🌐 Landing szerkesztő ↗` gomb (új ablakban nyit).
+- 108 teszt zöld.
+
 ## 2026-06-15 — Developer szerkeszthető tartalmak: landing + email + csomag + push (PR #103)
 
 - **🌐 Landing szövegek** (`routes/landing-texts.js`, `handlers/developer.js` `devGetLandingContent`/`devSaveLandingContent`) — a landing page marketing szövegei (hero H1/alcím/badge, 3 bullet, heroNote, USP cím/leírás) DB-ből töltődnek (`developer_settings` `landing_content` kulcs); `GET /api/landing-texts` publikus; developer szerkesztheti és mentheti.
