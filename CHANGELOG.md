@@ -14,6 +14,17 @@
 
 ---
 
+## 2026-06-15 — Admin Előfizetések almenü + developer fizetés-aktiválás (PR #138)
+
+- **`public/admin.html`** — Beállítások sidebar: leaf tab → nav-head csoport két almenüvel (👤 Fiók / 💳 Előfizetés); régi subscriptionCard eltávolítva; új `data-pane="elofizetesek"` pane hozzáadva (státusz, csomag-választó, referencia-kártya, fizetési előzmények)
+- **`handlers/billingHandlers.js`** — `requestSubscriptionExtension`: payment_request létrehozás, admin fizetési email (banki adatokkal, összeg EUR+RON+TVA), developer értesítő email (DEV_NOTIFY_EMAIL / vallorsoft@gmail.com); `getMyPaymentRequests`: admin látja a saját cégének kérelmeit
+- **`handlers/developer.js`** — `devActivatePayment`: pending kérelmet paid-re állít, company paid_until + subscription_status frissítés (éves +12 hó, havi +1 hó, meglévő jövőbeli lejárattól számítva)
+- **`public/developer.html`** — Fizetési kérelmek tábla: 9. Művelet oszlop, ✅ Aktiválás gomb pending sorokon
+- **`public/console-shared.js`** — `loadElofizetesek`, `elofSetBilling`, `elofRenderPlans`, `elofLoadHistory`, `elofRequestPlan`; `loadSubscriptionCard` eltávolítva `loadSettingsPane`-ből
+- **`public/admin.js`** — `loadTab` bővítve `elofizetesek` esettel
+
+---
+
 ## 2026-06-15 — Emailek csak románul (PR #136)
 
 - **`routes/trial-select.js`** — fizetési email + köszönő oldal: tábla-feliratok, szekció-fejlécek, instrukciók, CTA gomb, tárgy — mind csak román (HU szövegek eltávolítva)
