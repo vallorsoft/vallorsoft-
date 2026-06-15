@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-15 — Landing #pricing: 4 csomagos rács, per-csomag színek, kétnyelvű, ÁFA-megjegyzés (PR #126)
+
+- **`public/landing.css`** — `--lp-green` token; `.lp-plan-green/.blue/.indigo/.dark` szín-módosítók `--plan-accent` CSS-változóval (border/badge/checkmark/hover egységes); 4 oszlopos rács (1024px → 2×2, 640px → 1 col); `.lp-plan-audience` célközönség-sor; `.lp-pricing-vat` megjegyzés-stílus; Pro kártya lift (`translateY -4px`)
+- **`public/landing.js`** — `_cachedPlans` + `renderPricingGrid` teljes újraírás: `p.features` JSONB array → `<li>` bullet-lista; per-csomag szín/badge/célcsoport/CTA; `applyLanguage`-ban re-render (HU↔RO váltáskor automatikusan frissül); 8 új i18n kulcs mindkét nyelvhez: `planAlapAudience`, `planStandardAudience`, `planProAudience`, `planBusinessAudience`, `planStartBtn`, `planContactBtn`, `planPopular`, `pricingVatNote`
+- **`public/index.html`** — statikus fallback frissítve 4 valós csomagra (Alap/Standard/Pro/Business) helyes célközönség, feature-lista, CTA gombok és `#lpPricingVat` ÁFA-megjegyzés elemmel
+
+---
+
 ## 2026-06-15 — Carrier járművek megjelenítése a planificatorban (PR #114)
 
 - **`handlers/orders.js`** — `getPlannerData`: `carrier_vehicles JOIN carriers` lekérés (`company_id`-szűrt), `carrierVehicles` tömbként visszaadva
