@@ -220,6 +220,9 @@ const translations = {
     planContactBtn: 'Contactați-ne',
     planPopular: 'Recomandat',
     pricingVatNote: 'Prețurile sunt tarife nete. La facturare se adaugă TVA 21%.',
+    billingMonthly: 'Lunar / Havonta',
+    billingAnnual: 'Anual / Éves',
+    billingAnnualBadge: '−1 lună / −1 hó',
   },
   hu: {
     cookieTitle: 'Cookie-k és adatvédelem',
@@ -437,6 +440,9 @@ const translations = {
     planContactBtn: 'Kapcsolatfelvétel',
     planPopular: 'Ajánlott',
     pricingVatNote: 'Az árak nettó árak. Számlázáskor 21% ÁFÁ-t számítunk fel.',
+    billingMonthly: 'Havonta',
+    billingAnnual: 'Éves',
+    billingAnnualBadge: '−1 hónap ingyen',
   }
 };
 
@@ -678,30 +684,51 @@ document.getElementById('contactForm')?.addEventListener('submit', async e => {
 });
 
 /* ── Dinamikus árazási kártyák (/api/public-plans alapján) ─── */
-var _cachedPlans = null;
+var _cachedPlans   = null;
+var _billingMode   = 'monthly'; // 'monthly' | 'annual'
 
 var _planColorClasses = ['lp-plan-green', 'lp-plan-blue', 'lp-plan-indigo', 'lp-plan-dark'];
 var _planAudienceKeys = ['planAlapAudience', 'planStandardAudience', 'planProAudience', 'planBusinessAudience'];
+
+function setBillingMode(mode) {
+  _billingMode = mode;
+  document.querySelectorAll('.lp-toggle-btn').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.billing === mode);
+  });
+  if (_cachedPlans) renderPricingGrid(_cachedPlans);
+}
 
 function renderPricingGrid(plans) {
   const grid = document.getElementById('lpPricingGrid');
   if (!grid || !plans || !plans.length) return;
   _cachedPlans = plans;
-  const lang = localStorage.getItem('vs-landing-lang') || 'ro';
-  const t    = translations[lang] || translations.ro;
+  const lang     = localStorage.getItem('vs-landing-lang') || 'ro';
+  const t        = translations[lang] || translations.ro;
+  const isAnnual = (_billingMode === 'annual');
   const featuredIndex = 2; // Pro kártya kiemelt
 
   grid.innerHTML = plans.map(function(p, i) {
-    const colorClass = _planColorClasses[i] || 'lp-plan-blue';
-    const isFeature  = (i === featuredIndex);
-    const isDark     = (i === 3);
+    const colorClass  = _planColorClasses[i] || 'lp-plan-blue';
+    const isFeature   = (i === featuredIndex);
+    const isDark      = (i === 3);
     const audienceKey = _planAudienceKeys[Math.min(i, _planAudienceKeys.length - 1)];
-    const audience   = t[audienceKey] || escHtmlLp(p.description || '');
+    const audience    = t[audienceKey] || escHtmlLp(p.description || '');
+
+    const monthlyEur = parseFloat(p.price_net) || 0;
+    const annualEur  = monthlyEur * 11; // 11 hónap = 12 hónap hozzáférés
+    const moEqEur    = annualEur / 12;  // havi ekvivalens éves csomagnál
 
     let priceHtml;
-    if (p.price_net > 0) {
-      priceHtml = '<span class="lp-price-val">€' + Math.round(p.price_net) + '</span>'
-        + '<span class="lp-price-period">' + (lang === 'hu' ? '/hó' : '/lună') + '</span>';
+    if (monthlyEur > 0) {
+      if (isAnnual) {
+        priceHtml = '<span class="lp-price-val">€' + annualEur + '</span>'
+          + '<span class="lp-price-period">' + (lang === 'hu' ? '/év' : '/an') + '</span>'
+          + '<div class="lp-price-annual-note">≈ €' + moEqEur.toFixed(2) + (lang === 'hu' ? '/hó' : '/lună') + '</div>'
+          + '<div class="lp-price-saving">' + (lang === 'hu' ? '1 hónap ingyen' : '1 lună gratuită') + '</div>';
+      } else {
+        priceHtml = '<span class="lp-price-val">€' + Math.round(monthlyEur) + '</span>'
+          + '<span class="lp-price-period">' + (lang === 'hu' ? '/hó' : '/lună') + '</span>';
+      }
     } else {
       priceHtml = '<span class="lp-price-val lp-price-custom">'
         + (lang === 'hu' ? 'Egyedi' : 'Personalizat') + '</span>';
@@ -717,7 +744,8 @@ function renderPricingGrid(plans) {
       featureItems = '<li>' + escHtmlLp(p.description) + '</li>';
     }
 
-    const ctaHref  = isDark ? '#contact' : '/register';
+    const billing  = isAnnual ? 'annual' : 'monthly';
+    const ctaHref  = isDark ? '#contact' : ('/register?billing=' + billing);
     const ctaLabel = isDark ? (t.planContactBtn || (lang === 'hu' ? 'Kapcsolatfelvétel' : 'Contactați-ne'))
                             : (t.planStartBtn   || (lang === 'hu' ? 'Ingyenes próba' : 'Testează gratuit'));
     const ctaClass = isFeature ? 'lp-btn-primary' : 'lp-btn-outline';

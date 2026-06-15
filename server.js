@@ -193,7 +193,8 @@ app.use(require('./routes/uit'));
 app.use(require('./routes/inbound-orders'));
 app.use(require('./routes/client-mail'));
 app.use(require('./routes/developer-export'));
-app.use(require('./routes/blog')); // publikus blog cikk API
+app.use(require('./routes/blog'));          // publikus blog cikk API
+app.use(require('./routes/trial-select')); // trial csomag-választás + fizetési email
 
 // ===== 404 az ismeretlen API-utakra + GLOBÁLIS HIBAKEZELŐ (végső védőháló) =====
 // A handlerek általában maguk kezelik a hibájukat; ez csak a réseket fogja be,
@@ -213,13 +214,14 @@ app.use((err, req, res, next) => {
 });
 
 // E-mail intake (beérkező megrendelések) — csak akkor fut, ha az INTAKE_IMAP_* be van állítva.
-const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler } = require('./services/scheduler');
+const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler } = require('./services/scheduler');
 startIntakeScheduler();
 startExpiryScheduler();
 startGpsMileageScheduler();
 startMonthlyReportScheduler();
 startEFacturaStatusScheduler();
-startTrialExpiryScheduler(); // trial lejárat e-mail értesítő
+startTrialExpiryScheduler();       // trial lejárat e-mail értesítő (14. nap)
+startTrialReminderScheduler();     // trial emlékeztető 3d és 1d előtt
 
 // Opcionális automatikus DB-mentés (alapból KI; BACKUP_ENABLED=true + BACKUP_DIR).
 require('./services/backup').startBackupScheduler();
