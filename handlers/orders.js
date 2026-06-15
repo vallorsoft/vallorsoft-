@@ -770,16 +770,23 @@ handlers.getPlannerData = async function (req, res, args) {
        WHERE company_id = $1 AND tip = 'Vontato' AND activ = TRUE ORDER BY rendszam`,
       [cid]
     );
-    // Carrier járművek (alvállalkozói portálról beküldöttek)
-    const carrierVehR = await pool.query(
-      `SELECT cv.id, cv.rendszam_camion AS rendszam, cv.rendszam_remorca,
-              cv.marca, cv.model, c.denumire AS carrier_nev
-       FROM carrier_vehicles cv
-       JOIN carriers c ON c.id = cv.carrier_id
-       WHERE cv.company_id = $1
-       ORDER BY c.denumire, cv.rendszam_camion`,
-      [cid]
-    );
+    // Carrier járművek (alvállalkozói portálról beküldöttek) — best-effort, ha a tábla
+    // még nem létezik (pl. carriers-ap.sql migráció még nem futott), üres tömböt adunk.
+    let carrierVehRows = [];
+    try {
+      const carrierVehR = await pool.query(
+        `SELECT cv.id, cv.rendszam_camion AS rendszam, cv.rendszam_remorca,
+                cv.marca, cv.model, c.denumire AS carrier_nev
+         FROM carrier_vehicles cv
+         JOIN carriers c ON c.id = cv.carrier_id
+         WHERE cv.company_id = $1
+         ORDER BY c.denumire, cv.rendszam_camion`,
+        [cid]
+      );
+      carrierVehRows = carrierVehR.rows;
+    } catch (cvErr) {
+      console.warn('getPlannerData: carrier_vehicles lekérdezés sikertelen:', cvErr.message);
+    }
     // MINDEN aktív (nem Finalizat/Anulat) fuvar — függetlenül a dátumtól, hogy a
     // korábbi/jövőbeli vagy dátum nélküli, még folyamatban lévő fuvar se tűnjön el
     // az ablakból (a kiosztatlanok a pool-ba, a kiosztottak a járműsorba kerülnek).
@@ -799,7 +806,7 @@ handlers.getPlannerData = async function (req, res, args) {
        LIMIT 400`,
       [cid, from, to]
     );
-    return res.json({ result: { ok: true, vehicles: vehR.rows, orders: ordR.rows, carrierVehicles: carrierVehR.rows } });
+    return res.json({ result: { ok: true, vehicles: vehR.rows, orders: ordR.rows, carrierVehicles: carrierVehRows } });
   } catch (err) {
     console.error('getPlannerData hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
