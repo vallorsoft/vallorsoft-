@@ -1306,6 +1306,7 @@ function loadCarrierAp(){
         +'<td style="font-size:11px;color:var(--muted);">'+esc(orderIds.join(', ')||'—')+'</td>'
         +'<td style="text-align:right;">'+Math.round(it.amount)+' '+esc(it.currency||'EUR')+'</td><td>'+due+'</td><td>'+stB+'</td>'
         +'<td style="white-space:nowrap;">'+(it.status!=='paid'?'<button class="btn ok" style="padding:4px 9px;font-size:12px;" onclick="carrierInvoicePayUi('+it.id+','+rem+')">'+t('cs.ap.payBtn')+'</button> ':'')
+        +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierApDocs('+it.carrier_id+')">📎 Dok.</button> '
         +'<button class="btn danger" style="padding:4px 9px;font-size:12px;" onclick="carrierInvoiceDeleteUi('+it.id+')">✕</button></td></tr>';
     }).join('');
     box.innerHTML='<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:10px;">'+t('cs.ap.title')+'</div>'
@@ -1353,6 +1354,83 @@ function carrierInvoicePayUi(id, rem){
   gas('carrierInvoicePayment',[id, arg]).then(function(r){ if(r&&r.ok){ toast(t('cs.paymentSaved'),'ok'); loadCarrierAp(); loadCarriers(); } else toast((r&&r.err)||t('common.error'),'err'); });
 }
 function carrierInvoiceDeleteUi(id){ if(!confirm(t('cs.cf.delInvoice'))) return; gas('carrierInvoiceDelete',[id]).then(function(r){ if(r&&r.ok){ toast(t('common.deleted'),'ok'); loadCarrierAp(); loadCarriers(); } }); }
+
+// ── Carrier dokumentumok modal (AP fülből) ──
+function ensureCarrierDocsModal(){
+  if(document.getElementById('carrierDocsModal')) return;
+  var d=document.createElement('div');
+  d.id='carrierDocsModal'; d.className='modal-back';
+  d.innerHTML='<div class="modal glass" style="max-width:520px;">'
+    +'<h3 style="margin-bottom:12px;">📎 Documente alvállalkozó</h3>'
+    +'<div id="carrierDocsModalBody"></div>'
+    +'<div style="margin-top:14px;text-align:right;">'
+    +'<button class="btn ghost" onclick="document.getElementById(\'carrierDocsModal\').classList.remove(\'open\')">✕ Închide</button>'
+    +'</div></div>';
+  document.body.appendChild(d);
+  (function(){ var s=document.createElement('style'); s.textContent='#carrierDocsModal.open{display:flex!important;}'; document.head.appendChild(s); })();
+}
+function carrierApDocs(carrierId){
+  ensureCarrierDocsModal();
+  var modal=document.getElementById('carrierDocsModal');
+  var body=document.getElementById('carrierDocsModalBody');
+  body.innerHTML='<div style="color:var(--text-muted);padding:12px 0;">Se încarcă…</div>';
+  modal.classList.add('open');
+  gas('carrierGetDocs',{carrierId:carrierId}).then(function(d){
+    if(!d||!d.ok){ body.innerHTML='<div style="color:var(--status-danger);">'+(d&&d.err?esc(d.err):'Eroare')+'</div>'; return; }
+    var docs=d.docs||[];
+    var listHtml='';
+    if(!docs.length){
+      listHtml='<p style="color:var(--text-muted);font-size:13px;">Niciun document.</p>';
+    } else {
+      listHtml='<div style="margin-bottom:12px;">';
+      docs.forEach(function(doc){
+        var icon=(doc.mime&&doc.mime.indexOf('pdf')>=0)?'📄':'🖼';
+        listHtml+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border,rgba(255,255,255,.1));">'
+          +icon+' <span style="flex:1;font-size:13px;">'+esc(doc.file_name||'')+'</span>'
+          +'<span class="badge info" style="font-size:11px;">'+esc(doc.kind||'')+'</span>'
+          +'<button class="btn ghost" style="font-size:12px;" onclick="carrierDocDl('+doc.id+',\''+esc(doc.file_name||'document')+'\')">⬇</button>'
+          +'</div>';
+      });
+      listHtml+='</div>';
+    }
+    // Faktúra feltöltés
+    listHtml+='<div style="margin-top:10px;">'
+      +'<div style="font-size:12px;font-weight:600;margin-bottom:6px;">➕ Faktúra feltöltése</div>'
+      +'<input type="file" id="apDocFile_'+carrierId+'" accept=".pdf,.jpg,.jpeg,.png" style="font-size:12px;color:var(--text-primary);">'
+      +'<button class="btn primary" style="margin-top:8px;font-size:12px;" onclick="carrierApDocUpload('+carrierId+')">📤 Feltöltés</button>'
+      +'</div>';
+    body.innerHTML=listHtml;
+  });
+}
+function carrierDocDl(docId, fileName){
+  gas('carrierDocDownload',{docId:docId}).then(function(d){
+    if(!d||!d.ok){ toast('Eroare descărcare','err'); return; }
+    var a=document.createElement('a');
+    a.href=d.data_base64;
+    a.download=d.file_name||fileName||'document';
+    a.click();
+  });
+}
+function carrierApDocUpload(carrierId){
+  var inp=document.getElementById('apDocFile_'+carrierId);
+  if(!inp||!inp.files||!inp.files.length){ toast('Selectează un fișier','err'); return; }
+  var f=inp.files[0];
+  if(f.size>10*1024*1024){ toast('Fișier prea mare (max 10MB)','err'); return; }
+  var reader=new FileReader();
+  reader.onload=function(e){
+    gas('carrierDocUploadAdmin',{
+      carrierId:carrierId,
+      fileName:f.name,
+      mime:f.type||'application/octet-stream',
+      data_base64:e.target.result,
+      kind:'invoice'
+    }).then(function(d){
+      if(d&&d.ok){ toast('Factură încărcată ✓','ok'); carrierApDocs(carrierId); }
+      else toast((d&&d.err)||'Eroare','err');
+    });
+  };
+  reader.readAsDataURL(f);
+}
 
 // ── GDPR: adat-export + anonimizálás — admin Integrációk ──
 function loadGdpr(){

@@ -247,4 +247,64 @@ handlers.carrierPortalSetActive = async function (req, res, args) {
   } catch (err) { console.error('carrierPortalSetActive hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
+// ── Carrier dokumentumok — admin oldalról ──
+
+handlers.carrierGetDocs = async function (req, res, args) {
+  try {
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = req.session.user.company_id;
+    const carrierId = parseInt(args && args.carrierId, 10);
+    if (!carrierId) return res.json({ result: { ok: false, err: 'Lipsă carrierId' } });
+    const r = await pool.query(
+      `SELECT id, carrier_id, order_id, file_name, mime, kind, uploaded_by, created_at
+       FROM carrier_documents
+       WHERE company_id=$1 AND carrier_id=$2
+       ORDER BY created_at DESC`,
+      [cid, carrierId]
+    );
+    return res.json({ result: { ok: true, docs: r.rows } });
+  } catch (err) { console.error('carrierGetDocs hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
+};
+
+handlers.carrierDocDownload = async function (req, res, args) {
+  try {
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = req.session.user.company_id;
+    const docId = parseInt(args && args.docId, 10);
+    if (!docId) return res.json({ result: { ok: false, err: 'Lipsă docId' } });
+    const r = await pool.query(
+      `SELECT file_name, mime, data_base64 FROM carrier_documents WHERE id=$1 AND company_id=$2`,
+      [docId, cid]
+    );
+    if (!r.rows.length) return res.json({ result: { ok: false, err: 'Nu s-a găsit' } });
+    return res.json({ result: { ok: true, ...r.rows[0] } });
+  } catch (err) { console.error('carrierDocDownload hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
+};
+
+handlers.carrierDocUploadAdmin = async function (req, res, args) {
+  try {
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = req.session.user.company_id;
+    const a = args || {};
+    const { carrierId, orderId, fileName, mime, data_base64, kind } = a;
+    if (!carrierId || !data_base64) return res.json({ result: { ok: false, err: 'Lipsă date' } });
+    // Ownership ellenőrzés — csak a saját cég alvállalkozójához
+    const ck = await pool.query('SELECT id FROM carriers WHERE id=$1 AND company_id=$2', [carrierId, cid]);
+    if (!ck.rows.length) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    // Méretkorlát ~10MB
+    if (data_base64.length > 14 * 1024 * 1024) return res.json({ result: { ok: false, err: 'Fișier prea mare (max 10MB)' } });
+    const allowedKinds = ['cmr', 'invoice', 'insurance', 'contract', 'other'];
+    const docKind = allowedKinds.includes(kind) ? kind : 'invoice';
+    const r = await pool.query(
+      `INSERT INTO carrier_documents (company_id, carrier_id, order_id, file_name, mime, data_base64, kind, uploaded_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+      [cid, parseInt(carrierId, 10), orderId || null,
+       String(fileName || 'factura').slice(0, 200),
+       String(mime || 'application/pdf').slice(0, 100),
+       data_base64, docKind, req.session.user.email]
+    );
+    return res.json({ result: { ok: true, id: r.rows[0].id } });
+  } catch (err) { console.error('carrierDocUploadAdmin hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
+};
+
 module.exports = handlers;
