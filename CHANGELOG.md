@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-15 — Developer 📋 Jogi oldalak szerkesztő + kötelező visszaigazolás (PR #102)
+
+- **`legal_consents` tábla** (`db/legal-consents.sql`) — visszaigazolás-napló: `user_type` (user/client_user/carrier_user), `user_id`, `page_key`, `version` (timestamp), `acknowledged_at`, `ip`.
+- **`routes/legal.js`** — dinamikus `/terms`, `/privacy`, `/cookies`, `/dpa`, `/security` (DB tartalomból, fallback: statikus fájl) + `GET /api/legal/pending-ack` + `POST /api/legal/ack` (minden session-típusra: bejelentkezett user, ügyfél-portál, alvállalkozói portál).
+- **`devGetLegalPage` + `devSaveLegalPage`** (`handlers/developer.js`) — Quill HTML → `developer_settings` DB; auto-frissíti az „Ultima actualizare" sort; bekezdés-szintű diff (zöld/piros); `notify_version` beállítása = kötelező visszaigazolás.
+- **`public/legal-ack.js`** — fullscreen modal (nem bezárható, csak „Am luat la cunoștință" gombbal); diff megjelenítés (hozzáadott/törölt bekezdések); link az oldalhoz; több módosítás esetén egymás után; audit-naplózva.
+- **Developer `📋 Jogi oldalak` fül** (`developer.html`) — Quill.js WYSIWYG szerkesztő (cdnjs); 5 oldal-fül; mentés + „Kötelező visszaigazolás küldése minden felhasználónak" checkbox.
+- **`legal-ack.js` bekötve** 6 oldalba: `admin.html`, `manager.html`, `sofer.html`, `portal.html`, `carrier.html`, `konyvelo.html`.
+
 ## 2026-06-15 — Developer 📥 Regisztrációk fül — cég-lista + email sablon küldő (PR #101)
 
 - **`developer_settings` tábla** (`db/developer-email-templates.sql`) — kulcs-érték JSONB tárolás; email sablon (`email_template` kulcs) itt él; auto-migráció induláskor.
