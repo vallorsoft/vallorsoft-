@@ -639,7 +639,8 @@ function loadPlanEditor(){
         +'<div class="field"><label>Stripe Price ID '+fhBtn('<b>Stripe Price ID</b><span class="fh-where">A Stripe dashboardon (Products) megtalálod: price_xxxxxxxxxxxxxxxx formátum. Ide írd be, hogy az „Előfizetek" gomb Stripe Checkout-ra vigyen. Nélküle a gomb kapcsolatfelvétel-linkre mutat.</span>')+' <span style="font-size:11px;color:var(--muted);">(price_xxx)</span></label><input class="input" id="plStripe_'+p.id+'" placeholder="price_..." value="'+escHtml(p.stripe_price_id||'')+'"></div>'
         // Marketing bullet-pontok
         +'<div class="field"><label>Marketing bullet-pontok '+fhBtn('<b>Funkció-lista az előfizetési oldalon</b><span class="fh-where">Soronként 1 bullet pont. ✓ jelölt listaként jelenik meg a /subscription és a landing #pricing szekciójában. Pl.: „GPS követés valós időben", „Korlátlan fuvar", „E-Factura integráció"</span>')+'</label>'
-        +'<textarea class="input" id="plFeatures_'+p.id+'" rows="4" style="resize:vertical;" placeholder="pl. 10 jármű&#10;Sofőr-portál&#10;GPS integráció">'+escHtml((Array.isArray(p.features)?p.features:[]).join('\n'))+'</textarea></div>'
+        +'<textarea class="input" id="plFeatures_'+p.id+'" rows="5" style="resize:vertical;" placeholder="pl. GPS integráció | GPS integráció&#10;(formátum: RO szöveg | HU szöveg)">'+escHtml((Array.isArray(p.features)?p.features:[]).map(function(f){if(f&&typeof f==='object')return(f.ro||'')+' | '+(f.hu||'');return String(f||'');}).join('\n'))+'</textarea>'
+        +'<div style="font-size:11px;color:var(--muted);margin-top:4px;">Soronként 1 pont. Kétnyelvű: <code>RO szöveg | HU szöveg</code></div></div>'
         +'<button class="btn-dev" onclick="savePlan('+p.id+')">💾 Mentés</button>'
         +' <button class="btn-dev" onclick="loadPlanFeatures('+p.id+')" style="margin-left:8px;">⚙️ Funkció-kapcsolók</button>'
         +'<div id="planFeatDiv_'+p.id+'" style="display:none;margin-top:14px;"></div>'
@@ -665,7 +666,12 @@ function savePlan(id){
     max_orders_per_month:lim('plMaxO_'+id),
     max_sofors:lim('plMaxS_'+id),
     stripe_price_id:document.getElementById('plStripe_'+id).value.trim()||null,
-    features:(document.getElementById('plFeatures_'+id).value||'').split('\n').map(function(s){return s.trim();}).filter(Boolean)};
+    features:(document.getElementById('plFeatures_'+id).value||'').split('\n').map(function(s){
+      s=s.trim(); if(!s) return null;
+      var idx=s.indexOf('|');
+      if(idx>-1) return {ro:s.slice(0,idx).trim(), hu:s.slice(idx+1).trim()};
+      return {ro:s, hu:s};
+    }).filter(Boolean)};
   gas('updateSubscriptionPlan',[f]).then(function(r){ if(r&&r.ok){toast('Csomag mentve','ok');loadPlanEditor();}else{toast((r&&r.err)||t('common.error'),'err');} });
 }
 // Csomag funkció-kapcsolói
