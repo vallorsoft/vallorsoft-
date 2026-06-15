@@ -86,6 +86,9 @@
       + '<input class="inp" id="ve_marca_' + id + '" value="' + esc(v.marca || '') + '" placeholder="' + esc(t('car.phBrand')) + '" style="flex:1;min-width:70px;padding:7px 9px">'
       + '<input class="inp" id="ve_model_' + id + '" value="' + esc(v.model || '') + '" placeholder="' + esc(t('car.phModel')) + '" style="flex:1;min-width:70px;padding:7px 9px">'
       + '<input class="inp" id="ve_sofer_' + id + '" value="' + esc(v.sofer_nev || '') + '" placeholder="' + esc(t('car.phDriver')) + '" style="flex:2;min-width:110px;padding:7px 9px">'
+      + '<input class="inp" id="ve_sofertel_' + id + '" value="' + esc(v.sofer_tel || '') + '" placeholder="' + esc(t('car.phDriverTel')) + '" type="tel" style="flex:1;min-width:90px;padding:7px 9px">'
+      + '<input class="inp" id="ve_an_' + id + '" value="' + esc(v.an_fabricatie || '') + '" placeholder="' + esc(t('car.phYear')) + '" type="number" min="1990" max="2030" style="flex:1;min-width:80px;padding:7px 9px">'
+      + '<textarea class="inp" id="ve_nota_' + id + '" placeholder="' + esc(t('car.phNote')) + '" style="flex:2;min-width:140px;padding:7px 9px;resize:vertical">' + esc(v.nota || '') + '</textarea>'
       + '<button class="btn ok" style="padding:5px 10px" onclick="Carrier.saveVehicle(' + id + ')">✓</button>'
       + '<button class="btn" style="padding:5px 10px" onclick="Carrier.loadVehicles()">✕</button>'
       + '</div>';
@@ -93,7 +96,8 @@
   function saveVehicle(id) {
     var g = function (sfx) { var el = document.getElementById(sfx + '_' + id); return el ? el.value.trim() : ''; };
     var cam = g('ve_cam'); if (!cam) { toast(t('car.tractorReq'), 'err'); return; }
-    api('PUT', '/api/carrier/vehicles/' + id, { rendszam_camion: cam, rendszam_remorca: g('ve_rem'), marca: g('ve_marca'), model: g('ve_model'), sofer_nev: g('ve_sofer') }).then(function (r) {
+    var anRaw = g('ve_an'); var anVal = anRaw ? parseInt(anRaw, 10) || null : null;
+    api('PUT', '/api/carrier/vehicles/' + id, { rendszam_camion: cam, rendszam_remorca: g('ve_rem'), marca: g('ve_marca'), model: g('ve_model'), sofer_nev: g('ve_sofer'), sofer_tel: g('ve_sofertel'), an_fabricatie: anVal, nota: g('ve_nota') }).then(function (r) {
       if (r && r.ok) { toast(t('car.vehicleSaved'), 'ok'); loadVehicles(); } else toast((r && r.err) || t('common.error'), 'err');
     });
   }
@@ -103,16 +107,20 @@
     // GDPR check — sofőr névnél kötelező figyelmeztetés
     var sofer = $('vSofer') ? $('vSofer').value.trim() : '';
     function doSave() {
+      var anRaw = $('vAn') ? $('vAn').value.trim() : '';
       api('POST', '/api/carrier/vehicles', {
         rendszam_camion: cam,
         rendszam_remorca: $('vRem').value.trim(),
         marca: $('vMarca').value.trim(),
         model: $('vModel').value.trim(),
-        sofer_nev: sofer
+        sofer_nev: sofer,
+        sofer_tel: $('vSoferTel') ? $('vSoferTel').value.trim() : '',
+        an_fabricatie: anRaw ? (parseInt(anRaw, 10) || null) : null,
+        nota: $('vNota') ? $('vNota').value.trim() : ''
       }).then(function (r) {
         if (r && r.ok) {
           toast(t('car.vehicleAdded'), 'ok');
-          ['vCam', 'vRem', 'vMarca', 'vModel', 'vSofer'].forEach(function (i) { if ($(i)) $(i).value = ''; });
+          ['vCam', 'vRem', 'vMarca', 'vModel', 'vSofer', 'vSoferTel', 'vAn', 'vNota'].forEach(function (i) { if ($(i)) $(i).value = ''; });
           loadVehicles();
         } else toast((r && r.err) || t('common.error'), 'err');
       });
