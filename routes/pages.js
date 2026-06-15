@@ -77,6 +77,19 @@ router.get('/utvonaltervezes', requirePageLogin, requirePageRole('Admin', 'Manag
 
 router.get('/subscription', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'subscription.html')));
 
+// Developer landing szerkesztő (is_dev kötelező)
+router.get('/developer/landing-editor', requirePageLogin, function(req, res) {
+  if (!req.session.user || !req.session.user.is_dev) return res.redirect('/developer');
+  res.sendFile(path.join(__dirname, '..', 'public', 'landing-editor.html'));
+});
+
+// Publikus blog cikk oldal
+router.get('/blog/:id', function(req, res) {
+  const id = parseInt(req.params.id, 10);
+  if (![1,2,3].includes(id)) return res.status(404).sendFile(path.join(__dirname,'..','public','404.html'), () => res.status(404).send('Not found'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'blog-post.html'));
+});
+
 // /terms, /privacy, /cookies, /dpa, /security → routes/legal.js kezeli (dinamikusan DB-ből)
 
 module.exports = router;

@@ -538,6 +538,16 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   color: var(--lp-muted);
   line-height: 1.55;
 }
+.lp-blog-read-more {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--brand-indigo, #6366f1);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+.lp-blog-read-more:hover { opacity: 0.75; text-decoration: underline; }
 
 /* ── Stats ──────────────────────────────────────────────────── */
 .lp-stats-grid {

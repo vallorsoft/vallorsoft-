@@ -193,6 +193,7 @@ app.use(require('./routes/uit'));
 app.use(require('./routes/inbound-orders'));
 app.use(require('./routes/client-mail'));
 app.use(require('./routes/developer-export'));
+app.use(require('./routes/blog')); // publikus blog cikk API
 
 // ===== 404 az ismeretlen API-utakra + GLOBÁLIS HIBAKEZELŐ (végső védőháló) =====
 // A handlerek általában maguk kezelik a hibájukat; ez csak a réseket fogja be,

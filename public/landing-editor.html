@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Landing szerkesztő — VallorSoft Developer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, 'Segoe UI', sans-serif; background: #f1f5f9; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+    /* Topbar */
+    .le-top {
+      height: 48px; background: #fff; border-bottom: 1px solid #e2e8f0;
+      display: flex; align-items: center; padding: 0 16px; gap: 12px; flex-shrink: 0; z-index: 100;
+    }
+    .le-top-title { font-size: 15px; font-weight: 700; color: #0f172a; flex: 1; }
+    .le-lang-btn {
+      padding: 4px 12px; border-radius: 6px; border: 1.5px solid #e2e8f0;
+      font-size: 12px; font-weight: 700; cursor: pointer; background: #fff; color: #334155;
+      transition: background 0.15s, color 0.15s;
+    }
+    .le-lang-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+    .le-save-btn {
+      padding: 6px 18px; background: linear-gradient(135deg,#3b82f6,#6366f1); color: #fff;
+      border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .le-save-btn:hover { opacity: 0.9; }
+    .le-unsaved { font-size: 11px; color: #f59e0b; font-weight: 600; }
+    .le-close { color: #64748b; text-decoration: none; font-size: 13px; font-weight: 600; padding: 4px 8px; border-radius: 6px; }
+    .le-close:hover { background: #f1f5f9; }
+    .le-msg { font-size: 12px; min-width: 80px; text-align: right; }
+
+    /* Fő elrendezés */
+    .le-body { display: flex; flex: 1; overflow: hidden; }
+
+    /* Oldalpanel */
+    .le-sidebar {
+      width: 300px; flex-shrink: 0; background: #fff; border-right: 1px solid #e2e8f0;
+      overflow-y: auto; padding: 12px;
+    }
+    .le-sidebar-heading {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #94a3b8; margin: 8px 0 6px; padding: 0 4px;
+    }
+
+    /* Szekció sor */
+    .le-sec-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 8px; border-radius: 8px; margin-bottom: 2px;
+      background: #f8fafc; border: 1px solid #e2e8f0;
+    }
+    .le-sec-row.hidden-sec { opacity: 0.45; }
+    .le-sec-label { flex: 1; font-size: 13px; color: #1e293b; font-weight: 500; }
+    .le-sec-btn {
+      width: 26px; height: 26px; border: none; background: transparent; cursor: pointer;
+      border-radius: 5px; font-size: 13px; display: flex; align-items: center; justify-content: center;
+      color: #64748b; transition: background 0.12s;
+    }
+    .le-sec-btn:hover { background: #e2e8f0; }
+    .le-vis-btn { font-size: 15px; }
+    .le-vis-btn.hidden { color: #cbd5e1; }
+
+    /* Blog accordion */
+    .le-blog-item { margin-bottom: 4px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+    .le-blog-head {
+      padding: 9px 12px; font-size: 13px; font-weight: 600; color: #334155;
+      cursor: pointer; background: #f8fafc; display: flex; justify-content: space-between;
+      align-items: center;
+    }
+    .le-blog-head:hover { background: #f1f5f9; }
+    .le-blog-body { display: none; padding: 10px 12px; background: #fff; }
+    .le-blog-body.open { display: block; }
+    .le-field-label { font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 3px; margin-top: 8px; }
+    .le-field-label:first-child { margin-top: 0; }
+    .le-field { width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; color: #1e293b; font-family: inherit; resize: vertical; }
+    .le-field:focus { outline: none; border-color: #6366f1; }
+    .le-blog-save {
+      margin-top: 8px; width: 100%; padding: 6px; border: none;
+      background: linear-gradient(135deg,#3b82f6,#6366f1); color: #fff;
+      border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    .le-blog-save:hover { opacity: 0.9; }
+
+    /* iframe */
+    .le-iframe-wrap { flex: 1; position: relative; overflow: hidden; }
+    .le-iframe { width: 100%; height: 100%; border: none; }
+
+    /* Súgó panel */
+    .le-hint { font-size: 11px; color: #64748b; padding: 8px; background: #f8fafc; border-radius: 6px; margin-bottom: 8px; line-height: 1.5; border: 1px solid #e2e8f0; }
+  </style>
+</head>
+<body>
+<div class="le-top">
+  <div class="le-top-title">🌐 Landing szerkesztő</div>
+  <span class="le-unsaved" id="unsavedBadge" style="display:none;">⚠️ Nem mentett változások</span>
+  <button class="le-lang-btn active" id="btnRo" onclick="setEditLang('ro')">RO</button>
+  <button class="le-lang-btn" id="btnHu" onclick="setEditLang('hu')">HU</button>
+  <button class="le-save-btn" onclick="saveAll()">💾 Mentés</button>
+  <div class="le-msg" id="leMsg"></div>
+  <a href="/developer" class="le-close">✕ Bezárás</a>
+</div>
+
+<div class="le-body">
+  <div class="le-sidebar" id="sidebar">
+    <div class="le-hint">💡 <b>Szövegszerkesztés:</b> kattintsd duplán bármelyik szövegre a jobb oldali előnézetben a szerkesztéshez. <b>Sorrend:</b> ▲▼ gombokkal.</div>
+
+    <div class="le-sidebar-heading">📋 Szekciók</div>
+    <div id="secList"></div>
+
+    <div class="le-sidebar-heading" style="margin-top:12px;">📰 Blog cikkek</div>
+    <div id="blogList"></div>
+  </div>
+
+  <div class="le-iframe-wrap">
+    <iframe class="le-iframe" id="previewFrame" src="/" title="Landing előnézet"></iframe>
+  </div>
+</div>
+
+<script>
+// ── Állapot ──────────────────────────────────────────────────────────────────
+var _editLang     = 'ro';
+var _dbTexts      = { ro: {}, hu: {} };
+var _pendingTexts = { ro: {}, hu: {} };
+var _sectionOrder = ['hero','strip','how','features','stats','testimonials','pricing','blog','contact','cta'];
+var _sectionVis   = {};
+var _iframe       = document.getElementById('previewFrame');
+var _iframeReady  = false;
+var _blogData     = { 1:{title:'',content:'',titleHu:'',contentHu:''}, 2:{title:'',content:'',titleHu:'',contentHu:''}, 3:{title:'',content:'',titleHu:'',contentHu:''} };
+
+var SEC_LABELS = {
+  hero:         '🦸 Hero',
+  strip:        '⚡ Feature strip',
+  how:          '📋 Hogyan működik',
+  features:     '📦 Modulok',
+  stats:        '📊 Statisztikák',
+  testimonials: '💬 Vélemények',
+  pricing:      '💳 Árazás',
+  blog:         '📰 Blog',
+  contact:      '📞 Kapcsolat',
+  cta:          '🚀 CTA',
+};
+
+// ── gas() helper ─────────────────────────────────────────────────────────────
+function gas(fn, args) {
+  return fetch('/api/execute', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({functionName:fn,arguments:args||{}})})
+    .then(function(r){return r.json();})
+    .then(function(d){return d&&d.result;});
+}
+
+// ── Betöltés ─────────────────────────────────────────────────────────────────
+fetch('/api/landing-texts')
+  .then(function(r){return r.json();})
+  .then(function(d) {
+    _dbTexts = { ro: d.ro||{}, hu: d.hu||{} };
+    if (d.sectionOrder && d.sectionOrder.length) _sectionOrder = d.sectionOrder;
+    if (d.sectionVisibility) _sectionVis = d.sectionVisibility;
+    renderSecList();
+  });
+
+// Blog cikkek betöltése
+[1,2,3].forEach(function(id) {
+  gas('devGetBlogPost', {id:id}).then(function(r) {
+    if (r && r.ok) {
+      _blogData[id] = { title:r.title||'', content:r.content||'', titleHu:r.titleHu||'', contentHu:r.contentHu||'' };
+      renderBlogList();
+    }
+  });
+});
+
+// ── Szekció lista render ──────────────────────────────────────────────────────
+function renderSecList() {
+  var list = document.getElementById('secList');
+  list.innerHTML = '';
+  _sectionOrder.forEach(function(key, idx) {
+    var hidden = _sectionVis[key] === false;
+    var row = document.createElement('div');
+    row.className = 'le-sec-row' + (hidden ? ' hidden-sec' : '');
+    row.dataset.key = key;
+    row.innerHTML =
+      '<span class="le-sec-label">' + (SEC_LABELS[key]||key) + '</span>' +
+      '<button class="le-sec-btn" onclick="moveSection(\'' + key + '\',-1)" title="Feljebb">▲</button>' +
+      '<button class="le-sec-btn" onclick="moveSection(\'' + key + '\',1)" title="Lejjebb">▼</button>' +
+      '<button class="le-sec-btn le-vis-btn' + (hidden?' hidden':'') + '" onclick="toggleVis(\'' + key + '\')" title="' + (hidden?'Megjelenítés':'Elrejtés') + '">' + (hidden?'🙈':'👁') + '</button>';
+    list.appendChild(row);
+  });
+}
+
+function moveSection(key, dir) {
+  var idx = _sectionOrder.indexOf(key);
+  if (idx < 0) return;
+  var newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= _sectionOrder.length) return;
+  _sectionOrder.splice(idx, 1);
+  _sectionOrder.splice(newIdx, 0, key);
+  renderSecList();
+  applyOrderToIframe();
+  markUnsaved();
+}
+
+function toggleVis(key) {
+  _sectionVis[key] = (_sectionVis[key] === false) ? true : false;
+  renderSecList();
+  applyVisToIframe();
+  markUnsaved();
+}
+
+// ── Blog lista render ─────────────────────────────────────────────────────────
+function renderBlogList() {
+  var list = document.getElementById('blogList');
+  list.innerHTML = '';
+  [1,2,3].forEach(function(id) {
+    var d = _blogData[id];
+    var title = (_editLang==='hu'?d.titleHu:d.title) || ('Cikk ' + id);
+    var item = document.createElement('div');
+    item.className = 'le-blog-item';
+    item.innerHTML =
+      '<div class="le-blog-head" onclick="toggleBlog(' + id + ')"><span>📰 ' + escHtml(title) + '</span><span id="blogArrow' + id + '">▶</span></div>' +
+      '<div class="le-blog-body" id="blogBody' + id + '">' +
+        '<div class="le-field-label">RO cím</div>' +
+        '<input class="le-field" id="bTitle_' + id + '" value="' + escHtml(d.title) + '" placeholder="Titlu articol (RO)">' +
+        '<div class="le-field-label">HU cím</div>' +
+        '<input class="le-field" id="bTitleHu_' + id + '" value="' + escHtml(d.titleHu) + '" placeholder="Cikk cím (HU)">' +
+        '<div class="le-field-label">RO tartalom (HTML megengedett)</div>' +
+        '<textarea class="le-field" id="bContent_' + id + '" rows="6" placeholder="Conținut complet al articolului...">' + escHtml(d.content) + '</textarea>' +
+        '<div class="le-field-label">HU tartalom (HTML megengedett)</div>' +
+        '<textarea class="le-field" id="bContentHu_' + id + '" rows="6" placeholder="A cikk teljes tartalma...">' + escHtml(d.contentHu) + '</textarea>' +
+        '<button class="le-blog-save" onclick="saveBlogPost(' + id + ')">💾 Cikk mentése</button>' +
+        '<div id="blogMsg' + id + '" style="font-size:11px;margin-top:4px;min-height:14px;"></div>' +
+      '</div>';
+    list.appendChild(item);
+  });
+}
+
+function toggleBlog(id) {
+  var body = document.getElementById('blogBody' + id);
+  var arrow = document.getElementById('blogArrow' + id);
+  var open = body.classList.toggle('open');
+  arrow.textContent = open ? '▼' : '▶';
+}
+
+function saveBlogPost(id) {
+  var title = document.getElementById('bTitle_' + id).value;
+  var titleHu = document.getElementById('bTitleHu_' + id).value;
+  var content = document.getElementById('bContent_' + id).value;
+  var contentHu = document.getElementById('bContentHu_' + id).value;
+  _blogData[id] = { title: title, content: content, titleHu: titleHu, contentHu: contentHu };
+  var msgEl = document.getElementById('blogMsg' + id);
+  msgEl.style.color = '#64748b'; msgEl.textContent = 'Mentés...';
+  gas('devSaveBlogPost', {id: id, title: title, content: content, titleHu: titleHu, contentHu: contentHu}).then(function(r) {
+    if (r && r.ok) { msgEl.style.color='#22c55e'; msgEl.textContent='✓ Mentve'; renderBlogList(); }
+    else { msgEl.style.color='#ef4444'; msgEl.textContent='Hiba!'; }
+  });
+}
+
+// ── Iframe editor overlay ─────────────────────────────────────────────────────
+_iframe.addEventListener('load', function() {
+  _iframeReady = true;
+  injectEditorOverlay();
+  applyOrderToIframe();
+  applyVisToIframe();
+});
+
+function injectEditorOverlay() {
+  try {
+    var doc = _iframe.contentDocument;
+    if (!doc) return;
+
+    // Szerkesztési mód jelző sáv
+    var bar = doc.createElement('div');
+    bar.id = 'vsEditorBar';
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:rgba(99,102,241,0.92);color:#fff;text-align:center;padding:5px 12px;font-size:12px;font-family:Inter,sans-serif;pointer-events:none;backdrop-filter:blur(4px);';
+    bar.textContent = '✏️ Szerkesztési mód — duplaklikk a szövegekre a módosításhoz';
+    doc.body.appendChild(bar);
+    doc.body.style.paddingTop = (parseInt(doc.body.style.paddingTop)||0) + 28 + 'px';
+
+    // CSS a szerkeszthető elemekhez
+    var style = doc.createElement('style');
+    style.textContent =
+      '[data-i18n]{cursor:text;outline:1px dashed rgba(99,102,241,0.25);outline-offset:2px;border-radius:3px;}' +
+      '[data-i18n]:hover{outline-color:rgba(99,102,241,0.6);background:rgba(99,102,241,0.04);}';
+    doc.head.appendChild(style);
+
+    // Duplaklikk → inline szerkesztő popup
+    doc.querySelectorAll('[data-i18n]').forEach(function(el) {
+      el.addEventListener('dblclick', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        var key = el.getAttribute('data-i18n');
+        var current = el.textContent.trim();
+        var isBlock = (el.tagName === 'P' || el.tagName === 'LI' || el.tagName === 'H1' || el.tagName === 'H2' || el.tagName === 'H3');
+        var inp = doc.createElement(isBlock ? 'textarea' : 'input');
+        inp.value = current;
+        var r = el.getBoundingClientRect();
+        inp.style.cssText =
+          'position:fixed;z-index:100001;background:#fff;border:2px solid #6366f1;border-radius:8px;' +
+          'padding:8px 12px;font-size:' + (window.getComputedStyle ? window.getComputedStyle(el).fontSize : '14px') + ';' +
+          'color:#1e293b;min-width:240px;max-width:500px;font-family:Inter,sans-serif;' +
+          'top:' + Math.min(r.top + (_iframe.contentWindow.pageYOffset||0), (_iframe.contentWindow.innerHeight||600) - 120) + 'px;' +
+          'left:' + Math.min(r.left, (_iframe.contentWindow.innerWidth||800) - 520) + 'px;';
+        if (isBlock) { inp.rows = 3; inp.style.resize = 'both'; inp.style.minWidth = '320px'; }
+        doc.body.appendChild(inp);
+        inp.focus(); inp.select();
+
+        function save() {
+          var val = inp.value;
+          if (val !== current) {
+            el.textContent = val;
+            try { window.parent.editorTextChange(key, val); } catch(ex) {}
+          }
+          inp.remove();
+        }
+        inp.addEventListener('blur', save);
+        inp.addEventListener('keydown', function(ev) {
+          if (ev.key === 'Escape') { inp.remove(); return; }
+          if (ev.key === 'Enter' && !isBlock) { ev.preventDefault(); save(); }
+        });
+      });
+    });
+  } catch(ex) {
+    console.error('Editor overlay inject hiba:', ex);
+  }
+}
+
+// Szekció sorrend alkalmazása az iframe-ben
+function applyOrderToIframe() {
+  try {
+    var doc = _iframe.contentDocument;
+    if (!doc) return;
+    var footer = doc.querySelector('footer.lp-footer');
+    if (!footer) return;
+    var sections = {};
+    doc.querySelectorAll('[data-vs-section]').forEach(function(el) {
+      sections[el.getAttribute('data-vs-section')] = el;
+    });
+    _sectionOrder.forEach(function(key) {
+      if (sections[key] && footer.parentNode) {
+        footer.parentNode.insertBefore(sections[key], footer);
+      }
+    });
+  } catch(ex) {}
+}
+
+// Láthatóság alkalmazása az iframe-ben
+function applyVisToIframe() {
+  try {
+    var doc = _iframe.contentDocument;
+    if (!doc) return;
+    doc.querySelectorAll('[data-vs-section]').forEach(function(el) {
+      var key = el.getAttribute('data-vs-section');
+      el.style.display = (_sectionVis[key] === false) ? 'none' : '';
+    });
+  } catch(ex) {}
+}
+
+// ── Szöveg változás callback (iframe-ből hívja parent.editorTextChange) ───────
+function editorTextChange(key, value) {
+  _pendingTexts[_editLang][key] = value;
+  markUnsaved();
+}
+
+// ── Nyelv váltó ───────────────────────────────────────────────────────────────
+function setEditLang(lang) {
+  _editLang = lang;
+  document.getElementById('btnRo').classList.toggle('active', lang==='ro');
+  document.getElementById('btnHu').classList.toggle('active', lang==='hu');
+  // iframe-t is átváltja a localStorage-n keresztül
+  try {
+    _iframe.contentWindow.localStorage.setItem('vs-lang', lang);
+    _iframeReady = false;
+    _iframe.contentWindow.location.reload();
+  } catch(ex) {}
+  renderBlogList();
+}
+
+// ── Mentés ────────────────────────────────────────────────────────────────────
+function saveAll() {
+  var msgEl = document.getElementById('leMsg');
+  msgEl.style.color = '#64748b'; msgEl.textContent = 'Mentés...';
+  var mergedRo = Object.assign({}, _dbTexts.ro, _pendingTexts.ro);
+  var mergedHu = Object.assign({}, _dbTexts.hu, _pendingTexts.hu);
+  var p1 = gas('devSaveLandingTexts', { ro: mergedRo, hu: mergedHu });
+  var p2 = gas('devSaveSectionOrder', { order: _sectionOrder, visibility: _sectionVis });
+  Promise.all([p1, p2]).then(function(results) {
+    var ok = results.every(function(r){ return r && r.ok; });
+    if (ok) {
+      _dbTexts = { ro: mergedRo, hu: mergedHu };
+      _pendingTexts = { ro: {}, hu: {} };
+      msgEl.style.color = '#22c55e'; msgEl.textContent = '✓ Mentve';
+      document.getElementById('unsavedBadge').style.display = 'none';
+    } else {
+      msgEl.style.color = '#ef4444'; msgEl.textContent = 'Hiba!';
+    }
+    setTimeout(function(){ msgEl.textContent = ''; }, 3000);
+  });
+}
+
+function markUnsaved() {
+  document.getElementById('unsavedBadge').style.display = '';
+}
+
+// ── Segédfüggvény ─────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

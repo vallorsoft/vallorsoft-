@@ -6,6 +6,7 @@
 // ============================================================
 const pool = require('../db');
 const { sendInviteEmail } = require('../services/email');
+const audit = require('../lib/audit');
 
 const handlers = {};
 
@@ -715,6 +716,64 @@ handlers.devSaveSystemEmailTemplate = async function(req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('devSaveSystemEmailTemplate hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Szekció-sorrend és láthatóság mentése ──────────────────
+handlers.devSaveSectionOrder = async function(req, res, args) {
+  const isDev = req.session.user && req.session.user.is_dev;
+  if (!isDev) return res.json({ result: { ok: false, err: 'Tiltott' } });
+  const { order, visibility } = args || {};
+  if (!Array.isArray(order)) return res.json({ result: { ok: false, err: 'Érvénytelen sorrend' } });
+  try {
+    await pool.query(
+      `INSERT INTO developer_settings(key,value) VALUES($1,$2),($3,$4)
+       ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()`,
+      ['landing_section_order', JSON.stringify(order),
+       'landing_section_visibility', JSON.stringify(visibility || {})]
+    );
+    audit.fromReq(req, 'developer.saveSectionOrder', 'landing', null, null);
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('devSaveSectionOrder hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Blog bejegyzés lekérése ──────────────────────────────────
+handlers.devGetBlogPost = async function(req, res, args) {
+  const isDev = req.session.user && req.session.user.is_dev;
+  if (!isDev) return res.json({ result: { ok: false, err: 'Tiltott' } });
+  const id = parseInt(args && args.id, 10);
+  if (![1,2,3].includes(id)) return res.json({ result: { ok: false, err: 'Érvénytelen id' } });
+  try {
+    const r = await pool.query(`SELECT value FROM developer_settings WHERE key=$1`, [`blog_post_${id}`]);
+    const val = r.rows[0] ? r.rows[0].value : {};
+    return res.json({ result: { ok: true, id, title: val.title||'', content: val.content||'', titleHu: val.titleHu||'', contentHu: val.contentHu||'' } });
+  } catch (err) {
+    console.error('devGetBlogPost hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Blog bejegyzés mentése ───────────────────────────────────
+handlers.devSaveBlogPost = async function(req, res, args) {
+  const isDev = req.session.user && req.session.user.is_dev;
+  if (!isDev) return res.json({ result: { ok: false, err: 'Tiltott' } });
+  const id = parseInt(args && args.id, 10);
+  if (![1,2,3].includes(id)) return res.json({ result: { ok: false, err: 'Érvénytelen id' } });
+  const { title='', content='', titleHu='', contentHu='' } = args || {};
+  try {
+    await pool.query(
+      `INSERT INTO developer_settings(key,value) VALUES($1,$2)
+       ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()`,
+      [`blog_post_${id}`, JSON.stringify({ title, content, titleHu, contentHu })]
+    );
+    audit.fromReq(req, 'developer.saveBlogPost', 'blog_post', id, null);
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('devSaveBlogPost hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
