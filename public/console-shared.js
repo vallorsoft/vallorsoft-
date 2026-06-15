@@ -1294,26 +1294,70 @@ function loadCarrierAp(){
   var box=document.getElementById('carrierApBox'); if(!box) return;
   gas('carrierInvoiceList').then(function(r){
     if(!r||!r.ok){ box.innerHTML=''; return; }
-    var s=r.summary||{}; var items=r.items||[];
-    var rows=items.map(function(it){
-      var rem=Math.round((parseFloat(it.amount)||0)-(parseFloat(it.paid_amount)||0));
-      var due='—', dueCls='';
-      if(it.due_date){ var days=Math.round((new Date(it.due_date)-new Date())/86400000);
-        due = days<0?('<span class="badge err">'+t('cs.ap.expiredDays',{n:(-days)})+'</span>'):days<=7?('<span class="badge warn">'+days+t('cs.ca.days')+'</span>'):String(it.due_date).slice(0,10); }
-      var stB = it.status==='paid'?'<span class="badge ok">'+t('pay.paid')+'</span>':it.status==='partial'?'<span class="badge warn">'+t('cs.ap.partialAmt',{n:Math.round(it.paid_amount)})+'</span>':'<span class="badge err">'+t('cs.ap.toPay')+'</span>';
-      var orderIds=(function(){ try{ return Array.isArray(it.order_ids)?it.order_ids:JSON.parse(it.order_ids||'[]'); }catch(e){ return []; } })();
-      return '<tr><td>'+esc(it.carrier_nev||'')+'</td><td>'+esc(it.invoice_number||'—')+'</td>'
-        +'<td style="font-size:11px;color:var(--muted);">'+esc(orderIds.join(', ')||'—')+'</td>'
-        +'<td style="text-align:right;">'+Math.round(it.amount)+' '+esc(it.currency||'EUR')+'</td><td>'+due+'</td><td>'+stB+'</td>'
-        +'<td style="white-space:nowrap;">'+(it.status!=='paid'?'<button class="btn ok" style="padding:4px 9px;font-size:12px;" onclick="carrierInvoicePayUi('+it.id+','+rem+')">'+t('cs.ap.payBtn')+'</button> ':'')
-        +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierApDocs('+it.carrier_id+')">📎 Dok.</button> '
-        +'<button class="btn danger" style="padding:4px 9px;font-size:12px;" onclick="carrierInvoiceDeleteUi('+it.id+')">✕</button></td></tr>';
+    var s=r.summary||{}, items=r.items||[];
+
+    // Csoportosítás carrier szerint
+    var groups = {};
+    items.forEach(function(it){
+      var key = String(it.carrier_id);
+      if(!groups[key]) groups[key] = { carrier_id: it.carrier_id, carrier_nev: it.carrier_nev||'—', invoices: [], total_open: 0 };
+      groups[key].invoices.push(it);
+      if(it.status !== 'paid') groups[key].total_open += (parseFloat(it.amount)||0) - (parseFloat(it.paid_amount)||0);
+    });
+
+    var accordionHtml = Object.values(groups).sort(function(a,b){ return (a.carrier_nev||'').localeCompare(b.carrier_nev||''); }).map(function(g){
+      var cnt = g.invoices.length;
+      var openStr = g.total_open > 0 ? Math.round(g.total_open) + ' EUR nyitott' : 'Rendezett';
+      var gid = 'cg_' + g.carrier_id;
+
+      // Számla sorok
+      var invoiceRows = g.invoices.map(function(it){
+        var rem = Math.round((parseFloat(it.amount)||0)-(parseFloat(it.paid_amount)||0));
+        var due='—';
+        if(it.due_date){ var days=Math.round((new Date(it.due_date)-new Date())/86400000);
+          due = days<0?('<span class="badge err">'+(-days)+'n lejárt</span>'):days<=7?('<span class="badge warn">'+days+' nap</span>'):String(it.due_date).slice(0,10); }
+        var stB = it.status==='paid'?'<span class="badge ok">'+t('pay.paid')+'</span>':it.status==='partial'?'<span class="badge warn">Részfizetés ('+Math.round(it.paid_amount||0)+')</span>':'<span class="badge err">'+t('cs.ap.toPay')+'</span>';
+        var orderIds=(function(){ try{ return Array.isArray(it.order_ids)?it.order_ids:JSON.parse(it.order_ids||'[]'); }catch(e){ return []; } })();
+        return '<div style="padding:8px 12px;border-bottom:1px solid var(--border);font-size:13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+          +'<span style="font-weight:600;">📄 '+esc(it.invoice_number||'—')+'</span>'
+          +(orderIds.length?'<span style="color:var(--muted);font-size:11px;">'+esc(orderIds.join(', '))+'</span>':'')
+          +'<span>'+Math.round(it.amount)+' '+esc(it.currency||'EUR')+'</span>'
+          +'<span>'+due+'</span>'
+          +'<span>'+stB+'</span>'
+          +'<span style="margin-left:auto;display:flex;gap:4px;">'
+          +(it.status!=='paid'?'<button class="btn ok" style="padding:3px 8px;font-size:11px;" onclick="carrierInvoicePayUi('+it.id+','+rem+')">'+t('cs.ap.payBtn')+'</button>':'')
+          +'<button class="btn danger" style="padding:3px 8px;font-size:11px;" onclick="carrierInvoiceDeleteUi('+it.id+')">✕</button>'
+          +'</span></div>';
+      }).join('');
+
+      // Accordion kártya
+      return '<div class="glass-soft" style="margin-bottom:8px;border-radius:12px;overflow:hidden;">'
+        // Fejléc (accordion header)
+        +'<div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;background:rgba(99,102,241,0.07);border-bottom:2px solid rgba(99,102,241,0.18);" onclick="carrierApToggle(\''+gid+'\')">'
+        +'<span style="font-size:15px;font-weight:800;color:#e2e8f0;flex:1;">🚚 '+esc(g.carrier_nev)+'</span>'
+        +'<span style="font-size:12px;color:#a5b4fc;">'+cnt+' számla · '+esc(openStr)+'</span>'
+        +'<button class="btn ghost" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();carrierApDocs('+g.carrier_id+')">📎 Dok.</button>'
+        +'<span id="'+gid+'_arr" style="color:#818cf8;font-size:14px;transition:transform .2s;">▼</span>'
+        +'</div>'
+        // Lenyíló rész (alapból NYITVA)
+        +'<div id="'+gid+'">'
+        // Dokumentumok szekció
+        +'<div id="'+gid+'_docs" style="background:rgba(0,0,0,0.15);padding:8px 12px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);">📎 Betöltés...</div>'
+        // Számlák szekció
+        +(invoiceRows || '<div style="padding:10px 12px;font-size:12px;color:var(--muted);">Nincs számla.</div>')
+        +'</div>'
+        +'</div>';
     }).join('');
-    box.innerHTML='<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:10px;">'+t('cs.ap.title')+'</div>'
+
+    box.innerHTML = '<div class="glass" style="padding:20px;">'
+      +'<div style="font-size:16px;font-weight:800;margin-bottom:10px;">'+t('cs.ap.title')+'</div>'
+      // Stat tile-ok
       +'<div class="dash-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;">'
       +apTile(t('cs.ap.openTotal'), Math.round(s.open_total||0)+' €', '#ff6b75')+apTile(t('cs.ap.dueSoon'), Math.round(s.due_soon||0)+' €', '#fbbf24')
-      +apTile(t('cs.ap.overdue'), Math.round(s.overdue||0)+' €', (s.overdue>0?'#ff6b75':''))+apTile(t('cs.ap.openInvoices'), (s.open_cnt||0)+t('cs.ap.pcs'),'')+'</div>'
-      +'<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:10px;">'
+      +apTile(t('cs.ap.overdue'), Math.round(s.overdue||0)+' €', (s.overdue>0?'#ff6b75':''))+apTile(t('cs.ap.openInvoices'), (s.open_cnt||0)+t('cs.ap.pcs'),'')
+      +'</div>'
+      // Új számla form
+      +'<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:14px;">'
       +'<div class="field" style="margin:0;min-width:170px;"><label>'+t('cs.ap.carrier')+'</label><select class="select" id="ciCarrier" onchange="apLoadOrders()"><option value="">—</option></select></div>'
       +'<div class="field" style="margin:0;"><label>'+t('cs.ap.invNum')+'</label><input class="input" id="ciNum" style="max-width:140px;"></div>'
       +'<div class="field" style="margin:0;"><label>'+t('cs.ap.issueDate')+'</label><input class="input" id="ciIssue" type="date" style="max-width:150px;"></div>'
@@ -1323,9 +1367,60 @@ function loadCarrierAp(){
       +'<button class="btn primary" style="height:42px;" onclick="carrierInvoiceSaveUi()">'+t('cs.ap.saveInvoice')+'</button>'
       +'</div>'
       +'<div class="field" id="ciOrdersWrap" style="display:none;"><label>'+t('cs.ap.whichOrders')+'</label><select class="select" id="ciOrders" multiple size="3" style="height:auto;"></select></div>'
-      +'<table class="table" style="margin-top:12px;"><thead><tr><th>'+t('cs.ap.carrier')+'</th><th>'+t('cs.ap.colInvoice')+'</th><th>'+t('cs.ap.colOrders')+'</th><th style="text-align:right;">'+t('cs.ap.amount')+'</th><th>'+t('cs.ap.colDue')+'</th><th>'+t('cs.ap.colState')+'</th><th>'+t('col.action')+'</th></tr></thead>'
-      +'<tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px;">'+t('cs.ap.none')+'</td></tr>')+'</tbody></table></div>';
+      // Carrier accordion-ok
+      +(accordionHtml || '<div style="text-align:center;color:var(--muted);padding:20px;font-size:13px;">'+t('cs.ap.none')+'</div>')
+      +'</div>';
+
     ensureCarriers(function(){ fillCarrierSelect('ciCarrier',''); });
+
+    // Dokumentumok lazy-load minden carrier-hez
+    Object.values(groups).forEach(function(g){
+      var gid = 'cg_' + g.carrier_id;
+      carrierApLoadDocs(g.carrier_id, gid + '_docs');
+    });
+  });
+}
+
+function carrierApToggle(gid){
+  var panel = document.getElementById(gid);
+  var arrow = document.getElementById(gid + '_arr');
+  if(!panel) return;
+  var open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : '';
+  if(arrow) arrow.style.transform = open ? 'rotate(-90deg)' : '';
+}
+
+function carrierApLoadDocs(carrierId, targetId){
+  var el = document.getElementById(targetId); if(!el) return;
+  gas('carrierGetDocs', { carrierId: carrierId }).then(function(d){
+    if(!d || !d.ok || !d.docs || !d.docs.length){
+      el.innerHTML = '<em style="font-size:12px;color:var(--muted);">Nincs feltöltött dokumentum.</em>';
+      return;
+    }
+    // Csoportosítás order_id szerint
+    var byOrder = {};
+    d.docs.forEach(function(doc){
+      var key = doc.order_id ? String(doc.order_id) : '__none__';
+      if(!byOrder[key]) byOrder[key] = [];
+      byOrder[key].push(doc);
+    });
+    var html = '';
+    Object.keys(byOrder).sort().forEach(function(orderId){
+      var docs = byOrder[orderId];
+      html += '<div style="padding:6px 0;border-bottom:1px solid var(--border);">'
+        +'<div style="font-size:11px;font-weight:700;color:#94a3b8;margin-bottom:4px;">'
+        +(orderId==='__none__'?'📁 Fuvar nélkül':'📦 Fuvar: '+esc(orderId))+'</div>'
+        +docs.map(function(doc){
+          var icon = (doc.mime||'').indexOf('pdf')>=0 ? '📄' : '🖼';
+          return '<div style="display:flex;align-items:center;gap:6px;padding:2px 0;">'
+            +icon+' <span style="font-size:12px;flex:1;">'+esc(doc.file_name||'—')+'</span>'
+            +'<span class="badge info" style="font-size:10px;">'+esc(doc.kind||'')+'</span>'
+            +'<button class="btn ghost" style="padding:2px 7px;font-size:11px;" onclick="carrierDocDl('+doc.id+',\''+esc(doc.file_name||'dok')+'\')">⬇</button>'
+            +'</div>';
+        }).join('')
+        +'</div>';
+    });
+    el.innerHTML = html;
   });
 }
 function apTile(k,v,col){ return '<div class="glass-soft" style="padding:12px 14px;"><div style="font-size:11px;color:var(--muted);">'+esc(k)+'</div><div style="font-size:20px;font-weight:800;margin-top:3px;'+(col?'color:'+col:'')+'">'+v+'</div></div>'; }
