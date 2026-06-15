@@ -476,4 +476,138 @@ function startTrialExpiryScheduler() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler };
+// ============================================================
+//  Trial emlékeztető ütemező — 3 és 1 nappal lejárat előtt
+//  Emailt küld a csomag-választó linkekkel + éves opcióval.
+// ============================================================
+function startTrialReminderScheduler() {
+  const crypto = require('crypto');
+  const { sendClientEmail } = require('./email');
+  const appUrl = process.env.APP_URL || 'https://app.vallorsoft.com';
+
+  function makeToken(cid, planId, billing) {
+    const secret = process.env.SESSION_SECRET || 'dev-secret';
+    return crypto.createHmac('sha256', secret)
+      .update(`${cid}:${planId}:${billing}`)
+      .digest('hex').slice(0, 16);
+  }
+
+  function buildPlanLink(cid, planId, billing) {
+    const tok = makeToken(cid, planId, billing);
+    return `${appUrl}/api/trial/select-plan?cid=${cid}&plan=${planId}&billing=${billing}&tok=${tok}`;
+  }
+
+  function buildReminderHtml(company, plans, daysLeft) {
+    const escH = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const planColors = ['#16a34a','#3b82f6','#6366f1','#1e293b'];
+
+    const planCards = plans.map(function(p, i) {
+      const isDark     = i === 3;
+      const monthlyEur = parseFloat(p.price_net) || 0;
+      const annualEur  = monthlyEur * 11;
+      const color      = planColors[i] || '#3b82f6';
+      const linkM      = isDark ? null : buildPlanLink(company.id, p.id, 'monthly');
+      const linkA      = isDark ? null : buildPlanLink(company.id, p.id, 'annual');
+
+      const priceBlock = monthlyEur > 0
+        ? `<div style="font-size:22px;font-weight:800;color:${color};">€${Math.round(monthlyEur)}<span style="font-size:13px;font-weight:500;color:#64748b;">/lună</span></div>
+           <div style="font-size:11px;color:#64748b;">Anual: €${annualEur} (11 luni)</div>`
+        : `<div style="font-size:16px;font-weight:700;color:#475569;">Preț personalizat</div>`;
+
+      const ctaBlock = isDark
+        ? `<a href="mailto:vallorsoft@gmail.com" style="display:block;text-align:center;margin-top:10px;padding:8px;background:#1e293b;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;">Contactați-ne</a>`
+        : `<a href="${linkM}" style="display:block;text-align:center;margin-top:8px;padding:7px;background:${color};color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;">Lunar / Havi</a>
+           <a href="${linkA}" style="display:block;text-align:center;margin-top:5px;padding:7px;background:transparent;color:${color};border:1.5px solid ${color};border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;">Anual / Éves ★ −1 lună</a>`;
+
+      return `<td style="width:25%;padding:8px;vertical-align:top;">
+        <div style="border:1.5px solid ${i===2?color:'#e2e8f0'};border-radius:10px;padding:14px;background:${i===2?'#fafafe':'#fff'};">
+          <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:6px;">${escH(p.name)}</div>
+          ${priceBlock}
+          ${ctaBlock}
+        </div>
+      </td>`;
+    }).join('');
+
+    return `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#0f172a;">
+  <div style="background:linear-gradient(135deg,#6366f1,#3b82f6);padding:24px 28px;border-radius:12px 12px 0 0;">
+    <h1 style="margin:0;color:#fff;font-size:20px;">vallor<span style="color:#c7d2fe;">Soft</span></h1>
+    <p style="margin:6px 0 0;color:rgba(255,255,255,.85);font-size:14px;">⏳ ${daysLeft === 1 ? 'Ultima zi / Utolsó nap' : `Mai ai ${daysLeft} zile / Még ${daysLeft} nap`}</p>
+  </div>
+  <div style="background:#fff;padding:24px 28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
+    <p style="margin:0 0 12px;font-size:15px;">
+      <strong>RO:</strong> Perioada de probă a companiei <em>${escH(company.nev)}</em> expiră în <strong>${daysLeft} ${daysLeft===1?'zi':'zile'}</strong>.
+      Alege un pachet pentru a continua fără întrerupere.
+    </p>
+    <p style="margin:0 0 20px;font-size:15px;">
+      <strong>HU:</strong> A(z) <em>${escH(company.nev)}</em> próbaidőszaka <strong>${daysLeft} nap</strong> múlva lejár.
+      Válassz csomagot a folyamatos hozzáféréshez.
+    </p>
+
+    <!-- Csomag kártyák -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+      <tr>${planCards}</tr>
+    </table>
+
+    <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;font-size:12px;color:#92400e;margin-bottom:16px;">
+      ★ <strong>Éves előfizetésnél</strong>: 11 hónapot fizet, 12 hónapot használ (1 hónap ingyen).<br>
+      ★ <strong>Abonament anual</strong>: plătești 11 luni, folosești 12 (1 lună gratuită).
+    </div>
+
+    <p style="margin:0;font-size:12px;color:#94a3b8;">
+      Abonamentul începe după perioada de probă de 14 zile. / Az előfizetés a 14 napos próba után kezdődik.<br>
+      Întrebări? <a href="mailto:vallorsoft@gmail.com" style="color:#6366f1;">vallorsoft@gmail.com</a>
+    </p>
+  </div>
+</div>`;
+  }
+
+  async function tick() {
+    try {
+      // 3 napos és 1 napos emlékeztetők
+      for (const daysLeft of [3, 1]) {
+        const targetDate = new Date();
+        targetDate.setDate(targetDate.getDate() + daysLeft);
+        const targetStr = targetDate.toISOString().slice(0, 10);
+
+        const res = await pool.query(
+          `SELECT c.id, c.nev, c.email_contact
+           FROM companies c
+           WHERE c.subscription_status = 'trial'
+             AND c.paid_until::date = $1::date`,
+          [targetStr]
+        );
+        if (!res.rows.length) continue;
+
+        const plansR = await pool.query(
+          'SELECT id, name, price_net FROM subscription_plans ORDER BY sort_order, price_net'
+        );
+        const plans = plansR.rows;
+
+        for (const company of res.rows) {
+          if (!company.email_contact) continue;
+          try {
+            const html = buildReminderHtml(company, plans, daysLeft);
+            await sendClientEmail({
+              to:      company.email_contact,
+              subject: `⏳ VallorSoft — ${daysLeft === 1 ? 'Ultima zi / Utolsó nap' : `${daysLeft} zile rămase / ${daysLeft} nap van hátra`} — Alege pachet / Válassz csomagot`,
+              html,
+            });
+            console.log(`[TrialReminder] ${daysLeft}d — cég #${company.id} (${company.nev}) emlékeztető elküldve`);
+          } catch (mailErr) {
+            console.error(`[TrialReminder] email hiba cég #${company.id}:`, mailErr.message);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[TrialReminder] ütemező hiba:', err.message);
+    }
+  }
+
+  // Indulás után 90s-vel az első futás, majd 24 óránként
+  setTimeout(tick, 90 * 1000);
+  const interval = setInterval(tick, 24 * 60 * 60 * 1000);
+  console.log('[TrialReminder] 3d/1d emlékeztető ütemező elindítva — 24 órás ciklus.');
+  return interval;
+}
+
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler };

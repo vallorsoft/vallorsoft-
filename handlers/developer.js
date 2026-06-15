@@ -778,4 +778,35 @@ handlers.devSaveBlogPost = async function(req, res, args) {
   }
 };
 
+// ── Banki adatok (developer_settings key='bank_details') ──────────────────
+handlers.devGetBankDetails = async function (req, res) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const r = await pool.query("SELECT value FROM developer_settings WHERE key='bank_details'");
+  res.json({ result: { ok: true, details: r.rows[0]?.value || {} } });
+};
+
+handlers.devSaveBankDetails = async function (req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const [details] = args || [{}];
+  await pool.query(
+    `INSERT INTO developer_settings(key, value, updated_at) VALUES('bank_details',$1::jsonb, NOW())
+     ON CONFLICT(key) DO UPDATE SET value=$1::jsonb, updated_at=NOW()`,
+    [JSON.stringify(details)]
+  );
+  res.json({ result: { ok: true } });
+};
+
+// ── Fizetési kérelmek listája (developer áttekintő) ─────────────────────────
+handlers.devGetPaymentRequests = async function (req, res) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const r = await pool.query(
+    `SELECT pr.*, c.nev AS company_nev, sp.name AS plan_name
+     FROM payment_requests pr
+     LEFT JOIN companies c ON c.id = pr.company_id
+     LEFT JOIN subscription_plans sp ON sp.id = pr.plan_id
+     ORDER BY pr.created_at DESC LIMIT 200`
+  );
+  res.json({ result: { ok: true, requests: r.rows } });
+};
+
 module.exports = handlers;

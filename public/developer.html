@@ -165,6 +165,8 @@
     <div class="dev-tab" onclick="showPane('sysemails')">✉️ Rendszer-emailek</div>
     <div class="dev-tab" onclick="showPane('pushtempl')">🔔 Push értesítések</div>
     <div class="dev-tab" onclick="showPane('elofiz')" data-i18n-html="dev.tabElofiz">📦 Előfizetések</div>
+    <div class="dev-tab" onclick="showPane('bank');loadBankDetails()">🏦 Banki adatok</div>
+    <div class="dev-tab" onclick="showPane('payments');loadPaymentRequests()">💸 Fizetési kérelmek</div>
     <div style="margin-top:auto; padding-top:20px; border-top:1px solid var(--border);">
       <div id="devBadge" style="font-size:12px; color:var(--muted); margin-bottom:10px;">—</div>
       <button class="btn-danger-sm" style="width:100%;" onclick="logout()" data-i18n="common.logout">Kilépés</button>
@@ -421,6 +423,44 @@
         <table class="table">
           <thead><tr><th data-i18n="dev.thCompany">Cég</th><th data-i18n="dev.thAssignedPlan">Hozzárendelt csomag</th></tr></thead>
           <tbody id="compPlanTbody"><tr><td colspan="2" style="text-align:center;color:var(--muted);padding:20px;" data-i18n="common.loading">Betöltés...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- BANKI ADATOK -->
+    <div class="dev-pane hidden" id="pane-bank">
+      <div class="section-title">🏦 Banki adatok (utalásos fizetéshez)</div>
+      <div class="glass" style="padding:24px;max-width:520px;">
+        <p style="font-size:13px;color:var(--muted);margin:0 0 18px;">Ezeket az adatokat tartalmazzák a fizetési emailek (trial emlékeztető + csomag-választás után).</p>
+        <div style="display:grid;gap:12px;">
+          <label style="font-size:13px;font-weight:600;">Számlatulajdonos / Titular cont
+            <input id="bankHolder" class="input" style="margin-top:4px;width:100%;" placeholder="VALLOR TEAM SRL" />
+          </label>
+          <label style="font-size:13px;font-weight:600;">IBAN
+            <input id="bankIban" class="input" style="margin-top:4px;width:100%;font-family:monospace;" placeholder="RO49BTRL..." />
+          </label>
+          <label style="font-size:13px;font-weight:600;">Bank neve / Denumire bancă
+            <input id="bankName" class="input" style="margin-top:4px;width:100%;" placeholder="Banca Transilvania" />
+          </label>
+          <label style="font-size:13px;font-weight:600;">SWIFT / BIC (opcionális)
+            <input id="bankSwift" class="input" style="margin-top:4px;width:100%;font-family:monospace;" placeholder="BTRLRO22" />
+          </label>
+        </div>
+        <button class="btn primary" style="margin-top:18px;" onclick="saveBankDetails()">💾 Mentés</button>
+        <span id="bankSaveMsg" style="font-size:13px;margin-left:10px;color:#22c55e;display:none;">Mentve ✓</span>
+      </div>
+    </div>
+
+    <!-- FIZETÉSI KÉRELMEK -->
+    <div class="dev-pane hidden" id="pane-payments">
+      <div class="section-title">💸 Fizetési kérelmek</div>
+      <div class="glass" style="padding:0;overflow:hidden;">
+        <table class="table">
+          <thead><tr>
+            <th>Dátum</th><th>Cég</th><th>Csomag</th><th>Időszak</th>
+            <th>Referencia</th><th>EUR</th><th>RON bruttó</th><th>Státusz</th>
+          </tr></thead>
+          <tbody id="paymentReqTbody"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1702,6 +1742,62 @@ async function clearSysEmailTemplate() {
     document.getElementById('sysEmailBodyHu').value = '';
     msg.textContent = '✅ Sablon törölve — alapértelmezett fut.'; msg.style.color='#22c55e';
   } else { msg.textContent = '❌ ' + (d && d.err || 'Hiba'); msg.style.color='#ef4444'; }
+}
+
+// ── Banki adatok ────────────────────────────────────────────────────────────
+async function loadBankDetails() {
+  const d = await gas('devGetBankDetails');
+  if (!d || !d.ok) return;
+  const det = d.details || {};
+  document.getElementById('bankHolder').value = det.holder || '';
+  document.getElementById('bankIban').value   = det.iban   || '';
+  document.getElementById('bankName').value   = det.bank   || '';
+  document.getElementById('bankSwift').value  = det.swift  || '';
+}
+
+async function saveBankDetails() {
+  const details = {
+    holder: document.getElementById('bankHolder').value.trim(),
+    iban:   document.getElementById('bankIban').value.trim(),
+    bank:   document.getElementById('bankName').value.trim(),
+    swift:  document.getElementById('bankSwift').value.trim(),
+  };
+  const d = await gas('devSaveBankDetails', [details]);
+  const msg = document.getElementById('bankSaveMsg');
+  if (d && d.ok) {
+    msg.textContent = 'Mentve ✓'; msg.style.color = '#22c55e'; msg.style.display = '';
+    setTimeout(() => { msg.style.display = 'none'; }, 2500);
+  } else {
+    msg.textContent = '❌ Hiba'; msg.style.color = '#ef4444'; msg.style.display = '';
+  }
+}
+
+// ── Fizetési kérelmek ───────────────────────────────────────────────────────
+async function loadPaymentRequests() {
+  const d = await gas('devGetPaymentRequests');
+  const tbody = document.getElementById('paymentReqTbody');
+  if (!d || !d.ok || !d.requests.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">Nincs fizetési kérelem</td></tr>';
+    return;
+  }
+  tbody.innerHTML = d.requests.map(function(r) {
+    const dt = r.created_at ? new Date(r.created_at).toLocaleDateString('ro-RO') : '—';
+    const statusColor = r.status === 'paid' ? '#22c55e' : r.status === 'cancelled' ? '#94a3b8' : '#f59e0b';
+    return '<tr>'
+      + '<td style="white-space:nowrap;">' + dt + '</td>'
+      + '<td>' + escDev(r.company_nev || r.company_id) + '</td>'
+      + '<td>' + escDev(r.plan_name || r.plan_id) + '</td>'
+      + '<td>' + (r.billing_type === 'annual' ? '📅 Éves' : '📆 Havi') + '</td>'
+      + '<td style="font-family:monospace;font-weight:700;">' + escDev(r.reference) + '</td>'
+      + '<td style="text-align:right;">€' + (parseFloat(r.amount_eur)||0).toFixed(2) + '</td>'
+      + '<td style="text-align:right;font-weight:600;">' + (r.total_ron ? parseFloat(r.total_ron).toFixed(2) + ' RON' : '—') + '</td>'
+      + '<td><span style="color:' + statusColor + ';font-weight:600;">' + r.status + '</span></td>'
+      + '</tr>';
+  }).join('');
+}
+
+function escDev(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 </script>

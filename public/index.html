@@ -324,6 +324,14 @@
       <h2 data-i18n="pricingTitle">Planuri și prețuri</h2>
       <p data-i18n="pricingSubtitle">Prețuri transparente, fără costuri ascunse</p>
     </div>
+    <!-- Havi / Éves váltó -->
+    <div class="lp-billing-toggle reveal" id="lpBillingToggle">
+      <button class="lp-toggle-btn active" data-billing="monthly" onclick="setBillingMode('monthly')" data-i18n="billingMonthly">Lunar / Havonta</button>
+      <button class="lp-toggle-btn" data-billing="annual" onclick="setBillingMode('annual')">
+        <span data-i18n="billingAnnual">Anual / Éves</span>
+        <span class="lp-toggle-badge" data-i18n="billingAnnualBadge">−1 lună / −1 hó</span>
+      </button>
+    </div>
     <div class="lp-pricing-grid" id="lpPricingGrid">
       <!-- JS tölti be a /api/public-plans alapján; statikus fallback 4 valós csomag: -->
       <div class="lp-pricing-card lp-plan-green reveal">
