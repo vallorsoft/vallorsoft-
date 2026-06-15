@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preview: Detalii plată — VallorSoft</title>
+<style>
+  body { margin: 0; padding: 40px 20px; background: #e8edf2; font-family: Arial, Helvetica, sans-serif; }
+  .preview-label {
+    max-width: 620px; margin: 0 auto 12px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; color: #64748b; letter-spacing: .3px;
+  }
+  .preview-label .badge {
+    background: #6366f1; color: #fff; padding: 3px 10px; border-radius: 20px;
+    font-weight: 700; font-size: 10px; letter-spacing: .5px;
+  }
+  .email-client {
+    max-width: 620px; margin: 0 auto;
+    background: #fff; border-radius: 8px;
+    box-shadow: 0 4px 32px rgba(0,0,0,.18);
+    overflow: hidden;
+  }
+  .email-client-chrome {
+    background: #f1f3f5; border-bottom: 1px solid #dde1e7;
+    padding: 10px 16px; display: flex; align-items: center; gap: 6px;
+  }
+  .chrome-dot { width: 11px; height: 11px; border-radius: 50%; }
+  .chrome-bar {
+    flex: 1; background: #fff; border-radius: 4px;
+    border: 1px solid #d1d5db; padding: 4px 10px;
+    font-size: 11px; color: #94a3b8; margin-left: 8px;
+  }
+  .email-header-meta {
+    background: #f8fafc; border-bottom: 1px solid #e8edf2;
+    padding: 14px 20px; font-size: 12px; color: #475569;
+  }
+  .email-header-meta .subject { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 6px; }
+  .email-header-meta .meta-row { display: flex; gap: 8px; margin: 2px 0; }
+  .email-header-meta .label { color: #94a3b8; min-width: 52px; }
+</style>
+</head>
+<body>
+
+<div class="preview-label">
+  <span><strong>payment-details.html</strong> — Detalii plată (requestSubscriptionExtension / buildPaymentEmailHtml)</span>
+  <span class="badge">VallorSoft Email Preview</span>
+</div>
+<div style="max-width:620px;margin:0 auto 8px;text-align:right;font-size:11px;color:#94a3b8;">Generat: 2026-06-15</div>
+
+<div class="email-client">
+  <div class="email-client-chrome">
+    <div class="chrome-dot" style="background:#ff5f57;"></div>
+    <div class="chrome-dot" style="background:#ffbd2e;"></div>
+    <div class="chrome-dot" style="background:#28ca42;"></div>
+    <div class="chrome-bar">VallorSoft — Detalii plată: Standard · VS-202506-0001</div>
+  </div>
+  <div class="email-header-meta">
+    <div class="subject">VallorSoft — Detalii plată: Standard · VS-202506-0001</div>
+    <div class="meta-row"><span class="label">De la:</span> VallorSoft &lt;vallorteam.office@gmail.com&gt;</div>
+    <div class="meta-row"><span class="label">Către:</span> admin@vallortrans.ro</div>
+    <div class="meta-row"><span class="label">Data:</span> 15 iun. 2026, 14:35</div>
+  </div>
+
+  <!-- Actual email body from buildPaymentEmailHtml() in trial-select.js / billingHandlers.js -->
+  <div style="font-family:sans-serif;max-width:580px;margin:0 auto;color:#0f172a;">
+    <div style="background:linear-gradient(135deg,#6366f1,#3b82f6);padding:28px 32px;border-radius:0;">
+      <h1 style="margin:0;color:#fff;font-size:22px;">vallor<span style="color:#c7d2fe;">Soft</span></h1>
+      <p style="margin:8px 0 0;color:rgba(255,255,255,.8);font-size:14px;">Detalii plată</p>
+    </div>
+    <div style="background:#fff;padding:28px 32px;border:1px solid #e2e8f0;border-top:none;border-radius:0;">
+
+      <p style="margin:0 0 20px;font-size:15px;">Ați solicitat pachetul <strong>Standard</strong> (lunar) pentru compania <em>Vallor Team SRL</em>.</p>
+
+      <!-- Summary table -->
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px 20px;margin-bottom:20px;">
+        <div style="font-size:13px;color:#475569;margin-bottom:8px;font-weight:600;">REZUMAT PLATĂ</div>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td style="padding:4px 0;font-size:13px;color:#64748b;">Pachet</td>
+            <td style="padding:4px 0;font-size:13px;text-align:right;">Standard (lunar)</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;font-size:13px;color:#64748b;">Preț net EUR</td>
+            <td style="padding:4px 0;font-size:13px;text-align:right;">€19.00</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;font-size:13px;color:#64748b;">Curs BNR EUR/RON</td>
+            <td style="padding:4px 0;font-size:13px;text-align:right;">5.0000 RON/€</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;font-size:13px;color:#64748b;">Preț net RON</td>
+            <td style="padding:4px 0;font-size:13px;text-align:right;">95.00 RON</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;font-size:13px;color:#64748b;">TVA 21%</td>
+            <td style="padding:4px 0;font-size:13px;text-align:right;">19.95 RON</td>
+          </tr>
+          <tr style="border-top:2px solid #6366f1;">
+            <td style="padding:8px 0 4px;font-size:15px;font-weight:700;">TOTAL</td>
+            <td style="padding:8px 0 4px;font-size:15px;font-weight:700;text-align:right;color:#6366f1;">114.95 RON</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Bank details -->
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:16px 20px;margin-bottom:20px;">
+        <div style="font-size:13px;color:#166534;font-weight:700;margin-bottom:8px;">DATE CONT BANCAR</div>
+        <table style="width:100%;border-collapse:collapse;margin:12px 0;">
+          <tr>
+            <td style="padding:6px 0;color:#475569;font-size:13px;">Titular cont</td>
+            <td style="padding:6px 0;font-weight:600;font-size:13px;">VALLOR TEAM SRL</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#475569;font-size:13px;">IBAN</td>
+            <td style="padding:6px 0;font-weight:600;font-size:13px;font-family:monospace;">RO49AAAA1B31007593840000</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#475569;font-size:13px;">Bancă</td>
+            <td style="padding:6px 0;font-weight:600;font-size:13px;">Banca Transilvania</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#475569;font-size:13px;">SWIFT/BIC</td>
+            <td style="padding:6px 0;font-weight:600;font-size:13px;font-family:monospace;">BTRLRO22</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Payment reference -->
+      <div style="background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(59,130,246,.08));border:2px solid #6366f1;border-radius:10px;padding:16px 20px;margin-bottom:20px;text-align:center;">
+        <div style="font-size:12px;color:#6366f1;font-weight:700;letter-spacing:.5px;margin-bottom:6px;">REFERINȚĂ PLATĂ</div>
+        <div style="font-size:26px;font-weight:800;font-family:monospace;letter-spacing:2px;color:#0f172a;">VS-202506-0001</div>
+        <div style="font-size:12px;color:#475569;margin-top:6px;">Scrieți acest cod în câmpul „Observații" al ordinului de plată.</div>
+      </div>
+
+      <p style="font-size:13px;color:#475569;margin:0 0 20px;">
+        Vă rugăm efectuați plata în termen de <strong>5 zile lucrătoare</strong>.
+        Abonamentul va fi activat în maxim 24h de la confirmarea plății.
+      </p>
+
+      <a href="https://vallorsoft.onrender.com/admin" style="display:inline-block;background:linear-gradient(180deg,#3b82f6,#2563eb);color:#fff;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:600;font-size:14px;">
+        Intră în aplicație
+      </a>
+
+      <p style="margin:20px 0 0;font-size:12px;color:#94a3b8;">
+        Întrebări? <a href="mailto:vallorsoft@gmail.com" style="color:#6366f1;">vallorsoft@gmail.com</a>
+        &nbsp;·&nbsp; <a href="https://vallorsoft.onrender.com/terms" style="color:#6366f1;">Termeni</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
