@@ -549,6 +549,37 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 }
 .lp-blog-read-more:hover { opacity: 0.75; text-decoration: underline; }
 
+/* Blog 3 kártyás sor — középre igazítva */
+.lp-blog-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+/* Kapcsolat 3 blokk — egyforma széles, középre */
+.lp-contact-grid {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+.lp-contact-block {
+  flex: 1;
+  min-width: 200px;
+  max-width: 260px;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 16px;
+  padding: 2rem 1.6rem;
+  text-align: center;
+}
+.lp-contact-block h3 { font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: .6rem; }
+.lp-contact-block p  { font-size: .85rem; color: rgba(255,255,255,.5); line-height: 1.6; }
+.lp-contact-link { color: #818cf8; text-decoration: none; }
+.lp-contact-link:hover { text-decoration: underline; }
+
 /* ── Stats ──────────────────────────────────────────────────── */
 .lp-stats-grid {
   display: grid;
