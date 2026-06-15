@@ -387,16 +387,16 @@
 
       <!-- szerkesztő -->
       <div style="margin-bottom:10px;">
-        <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Tárgy (subject) <button type="button" class="fh-btn" onclick="showHint(this,'<b>Email tárgy sora</b><span class=\'fh-where\'>Ez jelenik meg a levélfiókban a feladó neve mellett. Rövid, egyértelmű legyen. {{változók}} itt is működnek.</span>')">!</button></label>
+        <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Tárgy (subject) <button type="button" class="fh-btn" data-fh="&lt;b&gt;Email tárgy sora&lt;/b&gt;&lt;span class=&quot;fh-where&quot;&gt;Ez jelenik meg a levélfiókban a feladó neve mellett. Rövid, egyértelmű legyen. {{változók}} itt is működnek.&lt;/span&gt;" onclick="showHint(this,this.dataset.fh)">!</button></label>
         <input id="sysEmailSubject" type="text" style="width:100%;padding:9px 11px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:#141c25;color:#e9eef5;font-family:inherit;font-size:13px;" placeholder="Email tárgy…">
       </div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;">
         <div style="flex:1;min-width:240px;">
-          <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Törzs — RO (HTML) <button type="button" class="fh-btn" onclick="showHint(this,'<b>Email törzse — románul (HTML)</b><span class=\'fh-where\'>HTML formátum: &lt;p&gt;, &lt;b&gt;, &lt;a href=...&gt; stb. is használható. {{változónév}} automatikusan behelyettesítve. Ha üresen hagyod, az alapértelmezett VallorSoft-sablonos email megy ki.</span>')">!</button></label>
+          <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Törzs — RO (HTML) <button type="button" class="fh-btn" data-fh="&lt;b&gt;Email törzse — románul (HTML)&lt;/b&gt;&lt;span class=&quot;fh-where&quot;&gt;HTML formátum: &amp;lt;p&amp;gt;, &amp;lt;b&amp;gt; stb. is használható. {{változónév}} automatikusan behelyettesítve. Ha üresen hagyod, az alapértelmezett VallorSoft-sablonos email megy ki.&lt;/span&gt;" onclick="showHint(this,this.dataset.fh)">!</button></label>
           <textarea id="sysEmailBodyRo" rows="10" style="width:100%;padding:9px 11px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:#141c25;color:#e9eef5;font-family:monospace;font-size:12px;resize:vertical;" placeholder="<p>Bun venit…</p>"></textarea>
         </div>
         <div style="flex:1;min-width:240px;">
-          <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Törzs — HU (HTML) <button type="button" class="fh-btn" onclick="showHint(this,'<b>Email törzse — magyarul (HTML)</b><span class=\'fh-where\'>HTML formátum — ugyanolyan, mint a RO törzs. A rendszer mindkét nyelvű törzsöt elküldi egymás után (RO+HU kétnyelvű email). Ha üresen hagyod, csak a RO változat megy ki, vagy az alapértelmezett szöveg.</span>')">!</button></label>
+          <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Törzs — HU (HTML) <button type="button" class="fh-btn" data-fh="&lt;b&gt;Email törzse — magyarul (HTML)&lt;/b&gt;&lt;span class=&quot;fh-where&quot;&gt;HTML formátum — ugyanolyan, mint a RO törzs. A rendszer mindkét nyelvű törzsöt elküldi egymás után (RO+HU kétnyelvű email). Ha üresen hagyod, csak a RO változat megy ki, vagy az alapértelmezett szöveg.&lt;/span&gt;" onclick="showHint(this,this.dataset.fh)">!</button></label>
           <textarea id="sysEmailBodyHu" rows="10" style="width:100%;padding:9px 11px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:#141c25;color:#e9eef5;font-family:monospace;font-size:12px;resize:vertical;" placeholder="<p>Üdvözöljük…</p>"></textarea>
         </div>
       </div>
@@ -1020,7 +1020,10 @@ function showHint(btn, html) {
     }, 0);
   });
 }
-function fhBtn(html) { return '<button type="button" class="fh-btn" onclick="showHint(this,'+JSON.stringify(html)+')">!</button>'; }
+function fhBtn(html) {
+  var attr = html.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return '<button type="button" class="fh-btn" data-fh="'+attr+'" onclick="showHint(this,this.dataset.fh)">!</button>';
+}
 
 /* ── Landing szövegek szerkesztő ── */
 
