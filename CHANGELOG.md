@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-06-15 — Add-on árak — landing chips + developer szerkesztő (PR #133)
+
+- **`handlers/developer.js`** — `devGetAddonPrices` / `devSaveAddonPrices`: add-on árak `developer_settings` `addon_prices` JSONB kulcsban (alapértelmezett: jármű=3€, munkatárs=2€, sofőr=1€/hó)
+- **`public/developer.html`** — 🏦 Banki adatok pane alján „Add-on árak" form; `loadBankDetails()` egyszerre tölti banki + addon adatot; `saveAddonPrices()` mentés
+- **`public/index.html`** — `.lp-addon-section` chip-sor a #pricing szekció aljára (alapból rejtett, JS tölti fel)
+- **`public/landing.css`** — `.lp-addon-section` / `.lp-addon-grid` / `.lp-addon-chip` stílusok
+- **`public/landing.js`** — `_cachedAddonPrices` + `fetchAddons()` IIFE + `renderAddonPrices()` (kétnyelvű /lună|/hó); `applyLanguage()` re-rendereli; `addonTitle` i18n kulcs (RO+HU)
+
+---
+
 ## 2026-06-15 — Kétnyelvű csomag feature-lista a landing árazási kártyákon (PR #129)
 
 - **`db/plan-features-bilingual.sql`** — `subscription_plans.features` JSONB frissítve `[{"ro":"...","hu":"..."}]` formátumra mind a 4 csomagnál (28 bullet-pont RO+HU)
