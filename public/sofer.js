@@ -403,6 +403,58 @@ function addAchRow(a) {
 }
 
 // ============================================================
+// HATÁRÁTLÉPÉS SOROK (menetlevél-2. lépés)
+// ============================================================
+function addHatarRow(dt, dir) {
+  dt = dt || '';
+  dir = dir || 'OUT';
+  var c = document.getElementById('hatarContainer');
+  var row = document.createElement('div');
+  row.className = 'dyn-row';
+  row.innerHTML = '<button class="del-row" onclick="this.parentElement.remove();updateDiurnaPreview()">✕</button>'
+    + '<div class="g2">'
+    + '<div class="field"><label>' + t('sofer.crossingDate') + '</label>'
+    + '<input class="input hatar-dt" type="datetime-local" value="' + esc(dt) + '" style="padding:10px 14px;"></div>'
+    + '<div class="field"><label>' + t('sofer.crossingDir') + '</label>'
+    + '<select class="input hatar-dir" style="padding:10px 14px;">'
+    + '<option value="OUT"' + (dir === 'OUT' ? ' selected' : '') + '>' + t('sofer.crossOut') + '</option>'
+    + '<option value="IN"' + (dir === 'IN' ? ' selected' : '') + '>' + t('sofer.crossIn') + '</option>'
+    + '</select></div>'
+    + '</div>';
+  c.appendChild(row);
+  // Változás esetén frissítjük az előnézetet
+  row.querySelector('.hatar-dt').addEventListener('change', updateDiurnaPreview);
+  row.querySelector('.hatar-dir').addEventListener('change', updateDiurnaPreview);
+}
+
+function collectHataratok() {
+  var rows = document.querySelectorAll('#hatarContainer .dyn-row');
+  var result = [];
+  rows.forEach(function(row) {
+    var dt = (row.querySelector('.hatar-dt') || {}).value || '';
+    var dir = (row.querySelector('.hatar-dir') || {}).value || 'OUT';
+    if (dt) result.push({ datetime: dt, direction: dir });
+  });
+  // Időrend szerinti rendezés
+  result.sort(function(a, b) { return a.datetime.localeCompare(b.datetime); });
+  return result;
+}
+
+function updateDiurnaPreview() {
+  var dep = (document.getElementById('fIndulasDt') || {}).value || '';
+  var arr = (document.getElementById('fErkezesDt') || {}).value || '';
+  var el = document.getElementById('diurnaPreview');
+  if (!el) return;
+  if (!dep || !arr) { el.style.display = 'none'; return; }
+  var depD = dep.slice(0, 10);
+  var arrD = arr.slice(0, 10);
+  var crossings = collectHataratok();
+  var days = Math.ceil((new Date(arr) - new Date(dep)) / 86400000) + 1;
+  el.style.display = 'block';
+  el.textContent = '🕐 ' + depD + ' → ' + arrD + ' · ' + days + ' ' + t('sofer.days') + ' · ' + crossings.length + ' ' + t('sofer.crossingCount');
+}
+
+// ============================================================
 // MENETLEVÉL BEKÜLDÉS
 // ============================================================
 function submitFuvarlevel() {
@@ -451,7 +503,10 @@ function submitFuvarlevel() {
     kmSfarsit: document.getElementById('fKmSf').value,
     locPlecare: locPlecare,
     locSosire: locSosire,
-    // Diurna nem megy a payloadban — a szerver számolja a határátlépésekből
+    // Sofőr által megadott indulás/érkezés + határátlépések → szerver számolja a diurnát
+    indulasDt: (document.getElementById('fIndulasDt') || {}).value || null,
+    erkezesDt: (document.getElementById('fErkezesDt') || {}).value || null,
+    hataratok: collectHataratok(),
     cantInceput: document.getElementById('fCantInc').value,
     cantSfarsit: document.getElementById('fCantSf').value,
     alteMentiuni: document.getElementById('fMentiuni').value,
@@ -484,6 +539,11 @@ function submitFuvarlevel() {
         document.getElementById('fCantInc').value = '0';
         document.getElementById('fCantSf').value = '0';
         document.getElementById('fMentiuni').value = '';
+        // Indulás/érkezés + határátlépések visszaállítása
+        if (document.getElementById('fIndulasDt')) document.getElementById('fIndulasDt').value = '';
+        if (document.getElementById('fErkezesDt')) document.getElementById('fErkezesDt').value = '';
+        if (document.getElementById('hatarContainer')) document.getElementById('hatarContainer').innerHTML = '';
+        if (document.getElementById('diurnaPreview')) document.getElementById('diurnaPreview').style.display = 'none';
         alimIdx = 0; achIdx = 0; punctIdx = 0;
         loadSoferOrders();
       }, 500);
@@ -1033,6 +1093,14 @@ function driverOrderStatus(id, status) {
     }
   });
 }
+
+// Indulás/érkezés mezők eseményfigyelők (DOMContentLoaded után)
+document.addEventListener('DOMContentLoaded', function() {
+  var depEl = document.getElementById('fIndulasDt');
+  var arrEl = document.getElementById('fErkezesDt');
+  if (depEl) depEl.addEventListener('change', updateDiurnaPreview);
+  if (arrEl) arrEl.addEventListener('change', updateDiurnaPreview);
+});
 
 // ── Nyelvváltáskor a JS-ből renderelt részek újrarajzolása ──
 // (a static data-i18n elemeket a motor magától frissíti; itt a dinamikus

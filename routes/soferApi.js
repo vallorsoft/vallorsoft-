@@ -109,12 +109,22 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     } catch (seqErr) {
       console.error('document_series sorszám hiba (a mentés folytatódik):', seqErr.message);
     }
-    // Diurna automatikus számítása a határátlépésekből. Hiba esetén 0/0,
-    // a menetlevél mentése akkor is fusson.
+    // Diurna számítása: ha a sofőr megadta az indulás/érkezés időpontot + határátlépéseket,
+    // az új módot használjuk; különben visszaesünk a régi border_crossings alapú módra.
+    // Hiba esetén 0/0 — a menetlevél mentése akkor is fusson.
+    const indulasDt = d.indulasDt || null;
+    const erkezesDt = d.erkezesDt || null;
+    const hataratok = Array.isArray(d.hataratok) ? d.hataratok : [];
     let diurnaCalc = { externDays: 0, internDays: 0, crossingLog: [] };
     try {
-      const crossR = await pool.query(`SELECT CASE WHEN tip='Iesire' THEN 'OUT' WHEN tip='Intrare' THEN 'IN' ELSE tip END AS direction, created_at AS crossed_at FROM border_crossings WHERE email_sofer=$1 AND created_at >= NOW()-INTERVAL '90 days' ORDER BY created_at ASC`, [req.session.user.email]);
-      diurnaCalc = calculateDiurna(crossR.rows);
+      if (indulasDt && erkezesDt) {
+        // Új mód: sofőr által megadott időpontok + határátlépések
+        diurnaCalc = calculateDiurna(indulasDt, erkezesDt, hataratok);
+      } else {
+        // Visszafelé kompatibilis mód: border_crossings tábla alapján
+        const crossR = await pool.query(`SELECT CASE WHEN tip='Iesire' THEN 'OUT' WHEN tip='Intrare' THEN 'IN' ELSE tip END AS direction, created_at AS crossed_at FROM border_crossings WHERE email_sofer=$1 AND created_at >= NOW()-INTERVAL '90 days' ORDER BY created_at ASC`, [req.session.user.email]);
+        diurnaCalc = calculateDiurna(crossR.rows);
+      }
     } catch (diurnaErr) {
       console.error('diurna számítás hiba (a mentés folytatódik):', diurnaErr.message);
     }
@@ -139,21 +149,25 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
         loc_plecare, loc_sosire, loc_desc_tur, loc_inc_retur,
         diurna_externa, diurna_interna,
         cant_inceput, cant_sfarsit, motorina_folosit, total_alim, consum_100,
-        alte_mentiuni, alimentari, achizitii, tranzite, puncte, order_ids
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
+        alte_mentiuni, alimentari, achizitii, tranzite, puncte, order_ids,
+        indulas_dt, erkezes_dt, hataratok
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)`,
       [
         id, fileName, req.session.user.email, req.session.user.nume,
         d.numarCamion || null, d.numarRemorca || null, autoDocNumber || d.numarFisa || null, d.cursaSaptamanii || null,
         Number(d.kmInceput || 0), Number(d.kmSfarsit || 0), totalKm,
         d.locPlecare || null, d.locSosire || null, d.locDescTUR || null, d.locIncRETUR || null,
-        diurnaCalc.externDays, diurnaCalc.internDays,  // automatikusan a határátlépésekből
+        diurnaCalc.externDays, diurnaCalc.internDays,  // sofőr által megadott időpontokból (vagy border_crossings fallback)
         cantInc, cantSf, motorinaFolosit, totalAlim, consum100,
         d.alteMentiuni || null,
         JSON.stringify(alimentari),
         JSON.stringify(Array.isArray(d.achizitii) ? d.achizitii : []),
         JSON.stringify(Array.isArray(d.tranzite) ? d.tranzite : []),
         JSON.stringify(puncte),
-        JSON.stringify(orderIds)
+        JSON.stringify(orderIds),
+        indulasDt ? new Date(indulasDt) : null,
+        erkezesDt ? new Date(erkezesDt) : null,
+        JSON.stringify(hataratok)
       ]
     );
     res.json({ success: true, id, docNumber: autoDocNumber });
