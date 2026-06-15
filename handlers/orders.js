@@ -227,21 +227,39 @@ handlers.getMySoferOrders = async function (req, res, args) {
         `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare, o.km,
                 o.rendszam_camion, o.rendszam_remorca, o.status,
                 o.handover_status, o.handover_type, o.handover_loc,
-                o.finalized_at, wb.waybill_at,
-                (
-                  o.status IN ('Alocat', 'In Curs', 'Parkolt', 'Raktarban')
-                  OR (o.status = 'Finalizat'
-                      AND COALESCE(o.finalized_at, o.updated_at) >= NOW() - INTERVAL '3 days')
-                ) AS dash_visible,
-                (
-                  wb.waybill_at IS NULL
-                  OR wb.waybill_at >= NOW() - INTERVAL '3 days'
-                ) AS waybill_visible
+                o.finalized_at,
+                wb.waybill_at, wb.waybill_last, COALESCE(wb.waybill_count, 0) AS waybill_count,
+                -- dash_visible: aktív → mindig; Finalizat + 2× menetlevél → 15 perc; egyébként 3 nap
+                CASE
+                  WHEN o.status IN ('Alocat', 'In Curs', 'Parkolt', 'Raktarban') THEN true
+                  WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) >= 2
+                    THEN wb.waybill_last >= NOW() - INTERVAL '15 minutes'
+                  WHEN o.status = 'Finalizat'
+                    THEN COALESCE(o.finalized_at, o.updated_at) >= NOW() - INTERVAL '3 days'
+                  ELSE false
+                END AS dash_visible,
+                -- waybill_visible (menetlevél picker): same mint dash_visible
+                CASE
+                  WHEN o.status IN ('Alocat', 'In Curs', 'Parkolt', 'Raktarban') THEN true
+                  WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) >= 2
+                    THEN wb.waybill_last >= NOW() - INTERVAL '15 minutes'
+                  WHEN o.status = 'Finalizat'
+                    THEN COALESCE(o.finalized_at, o.updated_at) >= NOW() - INTERVAL '3 days'
+                  ELSE false
+                END AS waybill_visible,
+                -- waybill_phase: loading (Alocat/InCurs) / unloading (Finalizat+1×) / complete (Finalizat+2×)
+                CASE
+                  WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) >= 1 THEN 'unloading'
+                  WHEN o.status IN ('Alocat', 'In Curs', 'Parkolt', 'Raktarban') THEN 'loading'
+                  ELSE 'complete'
+                END AS waybill_phase
            FROM orders o
            LEFT JOIN LATERAL (
-             SELECT MIN(f.data_completare) AS waybill_at
+             SELECT MIN(f.data_completare) AS waybill_at,
+                    MAX(f.data_completare) AS waybill_last,
+                    COUNT(*)::int          AS waybill_count
                FROM fuvarlevelek f
-              WHERE f.order_ids ? o.id::text -- a ? operátor használja a GIN indexet (a jsonb_exists nem)
+              WHERE f.order_ids ? o.id::text
            ) wb ON true
           WHERE o.company_id = $1 AND LOWER(o.email_sofer) = LOWER($2)
           ORDER BY o.created_at DESC`,
