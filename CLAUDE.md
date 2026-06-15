@@ -16,7 +16,7 @@
 > **Konvenció (ezt én kötöm be minden új funkcióba):**
 > 1. **Multi-tenant**: minden SQL `WHERE company_id=$x` (`req.session.user.company_id`).
 > 2. **Paraméteres SQL** ($1,$2…), soha string-összefűzés.
-> 3. **Kétnyelvűség (RO-alap+HU)**: felület `data-i18n`/`t()` (RO+HU pár az `i18n.js`-ben); szerver-hibaüzenet/validáció/integráció-válasz **románul**; push/e-mail a usernek **kétnyelvű RO/HU**; belső `console.*`+komment magyarul.
+> 3. **Kétnyelvűség (RO-alap+HU)**: felület `data-i18n`/`t()` (RO+HU pár az `i18n.js`-ben); szerver-hibaüzenet/validáció/integráció-válasz **románul**; push/e-mail a usernek **csak románul** (a HU szövegek eltávolítva — PR #136); belső `console.*`+komment magyarul.
 > 4. **Szerep-/jogvédelem**: API `requireLogin`+`requireRole`; oldal `requirePageLogin/Role`; RPC-nél a handlerben.
 > 5. **Audit-napló**: minden írásra (create/update/delete, státuszváltás, pénzügy/integráció) `audit.fromReq(req,'domain.action',entityType,entityId,detail)` — best-effort (`lib/audit.js`).
 > 6. **GDPR**: ha személyes adatot tárol (név/e-mail/tel/GPS) → bekötés `handlers/gdpr.js` `exportUserData` + `anonymizeUser` körébe.
@@ -51,7 +51,13 @@ Tesztek zöldek (**106 Jest**, 24 suite). **CI: GitHub Actions** (`.github/workf
 
 > **Hiánylista — a 2026-06-13-i ütemterv LEZÁRVA:** **(1) ✅ CI + valódi tesztek** (mock + valós-DB, 106 teszt); **(2) ✅ teherautó-routing váltó** (ORS `driving-hgv`, alap ingyenes OSRM) **+ ✅ valós útdíj váltó** (HERE „Pontos", alap becslés); **(3) ✅ UIT CargoTrack deep-link** (ANAF-integráció helyett, providerkénti URL-sablon — `uit_deeplink_templates` JSONB; `cargotrack-et.js`/`fomco-et.js` törölve); **(4) ✅ üzemeltetés** (health-check `/healthz`+`/readyz`, strukturált log, opcionális Sentry, opcionális pg_dump backup); **(5) ✅ leg ↔ `orders.email_sofer` szinkron**; **(6) ✅ SaaS-vízvezeték** (csomag-limit kikényszerítés, audit-napló, GDPR export/anonimizálás, Stripe-váz); **(7) ✅ e-Factura státusz automatikus lekérdezés** (3 órás scheduler, SmartBill/Oblio `getInvoice` implementálva, `efactura_last_raw`/`efactura_checked_at` tárolás); **(8) ✅ ANAF CUI strukturált cím** (utca/helység/megye külön mezők, `adresa_sediu_social` alapján). **Nyitott jövőbeli munka:** Stripe éles bekötés (kulcsok + price_xxx — utolsó lépés, nem sürgős), SAF-T D406 XML (jövőbeli javaslat, a könyvelő SAGA/WinMentor CSV-ből generál egyelőre). **RO megfelelőség:** a rendszer megfelel — minden ANAF-kommunikáció (e-Factura SPV-beküldés) a számlázó-providereken (FGO/SmartBill/Oblio stb.) keresztül történik, saját ANAF-kapcsolat NEM kell és NEM is akarunk. Az UIT-kódot sem mi generáljuk — a sofőr/cég a CargoTrack/Fomco deep-linken keresztül intézi. A GPS→ANAF élő e-Transport-transzmisszió NEM feladatunk.
 
-**Legújabb kör (2026-06-15 — Add-on árak + Trial email + éves árazás, PR #130–#133):** *(részletes kész-lista: `CHANGELOG.md`)*
+**Legújabb kör (2026-06-15 — Emailek csak románul, PR #136):** *(részletes kész-lista: `CHANGELOG.md`)*
+1. **`routes/trial-select.js`** — fizetési email + köszönő oldal: tábla-feliratok, szekció-fejlécek, instrukciók, CTA gomb, tárgy — mind csak román.
+2. **`services/scheduler.js`** — havi riport email: tábla-feliratok, tárgy, footer-megjegyzés — csak román (trial lejárat + emlékeztető az előző körben már RO-only volt).
+3. **`services/email.js`** — `buildInviteHtml` mindig `L='ro'`; `sendResetEmail` tárgy mindig román; DB sablon body_ro elsőbbséggel.
+4. **`tests/unit/invite-email.test.js`** — elvárások frissítve román szövegekre; 111 teszt zöld.
+
+**Korábbi kör (2026-06-15 — Add-on árak + Trial email + éves árazás, PR #130–#133):** *(részletes kész-lista: `CHANGELOG.md`)*
 1. **CLAUDE.md + CHANGELOG docs (PR #130)** — PR #129 dokumentáció pótlása.
 2. **Bérlői adattisztítás szkript (PR #131)** — `scripts/purge-all-tenants.sql`: egyszeri manual cleanup (NEM auto-fut); companies CASCADE + manuális táblák; developer user megmarad.
 3. **Trial email rendszer (PR #132)** — `db/bank-payment-details.sql`: `payment_requests` tábla; `services/bnr.js`: BNR EUR/RON napi árfolyam; `routes/trial-select.js`: HMAC-tokenes csomag-választó link → fizetési email (összeg EUR+RON+TVA 21%+referencia VS-YYYYMM-XXXX); `services/scheduler.js`: 3 és 1 nappal trial lejárat előtt emlékeztető (4 csomag × havi+éves link); `handlers/developer.js`: `devGetBankDetails`/`devSaveBankDetails`/`devGetPaymentRequests`; Developer `🏦 Banki adatok` + `💸 Fizetési kérelmek` fülek; `public/index.html`/`landing.css`/`landing.js`: éves/havi váltó toggle, éves ár = 11 hónap × havidíj, `−1 lună` badge.
