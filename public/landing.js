@@ -709,7 +709,10 @@ function renderPricingGrid(plans) {
 
     let featureItems = '';
     if (Array.isArray(p.features) && p.features.length) {
-      featureItems = p.features.map(function(f) { return '<li>' + escHtmlLp(String(f)) + '</li>'; }).join('');
+      featureItems = p.features.map(function(f) {
+        var text = (f && typeof f === 'object') ? (f[lang] || f.ro || '') : String(f);
+        return '<li>' + escHtmlLp(text) + '</li>';
+      }).join('');
     } else if (p.description) {
       featureItems = '<li>' + escHtmlLp(p.description) + '</li>';
     }
