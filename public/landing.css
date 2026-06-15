@@ -849,6 +849,40 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   margin-top: 4px;
 }
 
+/* Add-on árak szekció */
+.lp-addon-section {
+  margin-top: 32px;
+  text-align: center;
+}
+.lp-addon-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lp-muted, #64748b);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.lp-addon-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+.lp-addon-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  font-size: 14px;
+  color: #334155;
+}
+.lp-addon-chip strong {
+  color: #6366f1;
+}
+
 /* Pricing card outline button on light bg */
 .lp-pricing-card .lp-btn-outline {
   border-color: var(--lp-border);
