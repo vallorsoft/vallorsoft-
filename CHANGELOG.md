@@ -14,6 +14,24 @@
 
 ---
 
+## 2026-06-15 — Csomag finomítás: sofőr limitek + chat Standard-ra (PR #125)
+
+- **`db/package-setup-v2.sql`** — delta migráció: meglévő szerveren is lefut
+- `max_sofors` reálisabb arányra növelve: Alap=4 / Standard=10 / Pro=40 / Business=100
+- `chat` kivéve az Alap csomagból → Standard-tól BE (kis cégnél nincs valódi igény)
+- Marketing bullet-pontok frissítve (Alap: chat ki, Standard: chat be)
+
+---
+
+## 2026-06-15 — 4 csomag automatikus beállítása induláskor (PR #124)
+
+- **`db/package-setup.sql`** — induláskor automatikusan beállítja a 4 csomagot
+- Alap / Standard / Pro / Business: limitek, marketing bullet-pontok, plan_features
+- Alap: 29 feature KI · Standard: 13 KI · Pro: 7 KI · Business: mind BE
+- 2-menetes migráció-rendszerbe illeszkedik (függőségek pass 2-ben oldódnak)
+
+---
+
 ## 2026-06-15 — 6 prémium feature gate + megosztott featureEnabled helper (PR #123)
 
 - **`lib/featureEnabled.js`** — új megosztott helper: `company_features` (cég-override) > `plan_features` (csomag) > `true` hierarchia; cég-szintű egyedi beállítás felülírja a csomag-alapértéket
