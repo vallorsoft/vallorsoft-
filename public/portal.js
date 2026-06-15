@@ -178,8 +178,116 @@
   }
   function closeMap() { $('mapModal').classList.remove('open'); }
 
+  // ── CSV tömeges import ──
+  var _csvData = null, _csvMap = {};
+  var CSV_FIELDS = [
+    { key: 'ref',            re: /ref|referint|referencia/i },
+    { key: 'loc_incarcare',  re: /incarca|felrak|origin|^from$|sursa|expedier/i },
+    { key: 'loc_descarcare', re: /descarca|lerak|^dest|^to$|livr|destinat/i },
+    { key: 'data_incarcare', re: /dat.*inc|inc.*dat|felrak.*dat|dat.*felrak|load.*dat|dat.*load/i },
+    { key: 'data_descarcare',re: /dat.*des|des.*dat|lerak.*dat|dat.*lerak|unload.*dat|dat.*unload/i },
+    { key: 'suly_kg',        re: /greutate|suly|^kg$|weight/i },
+    { key: 'load_type',      re: /tip.*mar|^ftl$|^ltl$|type|^tip$/i },
+    { key: 'megjegyzes',     re: /observ|megjegyz|note|remark|comment/i },
+  ];
+
+  function openCsv() {
+    var willShow = $('csvBox').classList.contains('hidden');
+    $('csvBox').classList.toggle('hidden', !willShow);
+    if (willShow) {
+      $('reqBox').classList.add('hidden');
+      $('reqHint').classList.add('hidden');
+    } else {
+      if ($('reqBox').classList.contains('hidden')) $('reqHint').classList.remove('hidden');
+    }
+  }
+
+  function parseCsvFile(input) {
+    var f = input.files && input.files[0];
+    if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function (e) {
+      var text = e.target.result;
+      var comma = (text.match(/,/g) || []).length;
+      var semi  = (text.match(/;/g) || []).length;
+      var tab   = (text.match(/\t/g) || []).length;
+      var delim = tab > semi && tab > comma ? '\t' : (semi >= comma ? ';' : ',');
+      var lines = text.split(/\r?\n/).filter(function (l) { return l.trim(); });
+      if (lines.length < 2) { toast(t('por.csvMinRows'), 'err'); return; }
+      var headers = lines[0].split(delim).map(function (h) { return h.trim().replace(/^"|"$/g, ''); });
+      var rows = lines.slice(1, 201).map(function (l) {
+        return l.split(delim).map(function (c) { return c.trim().replace(/^"|"$/g, ''); });
+      });
+      _csvData = { headers: headers, rows: rows };
+      _csvMap = {};
+      headers.forEach(function (h, i) {
+        CSV_FIELDS.forEach(function (fd) {
+          if (_csvMap[fd.key] == null && fd.re.test(h)) _csvMap[fd.key] = i;
+        });
+      });
+      renderCsvPreview();
+    };
+    rd.onerror = function () { toast(t('common.error'), 'err'); };
+    rd.readAsText(f, 'UTF-8');
+  }
+
+  function renderCsvPreview() {
+    if (!_csvData) return;
+    var h = _csvData.headers, rows = _csvData.rows;
+    var html = '<div style="overflow-x:auto"><table class="table" style="width:100%;font-size:12px"><thead><tr>';
+    h.forEach(function (col, i) {
+      var sel = Object.keys(_csvMap).find(function (k) { return _csvMap[k] === i; }) || '';
+      var opts = '<option value="">— ' + t('por.csvIgnore') + ' —</option>'
+        + CSV_FIELDS.map(function (fd) {
+          return '<option value="' + fd.key + '"' + (sel === fd.key ? ' selected' : '') + '>' + fd.key + '</option>';
+        }).join('');
+      html += '<th style="padding:4px 6px;white-space:nowrap">' + esc(col)
+        + '<br><select class="inp" style="font-size:11px;padding:2px 4px;margin-top:3px" onchange="Portal.csvMapCol(' + i + ',this.value)">'
+        + opts + '</select></th>';
+    });
+    html += '</tr></thead><tbody>';
+    rows.slice(0, 5).forEach(function (r) {
+      html += '<tr>' + h.map(function (_, i) { return '<td style="padding:3px 6px">' + esc(r[i] || '') + '</td>'; }).join('') + '</tr>';
+    });
+    if (rows.length > 5) html += '<tr><td colspan="' + h.length + '" class="text-muted" style="padding:4px 6px;font-size:11px">… + ' + (rows.length - 5) + ' ' + t('por.csvMoreRows') + '</td></tr>';
+    html += '</tbody></table></div>';
+    html += '<div class="muted" style="font-size:11px;margin-top:6px">' + rows.length + ' ' + t('por.csvRows') + ' | ' + t('por.csvMappedCols') + ': ' + Object.keys(_csvMap).length + '</div>';
+    $('csvPreview').innerHTML = html;
+    $('csvImportBtn').classList.remove('hidden');
+  }
+
+  function csvMapCol(colIdx, fieldKey) {
+    Object.keys(_csvMap).forEach(function (k) { if (_csvMap[k] === colIdx) delete _csvMap[k]; });
+    if (fieldKey) { delete _csvMap[fieldKey]; _csvMap[fieldKey] = colIdx; }
+    renderCsvPreview();
+  }
+
+  function importCsv() {
+    if (!_csvData || !_csvData.rows.length) return;
+    var rows = _csvData.rows.map(function (r) {
+      var obj = {};
+      CSV_FIELDS.forEach(function (fd) { if (_csvMap[fd.key] != null) obj[fd.key] = r[_csvMap[fd.key]] || ''; });
+      return obj;
+    }).filter(function (o) { return o.loc_incarcare || o.loc_descarcare || o.ref || o.suly_kg; });
+    if (!rows.length) { toast(t('por.csvNoValid'), 'err'); return; }
+    var btn = $('csvImportBtn');
+    btn.disabled = true;
+    api('POST', '/api/portal/bulk-request', { rows: rows }).then(function (r) {
+      btn.disabled = false;
+      if (r && r.ok) {
+        toast(r.count + ' ' + t('por.csvImported'), 'ok');
+        $('csvFile').value = ''; $('csvPreview').innerHTML = ''; btn.classList.add('hidden');
+        _csvData = null; _csvMap = {};
+        openCsv();
+      } else toast((r && r.err) || t('common.error'), 'err');
+    }).catch(function () { btn.disabled = false; toast(t('common.error'), 'err'); });
+  }
+
   // ── Új fuvar igénylése ──
-  function openRequest() { $('reqBox').classList.toggle('hidden'); $('reqHint').classList.toggle('hidden'); }
+  function openRequest() {
+    $('csvBox').classList.add('hidden');
+    $('reqBox').classList.toggle('hidden'); $('reqHint').classList.toggle('hidden');
+  }
   function sendRequest() {
     var p = {
       ref: $('rqRef').value.trim(),
@@ -211,7 +319,7 @@
     } else { submit(); }
   }
 
-  window.Portal = { login: login, setPw: setPw, logout: logout, track: track, closeMap: closeMap, openRequest: openRequest, sendRequest: sendRequest };
+  window.Portal = { login: login, setPw: setPw, logout: logout, track: track, closeMap: closeMap, openRequest: openRequest, sendRequest: sendRequest, openCsv: openCsv, parseCsvFile: parseCsvFile, csvMapCol: csvMapCol, importCsv: importCsv };
   // Nyelvváltáskor a JS-ből renderelt fuvar-lista/statisztika újrarajzolása
   window.onLangChange = function () {
     if (!$('viewDash').classList.contains('hidden')) loadOrders();

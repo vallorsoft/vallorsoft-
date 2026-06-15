@@ -133,12 +133,20 @@
 
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
     <button class="btn primary" onclick="Portal.openRequest()" data-i18n="por.newOrderReq">＋ Új fuvar igénylése</button>
+    <button class="btn" onclick="Portal.openCsv()" data-i18n="por.csvImport">📥 CSV import</button>
     <span class="muted" style="font-size:12px" data-i18n="por.reqApprovalHint">Az igénylést a diszpécser hagyja jóvá, és bekerül a fuvarok közé.</span>
   </div>
 
   <div class="grid">
     <div><div class="glass" style="padding:16px 18px"><div class="h" data-i18n="por.yourOrders">📦 A te fuvarjaid</div><div id="dOrders"></div></div></div>
     <div>
+      <div class="glass hidden" id="csvBox" style="padding:16px 18px">
+        <div class="h" data-i18n="por.csvImportTitle">📥 Több fuvar importálása CSV-ből</div>
+        <div class="muted" style="font-size:12px;margin-bottom:10px" data-i18n="por.csvImportHint">Az első sor legyen fejléc. Az oszlopokat automatikusan párosítja a rendszer — a legördülőkben módosítható.</div>
+        <input type="file" id="csvFile" accept=".csv,.txt" class="inp" style="margin-bottom:10px" onchange="Portal.parseCsvFile(this)">
+        <div id="csvPreview"></div>
+        <button class="btn ok hidden" id="csvImportBtn" style="width:100%;margin-top:10px" onclick="Portal.importCsv()" data-i18n="por.csvDoImport">Importálás →</button>
+      </div>
       <div class="glass hidden" id="reqBox" style="padding:16px 18px">
         <div class="h" data-i18n="por.newOrderReq">＋ Új fuvar igénylése</div>
         <div class="muted" style="font-size:12px;margin-bottom:8px" data-i18n="por.reqAllOptional">Toate câmpurile sunt opționale — completați ce știți, sau atașați un document. / Minden mező opcionális — töltsd ki amit tudsz, vagy csatolj dokumentumot.</div>
