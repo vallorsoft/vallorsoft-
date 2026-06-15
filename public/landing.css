@@ -932,6 +932,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   .lp-nav-menu { display: none; }
   .lp-hamburger { display: flex; grid-column: 3; }
   .lp-nav-actions { grid-column: 2; justify-content: flex-end; }
+  .lp-nav-actions .lp-btn-ghost { display: none; }
   .lp-nav-menu.open {
     display: flex;
     position: fixed;
@@ -952,7 +953,8 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 /* ── Responsive 640px ───────────────────────────────────────── */
 @media (max-width: 640px) {
   .lp-hero-grid { grid-template-columns: 1fr; }
-  .lp-hero-visual { display: none; }
+  .lp-hero-visual { order: -1; margin-bottom: .5rem; }
+  .lp-sofer-week { max-width: 100%; }
   .lp-hero { min-height: auto; padding: 100px 0 60px; }
   .lp-hero-content h1 { font-size: 2rem; }
   .lp-hero-cta { flex-direction: column; }
@@ -972,4 +974,10 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 
   .lp-section { padding: 56px 0; }
   .lp-section-header { margin-bottom: 36px; }
+}
+
+/* ── Responsive 480px ───────────────────────────────────────── */
+@media (max-width: 480px) {
+  .lp-nav-inner { gap: .75rem; }
+  .lp-nav-actions .lp-btn-primary { display: none; }
 }
