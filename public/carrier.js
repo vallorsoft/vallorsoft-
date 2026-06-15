@@ -4,7 +4,7 @@
 //  + saját jármű felvitele. Adat: /api/carrier/*.
 // ============================================================
 (function () {
-  var _orders = [], _setToken = null;
+  var _orders = [], _vehicles = [], _setToken = null;
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function show(v) { ['viewLogin', 'viewSet', 'viewDash'].forEach(function (x) { $(x).classList.toggle('hidden', x !== v); }); }
@@ -59,17 +59,46 @@
   function loadVehicles() {
     api('GET', '/api/carrier/vehicles').then(function (r) {
       var box = $('dVehicles'); if (!box) return;
-      var items = (r && r.items) || [];
-      box.innerHTML = items.length ? items.map(function (v) {
-        return '<div class="vrow"><div style="flex:1"><b>' + esc(v.rendszam_camion || '') + '</b>' + (v.rendszam_remorca ? ' + ' + esc(v.rendszam_remorca) : '') + (v.marca ? ' <span class="mut">' + esc(v.marca) + ' ' + esc(v.model || '') + '</span>' : '') + '</div>'
-          + '<button class="btn" style="padding:5px 9px" onclick="Carrier.delVehicle(' + v.id + ')">✕</button></div>';
+      _vehicles = (r && r.items) || [];
+      box.innerHTML = _vehicles.length ? _vehicles.map(function (v) {
+        return '<div class="vrow" id="vrow_' + v.id + '">'
+          + '<div style="flex:1">'
+          + '<b>' + esc(v.rendszam_camion || '') + '</b>'
+          + (v.rendszam_remorca ? ' + ' + esc(v.rendszam_remorca) : '')
+          + (v.marca ? ' <span class="mut">' + esc(v.marca) + ' ' + esc(v.model || '') + '</span>' : '')
+          + (v.sofer_nev ? ' <span class="mut" style="font-size:11px">👤 ' + esc(v.sofer_nev) + '</span>' : '')
+          + '</div>'
+          + '<button class="btn" style="padding:5px 9px;font-size:11px" onclick="Carrier.editVehicle(' + v.id + ')" title="' + esc(t('car.editVehicle')) + '">✎</button>'
+          + '<button class="btn" style="padding:5px 9px" onclick="Carrier.delVehicle(' + v.id + ')">✕</button>'
+          + '</div>';
       }).join('') : '<div class="mut" style="font-size:12px">' + esc(t('car.noVehicleYet')) + '</div>';
+    });
+  }
+  function editVehicle(id) {
+    var v = _vehicles.find(function (x) { return x.id === id; });
+    if (!v) return;
+    var row = $('vrow_' + id); if (!row) return;
+    row.innerHTML = '<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;width:100%">'
+      + '<input class="inp" id="ve_cam_' + id + '" value="' + esc(v.rendszam_camion || '') + '" style="flex:1;min-width:90px;padding:7px 9px">'
+      + '<input class="inp" id="ve_rem_' + id + '" value="' + esc(v.rendszam_remorca || '') + '" placeholder="' + esc(t('car.phTrailer')) + '" style="flex:1;min-width:80px;padding:7px 9px">'
+      + '<input class="inp" id="ve_marca_' + id + '" value="' + esc(v.marca || '') + '" placeholder="' + esc(t('car.phBrand')) + '" style="flex:1;min-width:70px;padding:7px 9px">'
+      + '<input class="inp" id="ve_model_' + id + '" value="' + esc(v.model || '') + '" placeholder="' + esc(t('car.phModel')) + '" style="flex:1;min-width:70px;padding:7px 9px">'
+      + '<input class="inp" id="ve_sofer_' + id + '" value="' + esc(v.sofer_nev || '') + '" placeholder="' + esc(t('car.phDriver')) + '" style="flex:2;min-width:110px;padding:7px 9px">'
+      + '<button class="btn ok" style="padding:5px 10px" onclick="Carrier.saveVehicle(' + id + ')">✓</button>'
+      + '<button class="btn" style="padding:5px 10px" onclick="Carrier.loadVehicles()">✕</button>'
+      + '</div>';
+  }
+  function saveVehicle(id) {
+    var g = function (sfx) { var el = document.getElementById(sfx + '_' + id); return el ? el.value.trim() : ''; };
+    var cam = g('ve_cam'); if (!cam) { toast(t('car.tractorReq'), 'err'); return; }
+    api('PUT', '/api/carrier/vehicles/' + id, { rendszam_camion: cam, rendszam_remorca: g('ve_rem'), marca: g('ve_marca'), model: g('ve_model'), sofer_nev: g('ve_sofer') }).then(function (r) {
+      if (r && r.ok) { toast(t('car.vehicleSaved'), 'ok'); loadVehicles(); } else toast((r && r.err) || t('common.error'), 'err');
     });
   }
   function addVehicle() {
     var cam = $('vCam').value.trim(); if (!cam) { toast(t('car.tractorReq'), 'err'); return; }
-    api('POST', '/api/carrier/vehicles', { rendszam_camion: cam, rendszam_remorca: $('vRem').value.trim(), marca: $('vMarca').value.trim(), model: $('vModel').value.trim() }).then(function (r) {
-      if (r && r.ok) { toast(t('car.vehicleAdded'), 'ok'); ['vCam', 'vRem', 'vMarca', 'vModel'].forEach(function (i) { $(i).value = ''; }); loadVehicles(); } else toast((r && r.err) || t('common.error'), 'err');
+    api('POST', '/api/carrier/vehicles', { rendszam_camion: cam, rendszam_remorca: $('vRem').value.trim(), marca: $('vMarca').value.trim(), model: $('vModel').value.trim(), sofer_nev: $('vSofer') ? $('vSofer').value.trim() : '' }).then(function (r) {
+      if (r && r.ok) { toast(t('car.vehicleAdded'), 'ok'); ['vCam', 'vRem', 'vMarca', 'vModel', 'vSofer'].forEach(function (i) { if ($(i)) $(i).value = ''; }); loadVehicles(); } else toast((r && r.err) || t('common.error'), 'err');
     });
   }
   function delVehicle(id) { api('DELETE', '/api/carrier/vehicles/' + id).then(function (r) { if (r && r.ok) { toast(t('common.deleted'), 'ok'); loadVehicles(); } }); }
@@ -95,7 +124,7 @@
     reader.readAsDataURL(f);
   }
 
-  window.Carrier = { login: login, setPw: setPw, logout: logout, addVehicle: addVehicle, delVehicle: delVehicle, upload: upload };
+  window.Carrier = { login: login, setPw: setPw, logout: logout, addVehicle: addVehicle, editVehicle: editVehicle, saveVehicle: saveVehicle, delVehicle: delVehicle, upload: upload, loadVehicles: loadVehicles };
   // Nyelvváltáskor a JS-ből renderelt tartalmat újrarajzoljuk
   window.onLangChange = function () { if (!$('viewDash').classList.contains('hidden')) loadAll(); };
   document.addEventListener('DOMContentLoaded', init);

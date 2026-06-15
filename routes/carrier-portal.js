@@ -111,7 +111,9 @@ router.get('/api/carrier/orders', requireCarrier, async (req, res) => {
 router.get('/api/carrier/vehicles', requireCarrier, async (req, res) => {
   try {
     const cu = req.session.carrierUser;
-    const r = await pool.query('SELECT id, rendszam_camion, rendszam_remorca, marca, model, nota FROM carrier_vehicles WHERE company_id=$1 AND carrier_id=$2 ORDER BY created_at DESC', [cu.company_id, cu.carrier_id]);
+    const r = await pool.query(
+      'SELECT id, rendszam_camion, rendszam_remorca, marca, model, sofer_nev, nota FROM carrier_vehicles WHERE company_id=$1 AND carrier_id=$2 ORDER BY created_at DESC',
+      [cu.company_id, cu.carrier_id]);
     return res.json({ ok: true, items: r.rows });
   } catch (err) { console.error('carrier vehicles hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
 });
@@ -122,14 +124,35 @@ router.post('/api/carrier/vehicles', requireCarrier, async (req, res) => {
     const cam = String(b.rendszam_camion || '').trim().toUpperCase().slice(0, 50);
     if (!cam) return res.json({ ok: false, err: 'Numarul de inmatriculare al capului tractor este obligatoriu.' });
     await pool.query(
-      `INSERT INTO carrier_vehicles (company_id, carrier_id, rendszam_camion, rendszam_remorca, marca, model, nota)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+      `INSERT INTO carrier_vehicles (company_id, carrier_id, rendszam_camion, rendszam_remorca, marca, model, sofer_nev, nota)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
       [cu.company_id, cu.carrier_id, cam,
        String(b.rendszam_remorca || '').trim().toUpperCase().slice(0, 50) || null,
-       String(b.marca || '').trim().slice(0, 80) || null, String(b.model || '').trim().slice(0, 80) || null,
+       String(b.marca || '').trim().slice(0, 80) || null,
+       String(b.model || '').trim().slice(0, 80) || null,
+       String(b.sofer_nev || '').trim().slice(0, 120) || null,
        String(b.nota || '').trim().slice(0, 500) || null]);
     return res.json({ ok: true });
   } catch (err) { console.error('carrier vehicle add hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
+});
+router.put('/api/carrier/vehicles/:id', requireCarrier, async (req, res) => {
+  try {
+    const cu = req.session.carrierUser;
+    const id = parseInt(req.params.id, 10);
+    const b = req.body || {};
+    const cam = String(b.rendszam_camion || '').trim().toUpperCase().slice(0, 50);
+    if (!cam) return res.json({ ok: false, err: 'Numarul de inmatriculare al capului tractor este obligatoriu.' });
+    const r = await pool.query(
+      `UPDATE carrier_vehicles SET rendszam_camion=$1, rendszam_remorca=$2, marca=$3, model=$4, sofer_nev=$5
+       WHERE id=$6 AND company_id=$7 AND carrier_id=$8`,
+      [cam,
+       String(b.rendszam_remorca || '').trim().toUpperCase().slice(0, 50) || null,
+       String(b.marca || '').trim().slice(0, 80) || null,
+       String(b.model || '').trim().slice(0, 80) || null,
+       String(b.sofer_nev || '').trim().slice(0, 120) || null,
+       id, cu.company_id, cu.carrier_id]);
+    return res.json({ ok: !!r.rowCount });
+  } catch (err) { console.error('carrier vehicle edit hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
 });
 router.delete('/api/carrier/vehicles/:id', requireCarrier, async (req, res) => {
   try {
