@@ -130,9 +130,15 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev, lang
   const tpl = await getEmailTemplate('email_sys_invite');
   if (tpl && tpl.subject && (tpl.body_ro || tpl.body_hu)) {
     const bodyText = L === 'hu' ? (tpl.body_hu || tpl.body_ro) : (tpl.body_ro || tpl.body_hu);
-    const vars = { nev: meghivottNev || '', ceg_nev: cegNev || '', pozicio: pozicio || '', register_url: registerUrl + '/register' };
-    subject = applyTemplateVars(tpl.subject, vars);
-    html = applyTemplateVars(bodyText, vars);
+    const inviteHref = escHtml(registerUrl + '/register?kod=' + encodeURIComponent(kod || '')).replace(/"/g, '%22');
+    const inviteBtnLabel = L === 'hu' ? 'Regisztráció' : 'Înregistrare';
+    const vars    = { nev: meghivottNev || '', ceg_nev: cegNev || '', pozicio: pozicio || '', register_url: registerUrl + '/register' };
+    const rawVars = {
+      invite_url_btn: `<a href="${inviteHref}" style="display:inline-block;background:#6366f1;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">${inviteBtnLabel}</a>`,
+      invite_url_link: `<a href="${inviteHref}" style="color:#3b82f6;word-break:break-all;">${escHtml(registerUrl + '/register')}</a>`,
+    };
+    subject = applyTemplateVars(tpl.subject, vars, rawVars);
+    html = applyTemplateVars(bodyText, vars, rawVars);
   } else {
     html = buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl, lang: L });
     subject = (L === 'hu' ? 'VallorSoft — Meghívó' : 'VallorSoft — Invitație') + ` (${cegNev || 'VallorSoft'})`;
