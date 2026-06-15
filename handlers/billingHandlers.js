@@ -9,6 +9,7 @@ const billing = require('../services/billing');
 const { encrypt, decrypt } = require('../lib/crypto');
 const { computePool } = require('../lib/herePool');
 const stripe = require('../lib/stripe');
+const { featureEnabled } = require('../lib/featureEnabled');
 
 const handlers = {};
 
@@ -67,12 +68,14 @@ handlers.getCompanyBillingIntegration = async function (req, res, args) {
 handlers.saveBillingIntegration = async function (req, res, args) {
   try {
     if (!isAdminOrDev(req.session.user)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = req.session.user.company_id;
+    if (!isDev(req.session.user) && !(await featureEnabled(cid, 'szamlazas-integracio')))
+      return res.json({ result: { ok: false, err: 'Functie nedisponibila in pachetul curent.' } });
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const provider = String(a.provider || '').trim();
     const credentials = (a.credentials && typeof a.credentials === 'object') ? a.credentials : {};
     if (!billing.isValidProvider(provider)) return res.json({ result: { ok: false, err: 'Furnizor de facturare necunoscut.' } });
 
-    const cid = req.session.user.company_id;
     const display_name = billing.displayName(provider);
     // Üres mezők nem törlik a tárolt értéket (jelszó-megőrzés újramentéskor).
     const prev = await pool.query('SELECT credentials FROM billing_integrations WHERE company_id = $1 AND provider = $2', [cid, provider]);
@@ -101,6 +104,8 @@ handlers.saveBillingIntegration = async function (req, res, args) {
 handlers.testBillingIntegration = async function (req, res, args) {
   try {
     if (!isAdminOrDev(req.session.user)) return res.json({ result: { ok: false, message: 'Acces interzis' } });
+    if (!isDev(req.session.user) && !(await featureEnabled(req.session.user.company_id, 'szamlazas-integracio')))
+      return res.json({ result: { ok: false, message: 'Functie nedisponibila in pachetul curent.' } });
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const provider = String(a.provider || '').trim();
     if (!billing.isValidProvider(provider)) return res.json({ result: { ok: false, message: 'Furnizor de facturare necunoscut.' } });

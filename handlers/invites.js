@@ -6,6 +6,7 @@
 // ============================================================
 const pool = require('../db');
 const { sendInviteEmail } = require('../services/email');
+const { featureEnabled } = require('../lib/featureEnabled');
 
 const handlers = {};
 
@@ -52,6 +53,9 @@ handlers.invCreate = async function (req, res, args) {
       if (!['Admin', 'Manager', 'Sofer', 'Konyvelo'].includes(pozicio)) {
         return res.json({ result: { ok: false, err: 'Functie invalida.' } });
       }
+
+      if (pozicio === 'Konyvelo' && !(await featureEnabled(req.session.user.company_id, 'konyvelo-szerepkor')))
+        return res.json({ result: { ok: false, err: 'Functie nedisponibila in pachetul curent.' } });
 
       // veletlen kod generalas - hasonloan a regi _genCode-hoz
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';

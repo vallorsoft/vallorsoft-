@@ -51,6 +51,13 @@ window.VS_FEATURES = [
   { key: 'signature',        label: 'Aláírás és bélyegző',         group: 'Adminisztráció' },
   { key: 'chat',             label: 'Belső chat',                  group: 'Kommunikáció' },
   { key: 'settings',         label: 'Beállítások',                 group: 'Rendszer', core: true },
+  // ── Prémium funkció-gate-ek (csomag-szintű korlátozáshoz) ──────────────────
+  { key: 'visszfuvar-radar',     label: 'Visszfuvar-radar 🎯',          group: 'Fuvarozás & Logisztika' },
+  { key: 'toll-becsles',         label: 'Útdíj-becslés 🛣️',             group: 'Fuvarozás & Logisztika' },
+  { key: 'ai-kiolvasas',         label: 'AI kiolvasás (Gemini) 🤖',     group: 'Fuvarozás & Logisztika' },
+  { key: 'gps-integracio',       label: 'GPS integráció 📡',            group: 'Adminisztráció' },
+  { key: 'szamlazas-integracio', label: 'Számlázó integráció 🧾',        group: 'Adminisztráció' },
+  { key: 'konyvelo-szerepkor',   label: 'Könyvelő szerepkör 📚',        group: 'Adminisztráció' },
 ];
 
 // HERE Map prémium funkciók — cégre szabott JOGOSULTSÁG (developer a Funkciók fülön).

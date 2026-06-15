@@ -7,25 +7,7 @@ const path = require('path');
 const router = express.Router();
 const pool = require('../db');
 const { requirePageLogin, requirePageRole } = require('../middleware/pageGuard');
-
-// Hierarchia: company_features (override) > plan_features (csomag default) > true
-async function featureEnabled(companyId, key) {
-  if (!companyId) return true;
-  try {
-    // 1. Cég-szintű override (felülírja a plan-t)
-    const cr = await pool.query(
-      'SELECT enabled FROM company_features WHERE company_id=$1 AND feature_key=$2', [companyId, key]);
-    if (cr.rows.length) return cr.rows[0].enabled !== false;
-    // 2. Csomag-szintű alapértelmezés
-    const pr = await pool.query(
-      `SELECT pf.enabled FROM plan_features pf
-         JOIN companies c ON c.subscription_plan_id = pf.plan_id
-        WHERE c.id=$1 AND pf.feature_key=$2`, [companyId, key]);
-    if (pr.rows.length) return pr.rows[0].enabled !== false;
-    // 3. Default: engedélyezett
-    return true;
-  } catch (e) { return true; }
-}
+const { featureEnabled } = require('../lib/featureEnabled');
 
 router.get('/index.html', (req, res) => res.redirect(301, '/'));
 
@@ -65,7 +47,9 @@ router.get('/manager', requirePageLogin, requirePageRole('Manager', 'Admin'), fu
 router.get('/sofer', requirePageLogin, requirePageRole('Sofer', 'Admin', 'Manager'), function(req, res) {
   res.sendFile(path.join(__dirname, '..', 'public', 'sofer.html'));
 });
-router.get('/konyvelo', requirePageLogin, requirePageRole('Konyvelo', 'Admin'), function(req, res) {
+router.get('/konyvelo', requirePageLogin, requirePageRole('Konyvelo', 'Admin'), async function(req, res) {
+  const ok = await featureEnabled(req.session.user.company_id, 'konyvelo-szerepkor');
+  if (!ok) return res.redirect(req.session.user.pozicio === 'Admin' ? '/admin' : '/login');
   res.sendFile(path.join(__dirname, '..', 'public', 'konyvelo.html'));
 });
 router.get('/utvonaltervezes', requirePageLogin, requirePageRole('Admin', 'Manager'), async function(req, res) {
