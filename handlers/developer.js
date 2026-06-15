@@ -669,6 +669,38 @@ handlers.devGetSystemEmailTemplate = async function(req, res, args) {
   }
 };
 
+// ── Push értesítés sablonok ──────────────────────────────────
+handlers.devGetPushTemplates = async function(req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  try {
+    const r = await pool.query("SELECT value FROM developer_settings WHERE key='push_templates'");
+    return res.json({ result: { ok: true, data: r.rows.length ? r.rows[0].value : null } });
+  } catch (err) {
+    console.error('devGetPushTemplates hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.devSavePushTemplates = async function(req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const { templates } = args || {};
+  if (!templates || typeof templates !== 'object' || Array.isArray(templates)) {
+    return res.json({ result: { ok: false, err: 'Date invalide' } });
+  }
+  try {
+    await pool.query(
+      `INSERT INTO developer_settings(key, value, updated_at) VALUES('push_templates',$1,NOW())
+       ON CONFLICT(key) DO UPDATE SET value=$1, updated_at=NOW()`,
+      [JSON.stringify(templates)]
+    );
+    try { require('../lib/pushTemplates').invalidateCache(); } catch (_) {}
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('devSavePushTemplates hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 handlers.devSaveSystemEmailTemplate = async function(req, res, args) {
   if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
   const { key, subject, body_ro, body_hu } = args || {};

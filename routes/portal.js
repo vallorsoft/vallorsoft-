@@ -342,13 +342,26 @@ router.post('/api/portal/request', requireClient, async (req, res) => {
     // A diszpécser azonnal értesül; a böngészőn belüli lebegő sáv is jelez (getMyFeatures polling).
     if (sendPushToRole) {
       const route = (loc_incarcare && loc_descarcare) ? (loc_incarcare + ' → ' + loc_descarcare)
-                  : (loc_incarcare || loc_descarcare || (pdfBuf ? '📎 document atasat / csatolt dokumentum' : ''));
-      sendPushToRole(cu.company_id, ['Admin', 'Manager'], {
-        title: '🔔 Cerere nouă de transport / Új fuvarkérés',
-        body: (cu.client_nev || cu.email) + (route ? ': ' + route : ''),
-        icon: '/icon192.png', badge: '/icon192.png',
-        tag: 'inbound-portal', url: '/admin',
-      }).catch(() => {});
+                  : (loc_incarcare || loc_descarcare || (pdfBuf ? '📎 document atasat / csatolt documentum' : ''));
+      const clientStr = cu.client_nev || cu.email;
+      const routeStr = route ? ': ' + route : '';
+      require('../lib/pushTemplates').getTemplate('push_inbound_new').then(function(tpl) {
+        const { applyVars } = require('../lib/pushTemplates');
+        const vars = { client: clientStr, route: routeStr };
+        sendPushToRole(cu.company_id, ['Admin', 'Manager'], {
+          title: (tpl.title_ro || '🔔 Cerere nouă de transport') + ' / ' + (tpl.title_hu || 'Új fuvarkérés'),
+          body: applyVars(tpl.body_ro || '{{client}}{{route}}', vars),
+          icon: '/icon192.png', badge: '/icon192.png',
+          tag: 'inbound-portal', url: '/admin',
+        }).catch(() => {});
+      }).catch(() => {
+        sendPushToRole(cu.company_id, ['Admin', 'Manager'], {
+          title: '🔔 Cerere nouă de transport / Új fuvarkérés',
+          body: clientStr + routeStr,
+          icon: '/icon192.png', badge: '/icon192.png',
+          tag: 'inbound-portal', url: '/admin',
+        }).catch(() => {});
+      });
     }
     return res.json({ ok: true });
   } catch (err) {

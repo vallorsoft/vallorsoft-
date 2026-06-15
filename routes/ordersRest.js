@@ -62,14 +62,24 @@ router.post('/api/orders/:id/driver-status', requireLogin, requireRole('Sofer'),
     // Push értesítés a Manager / Admin szerepkörűeknek
     const label = status === 'In Curs' ? 'a acceptat / elfogadta' : 'a finalizat / teljesítette';
     const clientName = check.rows[0].client || ('#' + req.params.id);
-    await sendPushToRole(driver.company_id, ['Manager', 'Admin'], {
-      title: '🚛 Status cursă actualizat / Fuvar státusz frissítve',
-      body: (driver.nume || driver.email) + ' ' + label + ': ' + clientName,
-      icon: '/icon192.png',
-      badge: '/icon192.png',
-      tag: 'order-status-' + req.params.id,
-      url: '/manager',
-    });
+    try {
+      const { getTemplate, applyVars } = require('../lib/pushTemplates');
+      const stpl = await getTemplate('push_order_status');
+      const vars = { sofor: driver.nume || driver.email, label, client: clientName };
+      await sendPushToRole(driver.company_id, ['Manager', 'Admin'], {
+        title: (stpl.title_ro || '🚛 Status cursă actualizat') + ' / ' + (stpl.title_hu || 'Fuvar státusz frissítve'),
+        body: applyVars(stpl.body_ro || '{{sofor}} {{label}}: {{client}}', vars),
+        icon: '/icon192.png', badge: '/icon192.png',
+        tag: 'order-status-' + req.params.id, url: '/manager',
+      });
+    } catch (_) {
+      await sendPushToRole(driver.company_id, ['Manager', 'Admin'], {
+        title: '🚛 Status cursă actualizat / Fuvar státusz frissítve',
+        body: (driver.nume || driver.email) + ' ' + label + ': ' + clientName,
+        icon: '/icon192.png', badge: '/icon192.png',
+        tag: 'order-status-' + req.params.id, url: '/manager',
+      });
+    }
     return res.json({ ok: true });
   } catch (err) {
     console.error('driver-status hiba:', err);
