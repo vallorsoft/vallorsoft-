@@ -201,6 +201,18 @@ fetch('/api/public-plans', { credentials: 'same-origin' })
     document.getElementById('subContent').innerHTML = '<p style="color:#ef4444;text-align:center;">Hiba a csomagok betöltésekor. / Eroare la încărcarea pachetelor.</p>';
   });
 
+function buildFeaturesList(features) {
+  var list = Array.isArray(features) ? features : [];
+  if (!list.length) return '';
+  return '<ul style="list-style:none;padding:0;margin:0 0 16px;display:flex;flex-direction:column;gap:6px;">'
+    + list.map(function(f) {
+      return '<li style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--lp-text);">'
+        + '<span style="color:#22c55e;font-size:14px;flex-shrink:0;margin-top:1px;">✓</span>'
+        + '<span>' + escHtml(String(f)) + '</span></li>';
+    }).join('')
+    + '</ul>';
+}
+
 function renderPlans() {
   if (!_plans.length) return;
   var grid = document.createElement('div');
@@ -220,6 +232,7 @@ function renderPlans() {
       '<div class="sub-plan-name">' + escHtml(p.name) + '</div>' +
       '<div style="margin:8px 0 4px;">' + priceHtml + '</div>' +
       '<div class="sub-desc">' + escHtml(p.description || 'Teljes hozzáférés a VallorSoft minden funkciójához.') + '</div>' +
+      buildFeaturesList(p.features) +
       '<button class="sub-btn ' + (featured ? 'sub-btn-primary' : 'sub-btn-outline') + '" onclick="selectPlan(' + p.id + ',\'' + escHtml(p.name) + '\')">' +
       '📦 Csomag választása</button>';
     grid.appendChild(card);

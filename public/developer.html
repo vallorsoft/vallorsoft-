@@ -576,6 +576,9 @@ function loadPlanEditor(){
         +'</div></div>'
         // Stripe
         +'<div class="field"><label>Stripe Price ID <span style="font-size:11px;color:var(--muted);">(price_xxx)</span></label><input class="input" id="plStripe_'+p.id+'" placeholder="price_..." value="'+escHtml(p.stripe_price_id||'')+'"></div>'
+        // Marketing bullet-pontok
+        +'<div class="field"><label>Marketing bullet-pontok <span style="font-size:11px;color:var(--muted);">(soronként 1 pont — /subscription és #pricing oldalon jelenik meg)</span></label>'
+        +'<textarea class="input" id="plFeatures_'+p.id+'" rows="4" style="resize:vertical;" placeholder="pl. 10 jármű&#10;Sofőr-portál&#10;GPS integráció">'+escHtml((Array.isArray(p.features)?p.features:[]).join('\n'))+'</textarea></div>'
         +'<button class="btn-dev" onclick="savePlan('+p.id+')">💾 Mentés</button>'
         +' <button class="btn-dev" onclick="loadPlanFeatures('+p.id+')" style="margin-left:8px;">⚙️ Funkció-kapcsolók</button>'
         +'<div id="planFeatDiv_'+p.id+'" style="display:none;margin-top:14px;"></div>'
@@ -600,7 +603,8 @@ function savePlan(id){
     max_vehicles:lim('plMaxV_'+id),
     max_orders_per_month:lim('plMaxO_'+id),
     max_sofors:lim('plMaxS_'+id),
-    stripe_price_id:document.getElementById('plStripe_'+id).value.trim()||null};
+    stripe_price_id:document.getElementById('plStripe_'+id).value.trim()||null,
+    features:(document.getElementById('plFeatures_'+id).value||'').split('\n').map(function(s){return s.trim();}).filter(Boolean)};
   gas('updateSubscriptionPlan',[f]).then(function(r){ if(r&&r.ok){toast('Csomag mentve','ok');loadPlanEditor();}else{toast((r&&r.err)||t('common.error'),'err');} });
 }
 // Csomag funkció-kapcsolói

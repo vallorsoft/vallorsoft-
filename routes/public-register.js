@@ -137,7 +137,7 @@ router.post('/api/public-register', publicRegLimiter, async (req, res) => {
 router.get('/api/public-plans', async (req, res) => {
   try {
     const r = await pool.query(
-      'SELECT id, name, description, price_net, vat_percent, sort_order FROM subscription_plans WHERE is_active=true ORDER BY sort_order'
+      'SELECT id, name, description, price_net, vat_percent, sort_order, features FROM subscription_plans WHERE is_active=true ORDER BY sort_order'
     );
     res.json({ ok: true, plans: r.rows });
   } catch (e) {
