@@ -3055,7 +3055,6 @@ function loadSubscriptionCard() {
 
 function loadSettingsPane(){
   loadEmailLang();
-  loadSubscriptionCard();
   gas('authMe').then(function(u){
     if(!u) return;
     document.getElementById('stNume').value    = u.nume  || '';
@@ -3096,6 +3095,115 @@ function loadSettingsPane(){
       disW.style.display     = 'none';
       enW.style.display      = '';
     }
+  });
+}
+
+// ── Előfizetések pane ────────────────────────────────────────────────────────
+var _elofBilling = 'monthly';
+
+function elofSetBilling(mode) {
+  _elofBilling = mode;
+  var mBtn = document.getElementById('elofBillingMonthly');
+  var aBtn = document.getElementById('elofBillingAnnual');
+  if (mBtn) mBtn.className = 'btn ' + (mode === 'monthly' ? 'primary' : 'ghost');
+  if (aBtn) aBtn.className = 'btn ' + (mode === 'annual'  ? 'primary' : 'ghost');
+  if (window._elofPlans) elofRenderPlans(window._elofPlans);
+}
+
+function elofRenderPlans(plans) {
+  window._elofPlans = plans;
+  var grid = document.getElementById('elofPlanGrid');
+  if (!grid) return;
+  var isAnnual = _elofBilling === 'annual';
+  var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  grid.innerHTML = plans.map(function(p) {
+    var monthly = parseFloat(p.price_net) || 0;
+    var amount  = isAnnual ? monthly * 11 : monthly;
+    var per     = isAnnual ? '/an (11 luni)' : '/lună';
+    var isFree  = monthly === 0;
+    return '<div style="border:1.5px solid var(--border);border-radius:10px;padding:14px;background:rgba(255,255,255,0.03);">'
+      + '<div style="font-size:13px;font-weight:700;margin-bottom:6px;">' + esc(p.name) + '</div>'
+      + (isFree
+          ? '<div style="font-size:14px;font-weight:700;color:var(--muted);">Preț personalizat</div>'
+          : '<div style="font-size:20px;font-weight:800;color:#6366f1;">€' + amount.toFixed(0) + '<span style="font-size:11px;font-weight:500;color:var(--muted);">' + per + '</span></div>')
+      + (isFree
+          ? '<a href="mailto:vallorsoft@gmail.com" style="display:block;text-align:center;margin-top:10px;padding:7px;background:#1e293b;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;">Contactați-ne</a>'
+          : '<button style="width:100%;margin-top:8px;padding:7px;background:#6366f1;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;" onclick="elofRequestPlan(' + p.id + ')">📧 Kérelem</button>')
+      + '</div>';
+  }).join('');
+}
+
+function loadElofizetesek() {
+  gas('getMySubscription').then(function(r) {
+    var el = document.getElementById('elofSubText');
+    var ex = document.getElementById('elofSubExpiry');
+    if (!el || !r || !r.ok) return;
+    var sm = { active: '✅ Aktív', trial: '⏳ Próbaidőszak', inactive: '❌ Inaktív', cancelled: '🚫 Lemondott' };
+    el.textContent = (sm[r.status] || r.status || '—') + (r.plan_name ? ' — ' + r.plan_name : '');
+    if (ex) ex.textContent = r.days_left !== null
+      ? (r.days_left > 0 ? r.days_left + ' nap van hátra' : 'Lejárt') + (r.paid_until ? ' (' + new Date(r.paid_until).toLocaleDateString('ro-RO') + ')' : '')
+      : '';
+  });
+  fetch('/api/public-plans').then(function(rsp){ return rsp.json(); }).then(function(data){
+    elofRenderPlans(data.plans || []);
+  }).catch(function(){
+    var g = document.getElementById('elofPlanGrid');
+    if (g) g.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px;">Nem sikerült betölteni a csomagokat.</div>';
+  });
+  elofLoadHistory();
+}
+
+function elofLoadHistory() {
+  gas('getMyPaymentRequests').then(function(r) {
+    var tbody = document.getElementById('elofHistTbody');
+    if (!tbody) return;
+    if (!r || !r.ok || !r.requests || !r.requests.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px;">Nincs fizetési előzmény</td></tr>';
+      return;
+    }
+    var sc = { paid: '#22c55e', cancelled: '#94a3b8', pending: '#f59e0b' };
+    var stl = { paid: '✅ Fizetve', cancelled: '✕ Törölve', pending: '⏳ Folyamatban' };
+    var esc = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+    tbody.innerHTML = r.requests.map(function(p) {
+      return '<tr>'
+        + '<td style="white-space:nowrap;">' + (p.created_at ? new Date(p.created_at).toLocaleDateString('ro-RO') : '—') + '</td>'
+        + '<td>' + esc(p.plan_name || p.plan_id) + '</td>'
+        + '<td>' + (p.billing_type === 'annual' ? '📅 Éves' : '📆 Havi') + '</td>'
+        + '<td style="font-family:monospace;font-weight:700;font-size:12px;">' + esc(p.reference) + '</td>'
+        + '<td style="text-align:right;">€' + (parseFloat(p.amount_eur)||0).toFixed(2) + '</td>'
+        + '<td style="text-align:right;">' + (p.total_ron ? parseFloat(p.total_ron).toFixed(2) + ' RON' : '—') + '</td>'
+        + '<td><span style="color:' + (sc[p.status]||'#94a3b8') + ';font-weight:600;font-size:12px;">' + (stl[p.status] || p.status) + '</span></td>'
+        + '</tr>';
+    }).join('');
+  });
+}
+
+function elofRequestPlan(planId) {
+  if (!confirm('Kérelmet küldesz a ' + (_elofBilling === 'annual' ? 'éves' : 'havi') + ' előfizetésre. Fizetési részleteket emailben kapod. Folytatod?')) return;
+  gas('requestSubscriptionExtension', [planId, _elofBilling]).then(function(r) {
+    if (!r || !r.ok) { toast((r && r.err) || 'Eroare la trimiterea cererii', 'err'); return; }
+    var rc   = document.getElementById('elofRefCard');
+    var refEl = document.getElementById('elofRefCode');
+    if (rc && refEl) {
+      refEl.textContent = r.reference || '—';
+      var bb = document.getElementById('elofBankBlock');
+      if (bb && r.bankDetails) {
+        var b = r.bankDetails;
+        var e = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+        bb.innerHTML = '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 16px;">'
+          + '<div style="font-size:12px;color:#166534;font-weight:700;margin-bottom:8px;">DATE CONT BANCAR</div>'
+          + '<table style="width:100%;font-size:13px;border-collapse:collapse;">'
+          + '<tr><td style="color:#475569;padding:3px 0;">Titular</td><td style="font-weight:600;">' + e(b.holder||'') + '</td></tr>'
+          + '<tr><td style="color:#475569;padding:3px 0;">IBAN</td><td style="font-family:monospace;font-weight:600;">' + e(b.iban||'') + '</td></tr>'
+          + '<tr><td style="color:#475569;padding:3px 0;">Bancă</td><td style="font-weight:600;">' + e(b.bank||'') + '</td></tr>'
+          + (b.swift ? '<tr><td style="color:#475569;padding:3px 0;">SWIFT</td><td style="font-family:monospace;font-weight:600;">' + e(b.swift) + '</td></tr>' : '')
+          + '</table></div>';
+      }
+      rc.style.display = '';
+      rc.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    toast('Kérelem elküldve! Fizetési részleteket emailben kapod.', 'ok');
+    elofLoadHistory();
   });
 }
 

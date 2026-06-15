@@ -828,4 +828,37 @@ handlers.devSaveAddonPrices = async function (req, res, args) {
   res.json({ result: { ok: true } });
 };
 
+handlers.devActivatePayment = async function (req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const [id] = args || [];
+  if (!id) return res.json({ result: { ok: false, err: 'ID hiányzik' } });
+
+  const pr = await pool.query(
+    `SELECT pr.*, sp.price_net, sp.billing_interval FROM payment_requests pr
+     LEFT JOIN subscription_plans sp ON sp.id = pr.plan_id
+     WHERE pr.id = $1`, [id]
+  );
+  if (!pr.rows.length) return res.json({ result: { ok: false, err: 'Nem található' } });
+  const r = pr.rows[0];
+  if (r.status === 'paid') return res.json({ result: { ok: false, err: 'Már aktiválva' } });
+
+  const comp = await pool.query('SELECT paid_until, subscription_status FROM companies WHERE id=$1', [r.company_id]);
+  const c = comp.rows[0] || {};
+
+  let base = (c.subscription_status === 'active' && c.paid_until && new Date(c.paid_until) > new Date())
+    ? new Date(c.paid_until) : new Date();
+  const isAnnual = r.billing_type === 'annual';
+  const newPaidUntil = new Date(base);
+  if (isAnnual) newPaidUntil.setMonth(newPaidUntil.getMonth() + 12);
+  else newPaidUntil.setMonth(newPaidUntil.getMonth() + 1);
+
+  await pool.query(`UPDATE payment_requests SET status='paid' WHERE id=$1`, [id]);
+  await pool.query(
+    `UPDATE companies SET subscription_status='active', subscription_plan_id=$1, paid_until=$2, trial_email_sent=false WHERE id=$3`,
+    [r.plan_id, newPaidUntil.toISOString(), r.company_id]
+  );
+
+  return res.json({ result: { ok: true, paid_until: newPaidUntil.toISOString().slice(0, 10) } });
+};
+
 module.exports = handlers;

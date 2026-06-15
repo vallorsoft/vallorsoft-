@@ -476,9 +476,9 @@
         <table class="table">
           <thead><tr>
             <th>Dátum</th><th>Cég</th><th>Csomag</th><th>Időszak</th>
-            <th>Referencia</th><th>EUR</th><th>RON bruttó</th><th>Státusz</th>
+            <th>Referencia</th><th>EUR</th><th>RON bruttó</th><th>Státusz</th><th>Művelet</th>
           </tr></thead>
-          <tbody id="paymentReqTbody"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
+          <tbody id="paymentReqTbody"><tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1825,12 +1825,15 @@ async function loadPaymentRequests() {
   const d = await gas('devGetPaymentRequests');
   const tbody = document.getElementById('paymentReqTbody');
   if (!d || !d.ok || !d.requests.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px;">Nincs fizetési kérelem</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px;">Nincs fizetési kérelem</td></tr>';
     return;
   }
   tbody.innerHTML = d.requests.map(function(r) {
     const dt = r.created_at ? new Date(r.created_at).toLocaleDateString('ro-RO') : '—';
     const statusColor = r.status === 'paid' ? '#22c55e' : r.status === 'cancelled' ? '#94a3b8' : '#f59e0b';
+    const activateBtn = r.status === 'pending'
+      ? '<button onclick="activatePayment(' + r.id + ')" style="background:#22c55e;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;">✅ Aktiválás</button>'
+      : '';
     return '<tr>'
       + '<td style="white-space:nowrap;">' + dt + '</td>'
       + '<td>' + escDev(r.company_nev || r.company_id) + '</td>'
@@ -1840,8 +1843,17 @@ async function loadPaymentRequests() {
       + '<td style="text-align:right;">€' + (parseFloat(r.amount_eur)||0).toFixed(2) + '</td>'
       + '<td style="text-align:right;font-weight:600;">' + (r.total_ron ? parseFloat(r.total_ron).toFixed(2) + ' RON' : '—') + '</td>'
       + '<td><span style="color:' + statusColor + ';font-weight:600;">' + r.status + '</span></td>'
+      + '<td>' + activateBtn + '</td>'
       + '</tr>';
   }).join('');
+}
+
+async function activatePayment(id) {
+  if (!confirm('Biztosan aktiválod az előfizetést? A payment_request státusza "paid" lesz és a cég előfizetése megújul.')) return;
+  const d = await gas('devActivatePayment', [id]);
+  if (!d || !d.ok) { alert('Hiba: ' + (d && d.err || 'ismeretlen')); return; }
+  alert('✅ Aktiválva! Új lejárat: ' + (d.paid_until || '—'));
+  loadPaymentRequests();
 }
 
 function escDev(s) {
