@@ -321,57 +321,83 @@
 <section id="pricing" class="lp-section lp-section-light" data-vs-section="pricing">
   <div class="lp-container">
     <div class="lp-section-header reveal">
-      <h2 data-i18n="pricingTitle">Egyszerű árazás, rejtett költségek nélkül</h2>
+      <h2 data-i18n="pricingTitle">Planuri și prețuri</h2>
+      <p data-i18n="pricingSubtitle">Prețuri transparente, fără costuri ascunse</p>
     </div>
     <div class="lp-pricing-grid" id="lpPricingGrid">
-      <!-- JS tölti be a /api/public-plans alapján; fallback statikus kártyák: -->
-      <div class="lp-pricing-card reveal">
-        <div class="lp-plan-name" data-i18n="planBasic">Basic</div>
+      <!-- JS tölti be a /api/public-plans alapján; statikus fallback 4 valós csomag: -->
+      <div class="lp-pricing-card lp-plan-green reveal">
+        <div class="lp-plan-name">Alap</div>
+        <div class="lp-plan-audience" data-i18n="planAlapAudience">Firme cu 1–2 vehicule · Start</div>
         <div class="lp-plan-price">
-          <span class="lp-price-val">€49</span>
-          <span class="lp-price-period" data-i18n="perMonth">/hó</span>
+          <span class="lp-price-val">€29</span>
+          <span class="lp-price-period" data-i18n="perMonth">/lună</span>
         </div>
         <ul class="lp-plan-features">
-          <li data-i18n="bp1">Alap funkciók</li>
-          <li data-i18n="bp2">GPS követés</li>
-          <li data-i18n="bp3">Számlázás</li>
-          <li data-i18n="bp4">E-mail támogatás</li>
+          <li>Fuvar kiírás &amp; kezelés</li>
+          <li>Fuvarlevelek &amp; CMR</li>
+          <li>Sofőrök &amp; járművek kezelése</li>
+          <li>Ügyfelek adatbázis</li>
+          <li>Alap statisztika</li>
         </ul>
-        <a href="/register" class="lp-btn-outline lp-btn-full" data-i18n="startNow">Kezdés most</a>
+        <a href="/register" class="lp-btn-outline lp-btn-full" data-i18n="planStartBtn">Testează gratuit</a>
       </div>
-      <div class="lp-pricing-card lp-pricing-featured reveal">
-        <div class="lp-plan-badge" data-i18n="popular">Legnépszerűbb</div>
-        <div class="lp-plan-name">Professional</div>
+      <div class="lp-pricing-card lp-plan-blue reveal">
+        <div class="lp-plan-name">Standard</div>
+        <div class="lp-plan-audience" data-i18n="planStandardAudience">Flote cu 3–5 vehicule</div>
         <div class="lp-plan-price">
-          <span class="lp-price-val">€99</span>
-          <span class="lp-price-period" data-i18n="perMonth">/hó</span>
+          <span class="lp-price-val">€69</span>
+          <span class="lp-price-period" data-i18n="perMonth">/lună</span>
         </div>
         <ul class="lp-plan-features">
-          <li data-i18n="pp1">Minden a Basic-ből</li>
-          <li data-i18n="pp2">e-Factura integráció</li>
-          <li data-i18n="pp3">Ügyfél-portál</li>
-          <li data-i18n="pp4">Alvállalkozói portál</li>
-          <li data-i18n="pp5">Fejlett statisztika</li>
-          <li data-i18n="pp6">Prioritásos támogatás</li>
-          <li data-i18n="pp7">SLA garancia</li>
+          <li>Minden Alap +</li>
+          <li>Belső chat</li>
+          <li>Tervezőtábla (Gantt)</li>
+          <li>GPS integráció (live térkép)</li>
+          <li>Számlázó integráció (e-Factura)</li>
+          <li>Útdíj-becslés &amp; útvonaltervezés</li>
+          <li>Pénzügyi riportok</li>
         </ul>
-        <a href="/register" class="lp-btn-primary lp-btn-full" data-i18n="startNow">Kezdés most</a>
+        <a href="/register" class="lp-btn-outline lp-btn-full" data-i18n="planStartBtn">Testează gratuit</a>
       </div>
-      <div class="lp-pricing-card reveal">
-        <div class="lp-plan-name">Enterprise</div>
+      <div class="lp-pricing-card lp-plan-indigo lp-pricing-featured reveal">
+        <div class="lp-plan-badge" data-i18n="planPopular">Recomandat</div>
+        <div class="lp-plan-name">Pro</div>
+        <div class="lp-plan-audience" data-i18n="planProAudience">Companii cu 6–20 vehicule</div>
         <div class="lp-plan-price">
-          <span class="lp-price-val lp-price-custom" data-i18n="customPrice">Egyedi ár</span>
+          <span class="lp-price-val">€149</span>
+          <span class="lp-price-period" data-i18n="perMonth">/lună</span>
         </div>
         <ul class="lp-plan-features">
-          <li data-i18n="ep1">Minden a Professional-ból</li>
-          <li data-i18n="ep2">Dedikált szerver</li>
-          <li data-i18n="ep3">Egyedi fejlesztés</li>
-          <li data-i18n="ep4">Onboarding asszisztens</li>
-          <li data-i18n="ep5">Éves szerződés</li>
+          <li>Minden Standard +</li>
+          <li>Ügyfél-portál</li>
+          <li>Alvállalkozói portál</li>
+          <li>Visszfuvar-radar</li>
+          <li>AI dokumentum-feldolgozás</li>
+          <li>Raktár modul</li>
+          <li>Könyvelő szerepkör</li>
         </ul>
-        <a href="#contact" class="lp-btn-outline lp-btn-full" data-i18n="contactUs">Kapcsolatfelvétel</a>
+        <a href="/register" class="lp-btn-primary lp-btn-full" data-i18n="planStartBtn">Testează gratuit</a>
+      </div>
+      <div class="lp-pricing-card lp-plan-dark reveal">
+        <div class="lp-plan-name">Business</div>
+        <div class="lp-plan-audience" data-i18n="planBusinessAudience">Întreprinderi 20+ vehicule</div>
+        <div class="lp-plan-price">
+          <span class="lp-price-val lp-price-custom" data-i18n="customPrice">Personalizat</span>
+        </div>
+        <ul class="lp-plan-features">
+          <li>Minden Pro +</li>
+          <li>Fogyasztás &amp; jármű kihasználtság</li>
+          <li>Sofőr teljesítmény riport</li>
+          <li>Üzemanyagkártya-import</li>
+          <li>Havi e-mail összefoglaló</li>
+          <li>Egyedi beállítások</li>
+          <li>Dedikált support</li>
+        </ul>
+        <a href="#contact" class="lp-btn-outline lp-btn-full" data-i18n="planContactBtn">Contactați-ne</a>
       </div>
     </div>
+    <p class="lp-pricing-vat" id="lpPricingVat" data-i18n="pricingVatNote">Prețurile sunt tarife nete. La facturare se adaugă TVA 21%.</p>
   </div>
 </section>
 

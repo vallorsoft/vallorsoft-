@@ -212,6 +212,14 @@ const translations = {
     startNow: 'Începe acum',
     customPrice: 'Preț personalizat',
     blogReadMore: 'Citește mai mult →',
+    planAlapAudience: 'Firme cu 1–2 vehicule · Start',
+    planStandardAudience: 'Flote cu 3–5 vehicule',
+    planProAudience: 'Companii cu 6–20 vehicule',
+    planBusinessAudience: 'Întreprinderi 20+ vehicule',
+    planStartBtn: 'Testează gratuit',
+    planContactBtn: 'Contactați-ne',
+    planPopular: 'Recomandat',
+    pricingVatNote: 'Prețurile sunt tarife nete. La facturare se adaugă TVA 21%.',
   },
   hu: {
     cookieTitle: 'Cookie-k és adatvédelem',
@@ -421,6 +429,14 @@ const translations = {
     startNow: 'Kezdés most',
     customPrice: 'Egyedi ár',
     blogReadMore: 'Tovább olvasom →',
+    planAlapAudience: '1–2 járműves vállalkozásoknak · Start',
+    planStandardAudience: '3–5 járműves flottáknak',
+    planProAudience: '6–20 járműves cégeknek',
+    planBusinessAudience: '20+ járműves vállalatoknak',
+    planStartBtn: 'Ingyenes próba',
+    planContactBtn: 'Kapcsolatfelvétel',
+    planPopular: 'Ajánlott',
+    pricingVatNote: 'Az árak nettó árak. Számlázáskor 21% ÁFÁ-t számítunk fel.',
   }
 };
 
@@ -476,6 +492,7 @@ function applyLanguage(lang) {
   if (toggle) toggle.textContent = lang === 'ro' ? 'HU' : 'RO';
   document.documentElement.lang = lang;
   renderSoferTimeline();
+  if (_cachedPlans) renderPricingGrid(_cachedPlans);
 }
 
 document.getElementById('languageToggle')?.addEventListener('click', () => {
@@ -661,28 +678,63 @@ document.getElementById('contactForm')?.addEventListener('submit', async e => {
 });
 
 /* ── Dinamikus árazási kártyák (/api/public-plans alapján) ─── */
+var _cachedPlans = null;
+
+var _planColorClasses = ['lp-plan-green', 'lp-plan-blue', 'lp-plan-indigo', 'lp-plan-dark'];
+var _planAudienceKeys = ['planAlapAudience', 'planStandardAudience', 'planProAudience', 'planBusinessAudience'];
+
 function renderPricingGrid(plans) {
   const grid = document.getElementById('lpPricingGrid');
-  if (!grid || !plans || !plans.length) return; // fallback statikus
-  const lang = window._lang || localStorage.getItem('vs-landing-lang') || 'ro';
-  const periodLabel = lang === 'hu' ? '/hó' : '/lună';
-  const startLabel  = lang === 'hu' ? 'Kezdés most' : 'Începeți acum';
-  const popLabel    = lang === 'hu' ? 'Legnépszerűbb' : 'Cel mai popular';
+  if (!grid || !plans || !plans.length) return;
+  _cachedPlans = plans;
+  const lang = localStorage.getItem('vs-landing-lang') || 'ro';
+  const t    = translations[lang] || translations.ro;
+  const featuredIndex = 2; // Pro kártya kiemelt
 
   grid.innerHTML = plans.map(function(p, i) {
-    const featured = i === 1; // a második kártya kiemelt
-    const price = p.price_net > 0 ? '€' + Math.round(p.price_net) : (lang === 'hu' ? 'Egyedi' : 'Personalizat');
-    return '<div class="lp-pricing-card' + (featured ? ' lp-pricing-featured' : '') + ' reveal">'
-      + (featured ? '<div class="lp-plan-badge">' + popLabel + '</div>' : '')
+    const colorClass = _planColorClasses[i] || 'lp-plan-blue';
+    const isFeature  = (i === featuredIndex);
+    const isDark     = (i === 3);
+    const audienceKey = _planAudienceKeys[Math.min(i, _planAudienceKeys.length - 1)];
+    const audience   = t[audienceKey] || escHtmlLp(p.description || '');
+
+    let priceHtml;
+    if (p.price_net > 0) {
+      priceHtml = '<span class="lp-price-val">€' + Math.round(p.price_net) + '</span>'
+        + '<span class="lp-price-period">' + (lang === 'hu' ? '/hó' : '/lună') + '</span>';
+    } else {
+      priceHtml = '<span class="lp-price-val lp-price-custom">'
+        + (lang === 'hu' ? 'Egyedi' : 'Personalizat') + '</span>';
+    }
+
+    let featureItems = '';
+    if (Array.isArray(p.features) && p.features.length) {
+      featureItems = p.features.map(function(f) { return '<li>' + escHtmlLp(String(f)) + '</li>'; }).join('');
+    } else if (p.description) {
+      featureItems = '<li>' + escHtmlLp(p.description) + '</li>';
+    }
+
+    const ctaHref  = isDark ? '#contact' : '/register';
+    const ctaLabel = isDark ? (t.planContactBtn || (lang === 'hu' ? 'Kapcsolatfelvétel' : 'Contactați-ne'))
+                            : (t.planStartBtn   || (lang === 'hu' ? 'Ingyenes próba' : 'Testează gratuit'));
+    const ctaClass = isFeature ? 'lp-btn-primary' : 'lp-btn-outline';
+    const badge    = isFeature
+      ? '<div class="lp-plan-badge">' + (t.planPopular || (lang === 'hu' ? 'Ajánlott' : 'Recomandat')) + '</div>'
+      : '';
+
+    return '<div class="lp-pricing-card ' + colorClass + (isFeature ? ' lp-pricing-featured' : '') + ' reveal visible">'
+      + badge
       + '<div class="lp-plan-name">' + escHtmlLp(p.name) + '</div>'
-      + '<div class="lp-plan-price">'
-      +   '<span class="lp-price-val">' + escHtmlLp(price) + '</span>'
-      +   (p.price_net > 0 ? '<span class="lp-price-period">' + periodLabel + '</span>' : '')
-      + '</div>'
-      + '<ul class="lp-plan-features"><li>' + escHtmlLp(p.description || (lang === 'hu' ? 'Minden funkció' : 'Toate funcțiile')) + '</li></ul>'
-      + '<a href="/register" class="' + (featured ? 'lp-btn-primary' : 'lp-btn-outline') + ' lp-btn-full">' + startLabel + '</a>'
+      + '<div class="lp-plan-audience">' + escHtmlLp(audience) + '</div>'
+      + '<div class="lp-plan-price">' + priceHtml + '</div>'
+      + '<ul class="lp-plan-features">' + featureItems + '</ul>'
+      + '<a href="' + ctaHref + '" class="' + ctaClass + ' lp-btn-full">' + escHtmlLp(ctaLabel) + '</a>'
       + '</div>';
   }).join('');
+
+  // ÁFA-megjegyzés a rács alatt
+  const vatNote = document.getElementById('lpPricingVat');
+  if (vatNote) vatNote.textContent = t.pricingVatNote || '';
 }
 
 function escHtmlLp(v) {

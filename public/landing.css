@@ -8,6 +8,7 @@
   --lp-blue:        #3b82f6;
   --lp-blue-hover:  #2563eb;
   --lp-indigo:      #6366f1;
+  --lp-green:       #16a34a;
   --lp-dark:        #080f1a;
   --lp-dark2:       #0d1526;
   --lp-white:       #ffffff;
@@ -682,75 +683,112 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 /* ── Pricing ────────────────────────────────────────────────── */
 .lp-pricing-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
   align-items: start;
 }
 .lp-pricing-card {
+  --plan-accent: var(--lp-blue);
   background: var(--lp-white);
   border: 1px solid var(--lp-border);
   border-radius: var(--lp-radius);
-  padding: 2rem;
+  padding: 1.75rem;
   box-shadow: var(--lp-card-shadow);
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
+/* Per-card accent colours */
+.lp-pricing-card.lp-plan-green  { --plan-accent: var(--lp-green); }
+.lp-pricing-card.lp-plan-blue   { --plan-accent: var(--lp-blue); }
+.lp-pricing-card.lp-plan-indigo { --plan-accent: var(--lp-indigo); }
+.lp-pricing-card.lp-plan-dark {
+  --plan-accent: #a5b4fc;
+  background: var(--lp-dark);
+  border-color: rgba(255,255,255,.1);
+  color: #e2e8f0;
+}
+
 .lp-pricing-featured {
-  border: 2px solid var(--lp-blue);
-  box-shadow: 0 4px 24px rgba(59,130,246,.18);
+  border: 2px solid var(--plan-accent);
+  box-shadow: 0 6px 28px rgba(99,102,241,.2);
+  transform: translateY(-4px);
 }
 .lp-plan-badge {
   position: absolute;
   top: -14px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--lp-blue);
+  background: var(--plan-accent);
   color: #fff;
-  font-size: .72rem;
+  font-size: .7rem;
   font-weight: 700;
   padding: 3px 14px;
   border-radius: 99px;
-  letter-spacing: .05em;
+  letter-spacing: .06em;
   white-space: nowrap;
 }
 .lp-plan-name {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--lp-text);
-  margin-bottom: 1rem;
+  margin-bottom: .3rem;
 }
-.lp-plan-price { margin-bottom: 1.5rem; }
+.lp-pricing-card.lp-plan-dark .lp-plan-name { color: #fff; }
+
+.lp-plan-audience {
+  font-size: .78rem;
+  color: var(--lp-muted);
+  margin-bottom: 1rem;
+  min-height: 1.2em;
+}
+.lp-pricing-card.lp-plan-dark .lp-plan-audience { color: rgba(255,255,255,.55); }
+
+.lp-plan-price { margin-bottom: 1.25rem; }
 .lp-price-val {
-  font-size: 2.6rem;
+  font-size: 2.4rem;
   font-weight: 800;
   color: var(--lp-text);
   letter-spacing: -.03em;
 }
-.lp-price-custom {
-  font-size: 1.6rem;
-}
+.lp-pricing-card.lp-plan-dark .lp-price-val { color: #fff; }
+.lp-price-custom { font-size: 1.5rem; }
 .lp-price-period {
-  font-size: .9rem;
+  font-size: .85rem;
   color: var(--lp-muted);
   margin-left: 3px;
 }
+.lp-pricing-card.lp-plan-dark .lp-price-period { color: rgba(255,255,255,.5); }
+
 .lp-plan-features {
-  margin-bottom: 1.8rem;
+  margin-bottom: 1.5rem;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: .65rem;
+  gap: .6rem;
 }
 .lp-plan-features li {
-  font-size: .875rem;
+  font-size: .84rem;
   color: var(--lp-muted);
   padding-left: 1.3rem;
   position: relative;
+  line-height: 1.4;
 }
+.lp-pricing-card.lp-plan-dark .lp-plan-features li { color: rgba(255,255,255,.72); }
 .lp-plan-features li::before {
   content: '✓';
   position: absolute;
   left: 0;
-  color: var(--lp-blue);
+  color: var(--plan-accent);
   font-weight: 700;
+}
+
+/* VAT note under the grid */
+.lp-pricing-vat {
+  text-align: center;
+  font-size: .78rem;
+  color: var(--lp-muted);
+  margin-top: 1.25rem;
 }
 
 /* Pricing card outline button on light bg */
@@ -759,8 +797,16 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   color: var(--lp-text);
 }
 .lp-pricing-card .lp-btn-outline:hover {
-  border-color: var(--lp-blue);
-  color: var(--lp-blue);
+  border-color: var(--plan-accent);
+  color: var(--plan-accent);
+}
+.lp-pricing-card.lp-plan-dark .lp-btn-outline {
+  border-color: rgba(255,255,255,.3);
+  color: #e2e8f0;
+}
+.lp-pricing-card.lp-plan-dark .lp-btn-outline:hover {
+  border-color: var(--plan-accent);
+  color: var(--plan-accent);
 }
 
 /* ── CTA Section ────────────────────────────────────────────── */
@@ -1005,6 +1051,8 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   .lp-footer-grid { grid-template-columns: 1fr 1fr; gap: 2rem; }
   .lp-how-steps { grid-template-columns: 1fr; }
   .lp-how-arrow { display: none; }
+  .lp-pricing-grid { grid-template-columns: repeat(2, 1fr); }
+  .lp-pricing-featured { transform: none; }
 }
 
 /* ── Responsive 860px ───────────────────────────────────────── */
