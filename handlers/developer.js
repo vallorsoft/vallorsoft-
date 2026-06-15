@@ -788,12 +788,17 @@ handlers.devGetBankDetails = async function (req, res) {
 handlers.devSaveBankDetails = async function (req, res, args) {
   if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
   const [details] = args || [{}];
-  await pool.query(
-    `INSERT INTO developer_settings(key, value, updated_at) VALUES('bank_details',$1::jsonb, NOW())
-     ON CONFLICT(key) DO UPDATE SET value=$1::jsonb, updated_at=NOW()`,
-    [JSON.stringify(details)]
-  );
-  res.json({ result: { ok: true } });
+  try {
+    await pool.query(
+      `INSERT INTO developer_settings(key, value) VALUES('bank_details',$1::jsonb)
+       ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value`,
+      [JSON.stringify(details)]
+    );
+    res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('[devSaveBankDetails] hiba:', err.message);
+    res.json({ result: { ok: false, err: 'Eroare de server: ' + err.message } });
+  }
 };
 
 // ── Fizetési kérelmek listája (developer áttekintő) ─────────────────────────
