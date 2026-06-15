@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-15 — Landing nav cleanup + vissza gomb szín javítás (PR #122)
+
+- **`public/login.html` / `portal.html` / `carrier.html`** — vissza gomb stílus javítva: a világos háttéren (`#f7f9fc`) láthatatlan fehér/átlátszó stílus (`rgba(255,255,255,0.08)`) helyett sötét szöveg (`#475569`) és szürke keret (`#cbd5e1`) — jól olvasható kontraszttal
+- **`public/index.html`** — „Ügyfél-portál" és „Alvállalkozói portál" linkek eltávolítva az asztali navigációból (megmaradnak a mobilos hamburger menüben `lp-mobile-only` osztállyal)
+- **`public/landing.js` / `i18n.js`** — login dropdown Diszpécser/Admin alcíme frissítve: Admin · Manager · Könyvelő · Sofőr (HU) / Admin · Manager · Contabil · Șofer (RO)
+- **`public/landing.css`** — `.lp-mobile-only` CSS: asztali nézeten rejtett, mobil ≤860px-en látható
+
+---
+
 ## 2026-06-15 — Carrier járművek megjelenítése a planificatorban (PR #114)
 
 - **`handlers/orders.js`** — `getPlannerData`: `carrier_vehicles JOIN carriers` lekérés (`company_id`-szűrt), `carrierVehicles` tömbként visszaadva
