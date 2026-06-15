@@ -776,7 +776,9 @@ handlers.getPlannerData = async function (req, res, args) {
     try {
       const carrierVehR = await pool.query(
         `SELECT cv.id, cv.rendszam_camion AS rendszam, cv.rendszam_remorca,
-                cv.marca, cv.model, cv.sofer_nev, c.denumire AS carrier_nev
+                cv.marca, cv.model, cv.sofer_nev, cv.sofer_tel,
+                cv.trailer_kind, cv.cargo_length_cm, cv.cargo_width_cm, cv.cargo_height_cm,
+                c.denumire AS carrier_nev
          FROM carrier_vehicles cv
          JOIN carriers c ON c.id = cv.carrier_id
          WHERE cv.company_id = $1

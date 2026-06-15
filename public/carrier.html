@@ -107,6 +107,19 @@
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
           <input class="inp" id="vAn" data-i18n-ph="car.phYear" placeholder="Gyártási év" type="number" min="1990" max="2030" style="flex:1;min-width:100px">
         </div>
+        <div class="mut" style="font-size:11px;margin-top:10px;margin-bottom:4px;" data-i18n="car.trailerDimsLabel">📐 Pótkocsi rakodási méretek (kötelező ha van pótkocsi):</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;align-items:center;">
+          <select class="inp" id="vTrailerKind" style="flex:1;min-width:120px;" onchange="(function(){var k=this.value,d=k==='mega'?305:260;if(k){if(!document.getElementById('vCargoLen').value)document.getElementById('vCargoLen').value=1360;if(!document.getElementById('vCargoWid').value)document.getElementById('vCargoWid').value=248;if(!document.getElementById('vCargoHei').value)document.getElementById('vCargoHei').value=d;}}).call(this)">
+            <option value="" data-i18n="car.trailerKindPick">— Típus —</option>
+            <option value="standard" data-i18n="car.trailerStd">Standard (260 cm)</option>
+            <option value="mega" data-i18n="car.trailerMega">Mega (305 cm)</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+          <input class="inp" id="vCargoLen" data-i18n-ph="car.phCargoLen" placeholder="Hossz cm *" type="number" min="100" max="2000" style="flex:1;min-width:80px;">
+          <input class="inp" id="vCargoWid" data-i18n-ph="car.phCargoWid" placeholder="Szélesség cm *" type="number" min="100" max="350" style="flex:1;min-width:80px;">
+          <input class="inp" id="vCargoHei" data-i18n-ph="car.phCargoHei" placeholder="Magasság cm *" type="number" min="50" max="400" style="flex:1;min-width:80px;">
+        </div>
         <div style="margin-top:6px">
           <textarea class="inp" id="vNota" data-i18n-ph="car.phNote" placeholder="Megjegyzés" rows="2" style="resize:vertical"></textarea>
         </div>

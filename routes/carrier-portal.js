@@ -112,7 +112,7 @@ router.get('/api/carrier/vehicles', requireCarrier, async (req, res) => {
   try {
     const cu = req.session.carrierUser;
     const r = await pool.query(
-      'SELECT id, rendszam_camion, rendszam_remorca, marca, model, sofer_nev, sofer_tel, an_fabricatie, nota FROM carrier_vehicles WHERE company_id=$1 AND carrier_id=$2 ORDER BY created_at DESC',
+      'SELECT id, rendszam_camion, rendszam_remorca, marca, model, sofer_nev, sofer_tel, an_fabricatie, nota, trailer_kind, cargo_length_cm, cargo_width_cm, cargo_height_cm FROM carrier_vehicles WHERE company_id=$1 AND carrier_id=$2 ORDER BY created_at DESC',
       [cu.company_id, cu.carrier_id]);
     return res.json({ ok: true, items: r.rows });
   } catch (err) { console.error('carrier vehicles hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
@@ -124,8 +124,8 @@ router.post('/api/carrier/vehicles', requireCarrier, async (req, res) => {
     const cam = String(b.rendszam_camion || '').trim().toUpperCase().slice(0, 50);
     if (!cam) return res.json({ ok: false, err: 'Numarul de inmatriculare al capului tractor este obligatoriu.' });
     await pool.query(
-      `INSERT INTO carrier_vehicles (company_id, carrier_id, rendszam_camion, rendszam_remorca, marca, model, sofer_nev, nota, sofer_tel, an_fabricatie)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      `INSERT INTO carrier_vehicles (company_id, carrier_id, rendszam_camion, rendszam_remorca, marca, model, sofer_nev, nota, sofer_tel, an_fabricatie, trailer_kind, cargo_length_cm, cargo_width_cm, cargo_height_cm)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
       [cu.company_id, cu.carrier_id, cam,
        String(b.rendszam_remorca || '').trim().toUpperCase().slice(0, 50) || null,
        String(b.marca || '').trim().slice(0, 80) || null,
@@ -133,7 +133,11 @@ router.post('/api/carrier/vehicles', requireCarrier, async (req, res) => {
        String(b.sofer_nev || '').trim().slice(0, 120) || null,
        String(b.nota || '').trim().slice(0, 500) || null,
        String(b.sofer_tel || '').trim().slice(0, 30) || null,
-       b.an_fabricatie ? (parseInt(b.an_fabricatie, 10) || null) : null]);
+       b.an_fabricatie ? (parseInt(b.an_fabricatie, 10) || null) : null,
+       ['standard','mega'].includes(b.trailer_kind) ? b.trailer_kind : null,
+       b.cargo_length_cm ? (parseInt(b.cargo_length_cm, 10) || null) : null,
+       b.cargo_width_cm  ? (parseInt(b.cargo_width_cm, 10)  || null) : null,
+       b.cargo_height_cm ? (parseInt(b.cargo_height_cm, 10) || null) : null]);
     return res.json({ ok: true });
   } catch (err) { console.error('carrier vehicle add hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
 });
@@ -145,8 +149,8 @@ router.put('/api/carrier/vehicles/:id', requireCarrier, async (req, res) => {
     const cam = String(b.rendszam_camion || '').trim().toUpperCase().slice(0, 50);
     if (!cam) return res.json({ ok: false, err: 'Numarul de inmatriculare al capului tractor este obligatoriu.' });
     const r = await pool.query(
-      `UPDATE carrier_vehicles SET rendszam_camion=$1, rendszam_remorca=$2, marca=$3, model=$4, sofer_nev=$5, sofer_tel=$6, an_fabricatie=$7, nota=$8
-       WHERE id=$9 AND company_id=$10 AND carrier_id=$11`,
+      `UPDATE carrier_vehicles SET rendszam_camion=$1, rendszam_remorca=$2, marca=$3, model=$4, sofer_nev=$5, sofer_tel=$6, an_fabricatie=$7, nota=$8, trailer_kind=$9, cargo_length_cm=$10, cargo_width_cm=$11, cargo_height_cm=$12
+       WHERE id=$13 AND company_id=$14 AND carrier_id=$15`,
       [cam,
        String(b.rendszam_remorca || '').trim().toUpperCase().slice(0, 50) || null,
        String(b.marca || '').trim().slice(0, 80) || null,
@@ -155,6 +159,10 @@ router.put('/api/carrier/vehicles/:id', requireCarrier, async (req, res) => {
        String(b.sofer_tel || '').trim().slice(0, 30) || null,
        b.an_fabricatie ? (parseInt(b.an_fabricatie, 10) || null) : null,
        String(b.nota || '').trim().slice(0, 500) || null,
+       ['standard','mega'].includes(b.trailer_kind) ? b.trailer_kind : null,
+       b.cargo_length_cm ? (parseInt(b.cargo_length_cm, 10) || null) : null,
+       b.cargo_width_cm  ? (parseInt(b.cargo_width_cm, 10)  || null) : null,
+       b.cargo_height_cm ? (parseInt(b.cargo_height_cm, 10) || null) : null,
        id, cu.company_id, cu.carrier_id]);
     return res.json({ ok: !!r.rowCount });
   } catch (err) { console.error('carrier vehicle edit hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
