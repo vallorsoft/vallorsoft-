@@ -498,4 +498,114 @@ handlers.devSendCompanyEmail = async function (req, res, args) {
   }
 };
 
+// ---- Jogi oldalak szerkesztő ----
+
+const LEGAL_META = {
+  terms:    { file: 'terms.html',    title: 'Termeni și Condiții' },
+  privacy:  { file: 'privacy.html',  title: 'Politica de Confidențialitate' },
+  cookies:  { file: 'cookies.html',  title: 'Politica de Cookies' },
+  dpa:      { file: 'dpa.html',      title: 'Acord de Prelucrare Date' },
+  security: { file: 'security.html', title: 'Politica de Securitate' },
+};
+
+// HTML-tagek eltávolítása szöveges diffhez
+function stripHtml(html) {
+  return (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Bekezdés-szintű diff (zöld=hozzáadott, piros=törölt)
+function computeDiffHtml(oldText, newText) {
+  const split = t => t.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(s => s.length > 15);
+  const oldSet = new Set(split(oldText));
+  const newSet = new Set(split(newText));
+  const added   = split(newText).filter(p => !oldSet.has(p));
+  const removed = split(oldText).filter(p => !newSet.has(p));
+  if (!added.length && !removed.length) {
+    return '<p style="color:#9ca6b5">Modificare minoră de formatare sau punctuație.</p>';
+  }
+  let html = '';
+  for (const p of added) {
+    html += `<p style="background:rgba(34,197,94,.12);border-left:3px solid #22c55e;padding:.4rem .8rem;margin:.3rem 0;border-radius:4px;color:#e9eef5;font-size:.82rem">➕ ${p}</p>`;
+  }
+  for (const p of removed) {
+    html += `<p style="background:rgba(239,68,68,.08);border-left:3px solid #ef4444;padding:.4rem .8rem;margin:.3rem 0;border-radius:4px;color:#9ca6b5;font-size:.82rem;text-decoration:line-through">➖ ${p}</p>`;
+  }
+  return html;
+}
+
+// Jogi oldal tartalmának lekérése (DB → fallback statikus fájl)
+handlers.devGetLegalPage = async function (req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis.' } });
+  const { page_key } = args || {};
+  if (!LEGAL_META[page_key]) return res.json({ result: { ok: false, err: 'Pagină invalidă.' } });
+  try {
+    const dbR = await pool.query(
+      'SELECT value FROM developer_settings WHERE key=$1', ['legal_' + page_key]
+    );
+    if (dbR.rows.length && dbR.rows[0].value.html) {
+      const val = dbR.rows[0].value;
+      return res.json({ result: { ok: true, html: val.html, updated_at: val.updated_at, from_db: true } });
+    }
+    // Statikus fájlból olvassuk a main tartalmát
+    const fsP  = require('fs').promises;
+    const pathM = require('path');
+    const raw  = await fsP.readFile(pathM.join(__dirname, '..', 'public', LEGAL_META[page_key].file), 'utf8');
+    const match = raw.match(/<main class="policy-content">([\s\S]*?)<\/main>/);
+    return res.json({ result: { ok: true, html: match ? match[1].trim() : '', updated_at: null, from_db: false } });
+  } catch (err) {
+    console.error('devGetLegalPage hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server.' } });
+  }
+};
+
+// Jogi oldal tartalmának mentése (+ opcionális értesítés-verzió beállítása)
+handlers.devSaveLegalPage = async function (req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis.' } });
+  const { page_key, html, notify } = args || {};
+  if (!LEGAL_META[page_key] || !html) return res.json({ result: { ok: false, err: 'Date lipsă.' } });
+
+  try {
+    // Előző tartalom lekérése a diffhez
+    const prevR  = await pool.query('SELECT value FROM developer_settings WHERE key=$1', ['legal_' + page_key]);
+    const prevVal = prevR.rows[0]?.value || {};
+    const prevHtml = prevVal.html || '';
+
+    const now = new Date();
+    const dd  = String(now.getDate()).padStart(2,'0');
+    const mm  = String(now.getMonth()+1).padStart(2,'0');
+    const yyyy = now.getFullYear();
+    const dateStr = `${dd}.${mm}.${yyyy}`;
+
+    // last-update sor automatikus frissítése a tartalomban
+    let newHtml = html.replace(
+      /<p class="last-update">[\s\S]*?<\/p>/,
+      `<p class="last-update">Ultima actualizare: ${dateStr}</p>`
+    );
+
+    const diffHtml = notify
+      ? computeDiffHtml(stripHtml(prevHtml), stripHtml(newHtml))
+      : (prevVal.diff_html || null);
+
+    const value = {
+      html:           newHtml,
+      updated_at:     dateStr,
+      title:          LEGAL_META[page_key].title,
+      prev_html:      prevHtml,
+      diff_html:      diffHtml,
+      notify_version: notify ? now.toISOString() : (prevVal.notify_version || null),
+    };
+
+    await pool.query(
+      `INSERT INTO developer_settings(key, value, updated_at) VALUES($1,$2,now())
+       ON CONFLICT(key) DO UPDATE SET value=$2, updated_at=now()`,
+      ['legal_' + page_key, JSON.stringify(value)]
+    );
+
+    return res.json({ result: { ok: true, updated_at: dateStr } });
+  } catch (err) {
+    console.error('devSaveLegalPage hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server.' } });
+  }
+};
+
 module.exports = handlers;

@@ -171,6 +171,7 @@ app.use(session({
 
 // ===== ROUTE-OK MOUNTOLASA =====
 app.use(require('./routes/firebase'));
+app.use(require('./routes/legal'));   // dinamikus jogi oldalak + ack
 app.use(require('./routes/pages'));
 app.use(require('./routes/auth'));
 app.use(require('./routes/public-register')); // nyilvános regisztráció + trial
