@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Blog — VallorSoft</title>
+  <link rel="stylesheet" href="/landing.css">
+  <style>
+    .bp-wrap { max-width: 760px; margin: 0 auto; padding: 48px 24px 80px; }
+    .bp-back { display: inline-flex; align-items: center; gap: 6px; color: var(--brand-indigo,#6366f1); font-size: 14px; font-weight: 600; text-decoration: none; margin-bottom: 32px; }
+    .bp-back:hover { opacity: 0.75; }
+    .bp-title { font-size: clamp(1.6rem,4vw,2.4rem); font-weight: 800; line-height: 1.25; margin-bottom: 24px; color: #0f172a; }
+    .bp-content { font-size: 16px; line-height: 1.8; color: #334155; }
+    .bp-content h2 { font-size: 1.3rem; font-weight: 700; margin: 2em 0 0.6em; color: #0f172a; }
+    .bp-content h3 { font-size: 1.1rem; font-weight: 700; margin: 1.5em 0 0.5em; color: #1e293b; }
+    .bp-content p { margin-bottom: 1em; }
+    .bp-content ul, .bp-content ol { margin: 0 0 1em 1.5em; }
+    .bp-content li { margin-bottom: 0.4em; }
+    .bp-empty { color: #64748b; font-size: 15px; padding: 40px 0; }
+    .bp-loading { color: #6366f1; padding: 40px 0; }
+  </style>
+</head>
+<body>
+<header class="lp-navbar" id="navbar">
+  <div class="lp-container lp-navbar-inner">
+    <a href="/" class="lp-logo"><span class="lp-logo-vallor">Vallor</span><span class="lp-logo-soft">Soft</span></a>
+    <nav class="lp-nav-menu">
+      <ul class="lp-nav-list">
+        <li><a href="/#blog" class="lp-nav-link" id="navBackBlog">← Blog</a></li>
+        <li><a href="/login" class="lp-nav-link">Login</a></li>
+      </ul>
+    </nav>
+    <button id="languageToggle" class="lp-lang-btn" title="Váltás magyarra / Schimbă în română">HU</button>
+  </div>
+</header>
+
+<main style="background:#f8fafc;min-height:80vh;padding-top:72px;">
+  <div class="bp-wrap">
+    <a href="/#blog" class="bp-back" id="backLink">← Blog</a>
+    <h1 class="bp-title" id="postTitle"><span class="bp-loading">Se încarcă...</span></h1>
+    <div class="bp-content" id="postContent"></div>
+  </div>
+</main>
+
+<footer class="lp-footer" style="margin-top:0;">
+  <div class="lp-container">
+    <div style="text-align:center;padding:24px 0;border-top:1px solid rgba(255,255,255,0.08);">
+      <a href="/" class="lp-logo" style="font-size:1.1rem;"><span class="lp-logo-vallor">Vallor</span><span class="lp-logo-soft">Soft</span></a>
+      <p style="color:#64748b;font-size:12px;margin-top:8px;">© 2024 VALLOR TEAM SRL</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function() {
+  var TRANS = {
+    ro: { back: '← Blog', loading: 'Se încarcă...', notFound: 'Articolul nu a fost găsit.', noContent: 'Conținut indisponibil momentan.' },
+    hu: { back: '← Blog', loading: 'Betöltés...', notFound: 'A cikk nem található.', noContent: 'A tartalom jelenleg nem érhető el.' }
+  };
+
+  var lang = localStorage.getItem('vs-lang') || 'ro';
+  var t = TRANS[lang] || TRANS.ro;
+
+  // Language toggle
+  var btn = document.getElementById('languageToggle');
+  btn.textContent = lang === 'ro' ? 'HU' : 'RO';
+  btn.addEventListener('click', function() {
+    var newLang = lang === 'ro' ? 'hu' : 'ro';
+    localStorage.setItem('vs-lang', newLang);
+    location.reload();
+  });
+
+  // Back links
+  document.getElementById('backLink').textContent = t.back;
+  document.getElementById('navBackBlog').textContent = t.back;
+
+  // Get blog post id from URL
+  var parts = window.location.pathname.split('/').filter(Boolean);
+  var id = parseInt(parts[parts.length - 1], 10);
+  var titleEl = document.getElementById('postTitle');
+  var contentEl = document.getElementById('postContent');
+
+  if (![1,2,3].includes(id)) {
+    titleEl.textContent = t.notFound;
+    return;
+  }
+
+  // Fetch article
+  fetch('/api/blog/' + id)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) { titleEl.textContent = t.notFound; return; }
+      var title = lang === 'hu' ? (d.titleHu || d.title) : d.title;
+      var content = lang === 'hu' ? (d.contentHu || d.content) : d.content;
+      titleEl.textContent = title || t.notFound;
+      document.title = (title || 'Blog') + ' — VallorSoft';
+      if (content) {
+        // Sanitize: only allow basic HTML tags
+        contentEl.innerHTML = content;
+      } else {
+        contentEl.innerHTML = '<p class="bp-empty">' + t.noContent + '</p>';
+      }
+    })
+    .catch(function() { titleEl.textContent = t.notFound; });
+})();
+</script>
+</body>
+</html>
