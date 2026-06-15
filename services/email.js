@@ -34,9 +34,10 @@ async function getEmailTemplate(key) {
 }
 
 // Változókat ({{kulcs}}) biztonságosan cseréli le a sablon szövegben (XSS-védelem).
-function applyTemplateVars(text, vars) {
+function applyTemplateVars(text, vars, rawVars) {
   if (!text) return '';
   return text.replace(/\{\{(\w+)\}\}/g, function(_, k) {
+    if (rawVars && k in rawVars) return rawVars[k]; // megbízható HTML, nem escape-eljük
     return k in vars ? escHtml(String(vars[k])) : '';
   });
 }
@@ -129,9 +130,15 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev, lang
   const tpl = await getEmailTemplate('email_sys_invite');
   if (tpl && tpl.subject && (tpl.body_ro || tpl.body_hu)) {
     const bodyText = L === 'hu' ? (tpl.body_hu || tpl.body_ro) : (tpl.body_ro || tpl.body_hu);
-    const vars = { nev: meghivottNev || '', ceg_nev: cegNev || '', pozicio: pozicio || '', register_url: registerUrl + '/register' };
-    subject = applyTemplateVars(tpl.subject, vars);
-    html = applyTemplateVars(bodyText, vars);
+    const inviteHref = escHtml(registerUrl + '/register?kod=' + encodeURIComponent(kod || '')).replace(/"/g, '%22');
+    const inviteBtnLabel = L === 'hu' ? 'Regisztráció' : 'Înregistrare';
+    const vars    = { nev: meghivottNev || '', ceg_nev: cegNev || '', pozicio: pozicio || '', register_url: registerUrl + '/register' };
+    const rawVars = {
+      invite_url_btn: `<a href="${inviteHref}" style="display:inline-block;background:#6366f1;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">${inviteBtnLabel}</a>`,
+      invite_url_link: `<a href="${inviteHref}" style="color:#3b82f6;word-break:break-all;">${escHtml(registerUrl + '/register')}</a>`,
+    };
+    subject = applyTemplateVars(tpl.subject, vars, rawVars);
+    html = applyTemplateVars(bodyText, vars, rawVars);
   } else {
     html = buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl, lang: L });
     subject = (L === 'hu' ? 'VallorSoft — Meghívó' : 'VallorSoft — Invitație') + ` (${cegNev || 'VallorSoft'})`;
@@ -176,9 +183,15 @@ async function sendResetEmail(toEmail, nume, resetUrl, lang) {
   const tpl = await getEmailTemplate('email_sys_reset');
   if (tpl && tpl.subject && (tpl.body_ro || tpl.body_hu)) {
     const bodyText = L === 'hu' ? (tpl.body_hu || tpl.body_ro) : (tpl.body_ro || tpl.body_hu);
-    const vars = { nev: nume || '', reset_url: resetUrl || '' };
-    const subject = applyTemplateVars(tpl.subject, vars);
-    const htmlContent = applyTemplateVars(bodyText, vars);
+    const btnLabel = L === 'hu' ? 'Új jelszó beállítása' : 'Setează parolă nouă';
+    const safeUrl  = (resetUrl || '').replace(/"/g, '%22');
+    const vars    = { nev: escHtml(nume || ''), reset_url: resetUrl || '' };
+    const rawVars = {
+      reset_url_btn:  `<a href="${safeUrl}" style="display:inline-block;background:#e10b1a;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">${btnLabel}</a>`,
+      reset_url_link: `<a href="${safeUrl}" style="color:#3b82f6;word-break:break-all;">${escHtml(resetUrl || '')}</a>`,
+    };
+    const subject = applyTemplateVars(tpl.subject, vars, rawVars);
+    const htmlContent = applyTemplateVars(bodyText, vars, rawVars);
     try {
       const resp = await fetchT('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
