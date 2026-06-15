@@ -1099,10 +1099,14 @@ var LANDING_KEY_HELP = {
   blog3Title: { label:'3. bejegyzés cím',   where:'Blog — 3. kártya cím' },
   blog3Desc:  { label:'3. bejegyzés összefoglaló', where:'Blog — 3. kártya szöveg' },
   statsTitle:          { label:'Statisztika főcím',    where:'Számok szekció H2 felirata, pl. „Platformă de încredere"' },
-  stat1:               { label:'1. statisztika',       where:'Nagy számok blokk — 1. elem, pl. „500+ cég / vállalat"' },
-  stat2:               { label:'2. statisztika',       where:'Nagy számok blokk — 2. elem' },
-  stat3:               { label:'3. statisztika',       where:'Nagy számok blokk — 3. elem' },
-  stat4:               { label:'4. statisztika',       where:'Nagy számok blokk — 4. elem' },
+  stat1Num:            { label:'1. szám (nagy szám)',  where:'Nagy számok blokk — 1. elem nagy száma, pl. „98%"' },
+  stat1:               { label:'1. statisztika felirat',where:'Nagy számok blokk — 1. elem alatti szöveg, pl. „Ügyfél elégedettség"' },
+  stat2Num:            { label:'2. szám (nagy szám)',  where:'Nagy számok blokk — 2. elem nagy száma, pl. „50+"' },
+  stat2:               { label:'2. statisztika felirat',where:'Nagy számok blokk — 2. elem alatti szöveg' },
+  stat3Num:            { label:'3. szám (nagy szám)',  where:'Nagy számok blokk — 3. elem nagy száma, pl. „1000+"' },
+  stat3:               { label:'3. statisztika felirat',where:'Nagy számok blokk — 3. elem alatti szöveg' },
+  stat4Num:            { label:'4. szám (nagy szám)',  where:'Nagy számok blokk — 4. elem nagy száma, pl. „24/7"' },
+  stat4:               { label:'4. statisztika felirat',where:'Nagy számok blokk — 4. elem alatti szöveg' },
   registerTitle:       { label:'Regisztrációs CTA cím',   where:'Alsó CTA szekció H2 felirata (regisztrálj most blokk)' },
   registerSub:         { label:'Regisztrációs CTA alcím', where:'CTA szekció alcíme' },
   contactTitle:        { label:'Kapcsolat szekció főcím', where:'Chat/kapcsolat blokk H2 felirata' },
@@ -1156,7 +1160,7 @@ var LANDING_DEFAULTS = {
     blog1Title:'Digitalizarea transportului rutier în România',blog1Desc:'Cum ajută tehnologia la eficientizarea flotelor și reducerea costurilor operaționale.',
     blog2Title:'e-Factura 2026 — tot ce trebuie să știți',blog2Desc:'Ghid complet privind obligațiile e-Factura pentru transportatori și cum VallorSoft automatizează procesul.',
     blog3Title:'Codul UIT și RO e-Transport — ghid practic',blog3Desc:'Ce este codul UIT, când este obligatoriu și cum gestionați declarațiile prin CargoTrack.',
-    statsTitle:'Cifre care vorbesc de la sine',stat1:'Satisfacție clienți',stat2:'Integrări active',stat3:'Vehicule gestionate',stat4:'Suport',
+    statsTitle:'Cifre care vorbesc de la sine',stat1Num:'98%',stat1:'Satisfacție clienți',stat2Num:'50+',stat2:'Integrări active',stat3Num:'1000+',stat3:'Vehicule gestionate',stat4Num:'24/7',stat4:'Suport',
     registerTitle:'Începeți testarea gratuită',registerSub:'14 zile gratuite — fără card bancar, anulare oricând.',
     contactTitle:'Contact',contactDesc:'Suntem disponibili pentru întrebări, demonstrații și oferte personalizate.',
     footerTagline:'Platformă SaaS pentru transport rutier & management flotă — România',
@@ -1204,7 +1208,7 @@ var LANDING_DEFAULTS = {
     blog1Title:'A közúti fuvarozás digitalizálása Romániában',blog1Desc:'Hogyan segít a technológia a flottahatékonyság növelésében és az üzemeltetési költségek csökkentésében.',
     blog2Title:'e-Factura 2026 — amit tudni kell',blog2Desc:'Teljes útmutató a fuvarozókra vonatkozó e-Factura kötelezettségekről és a VallorSoft automatizálásáról.',
     blog3Title:'UIT-kód és RO e-Transport — gyakorlati útmutató',blog3Desc:'Mi az UIT-kód, mikor kötelező, és hogyan intézze a CargoTrack segítségével.',
-    statsTitle:'Számok, amelyek magukért beszélnek',stat1:'Ügyfél elégedettség',stat2:'Aktív integráció',stat3:'Kezelt jármű',stat4:'Támogatás',
+    statsTitle:'Számok, amelyek magukért beszélnek',stat1Num:'98%',stat1:'Ügyfél elégedettség',stat2Num:'50+',stat2:'Aktív integráció',stat3Num:'1000+',stat3:'Kezelt jármű',stat4Num:'24/7',stat4:'Támogatás',
     registerTitle:'Ingyenes próba indítása',registerSub:'14 nap ingyenesen — bankkártya nélkül, bármikor lemondható.',
     contactTitle:'Kapcsolat',contactDesc:'Elérhetők vagyunk kérdések, bemutatók és egyedi ajánlatok esetén.',
     footerTagline:'SaaS platform közúti fuvarozáshoz és flottakezeléshez — Románia',
@@ -1240,7 +1244,7 @@ var LANDING_SECTIONS = {
   },
   other: {
     label: '🔖 Egyéb',
-    keys: ['statsTitle','stat1','stat2','stat3','stat4','registerTitle','registerSub','contactTitle','contactDesc','footerTagline','footerIntegrations','pricingTitle','pricingSubtitle']
+    keys: ['statsTitle','stat1Num','stat1','stat2Num','stat2','stat3Num','stat3','stat4Num','stat4','registerTitle','registerSub','contactTitle','contactDesc','footerTagline','footerIntegrations','pricingTitle','pricingSubtitle']
   }
 };
 
