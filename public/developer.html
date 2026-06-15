@@ -153,6 +153,7 @@
     <div class="dev-tab" onclick="showPane('here')" data-i18n-html="dev.tabHere">⚡ HERE API</div>
     <div class="dev-tab" onclick="showPane('integ')" data-i18n-html="dev.tabInteg">💳 Integrációk</div>
     <div class="dev-tab" onclick="showPane('regisztraciok')">📥 Regisztrációk</div>
+    <div class="dev-tab" onclick="showPane('landing')">🌐 Landing szövegek</div>
     <div class="dev-tab" onclick="showPane('legal')">📋 Jogi oldalak</div>
     <div class="dev-tab" onclick="showPane('elofiz')" data-i18n-html="dev.tabElofiz">📦 Előfizetések</div>
     <div style="margin-top:auto; padding-top:20px; border-top:1px solid var(--border);">
@@ -274,6 +275,35 @@
         <div style="font-size:13px;font-weight:700;color:#6366f1;margin-bottom:12px;">🏢 Regisztrált cégek</div>
         <div id="regCegekList"><div style="color:var(--muted);font-size:13px;">Betöltés...</div></div>
       </div>
+    </div>
+
+    <!-- LANDING SZÖVEGEK szerkesztő -->
+    <div class="dev-pane hidden" id="pane-landing">
+      <div class="section-title">🌐 Landing page szövegek</div>
+      <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);border-radius:10px;padding:12px 16px;font-size:12px;color:#334155;margin-bottom:16px;">
+        Szerkesztés után <b>Mentés</b> → a landing oldal azonnal frissül (deploy nélkül). Az üres mezőkre az alapértelmezett szöveg érvényes.
+      </div>
+
+      <!-- Szekció-választó -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;" id="landingSecBtns">
+        <button class="landing-sec-btn active" data-sec="hero"     onclick="selectLandingSection('hero')">🦸 Hero</button>
+        <button class="landing-sec-btn"        data-sec="strip"    onclick="selectLandingSection('strip')">⚡ Strip</button>
+        <button class="landing-sec-btn"        data-sec="features" onclick="selectLandingSection('features')">🔧 Funkciók</button>
+        <button class="landing-sec-btn"        data-sec="how"      onclick="selectLandingSection('how')">📋 Hogyan</button>
+        <button class="landing-sec-btn"        data-sec="modules"  onclick="selectLandingSection('modules')">📦 Modulok</button>
+        <button class="landing-sec-btn"        data-sec="blog"     onclick="selectLandingSection('blog')">📰 Blog</button>
+        <button class="landing-sec-btn"        data-sec="other"    onclick="selectLandingSection('other')">🔖 Egyéb</button>
+      </div>
+
+      <div id="landingKeysForm" style="max-height:520px;overflow-y:auto;padding-right:4px;">
+        <!-- JS generálja dinamikusan -->
+      </div>
+
+      <div style="margin-top:14px;display:flex;align-items:center;gap:12px;">
+        <button onclick="saveLandingTexts()" style="background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;border:none;border-radius:10px;padding:9px 22px;font-size:13px;font-weight:700;cursor:pointer;">💾 Mentés</button>
+        <a href="/" target="_blank" style="color:#6366f1;font-size:12px;text-decoration:none;">🔗 Landing megtekintése →</a>
+      </div>
+      <div id="landingMsg" style="min-height:20px;font-size:12px;margin-top:8px;"></div>
     </div>
 
     <!-- JOGI OLDALAK szerkesztő -->
@@ -433,6 +463,7 @@ function showPane(id) {
   if(id==='integ') loadIntegPane();
   if(id==='elofiz') loadElofizPane();
   if(id==='regisztraciok') loadRegPane();
+  if(id==='landing') loadLandingTextsPane();
   if(id==='legal') loadLegalPane();
 }
 
@@ -871,6 +902,113 @@ function loadDash(){
     document.getElementById('kAktiv').textContent = r.aktiv_cegek;
     document.getElementById('kUsers').textContent = r.userek;
     document.getElementById('kFuvar').textContent = r.fuvarok;
+  });
+}
+
+/* ── Landing szövegek szerkesztő ── */
+
+var LANDING_SECTIONS = {
+  hero: {
+    label: '🦸 Hero szekció',
+    keys: ['heroTitle','heroSubtitle','heroBadge','startFreeBtn','trialNote','heroBullet1','heroBullet2','heroBullet3','heroNote']
+  },
+  strip: {
+    label: '⚡ Feature strip',
+    keys: ['strip1Title','strip1Desc','strip2Title','strip2Desc','strip3Title','strip3Desc','strip4Title','strip4Desc','strip5Title','strip5Desc']
+  },
+  features: {
+    label: '🔧 Főbb funkciók',
+    keys: ['featuresTitle','featuresSubtitle','feat1Title','feat1Desc','feat2Title','feat2Desc','feat3Title','feat3Desc','feat4Title','feat4Desc','feat5Title','feat5Desc','feat6Title','feat6Desc','feat7Title','feat7Desc','feat8Title','feat8Desc']
+  },
+  how: {
+    label: '📋 Hogyan működik',
+    keys: ['howTitle','howSubtitle','step1Title','step1Desc','step2Title','step2Desc','step3Title','step3Desc']
+  },
+  modules: {
+    label: '📦 Modulok',
+    keys: ['modulesTitle','modulesSubtitle','mod1Title','mod1Desc','mod2Title','mod2Desc','mod3Title','mod3Desc','mod4Title','mod4Desc','mod5Title','mod5Desc','mod6Title','mod6Desc','mod7Title','mod7Desc','mod8Title','mod8Desc']
+  },
+  blog: {
+    label: '📰 Blog / Hírek',
+    keys: ['blogTitle','blog1Title','blog1Desc','blog2Title','blog2Desc','blog3Title','blog3Desc']
+  },
+  other: {
+    label: '🔖 Egyéb',
+    keys: ['statsTitle','stat1','stat2','stat3','stat4','registerTitle','registerSub','contactTitle','contactDesc','footerTagline','footerIntegrations','pricingTitle','pricingSubtitle']
+  }
+};
+
+var _landingCurrentSec = 'hero';
+var _landingDbTexts = { ro: {}, hu: {} };
+
+function loadLandingTextsPane() {
+  gas('devGetLandingTexts').then(function(r) {
+    if (r && r.ok) {
+      _landingDbTexts = { ro: r.ro || {}, hu: r.hu || {} };
+    }
+    selectLandingSection(_landingCurrentSec);
+  });
+}
+
+function selectLandingSection(sec) {
+  _landingCurrentSec = sec;
+  document.querySelectorAll('.landing-sec-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.sec === sec);
+  });
+  renderLandingForm(sec);
+}
+
+function renderLandingForm(sec) {
+  var secDef = LANDING_SECTIONS[sec];
+  var formEl = document.getElementById('landingKeysForm');
+  if (!secDef || !formEl) return;
+
+  var html = '<div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:12px;">' + escHtml(secDef.label) + '</div>';
+  html += '<div style="display:grid;grid-template-columns:160px 1fr 1fr;gap:8px;align-items:center;margin-bottom:6px;">'
+    + '<div style="font-size:11px;font-weight:700;color:var(--muted)">Kulcs</div>'
+    + '<div style="font-size:11px;font-weight:700;color:#1e40af">🇷🇴 Román</div>'
+    + '<div style="font-size:11px;font-weight:700;color:#166534">🇭🇺 Magyar</div>'
+    + '</div>';
+
+  secDef.keys.forEach(function(key) {
+    var roVal = escHtml(_landingDbTexts.ro[key] || '');
+    var huVal = escHtml(_landingDbTexts.hu[key] || '');
+    html += '<div style="display:grid;grid-template-columns:160px 1fr 1fr;gap:8px;align-items:start;margin-bottom:8px;">'
+      + '<div style="font-size:11px;color:var(--muted);font-weight:600;padding-top:9px;">' + escHtml(key) + '</div>'
+      + '<textarea data-key="' + escHtml(key) + '" data-lang="ro" rows="2" style="width:100%;box-sizing:border-box;background:#fff;border:1px solid var(--border-bright,#e2e8f0);border-radius:8px;padding:8px;font-size:12px;resize:vertical;" placeholder="(alapértelmezett)">' + roVal + '</textarea>'
+      + '<textarea data-key="' + escHtml(key) + '" data-lang="hu" rows="2" style="width:100%;box-sizing:border-box;background:#fff;border:1px solid var(--border-bright,#e2e8f0);border-radius:8px;padding:8px;font-size:12px;resize:vertical;" placeholder="(alapértelmezett)">' + huVal + '</textarea>'
+      + '</div>';
+  });
+
+  formEl.innerHTML = html;
+}
+
+function saveLandingTexts() {
+  // Az aktuális szekció textarea értékeit + a többi szekció tárolt értékeit összegyűjtjük
+  var newRo = Object.assign({}, _landingDbTexts.ro);
+  var newHu = Object.assign({}, _landingDbTexts.hu);
+
+  document.querySelectorAll('#landingKeysForm textarea').forEach(function(ta) {
+    var key = ta.dataset.key;
+    var lang = ta.dataset.lang;
+    var val = ta.value.trim();
+    if (lang === 'ro') { if (val) newRo[key] = val; else delete newRo[key]; }
+    if (lang === 'hu') { if (val) newHu[key] = val; else delete newHu[key]; }
+  });
+
+  var msgEl = document.getElementById('landingMsg');
+  msgEl.style.color = '#64748b';
+  msgEl.textContent = 'Mentés...';
+
+  gas('devSaveLandingTexts', { ro: newRo, hu: newHu }).then(function(r) {
+    if (r && r.ok) {
+      _landingDbTexts = { ro: newRo, hu: newHu };
+      msgEl.style.color = '#22c55e';
+      msgEl.textContent = '✓ Elmentve';
+    } else {
+      msgEl.style.color = '#ef4444';
+      msgEl.textContent = '✕ Hiba: ' + ((r && r.err) || 'ismeretlen');
+    }
   });
 }
 

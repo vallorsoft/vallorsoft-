@@ -613,4 +613,42 @@ handlers.devSaveLegalPage = async function (req, res, args) {
   }
 };
 
+/* ── Landing szövegek CRUD ── */
+
+handlers.devGetLandingTexts = async function(req, res, args) {
+  const isDev = req.session.user && req.session.user.is_dev;
+  if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  try {
+    const r = await pool.query(
+      `SELECT value FROM developer_settings WHERE key='landing_content'`
+    );
+    if (!r.rows.length) {
+      return res.json({ result: { ok: true, ro: {}, hu: {}, has_db: false } });
+    }
+    const val = r.rows[0].value;
+    return res.json({ result: { ok: true, ro: (val && val.ro) || {}, hu: (val && val.hu) || {}, has_db: true } });
+  } catch (err) {
+    console.error('devGetLandingTexts hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.devSaveLandingTexts = async function(req, res, args) {
+  const isDev = req.session.user && req.session.user.is_dev;
+  if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  try {
+    const ro = (args && typeof args.ro === 'object' && args.ro !== null) ? args.ro : {};
+    const hu = (args && typeof args.hu === 'object' && args.hu !== null) ? args.hu : {};
+    await pool.query(
+      `INSERT INTO developer_settings(key, value, updated_at) VALUES($1,$2,now())
+       ON CONFLICT(key) DO UPDATE SET value=$2, updated_at=now()`,
+      ['landing_content', JSON.stringify({ ro, hu })]
+    );
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('devSaveLandingTexts hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 module.exports = handlers;

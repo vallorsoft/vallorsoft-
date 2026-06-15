@@ -453,6 +453,31 @@ document.getElementById('languageToggle')?.addEventListener('click', () => {
 
 applyLanguage(localStorage.getItem('vs-landing-lang') || 'ro');
 
+/* ── Landing szövegek DB override (best-effort, dev által szerkeszthető) ─── */
+(function() {
+  try {
+    fetch('/api/landing-texts')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (!data) return;
+        var changed = false;
+        if (data.ro && typeof data.ro === 'object' && Object.keys(data.ro).length) {
+          Object.assign(translations.ro, data.ro);
+          changed = true;
+        }
+        if (data.hu && typeof data.hu === 'object' && Object.keys(data.hu).length) {
+          Object.assign(translations.hu, data.hu);
+          changed = true;
+        }
+        if (changed) {
+          var cur = localStorage.getItem('vs-landing-lang') || 'ro';
+          applyLanguage(cur);
+        }
+      })
+      .catch(function() { /* DB nem elérhető — alapértelmezett szövegekkel megy tovább */ });
+  } catch(e) { /* no-op */ }
+})();
+
 /* ── Scroll reveal ──────────────────────────────────────────── */
 const revealObserver = new IntersectionObserver(entries => {
   entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
