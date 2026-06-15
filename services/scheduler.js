@@ -226,21 +226,21 @@ function startMonthlyReportScheduler() {
         const row = (l, v) => '<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;color:#555;">' + l
           + '</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700;">' + v + '</td></tr>';
         const html =
-          '<p><b>' + c.nev + '</b> — raport lunar / havi összefoglaló: <b>' + month + '</b></p>'
+          '<p><b>' + c.nev + '</b> — raport lunar: <b>' + month + '</b></p>'
           + '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
-          + row('Curse finalizate / Lezárt fuvarok', fmt(k.lezart) + ' buc / db')
-          + row('Venit (finalizate) / Bevétel (lezárt)', fmt(k.bevetel) + ' EUR')
-          + row('Km parcurși (foi de parcurs) / Megtett km (menetlevelek)', fmt(fv.km) + ' km')
-          + row('Cost combustibil / Üzemanyag-költség', fmt(fv.uzemanyag) + ' RON')
-          + row('Alte cheltuieli șofer / Egyéb sofőr-költés', fmt(fv.vasarlas) + ' RON')
-          + row('Restanțe curente / Aktuális kintlévőség', fmt(k.kintlevo) + ' EUR')
+          + row('Curse finalizate', fmt(k.lezart) + ' buc')
+          + row('Venit (finalizate)', fmt(k.bevetel) + ' EUR')
+          + row('Km parcurși (foi de parcurs)', fmt(fv.km) + ' km')
+          + row('Cost combustibil', fmt(fv.uzemanyag) + ' RON')
+          + row('Alte cheltuieli șofer', fmt(fv.vasarlas) + ' RON')
+          + row('Restanțe curente', fmt(k.kintlevo) + ' EUR')
           + '</table>'
-          + '<p style="font-size:12px;color:#888;">Rapoarte detaliate: în meniul 📊 Statistici al VallorSoft. / Részletes riportok: a VallorSoft 📊 Statisztika menüjében.</p>';
+          + '<p style="font-size:12px;color:#888;">Rapoarte detaliate: în meniul 📊 Statistici al VallorSoft.</p>';
 
         let sentAny = false;
         for (const a of adminsR.rows) {
           const r = await email.sendClientEmail({
-            to: a.email, subject: '📊 VallorSoft raport lunar / havi összefoglaló — ' + month + ' (' + c.nev + ')', html,
+            to: a.email, subject: '📊 VallorSoft raport lunar — ' + month + ' (' + c.nev + ')', html,
           });
           if (r && r.ok) sentAny = true;
         }
@@ -432,27 +432,23 @@ function startTrialExpiryScheduler() {
             emailSubject = replVars(tpl.subject, vars);
             emailHtml = bodyRo + (bodyHu && bodyRo ? '<hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;">' : '') + bodyHu;
           } else {
-            emailSubject = 'Perioada de probă a expirat / Próbaidőszak lejárt — VallorSoft';
+            emailSubject = 'Perioada de probă a expirat — VallorSoft';
             emailHtml = `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
   <div style="background:linear-gradient(135deg,#6366f1,#3b82f6);padding:28px 32px;border-radius:12px 12px 0 0;">
     <h1 style="margin:0;color:#fff;font-size:22px;">vallor<span style="color:#c7d2fe;">Soft</span></h1>
   </div>
   <div style="background:#fff;padding:28px 32px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
-    <p style="margin:0 0 12px;font-size:16px;font-weight:600;">Perioada de probă a expirat / Próbaidőszak lejárt</p>
-    <p style="margin:0 0 12px;color:#475569;">
-      <strong>RO:</strong> Perioada de probă de 14 zile pentru <em>${ceg.nev}</em> a expirat astăzi.
+    <p style="margin:0 0 12px;font-size:16px;font-weight:600;">Perioada de probă a expirat</p>
+    <p style="margin:0 0 20px;color:#475569;">
+      Perioada de probă de 14 zile pentru <em>${ceg.nev}</em> a expirat astăzi.
       Pentru a continua să utilizați VallorSoft, vă rugăm să alegeți un pachet de abonament.
     </p>
-    <p style="margin:0 0 20px;color:#475569;">
-      <strong>HU:</strong> A(z) <em>${ceg.nev}</em> cég 14 napos próbaidőszaka ma lejárt.
-      A VallorSoft folyamatos használatához kérjük, válasszon előfizetési csomagot.
-    </p>
     <a href="${appUrl}/subscription" style="display:inline-block;background:linear-gradient(180deg,#3b82f6,#2563eb);color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">
-      📦 Alege pachet / Csomag választása
+      📦 Alege pachet
     </a>
     <p style="margin:24px 0 0;font-size:12px;color:#94a3b8;">
-      Întrebări? / Kérdés? <a href="mailto:vallorsoft@gmail.com" style="color:#6366f1;">vallorsoft@gmail.com</a>
+      Întrebări? <a href="mailto:vallorsoft@gmail.com" style="color:#6366f1;">vallorsoft@gmail.com</a>
     </p>
   </div>
 </div>`;
@@ -516,8 +512,8 @@ function startTrialReminderScheduler() {
 
       const ctaBlock = isDark
         ? `<a href="mailto:vallorsoft@gmail.com" style="display:block;text-align:center;margin-top:10px;padding:8px;background:#1e293b;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;">Contactați-ne</a>`
-        : `<a href="${linkM}" style="display:block;text-align:center;margin-top:8px;padding:7px;background:${color};color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;">Lunar / Havi</a>
-           <a href="${linkA}" style="display:block;text-align:center;margin-top:5px;padding:7px;background:transparent;color:${color};border:1.5px solid ${color};border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;">Anual / Éves ★ −1 lună</a>`;
+        : `<a href="${linkM}" style="display:block;text-align:center;margin-top:8px;padding:7px;background:${color};color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;">Lunar</a>
+           <a href="${linkA}" style="display:block;text-align:center;margin-top:5px;padding:7px;background:transparent;color:${color};border:1.5px solid ${color};border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;">Anual ★ −1 lună</a>`;
 
       return `<td style="width:25%;padding:8px;vertical-align:top;">
         <div style="border:1.5px solid ${i===2?color:'#e2e8f0'};border-radius:10px;padding:14px;background:${i===2?'#fafafe':'#fff'};">
@@ -531,16 +527,12 @@ function startTrialReminderScheduler() {
     return `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#0f172a;">
   <div style="background:linear-gradient(135deg,#6366f1,#3b82f6);padding:24px 28px;border-radius:12px 12px 0 0;">
     <h1 style="margin:0;color:#fff;font-size:20px;">vallor<span style="color:#c7d2fe;">Soft</span></h1>
-    <p style="margin:6px 0 0;color:rgba(255,255,255,.85);font-size:14px;">⏳ ${daysLeft === 1 ? 'Ultima zi / Utolsó nap' : `Mai ai ${daysLeft} zile / Még ${daysLeft} nap`}</p>
+    <p style="margin:6px 0 0;color:rgba(255,255,255,.85);font-size:14px;">⏳ ${daysLeft === 1 ? 'Ultima zi de probă' : `Mai ai ${daysLeft} zile din perioada de probă`}</p>
   </div>
   <div style="background:#fff;padding:24px 28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
-    <p style="margin:0 0 12px;font-size:15px;">
-      <strong>RO:</strong> Perioada de probă a companiei <em>${escH(company.nev)}</em> expiră în <strong>${daysLeft} ${daysLeft===1?'zi':'zile'}</strong>.
-      Alege un pachet pentru a continua fără întrerupere.
-    </p>
     <p style="margin:0 0 20px;font-size:15px;">
-      <strong>HU:</strong> A(z) <em>${escH(company.nev)}</em> próbaidőszaka <strong>${daysLeft} nap</strong> múlva lejár.
-      Válassz csomagot a folyamatos hozzáféréshez.
+      Perioada de probă a companiei <em>${escH(company.nev)}</em> expiră în <strong>${daysLeft} ${daysLeft===1?'zi':'zile'}</strong>.
+      Alege un pachet pentru a continua fără întrerupere.
     </p>
 
     <!-- Csomag kártyák -->
@@ -549,12 +541,11 @@ function startTrialReminderScheduler() {
     </table>
 
     <div style="background:#fffbeb;border:1px solid #fbbf24;border-radius:8px;padding:12px 16px;font-size:12px;color:#92400e;margin-bottom:16px;">
-      ★ <strong>Éves előfizetésnél</strong>: 11 hónapot fizet, 12 hónapot használ (1 hónap ingyen).<br>
       ★ <strong>Abonament anual</strong>: plătești 11 luni, folosești 12 (1 lună gratuită).
     </div>
 
     <p style="margin:0;font-size:12px;color:#94a3b8;">
-      Abonamentul începe după perioada de probă de 14 zile. / Az előfizetés a 14 napos próba után kezdődik.<br>
+      Abonamentul începe după perioada de probă de 14 zile.<br>
       Întrebări? <a href="mailto:vallorsoft@gmail.com" style="color:#6366f1;">vallorsoft@gmail.com</a>
     </p>
   </div>
@@ -589,7 +580,7 @@ function startTrialReminderScheduler() {
             const html = buildReminderHtml(company, plans, daysLeft);
             await sendClientEmail({
               to:      company.email_contact,
-              subject: `⏳ VallorSoft — ${daysLeft === 1 ? 'Ultima zi / Utolsó nap' : `${daysLeft} zile rămase / ${daysLeft} nap van hátra`} — Alege pachet / Válassz csomagot`,
+              subject: `⏳ VallorSoft — ${daysLeft === 1 ? 'Ultima zi de probă' : `${daysLeft} zile rămase din perioada de probă`} — Alege pachet`,
               html,
             });
             console.log(`[TrialReminder] ${daysLeft}d — cég #${company.id} (${company.nev}) emlékeztető elküldve`);
