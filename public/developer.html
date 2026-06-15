@@ -150,6 +150,7 @@
     <div class="dev-tab" onclick="showPane('userek')" data-i18n-html="dev.tabUserek">👥 Felhasználók</div>
     <div class="dev-tab" onclick="showPane('here')" data-i18n-html="dev.tabHere">⚡ HERE API</div>
     <div class="dev-tab" onclick="showPane('integ')" data-i18n-html="dev.tabInteg">💳 Integrációk</div>
+    <div class="dev-tab" onclick="showPane('regisztraciok')">📥 Regisztrációk</div>
     <div class="dev-tab" onclick="showPane('elofiz')" data-i18n-html="dev.tabElofiz">📦 Előfizetések</div>
     <div style="margin-top:auto; padding-top:20px; border-top:1px solid var(--border);">
       <div id="devBadge" style="font-size:12px; color:var(--muted); margin-bottom:10px;">—</div>
@@ -236,6 +237,39 @@
           <thead><tr><th data-i18n="dev.thCompany">Cég</th><th data-i18n="dev.thBilling">Számlázó</th><th data-i18n="dev.thInvoicing">Számlázás</th></tr></thead>
           <tbody id="compBillingTbody"><tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px;" data-i18n="common.loading">Betöltés...</td></tr></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- REGISZTRÁCIÓK -->
+    <div class="dev-pane hidden" id="pane-regisztraciok">
+      <div class="section-title">📥 Beérkező regisztrációk</div>
+
+      <!-- Email sablon szerkesztő -->
+      <div class="ceg-card" style="margin-bottom:20px;">
+        <div style="font-size:13px;font-weight:700;color:#6366f1;margin-bottom:10px;">📧 Email sablon beállítása</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+          Változók:
+          <code style="background:rgba(99,102,241,.12);padding:1px 6px;border-radius:4px;color:#a5b4fc;">{{ceg_nev}}</code>
+          <code style="background:rgba(99,102,241,.12);padding:1px 6px;border-radius:4px;color:#a5b4fc;">{{email}}</code>
+          <code style="background:rgba(99,102,241,.12);padding:1px 6px;border-radius:4px;color:#a5b4fc;">{{paid_until}}</code>
+          <code style="background:rgba(99,102,241,.12);padding:1px 6px;border-radius:4px;color:#a5b4fc;">{{nap_maradt}}</code>
+          <code style="background:rgba(99,102,241,.12);padding:1px 6px;border-radius:4px;color:#a5b4fc;">{{subscription_url}}</code>
+        </div>
+        <div class="field">
+          <label>Tárgy (Subject)</label>
+          <input class="input" id="regEmailSubject" placeholder="Pl.: VallorSoft — Előfizetés emlékeztető">
+        </div>
+        <div class="field">
+          <label>Email törzs (HTML engedélyezett)</label>
+          <textarea class="input" id="regEmailBody" rows="9" style="resize:vertical;font-family:monospace;font-size:12px;" placeholder="Pl.:&#10;Tisztelt {{ceg_nev}},&#10;&#10;Emlékeztetjük, hogy a trial időszaka &lt;b&gt;{{nap_maradt}} nap&lt;/b&gt; múlva lejár.&#10;&#10;Az előfizetés megújításához kattintson ide: &lt;a href='{{subscription_url}}'&gt;Előfizetés kezelése&lt;/a&gt;&#10;&#10;Üdvözlettel,&#10;VallorSoft csapat"></textarea>
+        </div>
+        <button class="btn-dev" onclick="saveRegEmailTemplate()">💾 Sablon mentése</button>
+      </div>
+
+      <!-- Cégek listája -->
+      <div class="ceg-card">
+        <div style="font-size:13px;font-weight:700;color:#6366f1;margin-bottom:12px;">🏢 Regisztrált cégek</div>
+        <div id="regCegekList"><div style="color:var(--muted);font-size:13px;">Betöltés...</div></div>
       </div>
     </div>
 
@@ -344,6 +378,7 @@ function showPane(id) {
   if(id==='here') loadHerePane();
   if(id==='integ') loadIntegPane();
   if(id==='elofiz') loadElofizPane();
+  if(id==='regisztraciok') loadRegPane();
 }
 
 /* ── Integrációk: számlázó programok + cégek számlázói ── */
@@ -697,6 +732,81 @@ function toggleFeatUsers(uid,btn){
   var open=el.style.display==='none';
   el.style.display=open?'block':'none';
   if(btn) btn.textContent=open?('▲ '+t('common.close')):('▼ '+t('dev.details'));
+}
+
+/* ── Regisztrációk fül ── */
+function loadRegPane(){
+  loadRegEmailTemplate();
+  loadRegCegek();
+}
+function loadRegEmailTemplate(){
+  gas('devGetEmailTemplate').then(function(r){
+    if(r&&r.ok&&r.template){
+      var s=document.getElementById('regEmailSubject');
+      var b=document.getElementById('regEmailBody');
+      if(s) s.value=r.template.subject||'';
+      if(b) b.value=r.template.body||'';
+    }
+  });
+}
+function saveRegEmailTemplate(){
+  var subject=(document.getElementById('regEmailSubject')||{}).value||'';
+  var body=(document.getElementById('regEmailBody')||{}).value||'';
+  if(!subject.trim()||!body.trim()){ toast('Tárgy és törzs kötelező','err'); return; }
+  gas('devSaveEmailTemplate',[{subject:subject,body:body}]).then(function(r){
+    if(r&&r.ok) toast('Sablon mentve','ok');
+    else toast((r&&r.err)||t('common.error'),'err');
+  });
+}
+function loadRegCegek(){
+  var el=document.getElementById('regCegekList'); if(!el) return;
+  el.innerHTML='<div style="color:var(--muted);font-size:13px;">Betöltés...</div>';
+  gas('devGetTrialCompanies').then(function(r){
+    if(!r||!r.ok||!r.companies||!r.companies.length){
+      el.innerHTML='<div style="color:var(--muted);font-size:13px;">Nincsenek regisztrált cégek.</div>'; return;
+    }
+    var today=new Date(); today.setHours(0,0,0,0);
+    el.innerHTML='<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      +'<thead><tr style="border-bottom:1px solid var(--border);">'
+      +'<th style="text-align:left;padding:8px 6px;color:var(--muted);font-weight:600;">Cégnév</th>'
+      +'<th style="text-align:left;padding:8px 6px;color:var(--muted);font-weight:600;">Admin e-mail</th>'
+      +'<th style="text-align:left;padding:8px 6px;color:var(--muted);font-weight:600;">Regisztrált</th>'
+      +'<th style="text-align:left;padding:8px 6px;color:var(--muted);font-weight:600;">Státusz</th>'
+      +'<th style="text-align:left;padding:8px 6px;color:var(--muted);font-weight:600;">Trial lejár</th>'
+      +'<th style="padding:8px 6px;"></th>'
+      +'</tr></thead><tbody>'
+      +r.companies.map(function(c){
+        var paid=c.paid_until?new Date(c.paid_until):null;
+        var dLeft=paid?Math.ceil((paid-today)/86400000):null;
+        var statusBadge=c.subscription_status==='trial'
+          ?'<span style="color:#f59e0b;font-weight:700;">trial</span>'
+          :c.subscription_status==='active'
+          ?'<span style="color:#22c55e;font-weight:700;">aktív</span>'
+          :'<span style="color:#ef4444;font-weight:700;">'+(escHtml(c.subscription_status||'—'))+'</span>';
+        var dLeftStr=dLeft!==null?(dLeft>0?dLeft+' nap':'<span style="color:#ef4444;font-weight:600;">lejárt</span>'):'—';
+        var reg=c.created_at?new Date(c.created_at).toLocaleDateString('hu-HU'):'—';
+        return '<tr style="border-bottom:1px solid rgba(255,255,255,.05);">'
+          +'<td style="padding:8px 6px;"><b style="color:#e9eef5;">'+escHtml(c.nev||'—')+'</b>'
+            +(c.plan_name?'<br><span style="font-size:11px;color:var(--muted);">'+escHtml(c.plan_name)+'</span>':'')
+          +'</td>'
+          +'<td style="padding:8px 6px;color:var(--muted);">'+escHtml(c.admin_email||'—')+'</td>'
+          +'<td style="padding:8px 6px;color:var(--muted);">'+reg+'</td>'
+          +'<td style="padding:8px 6px;">'+statusBadge+'</td>'
+          +'<td style="padding:8px 6px;">'+dLeftStr+'</td>'
+          +'<td style="padding:8px 6px;">'
+            +'<button class="btn-dev" style="padding:4px 12px;font-size:12px;" onclick="devSendRegEmail('+c.id+')">📧 Email</button>'
+          +'</td>'
+          +'</tr>';
+      }).join('')
+      +'</tbody></table></div>';
+  });
+}
+function devSendRegEmail(companyId){
+  if(!confirm('Email küldése ennek a cégnek a mentett sablon alapján?')) return;
+  gas('devSendCompanyEmail',[{company_id:companyId}]).then(function(r){
+    if(r&&r.ok) toast('Email elküldve ✓','ok');
+    else toast((r&&r.err)||'Küldési hiba','err');
+  });
 }
 
 function loadDash(){
@@ -1161,7 +1271,7 @@ function logout(){
 
 // Nyelvváltáskor újrarajzoljuk az aktív (JS-ből renderelt) panelt, mert az nem auto-frissül.
 window.onLangChange = function(){
-  var panes=[['dash',loadDash],['cegek',loadCegek],['userek',loadUsers],['here',loadHerePane],['integ',loadIntegPane],['elofiz',loadElofizPane]];
+  var panes=[['dash',loadDash],['cegek',loadCegek],['userek',loadUsers],['here',loadHerePane],['integ',loadIntegPane],['elofiz',loadElofizPane],['regisztraciok',loadRegPane]];
   panes.forEach(function(p){
     var el=document.getElementById('pane-'+p[0]);
     if(el && !el.classList.contains('hidden')) p[1]();

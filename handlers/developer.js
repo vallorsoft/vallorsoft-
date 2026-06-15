@@ -406,4 +406,96 @@ handlers.devStats = async function (req, res, args) {
     } catch (err) { return res.json({ result: { ok: false } }); }
   };
 
+// ─── Beérkező regisztrációk ───────────────────────────────────
+handlers.devGetTrialCompanies = async function (req, res, args) {
+  if (!req.session.user || !req.session.user.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  try {
+    const r = await pool.query(`
+      SELECT c.id, c.nev, c.created_at, c.subscription_status, c.paid_until,
+             sp.name AS plan_name,
+             u.email AS admin_email, u.nume AS admin_name
+      FROM companies c
+      LEFT JOIN subscription_plans sp ON sp.id = c.subscription_plan_id
+      LEFT JOIN users u ON u.company_id = c.id AND u.pozicio = 'Admin'
+      ORDER BY c.created_at DESC
+    `);
+    return res.json({ result: { ok: true, companies: r.rows } });
+  } catch (err) {
+    console.error('devGetTrialCompanies hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.devGetEmailTemplate = async function (req, res, args) {
+  if (!req.session.user || !req.session.user.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  try {
+    const r = await pool.query("SELECT value FROM developer_settings WHERE key='email_template'");
+    const tpl = r.rows.length ? r.rows[0].value : { subject: '', body: '' };
+    return res.json({ result: { ok: true, template: tpl } });
+  } catch (err) {
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.devSaveEmailTemplate = async function (req, res, args) {
+  if (!req.session.user || !req.session.user.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
+  const subject = String(a.subject || '').trim();
+  const body    = String(a.body    || '').trim();
+  if (!subject || !body) return res.json({ result: { ok: false, err: 'Subiectul și corpul sunt obligatorii.' } });
+  try {
+    await pool.query(
+      `INSERT INTO developer_settings (key, value, updated_at)
+       VALUES ('email_template', $1::jsonb, now())
+       ON CONFLICT (key) DO UPDATE SET value = $1::jsonb, updated_at = now()`,
+      [JSON.stringify({ subject, body })]
+    );
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.devSendCompanyEmail = async function (req, res, args) {
+  if (!req.session.user || !req.session.user.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
+  const companyId = parseInt(a.company_id, 10);
+  if (!companyId) return res.json({ result: { ok: false, err: 'ID-ul firmei lipseste' } });
+  try {
+    const tplR = await pool.query("SELECT value FROM developer_settings WHERE key='email_template'");
+    if (!tplR.rows.length || !tplR.rows[0].value.subject) {
+      return res.json({ result: { ok: false, err: 'Nu exista sablon configurat. Salvati mai intai un sablon.' } });
+    }
+    const tpl = tplR.rows[0].value;
+    const cR = await pool.query(
+      `SELECT c.nev, c.paid_until, u.email, u.nume
+       FROM companies c LEFT JOIN users u ON u.company_id = c.id AND u.pozicio = 'Admin'
+       WHERE c.id = $1 LIMIT 1`, [companyId]);
+    if (!cR.rows.length || !cR.rows[0].email) {
+      return res.json({ result: { ok: false, err: 'Nu s-a gasit e-mail admin pentru aceasta firma.' } });
+    }
+    const row = cR.rows[0];
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const paidUntil = row.paid_until ? new Date(row.paid_until).toLocaleDateString('ro-RO') : '—';
+    const daysLeft = row.paid_until
+      ? Math.max(0, Math.ceil((new Date(row.paid_until) - new Date()) / 86400000))
+      : 0;
+    function fillVars(s) {
+      return s
+        .replace(/\{\{ceg_nev\}\}/g, row.nev || '')
+        .replace(/\{\{email\}\}/g, row.email || '')
+        .replace(/\{\{paid_until\}\}/g, paidUntil)
+        .replace(/\{\{nap_maradt\}\}/g, String(daysLeft))
+        .replace(/\{\{subscription_url\}\}/g, appUrl + '/subscription');
+    }
+    const { sendDeveloperEmail } = require('../services/email');
+    const sent = await sendDeveloperEmail(row.email, row.nev, fillVars(tpl.subject), fillVars(tpl.body));
+    if (!sent.ok) return res.json({ result: { ok: false, err: sent.error || 'Trimitere esuata.' } });
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('devSendCompanyEmail hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 module.exports = handlers;

@@ -14,6 +14,22 @@
 
 ---
 
+## 2026-06-15 — Developer 📥 Regisztrációk fül — cég-lista + email sablon küldő (PR #101)
+
+- **`developer_settings` tábla** (`db/developer-email-templates.sql`) — kulcs-érték JSONB tárolás; email sablon (`email_template` kulcs) itt él; auto-migráció induláskor.
+- **`devGetTrialCompanies`** (`handlers/developer.js`) — az összes regisztrált céget listázza: cégnév, admin e-mail, csomag neve, előfizetési státusz, trial lejárat.
+- **`devGetEmailTemplate` / `devSaveEmailTemplate`** — sablon olvasás / UPSERT (`developer_settings`); tárgy + HTML törzs.
+- **`devSendCompanyEmail`** — sablon változóit behelyettesíti (`{{ceg_nev}}`, `{{email}}`, `{{paid_until}}`, `{{nap_maradt}}`, `{{subscription_url}}`), majd `sendDeveloperEmail`-en át Brevo-n küldi.
+- **`sendDeveloperEmail`** (`services/email.js`) — VallorSoft branded (sötét, indigó #6366f1) Brevo e-mail; `escHtml` XSS-védelem; exportálva.
+- **Developer UI** (`public/developer.html`) — `📥 Regisztrációk` tab a sidebarban; pane: email sablon szerkesztő (tárgy + HTML törzs + változó-lista) + regisztrált cégek táblázat per-cég `📧 Email` gombbal.
+
+## 2026-06-15 — Landing page i18n hiányzó kulcsok + mobil optimalizálás (PR #100)
+
+- **~58 hiányzó i18n kulcs pótolva** (`public/landing.js`) — RO módban is HU szöveg látszott a feature stripben, moduloknál, statisztikánál, testimonialsoknál, CTA szekciónál, footer fejléceknél, árazás fallbacknél.
+- **Mobil navbar**: 860px-en `.lp-btn-ghost` (login szöveglink) elrejt — csak lang toggle + register gomb marad; 480px-en a register is elrejt, csak lang toggle látszik.
+- **Hero mobile**: sofőr-hét timeline 640px alatt `display:none` helyett `order:-1` — megjelenik a szöveg felett (single-column); `lp-sofer-week { max-width: 100% }`.
+- **Hamburger menü** (`index.html`): login link hozzáadva a mobilos nav listájához.
+
 ## 2026-06-14 — Developer csomag-limitek + plan_features funkció-kapcsolók (PR #99)
 
 - **`plan_features` tábla** (`db/plan-features.sql`) — csomag-szintű funkció-kapcsolók: `plan_id + feature_key + enabled`; auto-migráció induláskor. `subscription_plans.max_sofors` új limit-oszlop.

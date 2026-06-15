@@ -51,7 +51,19 @@ Tesztek zöldek (**106 Jest**, 24 suite). **CI: GitHub Actions** (`.github/workf
 
 > **Hiánylista — a 2026-06-13-i ütemterv LEZÁRVA:** **(1) ✅ CI + valódi tesztek** (mock + valós-DB, 106 teszt); **(2) ✅ teherautó-routing váltó** (ORS `driving-hgv`, alap ingyenes OSRM) **+ ✅ valós útdíj váltó** (HERE „Pontos", alap becslés); **(3) ✅ UIT CargoTrack deep-link** (ANAF-integráció helyett, providerkénti URL-sablon — `uit_deeplink_templates` JSONB; `cargotrack-et.js`/`fomco-et.js` törölve); **(4) ✅ üzemeltetés** (health-check `/healthz`+`/readyz`, strukturált log, opcionális Sentry, opcionális pg_dump backup); **(5) ✅ leg ↔ `orders.email_sofer` szinkron**; **(6) ✅ SaaS-vízvezeték** (csomag-limit kikényszerítés, audit-napló, GDPR export/anonimizálás, Stripe-váz); **(7) ✅ e-Factura státusz automatikus lekérdezés** (3 órás scheduler, SmartBill/Oblio `getInvoice` implementálva, `efactura_last_raw`/`efactura_checked_at` tárolás); **(8) ✅ ANAF CUI strukturált cím** (utca/helység/megye külön mezők, `adresa_sediu_social` alapján). **Nyitott jövőbeli munka:** Stripe éles bekötés (kulcsok + price_xxx — utolsó lépés, nem sürgős), SAF-T D406 XML (jövőbeli javaslat, a könyvelő SAGA/WinMentor CSV-ből generál egyelőre). **RO megfelelőség:** a rendszer megfelel — minden ANAF-kommunikáció (e-Factura SPV-beküldés) a számlázó-providereken (FGO/SmartBill/Oblio stb.) keresztül történik, saját ANAF-kapcsolat NEM kell és NEM is akarunk. Az UIT-kódot sem mi generáljuk — a sofőr/cég a CargoTrack/Fomco deep-linken keresztül intézi. A GPS→ANAF élő e-Transport-transzmisszió NEM feladatunk.
 
-**Legújabb kör (2026-06-14 — Developer csomag-limitek + plan_features funkció-kapcsolók, PR #99):** *(részletes kész-lista: `CHANGELOG.md`)*
+**Legújabb kör (2026-06-15 — Developer 📥 Regisztrációk fül + email sablon küldő, PR #101):** *(részletes kész-lista: `CHANGELOG.md`)*
+1. **`developer_settings` tábla** (`db/developer-email-templates.sql`) — kulcs-érték JSONB; email sablon (`email_template` kulcs) itt él; auto-migráció.
+2. **4 új RPC handler** (`handlers/developer.js`): `devGetTrialCompanies` (cég-lista admin e-maillel + csomag + státusz), `devGetEmailTemplate`/`devSaveEmailTemplate` (sablon CRUD), `devSendCompanyEmail` (változó-behelyettesítés + Brevo küldés).
+3. **`sendDeveloperEmail`** (`services/email.js`) — VallorSoft branded dark HTML wrapper, Brevo API, exportálva.
+4. **Developer UI** (`developer.html`) — `📥 Regisztrációk` sidebar tab; pane: sablon szerkesztő (tárgy + HTML törzs + `{{változó}}` lista) + cégek táblázat per-sor `📧 Email` gombbal.
+
+**Korábbi kör (2026-06-15 — Landing page i18n + mobil optimalizálás, PR #100):** *(részletes kész-lista: `CHANGELOG.md`)*
+1. **~58 hiányzó i18n kulcs** pótolva mindkét nyelvhez (`ro`+`hu`) — feature strip, modulok, statisztika, testimonialok, CTA, footer fejlécek, árazás fallback.
+2. **Mobil navbar**: 860px-en login elrejt (lang + register marad); 480px-en csak lang toggle.
+3. **Hero mobilon**: sofőr-hét timeline megjelenik (fölé kerül), nem tűnik el.
+4. **Hamburger menü**: login link hozzáadva mobilos listához.
+
+**Korábbi kör (2026-06-14 — Developer csomag-limitek + plan_features funkció-kapcsolók, PR #99):** *(részletes kész-lista: `CHANGELOG.md`)*
 1. **`plan_features` tábla** (`db/plan-features.sql`) — csomag-szintű funkció-kapcsolók (plan_id, feature_key, enabled); auto-migráció. `subscription_plans.max_sofors` új limit-oszlop.
 2. **Hierarchia**: `company_features` (cég-szintű dev override) > `plan_features` (csomag default) > `true`; `getMyFeatures` (dashboard.js) + `featureEnabled` (pages.js) egységesen alkalmazza.
 3. **Limit mezők a plan editorban** (`developer.html`) — max_users/vehicles/orders_month/sofors + stripe_price_id; 0=tiltott, üres=korlátlan.

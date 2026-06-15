@@ -229,4 +229,44 @@ async function sendClientEmail(opts) {
   } catch (err) { return { ok: false, error: err.message }; }
 }
 
-module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml };
+// Developer által küldött sablonalapú email — VallorSoft branding wrapperrel
+async function sendDeveloperEmail(toEmail, companyName, subject, htmlBody) {
+  if (!BREVO_API_KEY || !BREVO_SENDER || !toEmail) {
+    return { ok: false, error: 'BREVO_API_KEY / BREVO_SENDER nu este configurat.' };
+  }
+  const loginLink = (process.env.APP_URL || 'http://localhost:3000') + '/login';
+  const html = `
+    <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;background:#05070b;color:#e9eef5;padding:24px;border-radius:16px;">
+      <div style="font-size:24px;font-weight:800;margin-bottom:4px;">
+        <span style="color:#fff;">Vallor</span><span style="color:#6366f1;">Soft</span>
+      </div>
+      <div style="font-size:12px;color:#8a97a8;margin-bottom:24px;">Platformă de management transport</div>
+      <div style="color:#e9eef5;font-size:14px;line-height:1.7;">${htmlBody}</div>
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:24px 0;">
+      <p style="font-size:11px;color:#6b7689;line-height:1.5;margin:0;">
+        Acest e-mail a fost trimis automat de sistemul VallorSoft.<br>
+        Autentificare: <a href="${escHtml(loginLink)}" style="color:#6366f1;">${escHtml(loginLink)}</a>
+      </p>
+    </div>`;
+  try {
+    const resp = await fetchT('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
+      body: JSON.stringify({
+        sender: { name: 'VallorSoft', email: BREVO_SENDER },
+        to: [{ email: toEmail, name: companyName || toEmail }],
+        subject: subject,
+        htmlContent: html,
+      }),
+    });
+    if (!resp.ok) {
+      const err = await resp.text().catch(() => '');
+      return { ok: false, error: 'Brevo error: ' + err.slice(0, 120) };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail };
