@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-15 — Emailek csak románul (PR #136)
+
+- **`routes/trial-select.js`** — fizetési email + köszönő oldal: tábla-feliratok, szekció-fejlécek, instrukciók, CTA gomb, tárgy — mind csak román (HU szövegek eltávolítva)
+- **`services/scheduler.js`** — havi riport email: tábla-feliratok, tárgy, footer-megjegyzés — csak román
+- **`services/email.js`** — `buildInviteHtml` mindig `L='ro'`; `sendResetEmail` tárgy mindig román; DB sablon `body_ro` elsőbbséggel
+- **`tests/unit/invite-email.test.js`** — elvárások frissítve román szövegekre (111 teszt zöld)
+
+---
+
 ## 2026-06-15 — Add-on árak — landing chips + developer szerkesztő (PR #133)
 
 - **`handlers/developer.js`** — `devGetAddonPrices` / `devSaveAddonPrices`: add-on árak `developer_settings` `addon_prices` JSONB kulcsban (alapértelmezett: jármű=3€, munkatárs=2€, sofőr=1€/hó)
