@@ -7,7 +7,7 @@
 const express = require('express');
 const bcrypt  = require('bcrypt');
 const pool    = require('../db');
-const { sendClientEmail } = require('../services/email');
+const { sendClientEmail, getEmailTemplate } = require('../services/email');
 
 const router = express.Router();
 
@@ -82,10 +82,20 @@ router.post('/api/public-register', publicRegLimiter, async (req, res) => {
     // --- Üdvözlő e-mail (best-effort, nem buktatja a regisztrációt) ---
     const appUrl = process.env.APP_URL || 'https://app.vallorsoft.com';
     try {
-      await sendClientEmail({
-        to: cleanEmail,
-        subject: 'Bun venit la VallorSoft! / Üdvözöl a VallorSoft!',
-        html: `
+      // DB sablon felülírja a hardcoded szöveget, ha be van állítva
+      const welcomeTpl = await getEmailTemplate('email_sys_welcome');
+      let welcomeSubject, welcomeHtml;
+      if (welcomeTpl && welcomeTpl.subject && (welcomeTpl.body_ro || welcomeTpl.body_hu)) {
+        const escV = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        const replVars = (t, v) => t.replace(/\{\{(\w+)\}\}/g, (_, k) => k in v ? escV(v[k]) : '');
+        const vars = { ceg_nev: cleanCeg };
+        const bodyRo = welcomeTpl.body_ro ? replVars(welcomeTpl.body_ro, vars) : '';
+        const bodyHu = welcomeTpl.body_hu ? replVars(welcomeTpl.body_hu, vars) : '';
+        welcomeSubject = replVars(welcomeTpl.subject, vars);
+        welcomeHtml = bodyRo + (bodyHu && bodyRo ? '<hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;">' : '') + bodyHu;
+      } else {
+        welcomeSubject = 'Bun venit la VallorSoft! / Üdvözöl a VallorSoft!';
+        welcomeHtml = `
 <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
   <div style="background:linear-gradient(135deg,#6366f1,#3b82f6);padding:28px 32px;border-radius:12px 12px 0 0;">
     <h1 style="margin:0;color:#fff;font-size:22px;">vallor<span style="color:#c7d2fe;">Soft</span></h1>
@@ -107,8 +117,9 @@ router.post('/api/public-register', publicRegLimiter, async (req, res) => {
       vallorsoft@gmail.com · <a href="${appUrl}/terms" style="color:#6366f1;">Termeni</a> · <a href="${appUrl}/privacy" style="color:#6366f1;">Confidențialitate</a>
     </p>
   </div>
-</div>`,
-      });
+</div>`;
+      }
+      await sendClientEmail({ to: cleanEmail, subject: welcomeSubject, html: welcomeHtml });
     } catch (mailErr) {
       console.warn('[public-register] Üdvözlő e-mail küldés sikertelen (best-effort):', mailErr.message);
     }

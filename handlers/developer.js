@@ -651,4 +651,40 @@ handlers.devSaveLandingTexts = async function(req, res, args) {
   }
 };
 
+// ============================================================
+//  Rendszer-email sablonok (devGetSystemEmailTemplate / devSaveSystemEmailTemplate)
+//  Kulcsok: email_sys_welcome, email_sys_trial_expiry, email_sys_invite, email_sys_reset
+// ============================================================
+
+handlers.devGetSystemEmailTemplate = async function(req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const { key } = args || {};
+  if (!key || !key.startsWith('email_sys_')) return res.json({ result: { ok: false, err: 'Cheie invalidă' } });
+  try {
+    const r = await pool.query('SELECT value FROM developer_settings WHERE key=$1', [key]);
+    return res.json({ result: { ok: true, data: r.rows.length ? r.rows[0].value : null } });
+  } catch (err) {
+    console.error('devGetSystemEmailTemplate hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.devSaveSystemEmailTemplate = async function(req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const { key, subject, body_ro, body_hu } = args || {};
+  if (!key || !key.startsWith('email_sys_')) return res.json({ result: { ok: false, err: 'Cheie invalidă' } });
+  if (!subject || !subject.trim()) return res.json({ result: { ok: false, err: 'Subiectul este obligatoriu' } });
+  try {
+    await pool.query(
+      `INSERT INTO developer_settings(key, value, updated_at) VALUES($1,$2,NOW())
+       ON CONFLICT(key) DO UPDATE SET value=$2, updated_at=NOW()`,
+      [key, JSON.stringify({ subject: subject.trim(), body_ro: body_ro || '', body_hu: body_hu || '' })]
+    );
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('devSaveSystemEmailTemplate hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 module.exports = handlers;

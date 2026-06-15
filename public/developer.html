@@ -155,6 +155,7 @@
     <div class="dev-tab" onclick="showPane('regisztraciok')">📥 Regisztrációk</div>
     <div class="dev-tab" onclick="showPane('landing')">🌐 Landing szövegek</div>
     <div class="dev-tab" onclick="showPane('legal')">📋 Jogi oldalak</div>
+    <div class="dev-tab" onclick="showPane('sysemails')">✉️ Rendszer-emailek</div>
     <div class="dev-tab" onclick="showPane('elofiz')" data-i18n-html="dev.tabElofiz">📦 Előfizetések</div>
     <div style="margin-top:auto; padding-top:20px; border-top:1px solid var(--border);">
       <div id="devBadge" style="font-size:12px; color:var(--muted); margin-bottom:10px;">—</div>
@@ -357,6 +358,56 @@
       <div id="legalSaveMsg" style="min-height:20px;font-size:12px;margin-top:8px;"></div>
     </div>
 
+    <!-- RENDSZER-EMAILEK szerkesztő -->
+    <div class="dev-pane hidden" id="pane-sysemails">
+      <div class="section-title">✉️ Rendszer-email sablonok</div>
+      <p style="font-size:12px;color:#8a97a8;margin:0 0 14px;">
+        Ha itt mentesz sablont, az felülírja a hardcoded szöveget. Üresen hagyva az alapértelmezett HTML fut.
+        Változók: <code>{{változónév}}</code> — HTML-escape-elve kerülnek be.
+      </p>
+
+      <!-- típusválasztó -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;" id="sysEmailTypeBtns">
+        <button class="legal-page-btn active" data-key="email_sys_welcome"       onclick="selectSysEmailType('email_sys_welcome')">Üdvözlő (regisztráció)</button>
+        <button class="legal-page-btn"        data-key="email_sys_trial_expiry"  onclick="selectSysEmailType('email_sys_trial_expiry')">Trial lejárat</button>
+        <button class="legal-page-btn"        data-key="email_sys_invite"        onclick="selectSysEmailType('email_sys_invite')">Meghívó</button>
+        <button class="legal-page-btn"        data-key="email_sys_reset"         onclick="selectSysEmailType('email_sys_reset')">Jelszó-visszaállítás</button>
+      </div>
+
+      <!-- változólista -->
+      <div id="sysEmailVarList" style="margin-bottom:14px;font-size:12px;color:#8a97a8;display:flex;gap:6px;flex-wrap:wrap;"></div>
+
+      <!-- szerkesztő -->
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Tárgy (subject)</label>
+        <input id="sysEmailSubject" type="text" style="width:100%;padding:9px 11px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:#141c25;color:#e9eef5;font-family:inherit;font-size:13px;" placeholder="Email tárgy…">
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:240px;">
+          <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Törzs — RO (HTML)</label>
+          <textarea id="sysEmailBodyRo" rows="10" style="width:100%;padding:9px 11px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:#141c25;color:#e9eef5;font-family:monospace;font-size:12px;resize:vertical;" placeholder="<p>Bun venit…</p>"></textarea>
+        </div>
+        <div style="flex:1;min-width:240px;">
+          <label style="font-size:12px;font-weight:600;color:#8a97a8;display:block;margin-bottom:4px;">Törzs — HU (HTML)</label>
+          <textarea id="sysEmailBodyHu" rows="10" style="width:100%;padding:9px 11px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:#141c25;color:#e9eef5;font-family:monospace;font-size:12px;resize:vertical;" placeholder="<p>Üdvözöljük…</p>"></textarea>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:12px;">
+        <button onclick="saveSysEmailTemplate()" style="
+          padding:9px 22px;background:linear-gradient(135deg,#3b82f6,#6366f1);
+          color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;
+          cursor:pointer;box-shadow:0 6px 18px -8px rgba(59,130,246,.6);">
+          💾 Mentés
+        </button>
+        <button onclick="clearSysEmailTemplate()" style="
+          padding:9px 16px;background:transparent;border:1px solid rgba(255,255,255,0.15);
+          color:#8a97a8;border-radius:10px;font-size:13px;cursor:pointer;">
+          🗑️ Sablon törlése (alapértelmezett visszaállítás)
+        </button>
+      </div>
+      <div id="sysEmailMsg" style="min-height:20px;font-size:12px;margin-top:8px;"></div>
+    </div>
+
     <!-- ELŐFIZETÉSEK (csomagok + cég-hozzárendelés) -->
     <div class="dev-pane hidden" id="pane-elofiz">
       <div class="section-title" data-i18n="dev.plansTitle">📦 Előfizetési csomagok</div>
@@ -465,6 +516,7 @@ function showPane(id) {
   if(id==='regisztraciok') loadRegPane();
   if(id==='landing') loadLandingTextsPane();
   if(id==='legal') loadLegalPane();
+  if(id==='sysemails') loadSysEmailsPane();
 }
 
 /* ── Integrációk: számlázó programok + cégek számlázói ── */
@@ -1563,6 +1615,73 @@ document.querySelectorAll('.dev-tab').forEach(function(el) {
     if (window.innerWidth <= 768) devCloseSidebar();
   });
 });
+
+/* ── Rendszer-email sablonok ── */
+var SYS_EMAIL_TYPES = {
+  email_sys_welcome:      { label: 'Üdvözlő (regisztráció)', vars: ['ceg_nev'] },
+  email_sys_trial_expiry: { label: 'Trial lejárat', vars: ['ceg_nev', 'paid_until', 'subscription_url'] },
+  email_sys_invite:       { label: 'Meghívó', vars: ['nev', 'ceg_nev', 'pozicio', 'register_url'] },
+  email_sys_reset:        { label: 'Jelszó-visszaállítás', vars: ['nev', 'reset_url'] },
+};
+var _curSysEmailKey = 'email_sys_welcome';
+
+function loadSysEmailsPane() {
+  selectSysEmailType(_curSysEmailKey);
+}
+
+async function selectSysEmailType(key) {
+  _curSysEmailKey = key;
+  document.querySelectorAll('#sysEmailTypeBtns .legal-page-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.key === key);
+  });
+  // Változólista megjelenítése
+  var info = SYS_EMAIL_TYPES[key] || {};
+  var varList = document.getElementById('sysEmailVarList');
+  varList.innerHTML = (info.vars || []).map(function(v) {
+    return '<span onclick="copySysEmailVar(\'{{'+v+'}}\')" title="Kattints a másoláshoz" style="cursor:pointer;background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:2px 8px;font-family:monospace;">{{'+v+'}}</span>';
+  }).join('');
+  // Sablon betöltése
+  document.getElementById('sysEmailMsg').textContent = '';
+  var d = await gas('devGetSystemEmailTemplate', { key: key });
+  if (d && d.ok) {
+    var tpl = d.data || {};
+    document.getElementById('sysEmailSubject').value = tpl.subject || '';
+    document.getElementById('sysEmailBodyRo').value = tpl.body_ro || '';
+    document.getElementById('sysEmailBodyHu').value = tpl.body_hu || '';
+  }
+}
+
+function copySysEmailVar(v) {
+  if (navigator.clipboard) navigator.clipboard.writeText(v).then(function() { toast('Másolva: ' + v); }).catch(function() {});
+  else toast(v);
+}
+
+async function saveSysEmailTemplate() {
+  var key     = _curSysEmailKey;
+  var subject = document.getElementById('sysEmailSubject').value.trim();
+  var body_ro = document.getElementById('sysEmailBodyRo').value;
+  var body_hu = document.getElementById('sysEmailBodyHu').value;
+  var msg = document.getElementById('sysEmailMsg');
+  if (!subject) { msg.textContent = '⚠️ A tárgy megadása kötelező.'; msg.style.color='#f59e0b'; return; }
+  msg.textContent = 'Mentés…'; msg.style.color='#8a97a8';
+  var d = await gas('devSaveSystemEmailTemplate', { key, subject, body_ro, body_hu });
+  if (d && d.ok) { msg.textContent = '✅ Elmentve!'; msg.style.color='#22c55e'; }
+  else { msg.textContent = '❌ ' + (d && d.err || 'Hiba'); msg.style.color='#ef4444'; }
+}
+
+async function clearSysEmailTemplate() {
+  if (!confirm('Biztosan törlöd a sablont? Az alapértelmezett hardcoded szöveg fog futni.')) return;
+  var key = _curSysEmailKey;
+  var msg = document.getElementById('sysEmailMsg');
+  // Üres értékkel mentjük → a szerver nem talál subject-et → email.js fallbackre esik
+  var d = await gas('devSaveSystemEmailTemplate', { key, subject: ' ', body_ro: '', body_hu: '' });
+  if (d && d.ok) {
+    document.getElementById('sysEmailSubject').value = '';
+    document.getElementById('sysEmailBodyRo').value = '';
+    document.getElementById('sysEmailBodyHu').value = '';
+    msg.textContent = '✅ Sablon törölve — alapértelmezett fut.'; msg.style.color='#22c55e';
+  } else { msg.textContent = '❌ ' + (d && d.err || 'Hiba'); msg.style.color='#ef4444'; }
+}
 
 </script>
 </body>
