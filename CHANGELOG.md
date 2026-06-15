@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-15 — Kétnyelvű csomag feature-lista a landing árazási kártyákon (PR #129)
+
+- **`db/plan-features-bilingual.sql`** — `subscription_plans.features` JSONB frissítve `[{"ro":"...","hu":"..."}]` formátumra mind a 4 csomagnál (28 bullet-pont RO+HU)
+- **`public/landing.js`** — `renderPricingGrid`: objektum-elem esetén `f[lang]||f.ro` a megfelelő nyelv; visszafelé kompatibilis string fallback; nyelvváltáskor automatikusan újrarenderel
+- **`public/subscription.html`** — `buildFeaturesList`: ugyanaz a logika `document.lang` alapján
+
+---
+
 ## 2026-06-15 — Rendszer-emailek linkje kattinthatatlan volt — javítva (PR #128)
 
 - **`db/fix-reset-email-template.sql`** — törli az összes hibás `email_sys_*` DB-sablont (reset/invite/welcome/trial_expiry); a beégetett, helyes HTML e-mailek lépnek életbe szerver-restart után
