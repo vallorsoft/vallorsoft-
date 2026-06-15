@@ -186,6 +186,10 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   white-space: nowrap;
 }
 
+/* Desktop navban nem látszanak — csak a hamburger mobilos menüben */
+.lp-nav-links .lp-mobile-only { display: none; }
+@media (max-width: 860px) { .lp-nav-links .lp-mobile-only { display: list-item; } }
+
 /* ── Bejelentkezés dropdown ─────────────────────────────────── */
 .lp-login-wrap { position: relative; }
 .lp-drop-arr { font-size: .7em; margin-left: 2px; transition: transform .2s; display: inline-block; }

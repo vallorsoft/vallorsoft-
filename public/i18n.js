@@ -1171,6 +1171,7 @@
     'login.forgotSent': { hu: 'Ha létezik a fiók, elküldtük a linket.', ro: 'Dacă contul există, am trimis linkul.' },
     'login.enterEmailFirst': { hu: 'Adja meg az email címét a mezőben, majd kattintson újra!', ro: 'Introduceți adresa de e-mail în câmp, apoi faceți clic din nou!' },
     'login.timeout': { hu: 'Biztonsági okból kiléptettünk inaktivitás miatt. Jelentkezz be újra.', ro: 'Din motive de securitate v-am deconectat din cauza inactivității. Autentificați-vă din nou.' },
+    'login.backHome': { hu: 'Főoldal', ro: 'Pagina principală' },
 
     // ── Regisztráció + jelszó-visszaállítás ──
     'reg.subtitle': { hu: 'Regisztráció meghívókóddal', ro: 'Înregistrare cu cod de invitație' },
