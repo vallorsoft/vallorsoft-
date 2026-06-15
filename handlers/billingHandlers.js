@@ -152,7 +152,8 @@ handlers.updateSubscriptionPlan = async function (req, res, args) {
     // Marketing bullet-pointok: tömb vagy stringből soronként parsolt tömb → JSONB
     let featuresJson = '[]';
     if (Array.isArray(a.features)) {
-      featuresJson = JSON.stringify(a.features.map((s) => String(s)).filter((s) => s.trim()));
+      // Bilingual {ro,hu} objektumokat megtartjuk; string-eket trim+filter
+      featuresJson = JSON.stringify(a.features.filter((s) => s && (typeof s === 'object' || String(s).trim())));
     } else if (typeof a.features === 'string') {
       featuresJson = JSON.stringify(a.features.split('\n').map((s) => s.trim()).filter(Boolean));
     }
