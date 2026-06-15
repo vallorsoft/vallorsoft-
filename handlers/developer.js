@@ -576,11 +576,16 @@ handlers.devSaveLegalPage = async function (req, res, args) {
     const yyyy = now.getFullYear();
     const dateStr = `${dd}.${mm}.${yyyy}`;
 
-    // last-update sor automatikus frissítése a tartalomban
-    let newHtml = html.replace(
-      /<p class="last-update">[\s\S]*?<\/p>/,
-      `<p class="last-update">Ultima actualizare: ${dateStr}</p>`
-    );
+    // last-update sor frissítése: Quill stripeli a class attribútumot, ezért
+    // mindkét formát lekezeljük (class-os statikus + class nélküli Quill-output)
+    const lastUpdateTag = `<p class="last-update">Ultima actualizare: ${dateStr}</p>`;
+    let newHtml = html
+      .replace(/<p class="last-update">[\s\S]*?<\/p>/, lastUpdateTag)  // statikus fájl alap
+      .replace(/<p>Ultima actualizare:[^<]*<\/p>/, lastUpdateTag);      // Quill-output (class nélkül)
+    // Ha se egyik sem volt benne (első mentés üres tartalomból)
+    if (!newHtml.includes('Ultima actualizare:')) {
+      newHtml = lastUpdateTag + '\n' + newHtml;
+    }
 
     const diffHtml = notify
       ? computeDiffHtml(stripHtml(prevHtml), stripHtml(newHtml))
