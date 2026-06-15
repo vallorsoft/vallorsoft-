@@ -14,6 +14,22 @@
 
 ---
 
+## 2026-06-15 — 6 prémium feature gate + megosztott featureEnabled helper (PR #123)
+
+- **`lib/featureEnabled.js`** — új megosztott helper: `company_features` (cég-override) > `plan_features` (csomag) > `true` hierarchia; cég-szintű egyedi beállítás felülírja a csomag-alapértéket
+- **`public/feature-catalog.js`** — 6 új feature key: `visszfuvar-radar`, `toll-becsles`, `ai-kiolvasas`, `gps-integracio`, `szamlazas-integracio`, `konyvelo-szerepkor`
+- **Szerver-oldali gate-ek bekötve:**
+  - `handlers/orders.js` `getPlannerMatches` → `visszfuvar-radar` (üres matches, nem hiba)
+  - `handlers/toll.js` `estimateToll` → `toll-becsles`
+  - `routes/inbound-orders.js` `/reparse` → `ai-kiolvasas` (403 Gemini-hívás előtt)
+  - `lib/vehiclePositions.js` `getPositions` → `gps-integracio` (üres pozíciók, nem hiba)
+  - `handlers/billingHandlers.js` `saveBillingIntegration` + `testBillingIntegration` → `szamlazas-integracio`
+  - `handlers/invites.js` `invCreate` (Konyvelo) + `routes/pages.js` `/konyvelo` → `konyvelo-szerepkor`
+- **Developer (`is_dev`) mindig átmegy** minden gate-en
+- `routes/pages.js`: helyi `featureEnabled` duplikáció eltávolítva → shared lib
+
+---
+
 ## 2026-06-15 — Landing nav cleanup + vissza gomb szín javítás (PR #122)
 
 - **`public/login.html` / `portal.html` / `carrier.html`** — vissza gomb stílus javítva: a világos háttéren (`#f7f9fc`) láthatatlan fehér/átlátszó stílus (`rgba(255,255,255,0.08)`) helyett sötét szöveg (`#475569`) és szürke keret (`#cbd5e1`) — jól olvasható kontraszttal
