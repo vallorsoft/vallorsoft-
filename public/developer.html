@@ -1774,11 +1774,31 @@ document.querySelectorAll('.dev-tab').forEach(function(el) {
 
 /* ── Push értesítés sablonok ── */
 var PUSH_TEMPL_META = [
-  { key: 'push_inbound_new',       label: 'Új fuvarkérés (portál)',      vars: ['client', 'route'] },
-  { key: 'push_handover_request',  label: 'Áru-leadás kérés (sofőr)',    vars: ['sofor', 'rendszam', 'tipus', 'helyszin'] },
-  { key: 'push_handover_confirmed',label: 'Áru-leadás visszaigazolva',   vars: ['rendszam', 'helyszin', 'tipus'] },
-  { key: 'push_handover_rejected', label: 'Áru-leadás elutasítva',       vars: ['rendszam'] },
-  { key: 'push_order_status',      label: 'Fuvar státusz (sofőr frissít)',vars: ['sofor', 'label', 'client'] },
+  { key: 'push_inbound_new',
+    label: '1. Új fuvarkérés (portál)',
+    when:  'Mikor: ügyfél-portálon új fuvart igényelnek',
+    to:    'Kinek: Admin / Manager kapja',
+    vars: ['client', 'route'] },
+  { key: 'push_handover_request',
+    label: '2. Áru-leadás kérés (sofőr)',
+    when:  'Mikor: sofőr a ⛔ Leadás gombot nyomja meg',
+    to:    'Kinek: Admin / Manager kapja — visszaigazolásra vár',
+    vars: ['sofor', 'rendszam', 'tipus', 'helyszin'] },
+  { key: 'push_handover_confirmed',
+    label: '3. Áru-leadás visszaigazolva',
+    when:  'Mikor: admin jóváhagyja az áru-leadást',
+    to:    'Kinek: Sofőr kapja',
+    vars: ['rendszam', 'helyszin', 'tipus'] },
+  { key: 'push_handover_rejected',
+    label: '4. Áru-leadás elutasítva',
+    when:  'Mikor: admin elutasítja az áru-leadást',
+    to:    'Kinek: Sofőr kapja',
+    vars: ['rendszam'] },
+  { key: 'push_order_status',
+    label: '5. Fuvar státusz (sofőr frissít)',
+    when:  'Mikor: sofőr „In Curs" vagy „Finalizat"-ra állítja a fuvarát',
+    to:    'Kinek: Admin / Manager kapja',
+    vars: ['sofor', 'label', 'client'] },
 ];
 var _pushTplData = {};
 
@@ -1791,7 +1811,9 @@ async function loadPushTemplPane() {
     var cur = _pushTplData[m.key] || {};
     var varHints = m.vars.map(function(v){ return '<code style="background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 5px;font-size:11px;">{{'+v+'}}</code>'; }).join(' ');
     return '<div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;" data-pkey="'+m.key+'">' +
-      '<div style="font-weight:700;font-size:13px;margin-bottom:6px;">'+m.label+'</div>' +
+      '<div style="font-weight:700;font-size:13px;margin-bottom:4px;">'+m.label+'</div>' +
+      '<div style="font-size:11px;color:#94a3b8;margin-bottom:2px;">📅 '+m.when+'</div>' +
+      '<div style="font-size:11px;color:#6366f1;margin-bottom:10px;">👤 '+m.to+'</div>' +
       '<div style="font-size:11px;color:#8a97a8;margin-bottom:10px;">Változók: '+varHints+'</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
         '<div><label style="font-size:11px;color:#8a97a8;">Cím RO'+fhBtn('<b>Értesítés főcím — román</b><span class="fh-where">A push értesítés fejléce románul. Félkövér, max ~50 karakter. Pl. „🔔 Cerere nouă de transport"</span>')+'</label><input class="pt-inp" data-f="title_ro" value="'+esc(cur.title_ro||'')+'" style="width:100%;margin-top:3px;padding:7px 9px;border:1px solid rgba(255,255,255,0.1);border-radius:7px;background:#0c1218;color:#e9eef5;font-size:12px;"></div>' +
@@ -1828,10 +1850,22 @@ async function resetPushTemplates() {
 
 /* ── Rendszer-email sablonok ── */
 var SYS_EMAIL_TYPES = {
-  email_sys_welcome:      { label: 'Üdvözlő (regisztráció)', vars: ['ceg_nev'] },
-  email_sys_trial_expiry: { label: 'Trial lejárat', vars: ['ceg_nev', 'paid_until', 'subscription_url'] },
-  email_sys_invite:       { label: 'Meghívó', vars: ['nev', 'ceg_nev', 'pozicio', 'register_url'] },
-  email_sys_reset:        { label: 'Jelszó-visszaállítás', vars: ['nev', 'reset_url'] },
+  email_sys_welcome:      { label: 'Üdvözlő (regisztráció)',
+    when: 'Mikor: új cég regisztrál az önkiszolgáló oldalon',
+    to:   'Kinek: az új cég Admin felhasználója kapja',
+    vars: ['ceg_nev'] },
+  email_sys_trial_expiry: { label: 'Trial lejárat',
+    when: 'Mikor: a 14 napos trial lejáratának napján (napi ütemező)',
+    to:   'Kinek: a cég Admin felhasználója kapja',
+    vars: ['ceg_nev', 'paid_until', 'subscription_url'] },
+  email_sys_invite:       { label: 'Meghívó',
+    when: 'Mikor: Admin / Manager meghívót küld új felhasználónak',
+    to:   'Kinek: a meghívott felhasználó kapja (regisztrációs linkkel)',
+    vars: ['nev', 'ceg_nev', 'pozicio', 'register_url'] },
+  email_sys_reset:        { label: 'Jelszó-visszaállítás',
+    when: 'Mikor: felhasználó az „Elfelejtett jelszó" linket használja',
+    to:   'Kinek: a kérő felhasználó kapja (reset linkkel)',
+    vars: ['nev', 'reset_url'] },
 };
 var _curSysEmailKey = 'email_sys_welcome';
 
@@ -1844,12 +1878,15 @@ async function selectSysEmailType(key) {
   document.querySelectorAll('#sysEmailTypeBtns .legal-page-btn').forEach(function(b) {
     b.classList.toggle('active', b.dataset.key === key);
   });
-  // Változólista megjelenítése
+  // Mikor/kinek + változólista megjelenítése
   var info = SYS_EMAIL_TYPES[key] || {};
   var varList = document.getElementById('sysEmailVarList');
-  varList.innerHTML = (info.vars || []).map(function(v) {
+  var whenHtml = info.when ? '<div style="font-size:11px;color:#94a3b8;margin-bottom:3px;">📅 '+info.when+'</div>' : '';
+  var toHtml   = info.to   ? '<div style="font-size:11px;color:#6366f1;margin-bottom:8px;">👤 '+info.to+'</div>' : '';
+  var varHtml  = (info.vars || []).map(function(v) {
     return '<span onclick="copySysEmailVar(\'{{'+v+'}}\')" title="Kattints a másoláshoz" style="cursor:pointer;background:#1e293b;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:2px 8px;font-family:monospace;">{{'+v+'}}</span>';
   }).join('');
+  varList.innerHTML = whenHtml + toHtml + (varHtml ? '<div style="display:flex;gap:6px;flex-wrap:wrap;">'+varHtml+'</div>' : '');
   // Sablon betöltése
   document.getElementById('sysEmailMsg').textContent = '';
   var d = await gas('devGetSystemEmailTemplate', { key: key });
