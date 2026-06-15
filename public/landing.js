@@ -24,6 +24,12 @@ const translations = {
     navBlog: 'Blog',
     navContact: 'Contact',
     loginBtn: 'Autentificare',
+    loginDispatcher: 'Dispecer / Admin',
+    loginDispatcherSub: 'Autentificare companie de transport',
+    loginClient: 'Portal clienți',
+    loginClientSub: 'Autentificare expeditor / beneficiar',
+    loginCarrier: 'Portal subcontractor',
+    loginCarrierSub: 'Autentificare transportator extern',
     startBtn: 'Începe gratuit',
     heroBadge: 'Orientat pe șofer · Fără hârtii · Automatizat',
     heroTitle: 'Cele mai multe softuri de transport sunt create pentru management. Noi am început cu șoferul.',
@@ -227,6 +233,12 @@ const translations = {
     navBlog: 'Blog',
     navContact: 'Kapcsolat',
     loginBtn: 'Bejelentkezés',
+    loginDispatcher: 'Diszpécser / Admin',
+    loginDispatcherSub: 'Fuvarozó cég belépése',
+    loginClient: 'Ügyfél-portál',
+    loginClientSub: 'Megrendelő / feladó belépése',
+    loginCarrier: 'Alvállalkozói portál',
+    loginCarrierSub: 'Külsős fuvarozó belépése',
     startBtn: 'Kezdem',
     heroBadge: 'Sofőr-centrikus · Papírmentes · Automatizált',
     heroTitle: 'A legtöbb fuvarozási szoftver a vezetőségnek készült. Mi a sofőrrel kezdtük.',
@@ -509,6 +521,22 @@ const navbar = document.getElementById('navbar');
 window.addEventListener('scroll', () => {
   navbar?.classList.toggle('scrolled', window.scrollY > 40);
 }, { passive: true });
+
+/* ── Bejelentkezés dropdown ─────────────────────────────────── */
+window.toggleLoginDrop = function () {
+  const wrap = document.getElementById('loginWrap');
+  const btn  = document.getElementById('loginToggle');
+  if (!wrap) return;
+  const open = wrap.classList.toggle('open');
+  btn?.setAttribute('aria-expanded', open ? 'true' : 'false');
+};
+document.addEventListener('click', function (e) {
+  const wrap = document.getElementById('loginWrap');
+  if (wrap && !wrap.contains(e.target)) {
+    wrap.classList.remove('open');
+    document.getElementById('loginToggle')?.setAttribute('aria-expanded', 'false');
+  }
+});
 
 /* ── Hamburger ──────────────────────────────────────────────── */
 const hamburger = document.getElementById('hamburger');

@@ -185,6 +185,42 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   gap: .6rem;
   white-space: nowrap;
 }
+
+/* ── Bejelentkezés dropdown ─────────────────────────────────── */
+.lp-login-wrap { position: relative; }
+.lp-drop-arr { font-size: .7em; margin-left: 2px; transition: transform .2s; display: inline-block; }
+.lp-login-wrap.open .lp-drop-arr { transform: rotate(180deg); }
+.lp-login-drop {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 230px;
+  background: rgba(10,16,30,.97);
+  border: 1px solid rgba(99,102,241,.35);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.45);
+  overflow: hidden;
+  z-index: 200;
+  backdrop-filter: blur(16px);
+}
+.lp-login-wrap.open .lp-login-drop { display: block; }
+.lp-login-opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  color: rgba(255,255,255,.85);
+  text-decoration: none;
+  font-size: .875rem;
+  transition: background .15s, color .15s;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.lp-login-opt:last-child { border-bottom: none; }
+.lp-login-opt:hover { background: rgba(99,102,241,.18); color: #fff; }
+.lp-login-icon { font-size: 1.4rem; flex-shrink: 0; }
+.lp-login-opt b { display: block; font-weight: 700; margin-bottom: 1px; }
+.lp-login-opt small { color: rgba(255,255,255,.5); font-size: .78rem; }
 .lp-lang-btn {
   background: transparent;
   color: rgba(255,255,255,.6);

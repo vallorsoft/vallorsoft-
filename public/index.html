@@ -75,12 +75,32 @@
         <li><a href="#how" data-i18n="navHow">Hogyan működik</a></li>
         <li><a href="#blog" data-i18n="navBlog">Blog</a></li>
         <li><a href="#contact" data-i18n="navContact">Kapcsolat</a></li>
-        <li><a href="/login" data-i18n="loginBtn">Bejelentkezés</a></li>
+        <li><a href="/login" data-i18n="loginDispatcher">Diszpécser / Admin</a></li>
+        <li><a href="/portal" data-i18n="loginClient">Ügyfél-portál</a></li>
+        <li><a href="/carrier" data-i18n="loginCarrier">Alvállalkozói portál</a></li>
       </ul>
     </nav>
     <div class="lp-nav-actions">
       <button id="languageToggle" class="lp-lang-btn" title="Váltás magyarra / Schimbă în română">HU</button>
-      <a href="/login" class="lp-btn-ghost" data-i18n="loginBtn">Bejelentkezés</a>
+      <div class="lp-login-wrap" id="loginWrap">
+        <button class="lp-btn-ghost lp-login-toggle" id="loginToggle" onclick="toggleLoginDrop()" aria-haspopup="true" aria-expanded="false">
+          <span data-i18n="loginBtn">Bejelentkezés</span> <span class="lp-drop-arr">▾</span>
+        </button>
+        <div class="lp-login-drop" id="loginDrop" role="menu">
+          <a href="/login" class="lp-login-opt" role="menuitem">
+            <span class="lp-login-icon">🏢</span>
+            <span><b data-i18n="loginDispatcher">Diszpécser / Admin</b><br><small data-i18n="loginDispatcherSub">Fuvarozó cég belépése</small></span>
+          </a>
+          <a href="/portal" class="lp-login-opt" role="menuitem">
+            <span class="lp-login-icon">📦</span>
+            <span><b data-i18n="loginClient">Ügyfél-portál</b><br><small data-i18n="loginClientSub">Megrendelő belépése</small></span>
+          </a>
+          <a href="/carrier" class="lp-login-opt" role="menuitem">
+            <span class="lp-login-icon">🚚</span>
+            <span><b data-i18n="loginCarrier">Alvállalkozói portál</b><br><small data-i18n="loginCarrierSub">Külsős fuvarozó belépése</small></span>
+          </a>
+        </div>
+      </div>
       <a href="/register" class="lp-btn-primary" data-i18n="startBtn">Ingyenes próba</a>
     </div>
     <button class="lp-hamburger" id="hamburger" aria-label="Menü">
@@ -420,7 +440,9 @@
       <p data-i18n="ctaSubtitle">Próbáld ki a VallorSoft-ot 14 napig ingyen, kötelezettségek nélkül.</p>
       <div class="lp-cta-actions">
         <a href="/register" class="lp-btn-primary lp-btn-lg" data-i18n="ctaBtn">Ingyenes próba indítása</a>
-        <a href="/login" class="lp-cta-login" data-i18n="loginBtn">Bejelentkezés</a>
+        <a href="/login" class="lp-cta-login" data-i18n="loginDispatcher">Diszpécser / Admin</a>
+        <a href="/portal" class="lp-cta-login" data-i18n="loginClient">Ügyfél-portál</a>
+        <a href="/carrier" class="lp-cta-login" data-i18n="loginCarrier">Alvállalkozói portál</a>
       </div>
     </div>
   </div>
@@ -441,7 +463,9 @@
       <ul>
         <li><a href="#features" data-i18n="navFeatures">Funkciók</a></li>
         <li><a href="#pricing" data-i18n="navPricing">Árak</a></li>
-        <li><a href="/login" data-i18n="loginBtn">Bejelentkezés</a></li>
+        <li><a href="/login" data-i18n="loginDispatcher">Diszpécser / Admin</a></li>
+        <li><a href="/portal" data-i18n="loginClient">Ügyfél-portál</a></li>
+        <li><a href="/carrier" data-i18n="loginCarrier">Alvállalkozói portál</a></li>
       </ul>
     </div>
     <div class="lp-footer-col">

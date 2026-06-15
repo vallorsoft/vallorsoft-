@@ -495,6 +495,7 @@
     'cs.newTractor': { hu: 'Új vontató hozzáadása', ro: 'Adăugare cap tractor nou' },
     'cs.newTrailer': { hu: 'Új pótkocsi hozzáadása', ro: 'Adăugare remorcă nouă' },
     'cs.notSetDash': { hu: '— Nincs megadva —', ro: '— Neselectat —' },
+    'cs.ownVehicles': { hu: 'Saját járművek', ro: 'Vehicule proprii' },
     'cs.noMatch': { hu: 'Nincs találat.', ro: 'Niciun rezultat.' },
     'cs.files': { hu: ' fájl', ro: ' fișiere' },
     'cs.other': { hu: 'Egyéb', ro: 'Altele' },
