@@ -32,7 +32,7 @@ Fuvarozási / flottakezelő webalkalmazás (Node.js + Express 5 + PostgreSQL).
 
 > **Aktuális fókusz:** kinézet (UI) és funkciók javítása. A „Felületek és kinézet” szekció a térkép ehhez — melyik oldal melyik fájlokból áll, hol a CSS, mi a dizájn-rendszer.
 >
-> ### 📍 Hol tartunk (2026-06-14 vége) — állapot + következő fókusz
+> ### 📍 Hol tartunk (2026-06-15 vége) — állapot + következő fókusz
 > **KÉSZ ebben a nagy körben (PR #87–#94, mind mergelve + élesítve):**
 > - **Teljes frontend-redesign** a landing prémium kék/indigó palettájára (világos-alap + dark navy; gradiens kártyák, felső sheen, kék glow gombok, gradiens KPI) — MINDEN oldal (admin/manager konzol, auth, jogi, sofőr `sofer.css`, developer, útvonaltervezés, ügyfél-portál, követés, alvállalkozó, könyvelő). Csak megjelenés, funkció érintetlen.
 > - **Admin konzol FGO-elrendezés:** ikonos (monokróm vonalas SVG) 10-főmenüs sidebar (32 menüpont), **fix felső sáv** (breadcrumb + nyelv/téma), **globális kereső** (`Ctrl+K` command palette: menü-navigáció + élő adatkeresés `handlers/globalSearch.js`-en át — fuvar/ügyfél/jármű/sofőr, `company_id`-szűrt).
@@ -45,13 +45,19 @@ Fuvarozási / flottakezelő webalkalmazás (Node.js + Express 5 + PostgreSQL).
 > - **✅ KÉSZ — Globális kereső bővítés:** a `globalSearch` már keres fuvar/ügyfél/jármű/sofőr + **megrendelések/menetlevelek/számlák** közt is.
 > - Lásd még lent a „Nyitott jövőbeli munka" (Stripe éles, SAF-T) — nem sürgős.
 
-## Fejlesztési állapot (2026-06-14)
+## Fejlesztési állapot (2026-06-15)
 
 Tesztek zöldek (**106 Jest**, 24 suite). **CI: GitHub Actions** (`.github/workflows/ci.yml`) — minden PR-en és main-push után `npm ci && npm test` Node 22 + **Postgres 16 service**-szel; ha van `DATABASE_URL`, a valódi-DB integrációs suite is fut, enélkül azok kihagyódnak (a CI `--runInBand`/soros — a valódi-DB fájlok közös DB-t használnak). Deploy-teendő: szerver-restart (a `db/*.sql` migrációk automatikusan lefutnak) + böngésző hard refresh.
 
 > **Hiánylista — a 2026-06-13-i ütemterv LEZÁRVA:** **(1) ✅ CI + valódi tesztek** (mock + valós-DB, 106 teszt); **(2) ✅ teherautó-routing váltó** (ORS `driving-hgv`, alap ingyenes OSRM) **+ ✅ valós útdíj váltó** (HERE „Pontos", alap becslés); **(3) ✅ UIT CargoTrack deep-link** (ANAF-integráció helyett, providerkénti URL-sablon — `uit_deeplink_templates` JSONB; `cargotrack-et.js`/`fomco-et.js` törölve); **(4) ✅ üzemeltetés** (health-check `/healthz`+`/readyz`, strukturált log, opcionális Sentry, opcionális pg_dump backup); **(5) ✅ leg ↔ `orders.email_sofer` szinkron**; **(6) ✅ SaaS-vízvezeték** (csomag-limit kikényszerítés, audit-napló, GDPR export/anonimizálás, Stripe-váz); **(7) ✅ e-Factura státusz automatikus lekérdezés** (3 órás scheduler, SmartBill/Oblio `getInvoice` implementálva, `efactura_last_raw`/`efactura_checked_at` tárolás); **(8) ✅ ANAF CUI strukturált cím** (utca/helység/megye külön mezők, `adresa_sediu_social` alapján). **Nyitott jövőbeli munka:** Stripe éles bekötés (kulcsok + price_xxx — utolsó lépés, nem sürgős), SAF-T D406 XML (jövőbeli javaslat, a könyvelő SAGA/WinMentor CSV-ből generál egyelőre). **RO megfelelőség:** a rendszer megfelel — minden ANAF-kommunikáció (e-Factura SPV-beküldés) a számlázó-providereken (FGO/SmartBill/Oblio stb.) keresztül történik, saját ANAF-kapcsolat NEM kell és NEM is akarunk. Az UIT-kódot sem mi generáljuk — a sofőr/cég a CargoTrack/Fomco deep-linken keresztül intézi. A GPS→ANAF élő e-Transport-transzmisszió NEM feladatunk.
 
-**Legújabb kör (2026-06-15 — Developer 📋 Jogi oldalak szerkesztő + kötelező visszaigazolás, PR #102):** *(részletes kész-lista: `CHANGELOG.md`)*
+**Legújabb kör (2026-06-15 — Developer szerkeszthető tartalmak: landing + email + csomag + push, PR #103):** *(részletes kész-lista: `CHANGELOG.md`)*
+1. **🌐 Landing szövegek** (`routes/landing-texts.js`, `devGetLandingContent`/`devSaveLandingContent`) — hero/USP marketing szövegek `developer_settings`-ből; `GET /api/landing-texts` publikus.
+2. **✉️ Rendszer-email sablonok** (`services/email.js`, `devGetSystemEmailTemplate`/`devSaveSystemEmailTemplate`) — 4 rendszer-email típus (meghívó/reset/üdvözlő/trial lejárat) szerkeszthető tárgy+RO/HU törzzsel; hardcoded fallback.
+3. **📦 Csomag marketing bullet pontok** (`db/plan-features-bullets.sql`, `billingHandlers.js`, `subscription.html`) — `subscription_plans.features JSONB` bullet-lista; developer szerkeszti, előfizetési oldalon ✓ listaként jelenik meg.
+4. **🔔 Push értesítés sablonok** (`lib/pushTemplates.js`, `devGetPushTemplates`/`devSavePushTemplates`) — 5 push-típus RO+HU title/body; in-memory cache; bekötve: portál-kérés, áru-leadás, fuvar-státusz.
+
+**Korábbi kör (2026-06-15 — Developer 📋 Jogi oldalak szerkesztő + kötelező visszaigazolás, PR #102):** *(részletes kész-lista: `CHANGELOG.md`)*
 1. **`legal_consents` tábla** (`db/legal-consents.sql`) — visszaigazolás-napló minden felhasználó-típusra (`user`/`client_user`/`carrier_user`); `page_key`+`version`+IP.
 2. **`routes/legal.js`** — dinamikus jogi oldalak DB-ből + `pending-ack`/`ack` REST endpoint (minden session-típusra).
 3. **`devGetLegalPage`/`devSaveLegalPage`** — Quill HTML CRUD a `developer_settings`-ben; auto last-update; bekezdés diff; `notify_version`.

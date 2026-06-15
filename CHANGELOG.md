@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-06-15 — Developer szerkeszthető tartalmak: landing + email + csomag + push (PR #103)
+
+- **🌐 Landing szövegek** (`routes/landing-texts.js`, `handlers/developer.js` `devGetLandingContent`/`devSaveLandingContent`) — a landing page marketing szövegei (hero H1/alcím/badge, 3 bullet, heroNote, USP cím/leírás) DB-ből töltődnek (`developer_settings` `landing_content` kulcs); `GET /api/landing-texts` publikus; developer szerkesztheti és mentheti.
+- **✉️ Rendszer-email sablonok** (`services/email.js`, `handlers/developer.js` `devGetSystemEmailTemplate`/`devSaveSystemEmailTemplate`) — 4 email-típus szerkeszthető: meghívó, jelszó-reset, üdvözlő (trial cég-regisztráció), trial lejárat; tárgy + RO/HU törzs; `{{változó}}` lista; hardcoded fallback ha nincs sablon mentve.
+- **📦 Csomag marketing bullet pontok** (`db/plan-features-bullets.sql`, `handlers/billingHandlers.js`, `public/subscription.html`) — `subscription_plans.features JSONB` tömb: developer a csomag-szerkesztőben szöveges bullet pontokat adhat meg; az előfizetés-oldalon ✓ jelölt listában jelenik meg.
+- **🔔 Push értesítés sablonok** (`lib/pushTemplates.js`, `handlers/developer.js` `devGetPushTemplates`/`devSavePushTemplates`) — 5 push-típus title/body szerkeszthető RO+HU párban; in-memory cache `invalidateCache()`-szel; bekötve: portál beérkező kérés, áru-leadás (request/confirm/reject), fuvar sofőr-státusz; hardcoded DEFAULTS fallback.
+
 ## 2026-06-15 — Developer 📋 Jogi oldalak szerkesztő + kötelező visszaigazolás (PR #102)
 
 - **`legal_consents` tábla** (`db/legal-consents.sql`) — visszaigazolás-napló: `user_type` (user/client_user/carrier_user), `user_id`, `page_key`, `version` (timestamp), `acknowledged_at`, `ip`.
