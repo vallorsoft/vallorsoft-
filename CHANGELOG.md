@@ -14,6 +14,21 @@
 
 ---
 
+## 2026-06-15 — Rendszer-emailek linkje kattinthatatlan volt — javítva (PR #128)
+
+- **`db/fix-reset-email-template.sql`** — törli az összes hibás `email_sys_*` DB-sablont (reset/invite/welcome/trial_expiry); a beégetett, helyes HTML e-mailek lépnek életbe szerver-restart után
+- **`services/email.js`** — `applyTemplateVars(text, vars, rawVars)`: a `rawVars`-ban lévő változók HTML-escape nélkül kerülnek be; `sendInviteEmail` + `sendResetEmail` átad `{{invite_url_btn}}`, `{{reset_url_btn}}`, `{{invite_url_link}}`, `{{reset_url_link}}` HTML-változókat jövőbeli sablonokhoz
+
+---
+
+## 2026-06-15 — Landing #pricing: 4 csomagos rács, per-csomag színek, kétnyelvű, ÁFA-megjegyzés (PR #126)
+
+- **`public/landing.css`** — `--lp-green` token; `.lp-plan-green/.blue/.indigo/.dark` szín-módosítók `--plan-accent` CSS-változóval; 4 oszlopos rács (1024px → 2×2, 640px → 1 col); `.lp-plan-audience` célközönség-sor; `.lp-pricing-vat` ÁFA-megjegyzés
+- **`public/landing.js`** — `_cachedPlans` + `renderPricingGrid` újraírás: `p.features` JSONB → bullet-lista; per-csomag szín/badge/CTA; `applyLanguage`-ban re-render; 8 új i18n kulcs (RO+HU): `planAlapAudience/Standard/Pro/Business`, `planStartBtn/ContactBtn/Popular`, `pricingVatNote`
+- **`public/index.html`** — statikus fallback: 4 valós csomag (Alap/Standard/Pro/Business) helyes tartalommal, CSS osztályokkal és `#lpPricingVat` elemmel
+
+---
+
 ## 2026-06-15 — Csomag finomítás: sofőr limitek + chat Standard-ra (PR #125)
 
 - **`db/package-setup-v2.sql`** — delta migráció: meglévő szerveren is lefut
