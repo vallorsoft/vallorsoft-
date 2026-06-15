@@ -1292,9 +1292,18 @@ function carrierInvitePrompt(carrierId){
 // ── Szállítói számlák (AP) ──
 function loadCarrierAp(){
   var box=document.getElementById('carrierApBox'); if(!box) return;
-  gas('carrierInvoiceList').then(function(r){
+  Promise.all([gas('carrierInvoiceList'), gas('carrierVehicleList')]).then(function(results){
+    var r = results[0]; var vr = results[1];
     if(!r||!r.ok){ box.innerHTML=''; return; }
     var s=r.summary||{}, items=r.items||[];
+
+    // Járművek carrier szerint csoportosítva
+    var vehByCarrier = {};
+    ((vr && vr.ok && vr.items) || []).forEach(function(v){
+      var k = String(v.carrier_id);
+      if(!vehByCarrier[k]) vehByCarrier[k] = [];
+      vehByCarrier[k].push(v);
+    });
 
     // Csoportosítás carrier szerint
     var groups = {};
@@ -1309,6 +1318,27 @@ function loadCarrierAp(){
       var cnt = g.invoices.length;
       var openStr = g.total_open > 0 ? Math.round(g.total_open) + ' EUR ' + t('cs.ap.open') : t('cs.ap.settled');
       var gid = 'cg_' + g.carrier_id;
+
+      // Járművek szekció
+      var vehs = vehByCarrier[String(g.carrier_id)] || [];
+      var vehHtml = vehs.length
+        ? '<table style="width:100%;font-size:12px;border-collapse:collapse;">'
+          + '<thead><tr>'
+          + '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);">Vontató</th>'
+          + '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);">Pótkocsi</th>'
+          + '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);">Márka/Modell</th>'
+          + '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);">Sofőr</th>'
+          + '</tr></thead><tbody>'
+          + vehs.map(function(v){
+              return '<tr>'
+                + '<td style="padding:4px 8px;">'+esc(v.rendszam_camion||'—')+'</td>'
+                + '<td style="padding:4px 8px;color:var(--text-muted);">'+esc(v.rendszam_remorca||'—')+'</td>'
+                + '<td style="padding:4px 8px;color:var(--text-muted);">'+esc([v.marca,v.model].filter(Boolean).join(' ')||'—')+'</td>'
+                + '<td style="padding:4px 8px;color:var(--text-muted);">'+esc(v.sofer_nev||'—')+'</td>'
+                + '</tr>';
+            }).join('')
+          + '</tbody></table>'
+        : '<span style="font-size:12px;color:var(--text-muted);">'+t('cs.ap.noVehicles')+'</span>';
 
       // Számla sorok
       var invoiceRows = g.invoices.map(function(it){
@@ -1335,7 +1365,7 @@ function loadCarrierAp(){
         // Fejléc (accordion header)
         +'<div style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;background:rgba(99,102,241,0.10);border-bottom:2px solid rgba(99,102,241,0.22);" onclick="carrierApToggle(\''+gid+'\')">'
         +'<span style="font-size:15px;font-weight:800;color:var(--text-primary);flex:1;">🚚 '+esc(g.carrier_nev)+'</span>'
-        +'<span style="font-size:12px;color:#6366f1;font-weight:600;">'+cnt+' '+t('cs.ap.invoiceCount')+' · '+esc(openStr)+'</span>'
+        +'<span style="font-size:12px;color:#6366f1;font-weight:600;">'+cnt+' '+t('cs.ap.invoiceCount')+' · '+esc(openStr)+(vehs.length?' · '+vehs.length+' '+t('cs.ap.vehicleCount'):'')+'</span>'
         +'<button class="btn ghost" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();carrierApDocs('+g.carrier_id+')">📎 '+t('cs.ap.docsBtn')+'</button>'
         +'<span id="'+gid+'_arr" style="color:#6366f1;font-size:14px;transition:transform .2s;">▼</span>'
         +'</div>'
@@ -1343,6 +1373,11 @@ function loadCarrierAp(){
         +'<div id="'+gid+'">'
         // Dokumentumok szekció
         +'<div id="'+gid+'_docs" style="background:rgba(99,102,241,0.05);padding:8px 12px;font-size:12px;color:var(--text-muted);border-bottom:1px solid var(--border);">📎 '+t('cs.ap.docsLoading')+'</div>'
+        // Járművek szekció
+        +'<div style="padding:8px 12px;background:rgba(99,102,241,0.03);border-bottom:1px solid var(--border);">'
+        +'<div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:6px;">🚗 '+t('cs.ap.vehicles')+'</div>'
+        + vehHtml
+        +'</div>'
         // Számlák szekció
         +(invoiceRows || '<div style="padding:10px 12px;font-size:12px;color:var(--text-muted);">'+t('cs.ap.noInvoices')+'</div>')
         +'</div>'

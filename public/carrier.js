@@ -66,7 +66,9 @@
           + '<b>' + esc(v.rendszam_camion || '') + '</b>'
           + (v.rendszam_remorca ? ' + ' + esc(v.rendszam_remorca) : '')
           + (v.marca ? ' <span class="mut">' + esc(v.marca) + ' ' + esc(v.model || '') + '</span>' : '')
-          + (v.sofer_nev ? ' <span class="mut" style="font-size:11px">👤 ' + esc(v.sofer_nev) + '</span>' : '')
+          + (v.an_fabricatie ? ' <span class="mut" style="font-size:11px">📅 ' + esc(v.an_fabricatie) + '</span>' : '')
+          + (v.sofer_nev ? ' <span class="mut" style="font-size:11px">👤 ' + esc(v.sofer_nev) + (v.sofer_tel ? ' · 📞 ' + esc(v.sofer_tel) : '') + '</span>' : '')
+          + (v.nota ? ' <span class="mut" style="font-size:11px;display:block">📝 ' + esc(v.nota) + '</span>' : '')
           + '</div>'
           + '<button class="btn" style="padding:5px 9px;font-size:11px" onclick="Carrier.editVehicle(' + v.id + ')" title="' + esc(t('car.editVehicle')) + '">✎</button>'
           + '<button class="btn" style="padding:5px 9px" onclick="Carrier.delVehicle(' + v.id + ')">✕</button>'
@@ -96,11 +98,39 @@
     });
   }
   function addVehicle() {
-    var cam = $('vCam').value.trim(); if (!cam) { toast(t('car.tractorReq'), 'err'); return; }
-    api('POST', '/api/carrier/vehicles', { rendszam_camion: cam, rendszam_remorca: $('vRem').value.trim(), marca: $('vMarca').value.trim(), model: $('vModel').value.trim(), sofer_nev: $('vSofer') ? $('vSofer').value.trim() : '' }).then(function (r) {
-      if (r && r.ok) { toast(t('car.vehicleAdded'), 'ok'); ['vCam', 'vRem', 'vMarca', 'vModel', 'vSofer'].forEach(function (i) { if ($(i)) $(i).value = ''; }); loadVehicles(); } else toast((r && r.err) || t('common.error'), 'err');
-    });
+    var cam = ($('vCam').value || '').trim().toUpperCase();
+    if (!cam) { toast(t('car.tractorReq'), 'err'); return; }
+    // GDPR check — sofőr névnél kötelező figyelmeztetés
+    var sofer = $('vSofer') ? $('vSofer').value.trim() : '';
+    function doSave() {
+      api('POST', '/api/carrier/vehicles', {
+        rendszam_camion: cam,
+        rendszam_remorca: $('vRem').value.trim(),
+        marca: $('vMarca').value.trim(),
+        model: $('vModel').value.trim(),
+        sofer_nev: sofer
+      }).then(function (r) {
+        if (r && r.ok) {
+          toast(t('car.vehicleAdded'), 'ok');
+          ['vCam', 'vRem', 'vMarca', 'vModel', 'vSofer'].forEach(function (i) { if ($(i)) $(i).value = ''; });
+          loadVehicles();
+        } else toast((r && r.err) || t('common.error'), 'err');
+      });
+    }
+    if (!sessionStorage.getItem('car_gdpr_veh_ok')) {
+      var modal = document.getElementById('gdprVehModal');
+      if (modal) {
+        modal.style.display = 'flex';
+        window._gdprVehPendingSave = doSave;
+      } else { doSave(); }
+    } else { doSave(); }
   }
+  window.gdprVehAccept = function () {
+    sessionStorage.setItem('car_gdpr_veh_ok', '1');
+    var modal = document.getElementById('gdprVehModal');
+    if (modal) modal.style.display = 'none';
+    if (window._gdprVehPendingSave) { window._gdprVehPendingSave(); window._gdprVehPendingSave = null; }
+  };
   function delVehicle(id) { api('DELETE', '/api/carrier/vehicles/' + id).then(function (r) { if (r && r.ok) { toast(t('common.deleted'), 'ok'); loadVehicles(); } }); }
 
   function loadMyDocs() {

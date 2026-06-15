@@ -474,6 +474,9 @@
     'cs.ap.partialAmt': { hu: 'Részben ({n})', ro: 'Parțial ({n})' },
     'cs.ap.toPay': { hu: 'Fizetendő', ro: 'De plată' },
     'cs.ap.payBtn': { hu: 'Fizetve', ro: 'Plătit' },
+    'cs.ap.vehicles': { hu: 'Alvállalkozó járművei', ro: 'Vehiculele subcontractorului' },
+    'cs.ap.vehicleCount': { hu: 'jármű', ro: 'vehicule' },
+    'cs.ap.noVehicles': { hu: 'Még nincs felvitt jármű', ro: 'Nu sunt vehicule înregistrate' },
 
     'cs.gdpr.title': { hu: 'GDPR — adatkezelés', ro: 'GDPR — gestionare date' },
     'cs.gdpr.hint': { hu: 'A cég összes adatának letöltése (hozzáférés/hordozhatóság) JSON-ban — jelszó-hash és 2FA-titok nélkül. A felhasználók anonimizálása (törléshez való jog) a Felhasználók listában.', ro: 'Descărcarea tuturor datelor firmei (acces/portabilitate) în JSON — fără hash de parolă și secret 2FA. Anonimizarea utilizatorilor (dreptul la ștergere) în lista Utilizatori.' },
@@ -1343,6 +1346,7 @@
     'car.noDocsYet': { hu: 'Még nincs dokumentum', ro: 'Încă niciun document' },
     'car.noVehicleYet': { hu: 'Még nincs felvitt jármű', ro: 'Niciun vehicul adăugat încă' },
     'car.tractorReq': { hu: 'A vontató rendszáma kötelező.', ro: 'Nr. de înmatriculare al capului tractor este obligatoriu.' },
+    'car.plateRequired': { hu: 'A vontató rendszáma kötelező', ro: 'Numărul de înmatriculare al capului tractor este obligatoriu' },
     'car.vehicleAdded': { hu: 'Jármű felvéve', ro: 'Vehicul adăugat' },
     'car.myUploads': { hu: 'Feltöltéseim:', ro: 'Încărcările mele:' },
     'car.pickFile': { hu: 'Válassz fájlt.', ro: 'Alege un fișier.' },

@@ -100,8 +100,15 @@
           <input class="inp" id="vMarca" data-i18n-ph="car.phBrand" placeholder="Márka" style="flex:1;min-width:100px">
           <input class="inp" id="vModel" data-i18n-ph="car.phModel" placeholder="Modell" style="flex:1;min-width:100px">
         </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+          <input class="inp" id="vSofer" data-i18n-ph="car.phDriver" placeholder="Sofőr neve (opcionális)" style="flex:2;min-width:120px">
+          <input class="inp" id="vSoferTel" data-i18n-ph="car.phDriverTel" placeholder="Sofőr tel." type="tel" style="flex:1;min-width:100px">
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+          <input class="inp" id="vAn" data-i18n-ph="car.phYear" placeholder="Gyártási év" type="number" min="1990" max="2030" style="flex:1;min-width:100px">
+        </div>
         <div style="margin-top:6px">
-          <input class="inp" id="vSofer" data-i18n-ph="car.phDriver" placeholder="Sofőr neve (opcionális)">
+          <textarea class="inp" id="vNota" data-i18n-ph="car.phNote" placeholder="Megjegyzés" rows="2" style="resize:vertical"></textarea>
         </div>
         <button class="btn ok" style="width:100%;margin-top:8px" onclick="Carrier.addVehicle()" data-i18n="car.addVehicle">＋ Jármű felvitele</button>
         <div class="mut" style="font-size:11px;margin-top:6px" data-i18n="car.vehicleHint">A felvitt járművet a diszpécser látja a kiosztásnál.</div>
@@ -118,6 +125,19 @@
   </div>
 </div>
 
+<div id="gdprVehModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;color:#111;border-radius:16px;max-width:480px;width:100%;padding:28px 24px;box-shadow:0 8px 40px rgba(0,0,0,.4);">
+    <div style="font-size:17px;font-weight:800;margin-bottom:12px;">⚠️ GDPR — Date personale șofer / Sofőr személyes adatok</div>
+    <div style="font-size:13px;line-height:1.6;margin-bottom:16px;" id="gdprVehText">
+      <b>RO:</b> Prin adăugarea numelui șoferului, partajați date cu caracter personal cu societatea transportatoare. Sunteți responsabil pentru obținerea consimțământului șoferului și pentru legalitatea acestei prelucrări de date (GDPR, Legea 190/2018).<br><br>
+      <b>HU:</b> A sofőr nevének megadásával személyes adatot oszt meg a fuvarozó céggel. Ön felel a sofőr hozzájárulásának megszerzéséért és az adatkezelés jogszerűségéért (GDPR, Legea 190/2018).
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="document.getElementById('gdprVehModal').style.display='none';" style="padding:10px 20px;background:#e2e8f0;color:#111;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;" id="gdprVehCancelBtn">Anulare / Mégsem</button>
+      <button onclick="gdprVehAccept()" style="padding:10px 20px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;" id="gdprVehOkBtn">Am înțeles / Értem →</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <script src="/carrier.js?v=20260614qa"></script>
 <script src="/legal-ack.js"></script>
