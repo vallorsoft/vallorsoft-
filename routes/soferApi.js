@@ -247,12 +247,15 @@ router.get('/api/pdf-download/:id', async (req, res) => {
   try {
     if (!req.session.user) return res.status(401).send('Nu sunteti autentificat');
     const r = await pool.query(
-      `SELECT * FROM fuvarlevelek
-       WHERE id = $1 AND email_sofer IN (SELECT email FROM users WHERE company_id = $2)`,
+      `SELECT f.*, c.denumire AS company_denumire
+       FROM fuvarlevelek f
+       JOIN companies c ON c.id = $2
+       WHERE f.id = $1 AND f.email_sofer IN (SELECT email FROM users WHERE company_id = $2)`,
       [req.params.id, req.session.user.company_id]
     );
     if (!r.rows.length) return res.status(404).send('Nu a fost gasit.');
     const f = r.rows[0];
+    const companyName = f.company_denumire || 'VallorSoft';
 
     const alimentari = Array.isArray(f.alimentari) ? f.alimentari : [];
     const achizitii  = Array.isArray(f.achizitii)  ? f.achizitii  : [];
@@ -327,12 +330,13 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       <button onclick="window.close();setTimeout(function(){if(!window.closed){if(history.length>1){history.back();}else{location.href='/';}}},150);" style="padding:10px 24px;background:#555;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">← Inapoi</button>
       <button onclick="window.print()" style="padding:10px 24px;background:#000;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">🖨️ Tipareste / Salveaza PDF</button>
     </div>
-    <div class="header-box">VALLOR TEAM SRL<br><span style="font-size:14px;">FIȘĂ DE CURSĂ SĂPTĂMÂNALĂ</span><br><span style="font-size:15px;color:#b00;letter-spacing:1px;">Serie / Nr.: ${escHtml(f.numar_fisa || '—')}</span></div>
+    <div class="header-box">${escHtml(companyName)}<br><span style="font-size:14px;">Foi de Parcurs</span><br><span style="font-size:15px;color:#b00;letter-spacing:1px;">Serie / Nr.: ${escHtml(f.numar_fisa || '—')}</span></div>
 
     <table class="grid-table">
       <tr><td width="50%"><b>Nume șofer:</b> ${escHtml(f.nume_sofer || '—')}</td><td><b>Serie / Număr:</b> ${escHtml(f.numar_fisa || '—')}</td></tr>
       <tr><td><b>Număr camion:</b> ${escHtml(f.numar_camion || '—')}</td><td><b>Număr remorcă:</b> ${escHtml(f.numar_remorca || '—')}</td></tr>
       <tr><td colspan="2"><b>Fuvar ID-k:</b> ${orderIdsStr}</td></tr>
+      <tr><td><b>Data / ora plecare:</b> ${f.indulas_dt ? escHtml(new Date(f.indulas_dt).toLocaleString('ro-RO', {timeZone:'Europe/Bucharest',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})) : '—'}</td><td><b>Data / ora sosire:</b> ${f.erkezes_dt ? escHtml(new Date(f.erkezes_dt).toLocaleString('ro-RO', {timeZone:'Europe/Bucharest',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})) : '—'}</td></tr>
       <tr><td><b>Km început:</b> ${f.km_inceput || 0} km</td><td><b>Km sfârșit:</b> ${f.km_sfarsit || 0} km</td></tr>
       <tr><td colspan="2"><b>Total kilometri parcurși: ${f.total_km || 0} km</b></td></tr>
       <tr><td><b>Diurnă externă:</b> ${f.diurna_externa || 0} nap</td><td><b>Diurnă internă:</b> ${f.diurna_interna || 0} nap</td></tr>
