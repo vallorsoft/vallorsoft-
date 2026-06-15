@@ -1609,11 +1609,13 @@ function loadInvites(){
 function loadOrderFormData(){
   gas('userListAll').then(list=>{internDriversCache=list.filter(u=>u.pozicio==='Sofer');renderInternDrivers(internDriversCache);});
   gas('extDriverList').then(list=>{externDriversCache=Array.isArray(list)?list:[];renderExternDrivers(externDriversCache);});
-  gas('vehicleList').then(list=>{
-    if(!Array.isArray(list))list=[];
-    camionCache=list.filter(v=>v.tip==='Vontato');
-    remorcaCache=list.filter(v=>v.tip==='Potkocsi');
-    renderCamions(camionCache);renderRemorcas(remorcaCache);
+  Promise.all([gas('vehicleList'), gas('carrierVehicleList')]).then(function(res){
+    var list = Array.isArray(res[0]) ? res[0] : [];
+    var cvItems = (res[1] && res[1].ok && res[1].items) ? res[1].items : [];
+    camionCache = list.filter(v=>v.tip==='Vontato');
+    remorcaCache = list.filter(v=>v.tip==='Potkocsi');
+    renderCamions(camionCache, cvItems);
+    renderRemorcas(remorcaCache);
   });
   // jármű/sofőr választásra a párja automatikusan kitöltődik (ha üres)
   const cs=document.getElementById('oCamionSelect');if(cs)cs.onchange=orderFormPairFromVehicle;
@@ -2138,7 +2140,20 @@ function renderAdminRoomList(me){
   }).join('');
 }
 
-function renderCamions(list){const sel=document.getElementById('oCamionSelect');if(!sel)return;sel.innerHTML='<option value="">'+t('cs.notSetDash')+'</option>'+list.map(v=>`<option value="${esc(v.rendszam)}">${esc(v.rendszam)}${v.marca?' — '+esc(v.marca):''}${v.model?' '+esc(v.model):''}</option>`).join('');}
+function renderCamions(list, carrierVehs){
+  var sel=document.getElementById('oCamionSelect'); if(!sel) return;
+  var ownHtml = list.length
+    ? '<optgroup label="'+t('cs.ownVehicles')+'">'+list.map(v=>'<option value="'+esc(v.rendszam)+'">'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+(v.model?' '+esc(v.model):'')+' </option>').join('')+'</optgroup>'
+    : '';
+  var cvGroups = {};
+  (carrierVehs||[]).forEach(function(cv){ var k=cv.carrier_nev||'Alvállalkozó'; if(!cvGroups[k])cvGroups[k]=[]; cvGroups[k].push(cv); });
+  var cvHtml = Object.keys(cvGroups).sort().map(function(nev){
+    return '<optgroup label="🚚 '+esc(nev)+'">'+cvGroups[nev].map(function(cv){
+      return '<option value="'+esc(cv.rendszam_camion)+'">'+esc(cv.rendszam_camion)+(cv.marca?' — '+esc(cv.marca):'')+(cv.sofer_nev?' 👤'+esc(cv.sofer_nev):'')+' ('+esc(nev)+')</option>';
+    }).join('')+'</optgroup>';
+  }).join('');
+  sel.innerHTML='<option value="">'+t('cs.notSetDash')+'</option>'+ownHtml+cvHtml;
+}
 
 function renderDocGroups() {
   var container = document.getElementById('docGroupsContainer');
@@ -3525,7 +3540,8 @@ function openOrderEdit(id) {
   // le még egyszer a Promise.all-ban (korábban duplán futott).
   Promise.all([
     gas('userListAll'),
-    gas('vehicleList')
+    gas('vehicleList'),
+    gas('carrierVehicleList')
   ]).then(function(results) {
     fetch('/api/execute', {method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({functionName:'getOrderById',arguments:[id]})})
@@ -3599,12 +3615,41 @@ function openOrderEdit(id) {
       var vehicles = results[1] || [];
       _oeCamionCache = vehicles.filter(v => v.tip === 'Vontato');
       _oeRemorcaCache = vehicles.filter(v => v.tip === 'Potkocsi');
+      var carrierVehs = (results[2] && results[2].ok && results[2].items) ? results[2].items : [];
       var camSel = document.getElementById('oeCamion');
-      camSel.innerHTML = '<option value="">'+t('edit.noneDash')+'</option>' +
-        _oeCamionCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_camion?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
+      // Carrier jármű optgroup csoportosítva carrier neve szerint
+      var carrierGroups = {};
+      carrierVehs.forEach(function(cv) {
+        var k = esc(cv.carrier_nev || t('cs.ca.title'));
+        if (!carrierGroups[k]) carrierGroups[k] = [];
+        carrierGroups[k].push(cv);
+      });
+      var carrierOptHtml = Object.keys(carrierGroups).sort().map(function(nev) {
+        return '<optgroup label="🚚 '+nev+'">'
+          + carrierGroups[nev].map(function(cv) {
+              return '<option value="'+esc(cv.rendszam_camion)+'"'+(cv.rendszam_camion===o.rendszam_camion?' selected':'')+'>'
+                +esc(cv.rendszam_camion)+(cv.marca?' — '+esc(cv.marca):'')+' ('+esc(cv.carrier_nev||nev)+')'+'</option>';
+            }).join('')
+          + '</optgroup>';
+      }).join('');
+      camSel.innerHTML = '<option value="">'+t('edit.noneDash')+'</option>'
+        + (_oeCamionCache.length ? '<optgroup label="'+t('cs.ownVehicles')+'">'
+            + _oeCamionCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_camion?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('')
+            + '</optgroup>' : '')
+        + carrierOptHtml;
+      // Pótkocsi is kiegészül a carrier pótkocsi rendszámokkal
+      var carrierRemHtml = carrierVehs.filter(function(cv){ return cv.rendszam_remorca; }).length
+        ? '<optgroup label="🚚 '+t('cs.ca.title')+'">'
+          + carrierVehs.filter(function(cv){ return cv.rendszam_remorca; })
+              .map(function(cv){ return '<option value="'+esc(cv.rendszam_remorca)+'"'+(cv.rendszam_remorca===o.rendszam_remorca?' selected':'')+'>'+esc(cv.rendszam_remorca)+'</option>'; }).join('')
+          + '</optgroup>'
+        : '';
       var remSel = document.getElementById('oeRemorca');
-      remSel.innerHTML = '<option value="">'+t('edit.noneDash')+'</option>' +
-        _oeRemorcaCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_remorca?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('');
+      remSel.innerHTML = '<option value="">'+t('edit.noneDash')+'</option>'
+        + (_oeRemorcaCache.length ? '<optgroup label="'+t('cs.ownVehicles')+'">'
+            + _oeRemorcaCache.map(v => '<option value="'+esc(v.rendszam)+'"'+(v.rendszam===o.rendszam_remorca?' selected':'')+'>'+esc(v.rendszam)+(v.marca?' — '+esc(v.marca):'')+'</option>').join('')
+            + '</optgroup>' : '')
+        + carrierRemHtml;
 
       // Auto-párosítás a szerkesztőben (vehicles.assigned_driver_email):
       // jármű-választásra a párosított sofőr töltődik (és fordítva) —
