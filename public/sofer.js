@@ -257,10 +257,16 @@ function loadSoferOrders() {
     }
     el.innerHTML = _soferOrdersCache.map(function(o) {
       var checked = _selectedOrderIds.indexOf(o.id) !== -1;
+      var phaseBadge = '';
+      if (o.waybill_phase === 'loading') {
+        phaseBadge = ' <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(34,197,94,0.2);color:#4ade80;">📤 ' + t('sof.phaseLoading') + '</span>';
+      } else if (o.waybill_phase === 'unloading') {
+        phaseBadge = ' <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(99,102,241,0.25);color:#a5b4fc;">📥 ' + t('sof.phaseUnloading') + '</span>';
+      }
       return '<label style="display:flex;align-items:flex-start;gap:12px;background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;">'
         + '<input type="checkbox" value="' + o.id + '" ' + (checked ? 'checked' : '') + ' onchange="toggleOrderSel(this)" style="margin-top:3px;width:18px;height:18px;accent-color:#3b82f6;flex-shrink:0;">'
         + '<div>'
-        + '<div style="font-weight:700;font-size:14px;color:#fff;">' + esc(o.client || '—') + ' <span style="font-size:11px;color:var(--muted);">#' + o.id + '</span> <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,0.1);">' + esc(o.status||'—') + '</span></div>'
+        + '<div style="font-weight:700;font-size:14px;color:#fff;">' + esc(o.client || '—') + ' <span style="font-size:11px;color:var(--muted);">#' + o.id + '</span> <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,0.1);">' + esc(o.status||'—') + '</span>' + phaseBadge + '</div>'
         + '<div style="font-size:12px;color:var(--soft);margin-top:3px;">📍 ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—') + '</div>'
         + (o.rendszam_camion ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">🚛 ' + esc(o.rendszam_camion) + (o.rendszam_remorca ? ' / ' + esc(o.rendszam_remorca) : '') + '</div>' : '')
         + '</div></label>';
@@ -295,8 +301,18 @@ function fuvarStep2() {
   document.getElementById('puncteContainer').innerHTML = '';
   punctIdx = 0;
   selected.forEach(function(o) {
-    if (o.loc_incarcare) addPunctRow(o.loc_incarcare, 'Încărcare');
-    if (o.loc_descarcare) addPunctRow(o.loc_descarcare, 'Descărcare');
+    var phase = o.waybill_phase;
+    if (phase === 'loading') {
+      // Alocat / In Curs: csak a felrakási adatok — az Extern fuvarhoz nincs lerakó még
+      if (o.loc_incarcare) addPunctRow(o.loc_incarcare, 'Încărcare');
+    } else if (phase === 'unloading') {
+      // Finalizat, már volt menetlevélbe foglalva (rakodás): csak lerakási adatok
+      if (o.loc_descarcare) addPunctRow(o.loc_descarcare, 'Descărcare');
+    } else {
+      // complete vagy ismeretlen: mindkettő (régi viselkedés / egyszerű fuvar)
+      if (o.loc_incarcare) addPunctRow(o.loc_incarcare, 'Încărcare');
+      if (o.loc_descarcare) addPunctRow(o.loc_descarcare, 'Descărcare');
+    }
   });
 
   document.getElementById('fuvarStep1').style.display = 'none';

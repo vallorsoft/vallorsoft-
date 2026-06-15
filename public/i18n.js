@@ -1586,6 +1586,8 @@
     'sof.bug.send': { hu: '📤 Küldés', ro: '📤 Trimite' },
     'sof.bug.minChars': { hu: 'Írj le legalább 5 karaktert!', ro: 'Scrie cel puțin 5 caractere!' },
     'sof.bug.thanks': { hu: 'Hibajelentés elküldve, köszönjük!', ro: 'Raport de eroare trimis, mulțumim!' },
+    'sof.phaseLoading': { hu: 'Felrakás', ro: 'Încărcare' },
+    'sof.phaseUnloading': { hu: 'Lerakás', ro: 'Descărcare' },
 
     // ── Developer felület ──
     'dev.menu': { hu: 'Menü', ro: 'Meniu' },
