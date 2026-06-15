@@ -12,16 +12,15 @@ const router  = express.Router();
 router.get('/api/landing-texts', async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT value FROM developer_settings WHERE key='landing_content'`
+      `SELECT key, value FROM developer_settings WHERE key IN ('landing_content','landing_section_order','landing_section_visibility')`
     );
-    if (!r.rows.length) {
-      return res.json({ ro: {}, hu: {} });
-    }
-    const val = r.rows[0].value;
-    return res.json({
-      ro: (val && val.ro) || {},
-      hu: (val && val.hu) || {},
-    });
+    const byKey = {};
+    r.rows.forEach(row => { byKey[row.key] = row.value; });
+    const content = byKey['landing_content'] || {};
+    const DEFAULT_ORDER = ['hero','strip','how','features','stats','testimonials','pricing','blog','contact','cta'];
+    const sectionOrder = byKey['landing_section_order'] || DEFAULT_ORDER;
+    const sectionVisibility = byKey['landing_section_visibility'] || {};
+    return res.json({ ro: content.ro || {}, hu: content.hu || {}, sectionOrder, sectionVisibility });
   } catch (err) {
     // Best-effort: hiba esetén üres objektum (a landing az alapértelmezett szövegekkel tölt be)
     return res.json({ ro: {}, hu: {} });
