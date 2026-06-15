@@ -116,7 +116,11 @@
     </div>
     <!-- 10. Beállítások -->
     <div class="menu-group" style="margin-top:auto;">
-      <div class="tab" data-tab="settings"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span data-i18n="nav.settings">Beállítások</span></div>
+      <div class="tab nav-head" onclick="toggleGroup(this)"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span data-i18n="nav.settings">Beállítások</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+      <div class="submenu">
+        <div class="sub-tab" data-tab="settings">👤 Fiók</div>
+        <div class="sub-tab" data-tab="elofizetesek">💳 Előfizetés</div>
+      </div>
     </div>
     <div style="padding:10px 12px; border-top:1px solid var(--border); margin-top:8px;">
       <div id="meBadge" style="font-size:12px; color:var(--muted); margin-bottom:10px;">—</div>
@@ -663,15 +667,6 @@
           </div>
         </div>
 
-        <!-- ELŐFIZETÉS (csak admin) -->
-        <div class="glass" id="subscriptionCard" style="padding:24px;display:none;">
-          <h2 class="h-title" style="margin-top:0;">💳 Előfizetés</h2>
-          <div id="subStatusBlock" style="padding:14px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--border);margin-bottom:14px;">
-            <div id="subStatusText" style="font-size:14px;">Betöltés...</div>
-          </div>
-          <a id="subUpgradeBtn" href="/subscription" class="btn primary" style="display:none;">📦 Csomag választása</a>
-        </div>
-
          <!-- GDPR / ADATVÉDELEM (csak admin) -->
         <div class="glass" id="gdprSettingsCard" style="padding:24px;display:none;">
           <h2 class="h-title" style="margin-top:0;" data-i18n="gdpr.title">🔒 GDPR / Adatvédelem</h2>
@@ -760,6 +755,52 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- Előfizetés pane -->
+<div class="pane hidden" data-pane="elofizetesek">
+  <div style="max-width:640px; margin:0 auto; display:flex; flex-direction:column; gap:18px; padding:24px 0;">
+    <!-- Státusz kártya -->
+    <div class="glass" style="padding:24px;">
+      <h2 class="h-title" style="margin-top:0;">💳 Előfizetés állapota</h2>
+      <div id="elofSubStatus" style="padding:14px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--border);margin-bottom:14px;">
+        <div id="elofSubText" style="font-size:15px;">Betöltés...</div>
+        <div id="elofSubExpiry" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
+      </div>
+    </div>
+    <!-- Csomag választó -->
+    <div class="glass" style="padding:24px;">
+      <h2 class="h-title" style="margin-top:0;">📦 Csomag / Megújítás</h2>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Válassz csomagot. Fizetési részleteket emailben küldjük; a banki jóváírás után a developer aktiválja.</p>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button id="elofBillingMonthly" class="btn primary" style="font-size:12px;padding:6px 14px;" onclick="elofSetBilling('monthly')">Havi</button>
+        <button id="elofBillingAnnual" class="btn ghost" style="font-size:12px;padding:6px 14px;" onclick="elofSetBilling('annual')">Éves ★ −1 hónap</button>
+      </div>
+      <div id="elofPlanGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;">
+        <div style="text-align:center;color:var(--muted);font-size:13px;padding:20px;">Betöltés...</div>
+      </div>
+    </div>
+    <!-- Referencia kártya (kérelem után jelenik meg) -->
+    <div id="elofRefCard" class="glass" style="padding:24px;display:none;">
+      <h2 class="h-title" style="margin-top:0;">✅ Kérelem elküldve</h2>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">A fizetési részleteket emailben elküldtük. Utalásnál add meg a referencia-kódot a megjegyzés mezőben.</p>
+      <div style="text-align:center;padding:16px;background:rgba(99,102,241,.06);border:2px solid #6366f1;border-radius:10px;">
+        <div style="font-size:11px;color:#6366f1;font-weight:700;letter-spacing:.5px;margin-bottom:6px;">REFERINȚĂ PLATĂ</div>
+        <div id="elofRefCode" style="font-size:26px;font-weight:800;font-family:monospace;letter-spacing:2px;"></div>
+      </div>
+      <div id="elofBankBlock" style="margin-top:14px;"></div>
+    </div>
+    <!-- Fizetési előzmények -->
+    <div class="glass" style="padding:24px;">
+      <h2 class="h-title" style="margin-top:0;">📋 Fizetési előzmények</h2>
+      <div style="overflow-x:auto;">
+        <table class="table" style="font-size:13px;">
+          <thead><tr><th>Dátum</th><th>Csomag</th><th>Időszak</th><th>Referencia</th><th>EUR</th><th>RON</th><th>Státusz</th></tr></thead>
+          <tbody id="elofHistTbody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px;">Betöltés...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 

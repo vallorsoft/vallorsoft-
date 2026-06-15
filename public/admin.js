@@ -40,6 +40,7 @@ function loadTab(name){
   if(name==='external-drivers'){ loadExtDrivers(); if(typeof loadCarriers==='function') loadCarriers(); if(typeof loadCarrierAp==='function') loadCarrierAp(); }
   if(name==='signature') initAdminSigCanvas();
   if(name==='settings') loadSettingsPane();
+  if(name==='elofizetesek') loadElofizetesek();
   if(name==='internal-drivers') loadInternalDrivers();
   if(name==='clients' && window.ClientsPage){ ClientsPage.mount('clientsBox'); if(typeof loadClientPortalAccess==='function') loadClientPortalAccess(); }
   if(name && name.indexOf('stats-')===0 && window.VS_STATS) VS_STATS.load(name);
