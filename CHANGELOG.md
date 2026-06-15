@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-06-15 — Landing page i18n hiányzó kulcsok + mobil optimalizálás (PR #100)
+
+- **~58 hiányzó i18n kulcs pótolva** (`public/landing.js`) — RO módban is HU szöveg látszott a feature stripben, moduloknál, statisztikánál, testimonialsoknál, CTA szekciónál, footer fejléceknél, árazás fallbacknél.
+- **Mobil navbar**: 860px-en `.lp-btn-ghost` (login szöveglink) elrejt — csak lang toggle + register gomb marad; 480px-en a register is elrejt, csak lang toggle látszik.
+- **Hero mobile**: sofőr-hét timeline 640px alatt `display:none` helyett `order:-1` — megjelenik a szöveg felett (single-column); `lp-sofer-week { max-width: 100% }`.
+- **Hamburger menü** (`index.html`): login link hozzáadva a mobilos nav listájához.
+
 ## 2026-06-14 — Developer csomag-limitek + plan_features funkció-kapcsolók (PR #99)
 
 - **`plan_features` tábla** (`db/plan-features.sql`) — csomag-szintű funkció-kapcsolók: `plan_id + feature_key + enabled`; auto-migráció induláskor. `subscription_plans.max_sofors` új limit-oszlop.
