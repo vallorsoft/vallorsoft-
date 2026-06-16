@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-16 — Regisztráció: nincs többé egymás melletti kétnyelvű felirat (i18n + RO-alap)
+
+> A regisztrációs oldal ingyenes-trial űrlapja egymás mellett mutatta a két nyelvet (pl. „Cégnév / Numele companiei", „Jelszó / Parolă"). A felhasználó kérése: SEHOL ne legyen egymás mellett két nyelv — ezt a nyelvváltó kapcsoló intézze, alapértelmezett a román.
+
+- **`public/register.html`** — az ingyenes-trial űrlap minden beégetett kétnyelvű/magyar szövege `data-i18n`/`data-i18n-ph`/`data-i18n-html` kulcsra cserélve (cégnév, teljes név, telefon, jelszó, megerősítés, beleegyezés-szövegek, gomb, váltó-linkek, alcím). A meghívókódos űrlap maradék beégetett szövegei is i18n-esítve (beleegyezés, „Nincs meghívókód?"). Az alcímet a `showFreeMode`/`showInviteMode` már `data-i18n` attribútummal állítja, így a váltó újrafordítja.
+- **`public/i18n.js`** — 11 új `reg.*` kulcs (RO+HU): `freeSubtitle`, `companyName`, `companyNamePh`, `phoneOpt`, `acceptTermsHtml`, `acceptPrivacyHtml`, `freeSubmit`, `haveInvite`, `loginWithCode`, `noInvite`, `freeRegLink`. (A motor alapértelmezése már RO, és magától beilleszt egy 🇷🇴/🇭🇺 kapcsolót.)
+- A jelszó-követelmény hint továbbra is **csak románul** (az előző kör szerint). Cache-bust `i18n.js?v=...pw3`. 93 Jest zöld.
+
 ## 2026-06-16 — Jelszó-szabály finomítás: követelmény csak románul + jelszó kétszer (megerősítés)
 
 > A PR #144 utáni két kérés: (1) a jelszó-követelmény szövege CSAK románul jelenjen meg, (2) minden regisztrációnál és jelszó-cserénél kétszer kelljen megadni a jelszót, és csak egyezés esetén érvényes (elgépelés ellen).
