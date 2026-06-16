@@ -6,7 +6,7 @@
   <title data-i18n="title.manager">vallorSoft - Manager Console</title>
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="/style.css?v=20260614shell">
+  <link rel="stylesheet" href="/style.css?v=20260616band">
   <script src="/i18n.js?v=20260616menu"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -153,24 +153,8 @@
 
        <!-- Stat kártyák -->
       <div id="dashExpiryAlert"></div>
-      <div class="dash-stats" style="margin-bottom:20px;">
-        <div class="glass stat-tile">
-          <div class="stat-ico">📦</div>
-          <div><div class="stat-val text-primary" id="kpiTotal">—</div><div class="stat-lbl text-muted" data-i18n="dash.kpiTotal">Összes fuvar</div></div>
-        </div>
-        <div class="glass stat-tile">
-          <div class="stat-ico">🚚</div>
-          <div><div class="stat-val text-primary" id="kpiAktiv">—</div><div class="stat-lbl text-muted" data-i18n="dash.kpiActive">Aktív fuvar</div></div>
-        </div>
-        <div class="glass stat-tile">
-          <div class="stat-ico">👥</div>
-          <div><div class="stat-val text-primary" id="cUsers">—</div><div class="stat-lbl text-muted" data-i18n="dash.kpiUsers">Felhasználók</div></div>
-        </div>
-        <div class="glass stat-tile">
-          <div class="stat-ico">📄</div>
-          <div><div class="stat-val text-primary" id="countFuv">—</div><div class="stat-lbl text-muted" data-i18n="dash.kpiWaybills">Beérkezett menetlevelek</div></div>
-        </div>
-      </div>
+      <!-- Fázis 2: interaktív KPI mutató-sáv (console-shared.js vsMetricBand) -->
+      <div id="dashMetricBand" style="margin-bottom:20px;"></div>
 
        <!-- Fő tartalom: 2 oszlop (lista + térkép) -->
       <div class="dash-grid">
@@ -1103,7 +1087,7 @@
 
 <script src="/email-intake-card.js?v=20260614qa"></script>
 <script src="/feature-catalog.js?v=20260614qa"></script>
-<script src="/console-shared.js?v=20260616pw2"></script>
+<script src="/console-shared.js?v=20260616band"></script>
 <!-- ===== INTEGRACIOK (Manager: Ugyfelek + "Hol a kocsi?"; szamlazo/beallitas Admin-only) ===== -->
 <script src="/clients-page.js?v=20260614qa"></script>
 <script src="/client-mail.js?v=20260614qa"></script>

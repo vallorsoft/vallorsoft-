@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-16 — Fázis 2 (1. lépés): interaktív KPI mutató-sáv a Vezérlőpulton (PR #151)
+
+> A megjelenés-csiszolás első éles lépése: a Vezérlőpult 4 különálló KPI-négyzete helyett egy egységes, interaktív **mutató-sáv** (a jóváhagyott „C" minta alapján). Saját, meleg signature-akcent (napnyugta gradiens), a funkció és az adat változatlan.
+
+- **`public/style.css`** — új `vsMetricBand` komponens (`.vsmb*`): 85/15 rács, balra nagy gradiens fő-szám (`--vs-warm-grad` napnyugta narancs→korall), jobbra 3 kis kocka egymás alatt; a kockák bal-csík árnyalata a **fontossági sorrendet** követi (`#ea580c → #f97316 → #fb923c → #fdba74`). Alap: alacsony (`min-height:120px`); `.tall` módban magasabb (Statisztikának). Téma-érzékeny (light/dark), reszponzív (mobilon a fő-szám felül, kockák alatta).
+- **`public/console-shared.js`** — `vsMetricBand(metrics,opts)` + `vsBandPick(i)` közös renderelő: **kattintásra a kis kocka a grafikonra ugrik, a mostani fő-szám visszaugrik a helyére** (átúszással). A `t`/`s` (trend/idősor) opcionális → ahol nincs valós adat, elmarad (nincs koholt trend). `loadDashboard` átírva: `dashStats`+`userListAll`+`getFuvarlevelek` egy `Promise.all`-ban → a sávot **valós értékkel** tölti (Összes/Aktív fuvar, Felhasználók, Menetlevél).
+- **`public/admin.html` + `public/manager.html`** — a `.dash-stats` 4 csempe helyén `#dashMetricBand` konténer; cache-bust `style.css?v=20260616band`, `console-shared.js?v=20260616band`. 93 Jest zöld.
+- **Következő lépések:** a sáv kiterjesztése a többi listaoldalra + egységes oldal-fej/táblázat-csiszolás; a valós trend-grafikonokhoz (sparkline) egy könnyű history-lekérdezés; a meleg paletta fokozatos kiterjesztése. (A 3 javasolt ÚJ modul — Bursă / e-CMR / CO₂ — még csak prototípus, külön döntésre.)
+
 ## 2026-06-16 — Landing árazás: a csomag-feature-ek is a kiválasztott nyelven (DB-fix)
 
 > Az előző kör után a landing árazásánál a **csomag-feature listák** még mindig magyarul látszottak (miközben a lap románul) — mert a `package-setup*.sql` migrációk **egynyelvű magyar string** tömbként írták a `subscription_plans.features`-t a kétnyelvű objektumok helyett. A render (`f[lang]`) csak objektumnál nyelv-helyes.
