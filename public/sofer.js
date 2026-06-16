@@ -630,18 +630,21 @@ function loadSoferMiniStats() {
     var s = d.result;
     if (!s || !s.ok) return;
     function n(x) { var v = parseFloat(x); return isFinite(v) ? v.toLocaleString(t('sof.locale'), { maximumFractionDigits: 0 }) : '0'; }
-    function tile(ico, val, lbl) {
-      return '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:10px 6px;text-align:center;">'
-        + '<div style="font-size:18px;">' + ico + '</div>'
-        + '<div style="font-size:16px;font-weight:800;color:#fff;margin-top:2px;">' + val + '</div>'
-        + '<div style="font-size:10px;color:#8a97a8;margin-top:2px;">' + lbl + '</div></div>';
+    // Világos téma: fehér kártya + olvasható sötét/akcentes szöveg (a régi
+    // fehér-fehér olvashatatlan volt). Per-csempe akcent a motivációs hatáshoz.
+    function tile(ico, val, lbl, accent) {
+      return '<div style="background:var(--sof-card);border:1px solid var(--sof-border);border-radius:14px;padding:12px 8px;text-align:center;box-shadow:0 2px 8px rgba(15,23,42,0.04);">'
+        + '<div style="font-size:20px;line-height:1;">' + ico + '</div>'
+        + '<div style="font-size:18px;font-weight:800;color:' + accent + ';margin-top:4px;line-height:1.1;">' + val + '</div>'
+        + '<div style="font-size:10px;font-weight:600;color:var(--sof-muted);margin-top:3px;text-transform:uppercase;letter-spacing:.3px;">' + lbl + '</div></div>';
     }
-    box.innerHTML = '<div style="font-size:12px;font-weight:700;color:#8a97a8;margin:14px 0 8px;">' + t('sof.myMonthPerf') + '</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">'
-      + tile('✅', n(s.lezart), t('sof.statClosed'))
-      + tile('🛣️', n(s.km), t('sof.statKm'))
-      + tile('🗓️', n(s.diurna_ext) + '+' + n(s.diurna_int), t('sof.statDiurna'))
-      + tile('⛽', n(s.tankolt_l) + ' L', t('sof.statFueled'))
+    // 2×2 rács (2-2) — ne húzza el az oldalt függőlegesen.
+    box.innerHTML = '<div style="font-size:12px;font-weight:700;color:var(--sof-muted);margin:14px 0 8px;">' + t('sof.myMonthPerf') + '</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">'
+      + tile('✅', n(s.lezart), t('sof.statClosed'), '#16a34a')
+      + tile('🛣️', n(s.km), t('sof.statKm'), '#2563eb')
+      + tile('🗓️', n(s.diurna_ext) + '+' + n(s.diurna_int), t('sof.statDiurna'), '#6366f1')
+      + tile('⛽', n(s.tankolt_l) + ' L', t('sof.statFueled'), '#d97706')
       + '</div>';
     box.style.display = '';
   }).catch(function() {});
