@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-06-16 — Sofőr mini-statisztika: 2×2 rács + világos-téma olvashatóság
+
+- **`public/sofer.js`** — a főoldali motivációs havi mini-statisztika (lezárt fuvar / km / diurna / tankolás) `repeat(4,1fr)` egysoros rács helyett **2×2 rácsban** (2-2), így nem húzza el az oldalt. A csempék a sofőr **világos témájához** igazítva: fehér kártya (`--sof-card`) + sötét/akcentes érték (per-csempe szín: zöld/kék/indigó/borostyán) + muted címke — a korábbi `color:#fff` + áttetsző fehér háttér olvashatatlan volt világos alapon.
+- **`public/sofer.html`** — `sofer.js` cache-bust `?v=20260616a`.
+
 ## 2026-06-16 — HERE/előfizetési számla a developer SAJÁT számlázójával (nem a célcég kulcsával)
 
 > Biztonsági javítás: eddig a `generateHereInvoice` (developer) **dekódolta és használta a célcég számlázó-kulcsát** a HERE/előfizetési számla kiállításához (a developer hozzáfért a cég kulcsához, és eladó=vevő számla jött létre). **24 suite → 25 suite / 115 Jest teszt zöld.**
