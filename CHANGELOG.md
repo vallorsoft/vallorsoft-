@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-16 — Fázis 2 (2. lépés): KPI mutató-sáv a Statisztikán és a Sofőr-elszámoláson (PR #152)
+
+> A `.tall` (magas) mutató-sáv kiterjesztése a riport-oldalakra — a régi 4-csempés KPI-sorok helyett. Csak megjelenés; az adat, a grafikonok, a táblák és a szűrők változatlanok.
+
+- **`public/stats.js`** — 4 KPI-csempesor cseréje `vsMetricBand([...],{tall:true})`-re: **Áttekintés** (5 alap mutató + feltételesen beszedett/kintlévőség, ill. eredmény — a jogosultság-feltételek megőrizve), **Pénzügy** (5), **Fogyasztás** (4), **Vásárlások** (3). A grafikonok, táblák, szűrő-sáv, CSV-export, BNR/ráta-sor érintetlen. (A Sofőr/Jármű/Ügyfél riport oldalakon nincs KPI-csempesor — ott nem volt mit cserélni.)
+- **`public/fleet-extra.js`** — a `decont` (Sofőr-elszámolás) 4 csempéje (Előleg/Készpénz/Egyenleg/Diurna) → `vsMetricBand({tall:true})`; az alsó táblák, ráta-szerkesztő, nyomtatás érintetlen.
+- Mindenhol az **eredeti i18n-címkék** (ikon + `t(...)`) és értékek; **nincs koholt trend/sparkline** (a riport-handlerek nem adnak idősort). Backend/SQL/auth/handler **nem változott**. `node --check` OK, **93 Jest zöld**.
+
 ## 2026-06-16 — Fázis 2 (1. lépés): interaktív KPI mutató-sáv a Vezérlőpulton (PR #151)
 
 > A megjelenés-csiszolás első éles lépése: a Vezérlőpult 4 különálló KPI-négyzete helyett egy egységes, interaktív **mutató-sáv** (a jóváhagyott „C" minta alapján). Saját, meleg signature-akcent (napnyugta gradiens), a funkció és az adat változatlan.

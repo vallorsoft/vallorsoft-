@@ -294,14 +294,12 @@
       var bal = parseFloat(r.kassza_egyenleg) || 0;
       var balColor = bal >= 0 ? 'var(--status-ok)' : 'var(--status-danger)';
       var tiles =
-        '<div class="dash-stats" style="margin-bottom:14px;">'
-        + '<div class="glass stat-tile"><div class="stat-ico">💵</div><div><div class="stat-val text-primary">' + n2(r.eloleg_total, 0) + ' RON</div><div class="stat-lbl text-muted">' + t('fe.dc.advGiven', { n: r.eloleg_db }) + '</div></div></div>'
-        + '<div class="glass stat-tile"><div class="stat-ico">🛒</div><div><div class="stat-val text-primary">' + n2(r.cash_koltes, 0) + ' RON</div><div class="stat-lbl text-muted">' + t('fe.dc.cashSpend') + '</div></div></div>'
-        + '<div class="glass stat-tile"><div class="stat-ico">⚖️</div><div><div class="stat-val" style="color:' + balColor + ' !important;">' + n2(bal, 0) + ' RON</div><div class="stat-lbl text-muted">' + t('fe.dc.balance', { s: (bal >= 0 ? t('fe.dc.toCompany') : t('fe.dc.toDriver')) }) + '</div></div></div>'
-        + '<div class="glass stat-tile"><div class="stat-ico">🗓️</div><div><div class="stat-val text-primary">'
-        + (r.diurna.total != null ? n2(r.diurna.total, 0) + ' RON' : '—')
-        + '</div><div class="stat-lbl text-muted">' + t('fe.dc.diurnaEnt', { e: r.diurna.ext_nap, i: r.diurna.int_nap }) + '</div></div></div>'
-        + '</div>';
+        '<div style="margin-bottom:14px;">' + vsMetricBand([
+          { l: '💵 ' + t('fe.dc.advGiven', { n: r.eloleg_db }), v: n2(r.eloleg_total, 0) + ' RON' },
+          { l: '🛒 ' + t('fe.dc.cashSpend'), v: n2(r.cash_koltes, 0) + ' RON' },
+          { l: '⚖️ ' + t('fe.dc.balance', { s: (bal >= 0 ? t('fe.dc.toCompany') : t('fe.dc.toDriver')) }), v: n2(bal, 0) + ' RON' },
+          { l: '🗓️ ' + t('fe.dc.diurnaEnt', { e: r.diurna.ext_nap, i: r.diurna.int_nap }), v: (r.diurna.total != null ? n2(r.diurna.total, 0) + ' RON' : '—') }
+        ], { tall: true }) + '</div>';
 
       var rateNote = (r.diurna.total == null && typeof VS_ROLE !== 'undefined' && VS_ROLE === 'admin')
         ? '<div class="glass-soft" style="padding:12px 14px;margin-bottom:14px;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
