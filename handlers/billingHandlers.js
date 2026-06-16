@@ -237,9 +237,8 @@ async function buildHereInvoice(companyId, monthYear) {
      FROM subscription_plans sp JOIN companies c ON c.subscription_plan_id = sp.id WHERE c.id = $1`, [companyId]);
   const plan = pR.rows[0] || null;
 
-  const iR = await pool.query(
-    `SELECT provider, display_name, credentials FROM billing_integrations WHERE company_id = $1 AND is_active = true LIMIT 1`, [companyId]);
-  const integration = iR.rows[0] || null;
+  // FONTOS: a célcég számlázó-kulcsát NEM olvassuk be — a szolgáltatási számlát
+  // a VallorSoft (developer) SAJÁT számlázója állítja ki (lásd generateHereInvoice).
 
   // HERE: a közös 1000-es pool feletti (fizetős) használat szolgáltatásonként (computePool).
   const hp = await computePool(companyId, month);
@@ -264,7 +263,7 @@ async function buildHereInvoice(companyId, monthYear) {
   const totals = { net: round2(net), vat: round2(vat), gross: round2(net + vat) };
 
   return {
-    company, plan, integration, items, totals,
+    company, plan, items, totals,
     month, month_label: label,
     issue_date: addDaysISO(0), due_date: addDaysISO(30),
     notes: 'VallorSoft HERE API szolgáltatás — ' + label + '. Automatikusan generált számla.',
@@ -280,11 +279,16 @@ handlers.previewHereInvoice = async function (req, res, args) {
     const companyId = parseInt(a.company_id, 10);
     if (!companyId) return res.json({ result: { ok: false, err: 'ID-ul firmei lipseste' } });
     const d = await buildHereInvoice(companyId, a.month_year);
+    // A kiállító a VallorSoft (developer) SAJÁT számlázója — NEM a célcégé.
+    const vR = await pool.query(
+      `SELECT provider, display_name FROM billing_integrations WHERE company_id = $1 AND is_active = true LIMIT 1`,
+      [req.session.user.company_id]);
+    const issuer = vR.rows[0] || null;
     return res.json({ result: {
       ok: true,
       company_name: d.company.name,
-      provider: d.integration ? d.integration.provider : null,
-      provider_name: d.integration ? d.integration.display_name : null,
+      provider: issuer ? issuer.provider : null,
+      provider_name: issuer ? issuer.display_name : null,
       items: d.items, totals: d.totals,
       month_label: d.month_label, due_date: d.due_date,
       has_plan: d.has_plan, has_here: d.has_here,
@@ -302,22 +306,32 @@ handlers.generateHereInvoice = async function (req, res, args) {
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const companyId = parseInt(a.company_id, 10);
     if (!companyId) return res.json({ result: { ok: false, err: 'ID-ul firmei lipseste' } });
+    // Eladó = vevő TILOS: a developer nem állíthat ki számlát a saját cégének.
+    if (companyId === req.session.user.company_id)
+      return res.json({ result: { ok: false, err: 'Emitentul nu poate fi si client — nu se poate emite factura catre propria firma.' } });
 
     const d = await buildHereInvoice(companyId, a.month_year);
-    if (!d.integration) return res.json({ result: { ok: false, err: 'Nu exista o integrare de facturare activa pentru aceasta firma.' } });
     if (!d.items.length) return res.json({ result: { ok: false, err: 'Nu exista pozitii facturabile (niciun pachet si niciun consum HERE).' } });
 
-    let creds = {};
-    try { creds = JSON.parse(decrypt(d.integration.credentials.enc)); } catch (e) { return res.json({ result: { ok: false, err: 'Datele de autentificare ale furnizorului de facturare nu pot fi citite.' } }); }
+    // A számlát a VallorSoft (developer) SAJÁT számlázó-integrációja állítja ki —
+    // SOHA nem a célcég kulcsával (egyetlen más cég kulcsához sem nyúlunk).
+    const vR = await pool.query(
+      `SELECT provider, credentials FROM billing_integrations WHERE company_id = $1 AND is_active = true LIMIT 1`,
+      [req.session.user.company_id]);
+    if (!vR.rows.length) return res.json({ result: { ok: false, err: 'Configurati mai intai integrarea de facturare VallorSoft (Developer → Integratii).' } });
+    const issuer = vR.rows[0];
 
-    const adapter = billing.loadAdapter(d.integration.provider, creds);
+    let creds = {};
+    try { creds = JSON.parse(decrypt(issuer.credentials.enc)); } catch (e) { return res.json({ result: { ok: false, err: 'Datele de facturare VallorSoft nu pot fi citite.' } }); }
+
+    const adapter = billing.loadAdapter(issuer.provider, creds);
     const result = await adapter.createInvoice({
       client: { name: d.company.name, email: d.company.admin_email },
       items: d.items.map((it) => ({ name: it.name, quantity: it.quantity, unit: it.unit, price_net: it.price_net, vat_percent: it.vat_percent, description: it.description || undefined })),
       currency: 'EUR', issue_date: d.issue_date, due_date: d.due_date, notes: d.notes,
     });
-    if (!result.ok) return res.json({ result: { ok: false, err: d.integration.provider + ': ' + (result.message || 'eroare necunoscuta') } });
-    return res.json({ result: { ok: true, invoice_number: result.invoice_number, pdf_url: result.pdf_url || null, provider: d.integration.provider } });
+    if (!result.ok) return res.json({ result: { ok: false, err: issuer.provider + ': ' + (result.message || 'eroare necunoscuta') } });
+    return res.json({ result: { ok: true, invoice_number: result.invoice_number, pdf_url: result.pdf_url || null, provider: issuer.provider } });
   } catch (err) {
     console.error('generateHereInvoice hiba:', err);
     return res.json({ result: { ok: false, err: err._user ? err.message : ('Eroare de server: ' + err.message) } });
