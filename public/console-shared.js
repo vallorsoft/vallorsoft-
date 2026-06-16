@@ -1972,8 +1972,18 @@ function loadVehicles(){
   gas('vehicleList').then(list=>{
     if(!Array.isArray(list))list=[];
     vehicleCache=list;
-    renderVehicleTable('tblVontato',list.filter(v=>v.tip==='Vontato'));
-    renderVehicleTable('tblPotkocsi',list.filter(v=>v.tip==='Potkocsi'));
+    var vontatok=list.filter(v=>v.tip==='Vontato');
+    var potkocsik=list.filter(v=>v.tip==='Potkocsi');
+    renderVehicleTable('tblVontato',vontatok);
+    renderVehicleTable('tblPotkocsi',potkocsik);
+    var band=document.getElementById('vehiclesMetricBand');
+    if(band && typeof vsMetricBand==='function'){
+      band.innerHTML=vsMetricBand([
+        { l:t('veh.bandTotal'), v:list.length, sub:t('veh.tractors')+': '+vontatok.length },
+        { l:t('veh.tractors'), v:vontatok.length, sub:'' },
+        { l:t('veh.trailers'), v:potkocsik.length, sub:'' }
+      ]);
+    }
   }).catch(function(e){ console.error('loadVehicles hiba:', e); toast(t('common.loadError'),'err'); });
 }
 

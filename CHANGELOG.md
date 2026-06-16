@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-16 — Fázis 2 (5. lépés): KPI-sáv a Járművek és Ügyfelek oldalon (PR #155)
+
+> A (kompakt) mutató-sáv a Járművek és Ügyfelek oldalra, a már lekért listából. Additív — a táblák, űrlapok, ANAF-keresés, portál-hozzáférés érintetlenek.
+
+- **`public/console-shared.js`** — `loadVehicles`: a `vehicleList`-ből számolt sáv (Járművek összesen [hero] / Vontatók / Pótkocsik) a `#vehiclesMetricBand` konténerbe.
+- **`public/clients-page.js`** — `loadList` → `renderBand`: a `/api/clients` válaszból (Ügyfelek összesen [hero] / Cégek `PJ` / Magánszemélyek `PF`) a `#clMetricBand`-be; `typeof`-guard, `window.t` fallback (IIFE-modul).
+- **`public/admin.html` + `public/manager.html`** — `#vehiclesMetricBand` konténer a vehicles pane-ben; cache-bust `console-shared/i18n/clients-page ?v=20260616band4`.
+- **`public/i18n.js`** — `veh.bandTotal`, `cl.bandTotal/bandPj/bandPf` (RO-alap+HU); `veh.tractors/trailers` újrahasználva. Backend/SQL/auth nem változott; 93 Jest zöld.
+
 ## 2026-06-16 — Fázis 2 (4. lépés): KPI-sáv a Lejáratok és Üzemanyagkártya oldalon (PR #154)
 
 > A (kompakt) mutató-sáv a Flotta két riport-jellegű oldalára, a már kiszámolt adatból. Additív — az űrlapok, táblák, CSV-import, eltérés-riport érintetlenek.
