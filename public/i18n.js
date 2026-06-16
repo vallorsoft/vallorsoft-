@@ -55,6 +55,8 @@
     'nav.docsHead': { hu: 'Dokumentumok', ro: 'Documente' },
     'nav.fleetHead': { hu: 'Flotta', ro: 'Flotă' },
     'nav.statsFinHead': { hu: 'Statisztika & Pénzügy', ro: 'Statistici & Finanțe' },
+    'nav.financeHead': { hu: 'Pénzügy', ro: 'Finanțe' },
+    'nav.statsHead': { hu: 'Statisztika', ro: 'Statistici' },
     'search.placeholder': { hu: 'Keresés a rendszerben…', ro: 'Caută în sistem…' },
     'nav.orders': { hu: 'Fuvarfeladatok ▾', ro: 'Curse ▾' },
     'nav.ordersForm': { hu: 'Kiírás', ro: 'Creare' },
