@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-16 — Fázis 2 (6. lépés): KPI-sáv a Beérkező megrendelések és Ügyfél kérések oldalon (PR #156)
+
+> Az A (KPI-sávok) kör lezárása: a kompakt mutató-sáv a két beérkező-oldalra, a már lekért listából. Additív — a listák, elfogadás/elvetés, AI-kiolvasás érintetlenek.
+
+- **`public/inbound-orders.js`** — `load()`: sáv a `#ioBand`-be a már lekért adatból: **Feldolgozatlan** (hero) / **Elintézett** / **Összes megrendelés**. (A lista `?exclude_source=portal` → nincs félrevezető e-mail/portál bontás, helyette pending/handled/total.)
+- **`public/client-requests.js`** — `load()`: sáv a `#crBand`-be: **Összes kérés** (hero) / **Új/várakozik** / **Elvetett** (a meglévő status-mezőből; az üres ág előtt is renderel).
+- **`public/i18n.js`** — `inb.kpi*` / `cr.kpi*` kulcsok (RO-alap + HU). Cache-bust `?v=20260616band5`. `typeof`-guard; backend/SQL/auth nem változott; 93 Jest zöld.
+- Ezzel a KPI-sáv minden releváns konzol-oldalon él (a form/chat/beállítás-jellegű oldalakon a mockupban sem volt sáv).
+
 ## 2026-06-16 — Fázis 2 (5. lépés): KPI-sáv a Járművek és Ügyfelek oldalon (PR #155)
 
 > A (kompakt) mutató-sáv a Járművek és Ügyfelek oldalra, a már lekért listából. Additív — a táblák, űrlapok, ANAF-keresés, portál-hozzáférés érintetlenek.

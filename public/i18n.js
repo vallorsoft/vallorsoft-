@@ -140,6 +140,14 @@
     'form.saveOrder': { hu: 'Fuvarfeladat mentése', ro: 'Salvează cursa' },
     'form.searchName': { hu: 'Keresés névben / cégben...', ro: 'Căutare după nume / firmă...' },
 
+    // ── KPI-sáv: Beérkező megrendelések + Ügyfél kérések ──
+    'inb.kpiPending': { hu: 'Feldolgozatlan', ro: 'Neprocesate' },
+    'inb.kpiHandled': { hu: 'Elintézett', ro: 'Rezolvate' },
+    'inb.kpiTotal': { hu: 'Összes megrendelés', ro: 'Total comenzi' },
+    'cr.kpiTotal': { hu: 'Összes kérés', ro: 'Total cereri' },
+    'cr.kpiPending': { hu: 'Új / várakozik', ro: 'Noi / în așteptare' },
+    'cr.kpiRejected': { hu: 'Elvetett', ro: 'Respinse' },
+
     // ── Fuvar-lista (orders-list) ──
     'list.title': { hu: 'Fuvarfeladatok kezelése', ro: 'Gestionare curse' },
     'list.kpiWaiting': { hu: 'Kiosztásra vár', ro: 'Așteaptă alocare' },
