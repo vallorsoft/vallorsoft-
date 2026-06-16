@@ -206,25 +206,24 @@
           + '<td style="text-align:right;font-weight:700;">' + stNum(u.bevetel, 0) + '</td></tr>';
       }).join('') || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:14px;">' + t('st.ov.noClosedRoute') + '</td></tr>';
 
-      var tiles =
-        stTile('💶', stNum(k.bevetel, 0) + ' <span style="font-size:13px;">EUR</span>', t('st.ov.revClosed'))
-        + stTile('📦', stNum(k.lezart, 0), t('st.ov.closedOrder', { a: stNum(k.osszes, 0), b: stNum(k.torolt, 0) }))
-        + stTile('🛣️', stNum(k.fuvarlevel_km, 0) + ' km', t('st.ov.kmDone'))
-        + stTile('⛽', stNum(k.consum_100, 1) + ' L/100km', t('st.ov.fleetAvg'))
-        + stTile('🗓️', stNum(k.diurna_ext, 0) + ' / ' + stNum(k.diurna_int, 0), t('st.ov.diurnaDays'));
+      var ovMetrics = [
+        { l: '💶 ' + t('st.ov.revClosed'), v: stNum(k.bevetel, 0) + ' <span style="font-size:13px;">EUR</span>' },
+        { l: '📦 ' + t('st.ov.closedOrder', { a: stNum(k.osszes, 0), b: stNum(k.torolt, 0) }), v: stNum(k.lezart, 0) },
+        { l: '🛣️ ' + t('st.ov.kmDone'), v: stNum(k.fuvarlevel_km, 0) + ' km' },
+        { l: '⛽ ' + t('st.ov.fleetAvg'), v: stNum(k.consum_100, 1) + ' L/100km' },
+        { l: '🗓️ ' + t('st.ov.diurnaDays'), v: stNum(k.diurna_ext, 0) + ' / ' + stNum(k.diurna_int, 0) }
+      ];
       if (fin) {
-        tiles += stTile('💰', stNum(fin.beszedett, 0) + ' <span style="font-size:13px;">EUR</span>', t('st.ov.collected'), 'var(--status-ok)')
-          + stTile('⏳', stNum(fin.kintlevo, 0) + ' <span style="font-size:13px;">EUR</span>', t('st.ov.outstanding', { n: stNum(fin.kintlevo_db, 0) }), 'var(--status-danger)');
+        ovMetrics.push({ l: '💰 ' + t('st.ov.collected'), v: stNum(fin.beszedett, 0) + ' <span style="font-size:13px;">EUR</span>' });
+        ovMetrics.push({ l: '⏳ ' + t('st.ov.outstanding', { n: stNum(fin.kintlevo_db, 0) }), v: stNum(fin.kintlevo, 0) + ' <span style="font-size:13px;">EUR</span>' });
       }
       if (eredmeny != null) {
-        tiles += stTile('🎯', stNum(eredmeny, 0) + ' <span style="font-size:13px;">EUR</span>',
-          t('st.ov.result', { r: stNum(rate, 2) }),
-          eredmeny >= 0 ? 'var(--status-ok)' : 'var(--status-danger)');
+        ovMetrics.push({ l: '🎯 ' + t('st.ov.result', { r: stNum(rate, 2) }), v: stNum(eredmeny, 0) + ' <span style="font-size:13px;">EUR</span>' });
       }
       box.innerHTML = stFilterBar('stats-overview')
         + alertsHtml
         + rateRow
-        + '<div class="dash-stats" style="margin-bottom:16px;">' + tiles + '</div>'
+        + '<div style="margin-bottom:16px;">' + vsMetricBand(ovMetrics, { tall: true }) + '</div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;">'
         + stPanel(t('st.ov.pRevenue'), stChartCanvas('stChOvBevetel'))
         + stPanel(t('st.ov.pCost'), stChartCanvas('stChOvKoltseg'))
@@ -306,13 +305,13 @@
       }).join('') || '<tr><td colspan="9" class="text-muted" style="text-align:center;padding:18px;">' + t('st.fin.noOut') + '</td></tr>';
 
       box.innerHTML = stFilterBar('stats-finance')
-        + '<div class="dash-stats" style="margin-bottom:16px;">'
-        + stTile('💶', stNum(m.bevetel, 0) + ' <span style="font-size:13px;">EUR</span>', t('st.fin.revClosed'))
-        + stTile('💰', stNum(beszedett, 0) + ' <span style="font-size:13px;">EUR</span>', t('st.fin.collected'), 'var(--status-ok)')
-        + stTile('⏳', stNum(kintlevoTotal, 0) + ' <span style="font-size:13px;">EUR</span>', t('st.fin.totalOut'), 'var(--status-danger)')
-        + stTile('📏', stNum(m.per_km, 2) + ' EUR/km', t('st.fin.perKm'))
-        + stTile('⌛', m.atlag_fizetesi_nap != null ? t('st.fin.days', { n: stNum(m.atlag_fizetesi_nap, 0) }) : '—', t('st.fin.avgPayDays'))
-        + '</div>'
+        + '<div style="margin-bottom:16px;">' + vsMetricBand([
+          { l: '💶 ' + t('st.fin.revClosed'), v: stNum(m.bevetel, 0) + ' <span style="font-size:13px;">EUR</span>' },
+          { l: '💰 ' + t('st.fin.collected'), v: stNum(beszedett, 0) + ' <span style="font-size:13px;">EUR</span>' },
+          { l: '⏳ ' + t('st.fin.totalOut'), v: stNum(kintlevoTotal, 0) + ' <span style="font-size:13px;">EUR</span>' },
+          { l: '📏 ' + t('st.fin.perKm'), v: stNum(m.per_km, 2) + ' EUR/km' },
+          { l: '⌛ ' + t('st.fin.avgPayDays'), v: m.atlag_fizetesi_nap != null ? t('st.fin.days', { n: stNum(m.atlag_fizetesi_nap, 0) }) : '—' }
+        ], { tall: true }) + '</div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;">'
         + stPanel(t('st.fin.pRevVsCol'), stChartCanvas('stChFinHavi'))
         + stPanel(t('st.fin.pAging'),
@@ -425,12 +424,12 @@
       }).join('') || '<tr><td colspan="8" class="text-muted" style="text-align:center;padding:18px;">' + t('st.fu.noFills') + '</td></tr>';
 
       box.innerHTML = stFilterBar('stats-fuel')
-        + '<div class="dash-stats" style="margin-bottom:16px;">'
-        + stTile('⛽', stNum(totL, 0) + ' L', t('st.fu.fuelL'))
-        + stTile('💸', stNum(totS, 0) + ' RON', t('st.fu.fuelCost'))
-        + stTile('🏷️', stNum(avgPrice, 2) + ' RON/L', t('st.fu.avgPrice'))
-        + stTile('📉', stNum(fleetAvg, 1) + ' L/100km', t('st.ov.fleetAvg'))
-        + '</div>'
+        + '<div style="margin-bottom:16px;">' + vsMetricBand([
+          { l: '⛽ ' + t('st.fu.fuelL'), v: stNum(totL, 0) + ' L' },
+          { l: '💸 ' + t('st.fu.fuelCost'), v: stNum(totS, 0) + ' RON' },
+          { l: '🏷️ ' + t('st.fu.avgPrice'), v: stNum(avgPrice, 2) + ' RON/L' },
+          { l: '📉 ' + t('st.ov.fleetAvg'), v: stNum(fleetAvg, 1) + ' L/100km' }
+        ], { tall: true }) + '</div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;">'
         + stPanel(t('st.fu.pMonthly'), stChartCanvas('stChFuelHavi'))
         + stPanel(t('st.fu.pPay'), stChartCanvas('stChFuelPlata'))
@@ -499,11 +498,11 @@
       }).join('') || '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:14px;">' + t('st.noDataShort') + '</td></tr>';
 
       box.innerHTML = stFilterBar('stats-purchases')
-        + '<div class="dash-stats" style="margin-bottom:16px;">'
-        + stTile('🛒', stNum(totS, 0) + ' RON', t('st.pu.totalSpend'))
-        + stTile('🧾', stNum(totDb, 0), t('st.pu.items'))
-        + stTile('💵', cashRow ? stNum(cashRow.suma, 0) + ' RON' : '0 RON', t('st.pu.cash'), 'var(--status-warn)')
-        + '</div>'
+        + '<div style="margin-bottom:16px;">' + vsMetricBand([
+          { l: '🛒 ' + t('st.pu.totalSpend'), v: stNum(totS, 0) + ' RON' },
+          { l: '🧾 ' + t('st.pu.items'), v: stNum(totDb, 0) },
+          { l: '💵 ' + t('st.pu.cash'), v: cashRow ? stNum(cashRow.suma, 0) + ' RON' : '0 RON' }
+        ], { tall: true }) + '</div>'
         + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;">'
         + stPanel(t('st.pu.pMonthly'), stChartCanvas('stChPurHavi'))
         + stPanel(t('st.pu.pTopProd'), stChartCanvas('stChPurTermek'))
