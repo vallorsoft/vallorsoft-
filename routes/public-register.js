@@ -8,6 +8,7 @@ const express = require('express');
 const bcrypt  = require('bcrypt');
 const pool    = require('../db');
 const { sendClientEmail, getEmailTemplate } = require('../services/email');
+const { validatePassword } = require('../lib/passwordPolicy');
 
 const router = express.Router();
 
@@ -31,8 +32,9 @@ router.post('/api/public-register', publicRegLimiter, async (req, res) => {
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRe.test(String(email).trim()))
       return res.json({ ok: false, err: 'Adresă de e-mail invalidă. / Érvénytelen e-mail cím.' });
-    if (!jelszo || String(jelszo).length < 6)
-      return res.json({ ok: false, err: 'Parola trebuie să aibă minim 6 caractere. / A jelszónak min. 6 karakter kell.' });
+    const pwCheck = validatePassword(jelszo);
+    if (!pwCheck.ok)
+      return res.json({ ok: false, err: pwCheck.err });
     if (!nume || String(nume).trim().length < 1)
       return res.json({ ok: false, err: 'Numele este obligatoriu. / A név megadása kötelező.' });
 

@@ -2411,7 +2411,7 @@ function settingsChangePassword(){
   var nw2  = document.getElementById('stPwdNew2').value;
   if(!cur||!nw||!nw2){ toast(t('cs.allFieldsReq'),'err'); return; }
   if(nw!==nw2){ toast(t('cs.pwMismatch'),'err'); return; }
-  if(nw.length<6){ toast(t('cs.pwMin6'),'err'); return; }
+  if(nw.length<8 || !/[a-z]/.test(nw) || !/[A-Z]/.test(nw) || !/[0-9]/.test(nw) || !/[^A-Za-z0-9]/.test(nw)){ toast(t('cs.pwMin6'),'err'); return; }
   gas('settingsChangePassword',[{current:cur,newPwd:nw}]).then(function(r){
     if(r&&r.ok){
       toast(t('cs.pwChanged'),'ok');

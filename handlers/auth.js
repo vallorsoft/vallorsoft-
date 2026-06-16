@@ -7,6 +7,7 @@
 const pool = require('../db');
 const bcrypt = require('bcrypt');
 const planLimits = require('../lib/planLimits');
+const { validatePassword } = require('../lib/passwordPolicy');
 
 const handlers = {};
 
@@ -37,8 +38,9 @@ handlers.authRegister = async function (req, res, args) {
       if (!nume || !email || !jelszo || !kod) {
         return res.json({ result: { ok: false, err: 'Toate campurile sunt obligatorii.' } });
       }
-      if (jelszo.length < 6) {
-        return res.json({ result: { ok: false, err: 'Parola trebuie sa aiba cel putin 6 caractere.' } });
+      const pwCheck = validatePassword(jelszo);
+      if (!pwCheck.ok) {
+        return res.json({ result: { ok: false, err: pwCheck.err } });
       }
 
       const invResult = await pool.query(

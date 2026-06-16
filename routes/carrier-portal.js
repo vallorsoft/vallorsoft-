@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const router = express.Router();
 const pool = require('../db');
+const { validatePassword } = require('../lib/passwordPolicy');
 
 function requireCarrier(req, res, next) {
   if (!req.session || !req.session.carrierUser) return res.status(401).json({ ok: false, err: 'Nu sunteti autentificat.' });
@@ -60,7 +61,9 @@ router.post('/api/carrier/set-password', async (req, res) => {
   try {
     const token = String(req.body.token || '').trim();
     const password = String(req.body.password || '');
-    if (!token || password.length < 6) return res.json({ ok: false, err: 'Parola trebuie sa aiba cel putin 6 caractere.' });
+    if (!token) return res.json({ ok: false, err: 'Date lipsă.' });
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.ok) return res.json({ ok: false, err: pwCheck.err });
     const r = await pool.query(
       `SELECT id, company_id, carrier_id, email, nev FROM carrier_users
        WHERE invite_token=$1 AND (invite_expires IS NULL OR invite_expires > NOW())`, [token]);

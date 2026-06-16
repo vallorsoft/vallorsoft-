@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-16 — Kötelező erős jelszó-szabály (min. 8 + kis/nagybetű + szám + szimbólum)
+
+> Egy Google Jelszóvizsgálat-értesítés nyomán: a rendszerben gyenge/újrahasznált teszt-jelszavak voltak. Mostantól MINDEN új jelszó-beállításnál kötelező az erős jelszó. A belépést (`bcrypt.compare`) NEM érinti → a már regisztrált felhasználók (jelenleg a developer) régi jelszava változatlanul működik, nincs kényszerített csere.
+
+- **`lib/passwordPolicy.js`** (ÚJ, közös — EGY forrás) — `validatePassword(pw)` → `{ ok, err }`: min. 8 karakter ÉS legalább 1 kisbetű + 1 nagybetű + 1 számjegy + 1 szimbólum (nem betű/szám, pl. `_`). Kétnyelvű (RO-alap + HU) hibaüzenet.
+- **Szerveroldali kikényszerítés mind a 6 jelszó-beállító úton** (a régi `length < 6` csere): `handlers/auth.js` (meghívós regisztráció), `handlers/users.js` (admin által beállított jelszó + saját jelszó-csere), `routes/auth.js` (jelszó-reset), `routes/public-register.js` (nyilvános trial-regisztráció), `routes/portal.js` + `routes/carrier-portal.js` (ügyfél-/alvállalkozói portál belépő-beállítás).
+- **Kliens-oldali validáció + feliratok** (azonos szabály, gyors visszajelzés): `public/register.html` (mindkét reg-mód + hint), `public/reset-password.html` (+hint), `public/portal.js`, `public/carrier.js`, `public/console-shared.js` (Beállítások → jelszó-csere); `public/i18n.js` 6 kulcs frissítve + `rst.pwHint` új.
+- **Teszt:** `tests/unit/passwordPolicy.test.js` (8 eset); `tests/integration/execute.test.js` fixture-jelszó `titok123` → `Titok123_`. **20 suite / 93 Jest zöld** (6 valódi-DB suite kihagyva DB nélkül).
+
 ## 2026-06-16 — Sofőr mini-statisztika: 2×2 rács + világos-téma olvashatóság
 
 - **`public/sofer.js`** — a főoldali motivációs havi mini-statisztika (lezárt fuvar / km / diurna / tankolás) `repeat(4,1fr)` egysoros rács helyett **2×2 rácsban** (2-2), így nem húzza el az oldalt. A csempék a sofőr **világos témájához** igazítva: fehér kártya (`--sof-card`) + sötét/akcentes érték (per-csempe szín: zöld/kék/indigó/borostyán) + muted címke — a korábbi `color:#fff` + áttetsző fehér háttér olvashatatlan volt világos alapon.

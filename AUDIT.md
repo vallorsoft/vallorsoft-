@@ -9,6 +9,12 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 13. lépés — Kötelező erős jelszó-szabály (2026-06-16) ✅ KÉSZ
+Egy Google Jelszóvizsgálat (Password Checkup) értesítés jelezte, hogy a fiókokhoz tartozó jelszavak gyengék/újrahasználtak és külső szivárgási listán szerepelnek (NEM a VallorSoft-szerver/adatbázis kompromittálódott — a Google a jelszó-érték hash-ét veti össze internetes szivárgásokkal). Megerősítés: a jelszavak **bcrypt**-tel tárolódnak (helyes), a probléma a gyenge jelszó-választás volt.
+- **Megelőzés:** új közös `lib/passwordPolicy.js` `validatePassword(pw)` — kötelező min. 8 karakter + kisbetű + nagybetű + számjegy + szimbólum. Bekötve mind a 6 jelszó-beállító úton (regisztráció meghívóval/nyilvánosan, jelszó-reset, admin-állítás, saját jelszó-csere, ügyfél-/alvállalkozói portál belépő). A korábbi `length < 6` minimum mindenhol lecserélve.
+- **Visszafelé kompatibilitás:** a **belépés (`bcrypt.compare`) változatlan** — a már létező (jelenleg csak developer) fiók régi jelszava működik, nincs kényszerített csere; csak az ÚJ jelszó-beállítás validálódik.
+- **Ajánlás (nem kód):** a valódi admin-fiók (`admin@vallorsoft.ro`) jelszavát cserélni egyedi erősre + 2FA (TOTP) bekapcsolása; a `proba@conta.ro`/`manager@proba.hh` teszt-fiókok kivétele/jelszó-cseréje.
+
 ### 12. lépés — Teljeskörű átvilágítás: gomb/parancs-bekötés + multi-tenant + hiányosságok (2026-06-16) ✅ KÉSZ
 Átfogó audit 4 párhuzamos agenttel (RPC handlerek / REST route-ok + portálok / kliens-bekötés) + valódi-DB tesztek. **Eredmény: a tenant-izoláció erős** — nem találtunk kiaknázható cross-tenant ADAT-olvasást; minden szerepkör (`Admin/Manager/Sofer/Konyvelo`, `clientUser`, `carrierUser`, publikus token) verifikálva. Minden `gas()` RPC-hívás és 207 `onclick` + 48 `fetch` útvonal létező handlerre/route-ra mutat.
 - **HIGH — jogosultság-emelés javítva:** `handlers/users.js` `userUpdate` — a Manager egy Sofőrt Admin/Manager szerepre emelhetett (csak cégen belül). Javítás: a Manager már csak `Sofer` pozíciót állíthat.

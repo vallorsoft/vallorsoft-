@@ -10,6 +10,7 @@ const pool = require('../db');
 const { requireLogin } = require('../middleware/auth');
 const { sendResetEmail } = require('../services/email');
 const audit = require('../lib/audit');
+const { validatePassword } = require('../lib/passwordPolicy');
 
 // 2FA (TOTP) — opcionális csomagok, ahogy az eredeti server.js-ben
 let speakeasy = null, qrcode = null;
@@ -57,8 +58,9 @@ router.post('/api/reset-password', async (req, res) => {
     if (!token || !newPassword) {
       return res.json({ success: false, message: 'Date lipsă.' });
     }
-    if (newPassword.length < 6) {
-      return res.json({ success: false, message: 'Parola trebuie să aibă cel puțin 6 caractere.' });
+    const pwCheck = validatePassword(newPassword);
+    if (!pwCheck.ok) {
+      return res.json({ success: false, message: pwCheck.err });
     }
 
     const result = await pool.query(
