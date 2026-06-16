@@ -1142,3 +1142,12 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 .main-content[data-theme="dark"] .vsmb-mini{ background:var(--bg-panel-raised); border-color:var(--glass-border-dark); }
 @media(max-width:760px){ .vsmb{ grid-template-columns:1fr; } .vsmb-minis{ flex-direction:row; } }
 @media(max-width:480px){ .vsmb-minis{ flex-wrap:wrap; } .vsmb-mini{ flex:1 1 45%; } }
+
+/* ════════════════════════════════════════════════════════════
+   FÁZIS 2 — Egységes oldal-fej: finom gradiens akcent-csík a panel-
+   címek elé (konzolra szűkítve). CSS-only, nem rendezi át a cím
+   gyerekeit (abszolút pozíciójú ::before), könnyen visszavonható.
+   ════════════════════════════════════════════════════════════ */
+.main-content .h-title{ position:relative; padding-left:15px; letter-spacing:-.01em; }
+.main-content .h-title::before{ content:""; position:absolute; left:0; top:.14em; bottom:.14em; width:5px; border-radius:3px; background:var(--vs-warm-grad); box-shadow:0 4px 10px -5px rgba(249,115,22,.55); }
+.main-content .h-sub{ margin-top:-2px; }

@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-06-16 — Fázis 2 (7. lépés): egységes oldal-fej (gradiens akcent-csík a címek elé) (PR #157)
+
+> A panel-/szekciócímek egységes ritmust kapnak: finom napnyugta-gradiens akcent-csík a `.h-title` elé. CSS-only, a konzolra szűkítve (`.main-content`), abszolút pozíciójú `::before` → nem rendezi át a cím gyerekeit; könnyen visszavonható. Nincs HTML-átírás, nincs funkció-érintés.
+
+- **`public/style.css`** — `.main-content .h-title::before` (5px gradiens csík, `--vs-warm-grad`), `padding-left:15px`, finom `letter-spacing`/`.h-sub` ritmus. Cache-bust `style.css?v=20260616band6`.
+- Backend/SQL/auth/HTML-szerkezet nem változott; 93 Jest zöld.
+
 ## 2026-06-16 — Fázis 2 (6. lépés): KPI-sáv a Beérkező megrendelések és Ügyfél kérések oldalon (PR #156)
 
 > Az A (KPI-sávok) kör lezárása: a kompakt mutató-sáv a két beérkező-oldalra, a már lekért listából. Additív — a listák, elfogadás/elvetés, AI-kiolvasás érintetlenek.
