@@ -94,29 +94,29 @@ router.post('/api/public-register', publicRegLimiter, async (req, res) => {
         const bodyRo = welcomeTpl.body_ro ? replVars(welcomeTpl.body_ro, vars) : '';
         const bodyHu = welcomeTpl.body_hu ? replVars(welcomeTpl.body_hu, vars) : '';
         welcomeSubject = replVars(welcomeTpl.subject, vars);
-        welcomeHtml = bodyRo + (bodyHu && bodyRo ? '<hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;">' : '') + bodyHu;
+        welcomeHtml = bodyRo + (bodyHu && bodyRo ? '<hr style="border:none;border-top:1px solid #ece3d8;margin:16px 0;">' : '') + bodyHu;
       } else {
         welcomeSubject = 'Bun venit la VallorSoft! / Üdvözöl a VallorSoft!';
         welcomeHtml = `
-<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
-  <div style="background:linear-gradient(135deg,#6366f1,#3b82f6);padding:28px 32px;border-radius:12px 12px 0 0;">
-    <h1 style="margin:0;color:#fff;font-size:22px;">vallor<span style="color:#c7d2fe;">Soft</span></h1>
+<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#2a2018;">
+  <div style="background:linear-gradient(135deg,#fb8c3a,#f6517b);padding:28px 32px;border-radius:12px 12px 0 0;">
+    <h1 style="margin:0;color:#fff;font-size:22px;">vallor<span style="color:#fdba74;">Soft</span></h1>
   </div>
-  <div style="background:#fff;padding:28px 32px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
+  <div style="background:#faf6f0;padding:28px 32px;border:1px solid #ece3d8;border-top:none;border-radius:0 0 12px 12px;">
     <p style="margin:0 0 12px;font-size:16px;font-weight:600;">Bun venit, ${cleanNume}! / Üdvözlünk, ${cleanNume}!</p>
-    <p style="margin:0 0 12px;color:#475569;">
+    <p style="margin:0 0 12px;color:#8a7d6e;">
       <strong>RO:</strong> Contul companiei <em>${cleanCeg}</em> a fost creat cu succes.
       Ai la dispoziție o perioadă de probă de <strong>14 zile</strong> — fără card bancar.
     </p>
-    <p style="margin:0 0 20px;color:#475569;">
+    <p style="margin:0 0 20px;color:#8a7d6e;">
       <strong>HU:</strong> A(z) <em>${cleanCeg}</em> cég fiókja sikeresen létrejött.
       <strong>14 napos ingyenes próbaidőszak</strong> áll rendelkezésedre — bankkártya nélkül.
     </p>
-    <a href="${appUrl}/admin" style="display:inline-block;background:linear-gradient(180deg,#3b82f6,#2563eb);color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">
+    <a href="${appUrl}/admin" style="display:inline-block;background:linear-gradient(180deg,#fb8c3a,#f6711e);color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">
       🚀 Intră în aplicație / Belépés az alkalmazásba
     </a>
-    <p style="margin:24px 0 0;font-size:12px;color:#94a3b8;">
-      vallorsoft@gmail.com · <a href="${appUrl}/terms" style="color:#6366f1;">Termeni</a> · <a href="${appUrl}/privacy" style="color:#6366f1;">Confidențialitate</a>
+    <p style="margin:24px 0 0;font-size:12px;color:#b09a82;">
+      vallorsoft@gmail.com · <a href="${appUrl}/terms" style="color:#f6711e;">Termeni</a> · <a href="${appUrl}/privacy" style="color:#f6711e;">Confidențialitate</a>
     </p>
   </div>
 </div>`;
