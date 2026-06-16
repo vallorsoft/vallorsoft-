@@ -655,7 +655,7 @@ document.getElementById('registerForm')?.addEventListener('submit', async e => {
   if (btn) { btn.disabled = true; btn.textContent = '...'; }
 
   try {
-    const res = await fetch('/api/register', {
+    const res = await fetch('/api/public-register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

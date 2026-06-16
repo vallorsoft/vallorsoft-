@@ -12,9 +12,10 @@ const { fetchBnrEurRon }   = require('../services/bnr');
 // HMAC token generálás / ellenőrzés
 function makeToken(cid, planId, billing) {
   const secret = process.env.SESSION_SECRET || 'dev-secret';
+  // Teljes HMAC-SHA256 digest (nem csonkolt) — a korabbi 16 hex (64 bit) tul gyenge volt
   return crypto.createHmac('sha256', secret)
     .update(`${cid}:${planId}:${billing}`)
-    .digest('hex').slice(0, 16);
+    .digest('hex');
 }
 
 // Fizetési referencia-kód generálás (VS-YYYYMM-XXXX)
