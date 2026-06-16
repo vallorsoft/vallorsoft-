@@ -15,6 +15,7 @@ const bcrypt = require('bcrypt');
 const router = express.Router();
 const pool = require('../db');
 const { getPositions } = require('../lib/vehiclePositions');
+const { validatePassword } = require('../lib/passwordPolicy');
 
 let sendResetEmail = null;
 try { ({ sendResetEmail } = require('../services/email')); } catch (_) { /* e-mail opcionális */ }
@@ -95,7 +96,9 @@ router.post('/api/portal/set-password', async (req, res) => {
   try {
     const token = String(req.body.token || '').trim();
     const password = String(req.body.password || '');
-    if (!token || password.length < 6) return res.json({ ok: false, err: 'Parola trebuie sa aiba cel putin 6 caractere.' });
+    if (!token) return res.json({ ok: false, err: 'Date lipsă.' });
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.ok) return res.json({ ok: false, err: pwCheck.err });
 
     const r = await pool.query(
       `SELECT id, company_id, client_id, email, nev FROM client_users

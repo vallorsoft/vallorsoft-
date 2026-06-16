@@ -6,6 +6,7 @@
 // ============================================================
 const pool = require('../db');
 const bcrypt = require('bcrypt');
+const { validatePassword } = require('../lib/passwordPolicy');
 
 const handlers = {};
 
@@ -151,6 +152,10 @@ handlers.userUpdate = async function (req, res, args) {
         values.push(fields.pozicio);
       }
       if (fields.jelszo) {
+        const pwCheck = validatePassword(fields.jelszo);
+        if (!pwCheck.ok) {
+          return res.json({ result: { ok: false, err: pwCheck.err } });
+        }
         const hash = await bcrypt.hash(fields.jelszo, 10);
         updates.push(`password_hash = $${i++}`);
         values.push(hash);
@@ -239,7 +244,8 @@ handlers.settingsChangePassword = async function (req, res, args) {
       if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat.' } });
       const { current, newPwd } = args[0] || {};
       if (!current || !newPwd) return res.json({ result: { ok: false, err: 'Toate campurile sunt obligatorii.' } });
-      if (newPwd.length < 6) return res.json({ result: { ok: false, err: 'Parola noua trebuie sa aiba cel putin 6 caractere.' } });
+      const pwCheck = validatePassword(newPwd);
+      if (!pwCheck.ok) return res.json({ result: { ok: false, err: pwCheck.err } });
 
       const r = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.session.user.id]);
       if (!r.rows.length) return res.json({ result: { ok: false, err: 'Utilizatorul nu a fost gasit.' } });

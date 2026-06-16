@@ -48,7 +48,7 @@ describe('POST /api/execute', () => {
       .mockResolvedValueOnce(rows([]));
     const res = await request(app).post('/api/execute').send({
       functionName: 'authRegister',
-      arguments: [{ nume: 'Teszt Elek', email: 'teszt@pelda.hu', tel: '', jelszo: 'titok123', kod: 'VS-ABC123' }]
+      arguments: [{ nume: 'Teszt Elek', email: 'teszt@pelda.hu', tel: '', jelszo: 'Titok123_', kod: 'VS-ABC123' }]
     });
     expect(res.status).toBe(200);
     expect(res.body.result.ok).toBe(true);
@@ -61,7 +61,7 @@ describe('POST /api/execute', () => {
     pool.query.mockResolvedValueOnce(rows([{ id: 2, pozicio: 'Sofer', email: null, status: 'Visszavonva', company_id: 7 }]));
     const res = await request(app).post('/api/execute').send({
       functionName: 'authRegister',
-      arguments: [{ nume: 'Teszt Elek', email: 'teszt2@pelda.hu', tel: '', jelszo: 'titok123', kod: 'VS-DEAD01' }]
+      arguments: [{ nume: 'Teszt Elek', email: 'teszt2@pelda.hu', tel: '', jelszo: 'Titok123_', kod: 'VS-DEAD01' }]
     });
     expect(res.status).toBe(200);
     expect(res.body.result.ok).toBe(false);

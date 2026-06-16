@@ -59,7 +59,7 @@
 
   function setPw() {
     var p1 = $('spPass').value, p2 = $('spPass2').value;
-    if (p1.length < 6) { toast(t('por.pwMin6'), 'err'); return; }
+    if (p1.length < 8 || !/[a-z]/.test(p1) || !/[A-Z]/.test(p1) || !/[0-9]/.test(p1) || !/[^A-Za-z0-9]/.test(p1)) { toast(t('por.pwMin6'), 'err'); return; }
     if (p1 !== p2) { toast(t('por.pwMismatch'), 'err'); return; }
     api('POST', '/api/portal/set-password', { token: _setToken, password: p1 }).then(function (r) {
       if (r && r.ok) {
