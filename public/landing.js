@@ -645,47 +645,6 @@ function showToast(msg, type = 'success') {
   setTimeout(() => t.remove(), 4500);
 }
 
-/* ── Register form ──────────────────────────────────────────── */
-document.getElementById('registerForm')?.addEventListener('submit', async e => {
-  e.preventDefault();
-  const form = e.target;
-  const btn  = document.getElementById('registerSubmit');
-  const lang = localStorage.getItem('vs-landing-lang') || 'ro';
-
-  if (btn) { btn.disabled = true; btn.textContent = '...'; }
-
-  try {
-    const res = await fetch('/api/public-register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        company:  form.company.value.trim(),
-        email:    form.email.value.trim().toLowerCase(),
-        password: form.password.value,
-      }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      showToast(data.message || (lang === 'hu' ? 'Sikeres regisztráció!' : 'Înregistrare reușită!'), 'success');
-      form.reset();
-    } else {
-      showToast(data.message || (lang === 'hu' ? 'Hiba történt' : 'Eroare'), 'error');
-    }
-  } catch {
-    showToast(lang === 'hu' ? 'Hálózati hiba' : 'Eroare de rețea', 'error');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = translations[lang]?.submitRegister || 'Creați cont gratuit'; }
-  }
-});
-
-/* ── Contact form ───────────────────────────────────────────── */
-document.getElementById('contactForm')?.addEventListener('submit', async e => {
-  e.preventDefault();
-  const lang = localStorage.getItem('vs-landing-lang') || 'ro';
-  showToast(lang === 'hu' ? 'Üzenet elküldve!' : 'Mesaj trimis!', 'success');
-  e.target.reset();
-});
-
 /* ── Dinamikus árazási kártyák (/api/public-plans alapján) ─── */
 var _cachedPlans        = null;
 var _cachedAddonPrices  = null;

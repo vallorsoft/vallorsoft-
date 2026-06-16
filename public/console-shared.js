@@ -2109,6 +2109,33 @@ function quickStatusChange(id, sel) {
   }).catch(function(){ toast(t('common.connError'), 'err'); loadOrders(); });
 }
 
+// ── Anulare (lágy törlés) i18n-kulcsok regisztrálása (RO-alap + HU) ──
+// Az i18n.js DICT-jét futásidőben bővítjük, hogy ne kelljen másik fájlt módosítani.
+(function(){
+  try {
+    if (window.I18N && window.I18N.dict) {
+      var D = window.I18N.dict;
+      if (!D['cs.ol.mCancel'])           D['cs.ol.mCancel']           = { hu: 'Törlés (Anulat)', ro: 'Anulare' };
+      if (!D['cs.ol.cancelOrderTitle'])  D['cs.ol.cancelOrderTitle']  = { hu: 'Fuvar törlése (Anulat státusz)', ro: 'Anulează transportul (status Anulat)' };
+      if (!D['cs.ol.cancelledLocked'])   D['cs.ol.cancelledLocked']   = { hu: 'Anulált fuvar — nem szerkeszthető', ro: 'Transport anulat — nu poate fi modificat' };
+      if (!D['cs.cf.cancelOrder'])       D['cs.cf.cancelOrder']       = { hu: 'Biztosan törlöd (Anulat) ezt a fuvart? Látható marad, de nem szerkeszthető tovább.', ro: 'Sigur anulezi acest transport? Rămâne vizibil, dar nu mai poate fi modificat.' };
+    }
+  } catch(e) {}
+})();
+
+// Lágy törlés: a fuvart 'Anulat'-ra állítja (comDelete). Nem fizikai törlés.
+function cancelOrder(id){
+  if (!confirm(t('cs.cf.cancelOrder'))) return;
+  gas('comDelete', [String(id)]).then(function(r){
+    if (r && r.ok) {
+      toast(r.err || t('common.deleted'), 'ok');   // r.err itt csak „deja anulat" info lehet
+      if (typeof loadOrders === 'function') loadOrders();
+    } else {
+      toast((r && r.err) || t('common.error'), 'err');
+    }
+  }).catch(function(){ toast(t('common.connError'), 'err'); });
+}
+
 function renderAdminRoomList(me){
   var listEl=document.getElementById('chatRoomList');
   if(!listEl)return;
@@ -3327,6 +3354,8 @@ function renderFilteredOrders(list) {
   document.querySelectorAll('body > .vs-act-menu').forEach(function(n){ n.remove(); });
   if (!list.length) { tbody.innerHTML='<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:20px;">'+t('cs.noMatch')+'</td></tr>'; return; }
   tbody.innerHTML = list.map(function(c){
+    // Anulált (törölt) fuvar: látható marad, de zárolt — semmilyen művelet nincs rajta.
+    var isCancelled = (c.status==='Anulat');
     var soferInfo='—';
     if(c.sofer_type==='Intern')soferInfo=c.nume_sofer||c.email_sofer||'—';
     else if(c.sofer_type==='Extern')soferInfo=c.nume_sofer||c.firma_extern||'—';
@@ -3354,8 +3383,10 @@ function renderFilteredOrders(list) {
       'park': 'background:rgba(20,184,166,0.18);color:#0f766e;border-color:rgba(20,184,166,0.4);',
       'wh':   'background:rgba(249,115,22,0.18);color:#c2410c;border-color:rgba(249,115,22,0.45);'
     };
+    // Anulált fuvarnál a dropdown letiltva (nem támasztható fel a felületről sem).
     var statusSel = '<select onchange="quickStatusChange(\''+c.id+'\',this)" '+
-      'style="'+selStyle+(bgMap[sc]||bgMap['info'])+'">'+
+      (isCancelled?'disabled ':'')+
+      'style="'+selStyle+(bgMap[sc]||bgMap['info'])+(isCancelled?'opacity:.7;cursor:not-allowed;':'')+'">'+
       statuses.map(function(s){
         return '<option value="'+s+'" '+(c.status===s?'selected':'')+' style="background:#0c1218;color:#e9eef5;">'+s+'</option>';
       }).join('')+
@@ -3461,20 +3492,35 @@ function renderFilteredOrders(list) {
         '<span class="vs-act-ico">🌍</span><span class="vs-act-lbl">'+t('cs.ol.mTrack')+'</span></button>';
     }
     // ⛔ Áru leadása (megszakítás) — elválasztó után, danger színnel; aktív fuvaron
-    if ((c.status==='Alocat'||c.status==='In Curs') && c.handover_status!=='Fuggoben') {
+    if (!isCancelled && (c.status==='Alocat'||c.status==='In Curs') && c.handover_status!=='Fuggoben') {
       menuItems += '<div class="vs-act-sep"></div>'+
         '<button class="vs-act-item danger" role="menuitem" title="'+t('cs.ol.handoverTitle')+'" '+
         'onclick="openHandoverModal(\''+c.id+'\');closeOrderActions()">'+
         '<span class="vs-act-ico">⛔</span><span class="vs-act-lbl">'+t('cs.ol.mHandover')+'</span></button>';
     }
+    // 🗑 Anulare (lágy törlés → Anulat) — csak még nem anulált fuvaron.
+    if (!isCancelled) {
+      menuItems += '<div class="vs-act-sep"></div>'+
+        '<button class="vs-act-item danger" role="menuitem" title="'+t('cs.ol.cancelOrderTitle')+'" '+
+        'onclick="cancelOrder(\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">🗑</span><span class="vs-act-lbl">'+t('cs.ol.mCancel')+'</span></button>';
+    }
 
-    return '<tr><td><b>'+c.id+'</b></td><td>'+esc(c.client||'—')+'</td>'+
+    // Anulált sor: halványítva + áthúzva (látszik, de „holt"); a ✏️ szerkesztés letiltva.
+    var rowStyle = isCancelled ? ' style="opacity:.55;"' : '';
+    var clientCell = isCancelled
+      ? '<span style="text-decoration:line-through;">'+esc(c.client||'—')+'</span> <span class="badge err" style="font-size:10px;">Anulat</span>'
+      : esc(c.client||'—');
+    var editBtn = isCancelled
+      ? '<button class="btn ghost vs-act-edit" title="'+t('cs.ol.cancelledLocked')+'" disabled style="opacity:.5;cursor:not-allowed;">✏️</button>'
+      : '<button class="btn primary vs-act-edit" title="'+t('cs.ol.mEdit')+'" onclick="openOrderEdit(\''+c.id+'\')">✏️</button>';
+    return '<tr'+rowStyle+'><td><b>'+c.id+'</b></td><td>'+clientCell+'</td>'+
       '<td>'+routeCell+'</td>'+
       '<td>'+(c.km||'—')+(c.route_km!=null&&c.route_km!==''?' <span class="badge info" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="'+t('cs.tt.autoRouteKm')+'">🗺️ '+c.route_km+'</span>':'')+'</td><td>'+(c.pret||'—')+'</td>'+
       '<td>'+soferCell+'</td><td>'+esc(c.rendszam_camion||'—')+'</td>'+
       '<td>'+statusSel+'</td>'+
       '<td class="vs-row-actions" id="actcell-'+c.id+'">'+
-        '<button class="btn primary vs-act-edit" title="'+t('cs.ol.mEdit')+'" onclick="openOrderEdit(\''+c.id+'\')">✏️</button>'+
+        editBtn+
         '<button class="btn ghost vs-act-more" data-act-toggle title="'+t('cs.ol.actMenu')+'" '+
           'onclick="toggleOrderActions(\''+c.id+'\',this)">⋯</button>'+
         '<div class="vs-act-menu" id="actmenu-'+c.id+'" role="menu" style="display:none;">'+menuItems+'</div>'+

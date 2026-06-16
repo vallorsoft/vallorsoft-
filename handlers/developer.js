@@ -615,24 +615,7 @@ handlers.devSaveLegalPage = async function (req, res, args) {
 };
 
 /* ── Landing szövegek CRUD ── */
-
-handlers.devGetLandingTexts = async function(req, res, args) {
-  const isDev = req.session.user && req.session.user.is_dev;
-  if (!isDev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
-  try {
-    const r = await pool.query(
-      `SELECT value FROM developer_settings WHERE key='landing_content'`
-    );
-    if (!r.rows.length) {
-      return res.json({ result: { ok: true, ro: {}, hu: {}, has_db: false } });
-    }
-    const val = r.rows[0].value;
-    return res.json({ result: { ok: true, ro: (val && val.ro) || {}, hu: (val && val.hu) || {}, has_db: true } });
-  } catch (err) {
-    console.error('devGetLandingTexts hiba:', err);
-    return res.json({ result: { ok: false, err: 'Eroare de server' } });
-  }
-};
+// devGetLandingTexts törölve: a getter szerepét a REST /api/landing-texts vette át.
 
 handlers.devSaveLandingTexts = async function(req, res, args) {
   const isDev = req.session.user && req.session.user.is_dev;

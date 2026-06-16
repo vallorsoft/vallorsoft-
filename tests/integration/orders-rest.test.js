@@ -36,18 +36,28 @@ describe('POST /api/orders/:id/quick-status', () => {
 
   test('Raktarban most elfogadott státusz (regresszió) → ok:true', async () => {
     setUser(fixtures.manager);
-    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });   // fő UPDATE (Raktarban → nincs raktár-feloldás)
+    pool.query.mockResolvedValueOnce(rows([{ status: 'Alocat' }])); // Anulat-guard SELECT (nem anulált)
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });    // fő UPDATE (Raktarban → nincs raktár-feloldás)
     const res = await request(app).post('/api/orders/CMD-1/quick-status').send({ status: 'Raktarban' });
     expect(res.body.ok).toBe(true);
   });
 
-  test('Disponibil → ok:true + Raktarban-feloldás fut (2. query)', async () => {
+  test('Disponibil → ok:true + Raktarban-feloldás fut (3. query)', async () => {
     setUser(fixtures.admin);
-    pool.query.mockResolvedValue(rows([]));                        // raktár-feloldás default
-    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });   // fő UPDATE
+    pool.query.mockResolvedValue(rows([]));                         // raktár-feloldás default
+    pool.query.mockResolvedValueOnce(rows([{ status: 'Alocat' }])); // Anulat-guard SELECT
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });    // fő UPDATE
     const res = await request(app).post('/api/orders/CMD-1/quick-status').send({ status: 'Disponibil' });
     expect(res.body.ok).toBe(true);
-    expect(pool.query.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(pool.query.mock.calls.length).toBeGreaterThanOrEqual(3);
+  });
+
+  test('anulált fuvar nem támasztható fel → ok:false', async () => {
+    setUser(fixtures.admin);
+    pool.query.mockResolvedValueOnce(rows([{ status: 'Anulat' }])); // guard SELECT → Anulat
+    const res = await request(app).post('/api/orders/CMD-1/quick-status').send({ status: 'Alocat' });
+    expect(res.body.ok).toBe(false);
+    expect(res.body.err).toMatch(/anulat/i);
   });
 
   test('nem talált fuvar (rowCount 0) → ok:false', async () => {

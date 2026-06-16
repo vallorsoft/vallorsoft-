@@ -205,12 +205,21 @@ router.post('/api/doc-upload', async (req, res) => {
 router.get('/api/doc-download/:id', async (req, res) => {
   try {
     if (!req.session.user) return res.status(401).send('Nu sunteti autentificat');
+    // Sofőr CSAK a saját dokumentumát töltheti le; Admin/Manager (diszpécser)
+    // a cégen belül bármelyiket. Az e-mail kisbetűsítve illeszkedik a tárolthoz.
+    const isSofer = req.session.user.pozicio === 'Sofer';
+    const params = [req.params.id, req.session.user.company_id];
+    let ownClause = '';
+    if (isSofer) {
+      params.push((req.session.user.email || '').toLowerCase());
+      ownClause = ' AND LOWER(d.email_sofer) = $3';
+    }
     const r = await pool.query(
       `SELECT d.id, d.file_name, d.tip, d.storage_url
        FROM documents d
        JOIN users u ON u.email = d.email_sofer
-       WHERE d.id = $1 AND u.company_id = $2`,
-      [req.params.id, req.session.user.company_id]
+       WHERE d.id = $1 AND u.company_id = $2${ownClause}`,
+      params
     );
     if (!r.rows.length) return res.status(404).send('Nu a fost gasit');
     const doc = r.rows[0];
@@ -246,12 +255,21 @@ function escHtml(s) {
 router.get('/api/pdf-download/:id', async (req, res) => {
   try {
     if (!req.session.user) return res.status(401).send('Nu sunteti autentificat');
+    // Sofőr CSAK a saját menetlevelét nézheti/töltheti le; Admin/Manager
+    // (diszpécser) a cégen belül bármelyiket. E-mail kisbetűsítve illeszkedik.
+    const isSofer = req.session.user.pozicio === 'Sofer';
+    const params = [req.params.id, req.session.user.company_id];
+    let ownClause = '';
+    if (isSofer) {
+      params.push((req.session.user.email || '').toLowerCase());
+      ownClause = ' AND LOWER(f.email_sofer) = $3';
+    }
     const r = await pool.query(
       `SELECT f.*, c.denumire AS company_denumire
        FROM fuvarlevelek f
        JOIN companies c ON c.id = $2
-       WHERE f.id = $1 AND f.email_sofer IN (SELECT email FROM users WHERE company_id = $2)`,
-      [req.params.id, req.session.user.company_id]
+       WHERE f.id = $1 AND f.email_sofer IN (SELECT email FROM users WHERE company_id = $2)${ownClause}`,
+      params
     );
     if (!r.rows.length) return res.status(404).send('Nu a fost gasit.');
     const f = r.rows[0];

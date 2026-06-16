@@ -521,6 +521,23 @@ handlers.comUpdate = async function (req, res, args) {
         return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
       }
 
+      // Bemenet-validáció MÉG a DB-hívás ELŐTT: érvénytelen státusz → ne nyúljunk a DB-hez.
+      if (o.status !== undefined &&
+          !['Disponibil','Alocat','Extern','In Curs','Finalizat','Anulat','Parkolt','Raktarban'].includes(o.status)) {
+        return res.json({ result: { ok: false, err: 'Status invalid.' } });
+      }
+
+      // Anulált fuvar zárolása: nem szerkeszthető tovább (szerver-oldali védelem).
+      const cur = await pool.query(
+        'SELECT status FROM orders WHERE id = $1 AND company_id = $2',
+        [id, req.session.user.company_id]);
+      if (!cur.rows.length) {
+        return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit sau acces interzis.' } });
+      }
+      if (cur.rows[0].status === 'Anulat') {
+        return res.json({ result: { ok: false, err: 'Transportul este anulat și nu mai poate fi modificat.' } });
+      }
+
       const updates = [];
       const values = [];
       let i = 1;
@@ -619,20 +636,29 @@ handlers.comDelete = async function (req, res, args) {
         return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
       }
       const check = await pool.query(
-        'SELECT id FROM orders WHERE id = $1 AND company_id = $2',
+        'SELECT id, status FROM orders WHERE id = $1 AND company_id = $2',
         [id, req.session.user.company_id]
       );
       if (!check.rows.length) {
         return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit sau acces interzis.' } });
       }
-      await pool.query('DELETE FROM order_legs WHERE order_id = $1', [id]);
-      await pool.query('DELETE FROM warehouse_items WHERE order_id = $1 AND company_id = $2',
-        [id, req.session.user.company_id]).catch(() => {});
-      const r = await pool.query('DELETE FROM orders WHERE id = $1 AND company_id = $2', [id, req.session.user.company_id]);
+      // Soft delete: a fuvart SOHA nem töröljük fizikailag — csak 'Anulat'-ra állítjuk.
+      // Marad látható a listában, de nem szerkeszthető/újraosztható tovább.
+      if (check.rows[0].status === 'Anulat') {
+        // Idempotens: már anulált fuvar → kecses visszajelzés, nem hiba.
+        return res.json({ result: { ok: true, err: 'Transportul este deja anulat.' } });
+      }
+      const r = await pool.query(
+        "UPDATE orders SET status = 'Anulat', updated_at = NOW() WHERE id = $1 AND company_id = $2",
+        [id, req.session.user.company_id]);
       if (r.rowCount === 0) {
         return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit.' } });
       }
-      audit.fromReq(req, 'order.delete', 'order', id);   // best-effort audit
+      // Ha raktárban volt és van 'Bent' tétel, oldjuk fel (ne ragadjon bent).
+      await pool.query(
+        "UPDATE warehouse_items SET status = 'Kiadva', released_at = NOW() WHERE order_id = $1 AND company_id = $2 AND status = 'Bent'",
+        [id, req.session.user.company_id]).catch(() => {});
+      audit.fromReq(req, 'order.cancel', 'order', id);   // best-effort audit
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('comDelete hiba:', err);
@@ -845,6 +871,17 @@ handlers.plannerAssign = async function (req, res, args) {
     const cid = req.session.user.company_id;
     const orderId = String(args[0] || '').trim();
     const f = args[1] || {};
+
+    // Anulált fuvar zárolása: nem osztható ki / nem aktiválható újra.
+    const stCheck = await pool.query(
+      'SELECT status FROM orders WHERE id = $1 AND company_id = $2',
+      [orderId, cid]);
+    if (!stCheck.rows.length) {
+      return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit' } });
+    }
+    if (stCheck.rows[0].status === 'Anulat') {
+      return res.json({ result: { ok: false, err: 'Transportul este anulat și nu mai poate fi modificat.' } });
+    }
 
     const sets = ['updated_at = NOW()'];
     const params = [orderId, cid];

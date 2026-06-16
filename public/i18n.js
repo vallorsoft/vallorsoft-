@@ -37,6 +37,15 @@
     'common.password': { hu: 'Jelszó', ro: 'Parolă' },
     'common.required': { hu: 'kötelező', ro: 'obligatoriu' },
 
+    // ── Ügyfelek — strukturált cím-mezők ──
+    'clients.street': { hu: 'Utca', ro: 'Stradă' },
+    'clients.streetNo': { hu: 'Házszám', ro: 'Nr.' },
+    'clients.addrDetails': { hu: 'Cím részletek (bl./sc./ap.)', ro: 'Detalii adresă (bl./sc./ap.)' },
+    'clients.locality': { hu: 'Helység / Város', ro: 'Localitate / Oraș' },
+    'clients.county': { hu: 'Megye', ro: 'Județ' },
+    'clients.postalCode': { hu: 'Irányítószám', ro: 'Cod poștal' },
+    'clients.email': { hu: 'E-mail', ro: 'E-mail' },
+
     // ── Oldalsáv / menü (admin + manager) ──
     'nav.grpOverview': { hu: 'Áttekintés', ro: 'Prezentare generală' },
     'nav.dash': { hu: 'Vezérlőpult', ro: 'Panou de control' },

@@ -42,13 +42,14 @@ describe('comUpdate (fuvar szerkesztés)', () => {
 
   test('belső sofőr hozzárendelése Disponibil-ról → státusz Alocat-ra lép + email kisbetűs', async () => {
     setUser(fixtures.admin);
-    pool.query.mockResolvedValue(rows([]));                       // default (pl. raktár-feloldás)
-    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });  // 1. = fő UPDATE
+    pool.query.mockResolvedValue(rows([]));                              // default (pl. raktár-feloldás)
+    pool.query.mockResolvedValueOnce(rows([{ status: 'Disponibil' }]));  // 1. = Anulat-guard SELECT (nem anulált)
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });         // 2. = fő UPDATE
     const res = await exec('comUpdate', ['CMD-1', {
       status: 'Disponibil', sofer_type: 'Intern', email_sofer: 'Sofor@CEG.HU',
     }]);
     expect(res.body.result.ok).toBe(true);
-    const values = pool.query.mock.calls[0][1];                  // a fő UPDATE értékei
+    const values = pool.query.mock.calls[1][1];                  // a fő UPDATE a 2. hívás (a guard SELECT után)
     expect(values).toContain('Alocat');                          // Disponibil → Alocat auto-léptetés
     expect(values).toContain('sofor@ceg.hu');                    // trim+lowercase
     expect(values).not.toContain('Disponibil');
@@ -58,10 +59,11 @@ describe('comUpdate (fuvar szerkesztés)', () => {
   test('Extern hozzárendelés Disponibil-ról → státusz Extern-re lép', async () => {
     setUser(fixtures.admin);
     pool.query.mockResolvedValue(rows([]));
-    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+    pool.query.mockResolvedValueOnce(rows([{ status: 'Disponibil' }]));  // Anulat-guard SELECT
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });         // fő UPDATE
     const res = await exec('comUpdate', ['CMD-1', { status: 'Disponibil', sofer_type: 'Extern' }]);
     expect(res.body.result.ok).toBe(true);
-    expect(pool.query.mock.calls[0][1]).toContain('Extern');
+    expect(pool.query.mock.calls[1][1]).toContain('Extern');
   });
 
   test('nem talált fuvar (rowCount 0) → ok:false', async () => {

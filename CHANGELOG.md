@@ -14,6 +14,23 @@
 
 ---
 
+## 2026-06-16 — Teljeskörű átvilágítás: biztonsági javítások + hiányosság-rendrakás
+
+> Teljes audit (4 párhuzamos agent + valódi-DB tesztek). **24 suite / 112 Jest teszt zöld** élő Postgres ellen; require-sweep 91 modul 0 hiba; szerver-boot smoke OK.
+
+**Biztonság (multi-tenant / szerepkör):**
+- **`services/push.js` + `routes/push.js` + `handlers/handover.js`** — `sendPushToEmail` `company_id`-szűrést kapott: a `/api/chat-notify` `toEmails` listája eddig cégek között is kézbesített push-t (cross-tenant injekció) → a hívók átadják a session cég-azonosítóját, a lekérdezés `AND company_id=$` szerint szűr.
+- **`handlers/users.js` `userUpdate`** — a Manager eddig egy Sofőrt Admin/Manager szerepre emelhetett (jogosultság-emelés) → a Manager már csak `Sofer` pozíciót állíthat (összhangban `invCreate`/`userDelete`).
+- **`routes/soferApi.js`** — `doc-download`/`pdf-download`: a sofőr eddig a cégen belül más sofőr dokumentumát/menetlevelét is letölthette (`:id` léptetés) → Sofer szerepnél `email_sofer = saját email` kikötés; Admin/Manager (diszpécser) változatlanul mindent lát.
+- **`lib/trialToken.js` (új) + `routes/trial-select.js` + `services/scheduler.js`** — a trial-link HMAC token két helyen duplikálódott (csonkolt 16 hex / 64 bit) → közös helper, teljes HMAC-SHA256 digest; a generálás és az ellenőrzés többé nem csúszhat szét.
+- **`server.js`** — production fail-fast: `SESSION_SECRET` nélkül a szerver nem indul el éles módban.
+
+**Hiányosság / „semmibe vezető" funkciók rendrakása:**
+- **`handlers/orders.js` `comDelete` → soft-delete**: a fuvar fizikai törlése helyett `Anulat` státuszra állítás (látható marad, de nem szerkeszthető); `comUpdate`/`plannerAssign`/`routes/ordersRest.js` quick-status zárolja az Anulált fuvart; `public/console-shared.js` 🗑 Anulare-gomb + Anulat sorok letiltott vezérlőkkel.
+- **Duplikáció megszüntetve** — a redundáns legacy `public/invoicing-card.js` (FGO-only, félrevezető „hamarosan" opciókkal) törölve; marad az univerzális `BillingCard` (mind az 5 provider). `admin.html`/`admin.js` takarítva.
+- **ANAF strukturált cím** — `routes/clients.js`/`services/clients.js`/`public/clients-page.js`: a VIES endpoint törölve (csak ANAF marad); a cég-adatlekérés külön mezőket tölt (Stradă/Nr./Localitate/Județ/Cod poștal) egy sor helyett. Migráció: `db/clients-address-fields.sql`.
+- **Halott kód törölve** — `handlers/developer.js` `devGetLandingTexts`, `handlers/mapsProvider.js` `mapsGetProvider/Save/Test`, `public/feature-catalog.js` `VS_HERE_FEATURES`, `public/landing.js` halott `#registerForm`/`#contactForm` listenerek; `landing.js` regisztráció-fetch `/api/register` → `/api/public-register`.
+
 ## 2026-06-15 — Admin Előfizetések almenü + developer fizetés-aktiválás (PR #138)
 
 - **`public/admin.html`** — Beállítások sidebar: leaf tab → nav-head csoport két almenüvel (👤 Fiók / 💳 Előfizetés); régi subscriptionCard eltávolítva; új `data-pane="elofizetesek"` pane hozzáadva (státusz, csomag-választó, referencia-kártya, fizetési előzmények)
