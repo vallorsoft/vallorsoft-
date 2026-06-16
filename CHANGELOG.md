@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-16 — Fázis 2 (4. lépés): KPI-sáv a Lejáratok és Üzemanyagkártya oldalon (PR #154)
+
+> A (kompakt) mutató-sáv a Flotta két riport-jellegű oldalára, a már kiszámolt adatból. Additív — az űrlapok, táblák, CSV-import, eltérés-riport érintetlenek.
+
+- **`public/fleet-extra.js`** — `loadExpiries`: a `_expItems`-ből számolt sáv (Figyelt dok. [hero] / Hamarosan lejár / Lejárt / Rendben — a meglévő `days_left`/`alert_days` logikával). `fcLoadData`: a fuel-lista `total`-jából sáv (Tankolás [hero] / Liter / Költség). `typeof vsMetricBand === 'function'` guard, kompakt mód.
+- **`public/i18n.js`** — új `fe.exp.kpi*` / `fe.fc.kpi*` kulcsok (RO-alap + HU); a `fe.fc.colLiter` újrahasználva.
+- **`admin.html`/`manager.html`** — cache-bust `i18n.js?v=20260616band3`, `fleet-extra.js?v=20260616band3`. Backend/SQL/auth nem változott; `node --check` OK, 93 Jest zöld.
+
 ## 2026-06-16 — Fázis 2 (3. lépés): KPI mutató-sáv a Fuvarok-kezelés oldalon (PR #153)
 
 > A (kompakt) mutató-sáv a Fuvarok-kezelés oldal tetejére, a már lekért fuvar-listából számolt értékekkel. Additív — a táblázat és minden funkciója érintetlen.
