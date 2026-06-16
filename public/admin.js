@@ -98,9 +98,15 @@ function deleteUser(email, nev){
     }
   });
 }
-function editUser(u){uNume.value=u.nume;uEmail.value=u.email;uTel.value=u.tel||'';uPoz.value=u.pozicio;uPwd.value='';document.getElementById('userModal').classList.add('open');}
+function editUser(u){uNume.value=u.nume;uEmail.value=u.email;uTel.value=u.tel||'';uPoz.value=u.pozicio;uPwd.value='';if(document.getElementById('uPwd2'))document.getElementById('uPwd2').value='';document.getElementById('userModal').classList.add('open');}
 function saveUser(){
-  var f={nume:uNume.value,tel:uTel.value,pozicio:uPoz.value};if(uPwd.value)f.jelszo=uPwd.value;
+  var f={nume:uNume.value,tel:uTel.value,pozicio:uPoz.value};
+  if(uPwd.value){
+    var p2=(document.getElementById('uPwd2')||{}).value;
+    if(uPwd.value!==p2){toast('Cele două parole nu coincid.','err');return;}
+    if(!vsPwValid(uPwd.value)){toast(VS_PW_ERR,'err');return;}
+    f.jelszo=uPwd.value;
+  }
   gas('userUpdate',[uEmail.value,f]).then(()=>{toast('Sikeresen mentve!','ok');closeModal();loadUsers();loadDash();});
 }
 

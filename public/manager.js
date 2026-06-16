@@ -101,6 +101,7 @@ function editUser(u){
   uTel.value = u.tel || '';
   uPoz.value = u.pozicio;
   uPwd.value = '';
+  if (document.getElementById('uPwd2')) document.getElementById('uPwd2').value = '';
 
   const isSelf = u.email.toLowerCase() === myEmail.toLowerCase();
 
@@ -130,6 +131,9 @@ function saveUser(){
   // jelszot csak sajat magaval kuldhet
   const isSelf = uEmail.value.toLowerCase() === myEmail.toLowerCase();
   if (isSelf && uPwd.value) {
+    var p2m = (document.getElementById('uPwd2') || {}).value;
+    if (uPwd.value !== p2m) { toast('Cele două parole nu coincid.', 'err'); return; }
+    if (!vsPwValid(uPwd.value)) { toast(VS_PW_ERR, 'err'); return; }
     f.jelszo = uPwd.value;
   }
   gas('userUpdate', [uEmail.value, f]).then(r => {

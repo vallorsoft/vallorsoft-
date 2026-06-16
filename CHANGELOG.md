@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-16 — Jelszó-szabály finomítás: követelmény csak románul + jelszó kétszer (megerősítés)
+
+> A PR #144 utáni két kérés: (1) a jelszó-követelmény szövege CSAK románul jelenjen meg, (2) minden regisztrációnál és jelszó-cserénél kétszer kelljen megadni a jelszót, és csak egyezés esetén érvényes (elgépelés ellen).
+
+- **Csak román követelmény-szöveg** — `lib/passwordPolicy.js` `POLICY_ERR` románra szűkítve (HU rész törölve); a kliens-feliratok és i18n-kulcsok (`rst.pwHint`, `rst.minLen`, `por.pwMin6`, `car.min6`, `cs.pwMin6`, register-hintek, `PW_ERR`) mind románul (a HU érték is a román szövegre állítva, hogy nyelvtől függetlenül románul mutassa).
+- **Jelszó-megerősítés (kétszeri bevitel) a regisztrációnál** — `public/register.html`: mindkét reg-mód (nyilvános trial + meghívókódos) új „Jelszó megerősítése / Confirmă parola" mezőt kapott (`freeJelszo2`/`jelszo2`); a két jelszó eltérésekor `Cele două parole nu coincid.` és nem küld. (A reset/portál/alvállalkozó/saját-jelszó-csere már korábban is kétmezős volt.)
+- **Admin/Manager user-szerkesztő jelszó-megerősítés** — `public/admin.html`/`manager.html` `uPwd2` mező; `admin.js`/`manager.js` `saveUser` egyezés- + erősség-ellenőrzés; közös `vsPwValid`/`VS_PW_ERR` a `console-shared.js`-ben (EGY forrás).
+- **Cache-bust** bump (`...pw2`) az érintett JS-ekre. 93 Jest zöld.
+
 ## 2026-06-16 — Kötelező erős jelszó-szabály (min. 8 + kis/nagybetű + szám + szimbólum)
 
 > Egy Google Jelszóvizsgálat-értesítés nyomán: a rendszerben gyenge/újrahasznált teszt-jelszavak voltak. Mostantól MINDEN új jelszó-beállításnál kötelező az erős jelszó. A belépést (`bcrypt.compare`) NEM érinti → a már regisztrált felhasználók (jelenleg a developer) régi jelszava változatlanul működik, nincs kényszerített csere.
