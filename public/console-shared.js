@@ -2694,25 +2694,63 @@ function syncThemeToggleIcon() {
 }
 
 /* ── A teljes vezérlőpult betöltése ── */
+/* ══ Fázis 2 — interaktív KPI mutató-sáv (85/15, kattintásra cserél) ══
+   Közös admin/manager komponens. metrics: [{l,v,sub?,t?,d?,s?}], opts:{tall?}.
+   A 3 kis kocka árnyalata a fontossági sorrendet követi (VSMB_SHADES).
+   t/s opcionális — ahol nincs valós trend/idősor, ott egyszerűen elmarad. */
+var VSMB_SHADES = ['#ea580c', '#f97316', '#fb923c', '#fdba74'];
+var _vsmb = [], _vsmbFeat = 0;
+function vsHeroSpark(data) {
+  if (!data || !data.length) return '';
+  var n = data.length, mn = Math.min.apply(0, data), mx = Math.max.apply(0, data), rng = (mx - mn) || 1;
+  var pts = data.map(function (v, i) { return [(i / (n - 1)) * 100, 58 - ((v - mn) / rng) * 42 - 6]; });
+  var line = pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ');
+  return '<svg class="hspk" viewBox="0 0 100 64" preserveAspectRatio="none"><path d="' + line + ' L 100 64 L 0 64 Z" fill="#fff" fill-opacity=".22"/><path d="' + line + '" fill="none" stroke="#fff" stroke-width="2.5"/></svg>';
+}
+function vsBandInner() {
+  var f = _vsmb[_vsmbFeat] || _vsmb[0] || {};
+  var heroTrend = f.t ? '<span class="b">' + esc(f.t) + '</span> ' : '';
+  var hero = '<div class="vsmb-hero" id="vsmbHero"><div class="l">' + esc(f.l || '') + '</div>'
+    + '<div class="v">' + esc(String(f.v == null ? '—' : f.v)) + '</div>'
+    + '<div class="sub">' + heroTrend + esc(f.sub || '') + '</div>' + vsHeroSpark(f.s) + '</div>';
+  var minis = '<div class="vsmb-minis">' + _vsmb.map(function (m, i) {
+    if (i === _vsmbFeat) return '';
+    var tr = m.t ? '<span class="tr ' + (m.d || 'flat') + '">' + esc(m.t) + '</span>' : '';
+    return '<div class="vsmb-mini" style="--ac:' + VSMB_SHADES[i % VSMB_SHADES.length] + '" onclick="vsBandPick(' + i + ')">'
+      + '<div class="l">' + esc(m.l || '') + '</div><div class="row"><span class="v">' + esc(String(m.v == null ? '—' : m.v)) + '</span>' + tr + '</div></div>';
+  }).join('') + '</div>';
+  return hero + minis;
+}
+function vsMetricBand(metrics, opts) {
+  _vsmb = metrics || []; _vsmbFeat = 0;
+  var tall = (opts && opts.tall) ? ' tall' : '';
+  return '<div class="vsmb' + tall + '" id="vsmbWrap">' + vsBandInner() + '</div>';
+}
+function vsBandPick(i) {
+  _vsmbFeat = i;
+  var w = document.getElementById('vsmbWrap'); if (!w) return;
+  w.innerHTML = vsBandInner();
+  var h = document.getElementById('vsmbHero'); if (h) { h.style.animation = 'none'; void h.offsetWidth; h.style.animation = ''; }
+}
+
 function loadDashboard() {
-  // KPI: felhasználók + beérkezett menetlevelek
-  gas('userListAll').then(function (u) {
-    var e = document.getElementById('cUsers'); if (e) e.textContent = (u && u.length) || 0;
-  });
-  gas('getFuvarlevelek').then(function (d) {
-    var e = document.getElementById('countFuv'); if (e) e.textContent = (d && d.length) || 0;
-  });
-  // Cég neve + fuvar-KPI-k
-  gas('dashStats').then(function (r) {
-    if (!r || !r.ok) return;
-    var cn = document.getElementById('dashCegNev'); if (cn) cn.textContent = r.ceg_nev;
+  // Cég neve + 4 KPI együtt — az interaktív mutató-sávba (vsMetricBand)
+  Promise.all([gas('dashStats'), gas('userListAll'), gas('getFuvarlevelek')]).then(function (rs) {
+    var r = rs[0] || {};
+    var users = (rs[1] && rs[1].length) || 0;
+    var fuv = (rs[2] && rs[2].length) || 0;
+    var cn = document.getElementById('dashCegNev'); if (cn && r.ceg_nev) cn.textContent = r.ceg_nev;
     var total = (r.statuszok || []).reduce(function (s, x) { return s + x.db; }, 0);
     var aktiv = (r.statuszok || [])
       .filter(function (x) { return x.status === 'In Curs' || x.status === 'Alocat'; })
       .reduce(function (s, x) { return s + x.db; }, 0);
-    var t = document.getElementById('kpiTotal'); if (t) t.textContent = total;
-    var a = document.getElementById('kpiAktiv');
-    if (a) { a.textContent = aktiv; a.style.color = aktiv > 0 ? 'var(--status-ok)' : 'var(--text-muted)'; }
+    var box = document.getElementById('dashMetricBand');
+    if (box) box.innerHTML = vsMetricBand([
+      { l: t('dash.kpiTotal'), v: total, sub: t('dash.kpiActive') + ': ' + aktiv },
+      { l: t('dash.kpiActive'), v: aktiv, sub: 'In Curs / Alocat' },
+      { l: t('dash.kpiUsers'), v: users, sub: t('nav.staff') || '' },
+      { l: t('dash.kpiWaybills'), v: fuv, sub: '' }
+    ]);
   });
 
   loadDashRecentOrders();

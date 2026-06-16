@@ -1112,3 +1112,33 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 .vs-cmdk-item .vs-cmdk-tx{ min-width: 0; flex: 1; overflow: hidden; }
 .vs-cmdk-item .vs-cmdk-tt, .vs-cmdk-item .vs-cmdk-st{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vs-cmdk-empty{ padding: 28px 16px; text-align: center; color: #94a3b8; font-size: 13.5px; }
+
+/* ════════════════════════════════════════════════════════════
+   FÁZIS 2 — Interaktív KPI mutató-sáv (vsMetricBand)
+   85/15: nagy gradiens fő-szám + 3 kis kocka (árnyalat = fontosság).
+   Alap: alacsony; .tall módban (Statisztika) magasabb.
+   ════════════════════════════════════════════════════════════ */
+:root{ --vs-warm-grad: linear-gradient(135deg,#fb8c3a 0%,#f6517b 100%); }
+.vsmb{ display:grid; grid-template-columns:85fr 15fr; gap:14px; margin-bottom:20px; }
+.vsmb-hero{ position:relative; background:var(--vs-warm-grad); border-radius:16px; padding:16px 24px; color:#fff; overflow:hidden; min-height:120px; display:flex; flex-direction:column; justify-content:center; box-shadow:0 16px 34px -20px rgba(249,115,22,.6); animation:vsmbFade .35s ease; }
+.vsmb.tall .vsmb-hero{ min-height:172px; padding:20px 26px; }
+.vsmb-hero .l{ font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; opacity:.92; }
+.vsmb-hero .v{ font-size:38px; font-weight:800; letter-spacing:-.03em; line-height:1.04; margin:2px 0; color:#fff; }
+.vsmb.tall .vsmb-hero .v{ font-size:48px; margin:4px 0; }
+.vsmb-hero .sub{ font-size:13px; opacity:.95; display:flex; align-items:center; gap:8px; position:relative; z-index:2; }
+.vsmb-hero .sub .b{ background:rgba(255,255,255,.22); border-radius:999px; padding:2px 9px; font-weight:700; }
+.vsmb-hero .hspk{ position:absolute; left:0; right:0; bottom:0; height:58px; width:100%; z-index:1; }
+@keyframes vsmbFade{ from{ opacity:.3; transform:translateY(4px);} to{ opacity:1; transform:none; } }
+.vsmb-minis{ display:flex; flex-direction:column; gap:12px; }
+.vsmb-mini{ flex:1; background:#fff; border:1px solid var(--glass-border-light); border-left:3px solid var(--ac,#f97316); border-radius:12px; padding:9px 13px; cursor:pointer; display:flex; flex-direction:column; justify-content:center; gap:2px; box-shadow:0 6px 16px -14px rgba(30,41,59,.5); transition:transform .12s, box-shadow .12s; min-width:0; }
+.vsmb-mini:hover{ transform:translateY(-2px); box-shadow:0 10px 20px -12px rgba(30,41,59,.45); }
+.vsmb-mini .l{ font-size:10px; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vsmb-mini .row{ display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; }
+.vsmb-mini .v{ font-size:18px; font-weight:800; letter-spacing:-.02em; color:var(--text-primary); }
+.vsmb-mini .tr{ font-size:10px; font-weight:700; padding:1px 7px; border-radius:999px; }
+.vsmb-mini .tr.up{ color:var(--status-ok); background:rgba(34,197,94,.14); }
+.vsmb-mini .tr.dn{ color:var(--status-danger); background:rgba(239,68,68,.14); }
+.vsmb-mini .tr.flat{ color:var(--text-muted); background:rgba(148,163,184,.16); }
+.main-content[data-theme="dark"] .vsmb-mini{ background:var(--bg-panel-raised); border-color:var(--glass-border-dark); }
+@media(max-width:760px){ .vsmb{ grid-template-columns:1fr; } .vsmb-minis{ flex-direction:row; } }
+@media(max-width:480px){ .vsmb-minis{ flex-wrap:wrap; } .vsmb-mini{ flex:1 1 45%; } }
