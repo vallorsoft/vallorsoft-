@@ -6,7 +6,7 @@
   <title data-i18n="title.routePlanner">vallorSoft - Útvonaltervezés</title>
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="/style.css?v=20260614qa">
+  <link rel="stylesheet" href="/style.css?v=20260616warm2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
@@ -21,9 +21,9 @@
     /* Lágy radiális háttér-fény világos módban (mint a landing hero) */
     .main-content[data-theme="light"] {
       background:
-        radial-gradient(1100px 560px at 6% -6%, rgba(59,130,246,0.10), transparent 60%),
-        radial-gradient(900px 520px at 106% 2%, rgba(99,102,241,0.08), transparent 62%),
-        linear-gradient(180deg, #f7f9fc 0%, #eef2f8 100%);
+        radial-gradient(1100px 560px at 6% -6%, rgba(251,140,58,0.10), transparent 60%),
+        radial-gradient(900px 520px at 106% 2%, rgba(246,81,123,0.08), transparent 62%),
+        linear-gradient(180deg, #faf6f0 0%, #f3ece2 100%);
     }
     /* Prémium kártya-mélység (világos témában): finom gradiens + felső sheen + lágy árnyék */
     .main-content[data-theme="light"] .glass {
@@ -38,14 +38,14 @@
     }
     /* Elsődleges / akció gomb — kék gradiens + kék glow (mindkét témában) */
     .rp-card .btn.primary, #rpPlanBtn.btn.primary, #rpModeCar.btn.primary, #rpModeTruck.btn.primary {
-      background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+      background: linear-gradient(135deg, #fb8c3a 0%, #f6517b 100%);
       border: none; color: #fff;
-      box-shadow: 0 1px 1px rgba(15,23,42,0.05), 0 10px 24px -12px rgba(59,130,246,0.7);
+      box-shadow: 0 1px 1px rgba(15,23,42,0.05), 0 10px 24px -12px rgba(246,113,30,0.7);
       transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
     }
     .rp-card .btn.primary:hover, #rpPlanBtn.btn.primary:hover, #rpModeCar.btn.primary:hover, #rpModeTruck.btn.primary:hover {
       filter: brightness(1.04); transform: translateY(-1px);
-      box-shadow: 0 2px 3px rgba(15,23,42,0.06), 0 14px 30px -12px rgba(59,130,246,0.85);
+      box-shadow: 0 2px 3px rgba(15,23,42,0.06), 0 14px 30px -12px rgba(246,113,30,0.85);
     }
     #rpPlanBtn.btn.primary:disabled { background: #cbd5e1; box-shadow: none; transform: none; filter: none; color: #fff; }
     .rp-sec-title { font-size:13px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; margin-bottom:10px; }
@@ -55,12 +55,12 @@
     .rp-veh { display:flex; align-items:center; gap:8px; padding:9px 11px; border-radius:var(--radius-sm);
       border:1px solid var(--border); background:rgba(255,255,255,0.02); cursor:pointer; font-size:13px; }
     .rp-veh:hover { border-color:var(--border-bright); }
-    .rp-veh.sel { border-color:#3b82f6; background:rgba(59,130,246,0.12); }
+    .rp-veh.sel { border-color:#f6711e; background:rgba(246,113,30,0.12); }
     .rp-veh .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; background:transparent; }
     .rp-veh .dot.gps { background:var(--status-ok); box-shadow:0 0 6px var(--status-ok); }
     .rp-veh .nm { font-weight:700; }
     .rp-veh .meta { color:var(--text-muted); font-size:12px; }
-    .rp-veh .chk { margin-left:auto; color:#3b82f6; font-weight:800; display:none; }
+    .rp-veh .chk { margin-left:auto; color:#f6711e; font-weight:800; display:none; }
     .rp-veh.sel .chk { display:inline; }
     .rp-veh .warn { margin-left:auto; color:var(--status-warn); font-size:11px; white-space:nowrap; }
     .rp-point { margin-bottom:12px; }
@@ -96,6 +96,10 @@
     .fsw input:checked + .fsw-s { background:rgba(34,197,94,0.3); border-color:rgba(34,197,94,0.6); }
     .fsw input:checked + .fsw-s:before { transform:translateX(18px); background:var(--status-ok); }
     .fsw input:disabled + .fsw-s { opacity:.5; cursor:not-allowed; }
+    /* Logó: „Soft" akcent → napnyugta; „vallor" olvasható a krém háttéren */
+    .vs-logo .soft { color:#fb8c3a; text-shadow:0 0 18px rgba(251,140,58,.45); }
+    .main-content[data-theme="light"] .vs-logo .vallor { color:#2a2018; }
+    .main-content[data-theme="dark"] .vs-logo .vallor { color:#f4ede3; }
   </style>
 </head>
 <body>
@@ -517,7 +521,7 @@ function rpPlan(){
     rpDrawRoute(r);
   }).catch(function(){ sp.style.display='none'; rpUpdatePlanBtn(); toast(t('rp.netError'),'err'); });
 }
-function rpMarkerColor(type){ return type==='gps'?'#22c55e':type==='loading'?'#3b82f6':type==='unloading'?'#e10b1a':'#f59e0b'; }
+function rpMarkerColor(type){ return type==='gps'?'#22c55e':type==='loading'?'#f6711e':type==='unloading'?'#e10b1a':'#f59e0b'; }
 function rpDrawRoute(r){
   _lastRoute=r;
   rpLayer.clearLayers();

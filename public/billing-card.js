@@ -3,7 +3,7 @@
 // Mount: BillingCard.mount('billingCardBox'). Igényli: gas(), toast(), esc() (console-shared.js).
 window.BillingCard = (function () {
   var box, providers = [], current = null, selected = null, mode = 'view';
-  var ACCENT = '#6366f1';
+  var ACCENT = '#f6711e';
 
   function esc2(s) { return (window.esc ? esc(s) : String(s == null ? '' : s)); }
 
@@ -48,7 +48,7 @@ window.BillingCard = (function () {
     var grid = providers.map(function (p) {
       var sel = selected === p.provider;
       return '<button onclick="BillingCard._pick(\'' + p.provider + '\')" style="padding:14px 18px;border-radius:12px;cursor:pointer;font-weight:700;'
-        + 'border:1px solid ' + (sel ? ACCENT : 'var(--border-bright)') + ';background:' + (sel ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.03)') + ';color:' + (sel ? 'var(--text-primary)' : 'var(--text-muted)') + ';">'
+        + 'border:1px solid ' + (sel ? ACCENT : 'var(--border-bright)') + ';background:' + (sel ? 'rgba(246,113,30,0.12)' : 'rgba(255,255,255,0.03)') + ';color:' + (sel ? 'var(--text-primary)' : 'var(--text-muted)') + ';">'
         + esc2(p.display_name) + (sel ? ' ✓' : '') + '</button>';
     }).join('');
     box.innerHTML =

@@ -18,21 +18,21 @@ window.EmailIntakeCard = (function () {
     + ".eic-prov button{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 8px;"
     + "border:1px solid var(--glass-border-dark,rgba(255,255,255,.1));border-radius:var(--radius-md,12px);"
     + "background:rgba(255,255,255,.02);color:var(--text-primary);cursor:pointer;font-size:14px;font-weight:600;transition:.15s;}"
-    + ".eic-prov button:hover{border-color:var(--eic-accent,#6366f1);background:rgba(99,102,241,.07);}"
+    + ".eic-prov button:hover{border-color:var(--eic-accent,#f6711e);background:rgba(246,113,30,.07);}"
     + ".eic-prov .ic{font-size:24px;}"
     + ".eic-field{margin-bottom:12px;}"
     + ".eic-field label{display:block;font-size:13px;color:var(--text-primary);margin-bottom:6px;font-weight:600;}"
     + ".eic-field input{width:100%;font-size:15px;padding:10px 12px;border:1px solid var(--glass-border-dark,rgba(255,255,255,.12));"
     + "border-radius:var(--radius-sm,8px);background:rgba(255,255,255,.04);color:var(--text-primary);box-sizing:border-box;}"
     + ".eic-hint{font-size:12px;color:var(--text-muted);margin-top:5px;line-height:1.5;}"
-    + ".eic-hint a{color:var(--eic-accent,#6366f1);}"
+    + ".eic-hint a{color:var(--eic-accent,#f6711e);}"
     + ".eic-row{display:flex;gap:10px;}.eic-row .eic-field{flex:1;}"
     + ".eic-chk{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text-primary);cursor:pointer;}"
     + ".eic-msg{font-size:13px;margin:10px 0 0;min-height:18px;}"
     + ".eic-msg.ok{color:#22c55e;}.eic-msg.err{color:#ef4444;}"
     + ".eic-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}"
     + ".eic-btn{font-size:14px;font-weight:600;padding:10px 16px;border-radius:var(--radius-sm,8px);border:1px solid transparent;cursor:pointer;transition:.15s;}"
-    + ".eic-btn.primary{background:var(--eic-accent,#6366f1);color:#fff;}"
+    + ".eic-btn.primary{background:var(--eic-accent,#f6711e);color:#fff;}"
     + ".eic-btn.ghost{background:transparent;border-color:var(--glass-border-dark,rgba(255,255,255,.18));color:var(--text-primary);}"
     + ".eic-btn.danger{background:transparent;border-color:rgba(239,68,68,.5);color:#ef4444;}"
     + ".eic-btn[disabled]{opacity:.5;cursor:default;}"
@@ -68,7 +68,7 @@ window.EmailIntakeCard = (function () {
     var el = typeof target === 'string' ? document.getElementById(target) : target;
     if (!el) return;
     ensureStyle();
-    var ctx = { el: el, readOnly: !!(opts && opts.readOnly), accent: (opts && opts.accent) || '#6366f1' };
+    var ctx = { el: el, readOnly: !!(opts && opts.readOnly), accent: (opts && opts.accent) || '#f6711e' };
     el.style.setProperty('--eic-accent', ctx.accent);
     load(ctx);
   }

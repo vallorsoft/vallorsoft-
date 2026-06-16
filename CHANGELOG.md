@@ -14,6 +14,17 @@
 
 ---
 
+## 2026-06-16 — Meleg paletta-hézagok lezárása (gombok, intake/chat, Útvonaltervezés) (PR #165)
+
+> A warm-rollout befejezése: a konzol-skin által nem érintett hideg-kék/sötét pontok átszínezve. Csak szín — szöveg/szerkezet/logika érintetlen.
+
+- **Gyökérok:** `public/style.css` `.main-content .btn.primary` egy régi redesign-blokkban **`!important` kék** gradienst használt, ami felülütötte a meleg szabályt → **minden konzol primary-gomb kék maradt** (GDPR „Adat-export", számlázó „Tovább", CargoTrack „Mentés"). A blokk most napnyugta gradiens (`#fb8c3a→#f6517b`), keret/glow meleg. (A `.stat-val`/`.stat-ico` régi indigó `!important` is melegre.)
+- **Modul-kártyák:** `billing-card.js` (`ACCENT` `#6366f1`→`#f6711e`), `cargotrack-card.js`/`cargotrack-pairing.js` (`#2563eb`→`#f6711e`).
+- **E-mail-intake kártya** (`email-intake-card.js` + `style.css` `.eic` téma-szabályok): a sötét navy → olvasható (világos = krém+sötét szöveg, sötét = espresso+világos szöveg).
+- **Belső chat** (`style.css` `.chat-*` téma-szabályok): olvasható meleg (saját üzenet = napnyugta gradiens, másiké = világos/espresso kártya); az avatar-gradiens is meleg.
+- **Útvonaltervezés oldal** (`utvonaltervezes.html`, saját inline stílus): háttér-radálok, mód-gombok („Autós/Útvonal tervezése"), kijelölt jármű, betöltő-marker, „Soft" logó → meleg; a Leaflet-térkép és vezérlők érintetlenek (zöld=GPS/piros=lerakó szemantika megtartva).
+- Cache-bust `?v=20260616warm2`. `node --check` OK, 93 Jest zöld; backend/teszt/KPI-sáv/fuvar-tábla/e-mail-sablon nem érintve.
+
 ## 2026-06-16 — Meleg utánkövetés: KPI-sáv érték-HTML fix + e-mail sablonok átszínezése (PR #164)
 
 > Élesben jelentett hiba + a warm-rollout befejezése. (1) A KPI-sávban az érték HTML-je escape-elve jelent meg a Statisztika-oldalakon; (2) az összes kimenő e-mail sablon a meleg palettára színezve.
