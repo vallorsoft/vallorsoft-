@@ -1151,3 +1151,43 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 .main-content .h-title{ position:relative; padding-left:15px; letter-spacing:-.01em; }
 .main-content .h-title::before{ content:""; position:absolute; left:0; top:.14em; bottom:.14em; width:5px; border-radius:3px; background:var(--vs-warm-grad); box-shadow:0 4px 10px -5px rgba(249,115,22,.55); }
 .main-content .h-sub{ margin-top:-2px; }
+
+/* ════════════════════════════════════════════════════════════
+   FÁZIS 2 — Fuvarok-kezelés (orders list) vizuális gazdagítás.
+   CSAK megjelenés (route-vizuál, sofőr-avatar, státusz-pirula,
+   sor-bal csík, akciógombok). A táblázat-logika (méretezés/
+   átrendezés/kijelölés/dropdown) érintetlen — ezek osztály-
+   szintű, additív szabályok (vsl- prefix), a #tblOrders alá
+   szűkítve, hogy más táblákat ne érintsenek.
+   ════════════════════════════════════════════════════════════ */
+
+/* Útvonal cella: felrakó • ─ ─→ 📍 lerakó (display-only) */
+#tblOrders .vsl-route{ display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap; line-height:1.3; }
+#tblOrders .vsl-route-pt{ font-weight:600; }
+#tblOrders .vsl-route-dst{ color:var(--text-primary); }
+#tblOrders .vsl-route-link{ display:inline-flex; align-items:center; gap:3px; min-width:26px; }
+#tblOrders .vsl-route-link::before{ content:""; width:18px; height:0; border-top:2px dashed rgba(99,102,241,.55); }
+#tblOrders .vsl-route-pin{ font-size:11px; line-height:1; filter:saturate(1.1); }
+
+/* Sofőr cella: kör monogram-avatar */
+#tblOrders .vsl-av{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-size:10px; font-weight:800; color:#fff; vertical-align:middle; margin-right:6px; letter-spacing:.02em; box-shadow:0 2px 5px -2px rgba(15,23,42,.4); flex:0 0 auto; }
+#tblOrders .vsl-av-empty{ background:rgba(148,163,184,.35); color:rgba(71,85,105,.9); }
+#tblOrders .vsl-driver-name{ vertical-align:middle; }
+
+/* Státusz-pirula: a meglévő <select> kapja a lekerekített, színes pill-formát
+   (a háttér-/keret-szín az inline style-ból jön; itt csak a forma + finomítás) */
+#tblOrders select.vsl-pill{ border-radius:999px !important; font-weight:700; transition:filter .12s ease, box-shadow .12s ease; }
+#tblOrders select.vsl-pill:hover:not(:disabled){ filter:brightness(1.04); box-shadow:0 2px 8px -3px rgba(15,23,42,.35); }
+
+/* Sor bal-oldali státusz-színű csík (a sor első cellájára) */
+#tblOrders tr.vsl-orow .vsl-orow-first{ border-left:3px solid transparent; }
+#tblOrders tr.vsl-orow-info  .vsl-orow-first{ border-left-color:var(--status-info,#3b82f6); }
+#tblOrders tr.vsl-orow-warn  .vsl-orow-first{ border-left-color:var(--status-warn,#f59e0b); }
+#tblOrders tr.vsl-orow-ok    .vsl-orow-first{ border-left-color:var(--status-ok,#22c55e); }
+#tblOrders tr.vsl-orow-err   .vsl-orow-first{ border-left-color:var(--status-danger,#ef4444); }
+#tblOrders tr.vsl-orow-park  .vsl-orow-first{ border-left-color:#14b8a6; }
+#tblOrders tr.vsl-orow-wh    .vsl-orow-first{ border-left-color:#f97316; }
+
+/* Akciógombok finomítása a sor-akció cellában (méret/hover; logika érintetlen) */
+#tblOrders td.vs-row-actions .btn{ border-radius:9px; }
+#tblOrders td.vs-row-actions .btn:hover:not(:disabled){ transform:translateY(-1px); }

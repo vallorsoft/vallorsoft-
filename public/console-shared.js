@@ -3423,6 +3423,20 @@ async function renderSignPage(num){
   document.getElementById('signPageInfo').textContent = num + ' / ' + signTotalPages;
 }
 
+// Kör monogram-avatar a sofőr-névből (csak megjelenítés). 1-2 betű + determinisztikus
+// háttérszín a névből (nincs adat-/eseménylogika). Üres/„—" névnél semleges avatar.
+function vslAvatar(name){
+  var s = (name==null ? '' : String(name)).trim();
+  if(!s || s==='—'){ return '<span class="vsl-av vsl-av-empty" aria-hidden="true">–</span>'; }
+  var parts = s.split(/\s+/).filter(Boolean);
+  var ini = (parts[0]||'').charAt(0);
+  if(parts.length>1) ini += (parts[parts.length-1]||'').charAt(0);
+  ini = ini.toUpperCase();
+  var h = 0; for(var i=0;i<s.length;i++){ h = (h*31 + s.charCodeAt(i)) % 360; }
+  var bg = 'hsl('+h+',55%,42%)';
+  return '<span class="vsl-av" aria-hidden="true" style="background:'+bg+';">'+esc(ini)+'</span>';
+}
+
 function renderFilteredOrders(list) {
   var tbody = document.getElementById('tblOrdersBody');
   if (!tbody) return;
@@ -3462,7 +3476,7 @@ function renderFilteredOrders(list) {
       'wh':   'background:rgba(249,115,22,0.18);color:#c2410c;border-color:rgba(249,115,22,0.45);'
     };
     // Anulált fuvarnál a dropdown letiltva (nem támasztható fel a felületről sem).
-    var statusSel = '<select onchange="quickStatusChange(\''+c.id+'\',this)" '+
+    var statusSel = '<select class="vsl-pill vsl-pill-'+sc+'" onchange="quickStatusChange(\''+c.id+'\',this)" '+
       (isCancelled?'disabled ':'')+
       'style="'+selStyle+(bgMap[sc]||bgMap['info'])+(isCancelled?'opacity:.7;cursor:not-allowed;':'')+'">'+
       statuses.map(function(s){
@@ -3478,7 +3492,13 @@ function renderFilteredOrders(list) {
     var legCount = legs.length;
 
     // Útvonal cella: alap útvonal + FTL/LTL jelzés (+ méret) + szakasz közbülső pontok
-    var routeCell = esc(c.loc_incarcare||'—')+' → '+esc(c.loc_descarcare||'—')+loadTypeBadge(c.load_type, dimStr(c.hossz_cm,c.szel_cm,c.mag_cm));
+    // Vizuális megjelenítés (csak kinézet): felrakó • ─ ─→ 📍 lerakó. A szöveg/adat
+    // változatlan, az i18n érintetlen — pusztán egy dekoratív burok az értékek körül.
+    var routeCell = '<span class="vsl-route">'+
+        '<span class="vsl-route-pt">'+esc(c.loc_incarcare||'—')+'</span>'+
+        '<span class="vsl-route-link" aria-hidden="true"><span class="vsl-route-pin">📍</span></span>'+
+        '<span class="vsl-route-pt vsl-route-dst">'+esc(c.loc_descarcare||'—')+'</span>'+
+      '</span>'+loadTypeBadge(c.load_type, dimStr(c.hossz_cm,c.szel_cm,c.mag_cm));
     // RO e-Transport: ha a fuvar UIT-kötelezettnek jelölt, de nincs aktív UIT-kódja → figyelmeztetés
     if (c.needs_uit && !(parseInt(c.uit_active_count,10)>0)) {
       routeCell += ' <span class="badge err" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="'+t('cs.ol.uitMissingTitle')+'">⚠️ '+t('cs.ol.uitMissing')+'</span>';
@@ -3509,8 +3529,10 @@ function renderFilteredOrders(list) {
       routeCell += '</div>';
     }
 
-    // Sofőr cella: alap sofőr + váltások badge-del
-    var soferCell = esc(soferInfo);
+    // Sofőr cella: kör monogram-avatar (csak kinézet) + alap sofőr + váltások badge-del.
+    // Az avatar a sofőr nevéből képzett 1-2 betű, determinisztikus színnel; a név
+    // szövege/adat-logikája változatlan.
+    var soferCell = vslAvatar(soferInfo)+'<span class="vsl-driver-name">'+esc(soferInfo)+'</span>';
     if (legCount > 0) {
       soferCell += ' <span style="font-size:10px;background:rgba(99,102,241,0.15);color:#4f46e5;border:1px solid rgba(99,102,241,0.3);border-radius:6px;padding:1px 6px;white-space:nowrap;">+'+legCount+t('cs.ol.legBadge')+'</span>';
       soferCell += '<div style="margin-top:4px;">';
@@ -3592,7 +3614,7 @@ function renderFilteredOrders(list) {
     var editBtn = isCancelled
       ? '<button class="btn ghost vs-act-edit" title="'+t('cs.ol.cancelledLocked')+'" disabled style="opacity:.5;cursor:not-allowed;">✏️</button>'
       : '<button class="btn primary vs-act-edit" title="'+t('cs.ol.mEdit')+'" onclick="openOrderEdit(\''+c.id+'\')">✏️</button>';
-    return '<tr'+rowStyle+'><td><b>'+c.id+'</b></td><td>'+clientCell+'</td>'+
+    return '<tr class="vsl-orow vsl-orow-'+sc+'"'+rowStyle+'><td class="vsl-orow-first"><b>'+c.id+'</b></td><td>'+clientCell+'</td>'+
       '<td>'+routeCell+'</td>'+
       '<td>'+(c.km||'—')+(c.route_km!=null&&c.route_km!==''?' <span class="badge info" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="'+t('cs.tt.autoRouteKm')+'">🗺️ '+c.route_km+'</span>':'')+'</td><td>'+(c.pret||'—')+'</td>'+
       '<td>'+soferCell+'</td><td>'+esc(c.rendszam_camion||'—')+'</td>'+

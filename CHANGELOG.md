@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-16 — Fázis 2 (8. lépés): Fuvarok-kezelés tábla — vizuális gazdagítás (PR #158)
+
+> A fuvar-tábla a mockup kinézetét kapja: vizuális útvonal (felrakó • ─→ 📍 lerakó), sofőr-monogram-avatar, státusz-pirula és sor-bal státuszcsík. **CSAK megjelenés** — minden interaktív funkció (oszlop-átméretezés/átrendezés, kijelölés, tömeges letöltés, inline státusz-váltó, akciógombok) byte-pontosan megőrizve; a 10 oszlop és sorrend változatlan.
+
+- **`public/console-shared.js`** — `renderFilteredOrders`: a route/sofőr cella belső tartalma dekoratív burkot kap (`vsl-route`, `vslAvatar`), a státusz-`<select>` `vsl-pill` osztályt (az `onchange="quickStatusChange"`, `disabled`, opciók, inline szín változatlan), a `<tr>`/első cella státusz-osztályt a bal csíkhoz. Új `vslAvatar()` segéd (csak megjelenítés).
+- **`public/style.css`** — `#tblOrders`-re **szűkített** `.vsl-*` szabályok (route/avatar/pill/sorcsík/akciógomb); nincs globális hatás.
+- Cache-bust `console-shared.js`/`style.css` `?v=20260616olist`. Backend/SQL/auth/handler nem változott; a tábla-logika (resize/reorder/selection/download/dropdown) érintetlen; 93 Jest zöld.
+
 ## 2026-06-16 — Fázis 2 (7. lépés): egységes oldal-fej (gradiens akcent-csík a címek elé) (PR #157)
 
 > A panel-/szekciócímek egységes ritmust kapnak: finom napnyugta-gradiens akcent-csík a `.h-title` elé. CSS-only, a konzolra szűkítve (`.main-content`), abszolút pozíciójú `::before` → nem rendezi át a cím gyerekeit; könnyen visszavonható. Nincs HTML-átírás, nincs funkció-érintés.
