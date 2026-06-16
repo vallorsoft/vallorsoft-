@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-06-16 — Landing page meleg átszínezés (PR #160)
+
+> A publikus landing a konzol új **meleg arculatát** kapja: kék/indigó → napnyugta narancs/korall + krém + espresso + meleg teal. CSAK szín — a tartalom, layout, szövegek, i18n, JS-logika érintetlen.
+
+- **`public/landing.css`** — a `--lp-*` paletta-tokenek meleg értékekre: primer `#3b82f6`→`#f6711e` (narancs), másodlagos `#6366f1`→`#f6517b` (korall), `--lp-grad` napnyugta gradiens, `--lp-teal #0d9488` pop, sötét szekciók navy→espresso (`#1e1812`/`#271f18`), világos `#f7f9fc`→krém `#faf6f0`, szöveg/keret meleg. A státusz-színek (zöld ok / piros hiba) megőrizve; a „Soft" logó a napnyugta gradiensen.
+- **`public/index.html`** — cache-bust `landing.css?v=20260616warmland`. `landing.js` nem változott (csak osztálynevek, nem szín-értékek). 93 Jest zöld.
+
 ## 2026-06-16 — Fázis 2 (9. lépés): teljes meleg paletta a konzolon (PR #159)
 
 > A admin/manager konzol egységes **meleg arculatot** kap (krém + espresso + napnyugta akcent), a kék/indigó helyett. **Additív, könnyen visszavonható** réteg: egyetlen, kommentelt blokk a `style.css` VÉGÉN — a meglévő szabályok érintetlenek, más oldalakat (login/portál/sofőr/developer/landing) nem érint.
