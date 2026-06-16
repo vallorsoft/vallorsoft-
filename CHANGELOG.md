@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-16 — Meleg utánkövetés: KPI-sáv érték-HTML fix + e-mail sablonok átszínezése (PR #164)
+
+> Élesben jelentett hiba + a warm-rollout befejezése. (1) A KPI-sávban az érték HTML-je escape-elve jelent meg a Statisztika-oldalakon; (2) az összes kimenő e-mail sablon a meleg palettára színezve.
+
+- **`public/console-shared.js` `vsBandInner`** — **HIBAJAVÍTÁS:** a `v` (érték) **nem escape-elt** többé, mert a hívók (pl. a Statisztika a mértékegységet kis `<span>`-ban) megbízható megjelenítő HTML-t adnak — eddig `0 <span…>EUR</span>` nyersként jelent meg (CO₂/Áttekintés/Pénzügy). A címke (`l`)/sub/trend escape-elt marad (XSS-biztos; a `v` sosem nyers user-input). Cache-bust `console-shared.js?v=20260616fix`.
+- **E-mail sablonok meleg átszínezése (csak szín):** `services/email.js` (meghívó/reset/üdvözlő-wrapper/developer-wrapper), `routes/trial-select.js` (fizetési e-mail + köszönő oldal), `services/scheduler.js` (havi riport + trial-emlékeztető), `routes/public-register.js` (üdvözlő). Kék/indigó → napnyugta narancs/korall + espresso/krém; a szöveg/link/`{{változó}}`/tárgy/küldés-logika **érintetlen**, a státusz-színek (zöld/piros/borostyán) megőrizve. 93 Jest zöld (incl. `invite-email.test.js`).
+- **Még hátra (paletta-hézagok):** néhány modul-kártya gomb még kék (Integrációk: GDPR/számlázó/CargoTrack), az e-mail-intake + chat kártya sötét, és a külön Útvonaltervezés oldal (saját inline stílus) — következő körben.
+
 ## 2026-06-16 — Avatar + pirula a többi listatáblán (PR #163)
 
 > A fuvar-tábla „avatar + pirula" kinézete kiterjesztve a többi konzol-listára. Display-only, additív — a gombok/oszlopok/akciók érintetlenek.

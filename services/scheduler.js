@@ -223,8 +223,8 @@ function startMonthlyReportScheduler() {
            WHERE f.data_completare >= $2::date AND f.data_completare < $3::date`, [c.id, from, to]);
         const k = kpiR.rows[0], fv = fuvR.rows[0];
 
-        const row = (l, v) => '<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;color:#555;">' + l
-          + '</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-weight:700;">' + v + '</td></tr>';
+        const row = (l, v) => '<tr><td style="padding:6px 10px;border-bottom:1px solid #ece3d8;color:#8a7d6e;">' + l
+          + '</td><td style="padding:6px 10px;border-bottom:1px solid #ece3d8;text-align:right;font-weight:700;">' + v + '</td></tr>';
         const html =
           '<p><b>' + c.nev + '</b> — raport lunar: <b>' + month + '</b></p>'
           + '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
@@ -235,7 +235,7 @@ function startMonthlyReportScheduler() {
           + row('Alte cheltuieli șofer', fmt(fv.vasarlas) + ' RON')
           + row('Restanțe curente', fmt(k.kintlevo) + ' EUR')
           + '</table>'
-          + '<p style="font-size:12px;color:#888;">Rapoarte detaliate: în meniul 📊 Statistici al VallorSoft.</p>';
+          + '<p style="font-size:12px;color:#b09a82;">Rapoarte detaliate: în meniul 📊 Statistici al VallorSoft.</p>';
 
         let sentAny = false;
         for (const a of adminsR.rows) {
@@ -430,25 +430,25 @@ function startTrialExpiryScheduler() {
             const bodyRo = tpl.body_ro ? replVars(tpl.body_ro, vars) : '';
             const bodyHu = tpl.body_hu ? replVars(tpl.body_hu, vars) : '';
             emailSubject = replVars(tpl.subject, vars);
-            emailHtml = bodyRo + (bodyHu && bodyRo ? '<hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0;">' : '') + bodyHu;
+            emailHtml = bodyRo + (bodyHu && bodyRo ? '<hr style="border:none;border-top:1px solid #ece3d8;margin:16px 0;">' : '') + bodyHu;
           } else {
             emailSubject = 'Perioada de probă a expirat — VallorSoft';
             emailHtml = `
-<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#0f172a;">
-  <div style="background:linear-gradient(135deg,#6366f1,#3b82f6);padding:28px 32px;border-radius:12px 12px 0 0;">
-    <h1 style="margin:0;color:#fff;font-size:22px;">vallor<span style="color:#c7d2fe;">Soft</span></h1>
+<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#2a2018;">
+  <div style="background:linear-gradient(135deg,#fb8c3a,#f6517b);padding:28px 32px;border-radius:12px 12px 0 0;">
+    <h1 style="margin:0;color:#fff;font-size:22px;">vallor<span style="color:#fdba74;">Soft</span></h1>
   </div>
-  <div style="background:#fff;padding:28px 32px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
+  <div style="background:#faf6f0;padding:28px 32px;border:1px solid #ece3d8;border-top:none;border-radius:0 0 12px 12px;">
     <p style="margin:0 0 12px;font-size:16px;font-weight:600;">Perioada de probă a expirat</p>
-    <p style="margin:0 0 20px;color:#475569;">
+    <p style="margin:0 0 20px;color:#8a7d6e;">
       Perioada de probă de 14 zile pentru <em>${ceg.nev}</em> a expirat astăzi.
       Pentru a continua să utilizați VallorSoft, vă rugăm să alegeți un pachet de abonament.
     </p>
-    <a href="${appUrl}/subscription" style="display:inline-block;background:linear-gradient(180deg,#3b82f6,#2563eb);color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">
+    <a href="${appUrl}/subscription" style="display:inline-block;background:linear-gradient(180deg,#fb8c3a,#f6711e);color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;">
       📦 Alege pachet
     </a>
-    <p style="margin:24px 0 0;font-size:12px;color:#94a3b8;">
-      Întrebări? <a href="mailto:vallorsoft@gmail.com" style="color:#6366f1;">vallorsoft@gmail.com</a>
+    <p style="margin:24px 0 0;font-size:12px;color:#b09a82;">
+      Întrebări? <a href="mailto:vallorsoft@gmail.com" style="color:#f6711e;">vallorsoft@gmail.com</a>
     </p>
   </div>
 </div>`;
@@ -488,41 +488,41 @@ function startTrialReminderScheduler() {
 
   function buildReminderHtml(company, plans, daysLeft) {
     const escH = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    const planColors = ['#16a34a','#3b82f6','#6366f1','#1e293b'];
+    const planColors = ['#16a34a','#f6711e','#f6517b','#271f18'];
 
     const planCards = plans.map(function(p, i) {
       const isDark     = i === 3;
       const monthlyEur = parseFloat(p.price_net) || 0;
       const annualEur  = monthlyEur * 11;
-      const color      = planColors[i] || '#3b82f6';
+      const color      = planColors[i] || '#f6711e';
       const linkM      = isDark ? null : buildPlanLink(company.id, p.id, 'monthly');
       const linkA      = isDark ? null : buildPlanLink(company.id, p.id, 'annual');
 
       const priceBlock = monthlyEur > 0
-        ? `<div style="font-size:22px;font-weight:800;color:${color};">€${Math.round(monthlyEur)}<span style="font-size:13px;font-weight:500;color:#64748b;">/lună</span></div>
-           <div style="font-size:11px;color:#64748b;">Anual: €${annualEur} (11 luni)</div>`
-        : `<div style="font-size:16px;font-weight:700;color:#475569;">Preț personalizat</div>`;
+        ? `<div style="font-size:22px;font-weight:800;color:${color};">€${Math.round(monthlyEur)}<span style="font-size:13px;font-weight:500;color:#8a7d6e;">/lună</span></div>
+           <div style="font-size:11px;color:#8a7d6e;">Anual: €${annualEur} (11 luni)</div>`
+        : `<div style="font-size:16px;font-weight:700;color:#8a7d6e;">Preț personalizat</div>`;
 
       const ctaBlock = isDark
-        ? `<a href="mailto:vallorsoft@gmail.com" style="display:block;text-align:center;margin-top:10px;padding:8px;background:#1e293b;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;">Contactați-ne</a>`
+        ? `<a href="mailto:vallorsoft@gmail.com" style="display:block;text-align:center;margin-top:10px;padding:8px;background:#271f18;color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;">Contactați-ne</a>`
         : `<a href="${linkM}" style="display:block;text-align:center;margin-top:8px;padding:7px;background:${color};color:#fff;border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;">Lunar</a>
            <a href="${linkA}" style="display:block;text-align:center;margin-top:5px;padding:7px;background:transparent;color:${color};border:1.5px solid ${color};border-radius:7px;font-size:12px;font-weight:600;text-decoration:none;">Anual ★ −1 lună</a>`;
 
       return `<td style="width:25%;padding:8px;vertical-align:top;">
-        <div style="border:1.5px solid ${i===2?color:'#e2e8f0'};border-radius:10px;padding:14px;background:${i===2?'#fafafe':'#fff'};">
-          <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:6px;">${escH(p.name)}</div>
+        <div style="border:1.5px solid ${i===2?color:'#ece3d8'};border-radius:10px;padding:14px;background:${i===2?'#fbf7f1':'#fff'};">
+          <div style="font-size:13px;font-weight:700;color:#2a2018;margin-bottom:6px;">${escH(p.name)}</div>
           ${priceBlock}
           ${ctaBlock}
         </div>
       </td>`;
     }).join('');
 
-    return `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#0f172a;">
-  <div style="background:linear-gradient(135deg,#6366f1,#3b82f6);padding:24px 28px;border-radius:12px 12px 0 0;">
-    <h1 style="margin:0;color:#fff;font-size:20px;">vallor<span style="color:#c7d2fe;">Soft</span></h1>
+    return `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#2a2018;">
+  <div style="background:linear-gradient(135deg,#fb8c3a,#f6517b);padding:24px 28px;border-radius:12px 12px 0 0;">
+    <h1 style="margin:0;color:#fff;font-size:20px;">vallor<span style="color:#fdba74;">Soft</span></h1>
     <p style="margin:6px 0 0;color:rgba(255,255,255,.85);font-size:14px;">⏳ ${daysLeft === 1 ? 'Ultima zi de probă' : `Mai ai ${daysLeft} zile din perioada de probă`}</p>
   </div>
-  <div style="background:#fff;padding:24px 28px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
+  <div style="background:#faf6f0;padding:24px 28px;border:1px solid #ece3d8;border-top:none;border-radius:0 0 12px 12px;">
     <p style="margin:0 0 20px;font-size:15px;">
       Perioada de probă a companiei <em>${escH(company.nev)}</em> expiră în <strong>${daysLeft} ${daysLeft===1?'zi':'zile'}</strong>.
       Alege un pachet pentru a continua fără întrerupere.
@@ -537,9 +537,9 @@ function startTrialReminderScheduler() {
       ★ <strong>Abonament anual</strong>: plătești 11 luni, folosești 12 (1 lună gratuită).
     </div>
 
-    <p style="margin:0;font-size:12px;color:#94a3b8;">
+    <p style="margin:0;font-size:12px;color:#b09a82;">
       Abonamentul începe după perioada de probă de 14 zile.<br>
-      Întrebări? <a href="mailto:vallorsoft@gmail.com" style="color:#6366f1;">vallorsoft@gmail.com</a>
+      Întrebări? <a href="mailto:vallorsoft@gmail.com" style="color:#f6711e;">vallorsoft@gmail.com</a>
     </p>
   </div>
 </div>`;

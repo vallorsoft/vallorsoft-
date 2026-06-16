@@ -84,34 +84,34 @@ function buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl }) {
     footer: { hu: `Ez az e-mail automatikusan lett elküldve a VallorSoft rendszer által. Ha nem várta ezt az üzenetet, kérjük hagyja figyelmen kívül. Bejelentkezés: ${escHtml(loginLink)}`, ro: `Acest e-mail a fost trimis automat de sistemul VallorSoft. Dacă nu așteptați acest mesaj, ignorați-l. Autentificare: ${escHtml(loginLink)}` }[L],
   };
   return `
-        <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;background:#05070b;color:#e9eef5;padding:24px;border-radius:16px;">
+        <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;background:#1e1812;color:#faf6f0;padding:24px;border-radius:16px;">
           <div style="font-size:24px;font-weight:800;margin-bottom:4px;">
-            <span style="color:#fff;">vallor</span><span style="color:#e10b1a;">Soft</span>
+            <span style="color:#fff;">vallor</span><span style="color:#f6711e;">Soft</span>
           </div>
-          <div style="font-size:12px;color:#8a97a8;margin-bottom:24px;">${S.platform}</div>
+          <div style="font-size:12px;color:#fdba74;margin-bottom:24px;">${S.platform}</div>
           <h2 style="font-size:20px;margin-bottom:8px;line-height:1.3;">${S.greet}</h2>
-          <p style="color:#b8c2d0;font-size:14px;line-height:1.6;margin-bottom:20px;">
+          <p style="color:#e7d8c6;font-size:14px;line-height:1.6;margin-bottom:20px;">
             ${S.invited}${S.inRole}
           </p>
-          <div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;margin-bottom:20px;text-align:center;">
-            <div style="font-size:11px;color:#8a97a8;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">${S.yourCode}</div>
+          <div style="background:#271f18;border:1px solid rgba(253,186,116,0.18);border-radius:12px;padding:18px;margin-bottom:20px;text-align:center;">
+            <div style="font-size:11px;color:#fdba74;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">${S.yourCode}</div>
             <div style="font-size:28px;font-weight:800;letter-spacing:3px;color:#fff;word-break:break-word;">${kd}</div>
           </div>
           <div style="text-align:center;margin:24px 0;">
-            <a href="${regLink}" style="display:inline-block;background:#e10b1a;color:#fff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:10px;font-size:15px;">${S.openReg}</a>
+            <a href="${regLink}" style="display:inline-block;background:#f6711e;color:#fff;text-decoration:none;font-weight:700;padding:14px 28px;border-radius:10px;font-size:15px;">${S.openReg}</a>
           </div>
-          <div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:18px;margin-bottom:20px;">
+          <div style="background:#271f18;border:1px solid rgba(253,186,116,0.18);border-radius:12px;padding:18px;margin-bottom:20px;">
             <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:10px;">${S.stepsTitle}</div>
-            <ol style="color:#b8c2d0;font-size:13px;line-height:1.8;padding-left:20px;margin:0;">
+            <ol style="color:#e7d8c6;font-size:13px;line-height:1.8;padding-left:20px;margin:0;">
               <li>${S.step1}</li>
               <li>${S.step2}</li>
               <li>${S.step3}</li>
               <li>${S.step4}</li>
             </ol>
           </div>
-          <p style="font-size:12px;color:#8a97a8;line-height:1.6;margin:0 0 6px;">${S.ifBtn}</p>
-          <p style="word-break:break-all;font-size:12px;color:#3b82f6;margin:0 0 20px;">${escHtml(regLink)}</p>
-          <p style="font-size:11px;color:#6b7689;line-height:1.5;margin:0;">${S.footer}</p>
+          <p style="font-size:12px;color:#fdba74;line-height:1.6;margin:0 0 6px;">${S.ifBtn}</p>
+          <p style="word-break:break-all;font-size:12px;color:#f6517b;margin:0 0 20px;">${escHtml(regLink)}</p>
+          <p style="font-size:11px;color:#b09a82;line-height:1.5;margin:0;">${S.footer}</p>
         </div>
       `;
 }
@@ -132,8 +132,8 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev, lang
     const inviteHref = escHtml(registerUrl + '/register?kod=' + encodeURIComponent(kod || '')).replace(/"/g, '%22');
     const vars    = { nev: meghivottNev || '', ceg_nev: cegNev || '', pozicio: pozicio || '', register_url: registerUrl + '/register' };
     const rawVars = {
-      invite_url_btn: `<a href="${inviteHref}" style="display:inline-block;background:#6366f1;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">Înregistrare</a>`,
-      invite_url_link: `<a href="${inviteHref}" style="color:#3b82f6;word-break:break-all;">${escHtml(registerUrl + '/register')}</a>`,
+      invite_url_btn: `<a href="${inviteHref}" style="display:inline-block;background:#f6711e;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">Înregistrare</a>`,
+      invite_url_link: `<a href="${inviteHref}" style="color:#f6517b;word-break:break-all;">${escHtml(registerUrl + '/register')}</a>`,
     };
     subject = applyTemplateVars(tpl.subject, vars, rawVars);
     html = applyTemplateVars(bodyText, vars, rawVars);
@@ -184,8 +184,8 @@ async function sendResetEmail(toEmail, nume, resetUrl) {
     const safeUrl  = (resetUrl || '').replace(/"/g, '%22');
     const vars    = { nev: escHtml(nume || ''), reset_url: resetUrl || '' };
     const rawVars = {
-      reset_url_btn:  `<a href="${safeUrl}" style="display:inline-block;background:#e10b1a;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">Setează parolă nouă</a>`,
-      reset_url_link: `<a href="${safeUrl}" style="color:#3b82f6;word-break:break-all;">${escHtml(resetUrl || '')}</a>`,
+      reset_url_btn:  `<a href="${safeUrl}" style="display:inline-block;background:#f6711e;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">Setează parolă nouă</a>`,
+      reset_url_link: `<a href="${safeUrl}" style="color:#f6517b;word-break:break-all;">${escHtml(resetUrl || '')}</a>`,
     };
     const subject = applyTemplateVars(tpl.subject, vars, rawVars);
     const htmlContent = applyTemplateVars(bodyText, vars, rawVars);
@@ -216,22 +216,22 @@ async function sendResetEmail(toEmail, nume, resetUrl) {
     footer: { hu: 'Ez az email automatikusan lett elküldve a VallorSoft rendszer által.', ro: 'Acest e-mail a fost trimis automat de sistemul VallorSoft.' }[L],
   };
   const html = `
-        <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#05070b;color:#e9eef5;padding:32px;border-radius:16px;">
+        <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;background:#1e1812;color:#faf6f0;padding:32px;border-radius:16px;">
           <div style="font-size:24px;font-weight:800;margin-bottom:4px;">
-            <span style="color:#fff;">vallor</span><span style="color:#e10b1a;">Soft</span>
+            <span style="color:#fff;">vallor</span><span style="color:#f6711e;">Soft</span>
           </div>
-          <div style="font-size:12px;color:#8a97a8;margin-bottom:28px;">${S.platform}</div>
+          <div style="font-size:12px;color:#fdba74;margin-bottom:28px;">${S.platform}</div>
           <h2 style="font-size:20px;margin-bottom:8px;">${S.greet}</h2>
-          <p style="color:#8a97a8;margin-bottom:16px;">${S.intro}</p>
+          <p style="color:#e7d8c6;margin-bottom:16px;">${S.intro}</p>
           <div style="text-align:center;margin:28px 0;">
-            <a href="${resetUrl}" style="display:inline-block;background:#e10b1a;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">${S.btn}</a>
+            <a href="${resetUrl}" style="display:inline-block;background:#f6711e;color:#fff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:10px;font-size:15px;">${S.btn}</a>
           </div>
-          <p style="color:#8a97a8;font-size:13px;margin-bottom:8px;">${S.or}</p>
-          <p style="word-break:break-all;font-size:12px;color:#3b82f6;margin-bottom:24px;">${resetUrl}</p>
-          <div style="background:#141c25;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:16px;margin-bottom:24px;">
-            <p style="font-size:12px;color:#8a97a8;margin:0;">${S.valid}</p>
+          <p style="color:#e7d8c6;font-size:13px;margin-bottom:8px;">${S.or}</p>
+          <p style="word-break:break-all;font-size:12px;color:#f6517b;margin-bottom:24px;">${resetUrl}</p>
+          <div style="background:#271f18;border:1px solid rgba(253,186,116,0.18);border-radius:12px;padding:16px;margin-bottom:24px;">
+            <p style="font-size:12px;color:#e7d8c6;margin:0;">${S.valid}</p>
           </div>
-          <p style="font-size:11px;color:#8a97a8;margin:0;">${S.footer}</p>
+          <p style="font-size:11px;color:#b09a82;margin:0;">${S.footer}</p>
         </div>
       `;
   try {
@@ -274,12 +274,12 @@ async function sendClientEmail(opts) {
   const safeLogo = opts.logoUrl && /^(https?:\/\/|data:image\/)/i.test(String(opts.logoUrl)) ? String(opts.logoUrl) : null;
   const header = safeLogo
     ? `<img src="${escHtml(safeLogo)}" alt="${escHtml(senderName)}" style="max-height:48px;max-width:220px;display:block;margin-bottom:16px;">`
-    : `<div style="font-size:24px;font-weight:800;margin-bottom:16px;"><span style="color:#0b0f14;">vallor</span><span style="color:#e10b1a;">Soft</span></div>`;
+    : `<div style="font-size:24px;font-weight:800;margin-bottom:16px;"><span style="color:#2a2018;">vallor</span><span style="color:#f6711e;">Soft</span></div>`;
   const bodyHtml = (opts.html || '').trim();
   const html =
-    `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#0b0f14;padding:24px;">` +
+    `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#2a2018;padding:24px;">` +
       header +
-      `<div style="font-size:14px;line-height:1.6;color:#1c2630;white-space:normal;">${bodyHtml}</div>` +
+      `<div style="font-size:14px;line-height:1.6;color:#2a2018;white-space:normal;">${bodyHtml}</div>` +
     `</div>`;
   const payload = {
     sender: { name: senderName, email: BREVO_SENDER },
@@ -312,16 +312,16 @@ async function sendDeveloperEmail(toEmail, companyName, subject, htmlBody) {
   }
   const loginLink = (process.env.APP_URL || 'http://localhost:3000') + '/login';
   const html = `
-    <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;background:#05070b;color:#e9eef5;padding:24px;border-radius:16px;">
+    <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;background:#1e1812;color:#faf6f0;padding:24px;border-radius:16px;">
       <div style="font-size:24px;font-weight:800;margin-bottom:4px;">
-        <span style="color:#fff;">Vallor</span><span style="color:#6366f1;">Soft</span>
+        <span style="color:#fff;">Vallor</span><span style="color:#f6711e;">Soft</span>
       </div>
-      <div style="font-size:12px;color:#8a97a8;margin-bottom:24px;">Platformă de management transport</div>
-      <div style="color:#e9eef5;font-size:14px;line-height:1.7;">${htmlBody}</div>
-      <hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:24px 0;">
-      <p style="font-size:11px;color:#6b7689;line-height:1.5;margin:0;">
+      <div style="font-size:12px;color:#fdba74;margin-bottom:24px;">Platformă de management transport</div>
+      <div style="color:#faf6f0;font-size:14px;line-height:1.7;">${htmlBody}</div>
+      <hr style="border:none;border-top:1px solid rgba(253,186,116,0.16);margin:24px 0;">
+      <p style="font-size:11px;color:#b09a82;line-height:1.5;margin:0;">
         Acest e-mail a fost trimis automat de sistemul VallorSoft.<br>
-        Autentificare: <a href="${escHtml(loginLink)}" style="color:#6366f1;">${escHtml(loginLink)}</a>
+        Autentificare: <a href="${escHtml(loginLink)}" style="color:#f6711e;">${escHtml(loginLink)}</a>
       </p>
     </div>`;
   try {

@@ -2742,14 +2742,18 @@ function vsHeroSpark(data) {
 function vsBandInner() {
   var f = _vsmb[_vsmbFeat] || _vsmb[0] || {};
   var heroTrend = f.t ? '<span class="b">' + esc(f.t) + '</span> ' : '';
+  // FONTOS: a `v` (érték) megbízható megjelenítő HTML-t tartalmazhat (pl. a Statisztika
+  // a mértékegységet kis <span>-ban adja) — a hívók építik, sosem nyers user-input —,
+  // ezért NEM escape-eljük (különben a <span> nyersként jelenne meg). A címke (`l`),
+  // a sub és a trend escape-elt marad.
   var hero = '<div class="vsmb-hero" id="vsmbHero"><div class="l">' + esc(f.l || '') + '</div>'
-    + '<div class="v">' + esc(String(f.v == null ? '—' : f.v)) + '</div>'
+    + '<div class="v">' + (f.v == null ? '—' : String(f.v)) + '</div>'
     + '<div class="sub">' + heroTrend + esc(f.sub || '') + '</div>' + vsHeroSpark(f.s) + '</div>';
   var minis = '<div class="vsmb-minis">' + _vsmb.map(function (m, i) {
     if (i === _vsmbFeat) return '';
     var tr = m.t ? '<span class="tr ' + (m.d || 'flat') + '">' + esc(m.t) + '</span>' : '';
     return '<div class="vsmb-mini" style="--ac:' + VSMB_SHADES[i % VSMB_SHADES.length] + '" onclick="vsBandPick(' + i + ')">'
-      + '<div class="l">' + esc(m.l || '') + '</div><div class="row"><span class="v">' + esc(String(m.v == null ? '—' : m.v)) + '</span>' + tr + '</div></div>';
+      + '<div class="l">' + esc(m.l || '') + '</div><div class="row"><span class="v">' + (m.v == null ? '—' : String(m.v)) + '</span>' + tr + '</div></div>';
   }).join('') + '</div>';
   return hero + minis;
 }
