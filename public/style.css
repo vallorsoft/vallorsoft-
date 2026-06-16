@@ -149,7 +149,7 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 .chat-side { background: #0c1218; border-right: 1px solid var(--border); overflow-y: auto; }
 .chat-side .contact { display: flex; gap: 10px; align-items: center; padding: 12px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.03); }
 .chat-side .contact:hover { background: rgba(255,255,255,0.02); }
-.chat-side .av { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg,#6366f1,#3b82f6); display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; }
+.chat-side .av { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg,#fb8c3a,#f6517b); display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; }
 .chat-side .meta { flex: 1; min-width: 0; }
 .chat-side .nm { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chat-side .lst { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1011,29 +1011,29 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 .main-content[data-theme="light"] .glass:hover{ box-shadow: 0 8px 26px rgba(15,23,42,.11), 0 2px 6px rgba(15,23,42,.06); }
 .main-content[data-theme="dark"]  .glass:hover{ box-shadow: 0 10px 30px rgba(0,0,0,.5); }
 
-/* Elsődleges gomb: kék gradiens + ragyogás + belső felső fény */
+/* Elsődleges gomb: napnyugta gradiens + ragyogás + belső felső fény */
 .main-content .btn.primary{
-  background: linear-gradient(180deg, #3b82f6, #2563eb) !important;
-  border-color: #2563eb !important;
-  box-shadow: 0 2px 8px rgba(59,130,246,.35), inset 0 1px 0 rgba(255,255,255,.25) !important;
+  background: linear-gradient(135deg, #fb8c3a, #f6517b) !important;
+  border-color: #f6711e !important;
+  box-shadow: 0 2px 8px rgba(246,113,30,.35), inset 0 1px 0 rgba(255,255,255,.25) !important;
 }
 .main-content .btn.primary:hover{
-  background: linear-gradient(180deg, #4a8bf7, #2563eb) !important;
-  box-shadow: 0 6px 18px rgba(59,130,246,.45), inset 0 1px 0 rgba(255,255,255,.30) !important;
+  background: linear-gradient(135deg, #fc9a4e, #f6517b) !important;
+  box-shadow: 0 6px 18px rgba(246,113,30,.45), inset 0 1px 0 rgba(255,255,255,.30) !important;
   transform: translateY(-1px);
 }
 
-/* KPI-szám: gradiens szöveg (kék → indigó) */
+/* KPI-szám: gradiens szöveg (napnyugta narancs → korall) */
 .main-content .stat-val{
-  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  background: linear-gradient(135deg, #fb8c3a, #f6517b);
   -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent; color: #3b82f6;
+  -webkit-text-fill-color: transparent; color: #f6711e;
 }
 
-/* Stat-ikon korong: kék→indigó gradiens + belső fény */
+/* Stat-ikon korong: napnyugta gradiens + belső fény */
 .main-content .stat-ico{
-  background: linear-gradient(135deg, rgba(59,130,246,.18), rgba(99,102,241,.20)) !important;
-  border: 1px solid rgba(99,102,241,.30) !important;
+  background: linear-gradient(135deg, rgba(251,140,58,.18), rgba(246,81,123,.20)) !important;
+  border: 1px solid rgba(246,113,30,.30) !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.30);
 }
 
@@ -1387,3 +1387,42 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 /* Visszfuvar-radar panel (a planner-en belül) — meleg akcent-keret */
 .main-content #plannerBox .radar-card,
 .main-content #plannerBox .p2-radar{ border-color:var(--w-accent) !important; }
+
+/* ── BELSŐ CHAT (.chat-*) — a globális hideg-navy felületeket a konzolban
+   olvasható, meleg palettára cseréljük (CSAK átszínezés, az elrendezés/
+   struktúra változatlan). Témánként külön a jó kontrasztért. ── */
+/* LIGHT téma: krém felületek, sötét szöveg */
+.main-content[data-theme="light"] .chat-side{ background:#f6efe6; border-right-color:#ece3d8; }
+.main-content[data-theme="light"] .chat-side .contact{ border-bottom-color:#ece3d8; }
+.main-content[data-theme="light"] .chat-side .contact:hover{ background:rgba(246,113,30,.07); }
+.main-content[data-theme="light"] .chat-side .nm{ color:#2a2018; }
+.main-content[data-theme="light"] .chat-side .lst{ color:#8a7d6e; }
+.main-content[data-theme="light"] .chat-main{ background:#faf6f0; }
+.main-content[data-theme="light"] .chat-head{ background:#fffdfa; border-bottom-color:#ece3d8; color:#2a2018; }
+.main-content[data-theme="light"] .chat-foot{ border-top-color:#ece3d8; }
+.main-content[data-theme="light"] .bubble.other{ background:#fffdfa; border-color:#ece3d8; color:#2a2018; }
+/* DARK téma: meleg-espresso felületek, világos szöveg */
+.main-content[data-theme="dark"] .chat-side{ background:#1e1812; border-right-color:rgba(255,225,200,.10); }
+.main-content[data-theme="dark"] .chat-side .contact{ border-bottom-color:rgba(255,225,200,.08); }
+.main-content[data-theme="dark"] .chat-side .contact:hover{ background:rgba(255,225,200,.06); }
+.main-content[data-theme="dark"] .chat-side .nm{ color:#f4ede3; }
+.main-content[data-theme="dark"] .chat-side .lst{ color:#b6a895; }
+.main-content[data-theme="dark"] .chat-main{ background:#271f18; }
+.main-content[data-theme="dark"] .chat-head{ background:#1e1812; border-bottom-color:rgba(255,225,200,.10); color:#f4ede3; }
+.main-content[data-theme="dark"] .chat-foot{ border-top-color:rgba(255,225,200,.10); }
+.main-content[data-theme="dark"] .bubble.other{ background:#322619; border-color:rgba(255,225,200,.12); color:#f4ede3; }
+/* Saját üzenet — napnyugta akcent, fehér szöveg (mindkét téma) */
+.main-content .bubble.me{ background:var(--w-accent-grad); color:#fff; }
+
+/* ── E-MAIL INTAKE KÁRTYA (.eic*) — a globális sötét-glass felület
+   alacsony kontrasztú a krém konzolon. Témánként olvasható, meleg
+   felületet adunk (CSAK átszínezés; a kártya struktúrája/gombjai
+   változatlanok). A narancs akcent magában a kártya-JS-ben van. ── */
+.main-content[data-theme="light"] .eic{ background:#fffdfa; border-color:#ece3d8; }
+.main-content[data-theme="light"] .eic-prov button{ background:#f6efe6; border-color:#ece3d8; }
+.main-content[data-theme="light"] .eic-field input{ background:#fffdfa; border-color:#ece3d8; }
+.main-content[data-theme="light"] .eic-kv{ border-bottom-color:#ece3d8; }
+.main-content[data-theme="dark"] .eic{ background:#271f18; border-color:rgba(255,225,200,.10); }
+.main-content[data-theme="dark"] .eic-prov button{ background:#322619; border-color:rgba(255,225,200,.10); }
+.main-content[data-theme="dark"] .eic-field input{ background:#1e1812; border-color:rgba(255,225,200,.12); }
+.main-content[data-theme="dark"] .eic-kv{ border-bottom-color:rgba(255,225,200,.10); }
