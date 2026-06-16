@@ -4,18 +4,10 @@
 
 const express = require('express');
 const router  = express.Router();
-const crypto  = require('crypto');
 const pool    = require('../db');
 const { sendClientEmail }  = require('../services/email');
 const { fetchBnrEurRon }   = require('../services/bnr');
-
-// HMAC token generálás / ellenőrzés
-function makeToken(cid, planId, billing) {
-  const secret = process.env.SESSION_SECRET || 'dev-secret';
-  return crypto.createHmac('sha256', secret)
-    .update(`${cid}:${planId}:${billing}`)
-    .digest('hex').slice(0, 16);
-}
+const { makeTrialToken: makeToken } = require('../lib/trialToken');
 
 // Fizetési referencia-kód generálás (VS-YYYYMM-XXXX)
 async function generateReference(companyId) {

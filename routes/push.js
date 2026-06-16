@@ -109,7 +109,7 @@ router.post('/api/chat-notify', requireLogin, async (req, res) => {
     // Kuldes email lista alapjan (ha meg van adva)
     if (toEmails && Array.isArray(toEmails) && toEmails.length) {
       const filtered = toEmails.filter(e => e !== senderEmail);
-      if (filtered.length) await sendPushToEmail(filtered, payload);
+      if (filtered.length) await sendPushToEmail(filtered, payload, cid);
     }
     
     // Kuldes szerepkor alapjan (ha meg van adva)

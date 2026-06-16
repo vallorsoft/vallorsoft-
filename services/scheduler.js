@@ -477,16 +477,9 @@ function startTrialExpiryScheduler() {
 //  Emailt küld a csomag-választó linkekkel + éves opcióval.
 // ============================================================
 function startTrialReminderScheduler() {
-  const crypto = require('crypto');
   const { sendClientEmail } = require('./email');
+  const { makeTrialToken: makeToken } = require('../lib/trialToken');
   const appUrl = process.env.APP_URL || 'https://app.vallorsoft.com';
-
-  function makeToken(cid, planId, billing) {
-    const secret = process.env.SESSION_SECRET || 'dev-secret';
-    return crypto.createHmac('sha256', secret)
-      .update(`${cid}:${planId}:${billing}`)
-      .digest('hex').slice(0, 16);
-  }
 
   function buildPlanLink(cid, planId, billing) {
     const tok = makeToken(cid, planId, billing);

@@ -152,6 +152,13 @@ app.use(require('./middleware/requestLog'));
 // Cookie es session kezeles
 app.use(cookieParser());
 
+// Biztonsagi kapu: production-ben SESSION_SECRET nelkul NEM indulhat a szerver
+// (kulonben a session-ek alairhatatlanok / kitalalhatoak lennenek). Fejlesztesben tovabbmegy.
+if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+  console.error('FATALIS: SESSION_SECRET nincs beallitva production modban — a szerver nem indul el.');
+  process.exit(1);
+}
+
 app.use(session({
   store: new pgSession({
     pool: pool,

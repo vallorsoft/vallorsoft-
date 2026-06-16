@@ -5,17 +5,25 @@
 const pool = require('../db');
 const webpush = require('./webpush');
 
-async function sendPushToEmail(emails, payload) {
+async function sendPushToEmail(emails, payload, companyId) {
   if (!webpush) return;
   if (!Array.isArray(emails)) emails = [emails];
   if (!emails.length) return;
 
   try {
     const placeholders = emails.map((_, i) => '$' + (i + 1)).join(',');
-    const r = await pool.query(
-      `SELECT id, subscription FROM push_subscriptions WHERE email IN (${placeholders})`,
-      emails
-    );
+    // 🔒 Ceg-szures: ha kapunk company_id-t, csak az adott ceghez tartozo
+    // feliratkozasokra kuldunk (cross-tenant push-injekcio elleni vedelem).
+    let sql, params;
+    if (companyId) {
+      sql = `SELECT ps.id, ps.subscription FROM push_subscriptions ps
+             WHERE ps.email IN (${placeholders}) AND ps.company_id = $${emails.length + 1}`;
+      params = emails.concat([companyId]);
+    } else {
+      sql = `SELECT id, subscription FROM push_subscriptions WHERE email IN (${placeholders})`;
+      params = emails;
+    }
+    const r = await pool.query(sql, params);
     if (!r.rows.length) return;
 
     const payloadStr = JSON.stringify(payload);

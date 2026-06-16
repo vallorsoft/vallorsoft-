@@ -15,8 +15,17 @@ router.post('/api/orders/:id/quick-status', requireLogin, requireRole('Admin','M
   const valid = ['Disponibil','Alocat','Extern','In Curs','Finalizat','Anulat','Parkolt','Raktarban'];
   if (!valid.includes(status)) return res.json({ ok: false, err: 'Status invalid' });
   try {
+    // Anulált fuvar zárolása: a státusza nem változtatható (nem támasztható fel).
+    const cur = await pool.query(
+      'SELECT status FROM orders WHERE id=$1 AND company_id=$2',
+      [req.params.id, req.session.user.company_id]
+    );
+    if (cur.rowCount === 0) return res.json({ ok: false, err: 'Cursa nu a fost gasita' });
+    if (cur.rows[0].status === 'Anulat') {
+      return res.json({ ok: false, err: 'Transportul este anulat și nu mai poate fi modificat.' });
+    }
     const r = await pool.query(
-      'UPDATE orders SET status=$1, updated_at=NOW() WHERE id=$2 AND company_id=$3',
+      "UPDATE orders SET status=$1, updated_at=NOW() WHERE id=$2 AND company_id=$3 AND status <> 'Anulat'",
       [status, req.params.id, req.session.user.company_id]
     );
     if (r.rowCount === 0) return res.json({ ok: false, err: 'Cursa nu a fost gasita' });

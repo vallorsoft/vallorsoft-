@@ -124,6 +124,12 @@ handlers.userUpdate = async function (req, res, args) {
           return res.json({ result: { ok: false, err: 'Functie invalida.' } });
         }
 
+        // 🔒 Manager nem oszthat ki Admin/Manager jogot (jogosultsag-emeles tiltva) —
+        // a Manager csak Sofer-szerepet allithat be (osszhangban az invCreate/userDelete korlatozassal)
+        if (callerRole === 'Manager' && fields.pozicio !== 'Sofer') {
+          return res.json({ result: { ok: false, err: 'Managerul poate atribui doar functia de Sofer.' } });
+        }
+
         // 🔒 1. SZABALY: Admin ne tudja a SAJAT poziciojat megvaltoztatni (lefokozas tiltva)
         if (isSelf && fields.pozicio !== targetUser.pozicio) {
           return res.json({ result: { ok: false, err: 'Nu iti poti modifica propria functie.' } });

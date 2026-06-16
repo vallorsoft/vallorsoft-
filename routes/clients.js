@@ -6,7 +6,10 @@ const { requireLogin, requireRole } = require('../middleware/auth');
 const svc = require('../services/clients');
 
 const router = express.Router();
+// Strukturált cím-mezők (strada/nr_strada/detalii_adresa/oras/judet/cod_postal) is perzisztálódnak.
+// A régi összevont `adresa` mező megmarad (visszafelé kompatibilis).
 const FIELDS = ['denumire','tip','cui_cif','reg_com','tara','judet','localitate','adresa',
+                'strada','nr_strada','detalii_adresa','oras','cod_postal',
                 'email','telefon','iban','banca','default_tva','valuta','nota','payment_term_days'];
 
 router.get('/api/clients', requireLogin, async (req, res) => {
@@ -26,11 +29,6 @@ router.get('/api/clients/anaf', requireLogin, async (req, res) => {
   const validChecksum = svc.validateCui(cui);
   try { res.json({ ...(await svc.anafLookup(cui)), validChecksum }); }
   catch (e) { res.status(502).json({ error: 'ANAF indisponibil: ' + e.message, validChecksum }); }
-});
-
-router.get('/api/clients/vies', requireLogin, async (req, res) => {
-  try { res.json(await svc.viesCheck(req.query.country, req.query.number)); }
-  catch (e) { res.status(502).json({ error: 'VIES indisponibil: ' + e.message }); }
 });
 
 router.get('/api/clients/:id', requireLogin, async (req, res) => {

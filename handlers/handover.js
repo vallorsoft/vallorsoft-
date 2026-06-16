@@ -262,7 +262,7 @@ handlers.confirmHandover = async function (req, res, args) {
           body: applyVars(ctpl.body_ro || '{{rendszam}} — {{helyszin}}{{tipus}}', vars),
           icon: '/icon192.png', badge: '/icon192.png',
           tag: 'handover-' + orderId, url: '/sofer',
-        });
+        }, cid);
       }
     } catch (e) { console.error('handover confirm push hiba:', e); }
 
@@ -301,7 +301,7 @@ handlers.rejectHandover = async function (req, res, args) {
           body: applyVars(rtpl.body_ro || '{{rendszam}} — contactează dispecerul', vars),
           icon: '/icon192.png', badge: '/icon192.png',
           tag: 'handover-' + orderId, url: '/sofer',
-        });
+        }, cid);
       }
     } catch (e) { console.error('handover reject push hiba:', e); }
     return res.json({ result: { ok: true } });

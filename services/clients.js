@@ -1,9 +1,8 @@
 // clients-service.js
-// Ügyfél-validáció: ANAF v9 (hivatalos adatok CUI alapján), helyi CUI-ellenőrzés, VIES (EU ÁFA).
+// Ügyfél-validáció: ANAF v9 (hivatalos adatok CUI alapján) + helyi CUI-ellenőrzés.
 // Mind SZERVER OLDALON fut (CORS + tisztaság miatt).
 
 const ANAF_URL = 'https://webservicesp.anaf.ro/api/PlatitorTvaRest/v9/tva';
-const VIES_URL = 'https://ec.europa.eu/taxation_customs/vies/rest-api/ms'; // /{country}/vat/{number}
 
 // Csak számjegyek (RO előtag és szóközök nélkül)
 function normalizeCui(cui) {
@@ -83,27 +82,23 @@ async function anafLookup(cui) {
     found: true,
     name: g.denumire || null,
     cui: g.cui ? String(g.cui) : n, // (a korábbi 'RO'.startsWith('RO') feltétel mindig igaz volt)
-    address,
+    address,                        // összevont cím — visszafelé kompatibilis
     regCom: g.nrRegCom || null,
     phone: g.telefon || null,
     vatPayer: !!tva.scpTVA,                 // ÁFA-alany?
     active: !inactiv.statusInactivi,         // aktív (nem radiált/inaktív)?
     raw: rec,
   };
-  // Additívan: külön megye/helység mezők, ha jelen vannak (a kliens külön is megjelenítheti).
-  if (sediu.sdenumire_Judet) out.county = String(sediu.sdenumire_Judet).trim();
-  if (sediu.sdenumire_Localitate) out.locality = String(sediu.sdenumire_Localitate).trim();
+  // KÜLÖN strukturált cím-mezők — a kliens-űrlap ezeket tölti ki (nem egy összevont sort).
+  out.street = strada || null;                                      // utca (strada)
+  out.streetNumber = numar || null;                                 // házszám (numar)
+  out.addressDetails = String(sediu.sdetalii_Adresa || '').trim() || null; // detalii: bloc/scară/apartament
+  const localityRaw = String(sediu.sdenumire_Localitate || '').trim();
+  out.locality = localityRaw || null;                              // helység (oras/localitate)
+  out.city = localityRaw || null;                                  // alias
+  out.county = judetRaw || null;                                    // megye (judet) — 'Jud.' előtag nélkül
+  out.postalCode = String(sediu.scod_Postal || '').trim() || null; // irányítószám (cod postal)
   return out;
 }
 
-// VIES: EU-s ÁFA-szám érvényessége (külföldi, EU-s ügyfélhez). pl. country='DE', number='123456789'
-async function viesCheck(country, number) {
-  const c = String(country || '').toUpperCase().slice(0, 2);
-  const num = String(number || '').replace(/\s/g, '');
-  if (!c || !num) return { valid: false, error: 'Lipsește țara/numărul.' };
-  const r = await fetchJson(`${VIES_URL}/${c}/vat/${encodeURIComponent(num)}`, { method: 'GET' });
-  if (!r.ok || !r.data) return { valid: false, error: `Eroare VIES (${r.status}).` };
-  return { valid: !!r.data.isValid, name: r.data.name || null, address: r.data.address || null, raw: r.data };
-}
-
-module.exports = { normalizeCui, validateCui, anafLookup, viesCheck };
+module.exports = { normalizeCui, validateCui, anafLookup };

@@ -9,6 +9,15 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 12. lépés — Teljeskörű átvilágítás: gomb/parancs-bekötés + multi-tenant + hiányosságok (2026-06-16) ✅ KÉSZ
+Átfogó audit 4 párhuzamos agenttel (RPC handlerek / REST route-ok + portálok / kliens-bekötés) + valódi-DB tesztek. **Eredmény: a tenant-izoláció erős** — nem találtunk kiaknázható cross-tenant ADAT-olvasást; minden szerepkör (`Admin/Manager/Sofer/Konyvelo`, `clientUser`, `carrierUser`, publikus token) verifikálva. Minden `gas()` RPC-hívás és 207 `onclick` + 48 `fetch` útvonal létező handlerre/route-ra mutat.
+- **HIGH — jogosultság-emelés javítva:** `handlers/users.js` `userUpdate` — a Manager egy Sofőrt Admin/Manager szerepre emelhetett (csak cégen belül). Javítás: a Manager már csak `Sofer` pozíciót állíthat.
+- **MEDIUM — cross-tenant push injekció javítva:** `services/push.js` `sendPushToEmail` nem szűrt `company_id`-re → a `/api/chat-notify` `toEmails` cégek között is kézbesített push-t. Javítás: a hívók (`routes/push.js` chat-notify, `handlers/handover.js`) átadják a session `company_id`-t, a lekérdezés `AND company_id=$` szerint szűr.
+- **LOW — sofőr IDOR (cégen belül) javítva:** `routes/soferApi.js` `doc-download`/`pdf-download` — Sofer szerepnél `email_sofer = saját email` kikötés (Admin/Manager diszpécser-hozzáférés megtartva).
+- **LOW — gyenge trial-token javítva:** `routes/trial-select.js`+`services/scheduler.js` HMAC token csonkolt 16 hex (64 bit) volt és duplikálódott → közös `lib/trialToken.js`, teljes HMAC-SHA256 digest.
+- **Hardening:** `server.js` production fail-fast `SESSION_SECRET` nélkül. Whole-code review: a többi `process.env.X || '...'` fallback nem-titok (APP_URL/e-mail default), `lib/crypto.js`/`lib/stripe.js` helyesen fail-closed.
+- **Hiányosság-rendrakás (nem audit, de ebben a körben):** `comDelete` fizikai törlés → `Anulat` soft-delete + szerver-oldali zárolás; redundáns `invoicing-card.js` törölve (duplikáció); VIES törölve, ANAF strukturált cím; halott kód (devGetLandingTexts, maps-trió, VS_HERE_FEATURES, landing form-listenerek) eltávolítva.
+
 ### 11. lépés — Multi-tenant adatszivárgás audit (2026-06-14) ✅ KÉSZ
 Átfogó multi-tenant izolációs átvizsgálás (3 agent: handlers / routes / services+lib — mind a ~87 fájl).
 - **1 KRITIKUS javítva:** `handlers/documents.js` `orderDocUpload` — a kliens-megadta `orderId`-t ownership-ellenőrzés nélkül szúrta be, így „A" cég dokumentumot fűzhetett „B" cég fuvarához (cross-tenant write). Javítás: INSERT előtt `SELECT 1 FROM orders WHERE id=$1 AND company_id=$2` ellenőrzés; idegen fuvarnál „Comanda nu a fost gasita." Élesben verifikálva (saját→OK, idegen→blokkolva).
