@@ -75,7 +75,7 @@
         <li><a href="#how" data-i18n="navHow">Hogyan működik</a></li>
         <li><a href="#blog" data-i18n="navBlog">Blog</a></li>
         <li><a href="#contact" data-i18n="navContact">Kapcsolat</a></li>
-        <li class="lp-mobile-only"><a href="/login" data-i18n="loginDispatcher">Diszpécser / Admin</a></li>
+        <li class="lp-mobile-only"><a href="/login" data-i18n="loginDispatcher">Dispecer / Admin</a></li>
         <li class="lp-mobile-only"><a href="/portal" data-i18n="loginClient">Ügyfél-portál</a></li>
         <li class="lp-mobile-only"><a href="/carrier" data-i18n="loginCarrier">Alvállalkozói portál</a></li>
       </ul>
@@ -89,7 +89,7 @@
         <div class="lp-login-drop" id="loginDrop" role="menu">
           <a href="/login" class="lp-login-opt" role="menuitem">
             <span class="lp-login-icon">🏢</span>
-            <span><b data-i18n="loginDispatcher">Diszpécser / Admin</b><br><small data-i18n="loginDispatcherSub">Admin · Manager · Könyvelő · Sofőr</small></span>
+            <span><b data-i18n="loginDispatcher">Dispecer / Admin</b><br><small data-i18n="loginDispatcherSub">Admin · Manager · Contabil · Șofer</small></span>
           </a>
           <a href="/portal" class="lp-login-opt" role="menuitem">
             <span class="lp-login-icon">📦</span>
@@ -326,10 +326,10 @@
     </div>
     <!-- Havi / Éves váltó -->
     <div class="lp-billing-toggle reveal" id="lpBillingToggle">
-      <button class="lp-toggle-btn active" data-billing="monthly" onclick="setBillingMode('monthly')" data-i18n="billingMonthly">Lunar / Havonta</button>
+      <button class="lp-toggle-btn active" data-billing="monthly" onclick="setBillingMode('monthly')" data-i18n="billingMonthly">Lunar</button>
       <button class="lp-toggle-btn" data-billing="annual" onclick="setBillingMode('annual')">
-        <span data-i18n="billingAnnual">Anual / Éves</span>
-        <span class="lp-toggle-badge" data-i18n="billingAnnualBadge">−1 lună / −1 hó</span>
+        <span data-i18n="billingAnnual">Anual</span>
+        <span class="lp-toggle-badge" data-i18n="billingAnnualBadge">−1 lună</span>
       </button>
     </div>
     <div class="lp-pricing-grid" id="lpPricingGrid">
@@ -342,11 +342,11 @@
           <span class="lp-price-period" data-i18n="perMonth">/lună</span>
         </div>
         <ul class="lp-plan-features">
-          <li>Fuvar kiírás &amp; kezelés</li>
-          <li>Fuvarlevelek &amp; CMR</li>
-          <li>Sofőrök &amp; járművek kezelése</li>
-          <li>Ügyfelek adatbázis</li>
-          <li>Alap statisztika</li>
+          <li>Creare &amp; gestionare curse</li>
+          <li>Scrisori de transport &amp; CMR</li>
+          <li>Gestionare șoferi &amp; vehicule</li>
+          <li>Bază de date clienți</li>
+          <li>Statistici de bază</li>
         </ul>
         <a href="/register" class="lp-btn-outline lp-btn-full" data-i18n="planStartBtn">Testează gratuit</a>
       </div>
@@ -358,13 +358,13 @@
           <span class="lp-price-period" data-i18n="perMonth">/lună</span>
         </div>
         <ul class="lp-plan-features">
-          <li>Minden Alap +</li>
-          <li>Belső chat</li>
-          <li>Tervezőtábla (Gantt)</li>
-          <li>GPS integráció (live térkép)</li>
-          <li>Számlázó integráció (e-Factura)</li>
-          <li>Útdíj-becslés &amp; útvonaltervezés</li>
-          <li>Pénzügyi riportok</li>
+          <li>Tot din Alap +</li>
+          <li>Chat intern</li>
+          <li>Planificator (Gantt)</li>
+          <li>Integrare GPS (hartă live)</li>
+          <li>Integrare facturare (e-Factura)</li>
+          <li>Estimare taxe drum &amp; planificare rută</li>
+          <li>Rapoarte financiare</li>
         </ul>
         <a href="/register" class="lp-btn-outline lp-btn-full" data-i18n="planStartBtn">Testează gratuit</a>
       </div>
@@ -377,13 +377,13 @@
           <span class="lp-price-period" data-i18n="perMonth">/lună</span>
         </div>
         <ul class="lp-plan-features">
-          <li>Minden Standard +</li>
-          <li>Ügyfél-portál</li>
-          <li>Alvállalkozói portál</li>
-          <li>Visszfuvar-radar</li>
-          <li>AI dokumentum-feldolgozás</li>
-          <li>Raktár modul</li>
-          <li>Könyvelő szerepkör</li>
+          <li>Tot din Standard +</li>
+          <li>Portal client</li>
+          <li>Portal subcontractor</li>
+          <li>Radar curse retur</li>
+          <li>Procesare documente AI</li>
+          <li>Modul depozit</li>
+          <li>Rol contabil</li>
         </ul>
         <a href="/register" class="lp-btn-primary lp-btn-full" data-i18n="planStartBtn">Testează gratuit</a>
       </div>
@@ -394,20 +394,20 @@
           <span class="lp-price-val lp-price-custom" data-i18n="customPrice">Personalizat</span>
         </div>
         <ul class="lp-plan-features">
-          <li>Minden Pro +</li>
-          <li>Fogyasztás &amp; jármű kihasználtság</li>
-          <li>Sofőr teljesítmény riport</li>
-          <li>Üzemanyagkártya-import</li>
-          <li>Havi e-mail összefoglaló</li>
-          <li>Egyedi beállítások</li>
-          <li>Dedikált support</li>
+          <li>Tot din Pro +</li>
+          <li>Consum &amp; grad de utilizare vehicule</li>
+          <li>Raport performanță șoferi</li>
+          <li>Import carduri carburant</li>
+          <li>Raport lunar pe e-mail</li>
+          <li>Setări personalizate</li>
+          <li>Suport dedicat</li>
         </ul>
         <a href="#contact" class="lp-btn-outline lp-btn-full" data-i18n="planContactBtn">Contactați-ne</a>
       </div>
     </div>
     <p class="lp-pricing-vat" id="lpPricingVat" data-i18n="pricingVatNote">Prețurile sunt tarife nete. La facturare se adaugă TVA 21%.</p>
     <div class="lp-addon-section" id="lpAddonSection" style="display:none;">
-      <div class="lp-addon-title" data-i18n="addonTitle">Resurse suplimentare / Kiegészítők</div>
+      <div class="lp-addon-title" data-i18n="addonTitle">Resurse suplimentare</div>
       <div class="lp-addon-grid" id="lpAddonGrid"></div>
     </div>
   </div>
@@ -478,7 +478,7 @@
       <p data-i18n="ctaSubtitle">Próbáld ki a VallorSoft-ot 14 napig ingyen, kötelezettségek nélkül.</p>
       <div class="lp-cta-actions">
         <a href="/register" class="lp-btn-primary lp-btn-lg" data-i18n="ctaBtn">Ingyenes próba indítása</a>
-        <a href="/login" class="lp-cta-login" data-i18n="loginDispatcher">Diszpécser / Admin</a>
+        <a href="/login" class="lp-cta-login" data-i18n="loginDispatcher">Dispecer / Admin</a>
         <a href="/portal" class="lp-cta-login" data-i18n="loginClient">Ügyfél-portál</a>
         <a href="/carrier" class="lp-cta-login" data-i18n="loginCarrier">Alvállalkozói portál</a>
       </div>
@@ -501,7 +501,7 @@
       <ul>
         <li><a href="#features" data-i18n="navFeatures">Funkciók</a></li>
         <li><a href="#pricing" data-i18n="navPricing">Árak</a></li>
-        <li><a href="/login" data-i18n="loginDispatcher">Diszpécser / Admin</a></li>
+        <li><a href="/login" data-i18n="loginDispatcher">Dispecer / Admin</a></li>
         <li><a href="/portal" data-i18n="loginClient">Ügyfél-portál</a></li>
         <li><a href="/carrier" data-i18n="loginCarrier">Alvállalkozói portál</a></li>
       </ul>
@@ -535,6 +535,6 @@
 
 <div id="toastContainer" class="toast-container"></div>
 
-<script src="landing.js"></script>
+<script src="landing.js?v=20260616pw"></script>
 </body>
 </html>
