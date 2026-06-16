@@ -78,6 +78,7 @@
     'nav.driversPerf': { hu: 'Sofőr teljesítmény', ro: 'Performanță șoferi' },
     'nav.vehUsage': { hu: 'Jármű kihasználtság', ro: 'Utilizare vehicule' },
     'nav.clientReport': { hu: 'Ügyfél riport', ro: 'Raport clienți' },
+    'nav.co2Report': { hu: '🌱 CO₂ riport', ro: '🌱 Raport CO₂' },
     'nav.permissions': { hu: '🔐 Jogosultságok', ro: '🔐 Permisiuni' },
     'nav.grpFleet': { hu: 'Flotta & Megfelelés', ro: 'Flotă & Conformitate' },
     'nav.expiries': { hu: '⏰ Lejáratok', ro: '⏰ Expirări' },
@@ -868,6 +869,15 @@
     'st.fin.cToll': { hu: 'Útdíj (EUR)', ro: 'Taxă drum (EUR)' },
     'st.fin.cCarrier': { hu: 'Alváll. (EUR)', ro: 'Subcontr. (EUR)' },
     'st.fin.cCostRon': { hu: 'Költség (RON)', ro: 'Cost (RON)' },
+    // CO₂ riport
+    'st.co2.total': { hu: 'Össz. CO₂', ro: 'CO₂ total' },
+    'st.co2.litres': { hu: 'Tankolt liter', ro: 'Litri alimentați' },
+    'st.co2.per100': { hu: 'CO₂ / 100 km', ro: 'CO₂ / 100 km' },
+    'st.co2.trees': { hu: 'Fa-egyenérték', ro: 'Echivalent copaci' },
+    'st.co2.note': { hu: 'Az üzemanyagkártya-tranzakciók liter-adataiból számolva, dízel emissziós faktor {f} kg CO₂/liter. A CO₂/100 km a menetlevelek km-adataiból.', ro: 'Calculat din litrii tranzacțiilor de card combustibil, factor emisie motorină {f} kg CO₂/litru. CO₂/100 km din km-ii din foile de parcurs.' },
+    'st.co2.pMonthly': { hu: '📊 Havi CO₂ (kg)', ro: '📊 CO₂ lunar (kg)' },
+    'st.co2.pPerVeh': { hu: '🚚 Járművenkénti CO₂', ro: '🚚 CO₂ pe vehicul' },
+    'st.co2.cKg': { hu: 'CO₂ (kg)', ro: 'CO₂ (kg)' },
     // Fogyasztás
     'st.fu.fuelL': { hu: 'Tankolt motorină', ro: 'Motorină alimentată' },
     'st.fu.fuelCost': { hu: 'Üzemanyag-költség', ro: 'Cost combustibil' },
