@@ -85,8 +85,24 @@
           + '</tr>';
       }).join('') || '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:18px;">' + t('fe.exp.noItems') + '</td></tr>';
 
+      // ⏰ Interaktív KPI mutató-sáv — a már lekért _expItems-ből (nincs új hálózati hívás)
+      var expBand = '';
+      if (typeof vsMetricBand === 'function') {
+        var eTotal = _expItems.length;
+        var eSoon = _expItems.filter(function (it) { var dl = parseInt(it.days_left, 10); return dl >= 0 && dl <= (it.alert_days || 30); }).length;
+        var eExpired = _expItems.filter(function (it) { return parseInt(it.days_left, 10) < 0; }).length;
+        var eOk = _expItems.filter(function (it) { return parseInt(it.days_left, 10) > (it.alert_days || 30); }).length;
+        expBand = '<div style="margin-bottom:18px;">' + vsMetricBand([
+          { l: t('fe.exp.kpiWatched'), v: eTotal,   sub: t('fe.exp.kpiSoon') + ': ' + eSoon },
+          { l: t('fe.exp.kpiSoon'),    v: eSoon,     sub: t('fe.exp.kpiSoonSub') },
+          { l: t('fe.exp.kpiExpired'), v: eExpired,  sub: t('fe.exp.kpiExpiredSub') },
+          { l: t('fe.exp.kpiOk'),      v: eOk,       sub: t('fe.exp.kpiOkSub') }
+        ]) + '</div>';
+      }
+
       box.innerHTML =
-        panel(t('fe.exp.newTitle'), formHtml)
+        expBand
+        + panel(t('fe.exp.newTitle'), formHtml)
         + panel(t('fe.exp.listTitle'),
           '<p class="text-muted" style="font-size:12px;margin:0 0 10px;">' + t('fe.exp.listHint') + '</p>'
           + '<div style="overflow-x:auto;"><table class="table">'
@@ -426,7 +442,16 @@
             + '<td style="text-align:right;">' + n2(it.qty_l, 1) + '</td>'
             + '<td style="text-align:right;font-weight:700;">' + n2(it.amount_ron, 0) + '</td></tr>';
         }).join('') || '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:14px;">' + t('fe.fc.noTx') + '</td></tr>';
-        listBox.innerHTML = panel(t('fe.fc.listTitle', { db: n2(tot.db, 0), l: n2(tot.litru, 0), ron: n2(tot.suma, 0) }),
+        // ⛽ Interaktív KPI mutató-sáv — a már lekért lst.total összegekből (nincs új hálózati hívás)
+        var fuelBand = '';
+        if (typeof vsMetricBand === 'function') {
+          fuelBand = '<div style="margin-bottom:18px;">' + vsMetricBand([
+            { l: t('fe.fc.kpiCount'), v: n2(tot.db, 0),    sub: t('fe.fc.kpiCountSub') },
+            { l: t('fe.fc.colLiter'), v: n2(tot.litru, 0) + ' L',   sub: t('fe.fc.kpiLiterSub') },
+            { l: t('fe.fc.kpiCost'),  v: n2(tot.suma, 0) + ' RON',  sub: t('fe.fc.kpiCostSub') }
+          ]) + '</div>';
+        }
+        listBox.innerHTML = fuelBand + panel(t('fe.fc.listTitle', { db: n2(tot.db, 0), l: n2(tot.litru, 0), ron: n2(tot.suma, 0) }),
           '<div style="overflow-x:auto;"><table class="table">'
           + '<thead><tr><th>' + t('fe.sv.date') + '</th><th>' + t('fe.fc.source') + '</th><th>' + t('col.plate') + '</th><th>' + t('fe.fc.colProduct') + '</th><th style="text-align:right;">' + t('fe.fc.colLiter') + '</th><th style="text-align:right;">' + t('fe.dc.colSumRon') + '</th></tr></thead>'
           + '<tbody>' + rows2 + '</tbody></table></div>');
