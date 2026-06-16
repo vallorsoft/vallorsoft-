@@ -29,6 +29,7 @@ window.VS_FEATURES = [
   { key: 'stats-drivers',    label: 'Statisztika — Sofőr teljesítmény', group: 'Statisztika & Riport' },
   { key: 'stats-vehicles',   label: 'Statisztika — Jármű kihasználtság', group: 'Statisztika & Riport' },
   { key: 'stats-clients',    label: 'Statisztika — Ügyfél riport', group: 'Statisztika & Riport' },
+  { key: 'stats-co2',        label: 'Statisztika — CO₂ riport',    group: 'Statisztika & Riport' },
   { key: 'decont',           label: 'Sofőr-elszámolás (decont)',   group: 'Fuvarozás & Logisztika' },
   // 'tracking': nem menüpont, hanem a fuvarlista 🌍 gombja (publikus ügyfél
   // követő-link) — a kapcsoló a gombot és a link-generálást tiltja.

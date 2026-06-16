@@ -801,6 +801,53 @@
     });
   }
 
+  // ════════════════════════════════════════════════════════
+  //  9) CO₂ RIPORT (stats-co2) — CSAK OLVASÁS, valós adat
+  //     Az üzemanyagkártya-literekből számolt CO₂ (faktor 2.64 kg/L).
+  // ════════════════════════════════════════════════════════
+  function loadCo2() {
+    var box = document.getElementById('statsCo2Box');
+    if (!box) return;
+    box.innerHTML = stFilterBar('stats-co2') + '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
+    gas('getCo2Report', stRangeDates()).then(function (r) {
+      if (!r || !r.ok) { box.innerHTML = stFilterBar('stats-co2') + '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || t('common.error')) + '</div>'; return; }
+      _stData['stats-co2'] = r;
+
+      var per100 = (r.co2_per_100km != null) ? stNum(r.co2_per_100km, 2) + ' kg' : '—';
+      var metrics = [
+        { l: '🌍 ' + t('st.co2.total'), v: stNum(r.co2_tonna, 2) + ' <span style="font-size:13px;">t CO₂</span>' },
+        { l: '⛽ ' + t('st.co2.litres'), v: stNum(r.litru, 0) + ' L' },
+        { l: '🛣️ ' + t('st.co2.per100'), v: per100 },
+        { l: '🌳 ' + t('st.co2.trees'), v: stNum(r.fa_egyenertek, 0) }
+      ];
+
+      // Járművenkénti tábla (rendszám + liter + kg CO₂)
+      var vehRows = (r.jarmuvek || []).map(function (v) {
+        return '<tr><td><b class="text-primary">' + esc(v.rendszam || '—') + '</b></td>'
+          + '<td style="text-align:right;">' + stNum(v.litru, 0) + '</td>'
+          + '<td style="text-align:right;font-weight:700;">' + stNum(v.co2_kg, 0) + '</td></tr>';
+      }).join('') || '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:18px;">' + t('st.noData') + '</td></tr>';
+
+      box.innerHTML = stFilterBar('stats-co2')
+        + '<div style="margin-bottom:16px;">' + vsMetricBand(metrics, { tall: true }) + '</div>'
+        + '<p class="text-muted" style="font-size:12px;margin:0 0 14px;">' + t('st.co2.note', { f: stNum(r.factor, 2) }) + '</p>'
+        + stPanel(t('st.co2.pMonthly'), stChartCanvas('stChCo2Havi'))
+        + stPanel(t('st.co2.pPerVeh'),
+            '<div style="overflow-x:auto;"><table class="table">'
+            + '<thead><tr><th>' + t('st.cPlate') + '</th><th style="text-align:right;">' + t('st.cLiter') + '</th><th style="text-align:right;">' + t('st.co2.cKg') + '</th></tr></thead>'
+            + '<tbody>' + vehRows + '</tbody></table></div>',
+            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-co2\')">' + t('st.csvExport') + '</button>');
+
+      var months = stMonths([r.havi]);
+      stChart('stChCo2Havi', {
+        type: 'bar',
+        data: { labels: months, datasets: [
+          { label: 'CO₂ (kg)', data: stSeries(months, r.havi, 'co2_kg'), backgroundColor: 'rgba(34,197,94,0.7)' }
+        ]}
+      });
+    });
+  }
+
   // ── CSV exportok (az utoljára betöltött adatból) ────────
   function csvExport(pane) {
     var r = _stData[pane];
@@ -840,6 +887,10 @@
       stCsv('ugyfel-riport-' + stamp + '.csv',
         [t('st.cClient'), 'CUI', t('st.cOrder'), t('st.cClosed'), t('st.cRevenue'), t('st.cKm'), t('st.cl.cOutEur'), t('st.csv.avgPayDay')],
         (r.ugyfelek || []).map(function (u) { return [u.ugyfel, u.cui_cif, u.fuvarok, u.lezart, u.bevetel, u.km, u.kintlevo, u.atlag_fizetesi_nap]; }));
+    } else if (pane === 'stats-co2') {
+      stCsv('co2-riport-' + stamp + '.csv',
+        [t('st.cPlate'), t('st.cLiter'), t('st.co2.cKg')],
+        (r.jarmuvek || []).map(function (v) { return [v.rendszam, v.litru, v.co2_kg]; }));
     }
   }
 
@@ -854,6 +905,7 @@
         else if (name === 'stats-drivers') loadDrivers();
         else if (name === 'stats-vehicles') loadVehiclesStats();
         else if (name === 'stats-clients') loadClients();
+        else if (name === 'stats-co2') loadCo2();
         else if (name === 'stats-permissions') loadPermissions();
       });
     },

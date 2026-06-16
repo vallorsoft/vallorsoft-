@@ -846,6 +846,97 @@ handlers.getMySoferStats = async function (req, res, args) {
   }
 };
 
+// ── CO₂ riport (stats-co2) — CSAK OLVASÁS, nincs új tábla/írás ──
+// A CO₂-t a MÁR meglévő üzemanyag-adatból számoljuk: a tankolt dízel
+// literekből (fuel_card_transactions, cégre szűrve), dízel emissziós
+// faktor 2.64 kg CO₂ / liter alapján. A km-et (CO₂/100km-hez) a cég
+// menetleveleiből (fuvarlevelek.total_km, users-joinon át cégre szűrt)
+// vesszük. Nincs személyes adat a válaszban (se sofőr-név, se e-mail).
+const CO2_PER_LITRE_DIESEL = 2.64; // kg CO₂ / liter dízel
+handlers.getCo2Report = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const { from, to } = _range(args);
+    const P = [cid, from, to];
+
+    // 1) Üzemanyagkártya-tranzakciók (cégre szűrt) — összes liter + havi bontás
+    //    Csak a dízel/motorină terméket számoljuk a CO₂-ba (AdBlue nem üzemanyag).
+    const totR = await pool.query(
+      `SELECT COALESCE(SUM(qty_l),0)::numeric AS litru,
+              COUNT(*)::int AS tx
+       FROM fuel_card_transactions
+       WHERE company_id = $1 AND tx_date >= $2 AND tx_date < $3
+         AND COALESCE(product,'') !~* 'adblue'`, P
+    );
+
+    // 2) Havi liter-bontás (kis grafikonhoz)
+    const haviR = await pool.query(
+      `SELECT TO_CHAR(tx_date,'YYYY-MM') AS ho,
+              COALESCE(SUM(qty_l),0)::numeric AS litru
+       FROM fuel_card_transactions
+       WHERE company_id = $1 AND tx_date >= $2 AND tx_date < $3
+         AND COALESCE(product,'') !~* 'adblue'
+       GROUP BY ho ORDER BY ho`, P
+    );
+
+    // 3) Járművenkénti top-lista (rendszám szerint)
+    const vehR = await pool.query(
+      `SELECT COALESCE(NULLIF(TRIM(rendszam),''),'?') AS rendszam,
+              COALESCE(SUM(qty_l),0)::numeric AS litru
+       FROM fuel_card_transactions
+       WHERE company_id = $1 AND tx_date >= $2 AND tx_date < $3
+         AND COALESCE(product,'') !~* 'adblue'
+       GROUP BY rendszam ORDER BY litru DESC LIMIT 10`, P
+    );
+
+    // 4) Km az időszakban — a cég menetleveleiből (CO₂/100km mutatóhoz).
+    //    A fuvarlevelek táblának nincs company_id-ja → users-joinon át szűr.
+    const kmR = await pool.query(
+      `SELECT COALESCE(SUM(f.total_km),0)::numeric AS total_km
+       ${FUV_FROM}
+       WHERE f.data_completare >= $2 AND f.data_completare < $3`, P
+    );
+
+    const litru = parseFloat(totR.rows[0].litru) || 0;
+    const co2Kg = litru * CO2_PER_LITRE_DIESEL;
+    const co2Tonna = Math.round((co2Kg / 1000) * 1000) / 1000;
+    const totalKm = parseFloat(kmR.rows[0].total_km) || 0;
+    // CO₂ / 100 km (kg) — csak ha van km-adat
+    const co2Per100km = totalKm > 0 ? Math.round((co2Kg / totalKm) * 100 * 100) / 100 : null;
+    // Fa-egyenérték (durva): 1 t CO₂ ≈ 16.5 fa éves megkötése
+    const faEgyenertek = Math.round(co2Tonna * 16.5);
+
+    const havi = haviR.rows.map((h) => ({
+      ho: h.ho,
+      litru: parseFloat(h.litru) || 0,
+      co2_kg: Math.round((parseFloat(h.litru) || 0) * CO2_PER_LITRE_DIESEL * 10) / 10
+    }));
+    const jarmuvek = vehR.rows.map((v) => ({
+      rendszam: v.rendszam,
+      litru: parseFloat(v.litru) || 0,
+      co2_kg: Math.round((parseFloat(v.litru) || 0) * CO2_PER_LITRE_DIESEL * 10) / 10
+    }));
+
+    return res.json({ result: {
+      ok: true,
+      factor: CO2_PER_LITRE_DIESEL,
+      litru: Math.round(litru * 10) / 10,
+      tx_count: totR.rows[0].tx,
+      total_km: totalKm,
+      co2_kg: Math.round(co2Kg * 10) / 10,
+      co2_tonna: co2Tonna,
+      co2_per_100km: co2Per100km,
+      fa_egyenertek: faEgyenertek,
+      havi,
+      jarmuvek
+    }});
+  } catch (err) {
+    console.error('getCo2Report hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 // ── GPS flotta-pillanatkép (CargoTrack v2: üzemanyag + km-óra) ──
 // A /coordinates v2 válasz calculated_inputs mezőit jelenítjük meg:
 // fuel_level (tartályszint), fuel_consumption, mileage (GPS km-óra), rpm.

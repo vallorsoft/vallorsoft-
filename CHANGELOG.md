@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-16 — ÚJ modul: CO₂ riport (valódi, olvasás-only) (PR #161)
+
+> Új Statisztika-aloldal (`stats-co2`): a cég CO₂-kibocsátása a már tárolt üzemanyag-/km-adatból. EU fenntarthatósági elvárás; megkülönböztető marketing-érv. Read-only, nincs új tábla/migráció, nincs személyes adat.
+
+- **`handlers/statisticsHandlers.js`** — `getCo2Report(req,res,args)`: `_isAdminOrManager` kapu (mint a többi stats-handler); minden SQL **`company_id`-szűrt + paraméteres** (üzemanyag: `company_id=$1`; km: `FUV_FROM` users-joinján át `u.company_id=$1`). Diesel **2,64 kg CO₂/liter**; AdBlue kizárva. Visszaad: össz. CO₂ (t), liter, CO₂/100km (ha van km), fa-egyenérték, havi bontás, jármű top-10. Olvasás-only, generikus hibaüzenet.
+- **`public/stats.js`** — `loadCo2()`: `.tall` KPI-sáv + havi Chart.js oszlop + jármű-tábla + CSV; valós érték, nincs koholt trend.
+- **`admin.html`/`manager.html`** — `stats-co2` aloldal a Statisztika csoportban (🌱) + pane; **`feature-catalog.js`** + **`i18n.js`** (RO-alap+HU). Cache-bust `?v=20260616co2`. 93 Jest zöld.
+
 ## 2026-06-16 — Landing page meleg átszínezés (PR #160)
 
 > A publikus landing a konzol új **meleg arculatát** kapja: kék/indigó → napnyugta narancs/korall + krém + espresso + meleg teal. CSAK szín — a tartalom, layout, szövegek, i18n, JS-logika érintetlen.
