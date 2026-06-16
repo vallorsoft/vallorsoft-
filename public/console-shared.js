@@ -5,6 +5,14 @@
 //  Betoltes a HTML-ben: ELOBB ez, UTANA admin.js / manager.js.
 // ============================================================
 
+// ── Jelszó-szabály (közös, a szerverrel azonos) — min. 8 + kis/nagybetű + szám + szimbólum ──
+// Csak románul írja ki a követelményt (a felhasználó-felé menő szöveg románul).
+var VS_PW_ERR = 'Parola trebuie să aibă minim 8 caractere și să conțină o literă mică, o literă mare, o cifră și un simbol (ex. _).';
+function vsPwValid(pw){
+  pw = String(pw || '');
+  return pw.length >= 8 && /[a-z]/.test(pw) && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw);
+}
+
 // ── Funkció-kapcsolók (előfizetés) — letiltott menük elrejtése ──
 // A cég kikapcsolt funkciói nem jelennek meg a sidebarban. Hiányzó kulcs = engedélyezett.
 function applyFeatureFlags(){
