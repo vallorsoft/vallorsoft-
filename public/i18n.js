@@ -142,6 +142,8 @@
 
     // ── Fuvar-lista (orders-list) ──
     'list.title': { hu: 'Fuvarfeladatok kezelése', ro: 'Gestionare curse' },
+    'list.kpiWaiting': { hu: 'Kiosztásra vár', ro: 'Așteaptă alocare' },
+    'list.kpiClosed': { hu: 'Lezárt', ro: 'Finalizate' },
     'list.searchPh': { hu: '🔍 Ügyfél, sofőr, ID...', ro: '🔍 Client, șofer, ID...' },
     'list.allStatus': { hu: 'Minden státusz', ro: 'Toate statusurile' },
     'list.colId': { hu: 'ID', ro: 'ID' },

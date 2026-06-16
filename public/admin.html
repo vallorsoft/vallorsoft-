@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260616band">
-  <script src="/i18n.js?v=20260616menu"></script>
+  <script src="/i18n.js?v=20260616band2"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -281,6 +281,7 @@
     <div class="pane hidden" data-pane="orders-list">
       <div class="glass" style="padding:22px;">
         <h2 class="h-title" style="margin-bottom:14px;" data-i18n="list.title">Fuvarfeladatok kezelése</h2>
+        <div id="ordersMetricBand" style="margin-bottom:16px;"></div>
         <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
             <input class="input" id="orderSearch" placeholder="🔍 Ügyfél, sofőr, ID..." data-i18n-ph="list.searchPh" oninput="filterOrders()" style="flex:1;min-width:160px;">
             <select class="select" id="orderStatusFilter" onchange="filterOrders()" style="max-width:140px;">
@@ -1214,7 +1215,7 @@
 </div>
 
 <script src="/feature-catalog.js?v=20260614qa"></script>
-<script src="/console-shared.js?v=20260616band"></script>
+<script src="/console-shared.js?v=20260616band2"></script>
 <!-- ===== INTEGRACIOK (Ugyfelek / CargoTrack / Szamlazas) ===== -->
 <script src="/clients-page.js?v=20260614qa"></script>
 <script src="/client-mail.js?v=20260614qa"></script>

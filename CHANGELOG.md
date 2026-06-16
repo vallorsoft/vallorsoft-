@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-16 — Fázis 2 (3. lépés): KPI mutató-sáv a Fuvarok-kezelés oldalon (PR #153)
+
+> A (kompakt) mutató-sáv a Fuvarok-kezelés oldal tetejére, a már lekért fuvar-listából számolt értékekkel. Additív — a táblázat és minden funkciója érintetlen.
+
+- **`public/console-shared.js`** — új `renderOrdersMetricBand(list)`; a `loadOrders` a `comList` teljes (szűretlen) eredményéből (`_ordersAllCache`) tölti a sávot: **Összes fuvar** (hero) · **Aktív** (In Curs/Alocat/Extern) · **Kiosztásra vár** (Disponibil) · **Lezárt** (Finalizat). A kliens-oldali szűrés csak a táblát rendezi, a KPI-k stabilak. Nincs új hálózati hívás, nincs koholt trend.
+- **`public/admin.html` + `public/manager.html`** — `#ordersMetricBand` konténer a cím alatt, a szűrő-sor előtt; a táblázat (`#tblOrders`), oszlop-átméretezés/átrendezés, kijelölés, letöltés-sáv, státusz-dropdownok **érintetlenek**. Cache-bust `?v=20260616band2`.
+- **`public/i18n.js`** — 2 új kulcs (`list.kpiWaiting`, `list.kpiClosed`, RO-alap+HU) az inline kétnyelvű feliratok helyett. `node --check` OK, 93 Jest zöld.
+
 ## 2026-06-16 — Fázis 2 (2. lépés): KPI mutató-sáv a Statisztikán és a Sofőr-elszámoláson (PR #152)
 
 > A `.tall` (magas) mutató-sáv kiterjesztése a riport-oldalakra — a régi 4-csempés KPI-sorok helyett. Csak megjelenés; az adat, a grafikonok, a táblák és a szűrők változatlanok.
