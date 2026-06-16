@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="/i18n.js?v=20260616pw2"></script>
+  <script src="/i18n.js?v=20260616pw3"></script>
   <title data-i18n="title.register">vallorSoft - Regisztráció</title>
   <link rel="stylesheet" href="/style.css?v=20260614qa">
   <!-- Landing-skin (IZOLÁLT — csak ez az oldal): világos, letisztult, kék/indigó.
@@ -92,28 +92,28 @@
 
       <!-- ── INGYENES REGISZTRÁCIÓS ŰR LAP (trial) ── -->
       <div id="freeForm">
-        <div class="field"><label>Cégnév / Numele companiei</label><input class="input" id="freeCegNev" placeholder="Transport SRL / Logistică KFT" autocomplete="organization"></div>
-        <div class="field"><label>Teljes név / Nume complet</label><input class="input" id="freeNume" placeholder="Példa János / Ion Exemplu" autocomplete="name"></div>
-        <div class="field"><label>E-mail</label><input class="input" id="freeEmail" type="email" placeholder="nev@pelda.hu" autocomplete="email"></div>
-        <div class="field"><label>Telefon (opcionális)</label><input class="input" id="freeTel" placeholder="+40 ..." autocomplete="tel"></div>
-        <div class="field"><label>Jelszó / Parolă</label><input class="input" id="freeJelszo" type="password" placeholder="••••••••" autocomplete="new-password"><div class="hint" style="font-size:.78rem;color:var(--text-muted,#8a97a8);margin-top:4px">Min. 8 caractere, o literă mică, o literă mare, o cifră și un simbol (ex. _)</div></div>
-        <div class="field"><label>Jelszó megerősítése / Confirmă parola</label><input class="input" id="freeJelszo2" type="password" placeholder="••••••••" autocomplete="new-password"></div>
+        <div class="field"><label data-i18n="reg.companyName">Numele companiei</label><input class="input" id="freeCegNev" data-i18n-ph="reg.companyNamePh" placeholder="Ex. Transport SRL" autocomplete="organization"></div>
+        <div class="field"><label data-i18n="reg.fullName">Nume complet</label><input class="input" id="freeNume" data-i18n-ph="reg.fullNamePh" placeholder="Ion Popescu" autocomplete="name"></div>
+        <div class="field"><label data-i18n="common.email">E-mail</label><input class="input" id="freeEmail" type="email" placeholder="nume@exemplu.ro" autocomplete="email"></div>
+        <div class="field"><label data-i18n="reg.phoneOpt">Telefon (opțional)</label><input class="input" id="freeTel" placeholder="+40 ..." autocomplete="tel"></div>
+        <div class="field"><label data-i18n="reg.passwordMin">Parolă</label><input class="input" id="freeJelszo" type="password" placeholder="••••••••" autocomplete="new-password"><div class="hint" style="font-size:.78rem;color:var(--text-muted,#8a97a8);margin-top:4px">Min. 8 caractere, o literă mică, o literă mare, o cifră și un simbol (ex. _)</div></div>
+        <div class="field"><label data-i18n="reg.passwordConfirm">Confirmă parola</label><input class="input" id="freeJelszo2" type="password" placeholder="••••••••" autocomplete="new-password"></div>
         <div class="lp-consent" style="display:flex;flex-direction:column;gap:10px;margin:14px 0;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
           <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--lp-muted);line-height:1.5;">
             <input type="checkbox" id="freeChkTerms" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#6366f1;cursor:pointer;">
-            <span>Accept <a href="/terms" target="_blank" class="lp-link">Termenii și Condițiile</a></span>
+            <span data-i18n-html="reg.acceptTermsHtml">Accept <a href="/terms" target="_blank" class="lp-link">Termenii și Condițiile</a></span>
           </label>
           <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--lp-muted);line-height:1.5;">
             <input type="checkbox" id="freeChkPrivacy" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#6366f1;cursor:pointer;">
-            <span>Am citit <a href="/privacy" target="_blank" class="lp-link">Politica de Confidențialitate</a></span>
+            <span data-i18n-html="reg.acceptPrivacyHtml">Am citit <a href="/privacy" target="_blank" class="lp-link">Politica de Confidențialitate</a></span>
           </label>
         </div>
-        <button class="btn primary block xl" id="btnFreeReg">🚀 14 napos ingyenes próba indítása</button>
+        <button class="btn primary block xl" id="btnFreeReg" data-i18n="reg.freeSubmit">🚀 Începe proba gratuită de 14 zile</button>
         <div style="text-align:center;margin-top:14px;font-size:13px;color:var(--lp-muted);">
-          Van meghívókódja? → <a class="reg-toggle-link" id="switchToInvite">Belépés kóddal</a>
+          <span data-i18n="reg.haveInvite">Ai cod de invitație?</span> → <a class="reg-toggle-link" id="switchToInvite" data-i18n="reg.loginWithCode">Intră cu cod</a>
         </div>
         <div style="text-align:center;margin-top:8px;font-size:13px;color:var(--lp-muted);">
-          Van már fiókja? <a href="/login" class="lp-link">Bejelentkezés</a>
+          <span data-i18n="reg.haveAccount">Ai deja cont?</span> <a href="/login" class="lp-link" data-i18n="reg.login">Autentificare</a>
         </div>
       </div>
 
@@ -128,16 +128,16 @@
         <div class="lp-consent" style="display:flex;flex-direction:column;gap:10px;margin:14px 0;padding:14px;background:rgba(255,255,255,0.04);border-radius:10px;border:1px solid rgba(255,255,255,0.08);">
           <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--lp-muted);line-height:1.5;">
             <input type="checkbox" id="chkTerms" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#6366f1;cursor:pointer;">
-            <span>Accept <a href="/terms" target="_blank" class="lp-link" style="color:#fff;text-decoration:underline;">Termenii și Condițiile</a></span>
+            <span data-i18n-html="reg.acceptTermsHtml">Accept <a href="/terms" target="_blank" class="lp-link">Termenii și Condițiile</a></span>
           </label>
           <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--lp-muted);line-height:1.5;">
             <input type="checkbox" id="chkPrivacy" style="margin-top:2px;width:16px;height:16px;flex-shrink:0;accent-color:#6366f1;cursor:pointer;">
-            <span>Am citit <a href="/privacy" target="_blank" class="lp-link" style="color:#fff;text-decoration:underline;">Politica de Confidențialitate</a></span>
+            <span data-i18n-html="reg.acceptPrivacyHtml">Am citit <a href="/privacy" target="_blank" class="lp-link">Politica de Confidențialitate</a></span>
           </label>
         </div>
         <button class="btn primary block xl" id="btnReg" data-i18n="reg.submit">Regisztráció</button>
         <div style="text-align:center;margin-top:14px;font-size:13px;color:var(--lp-muted);">
-          Nincs meghívókód? → <a class="reg-toggle-link" id="switchToFree">Ingyenes regisztráció</a>
+          <span data-i18n="reg.noInvite">Nu ai cod de invitație?</span> → <a class="reg-toggle-link" id="switchToFree" data-i18n="reg.freeRegLink">Înregistrare gratuită</a>
         </div>
         <div style="text-align:center;margin-top:8px;color:var(--lp-muted);font-size:14px">
           <span data-i18n="reg.haveAccount">Van már fiókja?</span> <a href="/login" id="goLogin" class="lp-link" style="color:#fff;font-weight:600;text-decoration:none;border-bottom:1px dashed rgba(255,255,255,0.4)" data-i18n="reg.login">Bejelentkezés</a>
@@ -174,13 +174,17 @@
     function showFreeMode() {
       document.getElementById('freeForm').style.display = '';
       document.getElementById('inviteForm').style.display = 'none';
-      document.getElementById('regSubtitle').textContent = '14 napos ingyenes próba — bankkártya nem kell';
+      var s = document.getElementById('regSubtitle');
+      s.setAttribute('data-i18n', 'reg.freeSubtitle');
+      s.textContent = (window.t ? t('reg.freeSubtitle') : 'Probă gratuită 14 zile — fără card bancar');
     }
 
     function showInviteMode() {
       document.getElementById('freeForm').style.display = 'none';
       document.getElementById('inviteForm').style.display = '';
-      document.getElementById('regSubtitle').textContent = 'Regisztráció meghívókóddal';
+      var s = document.getElementById('regSubtitle');
+      s.setAttribute('data-i18n', 'reg.subtitle');
+      s.textContent = (window.t ? t('reg.subtitle') : 'Înregistrare cu cod de invitație');
       if (urlKod) {
         var el = document.getElementById('kod');
         if (el) el.value = urlKod.toUpperCase();
