@@ -5,17 +5,20 @@
 
 /* ── Design tokens ──────────────────────────────────────────── */
 :root {
-  --lp-blue:        #3b82f6;
-  --lp-blue-hover:  #2563eb;
-  --lp-indigo:      #6366f1;
-  --lp-green:       #16a34a;
-  --lp-dark:        #080f1a;
-  --lp-dark2:       #0d1526;
+  /* WARM paletta — napnyugta narancs/korall + meleg espresso + teal akcent */
+  --lp-blue:        #f6711e;          /* primer akcent (narancs) */
+  --lp-blue-hover:  #e25e10;          /* primer hover */
+  --lp-indigo:      #f6517b;          /* másodlagos akcent (korall) */
+  --lp-teal:        #0d9488;          /* hideg pop → meleg teal */
+  --lp-grad:        linear-gradient(135deg,#fb8c3a,#f6517b);  /* napnyugta gradiens */
+  --lp-green:       #15a34a;
+  --lp-dark:        #1e1812;          /* espresso (sötét szekciók/hero) */
+  --lp-dark2:       #271f18;
   --lp-white:       #ffffff;
-  --lp-light:       #f7f9fc;
-  --lp-text:        #0f172a;
-  --lp-muted:       #64748b;
-  --lp-border:      #e2e8f0;
+  --lp-light:       #faf6f0;          /* meleg krém */
+  --lp-text:        #2a2018;          /* meleg sötét szöveg */
+  --lp-muted:       #8a7d6e;          /* meleg muted */
+  --lp-border:      #ece3d8;          /* meleg keret */
   --lp-card-shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06);
   --lp-radius:      12px;
   --lp-radius-btn:  8px;
@@ -61,23 +64,22 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   justify-content: center;
   gap: .5rem;
   padding: .65rem 1.4rem;
-  background: var(--lp-blue);
+  background: var(--lp-grad);
   color: #fff;
   font-weight: 600;
   font-size: .9rem;
   border-radius: var(--lp-radius-btn);
-  border: 2px solid var(--lp-blue);
-  transition: background .2s, transform .15s, box-shadow .2s;
+  border: 2px solid transparent;
+  transition: background .2s, transform .15s, box-shadow .2s, filter .2s;
   cursor: pointer;
   font-family: inherit;
   text-decoration: none;
   white-space: nowrap;
 }
 .lp-btn-primary:hover {
-  background: var(--lp-blue-hover);
-  border-color: var(--lp-blue-hover);
+  filter: brightness(1.05);
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(59,130,246,.3);
+  box-shadow: 0 4px 16px rgba(246,113,30,.32);
 }
 .lp-btn-outline {
   display: inline-flex;
@@ -136,14 +138,14 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   top: 0;
   z-index: 100;
   height: 64px;
-  background: rgba(8,15,26,.9);
+  background: rgba(30,24,18,.9);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid rgba(255,255,255,.08);
   transition: background .3s, box-shadow .3s;
 }
 .lp-navbar.lp-scrolled {
-  background: rgba(8,15,26,.98);
+  background: rgba(30,24,18,.98);
   box-shadow: 0 2px 20px rgba(0,0,0,.3);
 }
 .lp-nav-inner {
@@ -161,7 +163,13 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   text-decoration: none;
 }
 .lp-logo-vallor { color: #fff; }
-.lp-logo-soft   { color: var(--lp-indigo); }
+.lp-logo-soft   {
+  background: var(--lp-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: var(--lp-blue);
+}
 
 .lp-nav-menu { display: flex; justify-content: center; }
 .lp-nav-links {
@@ -201,8 +209,8 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   top: calc(100% + 8px);
   right: 0;
   min-width: 230px;
-  background: rgba(10,16,30,.97);
-  border: 1px solid rgba(99,102,241,.35);
+  background: rgba(30,24,18,.97);
+  border: 1px solid rgba(246,113,30,.35);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0,0,0,.45);
   overflow: hidden;
@@ -222,7 +230,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   border-bottom: 1px solid rgba(255,255,255,.07);
 }
 .lp-login-opt:last-child { border-bottom: none; }
-.lp-login-opt:hover { background: rgba(99,102,241,.18); color: #fff; }
+.lp-login-opt:hover { background: rgba(246,113,30,.18); color: #fff; }
 .lp-login-icon { font-size: 1.4rem; flex-shrink: 0; }
 .lp-login-opt b { display: block; font-weight: 700; margin-bottom: 1px; }
 .lp-login-opt small { color: rgba(255,255,255,.5); font-size: .78rem; }
@@ -272,8 +280,8 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 60% 50% at 30% 40%, rgba(99,102,241,.12), transparent),
-    radial-gradient(ellipse 40% 40% at 80% 60%, rgba(59,130,246,.08), transparent);
+    radial-gradient(ellipse 60% 50% at 30% 40%, rgba(246,81,123,.12), transparent),
+    radial-gradient(ellipse 40% 40% at 80% 60%, rgba(251,140,58,.10), transparent);
   pointer-events: none;
 }
 .lp-hero-grid {
@@ -287,9 +295,9 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   display: inline-block;
   padding: .35rem .9rem;
   border-radius: 999px;
-  background: rgba(99,102,241,.15);
-  border: 1px solid rgba(99,102,241,.35);
-  color: #a5b4fc;
+  background: rgba(246,113,30,.15);
+  border: 1px solid rgba(246,113,30,.35);
+  color: #fdba74;
   font-size: .75rem;
   font-weight: 600;
   letter-spacing: .06em;
@@ -436,9 +444,9 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   background: rgba(255,255,255,.1);
   margin: 3px 0;
 }
-.lp-dot-active { background: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.22); }
+.lp-dot-active { background: #f6711e; box-shadow: 0 0 0 3px rgba(246,113,30,.22); }
 .lp-dot-done   { background: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,.18); }
-.lp-dot-final  { background: linear-gradient(135deg,#6366f1,#3b82f6); box-shadow: 0 0 0 3px rgba(99,102,241,.22); }
+.lp-dot-final  { background: linear-gradient(135deg,#fb8c3a,#f6517b); box-shadow: 0 0 0 3px rgba(246,81,123,.22); }
 .lp-sw-content {
   display: flex;
   flex-direction: column;
@@ -447,7 +455,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 }
 .lp-sw-label  { font-size: .78rem; font-weight: 600; color: rgba(255,255,255,.85); line-height: 1.3; }
 .lp-sw-sub    { font-size: .7rem; color: rgba(255,255,255,.42); line-height: 1.35; }
-.lp-sw-auto   { color: #60a5fa; }
+.lp-sw-auto   { color: #fdba74; }
 .lp-sw-steps  { font-size: .7rem; color: rgba(255,255,255,.45); }
 .lp-sw-result { font-size: .74rem; font-weight: 700; color: #4ade80; }
 .lp-sw-footer {
@@ -582,7 +590,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 .lp-blog-read-more {
   display: inline-block;
   margin-top: 10px;
-  color: var(--brand-indigo, #6366f1);
+  color: var(--lp-blue, #f6711e);
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
@@ -618,7 +626,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 }
 .lp-contact-block h3 { font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: .6rem; }
 .lp-contact-block p  { font-size: .85rem; color: rgba(255,255,255,.5); line-height: 1.6; }
-.lp-contact-link { color: #818cf8; text-decoration: none; }
+.lp-contact-link { color: #fdba74; text-decoration: none; }
 .lp-contact-link:hover { text-decoration: underline; }
 
 /* ── Stats ──────────────────────────────────────────────────── */
@@ -703,15 +711,15 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 .lp-pricing-card.lp-plan-blue   { --plan-accent: var(--lp-blue); }
 .lp-pricing-card.lp-plan-indigo { --plan-accent: var(--lp-indigo); }
 .lp-pricing-card.lp-plan-dark {
-  --plan-accent: #a5b4fc;
+  --plan-accent: #fdba74;
   background: var(--lp-dark);
   border-color: rgba(255,255,255,.1);
-  color: #e2e8f0;
+  color: #efe6da;
 }
 
 .lp-pricing-featured {
   border: 2px solid var(--plan-accent);
-  box-shadow: 0 6px 28px rgba(99,102,241,.2);
+  box-shadow: 0 6px 28px rgba(246,113,30,.2);
   transform: translateY(-4px);
 }
 .lp-plan-badge {
@@ -797,8 +805,8 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   justify-content: center;
   gap: 6px;
   margin-bottom: 2rem;
-  background: rgba(99,102,241,.07);
-  border: 1px solid rgba(99,102,241,.15);
+  background: rgba(246,113,30,.07);
+  border: 1px solid rgba(246,113,30,.15);
   border-radius: 12px;
   padding: 5px;
   width: fit-content;
@@ -822,12 +830,12 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 .lp-toggle-btn.active {
   background: #fff;
   color: var(--lp-text);
-  box-shadow: 0 1px 4px rgba(15,23,42,.12);
+  box-shadow: 0 1px 4px rgba(42,32,24,.12);
 }
 .lp-toggle-badge {
   font-size: 11px;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--lp-indigo), var(--lp-blue));
+  background: var(--lp-grad);
   color: #fff;
   padding: 2px 7px;
   border-radius: 20px;
@@ -857,7 +865,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 .lp-addon-title {
   font-size: 13px;
   font-weight: 600;
-  color: var(--lp-muted, #64748b);
+  color: var(--lp-muted, #8a7d6e);
   margin-bottom: 12px;
   text-transform: uppercase;
   letter-spacing: .06em;
@@ -874,13 +882,13 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   gap: 6px;
   padding: 7px 16px;
   border-radius: 999px;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  background: #f6efe6;
+  border: 1px solid #ece3d8;
   font-size: 14px;
-  color: #334155;
+  color: #4a3f33;
 }
 .lp-addon-chip strong {
-  color: #6366f1;
+  color: #f6711e;
 }
 
 /* Pricing card outline button on light bg */
@@ -894,7 +902,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 }
 .lp-pricing-card.lp-plan-dark .lp-btn-outline {
   border-color: rgba(255,255,255,.3);
-  color: #e2e8f0;
+  color: #efe6da;
 }
 .lp-pricing-card.lp-plan-dark .lp-btn-outline:hover {
   border-color: var(--plan-accent);
@@ -911,7 +919,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 60% 80% at 50% 50%, rgba(99,102,241,.1), transparent);
+  background: radial-gradient(ellipse 60% 80% at 50% 50%, rgba(246,81,123,.12), transparent);
   pointer-events: none;
 }
 .lp-cta-inner {
@@ -1032,7 +1040,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
   width: min(700px, calc(100vw - 32px));
 }
 .cookie-content {
-  background: #0e131b;
+  background: #221b14;
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 20px;
   padding: 1.5rem 1.8rem;
@@ -1056,7 +1064,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 .modal-card {
   width: min(520px, 100%);
   padding: 2rem 2.2rem;
-  background: #0e131b;
+  background: #221b14;
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 20px;
   box-shadow: 0 20px 60px rgba(0,0,0,.6);
@@ -1112,7 +1120,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
 /* ── Toast ──────────────────────────────────────────────────── */
 .toast-container { position: fixed; right: 20px; bottom: 20px; z-index: 11000; display: flex; flex-direction: column; gap: .6rem; }
 .toast {
-  background: #111827;
+  background: #221b14;
   border: 1px solid rgba(255,255,255,.15);
   padding: 1rem 1.2rem;
   border-radius: 12px;
@@ -1158,7 +1166,7 @@ button { cursor: pointer; font-family: inherit; border: none; background: none; 
     display: flex;
     position: fixed;
     top: 64px; left: 0; right: 0;
-    background: rgba(8,15,26,.98);
+    background: rgba(30,24,18,.98);
     border-bottom: 1px solid rgba(255,255,255,.1);
     padding: 20px 24px 28px;
     flex-direction: column;
