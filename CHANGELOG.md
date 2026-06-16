@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-16 — Landing: nincs egymás melletti kétnyelvű felirat (árazás + oldal)
+
+> A landing árazás-szekciója egymás mellett mutatta a két nyelvet (havi/éves váltó, kiegészítők cím). Kérés: SEHOL ne legyen két nyelv egyszerre — a nyelvváltó intézze, RO-alap.
+
+- **`public/landing.js`** — a RO fordítás-objektum kétnyelvű értékei egynyelvűre javítva: `billingMonthly` `'Lunar / Havonta'`→`'Lunar'`, `billingAnnual` `'Anual / Éves'`→`'Anual'`, `billingAnnualBadge` `'−1 lună / −1 hó'`→`'−1 lună'`, `addonTitle` `'Resurse suplimentare / Kiegészítők'`→`'Resurse suplimentare'`. (A HU értékek már egynyelvűek voltak; a renderelés `f[lang]`-gal nyelv-helyes.)
+- **`public/index.html`** — a `#pricing` statikus fallback javítva: a havi/éves váltó + kiegészítők-cím beégetett kétnyelvű szövege egynyelvűre; a 4 csomag fallback feature-listája magyarról **románra** (a lap alapnyelve RO; az API-betöltés úgyis felülírja, de a fallback se legyen rossz nyelvű); `loginDispatcher`/`Sub` fallback románra igazítva.
+- Cache-bust: `landing.js?v=20260616pw` (eddig nem volt verziózva). 93 Jest zöld.
+
 ## 2026-06-16 — Regisztráció: nincs többé egymás melletti kétnyelvű felirat (i18n + RO-alap)
 
 > A regisztrációs oldal ingyenes-trial űrlapja egymás mellett mutatta a két nyelvet (pl. „Cégnév / Numele companiei", „Jelszó / Parolă"). A felhasználó kérése: SEHOL ne legyen egymás mellett két nyelv — ezt a nyelvváltó kapcsoló intézze, alapértelmezett a román.
