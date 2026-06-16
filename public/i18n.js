@@ -1631,7 +1631,7 @@
     'dev.hereServicesNote': { hu: '💶 Az árak EUR-ban, 1000 tranzakcióra értendők. A módosítás azonnal érvénybe lép minden cégre.', ro: '💶 Prețurile sunt în EUR, pentru 1000 de tranzacții. Modificarea intră imediat în vigoare pentru toate firmele.' },
     'dev.hereByCompanyTitle': { hu: 'Cégenkénti használat — felhasználói bontással (aktuális hónap)', ro: 'Utilizare pe firmă — defalcat pe utilizatori (luna curentă)' },
     'dev.billingOwnTitle': { hu: '💳 Számlázó integráció (a te céged)', ro: '💳 Integrare facturare (firma ta)' },
-    'dev.billingOwnDesc': { hu: 'A developer (oldal-üzemeltető) céges FGO-/számlázó-fiókja. A hitelesítő adatok titkosítva tárolódnak.', ro: 'Contul de facturare FGO/facturator al firmei developer-ului (operatorul platformei). Datele de autentificare sunt stocate criptat.' },
+    'dev.billingOwnDesc': { hu: 'A VallorSoft (oldal-üzemeltető) saját számlázó-fiókja — EZZEL állítja ki a szolgáltatási (előfizetés + HERE) számlákat a regisztrált cégeknek. A cégek kulcsához SOHA nem nyúl. A hitelesítő adatok titkosítva tárolódnak.', ro: 'Contul propriu de facturare al VallorSoft (operatorul platformei) — cu ACESTA se emit facturile de serviciu (abonament + HERE) către firmele înregistrate. Nu se accesează niciodată cheia altei firme. Datele de autentificare sunt stocate criptat.' },
     'dev.providersTitle': { hu: '💳 Támogatott számlázó programok', ro: '💳 Programe de facturare suportate' },
     'dev.compBillingTitle': { hu: 'Cégek számlázó integrációi', ro: 'Integrările de facturare ale firmelor' },
     'dev.thBilling': { hu: 'Számlázó', ro: 'Facturator' },

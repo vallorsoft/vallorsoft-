@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-16 — HERE/előfizetési számla a developer SAJÁT számlázójával (nem a célcég kulcsával)
+
+> Biztonsági javítás: eddig a `generateHereInvoice` (developer) **dekódolta és használta a célcég számlázó-kulcsát** a HERE/előfizetési számla kiállításához (a developer hozzáfért a cég kulcsához, és eladó=vevő számla jött létre). **24 suite → 25 suite / 115 Jest teszt zöld.**
+
+- **`handlers/billingHandlers.js`** — `generateHereInvoice`: a számlát mostantól a **VallorSoft (developer) saját** `billing_integrations` rekordja állítja ki (session `company_id`), a célcég kulcsához SOHA nem nyúl; **self-invoice tiltva** (ha `company_id == developer cége` → `Emitentul nu poate fi si client`); ha a developernek nincs számlázója → „Configurati mai intai integrarea de facturare VallorSoft". `buildHereInvoice` többé nem olvassa a célcég `credentials`-ét; `previewHereInvoice` a kiállító (VallorSoft) providerét mutatja.
+- **`public/i18n.js`** — `dev.billingOwnDesc` pontosítva: a developer saját számlázója a szolgáltatási (előfizetés + HERE) számlákhoz, a cégek kulcsához nem nyúl. *(A developer billing-kártya UI — `developer.html` `devBillingCardBox` + BillingCard — már korábban létezett.)*
+- **`tests/integration/here-invoice.test.js`** (új) — regressziós őr: csak developer hívhatja; self-invoice tilos (DB-t sem hív); hiányzó company_id.
+
 ## 2026-06-16 — Teljeskörű átvilágítás: biztonsági javítások + hiányosság-rendrakás
 
 > Teljes audit (4 párhuzamos agent + valódi-DB tesztek). **24 suite / 112 Jest teszt zöld** élő Postgres ellen; require-sweep 91 modul 0 hiba; szerver-boot smoke OK.
