@@ -34,6 +34,7 @@ const handlers = Object.assign(
   require('../handlers/gdpr'),
   require('../handlers/stripe'),
   require('../handlers/globalSearch'),
+  require('../handlers/ecmr'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a
