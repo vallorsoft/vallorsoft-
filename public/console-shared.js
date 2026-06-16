@@ -1630,10 +1630,32 @@ function loadOrderFormData(){
   const ds=document.getElementById('oInternDriver');if(ds)ds.onchange=orderFormPairFromDriver;
 }
 
+// ── Fuvarok kezelése — interaktív KPI mutató-sáv (vsMetricBand) ──
+// A számokat a már lekért teljes fuvar-listából (_ordersAllCache) számolja,
+// NEM a kliens-oldali szűrt nézetből → a KPI-k stabilak maradnak. Nincs új
+// hálózati hívás. Kompakt (alacsony) sáv — a Statisztika .tall módja nélkül.
+function renderOrdersMetricBand(list){
+  var el = document.getElementById('ordersMetricBand');
+  if (!el || typeof vsMetricBand !== 'function') return;
+  list = Array.isArray(list) ? list : [];
+  var total = list.length;
+  var aktivSet = { 'In Curs':1, 'Alocat':1, 'Extern':1 };
+  var aktiv = list.filter(function(c){ return aktivSet[c.status]; }).length;
+  var varakozo = list.filter(function(c){ return c.status === 'Disponibil'; }).length;
+  var lezart = list.filter(function(c){ return c.status === 'Finalizat'; }).length;
+  el.innerHTML = vsMetricBand([
+    { l: t('dash.kpiTotal'),   v: total,    sub: t('dash.kpiActive') + ': ' + aktiv },
+    { l: t('dash.kpiActive'),  v: aktiv,    sub: 'In Curs / Alocat / Extern' },
+    { l: t('list.kpiWaiting'), v: varakozo, sub: 'Disponibil' },
+    { l: t('list.kpiClosed'),  v: lezart,   sub: 'Finalizat' }
+  ]);
+}
+
 function loadOrders(){
   gas('comList').then(list=>{
     if(!Array.isArray(list))list=[];
     _ordersAllCache = list;
+    renderOrdersMetricBand(list);
     renderFilteredOrders(list);
     // A fejléc statikus (a tbody cserélődik); a méretező/átrendező egyszer
     // fűződik fel, az oszlop-SORREND viszont minden render után újra
