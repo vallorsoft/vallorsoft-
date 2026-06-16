@@ -73,7 +73,7 @@ function loadUsers(){
       const canDel = !isSelf && u.pozicio !== 'Admin';
       const delBtn = canDel ? `<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUserIdx(${i})">Töröl</button>` : '';
       const anonBtn = (!isSelf && !u.pozicio_dev) ? ` <button class="btn ghost" style="padding:4px 10px;font-size:12px;" title="${t('cs.gdpr.anonymize')}" onclick="anonymizeUserIdx(${i})">🔐</button>` : '';
-      return `<tr><td>${esc(u.nume)}</td><td>${esc(u.email)}</td><td>${esc(u.tel||'—')}</td><td><span class="badge info">${u.pozicio}</span></td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editUserIdx(${i})">Szerk</button> ${delBtn}${anonBtn}</td></tr>`;
+      return `<tr><td>${vsAvatar(u.nume||'')}${esc(u.nume)}</td><td>${esc(u.email)}</td><td>${esc(u.tel||'—')}</td><td><span class="vs-cellpill">${esc(u.pozicio||'')}</span></td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editUserIdx(${i})">Szerk</button> ${delBtn}${anonBtn}</td></tr>`;
     }).join('');
   }).catch(function(e){ console.error('loadUsers hiba:', e); toast('Betöltési hiba','err'); });
 }
