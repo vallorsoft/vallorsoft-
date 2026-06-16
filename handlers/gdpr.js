@@ -29,10 +29,16 @@ handlers.exportCompanyData = async function (req, res) {
       // Portál-belépők (személyes adat: e-mail/név) — jelszó-hash és invite-token KIZÁRVA.
       client_portal_users: await rows('SELECT id, client_id, email, nev, activ, last_login, created_at FROM client_users WHERE company_id = $1'),
       carrier_portal_users: await rows('SELECT id, carrier_id, email, nev, activ, last_login, created_at FROM carrier_users WHERE company_id = $1'),
+      // e-CMR aláírások (személyes adat: aláíró név + IP + időbélyeg) — jogi
+      // fuvar-dokumentum, megőrzés Legea 82/1991 (5 év). A rajzolt aláírás-kép
+      // (*_sig data URL) méret miatt kizárva. A rows() üres tömböt ad, ha a tábla
+      // még nincs (migráció előtt) — nem buktatja az exportot.
+      ecmr: await rows('SELECT id, order_id, status, created_at, created_by, sender_name, sender_signed_at, sender_ip, carrier_name, carrier_signed_at, carrier_ip, consignee_name, consignee_signed_at, consignee_ip FROM order_ecmr WHERE company_id = $1'),
     };
     audit.fromReq(req, 'gdpr.export', 'company', cid, { counts: {
       users: data.users.length, clients: data.clients.length, vehicles: data.vehicles.length, orders: data.orders.length,
       client_portal_users: data.client_portal_users.length, carrier_portal_users: data.carrier_portal_users.length,
+      ecmr: data.ecmr.length,
     } });
     return res.json({ result: { ok: true, generated_at: new Date().toISOString(), data } });
   } catch (err) {

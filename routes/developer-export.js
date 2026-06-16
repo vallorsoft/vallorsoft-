@@ -212,6 +212,25 @@ router.get('/api/developer/export/:id', devGuard, async (req, res) => {
         uit.rows) });
     }
 
+    // e-CMR (digitális CMR aláírásokkal) — jogi fuvar-dokumentum.
+    // Az aláírások (név+IP+időbélyeg) személyes adat, de jogi
+    // megőrzési kötelezettség alá esnek (Legea 82/1991). A rajzolt
+    // aláírás (*_sig) data URL-eket kihagyjuk a CSV-ből (méret).
+    const ecmr = await pool.query(
+      `SELECT id,order_id,status,created_by,created_at,
+              sender_name,sender_signed_at,sender_ip,
+              carrier_name,carrier_signed_at,carrier_ip,
+              consignee_name,consignee_signed_at,consignee_ip
+       FROM order_ecmr WHERE company_id=$1 ORDER BY id`, [cid]).catch(() => ({ rows: [] }));
+    if (ecmr.rows.length) {
+      files.push({ name: 'csv/order_ecmr.csv', buffer: buildCsv(
+        ['id','order_id','status','created_by','created_at',
+         'sender_name','sender_signed_at','sender_ip',
+         'carrier_name','carrier_signed_at','carrier_ip',
+         'consignee_name','consignee_signed_at','consignee_ip'],
+        ecmr.rows) });
+    }
+
     // ── Bináris dokumentumok ──────────────────────────────────
     let totalBytes = files.reduce((s, f) => s + f.buffer.length, 0);
     const LIMIT = 400 * 1024 * 1024; // 400 MB vészfék

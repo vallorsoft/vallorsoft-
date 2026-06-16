@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-16 — ÚJ modul: e-CMR (digitális CMR többfeles aláírással) (PR #162)
+
+> Új, valódi modul a Dokumentumok alatt: egy fuvarhoz tartozó elektronikus CMR, amit max. 3 fél (feladó/fuvarozó/címzett) ír alá. EU-piaci alapelvárás (Transporeon/Timocom/Trans.eu). MVP: rögzítés + aláírás-állapot követés. Multi-tenant + GDPR-tudatos.
+
+- **`db/ecmr.sql`** (ÚJ, idempotens migráció) — `order_ecmr` tábla: `company_id`, `order_id`, `status` (draft/partial/completed/cancelled), és per-fél `*_name`/`*_signed_at`/`*_ip`/`*_sig` oszlopok; index `(company_id, order_id)`. Auto-fut induláskor.
+- **`handlers/ecmr.js`** (ÚJ) — `ecmrList/ecmrGet/ecmrCreate/ecmrSign`. **Biztonság:** `ecmrCreate` beszúrás ELŐTT ellenőrzi a fuvar tulajdonjogát (`orders WHERE id=$1 AND company_id=$2` → nincs cross-tenant write); minden SQL `company_id`-szűrt + paraméteres; az `ecmrSign` oszlopnév-interpoláció a `PARTIES` **fehérlistából** (a `party`-t a SQL előtt validálja); `isAdminManager` kapu az írásokon; input-korlátok (név 200 / sig 200 KB / IP 64); **audit** minden íráson; generikus hibaüzenet.
+- **GDPR:** **`handlers/gdpr.js` `exportCompanyData` kibővítve** az `order_ecmr` aláírás-adataival (név/IP/időbélyeg; a rajzolt aláírás-kép kizárva) — a 6. szabály szerint a személyes adat bekerül a GDPR-exportba. Anonimizálás NEM (jogi megőrzés, Legea 82/1991 → 5 év, felülírja a törlést). A `routes/developer-export.js` céges-export is tartalmazza.
+- **Frontend:** `public/ecmr.js` (lista per-fél aláírás-pillákkal, „létrehozás fuvarból", per-fél aláírás), `ecmr` aloldal a Dokumentumok csoportban (📝) admin+manager; `feature-catalog.js` (cégenként kapcsolható) + `i18n.js` (24 kulcs, RO-alap+HU). `routes/execute.js` regisztráció. Cache-bust `?v=20260616ecmr`. 93 Jest zöld.
+
 ## 2026-06-16 — ÚJ modul: CO₂ riport (valódi, olvasás-only) (PR #161)
 
 > Új Statisztika-aloldal (`stats-co2`): a cég CO₂-kibocsátása a már tárolt üzemanyag-/km-adatból. EU fenntarthatósági elvárás; megkülönböztető marketing-érv. Read-only, nincs új tábla/migráció, nincs személyes adat.

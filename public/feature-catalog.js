@@ -18,6 +18,7 @@ window.VS_FEATURES = [
   { key: 'received-fuv',     label: 'Fuvarlevelek',                group: 'Fuvarozás & Logisztika' },
   { key: 'warehouse',        label: 'Raktár (leadott áru) 📦',     group: 'Fuvarozás & Logisztika' },
   { key: 'driver-docs-pane', label: 'Feltöltött iratok & CMR-ek',  group: 'Fuvarozás & Logisztika' },
+  { key: 'ecmr',             label: 'e-CMR (digitális CMR) 📝',     group: 'Dokumentumok' },
   { key: 'utvonaltervezes',  label: 'Útvonaltervezés',             group: 'Fuvarozás & Logisztika' },
   // OPT-IN (alapból KI): a fuvar-kiírón térképes cím-kiegészítés + auto-km
   // + útvonal-előnézet köztespontokkal. A developer kapcsolja be cégenként.
