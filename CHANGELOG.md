@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-16 — Fázis 2 (9. lépés): teljes meleg paletta a konzolon (PR #159)
+
+> A admin/manager konzol egységes **meleg arculatot** kap (krém + espresso + napnyugta akcent), a kék/indigó helyett. **Additív, könnyen visszavonható** réteg: egyetlen, kommentelt blokk a `style.css` VÉGÉN — a meglévő szabályok érintetlenek, más oldalakat (login/portál/sofőr/developer/landing) nem érint.
+
+- **`public/style.css`** — konzolra szűkített (`.main-content`/`.sidebar`/`.vs-topbar`) meleg-skin: **világos** (krém #faf6f0, krém kártyák, meleg keret/szöveg) és **sötét** (espresso #1e1812→#271f18, NEM navy) téma is; sidebar espresso-gradiens; primary gomb/link/aktív fül/fókusz/logó-akcent → napnyugta narancs; az „info/folyamatban" hideg kék → **meleg teal**. A KPI-sáv, a `.vsl-*` fuvar-tábla és a `.h-title` akcent érintetlen (harmonizál).
+- **Tervezőtábla:** a layout/szélesség **változatlan** (csak átszínezés, nincs `width/grid/flex`); a Visszfuvar-radar panel meleg keretet kap.
+- Cache-bust `style.css?v=20260616warm`. Tisztán additív (0 törölt sor), nincs JS/HTML/handler/biztonság-érintés; 93 Jest zöld. *(Vizuális finomhangolás élesben várható.)*
+
 ## 2026-06-16 — Fázis 2 (8. lépés): Fuvarok-kezelés tábla — vizuális gazdagítás (PR #158)
 
 > A fuvar-tábla a mockup kinézetét kapja: vizuális útvonal (felrakó • ─→ 📍 lerakó), sofőr-monogram-avatar, státusz-pirula és sor-bal státuszcsík. **CSAK megjelenés** — minden interaktív funkció (oszlop-átméretezés/átrendezés, kijelölés, tömeges letöltés, inline státusz-váltó, akciógombok) byte-pontosan megőrizve; a 10 oszlop és sorrend változatlan.

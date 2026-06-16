@@ -1191,3 +1191,190 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 /* Akciógombok finomítása a sor-akció cellában (méret/hover; logika érintetlen) */
 #tblOrders td.vs-row-actions .btn{ border-radius:9px; }
 #tblOrders td.vs-row-actions .btn:hover:not(:disabled){ transform:translateY(-1px); }
+
+/* ════════════════════════════════════════════════════════════
+   FÁZIS 2 — MELEG KONZOL-BŐR (warm console skin) — ADDITÍV RÉTEG
+   ────────────────────────────────────────────────────────────
+   Cél: az admin/manager konzolnak egységes MELEG paletta — krém-
+   háttér, espresso sidebar, napnyugta (narancs→korall) akcent a
+   kék/indigó helyett, meleg keretek/kártyák. Mindkét témára (light
+   + dark) olvasható kontraszttal.
+
+   FONTOS — ez egy ZÁRÓ, ADDITÍV felülíró-blokk: a fenti meglévő
+   szabályok NEM lettek módosítva; ez csak felülír. Visszavonható:
+   töröld EZT a blokkot a fájl végéről.
+
+   Scope: MINDEN szelektor a konzol-konténerekre szűkítve
+   (.main-content / .sidebar / .app-layout / .vs-topbar), hogy a
+   közös style.css-t használó EGYÉB oldalak (login, portál, carrier,
+   sofer, developer, landing, legal) ÉRINTETLENEK maradjanak.
+
+   ⚠️ Tervezőtábla (#plannerBox / .p2-*): CSAK átszínezés (warm),
+   SEMMI width/max-width/grid/flex/méret-korlát — az elrendezés
+   pontosan a mostani marad (teljes szélesség).
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Meleg tokenek (konzolra szűkítve, a :root globálist NEM bántjuk) ── */
+.main-content{
+  --w-accent:        #f6711e;                                  /* napnyugta narancs (primary akcent) */
+  --w-accent-2:      #f6517b;                                  /* korall vég (gradiens) */
+  --w-accent-grad:   linear-gradient(135deg,#fb8c3a 0%,#f6517b 100%);
+  --w-accent-soft:   rgba(246,113,30,.14);                     /* halvány narancs-tinta */
+  --w-accent-ring:   rgba(246,113,30,.20);                     /* fókusz-gyűrű */
+  --w-teal:          #0d9488;                                  /* meleg-teal az „info/folyamatban" hideg kék helyett */
+}
+
+/* ── SIDEBAR (mindig sötét → espresso) ── */
+.sidebar{ background: linear-gradient(180deg,#241a12 0%,#1b130d 100%) !important; }
+.sidebar .tab.active{
+  background: var(--w-accent-grad);
+  border-color: var(--w-accent);
+  color:#fff;
+  box-shadow: 0 4px 14px rgba(246,113,30,.40) !important;
+}
+.sidebar .sub-tab.active{
+  background: var(--w-accent-soft);
+  border-left-color: var(--w-accent);
+}
+.sidebar a.tab-link:hover{ color:#ffe9d8; }
+/* Logó „Soft" akcent → napnyugta */
+.sidebar .vs-logo .soft{ color:#fb8c3a; text-shadow:0 0 18px rgba(251,140,58,.45); }
+
+/* ── LIGHT téma: krém oldal, fehér/krém kártyák, meleg keret/szöveg ── */
+.main-content[data-theme="light"]{
+  background:#faf6f0;
+  color:#2a2018;
+  --text-primary:#2a2018;
+  --text-muted:#8a7d6e;
+  --glass-border-light:#ece3d8;
+}
+.main-content[data-theme="light"] .glass{
+  background:#fffdfa;
+  border-color:#ece3d8;
+  box-shadow:0 1px 3px rgba(74,52,32,.06), 0 4px 16px rgba(74,52,32,.05);
+}
+.main-content[data-theme="light"] .glass-soft{
+  background:#f6efe6;
+  border-color:#ece3d8;
+}
+.main-content[data-theme="light"] .text-primary,
+.main-content[data-theme="light"] .h-title,
+.main-content[data-theme="light"] h1,
+.main-content[data-theme="light"] h2,
+.main-content[data-theme="light"] h3,
+.main-content[data-theme="light"] h4{ color:#2a2018; }
+.main-content[data-theme="light"] .text-muted,
+.main-content[data-theme="light"] .h-sub{ color:#8a7d6e; }
+.main-content[data-theme="light"] .input,
+.main-content[data-theme="light"] .select,
+.main-content[data-theme="light"] .textarea{
+  background:#fffdfa; color:#2a2018; border-color:#ece3d8;
+}
+.main-content[data-theme="light"] .table th{ color:#8a7d6e; }
+.main-content[data-theme="light"] .table td{ color:#2a2018; border-bottom-color:#ece3d8; }
+.main-content[data-theme="light"] .table tr:hover td{ background:#f6efe6; }
+.main-content[data-theme="light"] .btn:not(.primary):not(.danger):not(.ok){
+  background:#fffdfa; color:#2a2018; border-color:#ece3d8;
+}
+.main-content[data-theme="light"] .theme-toggle{
+  background:#fffdfa; border-color:#ece3d8; color:#2a2018;
+}
+.main-content[data-theme="light"] .vs-topbar{
+  background:rgba(250,246,240,.88); border-bottom-color:#ece3d8;
+}
+.main-content[data-theme="light"] .vs-tb-search{
+  background:#fffdfa; border-color:#ece3d8;
+}
+.main-content[data-theme="light"] .vs-tb-kbd{
+  background:rgba(74,52,32,.04); border-color:#ece3d8;
+}
+
+/* ── DARK téma: meleg-tintázott espresso (navy helyett), világos szöveg ── */
+.main-content[data-theme="dark"]{
+  background:linear-gradient(180deg,#1e1812 0%,#271f18 100%);
+  --text-primary:#f4ede3;
+  --text-muted:#b6a895;
+  --glass-border-dark:rgba(255,225,200,.10);
+}
+.main-content[data-theme="dark"] .glass{
+  background:#271f18;
+  border-color:rgba(255,225,200,.10);
+  box-shadow:0 1px 3px rgba(0,0,0,.45);
+}
+.main-content[data-theme="dark"] .glass-soft{
+  background:#322619; border-color:rgba(255,225,200,.10);
+}
+.main-content[data-theme="dark"] .text-primary{ color:#f4ede3; }
+.main-content[data-theme="dark"] .text-muted{ color:#b6a895; }
+.main-content[data-theme="dark"] .input,
+.main-content[data-theme="dark"] .select,
+.main-content[data-theme="dark"] .textarea{
+  background:#1e1812; color:#f4ede3; border-color:rgba(255,225,200,.12);
+}
+.main-content[data-theme="dark"] .table td{ border-bottom-color:rgba(255,225,200,.10); }
+.main-content[data-theme="dark"] .table tr:hover td{ background:rgba(255,225,200,.05); }
+.main-content[data-theme="dark"] .theme-toggle{
+  background:#271f18; border-color:rgba(255,225,200,.12); color:#f4ede3;
+}
+.main-content[data-theme="dark"] .vs-topbar{
+  background:rgba(30,24,18,.88); border-bottom-color:rgba(255,225,200,.10);
+}
+.main-content[data-theme="dark"] .vs-tb-search{
+  background:#1e1812; border-color:rgba(255,225,200,.12);
+}
+.main-content[data-theme="dark"] .vs-tb-kbd{
+  background:rgba(255,225,200,.07); border-color:rgba(255,225,200,.14);
+}
+.main-content[data-theme="dark"] .leaflet-container{ background:#1e1812; }
+
+/* ── Mindkét téma: napnyugta akcentek a kék/indigó helyett ── */
+.main-content .btn.primary{ background:var(--w-accent); border-color:var(--w-accent); color:#fff; }
+.main-content .btn.primary:hover{ background:#e8620f; border-color:#e8620f; }
+.main-content .stat-val{ color:var(--w-accent); }
+.main-content .dash-link{ color:var(--w-accent); }
+.main-content .stat-ico{
+  background:var(--w-accent-soft);
+  border-color:rgba(246,113,30,.28);
+}
+/* Input-fókusz: meleg gyűrű (a hideg kék box-shadow helyett) */
+.main-content .input:focus,
+.main-content .select:focus,
+.main-content .textarea:focus{
+  border-color:var(--w-accent) !important;
+  box-shadow:0 0 0 3px var(--w-accent-ring) !important;
+}
+/* Topbar kereső-hover: meleg keret+gyűrű */
+.main-content .vs-tb-search:hover{
+  border-color:var(--w-accent);
+  box-shadow:0 0 0 3px var(--w-accent-ring);
+}
+/* Command palette akcent-ikon → meleg (a palette body-ra kerül, ezért külön) */
+.vs-cmdk-item .vs-cmdk-ic{ color:var(--w-accent); }
+
+/* „info" badge → meleg-teal (megkülönböztetésért, a hideg kék helyett) */
+.main-content .badge.info{
+  background:linear-gradient(180deg, rgba(13,148,136,.20), rgba(13,148,136,.09));
+  color:#0d9488;
+}
+/* Fuvarlista „info/folyamatban" sor-csík → meleg-teal */
+.main-content #tblOrders tr.vsl-orow-info .vsl-orow-first{ border-left-color:var(--w-teal); }
+
+/* ── TERVEZŐTÁBLA (#plannerBox / .p2-*) — CSAK ÁTSZÍNEZÉS, NINCS
+   semmilyen elrendezés-/méret-korlát. A planner.js inline-stílusú
+   hideg-kék (#6366f1 / rgba(99,102,241,…)) jelzéseit váltjuk melegre.
+   Csak color/background/border-color tulajdonságokat írunk felül. ── */
+.main-content #plannerBox .p2-railrz:hover,
+.main-content #plannerBox .p2-dayrz:hover{ background:var(--w-accent) !important; }
+.main-content #plannerBox .p2-day.today{
+  background:rgba(246,113,30,.18) !important;
+}
+.main-content[data-theme="light"] #plannerBox .p2-corner,
+.main-content[data-theme="light"] #plannerBox .p2-utilcorner,
+.main-content[data-theme="light"] #plannerBox .p2-rail{ background:#fffdfa; }
+.main-content[data-theme="dark"]  #plannerBox .p2-corner,
+.main-content[data-theme="dark"]  #plannerBox .p2-utilcorner,
+.main-content[data-theme="dark"]  #plannerBox .p2-rail{ background:#271f18; }
+
+/* Visszfuvar-radar panel (a planner-en belül) — meleg akcent-keret */
+.main-content #plannerBox .radar-card,
+.main-content #plannerBox .p2-radar{ border-color:var(--w-accent) !important; }
