@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-06-16 — Landing árazás: a csomag-feature-ek is a kiválasztott nyelven (DB-fix)
+
+> Az előző kör után a landing árazásánál a **csomag-feature listák** még mindig magyarul látszottak (miközben a lap románul) — mert a `package-setup*.sql` migrációk **egynyelvű magyar string** tömbként írták a `subscription_plans.features`-t a kétnyelvű objektumok helyett. A render (`f[lang]`) csak objektumnál nyelv-helyes.
+
+- **`db/zz-plan-features-bilingual-final.sql`** (ÚJ migráció) — a 4 csomag `features`-ét a mérvadó kétnyelvű `{ro,hu}` objektum formátumra állítja. A `zz-` előtag miatt a migráció-futtató ABC-sorrendjében MINDEN korábbi feature-állító (`package-setup*.sql`, `plan-features-*.sql`) UTÁN fut → friss DB-n is ez a végső; a meglévő (éles) DB-n új fájlként egyszer lefut a következő deploykor és felülírja a magyar stringeket. Idempotens.
+- A `handlers/billingHandlers.js` `updateSubscriptionPlan` már megőrzi a bilingual objektumokat (nincs regresszió, ha a developer szerkeszti a csomagot).
+
 ## 2026-06-16 — Landing: nincs egymás melletti kétnyelvű felirat (árazás + oldal)
 
 > A landing árazás-szekciója egymás mellett mutatta a két nyelvet (havi/éves váltó, kiegészítők cím). Kérés: SEHOL ne legyen két nyelv egyszerre — a nyelvváltó intézze, RO-alap.
