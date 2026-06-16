@@ -75,7 +75,7 @@ function loadUsers(){
       const delBtn = (u.pozicio === 'Sofer' && !isSelf)
         ? ` <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUserIdx(${i})">Töröl</button>`
         : '';
-      return `<tr><td>${esc(u.nume)}</td><td>${esc(u.email)}</td><td>${esc(u.tel||'—')}</td><td><span class="badge info">${u.pozicio}</span></td><td>${editBtn}${delBtn}</td></tr>`;
+      return `<tr><td>${vsAvatar(u.nume||'')}${esc(u.nume)}</td><td>${esc(u.email)}</td><td>${esc(u.tel||'—')}</td><td><span class="vs-cellpill">${esc(u.pozicio||'')}</span></td><td>${editBtn}${delBtn}</td></tr>`;
     }).join('');
   }).catch(function(e){ console.error('loadUsers hiba:', e); toast('Betöltési hiba','err'); });
 }

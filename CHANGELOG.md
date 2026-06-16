@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-16 — Avatar + pirula a többi listatáblán (PR #163)
+
+> A fuvar-tábla „avatar + pirula" kinézete kiterjesztve a többi konzol-listára. Display-only, additív — a gombok/oszlopok/akciók érintetlenek.
+
+- **Közös `vsAvatar(name)`** (`public/console-shared.js`, `window`-re kitéve) — escape-elt monogram-avatar, determinisztikus szín; `.vs-av`/`.vs-cellpill` CSS (`public/style.css`, téma-érzékeny light+dark).
+- Bekötve: **Munkatársak** (`admin.js`/`manager.js` — avatar a név elé, `pozicio` → `.vs-cellpill`), **Belső sofőrök** + **Külső sofőrök** (`console-shared.js` — avatar a név elé), **Ügyfelek** (`clients-page.js` — avatar a `denumire` elé; az ÁFA-pirula marad). Minden gomb (Szerk/Törlés/Anonimizálás/stb.) byte-pontosan megőrizve.
+- Cache-bust `?v=20260616pill`. Backend/SQL/auth nem változott; 93 Jest zöld.
+
 ## 2026-06-16 — ÚJ modul: e-CMR (digitális CMR többfeles aláírással) (PR #162)
 
 > Új, valódi modul a Dokumentumok alatt: egy fuvarhoz tartozó elektronikus CMR, amit max. 3 fél (feladó/fuvarozó/címzett) ír alá. EU-piaci alapelvárás (Transporeon/Timocom/Trans.eu). MVP: rögzítés + aláírás-állapot követés. Multi-tenant + GDPR-tudatos.

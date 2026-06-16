@@ -39,7 +39,8 @@ window.ClientsPage = (function () {
           d.clients.forEach(c => {
             const tr = document.createElement('tr');
             const vat = c.anaf_status ? (c.anaf_status === 'activ' ? '<span class="cl-pill cl-pill--ok">aktív</span>' : '<span class="cl-pill cl-pill--no">' + c.anaf_status + '</span>') : '';
-            tr.innerHTML = '<td>' + esc(c.denumire) + '</td><td>' + esc(c.cui_cif || '') + '</td><td>' + esc(c.localitate || '') + '</td><td>' + vat + '</td>' +
+            const avatar = (typeof window.vsAvatar === 'function') ? window.vsAvatar(c.denumire || '') : '';
+            tr.innerHTML = '<td>' + avatar + esc(c.denumire) + '</td><td>' + esc(c.cui_cif || '') + '</td><td>' + esc(c.localitate || '') + '</td><td>' + vat + '</td>' +
               '<td style="text-align:right"><button class="cl-btn cl-btn--ghost cl-btn--sm">Szerkeszt</button></td>';
             tr.querySelector('button').addEventListener('click', () => openForm(c));
             rows.appendChild(tr);

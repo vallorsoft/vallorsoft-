@@ -914,7 +914,7 @@ function loadExtDrivers(){
     extDriverCache=list;
     const tb=document.querySelector('#tblExtDrivers tbody');
     if(list.length===0){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);">'+t('cs.noExtDriver')+'</td></tr>';return;}
-    tb.innerHTML=list.map(d=>`<tr><td>${esc(d.nume||'—')}</td><td>${esc(d.firma||'—')}</td><td>${esc(d.telefon||'—')}</td><td>${esc(d.email||'—')}</td><td>${esc(d.rendszam_camion||'—')}</td><td>${esc(d.rendszam_remorca||'—')}</td><td>${esc(d.nota||'—')}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editExtDriver(${d.id})">${t('cs.editShort')}</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteExtDriver(${d.id})">${t('cs.del')}</button></td></tr>`).join('');
+    tb.innerHTML=list.map(d=>`<tr><td>${vsAvatar(d.nume||'')}${esc(d.nume||'—')}</td><td>${esc(d.firma||'—')}</td><td>${esc(d.telefon||'—')}</td><td>${esc(d.email||'—')}</td><td>${esc(d.rendszam_camion||'—')}</td><td>${esc(d.rendszam_remorca||'—')}</td><td>${esc(d.nota||'—')}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editExtDriver(${d.id})">${t('cs.editShort')}</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteExtDriver(${d.id})">${t('cs.del')}</button></td></tr>`).join('');
   }).catch(function(e){ console.error('loadExtDrivers hiba:', e); toast(t('common.loadError'),'err'); });
 }
 
@@ -966,7 +966,7 @@ function loadInternalDrivers(){
           +'onchange="assignDefaultTrailerUi('+myVeh.id+', this.value)">'+topts+'</select></div>';
       }
       return '<tr>'
-        +'<td>'+esc(d.nume)+'</td>'
+        +'<td>'+vsAvatar(d.nume||'')+esc(d.nume)+'</td>'
         +'<td>'+esc(d.email)+'</td>'
         +'<td>'+esc(d.tel||'—')+'</td>'
         +'<td style="white-space:nowrap;">'
@@ -3436,6 +3436,22 @@ function vslAvatar(name){
   var bg = 'hsl('+h+',55%,42%)';
   return '<span class="vsl-av" aria-hidden="true" style="background:'+bg+';">'+esc(ini)+'</span>';
 }
+
+// Általános, táblafüggetlen monogram-avatar (a vslAvatar testvére, de a
+// .vs-av generikus osztállyal — más listatáblákon is használható, nem csak a
+// fuvarlistán). CSAK megjelenítés; a nevet escape-eljük (XSS-mentes).
+function vsAvatar(name){
+  var s = (name==null ? '' : String(name)).trim();
+  if(!s || s==='—'){ return '<span class="vs-av vs-av-empty" aria-hidden="true">–</span>'; }
+  var parts = s.split(/\s+/).filter(Boolean);
+  var ini = (parts[0]||'').charAt(0);
+  if(parts.length>1) ini += (parts[parts.length-1]||'').charAt(0);
+  ini = ini.toUpperCase();
+  var h = 0; for(var i=0;i<s.length;i++){ h = (h*31 + s.charCodeAt(i)) % 360; }
+  var bg = 'hsl('+h+',55%,42%)';
+  return '<span class="vs-av" aria-hidden="true" style="background:'+bg+';">'+esc(ini)+'</span>';
+}
+window.vsAvatar = vsAvatar;
 
 function renderFilteredOrders(list) {
   var tbody = document.getElementById('tblOrdersBody');

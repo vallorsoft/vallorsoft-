@@ -1192,6 +1192,15 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 #tblOrders td.vs-row-actions .btn{ border-radius:9px; }
 #tblOrders td.vs-row-actions .btn:hover:not(:disabled){ transform:translateY(-1px); }
 
+/* ── Általános, táblafüggetlen „pirula + avatar" díszítés (CSAK megjelenítés) ──
+   Más listatáblákon (Ügyfelek / sofőrök / Munkatársak) is használható, a
+   #tblOrders-mintát követve, de táblafüggetlenül. Téma-érzékeny (light+dark). */
+.vs-av{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-size:10px; font-weight:800; color:#fff; vertical-align:middle; margin-right:6px; letter-spacing:.02em; box-shadow:0 2px 5px -2px rgba(15,23,42,.4); flex:0 0 auto; }
+.vs-av-empty{ background:rgba(148,163,184,.35); color:rgba(71,85,105,.9); }
+/* Cella-pirula a státusz/szerep/típus oszlopokra — meleg tónus, semleges alap. */
+.vs-cellpill{ display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:999px; font-size:11px; font-weight:700; line-height:1.5; background:rgba(245,158,11,.14); color:#b45309; border:1px solid rgba(245,158,11,.28); }
+.main-content[data-theme="dark"] .vs-cellpill{ background:rgba(245,158,11,.18); color:#fbbf24; border-color:rgba(245,158,11,.30); }
+
 /* ════════════════════════════════════════════════════════════
    FÁZIS 2 — MELEG KONZOL-BŐR (warm console skin) — ADDITÍV RÉTEG
    ────────────────────────────────────────────────────────────
