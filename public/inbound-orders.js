@@ -67,6 +67,7 @@ window.InboundOrders = (function () {
         '<button class="io-btn io-btn--ghost" id="ioPoll">Lekérdezés most</button>' +
         '<button class="io-btn io-btn--ghost" id="ioRefresh">Frissítés</button>' +
       '</div>' +
+      '<div id="ioBand" style="margin-bottom:16px;"></div>' +
       '<div id="ioInfo"></div>' +
       '<div id="ioList"><div class="io-empty">Betöltés…</div></div>';
     const $ = (id) => root.querySelector('#' + id);
@@ -211,6 +212,15 @@ window.InboundOrders = (function () {
         const items = d.items || [];
         pending = items.filter(isPending);   // a szerver received_at DESC szerint adja → legújabb elöl
         totalHandled = items.length - pending.length;
+        // ── KPI-sáv (additív): a már lekért listából, új hálózati hívás nélkül ──
+        var band = $('ioBand');
+        if (band && typeof vsMetricBand === 'function') {
+          band.innerHTML = vsMetricBand([
+            { l: t('inb.kpiPending'), v: pending.length, sub: t('inb.kpiTotal') + ': ' + items.length },
+            { l: t('inb.kpiHandled'), v: totalHandled, sub: '' },
+            { l: t('inb.kpiTotal'), v: items.length, sub: '' }
+          ]);
+        }
         if (!keepIdx) idx = 0;               // friss betöltésnél a legutolsóval kezdünk
         renderCurrent();
       } catch (e) { $('ioList').innerHTML = '<div class="io-empty">' + esc(e.message) + '</div>'; }

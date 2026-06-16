@@ -107,6 +107,7 @@ window.ClientRequests = (function () {
         '<div class="cr-spacer"></div>' +
         '<button class="cr-btn cr-btn--ghost" id="crRefresh">↻ Reîmprospătează / Frissítés</button>' +
       '</div>' +
+      '<div id="crBand" style="margin-bottom:16px;"></div>' +
       '<div id="crInfo"></div>' +
       '<div id="crList"><div class="cr-empty">Se încarcă… / Betöltés…</div></div>';
     const $ = (id) => root.querySelector('#' + id);
@@ -245,6 +246,17 @@ window.ClientRequests = (function () {
         const items = d.items || [];
         Object.keys(itemsById).forEach(k => delete itemsById[k]);
         items.forEach(function (it) { itemsById[String(it.id)] = it; });
+        // ── KPI-sáv (additív): a már lekért listából, új hálózati hívás nélkül ──
+        const bandEl = $('crBand');
+        if (bandEl && typeof vsMetricBand === 'function') {
+          const pendingN = items.filter(it => it.status !== 'approved' && it.status !== 'rejected').length;
+          const rejectedN = items.filter(it => it.status === 'rejected').length;
+          bandEl.innerHTML = vsMetricBand([
+            { l: t('cr.kpiTotal'), v: items.length, sub: t('cr.kpiPending') + ': ' + pendingN },
+            { l: t('cr.kpiPending'), v: pendingN, sub: '' },
+            { l: t('cr.kpiRejected'), v: rejectedN, sub: '' }
+          ]);
+        }
         if (!items.length) { $('crInfo').innerHTML = ''; $('crList').innerHTML = '<div class="cr-empty">Nu există cereri de la clienți. / Nincs ügyfél-kérés.</div>'; return; }
         // Sorszám: beérkezés sorrendjében (legrégebbi = #1), stabil az egyes kérésekre
         const byDateAsc = items.slice().sort((a, b) =>
