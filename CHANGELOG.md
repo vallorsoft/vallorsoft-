@@ -21,6 +21,15 @@
 - **`db/zz-plan-features-bilingual-final.sql`** (ÚJ migráció) — a 4 csomag `features`-ét a mérvadó kétnyelvű `{ro,hu}` objektum formátumra állítja. A `zz-` előtag miatt a migráció-futtató ABC-sorrendjében MINDEN korábbi feature-állító (`package-setup*.sql`, `plan-features-*.sql`) UTÁN fut → friss DB-n is ez a végső; a meglévő (éles) DB-n új fájlként egyszer lefut a következő deploykor és felülírja a magyar stringeket. Idempotens.
 - A `handlers/billingHandlers.js` `updateSubscriptionPlan` már megőrzi a bilingual objektumokat (nincs regresszió, ha a developer szerkeszti a csomagot).
 
+## 2026-06-16 — Menü-átrendezés 1. fázis: domének szerinti csoportosítás (admin + manager) (PR #149)
+
+> A CargoTMS-mintára áttekinthetőbb menüstruktúra — a saját kinézet (vonalas SVG ikonok, accordion, dizájn-tokenek) és a funkciók teljes megtartásával. CSAK a menüpontok csoportosítása változott domének szerint; a `data-tab` kulcsok, a `pane`-ek és minden logika érintetlen.
+
+- **`public/admin.html` + `public/manager.html`** — a sidebar főmenü-csoportok átrendezve: a külön „Megrendelések" főmenü a **Fuvarok** alá olvasztva (beérkező + ügyfél-kérések); az **Üzemanyagkártya** a **Flotta** csoportba (Adminból); új **„Pénzügy"** csoport (Pénzügy-riport + Sofőr-elszámolás kiemelve a Statisztikából); a **Jogosultságok** (admin) + **Aláírás & bélyegző** az **Adminisztráció** csoportba; a **Statisztika** csoport ezután tisztán riport (a „& Pénzügy" elnevezés megszűnt). Admin és manager egységes vázon.
+- **`public/i18n.js`** — 2 új csoport-fejléc kulcs: `nav.financeHead` (Finanțe/Pénzügy), `nav.statsHead` (Statistici/Statisztika), RO-alap + HU. Cache-bust `i18n.js?v=20260616menu`.
+- Minden menü-logika `data-tab` / `[id$="ParentTab"]` alapú → a feature-flag rejtés, a single-open accordion és a beérkező-értesítő badge változatlanul működik. Nincs duplikált/elveszett menüpont (32 menüpont, mindnek van pane-je). 93 Jest zöld.
+- **Következő (jóváhagyott, még nyitott):** 2. fázis — megjelenés-csiszolás (egységes oldal-fej + űrlap-kártya + táblázat-pillák); a Lejárat/Szerviz felvitele a jármű/sofőr adatlapról is.
+
 ## 2026-06-16 — Landing: nincs egymás melletti kétnyelvű felirat (árazás + oldal)
 
 > A landing árazás-szekciója egymás mellett mutatta a két nyelvet (havi/éves váltó, kiegészítők cím). Kérés: SEHOL ne legyen két nyelv egyszerre — a nyelvváltó intézze, RO-alap.
