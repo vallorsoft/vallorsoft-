@@ -89,7 +89,7 @@
   }
 
   // ── Panel-váltó ──
-  var PANELS = ['create', 'browse', 'upload', 'pairing', 'sender'];
+  var PANELS = ['create', 'gallery', 'browse', 'upload', 'pairing', 'sender'];
   window.ebSwitch = function (panel) {
     document.querySelectorAll('.eb-card').forEach(function (c) {
       c.classList.toggle('active', c.getAttribute('data-panel') === panel);
@@ -99,9 +99,56 @@
       if (sec) sec.classList.toggle('active', p === panel);
     });
     if (panel === 'create' && !editor) initGjs();
+    if (panel === 'gallery') loadGallery();
     if (panel === 'browse') loadBrowse();
     if (panel === 'pairing') loadPairing();
     if (panel === 'sender') loadSender();
+  };
+
+  // ── Galéria: mindenki számára elérhető, beépített kész sablonok ──
+  function galleryName(g) {
+    var lang = (window.I18N && window.I18N.get) ? window.I18N.get() : (localStorage.getItem('vs-lang') || 'ro');
+    return (g.name && (g.name[lang] || g.name.ro || g.name.hu)) || g.key;
+  }
+  function loadGallery() {
+    var grid = document.getElementById('gallery-grid');
+    var list = window.EB_GALLERY || [];
+    if (!grid) return;
+    if (!list.length) { grid.innerHTML = '<p style="color:var(--muted)">—</p>'; return; }
+    grid.innerHTML = list.map(function (g) {
+      // Az élő HTML kicsinyített, kattintásmentes előnézete iframe-ben.
+      var prev = '<iframe class="gprev" sandbox="" srcdoc="' + esc(g.html) + '"></iframe>';
+      return '<div class="tplc gcard" style="--gac:' + esc(g.accent || '#f6711e') + ';">'
+        + '<div class="gthumb">' + prev + '</div>'
+        + '<div class="n">' + esc(galleryName(g)) + '</div>'
+        + '<div class="a">'
+        + '<button class="btn primary sm" onclick="ebUseGallery(\'' + esc(g.key) + '\')">' + esc(T('eb.useTemplate')) + '</button>'
+        + '<button class="btn ghost sm" onclick="ebPreviewGallery(\'' + esc(g.key) + '\')">👁️</button>'
+        + '</div></div>';
+    }).join('');
+  }
+
+  function findGallery(key) {
+    return (window.EB_GALLERY || []).filter(function (g) { return g.key === key; })[0];
+  }
+
+  window.ebUseGallery = function (key) {
+    var g = findGallery(key);
+    if (!g) return;
+    ebSwitch('create');
+    editingId = null; // a galériából mindig ÚJ sablon (nem írja felül a meglévőt)
+    document.getElementById('tpl-name').value = galleryName(g);
+    document.getElementById('tpl-subject').value = '';
+    document.getElementById('btn-save-tpl').textContent = T('eb.saveTpl');
+    initGjs(g.html);
+    toast(T('eb.galleryLoaded'), 'success');
+  };
+
+  window.ebPreviewGallery = function (key) {
+    var g = findGallery(key);
+    if (!g) return;
+    document.getElementById('pv-iframe').srcdoc = g.html;
+    document.getElementById('pv-modal').style.display = 'flex';
   };
 
   // ── Panel 1: létrehozás / szerkesztés ──
@@ -417,6 +464,7 @@
     loadMainTable();
     var act = document.querySelector('.eb-card.active');
     if (act && act.getAttribute('data-panel') === 'browse') loadBrowse();
+    if (act && act.getAttribute('data-panel') === 'gallery') loadGallery();
     if (act && act.getAttribute('data-panel') === 'pairing') loadPairing();
     if (!editingId) document.getElementById('btn-save-tpl').textContent = T('eb.saveTpl');
   };
