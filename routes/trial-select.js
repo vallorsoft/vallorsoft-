@@ -171,6 +171,7 @@ router.get('/api/trial/select-plan', async (req, res) => {
         to:      company.email_contact,
         subject: `VallorSoft — Detalii plată: ${planData.name} · ${reference}`,
         html:    emailHtml,
+        companyId: cid, mailType: 'payment',
       }).catch((e) => console.warn('[trial-select] Fizetési email hiba:', e.message));
     }
 

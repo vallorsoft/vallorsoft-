@@ -34,11 +34,15 @@ handlers.exportCompanyData = async function (req, res) {
       // (*_sig data URL) méret miatt kizárva. A rows() üres tömböt ad, ha a tábla
       // még nincs (migráció előtt) — nem buktatja az exportot.
       ecmr: await rows('SELECT id, order_id, status, created_at, created_by, sender_name, sender_signed_at, sender_ip, carrier_name, carrier_signed_at, carrier_ip, consignee_name, consignee_signed_at, consignee_ip FROM order_ecmr WHERE company_id = $1'),
+      // Értesítési központ — a szöveg (title/body) tartalmazhat személyes adatot.
+      notifications: await rows('SELECT id, user_id, type, title, body, link_tab, read_at, created_at FROM notifications WHERE company_id = $1'),
+      // Levél-napló — a címzett e-mail (to_email) SZEMÉLYES ADAT → exportálandó.
+      mail_log: await rows('SELECT id, to_email, subject, type, status, provider_id, created_at FROM mail_log WHERE company_id = $1'),
     };
     audit.fromReq(req, 'gdpr.export', 'company', cid, { counts: {
       users: data.users.length, clients: data.clients.length, vehicles: data.vehicles.length, orders: data.orders.length,
       client_portal_users: data.client_portal_users.length, carrier_portal_users: data.carrier_portal_users.length,
-      ecmr: data.ecmr.length,
+      ecmr: data.ecmr.length, notifications: data.notifications.length, mail_log: data.mail_log.length,
     } });
     return res.json({ result: { ok: true, generated_at: new Date().toISOString(), data } });
   } catch (err) {

@@ -115,7 +115,7 @@ router.post('/api/client-mail/send', requireLogin, requireRole('Admin', 'Manager
       if (p.rows.length && p.rows[0].pdf_data) attachments.push({ name: p.rows[0].pdf_name || 'comanda.pdf', contentBase64: p.rows[0].pdf_data.toString('base64') });
     }
 
-    const result = await sendClientEmail({ to, subject, html, replyTo: req.session.user.email, senderName, logoUrl, attachments });
+    const result = await sendClientEmail({ to, subject, html, replyTo: req.session.user.email, senderName, logoUrl, attachments, companyId: own(req), mailType: 'client' });
 
     await pool.query(
       `INSERT INTO client_emails (company_id, inbound_order_id, order_id, to_email, subject, body, status, error_message, sent_by)

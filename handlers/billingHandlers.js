@@ -584,6 +584,7 @@ handlers.requestSubscriptionExtension = async function (req, res, args) {
         to: company.email_contact,
         subject: `VallorSoft — Detalii plată: ${planData.name} · ${reference}`,
         html,
+        companyId: cid, mailType: 'payment',
       }).catch(e => console.warn('[SubExt] admin email hiba:', e.message));
     }
 
@@ -602,7 +603,8 @@ handlers.requestSubscriptionExtension = async function (req, res, args) {
            <tr><td style="padding:5px 0;color:#8a97a8;">Referencia</td><td style="font-weight:700;font-family:monospace;color:#6366f1;font-size:16px;">${escH(reference)}</td></tr>
            <tr><td style="padding:5px 0;color:#8a97a8;">Dátum</td><td>${new Date().toLocaleString('ro-RO')}</td></tr>
          </table>
-         <p style="font-size:13px;color:#8a97a8;margin:0;">Ellenőrizd a bankszámlán, majd <a href="${appUrl}/developer" style="color:#6366f1;">aktiváld a developer felületen</a>.</p>`
+         <p style="font-size:13px;color:#8a97a8;margin:0;">Ellenőrizd a bankszámlán, majd <a href="${appUrl}/developer" style="color:#6366f1;">aktiváld a developer felületen</a>.</p>`,
+        cid
       );
     } catch (e) { console.warn('[SubExt] developer értesítő hiba:', e.message); }
 

@@ -108,6 +108,15 @@ function startExpiryScheduler() {
           body,
           url: '/admin',
         });
+        // Cégen belüli értesítés (Notifications-központ) — a push mellett, best-effort.
+        try {
+          const { notify } = require('../handlers/notifications');
+          await notify(pool, {
+            company_id: cid, type: 'expiry',
+            title: 'Documente care expiră',
+            body, link_tab: 'expiries',
+          });
+        } catch (_) { /* best-effort */ }
         const ids = items.map((i) => i.id);
         await pool.query(
           'UPDATE document_expiries SET last_alert_at = CURRENT_DATE WHERE id = ANY($1)', [ids]);
@@ -241,6 +250,7 @@ function startMonthlyReportScheduler() {
         for (const a of adminsR.rows) {
           const r = await email.sendClientEmail({
             to: a.email, subject: '📊 VallorSoft raport lunar — ' + month + ' (' + c.nev + ')', html,
+            companyId: c.id, mailType: 'monthly_report',
           });
           if (r && r.ok) sentAny = true;
         }
@@ -453,7 +463,7 @@ function startTrialExpiryScheduler() {
   </div>
 </div>`;
           }
-          await sendClientEmail({ to: ceg.email_contact, subject: emailSubject, html: emailHtml });
+          await sendClientEmail({ to: ceg.email_contact, subject: emailSubject, html: emailHtml, companyId: ceg.id, mailType: 'trial_expiry' });
           await pool.query('UPDATE companies SET trial_email_sent=true WHERE id=$1', [ceg.id]);
           console.log('[Trial] cég #' + ceg.id + ' — trial lejárat email elküldve (' + ceg.nev + ')');
         } catch (mailErr) {
@@ -575,6 +585,7 @@ function startTrialReminderScheduler() {
               to:      company.email_contact,
               subject: `⏳ VallorSoft — ${daysLeft === 1 ? 'Ultima zi de probă' : `${daysLeft} zile rămase din perioada de probă`} — Alege pachet`,
               html,
+              companyId: company.id, mailType: 'trial_reminder',
             });
             console.log(`[TrialReminder] ${daysLeft}d — cég #${company.id} (${company.nev}) emlékeztető elküldve`);
           } catch (mailErr) {

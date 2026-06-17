@@ -121,6 +121,8 @@
         <div class="sub-tab" data-tab="invites" data-i18n="nav.invites">Meghívókódok</div>
         <div class="sub-tab" data-tab="billing" data-i18n="nav.billing">📥 E-mail feldolgozás</div>
         <div class="sub-tab" data-tab="signature" data-i18n="nav.signature">Aláírás és Bélyegző</div>
+        <div class="sub-tab" data-tab="notifications" data-i18n="nav.notifications">🔔 Értesítések</div>
+        <div class="sub-tab" data-tab="mail-log" data-i18n="nav.mailLog">✉️ Levél-napló</div>
       </div>
     </div>
     <!-- 10. Beállítások -->
@@ -479,6 +481,43 @@
         <div class="h-sub" data-i18n="invo.subIn">Alvállalkozói (szállítói) számlák / tartozások</div>
       </div>
       <div id="carrierApBox" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- ── Értesítések (Adminisztráció) ── -->
+    <div class="pane hidden" data-pane="notifications">
+      <div class="glass" style="padding:22px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+          <div>
+            <h2 class="h-title" data-i18n="notif.title">🔔 Értesítések</h2>
+            <div class="h-sub" data-i18n="notif.sub">A rendszer értesítései — beérkező kérések, lejáratok stb.</div>
+          </div>
+          <button class="btn ghost" onclick="NotifPageMarkAll()" data-i18n="notif.markAll">Mind olvasott</button>
+        </div>
+        <div id="notifPageBox" style="margin-top:16px;"></div>
+      </div>
+    </div>
+
+    <!-- ── Levél-napló (Adminisztráció) ── -->
+    <div class="pane hidden" data-pane="mail-log">
+      <div class="glass" style="padding:22px;">
+        <h2 class="h-title" data-i18n="mlog.title">✉️ Levél-napló</h2>
+        <div class="h-sub" data-i18n="mlog.sub">A rendszer által kiküldött e-mailek naplója.</div>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin:14px 0;">
+          <label style="display:flex;flex-direction:column;font-size:12px;gap:4px;"><span data-i18n="invo.from">Tól</span><input id="mlFrom" type="date" class="input"></label>
+          <label style="display:flex;flex-direction:column;font-size:12px;gap:4px;"><span data-i18n="invo.to">Ig</span><input id="mlTo" type="date" class="input"></label>
+          <button class="btn primary" onclick="loadMailLog()" data-i18n="invo.filter">Szűrés</button>
+        </div>
+        <table class="table" style="width:100%;border-collapse:collapse;">
+          <thead><tr>
+            <th style="padding:8px 10px;text-align:left;" data-i18n="mlog.colDate">Dátum</th>
+            <th style="padding:8px 10px;text-align:left;" data-i18n="mlog.colTo">Címzett</th>
+            <th style="padding:8px 10px;text-align:left;" data-i18n="mlog.colSubject">Tárgy</th>
+            <th style="padding:8px 10px;text-align:left;" data-i18n="mlog.colType">Típus</th>
+            <th style="padding:8px 10px;text-align:left;" data-i18n="mlog.colStatus">Státusz</th>
+          </tr></thead>
+          <tbody id="mailLogBody"></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- ── BNR árfolyam (Pénzügy) ── -->
@@ -1222,6 +1261,8 @@
 <script src="/fav-locations.js?v=20260617a2"></script>
 <script src="/invoice-modal.js?v=20260614qa"></script>
 <script src="/invoices-out.js?v=20260616inv"></script>
+<script src="/notifications.js?v=20260617c2"></script>
+<script src="/mail-log.js?v=20260617c2"></script>
 <script src="/stats.js?v=20260617b1"></script>
 <script src="/fleet-extra.js?v=20260616band3"></script>
 <script src="/entity-detail.js?v=20260617b2"></script>

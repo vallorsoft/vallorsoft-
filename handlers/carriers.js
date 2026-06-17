@@ -255,7 +255,7 @@ handlers.carrierPortalInvite = async function (req, res, args) {
     }
     const link = APP_URL + '/carrier?token=' + token;
     let emailed = false;
-    if (sendResetEmail) { try { await sendResetEmail(email, nev || email, link, await emailLang(cid)); emailed = true; } catch (_) { emailed = false; } }
+    if (sendResetEmail) { try { await sendResetEmail(email, nev || email, link, await emailLang(cid), cid); emailed = true; } catch (_) { emailed = false; } }
     return res.json({ result: { ok: true, link, emailed } });
   } catch (err) { console.error('carrierPortalInvite hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };

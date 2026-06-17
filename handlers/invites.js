@@ -75,7 +75,7 @@ handlers.invCreate = async function (req, res, args) {
         const cegRes = await pool.query('SELECT nev, email_lang FROM companies WHERE id = $1', [req.session.user.company_id]);
         const cegNev = cegRes.rows[0]?.nev || '';
         const lang = cegRes.rows[0]?.email_lang === 'hu' ? 'hu' : 'ro';
-        sendInviteEmail(email, kod, pozicio, cegNev, invNume, lang)
+        sendInviteEmail(email, kod, pozicio, cegNev, invNume, lang, req.session.user.company_id)
           .catch(e => console.error('Email hatter hiba:', e.message));
       }
 

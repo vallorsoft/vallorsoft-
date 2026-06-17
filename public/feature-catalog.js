@@ -59,6 +59,8 @@ window.VS_FEATURES = [
   { key: 'billing',          label: 'Számlázás fül (csak Manager)', group: 'Adminisztráció' },
   { key: 'integrations',     label: 'Integrációk fül (csak Admin)', group: 'Adminisztráció' },
   { key: 'signature',        label: 'Aláírás és bélyegző',         group: 'Adminisztráció' },
+  { key: 'notifications',    label: 'Értesítések 🔔',              group: 'Adminisztráció' },
+  { key: 'mail-log',         label: 'Levél-napló ✉️',              group: 'Adminisztráció' },
   { key: 'chat',             label: 'Belső chat',                  group: 'Kommunikáció' },
   { key: 'fav-locations',    label: 'Kedvenc helyszínek ⭐',        group: 'Rendszer' },
   { key: 'settings',         label: 'Beállítások',                 group: 'Rendszer', core: true },

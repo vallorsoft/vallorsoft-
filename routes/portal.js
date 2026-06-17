@@ -23,6 +23,10 @@ try { ({ sendResetEmail } = require('../services/email')); } catch (_) { /* e-ma
 let sendPushToRole = null;
 try { ({ sendPushToRole } = require('../services/push')); } catch (_) { /* push opcionális */ }
 
+// Értesítési-központ beszúró (best-effort, sosem dob) — a push mellett.
+let notifInsert = function () {};
+try { ({ notify: notifInsert } = require('../handlers/notifications')); } catch (_) { /* opcionális */ }
+
 // ─── Middleware: csak bejelentkezett portál-ügyfél ───────────
 function requireClient(req, res, next) {
   if (!req.session || !req.session.clientUser) return res.status(401).json({ ok: false, err: 'Nu sunteti autentificat.' });
@@ -366,6 +370,18 @@ router.post('/api/portal/request', requireClient, async (req, res) => {
         }).catch(() => {});
       });
     }
+    // Cégen belüli értesítés (Notifications-központ) — a push mellett, best-effort.
+    // user_id NULL = az egész cégnek (minden Admin/Manager látja).
+    try {
+      const route2 = (loc_incarcare && loc_descarcare) ? (loc_incarcare + ' → ' + loc_descarcare)
+                   : (loc_incarcare || loc_descarcare || '');
+      notifInsert(pool, {
+        company_id: cu.company_id, type: 'inbound',
+        title: 'Cerere nouă de transport',
+        body: (cu.client_nev || cu.email) + (route2 ? ': ' + route2 : ''),
+        link_tab: 'client-requests',
+      });
+    } catch (_) { /* best-effort */ }
     return res.json({ ok: true });
   } catch (err) {
     console.error('portal request hiba:', err);
