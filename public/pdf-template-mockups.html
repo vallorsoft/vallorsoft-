@@ -61,20 +61,20 @@
   .totbar b{font-size:16px;color:var(--accent);}
 
   /* ── CMR hivatalos formanyomtatvány (kitölthető, példány-szín váltóval) ── */
-  .cmr-form{--cmr:#d12f2f;border:2px solid var(--cmr);font-size:10px;color:#111;}
+  /* Tahoma: kis méretben is jól olvasható, kompakt — a teljes űrlap ezt örökli */
+  .cmr-form{--cmr:#d12f2f;border:2px solid var(--cmr);font-size:9px;color:#111;font-family:Tahoma,Verdana,'Segoe UI',Arial,sans-serif;}
   .cmr-copybar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
   .cmr-copybar .lab{font-size:11px;color:var(--muted);margin-right:4px;}
   .cmr-copybar button{font-size:11px;padding:5px 11px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:600;}
   .cmr-copybar button.on{color:#fff;border-color:transparent;}
-  .cmr-copytitle{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 8px;border-bottom:1px solid var(--cmr);}
-  .cmr-copytitle .big{font-size:22px;font-weight:800;color:var(--cmr);line-height:1;}
-  .cmr-copytitle .ct{font-size:10px;color:#333;line-height:1.4;}
+  .cmr-copytitle{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 8px;border-bottom:1px solid var(--cmr);}
+  .cmr-copytitle .ct{font-size:9.5px;color:#333;line-height:1.35;}
   .cmr-row{display:grid;grid-template-columns:1fr 1fr;}
   .cmr-cell{border:1px solid var(--cmr);padding:4px 7px;min-height:0;}
-  .cmr-cell .num{display:inline-block;color:var(--cmr);font-weight:800;font-size:11px;margin-right:5px;}
-  .cmr-cell .lbl{font-size:8.5px;line-height:1.3;color:#333;}
+  .cmr-cell .num{display:inline-block;color:var(--cmr);font-weight:800;font-size:10px;margin-right:5px;}
+  .cmr-cell .lbl{font-size:7.5px;line-height:1.25;color:#333;}
   .cmr-cell .lbl b{color:#111;}
-  .fillable{margin-top:2px;min-height:15px;font-size:11px;line-height:1.4;color:#0b3a8a;outline:none;white-space:pre-wrap;}
+  .fillable{margin-top:2px;min-height:15px;font-size:10px;line-height:1.4;color:#0b3a8a;outline:none;white-space:pre-wrap;}
   .fillable:focus{background:#fffdf5;box-shadow:inset 0 0 0 1px var(--cmr);}
   .fillable.tall{min-height:34px;}
   .fillable.short{min-height:13px;}
@@ -83,11 +83,11 @@
   .cmr-title .cmrlogo{position:absolute;top:6px;right:8px;border:1.5px solid var(--cmr);color:var(--cmr);font-weight:800;font-size:13px;border-radius:50%;padding:3px 9px;}
   .cmr-title h3{margin:0 0 3px;font-size:10px;color:#111;letter-spacing:.5px;}
   .cmr-goods{width:100%;border-collapse:collapse;}
-  .cmr-goods th{background:#fff;border:1px solid var(--cmr);color:#111;font-size:8px;font-weight:700;padding:4px 5px;text-align:left;vertical-align:top;}
-  .cmr-goods th .num{color:var(--cmr);font-weight:800;font-size:10px;}
+  .cmr-goods th{background:#fff;border:1px solid var(--cmr);color:#111;font-size:7px;font-weight:700;padding:3px 5px;text-align:left;vertical-align:top;}
+  .cmr-goods th .num{color:var(--cmr);font-weight:800;font-size:9px;}
   .cmr-goods td{border:1px solid var(--cmr);height:20px;padding:2px 5px;}
   .cmr-goods td .fillable{min-height:14px;}
-  .cmr-charge{width:100%;border-collapse:collapse;font-size:8px;line-height:1.15;}
+  .cmr-charge{width:100%;border-collapse:collapse;font-size:7px;line-height:1.15;}
   .cmr-charge td{border:1px solid var(--cmr);padding:1px 4px;}
   .cmr-charge .fillable.short{min-height:11px;margin-top:1px;}
   .cmr-charge .hd{background:#fff;color:var(--cmr);font-weight:800;}
@@ -186,8 +186,7 @@
 
   <div class="cmr-form var-de" id="cmrForm">
     <div class="cmr-copytitle">
-      <div><span class="big" id="cmrBig">1</span></div>
-      <div class="ct" id="cmrCopyLabel"><b>Exemplar pentru expeditor</b><br>Copy for sender<br><span class="l3 l-de">Exemplar für den Absender</span><span class="l3 l-fr">Exemplaire pour l'expéditeur</span></div>
+      <div class="ct" id="cmrCopyLabel"><b>Exemplar pentru expeditor</b> · Copy for sender · <span class="l3">Exemplar für den Absender</span></div>
     </div>
 
     <!-- Sor: 1 / Címblokk -->
@@ -304,10 +303,10 @@
   function renderCopyLabel(){
     if(!curBtn) return;
     var third = curVar === 'fr' ? curBtn.getAttribute('data-fr') : curBtn.getAttribute('data-de');
+    // Címzett egymás után (inline), példány-szám nélkül
     document.getElementById('cmrCopyLabel').innerHTML =
-      '<b>Exemplar pentru ' + curBtn.getAttribute('data-ro').toLowerCase() + '</b><br>' +
-      curBtn.getAttribute('data-en') + '<br>' +
-      '<span class="l3">' + third + '</span>';
+      '<b>Exemplar pentru ' + curBtn.getAttribute('data-ro').toLowerCase() + '</b> · ' +
+      curBtn.getAttribute('data-en') + ' · <span class="l3">' + third + '</span>';
   }
 
   // Példány-szín váltó
@@ -318,7 +317,6 @@
     b.classList.add('on'); b.style.background=c; b.style.color='#fff';
     curBtn = b;
     form.style.setProperty('--cmr', c);
-    document.getElementById('cmrBig').textContent = b.getAttribute('data-no');
     renderCopyLabel();
   });
 
