@@ -59,6 +59,14 @@ router.get('/utvonaltervezes', requirePageLogin, requirePageRole('Admin', 'Manag
   res.sendFile(path.join(__dirname, '..', 'public', 'utvonaltervezes.html'));
 });
 
+// Vizuális e-mail sablon / kimenő levelező modul (Admin/Manager).
+// Önálló statikus oldal (mint az /utvonaltervezes) — NEM res.render.
+router.get('/email-builder', requirePageLogin, requirePageRole('Admin', 'Manager'), async function(req, res) {
+  const ok = await featureEnabled(req.session.user.company_id, 'email-builder');
+  if (!ok) return res.redirect(req.session.user.pozicio === 'Manager' ? '/manager' : '/admin');
+  res.sendFile(path.join(__dirname, '..', 'public', 'email-builder.html'));
+});
+
 router.get('/subscription', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'subscription.html')));
 
 // Developer landing szerkesztő (is_dev kötelező)

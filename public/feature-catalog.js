@@ -63,6 +63,7 @@ window.VS_FEATURES = [
   { key: 'notifications',    label: 'Értesítések 🔔',              group: 'Adminisztráció' },
   { key: 'mail-log',         label: 'Levél-napló ✉️',              group: 'Adminisztráció' },
   { key: 'email-templates',  label: 'E-mail sablonok ✉️',          group: 'Adminisztráció' },
+  { key: 'email-builder',    label: 'E-mail szerkesztő & kiküldés 📧', group: 'Adminisztráció' },
   { key: 'chat',             label: 'Belső chat',                  group: 'Kommunikáció' },
   { key: 'fav-locations',    label: 'Kedvenc helyszínek ⭐',        group: 'Rendszer' },
   { key: 'company-settings', label: 'Cég & arculat 🏢',            group: 'Rendszer' },
