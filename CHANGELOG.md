@@ -14,6 +14,17 @@
 
 ---
 
+## 2026-06-17 — E-mail galéria: 30 kész sablon mindenki számára (PR #180 + #181)
+
+> A vizuális e-mail-szerkesztő (`/email-builder`) „🎨 Galéria" füle 30 beépített, kész e-mail-sablonnal — különböző színekben és formákban. Egy kattintással a szerkesztőbe tölthető, testreszabható és saját sablonként menthető.
+
+- **`public/email-gallery.js`** — a sablonok **kódból** jönnek (nem cégenkénti DB-tétel) → minden cég ugyanazt a galériát látja, nincs cégenkénti feltöltés. 30 db:
+  - **12 alap** (PR #180): 🌅 Napnyugta · 🌊 Óceán üzleti · ✅ Erdő visszaigazolás · 🖤 Espresso prémium · ⚪ Minimál · 🎉 Korall promó · 📰 Teal hírlevél · 🟣 Lila kreatív · 🔔 Borostyán emlékeztető · 🏢 Navy klasszikus · 🔴 Piros sürgős · 💗 Pasztel köszönő.
+  - **+18 új** (PR #181) — **komolyabb/sűrűbb:** 🧾 Számla/kimutatás (tétel-tábla) · 📋 Részletes árajánlat (rúta-tábla) · 📊 Havi riport (stat-rács) · ⚖️ Hivatalos értesítés · 🗞️ Több szekciós hírlevél · 🚚 Fuvar-állapot tábla · 💲 Árlista · 📅 Időpont-visszaigazolás · 🏆 Éves összegzés; **futurisztikus:** ⚡ Neon · 🔮 Üveg-gradiens · 💻 Terminál/tech · 🌈 Holografikus · 🌃 Cyberpunk · 🔷 Elektromos minimál · 🌌 Kozmikus; **modern:** ☁️ Lágy modern · 🎨 Gradiens mesh.
+- **E-mail-biztosság:** mind táblázatos elrendezés + inline CSS; a gradienses (futurisztikus) sablonoknál `solid` szín-fallback a nem támogató kliensekhez (pl. Outlook). Mindegyik a `{{nev}}` / `{{cegnev}}` / `{{datum}}` helyőrzőket használja.
+- **UI:** új „🎨 Galéria" nav-kártya + panel — élő, kicsinyített (sandbox-olt iframe) előnézet + „✏️ Használ" (a GrapesJS-be tölti ÚJ sablonként → testreszabás + saját mentés) + 👁️ nagyítható előnézet. Új `darkWrap`/`gbtn` segédek a sötét/futurisztikus kártyákhoz. RO+HU nevek. **Tisztán kliensoldali** — backend/DB érintetlen. Cache-bust `?v=20260617eb4`; 93 Jest zöld.
+- **Deploy-javítás:** a 30-sablonos PR (#181) main-push CI-futása a `concurrency: cancel-in-progress` miatt megszakadt, így a Render auto-deploy nem futott (élesen a 12-sablonos verzió maradt) → a `17470dd` commit CI-futásának **rerun**-jával a `deploy` job lefutott, az élesedés megtörtént.
+
 ## 2026-06-17 — ÚJ modul: vizuális e-mail szerkesztő + cég saját feladó-fiókról küldés
 
 > Teljes vizuális (GrapesJS) e-mail-sablon szerkesztő KÜLSŐ kapcsolatoknak (ügyfél/jövőbeli ügyfél/alvállalkozó/egyéb) — NEM a platform felhasználóinak. A kimenő levelek a **cég SAJÁT e-mail-fiókjáról** mennek (SMTP nodemailer és/vagy cégenkénti Brevo), **nem egy közös címről**.
