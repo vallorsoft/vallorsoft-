@@ -65,7 +65,7 @@
         sunset:    '🚚 [Denumire firmă] — Listă transporturi\n[Adresă] · [Telefon]',
       },
       {
-        system:    'Document generat automat · {{datum}}',
+        system:    'Document generat automat din sistemul VallorSoft.',
         corporate: FOOTER_LEGAL,
         sunset:    FOOTER_THANKS_RO,
       }
@@ -95,7 +95,7 @@
         sunset:    '📄 CMR — [Denumire firmă]',
       },
       {
-        system:    'Conform Convenției CMR. · {{datum}}',
+        system:    'Conform Convenției CMR (Geneva, 1956).',
         corporate: 'Mențiuni speciale: ____________________\nConform Convenției CMR (1956). · ' + FOOTER_LEGAL,
         sunset:    'Mulțumim pentru colaborare!',
       }

@@ -111,8 +111,8 @@
       { name: { hu: '🏢 Levél-keret', ro: '🏢 Format scrisoare' },
         subject_ro: '{{subject}}',
         subject_hu: '{{subject}}',
-        body_ro: '<p>Stimate client,</p><p>{{message}}</p><p>Cu stimă,<br>Echipa {{cegnev}}</p>',
-        body_hu: '<p>Tisztelt Ügyfelünk,</p><p>{{message}}</p><p>Üdvözlettel,<br>A(z) {{cegnev}} csapata</p>' },
+        body_ro: '<p>Stimate client,</p><p>{{message}}</p><p>Cu stimă,<br>Echipa noastră</p>',
+        body_hu: '<p>Tisztelt Ügyfelünk,</p><p>{{message}}</p><p>Üdvözlettel,<br>Csapatunk</p>' },
 
       { name: { hu: '😊 Barátságos', ro: '😊 Prietenos' },
         subject_ro: '{{subject}}',
