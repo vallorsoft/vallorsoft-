@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VallorSoft — Mockup șabloane PDF</title>
+<style>
+  :root{
+    --accent:#f6711e;        /* napnyugta narancs (a jelenlegi arculat) */
+    --accent-2:#f6517b;      /* korall */
+    --ink:#1e1812;           /* espresso szöveg */
+    --muted:#7a6c5d;
+    --line:#e4dccf;
+    --cream:#faf6f0;
+    --grad:linear-gradient(135deg,#fb8c3a 0%,#f6517b 100%);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#d9d2c7;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:var(--ink);}
+
+  /* Felső navigáció (a mockup-böngészéshez — nyomtatáskor eltűnik) */
+  .nav{position:sticky;top:0;z-index:50;background:#1e1812;padding:12px 18px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.25);}
+  .nav .brand{color:#fff;font-weight:800;margin-right:14px;font-size:15px;}
+  .nav .brand b{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+  .nav a{color:#f3e9dd;text-decoration:none;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);}
+  .nav a:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .hint{max-width:820px;margin:18px auto 0;padding:0 16px;color:#4a4036;font-size:13px;}
+
+  /* A4 lap */
+  .page{background:#fff;width:820px;max-width:96vw;margin:22px auto;padding:34px 38px;border-radius:6px;box-shadow:0 10px 30px rgba(0,0,0,.18);position:relative;}
+  .page h2.docname{margin:0;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);font-weight:800;}
+  .pagetag{position:absolute;top:-11px;left:24px;background:var(--grad);color:#fff;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px;letter-spacing:.5px;}
+
+  /* Fej (logó + cégadat) */
+  .doc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;border-bottom:3px solid var(--accent);padding-bottom:14px;margin-bottom:18px;}
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo .mark{width:46px;height:46px;border-radius:11px;background:var(--grad);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:20px;box-shadow:0 4px 12px rgba(246,113,30,.4);}
+  .logo .nm{font-size:20px;font-weight:800;}
+  .logo .nm span{color:var(--accent);}
+  .co-meta{font-size:11px;color:var(--muted);text-align:right;line-height:1.6;}
+  .doc-title{text-align:center;margin:6px 0 16px;}
+  .doc-title h1{margin:0;font-size:21px;font-weight:800;letter-spacing:.5px;}
+  .doc-title .sub{font-size:12px;color:var(--muted);margin-top:3px;}
+
+  table{width:100%;border-collapse:collapse;font-size:11.5px;}
+  th{background:var(--cream);color:var(--ink);text-align:left;padding:8px 9px;border:1px solid var(--line);font-weight:700;}
+  td{padding:7px 9px;border:1px solid var(--line);vertical-align:top;}
+  tr:nth-child(even) td{background:#fcfaf6;}
+  .right{text-align:right;} .center{text-align:center;}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;}
+  .p-ok{background:#dcfce7;color:#166534;} .p-run{background:#fff0dd;color:#9a3412;} .p-wait{background:#e0e7ff;color:#3730a3;}
+
+  .grid{display:grid;gap:10px;}
+  .box{border:1px solid var(--line);border-radius:8px;padding:11px 13px;}
+  .box .lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--accent);font-weight:700;margin-bottom:4px;}
+  .box .val{font-size:12.5px;line-height:1.55;}
+  .muted{color:var(--muted);}
+  .foot{margin-top:20px;border-top:1px solid var(--line);padding-top:11px;font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;gap:12px;}
+  .sig{margin-top:6px;height:48px;border:1px dashed var(--line);border-radius:7px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:5px;font-size:10px;color:var(--muted);}
+  .sig.signed{border-style:solid;border-color:#16a34a;background:#f0fdf4;}
+  .totbar{margin-top:14px;display:flex;justify-content:flex-end;gap:26px;font-size:13px;}
+  .totbar b{font-size:16px;color:var(--accent);}
+
+  /* ── CMR hivatalos formanyomtatvány (kitölthető, példány-szín váltóval) ── */
+  .cmr-form{--cmr:#d12f2f;border:2px solid var(--cmr);font-size:10px;color:#111;}
+  .cmr-copybar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+  .cmr-copybar .lab{font-size:11px;color:var(--muted);margin-right:4px;}
+  .cmr-copybar button{font-size:11px;padding:5px 11px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:600;}
+  .cmr-copybar button.on{color:#fff;border-color:transparent;}
+  .cmr-copytitle{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 8px;border-bottom:1px solid var(--cmr);}
+  .cmr-copytitle .big{font-size:22px;font-weight:800;color:var(--cmr);line-height:1;}
+  .cmr-copytitle .ct{font-size:10px;color:#333;line-height:1.4;}
+  .cmr-row{display:grid;grid-template-columns:1fr 1fr;}
+  .cmr-cell{border:1px solid var(--cmr);padding:5px 7px;min-height:0;}
+  .cmr-cell .num{display:inline-block;color:var(--cmr);font-weight:800;font-size:11px;margin-right:5px;}
+  .cmr-cell .lbl{font-size:8.5px;line-height:1.3;color:#333;}
+  .cmr-cell .lbl b{color:#111;}
+  .fillable{margin-top:3px;min-height:18px;font-size:11px;line-height:1.5;color:#0b3a8a;outline:none;white-space:pre-wrap;}
+  .fillable:focus{background:#fffdf5;box-shadow:inset 0 0 0 1px var(--cmr);}
+  .fillable.tall{min-height:54px;}
+  .fillable.short{min-height:14px;}
+  .cmr-title{border:1px solid var(--cmr);padding:6px 8px;font-size:8px;line-height:1.35;color:#333;position:relative;}
+  .cmr-title .cmrlogo{position:absolute;top:6px;right:8px;border:1.5px solid var(--cmr);color:var(--cmr);font-weight:800;font-size:13px;border-radius:50%;padding:3px 9px;}
+  .cmr-title h3{margin:0 0 3px;font-size:10px;color:#111;letter-spacing:.5px;}
+  .cmr-goods{width:100%;border-collapse:collapse;}
+  .cmr-goods th{background:#fff;border:1px solid var(--cmr);color:#111;font-size:8px;font-weight:700;padding:4px 5px;text-align:left;vertical-align:top;}
+  .cmr-goods th .num{color:var(--cmr);font-weight:800;font-size:10px;}
+  .cmr-goods td{border:1px solid var(--cmr);height:20px;padding:2px 5px;}
+  .cmr-goods td .fillable{min-height:14px;}
+  .cmr-charge{width:100%;border-collapse:collapse;font-size:8.5px;}
+  .cmr-charge td{border:1px solid var(--cmr);padding:3px 5px;}
+  .cmr-charge .hd{background:#fff;color:var(--cmr);font-weight:800;}
+  .cmr-sig{display:grid;grid-template-columns:1fr 1fr 1fr;}
+  .cmr-note{font-size:7.5px;color:#555;line-height:1.3;padding:4px 6px;border:1px solid var(--cmr);}
+  /* Háromnyelvű változat: a nyelvek EGYMÁS ALATT (külön sor), a 3. (DE/FR) váltható */
+  .l3{color:#555;}
+  .cmr-cell .lbl .ll, .cmr-goods th .ll, .cmr-charge .ll{display:block;line-height:1.25;}
+  .cmr-cell .lbl .ll.ro, .cmr-goods th .ll.ro, .cmr-charge .ll.ro{font-weight:700;color:#111;}
+  .cmr-cell .lbl .ll.en, .cmr-goods th .ll.en, .cmr-charge .ll.en{color:#333;}
+  .cmr-title .l3, .cmr-note .l3{display:block;}
+  /* A nem-aktív 3. nyelv elrejtése (!important: legyőzi a .ll blokkot és az inline stílust is) */
+  .cmr-form.var-de .l-fr{display:none !important;}
+  .cmr-form.var-fr .l-de{display:none !important;}
+  .cmr-langbar{display:flex;gap:6px;align-items:center;margin-bottom:8px;}
+  .cmr-langbar .lab{font-size:11px;color:var(--muted);margin-right:4px;}
+  .cmr-langbar button{font-size:11px;padding:5px 12px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:700;}
+  .cmr-langbar button.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+
+  @media print{
+    body{background:#fff;}
+    .nav,.hint{display:none;}
+    .page{box-shadow:none;margin:0;border-radius:0;width:auto;max-width:none;page-break-after:always;}
+  }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="brand">Vallor<b>Soft</b> · Mockup șabloane</div>
+  <a href="#lista">📋 Listă comenzi</a>
+  <a href="#cmr">📄 CMR</a>
+  <a href="#ecmr">🔏 e-CMR</a>
+  <a href="#nota">🧾 Notă factură</a>
+  <a href="#aviz">📦 Aviz mărfii</a>
+  <a href="#" onclick="window.print();return false;">🖨️ Print / PDF</a>
+</div>
+
+<div class="hint">
+  Acestea sunt <b>mockup-uri</b> (machete vizuale) pentru aprobarea aspectului șabloanelor PDF.
+  Datele sunt exemple. Culorile/antetul/logo-ul se preiau din „Cég &amp; arculat”. După aprobare,
+  fiecare devine șablon editabil, disponibil tuturor.
+</div>
+
+<!-- ════════════ 1. LISTĂ COMENZI ════════════ -->
+<div class="page" id="lista">
+  <div class="pagetag">1 / 5 · Listă comenzi</div>
+  <div class="doc-head">
+    <div class="logo"><div class="mark">V</div><div class="nm">Vallor<span>Trans</span> SRL</div></div>
+    <div class="co-meta">
+      CUI: RO47859317 · Reg. Com.: J2023000114142<br>
+      Sat Arcus, Cart. Poiana Arcusului 102, jud. Covasna<br>
+      Tel: 0769 532 015 · E-mail: office@vallortrans.ro
+    </div>
+  </div>
+  <div class="doc-title">
+    <h2 class="docname">Document operativ</h2>
+    <h1>LISTĂ COMENZI / TRANSPORTURI</h1>
+    <div class="sub">Perioada: 01.06.2026 – 17.06.2026 · 6 comenzi</div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>#</th><th>Data</th><th>Client</th><th>Rută</th><th>Vehicul</th><th>Șofer</th><th>Status</th><th class="right">Preț</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>1024</td><td>03.06</td><td>Demo Logistic SRL</td><td>București → München</td><td>B 104 VLR</td><td>I. Popescu</td><td><span class="pill p-ok">Finalizat</span></td><td class="right">1 850 €</td></tr>
+      <tr><td>1025</td><td>05.06</td><td>EuroCargo GmbH</td><td>Cluj → Wien</td><td>CV 22 VLR</td><td>A. Kovács</td><td><span class="pill p-run">In Curs</span></td><td class="right">1 200 €</td></tr>
+      <tr><td>1026</td><td>07.06</td><td>Marfa Rapidă SA</td><td>Constanța → Budapest</td><td>B 104 VLR</td><td>I. Popescu</td><td><span class="pill p-run">Extern</span></td><td class="right">1 430 €</td></tr>
+      <tr><td>1027</td><td>10.06</td><td>Demo Logistic SRL</td><td>Timișoara → Praha</td><td>CV 22 VLR</td><td>A. Kovács</td><td><span class="pill p-wait">Disponibil</span></td><td class="right">1 690 €</td></tr>
+      <tr><td>1028</td><td>12.06</td><td>Nord Expedit SRL</td><td>Iași → Warszawa</td><td>BV 71 VLR</td><td>G. Marin</td><td><span class="pill p-wait">Alocat</span></td><td class="right">2 050 €</td></tr>
+      <tr><td>1029</td><td>15.06</td><td>EuroCargo GmbH</td><td>Sibiu → Milano</td><td>BV 71 VLR</td><td>G. Marin</td><td><span class="pill p-ok">Finalizat</span></td><td class="right">2 240 €</td></tr>
+    </tbody>
+  </table>
+  <div class="totbar"><span class="muted">Total comenzi: 6</span><span>Valoare totală: <b>10 460 €</b></span></div>
+  <div class="foot"><span>Document generat automat de VallorSoft</span><span>17.06.2026 14:32</span></div>
+</div>
+
+<!-- ════════════ 2. CMR ════════════ -->
+<div class="page" id="cmr">
+  <div class="pagetag">2 / 5 · CMR</div>
+
+  <div class="cmr-langbar">
+    <span class="lab">Limba (a 3-a linie):</span>
+    <button data-var="de" class="on">🇷🇴 RO · 🇬🇧 EN · 🇩🇪 DE</button>
+    <button data-var="fr">🇷🇴 RO · 🇬🇧 EN · 🇫🇷 FR</button>
+  </div>
+
+  <div class="cmr-copybar">
+    <span class="lab">Exemplar (culoare per copie):</span>
+    <button data-c="#d12f2f" data-no="1" data-ro="Expeditor" data-en="Copy for sender" data-de="Exemplar für den Absender" data-fr="Exemplaire pour l'expéditeur" class="on" style="color:#fff;background:#d12f2f;">1 · Expeditor</button>
+    <button data-c="#1f5fbf" data-no="2" data-ro="Destinatar" data-en="Copy for consignee" data-de="Exemplar für den Empfänger" data-fr="Exemplaire pour le destinataire">2 · Destinatar</button>
+    <button data-c="#1f8f4d" data-no="3" data-ro="Transportator" data-en="Copy for carrier" data-de="Exemplar für den Frachtführer" data-fr="Exemplaire pour le transporteur">3 · Transportator</button>
+    <button data-c="#222222" data-no="4" data-ro="Contabilitate" data-en="Copy for accounting" data-de="Exemplar für die Buchhaltung" data-fr="Exemplaire pour la comptabilité">4 · Contabilitate</button>
+    <button data-c="#b8731f" data-no="5" data-ro="Casă de expediții" data-en="Copy for forwarder" data-de="Exemplar für den Spediteur" data-fr="Exemplaire pour le commissionnaire">5 · Expeditor (casă)</button>
+  </div>
+
+  <div class="cmr-form var-de" id="cmrForm">
+    <div class="cmr-copytitle">
+      <div><span class="big" id="cmrBig">1</span></div>
+      <div class="ct" id="cmrCopyLabel"><b>Exemplar pentru expeditor</b><br>Copy for sender<br><span class="l3 l-de">Exemplar für den Absender</span><span class="l3 l-fr">Exemplaire pour l'expéditeur</span></div>
+    </div>
+
+    <!-- Sor: 1 / Címblokk -->
+    <div class="cmr-row">
+      <div class="cmr-cell"><span class="num">1</span><span class="lbl"><span class="ll ro"><b>Expeditor</b> (nume, adresă, țară)</span><span class="ll en">Sender (name, address, country)</span><span class="ll l-de">Absender (Name, Anschrift, Land)</span><span class="ll l-fr">Expéditeur (nom, adresse, pays)</span></span><div class="fillable tall" contenteditable="true"></div></div>
+      <div class="cmr-title">
+        <span class="cmrlogo">CMR</span>
+        <h3>SCRISOARE DE TRANSPORT INTERNAȚIONAL</h3>
+        <span class="l3" style="display:block;">INTERNATIONAL CONSIGNMENT NOTE</span>
+        <span class="l3 l-de" style="display:block;">INTERNATIONALER FRACHTBRIEF</span>
+        <span class="l3 l-fr" style="display:block;">LETTRE DE VOITURE INTERNATIONALE</span>
+        <span style="display:block;margin-top:4px;">Acest transport este supus, sub rezerva oricărei clauze contrare, Convenției referitoare la contractul de transport internațional de mărfuri pe șosele (CMR).</span>
+        <span style="display:block;">This carriage is subject, notwithstanding any clause to the contrary, to the Convention on the Contract for the international Carriage of goods by road (CMR).</span>
+        <span class="l3 l-de" style="display:block;">Diese Beförderung unterliegt trotz einer gegenteiligen Abmachung den Bestimmungen des Übereinkommens über den Beförderungsvertrag im internationalen Strassengüterverkehr (CMR).</span>
+        <span class="l3 l-fr" style="display:block;">Ce transport est soumis, nonobstant toute clause contraire, à la Convention relative au contrat de transport international de marchandises par route (CMR).</span>
+      </div>
+    </div>
+
+    <!-- Sor: 2 / 16 -->
+    <div class="cmr-row">
+      <div class="cmr-cell"><span class="num">2</span><span class="lbl"><span class="ll ro"><b>Destinatar</b> (nume, adresă, țară)</span><span class="ll en">Consignee (name, address, country)</span><span class="ll l-de">Empfänger (Name, Anschrift, Land)</span><span class="ll l-fr">Destinataire (nom, adresse, pays)</span></span><div class="fillable tall" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">16</span><span class="lbl"><span class="ll ro"><b>Transportator</b> (nume, adresă, țară)</span><span class="ll en">Carrier (name, address, country)</span><span class="ll l-de">Frachtführer (Name, Anschrift, Land)</span><span class="ll l-fr">Transporteur (nom, adresse, pays)</span></span><div class="fillable" contenteditable="true"></div><span class="lbl"><span class="ll ro"><b>NR. ÎNMATRICULARE</b></span><span class="ll en">Reg. No.</span><span class="ll l-de">Amtl. Kennzeichen</span><span class="ll l-fr">Immatriculation</span></span><div class="fillable short" contenteditable="true"></div></div>
+    </div>
+
+    <!-- Sor: 3 / 17 -->
+    <div class="cmr-row">
+      <div class="cmr-cell"><span class="num">3</span><span class="lbl"><span class="ll ro"><b>Loc de livrare</b> (localitate, țară)</span><span class="ll en">Place of delivery (place, country)</span><span class="ll l-de">Auslieferungsort des Gutes (Ort, Land)</span><span class="ll l-fr">Lieu de livraison (lieu, pays)</span></span><div class="fillable" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">17</span><span class="lbl"><span class="ll ro"><b>Transportatori succesivi</b></span><span class="ll en">Successive carriers</span><span class="ll l-de">Nachfolgende Frachtführer</span><span class="ll l-fr">Transporteurs successifs</span></span><div class="fillable" contenteditable="true"></div></div>
+    </div>
+
+    <!-- Sor: 4 / 18 -->
+    <div class="cmr-row">
+      <div class="cmr-cell"><span class="num">4</span><span class="lbl"><span class="ll ro"><b>Loc și dată încărcare</b> (localitate, țară, dată)</span><span class="ll en">Place and date of taking over the goods</span><span class="ll l-de">Ort und Tag der Übernahme des Gutes</span><span class="ll l-fr">Lieu et date de prise en charge</span></span><div class="fillable" contenteditable="true"></div></div>
+      <div class="cmr-cell" style="grid-row:span 2;"><span class="num">18</span><span class="lbl"><span class="ll ro"><b>Rezervele și observațiile transportatorului</b></span><span class="ll en">Carrier's reservations and observations</span><span class="ll l-de">Vorbehalte und Bemerkungen der Frachtführer</span><span class="ll l-fr">Réserves et observations du transporteur</span></span><div class="fillable tall" contenteditable="true"></div></div>
+    </div>
+
+    <!-- Sor: 5 -->
+    <div class="cmr-row" style="grid-template-columns:1fr;">
+      <div class="cmr-cell"><span class="num">5</span><span class="lbl"><span class="ll ro"><b>Documente anexate</b></span><span class="ll en">Documents attached</span><span class="ll l-de">Beigefügte Dokumente</span><span class="ll l-fr">Documents annexés</span></span><div class="fillable short" contenteditable="true"></div></div>
+    </div>
+
+    <!-- Áru-tábla 6–12 -->
+    <table class="cmr-goods">
+      <thead><tr>
+        <th style="width:13%"><span class="num">6</span> <span class="ll ro">Mărci și numere</span><span class="ll en">Marks and Nos</span><span class="ll l-de">Kennzeichen und Nummern</span><span class="ll l-fr">Marques et numéros</span></th>
+        <th style="width:9%"><span class="num">7</span> <span class="ll ro">Nr. colete</span><span class="ll en">Packages</span><span class="ll l-de">Anzahl der Packstücke</span><span class="ll l-fr">Nombre de colis</span></th>
+        <th style="width:13%"><span class="num">8</span> <span class="ll ro">Mod ambalare</span><span class="ll en">Packing</span><span class="ll l-de">Art der Verpackung</span><span class="ll l-fr">Mode d'emballage</span></th>
+        <th style="width:27%"><span class="num">9</span> <span class="ll ro">Natura mărfii</span><span class="ll en">Nature of goods</span><span class="ll l-de">Bezeichnung des Gutes</span><span class="ll l-fr">Nature de la marchandise</span></th>
+        <th style="width:13%"><span class="num">10</span> <span class="ll ro">Nr. statistic</span><span class="ll en">Stat. No.</span><span class="ll l-de">Statistiknummer</span><span class="ll l-fr">Numéro statistique</span></th>
+        <th style="width:13%"><span class="num">11</span> <span class="ll ro">Greutate brută kg</span><span class="ll en">Gross weight</span><span class="ll l-de">Bruttogewicht in kg</span><span class="ll l-fr">Poids brut kg</span></th>
+        <th style="width:12%"><span class="num">12</span> <span class="ll ro">Volum m³</span><span class="ll en">Volume</span><span class="ll l-de">Umfang m³</span><span class="ll l-fr">Volume m³</span></th>
+      </tr></thead>
+      <tbody>
+        <tr><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td></tr>
+        <tr><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td></tr>
+        <tr><td colspan="7" style="height:auto;"><span class="lbl" style="font-size:7.5px;"><span class="ll ro">Marfă periculoasă (ADR): Nr. UN · Clasă · Grupă de ambalare · literă</span><span class="ll l-de">Gefahrgut (ADR): UN-Nr. · Klasse · Verpackungsgruppe · Buchstabe</span><span class="ll l-fr">Marchandises dangereuses (ADR): N° UN · classe · groupe d'emballage · lettre</span></span><div class="fillable short" contenteditable="true"></div></td></tr>
+      </tbody>
+    </table>
+
+    <!-- 13 / 19 -->
+    <div class="cmr-row">
+      <div class="cmr-cell"><span class="num">13</span><span class="lbl"><span class="ll ro"><b>Instrucțiunile expeditorului</b></span><span class="ll en">Sender's instructions</span><span class="ll l-de">Anweisungen des Absenders</span><span class="ll l-fr">Instructions de l'expéditeur</span></span><div class="fillable tall" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">19</span><span class="lbl"><span class="ll ro"><b>Convenții speciale</b></span><span class="ll en">Special agreements</span><span class="ll l-de">Besondere Vereinbarungen</span><span class="ll l-fr">Conventions particulières</span></span><div class="fillable tall" contenteditable="true"></div></div>
+    </div>
+
+    <!-- 14 / 20 -->
+    <div class="cmr-row">
+      <div class="cmr-cell"><span class="num">14</span><span class="lbl"><span class="ll ro"><b>Instrucțiuni privind plata transportului</b></span><span class="ll en">Instructions as to payment</span><span class="ll l-de">Frachtzahlungsanweisungen</span><span class="ll l-fr">Prescriptions d'affranchissement</span></span><div class="fillable" contenteditable="true"></div></div>
+      <div class="cmr-cell" style="padding:3px;">
+        <table class="cmr-charge">
+          <tr><td class="hd" style="width:46%"><span class="num" style="color:inherit;">20</span> <span class="ll ro">De plată</span><span class="ll en">To be paid by</span><span class="ll l-de">Zu zahlen vom</span><span class="ll l-fr">À payer par</span></td><td class="hd center"><span class="ll ro">Expeditor</span><span class="ll l-de">Absender</span><span class="ll l-fr">Expéditeur</span></td><td class="hd center"><span class="ll ro">Valută</span><span class="ll l-de">Währung</span><span class="ll l-fr">Monnaie</span></td><td class="hd center"><span class="ll ro">Destinatar</span><span class="ll l-de">Empfänger</span><span class="ll l-fr">Destinataire</span></td></tr>
+          <tr><td><span class="ll ro">Transport · Carriage</span><span class="ll l-de">Fracht</span><span class="ll l-fr">Prix de transport</span></td><td><div class="fillable short" contenteditable="true"></div></td><td><div class="fillable short" contenteditable="true"></div></td><td><div class="fillable short" contenteditable="true"></div></td></tr>
+          <tr><td><span class="ll ro">Reduceri · Deductions</span><span class="ll l-de">Ermässigungen</span><span class="ll l-fr">Réductions</span></td><td></td><td></td><td></td></tr>
+          <tr><td><span class="ll ro">Sold · Balance</span><span class="ll l-de">Zwischenbetrag</span><span class="ll l-fr">Solde</span></td><td></td><td></td><td></td></tr>
+          <tr><td><span class="ll ro">Suplimente · Supplem.</span><span class="ll l-de">Zuschläge</span><span class="ll l-fr">Suppléments</span></td><td></td><td></td><td></td></tr>
+          <tr><td><span class="ll ro">Diverse · Miscellaneous</span><span class="ll l-de">Sonstiges</span><span class="ll l-fr">Frais accessoires</span></td><td></td><td></td><td></td></tr>
+          <tr><td><span class="ll ro">Asigurare · Insurance</span><span class="ll l-de">Versicherung</span><span class="ll l-fr">Assurance</span></td><td></td><td></td><td></td></tr>
+          <tr><td><b><span class="ll ro">Total de plată · Total</span><span class="ll l-de">Gesamtsumme</span><span class="ll l-fr">Total à payer</span></b></td><td><div class="fillable short" contenteditable="true"></div></td><td></td><td><div class="fillable short" contenteditable="true"></div></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 21 / 15 -->
+    <div class="cmr-row">
+      <div class="cmr-cell"><span class="num">21</span><span class="lbl"><span class="ll ro"><b>Întocmit la</b> ......... <b>la data de</b> .........</span><span class="ll en">Established in ......... on .........</span><span class="ll l-de">Ausgefertigt in ......... am .........</span><span class="ll l-fr">Établi à ......... le .........</span></span><div class="fillable short" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">15</span><span class="lbl"><span class="ll ro"><b>Ramburs</b></span><span class="ll en">Cash on delivery</span><span class="ll l-de">Rückerstattung / Nachnahme</span><span class="ll l-fr">Remboursement</span></span><div class="fillable short" contenteditable="true"></div></div>
+    </div>
+
+    <!-- 22 / 23 / 24 aláírások -->
+    <div class="cmr-sig">
+      <div class="cmr-cell"><span class="num">22</span><span class="lbl"><span class="ll ro"><b>Semnătura și ștampila expeditorului</b></span><span class="ll en">Signature and stamp of the sender</span><span class="ll l-de">Unterschrift und Stempel des Absenders</span><span class="ll l-fr">Signature et timbre de l'expéditeur</span></span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">23</span><span class="lbl"><span class="ll ro"><b>Semnătura și ștampila transportatorului</b></span><span class="ll en">Signature and stamp of the carrier</span><span class="ll l-de">Unterschrift und Stempel des Frachtführers</span><span class="ll l-fr">Signature et timbre du transporteur</span></span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">24</span><span class="lbl"><span class="ll ro"><b>Marfă primită</b> · Semnătura destinatarului</span><span class="ll en">Goods received · stamp of the consignee</span><span class="ll l-de">Gut empfangen · Stempel des Empfängers</span><span class="ll l-fr">Marchandises reçues · timbre du destinataire</span></span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
+    </div>
+
+    <div class="cmr-note">
+      <span style="display:block;">Rubricile încadrate cu linii groase se completează de transportator. Rubricile 1–15, 19, 20 și 22 se completează pe răspunderea expeditorului. Model CMR/IRU conform Convenției de la Geneva (1956).</span>
+      <span class="l3 l-de" style="display:block;">Die mit fett gedruckten Linien eingerahmten Rubriken müssen vom Frachtführer ausgefüllt werden. Die Rubriken 1–15, 19, 20 und 22 sind unter der Verantwortung des Absenders auszufüllen.</span>
+      <span class="l3 l-fr" style="display:block;">Les cadres encadrés de lignes grasses doivent être remplis par le transporteur. Les cadres 1–15, 19, 20 et 22 sont remplis sous la responsabilité de l'expéditeur.</span>
+    </div>
+  </div>
+
+  <div class="hint" style="margin:12px auto 0;">
+    💡 <b>Kitölthető:</b> kattints bármelyik mezőbe és írj bele (a valós PDF-ben automatikusan a fuvar adataiból töltődik, de kézzel is felülírható). ·
+    <b>Példány-szín:</b> a fenti gombokkal váltasz a piros (expeditor) / kék (destinatar) / zöld (transportator) / fekete (contabilitate) / barna (casă expediții) példányok közt.
+  </div>
+</div>
+
+<script>
+(function(){
+  var copybar = document.querySelector('#cmr .cmr-copybar');
+  var langbar = document.querySelector('#cmr .cmr-langbar');
+  var form = document.getElementById('cmrForm');
+  if(!copybar || !form) return;
+  var curVar = 'de';      // alapból RO·EN·DE
+  var curBtn = copybar.querySelector('button.on');
+
+  function renderCopyLabel(){
+    if(!curBtn) return;
+    var third = curVar === 'fr' ? curBtn.getAttribute('data-fr') : curBtn.getAttribute('data-de');
+    document.getElementById('cmrCopyLabel').innerHTML =
+      '<b>Exemplar pentru ' + curBtn.getAttribute('data-ro').toLowerCase() + '</b><br>' +
+      curBtn.getAttribute('data-en') + '<br>' +
+      '<span class="l3">' + third + '</span>';
+  }
+
+  // Példány-szín váltó
+  copybar.addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    copybar.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); x.style.background='#fff'; x.style.color=''; });
+    var c = b.getAttribute('data-c');
+    b.classList.add('on'); b.style.background=c; b.style.color='#fff';
+    curBtn = b;
+    form.style.setProperty('--cmr', c);
+    document.getElementById('cmrBig').textContent = b.getAttribute('data-no');
+    renderCopyLabel();
+  });
+
+  // Nyelv-változat váltó (RO·EN·DE  /  RO·EN·FR)
+  if(langbar){
+    langbar.addEventListener('click', function(e){
+      var b = e.target.closest('button'); if(!b) return;
+      langbar.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
+      b.classList.add('on');
+      curVar = b.getAttribute('data-var');
+      form.classList.toggle('var-fr', curVar === 'fr');
+      form.classList.toggle('var-de', curVar === 'de');
+      renderCopyLabel();
+    });
+  }
+  renderCopyLabel();
+})();
+</script>
+
+<!-- ════════════ 3. e-CMR ════════════ -->
+<div class="page" id="ecmr">
+  <div class="pagetag">3 / 5 · e-CMR</div>
+  <div class="doc-head" style="border-bottom-color:#16a34a;">
+    <div class="logo"><div class="mark" style="background:linear-gradient(135deg,#10b981,#0d9488);box-shadow:0 4px 12px rgba(16,185,129,.4);">e</div><div class="nm">Vallor<span style="color:#10b981;">Soft</span> · e-CMR</div></div>
+    <div class="co-meta">
+      <span style="display:inline-block;background:linear-gradient(135deg,#10b981,#0d9488);color:#fff;padding:3px 10px;border-radius:6px;font-weight:700;">e-CMR digital · Protocol adițional CMR 2008</span><br>
+      ID: e-CMR-2026-000318 · Versiune: 1<br>Emis: 03.06.2026 09:14 · Stare: <b style="color:#16a34a;">Semnat 3/3 ✓</b>
+    </div>
+  </div>
+  <div class="doc-title">
+    <h2 class="docname" style="color:#10b981;">Scrisoare de transport electronică (e-CMR)</h2>
+    <h1>e-CMR Nr. 000318</h1>
+    <div class="sub">Aceleași rubrici ca documentul CMR pe hârtie · semnătură electronică calificată (QES)</div>
+  </div>
+
+  <!-- Felek (1/2/16) -->
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:12px;">
+    <div class="box"><div class="lbl" style="color:#10b981;">1 · Expeditor</div><div class="val">Demo Logistic SRL<br>Str. Industriei 14, București, RO<br>CUI: RO11223344</div></div>
+    <div class="box"><div class="lbl" style="color:#10b981;">2 · Destinatar</div><div class="val">BMW Group Logistik<br>Petuelring 130, München, DE</div></div>
+    <div class="box"><div class="lbl" style="color:#10b981;">16 · Transportator</div><div class="val">VallorTrans SRL · RO47859317<br>Nr. înmatr.: B 104 VLR</div></div>
+  </div>
+
+  <!-- Hely/dátum (3/4/5) -->
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:12px;">
+    <div class="box"><div class="lbl" style="color:#10b981;">4 · Loc/dată încărcare</div><div class="val">București, RO · 03.06.2026 08:30</div></div>
+    <div class="box"><div class="lbl" style="color:#10b981;">3 · Loc livrare</div><div class="val">München, DE · 06.06.2026</div></div>
+    <div class="box"><div class="lbl" style="color:#10b981;">5 · Documente anexate</div><div class="val">Factură FV-2026-1187 · Packing list</div></div>
+  </div>
+
+  <!-- Áru (6–12) -->
+  <table>
+    <thead><tr><th>9 · Natura mărfii</th><th class="center">7 · Colete</th><th class="center">8 · Ambalare</th><th class="center">11 · Greutate</th><th class="center">12 · Volum</th><th>19 · Convenții speciale</th></tr></thead>
+    <tbody><tr><td>Piese auto (subansamble)</td><td class="center">12 paleți</td><td class="center">EUR</td><td class="center">5 400 kg</td><td class="center">38 m³</td><td>Temp. +4°C · UIT 3RO…XXXXXX</td></tr></tbody>
+  </table>
+
+  <!-- Megfigyelések (18) -->
+  <div class="box" style="margin-top:12px;border-color:#bbf7d0;background:#f0fdf4;">
+    <div class="lbl" style="color:#16a34a;">18 · Observații / Rezerve (cu marcaj temporal)</div>
+    <div class="val" style="font-size:11.5px;">
+      <span style="display:inline-block;background:#dbeafe;color:#1e40af;border-radius:5px;padding:1px 7px;font-size:10px;">ℹ️ info</span>
+      03.06 11:02 — Încărcare conformă, 12 paleți verificați. <span class="muted">(transportator)</span>
+    </div>
+  </div>
+
+  <!-- Digitális aláírások (22/23/24) -->
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px;">
+    <div class="box"><div class="lbl" style="color:#10b981;">22 · Semnătură expeditor (QES)</div><div class="sig signed">✓ semnat digital<br>03.06.2026 09:14</div></div>
+    <div class="box"><div class="lbl" style="color:#10b981;">23 · Semnătură transportator (QES)</div><div class="sig signed">✓ semnat digital<br>03.06.2026 11:02</div></div>
+    <div class="box"><div class="lbl" style="color:#10b981;">24 · Semnătură destinatar (QES)</div><div class="sig signed">✓ marfă primită<br>06.06.2026 15:48</div></div>
+  </div>
+
+  <div class="foot" style="border-top-color:#bbf7d0;">
+    <span>🔒 Integritate verificată — hash SHA-256: a17f…9c2e · sigiliu temporal calificat aplicat · cod QR de verificare</span>
+    <span style="display:inline-block;width:42px;height:42px;background:repeating-linear-gradient(45deg,#111 0 3px,#fff 3px 6px);border-radius:4px;" title="QR"></span>
+  </div>
+</div>
+
+<!-- ════════════ 4. NOTĂ ÎNSOȚITOARE FACTURĂ ════════════ -->
+<div class="page" id="nota">
+  <div class="pagetag">4 / 5 · Notă factură</div>
+  <div class="doc-head">
+    <div class="logo"><div class="mark">V</div><div class="nm">Vallor<span>Trans</span> SRL</div></div>
+    <div class="co-meta">CUI: RO47859317 · Reg. Com.: J2023000114142<br>IBAN: RO49 RNCB 0000 0000 0000 0000 · BCR<br>Tel: 0769 532 015</div>
+  </div>
+  <div class="doc-title">
+    <h2 class="docname">Document financiar</h2>
+    <h1>NOTĂ DE ÎNSOȚIRE FACTURĂ</h1>
+    <div class="sub">Aferentă facturii FV-2026-1187 · Comanda 1024</div>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-bottom:14px;">
+    <div class="box"><div class="lbl">Către client</div><div class="val">Demo Logistic SRL<br>Str. Industriei 14, București<br>CUI: RO11223344</div></div>
+    <div class="box"><div class="lbl">Detalii factură</div><div class="val">Serie/Nr: <b>FV-2026-1187</b><br>Data emiterii: 06.06.2026<br>Scadență: 06.07.2026 (30 zile)</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Descriere serviciu</th><th class="center">Rută</th><th class="center">Cant.</th><th class="right">Valoare</th></tr></thead>
+    <tbody>
+      <tr><td>Servicii de transport rutier internațional de marfă</td><td class="center">București → München</td><td class="center">1</td><td class="right">1 850,00 €</td></tr>
+      <tr><td>Taxă de drum (rovinietă / tarife)</td><td class="center">—</td><td class="center">1</td><td class="right">incl.</td></tr>
+    </tbody>
+  </table>
+  <div class="totbar"><span class="muted">TVA (taxare inversă)</span><span>Total de plată: <b>1 850,00 €</b></span></div>
+  <div class="box" style="margin-top:16px;background:var(--cream);">
+    <div class="lbl">Instrucțiuni de plată</div>
+    <div class="val">Vă rugăm efectuați plata până la <b>06.07.2026</b> în contul <b>RO49 RNCB 0000 0000 0000 0000</b> (BCR),
+    menționând referința <b>FV-2026-1187</b>. Pentru orice nelămurire, contactați departamentul financiar.</div>
+  </div>
+  <div class="foot"><span>Vă mulțumim pentru colaborare!</span><span>VallorTrans SRL · 06.06.2026</span></div>
+</div>
+
+<!-- ════════════ 5. AVIZ DE ÎNSOȚIRE A MĂRFII ════════════ -->
+<div class="page" id="aviz">
+  <div class="pagetag">5 / 5 · Aviz mărfii</div>
+  <div class="doc-head">
+    <div class="logo"><div class="mark">V</div><div class="nm">Vallor<span>Trans</span> SRL</div></div>
+    <div class="co-meta">CUI: RO47859317 · Reg. Com.: J2023000114142<br>Sat Arcus 102, jud. Covasna<br>Capital social: 200 RON</div>
+  </div>
+  <div class="doc-title">
+    <h2 class="docname">Document de însoțire</h2>
+    <h1>AVIZ DE ÎNSOȚIRE A MĂRFII</h1>
+    <div class="sub">Seria VLR Nr. 000451 · Data: 03.06.2026</div>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-bottom:14px;">
+    <div class="box"><div class="lbl">Furnizor</div><div class="val">VallorTrans SRL<br>CUI: RO47859317 · J2023000114142<br>Sat Arcus 102, jud. Covasna</div></div>
+    <div class="box"><div class="lbl">Cumpărător</div><div class="val">BMW Group Logistik<br>Petuelring 130, München, DE<br>VAT: DE129273398</div></div>
+  </div>
+  <table>
+    <thead><tr>
+      <th class="center">Nr.</th><th>Denumirea produselor / serviciilor</th><th class="center">U.M.</th><th class="center">Cant.</th><th class="right">Preț unitar</th><th class="right">Valoare</th>
+    </tr></thead>
+    <tbody>
+      <tr><td class="center">1</td><td>Piese auto — subansamble (paleți EUR)</td><td class="center">buc</td><td class="center">12</td><td class="right">—</td><td class="right">—</td></tr>
+      <tr><td class="center">2</td><td>Componente electronice (cutii)</td><td class="center">buc</td><td class="center">30</td><td class="right">—</td><td class="right">—</td></tr>
+    </tbody>
+  </table>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px;">
+    <div class="box"><div class="lbl">Date privind transportul</div><div class="val">Mijloc: auto · <b>B 104 VLR</b><br>Remorcă: B 220 VLR<br>Greutate: 5 400 kg</div></div>
+    <div class="box"><div class="lbl">Delegat</div><div class="val">Popescu Ion<br>CI seria XV nr. 123456<br>Plecat la ora: 08:30</div></div>
+    <div class="box"><div class="lbl">Expediere</div><div class="val">București → München<br>Data: 03.06.2026<br>UIT: 3RO2026…XXXXXX</div></div>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px;">
+    <div class="box"><div class="lbl">Semnătura de expediere</div><div class="sig">numele &amp; semnătura</div></div>
+    <div class="box"><div class="lbl">Semnătura de primire</div><div class="sig">numele &amp; semnătura</div></div>
+  </div>
+  <div class="foot"><span>Aviz întocmit conform legislației în vigoare</span><span>VallorTrans SRL · 03.06.2026</span></div>
+</div>
+
+</body>
+</html>

@@ -63,6 +63,8 @@ window.PdfSettings = (function () {
 
         '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' + tabsHtml + '</div>' +
 
+        presetsHtml() +
+
         '<div class="grid-2" style="gap:22px;align-items:start;">' +
           // ── Bal: űrlap ──
           '<div>' +
@@ -129,6 +131,40 @@ window.PdfSettings = (function () {
       }).catch(function () {});
     }
     updatePreview();
+  }
+
+  // ── Kész sablonok (presetek) sora — mindenki számára elérhető, szerkeszthető ──
+  function presetsHtml() {
+    var list = (window.PDF_PRESETS && window.PDF_PRESETS[_active]) || [];
+    if (!list.length) return '';
+    var nameOf = window.pdfPresetName || function (p) { return (p && (p.name && (p.name.ro || p.name.hu) || p.key)) || ''; };
+    var btns = list.map(function (p, i) {
+      var sw = p.accent_color
+        ? '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + esc(p.accent_color) + ';margin-right:6px;vertical-align:middle;"></span>'
+        : '';
+      return '<button class="btn ghost" style="padding:7px 12px;font-size:12px;"' + (_canEdit ? '' : ' disabled') +
+        ' onclick="PdfSettings.applyPreset(' + i + ')">' + sw + esc(nameOf(p)) + '</button>';
+    }).join('');
+    return '<div style="margin-bottom:16px;">' +
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:6px;">' +
+        tt('pdfset.presets', '✨ Kész sablonok — kattints a betöltéshez, majd szabd testre és mentsd') + '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + btns + '</div>' +
+    '</div>';
+  }
+
+  // Preset betöltése az űrlapba (NEM ment automatikusan — a felhasználó áttekinti és menti).
+  function applyPreset(idx) {
+    if (!_canEdit || !_root) return;
+    var list = (window.PDF_PRESETS && window.PDF_PRESETS[_active]) || [];
+    var p = list[idx];
+    if (!p) return;
+    var hdr = _root.querySelector('#psHeader'); if (hdr) hdr.value = p.header_text || '';
+    var ftr = _root.querySelector('#psFooter'); if (ftr) ftr.value = p.footer_text || '';
+    var hex = _root.querySelector('#psAccentHex'); if (hex) hex.value = p.accent_color || '';
+    var picker = _root.querySelector('#psAccent'); if (picker) picker.value = p.accent_color || _brandColor || '#f6711e';
+    var sl = _root.querySelector('#psShowLogo'); if (sl && !sl.disabled) sl.checked = p.show_logo !== false;
+    updatePreview();
+    toast(tt('pdfset.presetLoaded', 'Sablon betöltve — szabd testre és mentsd'), 'ok');
   }
 
   function currentTpl() {
@@ -216,5 +252,5 @@ window.PdfSettings = (function () {
     }).catch(function () { _root.innerHTML = '<div class="glass" style="padding:20px;color:var(--muted);">' + tt('common.loadError', 'Betöltési hiba') + '</div>'; });
   }
 
-  return { mount: mount, select: select };
+  return { mount: mount, select: select, applyPreset: applyPreset };
 })();
