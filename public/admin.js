@@ -52,6 +52,7 @@ function loadTab(name){
   if(name==='active-fleet'){ if(typeof loadActiveFleet==='function') loadActiveFleet(); }
   if(name==='signature') initAdminSigCanvas();
   if(name==='settings') loadSettingsPane();
+  if(name==='company-settings' && window.CompanySettings) CompanySettings.mount('companySettingsBox');
   if(name==='elofizetesek') loadElofizetesek();
   if(name==='internal-drivers') loadInternalDrivers();
   if(name==='clients' && window.ClientsPage){ ClientsPage.mount('clientsBox'); if(typeof loadClientPortalAccess==='function') loadClientPortalAccess(); }
