@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260616warm2">
-  <script src="/i18n.js?v=20260617b1"></script>
+  <script src="/i18n.js?v=20260617c3"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -78,6 +78,7 @@
         <div class="sub-tab" data-tab="invoices-out" data-i18n="nav.invoicesOut">📤 Kimenő számlák</div>
         <div class="sub-tab" data-tab="invoices-in" data-i18n="nav.invoicesIn">📥 Bejövő számlák</div>
         <div class="sub-tab" data-tab="bnr-rate" data-i18n="nav.bnrRate">💱 BNR árfolyam</div>
+        <div class="sub-tab" data-tab="payment-schedule" data-i18n="nav.paymentSchedule">📅 Fizetési ütemterv</div>
         <div class="sub-tab" data-tab="decont" data-i18n="nav.decont">Sofőr-elszámolás</div>
       </div>
     </div>
@@ -481,6 +482,32 @@
         <div class="h-sub" data-i18n="invo.subIn">Alvállalkozói (szállítói) számlák / tartozások</div>
       </div>
       <div id="carrierApBox" style="margin-top:16px;"></div>
+    </div>
+
+    <div class="pane hidden" data-pane="payment-schedule">
+      <div class="glass" style="padding:22px;">
+        <h2 class="h-title" data-i18n="nav.paymentSchedule">📅 Fizetési ütemterv</h2>
+        <div class="h-sub" data-i18n="ps.sub">Esedékes számlák mindkét irányban (cashflow)</div>
+        <div id="psBand" style="margin:12px 0;"></div>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">
+          <label style="display:flex;flex-direction:column;font-size:12px;gap:4px;"><span data-i18n="invo.from">Tól</span><input id="psFrom" type="date" class="input"></label>
+          <label style="display:flex;flex-direction:column;font-size:12px;gap:4px;"><span data-i18n="invo.to">Ig</span><input id="psTo" type="date" class="input"></label>
+          <button class="btn primary" onclick="loadPaymentSchedule()" data-i18n="invo.filter">Szűrés</button>
+        </div>
+        <div id="paymentScheduleBox">
+          <table class="table" style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="ps.colDue">Esedékes</th>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="ps.colDir">Típus</th>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="ps.colPartner">Partner</th>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="ps.colRef">Hivatkozás</th>
+              <th style="padding:8px 10px;text-align:right;" data-i18n="ps.colAmount">Összeg</th>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="invo.colStatus">Státusz</th>
+            </tr></thead>
+            <tbody id="psBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- ── Értesítések (Adminisztráció) ── -->
@@ -1261,13 +1288,14 @@
 <script src="/fav-locations.js?v=20260617a2"></script>
 <script src="/invoice-modal.js?v=20260614qa"></script>
 <script src="/invoices-out.js?v=20260616inv"></script>
+<script src="/payment-schedule.js?v=20260617c3"></script>
 <script src="/notifications.js?v=20260617c2"></script>
 <script src="/mail-log.js?v=20260617c2"></script>
-<script src="/stats.js?v=20260617b1"></script>
+<script src="/stats.js?v=20260617c3"></script>
 <script src="/fleet-extra.js?v=20260616band3"></script>
 <script src="/entity-detail.js?v=20260617b2"></script>
 <script src="/planner.js?v=20260614qa"></script>
-<script src="/manager.js?v=20260617b1"></script>
+<script src="/manager.js?v=20260617c3"></script>
 <script src="/global-search.js?v=20260614fg"></script>
 
  <!-- ── BUG REPORT FAB ── -->

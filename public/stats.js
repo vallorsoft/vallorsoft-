@@ -768,34 +768,46 @@
   // ════════════════════════════════════════════════════════
   //  8) JOGOSULTSÁGOK (stats-permissions) — CSAK ADMIN
   // ════════════════════════════════════════════════════════
+  // A jogosultság-kulcsok rögzített sorrendje + i18n-címke kulcsuk.
+  // (A backend ugyanezt a fehérlistát kényszeríti ki — handlers/permissions.js.)
+  var PERM_DEFS = [
+    { key: 'stats_finance', i18n: 'st.pm.kFinance' },
+    { key: 'orders_delete', i18n: 'st.pm.kOrdersDelete' },
+    { key: 'invoice_issue', i18n: 'st.pm.kInvoiceIssue' },
+    { key: 'data_export',   i18n: 'st.pm.kDataExport' },
+    { key: 'users_manage',  i18n: 'st.pm.kUsersManage' }
+  ];
+
   function loadPermissions() {
     var box = document.getElementById('statsPermissionsBox');
     if (!box) return;
     box.innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
-    gas('getStatsPermissions').then(function (r) {
+    gas('getCompanyPermissions').then(function (r) {
       if (!r || !r.ok) { box.innerHTML = '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || t('common.error')) + '</div>'; return; }
+      var head = '<th>' + t('col.name') + '</th><th>' + t('common.email') + '</th>'
+        + PERM_DEFS.map(function (p) { return '<th style="text-align:center;font-size:12px;">' + t(p.i18n) + '</th>'; }).join('');
       var rows = (r.users || []).map(function (u) {
+        var cells = PERM_DEFS.map(function (p) {
+          var on = !!(u.flags && u.flags[p.key]);
+          return '<td style="text-align:center;">'
+            + '<input type="checkbox" ' + (on ? 'checked' : '') + ' style="width:18px;height:18px;cursor:pointer;accent-color:#22c55e;" '
+            + 'onchange="VS_STATS.setPerm(' + u.id + ',\'' + p.key + '\', this.checked)">'
+            + '</td>';
+        }).join('');
         return '<tr><td><b class="text-primary">' + esc(u.nume || '—') + '</b></td>'
-          + '<td>' + esc(u.email) + '</td>'
-          + '<td><span class="badge info">' + esc(u.pozicio) + '</span></td>'
-          + '<td style="text-align:center;">'
-          + '<label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">'
-          + '<input type="checkbox" ' + (u.finance_enabled ? 'checked' : '') + ' style="width:18px;height:18px;cursor:pointer;accent-color:#22c55e;" '
-          + 'onchange="VS_STATS.setPerm(' + u.id + ', this.checked)">'
-          + '<span style="font-size:12px;" class="text-muted">' + t('st.pm.financeVisible') + '</span></label>'
-          + '</td></tr>';
-      }).join('') || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:18px;">' + t('st.pm.noManager') + '</td></tr>';
+          + '<td>' + esc(u.email) + '</td>' + cells + '</tr>';
+      }).join('') || '<tr><td colspan="' + (2 + PERM_DEFS.length) + '" class="text-muted" style="text-align:center;padding:18px;">' + t('st.pm.noManager') + '</td></tr>';
 
       box.innerHTML = stPanel(t('st.pm.pTitle'),
-        '<p class="text-muted" style="font-size:13px;margin:0 0 14px;">' + t('st.pm.desc') + '</p>'
+        '<p class="text-muted" style="font-size:13px;margin:0 0 14px;">' + t('st.pm.descMatrix') + '</p>'
         + '<div style="overflow-x:auto;"><table class="table">'
-        + '<thead><tr><th>' + t('col.name') + '</th><th>' + t('common.email') + '</th><th>' + t('col.position') + '</th><th style="text-align:center;">' + t('st.pm.permission') + '</th></tr></thead>'
+        + '<thead><tr>' + head + '</tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>');
     });
   }
 
-  function setPerm(userId, enabled) {
-    gas('setStatsPermission', [userId, enabled]).then(function (r) {
+  function setPerm(userId, permKey, enabled) {
+    gas('setUserPermission', { user_id: userId, perm_key: permKey, enabled: enabled }).then(function (r) {
       if (r && r.ok) toast(enabled ? t('st.pm.granted') : t('st.pm.revoked'), 'ok');
       else { toast((r && r.err) || t('common.error'), 'err'); loadPermissions(); }
     });

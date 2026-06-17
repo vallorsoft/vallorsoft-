@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-17 — CargoTMS-hézagok Fázis C/3: Granulált jogosultságok + Fizetési ütemterv (PR #173)
+
+> A meglévő `user_permissions` kiterjesztése Manager-jogokra (Admin mindig átmegy) + read-only cashflow-nézet. Nincs új tábla.
+
+- **Granulált jogosultságok** — `handlers/permissions.js`: `getCompanyPermissions` (Admin), `setUserPermission` (Admin; a célfelhasználó cég-ellenőrzése, `perm_key` fehérlista, audit). Kulcsok: `stats_finance`, `orders_delete`, `invoice_issue`, `data_export`, `users_manage`. A `hasPerm()` segéd **nem-enumerable** (nem dispatchelhető). **Szerveroldali kapu (2, tiszta, Admin-bypass):** `comDelete` (Manager → `orders_delete`), `POST /api/orders/:id/invoice/emit` (Manager → `invoice_issue` middleware). A `data_export`/`users_manage` egyelőre UI-szintű (a meglévő útvonalak nem adnak tiszta egysoros kaput). UI: a Jogosultságok pane Manager × jog mátrix.
+- **Fizetési ütemterv** (`payment-schedule`, Pénzügy, read-only) — `handlers/paymentSchedule.js`: bejövő (`carrier_invoices` due) + kimenő (az `invoices`-hoz a `finalized_at + clients.payment_term_days` proxy, az Operatív központtal konzisztensen); dátum-rendezett lista + totálok (be/ki/lejárt/7/30 nap). UI `vsMetricBand` + tábla irány/státusz-pillával.
+- `feature-catalog` + `i18n` (RO-alap+HU), cache-bust `?v=20260617c3`. Minden lekérdezés `company_id`-szűrt + paraméteres; 93 Jest zöld; auth/billing/orders-logika érintetlen (csak additív kapuk).
+
 ## 2026-06-17 — CargoTMS-hézagok Fázis C/2: Értesítési központ + Mail-napló (PR #172)
 
 > Értesítés-központ (🔔) + kiküldött-e-mail napló — multi-tenant, GDPR-tudatos. A két belső segéd (`notify`/`logMail`) **nem dispatchelhető** `/api/execute`-en (nem-enumerable) → nincs cross-tenant injekció.

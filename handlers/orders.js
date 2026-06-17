@@ -10,6 +10,7 @@ const { getPositions } = require('../lib/vehiclePositions');
 const audit = require('../lib/audit');
 const planLimits = require('../lib/planLimits');
 const { featureEnabled } = require('../lib/featureEnabled');
+const { hasPerm } = require('./permissions');
 
 const handlers = {};
 
@@ -630,6 +631,12 @@ handlers.comDelete = async function (req, res, args) {
     try {
       if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
         return res.json({ result: { ok: false, err: 'Acces interzis' } });
+      }
+      // Granulált jog: a Manager csak akkor anulálhat fuvart, ha az admin az
+      // 'orders_delete' jogot megadta neki. Az Admin mindig átmegy.
+      if (req.session.user.pozicio === 'Manager') {
+        const allowed = await hasPerm(pool, req.session.user.company_id, req.session.user.id, 'orders_delete');
+        if (!allowed) return res.json({ result: { ok: false, err: 'Acces interzis' } });
       }
       const id = String(args[0] || '').trim();
       if (!id) {

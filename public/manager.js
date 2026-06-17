@@ -44,6 +44,7 @@ function loadTab(name){
     if(name==='external-drivers'){ loadExtDrivers(); if(typeof loadCarriers==='function') loadCarriers(); }
     if(name==='invoices-out'){ if(typeof loadInvoicesOut==='function') loadInvoicesOut(); }
     if(name==='invoices-in'){ if(typeof loadCarrierAp==='function') loadCarrierAp(); }
+    if(name==='payment-schedule'){ if(typeof loadPaymentSchedule==='function') loadPaymentSchedule(); }
     if(name==='bnr-rate'){ if(typeof loadBnrRate==='function') loadBnrRate(); }
     if(name==='notifications'){ if(window.Notifications) Notifications.loadPage(); }
     if(name==='mail-log'){ if(typeof loadMailLog==='function') loadMailLog(); }
