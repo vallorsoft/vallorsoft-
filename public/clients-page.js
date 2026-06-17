@@ -40,9 +40,14 @@ window.ClientsPage = (function () {
             const tr = document.createElement('tr');
             const vat = c.anaf_status ? (c.anaf_status === 'activ' ? '<span class="cl-pill cl-pill--ok">aktív</span>' : '<span class="cl-pill cl-pill--no">' + c.anaf_status + '</span>') : '';
             const avatar = (typeof window.vsAvatar === 'function') ? window.vsAvatar(c.denumire || '') : '';
+            const detLbl = (typeof window.t === 'function') ? window.t('ed.details') : 'Részletek';
             tr.innerHTML = '<td>' + avatar + esc(c.denumire) + '</td><td>' + esc(c.cui_cif || '') + '</td><td>' + esc(c.localitate || '') + '</td><td>' + vat + '</td>' +
-              '<td style="text-align:right"><button class="cl-btn cl-btn--ghost cl-btn--sm">Szerkeszt</button></td>';
-            tr.querySelector('button').addEventListener('click', () => openForm(c));
+              '<td style="text-align:right"><button class="cl-btn cl-btn--ghost cl-btn--sm cl-det-btn">' + esc(detLbl) + '</button> ' +
+              '<button class="cl-btn cl-btn--ghost cl-btn--sm cl-edit-btn">Szerkeszt</button></td>';
+            tr.querySelector('.cl-edit-btn').addEventListener('click', () => openForm(c));
+            tr.querySelector('.cl-det-btn').addEventListener('click', () => {
+              if (window.EntityDetail) window.EntityDetail.openClient(c.id, c.denumire);
+            });
             rows.appendChild(tr);
           });
         } catch (e) { $('clRows').innerHTML = '<tr><td colspan="5" class="cl-empty">' + e.message + '</td></tr>'; }

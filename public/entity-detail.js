@@ -51,13 +51,28 @@
   function renderTabs() {
     var tabs = document.getElementById('edTabs');
     if (!tabs) return;
-    var html = tabBtn('data', _t('ed.tab.data', 'Date'))
-      + tabBtn('expiries', _t('ed.tab.expiries', 'Documente & Expirări'));
-    if (T.type === 'vehicle') {
-      html += tabBtn('service', _t('ed.tab.service', 'Service'));
-      html += tabBtn('fuel', _t('ed.tab.fuel', 'Alimentări'));
-    } else if (T.type === 'driver' && T._hasAdvance) {
-      html += tabBtn('decont', _t('ed.tab.decont', 'Decont'));
+    var html = '';
+    if (T.type === 'order') {
+      html = tabBtn('overview', _t('ed.tab.overview', 'Privire de ansamblu'))
+        + tabBtn('odocs', _t('ed.tab.odocs', 'Documente'))
+        + tabBtn('finance', _t('ed.tab.finance', 'Finanțe'))
+        + tabBtn('legs', _t('ed.tab.legs', 'Etape'))
+        + tabBtn('activity', _t('ed.tab.activity', 'Activitate'))
+        + tabBtn('portal', _t('ed.tab.portal', 'Portal'));
+    } else if (T.type === 'client') {
+      html = tabBtn('cdata', _t('ed.tab.cdata', 'Date'))
+        + tabBtn('corders', _t('ed.tab.corders', 'Transporturi'))
+        + tabBtn('cinv', _t('ed.tab.cinv', 'Facturi'))
+        + tabBtn('cportal', _t('ed.tab.cportal', 'Portal'));
+    } else {
+      html = tabBtn('data', _t('ed.tab.data', 'Date'))
+        + tabBtn('expiries', _t('ed.tab.expiries', 'Documente & Expirări'));
+      if (T.type === 'vehicle') {
+        html += tabBtn('service', _t('ed.tab.service', 'Service'));
+        html += tabBtn('fuel', _t('ed.tab.fuel', 'Alimentări'));
+      } else if (T.type === 'driver' && T._hasAdvance) {
+        html += tabBtn('decont', _t('ed.tab.decont', 'Decont'));
+      }
     }
     tabs.innerHTML = html;
   }
@@ -262,8 +277,253 @@
       + '<p class="text-muted" style="font-size:12px;margin-top:12px;">' + _t('ed.decont.hint', 'Decontul detaliat se gestionează în pagina Decont șofer.') + '</p>';
   }
 
+  // ════════════════ FUVAR — Áttekintés ════════════════
+  function statusBadge(s) {
+    var cls = 'info';
+    if (s === 'Alocat' || s === 'Extern') cls = 'warn';
+    else if (s === 'In Curs' || s === 'Finalizat') cls = 'ok';
+    else if (s === 'Anulat') cls = 'err';
+    return '<span class="badge ' + cls + '">' + _esc(s || '—') + '</span>';
+  }
+  function bodyOrderOverview() {
+    var box = document.getElementById('edBody');
+    var o = T._data.order || {};
+    var rows = [
+      ['ID', o.id],
+      [_t('col.client', 'Client'), o.client_name || o.client],
+      [_t('ed.o.ref', 'Referință'), o.ref],
+      [_t('ed.o.from', 'Încărcare'), o.loc_incarcare],
+      [_t('ed.o.to', 'Descărcare'), o.loc_descarcare],
+      ['Km', o.km],
+      [_t('ed.o.price', 'Preț'), o.pret != null ? n2(o.pret, 2) + ' EUR' : null],
+      [_t('col.driver', 'Șofer'), o.nume_sofer || o.email_sofer || o.firma_extern],
+      [_t('ed.o.truck', 'Camion'), o.rendszam_camion],
+      [_t('ed.o.trailer', 'Remorcă'), o.rendszam_remorca],
+    ];
+    var editLink = (typeof openOrderEdit === 'function')
+      ? '<button class="btn primary" style="padding:6px 14px;font-size:13px;" onclick="EntityDetail.close();openOrderEdit(\'' + _esc(o.id) + '\')">✏️ ' + _t('ed.o.edit', 'Editează') + '</button>'
+      : '';
+    box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;">'
+      + '<div>' + statusBadge(o.status) + '</div>' + editLink + '</div>'
+      + infoTable(rows);
+  }
+
+  // ════════════════ FUVAR — Dokumentumok ════════════════
+  function bodyOrderDocs() {
+    var box = document.getElementById('edBody');
+    var docs = (T._data.documents || []);
+    var pod = (T._data.pod || []);
+    var openLink = (typeof openDocModal === 'function')
+      ? '<button class="btn ghost" style="padding:6px 14px;font-size:13px;margin-bottom:12px;" onclick="EntityDetail.close();openDocModal(\'' + _esc((T._data.order || {}).id) + '\')">📎 ' + _t('ed.o.openDocs', 'Gestionează documente') + '</button>'
+      : '';
+    var dRows = docs.map(function (it) {
+      return '<tr><td><b class="text-primary">' + _esc(it.file_name || '—') + '</b></td>'
+        + '<td>' + (it.signed ? '<span class="badge ok">' + _t('ed.o.signed', 'Semnat') + '</span>' : '<span class="badge info">' + _t('ed.o.original', 'Original') + '</span>') + '</td>'
+        + '<td class="text-muted" style="font-size:12px;">' + _esc(it.uploaded_by || '') + '</td>'
+        + '<td>' + d2(it.created_at) + '</td></tr>';
+    }).join('') || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:18px;">' + _t('ed.o.noDocs', 'Niciun document.') + '</td></tr>';
+    var pRows = pod.map(function (it) {
+      return '<tr><td>' + _esc(it.tip || '—') + '</td><td><b class="text-primary">' + _esc(it.file_name || '—') + '</b></td>'
+        + '<td class="text-muted" style="font-size:12px;">' + _esc(it.nume_sofer || '') + '</td>'
+        + '<td>' + d2(it.created_at) + '</td></tr>';
+    }).join('') || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:18px;">' + _t('ed.o.noPod', 'Nicio fotografie POD.') + '</td></tr>';
+    box.innerHTML = openLink
+      + '<div style="overflow-x:auto;"><table class="table"><thead><tr>'
+      + '<th>' + _t('ed.o.fileName', 'Fișier') + '</th><th>' + _t('ed.o.docType', 'Tip') + '</th>'
+      + '<th>' + _t('ed.o.uploadedBy', 'Încărcat de') + '</th><th>' + _t('fe.sv.date', 'Data') + '</th>'
+      + '</tr></thead><tbody>' + dRows + '</tbody></table></div>'
+      + '<div style="font-weight:700;margin:16px 0 8px;color:var(--text-primary);">📷 POD</div>'
+      + '<div style="overflow-x:auto;"><table class="table"><thead><tr>'
+      + '<th>' + _t('ed.o.docType', 'Tip') + '</th><th>' + _t('ed.o.fileName', 'Fișier') + '</th>'
+      + '<th>' + _t('col.driver', 'Șofer') + '</th><th>' + _t('fe.sv.date', 'Data') + '</th>'
+      + '</tr></thead><tbody>' + pRows + '</tbody></table></div>';
+  }
+
+  // ════════════════ FUVAR — Pénzügy ════════════════
+  function bodyOrderFinance() {
+    var box = document.getElementById('edBody');
+    var o = T._data.order || {};
+    var inv = (T._data.invoices || []);
+    var band = '<div class="glass-soft" style="display:flex;gap:18px;flex-wrap:wrap;padding:12px 16px;border-radius:12px;margin-bottom:14px;">'
+      + '<div><div class="text-muted" style="font-size:12px;">' + _t('ed.o.price', 'Preț') + '</div><div style="font-size:20px;font-weight:700;color:var(--text-primary);">' + n2(o.pret, 2) + ' EUR</div></div>'
+      + '<div><div class="text-muted" style="font-size:12px;">' + _t('ed.o.toll', 'Taxă drum') + '</div><div style="font-size:20px;font-weight:700;color:var(--text-primary);">' + n2(o.toll_cost, 2) + '</div></div>'
+      + '<div><div class="text-muted" style="font-size:12px;">' + _t('ed.o.carrierCost', 'Cost subcontractor') + '</div><div style="font-size:20px;font-weight:700;color:var(--text-primary);">' + n2(o.carrier_cost, 2) + '</div></div>'
+      + '<div><div class="text-muted" style="font-size:12px;">' + _t('ed.o.payStatus', 'Plată') + '</div><div style="font-size:20px;font-weight:700;color:var(--text-primary);">' + _esc(o.payment_status || 'unpaid') + (o.paid_amount != null ? ' (' + n2(o.paid_amount, 2) + ')' : '') + '</div></div>'
+      + '</div>';
+    var rows = inv.map(function (it) {
+      var link = it.pdf_link ? '<a class="btn ghost" style="padding:3px 9px;font-size:12px;" href="' + _esc(it.pdf_link) + '" target="_blank" rel="noopener">PDF</a>' : '';
+      return '<tr><td><b class="text-primary">' + _esc((it.serie || '') + ' ' + (it.numar || '')) + '</b></td>'
+        + '<td>' + _esc(it.provider || '—') + '</td>'
+        + '<td style="text-align:right;">' + n2(it.total, 2) + ' ' + _esc(it.valuta || '') + '</td>'
+        + '<td>' + _esc(it.status || '—') + (it.efactura_status ? ' / ' + _esc(it.efactura_status) : '') + '</td>'
+        + '<td>' + d2(it.created_at) + '</td><td style="text-align:right;">' + link + '</td></tr>';
+    }).join('') || '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:18px;">' + _t('ed.o.noInv', 'Nicio factură.') + '</td></tr>';
+    box.innerHTML = band
+      + '<div style="font-weight:700;margin-bottom:8px;color:var(--text-primary);">🧾 ' + _t('ed.o.invoices', 'Facturi') + '</div>'
+      + '<div style="overflow-x:auto;"><table class="table"><thead><tr>'
+      + '<th>' + _t('ed.o.invNo', 'Serie/Nr.') + '</th><th>' + _t('ed.o.provider', 'Furnizor') + '</th>'
+      + '<th style="text-align:right;">' + _t('ed.o.total', 'Total') + '</th><th>' + _t('fe.exp.colState', 'Stare') + '</th>'
+      + '<th>' + _t('fe.sv.date', 'Data') + '</th><th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  // ════════════════ FUVAR — Szakaszok ════════════════
+  function bodyOrderLegs() {
+    var box = document.getElementById('edBody');
+    var legs = (T._data.legs || []);
+    var rows = legs.map(function (l) {
+      var drv = l.nume_sofer || l.email_sofer || l.firma_extern || '—';
+      return '<tr><td style="text-align:center;"><b>' + (l.leg_number != null ? l.leg_number : '—') + '</b></td>'
+        + '<td>' + _esc(drv) + '</td>'
+        + '<td>' + _esc(l.rendszam_camion || '—') + (l.rendszam_remorca ? ' / ' + _esc(l.rendszam_remorca) : '') + '</td>'
+        + '<td>' + _esc(l.loc_preluare || '—') + (l.data_preluare ? ' <span class="text-muted" style="font-size:11px;">' + d2(l.data_preluare) + '</span>' : '') + '</td>'
+        + '<td>' + _esc(l.loc_predare || '—') + (l.data_predare ? ' <span class="text-muted" style="font-size:11px;">' + d2(l.data_predare) + '</span>' : '') + '</td></tr>';
+    }).join('') || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">' + _t('ed.o.noLegs', 'Nicio etapă.') + '</td></tr>';
+    box.innerHTML = '<div style="overflow-x:auto;"><table class="table"><thead><tr>'
+      + '<th style="text-align:center;">#</th><th>' + _t('col.driver', 'Șofer') + '</th>'
+      + '<th>' + _t('ed.o.truck', 'Camion') + '</th><th>' + _t('ed.o.legFrom', 'Preluare') + '</th>'
+      + '<th>' + _t('ed.o.legTo', 'Predare') + '</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  // ════════════════ FUVAR — Aktivitás (audit) ════════════════
+  function bodyOrderActivity() {
+    var box = document.getElementById('edBody');
+    var items = (T._data.activity || []);
+    var rows = items.map(function (it) {
+      var det = '';
+      try { det = it.detail ? (typeof it.detail === 'string' ? it.detail : JSON.stringify(it.detail)) : ''; } catch (e) { det = ''; }
+      if (det.length > 120) det = det.slice(0, 120) + '…';
+      return '<tr><td style="white-space:nowrap;">' + d2(it.created_at)
+        + ' <span class="text-muted" style="font-size:11px;">' + _esc(String(it.created_at || '').slice(11, 16)) + '</span></td>'
+        + '<td><b class="text-primary">' + _esc(it.action || '—') + '</b></td>'
+        + '<td class="text-muted" style="font-size:12px;">' + _esc(it.user_email || '—') + '</td>'
+        + '<td class="text-muted" style="font-size:11px;">' + _esc(det) + '</td></tr>';
+    }).join('') || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:18px;">' + _t('ed.o.noActivity', 'Nicio activitate înregistrată.') + '</td></tr>';
+    box.innerHTML = '<div style="overflow-x:auto;"><table class="table"><thead><tr>'
+      + '<th>' + _t('fe.sv.date', 'Data') + '</th><th>' + _t('ed.o.actName', 'Acțiune') + '</th>'
+      + '<th>' + _t('ed.o.actUser', 'Utilizator') + '</th><th>' + _t('ed.o.actDetail', 'Detalii') + '</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  // ════════════════ FUVAR — Portál (tracking) ════════════════
+  function bodyOrderPortal() {
+    var box = document.getElementById('edBody');
+    var tok = T._data.tracking_token;
+    if (!tok) {
+      box.innerHTML = '<p class="text-muted" style="padding:24px;text-align:center;">' + _t('ed.o.noTrack', 'Nu există link de urmărire pentru această comandă.') + '</p>';
+      return;
+    }
+    var url = location.origin + '/t/' + tok;
+    box.innerHTML = '<div class="glass-soft" style="padding:16px;border-radius:12px;">'
+      + '<div class="text-muted" style="font-size:12px;margin-bottom:6px;">' + _t('ed.o.trackLink', 'Link de urmărire pentru client') + '</div>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">'
+      + '<input class="input" readonly value="' + _esc(url) + '" style="flex:1;min-width:200px;">'
+      + '<button class="btn primary" style="height:42px;" onclick="EntityDetail.copyTrack(\'' + _esc(url) + '\')">📋 ' + _t('ed.o.copy', 'Copiază') + '</button>'
+      + '<a class="btn ghost" style="height:42px;line-height:42px;" href="' + _esc(url) + '" target="_blank" rel="noopener">↗</a>'
+      + '</div></div>';
+  }
+  function copyTrack(url) {
+    try { navigator.clipboard.writeText(url); _toast(_t('ed.o.copied', 'Copiat.'), 'ok'); }
+    catch (e) { _toast(url, 'ok'); }
+  }
+
+  // ════════════════ ÜGYFÉL — Adatok ════════════════
+  function bodyClientData() {
+    var box = document.getElementById('edBody');
+    var c = T._data.client || {};
+    var rows = [
+      [_t('col.name', 'Nume'), c.denumire],
+      [_t('ed.c.type', 'Tip'), c.tip === 'PF' ? _t('ed.c.pf', 'Persoană fizică') : _t('ed.c.pj', 'Persoană juridică')],
+      ['CUI / CIF', c.cui_cif],
+      [_t('ed.c.regCom', 'Reg. Com.'), c.reg_com],
+      [_t('clients.county', 'Județ'), c.judet],
+      [_t('clients.locality', 'Localitate'), c.localitate],
+      ['E-mail', c.email],
+      [_t('col.phone', 'Telefon'), c.telefon],
+      ['IBAN', c.iban],
+      [_t('ed.c.payTerm', 'Termen plată (zile)'), c.payment_term_days],
+      [_t('fld.note', 'Notă'), c.nota],
+    ];
+    box.innerHTML = infoTable(rows);
+  }
+
+  // ════════════════ ÜGYFÉL — Fuvarok ════════════════
+  function bodyClientOrders() {
+    var box = document.getElementById('edBody');
+    var items = (T._data.orders || []);
+    var rows = items.map(function (o) {
+      return '<tr><td><b>' + _esc(o.id) + '</b></td>'
+        + '<td>' + _esc(o.loc_incarcare || '—') + ' → ' + _esc(o.loc_descarcare || '—') + '</td>'
+        + '<td style="text-align:right;">' + n2(o.pret, 2) + '</td>'
+        + '<td style="text-align:center;">' + statusBadge(o.status) + '</td>'
+        + '<td>' + d2(o.created_at) + '</td></tr>';
+    }).join('') || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">' + _t('ed.c.noOrders', 'Niciun transport.') + '</td></tr>';
+    box.innerHTML = '<div style="overflow-x:auto;"><table class="table"><thead><tr>'
+      + '<th>ID</th><th>' + _t('ed.c.route', 'Rută') + '</th>'
+      + '<th style="text-align:right;">' + _t('ed.o.price', 'Preț') + '</th>'
+      + '<th style="text-align:center;">' + _t('fe.exp.colState', 'Stare') + '</th><th>' + _t('fe.sv.date', 'Data') + '</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  // ════════════════ ÜGYFÉL — Számlák ════════════════
+  function bodyClientInvoices() {
+    var box = document.getElementById('edBody');
+    var inv = (T._data.invoices || []);
+    var rows = inv.map(function (it) {
+      var link = it.pdf_link ? '<a class="btn ghost" style="padding:3px 9px;font-size:12px;" href="' + _esc(it.pdf_link) + '" target="_blank" rel="noopener">PDF</a>' : '';
+      return '<tr><td><b class="text-primary">' + _esc((it.serie || '') + ' ' + (it.numar || '')) + '</b></td>'
+        + '<td>' + _esc(it.order_id || '—') + '</td>'
+        + '<td style="text-align:right;">' + n2(it.total, 2) + ' ' + _esc(it.valuta || '') + '</td>'
+        + '<td>' + _esc(it.status || '—') + '</td>'
+        + '<td>' + d2(it.created_at) + '</td><td style="text-align:right;">' + link + '</td></tr>';
+    }).join('') || '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:18px;">' + _t('ed.o.noInv', 'Nicio factură.') + '</td></tr>';
+    box.innerHTML = '<div style="overflow-x:auto;"><table class="table"><thead><tr>'
+      + '<th>' + _t('ed.o.invNo', 'Serie/Nr.') + '</th><th>ID</th>'
+      + '<th style="text-align:right;">' + _t('ed.o.total', 'Total') + '</th><th>' + _t('fe.exp.colState', 'Stare') + '</th>'
+      + '<th>' + _t('fe.sv.date', 'Data') + '</th><th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  // ════════════════ ÜGYFÉL — Portál hozzáférés ════════════════
+  function bodyClientPortal() {
+    var box = document.getElementById('edBody');
+    var items = (T._data.portal || []);
+    var rows = items.map(function (u) {
+      var st = u.activ
+        ? (u.has_password ? '<span class="badge ok">' + _t('ed.c.active', 'Activ') + '</span>'
+          : (u.pending_invite ? '<span class="badge warn">' + _t('ed.c.invited', 'Invitat') + '</span>' : '<span class="badge info">—</span>'))
+        : '<span class="badge err">' + _t('ed.c.blocked', 'Dezactivat') + '</span>';
+      return '<tr><td><b class="text-primary">' + _esc(u.email || '—') + '</b></td>'
+        + '<td>' + _esc(u.nev || '') + '</td>'
+        + '<td style="text-align:center;">' + st + '</td>'
+        + '<td>' + (u.last_login ? d2(u.last_login) : '—') + '</td></tr>';
+    }).join('') || '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:18px;">' + _t('ed.c.noPortal', 'Niciun acces de portal.') + '</td></tr>';
+    var hint = '<p class="text-muted" style="font-size:12px;margin-top:12px;">' + _t('ed.c.portalHint', 'Invitațiile de portal se gestionează pe pagina Clienți.') + '</p>';
+    box.innerHTML = '<div style="overflow-x:auto;"><table class="table"><thead><tr>'
+      + '<th>E-mail</th><th>' + _t('col.name', 'Nume') + '</th>'
+      + '<th style="text-align:center;">' + _t('fe.exp.colState', 'Stare') + '</th><th>' + _t('ed.c.lastLogin', 'Ultima logare') + '</th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>' + hint;
+  }
+
   function renderBody() {
     if (!T._data) return;
+    if (T.type === 'order') {
+      if (T.tab === 'overview') bodyOrderOverview();
+      else if (T.tab === 'odocs') bodyOrderDocs();
+      else if (T.tab === 'finance') bodyOrderFinance();
+      else if (T.tab === 'legs') bodyOrderLegs();
+      else if (T.tab === 'activity') bodyOrderActivity();
+      else if (T.tab === 'portal') bodyOrderPortal();
+      return;
+    }
+    if (T.type === 'client') {
+      if (T.tab === 'cdata') bodyClientData();
+      else if (T.tab === 'corders') bodyClientOrders();
+      else if (T.tab === 'cinv') bodyClientInvoices();
+      else if (T.tab === 'cportal') bodyClientPortal();
+      return;
+    }
     if (T.tab === 'data') bodyData();
     else if (T.tab === 'expiries') bodyExpiries();
     else if (T.tab === 'service') bodyService();
@@ -274,6 +534,18 @@
   function renderTitle() {
     var el = document.getElementById('edTitle');
     if (!el) return;
+    if (T.type === 'order') {
+      var o = (T._data && T._data.order) || {};
+      el.innerHTML = '<span style="font-size:22px;">📦</span><span>' + _esc(T.id)
+        + (o.client_name || o.client ? ' <span class="text-muted" style="font-weight:500;font-size:14px;">— ' + _esc(o.client_name || o.client) + '</span>' : '') + '</span>';
+      return;
+    }
+    if (T.type === 'client') {
+      var c = (T._data && T._data.client) || {};
+      el.innerHTML = (typeof vsAvatar === 'function' ? vsAvatar(c.denumire || T.nume || '') : '🏢')
+        + '<span>' + _esc(c.denumire || T.nume || '') + '</span>';
+      return;
+    }
     if (T.type === 'vehicle') {
       el.innerHTML = '<span style="font-size:22px;">🚛</span><span>' + _esc(T.plate)
         + (T._data && T._data.vehicle && T._data.vehicle.marca ? ' <span class="text-muted" style="font-weight:500;font-size:14px;">— ' + _esc(T._data.vehicle.marca) + '</span>' : '') + '</span>';
@@ -284,16 +556,21 @@
   }
 
   function reload() {
-    var fn = T.type === 'vehicle' ? 'getVehicleDetail' : 'getDriverDetail';
-    var arg = T.type === 'vehicle' ? { id: T.id } : { email: T.email };
+    var fn, arg;
+    if (T.type === 'order') { fn = 'getOrderDetail'; arg = { id: T.id }; }
+    else if (T.type === 'client') { fn = 'getClientProfile'; arg = { id: T.id }; }
+    else if (T.type === 'vehicle') { fn = 'getVehicleDetail'; arg = { id: T.id }; }
+    else { fn = 'getDriverDetail'; arg = { email: T.email }; }
     gas(fn, [arg]).then(function (r) {
       if (!r || !r.ok) { _toast((r && r.err) || _t('common.error', 'Eroare'), 'err'); return; }
       T._data = r;
       if (T.type === 'driver') {
         T.nume = (r.driver && r.driver.nume) || T.nume;
         T._hasAdvance = !!(r.advanceTotal);
-      } else {
+      } else if (T.type === 'vehicle') {
         T.plate = (r.vehicle && r.vehicle.rendszam) || T.plate;
+      } else if (T.type === 'client') {
+        T.nume = (r.client && r.client.denumire) || T.nume;
       }
       renderTitle(); renderTabs(); renderBody();
     }).catch(function (e) { console.error('entity-detail reload hiba:', e); _toast(_t('common.loadError', 'Eroare'), 'err'); });
@@ -321,11 +598,34 @@
     reload();
   }
 
+  function openOrder(id) {
+    ensureModal();
+    T = { type: 'order', id: String(id || ''), tab: 'overview', _data: null };
+    var el = document.getElementById('edTitle'); if (el) el.innerHTML = '<span style="font-size:22px;">📦</span><span>' + _esc(T.id) + '</span>';
+    document.getElementById('edTabs').innerHTML = '';
+    document.getElementById('edBody').innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">' + _t('fe.loading', 'Se încarcă…') + '</div>';
+    open();
+    reload();
+  }
+
+  function openClient(id, nume) {
+    ensureModal();
+    T = { type: 'client', id: parseInt(id, 10), nume: nume || '', tab: 'cdata', _data: null };
+    var el = document.getElementById('edTitle'); if (el) el.innerHTML = (typeof vsAvatar === 'function' ? vsAvatar(T.nume || '') : '🏢') + '<span>' + _esc(T.nume || '…') + '</span>';
+    document.getElementById('edTabs').innerHTML = '';
+    document.getElementById('edBody').innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">' + _t('fe.loading', 'Se încarcă…') + '</div>';
+    open();
+    reload();
+  }
+
   window.EntityDetail = {
     openVehicle: openVehicle,
     openDriver: openDriver,
+    openOrder: openOrder,
+    openClient: openClient,
     setTab: setTab,
     close: close,
+    copyTrack: copyTrack,
     addExpiry: addExpiry,
     delExpiry: delExpiry,
     addService: addService,

@@ -180,4 +180,173 @@ handlers.getDriverDetail = async function (req, res, args) {
   }
 };
 
+// ════════════════════════════════════════════════════════════
+//  FUVAR-RÉSZLETEK (read-only drill-in)
+//  Visszaad: a fuvar sora + dokumentumai (order_documents + POD documents)
+//  + számlái (invoices) + szakaszai (order_legs) + audit-bejegyzései +
+//  tracking_token. Minden lekérdezés company_id-szűrt + tulajdonjog-ellenőrzés.
+//  CSAK olvasás — a szerkesztés/számlázás/dok-művelet a MÁR LÉTEZŐ
+//  (auditált) handlereken/modulokon megy (a kliens azokra linkel).
+// ════════════════════════════════════════════════════════════
+handlers.getOrderDetail = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const a = _arg(args);
+    const cid = req.session.user.company_id;
+    const id = a.id != null ? String(a.id).trim() : '';
+    if (!id) return res.json({ result: { ok: false, err: 'ID invalid.' } });
+
+    // 1) TULAJDONJOG-ELLENŐRZÉS — a fuvar a hívó cégéé (nincs cross-tenant olvasás)
+    const or = await pool.query(
+      `SELECT o.*, COALESCE(c.denumire, o.client) AS client_name
+       FROM orders o
+       LEFT JOIN clients c ON c.id = o.client_id AND c.company_id = o.company_id
+       WHERE o.id = $1 AND o.company_id = $2`,
+      [id, cid]
+    );
+    if (!or.rows.length) return res.json({ result: { ok: false, err: 'Comanda nu a fost gasita.' } });
+    const order = or.rows[0];
+
+    // 2) Fuvar-dokumentumok (megrendelő PDF / aláírt CMR) — order_id + company_id-szűrt
+    const docR = await pool.query(
+      `SELECT id, file_name, uploaded_by, created_at,
+              (signed_base64 IS NOT NULL) AS signed
+       FROM order_documents
+       WHERE order_id = $1 AND company_id = $2
+       ORDER BY created_at DESC, id DESC LIMIT 100`,
+      [id, cid]
+    );
+
+    // 3) POD-fotók (sofőr feltöltései) — a documents.order_id-hez kötve.
+    //    A documents tábla NEM tárol company_id-t, ezért a fuvar tulajdonjoga
+    //    (fenti ellenőrzés) jelenti a tenant-határt: csak a SAJÁT cég fuvarjának
+    //    POD-jait kérjük le (order_id = a már verifikált fuvar id-je).
+    const podR = await pool.query(
+      `SELECT id, tip, file_name, nume_sofer, created_at
+       FROM documents
+       WHERE order_id = $1
+       ORDER BY created_at DESC, id DESC LIMIT 100`,
+      [id]
+    );
+
+    // 4) Számlák (kimenő) — order_id + company_id-szűrt
+    const invR = await pool.query(
+      `SELECT id, provider, serie, numar, total, valuta, tva, status, pdf_link,
+              efactura_status, created_at
+       FROM invoices
+       WHERE order_id = $1 AND company_id = $2
+       ORDER BY created_at DESC, id DESC LIMIT 50`,
+      [id, cid]
+    );
+
+    // 5) Szakaszok (order_legs) — order_id + company_id-szűrt
+    const legR = await pool.query(
+      `SELECT id, leg_number, sofer_type, email_sofer, nume_sofer, firma_extern,
+              rendszam_camion, rendszam_remorca, loc_preluare, data_preluare,
+              loc_predare, data_predare
+       FROM order_legs
+       WHERE order_id = $1 AND company_id = $2
+       ORDER BY leg_number ASC, id ASC`,
+      [id, cid]
+    );
+
+    // 6) Audit-bejegyzések — entity_type='order', entity_id = a fuvar id-je,
+    //    company_id-szűrt (az audit_log tárol company_id-t → tiszta tenant-határ).
+    const audR = await pool.query(
+      `SELECT id, user_email, action, detail, ip, created_at
+       FROM audit_log
+       WHERE company_id = $1 AND entity_type = 'order' AND entity_id = $2
+       ORDER BY created_at DESC, id DESC LIMIT 50`,
+      [cid, id]
+    );
+
+    return res.json({
+      result: {
+        ok: true,
+        order: order,
+        documents: docR.rows,
+        pod: podR.rows,
+        invoices: invR.rows,
+        legs: legR.rows,
+        activity: audR.rows,
+        tracking_token: order.tracking_token || null,
+      },
+    });
+  } catch (err) {
+    console.error('getOrderDetail hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ════════════════════════════════════════════════════════════
+//  ÜGYFÉL-PROFIL (read-only drill-in)
+//  Visszaad: az ügyfél sora + a fuvarjai (utolsó ~50) + a számlái +
+//  portál-hozzáférései (client_users, jelszó-hash NÉLKÜL).
+//  Minden lekérdezés company_id-szűrt + tulajdonjog-ellenőrzés.
+// ════════════════════════════════════════════════════════════
+handlers.getClientProfile = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const a = _arg(args);
+    const cid = req.session.user.company_id;
+    const id = parseInt(a.id, 10);
+    if (!Number.isFinite(id)) return res.json({ result: { ok: false, err: 'ID invalid.' } });
+
+    // 1) TULAJDONJOG-ELLENŐRZÉS — az ügyfél a hívó cégéé (nincs cross-tenant olvasás)
+    const cr = await pool.query(
+      'SELECT * FROM clients WHERE id = $1 AND company_id = $2',
+      [id, cid]
+    );
+    if (!cr.rows.length) return res.json({ result: { ok: false, err: 'Clientul nu a fost gasit.' } });
+    const client = cr.rows[0];
+
+    // 2) Az ügyfél fuvarjai — company_id ÉS client_id szerint, utolsó ~50
+    const ordR = await pool.query(
+      `SELECT id, loc_incarcare, loc_descarcare, pret, km, status, created_at
+       FROM orders
+       WHERE company_id = $1 AND client_id = $2
+       ORDER BY created_at DESC LIMIT 50`,
+      [cid, id]
+    );
+
+    // 3) Az ügyfél számlái — a hozzá kötött fuvarok számlái (company_id-szűrt).
+    //    Az invoices nem hivatkozik közvetlenül client_id-re → az ügyfél fuvarjai
+    //    (orders.client_id) order_id-jén keresztül kötjük.
+    const invR = await pool.query(
+      `SELECT i.id, i.order_id, i.provider, i.serie, i.numar, i.total, i.valuta,
+              i.status, i.pdf_link, i.created_at
+       FROM invoices i
+       WHERE i.company_id = $1
+         AND i.order_id IN (SELECT id FROM orders WHERE company_id = $1 AND client_id = $2)
+       ORDER BY i.created_at DESC, i.id DESC LIMIT 50`,
+      [cid, id]
+    );
+
+    // 4) Portál-hozzáférések (client_users) — company_id ÉS client_id-szűrt,
+    //    jelszó-hash NÉLKÜL (csak a státusz-jelzők).
+    const cuR = await pool.query(
+      `SELECT id, email, nev, activ, last_login,
+              (pass_hash IS NOT NULL) AS has_password,
+              (invite_token IS NOT NULL) AS pending_invite
+       FROM client_users
+       WHERE company_id = $1 AND client_id = $2
+       ORDER BY created_at DESC`,
+      [cid, id]
+    );
+
+    return res.json({
+      result: {
+        ok: true,
+        client: client,
+        orders: ordR.rows,
+        invoices: invR.rows,
+        portal: cuR.rows,
+      },
+    });
+  } catch (err) {
+    console.error('getClientProfile hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 module.exports = handlers;
