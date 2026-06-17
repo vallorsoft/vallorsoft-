@@ -2708,6 +2708,14 @@ function toggleGroup(el){
   document.querySelectorAll('.sidebar .menu-group.open').forEach(function(o){ if(o!==g) o.classList.remove('open'); });
   // A kattintott csoport beállítása (második kattintás be is csukja)
   g.classList.toggle('open', willOpen);
+  // Ha lenyílt, gördüljön a látható területbe — különben az aljára ragasztott
+  // „Beállítások" almenüje a sidebar alá lógna (margin-top:auto miatt) és nem látszana.
+  if(willOpen){
+    requestAnimationFrame(function(){
+      var sub = g.querySelector('.submenu');
+      try{ (sub||g).scrollIntoView({ block:'nearest', behavior:'smooth' }); }catch(e){ (sub||g).scrollIntoView(false); }
+    });
+  }
 }
 
 function toggleSidebar() {
