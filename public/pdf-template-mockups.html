@@ -61,33 +61,43 @@
   .totbar b{font-size:16px;color:var(--accent);}
 
   /* ── CMR hivatalos formanyomtatvány (kitölthető, példány-szín váltóval) ── */
-  .cmr-form{--cmr:#d12f2f;border:2px solid var(--cmr);font-size:10px;color:#111;}
+  /* Tahoma: kis méretben is jól olvasható, kompakt — a teljes űrlap ezt örökli */
+  .cmr-form{--cmr:#d12f2f;border:2px solid var(--cmr);font-size:9px;color:#111;font-family:Tahoma,Verdana,'Segoe UI',Arial,sans-serif;}
   .cmr-copybar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
   .cmr-copybar .lab{font-size:11px;color:var(--muted);margin-right:4px;}
   .cmr-copybar button{font-size:11px;padding:5px 11px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:600;}
   .cmr-copybar button.on{color:#fff;border-color:transparent;}
-  .cmr-copytitle{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 8px;border-bottom:1px solid var(--cmr);}
-  .cmr-copytitle .big{font-size:22px;font-weight:800;color:var(--cmr);line-height:1;}
-  .cmr-copytitle .ct{font-size:10px;color:#333;line-height:1.4;}
+  .cmr-copytitle{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:5px 8px;border-bottom:1px solid var(--cmr);}
+  .cmr-copytitle .ct{font-size:9.5px;color:#333;line-height:1.35;}
   .cmr-row{display:grid;grid-template-columns:1fr 1fr;}
-  .cmr-cell{border:1px solid var(--cmr);padding:5px 7px;min-height:0;}
-  .cmr-cell .num{display:inline-block;color:var(--cmr);font-weight:800;font-size:11px;margin-right:5px;}
-  .cmr-cell .lbl{font-size:8.5px;line-height:1.3;color:#333;}
+  .cmr-cell{border:1px solid var(--cmr);padding:4px 7px;min-height:0;}
+  .cmr-cell .num{display:inline-block;color:var(--cmr);font-weight:800;font-size:10px;margin-right:5px;}
+  .cmr-cell .lbl{font-size:7.5px;line-height:1.25;color:#333;}
   .cmr-cell .lbl b{color:#111;}
-  .fillable{margin-top:3px;min-height:18px;font-size:11px;line-height:1.5;color:#0b3a8a;outline:none;white-space:pre-wrap;}
+  .fillable{margin-top:2px;min-height:15px;font-size:10px;line-height:1.4;color:#0b3a8a;outline:none;white-space:pre-wrap;}
   .fillable:focus{background:#fffdf5;box-shadow:inset 0 0 0 1px var(--cmr);}
-  .fillable.tall{min-height:54px;}
-  .fillable.short{min-height:14px;}
+  .fillable.tall{min-height:34px;}
+  .fillable.short{min-height:13px;}
+  .fillable.oneline{min-height:13px;}
+  /* Tömörített cellák (alacsonyabb sorok) — kisebb padding + szorosabb felirat-sortáv */
+  .cmr-cell.tight{padding-top:2px;padding-bottom:2px;}
+  .cmr-cell.tight .lbl{line-height:1.1;}
+  .cmr-cell.tight .ll{line-height:1.1;}
+  /* Még tömörebb (a leg­alacsonyabb sorokhoz) */
+  .cmr-cell.tight2{padding-top:1px;padding-bottom:1px;}
+  .cmr-cell.tight2 .lbl, .cmr-cell.tight2 .ll{line-height:1.0;}
+  .cmr-cell.tight2 .lbl{font-size:7px;}
   .cmr-title{border:1px solid var(--cmr);padding:6px 8px;font-size:8px;line-height:1.35;color:#333;position:relative;}
   .cmr-title .cmrlogo{position:absolute;top:6px;right:8px;border:1.5px solid var(--cmr);color:var(--cmr);font-weight:800;font-size:13px;border-radius:50%;padding:3px 9px;}
   .cmr-title h3{margin:0 0 3px;font-size:10px;color:#111;letter-spacing:.5px;}
   .cmr-goods{width:100%;border-collapse:collapse;}
-  .cmr-goods th{background:#fff;border:1px solid var(--cmr);color:#111;font-size:8px;font-weight:700;padding:4px 5px;text-align:left;vertical-align:top;}
-  .cmr-goods th .num{color:var(--cmr);font-weight:800;font-size:10px;}
+  .cmr-goods th{background:#fff;border:1px solid var(--cmr);color:#111;font-size:7px;font-weight:700;padding:3px 5px;text-align:left;vertical-align:top;}
+  .cmr-goods th .num{color:var(--cmr);font-weight:800;font-size:9px;}
   .cmr-goods td{border:1px solid var(--cmr);height:20px;padding:2px 5px;}
   .cmr-goods td .fillable{min-height:14px;}
-  .cmr-charge{width:100%;border-collapse:collapse;font-size:8.5px;}
-  .cmr-charge td{border:1px solid var(--cmr);padding:3px 5px;}
+  .cmr-charge{width:100%;border-collapse:collapse;font-size:7px;line-height:1.15;}
+  .cmr-charge td{border:1px solid var(--cmr);padding:1px 4px;}
+  .cmr-charge .fillable.short{min-height:11px;margin-top:1px;}
   .cmr-charge .hd{background:#fff;color:var(--cmr);font-weight:800;}
   .cmr-sig{display:grid;grid-template-columns:1fr 1fr 1fr;}
   .cmr-note{font-size:7.5px;color:#555;line-height:1.3;padding:4px 6px;border:1px solid var(--cmr);}
@@ -184,8 +194,7 @@
 
   <div class="cmr-form var-de" id="cmrForm">
     <div class="cmr-copytitle">
-      <div><span class="big" id="cmrBig">1</span></div>
-      <div class="ct" id="cmrCopyLabel"><b>Exemplar pentru expeditor</b><br>Copy for sender<br><span class="l3 l-de">Exemplar für den Absender</span><span class="l3 l-fr">Exemplaire pour l'expéditeur</span></div>
+      <div class="ct" id="cmrCopyLabel"><b>Exemplar pentru expeditor</b> · Copy for sender · <span class="l3">Exemplar für den Absender</span></div>
     </div>
 
     <!-- Sor: 1 / Címblokk -->
@@ -216,15 +225,11 @@
       <div class="cmr-cell"><span class="num">17</span><span class="lbl"><span class="ll ro"><b>Transportatori succesivi</b></span><span class="ll en">Successive carriers</span><span class="ll l-de">Nachfolgende Frachtführer</span><span class="ll l-fr">Transporteurs successifs</span></span><div class="fillable" contenteditable="true"></div></div>
     </div>
 
-    <!-- Sor: 4 / 18 -->
-    <div class="cmr-row">
-      <div class="cmr-cell"><span class="num">4</span><span class="lbl"><span class="ll ro"><b>Loc și dată încărcare</b> (localitate, țară, dată)</span><span class="ll en">Place and date of taking over the goods</span><span class="ll l-de">Ort und Tag der Übernahme des Gutes</span><span class="ll l-fr">Lieu et date de prise en charge</span></span><div class="fillable" contenteditable="true"></div></div>
-      <div class="cmr-cell" style="grid-row:span 2;"><span class="num">18</span><span class="lbl"><span class="ll ro"><b>Rezervele și observațiile transportatorului</b></span><span class="ll en">Carrier's reservations and observations</span><span class="ll l-de">Vorbehalte und Bemerkungen der Frachtführer</span><span class="ll l-fr">Réserves et observations du transporteur</span></span><div class="fillable tall" contenteditable="true"></div></div>
-    </div>
-
-    <!-- Sor: 5 -->
-    <div class="cmr-row" style="grid-template-columns:1fr;">
-      <div class="cmr-cell"><span class="num">5</span><span class="lbl"><span class="ll ro"><b>Documente anexate</b></span><span class="ll en">Documents attached</span><span class="ll l-de">Beigefügte Dokumente</span><span class="ll l-fr">Documents annexés</span></span><div class="fillable short" contenteditable="true"></div></div>
+    <!-- Sor: 4 + 5 (bal oszlop) / 18 (jobb, átíveli a 4+5-öt) -->
+    <div class="cmr-row" style="grid-template-rows:auto auto;">
+      <div class="cmr-cell tight" style="grid-column:1;grid-row:1;"><span class="num">4</span><span class="lbl"><span class="ll ro"><b>Loc și dată încărcare</b> (localitate, țară, dată)</span><span class="ll en">Place and date of taking over the goods</span><span class="ll l-de">Ort und Tag der Übernahme des Gutes</span><span class="ll l-fr">Lieu et date de prise en charge</span></span><div class="fillable oneline" style="min-height:9px" contenteditable="true"></div></div>
+      <div class="cmr-cell tight" style="grid-column:2;grid-row:1 / span 2;"><span class="num">18</span><span class="lbl"><span class="ll ro"><b>Rezervele și observațiile transportatorului</b></span><span class="ll en">Carrier's reservations and observations</span><span class="ll l-de">Vorbehalte und Bemerkungen der Frachtführer</span><span class="ll l-fr">Réserves et observations du transporteur</span></span><div class="fillable" style="min-height:11px" contenteditable="true"></div></div>
+      <div class="cmr-cell tight" style="grid-column:1;grid-row:2;"><span class="num">5</span><span class="lbl"><span class="ll ro"><b>Documente anexate</b></span><span class="ll en">Documents attached</span><span class="ll l-de">Beigefügte Dokumente</span><span class="ll l-fr">Documents annexés</span></span><div class="fillable oneline" style="min-height:9px" contenteditable="true"></div></div>
     </div>
 
     <!-- Áru-tábla 6–12 -->
@@ -241,19 +246,22 @@
       <tbody>
         <tr><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td></tr>
         <tr><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td></tr>
+        <tr><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td></tr>
+        <tr><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td></tr>
+        <tr><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td></tr>
         <tr><td colspan="7" style="height:auto;"><span class="lbl" style="font-size:7.5px;"><span class="ll ro">Marfă periculoasă (ADR): Nr. UN · Clasă · Grupă de ambalare · literă</span><span class="ll l-de">Gefahrgut (ADR): UN-Nr. · Klasse · Verpackungsgruppe · Buchstabe</span><span class="ll l-fr">Marchandises dangereuses (ADR): N° UN · classe · groupe d'emballage · lettre</span></span><div class="fillable short" contenteditable="true"></div></td></tr>
       </tbody>
     </table>
 
     <!-- 13 / 19 -->
     <div class="cmr-row">
-      <div class="cmr-cell"><span class="num">13</span><span class="lbl"><span class="ll ro"><b>Instrucțiunile expeditorului</b></span><span class="ll en">Sender's instructions</span><span class="ll l-de">Anweisungen des Absenders</span><span class="ll l-fr">Instructions de l'expéditeur</span></span><div class="fillable tall" contenteditable="true"></div></div>
-      <div class="cmr-cell"><span class="num">19</span><span class="lbl"><span class="ll ro"><b>Convenții speciale</b></span><span class="ll en">Special agreements</span><span class="ll l-de">Besondere Vereinbarungen</span><span class="ll l-fr">Conventions particulières</span></span><div class="fillable tall" contenteditable="true"></div></div>
+      <div class="cmr-cell tight tight2"><span class="num">13</span><span class="lbl"><span class="ll ro"><b>Instrucțiunile expeditorului</b></span><span class="ll en">Sender's instructions</span><span class="ll l-de">Anweisungen des Absenders</span><span class="ll l-fr">Instructions de l'expéditeur</span></span><div class="fillable oneline" style="min-height:3px" contenteditable="true"></div></div>
+      <div class="cmr-cell tight tight2"><span class="num">19</span><span class="lbl"><span class="ll ro"><b>Convenții speciale</b></span><span class="ll en">Special agreements</span><span class="ll l-de">Besondere Vereinbarungen</span><span class="ll l-fr">Conventions particulières</span></span><div class="fillable oneline" style="min-height:3px" contenteditable="true"></div></div>
     </div>
 
     <!-- 14 / 20 -->
     <div class="cmr-row">
-      <div class="cmr-cell"><span class="num">14</span><span class="lbl"><span class="ll ro"><b>Instrucțiuni privind plata transportului</b></span><span class="ll en">Instructions as to payment</span><span class="ll l-de">Frachtzahlungsanweisungen</span><span class="ll l-fr">Prescriptions d'affranchissement</span></span><div class="fillable" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">14</span><span class="lbl"><span class="ll ro"><b>Instrucțiuni privind plata transportului</b></span><span class="ll en">Instructions as to payment</span><span class="ll l-de">Frachtzahlungsanweisungen</span><span class="ll l-fr">Prescriptions d'affranchissement</span></span><div class="fillable oneline" contenteditable="true"></div></div>
       <div class="cmr-cell" style="padding:3px;">
         <table class="cmr-charge">
           <tr><td class="hd" style="width:46%"><span class="num" style="color:inherit;">20</span> <span class="ll ro">De plată</span><span class="ll en">To be paid by</span><span class="ll l-de">Zu zahlen vom</span><span class="ll l-fr">À payer par</span></td><td class="hd center"><span class="ll ro">Expeditor</span><span class="ll l-de">Absender</span><span class="ll l-fr">Expéditeur</span></td><td class="hd center"><span class="ll ro">Valută</span><span class="ll l-de">Währung</span><span class="ll l-fr">Monnaie</span></td><td class="hd center"><span class="ll ro">Destinatar</span><span class="ll l-de">Empfänger</span><span class="ll l-fr">Destinataire</span></td></tr>
@@ -270,15 +278,15 @@
 
     <!-- 21 / 15 -->
     <div class="cmr-row">
-      <div class="cmr-cell"><span class="num">21</span><span class="lbl"><span class="ll ro"><b>Întocmit la</b> ......... <b>la data de</b> .........</span><span class="ll en">Established in ......... on .........</span><span class="ll l-de">Ausgefertigt in ......... am .........</span><span class="ll l-fr">Établi à ......... le .........</span></span><div class="fillable short" contenteditable="true"></div></div>
-      <div class="cmr-cell"><span class="num">15</span><span class="lbl"><span class="ll ro"><b>Ramburs</b></span><span class="ll en">Cash on delivery</span><span class="ll l-de">Rückerstattung / Nachnahme</span><span class="ll l-fr">Remboursement</span></span><div class="fillable short" contenteditable="true"></div></div>
+      <div class="cmr-cell tight tight2"><span class="num">21</span><span class="lbl"><span class="ll ro"><b>Întocmit la</b> ......... <b>la data de</b> .........</span><span class="ll en">Established in ......... on .........</span><span class="ll l-de">Ausgefertigt in ......... am .........</span><span class="ll l-fr">Établi à ......... le .........</span></span><div class="fillable oneline" style="min-height:3px" contenteditable="true"></div></div>
+      <div class="cmr-cell tight tight2"><span class="num">15</span><span class="lbl"><span class="ll ro"><b>Ramburs</b></span><span class="ll en">Cash on delivery</span><span class="ll l-de">Rückerstattung / Nachnahme</span><span class="ll l-fr">Remboursement</span></span><div class="fillable oneline" style="min-height:3px" contenteditable="true"></div></div>
     </div>
 
     <!-- 22 / 23 / 24 aláírások -->
     <div class="cmr-sig">
-      <div class="cmr-cell"><span class="num">22</span><span class="lbl"><span class="ll ro"><b>Semnătura și ștampila expeditorului</b></span><span class="ll en">Signature and stamp of the sender</span><span class="ll l-de">Unterschrift und Stempel des Absenders</span><span class="ll l-fr">Signature et timbre de l'expéditeur</span></span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
-      <div class="cmr-cell"><span class="num">23</span><span class="lbl"><span class="ll ro"><b>Semnătura și ștampila transportatorului</b></span><span class="ll en">Signature and stamp of the carrier</span><span class="ll l-de">Unterschrift und Stempel des Frachtführers</span><span class="ll l-fr">Signature et timbre du transporteur</span></span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
-      <div class="cmr-cell"><span class="num">24</span><span class="lbl"><span class="ll ro"><b>Marfă primită</b> · Semnătura destinatarului</span><span class="ll en">Goods received · stamp of the consignee</span><span class="ll l-de">Gut empfangen · Stempel des Empfängers</span><span class="ll l-fr">Marchandises reçues · timbre du destinataire</span></span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">22</span><span class="lbl"><span class="ll ro"><b>Semnătura și ștampila expeditorului</b></span><span class="ll en">Signature and stamp of the sender</span><span class="ll l-de">Unterschrift und Stempel des Absenders</span><span class="ll l-fr">Signature et timbre de l'expéditeur</span></span><div class="fillable" style="min-height:34px" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">23</span><span class="lbl"><span class="ll ro"><b>Semnătura și ștampila transportatorului</b></span><span class="ll en">Signature and stamp of the carrier</span><span class="ll l-de">Unterschrift und Stempel des Frachtführers</span><span class="ll l-fr">Signature et timbre du transporteur</span></span><div class="fillable" style="min-height:34px" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">24</span><span class="lbl"><span class="ll ro"><b>Marfă primită</b> · Semnătura destinatarului</span><span class="ll en">Goods received · stamp of the consignee</span><span class="ll l-de">Gut empfangen · Stempel des Empfängers</span><span class="ll l-fr">Marchandises reçues · timbre du destinataire</span></span><div class="fillable" style="min-height:34px" contenteditable="true"></div></div>
     </div>
 
     <div class="cmr-note">
@@ -306,10 +314,10 @@
   function renderCopyLabel(){
     if(!curBtn) return;
     var third = curVar === 'fr' ? curBtn.getAttribute('data-fr') : curBtn.getAttribute('data-de');
+    // Címzett egymás után (inline), példány-szám nélkül
     document.getElementById('cmrCopyLabel').innerHTML =
-      '<b>Exemplar pentru ' + curBtn.getAttribute('data-ro').toLowerCase() + '</b><br>' +
-      curBtn.getAttribute('data-en') + '<br>' +
-      '<span class="l3">' + third + '</span>';
+      '<b>Exemplar pentru ' + curBtn.getAttribute('data-ro').toLowerCase() + '</b> · ' +
+      curBtn.getAttribute('data-en') + ' · <span class="l3">' + third + '</span>';
   }
 
   // Példány-szín váltó
@@ -320,7 +328,6 @@
     b.classList.add('on'); b.style.background=c; b.style.color='#fff';
     curBtn = b;
     form.style.setProperty('--cmr', c);
-    document.getElementById('cmrBig').textContent = b.getAttribute('data-no');
     renderCopyLabel();
   });
 
