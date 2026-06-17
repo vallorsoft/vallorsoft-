@@ -91,6 +91,15 @@
   .cmr-charge .hd{background:#fff;color:var(--cmr);font-weight:800;}
   .cmr-sig{display:grid;grid-template-columns:1fr 1fr 1fr;}
   .cmr-note{font-size:7.5px;color:#555;line-height:1.3;padding:4px 6px;border:1px solid var(--cmr);}
+  /* Háromnyelvű változat: a 3. nyelv (DE vagy FR) váltható */
+  .l3{color:#555;}
+  .cmr-form .l-fr{display:none;}
+  .cmr-form.var-fr .l-fr{display:inline;}
+  .cmr-form.var-fr .l-de{display:none;}
+  .cmr-langbar{display:flex;gap:6px;align-items:center;margin-bottom:8px;}
+  .cmr-langbar .lab{font-size:11px;color:var(--muted);margin-right:4px;}
+  .cmr-langbar button{font-size:11px;padding:5px 12px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:700;}
+  .cmr-langbar button.on{background:var(--ink);color:#fff;border-color:var(--ink);}
 
   @media print{
     body{background:#fff;}
@@ -154,115 +163,125 @@
 <div class="page" id="cmr">
   <div class="pagetag">2 / 5 · CMR</div>
 
-  <div class="cmr-copybar">
-    <span class="lab">Exemplar (culoare per copie):</span>
-    <button data-c="#d12f2f" data-no="1" data-ro="Expeditor" data-en="Copy for sender" class="on" style="color:#fff;background:#d12f2f;">1 · Expeditor</button>
-    <button data-c="#1f5fbf" data-no="2" data-ro="Destinatar" data-en="Copy for consignee">2 · Destinatar</button>
-    <button data-c="#1f8f4d" data-no="3" data-ro="Transportator" data-en="Copy for carrier">3 · Transportator</button>
-    <button data-c="#222222" data-no="4" data-ro="Contabilitate" data-en="Copy for accounting">4 · Contabilitate</button>
-    <button data-c="#b8731f" data-no="5" data-ro="Casă de expediții" data-en="Copy for forwarder">5 · Expeditor (casă)</button>
+  <div class="cmr-langbar">
+    <span class="lab">Limba (a 3-a linie):</span>
+    <button data-var="de" class="on">🇷🇴 RO · 🇬🇧 EN · 🇩🇪 DE</button>
+    <button data-var="fr">🇷🇴 RO · 🇬🇧 EN · 🇫🇷 FR</button>
   </div>
 
-  <div class="cmr-form" id="cmrForm">
+  <div class="cmr-copybar">
+    <span class="lab">Exemplar (culoare per copie):</span>
+    <button data-c="#d12f2f" data-no="1" data-ro="Expeditor" data-en="Copy for sender" data-de="Exemplar für den Absender" data-fr="Exemplaire pour l'expéditeur" class="on" style="color:#fff;background:#d12f2f;">1 · Expeditor</button>
+    <button data-c="#1f5fbf" data-no="2" data-ro="Destinatar" data-en="Copy for consignee" data-de="Exemplar für den Empfänger" data-fr="Exemplaire pour le destinataire">2 · Destinatar</button>
+    <button data-c="#1f8f4d" data-no="3" data-ro="Transportator" data-en="Copy for carrier" data-de="Exemplar für den Frachtführer" data-fr="Exemplaire pour le transporteur">3 · Transportator</button>
+    <button data-c="#222222" data-no="4" data-ro="Contabilitate" data-en="Copy for accounting" data-de="Exemplar für die Buchhaltung" data-fr="Exemplaire pour la comptabilité">4 · Contabilitate</button>
+    <button data-c="#b8731f" data-no="5" data-ro="Casă de expediții" data-en="Copy for forwarder" data-de="Exemplar für den Spediteur" data-fr="Exemplaire pour le commissionnaire">5 · Expeditor (casă)</button>
+  </div>
+
+  <div class="cmr-form var-de" id="cmrForm">
     <div class="cmr-copytitle">
       <div><span class="big" id="cmrBig">1</span></div>
-      <div class="ct" id="cmrCopyLabel"><b>Exemplar pentru expeditor</b><br>Exemplar für den Absender · Copy for sender</div>
+      <div class="ct" id="cmrCopyLabel"><b>Exemplar pentru expeditor</b><br><span class="l3 l-de">Exemplar für den Absender</span><span class="l3 l-fr">Exemplaire pour l'expéditeur</span> · Copy for sender</div>
     </div>
 
     <!-- Sor: 1 / Címblokk -->
     <div class="cmr-row">
-      <div class="cmr-cell"><span class="num">1</span><span class="lbl"><b>Expeditor</b> (nume, adresă, țară) · Sender (name, address, country)</span><div class="fillable tall" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">1</span><span class="lbl"><b>Expeditor</b> (nume, adresă, țară) · Sender (name, address, country) <span class="l3 l-de">· Absender (Name, Anschrift, Land)</span><span class="l3 l-fr">· Expéditeur (nom, adresse, pays)</span></span><div class="fillable tall" contenteditable="true"></div></div>
       <div class="cmr-title">
         <span class="cmrlogo">CMR</span>
         <h3>SCRISOARE DE TRANSPORT INTERNAȚIONAL</h3>
-        INTERNATIONALER FRACHTBRIEF · INTERNATIONAL CONSIGNMENT NOTE<br>
+        INTERNATIONAL CONSIGNMENT NOTE <span class="l3 l-de">· INTERNATIONALER FRACHTBRIEF</span><span class="l3 l-fr">· LETTRE DE VOITURE INTERNATIONALE</span><br>
         Acest transport este supus, sub rezerva oricărei clauze contrare, Convenției referitoare la
         contractul de transport internațional de mărfuri pe șosele (CMR).<br>
         This carriage is subject, notwithstanding any clause to the contrary, to the Convention on the
         Contract for the international Carriage of goods by road (CMR).
+        <span class="l3 l-de"><br>Diese Beförderung unterliegt trotz einer gegenteiligen Abmachung den Bestimmungen des Übereinkommens über den Beförderungsvertrag im internationalen Strassengüterverkehr (CMR).</span>
+        <span class="l3 l-fr"><br>Ce transport est soumis, nonobstant toute clause contraire, à la Convention relative au contrat de transport international de marchandises par route (CMR).</span>
       </div>
     </div>
 
     <!-- Sor: 2 / 16 -->
     <div class="cmr-row">
-      <div class="cmr-cell"><span class="num">2</span><span class="lbl"><b>Destinatar</b> (nume, adresă, țară) · Consignee (name, address, country)</span><div class="fillable tall" contenteditable="true"></div></div>
-      <div class="cmr-cell"><span class="num">16</span><span class="lbl"><b>Transportator</b> (nume, adresă, țară) · Carrier (name, address, country)</span><div class="fillable" contenteditable="true"></div><span class="lbl"><b>NR. ÎNMATRICULARE:</b></span><div class="fillable short" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">2</span><span class="lbl"><b>Destinatar</b> (nume, adresă, țară) · Consignee (name, address, country) <span class="l3 l-de">· Empfänger (Name, Anschrift, Land)</span><span class="l3 l-fr">· Destinataire (nom, adresse, pays)</span></span><div class="fillable tall" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">16</span><span class="lbl"><b>Transportator</b> (nume, adresă, țară) · Carrier (name, address, country) <span class="l3 l-de">· Frachtführer (Name, Anschrift, Land)</span><span class="l3 l-fr">· Transporteur (nom, adresse, pays)</span></span><div class="fillable" contenteditable="true"></div><span class="lbl"><b>NR. ÎNMATRICULARE</b> · Reg. No. <span class="l3 l-de">· Amtl. Kennzeichen</span><span class="l3 l-fr">· Immatriculation</span></span><div class="fillable short" contenteditable="true"></div></div>
     </div>
 
     <!-- Sor: 3 / 17 -->
     <div class="cmr-row">
-      <div class="cmr-cell"><span class="num">3</span><span class="lbl"><b>Loc de livrare</b> (localitate, țară) · Place of delivery (place, country)</span><div class="fillable" contenteditable="true"></div></div>
-      <div class="cmr-cell"><span class="num">17</span><span class="lbl"><b>Transportatori succesivi</b> · Successive carriers</span><div class="fillable" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">3</span><span class="lbl"><b>Loc de livrare</b> (localitate, țară) · Place of delivery (place, country) <span class="l3 l-de">· Auslieferungsort des Gutes (Ort, Land)</span><span class="l3 l-fr">· Lieu de livraison (lieu, pays)</span></span><div class="fillable" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">17</span><span class="lbl"><b>Transportatori succesivi</b> · Successive carriers <span class="l3 l-de">· Nachfolgende Frachtführer</span><span class="l3 l-fr">· Transporteurs successifs</span></span><div class="fillable" contenteditable="true"></div></div>
     </div>
 
     <!-- Sor: 4 / 18 -->
     <div class="cmr-row">
-      <div class="cmr-cell"><span class="num">4</span><span class="lbl"><b>Loc și dată încărcare</b> (localitate, țară, dată) · Place and date of taking over the goods</span><div class="fillable" contenteditable="true"></div></div>
-      <div class="cmr-cell" style="grid-row:span 2;"><span class="num">18</span><span class="lbl"><b>Rezervele și observațiile transportatorului</b> · Carrier's reservations and observations</span><div class="fillable tall" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">4</span><span class="lbl"><b>Loc și dată încărcare</b> (localitate, țară, dată) · Place and date of taking over the goods <span class="l3 l-de">· Ort und Tag der Übernahme des Gutes</span><span class="l3 l-fr">· Lieu et date de prise en charge</span></span><div class="fillable" contenteditable="true"></div></div>
+      <div class="cmr-cell" style="grid-row:span 2;"><span class="num">18</span><span class="lbl"><b>Rezervele și observațiile transportatorului</b> · Carrier's reservations and observations <span class="l3 l-de">· Vorbehalte und Bemerkungen der Frachtführer</span><span class="l3 l-fr">· Réserves et observations du transporteur</span></span><div class="fillable tall" contenteditable="true"></div></div>
     </div>
 
     <!-- Sor: 5 -->
     <div class="cmr-row" style="grid-template-columns:1fr;">
-      <div class="cmr-cell"><span class="num">5</span><span class="lbl"><b>Documente anexate</b> · Documents attached</span><div class="fillable short" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">5</span><span class="lbl"><b>Documente anexate</b> · Documents attached <span class="l3 l-de">· Beigefügte Dokumente</span><span class="l3 l-fr">· Documents annexés</span></span><div class="fillable short" contenteditable="true"></div></div>
     </div>
 
     <!-- Áru-tábla 6–12 -->
     <table class="cmr-goods">
       <thead><tr>
-        <th style="width:13%"><span class="num">6</span> Mărci și numere · Marks and Nos</th>
-        <th style="width:9%"><span class="num">7</span> Nr. colete · Packages</th>
-        <th style="width:13%"><span class="num">8</span> Mod ambalare · Packing</th>
-        <th style="width:27%"><span class="num">9</span> Natura mărfii · Nature of goods</th>
-        <th style="width:13%"><span class="num">10</span> Nr. statistic · Stat. No.</th>
-        <th style="width:13%"><span class="num">11</span> Greutate brută kg · Gross weight</th>
-        <th style="width:12%"><span class="num">12</span> Volum m³ · Volume</th>
+        <th style="width:13%"><span class="num">6</span> Mărci și numere · Marks and Nos <span class="l3 l-de">· Kennzeichen und Nummern</span><span class="l3 l-fr">· Marques et numéros</span></th>
+        <th style="width:9%"><span class="num">7</span> Nr. colete · Packages <span class="l3 l-de">· Anzahl der Packstücke</span><span class="l3 l-fr">· Nombre de colis</span></th>
+        <th style="width:13%"><span class="num">8</span> Mod ambalare · Packing <span class="l3 l-de">· Art der Verpackung</span><span class="l3 l-fr">· Mode d'emballage</span></th>
+        <th style="width:27%"><span class="num">9</span> Natura mărfii · Nature of goods <span class="l3 l-de">· Bezeichnung des Gutes</span><span class="l3 l-fr">· Nature de la marchandise</span></th>
+        <th style="width:13%"><span class="num">10</span> Nr. statistic · Stat. No. <span class="l3 l-de">· Statistiknummer</span><span class="l3 l-fr">· Numéro statistique</span></th>
+        <th style="width:13%"><span class="num">11</span> Greutate brută kg · Gross weight <span class="l3 l-de">· Bruttogewicht in kg</span><span class="l3 l-fr">· Poids brut kg</span></th>
+        <th style="width:12%"><span class="num">12</span> Volum m³ · Volume <span class="l3 l-de">· Umfang m³</span><span class="l3 l-fr">· Volume m³</span></th>
       </tr></thead>
       <tbody>
         <tr><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td></tr>
         <tr><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td></tr>
-        <tr><td colspan="7" style="height:auto;"><span class="lbl" style="font-size:7.5px;">Marfă periculoasă (ADR): Nr. UN · Clasă · Grupă de ambalare · literă</span><div class="fillable short" contenteditable="true"></div></td></tr>
+        <tr><td colspan="7" style="height:auto;"><span class="lbl" style="font-size:7.5px;">Marfă periculoasă (ADR): Nr. UN · Clasă · Grupă de ambalare · literă <span class="l3 l-de">· Gefahrgut (ADR): UN-Nr. · Klasse · Verpackungsgruppe · Buchstabe</span><span class="l3 l-fr">· Marchandises dangereuses (ADR): N° UN · classe · groupe d'emballage · lettre</span></span><div class="fillable short" contenteditable="true"></div></td></tr>
       </tbody>
     </table>
 
     <!-- 13 / 19 -->
     <div class="cmr-row">
-      <div class="cmr-cell"><span class="num">13</span><span class="lbl"><b>Instrucțiunile expeditorului</b> · Sender's instructions</span><div class="fillable tall" contenteditable="true"></div></div>
-      <div class="cmr-cell"><span class="num">19</span><span class="lbl"><b>Convenții speciale</b> · Special agreements</span><div class="fillable tall" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">13</span><span class="lbl"><b>Instrucțiunile expeditorului</b> · Sender's instructions <span class="l3 l-de">· Anweisungen des Absenders</span><span class="l3 l-fr">· Instructions de l'expéditeur</span></span><div class="fillable tall" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">19</span><span class="lbl"><b>Convenții speciale</b> · Special agreements <span class="l3 l-de">· Besondere Vereinbarungen</span><span class="l3 l-fr">· Conventions particulières</span></span><div class="fillable tall" contenteditable="true"></div></div>
     </div>
 
     <!-- 14 / 20 -->
     <div class="cmr-row">
-      <div class="cmr-cell"><span class="num">14</span><span class="lbl"><b>Instrucțiuni privind plata transportului</b> · Instructions as to payment</span><div class="fillable" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">14</span><span class="lbl"><b>Instrucțiuni privind plata transportului</b> · Instructions as to payment <span class="l3 l-de">· Frachtzahlungsanweisungen</span><span class="l3 l-fr">· Prescriptions d'affranchissement</span></span><div class="fillable" contenteditable="true"></div></div>
       <div class="cmr-cell" style="padding:3px;">
         <table class="cmr-charge">
-          <tr><td class="hd" style="width:46%"><span class="num" style="color:inherit;">20</span> De plată · To be paid by</td><td class="hd center">Expeditor</td><td class="hd center">Valută</td><td class="hd center">Destinatar</td></tr>
-          <tr><td>Transport · Carriage</td><td><div class="fillable short" contenteditable="true"></div></td><td><div class="fillable short" contenteditable="true"></div></td><td><div class="fillable short" contenteditable="true"></div></td></tr>
-          <tr><td>Reduceri · Deductions</td><td></td><td></td><td></td></tr>
-          <tr><td>Sold · Balance</td><td></td><td></td><td></td></tr>
-          <tr><td>Suplimente · Supplem.</td><td></td><td></td><td></td></tr>
-          <tr><td>Diverse · Miscellaneous</td><td></td><td></td><td></td></tr>
-          <tr><td>Asigurare · Insurance</td><td></td><td></td><td></td></tr>
-          <tr><td><b>Total de plată · Total</b></td><td><div class="fillable short" contenteditable="true"></div></td><td></td><td><div class="fillable short" contenteditable="true"></div></td></tr>
+          <tr><td class="hd" style="width:46%"><span class="num" style="color:inherit;">20</span> De plată · To be paid by <span class="l3 l-de">· Zu zahlen vom</span><span class="l3 l-fr">· À payer par</span></td><td class="hd center">Expeditor<br><span class="l3 l-de">Absender</span><span class="l3 l-fr">Expéditeur</span></td><td class="hd center">Valută<br><span class="l3 l-de">Währung</span><span class="l3 l-fr">Monnaie</span></td><td class="hd center">Destinatar<br><span class="l3 l-de">Empfänger</span><span class="l3 l-fr">Destinataire</span></td></tr>
+          <tr><td>Transport · Carriage <span class="l3 l-de">· Fracht</span><span class="l3 l-fr">· Prix de transport</span></td><td><div class="fillable short" contenteditable="true"></div></td><td><div class="fillable short" contenteditable="true"></div></td><td><div class="fillable short" contenteditable="true"></div></td></tr>
+          <tr><td>Reduceri · Deductions <span class="l3 l-de">· Ermässigungen</span><span class="l3 l-fr">· Réductions</span></td><td></td><td></td><td></td></tr>
+          <tr><td>Sold · Balance <span class="l3 l-de">· Zwischenbetrag</span><span class="l3 l-fr">· Solde</span></td><td></td><td></td><td></td></tr>
+          <tr><td>Suplimente · Supplem. <span class="l3 l-de">· Zuschläge</span><span class="l3 l-fr">· Suppléments</span></td><td></td><td></td><td></td></tr>
+          <tr><td>Diverse · Miscellaneous <span class="l3 l-de">· Sonstiges</span><span class="l3 l-fr">· Frais accessoires</span></td><td></td><td></td><td></td></tr>
+          <tr><td>Asigurare · Insurance <span class="l3 l-de">· Versicherung</span><span class="l3 l-fr">· Assurance</span></td><td></td><td></td><td></td></tr>
+          <tr><td><b>Total de plată · Total <span class="l3 l-de">· Gesamtsumme</span><span class="l3 l-fr">· Total à payer</span></b></td><td><div class="fillable short" contenteditable="true"></div></td><td></td><td><div class="fillable short" contenteditable="true"></div></td></tr>
         </table>
       </div>
     </div>
 
     <!-- 21 / 15 -->
     <div class="cmr-row">
-      <div class="cmr-cell"><span class="num">21</span><span class="lbl"><b>Întocmit la</b> · Established in ......... <b>la data de</b> · on .........</span><div class="fillable short" contenteditable="true"></div></div>
-      <div class="cmr-cell"><span class="num">15</span><span class="lbl"><b>Ramburs</b> · Cash on delivery</span><div class="fillable short" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">21</span><span class="lbl"><b>Întocmit la</b> · Established in ......... <b>la data de</b> · on ......... <span class="l3 l-de">· Ausgefertigt in ... am</span><span class="l3 l-fr">· Établi à ... le</span></span><div class="fillable short" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">15</span><span class="lbl"><b>Ramburs</b> · Cash on delivery <span class="l3 l-de">· Rückerstattung / Nachnahme</span><span class="l3 l-fr">· Remboursement</span></span><div class="fillable short" contenteditable="true"></div></div>
     </div>
 
     <!-- 22 / 23 / 24 aláírások -->
     <div class="cmr-sig">
-      <div class="cmr-cell"><span class="num">22</span><span class="lbl"><b>Semnătura și ștampila expeditorului</b><br>Signature and stamp of the sender</span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
-      <div class="cmr-cell"><span class="num">23</span><span class="lbl"><b>Semnătura și ștampila transportatorului</b><br>Signature and stamp of the carrier</span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
-      <div class="cmr-cell"><span class="num">24</span><span class="lbl"><b>Marfă primită</b> / Goods received<br>Semnătura și ștampila destinatarului</span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">22</span><span class="lbl"><b>Semnătura și ștampila expeditorului</b><br>Signature and stamp of the sender<span class="l3 l-de"><br>Unterschrift und Stempel des Absenders</span><span class="l3 l-fr"><br>Signature et timbre de l'expéditeur</span></span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">23</span><span class="lbl"><b>Semnătura și ștampila transportatorului</b><br>Signature and stamp of the carrier<span class="l3 l-de"><br>Unterschrift und Stempel des Frachtführers</span><span class="l3 l-fr"><br>Signature et timbre du transporteur</span></span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">24</span><span class="lbl"><b>Marfă primită</b> / Goods received<br>Semnătura și ștampila destinatarului<span class="l3 l-de"><br>Gut empfangen · Unterschrift u. Stempel des Empfängers</span><span class="l3 l-fr"><br>Marchandises reçues · Signature et timbre du destinataire</span></span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
     </div>
 
     <div class="cmr-note">
       Rubricile încadrate cu linii groase se completează de transportator. · Rubricile 1–15, 19, 20 și 22 se completează pe răspunderea expeditorului. ·
       Model CMR/IRU conform Convenției de la Geneva (1956). În cazul mărfurilor periculoase se indică pe ultimul rând: clasa, cifra și, dacă e cazul, litera.
+      <span class="l3 l-de"><br>Die mit fett gedruckten Linien eingerahmten Rubriken müssen vom Frachtführer ausgefüllt werden.</span>
+      <span class="l3 l-fr"><br>Les cadres encadrés de lignes grasses doivent être remplis par le transporteur.</span>
     </div>
   </div>
 
@@ -274,18 +293,46 @@
 
 <script>
 (function(){
-  var bar = document.querySelector('#cmr .cmr-copybar');
+  var copybar = document.querySelector('#cmr .cmr-copybar');
+  var langbar = document.querySelector('#cmr .cmr-langbar');
   var form = document.getElementById('cmrForm');
-  if(!bar || !form) return;
-  bar.addEventListener('click', function(e){
+  if(!copybar || !form) return;
+  var curVar = 'de';      // alapból RO·EN·DE
+  var curBtn = copybar.querySelector('button.on');
+
+  function renderCopyLabel(){
+    if(!curBtn) return;
+    var third = curVar === 'fr' ? curBtn.getAttribute('data-fr') : curBtn.getAttribute('data-de');
+    document.getElementById('cmrCopyLabel').innerHTML =
+      '<b>Exemplar pentru ' + curBtn.getAttribute('data-ro').toLowerCase() + '</b><br>' +
+      '<span class="l3">' + third + '</span> · ' + curBtn.getAttribute('data-en');
+  }
+
+  // Példány-szín váltó
+  copybar.addEventListener('click', function(e){
     var b = e.target.closest('button'); if(!b) return;
-    bar.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); x.style.background='#fff'; x.style.color=''; });
+    copybar.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); x.style.background='#fff'; x.style.color=''; });
     var c = b.getAttribute('data-c');
     b.classList.add('on'); b.style.background=c; b.style.color='#fff';
+    curBtn = b;
     form.style.setProperty('--cmr', c);
     document.getElementById('cmrBig').textContent = b.getAttribute('data-no');
-    document.getElementById('cmrCopyLabel').innerHTML = '<b>Exemplar pentru ' + b.getAttribute('data-ro').toLowerCase() + '</b><br>' + b.getAttribute('data-en');
+    renderCopyLabel();
   });
+
+  // Nyelv-változat váltó (RO·EN·DE  /  RO·EN·FR)
+  if(langbar){
+    langbar.addEventListener('click', function(e){
+      var b = e.target.closest('button'); if(!b) return;
+      langbar.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
+      b.classList.add('on');
+      curVar = b.getAttribute('data-var');
+      form.classList.toggle('var-fr', curVar === 'fr');
+      form.classList.toggle('var-de', curVar === 'de');
+      renderCopyLabel();
+    });
+  }
+  renderCopyLabel();
 })();
 </script>
 
