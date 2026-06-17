@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260616warm2">
-  <script src="/i18n.js?v=20260617a1"></script>
+  <script src="/i18n.js?v=20260617a2"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -127,6 +127,7 @@
       <div class="submenu">
         <div class="sub-tab" data-tab="settings">👤 Fiók</div>
         <div class="sub-tab" data-tab="elofizetesek">💳 Előfizetés</div>
+        <div class="sub-tab" data-tab="fav-locations" data-i18n="nav.favLocations">⭐ Kedvenc helyszínek</div>
       </div>
     </div>
     <div style="padding:10px 12px; border-top:1px solid var(--border); margin-top:8px;">
@@ -350,6 +351,8 @@
  
  
     <div class="pane hidden" data-pane="ecmr"><div id="ecmrBox"></div></div>
+
+    <div class="pane hidden" data-pane="fav-locations"><div id="favLocBox"></div></div>
 
     <div class="pane hidden" data-pane="driver-docs-pane">
       <div class="glass" style="padding:22px">
@@ -1315,8 +1318,8 @@
   </div>
 </div>
 
-<script src="/feature-catalog.js?v=20260617a1"></script>
-<script src="/console-shared.js?v=20260616fix"></script>
+<script src="/feature-catalog.js?v=20260617a2"></script>
+<script src="/console-shared.js?v=20260617a2"></script>
 <script src="/console-pages.js?v=20260617a1"></script>
 <!-- ===== INTEGRACIOK (Ugyfelek / CargoTrack / Szamlazas) ===== -->
 <script src="/clients-page.js?v=20260616pill"></script>
@@ -1332,11 +1335,12 @@
 <script src="/invoice-modal.js?v=20260614qa"></script>
 <script src="/uit-panel.js?v=20260614qa"></script>
 <script src="/ecmr.js?v=20260616ecmr"></script>
+<script src="/fav-locations.js?v=20260617a2"></script>
 <script src="/invoices-out.js?v=20260616inv"></script>
 <script src="/stats.js?v=20260616co2"></script>
 <script src="/fleet-extra.js?v=20260616band3"></script>
 <script src="/planner.js?v=20260614qa"></script>
-<script src="/admin.js?v=20260617a1"></script>
+<script src="/admin.js?v=20260617a2"></script>
 <script src="/global-search.js?v=20260614qa"></script>
  <!-- ── BUG REPORT FAB ── -->
 <button onclick="openBugReport()" title="Hibajelentés küldése"

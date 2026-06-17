@@ -35,6 +35,7 @@ function loadTab(name){
     if(name==='received-fuv'){loadReceivedFuvarlevelek();loadDocSeries();}
     if(name==='driver-docs-pane') loadDriverUploadedDocs();
     if(name==='ecmr' && window.ECmr) ECmr.mount('ecmrBox');
+    if(name==='fav-locations' && window.FavLocations) FavLocations.mount('favLocBox');
       if(name==='users') loadUsers();
     if(name==='invites') loadInvites();
     if(name==='vehicles') loadVehicles();

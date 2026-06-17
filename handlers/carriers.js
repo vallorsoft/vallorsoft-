@@ -9,6 +9,7 @@ const crypto = require('crypto');
 let sendResetEmail = null;
 try { ({ sendResetEmail } = require('../services/email')); } catch (_) { /* opcionális */ }
 const { emailLang } = require('../lib/companyLang');
+const audit = require('../lib/audit');
 
 const handlers = {};
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
@@ -26,7 +27,8 @@ handlers.carrierList = async function (req, res, args) {
       `SELECT c.*,
               COALESCE((SELECT SUM(ci.amount - ci.paid_amount) FROM carrier_invoices ci
                         WHERE ci.carrier_id = c.id AND ci.status <> 'paid'), 0)::numeric AS open_balance,
-              (SELECT COUNT(*) FROM carrier_users cu WHERE cu.carrier_id = c.id AND cu.activ)::int AS portal_users
+              (SELECT COUNT(*) FROM carrier_users cu WHERE cu.carrier_id = c.id AND cu.activ)::int AS portal_users,
+              (SELECT g.name FROM carrier_groups g WHERE g.id = c.group_id AND g.company_id = c.company_id) AS group_name
        FROM carriers c WHERE c.company_id = $1 ORDER BY c.aktiv DESC, c.nev`, [cid]);
     return res.json({ result: { ok: true, items: r.rows } });
   } catch (err) { console.error('carrierList hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
@@ -39,6 +41,16 @@ handlers.carrierSave = async function (req, res, args) {
     const a = (args && args[0]) || {};
     const nev = _str(a.nev, 255);
     if (!nev) return res.json({ result: { ok: false, err: 'Numele firmei este obligatoriu.' } });
+    // Csoport: csak akkor állítjuk, ha a kérés explicit küldi (undefined → érintetlen).
+    // A csoportnak a hívó cégéhez kell tartoznia (cross-tenant védelem).
+    let groupId; // undefined = ne nyúljunk hozzá
+    if (a.group_id !== undefined) {
+      groupId = (a.group_id === '' || a.group_id == null) ? null : parseInt(a.group_id, 10);
+      if (groupId != null) {
+        const g = await pool.query('SELECT id FROM carrier_groups WHERE id=$1 AND company_id=$2', [groupId, cid]);
+        if (!g.rows.length) return res.json({ result: { ok: false, err: 'Grupul nu a fost găsit.' } });
+      }
+    }
     const f = {
       nev, cui: _str(a.cui, 40), email: _str(a.email, 255), telefon: _str(a.telefon, 50),
       iban: _str(a.iban, 40), nota: _str(a.nota, 1000),
@@ -47,18 +59,30 @@ handlers.carrierSave = async function (req, res, args) {
       aktiv: a.aktiv === undefined ? true : !!a.aktiv,
     };
     if (a.id) {
-      const r = await pool.query(
-        `UPDATE carriers SET nev=$1, cui=$2, email=$3, telefon=$4, iban=$5, nota=$6,
-           payment_term_days=$7, cmr_insurance_expiry=$8, aktiv=$9
-         WHERE id=$10 AND company_id=$11`,
-        [f.nev, f.cui, f.email, f.telefon, f.iban, f.nota, f.payment_term_days, f.cmr_insurance_expiry, f.aktiv, parseInt(a.id, 10), cid]);
+      const id = parseInt(a.id, 10);
+      let r;
+      if (groupId !== undefined) {
+        r = await pool.query(
+          `UPDATE carriers SET nev=$1, cui=$2, email=$3, telefon=$4, iban=$5, nota=$6,
+             payment_term_days=$7, cmr_insurance_expiry=$8, aktiv=$9, group_id=$10
+           WHERE id=$11 AND company_id=$12`,
+          [f.nev, f.cui, f.email, f.telefon, f.iban, f.nota, f.payment_term_days, f.cmr_insurance_expiry, f.aktiv, groupId, id, cid]);
+      } else {
+        r = await pool.query(
+          `UPDATE carriers SET nev=$1, cui=$2, email=$3, telefon=$4, iban=$5, nota=$6,
+             payment_term_days=$7, cmr_insurance_expiry=$8, aktiv=$9
+           WHERE id=$10 AND company_id=$11`,
+          [f.nev, f.cui, f.email, f.telefon, f.iban, f.nota, f.payment_term_days, f.cmr_insurance_expiry, f.aktiv, id, cid]);
+      }
       if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost găsit.' } });
-      return res.json({ result: { ok: true, id: parseInt(a.id, 10) } });
+      audit.fromReq(req, 'carrier.update', 'carrier', id, { nev: f.nev });
+      return res.json({ result: { ok: true, id } });
     }
     const ins = await pool.query(
-      `INSERT INTO carriers (company_id, nev, cui, email, telefon, iban, nota, payment_term_days, cmr_insurance_expiry, aktiv)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id`,
-      [cid, f.nev, f.cui, f.email, f.telefon, f.iban, f.nota, f.payment_term_days, f.cmr_insurance_expiry, f.aktiv]);
+      `INSERT INTO carriers (company_id, nev, cui, email, telefon, iban, nota, payment_term_days, cmr_insurance_expiry, aktiv, group_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+      [cid, f.nev, f.cui, f.email, f.telefon, f.iban, f.nota, f.payment_term_days, f.cmr_insurance_expiry, f.aktiv, groupId === undefined ? null : groupId]);
+    audit.fromReq(req, 'carrier.create', 'carrier', ins.rows[0].id, { nev: f.nev });
     return res.json({ result: { ok: true, id: ins.rows[0].id } });
   } catch (err) { console.error('carrierSave hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
@@ -74,6 +98,7 @@ handlers.carrierDelete = async function (req, res, args) {
     await pool.query('DELETE FROM carrier_users WHERE carrier_id=$1 AND company_id=$2', [id, cid]);
     await pool.query('DELETE FROM carrier_vehicles WHERE carrier_id=$1 AND company_id=$2', [id, cid]);
     const r = await pool.query('DELETE FROM carriers WHERE id=$1 AND company_id=$2', [id, cid]);
+    if (r.rowCount) audit.fromReq(req, 'carrier.delete', 'carrier', id, null);
     return res.json({ result: { ok: !!r.rowCount } });
   } catch (err) { console.error('carrierDelete hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
@@ -305,6 +330,80 @@ handlers.carrierDocUploadAdmin = async function (req, res, args) {
     );
     return res.json({ result: { ok: true, id: r.rows[0].id } });
   } catch (err) { console.error('carrierDocUploadAdmin hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
+};
+
+// ─── Alvállalkozó-csoportok ──────────────────────────────────
+handlers.carrierGroupList = async function (req, res, args) {
+  try {
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = req.session.user.company_id;
+    const r = await pool.query(
+      `SELECT g.id, g.name, g.created_at,
+              (SELECT COUNT(*) FROM carriers c WHERE c.group_id = g.id AND c.company_id = g.company_id)::int AS carrier_count
+       FROM carrier_groups g WHERE g.company_id = $1 ORDER BY g.name`, [cid]);
+    return res.json({ result: { ok: true, items: r.rows } });
+  } catch (err) { console.error('carrierGroupList hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
+};
+
+// args: [{ id?, name }] — id megadásánál átnevezés (csak a saját cég csoportja)
+handlers.carrierGroupSave = async function (req, res, args) {
+  try {
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = req.session.user.company_id;
+    const a = (args && args[0]) || {};
+    const name = _str(a.name, 120);
+    if (!name) return res.json({ result: { ok: false, err: 'Numele grupului este obligatoriu.' } });
+    if (a.id) {
+      const id = parseInt(a.id, 10);
+      const r = await pool.query('UPDATE carrier_groups SET name=$1 WHERE id=$2 AND company_id=$3', [name, id, cid]);
+      if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost găsit.' } });
+      audit.fromReq(req, 'carrier_group.update', 'carrier_group', id, { name });
+      return res.json({ result: { ok: true, id } });
+    }
+    const ins = await pool.query('INSERT INTO carrier_groups (company_id, name) VALUES ($1,$2) RETURNING id', [cid, name]);
+    audit.fromReq(req, 'carrier_group.create', 'carrier_group', ins.rows[0].id, { name });
+    return res.json({ result: { ok: true, id: ins.rows[0].id } });
+  } catch (err) { console.error('carrierGroupSave hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
+};
+
+// args: [groupId] — csak a saját cég csoportját törli; a hivatkozó alvállalkozók group_id=NULL lesz
+handlers.carrierGroupDelete = async function (req, res, args) {
+  try {
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = req.session.user.company_id;
+    const id = parseInt(args && args[0], 10);
+    if (!id) return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
+    // Ownership-ellenőrzés a törlés előtt
+    const own = await pool.query('SELECT id FROM carrier_groups WHERE id=$1 AND company_id=$2', [id, cid]);
+    if (!own.rows.length) return res.json({ result: { ok: false, err: 'Nu a fost găsit.' } });
+    // A csoportra hivatkozó alvállalkozókat feloldjuk (csak a saját cégben)
+    await pool.query('UPDATE carriers SET group_id=NULL WHERE group_id=$1 AND company_id=$2', [id, cid]);
+    const r = await pool.query('DELETE FROM carrier_groups WHERE id=$1 AND company_id=$2', [id, cid]);
+    audit.fromReq(req, 'carrier_group.delete', 'carrier_group', id, null);
+    return res.json({ result: { ok: !!r.rowCount } });
+  } catch (err) { console.error('carrierGroupDelete hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
+};
+
+// args: [carrierId, groupId|null] — egy alvállalkozó csoportjának beállítása
+handlers.carrierSetGroup = async function (req, res, args) {
+  try {
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = req.session.user.company_id;
+    const carrierId = parseInt(args && args[0], 10);
+    if (!carrierId) return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
+    let groupId = (args[1] === '' || args[1] == null) ? null : parseInt(args[1], 10);
+    // Ownership: az alvállalkozó a hívó cégéhez tartozik?
+    const cc = await pool.query('SELECT id FROM carriers WHERE id=$1 AND company_id=$2', [carrierId, cid]);
+    if (!cc.rows.length) return res.json({ result: { ok: false, err: 'Subcontractantul nu a fost găsit.' } });
+    // A csoport (ha van) szintén a hívó cégéhez tartozik?
+    if (groupId != null) {
+      const g = await pool.query('SELECT id FROM carrier_groups WHERE id=$1 AND company_id=$2', [groupId, cid]);
+      if (!g.rows.length) return res.json({ result: { ok: false, err: 'Grupul nu a fost găsit.' } });
+    }
+    const r = await pool.query('UPDATE carriers SET group_id=$1 WHERE id=$2 AND company_id=$3', [groupId, carrierId, cid]);
+    audit.fromReq(req, 'carrier.set_group', 'carrier', carrierId, { group_id: groupId });
+    return res.json({ result: { ok: !!r.rowCount } });
+  } catch (err) { console.error('carrierSetGroup hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 module.exports = handlers;
