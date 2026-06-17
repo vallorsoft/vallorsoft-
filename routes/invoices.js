@@ -127,6 +127,26 @@ router.post('/api/orders/:id/invoice/storno', requireLogin, requireRole('Admin',
   } catch (e) { res.status(e.status || 500).json({ ok: false, error: e.message }); }
 });
 
+// Teljes céges kimenő számla-lista (Kimenő számlák oldal). Multi-tenant: company_id-szűrt, paraméteres.
+router.get('/api/invoices', requireLogin, async (req, res) => {
+  try {
+    const cid = req.session.user.company_id;
+    const params = [cid];
+    let dateFilter = '';
+    const from = String(req.query.from || '').trim();
+    const to = String(req.query.to || '').trim();
+    if (from) { params.push(from); dateFilter += ` AND i.created_at >= $${params.length}`; }
+    if (to) { params.push(to); dateFilter += ` AND i.created_at < $${params.length}`; }
+    const { rows } = await pool.query(
+      `SELECT i.id, i.order_id, i.serie, i.numar, i.total, i.valuta, i.tva,
+              i.pdf_link, i.status, i.efactura_status, i.provider, i.client_name, i.created_at
+       FROM invoices i
+       WHERE i.company_id = $1${dateFilter}
+       ORDER BY i.created_at DESC LIMIT 500`, params);
+    res.json({ ok: true, invoices: rows });
+  } catch (e) { res.status(500).json({ ok: false, error: 'Eroare de server.' }); }
+});
+
 // Számla-állapot összesítő több fuvarra (fuvar-lista indikátor + modal).
 router.get('/api/invoices/summary', requireLogin, async (req, res) => {
   try {

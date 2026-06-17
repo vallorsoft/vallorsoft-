@@ -32,6 +32,8 @@ window.VS_FEATURES = [
   { key: 'stats-clients',    label: 'Statisztika — Ügyfél riport', group: 'Statisztika & Riport' },
   { key: 'stats-co2',        label: 'Statisztika — CO₂ riport',    group: 'Statisztika & Riport' },
   { key: 'decont',           label: 'Sofőr-elszámolás (decont)',   group: 'Fuvarozás & Logisztika' },
+  { key: 'invoices-out',     label: 'Kimenő számlák 📤',           group: 'Pénzügy' },
+  { key: 'invoices-in',      label: 'Bejövő számlák (alvállalkozói) 📥', group: 'Pénzügy' },
   // 'tracking': nem menüpont, hanem a fuvarlista 🌍 gombja (publikus ügyfél
   // követő-link) — a kapcsoló a gombot és a link-generálást tiltja.
   { key: 'tracking',         label: 'Ügyfél tracking-link (🌍)',   group: 'Fuvarozás & Logisztika' },

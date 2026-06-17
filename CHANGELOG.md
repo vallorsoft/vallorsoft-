@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-16 — Pénzügy: Kimenő + Bejövő számlák almenük (PR #166)
+
+> A Pénzügy csoport két új számla-aloldalt kap — a meglévő funkciók újrahasználásával (nincs duplikáció).
+
+- **Backend (egyetlen új végpont):** `routes/invoices.js` `GET /api/invoices` — cégre szűrt kimenő számla-lista (`WHERE i.company_id=$1`, opcionális `?from=&to=` paraméteres, `ORDER BY created_at DESC LIMIT 500`, generikus hiba). A kiállítás/storno/státusz végpontok változatlanok.
+- **📤 Kimenő számlák** (`invoices-out`, új `public/invoices-out.js`): a cég kimenő számláinak listája (szám/ügyfél/dátum/összeg/ÁFA/státusz-pirula/e-Factura/PDF), KPI-sávval (Összes/Kiállított/Sztornózott/Össz. érték a lekért listából). Műveletek a **meglévő** végpontokon: PDF (`pdf_link`), Storno (`/api/orders/:id/invoice/storno`), Státusz (`/api/invoices/:id/status`). A per-fuvar 🧾 kiállító gomb érintetlen.
+- **📥 Bejövő számlák** (`invoices-in`): a kész alvállalkozói AP (`loadCarrierAp` + `carrierInvoice*` handlerek) **áthelyezve** ide a Külső sofőröktől — egyetlen `#carrierApBox` konzolonként (nincs duplikált id); az alvállalkozó-törzs a Külső sofőröknél marad.
+- **Wiring:** `loadTab` (admin/manager.js) `invoices-out`→`loadInvoicesOut`, `invoices-in`→`loadCarrierAp`; `feature-catalog.js` (cégenként kapcsolható) + `i18n.js` (`nav.invoicesOut/In` + `invo.*`, RO-alap+HU). Cache-bust `?v=20260616inv`. **Biztonság:** az új végpont `company_id`-szűrt + paraméteres; auth/multi-tenant/billing-logika érintetlen. 93 Jest zöld.
+
 ## 2026-06-16 — Meleg paletta-hézagok lezárása (gombok, intake/chat, Útvonaltervezés) (PR #165)
 
 > A warm-rollout befejezése: a konzol-skin által nem érintett hideg-kék/sötét pontok átszínezve. Csak szín — szöveg/szerkezet/logika érintetlen.

@@ -71,6 +71,8 @@
       <div class="tab nav-head" id="financeParentTab" onclick="toggleGroup(this)"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg><span data-i18n="nav.financeHead">Pénzügy</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
       <div class="submenu">
         <div class="sub-tab" data-tab="stats-finance" data-i18n="nav.finance">Pénzügy</div>
+        <div class="sub-tab" data-tab="invoices-out" data-i18n="nav.invoicesOut">📤 Kimenő számlák</div>
+        <div class="sub-tab" data-tab="invoices-in" data-i18n="nav.invoicesIn">📥 Bejövő számlák</div>
         <div class="sub-tab" data-tab="decont" data-i18n="nav.decont">Sofőr-elszámolás</div>
       </div>
     </div>
@@ -435,6 +437,40 @@
         </table>
       </div>
       <div id="carriersBox" style="margin-top:16px;"></div>
+    </div>
+
+    <div class="pane hidden" data-pane="invoices-out">
+      <div class="glass" style="padding:22px;">
+        <h2 class="h-title" data-i18n="nav.invoicesOut">📤 Kimenő számlák</h2>
+        <div class="h-sub" data-i18n="invo.subOut">Az ügyfeleknek kiállított számlák</div>
+        <div id="invOutBand" style="margin:12px 0;"></div>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">
+          <label style="display:flex;flex-direction:column;font-size:12px;gap:4px;"><span data-i18n="invo.from">Tól</span><input id="invOutFrom" type="date" class="input"></label>
+          <label style="display:flex;flex-direction:column;font-size:12px;gap:4px;"><span data-i18n="invo.to">Ig</span><input id="invOutTo" type="date" class="input"></label>
+          <button class="btn primary" onclick="loadInvoicesOut()" data-i18n="invo.filter">Szűrés</button>
+        </div>
+        <div id="invoicesOutBox">
+          <table class="table" style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="invo.colNum">Szám</th>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="invo.colClient">Ügyfél</th>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="invo.colDate">Dátum</th>
+              <th style="padding:8px 10px;text-align:right;" data-i18n="invo.colTotal">Összeg</th>
+              <th style="padding:8px 10px;text-align:right;" data-i18n="invo.colTva">ÁFA</th>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="invo.colStatus">Státusz</th>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="invo.colActions">Műveletek</th>
+            </tr></thead>
+            <tbody id="invOutBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane hidden" data-pane="invoices-in">
+      <div class="glass" style="padding:22px;">
+        <h2 class="h-title" data-i18n="nav.invoicesIn">📥 Bejövő számlák</h2>
+        <div class="h-sub" data-i18n="invo.subIn">Alvállalkozói (szállítói) számlák / tartozások</div>
+      </div>
       <div id="carrierApBox" style="margin-top:16px;"></div>
     </div>
 
@@ -1236,6 +1272,7 @@
 <script src="/invoice-modal.js?v=20260614qa"></script>
 <script src="/uit-panel.js?v=20260614qa"></script>
 <script src="/ecmr.js?v=20260616ecmr"></script>
+<script src="/invoices-out.js?v=20260616inv"></script>
 <script src="/stats.js?v=20260616co2"></script>
 <script src="/fleet-extra.js?v=20260616band3"></script>
 <script src="/planner.js?v=20260614qa"></script>
