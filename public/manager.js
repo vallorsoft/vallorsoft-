@@ -41,6 +41,9 @@ function loadTab(name){
     if(name==='external-drivers'){ loadExtDrivers(); if(typeof loadCarriers==='function') loadCarriers(); }
     if(name==='invoices-out'){ if(typeof loadInvoicesOut==='function') loadInvoicesOut(); }
     if(name==='invoices-in'){ if(typeof loadCarrierAp==='function') loadCarrierAp(); }
+    if(name==='bnr-rate'){ if(typeof loadBnrRate==='function') loadBnrRate(); }
+    if(name==='orders-done'){ if(typeof loadOrdersDone==='function') loadOrdersDone(); }
+    if(name==='active-fleet'){ if(typeof loadActiveFleet==='function') loadActiveFleet(); }
     if(name==='internal-drivers') loadInternalDrivers();
     if(name==='signature') initAdminSigCanvas();
   if(name==='clients' && window.ClientsPage){ ClientsPage.mount('clientsBox'); if(typeof loadClientPortalAccess==='function') loadClientPortalAccess(); }
