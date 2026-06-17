@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-17 — Beállítások pane-fix + PDF/e-mail kész sablon-galériák
+
+> Két javítás: (1) az Admin **Beállítások** almenüinek pane-jei a teljes weblap aljára renderelődtek; (2) a PDF-sablonokhoz és a tranzakciós e-mail sablonokhoz is bekerült a „kész sablon" galéria (mint a vizuális e-mail-szerkesztőnél).
+
+1. **HIBAJAVÍTÁS — Beállítások pane-ek a weblap alá csúsztak** (`public/admin.html`): a `company-settings`, `pdf-settings` és `elofizetesek` pane-ek a `#mainContent`/`app-layout` lezárása UTÁN voltak a DOM-ban (elárvult, 0-behúzású blokk), ezért az almenüre kattintva a tartalom a teljes oldal alján jelent meg, nem a normál content-területen. A három pane visszahelyezve a `#mainContent`-en belülre; a lezáró tagek a panek után. Div-egyensúly ellenőrizve (590/590). A `manager.html` már helyes volt.
+2. **PDF kész sablonok** (`public/pdf-gallery.js` ÚJ — `window.PDF_PRESETS`): dokumentumtípusonként (Fuvar-lista/Menetlevél/CMR/Számla-kísérő) **≥3 kész preset**, az ELSŐ minden típusnál az „Implicit (sistem)" — a rendszer által automatikusan kitöltött kinézet, így a meglévő alap is választható/visszaállítható tételként jelenik meg. A presetek kódból jönnek (mindenkinek elérhető), egy kattintással az űrlapba töltődnek (fejléc/lábléc/akcent/logó), majd a felhasználó testreszabja és SAJÁT sablonként menti (meglévő `pdfTemplateSave`). UI: „✨ Kész sablonok" sor a `pdf-settings.js`-ben (`applyPreset`).
+3. **Tranzakciós e-mail kész sablonok** (`public/email-templates-gallery.js` ÚJ — `window.ETPL_PRESETS`): kulcsonként (fuvar-visszaigazolás/státusz/árajánlat/számla/általános) **≥3 kétnyelvű (RO+HU) preset** (Implicit + Formális + Barátságos). Egy kattintással a kártya Tárgy/Törzs mezőibe töltődik, majd a meglévő `emailTemplateSave`-vel mentődik. UI a `email-templates.js`-ben (`applyPreset`).
+4. **Wiring:** új script-ek az `admin.html`+`manager.html`-be (`pdf-gallery.js`, `email-templates-gallery.js`), cache-bust `?v=20260617tpl`; 4 új i18n kulcs (`pdfset.presets`/`presetLoaded`, `etpl.presets`/`presetLoaded`, RO-alap+HU). Backend érintetlen (a presetek kliens-oldaliak, a meglévő mentő-végpontokat hívják). 93 Jest zöld.
+
 ## 2026-06-17 — ÚJ modul: vizuális e-mail szerkesztő + cég saját feladó-fiókról küldés
 
 > Teljes vizuális (GrapesJS) e-mail-sablon szerkesztő KÜLSŐ kapcsolatoknak (ügyfél/jövőbeli ügyfél/alvállalkozó/egyéb) — NEM a platform felhasználóinak. A kimenő levelek a **cég SAJÁT e-mail-fiókjáról** mennek (SMTP nodemailer és/vagy cégenkénti Brevo), **nem egy közös címről**.

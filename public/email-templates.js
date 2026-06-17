@@ -51,6 +51,19 @@ window.EmailTemplates = (function () {
       h += '</div>';
       if (vars) h += '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">' + tt('etpl.varsHint', 'Változók') + ': <code>' + esc(vars.split(',').map(function (v) { return '{{' + v.trim() + '}}'; }).join(' ')) + '</code></div>';
 
+      // Kész sablonok (presetek) — mindenki számára elérhető, betöltés után szerkeszthető.
+      var presets = (window.ETPL_PRESETS && window.ETPL_PRESETS[it.key]) || [];
+      if (presets.length) {
+        var nameOf = window.etplPresetName || function (p) { return (p && p.name && (p.name.ro || p.name.hu)) || ''; };
+        h += '<div style="margin-bottom:12px;">';
+        h += '<div style="font-size:11px;color:var(--muted);margin-bottom:5px;">' + tt('etpl.presets', '✨ Kész sablonok — kattints a betöltéshez, majd szabd testre és mentsd') + '</div>';
+        h += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+        presets.forEach(function (p, pi) {
+          h += '<button class="btn ghost" style="padding:6px 11px;font-size:12px;" onclick="EmailTemplates.applyPreset(' + i + ',' + pi + ')">' + esc(nameOf(p)) + '</button>';
+        });
+        h += '</div></div>';
+      }
+
       h += '<div class="grid-2" style="gap:14px;align-items:start;">';
       // RO
       h += '<div>';
@@ -129,5 +142,18 @@ window.EmailTemplates = (function () {
     });
   }
 
-  return { mount: mount, save: save, test: test };
+  // Preset betöltése a kártya mezőibe (NEM ment automatikusan — a felhasználó áttekinti és menti).
+  function applyPreset(i, pi) {
+    var presets = (window.ETPL_PRESETS && window.ETPL_PRESETS[_items[i] && _items[i].key]) || [];
+    var p = presets[pi];
+    if (!p) return;
+    function set(id, val) { var el = document.getElementById(id); if (el) el.value = val == null ? '' : val; }
+    set('etSubRo_' + i, p.subject_ro);
+    set('etSubHu_' + i, p.subject_hu);
+    set('etBodyRo_' + i, p.body_ro);
+    set('etBodyHu_' + i, p.body_hu);
+    toast(tt('etpl.presetLoaded', 'Sablon betöltve — szabd testre és mentsd'), 'ok');
+  }
+
+  return { mount: mount, save: save, test: test, applyPreset: applyPreset };
 })();

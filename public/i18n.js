@@ -182,6 +182,8 @@
     // E-mail sablon-kezelő (Adminisztráció)
     'etpl.title': { hu: '✉️ E-mail sablonok', ro: '✉️ Șabloane e-mail' },
     'etpl.intro': { hu: 'Cégszintű tranzakciós e-mail sablonok (RO + HU). A {{változók}} a küldéskor töltődnek ki.', ro: 'Șabloane de e-mail tranzacționale, la nivel de firmă (RO + HU). {{variabilele}} se completează la trimitere.' },
+    'etpl.presets': { hu: '✨ Kész sablonok — kattints a betöltéshez, majd szabd testre és mentsd', ro: '✨ Șabloane gata făcute — apasă pentru încărcare, apoi personalizează și salvează' },
+    'etpl.presetLoaded': { hu: 'Sablon betöltve — szabd testre és mentsd', ro: 'Șablon încărcat — personalizează și salvează' },
     'etpl.active': { hu: 'Aktív', ro: 'Activ' },
     'etpl.varsHint': { hu: 'Változók', ro: 'Variabile' },
     'etpl.subjectRo': { hu: 'Tárgy (RO)', ro: 'Subiect (RO)' },
@@ -395,6 +397,8 @@
     'nav.pdfSettings': { hu: '📄 PDF-sablonok', ro: '📄 Șabloane PDF' },
     'pdfset.title': { hu: '📄 PDF-sablonok', ro: '📄 Șabloane PDF' },
     'pdfset.intro': { hu: 'A kimenő dokumentumok fejléce, lábléce, akcent-színe és logó-megjelenítése dokumentumtípusonként.', ro: 'Antet, subsol, culoare de accent și afișarea logo-ului pentru documentele emise, pe tip de document.' },
+    'pdfset.presets': { hu: '✨ Kész sablonok — kattints a betöltéshez, majd szabd testre és mentsd', ro: '✨ Șabloane gata făcute — apasă pentru încărcare, apoi personalizează și salvează' },
+    'pdfset.presetLoaded': { hu: 'Sablon betöltve — szabd testre és mentsd', ro: 'Șablon încărcat — personalizează și salvează' },
     'pdfset.invoiceNote': { hu: 'A számlák kinézetét a számlázó-szolgáltató adja — azt itt nem szabjuk testre.', ro: 'Aspectul facturilor este stabilit de furnizorul de facturare — nu poate fi personalizat aici.' },
     'pdfset.readOnly': { hu: 'Csak megtekintés (a beállításokat az Admin módosíthatja).', ro: 'Doar vizualizare (setările pot fi modificate de Admin).' },
     'pdfset.dtOrder': { hu: 'Fuvar-lista (nyomtatás/export)', ro: 'Listă comenzi (tipărire/export)' },
