@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-17 — CargoTMS-hézagok Fázis C/1: Árajánlatok (Quotes) modul (PR #171)
+
+> Valódi ajánlat-kezelő — az elnyert ajánlatból egy kattintással fuvar lesz a MEGLÉVŐ fuvar-létrehozóval (nincs forkolt logika).
+
+- **`db/quotes.sql`** (idempotens, valós PG16-on ellenőrizve) — `quotes` tábla (client_id/name, loc_from/to, price/valuta, status, valid_until, note, order_id, …) + `idx_quotes_company`.
+- **`handlers/quotes.js`** — `quoteList` (bármely belépett, company-szűrt), `quoteSave` (Admin/Manager; update előtt tulajdon-ellenőrzés), `quoteSetStatus` (státusz-fehérlista {draft,sent,awarded,lost}), **`quoteToOrder`** (tulajdon-ellenőrzés → a meglévő `comCreate` hívása stub-res-szel; siker után `status='awarded'` + `order_id`). Mind paraméteres, audit minden íráson.
+- **Frontend:** `public/quotes.js` (`Quotes.mount`) — KPI-sáv (Összes/Függő/Elnyert/Érték) + űrlap (ClientPicker újrahasználva) + tábla státusz-pillával és „→ Fuvar" gombbal. `quotes` aloldal a Fuvarok csoportban (admin+manager), `loadTab` bekötés, `feature-catalog.js` + `i18n.js` (`nav.quotes`+`qt.*`, RO-alap+HU). Cache-bust `?v=20260617c1`; 93 Jest zöld; orders/billing/auth érintetlen.
+
 ## 2026-06-17 — CargoTMS-hézagok Fázis B/2: Jármű- és sofőr-adatlap (tabos drill-in) (PR #170)
 
 > A listából megnyíló, tabos entitás-adatlap — a Lejárat/Szerviz/Tankolás az adott járműre/sofőrre szűrve, és onnan is felvihető. A globális oldalak változatlanok.
