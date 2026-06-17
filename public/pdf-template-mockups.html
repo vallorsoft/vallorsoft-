@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VallorSoft — Mockup șabloane PDF</title>
+<style>
+  :root{
+    --accent:#f6711e;        /* napnyugta narancs (a jelenlegi arculat) */
+    --accent-2:#f6517b;      /* korall */
+    --ink:#1e1812;           /* espresso szöveg */
+    --muted:#7a6c5d;
+    --line:#e4dccf;
+    --cream:#faf6f0;
+    --grad:linear-gradient(135deg,#fb8c3a 0%,#f6517b 100%);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#d9d2c7;font-family:'Segoe UI',Arial,Helvetica,sans-serif;color:var(--ink);}
+
+  /* Felső navigáció (a mockup-böngészéshez — nyomtatáskor eltűnik) */
+  .nav{position:sticky;top:0;z-index:50;background:#1e1812;padding:12px 18px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.25);}
+  .nav .brand{color:#fff;font-weight:800;margin-right:14px;font-size:15px;}
+  .nav .brand b{background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+  .nav a{color:#f3e9dd;text-decoration:none;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.15);}
+  .nav a:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .hint{max-width:820px;margin:18px auto 0;padding:0 16px;color:#4a4036;font-size:13px;}
+
+  /* A4 lap */
+  .page{background:#fff;width:820px;max-width:96vw;margin:22px auto;padding:34px 38px;border-radius:6px;box-shadow:0 10px 30px rgba(0,0,0,.18);position:relative;}
+  .page h2.docname{margin:0;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);font-weight:800;}
+  .pagetag{position:absolute;top:-11px;left:24px;background:var(--grad);color:#fff;font-size:11px;font-weight:700;padding:3px 12px;border-radius:20px;letter-spacing:.5px;}
+
+  /* Fej (logó + cégadat) */
+  .doc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;border-bottom:3px solid var(--accent);padding-bottom:14px;margin-bottom:18px;}
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo .mark{width:46px;height:46px;border-radius:11px;background:var(--grad);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:20px;box-shadow:0 4px 12px rgba(246,113,30,.4);}
+  .logo .nm{font-size:20px;font-weight:800;}
+  .logo .nm span{color:var(--accent);}
+  .co-meta{font-size:11px;color:var(--muted);text-align:right;line-height:1.6;}
+  .doc-title{text-align:center;margin:6px 0 16px;}
+  .doc-title h1{margin:0;font-size:21px;font-weight:800;letter-spacing:.5px;}
+  .doc-title .sub{font-size:12px;color:var(--muted);margin-top:3px;}
+
+  table{width:100%;border-collapse:collapse;font-size:11.5px;}
+  th{background:var(--cream);color:var(--ink);text-align:left;padding:8px 9px;border:1px solid var(--line);font-weight:700;}
+  td{padding:7px 9px;border:1px solid var(--line);vertical-align:top;}
+  tr:nth-child(even) td{background:#fcfaf6;}
+  .right{text-align:right;} .center{text-align:center;}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;}
+  .p-ok{background:#dcfce7;color:#166534;} .p-run{background:#fff0dd;color:#9a3412;} .p-wait{background:#e0e7ff;color:#3730a3;}
+
+  .grid{display:grid;gap:10px;}
+  .box{border:1px solid var(--line);border-radius:8px;padding:11px 13px;}
+  .box .lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--accent);font-weight:700;margin-bottom:4px;}
+  .box .val{font-size:12.5px;line-height:1.55;}
+  .muted{color:var(--muted);}
+  .foot{margin-top:20px;border-top:1px solid var(--line);padding-top:11px;font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;gap:12px;}
+  .sig{margin-top:6px;height:48px;border:1px dashed var(--line);border-radius:7px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:5px;font-size:10px;color:var(--muted);}
+  .sig.signed{border-style:solid;border-color:#16a34a;background:#f0fdf4;}
+  .totbar{margin-top:14px;display:flex;justify-content:flex-end;gap:26px;font-size:13px;}
+  .totbar b{font-size:16px;color:var(--accent);}
+
+  /* CMR számozott dobozok */
+  .cmr{border:2px solid var(--ink);}
+  .cmr td{border:1px solid #b9ab98;padding:7px 8px;font-size:10.5px;}
+  .cmr .num{font-size:9px;color:var(--accent);font-weight:800;}
+  .cmr .fld{margin-top:3px;font-size:11.5px;line-height:1.45;}
+
+  @media print{
+    body{background:#fff;}
+    .nav,.hint{display:none;}
+    .page{box-shadow:none;margin:0;border-radius:0;width:auto;max-width:none;page-break-after:always;}
+  }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="brand">Vallor<b>Soft</b> · Mockup șabloane</div>
+  <a href="#lista">📋 Listă comenzi</a>
+  <a href="#cmr">📄 CMR</a>
+  <a href="#ecmr">🔏 e-CMR</a>
+  <a href="#nota">🧾 Notă factură</a>
+  <a href="#aviz">📦 Aviz mărfii</a>
+  <a href="#" onclick="window.print();return false;">🖨️ Print / PDF</a>
+</div>
+
+<div class="hint">
+  Acestea sunt <b>mockup-uri</b> (machete vizuale) pentru aprobarea aspectului șabloanelor PDF.
+  Datele sunt exemple. Culorile/antetul/logo-ul se preiau din „Cég &amp; arculat”. După aprobare,
+  fiecare devine șablon editabil, disponibil tuturor.
+</div>
+
+<!-- ════════════ 1. LISTĂ COMENZI ════════════ -->
+<div class="page" id="lista">
+  <div class="pagetag">1 / 5 · Listă comenzi</div>
+  <div class="doc-head">
+    <div class="logo"><div class="mark">V</div><div class="nm">Vallor<span>Trans</span> SRL</div></div>
+    <div class="co-meta">
+      CUI: RO47859317 · Reg. Com.: J2023000114142<br>
+      Sat Arcus, Cart. Poiana Arcusului 102, jud. Covasna<br>
+      Tel: 0769 532 015 · E-mail: office@vallortrans.ro
+    </div>
+  </div>
+  <div class="doc-title">
+    <h2 class="docname">Document operativ</h2>
+    <h1>LISTĂ COMENZI / TRANSPORTURI</h1>
+    <div class="sub">Perioada: 01.06.2026 – 17.06.2026 · 6 comenzi</div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>#</th><th>Data</th><th>Client</th><th>Rută</th><th>Vehicul</th><th>Șofer</th><th>Status</th><th class="right">Preț</th>
+    </tr></thead>
+    <tbody>
+      <tr><td>1024</td><td>03.06</td><td>Demo Logistic SRL</td><td>București → München</td><td>B 104 VLR</td><td>I. Popescu</td><td><span class="pill p-ok">Finalizat</span></td><td class="right">1 850 €</td></tr>
+      <tr><td>1025</td><td>05.06</td><td>EuroCargo GmbH</td><td>Cluj → Wien</td><td>CV 22 VLR</td><td>A. Kovács</td><td><span class="pill p-run">In Curs</span></td><td class="right">1 200 €</td></tr>
+      <tr><td>1026</td><td>07.06</td><td>Marfa Rapidă SA</td><td>Constanța → Budapest</td><td>B 104 VLR</td><td>I. Popescu</td><td><span class="pill p-run">Extern</span></td><td class="right">1 430 €</td></tr>
+      <tr><td>1027</td><td>10.06</td><td>Demo Logistic SRL</td><td>Timișoara → Praha</td><td>CV 22 VLR</td><td>A. Kovács</td><td><span class="pill p-wait">Disponibil</span></td><td class="right">1 690 €</td></tr>
+      <tr><td>1028</td><td>12.06</td><td>Nord Expedit SRL</td><td>Iași → Warszawa</td><td>BV 71 VLR</td><td>G. Marin</td><td><span class="pill p-wait">Alocat</span></td><td class="right">2 050 €</td></tr>
+      <tr><td>1029</td><td>15.06</td><td>EuroCargo GmbH</td><td>Sibiu → Milano</td><td>BV 71 VLR</td><td>G. Marin</td><td><span class="pill p-ok">Finalizat</span></td><td class="right">2 240 €</td></tr>
+    </tbody>
+  </table>
+  <div class="totbar"><span class="muted">Total comenzi: 6</span><span>Valoare totală: <b>10 460 €</b></span></div>
+  <div class="foot"><span>Document generat automat de VallorSoft</span><span>17.06.2026 14:32</span></div>
+</div>
+
+<!-- ════════════ 2. CMR ════════════ -->
+<div class="page" id="cmr">
+  <div class="pagetag">2 / 5 · CMR</div>
+  <div class="doc-head">
+    <div class="logo"><div class="mark">V</div><div class="nm">Vallor<span>Trans</span> SRL</div></div>
+    <div class="co-meta">SCRISOARE DE TRANSPORT INTERNAȚIONAL<br>Conform Convenției CMR (Geneva, 1956)<br>Nr. CMR: <b>0042178</b> · Data: 03.06.2026</div>
+  </div>
+  <table class="cmr">
+    <tr>
+      <td style="width:50%"><span class="num">1 · Expeditor (nume, adresă)</span><div class="fld">Demo Logistic SRL<br>Str. Industriei 14, București, RO</div></td>
+      <td><span class="num">16 · Transportator</span><div class="fld">VallorTrans SRL · CUI RO47859317<br>Sat Arcus 102, jud. Covasna</div></td>
+    </tr>
+    <tr>
+      <td><span class="num">2 · Destinatar</span><div class="fld">BMW Group Logistik<br>Petuelring 130, München, DE</div></td>
+      <td><span class="num">17 · Transportatori succesivi</span><div class="fld muted">—</div></td>
+    </tr>
+    <tr>
+      <td><span class="num">3 · Loc descărcare</span><div class="fld">München, DE · 06.06.2026</div></td>
+      <td><span class="num">18 · Rezerve și observații</span><div class="fld muted">—</div></td>
+    </tr>
+    <tr>
+      <td><span class="num">4 · Loc/data încărcare</span><div class="fld">București, RO · 03.06.2026</div></td>
+      <td rowspan="2"><span class="num">19 · Convenții speciale</span><div class="fld">Transport sub temperatură controlată +4°C.<br>UIT: 3RO20260603XXXXXX</div></td>
+    </tr>
+    <tr>
+      <td><span class="num">5 · Documente anexate</span><div class="fld">Factură FV-2026-1187 · Packing list</div></td>
+    </tr>
+    <tr>
+      <td><span class="num">6–9 · Marfă (natură, ambalaj, nr. colete)</span><div class="fld">Piese auto · 12 paleți EUR · 5 400 kg</div></td>
+      <td><span class="num">20 · De plată</span><div class="fld">Transport: 1 850 € · Plătitor: Expeditor</div></td>
+    </tr>
+    <tr>
+      <td><span class="num">11 · Greutate brută</span><div class="fld">5 400 kg · Volum: 38 m³</div></td>
+      <td><span class="num">21 · Întocmit la</span><div class="fld">București, 03.06.2026</div></td>
+    </tr>
+    <tr>
+      <td style="height:74px"><span class="num">22 · Semnătura expeditorului</span><div class="sig">semnătură &amp; ștampilă</div></td>
+      <td><span class="num">23 · Semnătura transportatorului</span><div class="sig">semnătură &amp; ștampilă</div></td>
+    </tr>
+    <tr>
+      <td colspan="2"><span class="num">24 · Marfă primită (destinatar) — loc, dată, semnătură</span><div class="sig" style="height:42px">München, ____.____.2026</div></td>
+    </tr>
+  </table>
+  <div class="foot"><span>VallorTrans SRL · CUI RO47859317 · IBAN RO49 RNCB 0000 0000 0000 0000</span><span>Exemplar transportator</span></div>
+</div>
+
+<!-- ════════════ 3. e-CMR ════════════ -->
+<div class="page" id="ecmr">
+  <div class="pagetag">3 / 5 · e-CMR</div>
+  <div class="doc-head">
+    <div class="logo"><div class="mark">V</div><div class="nm">Vallor<span>Trans</span> SRL</div></div>
+    <div class="co-meta">
+      <span style="display:inline-block;background:var(--grad);color:#fff;padding:3px 10px;border-radius:6px;font-weight:700;">e-CMR digital</span><br>
+      ID document: e-CMR-2026-000318<br>Emis: 03.06.2026 09:14 · Stare: <b style="color:#16a34a;">Semnat 3/3</b>
+    </div>
+  </div>
+  <div class="doc-title">
+    <h2 class="docname">Scrisoare de transport electronică</h2>
+    <h1>e-CMR · TRANSPORT 1024</h1>
+    <div class="sub">București → München · 5 400 kg · UIT 3RO20260603XXXXXX</div>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:14px;">
+    <div class="box"><div class="lbl">Expeditor</div><div class="val">Demo Logistic SRL<br>București, RO</div></div>
+    <div class="box"><div class="lbl">Transportator</div><div class="val">VallorTrans SRL<br>CUI RO47859317</div></div>
+    <div class="box"><div class="lbl">Destinatar</div><div class="val">BMW Group Logistik<br>München, DE</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Marfă</th><th class="center">Colete</th><th class="center">Greutate</th><th class="center">Volum</th><th>Mențiuni</th></tr></thead>
+    <tbody><tr><td>Piese auto (paleți EUR)</td><td class="center">12</td><td class="center">5 400 kg</td><td class="center">38 m³</td><td>Temp. +4°C</td></tr></tbody>
+  </table>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:16px;">
+    <div class="box"><div class="lbl">Semnătură expeditor</div><div class="sig signed">✓ semnat digital · 03.06 09:14</div></div>
+    <div class="box"><div class="lbl">Semnătură transportator</div><div class="sig signed">✓ semnat digital · 03.06 11:02</div></div>
+    <div class="box"><div class="lbl">Semnătură destinatar</div><div class="sig signed">✓ semnat digital · 06.06 15:48</div></div>
+  </div>
+  <div class="foot">
+    <span>🔒 Integritate verificată — hash SHA-256: a17f…9c2e · Sigiliu temporal aplicat</span>
+    <span>VallorSoft e-CMR</span>
+  </div>
+</div>
+
+<!-- ════════════ 4. NOTĂ ÎNSOȚITOARE FACTURĂ ════════════ -->
+<div class="page" id="nota">
+  <div class="pagetag">4 / 5 · Notă factură</div>
+  <div class="doc-head">
+    <div class="logo"><div class="mark">V</div><div class="nm">Vallor<span>Trans</span> SRL</div></div>
+    <div class="co-meta">CUI: RO47859317 · Reg. Com.: J2023000114142<br>IBAN: RO49 RNCB 0000 0000 0000 0000 · BCR<br>Tel: 0769 532 015</div>
+  </div>
+  <div class="doc-title">
+    <h2 class="docname">Document financiar</h2>
+    <h1>NOTĂ DE ÎNSOȚIRE FACTURĂ</h1>
+    <div class="sub">Aferentă facturii FV-2026-1187 · Comanda 1024</div>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-bottom:14px;">
+    <div class="box"><div class="lbl">Către client</div><div class="val">Demo Logistic SRL<br>Str. Industriei 14, București<br>CUI: RO11223344</div></div>
+    <div class="box"><div class="lbl">Detalii factură</div><div class="val">Serie/Nr: <b>FV-2026-1187</b><br>Data emiterii: 06.06.2026<br>Scadență: 06.07.2026 (30 zile)</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Descriere serviciu</th><th class="center">Rută</th><th class="center">Cant.</th><th class="right">Valoare</th></tr></thead>
+    <tbody>
+      <tr><td>Servicii de transport rutier internațional de marfă</td><td class="center">București → München</td><td class="center">1</td><td class="right">1 850,00 €</td></tr>
+      <tr><td>Taxă de drum (rovinietă / tarife)</td><td class="center">—</td><td class="center">1</td><td class="right">incl.</td></tr>
+    </tbody>
+  </table>
+  <div class="totbar"><span class="muted">TVA (taxare inversă)</span><span>Total de plată: <b>1 850,00 €</b></span></div>
+  <div class="box" style="margin-top:16px;background:var(--cream);">
+    <div class="lbl">Instrucțiuni de plată</div>
+    <div class="val">Vă rugăm efectuați plata până la <b>06.07.2026</b> în contul <b>RO49 RNCB 0000 0000 0000 0000</b> (BCR),
+    menționând referința <b>FV-2026-1187</b>. Pentru orice nelămurire, contactați departamentul financiar.</div>
+  </div>
+  <div class="foot"><span>Vă mulțumim pentru colaborare!</span><span>VallorTrans SRL · 06.06.2026</span></div>
+</div>
+
+<!-- ════════════ 5. AVIZ DE ÎNSOȚIRE A MĂRFII ════════════ -->
+<div class="page" id="aviz">
+  <div class="pagetag">5 / 5 · Aviz mărfii</div>
+  <div class="doc-head">
+    <div class="logo"><div class="mark">V</div><div class="nm">Vallor<span>Trans</span> SRL</div></div>
+    <div class="co-meta">CUI: RO47859317 · Reg. Com.: J2023000114142<br>Sat Arcus 102, jud. Covasna<br>Capital social: 200 RON</div>
+  </div>
+  <div class="doc-title">
+    <h2 class="docname">Document de însoțire</h2>
+    <h1>AVIZ DE ÎNSOȚIRE A MĂRFII</h1>
+    <div class="sub">Seria VLR Nr. 000451 · Data: 03.06.2026</div>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-bottom:14px;">
+    <div class="box"><div class="lbl">Furnizor</div><div class="val">VallorTrans SRL<br>CUI: RO47859317 · J2023000114142<br>Sat Arcus 102, jud. Covasna</div></div>
+    <div class="box"><div class="lbl">Cumpărător</div><div class="val">BMW Group Logistik<br>Petuelring 130, München, DE<br>VAT: DE129273398</div></div>
+  </div>
+  <table>
+    <thead><tr>
+      <th class="center">Nr.</th><th>Denumirea produselor / serviciilor</th><th class="center">U.M.</th><th class="center">Cant.</th><th class="right">Preț unitar</th><th class="right">Valoare</th>
+    </tr></thead>
+    <tbody>
+      <tr><td class="center">1</td><td>Piese auto — subansamble (paleți EUR)</td><td class="center">buc</td><td class="center">12</td><td class="right">—</td><td class="right">—</td></tr>
+      <tr><td class="center">2</td><td>Componente electronice (cutii)</td><td class="center">buc</td><td class="center">30</td><td class="right">—</td><td class="right">—</td></tr>
+    </tbody>
+  </table>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px;">
+    <div class="box"><div class="lbl">Date privind transportul</div><div class="val">Mijloc: auto · <b>B 104 VLR</b><br>Remorcă: B 220 VLR<br>Greutate: 5 400 kg</div></div>
+    <div class="box"><div class="lbl">Delegat</div><div class="val">Popescu Ion<br>CI seria XV nr. 123456<br>Plecat la ora: 08:30</div></div>
+    <div class="box"><div class="lbl">Expediere</div><div class="val">București → München<br>Data: 03.06.2026<br>UIT: 3RO2026…XXXXXX</div></div>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px;">
+    <div class="box"><div class="lbl">Semnătura de expediere</div><div class="sig">numele &amp; semnătura</div></div>
+    <div class="box"><div class="lbl">Semnătura de primire</div><div class="sig">numele &amp; semnătura</div></div>
+  </div>
+  <div class="foot"><span>Aviz întocmit conform legislației în vigoare</span><span>VallorTrans SRL · 03.06.2026</span></div>
+</div>
+
+</body>
+</html>
