@@ -1005,4 +1005,106 @@ handlers.getGpsFleetSnapshot = async function (req, res, args) {
   }
 };
 
+// ════════════════════════════════════════════════════════════
+//  SLA & ÉLETCIKLUS-ANALITIKA (stats-sla) — CSAK OLVASÁS, valós adat
+//  A meglévő orders + invoices táblákból, company_id-szűrten, paraméteresen.
+//  Megjegyzés: a pontos „visszaigazolási idő” / „kiállítási idő" nincs
+//  külön időbélyegként tárolva → az ilyen SLA-metrikákat KIHAGYJUK
+//  (nem fabrikálunk). A meglévő dátumokból (data_incarcare/data_descarcare/
+//  finalized_at/created_at) számolható metrikákat adjuk vissza.
+// ════════════════════════════════════════════════════════════
+handlers.getSlaStats = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const { from, to } = _range(args);
+    const P = [cid, from, to];
+
+    // Fő-számlálók az időszakra (created_at szerint az össz/törölt; finalized_at
+    // szerint a lezárt). Egyetlen aggregáció.
+    const cR = await pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE created_at >= $2 AND created_at < $3)::int AS osszes,
+         COUNT(*) FILTER (WHERE status = 'Anulat' AND created_at >= $2 AND created_at < $3)::int AS torolt,
+         COUNT(*) FILTER (WHERE status = 'Finalizat' AND finalized_at >= $2 AND finalized_at < $3)::int AS lezart,
+         COUNT(*) FILTER (WHERE status <> 'Anulat' AND created_at >= $2 AND created_at < $3)::int AS nem_torolt
+       FROM orders WHERE company_id = $1`, P
+    );
+    const c = cR.rows[0] || { osszes: 0, torolt: 0, lezart: 0, nem_torolt: 0 };
+
+    // Kiszámlázott lezárt fuvarok aránya: a Finalizat fuvarok, amelyekhez van
+    // legalább egy (nem cancelled) számla (invoices.order_id). Company-szűrt.
+    const invR = await pool.query(
+      `SELECT
+         COUNT(DISTINCT o.id)::int AS lezart_db,
+         COUNT(DISTINCT o.id) FILTER (
+           WHERE EXISTS (
+             SELECT 1 FROM invoices i
+              WHERE i.company_id = o.company_id AND i.order_id = o.id
+                AND COALESCE(i.status,'issued') <> 'cancelled')
+         )::int AS szamlazott_db
+       FROM orders o
+       WHERE o.company_id = $1 AND o.status = 'Finalizat'
+         AND o.finalized_at >= $2 AND o.finalized_at < $3`, P
+    );
+    const iv = invR.rows[0] || { lezart_db: 0, szamlazott_db: 0 };
+
+    // Átlag tranzit (nap): data_descarcare − data_incarcare a lezárt fuvarokra,
+    // ahol mindkét dátum létezik és a lerakás nem korábbi a felrakásnál.
+    const trR = await pool.query(
+      `SELECT
+         AVG((data_descarcare - data_incarcare))::numeric AS atlag_nap,
+         COUNT(*)::int AS db
+       FROM orders
+       WHERE company_id = $1 AND status = 'Finalizat'
+         AND finalized_at >= $2 AND finalized_at < $3
+         AND data_incarcare IS NOT NULL AND data_descarcare IS NOT NULL
+         AND data_descarcare >= data_incarcare`, P
+    );
+    const tr = trR.rows[0] || { atlag_nap: null, db: 0 };
+
+    // Havi idősor: lezárt (finalized_at) vs. törölt (created_at) — kis charthoz.
+    const mLezart = await pool.query(
+      `SELECT TO_CHAR(finalized_at,'YYYY-MM') AS ho, COUNT(*)::int AS db
+       FROM orders
+       WHERE company_id = $1 AND status = 'Finalizat'
+         AND finalized_at >= $2 AND finalized_at < $3
+       GROUP BY ho ORDER BY ho`, P
+    );
+    const mTorolt = await pool.query(
+      `SELECT TO_CHAR(created_at,'YYYY-MM') AS ho, COUNT(*)::int AS db
+       FROM orders
+       WHERE company_id = $1 AND status = 'Anulat'
+         AND created_at >= $2 AND created_at < $3
+       GROUP BY ho ORDER BY ho`, P
+    );
+
+    const pct = (num, den) => (den > 0 ? Math.round((num / den) * 1000) / 10 : null);
+
+    return res.json({ result: {
+      ok: true,
+      osszes: c.osszes,
+      torolt: c.torolt,
+      lezart: c.lezart,
+      nem_torolt: c.nem_torolt,
+      // Lemondási arány: Anulat / összes (időszak, created_at)
+      lemondasi_arany: pct(c.torolt, c.osszes),
+      // Kézbesített arány: Finalizat / nem-törölt
+      kezbesitett_arany: pct(c.lezart, c.nem_torolt),
+      // Kiszámlázási arány: számlázott lezárt / összes lezárt
+      kiszamlazasi_arany: pct(iv.szamlazott_db, iv.lezart_db),
+      lezart_szamlazott: iv.szamlazott_db,
+      lezart_invoiceable: iv.lezart_db,
+      // Átlag tranzit (nap)
+      atlag_tranzit_nap: (tr.atlag_nap != null) ? Math.round(parseFloat(tr.atlag_nap) * 10) / 10 : null,
+      tranzit_minta_db: tr.db,
+      havi_lezart: mLezart.rows,
+      havi_torolt: mTorolt.rows
+    }});
+  } catch (err) {
+    console.error('getSlaStats hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 module.exports = handlers;

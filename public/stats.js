@@ -848,6 +848,51 @@
     });
   }
 
+  // ════════════════════════════════════════════════════════
+  //  10) SLA & ÉLETCIKLUS (stats-sla) — CSAK OLVASÁS, valós adat
+  // ════════════════════════════════════════════════════════
+  function loadSla() {
+    var box = document.getElementById('statsSlaBox');
+    if (!box) return;
+    box.innerHTML = stFilterBar('stats-sla') + '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
+    gas('getSlaStats', stRangeDates()).then(function (r) {
+      if (!r || !r.ok) { box.innerHTML = stFilterBar('stats-sla') + '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || t('common.error')) + '</div>'; return; }
+      _stData['stats-sla'] = r;
+
+      function pctVal(x) { return (x != null) ? stNum(x, 1) + ' <span style="font-size:13px;">%</span>' : '—'; }
+      var metrics = [
+        { l: '✅ ' + t('st.sla.delivered'), v: pctVal(r.kezbesitett_arany), sub: r.lezart + ' / ' + r.nem_torolt },
+        { l: '🧾 ' + t('st.sla.invoiced'), v: pctVal(r.kiszamlazasi_arany), sub: r.lezart_szamlazott + ' / ' + r.lezart_invoiceable },
+        { l: '✖ ' + t('st.sla.cancelled'), v: pctVal(r.lemondasi_arany), sub: r.torolt + ' / ' + r.osszes },
+        { l: '⏱️ ' + t('st.sla.transit'), v: (r.atlag_tranzit_nap != null ? stNum(r.atlag_tranzit_nap, 1) + ' <span style="font-size:13px;">' + t('st.sla.days') + '</span>' : '—'), sub: t('st.sla.sample') + ': ' + r.tranzit_minta_db }
+      ];
+
+      box.innerHTML = stFilterBar('stats-sla')
+        + '<div style="margin-bottom:16px;">' + vsMetricBand(metrics, { tall: true }) + '</div>'
+        + '<p class="text-muted" style="font-size:12px;margin:0 0 14px;">' + t('st.sla.note') + '</p>'
+        + stPanel(t('st.sla.pMonthly'), stChartCanvas('stChSlaHavi'))
+        + stPanel(t('st.sla.pTable'),
+            '<div style="overflow-x:auto;"><table class="table">'
+            + '<thead><tr><th>' + t('st.sla.cMetric') + '</th><th style="text-align:right;">' + t('st.sla.cValue') + '</th></tr></thead>'
+            + '<tbody>'
+            + '<tr><td>' + t('st.sla.delivered') + '</td><td style="text-align:right;font-weight:700;">' + (r.kezbesitett_arany != null ? stNum(r.kezbesitett_arany, 1) + ' %' : '—') + '</td></tr>'
+            + '<tr><td>' + t('st.sla.invoiced') + '</td><td style="text-align:right;font-weight:700;">' + (r.kiszamlazasi_arany != null ? stNum(r.kiszamlazasi_arany, 1) + ' %' : '—') + '</td></tr>'
+            + '<tr><td>' + t('st.sla.cancelled') + '</td><td style="text-align:right;font-weight:700;">' + (r.lemondasi_arany != null ? stNum(r.lemondasi_arany, 1) + ' %' : '—') + '</td></tr>'
+            + '<tr><td>' + t('st.sla.transit') + '</td><td style="text-align:right;font-weight:700;">' + (r.atlag_tranzit_nap != null ? stNum(r.atlag_tranzit_nap, 1) + ' ' + t('st.sla.days') : '—') + '</td></tr>'
+            + '</tbody></table></div>',
+            '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-sla\')">' + t('st.csvExport') + '</button>');
+
+      var months = stMonths([r.havi_lezart, r.havi_torolt]);
+      stChart('stChSlaHavi', {
+        type: 'bar',
+        data: { labels: months, datasets: [
+          { label: t('st.sla.delivered'), data: stSeries(months, r.havi_lezart, 'db'), backgroundColor: 'rgba(34,197,94,0.7)' },
+          { label: t('st.sla.cancelled'), data: stSeries(months, r.havi_torolt, 'db'), backgroundColor: 'rgba(239,68,68,0.7)' }
+        ]}
+      });
+    });
+  }
+
   // ── CSV exportok (az utoljára betöltött adatból) ────────
   function csvExport(pane) {
     var r = _stData[pane];
@@ -891,6 +936,15 @@
       stCsv('co2-riport-' + stamp + '.csv',
         [t('st.cPlate'), t('st.cLiter'), t('st.co2.cKg')],
         (r.jarmuvek || []).map(function (v) { return [v.rendszam, v.litru, v.co2_kg]; }));
+    } else if (pane === 'stats-sla') {
+      stCsv('sla-analitika-' + stamp + '.csv',
+        [t('st.sla.cMetric'), t('st.sla.cValue')],
+        [
+          [t('st.sla.delivered'), r.kezbesitett_arany != null ? r.kezbesitett_arany + ' %' : ''],
+          [t('st.sla.invoiced'), r.kiszamlazasi_arany != null ? r.kiszamlazasi_arany + ' %' : ''],
+          [t('st.sla.cancelled'), r.lemondasi_arany != null ? r.lemondasi_arany + ' %' : ''],
+          [t('st.sla.transit'), r.atlag_tranzit_nap != null ? r.atlag_tranzit_nap + ' ' + t('st.sla.days') : '']
+        ]);
     }
   }
 
@@ -906,6 +960,7 @@
         else if (name === 'stats-vehicles') loadVehiclesStats();
         else if (name === 'stats-clients') loadClients();
         else if (name === 'stats-co2') loadCo2();
+        else if (name === 'stats-sla') loadSla();
         else if (name === 'stats-permissions') loadPermissions();
       });
     },
