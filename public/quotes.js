@@ -76,7 +76,8 @@ window.Quotes = (function () {
         '<td>' + price + '</td>' +
         '<td>' + valid + '</td>' +
         '<td>' + st + ' ' + stSel + '</td>' +
-        '<td>' + conv + ' <button class="qt-act" data-edit="' + q.id + '">' + tt('qt.edit', 'Editare') + '</button></td>' +
+        '<td>' + conv + ' <button class="qt-act" data-edit="' + q.id + '">' + tt('qt.edit', 'Editare') + '</button>' +
+          ' <button class="qt-act" data-sendtpl="' + q.id + '">' + tt('etpl.sendFromTpl', '📧 Sablonból küldés') + '</button></td>' +
         '</tr>';
     }).join('');
   }
@@ -141,6 +142,54 @@ window.Quotes = (function () {
     });
     Array.prototype.forEach.call(_root.querySelectorAll('[data-edit]'), function (b) {
       b.addEventListener('click', function () { startEdit(parseInt(b.getAttribute('data-edit'), 10)); });
+    });
+    Array.prototype.forEach.call(_root.querySelectorAll('[data-sendtpl]'), function (b) {
+      b.addEventListener('click', function () { openSendTpl(parseInt(b.getAttribute('data-sendtpl'), 10)); });
+    });
+  }
+
+  // 📧 Sablonból küldés — kis dialógus: sablon-választó (alap: quote_send),
+  // előkitöltött címzett + a fuvar/ajánlat változói. A küldés szerver-oldalon,
+  // a cég SAJÁT sablonjával megy (sendTemplatedEmail) — nincs injekció-kockázat.
+  function openSendTpl(id) {
+    var q = _items.filter(function (x) { return x.id === id; })[0];
+    if (!q) return;
+    var route = (q.loc_from || '') + ' → ' + (q.loc_to || '');
+    var price = (q.price != null && q.price !== '') ? (Number(q.price).toFixed(2) + ' ' + (q.valuta || 'EUR')) : '';
+    var KEYS = ['quote_send', 'order_confirm_carrier', 'order_status_change', 'invoice_notify', 'generic'];
+    var ovl = document.createElement('div');
+    ovl.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    var opts = KEYS.map(function (k) {
+      return '<option value="' + k + '"' + (k === 'quote_send' ? ' selected' : '') + '>' + esc(tt('etpl.key.' + k, k)) + '</option>';
+    }).join('');
+    ovl.innerHTML =
+      '<div class="glass" style="padding:20px;max-width:460px;width:100%;border-radius:14px;">' +
+        '<h3 class="h-title" style="margin-top:0;">' + tt('etpl.sendFromTpl', '📧 Sablonból küldés') + '</h3>' +
+        '<div class="field"><label>' + tt('etpl.pickTpl', 'Șablon') + '</label><select class="select" id="stplKey">' + opts + '</select></div>' +
+        '<div class="field"><label>' + tt('etpl.recipient', 'Destinatar') + '</label><input class="input" id="stplTo" type="email" placeholder="email@..."></div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">' +
+          '<button class="btn ghost" id="stplCancel">' + tt('etpl.cancel', 'Anulează') + '</button>' +
+          '<button class="btn primary" id="stplSend">' + tt('etpl.send', 'Trimite') + '</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ovl);
+    function close() { try { document.body.removeChild(ovl); } catch (e) {} }
+    ovl.addEventListener('click', function (e) { if (e.target === ovl) close(); });
+    ovl.querySelector('#stplCancel').addEventListener('click', close);
+    ovl.querySelector('#stplSend').addEventListener('click', function () {
+      var to = (ovl.querySelector('#stplTo').value || '').trim();
+      if (!to) { toast(tt('etpl.recipient', 'Destinatar'), 'err'); return; }
+      var key = ovl.querySelector('#stplKey').value;
+      var lang = 'ro';
+      try { if (window.I18N && typeof I18N.get === 'function') lang = I18N.get(); } catch (e) {}
+      var vars = {
+        client: q.client_name || '', route: route, pret: price,
+        order_id: q.order_id || '', status: '', invoice_no: '',
+      };
+      gas('sendTemplatedEmail', [{ template_key: key, to_email: to, lang: lang, vars: vars }]).then(function (d) {
+        if (d && d.ok) { toast(tt('etpl.sent', 'E-mail trimis') + ': ' + to, 'ok'); close(); }
+        else toast((d && d.err) || tt('common.error', 'Eroare'), 'err');
+      });
     });
   }
 

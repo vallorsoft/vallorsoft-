@@ -48,6 +48,7 @@ function loadTab(name){
   if(name==='bnr-rate'){ if(typeof loadBnrRate==='function') loadBnrRate(); }
   if(name==='notifications'){ if(window.Notifications) Notifications.loadPage(); }
   if(name==='mail-log'){ if(typeof loadMailLog==='function') loadMailLog(); }
+  if(name==='email-templates' && window.EmailTemplates) EmailTemplates.mount('emailTemplatesBox');
   if(name==='orders-done'){ if(typeof loadOrdersDone==='function') loadOrdersDone(); }
   if(name==='active-fleet'){ if(typeof loadActiveFleet==='function') loadActiveFleet(); }
   if(name==='signature') initAdminSigCanvas();
