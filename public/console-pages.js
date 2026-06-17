@@ -256,3 +256,91 @@ function loadFleetSummary(){
     _afRenderBand(window._afLastPts || []);
   });
 }
+
+/* ════════════════════════════════════════════════════════════
+   4) OPERATÍV KÖZPONT (#opsCenterBox) — getOpsCenter
+      Diszpécser-vezérlő: gyors-akció kártyák + sürgős sor + egészség-mutató.
+      CSAK OLVASÁS — minden kattintás a meglévő activateTab(...)-ra ugrik.
+   ════════════════════════════════════════════════════════════ */
+function loadOpsCenter(){
+  var box = document.getElementById('opsCenterBox');
+  if(!box) return;
+  box.innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">' + _cpEsc(t('common.loading')) + '</div>';
+  gas('getOpsCenter').then(function(r){
+    if(!r || !r.ok){
+      box.innerHTML = '<div class="text-muted" style="padding:20px;">' + _cpEsc((r && r.err) || t('common.loadError')) + '</div>';
+      return;
+    }
+    var c = r.counters || {};
+    var h = r.health || {};
+
+    // Felső mutató-sáv (vsMetricBand) — fő operatív számok
+    var band = (typeof vsMetricBand === 'function') ? vsMetricBand([
+      { l: '🚚 ' + t('ops.active'),     v: c.aktiv || 0,        sub: '' },
+      { l: '⬆️ ' + t('ops.todayLoad'),  v: c.mai_felrakas || 0, sub: t('ops.today') },
+      { l: '⬇️ ' + t('ops.todayUnload'),v: c.mai_lerakas || 0,  sub: t('ops.today') },
+      { l: '⏰ ' + t('ops.late'),        v: c.keso || 0,         sub: '' }
+    ]) : '';
+
+    // Gyors-akció kártyák (a releváns fülre ugranak)
+    function actCard(ico, lbl, tab){
+      return '<div class="glass" style="padding:16px;cursor:pointer;display:flex;align-items:center;gap:12px;" onclick="activateTab(\'' + tab + '\')">'
+        + '<div style="font-size:22px;">' + ico + '</div>'
+        + '<div style="font-weight:700;" class="text-primary">' + _cpEsc(lbl) + '</div>'
+        + '<div style="margin-left:auto;" class="text-muted">›</div></div>';
+    }
+    var actions = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:18px;">'
+      + actCard('📋', t('ops.actNewOrder'),  'orders-form')
+      + actCard('🗂️', t('ops.actOrders'),    'orders-list')
+      + actCard('📅', t('ops.actPlanner'),   'orders-planner')
+      + actCard('📥', t('ops.actInbound'),   'inbound')
+      + actCard('📦', t('ops.actWarehouse'), 'warehouse')
+      + actCard('💸', t('ops.actInvoicesIn'),'invoices-in')
+      + '</div>';
+
+    // Sürgős sor — csak a >0 tételek; kattintásra a megfelelő fülre
+    function urgent(ico, lbl, n, tab, sev){
+      if(!n) return '';
+      var bcls = sev === 'danger' ? 'err' : (sev === 'warn' ? 'warn' : 'info');
+      return '<div class="glass" style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;margin-bottom:8px;" onclick="activateTab(\'' + tab + '\')">'
+        + '<div style="font-size:18px;">' + ico + '</div>'
+        + '<div style="font-weight:600;" class="text-primary">' + _cpEsc(lbl) + '</div>'
+        + '<div style="margin-left:auto;"><span class="badge ' + bcls + '">' + n + '</span></div></div>';
+    }
+    var queueItems = ''
+      + urgent('⚠️', t('ops.uMissingUit'),     c.hianyzo_uit || 0,      'orders-list', 'danger')
+      + urgent('🚚', t('ops.uMissingCarrier'), c.hianyzo_fuvarozo || 0, 'orders-list', 'warn')
+      + urgent('⏰', t('ops.uLate'),            c.keso || 0,             'orders-list', 'danger')
+      + urgent('🧾', t('ops.uDueInvoice'),      c.lejaro_szamla || 0,    'stats-finance', 'warn')
+      + urgent('💸', t('ops.uDueApInvoice'),    c.lejaro_ap_szamla || 0, 'invoices-in', 'warn')
+      + urgent('📄', t('ops.uDueDoc'),          c.lejaro_dok || 0,       'expiries', 'warn');
+    if(!queueItems) queueItems = '<div class="text-muted" style="padding:14px;">' + _cpEsc(t('ops.queueEmpty')) + '</div>';
+
+    // Egészség-mutató sor — csak a tisztán számolható proxy-k (null = kihagyva)
+    function healthCard(lbl, val, sub){
+      return '<div class="glass" style="padding:16px;flex:1;min-width:180px;">'
+        + '<div class="text-muted" style="font-size:12px;font-weight:700;">' + _cpEsc(lbl) + '</div>'
+        + '<div class="text-primary" style="font-size:26px;font-weight:800;margin-top:4px;">' + val + '</div>'
+        + (sub ? '<div class="text-muted" style="font-size:12px;margin-top:2px;">' + _cpEsc(sub) + '</div>' : '')
+        + '</div>';
+    }
+    var healthCards = '';
+    if(h.assigned_pct != null) healthCards += healthCard(t('ops.hAssigned'), h.assigned_pct + ' %', t('ops.hWaiting') + ': ' + (h.waiting || 0));
+    if(h.utilization_pct != null) healthCards += healthCard(t('ops.hUtilization'), h.utilization_pct + ' %', (h.fleet_on_road || 0) + ' / ' + (h.fleet_active || 0));
+    var health = healthCards
+      ? '<div style="margin-top:18px;"><div class="text-primary" style="font-weight:700;margin-bottom:10px;">' + _cpEsc(t('ops.healthTitle')) + '</div>'
+        + '<div style="display:flex;gap:12px;flex-wrap:wrap;">' + healthCards + '</div></div>'
+      : '';
+
+    box.innerHTML =
+      '<div style="margin-bottom:18px;">' + band + '</div>'
+      + '<div class="text-primary" style="font-weight:700;margin-bottom:10px;">' + _cpEsc(t('ops.quickActions')) + '</div>'
+      + actions
+      + '<div class="text-primary" style="font-weight:700;margin-bottom:10px;">' + _cpEsc(t('ops.priorityQueue')) + '</div>'
+      + queueItems
+      + health
+      + '<div style="margin-top:16px;"><button class="btn ghost" style="padding:7px 14px;font-size:12px;" onclick="loadOpsCenter()">' + _cpEsc(t('st.refresh')) + '</button></div>';
+  }).catch(function(){
+    box.innerHTML = '<div class="text-muted" style="padding:14px;">' + _cpEsc(t('common.connError')) + '</div>';
+  });
+}

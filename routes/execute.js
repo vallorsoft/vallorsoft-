@@ -38,6 +38,7 @@ const handlers = Object.assign(
   require('../handlers/bnr'),
   require('../handlers/ordersDone'),
   require('../handlers/favLocations'),
+  require('../handlers/opsCenter'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a

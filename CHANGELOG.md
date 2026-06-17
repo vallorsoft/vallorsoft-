@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-17 — CargoTMS-hézagok Fázis B/1: Operatív központ + SLA-analitika (PR #169)
+
+> Két read-only, aggregáló oldal a meglévő adatból — nincs új tábla, nincs írás, koholt adat nélkül.
+
+- **Operatív központ** (`ops-center`, GENERAL) — `handlers/opsCenter.js` `getOpsCenter`: egyetlen `company_id`-szűrt aggregáció — aktív fuvar, mai fel-/lerakás, késő szállítás, **hiányzó UIT** (a `uit_active_count` logikával), hiányzó fuvarozó, lejáró AP-számla (`carrier_invoices` due≤7), lejáró dokumentum (`document_expiries`), kintlévőség-proxy (`finalized_at + clients.payment_term_days`, mert az `invoices`-nak nincs due-date oszlopa — kommentben jelölve). `_isAdminOrManager` kapu. UI: gyors-akció kártyák (`activateTab`), kattintható prioritás-sor, egészség-sor.
+- **SLA & életciklus** (`stats-sla`, Statisztika) — `handlers/statisticsHandlers.js` `getSlaStats`: lemondási / kézbesített / kiszámlázási arány (invoices-join), átlag tranzit (`data_descarcare − data_incarcare`), havi trend (kész vs. lemondott). **Kihagyva (nem koholt):** pontos „visszaigazolási idő" — nincs per-esemény időbélyeg (jelölve `st.sla.note`). UI: `loadSla` (`vsMetricBand{tall}` + Chart.js + tábla).
+- **Wiring:** `routes/execute.js`, `feature-catalog.js` (2 kulcs), `i18n.js` (`nav.opsCenter/slaStats` + `ops.*` + `st.sla.*`, RO-alap+HU). Cache-bust `?v=20260617b1`. Minden read `company_id`-szűrt + paraméteres, role-gated; 93 Jest zöld.
+
 ## 2026-06-17 — CargoTMS-hézagok Fázis A/2: Alvállalkozó-csoportok + Kedvenc helyszínek (PR #168)
 
 > Két új funkció a hiánylistából — multi-tenant, tulajdon-ellenőrzéssel, audittal.

@@ -5,6 +5,7 @@
 // `core:true` -> mindig elérhető, nem kapcsolható ki (pl. Beállítások).
 window.VS_FEATURES = [
   { key: 'dash',             label: 'Vezérlőpult',                 group: 'Áttekintés' },
+  { key: 'ops-center',       label: 'Operatív központ 🎛️',         group: 'Áttekintés' },
   { key: 'orders-form',      label: 'Fuvar kiírás',                group: 'Fuvarozás & Logisztika' },
   { key: 'orders-list',      label: 'Fuvar kezelés',               group: 'Fuvarozás & Logisztika' },
   { key: 'orders-import',    label: 'Fuvar CSV-import (📥)',        group: 'Fuvarozás & Logisztika' },
@@ -31,6 +32,7 @@ window.VS_FEATURES = [
   { key: 'stats-vehicles',   label: 'Statisztika — Jármű kihasználtság', group: 'Statisztika & Riport' },
   { key: 'stats-clients',    label: 'Statisztika — Ügyfél riport', group: 'Statisztika & Riport' },
   { key: 'stats-co2',        label: 'Statisztika — CO₂ riport',    group: 'Statisztika & Riport' },
+  { key: 'stats-sla',        label: 'Statisztika — SLA & életciklus', group: 'Statisztika & Riport' },
   { key: 'decont',           label: 'Sofőr-elszámolás (decont)',   group: 'Fuvarozás & Logisztika' },
   { key: 'invoices-out',     label: 'Kimenő számlák 📤',           group: 'Pénzügy' },
   { key: 'invoices-in',      label: 'Bejövő számlák (alvállalkozói) 📥', group: 'Pénzügy' },

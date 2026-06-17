@@ -28,6 +28,7 @@ document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(t
 
 function loadTab(name){
   if(name==='dash') loadDash();
+  if(name==='ops-center'){ if(typeof loadOpsCenter==='function') loadOpsCenter(); }
   if(name==='orders-form'){loadOrderFormData(); mountClientPicker();}
   if(name==='orders-list'){loadOrders();}
   if(name==='inbound' && window.InboundOrders) InboundOrders.mount('inboundBox');
