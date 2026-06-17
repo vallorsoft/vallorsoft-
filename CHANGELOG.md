@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-17 — Új landing page (meleg arculat) — eredeti szöveggel, szerkesztő-kompatibilisen (PR #178)
+
+> A publikus landing lecserélve a jóváhagyott meleg arculatra. 100% eredeti szöveg (semmi nem hasonlít a CargoTMS/xCargo/más RO TMS-re), a developer landing-szerkesztő végig működik.
+
+- **`public/index.html` + `landing.css` + `landing.js`** — új design: sticky nav (RO/HU + portál-választó login-lenyíló + „Încearcă gratuit"), hero 60/40 dashboard-mockuppal, integráció-sáv, előnyök, modulok, „Cum funcționează", 4 csomag (havi/éves), vélemények, GYIK, CTA, lábléc a cég-adatokkal.
+- **Originalitás:** a hero-szlogen lecserélve („Dispecerat, flotă și facturare — care lucrează în ritmul tău."); minden versenytárs-ízű felirat saját hangra átírva; a tiltott CargoTMS-frázisok ellenőrzötten **0** előfordulás.
+- **Szerkesztő-kompatibilitás:** mind a **10 szekció** `data-vs-section`-t kap a szerkesztő `DEFAULT_ORDER`-jével (szakasz-sorrend + láthatóság működik), **158 szerkeszthető szöveg** `data-i18n` RO+HU lefedettséggel (`devSaveLandingTexts`/`/api/landing-texts` él), a blog-kártyák `/blog/:id` + kulcsok érintetlenek. A `landing-editor.html` nem igényelt változtatást.
+- **Bekötés:** árazás a `/api/public-plans`-ból (havi/éves, éves=11×, TVA, EUR; RO fallback), „Încearcă gratuit" → `/register`, login-lenyíló → `/login`//`/portal`//`/carrier`, RO/HU váltó. Cache-bust `?v=20260617land`; 93 Jest zöld.
+
 ## 2026-06-17 — CargoTMS-hézagok Fázis D/2: PDF-sablon beállítások (PR #177) — a hiánylista A–D KÉSZ
 
 > Per-cég, per-dokumentumtípus PDF-testreszabás (fejléc/lábléc/akcent/logó), a meglévő branding újrahasználásával. Ezzel a teljes CargoTMS-hiánylista (A–D, a Bursă kivételével) le van fedve.
