@@ -79,6 +79,10 @@
   .fillable.tall{min-height:34px;}
   .fillable.short{min-height:13px;}
   .fillable.oneline{min-height:13px;}
+  /* Tömörített cellák (alacsonyabb sorok) — kisebb padding + szorosabb felirat-sortáv */
+  .cmr-cell.tight{padding-top:2px;padding-bottom:2px;}
+  .cmr-cell.tight .lbl{line-height:1.1;}
+  .cmr-cell.tight .ll{line-height:1.1;}
   .cmr-title{border:1px solid var(--cmr);padding:6px 8px;font-size:8px;line-height:1.35;color:#333;position:relative;}
   .cmr-title .cmrlogo{position:absolute;top:6px;right:8px;border:1.5px solid var(--cmr);color:var(--cmr);font-weight:800;font-size:13px;border-radius:50%;padding:3px 9px;}
   .cmr-title h3{margin:0 0 3px;font-size:10px;color:#111;letter-spacing:.5px;}
@@ -219,9 +223,9 @@
 
     <!-- Sor: 4 + 5 (bal oszlop) / 18 (jobb, átíveli a 4+5-öt) -->
     <div class="cmr-row" style="grid-template-rows:auto auto;">
-      <div class="cmr-cell" style="grid-column:1;grid-row:1;"><span class="num">4</span><span class="lbl"><span class="ll ro"><b>Loc și dată încărcare</b> (localitate, țară, dată)</span><span class="ll en">Place and date of taking over the goods</span><span class="ll l-de">Ort und Tag der Übernahme des Gutes</span><span class="ll l-fr">Lieu et date de prise en charge</span></span><div class="fillable oneline" contenteditable="true"></div></div>
-      <div class="cmr-cell" style="grid-column:2;grid-row:1 / span 2;"><span class="num">18</span><span class="lbl"><span class="ll ro"><b>Rezervele și observațiile transportatorului</b></span><span class="ll en">Carrier's reservations and observations</span><span class="ll l-de">Vorbehalte und Bemerkungen der Frachtführer</span><span class="ll l-fr">Réserves et observations du transporteur</span></span><div class="fillable" contenteditable="true"></div></div>
-      <div class="cmr-cell" style="grid-column:1;grid-row:2;"><span class="num">5</span><span class="lbl"><span class="ll ro"><b>Documente anexate</b></span><span class="ll en">Documents attached</span><span class="ll l-de">Beigefügte Dokumente</span><span class="ll l-fr">Documents annexés</span></span><div class="fillable oneline" contenteditable="true"></div></div>
+      <div class="cmr-cell tight" style="grid-column:1;grid-row:1;"><span class="num">4</span><span class="lbl"><span class="ll ro"><b>Loc și dată încărcare</b> (localitate, țară, dată)</span><span class="ll en">Place and date of taking over the goods</span><span class="ll l-de">Ort und Tag der Übernahme des Gutes</span><span class="ll l-fr">Lieu et date de prise en charge</span></span><div class="fillable oneline" style="min-height:9px" contenteditable="true"></div></div>
+      <div class="cmr-cell tight" style="grid-column:2;grid-row:1 / span 2;"><span class="num">18</span><span class="lbl"><span class="ll ro"><b>Rezervele și observațiile transportatorului</b></span><span class="ll en">Carrier's reservations and observations</span><span class="ll l-de">Vorbehalte und Bemerkungen der Frachtführer</span><span class="ll l-fr">Réserves et observations du transporteur</span></span><div class="fillable" style="min-height:11px" contenteditable="true"></div></div>
+      <div class="cmr-cell tight" style="grid-column:1;grid-row:2;"><span class="num">5</span><span class="lbl"><span class="ll ro"><b>Documente anexate</b></span><span class="ll en">Documents attached</span><span class="ll l-de">Beigefügte Dokumente</span><span class="ll l-fr">Documents annexés</span></span><div class="fillable oneline" style="min-height:9px" contenteditable="true"></div></div>
     </div>
 
     <!-- Áru-tábla 6–12 -->
@@ -244,8 +248,8 @@
 
     <!-- 13 / 19 -->
     <div class="cmr-row">
-      <div class="cmr-cell"><span class="num">13</span><span class="lbl"><span class="ll ro"><b>Instrucțiunile expeditorului</b></span><span class="ll en">Sender's instructions</span><span class="ll l-de">Anweisungen des Absenders</span><span class="ll l-fr">Instructions de l'expéditeur</span></span><div class="fillable oneline" contenteditable="true"></div></div>
-      <div class="cmr-cell"><span class="num">19</span><span class="lbl"><span class="ll ro"><b>Convenții speciale</b></span><span class="ll en">Special agreements</span><span class="ll l-de">Besondere Vereinbarungen</span><span class="ll l-fr">Conventions particulières</span></span><div class="fillable oneline" contenteditable="true"></div></div>
+      <div class="cmr-cell tight"><span class="num">13</span><span class="lbl"><span class="ll ro"><b>Instrucțiunile expeditorului</b></span><span class="ll en">Sender's instructions</span><span class="ll l-de">Anweisungen des Absenders</span><span class="ll l-fr">Instructions de l'expéditeur</span></span><div class="fillable oneline" style="min-height:7px" contenteditable="true"></div></div>
+      <div class="cmr-cell tight"><span class="num">19</span><span class="lbl"><span class="ll ro"><b>Convenții speciale</b></span><span class="ll en">Special agreements</span><span class="ll l-de">Besondere Vereinbarungen</span><span class="ll l-fr">Conventions particulières</span></span><div class="fillable oneline" style="min-height:7px" contenteditable="true"></div></div>
     </div>
 
     <!-- 14 / 20 -->
@@ -267,8 +271,8 @@
 
     <!-- 21 / 15 -->
     <div class="cmr-row">
-      <div class="cmr-cell"><span class="num">21</span><span class="lbl"><span class="ll ro"><b>Întocmit la</b> ......... <b>la data de</b> .........</span><span class="ll en">Established in ......... on .........</span><span class="ll l-de">Ausgefertigt in ......... am .........</span><span class="ll l-fr">Établi à ......... le .........</span></span><div class="fillable oneline" contenteditable="true"></div></div>
-      <div class="cmr-cell"><span class="num">15</span><span class="lbl"><span class="ll ro"><b>Ramburs</b></span><span class="ll en">Cash on delivery</span><span class="ll l-de">Rückerstattung / Nachnahme</span><span class="ll l-fr">Remboursement</span></span><div class="fillable oneline" contenteditable="true"></div></div>
+      <div class="cmr-cell tight"><span class="num">21</span><span class="lbl"><span class="ll ro"><b>Întocmit la</b> ......... <b>la data de</b> .........</span><span class="ll en">Established in ......... on .........</span><span class="ll l-de">Ausgefertigt in ......... am .........</span><span class="ll l-fr">Établi à ......... le .........</span></span><div class="fillable oneline" style="min-height:7px" contenteditable="true"></div></div>
+      <div class="cmr-cell tight"><span class="num">15</span><span class="lbl"><span class="ll ro"><b>Ramburs</b></span><span class="ll en">Cash on delivery</span><span class="ll l-de">Rückerstattung / Nachnahme</span><span class="ll l-fr">Remboursement</span></span><div class="fillable oneline" style="min-height:7px" contenteditable="true"></div></div>
     </div>
 
     <!-- 22 / 23 / 24 aláírások -->
