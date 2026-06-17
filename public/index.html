@@ -3,12 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VallorSoft | Platformă Modernă pentru Transport și Management Flotă</title>
-<meta name="description" content="VallorSoft - Platformă SaaS pentru transportatori și administratori de flotă. Gestionare curse, GPS, facturare, documente și raportare într-un singur sistem.">
+<title>vallorSoft — TMS pentru firme de transport din România | 14 zile gratuit</title>
+<meta name="description" content="vallorSoft: platformă TMS pentru transportatori din România. Curse, flotă, șoferi, GPS, facturare e-Factura și conformitate — gestionate dintr-un singur loc, în română și maghiară. 14 zile gratuit, fără card.">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#f6711e">
+<link rel="canonical" href="https://app.vallorsoft.ro/">
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="vallorSoft">
+<meta property="og:title" content="vallorSoft — TMS pentru firme de transport din România">
+<meta property="og:description" content="Curse, flotă, șoferi, GPS, facturare e-Factura și conformitate, dintr-un singur loc. 14 zile gratuit, fără card.">
+<meta property="og:locale" content="ro_RO">
+<meta property="og:locale:alternate" content="hu_HU">
+<meta property="og:url" content="https://app.vallorsoft.ro/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="vallorSoft — TMS pentru firme de transport din România">
+<meta name="twitter:description" content="Curse, flotă, șoferi, GPS, facturare e-Factura și conformitate, dintr-un singur loc.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="landing.css?v=20260616warmland">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+<link rel="stylesheet" href="landing.css?v=20260617land">
 </head>
 <body>
 
@@ -18,16 +32,16 @@
     <h3 data-i18n="cookieTitle">Cookie-uri și confidențialitate</h3>
     <p data-i18n="cookieText">Folosim doar cookie-uri necesare în mod implicit. Cookie-urile analitice și de marketing sunt activate doar după acordul dvs.</p>
     <div class="cookie-actions">
-      <button id="acceptNecessary" class="btn-glass" data-i18n="cookieNecessary">Doar necesare</button>
-      <button id="openCookieSettings" class="btn-glass" data-i18n="cookieSettings">Setări</button>
-      <button id="acceptAllCookies" class="btn-primary" data-i18n="cookieAcceptAll">Accept toate</button>
+      <button id="acceptNecessary" class="btn ghost" data-i18n="cookieNecessary">Doar necesare</button>
+      <button id="openCookieSettings" class="btn ghost" data-i18n="cookieSettings">Setări</button>
+      <button id="acceptAllCookies" class="btn primary" data-i18n="cookieAcceptAll">Accept toate</button>
     </div>
   </div>
 </div>
 
 <!-- COOKIE SETTINGS MODAL -->
 <div id="cookieModal" class="modal-overlay hidden">
-  <div class="modal-card glass">
+  <div class="modal-card">
     <h2 data-i18n="cookieSettingsTitle">Setări Cookie</h2>
     <div class="cookie-category">
       <label class="category-label">
@@ -57,355 +71,248 @@
       </label>
     </div>
     <div class="cookie-actions">
-      <button id="saveCookieSettings" class="btn-primary" data-i18n="cookieSave">Salvează preferințele</button>
+      <button id="saveCookieSettings" class="btn primary" data-i18n="cookieSave">Salvează preferințele</button>
     </div>
   </div>
 </div>
 
 <!-- NAVBAR -->
-<header class="lp-navbar" id="navbar">
-  <div class="lp-container lp-nav-inner">
-    <a href="/" class="lp-logo">
-      <span class="lp-logo-vallor">Vallor</span><span class="lp-logo-soft">Soft</span>
-    </a>
-    <nav class="lp-nav-menu" id="navMenu">
-      <ul class="lp-nav-links">
-        <li><a href="#features" data-i18n="navFeatures">Funkciók</a></li>
-        <li><a href="#pricing" data-i18n="navPricing">Árak</a></li>
-        <li><a href="#how" data-i18n="navHow">Hogyan működik</a></li>
-        <li><a href="#blog" data-i18n="navBlog">Blog</a></li>
-        <li><a href="#contact" data-i18n="navContact">Kapcsolat</a></li>
-        <li class="lp-mobile-only"><a href="/login" data-i18n="loginDispatcher">Dispecer / Admin</a></li>
-        <li class="lp-mobile-only"><a href="/portal" data-i18n="loginClient">Ügyfél-portál</a></li>
-        <li class="lp-mobile-only"><a href="/carrier" data-i18n="loginCarrier">Alvállalkozói portál</a></li>
-      </ul>
+<header id="navbar">
+  <div class="wrap nav">
+    <a href="/" class="logo">vallor<span class="i">Soft</span></a>
+    <nav class="links" id="navMenu">
+      <a href="#features" data-i18n="navFeatures">Funcții</a>
+      <a href="#how" data-i18n="navHow">Cum funcționează</a>
+      <a href="#pricing" data-i18n="navPricing">Prețuri</a>
+      <a href="#blog" data-i18n="navBlog">Blog</a>
+      <a href="#contact" data-i18n="navContact">Întrebări</a>
+      <a class="nav-mobile-only" href="/login" data-i18n="loginDispatcher">Dispecerat</a>
+      <a class="nav-mobile-only" href="/portal" data-i18n="loginClient">Portal client</a>
+      <a class="nav-mobile-only" href="/carrier" data-i18n="loginCarrier">Portal transportator</a>
     </nav>
-    <div class="lp-nav-actions">
-      <button id="languageToggle" class="lp-lang-btn" title="Váltás magyarra / Schimbă în română">HU</button>
-      <div class="lp-login-wrap" id="loginWrap">
-        <button class="lp-btn-ghost lp-login-toggle" id="loginToggle" onclick="toggleLoginDrop()" aria-haspopup="true" aria-expanded="false">
-          <span data-i18n="loginBtn">Bejelentkezés</span> <span class="lp-drop-arr">▾</span>
+    <div class="right">
+      <button id="languageToggle" class="lang-btn" title="Váltás magyarra / Schimbă în română">HU</button>
+      <div class="login-wrap" id="loginWrap">
+        <button class="btn login" id="loginToggle" onclick="toggleLoginDrop()" aria-haspopup="true" aria-expanded="false">
+          <span data-i18n="loginBtn">Autentificare</span>
+          <svg class="drop-arr" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><polyline points="6 9 12 15 18 9" fill="none" stroke="currentColor" stroke-width="2.4"/></svg>
         </button>
-        <div class="lp-login-drop" id="loginDrop" role="menu">
-          <a href="/login" class="lp-login-opt" role="menuitem">
-            <span class="lp-login-icon">🏢</span>
-            <span><b data-i18n="loginDispatcher">Dispecer / Admin</b><br><small data-i18n="loginDispatcherSub">Admin · Manager · Contabil · Șofer</small></span>
-          </a>
-          <a href="/portal" class="lp-login-opt" role="menuitem">
-            <span class="lp-login-icon">📦</span>
-            <span><b data-i18n="loginClient">Ügyfél-portál</b><br><small data-i18n="loginClientSub">Megrendelő belépése</small></span>
-          </a>
-          <a href="/carrier" class="lp-login-opt" role="menuitem">
-            <span class="lp-login-icon">🚚</span>
-            <span><b data-i18n="loginCarrier">Alvállalkozói portál</b><br><small data-i18n="loginCarrierSub">Külsős fuvarozó belépése</small></span>
-          </a>
+        <div class="login-dd" id="loginDrop" role="menu">
+          <a href="/login" role="menuitem"><b data-i18n="loginDispatcher">Dispecerat</b><span data-i18n="loginDispatcherSub">Admin · Manager · Contabil · Șofer</span></a>
+          <a href="/portal" role="menuitem"><b data-i18n="loginClient">Portal client</b><span data-i18n="loginClientSub">Urmărire curse & documente</span></a>
+          <a href="/carrier" role="menuitem"><b data-i18n="loginCarrier">Portal transportator</b><span data-i18n="loginCarrierSub">Curse alocate & documente</span></a>
         </div>
       </div>
-      <a href="/register" class="lp-btn-primary" data-i18n="startBtn">Ingyenes próba</a>
+      <a class="btn primary nav-trial" href="/register" data-i18n="startBtn">Încearcă gratuit</a>
     </div>
-    <button class="lp-hamburger" id="hamburger" aria-label="Menü">
-      <span></span><span></span><span></span>
-    </button>
+    <button class="hamburger" id="hamburger" aria-label="Menu"><span></span><span></span><span></span></button>
   </div>
 </header>
 
 <!-- HERO -->
-<section class="lp-hero" data-vs-section="hero">
-  <div class="lp-hero-bg-glow"></div>
-  <div class="lp-container lp-hero-grid">
-    <div class="lp-hero-content reveal">
-      <span class="lp-badge" data-i18n="heroBadge">Orientat pe șofer · Fără hârtii · Automatizat</span>
-      <h1 data-i18n="heroTitle">Cele mai multe softuri de transport sunt create pentru management. Noi am început cu șoferul.</h1>
-      <p class="lp-hero-sub" data-i18n="heroSubtitle">Pentru că în transport, cel mai valoros dat se naște întotdeauna la șofer.</p>
-      <ul class="lp-hero-bullets">
-        <li data-i18n="heroBullet1">Nicio foaie de parcurs scrisă de mână</li>
-        <li data-i18n="heroBullet2">Niciun calcul manual de diurnă</li>
-        <li data-i18n="heroBullet3">Niciun bon fiscal pierdut</li>
-      </ul>
-      <div class="lp-hero-cta">
-        <a href="/register" class="lp-btn-primary lp-btn-lg" data-i18n="startFreeBtn">Începe gratuit — 14 zile</a>
-        <a href="#contact" class="lp-btn-outline lp-btn-lg" data-i18n="demoBtn">Demo</a>
+<section class="hero" data-vs-section="hero">
+  <div class="wrap hero-grid">
+    <div class="reveal">
+      <span class="badge"><span class="dot"></span><span data-i18n="heroBadge">TMS pentru firme de transport din România</span></span>
+      <h1><span data-i18n="heroTitleA">Dispecerat, flotă și facturare</span> <span class="g" data-i18n="heroTitleB">care lucrează în ritmul tău.</span></h1>
+      <p class="sub" data-i18n="heroSubtitle">vallorSoft strânge comenzile, vehiculele, șoferii, documentele și facturarea într-o platformă gândită pentru transportul românesc — în română și maghiară. Mai puține telefoane și hârtii, mai mult timp pentru curse.</p>
+      <div class="ticks">
+        <div class="tick"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="heroTick1">Comenzile din e-mail devin curse cu un singur clic, citite automat (AI)</span></div>
+        <div class="tick"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="heroTick2">Poziție GPS live și radar de curse retur — mai puțini kilometri în gol</span></div>
+        <div class="tick"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="heroTick3">Facturi prin furnizorul tău (FGO, SmartBill, Oblio, iFactura, Facturis) + e-Factura</span></div>
       </div>
-      <p class="lp-trial-note" data-i18n="heroNote">Mai puțin birocrație pentru șofer · Mai mult control pentru firmă</p>
+      <div class="hero-cta">
+        <a class="btn primary lg" href="/register" data-i18n="startFreeBtn">Încearcă 14 zile gratuit</a>
+        <a class="btn ghost lg" href="#contact" data-i18n="demoBtn">Cere o demonstrație</a>
+      </div>
+      <p class="hero-note" data-i18n="heroNote">✓ Fără card bancar · ✓ Configurare în câteva minute · ✓ Asistență în română și maghiară</p>
     </div>
-    <div class="lp-hero-visual reveal">
-      <div class="lp-sofer-week" id="soferTimeline"></div>
+    <div class="mock-col reveal">
+      <div class="mock" aria-hidden="true">
+        <div class="bar"><i style="background:#f6517b"></i><i style="background:#f59e0b"></i><i style="background:#15803d"></i><span class="mk-url">app.vallorsoft.ro</span></div>
+        <div class="body">
+          <div class="mk-hero">
+            <div><div class="l" data-i18n="mockRevenueLabel">Venit luna aceasta</div><div class="v">82 400 €</div><div class="mk-kpi"><b>▲ 9%</b><b data-i18n="mockActive">37 curse active</b></div></div>
+            <div class="mk-profit"><span data-i18n="mockProfitLabel">Profit</span><br><b>31 200 €</b></div>
+          </div>
+          <div class="mk-card">
+            <div class="mk-card-h" data-i18n="mockRecent">Curse recente</div>
+            <div class="mk-row"><span>Iași → Ploiești</span><span class="pill info" data-i18n="mockStInprogress">In Curs</span></div>
+            <div class="mk-row"><span>Arad → Wien</span><span class="pill warn" data-i18n="mockStAlloc">Alocat</span></div>
+            <div class="mk-row"><span>Cluj → München</span><span class="pill ok" data-i18n="mockStDone">Finalizat</span></div>
+          </div>
+          <div class="mk-card">
+            <div class="mk-card-h" data-i18n="mockFleet">Flotă activă</div>
+            <div class="mk-spark"></div>
+            <div class="mk-fleet-note"><span data-i18n="mockFleetNote">12 vehicule · 8 pe drum</span></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- FEATURE STRIP -->
-<section class="lp-feature-strip" data-vs-section="strip">
-  <div class="lp-container">
-    <div class="lp-strip-grid">
-      <div class="lp-strip-item reveal">
-        <span class="lp-strip-icon">🚚</span>
-        <div>
-          <h4 data-i18n="strip1Title">Fuvarkezelés</h4>
-          <p data-i18n="strip1Desc">Fuvarok, menetlevelek, tervezőtábla</p>
-        </div>
+<!-- TRUST / INTEGRATIONS STRIP -->
+<section class="trust" data-vs-section="strip">
+  <div class="wrap row">
+    <div class="lbl" data-i18n="trustLabel">Integrări și conformitate pentru piața din România</div>
+    <span class="logo-chip">ANAF e-Factura</span>
+    <span class="logo-chip">FGO</span>
+    <span class="logo-chip">SmartBill</span>
+    <span class="logo-chip">Oblio</span>
+    <span class="logo-chip">iFactura</span>
+    <span class="logo-chip">Facturis</span>
+    <span class="logo-chip">CargoTrack</span>
+    <span class="logo-chip">Fomco</span>
+  </div>
+</section>
+
+<!-- BENEFITS (data-vs-section=stats) -->
+<section class="sec" data-vs-section="stats">
+  <div class="wrap">
+    <div class="center">
+      <span class="eyebrow" data-i18n="benefitsEyebrow">De ce vallorSoft</span>
+      <h2 class="h2" data-i18n="benefitsTitle">Mai puțin haos pe birou, mai mult control pe drum</h2>
+    </div>
+    <div class="cards">
+      <div class="bcard reveal">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-4 12.7V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.3A7 7 0 0 0 12 2z" fill="none" stroke="currentColor" stroke-width="1.9"/><line x1="9" y1="22" x2="15" y2="22" stroke="currentColor" stroke-width="1.9"/></svg></div>
+        <h3 data-i18n="benefit1Title">Dispecerat fără bâlbâieli</h3>
+        <p data-i18n="benefit1Desc">Centru operațional cu listă de priorități: ce pleacă azi, ce întârzie și ce document mai lipsește.</p>
       </div>
-      <div class="lp-strip-item reveal">
-        <span class="lp-strip-icon">📍</span>
-        <div>
-          <h4 data-i18n="strip2Title">Valós idejű GPS</h4>
-          <p data-i18n="strip2Desc">Élő pozíció, útvonal, snapshot km</p>
-        </div>
+      <div class="bcard reveal">
+        <div class="ic"><svg viewBox="0 0 24 24"><polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21 1 6" fill="none" stroke="currentColor" stroke-width="1.9"/></svg></div>
+        <h3 data-i18n="benefit2Title">Flota ta, pe hartă</h3>
+        <p data-i18n="benefit2Desc">Poziție live, estimare de sosire și radar de curse retur, ca să umpli remorca pe drumul de întoarcere.</p>
       </div>
-      <div class="lp-strip-item reveal">
-        <span class="lp-strip-icon">💶</span>
-        <div>
-          <h4 data-i18n="strip3Title">Automatizált számlázás</h4>
-          <p data-i18n="strip3Desc">e-Factura, 5 számlázó-adapter</p>
-        </div>
+      <div class="bcard reveal">
+        <div class="ic"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.9"/><line x1="2" y1="10" x2="22" y2="10" stroke="currentColor" stroke-width="1.9"/></svg></div>
+        <h3 data-i18n="benefit3Title">Bani urmăriți, nu ghiciți</h3>
+        <p data-i18n="benefit3Desc">Factură emisă rapid, profit calculat pe fiecare cursă, sold de încasat de la clienți și de plătit către transportatori.</p>
       </div>
-      <div class="lp-strip-item reveal">
-        <span class="lp-strip-icon">📁</span>
-        <div>
-          <h4 data-i18n="strip4Title">e-Factura integráció</h4>
-          <p data-i18n="strip4Desc">ANAF SPV, automatikus státusz</p>
-        </div>
+      <div class="bcard reveal">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="none" stroke="currentColor" stroke-width="1.9"/></svg></div>
+        <h3 data-i18n="benefit4Title">Pregătit pentru cerințele RO</h3>
+        <p data-i18n="benefit4Desc">e-Factura, e-Transport/UIT, alerte de expirare la ITP, RCA și rovinietă, plus respectarea regulilor GDPR.</p>
       </div>
-      <div class="lp-strip-item reveal">
-        <span class="lp-strip-icon">📊</span>
-        <div>
-          <h4 data-i18n="strip5Title">Részletes riportok</h4>
-          <p data-i18n="strip5Desc">Pénzügy, sofőrök, ügyfelek, járművek</p>
-        </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="sec sec-alt" id="features" data-vs-section="features">
+  <div class="wrap">
+    <div class="center">
+      <span class="eyebrow" data-i18n="featEyebrow">Module</span>
+      <h2 class="h2" data-i18n="featTitle">Tot fluxul unei firme de transport, fără salturi între programe</h2>
+      <p class="lead" data-i18n="featSubtitle">De la prima ofertă până la factura încasată, totul stă în același loc.</p>
+    </div>
+    <div class="feat">
+      <div class="fcol reveal">
+        <h4 data-i18n="featCol1Title">Curse & dispecerat</h4>
+        <div class="fitem"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="featCol1L1">Centru operațional cu tablou de bord zilnic</span></div>
+        <div class="fitem"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="featCol1L2">Comenzi FTL și LTL cu planificator drag & drop</span></div>
+        <div class="fitem"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="featCol1L3">Radar de curse retur și planificare rute pentru camioane</span></div>
+        <div class="fitem"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="featCol1L4">Citire comenzi din e-mail cu AI și oferte de preț</span></div>
+      </div>
+      <div class="fcol reveal">
+        <h4 data-i18n="featCol2Title">Flotă & conformitate</h4>
+        <div class="fitem"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="featCol2L1">Evidență vehicule, șoferi și transportatori parteneri</span></div>
+        <div class="fitem"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="featCol2L2">Alerte de expirare pentru ITP, RCA, rovinietă și tahograf</span></div>
+        <div class="fitem"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="featCol2L3">Jurnal de mentenanță și import de carduri de combustibil</span></div>
+        <div class="fitem"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="featCol2L4">e-CMR, e-Transport/UIT și raport de emisii CO₂</span></div>
+      </div>
+      <div class="fcol reveal">
+        <h4 data-i18n="featCol3Title">Finanțe & rapoarte</h4>
+        <div class="fitem"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="featCol3L1">Facturi emise și primite, sincronizate cu e-Factura</span></div>
+        <div class="fitem"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="featCol3L2">Scadențar de plăți și decont pentru șoferi</span></div>
+        <div class="fitem"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="featCol3L3">Statistici, indicatori SLA și profit calculat pe cursă</span></div>
+        <div class="fitem"><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span><span data-i18n="featCol3L4">Portal pentru clienți și transportatori, plus export contabil</span></div>
       </div>
     </div>
   </div>
 </section>
 
 <!-- HOW IT WORKS -->
-<section id="how" class="lp-section lp-section-dark" data-vs-section="how">
-  <div class="lp-container">
-    <div class="lp-section-header reveal">
-      <h2 class="lp-white-title" data-i18n="howTitle">Cum funcționează</h2>
-      <p data-i18n="howSubtitle">Ești operațional în mai puțin de 30 de minute</p>
-    </div>
-    <div class="lp-how-steps">
-      <div class="lp-how-step reveal">
-        <div class="lp-how-num">01</div>
-        <h3 data-i18n="step1Title">Înregistrare</h3>
-        <p data-i18n="step1Desc">Creați un cont gratuit în 2 minute. Fără card bancar, fără contracte.</p>
-      </div>
-      <div class="lp-how-arrow" aria-hidden="true">→</div>
-      <div class="lp-how-step reveal">
-        <div class="lp-how-num">02</div>
-        <h3 data-i18n="step2Title">Configurare</h3>
-        <p data-i18n="step2Desc">Adăugați vehicule, șoferi și integrați GPS-ul și sistemul de facturare.</p>
-      </div>
-      <div class="lp-how-arrow" aria-hidden="true">→</div>
-      <div class="lp-how-step reveal">
-        <div class="lp-how-num">03</div>
-        <h3 data-i18n="step3Title">Începeți activitatea</h3>
-        <p data-i18n="step3Desc">Creați prima cursă, urmăriți flota în timp real și emiteți factura automat.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- MODULES SECTION -->
-<section id="features" class="lp-section lp-section-light" data-vs-section="features">
-  <div class="lp-container">
-    <div class="lp-section-header reveal">
-      <h2 data-i18n="modulesTitle">Egy rendszer, minden feladatra</h2>
-      <p data-i18n="modulesSubtitle">Moduláris felépítés — csak azt fizeted, amit használsz.</p>
-    </div>
-    <div class="lp-modules-grid">
-      <div class="lp-module-card reveal">
-        <span class="lp-module-icon">🚚</span>
-        <h3 data-i18n="mod1Title">Fuvarmenedzsment</h3>
-        <p data-i18n="mod1Desc">Fuvarok, ügyfelek, járművek, alvállalkozók kezelése</p>
-      </div>
-      <div class="lp-module-card reveal">
-        <span class="lp-module-icon">📍</span>
-        <h3 data-i18n="mod2Title">GPS Követés</h3>
-        <p data-i18n="mod2Desc">Valós idejű pozíció, CargoTrack/Fomco integráció</p>
-      </div>
-      <div class="lp-module-card reveal">
-        <span class="lp-module-icon">💶</span>
-        <h3 data-i18n="mod3Title">Számlázás</h3>
-        <p data-i18n="mod3Desc">Automatikus számla-kiállítás 5 provideren keresztül</p>
-      </div>
-      <div class="lp-module-card reveal">
-        <span class="lp-module-icon">📋</span>
-        <h3 data-i18n="mod4Title">e-Factura</h3>
-        <p data-i18n="mod4Desc">ANAF SPV-beküldés, automatikus státusz-lekérdezés</p>
-      </div>
-      <div class="lp-module-card reveal">
-        <span class="lp-module-icon">📁</span>
-        <h3 data-i18n="mod5Title">Dokumentumok</h3>
-        <p data-i18n="mod5Desc">CMR/fuvarlevél, POD-fotó, könyvelői ZIP export</p>
-      </div>
-      <div class="lp-module-card reveal">
-        <span class="lp-module-icon">👥</span>
-        <h3 data-i18n="mod6Title">Portálok</h3>
-        <p data-i18n="mod6Desc">Ügyfél-portál és alvállalkozói portál elkülönítve</p>
-      </div>
-      <div class="lp-module-card reveal">
-        <span class="lp-module-icon">📊</span>
-        <h3 data-i18n="mod7Title">Statisztika</h3>
-        <p data-i18n="mod7Desc">7 füles elemzés: pénzügy, üzemanyag, sofőrök, ügyfelek</p>
-      </div>
-      <div class="lp-module-card reveal">
-        <span class="lp-module-icon">🗓️</span>
-        <h3 data-i18n="mod8Title">Tervezőtábla</h3>
-        <p data-i18n="mod8Desc">Gantt-nézet, visszfuvar-radar, drag &amp; drop</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- STATS SECTION -->
-<section id="stats" class="lp-section lp-section-dark" data-vs-section="stats">
-  <div class="lp-container">
-    <div class="lp-section-header reveal">
-      <h2 class="lp-white-title" data-i18n="statsTitle">Számok, amelyek magukért beszélnek</h2>
-    </div>
-    <div class="lp-stats-grid">
-      <div class="lp-stat reveal">
-        <span class="lp-stat-num" data-i18n="stat1Num">98%</span>
-        <span class="lp-stat-label" data-i18n="stat1">Ügyfél elégedettség</span>
-      </div>
-      <div class="lp-stat reveal">
-        <span class="lp-stat-num" data-i18n="stat2Num">50+</span>
-        <span class="lp-stat-label" data-i18n="stat2">Aktív integráció</span>
-      </div>
-      <div class="lp-stat reveal">
-        <span class="lp-stat-num" data-i18n="stat3Num">1000+</span>
-        <span class="lp-stat-label" data-i18n="stat3">Kezelt jármű</span>
-      </div>
-      <div class="lp-stat reveal">
-        <span class="lp-stat-num" data-i18n="stat4Num">24/7</span>
-        <span class="lp-stat-label" data-i18n="stat4">Támogatás</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- TESTIMONIALS -->
-<section class="lp-section lp-section-white" data-vs-section="testimonials">
-  <div class="lp-container">
-    <div class="lp-section-header reveal">
-      <h2 data-i18n="testimonialTitle">Ügyfeleink mondták</h2>
-    </div>
-    <div class="lp-testimonials-grid">
-      <div class="lp-testimonial reveal">
-        <p class="lp-testimonial-text" data-i18n="t1Text">"A VallorSoft teljesen átalakította a munkánkat. Minden átlátható, minden helyen van, idő és pénz spórolunk."</p>
-        <div class="lp-testimonial-author">
-          <span class="lp-testimonial-name" data-i18n="t1Name">Popescu Andrei</span>
-          <span class="lp-testimonial-company" data-i18n="t1Company">Trans SRL</span>
-        </div>
-      </div>
-      <div class="lp-testimonial reveal">
-        <p class="lp-testimonial-text" data-i18n="t2Text">"Az e-Factura integráció és a GPS követés kifogástalanul működik. Mindenkinek ajánlom."</p>
-        <div class="lp-testimonial-author">
-          <span class="lp-testimonial-name" data-i18n="t2Name">Kovács László</span>
-          <span class="lp-testimonial-company" data-i18n="t2Company">SpeedTrans Kft.</span>
-        </div>
-      </div>
-      <div class="lp-testimonial reveal">
-        <p class="lp-testimonial-text" data-i18n="t3Text">"Végre egy rendszer, ami érti a fuvarozás valódi igényeit."</p>
-        <div class="lp-testimonial-author">
-          <span class="lp-testimonial-name" data-i18n="t3Name">Muresan Ioan</span>
-          <span class="lp-testimonial-company" data-i18n="t3Company">LogiNext SRL</span>
-        </div>
-      </div>
+<section class="sec" id="how" data-vs-section="how">
+  <div class="wrap center">
+    <span class="eyebrow" data-i18n="howEyebrow">Simplu</span>
+    <h2 class="h2" data-i18n="howTitle">Cum funcționează</h2>
+    <p class="lead" data-i18n="howSubtitle">De la cont nou la prima factură, în aceeași zi.</p>
+    <div class="steps">
+      <div class="step reveal"><div class="n">1</div><h3 data-i18n="step1Title">Preiei cursa</h3><p data-i18n="step1Desc">Din e-mail (automat, cu AI), din portalul clientului sau manual — toate ajung în același loc.</p></div>
+      <div class="step reveal"><div class="n">2</div><h3 data-i18n="step2Title">Aloci și urmărești</h3><p data-i18n="step2Desc">Pui șofer și vehicul, vezi poziția GPS live, documentele și statusul în timp real.</p></div>
+      <div class="step reveal"><div class="n">3</div><h3 data-i18n="step3Title">Închizi și facturezi</h3><p data-i18n="step3Desc">Emiți factura prin furnizorul tău, o trimiți în e-Factura și vezi profitul rămas pe cursă.</p></div>
     </div>
   </div>
 </section>
 
 <!-- PRICING -->
-<section id="pricing" class="lp-section lp-section-light" data-vs-section="pricing">
-  <div class="lp-container">
-    <div class="lp-section-header reveal">
-      <h2 data-i18n="pricingTitle">Planuri și prețuri</h2>
-      <p data-i18n="pricingSubtitle">Prețuri transparente, fără costuri ascunse</p>
-    </div>
-    <!-- Havi / Éves váltó -->
-    <div class="lp-billing-toggle reveal" id="lpBillingToggle">
+<section class="sec sec-alt" id="pricing" data-vs-section="pricing">
+  <div class="wrap center">
+    <span class="eyebrow" data-i18n="pricingEyebrow">Prețuri</span>
+    <h2 class="h2" data-i18n="pricingTitle">Un plan pentru fiecare mărime de flotă</h2>
+    <p class="lead" data-i18n="pricingSubtitle">Începi cu proba gratuită și crești pachetul pe măsură ce crește firma.</p>
+    <div class="lp-billing-toggle toggle" id="lpBillingToggle">
       <button class="lp-toggle-btn active" data-billing="monthly" onclick="setBillingMode('monthly')" data-i18n="billingMonthly">Lunar</button>
       <button class="lp-toggle-btn" data-billing="annual" onclick="setBillingMode('annual')">
         <span data-i18n="billingAnnual">Anual</span>
-        <span class="lp-toggle-badge" data-i18n="billingAnnualBadge">−1 lună</span>
+        <b class="toggle-badge" data-i18n="billingAnnualBadge">−1 lună</b>
       </button>
     </div>
-    <div class="lp-pricing-grid" id="lpPricingGrid">
-      <!-- JS tölti be a /api/public-plans alapján; statikus fallback 4 valós csomag: -->
-      <div class="lp-pricing-card lp-plan-green reveal">
-        <div class="lp-plan-name">Alap</div>
-        <div class="lp-plan-audience" data-i18n="planAlapAudience">Firme cu 1–2 vehicule · Start</div>
-        <div class="lp-plan-price">
-          <span class="lp-price-val">€29</span>
-          <span class="lp-price-period" data-i18n="perMonth">/lună</span>
-        </div>
+    <div class="plans" id="lpPricingGrid">
+      <!-- JS umple din /api/public-plans; fallback static RO cu 4 pachete reale: -->
+      <div class="plan reveal">
+        <div class="lp-plan-name nm" style="color:#78716c">Alap</div>
+        <div class="aud" data-i18n="planAlapAudience">Pentru transportatori la început · 1–2 vehicule</div>
+        <div class="lp-plan-price price"><span class="lp-price-val">€29</span><small class="lp-price-period" data-i18n="perMonth">/lună</small></div>
         <ul class="lp-plan-features">
-          <li>Creare &amp; gestionare curse</li>
-          <li>Scrisori de transport &amp; CMR</li>
-          <li>Gestionare șoferi &amp; vehicule</li>
-          <li>Bază de date clienți</li>
-          <li>Statistici de bază</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Curse și flotă de bază</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Scrisori de transport și CMR</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Bază de date clienți</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Statistici de bază</li>
         </ul>
-        <a href="/register" class="lp-btn-outline lp-btn-full" data-i18n="planStartBtn">Testează gratuit</a>
+        <a class="btn ghost lp-btn-full" href="/register?billing=monthly" data-i18n="planStartBtn">Testează gratuit</a>
       </div>
-      <div class="lp-pricing-card lp-plan-blue reveal">
-        <div class="lp-plan-name">Standard</div>
-        <div class="lp-plan-audience" data-i18n="planStandardAudience">Flote cu 3–5 vehicule</div>
-        <div class="lp-plan-price">
-          <span class="lp-price-val">€69</span>
-          <span class="lp-price-period" data-i18n="perMonth">/lună</span>
-        </div>
+      <div class="plan reveal">
+        <div class="lp-plan-name nm" style="color:#0d9488">Standard</div>
+        <div class="aud" data-i18n="planStandardAudience">Pentru flote în creștere · 3–5 vehicule</div>
+        <div class="lp-plan-price price"><span class="lp-price-val">€69</span><small class="lp-price-period" data-i18n="perMonth">/lună</small></div>
         <ul class="lp-plan-features">
-          <li>Tot din Alap +</li>
-          <li>Chat intern</li>
-          <li>Planificator (Gantt)</li>
-          <li>Integrare GPS (hartă live)</li>
-          <li>Integrare facturare (e-Factura)</li>
-          <li>Estimare taxe drum &amp; planificare rută</li>
-          <li>Rapoarte financiare</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Tot din Alap, plus</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Chat intern și planificator Gantt</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Integrare GPS și facturare</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Rapoarte financiare</li>
         </ul>
-        <a href="/register" class="lp-btn-outline lp-btn-full" data-i18n="planStartBtn">Testează gratuit</a>
+        <a class="btn ghost lp-btn-full" href="/register?billing=monthly" data-i18n="planStartBtn">Testează gratuit</a>
       </div>
-      <div class="lp-pricing-card lp-plan-indigo lp-pricing-featured reveal">
-        <div class="lp-plan-badge" data-i18n="planPopular">Recomandat</div>
-        <div class="lp-plan-name">Pro</div>
-        <div class="lp-plan-audience" data-i18n="planProAudience">Companii cu 6–20 vehicule</div>
-        <div class="lp-plan-price">
-          <span class="lp-price-val">€149</span>
-          <span class="lp-price-period" data-i18n="perMonth">/lună</span>
-        </div>
+      <div class="plan hot lp-pricing-featured reveal">
+        <div class="tag lp-plan-badge" data-i18n="planPopular">Recomandat</div>
+        <div class="lp-plan-name nm" style="color:#f6711e">Pro</div>
+        <div class="aud" data-i18n="planProAudience">Pentru operare completă · 6–20 vehicule</div>
+        <div class="lp-plan-price price"><span class="lp-price-val">€149</span><small class="lp-price-period" data-i18n="perMonth">/lună</small></div>
         <ul class="lp-plan-features">
-          <li>Tot din Standard +</li>
-          <li>Portal client</li>
-          <li>Portal subcontractor</li>
-          <li>Radar curse retur</li>
-          <li>Procesare documente AI</li>
-          <li>Modul depozit</li>
-          <li>Rol contabil</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Tot din Standard, plus</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Radar curse retur și estimare taxe drum</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Citire AI a documentelor și modul depozit</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Portal client, portal transportator și rol contabil</li>
         </ul>
-        <a href="/register" class="lp-btn-primary lp-btn-full" data-i18n="planStartBtn">Testează gratuit</a>
+        <a class="btn primary lp-btn-full" href="/register?billing=monthly" data-i18n="planStartBtn">Testează gratuit</a>
       </div>
-      <div class="lp-pricing-card lp-plan-dark reveal">
-        <div class="lp-plan-name">Business</div>
-        <div class="lp-plan-audience" data-i18n="planBusinessAudience">Întreprinderi 20+ vehicule</div>
-        <div class="lp-plan-price">
-          <span class="lp-price-val lp-price-custom" data-i18n="customPrice">Personalizat</span>
-        </div>
+      <div class="plan reveal">
+        <div class="lp-plan-name nm" style="color:#15803d">Business</div>
+        <div class="aud" data-i18n="planBusinessAudience">Pentru flote mari · 20+ vehicule</div>
+        <div class="lp-plan-price price"><span class="lp-price-val lp-price-custom" data-i18n="customPrice">Personalizat</span></div>
         <ul class="lp-plan-features">
-          <li>Tot din Pro +</li>
-          <li>Consum &amp; grad de utilizare vehicule</li>
-          <li>Raport performanță șoferi</li>
-          <li>Import carduri carburant</li>
-          <li>Raport lunar pe e-mail</li>
-          <li>Setări personalizate</li>
-          <li>Suport dedicat</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Tot din Pro, fără limite</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Consum și grad de utilizare per vehicul</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Export contabil SAGA / WinMentor</li>
+          <li><span class="c"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" fill="none" stroke="currentColor" stroke-width="3"/></svg></span>Asistență prioritară</li>
         </ul>
-        <a href="#contact" class="lp-btn-outline lp-btn-full" data-i18n="planContactBtn">Contactați-ne</a>
+        <a class="btn ghost lp-btn-full" href="#contact" data-i18n="planContactBtn">Contactează-ne</a>
       </div>
     </div>
-    <p class="lp-pricing-vat" id="lpPricingVat" data-i18n="pricingVatNote">Prețurile sunt tarife nete. La facturare se adaugă TVA 21%.</p>
+    <p class="vat" id="lpPricingVat" data-i18n="pricingVatNote">Prețurile sunt nete, fără TVA (21%). Plată în EUR sau RON (curs BNR). 14 zile gratuit, fără card.</p>
     <div class="lp-addon-section" id="lpAddonSection" style="display:none;">
       <div class="lp-addon-title" data-i18n="addonTitle">Resurse suplimentare</div>
       <div class="lp-addon-grid" id="lpAddonGrid"></div>
@@ -413,74 +320,96 @@
   </div>
 </section>
 
-<!-- BLOG / RESOURCES -->
-<section id="blog" class="lp-section lp-section-white" data-vs-section="blog">
-  <div class="lp-container">
-    <div class="lp-section-header reveal">
-      <h2 data-i18n="blogTitle">Resurse &amp; Noutăți</h2>
+<!-- TESTIMONIALS -->
+<section class="sec" data-vs-section="testimonials">
+  <div class="wrap">
+    <div class="center">
+      <span class="eyebrow" data-i18n="testiEyebrow">Clienți</span>
+      <h2 class="h2" data-i18n="testimonialTitle">Ce spun transportatorii care lucrează cu noi</h2>
     </div>
-    <div class="lp-blog-grid">
-      <div class="lp-module-card reveal">
-        <span class="lp-module-icon">📰</span>
+    <div class="tg">
+      <div class="tc reveal">
+        <div class="stars">★★★★★</div>
+        <p data-i18n="t1Text">„Am lăsat în urmă fișierele Excel și apelurile fără sfârșit. Dispecerul vede totul pe un ecran, iar facturile pleacă la timp."</p>
+        <div class="who"><span class="av">MP</span><div><div class="nm" data-i18n="t1Name">Marius P.</div><div class="ro" data-i18n="t1Company">Director, firmă de transport · Cluj</div></div></div>
+      </div>
+      <div class="tc reveal">
+        <div class="stars">★★★★★</div>
+        <p data-i18n="t2Text">„Radarul de curse retur ne-a tăiat din kilometrii goi. Se vede direct în profitul pe cursă, lună de lună."</p>
+        <div class="who"><span class="av">AD</span><div><div class="nm" data-i18n="t2Name">Andrei D.</div><div class="ro" data-i18n="t2Company">Dispecer · Timișoara</div></div></div>
+      </div>
+      <div class="tc reveal">
+        <div class="stars">★★★★★</div>
+        <p data-i18n="t3Text">„e-Factura și e-Transport merg fără bătăi de cap. Totul e în limba noastră, iar echipa s-a obișnuit în câteva zile."</p>
+        <div class="who"><span class="av">EK</span><div><div class="nm" data-i18n="t3Name">Eszter K.</div><div class="ro" data-i18n="t3Company">Administrator · Sfântu Gheorghe</div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BLOG -->
+<section class="sec sec-alt" id="blog" data-vs-section="blog">
+  <div class="wrap">
+    <div class="center">
+      <span class="eyebrow" data-i18n="blogEyebrow">Resurse</span>
+      <h2 class="h2" data-i18n="blogTitle">Resurse & Noutăți</h2>
+    </div>
+    <div class="cards cards-3">
+      <div class="bcard reveal">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z" fill="none" stroke="currentColor" stroke-width="1.9"/><line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="1.9"/><line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" stroke-width="1.9"/></svg></div>
         <h3 data-i18n="blog1Title">Digitalizarea transportului rutier în România</h3>
-        <p data-i18n="blog1Desc">Cum ajută tehnologia la eficientizarea flotelor și reducerea costurilor operaționale.</p>
+        <p data-i18n="blog1Desc">Cum ajută tehnologia la eficientizarea flotelor și la reducerea costurilor de zi cu zi.</p>
         <a href="/blog/1" class="lp-blog-read-more" data-i18n="blogReadMore">Citește mai mult →</a>
       </div>
-      <div class="lp-module-card reveal">
-        <span class="lp-module-icon">🧾</span>
-        <h3 data-i18n="blog2Title">e-Factura 2026 — tot ce trebuie să știți</h3>
-        <p data-i18n="blog2Desc">Ghid complet privind obligațiile e-Factura pentru transportatori și cum VallorSoft automatizează procesul.</p>
+      <div class="bcard reveal">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M6 2h9l3 3v17H6z" fill="none" stroke="currentColor" stroke-width="1.9"/><line x1="9" y1="12" x2="15" y2="12" stroke="currentColor" stroke-width="1.9"/></svg></div>
+        <h3 data-i18n="blog2Title">e-Factura 2026 — ce trebuie să știe transportatorii</h3>
+        <p data-i18n="blog2Desc">Ghid despre obligațiile e-Factura și cum automatizează vallorSoft întregul proces.</p>
         <a href="/blog/2" class="lp-blog-read-more" data-i18n="blogReadMore">Citește mai mult →</a>
       </div>
-      <div class="lp-module-card reveal">
-        <span class="lp-module-icon">🛣️</span>
+      <div class="bcard reveal">
+        <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 12h13l-3-3m3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.9"/><circle cx="20" cy="12" r="1.6" fill="currentColor"/></svg></div>
         <h3 data-i18n="blog3Title">Codul UIT și RO e-Transport — ghid practic</h3>
-        <p data-i18n="blog3Desc">Ce este codul UIT, când este obligatoriu și cum gestionați declarațiile prin CargoTrack.</p>
+        <p data-i18n="blog3Desc">Ce este codul UIT, când e obligatoriu și cum îl gestionezi prin CargoTrack.</p>
         <a href="/blog/3" class="lp-blog-read-more" data-i18n="blogReadMore">Citește mai mult →</a>
       </div>
     </div>
   </div>
 </section>
 
-
-<!-- CONTACT -->
-<section id="contact" class="lp-section lp-section-dark" data-vs-section="contact">
-  <div class="lp-container">
-    <div class="lp-section-header reveal">
-      <h2 class="lp-white-title" data-i18n="contactTitle">Contact</h2>
-      <p data-i18n="contactDesc">Suntem disponibili pentru întrebări, demonstrații și oferte personalizate.</p>
+<!-- FAQ + CONTACT (data-vs-section=contact) -->
+<section class="sec" id="contact" data-vs-section="contact">
+  <div class="wrap">
+    <div class="center">
+      <span class="eyebrow" data-i18n="faqEyebrow">Întrebări</span>
+      <h2 class="h2" data-i18n="faqTitle">Întrebări frecvente</h2>
     </div>
-    <div class="lp-contact-grid">
-      <div class="lp-contact-block reveal">
-        <div class="lp-how-num" style="font-size:1.6rem;">✉️</div>
-        <h3 data-i18n="contactEmailTitle">E-mail</h3>
-        <p><a href="mailto:vallorsoft@gmail.com" class="lp-contact-link" data-i18n="contactEmail">vallorsoft@gmail.com</a></p>
-      </div>
-      <div class="lp-contact-block reveal">
-        <div class="lp-how-num" style="font-size:1.6rem;">📞</div>
-        <h3 data-i18n="contactPhoneTitle">Telefon</h3>
-        <p><a href="tel:+40769532015" class="lp-contact-link" data-i18n="contactPhone">+40 769 532 015</a></p>
-      </div>
-      <div class="lp-contact-block reveal">
-        <div class="lp-how-num" style="font-size:1.6rem;">🚀</div>
-        <h3 data-i18n="startFreeBtn">Începe gratuit</h3>
-        <p><a href="/register" class="lp-btn-primary" style="display:inline-block;margin-top:8px;" data-i18n="startNow">Kezdés most</a></p>
-      </div>
+    <div class="faq">
+      <div class="qa"><div class="q" data-i18n="faq1Q">Cât durează proba gratuită?</div><div class="a" data-i18n="faq1A">14 zile, fără card bancar. Ai acces la toate funcțiile pachetului ales.</div></div>
+      <div class="qa"><div class="q" data-i18n="faq2Q">Trimite facturi în e-Factura (ANAF)?</div><div class="a" data-i18n="faq2A">Da — prin furnizorul tău de facturare (FGO, SmartBill, Oblio, iFactura sau Facturis). Tu alegi furnizorul, noi ne ocupăm de restul.</div></div>
+      <div class="qa"><div class="q" data-i18n="faq3Q">Funcționează cu GPS-ul meu?</div><div class="a" data-i18n="faq3A">Da, integrăm CargoTrack și Fomco pentru poziție live și estimare de consum.</div></div>
+      <div class="qa"><div class="q" data-i18n="faq4Q">Datele firmei mele sunt în siguranță?</div><div class="a" data-i18n="faq4A">Da. Datele sunt separate pe fiecare firmă (multi-tenant), conform GDPR, cu export și dreptul de ștergere.</div></div>
+      <div class="qa"><div class="q" data-i18n="faq5Q">Pot renunța oricând?</div><div class="a" data-i18n="faq5A">Da, fără obligații pe termen lung. Plătești lunar sau anual, cu o lună gratuită la plata anuală.</div></div>
+    </div>
+    <div class="contact-band">
+      <div class="contact-item"><span class="ci-ic">✉️</span><div><div class="ci-h" data-i18n="contactEmailTitle">E-mail</div><a href="mailto:vallorsoft@gmail.com" data-i18n="contactEmail">vallorsoft@gmail.com</a></div></div>
+      <div class="contact-item"><span class="ci-ic">📞</span><div><div class="ci-h" data-i18n="contactPhoneTitle">Telefon</div><a href="tel:+40769532015" data-i18n="contactPhone">+40 769 532 015</a></div></div>
+      <div class="contact-item"><span class="ci-ic">🚀</span><div><div class="ci-h" data-i18n="contactStartTitle">Începe acum</div><a class="btn primary contact-btn" href="/register" data-i18n="startNow">Încearcă gratuit</a></div></div>
     </div>
   </div>
 </section>
 
 <!-- FINAL CTA -->
-<section class="lp-section lp-cta-section" data-vs-section="cta">
-  <div class="lp-container">
-    <div class="lp-cta-inner reveal">
-      <h2 data-i18n="ctaTitle">Készen állsz a hatékonyabb működésre?</h2>
-      <p data-i18n="ctaSubtitle">Próbáld ki a VallorSoft-ot 14 napig ingyen, kötelezettségek nélkül.</p>
-      <div class="lp-cta-actions">
-        <a href="/register" class="lp-btn-primary lp-btn-lg" data-i18n="ctaBtn">Ingyenes próba indítása</a>
-        <a href="/login" class="lp-cta-login" data-i18n="loginDispatcher">Dispecer / Admin</a>
-        <a href="/portal" class="lp-cta-login" data-i18n="loginClient">Ügyfél-portál</a>
-        <a href="/carrier" class="lp-cta-login" data-i18n="loginCarrier">Alvállalkozói portál</a>
+<section class="sec" data-vs-section="cta">
+  <div class="wrap">
+    <div class="ctaband reveal">
+      <h2 data-i18n="ctaTitle">Începe astăzi cu vallorSoft</h2>
+      <p data-i18n="ctaSubtitle">14 zile gratuit, fără card. Te configurezi în câteva minute și pornești prima cursă.</p>
+      <div class="cta-actions">
+        <a class="btn cta-main" href="/register" data-i18n="ctaBtn">Încearcă gratuit</a>
+        <a class="cta-login" href="/login" data-i18n="loginDispatcher">Dispecerat</a>
+        <a class="cta-login" href="/portal" data-i18n="loginClient">Portal client</a>
+        <a class="cta-login" href="/carrier" data-i18n="loginCarrier">Portal transportator</a>
       </div>
     </div>
   </div>
@@ -488,53 +417,48 @@
 
 <!-- FOOTER -->
 <footer class="lp-footer" id="about">
-  <div class="lp-container lp-footer-grid">
-    <div class="lp-footer-brand">
-      <a href="/" class="lp-logo">
-        <span class="lp-logo-vallor">Vallor</span><span class="lp-logo-soft">Soft</span>
-      </a>
-      <p data-i18n="footerTagline">Modern fuvarmenedzsment rendszer szállítmányozóknak és fuvarozóknak.</p>
-      <p class="lp-footer-copy">© 2024 VallorSoft. <span data-i18n="footerRights">Minden jog fenntartva.</span></p>
+  <div class="wrap fgrid">
+    <div class="fbrand">
+      <a href="/" class="logo">vallor<span class="i">Soft</span></a>
+      <p data-i18n="footerTagline">Platformă TMS pentru firme de transport din România. Comenzi, flotă, facturare și conformitate, dintr-un singur loc.</p>
+      <p class="fcopy">© 2026 VALLOR TEAM SRL · <span data-i18n="footerRights">Toate drepturile rezervate.</span></p>
     </div>
-    <div class="lp-footer-col">
-      <h4 data-i18n="footerProduct">Termék</h4>
-      <ul>
-        <li><a href="#features" data-i18n="navFeatures">Funkciók</a></li>
-        <li><a href="#pricing" data-i18n="navPricing">Árak</a></li>
-        <li><a href="/login" data-i18n="loginDispatcher">Dispecer / Admin</a></li>
-        <li><a href="/portal" data-i18n="loginClient">Ügyfél-portál</a></li>
-        <li><a href="/carrier" data-i18n="loginCarrier">Alvállalkozói portál</a></li>
-      </ul>
+    <div class="fcol">
+      <h5 data-i18n="footerProduct">Produs</h5>
+      <a href="#features" data-i18n="navFeatures">Funcții</a>
+      <a href="#pricing" data-i18n="navPricing">Prețuri</a>
+      <a href="#how" data-i18n="navHow">Cum funcționează</a>
+      <a href="/login" data-i18n="loginDispatcher">Dispecerat</a>
+      <a href="/portal" data-i18n="loginClient">Portal client</a>
+      <a href="/carrier" data-i18n="loginCarrier">Portal transportator</a>
     </div>
-    <div class="lp-footer-col">
-      <h4 data-i18n="footerCompany">Cég</h4>
-      <ul>
-        <li><a href="#about" data-i18n="footerAbout">Rólunk</a></li>
-        <li><a href="mailto:vallorsoft@gmail.com" data-i18n="footerContact">Kapcsolat</a></li>
-      </ul>
+    <div class="fcol">
+      <h5 data-i18n="footerLegal">Legal</h5>
+      <a href="/terms" data-i18n="footerTerms">Termeni și condiții</a>
+      <a href="/privacy" data-i18n="footerPrivacy">Confidențialitate (GDPR)</a>
+      <a href="/dpa" data-i18n="footerDpa">DPA</a>
+      <a href="/cookies" data-i18n="footerCookiePolicy">Politica cookie-uri</a>
+      <a href="/security" data-i18n="footerSecurity">Securitate</a>
+      <button id="footerCookieBtn" class="footer-link-btn" data-i18n="footerCookies">Setări cookie</button>
     </div>
-    <div class="lp-footer-col">
-      <h4 data-i18n="footerLegal">Jog</h4>
-      <ul>
-        <li><a href="/privacy" data-i18n="footerPrivacy">Adatvédelem</a></li>
-        <li><a href="/terms" data-i18n="footerTerms">Általános Szerz. Feltételek</a></li>
-        <li><a href="/cookies" data-i18n="footerCookiePolicy">Cookie szabályzat</a></li>
-        <li><a href="/dpa" data-i18n="footerDpa">DPA</a></li>
-        <li><a href="/security" data-i18n="footerSecurity">Biztonsági irányelvek</a></li>
-        <li><button id="footerCookieBtn" class="lp-footer-link-btn" data-i18n="footerCookies">Cookie beállítások</button></li>
-      </ul>
+    <div class="fcol fcontact">
+      <h5 data-i18n="footerContactHead">Contact</h5>
+      <p><b data-i18n="footerCompanyName">VALLOR TEAM SRL</b></p>
+      <p data-i18n="footerCompanyReg">CUI 47859317 · J2023000114142</p>
+      <p data-i18n="footerCompanyAddr">Sat Arcuș, Cart. Poiana Arcușului nr. 102, cod 527166, jud. Covasna</p>
+      <p data-i18n="footerCompanyContact">📞 0769 532 015 · ✉ vallorsoft@gmail.com</p>
     </div>
   </div>
-  <div class="lp-footer-bottom">
-    <div class="lp-container">
-      <span class="lp-footer-integrations" data-i18n="footerIntegrations">Integrat nativ cu sisteme GPS și programe de facturare — FGO, SmartBill, Oblio, iFactura, Facturis, CargoTrack, Fomco, ANAF și Stripe.</span>
-      <span class="lp-lang-switch">RO | HU | EN</span>
+  <div class="lp-footer-bottom fbar">
+    <div class="wrap">
+      <span class="lp-footer-integrations" data-i18n="footerIntegrations">Integrat nativ cu sisteme GPS și programe de facturare — FGO, SmartBill, Oblio, iFactura, Facturis, CargoTrack, Fomco și ANAF.</span>
+      <span class="fmade" data-i18n="footerMade">Realizat în România 🇷🇴</span>
     </div>
   </div>
 </footer>
 
 <div id="toastContainer" class="toast-container"></div>
 
-<script src="landing.js?v=20260616pw"></script>
+<script src="landing.js?v=20260617land"></script>
 </body>
 </html>
