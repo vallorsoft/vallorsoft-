@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-17 — CargoTMS-hézagok Fázis D/1: Fuvar-adatlap + Ügyfél-profil (tabos drill-in) (PR #176)
+
+> A listából megnyíló, tabos READ-nézet — a meglévő fuvar-szerkesztőt NEM írja át (csak olvasó-nézet + linkek a meglévő akciókra), a jármű/sofőr-adatlap mintájára.
+
+- **`handlers/entityDetail.js`** — `getOrderDetail({id})` (tulajdon-ellenőrzés: `orders WHERE id=$1 AND company_id=$2`; majd `order_documents`/`documents` POD/`invoices`/`order_legs`/tracking + **`audit_log` idővonal cégre szűrve**, mert az `audit_log`-nak van `company_id`-ja) + `getClientProfile({id})` (ügyfél + fuvarai + számlái + portál-hozzáférés `pass_hash` nélkül). `_isAdminOrManager`, read-only, paraméteres.
+- **UI** `public/entity-detail.js` — Fuvar: Áttekintés / Dokumentumok / Pénzügy / Szakaszok / **Aktivitás** / Portál; Ügyfél: Adatok / Fuvarok / Számlák / Portál. „🔎 Részletek" a fuvar-tábla `⋯` menüjébe (additív 7 soros blokk — a szerkesztő/státusz/akciók érintetlenek) és az ügyfél-listára. A szerkesztéshez a meglévő `openOrderEdit`/dok/számla akciókra linkel.
+- `i18n` `ed.*` (RO-alap+HU), cache-bust `?v=20260617d1`; 93 Jest zöld; a `comUpdate`/orders-render érintetlen.
+
 ## 2026-06-17 — CargoTMS-hézagok Fázis C/5: E-mail sablon-kezelő (PR #175)
 
 > Cégenkénti, kategorizált, kétnyelvű tranzakciós e-mail sablonok + sablonból küldés — a developer rendszer-sablonokat és a client-mail sablonokat NEM érintve.

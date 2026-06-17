@@ -3644,6 +3644,13 @@ function renderFilteredOrders(list) {
     // a tétel jobb szélén jelennek meg. A dekorátorok ugyanazokat a [data-*-ind]
     // span-eket töltik, mint korábban — a menü a DOM-ban van (rejtve), így találják.
     var menuItems = '';
+    // 🔎 Részletek (drill-in, csak olvasás) — a meglévő tételeket nem érinti
+    if (window.EntityDetail) {
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('ed.details')+'" '+
+        'onclick="EntityDetail.openOrder(\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">🔎</span><span class="vs-act-lbl">'+t('ed.details')+'</span></button>'+
+        '<div class="vs-act-sep"></div>';
+    }
     // 📎 Dokumentumok (mindig) — jobb szélén a POD-fotó jelző
     var podBadge = (parseInt(c.pod_count, 10) > 0)
       ? '<span class="vs-act-ind" style="color:var(--status-ok);" title="'+c.pod_count+t('cs.ol.podAttached')+'">📷'+c.pod_count+'</span>' : '';
