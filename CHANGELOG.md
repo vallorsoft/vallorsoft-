@@ -14,6 +14,17 @@
 
 ---
 
+## 2026-06-17 — CargoTMS-hézagok Fázis C/2: Értesítési központ + Mail-napló (PR #172)
+
+> Értesítés-központ (🔔) + kiküldött-e-mail napló — multi-tenant, GDPR-tudatos. A két belső segéd (`notify`/`logMail`) **nem dispatchelhető** `/api/execute`-en (nem-enumerable) → nincs cross-tenant injekció.
+
+- **`db/notifications.sql`** (idempotens) — `notifications` (company_id, user_id?, type, title, body, link_tab, read_at) + `mail_log` (company_id, to_email, subject, type, status, provider_id) + indexek.
+- **`handlers/notifications.js`** — `notifList/notifUnreadCount/notifMarkRead/notifMarkAllRead` (scope `company_id=$1 AND (user_id IS NULL OR user_id=$2)`); `handlers/mailLog.js` — `mailLogList` **Admin/Manager** kapu (a címzett-e-mail PII). Belső `notify()`/`logMail()` `Object.defineProperty`-vel nem-enumerable (require-elérhető, de nem RPC).
+- **Mail-napló bekötés:** `services/email.js` `_logMail()` minden küldő-ág végén (best-effort, try/catch — a küldést sosem buktatja); a `company_id` minden hívási útról átadva (invites/developer/auth-reset/carriers/client-mail/public-register/trial-select/billing/scheduler). Küldés-logika/szöveg/címzett változatlan.
+- **Értesítés-bekötés (2 tiszta esemény):** portál-fuvarigény (`routes/portal.js`) + lejárat-scheduler (`services/scheduler.js`) a meglévő push mellé.
+- **GDPR:** `handlers/gdpr.js` `exportCompanyData` kibővítve `notifications` + `mail_log`-gal (a 6. szabály szerint).
+- **UI:** `public/notifications.js` (🔔 felső sáv dropdown + olvasatlan-badge, 60s poll) + `notifications` és `mail-log` aloldal az **Adminisztráció** alatt (`public/mail-log.js`). `feature-catalog`+`i18n` (RO-alap+HU). Cache-bust `?v=20260617c2`; 93 Jest zöld; auth/billing/küldés érintetlen.
+
 ## 2026-06-17 — CargoTMS-hézagok Fázis C/1: Árajánlatok (Quotes) modul (PR #171)
 
 > Valódi ajánlat-kezelő — az elnyert ajánlatból egy kattintással fuvar lesz a MEGLÉVŐ fuvar-létrehozóval (nincs forkolt logika).

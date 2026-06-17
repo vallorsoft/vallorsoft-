@@ -45,6 +45,8 @@ function loadTab(name){
     if(name==='invoices-out'){ if(typeof loadInvoicesOut==='function') loadInvoicesOut(); }
     if(name==='invoices-in'){ if(typeof loadCarrierAp==='function') loadCarrierAp(); }
     if(name==='bnr-rate'){ if(typeof loadBnrRate==='function') loadBnrRate(); }
+    if(name==='notifications'){ if(window.Notifications) Notifications.loadPage(); }
+    if(name==='mail-log'){ if(typeof loadMailLog==='function') loadMailLog(); }
     if(name==='orders-done'){ if(typeof loadOrdersDone==='function') loadOrdersDone(); }
     if(name==='active-fleet'){ if(typeof loadActiveFleet==='function') loadActiveFleet(); }
     if(name==='internal-drivers') loadInternalDrivers();

@@ -121,7 +121,7 @@ router.post('/api/public-register', publicRegLimiter, async (req, res) => {
   </div>
 </div>`;
       }
-      await sendClientEmail({ to: cleanEmail, subject: welcomeSubject, html: welcomeHtml });
+      await sendClientEmail({ to: cleanEmail, subject: welcomeSubject, html: welcomeHtml, companyId, mailType: 'welcome' });
     } catch (mailErr) {
       console.warn('[public-register] Üdvözlő e-mail küldés sikertelen (best-effort):', mailErr.message);
     }

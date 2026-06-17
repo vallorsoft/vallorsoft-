@@ -72,7 +72,7 @@ handlers.devCompanyCreate = async function (req, res, args) {
       );
 
       if (f.email_contact) {
-        sendInviteEmail(f.email_contact, kod, 'Admin', f.nev, f.igazgato_nev||null)
+        sendInviteEmail(f.email_contact, kod, 'Admin', f.nev, f.igazgato_nev||null, undefined, companyId)
           .catch(e => console.error('Email hatter hiba:', e.message));
       }
 
@@ -490,7 +490,7 @@ handlers.devSendCompanyEmail = async function (req, res, args) {
         .replace(/\{\{subscription_url\}\}/g, appUrl + '/subscription');
     }
     const { sendDeveloperEmail } = require('../services/email');
-    const sent = await sendDeveloperEmail(row.email, row.nev, fillVars(tpl.subject), fillVars(tpl.body));
+    const sent = await sendDeveloperEmail(row.email, row.nev, fillVars(tpl.subject), fillVars(tpl.body), companyId);
     if (!sent.ok) return res.json({ result: { ok: false, err: sent.error || 'Trimitere esuata.' } });
     return res.json({ result: { ok: true } });
   } catch (err) {

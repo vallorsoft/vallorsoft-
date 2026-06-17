@@ -41,6 +41,8 @@ const handlers = Object.assign(
   require('../handlers/opsCenter'),
   require('../handlers/entityDetail'),
   require('../handlers/quotes'),
+  require('../handlers/notifications'),
+  require('../handlers/mailLog'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a

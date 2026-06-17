@@ -19,6 +19,20 @@ function getPool() {
   return _pool;
 }
 
+// Levél-napló (mail_log) best-effort segéd. Lazy require a körkörös
+// függőség elkerülésére. SOHA nem buktatja a küldést (try/catch).
+// Csak akkor naplóz, ha van company_id (multi-tenant) — különben kihagy.
+function _logMail(companyId, toEmail, subject, type, status, providerId) {
+  if (!companyId) return; // company_id nélkül NEM naplózunk
+  try {
+    const { logMail } = require('../handlers/mailLog');
+    Promise.resolve(logMail(getPool(), {
+      company_id: companyId, to_email: toEmail, subject: subject,
+      type: type, status: status, provider_id: providerId || null,
+    })).catch(() => {});
+  } catch (_) { /* best-effort */ }
+}
+
 // Rendszer-email sablon lekérése DB-ből — async, best-effort.
 // Ha nincs sablon, null-t ad vissza (a hívó a hardcoded szöveget használja).
 async function getEmailTemplate(key) {
@@ -116,7 +130,8 @@ function buildInviteHtml({ kod, pozicio, cegNev, meghivottNev, registerUrl }) {
       `;
 }
 
-async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev, lang) {
+// companyId (opcionális, additív): ha megadott, a kiküldés a mail_log-ba kerül.
+async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev, lang, companyId) {
   console.log('sendInviteEmail called:', toEmail, !!BREVO_API_KEY);
   if (!BREVO_API_KEY || !BREVO_SENDER || !toEmail) {
     console.log('early return - BREVO_API_KEY, BREVO_SENDER vagy toEmail hianyzik');
@@ -160,16 +175,20 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev, lang
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
       console.error('Brevo hiba:', resp.status, JSON.stringify(data));
+      _logMail(companyId, toEmail, subject, 'invite', 'failed', null);
     } else {
       console.log('Email elkulve, messageId:', data.messageId);
+      _logMail(companyId, toEmail, subject, 'invite', 'sent', data.messageId);
     }
   } catch (err) {
     console.error('Email kuldesi hiba:', err.message);
+    _logMail(companyId, toEmail, subject, 'invite', 'failed', null);
   }
 }
 
 // ============ JELSZO-VISSZAALLITO EMAIL ============
-async function sendResetEmail(toEmail, nume, resetUrl) {
+// companyId (opcionális, additív): ha megadott, a kiküldés a mail_log-ba kerül.
+async function sendResetEmail(toEmail, nume, resetUrl, lang, companyId) {
   console.log('sendResetEmail called:', toEmail, !!BREVO_API_KEY);
   if (!BREVO_API_KEY || !BREVO_SENDER || !toEmail) {
     console.log('early return - BREVO config vagy toEmail hianyzik');
@@ -196,11 +215,13 @@ async function sendResetEmail(toEmail, nume, resetUrl) {
         body: JSON.stringify({ sender: { name: 'VallorSoft', email: BREVO_SENDER }, to: [{ email: toEmail }], subject, htmlContent }),
       });
       const data = await resp.json().catch(() => ({}));
-      if (!resp.ok) { console.error('Reset email (tpl) Brevo hiba:', resp.status, JSON.stringify(data)); return false; }
+      if (!resp.ok) { console.error('Reset email (tpl) Brevo hiba:', resp.status, JSON.stringify(data)); _logMail(companyId, toEmail, subject, 'reset', 'failed', null); return false; }
       console.log('Reset email (tpl) elküldve, messageId:', data.messageId);
+      _logMail(companyId, toEmail, subject, 'reset', 'sent', data.messageId);
       return true;
     } catch (err) {
       console.error('Reset email (tpl) hiba:', err.message);
+      _logMail(companyId, toEmail, subject, 'reset', 'failed', null);
       return false;
     }
   }
@@ -252,12 +273,15 @@ async function sendResetEmail(toEmail, nume, resetUrl) {
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
       console.error('Reset email Brevo hiba:', resp.status, JSON.stringify(data));
+      _logMail(companyId, toEmail, 'VallorSoft — Resetare parolă', 'reset', 'failed', null);
       return false; // Brevo elutasította → nem ment ki e-mail
     }
     console.log('Reset email elkulve, messageId:', data.messageId);
+    _logMail(companyId, toEmail, 'VallorSoft — Resetare parolă', 'reset', 'sent', data.messageId);
     return true; // sikeres kiküldés
   } catch (err) {
     console.error('Reset email hiba:', err.message);
+    _logMail(companyId, toEmail, 'VallorSoft — Resetare parolă', 'reset', 'failed', null);
     return false; // hálózati/egyéb hiba → nem ment ki e-mail
   }
 }
@@ -293,6 +317,9 @@ async function sendClientEmail(opts) {
       .filter(a => a && a.contentBase64 && a.name)
       .map(a => ({ content: a.contentBase64, name: a.name }));
   }
+  // opts.companyId (opcionális): ha megadott, a kiküldés a mail_log-ba kerül.
+  const cid = opts.companyId;
+  const mtype = opts.mailType || 'client';
   try {
     const resp = await fetchT('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -300,13 +327,15 @@ async function sendClientEmail(opts) {
       body: JSON.stringify(payload),
     });
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) return { ok: false, error: 'Brevo hiba (' + resp.status + '): ' + JSON.stringify(data).slice(0, 200) };
+    if (!resp.ok) { _logMail(cid, opts.to, payload.subject, mtype, 'failed', null); return { ok: false, error: 'Brevo hiba (' + resp.status + '): ' + JSON.stringify(data).slice(0, 200) }; }
+    _logMail(cid, opts.to, payload.subject, mtype, 'sent', data.messageId);
     return { ok: true, messageId: data.messageId };
-  } catch (err) { return { ok: false, error: err.message }; }
+  } catch (err) { _logMail(cid, opts.to, payload.subject, mtype, 'failed', null); return { ok: false, error: err.message }; }
 }
 
 // Developer által küldött sablonalapú email — VallorSoft branding wrapperrel
-async function sendDeveloperEmail(toEmail, companyName, subject, htmlBody) {
+// companyId (opcionális, additív): ha megadott, a kiküldés a mail_log-ba kerül.
+async function sendDeveloperEmail(toEmail, companyName, subject, htmlBody, companyId) {
   if (!BREVO_API_KEY || !BREVO_SENDER || !toEmail) {
     return { ok: false, error: 'BREVO_API_KEY / BREVO_SENDER nu este configurat.' };
   }
@@ -337,10 +366,13 @@ async function sendDeveloperEmail(toEmail, companyName, subject, htmlBody) {
     });
     if (!resp.ok) {
       const err = await resp.text().catch(() => '');
+      _logMail(companyId, toEmail, subject, 'developer', 'failed', null);
       return { ok: false, error: 'Brevo error: ' + err.slice(0, 120) };
     }
+    _logMail(companyId, toEmail, subject, 'developer', 'sent', null);
     return { ok: true };
   } catch (e) {
+    _logMail(companyId, toEmail, subject, 'developer', 'failed', null);
     return { ok: false, error: e.message };
   }
 }

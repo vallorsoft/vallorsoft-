@@ -24,7 +24,7 @@ router.post('/api/forgot-password', async (req, res) => {
     if (!email) return res.json(genericMsg);
 
     const result = await pool.query(
-      'SELECT u.id, u.nume, c.email_lang FROM users u LEFT JOIN companies c ON c.id = u.company_id WHERE u.email = $1', [email]);
+      'SELECT u.id, u.nume, u.company_id, c.email_lang FROM users u LEFT JOIN companies c ON c.id = u.company_id WHERE u.email = $1', [email]);
     if (result.rows.length === 0) {
       return res.json(genericMsg); // nem letezik - de ugyanazt valaszoljuk (biztonsag)
     }
@@ -40,7 +40,7 @@ router.post('/api/forgot-password', async (req, res) => {
     );
 
     const resetUrl = (process.env.APP_URL || 'http://localhost:3000') + '/reset-password?token=' + token;
-    sendResetEmail(email, user.nume, resetUrl, lang).catch(e => console.error('Reset email hatter hiba:', e.message));
+    sendResetEmail(email, user.nume, resetUrl, lang, user.company_id).catch(e => console.error('Reset email hatter hiba:', e.message));
 
     return res.json(genericMsg);
   } catch (err) {
