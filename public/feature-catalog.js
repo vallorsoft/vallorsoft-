@@ -37,6 +37,7 @@ window.VS_FEATURES = [
   { key: 'invoices-out',     label: 'Kimenő számlák 📤',           group: 'Pénzügy' },
   { key: 'invoices-in',      label: 'Bejövő számlák (alvállalkozói) 📥', group: 'Pénzügy' },
   { key: 'bnr-rate',         label: 'BNR árfolyam 💱',             group: 'Pénzügy' },
+  { key: 'payment-schedule', label: 'Fizetési ütemterv 📅',        group: 'Pénzügy' },
   { key: 'orders-done',      label: 'Teljesített fuvarok',         group: 'Fuvarozás & Logisztika' },
   { key: 'quotes',           label: 'Árajánlatok 📝',              group: 'Fuvarozás & Logisztika' },
   { key: 'active-fleet',     label: 'Aktív flotta',                group: 'Flotta & Megfelelés' },

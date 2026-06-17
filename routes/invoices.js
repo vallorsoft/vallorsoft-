@@ -6,6 +6,19 @@ const svc = require('../services/invoicing');
 const { getAdapter, listProviders } = require('../services/invoiceAdapter');
 const billing = require('../services/billing');
 const { encrypt, decrypt, mask } = require('../lib/crypto');
+const { hasPerm } = require('../handlers/permissions');
+
+// Granulált jog-kapu: a Manager csak akkor állíthat ki számlát, ha az admin az
+// 'invoice_issue' jogot megadta. Az Admin mindig átmegy. Tiszta egysoros gate.
+async function requireInvoiceIssue(req, res, next) {
+  try {
+    if (req.session.user.pozicio === 'Manager') {
+      const ok = await hasPerm(pool, req.session.user.company_id, req.session.user.id, 'invoice_issue');
+      if (!ok) return res.status(403).json({ ok: false, error: 'Acces interzis' });
+    }
+    next();
+  } catch (e) { return res.status(500).json({ ok: false, error: 'Eroare de server' }); }
+}
 
 const router = express.Router();
 const CATEGORY = 'invoicing';
@@ -112,7 +125,7 @@ router.post('/api/orders/:id/invoice/preview', requireLogin, async (req, res) =>
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/api/orders/:id/invoice/emit', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
+router.post('/api/orders/:id/invoice/emit', requireLogin, requireRole('Admin', 'Manager'), requireInvoiceIssue, async (req, res) => {
   try {
     const r = await svc.emitInvoice(pool, req.session.user.company_id, req.session.user.id, req.params.id, req.body.invoice);
     res.json({ ok: true, ...r });

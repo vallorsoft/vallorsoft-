@@ -43,6 +43,8 @@ const handlers = Object.assign(
   require('../handlers/quotes'),
   require('../handlers/notifications'),
   require('../handlers/mailLog'),
+  require('../handlers/permissions'),
+  require('../handlers/paymentSchedule'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a
