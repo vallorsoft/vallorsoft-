@@ -377,4 +377,115 @@ async function sendDeveloperEmail(toEmail, companyName, subject, htmlBody, compa
   }
 }
 
-module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate };
+// ============ CÉG SAJÁT FELADÓ-FIÓK (SMTP és/vagy cégenkénti Brevo) ============
+// A kimenő ügyfél-/alvállalkozói leveleket a CÉG saját feladó-fiókjáról küldi,
+// NEM a közös VallorSoft/Brevo címről. Tárolás: company_integrations
+// (provider='email_sender'), credentials_enc = AES-256-GCM titkosított JSON:
+//   { prefer:'smtp'|'brevo', from_name, from_email,
+//     host, port, secure, user, pass,   // SMTP (nodemailer)
+//     brevo_api_key }                    // cégenkénti Brevo (HTTP)
+// SMTP elsőbbség (ha a tárhely engedi a kimenő kapcsolatot); ha a kapcsolat nem
+// áll össze (pl. Render ingyenes csomag tiltja az 587/465-öt) ÉS van cég-Brevo,
+// arra esik vissza — ez a felhasználó által választott "SMTP + Brevo fallback".
+
+// A cég feladó-konfigjának betöltése + visszafejtése. null, ha nincs beállítva.
+async function loadCompanySender(companyId) {
+  if (!companyId) return null;
+  try {
+    const r = await getPool().query(
+      `SELECT credentials_enc FROM company_integrations
+        WHERE company_id=$1 AND provider='email_sender' AND enabled=true`, [companyId]);
+    if (!r.rows.length || !r.rows[0].credentials_enc) return null;
+    const { decrypt } = require('../lib/crypto');
+    return JSON.parse(decrypt(r.rows[0].credentials_enc));
+  } catch (_) { return null; }
+}
+
+function _smtpTransport(cfg) {
+  const nodemailer = require('nodemailer');
+  return nodemailer.createTransport({
+    host: cfg.host,
+    port: parseInt(cfg.port, 10) || 587,
+    secure: !!cfg.secure,           // true = 465 (implicit TLS), false = 587 (STARTTLS)
+    auth: { user: cfg.user, pass: cfg.pass || '' },
+    connectionTimeout: 15000, greetingTimeout: 12000, socketTimeout: 20000,
+  });
+}
+
+async function _brevoSendCompany(cfg, opts) {
+  const fromEmail = cfg.from_email || cfg.user;
+  const payload = {
+    sender: { name: opts.senderName || cfg.from_name || fromEmail, email: fromEmail },
+    to: [{ email: opts.to }],
+    subject: opts.subject || '(fără subiect)',
+    htmlContent: opts.html || '',
+  };
+  if (opts.replyTo) payload.replyTo = { email: opts.replyTo };
+  const resp = await fetchT('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: { 'api-key': cfg.brevo_api_key, 'Content-Type': 'application/json', 'accept': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) return { ok: false, error: 'Brevo (' + resp.status + '): ' + JSON.stringify(data).slice(0, 160) };
+  return { ok: true, messageId: data.messageId };
+}
+
+// Batch-mailer: EGYSZER feloldja a feladási módot (SMTP-verify → szükség esetén
+// cég-Brevo fallback), majd a .send()-del küld minden címzettre + mail_log naplóz.
+// Visszatérés: { ok, noConfig?, error?, method, from, send(opts) } — vagy hiba.
+async function getCompanyMailer(companyId) {
+  const cfg = await loadCompanySender(companyId);
+  if (!cfg) return { ok: false, noConfig: true, error: 'Niciun cont expeditor configurat.' };
+  const smtpOk = !!(cfg.host && cfg.user && cfg.pass);
+  const brevoOk = !!(cfg.brevo_api_key && (cfg.from_email || cfg.user));
+  if (!smtpOk && !brevoOk) return { ok: false, noConfig: true, error: 'Cont expeditor incomplet.' };
+
+  const prefer = cfg.prefer === 'brevo' ? 'brevo' : 'smtp';
+  let method = null, transport = null;
+
+  const trySmtp = async () => {
+    const t = _smtpTransport(cfg);
+    try { await t.verify(); method = 'smtp'; transport = t; return true; }
+    catch (e) {
+      if (brevoOk) { method = 'brevo'; return true; }
+      return { ok: false, error: 'SMTP: ' + (e.message || 'eroare de conexiune') };
+    }
+  };
+
+  if (prefer === 'brevo' && brevoOk) { method = 'brevo'; }
+  else if (smtpOk) { const r = await trySmtp(); if (r !== true) return r; }
+  else { method = 'brevo'; }
+
+  const fromEmail = cfg.from_email || cfg.user;
+  const fromName = cfg.from_name || fromEmail;
+
+  async function send(opts) {
+    const cid = companyId;
+    const mtype = opts.mailType || 'builder';
+    const subject = opts.subject || '(fără subiect)';
+    try {
+      if (method === 'smtp') {
+        const info = await transport.sendMail({
+          from: fromName ? '"' + String(fromName).replace(/"/g, '') + '" <' + fromEmail + '>' : fromEmail,
+          to: opts.to,
+          subject: subject,
+          html: opts.html || '',
+          replyTo: opts.replyTo || undefined,
+        });
+        _logMail(cid, opts.to, subject, mtype, 'sent', info && info.messageId);
+        return { ok: true, messageId: info && info.messageId };
+      }
+      const r = await _brevoSendCompany(cfg, { to: opts.to, subject: subject, html: opts.html, senderName: fromName, replyTo: opts.replyTo });
+      _logMail(cid, opts.to, subject, mtype, r.ok ? 'sent' : 'failed', r.messageId || null);
+      return r;
+    } catch (err) {
+      _logMail(cid, opts.to, subject, mtype, 'failed', null);
+      return { ok: false, error: err.message };
+    }
+  }
+
+  return { ok: true, method: method, from: fromEmail, send: send };
+}
+
+module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate, loadCompanySender, getCompanyMailer };

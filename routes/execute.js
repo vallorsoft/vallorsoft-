@@ -48,6 +48,7 @@ const handlers = Object.assign(
   require('../handlers/companySettings'),
   require('../handlers/emailTemplates'),
   require('../handlers/pdfTemplates'),
+  require('../handlers/emailBuilder'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a

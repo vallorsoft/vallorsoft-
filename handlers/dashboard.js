@@ -167,7 +167,10 @@ handlers.getMyFeatures = async function (req, res, args) {
       'SELECT feature_key, enabled FROM company_features WHERE company_id = $1', [cid]);
     compR.rows.forEach((row) => { features[row.feature_key] = row.enabled; });
 
-    return res.json({ result: { ok: true, features } });
+    // pozicio additívan visszaadva (a standalone oldalak — pl. e-mail
+    // szerkesztő — ez alapján döntik el a "Vissza" cél-URL-t). Nem töri a
+    // meglévő hívókat, akik csak a features-t használják.
+    return res.json({ result: { ok: true, features, pozicio: req.session.user.pozicio } });
   } catch (err) {
     console.error('getMyFeatures hiba:', err);
     return res.json({ result: { ok: true, features: {} } });

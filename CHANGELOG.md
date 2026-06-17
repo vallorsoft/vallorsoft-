@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-17 — ÚJ modul: vizuális e-mail szerkesztő + cég saját feladó-fiókról küldés
+
+> Teljes vizuális (GrapesJS) e-mail-sablon szerkesztő KÜLSŐ kapcsolatoknak (ügyfél/jövőbeli ügyfél/alvállalkozó/egyéb) — NEM a platform felhasználóinak. A kimenő levelek a **cég SAJÁT e-mail-fiókjáról** mennek (SMTP nodemailer és/vagy cégenkénti Brevo), **nem egy közös címről**.
+
+- **`public/email-builder.html` + `email-builder.js`** — őrzött `/email-builder` oldal (Admin/Manager, `email-builder` feature-kapu); GrapesJS + `grapesjs-preset-newsletter` a `cdn.jsdelivr.net`-ről. 5 nav-kártya: **Új sablon** (vizuális szerkesztő, logó-beszúrás a meglévő `/api/branding/logo`-ból, base64-kép), **Megtekintés/Szerkesztés**, **HTML-feltöltés** (kliensoldali FileReader), **Párosítás & Küldés** (kontaktok + sablon↔kontakt párosítás + kiküldés + napló), **📮 Feladó-fiók** (a cég saját küldő-fiókja). Meleg arculat + RO-alap/HU.
+- **`handlers/emailBuilder.js`** — RPC: `ebTemplateList/Get/Save/Delete`, `ebContactList/Save/Delete`, `ebPairingGet/Save`, `ebSend`, `ebSendLog`, valamint **`ebSenderGet/Save/Test/Delete`** (feladó-fiók). Mind `company_id`-szűrt + paraméteres + tulajdon-ellenőrzött; sablon/kontakt/párosítás Admin/Manager, a feladó-fiók **csak Admin**. EMAIL_RE minden címzettre, `{{nev}}/{{cegnev}}/{{datum}}` **escape-elt** (nincs injekció), köteg-korlát 200, audit minden íráson/küldésen.
+- **Cég saját feladás (`services/email.js` `getCompanyMailer`/`loadCompanySender`)** — a feladó-konfig `company_integrations` `provider='email_sender'`-ben, **AES-256-GCM** titkosítva (titok sosem megy ki, csak `has_pass`/`has_brevo_key`). **SMTP elsőbbség** (nodemailer, `verify()` a köteg előtt); ha a kapcsolat nem áll össze (pl. Render ingyenes csomag tiltja az 587/465-öt) ÉS van cégenkénti **Brevo** API-kulcs → arra esik vissza. Ha nincs feladó-fiók beállítva, **NEM** küld közös címről — egyértelmű figyelmeztetés. A küldés a meglévő `mail_log`-ba naplóz (`type='builder'`).
+- **Tárolás:** `db/email-builder.sql` (idempotens) — `email_builder_templates` + `email_contacts` + `email_template_pairings`; a feladó-fiók a meglévő `company_integrations`-ban (nincs új tábla). **CSP:** egyetlen sor — `cdn.jsdelivr.net` a `styleSrc`-hez (GrapesJS CSS). `feature-catalog.js` (`email-builder`, Adminisztráció) + `i18n.js` (~95 `eb.*` kulcs RO+HU). Cache-bust `?v=20260617eb2`; 93 Jest zöld.
+
 ## 2026-06-17 — Új landing page (meleg arculat) — eredeti szöveggel, szerkesztő-kompatibilisen (PR #178)
 
 > A publikus landing lecserélve a jóváhagyott meleg arculatra. 100% eredeti szöveg (semmi nem hasonlít a CargoTMS/xCargo/más RO TMS-re), a developer landing-szerkesztő végig működik.
