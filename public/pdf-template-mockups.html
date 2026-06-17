@@ -60,11 +60,37 @@
   .totbar{margin-top:14px;display:flex;justify-content:flex-end;gap:26px;font-size:13px;}
   .totbar b{font-size:16px;color:var(--accent);}
 
-  /* CMR számozott dobozok */
-  .cmr{border:2px solid var(--ink);}
-  .cmr td{border:1px solid #b9ab98;padding:7px 8px;font-size:10.5px;}
-  .cmr .num{font-size:9px;color:var(--accent);font-weight:800;}
-  .cmr .fld{margin-top:3px;font-size:11.5px;line-height:1.45;}
+  /* ── CMR hivatalos formanyomtatvány (kitölthető, példány-szín váltóval) ── */
+  .cmr-form{--cmr:#d12f2f;border:2px solid var(--cmr);font-size:10px;color:#111;}
+  .cmr-copybar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+  .cmr-copybar .lab{font-size:11px;color:var(--muted);margin-right:4px;}
+  .cmr-copybar button{font-size:11px;padding:5px 11px;border-radius:7px;border:1px solid var(--line);background:#fff;cursor:pointer;font-weight:600;}
+  .cmr-copybar button.on{color:#fff;border-color:transparent;}
+  .cmr-copytitle{display:flex;justify-content:space-between;align-items:flex-start;padding:6px 8px;border-bottom:1px solid var(--cmr);}
+  .cmr-copytitle .big{font-size:22px;font-weight:800;color:var(--cmr);line-height:1;}
+  .cmr-copytitle .ct{font-size:10px;color:#333;line-height:1.4;}
+  .cmr-row{display:grid;grid-template-columns:1fr 1fr;}
+  .cmr-cell{border:1px solid var(--cmr);padding:5px 7px;min-height:0;}
+  .cmr-cell .num{display:inline-block;color:var(--cmr);font-weight:800;font-size:11px;margin-right:5px;}
+  .cmr-cell .lbl{font-size:8.5px;line-height:1.3;color:#333;}
+  .cmr-cell .lbl b{color:#111;}
+  .fillable{margin-top:3px;min-height:18px;font-size:11px;line-height:1.5;color:#0b3a8a;outline:none;white-space:pre-wrap;}
+  .fillable:focus{background:#fffdf5;box-shadow:inset 0 0 0 1px var(--cmr);}
+  .fillable.tall{min-height:54px;}
+  .fillable.short{min-height:14px;}
+  .cmr-title{border:1px solid var(--cmr);padding:6px 8px;font-size:8px;line-height:1.35;color:#333;position:relative;}
+  .cmr-title .cmrlogo{position:absolute;top:6px;right:8px;border:1.5px solid var(--cmr);color:var(--cmr);font-weight:800;font-size:13px;border-radius:50%;padding:3px 9px;}
+  .cmr-title h3{margin:0 0 3px;font-size:10px;color:#111;letter-spacing:.5px;}
+  .cmr-goods{width:100%;border-collapse:collapse;}
+  .cmr-goods th{background:#fff;border:1px solid var(--cmr);color:#111;font-size:8px;font-weight:700;padding:4px 5px;text-align:left;vertical-align:top;}
+  .cmr-goods th .num{color:var(--cmr);font-weight:800;font-size:10px;}
+  .cmr-goods td{border:1px solid var(--cmr);height:20px;padding:2px 5px;}
+  .cmr-goods td .fillable{min-height:14px;}
+  .cmr-charge{width:100%;border-collapse:collapse;font-size:8.5px;}
+  .cmr-charge td{border:1px solid var(--cmr);padding:3px 5px;}
+  .cmr-charge .hd{background:#fff;color:var(--cmr);font-weight:800;}
+  .cmr-sig{display:grid;grid-template-columns:1fr 1fr 1fr;}
+  .cmr-note{font-size:7.5px;color:#555;line-height:1.3;padding:4px 6px;border:1px solid var(--cmr);}
 
   @media print{
     body{background:#fff;}
@@ -127,81 +153,197 @@
 <!-- ════════════ 2. CMR ════════════ -->
 <div class="page" id="cmr">
   <div class="pagetag">2 / 5 · CMR</div>
-  <div class="doc-head">
-    <div class="logo"><div class="mark">V</div><div class="nm">Vallor<span>Trans</span> SRL</div></div>
-    <div class="co-meta">SCRISOARE DE TRANSPORT INTERNAȚIONAL<br>Conform Convenției CMR (Geneva, 1956)<br>Nr. CMR: <b>0042178</b> · Data: 03.06.2026</div>
+
+  <div class="cmr-copybar">
+    <span class="lab">Exemplar (culoare per copie):</span>
+    <button data-c="#d12f2f" data-no="1" data-ro="Expeditor" data-en="Copy for sender" class="on" style="color:#fff;background:#d12f2f;">1 · Expeditor</button>
+    <button data-c="#1f5fbf" data-no="2" data-ro="Destinatar" data-en="Copy for consignee">2 · Destinatar</button>
+    <button data-c="#1f8f4d" data-no="3" data-ro="Transportator" data-en="Copy for carrier">3 · Transportator</button>
+    <button data-c="#222222" data-no="4" data-ro="Contabilitate" data-en="Copy for accounting">4 · Contabilitate</button>
+    <button data-c="#b8731f" data-no="5" data-ro="Casă de expediții" data-en="Copy for forwarder">5 · Expeditor (casă)</button>
   </div>
-  <table class="cmr">
-    <tr>
-      <td style="width:50%"><span class="num">1 · Expeditor (nume, adresă)</span><div class="fld">Demo Logistic SRL<br>Str. Industriei 14, București, RO</div></td>
-      <td><span class="num">16 · Transportator</span><div class="fld">VallorTrans SRL · CUI RO47859317<br>Sat Arcus 102, jud. Covasna</div></td>
-    </tr>
-    <tr>
-      <td><span class="num">2 · Destinatar</span><div class="fld">BMW Group Logistik<br>Petuelring 130, München, DE</div></td>
-      <td><span class="num">17 · Transportatori succesivi</span><div class="fld muted">—</div></td>
-    </tr>
-    <tr>
-      <td><span class="num">3 · Loc descărcare</span><div class="fld">München, DE · 06.06.2026</div></td>
-      <td><span class="num">18 · Rezerve și observații</span><div class="fld muted">—</div></td>
-    </tr>
-    <tr>
-      <td><span class="num">4 · Loc/data încărcare</span><div class="fld">București, RO · 03.06.2026</div></td>
-      <td rowspan="2"><span class="num">19 · Convenții speciale</span><div class="fld">Transport sub temperatură controlată +4°C.<br>UIT: 3RO20260603XXXXXX</div></td>
-    </tr>
-    <tr>
-      <td><span class="num">5 · Documente anexate</span><div class="fld">Factură FV-2026-1187 · Packing list</div></td>
-    </tr>
-    <tr>
-      <td><span class="num">6–9 · Marfă (natură, ambalaj, nr. colete)</span><div class="fld">Piese auto · 12 paleți EUR · 5 400 kg</div></td>
-      <td><span class="num">20 · De plată</span><div class="fld">Transport: 1 850 € · Plătitor: Expeditor</div></td>
-    </tr>
-    <tr>
-      <td><span class="num">11 · Greutate brută</span><div class="fld">5 400 kg · Volum: 38 m³</div></td>
-      <td><span class="num">21 · Întocmit la</span><div class="fld">București, 03.06.2026</div></td>
-    </tr>
-    <tr>
-      <td style="height:74px"><span class="num">22 · Semnătura expeditorului</span><div class="sig">semnătură &amp; ștampilă</div></td>
-      <td><span class="num">23 · Semnătura transportatorului</span><div class="sig">semnătură &amp; ștampilă</div></td>
-    </tr>
-    <tr>
-      <td colspan="2"><span class="num">24 · Marfă primită (destinatar) — loc, dată, semnătură</span><div class="sig" style="height:42px">München, ____.____.2026</div></td>
-    </tr>
-  </table>
-  <div class="foot"><span>VallorTrans SRL · CUI RO47859317 · IBAN RO49 RNCB 0000 0000 0000 0000</span><span>Exemplar transportator</span></div>
+
+  <div class="cmr-form" id="cmrForm">
+    <div class="cmr-copytitle">
+      <div><span class="big" id="cmrBig">1</span></div>
+      <div class="ct" id="cmrCopyLabel"><b>Exemplar pentru expeditor</b><br>Exemplar für den Absender · Copy for sender</div>
+    </div>
+
+    <!-- Sor: 1 / Címblokk -->
+    <div class="cmr-row">
+      <div class="cmr-cell"><span class="num">1</span><span class="lbl"><b>Expeditor</b> (nume, adresă, țară) · Sender (name, address, country)</span><div class="fillable tall" contenteditable="true"></div></div>
+      <div class="cmr-title">
+        <span class="cmrlogo">CMR</span>
+        <h3>SCRISOARE DE TRANSPORT INTERNAȚIONAL</h3>
+        INTERNATIONALER FRACHTBRIEF · INTERNATIONAL CONSIGNMENT NOTE<br>
+        Acest transport este supus, sub rezerva oricărei clauze contrare, Convenției referitoare la
+        contractul de transport internațional de mărfuri pe șosele (CMR).<br>
+        This carriage is subject, notwithstanding any clause to the contrary, to the Convention on the
+        Contract for the international Carriage of goods by road (CMR).
+      </div>
+    </div>
+
+    <!-- Sor: 2 / 16 -->
+    <div class="cmr-row">
+      <div class="cmr-cell"><span class="num">2</span><span class="lbl"><b>Destinatar</b> (nume, adresă, țară) · Consignee (name, address, country)</span><div class="fillable tall" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">16</span><span class="lbl"><b>Transportator</b> (nume, adresă, țară) · Carrier (name, address, country)</span><div class="fillable" contenteditable="true"></div><span class="lbl"><b>NR. ÎNMATRICULARE:</b></span><div class="fillable short" contenteditable="true"></div></div>
+    </div>
+
+    <!-- Sor: 3 / 17 -->
+    <div class="cmr-row">
+      <div class="cmr-cell"><span class="num">3</span><span class="lbl"><b>Loc de livrare</b> (localitate, țară) · Place of delivery (place, country)</span><div class="fillable" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">17</span><span class="lbl"><b>Transportatori succesivi</b> · Successive carriers</span><div class="fillable" contenteditable="true"></div></div>
+    </div>
+
+    <!-- Sor: 4 / 18 -->
+    <div class="cmr-row">
+      <div class="cmr-cell"><span class="num">4</span><span class="lbl"><b>Loc și dată încărcare</b> (localitate, țară, dată) · Place and date of taking over the goods</span><div class="fillable" contenteditable="true"></div></div>
+      <div class="cmr-cell" style="grid-row:span 2;"><span class="num">18</span><span class="lbl"><b>Rezervele și observațiile transportatorului</b> · Carrier's reservations and observations</span><div class="fillable tall" contenteditable="true"></div></div>
+    </div>
+
+    <!-- Sor: 5 -->
+    <div class="cmr-row" style="grid-template-columns:1fr;">
+      <div class="cmr-cell"><span class="num">5</span><span class="lbl"><b>Documente anexate</b> · Documents attached</span><div class="fillable short" contenteditable="true"></div></div>
+    </div>
+
+    <!-- Áru-tábla 6–12 -->
+    <table class="cmr-goods">
+      <thead><tr>
+        <th style="width:13%"><span class="num">6</span> Mărci și numere · Marks and Nos</th>
+        <th style="width:9%"><span class="num">7</span> Nr. colete · Packages</th>
+        <th style="width:13%"><span class="num">8</span> Mod ambalare · Packing</th>
+        <th style="width:27%"><span class="num">9</span> Natura mărfii · Nature of goods</th>
+        <th style="width:13%"><span class="num">10</span> Nr. statistic · Stat. No.</th>
+        <th style="width:13%"><span class="num">11</span> Greutate brută kg · Gross weight</th>
+        <th style="width:12%"><span class="num">12</span> Volum m³ · Volume</th>
+      </tr></thead>
+      <tbody>
+        <tr><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td></tr>
+        <tr><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td><td><div class="fillable" contenteditable="true"></div></td></tr>
+        <tr><td colspan="7" style="height:auto;"><span class="lbl" style="font-size:7.5px;">Marfă periculoasă (ADR): Nr. UN · Clasă · Grupă de ambalare · literă</span><div class="fillable short" contenteditable="true"></div></td></tr>
+      </tbody>
+    </table>
+
+    <!-- 13 / 19 -->
+    <div class="cmr-row">
+      <div class="cmr-cell"><span class="num">13</span><span class="lbl"><b>Instrucțiunile expeditorului</b> · Sender's instructions</span><div class="fillable tall" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">19</span><span class="lbl"><b>Convenții speciale</b> · Special agreements</span><div class="fillable tall" contenteditable="true"></div></div>
+    </div>
+
+    <!-- 14 / 20 -->
+    <div class="cmr-row">
+      <div class="cmr-cell"><span class="num">14</span><span class="lbl"><b>Instrucțiuni privind plata transportului</b> · Instructions as to payment</span><div class="fillable" contenteditable="true"></div></div>
+      <div class="cmr-cell" style="padding:3px;">
+        <table class="cmr-charge">
+          <tr><td class="hd" style="width:46%"><span class="num" style="color:inherit;">20</span> De plată · To be paid by</td><td class="hd center">Expeditor</td><td class="hd center">Valută</td><td class="hd center">Destinatar</td></tr>
+          <tr><td>Transport · Carriage</td><td><div class="fillable short" contenteditable="true"></div></td><td><div class="fillable short" contenteditable="true"></div></td><td><div class="fillable short" contenteditable="true"></div></td></tr>
+          <tr><td>Reduceri · Deductions</td><td></td><td></td><td></td></tr>
+          <tr><td>Sold · Balance</td><td></td><td></td><td></td></tr>
+          <tr><td>Suplimente · Supplem.</td><td></td><td></td><td></td></tr>
+          <tr><td>Diverse · Miscellaneous</td><td></td><td></td><td></td></tr>
+          <tr><td>Asigurare · Insurance</td><td></td><td></td><td></td></tr>
+          <tr><td><b>Total de plată · Total</b></td><td><div class="fillable short" contenteditable="true"></div></td><td></td><td><div class="fillable short" contenteditable="true"></div></td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- 21 / 15 -->
+    <div class="cmr-row">
+      <div class="cmr-cell"><span class="num">21</span><span class="lbl"><b>Întocmit la</b> · Established in ......... <b>la data de</b> · on .........</span><div class="fillable short" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">15</span><span class="lbl"><b>Ramburs</b> · Cash on delivery</span><div class="fillable short" contenteditable="true"></div></div>
+    </div>
+
+    <!-- 22 / 23 / 24 aláírások -->
+    <div class="cmr-sig">
+      <div class="cmr-cell"><span class="num">22</span><span class="lbl"><b>Semnătura și ștampila expeditorului</b><br>Signature and stamp of the sender</span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">23</span><span class="lbl"><b>Semnătura și ștampila transportatorului</b><br>Signature and stamp of the carrier</span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
+      <div class="cmr-cell"><span class="num">24</span><span class="lbl"><b>Marfă primită</b> / Goods received<br>Semnătura și ștampila destinatarului</span><div class="fillable" style="min-height:46px" contenteditable="true"></div></div>
+    </div>
+
+    <div class="cmr-note">
+      Rubricile încadrate cu linii groase se completează de transportator. · Rubricile 1–15, 19, 20 și 22 se completează pe răspunderea expeditorului. ·
+      Model CMR/IRU conform Convenției de la Geneva (1956). În cazul mărfurilor periculoase se indică pe ultimul rând: clasa, cifra și, dacă e cazul, litera.
+    </div>
+  </div>
+
+  <div class="hint" style="margin:12px auto 0;">
+    💡 <b>Kitölthető:</b> kattints bármelyik mezőbe és írj bele (a valós PDF-ben automatikusan a fuvar adataiból töltődik, de kézzel is felülírható). ·
+    <b>Példány-szín:</b> a fenti gombokkal váltasz a piros (expeditor) / kék (destinatar) / zöld (transportator) / fekete (contabilitate) / barna (casă expediții) példányok közt.
+  </div>
 </div>
+
+<script>
+(function(){
+  var bar = document.querySelector('#cmr .cmr-copybar');
+  var form = document.getElementById('cmrForm');
+  if(!bar || !form) return;
+  bar.addEventListener('click', function(e){
+    var b = e.target.closest('button'); if(!b) return;
+    bar.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); x.style.background='#fff'; x.style.color=''; });
+    var c = b.getAttribute('data-c');
+    b.classList.add('on'); b.style.background=c; b.style.color='#fff';
+    form.style.setProperty('--cmr', c);
+    document.getElementById('cmrBig').textContent = b.getAttribute('data-no');
+    document.getElementById('cmrCopyLabel').innerHTML = '<b>Exemplar pentru ' + b.getAttribute('data-ro').toLowerCase() + '</b><br>' + b.getAttribute('data-en');
+  });
+})();
+</script>
 
 <!-- ════════════ 3. e-CMR ════════════ -->
 <div class="page" id="ecmr">
   <div class="pagetag">3 / 5 · e-CMR</div>
-  <div class="doc-head">
-    <div class="logo"><div class="mark">V</div><div class="nm">Vallor<span>Trans</span> SRL</div></div>
+  <div class="doc-head" style="border-bottom-color:#16a34a;">
+    <div class="logo"><div class="mark" style="background:linear-gradient(135deg,#10b981,#0d9488);box-shadow:0 4px 12px rgba(16,185,129,.4);">e</div><div class="nm">Vallor<span style="color:#10b981;">Soft</span> · e-CMR</div></div>
     <div class="co-meta">
-      <span style="display:inline-block;background:var(--grad);color:#fff;padding:3px 10px;border-radius:6px;font-weight:700;">e-CMR digital</span><br>
-      ID document: e-CMR-2026-000318<br>Emis: 03.06.2026 09:14 · Stare: <b style="color:#16a34a;">Semnat 3/3</b>
+      <span style="display:inline-block;background:linear-gradient(135deg,#10b981,#0d9488);color:#fff;padding:3px 10px;border-radius:6px;font-weight:700;">e-CMR digital · Protocol adițional CMR 2008</span><br>
+      ID: e-CMR-2026-000318 · Versiune: 1<br>Emis: 03.06.2026 09:14 · Stare: <b style="color:#16a34a;">Semnat 3/3 ✓</b>
     </div>
   </div>
   <div class="doc-title">
-    <h2 class="docname">Scrisoare de transport electronică</h2>
-    <h1>e-CMR · TRANSPORT 1024</h1>
-    <div class="sub">București → München · 5 400 kg · UIT 3RO20260603XXXXXX</div>
+    <h2 class="docname" style="color:#10b981;">Scrisoare de transport electronică (e-CMR)</h2>
+    <h1>e-CMR Nr. 000318</h1>
+    <div class="sub">Aceleași rubrici ca documentul CMR pe hârtie · semnătură electronică calificată (QES)</div>
   </div>
-  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:14px;">
-    <div class="box"><div class="lbl">Expeditor</div><div class="val">Demo Logistic SRL<br>București, RO</div></div>
-    <div class="box"><div class="lbl">Transportator</div><div class="val">VallorTrans SRL<br>CUI RO47859317</div></div>
-    <div class="box"><div class="lbl">Destinatar</div><div class="val">BMW Group Logistik<br>München, DE</div></div>
+
+  <!-- Felek (1/2/16) -->
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:12px;">
+    <div class="box"><div class="lbl" style="color:#10b981;">1 · Expeditor</div><div class="val">Demo Logistic SRL<br>Str. Industriei 14, București, RO<br>CUI: RO11223344</div></div>
+    <div class="box"><div class="lbl" style="color:#10b981;">2 · Destinatar</div><div class="val">BMW Group Logistik<br>Petuelring 130, München, DE</div></div>
+    <div class="box"><div class="lbl" style="color:#10b981;">16 · Transportator</div><div class="val">VallorTrans SRL · RO47859317<br>Nr. înmatr.: B 104 VLR</div></div>
   </div>
+
+  <!-- Hely/dátum (3/4/5) -->
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:12px;">
+    <div class="box"><div class="lbl" style="color:#10b981;">4 · Loc/dată încărcare</div><div class="val">București, RO · 03.06.2026 08:30</div></div>
+    <div class="box"><div class="lbl" style="color:#10b981;">3 · Loc livrare</div><div class="val">München, DE · 06.06.2026</div></div>
+    <div class="box"><div class="lbl" style="color:#10b981;">5 · Documente anexate</div><div class="val">Factură FV-2026-1187 · Packing list</div></div>
+  </div>
+
+  <!-- Áru (6–12) -->
   <table>
-    <thead><tr><th>Marfă</th><th class="center">Colete</th><th class="center">Greutate</th><th class="center">Volum</th><th>Mențiuni</th></tr></thead>
-    <tbody><tr><td>Piese auto (paleți EUR)</td><td class="center">12</td><td class="center">5 400 kg</td><td class="center">38 m³</td><td>Temp. +4°C</td></tr></tbody>
+    <thead><tr><th>9 · Natura mărfii</th><th class="center">7 · Colete</th><th class="center">8 · Ambalare</th><th class="center">11 · Greutate</th><th class="center">12 · Volum</th><th>19 · Convenții speciale</th></tr></thead>
+    <tbody><tr><td>Piese auto (subansamble)</td><td class="center">12 paleți</td><td class="center">EUR</td><td class="center">5 400 kg</td><td class="center">38 m³</td><td>Temp. +4°C · UIT 3RO…XXXXXX</td></tr></tbody>
   </table>
-  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:16px;">
-    <div class="box"><div class="lbl">Semnătură expeditor</div><div class="sig signed">✓ semnat digital · 03.06 09:14</div></div>
-    <div class="box"><div class="lbl">Semnătură transportator</div><div class="sig signed">✓ semnat digital · 03.06 11:02</div></div>
-    <div class="box"><div class="lbl">Semnătură destinatar</div><div class="sig signed">✓ semnat digital · 06.06 15:48</div></div>
+
+  <!-- Megfigyelések (18) -->
+  <div class="box" style="margin-top:12px;border-color:#bbf7d0;background:#f0fdf4;">
+    <div class="lbl" style="color:#16a34a;">18 · Observații / Rezerve (cu marcaj temporal)</div>
+    <div class="val" style="font-size:11.5px;">
+      <span style="display:inline-block;background:#dbeafe;color:#1e40af;border-radius:5px;padding:1px 7px;font-size:10px;">ℹ️ info</span>
+      03.06 11:02 — Încărcare conformă, 12 paleți verificați. <span class="muted">(transportator)</span>
+    </div>
   </div>
-  <div class="foot">
-    <span>🔒 Integritate verificată — hash SHA-256: a17f…9c2e · Sigiliu temporal aplicat</span>
-    <span>VallorSoft e-CMR</span>
+
+  <!-- Digitális aláírások (22/23/24) -->
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:14px;">
+    <div class="box"><div class="lbl" style="color:#10b981;">22 · Semnătură expeditor (QES)</div><div class="sig signed">✓ semnat digital<br>03.06.2026 09:14</div></div>
+    <div class="box"><div class="lbl" style="color:#10b981;">23 · Semnătură transportator (QES)</div><div class="sig signed">✓ semnat digital<br>03.06.2026 11:02</div></div>
+    <div class="box"><div class="lbl" style="color:#10b981;">24 · Semnătură destinatar (QES)</div><div class="sig signed">✓ marfă primită<br>06.06.2026 15:48</div></div>
+  </div>
+
+  <div class="foot" style="border-top-color:#bbf7d0;">
+    <span>🔒 Integritate verificată — hash SHA-256: a17f…9c2e · sigiliu temporal calificat aplicat · cod QR de verificare</span>
+    <span style="display:inline-block;width:42px;height:42px;background:repeating-linear-gradient(45deg,#111 0 3px,#fff 3px 6px);border-radius:4px;" title="QR"></span>
   </div>
 </div>
 
