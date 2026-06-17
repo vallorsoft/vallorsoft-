@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-17 — CargoTMS-hézagok Fázis A/1: BNR + Teljesített fuvarok + Aktív flotta (PR #167)
+
+> Három új, read-only oldal a meglévő adatból, menübe rendezve — a hiánylista (CargoTMS-összevetés) Fázis A első köre.
+
+- **BNR árfolyam** (`bnr-rate`, Pénzügy) — `handlers/bnr.js` `getBnrRate`: a meglévő `services/bnr.js` élő EUR/RON + a cég `eur_ron_rate` (Admin/Manager kapu, `company_id=$1` paraméteres). Pane KPI-sávval + frissítés.
+- **Teljesített fuvarok** (`orders-done`, Fuvarok) — `handlers/ordersDone.js` `getFinishedOrders`: `status='Finalizat'`, `company_id=$1` + opcionális `from/to` (validált), `COALESCE(finalized_at,created_at)`-re. Read-only archív tábla + KPI-sáv + CSV-export. A fő Fuvarok-kezelés érintetlen.
+- **Aktív flotta** (`active-fleet`, Flotta) — a **meglévő** `getActiveVehiclePositions` + `getVehicleStatusSummary` újrahasználva: dedikált élő Leaflet-térkép (`#fleetMap`, világos csempe) + jármű-státusz lista + KPI-sáv. Nincs új GPS-logika, saját map-id (nem `dashMap`).
+- **Wiring:** új `public/console-pages.js` (mindkét konzolon), `loadTab` (admin/manager), `feature-catalog.js` (3 kulcs), `i18n.js` (`nav.*`/`bnr.*`/`od.*`/`af.*`, RO-alap+HU). Cache-bust `?v=20260617a1`. Minden read `company_id`-szűrt + paraméteres, role-gated; auth/billing/orders-render érintetlen; 93 Jest zöld.
+
 ## 2026-06-16 — Pénzügy: Kimenő + Bejövő számlák almenük (PR #166)
 
 > A Pénzügy csoport két új számla-aloldalt kap — a meglévő funkciók újrahasználásával (nincs duplikáció).

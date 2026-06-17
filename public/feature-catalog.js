@@ -34,6 +34,9 @@ window.VS_FEATURES = [
   { key: 'decont',           label: 'Sofőr-elszámolás (decont)',   group: 'Fuvarozás & Logisztika' },
   { key: 'invoices-out',     label: 'Kimenő számlák 📤',           group: 'Pénzügy' },
   { key: 'invoices-in',      label: 'Bejövő számlák (alvállalkozói) 📥', group: 'Pénzügy' },
+  { key: 'bnr-rate',         label: 'BNR árfolyam 💱',             group: 'Pénzügy' },
+  { key: 'orders-done',      label: 'Teljesített fuvarok',         group: 'Fuvarozás & Logisztika' },
+  { key: 'active-fleet',     label: 'Aktív flotta',                group: 'Flotta & Megfelelés' },
   // 'tracking': nem menüpont, hanem a fuvarlista 🌍 gombja (publikus ügyfél
   // követő-link) — a kapcsoló a gombot és a link-generálást tiltja.
   { key: 'tracking',         label: 'Ügyfél tracking-link (🌍)',   group: 'Fuvarozás & Logisztika' },

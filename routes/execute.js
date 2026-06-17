@@ -35,6 +35,8 @@ const handlers = Object.assign(
   require('../handlers/stripe'),
   require('../handlers/globalSearch'),
   require('../handlers/ecmr'),
+  require('../handlers/bnr'),
+  require('../handlers/ordersDone'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a

@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260616warm2">
-  <script src="/i18n.js?v=20260616ecmr"></script>
+  <script src="/i18n.js?v=20260617a1"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -48,6 +48,7 @@
       <div class="submenu" id="ordersSubmenu">
         <div class="sub-tab" data-tab="orders-form" data-i18n="nav.ordersForm">Kiírás</div>
         <div class="sub-tab" data-tab="orders-list" data-i18n="nav.ordersList">Kezelés</div>
+        <div class="sub-tab" data-tab="orders-done" data-i18n="nav.ordersDone">Teljesített fuvarok</div>
         <div class="sub-tab" data-tab="orders-planner" data-i18n="nav.planner">📅 Tervezőtábla</div>
         <a href="/utvonaltervezes" class="sub-tab tab-link" data-i18n="nav.routePlanning">Útvonaltervezés</a>
         <div class="sub-tab" data-tab="inbound" data-i18n="nav.inbound">Megrendelések</div>
@@ -61,6 +62,7 @@
         <div class="sub-tab" data-tab="vehicles" data-i18n="nav.vehicles">Járművek</div>
         <div class="sub-tab" data-tab="internal-drivers" data-i18n="nav.internalDrivers">Belső sofőrök</div>
         <div class="sub-tab" data-tab="external-drivers" data-i18n="nav.externalDrivers">Külső sofőrök</div>
+        <div class="sub-tab" data-tab="active-fleet" data-i18n="nav.activeFleet">Aktív flotta</div>
         <div class="sub-tab" data-tab="expiries" data-i18n="nav.expiries">⏰ Lejáratok</div>
         <div class="sub-tab" data-tab="service-log" data-i18n="nav.service">🔧 Szerviz & karbantartás</div>
         <div class="sub-tab" data-tab="fuel-import" data-i18n="nav.fuelCard">⛽ Üzemanyagkártya</div>
@@ -73,6 +75,7 @@
         <div class="sub-tab" data-tab="stats-finance" data-i18n="nav.finance">Pénzügy</div>
         <div class="sub-tab" data-tab="invoices-out" data-i18n="nav.invoicesOut">📤 Kimenő számlák</div>
         <div class="sub-tab" data-tab="invoices-in" data-i18n="nav.invoicesIn">📥 Bejövő számlák</div>
+        <div class="sub-tab" data-tab="bnr-rate" data-i18n="nav.bnrRate">💱 BNR árfolyam</div>
         <div class="sub-tab" data-tab="decont" data-i18n="nav.decont">Sofőr-elszámolás</div>
       </div>
     </div>
@@ -459,6 +462,62 @@
         <div class="h-sub" data-i18n="invo.subIn">Alvállalkozói (szállítói) számlák / tartozások</div>
       </div>
       <div id="carrierApBox" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- ── BNR árfolyam (Pénzügy) ── -->
+    <div class="pane hidden" data-pane="bnr-rate">
+      <div class="glass" style="padding:22px;max-width:680px;">
+        <h2 class="h-title" data-i18n="bnr.title">💱 BNR EUR/RON árfolyam</h2>
+        <div class="h-sub" data-i18n="bnr.sub">A Román Nemzeti Bank napi referencia-árfolyama és a cég tárolt árfolyama.</div>
+        <div id="bnrBand" style="margin:14px 0;"></div>
+        <div style="margin-bottom:12px;"><button class="btn primary" onclick="loadBnrRate()" data-i18n="bnr.refresh">🔄 Frissítés</button></div>
+        <div id="bnrBody"></div>
+      </div>
+    </div>
+
+    <!-- ── Teljesített fuvarok (Fuvarok) — read-only archív ── -->
+    <div class="pane hidden" data-pane="orders-done">
+      <div class="glass" style="padding:22px;">
+        <h2 class="h-title" data-i18n="od.title">Teljesített fuvarok</h2>
+        <div class="h-sub" data-i18n="od.sub">A lezárt (Finalizat) fuvarok archívuma.</div>
+        <div id="odBand" style="margin:14px 0;"></div>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">
+          <label style="display:flex;flex-direction:column;font-size:12px;gap:4px;"><span data-i18n="invo.from">Tól</span><input id="odFrom" type="date" class="input"></label>
+          <label style="display:flex;flex-direction:column;font-size:12px;gap:4px;"><span data-i18n="invo.to">Ig</span><input id="odTo" type="date" class="input"></label>
+          <button class="btn primary" onclick="loadOrdersDone()" data-i18n="invo.filter">Szűrés</button>
+          <button class="btn ghost" onclick="exportOrdersDoneCsv()" data-i18n="od.export">⬇️ CSV export</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="table" style="width:100%;">
+            <thead><tr>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="list.colId">ID</th>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="list.colClient">Ügyfél</th>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="list.colRoute">Útvonal</th>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="list.colDriver">Sofőr</th>
+              <th style="padding:8px 10px;text-align:right;" data-i18n="list.colKm">KM</th>
+              <th style="padding:8px 10px;text-align:right;" data-i18n="list.colPrice">Ár</th>
+              <th style="padding:8px 10px;text-align:left;" data-i18n="od.colDate">Lezárva</th>
+            </tr></thead>
+            <tbody id="odBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Aktív flotta (Flotta) — saját Leaflet térkép (#fleetMap, NEM dashMap) ── -->
+    <div class="pane hidden" data-pane="active-fleet">
+      <div class="glass" style="padding:22px;">
+        <h2 class="h-title" data-i18n="af.title">Aktív flotta</h2>
+        <div class="h-sub" data-i18n="af.sub">Élő GPS-pozíciók térképen + jármű-státusz.</div>
+        <div id="afBand" style="margin:14px 0;"></div>
+        <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:stretch;" class="af-grid">
+          <div id="fleetMap" style="height:560px;border-radius:14px;overflow:hidden;min-height:360px;"></div>
+          <div style="max-height:560px;overflow-y:auto;">
+            <h3 style="font-size:14px;margin:0 0 10px;" data-i18n="af.list">Járművek</h3>
+            <div id="fleetVehList"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="pane hidden" data-pane="vehicles">
@@ -1129,8 +1188,9 @@
 </div>
 
 <script src="/email-intake-card.js?v=20260616warm2"></script>
-<script src="/feature-catalog.js?v=20260616ecmr"></script>
+<script src="/feature-catalog.js?v=20260617a1"></script>
 <script src="/console-shared.js?v=20260616fix"></script>
+<script src="/console-pages.js?v=20260617a1"></script>
 <!-- ===== INTEGRACIOK (Manager: Ugyfelek + "Hol a kocsi?"; szamlazo/beallitas Admin-only) ===== -->
 <script src="/clients-page.js?v=20260616pill"></script>
 <script src="/client-mail.js?v=20260614qa"></script>
@@ -1145,7 +1205,7 @@
 <script src="/stats.js?v=20260616co2"></script>
 <script src="/fleet-extra.js?v=20260616band3"></script>
 <script src="/planner.js?v=20260614qa"></script>
-<script src="/manager.js?v=20260616pill"></script>
+<script src="/manager.js?v=20260617a1"></script>
 <script src="/global-search.js?v=20260614fg"></script>
 
  <!-- ── BUG REPORT FAB ── -->
