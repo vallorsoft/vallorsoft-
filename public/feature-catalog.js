@@ -57,6 +57,7 @@ window.VS_FEATURES = [
   { key: 'integrations',     label: 'Integrációk fül (csak Admin)', group: 'Adminisztráció' },
   { key: 'signature',        label: 'Aláírás és bélyegző',         group: 'Adminisztráció' },
   { key: 'chat',             label: 'Belső chat',                  group: 'Kommunikáció' },
+  { key: 'fav-locations',    label: 'Kedvenc helyszínek ⭐',        group: 'Rendszer' },
   { key: 'settings',         label: 'Beállítások',                 group: 'Rendszer', core: true },
   // ── Prémium funkció-gate-ek (csomag-szintű korlátozáshoz) ──────────────────
   { key: 'visszfuvar-radar',     label: 'Visszfuvar-radar 🎯',          group: 'Fuvarozás & Logisztika' },

@@ -277,6 +277,17 @@ function vsAttachAutocomplete(inputId, ddId, onPick){
 
 // Bekötés a fuvar-kiíró + szerkesztő mezőkre (csak ha a kapcsoló BE van).
 function initOrderMapFeature(){
+  // ⭐ Kedvenc helyszínek gyors-választó a cím-mezőkhöz — független az
+  // order-route-map kapcsolótól (mindig elérhető, csak hozzáad egy gombot;
+  // a Photon autocomplete érintetlen marad). Ha sikerült a választás és a
+  // térképes funkció be van, az útvonal/km is újraszámol.
+  if(window.FavLocations){
+    ['create','edit'].forEach(function(which){
+      var c=RM_CFG[which];
+      FavLocations.attachPicker(c.load, 'load', function(){ if(typeof orderRouteRecalc==='function') orderRouteRecalc(which); });
+      FavLocations.attachPicker(c.unload, 'unload', function(){ if(typeof orderRouteRecalc==='function') orderRouteRecalc(which); });
+    });
+  }
   // Alapból BE (a kódbázis „hiányzó sor = bekapcsolva" konvenciója szerint);
   // a developer cégenként KI tudja kapcsolni (explicit enabled=false).
   _orderMapOn = !(window._vsFeatures && window._vsFeatures['order-route-map']===false);
@@ -1225,45 +1236,106 @@ function oeUpdateMargin(){
   else el.textContent='';
 }
 
+var _carrierGroupFilter=''; // '' = mind; szám = group_id; 'none' = csoport nélküli
 function loadCarriers(){
   var box=document.getElementById('carriersBox'); if(!box) return;
-  window._carriersCache=null;
-  gas('carrierList').then(function(r){
-    window._carriersCache=(r&&r.ok&&r.items)||[];
-    var items=window._carriersCache;
-    var rows=items.map(function(c,i){
-      var cmr='—';
-      if(c.cmr_insurance_expiry){ var d=new Date(c.cmr_insurance_expiry); var days=Math.round((d-new Date())/86400000);
-        cmr = days<0 ? '<span class="badge err">'+t('cs.ca.expired')+'</span>' : days<30 ? '<span class="badge warn">'+days+t('cs.ca.days')+'</span>' : '<span class="badge ok">'+String(c.cmr_insurance_expiry).slice(0,7)+'</span>'; }
-      var ob=Math.round(parseFloat(c.open_balance)||0);
-      return '<tr style="'+(!c.aktiv?'opacity:.5;':'')+'">'
-        +'<td><b class="text-primary">'+esc(c.nev)+'</b>'+(c.portal_users?' <span class="badge ok" style="font-size:9px;">'+t('cs.ca.portal')+'</span>':'')+'</td>'
-        +'<td>'+esc(c.cui||'—')+'</td><td>'+(c.payment_term_days||30)+t('cs.ca.days')+'</td><td>'+cmr+'</td>'
-        +'<td style="text-align:right;color:'+(ob>0?'#ff6b75':'inherit')+';font-weight:700;">'+ob+' €</td>'
-        +'<td style="white-space:nowrap;">'
-        +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierEditUi('+i+')">'+t('cs.editShort')+'</button> '
-        +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierInvitePrompt('+c.id+')" title="'+t('cs.tt.carrierInvite')+'">🔑</button> '
-        +'<button class="btn danger" style="padding:4px 9px;font-size:12px;" onclick="carrierDeleteUi('+c.id+')">✕</button></td></tr>';
-    }).join('');
-    box.innerHTML='<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:4px;">'+t('cs.ca.title')+'</div>'
-      +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">'+t('cs.ca.hint')+'</div>'
-      +'<div class="grid-3" style="margin-bottom:12px;">'
-      +'<div class="field"><label>'+t('cs.ca.companyName')+'</label><input class="input" id="caNev"></div>'
-      +'<div class="field"><label>'+t('cs.ca.cui')+'</label><input class="input" id="caCui"></div>'
-      +'<div class="field"><label>'+t('common.email')+'</label><input class="input" id="caEmail"></div>'
-      +'<div class="field"><label>'+t('form.phone')+'</label><input class="input" id="caTel"></div>'
-      +'<div class="field"><label>'+t('cs.ca.payTerm')+'</label><input class="input" id="caTerm" type="number" value="30"></div>'
-      +'<div class="field"><label>'+t('cs.ca.cmrExpiry')+'</label><input class="input" id="caCmr" type="date"></div>'
-      +'<div class="field"><label>IBAN</label><input class="input" id="caIban"></div>'
-      +'<div class="field" style="grid-column:span 2;"><label>'+t('fld.note')+'</label><input class="input" id="caNota"></div>'
-      +'</div>'
-      +'<input type="hidden" id="caId"><button class="btn primary" onclick="carrierSaveUi()">'+t('cs.ca.saveBtn')+'</button> <button class="btn ghost" onclick="carrierFormReset()">'+t('cs.ca.newEmpty')+'</button>'
-      +'<div id="carrierInviteLink" style="margin-top:12px;"></div>'
-      +'<table class="table" style="margin-top:16px;"><thead><tr><th>'+t('cs.ca.colCompany')+'</th><th>CUI</th><th>'+t('cs.ca.colPayTerm')+'</th><th>'+t('cs.ca.colCmr')+'</th><th style="text-align:right;">'+t('cs.ca.colOpenDebt')+'</th><th>'+t('col.action')+'</th></tr></thead>'
-      +'<tbody>'+(rows||'<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px;">'+t('cs.ca.none')+'</td></tr>')+'</tbody></table></div>';
+  window._carriersCache=null; window._carrierGroupsCache=null;
+  // Csoportok + alvállalkozók párhuzamosan
+  Promise.all([gas('carrierGroupList'), gas('carrierList')]).then(function(rr){
+    window._carrierGroupsCache=(rr[0]&&rr[0].ok&&rr[0].items)||[];
+    window._carriersCache=(rr[1]&&rr[1].ok&&rr[1].items)||[];
+    renderCarriers();
   });
 }
-function carrierFormReset(){ ['caNev','caCui','caEmail','caTel','caIban','caNota'].forEach(function(i){var e=document.getElementById(i);if(e)e.value='';}); var t=document.getElementById('caTerm');if(t)t.value='30'; var c=document.getElementById('caCmr');if(c)c.value=''; var id=document.getElementById('caId');if(id)id.value=''; }
+function _carrierGroupOptions(selVal){
+  var groups=window._carrierGroupsCache||[];
+  var opts='<option value=""'+(selVal==null||selVal===''?' selected':'')+'>'+t('cs.cg.noGroup')+'</option>';
+  groups.forEach(function(g){ opts+='<option value="'+g.id+'"'+(String(selVal)===String(g.id)?' selected':'')+'>'+esc(g.name)+'</option>'; });
+  return opts;
+}
+function renderCarriers(){
+  var box=document.getElementById('carriersBox'); if(!box) return;
+  var items=window._carriersCache||[];
+  var groups=window._carrierGroupsCache||[];
+  // Szűrés a kiválasztott csoportra (a render mindig a teljes cache-ből indul)
+  var filtered=items.filter(function(c){
+    if(_carrierGroupFilter===''||_carrierGroupFilter==null) return true;
+    if(_carrierGroupFilter==='none') return !c.group_id;
+    return String(c.group_id)===String(_carrierGroupFilter);
+  });
+  var rows=filtered.map(function(c){
+    var i=items.indexOf(c);
+    var cmr='—';
+    if(c.cmr_insurance_expiry){ var d=new Date(c.cmr_insurance_expiry); var days=Math.round((d-new Date())/86400000);
+      cmr = days<0 ? '<span class="badge err">'+t('cs.ca.expired')+'</span>' : days<30 ? '<span class="badge warn">'+days+t('cs.ca.days')+'</span>' : '<span class="badge ok">'+String(c.cmr_insurance_expiry).slice(0,7)+'</span>'; }
+    var ob=Math.round(parseFloat(c.open_balance)||0);
+    var grpSel='<select class="select cg-row-sel" style="padding:3px 6px;font-size:12px;min-width:120px;" onchange="carrierSetGroupUi('+c.id+',this.value)">'+_carrierGroupOptions(c.group_id)+'</select>';
+    return '<tr style="'+(!c.aktiv?'opacity:.5;':'')+'">'
+      +'<td><b class="text-primary">'+esc(c.nev)+'</b>'+(c.portal_users?' <span class="badge ok" style="font-size:9px;">'+t('cs.ca.portal')+'</span>':'')+'</td>'
+      +'<td>'+esc(c.cui||'—')+'</td><td>'+grpSel+'</td><td>'+(c.payment_term_days||30)+t('cs.ca.days')+'</td><td>'+cmr+'</td>'
+      +'<td style="text-align:right;color:'+(ob>0?'#ff6b75':'inherit')+';font-weight:700;">'+ob+' €</td>'
+      +'<td style="white-space:nowrap;">'
+      +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierEditUi('+i+')">'+t('cs.editShort')+'</button> '
+      +'<button class="btn ghost" style="padding:4px 9px;font-size:12px;" onclick="carrierInvitePrompt('+c.id+')" title="'+t('cs.tt.carrierInvite')+'">🔑</button> '
+      +'<button class="btn danger" style="padding:4px 9px;font-size:12px;" onclick="carrierDeleteUi('+c.id+')">✕</button></td></tr>';
+  }).join('');
+  // Csoport-szűrő legördülő
+  var filterOpts='<option value=""'+(_carrierGroupFilter===''?' selected':'')+'>'+t('cs.cg.allGroups')+'</option>'
+    +'<option value="none"'+(_carrierGroupFilter==='none'?' selected':'')+'>'+t('cs.cg.noGroup')+'</option>';
+  groups.forEach(function(g){ filterOpts+='<option value="'+g.id+'"'+(String(_carrierGroupFilter)===String(g.id)?' selected':'')+'>'+esc(g.name)+' ('+(g.carrier_count||0)+')</option>'; });
+  // Csoport-kezelő lista (átnevezés/törlés)
+  var grpRows=groups.map(function(g){
+    return '<tr><td><b class="text-primary">'+esc(g.name)+'</b></td><td>'+(g.carrier_count||0)+'</td>'
+      +'<td style="white-space:nowrap;">'
+      +'<button class="btn ghost" style="padding:3px 8px;font-size:12px;" onclick="carrierGroupRename('+g.id+')">'+t('common.edit')+'</button> '
+      +'<button class="btn danger" style="padding:3px 8px;font-size:12px;" onclick="carrierGroupDeleteUi('+g.id+')">✕</button></td></tr>';
+  }).join('');
+  box.innerHTML='<div class="glass" style="padding:20px;margin-bottom:16px;"><div style="font-size:15px;font-weight:800;margin-bottom:4px;">'+t('cs.cg.title')+'</div>'
+    +'<div class="text-muted" style="font-size:12.5px;margin-bottom:12px;">'+t('cs.cg.hint')+'</div>'
+    +'<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;">'
+    +'<div class="field" style="flex:1;min-width:160px;"><label>'+t('cs.cg.newName')+'</label><input class="input" id="cgNewName"></div>'
+    +'<button class="btn ok" onclick="carrierGroupAdd()">'+t('cs.cg.addBtn')+'</button></div>'
+    +(groups.length?('<table class="table"><thead><tr><th>'+t('cs.cg.colName')+'</th><th>'+t('cs.cg.colCount')+'</th><th>'+t('col.action')+'</th></tr></thead><tbody>'+grpRows+'</tbody></table>'):'<div class="text-muted" style="font-size:12.5px;">'+t('cs.cg.none')+'</div>')
+    +'</div>'
+    +'<div class="glass" style="padding:20px;"><div style="font-size:16px;font-weight:800;margin-bottom:4px;">'+t('cs.ca.title')+'</div>'
+    +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">'+t('cs.ca.hint')+'</div>'
+    +'<div class="grid-3" style="margin-bottom:12px;">'
+    +'<div class="field"><label>'+t('cs.ca.companyName')+'</label><input class="input" id="caNev"></div>'
+    +'<div class="field"><label>'+t('cs.ca.cui')+'</label><input class="input" id="caCui"></div>'
+    +'<div class="field"><label>'+t('common.email')+'</label><input class="input" id="caEmail"></div>'
+    +'<div class="field"><label>'+t('form.phone')+'</label><input class="input" id="caTel"></div>'
+    +'<div class="field"><label>'+t('cs.ca.payTerm')+'</label><input class="input" id="caTerm" type="number" value="30"></div>'
+    +'<div class="field"><label>'+t('cs.ca.cmrExpiry')+'</label><input class="input" id="caCmr" type="date"></div>'
+    +'<div class="field"><label>IBAN</label><input class="input" id="caIban"></div>'
+    +'<div class="field"><label>'+t('cs.cg.group')+'</label><select class="select" id="caGroup">'+_carrierGroupOptions('')+'</select></div>'
+    +'<div class="field"><label>'+t('fld.note')+'</label><input class="input" id="caNota"></div>'
+    +'</div>'
+    +'<input type="hidden" id="caId"><button class="btn primary" onclick="carrierSaveUi()">'+t('cs.ca.saveBtn')+'</button> <button class="btn ghost" onclick="carrierFormReset()">'+t('cs.ca.newEmpty')+'</button>'
+    +'<div id="carrierInviteLink" style="margin-top:12px;"></div>'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap;"><label style="font-size:12.5px;font-weight:600;">'+t('cs.cg.filter')+'</label>'
+    +'<select class="select" style="max-width:240px;" onchange="carrierGroupFilterSet(this.value)">'+filterOpts+'</select></div>'
+    +'<table class="table" style="margin-top:10px;"><thead><tr><th>'+t('cs.ca.colCompany')+'</th><th>CUI</th><th>'+t('cs.cg.group')+'</th><th>'+t('cs.ca.colPayTerm')+'</th><th>'+t('cs.ca.colCmr')+'</th><th style="text-align:right;">'+t('cs.ca.colOpenDebt')+'</th><th>'+t('col.action')+'</th></tr></thead>'
+    +'<tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:14px;">'+t('cs.ca.none')+'</td></tr>')+'</tbody></table></div>';
+}
+function carrierGroupFilterSet(v){ _carrierGroupFilter=v; renderCarriers(); }
+function carrierGroupAdd(){
+  var el=document.getElementById('cgNewName'); var name=el?el.value.trim():'';
+  if(!name){ toast(t('cs.cg.nameReq'),'err'); return; }
+  gas('carrierGroupSave',[{name:name}]).then(function(r){ if(r&&r.ok){ toast(t('common.saved'),'ok'); loadCarriers(); } else toast((r&&r.err)||t('common.error'),'err'); });
+}
+function carrierGroupRename(id){
+  var groups=window._carrierGroupsCache||[]; var g=groups.filter(function(x){return x.id===id;})[0];
+  var name=prompt(t('cs.cg.renamePrompt'), g?g.name:''); if(name==null) return; name=name.trim(); if(!name) return;
+  gas('carrierGroupSave',[{id:id,name:name}]).then(function(r){ if(r&&r.ok){ toast(t('common.saved'),'ok'); loadCarriers(); } else toast((r&&r.err)||t('common.error'),'err'); });
+}
+function carrierGroupDeleteUi(id){
+  if(!confirm(t('cs.cg.delConfirm'))) return;
+  gas('carrierGroupDelete',[id]).then(function(r){ if(r&&r.ok){ toast(t('common.deleted'),'ok'); if(String(_carrierGroupFilter)===String(id))_carrierGroupFilter=''; loadCarriers(); } else toast((r&&r.err)||t('common.error'),'err'); });
+}
+function carrierSetGroupUi(carrierId, groupId){
+  gas('carrierSetGroup',[carrierId, groupId||null]).then(function(r){ if(r&&r.ok){ toast(t('common.saved'),'ok'); loadCarriers(); } else toast((r&&r.err)||t('common.error'),'err'); });
+}
+function carrierFormReset(){ ['caNev','caCui','caEmail','caTel','caIban','caNota'].forEach(function(i){var e=document.getElementById(i);if(e)e.value='';}); var t=document.getElementById('caTerm');if(t)t.value='30'; var c=document.getElementById('caCmr');if(c)c.value=''; var id=document.getElementById('caId');if(id)id.value=''; var g=document.getElementById('caGroup');if(g)g.value=''; }
 function carrierEditUi(i){
   var c=(window._carriersCache||[])[i]; if(!c) return;
   document.getElementById('caId').value=c.id;
@@ -1271,6 +1343,7 @@ function carrierEditUi(i){
   document.getElementById('caEmail').value=c.email||''; document.getElementById('caTel').value=c.telefon||'';
   document.getElementById('caTerm').value=c.payment_term_days||30; document.getElementById('caCmr').value=c.cmr_insurance_expiry?String(c.cmr_insurance_expiry).slice(0,10):'';
   document.getElementById('caIban').value=c.iban||''; document.getElementById('caNota').value=c.nota||'';
+  var grp=document.getElementById('caGroup'); if(grp) grp.value=c.group_id||'';
   document.getElementById('carriersBox').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function carrierSaveUi(){
@@ -1278,6 +1351,7 @@ function carrierSaveUi(){
     cui:document.getElementById('caCui').value.trim(), email:document.getElementById('caEmail').value.trim(),
     telefon:document.getElementById('caTel').value.trim(), payment_term_days:document.getElementById('caTerm').value,
     cmr_insurance_expiry:document.getElementById('caCmr').value||null, iban:document.getElementById('caIban').value.trim(),
+    group_id:(document.getElementById('caGroup')||{}).value||'',
     nota:document.getElementById('caNota').value.trim() };
   if(!p.nev){ toast(t('cs.companyNameReq'),'err'); return; }
   gas('carrierSave',[p]).then(function(r){ if(r&&r.ok){ toast(t('cs.carrierSaved'),'ok'); carrierFormReset(); loadCarriers(); loadCarrierAp(); } else toast((r&&r.err)||t('common.error'),'err'); });

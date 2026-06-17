@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-17 — CargoTMS-hézagok Fázis A/2: Alvállalkozó-csoportok + Kedvenc helyszínek (PR #168)
+
+> Két új funkció a hiánylistából — multi-tenant, tulajdon-ellenőrzéssel, audittal.
+
+- **Alvállalkozó-csoportok** — `db/carrier-groups.sql` (idempotens): `carrier_groups` + `carriers.group_id`. `handlers/carriers.js`: `carrierGroupList/Save/Delete` + `carrierSetGroup`; a `carrierList` visszaadja a `group_name`-et, a `carrierSave` fogadja a `group_id`-t. **Biztonság:** a fuvarozó↔csoport kötés előtt MINDKÉT entitás tulajdon-ellenőrzése (`WHERE id=$1 AND company_id=$2`), `_am` (Admin/Manager) kapu, audit. UI a Külső sofőrök fülön: csoport-kezelő + szűrő + per-sor csoport-választó.
+- **Kedvenc helyszínek** — `db/fav-locations.sql` (idempotens): `favorite_locations`. `handlers/favLocations.js`: `favLocationList` (bármely belépett), `favLocationSave/Delete` (Admin/Manager); `company_id`-szűrt, input-korlát (label≤120, address≤300), `type` fehérlista (load/unload/both), audit. UI: `fav-locations` aloldal (Beállítások; a manager Beállítások accordion-csoporttá alakítva) + **gyors-kitöltés** a fuvar-űrlap fel-/lerakó mezőihez (`FavLocations.attachPicker`, a Photon-autocomplete megőrizve, km/route újraszámítással).
+- **Wiring:** `routes/execute.js` regisztráció, `feature-catalog.js` (`fav-locations` → Rendszer), `i18n.js` (`nav.favLocations`, `cs.cg.*`, `fav.*`, RO-alap+HU). Cache-bust `?v=20260617a2`. 93 Jest zöld; auth/AP/billing érintetlen.
+
 ## 2026-06-17 — CargoTMS-hézagok Fázis A/1: BNR + Teljesített fuvarok + Aktív flotta (PR #167)
 
 > Három új, read-only oldal a meglévő adatból, menübe rendezve — a hiánylista (CargoTMS-összevetés) Fázis A első köre.
