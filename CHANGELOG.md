@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-17 — CargoTMS-hézagok Fázis C/4: Cég-branding & beállítások (PR #174)
+
+> Egységes „Cég & arculat" önkiszolgáló oldal — a meglévő branding/dok-széria/árfolyam infra újrahasználásával (nincs duplikáció).
+
+- **`handlers/companySettings.js`** — `getCompanySettings` (Admin/Manager olvasás), `saveCompanySettings` (**csak Admin**): logó (a meglévő `/api/branding/logo` REST-en át), márka-szín (hex-validált), PDF-fejléc, `companies.eur_ron_rate`, és a menetlevél-prefix (a meglévő `document_series` upsert-logikájával). `company_id`-szűrt + paraméteres, audit.
+- **`db/company-settings.sql`** (idempotens) — `company_branding.brand_color` + `pdf_header_text` (`ADD COLUMN IF NOT EXISTS`); meglévő oszlopot nem módosít. A számlázó `serie/TVA/pénznem` szándékosan a `billing_integrations`-ban marad (nincs duplikálva), a régi széria-widget és az aláírás-oldal érintetlen.
+- **UI:** `public/company-settings.js` — Arculat (logó + szín + PDF-fejléc, élő előnézet) / Cég-adatok (EUR-RON) / Számozás; 🏢 „Cég & arculat" aloldal a Beállítások alatt; Manager csak olvas. `feature-catalog`+`i18n` (RO-alap+HU), cache-bust `?v=20260617c4`; 93 Jest zöld.
+
 ## 2026-06-17 — CargoTMS-hézagok Fázis C/3: Granulált jogosultságok + Fizetési ütemterv (PR #173)
 
 > A meglévő `user_permissions` kiterjesztése Manager-jogokra (Admin mindig átmegy) + read-only cashflow-nézet. Nincs új tábla.

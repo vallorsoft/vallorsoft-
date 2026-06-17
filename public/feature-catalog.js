@@ -64,6 +64,7 @@ window.VS_FEATURES = [
   { key: 'mail-log',         label: 'Levél-napló ✉️',              group: 'Adminisztráció' },
   { key: 'chat',             label: 'Belső chat',                  group: 'Kommunikáció' },
   { key: 'fav-locations',    label: 'Kedvenc helyszínek ⭐',        group: 'Rendszer' },
+  { key: 'company-settings', label: 'Cég & arculat 🏢',            group: 'Rendszer' },
   { key: 'settings',         label: 'Beállítások',                 group: 'Rendszer', core: true },
   // ── Prémium funkció-gate-ek (csomag-szintű korlátozáshoz) ──────────────────
   { key: 'visszfuvar-radar',     label: 'Visszfuvar-radar 🎯',          group: 'Fuvarozás & Logisztika' },
