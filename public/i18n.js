@@ -143,6 +143,12 @@
     'eb.netErr': { hu: 'Hálózati hiba.', ro: 'Eroare de rețea.' },
     'eb.sendResult': { hu: 'Elküldve: {n}, hiba: {e}', ro: 'Trimise: {n}, erori: {e}' },
     'eb.loadedToEditor': { hu: 'HTML betöltve a szerkesztőbe.', ro: 'HTML încărcat în editor.' },
+    // Galéria — mindenki számára elérhető kész sablonok
+    'eb.nav6': { hu: 'Galéria', ro: 'Galerie' },
+    'eb.nav6d': { hu: 'Kész sablonok', ro: 'Șabloane gata făcute' },
+    'eb.galleryLead': { hu: 'Válassz egy kész sablont (különböző színek és formák). Betöltődik a szerkesztőbe, ahol testreszabhatod (szöveg, logó, szín), majd saját sablonként mented. A {{változók}} kiküldéskor töltődnek ki.', ro: 'Alege un șablon gata făcut (diferite culori și forme). Se încarcă în editor, unde îl personalizezi (text, logo, culoare) și îl salvezi ca șablon propriu. {{variabilele}} se completează la trimitere.' },
+    'eb.useTemplate': { hu: '✏️ Használ', ro: '✏️ Folosește' },
+    'eb.galleryLoaded': { hu: 'Sablon betöltve — szabd testre és mentsd!', ro: 'Șablon încărcat — personalizează și salvează!' },
     // Feladó-fiók (cég saját SMTP / Brevo) — a kimenő levelek a cég címéről mennek
     'eb.nav5': { hu: 'Feladó-fiók', ro: 'Cont expeditor' },
     'eb.nav5d': { hu: 'A cég saját e-mail-fiókja', ro: 'Contul de e-mail al firmei' },
