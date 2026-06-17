@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-17 — CargoTMS-hézagok Fázis C/5: E-mail sablon-kezelő (PR #175)
+
+> Cégenkénti, kategorizált, kétnyelvű tranzakciós e-mail sablonok + sablonból küldés — a developer rendszer-sablonokat és a client-mail sablonokat NEM érintve.
+
+- **`db/company-email-templates.sql`** (idempotens) — ÚJ `company_email_templates` tábla (`company_id`, `key`, `category`, `subject_ro/hu`, `body_ro/hu`, `active`, UNIQUE(company_id,key)). Külön tárolás (a developer `email_sys_*` a `developer_settings`-ben, a client-mail az `email_templates`-ben marad).
+- **`handlers/emailTemplates.js`** — `emailTemplateList` (Admin/Manager, company-szűrt, a tárolt sorok a whitelist-defaultok fölé olvadva), `emailTemplateSave` (Admin/Manager, `key` fehérlista, hossz-korlát, upsert `(company_id,key)`-re, audit), `sendTemplatedEmail` (Admin/Manager; `EMAIL_RE` validáció, `template_key` fehérlista, company saját sablonja, `applyTemplateVars` **HTML-escape** → nincs injekció, a meglévő `sendClientEmail`+`logMail` küld). Kulcsok: order_confirm_carrier / order_status_change / quote_send / invoice_notify / generic (RO+HU default).
+- **UI:** `public/email-templates.js` — ✉️ aloldal az Adminisztráció alatt (szerkesztő RO/HU + teszt-küldés); „📧 Sablonból küldés" gomb az **Árajánlatok** során (sablon + címzett, a kvótából előtöltött változókkal). `feature-catalog`+`i18n` (RO-alap+HU), cache-bust `?v=20260617c5`; 93 Jest zöld. **Ezzel a Fázis C teljes.**
+
 ## 2026-06-17 — CargoTMS-hézagok Fázis C/4: Cég-branding & beállítások (PR #174)
 
 > Egységes „Cég & arculat" önkiszolgáló oldal — a meglévő branding/dok-széria/árfolyam infra újrahasználásával (nincs duplikáció).
