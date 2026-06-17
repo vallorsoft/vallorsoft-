@@ -3742,7 +3742,33 @@ function renderFilteredOrders(list) {
   if(_ot && _ot._colEnhanced) _applyColOrder(_ot, 'vs-cols-orders');
 }
 
+// ── PDF-sablon (order típus) betöltése a Fuvar-lista nyomtatáshoz ──
+// A pdf_templates.order beállításait (fejléc/lábléc/akcent/logó) használja.
+// Cégenkénti, session-szűrt; a logó a hitelesített /api/branding/logo-ból.
+// Best-effort: ha nincs/hiba, az alap (sablon nélküli) nyomtatás megy.
+function _vsEnsureOrderPdfTpl(cb){
+  if(window._vsOrderPdfTpl){ cb(window._vsOrderPdfTpl); return; }
+  try{
+    gas('pdfTemplateGet',['order']).then(function(r){
+      var tpl=(r&&r.ok&&r.template)||{};
+      var fin=function(){ window._vsOrderPdfTpl=tpl; cb(tpl); };
+      if(tpl.show_logo!==false){
+        fetch('/api/branding/logo').then(function(x){return x.json();}).then(function(lg){
+          if(lg&&lg.has&&lg.dataUri) tpl._logo=lg.dataUri;
+          fin();
+        }).catch(fin);
+      } else { fin(); }
+    }).catch(function(){ window._vsOrderPdfTpl={}; cb({}); });
+  }catch(e){ window._vsOrderPdfTpl={}; cb({}); }
+}
+
 function downloadSelectedOrders() {
+  var checked = document.querySelectorAll('.orderRowCb:checked');
+  if (!checked.length) { toast(t('cs.pickAtLeastOne'), 'err'); return; }
+  _vsEnsureOrderPdfTpl(function(_pdfTpl){ _downloadSelectedOrdersBuild(_pdfTpl); });
+}
+
+function _downloadSelectedOrdersBuild(_pdfTpl) {
   var checked = document.querySelectorAll('.orderRowCb:checked');
   if (!checked.length) { toast(t('cs.pickAtLeastOne'), 'err'); return; }
   var ids = Array.from(checked).map(function(cb){ return String(cb.value); });
@@ -3799,28 +3825,45 @@ function downloadSelectedOrders() {
 
   var hasLegs = selected.some(function(c){ return parselegs(c).length > 0; });
 
+  // ── PDF-sablon (order típus) alkalmazása — fejléc/lábléc/akcent/logó ──
+  var _tpl = _pdfTpl || {};
+  var _accent = (typeof _tpl.accent_color === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(_tpl.accent_color)) ? _tpl.accent_color : '#000000';
+  var _tplHeader = (_tpl.header_text || '').trim();
+  var _tplFooter = (_tpl.footer_text || '').trim();
+  var _tplLogo = (_tpl.show_logo !== false && _tpl._logo) ? _tpl._logo : null;
+  var _brandBlock = (_tplLogo || _tplHeader)
+    ? '<div class="brandhdr">'+(_tplLogo?'<img src="'+_tplLogo+'" alt="logo">':'')+(_tplHeader?'<div class="brandtxt">'+esc(_tplHeader)+'</div>':'')+'</div>'
+    : '';
+  var _footerBlock = _tplFooter ? '<div class="brandftr">'+esc(_tplFooter)+'</div>' : '';
+
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
     '<title>'+t('cs.pr.docTitle')+now+'</title>'+
     '<style>'+
     'body{font-family:Arial,sans-serif;padding:24px;font-size:13px;color:#000;}'+
     'h1{font-size:18px;text-align:center;margin:0 0 2px;}'+
-    '.sub{text-align:center;font-size:12px;color:#555;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid #000;}'+
+    '.sub{text-align:center;font-size:12px;color:#555;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid '+_accent+';}'+
+    '.brandhdr{display:flex;gap:14px;align-items:center;border-bottom:3px solid '+_accent+';padding-bottom:10px;margin-bottom:14px;}'+
+    '.brandhdr img{max-height:54px;max-width:160px;}'+
+    '.brandhdr .brandtxt{white-space:pre-wrap;font-size:12px;font-weight:600;color:#111;}'+
     'table{width:100%;border-collapse:collapse;margin-top:8px;}'+
     'th{background:#d0d0d0;border:1px solid #aaa;padding:6px 8px;font-size:11px;text-align:left;white-space:nowrap;}'+
     'td{border:1px solid #ddd;padding:5px 8px;vertical-align:top;}'+
-    '.legend{font-size:11px;color:#444;margin-top:10px;padding:7px 12px;background:#eef3ff;border-left:3px solid #2563eb;}'+
+    '.legend{font-size:11px;color:#444;margin-top:10px;padding:7px 12px;background:#eef3ff;border-left:3px solid '+_accent+';}'+
+    '.brandftr{font-size:11px;color:#555;margin-top:14px;padding-top:8px;border-top:1px solid #ddd;white-space:pre-wrap;}'+
     '.footer{font-size:11px;color:#aaa;margin-top:12px;}'+
     '.no-print{margin-bottom:16px;}'+
     '@media print{.no-print{display:none;}body{padding:10px;}}'+
     '</style></head><body>'+
     '<div class="no-print"><button onclick="window.print()" style="padding:10px 24px;background:#0f172a;color:#fff;font-weight:bold;border:none;border-radius:6px;font-size:14px;cursor:pointer;">'+t('cs.pr.printBtn')+'</button></div>'+
+    _brandBlock+
     '<h1>'+t('cs.pr.heading')+'</h1>'+
-    '<div class="sub">'+t('cs.pr.printedAt')+now+' &nbsp;·&nbsp; '+selected.length+t('cs.pr.orders')+(hasLegs?' &nbsp;·&nbsp; <span style="color:#2563eb;font-weight:700;">'+t('cs.pr.blueLegs')+'</span>':'')+'</div>'+
+    '<div class="sub">'+t('cs.pr.printedAt')+now+' &nbsp;·&nbsp; '+selected.length+t('cs.pr.orders')+(hasLegs?' &nbsp;·&nbsp; <span style="color:'+_accent+';font-weight:700;">'+t('cs.pr.blueLegs')+'</span>':'')+'</div>'+
     '<table><thead><tr>'+
     '<th>#ID</th><th>'+t('st.cClient')+'</th><th>'+t('cs.pr.colRef')+'</th><th>'+t('cs.pr.colLoad')+'</th><th>'+t('cs.pr.colUnload')+'</th>'+
     '<th>KM</th><th>'+t('cs.pr.colPrice')+'</th><th>'+t('cs.pr.colDriver')+'</th><th>'+t('cs.pr.colVehicle')+'</th><th>'+t('st.cStatus')+'</th>'+
     '</tr></thead><tbody>'+rows+'</tbody></table>'+
     (hasLegs ? '<div class="legend">'+t('cs.pr.legend')+'</div>' : '')+
+    _footerBlock+
     '<div class="footer">'+t('cs.pr.footer')+now+'</div>'+
     '</body></html>';
 

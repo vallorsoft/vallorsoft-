@@ -53,6 +53,7 @@ function loadTab(name){
     if(name==='active-fleet'){ if(typeof loadActiveFleet==='function') loadActiveFleet(); }
     if(name==='internal-drivers') loadInternalDrivers();
     if(name==='company-settings' && window.CompanySettings) CompanySettings.mount('companySettingsBox');
+    if(name==='pdf-settings' && window.PdfSettings) PdfSettings.mount('pdfSettingsBox');
     if(name==='signature') initAdminSigCanvas();
   if(name==='clients' && window.ClientsPage){ ClientsPage.mount('clientsBox'); if(typeof loadClientPortalAccess==='function') loadClientPortalAccess(); }
   if(name && name.indexOf('stats-')===0 && window.VS_STATS) VS_STATS.load(name);

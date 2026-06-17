@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-17 — CargoTMS-hézagok Fázis D/2: PDF-sablon beállítások (PR #177) — a hiánylista A–D KÉSZ
+
+> Per-cég, per-dokumentumtípus PDF-testreszabás (fejléc/lábléc/akcent/logó), a meglévő branding újrahasználásával. Ezzel a teljes CargoTMS-hiánylista (A–D, a Bursă kivételével) le van fedve.
+
+- **`db/pdf-templates.sql`** (idempotens) — `pdf_templates(company_id, doc_type, header_text, footer_text, accent_color, show_logo, UNIQUE(company_id,doc_type))`; a logó + alap-szín a `company_branding`-ből (nincs duplikáció).
+- **`handlers/pdfTemplates.js`** — `pdfTemplateList/Get` (Admin/Manager), `pdfTemplateSave` (**Admin**; `doc_type` fehérlista {order,waybill,cmr,invoice_note}, hex- + hossz-validáció, audit). Company_id-szűrt + paraméteres.
+- **Bekötés (őszinte):** STÍLUSOZVA a fuvar-lista print/HTML export (`downloadSelectedOrders` — header/logó/lábléc/akcent). KIZÁRVA a szolgáltatói számlák (FGO/SmartBill/… — a provider rajzolja, jelölve a UI-ban). A `waybill/cmr/invoice_note` egyelőre tárolás + élő előnézet (jelölve), az aláírt-PDF (`buildSignedPdf`) érintetlen.
+- **UI** `public/pdf-settings.js` — 📄 „PDF-sablonok" aloldal (Beállítások): per-típus űrlap + élő előnézet. `feature-catalog`+`i18n` (RO-alap+HU), cache-bust `?v=20260617d2`; 93 Jest zöld.
+
 ## 2026-06-17 — CargoTMS-hézagok Fázis D/1: Fuvar-adatlap + Ügyfél-profil (tabos drill-in) (PR #176)
 
 > A listából megnyíló, tabos READ-nézet — a meglévő fuvar-szerkesztőt NEM írja át (csak olvasó-nézet + linkek a meglévő akciókra), a jármű/sofőr-adatlap mintájára.
