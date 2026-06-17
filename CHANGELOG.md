@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-17 — CargoTMS-hézagok Fázis B/2: Jármű- és sofőr-adatlap (tabos drill-in) (PR #170)
+
+> A listából megnyíló, tabos entitás-adatlap — a Lejárat/Szerviz/Tankolás az adott járműre/sofőrre szűrve, és onnan is felvihető. A globális oldalak változatlanok.
+
+- **`handlers/entityDetail.js`** — `getVehicleDetail({id})` + `getDriverDetail({email|id})`: **tulajdon-ellenőrzés elöl** (`SELECT … WHERE id=$1 AND company_id=$2` → ha nem a cégé, `{ok:false}`), majd az entitásra szűrt `document_expiries` (normalizált rendszám-egyezés) + `vehicle_service_log` (vehicle_id) + `fuel_card_transactions` (rendszám) / sofőrnél a `driver_advances` összegzés. Mind `company_id`-szűrt + paraméteres, `Admin/Manager` kapu, read-only.
+- **Add-from-detail:** a Lejárat/Szerviz felvitel a Lejáratok/Szerviz fülről a **meglévő, auditált** `expirySave`/`serviceCreate`-et hívja, az entitással előtöltve — nincs párhuzamos mentő-logika.
+- **UI:** `public/entity-detail.js` — „Részletek" gomb a jármű- és belső-sofőr táblákon → tabos modal (Adatok / Dokumentumok & Lejáratok / Szerviz / Tankolás; sofőrnél Decont, ha van). `vsAvatar`, warm stílus, egyetlen `#entityDetailModal` (nincs dup id).
+- **Kihagyva (indokkal):** sofőr-tankolás (a `fuvarlevelek.alimentari` JSONB nem tisztán sofőrre köthető) — helyette a `driver_advances` összegzés. `i18n` `ed.*` (RO-alap+HU), cache-bust `?v=20260617b2`; 93 Jest zöld. Auth/global oldalak érintetlenek.
+
 ## 2026-06-17 — CargoTMS-hézagok Fázis B/1: Operatív központ + SLA-analitika (PR #169)
 
 > Két read-only, aggregáló oldal a meglévő adatból — nincs új tábla, nincs írás, koholt adat nélkül.

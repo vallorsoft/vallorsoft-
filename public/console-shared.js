@@ -987,6 +987,7 @@ function loadInternalDrivers(){
         +trailerSel
         +'</td>'
         +'<td>'
+        +'<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="EntityDetail.openDriver(window._vsIntDrvCache['+i+'].email, window._vsIntDrvCache['+i+'].nume)">'+t('ed.details')+'</button> '
         +'<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="editUser(window._vsIntDrvCache['+i+'])">'+t('cs.edit')+'</button> '
         +'<button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteUser(window._vsIntDrvCache['+i+'].email,window._vsIntDrvCache['+i+'].nume)">'+t('cs.del')+'</button>'
         +'</td>'
@@ -2352,7 +2353,7 @@ function renderRemorcas(list){const sel=document.getElementById('oRemorcaSelect'
 function renderVehicleTable(tableId,list){
   const tb=document.querySelector('#'+tableId+' tbody');
   if(!list||list.length===0){tb.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);">'+t('cs.noneAdded')+'</td></tr>';return;}
-  tb.innerHTML=list.map(v=>`<tr><td><b>${esc(v.rendszam)}</b></td><td>${esc(v.marca||'—')}</td><td>${esc(v.model||'—')}</td><td>${v.an||'—'}</td><td>${esc(v.nota||'—')}</td><td><button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editVehicle(${v.id})">${t('cs.editShort')}</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteVehicle(${v.id})">${t('cs.del')}</button></td></tr>`).join('');
+  tb.innerHTML=list.map(v=>`<tr><td><b>${esc(v.rendszam)}</b></td><td>${esc(v.marca||'—')}</td><td>${esc(v.model||'—')}</td><td>${v.an||'—'}</td><td>${esc(v.nota||'—')}</td><td><button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="EntityDetail.openVehicle(${v.id})">${t('ed.details')}</button> <button class="btn primary" style="padding:4px 10px;font-size:12px;" onclick="editVehicle(${v.id})">${t('cs.editShort')}</button> <button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="deleteVehicle(${v.id})">${t('cs.del')}</button></td></tr>`).join('');
 }
 
 function revokeInv(kod){
