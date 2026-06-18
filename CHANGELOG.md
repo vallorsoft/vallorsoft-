@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-06-18 — Tracking: élő GPS minden aktív státusznál (nem csak Alocat/In Curs)
+
+> A követő-oldalon a térkép megjelent, de „Poziția GPS nu este disponibilă" volt akkor is, ha a jármű GPS-re volt kötve és párosítva — mert az élő pozíciót csak `Alocat`/`In Curs` státusznál kértük le. A `Disponibil` (Înregistrat) fuvarnál így sosem jött a pozíció.
+
+- **`routes/track.js`** — az élő GPS-lekérés státusz-feltétele kibővítve **minden aktív státuszra**: `Disponibil`, `Alocat`, `Extern`, `In Curs`, `Parkolt`, `Raktarban`. A lezárt/törölt (`Finalizat`/`Anulat`) kizárva (ott a jármű már más fuvaron lehet → félrevezető lenne; a `Finalizat` a kézbesítve-jelzést kapja, a tervezett-útvonal térkép marad). Párosítás/kulcs/cache logika változatlan. 100 Jest zöld.
+
 ## 2026-06-18 — Tracking-oldal: tervezett útvonal térkép élő GPS nélkül is
 
 > A publikus követő-oldal (`/t/<token>`) eddig élő GPS hiányában csak egy „Poziția GPS nu este disponibilă" szöveget mutatott, alatta üres oldallal. Mostantól, ha nincs élő GPS, a **felrakó → lerakó tervezett útvonal** jelenik meg térképen.

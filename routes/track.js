@@ -46,9 +46,12 @@ router.get('/api/track/:token', async (req, res) => {
     if (!r.rows.length) return res.json({ ok: false });
     const o = r.rows[0];
 
-    // Élő GPS pozíció — csak aktív fuvarnál és párosított járműnél
+    // Élő GPS pozíció — minden AKTÍV fuvarnál és párosított járműnél.
+    // (A lezárt/törölt fuvarnál — Finalizat/Anulat — nincs élő követés: a jármű
+    //  már más fuvaron lehet, a pozíció félrevezető lenne.)
+    const ACTIVE_STATUSES = ['Disponibil', 'Alocat', 'Extern', 'In Curs', 'Parkolt', 'Raktarban'];
     let position = null;
-    if (['Alocat', 'In Curs'].includes(o.status) && o.rendszam_camion) {
+    if (ACTIVE_STATUSES.includes(o.status) && o.rendszam_camion) {
       const cached = _posCache.get(token);
       if (cached && Date.now() - cached.ts < POS_CACHE_MS) {
         position = cached.pos;
