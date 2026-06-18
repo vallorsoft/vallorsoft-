@@ -402,6 +402,8 @@
 
     // ── Kedvenc helyszínek (favorite locations) ──
     'nav.favLocations': { hu: '⭐ Kedvenc helyszínek', ro: '⭐ Locații favorite' },
+    'nav.account': { hu: '👤 Fiók', ro: '👤 Cont' },
+    'nav.subscription': { hu: '💳 Előfizetés', ro: '💳 Abonament' },
     'nav.companySettings': { hu: '🏢 Cég & arculat', ro: '🏢 Firmă & branding' },
     'comset.title': { hu: '🏢 Cég & arculat', ro: '🏢 Firmă & branding' },
     'comset.intro': { hu: 'A céged arculata és alapértelmezett beállításai egy helyen.', ro: 'Identitatea vizuală și setările implicite ale firmei, într-un singur loc.' },
