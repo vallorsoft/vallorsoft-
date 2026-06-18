@@ -123,13 +123,10 @@ window.EmailTemplates = (function () {
   }
 
   function test(i) {
-    // A teszt-küldés a sablon kulcsára megy, a saját (belépett) e-mailre.
-    // A változók a kulcshoz tartozó minta-értékekkel töltődnek (csak teszt).
+    // A teszt-küldés a KÖZÖS VallorSoft címről a belépett felhasználó SAJÁT
+    // címére megy (a szerver a `test:true` mellett a saját e-mailt használja,
+    // a megadott címet figyelmen kívül hagyja). A változók minta-értékek.
     var key = _items[i].key;
-    // A saját (belépett) e-mail — a console-shared.js által beállított globál.
-    var to = (typeof myEmail === 'string' && myEmail) ? myEmail : '';
-    if (!to) { to = prompt((tt('etpl.askEmail', 'Címzett e-mail:')) || 'E-mail:') || ''; }
-    if (!to) return;
     var sampleVars = {
       order_id: 'TEST-001', route: 'București → Cluj', client: 'Demo SRL',
       status: 'In Curs', pret: '1200 EUR', invoice_no: 'FV-2026-001',
@@ -137,8 +134,8 @@ window.EmailTemplates = (function () {
     };
     var lang = 'ro';
     try { if (window.I18N && typeof I18N.get === 'function') lang = I18N.get(); } catch (e) {}
-    gas('sendTemplatedEmail', [{ template_key: key, to_email: to, lang: lang, vars: sampleVars }]).then(function (d) {
-      if (d && d.ok) toast(tt('etpl.sent', 'Teszt e-mail elküldve') + ': ' + to, 'ok');
+    gas('sendTemplatedEmail', [{ template_key: key, test: true, lang: lang, vars: sampleVars }]).then(function (d) {
+      if (d && d.ok) toast(tt('etpl.sentTest', 'Teszt e-mail elküldve a saját címedre'), 'ok');
       else toast((d && d.err) || 'Eroare', 'err');
     });
   }

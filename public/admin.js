@@ -64,6 +64,7 @@ function loadTab(name){
   if(name==='warehouse') loadWarehouseTab();
   if(name==='integrations'){
     if(typeof loadGdpr==='function') loadGdpr();
+    if(window.EmailSenderCard)  EmailSenderCard.mount('emailSenderCardBox');
     if(window.EmailIntakeCard)  EmailIntakeCard.mount('emailIntakeCardBox', {readOnly:false});
     if(window.BillingCard)      BillingCard.mount('billingCardBox');
     if(window.CargoTrackCard)   CargoTrackCard.mount('ctCardBox');
