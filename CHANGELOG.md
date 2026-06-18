@@ -20,7 +20,7 @@
 
 - **`services/scheduler.js` `startGpsMileageScheduler`** — a GPS km-óra leolvasás **24 óránként → óránként** (env `GPS_MILEAGE_INTERVAL_MIN`, alap 60, min 5; átfedés-őr). Minden cég km-frissítése **UTÁN AZONNAL** lefut a szerviz-esedékesség ellenőrzés (`_dispatchServiceAlerts`) → a km-alapú push + e-mail a leolvasási cikluson belül megy, nem 12 óra múlva.
 - **Közös `_dispatchServiceAlerts(cid)`** kiemelve (push + Notifications + e-mail + `last_alert_at` hetente-egyszer őr). A `startServiceDueScheduler` (12 órás) megmaradt **seprés-biztonsági hálóként** (dátum-alapú esedékesség + GPS nélküli cégek).
-- **Részletes e-mail** (`handlers/fleetCompliance.js` `computeServiceDueAlerts` + e-mail-törzs) — járművenként blokk: **autó-adat** (rendszám, márka/típus, aktuális km-óra) + **szerviz-adat** (esedékesség km/dátum, állapot, szerviz típusa RO-ul, utolsó szerviz dátuma, megjegyzés). A `_alertEmailBody` rugalmas (táblázat VAGY blokk). 93 Jest zöld.
+- **Részletes e-mail** (`handlers/fleetCompliance.js` `computeServiceDueAlerts` + e-mail-törzs) — járművenként blokk: **autó-adat** (rendszám, márka/típus, aktuális km-óra) + **szerviz-adat** (esedékesség km/dátum, állapot, szerviz típusa RO-ul, utolsó szerviz dátuma, **költség RON**, **megjegyzés** teljes hosszában max 300 kar). A `_alertEmailBody` rugalmas (táblázat VAGY blokk). 93 Jest zöld.
 
 ## 2026-06-18 — Km-/dátum-alapú szerviz-esedékesség riasztás (GPS km) + e-mail értesítő a lejáratokról és szervizekről
 

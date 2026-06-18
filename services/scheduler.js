@@ -339,7 +339,8 @@ async function _dispatchServiceAlerts(cid) {
         detail += line('Stare', '<span style="color:' + col + ';font-weight:700;">' + scad + '</span>');
         if (cat) detail += line('Tip revizie', _escH(cat));
         if (i.service_date) detail += line('Ultima revizie', dRO(i.service_date));
-        if (i.description) detail += line('Observații', _escH(String(i.description).slice(0, 120)));
+        if (i.cost_ron != null) detail += line('Cost ultima revizie', _fmtKm(Math.round(i.cost_ron)) + ' RON');
+        if (i.description) detail += line('Observații', _escH(String(i.description).slice(0, 300)));
 
         return '<div style="border:1px solid #ece3d8;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fffdfa;">'
           + '<div style="font-size:15px;font-weight:800;color:#2a2018;margin-bottom:6px;">🚛 ' + vehName + '</div>'
