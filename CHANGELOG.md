@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-06-18 — Tranzakciós e-mail sablon: közvetlen küldés címzettnek + folyamatba kötés
+
+> A „Șabloane e-mail" (tranzakciós sablonok) eddig csak szerkeszthető + teszt-küldés (saját címre) volt. Most bármely sablon közvetlenül elküldhető valódi címzettnek, és a fuvar- ill. számla-folyamatba is be van kötve.
+
+- **`public/templated-email.js`** (ÚJ, közös) — `window.sendTemplatedEmailDialog({templateKey, keys, vars, toEmail, title})`: dialógus sablon-választóval (ha több kulcs), címzett-mezővel és a sablon `{{változó}}`-mezőivel; a meglévő `gas('sendTemplatedEmail')`-t hívja (cég sablonja, szerver-oldali escape). Bekötve admin/manager HTML-be.
+- **E-mail sablonok oldal** (`public/email-templates.js`) — minden sablonhoz **„📧 Küldés címzettnek"** gomb (a teszt-küldés mellett) → a dialógust a sablon kulcsára rögzítve nyitja.
+- **Fuvar-folyamat** (`public/console-shared.js`) — a fuvar-sor ⋯ menüjében **„📧 Sablonból e-mail"**: `vsSendOrderTplMail` a `_ordersAllCache`-ből (idézőjel-biztos) tölti elő az `order_id`/`route`/`client`/`status`-t.
+- **Számla-folyamat** (`public/invoices-out.js`) — a Kimenő számlák során **📧** gomb: `invOutSendTpl` a `invoice_notify` sablont tölti elő (`client`/`invoice_no`/`order_id`).
+- **i18n** (`public/i18n.js`) — `etpl.sendToBtn`, `cs.ol.mTplMail`, `etpl.var.*` (RO-alap+HU). Cache-bust `?v=20260618tpl`. A küldés a KÖZÖS VallorSoft Brevo-címről megy (mint eddig is a `sendTemplatedEmail`), `mail_log`-ba naplózva; 93 Jest zöld.
+
 ## 2026-06-18 — Szerviz-riasztás valós idejűvé tétele + részletes (autó+szerviz) e-mail
 
 > A km-alapú szerviz-riasztás már nem a 12 órás seprésre vár, hanem a GPS-km friss leolvasása után azonnal megy; az e-mail pedig járművenként kiírja a teljes autó- és szerviz-adatot.
