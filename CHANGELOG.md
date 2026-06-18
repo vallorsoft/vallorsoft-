@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-18 — Jogi oldalak (RO) bővítése az alvállalkozói GPS-funkcióval
+
+> Az alvállalkozói jármű GPS-követés bevezetése után a román jogi/GDPR oldalak frissítve, hogy lefedjék az új adatkezelést.
+
+- **`public/privacy.html`** — új §4.4.1 (alvállalkozói járművek GPS-e: megosztott link és/vagy az alvállalkozó által megadott CargoTrack object_id+API-kulcs; az alvállalkozó önálló adatkezelő a saját sofőrjei felé, Legea 190/2018; a kulcs AES-256-GCM-mel titkosítva, sosem kerül vissza) + §4.4.2 (publikus követő-link minimális adattal, visszavonható token); §7 destinatari + a HU összefoglaló kiegészítve.
+- **`public/terms.html`** — új §14.1 (az alvállalkozó/Ügyfél szavatolja, hogy joga van a link/kulcs megosztásához és tájékoztatta a sofőrjeit; a kulcsok titkosítva, a publikus link minimális adatot mutat).
+- **`public/dpa.html`** — §5 új adatkategória-sor (alvállalkozói GPS) + §9 subprocesszor-sor (alvállalkozó saját GPS-rendszere). Verzió 1.1, dátum 18.06.2026 (privacy/terms/dpa).
+- **`CLAUDE.md`** Jogi/GDPR szekció: subprocesszor-tábla + „Kezelt személyes adatok" kiegészítve. *(A statikus oldalak a dinamikus jogi rendszer fallbackjei; kötelező újra-visszaigazolás nem indul automatikusan — ha kell, a developer a `notify_version`-nel kérheti.)*
+
 ## 2026-06-18 — ÚJ: alvállalkozói (carrier) jármű GPS-követés — megosztott link + opc. CargoTrack kulcs
 
 > Eddig csak a SAJÁT flotta GPS-ét lehetett követni (a cég CargoTrack-fiókján). Mostantól az **alvállalkozó (Extern fuvar) járművéhez** is köthető követés: (1) **megosztott publikus követő-link** (bármilyen GPS-rendszerből), és/vagy (2) **CargoTrack object_id + API-kulcs** az élő pozícióhoz a térképen. Felvitel az **alvállalkozói portálon** (a fuvarozó maga) ÉS a **diszpécser** oldaláról; a link az **ügyfél követő-oldalán** is megjelenik.

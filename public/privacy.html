@@ -159,7 +159,7 @@
   <main class="policy-content">
 
     <h1>Politica de Confidențialitate</h1>
-    <p class="last-update">Ultima actualizare: 14.06.2026</p>
+    <p class="last-update">Ultima actualizare: 18.06.2026</p>
 
     <!-- 1 -->
     <h2>1. Operatorul de date</h2>
@@ -267,6 +267,29 @@
     <p>Datele de localizare sunt furnizate de sisteme telematice externe contractate de Operator.</p>
     <p>Platforma utilizează aceste informații exclusiv pentru afișare, analiză statistică și raportare în beneficiul Operatorului.</p>
 
+    <h3>4.4.1 Date GPS privind vehiculele subcontractorilor (transportatori colaboratori)</h3>
+    <p>Pentru transporturile externalizate, Operatorul (clientul) poate atașa unui vehicul al unui
+       subcontractor o modalitate de urmărire, sub una sau ambele forme:</p>
+    <ul>
+      <li><strong>Link de urmărire partajat (URL)</strong> furnizat de subcontractor din propriul sistem GPS —
+          platforma doar afișează un buton care deschide pagina externă a furnizorului subcontractorului;</li>
+      <li><strong>Cheie API + identificator de obiect (object_id)</strong> furnizate de subcontractor (de ex. CargoTrack),
+          pe baza cărora platforma preia și afișează poziția live pe hartă.</li>
+    </ul>
+    <p>Aceste date sunt puse la dispoziție <strong>de către subcontractor</strong>. Subcontractorul, în calitate de
+       operator independent pentru proprii angajați/șoferi, este responsabil de temeiul legal al monitorizării GPS și de
+       informarea propriilor conducători auto (conform Legii 190/2018 și GDPR). VallorSoft nu instalează dispozitive,
+       nu inițiază monitorizarea și nu accesează alte vehicule decât cele indicate de subcontractor/Operator.</p>
+    <p>Cheia API furnizată de subcontractor este stocată <strong>criptat (AES-256-GCM)</strong> și nu este niciodată
+       returnată în interfață sau către terți; este utilizată exclusiv pentru a prelua poziția vehiculului asociat comenzii.</p>
+
+    <h3>4.4.2 Pagina publică de urmărire (link pentru client)</h3>
+    <p>Operatorul poate genera un link public de urmărire (token aleatoriu) pe care îl transmite clientului său.
+       Pagina afișează un set <strong>minim</strong> de informații (rută, status, număr de înmatriculare și, dacă este
+       disponibilă, poziția pe hartă sau linkul de urmărire externă). Nu se divulgă prețuri, date de contact ale
+       șoferului sau alte date interne. Accesul nu necesită autentificare, dar este protejat printr-un token
+       imposibil de ghicit, revocabil de Operator.</p>
+
     <h3>4.5 Date privind documentele fiscale</h3>
     <p>
       Platforma poate integra servicii externe de facturare. Emiterea efectivă a documentelor fiscale
@@ -323,6 +346,11 @@
 
     <h3>CargoTrack / Fomco</h3>
     <p>Rol: furnizare date GPS, integrare telematică. Sediu: România.</p>
+
+    <h3>Sisteme GPS ale subcontractorilor</h3>
+    <p>Pentru transporturile externalizate, datele de poziție pot proveni din sistemul GPS propriu al
+       subcontractorului, prin link de urmărire partajat sau prin cheie API furnizată de acesta (de ex. CargoTrack).
+       Subcontractorul rămâne responsabil pentru aceste sisteme și pentru informarea propriilor șoferi.</p>
 
     <h3>Furnizor de găzduire</h3>
     <p>Furnizorul de găzduire va fi actualizat după punerea în producție a platformei.</p>
@@ -417,6 +445,13 @@
         <strong>Kezelt adatok:</strong> név, e-mail cím, telefonszám (opcionális), jelszó (hash formában),
         GPS-helyadatok (kizárólag üzleti célra, külső GPS-szolgáltató API-ján keresztül),
         számlázási adatok, technikai naplók.
+      </p>
+      <p>
+        <strong>Alvállalkozói GPS:</strong> kiszervezett fuvaroknál az alvállalkozó saját GPS-rendszeréből
+        származó helyadat is megjeleníthető — megosztott követő-linken vagy az alvállalkozó által megadott
+        API-kulccsal (pl. CargoTrack). Az API-kulcsot <strong>titkosítva (AES-256-GCM)</strong> tároljuk, és sosem
+        adjuk vissza a felületre. A saját sofőrjei tájékoztatásáért és a GPS-megfigyelés jogalapjáért az
+        alvállalkozó felel. Az ügyfélnek küldött publikus követő-link csak minimális adatot mutat.
       </p>
       <p>
         <strong>Jogalap:</strong> szerződés teljesítése (GDPR 6. cikk (1) b), jogi kötelezettség
