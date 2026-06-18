@@ -1,9 +1,10 @@
 // public/email-intake-card.js
-// "📧 Megrendelés email fiók" kártya az Integrációk / Számlázó fülre.
-// Cégenként megadható IMAP postafiók (Gmail / Outlook / Egyedi). A hitelesítő
-// adatok titkosítva, szerver oldalon tárolódnak — sosem kerülnek vissza nyíltan.
+// "Cont e-mail comenzi" kártya az Integrációk fülre. Cégenként megadható IMAP
+// postafiók (Gmail / Outlook / Egyedi). A hitelesítő adatok titkosítva, szerver
+// oldalon tárolódnak — sosem kerülnek vissza nyíltan.
+// Feliratok: RO-alap + HU-váltó az i18n-en (t('eic.*')); nyelvváltáskor a kártya
+// újrarenderelődik (console-shared onLangChange → loadTab('integrations')).
 // RPC: gas('getEmailIntakeConfig' | 'saveEmailIntakeConfig' | 'testEmailIntakeConfig' | 'deleteEmailIntakeConfig').
-// Használat: EmailIntakeCard.mount('emailIntakeCardBox', { readOnly:false });
 window.EmailIntakeCard = (function () {
   var STYLE = ""
     + ".eic{border:1px solid var(--glass-border-dark,rgba(255,255,255,.08));border-radius:var(--radius-lg,18px);"
@@ -39,11 +40,16 @@ window.EmailIntakeCard = (function () {
     + ".eic-kv{display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);}"
     + ".eic-kv span:first-child{color:var(--text-muted);}.eic-kv span:last-child{color:var(--text-primary);font-weight:600;}";
 
+  // Ikonok (a Gmail/Outlook márkanév nem fordul; az „Egyedi" felirat i18n).
   var PROV = {
-    gmail:   { label: 'Gmail', icon: '✉️' },
-    outlook: { label: 'Outlook', icon: '✉️' },
-    custom:  { label: 'Egyedi IMAP', icon: '🛠' },
+    gmail:   { icon: '✉️' },
+    outlook: { icon: '✉️' },
+    custom:  { icon: '🛠' },
   };
+  function L(k, v) { return (window.t ? window.t(k, v) : k); }
+  function provLabel(key) { return key === 'custom' ? L('eic.provCustom') : (key === 'gmail' ? 'Gmail' : key === 'outlook' ? 'Outlook' : (key || '—')); }
+  function curLang() { try { return (window.I18N && I18N.get) ? I18N.get() : 'ro'; } catch (e) { return 'ro'; } }
+  function loc() { return curLang() === 'hu' ? 'hu-HU' : 'ro-RO'; }
 
   function ensureStyle() {
     if (document.getElementById('eic-style')) return;
@@ -53,16 +59,16 @@ window.EmailIntakeCard = (function () {
   function call(fn, a) { return window.gas ? gas(fn, a ? [a] : []) : Promise.reject(new Error('gas hiányzik')); }
 
   function relTime(iso) {
-    if (!iso) return 'soha';
-    var t = new Date(iso).getTime(); if (isNaN(t)) return '—';
-    var d = Math.floor((Date.now() - t) / 1000);
-    if (d < 60) return 'most';
-    if (d < 3600) return Math.floor(d / 60) + ' perce';
-    if (d < 86400) return Math.floor(d / 3600) + ' órája';
-    return new Date(iso).toLocaleDateString('hu-HU');
+    if (!iso) return L('eic.never');
+    var ts = new Date(iso).getTime(); if (isNaN(ts)) return '—';
+    var d = Math.floor((Date.now() - ts) / 1000);
+    if (d < 60) return L('eic.now');
+    if (d < 3600) return L('eic.minAgo', { n: Math.floor(d / 60) });
+    if (d < 86400) return L('eic.hourAgo', { n: Math.floor(d / 3600) });
+    return new Date(iso).toLocaleDateString(loc());
   }
-  function dateHu(iso) { if (!iso) return '—'; var dt = new Date(iso); return isNaN(dt) ? '—' : dt.toLocaleDateString('hu-HU'); }
-  function dateHuTime(iso) { if (!iso) return '—'; var dt = new Date(iso); return isNaN(dt) ? '—' : dt.toLocaleString('hu-HU'); }
+  function dDate(iso) { if (!iso) return '—'; var dt = new Date(iso); return isNaN(dt) ? '—' : dt.toLocaleDateString(loc()); }
+  function dDateTime(iso) { if (!iso) return '—'; var dt = new Date(iso); return isNaN(dt) ? '—' : dt.toLocaleString(loc()); }
 
   function mount(target, opts) {
     var el = typeof target === 'string' ? document.getElementById(target) : target;
@@ -74,17 +80,17 @@ window.EmailIntakeCard = (function () {
   }
 
   function load(ctx) {
-    ctx.el.innerHTML = '<div class="eic"><div class="eic-title">📧 Megrendelés email fiók</div><div class="eic-sub">Betöltés…</div></div>';
+    ctx.el.innerHTML = '<div class="eic"><div class="eic-title">' + E(L('eic.title')) + '</div><div class="eic-sub">' + E(L('eic.loading')) + '</div></div>';
     call('getEmailIntakeConfig').then(function (r) {
-      if (!r || !r.ok) return renderError(ctx, (r && r.err) || 'Nem elérhető.');
+      if (!r || !r.ok) return renderError(ctx, (r && r.err) || L('eic.unavailable'));
       if (r.configured) renderConfigured(ctx, r);
       else renderEmpty(ctx);
-    }).catch(function () { renderError(ctx, 'Hálózati hiba.'); });
+    }).catch(function () { renderError(ctx, L('eic.netErr')); });
   }
 
   function shell(ctx, badge, inner) {
     return '<div class="eic">'
-      + '<div class="eic-head"><div class="eic-title">📧 Megrendelés email fiók</div>'
+      + '<div class="eic-head"><div class="eic-title">' + E(L('eic.title')) + '</div>'
       + (badge || '') + '</div>' + inner + '</div>';
   }
 
@@ -95,18 +101,18 @@ window.EmailIntakeCard = (function () {
   // ── Nincs beállítva ──
   function renderEmpty(ctx) {
     if (ctx.readOnly) {
-      ctx.el.innerHTML = shell(ctx, '<span class="eic-badge off">Nincs beállítva</span>',
-        '<div class="eic-sub">Még nincs megrendelés-fiók beállítva. A beállítást az Admin kezeli.</div>');
+      ctx.el.innerHTML = shell(ctx, '<span class="eic-badge off">' + E(L('eic.badgeOff')) + '</span>',
+        '<div class="eic-sub">' + E(L('eic.roEmpty')) + '</div>');
       return;
     }
-    var inner = '<div class="eic-sub">Nincs beállítva — add meg azt az email fiókot, amelyre a megrendeléseket kapod. <b>A mentés pillanatától</b> csak az azután beérkező leveleket dolgozza fel (a régieket nem).</div>'
-      + '<div style="font-size:13px;color:var(--text-primary);font-weight:600;margin-bottom:8px;">Válassz szolgáltatót:</div>'
+    var inner = '<div class="eic-sub">' + L('eic.emptyHint') + '</div>'
+      + '<div style="font-size:13px;color:var(--text-primary);font-weight:600;margin-bottom:8px;">' + E(L('eic.pickProvider')) + '</div>'
       + '<div class="eic-prov">'
       + '<button data-prov="gmail"><span class="ic">✉️</span>Gmail</button>'
       + '<button data-prov="outlook"><span class="ic">✉️</span>Outlook</button>'
-      + '<button data-prov="custom"><span class="ic">🛠</span>Egyedi IMAP</button>'
+      + '<button data-prov="custom"><span class="ic">🛠</span>' + E(L('eic.provCustom')) + '</button>'
       + '</div>';
-    ctx.el.innerHTML = shell(ctx, '<span class="eic-badge off">Nincs beállítva</span>', inner);
+    ctx.el.innerHTML = shell(ctx, '<span class="eic-badge off">' + E(L('eic.badgeOff')) + '</span>', inner);
     ctx.el.querySelectorAll('.eic-prov button').forEach(function (b) {
       b.onclick = function () { renderForm(ctx, b.getAttribute('data-prov'), {}); };
     });
@@ -114,41 +120,40 @@ window.EmailIntakeCard = (function () {
 
   // ── Beállítva (státusz) ──
   function renderConfigured(ctx, r) {
-    var prov = PROV[r.provider] ? PROV[r.provider].label : (r.provider || '—');
-    var kv = '<div class="eic-kv"><span>Szolgáltató</span><span>' + E(prov) + '</span></div>'
-      + (r.email ? '<div class="eic-kv"><span>Email</span><span>' + E(r.email) + '</span></div>' : '')
-      + '<div class="eic-kv"><span>Postafiók</span><span>' + E(r.mailbox || 'INBOX') + '</span></div>'
-      + '<div class="eic-kv"><span>Beállítva</span><span>' + dateHu(r.configured_at) + '</span></div>'
-      + (r.since ? '<div class="eic-kv"><span>Csak ettől dolgozza fel</span><span>' + dateHuTime(r.since) + '</span></div>' : '')
-      + '<div class="eic-kv" style="border-bottom:none;"><span>Utolsó lekérdezés</span><span>' + relTime(r.last_polled_at) + '</span></div>';
+    var kv = '<div class="eic-kv"><span>' + E(L('eic.kvProvider')) + '</span><span>' + E(provLabel(r.provider)) + '</span></div>'
+      + (r.email ? '<div class="eic-kv"><span>' + E(L('eic.kvEmail')) + '</span><span>' + E(r.email) + '</span></div>' : '')
+      + '<div class="eic-kv"><span>' + E(L('eic.kvMailbox')) + '</span><span>' + E(r.mailbox || 'INBOX') + '</span></div>'
+      + '<div class="eic-kv"><span>' + E(L('eic.kvConfigured')) + '</span><span>' + dDate(r.configured_at) + '</span></div>'
+      + (r.since ? '<div class="eic-kv"><span>' + E(L('eic.kvSince')) + '</span><span>' + dDateTime(r.since) + '</span></div>' : '')
+      + '<div class="eic-kv" style="border-bottom:none;"><span>' + E(L('eic.kvLastPoll')) + '</span><span>' + relTime(r.last_polled_at) + '</span></div>';
 
     if (ctx.readOnly) {
-      ctx.el.innerHTML = shell(ctx, '<span class="eic-badge ok">✅ Aktív</span>',
-        kv + '<div class="eic-sub" style="margin:14px 0 0;">A beállítást az Admin kezeli.</div>');
+      ctx.el.innerHTML = shell(ctx, '<span class="eic-badge ok">' + E(L('eic.badgeOk')) + '</span>',
+        kv + '<div class="eic-sub" style="margin:14px 0 0;">' + E(L('eic.roManaged')) + '</div>');
       return;
     }
     var inner = kv + '<div class="eic-msg" id="eicMsg"></div>'
       + '<div class="eic-actions">'
-      + '<button class="eic-btn ghost" id="eicTest">🔌 Tesztelés</button>'
-      + '<button class="eic-btn primary" id="eicEdit">✏️ Módosítás</button>'
-      + '<button class="eic-btn danger" id="eicDel">🗑 Törlés</button>'
+      + '<button class="eic-btn ghost" id="eicTest">' + E(L('eic.test')) + '</button>'
+      + '<button class="eic-btn primary" id="eicEdit">' + E(L('eic.edit')) + '</button>'
+      + '<button class="eic-btn danger" id="eicDel">' + E(L('eic.del')) + '</button>'
       + '</div>';
-    ctx.el.innerHTML = shell(ctx, '<span class="eic-badge ok">✅ Aktív</span>', inner);
+    ctx.el.innerHTML = shell(ctx, '<span class="eic-badge ok">' + E(L('eic.badgeOk')) + '</span>', inner);
 
     var msg = ctx.el.querySelector('#eicMsg');
     ctx.el.querySelector('#eicTest').onclick = function () {
-      setMsg(msg, 'Tesztelés…', '');
+      setMsg(msg, L('eic.testing'), '');
       call('testEmailIntakeConfig').then(function (rr) {
         if (rr && rr.ok) setMsg(msg, '✅ ' + rr.message, 'ok');
-        else setMsg(msg, '❌ ' + ((rr && rr.err) || 'Hiba'), 'err');
+        else setMsg(msg, '❌ ' + ((rr && rr.err) || L('eic.err')), 'err');
       });
     };
     ctx.el.querySelector('#eicEdit').onclick = function () { renderForm(ctx, r.provider || 'gmail', { mailbox: r.mailbox }); };
     ctx.el.querySelector('#eicDel').onclick = function () {
-      if (!confirm('Biztosan törlöd a megrendelés email fiók beállítását? A lekérdezés ezután leáll.')) return;
+      if (!confirm(L('eic.delConfirm'))) return;
       call('deleteEmailIntakeConfig').then(function (rr) {
-        if (rr && rr.ok) { if (window.toast) toast('Beállítás törölve', 'ok'); renderEmpty(ctx); }
-        else setMsg(msg, '❌ ' + ((rr && rr.err) || 'Hiba'), 'err');
+        if (rr && rr.ok) { if (window.toast) toast(L('eic.deleted'), 'ok'); renderEmpty(ctx); }
+        else setMsg(msg, '❌ ' + ((rr && rr.err) || L('eic.err')), 'err');
       });
     };
   }
@@ -157,34 +162,33 @@ window.EmailIntakeCard = (function () {
   function renderForm(ctx, provider, prefill) {
     provider = PROV[provider] ? provider : 'gmail';
     var p = prefill || {};
-    var title = provider === 'gmail' ? 'Gmail beállítása'
-      : provider === 'outlook' ? 'Outlook/Office365 beállítása' : 'Egyedi IMAP beállítása';
+    var title = provider === 'gmail' ? L('eic.formGmail')
+      : provider === 'outlook' ? L('eic.formOutlook') : L('eic.formCustom');
 
     var fields = '';
     if (provider === 'custom') {
       fields += '<div class="eic-row">'
-        + '<div class="eic-field"><label>IMAP szerver</label><input id="eicHost" value="' + E(p.host || '') + '" placeholder="mail.cegem.ro"></div>'
+        + '<div class="eic-field"><label>' + E(L('eic.fHost')) + '</label><input id="eicHost" value="' + E(p.host || '') + '" placeholder="mail.cegem.ro"></div>'
         + '<div class="eic-field" style="max-width:120px;"><label>Port</label><input id="eicPort" type="number" value="' + E(p.port || 993) + '"></div>'
         + '</div>'
-        + '<div class="eic-field"><label class="eic-chk"><input type="checkbox" id="eicTls" ' + (p.tls === false ? '' : 'checked') + '> TLS (biztonságos kapcsolat)</label></div>';
+        + '<div class="eic-field"><label class="eic-chk"><input type="checkbox" id="eicTls" ' + (p.tls === false ? '' : 'checked') + '> ' + E(L('eic.fTls')) + '</label></div>';
     }
-    fields += '<div class="eic-field"><label>Email cím</label><input id="eicEmail" value="' + E(p.email || '') + '" placeholder="rendeles@cegem.com"></div>';
+    fields += '<div class="eic-field"><label>' + E(L('eic.fEmail')) + '</label><input id="eicEmail" value="' + E(p.email || '') + '" placeholder="rendeles@cegem.com"></div>';
     if (provider === 'gmail') {
-      fields += '<div class="eic-field"><label>App jelszó</label><input id="eicPass" type="password" placeholder="•••• •••• •••• ••••">'
-        + '<div class="eic-hint">ⓘ Nem a Gmail jelszavad! Hozz létre app jelszót: '
-        + '<a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">myaccount.google.com</a> → Biztonság → Kétlépéses hitelesítés → App jelszavak.</div></div>';
+      fields += '<div class="eic-field"><label>' + E(L('eic.fAppPass')) + '</label><input id="eicPass" type="password" placeholder="•••• •••• •••• ••••">'
+        + '<div class="eic-hint">' + L('eic.gmailHint') + '</div></div>';
     } else {
-      fields += '<div class="eic-field"><label>Jelszó</label><input id="eicPass" type="password" placeholder="••••••••••••"></div>';
+      fields += '<div class="eic-field"><label>' + E(L('eic.fPass')) + '</label><input id="eicPass" type="password" placeholder="••••••••••••"></div>';
     }
-    fields += '<div class="eic-field"><label>Postafiók</label><input id="eicMailbox" value="' + E(p.mailbox || 'INBOX') + '" placeholder="INBOX"></div>';
+    fields += '<div class="eic-field"><label>' + E(L('eic.fMailbox')) + '</label><input id="eicMailbox" value="' + E(p.mailbox || 'INBOX') + '" placeholder="INBOX"></div>';
 
     var inner = '<div class="eic-sub" style="font-weight:600;color:var(--text-primary);">' + E(title) + '</div>'
       + fields
       + '<div class="eic-msg" id="eicMsg"></div>'
       + '<div class="eic-actions">'
-      + '<button class="eic-btn ghost" id="eicTest">🔌 Kapcsolat tesztelése</button>'
-      + '<button class="eic-btn ghost" id="eicBack">← Vissza</button>'
-      + '<button class="eic-btn primary" id="eicSave">💾 Mentés</button>'
+      + '<button class="eic-btn ghost" id="eicTest">' + E(L('eic.testConn')) + '</button>'
+      + '<button class="eic-btn ghost" id="eicBack">' + E(L('eic.back')) + '</button>'
+      + '<button class="eic-btn primary" id="eicSave">' + E(L('eic.save')) + '</button>'
       + '</div>';
     ctx.el.innerHTML = shell(ctx, '', inner);
 
@@ -208,20 +212,20 @@ window.EmailIntakeCard = (function () {
 
     ctx.el.querySelector('#eicBack').onclick = function () { load(ctx); };
     ctx.el.querySelector('#eicTest').onclick = function () {
-      busy(true); setMsg(msg, 'Tesztelés…', '');
+      busy(true); setMsg(msg, L('eic.testing'), '');
       call('testEmailIntakeConfig', gather()).then(function (rr) {
         busy(false);
         if (rr && rr.ok) setMsg(msg, '✅ ' + rr.message, 'ok');
-        else setMsg(msg, '❌ ' + ((rr && rr.err) || 'Hiba'), 'err');
-      }).catch(function () { busy(false); setMsg(msg, '❌ Hálózati hiba', 'err'); });
+        else setMsg(msg, '❌ ' + ((rr && rr.err) || L('eic.err')), 'err');
+      }).catch(function () { busy(false); setMsg(msg, L('eic.netErrShort'), 'err'); });
     };
     ctx.el.querySelector('#eicSave').onclick = function () {
-      busy(true); setMsg(msg, 'Mentés…', '');
+      busy(true); setMsg(msg, L('eic.saving'), '');
       call('saveEmailIntakeConfig', gather()).then(function (rr) {
         busy(false);
-        if (rr && rr.ok) { if (window.toast) toast('Beállítás mentve', 'ok'); load(ctx); }
-        else setMsg(msg, '❌ ' + ((rr && rr.err) || 'Hiba'), 'err');
-      }).catch(function () { busy(false); setMsg(msg, '❌ Hálózati hiba', 'err'); });
+        if (rr && rr.ok) { if (window.toast) toast(L('eic.saved'), 'ok'); load(ctx); }
+        else setMsg(msg, '❌ ' + ((rr && rr.err) || L('eic.err')), 'err');
+      }).catch(function () { busy(false); setMsg(msg, L('eic.netErrShort'), 'err'); });
     };
   }
 

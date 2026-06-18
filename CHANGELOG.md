@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-06-18 — Integrációk kártyák i18n: RO-alap + HU-váltó (egységes nyelv)
+
+> Az Integrációk fülön a kártyák kevert RO/HU feliratúak voltak (a Feladó-fiók románul, az e-mail-intake / számlázó / CargoTrack beégetett magyarral). Most mind a konvenció szerinti: **RO-alap + HU-váltó** az i18n-en.
+
+- **`public/i18n.js`** — ~95 új kulcs (RO+HU): `intg.*` (fül-fejlécek), `eic.*` (e-mail-intake), `bc.*` (számlázó), `ctc.*` (CargoTrack).
+- **`public/admin.html`** — az Integrációk fül-fejlécek `data-i18n`/`data-i18n-html` (intro + Fuvar-számlázás + GPS/Flotta).
+- **`public/email-intake-card.js`** + **`billing-card.js`** — teljes átírás `t()`-re (a render nyelvváltáskor frissül a `onLangChange → loadTab('integrations')` úton); dátum/relatív-idő a választott nyelv lokáljával.
+- **`public/cargotrack-card.js`** — a statikus markup `data-i18n` attribútumokkal (`I18N.apply` a mount után), a dinamikus szövegek (badge/gombok/üzenetek) `t()`-vel.
+- Cache-bust `i18n.js`/kártyák `?v=20260618i18n`; 100 Jest zöld. *(A Feladó-fiók kártya — `email-sender-card.js` — már korábban i18n-elt volt.)*
+
 ## 2026-06-18 — Feladó-fiók duplikáció megszüntetése (szerepfüggő)
 
 > A „Cont expeditor / Feladó-fiók" (SMTP/Brevo) beállító kártya KÉT helyen jelent meg, ugyanazt a backend-konfigot szerkesztve (azonos `ebSender*` handlerek): az **Integrációk** oldalon (`email-sender-card.js`, csak Admin) ÉS az **E-mail szerkesztő** (`/email-builder`, Admin+Manager) „Cont expeditor" paneljén.
