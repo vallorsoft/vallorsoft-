@@ -214,6 +214,12 @@ handlers.ebContactSave = async function (req, res, args) {
     const notes = _str(a.notes, MAX_NOTES);
 
     const id = a.id ? parseInt(a.id, 10) : null;
+    // Ne legyen két azonos e-mail-című kontakt a cégnél (akár insert, akár átírás).
+    const dup = await pool.query(
+      `SELECT id FROM email_contacts WHERE company_id=$1 AND lower(email)=lower($2)` + (id ? ' AND id<>$3' : ''),
+      id ? [cid, email, id] : [cid, email]
+    );
+    if (dup.rows.length) return res.json({ result: { ok: false, err: 'Există deja un contact cu acest e-mail.' } });
     if (id) {
       const r = await pool.query(
         `UPDATE email_contacts SET name=$1, email=$2, type=$3, notes=$4
@@ -356,13 +362,27 @@ handlers.ebSend = async function (req, res, args) {
     );
     if (!tr.rows.length) return res.json({ result: { ok: false, err: 'Negăsit' } });
     const tpl = tr.rows[0];
+    // Üres sablont nincs értelme kiküldeni.
+    if (!String(tpl.html_content || '').trim()) {
+      return res.json({ result: { ok: false, err: 'Șablonul este gol — adăugați conținut înainte de trimitere.' } });
+    }
 
     // Címzett-feloldás: 1) a cég kontaktjai a contact_ids-ből (company-szűrt),
     //                   2) extra_emails (mind EMAIL_RE-validált).
     const recipients = []; // { email, name }
     const seen = new Set();
 
-    const ids = Array.isArray(a.contact_ids) ? a.contact_ids.map(x => parseInt(x, 10)).filter(Boolean) : [];
+    let ids = Array.isArray(a.contact_ids) ? a.contact_ids.map(x => parseInt(x, 10)).filter(Boolean) : [];
+    const extraRaw = Array.isArray(a.extra_emails) ? a.extra_emails : [];
+    // Ha a hívó NEM adott meg címzettet, a sablon MENTETT párosítását használjuk —
+    // a párosítás lényege, hogy a sablon a párosított kontaktoknak menjen egy lépésben.
+    if (!ids.length && !extraRaw.length) {
+      const p = await pool.query(
+        `SELECT contact_id FROM email_template_pairings WHERE template_id=$1 AND company_id=$2`,
+        [tid, cid]
+      );
+      ids = p.rows.map(x => x.contact_id);
+    }
     if (ids.length) {
       const cr = await pool.query(
         `SELECT name, email FROM email_contacts
@@ -375,14 +395,13 @@ handlers.ebSend = async function (req, res, args) {
       }
     }
 
-    const extra = Array.isArray(a.extra_emails) ? a.extra_emails : [];
-    for (const raw of extra) {
+    for (const raw of extraRaw) {
       const em = String(raw || '').trim();
       const key = em.toLowerCase();
       if (EMAIL_RE.test(em) && !seen.has(key)) { seen.add(key); recipients.push({ email: em, name: '' }); }
     }
 
-    if (!recipients.length) return res.json({ result: { ok: false, err: 'Niciun destinatar valid' } });
+    if (!recipients.length) return res.json({ result: { ok: false, err: 'Niciun destinatar valid — selectați contacte, adăugați e-mailuri sau asociați contacte cu acest șablon.' } });
     if (recipients.length > MAX_BATCH) {
       return res.json({ result: { ok: false, err: 'Prea mulți destinatari (max ' + MAX_BATCH + ')' } });
     }

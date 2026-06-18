@@ -403,10 +403,17 @@ async function loadCompanySender(companyId) {
 
 function _smtpTransport(cfg) {
   const nodemailer = require('nodemailer');
+  const port = parseInt(cfg.port, 10) || 587;
+  // A `secure` a PORTBÓL vezethető le (a leggyakoribb felhasználói hiba forrása):
+  //   465 = implicit TLS (secure:true), 587/25/2525 = STARTTLS (secure:false).
+  // Csak nem-szokványos portnál vesszük figyelembe a beállított jelölőt.
+  const secure = port === 465 ? true
+    : (port === 587 || port === 25 || port === 2525) ? false
+    : !!cfg.secure;
   return nodemailer.createTransport({
     host: cfg.host,
-    port: parseInt(cfg.port, 10) || 587,
-    secure: !!cfg.secure,           // true = 465 (implicit TLS), false = 587 (STARTTLS)
+    port: port,
+    secure: secure,
     auth: { user: cfg.user, pass: cfg.pass || '' },
     connectionTimeout: 15000, greetingTimeout: 12000, socketTimeout: 20000,
   });

@@ -257,12 +257,24 @@
 
   // ── Panel 4: párosítás & küldés ──
   function loadPairing() {
-    Promise.all([gas('ebTemplateList'), gas('ebContactList')]).then(function (res) {
+    Promise.all([gas('ebTemplateList'), gas('ebContactList'), gas('ebSenderGet')]).then(function (res) {
       allTemplates = (res[0] && res[0].ok && res[0].templates) || [];
       allContacts = (res[1] && res[1].ok && res[1].contacts) || [];
       renderTplSelect();
       renderContacts();
+      // A renderContacts törli a pipákat — ha van kiválasztott sablon, a mentett
+      // párosítást újra bejelöljük, hogy a kijelölés ne vesszen el kontakt-művelet után.
+      if (document.getElementById('pair-tpl-sel').value) ebOnTplChange();
       loadSendLog();
+      // Figyelmeztetés, ha nincs feladó-fiók beállítva (küldés enélkül nem megy).
+      var warn = document.getElementById('pair-sender-warn');
+      if (warn) {
+        var s = res[2];
+        if (s && s.ok && !s.configured) {
+          warn.innerHTML = '<div class="it err" style="cursor:pointer" onclick="ebSwitch(\'sender\')">⚠️ '
+            + esc(T('eb.noSenderWarn')) + '</div>';
+        } else { warn.innerHTML = ''; }
+      }
     });
   }
 
@@ -366,7 +378,9 @@
       box.innerHTML = rows.slice(0, 25).map(function (l) {
         var ok = l.status === 'sent';
         return '<div class="it ' + (ok ? 'ok' : 'err') + '">'
-          + (ok ? '✅ ' : '❌ ') + '<strong>' + esc(l.to_email || '') + '</strong> — ' + fmtDateTime(l.created_at)
+          + (ok ? '✅ ' : '❌ ') + '<strong>' + esc(l.to_email || '') + '</strong>'
+          + (l.subject ? ' · ' + esc(l.subject) : '')
+          + ' — ' + fmtDateTime(l.created_at)
           + '</div>';
       }).join('');
     });
