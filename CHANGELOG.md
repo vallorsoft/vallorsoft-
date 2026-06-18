@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-18 — „Email a fuvarról": pipálós fuvar-adatok + csatolmányok (megrendelő/számla/fotók)
+
+> Egy kiírt fuvarhoz tartozó levél tetszőleges címre (külső VAGY belső). Küldés előtt pipálással választod ki, MELY fuvar-adat kerüljön a szövegbe és MELY fájl menjen csatolmányként (megrendelő eredeti/aláírt-pecsételt, sofőr-POD-fotók, számla-PDF). Ami nincs pipálva, az nem kerül bele.
+
+- **`services/email.js`** — a `getCompanyMailer.send` + `_brevoSendCompany` mostantól **csatolmányt** is küld (`attachments:[{name,contentBase64}]` → nodemailer `attachments` / Brevo `attachment`).
+- **`handlers/orderEmail.js`** (ÚJ) — `getOrderEmailData(order_id)`: a fuvar kiválasztható adat-mezői (RO címkékkel) + ügyfél-e-mail + **elérhető csatolmányok felsorolása** (order_documents eredeti/aláírt, `documents` POD-fotók a fuvarhoz, `invoices` PDF-link) — mind `company_id`-szűrt, base64 nélkül. `sendOrderEmail`: a kipipált mezőkből épít adat-táblát + a kipipált csatolmányokat base64-ben feloldja (data-URI strip; külső URL/számla-PDF best-effort letöltés; darab- és méret-korlát), majd a **cég saját SMTP-/feladó-fiókján** küld (nincs beállítva → RO hiba). Admin/Manager, paraméteres, audit.
+- **`public/order-email.js`** (ÚJ) — `openOrderEmail(orderId)` dialógus: címzett (ügyfél-e-mail előtöltve, bármilyen cím), tárgy, üzenet, **„Fuvar-adatok" checkbox-csoport** (alap: bepipálva), **„Csatolmányok" checkbox-csoport** (alap: kipipálatlan). A fuvar ⋯ menüjében „✉️ Email a fuvarról" váltja a korábbi egyszerű sablon-küldést.
+- **i18n** `cs.ol.mOrderMail` + `oe.*` (RO-alap+HU); regisztráció `routes/execute.js`. Cache-bust `?v=20260618oe`; 93 Jest zöld.
+
 ## 2026-06-18 — Külső levelek a cég SMTP-jén, közös cím csak rendszer-értesítésre
 
 > Tiszta szétválasztás: a cég KÜLSŐ levelei (sablonból küldés ügyfélnek/más cégnek, e-mail-szerkesztő) a **cég saját SMTP-fiókján** mennek (Integrációknál beállítva); a **közös VallorSoft cím** csak rendszer-értesítést küld (regisztráció, lejárat, szerviz) — és a teszt-leveleket.

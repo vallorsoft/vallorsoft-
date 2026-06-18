@@ -3759,8 +3759,12 @@ function renderFilteredOrders(list) {
         'onclick="copyTrackingLink(\''+c.id+'\');closeOrderActions()">'+
         '<span class="vs-act-ico">🌍</span><span class="vs-act-lbl">'+t('cs.ol.mTrack')+'</span></button>';
     }
-    // 📧 Sablonból e-mail (fuvar-visszaigazolás / státusz az ügyfélnek)
-    if (window.sendTemplatedEmailDialog) {
+    // ✉️ Email a fuvarról (pipálós: fuvar-adatok + csatolmányok; külső/belső cím)
+    if (window.openOrderEmail) {
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mOrderMail')+'" '+
+        'onclick="openOrderEmail(\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">✉️</span><span class="vs-act-lbl">'+t('cs.ol.mOrderMail')+'</span></button>';
+    } else if (window.sendTemplatedEmailDialog) {
       menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mTplMail')+'" '+
         'onclick="vsSendOrderTplMail(\''+c.id+'\');closeOrderActions()">'+
         '<span class="vs-act-ico">📧</span><span class="vs-act-lbl">'+t('cs.ol.mTplMail')+'</span></button>';

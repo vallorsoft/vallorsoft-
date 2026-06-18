@@ -23,6 +23,7 @@ const handlers = Object.assign(
   require('../handlers/intakeHandlers'),
   require('../handlers/statisticsHandlers'),
   require('../handlers/fleetCompliance'),
+  require('../handlers/orderEmail'),
   require('../handlers/handover'),
   require('../handlers/clientPortal'),
   require('../handlers/toll'),
