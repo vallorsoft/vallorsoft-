@@ -51,7 +51,10 @@ Tesztek zöldek (**106 Jest**, 24 suite). **CI: GitHub Actions** (`.github/workf
 
 > **Hiánylista — a 2026-06-13-i ütemterv LEZÁRVA:** **(1) ✅ CI + valódi tesztek** (mock + valós-DB, 106 teszt); **(2) ✅ teherautó-routing váltó** (ORS `driving-hgv`, alap ingyenes OSRM) **+ ✅ valós útdíj váltó** (HERE „Pontos", alap becslés); **(3) ✅ UIT CargoTrack deep-link** (ANAF-integráció helyett, providerkénti URL-sablon — `uit_deeplink_templates` JSONB; `cargotrack-et.js`/`fomco-et.js` törölve); **(4) ✅ üzemeltetés** (health-check `/healthz`+`/readyz`, strukturált log, opcionális Sentry, opcionális pg_dump backup); **(5) ✅ leg ↔ `orders.email_sofer` szinkron**; **(6) ✅ SaaS-vízvezeték** (csomag-limit kikényszerítés, audit-napló, GDPR export/anonimizálás, Stripe-váz); **(7) ✅ e-Factura státusz automatikus lekérdezés** (3 órás scheduler, SmartBill/Oblio `getInvoice` implementálva, `efactura_last_raw`/`efactura_checked_at` tárolás); **(8) ✅ ANAF CUI strukturált cím** (utca/helység/megye külön mezők, `adresa_sediu_social` alapján). **Nyitott jövőbeli munka:** Stripe éles bekötés (kulcsok + price_xxx — utolsó lépés, nem sürgős), SAF-T D406 XML (jövőbeli javaslat, a könyvelő SAGA/WinMentor CSV-ből generál egyelőre). **RO megfelelőség:** a rendszer megfelel — minden ANAF-kommunikáció (e-Factura SPV-beküldés) a számlázó-providereken (FGO/SmartBill/Oblio stb.) keresztül történik, saját ANAF-kapcsolat NEM kell és NEM is akarunk. Az UIT-kódot sem mi generáljuk — a sofőr/cég a CargoTrack/Fomco deep-linken keresztül intézi. A GPS→ANAF élő e-Transport-transzmisszió NEM feladatunk.
 
-**Legújabb kör (2026-06-18 — ÚJ: alvállalkozói jármű GPS-követés — megosztott link + opc. CargoTrack kulcs):** *(részletes kész-lista: `CHANGELOG.md`)*
+**Legújabb kör (2026-06-18 — Jogi oldalak (RO) bővítése az alvállalkozói GPS-funkcióval):** *(részletes kész-lista: `CHANGELOG.md`)*
+1. A román jogi/GDPR oldalak frissítve az új alvállalkozói GPS-adatkezeléshez: **`privacy.html`** §4.4.1 (alvállalkozói járművek GPS-e: megosztott link / AES-titkosított CargoTrack kulcs; az alvállalkozó önálló adatkezelő) + §4.4.2 (publikus követő-link minimális adat); **`terms.html`** §14.1 (szavatosság + sofőr-tájékoztatás); **`dpa.html`** adatkategória + subprocesszor-sor (verzió 1.1). A CLAUDE.md Jogi/GDPR szekció is kiegészítve. A statikus oldalak a dinamikus jogi rendszer fallbackjei.
+
+**Korábbi kör (2026-06-18 — ÚJ: alvállalkozói jármű GPS-követés — megosztott link + opc. CargoTrack kulcs):** *(részletes kész-lista: `CHANGELOG.md`)*
 1. Eddig csak a SAJÁT flotta GPS-ét lehetett követni. Most az **alvállalkozó (Extern) járművéhez** is: (1) **megosztott publikus követő-link** (bármilyen GPS-ből), és/vagy (2) **CargoTrack object_id + API-kulcs** élő pozícióhoz a térképen. Felvitel: alvállalkozói portál + diszpécser; megjelenik az ügyfél követő-oldalán is.
 2. **`db/carriers-vehicle-gps.sql`** (`carrier_vehicles` + `track_url`/`gps_object_id`/`gps_api_key_enc` AES; kulcs sosem megy kliensbe). **`routes/track.js`** carrier-fallback (rendszám-egyezés szóköz/kisbetű-független) → autó-marker és/vagy `external_url`. **`handlers/carriers.js`** `carrierVehicleSetGps` (titkosítás, jelszó-megőrzés, audit) + `carrierVehicleList` nem szivárogtat kulcsot. **`routes/carrier-portal.js`** portál-CRUD a GPS-mezőkkel.
 3. **UI:** diszpécser jármű-tábla „GPS" oszlop + 📍 modal, portál jármű-form GPS-mezők, `track.html` „🛰️ Urmărire externă" gomb. i18n `trk.externalTrack`/`cs.cv.*`/`car.*`; cache-bust `?v=20260618cargps`. 100 Jest zöld.
@@ -737,6 +740,7 @@ Routing (opcionális): **`ORS_API_KEY`** (OpenRouteService, ingyenes) — az út
 | **Stripe Payments Europe, Ltd** | online fizetés | Dublin, Írország 🇮🇪 | EU entitás → EU adatkezelés |
 | **Google Firebase (Google LLC)** | chat, push értesítések | USA → EU DPF + SCCs | EU–US Data Privacy Framework (2023) alapján legális; Google DPA szükséges |
 | **CargoTrack / Fomco** | GPS helyadat (sofőrök) | Románia 🇷🇴 | EU → nincs extra |
+| **Alvállalkozó saját GPS-rendszere** | kiszervezett fuvar járművének pozíciója (megosztott link vagy az alvállalkozó által megadott API-kulcs) | az alvállalkozó határozza meg | Az alvállalkozó önálló adatkezelő a saját sofőrjei felé (Legea 190/2018); a kulcs AES-titkosítva tárolva |
 | **[HOSTING — KITÖLTENDŐ]** | szerverszolgáltatás | [ország] | Ha EU → ok; ha USA → SCCs kell |
 
 > **Google Firebase jogi alap:** az EU–US Data Privacy Framework (Európai Bizottság 2023/1795 határozata) alapján az USA megfelelő védelmi szintűnek minősül; emellett Google Standard Contractual Clauses (SCCs) és DPA elérhető a [Google Cloud DPA](https://cloud.google.com/terms/data-processing-addendum) oldalán. Privacy policy-ban fel kell tüntetni: *„Adattovábbítás harmadik országba (USA) az EU–US Data Privacy Framework és SCCs alapján."*
@@ -744,7 +748,7 @@ Routing (opcionális): **`ORS_API_KEY`** (OpenRouteService, ingyenes) — az út
 ### Kezelt személyes adatok
 - **Sofőrök:** név, e-mail, telefonszám, valós idejű GPS pozíció
 - **Ügyfelek (client portal):** név, e-mail, kapcsolattartó adatok
-- **Alvállalkozók (carrier portal):** név, e-mail
+- **Alvállalkozók (carrier portal):** név, e-mail; jármű GPS-követés (megosztott link és/vagy AES-titkosított CargoTrack API-kulcs + object_id) — a kiszervezett fuvar járművének pozíciójához. Az alvállalkozó felel a saját sofőrjei tájékoztatásáért.
 - **GDPR-visszaigazolás:** IP-cím, időbélyeg (`gdpr_consents` tábla)
 - **Regisztrációkor:** cégnév, e-mail, jelszó (bcrypt hash)
 - **Fuvarlevelek:** feladó/átvevő személyes adatai
