@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-06-18 — Tracking-oldal: tervezett útvonal térkép élő GPS nélkül is
+
+> A publikus követő-oldal (`/t/<token>`) eddig élő GPS hiányában csak egy „Poziția GPS nu este disponibilă" szöveget mutatott, alatta üres oldallal. Mostantól, ha nincs élő GPS, a **felrakó → lerakó tervezett útvonal** jelenik meg térképen.
+
+- **`routes/track.js`** — a `/api/track/:token` válasz új `route: { from, to }` mezőt ad: a felrakó/lerakó cím **geokódolva** (`lib/routeEstimate.geocodeCached`, `geo_cache` mögött + tokenenkénti 1 órás memória-cache; best-effort — hiba nem dönti el az oldalt). Minimális adatkiadás elve megőrizve (nincs új érzékeny mező).
+- **`public/track.html`** — térkép-render: élő GPS → autó-pozíció (mint eddig); ha nincs GPS, de van geokódolt útvonal → **felrakó (zöld) → lerakó (piros) `circleMarker` + szaggatott összekötő vonal**, `fitBounds`-szal; ha egyik sincs → a régi szöveges jelzés. A markerek `circleMarker`-ek (nincs külső ikon-kép függés). 100 Jest zöld.
+
 ## 2026-06-18 — Fix (valódi gyökérok): hibás/markdown-os `APP_URL` env → minden e-mail-link érvénytelen
 
 > A követő-link a `[https://...](https://...)/t/<token>` formában ment ki, mert maga az **`APP_URL` környezeti változó volt markdown-osan beállítva** (Render env): `base + '/útvonal'` így `[url](url)/útvonal`-t adott. A token mindig jó volt — a zárójelek (a hibás base) törték el. Ez minden APP_URL-ből épülő linket érintett (követés, meghívó, jelszó-reset, portál/alvállalkozó, előfizetés).
