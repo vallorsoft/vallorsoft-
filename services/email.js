@@ -64,6 +64,35 @@ function escHtml(v) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// HTML → megbízható plain-text alternatíva az e-mailekhez.
+// MIÉRT: ha csak HTML-t küldünk, a Brevo AUTOMATIKUSAN generál szöveges
+// változatot, és a linkeket MARKDOWN formában írja ki: [url](url). A levelező-/
+// chat-appok a zárójeleknél elvágják a linket → a /t/<token> követő-link
+// érvénytelen lesz (a token jó, csak a zárójelek miatt nem kattintható).
+// Ezt úgy kerüljük el, hogy MI adunk explicit szöveges részt, NYERS URL-ekkel
+// (szögletes/kerek zárójel nélkül) — így a Brevo nem talál ki saját markdownt.
+function htmlToPlainText(html) {
+  let s = String(html == null ? '' : html);
+  // <a href="URL">SZÖVEG</a> → ha a szöveg maga az URL (vagy üres), csak az URL;
+  // egyébként "SZÖVEG: URL". Soha nem teszünk a link köré zárójelet.
+  s = s.replace(/<a\b[^>]*\bhref\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (_m, href, inner) => {
+    const text = inner.replace(/<[^>]+>/g, '').trim();
+    const url = String(href).trim();
+    if (!text || text === url) return url;
+    return text + ': ' + url;
+  });
+  return s
+    .replace(/<\/(p|div|h[1-6]|li|tr|table)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 // fetch timeouttal — beragadt Brevo-kapcsolat ne tartsa fogva a user kérését.
 async function fetchT(url, init, ms = 15000) {
   const ctrl = new AbortController();
@@ -170,6 +199,7 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev, lang
         to: [{ email: toEmail }],
         subject: subject,
         htmlContent: html,
+        textContent: htmlToPlainText(html),
       }),
     });
     const data = await resp.json().catch(() => ({}));
@@ -268,6 +298,7 @@ async function sendResetEmail(toEmail, nume, resetUrl, lang, companyId) {
         to: [{ email: toEmail }],
         subject: 'VallorSoft — Resetare parolă',
         htmlContent: html,
+        textContent: htmlToPlainText(html),
       }),
     });
     const data = await resp.json().catch(() => ({}));
@@ -310,6 +341,9 @@ async function sendClientEmail(opts) {
     to: [{ email: opts.to }],
     subject: opts.subject || '(nincs tárgy)',
     htmlContent: html,
+    // Explicit szöveges rész nyers URL-ekkel — ne a Brevo generáljon markdown-os
+    // ([url](url)) változatot, ami elvágná a /t/<token> linket a zárójeleknél.
+    textContent: htmlToPlainText(html),
   };
   if (opts.replyTo) payload.replyTo = { email: opts.replyTo };
   if (Array.isArray(opts.attachments) && opts.attachments.length) {
@@ -362,6 +396,7 @@ async function sendDeveloperEmail(toEmail, companyName, subject, htmlBody, compa
         to: [{ email: toEmail, name: companyName || toEmail }],
         subject: subject,
         htmlContent: html,
+        textContent: htmlToPlainText(html),
       }),
     });
     if (!resp.ok) {
@@ -426,6 +461,9 @@ async function _brevoSendCompany(cfg, opts) {
     to: [{ email: opts.to }],
     subject: opts.subject || '(fără subiect)',
     htmlContent: opts.html || '',
+    // Explicit szöveges rész nyers URL-ekkel (lásd htmlToPlainText) — különben a
+    // Brevo markdown-os [url](url) linket generál, ami a zárójeleknél érvénytelen.
+    textContent: htmlToPlainText(opts.html || ''),
   };
   if (opts.replyTo) payload.replyTo = { email: opts.replyTo };
   // Csatolmányok (opcionális): [{ name, contentBase64 }] -> Brevo formátum.
@@ -486,6 +524,9 @@ async function getCompanyMailer(companyId) {
           to: opts.to,
           subject: subject,
           html: opts.html || '',
+          // Tiszta szöveges rész (nyers URL-ek) — a követő-link a sima-szöveges
+          // levél-nézetben is érvényes maradjon (ne markdown [url](url) legyen).
+          text: htmlToPlainText(opts.html || ''),
           replyTo: opts.replyTo || undefined,
           attachments: atts.length ? atts.map(a => ({ filename: a.name, content: a.contentBase64, encoding: 'base64' })) : undefined,
         });
@@ -561,6 +602,7 @@ async function sendSubscriptionCancelEmail(opts) {
         to: [{ email: opts.to, name: opts.companyName || opts.to }],
         subject: subject,
         htmlContent: html,
+        textContent: htmlToPlainText(html),
       }),
     });
     if (!resp.ok) {
@@ -576,4 +618,4 @@ async function sendSubscriptionCancelEmail(opts) {
   }
 }
 
-module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate, loadCompanySender, getCompanyMailer, sendSubscriptionCancelEmail, applyTemplateVars };
+module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate, loadCompanySender, getCompanyMailer, sendSubscriptionCancelEmail, applyTemplateVars, htmlToPlainText };
