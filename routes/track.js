@@ -12,6 +12,12 @@ const router = express.Router();
 const pool = require('../db');
 const ctSvc = require('../services/cargotrack');
 const { decrypt } = require('../lib/crypto');
+const { geocodeCached } = require('../lib/routeEstimate');
+
+// Útvonal-végpont geokódolás cache tokenenként (a geo_cache tábla mögött is
+// cache-elt, de így a két címet egyszer oldjuk fel tokenenként).
+const _routeCache = new Map();
+const ROUTE_CACHE_MS = 60 * 60 * 1000; // 1 óra
 
 const TOKEN_RE = /^[a-f0-9]{32}$/;
 
@@ -69,6 +75,23 @@ router.get('/api/track/:token', async (req, res) => {
       }
     }
 
+    // Útvonal-végpontok (felrakó/lerakó) geokódolása — így élő GPS nélkül is
+    // térkép jelenik meg a tervezett útvonallal (best-effort, geo_cache mögött).
+    let route = null;
+    try {
+      const cached = _routeCache.get(token);
+      if (cached && Date.now() - cached.ts < ROUTE_CACHE_MS) {
+        route = cached.route;
+      } else {
+        const [from, to] = await Promise.all([
+          o.loc_incarcare ? geocodeCached(o.loc_incarcare).catch(() => null) : Promise.resolve(null),
+          o.loc_descarcare ? geocodeCached(o.loc_descarcare).catch(() => null) : Promise.resolve(null),
+        ]);
+        route = (from || to) ? { from, to } : null;
+        _routeCache.set(token, { ts: Date.now(), route });
+      }
+    } catch (_) { /* a geokódolás hibája ne döntse el a tracking-oldalt */ }
+
     return res.json({
       ok: true,
       transport: {
@@ -82,6 +105,7 @@ router.get('/api/track/:token', async (req, res) => {
         ceg: o.ceg_nev,
       },
       position,
+      route,
     });
   } catch (err) {
     console.error('track hiba:', err);

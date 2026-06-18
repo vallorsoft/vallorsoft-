@@ -91,19 +91,52 @@
       + '<div><div class="l">' + esc(t('trk.unloadDate')) + '</div><div class="v">' + d(tr.data_descarcare) + '</div></div>'
       + '<div><div class="l">' + esc(t('trk.vehicle')) + '</div><div class="v">' + esc(tr.rendszam || '—') + '</div></div>'
       + '</div></div>'
-      + (r.position ? '<div id="map"></div><div class="muted" style="margin-top:8px;text-align:right;">' + esc(t('trk.posUpdated')) + ' '
-          + (r.position.datetime ? new Date(r.position.datetime).toLocaleString('ro-RO') : '—')
-          + ' · ' + esc(t('trk.autoReload')) + '</div>'
-        : '<div class="card muted" style="text-align:center;">📍 ' + esc(t('trk.noGps'))
-          + (tr.status === 'Finalizat' ? ' — ' + esc(t('trk.deliveredNote')) + ' ✅' : '.') + '</div>');
+    // Térkép: van élő GPS → autó pozíció; nincs, de van geokódolt útvonal →
+    // tervezett útvonal (felrakó → lerakó); egyik sincs → szöveges jelzés.
+    var hasRoute = r.route && (r.route.from || r.route.to);
+    if (r.position) {
+      box.innerHTML += '<div id="map"></div><div class="muted" style="margin-top:8px;text-align:right;">' + esc(t('trk.posUpdated')) + ' '
+        + (r.position.datetime ? new Date(r.position.datetime).toLocaleString('ro-RO') : '—')
+        + ' · ' + esc(t('trk.autoReload')) + '</div>';
+    } else if (hasRoute) {
+      box.innerHTML += '<div id="map"></div><div class="muted" style="margin-top:8px;text-align:center;">📍 ' + esc(t('trk.noGps'))
+        + (tr.status === 'Finalizat' ? ' — ' + esc(t('trk.deliveredNote')) + ' ✅' : '') + '</div>';
+    } else {
+      box.innerHTML += '<div class="card muted" style="text-align:center;">📍 ' + esc(t('trk.noGps'))
+        + (tr.status === 'Finalizat' ? ' — ' + esc(t('trk.deliveredNote')) + ' ✅' : '.') + '</div>';
+    }
 
-    if (r.position && typeof L !== 'undefined') {
-      var map = L.map('map').setView([r.position.lat, r.position.lng], 9);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-        { attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
+    if (typeof L === 'undefined' || !document.getElementById('map')) return;
+    var map = L.map('map');
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+      { attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
+
+    if (r.position) {
+      map.setView([r.position.lat, r.position.lng], 9);
       var m = L.circleMarker([r.position.lat, r.position.lng],
         { radius: 10, color: '#6366f1', fillColor: '#6366f1', fillOpacity: 0.9, weight: 3 }).addTo(map);
       m.bindTooltip('🚛 ' + (tr.rendszam || '') + (r.position.speed != null ? ' · ' + Math.round(r.position.speed) + ' km/h' : '')).openTooltip();
+    } else {
+      // Tervezett útvonal: felrakó (zöld) → lerakó (piros) + összekötő vonal.
+      var pts = [];
+      if (r.route.from) {
+        L.circleMarker([r.route.from.lat, r.route.from.lng],
+          { radius: 9, color: '#16a34a', fillColor: '#16a34a', fillOpacity: 0.9, weight: 3 }).addTo(map)
+          .bindTooltip('📦 ' + esc(tr.loc_incarcare || r.route.from.label || ''));
+        pts.push([r.route.from.lat, r.route.from.lng]);
+      }
+      if (r.route.to) {
+        L.circleMarker([r.route.to.lat, r.route.to.lng],
+          { radius: 9, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.9, weight: 3 }).addTo(map)
+          .bindTooltip('🏁 ' + esc(tr.loc_descarcare || r.route.to.label || ''));
+        pts.push([r.route.to.lat, r.route.to.lng]);
+      }
+      if (pts.length === 2) {
+        L.polyline(pts, { color: '#6366f1', weight: 3, opacity: 0.7, dashArray: '6,8' }).addTo(map);
+        map.fitBounds(pts, { padding: [40, 40] });
+      } else if (pts.length === 1) {
+        map.setView(pts[0], 8);
+      }
     }
   }
 
