@@ -12,7 +12,7 @@ const { emailLang } = require('../lib/companyLang');
 const audit = require('../lib/audit');
 
 const handlers = {};
-const APP_URL = process.env.APP_URL || 'http://localhost:3000';
+const APP_URL = require('../lib/appUrl').appBaseUrl('http://localhost:3000');
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function _am(req) { return req.session.user && ['Admin', 'Manager'].includes(req.session.user.pozicio); }
 function _num(x) { return (x === '' || x == null) ? null : Number(x); }

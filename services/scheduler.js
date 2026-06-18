@@ -627,7 +627,7 @@ function startEFacturaStatusScheduler() {
 // ============================================================
 function startTrialExpiryScheduler() {
   const { sendClientEmail, getEmailTemplate } = require('./email');
-  const appUrl = process.env.APP_URL || 'https://app.vallorsoft.com';
+  const appUrl = require('../lib/appUrl').appBaseUrl('https://app.vallorsoft.com');
   const escV = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   const replVars = (t, v) => t.replace(/\{\{(\w+)\}\}/g, (_, k) => k in v ? escV(v[k]) : '');
 
@@ -700,7 +700,7 @@ function startTrialExpiryScheduler() {
 function startTrialReminderScheduler() {
   const { sendClientEmail } = require('./email');
   const { makeTrialToken: makeToken } = require('../lib/trialToken');
-  const appUrl = process.env.APP_URL || 'https://app.vallorsoft.com';
+  const appUrl = require('../lib/appUrl').appBaseUrl('https://app.vallorsoft.com');
 
   function buildPlanLink(cid, planId, billing) {
     const tok = makeToken(cid, planId, billing);
@@ -826,7 +826,7 @@ function startTrialReminderScheduler() {
 function startCancelReminderScheduler() {
   const { sendSubscriptionCancelEmail } = require('./email');
   const { makeReactivateToken } = require('../lib/trialToken');
-  const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
+  const appUrl = require('../lib/appUrl').appBaseUrl();
 
   async function tick() {
     try {

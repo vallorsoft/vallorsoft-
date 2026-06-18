@@ -105,7 +105,7 @@ router.post('/api/client-mail/send', requireLogin, requireRole('Admin', 'Manager
     let senderName = 'VallorSoft';
     try { const c = await pool.query(`SELECT * FROM companies WHERE id=$1`, [own(req)]); const r = c.rows[0] || {}; senderName = r.nume || r.name || r.denumire || senderName; } catch (_) {}
     const hasLogo = await pool.query(`SELECT 1 FROM company_branding WHERE company_id=$1 AND logo_base64 IS NOT NULL`, [own(req)]);
-    const appUrl = process.env.APP_URL || '';
+    const appUrl = require('../lib/appUrl').appBaseUrl();
     const logoUrl = (hasLogo.rows.length && appUrl) ? `${appUrl}/branding/logo/${own(req)}.png` : null;
 
     // opcionális: a beérkező megrendelő PDF csatolása

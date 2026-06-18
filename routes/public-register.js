@@ -82,7 +82,7 @@ router.post('/api/public-register', publicRegLimiter, async (req, res) => {
     }
 
     // --- Üdvözlő e-mail (best-effort, nem buktatja a regisztrációt) ---
-    const appUrl = process.env.APP_URL || 'https://app.vallorsoft.com';
+    const appUrl = require('../lib/appUrl').appBaseUrl('https://app.vallorsoft.com');
     try {
       // DB sablon felülírja a hardcoded szöveget, ha be van állítva
       const welcomeTpl = await getEmailTemplate('email_sys_welcome');

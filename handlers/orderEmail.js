@@ -14,6 +14,7 @@ const pool = require('../db');
 const audit = require('../lib/audit');
 const _crypto = require('crypto');
 const { getCompanyMailer, sendClientEmail } = require('../services/email');
+const { appBaseUrl } = require('../lib/appUrl');
 
 const handlers = {};
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -117,7 +118,7 @@ async function _trackingInfo(cid, orderId, generate) {
       await pool.query('UPDATE orders SET tracking_token=$1 WHERE id=$2 AND company_id=$3', [token, orderId, cid]);
     }
   } catch (_) { return { available: false, url: null }; }
-  var base = (process.env.APP_URL || '').replace(/\/$/, '');
+  var base = appBaseUrl();
   return { available: true, url: (token && base) ? base + '/t/' + token : null };
 }
 

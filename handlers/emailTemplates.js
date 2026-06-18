@@ -191,8 +191,8 @@ handlers.sendTemplatedEmail = async function (req, res, args) {
     try {
       const b = await pool.query('SELECT nev FROM companies WHERE id=$1', [cid]);
       senderName = b.rows[0] && b.rows[0].nev ? b.rows[0].nev : null;
-      const appUrl = process.env.APP_URL || '';
-      if (appUrl) logoUrl = appUrl.replace(/\/$/, '') + '/branding/logo/' + cid + '.png';
+      const appUrl = require('../lib/appUrl').appBaseUrl();
+      if (appUrl) logoUrl = appUrl + '/branding/logo/' + cid + '.png';
     } catch (_) { /* best-effort */ }
 
     let result;

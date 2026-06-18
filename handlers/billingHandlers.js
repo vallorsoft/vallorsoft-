@@ -498,7 +498,7 @@ handlers.cancelSubscription = async function (req, res) {
     // Újraaktiváló link (M-am răzgândit) — a lemondás időpontjához kötött token.
     let reactivateUrl = null;
     try {
-      const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
+      const appUrl = require('../lib/appUrl').appBaseUrl();
       const sec = Math.floor(new Date(cancelAt).getTime() / 1000);
       const tok = makeReactivateToken(cid, sec);
       if (appUrl) reactivateUrl = `${appUrl}/abonament/reactivare?cid=${cid}&tok=${tok}`;
@@ -616,7 +616,7 @@ handlers.requestSubscriptionExtension = async function (req, res, args) {
     );
 
     const escH = (s) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    const appUrl = process.env.APP_URL || 'https://app.vallorsoft.com';
+    const appUrl = require('../lib/appUrl').appBaseUrl('https://app.vallorsoft.com');
     const perioadas = isAnnual ? 'anual (11 luni facturate, 12 luni acces)' : 'lunar';
 
     // Email adminnak — fizetési részletek

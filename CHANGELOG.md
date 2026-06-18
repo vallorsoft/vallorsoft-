@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-18 — Fix (valódi gyökérok): hibás/markdown-os `APP_URL` env → minden e-mail-link érvénytelen
+
+> A követő-link a `[https://...](https://...)/t/<token>` formában ment ki, mert maga az **`APP_URL` környezeti változó volt markdown-osan beállítva** (Render env): `base + '/útvonal'` így `[url](url)/útvonal`-t adott. A token mindig jó volt — a zárójelek (a hibás base) törték el. Ez minden APP_URL-ből épülő linket érintett (követés, meghívó, jelszó-reset, portál/alvállalkozó, előfizetés).
+
+- **TEENDŐ a Renderen:** az `APP_URL` env-et tiszta URL-re kell állítani (`https://vallorsoft.onrender.com`), markdown/zárójel nélkül.
+- **`lib/appUrl.js`** (ÚJ) — `appBaseUrl(fallback)`: a tiszta báziscímet adja vissza akkor is, ha az `APP_URL` markdown-osan/körítéssel lett megadva (kinyeri a `(...)`-ben lévő URL-t, ill. az első http(s) URL-t; záró `/` levágva). Így egy elgépelt env sem tudja eltörni a linkeket.
+- **Bekötve** minden APP_URL-ből linket építő helyen: `handlers/orderEmail.js`, `services/email.js`, `routes/auth.js`, `handlers/clientPortal.js`, `handlers/carriers.js`, `routes/public-register.js`, `routes/trial-select.js`, `routes/subscription-cancel.js`, `services/scheduler.js`, `handlers/billingHandlers.js`, `handlers/emailTemplates.js`, `handlers/developer.js`, `handlers/stripe.js`, `routes/client-mail.js`.
+- **`tests/unit/app-url.test.js`** (ÚJ) — markdown/záró-perjel/üres/körítés esetek. 100 Jest zöld. **Deploy/restart + a Render `APP_URL` javítása után él.**
+
 ## 2026-06-18 — Fix: követő-link érvénytelen e-mailben (markdown `[url](url)` zárójelek) — PR #199
 
 > A kiküldött e-mailekben a publikus követő-link (`/t/<token>`) **érvénytelen** volt: markdown `[url](url)/t/token` formában jelent meg, és a levelező-/chat-appok a **zárójeleknél elvágták** a linket. A token mindig jó volt — csak a zárójelek rontották el.

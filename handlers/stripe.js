@@ -42,7 +42,7 @@ handlers.createSubscriptionCheckout = async function (req, res, args) {
     const priceId = pr.rows.length ? pr.rows[0].stripe_price_id : null;
     if (!priceId) return res.json({ result: { ok: false, err: 'Pachetul nu are un preț Stripe configurat.' } });
 
-    const base = process.env.APP_URL || 'http://localhost:3000';
+    const base = require('../lib/appUrl').appBaseUrl('http://localhost:3000');
     const session = await stripe.client().checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
