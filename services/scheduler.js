@@ -8,38 +8,30 @@ const { decrypt } = require('../lib/crypto');
 
 // ============================================================
 //  Közös értesítő-e-mail segéd (lejárat + szerviz emlékeztetők).
-//  A levél a CÉG SAJÁT feladó-fiókjáról megy (getCompanyMailer) az
+//  A levél a KÖZÖS VallorSoft feladó-címről megy (sendClientEmail →
+//  BREVO_SENDER, pont mint a regisztrációs/rendszer-levelek), az
 //  Admin/Manager felhasználóknak — mindig ROMÁNUL. Best-effort:
-//  ha a cég nem állított be feladó-fiókot, csendben kihagyjuk
-//  (a push + Notifications-központ így is megkapja a riasztást).
+//  ha a Brevo nincs konfigurálva, csendben kihagyjuk (a push +
+//  Notifications-központ így is megkapja a riasztást).
 // ============================================================
 function _escH(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// RO e-mail-keret a meleg palettával (mint a többi rendszer-levél).
-function _alertEmailWrap(headline, intro, tableHtml, footerLink) {
-  return `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#2a2018;">
-  <div style="background:linear-gradient(135deg,#fb8c3a,#f6517b);padding:22px 28px;border-radius:12px 12px 0 0;">
-    <h1 style="margin:0;color:#fff;font-size:19px;">vallor<span style="color:#fdba74;">Soft</span></h1>
-    <p style="margin:6px 0 0;color:rgba(255,255,255,.92);font-size:14px;">${headline}</p>
-  </div>
-  <div style="background:#faf6f0;padding:22px 28px;border:1px solid #ece3d8;border-top:none;border-radius:0 0 12px 12px;">
-    <p style="margin:0 0 14px;font-size:14px;color:#5a5048;">${intro}</p>
-    <table style="width:100%;border-collapse:collapse;font-size:13px;">${tableHtml}</table>
-    <p style="margin:18px 0 0;font-size:12px;color:#b09a82;">${footerLink || ''}</p>
-  </div>
-</div>`;
+// Riasztó e-mail TÖRZSE (a VallorSoft fejlécet/keretet a sendClientEmail rakja rá).
+function _alertEmailBody(headline, intro, tableHtml, footerLink) {
+  return `<p style="margin:0 0 10px;font-size:16px;font-weight:700;color:#2a2018;">${headline}</p>
+<p style="margin:0 0 14px;font-size:14px;color:#5a5048;">${intro}</p>
+<table style="width:100%;border-collapse:collapse;font-size:13px;">${tableHtml}</table>
+<p style="margin:18px 0 0;font-size:12px;color:#b09a82;">${footerLink || ''}</p>`;
 }
 
-// Riasztó e-mail kiküldése a cég Admin/Manager felhasználóinak a cég
-// saját feladó-fiókjáról. Visszatérés: hány címzettnek ment ki sikeresen.
+// Riasztó e-mail kiküldése a cég Admin/Manager felhasználóinak a KÖZÖS
+// VallorSoft címről (sendClientEmail). Visszatérés: hány címzettnek ment ki.
 async function _emailAlertToAdmins(cid, subject, html, mailType) {
   try {
-    const { getCompanyMailer } = require('./email');
-    const mailer = await getCompanyMailer(cid);
-    if (!mailer || !mailer.ok) return 0; // nincs (vagy hiányos) cég-feladó → kihagyjuk
+    const { sendClientEmail } = require('./email');
     const u = await pool.query(
       `SELECT DISTINCT email FROM users
         WHERE company_id=$1 AND pozicio IN ('Admin','Manager')
@@ -47,7 +39,7 @@ async function _emailAlertToAdmins(cid, subject, html, mailType) {
     let sent = 0;
     for (const row of u.rows) {
       try {
-        const r = await mailer.send({ to: row.email, subject, html, mailType: mailType || 'alert' });
+        const r = await sendClientEmail({ to: row.email, subject, html, companyId: cid, mailType: mailType || 'alert' });
         if (r && r.ok) sent++;
       } catch (_) { /* egy címzett hibája ne állítsa le a többit */ }
     }
@@ -180,7 +172,7 @@ function startExpiryScheduler() {
               + '<td style="padding:6px 10px;border-bottom:1px solid #ece3d8;text-align:right;font-weight:700;color:' + col + ';">' + st + '</td>'
               + '</tr>';
           }).join('');
-          const html = _alertEmailWrap(
+          const html = _alertEmailBody(
             '⏰ Documente care expiră',
             'Următoarele documente ale companiei <b>' + _escH(cname) + '</b> expiră în curând sau au expirat. Verificați secțiunea <b>Expirări</b> din VallorSoft.',
             tableHtml,
@@ -325,7 +317,7 @@ function startServiceDueScheduler() {
               + '<td style="padding:6px 10px;border-bottom:1px solid #ece3d8;text-align:right;font-weight:700;color:' + col + ';">' + scad + '</td>'
               + '</tr>';
           }).join('');
-          const html = _alertEmailWrap(
+          const html = _alertEmailBody(
             '🔧 Revizii scadente',
             'Următoarele vehicule ale companiei <b>' + _escH(cname) + '</b> au revizia scadentă (în funcție de kilometrajul GPS live sau de dată). Verificați <b>Jurnal service</b> din VallorSoft.',
             tableHtml,
