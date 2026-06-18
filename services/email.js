@@ -428,6 +428,12 @@ async function _brevoSendCompany(cfg, opts) {
     htmlContent: opts.html || '',
   };
   if (opts.replyTo) payload.replyTo = { email: opts.replyTo };
+  // Csatolmányok (opcionális): [{ name, contentBase64 }] -> Brevo formátum.
+  if (Array.isArray(opts.attachments) && opts.attachments.length) {
+    payload.attachment = opts.attachments
+      .filter(a => a && a.contentBase64 && a.name)
+      .map(a => ({ content: a.contentBase64, name: a.name }));
+  }
   const resp = await fetchT('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: { 'api-key': cfg.brevo_api_key, 'Content-Type': 'application/json', 'accept': 'application/json' },
@@ -471,6 +477,8 @@ async function getCompanyMailer(companyId) {
     const cid = companyId;
     const mtype = opts.mailType || 'builder';
     const subject = opts.subject || '(fără subiect)';
+    // Csatolmányok (opcionális): [{ name, contentBase64 }].
+    const atts = Array.isArray(opts.attachments) ? opts.attachments.filter(a => a && a.contentBase64 && a.name) : [];
     try {
       if (method === 'smtp') {
         const info = await transport.sendMail({
@@ -479,11 +487,12 @@ async function getCompanyMailer(companyId) {
           subject: subject,
           html: opts.html || '',
           replyTo: opts.replyTo || undefined,
+          attachments: atts.length ? atts.map(a => ({ filename: a.name, content: a.contentBase64, encoding: 'base64' })) : undefined,
         });
         _logMail(cid, opts.to, subject, mtype, 'sent', info && info.messageId);
         return { ok: true, messageId: info && info.messageId };
       }
-      const r = await _brevoSendCompany(cfg, { to: opts.to, subject: subject, html: opts.html, senderName: fromName, replyTo: opts.replyTo });
+      const r = await _brevoSendCompany(cfg, { to: opts.to, subject: subject, html: opts.html, senderName: fromName, replyTo: opts.replyTo, attachments: atts });
       _logMail(cid, opts.to, subject, mtype, r.ok ? 'sent' : 'failed', r.messageId || null);
       return r;
     } catch (err) {
