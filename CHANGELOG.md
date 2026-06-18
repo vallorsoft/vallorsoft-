@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-06-18 — Sablon→csatolmány auto-pipa (opcionális) + pecsét/aláírás ráégetés CSP-fix
+
+> Két dolog: (1) az „Email a fuvarról" sablon-választója bejelöli a megfelelő csatolmányt (opcionális, módosítható); (2) javítva a pecsét/aláírás ráégetés, ami CSP-blokk miatt nem működött.
+
+- **`public/order-email.js`** — sablon kiválasztásakor a megfelelő csatolmány **automatikus (de opcionális) bejelölése**: `invoice_notify` → számla-PDF; `order_confirm_carrier` → megrendelő-dok (az **aláírt/pecsételt** verzió preferálva, ha van). Csak bejelöl (nem vesz le), a felhasználó szabadon módosítja. Cache-bust `?v=20260618oe3`.
+- **`server.js` CSP-fix (pecsét/aláírás ráégetés)** — a `connectSrc` kibővítve: **`data:`** (a `pdf-lib` `fetch(dataURL)`-ja az aláírás/pecsét PNG-hez), **`https://cdnjs.cloudflare.com`** + **`blob:`** (a `pdf.js` worker letöltése → blob-worker; a `workerSrc` eddig is `'self' blob:` volt, de a cross-origin worker-URL-t a böngésző blokkolta, a fetch-fallbacket pedig a `connectSrc` tiltotta). Ezzel az aláíró-ablak renderel + a `buildSignedPdf` ráégeti a pecsétet/aláírást. **Deploy/restart után él.**
+
 ## 2026-06-18 — „Email a fuvarról" bővítés: követő-link pipa + mentett sablonok + teszt (közös cím)
 
 > Az „Email a fuvarról" összeállító kiegészült: (1) pipálható a **követő-link** (fuvar elfogadva/visszaigazolva + autó-követés), (2) **mentett sablonokból** előtölthető a tárgy+üzenet, (3) **teszt** gomb, ami a **közös VallorSoft címről** a saját címedre küld (a valós küldés továbbra is csak a cég SMTP-jén megy).
