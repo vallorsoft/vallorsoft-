@@ -20,10 +20,11 @@ function _escH(s) {
 }
 
 // Riasztó e-mail TÖRZSE (a VallorSoft fejlécet/keretet a sendClientEmail rakja rá).
-function _alertEmailBody(headline, intro, tableHtml, footerLink) {
+// A `bodyHtml` tetszőleges belső markup (táblázat VAGY blokkok) — a hívó adja.
+function _alertEmailBody(headline, intro, bodyHtml, footerLink) {
   return `<p style="margin:0 0 10px;font-size:16px;font-weight:700;color:#2a2018;">${headline}</p>
 <p style="margin:0 0 14px;font-size:14px;color:#5a5048;">${intro}</p>
-<table style="width:100%;border-collapse:collapse;font-size:13px;">${tableHtml}</table>
+${bodyHtml}
 <p style="margin:18px 0 0;font-size:12px;color:#b09a82;">${footerLink || ''}</p>`;
 }
 
@@ -175,7 +176,7 @@ function startExpiryScheduler() {
           const html = _alertEmailBody(
             '⏰ Documente care expiră',
             'Următoarele documente ale companiei <b>' + _escH(cname) + '</b> expiră în curând sau au expirat. Verificați secțiunea <b>Expirări</b> din VallorSoft.',
-            tableHtml,
+            '<table style="width:100%;border-collapse:collapse;font-size:13px;">' + tableHtml + '</table>',
             'Deschideți VallorSoft → Expirări pentru detalii.'
           );
           await _emailAlertToAdmins(cid, '⏰ VallorSoft — Documente care expiră (' + items.length + ')', html, 'expiry_alert');
@@ -197,15 +198,27 @@ function startExpiryScheduler() {
 }
 
 // ============================================================
-//  GPS km-óra napi snapshot (gps_mileage_log) — 24 óránként.
-//  A CargoTrack 'mileage' értékét naplózza járművenként, hogy a
-//  GPS-km összevethető legyen a sofőr által beírt menetlevél-km-rel.
+//  GPS km-óra snapshot (gps_mileage_log) — alapból ÓRÁNKÉNT.
+//  A CargoTrack 'mileage' értékét naplózza járművenként (a napi sort
+//  ON CONFLICT-tal a legfrissebbre frissíti), hogy a GPS-km összevethető
+//  legyen a menetlevél-km-mel ÉS a szerviz `next_due_km`-mel.
+//  Minden cég km-frissítése UTÁN AZONNAL lefuttatja a szerviz-esedékesség
+//  ellenőrzést (`_dispatchServiceAlerts`) → így a km-alapú riasztás
+//  (push + e-mail) ~a leolvasási cikluson belül megy, nem 12 óra múlva.
+//  Gyakoriság: GPS_MILEAGE_INTERVAL_MIN env (perc, alap 60; min 5).
 // ============================================================
 function startGpsMileageScheduler() {
   let ctSvc;
   try { ctSvc = require('./cargotrack'); } catch (_) { return null; }
+  let running = false;
 
   async function tick() {
+    if (running) return;            // átfedés-őr (egy kör tovább tarthat a GPS-hívások miatt)
+    running = true;
+    try { await tickBody(); } finally { running = false; }
+  }
+
+  async function tickBody() {
     let rows;
     try {
       ({ rows } = await pool.query(
@@ -223,6 +236,7 @@ function startGpsMileageScheduler() {
           `SELECT rendszam, object_id FROM vehicle_gps_map
            WHERE company_id=$1 AND provider='cargotrack'`, [row.company_id]));
       } catch (_) { continue; }
+      let updated = 0;
       for (const m of mapRows) {
         try {
           const st = await ctSvc.getLatestStatus(apiKey, m.object_id);
@@ -232,36 +246,133 @@ function startGpsMileageScheduler() {
                VALUES ($1,$2,$3,CURRENT_DATE)
                ON CONFLICT (company_id, rendszam, logged_on) DO UPDATE SET mileage = EXCLUDED.mileage`,
               [row.company_id, m.rendszam, parseFloat(st.mileage)]);
+            updated++;
           }
         } catch (_) { /* jármű-hiba ne állítsa le a kört */ }
+      }
+      // Friss km után AZONNAL szerviz-esedékesség ellenőrzés (best-effort).
+      if (updated) {
+        try { await _dispatchServiceAlerts(row.company_id); } catch (_) { /* best-effort */ }
       }
     }
   }
 
+  const minMin = 5;
+  let mins = parseInt(process.env.GPS_MILEAGE_INTERVAL_MIN, 10);
+  if (!Number.isFinite(mins) || mins < minMin) mins = 60;
   setTimeout(tick, 60 * 1000);
-  const interval = setInterval(tick, 24 * 60 * 60 * 1000);
-  console.log('[GpsKm] Napi km-óra snapshot ütemező elindítva.');
+  const interval = setInterval(tick, mins * 60 * 1000);
+  console.log('[GpsKm] km-óra snapshot + szerviz-ellenőrzés ütemező elindítva — ' + mins + ' perces ciklus.');
   return interval;
 }
 
+// ────────────────────────────────────────────────────────────
+//  Közös szerviz-riasztás-kiküldő EGY cégre. A `computeServiceDueAlerts`
+//  (km-óra vs. next_due_km + dátum vs. next_due_date) esedékes tételeire
+//  push + Notifications + e-mail (KÖZÖS VallorSoft cím) megy az Admin/
+//  Manager felhasználóknak, majd `last_alert_at`-tal hetente-egyszerre
+//  korlátoz. Ezt hívja a periodikus seprés ÉS — azonnal — a GPS-km-frissítés.
+//  Visszatérés: a riasztott tételek száma.
+// ────────────────────────────────────────────────────────────
+function _fmtKm(n) { const x = parseInt(n, 10); return isFinite(x) ? x.toLocaleString('ro-RO') : '0'; }
+
+async function _dispatchServiceAlerts(cid) {
+  let fleet;
+  try { fleet = require('../handlers/fleetCompliance'); } catch (_) { return 0; }
+  const compute = fleet && fleet.computeServiceDueAlerts;
+  if (typeof compute !== 'function') return 0;
+  let push; try { push = require('./push'); } catch (_) { push = null; }
+
+  let items;
+  try { items = await compute(cid, { onlyStale: true }); } catch (_) { return 0; }
+  if (!items || !items.length) return 0;
+
+  // Összefoglaló push-szöveg (ne tételenként spammeljen)
+  const first = items[0];
+  const firstTxt = '🔧 ' + (first.rendszam || '') + ' — '
+    + (first.km_left != null
+        ? (first.km_left < 0
+            ? 'depășit cu ' + _fmtKm(-first.km_left) + ' km / túllépve ' + _fmtKm(-first.km_left) + ' km'
+            : 'mai sunt ' + _fmtKm(first.km_left) + ' km / még ' + _fmtKm(first.km_left) + ' km')
+        : (first.days_left < 0 ? 'scadent / lejárt' : 'în ' + first.days_left + ' zile / ' + first.days_left + ' nap múlva'));
+  const body = items.length === 1 ? firstTxt
+    : firstTxt + ' (+' + (items.length - 1) + ' altele / további)';
+
+  try {
+    if (push) await push.sendPushToRole(cid, ['Admin', 'Manager'], {
+      title: '🔧 Revizii scadente / Esedékes szervizek',
+      body, url: '/admin',
+    });
+    // Notifications-központ (best-effort)
+    try {
+      const { notify } = require('../handlers/notifications');
+      await notify(pool, { company_id: cid, type: 'service', title: 'Revizii scadente', body, link_tab: 'service-log' });
+    } catch (_) { /* best-effort */ }
+
+    // E-mail a cég Admin/Manager felhasználóinak (KÖZÖS VallorSoft cím, RO, best-effort).
+    // Járművenként RÉSZLETES blokk: autó-adat (rendszám, márka/típus, aktuális km) +
+    // szerviz-adat (esedékesség km/dátum, állapot, szerviz típusa, utolsó szerviz).
+    try {
+      let cname = '';
+      try { const cr = await pool.query('SELECT nev FROM companies WHERE id=$1', [cid]); cname = (cr.rows[0] || {}).nev || ''; } catch (_) {}
+      const CAT_RO = { olajcsere: 'schimb ulei', gumi: 'anvelope', javitas: 'reparație', karbantartas: 'întreținere', egyeb: 'altele' };
+      const dRO = function (d) { try { return new Date(d).toLocaleDateString('ro-RO'); } catch (_) { return ''; } };
+      const blocks = items.slice(0, 50).map(function (i) {
+        let scad, col;
+        if (i.km_left != null) {
+          if (i.km_left < 0) { scad = 'depășit cu ' + _fmtKm(-i.km_left) + ' km'; col = '#dc2626'; }
+          else { scad = 'în ' + _fmtKm(i.km_left) + ' km'; col = '#d97706'; }
+        } else if (i.days_left < 0) { scad = 'scadent (dată depășită)'; col = '#dc2626'; }
+        else { scad = 'în ' + i.days_left + ' zile'; col = '#d97706'; }
+
+        const vehName = _escH(i.rendszam || '—')
+          + ((i.marca || i.tip) ? ' <span style="font-weight:400;color:#8a7d6e;">— ' + _escH([i.marca, i.tip].filter(Boolean).join(' ')) + '</span>' : '');
+        const cat = i.category ? (CAT_RO[i.category] || i.category) : null;
+        const line = function (label, val) {
+          return '<tr><td style="padding:3px 12px 3px 0;color:#8a7d6e;font-size:12px;white-space:nowrap;vertical-align:top;">' + label + '</td>'
+            + '<td style="padding:3px 0;font-size:13px;font-weight:600;color:#2a2018;">' + val + '</td></tr>';
+        };
+        let detail = '';
+        if (i.current_km != null) detail += line('Km actual', _fmtKm(i.current_km) + ' km');
+        if (i.next_due_km != null) detail += line('Revizie scadentă la', _fmtKm(i.next_due_km) + ' km');
+        if (i.next_due_date) detail += line('Scadentă la data', dRO(i.next_due_date));
+        detail += line('Stare', '<span style="color:' + col + ';font-weight:700;">' + scad + '</span>');
+        if (cat) detail += line('Tip revizie', _escH(cat));
+        if (i.service_date) detail += line('Ultima revizie', dRO(i.service_date));
+        if (i.description) detail += line('Observații', _escH(String(i.description).slice(0, 120)));
+
+        return '<div style="border:1px solid #ece3d8;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#fffdfa;">'
+          + '<div style="font-size:15px;font-weight:800;color:#2a2018;margin-bottom:6px;">🚛 ' + vehName + '</div>'
+          + '<table style="border-collapse:collapse;">' + detail + '</table>'
+          + '</div>';
+      }).join('');
+      const html = _alertEmailBody(
+        '🔧 Revizii scadente',
+        'Următoarele vehicule ale companiei <b>' + _escH(cname) + '</b> au revizia scadentă (în funcție de kilometrajul GPS live sau de dată). Verificați <b>Jurnal service</b> din VallorSoft.',
+        blocks,
+        'Deschideți VallorSoft → Jurnal service pentru detalii.'
+      );
+      await _emailAlertToAdmins(cid, '🔧 VallorSoft — Revizii scadente (' + items.length + ')', html, 'service_alert');
+    } catch (_) { /* best-effort */ }
+
+    const ids = items.map((i) => i.id);
+    await pool.query('UPDATE vehicle_service_log SET last_alert_at = CURRENT_DATE WHERE id = ANY($1)', [ids]);
+    console.log('[Service] cég #' + cid + ' — szerviz-riasztás: ' + items.length + ' jármű');
+    return items.length;
+  } catch (err) {
+    console.error('[Service] cég #' + cid + ' riasztás hiba:', err.message);
+    return 0;
+  }
+}
+
 // ============================================================
-//  Szerviz-esedékesség ütemező (vehicle_service_log) — 12 óránként.
-//  Járművenként a LEGUTÓBBI szerviz `next_due_km`/`next_due_date` mezőjét
-//  veti össze az ÉLŐ GPS km-órával (gps_mileage_log) és a mai dátummal.
-//  A küszöbön belüli (vagy túllépett) tételekről push + Notifications +
-//  e-mail (cég saját feladó-fiók) megy az Admin/Manager felhasználóknak.
-//  Ismétlés: hetente újra (last_alert_at dátum-őr — duplikált riasztás nélkül).
+//  Szerviz-esedékesség SEPRÉS ütemező — 12 óránként (biztonsági háló).
+//  A km-alapú riasztás VALÓS IDEJŰ része a GPS-km-frissítés után fut
+//  (startGpsMileageScheduler → _dispatchServiceAlerts); ez a periodikus
+//  kör fogja meg a DÁTUM-alapú esedékességet és a GPS nélküli cégeket is.
+//  Ismétlés: hetente újra (last_alert_at dátum-őr).
 // ============================================================
 function startServiceDueScheduler() {
-  let push;
-  try { push = require('./push'); } catch (_) { push = null; }
-  let fleet;
-  try { fleet = require('../handlers/fleetCompliance'); } catch (_) { return null; }
-  const compute = fleet && fleet.computeServiceDueAlerts;
-  if (typeof compute !== 'function') return null;
-
-  function fmtKm(n) { const x = parseInt(n, 10); return isFinite(x) ? x.toLocaleString('ro-RO') : '0'; }
-
   async function tick() {
     let companies;
     try {
@@ -269,75 +380,14 @@ function startServiceDueScheduler() {
         `SELECT DISTINCT company_id FROM vehicle_service_log
           WHERE next_due_km IS NOT NULL OR next_due_date IS NOT NULL`));
     } catch (_) { return; } // tábla migráció előtt
-
     for (const c of companies) {
-      const cid = c.company_id;
-      let items;
-      try { items = await compute(cid, { onlyStale: true }); } catch (_) { continue; }
-      if (!items || !items.length) continue;
-
-      // Összefoglaló push-szöveg (ne tételenként spammeljen)
-      const first = items[0];
-      const firstTxt = '🔧 ' + (first.rendszam || '') + ' — '
-        + (first.km_left != null
-            ? (first.km_left < 0
-                ? 'depășit cu ' + fmtKm(-first.km_left) + ' km / túllépve ' + fmtKm(-first.km_left) + ' km'
-                : 'mai sunt ' + fmtKm(first.km_left) + ' km / még ' + fmtKm(first.km_left) + ' km')
-            : (first.days_left < 0 ? 'scadent / lejárt' : 'în ' + first.days_left + ' zile / ' + first.days_left + ' nap múlva'));
-      const body = items.length === 1 ? firstTxt
-        : firstTxt + ' (+' + (items.length - 1) + ' altele / további)';
-
-      try {
-        if (push) await push.sendPushToRole(cid, ['Admin', 'Manager'], {
-          title: '🔧 Revizii scadente / Esedékes szervizek',
-          body, url: '/admin',
-        });
-        // Notifications-központ (best-effort)
-        try {
-          const { notify } = require('../handlers/notifications');
-          await notify(pool, { company_id: cid, type: 'service', title: 'Revizii scadente', body, link_tab: 'service-log' });
-        } catch (_) { /* best-effort */ }
-
-        // E-mail a cég Admin/Manager felhasználóinak (cég saját feladó-fiókról, RO, best-effort).
-        try {
-          let cname = '';
-          try { const cr = await pool.query('SELECT nev FROM companies WHERE id=$1', [cid]); cname = (cr.rows[0] || {}).nev || ''; } catch (_) {}
-          const tableHtml = items.slice(0, 50).map(function (i) {
-            let scad, col;
-            if (i.km_left != null) {
-              if (i.km_left < 0) { scad = 'depășit cu ' + fmtKm(-i.km_left) + ' km'; col = '#dc2626'; }
-              else { scad = 'în ' + fmtKm(i.km_left) + ' km'; col = '#d97706'; }
-            } else if (i.days_left < 0) { scad = 'scadent'; col = '#dc2626'; }
-            else { scad = 'în ' + i.days_left + ' zile'; col = '#d97706'; }
-            const ref = i.next_due_km != null ? fmtKm(i.next_due_km) + ' km'
-              : (i.next_due_date ? new Date(i.next_due_date).toLocaleDateString('ro-RO') : '');
-            return '<tr>'
-              + '<td style="padding:6px 10px;border-bottom:1px solid #ece3d8;">' + _escH(i.rendszam || '—') + '</td>'
-              + '<td style="padding:6px 10px;border-bottom:1px solid #ece3d8;">' + ref + '</td>'
-              + '<td style="padding:6px 10px;border-bottom:1px solid #ece3d8;text-align:right;font-weight:700;color:' + col + ';">' + scad + '</td>'
-              + '</tr>';
-          }).join('');
-          const html = _alertEmailBody(
-            '🔧 Revizii scadente',
-            'Următoarele vehicule ale companiei <b>' + _escH(cname) + '</b> au revizia scadentă (în funcție de kilometrajul GPS live sau de dată). Verificați <b>Jurnal service</b> din VallorSoft.',
-            tableHtml,
-            'Deschideți VallorSoft → Jurnal service pentru detalii.'
-          );
-          await _emailAlertToAdmins(cid, '🔧 VallorSoft — Revizii scadente (' + items.length + ')', html, 'service_alert');
-        } catch (_) { /* best-effort */ }
-
-        const ids = items.map((i) => i.id);
-        await pool.query('UPDATE vehicle_service_log SET last_alert_at = CURRENT_DATE WHERE id = ANY($1)', [ids]);
-        console.log('[Service] cég #' + cid + ' — szerviz-riasztás: ' + items.length + ' jármű');
-      } catch (err) {
-        console.error('[Service] cég #' + cid + ' riasztás hiba:', err.message);
-      }
+      try { await _dispatchServiceAlerts(c.company_id); } catch (_) { /* cég-hiba ne állítsa le a kört */ }
     }
   }
 
   setTimeout(tick, 45 * 1000);                       // indulás után 45 mp-cel első kör
   const interval = setInterval(tick, 12 * 60 * 60 * 1000);
-  console.log('[Service] Szerviz-esedékesség ütemező elindítva — 12 órás ciklus.');
+  console.log('[Service] Szerviz-esedékesség seprés-ütemező elindítva — 12 órás ciklus.');
   return interval;
 }
 

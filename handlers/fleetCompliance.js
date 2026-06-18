@@ -239,8 +239,8 @@ async function computeServiceDueAlerts(cid, opts) {
     ({ rows } = await pool.query(
       `WITH last_srv AS (
          SELECT DISTINCT ON (s.vehicle_id)
-                s.id, s.vehicle_id, v.rendszam, s.km AS base_km,
-                s.next_due_km, s.next_due_date,
+                s.id, s.vehicle_id, v.rendszam, v.marca, v.tip, s.km AS base_km,
+                s.next_due_km, s.next_due_date, s.description,
                 s.category, s.service_date, s.last_alert_at
          FROM vehicle_service_log s
          JOIN vehicles v ON v.id = s.vehicle_id
@@ -254,8 +254,9 @@ async function computeServiceDueAlerts(cid, opts) {
            FROM gps_mileage_log WHERE company_id = $1
          ) z ORDER BY norm, logged_on DESC
        )
-       SELECT ls.id, ls.vehicle_id, ls.rendszam, ls.base_km, ls.next_due_km, ls.next_due_date,
-              ls.category, ls.last_alert_at,
+       SELECT ls.id, ls.vehicle_id, ls.rendszam, ls.marca, ls.tip, ls.base_km,
+              ls.next_due_km, ls.next_due_date, ls.description,
+              ls.category, ls.service_date, ls.last_alert_at,
               (ls.next_due_date - CURRENT_DATE)::int AS days_left,
               lk.mileage AS gps_km,
               (SELECT COALESCE(SUM(f.total_km),0)
@@ -304,9 +305,13 @@ async function computeServiceDueAlerts(cid, opts) {
       id: r.id,
       vehicle_id: r.vehicle_id,
       rendszam: r.rendszam,
+      marca: r.marca || null,
+      tip: r.tip || null,
       category: r.category || null,
+      description: r.description || null,
+      service_date: r.service_date || null,   // utolsó szerviz dátuma
+      current_km: curKm,                       // aktuális (becsült/GPS) km-óra
       next_due_km: kmDue ? nextKm : null,
-      current_km: kmDue ? curKm : null,
       km_left: kmDue ? kmLeft : null,
       next_due_date: dateDue ? r.next_due_date : null,
       days_left: dateDue ? daysLeft : null,
