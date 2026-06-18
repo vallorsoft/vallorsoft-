@@ -567,4 +567,4 @@ async function sendSubscriptionCancelEmail(opts) {
   }
 }
 
-module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate, loadCompanySender, getCompanyMailer, sendSubscriptionCancelEmail };
+module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate, loadCompanySender, getCompanyMailer, sendSubscriptionCancelEmail, applyTemplateVars };
