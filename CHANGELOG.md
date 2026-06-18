@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-18 — Menü/almenü kétnyelvűsítés: a maradék emojis almenük (Fiók, Előfizetés)
+
+> Az admin/manager sidebar menü- és almenüpontjai szinte mind `data-i18n`-eltek (RO+HU), de **3 színes-emojis almenü** beégetett magyar maradt → RO-ban is magyarul látszott.
+
+- **`public/i18n.js`** — 2 új kulcs: `nav.account` (👤 Cont / 👤 Fiók), `nav.subscription` (💳 Abonament / 💳 Előfizetés).
+- **`public/admin.html`** — „👤 Fiók" (`data-tab=settings`) → `data-i18n="nav.account"`; „💳 Előfizetés" (`data-tab=elofizetesek`) → `data-i18n="nav.subscription"`.
+- **`public/manager.html`** — „👤 Fiók" → `data-i18n="nav.account"`.
+- Ellenőrizve: az admin+manager sidebar **mind az 57 `nav.*` kulcsa** létezik az i18n.js-ben (nincs literálként megjelenő kulcs). Cache-bust `i18n.js?v=20260618navi`; 100 Jest zöld. Ezzel a két konzol teljes menüje RO-alap + HU-váltó.
+
 ## 2026-06-18 — Integrációk kártyák i18n: RO-alap + HU-váltó (egységes nyelv)
 
 > Az Integrációk fülön a kártyák kevert RO/HU feliratúak voltak (a Feladó-fiók románul, az e-mail-intake / számlázó / CargoTrack beégetett magyarral). Most mind a konvenció szerinti: **RO-alap + HU-váltó** az i18n-en.
