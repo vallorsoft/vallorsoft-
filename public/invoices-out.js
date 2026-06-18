@@ -102,6 +102,7 @@ function invOutSendTpl(id){
   window.sendTemplatedEmailDialog({
     keys: ['invoice_notify', 'generic'],
     templateKey: 'invoice_notify',
+    toEmail: it.client_email || '',
     vars: { client: it.client_name || '', invoice_no: num, order_id: it.order_id ? String(it.order_id) : '' },
   });
 }

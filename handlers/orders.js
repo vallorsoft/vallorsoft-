@@ -179,6 +179,7 @@ handlers.comList = async function (req, res, args) {
                   o.load_type, o.hossz_cm, o.szel_cm, o.mag_cm,
                   (o.route_geo->>'km')::int AS route_km, o.payment_status, o.paid_amount,
                   o.handover_status, o.handover_type, o.handover_loc, o.handover_at,
+                  cl.email AS client_email,
                   (SELECT COUNT(*)::int FROM documents d WHERE d.order_id = o.id) AS pod_count,
                   o.needs_uit,
                   (SELECT COUNT(*)::int FROM order_uit_codes u
@@ -186,6 +187,7 @@ handlers.comList = async function (req, res, args) {
                   COALESCE(legs.leg_count, 0) AS leg_count,
                   COALESCE(legs.legs_json, '[]'::json) AS legs_json
            FROM orders o ${legsSubquery}
+           LEFT JOIN clients cl ON cl.id = o.client_id AND cl.company_id = o.company_id
            WHERE o.company_id = $1
            ORDER BY (o.status IN ('Parkolt','Raktarban') OR o.handover_status = 'Fuggoben') DESC,
                     o.created_at DESC

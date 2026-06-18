@@ -152,8 +152,11 @@ router.get('/api/invoices', requireLogin, async (req, res) => {
     if (to) { params.push(to); dateFilter += ` AND i.created_at < $${params.length}`; }
     const { rows } = await pool.query(
       `SELECT i.id, i.order_id, i.serie, i.numar, i.total, i.valuta, i.tva,
-              i.pdf_link, i.status, i.efactura_status, i.provider, i.client_name, i.created_at
+              i.pdf_link, i.status, i.efactura_status, i.provider, i.client_name, i.created_at,
+              cl.email AS client_email
        FROM invoices i
+       LEFT JOIN orders o ON o.id = i.order_id AND o.company_id = i.company_id
+       LEFT JOIN clients cl ON cl.id = o.client_id AND cl.company_id = i.company_id
        WHERE i.company_id = $1${dateFilter}
        ORDER BY i.created_at DESC LIMIT 500`, params);
     res.json({ ok: true, invoices: rows });
