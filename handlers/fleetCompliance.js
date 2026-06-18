@@ -240,7 +240,7 @@ async function computeServiceDueAlerts(cid, opts) {
       `WITH last_srv AS (
          SELECT DISTINCT ON (s.vehicle_id)
                 s.id, s.vehicle_id, v.rendszam, v.marca, v.tip, s.km AS base_km,
-                s.next_due_km, s.next_due_date, s.description,
+                s.next_due_km, s.next_due_date, s.description, s.cost_ron,
                 s.category, s.service_date, s.last_alert_at
          FROM vehicle_service_log s
          JOIN vehicles v ON v.id = s.vehicle_id
@@ -255,7 +255,7 @@ async function computeServiceDueAlerts(cid, opts) {
          ) z ORDER BY norm, logged_on DESC
        )
        SELECT ls.id, ls.vehicle_id, ls.rendszam, ls.marca, ls.tip, ls.base_km,
-              ls.next_due_km, ls.next_due_date, ls.description,
+              ls.next_due_km, ls.next_due_date, ls.description, ls.cost_ron,
               ls.category, ls.service_date, ls.last_alert_at,
               (ls.next_due_date - CURRENT_DATE)::int AS days_left,
               lk.mileage AS gps_km,
@@ -308,9 +308,10 @@ async function computeServiceDueAlerts(cid, opts) {
       marca: r.marca || null,
       tip: r.tip || null,
       category: r.category || null,
-      description: r.description || null,
-      service_date: r.service_date || null,   // utolsó szerviz dátuma
-      current_km: curKm,                       // aktuális (becsült/GPS) km-óra
+      description: r.description || null,       // szerviz megjegyzés
+      cost_ron: r.cost_ron != null ? parseFloat(r.cost_ron) : null,  // utolsó szerviz költsége
+      service_date: r.service_date || null,    // utolsó szerviz dátuma
+      current_km: curKm,                        // aktuális (becsült/GPS) km-óra
       next_due_km: kmDue ? nextKm : null,
       km_left: kmDue ? kmLeft : null,
       next_due_date: dateDue ? r.next_due_date : null,
