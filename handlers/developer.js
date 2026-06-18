@@ -476,7 +476,7 @@ handlers.devSendCompanyEmail = async function (req, res, args) {
       return res.json({ result: { ok: false, err: 'Nu s-a gasit e-mail admin pentru aceasta firma.' } });
     }
     const row = cR.rows[0];
-    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const appUrl = require('../lib/appUrl').appBaseUrl('http://localhost:3000');
     const paidUntil = row.paid_until ? new Date(row.paid_until).toLocaleDateString('ro-RO') : '—';
     const daysLeft = row.paid_until
       ? Math.max(0, Math.ceil((new Date(row.paid_until) - new Date()) / 86400000))

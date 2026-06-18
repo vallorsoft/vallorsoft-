@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const pool = require('../db');
 const { requireLogin } = require('../middleware/auth');
 const { sendResetEmail } = require('../services/email');
+const { appBaseUrl } = require('../lib/appUrl');
 const audit = require('../lib/audit');
 const { validatePassword } = require('../lib/passwordPolicy');
 
@@ -39,7 +40,7 @@ router.post('/api/forgot-password', async (req, res) => {
       [token, expiry, user.id]
     );
 
-    const resetUrl = (process.env.APP_URL || 'http://localhost:3000') + '/reset-password?token=' + token;
+    const resetUrl = appBaseUrl('http://localhost:3000') + '/reset-password?token=' + token;
     sendResetEmail(email, user.nume, resetUrl, lang, user.company_id).catch(e => console.error('Reset email hatter hiba:', e.message));
 
     return res.json(genericMsg);

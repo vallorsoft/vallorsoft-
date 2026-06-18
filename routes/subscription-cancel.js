@@ -48,7 +48,7 @@ function page(title, msg, ok, appUrl) {
 }
 
 router.get('/abonament/reactivare', async (req, res) => {
-  const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
+  const appUrl = require('../lib/appUrl').appBaseUrl();
   const cid = parseInt(req.query.cid, 10);
   const tok = String(req.query.tok || '');
   if (!cid || !tok) {

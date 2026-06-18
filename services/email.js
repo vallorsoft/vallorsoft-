@@ -8,6 +8,7 @@
 // Render env: BREVO_API_KEY=xkeysib-...   BREVO_SENDER=vallorteam.office@gmail.com
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const BREVO_SENDER  = process.env.BREVO_SENDER || process.env.MAIL_USER;
+const { appBaseUrl } = require('../lib/appUrl');
 
 console.log('BREVO ready:', !!BREVO_API_KEY, '| sender:', BREVO_SENDER);
 
@@ -166,7 +167,7 @@ async function sendInviteEmail(toEmail, kod, pozicio, cegNev, meghivottNev, lang
     console.log('early return - BREVO_API_KEY, BREVO_SENDER vagy toEmail hianyzik');
     return;
   }
-  const registerUrl = process.env.APP_URL || 'http://localhost:3000';
+  const registerUrl = appBaseUrl('http://localhost:3000');
 
   // DB sablon felülírja a hardcoded-ot, ha be van állítva
   let html, subject;
@@ -373,7 +374,7 @@ async function sendDeveloperEmail(toEmail, companyName, subject, htmlBody, compa
   if (!BREVO_API_KEY || !BREVO_SENDER || !toEmail) {
     return { ok: false, error: 'BREVO_API_KEY / BREVO_SENDER nu este configurat.' };
   }
-  const loginLink = (process.env.APP_URL || 'http://localhost:3000') + '/login';
+  const loginLink = appBaseUrl('http://localhost:3000') + '/login';
   const html = `
     <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;background:#1e1812;color:#faf6f0;padding:24px;border-radius:16px;">
       <div style="font-size:24px;font-weight:800;margin-bottom:4px;">

@@ -11,7 +11,7 @@ const { emailLang } = require('../lib/companyLang');
 
 const handlers = {};
 
-const APP_URL = process.env.APP_URL || 'http://localhost:3000';
+const APP_URL = require('../lib/appUrl').appBaseUrl('http://localhost:3000');
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // args: [clientId?] — a cég portál-hozzáférései (opcionálisan egy ügyfélre szűrve)

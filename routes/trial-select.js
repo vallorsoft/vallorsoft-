@@ -114,7 +114,7 @@ function escH(s) {
 
 router.get('/api/trial/select-plan', async (req, res) => {
   const { cid, plan, billing = 'monthly', tok } = req.query;
-  const appUrl = process.env.APP_URL || 'https://app.vallorsoft.com';
+  const appUrl = require('../lib/appUrl').appBaseUrl('https://app.vallorsoft.com');
 
   // Token ellenőrzés
   if (!cid || !plan || !tok || tok !== makeToken(cid, plan, billing)) {
