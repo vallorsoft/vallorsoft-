@@ -70,6 +70,7 @@
           + (v.sofer_nev ? ' <span class="mut" style="font-size:11px">👤 ' + esc(v.sofer_nev) + (v.sofer_tel ? ' · 📞 ' + esc(v.sofer_tel) : '') + '</span>' : '')
           + (v.nota ? ' <span class="mut" style="font-size:11px;display:block">📝 ' + esc(v.nota) + '</span>' : '')
           + (v.cargo_length_cm ? ' <span class="mut" style="font-size:11px;display:block">📐 ' + esc(v.cargo_length_cm) + '×' + esc(v.cargo_width_cm) + '×' + esc(v.cargo_height_cm) + ' cm' + (v.trailer_kind ? ' (' + esc(v.trailer_kind) + ')' : '') + '</span>' : '')
+          + ((v.has_gps_key || v.track_url) ? ' <span class="mut" style="font-size:11px;display:block">' + (v.has_gps_key ? '🛰️ GPS' : '🔗 ' + esc(t('car.trackLinkSet'))) + '</span>' : '')
           + '</div>'
           + '<button class="btn" style="padding:5px 9px;font-size:11px" onclick="Carrier.editVehicle(' + v.id + ')" title="' + esc(t('car.editVehicle')) + '">✎</button>'
           + '<button class="btn" style="padding:5px 9px" onclick="Carrier.delVehicle(' + v.id + ')">✕</button>'
@@ -98,6 +99,9 @@
       + '<input class="inp" id="ve_clen_' + id + '" value="' + esc(v.cargo_length_cm || '') + '" placeholder="' + esc(t('car.phCargoLen')) + '" type="number" min="100" max="2000" style="flex:1;min-width:75px;padding:7px 9px">'
       + '<input class="inp" id="ve_cwid_' + id + '" value="' + esc(v.cargo_width_cm || '') + '" placeholder="' + esc(t('car.phCargoWid')) + '" type="number" min="100" max="350" style="flex:1;min-width:75px;padding:7px 9px">'
       + '<input class="inp" id="ve_chei_' + id + '" value="' + esc(v.cargo_height_cm || '') + '" placeholder="' + esc(t('car.phCargoHei')) + '" type="number" min="50" max="400" style="flex:1;min-width:75px;padding:7px 9px">'
+      + '<input class="inp" id="ve_trk_' + id + '" value="' + esc(v.track_url || '') + '" placeholder="' + esc(t('car.phTrackUrl')) + '" type="url" style="flex:3;min-width:160px;padding:7px 9px">'
+      + '<input class="inp" id="ve_gobj_' + id + '" value="' + esc(v.gps_object_id || '') + '" placeholder="' + esc(t('car.phGpsObj')) + '" style="flex:1;min-width:110px;padding:7px 9px">'
+      + '<input class="inp" id="ve_gkey_' + id + '" value="" placeholder="' + esc(v.has_gps_key ? t('car.phGpsKeyKept') : t('car.phGpsKey')) + '" type="password" autocomplete="new-password" style="flex:1;min-width:110px;padding:7px 9px">'
       + '<button class="btn ok" style="padding:5px 10px" onclick="Carrier.saveVehicle(' + id + ')">✓</button>'
       + '<button class="btn" style="padding:5px 10px" onclick="Carrier.loadVehicles()">✕</button>'
       + '</div>';
@@ -111,7 +115,7 @@
     var cWid = g('ve_cwid') ? parseInt(g('ve_cwid'), 10) || null : null;
     var cHei = g('ve_chei') ? parseInt(g('ve_chei'), 10) || null : null;
     if (rem && (!cLen || !cWid || !cHei)) { toast(t('car.dimRequired'), 'err'); return; }
-    api('PUT', '/api/carrier/vehicles/' + id, { rendszam_camion: cam, rendszam_remorca: rem, marca: g('ve_marca'), model: g('ve_model'), sofer_nev: g('ve_sofer'), sofer_tel: g('ve_sofertel'), an_fabricatie: anVal, nota: g('ve_nota'), trailer_kind: g('ve_tkind'), cargo_length_cm: cLen, cargo_width_cm: cWid, cargo_height_cm: cHei }).then(function (r) {
+    api('PUT', '/api/carrier/vehicles/' + id, { rendszam_camion: cam, rendszam_remorca: rem, marca: g('ve_marca'), model: g('ve_model'), sofer_nev: g('ve_sofer'), sofer_tel: g('ve_sofertel'), an_fabricatie: anVal, nota: g('ve_nota'), trailer_kind: g('ve_tkind'), cargo_length_cm: cLen, cargo_width_cm: cWid, cargo_height_cm: cHei, track_url: g('ve_trk'), gps_object_id: g('ve_gobj'), gps_api_key: g('ve_gkey') }).then(function (r) {
       if (r && r.ok) { toast(t('car.vehicleSaved'), 'ok'); loadVehicles(); } else toast((r && r.err) || t('common.error'), 'err');
     });
   }
@@ -139,11 +143,14 @@
         trailer_kind: $('vTrailerKind') ? $('vTrailerKind').value : null,
         cargo_length_cm: cLen,
         cargo_width_cm: cWid,
-        cargo_height_cm: cHei
+        cargo_height_cm: cHei,
+        track_url: $('vTrackUrl') ? $('vTrackUrl').value.trim() : '',
+        gps_object_id: $('vGpsObj') ? $('vGpsObj').value.trim() : '',
+        gps_api_key: $('vGpsKey') ? $('vGpsKey').value : ''
       }).then(function (r) {
         if (r && r.ok) {
           toast(t('car.vehicleAdded'), 'ok');
-          ['vCam', 'vRem', 'vMarca', 'vModel', 'vSofer', 'vSoferTel', 'vAn', 'vNota', 'vCargoLen', 'vCargoWid', 'vCargoHei'].forEach(function (i) { if ($(i)) $(i).value = ''; });
+          ['vCam', 'vRem', 'vMarca', 'vModel', 'vSofer', 'vSoferTel', 'vAn', 'vNota', 'vCargoLen', 'vCargoWid', 'vCargoHei', 'vTrackUrl', 'vGpsObj', 'vGpsKey'].forEach(function (i) { if ($(i)) $(i).value = ''; });
           if ($('vTrailerKind')) $('vTrailerKind').value = '';
           loadVehicles();
         } else toast((r && r.err) || t('common.error'), 'err');

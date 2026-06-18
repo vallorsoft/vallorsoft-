@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title data-i18n="trk.title">Urmărire transport</title>
-  <script src="/i18n.js?v=20260616pw3"></script>
+  <script src="/i18n.js?v=20260618cargps"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>
@@ -42,6 +42,9 @@
     .b-info { background: linear-gradient(180deg, rgba(59,130,246,.14), rgba(59,130,246,.07)); color: #1d4ed8; border-color: rgba(59,130,246,.30); }
     #map { height: 380px; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(15,23,42,.06); }
     .muted { color: #64748b; font-size: 13px; }
+    .extbtn { display: inline-block; text-decoration: none; font-weight: 700; font-size: 14px;
+      color: #fff; background: linear-gradient(180deg, #6366f1, #4f46e5);
+      padding: 11px 22px; border-radius: 10px; box-shadow: 0 4px 12px rgba(79,70,229,.25); }
     .err { text-align: center; padding: 60px 20px; }
     .foot { text-align: center; color: #94a3b8; font-size: 11px; margin-top: 20px; }
   </style>
@@ -104,6 +107,13 @@
     } else {
       box.innerHTML += '<div class="card muted" style="text-align:center;">📍 ' + esc(t('trk.noGps'))
         + (tr.status === 'Finalizat' ? ' — ' + esc(t('trk.deliveredNote')) + ' ✅' : '.') + '</div>';
+    }
+
+    // Alvállalkozói külső követő-link (megosztott URL) — gombként.
+    if (r.external_url && /^https?:\/\//i.test(r.external_url)) {
+      box.innerHTML += '<div style="text-align:center;margin-top:12px;">'
+        + '<a class="extbtn" href="' + esc(r.external_url).replace(/"/g, '&quot;') + '" target="_blank" rel="noopener noreferrer">🛰️ '
+        + esc(t('trk.externalTrack')) + '</a></div>';
     }
 
     if (typeof L === 'undefined' || !document.getElementById('map')) return;

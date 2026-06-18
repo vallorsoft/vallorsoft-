@@ -111,9 +111,64 @@ handlers.carrierVehicleList = async function (req, res, args) {
     const carrierId = parseInt(args && args[0], 10) || null;
     const params = [cid]; let where = 'company_id=$1';
     if (carrierId) { params.push(carrierId); where += ' AND carrier_id=$2'; }
-    const r = await pool.query(`SELECT * FROM carrier_vehicles WHERE ${where} ORDER BY created_at DESC`, params);
+    // A titkosított GPS-kulcsot SOHA nem adjuk vissza, csak a „van-e kulcs" jelzőt.
+    const r = await pool.query(
+      `SELECT id, company_id, carrier_id, rendszam_camion, rendszam_remorca, marca, model,
+              sofer_nev, sofer_tel, an_fabricatie, nota, trailer_kind,
+              cargo_length_cm, cargo_width_cm, cargo_height_cm,
+              track_url, gps_object_id, (gps_api_key_enc IS NOT NULL) AS has_gps_key, created_at
+         FROM carrier_vehicles WHERE ${where} ORDER BY created_at DESC`, params);
     return res.json({ result: { ok: true, items: r.rows } });
   } catch (err) { console.error('carrierVehicleList hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
+};
+
+// Alvállalkozói jármű GPS-beállítása a diszpécser (Admin/Manager) oldaláról.
+// args: [{ id, track_url, gps_object_id, gps_api_key }]
+//   - track_url: megosztott publikus követő-link (URL) — üres = törlés.
+//   - gps_object_id + gps_api_key: opcionális CargoTrack élő pozícióhoz.
+//   - üresen hagyott gps_api_key → a tárolt kulcs MEGMARAD (jelszó-megőrzés);
+//     a kulcs törléséhez a gps_object_id-t is üresre kell hagyni.
+handlers.carrierVehicleSetGps = async function (req, res, args) {
+  try {
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = req.session.user.company_id;
+    const a = (Array.isArray(args) ? args[0] : args) || {};
+    const id = parseInt(a.id, 10);
+    if (!id) return res.json({ result: { ok: false, err: 'Identificator lipsă' } });
+
+    // Tulajdon-ellenőrzés: a jármű a belépett céghez tartozik-e.
+    const own = await pool.query('SELECT id FROM carrier_vehicles WHERE id=$1 AND company_id=$2', [id, cid]);
+    if (!own.rows.length) return res.json({ result: { ok: false, err: 'Vehiculul nu a fost găsit.' } });
+
+    let trackUrl = _str(a.track_url, 1000);
+    if (trackUrl && !/^https?:\/\//i.test(trackUrl)) {
+      return res.json({ result: { ok: false, err: 'Link de urmărire invalid (trebuie să înceapă cu http:// sau https://).' } });
+    }
+    const objectId = _str(a.gps_object_id, 100);
+    const newKey = (a.gps_api_key == null ? '' : String(a.gps_api_key)).trim();
+
+    if (objectId && newKey) {
+      const { encrypt } = require('../lib/crypto');
+      await pool.query(
+        `UPDATE carrier_vehicles SET track_url=$1, gps_object_id=$2, gps_api_key_enc=$3
+          WHERE id=$4 AND company_id=$5`,
+        [trackUrl, objectId, encrypt(newKey), id, cid]);
+    } else if (objectId && !newKey) {
+      // Kulcs üres → a meglévőt megtartjuk, csak az object_id + link frissül.
+      await pool.query(
+        `UPDATE carrier_vehicles SET track_url=$1, gps_object_id=$2 WHERE id=$3 AND company_id=$4`,
+        [trackUrl, objectId, id, cid]);
+    } else {
+      // Nincs object_id → a CargoTrack-párosítást töröljük; a link maradhat.
+      await pool.query(
+        `UPDATE carrier_vehicles SET track_url=$1, gps_object_id=NULL, gps_api_key_enc=NULL
+          WHERE id=$2 AND company_id=$3`,
+        [trackUrl, id, cid]);
+    }
+
+    audit.fromReq(req, 'carrier.vehicle_gps', 'carrier_vehicle', String(id), { hasLink: !!trackUrl, hasKey: !!(objectId && newKey) });
+    return res.json({ result: { ok: true } });
+  } catch (err) { console.error('carrierVehicleSetGps hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
 };
 
 // ─── Szállítói számlák (AP) ──────────────────────────────────

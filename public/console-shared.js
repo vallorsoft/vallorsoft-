@@ -1382,7 +1382,8 @@ function loadCarrierAp(){
 
     // Járművek carrier szerint csoportosítva
     var vehByCarrier = {};
-    ((vr && vr.ok && vr.items) || []).forEach(function(v){
+    window._carrierVehCache = (vr && vr.ok && vr.items) || [];
+    window._carrierVehCache.forEach(function(v){
       var k = String(v.carrier_id);
       if(!vehByCarrier[k]) vehByCarrier[k] = [];
       vehByCarrier[k].push(v);
@@ -1411,13 +1412,17 @@ function loadCarrierAp(){
           + '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);">Pótkocsi</th>'
           + '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);">Márka/Modell</th>'
           + '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);">Sofőr</th>'
+          + '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);">GPS</th>'
           + '</tr></thead><tbody>'
           + vehs.map(function(v){
+              var gpsBadge = v.has_gps_key ? '🛰️' : (v.track_url ? '🔗' : '<span style="color:var(--text-muted);">—</span>');
               return '<tr>'
                 + '<td style="padding:4px 8px;">'+esc(v.rendszam_camion||'—')+'</td>'
                 + '<td style="padding:4px 8px;color:var(--text-muted);">'+esc(v.rendszam_remorca||'—')+'</td>'
                 + '<td style="padding:4px 8px;color:var(--text-muted);">'+esc([v.marca,v.model].filter(Boolean).join(' ')||'—')+'</td>'
                 + '<td style="padding:4px 8px;color:var(--text-muted);">'+esc(v.sofer_nev||'—')+'</td>'
+                + '<td style="padding:4px 8px;white-space:nowrap;">'+gpsBadge
+                + ' <button class="btn ghost" style="padding:2px 8px;font-size:11px;" onclick="openCarrierVehGps('+v.id+')">'+t('cs.cv.gpsBtn')+'</button></td>'
                 + '</tr>';
             }).join('')
           + '</tbody></table>'
@@ -1567,6 +1572,38 @@ function carrierInvoicePayUi(id, rem){
   gas('carrierInvoicePayment',[id, arg]).then(function(r){ if(r&&r.ok){ toast(t('cs.paymentSaved'),'ok'); loadCarrierAp(); loadCarriers(); } else toast((r&&r.err)||t('common.error'),'err'); });
 }
 function carrierInvoiceDeleteUi(id){ if(!confirm(t('cs.cf.delInvoice'))) return; gas('carrierInvoiceDelete',[id]).then(function(r){ if(r&&r.ok){ toast(t('common.deleted'),'ok'); loadCarrierAp(); loadCarriers(); } }); }
+
+// ── Alvállalkozói jármű GPS-beállítás (megosztott link + opc. CargoTrack kulcs) ──
+function openCarrierVehGps(id){
+  var v=(window._carrierVehCache||[]).filter(function(x){return x.id===id;})[0]||{};
+  var ovl=document.createElement('div');
+  ovl.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+  ovl.innerHTML='<div class="glass" style="padding:20px;max-width:480px;width:100%;border-radius:14px;max-height:92vh;overflow:auto;">'
+    +'<h3 class="h-title" style="margin-top:0;">📍 '+t('cs.cv.gpsTitle')+' — <b>'+esc(v.rendszam_camion||'')+'</b></h3>'
+    +'<div class="text-muted" style="font-size:12px;margin-bottom:12px;">'+t('cs.cv.gpsHint')+'</div>'
+    +'<div class="field"><label>'+t('cs.cv.trackUrl')+'</label><input class="input" id="cvgUrl" type="url" placeholder="https://..." value="'+esc(v.track_url||'')+'"></div>'
+    +'<div class="field"><label>'+t('cs.cv.gpsObjectId')+'</label><input class="input" id="cvgObj" placeholder="CargoTrack object_id" value="'+esc(v.gps_object_id||'')+'"></div>'
+    +'<div class="field"><label>'+t('cs.cv.gpsApiKey')+'</label><input class="input" id="cvgKey" type="password" autocomplete="new-password" placeholder="'+(v.has_gps_key?'••••••••':'')+'"></div>'
+    +(v.has_gps_key?'<div class="text-muted" style="font-size:11px;margin:-6px 0 10px;">'+t('cs.cv.keyKept')+'</div>':'')
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap;">'
+    +'<button class="btn ghost" id="cvgCancel">'+t('etpl.cancel')+'</button>'
+    +'<button class="btn primary" id="cvgSave">'+t('common.save')+'</button>'
+    +'</div></div>';
+  document.body.appendChild(ovl);
+  function close(){ try{document.body.removeChild(ovl);}catch(e){} }
+  ovl.addEventListener('click',function(e){ if(e.target===ovl) close(); });
+  ovl.querySelector('#cvgCancel').addEventListener('click',close);
+  ovl.querySelector('#cvgSave').addEventListener('click',function(){
+    var p={ id:id,
+      track_url:(ovl.querySelector('#cvgUrl').value||'').trim(),
+      gps_object_id:(ovl.querySelector('#cvgObj').value||'').trim(),
+      gps_api_key:(ovl.querySelector('#cvgKey').value||'') };
+    gas('carrierVehicleSetGps',[p]).then(function(r){
+      if(r&&r.ok){ toast(t('common.saved'),'ok'); close(); loadCarrierAp(); }
+      else toast((r&&r.err)||t('common.error'),'err');
+    });
+  });
+}
 
 // ── Carrier dokumentumok modal (AP fülből) ──
 function ensureCarrierDocsModal(){
