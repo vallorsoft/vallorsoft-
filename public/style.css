@@ -1466,3 +1466,49 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 .vs-bell-pop.dark .vs-notif-body{ color:#c9bcaa; }
 .main-content[data-theme="dark"] #notifPageBox .vs-notif-item{ border-color:rgba(255,225,200,.10); }
 .main-content[data-theme="dark"] .vs-notif-body{ color:#c9bcaa; }
+
+/* ════════════════════════════════════════════════════════════
+   INTEGRÁCIÓK OLDAL — egységes, szimmetrikus kártyák (additív, izolált)
+   Csak a [data-pane="integrations"] alá hat. A három eltérő kártya-stílust
+   (.glass / .ct-card / .eic) azonos szélességre, paddingre, keretre, sarokra
+   és térközre hozza, és a CargoTrack kártyát a rendszer-témához igazítja.
+   ════════════════════════════════════════════════════════════ */
+.main-content [data-pane="integrations"] .glass,
+.main-content [data-pane="integrations"] .ct-card,
+.main-content [data-pane="integrations"] .eic{
+  max-width:none !important;
+  width:100% !important;
+  padding:22px !important;
+  border-radius:var(--radius-lg) !important;
+  margin:0 0 20px 0 !important;
+  box-sizing:border-box;
+}
+/* Egységes, látható keret világos témában (a .eic/.ct sötét-keretet használt) */
+.main-content[data-theme="light"] [data-pane="integrations"] .glass,
+.main-content[data-theme="light"] [data-pane="integrations"] .ct-card,
+.main-content[data-theme="light"] [data-pane="integrations"] .eic{
+  border:1px solid #e2e8f0 !important;
+}
+/* CargoTrack kártya: a beégetett fehér/szürke helyett a rendszer-stílus */
+.main-content [data-pane="integrations"] .ct-card{
+  background:linear-gradient(180deg,#ffffff,#fbfcfe);
+  font-family:inherit;
+}
+.main-content[data-theme="dark"] [data-pane="integrations"] .ct-card{
+  background:var(--bg-panel-raised) !important;
+  border-color:var(--glass-border-dark) !important;
+}
+.main-content[data-theme="dark"] [data-pane="integrations"] .ct-card .ct-title,
+.main-content[data-theme="dark"] [data-pane="integrations"] .ct-card .ct-label{ color:var(--text-primary); }
+.main-content[data-theme="dark"] [data-pane="integrations"] .ct-card .ct-sub{ color:var(--text-muted); }
+.main-content[data-theme="dark"] [data-pane="integrations"] .ct-card .ct-input,
+.main-content[data-theme="dark"] [data-pane="integrations"] .ct-card select.ct-input{
+  background:var(--bg-panel); border-color:var(--glass-border-dark); color:var(--text-primary);
+}
+.main-content[data-theme="dark"] [data-pane="integrations"] .ct-card .ct-btn--ghost{
+  background:transparent; border-color:var(--glass-border-dark); color:var(--text-primary);
+}
+.main-content[data-theme="dark"] [data-pane="integrations"] .ct-cat{ background:rgba(255,255,255,.08); color:var(--text-muted); }
+/* Egységes szakasz-fejléc ritmus + törhető gomb-sorok */
+.main-content [data-pane="integrations"] > div > h3{ margin:6px 0 10px !important; }
+.main-content [data-pane="integrations"] .ct-actions{ flex-wrap:wrap; }

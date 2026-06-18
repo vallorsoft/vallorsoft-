@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-18 — Integrációk oldal: egységes, szimmetrikus kártya-megjelenés
+
+> Az Integrációk fülön három eltérő stílusú kártya keveredett (`.glass` 18–22px, a CargoTrack `.ct-card` beégetett fehérrel + `max-width:560px` + 16px, az e-mail-intake `.eic`), ezért aszimmetrikus volt. Most minden kártya azonos kinézetű.
+
+- **`public/style.css`** (additív, a fájl végén, **csak `[data-pane="integrations"]` alá szűkítve**) — minden szekció-kártya azonos szélesség (full), padding (22px), sarok (`--radius-lg`), keret (világosban `#e2e8f0`) és térköz (20px); a **CargoTrack kártya a rendszer-témához igazítva** (világos+sötét: háttér/keret/szöveg/inputok/gombok), így már nem a beégetett fehér 560px-es widget. Más oldalt nem érint.
+- **`public/billing-card.js`** — a számlázó-választó chipek **egyenlő oszlopos rácsban** (`repeat(auto-fit,minmax(120px,1fr))`, középre igazítva) a korábbi változó szélességű flex helyett → szimmetrikus sor.
+- Cache-bust `style.css`/`billing-card.js` `?v=20260618sym`. 100 Jest zöld. *(A kártyák kevert RO/HU feliratai külön i18n-kör — ez a kör csak a vizuális szimmetria.)*
+
 ## 2026-06-18 — Jogi oldalak (RO) bővítése az alvállalkozói GPS-funkcióval
 
 > Az alvállalkozói jármű GPS-követés bevezetése után a román jogi/GDPR oldalak frissítve, hogy lefedjék az új adatkezelést.

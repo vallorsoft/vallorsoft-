@@ -47,7 +47,7 @@ window.BillingCard = (function () {
   function renderChooser() {
     var grid = providers.map(function (p) {
       var sel = selected === p.provider;
-      return '<button onclick="BillingCard._pick(\'' + p.provider + '\')" style="padding:14px 18px;border-radius:12px;cursor:pointer;font-weight:700;'
+      return '<button onclick="BillingCard._pick(\'' + p.provider + '\')" style="padding:14px 12px;border-radius:12px;cursor:pointer;font-weight:700;text-align:center;width:100%;'
         + 'border:1px solid ' + (sel ? ACCENT : 'var(--border-bright)') + ';background:' + (sel ? 'rgba(246,113,30,0.12)' : 'rgba(255,255,255,0.03)') + ';color:' + (sel ? 'var(--text-primary)' : 'var(--text-muted)') + ';">'
         + esc2(p.display_name) + (sel ? ' ✓' : '') + '</button>';
     }).join('');
@@ -55,7 +55,7 @@ window.BillingCard = (function () {
       '<div class="glass" style="padding:18px;">'
       + head('Számlázó integrálása')
       + '<div class="text-muted" style="font-size:12px;margin-bottom:14px;">Válassz számlázó szolgáltatót:</div>'
-      + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">' + grid + '</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;">' + grid + '</div>'
       + '<button class="btn primary" ' + (selected ? '' : 'disabled') + ' onclick="BillingCard._next()">Tovább →</button>'
       + (current ? ' <button class="btn ghost" onclick="BillingCard._cancel()">Mégse</button>' : '')
       + '</div>';
