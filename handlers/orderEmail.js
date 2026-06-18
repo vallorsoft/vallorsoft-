@@ -12,7 +12,8 @@
 // ============================================================
 const pool = require('../db');
 const audit = require('../lib/audit');
-const { getCompanyMailer } = require('../services/email');
+const _crypto = require('crypto');
+const { getCompanyMailer, sendClientEmail } = require('../services/email');
 
 const handlers = {};
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -99,6 +100,27 @@ async function _listAttachments(cid, orderId) {
   return out;
 }
 
+// Ügyfél követő-link (publikus /t/<token>) — feature-gate + token (opc. generálás).
+async function _trackingInfo(cid, orderId, generate) {
+  try {
+    var fr = await pool.query(
+      "SELECT enabled FROM company_features WHERE company_id=$1 AND feature_key='tracking'", [cid]);
+    if (fr.rows.length && fr.rows[0].enabled === false) return { available: false, url: null };
+  } catch (_) { /* alapból elérhető */ }
+  var token = null;
+  try {
+    var r = await pool.query('SELECT tracking_token FROM orders WHERE id=$1 AND company_id=$2', [orderId, cid]);
+    if (!r.rows.length) return { available: false, url: null };
+    token = r.rows[0].tracking_token;
+    if (!token && generate) {
+      token = _crypto.randomBytes(16).toString('hex');
+      await pool.query('UPDATE orders SET tracking_token=$1 WHERE id=$2 AND company_id=$3', [token, orderId, cid]);
+    }
+  } catch (_) { return { available: false, url: null }; }
+  var base = (process.env.APP_URL || '').replace(/\/$/, '');
+  return { available: true, url: (token && base) ? base + '/t/' + token : null };
+}
+
 // Külső URL letöltése base64-ként (számla-PDF / külső tárolású fotó), best-effort.
 async function _fetchBase64(url) {
   try {
@@ -125,7 +147,23 @@ handlers.getOrderEmailData = async function (req, res, args) {
     if (!o) return res.json({ result: { ok: false, err: 'Comanda nu a fost găsită.' } });
     var fields = _orderFields(o);
     var attachments = await _listAttachments(cid, orderId);
-    return res.json({ result: { ok: true, order_id: orderId, client_email: o.client_email || '', fields: fields, attachments: attachments } });
+    var trk = await _trackingInfo(cid, orderId, false);
+    // Mentett sablonok szövegesen, a fuvar adataival előtöltve (előtöltéshez).
+    var lang = (_arg(args).lang === 'hu') ? 'hu' : 'ro';
+    var templates = [];
+    try {
+      var et = require('./emailTemplates');
+      if (et && typeof et.renderCompanyTemplates === 'function') {
+        var route = ((o.loc_incarcare || '') + (o.loc_descarcare ? ' → ' + o.loc_descarcare : '')).trim();
+        templates = await et.renderCompanyTemplates(cid, lang, {
+          order_id: String(o.id), route: route, client: o.client || '',
+          status: o.status || '', pret: o.pret != null ? String(o.pret) : '', invoice_no: '',
+        });
+      }
+    } catch (_) { templates = []; }
+    return res.json({ result: { ok: true, order_id: orderId, client_email: o.client_email || '',
+      fields: fields, attachments: attachments,
+      tracking_available: trk.available, tracking_url: trk.url, templates: templates } });
   } catch (err) {
     console.error('getOrderEmailData hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
@@ -140,9 +178,15 @@ handlers.sendOrderEmail = async function (req, res, args) {
     var cid = req.session.user.company_id;
     var a = _arg(args);
     var orderId = String(a.order_id || '').trim();
-    var toEmail = String(a.to_email || '').trim();
     if (!orderId) return res.json({ result: { ok: false, err: 'Identificator lipsă' } });
-    if (!EMAIL_RE.test(toEmail)) return res.json({ result: { ok: false, err: 'E-mail invalid' } });
+
+    // TESZT: a KÖZÖS VallorSoft címről a belépett felhasználó SAJÁT címére megy
+    // (a megadott címet figyelmen kívül hagyja). VALÓS: a megadott külső/belső cím.
+    var isTest = a.test === true || String(a.test) === 'true';
+    var toEmail = isTest ? String(req.session.user.email || '').trim() : String(a.to_email || '').trim();
+    if (!EMAIL_RE.test(toEmail)) {
+      return res.json({ result: { ok: false, err: isTest ? 'Adresa dvs. de e-mail lipsește.' : 'E-mail invalid' } });
+    }
 
     var o = await _loadOrder(cid, orderId);
     if (!o) return res.json({ result: { ok: false, err: 'Comanda nu a fost găsită.' } });
@@ -163,6 +207,14 @@ handlers.sendOrderEmail = async function (req, res, args) {
           return '<tr><td style="padding:4px 14px 4px 0;color:#8a7d6e;">' + _esc(f.label) + '</td>' +
                  '<td style="padding:4px 0;font-weight:600;color:#2a2018;">' + _esc(f.value) + '</td></tr>';
         }).join('') + '</table>';
+    }
+    // Követő-link (ha kipipálva): a publikus /t/<token> az ügyfélnek.
+    if (a.include_tracking === true || String(a.include_tracking) === 'true') {
+      var trk = await _trackingInfo(cid, orderId, true);
+      if (trk.url) {
+        bodyHtml += '<p style="margin-top:14px;font-size:14px;">🌍 ' +
+          'Urmăriți transportul / Kövesse a fuvart: <a href="' + _esc(trk.url) + '">' + _esc(trk.url) + '</a></p>';
+      }
     }
     if (!bodyHtml) bodyHtml = '<p>Comandă ' + _esc(orderId) + '</p>';
 
@@ -217,17 +269,26 @@ handlers.sendOrderEmail = async function (req, res, args) {
       attachments.push({ name: name, contentBase64: b64 });
     }
 
-    // Küldés a CÉG SAJÁT feladó-fiókján (SMTP/Brevo). Nincs beállítva → RO hiba.
-    var mailer = await getCompanyMailer(cid);
-    if (!mailer || !mailer.ok) {
-      return res.json({ result: { ok: false, err: (mailer && mailer.noConfig)
-        ? 'Configurați contul de e-mail (SMTP) în Integrări înainte de a trimite.'
-        : ((mailer && mailer.error) || 'Eroare la contul expeditor') } });
+    var sent;
+    if (isTest) {
+      // Teszt → KÖZÖS VallorSoft cím (rendszer-feladó), a saját címünkre.
+      sent = await sendClientEmail({
+        to: toEmail, subject: subject, html: bodyHtml, attachments: attachments,
+        companyId: cid, mailType: 'order_test',
+      });
+    } else {
+      // Valós küldés → a CÉG SAJÁT feladó-fiókján (SMTP/Brevo). Nincs beállítva → RO hiba.
+      var mailer = await getCompanyMailer(cid);
+      if (!mailer || !mailer.ok) {
+        return res.json({ result: { ok: false, err: (mailer && mailer.noConfig)
+          ? 'Configurați contul de e-mail (SMTP) în Integrări înainte de a trimite.'
+          : ((mailer && mailer.error) || 'Eroare la contul expeditor') } });
+      }
+      sent = await mailer.send({ to: toEmail, subject: subject, html: bodyHtml, attachments: attachments, mailType: 'order' });
     }
-    var sent = await mailer.send({ to: toEmail, subject: subject, html: bodyHtml, attachments: attachments, mailType: 'order' });
 
     audit.fromReq(req, 'order.email_send', 'order', orderId, {
-      to: toEmail, fields: fieldRows.length, attachments: attachments.length, skipped: skipped, ok: !!(sent && sent.ok),
+      to: toEmail, test: isTest, fields: fieldRows.length, attachments: attachments.length, skipped: skipped, ok: !!(sent && sent.ok),
     });
 
     if (!sent || !sent.ok) return res.json({ result: { ok: false, err: (sent && sent.error) || 'Eroare la trimitere' } });

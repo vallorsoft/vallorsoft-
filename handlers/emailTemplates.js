@@ -237,4 +237,43 @@ handlers.sendTemplatedEmail = async function (req, res, args) {
   }
 };
 
+// ── Újrahasználható segéd: a cég tranzakciós sablonjai SZÖVEGESEN renderelve
+//  (a {{vars}} behelyettesítve, HTML→szöveg) — pl. az „Email a fuvarról"
+//  összeállító előtöltéséhez. NEM-enumerable (nem /api/execute-handler).
+function _htmlToText(h) {
+  return String(h || '')
+    .replace(/<\/(p|div|h[1-6]|li)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, '\n\n').trim();
+}
+async function renderCompanyTemplates(cid, lang, vars) {
+  lang = lang === 'hu' ? 'hu' : 'ro';
+  vars = vars || {};
+  const stored = {};
+  try {
+    const r = await pool.query(
+      `SELECT key, subject_ro, subject_hu, body_ro, body_hu, active
+         FROM company_email_templates WHERE company_id=$1`, [cid]);
+    for (const row of r.rows) stored[row.key] = row;
+  } catch (_) { /* tábla hiányában csak az alapértelmezettek */ }
+  const out = [];
+  for (const key of Object.keys(TEMPLATE_KEYS)) {
+    const s = stored[key];
+    if (s && s.active === false) continue;
+    const tpl = s || TEMPLATE_KEYS[key];
+    const subjectTpl = (lang === 'hu' ? (tpl.subject_hu || tpl.subject_ro) : (tpl.subject_ro || tpl.subject_hu)) || '';
+    const bodyTpl = (lang === 'hu' ? (tpl.body_hu || tpl.body_ro) : (tpl.body_ro || tpl.body_hu)) || '';
+    out.push({
+      key: key,
+      subject: applyTemplateVars(subjectTpl, vars),
+      body: _htmlToText(applyTemplateVars(bodyTpl, vars)),
+    });
+  }
+  return out;
+}
+
 module.exports = handlers;
+Object.defineProperty(module.exports, 'renderCompanyTemplates', { enumerable: false, value: renderCompanyTemplates });

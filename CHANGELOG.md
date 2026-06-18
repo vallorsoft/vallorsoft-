@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-18 — „Email a fuvarról" bővítés: követő-link pipa + mentett sablonok + teszt (közös cím)
+
+> Az „Email a fuvarról" összeállító kiegészült: (1) pipálható a **követő-link** (fuvar elfogadva/visszaigazolva + autó-követés), (2) **mentett sablonokból** előtölthető a tárgy+üzenet, (3) **teszt** gomb, ami a **közös VallorSoft címről** a saját címedre küld (a valós küldés továbbra is csak a cég SMTP-jén megy).
+
+- **`handlers/orderEmail.js`** — `getOrderEmailData` most ad `templates` (a cég mentett tranzakciós sablonjai, a fuvar adataival szövegesen előtöltve), `tracking_available`/`tracking_url` mezőt is. `sendOrderEmail`: új `include_tracking` (a publikus `/t/<token>` link beszúrása a body-ba — token-generálás a `tracking` feature-gate mögött) és `test` (a KÖZÖS címről `sendClientEmail`-lel a saját címre; a valós küldés a cég SMTP-jén). Csatolmányok a tesztben is mennek.
+- **`handlers/emailTemplates.js`** — új NEM-enumerable `renderCompanyTemplates(cid,lang,vars)` segéd: a fehérlistás sablonok (tárolt vagy alapértelmezett) `{{vars}}`-behelyettesítve + HTML→szöveg, az összeállító előtöltéséhez.
+- **`public/order-email.js`** — sablon-választó (előtölti a tárgyat+üzenetet), „🌍 Követő-link" checkbox (ha a funkció elérhető), „✉️ Teszt magamnak" gomb. i18n `oe.tracking/tpl/tplNone/test/testSentTo` (RO-alap+HU). Cache-bust `?v=20260618oe2`; 93 Jest zöld.
+
 ## 2026-06-18 — „Email a fuvarról": pipálós fuvar-adatok + csatolmányok (megrendelő/számla/fotók)
 
 > Egy kiírt fuvarhoz tartozó levél tetszőleges címre (külső VAGY belső). Küldés előtt pipálással választod ki, MELY fuvar-adat kerüljön a szövegbe és MELY fájl menjen csatolmányként (megrendelő eredeti/aláírt-pecsételt, sofőr-POD-fotók, számla-PDF). Ami nincs pipálva, az nem kerül bele.
