@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-18 — Külső levelek a cég SMTP-jén, közös cím csak rendszer-értesítésre
+
+> Tiszta szétválasztás: a cég KÜLSŐ levelei (sablonból küldés ügyfélnek/más cégnek, e-mail-szerkesztő) a **cég saját SMTP-fiókján** mennek (Integrációknál beállítva); a **közös VallorSoft cím** csak rendszer-értesítést küld (regisztráció, lejárat, szerviz) — és a teszt-leveleket.
+
+- **`handlers/emailTemplates.js` `sendTemplatedEmail`** — valós küldés (külső címzett) mostantól a **cég saját feladó-fiókján** (`getCompanyMailer` → SMTP, Brevo-fallback). Ha nincs beállítva → RO hibaüzenet: „Configurați contul de e-mail (SMTP) în Integrări…". A **teszt** (`test:true`) a KÖZÖS VallorSoft címről a belépett felhasználó SAJÁT címére megy (a megadott címet figyelmen kívül hagyja — nem lehet vele bárhová küldeni).
+- **`public/email-sender-card.js`** (ÚJ) — a feladó-fiók (SMTP/Brevo) beállító kártya az **Integrációk** fülön (`#emailSenderCardBox`, csak Admin), a meglévő `ebSenderGet/Save/Test/Delete` handlereken. Bekötve `admin.js` `loadTab('integrations')`-be.
+- **`public/email-templates.js`** — a teszt-küldés `test:true`-val megy (saját címre); ~25 új `es.*` + `etpl.sentTest` i18n kulcs (RO-alap+HU).
+- A **vizuális e-mail-szerkesztő** (`ebSend`) eddig is a cég SMTP-jén ment — változatlan, így a szabály egységes. Cache-bust `?v=20260618tpl2`; 93 Jest zöld.
+
 ## 2026-06-18 — Tranzakciós e-mail sablon: közvetlen küldés címzettnek + folyamatba kötés
 
 > A „Șabloane e-mail" (tranzakciós sablonok) eddig csak szerkeszthető + teszt-küldés (saját címre) volt. Most bármely sablon közvetlenül elküldhető valódi címzettnek, és a fuvar- ill. számla-folyamatba is be van kötve.

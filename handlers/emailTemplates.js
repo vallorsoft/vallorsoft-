@@ -20,7 +20,7 @@
 // ============================================================
 const pool = require('../db');
 const audit = require('../lib/audit');
-const { sendClientEmail, applyTemplateVars } = require('../services/email');
+const { sendClientEmail, applyTemplateVars, getCompanyMailer } = require('../services/email');
 
 const handlers = {};
 
@@ -153,8 +153,16 @@ handlers.sendTemplatedEmail = async function (req, res, args) {
     const key = String(a.template_key || '').trim();
     if (!TEMPLATE_KEYS[key]) return res.json({ result: { ok: false, err: 'Cheie de șablon invalidă' } });
 
-    const toEmail = String(a.to_email || '').trim();
-    if (!EMAIL_RE.test(toEmail)) return res.json({ result: { ok: false, err: 'E-mail invalid' } });
+    // TESZT vs. VALÓS küldés:
+    //  - teszt (a.test): a KÖZÖS VallorSoft címről a belépett felhasználó SAJÁT
+    //    címére megy (rendszer-feladó), bárhová NEM küldhető.
+    //  - valós: külső címzettnek → a CÉG SAJÁT SMTP-fiókjáról (Integrációk →
+    //    Feladó-fiók). A közös cím itt NEM használható.
+    const isTest = a.test === true || String(a.test) === 'true';
+    const toEmail = isTest ? String(u.email || '').trim() : String(a.to_email || '').trim();
+    if (!EMAIL_RE.test(toEmail)) {
+      return res.json({ result: { ok: false, err: isTest ? 'Adresa dvs. de e-mail lipsește.' : 'E-mail invalid' } });
+    }
 
     const lang = a.lang === 'hu' ? 'hu' : 'ro';
     const vars = (a.vars && typeof a.vars === 'object' && !Array.isArray(a.vars)) ? a.vars : {};
@@ -187,18 +195,36 @@ handlers.sendTemplatedEmail = async function (req, res, args) {
       if (appUrl) logoUrl = appUrl.replace(/\/$/, '') + '/branding/logo/' + cid + '.png';
     } catch (_) { /* best-effort */ }
 
-    const result = await sendClientEmail({
-      to: toEmail,
-      subject: subject || '(fără subiect)',
-      html: html,
-      senderName: senderName || 'VallorSoft',
-      logoUrl: logoUrl,
-      companyId: cid,
-      mailType: 'template',
-    });
+    let result;
+    if (isTest) {
+      // Teszt → KÖZÖS VallorSoft cím (rendszer-feladó), a saját címünkre.
+      result = await sendClientEmail({
+        to: toEmail,
+        subject: subject || '(fără subiect)',
+        html: html,
+        senderName: senderName || 'VallorSoft',
+        logoUrl: logoUrl,
+        companyId: cid,
+        mailType: 'template_test',
+      });
+    } else {
+      // Valós küldés (külső címzett) → a CÉG SAJÁT SMTP-/feladó-fiókja.
+      const mailer = await getCompanyMailer(cid);
+      if (!mailer || !mailer.ok) {
+        return res.json({ result: { ok: false, err: (mailer && mailer.noConfig)
+          ? 'Configurați contul de e-mail (SMTP) în Integrări înainte de a trimite către clienți.'
+          : ((mailer && mailer.error) || 'Eroare la contul expeditor') } });
+      }
+      result = await mailer.send({
+        to: toEmail,
+        subject: subject || '(fără subiect)',
+        html: html,
+        mailType: 'template',
+      });
+    }
 
     audit.fromReq(req, 'email_template.send', 'email_template', key, {
-      to: toEmail, ok: !!(result && result.ok),
+      to: toEmail, test: isTest, ok: !!(result && result.ok),
     });
 
     if (!result || !result.ok) {
