@@ -143,6 +143,7 @@
     'eb.netErr': { hu: 'Hálózati hiba.', ro: 'Eroare de rețea.' },
     'eb.sendResult': { hu: 'Elküldve: {n}, hiba: {e}', ro: 'Trimise: {n}, erori: {e}' },
     'eb.loadedToEditor': { hu: 'HTML betöltve a szerkesztőbe.', ro: 'HTML încărcat în editor.' },
+    'eb.noSenderWarn': { hu: 'Nincs feladó-fiók beállítva — a küldéshez kattints ide és állítsd be a „Feladó-fiók" fülön.', ro: 'Niciun cont expeditor configurat — apasă aici și configurează în fila „Cont expeditor".' },
     // Galéria — mindenki számára elérhető kész sablonok
     'eb.nav6': { hu: 'Galéria', ro: 'Galerie' },
     'eb.nav6d': { hu: 'Kész sablonok', ro: 'Șabloane gata făcute' },
