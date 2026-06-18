@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-18 — Fix: követő-link érvénytelen e-mailben (markdown `[url](url)` zárójelek) — PR #199
+
+> A kiküldött e-mailekben a publikus követő-link (`/t/<token>`) **érvénytelen** volt: markdown `[url](url)/t/token` formában jelent meg, és a levelező-/chat-appok a **zárójeleknél elvágták** a linket. A token mindig jó volt — csak a zárójelek rontották el.
+
+- **Gyökérok:** a kód mindenhol rendes HTML `<a>` linket állít elő, de a leveleket **csak `htmlContent`-tel** küldtük ki → a **Brevo automatikusan generál sima-szöveges változatot, és a linkeket markdown formában (`[url](url)`) írja**. A plain-text részt mutató kliensek így törött linket kaptak. Renderen ez különösen érint, mert a kimenő levél a cégenkénti **Brevo fallbacken** megy.
+- **`services/email.js`** — új `htmlToPlainText()` segéd (a linkeket **nyers URL-ként** adja vissza, sosem `[ ]`/`( )` köré csomagolva), és minden küldő-ágra explicit szöveges rész (`textContent` Brevónál, `text` nodemailernél): `sendClientEmail`, `_brevoSendCompany`, `getCompanyMailer` SMTP, valamint a meghívó/jelszó-reset/developer/lemondás rendszer-levelek. Exportálva teszteléshez.
+- **`tests/unit/email-plaintext.test.js`** (ÚJ) — a követő-link nyers URL, nincs `()`/`[]`; eltérő linkszövegnél „szöveg: URL". 96 Jest zöld (30 kihagyott valódi-DB suite). **Deploy/restart után él.**
+
 ## 2026-06-18 — Sablon→csatolmány auto-pipa (opcionális) + pecsét/aláírás ráégetés CSP-fix
 
 > Két dolog: (1) az „Email a fuvarról" sablon-választója bejelöli a megfelelő csatolmányt (opcionális, módosítható); (2) javítva a pecsét/aláírás ráégetés, ami CSP-blokk miatt nem működött.
