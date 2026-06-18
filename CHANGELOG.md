@@ -14,6 +14,17 @@
 
 ---
 
+## 2026-06-18 — Előfizetés lemondás (dezabonare) türelmi idővel + visszavonás
+
+> Az Admin az Előfizetés pane-en lemondhatja az előfizetést, de a hozzáférés a már kifizetett időszak végéig megmarad. E-mail értesítő „M-am răzgândit" gombbal, és az utolsó napon emlékeztető.
+
+- **`db/subscription-cancel.sql`** (idempotens) — `companies.subscription_cancel_at` (lemondás időpontja, NULL = nincs) + `cancel_lastday_notified`. A lemondás **NEM** állítja azonnal `cancelled`-re a státuszt (azt a login-kapu tiltaná) — a státusz `active`/`trial` marad, a hozzáférés a meglévő `paid_until`-kapun ér véget magától.
+- **`handlers/billingHandlers.js`** — `cancelSubscription` (Admin; csak aktív/trial + hátralévő idő esetén; beteszi a jelzőt, RO értesítő e-mailt küld a `paid_until`-ig tartó hozzáférésről + „M-am răzgândit" linkkel; audit), `reactivateSubscription` (Admin; törli a jelzőt; audit). A `getMySubscription` mostantól ad `cancel_pending`/`cancel_at`/`can_cancel` mezőt is.
+- **`routes/subscription-cancel.js`** — publikus `GET /abonament/reactivare?cid&tok` (bejelentkezés nélkül, az e-mail gombja): HMAC-token (a lemondás időpontjához kötve, timing-safe összevetés) → törli a jelzőt, meleg arculatú RO visszajelző oldal. A token újraaktiválás után érvénytelen.
+- **`services/email.js` `sendSubscriptionCancelEmail`** — RO platform-értesítő (közös Brevo feladóról), „M-am răzgândit" zöld gombbal; lemondáskor és az utolsó napon is. `mail_log` (`type='subscription'`).
+- **`services/scheduler.js` `startCancelReminderScheduler`** (24 órás) — az utolsó napon (`paid_until = ma`) emlékeztető e-mail a lemondott, de még hozzáférő cégeknek („még meggondolhatja magát"), majd a lejárt lemondott cégek véglegesítése `cancelled` státuszra.
+- **UI:** Admin → Beállítások → 💳 Előfizetés státusz-kártyáján „Anulează abonamentul" gomb; lemondás után piros sáv a hátralévő napokkal + „↩️ M-am răzgândit" gomb. RO feliratok. Cache-bust `console-shared.js?v=20260618cancel`; 93 Jest zöld.
+
 ## 2026-06-17 — Beállítások pane-fix + PDF/e-mail kész sablon-galériák
 
 > Két javítás: (1) az Admin **Beállítások** almenüinek pane-jei a teljes weblap aljára renderelődtek; (2) a PDF-sablonokhoz és a tranzakciós e-mail sablonokhoz is bekerült a „kész sablon" galéria (mint a vizuális e-mail-szerkesztőnél).

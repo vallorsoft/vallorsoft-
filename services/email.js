@@ -495,4 +495,76 @@ async function getCompanyMailer(companyId) {
   return { ok: true, method: method, from: fromEmail, send: send };
 }
 
-module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate, loadCompanySender, getCompanyMailer };
+// ============ ELŐFIZETÉS-LEMONDÁS (dezabonare) ÉRTESÍTŐ ============
+// PLATFORM-értesítő (VallorSoft → cég Adminja) → a közös Brevo feladóról megy
+// (mint a trial-e-mailek), NEM a cég saját fiókjáról. Mindig románul.
+// opts: { to, companyName, paidUntil (Date|string), daysLeft, reactivateUrl, lastDay, companyId }
+async function sendSubscriptionCancelEmail(opts) {
+  if (!BREVO_API_KEY || !BREVO_SENDER || !opts || !opts.to) {
+    return { ok: false, error: 'BREVO necofigurat sau destinatar lipsă.' };
+  }
+  const cn = escHtml(opts.companyName || '');
+  const paidStr = opts.paidUntil ? new Date(opts.paidUntil).toLocaleDateString('ro-RO') : '';
+  const daysLeft = (opts.daysLeft != null) ? opts.daysLeft : null;
+  const reactivate = /^https?:\/\//i.test(String(opts.reactivateUrl || '')) ? String(opts.reactivateUrl) : null;
+  const lastDay = !!opts.lastDay;
+
+  const subject = lastDay
+    ? 'Ultima zi de acces — vă puteți răzgândi (VallorSoft)'
+    : 'Ați anulat abonamentul — VallorSoft';
+
+  const headline = lastDay ? 'Astăzi expiră accesul' : 'Abonament anulat';
+  const intro = lastDay
+    ? `Astăzi (<b>${escHtml(paidStr)}</b>) este ultima zi în care firma <b>${cn}</b> mai are acces la VallorSoft. După această dată contul se dezactivează.`
+    : `Am înregistrat cererea de anulare a abonamentului pentru firma <b>${cn}</b>.`;
+  const accessLine = lastDay
+    ? 'Dacă v-ați răzgândit, reactivați acum — păstrați tot ce aveți, fără întreruperi.'
+    : `Aveți în continuare acces complet până la <b>${escHtml(paidStr)}</b>${daysLeft != null ? ` (încă <b>${daysLeft}</b> ${daysLeft === 1 ? 'zi' : 'zile'})` : ''}. Până atunci puteți folosi platforma normal.`;
+
+  const btnHtml = reactivate
+    ? `<div style="text-align:center;margin:26px 0 6px;">
+         <a href="${escHtml(reactivate)}" style="display:inline-block;background:linear-gradient(180deg,#16a34a,#15803d);color:#fff;text-decoration:none;padding:13px 30px;border-radius:9px;font-weight:700;font-size:15px;">M-am răzgândit</a>
+       </div>
+       <p style="margin:6px 0 0;text-align:center;font-size:12px;color:#b09a82;">Apăsând butonul, anularea este anulată și abonamentul rămâne activ.</p>`
+    : '';
+
+  const html = `
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;color:#2a2018;">
+  <div style="background:linear-gradient(135deg,#fb8c3a,#f6517b);padding:26px 32px;border-radius:12px 12px 0 0;">
+    <h1 style="margin:0;color:#fff;font-size:22px;">vallor<span style="color:#fdba74;">Soft</span></h1>
+  </div>
+  <div style="background:#faf6f0;padding:28px 32px;border:1px solid #ece3d8;border-top:none;border-radius:0 0 12px 12px;">
+    <p style="margin:0 0 12px;font-size:17px;font-weight:700;">${headline}</p>
+    <p style="margin:0 0 14px;color:#5a4636;font-size:14px;line-height:1.7;">${intro}</p>
+    <p style="margin:0 0 4px;color:#5a4636;font-size:14px;line-height:1.7;">${accessLine}</p>
+    ${btnHtml}
+    <p style="margin:24px 0 0;font-size:12px;color:#b09a82;">Întrebări? <a href="mailto:vallorsoft@gmail.com" style="color:#f6711e;">vallorsoft@gmail.com</a></p>
+  </div>
+</div>`;
+
+  const cid = opts.companyId;
+  try {
+    const resp = await fetchT('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', 'accept': 'application/json' },
+      body: JSON.stringify({
+        sender: { name: 'VallorSoft', email: BREVO_SENDER },
+        to: [{ email: opts.to, name: opts.companyName || opts.to }],
+        subject: subject,
+        htmlContent: html,
+      }),
+    });
+    if (!resp.ok) {
+      const err = await resp.text().catch(() => '');
+      _logMail(cid, opts.to, subject, 'subscription', 'failed', null);
+      return { ok: false, error: 'Brevo error: ' + err.slice(0, 120) };
+    }
+    _logMail(cid, opts.to, subject, 'subscription', 'sent', null);
+    return { ok: true };
+  } catch (e) {
+    _logMail(cid, opts.to, subject, 'subscription', 'failed', null);
+    return { ok: false, error: e.message };
+  }
+}
+
+module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate, loadCompanySender, getCompanyMailer, sendSubscriptionCancelEmail };

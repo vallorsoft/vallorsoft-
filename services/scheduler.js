@@ -605,4 +605,63 @@ function startTrialReminderScheduler() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler };
+// ============================================================
+//  Lemondás (dezabonare) ütemező — naponta:
+//   (1) az UTOLSÓ napon (paid_until = ma) "még meggondolhatja magát"
+//       emlékeztető e-mail a lemondott, de még hozzáférő cégeknek;
+//   (2) a lejárt (paid_until < ma) lemondott cégek státusza 'cancelled'
+//       (a hozzáférést a login paid_until-kapuja amúgy is már tiltja).
+// ============================================================
+function startCancelReminderScheduler() {
+  const { sendSubscriptionCancelEmail } = require('./email');
+  const { makeReactivateToken } = require('../lib/trialToken');
+  const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
+
+  async function tick() {
+    try {
+      // (1) Utolsó-napi emlékeztető
+      const due = await pool.query(
+        `SELECT id, nev, email_contact, paid_until, subscription_cancel_at
+           FROM companies
+          WHERE subscription_cancel_at IS NOT NULL
+            AND paid_until::date = CURRENT_DATE
+            AND (cancel_lastday_notified IS NULL OR cancel_lastday_notified = false)`
+      );
+      for (const c of due.rows) {
+        try {
+          let reactivateUrl = null;
+          if (appUrl && c.subscription_cancel_at) {
+            const sec = Math.floor(new Date(c.subscription_cancel_at).getTime() / 1000);
+            reactivateUrl = `${appUrl}/abonament/reactivare?cid=${c.id}&tok=${makeReactivateToken(c.id, sec)}`;
+          }
+          if (c.email_contact) {
+            await sendSubscriptionCancelEmail({
+              to: c.email_contact, companyName: c.nev, paidUntil: c.paid_until,
+              daysLeft: 0, reactivateUrl: reactivateUrl, lastDay: true, companyId: c.id,
+            });
+          }
+          await pool.query('UPDATE companies SET cancel_lastday_notified=true WHERE id=$1', [c.id]);
+          console.log('[Cancel] utolsó-napi emlékeztető — cég #' + c.id + ' (' + c.nev + ')');
+        } catch (e) {
+          console.error('[Cancel] emlékeztető hiba cég #' + c.id + ':', e.message);
+        }
+      }
+      // (2) Lejárt lemondott cégek véglegesítése
+      await pool.query(
+        `UPDATE companies SET subscription_status='cancelled'
+          WHERE subscription_cancel_at IS NOT NULL
+            AND paid_until::date < CURRENT_DATE
+            AND subscription_status <> 'cancelled'`
+      );
+    } catch (err) {
+      console.error('[Cancel] ütemező hiba:', err.message);
+    }
+  }
+
+  setTimeout(tick, 120 * 1000);
+  const interval = setInterval(tick, 24 * 60 * 60 * 1000);
+  console.log('[Cancel] Lemondás-emlékeztető ütemező elindítva — 24 órás ciklus.');
+  return interval;
+}
+
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler };
