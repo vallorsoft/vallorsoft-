@@ -2868,6 +2868,8 @@ function loadDashboard() {
   loadDashVehicleSummary();
   // ⏰ Lejáró dokumentumok riasztás-sáv (fleet-extra.js)
   if (window.FleetExtra) FleetExtra.dashExpiryAlert();
+  // 🔧 Esedékes szervizek riasztás-sáv (km-/dátum-alapú, fleet-extra.js)
+  if (window.FleetExtra && FleetExtra.dashServiceAlert) FleetExtra.dashServiceAlert();
   syncThemeToggleIcon();
   initDashMap();
   refreshDashVehicles();

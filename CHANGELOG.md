@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-06-18 — Km-/dátum-alapú szerviz-esedékesség riasztás (GPS km) + e-mail értesítő a lejáratokról és szervizekről
+
+> Két új, teljesen bekötött funkció: (1) a szerviz „köv. esedékes km" összevetése az élő GPS km-órával → push + vezérlőpult-sáv, amikor közeleg/elérte; (2) a lejáratokról ÉS az esedékes szervizekről e-mail is megy az Admin/Manager felhasználóknak a cég saját feladó-fiókjáról (RO).
+
+- **`db/service-due-alert.sql`** (idempotens) — `vehicle_service_log.last_alert_at DATE` (hetente-egyszer duplikáció-őr a riasztás-ismétléshez, mint a `document_expiries`-nél). A `next_due_km`/`next_due_date` mezők már léteztek.
+- **`handlers/fleetCompliance.js`** — új `computeServiceDueAlerts(cid, {onlyStale})` belső segéd (NEM-enumerable → `/api/execute`-en át nem hívható): járművenként a LEGUTÓBBI szerviz `next_due_km`-jét veti össze az élő GPS km-órával (`gps_mileage_log` legutóbbi snapshotja), illetve a `next_due_date`-et a mai dátummal. Küszöb: 2000 km / 30 nap (vagy már túllépve). Új `getServiceDueAlerts` handler (Admin/Manager, read-only, `company_id`-szűrt, paraméteres).
+- **`services/scheduler.js`** — új `startServiceDueScheduler` (12 órás): a küszöbön belüli/túllépett szervizekről **push** (`sendPushToRole` Admin/Manager) + **Notifications-központ** (`notify`) + **e-mail** (a **KÖZÖS VallorSoft címről** — `sendClientEmail` → `BREVO_SENDER`, pont mint a regisztrációs/rendszer-leveleknél; RO). Hetente ismétel (`last_alert_at`). A **`startExpiryScheduler`** is kap **e-mailt** a meglévő push/notify mellé (a lejáró dokumentumokról). Új közös segédek: `_alertEmailBody` (RO törzs; a fejlécet a `sendClientEmail` rakja rá) + `_emailAlertToAdmins` (a cég Admin/Manager felhasználóinak a közös címről, best-effort — Brevo nélkül csendben kihagyja).
+- **Vezérlőpult-sáv:** `public/fleet-extra.js` `renderDashServiceAlert` (🔧 sáv: „még N km"/„N km túllépve"/„N nap"/„LEJÁRT", kattintásra a Szerviz-naplóra ugrik) — új `#dashServiceAlert` konténer az admin/manager vezérlőpulton, `loadDashboard` hívja (`console-shared.js`). 4 új i18n kulcs (`fe.dash.serviceDue/kmLeft/kmOver/toService`, RO-alap+HU).
+- **Bekötés:** `server.js` `startServiceDueScheduler()`; cache-bust `i18n/console-shared/fleet-extra.js?v=20260618svc`. Multi-tenant + paraméteres SQL + best-effort e-mail; 93 Jest zöld.
+
 ## 2026-06-18 — Előfizetés lemondás (dezabonare) türelmi idővel + visszavonás
 
 > Az Admin az Előfizetés pane-en lemondhatja az előfizetést, de a hozzáférés a már kifizetett időszak végéig megmarad. E-mail értesítő „M-am răzgândit" gombbal, és az utolsó napon emlékeztető.
