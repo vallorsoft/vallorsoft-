@@ -222,10 +222,11 @@ app.use((err, req, res, next) => {
 });
 
 // E-mail intake (beérkező megrendelések) — csak akkor fut, ha az INTAKE_IMAP_* be van állítva.
-const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler } = require('./services/scheduler');
+const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler } = require('./services/scheduler');
 startIntakeScheduler();
 startExpiryScheduler();
 startGpsMileageScheduler();
+startServiceDueScheduler();         // km-/dátum-alapú szerviz-esedékesség riasztás (push + e-mail)
 startMonthlyReportScheduler();
 startEFacturaStatusScheduler();
 startTrialExpiryScheduler();       // trial lejárat e-mail értesítő (14. nap)

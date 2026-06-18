@@ -561,6 +561,33 @@
     }).catch(function () { box.innerHTML = ''; });
   }
 
+  // ── Vezérlőpult szerviz-esedékesség kártya (loadDashboard hívja) ──
+  // Az élő GPS km-órát (gps_mileage_log) veti össze a szerviz „köv. esedékes”
+  // km-jével, illetve a dátum-alapú esedékességgel. Csak megjelenítés.
+  function renderDashServiceAlert() {
+    var box = document.getElementById('dashServiceAlert');
+    if (!box) return;
+    gas('getServiceDueAlerts').then(function (r) {
+      if (!r || !r.ok || !(r.items || []).length) { box.innerHTML = ''; return; }
+      var over = r.items.filter(function (i) { return (i.km_left != null && i.km_left < 0) || (i.days_left != null && i.days_left < 0); });
+      var rows = r.items.slice(0, 6).map(function (i) {
+        var txt, col;
+        if (i.km_left != null) {
+          if (i.km_left < 0) { txt = t('fe.dash.kmOver', { n: Math.abs(i.km_left).toLocaleString('hu-HU') }); col = 'var(--status-danger)'; }
+          else { txt = t('fe.dash.kmLeft', { n: i.km_left.toLocaleString('hu-HU') }); col = 'var(--status-warn)'; }
+        } else if (i.days_left < 0) { txt = t('fe.dash.expired'); col = 'var(--status-danger)'; }
+        else { txt = t('fe.dash.days', { n: i.days_left }); col = 'var(--status-warn)'; }
+        return '<span style="white-space:nowrap;font-size:12px;">🔧 <b>' + esc(i.rendszam || '') + '</b> '
+          + '<span style="color:' + col + ';font-weight:700;">' + txt + '</span></span>';
+      }).join(' · ');
+      box.innerHTML = '<div class="glass" style="padding:12px 16px;margin-bottom:16px;border:1px solid '
+        + (over.length ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.4)') + ';cursor:pointer;display:flex;gap:10px;align-items:center;flex-wrap:wrap;" onclick="activateTab(\'service-log\')">'
+        + '<span style="font-size:18px;">🔧</span>'
+        + '<b class="text-primary" style="font-size:13px;">' + t('fe.dash.serviceDue', { n: r.items.length }) + ':</b> ' + rows
+        + ' <span class="text-muted" style="font-size:12px;margin-left:auto;">' + t('fe.dash.toService') + '</span></div>';
+    }).catch(function () { box.innerHTML = ''; });
+  }
+
   // ── Publikus API ────────────────────────────────────────
   window.FleetExtra = {
     load: function (name) {
@@ -570,6 +597,7 @@
       else if (name === 'fuel-import') loadFuelImport();
     },
     dashExpiryAlert: renderDashExpiryAlert,
+    dashServiceAlert: renderDashServiceAlert,
     expEntityChange: expEntityChange, expSave: expSave, expEdit: expEdit, expDelete: expDelete,
     svSave: svSave, svDelete: svDelete,
     dcLoad: dcLoad, dcSaveRates: dcSaveRates, advSave: advSave, advDelete: advDelete,

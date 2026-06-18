@@ -10,6 +10,12 @@ const pool = require('../db');
 
 const handlers = {};
 
+// Szerviz-esedékesség riasztási küszöbök (km- és dátum-alapú emlékeztető):
+//  - SERVICE_WARN_KM: ennyi km-rel a `next_due_km` előtt (vagy ha már túllépte) jelez
+//  - SERVICE_WARN_DAYS: ennyi nappal a `next_due_date` előtt (vagy ha már lejárt) jelez
+const SERVICE_WARN_KM = 2000;
+const SERVICE_WARN_DAYS = 30;
+
 function _isAdminOrManager(req) {
   return req.session.user && ['Admin', 'Manager'].includes(req.session.user.pozicio);
 }
@@ -209,6 +215,100 @@ handlers.serviceDelete = async function (req, res, args) {
   } catch (err) {
     console.error('serviceDelete hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ────────────────────────────────────────────────────────────
+//  Szerviz-esedékesség (km- és dátum-alapú) — közös segéd.
+//  Járművenként a LEGUTÓBBI szerviz-bejegyzés `next_due_km`/`next_due_date`
+//  mezőjét veti össze az ÉLŐ GPS km-órával (gps_mileage_log legutóbbi
+//  snapshotja) és a mai dátummal. A küszöbön belüli (vagy már túllépett)
+//  tételeket adja vissza. Best-effort: ha a tábla/oszlop hiányzik → üres.
+//  opts.onlyStale=true → csak a hetente-egyszer logika szerint esedékes
+//  (utoljára 7+ napja riasztott) tételek — a schedulernek.
+// ────────────────────────────────────────────────────────────
+async function computeServiceDueAlerts(cid, opts) {
+  const onlyStale = !!(opts && opts.onlyStale);
+  let rows;
+  try {
+    ({ rows } = await pool.query(
+      `WITH last_srv AS (
+         SELECT DISTINCT ON (s.vehicle_id)
+                s.id, s.vehicle_id, v.rendszam, s.next_due_km, s.next_due_date,
+                s.category, s.service_date, s.last_alert_at
+         FROM vehicle_service_log s
+         JOIN vehicles v ON v.id = s.vehicle_id
+         WHERE s.company_id = $1
+           AND (s.next_due_km IS NOT NULL OR s.next_due_date IS NOT NULL)
+         ORDER BY s.vehicle_id, s.service_date DESC NULLS LAST, s.id DESC
+       ),
+       last_km AS (
+         SELECT DISTINCT ON (norm) norm, mileage FROM (
+           SELECT UPPER(REGEXP_REPLACE(rendszam,'[^A-Za-z0-9]','','g')) AS norm, mileage, logged_on
+           FROM gps_mileage_log WHERE company_id = $1
+         ) z ORDER BY norm, logged_on DESC
+       )
+       SELECT ls.id, ls.vehicle_id, ls.rendszam, ls.next_due_km, ls.next_due_date,
+              ls.category, ls.last_alert_at,
+              (ls.next_due_date - CURRENT_DATE)::int AS days_left,
+              lk.mileage AS current_km
+       FROM last_srv ls
+       LEFT JOIN last_km lk
+         ON lk.norm = UPPER(REGEXP_REPLACE(ls.rendszam,'[^A-Za-z0-9]','','g'))`,
+      [cid]));
+  } catch (e) {
+    return []; // migráció előtt / tábla hiányában csendben üres
+  }
+
+  const items = [];
+  for (const r of rows) {
+    const nextKm = r.next_due_km != null ? parseInt(r.next_due_km, 10) : null;
+    const curKm = r.current_km != null ? Math.round(parseFloat(r.current_km)) : null;
+    const kmLeft = (nextKm != null && curKm != null) ? (nextKm - curKm) : null;
+    const daysLeft = r.days_left != null ? parseInt(r.days_left, 10) : null;
+
+    const kmDue = kmLeft != null && kmLeft <= SERVICE_WARN_KM;
+    const dateDue = daysLeft != null && daysLeft <= SERVICE_WARN_DAYS;
+    if (!kmDue && !dateDue) continue;
+
+    // hetente-egyszer duplikáció-őr (csak a schedulernek)
+    if (onlyStale && r.last_alert_at) {
+      const last = new Date(r.last_alert_at);
+      const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+      if (last > weekAgo) continue;
+    }
+
+    items.push({
+      id: r.id,
+      vehicle_id: r.vehicle_id,
+      rendszam: r.rendszam,
+      category: r.category || null,
+      next_due_km: kmDue ? nextKm : null,
+      current_km: kmDue ? curKm : null,
+      km_left: kmDue ? kmLeft : null,
+      next_due_date: dateDue ? r.next_due_date : null,
+      days_left: dateDue ? daysLeft : null,
+    });
+  }
+
+  // Sürgősség szerint: a túllépett/lejárt elöl, majd a legkevesebb hátralévő
+  items.sort(function (a, b) {
+    const sa = Math.min(a.km_left != null ? a.km_left : 9e9, a.days_left != null ? a.days_left : 9e9);
+    const sb = Math.min(b.km_left != null ? b.km_left : 9e9, b.days_left != null ? b.days_left : 9e9);
+    return sa - sb;
+  });
+  return items;
+}
+
+// Vezérlőpult-kártya: km-/dátum-alapú esedékes szervizek (read-only).
+handlers.getServiceDueAlerts = async function (req, res) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const items = await computeServiceDueAlerts(req.session.user.company_id, { onlyStale: false });
+    return res.json({ result: { ok: true, items: items.slice(0, 30) } });
+  } catch (err) {
+    console.error('getServiceDueAlerts hiba:', err);
+    return res.json({ result: { ok: true, items: [] } }); // migráció előtt: üres
   }
 };
 
@@ -540,4 +640,8 @@ handlers.getGpsKmComparison = async function (req, res, args) {
   }
 };
 
+// A `computeServiceDueAlerts` belső segéd NEM-enumerable → NEM hívható
+// /api/execute-on át (a registry csak az enumerálható handlereket másolja),
+// de require-rel a scheduler eléri (services/scheduler.js).
 module.exports = handlers;
+Object.defineProperty(module.exports, 'computeServiceDueAlerts', { enumerable: false, value: computeServiceDueAlerts });

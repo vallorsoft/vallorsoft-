@@ -1614,6 +1614,10 @@
     'fe.dash.docsExpiring': { hu: '{n} lejáró dokumentum', ro: '{n} documente care expiră' },
     'fe.dash.expiredCount': { hu: ' ({n} LEJÁRT!)', ro: ' ({n} EXPIRATE!)' },
     'fe.dash.toExpiries': { hu: '→ Lejáratok', ro: '→ Expirări' },
+    'fe.dash.serviceDue': { hu: '{n} esedékes szerviz', ro: '{n} revizii scadente' },
+    'fe.dash.kmLeft': { hu: 'még {n} km', ro: 'încă {n} km' },
+    'fe.dash.kmOver': { hu: '{n} km túllépve', ro: 'depășit cu {n} km' },
+    'fe.dash.toService': { hu: '→ Szerviz-napló', ro: '→ Jurnal service' },
 
     // ── Tervezőtábla (planner) ──
     'pl.today': { hu: 'Ma', ro: 'Azi' },
