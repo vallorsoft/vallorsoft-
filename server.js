@@ -70,6 +70,10 @@ if (helmet) {
         imgSrc: ["'self'", "data:", "blob:", "https:"],
         connectSrc: [
           "'self'",
+          "data:",                          // pdf-lib: fetch(dataURL) az aláírás/pecsét PNG-hez
+          "blob:",
+          "https://cdnjs.cloudflare.com",   // pdf.js worker fetch → blob-worker (workerSrc: blob:)
+          "https://cdn.jsdelivr.net",
           "https://*.firebaseio.com",
           "https://*.firebase.com",
           "https://*.firebaseapp.com",

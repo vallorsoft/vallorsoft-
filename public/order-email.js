@@ -72,7 +72,23 @@
     ovl.addEventListener('click', function (e) { if (e.target === ovl) close(); });
     ovl.querySelector('#oeCancel').addEventListener('click', close);
 
-    // Sablon-választás → tárgy + üzenet előtöltése (szerkeszthető marad)
+    // Sablon-választás → tárgy + üzenet előtöltése (szerkeszthető marad) +
+    // a megfelelő csatolmány OPCIONÁLIS bejelölése (csak bejelöl, nem vesz le —
+    // a felhasználó szabadon módosíthatja).
+    function autoCheckAtt(tplKey) {
+      var map = { invoice_notify: 'inv-', order_confirm_carrier: 'od-' };
+      var pref = map[tplKey];
+      if (!pref) return;
+      var boxes = ovl.querySelectorAll('.oe-att');
+      if (pref === 'od-') {
+        // a megrendelőnél az aláírt/pecsételt verziót preferáljuk, ha van
+        var signed = [].filter.call(boxes, function (b) { return /^od-\d+-signed$/.test(b.value); });
+        var targets = signed.length ? signed : [].filter.call(boxes, function (b) { return /^od-\d+-original$/.test(b.value); });
+        targets.forEach(function (b) { b.checked = true; });
+      } else {
+        [].forEach.call(boxes, function (b) { if (b.value.indexOf(pref) === 0) b.checked = true; });
+      }
+    }
     var tplEl = ovl.querySelector('#oeTpl');
     if (tplEl) tplEl.addEventListener('change', function () {
       var idx = tplEl.value;
@@ -81,6 +97,7 @@
       if (!tp) return;
       if (tp.subject) ovl.querySelector('#oeSubject').value = tp.subject;
       ovl.querySelector('#oeBody').value = tp.body || '';
+      autoCheckAtt(tp.key);
     });
 
     function doSend(isTest) {
