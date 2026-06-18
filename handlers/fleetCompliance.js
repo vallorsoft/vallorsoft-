@@ -221,9 +221,14 @@ handlers.serviceDelete = async function (req, res, args) {
 // ────────────────────────────────────────────────────────────
 //  Szerviz-esedékesség (km- és dátum-alapú) — közös segéd.
 //  Járművenként a LEGUTÓBBI szerviz-bejegyzés `next_due_km`/`next_due_date`
-//  mezőjét veti össze az ÉLŐ GPS km-órával (gps_mileage_log legutóbbi
-//  snapshotja) és a mai dátummal. A küszöbön belüli (vagy már túllépett)
-//  tételeket adja vissza. Best-effort: ha a tábla/oszlop hiányzik → üres.
+//  mezőjét veti össze az aktuális kilométerórával és a mai dátummal.
+//  Az aktuális km forrása (a nagyobbat veszi, ha több is van):
+//    (a) ÉLŐ GPS km-óra (gps_mileage_log legutóbbi snapshotja), HA a
+//        GPS-feed ad kilométeróra-állást;
+//    (b) BECSLÉS a menetlevelekből: utolsó szerviz km + az azóta megtett
+//        km (fuvarlevelek.total_km, rendszámra szűrve) — így GPS-kilométeróra
+//        nélkül is működik, ha a sofőrök kitöltik a menetlevél-km-et.
+//  Best-effort: ha a tábla/oszlop hiányzik → üres.
 //  opts.onlyStale=true → csak a hetente-egyszer logika szerint esedékes
 //  (utoljára 7+ napja riasztott) tételek — a schedulernek.
 // ────────────────────────────────────────────────────────────
@@ -234,7 +239,8 @@ async function computeServiceDueAlerts(cid, opts) {
     ({ rows } = await pool.query(
       `WITH last_srv AS (
          SELECT DISTINCT ON (s.vehicle_id)
-                s.id, s.vehicle_id, v.rendszam, s.next_due_km, s.next_due_date,
+                s.id, s.vehicle_id, v.rendszam, s.km AS base_km,
+                s.next_due_km, s.next_due_date,
                 s.category, s.service_date, s.last_alert_at
          FROM vehicle_service_log s
          JOIN vehicles v ON v.id = s.vehicle_id
@@ -248,10 +254,18 @@ async function computeServiceDueAlerts(cid, opts) {
            FROM gps_mileage_log WHERE company_id = $1
          ) z ORDER BY norm, logged_on DESC
        )
-       SELECT ls.id, ls.vehicle_id, ls.rendszam, ls.next_due_km, ls.next_due_date,
+       SELECT ls.id, ls.vehicle_id, ls.rendszam, ls.base_km, ls.next_due_km, ls.next_due_date,
               ls.category, ls.last_alert_at,
               (ls.next_due_date - CURRENT_DATE)::int AS days_left,
-              lk.mileage AS current_km
+              lk.mileage AS gps_km,
+              (SELECT COALESCE(SUM(f.total_km),0)
+                 FROM fuvarlevelek f
+                 JOIN users u ON LOWER(u.email)=LOWER(f.email_sofer) AND u.company_id=$1
+                WHERE COALESCE(f.numar_camion,'') <> ''
+                  AND UPPER(REGEXP_REPLACE(f.numar_camion,'[^A-Za-z0-9]','','g'))
+                      = UPPER(REGEXP_REPLACE(ls.rendszam,'[^A-Za-z0-9]','','g'))
+                  AND (ls.service_date IS NULL OR f.data_completare >= ls.service_date)
+              ) AS driven_since
        FROM last_srv ls
        LEFT JOIN last_km lk
          ON lk.norm = UPPER(REGEXP_REPLACE(ls.rendszam,'[^A-Za-z0-9]','','g'))`,
@@ -263,7 +277,15 @@ async function computeServiceDueAlerts(cid, opts) {
   const items = [];
   for (const r of rows) {
     const nextKm = r.next_due_km != null ? parseInt(r.next_due_km, 10) : null;
-    const curKm = r.current_km != null ? Math.round(parseFloat(r.current_km)) : null;
+    // Aktuális km: az élő GPS km-óra ÉS a menetlevél-becslés közül a nagyobb.
+    const gpsKm = r.gps_km != null ? Math.round(parseFloat(r.gps_km)) : null;
+    const baseKm = r.base_km != null ? parseInt(r.base_km, 10) : null;
+    const driven = r.driven_since != null ? Math.round(parseFloat(r.driven_since)) : 0;
+    const estKm = baseKm != null ? baseKm + driven : null;
+    let curKm = null;
+    if (gpsKm != null && estKm != null) curKm = Math.max(gpsKm, estKm);
+    else if (gpsKm != null) curKm = gpsKm;
+    else if (estKm != null) curKm = estKm;
     const kmLeft = (nextKm != null && curKm != null) ? (nextKm - curKm) : null;
     const daysLeft = r.days_left != null ? parseInt(r.days_left, 10) : null;
 
