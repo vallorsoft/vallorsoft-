@@ -91,6 +91,8 @@
   // ── Panel-váltó ──
   var PANELS = ['create', 'gallery', 'browse', 'upload', 'pairing', 'sender'];
   window.ebSwitch = function (panel) {
+    // Admin/dev: a feladó-fiók az Integrációknál van → ide ne navigáljunk.
+    if (panel === 'sender' && window.__ebHideSender) { window.location.href = '/admin'; return; }
     document.querySelectorAll('.eb-card').forEach(function (c) {
       c.classList.toggle('active', c.getAttribute('data-panel') === panel);
     });
@@ -271,7 +273,9 @@
       if (warn) {
         var s = res[2];
         if (s && s.ok && !s.configured) {
-          warn.innerHTML = '<div class="it err" style="cursor:pointer" onclick="ebSwitch(\'sender\')">⚠️ '
+          // Admin/dev → az Integrációkra irányít (ott a feladó-fiók); Manager → a helyi panelre.
+          var act = window.__ebHideSender ? "window.location.href='/admin'" : "ebSwitch('sender')";
+          warn.innerHTML = '<div class="it err" style="cursor:pointer" onclick="' + act + '">⚠️ '
             + esc(T('eb.noSenderWarn')) + '</div>';
         } else { warn.innerHTML = ''; }
       }
@@ -485,10 +489,19 @@
 
   // ── Boot ──
   function boot() {
-    // "Vissza" cél a szerepkör szerint (Manager → /manager, egyébként /admin).
+    // "Vissza" cél + a Feladó-fiók panel szerepkör szerint:
+    //  - Manager: a feladó-fiókot ITT állítja (nem éri el az Integrációkat).
+    //  - Admin/dev: a feladó-fiók az Integrációk oldalon él → itt elrejtjük
+    //    (nincs duplikáció). A küldés/párosítás ettől még működik.
     gas('getMyFeatures').then(function (r) {
+      var isManager = r && r.pozicio === 'Manager';
       var back = document.getElementById('ebBack');
-      if (back && r && r.pozicio === 'Manager') back.setAttribute('href', '/manager');
+      if (back && isManager) back.setAttribute('href', '/manager');
+      if (!isManager) {
+        window.__ebHideSender = true;
+        var nav = document.querySelector('.eb-card[data-panel="sender"]'); if (nav) nav.style.display = 'none';
+        var sec = document.getElementById('sec-sender'); if (sec) sec.style.display = 'none';
+      }
     });
     initGjs();
     loadMainTable();

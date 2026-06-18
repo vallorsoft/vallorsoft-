@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-18 — Feladó-fiók duplikáció megszüntetése (szerepfüggő)
+
+> A „Cont expeditor / Feladó-fiók" (SMTP/Brevo) beállító kártya KÉT helyen jelent meg, ugyanazt a backend-konfigot szerkesztve (azonos `ebSender*` handlerek): az **Integrációk** oldalon (`email-sender-card.js`, csak Admin) ÉS az **E-mail szerkesztő** (`/email-builder`, Admin+Manager) „Cont expeditor" paneljén.
+
+- **Szerepfüggő megoldás:** a Manager nem éri el az Integrációkat, ezért neki **az e-mail szerkesztőben marad** a feladó-fiók; az **Adminnál elrejtjük** az e-mail szerkesztőből (nála az Integrációk a forrás) → egy szerep sem látja két helyen.
+- **`public/email-builder.js`** — `boot()`: `getMyFeatures.pozicio` alapján, ha NEM Manager, elrejti a „Feladó-fiók" nav-kártyát + `#sec-sender` panelt (`window.__ebHideSender`). `ebSwitch` guard: `sender` panelre Adminnál nem navigál (→ `/admin`). A párosítás-figyelmeztetés Adminnál az Integrációkra mutat. A küldés/párosítás változatlan.
+- A backend (`ebSenderSave` „csak Admin") és az Integrációk `email-sender-card.js` **érintetlen**. Cache-bust `email-builder.js?v=20260618dedup`; 100 Jest zöld.
+
 ## 2026-06-18 — Integrációk oldal: egységes, szimmetrikus kártya-megjelenés
 
 > Az Integrációk fülön három eltérő stílusú kártya keveredett (`.glass` 18–22px, a CargoTrack `.ct-card` beégetett fehérrel + `max-width:560px` + 16px, az e-mail-intake `.eic`), ezért aszimmetrikus volt. Most minden kártya azonos kinézetű.
