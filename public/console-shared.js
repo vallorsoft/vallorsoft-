@@ -3592,6 +3592,7 @@ function vsSendOrderTplMail(orderId) {
   window.sendTemplatedEmailDialog({
     keys: ['order_confirm_carrier', 'order_status_change', 'generic'],
     templateKey: 'order_confirm_carrier',
+    toEmail: c.client_email || '',
     vars: { order_id: String(c.id), route: route, client: c.client || '', status: c.status || '' },
   });
 }

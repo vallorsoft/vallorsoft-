@@ -23,6 +23,7 @@
 - **Fuvar-folyamat** (`public/console-shared.js`) — a fuvar-sor ⋯ menüjében **„📧 Sablonból e-mail"**: `vsSendOrderTplMail` a `_ordersAllCache`-ből (idézőjel-biztos) tölti elő az `order_id`/`route`/`client`/`status`-t.
 - **Számla-folyamat** (`public/invoices-out.js`) — a Kimenő számlák során **📧** gomb: `invOutSendTpl` a `invoice_notify` sablont tölti elő (`client`/`invoice_no`/`order_id`).
 - **i18n** (`public/i18n.js`) — `etpl.sendToBtn`, `cs.ol.mTplMail`, `etpl.var.*` (RO-alap+HU). Cache-bust `?v=20260618tpl`. A küldés a KÖZÖS VallorSoft Brevo-címről megy (mint eddig is a `sendTemplatedEmail`), `mail_log`-ba naplózva; 93 Jest zöld.
+- **Címzett auto-kitöltés (követő commit):** a fuvar (`handlers/orders.js` `comList` → `clients.email` join `o.client_id`-n) és a számla (`routes/invoices.js` lista → `orders`→`clients` join) mostantól visszaadja az ügyfél e-mailjét, és a dialógus **előtölti a címzettet** (`vsSendOrderTplMail`/`invOutSendTpl` `toEmail`). Ha nincs `client_id`/e-mail, a mező üres marad (kézzel kitölthető). Cache-bust `?v=20260618tpl2`.
 
 ## 2026-06-18 — Szerviz-riasztás valós idejűvé tétele + részletes (autó+szerviz) e-mail
 
