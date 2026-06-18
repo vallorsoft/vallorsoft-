@@ -3327,6 +3327,7 @@ function loadElofizetesek() {
     if (ex) ex.textContent = r.days_left !== null
       ? (r.days_left > 0 ? r.days_left + ' nap van hátra' : 'Lejárt') + (r.paid_until ? ' (' + new Date(r.paid_until).toLocaleDateString('ro-RO') + ')' : '')
       : '';
+    elofRenderCancel(r);
   });
   fetch('/api/public-plans').then(function(rsp){ return rsp.json(); }).then(function(data){
     elofRenderPlans(data.plans || []);
@@ -3336,6 +3337,54 @@ function loadElofizetesek() {
   });
   elofLoadHistory();
 }
+
+// Lemondás / visszavonás doboz a státusz-kártyán (RO feliratokkal).
+function elofRenderCancel(r) {
+  var box = document.getElementById('elofCancelBox');
+  if (!box) return;
+  var paidStr = r.paid_until ? new Date(r.paid_until).toLocaleDateString('ro-RO') : '';
+  if (r.cancel_pending) {
+    var dl = (r.days_left != null && r.days_left > 0) ? r.days_left : 0;
+    box.innerHTML =
+      '<div style="margin-top:14px;padding:14px;border-radius:10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.35);">'
+      + '<div style="font-size:13px;font-weight:700;color:#ef4444;margin-bottom:4px;">🚫 Abonament anulat</div>'
+      + '<div style="font-size:13px;color:var(--muted);margin-bottom:10px;">Aveți acces până la <b>' + paidStr + '</b>'
+      + (dl ? ' (încă ' + dl + (dl === 1 ? ' zi' : ' zile') + ')' : '') + '. Vă puteți răzgândi oricând până atunci.</div>'
+      + '<button class="btn primary" style="font-size:13px;" onclick="reactivateSubscription()">↩️ M-am răzgândit</button>'
+      + '</div>';
+  } else if (r.can_cancel) {
+    box.innerHTML =
+      '<div style="margin-top:14px;">'
+      + '<button class="btn ghost" style="font-size:12px;color:#ef4444;border-color:rgba(239,68,68,0.4);" onclick="cancelSubscription()">Anulează abonamentul</button>'
+      + '<div style="font-size:11px;color:var(--muted);margin-top:6px;">După anulare păstrați accesul până la sfârșitul perioadei plătite'
+      + (paidStr ? ' (' + paidStr + ')' : '') + '. Veți primi un e-mail cu opțiunea de a vă răzgândi.</div>'
+      + '</div>';
+  } else {
+    box.innerHTML = '';
+  }
+}
+
+window.cancelSubscription = function() {
+  if (!confirm('Sigur anulați abonamentul? Veți păstra accesul până la sfârșitul perioadei plătite.')) return;
+  gas('cancelSubscription').then(function(r) {
+    if (r && r.ok) {
+      if (typeof toast === 'function') toast(r.already
+        ? 'Abonamentul este deja anulat.'
+        : 'Abonament anulat. Aveți acces până la finalul perioadei plătite — v-am trimis un e-mail.', 'success');
+      loadElofizetesek();
+    } else if (typeof toast === 'function') { toast((r && r.err) || 'Eroare', 'error'); }
+    else { alert((r && r.err) || 'Eroare'); }
+  });
+};
+
+window.reactivateSubscription = function() {
+  gas('reactivateSubscription').then(function(r) {
+    if (r && r.ok) {
+      if (typeof toast === 'function') toast('Bine ați revenit! Abonamentul rămâne activ.', 'success');
+      loadElofizetesek();
+    } else if (typeof toast === 'function') { toast((r && r.err) || 'Eroare', 'error'); }
+  });
+};
 
 function elofLoadHistory() {
   gas('getMyPaymentRequests').then(function(r) {

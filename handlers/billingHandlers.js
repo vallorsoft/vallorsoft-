@@ -10,6 +10,8 @@ const { encrypt, decrypt } = require('../lib/crypto');
 const { computePool } = require('../lib/herePool');
 const stripe = require('../lib/stripe');
 const { featureEnabled } = require('../lib/featureEnabled');
+const audit = require('../lib/audit');
+const { makeReactivateToken } = require('../lib/trialToken');
 
 const handlers = {};
 
@@ -430,7 +432,7 @@ handlers.getMySubscription = async function(req, res) {
   const cid = req.session.user.company_id;
   try {
     const r = await pool.query(
-      `SELECT c.subscription_status, c.paid_until, c.subscription_plan_id,
+      `SELECT c.subscription_status, c.paid_until, c.subscription_plan_id, c.subscription_cancel_at,
               sp.name AS plan_name, sp.price_net, sp.stripe_price_id
        FROM companies c
        LEFT JOIN subscription_plans sp ON sp.id = c.subscription_plan_id
@@ -442,6 +444,9 @@ handlers.getMySubscription = async function(req, res) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const paidUntil = row.paid_until ? new Date(row.paid_until) : null;
     const daysLeft = paidUntil ? Math.ceil((paidUntil - today) / 86400000) : null;
+    // Lemondás akkor mondható le, ha aktív/trial és van hátralévő (fizetett) idő.
+    const canCancel = (row.subscription_status === 'active' || row.subscription_status === 'trial')
+      && !row.subscription_cancel_at && daysLeft != null && daysLeft > 0;
     return res.json({ result: {
       ok: true,
       status:            row.subscription_status,
@@ -449,10 +454,87 @@ handlers.getMySubscription = async function(req, res) {
       days_left:         daysLeft,
       plan_name:         row.plan_name || null,
       plan_id:           row.subscription_plan_id,
+      cancel_pending:    !!row.subscription_cancel_at,
+      cancel_at:         row.subscription_cancel_at,
+      can_cancel:        canCancel,
       stripe_configured: stripe.isConfigured(),
     }});
   } catch (err) {
     console.error('getMySubscription hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Előfizetés lemondása (dezabonare) — türelmi idővel ───────────────────
+// A státusz NEM lesz azonnal 'cancelled' (azt a login-kapu tiltaná); csak a
+// subscription_cancel_at jelzőt tesszük be. A hozzáférés a paid_until-ig
+// megmarad. Értesítő e-mail megy "M-am răzgândit" gombbal.
+handlers.cancelSubscription = async function (req, res) {
+  const u = req.session && req.session.user;
+  if (!u || u.pozicio !== 'Admin') return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const cid = u.company_id;
+  try {
+    const r = await pool.query(
+      `SELECT nev, email_contact, subscription_status, paid_until, subscription_cancel_at
+         FROM companies WHERE id=$1`, [cid]);
+    if (!r.rows.length) return res.json({ result: { ok: false, err: 'Companie negăsită' } });
+    const c = r.rows[0];
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const paidUntil = c.paid_until ? new Date(c.paid_until) : null;
+    const daysLeft = paidUntil ? Math.ceil((paidUntil - today) / 86400000) : null;
+
+    if (c.subscription_cancel_at) {
+      return res.json({ result: { ok: true, already: true, days_left: daysLeft, paid_until: c.paid_until } });
+    }
+    if (!(c.subscription_status === 'active' || c.subscription_status === 'trial') || !paidUntil || daysLeft == null || daysLeft <= 0) {
+      return res.json({ result: { ok: false, err: 'Nu există un abonament activ de anulat.' } });
+    }
+
+    const upd = await pool.query(
+      `UPDATE companies SET subscription_cancel_at=NOW(), cancel_lastday_notified=false
+        WHERE id=$1 RETURNING subscription_cancel_at`, [cid]);
+    const cancelAt = upd.rows[0].subscription_cancel_at;
+
+    // Újraaktiváló link (M-am răzgândit) — a lemondás időpontjához kötött token.
+    let reactivateUrl = null;
+    try {
+      const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
+      const sec = Math.floor(new Date(cancelAt).getTime() / 1000);
+      const tok = makeReactivateToken(cid, sec);
+      if (appUrl) reactivateUrl = `${appUrl}/abonament/reactivare?cid=${cid}&tok=${tok}`;
+    } catch (_) {}
+
+    // Értesítő e-mail (RO) — best-effort, nem buktatja a lemondást.
+    try {
+      const { sendSubscriptionCancelEmail } = require('../services/email');
+      if (c.email_contact) {
+        await sendSubscriptionCancelEmail({
+          to: c.email_contact, companyName: c.nev, paidUntil: c.paid_until,
+          daysLeft: daysLeft, reactivateUrl: reactivateUrl, lastDay: false, companyId: cid,
+        });
+      }
+    } catch (_) {}
+
+    audit.fromReq(req, 'subscription.cancel', 'company', String(cid), { paid_until: c.paid_until });
+    return res.json({ result: { ok: true, days_left: daysLeft, paid_until: c.paid_until } });
+  } catch (err) {
+    console.error('cancelSubscription hiba:', err.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Lemondás visszavonása ("M-am răzgândit") — a konzolból ───────────────
+handlers.reactivateSubscription = async function (req, res) {
+  const u = req.session && req.session.user;
+  if (!u || u.pozicio !== 'Admin') return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const cid = u.company_id;
+  try {
+    await pool.query(
+      `UPDATE companies SET subscription_cancel_at=NULL, cancel_lastday_notified=false WHERE id=$1`, [cid]);
+    audit.fromReq(req, 'subscription.reactivate', 'company', String(cid), {});
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('reactivateSubscription hiba:', err.message);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };

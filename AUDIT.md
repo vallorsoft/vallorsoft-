@@ -9,6 +9,13 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 15. lépés — Előfizetés-lemondás (dezabonare) + publikus újraaktiváló link (2026-06-18) ✅ KÉSZ
+Az Admin lemondhatja az előfizetést (türelmi idő a `paid_until`-ig), e-mail értesítő „M-am răzgândit" gombbal. Biztonsági átnézés:
+- **Hozzáférés-kapu konzisztencia:** a lemondás NEM állítja azonnal `cancelled`-re a státuszt — azt a `routes/auth.js` login-kapuja (`subscription_status IN ('inactive','cancelled')` VAGY `paid_until < ma`) azonnal tiltaná. Helyette `subscription_cancel_at` jelző; a hozzáférés a meglévő `paid_until`-kapun ér véget. Így a lemondó cég a fizetett ideig használhatja — nincs új, kikerülő hozzáférés-út.
+- **cancel/reactivate handlerek:** Admin-only (`pozicio==='Admin'`), `company_id` a session-ből, paraméteres SQL, audit (`subscription.cancel`/`reactivate`). Más cég előfizetését nem érintheti.
+- **Publikus újraaktiváló route (`/abonament/reactivare`):** bejelentkezés NÉLKÜL elérhető (az e-mail gombja), **HMAC-SHA256 tokennel** hitelesít (`SESSION_SECRET`), amely a `cid`-hez ÉS a lemondás időpontjához (epoch sec) kötött → újraaktiválás után (cancel_at törlve) a régi link érvénytelen (gyakorlatilag egyszer használatos). **timing-safe** összevetés (`crypto.timingSafeEqual`, hossz-ellenőrzéssel). A művelet jóindulatú (a lemondás visszavonása = az előfizetés aktív marad), nincs adat-kiszivárgás; a `cid` egész, a válasz generikus RO oldal.
+- **E-mail:** PLATFORM-értesítő (VallorSoft → cég Adminja) a közös Brevo feladóról megy (mint a trial-e-mailek), NEM a cég saját fiókjáról; `mail_log` (`type='subscription'`). Az interpolált értékek `escHtml`-elve. A scheduler (utolsó-napi emlékeztető + lejárt véglegesítés) paraméteres, best-effort.
+
 ### 14. lépés — Vizuális e-mail szerkesztő + cég saját feladó-fiók (2026-06-17) ✅ KÉSZ
 Új modul (`handlers/emailBuilder.js`, `/email-builder`, PR #179–#181): a cég vizuálisan szerkesztett e-mail-sablonokat küld KÜLSŐ kontaktoknak (ügyfél/alvállalkozó/egyéb), a **cég saját feladó-fiókjáról** (nem közös címről). Biztonsági átnézés a beépítéskor:
 - **Multi-tenant + tulajdon-ellenőrzés:** minden RPC (`ebTemplate*`/`ebContact*`/`ebPairing*`/`ebSend`/`ebSendLog`/`ebSender*`) `company_id`-szűrt + paraméteres SQL; az update/delete/küldés/párosítás `WHERE id=$1 AND company_id=$2`-vel ellenőriz (nincs cross-tenant write). A párosításnál a `contact_ids` a céghez tartozókra szűrve.
