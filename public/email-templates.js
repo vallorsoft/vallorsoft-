@@ -79,6 +79,7 @@ window.EmailTemplates = (function () {
 
       h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">';
       h += '<button class="btn primary" onclick="EmailTemplates.save(' + i + ')">' + tt('etpl.save', '💾 Mentés') + '</button>';
+      h += '<button class="btn ghost" onclick="EmailTemplates.sendTo(' + i + ')">' + tt('etpl.sendToBtn', '📧 Küldés címzettnek') + '</button>';
       h += '<button class="btn ghost" onclick="EmailTemplates.test(' + i + ')">' + tt('etpl.test', '📧 Teszt-küldés (saját e-mail)') + '</button>';
       h += '</div>';
       h += '</div>';
@@ -155,5 +156,14 @@ window.EmailTemplates = (function () {
     toast(tt('etpl.presetLoaded', 'Sablon betöltve — szabd testre és mentsd'), 'ok');
   }
 
-  return { mount: mount, save: save, test: test, applyPreset: applyPreset };
+  // 📧 Küldés valódi címzettnek — a közös dialógussal (templated-email.js),
+  // a sablon kulcsára rögzítve. A felhasználó megadja a címzettet + változókat.
+  function sendTo(i) {
+    var key = _items[i] && _items[i].key;
+    if (!key) return;
+    if (typeof window.sendTemplatedEmailDialog !== 'function') { toast('—', 'err'); return; }
+    window.sendTemplatedEmailDialog({ templateKey: key, keys: [key], title: keyLabel(key) });
+  }
+
+  return { mount: mount, save: save, test: test, applyPreset: applyPreset, sendTo: sendTo };
 })();

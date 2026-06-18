@@ -3583,6 +3583,20 @@ function vsAvatar(name){
 }
 window.vsAvatar = vsAvatar;
 
+// 📧 Sablonból e-mail egy fuvarhoz — a fuvar adatait a _ordersAllCache-ből
+// olvassa (idézőjel-biztos: nem inline-interpolált), és a közös dialógust nyitja.
+function vsSendOrderTplMail(orderId) {
+  var c = (window._ordersAllCache || []).find(function (x) { return String(x.id) === String(orderId); });
+  if (!c || typeof window.sendTemplatedEmailDialog !== 'function') return;
+  var route = ((c.loc_incarcare || '') + ' → ' + (c.loc_descarcare || '')).trim();
+  window.sendTemplatedEmailDialog({
+    keys: ['order_confirm_carrier', 'order_status_change', 'generic'],
+    templateKey: 'order_confirm_carrier',
+    vars: { order_id: String(c.id), route: route, client: c.client || '', status: c.status || '' },
+  });
+}
+window.vsSendOrderTplMail = vsSendOrderTplMail;
+
 function renderFilteredOrders(list) {
   var tbody = document.getElementById('tblOrdersBody');
   if (!tbody) return;
@@ -3743,6 +3757,12 @@ function renderFilteredOrders(list) {
       menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.copyTrack')+'" '+
         'onclick="copyTrackingLink(\''+c.id+'\');closeOrderActions()">'+
         '<span class="vs-act-ico">🌍</span><span class="vs-act-lbl">'+t('cs.ol.mTrack')+'</span></button>';
+    }
+    // 📧 Sablonból e-mail (fuvar-visszaigazolás / státusz az ügyfélnek)
+    if (window.sendTemplatedEmailDialog) {
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mTplMail')+'" '+
+        'onclick="vsSendOrderTplMail(\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">📧</span><span class="vs-act-lbl">'+t('cs.ol.mTplMail')+'</span></button>';
     }
     // ⛔ Áru leadása (megszakítás) — elválasztó után, danger színnel; aktív fuvaron
     if (!isCancelled && (c.status==='Alocat'||c.status==='In Curs') && c.handover_status!=='Fuggoben') {

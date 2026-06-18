@@ -7,6 +7,8 @@
  */
 function _ioEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+var _ioItemsCache = [];  // a betöltött számlák (a 📧 Sablonból küldés idézőjel-biztos előtöltéséhez)
+
 function _ioStatusPill(st){
   var s = String(st||'').toLowerCase();
   var cls = 'info', txt = st || '—';
@@ -33,6 +35,7 @@ function loadInvoicesOut(){
     .then(function(d){
       if(!d || !d.ok){ if(body) body.innerHTML = '<tr><td colspan="7" style="padding:14px;text-align:center;opacity:.6;">' + _ioEsc(t('invo.empty')) + '</td></tr>'; return; }
       var items = d.invoices || [];
+      _ioItemsCache = items;
       _ioRenderBand(items);
       if(!items.length){ if(body) body.innerHTML = '<tr><td colspan="7" style="padding:14px;text-align:center;opacity:.6;">' + _ioEsc(t('invo.empty')) + '</td></tr>'; return; }
       var html = items.map(function(it){
@@ -47,6 +50,8 @@ function loadInvoicesOut(){
         if(it.order_id && st !== 'cancelled' && st !== 'storno' && st !== 'canceled')
           acts.push('<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="invOutStorno(' + JSON.stringify(String(it.order_id)) + ')">' + _ioEsc(t('invo.storno')) + '</button>');
         acts.push('<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="invOutRefreshStatus(' + Number(it.id) + ')">' + _ioEsc(t('invo.refresh')) + '</button>');
+        if (typeof window.sendTemplatedEmailDialog === 'function')
+          acts.push('<button class="btn ghost" style="padding:4px 10px;font-size:12px;" title="' + _ioEsc(t('etpl.sendFromTpl')) + '" onclick="invOutSendTpl(' + Number(it.id) + ')">📧</button>');
         return '<tr>'
           + '<td style="padding:8px 10px;">' + _ioEsc(num) + '</td>'
           + '<td style="padding:8px 10px;">' + _ioEsc(it.client_name || '—') + '</td>'
@@ -86,6 +91,19 @@ function invOutStorno(orderId){
       else toast((d && d.error) || t('invo.stornoErr'), 'err');
     })
     .catch(function(){ toast(t('invo.stornoErr'), 'err'); });
+}
+
+// 📧 Számla-értesítő sablon küldése az ügyfélnek — a számla adatait a
+// cache-ből olvassa (idézőjel-biztos), és a közös dialógust nyitja.
+function invOutSendTpl(id){
+  var it = (_ioItemsCache || []).find(function(x){ return Number(x.id) === Number(id); });
+  if(!it || typeof window.sendTemplatedEmailDialog !== 'function') return;
+  var num = ((it.serie || '') + ' ' + (it.numar || '')).trim();
+  window.sendTemplatedEmailDialog({
+    keys: ['invoice_notify', 'generic'],
+    templateKey: 'invoice_notify',
+    vars: { client: it.client_name || '', invoice_no: num, order_id: it.order_id ? String(it.order_id) : '' },
+  });
 }
 
 function invOutRefreshStatus(id){
