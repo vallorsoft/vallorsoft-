@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-06-18 — ÚJ: alvállalkozói (carrier) jármű GPS-követés — megosztott link + opc. CargoTrack kulcs
+
+> Eddig csak a SAJÁT flotta GPS-ét lehetett követni (a cég CargoTrack-fiókján). Mostantól az **alvállalkozó (Extern fuvar) járművéhez** is köthető követés: (1) **megosztott publikus követő-link** (bármilyen GPS-rendszerből), és/vagy (2) **CargoTrack object_id + API-kulcs** az élő pozícióhoz a térképen. Felvitel az **alvállalkozói portálon** (a fuvarozó maga) ÉS a **diszpécser** oldaláról; a link az **ügyfél követő-oldalán** is megjelenik.
+
+- **`db/carriers-vehicle-gps.sql`** (ÚJ migráció) — `carrier_vehicles` + `track_url`, `gps_object_id`, `gps_api_key_enc` (AES-256-GCM). A kulcs a kliensbe SOHA nem kerül vissza (csak „van-e kulcs" jelző). A fájlnév a `carriers-ap.sql` UTÁN rendeződik (a tábla onnan jön).
+- **`routes/track.js`** — ha a saját flotta nem ad pozíciót, a `carrier_vehicles`-ből (rendszám-egyezés szóköz-/kisbetű-függetlenül) feloldja: élő CargoTrack pozíció (saját kulccsal) → autó-marker, és/vagy `external_url` → „Urmărire externă" gomb. Best-effort, cache-elt.
+- **`handlers/carriers.js`** — `carrierVehicleList` már nem szivárogtatja a titkosított kulcsot (csak `has_gps_key`); új `carrierVehicleSetGps` (Admin/Manager, tulajdon-ellenőrzött, AES-titkosítás, jelszó-megőrzés, audit).
+- **`routes/carrier-portal.js`** — a portál jármű-CRUD kezeli a `track_url` + `gps_object_id` + `gps_api_key` mezőket (titkosítva, link-validációval, kulcs-megőrzéssel).
+- **UI:** diszpécser (Bejövő számlák → alvállalkozói jármű-tábla „GPS" oszlop + 📍 szerkesztő-modal), alvállalkozói portál (jármű add/edit GPS-mezők + 🛰️/🔗 jelző), publikus `track.html` („🛰️ Urmărire externă" gomb). Új i18n `trk.externalTrack` / `cs.cv.*` / `car.*` (RO-alap+HU); cache-bust `?v=20260618cargps`. 100 Jest zöld.
+
 ## 2026-06-18 — Tracking: élő GPS minden aktív státusznál (nem csak Alocat/In Curs)
 
 > A követő-oldalon a térkép megjelent, de „Poziția GPS nu este disponibilă" volt akkor is, ha a jármű GPS-re volt kötve és párosítva — mert az élő pozíciót csak `Alocat`/`In Curs` státusznál kértük le. A `Disponibil` (Înregistrat) fuvarnál így sosem jött a pozíció.

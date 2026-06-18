@@ -51,11 +51,14 @@ router.get('/api/track/:token', async (req, res) => {
     //  már más fuvaron lehet, a pozíció félrevezető lenne.)
     const ACTIVE_STATUSES = ['Disponibil', 'Alocat', 'Extern', 'In Curs', 'Parkolt', 'Raktarban'];
     let position = null;
+    let externalUrl = null;          // alvállalkozói megosztott követő-link (URL)
     if (ACTIVE_STATUSES.includes(o.status) && o.rendszam_camion) {
       const cached = _posCache.get(token);
       if (cached && Date.now() - cached.ts < POS_CACHE_MS) {
         position = cached.pos;
+        externalUrl = cached.ext || null;
       } else {
+        // 1) SAJÁT flotta — a cég CargoTrack-fiókja + vehicle_gps_map párosítás.
         try {
           const keyR = await pool.query(
             `SELECT credentials_enc, enabled FROM company_integrations
@@ -74,7 +77,36 @@ router.get('/api/track/:token', async (req, res) => {
             }
           }
         } catch (e) { /* GPS-hiba ne döntse el a tracking-oldalt */ }
-        _posCache.set(token, { ts: Date.now(), pos: position });
+
+        // 2) ALVÁLLALKOZÓI jármű (carrier_vehicles): megosztott link + opcionális
+        //    saját CargoTrack-kulcs az adott rendszámra (Extern fuvar követése).
+        //    A rendszám-egyezés szóköz-/kisbetű-független.
+        if (!position || !externalUrl) {
+          try {
+            const cv = await pool.query(
+              `SELECT track_url, gps_object_id, gps_api_key_enc FROM carrier_vehicles
+                WHERE company_id = $1
+                  AND regexp_replace(upper(rendszam_camion), '\\s', '', 'g')
+                    = regexp_replace(upper($2), '\\s', '', 'g')
+                ORDER BY created_at DESC LIMIT 1`,
+              [o.company_id, o.rendszam_camion]);
+            if (cv.rows.length) {
+              const v = cv.rows[0];
+              if (!externalUrl && v.track_url && /^https?:\/\//i.test(v.track_url)) externalUrl = v.track_url;
+              if (!position && v.gps_object_id && v.gps_api_key_enc) {
+                try {
+                  const apiKey = decrypt(v.gps_api_key_enc);
+                  const st = await ctSvc.getLatestStatus(apiKey, v.gps_object_id);
+                  if (st && st.latitude != null && st.longitude != null) {
+                    position = { lat: st.latitude, lng: st.longitude, speed: st.speed, datetime: st.datetime };
+                  }
+                } catch (e) { /* az alvállalkozói kulcs hibája ne döntse el az oldalt */ }
+              }
+            }
+          } catch (e) { /* best-effort */ }
+        }
+
+        _posCache.set(token, { ts: Date.now(), pos: position, ext: externalUrl });
       }
     }
 
@@ -108,6 +140,7 @@ router.get('/api/track/:token', async (req, res) => {
         ceg: o.ceg_nev,
       },
       position,
+      external_url: externalUrl,
       route,
     });
   } catch (err) {
