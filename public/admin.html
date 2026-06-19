@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260618sym">
-  <script src="/i18n.js?v=20260618set"></script>
+  <script src="/i18n.js?v=20260618panes"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -236,7 +236,7 @@
           </div>
           <div class="field"><label data-i18n="form.ref">Referencia</label><input class="input" id="oRef" placeholder="opcionális" data-i18n-ph="form.refPh"></div>
           <div class="field"><label data-i18n="form.price">Ár / Preț</label><input class="input" id="oPret" type="number" placeholder="0"></div>
-          <div class="field"><label data-i18n="form.km">Távolság / Km</label><div class="vs-km-row"><input class="input" id="oKm" type="number" placeholder="0"><button type="button" class="btn ghost vs-map-btn" id="oMapBtn" title="Útvonal-előnézet térképen" style="display:none;">🗺️</button></div></div>
+          <div class="field"><label data-i18n="form.km">Távolság / Km</label><div class="vs-km-row"><input class="input" id="oKm" type="number" placeholder="0"><button type="button" class="btn ghost vs-map-btn" id="oMapBtn" title="Útvonal-előnézet térképen" data-i18n-title="o.mapPreviewTitle" style="display:none;">🗺️</button></div></div>
           <div class="field"><label><span data-i18n="form.weight">Súly / kg</span> <span style="color:var(--muted);font-weight:400;" data-i18n="form.weightHint">(részrakomány-ellenőrzéshez)</span></label><input class="input" id="oSuly" type="number" min="0" placeholder="pl. 12000"></div>
           <div class="field"><label><span data-i18n="form.loadType">Rakomány típusa</span> <span style="color:var(--brand-red);">*</span></label>
             <div style="display:flex;gap:18px;align-items:center;padding:10px 2px;">
@@ -290,12 +290,12 @@
             <div class="field">
             <label><span data-i18n="form.tractorPlate">Vontató rendszám</span> <button class="btn ok" onclick="openQuickVehicle('Vontato')" style="padding:2px 8px;font-size:11px;margin-left:8px;" data-i18n="form.newShort">+ Új</button></label>
 <input class="input" id="oCamionSearch" placeholder="Keresés..." oninput="filterCamions()" style="margin-bottom:6px;">
-<select class="select" id="oCamionSelect" size="3" style="height:auto;"><option value="">— Nincs megadva —</option></select>  
+<select class="select" id="oCamionSelect" size="3" style="height:auto;"><option value="" data-i18n="o.selNone">— Nincs megadva —</option></select>  
             </div>
             <div class="field">
             <label><span data-i18n="form.trailerPlate">Pótkocsi rendszám</span> <button class="btn ok" onclick="openQuickVehicle('Potkocsi')" style="padding:2px 8px;font-size:11px;margin-left:8px;" data-i18n="form.newShort">+ Új</button></label>
 <input class="input" id="oRemorcaSearch" placeholder="Keresés..." oninput="filterRemorcas()" style="margin-bottom:6px;">
-<select class="select" id="oRemorcaSelect" size="3" style="height:auto;"><option value="">— Nincs megadva —</option></select>  
+<select class="select" id="oRemorcaSelect" size="3" style="height:auto;"><option value="" data-i18n="o.selNone">— Nincs megadva —</option></select>  
             </div>
           </div>
         </div>
@@ -343,24 +343,24 @@
       <!-- Dokumentum széria konfigurátor -->
       <div class="glass" style="padding:22px;margin-bottom:16px;">
         <h2 class="h-title" style="margin-top:0;" data-i18n="pane.docSeries">📋 Dokumentum szériák</h2>
-        <p style="color:var(--muted);font-size:13px;margin:0 0 14px;">Sorszám: [Prefix]-[Év]-[0001]. Új prefix esetén a számozás 1-ről indul.</p>
+        <p style="color:var(--muted);font-size:13px;margin:0 0 14px;" data-i18n="ds.hint">Sorszám: [Prefix]-[Év]-[0001]. Új prefix esetén a számozás 1-ről indul.</p>
         <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
           <div class="field" style="flex:1;min-width:140px;margin:0;">
-            <label>Menetlevél prefix</label>
+            <label data-i18n="ds.prefix">Menetlevél prefix</label>
             <input class="input" id="docSeriesPrefix" placeholder="MT" maxlength="10" oninput="updateDocSeriesPreview()">
           </div>
           <div style="padding-bottom:2px;">
-            <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Aktuális sorszám</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:4px;" data-i18n="ds.currentSeq">Aktuális sorszám</div>
             <div id="docSeriesCurrentSeq" style="font-size:20px;font-weight:800;color:#fff;">—</div>
           </div>
-          <button class="btn primary" style="padding:10px 20px;" onclick="saveDocSeries()">💾 Mentés</button>
+          <button class="btn primary" style="padding:10px 20px;" onclick="saveDocSeries()" data-i18n="ds.save">💾 Mentés</button>
         </div>
-        <div style="margin-top:10px;font-size:12px;color:var(--muted);" id="docSeriesPreview">Előnézet: MT-2025-0001</div>
+        <div style="margin-top:10px;font-size:12px;color:var(--muted);" id="docSeriesPreview" data-i18n="ds.preview">Előnézet: MT-2025-0001</div>
       </div>
       <div class="glass" style="padding:22px">
         <h2 class="h-title" data-i18n="nav.waybills">Fuvarlevelek</h2>
         <table class="table" id="tblReceivedFuv">
-          <thead><tr><th>Sorszám</th><th>Fájlnév</th><th>Sofőr</th><th>Beküldés ideje</th><th>Művelet</th></tr></thead>
+          <thead><tr><th data-i18n="col.seq">Sorszám</th><th data-i18n="col.fileName">Fájlnév</th><th data-i18n="col.driver">Sofőr</th><th data-i18n="col.submitTime">Beküldés ideje</th><th data-i18n="col.action">Művelet</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -379,19 +379,19 @@
           <h2 class="h-title" style="margin:0;" data-i18n="pane.docs">📷 Feltöltött iratok és CMR-ek</h2>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <select class="select" id="docFilterSofer" style="max-width:180px;padding:8px 10px;font-size:13px;" onchange="renderDocGroups()">
-              <option value="">Összes sofőr</option>
+              <option value="" data-i18n="df.allDrivers">Összes sofőr</option>
             </select>
             <select class="select" id="docFilterTip" style="max-width:140px;padding:8px 10px;font-size:13px;" onchange="renderDocGroups()">
-              <option value="">Összes típus</option>
+              <option value="" data-i18n="df.allTypes">Összes típus</option>
               <option value="CMR">CMR</option>
-              <option value="Számla">Számla</option>
-              <option value="Vám">Vám</option>
-              <option value="Egyéb">Egyéb</option>
+              <option value="Számla" data-i18n="df.typeInvoice">Számla</option>
+              <option value="Vám" data-i18n="df.typeCustoms">Vám</option>
+              <option value="Egyéb" data-i18n="df.typeOther">Egyéb</option>
             </select>
           </div>
         </div>
         <div id="docGroupsContainer">
-          <div style="text-align:center;color:var(--muted);padding:40px;">Betöltés...</div>
+          <div style="text-align:center;color:var(--muted);padding:40px;" data-i18n="dash.loading">Betöltés...</div>
         </div>
       </div>
     </div>
@@ -733,7 +733,7 @@
         <div class="modal glass" style="min-width:320px;">
           <h3 data-i18n="chat.newChat">Új chat indítása</h3>
           <div class="field"><label data-i18n="chat.pickUser">Felhasználó kiválasztása</label>
-            <select class="select" id="newRoomUser"><option value="">— Betöltés... —</option></select>
+            <select class="select" id="newRoomUser"><option value="" data-i18n="o.selLoading">— Betöltés... —</option></select>
           </div>
           <div style="display:flex; gap:10px; margin-top:14px;">
             <button class="btn ghost col" onclick="document.getElementById('newRoomModal').style.display='none'" data-i18n="common.cancel">Mégse</button>
@@ -865,18 +865,18 @@
         <div class="glass" style="padding:24px;">
           <h2 class="h-title" style="margin-top:0;" data-i18n="pane.changePw">🔑 Jelszó módosítása</h2>
           <div class="field">
-            <label>Jelenlegi jelszó</label>
+            <label data-i18n="set.pwCurrent">Jelenlegi jelszó</label>
             <input class="input" type="password" id="stPwdCurrent" placeholder="••••••••" autocomplete="current-password">
           </div>
           <div class="field">
-            <label>Új jelszó</label>
-            <input class="input" type="password" id="stPwdNew" placeholder="Legalább 6 karakter" autocomplete="new-password">
+            <label data-i18n="set.pwNew">Új jelszó</label>
+            <input class="input" type="password" id="stPwdNew" placeholder="Legalább 6 karakter" data-i18n-ph="set.pwMin6Ph" autocomplete="new-password">
           </div>
           <div class="field">
-            <label>Új jelszó megerősítése</label>
+            <label data-i18n="set.pwNew2">Új jelszó megerősítése</label>
             <input class="input" type="password" id="stPwdNew2" placeholder="••••••••" autocomplete="new-password">
           </div>
-          <button class="btn primary" style="margin-top:6px;" onclick="settingsChangePassword()">🔒 Jelszó módosítása</button>
+          <button class="btn primary" style="margin-top:6px;" onclick="settingsChangePassword()" data-i18n="set.changePwBtn">🔒 Jelszó módosítása</button>
         </div>
 
          <!-- BIZTONSÁG (2FA) -->
@@ -885,42 +885,42 @@
           <div id="st2faStatus" style="display:flex; align-items:center; gap:12px; margin-bottom:16px; padding:12px 14px; background:rgba(255,255,255,0.04); border-radius:var(--r-sm); border:1px solid var(--border);">
             <div id="st2faDot" style="width:10px;height:10px;border-radius:50%;background:var(--muted);flex-shrink:0;"></div>
             <div>
-              <div id="st2faLabel" style="font-weight:600;font-size:13px;color:#fff;">Betöltés...</div>
+              <div id="st2faLabel" style="font-weight:600;font-size:13px;color:#fff;" data-i18n="dash.loading">Betöltés...</div>
               <div id="st2faDesc" style="font-size:12px;color:var(--muted);margin-top:2px;"></div>
             </div>
           </div>
            <!-- 2FA kikapcsolás szekció -->
           <div id="st2faDisableWrap" style="display:none;">
             <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); border-radius:var(--r-sm); padding:12px 14px; margin-bottom:12px;">
-              <div style="font-size:12px;color:var(--warn);">⚠️ A 2FA kikapcsolása csökkenti a fiókod biztonságát. Csak akkor tedd, ha indokolt.</div>
+              <div style="font-size:12px;color:var(--warn);" data-i18n="set.2faWarn">⚠️ A 2FA kikapcsolása csökkenti a fiókod biztonságát. Csak akkor tedd, ha indokolt.</div>
             </div>
             <div class="field">
-              <label>Jelenlegi jelszó a megerősítéshez</label>
+              <label data-i18n="set.2faDisablePwd">Jelenlegi jelszó a megerősítéshez</label>
               <input class="input" type="password" id="st2faDisablePwd" placeholder="••••••••">
             </div>
-            <button class="btn danger" onclick="settings2faDisable()">🔓 2FA kikapcsolása</button>
+            <button class="btn danger" onclick="settings2faDisable()" data-i18n="set.2faDisableBtn">🔓 2FA kikapcsolása</button>
           </div>
 
           <div id="st2faEnableWrap" style="display:none;">
-            <p style="color:var(--muted);font-size:13px;margin:0 0 14px;">A 2FA bekapcsolásával minden belépésnél kódbevitel szükséges (Google Authenticator vagy hasonló app).</p>
-            <button class="btn primary" type="button" id="btn2faStart" onclick="settings2faStart()">🔐 2FA bekapcsolása</button>
+            <p style="color:var(--muted);font-size:13px;margin:0 0 14px;" data-i18n="set.2faEnableHint">A 2FA bekapcsolásával minden belépésnél kódbevitel szükséges (Google Authenticator vagy hasonló app).</p>
+            <button class="btn primary" type="button" id="btn2faStart" onclick="settings2faStart()" data-i18n="set.2faEnableBtn">🔐 2FA bekapcsolása</button>
           </div>
 
           <!-- 2FA setup modal (settings-ből) -->
           <div class="modal-back" id="modal2faSetup">
             <div class="modal glass" style="width:min(420px,100%);text-align:center;">
-              <h3 style="margin-top:0;">🔐 2FA bekapcsolása</h3>
-              <p style="color:var(--muted);font-size:13px;">Olvasd be a QR kódot Google Authenticator vagy Authy appban, majd add meg az első kódot a megerősítéshez.</p>
+              <h3 style="margin-top:0;" data-i18n="set.2faModalTitle">🔐 2FA bekapcsolása</h3>
+              <p style="color:var(--muted);font-size:13px;" data-i18n="set.2faModalHint">Olvasd be a QR kódot Google Authenticator vagy Authy appban, majd add meg az első kódot a megerősítéshez.</p>
               <div id="setup2faQrWrap" style="margin:16px 0;">
                 <div class="spinner" style="margin:0 auto;"></div>
               </div>
               <div class="field" style="text-align:left;">
-                <label>Megerősítő kód (6 jegy)</label>
+                <label data-i18n="set.2faCodeLabel">Megerősítő kód (6 jegy)</label>
                 <input class="input" type="tel" id="setup2faCode" maxlength="6" placeholder="000000" style="font-size:22px;letter-spacing:6px;text-align:center;">
               </div>
               <div style="display:flex;gap:10px;margin-top:14px;">
-                <button class="btn ghost col" type="button" onclick="close2faSetupModal()">Mégse</button>
-                <button class="btn primary col" type="button" id="btn2faConfirm" onclick="settings2faConfirm()">✅ Megerősítés</button>
+                <button class="btn ghost col" type="button" onclick="close2faSetupModal()" data-i18n="common.cancel">Mégse</button>
+                <button class="btn primary col" type="button" id="btn2faConfirm" onclick="settings2faConfirm()" data-i18n="set.2faConfirmBtn">✅ Megerősítés</button>
               </div>
             </div>
           </div>
@@ -944,9 +944,9 @@
   <div style="max-width:640px; margin:0 auto; display:flex; flex-direction:column; gap:18px; padding:24px 0;">
     <!-- Státusz kártya -->
     <div class="glass" style="padding:24px;">
-      <h2 class="h-title" style="margin-top:0;">💳 Előfizetés állapota</h2>
+      <h2 class="h-title" style="margin-top:0;" data-i18n="elf.statusTitle">💳 Előfizetés állapota</h2>
       <div id="elofSubStatus" style="padding:14px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid var(--border);margin-bottom:14px;">
-        <div id="elofSubText" style="font-size:15px;">Betöltés...</div>
+        <div id="elofSubText" style="font-size:15px;" data-i18n="dash.loading">Betöltés...</div>
         <div id="elofSubExpiry" style="font-size:12px;color:var(--muted);margin-top:4px;"></div>
       </div>
       <!-- Lemondás / visszavonás (dezabonare) -->
@@ -954,20 +954,20 @@
     </div>
     <!-- Csomag választó -->
     <div class="glass" style="padding:24px;">
-      <h2 class="h-title" style="margin-top:0;">📦 Csomag / Megújítás</h2>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 16px;">Válassz csomagot. Fizetési részleteket emailben küldjük; a banki jóváírás után a developer aktiválja.</p>
+      <h2 class="h-title" style="margin-top:0;" data-i18n="elf.planTitle">📦 Csomag / Megújítás</h2>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 16px;" data-i18n="elf.planHint">Válassz csomagot. Fizetési részleteket emailben küldjük; a banki jóváírás után a developer aktiválja.</p>
       <div style="display:flex;gap:8px;margin-bottom:16px;">
-        <button id="elofBillingMonthly" class="btn primary" style="font-size:12px;padding:6px 14px;" onclick="elofSetBilling('monthly')">Havi</button>
-        <button id="elofBillingAnnual" class="btn ghost" style="font-size:12px;padding:6px 14px;" onclick="elofSetBilling('annual')">Éves ★ −1 hónap</button>
+        <button id="elofBillingMonthly" class="btn primary" style="font-size:12px;padding:6px 14px;" onclick="elofSetBilling('monthly')" data-i18n="elf.monthly">Havi</button>
+        <button id="elofBillingAnnual" class="btn ghost" style="font-size:12px;padding:6px 14px;" onclick="elofSetBilling('annual')" data-i18n="elf.annual">Éves ★ −1 hónap</button>
       </div>
       <div id="elofPlanGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;">
-        <div style="text-align:center;color:var(--muted);font-size:13px;padding:20px;">Betöltés...</div>
+        <div style="text-align:center;color:var(--muted);font-size:13px;padding:20px;" data-i18n="dash.loading">Betöltés...</div>
       </div>
     </div>
     <!-- Referencia kártya (kérelem után jelenik meg) -->
     <div id="elofRefCard" class="glass" style="padding:24px;display:none;">
-      <h2 class="h-title" style="margin-top:0;">✅ Kérelem elküldve</h2>
-      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">A fizetési részleteket emailben elküldtük. Utalásnál add meg a referencia-kódot a megjegyzés mezőben.</p>
+      <h2 class="h-title" style="margin-top:0;" data-i18n="elf.reqSentTitle">✅ Kérelem elküldve</h2>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;" data-i18n="elf.reqSentHint">A fizetési részleteket emailben elküldtük. Utalásnál add meg a referencia-kódot a megjegyzés mezőben.</p>
       <div style="text-align:center;padding:16px;background:rgba(99,102,241,.06);border:2px solid #6366f1;border-radius:10px;">
         <div style="font-size:11px;color:#6366f1;font-weight:700;letter-spacing:.5px;margin-bottom:6px;">REFERINȚĂ PLATĂ</div>
         <div id="elofRefCode" style="font-size:26px;font-weight:800;font-family:monospace;letter-spacing:2px;"></div>
@@ -976,11 +976,11 @@
     </div>
     <!-- Fizetési előzmények -->
     <div class="glass" style="padding:24px;">
-      <h2 class="h-title" style="margin-top:0;">📋 Fizetési előzmények</h2>
+      <h2 class="h-title" style="margin-top:0;" data-i18n="elf.histTitle">📋 Fizetési előzmények</h2>
       <div style="overflow-x:auto;">
         <table class="table" style="font-size:13px;">
-          <thead><tr><th>Dátum</th><th>Csomag</th><th>Időszak</th><th>Referencia</th><th>EUR</th><th>RON</th><th>Státusz</th></tr></thead>
-          <tbody id="elofHistTbody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px;">Betöltés...</td></tr></tbody>
+          <thead><tr><th data-i18n="elf.colDate">Dátum</th><th data-i18n="elf.colPlan">Csomag</th><th data-i18n="elf.colPeriod">Időszak</th><th data-i18n="elf.colRef">Referencia</th><th>EUR</th><th>RON</th><th data-i18n="elf.colStatus">Státusz</th></tr></thead>
+          <tbody id="elofHistTbody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px;" data-i18n="dash.loading">Betöltés...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -992,138 +992,138 @@
 
 <div class="modal-back" id="userModal">
   <div class="modal glass">
-    <h3>Adatok szerkesztése</h3>
-    <div class="field"><label>Név</label><input class="input" id="uNume"></div>
-    <div class="field"><label>E-mail</label><input class="input" id="uEmail" disabled></div>
+    <h3 data-i18n="um.title">Adatok szerkesztése</h3>
+    <div class="field"><label data-i18n="um.name">Név</label><input class="input" id="uNume"></div>
+    <div class="field"><label data-i18n="common.email">E-mail</label><input class="input" id="uEmail" disabled></div>
     <div class="field"><label data-i18n="form.phone">Telefon</label><input class="input" id="uTel"></div>
-    <div class="field"><label>Pozíció</label><select class="select" id="uPoz"><option>Admin</option><option>Manager</option><option>Sofer</option></select></div>
-    <div class="field"><label>Új jelszó</label><input class="input" id="uPwd" type="password" placeholder="Hagyja üresen, ha nem változik"></div>
-    <div class="field"><label>Új jelszó megerősítése</label><input class="input" id="uPwd2" type="password" placeholder="Ismételje meg az új jelszót"></div>
-    <div class="row" style="margin-top:14px; display:flex; gap:10px;"><button class="btn ghost col" onclick="closeModal()">Mégse</button><button class="btn primary col" onclick="saveUser()">Mentés</button></div>
+    <div class="field"><label data-i18n="um.position">Pozíció</label><select class="select" id="uPoz"><option>Admin</option><option>Manager</option><option>Sofer</option></select></div>
+    <div class="field"><label data-i18n="um.newPwd">Új jelszó</label><input class="input" id="uPwd" type="password" placeholder="Hagyja üresen, ha nem változik" data-i18n-ph="um.newPwdPh"></div>
+    <div class="field"><label data-i18n="um.newPwd2">Új jelszó megerősítése</label><input class="input" id="uPwd2" type="password" placeholder="Ismételje meg az új jelszót" data-i18n-ph="um.newPwd2Ph"></div>
+    <div class="row" style="margin-top:14px; display:flex; gap:10px;"><button class="btn ghost col" onclick="closeModal()" data-i18n="common.cancel">Mégse</button><button class="btn primary col" onclick="saveUser()" data-i18n="common.save">Mentés</button></div>
   </div>
 </div>
 
 <div class="modal-back" id="vehicleModal">
   <div class="modal glass">
-    <h3>Jármű szerkesztése</h3>
+    <h3 data-i18n="vm.title">Jármű szerkesztése</h3>
     <input type="hidden" id="vehEditId">
     <input type="hidden" id="vehEditTip">
-    <div class="field"><label>Rendszám</label><input class="input" id="vehEditRendszam"></div>
-    <div class="field"><label>Márka</label><input class="input" id="vehEditMarca"></div>
-    <div class="field"><label>Model</label><input class="input" id="vehEditModel"></div>
-    <div class="field"><label>Év</label><input class="input" id="vehEditAn" type="number"></div>
-    <div class="field"><label>Megjegyzés</label><input class="input" id="vehEditNota"></div>
+    <div class="field"><label data-i18n="col.plate">Rendszám</label><input class="input" id="vehEditRendszam"></div>
+    <div class="field"><label data-i18n="col.brand">Márka</label><input class="input" id="vehEditMarca"></div>
+    <div class="field"><label data-i18n="col.model">Model</label><input class="input" id="vehEditModel"></div>
+    <div class="field"><label data-i18n="col.year">Év</label><input class="input" id="vehEditAn" type="number"></div>
+    <div class="field"><label data-i18n="vm.note">Megjegyzés</label><input class="input" id="vehEditNota"></div>
 
      <!-- Teherjármű paraméterek (útvonaltervezés) — alapból nyitva -->
     <details class="veh-params" style="margin-top:8px;" open>
-      <summary>🚚 Teherjármű paraméterek (útvonaltervezés)</summary>
+      <summary data-i18n="vm.truckParams">🚚 Teherjármű paraméterek (útvonaltervezés)</summary>
       <div style="margin-top:12px;">
-        <div class="text-muted" style="font-size:12px;margin-bottom:8px;font-weight:600;">Fizikai méretek</div>
+        <div class="text-muted" style="font-size:12px;margin-bottom:8px;font-weight:600;" data-i18n="vm.physDims">Fizikai méretek</div>
         <div class="grid-3">
-          <div class="field"><label>Magasság (cm)</label><input class="input" id="vehEditHeight" type="number" placeholder="pl. 390"></div>
-          <div class="field"><label>Szélesség (cm)</label><input class="input" id="vehEditWidth" type="number" placeholder="pl. 255"></div>
-          <div class="field"><label>Hossz (cm)</label><input class="input" id="vehEditLength" type="number" placeholder="pl. 1350"></div>
+          <div class="field"><label data-i18n="vm.height">Magasság (cm)</label><input class="input" id="vehEditHeight" type="number" placeholder="pl. 390"></div>
+          <div class="field"><label data-i18n="vm.width">Szélesség (cm)</label><input class="input" id="vehEditWidth" type="number" placeholder="pl. 255"></div>
+          <div class="field"><label data-i18n="vm.length">Hossz (cm)</label><input class="input" id="vehEditLength" type="number" placeholder="pl. 1350"></div>
         </div>
-        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;">Tömeg adatok</div>
+        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;" data-i18n="vm.weightData">Tömeg adatok</div>
         <div class="grid-2">
-          <div class="field"><label>Teljes tömeg (kg, rakománnyal)</label><input class="input" id="vehEditWeight" type="number" placeholder="pl. 40000"></div>
-          <div class="field"><label>Tengelyterhelés (kg)</label><input class="input" id="vehEditAxleWeight" type="number" placeholder="pl. 11500"></div>
+          <div class="field"><label data-i18n="vm.totalWeight">Teljes tömeg (kg, rakománnyal)</label><input class="input" id="vehEditWeight" type="number" placeholder="pl. 40000"></div>
+          <div class="field"><label data-i18n="vm.axleWeight">Tengelyterhelés (kg)</label><input class="input" id="vehEditAxleWeight" type="number" placeholder="pl. 11500"></div>
         </div>
-        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;">Konfiguráció</div>
+        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;" data-i18n="vm.config">Konfiguráció</div>
         <div class="grid-3">
-          <div class="field"><label>Tengelyek száma</label><input class="input" id="vehEditAxleCount" type="number" min="2" max="10" value="2"></div>
-          <div class="field"><label>Pótkocsi</label><input class="input" id="vehEditTrailerCount" type="number" min="0" max="3" value="0"></div>
-          <div class="field"><label>Jármű típus</label>
+          <div class="field"><label data-i18n="vm.axleCount">Tengelyek száma</label><input class="input" id="vehEditAxleCount" type="number" min="2" max="10" value="2"></div>
+          <div class="field"><label data-i18n="vm.trailer">Pótkocsi</label><input class="input" id="vehEditTrailerCount" type="number" min="0" max="3" value="0"></div>
+          <div class="field"><label data-i18n="vm.truckType">Jármű típus</label>
             <select class="select" id="vehEditTruckType">
-              <option value="straight">Merevtengelyes teherautó</option>
-              <option value="tractor">Nyerges vontató</option>
-              <option value="lightTruck">Könnyű teherjármű</option>
+              <option value="straight" data-i18n="vm.ttStraight">Merevtengelyes teherautó</option>
+              <option value="tractor" data-i18n="vm.ttTractor">Nyerges vontató</option>
+              <option value="lightTruck" data-i18n="vm.ttLight">Könnyű teherjármű</option>
             </select>
           </div>
         </div>
-        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;">Speciális</div>
+        <div class="text-muted" style="font-size:12px;margin:6px 0 8px;font-weight:600;" data-i18n="vm.special">Speciális</div>
         <div class="grid-2">
-          <div class="field"><label>Alagút kategória</label>
+          <div class="field"><label data-i18n="vm.tunnel">Alagút kategória</label>
             <select class="select" id="vehEditTunnel">
-              <option value="">Nincs korlátozás</option>
-              <option value="B">B kategória</option>
-              <option value="C">C kategória</option>
-              <option value="D">D kategória</option>
-              <option value="E">E kategória (legszigorúbb)</option>
+              <option value="" data-i18n="vm.tunnelNone">Nincs korlátozás</option>
+              <option value="B" data-i18n="vm.tunnelB">B kategória</option>
+              <option value="C" data-i18n="vm.tunnelC">C kategória</option>
+              <option value="D" data-i18n="vm.tunnelD">D kategória</option>
+              <option value="E" data-i18n="vm.tunnelE">E kategória (legszigorúbb)</option>
             </select>
           </div>
-          <div class="field"><label>Veszélyes áru</label>
+          <div class="field"><label data-i18n="vm.hazmat">Veszélyes áru</label>
             <select class="select" id="vehEditHazmat">
-              <option value="">Nincs</option>
-              <option value="explosive">Robbanóanyag</option>
-              <option value="gas">Gáz</option>
-              <option value="flammable">Gyúlékony</option>
-              <option value="combustible">Égőanyag</option>
-              <option value="organic">Szerves anyag</option>
-              <option value="poison">Méreg</option>
-              <option value="harmfulToWater">Vízszennyező</option>
+              <option value="" data-i18n="vm.hazNone">Nincs</option>
+              <option value="explosive" data-i18n="vm.hazExplosive">Robbanóanyag</option>
+              <option value="gas" data-i18n="vm.hazGas">Gáz</option>
+              <option value="flammable" data-i18n="vm.hazFlammable">Gyúlékony</option>
+              <option value="combustible" data-i18n="vm.hazCombustible">Égőanyag</option>
+              <option value="organic" data-i18n="vm.hazOrganic">Szerves anyag</option>
+              <option value="poison" data-i18n="vm.hazPoison">Méreg</option>
+              <option value="harmfulToWater" data-i18n="vm.hazWater">Vízszennyező</option>
             </select>
           </div>
         </div>
-        <div class="field" style="margin-top:8px;"><label>Fogyasztás (L/100km)</label><input class="input" id="vehEditFuel" type="number" step="0.1" placeholder="pl. 28.5"></div>
+        <div class="field" style="margin-top:8px;"><label data-i18n="vm.fuel">Fogyasztás (L/100km)</label><input class="input" id="vehEditFuel" type="number" step="0.1" placeholder="pl. 28.5"></div>
       </div>
     </details>
 
     <!-- Rakodási felület — csak pótkocsinál látszik (editVehicle kapcsolja) -->
     <div id="vehTrailerCargoWrap" style="display:none;margin-top:10px;">
-      <div class="text-muted" style="font-size:12px;font-weight:600;margin-bottom:8px;">📦 Rakodási felület (nem a teljes méret!)</div>
+      <div class="text-muted" style="font-size:12px;font-weight:600;margin-bottom:8px;" data-i18n="vm.cargoArea">📦 Rakodási felület (nem a teljes méret!)</div>
       <div class="grid-2">
-        <div class="field"><label>Típus</label>
+        <div class="field"><label data-i18n="vm.kind">Típus</label>
           <select class="select" id="vehEditTrailerKind" onchange="vehEditKindChange()">
-            <option value="standard">Standard (260 cm)</option>
-            <option value="mega">Mega (305 cm)</option>
+            <option value="standard" data-i18n="vm.kindStandard">Standard (260 cm)</option>
+            <option value="mega" data-i18n="vm.kindMega">Mega (305 cm)</option>
           </select>
         </div>
-        <div class="field"><label>Hossz (cm)</label><input class="input" id="vehEditCargoLen" type="number" placeholder="1360"></div>
+        <div class="field"><label data-i18n="vm.cargoLen">Hossz (cm)</label><input class="input" id="vehEditCargoLen" type="number" placeholder="1360"></div>
       </div>
       <div class="grid-2">
-        <div class="field"><label>Szélesség (cm)</label><input class="input" id="vehEditCargoWid" type="number" placeholder="248"></div>
-        <div class="field"><label>Magasság (cm)</label><input class="input" id="vehEditCargoHei" type="number" placeholder="260 / mega: 305"></div>
+        <div class="field"><label data-i18n="vm.cargoWid">Szélesség (cm)</label><input class="input" id="vehEditCargoWid" type="number" placeholder="248"></div>
+        <div class="field"><label data-i18n="vm.cargoHei">Magasság (cm)</label><input class="input" id="vehEditCargoHei" type="number" placeholder="260 / mega: 305"></div>
       </div>
     </div>
 
     <div class="row" style="margin-top:14px; display:flex; gap:10px;">
-      <button class="btn ghost col" onclick="closeVehicleModal()">Mégse</button>
-      <button class="btn primary col" onclick="saveVehicle()">Mentés</button>
+      <button class="btn ghost col" onclick="closeVehicleModal()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn primary col" onclick="saveVehicle()" data-i18n="common.save">Mentés</button>
     </div>
   </div>
 </div>
 
 <div class="modal-back" id="extDriverModal">
   <div class="modal glass">
-    <h3>Külső sofőr szerkesztése</h3>
+    <h3 data-i18n="eds.title">Külső sofőr szerkesztése</h3>
     <input type="hidden" id="edEditId">
     <div class="field"><label data-i18n="form.driverName">Sofőr neve</label><input class="input" id="edEditNume"></div>
     <div class="field"><label data-i18n="form.companyName">Cég neve</label><input class="input" id="edEditFirma"></div>
     <div class="field"><label data-i18n="form.phone">Telefon</label><input class="input" id="edEditTelefon"></div>
-    <div class="field"><label>E-mail</label><input class="input" id="edEditEmail" type="email"></div>
-    <div class="field"><label>Vontató rendszám</label><input class="input" id="edEditCamion"></div>
-    <div class="field"><label>Pótkocsi rendszám</label><input class="input" id="edEditRemorca"></div>
-    <div class="field"><label>Megjegyzés</label><input class="input" id="edEditNota"></div>
+    <div class="field"><label data-i18n="common.email">E-mail</label><input class="input" id="edEditEmail" type="email"></div>
+    <div class="field"><label data-i18n="eds.tractorPlate">Vontató rendszám</label><input class="input" id="edEditCamion"></div>
+    <div class="field"><label data-i18n="eds.trailerPlate">Pótkocsi rendszám</label><input class="input" id="edEditRemorca"></div>
+    <div class="field"><label data-i18n="eds.note">Megjegyzés</label><input class="input" id="edEditNota"></div>
     <div class="row" style="margin-top:14px; display:flex; gap:10px;">
-      <button class="btn ghost col" onclick="closeExtDriverModal()">Mégse</button>
-      <button class="btn primary col" onclick="saveExtDriver()">Mentés</button>
+      <button class="btn ghost col" onclick="closeExtDriverModal()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn primary col" onclick="saveExtDriver()" data-i18n="common.save">Mentés</button>
     </div>
   </div>
 </div>
 
 <div class="modal-back" id="quickVehicleModal">
   <div class="modal glass">
-    <h3 id="quickVehicleTitle">Új jármű hozzáadása</h3>
+    <h3 id="quickVehicleTitle" data-i18n="qv.title">Új jármű hozzáadása</h3>
     <input type="hidden" id="qvTip">
-    <div class="field"><label>Rendszám *</label><input class="input" id="qvRendszam" placeholder="BV-12-XYZ"></div>
-    <div class="field"><label>Márka</label><input class="input" id="qvMarca" placeholder="Volvo"></div>
-    <div class="field"><label>Model</label><input class="input" id="qvModel" placeholder="FH16"></div>
-    <div class="field"><label>Év</label><input class="input" id="qvAn" type="number" placeholder="2022"></div>
-    <div class="field"><label>Megjegyzés</label><input class="input" id="qvNota"></div>
+    <div class="field"><label data-i18n="qv.plateReq">Rendszám *</label><input class="input" id="qvRendszam" placeholder="BV-12-XYZ"></div>
+    <div class="field"><label data-i18n="col.brand">Márka</label><input class="input" id="qvMarca" placeholder="Volvo"></div>
+    <div class="field"><label data-i18n="col.model">Model</label><input class="input" id="qvModel" placeholder="FH16"></div>
+    <div class="field"><label data-i18n="col.year">Év</label><input class="input" id="qvAn" type="number" placeholder="2022"></div>
+    <div class="field"><label data-i18n="qv.note">Megjegyzés</label><input class="input" id="qvNota"></div>
     <div class="row" style="margin-top:14px; display:flex; gap:10px;">
-      <button class="btn ghost col" onclick="closeQuickVehicle()">Mégse</button>
-      <button class="btn primary col" onclick="saveQuickVehicle()">Hozzáadás</button>
+      <button class="btn ghost col" onclick="closeQuickVehicle()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn primary col" onclick="saveQuickVehicle()" data-i18n="qv.addBtn">Hozzáadás</button>
     </div>
   </div>
 </div>
@@ -1133,13 +1133,13 @@
   <div class="modal glass" style="width:min(700px,100%); max-height:90vh; overflow-y:auto;">
     <h3>📎 Megrendelő — <span id="docModalOrderId"></span></h3>
     <div class="glass-soft" style="padding:16px; margin-bottom:16px;">
-      <div style="font-weight:600; margin-bottom:10px; color:#fff;">Új megrendelő feltöltése (PDF)</div>
+      <div style="font-weight:600; margin-bottom:10px; color:#fff;" data-i18n="dm.uploadTitle">Új megrendelő feltöltése (PDF)</div>
       <input type="file" id="docUploadInput" class="input" accept="application/pdf">
-      <button class="btn primary" onclick="uploadOrderDoc()" style="margin-top:10px; width:100%;">Feltöltés és megnyitás szerkesztőben</button>
+      <button class="btn primary" onclick="uploadOrderDoc()" style="margin-top:10px; width:100%;" data-i18n="dm.uploadBtn">Feltöltés és megnyitás szerkesztőben</button>
     </div>
-    <div id="docListWrap"><div style="color:var(--muted);font-size:13px;">Betöltés...</div></div>
+    <div id="docListWrap"><div style="color:var(--muted);font-size:13px;" data-i18n="dash.loading">Betöltés...</div></div>
     <div style="margin-top:16px;text-align:right;">
-      <button class="btn ghost" onclick="closeDocModal()">Bezárás</button>
+      <button class="btn ghost" onclick="closeDocModal()" data-i18n="common.close">Bezárás</button>
     </div>
   </div>
 </div>
@@ -1150,36 +1150,36 @@
 
      <!-- Fejléc — sticky, bezárás gomb mindig látható -->
     <div style="position:sticky;top:0;z-index:10;background:var(--bg-2);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;">
-      <h3 style="margin:0;font-size:16px;">✍️ Aláírás / Pecsét</h3>
-      <button class="btn ghost" onclick="closeSignModal()" style="padding:8px 16px;font-size:14px;min-width:80px;">✕ Bezárás</button>
+      <h3 style="margin:0;font-size:16px;" data-i18n="sg.title">✍️ Aláírás / Pecsét</h3>
+      <button class="btn ghost" onclick="closeSignModal()" style="padding:8px 16px;font-size:14px;min-width:80px;" data-i18n="sg.close">✕ Bezárás</button>
     </div>
 
     <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
 
        <!-- 1. Aláírás rajzolás -->
       <div class="glass-soft" style="padding:14px;">
-        <div style="font-weight:600;color:#fff;margin-bottom:8px;">1. Aláírás rajzolása</div>
+        <div style="font-weight:600;color:#fff;margin-bottom:8px;" data-i18n="sg.step1">1. Aláírás rajzolása</div>
         <canvas id="signCanvas" style="width:100%;height:140px;background:#fff;border-radius:8px;border:2px solid var(--border-bright);cursor:crosshair;touch-action:none;display:block;"></canvas>
         <div style="display:flex;gap:8px;margin-top:8px;">
-          <button class="btn ghost" style="flex:1;padding:10px;" onclick="clearSignCanvas()">Törlés</button>
-          <button class="btn ok" style="flex:1;padding:10px;" onclick="addSignatureToPage()">➕ Hozzáad</button>
+          <button class="btn ghost" style="flex:1;padding:10px;" onclick="clearSignCanvas()" data-i18n="sg.clear">Törlés</button>
+          <button class="btn ok" style="flex:1;padding:10px;" onclick="addSignatureToPage()" data-i18n="sg.add">➕ Hozzáad</button>
         </div>
       </div>
 
        <!-- 2. Pecsét -->
       <div class="glass-soft" style="padding:14px;">
-        <div style="font-weight:600;color:#fff;margin-bottom:8px;">2. Pecsét (mentett PNG)</div>
+        <div style="font-weight:600;color:#fff;margin-bottom:8px;" data-i18n="sg.step2">2. Pecsét (mentett PNG)</div>
         <div id="stampPreviewWrap" style="background:#fff;padding:8px;border-radius:8px;text-align:center;min-height:60px;">
           <img id="signStampImg" style="max-height:70px;display:none;">
-          <span id="signNoStamp" style="color:#999;font-size:12px;">Nincs mentett pecsét.</span>
+          <span id="signNoStamp" style="color:#999;font-size:12px;" data-i18n="sg.noStamp">Nincs mentett pecsét.</span>
         </div>
-        <button class="btn primary" style="width:100%;margin-top:8px;padding:10px;" onclick="addStampToPage()">➕ Pecsét hozzáadása</button>
+        <button class="btn primary" style="width:100%;margin-top:8px;padding:10px;" onclick="addStampToPage()" data-i18n="sg.addStamp">➕ Pecsét hozzáadása</button>
       </div>
 
        <!-- 3. PDF előnézet -->
       <div class="glass-soft" style="padding:14px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
-          <span style="font-size:13px;color:var(--muted);">PDF előnézet — húzd a helyére az elemeket</span>
+          <span style="font-size:13px;color:var(--muted);" data-i18n="sg.previewHint">PDF előnézet — húzd a helyére az elemeket</span>
           <span style="display:flex;align-items:center;gap:6px;">
             <button class="btn ghost" style="padding:4px 12px;" onclick="signPrevPage()">◀</button>
             <span id="signPageInfo" style="font-size:13px;color:#fff;min-width:50px;text-align:center;">– / –</span>
@@ -1189,14 +1189,14 @@
         <div id="signPdfStage" style="position:relative;width:100%;background:#555;border:1px solid var(--border-bright);border-radius:var(--r-md);overflow:hidden;display:flex;justify-content:center;min-height:200px;">
           <canvas id="signPdfCanvas" style="max-width:100%;display:block;"></canvas>
         </div>
-        <div style="font-size:11px;color:var(--muted);margin-top:8px;">💡 Az elhelyezett elemeket ujjal húzhatod, a zöld sarokkal átméretezheted.</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;" data-i18n="sg.dragHint">💡 Az elhelyezett elemeket ujjal húzhatod, a zöld sarokkal átméretezheted.</div>
       </div>
 
        <!-- 4. Véglegesítés -->
       <div class="glass-soft" style="padding:14px;">
-        <div style="font-weight:600;color:#fff;margin-bottom:10px;">3. Véglegesítés</div>
-        <button class="btn ok" style="width:100%;margin-bottom:8px;padding:14px;" onclick="burnAndSaveDoc()">🔥 Ráégetés és mentés</button>
-        <button class="btn primary" style="width:100%;padding:14px;" onclick="burnAndDownloadDoc()">⬇️ Ráégetés és letöltés (PDF)</button>
+        <div style="font-weight:600;color:#fff;margin-bottom:10px;" data-i18n="sg.step3">3. Véglegesítés</div>
+        <button class="btn ok" style="width:100%;margin-bottom:8px;padding:14px;" onclick="burnAndSaveDoc()" data-i18n="sg.burnSave">🔥 Ráégetés és mentés</button>
+        <button class="btn primary" style="width:100%;padding:14px;" onclick="burnAndDownloadDoc()" data-i18n="sg.burnDownload">⬇️ Ráégetés és letöltés (PDF)</button>
       </div>
 
     </div>
@@ -1216,7 +1216,7 @@
       <div class="field"><label data-i18n="edit.loadDate">Rakodás dátuma</label><input class="input" id="oeDataInc" type="date"></div>
       <div class="field"><label data-i18n="edit.unloadDate">Lerakás dátuma</label><input class="input" id="oeDataDesc" type="date"></div>
       <div class="field"><label data-i18n="edit.price">Ár (EUR)</label><input class="input" id="oePret" type="number"></div>
-      <div class="field"><label data-i18n="edit.km">Km</label><div class="vs-km-row"><input class="input" id="oeKm" type="number"><button type="button" class="btn ghost vs-map-btn" id="oeMapBtn" title="Útvonal-előnézet térképen" style="display:none;">🗺️</button></div></div>
+      <div class="field"><label data-i18n="edit.km">Km</label><div class="vs-km-row"><input class="input" id="oeKm" type="number"><button type="button" class="btn ghost vs-map-btn" id="oeMapBtn" title="Útvonal-előnézet térképen" data-i18n-title="o.mapPreviewTitle" style="display:none;">🗺️</button></div></div>
       <div class="field"><label data-i18n="edit.weight">Súly (kg)</label><input class="input" id="oeSuly" type="number" min="0"></div>
       <div class="field"><label><span data-i18n="form.loadType">Rakomány típusa</span> <span style="color:var(--brand-red);">*</span></label>
         <div style="display:flex;gap:16px;align-items:center;padding:9px 2px;">
@@ -1329,47 +1329,47 @@
     <input type="hidden" id="feId">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;">
       <div class="field"><label data-i18n="form.driverName">Sofőr neve</label><input class="input" id="feNumeSofer"></div>
-      <div class="field"><label>Serie / Sorszám</label><input class="input" id="feNumarFisa" placeholder="pl. B-2026-0001"></div>
-      <div class="field"><label>Vontató rendszám</label><input class="input" id="feCamion"></div>
-      <div class="field"><label>Pótkocsi rendszám</label><input class="input" id="feRemorca"></div>
-      <div class="field"><label>Km kezdés</label><input class="input" type="number" id="feKmInc"></div>
-      <div class="field"><label>Km vég</label><input class="input" type="number" id="feKmSf"></div>
-      <div class="field"><label>Diurnă externă (nap)</label><input class="input" type="number" id="feDiurnaEx"></div>
-      <div class="field"><label>Diurnă internă (nap)</label><input class="input" type="number" id="feDiurnaIn"></div>
-      <div class="field"><label>Üzemanyag kezdés (L)</label><input class="input" type="number" id="feCantInc"></div>
-      <div class="field"><label>Üzemanyag vég (L)</label><input class="input" type="number" id="feCantSf"></div>
+      <div class="field"><label data-i18n="fed.serie">Serie / Sorszám</label><input class="input" id="feNumarFisa" placeholder="pl. B-2026-0001"></div>
+      <div class="field"><label data-i18n="fed.tractor">Vontató rendszám</label><input class="input" id="feCamion"></div>
+      <div class="field"><label data-i18n="fed.trailer">Pótkocsi rendszám</label><input class="input" id="feRemorca"></div>
+      <div class="field"><label data-i18n="fed.kmStart">Km kezdés</label><input class="input" type="number" id="feKmInc"></div>
+      <div class="field"><label data-i18n="fed.kmEnd">Km vég</label><input class="input" type="number" id="feKmSf"></div>
+      <div class="field"><label data-i18n="fed.diurnaEx">Diurnă externă (nap)</label><input class="input" type="number" id="feDiurnaEx"></div>
+      <div class="field"><label data-i18n="fed.diurnaIn">Diurnă internă (nap)</label><input class="input" type="number" id="feDiurnaIn"></div>
+      <div class="field"><label data-i18n="fed.fuelStart">Üzemanyag kezdés (L)</label><input class="input" type="number" id="feCantInc"></div>
+      <div class="field"><label data-i18n="fed.fuelEnd">Üzemanyag vég (L)</label><input class="input" type="number" id="feCantSf"></div>
     </div>
 
     <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-weight:700;color:var(--text-primary);">📍 Útvonal pontok</div>
-        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddPunct()">+ Pont</button>
+        <div style="font-weight:700;color:var(--text-primary);" data-i18n="fed.routePoints">📍 Útvonal pontok</div>
+        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddPunct()" data-i18n="fed.addPoint">+ Pont</button>
       </div>
       <div id="fePuncte" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
 
     <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-weight:700;color:var(--text-primary);">⛽ Tankolások</div>
-        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddAlim()">+ Tankolás</button>
+        <div style="font-weight:700;color:var(--text-primary);" data-i18n="fed.fuelings">⛽ Tankolások</div>
+        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddAlim()" data-i18n="fed.addFueling">+ Tankolás</button>
       </div>
       <div id="feAlim" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
 
     <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-weight:700;color:var(--text-primary);">🛒 Kiadások</div>
-        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddAch()">+ Kiadás</button>
+        <div style="font-weight:700;color:var(--text-primary);" data-i18n="fed.expenses">🛒 Kiadások</div>
+        <button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="feAddAch()" data-i18n="fed.addExpense">+ Kiadás</button>
       </div>
       <div id="feAch" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
 
-    <div class="field" style="margin-top:10px;"><label>Megjegyzések</label><textarea class="textarea" id="feMentiuni" rows="2"></textarea></div>
+    <div class="field" style="margin-top:10px;"><label data-i18n="fed.notes">Megjegyzések</label><textarea class="textarea" id="feMentiuni" rows="2"></textarea></div>
 
     <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
-      <button class="btn ghost col" onclick="closeFuvEdit()">Mégse</button>
-      <button class="btn col" onclick="openPdfView(document.getElementById('feId').value)">👁 PDF nézet</button>
-      <button class="btn primary col" onclick="saveFuvEdit()">💾 Mentés</button>
+      <button class="btn ghost col" onclick="closeFuvEdit()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn col" onclick="openPdfView(document.getElementById('feId').value)" data-i18n="fed.pdfView">👁 PDF nézet</button>
+      <button class="btn primary col" onclick="saveFuvEdit()" data-i18n="fed.save">💾 Mentés</button>
     </div>
   </div>
 </div>
@@ -1378,9 +1378,9 @@
 <div class="modal-back" id="pdfViewModal" style="align-items:stretch;padding:0;">
   <div class="modal glass" style="width:100%;max-width:100%;height:100vh;max-height:100vh;border-radius:0;margin:0;padding:0;display:flex;flex-direction:column;">
     <div style="display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;">
-      <button class="btn ghost" onclick="closePdfView()" style="padding:8px 16px;">← Vissza</button>
-      <button class="btn primary" onclick="printPdfView()" style="padding:8px 16px;">🖨️ Nyomtatás / PDF</button>
-      <div style="margin-left:auto;font-weight:700;color:var(--text-primary);">Menetlevél</div>
+      <button class="btn ghost" onclick="closePdfView()" style="padding:8px 16px;" data-i18n="pv.back">← Vissza</button>
+      <button class="btn primary" onclick="printPdfView()" style="padding:8px 16px;" data-i18n="pv.print">🖨️ Nyomtatás / PDF</button>
+      <div style="margin-left:auto;font-weight:700;color:var(--text-primary);" data-i18n="pv.waybill">Menetlevél</div>
     </div>
     <iframe id="pdfFrame" title="Menetlevél PDF" style="flex:1;width:100%;border:0;background:#fff;"></iframe>
   </div>
@@ -1391,31 +1391,31 @@
   <div class="modal glass" style="width:min(440px,100%);">
     <h3 style="margin-top:0;">💰 Fizetés rögzítése — <span id="payOrderId" style="color:var(--brand-red);"></span></h3>
     <div class="glass-soft" style="padding:12px 14px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
-      <div><div style="font-size:11px;color:var(--muted);">Fuvar ára</div><div style="font-size:17px;font-weight:800;color:#fff;"><span id="payPretLbl">—</span></div></div>
-      <div><div style="font-size:11px;color:var(--muted);">Eddig fizetve</div><div style="font-size:17px;font-weight:800;color:var(--status-ok);"><span id="payPaidLbl">—</span></div></div>
-      <div><div style="font-size:11px;color:var(--muted);">Hátralék</div><div style="font-size:17px;font-weight:800;color:var(--status-danger);"><span id="payRemainLbl">—</span></div></div>
+      <div><div style="font-size:11px;color:var(--muted);" data-i18n="pm.orderPrice">Fuvar ára</div><div style="font-size:17px;font-weight:800;color:#fff;"><span id="payPretLbl">—</span></div></div>
+      <div><div style="font-size:11px;color:var(--muted);" data-i18n="pm.paidSoFar">Eddig fizetve</div><div style="font-size:17px;font-weight:800;color:var(--status-ok);"><span id="payPaidLbl">—</span></div></div>
+      <div><div style="font-size:11px;color:var(--muted);" data-i18n="pm.remaining">Hátralék</div><div style="font-size:17px;font-weight:800;color:var(--status-danger);"><span id="payRemainLbl">—</span></div></div>
     </div>
     <div class="field">
-      <label>Beérkezett összeg (részfizetés is lehet)</label>
+      <label data-i18n="pm.amountLabel">Beérkezett összeg (részfizetés is lehet)</label>
       <div style="display:flex;gap:8px;">
         <input class="input" id="payAmount" type="number" step="0.01" min="0" placeholder="0" style="flex:1;">
-        <button class="btn ok" style="white-space:nowrap;padding:8px 14px;" onclick="payFillFull()">Teljes hátralék</button>
+        <button class="btn ok" style="white-space:nowrap;padding:8px 14px;" onclick="payFillFull()" data-i18n="pm.fillFull">Teljes hátralék</button>
       </div>
     </div>
-    <div class="field"><label>Fizetés módja</label>
+    <div class="field"><label data-i18n="pm.method">Fizetés módja</label>
       <select class="select" id="payMethod">
-        <option value="Átutalás">Átutalás</option>
-        <option value="Készpénz">Készpénz</option>
-        <option value="Kompenzáció">Kompenzáció</option>
-        <option value="Egyéb">Egyéb</option>
+        <option value="Átutalás" data-i18n="pm.mTransfer">Átutalás</option>
+        <option value="Készpénz" data-i18n="pm.mCash">Készpénz</option>
+        <option value="Kompenzáció" data-i18n="pm.mComp">Kompenzáció</option>
+        <option value="Egyéb" data-i18n="pm.mOther">Egyéb</option>
       </select>
     </div>
-    <div class="field"><label>Megjegyzés (opcionális)</label><input class="input" id="payNote" placeholder="pl. banki referencia"></div>
+    <div class="field"><label data-i18n="pm.noteOpt">Megjegyzés (opcionális)</label><input class="input" id="payNote" placeholder="pl. banki referencia" data-i18n-ph="pm.notePh"></div>
     <div style="display:flex;gap:10px;margin-top:14px;">
-      <button class="btn ghost col" onclick="closePaymentModal()">Mégse</button>
-      <button class="btn primary col" onclick="savePayment()">💾 Rögzítés</button>
+      <button class="btn ghost col" onclick="closePaymentModal()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn primary col" onclick="savePayment()" data-i18n="pm.saveBtn">💾 Rögzítés</button>
     </div>
-    <button class="btn ghost" id="payResetBtn" onclick="resetPayment()" style="width:100%;margin-top:10px;padding:7px;font-size:12px;color:var(--status-danger);display:none;">↩️ Téves rögzítés — fizetések nullázása</button>
+    <button class="btn ghost" id="payResetBtn" onclick="resetPayment()" style="width:100%;margin-top:10px;padding:7px;font-size:12px;color:var(--status-danger);display:none;" data-i18n="pm.reset">↩️ Téves rögzítés — fizetések nullázása</button>
   </div>
 </div>
 
@@ -1468,16 +1468,16 @@
  <!-- ── BUG REPORT MODAL ── -->
 <div class="modal-back" id="bugModal">
   <div class="modal glass" style="width:min(480px,100%);max-height:90vh;">
-    <h3 style="margin-top:0;">🐛 Hibajelentés</h3>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">Írd le pontosan mi történt, mit csináltál, és mi nem működött megfelelően. A fejlesztőhöz kerül.</p>
+    <h3 style="margin-top:0;" data-i18n="bug.title">🐛 Hibajelentés</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;" data-i18n="bug.hint">Írd le pontosan mi történt, mit csináltál, és mi nem működött megfelelően. A fejlesztőhöz kerül.</p>
     <div class="field">
-      <label>Leírás *</label>
+      <label data-i18n="bug.descLabel">Leírás *</label>
       <textarea id="bugText" class="input" style="min-height:130px;resize:vertical;font-family:inherit;line-height:1.5;"
-        placeholder="pl. A Beérkezett Fuvarlevelek fülön kattintottam a letöltés gombra, de semmi sem történt..."></textarea>
+        placeholder="pl. A Beérkezett Fuvarlevelek fülön kattintottam a letöltés gombra, de semmi sem történt..." data-i18n-ph="bug.descPh"></textarea>
     </div>
     <div style="display:flex;gap:10px;margin-top:6px;">
-      <button class="btn ghost col" onclick="closeBugReport()">Mégse</button>
-      <button class="btn primary col" id="bugSubmitBtn" onclick="submitBugReport()">📤 Küldés</button>
+      <button class="btn ghost col" onclick="closeBugReport()" data-i18n="common.cancel">Mégse</button>
+      <button class="btn primary col" id="bugSubmitBtn" onclick="submitBugReport()" data-i18n="bug.send">📤 Küldés</button>
     </div>
   </div>
 </div>
