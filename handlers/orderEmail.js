@@ -46,12 +46,25 @@ function _rawB64(s) { if (!s) return null; var m = String(s).match(/^data:[^;]+;
 
 // {{kulcs}} behelyettesítés escape-elt értékekkel egy vizuális sablon HTML-jébe
 // (a builder {{nev}}/{{cegnev}}/{{datum}} mellett fuvar-mezők is: order_id/route/...).
+// A {{logo}} KIVÉTEL: nyers (előre összeállított) HTML-t kap (céges logó-kép),
+// hogy a sablon fejlécébe valódi kép kerüljön — a benne lévő URL escape-elt.
 function _applyBuilderVars(html, vars) {
   var v = vars || {};
   return String(html || '').replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, function (m, key) {
     var k = String(key).toLowerCase();
+    if (k === 'logo') return v.__logoHtml || '';
     return Object.prototype.hasOwnProperty.call(v, k) ? _esc(v[k]) : m;
   });
+}
+
+// A céges logó HTML-darabkája a sablon-fejlécbe (fehér „chip" mögötte → bármilyen
+// háttéren látszik). Üres, ha nincs feltöltött logó → a fejléc változatlan marad.
+function _logoSnippet(brand) {
+  if (!brand || !brand.logoUrl) return '';
+  return '<div style="margin:0 0 12px;line-height:0;">' +
+    '<span style="display:inline-block;background:#ffffff;padding:7px 14px;border-radius:9px;">' +
+    '<img src="' + _esc(brand.logoUrl) + '" alt="' + _esc(brand.senderName || '') + '" ' +
+    'style="max-height:40px;max-width:170px;border:0;display:block;"></span></div>';
 }
 
 // A fuvar kiválasztható adat-mezői (kulcs → RO címke + érték a sor-adatból).
@@ -235,6 +248,10 @@ handlers.sendOrderEmail = async function (req, res, args) {
     var selFields = Array.isArray(a.fields) ? a.fields : [];
     var selAtt = Array.isArray(a.attachments) ? a.attachments.slice(0, MAX_ATTACH) : [];
 
+    // Cég-arculat (logó + feladó-név) — a sablon {{logo}} helyőrzőjéhez és a
+    // nem-sablonos levél fejlécéhez egyaránt.
+    var brand = await _companyBranding(cid);
+
     // Vizuális sablon (e-mail szerkesztő / galériából mentett) — ha választott,
     // a sablon teljes HTML-je lesz a levél törzse (a {{változók}} a fuvar adataival
     // behelyettesítve, escape-elve → nincs injekció). company_id-szűrt feloldás.
@@ -247,13 +264,17 @@ handlers.sendOrderEmail = async function (req, res, args) {
           [builderId, cid]);
         if (btr.rows.length && String(btr.rows[0].html_content || '').trim()) {
           var route0 = ((o.loc_incarcare || '') + (o.loc_descarcare ? ' → ' + o.loc_descarcare : '')).trim();
-          var cegnev = '';
-          try { var cn = await pool.query('SELECT nev FROM companies WHERE id=$1', [cid]); cegnev = (cn.rows[0] && cn.rows[0].nev) || ''; } catch (_) {}
+          // Követő-link a sablon {{track_url}} gombjához (token generálással, ha a
+          // funkció elérhető; különben '#' — a gomb nem visz sehová, de nem törik).
+          var trkB = await _trackingInfo(cid, orderId, true);
           builderHtml = _applyBuilderVars(btr.rows[0].html_content, {
-            nev: o.client || '', cegnev: cegnev, datum: new Date().toISOString().slice(0, 10),
+            nev: o.client || '', cegnev: brand.senderName === 'VallorSoft' ? '' : brand.senderName,
+            datum: new Date().toISOString().slice(0, 10),
             order_id: String(o.id), route: route0, client: o.client || '',
             status: o.status || '', pret: o.pret != null ? String(o.pret) : '',
             km: o.km != null ? String(o.km) : '',
+            track_url: trkB.url || '#',
+            __logoHtml: _logoSnippet(brand),
           });
         }
       } catch (_) { builderHtml = ''; }
@@ -336,8 +357,8 @@ handlers.sendOrderEmail = async function (req, res, args) {
     }
 
     // Cég-arculatos fejléc: a feltöltött céges logó (ha van), különben „vallorSoft".
-    // Vizuális sablonnál NEM csomagoljuk be újra (a sablon a saját arculatát hozza).
-    var brand = await _companyBranding(cid);
+    // Vizuális sablonnál NEM csomagoljuk be újra (a sablon a saját arculatát hozza,
+    // a {{logo}} már behelyettesítve).
     var realHtml = builderHtml ? bodyHtml : wrapBrandedEmail(bodyHtml, brand);
 
     var sent;

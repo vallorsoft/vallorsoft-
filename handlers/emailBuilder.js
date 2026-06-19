@@ -54,13 +54,32 @@ function escHtml(v) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// {{nev}}, {{cegnev}}, {{datum}} cseréje escape-elt értékekre.
+// {{nev}}, {{cegnev}}, {{datum}}, {{track_url}} cseréje escape-elt értékekre.
+// A {{logo}} KIVÉTEL: előre összeállított nyers HTML (céges logó-kép); üres, ha
+// nincs feltöltött logó → a sablon fejléce változatlan marad.
 function applyVars(html, vars) {
   const v = vars || {};
   return String(html || '')
+    .replace(/\{\{\s*logo\s*\}\}/gi, v.__logoHtml || '')
     .replace(/\{\{\s*nev\s*\}\}/g, escHtml(v.nev || ''))
     .replace(/\{\{\s*cegnev\s*\}\}/g, escHtml(v.cegnev || ''))
-    .replace(/\{\{\s*datum\s*\}\}/g, escHtml(v.datum || ''));
+    .replace(/\{\{\s*datum\s*\}\}/g, escHtml(v.datum || ''))
+    .replace(/\{\{\s*track_url\s*\}\}/gi, escHtml(v.track_url || '#'));
+}
+
+// A céges logó HTML-darabkája a sablon {{logo}} helyőrzőjéhez (fehér chip mögötte).
+// company_id-szűrt: csak ha a cégnek van feltöltött logója; különben üres.
+async function _companyLogoSnippet(cid) {
+  try {
+    const r = await pool.query(
+      "SELECT 1 FROM company_branding WHERE company_id=$1 AND logo_base64 IS NOT NULL", [cid]);
+    const appUrl = require('../lib/appUrl').appBaseUrl();
+    if (!r.rows.length || !appUrl) return '';
+    const url = appUrl + '/branding/logo/' + cid + '.png';
+    return '<div style="margin:0 0 12px;line-height:0;">' +
+      '<span style="display:inline-block;background:#ffffff;padding:7px 14px;border-radius:9px;">' +
+      '<img src="' + escHtml(url) + '" alt="" style="max-height:40px;max-width:170px;border:0;display:block;"></span></div>';
+  } catch (_) { return ''; }
 }
 
 // ─────────────────────────── SABLONOK ───────────────────────────
@@ -413,6 +432,8 @@ handlers.ebSend = async function (req, res, args) {
       try { const b = await pool.query('SELECT nev FROM companies WHERE id=$1', [cid]); companyName = b.rows[0] && b.rows[0].nev; } catch (_) {}
     }
     const today = new Date().toISOString().slice(0, 10);
+    // Céges logó-darabka a {{logo}} helyőrzőhöz (egyszer, a kötegre).
+    const logoHtml = await _companyLogoSnippet(cid);
 
     // A CÉG saját feladó-fiókja (SMTP és/vagy cégenkénti Brevo) — egyszer feloldva
     // a kötegre. Ha nincs beállítva, NEM küldünk közös címről: egyértelmű hiba.
@@ -430,6 +451,8 @@ handlers.ebSend = async function (req, res, args) {
         nev: rcpt.name || baseVars.nev || '',
         cegnev: companyName || '',
         datum: baseVars.datum || today,
+        track_url: baseVars.track_url || '#',
+        __logoHtml: logoHtml,
       };
       // A {{nev}}/{{cegnev}}/{{datum}} értékei escape-eltek → nincs injekció.
       // A sablon teljes (GrapesJS-inline-olt) HTML-jét nyersen küldjük — a saját
