@@ -14,6 +14,24 @@
 
 ---
 
+## 2026-06-19 — Galéria-sablonok: céges logó a fejlécbe + működő követő-gomb ({{logo}}/{{track_url}})
+
+> A 30 beépített e-mail-galéria sablon mostantól a **cég feltöltött logóját** jeleníti meg a
+> fejlécben, és a „Urmărește" gombok a megosztott **követő-linkre** mutatnak (eddig `href="#"` volt).
+
+- **`public/email-gallery.js`** — mind a 30 sablon fejléccellájába bekerült a `{{logo}}` helyőrző
+  (fehér „chip" mögötte → bármilyen háttéren látszik; üres, ha nincs feltöltött logó → a fejléc
+  változatlan). A két követő-gomb (✅ visszaigazolás, 🚚 fuvar-állapot) `href="{{track_url}}"`-t kap
+  (`btn`/`gbtn` opcionális `href` paraméter).
+- **`handlers/orderEmail.js`** — `_applyBuilderVars` a `{{logo}}`-t nyers HTML-ként (céges logó-kép,
+  escape-elt URL) helyettesíti, a `{{track_url}}`-t a fuvar publikus `/t/<token>` linkjére (token-gen,
+  ha a `tracking` funkció elérhető; különben `#`). A logó a feltöltött `company_branding`-ből.
+- **`handlers/emailBuilder.js`** — `applyVars` + `ebSend` ugyanezt: `{{logo}}` a cég logója,
+  `{{track_url}}` → `#` (a builder-küldésnek nincs fuvar-kontextusa). company_id-szűrt logó-feloldás.
+- **Megjegyzés:** a korábban már elmentett saját sablonok a token nélkül készültek — a logó/követő-gomb
+  a galériából **újra használt** (újra mentett) sablonoknál jelenik meg. Cache-bust
+  `email-gallery.js?v=20260619logo`. 100 Jest zöld.
+
 ## 2026-06-19 — „Email a fuvarról": vizuális sablon-választó + céges logó a fejlécben
 
 > A fuvar ✉️ „Email despre cursă" dialógusában mostantól a mentett **vizuális sablonok**
