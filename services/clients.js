@@ -22,7 +22,7 @@ function validateCui(cui) {
   return c === control;
 }
 
-async function fetchJson(url, opts, timeoutMs = 12000) {
+async function fetchJson(url, opts, timeoutMs = 25000) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -30,6 +30,11 @@ async function fetchJson(url, opts, timeoutMs = 12000) {
     const text = await res.text();
     let data; try { data = JSON.parse(text); } catch (_) { data = null; }
     return { ok: res.ok, status: res.status, data, text };
+  } catch (err) {
+    // Enrichítjük a hibaüzenetet a cause-szal (pl. SSL részletek Node.js undici-ben).
+    const cause = err && err.cause && err.cause.message ? ` (${err.cause.message})` : '';
+    const msg = (err && err.message ? err.message : String(err)) + cause;
+    throw new Error(msg);
   } finally { clearTimeout(t); }
 }
 
@@ -43,7 +48,8 @@ async function anafLookup(cui) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify([{ cui: Number(n), data }]),
   });
-  if (!r.ok || !r.data) return { found: false, error: `Eroare ANAF (${r.status}).` };
+  if (!r.ok) return { found: false, error: `Eroare ANAF (HTTP ${r.status}).` };
+  if (!r.data) return { found: false, error: 'ANAF a returnat un răspuns invalid (non-JSON).' };
   const rec = (r.data.found && r.data.found[0]) || null;
   if (!rec) return { found: false };
 

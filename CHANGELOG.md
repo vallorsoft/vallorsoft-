@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-19 — Fix: ANAF CUI-lekérdezés robusztusság — timeout 25s, SSL cause-logging, jobb hibaüzenetek
+
+- **`services/clients.js`** — `fetchJson` timeout 12 s → 25 s (ANAF lassú); hibaüzenet enrichment: a Node.js `undici`
+  (`err.cause`) SSL/hálózati hiba részletei is megjelennek a szerver-naplóban és a kliens hibaüzenetben; `!r.ok` és
+  `!r.data` esetén külön, érthetőbb román hibaüzenet (`Eroare ANAF (HTTP 5xx)` / `răspuns invalid`).
+- **`routes/clients.js`** — `console.error` naplózás az ANAF-hibáknál (CUI + hibaüzenet → Render-logban látszik).
+
+---
+
 ## 2026-06-19 — Fix: HERE útdíj-becslés sosem adott vissza HERE-eredményt (`bump` nem volt exportálva)
 
 - **`lib/mapsProvider.js`** — a `bump()` függvény hozzáadva az `module.exports`-hoz. A `handlers/toll.js`
