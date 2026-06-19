@@ -10,6 +10,7 @@ let sendResetEmail = null;
 try { ({ sendResetEmail } = require('../services/email')); } catch (_) { /* opcionális */ }
 const { emailLang } = require('../lib/companyLang');
 const audit = require('../lib/audit');
+const { featureEnabled } = require('../lib/featureEnabled');
 
 const handlers = {};
 const APP_URL = require('../lib/appUrl').appBaseUrl('http://localhost:3000');
@@ -132,6 +133,8 @@ handlers.carrierVehicleSetGps = async function (req, res, args) {
   try {
     if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = req.session.user.company_id;
+    if (!(await featureEnabled(cid, 'carrier-gps')))
+      return res.json({ result: { ok: false, err: 'Funcția de urmărire GPS subcontractor nu este activă.' } });
     const a = (Array.isArray(args) ? args[0] : args) || {};
     const id = parseInt(a.id, 10);
     if (!id) return res.json({ result: { ok: false, err: 'Identificator lipsă' } });

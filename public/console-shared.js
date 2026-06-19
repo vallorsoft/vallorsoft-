@@ -1403,7 +1403,8 @@ function loadCarrierAp(){
       var openStr = g.total_open > 0 ? Math.round(g.total_open) + ' EUR ' + t('cs.ap.open') : t('cs.ap.settled');
       var gid = 'cg_' + g.carrier_id;
 
-      // Járművek szekció
+      // Járművek szekció — a GPS oszlop csak ha a 'carrier-gps' funkció be van kapcsolva
+      var gpsFeat = !(window._vsFeatures && window._vsFeatures['carrier-gps'] === false);
       var vehs = vehByCarrier[String(g.carrier_id)] || [];
       var vehHtml = vehs.length
         ? '<table style="width:100%;font-size:12px;border-collapse:collapse;">'
@@ -1412,7 +1413,7 @@ function loadCarrierAp(){
           + '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);">Pótkocsi</th>'
           + '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);">Márka/Modell</th>'
           + '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);">Sofőr</th>'
-          + '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);">GPS</th>'
+          + (gpsFeat ? '<th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border);">GPS</th>' : '')
           + '</tr></thead><tbody>'
           + vehs.map(function(v){
               var gpsBadge = v.has_gps_key ? '🛰️' : (v.track_url ? '🔗' : '<span style="color:var(--text-muted);">—</span>');
@@ -1421,8 +1422,8 @@ function loadCarrierAp(){
                 + '<td style="padding:4px 8px;color:var(--text-muted);">'+esc(v.rendszam_remorca||'—')+'</td>'
                 + '<td style="padding:4px 8px;color:var(--text-muted);">'+esc([v.marca,v.model].filter(Boolean).join(' ')||'—')+'</td>'
                 + '<td style="padding:4px 8px;color:var(--text-muted);">'+esc(v.sofer_nev||'—')+'</td>'
-                + '<td style="padding:4px 8px;white-space:nowrap;">'+gpsBadge
-                + ' <button class="btn ghost" style="padding:2px 8px;font-size:11px;" onclick="openCarrierVehGps('+v.id+')">'+t('cs.cv.gpsBtn')+'</button></td>'
+                + (gpsFeat ? ('<td style="padding:4px 8px;white-space:nowrap;">'+gpsBadge
+                  + ' <button class="btn ghost" style="padding:2px 8px;font-size:11px;" onclick="openCarrierVehGps('+v.id+')">'+t('cs.cv.gpsBtn')+'</button></td>') : '')
                 + '</tr>';
             }).join('')
           + '</tbody></table>'

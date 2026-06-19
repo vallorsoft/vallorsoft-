@@ -126,11 +126,13 @@
         <div style="margin-top:6px">
           <textarea class="inp" id="vNota" data-i18n-ph="car.phNote" placeholder="Megjegyzés" rows="2" style="resize:vertical"></textarea>
         </div>
-        <div class="mut" style="font-size:11px;margin-top:8px" data-i18n="car.gpsSectionHint">📍 GPS-követés (opcionális): megosztott követő-link és/vagy CargoTrack object_id + API-kulcs az élő pozícióhoz.</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
-          <input class="inp" id="vTrackUrl" data-i18n-ph="car.phTrackUrl" placeholder="Megosztott követő-link (URL)" type="url" style="flex:3;min-width:160px">
-          <input class="inp" id="vGpsObj" data-i18n-ph="car.phGpsObj" placeholder="CargoTrack object_id" style="flex:1;min-width:120px">
-          <input class="inp" id="vGpsKey" data-i18n-ph="car.phGpsKey" placeholder="CargoTrack API-kulcs" type="password" autocomplete="new-password" style="flex:1;min-width:120px">
+        <div id="carGpsAddBox">
+          <div class="mut" style="font-size:11px;margin-top:8px" data-i18n="car.gpsSectionHint">📍 GPS-követés (opcionális): megosztott követő-link és/vagy CargoTrack object_id + API-kulcs az élő pozícióhoz.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+            <input class="inp" id="vTrackUrl" data-i18n-ph="car.phTrackUrl" placeholder="Megosztott követő-link (URL)" type="url" style="flex:3;min-width:160px">
+            <input class="inp" id="vGpsObj" data-i18n-ph="car.phGpsObj" placeholder="CargoTrack object_id" style="flex:1;min-width:120px">
+            <input class="inp" id="vGpsKey" data-i18n-ph="car.phGpsKey" placeholder="CargoTrack API-kulcs" type="password" autocomplete="new-password" style="flex:1;min-width:120px">
+          </div>
         </div>
         <button class="btn ok" style="width:100%;margin-top:8px" onclick="Carrier.addVehicle()" data-i18n="car.addVehicle">＋ Jármű felvitele</button>
         <div class="mut" style="font-size:11px;margin-top:6px" data-i18n="car.vehicleHint">A felvitt járművet a diszpécser látja a kiosztásnál.</div>
@@ -158,6 +160,6 @@
   </div>
 </div>
 <div class="toast" id="toast"></div>
-<script src="/carrier.js?v=20260618cargps"></script>
+<script src="/carrier.js?v=20260618cgps2"></script>
 <script src="/legal-ack.js"></script>
 </body></html>
