@@ -29,8 +29,10 @@
       + '<a href="#" style="color:' + accent + ';text-decoration:none;">Contact</a>'
       + '</p></td></tr>';
   }
+  // A gombok alapértelmezett linkje a {{action_url}} helyőrző (a követő-gombok
+  // explicit {{track_url}}-t kapnak). Küldéskor: ha a link üres → a gomb eltűnik.
   function btn(color, label, href) {
-    return '<a href="' + (href || '#') + '" style="display:inline-block;background:' + color + ';color:#ffffff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:9px;font-size:15px;">' + label + '</a>';
+    return '<a href="' + (href || '{{action_url}}') + '" style="display:inline-block;background:' + color + ';color:#ffffff;text-decoration:none;font-weight:700;padding:14px 32px;border-radius:9px;font-size:15px;">' + label + '</a>';
   }
   // Sötét / futurisztikus keret (kártya egyedi háttérrel).
   function darkWrap(outerBg, cardBg, font, inner) {
@@ -41,7 +43,7 @@
   }
   // Gradiens gomb (solid fallback a háttérben a nem támogató kliensekhez).
   function gbtn(solid, grad, label, href) {
-    return '<a href="' + (href || '#') + '" style="display:inline-block;background:' + solid + ';background:' + grad + ';color:#ffffff;text-decoration:none;font-weight:700;padding:14px 34px;border-radius:10px;font-size:14px;letter-spacing:.5px;">' + label + '</a>';
+    return '<a href="' + (href || '{{action_url}}') + '" style="display:inline-block;background:' + solid + ';background:' + grad + ';color:#ffffff;text-decoration:none;font-weight:700;padding:14px 34px;border-radius:10px;font-size:14px;letter-spacing:.5px;">' + label + '</a>';
   }
 
   window.EB_GALLERY = [
@@ -96,7 +98,7 @@
         + '<h1 style="margin:14px 0 0;font-size:27px;color:#faf6f0;font-weight:400;">O experiență premium</h1></td></tr>'
         + '<tr><td style="padding:18px 36px 34px;text-align:center;">'
         + '<p style="margin:0 0 24px;font-size:15px;line-height:1.8;color:#cdbfb0;">Stimate {{nev}}, vă invităm să descoperiți serviciile noastre de top, gândite pentru parteneri exigenți.</p>'
-        + '<a href="#" style="display:inline-block;border:1px solid #d4a14e;color:#d4a14e;text-decoration:none;font-weight:600;padding:13px 34px;border-radius:4px;font-size:14px;letter-spacing:1px;font-family:Arial,sans-serif;">DESCOPERĂ</a></td></tr>'
+        + '<a href="{{action_url}}" style="display:inline-block;border:1px solid #d4a14e;color:#d4a14e;text-decoration:none;font-weight:600;padding:13px 34px;border-radius:4px;font-size:14px;letter-spacing:1px;font-family:Arial,sans-serif;">DESCOPERĂ</a></td></tr>'
         + '<tr><td style="padding:16px 36px 26px;border-top:1px solid #33291f;text-align:center;font-size:11px;color:#8a7a68;font-family:Arial,sans-serif;">{{cegnev}} · {{datum}}</td></tr>'
         + '</table></td></tr></table>' },
 
@@ -110,7 +112,7 @@
         + '<h1 style="margin:0 0 18px;font-size:24px;color:#111827;font-weight:600;line-height:1.3;">Bună, {{nev}}.</h1>'
         + '<p style="margin:0 0 16px;font-size:16px;line-height:1.8;color:#4b5563;">Un mesaj scurt și clar. Fără zgomot, doar informația esențială pe care doriți să o transmiteți.</p>'
         + '<p style="margin:0 0 30px;font-size:16px;line-height:1.8;color:#4b5563;">Cu stimă,<br>echipa {{cegnev}}</p>'
-        + '<a href="#" style="font-size:15px;color:#111827;font-weight:700;text-decoration:none;border-bottom:2px solid #111827;padding-bottom:2px;">Află mai mult →</a>'
+        + '<a href="{{action_url}}" style="font-size:15px;color:#111827;font-weight:700;text-decoration:none;border-bottom:2px solid #111827;padding-bottom:2px;">Află mai mult →</a>'
         + '<div style="height:40px;"></div></td></tr>'
         + footer('#9ca3af', '#111827')) },
 
@@ -205,7 +207,7 @@
         + '<tr><td style="padding:14px 40px 36px;text-align:center;color:#7a2a4f;">'
         + '<p style="margin:0 0 14px;font-size:16px;line-height:1.8;">Dragă {{nev}},</p>'
         + '<p style="margin:0 0 24px;font-size:15px;line-height:1.8;color:#9a5575;">Vă mulțumim pentru încrederea acordată companiei {{cegnev}}. Colaborarea cu dvs. înseamnă mult pentru noi.</p>'
-        + '<a href="#" style="display:inline-block;background:#fff;border:1.5px solid #db2777;color:#db2777;text-decoration:none;font-weight:700;padding:12px 30px;border-radius:30px;font-size:14px;">Rămânem în legătură</a></td></tr>'
+        + '<a href="{{action_url}}" style="display:inline-block;background:#fff;border:1.5px solid #db2777;color:#db2777;text-decoration:none;font-weight:700;padding:12px 30px;border-radius:30px;font-size:14px;">Rămânem în legătură</a></td></tr>'
         + footer('#c98aa9', '#db2777')) },
 
     // ───────── KOMOLYABB / SŰRŰBB SABLONOK ─────────
@@ -375,7 +377,7 @@
         + '<tr><td style="padding:46px 36px;text-align:center;">{{logo}}'
         + '<h1 style="margin:0 0 10px;font-size:26px;color:#fff;font-weight:800;">Ceva nou, transparent și clar</h1>'
         + '<p style="margin:0 0 26px;font-size:14px;line-height:1.8;color:#eef2ff;">Bună {{nev}}, {{cegnev}} îți prezintă o experiență modernă și fără complicații.</p>'
-        + '<a href="#" style="display:inline-block;background:rgba(255,255,255,0.92);color:#5b21b6;text-decoration:none;font-weight:800;padding:13px 32px;border-radius:30px;font-size:14px;">Hai să începem</a></td></tr>'
+        + '<a href="{{action_url}}" style="display:inline-block;background:rgba(255,255,255,0.92);color:#5b21b6;text-decoration:none;font-weight:800;padding:13px 32px;border-radius:30px;font-size:14px;">Hai să începem</a></td></tr>'
         + '<tr><td style="padding:14px 36px 24px;text-align:center;font-size:11px;color:#e0d7ff;border-top:1px solid rgba(255,255,255,0.18);">{{cegnev}} · {{datum}}</td></tr>'
         + '</table></td></tr></table>' },
 
@@ -389,7 +391,7 @@
         + '<p style="margin:0 0 10px;font-size:13px;line-height:1.8;color:#86efac;">&gt; Inițializare colaborare... <span style="color:#22c55e;">[OK]</span></p>'
         + '<p style="margin:0 0 10px;font-size:13px;line-height:1.8;color:#86efac;">&gt; Soluții de transport eficiente, monitorizate în timp real.</p>'
         + '<p style="margin:0 0 22px;font-size:13px;line-height:1.8;color:#86efac;">&gt; Status: <span style="color:#22c55e;">gata de drum</span></p>'
-        + '<a href="#" style="display:inline-block;border:1px solid #22c55e;color:#22c55e;text-decoration:none;font-weight:700;padding:11px 26px;border-radius:4px;font-size:13px;">[ EXECUTĂ ]</a></td></tr>'
+        + '<a href="{{action_url}}" style="display:inline-block;border:1px solid #22c55e;color:#22c55e;text-decoration:none;font-weight:700;padding:11px 26px;border-radius:4px;font-size:13px;">[ EXECUTĂ ]</a></td></tr>'
         + '<tr><td style="padding:14px 24px;border-top:1px solid #16301a;font-size:11px;color:#3f6b48;">// {{cegnev}} · {{datum}}</td></tr>') },
 
     // 25 — Holografikus (iridescent gradiens)

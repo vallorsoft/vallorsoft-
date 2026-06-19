@@ -69,6 +69,9 @@
           '<input class="input" id="oeSubject" value="' + esc('Comandă ' + orderId) + '"></div>' +
         '<div class="field"><label>' + tt('oe.body', 'Üzenet') + '</label>' +
           '<textarea class="textarea" id="oeBody" rows="4" placeholder="' + esc(tt('oe.bodyPh', 'Scrieți mesajul…')) + '"></textarea></div>' +
+        '<div class="field"><label>' + tt('oe.btnLink', '🔗 Link a sablon gombjaihoz (opcionális)') + '</label>' +
+          '<input class="input" id="oeBtnLink" type="url" placeholder="https://…">' +
+          '<div class="oe-bnote">' + tt('oe.btnLinkNote', 'Ha üres, a sablon link nélküli gombjai nem jelennek meg. A „követés" gomb a követő-linket használja.') + '</div></div>' +
         '<div class="oe-sec"><div class="oe-sec-h">' + tt('oe.fieldsHead', '📋 Fuvar-adatok a levélbe (pipáld, amit küldesz)') + '</div>' + fieldRows + trkRow + '</div>' +
         '<div class="oe-sec"><div class="oe-sec-h">' + tt('oe.attHead', '📎 Csatolmányok (pipáld, amit küldesz)') + '</div>' + attRows + '</div>' +
         '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">' +
@@ -140,6 +143,7 @@
         attachments: [].map.call(ovl.querySelectorAll('.oe-att:checked'), function (el) { return el.value; }),
         include_tracking: !!(ovl.querySelector('#oeTrk') && ovl.querySelector('#oeTrk').checked),
         builder_template_id: (ovl.querySelector('#oeBTpl') && ovl.querySelector('#oeBTpl').value) || '',
+        button_link: (ovl.querySelector('#oeBtnLink') && ovl.querySelector('#oeBtnLink').value || '').trim(),
       };
       var btn = ovl.querySelector(isTest ? '#oeTest' : '#oeSend');
       var old = btn.textContent; btn.disabled = true; btn.textContent = tt('oe.sending', 'Se trimite…');

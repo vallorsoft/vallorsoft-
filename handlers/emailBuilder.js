@@ -57,14 +57,20 @@ function escHtml(v) {
 // {{nev}}, {{cegnev}}, {{datum}}, {{track_url}} cseréje escape-elt értékekre.
 // A {{logo}} KIVÉTEL: előre összeállított nyers HTML (céges logó-kép); üres, ha
 // nincs feltöltött logó → a sablon fejléce változatlan marad.
+const BTN_REMOVE = '__VS_REMOVE__';
 function applyVars(html, vars) {
   const v = vars || {};
-  return String(html || '')
+  const urlOrRemove = (u) => (u && u !== '#') ? escHtml(u) : BTN_REMOVE;
+  let out = String(html || '')
     .replace(/\{\{\s*logo\s*\}\}/gi, v.__logoHtml || '')
     .replace(/\{\{\s*nev\s*\}\}/g, escHtml(v.nev || ''))
     .replace(/\{\{\s*cegnev\s*\}\}/g, escHtml(v.cegnev || ''))
     .replace(/\{\{\s*datum\s*\}\}/g, escHtml(v.datum || ''))
-    .replace(/\{\{\s*track_url\s*\}\}/gi, escHtml(v.track_url || '#'));
+    .replace(/\{\{\s*track_url\s*\}\}/gi, urlOrRemove(v.track_url))
+    .replace(/\{\{\s*action_url\s*\}\}/gi, urlOrRemove(v.action_url));
+  // A link nélküli gombokat teljesen eltávolítjuk (ne maradjon „halott" gomb).
+  out = out.replace(new RegExp('<a\\b[^>]*href="' + BTN_REMOVE + '"[^>]*>[\\s\\S]*?<\\/a>', 'gi'), '');
+  return out;
 }
 
 // A céges logó HTML-darabkája a sablon {{logo}} helyőrzőjéhez (fehér chip mögötte).
@@ -451,7 +457,10 @@ handlers.ebSend = async function (req, res, args) {
         nev: rcpt.name || baseVars.nev || '',
         cegnev: companyName || '',
         datum: baseVars.datum || today,
-        track_url: baseVars.track_url || '#',
+        // A builder-küldésnek nincs fuvar-kontextusa: a követő-gomb így törlődik,
+        // hacsak a hívó nem adott meg explicit linket (action_url/track_url).
+        track_url: baseVars.track_url || '',
+        action_url: baseVars.action_url || '',
         __logoHtml: logoHtml,
       };
       // A {{nev}}/{{cegnev}}/{{datum}} értékei escape-eltek → nincs injekció.
