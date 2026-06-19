@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-18 — Szerep-oldalak kétnyelvűsítés lezárása (sofőr/portál/alvállalkozó/könyvelő)
+
+> A teljes admin+manager kör után a maradék szerep-oldalak átnézése. Eredmény: ezek **már nagyrészt i18n-eltek** voltak (a sofer.js/portal.js/carrier.js/konyvelo.js bőven `t()`-zik, a HTML-labelek `data-i18n`/`<span data-i18n>` mintát használnak). Egyetlen valódi maradék: az alvállalkozói portál GDPR jármű-modalja egymás mellett RO/HU volt.
+
+- **`public/carrier.html`** — a GDPR jármű-figyelmeztető modal (cím, szöveg, „Mégsem"/„Értem →" gombok) és a vissza-link RO/HU-inline helyett `data-i18n`-re; **`i18n.js`** +6 `car.*` kulcs (`backHome`/`gdprVehTitle`/`gdprVehText`/`gdprCancel`/`gdprOk`).
+- **Ellenőrzés:** sofer/portal/konyvelo HTML-ben 0 bekötetlen felirat; a JS-ekben nincs beégetett `toast/confirm/alert` (mind `t()`); minden hivatkozott kulcs létezik; `i18n.js` parse OK; 100 Jest zöld. Cache-bust `i18n.js?v=20260618roles`.
+- *(A **developer** felület szándékosan kimarad — `is_dev`-only belső eszköz, HU-központú a konvenció szerint.)*
+
 ## 2026-06-18 — Teljes admin+manager panel-kétnyelvűsítés (minden felirat bekötve)
 
 > Az admin és manager konzol ÖSSZES paneljének és moduljának beégetett magyar felirata bekötve az i18n-be (RO-alap + HU-váltó): mezőcímkék, gombok, szekció-/modal-fejlécek, `<option>`-ök, táblázat-fejlécek, hint-szövegek, placeholderök és tooltip-ek.
