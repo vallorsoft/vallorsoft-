@@ -1100,6 +1100,8 @@
     'oe.tracking':  { hu: 'Követő-link az ügyfélnek (autó követése)', ro: 'Link de urmărire pentru client (urmărire camion)' },
     'oe.tpl':       { hu: 'Sablon betöltése', ro: 'Încarcă șablon' },
     'oe.tplNone':   { hu: 'nincs (saját szöveg)', ro: 'fără (text propriu)' },
+    'oe.tplVisual': { hu: 'Vizuális sablon (szerkesztő / galéria)', ro: 'Șablon vizual (editor / galerie)' },
+    'oe.tplVisualNote': { hu: 'A levél a kiválasztott vizuális sablonnal (HTML) megy ki.', ro: 'E-mailul va fi trimis cu șablonul vizual selectat (HTML).' },
     'oe.test':      { hu: '✉️ Teszt magamnak', ro: '✉️ Test către mine' },
     'oe.testSentTo':{ hu: 'Teszt elküldve a saját címedre', ro: 'Test trimis pe adresa ta' },
     'cs.ol.mHandover': { hu: 'Áru leadása', ro: 'Predare marfă' },

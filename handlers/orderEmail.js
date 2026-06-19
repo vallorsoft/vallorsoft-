@@ -13,8 +13,26 @@
 const pool = require('../db');
 const audit = require('../lib/audit');
 const _crypto = require('crypto');
-const { getCompanyMailer, sendClientEmail } = require('../services/email');
+const { getCompanyMailer, sendClientEmail, wrapBrandedEmail } = require('../services/email');
 const { appBaseUrl } = require('../lib/appUrl');
+
+// A cég arculata az e-mail fejlécéhez: a feltöltött logó publikus URL-je (csak ha
+// van feltöltött logó), különben null → az alapértelmezett „vallorSoft" felirat
+// marad. A feladó-név a cég neve (ha van). best-effort.
+async function _companyBranding(cid) {
+  var out = { logoUrl: null, senderName: 'VallorSoft' };
+  try {
+    var c = await pool.query('SELECT nev FROM companies WHERE id=$1', [cid]);
+    if (c.rows.length && c.rows[0].nev) out.senderName = c.rows[0].nev;
+  } catch (_) {}
+  try {
+    var hl = await pool.query(
+      "SELECT 1 FROM company_branding WHERE company_id=$1 AND logo_base64 IS NOT NULL", [cid]);
+    var appUrl = appBaseUrl();
+    if (hl.rows.length && appUrl) out.logoUrl = appUrl + '/branding/logo/' + cid + '.png';
+  } catch (_) {}
+  return out;
+}
 
 const handlers = {};
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -25,6 +43,16 @@ function _am(req) { const u = req.session && req.session.user; return !!(u && ['
 function _arg(args) { return (Array.isArray(args) ? args[0] : args) || {}; }
 function _esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]; }); }
 function _rawB64(s) { if (!s) return null; var m = String(s).match(/^data:[^;]+;base64,([\s\S]*)$/); return m ? m[1] : String(s); }
+
+// {{kulcs}} behelyettesítés escape-elt értékekkel egy vizuális sablon HTML-jébe
+// (a builder {{nev}}/{{cegnev}}/{{datum}} mellett fuvar-mezők is: order_id/route/...).
+function _applyBuilderVars(html, vars) {
+  var v = vars || {};
+  return String(html || '').replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, function (m, key) {
+    var k = String(key).toLowerCase();
+    return Object.prototype.hasOwnProperty.call(v, k) ? _esc(v[k]) : m;
+  });
+}
 
 // A fuvar kiválasztható adat-mezői (kulcs → RO címke + érték a sor-adatból).
 function _orderFields(o) {
@@ -162,9 +190,19 @@ handlers.getOrderEmailData = async function (req, res, args) {
         });
       }
     } catch (_) { templates = []; }
+    // Vizuális sablonok (e-mail szerkesztő / galériából mentett) — csak metaadat
+    // (id/név/tárgy), a HTML-t küldéskor oldjuk fel a sablon-id alapján.
+    var builderTemplates = [];
+    try {
+      var bt = await pool.query(
+        `SELECT id, name, subject FROM email_builder_templates
+          WHERE company_id=$1 ORDER BY updated_at DESC, id DESC`, [cid]);
+      builderTemplates = bt.rows;
+    } catch (_) { builderTemplates = []; }
     return res.json({ result: { ok: true, order_id: orderId, client_email: o.client_email || '',
       fields: fields, attachments: attachments,
-      tracking_available: trk.available, tracking_url: trk.url, templates: templates } });
+      tracking_available: trk.available, tracking_url: trk.url,
+      templates: templates, builder_templates: builderTemplates } });
   } catch (err) {
     console.error('getOrderEmailData hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
@@ -197,11 +235,38 @@ handlers.sendOrderEmail = async function (req, res, args) {
     var selFields = Array.isArray(a.fields) ? a.fields : [];
     var selAtt = Array.isArray(a.attachments) ? a.attachments.slice(0, MAX_ATTACH) : [];
 
-    // Body: szabad szöveg + (ha vannak kipipált mezők) a fuvar-adat tábla.
+    // Vizuális sablon (e-mail szerkesztő / galériából mentett) — ha választott,
+    // a sablon teljes HTML-je lesz a levél törzse (a {{változók}} a fuvar adataival
+    // behelyettesítve, escape-elve → nincs injekció). company_id-szűrt feloldás.
+    var builderHtml = '';
+    var builderId = parseInt(a.builder_template_id, 10);
+    if (builderId) {
+      try {
+        var btr = await pool.query(
+          `SELECT html_content FROM email_builder_templates WHERE id=$1 AND company_id=$2`,
+          [builderId, cid]);
+        if (btr.rows.length && String(btr.rows[0].html_content || '').trim()) {
+          var route0 = ((o.loc_incarcare || '') + (o.loc_descarcare ? ' → ' + o.loc_descarcare : '')).trim();
+          var cegnev = '';
+          try { var cn = await pool.query('SELECT nev FROM companies WHERE id=$1', [cid]); cegnev = (cn.rows[0] && cn.rows[0].nev) || ''; } catch (_) {}
+          builderHtml = _applyBuilderVars(btr.rows[0].html_content, {
+            nev: o.client || '', cegnev: cegnev, datum: new Date().toISOString().slice(0, 10),
+            order_id: String(o.id), route: route0, client: o.client || '',
+            status: o.status || '', pret: o.pret != null ? String(o.pret) : '',
+            km: o.km != null ? String(o.km) : '',
+          });
+        }
+      } catch (_) { builderHtml = ''; }
+    }
+
+    // Body: (1) vizuális sablon HTML-je VAGY (2) szabad szöveg + (ha vannak
+    // kipipált mezők) a fuvar-adat tábla. Ha mindkettő van: a beírt szöveg a
+    // sablon FÖLÉ kerül bevezetőként.
     var fieldRows = _orderFields(o).filter(function (f) { return selFields.indexOf(f.key) >= 0; });
-    var bodyHtml = bodyText
+    var textHtml = bodyText
       ? '<div style="font-size:14px;line-height:1.6;color:#2a2018;white-space:pre-wrap;">' + _esc(bodyText) + '</div>'
       : '';
+    var bodyHtml = builderHtml ? (textHtml + builderHtml) : textHtml;
     if (fieldRows.length) {
       bodyHtml += '<table style="border-collapse:collapse;margin-top:14px;font-size:13px;">' +
         fieldRows.map(function (f) {
@@ -270,11 +335,18 @@ handlers.sendOrderEmail = async function (req, res, args) {
       attachments.push({ name: name, contentBase64: b64 });
     }
 
+    // Cég-arculatos fejléc: a feltöltött céges logó (ha van), különben „vallorSoft".
+    // Vizuális sablonnál NEM csomagoljuk be újra (a sablon a saját arculatát hozza).
+    var brand = await _companyBranding(cid);
+    var realHtml = builderHtml ? bodyHtml : wrapBrandedEmail(bodyHtml, brand);
+
     var sent;
     if (isTest) {
       // Teszt → KÖZÖS VallorSoft cím (rendszer-feladó), a saját címünkre.
+      // A sendClientEmail maga rakja rá a fejlécet (logó vagy „vallorSoft").
       sent = await sendClientEmail({
         to: toEmail, subject: subject, html: bodyHtml, attachments: attachments,
+        logoUrl: brand.logoUrl, senderName: brand.senderName,
         companyId: cid, mailType: 'order_test',
       });
     } else {
@@ -285,7 +357,7 @@ handlers.sendOrderEmail = async function (req, res, args) {
           ? 'Configurați contul de e-mail (SMTP) în Integrări înainte de a trimite.'
           : ((mailer && mailer.error) || 'Eroare la contul expeditor') } });
       }
-      sent = await mailer.send({ to: toEmail, subject: subject, html: bodyHtml, attachments: attachments, mailType: 'order' });
+      sent = await mailer.send({ to: toEmail, subject: subject, html: realHtml, attachments: attachments, mailType: 'order' });
     }
 
     audit.fromReq(req, 'order.email_send', 'order', orderId, {

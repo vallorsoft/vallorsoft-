@@ -21,6 +21,7 @@
     var fields = d.fields || [];
     var atts = d.attachments || [];
     var tpls = d.templates || [];
+    var bTpls = d.builder_templates || [];
 
     var fieldRows = fields.map(function (f) {
       return '<label class="oe-row"><input type="checkbox" class="oe-fld" value="' + esc(f.key) + '" checked> ' +
@@ -46,6 +47,15 @@
       ? '<div class="field"><label>' + tt('oe.tpl', 'Sablon betöltése') + '</label><select class="select" id="oeTpl">' + tplOpts + '</select></div>'
       : '';
 
+    // Vizuális sablon-választó (e-mail szerkesztő / galériából mentett sablonok)
+    var bOpts = '<option value="">— ' + tt('oe.tplNone', 'nincs (saját szöveg)') + ' —</option>' +
+      bTpls.map(function (b) { return '<option value="' + esc(b.id) + '">' + esc(b.name || ('#' + b.id)) + '</option>'; }).join('');
+    var bSel = bTpls.length
+      ? '<div class="field"><label>' + tt('oe.tplVisual', 'Vizuális sablon (szerkesztő / galéria)') + '</label>' +
+          '<select class="select" id="oeBTpl">' + bOpts + '</select>' +
+          '<div class="oe-bnote" id="oeBNote" style="display:none;"></div></div>'
+      : '';
+
     var ovl = document.createElement('div');
     ovl.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
     ovl.innerHTML =
@@ -54,6 +64,7 @@
         '<div class="field"><label>' + tt('oe.to', 'Címzett (bármilyen cím)') + '</label>' +
           '<input class="input" id="oeTo" type="email" placeholder="email@..." value="' + esc(d.client_email || '') + '"></div>' +
         tplSel +
+        bSel +
         '<div class="field"><label>' + tt('oe.subject', 'Tárgy') + '</label>' +
           '<input class="input" id="oeSubject" value="' + esc('Comandă ' + orderId) + '"></div>' +
         '<div class="field"><label>' + tt('oe.body', 'Üzenet') + '</label>' +
@@ -100,6 +111,22 @@
       autoCheckAtt(tp.key);
     });
 
+    // Vizuális sablon kiválasztása → a sablon HTML-je lesz a levél törzse
+    // (szerver oldalon oldódik fel a fuvar adataival). A „Mesaj" mező szabad
+    // szöveg marad (bevezetőként a sablon fölé kerül).
+    var bEl = ovl.querySelector('#oeBTpl');
+    if (bEl) bEl.addEventListener('change', function () {
+      var note = ovl.querySelector('#oeBNote');
+      var val = bEl.value;
+      if (!val) { if (note) { note.style.display = 'none'; note.textContent = ''; } return; }
+      var bt = null;
+      for (var i = 0; i < bTpls.length; i++) { if (String(bTpls[i].id) === String(val)) { bt = bTpls[i]; break; } }
+      if (!bt) return;
+      if (bt.subject) ovl.querySelector('#oeSubject').value = bt.subject;
+      if (note) { note.style.display = 'block';
+        note.textContent = '📐 ' + tt('oe.tplVisualNote', 'A levél a kiválasztott vizuális sablonnal (HTML) megy ki.'); }
+    });
+
     function doSend(isTest) {
       var to = (ovl.querySelector('#oeTo').value || '').trim();
       if (!isTest && !to) { toast(tt('oe.to', 'Címzett'), 'err'); return; }
@@ -112,6 +139,7 @@
         fields: [].map.call(ovl.querySelectorAll('.oe-fld:checked'), function (el) { return el.value; }),
         attachments: [].map.call(ovl.querySelectorAll('.oe-att:checked'), function (el) { return el.value; }),
         include_tracking: !!(ovl.querySelector('#oeTrk') && ovl.querySelector('#oeTrk').checked),
+        builder_template_id: (ovl.querySelector('#oeBTpl') && ovl.querySelector('#oeBTpl').value) || '',
       };
       var btn = ovl.querySelector(isTest ? '#oeTest' : '#oeSend');
       var old = btn.textContent; btn.disabled = true; btn.textContent = tt('oe.sending', 'Se trimite…');
@@ -138,7 +166,8 @@
       '.oe-sec-h{font-size:12px;color:var(--muted,#8a7d6e);margin-bottom:6px;font-weight:600;}' +
       '.oe-row{display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:13px;cursor:pointer;}' +
       '.oe-row input{margin-top:3px;}' +
-      '.oe-empty{font-size:12px;color:var(--muted,#8a7d6e);font-style:italic;}';
+      '.oe-empty{font-size:12px;color:var(--muted,#8a7d6e);font-style:italic;}' +
+      '.oe-bnote{margin-top:6px;font-size:12px;color:var(--muted,#8a7d6e);}';
     document.head.appendChild(s);
   }
 })();

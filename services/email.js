@@ -322,21 +322,31 @@ async function sendResetEmail(toEmail, nume, resetUrl, lang, companyId) {
 // Brevo HTTP API-n megy (mint a többi). A fejlécbe a cég logója kerül (ha van),
 // különben a nagy „vallorSoft” felirat. opts: { to, subject, html, replyTo, senderName, logoUrl, attachments }
 //   attachments: [{ name, contentBase64 }]
-async function sendClientEmail(opts) {
-  if (!BREVO_API_KEY || !BREVO_SENDER) return { ok: false, error: 'BREVO_API_KEY / BREVO_SENDER nu este configurat (.env).' };
-  if (!opts || !opts.to) return { ok: false, error: 'Lipsește destinatarul.' };
+// Egységes „cég-arculatos" e-mail-keret: a fejlécben a CÉG feltöltött logója
+// (ha van), különben az alapértelmezett „vallorSoft" felirat. Mind a közös-címes
+// (sendClientEmail), mind a cég-saját-fiókos (getCompanyMailer) küldés ezt
+// használja, hogy az ügyfél MINDIG a feladó cég arculatát lássa.
+//   opts: { logoUrl, senderName }
+function wrapBrandedEmail(bodyHtml, opts) {
+  opts = opts || {};
   const senderName = opts.senderName || 'VallorSoft';
   // Logo csak biztonságos URL-sémával kerülhet a levélbe (markup-injektálás ellen)
   const safeLogo = opts.logoUrl && /^(https?:\/\/|data:image\/)/i.test(String(opts.logoUrl)) ? String(opts.logoUrl) : null;
   const header = safeLogo
     ? `<img src="${escHtml(safeLogo)}" alt="${escHtml(senderName)}" style="max-height:48px;max-width:220px;display:block;margin-bottom:16px;">`
     : `<div style="font-size:24px;font-weight:800;margin-bottom:16px;"><span style="color:#2a2018;">vallor</span><span style="color:#f6711e;">Soft</span></div>`;
-  const bodyHtml = (opts.html || '').trim();
-  const html =
-    `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#2a2018;padding:24px;">` +
+  const body = (bodyHtml || '').trim();
+  return `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#2a2018;padding:24px;">` +
       header +
-      `<div style="font-size:14px;line-height:1.6;color:#2a2018;white-space:normal;">${bodyHtml}</div>` +
+      `<div style="font-size:14px;line-height:1.6;color:#2a2018;white-space:normal;">${body}</div>` +
     `</div>`;
+}
+
+async function sendClientEmail(opts) {
+  if (!BREVO_API_KEY || !BREVO_SENDER) return { ok: false, error: 'BREVO_API_KEY / BREVO_SENDER nu este configurat (.env).' };
+  if (!opts || !opts.to) return { ok: false, error: 'Lipsește destinatarul.' };
+  const senderName = opts.senderName || 'VallorSoft';
+  const html = wrapBrandedEmail(opts.html, { logoUrl: opts.logoUrl, senderName: senderName });
   const payload = {
     sender: { name: senderName, email: BREVO_SENDER },
     to: [{ email: opts.to }],
@@ -619,4 +629,4 @@ async function sendSubscriptionCancelEmail(opts) {
   }
 }
 
-module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate, loadCompanySender, getCompanyMailer, sendSubscriptionCancelEmail, applyTemplateVars, htmlToPlainText };
+module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate, loadCompanySender, getCompanyMailer, sendSubscriptionCancelEmail, applyTemplateVars, htmlToPlainText, wrapBrandedEmail };
