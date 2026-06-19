@@ -14,6 +14,29 @@
 
 ---
 
+## 2026-06-19 — „Email a fuvarról": vizuális sablon-választó + céges logó a fejlécben
+
+> A fuvar ✉️ „Email despre cursă" dialógusában mostantól a mentett **vizuális sablonok**
+> (e-mail szerkesztő + galériából mentett) közül is lehet választani, és a kiküldött
+> levél fejlécében a cég **feltöltött logója** jelenik meg (ha nincs, marad a „vallorSoft").
+
+- **`handlers/orderEmail.js`** — `getOrderEmailData` mostantól visszaadja a cég
+  `email_builder_templates` sablonjait is (`builder_templates`: id/név/tárgy, company_id-szűrt).
+  `sendOrderEmail` új `builder_template_id` paraméter: ha választott, a sablon teljes
+  HTML-je lesz a levél törzse, a `{{változók}}` ({{nev}}/{{cegnev}}/{{datum}} + fuvar-mezők
+  order_id/route/status/pret/km) escape-elt behelyettesítéssel feloldva (ownership: id+company_id).
+- **Céges logó az e-mail fejlécében** — a kiküldött levél (valós ÉS teszt) fejlécében a cég
+  feltöltött logója (`company_branding`, `/branding/logo/<cid>.png`), ha nincs feltöltve,
+  az alapértelmezett „vallorSoft" felirat marad. A branding-keret közös segéddé emelve
+  (`services/email.js` `wrapBrandedEmail`, exportálva); a `sendClientEmail` is ezt használja.
+  Vizuális sablonnál NEM csomagoljuk be újra (a sablon a saját arculatát hozza).
+- **`public/order-email.js`** — második „Vizuális sablon (szerkesztő / galéria)" választó;
+  kiválasztáskor a tárgy előtöltődik + jelzés, hogy a levél a sablon HTML-jével megy ki.
+  i18n `oe.tplVisual`/`oe.tplVisualNote` (RO-alap + HU); cache-bust `order-email.js?v=20260619oetpl`,
+  `i18n.js?v=20260619oetpl`. 100 Jest zöld.
+
+---
+
 ## 2026-06-18 — Alvállalkozói GPS-követés mint developer funkció-kapcsoló (csomag + cég)
 
 > Ellenőrzés: az új funkciók kezelhetők-e a developernél (csomagban engedélyezni/kivenni ÉS cégenként)? A legtöbb új funkció már a `VS_FEATURES` katalógusban van → a developer mind csomag- (`getPlanFeatures`/`setPlanFeature`), mind cégszinten (`devGetCompanyFeatures`/`devSetCompanyFeature`) kapcsolja. **Egyetlen kivétel volt: az alvállalkozói jármű-GPS** — nem volt önálló kulcsa (a `carrier-portal`/`tracking` alá bújt). Most külön kapcsolható.
