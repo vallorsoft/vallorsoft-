@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-18 — Teljes admin+manager panel-kétnyelvűsítés (minden felirat bekötve)
+
+> Az admin és manager konzol ÖSSZES paneljének és moduljának beégetett magyar felirata bekötve az i18n-be (RO-alap + HU-váltó): mezőcímkék, gombok, szekció-/modal-fejlécek, `<option>`-ök, táblázat-fejlécek, hint-szövegek, placeholderök és tooltip-ek.
+
+- **`public/admin.html` + `public/manager.html`** — ~**260 elem** kapott `data-i18n` / `data-i18n-ph` / `data-i18n-html` / `data-i18n-title` attribútumot (a két konzol azonos modaljai — user-szerkesztő, jármű-szerkesztő, külső-sofőr, gyors-jármű, menetlevél, fizetés, hibajelentés — KÖZÖS kulcsokkal). Csak attribútum-hozzáadás: az `id`/`onclick`/`class`/logika **bájtra változatlan** (onclick-darabszám 86=86 admin, 82=82 manager; id 316=316).
+- **`public/i18n.js`** — **161 új kulcs** (RO+HU), a meglévők újrahasználva. A gyerek-kontrollos labeleknél a szöveg `<span data-i18n>`-be került (nincs gyermek-törlés).
+- A nem fordítandó értékek szándékosan érintetlenek: státusz-kódok (`Disponibil/Alocat/...`), pénznemek (`EUR/RON`), szerepkörök.
+- **Ellenőrzés:** 0 maradék beégetett `<label>` mindkét fájlban; minden hivatkozott kulcs létezik; nincs duplikált kulcs; nincs gyerek-kontrollos `data-i18n` label; `i18n.js` parse OK; 100 Jest zöld. Cache-bust `i18n.js?v=20260618panes`.
+
 ## 2026-06-18 — Kétnyelvűsítés folyt.: szerep-oldalak nav-ellenőrzés + Beállítások profil-szekció
 
 > A menü/almenü kör után a többi szerep-oldal navigációja és a Beállítások panel látható feliratai.
