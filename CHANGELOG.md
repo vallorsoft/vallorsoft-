@@ -14,6 +14,24 @@
 
 ---
 
+## 2026-06-19 — Galéria-sablonok: minden gomb működik vagy eltűnik (nincs „halott" gomb)
+
+> Folytatás: a sablonok ÖSSZES beépített gombja vagy valódi linkre mutat (reagál kattintásra),
+> vagy — ha nincs link — **eltűnik a levélből** (nem marad rákattinthatatlan `href="#"` gomb).
+
+- **`public/email-gallery.js`** — a `btn`/`gbtn` alapértelmezett linkje `#` helyett `{{action_url}}`;
+  az 5 inline CTA-gomb (DESCOPERĂ, Află mai mult, Rămânem în legătură, Hai să începem, [ EXECUTĂ ])
+  is `{{action_url}}`-t kap; a követő-gombok `{{track_url}}`-t. A footer Dezabonare/Contact linkek
+  változatlanok (nem gombok).
+- **Küldéskori behelyettesítés + tisztítás** (`handlers/orderEmail.js` `_applyBuilderVars`,
+  `handlers/emailBuilder.js` `applyVars`): a `{{track_url}}`/`{{action_url}}` üres értéke egy
+  eltávolító-jelölővé (`__VS_REMOVE__`) fordul, majd egy záró regex a **teljes `<a>` gombot törli**.
+  Így link nélkül nem marad gomb; linkkel működik.
+- **`public/order-email.js`** — új opcionális „🔗 Link a sablon gombjaihoz" mező (`button_link`,
+  csak http/https) → a `{{action_url}}` gombok ide mutatnak; a „követés" gomb a fuvar `/t/<token>`
+  linkjét használja. i18n `oe.btnLink`/`oe.btnLinkNote` (RO-alap + HU). Cache-bust
+  `?v=20260619btn`. 100 Jest zöld.
+
 ## 2026-06-19 — Galéria-sablonok: céges logó a fejlécbe + működő követő-gomb ({{logo}}/{{track_url}})
 
 > A 30 beépített e-mail-galéria sablon mostantól a **cég feltöltött logóját** jeleníti meg a

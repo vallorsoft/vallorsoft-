@@ -48,13 +48,21 @@ function _rawB64(s) { if (!s) return null; var m = String(s).match(/^data:[^;]+;
 // (a builder {{nev}}/{{cegnev}}/{{datum}} mellett fuvar-mezők is: order_id/route/...).
 // A {{logo}} KIVÉTEL: nyers (előre összeállított) HTML-t kap (céges logó-kép),
 // hogy a sablon fejlécébe valódi kép kerüljön — a benne lévő URL escape-elt.
+var _BTN_REMOVE = '__VS_REMOVE__';
 function _applyBuilderVars(html, vars) {
   var v = vars || {};
-  return String(html || '').replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, function (m, key) {
+  var out = String(html || '').replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, function (m, key) {
     var k = String(key).toLowerCase();
     if (k === 'logo') return v.__logoHtml || '';
+    // Gomb-linkek: ha üres/„#" → eltávolító-jelölő (a gomb törlődik), különben az URL.
+    if (k === 'track_url' || k === 'action_url') {
+      var u = v[k]; return (u && u !== '#') ? _esc(u) : _BTN_REMOVE;
+    }
     return Object.prototype.hasOwnProperty.call(v, k) ? _esc(v[k]) : m;
   });
+  // A link nélküli gombokat teljesen eltávolítjuk (ne maradjon „halott" gomb).
+  out = out.replace(new RegExp('<a\\b[^>]*href="' + _BTN_REMOVE + '"[^>]*>[\\s\\S]*?<\\/a>', 'gi'), '');
+  return out;
 }
 
 // A céges logó HTML-darabkája a sablon-fejlécbe (fehér „chip" mögötte → bármilyen
@@ -265,15 +273,19 @@ handlers.sendOrderEmail = async function (req, res, args) {
         if (btr.rows.length && String(btr.rows[0].html_content || '').trim()) {
           var route0 = ((o.loc_incarcare || '') + (o.loc_descarcare ? ' → ' + o.loc_descarcare : '')).trim();
           // Követő-link a sablon {{track_url}} gombjához (token generálással, ha a
-          // funkció elérhető; különben '#' — a gomb nem visz sehová, de nem törik).
+          // funkció elérhető; ha nincs → a követő-gomb törlődik a levélből).
           var trkB = await _trackingInfo(cid, orderId, true);
+          // Általános gomb-link a {{action_url}}-höz: a dialógus opcionális mezőjéből
+          // (csak http/https); ha üres → a sablon CTA-gombjai törlődnek.
+          var actUrl = String(a.button_link || '').trim();
+          if (!/^https?:\/\//i.test(actUrl)) actUrl = '';
           builderHtml = _applyBuilderVars(btr.rows[0].html_content, {
             nev: o.client || '', cegnev: brand.senderName === 'VallorSoft' ? '' : brand.senderName,
             datum: new Date().toISOString().slice(0, 10),
             order_id: String(o.id), route: route0, client: o.client || '',
             status: o.status || '', pret: o.pret != null ? String(o.pret) : '',
             km: o.km != null ? String(o.km) : '',
-            track_url: trkB.url || '#',
+            track_url: trkB.url || '', action_url: actUrl,
             __logoHtml: _logoSnippet(brand),
           });
         }
