@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-06-18 — Kétnyelvűsítés folyt.: szerep-oldalak nav-ellenőrzés + Beállítások profil-szekció
+
+> A menü/almenü kör után a többi szerep-oldal navigációja és a Beállítások panel látható feliratai.
+
+- **Nav-ellenőrzés (nincs hiba):** a **sofőr** alsó-nav (`sofer.nav*`) és a **könyvelő** tab-jai (`kon.tab*`) már `data-i18n`-eltek, a kulcsok léteznek; az **ügyfél-portál** és **alvállalkozói portál** nem tab-alapú. → a navigáció minden szerep-oldalon RO-alap + HU-váltó.
+- **Beállítások panel — Profil adatok (admin + manager):** a beégetett mezőcímkék i18n-eltek: **`i18n.js`** +5 kulcs (`set.fullName`/`set.emailReadonly`/`set.phone`/`set.position`/`set.saveProfile`); **`admin.html`**+**`manager.html`** `data-i18n`(+`data-i18n-ph`). Cache-bust `i18n.js?v=20260618set`; 100 Jest zöld.
+- *(A panel-tartalmak teljes kétnyelvűsítése iteratív — ez a profil-szekcióval indult; a többi panel külön körökben.)*
+
 ## 2026-06-18 — Menü/almenü kétnyelvűsítés: a maradék emojis almenük (Fiók, Előfizetés)
 
 > Az admin/manager sidebar menü- és almenüpontjai szinte mind `data-i18n`-eltek (RO+HU), de **3 színes-emojis almenü** beégetett magyar maradt → RO-ban is magyarul látszott.
