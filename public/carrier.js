@@ -21,7 +21,10 @@
     if (_setToken) { show('viewSet'); return; }
     api('GET', '/api/carrier/me').then(function (r) { if (r && r.ok) { fillMe(r); show('viewDash'); loadAll(); } else show('viewLogin'); }).catch(function () { show('viewLogin'); });
   }
-  function fillMe(r) { $('dCarrier').textContent = r.carrier_nev || r.nev || ''; $('dCeg').textContent = t('car.carrierLabel') + ' ' + (r.ceg_nev || ''); $('dAv').textContent = (r.carrier_nev || r.email || '?').charAt(0).toUpperCase(); }
+  function fillMe(r) { $('dCarrier').textContent = r.carrier_nev || r.nev || ''; $('dCeg').textContent = t('car.carrierLabel') + ' ' + (r.ceg_nev || ''); $('dAv').textContent = (r.carrier_nev || r.email || '?').charAt(0).toUpperCase();
+    // GPS-mezők láthatósága a 'carrier-gps' funkció szerint (a developer kapcsolja).
+    window._carGps = (r.gps_enabled !== false);
+    var gbox = document.getElementById('carGpsAddBox'); if (gbox) gbox.style.display = window._carGps ? '' : 'none'; }
   function login() { var e = $('liEmail').value.trim(), p = $('liPass').value; if (!e || !p) { toast(t('car.needLogin'), 'err'); return; } api('POST', '/api/carrier/login', { email: e, password: p }).then(function (r) { if (r && r.ok) { api('GET', '/api/carrier/me').then(function (m) { if (m.ok) fillMe(m); show('viewDash'); loadAll(); }); } else toast((r && r.err) || t('car.badLogin'), 'err'); }); }
   function setPw() { var a = $('spPass').value, b = $('spPass2').value; if (a.length < 8 || !/[a-z]/.test(a) || !/[A-Z]/.test(a) || !/[0-9]/.test(a) || !/[^A-Za-z0-9]/.test(a)) { toast(t('car.min6'), 'err'); return; } if (a !== b) { toast(t('car.pwMismatch'), 'err'); return; } api('POST', '/api/carrier/set-password', { token: _setToken, password: a }).then(function (r) { if (r && r.ok) { history.replaceState(null, '', '/carrier'); api('GET', '/api/carrier/me').then(function (m) { if (m.ok) fillMe(m); show('viewDash'); loadAll(); }); toast(t('car.pwSet'), 'ok'); } else toast((r && r.err) || t('common.error'), 'err'); }); }
   function logout() { api('POST', '/api/carrier/logout').then(function () { location.href = '/carrier'; }); }
@@ -99,9 +102,10 @@
       + '<input class="inp" id="ve_clen_' + id + '" value="' + esc(v.cargo_length_cm || '') + '" placeholder="' + esc(t('car.phCargoLen')) + '" type="number" min="100" max="2000" style="flex:1;min-width:75px;padding:7px 9px">'
       + '<input class="inp" id="ve_cwid_' + id + '" value="' + esc(v.cargo_width_cm || '') + '" placeholder="' + esc(t('car.phCargoWid')) + '" type="number" min="100" max="350" style="flex:1;min-width:75px;padding:7px 9px">'
       + '<input class="inp" id="ve_chei_' + id + '" value="' + esc(v.cargo_height_cm || '') + '" placeholder="' + esc(t('car.phCargoHei')) + '" type="number" min="50" max="400" style="flex:1;min-width:75px;padding:7px 9px">'
-      + '<input class="inp" id="ve_trk_' + id + '" value="' + esc(v.track_url || '') + '" placeholder="' + esc(t('car.phTrackUrl')) + '" type="url" style="flex:3;min-width:160px;padding:7px 9px">'
-      + '<input class="inp" id="ve_gobj_' + id + '" value="' + esc(v.gps_object_id || '') + '" placeholder="' + esc(t('car.phGpsObj')) + '" style="flex:1;min-width:110px;padding:7px 9px">'
-      + '<input class="inp" id="ve_gkey_' + id + '" value="" placeholder="' + esc(v.has_gps_key ? t('car.phGpsKeyKept') : t('car.phGpsKey')) + '" type="password" autocomplete="new-password" style="flex:1;min-width:110px;padding:7px 9px">'
+      + (window._carGps === false ? '' : (''
+        + '<input class="inp" id="ve_trk_' + id + '" value="' + esc(v.track_url || '') + '" placeholder="' + esc(t('car.phTrackUrl')) + '" type="url" style="flex:3;min-width:160px;padding:7px 9px">'
+        + '<input class="inp" id="ve_gobj_' + id + '" value="' + esc(v.gps_object_id || '') + '" placeholder="' + esc(t('car.phGpsObj')) + '" style="flex:1;min-width:110px;padding:7px 9px">'
+        + '<input class="inp" id="ve_gkey_' + id + '" value="" placeholder="' + esc(v.has_gps_key ? t('car.phGpsKeyKept') : t('car.phGpsKey')) + '" type="password" autocomplete="new-password" style="flex:1;min-width:110px;padding:7px 9px">'))
       + '<button class="btn ok" style="padding:5px 10px" onclick="Carrier.saveVehicle(' + id + ')">✓</button>'
       + '<button class="btn" style="padding:5px 10px" onclick="Carrier.loadVehicles()">✕</button>'
       + '</div>';

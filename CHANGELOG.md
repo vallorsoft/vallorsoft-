@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-18 — Alvállalkozói GPS-követés mint developer funkció-kapcsoló (csomag + cég)
+
+> Ellenőrzés: az új funkciók kezelhetők-e a developernél (csomagban engedélyezni/kivenni ÉS cégenként)? A legtöbb új funkció már a `VS_FEATURES` katalógusban van → a developer mind csomag- (`getPlanFeatures`/`setPlanFeature`), mind cégszinten (`devGetCompanyFeatures`/`devSetCompanyFeature`) kapcsolja. **Egyetlen kivétel volt: az alvállalkozói jármű-GPS** — nem volt önálló kulcsa (a `carrier-portal`/`tracking` alá bújt). Most külön kapcsolható.
+
+- **`public/feature-catalog.js`** — új `carrier-gps` kulcs (Alvállalkozói jármű GPS-követés 🛰️). Alapból BE (hiányzó sor = engedélyezett → nem törő), a developer csomag- és cégszinten letilthatja.
+- **Szerver-gate-ek** (`featureEnabled(cid,'carrier-gps')`): `handlers/carriers.js` `carrierVehicleSetGps` (diszpécser mentés tiltva, ha ki); `routes/carrier-portal.js` POST/PUT — GPS-mezők csak ha be (kikapcsolva a tárolt adat érintetlen marad); `routes/track.js` — az ügyfél követő-oldalon az alvállalkozói pozíció/külső-link csak ha be; `/api/carrier/me` `gps_enabled` jelző.
+- **Kliens:** a diszpécser jármű-tábla „GPS" oszlopa/gombja + az alvállalkozói portál GPS-mezői (add-form + inline szerkesztő) elrejtve, ha a funkció ki van kapcsolva (`window._vsFeatures` / `me.gps_enabled`).
+- 100 Jest zöld; require-sweep OK. Cache-bust `feature-catalog/console-shared/carrier ?v=20260618cgps2`.
+
 ## 2026-06-18 — Szerep-oldalak kétnyelvűsítés lezárása (sofőr/portál/alvállalkozó/könyvelő)
 
 > A teljes admin+manager kör után a maradék szerep-oldalak átnézése. Eredmény: ezek **már nagyrészt i18n-eltek** voltak (a sofer.js/portal.js/carrier.js/konyvelo.js bőven `t()`-zik, a HTML-labelek `data-i18n`/`<span data-i18n>` mintát használnak). Egyetlen valódi maradék: az alvállalkozói portál GDPR jármű-modalja egymás mellett RO/HU volt.

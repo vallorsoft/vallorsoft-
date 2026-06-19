@@ -13,6 +13,7 @@ const router = express.Router();
 const pool = require('../db');
 const { validatePassword } = require('../lib/passwordPolicy');
 const { encrypt } = require('../lib/crypto');
+const { featureEnabled } = require('../lib/featureEnabled');
 
 // Megosztott követő-link validálása (http/https). Üres → null (törlés).
 function _trackUrl(v) {
@@ -59,10 +60,12 @@ router.post('/api/carrier/login', async (req, res) => {
 });
 
 router.post('/api/carrier/logout', (req, res) => { if (req.session) req.session.carrierUser = null; res.json({ ok: true }); });
-router.get('/api/carrier/me', (req, res) => {
+router.get('/api/carrier/me', async (req, res) => {
   const cu = req.session && req.session.carrierUser;
   if (!cu) return res.json({ ok: false });
-  res.json({ ok: true, nev: cu.nev, email: cu.email, carrier_nev: cu.carrier_nev, ceg_nev: cu.ceg_nev });
+  let gpsEnabled = true;
+  try { gpsEnabled = await featureEnabled(cu.company_id, 'carrier-gps'); } catch (_) {}
+  res.json({ ok: true, nev: cu.nev, email: cu.email, carrier_nev: cu.carrier_nev, ceg_nev: cu.ceg_nev, gps_enabled: gpsEnabled });
 });
 
 router.post('/api/carrier/set-password', async (req, res) => {
@@ -134,9 +137,12 @@ router.post('/api/carrier/vehicles', requireCarrier, async (req, res) => {
     const b = req.body || {};
     const cam = String(b.rendszam_camion || '').trim().toUpperCase().slice(0, 50);
     if (!cam) return res.json({ ok: false, err: 'Numarul de inmatriculare al capului tractor este obligatoriu.' });
-    const objId = String(b.gps_object_id || '').trim().slice(0, 100) || null;
-    const keyRaw = String(b.gps_api_key || '').trim();
+    // GPS-mezők CSAK ha a 'carrier-gps' funkció engedélyezett a cégnél (különben null).
+    const gpsOn = await featureEnabled(cu.company_id, 'carrier-gps');
+    const objId = gpsOn ? (String(b.gps_object_id || '').trim().slice(0, 100) || null) : null;
+    const keyRaw = gpsOn ? String(b.gps_api_key || '').trim() : '';
     const keyEnc = (objId && keyRaw) ? encrypt(keyRaw) : null;
+    const trackUrl = gpsOn ? _trackUrl(b.track_url) : null;
     await pool.query(
       `INSERT INTO carrier_vehicles (company_id, carrier_id, rendszam_camion, rendszam_remorca, marca, model, sofer_nev, nota, sofer_tel, an_fabricatie, trailer_kind, cargo_length_cm, cargo_width_cm, cargo_height_cm, track_url, gps_object_id, gps_api_key_enc)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
@@ -152,7 +158,7 @@ router.post('/api/carrier/vehicles', requireCarrier, async (req, res) => {
        b.cargo_length_cm ? (parseInt(b.cargo_length_cm, 10) || null) : null,
        b.cargo_width_cm  ? (parseInt(b.cargo_width_cm, 10)  || null) : null,
        b.cargo_height_cm ? (parseInt(b.cargo_height_cm, 10) || null) : null,
-       _trackUrl(b.track_url), objId, keyEnc]);
+       trackUrl, objId, keyEnc]);
     return res.json({ ok: true });
   } catch (err) { console.error('carrier vehicle add hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }
 });
@@ -163,10 +169,11 @@ router.put('/api/carrier/vehicles/:id', requireCarrier, async (req, res) => {
     const b = req.body || {};
     const cam = String(b.rendszam_camion || '').trim().toUpperCase().slice(0, 50);
     if (!cam) return res.json({ ok: false, err: 'Numarul de inmatriculare al capului tractor este obligatoriu.' });
-    const objId = String(b.gps_object_id || '').trim().slice(0, 100) || null;
+    // A GPS-oszlopok NEM részei az alap-frissítésnek — csak ha a 'carrier-gps'
+    // funkció engedélyezett (különben a tárolt GPS-adat érintetlen marad).
     const r = await pool.query(
-      `UPDATE carrier_vehicles SET rendszam_camion=$1, rendszam_remorca=$2, marca=$3, model=$4, sofer_nev=$5, sofer_tel=$6, an_fabricatie=$7, nota=$8, trailer_kind=$9, cargo_length_cm=$10, cargo_width_cm=$11, cargo_height_cm=$12, track_url=$13, gps_object_id=$14
-       WHERE id=$15 AND company_id=$16 AND carrier_id=$17`,
+      `UPDATE carrier_vehicles SET rendszam_camion=$1, rendszam_remorca=$2, marca=$3, model=$4, sofer_nev=$5, sofer_tel=$6, an_fabricatie=$7, nota=$8, trailer_kind=$9, cargo_length_cm=$10, cargo_width_cm=$11, cargo_height_cm=$12
+       WHERE id=$13 AND company_id=$14 AND carrier_id=$15`,
       [cam,
        String(b.rendszam_remorca || '').trim().toUpperCase().slice(0, 50) || null,
        String(b.marca || '').trim().slice(0, 80) || null,
@@ -179,17 +186,20 @@ router.put('/api/carrier/vehicles/:id', requireCarrier, async (req, res) => {
        b.cargo_length_cm ? (parseInt(b.cargo_length_cm, 10) || null) : null,
        b.cargo_width_cm  ? (parseInt(b.cargo_width_cm, 10)  || null) : null,
        b.cargo_height_cm ? (parseInt(b.cargo_height_cm, 10) || null) : null,
-       _trackUrl(b.track_url), objId,
        id, cu.company_id, cu.carrier_id]);
-    // GPS-kulcs: új kulcs megadva → titkosítva mentjük; object_id törölve → kulcs is;
-    // üresen hagyott kulcs object_id mellett → a meglévő MEGMARAD (jelszó-megőrzés).
-    const keyRaw = String(b.gps_api_key || '').trim();
-    if (objId && keyRaw) {
-      await pool.query('UPDATE carrier_vehicles SET gps_api_key_enc=$1 WHERE id=$2 AND company_id=$3 AND carrier_id=$4',
-        [encrypt(keyRaw), id, cu.company_id, cu.carrier_id]);
-    } else if (!objId) {
-      await pool.query('UPDATE carrier_vehicles SET gps_api_key_enc=NULL WHERE id=$1 AND company_id=$2 AND carrier_id=$3',
-        [id, cu.company_id, cu.carrier_id]);
+    if (await featureEnabled(cu.company_id, 'carrier-gps')) {
+      const objId = String(b.gps_object_id || '').trim().slice(0, 100) || null;
+      await pool.query('UPDATE carrier_vehicles SET track_url=$1, gps_object_id=$2 WHERE id=$3 AND company_id=$4 AND carrier_id=$5',
+        [_trackUrl(b.track_url), objId, id, cu.company_id, cu.carrier_id]);
+      // GPS-kulcs: új kulcs → titkosítva; object_id törölve → kulcs is; üres kulcs object_id mellett → marad.
+      const keyRaw = String(b.gps_api_key || '').trim();
+      if (objId && keyRaw) {
+        await pool.query('UPDATE carrier_vehicles SET gps_api_key_enc=$1 WHERE id=$2 AND company_id=$3 AND carrier_id=$4',
+          [encrypt(keyRaw), id, cu.company_id, cu.carrier_id]);
+      } else if (!objId) {
+        await pool.query('UPDATE carrier_vehicles SET gps_api_key_enc=NULL WHERE id=$1 AND company_id=$2 AND carrier_id=$3',
+          [id, cu.company_id, cu.carrier_id]);
+      }
     }
     return res.json({ ok: !!r.rowCount });
   } catch (err) { console.error('carrier vehicle edit hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }

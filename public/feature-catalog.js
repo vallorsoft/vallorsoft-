@@ -13,6 +13,7 @@ window.VS_FEATURES = [
   // a fuvarjait + dokumentumokat, és új fuvart igényelhet. Developer kapcsolja.
   { key: 'client-portal',    label: 'Ügyfél-portál (🔑)',          group: 'Fuvarozás & Logisztika', optIn: true },
   { key: 'carrier-portal',   label: 'Alvállalkozói portál (🔑)',   group: 'Fuvarozás & Logisztika', optIn: true },
+  { key: 'carrier-gps',      label: 'Alvállalkozói jármű GPS-követés 🛰️', group: 'Fuvarozás & Logisztika' },
   { key: 'inbound',          label: 'Beérkező megrendelések',      group: 'Fuvarozás & Logisztika' },
   { key: 'client-requests',  label: 'Ügyfél kérések (📋)',         group: 'Fuvarozás & Logisztika' },
   { key: 'orders-planner',   label: 'Tervezőtábla (diszpécser)',   group: 'Fuvarozás & Logisztika' },

@@ -13,6 +13,7 @@ const pool = require('../db');
 const ctSvc = require('../services/cargotrack');
 const { decrypt } = require('../lib/crypto');
 const { geocodeCached } = require('../lib/routeEstimate');
+const { featureEnabled } = require('../lib/featureEnabled');
 
 // Útvonal-végpont geokódolás cache tokenenként (a geo_cache tábla mögött is
 // cache-elt, de így a két címet egyszer oldjuk fel tokenenként).
@@ -81,7 +82,7 @@ router.get('/api/track/:token', async (req, res) => {
         // 2) ALVÁLLALKOZÓI jármű (carrier_vehicles): megosztott link + opcionális
         //    saját CargoTrack-kulcs az adott rendszámra (Extern fuvar követése).
         //    A rendszám-egyezés szóköz-/kisbetű-független.
-        if (!position || !externalUrl) {
+        if ((!position || !externalUrl) && await featureEnabled(o.company_id, 'carrier-gps')) {
           try {
             const cv = await pool.query(
               `SELECT track_url, gps_object_id, gps_api_key_enc FROM carrier_vehicles
