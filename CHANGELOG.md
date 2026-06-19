@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-06-19 — Fix: HERE útdíj-becslés sosem adott vissza HERE-eredményt (`bump` nem volt exportálva)
+
+- **`lib/mapsProvider.js`** — a `bump()` függvény hozzáadva az `module.exports`-hoz. A `handlers/toll.js`
+  `maps.bump(cid, 'here')`-t hívott a sikeres HERE-hívás után, de a függvény nem volt exportálva →
+  `TypeError` → try/catch elkapta → a HERE-eredmény elveszett, a kód visszaesett az ingyenes becslésre.
+  Megoldás: `bump` exportálva. A „🎯 Pontos (HERE)" jelölőnégyzet + beállított per-cég HERE-kulcs esetén
+  mostantól valóban HERE-eredmény érkezik (`source: 'here'`).
+
+---
+
 ## 2026-06-19 — Galéria-sablonok: minden gomb működik vagy eltűnik (nincs „halott" gomb)
 
 > Folytatás: a sablonok ÖSSZES beépített gombja vagy valódi linkre mutat (reagál kattintásra),
