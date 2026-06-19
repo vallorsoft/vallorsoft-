@@ -28,7 +28,10 @@ router.get('/api/clients/anaf', requireLogin, async (req, res) => {
   if (!cui) return res.status(400).json({ error: 'CUI este obligatoriu.' });
   const validChecksum = svc.validateCui(cui);
   try { res.json({ ...(await svc.anafLookup(cui)), validChecksum }); }
-  catch (e) { res.status(502).json({ error: 'ANAF indisponibil: ' + e.message, validChecksum }); }
+  catch (e) {
+    console.error('ANAF lekérdezés hiba (CUI=' + cui + '):', e.message);
+    res.status(502).json({ error: 'ANAF indisponibil: ' + e.message, validChecksum });
+  }
 });
 
 router.get('/api/clients/:id', requireLogin, async (req, res) => {
