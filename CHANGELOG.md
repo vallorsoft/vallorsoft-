@@ -14,6 +14,31 @@
 
 ---
 
+## 2026-06-20 — ÚJ: ember-olvasható fuvar-szám (CMD-YYYY-XXXX)
+
+- **Gyökér-igény:** a fuvar azonosítója eddig csak a belső, véletlenszerű kulcs volt
+  (`orders.id`, pl. `CMD-MBKZ41X07AF`) — gép-barát, de csúnya és nem sorszámozott.
+  Most minden fuvar kap egy cégenként/évenként növekvő, ember-olvasható fuvar-számot
+  (pl. `CMD-2026-0001`); a belső `orders.id` VÁLTOZATLAN marad (minden FK/hivatkozás
+  rá épül) — a fuvar-szám csak megjelenítési/keresési érték.
+- **`db/order-fuvar-no.sql`** (ÚJ migráció, idempotens) — `orders.fuvar_no VARCHAR(30)`
+  + `idx_orders_fuvar_no (company_id, fuvar_no)`; **visszamenőleges feltöltés** a meglévő
+  fuvarokra (cégenként/évenként, `created_at`-sorrendben) + a `document_series` `CMD`
+  számláló szinkronizálása a backfillelt maximumra, hogy az ÚJ fuvarok onnan folytassák.
+  A sorszámozás a meglévő `document_series` mintát használja (mint a menetlevél MT-YYYY-XXXX).
+- **`lib/orderNo.js`** (ÚJ) — `nextFuvarNo(db, companyId, year)`: cégenként/évenként növekvő
+  fuvar-szám a `document_series`-ből (`doc_type='CMD'`); a `db` lehet pool vagy tranzakciós
+  kliens. Bekötve a 3 fuvar-létrehozó úton (mind best-effort: hiba esetén `fuvar_no=NULL`,
+  a fuvar mentése akkor is fut): **`handlers/orders.js`** `comCreate` + `bulkCreateOrders`,
+  **`routes/inbound-orders.js`** approve.
+- **Megjelenítés:** `comList` visszaadja a `fuvar_no`-t; a **fuvar-lista** első cellája a
+  fuvar-számot mutatja (a belső id tooltipben), az **entitás-adatlap** (`getOrderDetail`/
+  `entity-detail.js`) „Nr. cursă / Fuvar-szám" sorral; a **globális kereső** is keres rá és
+  azt jeleníti meg. i18n `ed.o.fuvarNo` (RO-alap+HU); cache-bust `?v=20260620fno`.
+- **Verifikáció:** valós Postgres 16-on a backfill (cégenként/évenként 1..N), a
+  `document_series` szinkron, a `nextFuvarNo` folytatása és a migráció idempotenciája
+  ellenőrizve; 100 Jest zöld + require-sweep.
+
 ## 2026-06-19 — Fix: ANAF CUI-lekérdezés robusztusság — timeout 25s, SSL cause-logging, jobb hibaüzenetek
 
 - **`services/clients.js`** — `fetchJson` timeout 12 s → 25 s (ANAF lassú); hibaüzenet enrichment: a Node.js `undici`

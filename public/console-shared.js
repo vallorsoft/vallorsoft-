@@ -3830,7 +3830,13 @@ function renderFilteredOrders(list) {
     var editBtn = isCancelled
       ? '<button class="btn ghost vs-act-edit" title="'+t('cs.ol.cancelledLocked')+'" disabled style="opacity:.5;cursor:not-allowed;">✏️</button>'
       : '<button class="btn primary vs-act-edit" title="'+t('cs.ol.mEdit')+'" onclick="openOrderEdit(\''+c.id+'\')">✏️</button>';
-    return '<tr class="vsl-orow vsl-orow-'+sc+'"'+rowStyle+'><td class="vsl-orow-first"><b>'+c.id+'</b></td><td>'+clientCell+'</td>'+
+    // Első cella: az ember-olvasható fuvar-szám (CMD-YYYY-XXXX) látszik, ha van;
+    // a belső azonosító (orders.id) tooltipben elérhető (támogatáshoz). Régi,
+    // fuvar_no nélküli fuvarnál visszaesik a belső id-re.
+    var idCell = c.fuvar_no
+      ? '<b>'+esc(c.fuvar_no)+'</b>'
+      : '<b>'+esc(String(c.id))+'</b>';
+    return '<tr class="vsl-orow vsl-orow-'+sc+'"'+rowStyle+'><td class="vsl-orow-first" title="'+esc(String(c.id))+'">'+idCell+'</td><td>'+clientCell+'</td>'+
       '<td>'+routeCell+'</td>'+
       '<td>'+(c.km||'—')+(c.route_km!=null&&c.route_km!==''?' <span class="badge info" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="'+t('cs.tt.autoRouteKm')+'">🗺️ '+c.route_km+'</span>':'')+'</td><td>'+(c.pret||'—')+'</td>'+
       '<td>'+soferCell+'</td><td>'+esc(c.rendszam_camion||'—')+'</td>'+

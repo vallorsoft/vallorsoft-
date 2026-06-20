@@ -8,6 +8,7 @@ const orderAi = require('../services/order-ai');
 const intake = require('../services/email-intake');
 const { decrypt } = require('../lib/crypto');
 const { genDocId } = require('../lib/ids');
+const { nextFuvarNo } = require('../lib/orderNo');
 const { estimateRoute } = require('../lib/routeEstimate');
 const { featureEnabled } = require('../lib/featureEnabled');
 
@@ -212,6 +213,12 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
     // Tranzakció: fuvar + láb + jóváhagyott státusz EGYÜTT — félbeszakadásnál
     // ne maradjon létrejött fuvar 'feldolgozatlan' inbounddal (újrapróbálásnál
     // az duplikált fuvart eredményezne).
+    // Ember-olvasható fuvar-szám (CMD-YYYY-XXXX) — best-effort; ha elszáll,
+    // a jóváhagyás akkor is fusson (fuvar_no=NULL).
+    let fuvar_no = null;
+    try { fuvar_no = await nextFuvarNo(pool, company_id); }
+    catch (e) { console.error('fuvar_no generálás hiba (approve, a mentés folytatódik):', e.message); }
+
     const dbc = await pool.connect();
     try {
       await dbc.query('BEGIN');
@@ -219,12 +226,12 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
         `INSERT INTO orders (id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
            pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
            rendszam_camion, rendszam_remorca, status, company_id,
-           suly_kg, load_type, hossz_cm, szel_cm, mag_cm, client_id)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
+           suly_kg, load_type, hossz_cm, szel_cm, mag_cm, client_id, fuvar_no)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)`,
         [id, clientName, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
          pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
          rendszam_camion, rendszam_remorca, status, company_id,
-         suly_kg, load_type, hossz_cm, szel_cm, mag_cm, clientId]);
+         suly_kg, load_type, hossz_cm, szel_cm, mag_cm, clientId, fuvar_no]);
       await dbc.query(
         `INSERT INTO order_legs (order_id, leg_number, sofer_type, email_sofer, nume_sofer, firma_extern,
            telefon_extern, external_driver_id, rendszam_camion, rendszam_remorca, loc_preluare, data_preluare, company_id)

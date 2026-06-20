@@ -1610,6 +1610,7 @@
     'ed.tab.legs': { hu: 'Szakaszok', ro: 'Etape' },
     'ed.tab.activity': { hu: 'Aktivitás', ro: 'Activitate' },
     'ed.tab.portal': { hu: 'Portál', ro: 'Portal' },
+    'ed.o.fuvarNo': { hu: 'Fuvar-szám', ro: 'Nr. cursă' },
     'ed.o.ref': { hu: 'Referencia', ro: 'Referință' },
     'ed.o.from': { hu: 'Felrakó', ro: 'Încărcare' },
     'ed.o.to': { hu: 'Lerakó', ro: 'Descărcare' },

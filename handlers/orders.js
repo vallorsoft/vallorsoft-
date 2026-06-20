@@ -6,6 +6,7 @@
 // ============================================================
 const pool = require('../db');
 const { genDocId } = require('../lib/ids');
+const { nextFuvarNo } = require('../lib/orderNo');
 const { getPositions } = require('../lib/vehiclePositions');
 const audit = require('../lib/audit');
 const planLimits = require('../lib/planLimits');
@@ -173,7 +174,7 @@ handlers.comList = async function (req, res, args) {
       let r;
       if (me.pozicio === 'Admin' || me.pozicio === 'Manager') {
         r = await pool.query(
-          `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare,
+          `SELECT o.id, o.fuvar_no, o.client, o.ref, o.loc_incarcare, o.loc_descarcare,
                   o.pret, o.km, o.status, o.sofer_type, o.email_sofer, o.nume_sofer,
                   o.firma_extern, o.telefon_extern, o.rendszam_camion, o.rendszam_remorca,
                   o.load_type, o.hossz_cm, o.szel_cm, o.mag_cm,
@@ -197,7 +198,7 @@ handlers.comList = async function (req, res, args) {
       } else {
         // Sofernek csak a sajat nevere kiosztott fuvarok latszanak
         r = await pool.query(
-          `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare,
+          `SELECT o.id, o.fuvar_no, o.client, o.ref, o.loc_incarcare, o.loc_descarcare,
                   o.pret, o.km, o.status, o.sofer_type, o.email_sofer, o.nume_sofer,
                   o.firma_extern, o.telefon_extern, o.rendszam_camion, o.rendszam_remorca,
                   o.load_type,
@@ -335,6 +336,12 @@ handlers.comCreate = async function (req, res, args) {
       if (sofer_type === 'Intern' && email_sofer) status = 'Alocat';
       else if (sofer_type === 'Extern') status = 'Extern';
 
+      // Ember-olvasható fuvar-szám (CMD-YYYY-XXXX) — best-effort; ha elszáll
+      // (pl. hiányzó document_series), a fuvar mentése akkor is fusson (fuvar_no=NULL).
+      let fuvar_no = null;
+      try { fuvar_no = await nextFuvarNo(pool, company_id); }
+      catch (e) { console.error('fuvar_no generálás hiba (a mentés folytatódik):', e.message); }
+
       // Tranzakció: a fuvar és az első láb együtt jöjjön létre — láb nélküli
       // fuvar ne maradhasson, ha a második INSERT elszáll.
       const dbc = await pool.connect();
@@ -347,9 +354,9 @@ handlers.comCreate = async function (req, res, args) {
             sofer_type, email_sofer, nume_sofer,
             firma_extern, telefon_extern, external_driver_id,
             rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type, route_geo,
-            hossz_cm, szel_cm, mag_cm
+            hossz_cm, szel_cm, mag_cm, fuvar_no
           ) VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26
           )`,
           [
             id, client, ref, loc_incarcare, loc_descarcare,
@@ -358,7 +365,7 @@ handlers.comCreate = async function (req, res, args) {
             firma_extern, telefon_extern, external_driver_id,
             rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type,
             route_geo ? JSON.stringify(route_geo) : null,
-            hossz_cm, szel_cm, mag_cm
+            hossz_cm, szel_cm, mag_cm, fuvar_no
           ]
         );
 
@@ -385,7 +392,7 @@ handlers.comCreate = async function (req, res, args) {
       }
 
       return res.json({ result: {
-        ok: true, id: id,
+        ok: true, id: id, fuvar_no: fuvar_no,
         paired_driver: pair.autoPaired === 'driver' ? (nume_sofer || email_sofer) : null,
         paired_vehicle: pair.autoPaired === 'vehicle' ? rendszam_camion : null,
         paired_trailer: pairedTrailer,
@@ -466,6 +473,10 @@ handlers.bulkCreateOrders = async function (req, res, args) {
         else if (sofer_type === 'Extern') status = 'Extern';
 
         const id = genDocId('CMD');
+        // Ember-olvasható fuvar-szám (CMD-YYYY-XXXX) — best-effort soronként.
+        let fuvar_no = null;
+        try { fuvar_no = await nextFuvarNo(pool, cid); }
+        catch (e) { console.error('fuvar_no generálás hiba (import, a sor folytatódik):', e.message); }
         const dbc = await pool.connect();
         try {
           await dbc.query('BEGIN');
@@ -476,14 +487,14 @@ handlers.bulkCreateOrders = async function (req, res, args) {
               sofer_type, email_sofer, nume_sofer,
               firma_extern, telefon_extern, external_driver_id,
               rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type,
-              hossz_cm, szel_cm, mag_cm, import_extra
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
+              hossz_cm, szel_cm, mag_cm, import_extra, fuvar_no
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)`,
             [id, client, ref, loc_incarcare, loc_descarcare,
              data_incarcare, data_descarcare, pret, km,
              sofer_type, email_sofer, nume_sofer,
              firma_extern, telefon_extern, external_driver_id,
              rendszam_camion, rendszam_remorca, status, cid, suly_kg, load_type,
-             hossz_cm, szel_cm, mag_cm, import_extra ? JSON.stringify(import_extra) : null]);
+             hossz_cm, szel_cm, mag_cm, import_extra ? JSON.stringify(import_extra) : null, fuvar_no]);
           await dbc.query(
             `INSERT INTO order_legs (
               order_id, leg_number, sofer_type, email_sofer, nume_sofer,
