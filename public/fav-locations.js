@@ -29,9 +29,10 @@ window.FavLocations = (function () {
       rows = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:14px;">' + tt('fav.none', 'Nincs mentett helyszín.') + '</td></tr>';
     } else {
       rows = _cache.map(function (f) {
+        var gps = (f.lat != null) ? ' <span title="' + esc((+f.lat).toFixed(4) + ', ' + (+f.lng).toFixed(4)) + '" style="color:var(--status-ok);font-size:11px;">📍</span>' : '';
         return '<tr>' +
           '<td><b class="text-primary">' + esc(f.label) + '</b></td>' +
-          '<td>' + esc(f.address) + '</td>' +
+          '<td>' + esc(f.address) + gps + '</td>' +
           '<td>' + esc(typeLabel(f.type)) + '</td>' +
           '<td style="white-space:nowrap;"><button class="btn danger" style="padding:3px 9px;font-size:12px;" data-del="' + f.id + '">✕</button></td>' +
           '</tr>';
@@ -43,7 +44,7 @@ window.FavLocations = (function () {
         '<p style="color:var(--muted);font-size:13px;margin:0 0 14px;">' + tt('fav.intro', 'Gyakran használt felrakó/lerakó címek a fuvar-űrlap gyors kitöltéséhez.') + '</p>' +
         '<div class="grid-3" style="margin-bottom:12px;">' +
           '<div class="field"><label>' + tt('fav.label', 'Megnevezés') + '</label><input class="input" id="favLabel" maxlength="120"></div>' +
-          '<div class="field" style="grid-column:span 2;"><label>' + tt('fav.address', 'Cím') + '</label><input class="input" id="favAddress" maxlength="300"></div>' +
+          '<div class="field" style="grid-column:span 2;"><label>' + tt('fav.address', 'Cím') + '</label><div class="vs-ac-wrap"><input class="input" id="favAddress" maxlength="300" autocomplete="off"><div class="vs-ac-dd" id="favAddressDD"></div></div></div>' +
           '<div class="field"><label>' + tt('fav.typeLbl', 'Típus') + '</label><select class="select" id="favType">' +
             '<option value="both">' + esc(typeLabel('both')) + '</option>' +
             '<option value="load">' + esc(typeLabel('load')) + '</option>' +
@@ -61,16 +62,22 @@ window.FavLocations = (function () {
     Array.prototype.forEach.call(root.querySelectorAll('[data-del]'), function (b) {
       b.addEventListener('click', function () { doDelete(parseInt(b.getAttribute('data-del'), 10)); });
     });
+    if (typeof vsAttachAutocomplete === 'function') {
+      vsAttachAutocomplete('favAddress', 'favAddressDD', function () { /* lat/lng a input._vsLat/_vsLng-n */ });
+    }
   }
 
   function doSave() {
     var label = (document.getElementById('favLabel') || {}).value || '';
-    var address = (document.getElementById('favAddress') || {}).value || '';
+    var addrEl = document.getElementById('favAddress');
+    var address = (addrEl || {}).value || '';
     var type = (document.getElementById('favType') || {}).value || 'both';
     label = label.trim(); address = address.trim();
     if (!label) { toast(tt('fav.labelReq', 'A megnevezés kötelező.'), 'err'); return; }
     if (!address) { toast(tt('fav.addressReq', 'A cím kötelező.'), 'err'); return; }
-    gas('favLocationSave', [{ label: label, address: address, type: type }]).then(function (r) {
+    var lat = addrEl && addrEl._vsLat != null ? addrEl._vsLat : null;
+    var lng = addrEl && addrEl._vsLng != null ? addrEl._vsLng : null;
+    gas('favLocationSave', [{ label: label, address: address, type: type, lat: lat, lng: lng }]).then(function (r) {
       if (r && r.ok) { toast(tt('common.saved', 'Mentve!'), 'ok'); reload(); }
       else toast((r && r.err) || tt('common.error', 'Hiba'), 'err');
     });
@@ -133,8 +140,11 @@ window.FavLocations = (function () {
         m.innerHTML = '<div style="padding:8px 10px;color:var(--muted);font-size:12.5px;">' + tt('fav.none', 'Nincs mentett helyszín.') + '</div>';
       } else {
         m.innerHTML = rel.map(function (f) {
-          return '<div class="fav-pick-item" data-addr="' + esc(f.address) + '" style="padding:7px 10px;cursor:pointer;border-radius:6px;font-size:13px;">' +
-            '<b class="text-primary">' + esc(f.label) + '</b><div style="font-size:11.5px;color:var(--muted);">' + esc(f.address) + '</div></div>';
+          var lat = f.lat != null ? f.lat : '';
+          var lng = f.lng != null ? f.lng : '';
+          var gpsBadge = f.lat != null ? '<span style="color:var(--status-ok);font-size:10px;margin-left:4px;">📍</span>' : '';
+          return '<div class="fav-pick-item" data-addr="' + esc(f.address) + '" data-lat="' + lat + '" data-lng="' + lng + '" style="padding:7px 10px;cursor:pointer;border-radius:6px;font-size:13px;">' +
+            '<b class="text-primary">' + esc(f.label) + '</b>' + gpsBadge + '<div style="font-size:11.5px;color:var(--muted);">' + esc(f.address) + '</div></div>';
         }).join('');
       }
       document.body.appendChild(m);
@@ -145,8 +155,12 @@ window.FavLocations = (function () {
         el.addEventListener('mousedown', function (ev) {
           ev.preventDefault();
           input.value = el.getAttribute('data-addr');
+          var lat = parseFloat(el.getAttribute('data-lat'));
+          var lng = parseFloat(el.getAttribute('data-lng'));
+          input._vsLat = isNaN(lat) ? null : lat;
+          input._vsLng = isNaN(lng) ? null : lng;
           m.remove();
-          if (typeof onPick === 'function') onPick();
+          if (typeof onPick === 'function') onPick(input._vsLat, input._vsLng);
         });
       });
       setTimeout(function () {

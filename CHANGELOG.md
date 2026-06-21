@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-06-21 — Photon autocomplete javítás: Romania bias + POI cég-találatok
+
+- `lib/mapsProvider.js` — Romania területi bias (`lat=45.9&lon=24.9&location_bias_scale=0.5`),
+  limit 6→8, POI-típus felismerés (amenity/shop/office/craft/...) → utca+házszám a
+  label-ben, duplikáció-szűrés. A cím-autocomplete mostantól az OSM-ben szereplő
+  romániai cégeket/üzleteket is jobban megtalálja.
+
+---
+
 ## 2026-06-21 — Blog rendszer: EasyMDE szerkesztő + slug-alapú URL-ek + sitemap.xml
 
 - **`db/blog-posts.sql`** (ÚJ, idempotens) — `blog_posts` tábla: SERIAL id, egyedi slug,
