@@ -6,7 +6,7 @@
 // ============================================================
 const pool = require('../db');
 const { genDocId } = require('../lib/ids');
-const { nextFuvarNo } = require('../lib/orderNo');
+const { nextFuvarNo, resolveOrderSeries } = require('../lib/orderNo');
 const { getPositions } = require('../lib/vehiclePositions');
 const audit = require('../lib/audit');
 const planLimits = require('../lib/planLimits');
@@ -336,11 +336,14 @@ handlers.comCreate = async function (req, res, args) {
       if (sofer_type === 'Intern' && email_sofer) status = 'Alocat';
       else if (sofer_type === 'Extern') status = 'Extern';
 
-      // Ember-olvasható fuvar-szám (CMD-YYYY-XXXX) — best-effort; ha elszáll
-      // (pl. hiányzó document_series), a fuvar mentése akkor is fusson (fuvar_no=NULL).
+      // Ember-olvasható fuvar-szám (PREFIX-YYYY-XXXX) — a választott (vagy
+      // alapértelmezett) fuvar-széria szerint. Best-effort; ha elszáll (pl.
+      // hiányzó tábla), a fuvar mentése akkor is fusson (fuvar_no=NULL).
       let fuvar_no = null;
-      try { fuvar_no = await nextFuvarNo(pool, company_id); }
-      catch (e) { console.error('fuvar_no generálás hiba (a mentés folytatódik):', e.message); }
+      try {
+        const series = await resolveOrderSeries(pool, company_id, o.series_id);
+        fuvar_no = await nextFuvarNo(pool, company_id, null, series);
+      } catch (e) { console.error('fuvar_no generálás hiba (a mentés folytatódik):', e.message); }
 
       // Tranzakció: a fuvar és az első láb együtt jöjjön létre — láb nélküli
       // fuvar ne maradhasson, ha a második INSERT elszáll.
@@ -419,6 +422,10 @@ handlers.bulkCreateOrders = async function (req, res, args) {
     const cid = req.session.user.company_id;
     const a = (args && args[0]) || {};
     let rows = Array.isArray(a.rows) ? a.rows : [];
+    // A teljes importhoz egy közös fuvar-széria (választott vagy alapértelmezett).
+    let _importSeries = null;
+    try { _importSeries = await resolveOrderSeries(pool, cid, a.series_id); }
+    catch (e) { console.error('import széria-feloldás hiba (folytatás alappal):', e.message); }
     if (!rows.length) return res.json({ result: { ok: false, err: 'Nu exista randuri de importat.' } });
     if (rows.length > 1000) rows = rows.slice(0, 1000); // fair-use felső korlát
 
@@ -473,9 +480,10 @@ handlers.bulkCreateOrders = async function (req, res, args) {
         else if (sofer_type === 'Extern') status = 'Extern';
 
         const id = genDocId('CMD');
-        // Ember-olvasható fuvar-szám (CMD-YYYY-XXXX) — best-effort soronként.
+        // Ember-olvasható fuvar-szám (PREFIX-YYYY-XXXX) — best-effort soronként,
+        // a teljes importra feloldott közös szériával.
         let fuvar_no = null;
-        try { fuvar_no = await nextFuvarNo(pool, cid); }
+        try { fuvar_no = await nextFuvarNo(pool, cid, null, _importSeries); }
         catch (e) { console.error('fuvar_no generálás hiba (import, a sor folytatódik):', e.message); }
         const dbc = await pool.connect();
         try {

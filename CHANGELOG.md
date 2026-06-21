@@ -14,6 +14,35 @@
 
 ---
 
+## 2026-06-21 — Fuvar-sorozatok: cégenként állítható/választható fuvar-szám előtag
+
+- **Igény:** a fuvar-szám előtagja eddig fixen `CMD` volt. Mostantól a cég SAJÁT MAGÁNAK
+  állíthatja (mint a menetlevél-szériát): alapból `CMD`, de **új sorozatot is felvehet,
+  átnevezhet**, beállíthat alapértelmezettet, és **fuvar-kiíráskor választhat** közülük.
+- **Háttér-garancia:** a fuvar valódi azonosítója továbbra is a háttérben generált,
+  cégfüggetlen véletlen kulcs (`orders.id`), és minden lekérdezés `company_id`-szűrt →
+  két cég fuvarjai sosem keverednek, akkor sem, ha azonos fuvar-számot választanak.
+- **`db/order-series.sql`** (ÚJ, idempotens) — `order_series` tábla (megjelenített
+  `prefix` + belső `seq_key` + `is_default`); minden meglévő cég kap egy alapértelmezett
+  `CMD` szériát (`seq_key='CMD'` → a meglévő `document_series` `CMD` számláló folytatódik).
+  A `prefix` ELVÁLIK a `seq_key`-től → az előtag átnevezhető a számlálás megszakítása nélkül.
+- **`lib/orderNo.js`** — `getDefaultSeries` + `resolveOrderSeries(db,cid,seriesId)` (idegen
+  szériát sosem ad — a cég alapértelmezettjére esik vissza) + `nextFuvarNo(db,cid,year,series)`.
+- **`handlers/orderSeries.js`** (ÚJ, regisztrálva) — `orderSeriesList` (Admin/Manager),
+  `orderSeriesSave` (létrehozás/átnevezés), `orderSeriesSetDefault`, `orderSeriesDelete`
+  (az alapértelmezett nem törölhető); CSAK Admin írhat, company_id-szűrt, `prefix`
+  validáció (`[A-Z0-9]{1,10}`, `MT` foglalt), audit minden íráson.
+- **Bekötés:** `handlers/orders.js` `comCreate` (`series_id`) + `bulkCreateOrders`
+  (importonként egy közös széria) + `routes/inbound-orders.js` approve — mind a választott
+  vagy alapértelmezett szériát használja.
+- **UI:** a fuvar-kiíró űrlap „Fuvar-sorozat" választója (`oSeria`, alapértelmezett ★);
+  a Beállítások → Cég & arculat → 📋 Számozás alatt **🚚 Fuvar-sorozatok** kezelő (lista
+  következő számmal, alapértelmezett-jelölés, átnevezés, törlés, új felvétele). i18n
+  `form.seria` + `comset.os.*` (RO-alap+HU); cache-bust `?v=20260621os`.
+- **Verifikáció:** valós Postgres 16-on — default folytatás, új széria független számláló,
+  átnevezés-folytonosság, cross-tenant fallback (idegen széria → saját default), migráció
+  idempotencia; 100 Jest zöld + require-sweep.
+
 ## 2026-06-20 — ÚJ: ember-olvasható fuvar-szám (CMD-YYYY-XXXX)
 
 - **Gyökér-igény:** a fuvar azonosítója eddig csak a belső, véletlenszerű kulcs volt

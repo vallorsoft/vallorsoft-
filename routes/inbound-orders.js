@@ -8,7 +8,7 @@ const orderAi = require('../services/order-ai');
 const intake = require('../services/email-intake');
 const { decrypt } = require('../lib/crypto');
 const { genDocId } = require('../lib/ids');
-const { nextFuvarNo } = require('../lib/orderNo');
+const { nextFuvarNo, resolveOrderSeries } = require('../lib/orderNo');
 const { estimateRoute } = require('../lib/routeEstimate');
 const { featureEnabled } = require('../lib/featureEnabled');
 
@@ -213,11 +213,14 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
     // Tranzakció: fuvar + láb + jóváhagyott státusz EGYÜTT — félbeszakadásnál
     // ne maradjon létrejött fuvar 'feldolgozatlan' inbounddal (újrapróbálásnál
     // az duplikált fuvart eredményezne).
-    // Ember-olvasható fuvar-szám (CMD-YYYY-XXXX) — best-effort; ha elszáll,
-    // a jóváhagyás akkor is fusson (fuvar_no=NULL).
+    // Ember-olvasható fuvar-szám (PREFIX-YYYY-XXXX) — a választott (vagy
+    // alapértelmezett) fuvar-széria szerint. Best-effort; ha elszáll, a
+    // jóváhagyás akkor is fusson (fuvar_no=NULL).
     let fuvar_no = null;
-    try { fuvar_no = await nextFuvarNo(pool, company_id); }
-    catch (e) { console.error('fuvar_no generálás hiba (approve, a mentés folytatódik):', e.message); }
+    try {
+      const series = await resolveOrderSeries(pool, company_id, a.series_id);
+      fuvar_no = await nextFuvarNo(pool, company_id, null, series);
+    } catch (e) { console.error('fuvar_no generálás hiba (approve, a mentés folytatódik):', e.message); }
 
     const dbc = await pool.connect();
     try {

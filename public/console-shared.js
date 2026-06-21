@@ -664,6 +664,7 @@ function createOrder(){
   const p={
     client:document.getElementById('oClient').value.trim(),
     ref:document.getElementById('oRef').value.trim(),
+    series_id:(document.getElementById('oSeria')||{}).value||null,
     pret:document.getElementById('oPret').value,
     km:document.getElementById('oKm').value,
     suly_kg:(document.getElementById('oSuly')||{}).value||null,
@@ -1764,7 +1765,23 @@ function renderOrdersMetricBand(list){
   ]);
 }
 
+// A fuvar-kiíró sorozat-választójának feltöltése (alapértelmezett kijelölve).
+// A választott séria id-je a createOrder payload series_id mezőjébe megy.
+function populateOrderSeriaSelect(){
+  var sel=document.getElementById('oSeria'); if(!sel)return;
+  gas('orderSeriesList').then(function(r){
+    if(!r||!r.ok||!Array.isArray(r.series))return;
+    var prev=sel.value;
+    sel.innerHTML=r.series.map(function(s){
+      return '<option value="'+s.id+'"'+(s.is_default?' selected':'')+'>'+esc(s.prefix)+(s.is_default?' ★':'')+'</option>';
+    }).join('');
+    // Ha volt korábbi kézi választás és még létezik, megtartjuk.
+    if(prev && sel.querySelector('option[value="'+prev+'"]')) sel.value=prev;
+  }).catch(function(){});
+}
+
 function loadOrders(){
+  populateOrderSeriaSelect();
   gas('comList').then(list=>{
     if(!Array.isArray(list))list=[];
     _ordersAllCache = list;
