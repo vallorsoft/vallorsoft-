@@ -47,6 +47,7 @@ if (helmet) {
           "'self'", "'unsafe-inline'",
           "https://cdnjs.cloudflare.com",
           "https://cdn.jsdelivr.net",
+          "https://editor.unlayer.com",
           "https://*.gstatic.com",
           "https://*.googleapis.com",
           "https://*.firebaseio.com",
@@ -57,6 +58,7 @@ if (helmet) {
           "'self'", "'unsafe-inline'",
           "https://cdnjs.cloudflare.com",
           "https://cdn.jsdelivr.net",
+          "https://editor.unlayer.com",
           "https://*.gstatic.com",
           "https://*.googleapis.com",
           "https://*.firebaseio.com",
@@ -80,8 +82,9 @@ if (helmet) {
           "https://*.googleapis.com",
           "wss://*.firebaseio.com",
           "https://api.brevo.com",
+          "https://editor.unlayer.com",
         ],
-        frameSrc: ["'self'"],            // menetlevél PDF in-app nézet (azonos eredetű iframe)
+        frameSrc: ["'self'", "https://editor.unlayer.com"],            // menetlevél PDF in-app nézet (azonos eredetű iframe) + Unlayer editor iframe
         frameAncestors: ["'self'"],      // a PDF-oldal csak azonos eredetből ágyazható
         objectSrc: ["'none'"],
         upgradeInsecureRequests: [],

@@ -9,10 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-  <!-- GrapesJS + newsletter preset (CSP: csak cdn.jsdelivr.net engedett) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/grapesjs@0.21.13/dist/css/grapes.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/grapesjs@0.21.13/dist/grapes.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/grapesjs-preset-newsletter@1.0.2/dist/index.js"></script>
+  <!-- Unlayer email editor (ingyenes, drag&drop, képfeltöltés) -->
+  <script src="https://editor.unlayer.com/embed.js"></script>
   <script src="/i18n.js?v=20260618roles"></script>
   <script src="/session-guard.js?v=20260614qa"></script>
   <style>
@@ -74,7 +72,7 @@
     .btn.sm{ padding:5px 10px; font-size:.8rem; }
     .btn:disabled{ opacity:.55; cursor:not-allowed; }
 
-    #gjs-box{ border:1px solid var(--line); border-radius:var(--r-sm); overflow:hidden; margin-top:14px; }
+    #editor-container{ border:1px solid var(--line); border-radius:var(--r-sm); overflow:hidden; margin-top:14px; height:520px; }
     .eb-actions{ margin-top:14px; display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; }
 
     .eb-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; }
@@ -181,10 +179,7 @@
           </div>
         </div>
         <div class="eb-hint" data-i18n-html="eb.varHint">💡 Tipp: használj <code>{{nev}}</code>, <code>{{cegnev}}</code>, <code>{{datum}}</code> helyőrzőket — kiküldéskor automatikusan kitöltődnek.</div>
-        <div style="margin-bottom:10px;">
-          <button class="btn ghost sm" type="button" onclick="ebInsertLogo()" data-i18n="eb.insertLogo">🖼️ Céges logó beszúrása</button>
-        </div>
-        <div id="gjs-box"><div id="gjs"></div></div>
+        <div id="editor-container"></div>
         <div class="eb-actions">
           <button class="btn ghost" type="button" onclick="ebNewTemplate()" data-i18n="eb.clear">🧹 Új / ürítés</button>
           <button id="btn-save-tpl" class="btn primary" type="button" onclick="ebSaveTemplate()" data-i18n="eb.saveTpl">💾 Sablon mentése</button>
@@ -353,7 +348,7 @@
 
   <div id="toast-box"></div>
 
-  <script src="/email-gallery.js?v=20260619btn"></script>
-  <script src="/email-builder.js?v=20260618dedup"></script>
+  <script src="/email-gallery.js?v=20260621ul"></script>
+  <script src="/email-builder.js?v=20260621ul"></script>
 </body>
 </html>
