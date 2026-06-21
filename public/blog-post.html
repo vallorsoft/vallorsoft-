@@ -3,13 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Blog — VallorSoft</title>
+  <title id="metaTitle">Blog — VallorSoft</title>
+  <meta name="description" id="metaDesc" content="Blog VallorSoft — resurse pentru transportatori">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="VallorSoft">
+  <meta property="og:title" id="ogTitle" content="Blog — VallorSoft">
+  <meta property="og:description" id="ogDesc" content="">
+  <meta property="og:image" id="ogImage" content="">
+  <link rel="canonical" id="canonicalLink" href="">
+  <script type="application/ld+json" id="ldJson"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/landing.css">
   <style>
-    /* ── Blog cikk oldal ── */
     .bp-hero {
       background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
       padding: 100px 24px 56px;
@@ -34,7 +41,12 @@
       line-height: 1.2;
       color: #f1f5f9;
       max-width: 760px;
-      margin: 0 auto 24px;
+      margin: 0 auto 16px;
+    }
+    .bp-hero-meta {
+      color: #94a3b8;
+      font-size: 13px;
+      margin-bottom: 8px;
     }
     .bp-hero-back {
       display: inline-flex;
@@ -44,12 +56,10 @@
       font-size: 13px;
       font-weight: 600;
       text-decoration: none;
-      margin-top: 8px;
+      margin-top: 12px;
       transition: color .2s;
     }
     .bp-hero-back:hover { color: #a5b4fc; }
-
-    /* ── Tartalom terület ── */
     .bp-body {
       background: #f8fafc;
       min-height: 50vh;
@@ -63,26 +73,22 @@
       box-shadow: 0 1px 4px rgba(0,0,0,.06), 0 4px 24px rgba(0,0,0,.04);
       padding: 48px 56px;
     }
-    @media (max-width: 600px) {
-      .bp-article { padding: 28px 20px; }
+    @media (max-width: 600px) { .bp-article { padding: 28px 20px; } }
+    .bp-cover {
+      width: 100%;
+      border-radius: 10px;
+      margin-bottom: 32px;
+      max-height: 320px;
+      object-fit: cover;
+      display: none;
     }
     .bp-content {
       font-size: 16px;
       line-height: 1.85;
       color: #334155;
     }
-    .bp-content h2 {
-      font-size: 1.35rem;
-      font-weight: 700;
-      margin: 2.2em 0 .65em;
-      color: #0f172a;
-    }
-    .bp-content h3 {
-      font-size: 1.1rem;
-      font-weight: 700;
-      margin: 1.8em 0 .5em;
-      color: #1e293b;
-    }
+    .bp-content h2 { font-size: 1.35rem; font-weight: 700; margin: 2.2em 0 .65em; color: #0f172a; }
+    .bp-content h3 { font-size: 1.1rem; font-weight: 700; margin: 1.8em 0 .5em; color: #1e293b; }
     .bp-content p { margin-bottom: 1.1em; }
     .bp-content ul, .bp-content ol { margin: .4em 0 1.1em 1.6em; }
     .bp-content li { margin-bottom: .45em; }
@@ -95,23 +101,30 @@
       font-style: italic;
       margin: 1.5em 0;
     }
-    .bp-empty {
-      color: #94a3b8;
-      font-size: 15px;
-      text-align: center;
-      padding: 48px 0;
+    .bp-content code {
+      background: #f1f5f9;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: .88em;
+      font-family: 'Fira Mono', 'Courier New', monospace;
     }
-    .bp-loading {
-      color: #6366f1;
-      text-align: center;
-      padding: 48px 0;
-      font-size: 15px;
+    .bp-content pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      border-radius: 8px;
+      padding: 16px 20px;
+      overflow-x: auto;
+      margin: 1.2em 0;
     }
-    .bp-divider {
-      border: none;
-      border-top: 1px solid #e2e8f0;
-      margin: 40px 0;
-    }
+    .bp-content pre code { background: none; padding: 0; color: inherit; }
+    .bp-content table { width: 100%; border-collapse: collapse; margin: 1.2em 0; }
+    .bp-content th, .bp-content td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; }
+    .bp-content th { background: #f8fafc; font-weight: 600; }
+    .bp-content img { max-width: 100%; border-radius: 8px; margin: 1em 0; }
+    .bp-content hr { border: none; border-top: 1px solid #e2e8f0; margin: 2em 0; }
+    .bp-empty { color: #94a3b8; font-size: 15px; text-align: center; padding: 48px 0; }
+    .bp-loading { color: #6366f1; text-align: center; padding: 48px 0; font-size: 15px; }
+    .bp-divider { border: none; border-top: 1px solid #e2e8f0; margin: 40px 0; }
     .bp-cta {
       background: linear-gradient(135deg, #3b82f6, #6366f1);
       border-radius: 12px;
@@ -133,11 +146,12 @@
       transition: opacity .2s;
     }
     .bp-cta a:hover { opacity: .9; }
+    .bp-all-link { display: block; text-align: center; margin-top: 24px; color: #6366f1; font-size: 14px; font-weight: 600; text-decoration: none; }
+    .bp-all-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
 
-<!-- NAVBAR -->
 <header class="lp-navbar" id="navbar">
   <div class="lp-container lp-navbar-inner">
     <a href="/" class="lp-logo">
@@ -145,7 +159,7 @@
     </a>
     <nav class="lp-nav-menu">
       <ul class="lp-nav-list">
-        <li><a href="/#blog" class="lp-nav-link" id="navBackBlog">← Blog</a></li>
+        <li><a href="/blog" class="lp-nav-link" id="navBlog">Blog</a></li>
         <li><a href="/login" class="lp-nav-link" id="navLogin">Autentificare</a></li>
       </ul>
     </nav>
@@ -153,29 +167,29 @@
   </div>
 </header>
 
-<!-- HERO SÁV (cím betöltés előtt üres, JS tölti ki) -->
 <div class="bp-hero" id="postHero">
-  <span class="bp-hero-tag" id="postTag">Blog</span>
+  <span class="bp-hero-tag">Blog</span>
   <h1 class="bp-hero-title" id="postTitle">
     <span class="bp-loading" id="loadingMsg">Se încarcă...</span>
   </h1>
-  <a href="/#blog" class="bp-hero-back" id="backLink">← Blog</a>
+  <p class="bp-hero-meta" id="postDate"></p>
+  <a href="/blog" class="bp-hero-back" id="backLink">← Blog</a>
 </div>
 
-<!-- TARTALOM -->
 <div class="bp-body">
   <div class="bp-article">
+    <img id="coverImg" class="bp-cover" alt="">
     <div class="bp-content" id="postContent"></div>
     <hr class="bp-divider" id="ctaDivider" style="display:none;">
     <div class="bp-cta" id="postCta" style="display:none;">
-      <h3 id="ctaTitle">Próbálja ki a VallorSoft-ot ingyen</h3>
-      <p id="ctaSubtitle">14 nap ingyenesen — bankkártya nélkül, bármikor lemondható.</p>
-      <a href="/register" id="ctaBtn">Ingyenes próba indítása</a>
+      <h3 id="ctaTitle">Încercați VallorSoft gratuit</h3>
+      <p id="ctaSubtitle">14 zile gratuit — fără card bancar, anulare oricând.</p>
+      <a href="/register" id="ctaBtn">Începeți testarea gratuită</a>
     </div>
+    <a href="/blog" class="bp-all-link" id="allPostsLink">← Toate articolele</a>
   </div>
 </div>
 
-<!-- FOOTER -->
 <footer class="lp-footer" style="padding: 32px 0;">
   <div class="lp-container">
     <div style="text-align:center;border-top:1px solid rgba(255,255,255,0.08);padding-top:24px;">
@@ -187,101 +201,123 @@
   </div>
 </footer>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 <script>
 (function() {
   var TRANS = {
     ro: {
-      back: '← Blog',
-      loading: 'Se încarcă...',
-      notFound: 'Articolul nu a fost găsit.',
-      noContent: 'Conținut indisponibil momentan.',
-      tag: 'Blog',
+      back: '← Blog', allPosts: '← Toate articolele', loading: 'Se încarcă...',
+      notFound: 'Articolul nu a fost găsit.', noContent: 'Conținut indisponibil momentan.',
       ctaTitle: 'Încercați VallorSoft gratuit',
       ctaSubtitle: '14 zile gratuit — fără card bancar, anulare oricând.',
       ctaBtn: 'Începeți testarea gratuită',
-      navBack: '← Blog',
-      navLogin: 'Autentificare',
+      navBlog: 'Blog', navLogin: 'Autentificare',
     },
     hu: {
-      back: '← Blog',
-      loading: 'Betöltés...',
-      notFound: 'A cikk nem található.',
-      noContent: 'A tartalom jelenleg nem érhető el.',
-      tag: 'Blog',
+      back: '← Blog', allPosts: '← Összes cikk', loading: 'Betöltés...',
+      notFound: 'A cikk nem található.', noContent: 'A tartalom jelenleg nem érhető el.',
       ctaTitle: 'Próbálja ki a VallorSoft-ot ingyen',
       ctaSubtitle: '14 nap ingyenesen — bankkártya nélkül, bármikor lemondható.',
       ctaBtn: 'Ingyenes próba indítása',
-      navBack: '← Blog',
-      navLogin: 'Bejelentkezés',
+      navBlog: 'Blog', navLogin: 'Bejelentkezés',
     }
   };
 
   var lang = localStorage.getItem('vs-lang') || 'ro';
   var t = TRANS[lang] || TRANS.ro;
 
-  // Navbar szövegek
-  document.getElementById('navBackBlog').textContent = t.navBack;
+  document.getElementById('navBlog').textContent = t.navBlog;
   document.getElementById('navLogin').textContent = t.navLogin;
   document.getElementById('backLink').textContent = t.back;
-  document.getElementById('postTag').textContent = t.tag;
+  document.getElementById('allPostsLink').textContent = t.allPosts;
   document.getElementById('loadingMsg').textContent = t.loading;
-
-  // Nyelv-gomb
-  var btn = document.getElementById('languageToggle');
-  btn.textContent = lang === 'ro' ? 'HU' : 'RO';
-  btn.addEventListener('click', function() {
-    localStorage.setItem('vs-lang', lang === 'ro' ? 'hu' : 'ro');
-    location.reload();
-  });
-
-  // CTA fordítás
   document.getElementById('ctaTitle').textContent = t.ctaTitle;
   document.getElementById('ctaSubtitle').textContent = t.ctaSubtitle;
   document.getElementById('ctaBtn').textContent = t.ctaBtn;
 
-  // Blog cikk id az URL-ből
-  var parts = window.location.pathname.split('/').filter(Boolean);
-  var id = parseInt(parts[parts.length - 1], 10);
+  var langBtn = document.getElementById('languageToggle');
+  langBtn.textContent = lang === 'ro' ? 'HU' : 'RO';
+  langBtn.addEventListener('click', function() {
+    localStorage.setItem('vs-lang', lang === 'ro' ? 'hu' : 'ro');
+    location.reload();
+  });
+
+  // Slug az URL-ből
+  var slug = window.location.pathname.replace(/^\/blog\//, '').replace(/\/$/, '');
   var titleEl = document.getElementById('postTitle');
   var contentEl = document.getElementById('postContent');
 
-  if (![1, 2, 3].includes(id)) {
+  if (!slug) {
     titleEl.textContent = t.notFound;
     return;
   }
 
-  // Cikk betöltése
-  fetch('/api/blog/' + id)
+  fetch('/api/blog/' + encodeURIComponent(slug))
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      if (!d.ok) {
-        titleEl.textContent = t.notFound;
-        return;
-      }
-      var title   = lang === 'hu' ? (d.titleHu   || d.title)   : d.title;
-      var content = lang === 'hu' ? (d.contentHu || d.content) : d.content;
+      if (!d.ok || !d.post) { titleEl.textContent = t.notFound; return; }
+      var p = d.post;
+      var title   = lang === 'hu' ? (p.title_hu   || p.title_ro)   : p.title_ro;
+      var content = lang === 'hu' ? (p.content_hu || p.content_ro) : p.content_ro;
+      var excerpt = lang === 'hu' ? (p.excerpt_hu || p.excerpt_ro) : p.excerpt_ro;
+      var meta    = lang === 'hu' ? (p.meta_desc_hu || p.meta_desc_ro) : p.meta_desc_ro;
 
-      // Cím frissítése
+      // Cím
       titleEl.textContent = title || t.notFound;
       document.title = (title || 'Blog') + ' — VallorSoft';
 
+      // Dátum
+      if (p.published_at) {
+        var dt = new Date(p.published_at);
+        document.getElementById('postDate').textContent = dt.toLocaleDateString(lang === 'hu' ? 'hu-HU' : 'ro-RO', { year:'numeric', month:'long', day:'numeric' });
+      }
+
+      // Meta tagek
+      var desc = meta || excerpt || '';
+      document.getElementById('metaDesc').setAttribute('content', desc);
+      document.getElementById('ogTitle').setAttribute('content', title || 'Blog — VallorSoft');
+      document.getElementById('ogDesc').setAttribute('content', desc);
+      var base = window.location.origin;
+      document.getElementById('canonicalLink').setAttribute('href', base + '/blog/' + p.slug);
+
+      if (p.cover_image_url) {
+        document.getElementById('ogImage').setAttribute('content', p.cover_image_url);
+        var img = document.getElementById('coverImg');
+        img.src = p.cover_image_url;
+        img.style.display = 'block';
+      }
+
+      // Article structured data
+      document.getElementById('ldJson').textContent = JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        headline: title,
+        description: desc,
+        url: base + '/blog/' + p.slug,
+        datePublished: p.published_at,
+        dateModified: p.updated_at || p.published_at,
+        author: { '@type': 'Organization', name: 'VallorSoft' },
+        publisher: { '@type': 'Organization', name: 'VallorSoft', url: base }
+      });
+
+      // Markdown → HTML (marked.js)
       if (content) {
-        contentEl.innerHTML = content;
-        // CTA megjelenítése ha van tartalom
+        if (typeof marked !== 'undefined') {
+          contentEl.innerHTML = marked.parse(content);
+        } else {
+          // fallback: plain text
+          contentEl.textContent = content;
+        }
         document.getElementById('ctaDivider').style.display = '';
         document.getElementById('postCta').style.display = '';
       } else {
         contentEl.innerHTML = '<p class="bp-empty">' + t.noContent + '</p>';
       }
     })
-    .catch(function() {
-      titleEl.textContent = t.notFound;
-    });
+    .catch(function() { titleEl.textContent = t.notFound; });
 
-  // Navbar sticky scroll
-  var navbar = document.getElementById('navbar');
   window.addEventListener('scroll', function() {
-    navbar.classList.toggle('scrolled', window.scrollY > 20);
+    document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 20);
   });
 })();
 </script>

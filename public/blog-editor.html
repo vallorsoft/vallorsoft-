@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Blog kezelő — VallorSoft Developer</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/easymde/2.18.0/easymde.min.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, 'Segoe UI', sans-serif; background: #f1f5f9; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+    /* Topbar */
+    .be-top {
+      height: 48px; background: #fff; border-bottom: 1px solid #e2e8f0;
+      display: flex; align-items: center; padding: 0 16px; gap: 12px; flex-shrink: 0;
+    }
+    .be-top-title { font-size: 15px; font-weight: 700; color: #0f172a; flex: 1; }
+    .be-back { color: #64748b; text-decoration: none; font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 6px; }
+    .be-back:hover { background: #f1f5f9; }
+
+    /* Body */
+    .be-body { display: flex; flex: 1; overflow: hidden; }
+
+    /* Post list panel */
+    .be-list-panel {
+      width: 260px; flex-shrink: 0; background: #fff; border-right: 1px solid #e2e8f0;
+      display: flex; flex-direction: column;
+    }
+    .be-list-header {
+      padding: 12px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 8px;
+    }
+    .be-list-heading { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; flex: 1; }
+    .be-new-btn {
+      padding: 5px 12px; background: linear-gradient(135deg,#3b82f6,#6366f1); color: #fff;
+      border: none; border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
+    }
+    .be-new-btn:hover { opacity: .9; }
+    .be-list-scroll { flex: 1; overflow-y: auto; padding: 8px; }
+    .be-post-row {
+      padding: 9px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 2px;
+      border: 1.5px solid transparent; transition: background .12s, border-color .12s;
+    }
+    .be-post-row:hover { background: #f8fafc; }
+    .be-post-row.active { background: #eff6ff; border-color: #bfdbfe; }
+    .be-post-title { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.35; margin-bottom: 3px; }
+    .be-post-meta { font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 6px; }
+    .be-status { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+    .be-status.pub { background: #dcfce7; color: #16a34a; }
+    .be-status.draft { background: #f1f5f9; color: #64748b; }
+    .be-empty-list { padding: 32px 12px; text-align: center; color: #94a3b8; font-size: 13px; }
+
+    /* Editor panel */
+    .be-editor-panel {
+      flex: 1; overflow-y: auto; background: #f8fafc; display: flex; flex-direction: column;
+    }
+    .be-no-sel {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      color: #94a3b8; font-size: 15px; text-align: center; padding: 32px;
+    }
+    .be-form { padding: 20px 28px; max-width: 900px; width: 100%; }
+
+    /* Form elements */
+    .be-row { margin-bottom: 16px; }
+    .be-label { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px; display: block; }
+    .be-input {
+      width: 100%; padding: 8px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px;
+      font-size: 14px; color: #1e293b; font-family: inherit; background: #fff;
+    }
+    .be-input:focus { outline: none; border-color: #6366f1; }
+    .be-slug-row { display: flex; gap: 8px; }
+    .be-slug-row .be-input { flex: 1; font-family: 'Fira Mono', monospace; font-size: 13px; }
+    .be-auto-btn {
+      padding: 8px 14px; background: #f1f5f9; border: 1.5px solid #e2e8f0;
+      border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; color: #334155;
+      white-space: nowrap;
+    }
+    .be-auto-btn:hover { background: #e2e8f0; }
+    .be-meta-row { display: flex; align-items: flex-start; gap: 8px; }
+    .be-meta-row .be-input { flex: 1; }
+    .be-meta-count { font-size: 11px; color: #94a3b8; white-space: nowrap; padding-top: 10px; min-width: 44px; }
+    .be-meta-count.warn { color: #f59e0b; }
+    .be-meta-count.ok { color: #22c55e; }
+
+    /* Lang tabs */
+    .be-tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+    .be-tab {
+      padding: 7px 16px; border-radius: 8px; border: 1.5px solid #e2e8f0;
+      font-size: 13px; font-weight: 700; cursor: pointer; background: #fff; color: #475569;
+    }
+    .be-tab.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+
+    /* Dividers */
+    .be-divider { border: none; border-top: 1px solid #e2e8f0; margin: 20px 0; }
+    .be-section-title { font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 12px; }
+
+    /* Publish toggle */
+    .be-pub-row { display: flex; align-items: center; gap: 10px; }
+    .be-pub-check { width: 16px; height: 16px; cursor: pointer; }
+    .be-pub-label { font-size: 14px; color: #1e293b; font-weight: 500; cursor: pointer; }
+
+    /* Action buttons */
+    .be-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+    .be-save-btn {
+      padding: 9px 22px; background: linear-gradient(135deg,#3b82f6,#6366f1); color: #fff;
+      border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+    .be-save-btn:hover { opacity: .9; }
+    .be-del-btn {
+      padding: 9px 18px; background: #fff; color: #ef4444;
+      border: 1.5px solid #fecaca; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+    .be-del-btn:hover { background: #fff1f2; }
+    .be-preview-btn {
+      padding: 9px 18px; background: #fff; color: #6366f1;
+      border: 1.5px solid #c7d2fe; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
+    }
+    .be-preview-btn:hover { background: #f5f3ff; }
+    .be-msg { font-size: 12px; padding: 6px 10px; border-radius: 6px; display: none; margin-top: 8px; }
+    .be-msg.ok { background: #dcfce7; color: #16a34a; display: block; }
+    .be-msg.err { background: #fee2e2; color: #dc2626; display: block; }
+
+    /* EasyMDE override — téma illeszkedés */
+    .EasyMDEContainer .CodeMirror { border-radius: 0 0 8px 8px; font-size: 14px; min-height: 320px; }
+    .editor-toolbar { border-radius: 8px 8px 0 0; background: #f8fafc; border-color: #e2e8f0; }
+    .editor-toolbar button { color: #475569 !important; }
+    .editor-preview { background: #fff; padding: 20px; }
+    .editor-statusbar { border-color: #e2e8f0; font-size: 11px; color: #94a3b8; }
+    .EasyMDEContainer { border: 1.5px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+    .EasyMDEContainer:focus-within { border-color: #6366f1; }
+  </style>
+</head>
+<body>
+
+<div class="be-top">
+  <div class="be-top-title">📰 Blog kezelő</div>
+  <a href="/developer" class="be-back">← Developer</a>
+  <a href="/blog" target="_blank" class="be-back">🌐 Élő blog ↗</a>
+</div>
+
+<div class="be-body">
+  <!-- Bal panel: poszt lista -->
+  <div class="be-list-panel">
+    <div class="be-list-header">
+      <span class="be-list-heading">Cikkek</span>
+      <button class="be-new-btn" onclick="newPost()">➕ Új</button>
+    </div>
+    <div class="be-list-scroll" id="postList">
+      <div class="be-empty-list" id="listLoading">Betöltés...</div>
+    </div>
+  </div>
+
+  <!-- Jobb panel: szerkesztő -->
+  <div class="be-editor-panel" id="editorPanel">
+    <div class="be-no-sel" id="noSel">
+      <div>
+        <div style="font-size:48px;margin-bottom:12px;">📰</div>
+        <div>← Válassz egy cikket<br>vagy hozz létre újat</div>
+      </div>
+    </div>
+
+    <div class="be-form" id="editForm" style="display:none;">
+      <!-- Slug -->
+      <div class="be-row">
+        <label class="be-label" for="fSlug">URL slug <span style="color:#94a3b8;font-weight:400">(pl. e-factura-2026-ghid)</span></label>
+        <div class="be-slug-row">
+          <input class="be-input" id="fSlug" type="text" placeholder="slug-url-cikk" oninput="validateSlug()">
+          <button class="be-auto-btn" onclick="autoSlug()">⚡ Auto</button>
+        </div>
+        <div id="slugMsg" style="font-size:11px;color:#ef4444;margin-top:3px;min-height:14px;"></div>
+      </div>
+
+      <!-- Nyelv fülek -->
+      <div class="be-tabs">
+        <button class="be-tab active" id="tabRo" onclick="setLang('ro')">🇷🇴 Román</button>
+        <button class="be-tab" id="tabHu" onclick="setLang('hu')">🇭🇺 Magyar</button>
+      </div>
+
+      <!-- Román mezők -->
+      <div id="langRo">
+        <div class="be-row">
+          <label class="be-label" for="fTitleRo">Cím (román)</label>
+          <input class="be-input" id="fTitleRo" type="text" placeholder="Titlul articolului în română">
+        </div>
+        <div class="be-row">
+          <label class="be-label" for="fExcerptRo">Rövid leírás / kivonat (román) <span style="color:#94a3b8;font-weight:400">— lista oldal kártyáján jelenik meg</span></label>
+          <textarea class="be-input" id="fExcerptRo" rows="2" placeholder="1-2 mondat a cikk tartalmáról (románul)..." style="resize:vertical;"></textarea>
+        </div>
+        <div class="be-row">
+          <label class="be-label" for="fMetaRo">Meta leírás SEO (román) <span style="color:#94a3b8;font-weight:400">— Google keresőeredményben jelenik meg</span></label>
+          <div class="be-meta-row">
+            <input class="be-input" id="fMetaRo" type="text" placeholder="Max 160 karakter — mit lát a Google..." oninput="updateMetaCount('Ro')">
+            <span class="be-meta-count" id="metaCountRo">0/160</span>
+          </div>
+        </div>
+        <div class="be-row">
+          <label class="be-label">Tartalom (román) — Markdown szerkesztő</label>
+          <div id="editorRoWrap"><textarea id="fContentRo"></textarea></div>
+        </div>
+      </div>
+
+      <!-- Magyar mezők -->
+      <div id="langHu" style="display:none;">
+        <div class="be-row">
+          <label class="be-label" for="fTitleHu">Cím (magyar)</label>
+          <input class="be-input" id="fTitleHu" type="text" placeholder="A cikk címe magyarul">
+        </div>
+        <div class="be-row">
+          <label class="be-label" for="fExcerptHu">Rövid leírás / kivonat (magyar)</label>
+          <textarea class="be-input" id="fExcerptHu" rows="2" placeholder="1-2 mondat a cikk tartalmáról (magyarul)..." style="resize:vertical;"></textarea>
+        </div>
+        <div class="be-row">
+          <label class="be-label" for="fMetaHu">Meta leírás SEO (magyar)</label>
+          <div class="be-meta-row">
+            <input class="be-input" id="fMetaHu" type="text" placeholder="Max 160 karakter..." oninput="updateMetaCount('Hu')">
+            <span class="be-meta-count" id="metaCountHu">0/160</span>
+          </div>
+        </div>
+        <div class="be-row">
+          <label class="be-label">Tartalom (magyar) — Markdown szerkesztő</label>
+          <div id="editorHuWrap"><textarea id="fContentHu"></textarea></div>
+        </div>
+      </div>
+
+      <hr class="be-divider">
+
+      <!-- Borítókép -->
+      <div class="be-row">
+        <label class="be-label" for="fCover">Borítókép URL <span style="color:#94a3b8;font-weight:400">(opcionális, https://...)</span></label>
+        <input class="be-input" id="fCover" type="url" placeholder="https://example.com/kep.jpg">
+      </div>
+
+      <!-- Publikálás -->
+      <div class="be-row">
+        <div class="be-pub-row">
+          <input type="checkbox" class="be-pub-check" id="fPublished">
+          <label class="be-pub-label" for="fPublished">🌐 Megjelent (publikusan elérhető a /blog oldalon)</label>
+        </div>
+      </div>
+
+      <!-- Gombok -->
+      <div class="be-actions">
+        <button class="be-save-btn" onclick="savePost()">💾 Mentés</button>
+        <a id="previewLink" href="#" target="_blank" class="be-preview-btn">👁 Előnézet ↗</a>
+        <button class="be-del-btn" onclick="deletePost()">🗑️ Törlés</button>
+      </div>
+      <div class="be-msg" id="saveMsg"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/easymde/2.18.0/easymde.min.js"></script>
+<script>
+var _posts = [];
+var _curId = null;
+var _lang = 'ro';
+var _emdRo = null;
+var _emdHu = null;
+
+var EMD_OPTS = {
+  spellChecker: false,
+  autosave: { enabled: false },
+  status: ['lines', 'words', 'cursor'],
+  toolbar: [
+    'bold','italic','heading','|',
+    'unordered-list','ordered-list','|',
+    'link','image','table','|',
+    'code','blockquote','horizontal-rule','|',
+    'preview','side-by-side','fullscreen','|',
+    'guide'
+  ],
+  previewImagesInEditor: true,
+};
+
+function gas(fn, args) {
+  return fetch('/api/execute', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: fn, arguments: args || {} })
+  }).then(function(r) { return r.json(); }).then(function(d) { return d && d.result; });
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Poszt lista betöltése ─────────────────────────────────────
+function loadList() {
+  gas('devListBlogPosts', {}).then(function(r) {
+    _posts = (r && r.posts) || [];
+    renderList();
+  });
+}
+
+function renderList() {
+  var el = document.getElementById('postList');
+  if (!_posts.length) {
+    el.innerHTML = '<div class="be-empty-list">Még nincs cikk.<br>Kattints az ➕ Új gombra!</div>';
+    return;
+  }
+  el.innerHTML = _posts.map(function(p) {
+    var title = p.title_ro || p.title_hu || '(Cím nélkül)';
+    var dt = p.published_at ? new Date(p.published_at).toLocaleDateString('hu-HU', {year:'numeric',month:'2-digit',day:'2-digit'}) : '';
+    return '<div class="be-post-row' + (p.id === _curId ? ' active' : '') + '" onclick="openPost(' + p.id + ')">' +
+      '<div class="be-post-title">' + escHtml(title) + '</div>' +
+      '<div class="be-post-meta">' +
+        '<span class="be-status ' + (p.is_published ? 'pub' : 'draft') + '">' + (p.is_published ? '● Megjelent' : '○ Piszkozat') + '</span>' +
+        (dt ? '<span>' + dt + '</span>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// ── Poszt megnyitása szerkesztésre ───────────────────────────
+function openPost(id) {
+  gas('devGetBlogPost', { id: id }).then(function(r) {
+    if (!r || !r.ok) { alert('Nem sikerült betölteni.'); return; }
+    var p = r.post;
+    _curId = id;
+    renderList();
+    fillForm(p);
+  });
+}
+
+function fillForm(p) {
+  document.getElementById('noSel').style.display = 'none';
+  document.getElementById('editForm').style.display = 'block';
+
+  document.getElementById('fSlug').value = p.slug || '';
+  document.getElementById('fTitleRo').value = p.title_ro || '';
+  document.getElementById('fTitleHu').value = p.title_hu || '';
+  document.getElementById('fExcerptRo').value = p.excerpt_ro || '';
+  document.getElementById('fExcerptHu').value = p.excerpt_hu || '';
+  document.getElementById('fMetaRo').value = p.meta_desc_ro || '';
+  document.getElementById('fMetaHu').value = p.meta_desc_hu || '';
+  document.getElementById('fCover').value = p.cover_image_url || '';
+  document.getElementById('fPublished').checked = !!p.is_published;
+  updateMetaCount('Ro');
+  updateMetaCount('Hu');
+
+  var previewLink = document.getElementById('previewLink');
+  previewLink.href = '/blog/' + (p.slug || '');
+
+  // EasyMDE inicializálás
+  initEditors(p.content_ro || '', p.content_hu || '');
+  setLang(_lang);
+  hideSaveMsg();
+}
+
+function initEditors(contentRo, contentHu) {
+  // Elpusztítjuk a régi editorokat
+  if (_emdRo) { try { _emdRo.toTextArea(); } catch(e){} _emdRo = null; }
+  if (_emdHu) { try { _emdHu.toTextArea(); } catch(e){} _emdHu = null; }
+
+  // Visszaállítjuk a textarea-kat (toTextArea eltávolítja a textarea-t, újra kell injektálni)
+  document.getElementById('editorRoWrap').innerHTML = '<textarea id="fContentRo"></textarea>';
+  document.getElementById('editorHuWrap').innerHTML = '<textarea id="fContentHu"></textarea>';
+
+  _emdRo = new EasyMDE(Object.assign({}, EMD_OPTS, { element: document.getElementById('fContentRo'), initialValue: contentRo }));
+  _emdHu = new EasyMDE(Object.assign({}, EMD_OPTS, { element: document.getElementById('fContentHu'), initialValue: contentHu }));
+}
+
+// ── Nyelv váltó ───────────────────────────────────────────────
+function setLang(lang) {
+  _lang = lang;
+  document.getElementById('tabRo').classList.toggle('active', lang === 'ro');
+  document.getElementById('tabHu').classList.toggle('active', lang === 'hu');
+  document.getElementById('langRo').style.display = lang === 'ro' ? '' : 'none';
+  document.getElementById('langHu').style.display = lang === 'hu' ? '' : 'none';
+  // CodeMirror el lett rejtve, frissíteni kell
+  if (lang === 'ro' && _emdRo) setTimeout(function(){ _emdRo.codemirror.refresh(); }, 10);
+  if (lang === 'hu' && _emdHu) setTimeout(function(){ _emdHu.codemirror.refresh(); }, 10);
+}
+
+// ── Slug auto-generálás ───────────────────────────────────────
+function autoSlug() {
+  var title = document.getElementById('fTitleRo').value || document.getElementById('fTitleHu').value || '';
+  var slug = title
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/ș/g,'s').replace(/ț/g,'t').replace(/ă/g,'a').replace(/î/g,'i').replace(/â/g,'a')
+    .replace(/ö/g,'o').replace(/ü/g,'u').replace(/ő/g,'o').replace(/ű/g,'u').replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim().replace(/\s+/g, '-').replace(/-+/g, '-').substring(0, 100);
+  document.getElementById('fSlug').value = slug;
+  validateSlug();
+}
+
+function validateSlug() {
+  var slug = document.getElementById('fSlug').value;
+  var msg = document.getElementById('slugMsg');
+  if (!slug) { msg.textContent = ''; return false; }
+  if (!/^[a-z0-9-]{3,200}$/.test(slug)) {
+    msg.textContent = 'Csak kisbetű (a-z), szám, kötőjel, 3-200 karakter!';
+    return false;
+  }
+  msg.textContent = '';
+  return true;
+}
+
+// ── Meta karakter számláló ────────────────────────────────────
+function updateMetaCount(lang) {
+  var input = document.getElementById('fMeta' + lang);
+  var counter = document.getElementById('metaCount' + lang);
+  if (!input || !counter) return;
+  var len = input.value.length;
+  counter.textContent = len + '/160';
+  counter.className = 'be-meta-count' + (len > 160 ? ' warn' : (len >= 120 ? ' ok' : ''));
+}
+
+// ── Mentés ────────────────────────────────────────────────────
+function savePost() {
+  if (!_curId) return;
+  if (!validateSlug()) { alert('Érvénytelen slug!'); return; }
+  var args = {
+    id: _curId,
+    slug:          document.getElementById('fSlug').value.trim(),
+    title_ro:      document.getElementById('fTitleRo').value.trim(),
+    title_hu:      document.getElementById('fTitleHu').value.trim(),
+    excerpt_ro:    document.getElementById('fExcerptRo').value.trim(),
+    excerpt_hu:    document.getElementById('fExcerptHu').value.trim(),
+    meta_desc_ro:  document.getElementById('fMetaRo').value.trim(),
+    meta_desc_hu:  document.getElementById('fMetaHu').value.trim(),
+    content_ro:    _emdRo ? _emdRo.value() : '',
+    content_hu:    _emdHu ? _emdHu.value() : '',
+    cover_image_url: document.getElementById('fCover').value.trim() || null,
+  };
+  var isPublished = document.getElementById('fPublished').checked;
+
+  showSaveMsg('Mentés...', '');
+  gas('devSaveBlogPost', args).then(function(r) {
+    if (!r || !r.ok) { showSaveMsg(r && r.err || 'Hiba!', 'err'); return; }
+    // Publikálás státusz szinkronizálás
+    return gas('devPublishBlogPost', { id: _curId, publish: isPublished });
+  }).then(function(r) {
+    showSaveMsg('✓ Elmentve!', 'ok');
+    loadList();
+    // Előnézet link frissítés
+    document.getElementById('previewLink').href = '/blog/' + args.slug;
+    setTimeout(function(){ hideSaveMsg(); }, 3000);
+  }).catch(function() {
+    showSaveMsg('Hiba a mentésnél.', 'err');
+  });
+}
+
+function showSaveMsg(txt, cls) {
+  var el = document.getElementById('saveMsg');
+  el.textContent = txt;
+  el.className = 'be-msg' + (cls ? ' ' + cls : '');
+}
+function hideSaveMsg() {
+  var el = document.getElementById('saveMsg');
+  el.textContent = '';
+  el.className = 'be-msg';
+}
+
+// ── Törlés ────────────────────────────────────────────────────
+function deletePost() {
+  if (!_curId) return;
+  if (!confirm('Biztosan törlöd ezt a cikket? Ez nem visszavonható!')) return;
+  gas('devDeleteBlogPost', { id: _curId }).then(function(r) {
+    if (!r || !r.ok) { alert(r && r.err || 'Hiba a törléskor!'); return; }
+    _curId = null;
+    document.getElementById('noSel').style.display = '';
+    document.getElementById('editForm').style.display = 'none';
+    loadList();
+  });
+}
+
+// ── Új poszt ──────────────────────────────────────────────────
+function newPost() {
+  var slug = prompt('Új cikk slug (URL rész):\nPl.: e-factura-2026-ghid\n(csak kisbetű, szám, kötőjel)');
+  if (!slug) return;
+  slug = slug.trim().toLowerCase().replace(/\s+/g,'-');
+  if (!/^[a-z0-9-]{3,200}$/.test(slug)) { alert('Érvénytelen slug!'); return; }
+  gas('devCreateBlogPost', { slug: slug, title_ro: '', title_hu: '' }).then(function(r) {
+    if (!r || !r.ok) { alert(r && r.err || 'Hiba a létrehozáskor!'); return; }
+    loadList();
+    openPost(r.id);
+  });
+}
+
+// ── Betöltés ──────────────────────────────────────────────────
+loadList();
+</script>
+</body>
+</html>

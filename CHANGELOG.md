@@ -14,6 +14,33 @@
 
 ---
 
+## 2026-06-21 — Blog rendszer: EasyMDE szerkesztő + slug-alapú URL-ek + sitemap.xml
+
+- **`db/blog-posts.sql`** (ÚJ, idempotens) — `blog_posts` tábla: SERIAL id, egyedi slug,
+  kétnyelvű mezők (title/content/excerpt/meta_desc RO+HU), cover_image_url, is_published,
+  published_at. A meglévő 3 blog cikk (`developer_settings` `blog_post_1/2/3`) automatikusan
+  átmigrál predefinált slug-okkal.
+- **`routes/blog.js`** (FELÜLÍRVA) — `GET /api/blog/list` (közzétett cikkek listája),
+  `GET /api/blog/:slug` (visszafelé kompatibilis: slug ÉS numerikus id is elfogadott),
+  `GET /sitemap.xml` (dinamikus XML-sitemap: statikus oldalak + közzétett blog cikkek).
+- **`handlers/developer.js`** (bővítve) — `devListBlogPosts`, `devGetBlogPost`,
+  `devSaveBlogPost` (slug validáció, unique constraint kezelés), `devCreateBlogPost`,
+  `devPublishBlogPost`, `devDeleteBlogPost` — mind is_dev gated + audit.
+- **`public/blog-editor.html`** (ÚJ) — developer blog kezelő (`/developer/blog`): kétpaneles
+  elrendezés (lista + szerkesztő), EasyMDE 2.18.0 Markdown szerkesztő RO+HU nyelven,
+  slug auto-generálás ékezetleítéssel, SEO meta leírás karakterszámlálóval, cover image URL,
+  közzététel/törlés gombok.
+- **`public/blog.html`** (ÚJ) — publikus blog lista oldal (`/blog`): kártyás elrendezés
+  cover képpel vagy emoji fallbackkel, RO/HU kétnyelvű, API-ból töltve.
+- **`public/blog-post.html`** (FELÜLÍRVA) — slug-alapú blog cikk oldal: dinamikus meta tagek,
+  OG tagek, Article structured data (ld+json), marked.js Markdown→HTML renderelés, CTA blokk.
+- **`public/landing-editor.html`** (egyszerűsítve) — a régi 3-accordion blog szerkesztő
+  eltávolítva; helyette link a `/developer/blog` szerkesztőbe.
+- **`public/index.html`** — blog kártyák linkjei `/blog/1|2|3` → slug-alapú URL-ekre frissítve.
+- **`routes/pages.js`** — `/blog` és `/blog/:slug` route-ok bekötve, `/developer/blog` gated.
+
+---
+
 ## 2026-06-21 — Fuvar-sorozatok: cégenként állítható/választható fuvar-szám előtag
 
 - **Igény:** a fuvar-szám előtagja eddig fixen `CMD` volt. Mostantól a cég SAJÁT MAGÁNAK
