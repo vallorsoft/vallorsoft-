@@ -4,11 +4,10 @@
  *
  *  Stack-illesztés (a generikus spec adaptálva ehhez a kódbázishoz):
  *    - Statikus oldal (NEM EJS) — a /api/execute RPC-t hívja (gas()).
- *    - GrapesJS + grapesjs-preset-newsletter a cdn.jsdelivr.net-ről (CSP).
+ *    - Unlayer drag&drop e-mail szerkesztő (editor.unlayer.com/embed.js, CSP-engedett).
  *    - NINCS multer/fájlfeltöltés: a HTML feltöltés FileReaderrel a böngészőben
- *      olvasódik; a képek base64/data-URL-ként ágyazódnak a GrapesJS asset
- *      managerébe (Render FS efemer → nem tárolunk fájlt szerveren). A céges
- *      logót a meglévő GET /api/branding/logo (dataUri) adja.
+ *      olvasódik; a grapes_json oszlopban Unlayer design JSON tárolódik (visszafelé
+ *      kompatibilis: régi GrapesJS JSON-t a _htmlToUnlayerDesign() wrapperrel kezeljük).
  *    - A küldés a szerveren a meglévő Brevo-küldőn megy + mail_log naplózás.
  * ============================================================ */
 (function () {
@@ -40,52 +39,58 @@
   }
 
   // ── Állapot ──
-  var editor = null;
+  var _unlayerReady = false;
+  var _pendingAction = null;
   var editingId = null;       // null = új; szám = szerkesztés
   var allTemplates = [];
   var allContacts = [];
 
-  // ── GrapesJS ──
-  function initGjs(html, projectJson) {
-    if (editor) { try { editor.destroy(); } catch (e) {} editor = null; }
-    editor = grapesjs.init({
-      container: '#gjs',
-      height: '520px',
-      width: 'auto',
-      fromElement: false,
-      storageManager: false,
-      plugins: ['grapesjs-preset-newsletter'],
-      pluginsOpts: {
-        'grapesjs-preset-newsletter': {
-          inlineCss: true,
-          tableStyle: { width: '100%', border: '0', cellpadding: '0', cellspacing: '0' },
-        },
-      },
-      // Képek base64/data-URL-ként a kliensoldalon (nincs upload endpoint;
-      // Render FS efemer). A drop-pal beszúrt kép a kanvászba ágyazódik.
-      assetManager: {
-        embedAsBase64: true,
-        upload: false,
-        uploadText: 'Húzd ide vagy válassz képet (base64)',
-      },
+  // ── Unlayer init (egyszer hívódik boot()-ban) ──
+  function initUnlayer() {
+    unlayer.init({
+      id: 'editor-container',
+      displayMode: 'email',
+      appearance: { theme: 'light' },
+      features: { preview: true, imageEditor: true },
     });
-    if (projectJson) {
-      try { editor.loadProjectData(typeof projectJson === 'string' ? JSON.parse(projectJson) : projectJson); }
-      catch (e) { if (html) editor.setComponents(html); }
-    } else if (html) {
-      editor.setComponents(html);
-    }
-    return editor;
+    unlayer.addEventListener('editor:ready', function () {
+      _unlayerReady = true;
+      if (_pendingAction) { var fn = _pendingAction; _pendingAction = null; fn(); }
+    });
   }
 
-  function grapesData() {
-    if (!editor) return { html: '', json: null };
-    var html;
-    try { html = editor.runCommand('gjs-get-inlined-html'); } catch (e) { html = null; }
-    if (!html) html = editor.getHtml();
-    var json = null;
-    try { json = editor.getProjectData(); } catch (e) { json = null; }
-    return { html: html || '', json: json };
+  function _whenReady(fn) {
+    if (_unlayerReady) fn(); else _pendingAction = fn;
+  }
+
+  function _htmlToUnlayerDesign(html) {
+    return {
+      counters: { u_row: 1, u_column: 1, u_content_html: 1 },
+      body: {
+        rows: [{
+          cells: [1],
+          columns: [{
+            contents: [{ type: 'html', values: { html: html } }],
+            values: {}
+          }],
+          values: {}
+        }],
+        values: { backgroundColor: '#ffffff', width: '600px' }
+      }
+    };
+  }
+
+  function loadDesignInUnlayer(html, json) {
+    _whenReady(function () {
+      var parsed = typeof json === 'string' ? (function () { try { return JSON.parse(json); } catch (e) { return null; } }()) : json;
+      if (parsed && parsed.body && parsed.body.rows) {
+        unlayer.loadDesign(parsed);
+      } else if (html) {
+        unlayer.loadDesign(_htmlToUnlayerDesign(html));
+      } else {
+        unlayer.loadBlank({ backgroundColor: '#ffffff' });
+      }
+    });
   }
 
   // ── Panel-váltó ──
@@ -100,7 +105,6 @@
       var sec = document.getElementById('sec-' + p);
       if (sec) sec.classList.toggle('active', p === panel);
     });
-    if (panel === 'create' && !editor) initGjs();
     if (panel === 'gallery') loadGallery();
     if (panel === 'browse') loadBrowse();
     if (panel === 'pairing') loadPairing();
@@ -142,7 +146,7 @@
     document.getElementById('tpl-name').value = galleryName(g);
     document.getElementById('tpl-subject').value = '';
     document.getElementById('btn-save-tpl').textContent = T('eb.saveTpl');
-    initGjs(g.html);
+    loadDesignInUnlayer(g.html, null);
     toast(T('eb.galleryLoaded'), 'success');
   };
 
@@ -159,7 +163,7 @@
     document.getElementById('tpl-name').value = '';
     document.getElementById('tpl-subject').value = '';
     document.getElementById('btn-save-tpl').textContent = T('eb.saveTpl');
-    initGjs();
+    _whenReady(function () { unlayer.loadBlank({ backgroundColor: '#ffffff' }); });
   };
 
   function fillCreate(tpl) {
@@ -167,34 +171,26 @@
     document.getElementById('tpl-name').value = (tpl && tpl.name) || '';
     document.getElementById('tpl-subject').value = (tpl && tpl.subject) || '';
     document.getElementById('btn-save-tpl').textContent = editingId ? T('eb.updateTpl') : T('eb.saveTpl');
-    initGjs(tpl && tpl.html_content, tpl && tpl.grapes_json);
+    loadDesignInUnlayer(tpl && tpl.html_content, tpl && tpl.grapes_json);
   }
-
-  window.ebInsertLogo = function () {
-    fetch('/api/branding/logo').then(function (r) { return r.json(); }).then(function (d) {
-      if (!d || !d.has || !d.dataUri) { toast('—', 'warn'); return; }
-      if (!editor) initGjs();
-      // A logó data-URL-ként ágyazódik a kanvászba (nincs szerver-tárolás).
-      editor.addComponents('<img src="' + d.dataUri + '" alt="logo" style="max-height:56px;display:block;margin:0 auto 12px;">');
-    }).catch(function () { toast(T('eb.netErr'), 'error'); });
-  };
 
   window.ebSaveTemplate = function () {
     var name = document.getElementById('tpl-name').value.trim();
     var subject = document.getElementById('tpl-subject').value.trim();
     if (!name) { toast(T('eb.needName'), 'error'); return; }
-    var d = grapesData();
-    var payload = { name: name, subject: subject, html_content: d.html, grapes_json: d.json };
-    if (editingId) payload.id = editingId;
-    gas('ebTemplateSave', [payload]).then(function (r) {
-      if (r && r.ok) {
-        editingId = r.id || editingId;
-        document.getElementById('btn-save-tpl').textContent = T('eb.updateTpl');
-        toast(T('eb.saved'), 'success');
-        loadMainTable();
-      } else {
-        toast((r && r.err) || T('eb.netErr'), 'error');
-      }
+    unlayer.exportHtml(function (data) {
+      var payload = { name: name, subject: subject, html_content: data.html, grapes_json: data.design };
+      if (editingId) payload.id = editingId;
+      gas('ebTemplateSave', [payload]).then(function (r) {
+        if (r && r.ok) {
+          editingId = r.id || editingId;
+          document.getElementById('btn-save-tpl').textContent = T('eb.updateTpl');
+          toast(T('eb.saved'), 'success');
+          loadMainTable();
+        } else {
+          toast((r && r.err) || T('eb.netErr'), 'error');
+        }
+      });
     });
   };
 
@@ -250,7 +246,7 @@
       ebSwitch('create');
       editingId = null;
       document.getElementById('btn-save-tpl').textContent = T('eb.saveTpl');
-      initGjs(String(rd.result || ''));
+      loadDesignInUnlayer(String(rd.result || ''), null);
       toast(T('eb.loadedToEditor'), 'success');
     };
     rd.onerror = function () { toast(T('eb.netErr'), 'error'); };
@@ -503,7 +499,7 @@
         var sec = document.getElementById('sec-sender'); if (sec) sec.style.display = 'none';
       }
     });
-    initGjs();
+    initUnlayer();
     loadMainTable();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
