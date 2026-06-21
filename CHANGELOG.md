@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-06-21 — Kedvenc helyszínek: autocomplete + koordináta-kezelés (PR #221)
+
+- `lib/mapsProvider.js` — `_acFree` (Photon) és `_acHere` mostantól `lat`/`lng`-t is visszaad
+- `public/console-shared.js` `vsAttachAutocomplete` — kézi gépeléskor koordináta törlése;
+  autocomplete-választáskor `input._vsLat`/`_vsLng` beállítása; `onPick(lat, lng)` (visszafelé kompatibilis)
+- `public/console-shared.js` `_rmBuildWps` — ismert koordináta átadása a waypoint-ba
+  → geokódolás kihagyható, gyorsabb és pontosabb km-becslés
+- `public/fav-locations.js` — cím-mező Photon autocomplete-tel; mentéskor lat/lng tárolás;
+  📍 badge a táblában és a picker menüben; fuvar-kiírásból választáskor koordináta beállítva
+
+---
+
 ## 2026-06-21 — Photon autocomplete javítás: Romania bias + POI cég-találatok
 
 - `lib/mapsProvider.js` — Romania területi bias (`lat=45.9&lon=24.9&location_bias_scale=0.5`),
