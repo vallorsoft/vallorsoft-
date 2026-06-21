@@ -61,26 +61,9 @@
     .le-vis-btn { font-size: 15px; }
     .le-vis-btn.hidden { color: #cbd5e1; }
 
-    /* Blog accordion */
-    .le-blog-item { margin-bottom: 4px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
-    .le-blog-head {
-      padding: 9px 12px; font-size: 13px; font-weight: 600; color: #334155;
-      cursor: pointer; background: #f8fafc; display: flex; justify-content: space-between;
-      align-items: center;
-    }
-    .le-blog-head:hover { background: #f1f5f9; }
-    .le-blog-body { display: none; padding: 10px 12px; background: #fff; }
-    .le-blog-body.open { display: block; }
     .le-field-label { font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 3px; margin-top: 8px; }
-    .le-field-label:first-child { margin-top: 0; }
     .le-field { width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; color: #1e293b; font-family: inherit; resize: vertical; }
     .le-field:focus { outline: none; border-color: #6366f1; }
-    .le-blog-save {
-      margin-top: 8px; width: 100%; padding: 6px; border: none;
-      background: linear-gradient(135deg,#3b82f6,#6366f1); color: #fff;
-      border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer;
-    }
-    .le-blog-save:hover { opacity: 0.9; }
 
     /* iframe */
     .le-iframe-wrap { flex: 1; position: relative; overflow: hidden; }
@@ -109,7 +92,10 @@
     <div id="secList"></div>
 
     <div class="le-sidebar-heading" style="margin-top:12px;">📰 Blog cikkek</div>
-    <div id="blogList"></div>
+    <div style="padding:10px 8px;">
+      <div class="le-hint">A blog cikkeket az új Blog szerkesztőben kezeld (slug, SEO, Markdown, kétnyelvű).</div>
+      <a href="/developer/blog" target="_blank" style="display:block;text-align:center;padding:8px 12px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;">📰 Blog szerkesztő ↗</a>
+    </div>
   </div>
 
   <div class="le-iframe-wrap">
@@ -126,7 +112,7 @@ var _sectionOrder = ['hero','strip','how','features','stats','testimonials','pri
 var _sectionVis   = {};
 var _iframe       = document.getElementById('previewFrame');
 var _iframeReady  = false;
-var _blogData     = { 1:{title:'',content:'',titleHu:'',contentHu:''}, 2:{title:'',content:'',titleHu:'',contentHu:''}, 3:{title:'',content:'',titleHu:'',contentHu:''} };
+var _blogData     = {};
 
 var SEC_LABELS = {
   hero:         '🦸 Hero',
@@ -158,15 +144,6 @@ fetch('/api/landing-texts')
     renderSecList();
   });
 
-// Blog cikkek betöltése
-[1,2,3].forEach(function(id) {
-  gas('devGetBlogPost', {id:id}).then(function(r) {
-    if (r && r.ok) {
-      _blogData[id] = { title:r.title||'', content:r.content||'', titleHu:r.titleHu||'', contentHu:r.contentHu||'' };
-      renderBlogList();
-    }
-  });
-});
 
 // ── Szekció lista render ──────────────────────────────────────────────────────
 function renderSecList() {
@@ -205,53 +182,6 @@ function toggleVis(key) {
   markUnsaved();
 }
 
-// ── Blog lista render ─────────────────────────────────────────────────────────
-function renderBlogList() {
-  var list = document.getElementById('blogList');
-  list.innerHTML = '';
-  [1,2,3].forEach(function(id) {
-    var d = _blogData[id];
-    var title = (_editLang==='hu'?d.titleHu:d.title) || ('Cikk ' + id);
-    var item = document.createElement('div');
-    item.className = 'le-blog-item';
-    item.innerHTML =
-      '<div class="le-blog-head" onclick="toggleBlog(' + id + ')"><span>📰 ' + escHtml(title) + '</span><span id="blogArrow' + id + '">▶</span></div>' +
-      '<div class="le-blog-body" id="blogBody' + id + '">' +
-        '<div class="le-field-label">RO cím</div>' +
-        '<input class="le-field" id="bTitle_' + id + '" value="' + escHtml(d.title) + '" placeholder="Titlu articol (RO)">' +
-        '<div class="le-field-label">HU cím</div>' +
-        '<input class="le-field" id="bTitleHu_' + id + '" value="' + escHtml(d.titleHu) + '" placeholder="Cikk cím (HU)">' +
-        '<div class="le-field-label">RO tartalom (HTML megengedett)</div>' +
-        '<textarea class="le-field" id="bContent_' + id + '" rows="6" placeholder="Conținut complet al articolului...">' + escHtml(d.content) + '</textarea>' +
-        '<div class="le-field-label">HU tartalom (HTML megengedett)</div>' +
-        '<textarea class="le-field" id="bContentHu_' + id + '" rows="6" placeholder="A cikk teljes tartalma...">' + escHtml(d.contentHu) + '</textarea>' +
-        '<button class="le-blog-save" onclick="saveBlogPost(' + id + ')">💾 Cikk mentése</button>' +
-        '<div id="blogMsg' + id + '" style="font-size:11px;margin-top:4px;min-height:14px;"></div>' +
-      '</div>';
-    list.appendChild(item);
-  });
-}
-
-function toggleBlog(id) {
-  var body = document.getElementById('blogBody' + id);
-  var arrow = document.getElementById('blogArrow' + id);
-  var open = body.classList.toggle('open');
-  arrow.textContent = open ? '▼' : '▶';
-}
-
-function saveBlogPost(id) {
-  var title = document.getElementById('bTitle_' + id).value;
-  var titleHu = document.getElementById('bTitleHu_' + id).value;
-  var content = document.getElementById('bContent_' + id).value;
-  var contentHu = document.getElementById('bContentHu_' + id).value;
-  _blogData[id] = { title: title, content: content, titleHu: titleHu, contentHu: contentHu };
-  var msgEl = document.getElementById('blogMsg' + id);
-  msgEl.style.color = '#64748b'; msgEl.textContent = 'Mentés...';
-  gas('devSaveBlogPost', {id: id, title: title, content: content, titleHu: titleHu, contentHu: contentHu}).then(function(r) {
-    if (r && r.ok) { msgEl.style.color='#22c55e'; msgEl.textContent='✓ Mentve'; renderBlogList(); }
-    else { msgEl.style.color='#ef4444'; msgEl.textContent='Hiba!'; }
-  });
-}
 
 // ── Iframe editor overlay ─────────────────────────────────────────────────────
 _iframe.addEventListener('load', function() {

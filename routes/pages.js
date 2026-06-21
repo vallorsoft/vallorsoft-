@@ -75,10 +75,19 @@ router.get('/developer/landing-editor', requirePageLogin, function(req, res) {
   res.sendFile(path.join(__dirname, '..', 'public', 'landing-editor.html'));
 });
 
-// Publikus blog cikk oldal
-router.get('/blog/:id', function(req, res) {
-  const id = parseInt(req.params.id, 10);
-  if (![1,2,3].includes(id)) return res.status(404).sendFile(path.join(__dirname,'..','public','404.html'), () => res.status(404).send('Not found'));
+// Developer blog szerkesztő (is_dev kötelező)
+router.get('/developer/blog', requirePageLogin, function(req, res) {
+  if (!req.session.user || !req.session.user.is_dev) return res.redirect('/developer');
+  res.sendFile(path.join(__dirname, '..', 'public', 'blog-editor.html'));
+});
+
+// Publikus blog lista
+router.get('/blog', function(req, res) {
+  res.sendFile(path.join(__dirname, '..', 'public', 'blog.html'));
+});
+
+// Publikus blog cikk oldal (slug-alapú, bármilyen slug elfogadott)
+router.get('/blog/:slug', function(req, res) {
   res.sendFile(path.join(__dirname, '..', 'public', 'blog-post.html'));
 });
 

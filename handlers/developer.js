@@ -724,39 +724,112 @@ handlers.devSaveSectionOrder = async function(req, res, args) {
   }
 };
 
-// ── Blog bejegyzés lekérése ──────────────────────────────────
-handlers.devGetBlogPost = async function(req, res, args) {
-  const isDev = req.session.user && req.session.user.is_dev;
-  if (!isDev) return res.json({ result: { ok: false, err: 'Tiltott' } });
-  const id = parseInt(args && args.id, 10);
-  if (![1,2,3].includes(id)) return res.json({ result: { ok: false, err: 'Érvénytelen id' } });
+// ── Blog bejegyzések listája (dev) ───────────────────────────
+handlers.devListBlogPosts = async function(req, res) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Tiltott' } });
   try {
-    const r = await pool.query(`SELECT value FROM developer_settings WHERE key=$1`, [`blog_post_${id}`]);
-    const val = r.rows[0] ? r.rows[0].value : {};
-    return res.json({ result: { ok: true, id, title: val.title||'', content: val.content||'', titleHu: val.titleHu||'', contentHu: val.contentHu||'' } });
+    const r = await pool.query(
+      `SELECT id, slug, title_ro, title_hu, is_published, published_at, created_at
+       FROM blog_posts ORDER BY created_at DESC`
+    );
+    return res.json({ result: { ok: true, posts: r.rows } });
+  } catch (err) {
+    console.error('devListBlogPosts hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Blog bejegyzés lekérése (dev, id alapján) ────────────────
+handlers.devGetBlogPost = async function(req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Tiltott' } });
+  const id = parseInt(args && args.id, 10);
+  if (!id || id < 1) return res.json({ result: { ok: false, err: 'Érvénytelen id' } });
+  try {
+    const r = await pool.query(`SELECT * FROM blog_posts WHERE id=$1`, [id]);
+    if (!r.rows[0]) return res.json({ result: { ok: false, err: 'Nem található' } });
+    return res.json({ result: { ok: true, post: r.rows[0] } });
   } catch (err) {
     console.error('devGetBlogPost hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
 
-// ── Blog bejegyzés mentése ───────────────────────────────────
+// ── Blog bejegyzés mentése (update, id kötelező) ─────────────
 handlers.devSaveBlogPost = async function(req, res, args) {
-  const isDev = req.session.user && req.session.user.is_dev;
-  if (!isDev) return res.json({ result: { ok: false, err: 'Tiltott' } });
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Tiltott' } });
   const id = parseInt(args && args.id, 10);
-  if (![1,2,3].includes(id)) return res.json({ result: { ok: false, err: 'Érvénytelen id' } });
-  const { title='', content='', titleHu='', contentHu='' } = args || {};
+  if (!id || id < 1) return res.json({ result: { ok: false, err: 'Érvénytelen id' } });
+  const {
+    slug='', title_ro='', title_hu='', content_ro='', content_hu='',
+    excerpt_ro='', excerpt_hu='', meta_desc_ro='', meta_desc_hu='',
+    cover_image_url=null
+  } = args || {};
+  if (!slug || !/^[a-z0-9-]{3,200}$/.test(slug))
+    return res.json({ result: { ok: false, err: 'Slug invalid (csak kisbetű, szám, kötőjel, 3-200 karakter)' } });
   try {
     await pool.query(
-      `INSERT INTO developer_settings(key,value) VALUES($1,$2)
-       ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()`,
-      [`blog_post_${id}`, JSON.stringify({ title, content, titleHu, contentHu })]
+      `UPDATE blog_posts SET slug=$1, title_ro=$2, title_hu=$3, content_ro=$4, content_hu=$5,
+         excerpt_ro=$6, excerpt_hu=$7, meta_desc_ro=$8, meta_desc_hu=$9,
+         cover_image_url=$10, updated_at=NOW()
+       WHERE id=$11`,
+      [slug, title_ro, title_hu, content_ro, content_hu,
+       excerpt_ro, excerpt_hu, meta_desc_ro, meta_desc_hu,
+       cover_image_url || null, id]
     );
-    audit.fromReq(req, 'developer.saveBlogPost', 'blog_post', id, null);
+    audit.fromReq(req, 'developer.saveBlogPost', 'blog_post', id, { slug });
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('devSaveBlogPost hiba:', err);
+    return res.json({ result: { ok: false, err: err.code === '23505' ? 'Ez a slug már foglalt' : 'Eroare de server' } });
+  }
+};
+
+// ── Blog bejegyzés létrehozása (ÚJ) ─────────────────────────
+handlers.devCreateBlogPost = async function(req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Tiltott' } });
+  const { slug='', title_ro='', title_hu='' } = args || {};
+  if (!slug || !/^[a-z0-9-]{3,200}$/.test(slug))
+    return res.json({ result: { ok: false, err: 'Slug invalid (csak kisbetű, szám, kötőjel, 3-200 karakter)' } });
+  try {
+    const r = await pool.query(
+      `INSERT INTO blog_posts(slug, title_ro, title_hu) VALUES($1,$2,$3) RETURNING id`,
+      [slug, title_ro, title_hu]
+    );
+    audit.fromReq(req, 'developer.createBlogPost', 'blog_post', r.rows[0].id, { slug });
+    return res.json({ result: { ok: true, id: r.rows[0].id } });
+  } catch (err) {
+    return res.json({ result: { ok: false, err: err.code === '23505' ? 'Ez a slug már foglalt' : 'Eroare de server' } });
+  }
+};
+
+// ── Blog publikálás toggle ────────────────────────────────────
+handlers.devPublishBlogPost = async function(req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Tiltott' } });
+  const id = parseInt(args && args.id, 10);
+  const publish = args && args.publish === true;
+  if (!id) return res.json({ result: { ok: false, err: 'Érvénytelen id' } });
+  try {
+    await pool.query(
+      `UPDATE blog_posts SET is_published=$1, published_at=CASE WHEN $1 AND published_at IS NULL THEN NOW() ELSE published_at END, updated_at=NOW() WHERE id=$2`,
+      [publish, id]
+    );
+    audit.fromReq(req, publish ? 'developer.publishBlogPost' : 'developer.unpublishBlogPost', 'blog_post', id, null);
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Blog bejegyzés törlése ────────────────────────────────────
+handlers.devDeleteBlogPost = async function(req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Tiltott' } });
+  const id = parseInt(args && args.id, 10);
+  if (!id) return res.json({ result: { ok: false, err: 'Érvénytelen id' } });
+  try {
+    await pool.query(`DELETE FROM blog_posts WHERE id=$1`, [id]);
+    audit.fromReq(req, 'developer.deleteBlogPost', 'blog_post', id, null);
+    return res.json({ result: { ok: true } });
+  } catch (err) {
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
