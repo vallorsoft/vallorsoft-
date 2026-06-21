@@ -80,6 +80,7 @@ window.CompanySettings = (function () {
             '<div style="font-size:20px;font-weight:800;" class="text-primary">' + esc(d.waybillSeq || 0) + '</div></div>' +
         '</div>' +
         '<div style="margin-top:8px;font-size:12px;color:var(--muted);" id="csSeriesPreview"></div>' +
+        '<div id="csOrderSeriesBox" style="margin-top:6px;"></div>' +
 
         (_canEdit
           ? '<div style="margin-top:22px;"><button class="btn primary" id="csSaveBtn" style="padding:11px 26px;">💾 ' + tt('common.save', 'Mentés') + '</button></div>'
@@ -110,6 +111,92 @@ window.CompanySettings = (function () {
       }
     }
     previewSeries();
+    renderOrderSeries();
+  }
+
+  // ── Fuvar-sorozatok (fuvar-szám előtagok) kezelője ──
+  function renderOrderSeries() {
+    if (!_root) return;
+    var box = _root.querySelector('#csOrderSeriesBox');
+    if (!box) return;
+    box.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:6px 0;">…</div>';
+    gas('orderSeriesList').then(function (r) {
+      if (!r || !r.ok) { box.innerHTML = ''; return; }
+      var canEdit = !!r.canEdit;
+      var year = r.year || new Date().getFullYear();
+      var rows = (r.series || []).map(function (s) {
+        var nextNo = esc(s.prefix) + '-' + year + '-' + String((s.current_seq || 0) + 1).padStart(4, '0');
+        var defCell = s.is_default
+          ? '<span title="' + tt('comset.os.default', 'Alapért.') + '" style="color:#f59e0b;font-size:15px;">★</span>'
+          : (canEdit ? '<button class="btn ghost" style="padding:2px 8px;font-size:11px;" onclick="CompanySettings.seriesDefault(' + s.id + ')">' + tt('comset.os.setDefault', 'Beállít') + '</button>' : '');
+        var actions = canEdit
+          ? ('<button class="btn ghost" title="' + tt('comset.os.rename', 'Átnevezés') + '" style="padding:2px 8px;font-size:11px;" onclick="CompanySettings.seriesRename(' + s.id + ',\'' + esc(s.prefix) + '\')">✏️</button>'
+             + (s.is_default ? '' : '<button class="btn ghost" style="padding:2px 8px;font-size:11px;color:#dc2626;" onclick="CompanySettings.seriesDelete(' + s.id + ',\'' + esc(s.prefix) + '\')">🗑</button>'))
+          : '';
+        return '<tr>'
+          + '<td style="padding:5px 8px;font-weight:700;">' + esc(s.prefix) + '</td>'
+          + '<td style="padding:5px 8px;color:var(--muted);font-size:12px;">' + nextNo + '</td>'
+          + '<td style="padding:5px 8px;text-align:center;">' + defCell + '</td>'
+          + '<td style="padding:5px 8px;text-align:right;white-space:nowrap;">' + actions + '</td></tr>';
+      }).join('');
+      box.innerHTML =
+        '<h3 class="h-title" style="font-size:15px;margin:18px 0 10px;">' + tt('comset.os.head', '🚚 Fuvar-sorozatok') + '</h3>'
+        + '<p style="color:var(--muted);font-size:12px;margin:0 0 10px;max-width:560px;">' + tt('comset.os.intro', 'A fuvar-szám előtagja. Alapból CMD, de új sorozatot is felvehetsz, és fuvar-kiíráskor választhatsz közülük. A belső fuvar-azonosító ettől függetlenül egyedi marad — más céggel sosem keveredik.') + '</p>'
+        + '<table style="border-collapse:collapse;width:100%;max-width:560px;"><thead><tr style="text-align:left;color:var(--muted);font-size:11px;">'
+        + '<th style="padding:4px 8px;">' + tt('comset.os.prefix', 'Előtag') + '</th>'
+        + '<th style="padding:4px 8px;">' + tt('comset.os.next', 'Következő szám') + '</th>'
+        + '<th style="padding:4px 8px;text-align:center;">' + tt('comset.os.default', 'Alapért.') + '</th>'
+        + '<th></th></tr></thead><tbody>' + rows + '</tbody></table>'
+        + (canEdit
+          ? '<div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap;">'
+            + '<input class="input" id="csNewSeriesPrefix" maxlength="10" placeholder="' + tt('comset.os.newPh', 'pl. TR') + '" style="max-width:140px;text-transform:uppercase;">'
+            + '<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="csNewSeriesDefault"> ' + tt('comset.os.makeDefault', 'Legyen alapértelmezett') + '</label>'
+            + '<button class="btn primary" style="padding:7px 16px;font-size:13px;" onclick="CompanySettings.seriesAdd()">+ ' + tt('comset.os.add', 'Hozzáadás') + '</button>'
+            + '</div>'
+          : '');
+    }).catch(function () { box.innerHTML = ''; });
+  }
+
+  function _refreshOrderSeriaSelect() {
+    if (typeof populateOrderSeriaSelect === 'function') { try { populateOrderSeriaSelect(); } catch (e) {} }
+  }
+
+  function seriesAdd() {
+    var el = _root && _root.querySelector('#csNewSeriesPrefix');
+    if (!el) return;
+    var prefix = (el.value || '').trim();
+    if (!prefix) { toast(tt('comset.os.prefixReq', 'Adj meg egy előtagot.'), 'err'); return; }
+    var mk = (_root.querySelector('#csNewSeriesDefault') || {}).checked;
+    gas('orderSeriesSave', [{ prefix: prefix, makeDefault: !!mk }]).then(function (r) {
+      if (r && r.ok) { toast(tt('common.saved', 'Mentve'), 'ok'); renderOrderSeries(); _refreshOrderSeriaSelect(); }
+      else toast((r && r.err) || tt('common.error', 'Hiba'), 'err');
+    }).catch(function () { toast(tt('common.error', 'Hiba'), 'err'); });
+  }
+
+  function seriesRename(id, cur) {
+    var v = prompt(tt('comset.os.renamePrompt', 'Új előtag:'), cur);
+    if (v == null) return;
+    v = v.trim();
+    if (!v) return;
+    gas('orderSeriesSave', [{ id: id, prefix: v }]).then(function (r) {
+      if (r && r.ok) { toast(tt('common.saved', 'Mentve'), 'ok'); renderOrderSeries(); _refreshOrderSeriaSelect(); }
+      else toast((r && r.err) || tt('common.error', 'Hiba'), 'err');
+    }).catch(function () { toast(tt('common.error', 'Hiba'), 'err'); });
+  }
+
+  function seriesDefault(id) {
+    gas('orderSeriesSetDefault', [{ id: id }]).then(function (r) {
+      if (r && r.ok) { renderOrderSeries(); _refreshOrderSeriaSelect(); }
+      else toast((r && r.err) || tt('common.error', 'Hiba'), 'err');
+    }).catch(function () { toast(tt('common.error', 'Hiba'), 'err'); });
+  }
+
+  function seriesDelete(id, prefix) {
+    if (!confirm(tt('comset.os.delConfirm', 'Törlöd a sorozatot?') + ' ' + prefix)) return;
+    gas('orderSeriesDelete', [{ id: id }]).then(function (r) {
+      if (r && r.ok) { toast(tt('common.deleted', 'Törölve'), 'ok'); renderOrderSeries(); _refreshOrderSeriaSelect(); }
+      else toast((r && r.err) || tt('common.error', 'Hiba'), 'err');
+    }).catch(function () { toast(tt('common.error', 'Hiba'), 'err'); });
   }
 
   function previewSeries() {
@@ -172,5 +259,9 @@ window.CompanySettings = (function () {
     }).catch(function () { _root.innerHTML = '<div class="glass" style="padding:20px;color:var(--muted);">' + tt('common.loadError', 'Betöltési hiba') + '</div>'; });
   }
 
-  return { mount: mount, previewSeries: previewSeries };
+  return {
+    mount: mount, previewSeries: previewSeries,
+    seriesAdd: seriesAdd, seriesRename: seriesRename,
+    seriesDefault: seriesDefault, seriesDelete: seriesDelete,
+  };
 })();

@@ -664,6 +664,7 @@ function createOrder(){
   const p={
     client:document.getElementById('oClient').value.trim(),
     ref:document.getElementById('oRef').value.trim(),
+    series_id:(document.getElementById('oSeria')||{}).value||null,
     pret:document.getElementById('oPret').value,
     km:document.getElementById('oKm').value,
     suly_kg:(document.getElementById('oSuly')||{}).value||null,
@@ -1764,7 +1765,23 @@ function renderOrdersMetricBand(list){
   ]);
 }
 
+// A fuvar-kiíró sorozat-választójának feltöltése (alapértelmezett kijelölve).
+// A választott séria id-je a createOrder payload series_id mezőjébe megy.
+function populateOrderSeriaSelect(){
+  var sel=document.getElementById('oSeria'); if(!sel)return;
+  gas('orderSeriesList').then(function(r){
+    if(!r||!r.ok||!Array.isArray(r.series))return;
+    var prev=sel.value;
+    sel.innerHTML=r.series.map(function(s){
+      return '<option value="'+s.id+'"'+(s.is_default?' selected':'')+'>'+esc(s.prefix)+(s.is_default?' ★':'')+'</option>';
+    }).join('');
+    // Ha volt korábbi kézi választás és még létezik, megtartjuk.
+    if(prev && sel.querySelector('option[value="'+prev+'"]')) sel.value=prev;
+  }).catch(function(){});
+}
+
 function loadOrders(){
+  populateOrderSeriaSelect();
   gas('comList').then(list=>{
     if(!Array.isArray(list))list=[];
     _ordersAllCache = list;
@@ -3830,7 +3847,13 @@ function renderFilteredOrders(list) {
     var editBtn = isCancelled
       ? '<button class="btn ghost vs-act-edit" title="'+t('cs.ol.cancelledLocked')+'" disabled style="opacity:.5;cursor:not-allowed;">✏️</button>'
       : '<button class="btn primary vs-act-edit" title="'+t('cs.ol.mEdit')+'" onclick="openOrderEdit(\''+c.id+'\')">✏️</button>';
-    return '<tr class="vsl-orow vsl-orow-'+sc+'"'+rowStyle+'><td class="vsl-orow-first"><b>'+c.id+'</b></td><td>'+clientCell+'</td>'+
+    // Első cella: az ember-olvasható fuvar-szám (CMD-YYYY-XXXX) látszik, ha van;
+    // a belső azonosító (orders.id) tooltipben elérhető (támogatáshoz). Régi,
+    // fuvar_no nélküli fuvarnál visszaesik a belső id-re.
+    var idCell = c.fuvar_no
+      ? '<b>'+esc(c.fuvar_no)+'</b>'
+      : '<b>'+esc(String(c.id))+'</b>';
+    return '<tr class="vsl-orow vsl-orow-'+sc+'"'+rowStyle+'><td class="vsl-orow-first" title="'+esc(String(c.id))+'">'+idCell+'</td><td>'+clientCell+'</td>'+
       '<td>'+routeCell+'</td>'+
       '<td>'+(c.km||'—')+(c.route_km!=null&&c.route_km!==''?' <span class="badge info" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="'+t('cs.tt.autoRouteKm')+'">🗺️ '+c.route_km+'</span>':'')+'</td><td>'+(c.pret||'—')+'</td>'+
       '<td>'+soferCell+'</td><td>'+esc(c.rendszam_camion||'—')+'</td>'+

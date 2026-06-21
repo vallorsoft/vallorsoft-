@@ -14,6 +14,60 @@
 
 ---
 
+## 2026-06-21 — Fuvar-sorozatok: cégenként állítható/választható fuvar-szám előtag
+
+- **Igény:** a fuvar-szám előtagja eddig fixen `CMD` volt. Mostantól a cég SAJÁT MAGÁNAK
+  állíthatja (mint a menetlevél-szériát): alapból `CMD`, de **új sorozatot is felvehet,
+  átnevezhet**, beállíthat alapértelmezettet, és **fuvar-kiíráskor választhat** közülük.
+- **Háttér-garancia:** a fuvar valódi azonosítója továbbra is a háttérben generált,
+  cégfüggetlen véletlen kulcs (`orders.id`), és minden lekérdezés `company_id`-szűrt →
+  két cég fuvarjai sosem keverednek, akkor sem, ha azonos fuvar-számot választanak.
+- **`db/order-series.sql`** (ÚJ, idempotens) — `order_series` tábla (megjelenített
+  `prefix` + belső `seq_key` + `is_default`); minden meglévő cég kap egy alapértelmezett
+  `CMD` szériát (`seq_key='CMD'` → a meglévő `document_series` `CMD` számláló folytatódik).
+  A `prefix` ELVÁLIK a `seq_key`-től → az előtag átnevezhető a számlálás megszakítása nélkül.
+- **`lib/orderNo.js`** — `getDefaultSeries` + `resolveOrderSeries(db,cid,seriesId)` (idegen
+  szériát sosem ad — a cég alapértelmezettjére esik vissza) + `nextFuvarNo(db,cid,year,series)`.
+- **`handlers/orderSeries.js`** (ÚJ, regisztrálva) — `orderSeriesList` (Admin/Manager),
+  `orderSeriesSave` (létrehozás/átnevezés), `orderSeriesSetDefault`, `orderSeriesDelete`
+  (az alapértelmezett nem törölhető); CSAK Admin írhat, company_id-szűrt, `prefix`
+  validáció (`[A-Z0-9]{1,10}`, `MT` foglalt), audit minden íráson.
+- **Bekötés:** `handlers/orders.js` `comCreate` (`series_id`) + `bulkCreateOrders`
+  (importonként egy közös széria) + `routes/inbound-orders.js` approve — mind a választott
+  vagy alapértelmezett szériát használja.
+- **UI:** a fuvar-kiíró űrlap „Fuvar-sorozat" választója (`oSeria`, alapértelmezett ★);
+  a Beállítások → Cég & arculat → 📋 Számozás alatt **🚚 Fuvar-sorozatok** kezelő (lista
+  következő számmal, alapértelmezett-jelölés, átnevezés, törlés, új felvétele). i18n
+  `form.seria` + `comset.os.*` (RO-alap+HU); cache-bust `?v=20260621os`.
+- **Verifikáció:** valós Postgres 16-on — default folytatás, új széria független számláló,
+  átnevezés-folytonosság, cross-tenant fallback (idegen széria → saját default), migráció
+  idempotencia; 100 Jest zöld + require-sweep.
+
+## 2026-06-20 — ÚJ: ember-olvasható fuvar-szám (CMD-YYYY-XXXX)
+
+- **Gyökér-igény:** a fuvar azonosítója eddig csak a belső, véletlenszerű kulcs volt
+  (`orders.id`, pl. `CMD-MBKZ41X07AF`) — gép-barát, de csúnya és nem sorszámozott.
+  Most minden fuvar kap egy cégenként/évenként növekvő, ember-olvasható fuvar-számot
+  (pl. `CMD-2026-0001`); a belső `orders.id` VÁLTOZATLAN marad (minden FK/hivatkozás
+  rá épül) — a fuvar-szám csak megjelenítési/keresési érték.
+- **`db/order-fuvar-no.sql`** (ÚJ migráció, idempotens) — `orders.fuvar_no VARCHAR(30)`
+  + `idx_orders_fuvar_no (company_id, fuvar_no)`; **visszamenőleges feltöltés** a meglévő
+  fuvarokra (cégenként/évenként, `created_at`-sorrendben) + a `document_series` `CMD`
+  számláló szinkronizálása a backfillelt maximumra, hogy az ÚJ fuvarok onnan folytassák.
+  A sorszámozás a meglévő `document_series` mintát használja (mint a menetlevél MT-YYYY-XXXX).
+- **`lib/orderNo.js`** (ÚJ) — `nextFuvarNo(db, companyId, year)`: cégenként/évenként növekvő
+  fuvar-szám a `document_series`-ből (`doc_type='CMD'`); a `db` lehet pool vagy tranzakciós
+  kliens. Bekötve a 3 fuvar-létrehozó úton (mind best-effort: hiba esetén `fuvar_no=NULL`,
+  a fuvar mentése akkor is fut): **`handlers/orders.js`** `comCreate` + `bulkCreateOrders`,
+  **`routes/inbound-orders.js`** approve.
+- **Megjelenítés:** `comList` visszaadja a `fuvar_no`-t; a **fuvar-lista** első cellája a
+  fuvar-számot mutatja (a belső id tooltipben), az **entitás-adatlap** (`getOrderDetail`/
+  `entity-detail.js`) „Nr. cursă / Fuvar-szám" sorral; a **globális kereső** is keres rá és
+  azt jeleníti meg. i18n `ed.o.fuvarNo` (RO-alap+HU); cache-bust `?v=20260620fno`.
+- **Verifikáció:** valós Postgres 16-on a backfill (cégenként/évenként 1..N), a
+  `document_series` szinkron, a `nextFuvarNo` folytatása és a migráció idempotenciája
+  ellenőrizve; 100 Jest zöld + require-sweep.
+
 ## 2026-06-19 — Fix: ANAF CUI-lekérdezés robusztusság — timeout 25s, SSL cause-logging, jobb hibaüzenetek
 
 - **`services/clients.js`** — `fetchJson` timeout 12 s → 25 s (ANAF lassú); hibaüzenet enrichment: a Node.js `undici`

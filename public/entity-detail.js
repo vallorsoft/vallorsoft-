@@ -289,6 +289,7 @@
     var box = document.getElementById('edBody');
     var o = T._data.order || {};
     var rows = [
+      [_t('ed.o.fuvarNo', 'Nr. cursă'), o.fuvar_no || o.id],
       ['ID', o.id],
       [_t('col.client', 'Client'), o.client_name || o.client],
       [_t('ed.o.ref', 'Referință'), o.ref],

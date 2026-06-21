@@ -40,10 +40,10 @@ handlers.globalSearch = async function (req, res, args) {
     // ── Fuvarok (csak Admin/Manager) ──────────────────────────
     const ordersP = isStaff
       ? pool.query(
-          `SELECT id, client, loc_incarcare, loc_descarcare, status, rendszam_camion
+          `SELECT id, fuvar_no, client, loc_incarcare, loc_descarcare, status, rendszam_camion
              FROM orders
             WHERE company_id = $1
-              AND (id ILIKE '%'||$2||'%' OR client ILIKE '%'||$2||'%'
+              AND (id ILIKE '%'||$2||'%' OR fuvar_no ILIKE '%'||$2||'%' OR client ILIKE '%'||$2||'%'
                    OR loc_incarcare ILIKE '%'||$2||'%' OR loc_descarcare ILIKE '%'||$2||'%'
                    OR rendszam_camion ILIKE '%'||$2||'%' OR ref ILIKE '%'||$2||'%')
             ORDER BY created_at DESC
@@ -149,7 +149,7 @@ handlers.globalSearch = async function (req, res, args) {
 
     pushGroup(groups, 'orders', 'Fuvarok', 'orders-list', orders.rows, (r) => ({
       id: r.id,
-      title: r.id,
+      title: r.fuvar_no || r.id,
       subtitle: [
         r.client || '',
         (r.loc_incarcare || '') + '→' + (r.loc_descarcare || ''),
