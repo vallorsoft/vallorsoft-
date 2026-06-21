@@ -248,13 +248,14 @@ function _rmFresh(){ return { via:[], km:null, dur:null, polyline:[], waypoints:
 var _rmState = { create:_rmFresh(), edit:_rmFresh() };
 var _rmLeaflet=null, _rmLayers=null, _rmWhich=null, _rmClickAdds=false;
 
-// Általános cím-autocomplete (Photon proxy). onPick(): a kiválasztás után fut.
+/// Általános cím-autocomplete (Photon proxy). onPick(lat,lng): a kiválasztás után fut.
 function vsAttachAutocomplete(inputId, ddId, onPick){
   var input=document.getElementById(inputId), dd=document.getElementById(ddId);
   if(!input||!dd||input._vsAcBound) return; input._vsAcBound=true;
   var timer=null;
   input.addEventListener('input', function(){
     var q=input.value.trim(); if(timer)clearTimeout(timer);
+    input._vsLat=null; input._vsLng=null; // kézi gépelés törli a cached koordinátát
     if(q.length<3){ dd.classList.remove('open'); dd.innerHTML=''; return; }
     timer=setTimeout(function(){
       fetch('/api/geo-autocomplete?q='+encodeURIComponent(q),{credentials:'same-origin'})
@@ -262,12 +263,16 @@ function vsAttachAutocomplete(inputId, ddId, onPick){
           var items=(d&&d.items)||[];
           if(!items.length){ dd.classList.remove('open'); dd.innerHTML=''; return; }
           dd.innerHTML=items.map(function(it){ var label=it.label||it.title; var main=it.title||label;
-            return '<div class="vs-ac-item" data-label="'+esc(label)+'"><div class="ac-main">'+esc(main)+'</div><div class="ac-sub">'+esc(label)+'</div></div>'; }).join('');
+            var lat=it.lat!=null?it.lat:'', lng=it.lng!=null?it.lng:'';
+            return '<div class="vs-ac-item" data-label="'+esc(label)+'" data-lat="'+lat+'" data-lng="'+lng+'"><div class="ac-main">'+esc(main)+'</div><div class="ac-sub">'+esc(label)+'</div></div>'; }).join('');
           dd.classList.add('open');
           Array.prototype.forEach.call(dd.querySelectorAll('.vs-ac-item'), function(el){
             el.addEventListener('mousedown', function(e){ e.preventDefault();
-              input.value=el.getAttribute('data-label'); dd.classList.remove('open'); dd.innerHTML='';
-              if(onPick) onPick(); });
+              input.value=el.getAttribute('data-label');
+              var lat=parseFloat(el.getAttribute('data-lat')), lng=parseFloat(el.getAttribute('data-lng'));
+              input._vsLat=isNaN(lat)?null:lat; input._vsLng=isNaN(lng)?null:lng;
+              dd.classList.remove('open'); dd.innerHTML='';
+              if(onPick) onPick(input._vsLat, input._vsLng); });
           });
         }).catch(function(){ dd.classList.remove('open'); });
     },300);
@@ -314,12 +319,17 @@ function initOrderMapFeature(){
 
 function _rmBuildWps(which){
   var c=RM_CFG[which], st=_rmState[which];
-  var load=((document.getElementById(c.load)||{}).value||'').trim();
-  var unload=((document.getElementById(c.unload)||{}).value||'').trim();
+  var loadEl=document.getElementById(c.load), unloadEl=document.getElementById(c.unload);
+  var load=((loadEl||{}).value||'').trim();
+  var unload=((unloadEl||{}).value||'').trim();
   if(!load||!unload) return null;
-  var wps=[{type:'loading',address:load}];
+  var lWp={type:'loading',address:load};
+  if(loadEl && loadEl._vsLat!=null){ lWp.lat=loadEl._vsLat; lWp.lng=loadEl._vsLng; }
+  var uWp={type:'unloading',address:unload};
+  if(unloadEl && unloadEl._vsLat!=null){ uWp.lat=unloadEl._vsLat; uWp.lng=unloadEl._vsLng; }
+  var wps=[lWp];
   st.via.forEach(function(v){ wps.push(v.lat!=null?{type:'waypoint',lat:v.lat,lng:v.lng,address:v.address||null}:{type:'waypoint',address:v.address}); });
-  wps.push({type:'unloading',address:unload});
+  wps.push(uWp);
   return wps;
 }
 
