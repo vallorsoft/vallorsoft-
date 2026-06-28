@@ -14,6 +14,26 @@
 
 ---
 
+## 2026-06-28 — Belső tesztek bővítése: require-sweep + web-smoke + menetlevél valós-DB (PR #225)
+
+- **`tests/unit/require-sweep.test.js`** (ÚJ) — automatizált require-sweep: MINDEN
+  modul a `handlers/`/`routes/`/`services/`/`lib/`/`middleware/` alól betöltődik-e
+  hiba nélkül (a `../db` mockolva, nincs valódi kapcsolat). Syntax-/export-hibát
+  azonnal elkap (a CLAUDE.md-ben eddig kézi „require-sweep" volt).
+- **`tests/integration/web-smoke.test.js`** (ÚJ) — a teljes web-réteg (a server.js
+  route-listája) felmountolódik-e; publikus oldalak 200; védett oldalak login
+  nélkül → `/login`; szerep-eltérés → saját oldalra; `/healthz` 200. DB mockolva.
+- **`tests/integration/fuvarlevelek-db.test.js`** (ÚJ, valós DB) — menetlevél teljes
+  út: `POST /api/fuvarlevel-save` (indulas/erkezes/hataratok oszlopokkal),
+  **`GET /api/pdf-download/:id` regresszió-őr** (a `companies.nev` join — a korábbi
+  `c.denumire` bug ezt 500-ra vitte), `getFuvarlevelek`/`getFuvarlevelDetail`/
+  `fuvarlevelUpdate`, és a `getFuvarlevelFieldSuggestions` (distinct + szerep-védelem
+  + cross-tenant izoláció).
+- Eredmény: **valós DB-vel 277 teszt zöld** (31 suite); DB nélkül 240 zöld + 37 skip
+  (a valós-DB suite-ok). A CI Postgres 16 service-szel a teljes készlet fut.
+
+---
+
 ## 2026-06-28 — Menetlevél-szerkesztő: mező-autocomplete a korábbi értékekből (PR #224)
 
 - Admin/Manager menetlevél-szerkesztésekor minden szöveges mező gépelés közben
