@@ -265,7 +265,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       ownClause = ' AND LOWER(f.email_sofer) = $3';
     }
     const r = await pool.query(
-      `SELECT f.*, c.denumire AS company_denumire
+      `SELECT f.*, c.nev AS company_denumire
        FROM fuvarlevelek f
        JOIN companies c ON c.id = $2
        WHERE f.id = $1 AND f.email_sofer IN (SELECT email FROM users WHERE company_id = $2)${ownClause}`,
