@@ -98,18 +98,31 @@ d('Valódi DB integráció (menetlevelek)', () => {
     expect(res.text).toContain('Cluj-Napoca');
   });
 
-  test('GET /api/pdf-download/:id: nyomtatott fuvarlap CSAK románul (nincs magyar felirat)', async () => {
-    const id = await seedWaybill();
+  test('GET /api/pdf-download/:id: a MEZŐ-FELIRATOK csak románok; a BEÍRT ADAT bármilyen nyelvű lehet', async () => {
+    // A felhasználó SZÁNDÉKOSAN magyar nyelvű adatot ír be — ez teljesen rendben
+    // van, az adat nyelve nem számít. CSAK a sablon feliratainak/címkéinek kell
+    // románnak lenniük.
+    const id = await seedWaybill({
+      nume_sofer: 'Kovács Béla',
+      alte_mentiuni: 'Sürgős, törékeny szállítmány',
+      puncte: '[{"tip":"Felrakás","loc":"Záhony"}]',
+      achizitii: '[{"loc":"Bolt","produs":"kesztyű","plata":"készpénz"}]',
+    });
     setUser(ADMIN);
     const res = await request(app).get('/api/pdf-download/' + id);
     expect(res.status).toBe(200);
-    // a korábbi magyar glosszák / feliratok eltűntek:
-    ['Útvonal pontok', 'Tankolások', 'Kiadások', 'Megjegyzések', 'Fuvar ID-k', ' nap<', 'Data / ora'].forEach((hu) => {
-      expect(res.text).not.toContain(hu);
+
+    // 1) A BEÍRT ADAT változatlanul megjelenik — a nyelve mindegy:
+    ['Kovács Béla', 'Sürgős, törékeny szállítmány', 'Záhony', 'kesztyű', 'készpénz'].forEach((dataVal) => {
+      expect(res.text).toContain(dataVal);
     });
-    // a román megfelelők megvannak:
-    ['ID-uri cursă', 'Data plecare', 'Data sosire', 'zile'].forEach((ro) => {
-      expect(res.text).toContain(ro);
+
+    // 2) A SABLON FELIRATAI / szekciócímei kizárólag románok — magyar CÍMKE nincs:
+    ['Útvonal pontok', 'Tankolások', 'Kiadások', 'Megjegyzések', 'Fuvar ID-k', 'Data / ora'].forEach((huLabel) => {
+      expect(res.text).not.toContain(huLabel);
+    });
+    ['Puncte de traseu', 'Alimentări', 'Achiziții', 'Alte mențiuni', 'ID-uri cursă', 'Data plecare', 'Data sosire', 'zile'].forEach((roLabel) => {
+      expect(res.text).toContain(roLabel);
     });
   });
 
