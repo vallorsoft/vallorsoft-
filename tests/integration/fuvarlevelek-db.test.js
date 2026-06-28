@@ -98,6 +98,21 @@ d('Valódi DB integráció (menetlevelek)', () => {
     expect(res.text).toContain('Cluj-Napoca');
   });
 
+  test('GET /api/pdf-download/:id: nyomtatott fuvarlap CSAK románul (nincs magyar felirat)', async () => {
+    const id = await seedWaybill();
+    setUser(ADMIN);
+    const res = await request(app).get('/api/pdf-download/' + id);
+    expect(res.status).toBe(200);
+    // a korábbi magyar glosszák / feliratok eltűntek:
+    ['Útvonal pontok', 'Tankolások', 'Kiadások', 'Megjegyzések', 'Fuvar ID-k', ' nap<', 'Data / ora'].forEach((hu) => {
+      expect(res.text).not.toContain(hu);
+    });
+    // a román megfelelők megvannak:
+    ['ID-uri cursă', 'Data plecare', 'Data sosire', 'zile'].forEach((ro) => {
+      expect(res.text).toContain(ro);
+    });
+  });
+
   test('GET /api/pdf-download/:id: ismeretlen id → 404, login nélkül → 401', async () => {
     setUser(ADMIN);
     const r404 = await request(app).get('/api/pdf-download/NINCS-ILYEN');
@@ -149,6 +164,20 @@ d('Valódi DB integráció (menetlevelek)', () => {
     expect(row.order_ids).toEqual(['CMD-2026-0001', 'CMD-2026-0002']);
     expect(new Date(row.data_completare).getFullYear()).toBe(2026);
     expect(new Date(row.data_completare).getMonth()).toBe(1);   // február (0-indexelt)
+  });
+
+  test('fuvarlevelUpdate: kezdő/végző dátum óra nélkül (indulas_dt/erkezes_dt) szerkeszthető', async () => {
+    const id = await seedWaybill();
+    const upd = makeRes();
+    await documents.fuvarlevelUpdate(reqAs(ADMIN), upd, [id, {
+      km_inceput: 0, km_sfarsit: 0,
+      indulas_date: '2026-03-10', erkezes_date: '2026-03-14',
+    }]);
+    expect(upd.body.result.ok).toBe(true);
+    const row = (await pool.query('SELECT indulas_dt, erkezes_dt FROM fuvarlevelek WHERE id = $1', [id])).rows[0];
+    // UTC-éjfélként tárolva → a kiválasztott nap stabil
+    expect(new Date(row.indulas_dt).toISOString().slice(0, 10)).toBe('2026-03-10');
+    expect(new Date(row.erkezes_dt).toISOString().slice(0, 10)).toBe('2026-03-14');
   });
 
   test('fuvarlevelUpdate: hiányzó dátum/order_ids → a meglévő érték marad (COALESCE)', async () => {

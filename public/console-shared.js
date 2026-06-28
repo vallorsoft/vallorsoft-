@@ -2063,6 +2063,14 @@ function feToLocalDtInput(ts){
   return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());
 }
 
+// Timestamp → <input type="date"> érték (YYYY-MM-DD). UTC dátum-rész, hogy
+// a kezdő/végző dátum stabil maradjon (a szerver UTC-éjfélként tárolja).
+function feToDateInput(ts){
+  if(!ts) return '';
+  var d=new Date(ts); if(isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0,10);
+}
+
 function openFuvEdit(id){
   gas('getFuvarlevelDetail',[id]).then(function(r){
     if(!r||!r.ok){toast(r&&r.err||t('cs.cannotLoad'),'err');return;}
@@ -2082,6 +2090,8 @@ function openFuvEdit(id){
     document.getElementById('feMentiuni').value=f.alte_mentiuni||'';
     var feDt=document.getElementById('feDataCompletare'); if(feDt) feDt.value=feToLocalDtInput(f.data_completare);
     var feOi=document.getElementById('feOrderIds'); if(feOi) feOi.value=Array.isArray(f.order_ids)?f.order_ids.join(', '):'';
+    var feIn=document.getElementById('feIndulasDate'); if(feIn) feIn.value=feToDateInput(f.indulas_dt);
+    var feEr=document.getElementById('feErkezesDate'); if(feEr) feEr.value=feToDateInput(f.erkezes_dt);
     var puncte=Array.isArray(f.puncte)?f.puncte:[];
     var alim=Array.isArray(f.alimentari)?f.alimentari:[];
     var ach=Array.isArray(f.achizitii)?f.achizitii:[];
@@ -2194,6 +2204,8 @@ function saveFuvEdit(){
     alte_mentiuni:document.getElementById('feMentiuni').value,
     data_completare:(document.getElementById('feDataCompletare')||{}).value||null,
     order_ids:(((document.getElementById('feOrderIds')||{}).value)||'').split(',').map(function(s){return s.trim();}).filter(Boolean),
+    indulas_date:(document.getElementById('feIndulasDate')||{}).value||null,
+    erkezes_date:(document.getElementById('feErkezesDate')||{}).value||null,
     puncte:puncte, alimentari:alimentari, achizitii:achizitii
   };
   gas('fuvarlevelUpdate',[id,payload]).then(function(r){

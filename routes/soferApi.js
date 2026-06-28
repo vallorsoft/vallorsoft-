@@ -251,6 +251,15 @@ function escHtml(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
+// Dátum CSAK (óra nélkül), románul. UTC-ben formázunk, hogy a kiválasztott
+// dátum stabil maradjon (a date-only mezőket UTC-éjfélként tároljuk).
+function fmtDateRo(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return escHtml(d.toLocaleDateString('ro-RO', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }));
+}
+
 // PDF DOWNLOAD (DB-bol) — csak bejelentkezve, csak a saját cég menetlevele
 router.get('/api/pdf-download/:id', async (req, res) => {
   try {
@@ -353,20 +362,20 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     <table class="grid-table">
       <tr><td width="50%"><b>Nume șofer:</b> ${escHtml(f.nume_sofer || '—')}</td><td><b>Serie / Număr:</b> ${escHtml(f.numar_fisa || '—')}</td></tr>
       <tr><td><b>Număr camion:</b> ${escHtml(f.numar_camion || '—')}</td><td><b>Număr remorcă:</b> ${escHtml(f.numar_remorca || '—')}</td></tr>
-      <tr><td colspan="2"><b>Fuvar ID-k:</b> ${orderIdsStr}</td></tr>
-      <tr><td><b>Data / ora plecare:</b> ${f.indulas_dt ? escHtml(new Date(f.indulas_dt).toLocaleString('ro-RO', {timeZone:'Europe/Bucharest',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})) : '—'}</td><td><b>Data / ora sosire:</b> ${f.erkezes_dt ? escHtml(new Date(f.erkezes_dt).toLocaleString('ro-RO', {timeZone:'Europe/Bucharest',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})) : '—'}</td></tr>
+      <tr><td colspan="2"><b>ID-uri cursă:</b> ${orderIdsStr}</td></tr>
+      <tr><td><b>Data plecare:</b> ${fmtDateRo(f.indulas_dt)}</td><td><b>Data sosire:</b> ${fmtDateRo(f.erkezes_dt)}</td></tr>
       <tr><td><b>Km început:</b> ${f.km_inceput || 0} km</td><td><b>Km sfârșit:</b> ${f.km_sfarsit || 0} km</td></tr>
       <tr><td colspan="2"><b>Total kilometri parcurși: ${f.total_km || 0} km</b></td></tr>
-      <tr><td><b>Diurnă externă:</b> ${f.diurna_externa || 0} nap</td><td><b>Diurnă internă:</b> ${f.diurna_interna || 0} nap</td></tr>
+      <tr><td><b>Diurnă externă:</b> ${f.diurna_externa || 0} zile</td><td><b>Diurnă internă:</b> ${f.diurna_interna || 0} zile</td></tr>
     </table>
 
-    <div class="sec-title">Puncte de traseu (Útvonal pontok)</div>
+    <div class="sec-title">Puncte de traseu</div>
     <table class="grid-table">
       <tr><th>#</th><th>Tip</th><th>Localitate / Adresă</th><th>Dată</th></tr>
       ${puncteHtml}
     </table>
 
-    <div class="sec-title">Alimentări (Tankolások)</div>
+    <div class="sec-title">Alimentări</div>
     <table class="grid-table">
       <tr><th>Loc & Data</th><th>Combustibil</th><th>Litri</th><th>Km</th><th>Plată</th><th>Sumă</th></tr>
       ${alimHtml}
@@ -379,13 +388,13 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       <tr><td colspan="2"><b>Consum mediu / 100 km: ${f.consum_100 || 0} L</b></td></tr>
     </table>
 
-    <div class="sec-title">Achiziții / Cheltuieli (Kiadások)</div>
+    <div class="sec-title">Achiziții / Cheltuieli</div>
     <table class="grid-table">
       <tr><th>Loc & Data</th><th>Produs / Serviciu</th><th>Preț</th><th>Metodă plată</th></tr>
       ${achHtml}
     </table>
 
-    <div class="sec-title">Alte mențiuni (Megjegyzések)</div>
+    <div class="sec-title">Alte mențiuni</div>
     <div style="border:1px solid #000;padding:10px;min-height:40px;">${escHtml(f.alte_mentiuni || '—')}</div>
 
     <div style="margin-top:30px;display:flex;justify-content:space-between;">
