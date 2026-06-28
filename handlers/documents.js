@@ -234,13 +234,23 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
       const motorinaFolosit = Math.max(0, cantInc + totalAlim - cantSf);
       const consum100 = totalKm > 0 ? Math.round((motorinaFolosit / totalKm * 100) * 100) / 100 : 0;
 
+      // Dátum + fuvar ID-k (Admin/Manager szerkesztheti). Üres/hiányzó → a
+      // meglévő érték marad (COALESCE); érvénytelen dátum → szintén marad.
+      let dataCompletare = null;
+      if (d.data_completare) { const dt = new Date(d.data_completare); if (!isNaN(dt.getTime())) dataCompletare = dt; }
+      const orderIds = Array.isArray(d.order_ids)
+        ? d.order_ids.map(x => String(x).trim()).filter(Boolean)
+        : null;
+
       await pool.query(
         `UPDATE fuvarlevelek SET
            nume_sofer = $2, numar_camion = $3, numar_remorca = $4, numar_fisa = $5,
            km_inceput = $6, km_sfarsit = $7, total_km = $8,
            diurna_externa = $9, diurna_interna = $10,
            cant_inceput = $11, cant_sfarsit = $12, motorina_folosit = $13, total_alim = $14, consum_100 = $15,
-           alte_mentiuni = $16, alimentari = $17, achizitii = $18, puncte = $19
+           alte_mentiuni = $16, alimentari = $17, achizitii = $18, puncte = $19,
+           data_completare = COALESCE($20::timestamp, data_completare),
+           order_ids = COALESCE($21::jsonb, order_ids)
          WHERE id = $1`,
         [
           id,
@@ -249,7 +259,9 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
           parseInt(d.diurna_externa || 0), parseInt(d.diurna_interna || 0),
           cantInc, cantSf, motorinaFolosit, totalAlim, consum100,
           d.alte_mentiuni || null,
-          JSON.stringify(alimentari), JSON.stringify(achizitii), JSON.stringify(puncte)
+          JSON.stringify(alimentari), JSON.stringify(achizitii), JSON.stringify(puncte),
+          dataCompletare,
+          orderIds === null ? null : JSON.stringify(orderIds)
         ]
       );
       return res.json({ result: { ok: true, total_km: totalKm, consum_100: consum100 } });
