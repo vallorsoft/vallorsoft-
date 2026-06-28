@@ -14,6 +14,25 @@
 
 ---
 
+## 2026-06-28 — Fuvarlap nyomtatás CSAK románul + kezdő/végző dátum óra nélkül (PR #227)
+
+- **Nyomtatott fuvarlap (PDF) — minden magyar felirat eltávolítva**, csak román:
+  `routes/soferApi.js` `/api/pdf-download/:id` — a szekciócímek magyar glosszái
+  törölve (`Puncte de traseu (Útvonal pontok)` → `Puncte de traseu`, ugyanígy
+  Alimentări/Achiziții/Alte mențiuni); `Fuvar ID-k` → `ID-uri cursă`; `... nap` →
+  `... zile`; `Data / ora plecare/sosire` (időponttal) → `Data plecare`/`Data sosire`
+  **dátum óra nélkül** (új `fmtDateRo`, UTC-formázás a nap-stabilitásért).
+- **Kezdő + végző dátum szerkeszthető óra nélkül (Admin/Manager):** `admin.html`/
+  `manager.html` két új `type="date"` mező (`feIndulasDate`/`feErkezesDate` →
+  `indulas_dt`/`erkezes_dt`); `console-shared.js` `openFuvEdit` feltölt
+  (`feToDateInput`, UTC dátum-rész) + `saveFuvEdit` beolvas; `handlers/documents.js`
+  `fuvarlevelUpdate` perzisztál (`::timestamptz`, UTC-éjfél, hiányzó→`COALESCE`).
+- i18n `fed.startDate`/`fed.endDate`; cache-bust `?v=20260628fed2`.
+- Teszt: `fuvarlevelek-db.test.js` +2 eset (PDF csak-román őr + kezdő/végző dátum);
+  valós DB-vel **281 teszt zöld**.
+
+---
+
 ## 2026-06-28 — Menetlevél: a dátum és a fuvar ID-k is szerkeszthetők (Admin/Manager) (PR #226)
 
 - A menetlevél-szerkesztő modálban (Admin/Manager) most a **Dátum** (`data_completare`,

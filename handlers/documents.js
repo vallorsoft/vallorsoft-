@@ -241,6 +241,17 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
       const orderIds = Array.isArray(d.order_ids)
         ? d.order_ids.map(x => String(x).trim()).filter(Boolean)
         : null;
+      // Kezdő/végző dátum óra NÉLKÜL (YYYY-MM-DD). UTC-éjfélként tároljuk,
+      // hogy a kiválasztott nap ne csússzon át időzóna miatt. Üres/érvénytelen
+      // → a meglévő érték marad (COALESCE).
+      const parseDateOnly = (v) => {
+        if (!v) return null;
+        const m = /^\d{4}-\d{2}-\d{2}$/.test(String(v).trim());
+        const dt = new Date(m ? (String(v).trim() + 'T00:00:00Z') : v);
+        return isNaN(dt.getTime()) ? null : dt;
+      };
+      const indulasDt = parseDateOnly(d.indulas_date);
+      const erkezesDt = parseDateOnly(d.erkezes_date);
 
       await pool.query(
         `UPDATE fuvarlevelek SET
@@ -250,7 +261,9 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
            cant_inceput = $11, cant_sfarsit = $12, motorina_folosit = $13, total_alim = $14, consum_100 = $15,
            alte_mentiuni = $16, alimentari = $17, achizitii = $18, puncte = $19,
            data_completare = COALESCE($20::timestamp, data_completare),
-           order_ids = COALESCE($21::jsonb, order_ids)
+           order_ids = COALESCE($21::jsonb, order_ids),
+           indulas_dt = COALESCE($22::timestamptz, indulas_dt),
+           erkezes_dt = COALESCE($23::timestamptz, erkezes_dt)
          WHERE id = $1`,
         [
           id,
@@ -261,7 +274,9 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
           d.alte_mentiuni || null,
           JSON.stringify(alimentari), JSON.stringify(achizitii), JSON.stringify(puncte),
           dataCompletare,
-          orderIds === null ? null : JSON.stringify(orderIds)
+          orderIds === null ? null : JSON.stringify(orderIds),
+          indulasDt,
+          erkezesDt
         ]
       );
       return res.json({ result: { ok: true, total_km: totalKm, consum_100: consum100 } });
