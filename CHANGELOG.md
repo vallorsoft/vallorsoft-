@@ -14,6 +14,19 @@
 
 ---
 
+## 2026-06-28 — Fix: menetlevél PDF letöltés „Eroare de server" (PR #223)
+
+- **Gyökérok:** a `routes/soferApi.js` `/api/pdf-download/:id` útvonala a `companies`
+  táblát `c.denumire`-ként kérdezte le, de a `companies` névoszlopa `nev` (a `denumire`
+  a `clients` tábláé) → `column c.denumire does not exist` → a route `500 Eroare de
+  server`-rel válaszolt, és a menetlevél PDF semmilyen adatot nem mutatott.
+- **Javítás:** `c.denumire` → `c.nev` (alias `company_denumire` változatlan).
+- Teljes kódbázis-átvizsgálás `denumire`-re: ez volt az EGYETLEN hely, ahol a `companies`
+  táblát tévesen `denumire`-ként hivatkozták (máshol a `c.denumire` a `clients` tábláé,
+  a cégnév `co.nev`). Valós Postgres 16-on reprodukálva + verifikálva; 130 Jest zöld.
+
+---
+
 ## 2026-06-21 — Kedvenc helyszínek: autocomplete + koordináta-kezelés (PR #221)
 
 - `lib/mapsProvider.js` — `_acFree` (Photon) és `_acHere` mostantól `lat`/`lng`-t is visszaad
