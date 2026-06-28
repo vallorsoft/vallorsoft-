@@ -14,6 +14,25 @@
 
 ---
 
+## 2026-06-28 — Menetlevél: a dátum és a fuvar ID-k is szerkeszthetők (Admin/Manager) (PR #226)
+
+- A menetlevél-szerkesztő modálban (Admin/Manager) most a **Dátum** (`data_completare`,
+  `datetime-local`) és a **Fuvar ID-k** (`order_ids`, vesszővel elválasztva) is
+  szerkeszthető — eddig csak megjelentek, de nem lehetett őket módosítani.
+- **`public/admin.html` + `public/manager.html`** — két új mező a modal rácsában
+  (`feDataCompletare`, `feOrderIds`); `data-i18n` (RO-alap + HU).
+- **`public/console-shared.js`** — `openFuvEdit` feltölti a két mezőt (`feToLocalDtInput`
+  helyi datetime-local konverzió; order_ids → vesszős lista); `saveFuvEdit` beolvassa
+  (trim + üres kiszűrése).
+- **`handlers/documents.js` `fuvarlevelUpdate`** — perzisztálja a `data_completare`-t
+  (`::timestamp`) és az `order_ids`-t (`::jsonb`); hiányzó/üres érték → a meglévő marad
+  (`COALESCE`), érvénytelen dátum → szintén marad.
+- `i18n.js` `fed.dataCompletare`/`fed.orderIds`; cache-bust `?v=20260628fed`.
+- Teszt: `tests/integration/fuvarlevelek-db.test.js` +2 eset (szerkesztés + COALESCE-megtartás);
+  valós DB-vel **279 teszt zöld**.
+
+---
+
 ## 2026-06-28 — Belső tesztek bővítése: require-sweep + web-smoke + menetlevél valós-DB (PR #225)
 
 - **`tests/unit/require-sweep.test.js`** (ÚJ) — automatizált require-sweep: MINDEN

@@ -2055,6 +2055,14 @@ function feAddAch(){document.getElementById('feAch').insertAdjacentHTML('beforee
 
 function closeFuvEdit(){document.getElementById('fuvEditModal').classList.remove('open');if(typeof feSgClose==='function')feSgClose();}
 
+// Timestamp → <input type="datetime-local"> érték (YYYY-MM-DDTHH:mm, helyi idő).
+function feToLocalDtInput(ts){
+  if(!ts) return '';
+  var d=new Date(ts); if(isNaN(d.getTime())) return '';
+  var p=function(n){return String(n).padStart(2,'0');};
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());
+}
+
 function openFuvEdit(id){
   gas('getFuvarlevelDetail',[id]).then(function(r){
     if(!r||!r.ok){toast(r&&r.err||t('cs.cannotLoad'),'err');return;}
@@ -2072,6 +2080,8 @@ function openFuvEdit(id){
     document.getElementById('feCantInc').value=f.cant_inceput||0;
     document.getElementById('feCantSf').value=f.cant_sfarsit||0;
     document.getElementById('feMentiuni').value=f.alte_mentiuni||'';
+    var feDt=document.getElementById('feDataCompletare'); if(feDt) feDt.value=feToLocalDtInput(f.data_completare);
+    var feOi=document.getElementById('feOrderIds'); if(feOi) feOi.value=Array.isArray(f.order_ids)?f.order_ids.join(', '):'';
     var puncte=Array.isArray(f.puncte)?f.puncte:[];
     var alim=Array.isArray(f.alimentari)?f.alimentari:[];
     var ach=Array.isArray(f.achizitii)?f.achizitii:[];
@@ -2182,6 +2192,8 @@ function saveFuvEdit(){
     cant_inceput:document.getElementById('feCantInc').value,
     cant_sfarsit:document.getElementById('feCantSf').value,
     alte_mentiuni:document.getElementById('feMentiuni').value,
+    data_completare:(document.getElementById('feDataCompletare')||{}).value||null,
+    order_ids:(((document.getElementById('feOrderIds')||{}).value)||'').split(',').map(function(s){return s.trim();}).filter(Boolean),
     puncte:puncte, alimentari:alimentari, achizitii:achizitii
   };
   gas('fuvarlevelUpdate',[id,payload]).then(function(r){

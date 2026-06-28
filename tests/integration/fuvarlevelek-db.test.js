@@ -136,6 +136,32 @@ d('Valódi DB integráció (menetlevelek)', () => {
     expect(Number(row.motorina_folosit)).toBe(60);
   });
 
+  test('fuvarlevelUpdate: a dátum (data_completare) és a fuvar ID-k (order_ids) szerkeszthetők', async () => {
+    const id = await seedWaybill();
+    const upd = makeRes();
+    await documents.fuvarlevelUpdate(reqAs(ADMIN), upd, [id, {
+      km_inceput: 0, km_sfarsit: 0,
+      data_completare: '2026-02-15T09:30',
+      order_ids: ['CMD-2026-0001', ' CMD-2026-0002 ', ''],   // trim + üres kiszűrése
+    }]);
+    expect(upd.body.result.ok).toBe(true);
+    const row = (await pool.query('SELECT data_completare, order_ids FROM fuvarlevelek WHERE id = $1', [id])).rows[0];
+    expect(row.order_ids).toEqual(['CMD-2026-0001', 'CMD-2026-0002']);
+    expect(new Date(row.data_completare).getFullYear()).toBe(2026);
+    expect(new Date(row.data_completare).getMonth()).toBe(1);   // február (0-indexelt)
+  });
+
+  test('fuvarlevelUpdate: hiányzó dátum/order_ids → a meglévő érték marad (COALESCE)', async () => {
+    const id = await seedWaybill();
+    await pool.query("UPDATE fuvarlevelek SET data_completare = '2025-12-01 10:00', order_ids = '[\"CMD-KEEP\"]'::jsonb WHERE id = $1", [id]);
+    const upd = makeRes();
+    await documents.fuvarlevelUpdate(reqAs(ADMIN), upd, [id, { km_inceput: 0, km_sfarsit: 0 }]); // nincs data/order_ids
+    expect(upd.body.result.ok).toBe(true);
+    const row = (await pool.query('SELECT data_completare, order_ids FROM fuvarlevelek WHERE id = $1', [id])).rows[0];
+    expect(row.order_ids).toEqual(['CMD-KEEP']);
+    expect(new Date(row.data_completare).getFullYear()).toBe(2025);
+  });
+
   test('getFuvarlevelFieldSuggestions: distinct értékek (top + JSONB), Sofer tiltva', async () => {
     await seedWaybill({ id: 'FUV-S1', numar_camion: 'CJ01ABC' });
     await seedWaybill({ id: 'FUV-S2', numar_camion: 'CJ02XYZ', alimentari: '[{"loc":"Petrom","tip":"AdBlue","plata":"Card"}]' });

@@ -2721,6 +2721,8 @@
     'fed.diurnaIn': { hu: 'Diurnă internă (nap)', ro: 'Diurnă internă (zile)' },
     'fed.fuelStart': { hu: 'Üzemanyag kezdés (L)', ro: 'Combustibil început (L)' },
     'fed.fuelEnd': { hu: 'Üzemanyag vég (L)', ro: 'Combustibil sfârșit (L)' },
+    'fed.dataCompletare': { hu: 'Dátum', ro: 'Dată' },
+    'fed.orderIds': { hu: 'Fuvar ID-k (vesszővel)', ro: 'ID-uri cursă (separate cu virgulă)' },
     'fed.routePoints': { hu: '📍 Útvonal pontok', ro: '📍 Puncte de traseu' },
     'fed.addPoint': { hu: '+ Pont', ro: '+ Punct' },
     'fed.fuelings': { hu: '⛽ Tankolások', ro: '⛽ Alimentări' },
