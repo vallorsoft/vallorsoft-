@@ -2028,32 +2028,32 @@ function printPdfView(){
 function feEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 function feRowPunct(p){p=p||{};return '<div class="fe-row" style="display:grid;grid-template-columns:1fr 2fr 1.2fr auto;gap:6px;align-items:center;">'
-  +'<input class="input fe-p-tip" placeholder="Tip" value="'+feEsc(p.tip)+'">'
-  +'<input class="input fe-p-loc" placeholder="Localitate" value="'+feEsc(p.loc)+'">'
+  +'<input class="input fe-p-tip" data-sg="punct_tip" placeholder="Tip" value="'+feEsc(p.tip)+'">'
+  +'<input class="input fe-p-loc" data-sg="punct_loc" placeholder="Localitate" value="'+feEsc(p.loc)+'">'
   +'<input class="input fe-p-data" placeholder="Dată" value="'+feEsc(p.data)+'">'
   +'<button class="btn ghost" style="padding:4px 9px;" onclick="this.parentNode.remove()">✕</button></div>';}
 
 function feRowAlim(a){a=a||{};return '<div class="fe-row" style="display:grid;grid-template-columns:1.4fr 1fr .7fr .7fr .8fr .8fr auto;gap:6px;align-items:center;">'
-  +'<input class="input fe-a-loc" placeholder="Loc" value="'+feEsc(a.loc)+'">'
-  +'<input class="input fe-a-tip" placeholder="Combustibil" value="'+feEsc(a.tip||'Motorină')+'">'
+  +'<input class="input fe-a-loc" data-sg="alim_loc" placeholder="Loc" value="'+feEsc(a.loc)+'">'
+  +'<input class="input fe-a-tip" data-sg="alim_tip" placeholder="Combustibil" value="'+feEsc(a.tip||'Motorină')+'">'
   +'<input class="input fe-a-lit" type="number" placeholder="L" value="'+feEsc(a.litru)+'">'
   +'<input class="input fe-a-km" type="number" placeholder="Km" value="'+feEsc(a.km)+'">'
-  +'<input class="input fe-a-plata" placeholder="Plată" value="'+feEsc(a.plata||'Card')+'">'
+  +'<input class="input fe-a-plata" data-sg="alim_plata" placeholder="Plată" value="'+feEsc(a.plata||'Card')+'">'
   +'<input class="input fe-a-suma" type="number" placeholder="Sumă" value="'+feEsc(a.suma)+'">'
   +'<button class="btn ghost" style="padding:4px 9px;" onclick="this.parentNode.remove()">✕</button></div>';}
 
 function feRowAch(c){c=c||{};return '<div class="fe-row" style="display:grid;grid-template-columns:1.4fr 1.4fr .8fr .8fr auto;gap:6px;align-items:center;">'
-  +'<input class="input fe-c-loc" placeholder="Loc" value="'+feEsc(c.loc)+'">'
-  +'<input class="input fe-c-prod" placeholder="Produs" value="'+feEsc(c.produs)+'">'
+  +'<input class="input fe-c-loc" data-sg="ach_loc" placeholder="Loc" value="'+feEsc(c.loc)+'">'
+  +'<input class="input fe-c-prod" data-sg="ach_produs" placeholder="Produs" value="'+feEsc(c.produs)+'">'
   +'<input class="input fe-c-pret" type="number" placeholder="Preț" value="'+feEsc(c.pret)+'">'
-  +'<input class="input fe-c-plata" placeholder="Plată" value="'+feEsc(c.plata||'Card')+'">'
+  +'<input class="input fe-c-plata" data-sg="ach_plata" placeholder="Plată" value="'+feEsc(c.plata||'Card')+'">'
   +'<button class="btn ghost" style="padding:4px 9px;" onclick="this.parentNode.remove()">✕</button></div>';}
 
 function feAddPunct(){document.getElementById('fePuncte').insertAdjacentHTML('beforeend', feRowPunct());}
 function feAddAlim(){document.getElementById('feAlim').insertAdjacentHTML('beforeend', feRowAlim());}
 function feAddAch(){document.getElementById('feAch').insertAdjacentHTML('beforeend', feRowAch());}
 
-function closeFuvEdit(){document.getElementById('fuvEditModal').classList.remove('open');}
+function closeFuvEdit(){document.getElementById('fuvEditModal').classList.remove('open');if(typeof feSgClose==='function')feSgClose();}
 
 function openFuvEdit(id){
   gas('getFuvarlevelDetail',[id]).then(function(r){
@@ -2079,7 +2079,90 @@ function openFuvEdit(id){
     document.getElementById('feAlim').innerHTML=alim.length?alim.map(feRowAlim).join(''):'';
     document.getElementById('feAch').innerHTML=ach.length?ach.map(feRowAch).join(''):'';
     document.getElementById('fuvEditModal').classList.add('open');
+    // Mező-autocomplete: a korábban beírt értékek felkínálása gépelés közben.
+    feSetStaticSg();
+    gas('getFuvarlevelFieldSuggestions').then(function(sg){ feSgInit(sg||{}); }).catch(function(){});
   });
+}
+
+// ===== Menetlevél-szerkesztő mező-autocomplete (korábban beírt értékek) =====
+// A cég eddigi menetleveleibe ugyanabba a mezőbe már beírt értékeket kínálja
+// fel gépelés közben (Admin/Manager). Megosztott, body-hoz fűzött legördülő +
+// a szerkesztő-modálra delegált input/focus kezelés (a dinamikusan hozzáadott
+// sorok is automatikusan kapnak javaslatot a `data-sg` attribútumon át).
+var _feSg = {};        // kulcs -> [értékek]
+var _feSgDD = null;    // megosztott legördülő
+var _feSgEl = null;    // aktuális mező
+
+function feSetStaticSg(){
+  var map={feNumeSofer:'nume_sofer',feCamion:'numar_camion',feRemorca:'numar_remorca',feMentiuni:'alte_mentiuni'};
+  Object.keys(map).forEach(function(idn){ var el=document.getElementById(idn); if(el) el.setAttribute('data-sg',map[idn]); });
+}
+
+function feSgEnsureDD(){
+  if(_feSgDD) return _feSgDD;
+  _feSgDD=document.createElement('div');
+  _feSgDD.id='feSgDD';
+  _feSgDD.style.cssText='position:fixed;z-index:100000;display:none;max-height:240px;overflow:auto;'
+    +'border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.35);font-size:13px;padding:4px;';
+  document.body.appendChild(_feSgDD);
+  window.addEventListener('scroll', feSgClose, true);
+  window.addEventListener('resize', feSgClose);
+  document.addEventListener('mousedown', function(e){
+    if(!_feSgDD || _feSgDD.style.display==='none') return;
+    if(e.target===_feSgEl || _feSgDD.contains(e.target)) return;
+    feSgClose();
+  });
+  return _feSgDD;
+}
+function feSgClose(){ if(_feSgDD){ _feSgDD.style.display='none'; _feSgDD.innerHTML=''; } _feSgEl=null; }
+
+function feSgTheme(){
+  var mc=document.querySelector('.main-content');
+  var dark=!mc || mc.getAttribute('data-theme')!=='light';
+  return dark ? {bg:'#141c25',bd:'#2a3645',tx:'#e9eef5',hv:'#1f2a36'}
+              : {bg:'#ffffff',bd:'#cbd5e1',tx:'#0f172a',hv:'#eef2ff'};
+}
+
+function feSgRender(el){
+  var key=el.getAttribute('data-sg'); if(!key){ feSgClose(); return; }
+  var list=_feSg[key]||[]; if(!list.length){ feSgClose(); return; }
+  var q=(el.value||'').trim().toLowerCase();
+  var matches=(q?list.filter(function(v){return String(v).toLowerCase().indexOf(q)>=0;}):list.slice())
+    .filter(function(v){return String(v).toLowerCase()!==q;});
+  if(!matches.length){ feSgClose(); return; }
+  matches=matches.slice(0,12);
+  var th=feSgTheme(), dd=feSgEnsureDD();
+  dd.style.background=th.bg; dd.style.border='1px solid '+th.bd; dd.style.color=th.tx;
+  dd.innerHTML=matches.map(function(v){
+    return '<div class="fe-sg-item" data-v="'+feEsc(v)+'" style="padding:6px 9px;border-radius:6px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+feEsc(v)+'</div>';
+  }).join('');
+  Array.prototype.forEach.call(dd.querySelectorAll('.fe-sg-item'),function(it){
+    it.addEventListener('mouseenter',function(){ it.style.background=th.hv; });
+    it.addEventListener('mouseleave',function(){ it.style.background=''; });
+    it.addEventListener('mousedown',function(e){ e.preventDefault();
+      el.value=it.getAttribute('data-v');
+      try{ el.dispatchEvent(new Event('input',{bubbles:true})); }catch(_){}
+      feSgClose(); try{ el.focus(); }catch(_){}
+    });
+  });
+  var r=el.getBoundingClientRect();
+  dd.style.left=Math.round(r.left)+'px';
+  dd.style.top=Math.round(r.bottom+2)+'px';
+  dd.style.minWidth=Math.max(160,Math.round(r.width))+'px';
+  dd.style.maxWidth=Math.max(240,Math.round(r.width))+'px';
+  dd.style.display='block';
+  _feSgEl=el;
+}
+
+function feSgInit(suggest){
+  _feSg=suggest||{};
+  var modal=document.getElementById('fuvEditModal');
+  if(!modal || modal._feSgBound) return;   // a delegált kötés egyszer
+  modal._feSgBound=true;
+  modal.addEventListener('input', function(e){ var el=e.target; if(el&&el.getAttribute&&el.getAttribute('data-sg')) feSgRender(el); });
+  modal.addEventListener('focusin', function(e){ var el=e.target; if(el&&el.getAttribute&&el.getAttribute('data-sg')) feSgRender(el); });
+  modal.addEventListener('keydown', function(e){ if(e.key==='Escape') feSgClose(); });
 }
 
 function saveFuvEdit(){

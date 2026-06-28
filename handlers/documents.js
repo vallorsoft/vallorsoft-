@@ -259,6 +259,82 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
     }
   };
 
+// Menetlevél-szerkesztő mező-javaslatok (Admin/Manager): a cég eddigi
+// menetleveleibe ugyanabba a mezőbe már beírt, NEM üres, egyedi értékek —
+// a kliens ebből kínál autocomplete-et gépelés közben. Csak olvasás, a cég
+// sofőrjeinek menetleveleire szűrve (company_id-n keresztül).
+handlers.getFuvarlevelFieldSuggestions = async function (req, res, args) {
+    try {
+      if (!req.session.user) return res.json({ result: {} });
+      const me = req.session.user;
+      if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: {} });
+      const cid = me.company_id;
+      if (!cid) return res.json({ result: {} });
+      const sofors = await pool.query('SELECT email FROM users WHERE company_id = $1', [cid]);
+      const emails = sofors.rows.map(u => u.email);
+      if (!emails.length) return res.json({ result: {} });
+
+      // Top-szintű szöveges mezők (egyedi, nem üres) — egy lekérdezésben.
+      const topR = await pool.query(
+        `SELECT
+           array_agg(DISTINCT nume_sofer)    FILTER (WHERE COALESCE(TRIM(nume_sofer),'')    <> '') AS nume_sofer,
+           array_agg(DISTINCT numar_camion)  FILTER (WHERE COALESCE(TRIM(numar_camion),'')  <> '') AS numar_camion,
+           array_agg(DISTINCT numar_remorca) FILTER (WHERE COALESCE(TRIM(numar_remorca),'') <> '') AS numar_remorca,
+           array_agg(DISTINCT alte_mentiuni) FILTER (WHERE COALESCE(TRIM(alte_mentiuni),'') <> '') AS alte_mentiuni
+         FROM fuvarlevelek WHERE email_sofer = ANY($1)`,
+        [emails]
+      );
+      // Beágyazott JSONB tömbök kulcsai (puncte / alimentari / achizitii).
+      const pctR = await pool.query(
+        `SELECT
+           array_agg(DISTINCT TRIM(e->>'tip')) FILTER (WHERE COALESCE(TRIM(e->>'tip'),'') <> '') AS tip,
+           array_agg(DISTINCT TRIM(e->>'loc')) FILTER (WHERE COALESCE(TRIM(e->>'loc'),'') <> '') AS loc
+         FROM fuvarlevelek f, jsonb_array_elements(f.puncte) e
+         WHERE f.email_sofer = ANY($1)`,
+        [emails]
+      );
+      const alimR = await pool.query(
+        `SELECT
+           array_agg(DISTINCT TRIM(e->>'loc'))   FILTER (WHERE COALESCE(TRIM(e->>'loc'),'')   <> '') AS loc,
+           array_agg(DISTINCT TRIM(e->>'tip'))   FILTER (WHERE COALESCE(TRIM(e->>'tip'),'')   <> '') AS tip,
+           array_agg(DISTINCT TRIM(e->>'plata')) FILTER (WHERE COALESCE(TRIM(e->>'plata'),'') <> '') AS plata
+         FROM fuvarlevelek f, jsonb_array_elements(f.alimentari) e
+         WHERE f.email_sofer = ANY($1)`,
+        [emails]
+      );
+      const achR = await pool.query(
+        `SELECT
+           array_agg(DISTINCT TRIM(e->>'loc'))    FILTER (WHERE COALESCE(TRIM(e->>'loc'),'')    <> '') AS loc,
+           array_agg(DISTINCT TRIM(e->>'produs')) FILTER (WHERE COALESCE(TRIM(e->>'produs'),'') <> '') AS produs,
+           array_agg(DISTINCT TRIM(e->>'plata'))  FILTER (WHERE COALESCE(TRIM(e->>'plata'),'')  <> '') AS plata
+         FROM fuvarlevelek f, jsonb_array_elements(f.achizitii) e
+         WHERE f.email_sofer = ANY($1)`,
+        [emails]
+      );
+
+      const t = topR.rows[0] || {}, p = pctR.rows[0] || {}, a = alimR.rows[0] || {}, c = achR.rows[0] || {};
+      // Mezőnként legfeljebb 300 javaslat (rendezve), üres tömb ha nincs.
+      const cap = (arr) => (Array.isArray(arr) ? arr.filter(Boolean).sort((x, y) => String(x).localeCompare(String(y))).slice(0, 300) : []);
+      return res.json({ result: {
+        nume_sofer:    cap(t.nume_sofer),
+        numar_camion:  cap(t.numar_camion),
+        numar_remorca: cap(t.numar_remorca),
+        alte_mentiuni: cap(t.alte_mentiuni),
+        punct_tip:     cap(p.tip),
+        punct_loc:     cap(p.loc),
+        alim_loc:      cap(a.loc),
+        alim_tip:      cap(a.tip),
+        alim_plata:    cap(a.plata),
+        ach_loc:       cap(c.loc),
+        ach_produs:    cap(c.produs),
+        ach_plata:     cap(c.plata)
+      } });
+    } catch (err) {
+      console.error('getFuvarlevelFieldSuggestions hiba:', err);
+      return res.json({ result: {} });
+    }
+  };
+
 handlers.getDriverDocs = async function (req, res, args) {
     try {
       if (!req.session.user) return res.json({ result: [] });

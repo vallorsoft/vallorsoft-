@@ -14,6 +14,24 @@
 
 ---
 
+## 2026-06-28 — Menetlevél-szerkesztő: mező-autocomplete a korábbi értékekből (PR #224)
+
+- Admin/Manager menetlevél-szerkesztésekor minden szöveges mező gépelés közben
+  felkínálja a cég eddigi menetleveleibe UGYANABBA a mezőbe már beírt, egyedi
+  értékeket (autocomplete).
+- **`handlers/documents.js`** — ÚJ `getFuvarlevelFieldSuggestions` (Admin/Manager,
+  `company_id`-szűrt, csak olvasás): top-szintű mezők (nume_sofer, numar_camion,
+  numar_remorca, alte_mentiuni) + a JSONB tömbök kulcsai (puncte tip/loc,
+  alimentari loc/tip/plata, achizitii loc/produs/plata); egyedi, nem üres, max 300/mező.
+- **`public/console-shared.js`** — könnyű, a szerkesztő-modálra delegált
+  autocomplete-motor (megosztott, body-hoz fűzött fixed legördülő, téma-érzékeny);
+  statikus mezők + dinamikusan hozzáadott sorok `data-sg`-n át; textarea is.
+- Numerikus mezők (km/cantitate/litri/sumă/preț) szándékosan kimaradnak.
+- Cache-bust `console-shared.js?v=20260628sg`. Valós Postgres 16-on verifikálva
+  (Admin javaslatok, Sofer tiltva, nincs cross-tenant szivárgás); 130 Jest zöld.
+
+---
+
 ## 2026-06-28 — Fix: menetlevél PDF letöltés „Eroare de server" (PR #223)
 
 - **Gyökérok:** a `routes/soferApi.js` `/api/pdf-download/:id` útvonala a `companies`
