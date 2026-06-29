@@ -2071,11 +2071,73 @@ function feToDateInput(ts){
   return d.toISOString().slice(0,10);
 }
 
+// Menetlevél-modal mód: 'edit' (beküldött szerkesztése) vagy 'create' (kézi
+// létrehozás). A create mód ugyanazt a modált használja, üres mezőkkel + sofőr-
+// választóval; mentéskor a fuvarlevelCreate handlert hívja.
+var _fuvMode='edit';
+function feApplyMode(mode){
+  _fuvMode=mode;
+  var pickRow=document.getElementById('feDriverPickRow');
+  var pdfBtn=document.getElementById('fePdfBtn');
+  var title=document.getElementById('feTitle');
+  if(pickRow) pickRow.style.display=(mode==='create')?'':'none';
+  if(pdfBtn) pdfBtn.style.display=(mode==='create')?'none':'';
+  if(title) title.textContent=(mode==='create')?t('fed.createTitle'):t('fed.title');
+}
+
+// Kézi menetlevél-készítés (Admin/Manager): üres modal + sofőr-választó.
+function openFuvCreate(){
+  feApplyMode('create');
+  document.getElementById('feId').value='';
+  var em=document.getElementById('feEmailSofer'); if(em) em.value='';
+  document.getElementById('feSeria').textContent=t('fed.autoSerial');
+  ['feNumeSofer','feNumarFisa','feCamion','feRemorca','feMentiuni','feOrderIds'].forEach(function(idn){var e=document.getElementById(idn);if(e)e.value='';});
+  ['feKmInc','feKmSf','feDiurnaEx','feDiurnaIn','feCantInc','feCantSf','feTotalPret'].forEach(function(idn){var e=document.getElementById(idn);if(e)e.value='';});
+  ['feDataCompletare','feIndulasDate','feErkezesDate'].forEach(function(idn){var e=document.getElementById(idn);if(e)e.value='';});
+  document.getElementById('fePuncte').innerHTML='';
+  document.getElementById('feAlim').innerHTML='';
+  document.getElementById('feAch').innerHTML='';
+  // Sofőr-választó feltöltése a cég belső sofőrjeiből.
+  var sel=document.getElementById('feDriverPick');
+  if(sel){
+    sel.innerHTML='<option value="">'+feEsc(t('fed.pickDriverNone'))+'</option>';
+    gas('getInternalDrivers').then(function(list){
+      (list||[]).forEach(function(dv){
+        var o=document.createElement('option');
+        o.value=dv.email||''; o.textContent=dv.nume||dv.email||'—';
+        o.setAttribute('data-nume',dv.nume||'');
+        sel.appendChild(o);
+      });
+    }).catch(function(){});
+  }
+  document.getElementById('fuvEditModal').classList.add('open');
+  feSetStaticSg();
+  gas('getFuvarlevelFieldSuggestions').then(function(sg){ feSgInit(sg||{}); }).catch(function(){});
+}
+
+// Sofőr kiválasztva a legördülőből → kitölti a nevet + tárolja az e-mailt
+// (a szerver ehhez a cég-felhasználóhoz köti a menetlevelet). Üresre állítva
+// a kézi név marad érvényben (a létrehozó e-mailje lesz a tenant-horgony).
+function feDriverPicked(){
+  var sel=document.getElementById('feDriverPick'); if(!sel) return;
+  var opt=sel.options[sel.selectedIndex];
+  var em=document.getElementById('feEmailSofer');
+  if(sel.value){
+    if(em) em.value=sel.value;
+    var nm=opt?opt.getAttribute('data-nume'):'';
+    if(nm) document.getElementById('feNumeSofer').value=nm;
+  } else {
+    if(em) em.value='';
+  }
+}
+
 function openFuvEdit(id){
   gas('getFuvarlevelDetail',[id]).then(function(r){
     if(!r||!r.ok){toast(r&&r.err||t('cs.cannotLoad'),'err');return;}
     var f=r.fuv;
+    feApplyMode('edit');
     document.getElementById('feId').value=f.id;
+    var feTp=document.getElementById('feTotalPret'); if(feTp) feTp.value=(f.total_pret!=null&&Number(f.total_pret)!==0)?f.total_pret:'';
     document.getElementById('feSeria').textContent=f.numar_fisa||t('cs.noSerial');
     document.getElementById('feNumeSofer').value=f.nume_sofer||'';
     document.getElementById('feNumarFisa').value=f.numar_fisa||'';
@@ -2202,12 +2264,22 @@ function saveFuvEdit(){
     cant_inceput:document.getElementById('feCantInc').value,
     cant_sfarsit:document.getElementById('feCantSf').value,
     alte_mentiuni:document.getElementById('feMentiuni').value,
+    total_pret:(document.getElementById('feTotalPret')||{}).value||null,
     data_completare:(document.getElementById('feDataCompletare')||{}).value||null,
     order_ids:(((document.getElementById('feOrderIds')||{}).value)||'').split(',').map(function(s){return s.trim();}).filter(Boolean),
     indulas_date:(document.getElementById('feIndulasDate')||{}).value||null,
     erkezes_date:(document.getElementById('feErkezesDate')||{}).value||null,
     puncte:puncte, alimentari:alimentari, achizitii:achizitii
   };
+  if(_fuvMode==='create'){
+    if(!String(payload.nume_sofer||'').trim()){ toast(t('fed.driverRequired'),'err'); return; }
+    payload.email_sofer=(document.getElementById('feEmailSofer')||{}).value||'';
+    gas('fuvarlevelCreate',[payload]).then(function(r){
+      if(r&&r.ok){toast(t('fed.created'),'ok');closeFuvEdit();loadReceivedFuvarlevelek();}
+      else toast(r&&r.err||'Eroare de server','err');
+    });
+    return;
+  }
   gas('fuvarlevelUpdate',[id,payload]).then(function(r){
     if(r&&r.ok){toast(t('cs.waybillSaved'),'ok');closeFuvEdit();loadReceivedFuvarlevelek();}
     else toast(r&&r.err||'Szerver hiba','err');

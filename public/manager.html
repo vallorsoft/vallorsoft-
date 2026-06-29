@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260618sym">
-  <script src="/i18n.js?v=20260628fed2"></script>
+  <script src="/i18n.js?v=20260629fuvcreate"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -357,8 +357,11 @@
         <div style="margin-top:10px;font-size:12px;color:var(--muted);" id="docSeriesPreview" data-i18n="ds.preview">Előnézet: MT-2025-0001</div>
       </div>
       <div class="glass" style="padding:22px">
-        <h2 class="h-title" data-i18n="nav.waybills">Fuvarlevelek</h2>
-        <table class="table" id="tblReceivedFuv">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+          <h2 class="h-title" style="margin:0;" data-i18n="nav.waybills">Fuvarlevelek</h2>
+          <button class="btn primary" style="padding:9px 18px;" onclick="openFuvCreate()" data-i18n="fed.addNew">➕ Új menetlevél</button>
+        </div>
+        <table class="table" id="tblReceivedFuv" style="margin-top:14px;">
           <thead><tr><th data-i18n="col.seq">Sorszám</th><th data-i18n="col.fileName">Fájlnév</th><th data-i18n="col.driver">Sofőr</th><th data-i18n="col.submitTime">Beküldés ideje</th><th data-i18n="col.action">Művelet</th></tr></thead>
           <tbody></tbody>
         </table>
@@ -1197,8 +1200,13 @@
 <!-- ── MENETLEVÉL SZERKESZTŐ MODAL ── -->
 <div class="modal-back" id="fuvEditModal">
   <div class="modal glass" style="width:min(820px,100%);max-height:92vh;overflow-y:auto;">
-    <h3>✏️ Menetlevél szerkesztése — <span id="feSeria" style="color:var(--brand-red);font-size:14px;font-weight:800;letter-spacing:.5px;"></span></h3>
+    <h3><span id="feTitle" data-i18n="fed.title">✏️ Menetlevél szerkesztése —</span> <span id="feSeria" style="color:var(--brand-red);font-size:14px;font-weight:800;letter-spacing:.5px;"></span></h3>
     <input type="hidden" id="feId">
+    <input type="hidden" id="feEmailSofer">
+    <div class="field" id="feDriverPickRow" style="display:none;margin-bottom:8px;">
+      <label data-i18n="fed.pickDriver">Sofőr kiválasztása (vagy írd be kézzel lent)</label>
+      <select class="select" id="feDriverPick" onchange="feDriverPicked()"><option value="" data-i18n="fed.pickDriverNone">— Kézi név beírása —</option></select>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px;">
       <div class="field"><label data-i18n="form.driverName">Sofőr neve</label><input class="input" id="feNumeSofer"></div>
       <div class="field"><label data-i18n="fed.serie">Serie / Sorszám</label><input class="input" id="feNumarFisa" placeholder="ex. B-2026-0001"></div>
@@ -1214,6 +1222,7 @@
       <div class="field"><label data-i18n="fed.orderIds">Fuvar ID-k (vesszővel)</label><input class="input" id="feOrderIds" placeholder="CMD-..., CMD-..."></div>
       <div class="field"><label data-i18n="fed.startDate">Kezdő dátum</label><input class="input" type="date" id="feIndulasDate"></div>
       <div class="field"><label data-i18n="fed.endDate">Végző dátum</label><input class="input" type="date" id="feErkezesDate"></div>
+      <div class="field" style="grid-column:1/-1;"><label data-i18n="fed.totalPret">💶 Össz-bevétel (nettó, EUR)</label><input class="input" type="number" step="0.01" min="0" id="feTotalPret" placeholder="0"></div>
     </div>
 
     <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:10px;">
@@ -1244,7 +1253,7 @@
 
     <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
       <button class="btn ghost col" onclick="closeFuvEdit()" data-i18n="common.cancel">Mégse</button>
-      <button class="btn col" onclick="openPdfView(document.getElementById('feId').value)" data-i18n="fed.pdfView">👁 PDF nézet</button>
+      <button class="btn col" id="fePdfBtn" onclick="openPdfView(document.getElementById('feId').value)" data-i18n="fed.pdfView">👁 PDF nézet</button>
       <button class="btn primary col" onclick="saveFuvEdit()" data-i18n="fed.save">💾 Mentés</button>
     </div>
   </div>
@@ -1297,7 +1306,7 @@
 
 <script src="/email-intake-card.js?v=20260616warm2"></script>
 <script src="/feature-catalog.js?v=20260618cgps2"></script>
-<script src="/console-shared.js?v=20260628fed2"></script>
+<script src="/console-shared.js?v=20260629fuvcreate"></script>
 <script src="/console-pages.js?v=20260617b1"></script>
 <!-- ===== INTEGRACIOK (Manager: Ugyfelek + "Hol a kocsi?"; szamlazo/beallitas Admin-only) ===== -->
 <script src="/clients-page.js?v=20260617d1"></script>
