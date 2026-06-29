@@ -14,6 +14,29 @@
 
 ---
 
+## 2026-06-29 — Kézi menetlevél-készítés (Admin/Manager) + össz-bevétel mező
+
+- **Új „➕ Új menetlevél" gomb a FUVARLEVELEK oldalon** (admin + manager): az Admin/Manager
+  pont úgy hozhat létre menetlevelet, mint ahogy egy beküldöttet szerkeszt — a meglévő
+  szerkesztő-modált használja újra (üres mezőkkel). A **sofőr kiválasztható a cég belső
+  sofőrjei közül** (legördülő, `getInternalDrivers`) **vagy szabadon beírható egy név**.
+  A sor **ugyanúgy beleszámít a statisztikába** (tenant-kötés az `email_sofer` → `users.company_id`
+  joinon át): kiválasztott sofőrnél az ő e-mailje, kézi névnél a létrehozó (Admin/Manager)
+  e-mailje a tenant-horgony.
+- **Új össz-bevétel mező** (`fuvarlevelek.total_pret`, nettó EUR) — mivel a kézi menetlevél
+  nem egy kiírt fuvarból születik, egy önálló mezőbe írható az adott időszak teljes nettó
+  keresete; a Statisztika **Áttekintés** fülén a fuvar-bevételhez adódik (KPI + havi idősor).
+- **`db/fuvarlevel-price.sql`** (ÚJ, idempotens) — `total_pret NUMERIC(12,2) DEFAULT 0`.
+  **`handlers/documents.js`** új `fuvarlevelCreate` (Admin/Manager, `genDocId('FUV')`,
+  cégenkénti MT-YYYY-XXXX sorszám, szerveroldali derivált km/üzemanyag/diurna), `fuvarlevelUpdate`
+  +`total_pret` (COALESCE — sofőr-beküldést nem nulláz), `getFuvarlevelek` admin-lista a cég
+  ÖSSZES felhasználójára (a kézi menetlevél is megjelenik). **`handlers/statisticsHandlers.js`**
+  `getStatsOverview` bevétel = kiírt fuvar (Finalizat) + kézi menetlevél `total_pret`.
+- **UI:** a `#fuvEditModal` kétmódú (edit/create); sofőr-választó + 💶 össz-bevétel mező;
+  `public/console-shared.js` `openFuvCreate`/`feDriverPicked`/mód-váltó + `saveFuvEdit` elágazás.
+  i18n `fed.addNew`/`fed.createTitle`/`fed.pickDriver`/`fed.totalPret`… (RO-alap+HU), cache-bust
+  `?v=20260629fuvcreate`. Valós DB nélkül 240 Jest zöld (+ require-sweep).
+
 ## 2026-06-28 — Fuvarlap nyomtatás CSAK románul + kezdő/végző dátum óra nélkül (PR #227)
 
 - **Nyomtatott fuvarlap (PDF) — minden magyar felirat eltávolítva**, csak román:

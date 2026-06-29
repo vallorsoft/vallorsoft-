@@ -196,6 +196,24 @@ handlers.getStatsOverview = async function (req, res, args) {
        GROUP BY ho ORDER BY ho`, P
     );
 
+    // Kézi menetlevél-bevétel idősor (fuvarlevelek.total_pret, data_completare szerint).
+    // Ezek nem kiírt fuvarból születnek, így itt adódnak a fuvar-bevételhez.
+    const fuvBevR = await pool.query(
+      `SELECT TO_CHAR(f.data_completare,'YYYY-MM') AS ho, COALESCE(SUM(f.total_pret),0)::numeric AS osszeg
+       ${FUV_FROM}
+       WHERE f.data_completare >= $2 AND f.data_completare < $3 AND COALESCE(f.total_pret,0) <> 0
+       GROUP BY ho ORDER BY ho`, P
+    );
+    // Havi bevétel összevonása (orders + kézi menetlevél) egy idősorrá.
+    const _haviMap = {};
+    bevR.rows.forEach(r => { _haviMap[r.ho] = parseFloat(r.osszeg) || 0; });
+    let fuvBevTotal = 0;
+    fuvBevR.rows.forEach(r => {
+      const v = parseFloat(r.osszeg) || 0; fuvBevTotal += v;
+      _haviMap[r.ho] = (_haviMap[r.ho] || 0) + v;
+    });
+    const haviBevetel = Object.keys(_haviMap).sort().map(ho => ({ ho, osszeg: _haviMap[ho] }));
+
     // Havi költség idősor + bontás (fuvarlevelek: tankolás + kiadás)
     const ktgR = await pool.query(
       `SELECT TO_CHAR(f.data_completare,'YYYY-MM') AS ho,
@@ -291,10 +309,13 @@ handlers.getStatsOverview = async function (req, res, args) {
       ? Math.round((parseFloat(fv.motorina) / parseFloat(fv.total_km)) * 10000) / 100
       : 0;
 
+    // Össz-bevétel: kiírt fuvarok (Finalizat) + kézi menetlevél össz-ára.
+    const bevetelOssz = Math.round(((parseFloat(k.bevetel) || 0) + fuvBevTotal) * 100) / 100;
+
     return res.json({ result: {
       ok: true,
       kpi: {
-        bevetel: k.bevetel, lezart: k.lezart, osszes: k.osszes, torolt: k.torolt,
+        bevetel: bevetelOssz, lezart: k.lezart, osszes: k.osszes, torolt: k.torolt,
         km: k.km, fuvarlevel_km: fv.total_km, consum_100: consum,
         diurna_ext: fv.diurna_ext, diurna_int: fv.diurna_int
       },
@@ -302,7 +323,7 @@ handlers.getStatsOverview = async function (req, res, args) {
       eur_ron_rate: eurRonRate,
       top_utvonalak: utvR.rows,
       alerts,
-      havi_bevetel: bevR.rows,
+      havi_bevetel: haviBevetel,
       havi_koltseg: ktgR.rows
     }});
   } catch (err) {
