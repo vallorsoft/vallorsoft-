@@ -5,6 +5,8 @@
 //  Hívás: handlers.<funkcioNev>(req, res, args)
 // ============================================================
 const pool = require('../db');
+const { genDocId } = require('../lib/ids');
+const { calculateDiurna } = require('../lib/diurna');
 
 const handlers = {};
 
@@ -153,9 +155,11 @@ handlers.getFuvarlevelek = async function (req, res, args) {
       const isAdmin = ['Admin', 'Manager'].includes(me.pozicio);
       let r;
       if (isAdmin && cid) {
-        // Cég összes sofőrjének menetlevelei — email lista alapján (nem JOIN, megbízhatóbb online)
+        // Cég összes felhasználójának menetlevelei — email lista alapján (nem JOIN,
+        // megbízhatóbb online). NEM csak a Sofer-eké: a kézzel (Admin/Manager) létrehozott
+        // menetlevél a létrehozó e-mailjéhez kötődik, az is jelenjen meg a listában.
         const sofors = await pool.query(
-          'SELECT email FROM users WHERE company_id = $1 AND pozicio = $2', [cid, 'Sofer']
+          'SELECT email FROM users WHERE company_id = $1', [cid]
         );
         const emails = sofors.rows.map(u => u.email);
         if (!emails.length) return res.json({ result: [] });
@@ -253,6 +257,15 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
       const indulasDt = parseDateOnly(d.indulas_date);
       const erkezesDt = parseDateOnly(d.erkezes_date);
 
+      // Össz-bevétel (nettó EUR) — kézi menetlevélnél a bevétel forrása. Üres/
+      // hiányzó → a meglévő érték marad (COALESCE), így a sofőr beküldte
+      // menetlevélnél véletlenül se nullázódik.
+      let totalPret = null;
+      if (d.total_pret !== undefined && d.total_pret !== null && String(d.total_pret).trim() !== '') {
+        const tp = parseFloat(d.total_pret);
+        if (Number.isFinite(tp) && tp >= 0) totalPret = tp;
+      }
+
       await pool.query(
         `UPDATE fuvarlevelek SET
            nume_sofer = $2, numar_camion = $3, numar_remorca = $4, numar_fisa = $5,
@@ -263,7 +276,8 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
            data_completare = COALESCE($20::timestamp, data_completare),
            order_ids = COALESCE($21::jsonb, order_ids),
            indulas_dt = COALESCE($22::timestamptz, indulas_dt),
-           erkezes_dt = COALESCE($23::timestamptz, erkezes_dt)
+           erkezes_dt = COALESCE($23::timestamptz, erkezes_dt),
+           total_pret = COALESCE($24::numeric, total_pret)
          WHERE id = $1`,
         [
           id,
@@ -276,12 +290,143 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
           dataCompletare,
           orderIds === null ? null : JSON.stringify(orderIds),
           indulasDt,
-          erkezesDt
+          erkezesDt,
+          totalPret
         ]
       );
       return res.json({ result: { ok: true, total_km: totalKm, consum_100: consum100 } });
     } catch (err) {
       console.error('fuvarlevelUpdate hiba:', err);
+      return res.json({ result: { ok: false, err: err.message } });
+    }
+  };
+
+// Menetlevél KÉZI létrehozása (Admin/Manager). Pont úgy viselkedik, mint egy
+// beküldött menetlevél szerkesztése: a derivált mezőket szerveroldalon
+// számoljuk, és a sor a statisztikába is ugyanúgy beleszámít (a tenant-kötés
+// az email_sofer → users.company_id joinon át). A sofőr kiválasztható a cég
+// belső sofőrjei közül (email-mel) VAGY szabadon beírható egy név — utóbbinál
+// a tenant-horgony a létrehozó (Admin/Manager) e-mailje. Új össz-bevétel mező
+// (total_pret, nettó EUR), mert ez nem egy kiírt fuvarból születik.
+handlers.fuvarlevelCreate = async function (req, res, args) {
+    try {
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
+      const me = req.session.user;
+      if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+      const cid = me.company_id;
+      if (!cid) return res.json({ result: { ok: false, err: 'Companie lipsa' } });
+      const d = (Array.isArray(args) ? args[0] : args) || {};
+
+      const numeSofer = (d.nume_sofer || '').toString().trim();
+      if (!numeSofer) return res.json({ result: { ok: false, err: 'Numele soferului este obligatoriu' } });
+
+      // Tenant-horgony (email_sofer): ha a kliens kiválasztott sofőrt (email),
+      // ellenőrizzük, hogy a SAJÁT cég felhasználója-e; ha nem (vagy szabadon
+      // beírt név), a létrehozó e-mailjét használjuk → a sor a cégen belül marad.
+      let emailSofer = me.email;
+      const pickedEmail = (d.email_sofer || '').toString().trim().toLowerCase();
+      if (pickedEmail) {
+        const ur = await pool.query(
+          'SELECT email FROM users WHERE LOWER(email) = $1 AND company_id = $2 LIMIT 1',
+          [pickedEmail, cid]
+        );
+        if (ur.rows.length) emailSofer = ur.rows[0].email;
+      }
+
+      const id = genDocId('FUV');
+      const fileName = `Menetlevel_${numeSofer.replace(/\s+/g, '_')}_${id.slice(4)}.pdf`;
+      const year = new Date().getFullYear();
+
+      // Automatikus, cégenkénti sorszám (MT-YYYY-XXXX) — mint a sofőr-beküldésnél.
+      // Ha a kliens kézzel adott sorszámot (numar_fisa), azt tartjuk meg.
+      let autoDocNumber = (d.numar_fisa || '').toString().trim() || null;
+      if (!autoDocNumber) {
+        try {
+          const seqR = await pool.query(
+            `INSERT INTO document_series (company_id,doc_type,prefix,year,current_seq) VALUES ($1,'MT','MT',$2,1)
+             ON CONFLICT (company_id,doc_type,year) DO UPDATE SET current_seq=document_series.current_seq+1, updated_at=NOW()
+             RETURNING prefix, current_seq`, [cid, year]
+          );
+          autoDocNumber = seqR.rows[0] ? `${seqR.rows[0].prefix}-${year}-${String(seqR.rows[0].current_seq).padStart(4, '0')}` : null;
+        } catch (seqErr) {
+          console.error('document_series sorszám hiba (a mentés folytatódik):', seqErr.message);
+        }
+      }
+
+      const alimentari = Array.isArray(d.alimentari) ? d.alimentari : [];
+      const achizitii  = Array.isArray(d.achizitii)  ? d.achizitii  : [];
+      const puncte     = Array.isArray(d.puncte)      ? d.puncte      : [];
+
+      const kmInc = Number(d.km_inceput || 0);
+      const kmSf  = Number(d.km_sfarsit || 0);
+      const totalKm = Math.max(0, kmSf - kmInc);
+      let totalAlim = 0;
+      alimentari.forEach(a => { totalAlim += Number(a.litru || 0); });
+      const cantInc = Number(d.cant_inceput || 0);
+      const cantSf  = Number(d.cant_sfarsit || 0);
+      const motorinaFolosit = Math.max(0, cantInc + totalAlim - cantSf);
+      const consum100 = totalKm > 0 ? Math.round((motorinaFolosit / totalKm * 100) * 100) / 100 : 0;
+
+      // Dátum (data_completare) — megadható; hiányában NOW() (tábla-alapérték).
+      let dataCompletare = null;
+      if (d.data_completare) { const dt = new Date(d.data_completare); if (!isNaN(dt.getTime())) dataCompletare = dt; }
+
+      const parseDateOnly = (v) => {
+        if (!v) return null;
+        const m = /^\d{4}-\d{2}-\d{2}$/.test(String(v).trim());
+        const dt = new Date(m ? (String(v).trim() + 'T00:00:00Z') : v);
+        return isNaN(dt.getTime()) ? null : dt;
+      };
+      const indulasDt = parseDateOnly(d.indulas_date);
+      const erkezesDt = parseDateOnly(d.erkezes_date);
+
+      // Diurna: ha az adminban beírt diurna-napok jöttek, azt használjuk; egyébként
+      // az indulás/érkezés dátumból becsüljük (mint a sofőr-beküldésnél).
+      let diurnaExt = parseInt(d.diurna_externa || 0) || 0;
+      let diurnaInt = parseInt(d.diurna_interna || 0) || 0;
+      if (!diurnaExt && !diurnaInt && (indulasDt || erkezesDt)) {
+        try {
+          const dc = calculateDiurna(d.indulas_date || null, d.erkezes_date || null, []);
+          diurnaExt = dc.externDays || 0;
+          diurnaInt = dc.internDays || 0;
+        } catch (_) { /* best-effort */ }
+      }
+
+      const orderIds = Array.isArray(d.order_ids)
+        ? d.order_ids.map(x => String(x).trim()).filter(Boolean) : [];
+
+      let totalPret = 0;
+      if (d.total_pret !== undefined && d.total_pret !== null && String(d.total_pret).trim() !== '') {
+        const tp = parseFloat(d.total_pret);
+        if (Number.isFinite(tp) && tp >= 0) totalPret = tp;
+      }
+
+      await pool.query(
+        `INSERT INTO fuvarlevelek (
+          id, file_name, email_sofer, nume_sofer,
+          numar_camion, numar_remorca, numar_fisa,
+          km_inceput, km_sfarsit, total_km,
+          diurna_externa, diurna_interna,
+          cant_inceput, cant_sfarsit, motorina_folosit, total_alim, consum_100,
+          alte_mentiuni, alimentari, achizitii, puncte, order_ids,
+          data_completare, indulas_dt, erkezes_dt, total_pret
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
+          COALESCE($23::timestamp, NOW()),$24,$25,$26)`,
+        [
+          id, fileName, emailSofer, numeSofer,
+          d.numar_camion || null, d.numar_remorca || null, autoDocNumber,
+          kmInc, kmSf, totalKm,
+          diurnaExt, diurnaInt,
+          cantInc, cantSf, motorinaFolosit, totalAlim, consum100,
+          d.alte_mentiuni || null,
+          JSON.stringify(alimentari), JSON.stringify(achizitii), JSON.stringify(puncte),
+          JSON.stringify(orderIds),
+          dataCompletare, indulasDt, erkezesDt, totalPret
+        ]
+      );
+      return res.json({ result: { ok: true, id, docNumber: autoDocNumber, total_km: totalKm, consum_100: consum100 } });
+    } catch (err) {
+      console.error('fuvarlevelCreate hiba:', err);
       return res.json({ result: { ok: false, err: err.message } });
     }
   };

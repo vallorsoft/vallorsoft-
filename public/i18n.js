@@ -2734,6 +2734,15 @@
     'fed.notes': { hu: 'Megjegyzések', ro: 'Mențiuni' },
     'fed.pdfView': { hu: '👁 PDF nézet', ro: '👁 Vizualizare PDF' },
     'fed.save': { hu: '💾 Mentés', ro: '💾 Salvează' },
+    // ── Kézi menetlevél-készítés (Admin/Manager) ──
+    'fed.addNew': { hu: '➕ Új menetlevél', ro: '➕ Foaie nouă' },
+    'fed.createTitle': { hu: '➕ Új menetlevél', ro: '➕ Foaie de parcurs nouă' },
+    'fed.pickDriver': { hu: 'Sofőr kiválasztása (vagy írd be kézzel lent)', ro: 'Alege șoferul (sau scrie manual mai jos)' },
+    'fed.pickDriverNone': { hu: '— Kézi név beírása —', ro: '— Introducere nume manual —' },
+    'fed.totalPret': { hu: '💶 Össz-bevétel (nettó, EUR)', ro: '💶 Venit total (net, EUR)' },
+    'fed.autoSerial': { hu: 'automatikus sorszám', ro: 'număr automat' },
+    'fed.driverRequired': { hu: 'A sofőr neve kötelező.', ro: 'Numele șoferului este obligatoriu.' },
+    'fed.created': { hu: '✅ Menetlevél létrehozva', ro: '✅ Foaie de parcurs creată' },
 
     // ── Menetlevél PDF nézet modal (pdfViewModal) ──
     'pv.back': { hu: '← Vissza', ro: '← Înapoi' },
