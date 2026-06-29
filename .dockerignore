@@ -1,0 +1,25 @@
+# Verziókezelés / CI
+.git
+.github
+.gitignore
+
+# Függőségek (a konténerben friss npm ci megy)
+node_modules
+npm-debug.log
+
+# Titkok / lokális env — SOHA ne kerüljön image-be
+.env
+.env.*
+!.env.example
+
+# Tesztek és fejlesztői segédanyagok (futtatáshoz nem kellenek)
+tests
+mockups
+.vscode
+coverage
+
+# Dokumentáció (nem kell a futó image-be)
+*.md
+
+# Egyéb
+.DS_Store
