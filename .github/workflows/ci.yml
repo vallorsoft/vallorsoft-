@@ -3,8 +3,8 @@ name: CI
 # Minden PR-en és a main-be való push után lefuttatja a Jest-tesztcsomagot.
 # A DATABASE_URL beállításával a valódi-DB integrációs suite is fut (db-orders.test.js);
 # enélkül (helyben) az a suite kihagyódik, a mock-tesztek mennek.
-# Main-push után sikeres tesztek esetén automatikusan élesít Render-re
-# (RENDER_DEPLOY_HOOK_URL GitHub Secret szükséges — Render → Service → Settings → Deploy Hooks).
+# Main-push után sikeres tesztek esetén automatikusan élesít Fly.io-ra
+# (FLY_API_TOKEN GitHub Secret szükséges — Fly app → Tokens → deploy token).
 on:
   push:
     branches: [main]
@@ -49,13 +49,15 @@ jobs:
         run: npm test
 
   deploy:
-    name: Deploy to Render
+    name: Deploy to Fly.io
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-      - name: Trigger Render deploy hook
-        run: |
-          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
-          echo "Deploy triggered."
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy to Fly.io
+        run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
