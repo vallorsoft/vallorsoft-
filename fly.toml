@@ -1,0 +1,39 @@
+# ============================================================
+#  VallorSoft — Fly.io alkalmazás-konfiguráció
+#  A titkokat NEM tartalmazza — azokat `fly secrets set ...` paranccsal
+#  kell beállítani (lásd FLY-DEPLOY.md). A DB-migrációk a szerver
+#  indulásakor automatikusan lefutnak.
+#
+#  Az "app" nevet a `fly launch` írja be / kérdezi meg — ha kézzel
+#  hozod létre, cseréld a sajátodra.
+# ============================================================
+
+app = "vallorsoft"
+primary_region = "waw"   # Varsó — a legközelebbi EU-régió Romániához (fra=Frankfurt is jó)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3000"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"     # tétlenkor leáll (spórolás); kérésre felébred
+  auto_start_machines = true
+  min_machines_running = 1        # 1 példány mindig fusson (scheduler/IMAP-poll miatt)
+  processes = ["app"]
+
+  # Liveness check — a beépített /healthz végpont (mindig 200, ha fut a process)
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"     # tesseract.js / pdf-parse miatt 512MB ajánlott; igény szerint emelhető
