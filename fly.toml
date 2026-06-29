@@ -16,10 +16,10 @@ primary_region = "waw"   # Varsó — a legközelebbi EU-régió Romániához (f
 
 [env]
   NODE_ENV = "production"
-  PORT = "3000"
+  PORT = "8080"
 
 [http_service]
-  internal_port = 3000
+  internal_port = 8080
   force_https = true
   auto_stop_machines = "stop"     # tétlenkor leáll (spórolás); kérésre felébred
   auto_start_machines = true

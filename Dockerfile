@@ -33,8 +33,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /app/node_modules ./node_modules
 COPY . .
 
-# A szerver alapból a 3000-es porton figyel (process.env.PORT || 3000).
-# A fly.toml internal_port = 3000 ehhez igazodik.
-EXPOSE 3000
+# A szerver a process.env.PORT-on figyel (a fly.toml PORT=8080-at állít,
+# ami a Fly alapértelmezett internal_port-jával egyezik).
+EXPOSE 8080
 
 CMD ["node", "server.js"]

@@ -8,7 +8,7 @@ induláskor automatikusan lefutnak — így a konténerizálás egyszerű.
 A repóban már megvan:
 - `Dockerfile` — kétlépcsős build (natív `bcrypt` fordítás + karcsú runtime)
 - `.dockerignore`
-- `fly.toml` — app-konfiguráció (port 3000, `/healthz` health-check, 1 állandó példány)
+- `fly.toml` — app-konfiguráció (port 8080 = Fly alapértelmezett, `/healthz` health-check, 1 állandó példány)
 
 > A `render.yaml` szándékosan **bent marad**, hogy az átállás alatt a Render
 > deploy is működjön. A Fly.io élesedése után törölhető.
