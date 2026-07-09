@@ -14,6 +14,27 @@
 
 ---
 
+## 2026-07-09 — Fix: developer reaktiválás — a `paid_until` is auto-hosszabbodik trial-lejárat után (PR #233)
+
+- **Bug:** a developer cégkártya **„🔓 Activare"** gombja (`unblockCeg` → `devCompanyUpdate`)
+  csak a `subscription_status`-t állította `'active'`-ra, a `paid_until` a múltban maradt
+  (trial regisztrációnál `NOW()+14 nap`, utána lejárt). Így a felhasználó **mégsem tudott
+  belépni**: a login-kapu (`routes/auth.js:136`, `paid_until < NOW()`) tovább elutasította
+  „Abonamentul firmei a expirat (dátum)" üzenettel. Emellett a napi `startCancelReminderScheduler`
+  másnap újra `'cancelled'`-re állította volna a státuszt, ha volt `subscription_cancel_at`.
+- **Javítás** (`handlers/developer.js` `devCompanyUpdate`): ha reaktiválás (`status='active'`)
+  és nincs explicit `paid_until` a hívásban, és a jelenlegi `paid_until` NULL vagy múlt →
+  auto-hosszabbítás **`NOW() + 30 nap`**, `trial_email_sent=false` reset, és (ha be van
+  állítva) `subscription_cancel_at=NULL` + `cancel_lastday_notified=false` törlés.
+- **Nem érinti:** explicit `paid_until` a szerkesztő modálból (`saveCeg`) — tiszteletben tartva;
+  jövőbeli `paid_until` — nem íródik felül; blokkolás (`status='inactive'`) — `paid_until`
+  érintetlen; `devActivatePayment` (payment_request út) — már helyes volt.
+- **Teszt:** `tests/integration/dev-company-reactivate.test.js` — 6 új eset (nem-dev
+  interzis, múlt paid_until + cancel_at, NULL paid_until, jövőbeli megtartás, explicit
+  paid_until, inactive-set). **246 Jest zöld** (240 → 246).
+
+---
+
 ## 2026-06-29 — Kézi menetlevél-készítés (Admin/Manager) + össz-bevétel mező
 
 - **Új „➕ Új menetlevél" gomb a FUVARLEVELEK oldalon** (admin + manager): az Admin/Manager
