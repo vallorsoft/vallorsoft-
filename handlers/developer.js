@@ -42,6 +42,23 @@ handlers.devCompanyUpdate = async function (req, res, args) {
       if (f.max_users !== undefined) { updates.push(`max_users=$${i++}`); values.push(intOrNull(f.max_users)); }
       if (f.max_trucks !== undefined) { updates.push(`max_trucks=$${i++}`); values.push(intOrNull(f.max_trucks)); }
       if (f.igazgato_nev !== undefined) { updates.push(`igazgato_nev=$${i++}`); values.push(f.igazgato_nev); }
+      // Ha a developer reaktivalja a ceget (status -> 'active') es nem ad explicit paid_until-t,
+      // a jelenlegi paid_until pedig NULL vagy mult, akkor auto-hosszabbitas NOW() + 30 nap +
+      // subscription_cancel_at torlese. Kulonben a login-kapu (paid_until < NOW()) tovabb tiltja
+      // a belepest, es a napi cancel-scheduler ujra 'cancelled'-re allitja a status-t.
+      if (f.subscription_status === 'active' && f.paid_until === undefined) {
+        const cur = await pool.query(
+          'SELECT paid_until, subscription_cancel_at FROM companies WHERE id=$1', [id]);
+        const cp = cur.rows[0] && cur.rows[0].paid_until;
+        if (!cp || new Date(cp) < new Date()) {
+          updates.push(`paid_until=NOW() + INTERVAL '30 days'`);
+          updates.push(`trial_email_sent=false`);
+        }
+        if (cur.rows[0] && cur.rows[0].subscription_cancel_at) {
+          updates.push(`subscription_cancel_at=NULL`);
+          updates.push(`cancel_lastday_notified=false`);
+        }
+      }
       if (!updates.length) return res.json({ result: { ok: false, err: 'Nimic de modificat' } });
       values.push(id);
       await pool.query(`UPDATE companies SET ${updates.join(',')} WHERE id=$${i}`, values);
