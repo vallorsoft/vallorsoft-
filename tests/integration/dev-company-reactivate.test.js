@@ -67,11 +67,11 @@ describe('devCompanyUpdate — reaktivalas trial-lejarat utan', () => {
     expect(updateCall[1]).toEqual(['active', 7]);
   });
 
-  test('reaktivalas NULL paid_until-lal → auto-hosszabbitas', async () => {
+  test('reaktivalas NULL paid_until-lal → auto-hosszabbitas + cancel_at MINDIG torles', async () => {
     setUser(dev);
     const pool = require('../../db');
     pool.query
-      .mockResolvedValueOnce(rows([{ paid_until: null, subscription_cancel_at: null }]))
+      .mockResolvedValueOnce(rows([{ paid_until: null }]))
       .mockResolvedValueOnce(rows([]));
 
     const res = await request(app).post('/api/execute').send({
@@ -81,8 +81,55 @@ describe('devCompanyUpdate — reaktivalas trial-lejarat utan', () => {
     expect(res.body.result.ok).toBe(true);
     const sql = pool.query.mock.calls[1][0];
     expect(sql).toMatch(/paid_until=NOW\(\) \+ INTERVAL '30 days'/);
-    // Nincs cancel_at → nem tesszuk bele feleslegesen a SET-be.
-    expect(sql).not.toMatch(/subscription_cancel_at=NULL/);
+    // Reaktivalasnal a cancel-jelzot MINDIG toroljuk (idempotens) — igy a napi
+    // cancel-scheduler nem allitja vissza 'cancelled'-re.
+    expect(sql).toMatch(/subscription_cancel_at=NULL/);
+    expect(sql).toMatch(/cancel_lastday_notified=false/);
+  });
+
+  // ── A TÉNYLEGES BUG: a szerkesztő modál (saveCeg) MINDIG küld paid_until-t,
+  //    üres mezőnél explicit null-t. Régen ez kihagyta a reaktiválás-blokkot
+  //    (a `paid_until === undefined` feltétel miatt), így a cancel-jelző bent
+  //    maradt → a scheduler visszaállította 'cancelled'-re. ──
+  test('modál-út: status=active + explicit null paid_until → +30 nap + cancel_at torles', async () => {
+    setUser(dev);
+    const pool = require('../../db');
+    // Cancelled ceg, lejart paid_until, cancel-jelzovel.
+    const past = new Date(Date.now() - 10 * 86400000).toISOString();
+    pool.query
+      .mockResolvedValueOnce(rows([{ paid_until: past }]))   // SELECT paid_until
+      .mockResolvedValueOnce(rows([]));                       // UPDATE
+
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'devCompanyUpdate',
+      arguments: [7, { subscription_status: 'active', paid_until: null }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    const sql = pool.query.mock.calls[1][0];
+    expect(sql).toMatch(/paid_until=NOW\(\) \+ INTERVAL '30 days'/);
+    expect(sql).toMatch(/subscription_cancel_at=NULL/);
+    expect(sql).toMatch(/cancel_lastday_notified=false/);
+    // A paid_until nem placeholderként ($) megy — NOW()+30 literál.
+    expect(pool.query.mock.calls[1][1]).toEqual(['active', 7]);
+  });
+
+  test('modál-út: status=active + explicit MULT paid_until → +30 nap (nem a multat allitja)', async () => {
+    setUser(dev);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ paid_until: null }]))   // SELECT (provided mult, de biztos ami biztos)
+      .mockResolvedValueOnce(rows([]));
+
+    const pastDate = '2020-01-01';
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'devCompanyUpdate',
+      arguments: [7, { subscription_status: 'active', paid_until: pastDate }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    const sql = pool.query.mock.calls[1][0];
+    expect(sql).toMatch(/paid_until=NOW\(\) \+ INTERVAL '30 days'/);
+    expect(sql).not.toMatch(/paid_until=\$/);
+    expect(sql).toMatch(/subscription_cancel_at=NULL/);
   });
 
   test('reaktivalas JOVOBELI paid_until-lal → NEM ir felul', async () => {
