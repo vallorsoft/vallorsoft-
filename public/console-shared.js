@@ -83,6 +83,8 @@ function vsSyncDriverModeUI(){
 function toggleDriverMode(){
   window._vsDriverMode = !vsDriverModeOn();
   try{ localStorage.setItem('vs-driver-mode', window._vsDriverMode ? '1':'0'); }catch(e){}
+  // A menü-drawer állapotát visszaállítjuk (sofőr-módban a sidebar hamburger mögé kerül)
+  if(typeof closeSidebar==='function') closeSidebar();
   vsSyncDriverModeUI();
   vsRecomputeSidebar();
   // Sofőr-módba lépéskor a fuvar-kezelésre ugrunk (a diszpécser fő munkaterülete)
@@ -4100,11 +4102,13 @@ function renderFilteredOrders(list) {
     var idCell = c.fuvar_no
       ? '<b>'+esc(c.fuvar_no)+'</b>'
       : '<b>'+esc(String(c.id))+'</b>';
-    return '<tr class="vsl-orow vsl-orow-'+sc+'"'+rowStyle+'><td class="vsl-orow-first" title="'+esc(String(c.id))+'">'+idCell+'</td><td>'+clientCell+'</td>'+
-      '<td>'+routeCell+'</td>'+
-      '<td>'+(c.km||'—')+(c.route_km!=null&&c.route_km!==''?' <span class="badge info" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="'+t('cs.tt.autoRouteKm')+'">🗺️ '+c.route_km+'</span>':'')+'</td><td>'+(c.pret||'—')+'</td>'+
-      '<td>'+soferCell+'</td><td>'+esc(c.rendszam_camion||'—')+'</td>'+
-      '<td>'+statusSel+'</td>'+
+    // data-label a cellákon: sofőr-módban mobilon a táblázat kártyás nézetté
+    // alakul, és a label (Ügyfél/Útvonal/…) a cella elé kerül (CSS ::before).
+    return '<tr class="vsl-orow vsl-orow-'+sc+'"'+rowStyle+'><td class="vsl-orow-first" data-label="'+t('list.colId')+'" title="'+esc(String(c.id))+'">'+idCell+'</td><td data-label="'+t('list.colClient')+'">'+clientCell+'</td>'+
+      '<td data-label="'+t('list.colRoute')+'">'+routeCell+'</td>'+
+      '<td data-label="'+t('list.colKm')+'">'+(c.km||'—')+(c.route_km!=null&&c.route_km!==''?' <span class="badge info" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="'+t('cs.tt.autoRouteKm')+'">🗺️ '+c.route_km+'</span>':'')+'</td><td data-label="'+t('list.colPrice')+'">'+(c.pret||'—')+'</td>'+
+      '<td data-label="'+t('list.colDriver')+'">'+soferCell+'</td><td data-label="'+t('list.colTractor')+'">'+esc(c.rendszam_camion||'—')+'</td>'+
+      '<td data-label="'+t('list.colStatus')+'">'+statusSel+'</td>'+
       '<td class="vs-row-actions" id="actcell-'+c.id+'">'+
         editBtn+
         '<button class="btn ghost vs-act-more" data-act-toggle title="'+t('cs.ol.actMenu')+'" '+
