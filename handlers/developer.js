@@ -34,7 +34,6 @@ handlers.devCompanyUpdate = async function (req, res, args) {
       const updates = []; const values = []; let i = 1;
       if (f.nev !== undefined) { updates.push(`nev=$${i++}`); values.push(f.nev); }
       if (f.subscription_status !== undefined) { updates.push(`subscription_status=$${i++}`); values.push(f.subscription_status); }
-      if (f.paid_until !== undefined) { updates.push(`paid_until=$${i++}`); values.push(f.paid_until || null); }
       if (f.email_contact !== undefined) { updates.push(`email_contact=$${i++}`); values.push(f.email_contact); }
       if (f.telefon !== undefined) { updates.push(`telefon=$${i++}`); values.push(f.telefon); }
       // NaN-védelem: nem szám bemenetnél NULL kerül a DB-be (22P02 hiba helyett)
@@ -42,23 +41,44 @@ handlers.devCompanyUpdate = async function (req, res, args) {
       if (f.max_users !== undefined) { updates.push(`max_users=$${i++}`); values.push(intOrNull(f.max_users)); }
       if (f.max_trucks !== undefined) { updates.push(`max_trucks=$${i++}`); values.push(intOrNull(f.max_trucks)); }
       if (f.igazgato_nev !== undefined) { updates.push(`igazgato_nev=$${i++}`); values.push(f.igazgato_nev); }
-      // Ha a developer reaktivalja a ceget (status -> 'active') es nem ad explicit paid_until-t,
-      // a jelenlegi paid_until pedig NULL vagy mult, akkor auto-hosszabbitas NOW() + 30 nap +
-      // subscription_cancel_at torlese. Kulonben a login-kapu (paid_until < NOW()) tovabb tiltja
-      // a belepest, es a napi cancel-scheduler ujra 'cancelled'-re allitja a status-t.
-      if (f.subscription_status === 'active' && f.paid_until === undefined) {
-        const cur = await pool.query(
-          'SELECT paid_until, subscription_cancel_at FROM companies WHERE id=$1', [id]);
-        const cp = cur.rows[0] && cur.rows[0].paid_until;
-        if (!cp || new Date(cp) < new Date()) {
-          updates.push(`paid_until=NOW() + INTERVAL '30 days'`);
+
+      // ── paid_until + reaktiválás egységes, IDEMPOTENS kezelése ──
+      // A reaktiválás MINDEN úton (developer "🔓 Activare" gomb ÉS a szerkesztő
+      // modál — ez utóbbi mindig küld paid_until-t, üres mezőnél null-t) garantáltan
+      // használhatóvá teszi a céget, ÉS AZ IS MARAD:
+      //  • a lemondás-jelzőt (subscription_cancel_at) reaktiváláskor MINDIG töröljük,
+      //    különben a napi cancel-scheduler a lejárt paid_until miatt újra
+      //    'cancelled'-re állítaná (EZ okozta, hogy "aktiválom, de visszavált / nem
+      //    íródik át");
+      //  • a paid_until-t érvényes (jövőbeli) értékre hozzuk: explicit jövőbeli
+      //    dátumot tiszteljük, NULL/múlt/nincs esetén NOW()+30 nap; egy már meglévő
+      //    jövőbeli paid_until-t viszont NEM rövidítünk.
+      const provided = (f.paid_until !== undefined) ? (f.paid_until || null) : undefined;
+      if (f.subscription_status === 'active') {
+        const providedFuture = provided && new Date(provided) > new Date();
+        if (providedFuture) {
+          // explicit jövőbeli dátum → nincs szükség a jelenlegi lekérdezésére
+          updates.push(`paid_until=$${i++}`); values.push(provided);
           updates.push(`trial_email_sent=false`);
+        } else {
+          // nincs / NULL / múlt provided → a jelenlegit nézzük, hogy ne rövidítsünk
+          const cur = await pool.query('SELECT paid_until FROM companies WHERE id=$1', [id]);
+          const curPaid = cur.rows[0] && cur.rows[0].paid_until;
+          const curFuture = curPaid && new Date(curPaid) > new Date();
+          if (provided !== undefined || !curFuture) {
+            updates.push(`paid_until=NOW() + INTERVAL '30 days'`);
+            updates.push(`trial_email_sent=false`);
+          }
+          // (provided===undefined && curFuture): a meglévő jövőbeli paid_until marad
         }
-        if (cur.rows[0] && cur.rows[0].subscription_cancel_at) {
-          updates.push(`subscription_cancel_at=NULL`);
-          updates.push(`cancel_lastday_notified=false`);
-        }
+        // Reaktiváláskor a lemondás-jelzőt MINDIG töröljük (idempotens).
+        updates.push(`subscription_cancel_at=NULL`);
+        updates.push(`cancel_lastday_notified=false`);
+      } else if (provided !== undefined) {
+        // Nem aktiválás — a megadott paid_until-t úgy állítjuk, ahogy jött.
+        updates.push(`paid_until=$${i++}`); values.push(provided);
       }
+
       if (!updates.length) return res.json({ result: { ok: false, err: 'Nimic de modificat' } });
       values.push(id);
       await pool.query(`UPDATE companies SET ${updates.join(',')} WHERE id=$${i}`, values);
@@ -931,8 +951,11 @@ handlers.devActivatePayment = async function (req, res, args) {
   else newPaidUntil.setMonth(newPaidUntil.getMonth() + 1);
 
   await pool.query(`UPDATE payment_requests SET status='paid' WHERE id=$1`, [id]);
+  // Fizetés-aktiváláskor a lemondás-jelzőt is töröljük — különben a napi
+  // cancel-scheduler később visszaállíthatná a státuszt (idempotens reaktiválás).
   await pool.query(
-    `UPDATE companies SET subscription_status='active', subscription_plan_id=$1, paid_until=$2, trial_email_sent=false WHERE id=$3`,
+    `UPDATE companies SET subscription_status='active', subscription_plan_id=$1, paid_until=$2,
+        trial_email_sent=false, subscription_cancel_at=NULL, cancel_lastday_notified=false WHERE id=$3`,
     [r.plan_id, newPaidUntil.toISOString(), r.company_id]
   );
 

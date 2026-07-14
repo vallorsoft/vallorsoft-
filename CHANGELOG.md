@@ -14,6 +14,29 @@
 
 ---
 
+## 2026-07-14 — Fix: lemondott (cancelled) cég reaktiválása nem maradt meg („aktiválom, de visszavált")
+
+- **Tünet:** egy `cancelled` státuszú, regisztrált cég a developer felületről (vagy
+  akár közvetlenül Neonban) **nem volt véglegesen aktiválható** — státusza visszaállt
+  `cancelled`-re / „nem íródott át".
+- **Gyökérok:** a developer **szerkesztő modálja** (`saveCeg`) MINDIG küld `paid_until`-t
+  (üres mezőnél explicit `null`-t). A régi reaktiválás-blokk csak akkor futott, ha
+  `paid_until === undefined` (a „🔓 Activare" gomb útja), így a modál-úton **a
+  `subscription_cancel_at` lemondás-jelző bent maradt**, a `paid_until` pedig NULL/múlt
+  lett. A napi **cancel-scheduler** (`services/scheduler.js`) ezután a lejárt
+  `paid_until` + beállított `subscription_cancel_at` miatt visszaállította a státuszt
+  `cancelled`-re. Ugyanez történt kézi Neon-szerkesztésnél is.
+- **Javítás (`handlers/developer.js`):** a reaktiválás mostantól **IDEMPOTENS és minden
+  úton egységes**. `devCompanyUpdate` — ha a cél státusz `active`, **MINDIG** törli a
+  `subscription_cancel_at` + `cancel_lastday_notified` jelzőt, és a `paid_until`-t
+  érvényes (jövőbeli) értékre hozza: explicit jövőbeli dátumot tisztel, NULL/múlt/nincs
+  esetén `NOW()+30 nap`, egy már meglévő jövőbeli dátumot viszont nem rövidít.
+  `devActivatePayment` (fizetés-aktiválás) is törli a lemondás-jelzőt. Így „minden
+  felhasználással" (gomb, modál, fizetés-aktiválás) a cég valóban használható marad.
+- **Teszt (`tests/integration/dev-company-reactivate.test.js`):** +2 eset (modál-út
+  explicit `null` és múlt `paid_until`), a NULL-esetes assert frissítve (cancel-jelző
+  MINDIG törlődik); **596 Jest zöld**.
+
 ## 2026-07-14 — Sofőr mód: mobil-optimalizált, nagyobb & áttekinthetőbb kezelőfelület
 
 - A „Sofőr mód" (🚚) mostantól **érintő-barát, egyszerű kezelést** is ad, nem csak
