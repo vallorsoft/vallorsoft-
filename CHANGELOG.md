@@ -14,6 +14,20 @@
 
 ---
 
+## 2026-07-14 — Sofőr mód telefon-finomítás: kiírás egy oszlopban, kezelés-kártya 2 oszlopban
+
+- **Fuvar-KIÍRÁS űrlap telefonon egy oszlopban:** sofőr-módban (≤1024px) minden beviteli
+  mező **egymás alá** kerül (a `.grid-2`/`.grid-3`/`.grid-4` → 1 oszlop, a `grid-column:span`
+  resetelve) → a korábban jobb oldalon **kilógó/levágott** mezők (Referencia, Ár, Súly,
+  Méretek, Felrakás/Lerakás ideje, Pótkocsi) most teljes szélességben látszanak.
+- **Fuvar-KEZELÉS kártya 2 oszlopban:** a mobil-kártya mostantól **2 mező soronként**
+  (ID | Ügyfél · KM | Ár · Vontató | Státusz), a hosszú/rich cellák (Útvonal, Sofőr,
+  Műveletek) teljes szélességben → rövidebb, áttekinthetőbb kártya, ami kitölti a telefon
+  képernyőjét (a korábbi 1-mező-soronkénti, túl hosszú nézet helyett).
+- **Csak megjelenés (kliens-oldal):** `public/style.css` additív, `body.vs-dm`-re +
+  `@media (max-width:1024px)`-re szűkítve — a teljes/normál nézet érintetlen. Cache-bust
+  `style.css?v=20260714drvmode4`. Headless Chromiummal (390px) verifikálva.
+
 ## 2026-07-14 — Sofőr menetlevél: offline mentés a telefonra (PWA), internet csak a beküldéshez
 
 - **Új „💾 Mentés a telefonra" gomb** a sofőr menetlevél-kitöltő oldalán: indulás
