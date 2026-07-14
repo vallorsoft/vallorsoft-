@@ -14,6 +14,22 @@
 
 ---
 
+## 2026-07-14 — CI: automatikus Fly.io deploy (az éles oldal Fly-on fut, nem Renderen)
+
+- **Tünet:** a mainre mergelt változások (pl. a 🚚 Sofőr mód, a cancel-fix) **nem
+  jelentek meg az éles oldalon** (`vallorsoft.fly.dev`).
+- **Gyökérok:** az éles környezet átköltözött **Render → Fly.io**-ra (lásd
+  `FLY-DEPLOY.md`), de a CI (`.github/workflows/ci.yml`) `deploy` jobja **csak a Render
+  deploy-hookot** hívta (`RENDER_DEPLOY_HOOK_URL`). Így a main-merge egy elavult Render
+  környezetet frissített, az éles Fly.io alkalmazást **soha** — az csak kézi
+  `fly deploy`-jal frissült.
+- **Javítás (`.github/workflows/ci.yml`):** új **`deploy-fly`** job — sikeres tesztek
+  után, main-push-ra `flyctl deploy --remote-only` (`superfly/flyctl-actions`). **Egyszeri
+  teendő:** a `FLY_API_TOKEN` GitHub secret beállítása (Repo → Settings → Secrets →
+  Actions; token: `fly tokens create deploy`). Ha a secret hiányzik, a lépés **kecsesen
+  kihagyódik** (a CI nem lesz piros). A meglévő Render job megmarad (szintén secret-guard
+  mögött), így semmi nem törik el.
+
 ## 2026-07-14 — Fix: lemondott (cancelled) cég reaktiválása nem maradt meg („aktiválom, de visszavált")
 
 - **Tünet:** egy `cancelled` státuszú, regisztrált cég a developer felületről (vagy
