@@ -56,6 +56,38 @@ jobs:
 
     steps:
       - name: Trigger Render deploy hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
-          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
-          echo "Deploy triggered."
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL secret nincs beállítva — Render deploy kihagyva."
+            exit 0
+          fi
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+          echo "Render deploy triggered."
+
+  # Az ÉLES oldal a Fly.io-n fut (vallorsoft.fly.dev) — minden sikeres main-merge
+  # automatikusan élesedjen ott is. Egyszeri teendő: a FLY_API_TOKEN GitHub secret
+  # beállítása (Repo → Settings → Secrets and variables → Actions). Token generálás:
+  #   fly tokens create deploy   (vagy: fly auth token)
+  # Ha a secret nincs beállítva, a lépés kecsesen kihagyódik (nem lesz piros a CI).
+  deploy-fly:
+    name: Deploy to Fly.io
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy to Fly.io
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "FLY_API_TOKEN secret nincs beállítva — Fly deploy kihagyva."
+            echo "Beállítás: Repo → Settings → Secrets → Actions → FLY_API_TOKEN"
+            exit 0
+          fi
+          flyctl deploy --remote-only
+          echo "Fly.io deploy kész."
