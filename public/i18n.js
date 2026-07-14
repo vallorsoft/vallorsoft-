@@ -52,6 +52,8 @@
     // ── Oldalsáv / menü (admin + manager) ──
     'nav.grpOverview': { hu: 'Áttekintés', ro: 'Prezentare generală' },
     'nav.dash': { hu: 'Vezérlőpult', ro: 'Panou de control' },
+    'dm.enter': { hu: 'Sofőr mód (egyszerűsített nézet)', ro: 'Mod șofer (vizualizare simplificată)' },
+    'dm.exit': { hu: 'Teljes nézet', ro: 'Vizualizare completă' },
     'nav.opsCenter': { hu: 'Operatív központ', ro: 'Centru operațional' },
     'nav.grpLogistics': { hu: 'Fuvarozás & Logisztika', ro: 'Transport & Logistică' },
     'nav.fuvarokHead': { hu: 'Fuvarok', ro: 'Transporturi' },

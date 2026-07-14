@@ -13,42 +13,97 @@ function vsPwValid(pw){
   return pw.length >= 8 && /[a-z]/.test(pw) && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && /[^A-Za-z0-9]/.test(pw);
 }
 
+// ── Sofőr-mód (egyszerűsített diszpécser nézet) állapota ──
+// Kliens-oldali, localStorage-ban tárolt kapcsoló: bekapcsolva CSAK a sofőrrel
+// való kapcsolattartás menüpontjai látszanak (fuvar-kiírás/kezelés, tervezőtábla,
+// menetlevelek/iratok, belső sofőrök, chat + Beállítások). Nem érinti a szerver-
+// adatokat vagy a jogosultságokat — csak a menüt szűri meg vizuálisan.
+try{ window._vsDriverMode = (localStorage.getItem('vs-driver-mode')==='1'); }catch(e){ window._vsDriverMode=false; }
+// A sofőr-módban látható menüpontok (data-tab kulcsok). A Beállítások mindig elérhető.
+var VS_DRIVER_MODE_TABS = ['dash','orders-form','orders-list','orders-planner',
+  'received-fuv','driver-docs-pane','internal-drivers','chat','settings'];
+function vsDriverModeOn(){ return window._vsDriverMode===true; }
+
+// Egy menü-levél (tab / sub-tab / link) data-tab kulcsa; az útvonaltervező <a>-nak nincs.
+function _vsTabKey(el){
+  var k = el.getAttribute('data-tab');
+  if(k) return k;
+  if(el.tagName==='A' && /\/utvonaltervezes/.test(el.getAttribute('href')||'')) return 'utvonaltervezes';
+  return null;
+}
+
+// A sidebar láthatóságának EGYSÉGES újraszámítása: csomag-kapcsoló (getMyFeatures)
+// + sofőr-mód szűrő egyben. Ez az egyetlen forrás — így a két szűrő nem üti egymást.
+function vsRecomputeSidebar(){
+  var feats = window._vsFeatures || {};
+  var dm = vsDriverModeOn();
+  var coreKeys = {};
+  (window.VS_FEATURES||[]).forEach(function(f){ if(f.core) coreKeys[f.key]=1; });
+  // Minden menü-levél láthatóságának újraszámítása
+  document.querySelectorAll('.sidebar .tab[data-tab], .sidebar .sub-tab, .sidebar a.tab-link').forEach(function(el){
+    if(el.classList.contains('nav-head')) return;   // a szülő-fejlécet külön kezeljük
+    var key = _vsTabKey(el);
+    if(!key) return;
+    var hidden = false;
+    if(!coreKeys[key] && feats[key]===false) hidden = true;         // csomag-kapcsoló
+    if(dm && VS_DRIVER_MODE_TABS.indexOf(key)===-1) hidden = true;  // sofőr-mód szűrő
+    el.style.display = hidden ? 'none' : '';
+  });
+  // Üres almenük + szülő-fülek elrejtése; visszaállítás, ha (újra) van látható elem
+  document.querySelectorAll('.sidebar .menu-group').forEach(function(grp){
+    var sub=grp.querySelector('.submenu');
+    if(!sub) return;
+    var parent=grp.querySelector('.tab[id$="ParentTab"]');
+    var vis=Array.prototype.filter.call(sub.querySelectorAll('.sub-tab, a.tab-link'),function(s){return s.style.display!=='none';});
+    if(!vis.length){ if(parent) parent.style.display='none'; sub.style.display='none'; }
+    else { if(parent) parent.style.display=''; sub.style.display=''; }
+  });
+  // Ha az aktív fül időközben rejtett lett -> ugrás egy elérhető fülre
+  var active=document.querySelector('.sidebar .tab.active, .sidebar .sub-tab.active');
+  if(active && active.style.display==='none'){ activateTab(dm ? 'orders-list' : 'dash'); }
+}
+
+// A felső sávi kapcsoló-gomb kinézetének szinkronizálása az állapottal.
+function vsSyncDriverModeUI(){
+  var btn=document.getElementById('driverModeToggle');
+  if(!btn) return;
+  var on=vsDriverModeOn();
+  btn.classList.toggle('active', on);
+  btn.setAttribute('aria-pressed', on?'true':'false');
+  var lbl = (typeof t==='function')
+    ? (on ? t('dm.exit') : t('dm.enter'))
+    : (on ? 'Teljes nézet' : 'Sofőr mód');
+  btn.title = lbl;
+}
+
+// Gombnyomásra váltás a sofőr-mód és a teljes nézet között.
+function toggleDriverMode(){
+  window._vsDriverMode = !vsDriverModeOn();
+  try{ localStorage.setItem('vs-driver-mode', window._vsDriverMode ? '1':'0'); }catch(e){}
+  vsSyncDriverModeUI();
+  vsRecomputeSidebar();
+  // Sofőr-módba lépéskor a fuvar-kezelésre ugrunk (a diszpécser fő munkaterülete)
+  if(window._vsDriverMode) activateTab('orders-list');
+}
+
 // ── Funkció-kapcsolók (előfizetés) — letiltott menük elrejtése ──
 // A cég kikapcsolt funkciói nem jelennek meg a sidebarban. Hiányzó kulcs = engedélyezett.
 function applyFeatureFlags(){
   if(!window.gas) return;
   gas('getMyFeatures').then(function(r){
-    if(!r||!r.ok) return;
-    var feats = r.features||{};
-    window._vsFeatures = feats;   // nem-menü funkciók (pl. tracking gomb) ellenőrzéséhez
-    if(typeof initOrderMapFeature==='function') initOrderMapFeature();   // térképes km/előnézet (opt-in)
-    // Fuvar CSV-import gomb elrejtése, ha a developer kikapcsolta (alapból be)
-    var _impBtn=document.getElementById('ordersImportBtnBox');
-    if(_impBtn) _impBtn.style.display = (feats['orders-import']===false) ? 'none' : '';
-    var cat = window.VS_FEATURES||[];
-    cat.forEach(function(f){
-      if(f.core) return;
-      if(feats[f.key]!==false) return; // csak az explicit false rejt
-      document.querySelectorAll('.sidebar [data-tab="'+f.key+'"]').forEach(function(el){ el.style.display='none'; });
-      if(f.key==='utvonaltervezes'){
-        document.querySelectorAll('.sidebar a.tab-link[href="/utvonaltervezes"]').forEach(function(el){ el.style.display='none'; });
-      }
-    });
-    // Üres almenük + szülő-fülek elrejtése
-    document.querySelectorAll('.sidebar .menu-group').forEach(function(grp){
-      var sub=grp.querySelector('.submenu');
-      if(!sub) return;
-      var vis=Array.prototype.filter.call(sub.querySelectorAll('.sub-tab'),function(s){return s.style.display!=='none';});
-      if(!vis.length){
-        var parent=grp.querySelector('.tab[id$="ParentTab"]');
-        if(parent) parent.style.display='none';
-        sub.style.display='none';
-      }
-    });
-    // Ha az aktív fül időközben rejtett lett -> ugrás a Vezérlőpultra
-    var active=document.querySelector('.sidebar .tab.active, .sidebar .sub-tab.active');
-    if(active && active.style.display==='none'){ activateTab('dash'); }
-  });
+    if(r&&r.ok){
+      var feats = r.features||{};
+      window._vsFeatures = feats;   // nem-menü funkciók (pl. tracking gomb) ellenőrzéséhez
+      if(typeof initOrderMapFeature==='function') initOrderMapFeature();   // térképes km/előnézet (opt-in)
+      // Fuvar CSV-import gomb elrejtése, ha a developer kikapcsolta (alapból be)
+      var _impBtn=document.getElementById('ordersImportBtnBox');
+      if(_impBtn) _impBtn.style.display = (feats['orders-import']===false) ? 'none' : '';
+    }
+    // A sidebar láthatóság (csomag-kapcsoló + sofőr-mód) egy közös számításból —
+    // akkor is lefut (sofőr-mód szűrő), ha a funkció-lekérés hibázott.
+    vsRecomputeSidebar();
+    vsSyncDriverModeUI();
+  }).catch(function(){ vsRecomputeSidebar(); vsSyncDriverModeUI(); });
 }
 
 function activateTab(name){
