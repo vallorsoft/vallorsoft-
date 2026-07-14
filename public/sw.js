@@ -1,4 +1,4 @@
-const CACHE = 'vallorsoft-v5';      // verzió bump → kényszeríti a frissülést
+const CACHE = 'vallorsoft-v6';      // verzió bump → kényszeríti a frissülést
 const PRECACHE = ['/style.css'];    // '/sofer' KIVÉVE (auth-védett, megbuktatja az install-t)
 
 self.addEventListener('install', e => {
@@ -27,8 +27,18 @@ self.addEventListener('fetch', e => {
   let sameOrigin = false;
   try { sameOrigin = new URL(e.request.url).origin === self.location.origin; } catch (_) {}
   if (!sameOrigin) return;
+  // Network-first + futásidejű cache: a sikeres azonos-eredetű GET válaszokat
+  // (oldal-HTML, JS, CSS, ikon) elmentjük, hogy OFFLINE is betöltsön a PWA
+  // (pl. a sofőr menetlevél-oldala a helyi piszkozatokkal). Online mindig a
+  // friss válasz jön; csak hálózat-hiba esetén szolgálunk a cache-ből.
   e.respondWith(
-    fetch(e.request).catch(() =>
+    fetch(e.request).then(resp => {
+      if (resp && resp.ok && resp.type === 'basic') {
+        const copy = resp.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+      }
+      return resp;
+    }).catch(() =>
       caches.match(e.request).then(c => c || Response.error())  // ne adjon vissza undefined-et
     )
   );
