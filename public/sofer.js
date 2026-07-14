@@ -135,6 +135,156 @@ function draftClear() {
   stateSave({ draft: null });
 }
 
+// ============================================================
+//  HELYI (offline) MENETLEVÉL-PISZKOZATOK — a TELEFONON tárolva
+//  localStorage-ban (a sessionStorage-os auto-draft PERZISZTENS párja).
+//  A sofőr indulás előtt beír pár adatot, gombnyomásra elmenti a
+//  telefonjára; az OFFLINE is látható a PWA-ban, és offline szerkeszthető.
+//  Internet CSAK a beküldéshez kell.
+// ============================================================
+var LS_DRAFTS_KEY = 'vs_sofer_local_drafts';
+var _curLocalDraftId = null;
+
+function soferLoadLocalDrafts() {
+  try { return JSON.parse(localStorage.getItem(LS_DRAFTS_KEY) || '[]') || []; }
+  catch (e) { return []; }
+}
+function soferStoreLocalDrafts(arr) {
+  try { localStorage.setItem(LS_DRAFTS_KEY, JSON.stringify(arr || [])); } catch (e) {}
+}
+
+// A teljes menetlevél-űrlap begyűjtése (a beküldött mezők szuperhalmaza).
+function soferCollectFull() {
+  var puncte = [];
+  document.querySelectorAll('#puncteContainer .dyn-row').forEach(function (row) {
+    puncte.push({
+      tip: (row.querySelector('.punct-tip') || {}).value || '',
+      loc: (row.querySelector('.punct-loc') || {}).value || '',
+      data: (row.querySelector('.punct-data') || {}).value || ''
+    });
+  });
+  var alimentari = [];
+  document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function (row) {
+    alimentari.push({
+      loc: (row.querySelector('.alim-loc') || {}).value || '',
+      tip: (row.querySelector('.alim-tip') || {}).value || 'Motorină',
+      litru: (row.querySelector('.alim-lit') || {}).value || '0',
+      km: (row.querySelector('.alim-km') || {}).value || '0',
+      plata: (row.querySelector('.alim-plata') || {}).value || 'Card',
+      suma: (row.querySelector('.alim-suma') || {}).value || '0'
+    });
+  });
+  var achizitii = [];
+  document.querySelectorAll('#achizitiiContainer .dyn-row').forEach(function (row) {
+    achizitii.push({
+      produs: (row.querySelector('.ach-prod') || {}).value || '',
+      loc: (row.querySelector('.ach-loc') || {}).value || '',
+      pret: (row.querySelector('.ach-pret') || {}).value || '0',
+      plata: (row.querySelector('.ach-plata') || {}).value || 'Card'
+    });
+  });
+  function gv(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+  return {
+    fisa: gv('fFisa'),
+    camion: gv('fCamion'), remorca: gv('fRemorca'),
+    kmInc: gv('fKmInc'), kmSf: gv('fKmSf'),
+    cantInc: gv('fCantInc'), cantSf: gv('fCantSf'),
+    mentiuni: gv('fMentiuni'),
+    indulasDt: gv('fIndulasDt'), erkezesDt: gv('fErkezesDt'),
+    hataratok: (typeof collectHataratok === 'function' ? collectHataratok() : []),
+    puncte: puncte, alimentari: alimentari, achizitii: achizitii,
+    orderIds: _selectedOrderIds,
+    summary: (document.getElementById('selectedOrdersSummary') || {}).innerHTML || ''
+  };
+}
+
+// A teljes űrlap visszaállítása egy elmentett adatból (a step2-n).
+function soferApplyFull(data) {
+  if (!data) return;
+  draftRestore(data);   // közös mezők + puncte/alimentari/achizitii + orderIds/summary
+  function sv(id, v) { var el = document.getElementById(id); if (el) el.value = (v == null ? '' : v); }
+  sv('fFisa', data.fisa);
+  sv('fIndulasDt', data.indulasDt);
+  sv('fErkezesDt', data.erkezesDt);
+  var hc = document.getElementById('hatarContainer');
+  if (hc) {
+    hc.innerHTML = '';
+    (data.hataratok || []).forEach(function (h) {
+      if (typeof addHatarRow === 'function') addHatarRow(h.datetime, h.direction);
+    });
+  }
+  if (typeof updateDiurnaPreview === 'function') updateDiurnaPreview();
+}
+
+// A jelenlegi űrlap mentése a telefonra (helyi piszkozat). silent=true → nincs toast.
+function saveLocalDraft(silent) {
+  var data = soferCollectFull();
+  var arr = soferLoadLocalDrafts();
+  var label = (data.camion || '').trim();
+  if (data.puncte && data.puncte[0] && data.puncte[0].loc) label += (label ? ' · ' : '') + data.puncte[0].loc;
+  if (!label) label = t('sof.localDraftUnnamed');
+  var now = Date.now();
+  var existing = _curLocalDraftId ? arr.filter(function (d) { return d.id === _curLocalDraftId; })[0] : null;
+  if (existing) {
+    existing.label = label; existing.savedAt = now; existing.data = data;
+  } else {
+    _curLocalDraftId = 'd' + now;
+    arr.unshift({ id: _curLocalDraftId, label: label, savedAt: now, data: data });
+  }
+  soferStoreLocalDrafts(arr);
+  renderLocalDrafts();
+  if (!silent) toast(t('sof.localDraftSaved'), 'ok');
+}
+
+// Egy elmentett helyi piszkozat betöltése a szerkesztőbe (offline is működik).
+function loadLocalDraft(id) {
+  var d = soferLoadLocalDrafts().filter(function (x) { return x.id === id; })[0];
+  if (!d) return;
+  _curLocalDraftId = id;
+  goSec('fuvar');
+  // A mentett adatból töltünk (nem a kiválasztott fuvarokból), ezért közvetlenül
+  // a 2. lépést mutatjuk, majd alkalmazzuk a mentett menetlevél-adatot.
+  document.getElementById('fuvarStep1').style.display = 'none';
+  document.getElementById('fuvarStep2').style.display = 'block';
+  soferApplyFull(d.data);
+  if (typeof attachDraftListeners === 'function') attachDraftListeners();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+// Helyi piszkozat törlése (megerősítéssel).
+function deleteLocalDraft(id) {
+  if (!confirm(t('sof.localDraftConfirmDel'))) return;
+  var arr = soferLoadLocalDrafts().filter(function (x) { return x.id !== id; });
+  soferStoreLocalDrafts(arr);
+  if (_curLocalDraftId === id) _curLocalDraftId = null;
+  renderLocalDrafts();
+  toast(t('sof.localDraftDeleted'), '');
+}
+
+// A mentett helyi piszkozatok listája (a menetlevél 1. lépésén; offline is látszik).
+function renderLocalDrafts() {
+  var box = document.getElementById('localDraftsBox');
+  if (!box) return;
+  var arr = soferLoadLocalDrafts();
+  if (!arr.length) {
+    box.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 2px;">' + esc(t('sof.localDraftNone')) + '</div>';
+    return;
+  }
+  box.innerHTML = arr.map(function (d) {
+    var when = '';
+    try { when = new Date(d.savedAt).toLocaleString(); } catch (e) {}
+    return '<div class="local-draft-item" style="display:flex;align-items:center;gap:8px;justify-content:space-between;'
+      + 'background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.25);border-radius:10px;padding:10px 12px;margin-bottom:8px;">'
+      + '<div style="min-width:0;flex:1;" onclick="loadLocalDraft(\'' + d.id + '\')">'
+      + '<div style="font-weight:700;font-size:14px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📄 ' + esc(d.label) + '</div>'
+      + '<div style="font-size:11px;color:var(--muted);">' + esc(when) + '</div></div>'
+      + '<button class="btn-mini" onclick="loadLocalDraft(\'' + d.id + '\')" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(59,130,246,0.4);background:rgba(59,130,246,0.12);color:#3b82f6;font-weight:700;">'
+      + esc(t('sof.localDraftLoad')) + '</button>'
+      + '<button class="btn-mini" onclick="deleteLocalDraft(\'' + d.id + '\')" style="padding:8px 10px;border-radius:8px;border:1px solid rgba(239,68,68,0.35);background:rgba(239,68,68,0.1);color:#ef4444;">🗑</button>'
+      + '</div>';
+  }).join('');
+}
+
 // Oldal bezárás/frissítés előtt azonnal mentünk
 window.addEventListener('beforeunload', function() {
   var step2Visible = document.getElementById('fuvarStep2').style.display !== 'none';
@@ -175,7 +325,7 @@ function goSec(id) {
 
   stateSave({ sec: id });
   if (id === 'border') loadBorderLog();
-  if (id === 'fuvar')  loadSoferOrders();
+  if (id === 'fuvar')  { loadSoferOrders(); if (typeof renderLocalDrafts === 'function') renderLocalDrafts(); }
   if (id === 'docs')   loadDocOrderOptions();
 }
 
@@ -530,6 +680,13 @@ function submitFuvarlevel() {
     if (d.success) {
       toast(d.docNumber ? (t('sof.waybillSentNum', { num: d.docNumber })) : t('sof.waybillSent'), 'ok');
       draftClear();
+      // Sikeres beküldés után a hozzá tartozó HELYI piszkozatot is töröljük
+      // (ha mentett piszkozatból indult), és frissítjük a listát.
+      if (_curLocalDraftId) {
+        soferStoreLocalDrafts(soferLoadLocalDrafts().filter(function (x) { return x.id !== _curLocalDraftId; }));
+        _curLocalDraftId = null;
+        if (typeof renderLocalDrafts === 'function') renderLocalDrafts();
+      }
       _selectedOrderIds = [];
       goSec('dash');
       setTimeout(function() {
@@ -556,7 +713,12 @@ function submitFuvarlevel() {
     } else {
       toast(t('common.error') + ': ' + (d.err || t('sof.unknown')), 'err');
     }
-  }).catch(function() { toast(t('sof.networkError'), 'err'); });
+  }).catch(function() {
+    // Nincs internet a beküldéshez → az adat NE vesszen el: automatikusan
+    // a telefonra mentjük helyi piszkozatként, és jelezzük a sofőrnek.
+    saveLocalDraft(true);
+    toast(t('sof.offlineSaved'), 'err');
+  });
 }
 
 // ============================================================

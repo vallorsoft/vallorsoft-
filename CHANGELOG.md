@@ -14,6 +14,33 @@
 
 ---
 
+## 2026-07-14 — Sofőr menetlevél: offline mentés a telefonra (PWA), internet csak a beküldéshez
+
+- **Új „💾 Mentés a telefonra" gomb** a sofőr menetlevél-kitöltő oldalán: indulás
+  előtt a sofőr beír pár adatot, gombnyomásra **a telefonjára menti** (localStorage),
+  és az **offline is látható** a PWA-ban, offline szerkeszthető. Internet **csak a
+  beküldéshez** kell.
+- **„📥 Mentett menetlevelek (telefonon)" lista** a menetlevél 1. lépésén: a mentett
+  piszkozatok címkével + időbélyeggel, „Megnyitás" (betöltés a szerkesztőbe) és „🗑"
+  (törlés) gombbal. Offline is megjelenik.
+- **Offline-biztos beküldés:** ha a beküldéskor nincs internet, az adat NEM vész el —
+  automatikusan helyi piszkozatként a telefonra mentődik, és a sofőr jelzést kap
+  („Nincs internet — mentve a telefonra. Küldd el később."). Sikeres beküldés után a
+  hozzá tartozó helyi piszkozat automatikusan törlődik.
+- **PWA offline betöltés (Fly.io):** a service worker (`sw.js`) most **network-first +
+  futásidejű cache** — a sikeres azonos-eredetű oldal/JS/CSS válaszokat elmenti, így a
+  sofőr-oldal a helyi piszkozatokkal **offline is betöltődik**. A SW azonos-eredetű
+  (`self.location.origin`), tehát automatikusan a kiszolgáló hostot (fly.io) követi.
+  CACHE `v5`→`v6` (frissülés kikényszerítése).
+- **Hogyan (kliens-oldal, nincs szerver-/DB-változás):** `public/sofer.js` — perzisztens
+  local-draft réteg (`soferCollectFull`/`soferApplyFull`/`saveLocalDraft`/`loadLocalDraft`/
+  `deleteLocalDraft`/`renderLocalDrafts`) a meglévő (sessionStorage-os) auto-draft mellé;
+  `public/sofer.html` — gomb + lista + offline-tipp; `public/i18n.js` — 10 új `sof.*` kulcs
+  (RO-alap+HU); `public/sw.js` — offline cache. Cache-bust `sofer.js/i18n.js/sofer.css?v=20260714offline`.
+- **Verifikáció:** a valódi local-draft kód node-harnessen: üres→„nincs mentett", mentés→1
+  elem (fişă/határátlépés is elmentve), újramentés→marad 1 (nem duplikál), lista renderel,
+  törlés→0. **596 Jest zöld.**
+
 ## 2026-07-14 — Sofőr mód: hamburger menü + mobil-kártyás fuvar-táblázat
 
 - **Hamburger menü a sofőr-módban:** új ☰ gomb a felső sávban (`vs-dm-burger`).
