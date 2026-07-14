@@ -1655,3 +1655,36 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   body.vs-dm .main-content [style*="grid-column:span 3"],
   body.vs-dm .main-content [style*="grid-column: span 3"]{ grid-column:auto !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SOFŐR MÓD — teljes mobil-barát pass: NINCS oldalirányú húzogatás + nagyobb
+   Csak body.vs-dm-re + ≤1024px-re. A teljes/normál nézet érintetlen.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width:1024px){
+  /* A lap SOHA nem lóg ki oldalra (nincs bal-jobb húzogatás) */
+  body.vs-dm{ overflow-x:hidden; }
+  body.vs-dm .main-content{ overflow-x:hidden; max-width:100vw; font-size:15.5px; }
+  body.vs-dm .main-content img,
+  body.vs-dm .main-content svg{ max-width:100%; height:auto; }
+
+  /* A széles táblázatok (a kártyás #tblOrders kivételével) a SAJÁT dobozukon
+     belül görgethetők vízszintesen → a LAP maga sosem lóg ki / húzogatható,
+     és semmilyen adat nem tűnik el (nem vágjuk le). */
+  body.vs-dm .main-content .table:not(#tblOrders){
+    display:block; overflow-x:auto; -webkit-overflow-scrolling:touch;
+    max-width:100%; min-width:0 !important;
+  }
+  body.vs-dm .main-content .table:not(#tblOrders) th,
+  body.vs-dm .main-content .table:not(#tblOrders) td{ font-size:13.5px; padding:9px 10px; }
+  /* A táblázat-burkok (overflow-x:auto) se okozzanak lapszintű túllógást */
+  body.vs-dm .main-content [style*="overflow-x"]{ max-width:100%; }
+
+  /* Nagyobb, olvashatóbb szakasz-címek + űrlap-címkék */
+  body.vs-dm .main-content .h-title{ font-size:21px; }
+  body.vs-dm .main-content .field label{ font-size:14px; }
+
+  /* A Méretek (Hossz/Szél./Mag.) + hasonló flexes input-sorok is beférnek,
+     szükség esetén új sorba törnek (nem lógnak ki). */
+  body.vs-dm .main-content .field > div[style*="display:flex"]{ flex-wrap:wrap; }
+  body.vs-dm .main-content .field > div[style*="display:flex"] > .input{ min-width:0; flex:1 1 30%; }
+}

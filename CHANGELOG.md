@@ -14,6 +14,25 @@
 
 ---
 
+## 2026-07-14 — Sofőr mód: teljes mobil-barát pass — nincs oldalirányú húzogatás + nagyobb
+
+- **A LAP soha nem lóg ki oldalra** sofőr-módban telefonon (≤1024px): `body.vs-dm` +
+  `.main-content` `overflow-x:hidden` + `max-width:100vw` → **nincs bal-jobb húzogatás**
+  egyetlen oldalon sem.
+- **A széles táblázatok** (Fuvarlevelek, Belső sofőrök stb. — a már kártyás Fuvar-kezelés
+  kivételével) a **saját dobozukon belül** görgethetők vízszintesen (`display:block;
+  overflow-x:auto`) → a lap maga fix marad, és **semmilyen adat nem tűnik el** (nem vágjuk
+  le az oszlopokat). Az oszlop-igazítás megmarad.
+- **Nagyobb / barátibb:** nagyobb alap-betűméret a tartalomban (15.5px), nagyobb
+  szakasz-címek (21px) és űrlap-címkék (14px); a Méretek (Hossz/Szél./Mag.) és hasonló
+  flexes input-sorok szükség esetén új sorba törnek (nem lógnak ki).
+- **Csak megjelenés (kliens-oldal):** `public/style.css` additív, `body.vs-dm` +
+  `@media (max-width:1024px)`-re szűkítve — a teljes/normál nézet és a Tervezőtábla
+  (saját `.p2-*` scroll) érintetlen. Cache-bust `style.css?v=20260714mobilefit`.
+- **Verifikáció:** headless Chromiummal (390px) — 9-oszlopos széles tábla: a **lap nem
+  lóg ki** (over=0px), a tábla a saját dobozában görgethető, az oszlopok igazítva; a
+  fuvar-kiírás egy oszlop + a kezelés-kártya 2 oszlop változatlanul jó. 596 Jest zöld.
+
 ## 2026-07-14 — PWA-telepítő gomb a jobb alsó sarokban (sofőr + sofőr-mód admin/manager)
 
 - **Új kis „⬇️ telepítés" FAB** a jobb alsó sarokban, ami a böngésző natív PWA-telepítő
