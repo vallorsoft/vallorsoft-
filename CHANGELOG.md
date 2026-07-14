@@ -14,6 +14,26 @@
 
 ---
 
+## 2026-07-14 — PWA-telepítő gomb a jobb alsó sarokban (sofőr + sofőr-mód admin/manager)
+
+- **Új kis „⬇️ telepítés" FAB** a jobb alsó sarokban, ami a böngésző natív PWA-telepítő
+  ablakát nyitja meg (`beforeinstallprompt`) → a felhasználó a **kezdőképernyőre teheti**
+  az appot. A **sofőr felületen mindig** látszik, az **admin/manager felületen CSAK
+  sofőr-módban** (a téma-gomb melletti 🚚 kapcsoló bekapcsolt állapotában).
+- **Okos megjelenés:** a gomb csak akkor jelenik meg, ha a böngésző valóban
+  telepíthetőnek jelzi az appot (Chrome/Edge/Android) ÉS még nincs telepítve
+  (standalone módban / telepítés után elrejtőzik). A bug-jelentő FAB fölé van igazítva
+  (nincs átfedés).
+- **Hogyan (kliens-oldal, nincs szerver-/DB-változás):** `public/pwa-install.js` (ÚJ,
+  közös) — `beforeinstallprompt` elkapása + FAB + `window.VS_PWA_INSTALL.setEnabled(bool)`;
+  `public/sofer.html` betölti (alapból engedélyezve); `public/admin.html`/`manager.html`
+  betölti (`window.__pwaInstallDefault=false`), és a `console-shared.js` `vsSyncDriverModeUI`
+  kapcsolja a sofőr-móddal együtt. Cache-bust `pwa-install.js?v=20260714pwa`,
+  `console-shared.js?v=20260714drvmode5`.
+- **Verifikáció:** a valódi FAB-logika DOM-shim harnessen: install-prompt→megjelenik,
+  setEnabled(false/true)→rejt/mutat, kattintás→`prompt()`, telepítés után→elrejtőzik.
+  596 Jest zöld.
+
 ## 2026-07-14 — Sofőr mód telefon-finomítás: kiírás egy oszlopban, kezelés-kártya 2 oszlopban
 
 - **Fuvar-KIÍRÁS űrlap telefonon egy oszlopban:** sofőr-módban (≤1024px) minden beviteli

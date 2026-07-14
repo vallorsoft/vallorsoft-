@@ -69,6 +69,8 @@ function vsSyncDriverModeUI(){
   // A body.vs-dm osztály kapcsolja be a sofőr-mód mobil-optimalizált,
   // nagyobb/áttekinthetőbb stílusát (style.css, csak erre az osztályra szűrve).
   if(document.body) document.body.classList.toggle('vs-dm', on);
+  // PWA-telepítő gomb (jobb alsó sarok) CSAK sofőr-módban látszik az admin/manageren
+  if(window.VS_PWA_INSTALL) window.VS_PWA_INSTALL.setEnabled(on);
   var btn=document.getElementById('driverModeToggle');
   if(!btn) return;
   btn.classList.toggle('active', on);
