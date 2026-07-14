@@ -65,9 +65,12 @@ function vsRecomputeSidebar(){
 
 // A felső sávi kapcsoló-gomb kinézetének szinkronizálása az állapottal.
 function vsSyncDriverModeUI(){
+  var on=vsDriverModeOn();
+  // A body.vs-dm osztály kapcsolja be a sofőr-mód mobil-optimalizált,
+  // nagyobb/áttekinthetőbb stílusát (style.css, csak erre az osztályra szűrve).
+  if(document.body) document.body.classList.toggle('vs-dm', on);
   var btn=document.getElementById('driverModeToggle');
   if(!btn) return;
-  var on=vsDriverModeOn();
   btn.classList.toggle('active', on);
   btn.setAttribute('aria-pressed', on?'true':'false');
   var lbl = (typeof t==='function')

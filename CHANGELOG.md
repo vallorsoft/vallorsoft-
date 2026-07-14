@@ -14,6 +14,25 @@
 
 ---
 
+## 2026-07-14 — Sofőr mód: mobil-optimalizált, nagyobb & áttekinthetőbb kezelőfelület
+
+- A „Sofőr mód" (🚚) mostantól **érintő-barát, egyszerű kezelést** is ad, nem csak
+  menü-szűrést: bekapcsolva a `body` megkapja a `vs-dm` osztályt, és a felület
+  nagyobb, letisztultabb lesz.
+- **Mit ad (csak sofőr-módban, csak `body.vs-dm`-re szűrve — a teljes nézet változatlan):**
+  - **Nagyobb menüpontok** (54–60px magas sorok, nagyobb betű + ikon) → könnyebb koppintás.
+  - **Nagyobb, jól látható gombok** (min. 46px, mobilon 52px) és **nagyobb űrlapmezők**
+    (min. 46–50px) → egyszerűbb kitöltés.
+  - **Egyszerűbb felső sáv:** a globális kereső (`Ctrl+K`) elrejtve, a téma/mód gombok
+    nagyobbak; mobilon nagyobb hamburger + szélesebb menü-drawer + nagyobb logó.
+- **Hogyan (kliens-oldal, nincs szerver-/DB-változás):** `public/console-shared.js`
+  `vsSyncDriverModeUI()` a `body.vs-dm` osztályt kapcsolja; `public/style.css`
+  additív, **kizárólag `body.vs-dm`-re szűkített** blokk a fájl végén (desktop + mobil
+  ≤768px media query). Cache-bust `style.css?v=20260714drvmode2` +
+  `console-shared.js?v=20260714drvmode2`.
+- **Verifikáció:** a valódi `vsSyncDriverModeUI` a `body.vs-dm` osztályt mindkét irányban
+  helyesen kapcsolja (be/ki), CSS zárójel-egyensúly OK; **594 Jest zöld**.
+
 ## 2026-07-14 — ÚJ: „Sofőr mód" — egygombos egyszerűsített diszpécser nézet (admin + manager)
 
 - **Miért:** az admin/manager gyakran csak a **sofőrrel való kapcsolattartáshoz** használja
