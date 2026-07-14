@@ -1608,10 +1608,16 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   body.vs-dm #tblOrders thead{ display:none; }
   body.vs-dm #tblOrders tbody{ display:block; }
   body.vs-dm #tblOrders tr.vsl-orow{
-    display:block; margin:0 0 14px; padding:12px 14px 6px;
+    display:grid; grid-template-columns:1fr 1fr; column-gap:14px; row-gap:0;
+    margin:0 0 14px; padding:12px 14px 8px;
     border:1px solid #e8e0d4; border-radius:14px; background:#ffffff;
     box-shadow:0 2px 12px rgba(0,0,0,.07);
   }
+  /* 2 mező soronként (rövidebb, áttekinthetőbb kártya) — a hosszú/rich cellák
+     (Útvonal, Sofőr, Műveletek) teljes szélességben, a rövidek 2 oszlopban. */
+  body.vs-dm #tblOrders td:nth-child(3),   /* Útvonal */
+  body.vs-dm #tblOrders td:nth-child(6),   /* Sofőr */
+  body.vs-dm #tblOrders td.vs-row-actions{ grid-column:1 / -1; }
   body.vs-dm .main-content[data-theme="dark"] #tblOrders tr.vsl-orow{
     background:#141c25; border-color:rgba(255,255,255,.09); box-shadow:0 2px 12px rgba(0,0,0,.35);
   }
@@ -1635,4 +1641,17 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   body.vs-dm #tblOrders tr.vsl-orow td:last-child{ display:none; }
   /* Az útvonal rich tartalma törhet, ne fusson ki a kártyából */
   body.vs-dm #tblOrders .vsl-route{ flex-wrap:wrap; }
+}
+
+/* Sofőr mód: a fuvar-KIÍRÁS (és minden űrlap) telefonon EGY OSZLOPBAN —
+   minden beviteli mező egymás alá kerül, semmi nem lóg ki a képernyőről.
+   (A normál/teljes nézetet nem érinti — csak body.vs-dm-re, ≤1024px-en.) */
+@media (max-width:1024px){
+  body.vs-dm .main-content .grid-2,
+  body.vs-dm .main-content .grid-3,
+  body.vs-dm .main-content .grid-4{ grid-template-columns:1fr !important; }
+  body.vs-dm .main-content [style*="grid-column:span 2"],
+  body.vs-dm .main-content [style*="grid-column: span 2"],
+  body.vs-dm .main-content [style*="grid-column:span 3"],
+  body.vs-dm .main-content [style*="grid-column: span 3"]{ grid-column:auto !important; }
 }
