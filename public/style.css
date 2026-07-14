@@ -1568,3 +1568,71 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   body.vs-dm .main-content .textarea{ min-height:50px; font-size:16px; }
   body.vs-dm .main-content .h-title{ font-size:20px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SOFŐR MÓD — hamburger menü + mobil-kártyás fuvar-táblázat
+   Minden szabály body.vs-dm-re szűkítve → a teljes/normál nézet érintetlen.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Hamburger a felső sávban — alapból rejtve; csak sofőr-módban, a 769–1024px
+   sávban jelenik meg (telefon „asztali nézetben" / kis tablet). ≤768px-en a
+   mobil felső sáv saját hamburgere marad. */
+.vs-dm-burger{
+  display:none; width:44px; height:44px; flex:0 0 auto;
+  align-items:center; justify-content:center;
+  border-radius:var(--radius-md); background:var(--glass-bg-dark);
+  border:1px solid var(--glass-border-dark); color:var(--text-primary);
+  font-size:22px; line-height:1; cursor:pointer; margin-right:4px;
+}
+.main-content[data-theme="light"] .vs-dm-burger{ background:#fffdfa; border-color:#ece3d8; color:#2a2018; }
+
+/* Sofőr mód 769–1024px: a menü hamburger mögé kerül (off-canvas drawer),
+   a tartalom teljes szélességű. (≤768px-en a meglévő mobil-drawer intézi.) */
+@media (min-width:769px) and (max-width:1024px){
+  body.vs-dm .vs-dm-burger{ display:flex; }
+  body.vs-dm .app-layout{ display:block; }
+  body.vs-dm .sidebar{
+    position:fixed; top:0; left:0; bottom:0; width:300px; max-width:86vw; z-index:150;
+    transform:translateX(-100%); transition:transform .25s cubic-bezier(.4,0,.2,1);
+    overflow-y:auto; padding-top:16px;
+  }
+  body.vs-dm .sidebar.mob-open{ transform:translateX(0); box-shadow:4px 0 40px rgba(0,0,0,.5); }
+  body.vs-dm .main-content{ width:100%; }
+}
+
+/* Sofőr mód: a KIÍRT FUVAROK táblázata mobil-kártyás nézet (≤1024px).
+   A fejléc rejtve, minden sor egy kártya, a cellák a data-label alapján
+   címkézve. A checkbox-oszlop (tömeges kijelölés — asztali funkció) rejtve. */
+@media (max-width:1024px){
+  body.vs-dm #tblOrders{ table-layout:auto !important; width:100%; min-width:0 !important; }
+  body.vs-dm #tblOrders thead{ display:none; }
+  body.vs-dm #tblOrders tbody{ display:block; }
+  body.vs-dm #tblOrders tr.vsl-orow{
+    display:block; margin:0 0 14px; padding:12px 14px 6px;
+    border:1px solid #e8e0d4; border-radius:14px; background:#ffffff;
+    box-shadow:0 2px 12px rgba(0,0,0,.07);
+  }
+  body.vs-dm .main-content[data-theme="dark"] #tblOrders tr.vsl-orow{
+    background:#141c25; border-color:rgba(255,255,255,.09); box-shadow:0 2px 12px rgba(0,0,0,.35);
+  }
+  body.vs-dm #tblOrders td{
+    display:block; width:auto !important; max-width:100% !important;
+    padding:7px 0; border:0; border-bottom:1px solid rgba(120,120,120,.15);
+    text-align:left; white-space:normal;
+  }
+  body.vs-dm #tblOrders td[data-label]::before{
+    content:attr(data-label); display:block; margin-bottom:3px;
+    font-size:11px; font-weight:800; letter-spacing:.03em; text-transform:uppercase;
+    color:var(--text-muted);
+  }
+  body.vs-dm #tblOrders td.vsl-orow-first{ font-size:17px; }
+  /* Műveletek sor: gombok balra, nagy tapintható méret, nincs alsó vonal */
+  body.vs-dm #tblOrders td.vs-row-actions{
+    display:flex; gap:10px; align-items:center; border-bottom:0; padding-top:10px;
+  }
+  body.vs-dm #tblOrders td.vs-row-actions .btn{ min-height:44px; padding:9px 16px; font-size:15px; }
+  /* Checkbox-oszlop (utolsó cella) rejtve a kártyás nézetben */
+  body.vs-dm #tblOrders tr.vsl-orow td:last-child{ display:none; }
+  /* Az útvonal rich tartalma törhet, ne fusson ki a kártyából */
+  body.vs-dm #tblOrders .vsl-route{ flex-wrap:wrap; }
+}

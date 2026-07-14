@@ -14,6 +14,26 @@
 
 ---
 
+## 2026-07-14 — Sofőr mód: hamburger menü + mobil-kártyás fuvar-táblázat
+
+- **Hamburger menü a sofőr-módban:** új ☰ gomb a felső sávban (`vs-dm-burger`).
+  A 769–1024px sávban (telefon „asztali nézetben" / kis tablet) sofőr-módban a
+  sidebar **off-canvas drawerré** válik, a hamburger nyitja/zárja, a tartalom
+  teljes szélességű lesz. ≤768px-en a meglévő mobil felső sáv hamburgere marad.
+- **A KIÍRT FUVAROK táblázata mobilon kártyás nézet (≤1024px, sofőr-módban):** a
+  fejléc elrejtve, minden fuvar egy **kártya**, a cellák a `data-label` alapján
+  címkézve (Ügyfél / Útvonal / KM / Ár / Sofőr / Vontató / Státusz), a fuvar-szám
+  kiemelten a kártya tetején, a művelet-gombok nagyok/tapinthatók, a checkbox-oszlop
+  (tömeges kijelölés — asztali funkció) rejtve. A `.table { min-width:560px }` mobil-
+  szabály felülírva → nincs vízszintes túlfolyás.
+- **Hogyan (kliens-oldal, nincs szerver-/DB-változás):** `public/console-shared.js`
+  `renderFilteredOrders` — `data-label` a cellákon (a teljes nézetet nem érinti);
+  `toggleDriverMode` a drawer-állapotot visszaállítja (`closeSidebar`).
+  `public/admin.html`/`manager.html` — ☰ gomb a `vs-topbar`-ban. `public/style.css`
+  additív, **kizárólag `body.vs-dm`-re szűkített** blokk. Cache-bust `?v=20260714drvmode3`.
+- **Verifikáció:** headless Chromiummal (a valódi `style.css`-re) 390px és 900px szélességen
+  renderelve — a kártyás nézet és a 900px-es hamburger+drawer helyesen jelenik meg. 596 Jest zöld.
+
 ## 2026-07-14 — CI: automatikus Fly.io deploy (az éles oldal Fly-on fut, nem Renderen)
 
 - **Tünet:** a mainre mergelt változások (pl. a 🚚 Sofőr mód, a cancel-fix) **nem
