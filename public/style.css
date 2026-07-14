@@ -766,6 +766,13 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 .main-content[data-theme="light"] .theme-toggle {
   background: #ffffff; border-color: rgba(0, 0, 0, 0.1); color: #1a2332;
 }
+/* Sofőr-mód kapcsoló aktív állapota (bekapcsolva) — meleg akcent kiemelés */
+.dm-toggle.active,
+.main-content[data-theme="light"] .dm-toggle.active {
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  border-color: #ea580c; color: #fff;
+  box-shadow: 0 0 0 2px rgba(249,115,22,.25);
+}
 
 /* ----- Stat kártyák (4 db) ----- */
 .dash-stats {

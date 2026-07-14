@@ -14,6 +14,28 @@
 
 ---
 
+## 2026-07-14 — ÚJ: „Sofőr mód" — egygombos egyszerűsített diszpécser nézet (admin + manager)
+
+- **Miért:** az admin/manager gyakran csak a **sofőrrel való kapcsolattartáshoz** használja
+  a konzolt (fuvarokat ír ki, kezeli a menetleveleket) — a teljes menü ilyenkor zavaró.
+- **Mit:** a felső sávban új **🚚 gomb** (`driverModeToggle`, a téma-kapcsoló mellett) —
+  gombnyomásra a sidebar leegyszerűsödik, és CSAK a sofőr-releváns menüpontok látszanak:
+  **Vezérlőpult · Fuvar kiírás · Fuvar kezelés · Tervezőtábla · Fuvarlevelek ·
+  Feltöltött iratok & CMR-ek · Belső sofőrök · Belső chat · Beállítások**. Bekapcsolva a
+  fuvar-kezelésre ugrik; a gomb meleg akcenttel jelzi az aktív állapotot. A választás
+  `localStorage`-ban őrződik (`vs-driver-mode`), belépéskor visszaáll.
+- **Hogyan (nincs szerver-/DB-változás):** `public/console-shared.js` (KÖZÖS szekció) —
+  új `VS_DRIVER_MODE_TABS` fehérlista + `vsRecomputeSidebar()` (a **csomag-kapcsoló +
+  sofőr-mód szűrő EGY közös számításból**, így a két szűrő nem üti egymást),
+  `toggleDriverMode()`/`vsSyncDriverModeUI()`. Az `applyFeatureFlags` erre a közös
+  számításra épül át (funkció-lekérés hibája esetén is lefut). `admin.html`/`manager.html`
+  topbar-gomb, `style.css` `.dm-toggle.active`, `i18n.js` `dm.enter`/`dm.exit` (RO-alap+HU).
+  Cache-bust `?v=20260714drvmode`.
+- **Verifikáció:** a valódi kód (`vsRecomputeSidebar`) DOM-modell elleni ellenőrzése:
+  OFF=mind az 51 menüpont, ON=pontosan a 9-elemű fehérlista (üres szülő-csoportok
+  becsukva), OFF-ra visszaállva teljes restore, és a csomag-kapcsoló sofőr-módban is
+  felülír. **594 Jest zöld** (37 suite; DB-s suite-ok DATABASE_URL nélkül kihagyva).
+
 ## 2026-07-09 — Fix: developer reaktiválás — a `paid_until` is auto-hosszabbodik trial-lejárat után (PR #233)
 
 - **Bug:** a developer cégkártya **„🔓 Activare"** gombja (`unblockCeg` → `devCompanyUpdate`)
