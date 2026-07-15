@@ -230,6 +230,7 @@ handlers.getMySoferOrders = async function (req, res, args) {
       // waybill_visible: minden kiosztott fuvar, DE a mentett menetlevél után csak 3 napig.
       const r = await pool.query(
         `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare, o.km,
+                o.data_incarcare, o.data_descarcare,
                 o.rendszam_camion, o.rendszam_remorca, o.status,
                 o.handover_status, o.handover_type, o.handover_loc,
                 o.finalized_at,
