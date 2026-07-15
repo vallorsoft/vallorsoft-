@@ -14,6 +14,22 @@
 
 ---
 
+## 2026-07-14 — Sofőr mód: ~15%-kal kisebb megjelenítés + letisztult fejléc
+
+- **~15%-kal kisebb** az egész sofőr-mód (a korábbi „nagy" méretek finomítva):
+  űrlapmezők/gombok **56px→48px**, betűméret 17→15px, címkék 15.5→13.5px, alap
+  tartalom-betű 15.5→14px, szakasz-cím 23→20px, checkbox/rádió 22→19px; a
+  hamburger-menü menüpontjai is kisebbek (19→16.5px főmenü, 64→56px sorok), de
+  továbbra is nagyok/egykezesek.
+- **Letisztult fejléc:** a felső sávban az oldalnév (breadcrumb) **nem vágódik le**
+  többé („k" helyett a teljes név, hosszúnál „…" ellipszissel) — a `vs-tb-left`
+  `flex:1`+`min-width:0`, a név `text-overflow:ellipsis`; kompaktabb hamburger +
+  téma/mód gombok (56→48px), kisebb HU/RO nyelvváltó, alacsonyabb sáv (76→64px).
+- Csak megjelenés, `body.vs-dm` + `@media (max-width:1024px)`, a fájl végén (felülírja
+  a korábbi méreteket). Cache-bust `style.css?v=20260714smaller15`. Headless Chromiummal
+  (393px) verifikálva: „Kezelés" teljesen kiírva, nincs oldalgörgetés, kisebb mezők.
+  596 Jest zöld; a teljes/normál nézet érintetlen.
+
 ## 2026-07-14 — Sofőr mód: teljes szélességű tartalom + vastag fejléc + nagy hamburger-menü
 
 - **Nincs üres oldalsáv:** a korábbi 600px-es középre-zárt oszlop **eltávolítva** → a

@@ -1754,3 +1754,46 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   body.vs-dm .sidebar .nav-ico{ width:26px; height:26px; }
   body.vs-dm .sidebar .nav-head{ font-size:19px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SOFŐR MÓD — ~15%-kal kisebb megjelenítés + LETISZTULT fejléc (≤1024px)
+   A korábbi (nagyobb) méretek ~15%-kal kisebbre hangolva; a fejlécben a
+   breadcrumb nem vágódik le („k" helyett a teljes oldalnév, ellipszissel),
+   kompaktabb gombok. Ez a blokk a fájl VÉGÉN van → felülírja a korábbiakat.
+   Csak body.vs-dm.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width:1024px){
+  /* ── Fejléc: kompaktabb, a breadcrumb nem lóg ki ── */
+  body.vs-dm .vs-topbar{ min-height:64px; padding:12px 14px; gap:8px; }
+  body.vs-dm .vs-dm-burger{ width:48px; height:48px; font-size:24px; }
+  body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
+  body.vs-dm .vs-tb-left{ flex:1 1 auto; min-width:0; }
+  body.vs-dm .vs-bread{ font-size:15px; }
+  body.vs-dm .vs-bread #vsBreadCurrent{
+    font-size:16px; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  body.vs-dm #langSwitch button{ padding:9px 11px; font-size:13px; border-radius:10px; }
+
+  /* ── Tartalom ~15%-kal kisebb ── */
+  body.vs-dm .main-content{ font-size:14px; }
+  body.vs-dm .main-content .input,
+  body.vs-dm .main-content .select,
+  body.vs-dm .main-content .textarea{ min-height:48px; font-size:15px; padding:13px 14px; border-radius:12px; }
+  body.vs-dm .main-content textarea.textarea{ min-height:94px; }
+  body.vs-dm .main-content .field{ margin-bottom:16px; }
+  body.vs-dm .main-content .field label{ font-size:13.5px; margin-bottom:7px; }
+  body.vs-dm .main-content .btn,
+  body.vs-dm .main-content .submit-btn{ min-height:48px; font-size:15px; border-radius:12px; }
+  body.vs-dm .main-content .h-title{ font-size:20px; }
+  body.vs-dm .main-content input[type="radio"],
+  body.vs-dm .main-content input[type="checkbox"]{ width:19px; height:19px; }
+
+  /* ── Hamburger-menü ~15%-kal kisebb (de továbbra is nagy, 1kezes) ── */
+  body.vs-dm .sidebar .tab{ font-size:16.5px; min-height:56px; padding:14px 16px; }
+  body.vs-dm .sidebar .sub-tab{ font-size:15.5px; min-height:52px; padding:13px 16px; }
+  body.vs-dm .sidebar .nav-ico{ width:22px; height:22px; }
+  body.vs-dm .sidebar .nav-head{ font-size:16.5px; }
+
+  /* ── Kártya-cím (fuvar-szám) kompaktabb ── */
+  body.vs-dm #tblOrders td.vsl-orow-first{ font-size:15px; }
+}
