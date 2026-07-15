@@ -14,6 +14,21 @@
 
 ---
 
+## 2026-07-15 — Sofőr: a Finalizat fuvar menetlevél nélkül SOSEM tűnik el
+
+- **Követelmény:** amíg egy fuvarból **nem készült menetlevél**, addig a lezárt
+  (`Finalizat`) fuvar **semmiképp** nem eshet ki a sofőr felületéről (eddig 3 nap
+  után menetlevél nélkül is kiesett).
+- **`handlers/orders.js` `getMySoferOrders`** — mind a `dash_visible` (főoldali
+  kártya), mind a `waybill_visible` (menetlevél-választó) CASE kap egy új ágat:
+  `Finalizat AND waybill_count = 0 → true` (mindig látszik). A meglévő fade változatlan:
+  ≥2 menetlevél → 15 perc az utolsó mentés után; 1 menetlevél → 3 nap a lezárástól.
+  Az aktív státuszok (Alocat/In Curs/Parkolt/Raktarban) továbbra is mindig látszanak.
+- **Teszt** (`tests/integration/db-orders.test.js`) frissítve az új viselkedésre:
+  5 napos Finalizat menetlevél nélkül → `true`; 5 napos Finalizat 1 menetlevéllel →
+  `false`. Valós Postgres-en verifikálva; **637 teszt zöld** (a teljes valódi-DB
+  készlettel).
+
 ## 2026-07-15 — Sofőr: 4 lépéses állomás-visszajelzés (odaért → megrakodott → odaért → leürített)
 
 - **Egy gomb fuvar-kártyánként**, ami lenyomásra végiglépteti a fuvar 4 állomását,
