@@ -14,6 +14,24 @@
 
 ---
 
+## 2026-07-15 — Fuvar: külön felrakási / lerakási cégnév (feladó / címzett)
+
+- **Új adatmezők:** az `orders` eddig egyetlen cégmezőt tárolt (`client` =
+  megrendelő). Most **külön felrakási cég** (`firma_incarcare`) és **lerakási cég**
+  (`firma_descarcare`) is rögzíthető — a sofőrnek gyakran a konkrét feladó/címzett
+  cég neve kell. Migráció: `db/order-load-unload-firma.sql` (idempotens, auto-fut).
+- **Admin/Manager fuvar-űrlap** (kiíró + szerkesztő): „Felrakási cég" a felrakás
+  helye mellett, „Lerakási cég" a lerakás helye mellett (opcionális). Bekötve:
+  `comCreate` (INSERT), `comUpdate` (feltételes UPDATE, üres → törlés), `getOrderById`
+  (`SELECT *` → a szerkesztő előtölti). Input-korlát 255, paraméteres SQL.
+- **Sofőr fuvar-kártya:** a kinyíló részlet-panel Felrakás/Lerakás szekciója
+  mostantól a **cég nevét is** kiírja (a helyszín + időpont fölött). Szerver:
+  `getMySoferOrders` visszaadja a `firma_incarcare`/`firma_descarcare` mezőt.
+- **Kliens:** `admin.html`/`manager.html` (kiíró + szerkesztő mezők),
+  `console-shared.js` (beolvasás/reset/előtöltés/mentés), `sofer.js` (kártya),
+  `i18n.js` (`form.loadFirma`/`form.unloadFirma`/`form.firmaPh`/`sof.det.company`,
+  RO-alap+HU), cache-bust `?v=20260715firma`. **596 Jest zöld.**
+
 ## 2026-07-15 — Sofőr: kattintható fuvar-kártya + kinyíló fel-/lerakási részletek (másolható)
 
 - **Sofőr főoldal, kiosztott fuvarok:** a fuvar-kártya **fejléce mostantól

@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260714hdrfit">
-  <script src="/i18n.js?v=20260714drvmode"></script>
+  <script src="/i18n.js?v=20260715firma"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -255,8 +255,10 @@
             </div>
           </div>
           <div class="field"><label data-i18n="form.loadLoc">Felrakás helye</label><div class="vs-ac-wrap"><input class="input" id="oLoad" placeholder="pl. Budapest (HU)" autocomplete="off"><div class="vs-ac-dd" id="oLoadDD"></div></div></div>
+          <div class="field"><label data-i18n="form.loadFirma">Felrakási cég</label><input class="input" id="oLoadFirma" placeholder="opcionális" data-i18n-ph="form.firmaPh"></div>
           <div class="field"><label data-i18n="form.loadTime">Felrakás ideje</label><input class="input" id="oLoadDate" type="datetime-local"></div>
           <div class="field"><label data-i18n="form.unloadLoc">Lerakás helye</label><div class="vs-ac-wrap"><input class="input" id="oUnload" placeholder="pl. Bucharest (RO)" autocomplete="off"><div class="vs-ac-dd" id="oUnloadDD"></div></div></div>
+          <div class="field"><label data-i18n="form.unloadFirma">Lerakási cég</label><input class="input" id="oUnloadFirma" placeholder="opcionális" data-i18n-ph="form.firmaPh"></div>
           <div class="field"><label data-i18n="form.unloadTime">Lerakás ideje</label><input class="input" id="oUnloadDate" type="datetime-local"></div>
         </div>
         <div style="margin-top:20px; margin-bottom:12px;">
@@ -1218,7 +1220,9 @@
       <div class="field"><label data-i18n="edit.client">Ügyfél</label><input class="input" id="oeClient"></div>
       <div class="field"><label data-i18n="form.ref">Referencia</label><input class="input" id="oeRef"></div>
       <div class="field"><label data-i18n="edit.loadLoc">Rakodás helye</label><div class="vs-ac-wrap"><input class="input" id="oeLocInc" autocomplete="off"><div class="vs-ac-dd" id="oeLocIncDD"></div></div></div>
+      <div class="field"><label data-i18n="form.loadFirma">Felrakási cég</label><input class="input" id="oeFirmaInc" placeholder="opcionális" data-i18n-ph="form.firmaPh"></div>
       <div class="field"><label data-i18n="form.unloadLoc">Lerakás helye</label><div class="vs-ac-wrap"><input class="input" id="oeLocDesc" autocomplete="off"><div class="vs-ac-dd" id="oeLocDescDD"></div></div></div>
+      <div class="field"><label data-i18n="form.unloadFirma">Lerakási cég</label><input class="input" id="oeFirmaDesc" placeholder="opcionális" data-i18n-ph="form.firmaPh"></div>
       <div class="field"><label data-i18n="edit.loadDate">Rakodás dátuma</label><input class="input" id="oeDataInc" type="date"></div>
       <div class="field"><label data-i18n="edit.unloadDate">Lerakás dátuma</label><input class="input" id="oeDataDesc" type="date"></div>
       <div class="field"><label data-i18n="edit.price">Ár (EUR)</label><input class="input" id="oePret" type="number"></div>
@@ -1437,7 +1441,7 @@
 
 <script src="/feature-catalog.js?v=20260618cgps2"></script>
 <script>window.__pwaInstallDefault=false;</script>
-<script src="/console-shared.js?v=20260714drvmode5"></script>
+<script src="/console-shared.js?v=20260715firma"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 <script src="/console-pages.js?v=20260617b1"></script>
 <!-- ===== INTEGRACIOK (Ugyfelek / CargoTrack / Szamlazas) ===== -->

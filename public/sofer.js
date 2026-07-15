@@ -1216,11 +1216,13 @@ function renderFuvarCard(o) {
       (o.client ? '<div class="fd-firma">🏢 ' + esc(o.client) + '</div>' : '') +
       '<div class="fd-sec">' +
         '<div class="fd-sec-h">⬆️ ' + t('sof.det.loading') + '</div>' +
+        detRow('sof.det.company', o.firma_incarcare, null) +
         detRow('sof.det.location', o.loc_incarcare, 'load') +
         detRow('sof.det.date', dLoad, null) +
       '</div>' +
       '<div class="fd-sec">' +
         '<div class="fd-sec-h">⬇️ ' + t('sof.det.unloading') + '</div>' +
+        detRow('sof.det.company', o.firma_descarcare, null) +
         detRow('sof.det.location', o.loc_descarcare, 'unload') +
         detRow('sof.det.date', dUnload, null) +
       '</div>' +
