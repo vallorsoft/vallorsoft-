@@ -231,6 +231,7 @@ handlers.getMySoferOrders = async function (req, res, args) {
       const r = await pool.query(
         `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare, o.km,
                 o.data_incarcare, o.data_descarcare,
+                o.firma_incarcare, o.firma_descarcare,
                 o.rendszam_camion, o.rendszam_remorca, o.status,
                 o.handover_status, o.handover_type, o.handover_loc,
                 o.finalized_at,
@@ -292,6 +293,8 @@ handlers.comCreate = async function (req, res, args) {
       const km = Number(o.km || 0);
       const loc_incarcare = String(o.loc_incarcare || '').trim();
       const loc_descarcare = String(o.loc_descarcare || '').trim();
+      const firma_incarcare = o.firma_incarcare ? String(o.firma_incarcare).trim().slice(0, 255) : null;
+      const firma_descarcare = o.firma_descarcare ? String(o.firma_descarcare).trim().slice(0, 255) : null;
       const data_incarcare = o.data_incarcare || null;
       const data_descarcare = o.data_descarcare || null;
       const firma_extern = o.firma_extern ? String(o.firma_extern).trim() : null;
@@ -358,9 +361,10 @@ handlers.comCreate = async function (req, res, args) {
             sofer_type, email_sofer, nume_sofer,
             firma_extern, telefon_extern, external_driver_id,
             rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type, route_geo,
-            hossz_cm, szel_cm, mag_cm, fuvar_no
+            hossz_cm, szel_cm, mag_cm, fuvar_no,
+            firma_incarcare, firma_descarcare
           ) VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28
           )`,
           [
             id, client, ref, loc_incarcare, loc_descarcare,
@@ -369,7 +373,8 @@ handlers.comCreate = async function (req, res, args) {
             firma_extern, telefon_extern, external_driver_id,
             rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type,
             route_geo ? JSON.stringify(route_geo) : null,
-            hossz_cm, szel_cm, mag_cm, fuvar_no
+            hossz_cm, szel_cm, mag_cm, fuvar_no,
+            firma_incarcare, firma_descarcare
           ]
         );
 
@@ -569,6 +574,8 @@ handlers.comUpdate = async function (req, res, args) {
       if (o.ref !== undefined) { updates.push(`ref = $${i++}`); values.push(o.ref); }
       if (o.loc_incarcare !== undefined) { updates.push(`loc_incarcare = $${i++}`); values.push(o.loc_incarcare); }
       if (o.loc_descarcare !== undefined) { updates.push(`loc_descarcare = $${i++}`); values.push(o.loc_descarcare); }
+      if (o.firma_incarcare !== undefined) { updates.push(`firma_incarcare = $${i++}`); values.push(o.firma_incarcare ? String(o.firma_incarcare).trim().slice(0, 255) : null); }
+      if (o.firma_descarcare !== undefined) { updates.push(`firma_descarcare = $${i++}`); values.push(o.firma_descarcare ? String(o.firma_descarcare).trim().slice(0, 255) : null); }
       if (o.data_incarcare !== undefined) { updates.push(`data_incarcare = $${i++}`); values.push(o.data_incarcare || null); }
       if (o.data_descarcare !== undefined) { updates.push(`data_descarcare = $${i++}`); values.push(o.data_descarcare || null); }
       if (o.pret !== undefined) { updates.push(`pret = $${i++}`); values.push(Number(o.pret || 0)); }

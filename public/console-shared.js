@@ -747,6 +747,8 @@ function createOrder(){
     route_geo:buildRouteGeo('create'),
     loc_incarcare:document.getElementById('oLoad').value.trim(),
     loc_descarcare:document.getElementById('oUnload').value.trim(),
+    firma_incarcare:(document.getElementById('oLoadFirma')||{}).value ? document.getElementById('oLoadFirma').value.trim() : null,
+    firma_descarcare:(document.getElementById('oUnloadFirma')||{}).value ? document.getElementById('oUnloadFirma').value.trim() : null,
     data_incarcare:document.getElementById('oLoadDate').value||null,
     data_descarcare:document.getElementById('oUnloadDate').value||null,
     sofer_type:type==='None'?null:type,
@@ -766,7 +768,7 @@ function createOrder(){
       if(r.paired_trailer)extra+=' · '+t('cs.pairedTrailer')+r.paired_trailer;
       toast(t('cs.orderSavedId')+r.id+extra,'ok');
       loadOrders();
-      ['oClient','oRef','oPret','oKm','oSuly','oHossz','oSzel','oMag','oLoad','oUnload','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+      ['oClient','oRef','oPret','oKm','oSuly','oHossz','oSzel','oMag','oLoad','oUnload','oLoadFirma','oUnloadFirma','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
       ['oFtl','oLtl'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
       refreshDimReq();
       if(typeof resetRouteState==='function')resetRouteState('create');
@@ -4355,6 +4357,8 @@ function openOrderEdit(id) {
       }
       document.getElementById('oeLocInc').value = o.loc_incarcare||'';
       document.getElementById('oeLocDesc').value = o.loc_descarcare||'';
+      var oeFiEl=document.getElementById('oeFirmaInc'); if(oeFiEl) oeFiEl.value = o.firma_incarcare||'';
+      var oeFdEl=document.getElementById('oeFirmaDesc'); if(oeFdEl) oeFdEl.value = o.firma_descarcare||'';
       document.getElementById('oeDataInc').value = o.data_incarcare ? o.data_incarcare.split('T')[0] : '';
       document.getElementById('oeDataDesc').value = o.data_descarcare ? o.data_descarcare.split('T')[0] : '';
       document.getElementById('oePret').value = o.pret||0;
@@ -4538,6 +4542,8 @@ function saveOrderEdit() {
     ref:              document.getElementById('oeRef').value,
     loc_incarcare:    document.getElementById('oeLocInc').value,
     loc_descarcare:   document.getElementById('oeLocDesc').value,
+    firma_incarcare:  (document.getElementById('oeFirmaInc')||{}).value != null ? document.getElementById('oeFirmaInc').value.trim() : undefined,
+    firma_descarcare: (document.getElementById('oeFirmaDesc')||{}).value != null ? document.getElementById('oeFirmaDesc').value.trim() : undefined,
     data_incarcare:   document.getElementById('oeDataInc').value||null,
     data_descarcare:  document.getElementById('oeDataDesc').value||null,
     pret:             document.getElementById('oePret').value,
