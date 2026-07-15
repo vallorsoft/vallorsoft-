@@ -1121,6 +1121,50 @@ function updateScrollBehavior(orders) {
   else wrap.classList.remove('scrollable');
 }
 
+// Kártya-kattintással kinyíló részletek másolható szövegei (biztonságos:
+// a felhasználói adatot NEM injektáljuk onclick-be, hanem ebből a map-ből
+// olvassuk ki a fuvar id alapján).
+var _fuvarCopy = {};
+
+// DATE (fel-/lerakás) olvasható formázása; hiba/üres → '—'.
+function fmtFuvarDay(v) {
+  if (!v) return '';
+  try {
+    var d = new Date(v);
+    if (isNaN(d.getTime())) return String(v);
+    return d.toLocaleDateString(t('sof.locale'), { year: 'numeric', month: '2-digit', day: '2-digit' });
+  } catch (e) { return String(v); }
+}
+
+// Kattintásra a kártya részletei ki-/becsukódnak (felrakás/lerakás + megjegyzés).
+function toggleFuvarDetails(id) {
+  var el = document.getElementById('det_' + id);
+  var arr = document.getElementById('exp_' + id);
+  if (!el) return;
+  var open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (arr) arr.textContent = open ? '▾' : '▴';
+}
+
+// Egy mező (felrakó/lerakó helyszín vagy megjegyzés) vágólapra másolása.
+function soferCopy(id, kind) {
+  var rec = _fuvarCopy[id];
+  var txt = rec ? (rec[kind] || '') : '';
+  if (!txt) { toast(t('sof.det.nothingToCopy'), 'err'); return; }
+  var done = function () { toast(t('sof.det.copied'), 'ok'); };
+  var fallback = function () {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta); done();
+    } catch (e) { toast(t('sof.det.copyFail'), 'err'); }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(done).catch(fallback);
+  } else { fallback(); }
+}
+
 // Egy kiosztott fuvar kártyája — új .fuvar-card kinézet + MEGŐRZÖTT akciógombok.
 // Alocat → Elfogadom, In Curs → Elvégeztem, Finalizat → nincs státuszváltó (csak UIT).
 function renderFuvarCard(o) {
@@ -1150,15 +1194,55 @@ function renderFuvarCard(o) {
     hoBtn = '<button class="sh-btn" style="border:1px solid rgba(99,102,241,0.5);color:#a5b4fc;background:rgba(99,102,241,0.12);" ' +
       'onclick="openHandover(\'' + o.id + '\')" title="' + t('sof.handoverBtnTitle') + '">' + t('sof.ho.title') + '</button>';
   }
+  // Kattintható részletek forrás-adatai (biztonságos map, nem HTML-attribútum)
+  _fuvarCopy[o.id] = {
+    load: o.loc_incarcare || '',
+    unload: o.loc_descarcare || '',
+    note: o.ref || ''
+  };
+  var dLoad = fmtFuvarDay(o.data_incarcare);
+  var dUnload = fmtFuvarDay(o.data_descarcare);
+  // Egy részlet-sor: címke + érték + 📋 másoló gomb (ha van mit másolni)
+  function detRow(labelKey, val, copyKind) {
+    if (!val) return '';
+    var btn = copyKind
+      ? '<button class="fd-copy" onclick="soferCopy(\'' + o.id + '\',\'' + copyKind + '\')" title="' + t('sof.det.copy') + '">📋</button>'
+      : '';
+    return '<div class="fd-row"><div class="fd-cell"><span class="fd-lbl">' + t(labelKey) + '</span>' +
+           '<span class="fd-val">' + esc(val) + '</span></div>' + btn + '</div>';
+  }
+  var details =
+    '<div class="fuvar-details" id="det_' + o.id + '" style="display:none">' +
+      (o.client ? '<div class="fd-firma">🏢 ' + esc(o.client) + '</div>' : '') +
+      '<div class="fd-sec">' +
+        '<div class="fd-sec-h">⬆️ ' + t('sof.det.loading') + '</div>' +
+        detRow('sof.det.location', o.loc_incarcare, 'load') +
+        detRow('sof.det.date', dLoad, null) +
+      '</div>' +
+      '<div class="fd-sec">' +
+        '<div class="fd-sec-h">⬇️ ' + t('sof.det.unloading') + '</div>' +
+        detRow('sof.det.location', o.loc_descarcare, 'unload') +
+        detRow('sof.det.date', dUnload, null) +
+      '</div>' +
+      (o.ref ? '<div class="fd-sec">' +
+        '<div class="fd-sec-h">📝 ' + t('sof.det.note') + '</div>' +
+        detRow('sof.det.note', o.ref, 'note') +
+      '</div>' : '') +
+    '</div>';
   return '' +
     '<div class="fuvar-card">' +
-      '<div class="fuvar-destination">📍 ' + esc(o.loc_incarcare||'—') + ' → ' + esc(o.loc_descarcare||'—') + '</div>' +
-      '<div class="fuvar-meta">' +
-        '<span>#' + o.id + '</span>' +
-        (o.client ? '<span>' + esc(o.client) + '</span>' : '') +
-        (truck ? '<span>' + truck + '</span>' : '') +
-        '<span class="fuvar-status ' + statusCls + '">' + statusTxt + '</span>' +
+      '<div class="fuvar-head" role="button" tabindex="0" onclick="toggleFuvarDetails(\'' + o.id + '\')" ' +
+           'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleFuvarDetails(\'' + o.id + '\');}">' +
+        '<div class="fuvar-destination">📍 ' + esc(o.loc_incarcare||'—') + ' → ' + esc(o.loc_descarcare||'—') +
+          '<span class="fuvar-expand" id="exp_' + o.id + '">▾</span></div>' +
+        '<div class="fuvar-meta">' +
+          '<span>#' + o.id + '</span>' +
+          (o.client ? '<span>' + esc(o.client) + '</span>' : '') +
+          (truck ? '<span>' + truck + '</span>' : '') +
+          '<span class="fuvar-status ' + statusCls + '">' + statusTxt + '</span>' +
+        '</div>' +
       '</div>' +
+      details +
       '<div class="fuvar-actions">' +
         '<button class="sh-btn uit" onclick="SoferUit.open(\'' + o.id + '\')" title="' + t('sof.uitTitle') + '">🚛 UIT</button>' +
         actionBtn +

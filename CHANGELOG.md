@@ -14,6 +14,27 @@
 
 ---
 
+## 2026-07-15 — Sofőr: kattintható fuvar-kártya + kinyíló fel-/lerakási részletek (másolható)
+
+- **Sofőr főoldal, kiosztott fuvarok:** a fuvar-kártya **fejléce mostantól
+  kattintható** → kinyílik egy részlet-panel:
+  - 🏢 **Ügyfél** (a fuvar `client` mezője),
+  - ⬆️ **Felrakás**: helyszín + időpont (dátum),
+  - ⬇️ **Lerakás**: helyszín + időpont (dátum),
+  - 📝 **Megjegyzés** (a fuvar `ref`/referencia mezője), ha van.
+- **Vágólapra másolás:** a felrakó helyszín, a lerakó helyszín és a megjegyzés
+  mellett **📋 gomb** — gombnyomásra a szöveg a vágólapra kerül (Clipboard API,
+  `execCommand('copy')` tartalékkal), visszajelző toasttal. A másolandó szöveg
+  biztonságos JS-map-ből jön (nincs felhasználói adat onclick-attribútumban).
+- **Szerver (`handlers/orders.js`):** a `getMySoferOrders` mostantól a
+  `data_incarcare`/`data_descarcare` dátumot is visszaadja (a `client`/`ref` már
+  eddig is). Nincs séma-változás.
+- **Kliens:** `public/sofer.js` (`renderFuvarCard` + `toggleFuvarDetails`/`soferCopy`/
+  `fmtFuvarDay`), `public/sofer.css` (részlet-panel + 📋 gomb + kattintható fejléc),
+  `public/i18n.js` (10 új `sof.det.*` kulcs, RO-alap+HU), cache-bust `?v=20260715fdet`.
+  Az akciógombok (UIT / Elfogadom / Elvégeztem / Áru leadása) érintetlenek. DOM-shim
+  harnesszel verifikálva; **596 Jest zöld**.
+
 ## 2026-07-15 — Fix: fuvar-kiírás cím-autocomplete — Nominatim tartalék a Photon mellé
 
 - **Gyökérok:** a fuvar-kiírás felrakó/lerakó cím-mezőjének autocomplete-je
