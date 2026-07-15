@@ -82,6 +82,32 @@
   // ── Dátum / szám segédek ──
   function ymd(d) { if (!d) return ''; var s = String(d); return s.length >= 10 ? s.slice(0, 10) : s; }
   function d2(d) { var s = ymd(d); return s || '—'; }
+  // Időbélyeg (állomás) — dátum + óra:perc, hiba/üres → ''.
+  function dt2(v) { if (!v) return ''; try { var d = new Date(v); if (isNaN(d.getTime())) return String(v); return d.toLocaleString('ro-RO', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (e) { return String(v); } }
+  // Sofőr állomás-idővonal (4 lépés) — az irodai fuvar-adatlapra.
+  var _MS_STEPS = [
+    { col: 'sosit_incarcare_at',  key: 'ed.ms.arriveLoad',   def: 'Sosit la încărcare' },
+    { col: 'incarcat_at',         key: 'ed.ms.loaded',       def: 'Încărcat' },
+    { col: 'sosit_descarcare_at', key: 'ed.ms.arriveUnload',  def: 'Sosit la descărcare' },
+    { col: 'descarcat_at',        key: 'ed.ms.unloaded',     def: 'Descărcat' }
+  ];
+  function milestoneBlock(o) {
+    var anyMs = _MS_STEPS.some(function (s) { return o[s.col]; });
+    var active = ['Alocat', 'In Curs', 'Parkolt', 'Raktarban'].indexOf(o.status) !== -1;
+    if (!anyMs && !active) return ''; // se aktív, se állomás → ne mutassuk üresen
+    var rows = _MS_STEPS.map(function (s) {
+      var done = o[s.col];
+      return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;' + (done ? 'color:var(--text-primary);font-weight:600;' : 'color:var(--text-muted);') + '">'
+        + '<span style="width:20px;text-align:center;">' + (done ? '✅' : '○') + '</span>'
+        + '<span style="flex:1;">' + _t(s.key, s.def) + '</span>'
+        + (done ? '<span style="font-weight:700;color:var(--brand-indigo,#6366f1);font-variant-numeric:tabular-nums;">' + _esc(dt2(o[s.col])) + '</span>' : '')
+        + '</div>';
+    }).join('');
+    return '<div style="margin-top:16px;">'
+      + '<div style="font-weight:700;margin-bottom:6px;color:var(--text-primary);">🚚 ' + _t('ed.ms.progress', 'Stare cursă (marcaje șofer)') + '</div>'
+      + '<div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.18);border-radius:10px;padding:8px 14px;">' + rows + '</div>'
+      + '</div>';
+  }
   function n2(v, dec) { if (v == null || v === '') return '—'; var n = parseFloat(v); if (!isFinite(n)) return '—'; return n.toLocaleString('ro-RO', { minimumFractionDigits: dec || 0, maximumFractionDigits: dec || 0 }); }
 
   function daysBadge(dl) {
@@ -306,7 +332,8 @@
       : '';
     box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap;">'
       + '<div>' + statusBadge(o.status) + '</div>' + editLink + '</div>'
-      + infoTable(rows);
+      + infoTable(rows)
+      + milestoneBlock(o);
   }
 
   // ════════════════ FUVAR — Dokumentumok ════════════════
