@@ -237,18 +237,22 @@ handlers.getMySoferOrders = async function (req, res, args) {
                 o.handover_status, o.handover_type, o.handover_loc,
                 o.finalized_at,
                 wb.waybill_at, wb.waybill_last, COALESCE(wb.waybill_count, 0) AS waybill_count,
-                -- dash_visible: aktív → mindig; Finalizat + 2× menetlevél → 15 perc; egyébként 3 nap
+                -- dash_visible: aktív → mindig; Finalizat + MÉG NINCS menetlevél → SOSEM tűnik el
+                -- (amíg nem készült menetlevél); Finalizat + 2× menetlevél → 15 perc; 1× → 3 nap
                 CASE
                   WHEN o.status IN ('Alocat', 'In Curs', 'Parkolt', 'Raktarban') THEN true
+                  WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) = 0 THEN true
                   WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) >= 2
                     THEN wb.waybill_last >= NOW() - INTERVAL '15 minutes'
                   WHEN o.status = 'Finalizat'
                     THEN COALESCE(o.finalized_at, o.updated_at) >= NOW() - INTERVAL '3 days'
                   ELSE false
                 END AS dash_visible,
-                -- waybill_visible (menetlevél picker): same mint dash_visible
+                -- waybill_visible (menetlevél picker): mint dash_visible — amíg NINCS
+                -- menetlevél, a fuvar SOSEM esik ki (különben nem lehetne menetlevelet készíteni)
                 CASE
                   WHEN o.status IN ('Alocat', 'In Curs', 'Parkolt', 'Raktarban') THEN true
+                  WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) = 0 THEN true
                   WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) >= 2
                     THEN wb.waybill_last >= NOW() - INTERVAL '15 minutes'
                   WHEN o.status = 'Finalizat'
