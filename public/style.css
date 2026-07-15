@@ -1697,15 +1697,16 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
    ═══════════════════════════════════════════════════════════════════════ */
 @media (max-width:1024px){
   /* ── Fejléc (felső sáv): tisztább, nagyobb tap-targetek ── */
-  body.vs-dm .vs-topbar{ gap:8px; padding:12px 14px; }
-  body.vs-dm .vs-dm-burger{ width:50px; height:50px; font-size:26px; }
-  body.vs-dm .theme-toggle{ width:50px; height:50px; font-size:24px; }
-  body.vs-dm .vs-bread{ font-size:16px; font-weight:700; min-width:0; overflow:hidden; }
-  body.vs-dm .vs-bread #vsBreadCurrent{ font-size:16px; font-weight:800; color:var(--text-primary); }
+  /* VASTAGABB felső sáv, NAGYOBB gombok (érintő-barát, 1kezes) */
+  body.vs-dm .vs-topbar{ gap:10px; padding:16px 16px; min-height:76px; }
+  body.vs-dm .vs-dm-burger{ width:56px; height:56px; font-size:28px; }
+  body.vs-dm .theme-toggle{ width:56px; height:56px; font-size:26px; }
+  body.vs-dm .vs-bread{ font-size:18px; font-weight:700; min-width:0; overflow:hidden; }
+  body.vs-dm .vs-bread #vsBreadCurrent{ font-size:19px; font-weight:800; color:var(--text-primary); }
   /* A 🏠 + „›" elrejtve → csak az aktuális oldalnév marad (több hely, tisztább) */
   body.vs-dm .vs-bread > span:first-child,
   body.vs-dm .vs-bread .vs-bread-sep{ display:none; }
-  body.vs-dm #langSwitch button{ padding:9px 11px; font-size:14px; border-radius:10px; }
+  body.vs-dm #langSwitch button{ padding:12px 14px; font-size:15px; border-radius:12px; }
 
   /* ── Nagyobb, ujjbarát űrlapmezők — kényelmesen kitölthető telefonon ── */
   body.vs-dm .main-content .input,
@@ -1732,14 +1733,24 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
    (vs-topbar) teljes szélességű marad. Csak body.vs-dm.
    ═══════════════════════════════════════════════════════════════════════ */
 @media (max-width:1024px){
+  /* A lap SEHOL nem lóg ki oldalra (szél-levágás MINDEN oldalon/panelon) */
   body.vs-dm{ overflow-x:hidden; }
   body.vs-dm .main-content{ overflow-x:hidden; max-width:100vw; }
-  /* A tartalom-panelek fix, középre zárt oszlopban (a felső sáv nem) */
-  body.vs-dm .main-content .pane{ max-width:600px; margin-left:auto; margin-right:auto; }
-  /* Minden mező/gomb/tábla a panel szélességébe fér (nincs túlnyúlás) */
+  /* Teljes szélességű tartalom — NINCS üres oldalsáv (a max-width cap eltávolítva),
+     a tartalom és a felső sáv is a képernyő teljes szélességét használja. */
+  body.vs-dm .main-content .pane{ max-width:none; margin-left:0; margin-right:0; }
+  /* Minden mező/gomb a szélességbe fér (nincs túlnyúlás) */
   body.vs-dm .main-content .input,
   body.vs-dm .main-content .select,
   body.vs-dm .main-content .textarea,
   body.vs-dm .main-content .btn,
   body.vs-dm .main-content .submit-btn{ max-width:100%; box-sizing:border-box; }
+
+  /* ── Hamburger-menü: NAGY, nagy betűs menüpontok, közel teljes képernyős
+     drawer (1kezes kezelés) — a menü előjön, a tartalom mögé sötét fátyol ── */
+  body.vs-dm .sidebar{ width:90vw !important; max-width:400px; }
+  body.vs-dm .sidebar .tab{ font-size:19px; min-height:64px; padding:16px 18px; }
+  body.vs-dm .sidebar .sub-tab{ font-size:18px; min-height:60px; padding:15px 18px; }
+  body.vs-dm .sidebar .nav-ico{ width:26px; height:26px; }
+  body.vs-dm .sidebar .nav-head{ font-size:19px; }
 }

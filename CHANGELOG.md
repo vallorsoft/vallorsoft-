@@ -14,6 +14,24 @@
 
 ---
 
+## 2026-07-14 — Sofőr mód: teljes szélességű tartalom + vastag fejléc + nagy hamburger-menü
+
+- **Nincs üres oldalsáv:** a korábbi 600px-es középre-zárt oszlop **eltávolítva** → a
+  tartalom (űrlap, kártyák) és a felső sáv a **képernyő teljes szélességét** használja
+  (a „2 szél" eltűnt), a fejléc és a tartalom **egy vonalban** van.
+- **Vastagabb fejléc, nagyobb gombok:** a felső sáv `min-height:76px`, nagyobb padding;
+  a hamburger + téma/mód gombok **56px**, a nyelvváltó (HU/RO) nagyobb, az oldalnév 19px.
+- **Nagy, egykezes hamburger-menü:** a drawer **90vw** (max 400px, közel teljes képernyős),
+  nagy menüpontok (**19px** főmenü / 18px almenü, 64/60px magas sorok, 26px ikon) → nagy
+  betűkkel, hüvelykujjal kényelmesen.
+- **Szél-levágás MINDEN oldalon:** `body.vs-dm` + `.main-content` `overflow-x:hidden` +
+  `max-width:100vw` minden panelra → a lap sehol nem húzogatható oldalra (a széles
+  táblák a saját dobozukban görgetnek).
+- Csak megjelenés, `body.vs-dm` + `@media (max-width:1024px)`. Cache-bust
+  `style.css?v=20260714fullwidth`. Headless Chromiummal (900px + 393px) verifikálva:
+  full-width tartalom (input a teljes szélességben), 0px oldalgörgetés, nagy drawer-menü.
+  596 Jest zöld; a teljes/normál nézet érintetlen.
+
 ## 2026-07-14 — Sofőr mód: nagyobb ujjbarát méretek ≤1024px-en + tiszta fejléc
 
 - **Gyökérok:** a telefon gyakran **769–1024px logikai szélességen** renderel („asztali
