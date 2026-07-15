@@ -27,8 +27,13 @@
   - **Tisztább fejléc:** a felső sávban a 🏠 + „›" elrejtve, csak az **aktuális oldalnév**
     marad (félkövér, nagyobb); a hamburger + téma/mód gombok **50px** (nagy tap-target);
     a nyelvváltó (HU/RO) nagyobb.
-- Cache-bust `style.css?v=20260714bigfields`. Headless Chromiummal (900px) verifikálva —
-  a mezők/gombok nagyok, a fejléc letisztult. 596 Jest zöld. A teljes/normál nézet érintetlen.
+- **FIX szélességű, középre zárt tartalom-oszlop:** a tartalom-panelek (űrlap, kártyák)
+  max. **600px** széles, középre zárt oszlopba kerülnek → a beviteli mező **nem lesz túl
+  széles** asztali-nézetű telefonon (900px-en 600px, nem 840px), a lap **soha nem lóg ki
+  oldalra**, és minden befér. A felső sáv teljes szélességű marad.
+- Cache-bust `style.css?v=20260714fixwidth`. Headless Chromiummal **393px + 900px**-en
+  verifikálva: nincs oldalgörgetés egyik szélességen sem (mért 0px túllógás), az input
+  393px-en teljes szélességű, 900px-en 600px-re zárt. 596 Jest zöld. A teljes nézet érintetlen.
 
 ## 2026-07-14 — Sofőr mód: teljes mobil-barát pass — nincs oldalirányú húzogatás + nagyobb
 

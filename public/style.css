@@ -1723,3 +1723,23 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   body.vs-dm .main-content input[type="radio"],
   body.vs-dm .main-content input[type="checkbox"]{ width:22px; height:22px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SOFŐR MÓD — FIX szélességű, középre zárt tartalom-oszlop (≤1024px)
+   A tartalom (űrlap, kártyák) egy kényelmes max-szélességű oszlopba kerül és
+   középre zár → a beviteli mezők nem lesznek túl szélesek asztali-nézetű
+   telefonon, a lap SOHA nem lóg ki oldalra, és minden befér. A felső sáv
+   (vs-topbar) teljes szélességű marad. Csak body.vs-dm.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width:1024px){
+  body.vs-dm{ overflow-x:hidden; }
+  body.vs-dm .main-content{ overflow-x:hidden; max-width:100vw; }
+  /* A tartalom-panelek fix, középre zárt oszlopban (a felső sáv nem) */
+  body.vs-dm .main-content .pane{ max-width:600px; margin-left:auto; margin-right:auto; }
+  /* Minden mező/gomb/tábla a panel szélességébe fér (nincs túlnyúlás) */
+  body.vs-dm .main-content .input,
+  body.vs-dm .main-content .select,
+  body.vs-dm .main-content .textarea,
+  body.vs-dm .main-content .btn,
+  body.vs-dm .main-content .submit-btn{ max-width:100%; box-sizing:border-box; }
+}
