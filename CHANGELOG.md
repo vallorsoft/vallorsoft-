@@ -14,6 +14,28 @@
 
 ---
 
+## 2026-07-15 — Sofőr: 4 lépéses állomás-visszajelzés (odaért → megrakodott → odaért → leürített)
+
+- **Egy gomb fuvar-kártyánként**, ami lenyomásra végiglépteti a fuvar 4 állomását,
+  mindegyik **külön időbélyeget** kap, és minden lépésnél **push** megy az irodának
+  (Admin/Manager):
+  1. 📍 megérkezett a felrakóhoz (`sosit_incarcare_at`) → a fuvar `In Curs` lesz,
+  2. 📦 felrakodott (`incarcat_at`),
+  3. 📍 megérkezett a lerakóhoz (`sosit_descarcare_at`),
+  4. ✅ leürített (`descarcat_at`) → a fuvar `Finalizat` lesz.
+- **Szerver-oldali léptetés** (`routes/ordersRest.js` `POST /api/orders/:id/driver-milestone`,
+  Sofer role): a szerver dönti el a KÖVETKEZŐ üres állomást (nem lehet kihagyni /
+  visszajátszani), időbélyeget ír `NOW()`-val, státuszt léptet (első→In Curs,
+  utolsó→Finalizat), tulajdon-ellenőrzött (`company_id` + `email_sofer`), push best-effort.
+- **Migráció** `db/order-driver-milestones.sql` — 4 `TIMESTAMPTZ` oszlop (idempotens,
+  auto-fut). A meglévő status-logika (Alocat/In Curs/Finalizat) érintetlen.
+- **Sofőr-kártya** (`public/sofer.js`): a régi „Elfogadom"/„Elvégeztem" két gombot
+  **egyetlen léptető gomb** váltja (a következő lépés felirata); a kinyíló panel egy
+  **állomás-idővonalat** mutat (✅ kész + időbélyeg / ○ hátralévő). `getMySoferOrders`
+  visszaadja a 4 időbélyeget; `sofer.css` idővonal-stílus; `i18n.js` 7 új `sof.ms.*`
+  kulcs (RO-alap+HU), cache-bust `?v=20260715ms`. DOM-shim harnesszel verifikálva
+  (léptetés + idővonal + Finalizat/Parkolt esetek); **596 Jest zöld**.
+
 ## 2026-07-15 — Fuvar: külön felrakási / lerakási cégnév (feladó / címzett)
 
 - **Új adatmezők:** az `orders` eddig egyetlen cégmezőt tárolt (`client` =

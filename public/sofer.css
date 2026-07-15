@@ -300,6 +300,13 @@
   }
   .fd-copy:active { transform: scale(0.94); box-shadow: none; }
 
+  /* Állomás-idővonal (4 lépés + időbélyeg) */
+  .fd-ms-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; color: var(--sof-muted); }
+  .fd-ms-row.done { color: var(--sof-text); font-weight: 600; }
+  .fd-ms-ico { flex: 0 0 auto; width: 20px; text-align: center; font-size: 13px; }
+  .fd-ms-lbl { flex: 1; min-width: 0; }
+  .fd-ms-time { flex: 0 0 auto; font-size: 12px; color: var(--sof-primary); font-weight: 700; font-variant-numeric: tabular-nums; }
+
   /* Fuvar-kártya akciógombok */
   .fuvar-actions { display: flex; gap: 8px; margin-top: 12px; }
   .sh-btn {

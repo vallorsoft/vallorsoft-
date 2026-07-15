@@ -1135,6 +1135,41 @@ function fmtFuvarDay(v) {
     return d.toLocaleDateString(t('sof.locale'), { year: 'numeric', month: '2-digit', day: '2-digit' });
   } catch (e) { return String(v); }
 }
+// Időbélyeg (állomás visszaigazolás) — hónap.nap óra:perc.
+function fmtFuvarDateTime(v) {
+  if (!v) return '';
+  try {
+    var d = new Date(v);
+    if (isNaN(d.getTime())) return String(v);
+    return d.toLocaleString(t('sof.locale'), { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch (e) { return String(v); }
+}
+
+// A fuvar 4 állomása — EGY gomb lépteti (a szerver dönti el a következőt).
+var MS_STEPS = [
+  { col: 'sosit_incarcare_at',  key: 'sof.ms.arriveLoad' },
+  { col: 'incarcat_at',         key: 'sof.ms.loaded' },
+  { col: 'sosit_descarcare_at', key: 'sof.ms.arriveUnload' },
+  { col: 'descarcat_at',        key: 'sof.ms.unloaded' }
+];
+
+// Egy gombnyomás → a szerver a következő üres állomást rögzíti (időbélyeg),
+// és értesíti az irodát; az utolsónál a fuvar Finalizat lesz.
+function driverMilestone(id) {
+  fetch('/api/orders/' + id + '/driver-milestone', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+  })
+  .then(function (r) { return r.json(); })
+  .then(function (d) {
+    if (d && d.ok) {
+      var lblKey = { arriveLoad: 'sof.ms.arriveLoad', loaded: 'sof.ms.loaded',
+                     arriveUnload: 'sof.ms.arriveUnload', unloaded: 'sof.ms.unloaded' }[d.step];
+      toast('✅ ' + t(lblKey || 'sof.ms.recorded'), 'ok');
+      loadDashOrders();
+    } else { toast((d && d.err) || t('sof.errOccurred'), 'err'); }
+  })
+  .catch(function () { toast(t('sof.errOccurred'), 'err'); });
+}
 
 // Kattintásra a kártya részletei ki-/becsukódnak (felrakás/lerakás + megjegyzés).
 function toggleFuvarDetails(id) {
@@ -1181,10 +1216,15 @@ function renderFuvarCard(o) {
                 : isWh ? (t('sof.statusWarehouse') + (o.handover_loc ? ' @ ' + esc(o.handover_loc) : ''))
                 : esc(o.status || 'Alocat');
   var truck = o.rendszam_camion ? ('🚛 ' + esc(o.rendszam_camion) + (o.rendszam_remorca ? ' / ' + esc(o.rendszam_remorca) : '')) : '';
-  var actionBtn =
-      isAlocat ? '<button class="sh-btn resume"  onclick="driverOrderStatus(\'' + o.id + '\',\'In Curs\')">' + t('sof.accept') + '</button>' :
-      isCurs   ? '<button class="sh-btn confirm" onclick="driverOrderStatus(\'' + o.id + '\',\'Finalizat\')">' + t('sof.complete') + '</button>' :
-                 '';
+  // Állomás-gomb: EGY gomb, ami a következő üres állomást mutatja; a szerver
+  // rögzíti az időbélyeget és lépteti (utolsónál Finalizat). Csak aktív fuvaron.
+  var msNextIdx = -1;
+  for (var _i = 0; _i < MS_STEPS.length; _i++) { if (!o[MS_STEPS[_i].col]) { msNextIdx = _i; break; } }
+  var actionBtn = '';
+  if ((isAlocat || isCurs) && msNextIdx >= 0) {
+    actionBtn = '<button class="sh-btn confirm" onclick="driverMilestone(\'' + o.id + '\')">' +
+                '➜ ' + t(MS_STEPS[msNextIdx].key) + '</button>';
+  }
   // ⛔ Áru leadása (defekt / pótkocsi-csere) — a kérést a diszpécser igazolja vissza
   var hoPending = o.handover_status === 'Fuggoben';
   var hoBtn = '';
@@ -1229,6 +1269,18 @@ function renderFuvarCard(o) {
       (o.ref ? '<div class="fd-sec">' +
         '<div class="fd-sec-h">📝 ' + t('sof.det.note') + '</div>' +
         detRow('sof.det.note', o.ref, 'note') +
+      '</div>' : '') +
+      // Állomás-idővonal: a 4 lépés + időbélyeg (✅ kész / ○ hátra)
+      ((!isParked && !isWh) ? '<div class="fd-sec">' +
+        '<div class="fd-sec-h">🚚 ' + t('sof.ms.progress') + '</div>' +
+        MS_STEPS.map(function (s) {
+          var done = o[s.col];
+          return '<div class="fd-ms-row' + (done ? ' done' : '') + '">' +
+            '<span class="fd-ms-ico">' + (done ? '✅' : '○') + '</span>' +
+            '<span class="fd-ms-lbl">' + t(s.key) + '</span>' +
+            (done ? '<span class="fd-ms-time">' + esc(fmtFuvarDateTime(o[s.col])) + '</span>' : '') +
+          '</div>';
+        }).join('') +
       '</div>' : '') +
     '</div>';
   return '' +
