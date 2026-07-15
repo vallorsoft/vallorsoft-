@@ -448,6 +448,28 @@ function fuvarStep2() {
     document.getElementById('fRemorca').value = first.rendszam_remorca || '';
   }
 
+  // Indulás/érkezés dátum előtöltése a TÉNYLEGES állomás-időből (incarcat_at /
+  // descarcat_at), fallback a fuvar tervezett dátumára (data_incarcare/descarcare).
+  // CSAK a dátumot töltjük (óra 00:00 → a sofőr állítja); üres mezőt nem írunk
+  // felül piszkozat visszatöltésekor. Több fuvar: legkorábbi felrakás / legkésőbbi lerakás.
+  var _ymdOf = function(v){ return v ? String(v).slice(0, 10) : ''; };
+  var loadDates = [], unloadDates = [];
+  selected.forEach(function(o){
+    var l = _ymdOf(o.incarcat_at) || _ymdOf(o.data_incarcare);
+    var u = _ymdOf(o.descarcat_at) || _ymdOf(o.data_descarcare);
+    if (l) loadDates.push(l);
+    if (u) unloadDates.push(u);
+  });
+  var depEl = document.getElementById('fIndulasDt');
+  var arrEl = document.getElementById('fErkezesDt');
+  if (depEl && !depEl.value && loadDates.length) {
+    depEl.value = loadDates.sort()[0] + 'T00:00';           // legkorábbi felrakás
+  }
+  if (arrEl && !arrEl.value && unloadDates.length) {
+    arrEl.value = unloadDates.sort()[unloadDates.length - 1] + 'T00:00';  // legkésőbbi lerakás
+  }
+  if (typeof updateDiurnaPreview === 'function') { try { updateDiurnaPreview(); } catch (e) {} }
+
   document.getElementById('puncteContainer').innerHTML = '';
   punctIdx = 0;
   selected.forEach(function(o) {
@@ -1270,8 +1292,9 @@ function renderFuvarCard(o) {
         '<div class="fd-sec-h">📝 ' + t('sof.det.note') + '</div>' +
         detRow('sof.det.note', o.ref, 'note') +
       '</div>' : '') +
-      // Állomás-idővonal: a 4 lépés + időbélyeg (✅ kész / ○ hátra)
-      ((!isParked && !isWh) ? '<div class="fd-sec">' +
+      // Állomás-idővonal: a 4 lépés + időbélyeg (✅ kész / ○ hátra).
+      // Finalizat fuvarnál CSAK akkor, ha van rögzített állomás (különben üres ○○○○).
+      ((!isParked && !isWh && (isAlocat || isCurs || MS_STEPS.some(function(s){return o[s.col];}))) ? '<div class="fd-sec">' +
         '<div class="fd-sec-h">🚚 ' + t('sof.ms.progress') + '</div>' +
         MS_STEPS.map(function (s) {
           var done = o[s.col];

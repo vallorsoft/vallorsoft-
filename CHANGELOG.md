@@ -14,6 +14,30 @@
 
 ---
 
+## 2026-07-15 — Állomás-visszajelzés kiegészítés: irodai idővonal + menetlevél-előtöltés + kozmetika
+
+Három fejlesztés a sofőr 4 lépéses állomás-visszajelzéséhez (mind kliens-oldali,
+nincs szerver-/séma-változás):
+
+1. **Irodai idővonal** (`public/entity-detail.js`) — az admin/manager **fuvar-adatlap**
+   Áttekintés fülén megjelenik a „🚚 Fuvar állapota (sofőr-visszajelzés)" idővonal:
+   a 4 állomás ✅ + időbélyeggel / ○ hátralévővel. Így a diszpécser egy pillantással
+   látja, hol tart a fuvar (nem csak a röpke push-ból). A `getOrderDetail` `o.*`-ot ad,
+   így az időbélyegek már elérhetők; új `ed.ms.*` i18n kulcsok (RO+HU). Csak aktív
+   fuvaron vagy ha van rögzített állomás jelenik meg.
+2. **Menetlevél-előtöltés** (`public/sofer.js` `fuvarStep2`) — a menetlevél „Út
+   időpontjai" indulás/érkezés mezőjét a rendszer **előtölti a tényleges állomás-
+   dátumból** (`incarcat_at` → indulás, `descarcat_at` → érkezés), fallback a fuvar
+   tervezett `data_incarcare`/`data_descarcare` dátumára. **Csak a dátumot** tölti
+   (óra 00:00 → a sofőr állítja); üres mezőt piszkozat-visszatöltéskor nem ír felül;
+   több fuvarnál a legkorábbi felrakás / legkésőbbi lerakás.
+3. **Kozmetika** (`public/sofer.js`) — a `Finalizat` fuvar kártyáján **CSAK akkor**
+   jelenik meg az állomás-idővonal, ha van rögzített állomás (különben — pl. az admin
+   kézzel zárta le — nem mutat üres `○ ○ ○ ○`-t). Aktív fuvaron továbbra is mindig látszik.
+
+Cache-bust `?v=20260715ofc`. DOM-shim harnesszel verifikálva (idővonal-láthatóság +
+dátum-logika); **596 Jest zöld**.
+
 ## 2026-07-15 — Sofőr: a Finalizat fuvar menetlevél nélkül SOSEM tűnik el
 
 - **Követelmény:** amíg egy fuvarból **nem készült menetlevél**, addig a lezárt
