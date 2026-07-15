@@ -25,10 +25,16 @@
   többé („k" helyett a teljes név, hosszúnál „…" ellipszissel) — a `vs-tb-left`
   `flex:1`+`min-width:0`, a név `text-overflow:ellipsis`; kompaktabb hamburger +
   téma/mód gombok (56→48px), kisebb HU/RO nyelvváltó, alacsonyabb sáv (76→64px).
+- **A fejléc sem lóg ki:** a felső sáv **negatív oldal-margóit nulláztuk** (a `-16px`
+  full-bleed margó a 12px-es padding mellett ~4px-et túlnyúlt a képernyőn kétoldalt → ez
+  volt a fejléc-túllógás egyik oka), a vezérlők kompaktabbak (téma/mód gomb 44px, harang
+  40px, kisebb HU/RO, kisebb térköz), a breadcrumb rugalmasan zsugorodik (ellipszis) →
+  a jobb szélső gomb (☀️) sem lóg ki. NINCS `overflow:hidden` a sávon (különben a
+  harang-értesítő legördülője levágódna).
 - Csak megjelenés, `body.vs-dm` + `@media (max-width:1024px)`, a fájl végén (felülírja
-  a korábbi méreteket). Cache-bust `style.css?v=20260714smaller15`. Headless Chromiummal
-  (393px) verifikálva: „Kezelés" teljesen kiírva, nincs oldalgörgetés, kisebb mezők.
-  596 Jest zöld; a teljes/normál nézet érintetlen.
+  a korábbi méreteket). Cache-bust `style.css?v=20260714hdrfit`. Headless Chromiummal
+  verifikálva: nincs oldalgörgetés (pageOver=0), a ☀️ befér, a hosszú oldalnév „…"-tal
+  csonkol. 596 Jest zöld; a teljes/normál nézet érintetlen.
 
 ## 2026-07-14 — Sofőr mód: teljes szélességű tartalom + vastag fejléc + nagy hamburger-menü
 

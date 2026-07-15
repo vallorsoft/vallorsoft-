@@ -1797,3 +1797,25 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   /* ── Kártya-cím (fuvar-szám) kompaktabb ── */
   body.vs-dm #tblOrders td.vsl-orow-first{ font-size:15px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SOFŐR MÓD — a FEJLÉC sem lóg ki (≤1024px)
+   A felső sáv negatív oldal-margóit nullázzuk (ne nyúljon a képernyőn túlra),
+   a vezérlők kompaktak, a breadcrumb rugalmasan zsugorodik (ellipszis) → minden
+   befér, semmi nem lóg ki a jobb szélen. NINCS overflow:hidden a sávon (különben
+   a harang-értesítő legördülője levágódna). Csak body.vs-dm.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width:1024px){
+  body.vs-dm .vs-topbar{
+    margin-left:0; margin-right:0; max-width:100%; box-sizing:border-box;
+    gap:6px; padding:10px; min-height:60px;
+  }
+  body.vs-dm .vs-tb-left{ flex:1 1 auto; min-width:0; }
+  body.vs-dm .vs-tb-right{ flex:0 0 auto; gap:5px; }
+  body.vs-dm .vs-dm-burger{ width:44px; height:44px; font-size:22px; }
+  body.vs-dm .theme-toggle{ width:44px; height:44px; font-size:20px; }
+  body.vs-dm .vs-bell-btn{ width:40px; height:40px; }
+  body.vs-dm #langSwitch{ gap:3px; }
+  body.vs-dm #langSwitch button{ padding:7px 8px; font-size:12px; border-radius:9px; }
+  body.vs-dm .vs-bread #vsBreadCurrent{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; }
+}
