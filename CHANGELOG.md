@@ -14,6 +14,22 @@
 
 ---
 
+## 2026-07-14 — Sofőr mód: nagyobb ujjbarát méretek ≤1024px-en + tiszta fejléc
+
+- **Gyökérok:** a telefon gyakran **769–1024px logikai szélességen** renderel („asztali
+  nézet" / nagy DPR), ezért a korábbi nagy/érintő-barát méretek (amik `@media
+  max-width:768px`-re szóltak) **nem érvényesültek** a telefonon → minden „kicsinek"
+  tűnt (a kisebb asztali-mód méretek látszottak).
+- **Javítás (`public/style.css`, csak `body.vs-dm` + `@media max-width:1024px`):**
+  - **Nagyobb, ujjbarát űrlapmezők:** input/select/textarea **56px** magas, **17px**
+    betű, nagyobb padding + rádió/checkbox 22px; nagyobb címkék (15.5px, félkövér) és
+    mező-térköz (20px); a gombok **56px**; szakasz-cím 23px. → Kényelmesen kitölthető.
+  - **Tisztább fejléc:** a felső sávban a 🏠 + „›" elrejtve, csak az **aktuális oldalnév**
+    marad (félkövér, nagyobb); a hamburger + téma/mód gombok **50px** (nagy tap-target);
+    a nyelvváltó (HU/RO) nagyobb.
+- Cache-bust `style.css?v=20260714bigfields`. Headless Chromiummal (900px) verifikálva —
+  a mezők/gombok nagyok, a fejléc letisztult. 596 Jest zöld. A teljes/normál nézet érintetlen.
+
 ## 2026-07-14 — Sofőr mód: teljes mobil-barát pass — nincs oldalirányú húzogatás + nagyobb
 
 - **A LAP soha nem lóg ki oldalra** sofőr-módban telefonon (≤1024px): `body.vs-dm` +
