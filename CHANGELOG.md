@@ -14,6 +14,23 @@
 
 ---
 
+## 2026-07-15 — Fix: fuvar-kiírás cím-autocomplete — Nominatim tartalék a Photon mellé
+
+- **Gyökérok:** a fuvar-kiírás felrakó/lerakó cím-mezőjének autocomplete-je
+  KIZÁRÓLAG a publikus `photon.komoot.io`-ra támaszkodott, és a `jsonGet` a
+  nem-OK választ (429 rate-limit / 5xx / blokk / nem-JSON) **csendben `{}`-ra
+  nyelte** → a felület üres találati listát kapott („nem ad találatokat").
+- **Javítás (`lib/mapsProvider.js`):**
+  1. `jsonGet` mostantól **dob** nem-OK HTTP-státusznál (nem nyeli el csendben),
+     így a hívó a tartalékra eshet.
+  2. `_acFree` = **Photon → Nominatim fallback**: ha a Photon hibázik VAGY nem ad
+     találatot, a hívás a **Nominatim** (OSM hivatalos geocoder, RO/HU/MD/BG/RS
+     bias) tartalékra esik; a címkék tiszták (nincs utcanév-duplikáció), lat/lng-t
+     is ad. `_geoFree` (km-becslés geokódolás) ugyanígy Photon→Nominatim.
+  3. A kulcsos HERE/Google út érintetlen (továbbra is elsőbbség, majd ingyenes fallback).
+- Tisztán szerver-oldali, nincs séma-/UI-változás. Mock-fetch harnesszel
+  verifikálva (Photon-leállás → Nominatim találat; Photon-jó út); **596 Jest zöld**.
+
 ## 2026-07-14 — Sofőr mód: ~15%-kal kisebb megjelenítés + letisztult fejléc
 
 - **~15%-kal kisebb** az egész sofőr-mód (a korábbi „nagy" méretek finomítva):
