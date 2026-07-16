@@ -112,6 +112,35 @@
     -webkit-text-fill-color: transparent;
   }
 
+  /* Jobb oldali fejléc-csoport: nyelvváltó + név-jelvény egy sorban */
+  .sofer-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  /* Inline nyelvváltó (a fix/lebegő helyett) — világos, olvasható pill.
+     Magas specificitás (#langSwitch.sofer-lang) az i18n.js injektált
+     sötét alap-stílusa fölé. */
+  .sofer-lang { display: flex; gap: 4px; flex: 0 0 auto; }
+  #langSwitch.sofer-lang button {
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--sof-border);
+    background: #fff;
+    color: var(--sof-muted);
+    font-family: inherit;
+    line-height: 1;
+  }
+  #langSwitch.sofer-lang button.active {
+    background: var(--sof-primary);
+    border-color: var(--sof-primary);
+    color: #fff;
+  }
+
   #meBadge {
     font-size: 11px;
     font-weight: 600;
@@ -120,7 +149,7 @@
     border-radius: 999px;
     padding: 6px 12px;
     color: var(--sof-muted);
-    max-width: 180px;
+    max-width: 130px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -222,6 +251,25 @@
     padding: 0 8px;
     letter-spacing: -0.01em;
   }
+
+  /* ── Havi mini-statisztika (2×2 rács, kompakt) ──
+     FONTOS: a rács OSZTÁLLYAL kap grid-template-columns-t (nem inline
+     stílussal), különben a style.css mobil felülírója
+     ([style*="display:grid"][style*="grid-template-columns"] → 1fr)
+     egyoszloposra törné. Osztályt a felülíró nem talál el. */
+  .sof-mstat-h { font-size: 12px; font-weight: 700; color: var(--sof-muted); margin: 12px 0 8px; }
+  .sof-mstat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .sof-mstat {
+    background: var(--sof-card);
+    border: 1px solid var(--sof-border);
+    border-radius: 12px;
+    padding: 9px 6px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+  }
+  .sof-mstat-ico { font-size: 16px; line-height: 1; }
+  .sof-mstat-val { font-size: 15px; font-weight: 800; margin-top: 3px; line-height: 1.1; }
+  .sof-mstat-lbl { font-size: 9px; font-weight: 600; color: var(--sof-muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.3px; }
 
   /* Kiosztott fuvarok */
   .kiosztott-section { flex-shrink: 0; margin-bottom: 14px; }

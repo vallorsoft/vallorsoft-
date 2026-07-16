@@ -11,9 +11,9 @@
   <meta name="apple-mobile-web-app-title" content="VallorSoft">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
-  <link rel="stylesheet" href="/style.css?v=20260614qa">
+  <link rel="stylesheet" href="/style.css?v=20260716mobfix">
   <script src="/i18n.js?v=20260715ofc"></script>
-  <link rel="stylesheet" href="/sofer.css?v=20260715ms">
+  <link rel="stylesheet" href="/sofer.css?v=20260716mob">
   <script src="/push-client.js?v=20260614qa"></script>
   <script src="/session-guard.js?v=20260614qa"></script>
   <!-- ── Page-scoped prémium világos skin: az inline (hardcodolt sötét) stílusok olvashatóvá tétele.
@@ -142,7 +142,11 @@
   <!-- TOP BAR — logóra kattintva főoldal -->
   <div class="sofer-header">
     <a class="sofer-logo" onclick="goSec('dash')">vallor<span>Soft</span></a>
-    <span id="meBadge">...</span>
+    <div class="sofer-header-right">
+      <!-- Nyelvváltó IDE kerül (inline), így nem lóg rá a névre (fix helyett) -->
+      <div id="langSwitch" class="sofer-lang"></div>
+      <span id="meBadge">...</span>
+    </div>
   </div>
 
   <!-- GDPR adatvédelmi tájékoztató banner (visszaigazolásig) -->
@@ -363,7 +367,7 @@
 </div><!-- /sofer-wrap -->
 
 <script src="/sofer-uit.js?v=20260614qa"></script>
-<script src="/sofer.js?v=20260715ofc"></script>
+<script src="/sofer.js?v=20260716mob"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 
 <!-- ── ÁRU LEADÁSA MODAL (sofőr-kérés — admin visszaigazolja) ── -->

@@ -1088,8 +1088,26 @@ table.resizable th.col-drop-target { box-shadow: inset 3px 0 0 0 var(--brand-red
 .main-content[data-theme="dark"] .vs-tb-kbd{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); }
 .vs-tb-right{ display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
 @media (max-width: 768px){
-  .vs-topbar{ margin: -16px -16px 14px -16px; padding: 10px 14px; gap: 10px; }
-  .vs-tb-kbd{ display: none; } .vs-bread{ font-size: 12.5px; }
+  /* A felső sáv mobilon KÉT sorba tördel, hogy semmi ne lógjon ki / ne
+     takarja egymást: 1. sor = breadcrumb + jobb-oldali gombok (nyelv/mód/
+     téma/értesítés), 2. sor = teljes szélességű kereső. A negatív margó a
+     .main-content 12px-es mobil paddingjához igazítva. */
+  .vs-topbar{
+    flex-wrap: wrap;
+    margin: -12px -12px 14px -12px; padding: 10px 12px;
+    gap: 8px 10px;
+  }
+  .vs-tb-left{ order: 1; flex: 0 1 auto; min-width: 0; overflow: hidden; }
+  .vs-bread{ font-size: 12.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .vs-tb-right{ order: 2; margin-left: auto; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; }
+  .vs-tb-search{ order: 3; flex: 1 0 100%; max-width: none; margin: 0; }
+  .vs-tb-kbd{ display: none; }
+}
+@media (max-width: 380px){
+  /* Nagyon keskeny telefon: a breadcrumb elbújik, hogy a gombok kényelmesen
+     elférjenek (a mob-topbar-ban úgyis ott a logó + hamburger). */
+  .vs-tb-left{ display: none; }
+  .vs-tb-right{ margin-left: 0; width: 100%; justify-content: space-between; }
 }
 
 /* ── Ikonos sidebar (FGO) ── */
