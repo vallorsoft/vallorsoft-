@@ -14,6 +14,26 @@
 
 ---
 
+## 2026-07-16 — FIX: a kézi menetlevél bevétele megjelenik a sofőr statisztikájában
+
+Sofőrre osztás után a menetlevél km/diurna/fogyasztás adatai már megjelentek a
+Sofőrök (stats-drivers) nézetben, DE a **bevétel** (kézi menetlevél `total_pret`)
+nem — mert a per-sofőr bevétel eddig CSAK a fuvarokból (`orders`) számolt. Így a
+menetlevél „bevétele" nem látszott a sofőrnél (miközben az Áttekintés összbevétele
+már tartalmazta — inkonzisztencia).
+
+- **`getDriverStats` (`handlers/statisticsHandlers.js`)** — a menetlevél-oldali
+  aggregáció most a `SUM(f.total_pret)`-et is lekéri (`menetlevel_bevetel`), és a
+  sofőr `bevetel`-éhez adja (a fuvar-bevétel megmarad). Így a Sofőrök nézet a fuvar
+  ÉS a kézi menetlevél bevételét is mutatja, összhangban az Áttekintéssel. A
+  csak-kézi-menetlevéllel rendelkező sofőr is megjelenik a helyes bevétellel.
+- Szerver-only változás (a kliens már a `s.bevetel`-t rajzolja). **596 Jest zöld**
+  + mock-db teszt (fuvar+menetlevél összeg / csak-kézi-menetlevél sofőr).
+
+> **Megjegyzés a dátum-szűrőhöz:** a Statisztika alapból az **utolsó 12 hónapot**
+> mutatja (`data_completare` szerint). Ha egy visszakapott menetlevél ennél régebbi,
+> a dátum-tartományt kézzel kell kitágítani, hogy megjelenjen.
+
 ## 2026-07-16 — Menetlevél átköthető aktuális sofőrre (szerkesztőben) — statisztika-horgony
 
 A visszakapott (törölt sofőrtől származó) menetlevelek a cég Fuvarlevelek oldalán
