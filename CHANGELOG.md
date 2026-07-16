@@ -14,6 +14,26 @@
 
 ---
 
+## 2026-07-16 — Menetlevél átköthető aktuális sofőrre (szerkesztőben) — statisztika-horgony
+
+A visszakapott (törölt sofőrtől származó) menetlevelek a cég Fuvarlevelek oldalán
+megjelennek, de a `nume_sofer`/`email_sofer` a régi (törölt) sofőrre mutatott — így
+nem számítottak egy AKTUÁLIS sofőr statisztikájába. Most a menetlevél-szerkesztőben
+átköthetők:
+
+1. **`fuvarlevelUpdate` (`handlers/documents.js`)** — új `email_sofer` mező: ha a
+   kliens egy sofőrt választ, és az a **saját cég** felhasználója, a menetlevél
+   `email_sofer`-e (a statisztika-/tenant-horgony) átíródik rá; üres/idegen esetén a
+   meglévő marad (COALESCE) → nincs cross-tenant átkötés, és a régi horgony nem vész el.
+2. **Szerkesztő UI (`public/console-shared.js`)** — a sofőr-választó legördülő (eddig
+   csak a kézi „Új menetlevél" módban) most a **szerkesztésnél is** látszik, előre a
+   menetlevél jelenlegi sofőrjére állítva (`fePopulateDriverPicker`); mentéskor a
+   `saveFuvEdit` az `email_sofer`-t is küldi. Így a törölt sofőrtől visszakapott
+   menetlevél egy kattintással egy aktuális sofőrhöz rendelhető, és bekerül annak
+   statisztikájába.
+3. Cache-bust `console-shared.js?v=20260716drvbind`. **596 Jest zöld** + mock-db
+   handler-teszt (érvényes cég-sofőr átköt / üres marad / idegen elutasít).
+
 ## 2026-07-16 — Árva menetlevél helyreállítás bővítése: rendszám-alapú backfill + developer kézi hozzárendelő
 
 Az admin által **kézzel** létrehozott menetlevélnek jellemzően NINCS fuvar-

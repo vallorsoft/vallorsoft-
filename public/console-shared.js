@@ -2183,9 +2183,29 @@ function feApplyMode(mode){
   var pickRow=document.getElementById('feDriverPickRow');
   var pdfBtn=document.getElementById('fePdfBtn');
   var title=document.getElementById('feTitle');
-  if(pickRow) pickRow.style.display=(mode==='create')?'':'none';
+  // A sofőr-választó MINDKÉT módban látszik: create → új menetlevél sofőrje;
+  // edit → a menetlevél átköthető egy aktuális sofőrre (statisztika-horgony),
+  // pl. a törölt sofőrtől visszakapott menetleveleknél.
+  if(pickRow) pickRow.style.display='';
   if(pdfBtn) pdfBtn.style.display=(mode==='create')?'none':'';
   if(title) title.textContent=(mode==='create')?t('fed.createTitle'):t('fed.title');
+}
+
+// Sofőr-választó feltöltése a cég belső sofőrjeiből; a megadott e-mailhez tartozó
+// sofőrt előre kiválasztja (ha szerepel a listában).
+function fePopulateDriverPicker(selectedEmail){
+  var sel=document.getElementById('feDriverPick'); if(!sel) return;
+  var cur=(selectedEmail||'').toString().toLowerCase();
+  sel.innerHTML='<option value="">'+feEsc(t('fed.pickDriverNone'))+'</option>';
+  gas('getInternalDrivers').then(function(list){
+    (list||[]).forEach(function(dv){
+      var o=document.createElement('option');
+      o.value=dv.email||''; o.textContent=dv.nume||dv.email||'—';
+      o.setAttribute('data-nume',dv.nume||'');
+      if(cur && (dv.email||'').toLowerCase()===cur) o.selected=true;
+      sel.appendChild(o);
+    });
+  }).catch(function(){});
 }
 
 // Kézi menetlevél-készítés (Admin/Manager): üres modal + sofőr-választó.
@@ -2201,18 +2221,7 @@ function openFuvCreate(){
   document.getElementById('feAlim').innerHTML='';
   document.getElementById('feAch').innerHTML='';
   // Sofőr-választó feltöltése a cég belső sofőrjeiből.
-  var sel=document.getElementById('feDriverPick');
-  if(sel){
-    sel.innerHTML='<option value="">'+feEsc(t('fed.pickDriverNone'))+'</option>';
-    gas('getInternalDrivers').then(function(list){
-      (list||[]).forEach(function(dv){
-        var o=document.createElement('option');
-        o.value=dv.email||''; o.textContent=dv.nume||dv.email||'—';
-        o.setAttribute('data-nume',dv.nume||'');
-        sel.appendChild(o);
-      });
-    }).catch(function(){});
-  }
+  fePopulateDriverPicker('');
   document.getElementById('fuvEditModal').classList.add('open');
   feSetStaticSg();
   gas('getFuvarlevelFieldSuggestions').then(function(sg){ feSgInit(sg||{}); }).catch(function(){});
@@ -2240,6 +2249,9 @@ function openFuvEdit(id){
     var f=r.fuv;
     feApplyMode('edit');
     document.getElementById('feId').value=f.id;
+    // Sofőr-horgony (email_sofer) + a hozzárendelő legördülő előtöltése.
+    var feEm=document.getElementById('feEmailSofer'); if(feEm) feEm.value=f.email_sofer||'';
+    fePopulateDriverPicker(f.email_sofer||'');
     var feTp=document.getElementById('feTotalPret'); if(feTp) feTp.value=(f.total_pret!=null&&Number(f.total_pret)!==0)?f.total_pret:'';
     document.getElementById('feSeria').textContent=f.numar_fisa||t('cs.noSerial');
     document.getElementById('feNumeSofer').value=f.nume_sofer||'';
@@ -2372,11 +2384,13 @@ function saveFuvEdit(){
     order_ids:(((document.getElementById('feOrderIds')||{}).value)||'').split(',').map(function(s){return s.trim();}).filter(Boolean),
     indulas_date:(document.getElementById('feIndulasDate')||{}).value||null,
     erkezes_date:(document.getElementById('feErkezesDate')||{}).value||null,
+    // Sofőr-horgony (statisztika): a hozzárendelő legördülőből. Create-nél
+    // kötelező-jellegű; edit-nél üresen a meglévő marad (szerver COALESCE).
+    email_sofer:(document.getElementById('feEmailSofer')||{}).value||'',
     puncte:puncte, alimentari:alimentari, achizitii:achizitii
   };
   if(_fuvMode==='create'){
     if(!String(payload.nume_sofer||'').trim()){ toast(t('fed.driverRequired'),'err'); return; }
-    payload.email_sofer=(document.getElementById('feEmailSofer')||{}).value||'';
     gas('fuvarlevelCreate',[payload]).then(function(r){
       if(r&&r.ok){toast(t('fed.created'),'ok');closeFuvEdit();loadReceivedFuvarlevelek();}
       else toast(r&&r.err||'Eroare de server','err');
