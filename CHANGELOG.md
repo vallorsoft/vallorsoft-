@@ -14,6 +14,43 @@
 
 ---
 
+## 2026-07-16 — FIX: belső sofőr törlésekor a menetlevelei/dokumentumai NE vesszenek el
+
+**Gyökérok:** a menetlevél (`fuvarlevelek`) és a sofőr-dokumentum (`documents`)
+eddig CSAK az `email_sofer` → `users.company_id` joinon át kötődött a céghez.
+Amikor egy belső sofőrt (Belső sofőrök fül → `userDelete`) töröltek, a `users`
+sor eltűnt, a join megszakadt → a sofőr menetlevelei/dokumentumai **eltűntek a
+cég nézetéből** (bár fizikailag megmaradtak a táblában). Így lehetett egy cégnek
+0 látható menetlevele, pedig valójában több is volt (pl. `vallorteam23@gmail.com`).
+
+**Javítás — közvetlen `company_id` horgony, ami túléli a sofőr törlését:**
+1. **Migráció `db/fuvarlevelek-documents-company-id.sql`** (idempotens, valós
+   Postgres 16-on verifikálva) — `company_id` oszlop a `fuvarlevelek` + `documents`
+   táblára, visszamenőleges feltöltés két forrásból: (a) a még létező sofőr
+   `users.company_id`-ja (email-egyezés); (b) az **árva** soroknál (törölt sofőr) a
+   hivatkozott fuvar cége (`order_ids[0]` / `documents.order_id` → `orders.company_id`)
+   → a MÁR törölt sofőrök menetlevelei is visszakerülnek a helyes céghez.
+2. **`userDelete` (`handlers/users.js`)** — a `users` sor törlése ELŐTT rögzíti a
+   `company_id`-t a sofőr menetleveleire/dokumentumaira (best-effort) → jövőbeli
+   törlésnél sem veszik el semmi.
+3. **Beszúrás-horgonyzás** — minden új menetlevél/dokumentum eleve kap `company_id`-t:
+   `routes/soferApi.js` (`fuvarlevel-save`, `doc-upload`), `handlers/documents.js`
+   (`fuvarlevelCreate`).
+4. **Olvasás-oldal `company_id`-tudatos** (elsődleges `company_id`, fallback a régi
+   email-join): `getFuvarlevelek`, `getFuvarlevelDetail`, `fuvarlevelUpdate`,
+   `getOrdersMissingWaybill`, `getDriverDocs` (`handlers/documents.js`);
+   `getLastVehicleReadings` (`handlers/orders.js`); a **statisztika** közös
+   `FUV_FROM` blokkja (`handlers/statisticsHandlers.js`) → minden riport egyszerre;
+   PDF/dok letöltés (`routes/soferApi.js`); developer cég-összesítő + export
+   (`handlers/developer.js`, `routes/developer-export.js`).
+5. **Teszt** — `documents.test.js` frissítve (üres user-listánál is lekérdez a
+   `company_id`-horgony miatt). **596 Jest zöld**; a recovery valós Postgres-en
+   verifikálva (árva menetlevelek visszakerülnek a céghez, idempotens újrafuttatás).
+
+> **Megjegyzés:** egy **fuvar nélküli** menetlevél (`order_ids` üres) egy MÁR törölt
+> sofőrtől nem állítható vissza automatikusan (nincs cég-jel a soron); az újak és a
+> törlés-előtti horgonyzás viszont ezt is lefedik a jövőre nézve.
+
 ## 2026-07-16 — Menetlevél-automatizáció: km-óra átvitel + hiányzó menetlevél lista + fogyasztási anomália-jelző
 
 Három, a meglévő adatra épülő automatizálás (nincs séma-változás). **596 Jest zöld**

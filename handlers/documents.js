@@ -162,12 +162,13 @@ handlers.getFuvarlevelek = async function (req, res, args) {
           'SELECT email FROM users WHERE company_id = $1', [cid]
         );
         const emails = sofors.rows.map(u => u.email);
-        if (!emails.length) return res.json({ result: [] });
+        // A cég menetlevelei: elsődlegesen company_id szerint (túléli a sofőr
+        // törlését), fallback a régi email-egyezés (még nem horgonyzott sorok).
         r = await pool.query(
           `SELECT id, file_name, numar_fisa, email_sofer, nume_sofer, data_completare, total_km, consum_100, numar_camion, order_ids
-           FROM fuvarlevelek WHERE email_sofer = ANY($1)
+           FROM fuvarlevelek WHERE company_id = $2 OR email_sofer = ANY($1)
            ORDER BY data_completare DESC LIMIT 200`,
-          [emails]
+          [emails, cid]
         );
       } else {
         r = await pool.query(
@@ -236,7 +237,7 @@ handlers.getOrdersMissingWaybill = async function (req, res, args) {
          WHERE o.company_id = $1 AND o.status = 'Finalizat'
            AND NOT EXISTS (
              SELECT 1 FROM fuvarlevelek f
-             WHERE f.email_sofer IN (SELECT email FROM users WHERE company_id = $1)
+             WHERE (f.company_id = $1 OR f.email_sofer IN (SELECT email FROM users WHERE company_id = $1))
                AND f.order_ids @> to_jsonb(o.id::text)
            )
          ORDER BY COALESCE(o.finalized_at, o.data_descarcare) DESC NULLS LAST
@@ -260,7 +261,7 @@ handlers.getFuvarlevelDetail = async function (req, res, args) {
       // Csak a saját cég sofőrjeinek menetlevele érhető el.
       const r = await pool.query(
         `SELECT * FROM fuvarlevelek
-         WHERE id = $1 AND email_sofer IN (SELECT email FROM users WHERE company_id = $2)`,
+         WHERE id = $1 AND (company_id = $2 OR email_sofer IN (SELECT email FROM users WHERE company_id = $2))`,
         [id, me.company_id]
       );
       if (!r.rows.length) return res.json({ result: { ok: false, err: 'Nu a fost gasit' } });
@@ -284,7 +285,7 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
 
       // Jogosultság + létezés: csak saját cég menetlevele.
       const own = await pool.query(
-        `SELECT id FROM fuvarlevelek WHERE id = $1 AND email_sofer IN (SELECT email FROM users WHERE company_id = $2)`,
+        `SELECT id FROM fuvarlevelek WHERE id = $1 AND (company_id = $2 OR email_sofer IN (SELECT email FROM users WHERE company_id = $2))`,
         [id, me.company_id]
       );
       if (!own.rows.length) return res.json({ result: { ok: false, err: 'Nu a fost gasit / acces interzis' } });
@@ -474,9 +475,9 @@ handlers.fuvarlevelCreate = async function (req, res, args) {
           diurna_externa, diurna_interna,
           cant_inceput, cant_sfarsit, motorina_folosit, total_alim, consum_100,
           alte_mentiuni, alimentari, achizitii, puncte, order_ids,
-          data_completare, indulas_dt, erkezes_dt, total_pret
+          data_completare, indulas_dt, erkezes_dt, total_pret, company_id
         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
-          COALESCE($23::timestamp, NOW()),$24,$25,$26)`,
+          COALESCE($23::timestamp, NOW()),$24,$25,$26,$27)`,
         [
           id, fileName, emailSofer, numeSofer,
           d.numar_camion || null, d.numar_remorca || null, autoDocNumber,
@@ -486,7 +487,8 @@ handlers.fuvarlevelCreate = async function (req, res, args) {
           d.alte_mentiuni || null,
           JSON.stringify(alimentari), JSON.stringify(achizitii), JSON.stringify(puncte),
           JSON.stringify(orderIds),
-          dataCompletare, indulasDt, erkezesDt, totalPret
+          dataCompletare, indulasDt, erkezesDt, totalPret,
+          cid   // company_id horgony — túléli a sofőr törlését
         ]
       );
       return res.json({ result: { ok: true, id, docNumber: autoDocNumber, total_km: totalKm, consum_100: consum100 } });
@@ -578,7 +580,7 @@ handlers.getDriverDocs = async function (req, res, args) {
       const cid = req.session.user.company_id;
       const isAdmin = ['Admin', 'Manager'].includes(req.session.user.pozicio);
       const r = isAdmin
-        ? await pool.query('SELECT d.id, d.email_sofer, d.nume_sofer, d.tip, d.file_name, d.order_id, d.created_at FROM documents d JOIN users u ON u.email = d.email_sofer WHERE u.company_id = $1 ORDER BY d.created_at DESC LIMIT 200', [cid])
+        ? await pool.query('SELECT d.id, d.email_sofer, d.nume_sofer, d.tip, d.file_name, d.order_id, d.created_at FROM documents d WHERE d.company_id = $1 OR d.email_sofer IN (SELECT email FROM users WHERE company_id = $1) ORDER BY d.created_at DESC LIMIT 200', [cid])
         : await pool.query('SELECT id, email_sofer, nume_sofer, tip, file_name, order_id, created_at FROM documents WHERE email_sofer = $1 ORDER BY created_at DESC LIMIT 200', [req.session.user.email]);
       return res.json({ result: r.rows });
     } catch (err) {

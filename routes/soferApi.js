@@ -142,8 +142,8 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
         diurna_externa, diurna_interna,
         cant_inceput, cant_sfarsit, motorina_folosit, total_alim, consum_100,
         alte_mentiuni, alimentari, achizitii, tranzite, puncte, order_ids,
-        indulas_dt, erkezes_dt, hataratok
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)`,
+        indulas_dt, erkezes_dt, hataratok, company_id
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)`,
       [
         id, fileName, req.session.user.email, req.session.user.nume,
         d.numarCamion || null, d.numarRemorca || null, autoDocNumber || d.numarFisa || null, d.cursaSaptamanii || null,
@@ -159,7 +159,8 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
         JSON.stringify(orderIds),
         indulasDt ? new Date(indulasDt) : null,
         erkezesDt ? new Date(erkezesDt) : null,
-        JSON.stringify(hataratok)
+        JSON.stringify(hataratok),
+        cid   // company_id horgony — túléli a sofőr törlését
       ]
     );
     res.json({ success: true, id, docNumber: autoDocNumber });
@@ -183,15 +184,16 @@ router.post('/api/doc-upload', async (req, res) => {
       if (oc.rows.length) safeOrderId = oc.rows[0].id;
     }
     await pool.query(
-      `INSERT INTO documents (email_sofer, nume_sofer, tip, file_name, storage_url, order_id)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO documents (email_sofer, nume_sofer, tip, file_name, storage_url, order_id, company_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         req.session.user.email,
         req.session.user.nume,
         tip || 'CMR',
         numeFisier || 'dokument',
         base64 || null,
-        safeOrderId
+        safeOrderId,
+        req.session.user.company_id || null   // company_id horgony — túléli a sofőr törlését
       ]
     );
     res.json({ success: true });
@@ -217,8 +219,8 @@ router.get('/api/doc-download/:id', async (req, res) => {
     const r = await pool.query(
       `SELECT d.id, d.file_name, d.tip, d.storage_url
        FROM documents d
-       JOIN users u ON u.email = d.email_sofer
-       WHERE d.id = $1 AND u.company_id = $2${ownClause}`,
+       WHERE d.id = $1
+         AND (d.company_id = $2 OR d.email_sofer IN (SELECT email FROM users WHERE company_id = $2))${ownClause}`,
       params
     );
     if (!r.rows.length) return res.status(404).send('Nu a fost gasit');
@@ -277,7 +279,8 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       `SELECT f.*, c.nev AS company_denumire
        FROM fuvarlevelek f
        JOIN companies c ON c.id = $2
-       WHERE f.id = $1 AND f.email_sofer IN (SELECT email FROM users WHERE company_id = $2)${ownClause}`,
+       WHERE f.id = $1
+         AND (f.company_id = $2 OR f.email_sofer IN (SELECT email FROM users WHERE company_id = $2))${ownClause}`,
       params
     );
     if (!r.rows.length) return res.status(404).send('Nu a fost gasit.');

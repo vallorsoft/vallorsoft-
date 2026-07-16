@@ -228,6 +228,22 @@ handlers.userDelete = async function (req, res, args) {
         }
       }
 
+      // 🛟 ADATVÉDELEM: a törölt sofőr menetlevelei/dokumentumai NE vesszenek el.
+      // Mielőtt a users sort töröljük (amivel az email→company_id join megszakadna),
+      // rögzítjük a company_id-t a hozzá tartozó rekordokra, hogy a cég-nézet a
+      // törlés után is megtalálja őket (best-effort — nem buktatja a törlést).
+      try {
+        const cid = req.session.user.company_id;
+        await pool.query(
+          'UPDATE fuvarlevelek SET company_id = $2 WHERE LOWER(email_sofer) = $1 AND company_id IS NULL',
+          [targetEmail, cid]);
+        await pool.query(
+          'UPDATE documents SET company_id = $2 WHERE LOWER(email_sofer) = $1 AND company_id IS NULL',
+          [targetEmail, cid]);
+      } catch (stampErr) {
+        console.error('company_id rögzítés törlés előtt (a törlés folytatódik):', stampErr.message);
+      }
+
       const r = await pool.query('DELETE FROM users WHERE email = $1 AND company_id = $2', [targetEmail, req.session.user.company_id]);
       if (r.rowCount === 0) {
         return res.json({ result: { ok: false, err: 'Utilizatorul nu a fost gasit.' } });

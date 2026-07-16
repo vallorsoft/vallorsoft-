@@ -190,12 +190,17 @@ describe('getFuvarlevelek', () => {
     expect(pool.query.mock.calls[1][1][0]).toEqual(['a@a.hu', 'b@b.hu']);
   });
 
-  test('Admin, üres user-lista → üres eredmény, nincs 2. hívás', async () => {
+  test('Admin, üres user-lista → a company_id horgony miatt is lekérdez (törölt sofőr menetlevele)', async () => {
     setUser(ADMIN);
-    pool.query.mockResolvedValueOnce(rows([]));
+    pool.query
+      .mockResolvedValueOnce(rows([]))   // sofőr-emailek: üres (pl. minden sofőr törölve)
+      .mockResolvedValueOnce(rows([]));  // menetlevelek: company_id-re szűrve
     const res = await call('getFuvarlevelek', []);
     expect(res.body.result).toEqual([]);
-    expect(pool.query).toHaveBeenCalledTimes(1);
+    // A 2. lekérdezés ekkor is lefut (company_id = cég), hogy a törölt sofőrök
+    // menetlevelei ne vesszenek el; a 2. hívás paramétere [emails, company_id].
+    expect(pool.query).toHaveBeenCalledTimes(2);
+    expect(pool.query.mock.calls[1][1][1]).toBe(ADMIN.company_id);
   });
 });
 
