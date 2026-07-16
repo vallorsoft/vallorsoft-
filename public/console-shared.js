@@ -2052,13 +2052,27 @@ function resetOrderColumns(){
   loadOrders();   // kanonikus újrarenderelés + friss enhance a természetes szélességekből
 }
 
+// Fogyasztási anomália-badge (üzemanyag-lopás gyanú): a szerver adja a
+// consum_anomaly ('high'/'low') + consum_dev_pct + fuel_baseline mezőket.
+function fuvAnomalyBadge(f){
+  if(!f || !f.consum_anomaly) return '';
+  var high=f.consum_anomaly==='high';
+  var col=high?'#ef4444':'#3b82f6';
+  var bg=high?'rgba(239,68,68,0.14)':'rgba(59,130,246,0.14)';
+  var arrow=high?'▲':'▼';
+  var pct=(f.consum_dev_pct>0?'+':'')+f.consum_dev_pct+'%';
+  var title=t('cs.anomTitle',{c:(Number(f.consum_100)||0),b:(Number(f.fuel_baseline)||0)});
+  return ' <span title="'+esc(title)+'" style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;color:'+col+';background:'+bg+';white-space:nowrap;">⚠️ '+arrow+' '+esc(pct)+'</span>';
+}
+
 function loadReceivedFuvarlevelek(){
+  loadMissingWaybills();
   gas('getFuvarlevelek').then(list=>{
     var tb=document.querySelector('#tblReceivedFuv tbody');
     if(!list||list.length===0){tb.innerHTML='<tr><td colspan="5">'+t('cs.noWaybills')+'</td></tr>';return;}
     tb.innerHTML=list.map(f=>`<tr>`
       +`<td><b style="color:#6366f1;">${esc(f.numar_fisa||'—')}</b></td>`
-      +`<td><b style="color:var(--text-primary);">${esc(f.file_name||'—')}</b></td>`
+      +`<td><b style="color:var(--text-primary);">${esc(f.file_name||'—')}</b>${fuvAnomalyBadge(f)}</td>`
       +`<td>${esc(f.nume_sofer||f.email_sofer||'—')}</td>`
       +`<td>${f.data_completare?new Date(f.data_completare).toLocaleString('hu-HU'):'—'}</td>`
       +`<td style="display:flex;gap:6px;flex-wrap:wrap;">`
@@ -2066,6 +2080,31 @@ function loadReceivedFuvarlevelek(){
         +`<button class="btn primary" style="padding:5px 10px;" onclick="openFuvEdit('${f.id}')">${t('cs.editLong')}</button>`
       +`</td></tr>`).join('');
   });
+}
+
+// Hiányzó menetlevél teendő-sáv: lezárt (Finalizat) fuvarok, amikhez még nincs
+// menetlevél. Kattintható lista — a fuvar-számra kattintva a szerkesztő nyílik.
+function loadMissingWaybills(){
+  var band=document.getElementById('missingWaybillBand');
+  if(!band) return;
+  gas('getOrdersMissingWaybill').then(r=>{
+    if(!r||!r.ok||!Array.isArray(r.orders)||!r.orders.length){ band.style.display='none'; band.innerHTML=''; return; }
+    var items=r.orders.map(function(o){
+      var no=o.fuvar_no||o.id;
+      var route=esc(o.loc_incarcare||'—')+' → '+esc(o.loc_descarcare||'—');
+      var drv=o.nume_sofer?(' · '+esc(o.nume_sofer)):'';
+      var when=o.closed_at?(' · '+new Date(o.closed_at).toLocaleDateString('hu-HU')):'';
+      return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-top:1px solid rgba(245,158,11,0.18);">'
+        +'<b style="color:#f59e0b;">'+esc(no)+'</b>'
+        +'<span style="color:var(--text-muted);font-size:12px;">'+esc(o.client||'—')+' · '+route+drv+when+'</span>'
+        +'</div>';
+    }).join('');
+    band.innerHTML='<div style="border:1px solid rgba(245,158,11,0.45);background:linear-gradient(180deg,rgba(245,158,11,0.10),rgba(245,158,11,0.04));border-radius:14px;padding:12px 16px;">'
+      +'<div style="font-weight:700;color:#f59e0b;margin-bottom:2px;">⚠️ '+t('cs.missingWbTitle',{n:r.orders.length})+'</div>'
+      +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">'+t('cs.missingWbHint')+'</div>'
+      +items+'</div>';
+    band.style.display='';
+  }).catch(function(){ band.style.display='none'; });
 }
 
 // ===== Menetlevél PDF in-app nézet (web + PWA: NEM új lap, hanem iframe modal) =====

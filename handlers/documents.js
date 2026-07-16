@@ -164,23 +164,88 @@ handlers.getFuvarlevelek = async function (req, res, args) {
         const emails = sofors.rows.map(u => u.email);
         if (!emails.length) return res.json({ result: [] });
         r = await pool.query(
-          `SELECT id, file_name, numar_fisa, email_sofer, nume_sofer, data_completare, total_km, consum_100, order_ids
+          `SELECT id, file_name, numar_fisa, email_sofer, nume_sofer, data_completare, total_km, consum_100, numar_camion, order_ids
            FROM fuvarlevelek WHERE email_sofer = ANY($1)
            ORDER BY data_completare DESC LIMIT 200`,
           [emails]
         );
       } else {
         r = await pool.query(
-          `SELECT id, file_name, numar_fisa, email_sofer, nume_sofer, data_completare, total_km, consum_100, order_ids
+          `SELECT id, file_name, numar_fisa, email_sofer, nume_sofer, data_completare, total_km, consum_100, numar_camion, order_ids
            FROM fuvarlevelek WHERE email_sofer = $1
            ORDER BY data_completare DESC LIMIT 200`,
           [me.email]
         );
       }
-      return res.json({ result: r.rows });
+
+      // Fogyasztási anomália-jelző (üzemanyag-lopás gyanú): a menetlevél
+      // tényleges consum_100-ját a jármű alap-fogyasztásához (vehicles.fuel_per_100km,
+      // rendszám szerint) hasonlítjuk. >25% eltérésnél 'high' (▲ túlfogyasztás) /
+      // 'low' (▼ alulfogyasztás). Csak Admin/Manager listáján számolunk; ha nincs
+      // alapérték vagy consum, nincs jelző. A rendszám normalizálva illeszkedik.
+      const rows = r.rows;
+      if (isAdmin && cid && rows.length) {
+        try {
+          const vh = await pool.query(
+            `SELECT rendszam, fuel_per_100km FROM vehicles
+             WHERE company_id = $1 AND fuel_per_100km IS NOT NULL AND fuel_per_100km > 0`, [cid]);
+          const norm = (s) => String(s == null ? '' : s).toUpperCase().replace(/[^A-Z0-9]/g, '');
+          const base = {};
+          vh.rows.forEach(v => { const k = norm(v.rendszam); if (k) base[k] = Number(v.fuel_per_100km); });
+          const TH = 0.25;
+          rows.forEach(f => {
+            const b = base[norm(f.numar_camion)];
+            const c = Number(f.consum_100);
+            f.fuel_baseline = (b != null && isFinite(b)) ? b : null;
+            f.consum_anomaly = null; f.consum_dev_pct = null;
+            if (b && b > 0 && isFinite(c) && c > 0) {
+              const dev = (c - b) / b;
+              if (Math.abs(dev) >= TH) {
+                f.consum_anomaly = dev > 0 ? 'high' : 'low';
+                f.consum_dev_pct = Math.round(dev * 100);
+              }
+            }
+          });
+        } catch (anomErr) {
+          console.error('consum anomália számítás hiba (a lista folytatódik):', anomErr.message);
+        }
+      }
+      return res.json({ result: rows });
     } catch (err) {
       console.error('getFuvarlevelek hiba:', err);
       return res.json({ result: [] });
+    }
+  };
+
+// ─── Hiányzó menetlevél teendőlista (Admin/Manager) ───
+// Azok a LEZÁRT (Finalizat) fuvarok, amelyekhez még EGYETLEN menetlevél sem
+// készült (a fuvar id-ja egyetlen menetlevél order_ids tömbjében sem szerepel).
+// Cégre szűrt, csak olvasás — a manager egy pillantással látja, kit kell nógatni.
+handlers.getOrdersMissingWaybill = async function (req, res, args) {
+    try {
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
+      const me = req.session.user;
+      if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+      const cid = me.company_id;
+      if (!cid) return res.json({ result: { ok: true, orders: [] } });
+      const r = await pool.query(
+        `SELECT o.id, o.fuvar_no, o.client, o.loc_incarcare, o.loc_descarcare,
+                o.rendszam_camion, o.nume_sofer, o.email_sofer,
+                COALESCE(o.finalized_at, o.data_descarcare) AS closed_at
+         FROM orders o
+         WHERE o.company_id = $1 AND o.status = 'Finalizat'
+           AND NOT EXISTS (
+             SELECT 1 FROM fuvarlevelek f
+             WHERE f.email_sofer IN (SELECT email FROM users WHERE company_id = $1)
+               AND f.order_ids @> to_jsonb(o.id::text)
+           )
+         ORDER BY COALESCE(o.finalized_at, o.data_descarcare) DESC NULLS LAST
+         LIMIT 100`,
+        [cid]);
+      return res.json({ result: { ok: true, orders: r.rows } });
+    } catch (err) {
+      console.error('getOrdersMissingWaybill hiba:', err);
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 
