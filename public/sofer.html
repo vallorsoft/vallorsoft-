@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260715ofc"></script>
+  <script src="/i18n.js?v=20260716noord"></script>
   <link rel="stylesheet" href="/sofer.css?v=20260716mob">
   <script src="/push-client.js?v=20260614qa"></script>
   <script src="/session-guard.js?v=20260614qa"></script>
@@ -229,6 +229,10 @@
       <button class="submit-btn" onclick="fuvarStep2()" style="margin-top:16px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;" data-i18n="sofer.nextFill">
         Tovább → Menetlevél kitöltése
       </button>
+      <!-- Menetlevél kiválasztott fuvar nélkül -->
+      <button class="submit-btn" onclick="fuvarNoOrder()" style="margin-top:10px;background:var(--bg-2);border:1px solid var(--border);color:var(--soft);" data-i18n="sof.noOrderWaybill">
+        ➕ Menetlevél fuvar nélkül
+      </button>
     </div>
 
     <!-- 2. LÉPÉS: Menetlevél kitöltés -->
@@ -367,7 +371,7 @@
 </div><!-- /sofer-wrap -->
 
 <script src="/sofer-uit.js?v=20260614qa"></script>
-<script src="/sofer.js?v=20260716mob"></script>
+<script src="/sofer.js?v=20260716noord"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 
 <!-- ── ÁRU LEADÁSA MODAL (sofőr-kérés — admin visszaigazolja) ── -->

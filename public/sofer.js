@@ -433,14 +433,29 @@ function toggleOrderSel(cb) {
   }
 }
 
-function fuvarStep2() {
-  if (!_selectedOrderIds.length) { toast(t('sof.pickAtLeastOne'), 'err'); return; }
+// Menetlevél kiválasztott fuvar nélkül: a sofőr üres fuvar-listával lép a
+// kitöltő lépésre (pl. üres/tervezés-alatti fuvar, magánmenet). A kézi
+// beírt km/rendszám/pont adatokból készül a menetlevél; a szerver üres
+// order_ids-t elfogad, a statisztika a sofőr e-mailjéhez kötődik.
+function fuvarNoOrder() {
+  _selectedOrderIds = [];
+  fuvarStep2(true);
+}
+
+function fuvarStep2(allowEmpty) {
+  // allowEmpty === true → kiválasztott fuvar nélkül is folytatható (a „fuvar
+  // nélküli menetlevél" úton); egyébként legalább egy fuvar kell.
+  if (!_selectedOrderIds.length && allowEmpty !== true) { toast(t('sof.pickAtLeastOne'), 'err'); return; }
   var selected = _soferOrdersCache.filter(function(o) { return _selectedOrderIds.indexOf(o.id) !== -1; });
   var sumEl = document.getElementById('selectedOrdersSummary');
+  if (!selected.length) {
+    sumEl.innerHTML = '<b style="color:#fff;">' + t('sof.noOrderSummary') + '</b>';
+  } else {
   sumEl.innerHTML = '<b style="color:#fff;">✅ ' + t('sof.selectedOrders', { n: selected.length }) + '</b><br>'
     + selected.map(function(o) {
         return '• ' + esc(o.client || '—') + ': ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—');
       }).join('<br>');
+  }
 
   var first = selected[0];
   if (first && first.rendszam_camion) {
