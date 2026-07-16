@@ -7,6 +7,7 @@
 const pool = require('../db');
 const { genDocId } = require('../lib/ids');
 const { calculateDiurna } = require('../lib/diurna');
+const audit = require('../lib/audit');
 
 const handlers = {};
 
@@ -246,6 +247,73 @@ handlers.getOrdersMissingWaybill = async function (req, res, args) {
       return res.json({ result: { ok: true, orders: r.rows } });
     } catch (err) {
       console.error('getOrdersMissingWaybill hiba:', err);
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
+    }
+  };
+
+// ─── Menetlevélben szereplő sofőrök (a statisztika-„szellemek" feltárása) ───
+// A cég menetleveleiben előforduló sofőr-emailek + név + darabszám, jelezve, hogy
+// az email MÉG aktuális cég-felhasználó-e (is_current). A törölt sofőr menetlevelei
+// (company_id-horgonnyal helyreállítva) itt „szellemként" (is_current=false)
+// jelennek meg → a statisztikában is külön soron látszanak; innen átrendelhetők.
+handlers.getWaybillDrivers = async function (req, res) {
+    try {
+      if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
+      }
+      const cid = req.session.user.company_id;
+      if (!cid) return res.json({ result: { ok: true, drivers: [], current: [] } });
+      const r = await pool.query(
+        `SELECT LOWER(f.email_sofer) AS email, MAX(f.nume_sofer) AS nume, COUNT(*)::int AS db,
+                EXISTS(SELECT 1 FROM users u WHERE LOWER(u.email)=LOWER(f.email_sofer) AND u.company_id=$1) AS is_current
+         FROM fuvarlevelek f
+         WHERE (f.company_id=$1 OR LOWER(f.email_sofer) IN (SELECT LOWER(email) FROM users WHERE company_id=$1))
+           AND COALESCE(f.email_sofer,'')<>''
+         GROUP BY LOWER(f.email_sofer)
+         ORDER BY is_current, nume`, [cid]);
+      const cur = await pool.query(
+        `SELECT nume, email FROM users WHERE company_id=$1 AND pozicio='Sofer' ORDER BY nume`, [cid]);
+      return res.json({ result: { ok: true, drivers: r.rows, current: cur.rows } });
+    } catch (err) {
+      console.error('getWaybillDrivers hiba:', err);
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
+    }
+  };
+
+// ─── Egy (régi/törölt) sofőr ÖSSZES menetlevelének átrendelése egy aktuális sofőrre ───
+// A statisztika ekkor a cél-sofőrhöz sorolja őket (email szerint csoportosít), és a
+// régi „szellem" eltűnik. A cél sofőr a SAJÁT cég felhasználója kell legyen; csak a
+// cég menetleveleit/dokumentumait érinti (company_id-horgony vagy cég-user email).
+handlers.reassignDriverWaybills = async function (req, res, args) {
+    try {
+      if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
+      }
+      const cid = req.session.user.company_id;
+      const fromEmail = String((args && args[0]) || '').trim().toLowerCase();
+      const toEmail   = String((args && args[1]) || '').trim().toLowerCase();
+      if (!cid || !fromEmail || !toEmail) return res.json({ result: { ok: false, err: 'Parametri lipsa' } });
+      if (fromEmail === toEmail) return res.json({ result: { ok: false, err: 'Aceeasi persoana' } });
+      // A cél sofőr a saját cég felhasználója legyen (statisztika-horgony).
+      const ur = await pool.query(
+        `SELECT email, nume FROM users WHERE LOWER(email)=$1 AND company_id=$2 LIMIT 1`, [toEmail, cid]);
+      if (!ur.rows.length) return res.json({ result: { ok: false, err: 'Soferul destinatie nu a fost gasit in companie' } });
+      const canonEmail = ur.rows[0].email, canonNume = ur.rows[0].nume;
+      const r = await pool.query(
+        `UPDATE fuvarlevelek SET email_sofer=$3, nume_sofer=$4
+         WHERE LOWER(email_sofer)=$1
+           AND (company_id=$2 OR LOWER(email_sofer) IN (SELECT LOWER(email) FROM users WHERE company_id=$2))`,
+        [fromEmail, cid, canonEmail, canonNume]);
+      // A hozzá tartozó feltöltött dokumentumok (POD) is átkötve — cégen belül.
+      await pool.query(
+        `UPDATE documents SET email_sofer=$3
+         WHERE LOWER(email_sofer)=$1
+           AND (company_id=$2 OR LOWER(email_sofer) IN (SELECT LOWER(email) FROM users WHERE company_id=$2))`,
+        [fromEmail, cid, canonEmail]).catch(() => {});
+      try { await audit.fromReq(req, 'waybill.reassign_driver', 'fuvarlevel', null, { from: fromEmail, to: canonEmail, moved: r.rowCount }); } catch (_) {}
+      return res.json({ result: { ok: true, moved: r.rowCount } });
+    } catch (err) {
+      console.error('reassignDriverWaybills hiba:', err);
       return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
