@@ -265,7 +265,7 @@ async function computeServiceDueAlerts(cid, opts) {
                 WHERE COALESCE(f.numar_camion,'') <> ''
                   AND UPPER(REGEXP_REPLACE(f.numar_camion,'[^A-Za-z0-9]','','g'))
                       = UPPER(REGEXP_REPLACE(ls.rendszam,'[^A-Za-z0-9]','','g'))
-                  AND (ls.service_date IS NULL OR f.data_completare >= ls.service_date)
+                  AND (ls.service_date IS NULL OR COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) >= ls.service_date)
               ) AS driven_since
        FROM last_srv ls
        LEFT JOIN last_km lk
@@ -455,11 +455,11 @@ handlers.getDriverSettlement = async function (req, res, args) {
        FROM (
          SELECT a.elem->>'plata' AS plata, (a.elem->>'suma')::numeric AS osszeg
          FROM fuvarlevelek f, jsonb_array_elements(f.alimentari) a(elem)
-         WHERE LOWER(f.email_sofer)=$1 AND f.data_completare >= $2::date AND f.data_completare < ($3::date + 1)
+         WHERE LOWER(f.email_sofer)=$1 AND COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) >= $2::date AND COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) < ($3::date + 1)
          UNION ALL
          SELECT c.elem->>'plata', (c.elem->>'pret')::numeric
          FROM fuvarlevelek f, jsonb_array_elements(f.achizitii) c(elem)
-         WHERE LOWER(f.email_sofer)=$1 AND f.data_completare >= $2::date AND f.data_completare < ($3::date + 1)
+         WHERE LOWER(f.email_sofer)=$1 AND COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) >= $2::date AND COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) < ($3::date + 1)
        ) x
        GROUP BY 1 ORDER BY osszeg DESC NULLS LAST`,
       [email, from, to]
@@ -472,7 +472,7 @@ handlers.getDriverSettlement = async function (req, res, args) {
               COALESCE(SUM(total_km),0)::numeric AS km,
               COUNT(*)::int AS menetlevelek
        FROM fuvarlevelek
-       WHERE LOWER(email_sofer)=$1 AND data_completare >= $2::date AND data_completare < ($3::date + 1)`,
+       WHERE LOWER(email_sofer)=$1 AND COALESCE(erkezes_dt, indulas_dt, data_completare) >= $2::date AND COALESCE(erkezes_dt, indulas_dt, data_completare) < ($3::date + 1)`,
       [email, from, to]
     );
 
@@ -594,7 +594,7 @@ handlers.fuelCompare = async function (req, res, args) {
        FROM fuvarlevelek f
        JOIN users u ON LOWER(u.email)=LOWER(f.email_sofer) AND u.company_id=$1,
             jsonb_array_elements(f.alimentari) a(elem)
-       WHERE f.data_completare >= $2::date AND f.data_completare < ($3::date + 1)
+       WHERE COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) >= $2::date AND COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) < ($3::date + 1)
          AND COALESCE(a.elem->>'tip','Motorină') <> 'AdBlue'
          AND COALESCE(f.numar_camion,'') <> ''
        GROUP BY 1`, [cid, from, to]);
@@ -644,7 +644,7 @@ handlers.getGpsKmComparison = async function (req, res, args) {
               COALESCE(SUM(f.total_km),0)::numeric AS drv_km
        FROM fuvarlevelek f
        JOIN users u ON LOWER(u.email)=LOWER(f.email_sofer) AND u.company_id=$1
-       WHERE f.data_completare >= $2::date AND f.data_completare < ($3::date + 1)
+       WHERE COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) >= $2::date AND COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) < ($3::date + 1)
          AND COALESCE(f.numar_camion,'') <> ''
        GROUP BY 1`, [cid, from, to]);
     const drvMap = new Map();

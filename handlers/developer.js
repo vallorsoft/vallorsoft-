@@ -984,7 +984,7 @@ handlers.devListOrphanWaybills = async function (req, res) {
      ) g ON g.ncomp = 1
      LEFT JOIN companies gc ON gc.id = g.company_id
      WHERE f.company_id IS NULL
-     ORDER BY f.data_completare DESC NULLS LAST LIMIT 300`
+     ORDER BY COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) DESC NULLS LAST LIMIT 300`
   );
   // Cég-lista a hozzárendelő legördülőhöz.
   const comp = await pool.query('SELECT id, nev FROM companies ORDER BY nev');

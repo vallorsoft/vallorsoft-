@@ -58,9 +58,14 @@ async function _canSeeFinance(req) {
 // egyezés (még nem horgonyzott sorok). Derivált tábla, hogy a `f` alias és a
 // lateral append-ek (`, jsonb_array_elements(f.alimentari)`) változatlanul
 // működjenek. A $1 továbbra is a company_id.
+// Az `eff_date` a menetlevél TÉNYLEGES út-dátuma: a beírt érkezési (erkezes_dt),
+// fallback indulási (indulas_dt), végső fallback a kitöltés (data_completare)
+// — így minden szűrés/rendezés/statisztika a beírt út-dátum szerint megy, NEM a
+// létrehozás dátuma szerint (a dátum nélküli régi soroknál marad a data_completare).
 const FUV_FROM = `
   FROM (
-    SELECT * FROM fuvarlevelek fl
+    SELECT fl.*, COALESCE(fl.erkezes_dt, fl.indulas_dt, fl.data_completare) AS eff_date
+    FROM fuvarlevelek fl
     WHERE fl.company_id = $1
        OR LOWER(fl.email_sofer) IN (SELECT LOWER(email) FROM users WHERE company_id = $1)
   ) f
@@ -206,9 +211,9 @@ handlers.getStatsOverview = async function (req, res, args) {
     // Kézi menetlevél-bevétel idősor (fuvarlevelek.total_pret, data_completare szerint).
     // Ezek nem kiírt fuvarból születnek, így itt adódnak a fuvar-bevételhez.
     const fuvBevR = await pool.query(
-      `SELECT TO_CHAR(f.data_completare,'YYYY-MM') AS ho, COALESCE(SUM(f.total_pret),0)::numeric AS osszeg
+      `SELECT TO_CHAR(f.eff_date,'YYYY-MM') AS ho, COALESCE(SUM(f.total_pret),0)::numeric AS osszeg
        ${FUV_FROM}
-       WHERE f.data_completare >= $2 AND f.data_completare < $3 AND COALESCE(f.total_pret,0) <> 0
+       WHERE f.eff_date >= $2 AND f.eff_date < $3 AND COALESCE(f.total_pret,0) <> 0
        GROUP BY ho ORDER BY ho`, P
     );
     // Havi bevétel összevonása (orders + kézi menetlevél) egy idősorrá.
@@ -223,11 +228,11 @@ handlers.getStatsOverview = async function (req, res, args) {
 
     // Havi költség idősor + bontás (fuvarlevelek: tankolás + kiadás)
     const ktgR = await pool.query(
-      `SELECT TO_CHAR(f.data_completare,'YYYY-MM') AS ho,
+      `SELECT TO_CHAR(f.eff_date,'YYYY-MM') AS ho,
               COALESCE(SUM((SELECT COALESCE(SUM((a->>'suma')::numeric),0) FROM jsonb_array_elements(f.alimentari) a)),0) AS uzemanyag,
               COALESCE(SUM((SELECT COALESCE(SUM((c->>'pret')::numeric),0) FROM jsonb_array_elements(f.achizitii) c)),0) AS vasarlas
        ${FUV_FROM}
-       WHERE f.data_completare >= $2 AND f.data_completare < $3
+       WHERE f.eff_date >= $2 AND f.eff_date < $3
        GROUP BY ho ORDER BY ho`, P
     );
 
@@ -238,7 +243,7 @@ handlers.getStatsOverview = async function (req, res, args) {
               COALESCE(SUM(f.diurna_externa),0)::int AS diurna_ext,
               COALESCE(SUM(f.diurna_interna),0)::int AS diurna_int
        ${FUV_FROM}
-       WHERE f.data_completare >= $2 AND f.data_completare < $3`, P
+       WHERE f.eff_date >= $2 AND f.eff_date < $3`, P
     );
 
     // EUR↔RON árfolyam (admin állítja) — ezzel számolható eredmény (profit)
@@ -270,7 +275,7 @@ handlers.getStatsOverview = async function (req, res, args) {
        ${FUV_FROM}
        JOIN vehicles v ON v.company_id = $1 AND UPPER(v.rendszam) = UPPER(f.numar_camion)
             AND v.fuel_per_100km > 0
-       WHERE f.data_completare >= $2 AND f.data_completare < $3
+       WHERE f.eff_date >= $2 AND f.eff_date < $3
        GROUP BY f.numar_camion
        HAVING SUM(f.total_km) >= 300
           AND (SUM(f.motorina_folosit) / NULLIF(SUM(f.total_km),0)) * 100 > MAX(v.fuel_per_100km) * 1.15`, P
@@ -520,12 +525,12 @@ handlers.getFuelStats = async function (req, res, args) {
 
     // Havi tankolás (liter + összeg + átlagár), Motorină/AdBlue bontásban
     const haviR = await pool.query(
-      `SELECT TO_CHAR(f.data_completare,'YYYY-MM') AS ho,
+      `SELECT TO_CHAR(f.eff_date,'YYYY-MM') AS ho,
               COALESCE(a.elem->>'tip','Motorină') AS tip,
               SUM((a.elem->>'litru')::numeric) AS litru,
               SUM((a.elem->>'suma')::numeric) AS suma
        ${FUV_FROM}, jsonb_array_elements(f.alimentari) a(elem)
-       WHERE f.data_completare >= $2 AND f.data_completare < $3
+       WHERE f.eff_date >= $2 AND f.eff_date < $3
        GROUP BY ho, tip ORDER BY ho`, P
     );
 
@@ -538,7 +543,7 @@ handlers.getFuelStats = async function (req, res, args) {
               MAX(v.fuel_per_100km)::numeric AS nevleges
        ${FUV_FROM}
        LEFT JOIN vehicles v ON v.company_id = $1 AND UPPER(v.rendszam) = UPPER(f.numar_camion)
-       WHERE f.data_completare >= $2 AND f.data_completare < $3 AND f.numar_camion IS NOT NULL AND f.numar_camion <> ''
+       WHERE f.eff_date >= $2 AND f.eff_date < $3 AND f.numar_camion IS NOT NULL AND f.numar_camion <> ''
        GROUP BY f.numar_camion ORDER BY km DESC`, P
     );
 
@@ -547,19 +552,19 @@ handlers.getFuelStats = async function (req, res, args) {
       `SELECT COALESCE(NULLIF(a.elem->>'plata',''),'?') AS plata,
               COUNT(*)::int AS db, SUM((a.elem->>'suma')::numeric) AS suma
        ${FUV_FROM}, jsonb_array_elements(f.alimentari) a(elem)
-       WHERE f.data_completare >= $2 AND f.data_completare < $3
+       WHERE f.eff_date >= $2 AND f.eff_date < $3
        GROUP BY plata ORDER BY suma DESC NULLS LAST`, P
     );
 
     // Tankolási lista (legutóbbi 100)
     const listaR = await pool.query(
-      `SELECT f.data_completare, f.nume_sofer, f.numar_camion,
+      `SELECT f.eff_date AS data_completare, f.nume_sofer, f.numar_camion,
               a.elem->>'loc' AS loc, COALESCE(a.elem->>'tip','Motorină') AS tip,
               (a.elem->>'litru')::numeric AS litru, (a.elem->>'km')::numeric AS km,
               a.elem->>'plata' AS plata, (a.elem->>'suma')::numeric AS suma
        ${FUV_FROM}, jsonb_array_elements(f.alimentari) a(elem)
-       WHERE f.data_completare >= $2 AND f.data_completare < $3
-       ORDER BY f.data_completare DESC LIMIT 100`, P
+       WHERE f.eff_date >= $2 AND f.eff_date < $3
+       ORDER BY f.eff_date DESC LIMIT 100`, P
     );
 
     return res.json({ result: {
@@ -581,10 +586,10 @@ handlers.getPurchaseStats = async function (req, res, args) {
     const P = [cid, from, to];
 
     const haviR = await pool.query(
-      `SELECT TO_CHAR(f.data_completare,'YYYY-MM') AS ho,
+      `SELECT TO_CHAR(f.eff_date,'YYYY-MM') AS ho,
               COUNT(*)::int AS db, SUM((c.elem->>'pret')::numeric) AS suma
        ${FUV_FROM}, jsonb_array_elements(f.achizitii) c(elem)
-       WHERE f.data_completare >= $2 AND f.data_completare < $3
+       WHERE f.eff_date >= $2 AND f.eff_date < $3
        GROUP BY ho ORDER BY ho`, P
     );
 
@@ -592,7 +597,7 @@ handlers.getPurchaseStats = async function (req, res, args) {
       `SELECT COALESCE(NULLIF(TRIM(c.elem->>'produs'),''),'?') AS produs,
               COUNT(*)::int AS db, SUM((c.elem->>'pret')::numeric) AS suma
        ${FUV_FROM}, jsonb_array_elements(f.achizitii) c(elem)
-       WHERE f.data_completare >= $2 AND f.data_completare < $3
+       WHERE f.eff_date >= $2 AND f.eff_date < $3
        GROUP BY produs ORDER BY suma DESC NULLS LAST LIMIT 15`, P
     );
 
@@ -600,7 +605,7 @@ handlers.getPurchaseStats = async function (req, res, args) {
       `SELECT COALESCE(f.nume_sofer, f.email_sofer) AS sofer,
               COUNT(*)::int AS db, SUM((c.elem->>'pret')::numeric) AS suma
        ${FUV_FROM}, jsonb_array_elements(f.achizitii) c(elem)
-       WHERE f.data_completare >= $2 AND f.data_completare < $3
+       WHERE f.eff_date >= $2 AND f.eff_date < $3
        GROUP BY sofer ORDER BY suma DESC NULLS LAST`, P
     );
 
@@ -608,17 +613,17 @@ handlers.getPurchaseStats = async function (req, res, args) {
       `SELECT COALESCE(NULLIF(c.elem->>'plata',''),'?') AS plata,
               COUNT(*)::int AS db, SUM((c.elem->>'pret')::numeric) AS suma
        ${FUV_FROM}, jsonb_array_elements(f.achizitii) c(elem)
-       WHERE f.data_completare >= $2 AND f.data_completare < $3
+       WHERE f.eff_date >= $2 AND f.eff_date < $3
        GROUP BY plata ORDER BY suma DESC NULLS LAST`, P
     );
 
     const listaR = await pool.query(
-      `SELECT f.data_completare, f.nume_sofer, f.numar_camion,
+      `SELECT f.eff_date AS data_completare, f.nume_sofer, f.numar_camion,
               c.elem->>'produs' AS produs, c.elem->>'loc' AS loc,
               (c.elem->>'pret')::numeric AS pret, c.elem->>'plata' AS plata
        ${FUV_FROM}, jsonb_array_elements(f.achizitii) c(elem)
-       WHERE f.data_completare >= $2 AND f.data_completare < $3
-       ORDER BY f.data_completare DESC LIMIT 100`, P
+       WHERE f.eff_date >= $2 AND f.eff_date < $3
+       ORDER BY f.eff_date DESC LIMIT 100`, P
     );
 
     return res.json({ result: {
@@ -664,7 +669,7 @@ handlers.getDriverStats = async function (req, res, args) {
               COALESCE(SUM((SELECT COALESCE(SUM((a->>'suma')::numeric),0) FROM jsonb_array_elements(f.alimentari) a)),0) AS uzemanyag_ktg,
               COALESCE(SUM((SELECT COALESCE(SUM((c->>'pret')::numeric),0) FROM jsonb_array_elements(f.achizitii) c)),0) AS vasarlas_ktg
        ${FUV_FROM}
-       WHERE f.data_completare >= $2 AND f.data_completare < $3
+       WHERE f.eff_date >= $2 AND f.eff_date < $3
        GROUP BY LOWER(f.email_sofer)`, P
     );
 
@@ -736,7 +741,7 @@ handlers.getVehicleStats = async function (req, res, args) {
               COALESCE(SUM(f.motorina_folosit),0)::numeric AS motorina,
               COALESCE(SUM((SELECT COALESCE(SUM((a->>'suma')::numeric),0) FROM jsonb_array_elements(f.alimentari) a)),0) AS uzemanyag_ktg
        ${FUV_FROM}
-       WHERE f.data_completare >= $2 AND f.data_completare < $3
+       WHERE f.eff_date >= $2 AND f.eff_date < $3
          AND f.numar_camion IS NOT NULL AND f.numar_camion <> ''
        GROUP BY UPPER(f.numar_camion)`, P
     );
@@ -862,7 +867,7 @@ handlers.getMySoferStats = async function (req, res, args) {
                             FROM jsonb_array_elements(alimentari) a)),0) AS tankolt_l
        FROM fuvarlevelek
        WHERE LOWER(email_sofer) = LOWER($1)
-         AND data_completare >= DATE_TRUNC('month', NOW())`,
+         AND COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW())`,
       [me.email]
     );
 
@@ -930,7 +935,7 @@ handlers.getCo2Report = async function (req, res, args) {
     const kmR = await pool.query(
       `SELECT COALESCE(SUM(f.total_km),0)::numeric AS total_km
        ${FUV_FROM}
-       WHERE f.data_completare >= $2 AND f.data_completare < $3`, P
+       WHERE f.eff_date >= $2 AND f.eff_date < $3`, P
     );
 
     const litru = parseFloat(totR.rows[0].litru) || 0;
