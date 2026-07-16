@@ -332,8 +332,23 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
         if (Number.isFinite(tp) && tp >= 0) totalPret = tp;
       }
 
+      // Sofőr-hozzárendelés (statisztika-horgony): ha a kliens egy sofőrt
+      // választott (email_sofer), és az a SAJÁT cég felhasználója → átkötjük a
+      // menetlevelet erre a sofőrre (így az ő statisztikájába számít). Üres/
+      // hiányzó/idegen → a meglévő email_sofer marad (COALESCE). Így a törölt
+      // sofőrtől visszakapott menetlevél egy aktuális sofőrhöz köthető.
+      let newEmailSofer = null;
+      const pickedEmail = (d.email_sofer || '').toString().trim().toLowerCase();
+      if (pickedEmail) {
+        const ur = await pool.query(
+          'SELECT email FROM users WHERE LOWER(email) = $1 AND company_id = $2 LIMIT 1',
+          [pickedEmail, me.company_id]);
+        if (ur.rows.length) newEmailSofer = ur.rows[0].email;
+      }
+
       await pool.query(
         `UPDATE fuvarlevelek SET
+           email_sofer = COALESCE($25, email_sofer),
            nume_sofer = $2, numar_camion = $3, numar_remorca = $4, numar_fisa = $5,
            km_inceput = $6, km_sfarsit = $7, total_km = $8,
            diurna_externa = $9, diurna_interna = $10,
@@ -357,7 +372,8 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
           orderIds === null ? null : JSON.stringify(orderIds),
           indulasDt,
           erkezesDt,
-          totalPret
+          totalPret,
+          newEmailSofer   // $25 — új sofőr-horgony (validált cég-user) vagy NULL (marad a régi)
         ]
       );
       return res.json({ result: { ok: true, total_km: totalKm, consum_100: consum100 } });
