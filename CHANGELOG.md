@@ -14,6 +14,30 @@
 
 ---
 
+## 2026-07-16 — Sofőr: menetlevél kiválasztott fuvar nélkül is
+
+Tisztán kliens-oldali (HTML/JS/i18n), nincs szerver-/séma-változás — a
+`/api/fuvarlevel-save` végpont már eddig is elfogadott üres `orderIds`-t.
+**596 Jest zöld** + DOM-shim harness verifikáció.
+
+1. **Új „➕ Menetlevél fuvar nélkül" gomb** a sofőr menetlevél 1. lépésén
+   (`public/sofer.html`) — a fuvar-választó lista alatt, másodlagos (nem-kék)
+   stílussal. A sofőr így kiválasztott fuvar nélkül is elkészítheti a
+   menetlevelet (pl. üres/tervezés-alatti menet, magánmenet), a km/rendszám/
+   pont-adatokat kézzel beírva.
+2. **`fuvarStep2(allowEmpty)` + `fuvarNoOrder()` (`public/sofer.js`)** — a
+   léptető most opcionális `allowEmpty` jelzőt kap: `true` esetén üres
+   fuvar-listával is a kitöltő lépésre visz (a „legalább egy fuvar" toast csak
+   a normál `fuvarStep2()` úton él). Üres kiválasztásnál az összesítő a
+   „menetlevél fuvar nélkül" jelzést mutatja; a rendszám/dátum/pont-előtöltés
+   üres listánál kihagyódik (meglévő guard-ok). A beküldés `orderIds: []`-t
+   küld → a statisztika a sofőr e-mailjéhez kötődik, mint eddig.
+3. **i18n** (`public/i18n.js`) — `sof.noOrderWaybill` + `sof.noOrderSummary`
+   (RO-alap + HU). Cache-bust `sofer.js`/`i18n.js` `?v=20260716noord`.
+4. **Megjegyzés:** az Admin/Manager kézi menetlevél-készítés (sofőr-választó +
+   statisztika-kötés az `email_sofer`→`users.company_id` joinon át) már korábban
+   kész volt (`fuvarlevelCreate`, 2026-06-29); ez a kör a sofőr-oldalt egészíti ki.
+
 ## 2026-07-16 — Mobil UI rendberakás: admin/manager felső sáv + sofőr főoldal
 
 Tisztán kliens-oldali (HTML/CSS/JS), nincs szerver-/séma-változás. **596 Jest zöld.**
