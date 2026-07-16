@@ -14,6 +14,27 @@
 
 ---
 
+## 2026-07-16 — Régi/törölt sofőr menetleveleinek tömeges átrendezése aktuális sofőrre (statisztika-szellem megszüntetése)
+
+A törölt sofőr helyreállított (company_id-horgonyzott) menetlevelei a statisztikában
+külön soron („szellemként") jelentek meg a régi e-mailje alatt — és az új sofőr nem
+kapta meg ezeket, csak egyenkénti szerkesztő-átkötéssel. Most egy kattintással
+tömegesen átrendezhetők.
+
+- **`handlers/documents.js`** — `getWaybillDrivers` (Admin/Manager): a cég
+  menetleveleiben előforduló sofőr-emailek + név + darabszám + `is_current` (aktuális
+  cég-felhasználó-e). A `reassignDriverWaybills(fromEmail, toEmail)` (Admin/Manager):
+  a régi/szellem sofőr ÖSSZES menetlevelét (és POD-dokumentumát) átköti egy **aktuális
+  cég-sofőrre** (validált cél; `email_sofer`+`nume_sofer` frissítés) → a statisztika
+  ekkor az új sofőrhöz sorolja, a szellem eltűnik. Csak a cég adatait érinti
+  (`company_id`-horgony/cég-user), audit-naplózva.
+- **Belső sofőrök fül** — új „🔀 Régi sofőr menetleveleinek átrendezése" kártya
+  (`#ghostDriverBox`, `loadGhostDrivers`/`reassignGhostDriver`): a szellem-sofőrök
+  listája darabszámmal + aktuális-sofőr választó + „→ Átrendez". Az e-mailt
+  gyorsítótárból olvassuk (nem az onclick-be ágyazva — nincs injekció).
+- i18n `cs.gd.*` (RO-alap + HU), cache-bust `console-shared.js`/`i18n.js`
+  `?v=20260716ghost`. **596 Jest zöld** + mock-db handler-teszt.
+
 ## 2026-07-16 — MINDEN menetlevél-szűrés/rendezés/statisztika a beírt út-dátum szerint (nem a kitöltés dátuma)
 
 A menetlevél korábban sok helyen a **kitöltés/létrehozás** dátuma (`data_completare`)
