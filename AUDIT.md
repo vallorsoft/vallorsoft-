@@ -9,6 +9,13 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 16. lépés — Adatmegőrzés: belső sofőr törlésekor a menetlevél/dokumentum ne vesszen el (2026-07-16) ✅ KÉSZ
+A `fuvarlevelek`/`documents` eddig CSAK az `email_sofer`→`users.company_id` joinon át kötődött a céghez; a sofőr (`userDelete`) törlésekor a join megszakadt → a rekordok kiestek a cég-nézetből (fizikailag megmaradtak). Adat-integritási + multi-tenant szempontok:
+- **Új `company_id` horgony** a `fuvarlevelek` + `documents` táblán (`db/fuvarlevelek-documents-company-id.sql`, idempotens, valós Postgres 16-on verifikálva). A cég-szűrés innentől elsődlegesen erre horgonyoz, a régi email-join fallbackként megmarad — **nem lazít a multi-tenant izoláción** (a `WHERE company_id=$cid OR email_sofer IN (cég userei)` mindkét ága a saját céghez köt; idegen cég sora egyik ágon sem jön be).
+- **Visszamenőleges feltöltés** két megbízható forrásból: élő sofőr `users.company_id`-ja (email-egyezés), árva soroknál a hivatkozott fuvar `orders.company_id`-ja (`order_ids[0]`/`order_id`) — az `orders.id` cégfüggetlen véletlen kulcs, így a cég-hozzárendelés helyes (nincs cross-tenant elszivárgás).
+- **`userDelete`:** a `users` sor törlése ELŐTT best-effort rögzíti a `company_id`-t a sofőr rekordjaira; a törlés maga változatlanul `company_id`-szűrt. **Beszúrás:** minden új menetlevél/dokumentum eleve horgonyoz. Teszt frissítve; 596 Jest zöld.
+- **Korlát (nem biztonsági):** fuvar nélküli menetlevél MÁR törölt sofőrtől nem állítható vissza (nincs cég-jel a soron) — a jövőbeli sorok/törlés-előtti horgonyzás lefedi.
+
 ### 15. lépés — Előfizetés-lemondás (dezabonare) + publikus újraaktiváló link (2026-06-18) ✅ KÉSZ
 Az Admin lemondhatja az előfizetést (türelmi idő a `paid_until`-ig), e-mail értesítő „M-am răzgândit" gombbal. Biztonsági átnézés:
 - **Hozzáférés-kapu konzisztencia:** a lemondás NEM állítja azonnal `cancelled`-re a státuszt — azt a `routes/auth.js` login-kapuja (`subscription_status IN ('inactive','cancelled')` VAGY `paid_until < ma`) azonnal tiltaná. Helyette `subscription_cancel_at` jelző; a hozzáférés a meglévő `paid_until`-kapun ér véget. Így a lemondó cég a fizetett ideig használhatja — nincs új, kikerülő hozzáférés-út.

@@ -337,11 +337,11 @@ handlers.getLastVehicleReadings = async function (req, res, args) {
       const r = await pool.query(
         `SELECT
            (SELECT cant_sfarsit FROM fuvarlevelek
-             WHERE email_sofer IN (SELECT email FROM users WHERE company_id = $1)
+             WHERE (company_id = $1 OR email_sofer IN (SELECT email FROM users WHERE company_id = $1))
                AND ${norm} = $2 AND cant_sfarsit IS NOT NULL AND cant_sfarsit > 0
              ORDER BY data_completare DESC NULLS LAST LIMIT 1) AS fuel,
            (SELECT km_sfarsit FROM fuvarlevelek
-             WHERE email_sofer IN (SELECT email FROM users WHERE company_id = $1)
+             WHERE (company_id = $1 OR email_sofer IN (SELECT email FROM users WHERE company_id = $1))
                AND ${norm} = $2 AND km_sfarsit IS NOT NULL AND km_sfarsit > 0
              ORDER BY data_completare DESC NULLS LAST LIMIT 1) AS km`,
         [cid, plate]);

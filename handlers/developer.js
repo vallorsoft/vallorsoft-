@@ -339,8 +339,8 @@ handlers.devCompanyDetail = async function (req, res, args) {
         SELECT
           (SELECT COUNT(*)::int FROM orders WHERE company_id = $1) AS osszes_fuvar,
           (SELECT COUNT(*)::int FROM orders WHERE company_id = $1 AND status IN ('In Curs','Alocat')) AS aktiv_fuvar,
-          (SELECT COUNT(*)::int FROM fuvarlevelek fl JOIN users u ON LOWER(u.email)=LOWER(fl.email_sofer) WHERE u.company_id=$1) AS osszes_menetlevel,
-          (SELECT COUNT(*)::int FROM documents d JOIN users u ON LOWER(u.email)=LOWER(d.email_sofer) WHERE u.company_id=$1) AS osszes_dok,
+          (SELECT COUNT(*)::int FROM fuvarlevelek fl WHERE fl.company_id=$1 OR LOWER(fl.email_sofer) IN (SELECT LOWER(email) FROM users WHERE company_id=$1)) AS osszes_menetlevel,
+          (SELECT COUNT(*)::int FROM documents d WHERE d.company_id=$1 OR LOWER(d.email_sofer) IN (SELECT LOWER(email) FROM users WHERE company_id=$1)) AS osszes_dok,
           (SELECT COUNT(*)::int FROM bug_reports WHERE company_id=$1) AS osszes_hiba,
           (SELECT COUNT(*)::int FROM bug_reports WHERE company_id=$1 AND is_read=FALSE) AS olvasatlan_hiba
       `, [cid]);

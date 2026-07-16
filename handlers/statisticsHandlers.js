@@ -53,10 +53,17 @@ async function _canSeeFinance(req) {
   return !!(r.rows.length && r.rows[0].enabled);
 }
 
-// Cég-szűrt fuvarlevél FROM-blokk (a users joinon át).
+// Cég-szűrt fuvarlevél FROM-blokk. Elsődlegesen a fuvarlevelek.company_id
+// horgonyra szűr (túléli a sofőr törlését), fallback a régi email→users
+// egyezés (még nem horgonyzott sorok). Derivált tábla, hogy a `f` alias és a
+// lateral append-ek (`, jsonb_array_elements(f.alimentari)`) változatlanul
+// működjenek. A $1 továbbra is a company_id.
 const FUV_FROM = `
-  FROM fuvarlevelek f
-  JOIN users u ON LOWER(u.email) = LOWER(f.email_sofer) AND u.company_id = $1
+  FROM (
+    SELECT * FROM fuvarlevelek fl
+    WHERE fl.company_id = $1
+       OR LOWER(fl.email_sofer) IN (SELECT LOWER(email) FROM users WHERE company_id = $1)
+  ) f
 `;
 
 // ── Saját jogosultságaim (kliens-oldali fül-elrejtéshez) ─────

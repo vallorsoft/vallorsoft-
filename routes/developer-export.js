@@ -170,14 +170,14 @@ router.get('/api/developer/export/:id', devGuard, async (req, res) => {
         carInv.rows) });
     }
 
-    // menetlevelek (email_sofer → users.company_id)
+    // menetlevelek (company_id horgony, fallback email→users.company_id)
     const fl = await pool.query(
       `SELECT f.id,f.email_sofer,f.nume_sofer,f.order_ids,f.data_completare,
               f.numar_camion,f.numar_remorca,f.numar_fisa,
               f.km_inceput,f.km_sfarsit,f.total_km,
               f.loc_plecare,f.loc_sosire,f.total_alim,f.consum_100,f.alte_mentiuni
        FROM fuvarlevelek f
-       JOIN users u ON LOWER(u.email)=LOWER(f.email_sofer) AND u.company_id=$1
+       WHERE f.company_id=$1 OR LOWER(f.email_sofer) IN (SELECT LOWER(email) FROM users WHERE company_id=$1)
        ORDER BY f.id`, [cid]).catch(() => ({ rows: [] }));
     if (fl.rows.length) {
       files.push({ name: 'csv/fuvarlevelek.csv', buffer: buildCsv(
