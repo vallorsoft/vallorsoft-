@@ -41,8 +41,14 @@ cég nézetéből** (bár fizikailag megmaradtak a táblában). Így lehetett eg
    `getOrdersMissingWaybill`, `getDriverDocs` (`handlers/documents.js`);
    `getLastVehicleReadings` (`handlers/orders.js`); a **statisztika** közös
    `FUV_FROM` blokkja (`handlers/statisticsHandlers.js`) → minden riport egyszerre;
-   PDF/dok letöltés (`routes/soferApi.js`); developer cég-összesítő + export
-   (`handlers/developer.js`, `routes/developer-export.js`).
+   PDF/dok letöltés (`routes/soferApi.js`); a fuvar-email POD-fotó lista+csatolás
+   (`handlers/orderEmail.js`); developer cég-összesítő + export
+   (`handlers/developer.js`, `routes/developer-export.js`). A **feltöltött POD/CMR
+   képek** (`documents` tábla) ugyanígy `company_id`-horgonyt kapnak (feltöltéskor
+   `doc-upload`), és a migráció a `documents.order_id`→`orders.company_id` alapján
+   az árva (törölt sofőr) fotókat is visszaköti. Az `order_documents` (fuvarhoz
+   csatolt iratok) **eleve** `company_id`-horgonyzott volt — azt a törlés sosem
+   érintette.
 5. **Teszt** — `documents.test.js` frissítve (üres user-listánál is lekérdez a
    `company_id`-horgony miatt). **596 Jest zöld**; a recovery valós Postgres-en
    verifikálva (árva menetlevelek visszakerülnek a céghez, idempotens újrafuttatás).

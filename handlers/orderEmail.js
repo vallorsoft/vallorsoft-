@@ -130,8 +130,9 @@ async function _listAttachments(cid, orderId) {
   try {
     var pod = await pool.query(
       `SELECT d.id, d.file_name, d.tip
-       FROM documents d JOIN users u ON u.email = d.email_sofer
-       WHERE d.order_id = $1 AND u.company_id = $2
+       FROM documents d
+       WHERE d.order_id = $1
+         AND (d.company_id = $2 OR d.email_sofer IN (SELECT email FROM users WHERE company_id = $2))
        ORDER BY d.created_at DESC`, [String(orderId), cid]);
     pod.rows.forEach(function (d) {
       out.push({ key: 'pod-' + d.id, label: (d.tip ? d.tip + ' — ' : '📷 ') + (d.file_name || ('foto ' + d.id)), kind: 'photo' });
@@ -343,8 +344,8 @@ handlers.sendOrderEmail = async function (req, res, args) {
         } else if (mPod) {
           var rp = await pool.query(
             `SELECT d.file_name, d.storage_url FROM documents d
-             JOIN users u ON u.email = d.email_sofer
-             WHERE d.id = $1 AND d.order_id = $2 AND u.company_id = $3`,
+             WHERE d.id = $1 AND d.order_id = $2
+               AND (d.company_id = $3 OR d.email_sofer IN (SELECT email FROM users WHERE company_id = $3))`,
             [parseInt(mPod[1], 10), String(orderId), cid]);
           if (rp.rows.length && rp.rows[0].storage_url) {
             var su = String(rp.rows[0].storage_url);
