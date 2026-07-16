@@ -315,32 +315,42 @@ handlers.getMyAssignedVehicle = async function (req, res, args) {
     }
   };
 
-// ─── Jármű utolsó ismert üzemanyag-szintje (menetlevél átvitel) ───
+// ─── Jármű utolsó ismert menetlevél-értékei (üzemanyag + km-óra átvitel) ───
 // Egy adott rendszámhoz a cég legutóbbi menetleveléből a záró üzemanyag-szint
-// (cant_sfarsit), ha rögzítve volt (>0). Ez lesz a következő menetlevél kezdő
-// szintje (a sofőr felül tudja írni). A rendszám normalizálva illeszkedik
-// (szóköz/kötőjel-független). Sofőr + Admin/Manager hívhatja (mind készít
-// menetlevelet); minden lekérdezés cégre szűrve.
-handlers.getLastFuelLevel = async function (req, res, args) {
+// (cant_sfarsit) és a záró km-óra állás (km_sfarsit), ha rögzítve volt (>0).
+// Ezek lesznek a következő menetlevél kezdő értékei (a sofőr felül tudja írni):
+// a folytonos tankszint- és km-nyilvántartáshoz. A két érték egymástól
+// FÜGGETLENÜL a legutóbbi olyan menetlevélből jön, ahol az adott mező ki volt
+// töltve (>0) — így egy hiányos sor nem rontja el a másik átvitelt. A rendszám
+// normalizálva illeszkedik (szóköz/kötőjel-független). Sofőr + Admin/Manager
+// hívhatja (mind készít menetlevelet); minden lekérdezés cégre szűrve.
+// Visszafelé kompatibilis: a `level` mező = az üzemanyag-szint (régi név).
+handlers.getLastVehicleReadings = async function (req, res, args) {
     try {
       if (!req.session.user || !['Sofer', 'Admin', 'Manager'].includes(req.session.user.pozicio)) {
         return res.json({ result: { ok: false } });
       }
       const cid = req.session.user.company_id;
       const plate = normalizePlate(Array.isArray(args) ? args[0] : args);
-      if (!cid || !plate) return res.json({ result: { ok: true, level: null } });
+      if (!cid || !plate) return res.json({ result: { ok: true, fuel: null, km: null, level: null } });
+      const norm = `UPPER(REGEXP_REPLACE(COALESCE(numar_camion, ''), '[^A-Za-z0-9]', '', 'g'))`;
       const r = await pool.query(
-        `SELECT cant_sfarsit FROM fuvarlevelek
-         WHERE email_sofer IN (SELECT email FROM users WHERE company_id = $1)
-           AND UPPER(REGEXP_REPLACE(COALESCE(numar_camion, ''), '[^A-Za-z0-9]', '', 'g')) = $2
-           AND cant_sfarsit IS NOT NULL AND cant_sfarsit > 0
-         ORDER BY data_completare DESC NULLS LAST
-         LIMIT 1`,
+        `SELECT
+           (SELECT cant_sfarsit FROM fuvarlevelek
+             WHERE email_sofer IN (SELECT email FROM users WHERE company_id = $1)
+               AND ${norm} = $2 AND cant_sfarsit IS NOT NULL AND cant_sfarsit > 0
+             ORDER BY data_completare DESC NULLS LAST LIMIT 1) AS fuel,
+           (SELECT km_sfarsit FROM fuvarlevelek
+             WHERE email_sofer IN (SELECT email FROM users WHERE company_id = $1)
+               AND ${norm} = $2 AND km_sfarsit IS NOT NULL AND km_sfarsit > 0
+             ORDER BY data_completare DESC NULLS LAST LIMIT 1) AS km`,
         [cid, plate]);
-      const level = r.rows.length ? Number(r.rows[0].cant_sfarsit) : null;
-      return res.json({ result: { ok: true, level: (isFinite(level) ? level : null) } });
+      const row = r.rows[0] || {};
+      const fuel = (row.fuel != null && isFinite(Number(row.fuel))) ? Number(row.fuel) : null;
+      const km   = (row.km   != null && isFinite(Number(row.km)))   ? Number(row.km)   : null;
+      return res.json({ result: { ok: true, fuel: fuel, km: km, level: fuel } });
     } catch (err) {
-      console.error('getLastFuelLevel hiba:', err);
+      console.error('getLastVehicleReadings hiba:', err);
       return res.json({ result: { ok: false } });
     }
   };

@@ -472,7 +472,7 @@ function fuvarStep2(allowEmpty) {
     if (!remEl.value && _myAssignedVehicle.rendszam_remorca) remEl.value = _myAssignedVehicle.rendszam_remorca;
   }
   // Kezdő üzemanyag-szint átvitel az adott jármű utolsó menetleveléből.
-  if (camEl.value) prefillFuelStart(camEl.value);
+  if (camEl.value) prefillWaybillReadings(camEl.value);
 
   // Indulás/érkezés dátum előtöltése a TÉNYLEGES állomás-időből (incarcat_at /
   // descarcat_at), fallback a fuvar tervezett dátumára (data_incarcare/descarcare).
@@ -546,7 +546,7 @@ function attachDraftListeners() {
   if (camEl && !camEl._fuelBound) {
     camEl._fuelBound = true;
     camEl.addEventListener('change', function() {
-      if (camEl.value) prefillFuelStart(camEl.value.trim());
+      if (camEl.value) prefillWaybillReadings(camEl.value.trim());
     });
   }
   // Dinamikus sorok figyelése MutationObserver-rel
@@ -870,27 +870,36 @@ function loadMyAssignedVehicle() {
   }).catch(function() {});
 }
 
-// A menetlevél kezdő üzemanyag-szintjének előtöltése az adott rendszám utolsó
-// menetleveléből (záró szint → új kezdő szint). CSAK ha a kezdő mező üres/0
-// (a sofőr által beírt értéket sosem írjuk felül). A pótkocsi/rendszám kézzel
-// átírható, ezért a plate paramétert adjuk át.
-function prefillFuelStart(plate) {
-  var incEl = document.getElementById('fCantInc');
-  if (!incEl || !plate) return;
-  var cur = String(incEl.value || '').trim();
-  if (cur !== '' && cur !== '0') return;   // már beírt / átvitt érték — nem nyúlunk hozzá
+// A menetlevél kezdő üzemanyag-szintjének ÉS kezdő km-óra állásának előtöltése
+// az adott rendszám utolsó menetleveléből (záró érték → új kezdő érték). Mindkét
+// mezőt CSAK akkor tölti, ha üres/0 (a sofőr által beírt értéket sosem írjuk
+// felül). A rendszám kézzel átírható, ezért a plate paramétert adjuk át.
+function _fillIfEmpty(el, val) {
+  if (!el || val == null) return;
+  var now = String(el.value || '').trim();
+  if (now !== '' && now !== '0') return;   // már beírt / átvitt érték — nem nyúlunk hozzá
+  el.value = val;
+}
+function prefillWaybillReadings(plate) {
+  var incEl = document.getElementById('fCantInc');   // kezdő üzemanyag
+  var kmEl  = document.getElementById('fKmInc');      // kezdő km-óra
+  if (!plate || (!incEl && !kmEl)) return;
+  // Ha mindkét kezdő mezőben már van érték, nincs mit tenni.
+  var fuelBusy = !incEl || (String(incEl.value || '').trim() !== '' && String(incEl.value || '').trim() !== '0');
+  var kmBusy   = !kmEl  || (String(kmEl.value  || '').trim() !== '' && String(kmEl.value  || '').trim() !== '0');
+  if (fuelBusy && kmBusy) return;
   fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ functionName: 'getLastFuelLevel', arguments: [plate] }) })
+    body: JSON.stringify({ functionName: 'getLastVehicleReadings', arguments: [plate] }) })
   .then(function(r) { return r.json(); }).then(function(d) {
     var res = d && d.result;
-    if (!res || !res.ok || res.level == null) return;
-    // Közben nem gépelt bele a sofőr?
-    var now = String(incEl.value || '').trim();
-    if (now !== '' && now !== '0') return;
-    incEl.value = res.level;
+    if (!res || !res.ok) return;
+    _fillIfEmpty(incEl, res.fuel);
+    _fillIfEmpty(kmEl, res.km);
     if (typeof draftSave === 'function') { try { draftSave(); } catch (e) {} }
   }).catch(function() {});
 }
+// Visszafelé kompatibilis alias (a régi hívási pontokhoz).
+function prefillFuelStart(plate) { return prefillWaybillReadings(plate); }
 
 // ============================================================
 // SAJÁT HAVI MINI-STATISZTIKA (főoldal) — motivációs összegző

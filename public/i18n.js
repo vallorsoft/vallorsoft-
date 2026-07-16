@@ -1059,6 +1059,9 @@
     'cs.revoke': { hu: 'Visszavon', ro: 'Revocă' },
     'cs.noWaybills': { hu: 'Nincs beküldött fuvarlevél.', ro: 'Nicio foaie de parcurs trimisă.' },
     'cs.editLong': { hu: '✏️ Szerkeszt', ro: '✏️ Editează' },
+    'cs.missingWbTitle': { hu: '{n} lezárt fuvar menetlevél nélkül', ro: '{n} curse finalizate fără foaie de parcurs' },
+    'cs.missingWbHint': { hu: 'Ezekhez a lezárt fuvarokhoz még nem készült menetlevél.', ro: 'Pentru aceste curse finalizate nu s-a întocmit încă o foaie de parcurs.' },
+    'cs.anomTitle': { hu: 'Fogyasztás: {c} L/100km · jármű alapérték: {b} L/100km', ro: 'Consum: {c} L/100km · valoare de referință vehicul: {b} L/100km' },
 
     // Chat + dokumentum-csoportok + jármű-választók
     'cs.noChat': { hu: 'Még nincs csevegés.<br>Kattints a + gombra!', ro: 'Încă nicio conversație.<br>Apasă butonul +!' },

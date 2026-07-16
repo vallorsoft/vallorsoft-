@@ -14,6 +14,35 @@
 
 ---
 
+## 2026-07-16 — Menetlevél-automatizáció: km-óra átvitel + hiányzó menetlevél lista + fogyasztási anomália-jelző
+
+Három, a meglévő adatra épülő automatizálás (nincs séma-változás). **596 Jest zöld**
++ mock-db és DOM-shim harness.
+
+1. **Km-óra átvitel (az üzemanyag-átvitel ikertestvére)** — a `getLastFuelLevel`
+   handler átalakítva `getLastVehicleReadings`-re (`handlers/orders.js`): egy
+   rendszámhoz a cég utolsó menetleveléből a záró **üzemanyag-szint** (`cant_sfarsit`)
+   ÉS a záró **km-óra állás** (`km_sfarsit`) is (egymástól függetlenül, a legutóbbi
+   nem-nulla értékből; visszafelé kompatibilis `level`=fuel mező). A sofőr menetlevél
+   kitöltője (`prefillWaybillReadings`, `sofer.js`) a `Cantitate început`-ot ÉS a
+   `Km început`-et is ebből tölti elő (mindkettőt csak ha üres/0 — beírt értéket nem
+   ír felül; rendszám kézi váltásakor újratölt). Így a záró km automatikusan a
+   következő menetlevél kezdő km-je → hézagmentes km-nyilvántartás.
+2. **Hiányzó menetlevél teendő-lista (Admin/Manager)** — új `getOrdersMissingWaybill`
+   handler (`handlers/documents.js`, cégre szűrt, read-only): a **lezárt** (`Finalizat`)
+   fuvarok, amelyekhez még egyetlen menetlevél sem készült (a fuvar id-ja egyetlen
+   `fuvarlevelek.order_ids` tömbben sem szerepel — `@> to_jsonb`). A FUVARLEVELEK
+   oldal tetején sárga teendő-sáv (`#missingWaybillBand`, `loadMissingWaybills` a
+   `console-shared.js`-ben) fuvar-számmal/ügyféllel/útvonallal/sofőrrel.
+3. **Fogyasztási anomália-jelző (üzemanyag-lopás gyanú)** — a `getFuvarlevelek`
+   (`handlers/documents.js`) minden menetlevél `consum_100`-ját a jármű
+   `fuel_per_100km` alapértékéhez hasonlítja (rendszám szerint, normalizálva); >25%
+   eltérésnél `consum_anomaly` ='high' (▲ túlfogyasztás, piros) / 'low' (▼, kék) +
+   `consum_dev_pct`. A menetlevél-listában ⚠️ badge a fájlnév mellett (`fuvAnomalyBadge`),
+   tooltipben a tényleges vs. alapérték fogyasztás. Csak Admin/Manager listáján számol.
+4. **i18n** `cs.missingWbTitle`/`cs.missingWbHint`/`cs.anomTitle` (RO-alap + HU).
+   Cache-bust `console-shared.js`/`i18n.js`/`sofer.js` `?v=20260716auto3`.
+
 ## 2026-07-16 — Sofőr: kiosztott jármű kiírása + menetlevél rendszám-/üzemanyag-előtöltés
 
 Tisztán a meglévő párosításra épül (nincs séma-változás): a sofőr↔vontató

@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260715ofc"></script>
+  <script src="/i18n.js?v=20260716auto3"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -365,6 +365,8 @@
           <h2 class="h-title" style="margin:0;" data-i18n="nav.waybills">Fuvarlevelek</h2>
           <button class="btn primary" style="padding:9px 18px;" onclick="openFuvCreate()" data-i18n="fed.addNew">➕ Új menetlevél</button>
         </div>
+        <!-- Hiányzó menetlevél teendő-sáv (lezárt fuvarok menetlevél nélkül) -->
+        <div id="missingWaybillBand" style="display:none;margin-top:14px;"></div>
         <table class="table" id="tblReceivedFuv" style="margin-top:14px;">
           <thead><tr><th data-i18n="col.seq">Sorszám</th><th data-i18n="col.fileName">Fájlnév</th><th data-i18n="col.driver">Sofőr</th><th data-i18n="col.submitTime">Beküldés ideje</th><th data-i18n="col.action">Művelet</th></tr></thead>
           <tbody></tbody>
@@ -1313,7 +1315,7 @@
 <script src="/email-intake-card.js?v=20260616warm2"></script>
 <script src="/feature-catalog.js?v=20260618cgps2"></script>
 <script>window.__pwaInstallDefault=false;</script>
-<script src="/console-shared.js?v=20260715firma"></script>
+<script src="/console-shared.js?v=20260716auto3"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 <script src="/console-pages.js?v=20260617b1"></script>
 <!-- ===== INTEGRACIOK (Manager: Ugyfelek + "Hol a kocsi?"; szamlazo/beallitas Admin-only) ===== -->
