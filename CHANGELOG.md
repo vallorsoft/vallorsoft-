@@ -14,6 +14,33 @@
 
 ---
 
+## 2026-07-16 — Sofőr: kiosztott jármű kiírása + menetlevél rendszám-/üzemanyag-előtöltés
+
+Tisztán a meglévő párosításra épül (nincs séma-változás): a sofőr↔vontató
+(`vehicles.assigned_driver_email`) + vontató↔alapértelmezett pótkocsi
+(`vehicles.default_trailer_id`) párosítást az Admin/Manager **már eddig is**
+beállítja a Belső sofőrök fülön (`assignDriverVehicle`/`assignDefaultTrailer`).
+Ez a kör a **sofőr-oldalt** egészíti ki. **596 Jest zöld** + mock-db és DOM-shim harness.
+
+1. **Sofőr látja a neki kiosztott járművet** — új `getMyAssignedVehicle` handler
+   (`handlers/orders.js`, Sofer, cégre szűrt): a bejelentkezett sofőrhöz rendelt
+   vontató + alapértelmezett pótkocsi rendszáma. A sofőr főoldal tetején új
+   `#myVehicleBox` kártya (🚚 vontató-rendszám + márka/típus, 🚛 pótkocsi-rendszám),
+   csak ha van párosítás (`sofer.html`/`sofer.js` `loadMyAssignedVehicle`).
+2. **Menetlevél rendszám-előtöltés (szerkeszthető)** — `fuvarStep2` (`sofer.js`):
+   ha a kiválasztott fuvarban nincs rendszám (pl. fuvar nélküli menetlevél), a
+   `Număr camion`/`Număr remorcă` a nekem kiosztott járműből töltődik alapértékként
+   (üres mezőt nem ír felül, a sofőr szabadon átírja).
+3. **Üzemanyag-szint átvitel a következő menetlevélre** — új `getLastFuelLevel(plate)`
+   handler (`handlers/orders.js`, Sofer+Admin/Manager, cégre szűrt, normalizált
+   rendszám-illesztés): egy adott jármű legutóbbi menetleveléből a záró szint
+   (`cant_sfarsit`, ha >0). A menetlevél kitöltő a `Cantitate început`-ot ebből
+   tölti elő (`prefillFuelStart`) — az első menetlevél 0-ról indul, de ha rögzítve
+   volt pl. kezdő 100 L / záró 380 L, a következő menetlevél kezdő szintje 380 L
+   lesz (a sofőr felül tudja írni). Rendszám kézi módosításakor újratölt (csak ha
+   a kezdő mező üres/0).
+4. **i18n** `sof.myVehicle` (RO-alap + HU). Cache-bust `sofer.js`/`i18n.js` `?v=20260716pair`.
+
 ## 2026-07-16 — Sofőr: menetlevél kiválasztott fuvar nélkül is
 
 Tisztán kliens-oldali (HTML/JS/i18n), nincs szerver-/séma-változás — a

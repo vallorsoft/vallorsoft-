@@ -457,11 +457,22 @@ function fuvarStep2(allowEmpty) {
       }).join('<br>');
   }
 
+  // Rendszám előtöltése: elsőként a kiválasztott fuvarból; ha ott nincs (pl.
+  // fuvar nélküli menetlevél), a nekem kiosztott vontató + alapértelmezett
+  // pótkocsi rendszámából. Mindkettő szerkeszthető (csak alapérték). Üres mezőt
+  // nem írunk felül (piszkozat-visszatöltés védelme).
   var first = selected[0];
+  var camEl = document.getElementById('fCamion');
+  var remEl = document.getElementById('fRemorca');
   if (first && first.rendszam_camion) {
-    document.getElementById('fCamion').value = first.rendszam_camion;
-    document.getElementById('fRemorca').value = first.rendszam_remorca || '';
+    camEl.value = first.rendszam_camion;
+    remEl.value = first.rendszam_remorca || '';
+  } else if (_myAssignedVehicle && _myAssignedVehicle.rendszam_camion) {
+    if (!camEl.value) camEl.value = _myAssignedVehicle.rendszam_camion;
+    if (!remEl.value && _myAssignedVehicle.rendszam_remorca) remEl.value = _myAssignedVehicle.rendszam_remorca;
   }
+  // Kezdő üzemanyag-szint átvitel az adott jármű utolsó menetleveléből.
+  if (camEl.value) prefillFuelStart(camEl.value);
 
   // Indulás/érkezés dátum előtöltése a TÉNYLEGES állomás-időből (incarcat_at /
   // descarcat_at), fallback a fuvar tervezett dátumára (data_incarcare/descarcare).
@@ -529,6 +540,15 @@ function attachDraftListeners() {
       el.addEventListener('input', draftSave);
     }
   });
+  // Rendszám kézi módosításakor a kezdő üzemanyag-szintet az új jármű utolsó
+  // menetleveléből tölti (csak ha a kezdő mező üres/0 — beírt értéket nem ír felül).
+  var camEl = document.getElementById('fCamion');
+  if (camEl && !camEl._fuelBound) {
+    camEl._fuelBound = true;
+    camEl.addEventListener('change', function() {
+      if (camEl.value) prefillFuelStart(camEl.value.trim());
+    });
+  }
   // Dinamikus sorok figyelése MutationObserver-rel
   ['puncteContainer','alimentariContainer','achizitiiContainer'].forEach(function(cId) {
     var container = document.getElementById(cId);
@@ -818,6 +838,61 @@ function logoutSofer() {
 }
 
 // ============================================================
+// NEKEM KIOSZTOTT JÁRMŰ (vontató + pótkocsi) — főoldali kiírás
+// ============================================================
+// A Belső sofőrök fülön az admin/manager rendeli hozzám a vontatót + a hozzá
+// tartozó alapértelmezett pótkocsit. Itt a főoldal tetején látom a rendszámo(ka)t,
+// és a menetlevél ezekből tölt előre (szerkeszthetően).
+var _myAssignedVehicle = null;
+function loadMyAssignedVehicle() {
+  fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'getMyAssignedVehicle' }) })
+  .then(function(r) { return r.json(); }).then(function(d) {
+    var res = d && d.result;
+    _myAssignedVehicle = (res && res.ok && res.assigned) ? res.assigned : null;
+    var box = document.getElementById('myVehicleBox');
+    if (!box) return;
+    if (!_myAssignedVehicle || !_myAssignedVehicle.rendszam_camion) { box.style.display = 'none'; return; }
+    var v = _myAssignedVehicle;
+    var rem = v.rendszam_remorca
+      ? '<span style="margin-left:14px;">🚛 <b style="color:#0f172a;">' + esc(v.rendszam_remorca) + '</b></span>'
+      : '';
+    box.innerHTML = '<div style="background:linear-gradient(180deg,rgba(59,130,246,0.10),rgba(99,102,241,0.06));'
+      + 'border:1px solid rgba(59,130,246,0.30);border-radius:14px;padding:12px 14px;margin-bottom:14px;">'
+      + '<div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">'
+      + t('sof.myVehicle') + '</div>'
+      + '<div style="font-size:16px;color:#1e293b;">'
+      + '🚚 <b style="color:#0f172a;">' + esc(v.rendszam_camion) + '</b>'
+      + (v.marca ? ' <span style="font-size:12px;color:#64748b;">' + esc(v.marca) + (v.model ? ' ' + esc(v.model) : '') + '</span>' : '')
+      + rem
+      + '</div></div>';
+    box.style.display = '';
+  }).catch(function() {});
+}
+
+// A menetlevél kezdő üzemanyag-szintjének előtöltése az adott rendszám utolsó
+// menetleveléből (záró szint → új kezdő szint). CSAK ha a kezdő mező üres/0
+// (a sofőr által beírt értéket sosem írjuk felül). A pótkocsi/rendszám kézzel
+// átírható, ezért a plate paramétert adjuk át.
+function prefillFuelStart(plate) {
+  var incEl = document.getElementById('fCantInc');
+  if (!incEl || !plate) return;
+  var cur = String(incEl.value || '').trim();
+  if (cur !== '' && cur !== '0') return;   // már beírt / átvitt érték — nem nyúlunk hozzá
+  fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'getLastFuelLevel', arguments: [plate] }) })
+  .then(function(r) { return r.json(); }).then(function(d) {
+    var res = d && d.result;
+    if (!res || !res.ok || res.level == null) return;
+    // Közben nem gépelt bele a sofőr?
+    var now = String(incEl.value || '').trim();
+    if (now !== '' && now !== '0') return;
+    incEl.value = res.level;
+    if (typeof draftSave === 'function') { try { draftSave(); } catch (e) {} }
+  }).catch(function() {});
+}
+
+// ============================================================
 // SAJÁT HAVI MINI-STATISZTIKA (főoldal) — motivációs összegző
 // ============================================================
 function loadSoferMiniStats() {
@@ -887,6 +962,7 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
     initFirebaseChat(d.result);
     loadDashOrders();
     loadSoferMiniStats();
+    loadMyAssignedVehicle();
     loadGdprNotice();
 
   // ── Állapot visszaállítás ──

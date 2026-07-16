@@ -12,6 +12,7 @@ const audit = require('../lib/audit');
 const planLimits = require('../lib/planLimits');
 const { featureEnabled } = require('../lib/featureEnabled');
 const { hasPerm } = require('./permissions');
+const { normalizePlate } = require('../lib/plate');
 
 const handlers = {};
 
@@ -281,6 +282,66 @@ handlers.getMySoferOrders = async function (req, res, args) {
     } catch (err) {
       console.error('getMySoferOrders hiba:', err);
       return res.json({ result: [] });
+    }
+  };
+
+// ─── Sofőr saját párosított járműve (vontató + alapértelmezett pótkocsi) ───
+// A Belső sofőrök fülön az admin/manager a sofőrhöz rendel egy vontatót
+// (vehicles.assigned_driver_email), ahhoz pedig egy alapértelmezett pótkocsit
+// (vehicles.default_trailer_id). A sofőr így a saját felületén látja, mi van
+// kiosztva neki, és a menetlevél előtölti a rendszámokat (szerkeszthetően).
+handlers.getMyAssignedVehicle = async function (req, res, args) {
+    try {
+      if (!req.session.user || req.session.user.pozicio !== 'Sofer') {
+        return res.json({ result: { ok: false } });
+      }
+      const cid = req.session.user.company_id;
+      const email = (req.session.user.email || '').toLowerCase();
+      if (!cid || !email) return res.json({ result: { ok: true, assigned: null } });
+      const r = await pool.query(
+        `SELECT v.rendszam AS rendszam_camion, v.marca, v.model,
+                t.rendszam AS rendszam_remorca
+         FROM vehicles v
+         LEFT JOIN vehicles t ON t.id = v.default_trailer_id
+                              AND t.company_id = v.company_id AND t.tip = 'Potkocsi'
+         WHERE v.company_id = $1 AND LOWER(v.assigned_driver_email) = $2
+           AND v.tip = 'Vontato' AND v.activ = TRUE
+         ORDER BY v.rendszam LIMIT 1`,
+        [cid, email]);
+      return res.json({ result: { ok: true, assigned: r.rows.length ? r.rows[0] : null } });
+    } catch (err) {
+      console.error('getMyAssignedVehicle hiba:', err);
+      return res.json({ result: { ok: false } });
+    }
+  };
+
+// ─── Jármű utolsó ismert üzemanyag-szintje (menetlevél átvitel) ───
+// Egy adott rendszámhoz a cég legutóbbi menetleveléből a záró üzemanyag-szint
+// (cant_sfarsit), ha rögzítve volt (>0). Ez lesz a következő menetlevél kezdő
+// szintje (a sofőr felül tudja írni). A rendszám normalizálva illeszkedik
+// (szóköz/kötőjel-független). Sofőr + Admin/Manager hívhatja (mind készít
+// menetlevelet); minden lekérdezés cégre szűrve.
+handlers.getLastFuelLevel = async function (req, res, args) {
+    try {
+      if (!req.session.user || !['Sofer', 'Admin', 'Manager'].includes(req.session.user.pozicio)) {
+        return res.json({ result: { ok: false } });
+      }
+      const cid = req.session.user.company_id;
+      const plate = normalizePlate(Array.isArray(args) ? args[0] : args);
+      if (!cid || !plate) return res.json({ result: { ok: true, level: null } });
+      const r = await pool.query(
+        `SELECT cant_sfarsit FROM fuvarlevelek
+         WHERE email_sofer IN (SELECT email FROM users WHERE company_id = $1)
+           AND UPPER(REGEXP_REPLACE(COALESCE(numar_camion, ''), '[^A-Za-z0-9]', '', 'g')) = $2
+           AND cant_sfarsit IS NOT NULL AND cant_sfarsit > 0
+         ORDER BY data_completare DESC NULLS LAST
+         LIMIT 1`,
+        [cid, plate]);
+      const level = r.rows.length ? Number(r.rows[0].cant_sfarsit) : null;
+      return res.json({ result: { ok: true, level: (isFinite(level) ? level : null) } });
+    } catch (err) {
+      console.error('getLastFuelLevel hiba:', err);
+      return res.json({ result: { ok: false } });
     }
   };
 
