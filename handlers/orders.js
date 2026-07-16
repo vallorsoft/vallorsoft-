@@ -321,10 +321,18 @@ handlers.getMyAssignedVehicle = async function (req, res, args) {
 // Ezek lesznek a következő menetlevél kezdő értékei (a sofőr felül tudja írni):
 // a folytonos tankszint- és km-nyilvántartáshoz. A két érték egymástól
 // FÜGGETLENÜL a legutóbbi olyan menetlevélből jön, ahol az adott mező ki volt
-// töltve (>0) — így egy hiányos sor nem rontja el a másik átvitelt. A rendszám
-// normalizálva illeszkedik (szóköz/kötőjel-független). Sofőr + Admin/Manager
-// hívhatja (mind készít menetlevelet); minden lekérdezés cégre szűrve.
-// Visszafelé kompatibilis: a `level` mező = az üzemanyag-szint (régi név).
+// töltve (>0) — így egy hiányos sor nem rontja el a másik átvitelt.
+//
+// SORBAVÉTEL: a „legutóbbi" menetlevelet KIZÁRÓLAG a sofőr/manager/admin által a
+// menetlevélbe beírt ÉRKEZÉSI (erkezes_dt), fallback INDULÁSI (indulas_dt) dátum
+// szerint rendezzük — NEM a kitöltés/létrehozás dátuma (data_completare) szerint.
+// Így a következő menetlevél kezdő km/üzemanyag értéke a valóban legkésőbb
+// ÉRKEZETT út záró értékéből jön. (A beírt dátummal nem rendelkező sor csak
+// akkor jöhet szóba, ha nincs dátumozott — NULLS LAST.)
+//
+// A rendszám normalizálva illeszkedik (szóköz/kötőjel-független). Sofőr +
+// Admin/Manager hívhatja (mind készít menetlevelet); minden lekérdezés cégre
+// szűrve. Visszafelé kompatibilis: a `level` mező = az üzemanyag-szint (régi név).
 handlers.getLastVehicleReadings = async function (req, res, args) {
     try {
       if (!req.session.user || !['Sofer', 'Admin', 'Manager'].includes(req.session.user.pozicio)) {
@@ -334,16 +342,18 @@ handlers.getLastVehicleReadings = async function (req, res, args) {
       const plate = normalizePlate(Array.isArray(args) ? args[0] : args);
       if (!cid || !plate) return res.json({ result: { ok: true, fuel: null, km: null, level: null } });
       const norm = `UPPER(REGEXP_REPLACE(COALESCE(numar_camion, ''), '[^A-Za-z0-9]', '', 'g'))`;
+      // Sorbavétel a beírt érkezési (fallback indulási) dátum szerint.
+      const seqOrder = `ORDER BY COALESCE(erkezes_dt, indulas_dt) DESC NULLS LAST LIMIT 1`;
       const r = await pool.query(
         `SELECT
            (SELECT cant_sfarsit FROM fuvarlevelek
              WHERE (company_id = $1 OR email_sofer IN (SELECT email FROM users WHERE company_id = $1))
                AND ${norm} = $2 AND cant_sfarsit IS NOT NULL AND cant_sfarsit > 0
-             ORDER BY data_completare DESC NULLS LAST LIMIT 1) AS fuel,
+             ${seqOrder}) AS fuel,
            (SELECT km_sfarsit FROM fuvarlevelek
              WHERE (company_id = $1 OR email_sofer IN (SELECT email FROM users WHERE company_id = $1))
                AND ${norm} = $2 AND km_sfarsit IS NOT NULL AND km_sfarsit > 0
-             ORDER BY data_completare DESC NULLS LAST LIMIT 1) AS km`,
+             ${seqOrder}) AS km`,
         [cid, plate]);
       const row = r.rows[0] || {};
       const fuel = (row.fuel != null && isFinite(Number(row.fuel))) ? Number(row.fuel) : null;

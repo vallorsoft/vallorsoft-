@@ -14,6 +14,24 @@
 
 ---
 
+## 2026-07-16 — Menetlevél sorbavétel a beírt indulási/érkezési dátum szerint (km/üzemanyag-átvitel)
+
+A következő menetlevél kezdő km/üzemanyag értékét (a `getLastVehicleReadings`
+átvitel) eddig a **kitöltés/létrehozás** dátuma (`data_completare`) szerinti
+„legutóbbi" menetlevélből vettük. A helyes sorrend a sofőr/manager/admin által a
+menetlevélbe **beírt út-dátumok** szerinti — így a valóban legkésőbb ÉRKEZETT út
+záró értéke lesz a következő menetlevél kezdő értéke.
+
+- **`getLastVehicleReadings` (`handlers/orders.js`)** — a „legutóbbi" menetlevél
+  sorbavétele mostantól `ORDER BY COALESCE(erkezes_dt, indulas_dt) DESC NULLS LAST`
+  (érkezési, fallback indulási dátum), NEM `data_completare` szerint. A beírt
+  dátummal nem rendelkező sor csak akkor jöhet szóba, ha nincs dátumozott
+  (`NULLS LAST`). A `cant_sfarsit>0` / `km_sfarsit>0` szűrő + a cégre-szűrés
+  változatlan.
+- Szerver-only (a kliens hívása változatlan). **596 Jest zöld** + valós Postgres
+  16 verifikáció: a később KITÖLTÖTT, de korábban ÉRKEZETT menetlevél már nem
+  „üti felül" a valóban utolsó utat.
+
 ## 2026-07-16 — FIX: a kézi menetlevél bevétele megjelenik a sofőr statisztikájában
 
 Sofőrre osztás után a menetlevél km/diurna/fogyasztás adatai már megjelentek a
