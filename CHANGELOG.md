@@ -14,6 +14,39 @@
 
 ---
 
+## 2026-07-16 — Mobil UI rendberakás: admin/manager felső sáv + sofőr főoldal
+
+Tisztán kliens-oldali (HTML/CSS/JS), nincs szerver-/séma-változás. **596 Jest zöld.**
+
+1. **Admin/Manager felső sáv (`.vs-topbar`) mobilon nem lóg ki / nem takar (`public/style.css`)** —
+   gyökérok: a sáv (breadcrumb + kereső `flex:1` + jobb-oldali gombok: nyelv/sofőr-mód/
+   téma/értesítés) egy sorba préselődött → a jobb-oldali gombok kilógtak és a
+   `overflow-x:hidden` levágta őket (a téma-kapcsoló „eltűnt"), a kereső ráült a
+   breadcrumb-ra. Javítás: a `@media (max-width:768px)` alatt a sáv **tördel**
+   (`flex-wrap`), 1. sor = breadcrumb + gombok (mind látszik), 2. sor = teljes
+   szélességű kereső; a negatív margó a 12px-es mobil paddinghoz igazítva. `≤380px`:
+   a breadcrumb elbújik, a gombok teljes szélességben `space-between`. Minden admin/
+   manager oldalt érint (a sáv globális).
+2. **Sofőr havi statisztika 2×2, ~20%-kal kisebb (`public/sofer.css`+`sofer.js`)** —
+   gyökérok: a `soferMiniStats` inline `grid-template-columns:repeat(2,1fr)`-t adott,
+   de a sofőr oldal a `style.css`-t is betölti, amelynek mobil felülírója
+   (`[style*="display:grid"][style*="grid-template-columns"] → 1fr`) a rácsot
+   **egyoszloposra** törte (4 nagy, egymás alatti kártya). Javítás: a rács + csempék
+   most **osztályból** (`.sof-mstat-grid`/`.sof-mstat`) kapják a méretet (a felülíró
+   osztályt nem talál el) → valódi 2×2, kompaktabb (padding 12→9, ikon 20→16, érték
+   18→15px), teljes szélességű.
+3. **Sofőr kiosztott-fuvar kártya: összecsukva CSAK a fel-/lerakó cím (`public/sofer.js`)** —
+   a kártya összecsukott állapotban most kizárólag a `📍 felrakó → lerakó` címet + nyilat
+   mutatja; a meta-sor (#szám, ügyfél, kamion, státusz), a részletek és az akciógombok
+   (UIT / állomás-léptetés / áru-leadás) a **kinyíló** részbe kerültek → kattintásra
+   megnő a „buborék", a fejlécre újra kattintva összecsukható.
+4. **Sofőr felső sáv: a nyelvváltó nem lóg a névre (`sofer.html`+`sofer.css`)** —
+   eddig nem volt `#langSwitch` konténer, ezért az i18n.js **fixen, lebegve** rakta a
+   HU/RO váltót a jobb felső sarokba, rátakarva a név-jelvényt. Most inline `#langSwitch`
+   a fejlécben (logó | nyelvváltó + név), világos, olvasható pill-stílussal.
+
+---
+
 ## 2026-07-15 — Állomás-visszajelzés kiegészítés: irodai idővonal + menetlevél-előtöltés + kozmetika
 
 Három fejlesztés a sofőr 4 lépéses állomás-visszajelzéséhez (mind kliens-oldali,

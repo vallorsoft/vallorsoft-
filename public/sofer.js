@@ -814,17 +814,19 @@ function loadSoferMiniStats() {
     var s = d.result;
     if (!s || !s.ok) return;
     function n(x) { var v = parseFloat(x); return isFinite(v) ? v.toLocaleString(t('sof.locale'), { maximumFractionDigits: 0 }) : '0'; }
-    // Világos téma: fehér kártya + olvasható sötét/akcentes szöveg (a régi
-    // fehér-fehér olvashatatlan volt). Per-csempe akcent a motivációs hatáshoz.
+    // Világos téma: fehér kártya + olvasható sötét/akcentes szöveg. A méret/rács
+    // az .sof-mstat* OSZTÁLYOKBÓL jön (sofer.css) — kompakt 2×2, ~20%-kal kisebb —,
+    // NEM inline grid-stílusból (különben a style.css mobil felülírója
+    // egyoszloposra törné). Per-csempe akcent a motivációs hatáshoz.
     function tile(ico, val, lbl, accent) {
-      return '<div style="background:var(--sof-card);border:1px solid var(--sof-border);border-radius:14px;padding:12px 8px;text-align:center;box-shadow:0 2px 8px rgba(15,23,42,0.04);">'
-        + '<div style="font-size:20px;line-height:1;">' + ico + '</div>'
-        + '<div style="font-size:18px;font-weight:800;color:' + accent + ';margin-top:4px;line-height:1.1;">' + val + '</div>'
-        + '<div style="font-size:10px;font-weight:600;color:var(--sof-muted);margin-top:3px;text-transform:uppercase;letter-spacing:.3px;">' + lbl + '</div></div>';
+      return '<div class="sof-mstat">'
+        + '<div class="sof-mstat-ico">' + ico + '</div>'
+        + '<div class="sof-mstat-val" style="color:' + accent + ';">' + val + '</div>'
+        + '<div class="sof-mstat-lbl">' + lbl + '</div></div>';
     }
-    // 2×2 rács (2-2) — ne húzza el az oldalt függőlegesen.
-    box.innerHTML = '<div style="font-size:12px;font-weight:700;color:var(--sof-muted);margin:14px 0 8px;">' + t('sof.myMonthPerf') + '</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">'
+    // 2×2 rács (2-2), teljes szélességű — ne húzza el az oldalt függőlegesen.
+    box.innerHTML = '<div class="sof-mstat-h">' + t('sof.myMonthPerf') + '</div>'
+      + '<div class="sof-mstat-grid">'
       + tile('✅', n(s.lezart), t('sof.statClosed'), '#16a34a')
       + tile('🛣️', n(s.km), t('sof.statKm'), '#2563eb')
       + tile('🗓️', n(s.diurna_ext) + '+' + n(s.diurna_int), t('sof.statDiurna'), '#6366f1')
@@ -1273,8 +1275,18 @@ function renderFuvarCard(o) {
     return '<div class="fd-row"><div class="fd-cell"><span class="fd-lbl">' + t(labelKey) + '</span>' +
            '<span class="fd-val">' + esc(val) + '</span></div>' + btn + '</div>';
   }
+  // Meta-sor (#szám, ügyfél, kamion, státusz) — a KINYÍLÓ részbe kerül,
+  // hogy összecsukott állapotban CSAK a fel-/lerakó cím látszódjon.
+  var metaHtml =
+    '<div class="fuvar-meta">' +
+      '<span>#' + o.id + '</span>' +
+      (o.client ? '<span>' + esc(o.client) + '</span>' : '') +
+      (truck ? '<span>' + truck + '</span>' : '') +
+      '<span class="fuvar-status ' + statusCls + '">' + statusTxt + '</span>' +
+    '</div>';
   var details =
     '<div class="fuvar-details" id="det_' + o.id + '" style="display:none">' +
+      metaHtml +
       (o.client ? '<div class="fd-firma">🏢 ' + esc(o.client) + '</div>' : '') +
       '<div class="fd-sec">' +
         '<div class="fd-sec-h">⬆️ ' + t('sof.det.loading') + '</div>' +
@@ -1305,26 +1317,24 @@ function renderFuvarCard(o) {
           '</div>';
         }).join('') +
       '</div>' : '') +
+      // Akciógombok (UIT / állomás-léptetés / áru-leadás) — szintén a
+      // kinyíló részben, hogy összecsukva tiszta legyen a kártya.
+      '<div class="fuvar-actions">' +
+        '<button class="sh-btn uit" onclick="SoferUit.open(\'' + o.id + '\')" title="' + t('sof.uitTitle') + '">🚛 UIT</button>' +
+        actionBtn +
+        hoBtn +
+      '</div>' +
     '</div>';
+  // Összecsukott állapot: CSAK a fel-/lerakó cím + nyíl; kattintásra kinyílik
+  // (megnő a kártya) a többi infóval, a fejlécre újra kattintva összecsukható.
   return '' +
     '<div class="fuvar-card">' +
       '<div class="fuvar-head" role="button" tabindex="0" onclick="toggleFuvarDetails(\'' + o.id + '\')" ' +
            'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleFuvarDetails(\'' + o.id + '\');}">' +
         '<div class="fuvar-destination">📍 ' + esc(o.loc_incarcare||'—') + ' → ' + esc(o.loc_descarcare||'—') +
           '<span class="fuvar-expand" id="exp_' + o.id + '">▾</span></div>' +
-        '<div class="fuvar-meta">' +
-          '<span>#' + o.id + '</span>' +
-          (o.client ? '<span>' + esc(o.client) + '</span>' : '') +
-          (truck ? '<span>' + truck + '</span>' : '') +
-          '<span class="fuvar-status ' + statusCls + '">' + statusTxt + '</span>' +
-        '</div>' +
       '</div>' +
       details +
-      '<div class="fuvar-actions">' +
-        '<button class="sh-btn uit" onclick="SoferUit.open(\'' + o.id + '\')" title="' + t('sof.uitTitle') + '">🚛 UIT</button>' +
-        actionBtn +
-        hoBtn +
-      '</div>' +
     '</div>';
 }
 
