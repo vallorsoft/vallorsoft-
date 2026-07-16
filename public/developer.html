@@ -167,6 +167,7 @@
     <div class="dev-tab" onclick="showPane('elofiz')" data-i18n-html="dev.tabElofiz">📦 Előfizetések</div>
     <div class="dev-tab" onclick="showPane('bank');loadBankDetails()">🏦 Banki adatok</div>
     <div class="dev-tab" onclick="showPane('payments');loadPaymentRequests()">💸 Fizetési kérelmek</div>
+    <div class="dev-tab" onclick="showPane('orphanwb');loadOrphanWaybills()">🧾 Árva menetlevelek</div>
     <div style="margin-top:auto; padding-top:20px; border-top:1px solid var(--border);">
       <div id="devBadge" style="font-size:12px; color:var(--muted); margin-bottom:10px;">—</div>
       <button class="btn-danger-sm" style="width:100%;" onclick="logout()" data-i18n="common.logout">Kilépés</button>
@@ -479,6 +480,21 @@
             <th>Referencia</th><th>EUR</th><th>RON bruttó</th><th>Státusz</th><th>Művelet</th>
           </tr></thead>
           <tbody id="paymentReqTbody"><tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Árva menetlevelek: company_id NULL (törölt sofőr + nincs fuvar/rendszám-jel) -->
+    <div class="dev-pane hidden" id="pane-orphanwb">
+      <div class="section-title">🧾 Árva menetlevelek (cég nélkül)</div>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 12px;">Ezeknek a menetleveleknek nincs cég-hozzárendelése (pl. a létrehozó sofőrt törölték, és nincs fuvar- vagy egyértelmű rendszám-egyezés). Rendeld a megfelelő céghez — utána megjelennek a cég Fuvarlevelek oldalán. A „tippelt cég" a menetlevél rendszámából származik (ha egyértelmű).</p>
+      <div class="glass" style="padding:0;overflow:hidden;">
+        <table class="table">
+          <thead><tr>
+            <th>Dátum</th><th>Sofőr</th><th>E-mail</th><th>Rendszám</th>
+            <th>Sorszám</th><th>Km</th><th>Bevétel</th><th>Tippelt cég</th><th>Hozzárendelés</th>
+          </tr></thead>
+          <tbody id="orphanWbTbody"><tr><td colspan="9" style="text-align:center;color:var(--muted);padding:20px;">Betöltés...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1858,6 +1874,51 @@ async function activatePayment(id) {
 
 function escDev(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Árva menetlevelek (company_id NULL) — kézi cég-hozzárendelés ──
+var _orphanCompanies = [];
+async function loadOrphanWaybills() {
+  const d = await gas('devListOrphanWaybills');
+  const tbody = document.getElementById('orphanWbTbody');
+  if (!d || !d.ok) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#ef4444;padding:20px;">Hiba: ' + escDev(d && d.err || 'ismeretlen') + '</td></tr>'; return; }
+  _orphanCompanies = d.companies || [];
+  if (!d.waybills || !d.waybills.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#22c55e;padding:20px;">Nincs árva menetlevél — minden menetlevél céghez van rendelve. ✅</td></tr>';
+    return;
+  }
+  tbody.innerHTML = d.waybills.map(function(w) {
+    const dt = w.data_completare ? new Date(w.data_completare).toLocaleDateString('ro-RO') : '—';
+    const plate = escDev(w.numar_camion || '—') + (w.numar_remorca ? ' / ' + escDev(w.numar_remorca) : '');
+    const guessSel = w.guessed_company_id || '';
+    const opts = '<option value="">— válassz céget —</option>' + _orphanCompanies.map(function(c) {
+      return '<option value="' + c.id + '"' + (String(c.id) === String(guessSel) ? ' selected' : '') + '>' + escDev(c.nev) + '</option>';
+    }).join('');
+    const guessNote = w.guessed_company_nev ? '<div style="font-size:10px;color:#22c55e;margin-top:2px;">tipp: ' + escDev(w.guessed_company_nev) + '</div>' : '';
+    return '<tr>'
+      + '<td style="white-space:nowrap;">' + dt + '</td>'
+      + '<td>' + escDev(w.nume_sofer || '—') + '</td>'
+      + '<td style="font-size:11px;color:var(--muted);">' + escDev(w.email_sofer || '—') + '</td>'
+      + '<td style="font-family:monospace;">' + plate + '</td>'
+      + '<td>' + escDev(w.numar_fisa || '—') + '</td>'
+      + '<td style="text-align:right;">' + (parseFloat(w.total_km)||0) + '</td>'
+      + '<td style="text-align:right;">' + (w.total_pret ? '€' + (parseFloat(w.total_pret)||0).toFixed(2) : '—') + '</td>'
+      + '<td>' + guessNote + '</td>'
+      + '<td style="display:flex;gap:6px;align-items:center;">'
+        + '<select id="owc-' + escDev(w.id) + '" style="padding:5px 8px;border-radius:6px;font-size:12px;max-width:150px;">' + opts + '</select>'
+        + '<button onclick="assignOrphanWaybill(\'' + escDev(w.id) + '\')" style="background:#3b82f6;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">→ Hozzárendel</button>'
+      + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+async function assignOrphanWaybill(id) {
+  const sel = document.getElementById('owc-' + id);
+  const cid = sel ? sel.value : '';
+  if (!cid) { alert('Válassz céget a legördülőből.'); return; }
+  const d = await gas('devAssignWaybillCompany', [id, parseInt(cid, 10)]);
+  if (!d || !d.ok) { alert('Hiba: ' + (d && d.err || 'ismeretlen')); return; }
+  loadOrphanWaybills();
 }
 
 </script>
