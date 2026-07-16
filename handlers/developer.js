@@ -962,4 +962,47 @@ handlers.devActivatePayment = async function (req, res, args) {
   return res.json({ result: { ok: true, paid_until: newPaidUntil.toISOString().slice(0, 10) } });
 };
 
+// ── Árva menetlevelek (company_id NULL) — kézi cég-hozzárendelés (is_dev) ──
+// Azok a menetlevelek, amelyek egyetlen automatikus horgonyzási forrással sem
+// állíthatók vissza (törölt sofőr + nincs fuvar-hivatkozás + nincs egyértelmű
+// rendszám-egyezés). A developer itt látja őket az azonosító adatokkal, és a
+// megfelelő céghez rendeli. Tartalék az automatikus (order/plate) backfill mögé.
+handlers.devListOrphanWaybills = async function (req, res) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  // A menetlevél alapadatai + a rendszámból tippelt cég (ha egyértelmű) segítségként.
+  const r = await pool.query(
+    `SELECT f.id, f.nume_sofer, f.email_sofer, f.numar_camion, f.numar_remorca,
+            f.numar_fisa, f.data_completare, f.total_km, f.total_pret, f.order_ids,
+            g.company_id AS guessed_company_id, gc.nev AS guessed_company_nev
+     FROM fuvarlevelek f
+     LEFT JOIN LATERAL (
+       SELECT MIN(v.company_id) AS company_id, COUNT(DISTINCT v.company_id) AS ncomp
+       FROM vehicles v
+       WHERE COALESCE(TRIM(v.rendszam),'') <> ''
+         AND UPPER(REGEXP_REPLACE(v.rendszam,'[^A-Za-z0-9]','','g'))
+             = UPPER(REGEXP_REPLACE(COALESCE(f.numar_camion,''),'[^A-Za-z0-9]','','g'))
+     ) g ON g.ncomp = 1
+     LEFT JOIN companies gc ON gc.id = g.company_id
+     WHERE f.company_id IS NULL
+     ORDER BY f.data_completare DESC NULLS LAST LIMIT 300`
+  );
+  // Cég-lista a hozzárendelő legördülőhöz.
+  const comp = await pool.query('SELECT id, nev FROM companies ORDER BY nev');
+  return res.json({ result: { ok: true, waybills: r.rows, companies: comp.rows } });
+};
+
+handlers.devAssignWaybillCompany = async function (req, res, args) {
+  if (!req.session.user?.is_dev) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+  const id = String((args && args[0]) || '').trim();
+  const companyId = parseInt((args && args[1]), 10);
+  if (!id || !Number.isInteger(companyId)) return res.json({ result: { ok: false, err: 'Parametri lipsa' } });
+  const c = await pool.query('SELECT id FROM companies WHERE id = $1', [companyId]);
+  if (!c.rows.length) return res.json({ result: { ok: false, err: 'Compania nu a fost gasita' } });
+  const r = await pool.query(
+    'UPDATE fuvarlevelek SET company_id = $2 WHERE id = $1 AND company_id IS NULL', [id, companyId]);
+  if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost gasit / deja alocat' } });
+  try { await audit.fromReq(req, 'developer.waybill_assign_company', 'fuvarlevel', id, { company_id: companyId }); } catch (_) {}
+  return res.json({ result: { ok: true } });
+};
+
 module.exports = handlers;

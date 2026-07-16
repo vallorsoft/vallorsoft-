@@ -14,6 +14,27 @@
 
 ---
 
+## 2026-07-16 — Árva menetlevél helyreállítás bővítése: rendszám-alapú backfill + developer kézi hozzárendelő
+
+Az admin által **kézzel** létrehozott menetlevélnek jellemzően NINCS fuvar-
+hivatkozása (`order_ids` üres — időszaki keresetből születik), ezért a fuvar-alapú
+backfill nem éri el, ha a menetlevelet egy azóta törölt sofőrhöz rendelték. Két új
+helyreállítási út:
+
+1. **Rendszám-alapú backfill** — `db/fuvarlevelek-company-id-plate-backfill.sql`
+   (idempotens, valós Postgres 16-on verifikálva): az árva menetlevél `numar_camion`
+   (majd `numar_remorca`) rendszámát a cégek járműveihez (`vehicles.rendszam`)
+   illeszti; ha **egyértelműen** egyetlen céghez tartozik, annak a horgonyát kapja.
+   Kétértelmű rendszámnál NEM állít vissza → nincs cross-tenant elszivárgás.
+2. **Developer „🧾 Árva menetlevelek" fül** (`public/developer.html` +
+   `handlers/developer.js` `devListOrphanWaybills`/`devAssignWaybillCompany`, is_dev):
+   a maradék, automatikusan nem visszaállítható menetlevelek (törölt sofőr + nincs
+   fuvar/egyértelmű rendszám) listája az azonosító adatokkal + a rendszámból **tippelt
+   cég**; a developer egy legördülővel a helyes céghez rendeli (audit-naplózva).
+   Garantált manuális helyreállítás bármely árva sorra.
+
+**596 Jest zöld** + mock-db handler-teszt + valós Postgres backfill-verifikáció.
+
 ## 2026-07-16 — FIX: belső sofőr törlésekor a menetlevelei/dokumentumai NE vesszenek el
 
 **Gyökérok:** a menetlevél (`fuvarlevelek`) és a sofőr-dokumentum (`documents`)
