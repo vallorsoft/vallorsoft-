@@ -660,6 +660,7 @@ handlers.getDriverStats = async function (req, res, args) {
               COALESCE(SUM(f.motorina_folosit),0)::numeric AS motorina,
               COALESCE(SUM(f.diurna_externa),0)::int AS diurna_ext,
               COALESCE(SUM(f.diurna_interna),0)::int AS diurna_int,
+              COALESCE(SUM(f.total_pret),0)::numeric AS menetlevel_bevetel,
               COALESCE(SUM((SELECT COALESCE(SUM((a->>'suma')::numeric),0) FROM jsonb_array_elements(f.alimentari) a)),0) AS uzemanyag_ktg,
               COALESCE(SUM((SELECT COALESCE(SUM((c->>'pret')::numeric),0) FROM jsonb_array_elements(f.achizitii) c)),0) AS vasarlas_ktg
        ${FUV_FROM}
@@ -675,11 +676,17 @@ handlers.getDriverStats = async function (req, res, args) {
     }, r)));
     fuvR.rows.forEach((r) => {
       const cur = map.get(r.email) || { email: r.email, nume: r.nume, fuvarok: 0, lezart: 0, bevetel: 0, km: 0 };
+      // A kézi menetlevél bevétele (total_pret) a sofőr bevételéhez adódik — így
+      // a Sofőrök nézet a fuvar (orders) ÉS a kézi menetlevél bevételét is mutatja
+      // (összhangban az Áttekintés összbevételével). Az orders-bevétel megmarad.
+      const mlBev = parseFloat(r.menetlevel_bevetel) || 0;
       Object.assign(cur, {
         nume: cur.nume || r.nume,
         menetlevelek: r.menetlevelek, total_km: r.total_km, motorina: r.motorina,
         diurna_ext: r.diurna_ext, diurna_int: r.diurna_int,
-        uzemanyag_ktg: r.uzemanyag_ktg, vasarlas_ktg: r.vasarlas_ktg
+        uzemanyag_ktg: r.uzemanyag_ktg, vasarlas_ktg: r.vasarlas_ktg,
+        menetlevel_bevetel: mlBev,
+        bevetel: (parseFloat(cur.bevetel) || 0) + mlBev
       });
       map.set(r.email, cur);
     });
