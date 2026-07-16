@@ -2292,6 +2292,7 @@
     'sof.locale': { hu: 'hu-HU', ro: 'ro-RO' },
     'sof.noWaybillOrders': { hu: 'Nincs menetlevélbe vehető fuvar.', ro: 'Nu există curse disponibile pentru foaia de parcurs.' },
     'sof.pickAtLeastOne': { hu: 'Jelölj be legalább egy fuvart!', ro: 'Bifează cel puțin o cursă!' },
+    'sof.myVehicle': { hu: 'Nekem kiosztott jármű', ro: 'Vehiculul meu alocat' },
     'sof.noOrderWaybill': { hu: '➕ Menetlevél fuvar nélkül', ro: '➕ Foaie de parcurs fără cursă' },
     'sof.noOrderSummary': { hu: '📄 Menetlevél kiválasztott fuvar nélkül', ro: '📄 Foaie de parcurs fără cursă selectată' },
     'sof.selectedOrders': { hu: '{n} fuvar kiválasztva:', ro: '{n} curse selectate:' },
