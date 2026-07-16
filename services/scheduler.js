@@ -440,7 +440,7 @@ function startMonthlyReportScheduler() {
                   COALESCE(SUM((SELECT COALESCE(SUM((x->>'pret')::numeric),0) FROM jsonb_array_elements(f.achizitii) x)),0) AS vasarlas
            FROM fuvarlevelek f
            JOIN users u ON LOWER(u.email)=LOWER(f.email_sofer) AND u.company_id=$1
-           WHERE f.data_completare >= $2::date AND f.data_completare < $3::date`, [c.id, from, to]);
+           WHERE COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) >= $2::date AND COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) < $3::date`, [c.id, from, to]);
         const k = kpiR.rows[0], fv = fuvR.rows[0];
 
         const row = (l, v) => '<tr><td style="padding:6px 10px;border-bottom:1px solid #ece3d8;color:#8a7d6e;">' + l

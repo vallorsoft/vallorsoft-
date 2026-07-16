@@ -14,6 +14,33 @@
 
 ---
 
+## 2026-07-16 — MINDEN menetlevél-szűrés/rendezés/statisztika a beírt út-dátum szerint (nem a kitöltés dátuma)
+
+A menetlevél korábban sok helyen a **kitöltés/létrehozás** dátuma (`data_completare`)
+szerint szűrődött/rendeződött/összesítődött. Kérésre mostantól MINDENHOL a
+sofőr/manager/admin által beírt **tényleges út-dátum** számít: az érkezési
+(`erkezes_dt`), fallback indulási (`indulas_dt`), végső fallback a kitöltés
+(`data_completare`, csak a dátum nélküli régi soroknál).
+
+- **Statisztika** (`handlers/statisticsHandlers.js`) — a közös `FUV_FROM` blokk új
+  `eff_date` = `COALESCE(erkezes_dt, indulas_dt, data_completare)` oszlopot ad; MINDEN
+  menetlevél-alapú szűrés/havi-bontás (`WHERE`/`TO_CHAR`/`ORDER BY`) erre vált
+  (Áttekintés bevétel/km/diurna/fogyasztás idősor, Üzemanyag, Vásárlások, Sofőrök,
+  Járművek). A `getMySoferStats` (sofőr havi mini-stat) is a beírt út-dátum szerint
+  számol. A megjelenített dátum-oszlopok is az út-dátumot mutatják (`AS data_completare`).
+- **Fuvarlevelek lista** (`handlers/documents.js`) — rendezés
+  `COALESCE(erkezes_dt, indulas_dt, data_completare) DESC`.
+- **Sofőr-elszámolás (decont), szerviz-esedékesség km, üzemanyag/vásárlás riport**
+  (`handlers/fleetCompliance.js`) — a dátum-szűrők az út-dátumra váltva.
+- **Globális kereső** (`handlers/globalSearch.js`) + **developer árva-menetlevél lista**
+  (`handlers/developer.js`) — rendezés az út-dátum szerint.
+- **Havi e-mail riport** (`services/scheduler.js`) — a menetlevél-aggregáció az
+  út-dátum szerint.
+- Szerver-only; a `finalized_at`/`created_at` alapú **fuvar (orders)** metrikák
+  változatlanok (azok nem a menetlevél kitöltés-dátuma). **596 Jest zöld** + valós
+  Postgres 16 verifikáció (a júniusban ÉRKEZETT, de júliusban KITÖLTÖTT menetlevél a
+  júniusi hónaphoz számít).
+
 ## 2026-07-16 — Menetlevél sorbavétel a beírt indulási/érkezési dátum szerint (km/üzemanyag-átvitel)
 
 A következő menetlevél kezdő km/üzemanyag értékét (a `getLastVehicleReadings`

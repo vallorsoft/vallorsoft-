@@ -167,14 +167,14 @@ handlers.getFuvarlevelek = async function (req, res, args) {
         r = await pool.query(
           `SELECT id, file_name, numar_fisa, email_sofer, nume_sofer, data_completare, total_km, consum_100, numar_camion, order_ids
            FROM fuvarlevelek WHERE company_id = $2 OR email_sofer = ANY($1)
-           ORDER BY data_completare DESC LIMIT 200`,
+           ORDER BY COALESCE(erkezes_dt, indulas_dt, data_completare) DESC LIMIT 200`,
           [emails, cid]
         );
       } else {
         r = await pool.query(
           `SELECT id, file_name, numar_fisa, email_sofer, nume_sofer, data_completare, total_km, consum_100, numar_camion, order_ids
            FROM fuvarlevelek WHERE email_sofer = $1
-           ORDER BY data_completare DESC LIMIT 200`,
+           ORDER BY COALESCE(erkezes_dt, indulas_dt, data_completare) DESC LIMIT 200`,
           [me.email]
         );
       }

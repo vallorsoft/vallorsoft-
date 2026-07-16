@@ -120,7 +120,7 @@ handlers.globalSearch = async function (req, res, args) {
             WHERE (f.numar_fisa ILIKE '%'||$2||'%' OR f.nume_sofer ILIKE '%'||$2||'%'
                    OR f.numar_camion ILIKE '%'||$2||'%' OR f.loc_plecare ILIKE '%'||$2||'%'
                    OR f.loc_sosire ILIKE '%'||$2||'%')
-            ORDER BY f.data_completare DESC
+            ORDER BY COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) DESC
             LIMIT 6`,
           [cid, like]
         ).catch(() => ({ rows: [] }))
