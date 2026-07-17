@@ -14,6 +14,27 @@
 
 ---
 
+## 2026-07-16 — UX: bezárható fuvarkérés-értesítő + sofőr telefonos vissza-gomb + kézi sofőrnév védelme
+
+Három kliens-oldali UX-javítás (nincs szerver-/séma-változás):
+
+1. **Bezárható „beérkező fuvarkérés" értesítő** — a lebegő `#inboundAlert` sáv (admin/
+   manager) most **✕ gombot** kapott (`console-shared.js`): bezárva elrejtődik, és csak
+   akkor jön vissza, ha **újabb** kérés érkezik (a feldolgozatlan szám a bezáráskori fölé
+   nő — `window._inboundDismissedCount`). CSS `.ia-x` (`_inboundEnsureStyle`).
+2. **Sofőr telefonos „vissza" gomb — appon belüli visszalépés, nincs kijelentkezés**
+   (`sofer.js`): a rendszer-vissza gombot elkapjuk (History API csapda) — (a) menetlevél
+   2. lépésén → vissza az 1. lépésre; (b) nyitott modal → bezárás; (c) al-oldalon → vissza
+   a főoldalra; (d) a főoldalon **dupla** visszával lép ki (a session megmarad). Egyetlen
+   vissza-nyomás többé nem jelentkeztet ki. i18n `sof.backExitHint` (RO+HU).
+3. **Kézi sofőrnév védelme a menetlevél-szerkesztőben** (`console-shared.js` `feDriverPicked`):
+   a sofőr-választóból történő választás a nevet **CSAK akkor tölti ki, ha a mező üres** — a
+   kézzel beírt/módosított nevet **soha nem írja felül**. A választó a statisztika-horgonyt
+   (`email_sofer`) állítja, a megjelenített név kézzel szabadon marad.
+
+Cache-bust `console-shared.js`/`i18n.js`/`sofer.js` `?v=20260716uxfix`. **596 Jest zöld**
++ DOM-shim harness (kézi név megmarad / üres név kitöltődik / banner-dismiss logika).
+
 ## 2026-07-16 — Régi/törölt sofőr menetleveleinek tömeges átrendezése aktuális sofőrre (statisztika-szellem megszüntetése)
 
 A törölt sofőr helyreállított (company_id-horgonyzott) menetlevelei a statisztikában
