@@ -3,8 +3,9 @@ name: CI
 # Minden PR-en és a main-be való push után lefuttatja a Jest-tesztcsomagot.
 # A DATABASE_URL beállításával a valódi-DB integrációs suite is fut (db-orders.test.js);
 # enélkül (helyben) az a suite kihagyódik, a mock-tesztek mennek.
-# Main-push után sikeres tesztek esetén automatikusan élesít Render-re
-# (RENDER_DEPLOY_HOOK_URL GitHub Secret szükséges — Render → Service → Settings → Deploy Hooks).
+# Main-push után sikeres tesztek esetén automatikusan élesít a Fly.io-ra
+# (vallorsoft.fly.dev, FLY_API_TOKEN GitHub Secret). A Rendert MÁR NEM használjuk
+# (elköltöztünk Fly.io-ra); a Render deploy-hook lépés törölve.
 on:
   push:
     branches: [main]
@@ -47,24 +48,6 @@ jobs:
         run: npm ci
       - name: Run tests (mock + valódi DB)
         run: npm test
-
-  deploy:
-    name: Deploy to Render
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    steps:
-      - name: Trigger Render deploy hook
-        env:
-          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        run: |
-          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
-            echo "RENDER_DEPLOY_HOOK_URL secret nincs beállítva — Render deploy kihagyva."
-            exit 0
-          fi
-          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
-          echo "Render deploy triggered."
 
   # Az ÉLES oldal a Fly.io-n fut (vallorsoft.fly.dev) — minden sikeres main-merge
   # automatikusan élesedjen ott is. Egyszeri teendő: a FLY_API_TOKEN GitHub secret
