@@ -2288,8 +2288,12 @@ function feDriverPicked(){
   var em=document.getElementById('feEmailSofer');
   if(sel.value){
     if(em) em.value=sel.value;
+    // A nevet CSAK akkor töltjük ki a választott sofőréből, ha a mező ÜRES —
+    // a kézzel beírt/módosított nevet SOSEM írjuk felül (a választó a statisztika-
+    // horgonyt = email_sofer állítja, a megjelenített név kézzel szabadon marad).
     var nm=opt?opt.getAttribute('data-nume'):'';
-    if(nm) document.getElementById('feNumeSofer').value=nm;
+    var nameEl=document.getElementById('feNumeSofer');
+    if(nm && nameEl && !String(nameEl.value||'').trim()) nameEl.value=nm;
   } else {
     if(em) em.value='';
   }
@@ -3021,6 +3025,10 @@ function _inboundEnsureStyle(){
     '#inboundAlert .ia-txt{flex:1}'+
     '#inboundAlert .ia-cnt{font-weight:800;color:var(--status-warn,#f59e0b)}'+
     '#inboundAlert .ia-sub{font-size:11px;color:var(--text-muted,#8a97a8);margin-top:2px}'+
+    '#inboundAlert .ia-x{flex:0 0 auto;align-self:flex-start;margin:-4px -4px 0 2px;'+
+      'width:24px;height:24px;line-height:24px;text-align:center;border-radius:8px;'+
+      'font-size:13px;color:var(--text-muted,#8a97a8);cursor:pointer;user-select:none}'+
+    '#inboundAlert .ia-x:hover{background:rgba(148,163,184,.2);color:var(--text-primary,#e9eef5)}'+
     '.main-content[data-theme="light"] #inboundAlert{background:#fff;color:#1f2d3d}'+
     '@keyframes inboundPulse{0%,100%{box-shadow:0 10px 30px rgba(0,0,0,.35)}'+
       '50%{box-shadow:0 0 0 4px rgba(245,158,11,.25),0 10px 30px rgba(0,0,0,.35)}}'+
@@ -3038,11 +3046,19 @@ function _inboundEnsureBanner(){
   el.id='inboundAlert';
   el.setAttribute('role','button');
   el.title='Cereri / Megrendelések';
-  el.innerHTML='<span class="ia-ico">🔔</span><div class="ia-txt"></div>';
+  el.innerHTML='<span class="ia-ico">🔔</span><div class="ia-txt"></div><span class="ia-x" title="Închide / Bezárás">✕</span>';
   // Ha van ügyfél (portál) kérés, oda ugrunk; különben az e-mail Megrendelésekre.
   el.onclick=function(){
     var go=(window._inboundPortalCount>0)?'client-requests':'inbound';
     if(typeof activateTab==='function') activateTab(go);
+  };
+  // ✕ = a sáv elrejtése; a jelenlegi (feldolgozatlan) darabszámra „elnémítjuk",
+  // így csak akkor jön vissza, ha ÚJABB kérés érkezik (nő a szám).
+  var x=el.querySelector('.ia-x');
+  if(x) x.onclick=function(ev){
+    ev.stopPropagation();
+    window._inboundDismissedCount=(typeof window._inboundPrevCount==='number')?window._inboundPrevCount:0;
+    el.style.display='none';
   };
   document.body.appendChild(el);
   return el;
@@ -3063,8 +3079,10 @@ function _inboundUpdateUi(d){
   // Sidebar-badge-ek: az ügyfél-kérések a „client-requests", az e-mail intake az „inbound" fülön
   _inboundSetBadge('client-requests', portal);
   _inboundSetBadge('inbound', email);
-  // Lebegő sáv (csak ha van feldolgozatlan)
-  if(count>0){
+  // Lebegő sáv (csak ha van feldolgozatlan) — de ha a felhasználó ✕-szel bezárta,
+  // csak akkor jön vissza, ha ÚJABB kérés érkezik (a szám a bezáráskori fölé nő).
+  var dismissed=(typeof window._inboundDismissedCount==='number') && count<=window._inboundDismissedCount;
+  if(count>0 && !dismissed){
     var roTxt = portal>0
       ? (portal+' cerere(ri) noi de la clienți')
       : (count+' comand(ă/ri) noi de procesat');

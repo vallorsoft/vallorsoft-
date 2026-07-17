@@ -330,6 +330,46 @@ function goSec(id) {
 }
 
 // ============================================================
+// TELEFONOS „VISSZA" GOMB — appon belüli visszalépés (ne jelentkezzen ki)
+// ============================================================
+// A rendszer-vissza gombot elkapjuk: (1) menetlevél 2. lépésén → vissza az 1.
+// lépésre; (2) nyitott modal → bezárás; (3) al-oldalon → vissza a főoldalra;
+// (4) a főoldalon DUPLA visszával lép ki (a session megmarad). Így egyetlen
+// vissza-nyomás nem lép ki / nem jelentkeztet ki, csak visszanavigál.
+(function initSoferBackButton(){
+  var _backTs = 0, _exiting = false;
+  function repush(){ try { history.pushState({ vsSofer: true }, ''); } catch(e){} }
+  try { history.pushState({ vsSofer: true }, ''); } catch(e){}   // kezdő csapda-állapot
+  window.addEventListener('popstate', function(){
+    if (_exiting) return;
+    // 1) Menetlevél 2. lépés → vissza az 1. lépésre
+    var step2 = document.getElementById('fuvarStep2');
+    var fuvarSec = document.getElementById('sec-fuvar');
+    if (fuvarSec && !fuvarSec.classList.contains('hidden') && step2 && step2.style.display !== 'none') {
+      try { fuvarBackStep1(); } catch(e){}
+      repush(); return;
+    }
+    // 2) Nyitott modal → bezárás (áru-leadás / hibajelentés)
+    var ho = document.getElementById('hoModal'), bug = document.getElementById('bugModal');
+    if (ho && ho.style.display === 'flex')  { try { closeHandover(); }  catch(e){} repush(); return; }
+    if (bug && bug.style.display === 'flex') { try { closeBugReport(); } catch(e){} repush(); return; }
+    // 3) Al-oldalon → vissza a főoldalra
+    var active = 'dash';
+    ['dash','border','fuvar','docs','chat'].forEach(function(s){
+      var el = document.getElementById('sec-'+s);
+      if (el && !el.classList.contains('hidden')) active = s;
+    });
+    if (active !== 'dash') { try { goSec('dash'); } catch(e){} repush(); return; }
+    // 4) Főoldalon: dupla-vissza (2 mp-en belül) → kilépés; egyébként jelzés + maradás
+    var now = Date.now();
+    if (now - _backTs < 2000) { _exiting = true; try { history.back(); } catch(e){} return; }
+    _backTs = now;
+    try { toast(t('sof.backExitHint'), ''); } catch(e){}
+    repush();
+  });
+})();
+
+// ============================================================
 // HATÁRÁTLÉPÉS
 // ============================================================
 function sendBorderCross(tip, tara) {
