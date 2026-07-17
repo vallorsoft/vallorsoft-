@@ -14,6 +14,22 @@
 
 ---
 
+## 2026-07-17 — CI: Render-deploy kivéve, éles CSAK Fly.io
+
+A Rendert többé NEM használjuk / NEM deployoljuk — az éles oldal a **Fly.io**-n fut
+(`vallorsoft.fly.dev`, `FLY-DEPLOY.md`).
+
+1. **`.github/workflows/ci.yml`** — a `deploy` job (Render deploy-hook `curl`) TÖRÖLVE.
+   Marad: `test` (Jest, Node 22 + Postgres 16) + `deploy-fly`
+   (`superfly/flyctl-actions`, `FLY_API_TOKEN` secret). A workflow-fejléc kommentje is
+   frissítve. A `RENDER_DEPLOY_HOOK_URL` GitHub secret elhagyható.
+2. **`CLAUDE.md` ELSŐ SZABÁLY** — új 7. pont: „Éles deploy = CSAK Fly.io. A Rendert
+   NEM használjuk / NEM deployoljuk. Ne állítsd vissza a Render-lépést, ne javasold
+   Renderre költözést. Fly deploy elakadásnál azt javítsd — NE tegyél oda
+   Render-fallbacket." A múltbeli történelmi Render-bejegyzések (2026-06-14 kör,
+   ANAF-log, APP_URL-fix hivatkozások) érintetlenek — csak az élő deploy útvonala
+   változott.
+
 ## 2026-07-17 — Sofőr havi mini-statisztika: előző havi érték minden csempén (viszonyítás)
 
 A sofőr főoldali 4 mini-csempéjén (LEZÁRT FUVAR / KM / DIURNA / TANKOLVA) mostantól az
