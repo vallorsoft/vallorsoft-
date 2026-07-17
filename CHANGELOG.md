@@ -14,6 +14,26 @@
 
 ---
 
+## 2026-07-17 — Régi/törölt sofőr adatainak VÉGLEGES törlése + sofőr mini-statisztika forrás-megerősítés
+
+1. **Szellem-sofőr törlése (Belső sofőrök fül)** — a „🔀 Régi sofőr menetleveleinek
+   átrendezése" kártyán minden szellem-sofőr sorában új **🗑️ Törlés** gomb (megerősítő
+   ablakkal). Új `purgeDriverData(email)` handler (`handlers/documents.js`, Admin/Manager,
+   audit): **véglegesen** törli az adott email menetleveleit + feltöltött dokumentumait
+   (→ eltűnik a statisztikából), bontja a jármű-hozzárendelést, és ha maradt hozzá
+   Sofer-felhasználó a cégben, azt is törli. Csak a SAJÁT cég adatait érinti
+   (`company_id`-horgony/cég-user); önmagát (admint) nem törölheti. A kártya akkor is
+   megjelenik, ha nincs átrendezési cél-sofőr (a törlés így is elérhető). i18n `cs.gd.delete*`.
+2. **Sofőr havi mini-statisztika forrás-megerősítés** (`getMySoferStats`) — a **LEZÁRT
+   FUVAR** a tényleges lezárt (`Finalizat`) fuvarokból számol (robusztus hónap-szűrő:
+   `COALESCE(finalized_at, data_descarcare, created_at)` — hiányzó `finalized_at` sem rejt
+   el fuvart); a **KM / DIURNA / TANKOLVA** a sofőrre kiosztott VAGY általa készített
+   menetlevelekből (`email_sofer` = sofőr, beírt út-dátum szerinti hónap). *(Ha a mutatók
+   0-t mutatnak, az adat jellemzően egy másik/törölt e-mail alatt van — a szellem-sofőr
+   kártyán átrendezhető a helyes sofőrre.)*
+
+Cache-bust `console-shared.js`/`i18n.js` `?v=20260717purge`. **596 Jest zöld** + mock-db teszt.
+
 ## 2026-07-16 — UX: bezárható fuvarkérés-értesítő + sofőr telefonos vissza-gomb + kézi sofőrnév védelme
 
 Három kliens-oldali UX-javítás (nincs szerver-/séma-változás):

@@ -1085,20 +1085,26 @@ function loadGhostDrivers(){
     _ghostCurrentDrivers = r.current || [];
     _ghostEmailMap = {};
     var ghosts = (r.drivers||[]).filter(function(d){ return !d.is_current; });
-    if(!ghosts.length || !_ghostCurrentDrivers.length){ box.style.display='none'; box.innerHTML=''; return; }
+    if(!ghosts.length){ box.style.display='none'; box.innerHTML=''; return; }
+    var hasTargets = _ghostCurrentDrivers.length > 0;
     var opts = '<option value="">'+esc(t('cs.gd.pickTarget'))+'</option>' + _ghostCurrentDrivers.map(function(c){
       return '<option value="'+esc(c.email)+'">'+esc(c.nume||c.email)+'</option>';
     }).join('');
     var rows = ghosts.map(function(g, i){
       var sid = 'gd'+i;
       _ghostEmailMap[sid] = g.email;   // az emailt gyorsítótárból olvassuk, nem HTML-attribútumból
+      // Átrendezés (csak ha van aktuális cél-sofőr) + VÉGLEGES törlés.
+      var reassign = hasTargets
+        ? ('<select id="'+sid+'" class="select" style="max-width:190px;padding:5px 8px;font-size:12.5px;">'+opts+'</select>'
+           +'<button class="btn primary" style="padding:5px 10px;font-size:12px;" onclick="reassignGhostDriver(\''+sid+'\')">'+esc(t('cs.gd.moveBtn'))+'</button>')
+        : '';
       return '<tr>'
         +'<td>'+esc(g.nume||'—')+'</td>'
         +'<td style="font-size:12px;color:var(--text-muted);">'+esc(g.email)+'</td>'
         +'<td style="text-align:right;">'+ (g.db||0) +'</td>'
         +'<td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'
-          +'<select id="'+sid+'" class="select" style="max-width:200px;padding:5px 8px;font-size:12.5px;">'+opts+'</select>'
-          +'<button class="btn primary" style="padding:5px 10px;font-size:12px;" onclick="reassignGhostDriver(\''+sid+'\')">'+esc(t('cs.gd.moveBtn'))+'</button>'
+          + reassign
+          +'<button class="btn danger" style="padding:5px 10px;font-size:12px;" onclick="purgeGhostDriver(\''+sid+'\')" title="'+esc(t('cs.gd.deleteBtn'))+'">🗑️ '+esc(t('cs.gd.deleteBtn'))+'</button>'
         +'</td></tr>';
     }).join('');
     box.innerHTML = '<div class="glass" style="padding:22px;margin-top:16px;border-color:rgba(245,158,11,0.35);">'
@@ -1119,6 +1125,16 @@ function reassignGhostDriver(selId){
   if(!toEmail){ toast(t('cs.gd.pickTarget'),'err'); return; }
   gas('reassignDriverWaybills',[fromEmail, toEmail]).then(function(r){
     if(r && r.ok){ toast(t('cs.gd.moved',{n:r.moved}),'ok'); loadInternalDrivers(); }
+    else toast(r && r.err || 'Eroare de server','err');
+  });
+}
+// VÉGLEGES törlés: a szellem-sofőr összes menetlevele/dokumentuma (visszavonhatatlan).
+function purgeGhostDriver(selId){
+  var email = _ghostEmailMap[selId];
+  if(!email){ return; }
+  if(!confirm(t('cs.gd.deleteConfirm',{e:email}))) return;
+  gas('purgeDriverData',[email]).then(function(r){
+    if(r && r.ok){ toast(t('cs.gd.deleted',{n:r.deleted}),'ok'); loadInternalDrivers(); }
     else toast(r && r.err || 'Eroare de server','err');
   });
 }

@@ -848,16 +848,22 @@ handlers.getMySoferStats = async function (req, res, args) {
     if (!req.session.user || req.session.user.pozicio !== 'Sofer') return _deny(res);
     const me = req.session.user;
 
-    // Lezárt fuvarok e hónapban (a sofőr saját email-jére kiosztottak)
+    // LEZÁRT FUVAR: a TÉNYLEGES lezárt (Finalizat) fuvarokból, a sofőr saját
+    // email-jére kiosztottak. A hónap-szűrő robusztus: finalized_at, ha NULL akkor
+    // data_descarcare / created_at (így egy hiányzó finalized_at nem rejt el fuvart).
     const ordR = await pool.query(
-      `SELECT COUNT(*) FILTER (WHERE status='Finalizat' AND finalized_at >= DATE_TRUNC('month', NOW()))::int AS lezart,
+      `SELECT COUNT(*) FILTER (WHERE status='Finalizat'
+                AND COALESCE(finalized_at, data_descarcare, created_at) >= DATE_TRUNC('month', NOW()))::int AS lezart,
               COUNT(*) FILTER (WHERE status IN ('Alocat','In Curs'))::int AS aktiv
        FROM orders
        WHERE company_id = $1 AND LOWER(email_sofer) = LOWER($2)`,
       [me.company_id, me.email]
     );
 
-    // Saját menetlevelek e hónapban: km, diurna, tankolt liter
+    // A MÁSIK 3 mutató (km, diurna, tankolt liter) a sofőrre KIOSZTOTT vagy ÁLTALA
+    // KÉSZÍTETT menetlevelekből — mindkettő az email_sofer = sofőr horgonyon
+    // (a sofőr-beküldés és az admin által rá létrehozott/átkötött menetlevél is ide
+    // esik). A hónap a beírt út-dátum szerint (eff_date).
     const fuvR = await pool.query(
       `SELECT COUNT(*)::int AS menetlevelek,
               COALESCE(SUM(total_km),0)::numeric AS km,
