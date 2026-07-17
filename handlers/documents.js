@@ -318,6 +318,43 @@ handlers.reassignDriverWaybills = async function (req, res, args) {
     }
   };
 
+// ─── Egy (régi/törölt) sofőr ÖSSZES adatának VÉGLEGES törlése a cégből ───
+// VISSZAVONHATATLAN: törli az adott email menetleveleit + feltöltött
+// dokumentumait (→ eltűnik a statisztikából), bontja a jármű-hozzárendelést, és
+// ha maradt hozzá Sofer-felhasználó a cégben, azt is törli. CSAK a saját cég
+// adatait érinti (company_id-horgony vagy cég-user email). Admin/Manager, audit.
+handlers.purgeDriverData = async function (req, res, args) {
+    try {
+      if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
+      }
+      const cid = req.session.user.company_id;
+      const email = String((args && args[0]) || '').trim().toLowerCase();
+      if (!cid || !email) return res.json({ result: { ok: false, err: 'Parametri lipsa' } });
+      // Ne törölhesse magát (admint) sem véletlenül.
+      if (email === String(req.session.user.email || '').toLowerCase()) {
+        return res.json({ result: { ok: false, err: 'Nu te poti sterge pe tine insuti.' } });
+      }
+      const scope = '(company_id=$2 OR LOWER(email_sofer) IN (SELECT LOWER(email) FROM users WHERE company_id=$2))';
+      const f = await pool.query(
+        `DELETE FROM fuvarlevelek WHERE LOWER(email_sofer)=$1 AND ${scope}`, [email, cid]);
+      const dc = await pool.query(
+        `DELETE FROM documents WHERE LOWER(email_sofer)=$1 AND ${scope}`, [email, cid]).catch(() => ({ rowCount: 0 }));
+      // Jármű-hozzárendelés bontása + esetleg maradt Sofer-felhasználó törlése (cégen belül).
+      await pool.query(
+        `UPDATE vehicles SET assigned_driver_email=NULL WHERE company_id=$2 AND LOWER(assigned_driver_email)=$1`,
+        [email, cid]).catch(() => {});
+      const u = await pool.query(
+        `DELETE FROM users WHERE company_id=$2 AND LOWER(email)=$1 AND pozicio='Sofer'`,
+        [email, cid]).catch(() => ({ rowCount: 0 }));
+      try { await audit.fromReq(req, 'waybill.purge_driver', 'fuvarlevel', null, { email, waybills: f.rowCount, docs: dc.rowCount, user: u.rowCount }); } catch (_) {}
+      return res.json({ result: { ok: true, deleted: f.rowCount, docs: dc.rowCount, user: u.rowCount } });
+    } catch (err) {
+      console.error('purgeDriverData hiba:', err);
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
+    }
+  };
+
 // Egy menetlevél teljes adata — szerkesztéshez (Admin/Manager, cégre szűrve).
 handlers.getFuvarlevelDetail = async function (req, res, args) {
     try {
