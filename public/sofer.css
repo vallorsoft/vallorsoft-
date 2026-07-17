@@ -270,6 +270,11 @@
   .sof-mstat-ico { font-size: 16px; line-height: 1; }
   .sof-mstat-val { font-size: 15px; font-weight: 800; margin-top: 3px; line-height: 1.1; }
   .sof-mstat-lbl { font-size: 9px; font-weight: 600; color: var(--sof-muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.3px; }
+  /* Előző havi viszonyítás — apró, halvány szürke sor a csempe alján.
+     A csempe mérete/rács nem változik (fix rács oszlopok), csak a buborékon
+     BELÜL osztjuk meg a helyet: felül a nagy aktuális szám az akcentessel,
+     alatta ez a másodlagos sor. */
+  .sof-mstat-prev { font-size: 11px; color: #94a3b8; margin-top: 2px; line-height: 1.1; font-weight: 500; }
 
   /* Kiosztott fuvarok */
   .kiosztott-section { flex-shrink: 0; margin-bottom: 14px; }

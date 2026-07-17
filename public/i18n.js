@@ -2344,6 +2344,7 @@
     'sof.statKm': { hu: 'Km', ro: 'Km' },
     'sof.statDiurna': { hu: 'Diurna (K+B)', ro: 'Diurnă (E+I)' },
     'sof.statFueled': { hu: 'Tankolva', ro: 'Alimentat' },
+    'sof.lastMonthShort': { hu: 'múlt hó', ro: 'lună trecută' },
     'sof.draftRestored': { hu: '📝 Piszkozat visszaállítva', ro: '📝 Ciornă restaurată' },
     'sof.chatNoConfig': { hu: '⚠️ Chat konfiguráció hiányzik.', ro: '⚠️ Configurația de chat lipsește.' },
     'sof.chatUnavailable': { hu: '⚠️ Chat nem elérhető.', ro: '⚠️ Chat indisponibil.' },
