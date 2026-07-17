@@ -841,8 +841,11 @@ handlers.getClientStats = async function (req, res, args) {
   }
 };
 
-// ── Sofőr mini-statisztika (a sofőr SAJÁT, e havi adatai) ────
+// ── Sofőr mini-statisztika (a sofőr SAJÁT, e havi + előző havi adatai) ────
 // A sofőr mobilfelület főoldalán jelenik meg — motivációs összegző.
+// Minden mutatóra visszaadjuk az AKTUÁLIS és az ELŐZŐ havi értéket egyaránt
+// (*_prev), hogy a csempéken kicsi „múlt hó: X" felirat kerülhessen az érték
+// alá — motivációs viszonyítási pont.
 handlers.getMySoferStats = async function (req, res, args) {
   try {
     if (!req.session.user || req.session.user.pozicio !== 'Sofer') return _deny(res);
@@ -851,9 +854,13 @@ handlers.getMySoferStats = async function (req, res, args) {
     // LEZÁRT FUVAR: a TÉNYLEGES lezárt (Finalizat) fuvarokból, a sofőr saját
     // email-jére kiosztottak. A hónap-szűrő robusztus: finalized_at, ha NULL akkor
     // data_descarcare / created_at (így egy hiányzó finalized_at nem rejt el fuvart).
+    // Egy lekérdezésen belül a jelen ÉS az előző havi lezárt fuvarok is.
     const ordR = await pool.query(
       `SELECT COUNT(*) FILTER (WHERE status='Finalizat'
                 AND COALESCE(finalized_at, data_descarcare, created_at) >= DATE_TRUNC('month', NOW()))::int AS lezart,
+              COUNT(*) FILTER (WHERE status='Finalizat'
+                AND COALESCE(finalized_at, data_descarcare, created_at) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')
+                AND COALESCE(finalized_at, data_descarcare, created_at) <  DATE_TRUNC('month', NOW()))::int AS lezart_prev,
               COUNT(*) FILTER (WHERE status IN ('Alocat','In Curs'))::int AS aktiv
        FROM orders
        WHERE company_id = $1 AND LOWER(email_sofer) = LOWER($2)`,
@@ -863,17 +870,30 @@ handlers.getMySoferStats = async function (req, res, args) {
     // A MÁSIK 3 mutató (km, diurna, tankolt liter) a sofőrre KIOSZTOTT vagy ÁLTALA
     // KÉSZÍTETT menetlevelekből — mindkettő az email_sofer = sofőr horgonyon
     // (a sofőr-beküldés és az admin által rá létrehozott/átkötött menetlevél is ide
-    // esik). A hónap a beírt út-dátum szerint (eff_date).
+    // esik). A hónap a beírt út-dátum szerint (eff_date). A jelen és az előző havi
+    // értékeket ugyanabban a lekérdezésben, FILTER-rel gyűjtjük.
     const fuvR = await pool.query(
-      `SELECT COUNT(*)::int AS menetlevelek,
-              COALESCE(SUM(total_km),0)::numeric AS km,
-              COALESCE(SUM(diurna_externa),0)::int AS diurna_ext,
-              COALESCE(SUM(diurna_interna),0)::int AS diurna_int,
-              COALESCE(SUM((SELECT COALESCE(SUM((a->>'litru')::numeric),0)
-                            FROM jsonb_array_elements(alimentari) a)),0) AS tankolt_l
+      `SELECT
+         -- jelen havi (eff_date >= this month)
+         COUNT(*) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW()))::int AS menetlevelek,
+         COALESCE(SUM(total_km) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW())),0)::numeric AS km,
+         COALESCE(SUM(diurna_externa) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW())),0)::int AS diurna_ext,
+         COALESCE(SUM(diurna_interna) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW())),0)::int AS diurna_int,
+         COALESCE(SUM((SELECT COALESCE(SUM((a->>'litru')::numeric),0)
+                       FROM jsonb_array_elements(alimentari) a)) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW())),0) AS tankolt_l,
+         -- előző havi (DATE_TRUNC('month', NOW() - INTERVAL '1 month') <= eff_date < DATE_TRUNC('month', NOW()))
+         COALESCE(SUM(total_km) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')
+                                          AND COALESCE(erkezes_dt, indulas_dt, data_completare) <  DATE_TRUNC('month', NOW())),0)::numeric AS km_prev,
+         COALESCE(SUM(diurna_externa) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')
+                                                AND COALESCE(erkezes_dt, indulas_dt, data_completare) <  DATE_TRUNC('month', NOW())),0)::int AS diurna_ext_prev,
+         COALESCE(SUM(diurna_interna) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')
+                                                AND COALESCE(erkezes_dt, indulas_dt, data_completare) <  DATE_TRUNC('month', NOW())),0)::int AS diurna_int_prev,
+         COALESCE(SUM((SELECT COALESCE(SUM((a->>'litru')::numeric),0)
+                       FROM jsonb_array_elements(alimentari) a)) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')
+                                                                          AND COALESCE(erkezes_dt, indulas_dt, data_completare) <  DATE_TRUNC('month', NOW())),0) AS tankolt_l_prev
        FROM fuvarlevelek
        WHERE LOWER(email_sofer) = LOWER($1)
-         AND COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW())`,
+         AND COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')`,
       [me.email]
     );
 
@@ -881,10 +901,13 @@ handlers.getMySoferStats = async function (req, res, args) {
     return res.json({ result: {
       ok: true,
       honap: new Date().toISOString().slice(0, 7),
-      lezart: o.lezart, aktiv: o.aktiv,
-      km: f.km, menetlevelek: f.menetlevelek,
-      diurna_ext: f.diurna_ext, diurna_int: f.diurna_int,
-      tankolt_l: f.tankolt_l
+      lezart: o.lezart, lezart_prev: o.lezart_prev,
+      aktiv: o.aktiv,
+      km: f.km, km_prev: f.km_prev,
+      menetlevelek: f.menetlevelek,
+      diurna_ext: f.diurna_ext, diurna_ext_prev: f.diurna_ext_prev,
+      diurna_int: f.diurna_int, diurna_int_prev: f.diurna_int_prev,
+      tankolt_l: f.tankolt_l, tankolt_l_prev: f.tankolt_l_prev
     }});
   } catch (err) {
     console.error('getMySoferStats hiba:', err);

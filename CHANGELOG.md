@@ -14,6 +14,34 @@
 
 ---
 
+## 2026-07-17 — Sofőr havi mini-statisztika: előző havi érték minden csempén (viszonyítás)
+
+A sofőr főoldali 4 mini-csempéjén (LEZÁRT FUVAR / KM / DIURNA / TANKOLVA) mostantól az
+**aktuális havi érték MELLETT az előző havi is** megjelenik — kicsiben, halványan („múlt
+hó: X" / RO: „lună trecută: X"), a csempe méretét és a rácsot érintetlenül hagyva.
+Motivációs viszonyítási pont: 0 esetén is kiírja.
+
+1. **Szerver (`handlers/statisticsHandlers.js` `getMySoferStats`)** — ugyanabban az egy
+   SELECT-ben számoljuk a jelen és az előző havi értékeket `FILTER (WHERE …)`
+   segédzáradékokkal. Új mezők a válaszban: `lezart_prev`, `km_prev`, `diurna_ext_prev`,
+   `diurna_int_prev`, `tankolt_l_prev`. A jelen havi és előző havi szűrők a **beírt
+   út-dátum** (menetlevél: `COALESCE(erkezes_dt, indulas_dt, data_completare)` — eff_date)
+   ill. a **lezárás** (fuvar: `COALESCE(finalized_at, data_descarcare, created_at)`)
+   szerint mennek — ugyanaz a robusztus horgony, mint a jelen havi mutatóknál. Az előző
+   havi ablak: `>= DATE_TRUNC('month', NOW() - INTERVAL '1 month')` ÉS
+   `< DATE_TRUNC('month', NOW())`. A tenant-védelem változatlan: `company_id` +
+   `LOWER(email_sofer) = LOWER(saját email)`.
+2. **Kliens (`public/sofer.js` `loadSoferMiniStats` / `tile()`)** — a csempe HTML-je
+   kiegészült egy másodlagos `<div class="sof-mstat-prev">` sorral, ami a `*_prev`
+   értéket jeleníti meg. Új CSS (`sofer.css` `.sof-mstat-prev`): 11px, `#94a3b8`, halvány
+   — a csempe padding/rács változatlan. i18n új kulcs `sof.lastMonthShort` (HU „múlt hó" /
+   RO „lună trecută"). Cache-bust `sofer.js`/`sofer.css`/`i18n.js` `?v=20260717prev`.
+3. **Teszt (`tests/integration/sofer-mini-stats.test.js`)** — mock-db harness 4 esettel:
+   szerep-kapu (nem-sofőr elutasítva), a válasz tartalmazza az összes új `*_prev` mezőt,
+   a jelen + előző havi horgony megjelenik a menetlevél-SQL-ben (`km_prev`,
+   `tankolt_l_prev`, `NOW() - INTERVAL '1 month'` regex), és 0 érték is kiírásra kerül
+   (motivációs hatás). **600 Jest zöld** (a korábbi 596 + 4 új).
+
 ## 2026-07-17 — Régi/törölt sofőr adatainak VÉGLEGES törlése + sofőr mini-statisztika forrás-megerősítés
 
 1. **Szellem-sofőr törlése (Belső sofőrök fül)** — a „🔀 Régi sofőr menetleveleinek
