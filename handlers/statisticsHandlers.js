@@ -905,19 +905,33 @@ handlers.getMySoferStats = async function (req, res, args) {
     const prevYear = mPrev.getUTCFullYear();
     const prevMonth = mPrev.getUTCMonth() + 1; // 1..12
 
-    // GPS snapshot lookup — csak az előző hó vég snapshot kell (az átívelő
-    // menetlevelek határa). Cégre + rendszám-normalizált illesztéssel.
+    // GPS snapshot lookup — KÉT hó-végi snapshotot kérünk le:
+    //   • prev-month-end (pl. jún. 30): az átívelő menetlevelek határa
+    //     (a splittelésnél a KM prev/curr portio ez alapján számolódik) ÉS
+    //     a múlt havi GPS-delta later-fele.
+    //   • prev-prev-month-end (pl. máj. 31): a múlt havi GPS-delta earlier-
+    //     fele — a múlt hó ELEJI (~ kezdet) km-óra. A kettő különbsége adja
+    //     a múlt hó tényleges GPS-alapú km-jét: `later − earlier`.
+    // Cégre szűrt, rendszám-normalizált illesztéssel.
+    let ppYear = prevYear;
+    let ppMonth = prevMonth - 1;
+    if (ppMonth === 0) { ppMonth = 12; ppYear -= 1; }
     const snR = await pool.query(
-      `SELECT rendszam, mileage
+      `SELECT rendszam, year, month, mileage
        FROM gps_month_end_snapshots
-       WHERE company_id = $1 AND year = $2 AND month = $3`,
-      [me.company_id, prevYear, prevMonth]
+       WHERE company_id = $1
+         AND ((year = $2 AND month = $3) OR (year = $4 AND month = $5))`,
+      [me.company_id, prevYear, prevMonth, ppYear, ppMonth]
     );
     const normPlate = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const snapMap = new Map();
+    const snapMap = new Map();       // rendszam → prev-month-end mileage
+    const snapMapPP = new Map();     // rendszam → prev-prev-month-end mileage
     for (const s of snR.rows) {
       const km = Number(s.mileage);
-      if (isFinite(km)) snapMap.set(normPlate(s.rendszam), km);
+      if (!isFinite(km)) continue;
+      const p = normPlate(s.rendszam);
+      if (s.year === prevYear && s.month === prevMonth) snapMap.set(p, km);
+      else if (s.year === ppYear && s.month === ppMonth) snapMapPP.set(p, km);
     }
 
     // ── Aggregátorok ──
@@ -1002,13 +1016,44 @@ handlers.getMySoferStats = async function (req, res, args) {
       tl_curr += tlT * fracCurr;
     }
 
+    // ── GPS-alapú múlt havi KM = „teljes hónap" ─────────────────
+    // A sofőr KIOSZTOTT járműveire (vehicles.assigned_driver_email = saját
+    // email) megnézzük, van-e két egymást követő hó-vég snapshot (prev-prev
+    // + prev). Ha igen, a delta = a jármű ténylegesen vezetett km-je az
+    // előző hónapban. Ezek összege = a „teljes hónap" GPS-alapú km-je.
+    //
+    // A `km_prev` (menetlevél-alap = „leadott") és a `km_prev_gps` (GPS-alap
+    // = „teljes hónap") KÜLÖN mezőben megy vissza — a sofőr csempe MINDKETTŐT
+    // megjelenítheti („teljes: X / leadott: Y"). Így a sofőr látja, ha
+    // hiányos a menetlevél-leadása. (Diurna + tankolt liter továbbra is
+    // menetlevél-alapú — a GPS-ből nem tudunk napi diurnát / tankolási
+    // litert levezetni.)
+    let km_prev_gps = 0;
+    try {
+      const asgR = await pool.query(
+        `SELECT rendszam FROM vehicles
+          WHERE company_id = $1 AND LOWER(assigned_driver_email) = LOWER($2)`,
+        [me.company_id, me.email]
+      );
+      for (const v of asgR.rows) {
+        const p = normPlate(v.rendszam);
+        const end = snapMap.get(p);          // prev-month-end
+        const start = snapMapPP.get(p);      // prev-prev-month-end
+        if (end != null && start != null && end > start) {
+          km_prev_gps += end - start;
+        }
+      }
+    } catch (_) { /* best-effort: hiba esetén km_prev_gps = 0 marad */ }
+
     const o = ordR.rows[0];
     return res.json({ result: {
       ok: true,
       honap: new Date().toISOString().slice(0, 7),
       lezart: o.lezart, lezart_prev: o.lezart_prev,
       aktiv: o.aktiv,
-      km: km_curr, km_prev: km_prev,
+      km: km_curr,
+      km_prev: km_prev,          // menetlevél-alap („leadott")
+      km_prev_gps: km_prev_gps,  // GPS-alap („teljes hónap")
       menetlevelek: cnt_curr,
       diurna_ext: de_curr, diurna_ext_prev: de_prev,
       diurna_int: di_curr, diurna_int_prev: di_prev,

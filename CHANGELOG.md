@@ -14,6 +14,37 @@
 
 ---
 
+## 2026-07-18 — Sofőr mini-statisztika: „teljes hó" (GPS) + „leadott" (menetlevél) külön a KM csempén
+
+A múlt havi KM csempén mostantól KÉT sor jelenik meg:
+- **„teljes hó: X"** — GPS-alapú (két egymást követő hó-vég snapshot deltája)
+- **„leadott: Y"** — menetlevél-alapú (SUM(total_km) waybillekből)
+
+Így a sofőr lát ha hiányos a menetlevél-leadása (Peto-eset: valós 11 188 km, de 0
+menetlevél → csempe: „teljes hó: 11 188 / leadott: 0"). Motivációs cél: hívja
+fel a figyelmet a hiányzó bevitelre.
+
+1. **`handlers/statisticsHandlers.js` `getMySoferStats`** — új mező a válaszban:
+   `km_prev_gps` (GPS-alap = „teljes hónap"). A régi `km_prev` (menetlevél-alap =
+   „leadott") **változatlan**. A számítás: a sofőr KIOSZTOTT járműveire
+   (`vehicles.assigned_driver_email = saját email`) → a prev-month-end és
+   prev-prev-month-end snapshot deltáinak összege. Ha a prev-prev snapshot
+   hiányzik, `km_prev_gps = 0`.
+2. **Kliens (`public/sofer.js` `loadSoferMiniStats.tile()`)** — a KM csempe
+   most KÉT prev-sort tud megjeleníteni: ha van GPS-teljes (`km_prev_gps > 0`),
+   akkor „teljes hó: X" + „leadott: Y" két sorban; ha nincs (GPS off vagy nincs
+   snapshot), a régi egy soros „múlt hó: X" marad. A többi csempe (LEZÁRT
+   FUVAR, DIURNA, TANKOLVA) egyforrású → egy „múlt hó" sor.
+3. **i18n** — két új kulcs: `sof.mstatFull` (HU „teljes hó" / RO „lună completă")
+   + `sof.mstatSubmitted` (HU „leadott" / RO „livrat"). Cache-bust
+   `sofer.js`/`sofer.css`/`i18n.js` `?v=20260718gps`.
+4. **Snapshot lookup bővítés** — a snapshot query mostantól KÉT hónap-vég
+   snapshotát kéri le egyszerre (prev-month + prev-prev-month) egy SELECT-tel.
+   A prev-month-end tovább szolgál az átívelő menetlevelek splittelésénél is.
+5. **Teszt** — 4 új eset a dual-mező viselkedésre (Peto-eset, mindkettő
+   párhuzamosan, több jármű, hiányzó prev-prev). Régi MAX-alapú teszt
+   frissítve az új szétválasztott mezőkre. **615 Jest zöld** (611 → 615).
+
 ## 2026-07-18 — Sofőr mini-statisztika: hónap-határon átívelő menetlevél SZÉTBONTÁSA
 
 A sofőr főoldali mini-statisztikában (getMySoferStats) a **hónap-határon átívelő
