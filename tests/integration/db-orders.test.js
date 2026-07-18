@@ -41,7 +41,7 @@ d('Valódi DB integráció (orders / sofőr / handover / planner)', () => {
       [DRIVER, companyId]);
   });
 
-  test('comCreate (tranzakció): Intern sofőr → Alocat, email kisbetűs, + 1 leg jön létre', async () => {
+  test('comCreate: Intern sofőr → Alocat, email kisbetűs; szakasz (leg) NEM jön létre automatikusan', async () => {
     const res = makeRes();
     await orders.comCreate(admin(companyId), res, [{
       client: 'Ügyfél', loc_incarcare: 'A', loc_descarcare: 'B', load_type: 'FTL',
@@ -53,8 +53,10 @@ d('Valódi DB integráció (orders / sofőr / handover / planner)', () => {
     expect(o.status).toBe('Alocat');
     expect(o.email_sofer).toBe('driver@x.hu');     // comCreate normalizál
     expect(o.load_type).toBe('FTL');
+    // A kezdeti sofőr/jármű a felső orders.* mezőkben él; szakaszt csak
+    // explicit „➕ Szakasz" gombra (addOrderLeg) hozunk létre.
     const legs = await pool.query('SELECT * FROM order_legs WHERE order_id = $1', [id]);
-    expect(legs.rowCount).toBe(1);
+    expect(legs.rowCount).toBe(0);
   });
 
   test('comUpdate: Disponibil-ról belső sofőr hozzárendelése → DB-ben Alocat + kisbetűs email', async () => {
@@ -153,16 +155,23 @@ d('Valódi DB integráció (orders / sofőr / handover / planner)', () => {
   });
 
   test('leg-konzisztencia: deleteOrderLeg → a top-szint a megmaradó legutolsó leghez áll vissza', async () => {
+    // Új semantika: comCreate nem hoz létre kezdő szakaszt, ezért két
+    // explicit addOrderLeg-gel dolgozunk (első leg = DRIVER, második = Másik),
+    // majd az utolsót töröljük és a top-szint az elsőre esik vissza.
+    await pool.query(
+      "INSERT INTO users (nume, email, pozicio, password_hash, company_id) VALUES ('Másik2','masik@x.hu','Sofer','x',$1) ON CONFLICT (email) DO NOTHING",
+      [companyId]);
     const cr = makeRes();
     await orders.comCreate(admin(companyId), cr, [{
       client: 'X', loc_incarcare: 'A', loc_descarcare: 'B', load_type: 'FTL',
       sofer_type: 'Intern', email_sofer: DRIVER, nume_sofer: 'Sofőr D',
     }]);
     const id = cr.body.result.id;
+    await orders.addOrderLeg(admin(companyId), makeRes(), [id, { sofer_type: 'Intern', email_sofer: DRIVER, nume_sofer: 'Sofőr D' }]);
     await orders.addOrderLeg(admin(companyId), makeRes(), [id, { sofer_type: 'Intern', email_sofer: 'masik@x.hu', nume_sofer: 'Másik' }]);
     const leg2 = (await pool.query('SELECT id FROM order_legs WHERE order_id = $1 ORDER BY leg_number DESC LIMIT 1', [id])).rows[0].id;
     await orders.deleteOrderLeg(admin(companyId), makeRes(), [leg2]);
     const o = (await pool.query('SELECT email_sofer FROM orders WHERE id = $1', [id])).rows[0];
-    expect(o.email_sofer).toBe(DRIVER);   // vissza az eredeti (1.) leg sofőrjére
+    expect(o.email_sofer).toBe(DRIVER);   // vissza az első (megmaradt) leg sofőrjére
   });
 });

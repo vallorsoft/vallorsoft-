@@ -67,6 +67,7 @@
     'nav.orders': { hu: 'Fuvarfeladatok ▾', ro: 'Curse ▾' },
     'nav.ordersForm': { hu: 'Kiírás', ro: 'Creare' },
     'nav.ordersList': { hu: 'Kezelés', ro: 'Gestionare' },
+    'nav.ordersDeleted': { hu: '🗑️ Törölt fuvarok', ro: '🗑️ Curse anulate' },
     'nav.inbound': { hu: 'Megrendelések', ro: 'Comenzi primite' },
     'nav.clientRequests': { hu: '📋 Ügyfél kérések', ro: '📋 Cereri clienți' },
     'nav.planner': { hu: '📅 Tervezőtábla', ro: '📅 Planificator' },
