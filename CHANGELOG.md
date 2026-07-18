@@ -14,6 +14,42 @@
 
 ---
 
+## 2026-07-18 — Hó-végi GPS km + üzemanyag-szint snapshot → következő menetlevél pre-fillje
+
+A CargoTrack GPS-ből a hónap **utolsó napjának 23:59-hez legközelebbi** olvasása
+(km-óra + üzemanyag-szint) automatikusan rögzül minden párosított járműre; ez a
+következő hónap első menetlevelénél a **kezdő km + kezdő üzemanyag** pre-fill
+alapja lesz. A hónap-határon átívelő menetlevél (pl. jún. 28 → júl. 3) NEM
+csorbul: a júl. 3-i menetlevél záró értéke újabb mint a jún. 30-i snapshot, ezért
+azt a legutolsó menetlevelet a snapshot nem írja felül.
+
+1. **Migráció `db/gps-month-end-snapshot.sql`** (idempotens, auto-fut) —
+   új `gps_month_end_snapshots` tábla: `(company_id, rendszam, year, month,
+   mileage, fuel_level, snapped_at)`, `UNIQUE (company_id, rendszam, year, month)`
+   + index. A `fuel_level` a CargoTrack `calculated_inputs.fuel_level` nyers
+   értéke (eszköz-függő: liter vagy %, ha az eszköz méri; a sofőr felülírhatja).
+2. **Ütemező `services/scheduler.js` `startMonthEndSnapshotScheduler`** —
+   20 perces ciklus. Europe/Bucharest zóna alapján ellenőrzi, hogy ma van-e a
+   hónap utolsó napja ÉS az óra ≥ 23. Ha igen, minden CargoTrack-cégnél minden
+   párosított járműre `getLatestStatus` → mileage + fuel_level upsert
+   (`ON CONFLICT UPDATE`, a hó-végi 23:00-23:59 ablakban 3 tick fut →
+   ~23:40 vagy 23:59-hez legközelebbi olvasás marad). Bind `server.js`-ben.
+   A CargoTrack service hiánya esetén no-op (`try/catch require`).
+3. **Handler `handlers/orders.js` `getLastVehicleReadings`** — a meglévő
+   utolsó-menetlevél sub-select kiegészülve az `erkezes_dt` (fallback
+   `indulas_dt`) mezővel. Új: a `gps_month_end_snapshots` legfrissebb sora a
+   járműre. Ha `snapshot.snapped_at > last_arrival`, akkor a snapshot
+   `mileage` + `fuel_level` felülírja a pre-fillt. Best-effort try/catch a
+   snapshot-táblára → migráció nélkül a régi viselkedés érvényben marad
+   (visszafelé kompatibilis). Cross-tenant izoláció változatlan (cégre + plate-re
+   szűrt lekérdezés).
+4. **Teszt `tests/integration/gps-month-end-snapshot.test.js`** (mock-db,
+   9 eset): nincs snapshot / snapshot újabb (jún. 30 → júl. 5 nyer) / snapshot
+   régebbi (jún. 28 → júl. 3 átívelő nyer) / snapshot nélkül üres menetlevél /
+   csak mileage a snapshotban (fuel a menetlevélből) / tábla-hiba fallback /
+   auth-hiba / üres rendszám / cégre + normalizált rendszámra szűrt lekérdezés.
+   **609 Jest zöld** (600 → 609, +9).
+
 ## 2026-07-17 — CI: Render-deploy kivéve, éles CSAK Fly.io
 
 A Rendert többé NEM használjuk / NEM deployoljuk — az éles oldal a **Fly.io**-n fut

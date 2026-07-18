@@ -266,6 +266,111 @@ function startGpsMileageScheduler() {
   return interval;
 }
 
+// ============================================================
+//  Hónap-végi GPS km + üzemanyag-szint snapshot
+//  (gps_month_end_snapshots) — a hónap UTOLSÓ napján ~23:59-kor
+//  minden CargoTrack-cég minden párosított járművére lekéri az
+//  aktuális GPS mileage + fuel_level-t, és upsertoli a snapshot-
+//  táblába (UNIQUE company_id/rendszam/year/month → ON CONFLICT
+//  UPDATE). A scheduler minden órában ellenőrzi a Europe/
+//  Bucharest zóna szerinti dátumot; ha ma van a hónap utolsó
+//  napja ÉS az óra ≥ 23 (23:00 → 23:59), snapshotot vesz. Az
+//  egy órán belüli 3 tick (20 percenként) miatt a legutolsó
+//  értékre pontosít (kb. 23:40 vagy 23:59 körüli). Egy adott
+//  cég/jármű/hó cellára a legfrissebb overwrite marad meg.
+//
+//  A `handlers/orders.js` `getLastVehicleReadings` ebből tölti
+//  elő a következő menetlevél kezdő km-ét és üzemanyag-szintjét,
+//  HA a snapshot újabb, mint az utolsó menetlevél érkezés-dátuma
+//  (különben a menetlevél záró értéke nyer — a hónap-határon
+//  átívelő menetlevél így nem csorbul).
+// ============================================================
+function _bucharestNowParts() {
+  // Europe/Bucharest naptári dátum + óra (DST-biztos, Intl-alapú).
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Bucharest',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(new Date());
+  const m = {}; parts.forEach(p => { m[p.type] = p.value; });
+  return {
+    year: parseInt(m.year, 10),
+    month: parseInt(m.month, 10),
+    day: parseInt(m.day, 10),
+    hour: parseInt(m.hour, 10),
+    minute: parseInt(m.minute, 10),
+  };
+}
+// A JS Date(year, month, 0) egy hónappal korábbi hónap utolsó napját adja
+// (month 1-indexelten), tehát az adott hó utolsó napjához +1-et kell adni.
+function _lastDayOfMonth(year, month /* 1..12 */) {
+  return new Date(year, month, 0).getDate();
+}
+
+function startMonthEndSnapshotScheduler() {
+  let ctSvc;
+  try { ctSvc = require('./cargotrack'); } catch (_) { return null; }
+  let running = false;
+
+  async function tick() {
+    if (running) return;
+    running = true;
+    try { await tickBody(); } finally { running = false; }
+  }
+
+  async function tickBody() {
+    const now = _bucharestNowParts();
+    const lastDay = _lastDayOfMonth(now.year, now.month);
+    // Csak a hó utolsó napján, 23:00 után indulunk (23:59-hez legközelebbi
+    // GPS-olvasás rögzüljön). A 20 perces ciklus alatt 3 esély is van rá.
+    if (now.day !== lastDay || now.hour < 23) return;
+
+    let rows;
+    try {
+      ({ rows } = await pool.query(
+        `SELECT ci.company_id, ci.credentials_enc
+         FROM company_integrations ci
+         WHERE ci.provider='cargotrack' AND ci.enabled=true AND ci.credentials_enc IS NOT NULL`));
+    } catch (_) { return; }
+
+    for (const row of rows) {
+      let apiKey;
+      try { apiKey = decrypt(row.credentials_enc); } catch (_) { continue; }
+      let mapRows;
+      try {
+        ({ rows: mapRows } = await pool.query(
+          `SELECT rendszam, object_id FROM vehicle_gps_map
+           WHERE company_id=$1 AND provider='cargotrack'`, [row.company_id]));
+      } catch (_) { continue; }
+      for (const m of mapRows) {
+        try {
+          const st = await ctSvc.getLatestStatus(apiKey, m.object_id);
+          if (!st) continue;
+          const mi = (st.mileage != null && isFinite(parseFloat(st.mileage))) ? parseFloat(st.mileage) : null;
+          const fl = (st.fuel_level != null && isFinite(parseFloat(st.fuel_level))) ? parseFloat(st.fuel_level) : null;
+          if (mi == null && fl == null) continue; // semmi értelmes érték
+          await pool.query(
+            `INSERT INTO gps_month_end_snapshots
+               (company_id, rendszam, year, month, mileage, fuel_level, snapped_at)
+             VALUES ($1,$2,$3,$4,$5,$6,NOW())
+             ON CONFLICT (company_id, rendszam, year, month)
+             DO UPDATE SET mileage = COALESCE(EXCLUDED.mileage, gps_month_end_snapshots.mileage),
+                           fuel_level = COALESCE(EXCLUDED.fuel_level, gps_month_end_snapshots.fuel_level),
+                           snapped_at = NOW()`,
+            [row.company_id, m.rendszam, now.year, now.month, mi, fl]);
+        } catch (_) { /* jármű-hiba ne állítsa le a kört */ }
+      }
+    }
+  }
+
+  // 20 perces ciklus → a 23:00-23:59 ablakban ~3 esély jut a snapshotra
+  // (a legutolsó overwrite marad — kb. 23:40 vagy 23:59 körüli olvasás).
+  setTimeout(tick, 60 * 1000);
+  const interval = setInterval(tick, 20 * 60 * 1000);
+  console.log('[GpsMonthEnd] hó-végi GPS snapshot ütemező elindítva — 20 perces ciklus.');
+  return interval;
+}
+
 // ────────────────────────────────────────────────────────────
 //  Közös szerviz-riasztás-kiküldő EGY cégre. A `computeServiceDueAlerts`
 //  (km-óra vs. next_due_km + dátum vs. next_due_date) esedékes tételeire
@@ -875,4 +980,4 @@ function startCancelReminderScheduler() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler };
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler };

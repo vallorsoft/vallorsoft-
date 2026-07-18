@@ -342,7 +342,9 @@ handlers.getLastVehicleReadings = async function (req, res, args) {
       const plate = normalizePlate(Array.isArray(args) ? args[0] : args);
       if (!cid || !plate) return res.json({ result: { ok: true, fuel: null, km: null, level: null } });
       const norm = `UPPER(REGEXP_REPLACE(COALESCE(numar_camion, ''), '[^A-Za-z0-9]', '', 'g'))`;
-      // Sorbavétel a beírt érkezési (fallback indulási) dátum szerint.
+      // Sorbavétel a beírt érkezési (fallback indulási) dátum szerint. Az érkezés
+      // TIMESTAMPTZ-jét is visszaadjuk, hogy a hó-végi snapshot idejével össze
+      // tudjuk hasonlítani (a snapshot csak akkor nyer, ha nála NEM RÉGEBBI).
       const seqOrder = `ORDER BY COALESCE(erkezes_dt, indulas_dt) DESC NULLS LAST LIMIT 1`;
       const r = await pool.query(
         `SELECT
@@ -353,11 +355,39 @@ handlers.getLastVehicleReadings = async function (req, res, args) {
            (SELECT km_sfarsit FROM fuvarlevelek
              WHERE (company_id = $1 OR email_sofer IN (SELECT email FROM users WHERE company_id = $1))
                AND ${norm} = $2 AND km_sfarsit IS NOT NULL AND km_sfarsit > 0
-             ${seqOrder}) AS km`,
+             ${seqOrder}) AS km,
+           (SELECT COALESCE(erkezes_dt, indulas_dt) FROM fuvarlevelek
+             WHERE (company_id = $1 OR email_sofer IN (SELECT email FROM users WHERE company_id = $1))
+               AND ${norm} = $2
+             ${seqOrder}) AS last_arr`,
         [cid, plate]);
       const row = r.rows[0] || {};
-      const fuel = (row.fuel != null && isFinite(Number(row.fuel))) ? Number(row.fuel) : null;
-      const km   = (row.km   != null && isFinite(Number(row.km)))   ? Number(row.km)   : null;
+      let fuel = (row.fuel != null && isFinite(Number(row.fuel))) ? Number(row.fuel) : null;
+      let km   = (row.km   != null && isFinite(Number(row.km)))   ? Number(row.km)   : null;
+
+      // Hó-végi GPS snapshot: ha van, és a snapshot ÚJABB, mint az utolsó
+      // menetlevél érkezése (fallback indulása), akkor a snapshot mileage /
+      // fuel_level felülírja a pre-fill értékeket. Best-effort: ha a tábla nem
+      // létezik (migráció még nem futott le) vagy a lekérdezés dob, a régi
+      // logika érvényben marad. A cross-tenant izoláció: cégre + plate-re szűrt.
+      try {
+        const s = await pool.query(
+          `SELECT mileage, fuel_level, snapped_at FROM gps_month_end_snapshots
+            WHERE company_id = $1
+              AND UPPER(REGEXP_REPLACE(COALESCE(rendszam,''), '[^A-Za-z0-9]', '', 'g')) = $2
+            ORDER BY year DESC, month DESC LIMIT 1`,
+          [cid, plate]);
+        const snap = s.rows[0];
+        if (snap && snap.snapped_at) {
+          const lastArr = row.last_arr ? new Date(row.last_arr) : null;
+          const snapAt = new Date(snap.snapped_at);
+          if (!lastArr || snapAt > lastArr) {
+            if (snap.mileage != null && isFinite(Number(snap.mileage))) km = Number(snap.mileage);
+            if (snap.fuel_level != null && isFinite(Number(snap.fuel_level))) fuel = Number(snap.fuel_level);
+          }
+        }
+      } catch (_) { /* migráció nélkül vagy tábla-hiba: régi viselkedés */ }
+
       return res.json({ result: { ok: true, fuel: fuel, km: km, level: fuel } });
     } catch (err) {
       console.error('getLastVehicleReadings hiba:', err);
