@@ -55,6 +55,7 @@ function loadTab(name){
     if(name==='internal-drivers') loadInternalDrivers();
     if(name==='company-settings' && window.CompanySettings) CompanySettings.mount('companySettingsBox');
     if(name==='pdf-settings' && window.PdfSettings) PdfSettings.mount('pdfSettingsBox');
+    if(name==='chat'){ if(typeof loadWhatsappChatPane==='function') loadWhatsappChatPane(); }
     if(name==='signature') initAdminSigCanvas();
   if(name==='clients' && window.ClientsPage){ ClientsPage.mount('clientsBox'); if(typeof loadClientPortalAccess==='function') loadClientPortalAccess(); }
   if(name && name.indexOf('stats-')===0 && window.VS_STATS) VS_STATS.load(name);
@@ -194,7 +195,9 @@ gas('authMe').then(u => {
   if (!u || u.pozicio !== 'Manager') { window.location.href = '/login'; return; }
   myEmail = u.email;
   document.getElementById('meBadge').textContent = u.nume;
-  initFirebaseChatPanel(u);
+  // Chat ideiglenesen: WhatsApp-átirányítás — Firebase-panel kikapcsolva.
+  // A régi initFirebaseChatPanel a console-shared.js-ben érintetlen; a
+  // chat fülön a loadTab betölti a WhatsApp UI-t (loadWhatsappChatPane).
   if (window.VS_PUSH) VS_PUSH.init(u.email, u.pozicio);
   var savedTab = '';
   var savedRoom = '';

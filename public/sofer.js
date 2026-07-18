@@ -1054,7 +1054,9 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
   _meData = d.result;
   document.getElementById('meBadge').textContent = d.result.nume;
   if (window.VS_PUSH) VS_PUSH.init(d.result.email, d.result.pozicio);
-    initFirebaseChat(d.result);
+    // Chat ideiglenesen: WhatsApp-átirányítás — Firebase-chat kikapcsolva.
+    // A régi initFirebaseChat kódot érintetlenül hagyjuk, hogy könnyen
+    // visszavonható legyen (csak nem hívjuk innen).
     loadDashOrders();
     loadSoferMiniStats();
     loadMyAssignedVehicle();
@@ -1088,7 +1090,41 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
 });
 
 // ============================================================
-// FIREBASE CHAT — Sofőr oldal
+// CHAT — IDEIGLENESEN: WhatsApp átirányítás
+// ------------------------------------------------------------
+// A sofőr a chat-kártyáról közvetlenül a cég WhatsApp-számára ugrik
+// (a manager/admin állítja be a saját konzolján). Ha nincs beállítva,
+// jelzést kap. A régi Firebase-chat logika ALATTA érintetlen — csak
+// nem hívjuk sehol (könnyen visszavonható).
+// ============================================================
+function openWhatsAppFromChatCard() {
+  fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'getCompanyWhatsapp', arguments: [] }) })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    var num = d && d.result && d.result.ok ? d.result.number : null;
+    if (!num) {
+      // Nincs szám: jelzés + a chat pane-en is látszik a hint.
+      try { toast(t('sof.waNotConfigured'), 'warn'); } catch(e){}
+      try {
+        var hint = document.getElementById('soferWaHint');
+        if (hint) hint.textContent = t('sof.waNotConfigured');
+      } catch(e){}
+      try { goSec('chat'); } catch(e){}
+      return;
+    }
+    // wa.me a legrobusztusabb: webről a WhatsApp Web-et, mobilon a
+    // natív alkalmazást nyitja. A '+' NEM kell — a szerver már csak
+    // számjegyeket ad vissza (normalizePhone).
+    window.location.href = 'https://wa.me/' + encodeURIComponent(num);
+  })
+  .catch(function(){
+    try { toast(t('sof.waError'), 'err'); } catch(e){}
+  });
+}
+
+// ============================================================
+// FIREBASE CHAT — Sofőr oldal  (LEGACY, jelenleg nem hívott)
 // ============================================================
 var _fbDb = null, _chatCompanyId = null;
 var _chatCurrentRoom = null, _chatUnsubscribe = null, _chatRoomsListener = null;
