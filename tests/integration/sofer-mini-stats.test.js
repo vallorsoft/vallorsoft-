@@ -35,17 +35,25 @@ const CID = 1;
 const SOFER = { ...fixtures.sofer, company_id: CID };
 const ADMIN = { ...fixtures.admin, company_id: CID };
 
-// Segéd: felállítja az 5 alap-lekérdezést a chain-ben (orders, fuvarlevelek,
-// hónap-határok, snapshotok, kiosztott járművek). A snap-sorok most (rendszam,
-// year, month, mileage) formátumúak — a handler kiválogatja őket prev/prev-prev
+// Segéd: felállítja az 5-6 alap-lekérdezést a chain-ben (orders, fuvarlevelek,
+// hónap-határok, snapshotok, kiosztott járművek, és opcionálisan a manager
+// notification dedup-lookupot). A snap-sorok most (rendszam, year, month,
+// mileage, fuel_level) formátumúak — a handler kiválogatja őket prev/prev-prev
 // hónapra. Az `assigned` a sofőr kiosztott járműveinek rendszám-listája.
-function mockChain({ ord, fuvs, snaps, assigned, mCurr = '2026-07-01T00:00:00Z', mPrev = '2026-06-01T00:00:00Z' }) {
+// A `notifExists` (default true) → a dedup-lekérdezés talál/nem talál sort;
+// ha nem talál, a handler beszúrási hívást tesz — ezt is mockolnunk kell.
+function mockChain({ ord, fuvs, snaps, assigned, mCurr = '2026-07-01T00:00:00Z', mPrev = '2026-06-01T00:00:00Z', notifExists = true }) {
   pool.query
     .mockResolvedValueOnce(rows([ord]))
     .mockResolvedValueOnce(rows(fuvs || []))
     .mockResolvedValueOnce(rows([{ m_curr: mCurr, m_prev: mPrev }]))
     .mockResolvedValueOnce(rows(snaps || []))
     .mockResolvedValueOnce(rows((assigned || []).map((r) => ({ rendszam: r }))));
+  // Ha manager_warn_diff triggerelne (nagy avg_diff), a handler dedup-lookupot
+  // + esetleges INSERT-et is végez. A tesztek nagy részében nem triggerelünk,
+  // ezért ezt csak akkor kell mockolni, ha az adott teszt tényleg trigger-t
+  // vár — mockResolvedValue-t használunk fallbackre (végtelen üres válasz).
+  pool.query.mockResolvedValue(rows(notifExists ? [{ id: 1 }] : []));
 }
 
 beforeEach(() => reset());
@@ -246,6 +254,122 @@ describe('getMySoferStats — külön „teljes hó" (GPS) + „leadott" (menetl
     // Delta nem kalkulálható → km_prev_gps = 0
     expect(res.body.result.km_prev_gps).toBe(0);
     expect(res.body.result.km_prev).toBe(0);
+  });
+});
+
+describe('getMySoferStats — átlagos fogyasztás + figyelmeztetések', () => {
+  test('normál tartomány: van menetlevél, avg számítható, nincs warn', async () => {
+    setUser(SOFER);
+    mockChain({
+      ord: { lezart: 5, lezart_prev: 5, aktiv: 0 },
+      fuvs: [
+        // Menetlevél az előző hóra (jún.)
+        { id: 1, numar_camion: 'B111', indulas_dt: '2026-06-01T00:00:00Z',
+          erkezes_dt: '2026-06-30T00:00:00Z', data_completare: '2026-06-30',
+          km_inceput: 100000, km_sfarsit: 110000, total_km: 10000,
+          cant_inceput: 500, cant_sfarsit: 400,
+          diurna_externa: 30, diurna_interna: 0,
+          alimentari: [{ litru: 3100 }] },
+        // Menetlevél a jelen hóra (júl. eddig)
+        { id: 2, numar_camion: 'B111', indulas_dt: '2026-07-01T00:00:00Z',
+          erkezes_dt: '2026-07-15T00:00:00Z', data_completare: '2026-07-15',
+          km_inceput: 110000, km_sfarsit: 115000, total_km: 5000,
+          cant_inceput: 400, cant_sfarsit: 350,
+          diurna_externa: 15, diurna_interna: 0,
+          alimentari: [{ litru: 1450 }] },
+      ],
+      snaps: [], assigned: []  // menetlevél-fallback módban
+    });
+    const res = await call('getMySoferStats', []);
+    expect(res.body.result.ok).toBe(true);
+    // Jún: (500 + 3100 - 400) × 100 / 10000 = 32.0 L/100km — normál
+    expect(Math.round(res.body.result.avg_prev * 10) / 10).toBe(32.0);
+    // Júl: (400 + 1450 - 350) × 100 / 5000 = 30.0 L/100km — normál
+    expect(Math.round(res.body.result.avg_curr * 10) / 10).toBe(30.0);
+    expect(res.body.result.warn_range).toBe(false);
+    expect(res.body.result.warn_diff).toBe(false);
+    expect(res.body.result.manager_warn_diff).toBe(false);
+  });
+
+  test('tartományon KÍVÜL érték (Peto-eset): warn_range = true', async () => {
+    setUser({ ...SOFER, email: 'peto@example.com' });
+    mockChain({
+      ord: { lezart: 0, lezart_prev: 0, aktiv: 0 },
+      fuvs: [],  // nincs menetlevél
+      // GPS snapshotok VAN — máj. 31 tank 710 L km 567539; jún. 30 tank 280 L km 578727
+      snaps: [
+        { rendszam: 'B104VLR', year: 2026, month: 5, mileage: 567539, fuel_level: 710 },
+        { rendszam: 'B104VLR', year: 2026, month: 6, mileage: 578727, fuel_level: 280 },
+      ],
+      assigned: ['B104VLR']
+    });
+    // Nincs júniusi menetlevél → tanked = 0
+    // fls a fenti prev-hónapos szűrésen nem talál semmit → avg_prev = null
+    // A calcAvg üres fls-nél null-t ad → avg_prev = null → warn_range = false
+    // Peto valós helyzete: nincs waybill, snapshot van, avg NEM kalkulálható
+    // → nem figyelmeztet, csak „—"-t mutat. Ez OK: a warn a rossz értékre való,
+    // nem a hiányzó adatra.
+    const res = await call('getMySoferStats', []);
+    expect(res.body.result.avg_prev).toBeNull();
+    expect(res.body.result.warn_range).toBe(false);
+  });
+
+  test('nagy hó-közti eltérés (> 4.5): warn_diff = true (sofőr)', async () => {
+    setUser(SOFER);
+    mockChain({
+      ord: { lezart: 3, lezart_prev: 3, aktiv: 0 },
+      fuvs: [
+        // Jún: 32.0 L/100km
+        { id: 1, numar_camion: 'B111', indulas_dt: '2026-06-01T00:00:00Z',
+          erkezes_dt: '2026-06-30T00:00:00Z', data_completare: '2026-06-30',
+          km_inceput: 100000, km_sfarsit: 110000, total_km: 10000,
+          cant_inceput: 500, cant_sfarsit: 400,
+          diurna_externa: 30, diurna_interna: 0,
+          alimentari: [{ litru: 3100 }] },
+        // Júl: 25.0 L/100km — 7.0 eltérés
+        { id: 2, numar_camion: 'B111', indulas_dt: '2026-07-01T00:00:00Z',
+          erkezes_dt: '2026-07-15T00:00:00Z', data_completare: '2026-07-15',
+          km_inceput: 110000, km_sfarsit: 115000, total_km: 5000,
+          cant_inceput: 400, cant_sfarsit: 350,
+          diurna_externa: 15, diurna_interna: 0,
+          alimentari: [{ litru: 1200 }] },  // (400+1200-350)*100/5000 = 25.0
+      ],
+      snaps: [], assigned: []
+    });
+    const res = await call('getMySoferStats', []);
+    expect(Math.round(res.body.result.avg_prev * 10) / 10).toBe(32.0);
+    expect(Math.round(res.body.result.avg_curr * 10) / 10).toBe(25.0);
+    // diff = 7.0 → sofőr warn (>4.5) ÉS manager warn (>2.5)
+    expect(res.body.result.warn_diff).toBe(true);
+    expect(res.body.result.manager_warn_diff).toBe(true);
+  });
+
+  test('közepes hó-közti eltérés (>2.5 de ≤4.5): CSAK manager warn', async () => {
+    setUser(SOFER);
+    mockChain({
+      ord: { lezart: 3, lezart_prev: 3, aktiv: 0 },
+      fuvs: [
+        // Jún: 32.0 L/100km
+        { id: 1, numar_camion: 'B111', indulas_dt: '2026-06-01T00:00:00Z',
+          erkezes_dt: '2026-06-30T00:00:00Z', data_completare: '2026-06-30',
+          km_inceput: 100000, km_sfarsit: 110000, total_km: 10000,
+          cant_inceput: 500, cant_sfarsit: 400,
+          diurna_externa: 30, diurna_interna: 0,
+          alimentari: [{ litru: 3100 }] },
+        // Júl: 28.5 L/100km — 3.5 eltérés (jún 32 vs 28.5 = 3.5)
+        { id: 2, numar_camion: 'B111', indulas_dt: '2026-07-01T00:00:00Z',
+          erkezes_dt: '2026-07-15T00:00:00Z', data_completare: '2026-07-15',
+          km_inceput: 110000, km_sfarsit: 115000, total_km: 5000,
+          cant_inceput: 400, cant_sfarsit: 350,
+          diurna_externa: 15, diurna_interna: 0,
+          alimentari: [{ litru: 1375 }] },  // (400+1375-350)*100/5000 = 28.5
+      ],
+      snaps: [], assigned: []
+    });
+    const res = await call('getMySoferStats', []);
+    // diff = 3.5 → sofőr NEM warn (nem > 4.5), manager warn (> 2.5)
+    expect(res.body.result.warn_diff).toBe(false);
+    expect(res.body.result.manager_warn_diff).toBe(true);
   });
 });
 

@@ -14,6 +14,44 @@
 
 ---
 
+## 2026-07-18 — Sofőr TANKOLVA csempe: átlagfogyasztás L/100km + anomália-figyelmeztetés
+
+A sofőr TANKOLVA csempéjén két új sor jelenik meg: **e havi eddigi átlag** (a
+legutolsó menetlevél km/tankolásig) és **múlt hó átlag** (a teljes előző hó).
+Ha az érték kívül esik a 20–38 L/100km sávon, VAGY a két hó közti eltérés
+> 4.5 L/100km, a csempe alján figyelmeztetés jelenik meg. A manager külön push
++ notification-t kap, ha az eltérés > 2.5 L/100km.
+
+**Képlet** (mindkét ág): `(start_tank + tankolt − end_tank) × 100 / megtett_km`
+
+1. **`handlers/statisticsHandlers.js` `getMySoferStats`** — új
+   `avg_curr`/`avg_prev`/`avg_diff` mezők a válaszban, plusz `warn_range` (érték
+   <20 vagy >38), `warn_diff` (|Δ| > 4.5, sofőr), `manager_warn_diff` (|Δ| > 2.5,
+   manager). Új: menetlevél query kiegészítve `cant_inceput`/`cant_sfarsit`
+   mezőkkel; snapshot query kiegészítve `fuel_level`-lel; snapMap/snapMapPP
+   most `{mileage, fuel_level}` objektumot tárol.
+2. **Adatforrás-szabály:**
+   - **GPS-elsőbbség**: prev-prev-hó-vég snapshot (start_tank/km) + prev-hó-vég
+     snapshot (end_tank/km, ill. jelen hónál a legutolsó menetlevél end);
+     tankolt SUM az alimentari-ból.
+   - **Menetlevél-fallback**: az adott havi menetlevelek közül az elsőnek
+     `cant_inceput`/`km_inceput` a start; az utolsónak `cant_sfarsit`/`km_sfarsit`
+     az end; tankolt = alimentari SUM.
+   - Több kiosztott jármű esetén az aggregátum snapshot érték (SUM per jármű).
+3. **Manager push + notification** (best-effort, dedup 1× per sofőr/hónap):
+   `notifications` tábla `type='fuel_deviation'` + push az Admin/Manager felé.
+   A dedup a `body`-ban egy egyedi kulcsot keres (sofőr email + hónap).
+4. **Kliens (`sofer.js` `loadSoferMiniStats`)** — a TANKOLVA csempe új három
+   sort jelenít meg: „e havi átlag: X L/100km", „múlt hó átlag: Y L/100km",
+   opcionális warn-sor „⚠️ Elmaradt menetlevél beadása" (range warn) vagy
+   „⚠️ Nézze át a menetlevelet, tankolást" (diff warn). Új CSS
+   `.sof-mstat-warn` (narancs, félkövér). i18n `sof.avgCurr` / `sof.avgPrev`
+   / `sof.warnRange` / `sof.warnDiff` (RO+HU). Cache-bust
+   `sofer.js`/`sofer.css`/`i18n.js` `?v=20260718fuel`.
+5. **Teszt** — 4 új eset: normál sáv (nincs warn), Peto-eset (nincs waybill →
+   avg = null, nincs warn), nagy diff (>4.5, sofőr+manager warn), közepes diff
+   (>2.5 de ≤4.5, csak manager warn). **619 Jest zöld** (615 → 619).
+
 ## 2026-07-18 — Sofőr mini-statisztika: „teljes hó" (GPS) + „leadott" (menetlevél) külön a KM csempén
 
 A múlt havi KM csempén mostantól KÉT sor jelenik meg:

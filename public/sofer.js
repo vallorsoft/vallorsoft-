@@ -985,13 +985,37 @@ function loadSoferMiniStats() {
       kmPrev1 = lastMo + ': ' + n(s.km_prev);
       kmPrev2 = null;
     }
+
+    // TANKOLVA csempe: átlagfogyasztás (L/100km) — jelen havi eddigi + múlt havi.
+    // Kerekítés 1 tizedesre; null → „—". A csempe alján kiírunk egy figyelmeztetést
+    // ha valamelyik érték kívül esik [20, 38] tartományon (⚠️ Elmaradt menetlevél)
+    // VAGY a két hó közti eltérés > 4.5 L/100km (⚠️ Nézze át a menetlevelet).
+    function fmtAvg(v) {
+      if (v == null || !isFinite(parseFloat(v))) return '—';
+      return parseFloat(v).toFixed(1) + ' L/100km';
+    }
+    var avgLabelCurr = t('sof.avgCurr') + ': ' + fmtAvg(s.avg_curr);
+    var avgLabelPrev = t('sof.avgPrev') + ': ' + fmtAvg(s.avg_prev);
+    var warn = null;
+    if (s.warn_range) warn = t('sof.warnRange');
+    else if (s.warn_diff) warn = t('sof.warnDiff');
+
     // 2×2 rács (2-2), teljes szélességű — ne húzza el az oldalt függőlegesen.
+    // A TANKOLVA csempén 3 prev-sor: avg_curr, avg_prev, opcionális warn-sor.
+    // A warn-sor a `sof-mstat-warn` CSS-osztályt kapja (narancs, félkövér).
     box.innerHTML = '<div class="sof-mstat-h">' + t('sof.myMonthPerf') + '</div>'
       + '<div class="sof-mstat-grid">'
       + tile('✅', n(s.lezart), t('sof.statClosed'), '#16a34a', lastMo + ': ' + n(s.lezart_prev))
       + tile('🛣️', n(s.km), t('sof.statKm'), '#2563eb', kmPrev1, kmPrev2)
       + tile('🗓️', n(s.diurna_ext) + '+' + n(s.diurna_int), t('sof.statDiurna'), '#6366f1', lastMo + ': ' + n(s.diurna_ext_prev) + '+' + n(s.diurna_int_prev))
-      + tile('⛽', n(s.tankolt_l) + ' L', t('sof.statFueled'), '#d97706', lastMo + ': ' + n(s.tankolt_l_prev) + ' L')
+      + '<div class="sof-mstat">'
+        + '<div class="sof-mstat-ico">⛽</div>'
+        + '<div class="sof-mstat-val" style="color:#d97706;">' + n(s.tankolt_l) + ' L</div>'
+        + '<div class="sof-mstat-lbl">' + t('sof.statFueled') + '</div>'
+        + '<div class="sof-mstat-prev">' + avgLabelCurr + '</div>'
+        + '<div class="sof-mstat-prev">' + avgLabelPrev + '</div>'
+        + (warn ? '<div class="sof-mstat-warn">⚠️ ' + warn + '</div>' : '')
+      + '</div>'
       + '</div>';
     box.style.display = '';
   }).catch(function() {});
