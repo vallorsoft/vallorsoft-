@@ -14,6 +14,39 @@
 
 ---
 
+## 2026-07-18 — Statisztika Sofőrök: km-oszlopok is a fogyasztás-összehasonlításban (E havi km, Múlt hó GPS/leadott)
+
+A sofőr főoldali mini-csempéin megjelenő „teljes hó: X / leadott: Y" km-értékek és
+az „e havi + múlt havi átlagfogyasztás" mostantól a manager/admin
+**Statisztika → Sofőrök → ⛽ Fogyasztás összehasonlítás** panel táblájában is
+láthatók — sofőrönként, egyben áttekinthetően.
+
+1. **`handlers/statisticsHandlers.js` `getSoferConsumptionOverview`** kiegészítve:
+   sofőrönként új mezők a válaszban — `km_curr` (jelen havi menetlevél-alap
+   total_km összeg érkezés-hó horgony szerint), `km_prev` (múlt havi menetlevél-
+   alap, ugyanaz), `km_prev_gps` (múlt havi GPS-alap „teljes hónap": a sofőrhöz
+   kiosztott járművek prev / prev-prev hó-vég snapshotjainak deltájának összege
+   — `gps_month_end_snapshots`). A menetlevél-query a `total_km` mezővel bővítve;
+   a GPS-delta a már betöltött `snapMap`/`snapMapPP` + `platesByEmail` map-ekből
+   számol → nincs új query. `company_id`-szűrés, `_isAdminOrManager` kapu, sofőr
+   NEM éri el.
+2. **`public/stats.js` `loadDrivers`** — a fogyasztás-összehasonlítás tábla 3
+   új oszloppal bővül az avg oszlopok elé: **E havi km**, **Múlt hó — teljes
+   (GPS)**, **Múlt hó — leadott**. Ha a GPS-alap > 5%-kal nagyobb, mint a
+   leadott (menetlevél-alap), a „teljes (GPS)" cella narancsszín + `+X%` badge
+   → jelzi, hogy hiányzó menetlevél lehet. A meglévő sofőr-teljesítmény tábla
+   (`getDriverStats`, időszak-szűrős) érintetlen.
+3. **`public/i18n.js`** — 6 új kulcs (RO-alap + HU-váltó): `st.dr.cKmCurr`,
+   `st.dr.cKmCurrTip`, `st.dr.cKmPrevGps`, `st.dr.cKmPrevGpsTip`,
+   `st.dr.cKmPrevWb`, `st.dr.cKmPrevWbTip` (a tooltip elmagyarázza a forrást).
+4. **Teszt** `tests/integration/sofer-consumption-overview.test.js` — 3 új eset:
+   (a) `km_curr`/`km_prev` menetlevél total_km összegzés érkezés-hó horgony
+   szerint; (b) `km_prev_gps` kiosztott járművek delta-összege rendszám-
+   normalizálással (pl. „B 111" ↔ „B111"); (c) `km_prev_gps = 0`, ha csak az
+   egyik snapshot van meg. **627 Jest zöld** (624 → 627).
+
+---
+
 ## 2026-07-18 — Sofőr-fogyasztás cross-comparison a Statisztika oldalon (manager/admin only)
 
 A Statisztika → Sofőrök oldalra új szekció került: **⛽ Fogyasztás összehasonlítás

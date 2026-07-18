@@ -1535,6 +1535,13 @@
     'st.dr.cAvgPrev':        { hu: 'Múlt havi átlag', ro: 'Media lună trecută' },
     'st.dr.cAvgDiff':        { hu: 'Hó-közti eltérés', ro: 'Diferență între luni' },
     'st.dr.cDevFromAvg':     { hu: 'Cég-átlagtól', ro: 'De la media firmei' },
+    // KM oszlopok (sofőr fogyasztás-összehasonlítás — mint a sofőr főoldali csempéjén)
+    'st.dr.cKmCurr':         { hu: 'E havi km', ro: 'Km lună curentă' },
+    'st.dr.cKmCurrTip':      { hu: 'A sofőr e havi menetleveleinek total_km összege.', ro: 'Suma total_km din foile de parcurs ale lunii curente.' },
+    'st.dr.cKmPrevGps':      { hu: 'Múlt hó — teljes (GPS)', ro: 'Luna trecută — total (GPS)' },
+    'st.dr.cKmPrevGpsTip':   { hu: 'A sofőrhöz kiosztott járművek hó-végi GPS km-óra deltája (prev − prev-prev). Ha nagyobb mint a leadott, hiányzó menetlevélre utalhat.', ro: 'Delta contorului GPS de la sfârșit de lună a vehiculelor alocate șoferului (prev − prev-prev). Dacă e mai mare decât cel raportat, poate indica o foaie de parcurs lipsă.' },
+    'st.dr.cKmPrevWb':       { hu: 'Múlt hó — leadott', ro: 'Luna trecută — raportat' },
+    'st.dr.cKmPrevWbTip':    { hu: 'A sofőr múlt havi menetleveleinek total_km összege.', ro: 'Suma total_km din foile de parcurs ale lunii trecute.' },
     // Járművek
     'st.ve.pTop': { hu: '🏆 Top járművek bevétel szerint (EUR)', ro: '🏆 Top vehicule după venit (EUR)' },
     'st.ve.pTable': { hu: '🚛 Jármű-tábla', ro: '🚛 Tabel vehicule' },
