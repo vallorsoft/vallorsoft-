@@ -1871,6 +1871,8 @@ function loadInvites(){
 }
 
 function loadOrderFormData(){
+  // Mező-autocomplete előmelegítés (első fókusznál ne várjon a hálózatra).
+  if(typeof ocSgLoad === 'function') ocSgLoad();
   gas('userListAll').then(list=>{internDriversCache=list.filter(u=>u.pozicio==='Sofer');renderInternDrivers(internDriversCache);});
   gas('extDriverList').then(list=>{externDriversCache=Array.isArray(list)?list:[];renderExternDrivers(externDriversCache);});
   Promise.all([gas('vehicleList'), gas('carrierVehicleList')]).then(function(res){
@@ -1924,6 +1926,10 @@ function populateOrderSeriaSelect(){
 
 function loadOrders(){
   populateOrderSeriaSelect();
+  // Az autocomplete-hez a mező-javaslatok betöltése (a delegált handler is
+  // meghívná lazyn az első fókusznál — itt előre kérjük, hogy azonnal kész
+  // legyen, amikor a felhasználó megnyitja a szerkesztőt).
+  if(typeof ocSgLoad === 'function') ocSgLoad();
   gas('comList').then(list=>{
     if(!Array.isArray(list))list=[];
     _ordersAllCache = list;
@@ -2434,6 +2440,89 @@ function feSgInit(suggest){
   modal.addEventListener('keydown', function(e){ if(e.key==='Escape') feSgClose(); });
 }
 
+// ===== Fuvar-űrlap mező-autocomplete (kiíró + szerkesztő) =====================
+// A `getOrderFieldSuggestions`-ből (cég eddigi fuvarjai, nem Anulat) mezőnként
+// felkínált egyedi értékek — gépelés/fókusz közben, ugyanazon a body-hoz fűzött
+// DD elemen (_feSgDD) mint a menetlevél-szerkesztőnél. Delegált a document-en:
+// ha az input a `#fuvEditModal`-ban van → `_feSg`; másutt (order-form pane
+// vagy `#orderEditModal`) → `_ocSg`. A `data-sg` kulcs a mező neve
+// (client / ref / firma_incarcare / …).
+var _ocSg = {};
+var _ocSgLoaded = false;
+var _ocSgLoading = null;
+
+function ocSgLoad(force){
+  if(_ocSgLoaded && !force) return Promise.resolve(_ocSg);
+  if(_ocSgLoading) return _ocSgLoading;
+  _ocSgLoading = gas('getOrderFieldSuggestions').then(function(r){
+    _ocSg = r || {};
+    _ocSgLoaded = true;
+    _ocSgLoading = null;
+    return _ocSg;
+  }).catch(function(){ _ocSgLoading = null; return {}; });
+  return _ocSgLoading;
+}
+
+// A menetlevél-szerkesztő `feSgRender`-jét adaptáljuk: nem a `_feSg`-ből, hanem
+// a megadott map-ből dolgozik. Az `_feSgDD` DOM-elemet és stílusát újrahasznosítjuk.
+function _sgRenderFromMap(el, map){
+  var key = el.getAttribute('data-sg'); if(!key){ feSgClose(); return; }
+  var list = (map && map[key]) || [];
+  if(!list.length){ feSgClose(); return; }
+  var q = (el.value || '').trim().toLowerCase();
+  var matches = (q ? list.filter(function(v){ return String(v).toLowerCase().indexOf(q)>=0; }) : list.slice())
+    .filter(function(v){ return String(v).toLowerCase() !== q; });
+  if(!matches.length){ feSgClose(); return; }
+  matches = matches.slice(0, 12);
+  var th = feSgTheme(), dd = feSgEnsureDD();
+  dd.style.background = th.bg; dd.style.border = '1px solid '+th.bd; dd.style.color = th.tx;
+  dd.innerHTML = matches.map(function(v){
+    return '<div class="fe-sg-item" data-v="'+feEsc(v)+'" style="padding:6px 9px;border-radius:6px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+feEsc(v)+'</div>';
+  }).join('');
+  Array.prototype.forEach.call(dd.querySelectorAll('.fe-sg-item'), function(it){
+    it.addEventListener('mouseenter', function(){ it.style.background = th.hv; });
+    it.addEventListener('mouseleave', function(){ it.style.background = ''; });
+    it.addEventListener('mousedown', function(e){ e.preventDefault();
+      el.value = it.getAttribute('data-v');
+      try{ el.dispatchEvent(new Event('input', {bubbles:true})); }catch(_){ }
+      feSgClose(); try{ el.focus(); }catch(_){ }
+    });
+  });
+  var r = el.getBoundingClientRect();
+  dd.style.left = Math.round(r.left)+'px';
+  dd.style.top  = Math.round(r.bottom+2)+'px';
+  dd.style.minWidth = Math.max(160, Math.round(r.width))+'px';
+  dd.style.maxWidth = Math.max(240, Math.round(r.width))+'px';
+  dd.style.display = 'block';
+  _feSgEl = el;   // ugyanaz a „kattintás-kívülre-zár" mechanizmus él
+}
+
+// Globális, egyszer felkötött delegált — a `data-sg`-s inputokat kiszolgálja
+// mind az order-form / edit-modal / fuvar-modal. A megfelelő map-et
+// (menetlevél vs. fuvar) a konténer alapján választja ki.
+(function ensureOrderSgDelegate(){
+  if(window._vsOrderSgBound) return;
+  window._vsOrderSgBound = true;
+  var handler = function(e){
+    var el = e.target;
+    if(!(el && el.getAttribute && el.getAttribute('data-sg'))) return;
+    // A menetlevél-szerkesztő modálján belül a saját map-je fut (feSgInit már
+    // felköti a modálon; ez a globális ág csak akkor lép be, ha valamiért
+    // NEM a modál egyedi handlere fut előbb — pl. a modálon kívüli fuvar-
+    // form). Ha benn van a modálban, a saját init intézi — mi nem duplázunk.
+    if(el.closest && el.closest('#fuvEditModal')) return;
+    // Fuvar-oldal (kiíró pane vagy orderEditModal) — az _ocSg-ből.
+    if(!_ocSgLoaded){
+      ocSgLoad().then(function(map){ _sgRenderFromMap(el, map); });
+    } else {
+      _sgRenderFromMap(el, _ocSg);
+    }
+  };
+  document.addEventListener('input', handler, true);
+  document.addEventListener('focusin', handler, true);
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') feSgClose(); }, true);
+})();
+
 function saveFuvEdit(){
   var id=document.getElementById('feId').value;
   var puncte=[].map.call(document.querySelectorAll('#fePuncte .fe-row'),function(r){return {tip:r.querySelector('.fe-p-tip').value,loc:r.querySelector('.fe-p-loc').value,data:r.querySelector('.fe-p-data').value};});
@@ -2672,11 +2761,72 @@ function quickStatusChange(id, sel) {
 })();
 
 // Lágy törlés: a fuvart 'Anulat'-ra állítja (comDelete). Nem fizikai törlés.
+// A fuvar eltűnik a fő listáról (comList szerver-oldalon szűr), és megjelenik
+// a „🗑️ Törölt fuvarok" almenüben, ahonnan visszaállítható (restoreOrderRow).
 function cancelOrder(id){
   if (!confirm(t('cs.cf.cancelOrder'))) return;
   gas('comDelete', [String(id)]).then(function(r){
     if (r && r.ok) {
       toast(r.err || t('common.deleted'), 'ok');   // r.err itt csak „deja anulat" info lehet
+      if (typeof loadOrders === 'function') loadOrders();
+    } else {
+      toast((r && r.err) || t('common.error'), 'err');
+    }
+  }).catch(function(){ toast(t('common.connError'), 'err'); });
+}
+
+// ── Törölt fuvarok almenü: lista + visszaállítás ────────────────────────
+// A pane a fő fuvar-listáról kizárt Anulat státuszú fuvarokat mutatja
+// (getCancelledOrders). Visszaállítás: Anulat → Disponibil (restoreOrder).
+(function(){
+  try {
+    if (window.I18N && window.I18N.dict) {
+      var D = window.I18N.dict;
+      if (!D['nav.ordersDeleted'])       D['nav.ordersDeleted']       = { hu: '🗑️ Törölt fuvarok', ro: '🗑️ Curse anulate' };
+      if (!D['del.title'])               D['del.title']               = { hu: '🗑️ Törölt fuvarok', ro: '🗑️ Curse anulate' };
+      if (!D['del.hint'])                D['del.hint']                = { hu: 'Ezek a fuvarok Anulat státuszban vannak — a fő listáról el vannak rejtve. Visszaállításkor Disponibil állapotra kerülnek és újra szerkeszthetők.', ro: 'Aceste curse sunt cu status Anulat — sunt ascunse din lista principală. La restaurare devin Disponibil și pot fi modificate din nou.' };
+      if (!D['del.colDeletedAt'])        D['del.colDeletedAt']        = { hu: 'Törölve', ro: 'Anulat la' };
+      if (!D['del.restore'])             D['del.restore']             = { hu: '↩️ Visszaállítás', ro: '↩️ Restaurează' };
+      if (!D['del.confirmRestore'])      D['del.confirmRestore']      = { hu: 'Biztosan visszaállítod ezt a fuvart? Disponibil státuszra kerül és újra szerkeszthető lesz.', ro: 'Sigur restaurezi acest transport? Va deveni Disponibil și va putea fi modificat din nou.' };
+      if (!D['del.empty'])               D['del.empty']               = { hu: 'Nincs törölt fuvar.', ro: 'Nu există curse anulate.' };
+    }
+  } catch(e) {}
+})();
+
+function loadDeletedOrders(){
+  var tb = document.getElementById('tblOrdersDeletedBody');
+  if (!tb) return;
+  tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px;">…</td></tr>';
+  gas('getCancelledOrders').then(function(list){
+    if (!Array.isArray(list)) list = [];
+    if (!list.length) {
+      tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px;">'+t('del.empty')+'</td></tr>';
+      return;
+    }
+    tb.innerHTML = list.map(function(c){
+      var idCell = c.fuvar_no ? '<b>'+esc(c.fuvar_no)+'</b>' : '<b>'+esc(String(c.id))+'</b>';
+      var route  = esc(c.loc_incarcare||'—')+' → '+esc(c.loc_descarcare||'—');
+      var when   = c.updated_at ? new Date(c.updated_at).toLocaleString() : (c.created_at ? new Date(c.created_at).toLocaleString() : '—');
+      return '<tr style="opacity:.85;"><td title="'+esc(String(c.id))+'">'+idCell+'</td>'
+        +'<td>'+esc(c.client||'—')+'</td>'
+        +'<td>'+route+'</td>'
+        +'<td>'+esc(c.nume_sofer||'—')+'</td>'
+        +'<td>'+esc(c.rendszam_camion||'—')+'</td>'
+        +'<td style="white-space:nowrap;">'+esc(when)+'</td>'
+        +'<td><button class="btn primary" style="padding:5px 12px;font-size:12px;" onclick="restoreOrderRow(\''+esc(String(c.id))+'\')">'+t('del.restore')+'</button></td>'
+        +'</tr>';
+    }).join('');
+  }).catch(function(){
+    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px;">'+t('common.connError')+'</td></tr>';
+  });
+}
+
+function restoreOrderRow(id){
+  if (!confirm(t('del.confirmRestore'))) return;
+  gas('restoreOrder', [String(id)]).then(function(r){
+    if (r && r.ok) {
+      toast(t('common.savedOk'), 'ok');
+      loadDeletedOrders();
       if (typeof loadOrders === 'function') loadOrders();
     } else {
       toast((r && r.err) || t('common.error'), 'err');

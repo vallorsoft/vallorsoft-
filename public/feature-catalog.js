@@ -8,6 +8,7 @@ window.VS_FEATURES = [
   { key: 'ops-center',       label: 'Operatív központ 🎛️',         group: 'Áttekintés' },
   { key: 'orders-form',      label: 'Fuvar kiírás',                group: 'Fuvarozás & Logisztika' },
   { key: 'orders-list',      label: 'Fuvar kezelés',               group: 'Fuvarozás & Logisztika' },
+  { key: 'orders-deleted',   label: 'Törölt fuvarok 🗑️',           group: 'Fuvarozás & Logisztika' },
   { key: 'orders-import',    label: 'Fuvar CSV-import (📥)',        group: 'Fuvarozás & Logisztika' },
   // OPT-IN (alapból KI): ügyfél-portál — a megrendelő saját belépéssel látja
   // a fuvarjait + dokumentumokat, és új fuvart igényelhet. Developer kapcsolja.

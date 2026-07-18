@@ -222,6 +222,10 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
       fuvar_no = await nextFuvarNo(pool, company_id, null, series);
     } catch (e) { console.error('fuvar_no generálás hiba (approve, a mentés folytatódik):', e.message); }
 
+    // Tranzakció: fuvar + inbound „approved" jelzés EGYÜTT — félbeszakadásnál
+    // ne maradjon létrejött fuvar 'feldolgozatlan' inbounddal (újrapróbálás →
+    // duplikált fuvar). Kezdő szakaszt (order_legs) itt sem hozunk létre — a
+    // szakasz csak explicit „➕ Szakasz" gombra keletkezik.
     const dbc = await pool.connect();
     try {
       await dbc.query('BEGIN');
@@ -235,12 +239,6 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
          pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
          rendszam_camion, rendszam_remorca, status, company_id,
          suly_kg, load_type, hossz_cm, szel_cm, mag_cm, clientId, fuvar_no]);
-      await dbc.query(
-        `INSERT INTO order_legs (order_id, leg_number, sofer_type, email_sofer, nume_sofer, firma_extern,
-           telefon_extern, external_driver_id, rendszam_camion, rendszam_remorca, loc_preluare, data_preluare, company_id)
-         VALUES ($1,1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-        [id, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
-         rendszam_camion, rendszam_remorca, loc_incarcare, data_incarcare, company_id]);
       await dbc.query(`UPDATE inbound_orders SET status='approved', created_order_id=$1, updated_at=now() WHERE id=$2 AND company_id=$3`,
         [id, req.params.id, company_id]);
       await dbc.query('COMMIT');

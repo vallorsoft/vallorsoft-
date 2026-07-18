@@ -14,6 +14,48 @@
 
 ---
 
+## 2026-07-18 — Fuvarkezelés: Törölt fuvarok almenü + mező-autocomplete + auto-szakasz eltávolítva
+
+Három admin/manager UX-javítás egy körben a fuvar-modulhoz.
+
+1. **🗑️ Törölt fuvarok almenü.** A `comDelete`-tel törölt (`Anulat`) fuvarok
+   mostantól **eltűnnek a fő fuvarlistából** (a `handlers/orders.js` `comList`
+   `WHERE o.company_id = $1 AND o.status <> 'Anulat'`), és egy külön
+   „**🗑️ Törölt fuvarok**" almenüben jelennek meg (Fuvarok csoport, admin +
+   manager). A pane a `getCancelledOrders` handlerből (cégre szűrt, csak
+   Anulat, Admin/Manager) tölti az adatot; minden sor „↩️ Visszaállítás"
+   gombbal jár, ami a `restoreOrder(id)`-vel `Anulat → Disponibil` állapotra
+   hozza (audit, granulált jog: Manager csak `orders_delete` engedéllyel).
+   `feature-catalog.js` új kulcs: `orders-deleted` (developer ki/be
+   kapcsolhatja). i18n: `nav.ordersDeleted`, `del.*` (RO-alap + HU).
+
+2. **📝 Mező-autocomplete a fuvar-kiíráson és a szerkesztőben.** Minden
+   szöveges mezőnél (Ügyfél, Referencia, Felrakási/Lerakási cég, Külső sofőr
+   neve/cége/telefonja + szerkesztőben Rakodás/Lerakás helye) gépeléskor a
+   cég eddigi (nem Anulat) fuvarjaiba **ugyanabba a mezőbe** már beírt egyedi
+   értékek jelennek meg legördülőben — a mintát a menetlevél-szerkesztő
+   `getFuvarlevelFieldSuggestions`-ból örököltük. Új handler
+   `getOrderFieldSuggestions` (Admin/Manager, cégre szűrt, mezőnként max 300
+   érték); kliens: `data-sg` attribútum a mezőkön + globális, delegált
+   `data-sg` handler `public/console-shared.js`-ben, ami a body-hoz fűzött
+   DD-t (`_feSgDD`) újrahasznosítja (fuvar-modálon belül a menetlevél
+   szuggeszcióit adja, kívül a fuvar-adatokat). `ocSgLoad()` előmelegítés
+   `loadOrders`/`loadOrderFormData`-ból, így az első fókusz azonnal kínál.
+
+3. **➖ Auto-szakasz eltávolítva.** A `handlers/orders.js` `comCreate`,
+   `bulkCreateOrders` és a `routes/inbound-orders.js` `/approve` út **NEM**
+   hoz létre automatikusan kezdő `order_legs` sort — a fuvar egyetlen INSERT-
+   tel jön létre; szakasz csak explicit „➕ Szakasz" gombra (`addOrderLeg`)
+   keletkezik. A `syncOrderTopFromActiveLeg` viselkedése nem változott:
+   0 szakasz esetén a top-szintű `orders.*` marad az igazságforrás; szakasz-
+   felvételkor a top a legutolsó szakaszra állítódik (visszafelé kompatibilis).
+
+**Tesztek:** `tests/integration/db-orders.test.js` frissítve az új
+semantikára (nincs auto-leg; a deleteOrderLeg-teszt 2 explicit `addOrderLeg`-
+gel indul, a top-visszaesés így verifikálható). **627 Jest zöld**.
+
+---
+
 ## 2026-07-18 — Statisztika Sofőrök: km-oszlopok is a fogyasztás-összehasonlításban (E havi km, Múlt hó GPS/leadott)
 
 A sofőr főoldali mini-csempéin megjelenő „teljes hó: X / leadott: Y" km-értékek és

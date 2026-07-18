@@ -190,7 +190,7 @@ handlers.comList = async function (req, res, args) {
                   COALESCE(legs.legs_json, '[]'::json) AS legs_json
            FROM orders o ${legsSubquery}
            LEFT JOIN clients cl ON cl.id = o.client_id AND cl.company_id = o.company_id
-           WHERE o.company_id = $1
+           WHERE o.company_id = $1 AND o.status <> 'Anulat'
            ORDER BY (o.status IN ('Parkolt','Raktarban') OR o.handover_status = 'Fuggoben') DESC,
                     o.created_at DESC
            LIMIT 500`,
@@ -465,56 +465,34 @@ handlers.comCreate = async function (req, res, args) {
         fuvar_no = await nextFuvarNo(pool, company_id, null, series);
       } catch (e) { console.error('fuvar_no generálás hiba (a mentés folytatódik):', e.message); }
 
-      // Tranzakció: a fuvar és az első láb együtt jöjjön létre — láb nélküli
-      // fuvar ne maradhasson, ha a második INSERT elszáll.
-      const dbc = await pool.connect();
-      try {
-        await dbc.query('BEGIN');
-        await dbc.query(
-          `INSERT INTO orders (
-            id, client, ref, loc_incarcare, loc_descarcare,
-            data_incarcare, data_descarcare, pret, km,
-            sofer_type, email_sofer, nume_sofer,
-            firma_extern, telefon_extern, external_driver_id,
-            rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type, route_geo,
-            hossz_cm, szel_cm, mag_cm, fuvar_no,
-            firma_incarcare, firma_descarcare
-          ) VALUES (
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28
-          )`,
-          [
-            id, client, ref, loc_incarcare, loc_descarcare,
-            data_incarcare, data_descarcare, pret, km,
-            sofer_type, email_sofer, nume_sofer,
-            firma_extern, telefon_extern, external_driver_id,
-            rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type,
-            route_geo ? JSON.stringify(route_geo) : null,
-            hossz_cm, szel_cm, mag_cm, fuvar_no,
-            firma_incarcare, firma_descarcare
-          ]
-        );
-
-        await dbc.query(
-          `INSERT INTO order_legs (
-            order_id, leg_number, sofer_type, email_sofer, nume_sofer,
-            firma_extern, telefon_extern, external_driver_id,
-            rendszam_camion, rendszam_remorca,
-            loc_preluare, data_preluare, company_id
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-          [
-            id, 1, sofer_type, email_sofer, nume_sofer,
-            firma_extern, telefon_extern, external_driver_id,
-            rendszam_camion, rendszam_remorca,
-            loc_incarcare, data_incarcare, company_id
-          ]
-        );
-        await dbc.query('COMMIT');
-      } catch (txErr) {
-        await dbc.query('ROLLBACK').catch(() => {});
-        throw txErr;
-      } finally {
-        dbc.release();
-      }
+      // A fuvar egyetlen INSERT-ben jön létre; szakaszt (order_legs) fuvar-
+      // kiíráskor NEM hozunk létre — szakasz csak explicit „➕ Szakasz"
+      // gombra keletkezik (addOrderLeg). A kezdeti sofőr/jármű a felső
+      // orders.* mezőkben él (a szakasz-nézet 0 legs-nél helyesen a top-
+      // szintet mutatja).
+      await pool.query(
+        `INSERT INTO orders (
+          id, client, ref, loc_incarcare, loc_descarcare,
+          data_incarcare, data_descarcare, pret, km,
+          sofer_type, email_sofer, nume_sofer,
+          firma_extern, telefon_extern, external_driver_id,
+          rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type, route_geo,
+          hossz_cm, szel_cm, mag_cm, fuvar_no,
+          firma_incarcare, firma_descarcare
+        ) VALUES (
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28
+        )`,
+        [
+          id, client, ref, loc_incarcare, loc_descarcare,
+          data_incarcare, data_descarcare, pret, km,
+          sofer_type, email_sofer, nume_sofer,
+          firma_extern, telefon_extern, external_driver_id,
+          rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type,
+          route_geo ? JSON.stringify(route_geo) : null,
+          hossz_cm, szel_cm, mag_cm, fuvar_no,
+          firma_incarcare, firma_descarcare
+        ]
+      );
 
       return res.json({ result: {
         ok: true, id: id, fuvar_no: fuvar_no,
@@ -607,39 +585,23 @@ handlers.bulkCreateOrders = async function (req, res, args) {
         let fuvar_no = null;
         try { fuvar_no = await nextFuvarNo(pool, cid, null, _importSeries); }
         catch (e) { console.error('fuvar_no generálás hiba (import, a sor folytatódik):', e.message); }
-        const dbc = await pool.connect();
-        try {
-          await dbc.query('BEGIN');
-          await dbc.query(
-            `INSERT INTO orders (
-              id, client, ref, loc_incarcare, loc_descarcare,
-              data_incarcare, data_descarcare, pret, km,
-              sofer_type, email_sofer, nume_sofer,
-              firma_extern, telefon_extern, external_driver_id,
-              rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type,
-              hossz_cm, szel_cm, mag_cm, import_extra, fuvar_no
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)`,
-            [id, client, ref, loc_incarcare, loc_descarcare,
-             data_incarcare, data_descarcare, pret, km,
-             sofer_type, email_sofer, nume_sofer,
-             firma_extern, telefon_extern, external_driver_id,
-             rendszam_camion, rendszam_remorca, status, cid, suly_kg, load_type,
-             hossz_cm, szel_cm, mag_cm, import_extra ? JSON.stringify(import_extra) : null, fuvar_no]);
-          await dbc.query(
-            `INSERT INTO order_legs (
-              order_id, leg_number, sofer_type, email_sofer, nume_sofer,
-              firma_extern, telefon_extern, external_driver_id,
-              rendszam_camion, rendszam_remorca, loc_preluare, data_preluare, company_id
-            ) VALUES ($1,1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-            [id, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
-             rendszam_camion, rendszam_remorca, loc_incarcare, data_incarcare, cid]);
-          await dbc.query('COMMIT');
-        } catch (txErr) {
-          await dbc.query('ROLLBACK').catch(() => {});
-          throw txErr;
-        } finally {
-          dbc.release();
-        }
+        // Import-út: kezdő szakaszt (order_legs) itt sem hozunk létre —
+        // a szakasz csak explicit „➕ Szakasz" gombra keletkezik.
+        await pool.query(
+          `INSERT INTO orders (
+            id, client, ref, loc_incarcare, loc_descarcare,
+            data_incarcare, data_descarcare, pret, km,
+            sofer_type, email_sofer, nume_sofer,
+            firma_extern, telefon_extern, external_driver_id,
+            rendszam_camion, rendszam_remorca, status, company_id, suly_kg, load_type,
+            hossz_cm, szel_cm, mag_cm, import_extra, fuvar_no
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)`,
+          [id, client, ref, loc_incarcare, loc_descarcare,
+           data_incarcare, data_descarcare, pret, km,
+           sofer_type, email_sofer, nume_sofer,
+           firma_extern, telefon_extern, external_driver_id,
+           rendszam_camion, rendszam_remorca, status, cid, suly_kg, load_type,
+           hossz_cm, szel_cm, mag_cm, import_extra ? JSON.stringify(import_extra) : null, fuvar_no]);
         inserted++; ids.push(id);
       } catch (rowErr) {
         failed.push({ row: idx + 1, err: (rowErr && rowErr.message) || 'hiba' });
@@ -1269,6 +1231,114 @@ handlers.getPlannerMatches = async function (req, res, args) {
   } catch (err) {
     console.error('getPlannerMatches hiba:', err);
     return res.json({ result: { ok: true, matches: [], pending: 0 } }); // radar-hiba ne törje a táblát
+  }
+};
+
+// ─── Törölt (Anulat) fuvarok listája (külön almenü) ───
+// A comList a fő fuvarlistáról KIZÁRJA az Anulat státuszú fuvarokat — azok a
+// „Törölt fuvarok" almenüben jelennek meg (visszaállítási lehetőséggel).
+// Csak Admin/Manager, cégre szűrt, olvasás.
+handlers.getCancelledOrders = async function (req, res, args) {
+  try {
+    if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+      return res.json({ result: [] });
+    }
+    const cid = req.session.user.company_id;
+    const r = await pool.query(
+      `SELECT o.id, o.fuvar_no, o.client, o.ref, o.loc_incarcare, o.loc_descarcare,
+              o.pret, o.km, o.status,
+              o.nume_sofer, o.rendszam_camion,
+              o.created_at, o.updated_at
+         FROM orders o
+        WHERE o.company_id = $1 AND o.status = 'Anulat'
+        ORDER BY o.updated_at DESC NULLS LAST, o.created_at DESC
+        LIMIT 500`,
+      [cid]
+    );
+    return res.json({ result: r.rows });
+  } catch (err) {
+    console.error('getCancelledOrders hiba:', err);
+    return res.json({ result: [] });
+  }
+};
+
+// ─── Anulált fuvar visszaállítása (Anulat → Disponibil) ───
+// Admin/Manager, cégre szűrt, audit. A raktári tétel/kiosztás nem áll vissza —
+// a fuvar üres, kiosztható állapotba kerül; a szerkesztő nyithatja tovább.
+handlers.restoreOrder = async function (req, res, args) {
+  try {
+    if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    }
+    if (req.session.user.pozicio === 'Manager') {
+      const allowed = await hasPerm(pool, req.session.user.company_id, req.session.user.id, 'orders_delete');
+      if (!allowed) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    }
+    const id = String((args && args[0]) || '').trim();
+    if (!id) return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
+    const check = await pool.query(
+      'SELECT id, status FROM orders WHERE id = $1 AND company_id = $2',
+      [id, req.session.user.company_id]
+    );
+    if (!check.rows.length) return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit sau acces interzis.' } });
+    if (check.rows[0].status !== 'Anulat') return res.json({ result: { ok: false, err: 'Transportul nu este anulat.' } });
+    await pool.query(
+      "UPDATE orders SET status = 'Disponibil', updated_at = NOW() WHERE id = $1 AND company_id = $2",
+      [id, req.session.user.company_id]);
+    audit.fromReq(req, 'order.restore', 'order', id);
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('restoreOrder hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ─── Fuvar-űrlap mező-javaslatok (Admin/Manager) ───
+// A cég eddigi (nem Anulat) fuvarjaiba ugyanabba a mezőbe már beírt, NEM üres,
+// egyedi értékek — a fuvar-kiíró/szerkesztő ebből kínál autocomplete-et
+// gépelés közben (mint a menetlevél-szerkesztő getFuvarlevelFieldSuggestions).
+// Csak olvasás, cégre szűrt, mezőnként max 300 érték.
+handlers.getOrderFieldSuggestions = async function (req, res, args) {
+  try {
+    if (!req.session.user) return res.json({ result: {} });
+    const me = req.session.user;
+    if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: {} });
+    const cid = me.company_id;
+    if (!cid) return res.json({ result: {} });
+    const r = await pool.query(
+      `SELECT
+         array_agg(DISTINCT client)           FILTER (WHERE COALESCE(TRIM(client),'')           <> '') AS client,
+         array_agg(DISTINCT ref)              FILTER (WHERE COALESCE(TRIM(ref),'')              <> '') AS ref,
+         array_agg(DISTINCT loc_incarcare)    FILTER (WHERE COALESCE(TRIM(loc_incarcare),'')    <> '') AS loc_incarcare,
+         array_agg(DISTINCT loc_descarcare)   FILTER (WHERE COALESCE(TRIM(loc_descarcare),'')   <> '') AS loc_descarcare,
+         array_agg(DISTINCT firma_incarcare)  FILTER (WHERE COALESCE(TRIM(firma_incarcare),'')  <> '') AS firma_incarcare,
+         array_agg(DISTINCT firma_descarcare) FILTER (WHERE COALESCE(TRIM(firma_descarcare),'') <> '') AS firma_descarcare,
+         array_agg(DISTINCT nume_sofer)       FILTER (WHERE COALESCE(TRIM(nume_sofer),'')       <> '') AS nume_sofer,
+         array_agg(DISTINCT firma_extern)     FILTER (WHERE COALESCE(TRIM(firma_extern),'')     <> '') AS firma_extern,
+         array_agg(DISTINCT telefon_extern)   FILTER (WHERE COALESCE(TRIM(telefon_extern),'')   <> '') AS telefon_extern,
+         array_agg(DISTINCT rendszam_camion)  FILTER (WHERE COALESCE(TRIM(rendszam_camion),'')  <> '') AS rendszam_camion,
+         array_agg(DISTINCT rendszam_remorca) FILTER (WHERE COALESCE(TRIM(rendszam_remorca),'') <> '') AS rendszam_remorca
+       FROM orders WHERE company_id = $1 AND status <> 'Anulat'`,
+      [cid]
+    );
+    const row = r.rows[0] || {};
+    const cap = (a) => (Array.isArray(a) ? a.filter(Boolean).sort((x, y) => String(x).localeCompare(String(y))).slice(0, 300) : []);
+    return res.json({ result: {
+      client:           cap(row.client),
+      ref:              cap(row.ref),
+      loc_incarcare:    cap(row.loc_incarcare),
+      loc_descarcare:   cap(row.loc_descarcare),
+      firma_incarcare:  cap(row.firma_incarcare),
+      firma_descarcare: cap(row.firma_descarcare),
+      nume_sofer:       cap(row.nume_sofer),
+      firma_extern:     cap(row.firma_extern),
+      telefon_extern:   cap(row.telefon_extern),
+      rendszam_camion:  cap(row.rendszam_camion),
+      rendszam_remorca: cap(row.rendszam_remorca),
+    } });
+  } catch (err) {
+    console.error('getOrderFieldSuggestions hiba:', err);
+    return res.json({ result: {} });
   }
 };
 

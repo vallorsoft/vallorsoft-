@@ -31,6 +31,7 @@ function loadTab(name){
   if(name==='ops-center'){ if(typeof loadOpsCenter==='function') loadOpsCenter(); }
   if(name==='orders-form'){loadOrderFormData(); mountClientPicker();}
   if(name==='orders-list'){loadOrders();}
+  if(name==='orders-deleted'){ if(typeof loadDeletedOrders==='function') loadDeletedOrders(); }
   if(name==='inbound' && window.InboundOrders) InboundOrders.mount('inboundBox');
   if(name==='client-requests' && window.ClientRequests) ClientRequests.mount('clientReqBox');
   if(name==='received-fuv'){loadReceivedFuvarlevelek();loadDocSeries();}
