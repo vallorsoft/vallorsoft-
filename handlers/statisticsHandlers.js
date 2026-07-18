@@ -1239,6 +1239,210 @@ handlers.getMySoferStats = async function (req, res, args) {
   }
 };
 
+// ── Sofőr-fogyasztás-összehasonlítás (cross-sofőr) ────────────
+// Csak Admin/Manager hívhatja — a sofőr NEM éri el más sofőrök
+// adatát (a `getMySoferStats` továbbra is a sofőr saját mutatóit
+// adja, más sofőrét nem).
+//
+// A handler minden belső sofőrre kiszámolja az e havi eddigi és
+// az előző havi átlagfogyasztást (L/100km) — ugyanaz a képlet
+// mint a `getMySoferStats`-nál: (start_tank + tankolt − end_tank)
+// × 100 / megtett_km. GPS-elsőbbség (snapshotok), menetlevél-
+// fallback (első/utolsó havi menetlevél). Kiegészítésként:
+//   • cég-átlag = az avg_curr értékek átlaga (csak azoké, akiknek
+//     van értelmes értéke)
+//   • eltérés_a_cég-átlagtól = |sofőr.avg_curr − cég_átlag|
+//   • deviates: eltérés > 2.5 L/100km → kiemelendő a UI-ban
+//
+// A válasz mind az e havi, mind a múlt havi átlagot tartalmazza,
+// hogy a manager UI mindkettőt táblázatba tegye (jelen ill. múlt
+// hó összehasonlítás).
+handlers.getSoferConsumptionOverview = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+
+    // Hónap-határok SQL-ből (konzisztens a getMySoferStats-cal)
+    const bR = await pool.query(
+      `SELECT DATE_TRUNC('month', NOW()) AS m_curr,
+              DATE_TRUNC('month', NOW() - INTERVAL '1 month') AS m_prev`
+    );
+    const mCurr = new Date(bR.rows[0].m_curr);
+    const mPrev = new Date(bR.rows[0].m_prev);
+    const prevYear = mPrev.getUTCFullYear();
+    const prevMonth = mPrev.getUTCMonth() + 1;
+    let ppYear = prevYear;
+    let ppMonth = prevMonth - 1;
+    if (ppMonth === 0) { ppMonth = 12; ppYear -= 1; }
+
+    // 1) Belső sofőrök a cégben
+    const usersR = await pool.query(
+      `SELECT id, email, nume FROM users
+        WHERE company_id = $1 AND pozicio = 'Sofer'`,
+      [cid]
+    );
+    const sofers = usersR.rows;
+    if (sofers.length === 0) {
+      return res.json({ result: { ok: true, sofers: [], company_avg: null, threshold: 2.5 } });
+    }
+
+    // 2) Minden érintett menetlevél (utolsó 2 hó, mind a cég sofőrökre)
+    const emails = sofers.map((u) => u.email.toLowerCase());
+    const flR = await pool.query(
+      `SELECT id, LOWER(email_sofer) AS email_sofer,
+              numar_camion, indulas_dt, erkezes_dt, data_completare,
+              km_inceput, km_sfarsit, cant_inceput, cant_sfarsit, alimentari
+         FROM fuvarlevelek
+        WHERE LOWER(email_sofer) = ANY($1::text[])
+          AND COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')`,
+      [emails]
+    );
+
+    // 3) GPS hó-vég snapshotok a cégre a két hónapra (mileage + fuel_level)
+    const snR = await pool.query(
+      `SELECT rendszam, year, month, mileage, fuel_level
+         FROM gps_month_end_snapshots
+        WHERE company_id = $1
+          AND ((year = $2 AND month = $3) OR (year = $4 AND month = $5))`,
+      [cid, prevYear, prevMonth, ppYear, ppMonth]
+    );
+    const normPlate = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const snapMap = new Map();   // plate → { mileage, fuel_level } (prev-month)
+    const snapMapPP = new Map(); // plate → { ... } (prev-prev-month)
+    for (const s of snR.rows) {
+      const km = Number(s.mileage);
+      const fl = s.fuel_level != null ? Number(s.fuel_level) : null;
+      if (!isFinite(km)) continue;
+      const p = normPlate(s.rendszam);
+      const entry = { mileage: km, fuel_level: (fl != null && isFinite(fl)) ? fl : null };
+      if (s.year === prevYear && s.month === prevMonth) snapMap.set(p, entry);
+      else if (s.year === ppYear && s.month === ppMonth) snapMapPP.set(p, entry);
+    }
+
+    // 4) Kiosztott járművek per sofőr email
+    const asgR = await pool.query(
+      `SELECT LOWER(assigned_driver_email) AS email, rendszam
+         FROM vehicles
+        WHERE company_id = $1 AND assigned_driver_email IS NOT NULL AND assigned_driver_email <> ''`,
+      [cid]
+    );
+    const platesByEmail = new Map();
+    for (const v of asgR.rows) {
+      if (!platesByEmail.has(v.email)) platesByEmail.set(v.email, []);
+      platesByEmail.get(v.email).push(normPlate(v.rendszam));
+    }
+
+    // 5) Sofőrönként számoljuk az avg_curr / avg_prev értékeket
+    function _sortByEff(a, b) {
+      const da = a.erkezes_dt || a.indulas_dt || a.data_completare;
+      const db = b.erkezes_dt || b.indulas_dt || b.data_completare;
+      return new Date(da) - new Date(db);
+    }
+    function _flsInMonth(fls, monthStart) {
+      const nextMonth = new Date(monthStart);
+      nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+      return fls.filter((fl) => {
+        const e = fl.erkezes_dt || fl.indulas_dt || fl.data_completare;
+        if (!e) return false;
+        const d = new Date(e);
+        return d >= monthStart && d < nextMonth;
+      }).sort(_sortByEff);
+    }
+    function calcAvg({ fls, snapStart, snapEnd }) {
+      if (!fls || fls.length === 0) return null;
+      const tanked = fls.reduce((acc, fl) => {
+        const a = Array.isArray(fl.alimentari) ? fl.alimentari : [];
+        return acc + a.reduce((s, x) => s + (Number(x && x.litru) || 0), 0);
+      }, 0);
+      let startTank, startKm, endTank, endKm;
+      if (snapStart && snapStart.mileage != null && snapStart.fuel_level != null) {
+        startTank = snapStart.fuel_level;
+        startKm = snapStart.mileage;
+      } else {
+        startTank = Number(fls[0].cant_inceput);
+        startKm = Number(fls[0].km_inceput);
+      }
+      if (snapEnd && snapEnd.mileage != null && snapEnd.fuel_level != null) {
+        endTank = snapEnd.fuel_level;
+        endKm = snapEnd.mileage;
+      } else {
+        endTank = Number(fls[fls.length - 1].cant_sfarsit);
+        endKm = Number(fls[fls.length - 1].km_sfarsit);
+      }
+      if (!isFinite(startTank) || !isFinite(endTank) ||
+          !isFinite(startKm) || !isFinite(endKm)) return null;
+      const km = endKm - startKm;
+      const consumed = startTank + tanked - endTank;
+      if (km <= 0) return null;
+      const v = (consumed * 100) / km;
+      return isFinite(v) ? v : null;
+    }
+    function _aggSnap(map, plates) {
+      let mi = 0, fl = 0, hasMi = false, hasFl = false;
+      for (const p of plates) {
+        const s = map.get(p);
+        if (!s) continue;
+        if (s.mileage != null) { mi += s.mileage; hasMi = true; }
+        if (s.fuel_level != null) { fl += s.fuel_level; hasFl = true; }
+      }
+      if (!hasMi && !hasFl) return null;
+      return { mileage: hasMi ? mi : null, fuel_level: hasFl ? fl : null };
+    }
+
+    const results = [];
+    for (const u of sofers) {
+      const emailLc = u.email.toLowerCase();
+      const fls = flR.rows.filter((fl) => fl.email_sofer === emailLc);
+      const flsPrev = _flsInMonth(fls, mPrev);
+      const flsCurr = _flsInMonth(fls, mCurr);
+      const plates = platesByEmail.get(emailLc) || [];
+      const aggEnd   = _aggSnap(snapMap, plates);
+      const aggStart = _aggSnap(snapMapPP, plates);
+      const avg_prev = calcAvg({ fls: flsPrev, snapStart: aggStart, snapEnd: aggEnd });
+      const avg_curr = calcAvg({ fls: flsCurr, snapStart: aggEnd, snapEnd: null });
+      let avg_diff = null;
+      if (avg_curr != null && avg_prev != null) avg_diff = Math.abs(avg_curr - avg_prev);
+      results.push({
+        email: u.email,
+        nume: u.nume || u.email,
+        avg_curr, avg_prev, avg_diff
+      });
+    }
+
+    // 6) Cég-átlag (csak a nem-null avg_curr-okon)
+    const validCurr = results.map((r) => r.avg_curr).filter((v) => v != null && isFinite(v));
+    const company_avg = validCurr.length
+      ? validCurr.reduce((s, v) => s + v, 0) / validCurr.length
+      : null;
+
+    // 7) Cég-átlagtól való eltérés + kiemelés (>2.5 L/100km)
+    const THRESHOLD = 2.5;
+    for (const r of results) {
+      r.deviation_from_avg = (r.avg_curr != null && company_avg != null)
+        ? Math.abs(r.avg_curr - company_avg) : null;
+      r.deviates = r.deviation_from_avg != null && r.deviation_from_avg > THRESHOLD;
+    }
+
+    // 8) Rendezés: kiemelt (deviates) elöl, aztán deviation csökkenő
+    results.sort((a, b) => {
+      if (a.deviates !== b.deviates) return b.deviates - a.deviates;
+      const da = a.deviation_from_avg != null ? a.deviation_from_avg : -1;
+      const db = b.deviation_from_avg != null ? b.deviation_from_avg : -1;
+      return db - da;
+    });
+
+    return res.json({ result: {
+      ok: true,
+      sofers: results,
+      company_avg: company_avg,
+      threshold: THRESHOLD
+    }});
+  } catch (err) {
+    console.error('getSoferConsumptionOverview hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 // ── CO₂ riport (stats-co2) — CSAK OLVASÁS, nincs új tábla/írás ──
 // A CO₂-t a MÁR meglévő üzemanyag-adatból számoljuk: a tankolt dízel
 // literekből (fuel_card_transactions, cégre szűrve), dízel emissziós

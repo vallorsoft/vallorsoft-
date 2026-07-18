@@ -14,6 +14,36 @@
 
 ---
 
+## 2026-07-18 — Sofőr-fogyasztás cross-comparison a Statisztika oldalon (manager/admin only)
+
+A Statisztika → Sofőrök oldalra új szekció került: **⛽ Fogyasztás összehasonlítás
+(L/100km)** — minden belső sofőr e havi + előző havi átlagfogyasztása egy
+táblázatban, cég-átlaggal és eltérés-oszloppal. A > **2.5 L/100km** cég-átlagtól
+való eltérésű sofőrök **narancs háttérrel + ⚠️** kiemelve, rendezés eltérés-
+csökkenő sorrendben. **Sofőr NEM éri el** ezt az adatot (csak Admin/Manager).
+
+1. **`handlers/statisticsHandlers.js` `getSoferConsumptionOverview`** (ÚJ,
+   `_isAdminOrManager` kapu) — a cég belső Sofer-userjeire aggregátumos
+   avg_curr + avg_prev + avg_diff számítás ugyanazzal a képlettel, mint a
+   `getMySoferStats` ((`start_tank + tankolt − end_tank) × 100 / km`).
+   GPS-elsőbbség (snapshotok) → menetlevél-fallback. Válasz: `sofers[]` +
+   `company_avg` + `threshold: 2.5`. Sofőrönként `deviation_from_avg` +
+   `deviates` (bool). Rendezés: kiemeltek elöl.
+2. **Kliens (`public/stats.js` `loadDrivers`)** — a meglévő sofőr-teljesítmény-
+   tábla ALÁ új panel: „⛽ Fogyasztás összehasonlítás (L/100km)". Fejlécben
+   a cég-átlag + eltérés-küszöb, táblában sofőrönként: e havi átlag / múlt
+   havi átlag / hó-közti eltérés / cég-átlagtól való eltérés (⚠️ ha
+   deviates). Deviates sorok narancs háttérrel + félkövér narancs eltérés-
+   érték. Best-effort: hiba esetén szimplán nem jelenik meg (a régi
+   tábla látszik).
+3. **i18n** új kulcsok (RO+HU): `st.dr.pFuelCompare`, `st.dr.pFuelCompareAvg`,
+   `st.dr.pFuelCompareThr`, `st.dr.cAvgCurr`, `st.dr.cAvgPrev`, `st.dr.cAvgDiff`,
+   `st.dr.cDevFromAvg`. Cache-bust `stats.js` `?v=20260718fuelx`.
+4. **Teszt (`tests/integration/sofer-consumption-overview.test.js`)** —
+   szerep-kapu (Sofer tiltva, Admin/Manager átmegy), üres sofőrlista,
+   két sofőr eltérő avg-gel (cég-átlag + deviates flag helyes), nagy
+   eltérés (mindkettő deviates, rendezés). **624 Jest zöld** (619 → 624).
+
 ## 2026-07-18 — Sofőr TANKOLVA csempe: átlagfogyasztás L/100km + anomália-figyelmeztetés
 
 A sofőr TANKOLVA csempéjén két új sor jelenik meg: **e havi eddigi átlag** (a

@@ -596,6 +596,52 @@
         },
         options: { indexAxis: 'y' }
       });
+
+      // Cross-sofőr fogyasztás-összehasonlítás (Admin/Manager only) —
+      // csempén megjelenik a cég-átlag + minden sofőr avg_curr / avg_prev
+      // értéke, kiemelve akik eltérnek > 2.5 L/100km-mel. Alá tesszük a
+      // meglévő sofőr-teljesítmény táblázatnak.
+      gas('getSoferConsumptionOverview', []).then(function (rc) {
+        if (!rc || !rc.ok) return;
+        var sofs = rc.sofers || [];
+        if (sofs.length === 0) return;
+        var cAvg = rc.company_avg;
+        var thr = parseFloat(rc.threshold) || 2.5;
+        function fmtAvg(v) {
+          return (v == null || !isFinite(parseFloat(v))) ? '—' : parseFloat(v).toFixed(1);
+        }
+        var rowsHtml = sofs.map(function (s) {
+          var rowStyle = s.deviates ? 'background: rgba(234,88,12,0.10);' : '';
+          var devLabel = (s.deviation_from_avg != null)
+            ? fmtAvg(s.deviation_from_avg) + (s.deviates ? ' ⚠️' : '')
+            : '—';
+          return '<tr style="' + rowStyle + '">'
+            + '<td><b class="text-primary">' + esc(s.nume || s.email || '—') + '</b></td>'
+            + '<td style="text-align:right;">' + fmtAvg(s.avg_curr) + '</td>'
+            + '<td style="text-align:right;">' + fmtAvg(s.avg_prev) + '</td>'
+            + '<td style="text-align:right;">' + (s.avg_diff != null ? fmtAvg(s.avg_diff) : '—') + '</td>'
+            + '<td style="text-align:right;font-weight:' + (s.deviates ? '700' : '500') + ';color:' + (s.deviates ? '#ea580c' : 'inherit') + ';">' + devLabel + '</td>'
+            + '</tr>';
+        }).join('');
+        var subtitle = (cAvg != null)
+          ? t('st.dr.pFuelCompareAvg') + ': <b>' + fmtAvg(cAvg) + ' L/100km</b> · ' + t('st.dr.pFuelCompareThr') + ': ' + thr.toFixed(1)
+          : t('st.noData');
+        var panelHtml = '<div class="text-muted" style="margin:0 0 10px;font-size:12px;">' + subtitle + '</div>'
+          + '<div style="overflow-x:auto;"><table class="table">'
+          + '<thead><tr>'
+          + '<th>' + t('st.cDriver') + '</th>'
+          + '<th style="text-align:right;">' + t('st.dr.cAvgCurr') + '</th>'
+          + '<th style="text-align:right;">' + t('st.dr.cAvgPrev') + '</th>'
+          + '<th style="text-align:right;">' + t('st.dr.cAvgDiff') + '</th>'
+          + '<th style="text-align:right;">' + t('st.dr.cDevFromAvg') + '</th>'
+          + '</tr></thead>'
+          + '<tbody>' + rowsHtml + '</tbody></table></div>';
+        // Új panelt fűzünk a meglévő pane végére (a driver-tábla alá)
+        var extra = document.createElement('div');
+        extra.innerHTML = stPanel(t('st.dr.pFuelCompare'), panelHtml);
+        var boxNode = document.getElementById('statsDriversBox');
+        if (boxNode) boxNode.appendChild(extra);
+      }).catch(function () { /* best-effort */ });
     });
   }
 
