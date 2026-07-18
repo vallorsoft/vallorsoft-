@@ -1528,6 +1528,13 @@
     'st.dr.pTop': { hu: '🏆 Top sofőrök bevétel szerint (EUR)', ro: '🏆 Top șoferi după venit (EUR)' },
     'st.dr.pTable': { hu: '👤 Sofőr teljesítmény-tábla', ro: '👤 Tabel performanță șoferi' },
     'st.dr.cDiurna': { hu: 'Diurna K/B', ro: 'Diurnă E/I' },
+    'st.dr.pFuelCompare':    { hu: '⛽ Fogyasztás összehasonlítás (L/100km)', ro: '⛽ Comparație consum (L/100km)' },
+    'st.dr.pFuelCompareAvg': { hu: 'Cég-átlag', ro: 'Media firmei' },
+    'st.dr.pFuelCompareThr': { hu: 'Eltérés-küszöb', ro: 'Prag deviație' },
+    'st.dr.cAvgCurr':        { hu: 'E havi átlag', ro: 'Media lună curentă' },
+    'st.dr.cAvgPrev':        { hu: 'Múlt havi átlag', ro: 'Media lună trecută' },
+    'st.dr.cAvgDiff':        { hu: 'Hó-közti eltérés', ro: 'Diferență între luni' },
+    'st.dr.cDevFromAvg':     { hu: 'Cég-átlagtól', ro: 'De la media firmei' },
     // Járművek
     'st.ve.pTop': { hu: '🏆 Top járművek bevétel szerint (EUR)', ro: '🏆 Top vehicule după venit (EUR)' },
     'st.ve.pTable': { hu: '🚛 Jármű-tábla', ro: '🚛 Tabel vehicule' },
