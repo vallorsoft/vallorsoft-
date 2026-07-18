@@ -886,9 +886,14 @@ handlers.getMySoferStats = async function (req, res, args) {
     );
 
     // Előző + jelen havi menetlevelek — nyers mezők, JS-ben osztjuk szét.
+    // `cant_inceput/sfarsit` (kezdő/záró tankszint) + `km_inceput/sfarsit`
+    // (kezdő/záró km-óra) kell az átlagos fogyasztás számításához
+    // — a menetlevél-fallback ág használja őket.
     const flR = await pool.query(
       `SELECT id, numar_camion, indulas_dt, erkezes_dt, data_completare,
-              km_inceput, km_sfarsit, total_km, diurna_externa, diurna_interna, alimentari
+              km_inceput, km_sfarsit, total_km,
+              cant_inceput, cant_sfarsit,
+              diurna_externa, diurna_interna, alimentari
        FROM fuvarlevelek
        WHERE LOWER(email_sofer) = LOWER($1)
          AND COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')`,
@@ -917,21 +922,25 @@ handlers.getMySoferStats = async function (req, res, args) {
     let ppMonth = prevMonth - 1;
     if (ppMonth === 0) { ppMonth = 12; ppYear -= 1; }
     const snR = await pool.query(
-      `SELECT rendszam, year, month, mileage
+      `SELECT rendszam, year, month, mileage, fuel_level
        FROM gps_month_end_snapshots
        WHERE company_id = $1
          AND ((year = $2 AND month = $3) OR (year = $4 AND month = $5))`,
       [me.company_id, prevYear, prevMonth, ppYear, ppMonth]
     );
     const normPlate = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const snapMap = new Map();       // rendszam → prev-month-end mileage
-    const snapMapPP = new Map();     // rendszam → prev-prev-month-end mileage
+    // snapMap: prev-month-end (mileage + fuel_level)
+    // snapMapPP: prev-prev-month-end (mileage + fuel_level)
+    const snapMap = new Map();
+    const snapMapPP = new Map();
     for (const s of snR.rows) {
       const km = Number(s.mileage);
+      const fl = s.fuel_level != null ? Number(s.fuel_level) : null;
       if (!isFinite(km)) continue;
       const p = normPlate(s.rendszam);
-      if (s.year === prevYear && s.month === prevMonth) snapMap.set(p, km);
-      else if (s.year === ppYear && s.month === ppMonth) snapMapPP.set(p, km);
+      const entry = { mileage: km, fuel_level: (fl != null && isFinite(fl)) ? fl : null };
+      if (s.year === prevYear && s.month === prevMonth) snapMap.set(p, entry);
+      else if (s.year === ppYear && s.month === ppMonth) snapMapPP.set(p, entry);
     }
 
     // ── Aggregátorok ──
@@ -992,7 +1001,8 @@ handlers.getMySoferStats = async function (req, res, args) {
       const fracCurr = daysCurr / daysTot;
 
       // KM
-      const snapKm = snapMap.get(normPlate(fl.numar_camion));
+      const snapEnt = snapMap.get(normPlate(fl.numar_camion));
+      const snapKm = snapEnt ? snapEnt.mileage : null;
       const kmi = Number(fl.km_inceput), kms = Number(fl.km_sfarsit);
       if (snapKm != null && isFinite(kmi) && isFinite(kms) && kmi > 0 && kms >= kmi) {
         const kmPrevPortion = Math.max(0, snapKm - kmi);
@@ -1029,6 +1039,9 @@ handlers.getMySoferStats = async function (req, res, args) {
     // menetlevél-alapú — a GPS-ből nem tudunk napi diurnát / tankolási
     // litert levezetni.)
     let km_prev_gps = 0;
+    // Asszigned járművekre gyűjtött snapshot-értékek — a fogyasztás-
+    // számításnál is ezt használjuk (start_tank/km + end_tank/km).
+    let assignedPlates = [];
     try {
       const asgR = await pool.query(
         `SELECT rendszam FROM vehicles
@@ -1037,13 +1050,167 @@ handlers.getMySoferStats = async function (req, res, args) {
       );
       for (const v of asgR.rows) {
         const p = normPlate(v.rendszam);
-        const end = snapMap.get(p);          // prev-month-end
-        const start = snapMapPP.get(p);      // prev-prev-month-end
-        if (end != null && start != null && end > start) {
-          km_prev_gps += end - start;
+        assignedPlates.push(p);
+        const end = snapMap.get(p);
+        const start = snapMapPP.get(p);
+        if (end && start && end.mileage != null && start.mileage != null
+            && end.mileage > start.mileage) {
+          km_prev_gps += end.mileage - start.mileage;
         }
       }
     } catch (_) { /* best-effort: hiba esetén km_prev_gps = 0 marad */ }
+
+    // ── ÁTLAGOS FOGYASZTÁS L/100km ────────────────────────────────
+    // Képlet: (start_tank + tankolt − end_tank) × 100 / megtett_km
+    //
+    // MÚLT HÓ:
+    //   GPS-elsőbbség: prev-prev snapshot (start_tank/km) + prev snapshot
+    //     (end_tank/km) + menetlevél alimentari SUM (tankolt).
+    //   Menetlevél-fallback: az előző havi menetlevelek közül az elsőnek
+    //     a cant_inceput/km_inceput a start; az utolsónak a cant_sfarsit/
+    //     km_sfarsit az end; tankolt az alimentari SUM.
+    //
+    // JELEN HÓ (eddigi, a LEGUTOLSÓ menetlevélig):
+    //   GPS-elsőbbség: prev snapshot (start_tank/km) + LEGUTOLSÓ havi
+    //     menetlevél (end_tank/km) + menetlevél alimentari SUM (tankolt).
+    //   Menetlevél-fallback: ELSŐ havi menetlevél start, LEGUTOLSÓ end.
+    //
+    // Figyelmeztetések:
+    //   • érték < 20 vagy > 38 → sofőr: „Elmaradt menetlevél beadása"
+    //   • |curr − prev| > 4.5 → sofőr: „Nézze át a menetlevelet"
+    //   • |curr − prev| > 2.5 → manager push + notification (dedup:
+    //     1× per sofőr / hónap).
+    //
+    // Feltételezés: a sofőr több kiosztott járművénél a snapshot-értékeket
+    // összegzem (start_km = SUM(start_km per jármű), stb.); ez több
+    // jármű esetén közelítés, egyetlen járműnél pontos.
+    function _sortByEff(a, b) {
+      const da = a.erkezes_dt || a.indulas_dt || a.data_completare;
+      const db = b.erkezes_dt || b.indulas_dt || b.data_completare;
+      return new Date(da) - new Date(db);
+    }
+    function _flsInMonth(monthStart) {
+      const nextMonth = new Date(monthStart);
+      nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+      return flR.rows.filter((fl) => {
+        const e = fl.erkezes_dt || fl.indulas_dt || fl.data_completare;
+        if (!e) return false;
+        const d = new Date(e);
+        return d >= monthStart && d < nextMonth;
+      }).sort(_sortByEff);
+    }
+
+    // Számol egy hónapra egy avg-ot. Argumentumok:
+    //   fls: menetlevelek (időrendben)
+    //   snapStart: { mileage, fuel_level } vagy null — hónap-eleji snapshot
+    //   snapEnd:   { mileage, fuel_level } vagy null — hónap-vég snapshot
+    //     (jelen hónál a LEGUTOLSÓ menetlevél végét használjuk end-nek,
+    //      ezért ott snapEnd = null adható át, ilyenkor a menetlevél záró
+    //      értéke a end.)
+    function calcAvg({ fls, snapStart, snapEnd }) {
+      if (!fls || fls.length === 0) return null;
+      const tanked = fls.reduce((acc, fl) => {
+        const a = Array.isArray(fl.alimentari) ? fl.alimentari : [];
+        return acc + a.reduce((s, x) => s + (Number(x && x.litru) || 0), 0);
+      }, 0);
+      let startTank, startKm, endTank, endKm;
+      if (snapStart && snapStart.mileage != null && snapStart.fuel_level != null) {
+        startTank = snapStart.fuel_level;
+        startKm = snapStart.mileage;
+      } else {
+        startTank = Number(fls[0].cant_inceput);
+        startKm = Number(fls[0].km_inceput);
+      }
+      if (snapEnd && snapEnd.mileage != null && snapEnd.fuel_level != null) {
+        endTank = snapEnd.fuel_level;
+        endKm = snapEnd.mileage;
+      } else {
+        endTank = Number(fls[fls.length - 1].cant_sfarsit);
+        endKm = Number(fls[fls.length - 1].km_sfarsit);
+      }
+      if (!isFinite(startTank) || !isFinite(endTank) ||
+          !isFinite(startKm) || !isFinite(endKm)) return null;
+      const km = endKm - startKm;
+      const consumed = startTank + tanked - endTank;
+      if (km <= 0) return null;
+      const v = (consumed * 100) / km;
+      return isFinite(v) ? v : null;
+    }
+
+    // A sofőr összes kiosztott járművéhez gyűjtött aggregát snapshot
+    // (több jármű esetén összeg — egyetlen járműnél pontos).
+    function _aggSnap(map, plates) {
+      let mi = 0, fl = 0, hasMi = false, hasFl = false;
+      for (const p of plates) {
+        const s = map.get(p);
+        if (!s) continue;
+        if (s.mileage != null) { mi += s.mileage; hasMi = true; }
+        if (s.fuel_level != null) { fl += s.fuel_level; hasFl = true; }
+      }
+      if (!hasMi && !hasFl) return null;
+      return { mileage: hasMi ? mi : null, fuel_level: hasFl ? fl : null };
+    }
+
+    const flsPrev = _flsInMonth(mPrev);
+    const flsCurr = _flsInMonth(mCurr);
+    const aggSnapEnd   = _aggSnap(snapMap, assignedPlates);      // prev-hó-vég
+    const aggSnapStart = _aggSnap(snapMapPP, assignedPlates);    // prev-prev-hó-vég
+
+    // MÚLT HAVI átlag
+    const avg_prev = calcAvg({ fls: flsPrev, snapStart: aggSnapStart, snapEnd: aggSnapEnd });
+    // E HAVI eddigi átlag — a LEGUTOLSÓ menetlevél end-jét használjuk
+    const avg_curr = calcAvg({ fls: flsCurr, snapStart: aggSnapEnd, snapEnd: null });
+
+    // Figyelmeztetések
+    const _outOfRange = (v) => v != null && (v < 20 || v > 38);
+    const sofer_warn_range = _outOfRange(avg_prev) || _outOfRange(avg_curr);
+    let diff = null;
+    if (avg_prev != null && avg_curr != null) diff = Math.abs(avg_curr - avg_prev);
+    const sofer_warn_diff = diff != null && diff > 4.5;
+    const manager_warn_diff = diff != null && diff > 2.5;
+
+    // Manager értesítés (best-effort, dedup: 1× per sofőr / hónap).
+    // A `type = 'fuel_deviation'`, az entity a sofőr email + hónap.
+    if (manager_warn_diff) {
+      try {
+        const notif = require('./notifications');
+        const monthKey = new Date().toISOString().slice(0, 7);
+        const bodyKey = 'sofer:' + me.email + '|month:' + monthKey;
+        // Dedup: van már ilyen bejegyzés ebben a hónapban?
+        const existR = await pool.query(
+          `SELECT id FROM notifications
+            WHERE company_id = $1 AND type = 'fuel_deviation'
+              AND body ILIKE $2
+              AND created_at >= DATE_TRUNC('month', NOW())
+            LIMIT 1`,
+          [me.company_id, '%' + bodyKey + '%']
+        );
+        if (existR.rowCount === 0) {
+          const title = 'Deviație consum de combustibil';
+          const body = 'Șofer ' + (me.nume || me.email) + ' — '
+            + 'diferență între luni: ' + diff.toFixed(1) + ' L/100km. '
+            + 'Verificați foile de parcurs. [' + bodyKey + ']';
+          await notif.notify(pool, {
+            company_id: me.company_id,
+            user_id: null,
+            type: 'fuel_deviation',
+            title: title,
+            body: body,
+            link_tab: 'stats-drivers'
+          });
+          // Push az Admin/Manager felhasználóknak
+          try {
+            const push = require('../services/push');
+            await push.sendPushToRole(me.company_id, ['Admin', 'Manager'], {
+              titleRo: title, bodyRo: 'Diferență ' + diff.toFixed(1) + ' L/100km',
+              titleHu: 'Fogyasztás eltérés',
+              bodyHu: 'Sofőr ' + (me.nume || me.email) + ' — eltérés ' + diff.toFixed(1) + ' L/100km',
+              url: '/manager#stats-drivers'
+            });
+          } catch (_) { /* best-effort push */ }
+        }
+      } catch (_) { /* best-effort: notification-hiba ne buktassa a stats-endpointot */ }
+    }
 
     const o = ordR.rows[0];
     return res.json({ result: {
@@ -1057,7 +1224,14 @@ handlers.getMySoferStats = async function (req, res, args) {
       menetlevelek: cnt_curr,
       diurna_ext: de_curr, diurna_ext_prev: de_prev,
       diurna_int: di_curr, diurna_int_prev: di_prev,
-      tankolt_l: tl_curr, tankolt_l_prev: tl_prev
+      tankolt_l: tl_curr, tankolt_l_prev: tl_prev,
+      // Fogyasztás (avg L/100km) + figyelmeztetések
+      avg_curr: avg_curr, avg_prev: avg_prev,
+      avg_diff: diff,
+      warn_range: sofer_warn_range,     // <20 vagy >38
+      warn_diff:  sofer_warn_diff,      // |diff| > 4.5 sofőr
+      // (manager warn — csak informatív; a push már ment)
+      manager_warn_diff: manager_warn_diff
     }});
   } catch (err) {
     console.error('getMySoferStats hiba:', err);

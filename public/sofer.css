@@ -275,6 +275,13 @@
      BELÜL osztjuk meg a helyet: felül a nagy aktuális szám az akcentessel,
      alatta ez a másodlagos sor. */
   .sof-mstat-prev { font-size: 11px; color: #94a3b8; margin-top: 2px; line-height: 1.1; font-weight: 500; }
+  /* Figyelmeztetés-sor (fogyasztás anomália) — narancs, félkövér, kicsit
+     nagyobb betű, hogy feltűnjön; a csempe alján. */
+  .sof-mstat-warn {
+    font-size: 10.5px; color: #ea580c; font-weight: 700; margin-top: 4px;
+    line-height: 1.15; padding: 2px 4px; background: rgba(234,88,12,0.08);
+    border-radius: 4px;
+  }
 
   /* Kiosztott fuvarok */
   .kiosztott-section { flex-shrink: 0; margin-bottom: 14px; }
