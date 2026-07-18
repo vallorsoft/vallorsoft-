@@ -1287,11 +1287,13 @@ handlers.getSoferConsumptionOverview = async function (req, res, args) {
     }
 
     // 2) Minden érintett menetlevél (utolsó 2 hó, mind a cég sofőrökre)
+    // A `total_km` a KM aggregátorhoz kell (a menetlevél-alap „leadott" km-hez).
     const emails = sofers.map((u) => u.email.toLowerCase());
     const flR = await pool.query(
       `SELECT id, LOWER(email_sofer) AS email_sofer,
               numar_camion, indulas_dt, erkezes_dt, data_completare,
-              km_inceput, km_sfarsit, cant_inceput, cant_sfarsit, alimentari
+              km_inceput, km_sfarsit, total_km,
+              cant_inceput, cant_sfarsit, alimentari
          FROM fuvarlevelek
         WHERE LOWER(email_sofer) = ANY($1::text[])
           AND COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')`,
@@ -1389,6 +1391,13 @@ handlers.getSoferConsumptionOverview = async function (req, res, args) {
       return { mileage: hasMi ? mi : null, fuel_level: hasFl ? fl : null };
     }
 
+    // KM aggregátor sofőrönként: érkezés-hó horgony (áttekintő nézet — a
+    // sofőr saját nézete pontosabb, hó-határon átívelő menetlevél-bontással;
+    // itt az egyszerűbb érkezés-hó összesítést használjuk).
+    function sumTotalKm(fls) {
+      return fls.reduce((s, fl) => s + (Number(fl.total_km) || 0), 0);
+    }
+
     const results = [];
     for (const u of sofers) {
       const emailLc = u.email.toLowerCase();
@@ -1402,10 +1411,29 @@ handlers.getSoferConsumptionOverview = async function (req, res, args) {
       const avg_curr = calcAvg({ fls: flsCurr, snapStart: aggEnd, snapEnd: null });
       let avg_diff = null;
       if (avg_curr != null && avg_prev != null) avg_diff = Math.abs(avg_curr - avg_prev);
+
+      // KM: menetlevél-alap (leadott) e havi + múlt havi
+      const km_curr = sumTotalKm(flsCurr);
+      const km_prev = sumTotalKm(flsPrev);
+
+      // Múlt havi GPS-alap km: a sofőr kiosztott járműveire két egymást
+      // követő hó-vég snapshot deltájának összege (prev − prev-prev). Ha
+      // valamelyik snapshot hiányzik ARRA a járműre, 0-t ad (best-effort).
+      let km_prev_gps = 0;
+      for (const p of plates) {
+        const end = snapMap.get(p);
+        const start = snapMapPP.get(p);
+        if (end && start && end.mileage != null && start.mileage != null
+            && end.mileage > start.mileage) {
+          km_prev_gps += end.mileage - start.mileage;
+        }
+      }
+
       results.push({
         email: u.email,
         nume: u.nume || u.email,
-        avg_curr, avg_prev, avg_diff
+        avg_curr, avg_prev, avg_diff,
+        km_curr, km_prev, km_prev_gps
       });
     }
 

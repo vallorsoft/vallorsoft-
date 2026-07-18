@@ -610,13 +610,34 @@
         function fmtAvg(v) {
           return (v == null || !isFinite(parseFloat(v))) ? '—' : parseFloat(v).toFixed(1);
         }
+        // Múlt havi GPS-alap („teljes hó") vs. menetlevél-alap („leadott")
+        // km diff — ha > 5%, jelezzük halványan (nem blokkoló, csak infó).
+        function fmtKm(v) {
+          var n = parseFloat(v);
+          return (v == null || !isFinite(n)) ? '—' : stNum(n, 0);
+        }
         var rowsHtml = sofs.map(function (s) {
           var rowStyle = s.deviates ? 'background: rgba(234,88,12,0.10);' : '';
           var devLabel = (s.deviation_from_avg != null)
             ? fmtAvg(s.deviation_from_avg) + (s.deviates ? ' ⚠️' : '')
             : '—';
+          // Múlt havi GPS ↔ menetlevél km-eltérés (a sofőr főoldali csempéjével
+          // azonos „teljes hó / leadott" bontás megjelenik itt is).
+          var kmGps = parseFloat(s.km_prev_gps) || 0;
+          var kmWb = parseFloat(s.km_prev) || 0;
+          var kmGpsHtml = fmtKm(s.km_prev_gps);
+          if (kmGps > 0 && kmWb > 0 && kmGps > kmWb) {
+            var pct = ((kmGps - kmWb) / kmGps) * 100;
+            if (pct > 5) {
+              kmGpsHtml = '<b style="color:#d97706;">' + kmGpsHtml + '</b>'
+                + '<div style="font-size:11px;color:#d97706;">+' + stNum(pct, 0) + '%</div>';
+            }
+          }
           return '<tr style="' + rowStyle + '">'
             + '<td><b class="text-primary">' + esc(s.nume || s.email || '—') + '</b></td>'
+            + '<td style="text-align:right;">' + fmtKm(s.km_curr) + '</td>'
+            + '<td style="text-align:right;">' + kmGpsHtml + '</td>'
+            + '<td style="text-align:right;">' + fmtKm(s.km_prev) + '</td>'
             + '<td style="text-align:right;">' + fmtAvg(s.avg_curr) + '</td>'
             + '<td style="text-align:right;">' + fmtAvg(s.avg_prev) + '</td>'
             + '<td style="text-align:right;">' + (s.avg_diff != null ? fmtAvg(s.avg_diff) : '—') + '</td>'
@@ -630,6 +651,9 @@
           + '<div style="overflow-x:auto;"><table class="table">'
           + '<thead><tr>'
           + '<th>' + t('st.cDriver') + '</th>'
+          + '<th style="text-align:right;" title="' + esc(t('st.dr.cKmCurrTip')) + '">' + t('st.dr.cKmCurr') + '</th>'
+          + '<th style="text-align:right;" title="' + esc(t('st.dr.cKmPrevGpsTip')) + '">' + t('st.dr.cKmPrevGps') + '</th>'
+          + '<th style="text-align:right;" title="' + esc(t('st.dr.cKmPrevWbTip')) + '">' + t('st.dr.cKmPrevWb') + '</th>'
           + '<th style="text-align:right;">' + t('st.dr.cAvgCurr') + '</th>'
           + '<th style="text-align:right;">' + t('st.dr.cAvgPrev') + '</th>'
           + '<th style="text-align:right;">' + t('st.dr.cAvgDiff') + '</th>'

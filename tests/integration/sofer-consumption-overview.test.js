@@ -103,6 +103,79 @@ describe('getSoferConsumptionOverview — cross-sofőr összehasonlítás', () =
     expect(res.body.result.threshold).toBe(2.5);
   });
 
+  test('km_curr / km_prev = menetlevelek total_km összege érkezés-hó horgony szerint', async () => {
+    setUser(ADMIN);
+    mockChain({
+      sofers: [{ id: 100, email: 'a@ceg.hu', nume: 'Alma' }],
+      fuvs: [
+        // Múlt hó (jún.): 2 menetlevél összesen 3200 km
+        { id: 1, email_sofer: 'a@ceg.hu', numar_camion: 'B111',
+          indulas_dt: '2026-06-05T00:00:00Z', erkezes_dt: '2026-06-10T00:00:00Z',
+          data_completare: '2026-06-10', total_km: 1500 },
+        { id: 2, email_sofer: 'a@ceg.hu', numar_camion: 'B111',
+          indulas_dt: '2026-06-15T00:00:00Z', erkezes_dt: '2026-06-20T00:00:00Z',
+          data_completare: '2026-06-20', total_km: 1700 },
+        // Jelen hó (júl.): 1 menetlevél 800 km
+        { id: 3, email_sofer: 'a@ceg.hu', numar_camion: 'B111',
+          indulas_dt: '2026-07-01T00:00:00Z', erkezes_dt: '2026-07-05T00:00:00Z',
+          data_completare: '2026-07-05', total_km: 800 },
+      ],
+      snaps: [], assigned: []
+    });
+    const res = await call('getSoferConsumptionOverview', []);
+    expect(res.body.result.ok).toBe(true);
+    const alma = res.body.result.sofers.find((s) => s.email === 'a@ceg.hu');
+    expect(alma.km_curr).toBe(800);
+    expect(alma.km_prev).toBe(3200);
+    expect(alma.km_prev_gps).toBe(0); // nincs snapshot / kiosztott jármű
+  });
+
+  test('km_prev_gps = kiosztott járművek prev / prev-prev hó-vég snapshot deltájának összege', async () => {
+    setUser(ADMIN);
+    mockChain({
+      sofers: [{ id: 100, email: 'a@ceg.hu', nume: 'Alma' }],
+      fuvs: [],
+      snaps: [
+        // prev-prev = 2026-05 → 100000 mileage a B111-en
+        { rendszam: 'B111', year: 2026, month: 5, mileage: 100000, fuel_level: 400 },
+        // prev = 2026-06 → 111188 mileage a B111-en → delta 11188
+        { rendszam: 'B111', year: 2026, month: 6, mileage: 111188, fuel_level: 380 },
+        // CJ36VSN: 50000 → 55000 → delta 5000
+        { rendszam: 'CJ36VSN', year: 2026, month: 5, mileage: 50000, fuel_level: 300 },
+        { rendszam: 'CJ36VSN', year: 2026, month: 6, mileage: 55000, fuel_level: 280 },
+      ],
+      assigned: [
+        { email: 'a@ceg.hu', rendszam: 'B 111' },       // normalizálva B111
+        { email: 'a@ceg.hu', rendszam: 'cj-36-vsn' },   // normalizálva CJ36VSN
+      ]
+    });
+    const res = await call('getSoferConsumptionOverview', []);
+    expect(res.body.result.ok).toBe(true);
+    const alma = res.body.result.sofers.find((s) => s.email === 'a@ceg.hu');
+    // 11188 + 5000 = 16188
+    expect(alma.km_prev_gps).toBe(16188);
+    // Nincs menetlevél → km_curr/km_prev = 0
+    expect(alma.km_curr).toBe(0);
+    expect(alma.km_prev).toBe(0);
+  });
+
+  test('km_prev_gps = 0 ha csak az egyik snapshot van meg (nincs delta)', async () => {
+    setUser(ADMIN);
+    mockChain({
+      sofers: [{ id: 100, email: 'a@ceg.hu', nume: 'Alma' }],
+      fuvs: [],
+      snaps: [
+        // Csak a prev van, prev-prev hiányzik
+        { rendszam: 'B111', year: 2026, month: 6, mileage: 111188, fuel_level: 380 },
+      ],
+      assigned: [{ email: 'a@ceg.hu', rendszam: 'B111' }]
+    });
+    const res = await call('getSoferConsumptionOverview', []);
+    expect(res.body.result.ok).toBe(true);
+    const alma = res.body.result.sofers.find((s) => s.email === 'a@ceg.hu');
+    expect(alma.km_prev_gps).toBe(0);
+  });
+
   test('egy sofőr NAGY eltérése → deviates=true, kiemelten elöl a rendezésben', async () => {
     setUser(ADMIN);
     mockChain({
