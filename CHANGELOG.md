@@ -14,6 +14,46 @@
 
 ---
 
+## 2026-07-18 — Sofőr mini-statisztika: hónap-határon átívelő menetlevél SZÉTBONTÁSA
+
+A sofőr főoldali mini-statisztikában (getMySoferStats) a **hónap-határon átívelő
+menetlevél** (pl. jún. 28 → júl. 3) mostantól automatikusan szétosztódik a két
+hónap közt — a sofőr EGY menetlevelet tölt ki, a rendszer háttérben szétvágja
+a statisztikai bevitelt (km + diurna + tankolt liter).
+
+Példa a júl. előző körben bevezetett GPS snapshot alapján: **jún. 28 → júl. 3
+menetlevél** (km_inceput 99 800, km_sfarsit 100 500) + **jún. 30. 23:59 GPS
+snapshot 100 000** → jún. 200 km + júl. 500 km; napok szerinti 3-3 arány →
+diurna + tankolt liter fele-fele.
+
+1. **`handlers/statisticsHandlers.js` `getMySoferStats`** — a régi FILTER-es
+   SQL-t felváltotta egy nyers menetlevél-lekérdezés + JS-alapú aggregáció.
+   Új lekérdezések: (a) menetlevelek nyers mezők (id, plate, indulas_dt,
+   erkezes_dt, km_inceput, km_sfarsit, total_km, diurna_*, alimentari), (b)
+   hónap-határok SQL-ből (`m_curr`, `m_prev`), (c) az előző hó GPS-snapshotjai
+   a cégre.
+2. **Szétbontási szabály (JS-oldal):**
+   - **Nem-átívelő** menetlevél (`indulas_dt` és `erkezes_dt` ugyanabban a
+     hónapban): teljes érték az érkezés-hónaphoz. Változatlan viselkedés.
+   - **Átívelő + van snapshot** a járműre az előző hó végén:
+     - **KM**: prev = max(0, snapshot − km_inceput); curr = max(0, km_sfarsit
+       − snapshot). Pontos, GPS-alapú.
+     - **DIURNA + TANKOLT LITER**: napok szerinti arányosítás (a menetlevél
+       naptári napjai közt, hónap-váltás nap egészben a saját hónapjához).
+       A diurna intrinsic per-napi, a fuel-t sajnos nem tudjuk per-tétel
+       dátumhoz kötni (az `alimentari` nem tárol dátumot), ezért ez a
+       legjobb becslés.
+   - **Átívelő + nincs snapshot** (GPS ki, vagy még nem futott le): KM is
+     napok szerinti arányos (fallback).
+3. **Menetlevél-számláló** (`menetlevelek`) — továbbra is érkezés-hónap
+   alapján (a menetlevél mint EGYSÉG az érkezés-hónapba tartozik; a szám
+   nem bomlik).
+4. **Teszt (`tests/integration/sofer-mini-stats.test.js`)** — teljesen
+   átírva a 4-lekérdezéses chainre: szerep-kapu, üres, nem-átívelő
+   (jún.+júl. tisztán), átívelő + snapshot (jún. 28 → júl. 3), átívelő
+   snapshot nélkül (napok arányos fallback), vegyes eset (átívelő + tiszta
+   júliusi együtt). **611 Jest zöld** (609 → 611).
+
 ## 2026-07-18 — Hó-végi GPS km + üzemanyag-szint snapshot → következő menetlevél pre-fillje
 
 A CargoTrack GPS-ből a hónap **utolsó napjának 23:59-hez legközelebbi** olvasása

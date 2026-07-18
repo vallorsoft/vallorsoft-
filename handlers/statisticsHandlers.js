@@ -846,15 +846,33 @@ handlers.getClientStats = async function (req, res, args) {
 // Minden mutatóra visszaadjuk az AKTUÁLIS és az ELŐZŐ havi értéket egyaránt
 // (*_prev), hogy a csempéken kicsi „múlt hó: X" felirat kerülhessen az érték
 // alá — motivációs viszonyítási pont.
+//
+// ── Hónap-határon átívelő menetlevél SZÉTBONTÁS ──
+// Ha egy menetlevél (pl. jún. 28 → júl. 3) átível két hónapon, a rendszer
+// automatikusan szétosztja a statisztikai bevitelt a két hónapba:
+//   • KM: a jún. 30. 23:59-es GPS snapshot (`gps_month_end_snapshots`)
+//     használatával — jún. km = snapshot − km_inceput; júl. km = km_sfarsit
+//     − snapshot. Ha nincs snapshot az adott járműre, arányosan a napok
+//     alapján (ugyanaz mint a diurnánál).
+//   • DIURNA + TANKOLT LITER: napok szerinti arányos bontás (a diurna
+//     intrinsic per-napi fogalom; az alimentari sajnos nem tárol per-tétel
+//     dátumot, ezért ez a legjobb becslés). A napok az indulas_dt és
+//     erkezes_dt naptári napjai közt oszlanak — a hónap-váltás napja
+//     ahhoz a hónaphoz tartozik, amelyben 12:00-kor a sofőr van (a menet-
+//     levél Europe/Bucharest 24 órás naptári napjai szerint egyszerűsítve:
+//     minden 24 órás naptári nap ahhoz a hónaphoz tartozik, amelyben a
+//     napra eső 00:00 UTC-Bucharest esik → a hónap első/utolsó napja
+//     egészben számít).
+// A menetlevél db-ben EGY sor marad (a sofőr egy menetlevelet tölt ki), a
+// bontás csak a statisztikánál él. A menetlevelek számláló (`menetlevelek`)
+// továbbra is az érkezés-hónap alapján számol (nincs bontás).
 handlers.getMySoferStats = async function (req, res, args) {
   try {
     if (!req.session.user || req.session.user.pozicio !== 'Sofer') return _deny(res);
     const me = req.session.user;
 
     // LEZÁRT FUVAR: a TÉNYLEGES lezárt (Finalizat) fuvarokból, a sofőr saját
-    // email-jére kiosztottak. A hónap-szűrő robusztus: finalized_at, ha NULL akkor
-    // data_descarcare / created_at (így egy hiányzó finalized_at nem rejt el fuvart).
-    // Egy lekérdezésen belül a jelen ÉS az előző havi lezárt fuvarok is.
+    // email-jére kiosztottak. Robusztus hónap-szűrő + előző hónap egyben.
     const ordR = await pool.query(
       `SELECT COUNT(*) FILTER (WHERE status='Finalizat'
                 AND COALESCE(finalized_at, data_descarcare, created_at) >= DATE_TRUNC('month', NOW()))::int AS lezart,
@@ -867,47 +885,134 @@ handlers.getMySoferStats = async function (req, res, args) {
       [me.company_id, me.email]
     );
 
-    // A MÁSIK 3 mutató (km, diurna, tankolt liter) a sofőrre KIOSZTOTT vagy ÁLTALA
-    // KÉSZÍTETT menetlevelekből — mindkettő az email_sofer = sofőr horgonyon
-    // (a sofőr-beküldés és az admin által rá létrehozott/átkötött menetlevél is ide
-    // esik). A hónap a beírt út-dátum szerint (eff_date). A jelen és az előző havi
-    // értékeket ugyanabban a lekérdezésben, FILTER-rel gyűjtjük.
-    const fuvR = await pool.query(
-      `SELECT
-         -- jelen havi (eff_date >= this month)
-         COUNT(*) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW()))::int AS menetlevelek,
-         COALESCE(SUM(total_km) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW())),0)::numeric AS km,
-         COALESCE(SUM(diurna_externa) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW())),0)::int AS diurna_ext,
-         COALESCE(SUM(diurna_interna) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW())),0)::int AS diurna_int,
-         COALESCE(SUM((SELECT COALESCE(SUM((a->>'litru')::numeric),0)
-                       FROM jsonb_array_elements(alimentari) a)) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW())),0) AS tankolt_l,
-         -- előző havi (DATE_TRUNC('month', NOW() - INTERVAL '1 month') <= eff_date < DATE_TRUNC('month', NOW()))
-         COALESCE(SUM(total_km) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')
-                                          AND COALESCE(erkezes_dt, indulas_dt, data_completare) <  DATE_TRUNC('month', NOW())),0)::numeric AS km_prev,
-         COALESCE(SUM(diurna_externa) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')
-                                                AND COALESCE(erkezes_dt, indulas_dt, data_completare) <  DATE_TRUNC('month', NOW())),0)::int AS diurna_ext_prev,
-         COALESCE(SUM(diurna_interna) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')
-                                                AND COALESCE(erkezes_dt, indulas_dt, data_completare) <  DATE_TRUNC('month', NOW())),0)::int AS diurna_int_prev,
-         COALESCE(SUM((SELECT COALESCE(SUM((a->>'litru')::numeric),0)
-                       FROM jsonb_array_elements(alimentari) a)) FILTER (WHERE COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')
-                                                                          AND COALESCE(erkezes_dt, indulas_dt, data_completare) <  DATE_TRUNC('month', NOW())),0) AS tankolt_l_prev
+    // Előző + jelen havi menetlevelek — nyers mezők, JS-ben osztjuk szét.
+    const flR = await pool.query(
+      `SELECT id, numar_camion, indulas_dt, erkezes_dt, data_completare,
+              km_inceput, km_sfarsit, total_km, diurna_externa, diurna_interna, alimentari
        FROM fuvarlevelek
        WHERE LOWER(email_sofer) = LOWER($1)
          AND COALESCE(erkezes_dt, indulas_dt, data_completare) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')`,
       [me.email]
     );
 
-    const o = ordR.rows[0], f = fuvR.rows[0];
+    // Hónap-határok (SQL-ből, hogy egyezzen a NOW() zónájával).
+    const bR = await pool.query(
+      `SELECT DATE_TRUNC('month', NOW()) AS m_curr,
+              DATE_TRUNC('month', NOW() - INTERVAL '1 month') AS m_prev`
+    );
+    const mCurr = new Date(bR.rows[0].m_curr);
+    const mPrev = new Date(bR.rows[0].m_prev);
+    const prevYear = mPrev.getUTCFullYear();
+    const prevMonth = mPrev.getUTCMonth() + 1; // 1..12
+
+    // GPS snapshot lookup — csak az előző hó vég snapshot kell (az átívelő
+    // menetlevelek határa). Cégre + rendszám-normalizált illesztéssel.
+    const snR = await pool.query(
+      `SELECT rendszam, mileage
+       FROM gps_month_end_snapshots
+       WHERE company_id = $1 AND year = $2 AND month = $3`,
+      [me.company_id, prevYear, prevMonth]
+    );
+    const normPlate = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const snapMap = new Map();
+    for (const s of snR.rows) {
+      const km = Number(s.mileage);
+      if (isFinite(km)) snapMap.set(normPlate(s.rendszam), km);
+    }
+
+    // ── Aggregátorok ──
+    let km_curr = 0, km_prev = 0;
+    let de_curr = 0, de_prev = 0;
+    let di_curr = 0, di_prev = 0;
+    let tl_curr = 0, tl_prev = 0;
+    let cnt_curr = 0;
+
+    function dayFloor(d) {
+      // UTC naptári nap 00:00 — a hónap-határ mCurr is UTC 00:00, így
+      // konzisztensen összehasonlítható.
+      return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    }
+
+    for (const fl of flR.rows) {
+      const eff = fl.erkezes_dt || fl.indulas_dt || fl.data_completare;
+      if (!eff) continue;
+      const effDate = new Date(eff);
+      if (effDate < mPrev) continue;
+
+      const inCurr = effDate >= mCurr;
+      const startDt = fl.indulas_dt ? new Date(fl.indulas_dt) : effDate;
+      const endDt = fl.erkezes_dt ? new Date(fl.erkezes_dt) : effDate;
+
+      // Menetlevél-számláló: az érkezés-hónap alapján (nincs bontás).
+      if (inCurr) cnt_curr++;
+
+      // Totalizált nyers értékek
+      const kmT = Number(fl.total_km) || 0;
+      const deT = Number(fl.diurna_externa) || 0;
+      const diT = Number(fl.diurna_interna) || 0;
+      const alim = Array.isArray(fl.alimentari) ? fl.alimentari : [];
+      const tlT = alim.reduce((s, a) => s + (Number(a && a.litru) || 0), 0);
+
+      // Spans the prev→curr boundary?
+      const spans = startDt < mCurr && endDt >= mCurr;
+
+      if (!spans) {
+        // Nem átívelő: teljes érték az eff-hónapba (érkezés-hónap).
+        if (inCurr) {
+          km_curr += kmT; de_curr += deT; di_curr += diT; tl_curr += tlT;
+        } else {
+          km_prev += kmT; de_prev += deT; di_prev += diT; tl_prev += tlT;
+        }
+        continue;
+      }
+
+      // Átívelő: KM = snapshot-alapú, ha van; egyébként napok szerinti arány.
+      // DIURNA + TANKOLT LITER: napok szerinti arányos (nincs per-tétel dátum).
+      let daysPrev = 0, daysCurr = 0;
+      const s0 = dayFloor(startDt), e0 = dayFloor(endDt);
+      for (let d = new Date(s0); d <= e0; d = new Date(d.getTime() + 86400000)) {
+        if (d < mCurr) daysPrev++; else daysCurr++;
+      }
+      const daysTot = daysPrev + daysCurr || 1;
+      const fracPrev = daysPrev / daysTot;
+      const fracCurr = daysCurr / daysTot;
+
+      // KM
+      const snapKm = snapMap.get(normPlate(fl.numar_camion));
+      const kmi = Number(fl.km_inceput), kms = Number(fl.km_sfarsit);
+      if (snapKm != null && isFinite(kmi) && isFinite(kms) && kmi > 0 && kms >= kmi) {
+        const kmPrevPortion = Math.max(0, snapKm - kmi);
+        const kmCurrPortion = Math.max(0, kms - snapKm);
+        km_prev += kmPrevPortion;
+        km_curr += kmCurrPortion;
+      } else {
+        // Fallback: napok szerinti arányos km-bontás
+        km_prev += kmT * fracPrev;
+        km_curr += kmT * fracCurr;
+      }
+
+      // DIURNA — napok szerinti arányos (int-re kerekítve)
+      de_prev += Math.round(deT * fracPrev);
+      de_curr += Math.round(deT * fracCurr);
+      di_prev += Math.round(diT * fracPrev);
+      di_curr += Math.round(diT * fracCurr);
+
+      // TANKOLT LITER — napok szerinti arányos (float)
+      tl_prev += tlT * fracPrev;
+      tl_curr += tlT * fracCurr;
+    }
+
+    const o = ordR.rows[0];
     return res.json({ result: {
       ok: true,
       honap: new Date().toISOString().slice(0, 7),
       lezart: o.lezart, lezart_prev: o.lezart_prev,
       aktiv: o.aktiv,
-      km: f.km, km_prev: f.km_prev,
-      menetlevelek: f.menetlevelek,
-      diurna_ext: f.diurna_ext, diurna_ext_prev: f.diurna_ext_prev,
-      diurna_int: f.diurna_int, diurna_int_prev: f.diurna_int_prev,
-      tankolt_l: f.tankolt_l, tankolt_l_prev: f.tankolt_l_prev
+      km: km_curr, km_prev: km_prev,
+      menetlevelek: cnt_curr,
+      diurna_ext: de_curr, diurna_ext_prev: de_prev,
+      diurna_int: di_curr, diurna_int_prev: di_prev,
+      tankolt_l: tl_curr, tankolt_l_prev: tl_prev
     }});
   } catch (err) {
     console.error('getMySoferStats hiba:', err);
