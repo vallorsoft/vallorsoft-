@@ -1930,6 +1930,14 @@ function loadOrders(){
   // meghívná lazyn az első fókusznál — itt előre kérjük, hogy azonnal kész
   // legyen, amikor a felhasználó megnyitja a szerkesztőt).
   if(typeof ocSgLoad === 'function') ocSgLoad();
+  // Böngésző-autofill kiütése a keresőmezőben (Chrome/Firefox néha e-mailt
+  // ír bele az autocomplete="off" ellenére). Amikor a felhasználó először
+  // gépel, felfüggesztjük — utána már nem nyúlunk hozzá.
+  var _os = document.getElementById('orderSearch');
+  if (_os && !_os._vsUserTouched) {
+    _os.value = '';
+    _os.addEventListener('input', function _once(){ _os._vsUserTouched = true; _os.removeEventListener('input', _once); });
+  }
   gas('comList').then(list=>{
     if(!Array.isArray(list))list=[];
     _ordersAllCache = list;
