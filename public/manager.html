@@ -313,7 +313,7 @@
         <h2 class="h-title" style="margin-bottom:14px;" data-i18n="list.title">Fuvarfeladatok kezelése</h2>
         <div id="ordersMetricBand" style="margin-bottom:16px;"></div>
         <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-            <input class="input" id="orderSearch" placeholder="🔍 Ügyfél, sofőr, ID..." data-i18n-ph="list.searchPh" oninput="filterOrders()" style="flex:1;min-width:160px;">
+            <input class="input" id="orderSearch" type="search" name="vs-order-search" autocomplete="off" placeholder="🔍 Ügyfél, sofőr, ID..." data-i18n-ph="list.searchPh" oninput="filterOrders()" style="flex:1;min-width:160px;">
             <select class="select" id="orderStatusFilter" onchange="filterOrders()" style="max-width:140px;">
               <option value="" data-i18n="list.allStatus">Minden státusz</option>
               <option value="Disponibil">Disponibil</option>
@@ -1339,7 +1339,7 @@
 <script src="/email-intake-card.js?v=20260616warm2"></script>
 <script src="/feature-catalog.js?v=20260618cgps2"></script>
 <script>window.__pwaInstallDefault=false;</script>
-<script src="/console-shared.js?v=20260718delordr"></script>
+<script src="/console-shared.js?v=20260718srch"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 <script src="/console-pages.js?v=20260617b1"></script>
 <!-- ===== INTEGRACIOK (Manager: Ugyfelek + "Hol a kocsi?"; szamlazo/beallitas Admin-only) ===== -->
