@@ -35,14 +35,17 @@ const CID = 1;
 const SOFER = { ...fixtures.sofer, company_id: CID };
 const ADMIN = { ...fixtures.admin, company_id: CID };
 
-// Segéd: felállítja a 4 alap-lekérdezést (orders, fuvarlevelek, hónap-határok, snapshotok).
-// Az fuvarlevelek + snapshots két utolsó paraméterrel testre szabhatók.
-function mockChain({ ord, fuvs, snaps, mCurr = '2026-07-01T00:00:00Z', mPrev = '2026-06-01T00:00:00Z' }) {
+// Segéd: felállítja az 5 alap-lekérdezést a chain-ben (orders, fuvarlevelek,
+// hónap-határok, snapshotok, kiosztott járművek). A snap-sorok most (rendszam,
+// year, month, mileage) formátumúak — a handler kiválogatja őket prev/prev-prev
+// hónapra. Az `assigned` a sofőr kiosztott járműveinek rendszám-listája.
+function mockChain({ ord, fuvs, snaps, assigned, mCurr = '2026-07-01T00:00:00Z', mPrev = '2026-06-01T00:00:00Z' }) {
   pool.query
     .mockResolvedValueOnce(rows([ord]))
     .mockResolvedValueOnce(rows(fuvs || []))
     .mockResolvedValueOnce(rows([{ m_curr: mCurr, m_prev: mPrev }]))
-    .mockResolvedValueOnce(rows(snaps || []));
+    .mockResolvedValueOnce(rows(snaps || []))
+    .mockResolvedValueOnce(rows((assigned || []).map((r) => ({ rendszam: r }))));
 }
 
 beforeEach(() => reset());
@@ -127,7 +130,7 @@ describe('getMySoferStats — átívelő menetlevél SPLIT snapshot alapján', (
           diurna_externa: 60, diurna_interna: 0,
           alimentari: [{ litru: 400 }, { litru: 300 }] }, // total 700 L
       ],
-      snaps: [{ rendszam: 'b111abc', mileage: 100000 }]  // normalizáláson át illeszkedik
+      snaps: [{ rendszam: 'b111abc', year: 2026, month: 6, mileage: 100000 }]  // normalizáláson át illeszkedik
     });
     const res = await call('getMySoferStats', []);
     expect(res.body.result.ok).toBe(true);
@@ -166,6 +169,86 @@ describe('getMySoferStats — átívelő menetlevél SPLIT snapshot alapján', (
   });
 });
 
+describe('getMySoferStats — külön „teljes hó" (GPS) + „leadott" (menetlevél)', () => {
+  test('Peto-eset: nincs júniusi menetlevél, DE két snapshot → km_prev_gps a teljes, km_prev = 0', async () => {
+    setUser({ ...SOFER, email: 'peto@example.com' });
+    mockChain({
+      ord: { lezart: 0, lezart_prev: 0, aktiv: 0 },
+      fuvs: [],  // nulla menetlevél
+      snaps: [
+        // Prev-prev (máj. 31.) + prev (jún. 30.) snapshot ugyanarra a járműre
+        { rendszam: 'B104VLR', year: 2026, month: 5, mileage: 567539 },
+        { rendszam: 'B104VLR', year: 2026, month: 6, mileage: 578727 },
+      ],
+      assigned: ['B104VLR']  // sofőr kiosztott járműve
+    });
+    const res = await call('getMySoferStats', []);
+    expect(res.body.result.ok).toBe(true);
+    // km_prev (leadott menetlevél): 0 (nincs waybill)
+    expect(res.body.result.km_prev).toBe(0);
+    // km_prev_gps (teljes hónap): 578727 - 567539 = 11 188
+    expect(res.body.result.km_prev_gps).toBe(11188);
+  });
+
+  test('menetlevél-alapú km_prev + GPS-delta KETTŐ mezőben ELKÜLÖNÍTVE', async () => {
+    setUser(SOFER);
+    mockChain({
+      ord: { lezart: 3, lezart_prev: 3, aktiv: 0 },
+      fuvs: [
+        // Júniusi menetlevél 15 000 km-rel — több mint amit a GPS-delta mutat
+        { id: 1, numar_camion: 'B104VLR', indulas_dt: '2026-06-05T00:00:00Z',
+          erkezes_dt: '2026-06-25T00:00:00Z', data_completare: '2026-06-25',
+          km_inceput: 0, km_sfarsit: 0, total_km: 15000,
+          diurna_externa: 20, diurna_interna: 0, alimentari: [] },
+      ],
+      snaps: [
+        { rendszam: 'B104VLR', year: 2026, month: 5, mileage: 100000 },
+        { rendszam: 'B104VLR', year: 2026, month: 6, mileage: 108000 },  // delta = 8000
+      ],
+      assigned: ['B104VLR']
+    });
+    const res = await call('getMySoferStats', []);
+    // Külön mezőn: menetlevél 15000, GPS-teljes 8000
+    expect(res.body.result.km_prev).toBe(15000);
+    expect(res.body.result.km_prev_gps).toBe(8000);
+  });
+
+  test('több kiosztott jármű: snapshot deltáik összegződnek a km_prev_gps-ben', async () => {
+    setUser({ ...SOFER, email: 'multi@example.com' });
+    mockChain({
+      ord: { lezart: 0, lezart_prev: 0, aktiv: 0 },
+      fuvs: [],
+      snaps: [
+        { rendszam: 'B111', year: 2026, month: 5, mileage: 1000 },
+        { rendszam: 'B111', year: 2026, month: 6, mileage: 6000 },  // delta = 5000
+        { rendszam: 'B222', year: 2026, month: 5, mileage: 10000 },
+        { rendszam: 'B222', year: 2026, month: 6, mileage: 13000 }, // delta = 3000
+      ],
+      assigned: ['B111', 'B222']
+    });
+    const res = await call('getMySoferStats', []);
+    expect(res.body.result.km_prev_gps).toBe(8000);  // 5000 + 3000
+    expect(res.body.result.km_prev).toBe(0);         // nincs menetlevél
+  });
+
+  test('nincs prev-prev snapshot (csak prev-month-end) → km_prev_gps = 0', async () => {
+    setUser(SOFER);
+    mockChain({
+      ord: { lezart: 0, lezart_prev: 0, aktiv: 0 },
+      fuvs: [],
+      snaps: [
+        // Csak a prev (jún.) snapshot, prev-prev (máj.) HIÁNYZIK
+        { rendszam: 'B104VLR', year: 2026, month: 6, mileage: 578727 },
+      ],
+      assigned: ['B104VLR']
+    });
+    const res = await call('getMySoferStats', []);
+    // Delta nem kalkulálható → km_prev_gps = 0
+    expect(res.body.result.km_prev_gps).toBe(0);
+    expect(res.body.result.km_prev).toBe(0);
+  });
+});
+
 describe('getMySoferStats — vegyes eset', () => {
   test('átívelő + tisztán júliusi menetlevél EGYÜTT', async () => {
     setUser(SOFER);
@@ -185,7 +268,7 @@ describe('getMySoferStats — vegyes eset', () => {
           diurna_externa: 20, diurna_interna: 0,
           alimentari: [{ litru: 150 }] },
       ],
-      snaps: [{ rendszam: 'B111', mileage: 100000 }]
+      snaps: [{ rendszam: 'B111', year: 2026, month: 6, mileage: 100000 }]
     });
     const res = await call('getMySoferStats', []);
     // Júl. = 500 (átívelő júl. része) + 200 (tiszta júliusi) = 700

@@ -957,23 +957,41 @@ function loadSoferMiniStats() {
     // az .sof-mstat* OSZTÁLYOKBÓL jön (sofer.css) — kompakt 2×2, ~20%-kal kisebb —,
     // NEM inline grid-stílusból (különben a style.css mobil felülírója
     // egyoszloposra törné). Per-csempe akcent a motivációs hatáshoz.
-    // A csempe alá egy másodlagos sor kerül (.sof-mstat-prev) — apró szürke
-    // „múlt hó: X" viszonyítás; 0 esetén is kiírjuk (motivációs hatás).
+    // A csempe alá másodlagos sor(ok) kerülnek (.sof-mstat-prev) — apró szürke
+    // múlt havi viszonyítás; 0 esetén is kiírjuk (motivációs hatás).
+    // A KM csempe KÉT prev-sort mutat: „teljes hó" (GPS-delta) + „leadott"
+    // (menetlevél-alap) — a többi csempe egyet.
     var lastMo = t('sof.lastMonthShort');
-    function tile(ico, val, lbl, accent, prev) {
+    var lblFull = t('sof.mstatFull');
+    var lblSubm = t('sof.mstatSubmitted');
+    function tile(ico, val, lbl, accent, prev, prev2) {
       return '<div class="sof-mstat">'
         + '<div class="sof-mstat-ico">' + ico + '</div>'
         + '<div class="sof-mstat-val" style="color:' + accent + ';">' + val + '</div>'
         + '<div class="sof-mstat-lbl">' + lbl + '</div>'
-        + '<div class="sof-mstat-prev">' + lastMo + ': ' + prev + '</div></div>';
+        + '<div class="sof-mstat-prev">' + prev + '</div>'
+        + (prev2 ? '<div class="sof-mstat-prev">' + prev2 + '</div>' : '')
+        + '</div>';
+    }
+    // KM csempe: „teljes hó" (GPS-delta, ha van) + „leadott" (menetlevél).
+    // Ha nincs GPS-delta (km_prev_gps = 0), csak a „leadott" jelenik meg,
+    // hogy ne legyen felesleges „teljes hó: 0" sor.
+    var kmGps = parseFloat(s.km_prev_gps) || 0;
+    var kmPrev1, kmPrev2;
+    if (kmGps > 0) {
+      kmPrev1 = lblFull + ': ' + n(kmGps);
+      kmPrev2 = lblSubm + ': ' + n(s.km_prev);
+    } else {
+      kmPrev1 = lastMo + ': ' + n(s.km_prev);
+      kmPrev2 = null;
     }
     // 2×2 rács (2-2), teljes szélességű — ne húzza el az oldalt függőlegesen.
     box.innerHTML = '<div class="sof-mstat-h">' + t('sof.myMonthPerf') + '</div>'
       + '<div class="sof-mstat-grid">'
-      + tile('✅', n(s.lezart), t('sof.statClosed'), '#16a34a', n(s.lezart_prev))
-      + tile('🛣️', n(s.km), t('sof.statKm'), '#2563eb', n(s.km_prev))
-      + tile('🗓️', n(s.diurna_ext) + '+' + n(s.diurna_int), t('sof.statDiurna'), '#6366f1', n(s.diurna_ext_prev) + '+' + n(s.diurna_int_prev))
-      + tile('⛽', n(s.tankolt_l) + ' L', t('sof.statFueled'), '#d97706', n(s.tankolt_l_prev) + ' L')
+      + tile('✅', n(s.lezart), t('sof.statClosed'), '#16a34a', lastMo + ': ' + n(s.lezart_prev))
+      + tile('🛣️', n(s.km), t('sof.statKm'), '#2563eb', kmPrev1, kmPrev2)
+      + tile('🗓️', n(s.diurna_ext) + '+' + n(s.diurna_int), t('sof.statDiurna'), '#6366f1', lastMo + ': ' + n(s.diurna_ext_prev) + '+' + n(s.diurna_int_prev))
+      + tile('⛽', n(s.tankolt_l) + ' L', t('sof.statFueled'), '#d97706', lastMo + ': ' + n(s.tankolt_l_prev) + ' L')
       + '</div>';
     box.style.display = '';
   }).catch(function() {});
