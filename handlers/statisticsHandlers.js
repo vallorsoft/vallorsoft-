@@ -516,6 +516,11 @@ handlers.getOrderProfit = async function (req, res, args) {
 };
 
 // ── Fogyasztás (stats-fuel) ──────────────────────────────────
+// A tankolás mostantól PER-TÉTEL dátum szerint sorolódik hónapba (nem a
+// menetlevél `eff_date`-je alapján) — a sofőr minden tankoláshoz külön
+// dátumot ad; ha nincs (régi menetlevél), fallback a menetlevél `eff_date`-je.
+// Így egy jún.28→júl.3 átívelő menetlevél júniusi tankolása júniusban, júliusi
+// tankolása júliusban jelenik meg a statisztikában.
 handlers.getFuelStats = async function (req, res, args) {
   try {
     if (!_isAdminOrManager(req)) return _deny(res);
@@ -523,18 +528,29 @@ handlers.getFuelStats = async function (req, res, args) {
     const { from, to } = _range(args);
     const P = [cid, from, to];
 
+    // Per-tétel dátum kifejezés — biztonságos parse-olás (érvénytelen érték →
+    // fallback a menetlevél eff_date-jére). A JSONB-ben tárolt `data` mező
+    // YYYY-MM-DD; a NULLIF + regexp védi a regex-nem-illeszkedő értékektől.
+    // (JS-template `\\d` → SQL `\d` — PG ARE digit-osztály.)
+    const ITEM_DATE = `COALESCE(
+      CASE WHEN (a.elem->>'data') ~ '^\\d{4}-\\d{2}-\\d{2}' THEN (LEFT(a.elem->>'data',10))::date ELSE NULL END,
+      f.eff_date::date
+    )`;
+
     // Havi tankolás (liter + összeg + átlagár), Motorină/AdBlue bontásban
     const haviR = await pool.query(
-      `SELECT TO_CHAR(f.eff_date,'YYYY-MM') AS ho,
+      `SELECT TO_CHAR(${ITEM_DATE},'YYYY-MM') AS ho,
               COALESCE(a.elem->>'tip','Motorină') AS tip,
               SUM((a.elem->>'litru')::numeric) AS litru,
               SUM((a.elem->>'suma')::numeric) AS suma
        ${FUV_FROM}, jsonb_array_elements(f.alimentari) a(elem)
-       WHERE f.eff_date >= $2 AND f.eff_date < $3
+       WHERE ${ITEM_DATE} >= $2 AND ${ITEM_DATE} < $3
        GROUP BY ho, tip ORDER BY ho`, P
     );
 
     // Járművenkénti tényleges fogyasztás vs. névleges (vehicles.fuel_per_100km)
+    // Menetlevél-szintű aggregátum (motorina_folosit / total_km / fuel_per_100km
+    // menetlevél-alapú) — itt marad az `f.eff_date` szűrés, mert nem tétel-szintű.
     const jarmuR = await pool.query(
       `SELECT f.numar_camion AS rendszam,
               SUM(f.total_km)::numeric AS km,
@@ -547,24 +563,25 @@ handlers.getFuelStats = async function (req, res, args) {
        GROUP BY f.numar_camion ORDER BY km DESC`, P
     );
 
-    // Fizetési mód megoszlás (tankolások)
+    // Fizetési mód megoszlás (tankolások) — per-tétel dátum
     const plataR = await pool.query(
       `SELECT COALESCE(NULLIF(a.elem->>'plata',''),'?') AS plata,
               COUNT(*)::int AS db, SUM((a.elem->>'suma')::numeric) AS suma
        ${FUV_FROM}, jsonb_array_elements(f.alimentari) a(elem)
-       WHERE f.eff_date >= $2 AND f.eff_date < $3
+       WHERE ${ITEM_DATE} >= $2 AND ${ITEM_DATE} < $3
        GROUP BY plata ORDER BY suma DESC NULLS LAST`, P
     );
 
-    // Tankolási lista (legutóbbi 100)
+    // Tankolási lista (legutóbbi 100) — per-tétel dátum a `data_completare`
+    // oszlopban (a kliens „Dată" oszlopa ezt jeleníti meg).
     const listaR = await pool.query(
-      `SELECT f.eff_date AS data_completare, f.nume_sofer, f.numar_camion,
+      `SELECT ${ITEM_DATE} AS data_completare, f.nume_sofer, f.numar_camion,
               a.elem->>'loc' AS loc, COALESCE(a.elem->>'tip','Motorină') AS tip,
               (a.elem->>'litru')::numeric AS litru, (a.elem->>'km')::numeric AS km,
               a.elem->>'plata' AS plata, (a.elem->>'suma')::numeric AS suma
        ${FUV_FROM}, jsonb_array_elements(f.alimentari) a(elem)
-       WHERE f.eff_date >= $2 AND f.eff_date < $3
-       ORDER BY f.eff_date DESC LIMIT 100`, P
+       WHERE ${ITEM_DATE} >= $2 AND ${ITEM_DATE} < $3
+       ORDER BY ${ITEM_DATE} DESC LIMIT 100`, P
     );
 
     return res.json({ result: {
@@ -578,6 +595,8 @@ handlers.getFuelStats = async function (req, res, args) {
 };
 
 // ── Vásárlások / kiadások (stats-purchases) ──────────────────
+// A vásárlás mostantól PER-TÉTEL dátum szerint sorolódik hónapba — ugyanaz
+// a szabály mint a tankolásnál (lásd fentebb `getFuelStats`).
 handlers.getPurchaseStats = async function (req, res, args) {
   try {
     if (!_isAdminOrManager(req)) return _deny(res);
@@ -585,11 +604,18 @@ handlers.getPurchaseStats = async function (req, res, args) {
     const { from, to } = _range(args);
     const P = [cid, from, to];
 
+    // Per-tétel dátum kifejezés (fallback a menetlevél eff_date-jére)
+    // (JS-template `\\d` → SQL `\d` — PG ARE digit-osztály.)
+    const ITEM_DATE = `COALESCE(
+      CASE WHEN (c.elem->>'data') ~ '^\\d{4}-\\d{2}-\\d{2}' THEN (LEFT(c.elem->>'data',10))::date ELSE NULL END,
+      f.eff_date::date
+    )`;
+
     const haviR = await pool.query(
-      `SELECT TO_CHAR(f.eff_date,'YYYY-MM') AS ho,
+      `SELECT TO_CHAR(${ITEM_DATE},'YYYY-MM') AS ho,
               COUNT(*)::int AS db, SUM((c.elem->>'pret')::numeric) AS suma
        ${FUV_FROM}, jsonb_array_elements(f.achizitii) c(elem)
-       WHERE f.eff_date >= $2 AND f.eff_date < $3
+       WHERE ${ITEM_DATE} >= $2 AND ${ITEM_DATE} < $3
        GROUP BY ho ORDER BY ho`, P
     );
 
@@ -597,7 +623,7 @@ handlers.getPurchaseStats = async function (req, res, args) {
       `SELECT COALESCE(NULLIF(TRIM(c.elem->>'produs'),''),'?') AS produs,
               COUNT(*)::int AS db, SUM((c.elem->>'pret')::numeric) AS suma
        ${FUV_FROM}, jsonb_array_elements(f.achizitii) c(elem)
-       WHERE f.eff_date >= $2 AND f.eff_date < $3
+       WHERE ${ITEM_DATE} >= $2 AND ${ITEM_DATE} < $3
        GROUP BY produs ORDER BY suma DESC NULLS LAST LIMIT 15`, P
     );
 
@@ -605,7 +631,7 @@ handlers.getPurchaseStats = async function (req, res, args) {
       `SELECT COALESCE(f.nume_sofer, f.email_sofer) AS sofer,
               COUNT(*)::int AS db, SUM((c.elem->>'pret')::numeric) AS suma
        ${FUV_FROM}, jsonb_array_elements(f.achizitii) c(elem)
-       WHERE f.eff_date >= $2 AND f.eff_date < $3
+       WHERE ${ITEM_DATE} >= $2 AND ${ITEM_DATE} < $3
        GROUP BY sofer ORDER BY suma DESC NULLS LAST`, P
     );
 
@@ -613,17 +639,17 @@ handlers.getPurchaseStats = async function (req, res, args) {
       `SELECT COALESCE(NULLIF(c.elem->>'plata',''),'?') AS plata,
               COUNT(*)::int AS db, SUM((c.elem->>'pret')::numeric) AS suma
        ${FUV_FROM}, jsonb_array_elements(f.achizitii) c(elem)
-       WHERE f.eff_date >= $2 AND f.eff_date < $3
+       WHERE ${ITEM_DATE} >= $2 AND ${ITEM_DATE} < $3
        GROUP BY plata ORDER BY suma DESC NULLS LAST`, P
     );
 
     const listaR = await pool.query(
-      `SELECT f.eff_date AS data_completare, f.nume_sofer, f.numar_camion,
+      `SELECT ${ITEM_DATE} AS data_completare, f.nume_sofer, f.numar_camion,
               c.elem->>'produs' AS produs, c.elem->>'loc' AS loc,
               (c.elem->>'pret')::numeric AS pret, c.elem->>'plata' AS plata
        ${FUV_FROM}, jsonb_array_elements(f.achizitii) c(elem)
-       WHERE f.eff_date >= $2 AND f.eff_date < $3
-       ORDER BY f.eff_date DESC LIMIT 100`, P
+       WHERE ${ITEM_DATE} >= $2 AND ${ITEM_DATE} < $3
+       ORDER BY ${ITEM_DATE} DESC LIMIT 100`, P
     );
 
     return res.json({ result: {
@@ -956,6 +982,39 @@ handlers.getMySoferStats = async function (req, res, args) {
       return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
     }
 
+    // Per-tétel dátum → hónap (Date objektum a hónap első napjának 00:00 UTC-je),
+    // vagy null ha érvénytelen/üres. A menetlevél `data` mezője YYYY-MM-DD.
+    function itemMonthStart(v) {
+      if (!v || typeof v !== 'string') return null;
+      const m = v.match(/^(\d{4})-(\d{2})-\d{2}/);
+      if (!m) return null;
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10);
+      if (!y || !mo) return null;
+      return new Date(Date.UTC(y, mo - 1, 1));
+    }
+    // Alimentari-tömb összege ‛target’ hónapba tartozó tételekre (per-tétel
+    // `data` szerint). `fallbackBucket` = 'curr' | 'prev' | null: ha a tételen
+    // nincs `data` mező (régi sor), oda soroljuk. Így backward-compatible.
+    function litersInMonth(alim, target, fallbackBucket) {
+      let s = 0;
+      for (const a of alim) {
+        const lit = Number(a && a.litru) || 0;
+        if (!lit) continue;
+        const ms = itemMonthStart(a && a.data);
+        if (ms) {
+          if (ms.getTime() === target.getTime()) s += lit;
+        } else if (fallbackBucket) {
+          // per-tétel dátum hiánya: a menetlevél érkezés-hónapja szerint sorol
+          if ((fallbackBucket === 'curr' && target.getTime() === mCurr.getTime())
+              || (fallbackBucket === 'prev' && target.getTime() === mPrev.getTime())) {
+            s += lit;
+          }
+        }
+      }
+      return s;
+    }
+
     for (const fl of flR.rows) {
       const eff = fl.erkezes_dt || fl.indulas_dt || fl.data_completare;
       if (!eff) continue;
@@ -974,23 +1033,32 @@ handlers.getMySoferStats = async function (req, res, args) {
       const deT = Number(fl.diurna_externa) || 0;
       const diT = Number(fl.diurna_interna) || 0;
       const alim = Array.isArray(fl.alimentari) ? fl.alimentari : [];
-      const tlT = alim.reduce((s, a) => s + (Number(a && a.litru) || 0), 0);
 
       // Spans the prev→curr boundary?
       const spans = startDt < mCurr && endDt >= mCurr;
 
       if (!spans) {
         // Nem átívelő: teljes érték az eff-hónapba (érkezés-hónap).
+        // TANKOLT LITER esetén akkor is a per-tétel dátumot tiszteljük, ha van
+        // — így ha valaki „utólag" ír be egy régebbi hónapba tartozó tételt,
+        // az a jó hónapba kerül. Fallback (nincs per-tétel dátum) = eff-hónap.
+        const bucket = inCurr ? 'curr' : 'prev';
+        const tl_c = litersInMonth(alim, mCurr, bucket);
+        const tl_p = litersInMonth(alim, mPrev, bucket);
         if (inCurr) {
-          km_curr += kmT; de_curr += deT; di_curr += diT; tl_curr += tlT;
+          km_curr += kmT; de_curr += deT; di_curr += diT;
         } else {
-          km_prev += kmT; de_prev += deT; di_prev += diT; tl_prev += tlT;
+          km_prev += kmT; de_prev += deT; di_prev += diT;
         }
+        tl_curr += tl_c;
+        tl_prev += tl_p;
         continue;
       }
 
       // Átívelő: KM = snapshot-alapú, ha van; egyébként napok szerinti arány.
-      // DIURNA + TANKOLT LITER: napok szerinti arányos (nincs per-tétel dátum).
+      // DIURNA: napok szerinti arányos (nincs per-tétel dátum a diurnára).
+      // TANKOLT LITER: PER-TÉTEL DÁTUM szerint sorolódik; ha egy tételen nincs
+      // dátum (régi menetlevél), fallback = napok szerinti arány (nem vész el).
       let daysPrev = 0, daysCurr = 0;
       const s0 = dayFloor(startDt), e0 = dayFloor(endDt);
       for (let d = new Date(s0); d <= e0; d = new Date(d.getTime() + 86400000)) {
@@ -1021,9 +1089,23 @@ handlers.getMySoferStats = async function (req, res, args) {
       di_prev += Math.round(diT * fracPrev);
       di_curr += Math.round(diT * fracCurr);
 
-      // TANKOLT LITER — napok szerinti arányos (float)
-      tl_prev += tlT * fracPrev;
-      tl_curr += tlT * fracCurr;
+      // TANKOLT LITER — per-tétel dátum ha van; datum nélküli tételek napok
+      // szerint arányosan (a menetlevél napjaira szórva).
+      let tl_p = 0, tl_c = 0, tl_undated = 0;
+      for (const a of alim) {
+        const lit = Number(a && a.litru) || 0;
+        if (!lit) continue;
+        const ms = itemMonthStart(a && a.data);
+        if (ms) {
+          if (ms.getTime() === mPrev.getTime()) tl_p += lit;
+          else if (ms.getTime() === mCurr.getTime()) tl_c += lit;
+          // más hónapba tartozó dátum: hagyjuk figyelmen kívül (nem itt sorolódik)
+        } else {
+          tl_undated += lit;
+        }
+      }
+      tl_prev += tl_p + tl_undated * fracPrev;
+      tl_curr += tl_c + tl_undated * fracCurr;
     }
 
     // ── GPS-alapú múlt havi KM = „teljes hónap" ─────────────────
