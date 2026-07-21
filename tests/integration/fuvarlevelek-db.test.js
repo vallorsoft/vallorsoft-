@@ -234,4 +234,80 @@ d('Valódi DB integráció (menetlevelek)', () => {
     expect(blob).not.toContain('SECRET99');
     expect(blob).not.toContain('Titok');
   });
+
+  // ── PER-TÉTEL DÁTUM: getFuelStats / getPurchaseStats ─────────
+  // Egy átívelő menetlevél (jún. 28 → júl. 3) tankolás/vásárlás tételei
+  // MINDEN esetben a per-tétel `data` szerint sorolódnak hónapba (nem a
+  // menetlevél `eff_date`-je szerint). Régi sor (nincs `data` kulcs) fallback
+  // a menetlevél `eff_date`-jére.
+  test('getFuelStats + getPurchaseStats: per-tétel dátum szerint sorolódik hónapba', async () => {
+    // Átívelő menetlevél: eff_date = júl. 3 (érkezés). Az egyik tankolás
+    // jún. 29-én, a másik júl. 2-án történt.
+    await pool.query(
+      `INSERT INTO fuvarlevelek (id,file_name,email_sofer,nume_sofer,company_id,
+         indulas_dt,erkezes_dt,data_completare,alimentari,achizitii)
+       VALUES ('FUV-SPAN','x.pdf',$1,$2,$3,
+         '2026-06-28 08:00','2026-07-03 18:00','2026-07-03',
+         $4::jsonb, $5::jsonb)`,
+      [SOFER.email, SOFER.nume, companyId,
+        JSON.stringify([
+          { loc: 'OMV Oradea', tip: 'Motorină', litru: 400, suma: 2000, plata: 'Card', data: '2026-06-29' },
+          { loc: 'OMV Arad',    tip: 'Motorină', litru: 300, suma: 1500, plata: 'Card', data: '2026-07-02' },
+        ]),
+        JSON.stringify([
+          { loc: 'Bolt Cluj',    produs: 'Rovinieta', pret: 100, plata: 'Card', data: '2026-06-30' },
+          { loc: 'Magazin Arad', produs: 'Manusi',   pret:  50, plata: 'Cash', data: '2026-07-01' },
+        ])
+      ]);
+
+    const stats = require('../../handlers/statisticsHandlers');
+    // A range-nek le kell fednie mindkét hónapot.
+    const fRes = makeRes();
+    await stats.getFuelStats(reqAs(ADMIN), fRes, [{ from: '2026-06-01', to: '2026-08-01' }]);
+    expect(fRes.body.result.ok).toBe(true);
+    const havi = fRes.body.result.havi;
+    // Csoportosítás: 2026-06 → 400 L, 2026-07 → 300 L (nem 700 az egyik hónapban!)
+    const jun = havi.find((r) => r.ho === '2026-06' && r.tip === 'Motorină');
+    const jul = havi.find((r) => r.ho === '2026-07' && r.tip === 'Motorină');
+    expect(jun).toBeTruthy(); expect(jul).toBeTruthy();
+    expect(Number(jun.litru)).toBe(400);
+    expect(Number(jul.litru)).toBe(300);
+
+    // Vásárlások ugyanígy
+    const pRes = makeRes();
+    await stats.getPurchaseStats(reqAs(ADMIN), pRes, [{ from: '2026-06-01', to: '2026-08-01' }]);
+    expect(pRes.body.result.ok).toBe(true);
+    const pHavi = pRes.body.result.havi;
+    const pJun = pHavi.find((r) => r.ho === '2026-06');
+    const pJul = pHavi.find((r) => r.ho === '2026-07');
+    expect(pJun).toBeTruthy(); expect(pJul).toBeTruthy();
+    expect(Number(pJun.suma)).toBe(100);
+    expect(Number(pJul.suma)).toBe(50);
+  });
+
+  test('getFuelStats + getPurchaseStats: dátum nélküli tétel (régi menetlevél) az eff-hónapba esik (fallback)', async () => {
+    // Nincs per-tétel `data` — a menetlevél `eff_date`-je (júl. 6) alapján
+    // sorolódik júliusba.
+    await pool.query(
+      `INSERT INTO fuvarlevelek (id,file_name,email_sofer,nume_sofer,company_id,
+         indulas_dt,erkezes_dt,data_completare,alimentari,achizitii)
+       VALUES ('FUV-OLD','x.pdf',$1,$2,$3,
+         '2026-07-05 08:00','2026-07-06 18:00','2026-07-06',
+         $4::jsonb, $5::jsonb)`,
+      [SOFER.email, SOFER.nume, companyId,
+        JSON.stringify([{ loc: 'OMV', tip: 'Motorină', litru: 200, suma: 900, plata: 'Card' }]),   // nincs data
+        JSON.stringify([{ loc: 'Bolt', produs: 'Filtru', pret: 60, plata: 'Cash' }])              // nincs data
+      ]);
+    const stats = require('../../handlers/statisticsHandlers');
+    const fRes = makeRes();
+    await stats.getFuelStats(reqAs(ADMIN), fRes, [{ from: '2026-07-01', to: '2026-08-01' }]);
+    const jul = (fRes.body.result.havi || []).find((r) => r.ho === '2026-07' && r.tip === 'Motorină');
+    expect(jul).toBeTruthy();
+    expect(Number(jul.litru)).toBe(200);
+    const pRes = makeRes();
+    await stats.getPurchaseStats(reqAs(ADMIN), pRes, [{ from: '2026-07-01', to: '2026-08-01' }]);
+    const pJul = (pRes.body.result.havi || []).find((r) => r.ho === '2026-07');
+    expect(pJul).toBeTruthy();
+    expect(Number(pJul.suma)).toBe(60);
+  });
 });

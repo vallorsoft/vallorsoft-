@@ -14,6 +14,63 @@
 
 ---
 
+## 2026-07-21 — Menetlevél: tankolás/vásárlás per-tétel DÁTUM (naptár-választó, mai alapérték) → statisztika is per-tétel dátum szerint
+
+### Gyökér
+
+A menetlevél tankolás (`alimentari`) és vásárlás (`achizitii`) sorai eddig
+egyetlen szabadszöveges „Locație & Dată" mezőt kaptak, dátum-mező nem
+tartozott a tételhez. Emiatt egy átívelő menetlevélben (pl. jún. 28 → júl. 3)
+a júniusi tankolás a júliusi statisztikába csúszott (a hónap-szűrés a
+menetlevél `eff_date`-je alapján történt), és a sofőr havi mini-statisztikája
+a tankolt litert **napok szerint arányosan** bontotta a két hónap közt.
+
+### Változtatás
+
+**Sofőr menetlevél űrlap** (`public/sofer.html`+`sofer.js`): a régi „Locație
+& Dată" szövegmező **szétvált**: `Locație` (szabadszöveg) + **`Data`**
+(natív `type="date"` naptár-picker). Alapérték a **mai (helyi) dátum**, óra
+NINCS. A `draftSave` / `soferCollectFull` / `submitFuvarlevel` gyűjtő
+tömbök a `data` mezőt is beszúrják (backward-compatible: hiányzó `data`
+= üres string). A `sof.alimLocPh` placeholder „pl. Győr"-ra egyszerűsödött
+(a dátum kikerült).
+
+**Admin/Manager menetlevél-szerkesztő** (`public/console-shared.js`
+`feRowAlim`/`feRowAch`): új `type="date"` oszlop, közös `_feTodayLocalDate`
+alap, meglévő értéket visszaállít; `saveFuvEdit` beolvassa a `data` mezőt
+(`.fe-a-data`/`.fe-c-data`).
+
+**PDF export** (`routes/soferApi.js` `/api/pdf-download/:id`): Alimentări +
+Achiziții táblák új „Data" oszloppal (`Loc | Data | …`); `_fmtItemDate`
+YYYY-MM-DD-re vágja a tárolt értéket.
+
+**Statisztika per-tétel dátum szerint** (`handlers/statisticsHandlers.js`):
+- `getFuelStats`, `getPurchaseStats`: közös
+  `ITEM_DATE = COALESCE(NULLIF(elem->>'data','')::date, f.eff_date::date)`
+  kifejezéssel szűr/csoportosít — a hónap-bontás mostantól a tétel saját
+  dátuma szerint. Régi (dátum nélküli) tétel fallback: menetlevél `eff_date`.
+- `getMySoferStats`: a tankolt liter tétel-alapon sorolódik a jelen/előző
+  havi kosárba. Nem-átívelő menetlevélben is: ha egy tétel dátuma más
+  hónapba esik (pl. utólag rögzített), a helyes hónap kosarába kerül.
+  Dátum nélküli tétel = napi arány / eff-hónap fallback. Diurna + km
+  változatlanul (nincs per-tétel dátum ezekhez).
+
+Adatbázis-változás nincs (a JSONB már eleve tetszőleges kulcsokat őriz).
+
+### Teszt
+
+`tests/integration/sofer-mini-stats.test.js` — 3 új eset a per-tétel
+dátum-viselkedésre (átívelő tétel-alapú 400 jún./300 júl., dátum nélküli
+tétel napi arány fallback, utólag beírt más-hónapos tétel). **647 Jest
+zöld** (644 → 647).
+
+### Deploy
+
+Fly.io szerver-restart (nincs migráció) + böngésző hard refresh (cache-bust
+`?v=20260721itemdate` a `sofer.js`/`console-shared.js`-hez).
+
+---
+
 ## 2026-07-18 — Ideiglenes WhatsApp-alapú chat: sofőr → cég WhatsApp, manager → sofőr WhatsApp
 
 A belső Firebase-alapú chat átmenetileg **WhatsApp-átirányításra** vált. A cél,

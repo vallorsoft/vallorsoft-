@@ -55,6 +55,7 @@ function draftSave() {
     document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function(row) {
       alimentari.push({
         loc: (row.querySelector('.alim-loc') || {}).value || '',
+        data: (row.querySelector('.alim-data') || {}).value || '',
         tip: (row.querySelector('.alim-tip') || {}).value || 'Motorină',
         litru: (row.querySelector('.alim-lit') || {}).value || '0',
         km: (row.querySelector('.alim-km') || {}).value || '0',
@@ -69,6 +70,7 @@ function draftSave() {
       achizitii.push({
         produs: (row.querySelector('.ach-prod') || {}).value || '',
         loc: (row.querySelector('.ach-loc') || {}).value || '',
+        data: (row.querySelector('.ach-data') || {}).value || '',
         pret: (row.querySelector('.ach-pret') || {}).value || '0',
         plata: (row.querySelector('.ach-plata') || {}).value || 'Card'
       });
@@ -167,6 +169,7 @@ function soferCollectFull() {
   document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function (row) {
     alimentari.push({
       loc: (row.querySelector('.alim-loc') || {}).value || '',
+      data: (row.querySelector('.alim-data') || {}).value || '',
       tip: (row.querySelector('.alim-tip') || {}).value || 'Motorină',
       litru: (row.querySelector('.alim-lit') || {}).value || '0',
       km: (row.querySelector('.alim-km') || {}).value || '0',
@@ -179,6 +182,7 @@ function soferCollectFull() {
     achizitii.push({
       produs: (row.querySelector('.ach-prod') || {}).value || '',
       loc: (row.querySelector('.ach-loc') || {}).value || '',
+      data: (row.querySelector('.ach-data') || {}).value || '',
       pret: (row.querySelector('.ach-pret') || {}).value || '0',
       plata: (row.querySelector('.ach-plata') || {}).value || 'Card'
     });
@@ -622,13 +626,26 @@ function addPunctRow(locVal, tipVal, dataVal) {
   document.getElementById('puncteContainer').appendChild(d);
 }
 
+// A helyi (böngésző) mai dátum YYYY-MM-DD alakban — a per-tétel dátum-mező
+// alapértelmezett értéke (a sofőr csak akkor módosítja, ha nem ma tankolt/
+// vásárolt).
+function _todayLocalDate(){
+  var d = new Date();
+  var p = function(n){ return String(n).padStart(2,'0'); };
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+}
+
 function addAlimRow(a) {
   alimIdx++;
   a = a || {};
+  var dt = (typeof a.data === 'string' && a.data) ? a.data.slice(0,10) : _todayLocalDate();
   var d = document.createElement('div');
   d.className = 'dyn-row';
   d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
-    + '<div class="field"><label>' + t('sof.locDate') + '</label><input class="input alim-loc" placeholder="' + t('sof.alimLocPh') + '" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
+    + '<div class="g2">'
+    + '<div class="field"><label>' + t('sof.location') + '</label><input class="input alim-loc" placeholder="' + t('sof.alimLocPh') + '" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.date') + '</label><input class="input alim-data" type="date" value="' + dt + '" onchange="draftSave()"></div>'
+    + '</div>'
     + '<div class="g2">'
     + '<div class="field"><label>' + t('sof.fuelType') + '</label><select class="input alim-tip" style="padding:10px 14px;" onchange="draftSave()"><option' + (a.tip === 'AdBlue' ? '' : ' selected') + '>Motorină</option><option' + (a.tip === 'AdBlue' ? ' selected' : '') + '>AdBlue</option></select></div>'
     + '<div class="field"><label>' + t('sof.liters') + '</label><input class="input alim-lit" type="number" value="' + (a.litru || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
@@ -649,12 +666,14 @@ function addAlimRow(a) {
 function addAchRow(a) {
   achIdx++;
   a = a || {};
+  var dt = (typeof a.data === 'string' && a.data) ? a.data.slice(0,10) : _todayLocalDate();
   var d = document.createElement('div');
   d.className = 'dyn-row';
   d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
     + '<div class="field"><label>' + t('sof.product') + '</label><input class="input ach-prod" placeholder="' + t('sof.achProdPh') + '" value="' + (a.produs || '') + '" oninput="draftSave()"></div>'
-    + '<div class="g2">'
+    + '<div class="g3">'
     + '<div class="field"><label>' + t('sof.location') + '</label><input class="input ach-loc" placeholder="' + t('sof.achLocPh') + '" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.date') + '</label><input class="input ach-data" type="date" value="' + dt + '" onchange="draftSave()"></div>'
     + '<div class="field"><label>' + t('sof.sumRon') + '</label><input class="input ach-pret" type="number" value="' + (a.pret || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
     + '</div>'
     + '<div class="field"><label>' + t('sof.payment') + '</label><select class="input ach-plata" style="padding:10px 14px;" onchange="draftSave()"><option>Card</option><option>Cash</option><option>Flota Card</option><option>DKV</option></select></div>';
@@ -729,6 +748,7 @@ function submitFuvarlevel() {
   document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function(row) {
     alimentari.push({
       loc: (row.querySelector('.alim-loc') || {}).value || '',
+      data: (row.querySelector('.alim-data') || {}).value || '',
       tip: (row.querySelector('.alim-tip') || {}).value || 'Motorină',
       litru: parseFloat((row.querySelector('.alim-lit') || {}).value) || 0,
       km: parseFloat((row.querySelector('.alim-km') || {}).value) || 0,
@@ -742,6 +762,7 @@ function submitFuvarlevel() {
     achizitii.push({
       produs: (row.querySelector('.ach-prod') || {}).value || '',
       loc: (row.querySelector('.ach-loc') || {}).value || '',
+      data: (row.querySelector('.ach-data') || {}).value || '',
       pret: parseFloat((row.querySelector('.ach-pret') || {}).value) || 0,
       plata: (row.querySelector('.ach-plata') || {}).value || 'Card'
     });

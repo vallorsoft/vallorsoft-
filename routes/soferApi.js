@@ -305,12 +305,21 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       if (!puncteHtml)   puncteHtml  = '<tr><td colspan="4">—</td></tr>';
     }
 
-    // Tankolások HTML
+    // Tankolások HTML — külön Loc / Data oszlop (a Data mostantól per-tétel)
+    const _fmtItemDate = (v) => {
+      if (!v) return '—';
+      const s = String(v);
+      // Elfogadja YYYY-MM-DD / ISO / TIMESTAMPTZ formát; csak a dátum-részt
+      // mutatjuk (a menetlevélen mindig napra pontos, óra nincs).
+      const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+      return m ? m[1] : escHtml(s);
+    };
     let alimHtml = '';
     if (alimentari.length > 0) {
       alimentari.forEach((a, i) => {
         alimHtml += `<tr>
           <td>${i+1}. ${escHtml(a.loc || '—')}</td>
+          <td>${_fmtItemDate(a.data)}</td>
           <td>${escHtml(a.tip || 'Motorină')}</td>
           <td>${escHtml(a.litru || 0)} L</td>
           <td>${escHtml(a.km || 0)} km</td>
@@ -319,22 +328,23 @@ router.get('/api/pdf-download/:id', async (req, res) => {
         </tr>`;
       });
     } else {
-      alimHtml = '<tr><td colspan="6">Nu a fost inregistrata nicio alimentare.</td></tr>';
+      alimHtml = '<tr><td colspan="7">Nu a fost inregistrata nicio alimentare.</td></tr>';
     }
 
-    // Kiadások HTML
+    // Kiadások HTML — külön Loc / Data oszlop (a Data mostantól per-tétel)
     let achHtml = '';
     if (achizitii.length > 0) {
       achizitii.forEach((ach, i) => {
         achHtml += `<tr>
           <td>${i+1}. ${escHtml(ach.loc || '—')}</td>
+          <td>${_fmtItemDate(ach.data)}</td>
           <td>${escHtml(ach.produs || '—')}</td>
           <td>${escHtml(ach.pret || 0)} RON</td>
           <td>${escHtml(ach.plata || '—')}</td>
         </tr>`;
       });
     } else {
-      achHtml = '<tr><td colspan="4">Nu a fost inregistrata nicio cheltuiala.</td></tr>';
+      achHtml = '<tr><td colspan="5">Nu a fost inregistrata nicio cheltuiala.</td></tr>';
     }
 
     // Fuvar ID-k
@@ -380,7 +390,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
 
     <div class="sec-title">Alimentări</div>
     <table class="grid-table">
-      <tr><th>Loc & Data</th><th>Combustibil</th><th>Litri</th><th>Km</th><th>Plată</th><th>Sumă</th></tr>
+      <tr><th>Loc</th><th>Data</th><th>Combustibil</th><th>Litri</th><th>Km</th><th>Plată</th><th>Sumă</th></tr>
       ${alimHtml}
     </table>
 
@@ -393,7 +403,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
 
     <div class="sec-title">Achiziții / Cheltuieli</div>
     <table class="grid-table">
-      <tr><th>Loc & Data</th><th>Produs / Serviciu</th><th>Preț</th><th>Metodă plată</th></tr>
+      <tr><th>Loc</th><th>Data</th><th>Produs / Serviciu</th><th>Preț</th><th>Metodă plată</th></tr>
       ${achHtml}
     </table>
 

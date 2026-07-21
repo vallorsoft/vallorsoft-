@@ -2218,8 +2218,22 @@ function feRowPunct(p){p=p||{};return '<div class="fe-row" style="display:grid;g
   +'<input class="input fe-p-data" placeholder="Dată" value="'+feEsc(p.data)+'">'
   +'<button class="btn ghost" style="padding:4px 9px;" onclick="this.parentNode.remove()">✕</button></div>';}
 
-function feRowAlim(a){a=a||{};return '<div class="fe-row" style="display:grid;grid-template-columns:1.4fr 1fr .7fr .7fr .8fr .8fr auto;gap:6px;align-items:center;">'
+// A menetlevél-szerkesztő tankolás/vásárlás sorai a sofőr-oldali űrlappal
+// összhangban KÜLÖN „Data" (YYYY-MM-DD) mezőt kapnak — a statisztika
+// per-tétel dátumát ez adja (különben a menetlevél `eff_date`-jére esik
+// vissza). Új sornál alapérték a mai (helyi) dátum.
+function _feTodayLocalDate(){
+  var d = new Date();
+  var p = function(n){ return String(n).padStart(2,'0'); };
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+function _feNormItemDate(v){
+  return (typeof v === 'string' && v) ? v.slice(0,10) : _feTodayLocalDate();
+}
+
+function feRowAlim(a){a=a||{};var dt=_feNormItemDate(a.data);return '<div class="fe-row" style="display:grid;grid-template-columns:1.2fr 1fr 1fr .7fr .7fr .8fr .8fr auto;gap:6px;align-items:center;">'
   +'<input class="input fe-a-loc" data-sg="alim_loc" placeholder="Loc" value="'+feEsc(a.loc)+'">'
+  +'<input class="input fe-a-data" type="date" value="'+feEsc(dt)+'">'
   +'<input class="input fe-a-tip" data-sg="alim_tip" placeholder="Combustibil" value="'+feEsc(a.tip||'Motorină')+'">'
   +'<input class="input fe-a-lit" type="number" placeholder="L" value="'+feEsc(a.litru)+'">'
   +'<input class="input fe-a-km" type="number" placeholder="Km" value="'+feEsc(a.km)+'">'
@@ -2227,8 +2241,9 @@ function feRowAlim(a){a=a||{};return '<div class="fe-row" style="display:grid;gr
   +'<input class="input fe-a-suma" type="number" placeholder="Sumă" value="'+feEsc(a.suma)+'">'
   +'<button class="btn ghost" style="padding:4px 9px;" onclick="this.parentNode.remove()">✕</button></div>';}
 
-function feRowAch(c){c=c||{};return '<div class="fe-row" style="display:grid;grid-template-columns:1.4fr 1.4fr .8fr .8fr auto;gap:6px;align-items:center;">'
+function feRowAch(c){c=c||{};var dt=_feNormItemDate(c.data);return '<div class="fe-row" style="display:grid;grid-template-columns:1.2fr 1fr 1.4fr .8fr .8fr auto;gap:6px;align-items:center;">'
   +'<input class="input fe-c-loc" data-sg="ach_loc" placeholder="Loc" value="'+feEsc(c.loc)+'">'
+  +'<input class="input fe-c-data" type="date" value="'+feEsc(dt)+'">'
   +'<input class="input fe-c-prod" data-sg="ach_produs" placeholder="Produs" value="'+feEsc(c.produs)+'">'
   +'<input class="input fe-c-pret" type="number" placeholder="Preț" value="'+feEsc(c.pret)+'">'
   +'<input class="input fe-c-plata" data-sg="ach_plata" placeholder="Plată" value="'+feEsc(c.plata||'Card')+'">'
@@ -2534,8 +2549,8 @@ function _sgRenderFromMap(el, map){
 function saveFuvEdit(){
   var id=document.getElementById('feId').value;
   var puncte=[].map.call(document.querySelectorAll('#fePuncte .fe-row'),function(r){return {tip:r.querySelector('.fe-p-tip').value,loc:r.querySelector('.fe-p-loc').value,data:r.querySelector('.fe-p-data').value};});
-  var alimentari=[].map.call(document.querySelectorAll('#feAlim .fe-row'),function(r){return {loc:r.querySelector('.fe-a-loc').value,tip:r.querySelector('.fe-a-tip').value,litru:parseFloat(r.querySelector('.fe-a-lit').value)||0,km:parseFloat(r.querySelector('.fe-a-km').value)||0,plata:r.querySelector('.fe-a-plata').value,suma:parseFloat(r.querySelector('.fe-a-suma').value)||0};});
-  var achizitii=[].map.call(document.querySelectorAll('#feAch .fe-row'),function(r){return {loc:r.querySelector('.fe-c-loc').value,produs:r.querySelector('.fe-c-prod').value,pret:parseFloat(r.querySelector('.fe-c-pret').value)||0,plata:r.querySelector('.fe-c-plata').value};});
+  var alimentari=[].map.call(document.querySelectorAll('#feAlim .fe-row'),function(r){return {loc:r.querySelector('.fe-a-loc').value,data:((r.querySelector('.fe-a-data')||{}).value||''),tip:r.querySelector('.fe-a-tip').value,litru:parseFloat(r.querySelector('.fe-a-lit').value)||0,km:parseFloat(r.querySelector('.fe-a-km').value)||0,plata:r.querySelector('.fe-a-plata').value,suma:parseFloat(r.querySelector('.fe-a-suma').value)||0};});
+  var achizitii=[].map.call(document.querySelectorAll('#feAch .fe-row'),function(r){return {loc:r.querySelector('.fe-c-loc').value,data:((r.querySelector('.fe-c-data')||{}).value||''),produs:r.querySelector('.fe-c-prod').value,pret:parseFloat(r.querySelector('.fe-c-pret').value)||0,plata:r.querySelector('.fe-c-plata').value};});
   var payload={
     nume_sofer:document.getElementById('feNumeSofer').value,
     numar_fisa:document.getElementById('feNumarFisa').value,

@@ -177,6 +177,84 @@ describe('getMySoferStats — átívelő menetlevél SPLIT snapshot alapján', (
   });
 });
 
+describe('getMySoferStats — PER-TÉTEL DÁTUM az alimentari-nál', () => {
+  test('átívelő menetlevél: alimentari tétel-dátum szerint sorolódik (nem napok szerinti arány)', async () => {
+    setUser(SOFER);
+    mockChain({
+      ord: { lezart: 1, lezart_prev: 1, aktiv: 0 },
+      fuvs: [
+        // Átívelő jún. 28 → júl. 3. Két tankolás: 400 L jún. 29-én, 300 L júl. 2-án.
+        // Per-tétel dátum szerint jún = 400, júl = 300 (NEM 350-350 mint a napi arány).
+        { id: 1, numar_camion: 'B111', indulas_dt: '2026-06-28T08:00:00Z',
+          erkezes_dt: '2026-07-03T18:00:00Z', data_completare: '2026-07-03',
+          km_inceput: 99800, km_sfarsit: 100500, total_km: 700,
+          diurna_externa: 60, diurna_interna: 0,
+          alimentari: [
+            { litru: 400, data: '2026-06-29' },
+            { litru: 300, data: '2026-07-02' },
+          ] },
+      ],
+      snaps: [{ rendszam: 'B111', year: 2026, month: 6, mileage: 100000 }]
+    });
+    const res = await call('getMySoferStats', []);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.tankolt_l).toBe(300);       // per-tétel: júl. 2 (300)
+    expect(res.body.result.tankolt_l_prev).toBe(400);  // per-tétel: jún. 29 (400)
+    // A diurna továbbra is napok szerinti arányos, nem tétel-alapú:
+    expect(res.body.result.diurna_ext).toBe(30);
+    expect(res.body.result.diurna_ext_prev).toBe(30);
+  });
+
+  test('átívelő menetlevél: dátum nélküli tétel a napok szerint fallbackel', async () => {
+    setUser(SOFER);
+    mockChain({
+      ord: { lezart: 1, lezart_prev: 1, aktiv: 0 },
+      fuvs: [
+        // Átívelő 6 nap (3+3). Egy dátumozott + egy dátum nélküli tétel.
+        // Dátumozott 200 L a júliusi napon; dátum nélküli 600 L napok szerint arány (300-300).
+        { id: 1, numar_camion: 'B111', indulas_dt: '2026-06-28T08:00:00Z',
+          erkezes_dt: '2026-07-03T18:00:00Z', data_completare: '2026-07-03',
+          km_inceput: 99800, km_sfarsit: 100500, total_km: 700,
+          diurna_externa: 60, diurna_interna: 0,
+          alimentari: [
+            { litru: 200, data: '2026-07-01' },
+            { litru: 600 },   // dátum nélküli (régi menetlevél)
+          ] },
+      ],
+      snaps: []
+    });
+    const res = await call('getMySoferStats', []);
+    // júl = 200 (dátumozott) + 600 * 3/6 (fallback) = 500
+    // jún = 0 (dátumozott) + 600 * 3/6 (fallback) = 300
+    expect(res.body.result.tankolt_l).toBe(500);
+    expect(res.body.result.tankolt_l_prev).toBe(300);
+  });
+
+  test('nem-átívelő menetlevél: dátumozott tétel átkerülhet MÁS hónapba', async () => {
+    setUser(SOFER);
+    mockChain({
+      ord: { lezart: 1, lezart_prev: 0, aktiv: 0 },
+      fuvs: [
+        // Júliusi menetlevél (nem átívelő), de egy tétel jún. 30-i dátummal.
+        // Az admin/sofőr utólag beírta a júniusi tankolást — a per-tétel dátum
+        // szerint a JÚNIUSI kosárba kerül, NEM a júliusiba.
+        { id: 1, numar_camion: 'B111', indulas_dt: '2026-07-05T08:00:00Z',
+          erkezes_dt: '2026-07-06T18:00:00Z', data_completare: '2026-07-06',
+          km_inceput: 100000, km_sfarsit: 100500, total_km: 500,
+          diurna_externa: 40, diurna_interna: 0,
+          alimentari: [
+            { litru: 150, data: '2026-07-05' },  // júl.
+            { litru: 100, data: '2026-06-30' },  // jún. (utólag beírt)
+          ] },
+      ],
+      snaps: []
+    });
+    const res = await call('getMySoferStats', []);
+    expect(res.body.result.tankolt_l).toBe(150);
+    expect(res.body.result.tankolt_l_prev).toBe(100);
+  });
+});
+
 describe('getMySoferStats — külön „teljes hó" (GPS) + „leadott" (menetlevél)', () => {
   test('Peto-eset: nincs júniusi menetlevél, DE két snapshot → km_prev_gps a teljes, km_prev = 0', async () => {
     setUser({ ...SOFER, email: 'peto@example.com' });

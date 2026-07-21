@@ -2340,7 +2340,7 @@
     'sof.localityAddr': { hu: 'Helység / Cím', ro: 'Localitate / Adresă' },
     'sof.punctLocPh': { hu: 'pl. Budapest, Keleti pu.', ro: 'ex. Arad, Vama Nădlac' },
     'sof.locDate': { hu: 'Helyszín & Dátum', ro: 'Locație & Dată' },
-    'sof.alimLocPh': { hu: 'pl. Győr, 2025-01-15', ro: 'ex. Arad, 2025-01-15' },
+    'sof.alimLocPh': { hu: 'pl. Győr', ro: 'ex. Arad' },
     'sof.fuelType': { hu: 'Üzemanyag típusa', ro: 'Tip combustibil' },
     'sof.liters': { hu: 'Liter', ro: 'Litri' },
     'sof.km': { hu: 'Km', ro: 'Km' },
