@@ -788,6 +788,16 @@
     'chat.pickUser': { hu: 'Felhasználó kiválasztása', ro: 'Selectare utilizator' },
     'chat.start': { hu: 'Chat indítása', ro: 'Începe conversația' },
 
+    // ── Ideiglenes WhatsApp-alapú chat (admin/manager pane) ──
+    'wa.settingsTitle': { hu: 'Cég WhatsApp száma', ro: 'Număr WhatsApp companie' },
+    'wa.settingsHint':  { hu: 'A sofőrök a „Chat" gombra koppintva erre a számra jutnak WhatsApp-on.', ro: 'Șoferii tăi apasă pe „Chat" și se deschide WhatsApp la acest număr.' },
+    'wa.phoneLabel':    { hu: 'Telefonszám (nemzetközi formátumban)', ro: 'Număr (format internațional)' },
+    'wa.clear':         { hu: 'Törlés', ro: 'Șterge' },
+    'wa.driversTitle':  { hu: 'Sofőrök — WhatsApp-nyitás', ro: 'Șoferi — deschide WhatsApp' },
+    'wa.driversHint':   { hu: 'Koppints egy sofőrre, hogy megnyíljon a WhatsApp az ő számára.', ro: 'Apasă pe un șofer pentru a deschide WhatsApp la numărul lui.' },
+    'wa.noDrivers':     { hu: 'Egyetlen sofőr sincs rögzítve.', ro: 'Niciun șofer înregistrat.' },
+    'wa.noPhone':       { hu: 'nincs telefon', ro: 'fără telefon' },
+
     // ── console-shared.js beágyazott feliratok ──
     // Útvonal-előnézet modal
     'cs.rm.title': { hu: '🗺️ Útvonal-előnézet', ro: '🗺️ Previzualizare rută' },
@@ -2370,6 +2380,12 @@
     'sof.chatNoConfig': { hu: '⚠️ Chat konfiguráció hiányzik.', ro: '⚠️ Configurația de chat lipsește.' },
     'sof.chatUnavailable': { hu: '⚠️ Chat nem elérhető.', ro: '⚠️ Chat indisponibil.' },
     'sof.noManager': { hu: 'Nincs elérhető manager.', ro: 'Niciun manager disponibil.' },
+    // ── Ideiglenes WhatsApp-átirányítás (sofőr) ──
+    'sof.waRedirectTitle': { hu: 'Chat WhatsAppon', ro: 'Chat prin WhatsApp' },
+    'sof.waRedirectHint':  { hu: 'A chat WhatsApp-on nyílik meg a cég számára.', ro: 'Chatul se deschide în WhatsApp la numărul companiei.' },
+    'sof.waOpen':          { hu: '📱 WhatsApp megnyitása', ro: '📱 Deschide WhatsApp' },
+    'sof.waNotConfigured': { hu: 'A manager még nem állított be WhatsApp-számot.', ro: 'Managerul nu a setat încă un număr WhatsApp.' },
+    'sof.waError':         { hu: 'Nem sikerült a WhatsApp megnyitása.', ro: 'Nu s-a putut deschide WhatsApp.' },
     'sof.driver': { hu: 'Sofőr', ro: 'Șofer' },
     'sof.sending': { hu: 'Küldés...', ro: 'Se trimite...' },
     'sof.errOccurred': { hu: 'Hiba történt', ro: 'A apărut o eroare' },

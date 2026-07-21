@@ -52,6 +52,7 @@ function loadTab(name){
   if(name==='email-templates' && window.EmailTemplates) EmailTemplates.mount('emailTemplatesBox');
   if(name==='orders-done'){ if(typeof loadOrdersDone==='function') loadOrdersDone(); }
   if(name==='active-fleet'){ if(typeof loadActiveFleet==='function') loadActiveFleet(); }
+  if(name==='chat'){ if(typeof loadWhatsappChatPane==='function') loadWhatsappChatPane(); }
   if(name==='signature') initAdminSigCanvas();
   if(name==='settings') loadSettingsPane();
   if(name==='company-settings' && window.CompanySettings) CompanySettings.mount('companySettingsBox');
@@ -160,7 +161,9 @@ gas('authMe').then(u=>{
   if(!u||u.pozicio!=='Admin'){window.location.href='/login';return;}
   document.getElementById('meBadge').textContent=u.nume;
   myEmail=u.email;
-  initFirebaseChatPanel(u);
+  // Chat ideiglenesen: WhatsApp-átirányítás — Firebase-panel kikapcsolva.
+  // A régi initFirebaseChatPanel a console-shared.js-ben érintetlen; a
+  // chat fülön a loadTab betölti a WhatsApp UI-t (loadWhatsappChatPane).
   // Push ertesitesek inicializalasa
   if(window.VS_PUSH) VS_PUSH.init(u.email, u.pozicio);
   var savedTab='';

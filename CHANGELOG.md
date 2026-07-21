@@ -14,6 +14,29 @@
 
 ---
 
+## 2026-07-18 — Ideiglenes WhatsApp-alapú chat: sofőr → cég WhatsApp, manager → sofőr WhatsApp
+
+A belső Firebase-alapú chat átmenetileg **WhatsApp-átirányításra** vált. A cél,
+hogy a sofőrök egy kattintással a manager/admin által beállított cég
+WhatsApp-számára jussanak (natív app vagy WhatsApp Web nyílik), a manager/admin
+oldalon pedig a chat fül a sofőrjeit listázza, kattintásra pedig az adott
+sofőr saját `users.tel` számára nyitja a WhatsApp-ot. A régi Firebase-chat
+kód érintetlen — csak nincs meghívva, így könnyen visszaállítható.
+
+- **Migráció** `db/company-whatsapp-chat.sql` (idempotens): `companies.whatsapp_number VARCHAR(30)` — a manager/admin által beállított WhatsApp-szám. NEM módosítjuk a meglévő `companies.telefon` mezőt (az a cég kapcsolattartó telefonja, más lehet, mint a sofőrökkel operatív számra).
+- **`handlers/whatsappChat.js`** (ÚJ, regisztrálva a `routes/execute.js`-ben) 3 RPC:
+  - `getCompanyWhatsapp` — Admin/Manager/Sofer, olvasás; `company_id`-szűrt; normalizált (csak számjegyek) számot ad vissza vagy `null`-t.
+  - `saveCompanyWhatsapp` — Admin/Manager, írás; E.164 normalizálás (7–15 számjegy), üres → törlés (NULL), audit (`company.whatsapp_save`).
+  - `listDriversForWhatsapp` — Admin/Manager, csak SAJÁT cég belső sofőrjei (`pozicio='Sofer' AND COALESCE(blocked,false)=false`); a válasz `tel_normalized` mezője a WhatsApp-nyitóhoz.
+  - Belső segéd `_normalizePhone` **nem-enumerable exportként** — a `routes/execute.js` `Object.assign` registry-je NEM veszi föl, `/api/execute`-en át NEM hívható (regressziós teszttel is fedve).
+- **Sofőr oldal** (`public/sofer.html` + `sofer.js`): a chat nav-kártya `onclick`-je `openWhatsAppFromChatCard()` — a szerverről kéri a cég számát és a `wa.me/<szám>`-ra ugrik (mobilon natív app, weben WhatsApp Web). Ha nincs beállítva: barátságos jelzés + a `sec-chat` pane belül is látszik a hint. A régi `initFirebaseChat` HÍVÁS eltávolítva (a függvény érintetlen).
+- **Admin/Manager oldal** (`public/console-shared.js` + `admin.js`/`manager.js`): a `chatPane` div-be dinamikusan injektálódik két kártya — (1) „Cég WhatsApp száma" kártya (mentés/törlés Admin/Managernek), (2) sofőr-lista (avatar + név + telefon; kattintva `wa.me/<sofer_tel>` új tabon). Az `initFirebaseChatPanel` HÍVÁS mindkét szerep-JS-ben eltávolítva (a függvény érintetlen); a `loadTab('chat')` hívja az új közös `loadWhatsappChatPane()`-t.
+- **i18n** (`public/i18n.js`, RO-alap + HU): új `sof.wa*` kulcsok (átirányítás-cím/hint/gomb/hibaüzenetek) + `wa.*` kulcsok (kártya-címek, telefonmező-címke, „nincs sofőr"/„nincs telefon" jelzések).
+- **Teszt** `tests/integration/whatsapp-chat.test.js` (16 új eset): `_normalizePhone` határesetek (7/15 jegy, +/szóköz/kötőjel eltűnik, túl rövid/hosszú → null); szerep-kapu (Sofer NEM írhat/nem listázhat, bejelentkezés nélkül 401); `company_id` szűrés a SELECT/UPDATE-ben; érvénytelen tárolt szám → `null` a válaszban; üres bejövő szám → törlés (NULL írás); registry-védelem (`_normalizePhone` nem hívható `/api/execute`-en át — „Functie necunoscuta"). **644 Jest zöld** (628 → 644).
+- **Cache-bust:** `admin.html`/`manager.html` `?v=20260718wa`, `sofer.html` `?v=20260718wa`.
+
+---
+
 ## 2026-07-18 — Fuvarkezelés: Törölt fuvarok almenü + mező-autocomplete + auto-szakasz eltávolítva
 
 Három admin/manager UX-javítás egy körben a fuvar-modulhoz.

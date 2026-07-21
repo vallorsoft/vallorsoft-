@@ -5242,3 +5242,108 @@ function vehEditKindChange(){
     hei.value=kind==='mega'?TRAILER_DEFAULTS.heiMega:TRAILER_DEFAULTS.heiStd;
   }
 }
+
+/* ============================================================
+ * IDEIGLENES: WhatsApp-alapú chat (Admin/Manager pane)
+ * ------------------------------------------------------------
+ * A `chatPane` div-be beleinjektál egy egyszerű UI-t:
+ *   - felül kártya: a cég WhatsApp-száma (mentés Admin/Managernek)
+ *   - alatta sofőr-lista; kattintva wa.me/<sofer_tel> nyílik
+ * A régi Firebase-chat markupot és kódot nem törli — a `initFirebaseChatPanel`
+ * innentől nincs meghívva sehol; könnyen visszakapcsolható.
+ * ========================================================== */
+function loadWhatsappChatPane(){
+  var pane=document.getElementById('chatPane');
+  if(!pane) return;
+  pane.innerHTML=
+    '<div style="max-width:820px;margin:0 auto;padding:16px;">'
+      +'<div class="glass" style="padding:18px;margin-bottom:16px;">'
+        +'<h3 class="h-title" style="margin-top:0;" data-i18n="wa.settingsTitle">Număr WhatsApp companie</h3>'
+        +'<div style="font-size:12px;color:var(--muted);margin-bottom:10px;" data-i18n="wa.settingsHint">Șoferii tăi apasă pe „Chat" și se deschide WhatsApp la acest număr.</div>'
+        +'<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">'
+          +'<div style="flex:1;min-width:220px;">'
+            +'<label style="display:block;font-size:12px;color:var(--muted);margin-bottom:4px;" data-i18n="wa.phoneLabel">Număr (format internațional)</label>'
+            +'<input id="waCompanyPhone" class="input" type="tel" placeholder="+40712345678" style="width:100%;">'
+          +'</div>'
+          +'<button class="btn primary" onclick="saveCompanyWhatsappNumber()" data-i18n="common.save">Salvează</button>'
+          +'<button class="btn ghost" onclick="clearCompanyWhatsappNumber()" data-i18n="wa.clear">Șterge</button>'
+        +'</div>'
+        +'<div id="waSaveHint" style="font-size:12px;color:var(--muted);margin-top:8px;"></div>'
+      +'</div>'
+      +'<div class="glass" style="padding:18px;">'
+        +'<h3 class="h-title" style="margin-top:0;" data-i18n="wa.driversTitle">Șoferi — deschide WhatsApp</h3>'
+        +'<div style="font-size:12px;color:var(--muted);margin-bottom:10px;" data-i18n="wa.driversHint">Apasă pe un șofer pentru a deschide WhatsApp la numărul lui.</div>'
+        +'<div id="waDriverList"><div style="padding:12px;color:var(--muted);font-size:13px;">'+t('common.loading')+'</div></div>'
+      +'</div>'
+    +'</div>';
+  try{ if(window.I18N && I18N.apply) I18N.apply(pane); }catch(e){}
+  _waLoadSettings();
+  _waLoadDrivers();
+}
+
+function _waLoadSettings(){
+  gas('getCompanyWhatsapp').then(function(r){
+    if(!r || !r.ok) return;
+    var input=document.getElementById('waCompanyPhone');
+    if(input && r.number) input.value='+'+r.number;
+  }).catch(function(){});
+}
+
+function _waLoadDrivers(){
+  var box=document.getElementById('waDriverList');
+  gas('listDriversForWhatsapp').then(function(r){
+    if(!box) return;
+    if(!r || !r.ok){ box.innerHTML='<div style="padding:12px;color:var(--muted);font-size:13px;">'+esc((r&&r.err)||t('common.error'))+'</div>'; return; }
+    var list=r.drivers||[];
+    if(!list.length){ box.innerHTML='<div style="padding:12px;color:var(--muted);font-size:13px;" data-i18n="wa.noDrivers">Niciun șofer înregistrat.</div>'; try{if(window.I18N && I18N.apply) I18N.apply(box);}catch(e){} return; }
+    box.innerHTML=list.map(function(u,i){
+      var av=vsAvatar(u.nume||u.email||'?');
+      var hasTel=!!u.tel_normalized;
+      var telShown=u.tel?esc(u.tel):('— '+t('wa.noPhone')+' —');
+      var right = hasTel
+        ? '<button class="btn primary" style="padding:6px 12px;font-size:12px;" onclick="_waOpen('+i+')">📱 WhatsApp</button>'
+        : '<span style="font-size:11px;color:var(--muted);" data-i18n="wa.noPhone">fără telefon</span>';
+      return '<div style="display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid var(--border);">'
+        +'<div>'+av+'</div>'
+        +'<div style="flex:1;min-width:0;">'
+          +'<div style="font-weight:600;">'+esc(u.nume||u.email)+'</div>'
+          +'<div style="font-size:12px;color:var(--muted);">'+telShown+'</div>'
+        +'</div>'
+        +right
+      +'</div>';
+    }).join('');
+    window._waDriversCache = list;
+    try{if(window.I18N && I18N.apply) I18N.apply(box);}catch(e){}
+  }).catch(function(){
+    if(box) box.innerHTML='<div style="padding:12px;color:var(--muted);font-size:13px;">'+esc(t('common.error'))+'</div>';
+  });
+}
+
+function _waOpen(idx){
+  var list=window._waDriversCache||[];
+  var u=list[idx];
+  if(!u || !u.tel_normalized){ toast(t('wa.noPhone'),'warn'); return; }
+  window.open('https://wa.me/'+encodeURIComponent(u.tel_normalized), '_blank', 'noopener');
+}
+
+function saveCompanyWhatsappNumber(){
+  var input=document.getElementById('waCompanyPhone');
+  var num=input? input.value.trim() : '';
+  gas('saveCompanyWhatsapp',[{ number: num }]).then(function(r){
+    var hint=document.getElementById('waSaveHint');
+    if(r && r.ok){
+      if(input) input.value = r.number ? ('+'+r.number) : '';
+      if(hint) hint.textContent = t('common.savedOk');
+      toast(t('common.savedOk'),'ok');
+    } else {
+      if(hint) hint.textContent = (r&&r.err)||t('common.error');
+      toast((r&&r.err)||t('common.error'),'err');
+    }
+  }).catch(function(){ toast(t('common.error'),'err'); });
+}
+
+function clearCompanyWhatsappNumber(){
+  var input=document.getElementById('waCompanyPhone');
+  if(input) input.value='';
+  saveCompanyWhatsappNumber();
+}
