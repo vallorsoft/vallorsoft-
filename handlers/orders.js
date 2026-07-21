@@ -222,10 +222,12 @@ handlers.getMySoferOrders = async function (req, res, args) {
     try {
       if (!req.session.user) return res.json({ result: [] });
       const me = req.session.user;
-      // finalized_at: a Finalizat időbélyege (3-napos dashboard-kiöregítés).
+      // finalized_at: a Finalizat időbélyege (menetlevél-picker kiöregítéséhez).
       // waybill_at: a legkorábbi mentett menetlevél dátuma, amin szerepel a fuvar
       //   (a fuvarlevelek.order_ids JSONB tömb tartalmazza-e a fuvar id-jét).
-      // dash_visible: aktív (Alocat/In Curs) VAGY Finalizat a teljesítéstől max 3 napig.
+      // dash_visible: CSAK aktív fuvar (Alocat/In Curs/Parkolt/Raktarban) — a
+      //   Finalizat fuvar a főoldalról kiesik és kizárólag a menetlevél-picker-ben
+      //   marad (felhasználói kérés: elvégzett fuvar csak a menetlevélbe legyen látható).
       //   Parkolt/Raktarban is látszik, ha a fuvar még a sofőrhöz van rendelve
       //   (email_sofer) — különben „némán" eltűnne a kezéből (csak olvasható).
       // waybill_visible: minden kiosztott fuvar, DE a mentett menetlevél után csak 3 napig.
@@ -238,15 +240,10 @@ handlers.getMySoferOrders = async function (req, res, args) {
                 o.handover_status, o.handover_type, o.handover_loc,
                 o.finalized_at,
                 wb.waybill_at, wb.waybill_last, COALESCE(wb.waybill_count, 0) AS waybill_count,
-                -- dash_visible: aktív → mindig; Finalizat + MÉG NINCS menetlevél → SOSEM tűnik el
-                -- (amíg nem készült menetlevél); Finalizat + 2× menetlevél → 15 perc; 1× → 3 nap
+                -- dash_visible: CSAK aktív fuvar — Finalizat SOHA nem látszik
+                -- a főoldalon (a menetlevél-picker-ben viszont igen, waybill_visible)
                 CASE
                   WHEN o.status IN ('Alocat', 'In Curs', 'Parkolt', 'Raktarban') THEN true
-                  WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) = 0 THEN true
-                  WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) >= 2
-                    THEN wb.waybill_last >= NOW() - INTERVAL '15 minutes'
-                  WHEN o.status = 'Finalizat'
-                    THEN COALESCE(o.finalized_at, o.updated_at) >= NOW() - INTERVAL '3 days'
                   ELSE false
                 END AS dash_visible,
                 -- waybill_visible (menetlevél picker): mint dash_visible — amíg NINCS

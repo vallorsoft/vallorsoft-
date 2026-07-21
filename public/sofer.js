@@ -870,14 +870,17 @@ function uploadDoc() {
   fr.readAsDataURL(file);
 }
 
-// A fuvar-választó feltöltése a sofőr saját (aktív + friss) fuvarjaival
+// A fuvar-választó feltöltése a sofőr saját (aktív + friss) fuvarjaival.
+// A dokumentum-feltöltésnél a nemrég lezárt fuvart is felkínáljuk (POD/CMR
+// fotó utólagos csatolása), ezért waybill_visible-t használunk — nem dash_visible-t.
+// (A főoldal dash_visible-je szigorúbb: Finalizat sosem látszik.)
 function loadDocOrderOptions() {
   var sel = document.getElementById('docOrderSel');
   if (!sel) return;
   fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ functionName: 'getMySoferOrders' }) })
   .then(function(r) { return r.json(); }).then(function(d) {
-    var list = (d.result || []).filter(function(o) { return o.dash_visible !== false; });
+    var list = (d.result || []).filter(function(o) { return o.waybill_visible !== false; });
     sel.innerHTML = '<option value="">' + t('sofer.docNoOrder') + '</option>'
       + list.map(function(o) {
           return '<option value="' + o.id + '">' + o.id + ' — '
@@ -1469,7 +1472,11 @@ function soferCopy(id, kind) {
 
 // Egy kiosztott fuvar kártyája — új .fuvar-card kinézet + MEGŐRZÖTT akciógombok.
 // Alocat → Elfogadom, In Curs → Elvégeztem, Finalizat → nincs státuszváltó (csak UIT).
-function renderFuvarCard(o) {
+// `idx` (1-alapú): a sofőr által látott sorszám a jelenlegi aktív fuvarok
+// között — összecsukott fejlécben #-badge-ként jelenik meg. Ha az aktív
+// fuvarok elfogynak, a következő kiosztás újra 1-től indul (a lezárt fuvar
+// dash_visible=false, nem számít bele).
+function renderFuvarCard(o, idx) {
   var isAlocat = o.status === 'Alocat';
   var isCurs   = o.status === 'In Curs';
   var isFinal  = o.status === 'Finalizat';
@@ -1568,14 +1575,23 @@ function renderFuvarCard(o) {
         hoBtn +
       '</div>' +
     '</div>';
-  // Összecsukott állapot: CSAK a fel-/lerakó cím + nyíl; kattintásra kinyílik
-  // (megnő a kártya) a többi infóval, a fejlécre újra kattintva összecsukható.
+  // Összecsukott állapot: #-badge (sorszám) + felrakás dátuma + felrakási hely
+  // + nyíl. Kattintásra kinyílik (megnő a kártya) a többi infóval, a fejlécre
+  // újra kattintva összecsukható. A lerakó/további részlet a `details`-ben van.
+  var num = (typeof idx === 'number' && idx > 0) ? idx : null;
+  var loadDay = fmtFuvarDay(o.data_incarcare);
+  var headBits = [];
+  if (loadDay) headBits.push('📅 ' + esc(loadDay));
+  headBits.push('📍 ' + esc(o.loc_incarcare || '—'));
   return '' +
     '<div class="fuvar-card">' +
       '<div class="fuvar-head" role="button" tabindex="0" onclick="toggleFuvarDetails(\'' + o.id + '\')" ' +
            'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleFuvarDetails(\'' + o.id + '\');}">' +
-        '<div class="fuvar-destination">📍 ' + esc(o.loc_incarcare||'—') + ' → ' + esc(o.loc_descarcare||'—') +
-          '<span class="fuvar-expand" id="exp_' + o.id + '">▾</span></div>' +
+        '<div class="fuvar-destination">' +
+          (num ? '<span class="fuvar-num">#' + num + '</span>' : '') +
+          '<span class="fuvar-headtxt">' + headBits.join(' · ') + '</span>' +
+          '<span class="fuvar-expand" id="exp_' + o.id + '">▾</span>' +
+        '</div>' +
       '</div>' +
       details +
     '</div>';
@@ -1647,19 +1663,26 @@ function loadDashOrders() {
     var list = d.result || [];
     var el = document.getElementById('kiosztottList');
     if (!el) return;
-    // Dashboard: aktív (Alocat/In Curs) + Finalizat a teljesítéstől 3 napig (szerver számolja).
-    // Defenzív: ha a dash_visible mező hiányzik (régi, újra nem indított szerver),
-    // visszaesünk a státusz-alapú szűrésre — így a fuvarok nem tűnnek el.
+    // Dashboard: CSAK aktív (Alocat/In Curs/Parkolt/Raktarban) — a Finalizat
+    // már a menetlevél-picker-be tartozik. Defenzív: ha a dash_visible mező
+    // hiányzik (régi, újra nem indított szerver), visszaesünk a státusz-alapú
+    // szűrésre — így a fuvarok nem tűnnek el.
     var active = list.filter(function(o){
       if (typeof o.dash_visible === 'boolean') return o.dash_visible;
-      return o.status === 'Alocat' || o.status === 'In Curs';
+      return o.status === 'Alocat' || o.status === 'In Curs' ||
+             o.status === 'Parkolt' || o.status === 'Raktarban';
     });
+    // A szerver `created_at DESC` sorrendben ad — a főoldali sorszámhoz
+    // (legrégebbi = #1) megfordítjuk. Így új kiosztás nem üti át a meglévők
+    // sorszámát: a régiek maradnak, az újak a végére kerülnek (magasabb #).
+    // A lezárt fuvar kiesik → a következő kiosztás újra 1-től számoz.
+    active.reverse();
     updateScrollBehavior(active);
     if (!active.length) {
       el.innerHTML = '<div class="kiosztott-empty">' + t('sof.noActiveOrders') + '</div>';
       return;
     }
-    el.innerHTML = active.map(renderFuvarCard).join('');
+    el.innerHTML = active.map(function(o, i){ return renderFuvarCard(o, i + 1); }).join('');
   });
 }
 
