@@ -880,9 +880,12 @@ handlers.getClientStats = async function (req, res, args) {
 //     használatával — jún. km = snapshot − km_inceput; júl. km = km_sfarsit
 //     − snapshot. Ha nincs snapshot az adott járműre, arányosan a napok
 //     alapján (ugyanaz mint a diurnánál).
-//   • DIURNA + TANKOLT LITER: napok szerinti arányos bontás (a diurna
-//     intrinsic per-napi fogalom; az alimentari sajnos nem tárol per-tétel
-//     dátumot, ezért ez a legjobb becslés). A napok az indulas_dt és
+//   • DIURNA: napok szerinti arányos bontás (a diurna intrinsic per-napi
+//     fogalom, per-tétel dátuma nincs).
+//   • TANKOLT LITER: mostantól PER-TÉTEL DÁTUM szerint (a sofőr minden
+//     tankoláshoz külön dátumot ad, `alimentari[].data`). Ha egy tételen
+//     nincs dátum (régi menetlevél), fallback = napok szerinti arány.
+//     A napok az indulas_dt és
 //     erkezes_dt naptári napjai közt oszlanak — a hónap-váltás napja
 //     ahhoz a hónaphoz tartozik, amelyben 12:00-kor a sofőr van (a menet-
 //     levél Europe/Bucharest 24 órás naptári napjai szerint egyszerűsítve:
@@ -1810,6 +1813,270 @@ handlers.getSlaStats = async function (req, res, args) {
     }});
   } catch (err) {
     console.error('getSlaStats hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Jármű állásidő (üres napok fuvarok közt) — Járművek fül ──
+// Rendszámonként: hány nap volt üres átlagosan két egymást követő fuvar közt
+// (előző Finalizat.finalized_at → következő aktív fuvar.data_incarcare, csak
+// pozitív különbségek). Az időszak-szűrő a KÖVETKEZŐ fuvar `created_at`-jére
+// szűr. Ablak-függvény (LAG) → tenant-szűrt. `_isAdminOrManager` kapu.
+handlers.getVehicleIdleStats = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const { from, to } = _range(args);
+
+    const r = await pool.query(
+      `WITH ord AS (
+         SELECT UPPER(rendszam_camion) AS rendszam,
+                COALESCE(finalized_at::date, data_descarcare) AS finished_on,
+                data_incarcare AS started_on, created_at
+         FROM orders
+         WHERE company_id = $1
+           AND rendszam_camion IS NOT NULL AND rendszam_camion <> ''
+           AND status IN ('Finalizat','Alocat','In Curs','Extern')
+       ),
+       diffs AS (
+         SELECT rendszam,
+                started_on - LAG(finished_on) OVER (PARTITION BY rendszam ORDER BY started_on) AS gap_days,
+                created_at
+         FROM ord
+         WHERE started_on IS NOT NULL
+       )
+       SELECT rendszam,
+              COUNT(*) FILTER (WHERE gap_days >= 0 AND created_at >= $2 AND created_at < $3)::int AS gap_db,
+              COALESCE(AVG(gap_days) FILTER (WHERE gap_days >= 0 AND created_at >= $2 AND created_at < $3),0)::numeric AS atlag_nap,
+              COALESCE(SUM(GREATEST(gap_days,0)) FILTER (WHERE created_at >= $2 AND created_at < $3),0)::int AS ossz_ures_nap,
+              COALESCE(MAX(gap_days) FILTER (WHERE created_at >= $2 AND created_at < $3),0)::int AS max_ures_nap
+       FROM diffs
+       GROUP BY rendszam
+       HAVING COUNT(*) FILTER (WHERE gap_days >= 0 AND created_at >= $2 AND created_at < $3) > 0
+       ORDER BY atlag_nap DESC NULLS LAST`,
+      [cid, from, to]
+    );
+    return res.json({ result: { ok: true, jarmuvek: r.rows } });
+  } catch (err) {
+    console.error('getVehicleIdleStats hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Szerviz-előrejelzés — Járművek fül ───────────────────────
+// A vehicle_service_log utolsó (next_due_km / next_due_date) tétele + a jármű
+// átlagos havi km-je (menetlevél-alap, utolsó 90 nap) alapján hány hét múlva
+// esedékes a következő szerviz. Ha nincs havi átlag → NULL (kliens „—").
+handlers.getServiceForecast = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+
+    // Utolsó szerviz-tétel járművenként (next_due_km, next_due_date, utolsó km)
+    const svcR = await pool.query(
+      `SELECT DISTINCT ON (vehicle_id)
+              vehicle_id, service_date, km AS utolso_szerviz_km,
+              next_due_km, next_due_date
+       FROM vehicle_service_log
+       WHERE company_id = $1
+       ORDER BY vehicle_id, service_date DESC, id DESC`,
+      [cid]
+    );
+
+    // Havi átlag km rendszámonként az utolsó 90 nap menetleveleiből
+    const kmR = await pool.query(
+      `SELECT UPPER(f.numar_camion) AS rendszam,
+              COALESCE(SUM(f.total_km),0)::numeric AS km_90,
+              COUNT(*)::int AS wb_db
+       ${FUV_FROM}
+       WHERE f.eff_date >= NOW() - INTERVAL '90 days'
+         AND COALESCE(f.numar_camion,'') <> ''
+       GROUP BY UPPER(f.numar_camion)`,
+      [cid]
+    );
+    const kmMap = new Map();
+    kmR.rows.forEach((r) => kmMap.set(r.rendszam, parseFloat(r.km_90) || 0));
+
+    // Jármű-törzs (vontatók) + legutóbbi GPS km-óra ha van
+    const vehR = await pool.query(
+      `SELECT id, UPPER(rendszam) AS rendszam, rendszam AS rendszam_eredeti, marca, model, an
+       FROM vehicles WHERE company_id=$1 AND tip='Vontato' ORDER BY rendszam`,
+      [cid]
+    );
+    let gpsMap = new Map();
+    try {
+      const gR = await pool.query(
+        `SELECT DISTINCT ON (rendszam) UPPER(rendszam) AS rendszam, mileage
+         FROM gps_month_end_snapshots
+         WHERE company_id = $1
+         ORDER BY rendszam, year DESC, month DESC`,
+        [cid]
+      );
+      gR.rows.forEach((r) => gpsMap.set(r.rendszam, parseFloat(r.mileage) || 0));
+    } catch (_) { /* migráció előtt */ }
+
+    const svcMap = new Map();
+    svcR.rows.forEach((s) => svcMap.set(s.vehicle_id, s));
+
+    const out = vehR.rows.map((v) => {
+      const svc = svcMap.get(v.id) || null;
+      const km30 = (kmMap.get(v.rendszam) || 0) / 3;  // havi átlag (90/3)
+      const currentKm = gpsMap.get(v.rendszam) || (svc ? Number(svc.utolso_szerviz_km) || null : null);
+      let hetek_km = null, hetek_datum = null;
+      if (svc && svc.next_due_km && currentKm != null && km30 > 0) {
+        const hatra = Number(svc.next_due_km) - Number(currentKm);
+        // havi km → heti (átlag ~4.33 hét/hó)
+        hetek_km = Math.round((hatra / km30) * 4.33 * 10) / 10;
+      }
+      if (svc && svc.next_due_date) {
+        const now = new Date();
+        const due = new Date(svc.next_due_date);
+        hetek_datum = Math.round(((due - now) / (86400000 * 7)) * 10) / 10;
+      }
+      // A ténylegesen figyelembe vett esedékesség: a hamarabb bekövetkező
+      const kandidatok = [hetek_km, hetek_datum].filter((x) => x != null && isFinite(x));
+      const soonest = kandidatok.length ? Math.min.apply(null, kandidatok) : null;
+      return {
+        vehicle_id: v.id, rendszam: v.rendszam_eredeti, marca: v.marca, model: v.model, an: v.an,
+        aktualis_km: currentKm, havi_atlag_km: Math.round(km30),
+        next_due_km: svc ? svc.next_due_km : null,
+        next_due_date: svc ? svc.next_due_date : null,
+        hetek_km, hetek_datum, hetek_soonest: soonest,
+        // Sürgősség — kliens színez
+        surgos: (soonest != null && soonest <= 2), figyelmezteto: (soonest != null && soonest > 2 && soonest <= 6)
+      };
+    })
+    // Rendezés: sürgős / figyelmeztető elöl, aztán a legrövidebb hátralévő
+    .sort((a, b) => {
+      const av = a.hetek_soonest, bv = b.hetek_soonest;
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return av - bv;
+    });
+
+    return res.json({ result: { ok: true, jarmuvek: out } });
+  } catch (err) {
+    console.error('getServiceForecast hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Fuvar-státusz funnel + átlagos idő — SLA fül ────────────
+// A 4 új milestone-időbélyeg (sosit_incarcare_at → incarcat_at →
+// sosit_descarcare_at → descarcat_at) alapján az átlagos idő a lépések közt
+// (percben, majd órára/napra kliens számol). Csak azok a fuvarok számítanak,
+// ahol az adott PÁR mindkét oldala ki van töltve. Az időszak-szűrő a fuvar
+// created_at-jére.
+handlers.getOrderFunnel = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const { from, to } = _range(args);
+    const P = [cid, from, to];
+
+    const r = await pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE sosit_incarcare_at IS NOT NULL AND created_at IS NOT NULL)::int AS ossz_alocat_ig,
+         AVG(EXTRACT(EPOCH FROM (sosit_incarcare_at - created_at))/60) FILTER (WHERE sosit_incarcare_at IS NOT NULL AND created_at IS NOT NULL) AS avg_min_alocat_ig,
+         COUNT(*) FILTER (WHERE sosit_incarcare_at IS NOT NULL AND incarcat_at IS NOT NULL)::int AS ossz_felrako_felrakas,
+         AVG(EXTRACT(EPOCH FROM (incarcat_at - sosit_incarcare_at))/60) FILTER (WHERE sosit_incarcare_at IS NOT NULL AND incarcat_at IS NOT NULL) AS avg_min_felrako_felrakas,
+         COUNT(*) FILTER (WHERE incarcat_at IS NOT NULL AND sosit_descarcare_at IS NOT NULL)::int AS ossz_felrakas_lerako,
+         AVG(EXTRACT(EPOCH FROM (sosit_descarcare_at - incarcat_at))/60) FILTER (WHERE incarcat_at IS NOT NULL AND sosit_descarcare_at IS NOT NULL) AS avg_min_felrakas_lerako,
+         COUNT(*) FILTER (WHERE sosit_descarcare_at IS NOT NULL AND descarcat_at IS NOT NULL)::int AS ossz_lerako_lerakas,
+         AVG(EXTRACT(EPOCH FROM (descarcat_at - sosit_descarcare_at))/60) FILTER (WHERE sosit_descarcare_at IS NOT NULL AND descarcat_at IS NOT NULL) AS avg_min_lerako_lerakas,
+         COUNT(*) FILTER (WHERE created_at IS NOT NULL AND descarcat_at IS NOT NULL)::int AS ossz_teljes,
+         AVG(EXTRACT(EPOCH FROM (descarcat_at - created_at))/3600) FILTER (WHERE created_at IS NOT NULL AND descarcat_at IS NOT NULL) AS avg_ora_teljes,
+         -- Számláló mezők: melyik lépésig jutottak el a fuvarok
+         COUNT(*) FILTER (WHERE created_at IS NOT NULL AND created_at >= $2 AND created_at < $3)::int AS db_kiirt,
+         COUNT(*) FILTER (WHERE sosit_incarcare_at IS NOT NULL AND created_at >= $2 AND created_at < $3)::int AS db_felrakohoz,
+         COUNT(*) FILTER (WHERE incarcat_at IS NOT NULL AND created_at >= $2 AND created_at < $3)::int AS db_felrakva,
+         COUNT(*) FILTER (WHERE sosit_descarcare_at IS NOT NULL AND created_at >= $2 AND created_at < $3)::int AS db_lerakohoz,
+         COUNT(*) FILTER (WHERE descarcat_at IS NOT NULL AND created_at >= $2 AND created_at < $3)::int AS db_leurit
+       FROM orders
+       WHERE company_id = $1 AND created_at >= $2 AND created_at < $3`,
+      P
+    );
+    const x = r.rows[0] || {};
+    // Percet kerekítjük 1-tizedig
+    const round = (v) => (v == null ? null : Math.round(parseFloat(v) * 10) / 10);
+    return res.json({ result: {
+      ok: true,
+      // Funnel-számlálók (hány fuvar érte el az adott milestone-t)
+      funnel: {
+        kiirt:      x.db_kiirt,
+        felrakohoz: x.db_felrakohoz,
+        felrakva:   x.db_felrakva,
+        lerakohoz:  x.db_lerakohoz,
+        leurit:     x.db_leurit
+      },
+      // Átlagos időtartamok
+      lepesek: {
+        alocat_ig:         { min: round(x.avg_min_alocat_ig),         db: x.ossz_alocat_ig },
+        felrako_felrakas:  { min: round(x.avg_min_felrako_felrakas),  db: x.ossz_felrako_felrakas },
+        felrakas_lerako:   { min: round(x.avg_min_felrakas_lerako),   db: x.ossz_felrakas_lerako },
+        lerako_lerakas:    { min: round(x.avg_min_lerako_lerakas),    db: x.ossz_lerako_lerakas },
+        teljes_ora:        { ora: round(x.avg_ora_teljes),            db: x.ossz_teljes }
+      }
+    }});
+  } catch (err) {
+    console.error('getOrderFunnel hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Alvállalkozói AP-öregítés — Pénzügy fül (jogosultsághoz kötött) ──
+// Analóg a getFinanceStats aging-mintájához, de a `carrier_invoices` felől.
+// 0-30 / 31-60 / 60+ nap bontás a due_date túllépése (VAGY issue_date+30
+// fallback, ha nincs due_date) szerint. Legrégebbi kintlévő szállítói
+// számlák listája (max 200).
+handlers.getCarrierApAging = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    if (!(await _canSeeFinance(req))) {
+      return res.json({ result: { ok: false, err: 'Adminul nu ti-a permis accesul la raportul financiar', forbidden: true } });
+    }
+    const cid = req.session.user.company_id;
+
+    // Effektív esedékesség: due_date, vagy issue_date + 30 nap, vagy created_at + 30 nap
+    const EFF_DUE = `COALESCE(ci.due_date, (ci.issue_date + INTERVAL '30 days')::date, (ci.created_at + INTERVAL '30 days')::date)`;
+
+    const agingR = await pool.query(
+      `SELECT
+         COALESCE(SUM(ci.amount - ci.paid_amount) FILTER (
+           WHERE ci.status <> 'paid' AND (${EFF_DUE}) >= NOW() - INTERVAL '30 days'),0)::numeric AS d0_30,
+         COALESCE(SUM(ci.amount - ci.paid_amount) FILTER (
+           WHERE ci.status <> 'paid' AND (${EFF_DUE}) < NOW() - INTERVAL '30 days'
+             AND (${EFF_DUE}) >= NOW() - INTERVAL '60 days'),0)::numeric AS d31_60,
+         COALESCE(SUM(ci.amount - ci.paid_amount) FILTER (
+           WHERE ci.status <> 'paid' AND (${EFF_DUE}) < NOW() - INTERVAL '60 days'),0)::numeric AS d60p,
+         COALESCE(SUM(ci.amount - ci.paid_amount) FILTER (
+           WHERE ci.status <> 'paid'),0)::numeric AS ossz_kintlevo,
+         COUNT(*) FILTER (WHERE ci.status <> 'paid')::int AS kintlevo_db
+       FROM carrier_invoices ci
+       WHERE ci.company_id = $1 AND ci.amount > 0`,
+      [cid]
+    );
+
+    const listR = await pool.query(
+      `SELECT ci.id, ci.invoice_number, c.nev AS carrier_nev, ci.amount, ci.paid_amount,
+              ci.currency, ci.status, ci.issue_date,
+              ${EFF_DUE} AS effective_due,
+              GREATEST(0, EXTRACT(DAY FROM NOW() - (${EFF_DUE})::timestamp)::int) AS keses_nap
+       FROM carrier_invoices ci
+       LEFT JOIN carriers c ON c.id = ci.carrier_id
+       WHERE ci.company_id = $1 AND ci.status <> 'paid' AND ci.amount > 0
+       ORDER BY effective_due ASC NULLS FIRST LIMIT 200`,
+      [cid]
+    );
+
+    return res.json({ result: {
+      ok: true,
+      aging: agingR.rows[0],
+      lista: listR.rows
+    }});
+  } catch (err) {
+    console.error('getCarrierApAging hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };

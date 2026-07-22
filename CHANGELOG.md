@@ -14,6 +14,104 @@
 
 ---
 
+## 2026-07-22 — Statisztika: 4 új mutató (állásidő / szerviz-előrejelzés / fuvar-funnel / alvállalkozói AP-öregítés) + kereső/összehasonlítás
+
+### Cél
+
+Négy új, adott adatokból származó statisztika a rendszerben (a felhasználó
+kérésére) + a Sofőrök / Járművek / Ügyfelek statisztika-táblák bővítése
+**kereső mezővel** és **2 sor összehasonlítási** UI-val.
+
+### Új szerver-handlerek (`handlers/statisticsHandlers.js`)
+
+Mind `_isAdminOrManager` kapu + `company_id`-szűrt + paraméteres SQL,
+automatikusan bekötve a `routes/execute.js` registry-en át.
+
+- **`getVehicleIdleStats`** — Jármű állásidő (üres napok fuvarok közt):
+  ablak-függvénnyel (LAG) az előző Finalizat `finalized_at` → következő
+  aktív fuvar `data_incarcare` pozitív különbségeinek átlaga, össze és
+  max járművenként. Az időszak-szűrő a következő fuvar `created_at`-jére.
+  Járművek fülre.
+- **`getServiceForecast`** — Szerviz-előrejelzés (esedékesség hetekben):
+  az utolsó `vehicle_service_log.next_due_km` + jármű utolsó 90 napos
+  menetlevél-km átlaga + GPS hó-vég snapshot `mileage`-ből. Sürgős (≤2
+  hét), figyelmeztető (≤6 hét), normál — kliens színez. Járművek fülre.
+- **`getOrderFunnel`** — Fuvar-státusz funnel (kiírt → felrakóhoz →
+  felrakva → lerakóhoz → leürít) + minden lépés közti átlagos idő
+  percben/órában, a 4 új milestone-időbélyeg (`sosit_incarcare_at` /
+  `incarcat_at` / `sosit_descarcare_at` / `descarcat_at`) alapján. SLA
+  fülre.
+- **`getCarrierApAging`** — Alvállalkozói AP-öregítés (0-30/31-60/60+
+  nap) a `carrier_invoices`-ból, effektív esedékesség `due_date` →
+  `issue_date+30` → `created_at+30` fallback lánccal. Pénzügyi jog-védett
+  (`_canSeeFinance`); legrégebbi kintlévő szállítói számlák listája
+  (max 200). Pénzügy fülre.
+
+### Kliens — közös kereső + összehasonlítás segédek
+
+`public/stats.js` — új moduláris helper (`_stCmpState` map + 5 függvény):
+
+- **`stCompareToolbarHtml(pane, placeholder)`** — a tábla fejlécében
+  kereső input + kijelölés-info + „🆚 Összehasonlítás" gomb.
+- **`stCompareCellHtml(pane, key)`** — soronkénti checkbox-cella (első
+  oszlop, `data-cmp-pane` + `data-cmp-key`).
+- **`stCompareInit(pane, cfg)`** — a load() után hívva; a kereső
+  eseményt felteszi (`data-cmp-label` alapú kliens-szűrés a
+  `tr[data-cmp-key]` sorokra) + a delegált checkbox-kezelést a
+  `box._stCmpBound` flag-gel EGYSZER regisztrálja, max 2 sort enged,
+  a 3.-at visszaveszi (toast).
+- **`openCompare(pane)`** — overlay-modal, metrikánként párhuzamosan
+  mutatja a két entitást (érték + Δ, jobbik zöldre színezve;
+  `higherIsBetter:false`-val a fogyasztás/RON-költség „kevesebb a jobb";
+  `noWinner:true` szöveges cellához).
+- Bekötés: **Sofőrök** (`loadDrivers` — 9 metrika: fuvarok/lezárt/
+  bevétel/km/L100km/üzemanyag/vásárlás/diurna/menetlevél), **Járművek**
+  (`loadVehiclesStats` — 9 metrika: fuvarok/lezárt/bevétel/EUR-km/
+  km/üzemanyag/szerviz/L100km/névleges), **Ügyfelek** (`loadClients` —
+  4-6 metrika finance-jogtól függően).
+
+### Új panelek a meglévő pane-eken
+
+- **Járművek pane**: „💤 Állásidő" + „🔧 Szerviz-előrejelzés" — a Top
+  chart alatt, alul a meglévő GPS-km panelekhez sorolva.
+- **Pénzügy pane**: „🧾 Alvállalkozói AP-öregítés" — a fuvar-profit
+  panel alá.
+- **SLA pane**: „🔻 Fuvar-státusz funnel + átlagos idők" — a KPI-sáv
+  alá. Progressbar-vizu (bal→jobb csökkenő) + %-os konverzió az előző
+  lépéshez + `fmtDuration` perc/óra/nap az átlagos idő-mezőknél.
+
+### i18n
+
+~30 új kulcs RO-alap + HU:
+- `st.ve.pIdle`/`gapCount`/`avgIdleDays`/`totalIdleDays`/`maxIdleDays`/`idleHint`
+- `st.ve.pService`/`currentKm`/`nextDueKm`/`nextDueDate`/`monthlyKm`/`dueIn`/`dueNow`/`weeks`/`serviceHint`
+- `st.fin.pCarrierAp`/`noCarrierAp`/`cInvoice`/`cAmount`/`cIssue`/`daysShort`/`carrierApHint`
+- `st.sla.pFunnel`/`stKiirt`/`stFelrakohoz`/`stFelrakva`/`stLerakohoz`/`stLeurit`/`avgLbl`/`totalTime`
+- `st.cmp.*` — közös: `search`/`searchDriver`/`searchVehicle`/`searchClient`/`btn`/`selected`/`max2`/`title`/`metric`
+
+Cache-bust: `stats.js?v=20260722cmp`.
+
+### Tesztek
+
+Új: `tests/integration/stats-new-handlers.test.js` — 10 mock-eset:
+- Szerep-kapu (Sofer NEM hívhatja mind a 4 handlert).
+- `getVehicleIdleStats` visszaadja a jarmuvek listát + company_id
+  kényszerítve.
+- `getServiceForecast` sürgős/figyelmeztető helyesen jelölve; rendezés
+  sürgős-elöl.
+- `getOrderFunnel` funnel + lepesek válasz-alak; null-átlag is átmegy.
+- `getCarrierApAging`: Manager pénzügyi jog nélkül → `forbidden:true`;
+  Admin: aging + lista visszaadva.
+
+**700 Jest zöld** (690 → 700; valós Postgres 16-tal + mock).
+
+### Deploy
+
+Fly.io szerver-restart (nincs migráció) + böngésző hard refresh a
+cache-bust érvényesítéséhez.
+
+---
+
 ## 2026-07-21 — Sofőr főoldal: elvégzett + parkolt/raktári fuvar CSAK a menetlevélbe kerül + fuvar-kártyák sorszámmal (#1..N) + összecsukott fejléc = szám + felrakás dátuma + felrakási hely
 
 ### Gyökér
@@ -82,6 +180,8 @@ horgony) elvárás-blokk (`CMD-A/P/R/FN/FO/FW`). **647 Jest zöld**
 `public/sofer.html` (cache-bust),
 `tests/integration/db-orders.test.js` (elvárás-frissítés),
 `CHANGELOG.md` + `CLAUDE.md`.
+
+---
 
 ---
 
