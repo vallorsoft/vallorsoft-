@@ -1024,14 +1024,15 @@ function loadSoferMiniStats() {
     if (s.warn_range) warn = t('sof.warnRange');
     else if (s.warn_diff) warn = t('sof.warnDiff');
 
-    // 2×2 rács (2-2), teljes szélességű — ne húzza el az oldalt függőlegesen.
+    // 1×3 rács (3 csempe egymás mellett szorosan) — a diurna kivéve, marad a
+    // LEZÁRT / KM / TANKOLVA. A csempék ~15%-kal magasabbak (sofer.css),
+    // hogy a másodlagos prev-sorok kiférjenek.
     // A TANKOLVA csempén 3 prev-sor: avg_curr, avg_prev, opcionális warn-sor.
     // A warn-sor a `sof-mstat-warn` CSS-osztályt kapja (narancs, félkövér).
     box.innerHTML = '<div class="sof-mstat-h">' + t('sof.myMonthPerf') + '</div>'
       + '<div class="sof-mstat-grid">'
       + tile('✅', n(s.lezart), t('sof.statClosed'), '#16a34a', lastMo + ': ' + n(s.lezart_prev))
       + tile('🛣️', n(s.km), t('sof.statKm'), '#2563eb', kmPrev1, kmPrev2)
-      + tile('🗓️', n(s.diurna_ext) + '+' + n(s.diurna_int), t('sof.statDiurna'), '#6366f1', lastMo + ': ' + n(s.diurna_ext_prev) + '+' + n(s.diurna_int_prev))
       + '<div class="sof-mstat">'
         + '<div class="sof-mstat-ico">⛽</div>'
         + '<div class="sof-mstat-val" style="color:#d97706;">' + n(s.tankolt_l) + ' L</div>'

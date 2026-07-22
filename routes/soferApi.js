@@ -379,7 +379,7 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       <tr><td><b>Data plecare:</b> ${fmtDateRo(f.indulas_dt)}</td><td><b>Data sosire:</b> ${fmtDateRo(f.erkezes_dt)}</td></tr>
       <tr><td><b>Km început:</b> ${f.km_inceput || 0} km</td><td><b>Km sfârșit:</b> ${f.km_sfarsit || 0} km</td></tr>
       <tr><td colspan="2"><b>Total kilometri parcurși: ${f.total_km || 0} km</b></td></tr>
-      <tr><td><b>Diurnă externă:</b> ${f.diurna_externa || 0} zile</td><td><b>Diurnă internă:</b> ${f.diurna_interna || 0} zile</td></tr>
+      ${isSofer ? '' : `<tr><td><b>Diurnă externă:</b> ${f.diurna_externa || 0} zile</td><td><b>Diurnă internă:</b> ${f.diurna_interna || 0} zile</td></tr>`}
     </table>
 
     <div class="sec-title">Puncte de traseu</div>

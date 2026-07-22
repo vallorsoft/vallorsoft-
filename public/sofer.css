@@ -252,18 +252,22 @@
     letter-spacing: -0.01em;
   }
 
-  /* ── Havi mini-statisztika (2×2 rács, kompakt) ──
+  /* ── Havi mini-statisztika (1×3 rács, szoros) ──
+     A diurna csempe kivéve (csak Admin/Manager látja), marad 3 csempe:
+     LEZÁRT / KM / TANKOLVA — egymás mellett szorosan, ~15%-kal magasabb
+     mint a régi 2×2 verzió, hogy a prev-sorok (múlt havi, átlagfogyasztás,
+     opcionális warn) kényelmesen kiférjenek.
      FONTOS: a rács OSZTÁLLYAL kap grid-template-columns-t (nem inline
      stílussal), különben a style.css mobil felülírója
      ([style*="display:grid"][style*="grid-template-columns"] → 1fr)
      egyoszloposra törné. Osztályt a felülíró nem talál el. */
   .sof-mstat-h { font-size: 12px; font-weight: 700; color: var(--sof-muted); margin: 12px 0 8px; }
-  .sof-mstat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .sof-mstat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
   .sof-mstat {
     background: var(--sof-card);
     border: 1px solid var(--sof-border);
     border-radius: 12px;
-    padding: 9px 6px;
+    padding: 14px 5px;
     text-align: center;
     box-shadow: 0 2px 8px rgba(15,23,42,0.04);
   }

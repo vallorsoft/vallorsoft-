@@ -14,6 +14,20 @@
 
 ---
 
+## 2026-07-22 — Sofőr főoldal mini-statisztika: diurna csempe kivéve (csak Admin/Manager látja); 3 csempe egymás mellett szorosan + ~15%-kal magasabb
+
+### Miért
+A sofőr havi mini-statisztikáján 4 csempe volt (LEZÁRT / KM / DIURNA / TANKOLVA). A diurna napok száma pénzügyi/elszámolási információ — a sofőr főoldalán feleslegesen látszott. A kérés: a diurnát csak Admin/Manager lássa, a menetlevélen (PDF-ben) továbbra is szerepeljen mint eddig — csak a sofőr saját PDF-nézetéből tűnjön el.
+
+### Mi változott
+1. **`public/sofer.js` `loadSoferMiniStats`** — a `tile('🗓️', ..., 'statDiurna', ...)` sor eltávolítva; a `sof-mstat-grid` mostantól 3 csempét renderel: LEZÁRT / KM / TANKOLVA. A `getMySoferStats` handler változatlan (a diurna adat továbbra is jön a válaszban, csak nem jelenítjük meg — a sofőr statisztika-jogosultsága nem változik, más felületet nem érint).
+2. **`public/sofer.css` `.sof-mstat-grid`** — `grid-template-columns: repeat(2, 1fr)` → `repeat(3, 1fr)`, `gap: 8px` → `4px` (szoros egymás mellett). `.sof-mstat` `padding: 9px 6px` → `14px 5px` — ~15%-kal magasabb csempe, hogy a TANKOLVA prev-sorok (múlt hó, e havi átlagfogyasztás, opcionális warn) kényelmesen kiférjenek. A csempe többi tokene (border-radius, akcentek, tipográfia, `.sof-mstat-prev`/`.sof-mstat-warn`) érintetlen.
+3. **`routes/soferApi.js` `/api/pdf-download/:id`** — a menetlevél HTML/PDF a `Diurnă externă:` + `Diurnă internă:` sort mostantól csak akkor rendereli, ha a néző NEM sofőr (`isSofer` már meg volt: `req.session.user.pozicio === 'Sofer'`). Admin/Manager (diszpécser) a saját cége bármely menetlevelén továbbra is látja — a menetlevél többi mezője (útvonal-pontok, tankolások, kiadások, fogyasztás, mentések) minden szerepnek változatlan.
+4. **A diurna kalkuláció változatlan** (`routes/soferApi.js` `/api/fuvarlevel-save` a `calculateDiurna(indulasDt, erkezesDt, hataratok)`-ból tölti a `diurna_externa`/`diurna_interna` oszlopokat). A sofőr menetlevél-űrlapján az „Út időpontjai" + „Határátlépések" szekció + `#diurnaPreview` (a rövid „🕐 Út: dep → arr · N nap · X határátlépés" trip-összegző) érintetlen — ezek a kalkuláció bemeneti mezői, nem diurna-értéket mutatnak.
+5. **Regresszió-védelem** — a `tests/integration/fuvarlevelek-db.test.js` `GET /api/pdf-download/:id` tesztjei Admin-ként futnak → a `'zile'` felirat továbbra is megjelenik a PDF-ben (nincs teszt-módosítás). A `sofer-mini-stats.test.js` a handler adat-alakját teszteli, nem a UI csempéket, ezért érintetlen. Cache-bust: `sofer.html` `?v=20260721dashnum` → `?v=20260722diurna` (mind CSS, mind JS).
+
+---
+
 ## 2026-07-22 — FIX: sofőr átlagfogyasztás (`avg_curr`/`avg_prev`) PER-TÉTEL DÁTUM szerint — konzisztens a UI-n megjelenő TANKOLVA-val
 
 ### Gyökér
