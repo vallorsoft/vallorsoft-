@@ -8,13 +8,19 @@
   'use strict';
 
   // ---- Beallitasok ----
-  var IDLE_LIMIT_MS   = 30 * 60 * 1000;  // 30 perc inaktivitas -> kilepes
+  // Alap: 30 perc. A hivo oldal felulirhatja: window.VS_IDLE_LIMIT_MIN = <perc>.
+  // Peldaul a sofor mobil-app kozben oraig nem koppint (vezet) -> a sofer.html
+  // 8 orat allit be, hogy a szerver-cookie (7 nap) elottii esemenyek ne veszszenek.
+  var _idleMin = (typeof window !== 'undefined' && Number(window.VS_IDLE_LIMIT_MIN) > 0)
+    ? Number(window.VS_IDLE_LIMIT_MIN) : 30;
+  var IDLE_LIMIT_MS   = _idleMin * 60 * 1000;
   var WARN_BEFORE_MS  = 2 * 60 * 1000;   // 2 perccel elotte figyelmeztetes
   var CHECK_INTERVAL  = 15 * 1000;       // 15 mp-enkent ellenoriz
 
   var lastActivity = Date.now();
   var warned       = false;
   var warnBanner   = null;
+  var authPingInFlight = false;
 
   // ---- Aktivitas frissites ----
   function markActivity() {
@@ -125,5 +131,41 @@
   document.addEventListener('click', function() {
     try { localStorage.setItem('vs_last_activity', Date.now()); } catch(e) {}
   }, { passive: true });
+
+  // ---- Fedezetlen mobil-eset: telefon lock -> tab-hatterbe -> setInterval
+  //      throttolodik iOS/Androidon (percenkent 1-szer vagy ritkabban), es
+  //      amikor a felhasznalo visszater, sokszor kesve dont. Emiatt lehet
+  //      "app latszik, de nem mukodik" allapot: a szerver-session esetleg mar
+  //      megszunt (pl. deploy vagy explicit kileptetes miatt), a kliens
+  //      viszont nem tudja. Megoldas: visibilitychange-en AZONNAL:
+  //        1) ha az idle mar tullepte a limitet -> tiszta kileptetes,
+  //        2) egyebkent silent authMe ping -> ha a szerver mar nem lat minket,
+  //           azonnal atiranyitas /login-re (nem kell a felhasznalonak
+  //           manualisan Kilepest nyomnia).
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState !== 'visible') return;
+    var idle = Date.now() - lastActivity;
+    if (idle >= IDLE_LIMIT_MS) {
+      doLogout('idle');
+      return;
+    }
+    if (authPingInFlight) return;
+    authPingInFlight = true;
+    try {
+      fetch('/api/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ functionName: 'authMe' }),
+        credentials: 'same-origin'
+      })
+      .then(function(r) { return r.json().catch(function(){ return {}; }); })
+      .then(function(d) {
+        authPingInFlight = false;
+        // authMe null-t ad, ha nincs bejelentkezett user (session lejart, torolve).
+        if (!d || d.result == null) redirectToLogin('expired');
+      })
+      .catch(function() { authPingInFlight = false; /* offline - nem tehetunk semmit */ });
+    } catch(e) { authPingInFlight = false; }
+  });
 
 })();

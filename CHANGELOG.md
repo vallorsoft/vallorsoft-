@@ -14,6 +14,22 @@
 
 ---
 
+## 2026-07-22 — FIX: sofőr mobil-app „telefon-lock után nem működik, csak Kilépés+újralépés után" — visibility-alapú session-recovery + 8 órás idle-limit + főoldali auto-refresh
+
+### Miért
+Sofőrök jelezték: ha a telefon lockol/az app 30–60+ percig háttérben van, majd visszatérnek, az app „nem működik" — a kártyák üresek, kattintások nem történnek, csak akkor jön rendbe, ha manuálisan kijelentkeznek és újra belépnek. Két gyökér:
+1. **Túl agresszív idle-timeout.** A közös `public/session-guard.js` 30 perc inaktivitás után kényszerkilépést dob (`doLogout('idle')`), de mobilon a `setInterval` háttérbe kerülve throttolódik (iOS/Chrome max. 1×/perc), és amikor a felhasználó visszatér, a döntés késve fut le — közben a képernyő-koppintás resetelheti a `lastActivity`-t → a kliens fut tovább „bejelentkezettként", miközben lehet, hogy a szerver-session már megszűnt. Sofőrre 30 perc egyébként is túl rövid (vezetés közben óráig nem koppint a kijelzőre).
+2. **Nincs `visibilitychange` figyelő.** A tab feléledésekor sem az idle-döntés, sem egy „session még él?" ping nem futott le — a stale UI + esetleg halott szerver-session csak az első backend-hívásnál derül ki, de a `sofer.js` egyetlen fetch-je sem kezeli a 401-et (csak az induló `authMe` redirectel). Innen a „Kilépés → belépés = megoldás" tapasztalat.
+
+### Mi változott
+1. **`public/session-guard.js`** — új `visibilitychange` figyelő: amikor a tab újra láthatóvá válik (`document.visibilityState === 'visible'`), (a) azonnal ellenőrzi az idle-t → ha a limit fölött van, a szokásos `doLogout('idle')` fut (tiszta `/login?timeout=1` redirect); (b) különben egy csendes `authMe` pinget indít — ha a válasz `result: null` (a szerver-session megszűnt), azonnal `/login?timeout=1`-re irányít, hogy a sofőrnek NE kelljen manuálisan Kilépést nyomnia. `authPingInFlight` őr a duplikáció ellen. `IDLE_LIMIT_MS` mostantól konfigurálható: `window.VS_IDLE_LIMIT_MIN` (perc) felülírja az alap 30-at.
+2. **`public/sofer.html`** — sofőr-app-specifikus felülírás: `<script>window.VS_IDLE_LIMIT_MIN = 480;</script>` a session-guard betöltése ELŐTT → 8 óra idle-limit (a szerver-cookie 7 nap; addig nem kényszerkilépés vezetés közben). A többi konzol (admin/manager/developer/utvonaltervezes/email-builder) marad az alap 30 percen — a mögöttük álló felhasználó folyamatosan a gépnél van, ott a szigorúbb kilépés indokolt.
+3. **`public/sofer.js`** — új `visibilitychange` figyelő: a tab-visszatéréskor, ha a főoldal (`#sec-dash`) van előtérben, újratölti a kiosztott fuvarokat (`loadDashOrders`), a havi mini-statisztikát (`loadSoferMiniStats`) és a kiosztott jármű blokkot (`loadMyAssignedVehicle`) — így a friss adat azonnal látszik, nem a hátterezés előtti stale UI. 20 mp-es rate-limit (`_visRefreshLastAt`), hogy gyors tab-váltogatásnál ne köpködjön kéréseket. **A menetlevél-piszkozat / beírt űrlap NEM nulázódik**: csak `sec-dash`-en fut, más aloldalon nem.
+4. **Cache-bust minden érintett HTML-en** — `session-guard.js` régi `?v=20260614qa` → `?v=20260722sess` mind a hat oldalon (`sofer.html`, `admin.html`, `manager.html`, `developer.html`, `email-builder.html`, `utvonaltervezes.html`), hogy a fejlesztést mindenki friss verzióval kapja. `sofer.html` `?v=20260721dashnum` → `?v=20260722sess`.
+5. **Nem érintett**: a szerver-oldali `express-session` (7 napos cookie), a `handlers/auth.js` `authLogout`, a `middleware/pageGuard.js` — mindegyik változatlan. A javítás tisztán kliens-oldali. **702 Jest zöld** (a session-guard tisztán DOM-oldal, nem tesztelt egységként; a szerver oldali auth/session tesztek érintetlenek).
+
+---
+
 ## 2026-07-22 — Sofőr főoldal mini-statisztika: diurna csempe kivéve (csak Admin/Manager látja); 3 csempe egymás mellett szorosan + ~15%-kal magasabb
 
 ### Miért
