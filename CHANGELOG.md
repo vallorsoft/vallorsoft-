@@ -14,6 +14,77 @@
 
 ---
 
+## 2026-07-21 — Sofőr főoldal: elvégzett + parkolt/raktári fuvar CSAK a menetlevélbe kerül + fuvar-kártyák sorszámmal (#1..N) + összecsukott fejléc = szám + felrakás dátuma + felrakási hely
+
+### Gyökér
+
+Két összefüggő UX-igény:
+1. A `Finalizat` (elvégzett) fuvar eddig a sofőr **főoldalán** is látszott a
+   teljesítés utáni türelmi ideig (0 menetlevélig „örökké", 1× után 3 nap,
+   2× után 15 perc). Ugyanígy a `Parkolt`/`Raktarban` (áru-leadás) fuvar is
+   ott maradt a főoldalon, ha az `email_sofer` még a sofőrre mutatott. A
+   sofőr főoldalon már lezárt/leadott fuvarokkal találkozott — a **kész +
+   leadott fuvar helye a menetlevél**, nem a főoldal.
+2. Az összecsukott fuvar-kártya csak a `felrakó → lerakó` címeket mutatta,
+   sorszám nem volt → a sofőr nem látta, hányadik fuvarát kell csinálnia.
+
+### Változtatás
+
+**`handlers/orders.js` `getMySoferOrders`** — a `dash_visible` szigorodott:
+mostantól CSAK a **valóban élő** aktív fuvar (`Alocat`, `In Curs`) látszik
+a főoldalon; a `Finalizat` + `Parkolt` + `Raktarban` mind `dash_visible=false`
+(függetlenül a menetlevél-számtól és a `finalized_at` időtől). A
+`waybill_visible` (menetlevél-picker) logikája **változatlan** — a
+lezárt/leadott fuvar ott a mentett menetlevélig / 3 napig / 15 percig
+továbbra is kiválasztható (a Parkolt/Raktarban továbbra is `true`
+horgonnyal).
+
+**`public/sofer.js` `loadDashOrders`** — a szűrt aktív listát megfordítjuk
+(szerver `created_at DESC` → kliens ASC, legrégebbi fuvar = #1), és a
+`renderFuvarCard(o, idx)` 1-alapú `idx`-et kap. Így új kiosztás nem üti át
+a meglévő fuvarok sorszámát: a régiek maradnak (#1, #2), az újak a végére
+kerülnek (#3, #4, #5). Amikor egy fuvar lezárul (Finalizat / Parkolt /
+Raktarban), kiesik a listából — a következő kiosztás így újra 1-től számoz
+(nem `#5,#6,#7`, hanem `#3,#4,#5` példa: 4 aktívból 2 lezárul → maradék
+2 = #1,#2 → új 3 kiosztás = #3,#4,#5). A kliens-oldali defenzív fallback
+(dash_visible mező hiányában) is szigorodott: csak `Alocat`/`In Curs`.
+
+**`public/sofer.js` `renderFuvarCard`** — az összecsukott fejléc új
+felépítése: `#N` badge + `📅 felrakás dátuma` + `📍 felrakási hely` + `▾`.
+A lerakó és minden további részlet (ügyfél, cégek, dátumok, állomás-idővonal,
+UIT/leadás gombok) marad a kinyíló részben (kattintásra → változatlan). A
+felrakás dátumát a meglévő `fmtFuvarDay(data_incarcare)` formázza.
+
+**`public/sofer.js` `loadDocOrderOptions`** — a Feltöltött iratok fuvar-
+választója átvált `dash_visible`-ről `waybill_visible`-re, hogy a
+nemrég lezárt fuvarhoz utólag POD/CMR fotót is csatolni lehessen
+(különben a szigorúbb főoldal-szűrő ezt is elrejtette volna).
+
+**`public/sofer.css`** — új `.fuvar-num` szám-badge (kék `--sof-primary`
+kör, fehér 12px félkövér); a `.fuvar-destination` `flex`-re vált (szám +
+szöveg + nyíl egy sorban); `.fuvar-headtxt` `flex: 1 1 auto` a hosszú
+felrakási cím elipszisezéséhez.
+
+### Teszt
+
+`tests/integration/db-orders.test.js` — a régi „Finalizat menetlevél
+nélkül SOSEM tűnik el" eset a `dash_visible`-re már nem érvényes; helyette
+elkülönített `dash_visible` (csak aktív) + `waybill_visible` (menetlevél-
+horgony) elvárás-blokk (`CMD-A/P/R/FN/FO/FW`). **647 Jest zöld**
+(41 suite / 43 skip DB nélkül). Cache-bust `sofer.css/js?v=20260721dashnum`.
+
+### Fájlok
+
+`handlers/orders.js` (dash_visible egyszerűsítés + komment),
+`public/sofer.js` (loadDashOrders reverse + idx, renderFuvarCard(o,idx)
+új fejléc, docs picker → waybill_visible),
+`public/sofer.css` (`.fuvar-num` badge + `.fuvar-destination` flex),
+`public/sofer.html` (cache-bust),
+`tests/integration/db-orders.test.js` (elvárás-frissítés),
+`CHANGELOG.md` + `CLAUDE.md`.
+
+---
+
 ## 2026-07-21 — Menetlevél: tankolás/vásárlás per-tétel DÁTUM (naptár-választó, mai alapérték) → statisztika is per-tétel dátum szerint
 
 ### Gyökér
