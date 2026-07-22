@@ -14,7 +14,72 @@
 
 ---
 
-## 2026-07-22 — Statisztika: 4 új mutató (állásidő / szerviz-előrejelzés / fuvar-funnel / alvállalkozói AP-öregítés) + kereső/összehasonlítás
+## 2026-07-22 — FIX: sofőr átlagfogyasztás (`avg_curr`/`avg_prev`) PER-TÉTEL DÁTUM szerint — konzisztens a UI-n megjelenő TANKOLVA-val
+
+### Gyökér
+
+A **2026-07-21-i per-tétel dátum** bevezetése után (menetlevél tankolás/vásárlás sorai
+külön naptáras `data` mezőt kaptak, és a `getFuelStats`/`getPurchaseStats` per-tétel
+dátum szerint bucketolt), a sofőr főoldali **TANKOLVA csempéjén** megjelenő e havi
+átlagfogyasztás (`avg_curr`) inkonzisztens értéket adott a mellette megjelenő
+**TANKOLVA liter-értékkel** (`tl_curr`):
+
+- **`tl_curr` (kijelzés — HELYES):** per-tétel dátum szerint bucketolva — a
+  júliusi menetlevélbe utólag beírt június-dátumú tétel a **júniusi kosárba** kerül.
+- **`avg_curr` képlet — HIBÁS volt:** a `calcAvg` `tanked`-e a menetlevél TELJES
+  `alimentari`-tömbjét összegezte (`fls.reduce(SUM(litru))`), **függetlenül** a
+  tételek per-tétel dátumától → a júliusi menetlevélbe utólag beírt júniusi
+  tankolás is bekerült a júliusi képletbe → **hamisan magas L/100km**.
+
+**Peto konkrét esete** (7215 km, TANKOLVA: 2018 L, kijelzett avg: **36.6 L/100km**):
+- Egyszerű arány: 2018/72.15 = 27.97 L/100km
+- Kijelzett: 36.6 → a képlet ~2640 L-lel számolt (~620 L eltérés)
+- Ez pontosan az inkonzisztencia jele: a `tl_curr` a július-dátumú tételekre szűrt
+  (2018 L), a képlet viszont a menetlevél összes tételét beszámolta (~2640 L,
+  beleértve a júniusi dátumú vagy más hónapba tartozó tételeket).
+
+### Fix (`handlers/statisticsHandlers.js`)
+
+Mindkét érintett handler `calcAvg` képlete új opcionális `tanked` paramétert kapott
+— ha megadva, azt használja tanked-nek (ez a per-tétel dátum szerint bucketolt
+liter-érték, ugyanaz mint a UI-n megjelenő TANKOLVA), különben fallback = a régi
+menetlevél-alimentari SUM (backward-compat, régi hívók).
+
+1. **`getMySoferStats` `calcAvg`** — új opcionális `tanked` paraméter. A két
+   hívási hely (`avg_prev`/`avg_curr`) most explicit átadja a fő-ciklusban már
+   helyesen kiszámolt `tl_prev`/`tl_curr` értéket → a képlet és a UI ugyanazt a
+   liter-értéket használja.
+2. **`getSoferConsumptionOverview` `calcAvg`** — ugyanaz a paraméter-bővítés,
+   plusz új helyi `_bucketWaybillLiters(fl)` / `sumBucketLiters(fls)` segéd, ami
+   sofőrönként bucketolja a menetlevelek `alimentari` tömbjeit per-tétel dátum
+   szerint (a `getMySoferStats` fő-ciklusával azonos szemantika: nem-átívelő
+   waybill → dátumozott tétel a saját hónapjához, dátum nélküli → érkezés-hónap;
+   átívelő → dátumozott tétel a saját hónapjához, dátum nélküli → napok szerinti
+   arányos fallback). A `calcAvg` mindkét hívása most a bucketolt `curr`/`prev`
+   értéket kapja `tanked`-ként.
+
+### Nem érintett
+
+- A `tl_curr`/`tl_prev` mezők értéke változatlan — csak az `avg_curr`/`avg_prev`
+  képletbe kerülnek most helyesen bekötve.
+- A `getFuelStats` (jármű-oldali fogyasztás) képlete változatlan — az menetlevél-
+  alapú `motorina_folosit / total_km` aggregátumot mutat, ami önmagában
+  konzisztens (`f.eff_date` szerint).
+- A `motorina_folosit` mentése (menetlevél `cant_inc + total_alim - cant_sf`)
+  változatlan — az adattárolás alsóbb szintjén NEM avatkozunk be.
+
+### Teszt
+
+- **`tests/integration/sofer-mini-stats.test.js`** — új eset (18. teszt):
+  „PETO-ESET: júl. menetlevél jún.-dátumú tétellel — avg_curr per-tétel dátum
+  szerint, NEM a teljes alimentari-SUM". 7215 km + 2 tankolás (500 L jún.
+  28-i + 2018 L júl. 10-i dátummal). A régi buggy képlet ~34.90 L/100km-t
+  adott (2518 L tanked), az új helyes érték ~27.97 L/100km (2018 L tanked).
+- **`tests/integration/sofer-consumption-overview.test.js`** — új eset (9.
+  teszt): ugyanaz a Peto-eset admin cross-sofőr panelben. Egységes viselkedés.
+- **703 Jest zöld** (700 → 703, 43 skip valós-DB nélkül).
+
+
 
 ### Cél
 

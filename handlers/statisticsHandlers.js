@@ -1192,12 +1192,23 @@ handlers.getMySoferStats = async function (req, res, args) {
     //     (jelen hónál a LEGUTOLSÓ menetlevél végét használjuk end-nek,
     //      ezért ott snapEnd = null adható át, ilyenkor a menetlevél záró
     //      értéke a end.)
-    function calcAvg({ fls, snapStart, snapEnd }) {
+    //   tanked (opcionális): a hónap tankolt literje PER-TÉTEL DÁTUM szerint
+    //     bucketolva (a UI-n megjelenő TANKOLVA-val konzisztens érték —
+    //     ugyanaz mint `tl_curr` / `tl_prev`). Ha megadva, azt használjuk;
+    //     különben fallback = a menetlevelek `alimentari`-tömbjének SUM-ja
+    //     (backward-compat, régi viselkedés). A per-tétel dátum bevezetése
+    //     után (2026-07-21) ez a kettő ELTÉRHET: egy júliusi menetlevél
+    //     tartalmazhat júniusi dátumú tétellel, ami a UI-n a júniusi
+    //     kosárba kerül, de a régi fallback SUM a júliusi képletbe rakná
+    //     → hamisan magas L/100km. A `tanked` explicit átadása oldja meg.
+    function calcAvg({ fls, snapStart, snapEnd, tanked }) {
       if (!fls || fls.length === 0) return null;
-      const tanked = fls.reduce((acc, fl) => {
-        const a = Array.isArray(fl.alimentari) ? fl.alimentari : [];
-        return acc + a.reduce((s, x) => s + (Number(x && x.litru) || 0), 0);
-      }, 0);
+      const t = (tanked != null && isFinite(Number(tanked)))
+        ? Number(tanked)
+        : fls.reduce((acc, fl) => {
+            const a = Array.isArray(fl.alimentari) ? fl.alimentari : [];
+            return acc + a.reduce((s, x) => s + (Number(x && x.litru) || 0), 0);
+          }, 0);
       let startTank, startKm, endTank, endKm;
       if (snapStart && snapStart.mileage != null && snapStart.fuel_level != null) {
         startTank = snapStart.fuel_level;
@@ -1216,7 +1227,7 @@ handlers.getMySoferStats = async function (req, res, args) {
       if (!isFinite(startTank) || !isFinite(endTank) ||
           !isFinite(startKm) || !isFinite(endKm)) return null;
       const km = endKm - startKm;
-      const consumed = startTank + tanked - endTank;
+      const consumed = startTank + t - endTank;
       if (km <= 0) return null;
       const v = (consumed * 100) / km;
       return isFinite(v) ? v : null;
@@ -1241,10 +1252,12 @@ handlers.getMySoferStats = async function (req, res, args) {
     const aggSnapEnd   = _aggSnap(snapMap, assignedPlates);      // prev-hó-vég
     const aggSnapStart = _aggSnap(snapMapPP, assignedPlates);    // prev-prev-hó-vég
 
-    // MÚLT HAVI átlag
-    const avg_prev = calcAvg({ fls: flsPrev, snapStart: aggSnapStart, snapEnd: aggSnapEnd });
-    // E HAVI eddigi átlag — a LEGUTOLSÓ menetlevél end-jét használjuk
-    const avg_curr = calcAvg({ fls: flsCurr, snapStart: aggSnapEnd, snapEnd: null });
+    // MÚLT HAVI átlag — a `tanked` PER-TÉTEL DÁTUM szerint bucketolva
+    // (`tl_prev` — a UI-n megjelenő múlt havi TANKOLVA-val konzisztens).
+    const avg_prev = calcAvg({ fls: flsPrev, snapStart: aggSnapStart, snapEnd: aggSnapEnd, tanked: tl_prev });
+    // E HAVI eddigi átlag — a LEGUTOLSÓ menetlevél end-jét használjuk;
+    // `tanked` = `tl_curr` (per-tétel dátum, UI-n megjelenő e havi TANKOLVA).
+    const avg_curr = calcAvg({ fls: flsCurr, snapStart: aggSnapEnd, snapEnd: null, tanked: tl_curr });
 
     // Figyelmeztetések
     const _outOfRange = (v) => v != null && (v < 20 || v > 38);
@@ -1435,12 +1448,18 @@ handlers.getSoferConsumptionOverview = async function (req, res, args) {
         return d >= monthStart && d < nextMonth;
       }).sort(_sortByEff);
     }
-    function calcAvg({ fls, snapStart, snapEnd }) {
+    // Ugyanaz a `calcAvg` mint a `getMySoferStats`-ban: `tanked` explicit
+    // átadható PER-TÉTEL DÁTUM szerinti bucketolt liter-összeggel — így
+    // konzisztens a sofőr saját mini-statisztika értékével. Ha nincs
+    // megadva, fallback = az összes alimentari SUM (backward-compat).
+    function calcAvg({ fls, snapStart, snapEnd, tanked }) {
       if (!fls || fls.length === 0) return null;
-      const tanked = fls.reduce((acc, fl) => {
-        const a = Array.isArray(fl.alimentari) ? fl.alimentari : [];
-        return acc + a.reduce((s, x) => s + (Number(x && x.litru) || 0), 0);
-      }, 0);
+      const t = (tanked != null && isFinite(Number(tanked)))
+        ? Number(tanked)
+        : fls.reduce((acc, fl) => {
+            const a = Array.isArray(fl.alimentari) ? fl.alimentari : [];
+            return acc + a.reduce((s, x) => s + (Number(x && x.litru) || 0), 0);
+          }, 0);
       let startTank, startKm, endTank, endKm;
       if (snapStart && snapStart.mileage != null && snapStart.fuel_level != null) {
         startTank = snapStart.fuel_level;
@@ -1459,10 +1478,90 @@ handlers.getSoferConsumptionOverview = async function (req, res, args) {
       if (!isFinite(startTank) || !isFinite(endTank) ||
           !isFinite(startKm) || !isFinite(endKm)) return null;
       const km = endKm - startKm;
-      const consumed = startTank + tanked - endTank;
+      const consumed = startTank + t - endTank;
       if (km <= 0) return null;
       const v = (consumed * 100) / km;
       return isFinite(v) ? v : null;
+    }
+
+    // PER-TÉTEL DÁTUM szerinti liter-bucket EGY menetlevélre. Ugyanaz a
+    // szemantika mint a `getMySoferStats` fő-ciklusa: nem-átívelő menetlevél
+    // → dátumozott tétel a saját hónapjához, dátum nélküli → menetlevél
+    // érkezés-hónapjához; átívelő menetlevél → dátumozott tétel a saját
+    // hónapjához, dátum nélküli → napok szerinti arányos fallback (jún/júl).
+    // Visszatér: { curr, prev } (számok).
+    function _itemMonthStart(v) {
+      if (!v || typeof v !== 'string') return null;
+      const m = v.match(/^(\d{4})-(\d{2})-\d{2}/);
+      if (!m) return null;
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10);
+      if (!y || !mo) return null;
+      return new Date(Date.UTC(y, mo - 1, 1));
+    }
+    function _bucketWaybillLiters(fl) {
+      const alim = Array.isArray(fl.alimentari) ? fl.alimentari : [];
+      const eff = fl.erkezes_dt || fl.indulas_dt || fl.data_completare;
+      if (!eff) return { curr: 0, prev: 0 };
+      const effDate = new Date(eff);
+      if (effDate < mPrev) return { curr: 0, prev: 0 };
+      const inCurr = effDate >= mCurr;
+      const startDt = fl.indulas_dt ? new Date(fl.indulas_dt) : effDate;
+      const endDt = fl.erkezes_dt ? new Date(fl.erkezes_dt) : effDate;
+      const spans = startDt < mCurr && endDt >= mCurr;
+      if (!spans) {
+        let curr = 0, prev = 0;
+        for (const a of alim) {
+          const lit = Number(a && a.litru) || 0;
+          if (!lit) continue;
+          const ms = _itemMonthStart(a && a.data);
+          if (ms) {
+            if (ms.getTime() === mCurr.getTime()) curr += lit;
+            else if (ms.getTime() === mPrev.getTime()) prev += lit;
+            // más hónapba tartozó tétel: ide nem soroljuk (fallback nincs)
+          } else {
+            if (inCurr) curr += lit; else prev += lit;
+          }
+        }
+        return { curr, prev };
+      }
+      // Átívelő: napok szerinti arányos fallback a dátum nélküli tételekre
+      function dayFloor(d) {
+        return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+      }
+      let daysPrev = 0, daysCurr = 0;
+      const s0 = dayFloor(startDt), e0 = dayFloor(endDt);
+      for (let d = new Date(s0); d <= e0; d = new Date(d.getTime() + 86400000)) {
+        if (d < mCurr) daysPrev++; else daysCurr++;
+      }
+      const daysTot = daysPrev + daysCurr || 1;
+      const fracPrev = daysPrev / daysTot;
+      const fracCurr = daysCurr / daysTot;
+      let curr = 0, prev = 0, undated = 0;
+      for (const a of alim) {
+        const lit = Number(a && a.litru) || 0;
+        if (!lit) continue;
+        const ms = _itemMonthStart(a && a.data);
+        if (ms) {
+          if (ms.getTime() === mCurr.getTime()) curr += lit;
+          else if (ms.getTime() === mPrev.getTime()) prev += lit;
+        } else {
+          undated += lit;
+        }
+      }
+      return { curr: curr + undated * fracCurr, prev: prev + undated * fracPrev };
+    }
+    // Sofőrhöz tartozó menetlevelekből aggregált per-tétel-dátum
+    // liter-bucket (ugyanazt a szemantikát adja mint a `getMySoferStats`
+    // `tl_curr`/`tl_prev` mezője).
+    function sumBucketLiters(fls) {
+      let curr = 0, prev = 0;
+      for (const fl of fls) {
+        const b = _bucketWaybillLiters(fl);
+        curr += b.curr;
+        prev += b.prev;
+      }
+      return { curr, prev };
     }
     function _aggSnap(map, plates) {
       let mi = 0, fl = 0, hasMi = false, hasFl = false;
@@ -1492,8 +1591,13 @@ handlers.getSoferConsumptionOverview = async function (req, res, args) {
       const plates = platesByEmail.get(emailLc) || [];
       const aggEnd   = _aggSnap(snapMap, plates);
       const aggStart = _aggSnap(snapMapPP, plates);
-      const avg_prev = calcAvg({ fls: flsPrev, snapStart: aggStart, snapEnd: aggEnd });
-      const avg_curr = calcAvg({ fls: flsCurr, snapStart: aggEnd, snapEnd: null });
+      // A `tanked` PER-TÉTEL DÁTUM szerint bucketolva — a fls-en TÚLLÉPHET,
+      // hogy a július-arrival menetlevél júniusi tételét ne a júliusi
+      // képletbe rakja (és fordítva). A menetlevelek KÖZÖS halmazát nézzük
+      // (a sofőr összes fls-e), és bucketolunk per waybill.
+      const litBucket = sumBucketLiters(fls);
+      const avg_prev = calcAvg({ fls: flsPrev, snapStart: aggStart, snapEnd: aggEnd, tanked: litBucket.prev });
+      const avg_curr = calcAvg({ fls: flsCurr, snapStart: aggEnd, snapEnd: null, tanked: litBucket.curr });
       let avg_diff = null;
       if (avg_curr != null && avg_prev != null) avg_diff = Math.abs(avg_curr - avg_prev);
 
