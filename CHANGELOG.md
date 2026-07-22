@@ -14,35 +14,40 @@
 
 ---
 
-## 2026-07-21 — Sofőr főoldal: az elvégzett (Finalizat) fuvar CSAK a menetlevélbe kerül + fuvar-kártyák sorszámmal (#1..N) + összecsukott fejléc = szám + felrakás dátuma + felrakási hely
+## 2026-07-21 — Sofőr főoldal: elvégzett + parkolt/raktári fuvar CSAK a menetlevélbe kerül + fuvar-kártyák sorszámmal (#1..N) + összecsukott fejléc = szám + felrakás dátuma + felrakási hely
 
 ### Gyökér
 
 Két összefüggő UX-igény:
 1. A `Finalizat` (elvégzett) fuvar eddig a sofőr **főoldalán** is látszott a
    teljesítés utáni türelmi ideig (0 menetlevélig „örökké", 1× után 3 nap,
-   2× után 15 perc). A sofőr főoldalon már lezárt fuvarokkal találkozott —
-   a **kész fuvar helye a menetlevél**, nem a főoldal.
+   2× után 15 perc). Ugyanígy a `Parkolt`/`Raktarban` (áru-leadás) fuvar is
+   ott maradt a főoldalon, ha az `email_sofer` még a sofőrre mutatott. A
+   sofőr főoldalon már lezárt/leadott fuvarokkal találkozott — a **kész +
+   leadott fuvar helye a menetlevél**, nem a főoldal.
 2. Az összecsukott fuvar-kártya csak a `felrakó → lerakó` címeket mutatta,
    sorszám nem volt → a sofőr nem látta, hányadik fuvarát kell csinálnia.
 
 ### Változtatás
 
-**`handlers/orders.js` `getMySoferOrders`** — a `dash_visible` mostantól
-CSAK az aktív státuszokat engedi a főoldalra (`Alocat`, `In Curs`,
-`Parkolt`, `Raktarban`); minden `Finalizat` fuvar `dash_visible=false`
+**`handlers/orders.js` `getMySoferOrders`** — a `dash_visible` szigorodott:
+mostantól CSAK a **valóban élő** aktív fuvar (`Alocat`, `In Curs`) látszik
+a főoldalon; a `Finalizat` + `Parkolt` + `Raktarban` mind `dash_visible=false`
 (függetlenül a menetlevél-számtól és a `finalized_at` időtől). A
-`waybill_visible` (menetlevél-picker) logikája **változatlan** — a lezárt
-fuvar ott a mentett menetlevélig / 3 napig / 15 percig továbbra is
-kiválasztható.
+`waybill_visible` (menetlevél-picker) logikája **változatlan** — a
+lezárt/leadott fuvar ott a mentett menetlevélig / 3 napig / 15 percig
+továbbra is kiválasztható (a Parkolt/Raktarban továbbra is `true`
+horgonnyal).
 
 **`public/sofer.js` `loadDashOrders`** — a szűrt aktív listát megfordítjuk
 (szerver `created_at DESC` → kliens ASC, legrégebbi fuvar = #1), és a
 `renderFuvarCard(o, idx)` 1-alapú `idx`-et kap. Így új kiosztás nem üti át
 a meglévő fuvarok sorszámát: a régiek maradnak (#1, #2), az újak a végére
-kerülnek (#3, #4, #5). Amikor egy fuvar lezárul, kiesik a listából — a
-következő kiosztás így újra 1-től számoz (nem `#5,#6,#7`, hanem `#3,#4,#5`
-példa: 4 aktívból 2 lezárul → maradék 2 = #1,#2 → új 3 kiosztás = #3,#4,#5).
+kerülnek (#3, #4, #5). Amikor egy fuvar lezárul (Finalizat / Parkolt /
+Raktarban), kiesik a listából — a következő kiosztás így újra 1-től számoz
+(nem `#5,#6,#7`, hanem `#3,#4,#5` példa: 4 aktívból 2 lezárul → maradék
+2 = #1,#2 → új 3 kiosztás = #3,#4,#5). A kliens-oldali defenzív fallback
+(dash_visible mező hiányában) is szigorodott: csak `Alocat`/`In Curs`.
 
 **`public/sofer.js` `renderFuvarCard`** — az összecsukott fejléc új
 felépítése: `#N` badge + `📅 felrakás dátuma` + `📍 felrakási hely` + `▾`.

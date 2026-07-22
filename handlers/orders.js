@@ -225,11 +225,12 @@ handlers.getMySoferOrders = async function (req, res, args) {
       // finalized_at: a Finalizat időbélyege (menetlevél-picker kiöregítéséhez).
       // waybill_at: a legkorábbi mentett menetlevél dátuma, amin szerepel a fuvar
       //   (a fuvarlevelek.order_ids JSONB tömb tartalmazza-e a fuvar id-jét).
-      // dash_visible: CSAK aktív fuvar (Alocat/In Curs/Parkolt/Raktarban) — a
-      //   Finalizat fuvar a főoldalról kiesik és kizárólag a menetlevél-picker-ben
-      //   marad (felhasználói kérés: elvégzett fuvar csak a menetlevélbe legyen látható).
-      //   Parkolt/Raktarban is látszik, ha a fuvar még a sofőrhöz van rendelve
-      //   (email_sofer) — különben „némán" eltűnne a kezéből (csak olvasható).
+      // dash_visible: SZIGORÚAN csak élő fuvar (Alocat/In Curs) — ami a
+      //   sofőr keze alatt van. A Finalizat, Parkolt, Raktarban mind
+      //   „lezárt/leadott" a sofőr szempontjából → a főoldalról KIESIK,
+      //   kizárólag a menetlevél-picker-ben marad (waybill_visible).
+      //   Felhasználói kérés: az elvégzett + tényleges parkolásba/raktárba
+      //   került fuvar csak a menetlevélben legyen látható.
       // waybill_visible: minden kiosztott fuvar, DE a mentett menetlevél után csak 3 napig.
       const r = await pool.query(
         `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare, o.km,
@@ -240,10 +241,11 @@ handlers.getMySoferOrders = async function (req, res, args) {
                 o.handover_status, o.handover_type, o.handover_loc,
                 o.finalized_at,
                 wb.waybill_at, wb.waybill_last, COALESCE(wb.waybill_count, 0) AS waybill_count,
-                -- dash_visible: CSAK aktív fuvar — Finalizat SOHA nem látszik
-                -- a főoldalon (a menetlevél-picker-ben viszont igen, waybill_visible)
+                -- dash_visible: CSAK élő aktív fuvar (Alocat/In Curs). A
+                -- Finalizat + Parkolt + Raktarban SOHA nem látszik a főoldalon
+                -- (menetlevél-picker-ben viszont igen, waybill_visible).
                 CASE
-                  WHEN o.status IN ('Alocat', 'In Curs', 'Parkolt', 'Raktarban') THEN true
+                  WHEN o.status IN ('Alocat', 'In Curs') THEN true
                   ELSE false
                 END AS dash_visible,
                 -- waybill_visible (menetlevél picker): mint dash_visible — amíg NINCS

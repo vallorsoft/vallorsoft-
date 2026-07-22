@@ -1663,14 +1663,13 @@ function loadDashOrders() {
     var list = d.result || [];
     var el = document.getElementById('kiosztottList');
     if (!el) return;
-    // Dashboard: CSAK aktív (Alocat/In Curs/Parkolt/Raktarban) — a Finalizat
-    // már a menetlevél-picker-be tartozik. Defenzív: ha a dash_visible mező
-    // hiányzik (régi, újra nem indított szerver), visszaesünk a státusz-alapú
-    // szűrésre — így a fuvarok nem tűnnek el.
+    // Dashboard: CSAK élő aktív fuvar (Alocat/In Curs). A Finalizat + Parkolt
+    // + Raktarban „lezárt/leadott" → már a menetlevél-picker-be tartozik.
+    // Defenzív: ha a dash_visible mező hiányzik (régi, újra nem indított
+    // szerver), visszaesünk a szigorúbb státusz-alapú szűrésre.
     var active = list.filter(function(o){
       if (typeof o.dash_visible === 'boolean') return o.dash_visible;
-      return o.status === 'Alocat' || o.status === 'In Curs' ||
-             o.status === 'Parkolt' || o.status === 'Raktarban';
+      return o.status === 'Alocat' || o.status === 'In Curs';
     });
     // A szerver `created_at DESC` sorrendben ad — a főoldali sorszámhoz
     // (legrégebbi = #1) megfordítjuk. Így új kiosztás nem üti át a meglévők

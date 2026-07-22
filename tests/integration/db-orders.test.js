@@ -81,13 +81,14 @@ d('Valódi DB integráció (orders / sofőr / handover / planner)', () => {
     expect(o.finalized_at).not.toBeNull();
   });
 
-  test('getMySoferOrders dash_visible: CSAK aktív fuvar látszik a főoldalon; a Finalizat sosem (csak a menetlevélben, waybill_visible)', async () => {
+  test('getMySoferOrders dash_visible: CSAK élő aktív fuvar (Alocat/In Curs); a Finalizat + Parkolt + Raktarban a menetlevélbe kerül', async () => {
     const mk = (id, status, fin) => pool.query(
       'INSERT INTO orders (id, company_id, email_sofer, status, finalized_at) VALUES ($1,$2,$3,$4,$5)',
       [id, companyId, DRIVER, status, fin]);
     await mk('CMD-A', 'Alocat', null);
-    await mk('CMD-P', 'Parkolt', null);
-    await mk('CMD-R', 'Raktarban', null);
+    await mk('CMD-C', 'In Curs', null);
+    await mk('CMD-P', 'Parkolt', null);      // tényleges parkolásba → főoldalról kiesik
+    await mk('CMD-R', 'Raktarban', null);    // tényleges raktárba → főoldalról kiesik
     await mk('CMD-FN', 'Finalizat', new Date());                           // ma zárt, MÉG NINCS menetlevél
     await mk('CMD-FO', 'Finalizat', new Date(Date.now() - 5 * 86400000));   // 5 napos, MÉG NINCS menetlevél
     // 5 napos Finalizat, DE már készült róla menetlevél 5 napja → menetlevél-picker-ből is kiesett
@@ -99,15 +100,19 @@ d('Valódi DB integráció (orders / sofőr / handover / planner)', () => {
     await orders.getMySoferOrders(reqAs({ company_id: companyId, email: DRIVER, pozicio: 'Sofer' }), res, []);
     const dash = {}, way = {};
     res.body.result.forEach((r) => { dash[r.id] = r.dash_visible; way[r.id] = r.waybill_visible; });
-    // Főoldal: csak aktív státuszok
+    // Főoldal: CSAK Alocat + In Curs. Minden más lezárt/leadott → nincs itt.
     expect(dash['CMD-A']).toBe(true);
-    expect(dash['CMD-P']).toBe(true);      // regresszió-őr: leadott fuvar nem tűnik el
-    expect(dash['CMD-R']).toBe(true);
+    expect(dash['CMD-C']).toBe(true);
+    expect(dash['CMD-P']).toBe(false);     // tényleges parkolás → kiesik a főoldalról
+    expect(dash['CMD-R']).toBe(false);     // tényleges raktár → kiesik a főoldalról
     expect(dash['CMD-FN']).toBe(false);    // Finalizat → nincs a főoldalon
     expect(dash['CMD-FO']).toBe(false);    // Finalizat → nincs a főoldalon (menetlevél nélkül is)
     expect(dash['CMD-FW']).toBe(false);
-    // Menetlevél-picker: Finalizat itt látszik (amíg nincs menetlevél / friss zárás)
+    // Menetlevél-picker: Parkolt/Raktarban/Finalizat itt marad (amíg horgony van)
     expect(way['CMD-A']).toBe(true);
+    expect(way['CMD-C']).toBe(true);
+    expect(way['CMD-P']).toBe(true);       // parkolt fuvar a menetlevélbe kerül
+    expect(way['CMD-R']).toBe(true);       // raktári fuvar a menetlevélbe kerül
     expect(way['CMD-FN']).toBe(true);      // ma zárt → picker-ben
     expect(way['CMD-FO']).toBe(true);      // menetlevél nélkül SOSEM tűnik el a picker-ből
     expect(way['CMD-FW']).toBe(false);     // menetlevél már van + 5 napos → picker-ből is kiesett
