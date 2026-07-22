@@ -422,6 +422,56 @@ describe('getMySoferStats — átlagos fogyasztás + figyelmeztetések', () => {
     expect(res.body.result.manager_warn_diff).toBe(true);
   });
 
+  test('PETO-ESET: júl. menetlevél jún.-dátumú tétellel — avg_curr per-tétel dátum szerint, NEM a teljes alimentari-SUM', async () => {
+    // Regresszió-őr a per-tétel dátum ↔ avg_curr inkonzisztenciára.
+    // A júl.21-i per-tétel dátum bevezetése után a UI-n megjelenő TANKOLVA
+    // (`tl_curr`) per-tétel dátum szerint bucketolódott, DE a mellette lévő
+    // avg_curr képlete még mindig a menetlevél TELJES alimentari-tömbjét
+    // összegezte → hamisan magas L/100km. Ez a teszt biztosítja, hogy a
+    // képlet ugyanazt a liter-értéket használja mint amit a UI kiír.
+    setUser(SOFER);
+    mockChain({
+      ord: { lezart: 1, lezart_prev: 0, aktiv: 0 },
+      fuvs: [
+        // Egy júliusi menetlevél 7215 km + két tankolás:
+        //   • 500 L jún. 28-i dátummal (utólag beírt, még jún.-i volt fizikailag)
+        //   • 2018 L júl. 10-i dátummal (a valós júl. tankolás)
+        // Per-tétel dátum: tl_curr = 2018 (júl.), tl_prev = 500 (jún.)
+        // Régi (buggy) képlet: tanked = 500+2018 = 2518
+        //   → avg = (500 + 2518 - 500) × 100 / 7215 = 34.90 L/100km ✗
+        // Új (fix) képlet: tanked = tl_curr = 2018
+        //   → avg = (500 + 2018 - 500) × 100 / 7215 = 27.97 L/100km ✓
+        { id: 1, numar_camion: 'B111', indulas_dt: '2026-07-01T08:00:00Z',
+          erkezes_dt: '2026-07-25T18:00:00Z', data_completare: '2026-07-25',
+          km_inceput: 100000, km_sfarsit: 107215, total_km: 7215,
+          cant_inceput: 500, cant_sfarsit: 500,
+          diurna_externa: 20, diurna_interna: 0,
+          alimentari: [
+            { litru: 500, data: '2026-06-28' },
+            { litru: 2018, data: '2026-07-10' },
+          ] },
+      ],
+      snaps: [], assigned: []  // menetlevél-fallback módban (nincs snapshot)
+    });
+    const res = await call('getMySoferStats', []);
+    expect(res.body.result.ok).toBe(true);
+    // TANKOLVA (per-tétel dátum) — a UI-n megjelenő érték
+    expect(res.body.result.tankolt_l).toBe(2018);
+    expect(res.body.result.tankolt_l_prev).toBe(500);
+    // avg_curr — ugyanazt a 2018 L-t használja mint a UI-n megjelenő TANKOLVA,
+    // NEM a teljes alimentari-SUM-ot (2518 L). Elvárt: ~27.97 L/100km.
+    // (Régi buggy érték: ~34.90 → határozottan a 32-nél nagyobb, ezt kizárjuk.)
+    const av = res.body.result.avg_curr;
+    expect(av).not.toBeNull();
+    expect(Math.round(av * 10) / 10).toBe(28.0);   // 27.97 kerekítve
+    expect(av).toBeLessThan(30);
+    // avg_prev = null: egy jún.-dátumú tétel VAN a júliusi menetlevélben, de
+    // nincs júniusi arrival waybill → nincs első/utolsó cant_inceput/sfarsit
+    // → calcAvg fls üres esetén null-t ad. (Ez a viselkedés helyes: az egy
+    // beütött jún.-dátumú tétel önmagában nem elég egy átlagfogyasztáshoz.)
+    expect(res.body.result.avg_prev).toBeNull();
+  });
+
   test('közepes hó-közti eltérés (>2.5 de ≤4.5): CSAK manager warn', async () => {
     setUser(SOFER);
     mockChain({

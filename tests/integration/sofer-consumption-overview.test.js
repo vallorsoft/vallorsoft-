@@ -209,3 +209,38 @@ describe('getSoferConsumptionOverview — cross-sofőr összehasonlítás', () =
     expect(sofs[1].deviates).toBe(true);
   });
 });
+
+describe('getSoferConsumptionOverview — PER-TÉTEL DÁTUM az avg-ban (Peto-eset)', () => {
+  test('júl. arrival menetlevél jún.-dátumú tétellel: avg_curr per-tétel dátumot használja', async () => {
+    // Ugyanaz a regresszió-teszt mint a `getMySoferStats`-ban, de a
+    // cross-sofőr admin panelre. A calcAvg mindkét handlerben egységesen
+    // per-tétel dátum szerint kell számoljon a `tanked` értékkel.
+    setUser(ADMIN);
+    mockChain({
+      sofers: [{ id: 100, email: 'peto@ceg.hu', nume: 'Peto' }],
+      fuvs: [
+        // Egy júliusi menetlevél 7215 km + két tankolás:
+        //   • 500 L jún. 28-i dátummal (utólag beírt)
+        //   • 2018 L júl. 10-i dátummal (a valós júl. tankolás)
+        // Régi (buggy) képlet: tanked = 2518 → avg ≈ 34.90 ✗
+        // Új (fix) képlet: tanked = tl_curr = 2018 → avg ≈ 27.97 ✓
+        { id: 1, email_sofer: 'peto@ceg.hu', numar_camion: 'B111',
+          indulas_dt: '2026-07-01T08:00:00Z', erkezes_dt: '2026-07-25T18:00:00Z',
+          data_completare: '2026-07-25',
+          km_inceput: 100000, km_sfarsit: 107215,
+          cant_inceput: 500, cant_sfarsit: 500,
+          alimentari: [
+            { litru: 500, data: '2026-06-28' },
+            { litru: 2018, data: '2026-07-10' },
+          ] },
+      ],
+      snaps: [], assigned: []
+    });
+    const res = await call('getSoferConsumptionOverview', []);
+    expect(res.body.result.ok).toBe(true);
+    const s = res.body.result.sofers[0];
+    // avg_curr = (500 + 2018 - 500) × 100 / 7215 = 27.97 (a régi buggy: 34.90)
+    expect(Math.round(s.avg_curr * 10) / 10).toBe(28.0);
+    expect(s.avg_curr).toBeLessThan(30);
+  });
+});
