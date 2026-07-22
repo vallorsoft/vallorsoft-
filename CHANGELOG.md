@@ -14,6 +14,35 @@
 
 ---
 
+## 2026-07-22 — ÚJ: sofőr menetlevél — bon (tankolás/vásárlás) fotózás → AI (Gemini) kiolvasás → új sor előtöltve
+
+### Miért
+A sofőrök gyakran útközben tankolnak vagy vásárolnak (mosás, gumi, olaj, autópálya-matrica stb.), és a menetlevélbe a bonrol kézzel kellett átvezetniük minden mezőt (helyszín, dátum, liter, összeg, fizetés-mód). Ez időt visz és hibalehetőség (elgépelt liter, rossz dátum). Kérés: fotózza le a bont, az AI olvassa ki, és a menetlevél Tankolások/Kiadások szekciójába egy előtöltött sor kerüljön — amit a sofőr átnéz és a többi mezővel együtt menti; a hiányzó mezők üresen maradnak.
+
+### Mi történt
+1. **Új backend handler `handlers/receiptScan.js` (`scanReceipt` RPC)** — a sofőr/admin/manager egy base64-esbe csomagolt bon-fotót vagy PDF-et küld; a handler bon-specifikus rendszer-prompttal hívja a Google Gemini-t (ugyanaz a modell-lánc mint a fuvar-inbound `reparse`-nál: `gemini-2.0-flash` → `-flash-lite` → `-2.5-flash` → `-2.5-flash-lite` → `-1.5-flash` → `-1.5-flash-8b`; 429/503 esetén automatikusan a következő modellre vált, mert minden modellnek külön napi ingyenes kerete van). A Gemini a bont a `kind: "fuel"|"purchase"` mezővel is besorolja (Motorină/AdBlue = fuel; minden más = purchase), és visszaadja a `loc`/`data (YYYY-MM-DD)`/`tip (Motorină|AdBlue)`/`litru`/`km`/`plata (Card|Cash|Flota Card|DKV)`/`suma`/`valuta`/`produs`/`confidence` mezőket. A handler **fehérlistán validál** minden érkező mezőt (`plata`/`tip` csak a menetlevél-űrlap opcióiból; `data` csak ISO YYYY-MM-DD; számokat számmá konvertál) — nem propagál "kreatív" Gemini-kulcsokat a kliensbe. Kapuk: bejelentkezés + `Sofer|Admin|Manager` szerep + `ai-kiolvasas` csomag-flag (a fuvar-inbound `reparse` gate-jével egyenlő) + `GEMINI_API_KEY` env. Base64-méret korlát 8 MB (mobil-fotó bőven belefér). Audit-naplózva (`receipt.scan`).
+
+2. **Sofőr UI (`public/sofer.html` + `sofer.js`)** — a menetlevél 2. lépésén (⛽ Tankolások / 🛒 Kiadások) az „➕ Tankolás/Kiadás hozzáadása" gomb MELLÉ egy **narancs „📷 Bon szkennelés (AI)" gomb** került (kétnyelvű `data-i18n`). Koppintásra a rejtett `<input type="file" accept="image/*,application/pdf" capture="environment">` a natív kamerát/galériát nyitja. A kép **kliens-oldalon átméretezve** (max 1600px hosszú oldal, JPEG q=0.85, canvas) — a mobil-fotó (5–15 MB) is elfér a szerver 8 MB-os korlátjában, és a Gemini gyorsabban válaszol. Kiolvasás közben egy narancs „🔎 Bon feldolgozása AI-val…" sáv látszik. A válasz mezői a Gemini `kind`-jét követve **egy új `addAlimRow(f)` vagy `addAchRow(f)` sorba** töltődnek (a `sof.alim-*`/`ach-*` mezőkbe — pontosan úgy, mintha a sofőr kézzel írta volna be), majd `draftSave()` a piszkozatba menti — a sofőr átnézheti és javíthatja mielőtt beküldi a menetlevelet.
+
+3. **i18n** — 6 új `sof.scan*` kulcs a `public/i18n.js`-ben (`scanReceiptFuel`/`scanReceiptPurchase`/`scanBusy`/`scanOk`/`scanFailed`/`scanReadErr`), RO-alap + HU.
+
+4. **Regisztráció + cache-bust** — a `handlers/receiptScan` bekötve a `routes/execute.js` registry-be. Cache-bust: `sofer.html` `sofer.js?v=20260722scan` + `i18n.js?v=20260722scan`.
+
+5. **Teszt (`tests/unit/receiptScan.test.js`, 12 eset)** — Gemini `fetch`-e mockolva: szerep-kapuk (sofer/admin/manager engedve, más tiltva; nincs bejelentkezés → tiltva), csomag-kapu (feature ki → tiltva), env-kapu (`GEMINI_API_KEY` nélkül → jelezve), fájl-validáció (rossz mimetype, üres, >8 MB), fuel + purchase kiolvasás fehérlistázva, `_sanitize` (ismeretlen `plata`/`tip`/nem-ISO `data`/nem-szám `confidence` mind kiszűrve), modell-lánc (mind 429 → érthető végső hiba; 400 → azonnal áll). **12/12 zöld → teljes suite 672 Jest zöld (43 skip valós DB-teszt).**
+
+### Miért így
+- **Nincs séma-változás** — a bon-fotó a menetlevél-piszkozatba egy új tankolás/vásárlás sorként érkezik; a szerver nem ment külön táblát a nyers képhez (a fotó a menetlevél-beküldéskor a meglévő `fuvarlevelek` folyamaton át kerülhet, ha kell — külön kör). Ez a leggyorsabb, legkevesebbet érintő megoldás.
+- **A Gemini rendszer-promt bon-specifikus** — nem az `order-ai` (fuvar-megrendelés) prompt egy általánosítása, mert a bon-mezők (kind/litru/km/plata/tip/produs) mások, és a Gemini akkor a legpontosabb, ha egyértelmű, mit várunk. A modell-lánc + fetch pattern viszont a bevált (order-ai `gemini.js`) kód mintáját követi.
+- **Csomag-kapu ugyanaz** (`ai-kiolvasas`) — az AI-kiolvasás egyetlen csomag-flag mögé rendezve; nincs új feature-flag, ami menedzselni kell.
+- **A Gemini `kind`-je felülbírálja a gomb-választást** — ha a sofőr a „Vásárlás"-gombra koppintott, de az AI fuel-bonnak látja (vagy fordítva), a Gemini besorolását követjük. Így a rossz gombra koppintva sem raked el semmit.
+
+### Regresszió-védelem
+- **12 új Jest** (szerep/env/csomag-kapu + fájl-validáció + siker fuel/purchase + `_sanitize` + modell-lánc + azonnali-hiba). **Teljes suite 672 zöld** (require-sweep 125 zöld).
+- A `sanitize` **fehérlistán** engedi át a mezőket → egy jövőbeli Gemini-modell-váltás sem szivárogtathat váratlan kulcsot a kliensbe.
+- A kliens **kép-átméretezés** biztosítja, hogy a mobil-fotó ne blokkoljon a szerver 8 MB-os határánál (silent), és a Gemini inline-limitjéhez is bőven fér.
+
+---
+
 ## 2026-07-22 — FIX: sofőr mobil-app „telefon-lock után nem működik, csak Kilépés+újralépés után" — visibility-alapú session-recovery + 8 órás idle-limit + főoldali auto-refresh
 
 ### Miért

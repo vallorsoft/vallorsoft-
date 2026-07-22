@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260718wa"></script>
+  <script src="/i18n.js?v=20260722scan"></script>
   <link rel="stylesheet" href="/sofer.css?v=20260722sess">
   <script src="/push-client.js?v=20260614qa"></script>
   <!-- Sofor mobil-app: 8 ora idle-limit (vezetes kozben oraig nem koppint a
@@ -296,11 +296,23 @@
 
       <div class="section-head" data-i18n="sof.fuelings">⛽ Tankolások (Alimentări)</div>
       <div id="alimentariContainer"></div>
-      <button class="add-row-btn" onclick="addAlimRow()" data-i18n="sofer.addAlim">➕ Tankolás hozzáadása</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="add-row-btn" onclick="addAlimRow()" data-i18n="sofer.addAlim" style="flex:1;min-width:180px;">➕ Tankolás hozzáadása</button>
+        <button class="add-row-btn scan-btn" onclick="scanReceiptPick('fuel')" data-i18n="sof.scanReceiptFuel" style="flex:1;min-width:180px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;">📷 Bon szkennelés (AI)</button>
+      </div>
 
       <div class="section-head" data-i18n="sof.expenses">🛒 Kiadások (Achiziții)</div>
       <div id="achizitiiContainer"></div>
-      <button class="add-row-btn" onclick="addAchRow()" data-i18n="sofer.addAch">➕ Kiadás hozzáadása</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="add-row-btn" onclick="addAchRow()" data-i18n="sofer.addAch" style="flex:1;min-width:180px;">➕ Kiadás hozzáadása</button>
+        <button class="add-row-btn scan-btn" onclick="scanReceiptPick('purchase')" data-i18n="sof.scanReceiptPurchase" style="flex:1;min-width:180px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;">📷 Bon szkennelés (AI)</button>
+      </div>
+
+      <!-- A bon-fotó/PDF kiválasztó (rejtett) — mobilon a natív kamerát/galériát nyitja. -->
+      <input type="file" id="receiptScanFile" accept="image/*,application/pdf" capture="environment" style="display:none;">
+      <div id="receiptScanBusy" style="display:none;margin-top:8px;padding:10px 14px;border-radius:10px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);font-size:13px;color:#fbbf24;text-align:center;">
+        <span data-i18n="sof.scanBusy">🔎 Bon feldolgozása AI-val…</span>
+      </div>
 
       <div class="field" style="margin-top:16px;"><label data-i18n="sofer.otherNotes">Alte mențiuni</label><textarea class="textarea" id="fMentiuni" placeholder="Egyéb megjegyzések..." data-i18n-ph="sofer.otherNotesPh"></textarea></div>
 
@@ -361,7 +373,7 @@
 </div><!-- /sofer-wrap -->
 
 <script src="/sofer-uit.js?v=20260614qa"></script>
-<script src="/sofer.js?v=20260722sess"></script>
+<script src="/sofer.js?v=20260722scan"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 
 <!-- ── ÁRU LEADÁSA MODAL (sofőr-kérés — admin visszaigazolja) ── -->

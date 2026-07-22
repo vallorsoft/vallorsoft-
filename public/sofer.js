@@ -685,6 +685,128 @@ function addAchRow(a) {
 }
 
 // ============================================================
+// 📷 BON SZKENNELÉS (AI) — tankolás vagy vásárlás fotózása; a Gemini
+// visszaadott mezői egy új alim/ach sorba töltődnek, és a piszkozat
+// azonnal mentődik (draftSave). Kép mérete: kliens-oldalon max ~2 MB-ra
+// arányosan lekicsinyítjük (canvas), így a felkínált mobil-fotó (5–15 MB)
+// se akaszt el minket a szerver 8 MB-os korlátjához.
+// ============================================================
+var _receiptScanKind = 'fuel';   // 'fuel' | 'purchase' — melyik gomb hívta
+
+function scanReceiptPick(kind) {
+  _receiptScanKind = (kind === 'purchase') ? 'purchase' : 'fuel';
+  var f = document.getElementById('receiptScanFile');
+  if (!f) return;
+  f.value = ''; // hogy ugyanaz a fájl újra kiválasztható legyen
+  f.click();
+}
+
+// Kép lekicsinyítése base64-be. PDF esetén nem konvertálunk (áteresztjük).
+function _receiptToBase64(file, cb) {
+  if (!file) { cb(null); return; }
+  if (file.type === 'application/pdf') {
+    var fr = new FileReader();
+    fr.onload = function () {
+      var s = String(fr.result || '');
+      var i = s.indexOf(',');
+      cb({ mimeType: 'application/pdf', data: i >= 0 ? s.slice(i + 1) : s });
+    };
+    fr.onerror = function () { cb(null); };
+    fr.readAsDataURL(file);
+    return;
+  }
+  // Kép: canvas-ra rajzoljuk, ha nagyobb mint 1600px hosszú oldal, arányosan
+  // átméretezzük (a bonhoz bőven elég, és a Gemini így gyorsabb / kisebb).
+  var img = new Image();
+  var url = URL.createObjectURL(file);
+  img.onload = function () {
+    try {
+      var maxDim = 1600;
+      var w = img.naturalWidth || img.width;
+      var h = img.naturalHeight || img.height;
+      var scale = Math.min(1, maxDim / Math.max(w, h));
+      var cw = Math.round(w * scale), ch = Math.round(h * scale);
+      var cv = document.createElement('canvas');
+      cv.width = cw; cv.height = ch;
+      cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+      // JPEG 0.85 minőség — olvasható bon, kompakt méret
+      var dataUrl = cv.toDataURL('image/jpeg', 0.85);
+      var i = dataUrl.indexOf(',');
+      cb({ mimeType: 'image/jpeg', data: i >= 0 ? dataUrl.slice(i + 1) : dataUrl });
+    } catch (e) { cb(null); }
+    finally { URL.revokeObjectURL(url); }
+  };
+  img.onerror = function () { URL.revokeObjectURL(url); cb(null); };
+  img.src = url;
+}
+
+// A szerverre küldjük a Gemininek; a visszakapott mezőket egy új sorba
+// tesszük. Ha a Gemini "kind"-ot ad, azt tiszteljük; különben azt hisszük,
+// amit a felhasználó választott.
+function scanReceiptSend(file) {
+  var busy = document.getElementById('receiptScanBusy');
+  if (busy) busy.style.display = 'block';
+  _receiptToBase64(file, function (payload) {
+    if (!payload) {
+      if (busy) busy.style.display = 'none';
+      toast(t('sof.scanReadErr'), 'err');
+      return;
+    }
+    fetch('/api/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ functionName: 'scanReceipt', arguments: [payload] })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (busy) busy.style.display = 'none';
+        var r = (d && d.result) || {};
+        if (!r.ok) {
+          toast(t('sof.scanFailed') + ': ' + (r.err || ''), 'err');
+          return;
+        }
+        var f = r.fields || {};
+        // A "kind"-ot a szerver adja (a Gemini "kind"-ja fehérlistázva).
+        // Ha a Gemini "purchase"-nek látta, de a fuvarozó "fuel" gombra
+        // koppintott (vagy fordítva), a Gemini döntését követjük.
+        var kind = (f.kind === 'fuel' || f.kind === 'purchase') ? f.kind : _receiptScanKind;
+        if (kind === 'fuel') {
+          addAlimRow({
+            loc: f.loc || '', data: f.data || '',
+            tip: (f.tip === 'AdBlue') ? 'AdBlue' : 'Motorină',
+            litru: (f.litru != null) ? String(f.litru) : '0',
+            km: (f.km != null) ? String(f.km) : '0',
+            plata: f.plata || 'Card',
+            suma: (f.suma != null) ? String(f.suma) : '0'
+          });
+        } else {
+          addAchRow({
+            produs: f.produs || '',
+            loc: f.loc || '', data: f.data || '',
+            pret: (f.suma != null) ? String(f.suma) : '0',
+            plata: f.plata || 'Card'
+          });
+        }
+        try { draftSave(); } catch (_) {}
+        // A tétel automatikusan a listához fűzve — a sofőr átnézheti, javíthatja
+        // és mentheti a menetlevél többi részével együtt.
+        toast(t('sof.scanOk'), 'ok');
+      })
+      .catch(function () {
+        if (busy) busy.style.display = 'none';
+        toast(t('sof.scanFailed'), 'err');
+      });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  var f = document.getElementById('receiptScanFile');
+  if (f) f.addEventListener('change', function () {
+    if (f.files && f.files[0]) scanReceiptSend(f.files[0]);
+  });
+});
+
+// ============================================================
 // HATÁRÁTLÉPÉS SOROK
 // ============================================================
 function addHatarRow(dt, dir) {
