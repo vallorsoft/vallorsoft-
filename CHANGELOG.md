@@ -14,6 +14,33 @@
 
 ---
 
+## 2026-07-22 — ÚJ: főoldali „📷 Bon szkennelés" gomb + háttér-feldolgozás + perzisztens elfogadás-várólista
+
+### Miért
+Az előző körben (lentebb) a bon-fotózás a menetlevél 2. lépésén belül működött csak — és blokkolt: amíg a Gemini válaszolt, a sofőr a spinnert nézte. Kérés: a **főoldalról egy gomb** fotózzon; a feldolgozás **háttérben** menjen, hogy a sofőr közben dolgozhasson; ha időközben kilép a képernyőről, később **rákattinthasson és elfogadhassa** a kiolvasott adatokat.
+
+### Mi történt
+1. **Főoldali kártya (`sec-dash`)** — új „📷 Bon szkennelés (AI) — háttérben feldolgozódik" narancs gomb (`sof.dashScanBtn`) a mini-statisztika alatt; koppintásra a natív kamerát/galériát nyitja. A gomb + a várólista egyetlen `dash-scan-card` kártyában él.
+
+2. **Fire-and-forget fetch + perzisztens várólista** (`localStorage` `vs_sofer_receipt_queue`, max 20 tétel FIFO) — a `scanReceiptStart(file)` a kép kliens-oldali átméretezése (1600px hosszú oldal, JPEG q=0.85) után egy új `processing` státuszú tételt ír a várólistába (thumbnail + időbélyeg), majd elindítja a `fetch(/api/execute { keepalive:true })`-t → a válasz **nem várt** módon később futtatja a callbacket, ami a tételt `ready` (mezőkkel) vagy `error` státuszra írja át. A sofőr közben szabadon lép más képernyőre. A `keepalive:true` garantálja, hogy még a képernyő elhagyásakor is befejeződik a kérés. Toast: „Feltöltve — folytathatod, majd elfogadhatod".
+
+3. **Elfogadás-modal (`#receiptReviewModal`)** — a főoldali várólistában minden `ready` tétel „Áttekintés" gombja megnyit egy modalt, amiben a sofőr **szerkesztheti** a kiolvasott mezőket (Gemini nem tévedhetetlen), és tetszés szerint fuel↔purchase **típust is válthat** (a közös mezők — helyszín/dátum/összeg/fizetés — átkerülnek a másik nézetbe). Elfogadáskor a mezők egy új `alim`/`ach` sorként a menetlevél-piszkozatba (`sessionStorage`) kerülnek; ha a menetlevél 2. lépés éppen nyitva van, a DOM sor is beszúródik azonnal (`addAlimRow`/`addAchRow` + `draftSave`). Ha még nincs piszkozat, egy alap-vázlat automatikusan létrejön → a következő menetlevél-nyitáskor a `draftRestore` visszaállítja.
+
+4. **Elvetés** — „✕" gombbal (confirm-mel) a tétel törlődik a várólistából.
+
+5. **Robusztusság** — oldal-betöltéskor minden 60 mp-nél régebbi `processing` tétel automatikusan `error` státuszra vált (`sof.rr.interrupted`: „A feldolgozás megszakadt — kérlek fotózz újra") — így nem ragad örökké függőben, ha a fetch egy szélsőséges esetben (app kill, hálózat) nem tudott befejeződni. A `visibilitychange` (tab-visszatérés) is újrarajzolja a várólistát, és a `goSec('dash')` is.
+
+6. **A menetlevél 2. lépésén megmarad a fuel/purchase gomb-pár** (a gyors, közvetlen kiválasztásra), de mindkét út **ugyanabba a perzisztens várólistába** ír — a sofőr átléphet a főoldalra, és a lépés 2. gombbal indított feldolgozás is a főoldali kártyán jelenik meg.
+
+7. **i18n** — 17 új `sof.dashScanBtn`/`sof.scanQueued`/`sof.rr.*` kulcs (RO-alap + HU). Cache-bust: `sofer.html`/`sofer.js`/`sofer.css`/`i18n.js` `?v=20260722scanq`.
+
+### Regresszió-védelem
+- **Szerver-oldal (`handlers/receiptScan.js`) ÉRINTETLEN** — az előző körös 12 Jest-teszt továbbra is zöld; teljes suite **672 zöld** (43 skip valós DB-teszt). Require-sweep 125 modul 0 hiba.
+- A `sanitize` (backend fehérlista) minden mezőt védetten enged át → a szerkeszthető modalba is csak fehérlistás mezők (fuel: tip/litru/km/plata/suma; purchase: produs/plata/suma; közös: loc/data) kerülnek.
+- **Nincs séma-változás**, nincs új szerver-modul, nincs új függőség.
+
+---
+
 ## 2026-07-22 — ÚJ: sofőr menetlevél — bon (tankolás/vásárlás) fotózás → AI (Gemini) kiolvasás → új sor előtöltve
 
 ### Miért
