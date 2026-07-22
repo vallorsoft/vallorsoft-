@@ -139,6 +139,158 @@
     return '';
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  //  KERESŐ + ÖSSZEHASONLÍTÁS (2 sor egymás mellett) — közös segéd a
+  //  Sofőrök / Járművek / Ügyfelek statisztika-oldalakon.
+  //
+  //  Kliens-oldali (a betöltött listán fut). A hívó táblát „compare-able"-
+  //  ként regisztrálja: `stCompareInit(pane, {rows, keyOf, labelOf,
+  //  searchable, metrics})`, és a saját tábláját `data-cmp-pane` +
+  //  soronként `data-cmp-key`-vel jelöli meg. A helper felteszi a kereső
+  //  mezőt (fejléc jobb oldala) + a checkbox-oszlopot (a `#stCmp-<pane>-head`
+  //  / soronként `#stCmp-<pane>-cell-<key>` placeholder DIV-ekbe), és a
+  //  „🆚 Összehasonlítás" gombot ha 2 sor van kiválasztva.
+  // ══════════════════════════════════════════════════════════════════
+  var _stCmpState = {};  // pane -> { config, selectedKeys: Set }
+
+  // Hívja a load*() a stPanel(...) UTÁN — a fejlécben kereső+compare gomb.
+  // Rögzíti a config-ot (rows/keyOf/labelOf/metrics), és felfüggeszti a
+  // sor-szűrést + checkbox-kezelést a `#statsXBox`-ban.
+  function stCompareInit(pane, cfg) {
+    _stCmpState[pane] = { cfg: cfg, sel: new Set() };
+    // Kereső: minden módosításkor a `data-cmp-key` sorokat mutatja/elrejti.
+    var input = document.getElementById('stCmpSearch-' + pane);
+    if (input) {
+      input.oninput = function () {
+        var q = (input.value || '').trim().toLowerCase();
+        var box = document.getElementById(cfg.boxId);
+        if (!box) return;
+        box.querySelectorAll('tr[data-cmp-key]').forEach(function (tr) {
+          var lbl = (tr.getAttribute('data-cmp-label') || '').toLowerCase();
+          tr.style.display = (!q || lbl.indexOf(q) >= 0) ? '' : 'none';
+        });
+      };
+    }
+    // Delegált checkbox: max 2 sor jelölhető; a többit letiltjuk.
+    // Az egyszeri regisztrációt a box-elem `_stCmpBound` flag védi (a load()
+    // többszöri hívása így sem duplázza a handlert).
+    var box = document.getElementById(cfg.boxId);
+    if (box && !box._stCmpBound) {
+      box._stCmpBound = true;
+      box.addEventListener('change', function (e) {
+        var el = e.target;
+        if (!(el && el.matches && el.matches('input.stCmpChk[data-cmp-pane]'))) return;
+        var chkPane = el.getAttribute('data-cmp-pane');
+        var st = _stCmpState[chkPane]; if (!st) return;
+        var key = el.getAttribute('data-cmp-key');
+        if (el.checked) st.sel.add(key); else st.sel.delete(key);
+        // 2-nél több: az újat visszavesszük, jelezzük.
+        if (st.sel.size > 2) {
+          st.sel.delete(key); el.checked = false;
+          if (window.toast) toast(t('st.cmp.max2') || 'Maximum 2 rând poate fi comparat.', 'warn');
+        }
+        stCompareUpdateBar(chkPane);
+      });
+    }
+    // Új load() után újratölt: minden korábbi kijelölést törlünk, hogy a
+    // nem-létező sorra ne maradjon fantom-jelölés.
+    _stCmpState[pane].sel.clear();
+    stCompareUpdateBar(pane);
+  }
+
+  // A „🆚 Összehasonlítás" gomb aktiválás/deaktiválás + a kijelölt címkék.
+  function stCompareUpdateBar(pane) {
+    var st = _stCmpState[pane]; if (!st) return;
+    var btn = document.getElementById('stCmpBtn-' + pane);
+    var lbl = document.getElementById('stCmpSel-' + pane);
+    var n = st.sel.size;
+    if (btn) { btn.disabled = (n !== 2); btn.style.opacity = (n === 2) ? '1' : '.55'; }
+    if (lbl) {
+      var keys = Array.from(st.sel);
+      var labels = keys.map(function (k) {
+        var r = (st.cfg.rows || []).find(function (x) { return String(st.cfg.keyOf(x)) === String(k); });
+        return r ? st.cfg.labelOf(r) : k;
+      });
+      lbl.textContent = (n === 0) ? '' : (n + ' ' + (t('st.cmp.selected') || 'kijelölve') + ': ' + labels.join(' vs. '));
+    }
+  }
+
+  // A fejléc-blokk HTML-je (kereső mező + Compare gomb + kijelölés-info).
+  // A `pane` egyedi kulcs, a `placeholder` a helyi felirat (pl. "Keress sofőrt…").
+  function stCompareToolbarHtml(pane, placeholder) {
+    return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">'
+      + '<input class="input" id="stCmpSearch-' + pane + '" type="search" placeholder="' + esc(placeholder || (t('st.cmp.search') || 'Caută…')) + '" style="max-width:260px;padding:7px 12px;font-size:13px;">'
+      + '<span class="text-muted" id="stCmpSel-' + pane + '" style="font-size:12px;"></span>'
+      + '<span style="margin-left:auto;"></span>'
+      + '<button class="btn primary" id="stCmpBtn-' + pane + '" disabled style="padding:7px 14px;font-size:12px;" onclick="VS_STATS.openCompare(\'' + pane + '\')">🆚 ' + (t('st.cmp.btn') || 'Összehasonlítás') + '</button>'
+      + '</div>';
+  }
+
+  // A soronkénti KIJELÖLŐ CELLA HTML-je (első oszlop). A táblát így nő 1 oszloppal.
+  function stCompareCellHtml(pane, key) {
+    return '<td style="text-align:center;width:32px;">'
+      + '<input type="checkbox" class="stCmpChk" data-cmp-pane="' + pane + '" data-cmp-key="' + esc(String(key)) + '" '
+      + 'style="width:16px;height:16px;cursor:pointer;accent-color:#6366f1;">'
+      + '</td>';
+  }
+
+  // Az összehasonlító modal megnyitása — kiválasztott 2 sor metrikái egymás mellett.
+  function openCompare(pane) {
+    var st = _stCmpState[pane]; if (!st || st.sel.size !== 2) return;
+    var cfg = st.cfg;
+    var keys = Array.from(st.sel);
+    var rows = keys.map(function (k) {
+      return (cfg.rows || []).find(function (x) { return String(cfg.keyOf(x)) === String(k); });
+    });
+    if (!rows[0] || !rows[1]) return;
+
+    var metrics = cfg.metrics || [];
+    var trs = metrics.map(function (m) {
+      var v1 = m.value(rows[0]);
+      var v2 = m.value(rows[1]);
+      var n1 = parseFloat(v1), n2 = parseFloat(v2);
+      var winCls1 = '', winCls2 = '';
+      if (isFinite(n1) && isFinite(n2) && n1 !== n2 && !m.noWinner) {
+        var better = (m.higherIsBetter === false) ? (n1 < n2 ? 1 : 2) : (n1 > n2 ? 1 : 2);
+        if (better === 1) winCls1 = 'color:var(--status-ok);font-weight:800;';
+        else winCls2 = 'color:var(--status-ok);font-weight:800;';
+      }
+      var diffCell = '';
+      if (isFinite(n1) && isFinite(n2)) {
+        var d = n1 - n2;
+        var sign = d > 0 ? '+' : '';
+        diffCell = '<span class="text-muted" style="font-size:11px;">' + sign + stNum(d, m.dec != null ? m.dec : 0) + (m.unit ? ' ' + m.unit : '') + '</span>';
+      }
+      return '<tr>'
+        + '<td class="text-muted" style="font-size:12px;">' + esc(m.label) + '</td>'
+        + '<td style="text-align:right;' + winCls1 + '">' + (typeof v1 === 'string' ? v1 : stNum(v1, m.dec != null ? m.dec : 0)) + (m.unit ? ' <span class="text-muted" style="font-size:11px;">' + m.unit + '</span>' : '') + '</td>'
+        + '<td style="text-align:right;' + winCls2 + '">' + (typeof v2 === 'string' ? v2 : stNum(v2, m.dec != null ? m.dec : 0)) + (m.unit ? ' <span class="text-muted" style="font-size:11px;">' + m.unit + '</span>' : '') + '</td>'
+        + '<td style="text-align:right;">' + diffCell + '</td>'
+        + '</tr>';
+    }).join('');
+
+    var body = '<table class="table" style="width:100%;">'
+      + '<thead><tr>'
+      + '<th style="width:34%;">' + (t('st.cmp.metric') || 'Mutató') + '</th>'
+      + '<th style="text-align:right;">' + esc(cfg.labelOf(rows[0])) + '</th>'
+      + '<th style="text-align:right;">' + esc(cfg.labelOf(rows[1])) + '</th>'
+      + '<th style="text-align:right;">Δ</th>'
+      + '</tr></thead><tbody>' + trs + '</tbody></table>';
+
+    // Egyszerű overlay-modal (nincs függőség)
+    var ov = document.createElement('div');
+    ov.className = 'st-cmp-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    ov.onclick = function (e) { if (e.target === ov) document.body.removeChild(ov); };
+    ov.innerHTML = '<div class="glass" style="max-width:720px;width:100%;padding:22px;max-height:90vh;overflow:auto;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px;">'
+      + '<div class="text-primary" style="font-size:15px;font-weight:800;">🆚 ' + (t('st.cmp.title') || 'Összehasonlítás') + '</div>'
+      + '<button class="btn ghost" style="padding:6px 12px;font-size:13px;" onclick="this.closest(\'.st-cmp-overlay\').remove()">✕</button>'
+      + '</div>' + body + '</div>';
+    document.body.appendChild(ov);
+  }
+
+
   // ── Jogosultság: a Pénzügy fül láthatósága (admin adja) ──
   function applyPerms(cb) {
     if (_stPerms.loaded) { if (cb) cb(); return; }
@@ -325,9 +477,11 @@
             + '<thead><tr><th>' + t('st.cOrder') + '</th><th>' + t('st.cClient') + '</th><th style="text-align:right;">' + t('st.fin.cPrice') + '</th><th style="text-align:right;">' + t('st.cPaid') + '</th><th style="text-align:right;">' + t('st.fin.cRemain') + '</th><th>' + t('st.fin.cDone') + '</th><th style="text-align:center;">' + t('st.fin.cDue') + '</th><th>' + t('st.cStatus') + '</th><th></th></tr></thead>'
             + '<tbody>' + listRows + '</tbody></table></div>',
             '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-finance\')">' + t('st.csvExport') + '</button>')
-        + '<div id="stProfitBox"></div>';
+        + '<div id="stProfitBox"></div>'
+        + '<div id="stCarrierApBox"></div>';
 
       loadOrderProfit();
+      loadCarrierApAging();
 
       var months = stMonths([r.havi]);
       stChart('stChFinHavi', {
@@ -373,6 +527,51 @@
         + '<thead><tr><th>' + t('st.cOrder') + '</th><th>' + t('st.cClient') + '</th><th>' + t('st.fin.cDone') + '</th><th style="text-align:right;">' + t('st.cKm') + '</th><th style="text-align:right;">' + t('st.cRevenue') + '</th><th style="text-align:right;">' + t('st.fin.cToll') + '</th><th style="text-align:right;">' + t('st.fin.cCarrier') + '</th><th style="text-align:right;">' + t('st.fin.cCostRon') + '</th>'
         + (rate ? '<th style="text-align:right;">' + t('st.cResult') + '</th>' : '') + '</tr></thead>'
         + '<tbody>' + rows + '</tbody></table></div>');
+    }).catch(function () { box.innerHTML = ''; });
+  }
+
+  // ── Alvállalkozói AP-öregítés (a Pénzügy fülön, Kintlévőség aging alá) ──
+  // Analóg a kintlévőség-öregítéshez, csak a SZÁLLÍTÓI oldalról:
+  // 0-30 / 31-60 / 60+ nap bontás + legrégebbi lejárt AP-számla lista.
+  function loadCarrierApAging() {
+    var box = document.getElementById('stCarrierApBox');
+    if (!box) return;
+    gas('getCarrierApAging').then(function (r) {
+      if (!r || !r.ok) { box.innerHTML = ''; return; }
+      var ag = r.aging || {};
+      var lista = r.lista || [];
+      var listRows = lista.map(function (x) {
+        var marad = (parseFloat(x.amount) || 0) - (parseFloat(x.paid_amount) || 0);
+        var badge = x.keses_nap > 0
+          ? '<span class="badge err">' + t('st.fin.overdue') + ' ' + stNum(x.keses_nap, 0) + ' ' + (t('st.fin.daysShort') || 'zi') + '</span>'
+          : '<span class="badge warn">' + t('st.fin.days', { n: 0 }) + '</span>';
+        return '<tr>'
+          + '<td><b class="text-primary">' + esc(x.invoice_number || ('#' + x.id)) + '</b></td>'
+          + '<td>' + esc(x.carrier_nev || '—') + '</td>'
+          + '<td style="text-align:right;">' + stNum(x.amount, 2) + ' <span class="text-muted" style="font-size:11px;">' + esc(x.currency || '') + '</span></td>'
+          + '<td style="text-align:right;">' + stNum(x.paid_amount, 2) + '</td>'
+          + '<td style="text-align:right;font-weight:700;color:var(--status-danger);">' + stNum(marad, 2) + '</td>'
+          + '<td>' + stDate(x.issue_date) + '</td>'
+          + '<td style="text-align:center;">' + stDate(x.effective_due) + ' ' + badge + '</td>'
+          + '</tr>';
+      }).join('') || '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:18px;">' + (t('st.fin.noCarrierAp') || 'Nu există facturi neplătite către transportatori.') + '</td></tr>';
+      box.innerHTML = stPanel(t('st.fin.pCarrierAp') || '🧾 Alvállalkozói AP-öregítés (tartozásaink)',
+        '<div class="dash-veh-grid">'
+        + '<div class="dash-mini glass-soft"><div style="font-size:20px;">🟢</div><div style="font-size:22px;font-weight:800;color:var(--status-warn);">' + stNum(ag.d0_30, 0) + '</div><div class="text-muted" style="font-size:11px;">' + t('st.fin.a0_30') + '</div></div>'
+        + '<div class="dash-mini glass-soft"><div style="font-size:20px;">🟠</div><div style="font-size:22px;font-weight:800;color:var(--status-warn);">' + stNum(ag.d31_60, 0) + '</div><div class="text-muted" style="font-size:11px;">' + t('st.fin.a31_60') + '</div></div>'
+        + '<div class="dash-mini glass-soft"><div style="font-size:20px;">🔴</div><div style="font-size:22px;font-weight:800;color:var(--status-danger);">' + stNum(ag.d60p, 0) + '</div><div class="text-muted" style="font-size:11px;">' + t('st.fin.a60p') + '</div></div>'
+        + '</div>'
+        + '<div style="overflow-x:auto;margin-top:12px;"><table class="table">'
+        + '<thead><tr><th>' + (t('st.fin.cInvoice') || 'Számla') + '</th><th>' + (t('st.fin.cCarrier') || 'Alvállalkozó') + '</th>'
+        + '<th style="text-align:right;">' + (t('st.fin.cAmount') || 'Összeg') + '</th>'
+        + '<th style="text-align:right;">' + t('st.cPaid') + '</th>'
+        + '<th style="text-align:right;">' + t('st.fin.cRemain') + '</th>'
+        + '<th>' + (t('st.fin.cIssue') || 'Kiállítva') + '</th>'
+        + '<th style="text-align:center;">' + t('st.fin.cDue') + '</th></tr></thead>'
+        + '<tbody>' + listRows + '</tbody></table></div>'
+        + '<div class="text-muted" style="font-size:11px;margin-top:6px;">'
+        + (t('st.fin.carrierApHint') || 'Effektív esedékesség: due_date, vagy issue_date + 30 nap, vagy created_at + 30 nap (fallback).')
+        + '</div>');
     }).catch(function () { box.innerHTML = ''; });
   }
 
@@ -557,12 +756,15 @@
 
       var rows = list.map(function (s, i) {
         var medal = i === 0 ? '🥇 ' : i === 1 ? '🥈 ' : i === 2 ? '🥉 ' : '';
+        var key = s.email || String(i);
+        var labelSearch = (s.nume || '') + ' ' + (s.email || '');
         var profitCell = '';
         if (rate) {
           var p = (parseFloat(s.bevetel) || 0) - ((parseFloat(s.uzemanyag_ktg) || 0) + (parseFloat(s.vasarlas_ktg) || 0)) / rate;
           profitCell = '<td style="text-align:right;font-weight:700;color:' + (p >= 0 ? 'var(--status-ok)' : 'var(--status-danger)') + ';">' + stNum(p, 0) + '</td>';
         }
-        return '<tr>'
+        return '<tr data-cmp-key="' + esc(key) + '" data-cmp-label="' + esc(labelSearch) + '">'
+          + stCompareCellHtml('stats-drivers', key)
           + '<td><b class="text-primary">' + medal + esc(s.nume || s.email || '—') + '</b></td>'
           + '<td style="text-align:right;">' + stNum(s.fuvarok, 0) + '</td>'
           + '<td style="text-align:right;">' + stNum(s.lezart, 0) + '</td>'
@@ -575,17 +777,37 @@
           + '<td style="text-align:center;">' + stNum(s.diurna_ext, 0) + ' / ' + stNum(s.diurna_int, 0) + '</td>'
           + '<td style="text-align:right;">' + stNum(s.menetlevelek, 0) + '</td>'
           + '</tr>';
-      }).join('') || '<tr><td colspan="11" class="text-muted" style="text-align:center;padding:18px;">' + t('st.noData') + '</td></tr>';
+      }).join('') || '<tr><td colspan="12" class="text-muted" style="text-align:center;padding:18px;">' + t('st.noData') + '</td></tr>';
 
       box.innerHTML = stFilterBar('stats-drivers')
         + stPanel(t('st.dr.pTop'), stChartCanvas('stChDrvTop'))
         + stPanel(t('st.dr.pTable'),
-            '<div style="overflow-x:auto;"><table class="table">'
-            + '<thead><tr><th>' + t('st.cDriver') + '</th><th style="text-align:right;">' + t('st.cOrder') + '</th><th style="text-align:right;">' + t('st.cClosed') + '</th><th style="text-align:right;">' + t('st.cRevenue') + '</th><th style="text-align:right;">' + t('st.cKmWb') + '</th><th style="text-align:right;">L/100km</th><th style="text-align:right;">' + t('st.cFuelRon') + '</th><th style="text-align:right;">' + t('st.cBuyRon') + '</th>'
+            stCompareToolbarHtml('stats-drivers', t('st.cmp.searchDriver') || 'Caută șofer după nume / email…')
+            + '<div style="overflow-x:auto;"><table class="table">'
+            + '<thead><tr><th></th><th>' + t('st.cDriver') + '</th><th style="text-align:right;">' + t('st.cOrder') + '</th><th style="text-align:right;">' + t('st.cClosed') + '</th><th style="text-align:right;">' + t('st.cRevenue') + '</th><th style="text-align:right;">' + t('st.cKmWb') + '</th><th style="text-align:right;">L/100km</th><th style="text-align:right;">' + t('st.cFuelRon') + '</th><th style="text-align:right;">' + t('st.cBuyRon') + '</th>'
             + (rate ? '<th style="text-align:right;">' + t('st.cResult') + '</th>' : '')
             + '<th style="text-align:center;">' + t('st.dr.cDiurna') + '</th><th style="text-align:right;">' + t('st.cWaybill') + '</th></tr></thead>'
             + '<tbody>' + rows + '</tbody></table></div>',
             '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-drivers\')">' + t('st.csvExport') + '</button>');
+
+      // Compare init — a sofőr-tábla adott sorai
+      stCompareInit('stats-drivers', {
+        boxId: 'statsDriversBox',
+        rows: list,
+        keyOf: function (s) { return s.email; },
+        labelOf: function (s) { return s.nume || s.email || '—'; },
+        metrics: [
+          { label: t('st.cOrder') || 'Fuvarok', value: function (s) { return parseFloat(s.fuvarok) || 0; } },
+          { label: t('st.cClosed') || 'Lezárt', value: function (s) { return parseFloat(s.lezart) || 0; } },
+          { label: t('st.cRevenue') || 'Bevétel (EUR)', value: function (s) { return parseFloat(s.bevetel) || 0; }, unit: 'EUR' },
+          { label: t('st.cKmWb') || 'Km (menetlevél)', value: function (s) { return parseFloat(s.total_km) || 0; }, unit: 'km' },
+          { label: 'L/100km', value: function (s) { return parseFloat(s.consum_100) || 0; }, dec: 1, higherIsBetter: false },
+          { label: t('st.cFuelRon') || 'Üzemanyag (RON)', value: function (s) { return parseFloat(s.uzemanyag_ktg) || 0; }, unit: 'RON', higherIsBetter: false },
+          { label: t('st.cBuyRon') || 'Vásárlás (RON)', value: function (s) { return parseFloat(s.vasarlas_ktg) || 0; }, unit: 'RON', higherIsBetter: false },
+          { label: (t('st.dr.cDiurna') || 'Diurna') + ' (ext/int)', value: function (s) { return (parseFloat(s.diurna_ext) || 0) + ' / ' + (parseFloat(s.diurna_int) || 0); }, noWinner: true },
+          { label: t('st.cWaybill') || 'Menetlevél', value: function (s) { return parseFloat(s.menetlevelek) || 0; } }
+        ]
+      });
 
       var top = list.slice(0, 10);
       stChart('stChDrvTop', {
@@ -685,13 +907,16 @@
       var rows = list.map(function (v) {
         var nevleges = parseFloat(v.nevleges) || 0;
         var consum = parseFloat(v.consum_100) || 0;
+        var key = v.rendszam || v.rendszam_eredeti || '';
+        var labelSearch = (v.rendszam_eredeti || v.rendszam || '') + ' ' + (v.marca || '') + ' ' + (v.model || '');
         var diffBadge = '—';
         if (nevleges > 0 && consum > 0) {
           var diff = ((consum - nevleges) / nevleges) * 100;
           var cls = diff > 10 ? 'err' : diff > 0 ? 'warn' : 'ok';
           diffBadge = '<span class="badge ' + cls + '">' + (diff >= 0 ? '+' : '') + stNum(diff, 1) + '%</span>';
         }
-        return '<tr>'
+        return '<tr data-cmp-key="' + esc(key) + '" data-cmp-label="' + esc(labelSearch) + '">'
+          + stCompareCellHtml('stats-vehicles', key)
           + '<td><b class="text-primary">' + esc(v.rendszam_eredeti || v.rendszam || '—') + '</b>'
           + (v.marca ? '<div class="text-muted" style="font-size:11px;">' + esc(v.marca) + (v.model ? ' ' + esc(v.model) : '') + (v.an ? ' · ' + v.an : '') + '</div>' : '') + '</td>'
           + '<td style="text-align:center;">' + (v.activ === false ? '<span class="badge err">' + t('st.bIdle') + '</span>' : '<span class="badge ok">' + t('st.bActive') + '</span>') + '</td>'
@@ -709,19 +934,41 @@
           + '<td style="text-align:right;">' + (consum > 0 ? stNum(consum, 1) : '—') + '</td>'
           + '<td style="text-align:center;">' + diffBadge + '</td>'
           + '</tr>';
-      }).join('') || '<tr><td colspan="12" class="text-muted" style="text-align:center;padding:18px;">' + t('st.noData') + '</td></tr>';
+      }).join('') || '<tr><td colspan="13" class="text-muted" style="text-align:center;padding:18px;">' + t('st.noData') + '</td></tr>';
 
       box.innerHTML = stFilterBar('stats-vehicles')
         + '<div id="stGpsSnapshotBox"></div>'
         + '<div id="stGpsKmBox"></div>'
+        + '<div id="stIdleBox"></div>'
+        + '<div id="stServiceBox"></div>'
         + stPanel(t('st.ve.pTop'), stChartCanvas('stChVehTop'))
         + stPanel(t('st.ve.pTable'),
-            '<div style="overflow-x:auto;"><table class="table">'
-            + '<thead><tr><th>' + t('st.cVehicle') + '</th><th style="text-align:center;">' + t('st.cState') + '</th><th style="text-align:right;">' + t('st.cOrder') + '</th><th style="text-align:right;">' + t('st.cClosed') + '</th><th style="text-align:right;">' + t('st.cRevenue') + '</th><th style="text-align:right;">' + t('st.ve.cEurKm') + '</th><th style="text-align:right;">' + t('st.cKmWb') + '</th><th style="text-align:right;">' + t('st.cFuelRon') + '</th><th style="text-align:right;">' + t('st.ve.cService') + '</th>'
+            stCompareToolbarHtml('stats-vehicles', t('st.cmp.searchVehicle') || 'Caută vehicul după număr / marcă…')
+            + '<div style="overflow-x:auto;"><table class="table">'
+            + '<thead><tr><th></th><th>' + t('st.cVehicle') + '</th><th style="text-align:center;">' + t('st.cState') + '</th><th style="text-align:right;">' + t('st.cOrder') + '</th><th style="text-align:right;">' + t('st.cClosed') + '</th><th style="text-align:right;">' + t('st.cRevenue') + '</th><th style="text-align:right;">' + t('st.ve.cEurKm') + '</th><th style="text-align:right;">' + t('st.cKmWb') + '</th><th style="text-align:right;">' + t('st.cFuelRon') + '</th><th style="text-align:right;">' + t('st.ve.cService') + '</th>'
             + (rate ? '<th style="text-align:right;">' + t('st.cResult') + '</th>' : '')
             + '<th style="text-align:right;">L/100km</th><th style="text-align:center;">' + t('st.cDiff') + '</th></tr></thead>'
             + '<tbody>' + rows + '</tbody></table></div>',
             '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-vehicles\')">' + t('st.csvExport') + '</button>');
+
+      // Compare init — jármű-sorok
+      stCompareInit('stats-vehicles', {
+        boxId: 'statsVehiclesBox',
+        rows: list,
+        keyOf: function (v) { return v.rendszam; },
+        labelOf: function (v) { return v.rendszam_eredeti || v.rendszam || '—'; },
+        metrics: [
+          { label: t('st.cOrder') || 'Fuvarok', value: function (v) { return parseFloat(v.fuvarok) || 0; } },
+          { label: t('st.cClosed') || 'Lezárt', value: function (v) { return parseFloat(v.lezart) || 0; } },
+          { label: t('st.cRevenue') || 'Bevétel', value: function (v) { return parseFloat(v.bevetel) || 0; }, unit: 'EUR' },
+          { label: t('st.ve.cEurKm') || 'EUR/km', value: function (v) { return parseFloat(v.bevetel_per_km) || 0; }, dec: 2, unit: 'EUR/km' },
+          { label: t('st.cKmWb') || 'Km (menetlevél)', value: function (v) { return parseFloat(v.total_km) || 0; }, unit: 'km' },
+          { label: t('st.cFuelRon') || 'Üzemanyag (RON)', value: function (v) { return parseFloat(v.uzemanyag_ktg) || 0; }, unit: 'RON', higherIsBetter: false },
+          { label: t('st.ve.cService') || 'Szerviz (RON)', value: function (v) { return parseFloat(v.szerviz_ktg) || 0; }, unit: 'RON', higherIsBetter: false },
+          { label: 'L/100km', value: function (v) { return parseFloat(v.consum_100) || 0; }, dec: 1, higherIsBetter: false },
+          { label: (t('st.cNominal') || 'Névleges') + ' L/100km', value: function (v) { return parseFloat(v.nevleges) || 0; }, dec: 1, noWinner: true }
+        ]
+      });
 
       var top = list.filter(function (v) { return (parseFloat(v.bevetel) || 0) > 0; }).slice(0, 10);
       stChart('stChVehTop', {
@@ -735,7 +982,82 @@
 
       loadGpsSnapshot();
       loadGpsKmCompare();
+      loadIdleStats();
+      loadServiceForecast();
     });
+  }
+
+  // ── Jármű állásidő (üres napok fuvarok közt) — Járművek fül ──
+  // Egy jármű Finalizat.finalized_at → következő aktív fuvar.data_incarcare
+  // átlaga; össz. üres napok; max üres nap. Rendezés: átlag DESC (rosszabb
+  // fent). A backend a getVehicleIdleStats-ból jön (időszakra szűrt).
+  function loadIdleStats() {
+    var box = document.getElementById('stIdleBox');
+    if (!box) return;
+    gas('getVehicleIdleStats', stRangeDates()).then(function (r) {
+      if (!r || !r.ok || !(r.jarmuvek || []).length) { box.innerHTML = ''; return; }
+      var rows = r.jarmuvek.map(function (v) {
+        var avg = parseFloat(v.atlag_nap) || 0;
+        var color = avg > 5 ? 'var(--status-danger)' : avg > 2 ? 'var(--status-warn)' : 'var(--status-ok)';
+        return '<tr><td><b class="text-primary">' + esc(v.rendszam) + '</b></td>'
+          + '<td style="text-align:right;">' + stNum(v.gap_db, 0) + '</td>'
+          + '<td style="text-align:right;font-weight:700;color:' + color + ';">' + stNum(v.atlag_nap, 1) + '</td>'
+          + '<td style="text-align:right;">' + stNum(v.ossz_ures_nap, 0) + '</td>'
+          + '<td style="text-align:right;">' + stNum(v.max_ures_nap, 0) + '</td></tr>';
+      }).join('');
+      box.innerHTML = stPanel(t('st.ve.pIdle') || '💤 Állásidő (üres napok fuvarok közt)',
+        '<div style="overflow-x:auto;"><table class="table">'
+        + '<thead><tr><th>' + t('st.cPlate') + '</th>'
+        + '<th style="text-align:right;">' + (t('st.ve.gapCount') || 'Átmenetek') + '</th>'
+        + '<th style="text-align:right;">' + (t('st.ve.avgIdleDays') || 'Átlag üres nap') + '</th>'
+        + '<th style="text-align:right;">' + (t('st.ve.totalIdleDays') || 'Össz. üres nap') + '</th>'
+        + '<th style="text-align:right;">' + (t('st.ve.maxIdleDays') || 'Leghosszabb') + '</th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table></div>'
+        + '<div class="text-muted" style="font-size:11px;margin-top:6px;">'
+        + (t('st.ve.idleHint') || 'Előző Finalizat fuvar zárása → következő aktív fuvar felrakási dátuma közti napok. Csak pozitív különbségek.')
+        + '</div>');
+    }).catch(function () { box.innerHTML = ''; });
+  }
+
+  // ── Szerviz-előrejelzés — Járművek fül ─────────────────────
+  // A vehicle_service_log utolsó next_due_km + havi átlag km alapján hány hét
+  // múlva esedékes. Sürgős (≤2 hét) → piros; figyelmeztető (≤6 hét) → sárga.
+  function loadServiceForecast() {
+    var box = document.getElementById('stServiceBox');
+    if (!box) return;
+    gas('getServiceForecast').then(function (r) {
+      if (!r || !r.ok || !(r.jarmuvek || []).length) { box.innerHTML = ''; return; }
+      var rows = r.jarmuvek.map(function (v) {
+        var bg = v.surgos ? 'background:rgba(239,68,68,0.10);' : (v.figyelmezteto ? 'background:rgba(245,158,11,0.10);' : '');
+        var soonest = v.hetek_soonest;
+        var badge = '—';
+        if (soonest != null && isFinite(soonest)) {
+          if (soonest <= 0) badge = '<span class="badge err">' + (t('st.ve.dueNow') || 'Esedékes') + '</span>';
+          else if (soonest <= 2) badge = '<span class="badge err">' + stNum(soonest, 1) + ' ' + (t('st.ve.weeks') || 'hét') + '</span>';
+          else if (soonest <= 6) badge = '<span class="badge warn">' + stNum(soonest, 1) + ' ' + (t('st.ve.weeks') || 'hét') + '</span>';
+          else badge = '<span class="badge ok">' + stNum(soonest, 1) + ' ' + (t('st.ve.weeks') || 'hét') + '</span>';
+        }
+        return '<tr style="' + bg + '"><td><b class="text-primary">' + esc(v.rendszam) + '</b>'
+          + (v.marca ? '<div class="text-muted" style="font-size:11px;">' + esc(v.marca) + (v.model ? ' ' + esc(v.model) : '') + '</div>' : '') + '</td>'
+          + '<td style="text-align:right;">' + (v.aktualis_km != null ? stNum(v.aktualis_km, 0) : '—') + '</td>'
+          + '<td style="text-align:right;">' + (v.next_due_km != null ? stNum(v.next_due_km, 0) : '—') + '</td>'
+          + '<td>' + (v.next_due_date ? stDate(v.next_due_date) : '—') + '</td>'
+          + '<td style="text-align:right;">' + stNum(v.havi_atlag_km, 0) + '</td>'
+          + '<td style="text-align:center;">' + badge + '</td></tr>';
+      }).join('');
+      box.innerHTML = stPanel(t('st.ve.pService') || '🔧 Szerviz-előrejelzés',
+        '<div style="overflow-x:auto;"><table class="table">'
+        + '<thead><tr><th>' + t('st.cPlate') + '</th>'
+        + '<th style="text-align:right;">' + (t('st.ve.currentKm') || 'Aktuális km') + '</th>'
+        + '<th style="text-align:right;">' + (t('st.ve.nextDueKm') || 'Esedékes km') + '</th>'
+        + '<th>' + (t('st.ve.nextDueDate') || 'Esedékes dátum') + '</th>'
+        + '<th style="text-align:right;">' + (t('st.ve.monthlyKm') || 'Havi átlag km') + '</th>'
+        + '<th style="text-align:center;">' + (t('st.ve.dueIn') || 'Esedékes') + '</th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table></div>'
+        + '<div class="text-muted" style="font-size:11px;margin-top:6px;">'
+        + (t('st.ve.serviceHint') || 'Az utolsó szerviz-tétel next_due_km / next_due_date alapján + a jármű 90-napi menetlevél-km átlagából. A GPS km-óra pillanatnyi állása a fő pont a km-számításnál.')
+        + '</div>');
+    }).catch(function () { box.innerHTML = ''; });
   }
 
   // GPS-km (napi snapshot-napló) vs. a sofőr által beírt menetlevél-km
@@ -799,10 +1121,14 @@
       var list = r.ugyfelek || [];
       var fin = !!r.finance;
 
-      var rows = list.map(function (u) {
+      var rows = list.map(function (u, i) {
         var anaf = u.anaf_status === 'activ' ? '<span class="badge ok">' + t('st.cl.anafActive') + '</span>'
           : u.anaf_status === 'inactiv' ? '<span class="badge err">' + t('st.cl.anafInactive') + '</span>' : '';
-        return '<tr><td><b class="text-primary">' + esc(u.ugyfel || '—') + '</b>'
+        var key = u.client_id != null ? String(u.client_id) : (u.ugyfel || 'c' + i);
+        var labelSearch = (u.ugyfel || '') + ' ' + (u.cui_cif || '');
+        return '<tr data-cmp-key="' + esc(key) + '" data-cmp-label="' + esc(labelSearch) + '">'
+          + stCompareCellHtml('stats-clients', key)
+          + '<td><b class="text-primary">' + esc(u.ugyfel || '—') + '</b>'
           + (u.cui_cif ? '<div class="text-muted" style="font-size:11px;">' + esc(u.cui_cif) + '</div>' : '') + '</td>'
           + '<td>' + anaf + '</td>'
           + '<td style="text-align:right;">' + stNum(u.fuvarok, 0) + '</td>'
@@ -812,16 +1138,36 @@
           + (fin ? '<td style="text-align:right;color:' + ((parseFloat(u.kintlevo) || 0) > 0 ? 'var(--status-danger)' : 'inherit') + ';font-weight:700;">' + stNum(u.kintlevo, 0) + '</td>' : '')
           + (fin ? '<td style="text-align:center;">' + (u.atlag_fizetesi_nap != null ? stNum(u.atlag_fizetesi_nap, 0) + ' nap' : '—') + '</td>' : '')
           + '</tr>';
-      }).join('') || '<tr><td colspan="8" class="text-muted" style="text-align:center;padding:18px;">' + t('st.noData') + '</td></tr>';
+      }).join('') || '<tr><td colspan="9" class="text-muted" style="text-align:center;padding:18px;">' + t('st.noData') + '</td></tr>';
 
       box.innerHTML = stFilterBar('stats-clients')
         + stPanel(t('st.cl.pTop'), stChartCanvas('stChCliTop'))
         + stPanel(t('st.cl.pTable'),
-            '<div style="overflow-x:auto;"><table class="table">'
-            + '<thead><tr><th>' + t('st.cClient') + '</th><th>ANAF</th><th style="text-align:right;">' + t('st.cOrder') + '</th><th style="text-align:right;">' + t('st.cClosed') + '</th><th style="text-align:right;">' + t('st.cRevenue') + '</th><th style="text-align:right;">' + t('st.cKm') + '</th>'
+            stCompareToolbarHtml('stats-clients', t('st.cmp.searchClient') || 'Caută client după denumire / CUI…')
+            + '<div style="overflow-x:auto;"><table class="table">'
+            + '<thead><tr><th></th><th>' + t('st.cClient') + '</th><th>ANAF</th><th style="text-align:right;">' + t('st.cOrder') + '</th><th style="text-align:right;">' + t('st.cClosed') + '</th><th style="text-align:right;">' + t('st.cRevenue') + '</th><th style="text-align:right;">' + t('st.cKm') + '</th>'
             + (fin ? '<th style="text-align:right;">' + t('st.cl.cOutEur') + '</th><th style="text-align:center;">' + t('st.cl.cAvgPay') + '</th>' : '')
             + '</tr></thead><tbody>' + rows + '</tbody></table></div>',
             '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="VS_STATS.csv(\'stats-clients\')">' + t('st.csvExport') + '</button>');
+
+      // Compare init — ügyfél-sorok
+      var cliMetrics = [
+        { label: t('st.cOrder') || 'Fuvarok', value: function (u) { return parseFloat(u.fuvarok) || 0; } },
+        { label: t('st.cClosed') || 'Lezárt', value: function (u) { return parseFloat(u.lezart) || 0; } },
+        { label: t('st.cRevenue') || 'Bevétel', value: function (u) { return parseFloat(u.bevetel) || 0; }, unit: 'EUR' },
+        { label: t('st.cKm') || 'Km', value: function (u) { return parseFloat(u.km) || 0; }, unit: 'km' }
+      ];
+      if (fin) {
+        cliMetrics.push({ label: t('st.cl.cOutEur') || 'Kintlévő', value: function (u) { return parseFloat(u.kintlevo) || 0; }, unit: 'EUR', higherIsBetter: false });
+        cliMetrics.push({ label: t('st.cl.cAvgPay') || 'Átlag fiz. nap', value: function (u) { return parseFloat(u.atlag_fizetesi_nap) || 0; }, unit: 'nap', higherIsBetter: false });
+      }
+      stCompareInit('stats-clients', {
+        boxId: 'statsClientsBox',
+        rows: list,
+        keyOf: function (u, i) { return u.client_id != null ? String(u.client_id) : (u.ugyfel || 'c' + i); },
+        labelOf: function (u) { return u.ugyfel || '—'; },
+        metrics: cliMetrics
+      });
 
       var top = list.slice(0, 10);
       stChart('stChCliTop', {
@@ -952,6 +1298,7 @@
       box.innerHTML = stFilterBar('stats-sla')
         + '<div style="margin-bottom:16px;">' + vsMetricBand(metrics, { tall: true }) + '</div>'
         + '<p class="text-muted" style="font-size:12px;margin:0 0 14px;">' + t('st.sla.note') + '</p>'
+        + '<div id="stFunnelBox"></div>'
         + stPanel(t('st.sla.pMonthly'), stChartCanvas('stChSlaHavi'))
         + stPanel(t('st.sla.pTable'),
             '<div style="overflow-x:auto;"><table class="table">'
@@ -972,7 +1319,60 @@
           { label: t('st.sla.cancelled'), data: stSeries(months, r.havi_torolt, 'db'), backgroundColor: 'rgba(239,68,68,0.7)' }
         ]}
       });
+      loadOrderFunnel();
     });
+  }
+
+  // ── Fuvar-státusz funnel (Kiírt → Felrakóhoz → Felrakva → Lerakóhoz → Leürít)
+  // + minden lépés közti átlagos idő. Az SLA fülön a KPI-k alá kerül.
+  function loadOrderFunnel() {
+    var box = document.getElementById('stFunnelBox');
+    if (!box) return;
+    gas('getOrderFunnel', stRangeDates()).then(function (r) {
+      if (!r || !r.ok) { box.innerHTML = ''; return; }
+      var f = r.funnel || {};
+      var l = r.lepesek || {};
+      var maxVal = Math.max(f.kiirt || 0, 1);
+      function funnelStep(icon, lbl, val, prevVal, avgObj, unit) {
+        var w = Math.round(((val || 0) / maxVal) * 100);
+        var pct = prevVal > 0 ? Math.round(((val || 0) / prevVal) * 1000) / 10 : null;
+        var avgTxt = '';
+        if (avgObj) {
+          if (avgObj.min != null) avgTxt = fmtDuration(avgObj.min * 60); // min → sec
+          else if (avgObj.ora != null) avgTxt = fmtDuration(avgObj.ora * 3600);
+        }
+        return '<div style="margin-bottom:10px;">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:13px;">'
+          + '<span>' + icon + ' <b>' + esc(lbl) + '</b>' + (pct != null ? ' <span class="text-muted" style="font-size:11px;">(' + pct + '%)</span>' : '') + '</span>'
+          + '<span class="text-primary" style="font-weight:700;">' + stNum(val, 0) + '</span>'
+          + '</div>'
+          + '<div style="background:rgba(148,163,184,0.15);border-radius:6px;height:22px;overflow:hidden;">'
+          + '<div style="background:linear-gradient(90deg,#6366f1,#a855f7);height:100%;width:' + w + '%;"></div>'
+          + '</div>'
+          + (avgTxt ? '<div class="text-muted" style="font-size:11px;margin-top:2px;">⏱ ' + esc(avgTxt) + ' ' + (t('st.sla.avgLbl') || '(átlag ehhez a lépéshez)') + '</div>' : '')
+          + '</div>';
+      }
+      var body = funnelStep('📝', t('st.sla.stKiirt') || 'Kiírt', f.kiirt, null, null)
+        + funnelStep('📍', t('st.sla.stFelrakohoz') || 'Felrakóhoz érkezett', f.felrakohoz, f.kiirt, l.alocat_ig)
+        + funnelStep('📦', t('st.sla.stFelrakva') || 'Felrakva', f.felrakva, f.felrakohoz, l.felrako_felrakas)
+        + funnelStep('📍', t('st.sla.stLerakohoz') || 'Lerakóhoz érkezett', f.lerakohoz, f.felrakva, l.felrakas_lerako)
+        + funnelStep('✅', t('st.sla.stLeurit') || 'Leürítve', f.leurit, f.lerakohoz, l.lerako_lerakas)
+        + '<div style="margin-top:14px;padding:10px 14px;background:rgba(99,102,241,0.10);border:1px solid rgba(99,102,241,0.25);border-radius:10px;font-size:13px;">'
+        + '⌛ <b>' + (t('st.sla.totalTime') || 'Teljes idő (kiírt → leürít)') + ':</b> '
+        + (l.teljes_ora && l.teljes_ora.ora != null ? fmtDuration(l.teljes_ora.ora * 3600) : '—')
+        + (l.teljes_ora && l.teljes_ora.db ? ' <span class="text-muted" style="font-size:11px;">· ' + t('st.sla.sample') + ': ' + l.teljes_ora.db + '</span>' : '')
+        + '</div>';
+      box.innerHTML = stPanel(t('st.sla.pFunnel') || '🔻 Fuvar-státusz funnel + átlagos idők', body);
+    }).catch(function () { box.innerHTML = ''; });
+  }
+
+  // Percet/órát emberbarát formára — a funnel-átlagoknál használjuk.
+  function fmtDuration(sec) {
+    if (sec == null || !isFinite(sec)) return '—';
+    if (sec < 60) return Math.round(sec) + ' s';
+    if (sec < 3600) return Math.round(sec / 60) + ' perc';
+    if (sec < 86400) return (sec / 3600).toFixed(1) + ' óra';
+    return (sec / 86400).toFixed(1) + ' nap';
   }
 
   // ── CSV exportok (az utoljára betöltött adatból) ────────
@@ -1065,6 +1465,7 @@
     csv: csvExport,
     setPerm: setPerm,
     applyPerms: applyPerms,
+    openCompare: openCompare,
     saveRate: function () {
       var v = (document.getElementById('stEurRon') || {}).value;
       gas('setEurRonRate', [v === '' ? null : v]).then(function (r) {
