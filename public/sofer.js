@@ -564,6 +564,22 @@ function fuvarStep2(allowEmpty) {
   document.getElementById('achizitiiContainer').innerHTML = '';
   alimIdx = 0; achIdx = 0;
 
+  // Ha a sofőr korábban a főoldalról scannelt bonokat és elfogadta őket
+  // (rrAccept: step2 zárva → sessionStorage-piszkozatba pusholtuk), most
+  // állítsuk vissza a DOM-ba is — különben a következő draftSave (üres
+  // konténer) felülírná őket. Az igazságforrás a sessionStorage; ha a
+  // fuvarStep1-ből ide léptünk, csak a tankolás/vásárlás sorok érintettek
+  // (a km/rendszám/dátum előtöltés fentebb már megvolt, üres mezőt nem
+  // írunk felül).
+  try {
+    var _st = JSON.parse(sessionStorage.getItem(SS_KEY) || '{}');
+    var _dr = _st && _st.draft;
+    if (_dr) {
+      (_dr.alimentari || []).forEach(function (a) { addAlimRow(a); });
+      (_dr.achizitii  || []).forEach(function (a) { addAchRow(a); });
+    }
+  } catch (_e) { /* nincs érvényes piszkozat — üresen indul */ }
+
   // Piszkozat figyeli a változásokat
   attachDraftListeners();
   stateSave({ fuvarStep: 2 });

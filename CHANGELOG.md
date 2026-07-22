@@ -32,7 +32,9 @@ Az előző körben (lentebb) a bon-fotózás a menetlevél 2. lépésén belül 
 
 6. **A menetlevél 2. lépésén megmarad a fuel/purchase gomb-pár** (a gyors, közvetlen kiválasztásra), de mindkét út **ugyanabba a perzisztens várólistába** ír — a sofőr átléphet a főoldalra, és a lépés 2. gombbal indított feldolgozás is a főoldali kártyán jelenik meg.
 
-7. **i18n** — 17 új `sof.dashScanBtn`/`sof.scanQueued`/`sof.rr.*` kulcs (RO-alap + HU). Cache-bust: `sofer.html`/`sofer.js`/`sofer.css`/`i18n.js` `?v=20260722scanq`.
+7. **HALMOZOTT + MEGLÉVŐ ROKON — `fuvarStep2` restore** — a `rrAccept` (step2 zárva úton) a scannelt sort a sessionStorage-piszkozatba pusholja; a `fuvarStep2` a konténerek üresre-állítása után **visszaolvassa a piszkozatot** (`_dr.alimentari.forEach → addAlimRow`, `_dr.achizitii.forEach → addAchRow`). **Kezelt esetek:** (a) a sofőr kézzel bevisz 2 tankolást, majd a főoldalról scannel egy 3.-at → mindhárom megmarad; (b) 3 külön bont fényképez → 3 különálló queue-tétel, 3 külön elfogadás, 3 külön `addAlimRow`/`addAchRow` (append, nem cserél); (c) fresh menetlevélnél is: a fuvarStep2-t megnyitva a scannelt sorok megjelennek, nem vesznek el a következő `draftSave`-nél. Cache-bust `?v=20260722scanq2`.
+
+8. **i18n** — 17 új `sof.dashScanBtn`/`sof.scanQueued`/`sof.rr.*` kulcs (RO-alap + HU).
 
 ### Regresszió-védelem
 - **Szerver-oldal (`handlers/receiptScan.js`) ÉRINTETLEN** — az előző körös 12 Jest-teszt továbbra is zöld; teljes suite **672 zöld** (43 skip valós DB-teszt). Require-sweep 125 modul 0 hiba.
