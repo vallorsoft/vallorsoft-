@@ -1710,6 +1710,26 @@ document.addEventListener('DOMContentLoaded', function() {
   if (arrEl) arrEl.addEventListener('change', updateDiurnaPreview);
 });
 
+// ── Tab-visszatérés (telefon feléled, PWA elotérbe kerul): frissítjük a
+//    főoldal kritikus blokkjait, hogy a stale UI ne érje váratlanul a sofőrt
+//    (új kiosztott fuvar, sofőr↔jármű váltás, havi mini-statisztika). A
+//    session-guard oldalán a szerver-session-t is ellenőrizzük ugyanekkor
+//    (visibilitychange → authMe ping → tiszta redirect ha halott).
+//    Csak a főoldalon (sec-dash), hogy a menetlevél-piszkozat/beírt űrlap
+//    NE nulázódjon a listák újratöltésétől. Rate-limit: legfeljebb 20 mp-enként.
+var _visRefreshLastAt = 0;
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState !== 'visible') return;
+  var now = Date.now();
+  if (now - _visRefreshLastAt < 20000) return;
+  _visRefreshLastAt = now;
+  var dashSec = document.getElementById('sec-dash');
+  if (!dashSec || dashSec.classList.contains('hidden')) return;
+  try { if (typeof loadDashOrders === 'function') loadDashOrders(); } catch(e) {}
+  try { if (typeof loadSoferMiniStats === 'function') loadSoferMiniStats(); } catch(e) {}
+  try { if (typeof loadMyAssignedVehicle === 'function') loadMyAssignedVehicle(); } catch(e) {}
+});
+
 // ── Nyelvváltáskor a JS-ből renderelt részek újrarajzolása ──
 // (a static data-i18n elemeket a motor magától frissíti; itt a dinamikus
 //  listák/kártyák kerülnek újrarenderelésre — a menetlevél-űrlap és a nyitott
