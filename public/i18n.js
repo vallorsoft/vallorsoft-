@@ -2442,6 +2442,7 @@
                                  ro: 'Verifică, corectează dacă e nevoie, apoi acceptă — se adaugă ca rând de alimentare sau achiziție în foaie.' },
     'sof.rr.processing':       { hu: '⏳ Feldolgozás…', ro: '⏳ Se procesează…' },
     'sof.rr.processingTitle':  { hu: 'AI feldolgozás folyamatban', ro: 'Procesare AI în curs' },
+    'sof.rr.retrying':         { hu: '🔄 Újrapróbálkozás…', ro: '🔄 Se reîncearcă…' },
     'sof.rr.ready':            { hu: '✔️ Kész',   ro: '✔️ Gata' },
     'sof.rr.error':            { hu: '⚠️ Hiba',  ro: '⚠️ Eroare' },
     'sof.rr.review':           { hu: 'Áttekintés', ro: 'Verifică' },

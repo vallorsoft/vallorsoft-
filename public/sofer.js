@@ -869,8 +869,31 @@ function scanReceiptStart(file) {
     renderPendingReceipts();
     toast(t('sof.scanQueued'), 'ok');
 
-    // Fire-and-forget: a válaszra a queue-elem update-elődik, de a
-    // felhasználó közben szabadon léphet más képernyőre.
+    // Auto-retry hálózati vagy átmeneti szerver-hibánál (429/503/5xx).
+    // A payload (base64) végig a closure-ban él → a retry a memóriában
+    // meglévő képet küldi újra (nem kell újra fotózni). Nem-átmeneti
+    // hibáknál (400, tiltás, konfig-hiba) azonnal error → NINCS retry.
+    _scanReceiptTry(id, payload, 0);
+  });
+}
+
+// Egy próbálkozás — sikertelenség esetén rekurzívan indítja a következőt
+// backoff-fal. `attempt` 0-alapú; MAX_ATTEMPTS a felső határ.
+function _scanReceiptTry(id, payload, attempt) {
+  var MAX_ATTEMPTS = 3;
+  var BACKOFFS = [0, 5000, 15000]; // 0s, 5s, 15s — kb. 20 mp max összesen
+  var wait = BACKOFFS[attempt] || 15000;
+
+  // A queue-elemet frissítjük, hogy a UI mutassa a próbálkozás-számot.
+  if (attempt > 0) {
+    rcptQueueUpdate(id, {
+      status: 'processing', error: null,
+      attempt: attempt + 1, maxAttempts: MAX_ATTEMPTS
+    });
+    renderPendingReceipts();
+  }
+
+  setTimeout(function () {
     fetch('/api/execute', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -882,22 +905,37 @@ function scanReceiptStart(file) {
       .then(function (r) { return r.json(); })
       .then(function (d) {
         var r = (d && d.result) || {};
-        if (!r.ok) {
-          rcptQueueUpdate(id, { status: 'error', error: r.err || t('sof.scanFailed') });
-        } else {
+        if (r.ok) {
           var f = r.fields || {};
           var kind = (f.kind === 'fuel' || f.kind === 'purchase')
             ? f.kind
-            : (_receiptScanKind || 'purchase'); // fallback: általánosabb
-          rcptQueueUpdate(id, { status: 'ready', fields: f, kind: kind });
+            : (_receiptScanKind || 'purchase');
+          rcptQueueUpdate(id, { status: 'ready', fields: f, kind: kind, attempt: null, maxAttempts: null });
+          renderPendingReceipts();
+          return;
         }
+        // Átmeneti szerver-hiba: 429 (kvóta/limit), 503 (túlterhelés),
+        // 5xx (belső hiba). Végleges: 400 (rossz kérés), 403 (tiltás),
+        // egyéb 4xx → nincs értelme újrapróbálni.
+        var status = r.status || 0;
+        var transient = (status === 429 || status === 503 || status >= 500);
+        if (transient && attempt + 1 < MAX_ATTEMPTS) {
+          _scanReceiptTry(id, payload, attempt + 1);
+          return;
+        }
+        rcptQueueUpdate(id, { status: 'error', error: r.err || t('sof.scanFailed'), attempt: null, maxAttempts: null });
         renderPendingReceipts();
       })
       .catch(function () {
-        rcptQueueUpdate(id, { status: 'error', error: t('sof.scanFailed') });
+        // Hálózati hiba → mindig átmeneti, retry-oljuk (a MAX-ig).
+        if (attempt + 1 < MAX_ATTEMPTS) {
+          _scanReceiptTry(id, payload, attempt + 1);
+          return;
+        }
+        rcptQueueUpdate(id, { status: 'error', error: t('sof.scanFailed'), attempt: null, maxAttempts: null });
         renderPendingReceipts();
       });
-  });
+  }, wait);
 }
 
 // A főoldali kártya frissítése.
@@ -910,8 +948,11 @@ function renderPendingReceipts() {
   box.innerHTML = q.slice().reverse().map(function (it) {
     var badge = '', title = '';
     if (it.status === 'processing') {
-      badge = '<span class="pending-badge pb-processing">' + t('sof.rr.processing') + '</span>';
-      title = t('sof.rr.processingTitle');
+      var attSuffix = (it.attempt && it.maxAttempts)
+        ? ' (' + it.attempt + '/' + it.maxAttempts + ')'
+        : '';
+      badge = '<span class="pending-badge pb-processing">' + t('sof.rr.processing') + attSuffix + '</span>';
+      title = (it.attempt && it.attempt > 1) ? t('sof.rr.retrying') : t('sof.rr.processingTitle');
     } else if (it.status === 'ready') {
       badge = '<span class="pending-badge pb-ready">' + t('sof.rr.ready') + '</span>';
       var f = it.fields || {};
@@ -1113,12 +1154,14 @@ document.addEventListener('DOMContentLoaded', function () {
   // Ha az előző munkamenetben a fetch nem tudott befejeződni (app leállt,
   // hálózat megszakadt), a „processing" tétel örökké függőben maradna →
   // átvisszük „error"-ra, hogy legalább el lehessen vetni. A már ready
-  // (kiolvasott) és error tételek maradnak.
+  // (kiolvasott) és error tételek maradnak. Küszöb: 3 perc — hogy a
+  // legrosszabb esetben (3 retry × 30s Gemini timeout + 20s backoff)
+  // se törjük meg a folyamatot, ami még lehet, hogy csak most fejeződik be.
   var q = rcptQueueLoad();
   var changed = false;
   var now = Date.now();
   for (var i = 0; i < q.length; i++) {
-    if (q[i].status === 'processing' && (now - (q[i].createdAt || 0) > 60000)) {
+    if (q[i].status === 'processing' && (now - (q[i].createdAt || 0) > 3 * 60 * 1000)) {
       q[i].status = 'error';
       q[i].error = t('sof.rr.interrupted');
       changed = true;
