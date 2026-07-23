@@ -14,6 +14,48 @@
 
 ---
 
+## 2026-07-23 — ÚJ: bon-scanner TANULÁS (few-shot per merchant) + közös `lib/geminiJson` helper + nem-szivárgás megerősítés
+
+### Miért
+Az előző körben (lentebb) beépített bon-scanner mindig „üresen" hívta a Gemini-t. Ugyanakkor egy adott töltőállomás (MOL/OMV/Petrom/Kaufland stb.) bonja gyakorlatilag EGYFORMA a láncon belül — ha a rendszer emlékezne, hogy a MOL-nál hol vannak a mezők, a KÖVETKEZŐ MOL bon pontosabb lenne. Kérés: „tanulja meg adott bonon az adatok hol találhatók". Kérés #2: a modell-lánc + fetch logika legyen egy közös segédben (ne duplikálva a fuvar-inbound `reparse`-ban és a bon-scannerben). Kérés #3: „ha menti a képet, ne szivárogjon ki".
+
+### Mi történt
+
+1. **Közös `lib/geminiJson.js` helper** (ÚJ) — a Gemini modell-lánc (429/503 → következő modell külön napi kerettel), a 5xx-es retry (max 3 attempt), a hibaüzenetek + a fetch (kulcs headerben, timeout, JSON-parse) EGYETLEN forráson él. Egyszerű API: `extractJson({ systemPrompt, parts, models? })` → `{ json, model }`; dobás `e.status`-szal. Env: `GEMINI_MODELS` (vesszős lista) vagy `GEMINI_MODEL` (egy modell) felülírja a 6-elemű alapláncot.
+
+2. **`services/order-ai/gemini.js` REFAKTOR** — a helyi `callGemini` + modell-lánc + retry kód TÖRÖLVE; az `extract()` most `lib/geminiJson`-t hív. A 429/503-nál a régi „Sistemul a comutat pe citirea integrată…" emberbaráti kiegészítés megőrizve → az `order-ai/index.js` fallback szemantikája változatlan (semmi nem törik).
+
+3. **`handlers/receiptScan.js` REFAKTOR + TANULÁS** — a helyi callGemini/DEFAULT_MODELS TÖRÖLVE, a helyére `extractJson` hívás. **Új tanuló-réteg:**
+   - **Migráció `db/receipt-scan-samples.sql`** (idempotens): `receipt_scan_samples (id, company_id, merchant_key, merchant_label, fields, sample_count, created_at, updated_at)` + `UNIQUE (company_id, merchant_key)` — cégenként/merchantonként EGY aktív minta (a legutóbb megerősített felülírja a régit → self-healing).
+   - **`scanReceipt` few-shot**: minden hívás előtt lekéri a cég legutóbbi 5 EGYEDI merchant-mintáját (`DISTINCT ON (merchant_key) ORDER BY updated_at DESC LIMIT 5`), és a Gemini system-promptjához függeszti őket példaként. **CSAK STABIL mezőket** ad példaként (kind/loc/tip/plata/valuta/produs); a per-transaction mezőket (data/suma/litru/km) SZÁNDÉKOSAN kihagyja, hogy a Gemini ne másolja azokat az ÚJ bonhoz. Válaszban `learned_from: N` jelzi, hány mintát használt.
+   - **Új `confirmReceiptExtraction` handler**: a sofőr Elfogadás gombjára hívva. Sanitize a mezőket, kinyeri a `merchant_key`-t (`normalizeMerchant`: `loc` első jelentős szava, legalább 3 hosszú + betűt tartalmaz → „MOL Arad" → „mol"; „OMV Petrom" → „omv"; „SC MOL SRL" → „mol"; „1300" → üres → nem tárol), majd `INSERT … ON CONFLICT (company_id, merchant_key) DO UPDATE SET fields = EXCLUDED.fields, sample_count = +1`. Kapuk: bejelentkezés + `Sofer|Admin|Manager` + `ai-kiolvasas` (konzisztens a `scanReceipt`-tel). Audit-naplózva (`receipt.confirm`). **DB-hiba (tábla hiányzik / permission) → csendes noop** — a UI menete független.
+   - **Kliens (`public/sofer.js` `rrAccept`)**: a modal Elfogadás után best-effort `fetch(scanReceiptExtraction ...)` `keepalive:true`-vel; a sofőr átléphet más képernyőre, a tanulás a háttérben elmegy. Hiba esetén nem törik semmi (a menetlevél-piszkozatba már bekerült a sor).
+
+4. **NEM-SZIVÁRGÁS védőháló + megerősítés**:
+   - **Audit** (mind `scanReceipt`, mind `confirmReceiptExtraction`): CSAK metaadat (modell / kind / confidence / minta-szám / merchant-kulcs). A **base64 kép SOHA** nem kerül audit-logba / DB-be — csak a Gemini-hívás alatt él memóriában, utána V8 GC.
+   - **Request-log** (`middleware/requestLog.js`): csak metódus/útvonal/státusz/ms/request-id — **NEM logol body-t** (verifikálva).
+   - **Global error handler** (`server.js`): csak `err.message`/`err.stack`/`req.path` — nem logol body-t.
+   - **Hibaválasz csonkolva 300 karakterre** (`scanReceipt` catch): egy esetleges „echo-back" Gemini-hiba sem szivárogtathat vissza többet a kliensre.
+   - **localStorage queue** (kliens): csak 128px thumbnail — a teljes base64-et SOSEM tárolja (perzisztencia + méret-védelem).
+   - **Új-táblás `fields` JSONB**: csak bon-mezők (loc, kind, tip, plata, valuta, produs, + per-transaction data/suma/litru/km) — sofőr-név, kártyaszám, sofőr-email SOHA nem kerül ide.
+
+5. **Teszt** — **19 új eset**, teljes suite **691 Jest zöld** (43 skip valós DB):
+   - `tests/unit/geminiJson.test.js` (ÚJ, 8 eset): siker, 429→next model, 400→azonnal áll, minden modell 429→végső hiba, nincs API-kulcs→NO_KEY, kulcs header-ben (nem query), DEFAULT_MODELS.
+   - `tests/unit/receiptScan.test.js` (+11 új eset): `_normalizeMerchant` határesetek (MOL Arad/Timișoara/SC MOL SRL/tiszta szám/üres/null), few-shot bekerül a system-promptba, üres mintáknál változatlan alap-promt, stabil mezők vs per-transaction mezők szétválasztása (data/suma NEM megy példaként!), samples-lekérdezés hibája nem törik el a scan-t, confirm szerep-kapu, mezők nélküli confirm → noop, valós confirm → UPSERT normalizált merchant-key-vel, confirm DB-hiba → csendes noop, hibaüzenet 300 karakteren csonkolva.
+
+### Miért így
+- **Few-shot > fingerprint**: az image-alapú fingerprintelés (pHash) merchant-azonosítást igényelne még Gemini előtt (bonyolult, egy extra AI-hívás vagy heurisztika). A few-shot kisebb overhead (5 × ~150 token = ~750 token per hívás, gemini-flash-en filléres) és Gemini pattern-matching-jét használja: az IMAGE önmagában tartalmazza a layout-ot, a példák csak konzisztens értelmezést nudge-olnak.
+- **DISTINCT ON merchant_key**: 5 különböző lánc mintáját adjuk példaként — Gemini így többféle layout-ot lát, és a fizikai bon-képhez a leginkább illeszkedőt „választja". Nem kell tudnunk előre, melyik merchant-tól jött a bon.
+- **Per-transaction mezők KIHAGYVA a példákból**: a Gemini ne másolja a régi bon összegét/dátumát az újba! A régi bon példa csak a STRUKTÚRÁT tanítja, nem az értékeket.
+- **Csendes DB-fallback**: ha a `receipt_scan_samples` migráció még nem futott le (első deploy), a scan tovább megy hint nélkül; ha a confirm DB-je hibázik, a sofőr UI-ja nem törik el.
+
+### Regresszió-védelem
+- **Teljes suite 691 Jest zöld** (require-sweep 125 modul 0 hiba). Az e-mail-inbound `reparse` (order-ai) útja változatlan viselkedésű — az integrációs tesztek verifikálják.
+- A `sanitize` továbbra is fehérlistán szűr, most a confirm bemenetét is ellenőrzi (nem lehet a DB-be írni tetszőleges `plata`-t vagy nem-ISO dátumot).
+- Cache-bust `?v=20260723learn` (sofer.html/js/css + i18n.js).
+
+---
+
 ## 2026-07-22 — ÚJ: főoldali „📷 Bon szkennelés" gomb + háttér-feldolgozás + perzisztens elfogadás-várólista
 
 ### Miért

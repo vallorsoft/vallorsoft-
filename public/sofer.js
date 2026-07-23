@@ -1034,6 +1034,39 @@ function rrAccept() {
     try { sessionStorage.setItem(SS_KEY, JSON.stringify(st)); } catch (_) {}
   }
 
+  // ── TANULÁS: a sofőr által megerősített (esetleg javított) mezőket
+  // elküldjük a szervernek, hogy a receipt_scan_samples-be kerüljenek
+  // template-ként. Legközelebb ugyanattól a kereskedőtől (MOL/OMV/
+  // Kaufland stb.) beérkező bonok pontosabban kiolvasódnak — a Gemini
+  // few-shot promptja tartalmazni fogja a mostani mezőket. Best-effort:
+  // hiba esetén NEM törünk semmit (a piszkozatba már bekerült a sor).
+  try {
+    // Az eredeti queue-tétel valuta-ja (a modal-ban nem szerkeszthető)
+    var _q = rcptQueueLoad(), _origVal = null;
+    for (var _i = 0; _i < _q.length; _i++) {
+      if (_q[_i].id === _rrCurrentId && _q[_i].fields) { _origVal = _q[_i].fields.valuta || null; break; }
+    }
+    var confirmed = {
+      kind: kind,
+      loc: loc,
+      data: data,
+      plata: plata,
+      suma: parseFloat(suma) || null,
+      valuta: _origVal,
+      tip:    (kind === 'fuel')     ? tip : null,
+      litru:  (kind === 'fuel')     ? (parseFloat(litru) || null) : null,
+      km:     (kind === 'fuel')     ? (parseFloat(km)    || null) : null,
+      produs: (kind === 'purchase') ? produs : null,
+      confidence: 1.0
+    };
+    fetch('/api/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({ functionName: 'confirmReceiptExtraction', arguments: [{ fields: confirmed }] })
+    }).catch(function () { /* best-effort — a UI menete független */ });
+  } catch (_) { /* nincs baj — csak nem tanul ebből a bonból */ }
+
   toast(t('sof.rr.accepted'), 'ok');
   rcptQueueRemove(_rrCurrentId);
   renderPendingReceipts();
