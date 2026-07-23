@@ -74,7 +74,8 @@ window.VS_FEATURES = [
   // ── Prémium funkció-gate-ek (csomag-szintű korlátozáshoz) ──────────────────
   { key: 'visszfuvar-radar',     label: 'Visszfuvar-radar 🎯',          group: 'Fuvarozás & Logisztika' },
   { key: 'toll-becsles',         label: 'Útdíj-becslés 🛣️',             group: 'Fuvarozás & Logisztika' },
-  { key: 'ai-kiolvasas',         label: 'AI kiolvasás (Gemini) 🤖',     group: 'Fuvarozás & Logisztika' },
+  { key: 'ai-kiolvasas',         label: 'AI kiolvasás — e-mail 🤖',     group: 'Fuvarozás & Logisztika' },
+  { key: 'ai-bon-scan',          label: 'AI bon-szkennelés 📷',         group: 'Fuvarozás & Logisztika' },
   { key: 'gps-integracio',       label: 'GPS integráció 📡',            group: 'Adminisztráció' },
   { key: 'szamlazas-integracio', label: 'Számlázó integráció 🧾',        group: 'Adminisztráció' },
   { key: 'konyvelo-szerepkor',   label: 'Könyvelő szerepkör 📚',        group: 'Adminisztráció' },

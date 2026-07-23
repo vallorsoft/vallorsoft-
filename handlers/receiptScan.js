@@ -14,8 +14,10 @@
 //  matching-je konzisztensebb (ugyanaz a MOL/OMV/Kaufland bon mindig
 //  ugyanúgy értelmezve).
 //
-//  Kapuk: bejelentkezés + Sofer|Admin|Manager + `ai-kiolvasas` csomag-flag
-//  + GEMINI_API_KEY env. Válasz fehérlistán validálva. Base64 max 8 MB.
+//  Kapuk: bejelentkezés + Sofer|Admin|Manager + `ai-bon-scan` csomag-flag
+//  (KÜLÖN az e-mail-kiolvasás `ai-kiolvasas` flag-jétől — az admin/manager
+//  önmagának is engedélyezheti/tilthatja a Menetlevelek fülről) +
+//  GEMINI_API_KEY env. Válasz fehérlistán validálva. Base64 max 8 MB.
 //  Audit-naplózva (receipt.scan / receipt.confirm).
 // ============================================================
 'use strict';
@@ -148,7 +150,7 @@ handlers.scanReceipt = async function (req, res, args) {
     if (!allowed) return res.json({ result: { ok: false, err: 'Acces interzis' } });
 
     const cid = u.company_id;
-    if (!(await featureEnabled(cid, 'ai-kiolvasas'))) {
+    if (!(await featureEnabled(cid, 'ai-bon-scan'))) {
       return res.json({ result: { ok: false, err: 'Functie AI nedisponibila in pachetul curent.' } });
     }
     if (!process.env.GEMINI_API_KEY) {
@@ -213,7 +215,7 @@ handlers.confirmReceiptExtraction = async function (req, res, args) {
     const cid = u.company_id;
     if (!cid) return res.json({ result: { ok: false, err: 'Firma lipsa' } });
     // A tanulás-tároláson is legyen a csomag-kapu — konzisztens az scanReceipt-tel.
-    if (!(await featureEnabled(cid, 'ai-kiolvasas'))) {
+    if (!(await featureEnabled(cid, 'ai-bon-scan'))) {
       return res.json({ result: { ok: false, err: 'Functie AI nedisponibila.' } });
     }
 
