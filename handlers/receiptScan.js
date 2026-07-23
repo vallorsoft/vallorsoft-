@@ -188,10 +188,12 @@ handlers.scanReceipt = async function (req, res, args) {
       } catch (_) { /* audit best-effort */ }
       return res.json({ result: { ok: true, fields, model, learned_from: samples.length } });
     } catch (e) {
-      // 429/503: a lib összefoglaló üzenetet ad; nem-recoverable hibáknál
-      // a lib azonnal dobott. Az üzenetet 300 karakterre CSONKOLJUK —
-      // ne szivárogjon vissza esetleges Gemini-visszhang (echo-back) a
-      // kliensre. A base64 sosem kerül a hibaválaszba.
+      // Diagnosztika: minden AI-hiba naplózva a szerveren (bővített részletek)
+      // — a base64 SOHA nem kerül a naplóba (csak státusz + üzenet + attempts).
+      console.warn('scanReceipt AI hiba:', {
+        status: e.status, msg: e.message, attempts: e.attempts,
+      });
+      // A kliensnek: 300 karakterre CSONKOLT üzenet + státusz (echo-back védelem).
       const msg = String(e.message || 'Eroare AI').slice(0, 300);
       return res.json({ result: { ok: false, err: msg, status: e.status || 500 } });
     }

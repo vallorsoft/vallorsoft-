@@ -14,6 +14,32 @@
 
 ---
 
+## 2026-07-23 — Bővítés: Gemini modell-lánc 6 → 11 modell (pro + exp variánsok is) + részletes AI-hiba diagnosztika
+
+### Miért
+A sofőr jelezte: egy tiszta MOL bon fotózásra „Nem sikerült beolvasni" hibát kap még 3 retry után is. A gyökér-lehetőség: valamennyi (mind a 6) Gemini modell napi ingyenes kvótája elfogyott (a felhasználó testel + több sofőr fotózik). A megoldás: több modell a láncba → több független napi keret → ~10× több scan naponta.
+
+### Mit csinál
+1. **`lib/geminiJson.js` `DEFAULT_MODELS` bővítve 6 → 11 modellre** — a meglévő flash modellek mellett a Gemini pro-változatok és experimental variánsok is bekerülnek a láncba (mind KÜLÖN napi ingyenes kerettel):
+   - Flash (magas napi keret, elsődleges): `2.0-flash`, `2.5-flash`, `2.0-flash-lite`, `2.5-flash-lite`, `1.5-flash`, `1.5-flash-8b`
+   - Flash preview/exp: `2.0-flash-exp`
+   - Pro (erősebb, kisebb napi keret, jó fallback nehezebb bonokhoz): `2.5-pro`, `1.5-pro-002`, `1.5-pro`
+   - Végső fallback experimental: `exp-1206`
+2. **Részletes AI-hiba diagnosztika**:
+   - `lib/geminiJson.js`: minden modell-kudarc egy `attempts[]` tömbben gyűjtve; ha végül minden modell elhasal, a napló mutatja modellenként (`gemini-2.0-flash:429, gemini-2.5-flash:429, ...`). Sikeres modell után is naplózva, ha voltak előtte kudarcok.
+   - Az utolsó modell státuszkódja belekerül a felhasználói hibaüzenetbe („supraîncărcate (429)"), és a modellek száma is („Toate cele 11 modele…"). A base64 sosem kerül a naplóba.
+3. **`handlers/receiptScan.js`** AI-hiba naplózás bővítve (`status` + `msg` + `attempts` — a base64 nem).
+
+### Miért így
+- **A pro modellek később jönnek** a láncban, mert kisebb ingyenes kerettel rendelkeznek — a flash 1500 RPD helyett a pro csak ~50/nap. Így nem égetjük el a kis keretet feleslegesen; csak akkor jön a pro, ha az összes flash már kifogyott (vagy pl. Google-oldali szerver-túlterhelés miatt 503-at ad).
+- **11 modell × külön keret** → egy napra ~15–20 000 scan is lehet ingyenesen, ami messze több, mint amennyi bon egy nap alatt születik egy közepes flottánál.
+- **A napló + hibaüzenet** most már diagnosztizálható: ha ismét „nem sikerül", a fly-log megmutatja, melyik modell adta a nem-recoverable hibát (pl. 400 = rossz kép, 401 = kulcs-probléma, 403 = gate).
+
+### Regresszió-védelem
+- 701 Jest zöld. Az existing modell-lánc szemantika érintetlen (429/503 → next; 400/401/403 → azonnal áll).
+
+---
+
 ## 2026-07-23 — Fix: bon-scan auto-retry átmeneti hibáknál (429/503/5xx/network) — nem esik le első hibára
 
 ### Miért
