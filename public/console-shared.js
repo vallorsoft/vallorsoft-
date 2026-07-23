@@ -5362,3 +5362,115 @@ function clearCompanyWhatsappNumber(){
   if(input) input.value='';
   saveCompanyWhatsappNumber();
 }
+
+// ============================================================
+// 🎓 AI bon-szkennelés kártya (Fuvarlevelek pane, Admin/Manager)
+// ------------------------------------------------------------
+// - BE/KI kapcsoló a saját cégére (a Menetleveleknél a helyén).
+// - „Betanult minták" lista: melyik láncot (MOL/OMV/Kaufland stb.)
+//   ismeri már a rendszer, mikor tanulta utoljára, mennyi bont látott.
+// - 🗑 gomb: rossz mintát eldobhat, a Gemini legközelebb újratanulja.
+// ============================================================
+function loadBonScanCard() {
+  var box = document.getElementById('bonScanCard');
+  if (!box) return;
+  gas('getBonScanSettings').then(function (r) {
+    if (!r || !r.ok) {
+      box.innerHTML = '<div style="color:var(--muted);font-size:13px;">' + esc((r && r.err) || 'Eroare') + '</div>';
+      return;
+    }
+    _renderBonScanCard(box, r);
+  }).catch(function () {
+    box.innerHTML = '<div style="color:var(--muted);font-size:13px;">Eroare de rețea</div>';
+  });
+}
+
+function _renderBonScanCard(box, data) {
+  var enabled = !!data.enabled;
+  var override = data.override; // null | true | false
+  var samples = data.samples || [];
+  var overrideBadge = (override === true)
+    ? '<span class="badge ok" style="margin-left:8px;">' + t('bscan.overrideOn') + '</span>'
+    : (override === false)
+      ? '<span class="badge warn" style="margin-left:8px;">' + t('bscan.overrideOff') + '</span>'
+      : '<span class="badge info" style="margin-left:8px;">' + t('bscan.planDefault') + '</span>';
+
+  var toggleId = 'bonScanToggle';
+  var html = '<h2 class="h-title" style="margin-top:0;" data-i18n="bscan.title">🎓 AI bon-szkennelés</h2>'
+    + '<p style="color:var(--muted);font-size:13px;margin:0 0 14px;" data-i18n="bscan.hint">'
+    + 'A sofőrök a bonjaikat (tankolás/vásárlás) lefotózhatják — az AI kiolvassa a mezőket és a menetlevélbe teszi. A rendszer a megerősített kiolvasásokból tanul (MOL/OMV/Kaufland → pontosabb).'
+    + '</p>'
+    + '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px;">'
+    +   '<label style="display:inline-flex;align-items:center;gap:10px;cursor:pointer;">'
+    +     '<input type="checkbox" id="' + toggleId + '"' + (enabled ? ' checked' : '') + ' onchange="setBonScanEnabled(this.checked)" style="width:20px;height:20px;cursor:pointer;">'
+    +     '<span style="font-weight:600;color:var(--text);" data-i18n="bscan.toggle">Engedélyezve a sofőrök felületén</span>'
+    +   '</label>'
+    +   overrideBadge
+    + '</div>'
+    + '<div style="border-top:1px solid var(--border);padding-top:14px;">'
+    +   '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+    +     '<div style="font-weight:700;color:var(--text);" data-i18n="bscan.samplesTitle">📚 Betanult minták (' + samples.length + ')</div>'
+    +     '<div style="font-size:12px;color:var(--muted);" data-i18n="bscan.samplesHint">Merchantonként egy sor. A rossz mintát törölheted, az AI újratanulja.</div>'
+    +   '</div>'
+    +   (samples.length ? _renderBonScanSamples(samples) : '<div style="color:var(--muted);font-size:13px;padding:10px 4px;" data-i18n="bscan.samplesNone">Még nincs betanult minta. Az első elfogadott bonok után itt jelennek meg.</div>')
+    + '</div>';
+  box.innerHTML = html;
+  if (window.I18N && I18N.apply) I18N.apply(box);
+}
+
+function _renderBonScanSamples(samples) {
+  var rows = samples.map(function (s) {
+    var f = s.fields || {};
+    var kindEmoji = f.kind === 'fuel' ? '⛽' : (f.kind === 'purchase' ? '🛒' : '📄');
+    var updated = s.updated_at ? new Date(s.updated_at).toLocaleDateString() : '';
+    var stable = [];
+    if (f.tip)    stable.push(esc(f.tip));
+    if (f.plata)  stable.push(esc(f.plata));
+    if (f.valuta) stable.push(esc(f.valuta));
+    return '<tr>'
+      + '<td>' + kindEmoji + '</td>'
+      + '<td style="font-weight:600;">' + esc(s.merchant_label || s.merchant_key || '—') + '</td>'
+      + '<td style="color:var(--muted);font-size:12.5px;">' + stable.join(' · ') + '</td>'
+      + '<td style="text-align:center;">' + (s.sample_count || 0) + '</td>'
+      + '<td style="color:var(--muted);font-size:12px;">' + esc(updated) + '</td>'
+      + '<td style="text-align:right;">'
+      +   '<button class="btn ghost" style="padding:6px 10px;font-size:12px;" onclick="deleteBonScanSample(' + s.id + ')" title="' + t('bscan.deleteTitle') + '">🗑</button>'
+      + '</td></tr>';
+  }).join('');
+  return '<div style="overflow-x:auto;">'
+    + '<table class="table" style="width:100%;font-size:13px;">'
+    +   '<thead><tr>'
+    +     '<th style="width:30px;"></th>'
+    +     '<th data-i18n="bscan.colMerchant">Merchant</th>'
+    +     '<th data-i18n="bscan.colFields">Mezők</th>'
+    +     '<th style="text-align:center;width:60px;" data-i18n="bscan.colSamples">Bonok</th>'
+    +     '<th data-i18n="bscan.colUpdated">Frissítve</th>'
+    +     '<th style="text-align:right;width:60px;"></th>'
+    +   '</tr></thead>'
+    +   '<tbody>' + rows + '</tbody>'
+    + '</table>'
+    + '</div>';
+}
+
+function setBonScanEnabled(enabled) {
+  gas('setBonScanEnabled', { key: 'ai-bon-scan', enabled: !!enabled }).then(function (r) {
+    if (!r || !r.ok) {
+      alert((r && r.err) || 'Eroare');
+      // Visszaállítjuk a kapcsolót a régi értékre
+      var cb = document.getElementById('bonScanToggle');
+      if (cb) cb.checked = !enabled;
+      return;
+    }
+    if (typeof toast === 'function') toast(enabled ? t('bscan.savedOn') : t('bscan.savedOff'), 'ok');
+    loadBonScanCard();
+  });
+}
+
+function deleteBonScanSample(id) {
+  if (!confirm(t('bscan.confirmDelete'))) return;
+  gas('deleteBonScanSample', { id: id }).then(function (r) {
+    if (!r || !r.ok) { alert((r && r.err) || 'Eroare'); return; }
+    if (typeof toast === 'function') toast(t('bscan.deleted'), 'ok');
+    loadBonScanCard();
+  });
+}

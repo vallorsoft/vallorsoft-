@@ -14,6 +14,43 @@
 
 ---
 
+## 2026-07-23 — ÚJ: külön `ai-bon-scan` feature-flag + admin/manager önkiszolgáló BE/KI kapcsoló a Menetlevelek fülön + betanult minták nézet/törlés + sofőr főoldalon a gomb csak ha be van kapcsolva
+
+### Miért
+Az admin kérte: (1) a bon-szkennelő NE az e-mail-parser `ai-kiolvasas` flag-jével legyen egybegyúrva — legyen KÜLÖN kapcsolható. (2) A cég Admin/Manager-je ne várjon a developerre, ha a saját cégére akarja engedélyezni/tiltani — ez a Menetlevelek fülön legyen a helyén. (3) Legyen látható, milyen mintákat tanult meg a rendszer (MOL/OMV/Kaufland…), és rosszul betanultat lehessen törölni. (4) A sofőr NE lásson gombot, ha úgyis csak hibaüzenetet kapna (a cég kikapcsolta / nincs API-kulcs).
+
+### Mi történt
+
+1. **Feature-flag split** (`public/feature-catalog.js`): a régi `ai-kiolvasas` most csak az e-mail-kiolvasásé (címke frissítve: „AI kiolvasás — e-mail 🤖"); az új **`ai-bon-scan`** („AI bon-szkennelés 📷") a bon-scannerre él. A `handlers/receiptScan.js` (`scanReceipt` + `confirmReceiptExtraction`) mostantól az új kulcsra gate-el. Új kulcs → nincs `company_features` / `plan_features` sor → `featureEnabled()` default `true` → visszafelé kompatibilis (minden meglévő cégnél magától be van kapcsolva; az admin kikapcsolhatja).
+
+2. **Önkiszolgáló handlerek** (`handlers/receiptScan.js`):
+   - **`getBonScanSettings`** (Admin/Manager, read-only): a jelenlegi flag-állapot (`featureEnabled` a teljes hierarchián) + a cég-override (`company_features.enabled` ha van) + a `receipt_scan_samples` teljes lista (minden merchantonként).
+   - **`setBonScanEnabled`** (Admin/Manager, audit-naplózott): fehérlistás kulcsra (`SELF_ALLOWED_KEYS = ['ai-bon-scan']`) INSERT/UPDATE a `company_features` táblába. Nem `ai-bon-scan` kulcsot próbálni → felülírja `ai-bon-scan`-re (nincs cross-flag módosítás). A developer-oldal továbbra is minden kulcsot kezelhet — ez csak a saját cégre, csak erre az egy kulcsra.
+   - **`deleteBonScanSample`** (Admin/Manager, audit): egy betanult mintát töröl a cégéből (`DELETE ... WHERE id=$1 AND company_id=$2`); ha nem SAJÁT sor → 0 érintett sor → hiba.
+   - **`getMyBonScanEnabled`** (Sofer|Admin|Manager, read-only): egy bool + `hasKey` (van-e `GEMINI_API_KEY`) + `usable = (flag && hasKey)`. Nem szivárog cég-belső infó; a sofőr UI ez alapján rejt/mutat gombot.
+
+3. **Admin/Manager UI — Menetlevelek fül** (`public/admin.html` + `public/manager.html`):
+   - Új `#bonScanCard` a `pane[data-pane="received-fuv"]` legelső blokkjaként.
+   - `console-shared.js` új közös függvények: **`loadBonScanCard`** (fetch + render), **`_renderBonScanCard`** (címke + kapcsoló + override-badge + minta-lista), **`_renderBonScanSamples`** (táblázat: merchant, stabil mezők, sample_count, updated_at, 🗑 gomb), **`setBonScanEnabled`** (kapcsoló change → RPC + toast + újratöltés), **`deleteBonScanSample`** (confirm + RPC + toast + újratöltés). A `loadTab('received-fuv')` mindkét felületen meghívja.
+
+4. **Sofőr — a gomb csak ha usable** (`public/sofer.js`):
+   - Új **`applyBonScanVisibility`** (`getMyBonScanEnabled`) → ha nem `usable`, a `.dash-scan-card` (főoldali narancs gomb + várólista-doboz) és a `#fuvarStep2 .scan-btn` gombok `display:none`. Ha a hívás sikertelen (régi szerver stb.) → biztonságosabb: MUTAT (a szerver úgyis eldönti).
+   - Beindítás: sofőr boot után (a `loadDashOrders/loadSoferMiniStats/loadMyAssignedVehicle` mellett).
+
+5. **i18n** — 15 új `bscan.*` kulcs (RO-alap + HU) a kapcsolóhoz, override-badge-hez, minta-táblázat fejléceihez, confirm/toast szövegekhez.
+
+6. **Cache-bust** — `admin.html`/`manager.html`/`sofer.html`: `console-shared.js` + `i18n.js` + `sofer.js` `?v=20260723bscan`; `sofer.css` `?v=20260723bscanq`.
+
+7. **Teszt** — **10 új eset** a `tests/unit/receiptScan.test.js`-ben (`getBonScanSettings` szerep-kapu + válasz-alak; `setBonScanEnabled` szerep-kapu + fehérlistás kulcs-védelem + UPSERT; `deleteBonScanSample` szerep-kapu + `WHERE company_id` + 0-rows-hiba; `getMyBonScanEnabled` bool + no-key eset; `SELF_ALLOWED_KEYS` invariáns). Teljes suite **701 zöld** (691 → 701).
+
+### Miért így
+- **Whitelist a self-service handleren**: az admin nem tud tetszőleges `feature_key`-t állítani a saját cégére (nem tudja felülírni pl. az `ai-kiolvasas`-t vagy `konyvelo-szerepkor`-t). Csak az explicit engedélyezett `ai-bon-scan`. Új user-controlled flag-hez explicit bővítés kell → nincs tolerancia hiba.
+- **Fresh-branch a merged PR után**: PR #284 mergelve → új munka új commit-sor main-ről (CLAUDE.md 7. szabály); nem stackelünk merged PR fölé.
+- **Sofer-UI fail-open**: ha a `getMyBonScanEnabled` bármi okból hibázik, MUTATJA a gombot (a szerver úgyis a végső döntés). Régi szerver + új kliens kombó nem fagyasztja el a felhasználót.
+- **A tanulás megmarad**: a `receipt_scan_samples` tábla és a few-shot promptolás változatlan. Az admin csak a KAPCSOLÓT és a nézetet kapja meg.
+
+---
+
 ## 2026-07-23 — ÚJ: bon-scanner TANULÁS (few-shot per merchant) + közös `lib/geminiJson` helper + nem-szivárgás megerősítés
 
 ### Miért
