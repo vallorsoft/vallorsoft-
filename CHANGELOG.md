@@ -14,6 +14,27 @@
 
 ---
 
+## 2026-07-23 — FIX: bon-scan IGAZI gyökérok — `keepalive:true` 64 KiB body-limit → base64 kép el se ment a szerverre
+
+### Miért
+A megelőző körben (PR #288) a Gemini-lánc végre stabil lett (6 flash modell + 404-tolerancia), a szerver-oldal jó — de a sofőr főoldalán a bon-scan MÉG mindig hiába dob „Nem sikerült beolvasni a bont"-ot. A képernyőkép elárulta, hogy a kártya kizárólag a KLIENS-oldali fallback-szöveget (`t('sof.scanFailed')`) mutatja — szerver-oldali `err` mező nélkül. Ez a szöveg csak a `.catch()`-ből jön, ami azt jelenti: a fetch magától elhasal, még az /api/execute be se érkezik.
+
+### Gyökérok
+A `scanReceiptStart` (`public/sofer.js` PR #284) a fetch-et `keepalive:true`-val indítja, hogy az oldal-elhagyás után is befejeződjön. **A Fetch-specifikáció 64 KiB-re korlátozza a `keepalive:true` kérések body-jét** (a whatwg spec kifejezetten „throw a TypeError"-t ír elő body > 64 KiB esetén). Egy 1600px-re méretezett JPEG (q=0.85) base64-je azonban jellemzően 100–500 KB → a Chrome / mobil böngésző MÉG a küldés előtt eldobja TypeError-ral → a fetch `.catch()`-e fut → a kártya a fallback-szöveget mutatja. Ez a hiba PR #284 óta latens (kezdettől ott van), a felhasználó eddigi „működött korábban" észlelése valószínűleg apró tesztképekre vonatkozott, amelyek épp beléptek a 64 KiB alá.
+
+### Mit csinál
+1. **`public/sofer.js` `_scanReceiptTry`** — a `keepalive: true` KIVÉVE a scan-fetch-ből (körüljárva kommentelve, hogy miért nem tehető vissza). A confirm-fetch (`confirmReceiptExtraction`, ~200 bájt JSON) érintetlen — az beleférne a 64 KiB-be és néha kell is az oldal-elhagyáskor.
+2. **`scanReceiptStart` fej-komment frissítve** a gyökérok magyarázatával (jövőbeli regresszió-védelem: aki visszatenné a `keepalive:true`-t, azonnal látja, miért nem szabad).
+3. **`public/sofer.html` cache-bust** `?v=20260723retry` → `?v=20260723keepalive` → a mobil-cache-be beragadt régi JS mindenképp lecserélődik.
+
+### Miért így
+- A perzisztens localStorage-queue (`vs_sofer_receipt_queue`) + a `queueMaint` 3 perces takarítása fedezi az oldal-elhagyás esetét: ha a sofőr épp a fetch alatt lép ki, a következő nyitáskor a folyamatban lévő tétel error-ra vált (nem ragad be), és újra fotózható. A `keepalive` „akkor is befejeződik" garantálhatta volna ezt, de a 64 KiB-korlát miatt a fetch úgyse indul el — tehát az egész trade-off értelmetlen a mi image-body-nkra.
+- **Szerver-oldalon (PR #288 óta) minden rendben van** — a szerver az /api/execute-ra érkező scanReceipt-et helyesen dolgozza fel; csak sose kapott kérést, mert a böngésző eldobta.
+
+### Regresszió-védelem
+- 237 Jest zöld (a fix kliens-oldali, teszt nélküli — a body-limit specifikációs viselkedés, nem szerver-logika).
+- Cache-bust: a régi (kliens-oldalon cache-elt) `sofer.js` biztos lecserélődik minden mobilon.
+
 ## 2026-07-23 — FIX: bon-scan „nem működik" a sofőr főoldalon — retired/paid modellek kiszedve a láncból + 404-tolerancia
 
 ### Miért

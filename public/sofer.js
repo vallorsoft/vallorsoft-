@@ -846,8 +846,16 @@ function _receiptToPayload(file, cb) {
 }
 
 // Háttérben elindítjuk a feldolgozást; a UI azonnal frissül (van egy új
-// „processing" sor a listában), és a sofőr mást csinálhat. A fetch
-// keepalive:true → akkor is befejeződik, ha a sofőr elhagyja az oldalt.
+// „processing" sor a listában), és a sofőr mást csinálhat.
+//
+// FONTOS: a scan-fetch NEM `keepalive:true` — a Fetch-spec a keepalive
+// kéréseket 64 KiB body-ra korlátozza. Egy 1600px-re méretezett JPEG
+// base64-je is bőven 100–500 KB → keepalive-vel a böngésző el se küldi
+// (TypeError → .catch() → „Nem sikerült beolvasni a bont"). Ez volt a
+// gyökérok, amiért a bon-scan látszólag „nem működött". A perzisztens
+// localStorage queue + a queueMaint 3-perces takarítás gondoskodik
+// arról, hogy oldal-elhagyáskor sem vész el semmi (a folyamatban lévő
+// sor error-ra vált, a sofőr újra tudja fotózni).
 function scanReceiptStart(file) {
   var busy = document.getElementById('receiptScanBusy');
   if (busy) busy.style.display = 'block';
@@ -894,10 +902,13 @@ function _scanReceiptTry(id, payload, attempt) {
   }
 
   setTimeout(function () {
+    // NINCS `keepalive:true` — a base64 kép jellemzően 100–500 KB, a
+    // spec 64 KiB-re korlátozza a keepalive body-t → TypeError → .catch().
+    // A perzisztens localStorage queue + a queueMaint 3 perces takarítás
+    // fedezi az oldal-elhagyás esetét (ld. a scanReceiptStart komment).
     fetch('/api/execute', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      keepalive: true,
       body: JSON.stringify({ functionName: 'scanReceipt', arguments: [{
         mimeType: payload.mimeType, data: payload.data
       }] })
