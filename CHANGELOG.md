@@ -14,6 +14,106 @@
 
 ---
 
+## 2026-07-23 — ÚJ: bon-scanner TANULÁS (few-shot per merchant) + közös `lib/geminiJson` helper + nem-szivárgás megerősítés
+
+### Miért
+Az előző körben (lentebb) beépített bon-scanner mindig „üresen" hívta a Gemini-t. Ugyanakkor egy adott töltőállomás (MOL/OMV/Petrom/Kaufland stb.) bonja gyakorlatilag EGYFORMA a láncon belül — ha a rendszer emlékezne, hogy a MOL-nál hol vannak a mezők, a KÖVETKEZŐ MOL bon pontosabb lenne. Kérés: „tanulja meg adott bonon az adatok hol találhatók". Kérés #2: a modell-lánc + fetch logika legyen egy közös segédben (ne duplikálva a fuvar-inbound `reparse`-ban és a bon-scannerben). Kérés #3: „ha menti a képet, ne szivárogjon ki".
+
+### Mi történt
+
+1. **Közös `lib/geminiJson.js` helper** (ÚJ) — a Gemini modell-lánc (429/503 → következő modell külön napi kerettel), a 5xx-es retry (max 3 attempt), a hibaüzenetek + a fetch (kulcs headerben, timeout, JSON-parse) EGYETLEN forráson él. Egyszerű API: `extractJson({ systemPrompt, parts, models? })` → `{ json, model }`; dobás `e.status`-szal. Env: `GEMINI_MODELS` (vesszős lista) vagy `GEMINI_MODEL` (egy modell) felülírja a 6-elemű alapláncot.
+
+2. **`services/order-ai/gemini.js` REFAKTOR** — a helyi `callGemini` + modell-lánc + retry kód TÖRÖLVE; az `extract()` most `lib/geminiJson`-t hív. A 429/503-nál a régi „Sistemul a comutat pe citirea integrată…" emberbaráti kiegészítés megőrizve → az `order-ai/index.js` fallback szemantikája változatlan (semmi nem törik).
+
+3. **`handlers/receiptScan.js` REFAKTOR + TANULÁS** — a helyi callGemini/DEFAULT_MODELS TÖRÖLVE, a helyére `extractJson` hívás. **Új tanuló-réteg:**
+   - **Migráció `db/receipt-scan-samples.sql`** (idempotens): `receipt_scan_samples (id, company_id, merchant_key, merchant_label, fields, sample_count, created_at, updated_at)` + `UNIQUE (company_id, merchant_key)` — cégenként/merchantonként EGY aktív minta (a legutóbb megerősített felülírja a régit → self-healing).
+   - **`scanReceipt` few-shot**: minden hívás előtt lekéri a cég legutóbbi 5 EGYEDI merchant-mintáját (`DISTINCT ON (merchant_key) ORDER BY updated_at DESC LIMIT 5`), és a Gemini system-promptjához függeszti őket példaként. **CSAK STABIL mezőket** ad példaként (kind/loc/tip/plata/valuta/produs); a per-transaction mezőket (data/suma/litru/km) SZÁNDÉKOSAN kihagyja, hogy a Gemini ne másolja azokat az ÚJ bonhoz. Válaszban `learned_from: N` jelzi, hány mintát használt.
+   - **Új `confirmReceiptExtraction` handler**: a sofőr Elfogadás gombjára hívva. Sanitize a mezőket, kinyeri a `merchant_key`-t (`normalizeMerchant`: `loc` első jelentős szava, legalább 3 hosszú + betűt tartalmaz → „MOL Arad" → „mol"; „OMV Petrom" → „omv"; „SC MOL SRL" → „mol"; „1300" → üres → nem tárol), majd `INSERT … ON CONFLICT (company_id, merchant_key) DO UPDATE SET fields = EXCLUDED.fields, sample_count = +1`. Kapuk: bejelentkezés + `Sofer|Admin|Manager` + `ai-kiolvasas` (konzisztens a `scanReceipt`-tel). Audit-naplózva (`receipt.confirm`). **DB-hiba (tábla hiányzik / permission) → csendes noop** — a UI menete független.
+   - **Kliens (`public/sofer.js` `rrAccept`)**: a modal Elfogadás után best-effort `fetch(scanReceiptExtraction ...)` `keepalive:true`-vel; a sofőr átléphet más képernyőre, a tanulás a háttérben elmegy. Hiba esetén nem törik semmi (a menetlevél-piszkozatba már bekerült a sor).
+
+4. **NEM-SZIVÁRGÁS védőháló + megerősítés**:
+   - **Audit** (mind `scanReceipt`, mind `confirmReceiptExtraction`): CSAK metaadat (modell / kind / confidence / minta-szám / merchant-kulcs). A **base64 kép SOHA** nem kerül audit-logba / DB-be — csak a Gemini-hívás alatt él memóriában, utána V8 GC.
+   - **Request-log** (`middleware/requestLog.js`): csak metódus/útvonal/státusz/ms/request-id — **NEM logol body-t** (verifikálva).
+   - **Global error handler** (`server.js`): csak `err.message`/`err.stack`/`req.path` — nem logol body-t.
+   - **Hibaválasz csonkolva 300 karakterre** (`scanReceipt` catch): egy esetleges „echo-back" Gemini-hiba sem szivárogtathat vissza többet a kliensre.
+   - **localStorage queue** (kliens): csak 128px thumbnail — a teljes base64-et SOSEM tárolja (perzisztencia + méret-védelem).
+   - **Új-táblás `fields` JSONB**: csak bon-mezők (loc, kind, tip, plata, valuta, produs, + per-transaction data/suma/litru/km) — sofőr-név, kártyaszám, sofőr-email SOHA nem kerül ide.
+
+5. **Teszt** — **19 új eset**, teljes suite **691 Jest zöld** (43 skip valós DB):
+   - `tests/unit/geminiJson.test.js` (ÚJ, 8 eset): siker, 429→next model, 400→azonnal áll, minden modell 429→végső hiba, nincs API-kulcs→NO_KEY, kulcs header-ben (nem query), DEFAULT_MODELS.
+   - `tests/unit/receiptScan.test.js` (+11 új eset): `_normalizeMerchant` határesetek (MOL Arad/Timișoara/SC MOL SRL/tiszta szám/üres/null), few-shot bekerül a system-promptba, üres mintáknál változatlan alap-promt, stabil mezők vs per-transaction mezők szétválasztása (data/suma NEM megy példaként!), samples-lekérdezés hibája nem törik el a scan-t, confirm szerep-kapu, mezők nélküli confirm → noop, valós confirm → UPSERT normalizált merchant-key-vel, confirm DB-hiba → csendes noop, hibaüzenet 300 karakteren csonkolva.
+
+### Miért így
+- **Few-shot > fingerprint**: az image-alapú fingerprintelés (pHash) merchant-azonosítást igényelne még Gemini előtt (bonyolult, egy extra AI-hívás vagy heurisztika). A few-shot kisebb overhead (5 × ~150 token = ~750 token per hívás, gemini-flash-en filléres) és Gemini pattern-matching-jét használja: az IMAGE önmagában tartalmazza a layout-ot, a példák csak konzisztens értelmezést nudge-olnak.
+- **DISTINCT ON merchant_key**: 5 különböző lánc mintáját adjuk példaként — Gemini így többféle layout-ot lát, és a fizikai bon-képhez a leginkább illeszkedőt „választja". Nem kell tudnunk előre, melyik merchant-tól jött a bon.
+- **Per-transaction mezők KIHAGYVA a példákból**: a Gemini ne másolja a régi bon összegét/dátumát az újba! A régi bon példa csak a STRUKTÚRÁT tanítja, nem az értékeket.
+- **Csendes DB-fallback**: ha a `receipt_scan_samples` migráció még nem futott le (első deploy), a scan tovább megy hint nélkül; ha a confirm DB-je hibázik, a sofőr UI-ja nem törik el.
+
+### Regresszió-védelem
+- **Teljes suite 691 Jest zöld** (require-sweep 125 modul 0 hiba). Az e-mail-inbound `reparse` (order-ai) útja változatlan viselkedésű — az integrációs tesztek verifikálják.
+- A `sanitize` továbbra is fehérlistán szűr, most a confirm bemenetét is ellenőrzi (nem lehet a DB-be írni tetszőleges `plata`-t vagy nem-ISO dátumot).
+- Cache-bust `?v=20260723learn` (sofer.html/js/css + i18n.js).
+
+---
+
+## 2026-07-22 — ÚJ: főoldali „📷 Bon szkennelés" gomb + háttér-feldolgozás + perzisztens elfogadás-várólista
+
+### Miért
+Az előző körben (lentebb) a bon-fotózás a menetlevél 2. lépésén belül működött csak — és blokkolt: amíg a Gemini válaszolt, a sofőr a spinnert nézte. Kérés: a **főoldalról egy gomb** fotózzon; a feldolgozás **háttérben** menjen, hogy a sofőr közben dolgozhasson; ha időközben kilép a képernyőről, később **rákattinthasson és elfogadhassa** a kiolvasott adatokat.
+
+### Mi történt
+1. **Főoldali kártya (`sec-dash`)** — új „📷 Bon szkennelés (AI) — háttérben feldolgozódik" narancs gomb (`sof.dashScanBtn`) a mini-statisztika alatt; koppintásra a natív kamerát/galériát nyitja. A gomb + a várólista egyetlen `dash-scan-card` kártyában él.
+
+2. **Fire-and-forget fetch + perzisztens várólista** (`localStorage` `vs_sofer_receipt_queue`, max 20 tétel FIFO) — a `scanReceiptStart(file)` a kép kliens-oldali átméretezése (1600px hosszú oldal, JPEG q=0.85) után egy új `processing` státuszú tételt ír a várólistába (thumbnail + időbélyeg), majd elindítja a `fetch(/api/execute { keepalive:true })`-t → a válasz **nem várt** módon később futtatja a callbacket, ami a tételt `ready` (mezőkkel) vagy `error` státuszra írja át. A sofőr közben szabadon lép más képernyőre. A `keepalive:true` garantálja, hogy még a képernyő elhagyásakor is befejeződik a kérés. Toast: „Feltöltve — folytathatod, majd elfogadhatod".
+
+3. **Elfogadás-modal (`#receiptReviewModal`)** — a főoldali várólistában minden `ready` tétel „Áttekintés" gombja megnyit egy modalt, amiben a sofőr **szerkesztheti** a kiolvasott mezőket (Gemini nem tévedhetetlen), és tetszés szerint fuel↔purchase **típust is válthat** (a közös mezők — helyszín/dátum/összeg/fizetés — átkerülnek a másik nézetbe). Elfogadáskor a mezők egy új `alim`/`ach` sorként a menetlevél-piszkozatba (`sessionStorage`) kerülnek; ha a menetlevél 2. lépés éppen nyitva van, a DOM sor is beszúródik azonnal (`addAlimRow`/`addAchRow` + `draftSave`). Ha még nincs piszkozat, egy alap-vázlat automatikusan létrejön → a következő menetlevél-nyitáskor a `draftRestore` visszaállítja.
+
+4. **Elvetés** — „✕" gombbal (confirm-mel) a tétel törlődik a várólistából.
+
+5. **Robusztusság** — oldal-betöltéskor minden 60 mp-nél régebbi `processing` tétel automatikusan `error` státuszra vált (`sof.rr.interrupted`: „A feldolgozás megszakadt — kérlek fotózz újra") — így nem ragad örökké függőben, ha a fetch egy szélsőséges esetben (app kill, hálózat) nem tudott befejeződni. A `visibilitychange` (tab-visszatérés) is újrarajzolja a várólistát, és a `goSec('dash')` is.
+
+6. **A menetlevél 2. lépésén megmarad a fuel/purchase gomb-pár** (a gyors, közvetlen kiválasztásra), de mindkét út **ugyanabba a perzisztens várólistába** ír — a sofőr átléphet a főoldalra, és a lépés 2. gombbal indított feldolgozás is a főoldali kártyán jelenik meg.
+
+7. **HALMOZOTT + MEGLÉVŐ ROKON — `fuvarStep2` restore** — a `rrAccept` (step2 zárva úton) a scannelt sort a sessionStorage-piszkozatba pusholja; a `fuvarStep2` a konténerek üresre-állítása után **visszaolvassa a piszkozatot** (`_dr.alimentari.forEach → addAlimRow`, `_dr.achizitii.forEach → addAchRow`). **Kezelt esetek:** (a) a sofőr kézzel bevisz 2 tankolást, majd a főoldalról scannel egy 3.-at → mindhárom megmarad; (b) 3 külön bont fényképez → 3 különálló queue-tétel, 3 külön elfogadás, 3 külön `addAlimRow`/`addAchRow` (append, nem cserél); (c) fresh menetlevélnél is: a fuvarStep2-t megnyitva a scannelt sorok megjelennek, nem vesznek el a következő `draftSave`-nél. Cache-bust `?v=20260722scanq2`.
+
+8. **i18n** — 17 új `sof.dashScanBtn`/`sof.scanQueued`/`sof.rr.*` kulcs (RO-alap + HU).
+
+### Regresszió-védelem
+- **Szerver-oldal (`handlers/receiptScan.js`) ÉRINTETLEN** — az előző körös 12 Jest-teszt továbbra is zöld; teljes suite **672 zöld** (43 skip valós DB-teszt). Require-sweep 125 modul 0 hiba.
+- A `sanitize` (backend fehérlista) minden mezőt védetten enged át → a szerkeszthető modalba is csak fehérlistás mezők (fuel: tip/litru/km/plata/suma; purchase: produs/plata/suma; közös: loc/data) kerülnek.
+- **Nincs séma-változás**, nincs új szerver-modul, nincs új függőség.
+
+---
+
+## 2026-07-22 — ÚJ: sofőr menetlevél — bon (tankolás/vásárlás) fotózás → AI (Gemini) kiolvasás → új sor előtöltve
+
+### Miért
+A sofőrök gyakran útközben tankolnak vagy vásárolnak (mosás, gumi, olaj, autópálya-matrica stb.), és a menetlevélbe a bonrol kézzel kellett átvezetniük minden mezőt (helyszín, dátum, liter, összeg, fizetés-mód). Ez időt visz és hibalehetőség (elgépelt liter, rossz dátum). Kérés: fotózza le a bont, az AI olvassa ki, és a menetlevél Tankolások/Kiadások szekciójába egy előtöltött sor kerüljön — amit a sofőr átnéz és a többi mezővel együtt menti; a hiányzó mezők üresen maradnak.
+
+### Mi történt
+1. **Új backend handler `handlers/receiptScan.js` (`scanReceipt` RPC)** — a sofőr/admin/manager egy base64-esbe csomagolt bon-fotót vagy PDF-et küld; a handler bon-specifikus rendszer-prompttal hívja a Google Gemini-t (ugyanaz a modell-lánc mint a fuvar-inbound `reparse`-nál: `gemini-2.0-flash` → `-flash-lite` → `-2.5-flash` → `-2.5-flash-lite` → `-1.5-flash` → `-1.5-flash-8b`; 429/503 esetén automatikusan a következő modellre vált, mert minden modellnek külön napi ingyenes kerete van). A Gemini a bont a `kind: "fuel"|"purchase"` mezővel is besorolja (Motorină/AdBlue = fuel; minden más = purchase), és visszaadja a `loc`/`data (YYYY-MM-DD)`/`tip (Motorină|AdBlue)`/`litru`/`km`/`plata (Card|Cash|Flota Card|DKV)`/`suma`/`valuta`/`produs`/`confidence` mezőket. A handler **fehérlistán validál** minden érkező mezőt (`plata`/`tip` csak a menetlevél-űrlap opcióiból; `data` csak ISO YYYY-MM-DD; számokat számmá konvertál) — nem propagál "kreatív" Gemini-kulcsokat a kliensbe. Kapuk: bejelentkezés + `Sofer|Admin|Manager` szerep + `ai-kiolvasas` csomag-flag (a fuvar-inbound `reparse` gate-jével egyenlő) + `GEMINI_API_KEY` env. Base64-méret korlát 8 MB (mobil-fotó bőven belefér). Audit-naplózva (`receipt.scan`).
+
+2. **Sofőr UI (`public/sofer.html` + `sofer.js`)** — a menetlevél 2. lépésén (⛽ Tankolások / 🛒 Kiadások) az „➕ Tankolás/Kiadás hozzáadása" gomb MELLÉ egy **narancs „📷 Bon szkennelés (AI)" gomb** került (kétnyelvű `data-i18n`). Koppintásra a rejtett `<input type="file" accept="image/*,application/pdf" capture="environment">` a natív kamerát/galériát nyitja. A kép **kliens-oldalon átméretezve** (max 1600px hosszú oldal, JPEG q=0.85, canvas) — a mobil-fotó (5–15 MB) is elfér a szerver 8 MB-os korlátjában, és a Gemini gyorsabban válaszol. Kiolvasás közben egy narancs „🔎 Bon feldolgozása AI-val…" sáv látszik. A válasz mezői a Gemini `kind`-jét követve **egy új `addAlimRow(f)` vagy `addAchRow(f)` sorba** töltődnek (a `sof.alim-*`/`ach-*` mezőkbe — pontosan úgy, mintha a sofőr kézzel írta volna be), majd `draftSave()` a piszkozatba menti — a sofőr átnézheti és javíthatja mielőtt beküldi a menetlevelet.
+
+3. **i18n** — 6 új `sof.scan*` kulcs a `public/i18n.js`-ben (`scanReceiptFuel`/`scanReceiptPurchase`/`scanBusy`/`scanOk`/`scanFailed`/`scanReadErr`), RO-alap + HU.
+
+4. **Regisztráció + cache-bust** — a `handlers/receiptScan` bekötve a `routes/execute.js` registry-be. Cache-bust: `sofer.html` `sofer.js?v=20260722scan` + `i18n.js?v=20260722scan`.
+
+5. **Teszt (`tests/unit/receiptScan.test.js`, 12 eset)** — Gemini `fetch`-e mockolva: szerep-kapuk (sofer/admin/manager engedve, más tiltva; nincs bejelentkezés → tiltva), csomag-kapu (feature ki → tiltva), env-kapu (`GEMINI_API_KEY` nélkül → jelezve), fájl-validáció (rossz mimetype, üres, >8 MB), fuel + purchase kiolvasás fehérlistázva, `_sanitize` (ismeretlen `plata`/`tip`/nem-ISO `data`/nem-szám `confidence` mind kiszűrve), modell-lánc (mind 429 → érthető végső hiba; 400 → azonnal áll). **12/12 zöld → teljes suite 672 Jest zöld (43 skip valós DB-teszt).**
+
+### Miért így
+- **Nincs séma-változás** — a bon-fotó a menetlevél-piszkozatba egy új tankolás/vásárlás sorként érkezik; a szerver nem ment külön táblát a nyers képhez (a fotó a menetlevél-beküldéskor a meglévő `fuvarlevelek` folyamaton át kerülhet, ha kell — külön kör). Ez a leggyorsabb, legkevesebbet érintő megoldás.
+- **A Gemini rendszer-promt bon-specifikus** — nem az `order-ai` (fuvar-megrendelés) prompt egy általánosítása, mert a bon-mezők (kind/litru/km/plata/tip/produs) mások, és a Gemini akkor a legpontosabb, ha egyértelmű, mit várunk. A modell-lánc + fetch pattern viszont a bevált (order-ai `gemini.js`) kód mintáját követi.
+- **Csomag-kapu ugyanaz** (`ai-kiolvasas`) — az AI-kiolvasás egyetlen csomag-flag mögé rendezve; nincs új feature-flag, ami menedzselni kell.
+- **A Gemini `kind`-je felülbírálja a gomb-választást** — ha a sofőr a „Vásárlás"-gombra koppintott, de az AI fuel-bonnak látja (vagy fordítva), a Gemini besorolását követjük. Így a rossz gombra koppintva sem raked el semmit.
+
+### Regresszió-védelem
+- **12 új Jest** (szerep/env/csomag-kapu + fájl-validáció + siker fuel/purchase + `_sanitize` + modell-lánc + azonnali-hiba). **Teljes suite 672 zöld** (require-sweep 125 zöld).
+- A `sanitize` **fehérlistán** engedi át a mezőket → egy jövőbeli Gemini-modell-váltás sem szivárogtathat váratlan kulcsot a kliensbe.
+- A kliens **kép-átméretezés** biztosítja, hogy a mobil-fotó ne blokkoljon a szerver 8 MB-os határánál (silent), és a Gemini inline-limitjéhez is bőven fér.
+
+---
+
 ## 2026-07-22 — FIX: sofőr mobil-app „telefon-lock után nem működik, csak Kilépés+újralépés után" — visibility-alapú session-recovery + 8 órás idle-limit + főoldali auto-refresh
 
 ### Miért

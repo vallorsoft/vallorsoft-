@@ -331,6 +331,7 @@ function goSec(id) {
   if (id === 'border') loadBorderLog();
   if (id === 'fuvar')  { loadSoferOrders(); if (typeof renderLocalDrafts === 'function') renderLocalDrafts(); }
   if (id === 'docs')   loadDocOrderOptions();
+  if (id === 'dash')   { if (typeof renderPendingReceipts === 'function') renderPendingReceipts(); }
 }
 
 // ============================================================
@@ -563,6 +564,22 @@ function fuvarStep2(allowEmpty) {
   document.getElementById('achizitiiContainer').innerHTML = '';
   alimIdx = 0; achIdx = 0;
 
+  // Ha a sofőr korábban a főoldalról scannelt bonokat és elfogadta őket
+  // (rrAccept: step2 zárva → sessionStorage-piszkozatba pusholtuk), most
+  // állítsuk vissza a DOM-ba is — különben a következő draftSave (üres
+  // konténer) felülírná őket. Az igazságforrás a sessionStorage; ha a
+  // fuvarStep1-ből ide léptünk, csak a tankolás/vásárlás sorok érintettek
+  // (a km/rendszám/dátum előtöltés fentebb már megvolt, üres mezőt nem
+  // írunk felül).
+  try {
+    var _st = JSON.parse(sessionStorage.getItem(SS_KEY) || '{}');
+    var _dr = _st && _st.draft;
+    if (_dr) {
+      (_dr.alimentari || []).forEach(function (a) { addAlimRow(a); });
+      (_dr.achizitii  || []).forEach(function (a) { addAchRow(a); });
+    }
+  } catch (_e) { /* nincs érvényes piszkozat — üresen indul */ }
+
   // Piszkozat figyeli a változásokat
   attachDraftListeners();
   stateSave({ fuvarStep: 2 });
@@ -683,6 +700,402 @@ function addAchRow(a) {
     if (sel) sel.value = a.plata;
   }
 }
+
+// ============================================================
+// 📷 BON SZKENNELÉS (AI) — HÁTTÉR-FELDOLGOZÁS + PERZISZTENS
+// VÁRÓLISTA. A sofőr főoldalról vagy a menetlevél 2. lépéséből
+// koppinthat egy bonra; a fájl kliens-oldalon (canvas) lekicsinyül,
+// és háttérben (fetch, keepalive) elindul a Gemini kiolvasás. A
+// sofőr közben mást csinál, akár ki is lép a képernyőről; a
+// feldolgozott bonok „Bon eredmények" kártyaként jelennek meg a
+// főoldalon — kattintásra elfogadhatók (a menetlevél-piszkozatba
+// kerülnek) vagy elvethetők.
+//
+// Perzisztencia: localStorage (LS_RCPT_QUEUE_KEY). A teljes fotót
+// NEM tároljuk (méret-korlát); csak egy kis thumbnailt őrzünk meg
+// megjelenítéshez, és a Gemini kiolvasott mezőit.
+// ============================================================
+var _receiptScanKind = null;     // 'fuel' | 'purchase' | null (dashboardról jött)
+var LS_RCPT_QUEUE_KEY = 'vs_sofer_receipt_queue';
+var RCPT_MAX_ITEMS    = 20;      // a régiek magától kiesnek (FIFO)
+
+function rcptQueueLoad() {
+  try { return JSON.parse(localStorage.getItem(LS_RCPT_QUEUE_KEY) || '[]') || []; }
+  catch (e) { return []; }
+}
+function rcptQueueStore(arr) {
+  try {
+    // Régi elemek levágása (méret-védelem)
+    var trimmed = (arr || []).slice(-RCPT_MAX_ITEMS);
+    localStorage.setItem(LS_RCPT_QUEUE_KEY, JSON.stringify(trimmed));
+  } catch (e) { /* localStorage tele — csendesen áteresztjük */ }
+}
+function rcptQueueAdd(item) {
+  var q = rcptQueueLoad(); q.push(item); rcptQueueStore(q); return item.id;
+}
+function rcptQueueUpdate(id, patch) {
+  var q = rcptQueueLoad();
+  for (var i = 0; i < q.length; i++) if (q[i].id === id) {
+    q[i] = Object.assign({}, q[i], patch); rcptQueueStore(q); return q[i];
+  }
+  return null;
+}
+function rcptQueueRemove(id) {
+  var q = rcptQueueLoad().filter(function (x) { return x.id !== id; });
+  rcptQueueStore(q);
+}
+function rcptNewId() {
+  return 'r' + Date.now() + Math.random().toString(36).slice(2, 8);
+}
+
+// A főoldali „📷 Bon szkennelés" gomb — a Gemini dönti el, tankolás
+// vagy vásárlás (a szerver „kind"-ja fehérlistázott).
+function scanReceiptPickFromDash() {
+  _receiptScanKind = null;
+  var f = document.getElementById('receiptScanFile');
+  if (!f) return;
+  f.value = '';
+  f.click();
+}
+
+// A menetlevél 2. lépésének két gombja (fuel/purchase) — a felhasználó
+// választása fallback, ha a Gemini nem tud dönteni.
+function scanReceiptPick(kind) {
+  _receiptScanKind = (kind === 'purchase') ? 'purchase' : 'fuel';
+  var f = document.getElementById('receiptScanFile');
+  if (!f) return;
+  f.value = '';
+  f.click();
+}
+
+// Kép lekicsinyítése base64-be + thumbnail. PDF-nél nincs thumbnail (a
+// FileReader csak a nyers base64-et adja); a queue-listán ikonnal jelöljük.
+function _receiptToPayload(file, cb) {
+  if (!file) { cb(null); return; }
+  if (file.type === 'application/pdf') {
+    var fr = new FileReader();
+    fr.onload = function () {
+      var s = String(fr.result || '');
+      var i = s.indexOf(',');
+      cb({ mimeType: 'application/pdf', data: i >= 0 ? s.slice(i + 1) : s, thumb: '' });
+    };
+    fr.onerror = function () { cb(null); };
+    fr.readAsDataURL(file);
+    return;
+  }
+  var img = new Image();
+  var url = URL.createObjectURL(file);
+  img.onload = function () {
+    try {
+      // Full képet a szerverre (1600px hosszú oldal, JPEG q=0.85).
+      var maxDim = 1600;
+      var w = img.naturalWidth || img.width;
+      var h = img.naturalHeight || img.height;
+      var scale = Math.min(1, maxDim / Math.max(w, h));
+      var cw = Math.round(w * scale), ch = Math.round(h * scale);
+      var cv = document.createElement('canvas');
+      cv.width = cw; cv.height = ch;
+      cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+      var fullDataUrl = cv.toDataURL('image/jpeg', 0.85);
+      var i = fullDataUrl.indexOf(',');
+      var b64 = i >= 0 ? fullDataUrl.slice(i + 1) : fullDataUrl;
+      // Külön kis thumbnail (128px), csak megjelenítéshez.
+      var tScale = Math.min(1, 128 / Math.max(w, h));
+      var tw = Math.round(w * tScale), th = Math.round(h * tScale);
+      var tv = document.createElement('canvas');
+      tv.width = tw; tv.height = th;
+      tv.getContext('2d').drawImage(img, 0, 0, tw, th);
+      var thumb = tv.toDataURL('image/jpeg', 0.7);
+      cb({ mimeType: 'image/jpeg', data: b64, thumb: thumb });
+    } catch (e) { cb(null); }
+    finally { URL.revokeObjectURL(url); }
+  };
+  img.onerror = function () { URL.revokeObjectURL(url); cb(null); };
+  img.src = url;
+}
+
+// Háttérben elindítjuk a feldolgozást; a UI azonnal frissül (van egy új
+// „processing" sor a listában), és a sofőr mást csinálhat. A fetch
+// keepalive:true → akkor is befejeződik, ha a sofőr elhagyja az oldalt.
+function scanReceiptStart(file) {
+  var busy = document.getElementById('receiptScanBusy');
+  if (busy) busy.style.display = 'block';
+  _receiptToPayload(file, function (payload) {
+    if (busy) busy.style.display = 'none';
+    if (!payload) { toast(t('sof.scanReadErr'), 'err'); return; }
+
+    // Új queue-elem — csak a thumbnailt tároljuk (a nyers base64-et NEM)
+    var id = rcptNewId();
+    rcptQueueAdd({
+      id: id,
+      createdAt: Date.now(),
+      status: 'processing',
+      kindHint: _receiptScanKind, // 'fuel' | 'purchase' | null
+      thumb: payload.thumb || '',
+      fields: null,
+      error: null
+    });
+    renderPendingReceipts();
+    toast(t('sof.scanQueued'), 'ok');
+
+    // Fire-and-forget: a válaszra a queue-elem update-elődik, de a
+    // felhasználó közben szabadon léphet más képernyőre.
+    fetch('/api/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({ functionName: 'scanReceipt', arguments: [{
+        mimeType: payload.mimeType, data: payload.data
+      }] })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var r = (d && d.result) || {};
+        if (!r.ok) {
+          rcptQueueUpdate(id, { status: 'error', error: r.err || t('sof.scanFailed') });
+        } else {
+          var f = r.fields || {};
+          var kind = (f.kind === 'fuel' || f.kind === 'purchase')
+            ? f.kind
+            : (_receiptScanKind || 'purchase'); // fallback: általánosabb
+          rcptQueueUpdate(id, { status: 'ready', fields: f, kind: kind });
+        }
+        renderPendingReceipts();
+      })
+      .catch(function () {
+        rcptQueueUpdate(id, { status: 'error', error: t('sof.scanFailed') });
+        renderPendingReceipts();
+      });
+  });
+}
+
+// A főoldali kártya frissítése.
+function renderPendingReceipts() {
+  var box = document.getElementById('pendingReceiptsBox');
+  if (!box) return;
+  var q = rcptQueueLoad();
+  if (!q.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = 'block';
+  box.innerHTML = q.slice().reverse().map(function (it) {
+    var badge = '', title = '';
+    if (it.status === 'processing') {
+      badge = '<span class="pending-badge pb-processing">' + t('sof.rr.processing') + '</span>';
+      title = t('sof.rr.processingTitle');
+    } else if (it.status === 'ready') {
+      badge = '<span class="pending-badge pb-ready">' + t('sof.rr.ready') + '</span>';
+      var f = it.fields || {};
+      title = (it.kind === 'fuel' ? '⛽ ' : '🛒 ') + (f.loc || '—') + (f.suma != null ? (' · ' + f.suma + ' ' + (f.valuta || '')) : '');
+    } else {
+      badge = '<span class="pending-badge pb-error">' + t('sof.rr.error') + '</span>';
+      title = it.error || t('sof.scanFailed');
+    }
+    var timeStr = new Date(it.createdAt).toLocaleTimeString();
+    var thumb = it.thumb
+      ? '<img class="pending-thumb" src="' + it.thumb + '" alt="">'
+      : '<div class="pending-thumb" style="display:flex;align-items:center;justify-content:center;font-size:22px;">📄</div>';
+    var actions = '';
+    if (it.status === 'ready') {
+      actions = '<button class="btn-mini ok" onclick="rrOpen(\'' + it.id + '\')">' + t('sof.rr.review') + '</button>'
+              + '<button class="btn-mini err" onclick="rrRemove(\'' + it.id + '\')">✕</button>';
+    } else if (it.status === 'error') {
+      actions = '<button class="btn-mini err" onclick="rrRemove(\'' + it.id + '\')">✕</button>';
+    } else {
+      actions = '<div class="spinner"></div>';
+    }
+    return '<div class="pending-item">'
+      + thumb
+      + '<div class="pending-body"><div class="pending-title">' + badge + title + '</div>'
+      + '<div class="pending-sub">' + timeStr + '</div></div>'
+      + '<div class="pending-actions">' + actions + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+// ─── Review modal — a sofőr átnézheti/javíthatja a mezőket, majd
+// elfogadhatja (a menetlevél-piszkozatba kerül).
+var _rrCurrentId = null;
+
+function rrOpen(id) {
+  var q = rcptQueueLoad();
+  var it = null;
+  for (var i = 0; i < q.length; i++) if (q[i].id === id) { it = q[i]; break; }
+  if (!it || it.status !== 'ready') return;
+  _rrCurrentId = id;
+
+  var thumbEl = document.getElementById('rrThumbWrap');
+  thumbEl.innerHTML = it.thumb
+    ? '<img src="' + it.thumb + '" style="max-width:120px;max-height:120px;border-radius:10px;border:1px solid var(--border);">'
+    : '';
+
+  var f = it.fields || {};
+  var isFuel = it.kind === 'fuel';
+  var esc2 = function (v) { return (v == null) ? '' : String(v).replace(/"/g, '&quot;'); };
+  var fields = document.getElementById('rrFields');
+  var plataOpts = ['Card', 'Cash', 'Flota Card', 'DKV'].map(function (p) {
+    return '<option' + (f.plata === p ? ' selected' : '') + '>' + p + '</option>';
+  }).join('');
+  var rows = '';
+  rows += '<div class="rr-row"><label>' + t('sof.rr.kind') + '</label>'
+        + '<select id="rrKind"><option value="fuel"' + (isFuel ? ' selected' : '') + '>⛽ ' + t('sof.rr.kindFuel') + '</option>'
+        + '<option value="purchase"' + (!isFuel ? ' selected' : '') + '>🛒 ' + t('sof.rr.kindPurchase') + '</option></select></div>';
+  rows += '<div class="rr-row"><label>' + t('sof.location') + '</label><input id="rrLoc" value="' + esc2(f.loc) + '"></div>';
+  rows += '<div class="rr-row"><label>' + t('sof.date') + '</label><input id="rrData" type="date" value="' + esc2(f.data || _todayLocalDate()) + '"></div>';
+  if (isFuel) {
+    rows += '<div class="rr-row"><label>' + t('sof.fuelType') + '</label>'
+          + '<select id="rrTip"><option' + (f.tip === 'AdBlue' ? '' : ' selected') + '>Motorină</option>'
+          + '<option' + (f.tip === 'AdBlue' ? ' selected' : '') + '>AdBlue</option></select></div>';
+    rows += '<div class="rr-row"><label>' + t('sof.liters') + '</label><input id="rrLitru" type="number" value="' + esc2(f.litru != null ? f.litru : 0) + '"></div>';
+    rows += '<div class="rr-row"><label>' + t('sof.km') + '</label><input id="rrKm" type="number" value="' + esc2(f.km != null ? f.km : 0) + '"></div>';
+  } else {
+    rows += '<div class="rr-row"><label>' + t('sof.product') + '</label><input id="rrProdus" value="' + esc2(f.produs) + '"></div>';
+  }
+  rows += '<div class="rr-row"><label>' + t('sof.sumRon') + '</label><input id="rrSuma" type="number" value="' + esc2(f.suma != null ? f.suma : 0) + '"></div>';
+  rows += '<div class="rr-row"><label>' + t('sof.payment') + '</label><select id="rrPlata">' + plataOpts + '</select></div>';
+  fields.innerHTML = rows;
+
+  // A „kind" váltásra újrarajzol (fuel↔purchase mezők váltása).
+  document.getElementById('rrKind').addEventListener('change', function () {
+    var it2 = rcptQueueLoad().find(function (x) { return x.id === _rrCurrentId; });
+    if (!it2) return;
+    it2.kind = document.getElementById('rrKind').value;
+    // A már beírt közös mezőket megőrizzük (loc/data/suma/plata),
+    // hogy a váltás után ne vesszen el a sofőr munkája.
+    var cur = { loc: (document.getElementById('rrLoc') || {}).value, data: (document.getElementById('rrData') || {}).value,
+                suma: (document.getElementById('rrSuma') || {}).value, plata: (document.getElementById('rrPlata') || {}).value };
+    it2.fields = Object.assign({}, it2.fields || {}, cur);
+    rcptQueueUpdate(_rrCurrentId, { kind: it2.kind, fields: it2.fields });
+    rrOpen(_rrCurrentId);
+  });
+
+  document.getElementById('receiptReviewModal').style.display = 'flex';
+}
+
+function rrClose() {
+  document.getElementById('receiptReviewModal').style.display = 'none';
+  _rrCurrentId = null;
+}
+
+function rrDiscard() {
+  if (!_rrCurrentId) { rrClose(); return; }
+  if (!confirm(t('sof.rr.confirmDiscard'))) return;
+  rrRemove(_rrCurrentId);
+  rrClose();
+}
+
+function rrRemove(id) {
+  rcptQueueRemove(id);
+  renderPendingReceipts();
+}
+
+// A modal mezői → a sessionStorage-i menetlevél-piszkozatba egy új
+// tankolás vagy vásárlás sor; ha a menetlevél 2. lépés éppen nyitva,
+// a DOM sor is beszúródik.
+function rrAccept() {
+  if (!_rrCurrentId) return;
+  var kind = (document.getElementById('rrKind') || {}).value || 'purchase';
+  var loc  = (document.getElementById('rrLoc')  || {}).value || '';
+  var data = (document.getElementById('rrData') || {}).value || _todayLocalDate();
+  var suma = (document.getElementById('rrSuma') || {}).value || '0';
+  var plata= (document.getElementById('rrPlata')|| {}).value || 'Card';
+
+  var newRow;
+  if (kind === 'fuel') {
+    var tip   = (document.getElementById('rrTip')   || {}).value || 'Motorină';
+    var litru = (document.getElementById('rrLitru') || {}).value || '0';
+    var km    = (document.getElementById('rrKm')    || {}).value || '0';
+    newRow = { loc: loc, data: data, tip: tip, litru: litru, km: km, plata: plata, suma: suma };
+  } else {
+    var produs = (document.getElementById('rrProdus') || {}).value || '';
+    newRow = { produs: produs, loc: loc, data: data, pret: suma, plata: plata };
+  }
+
+  // Ha a menetlevél 2. lépés (fuvarStep2) nyitva van → közvetlenül a DOM-ba
+  // teszem a sort (és a draftSave menti automatikusan). Különben a
+  // sessionStorage-i piszkozatot módosítom közvetlenül, hogy a következő
+  // fuvarStep2 megnyitásakor ott legyen a sor.
+  var step2 = document.getElementById('fuvarStep2');
+  var step2Visible = step2 && step2.style.display !== 'none';
+  if (step2Visible && ((kind === 'fuel' && typeof addAlimRow === 'function')
+                    || (kind === 'purchase' && typeof addAchRow === 'function'))) {
+    if (kind === 'fuel') addAlimRow(newRow); else addAchRow(newRow);
+    try { draftSave(); } catch (_) {}
+  } else {
+    // A jelenlegi piszkozatot betöltjük (ha van), és hozzáfűzzük az új
+    // sort — a fuvarStep2 legközelebbi megnyitásakor a draftRestore() ezt
+    // visszaállítja. Ha még nincs draft, alap-vázlatot indítunk.
+    var st = (function () { try { return JSON.parse(sessionStorage.getItem(SS_KEY) || '{}'); } catch (_) { return {}; } })();
+    var draft = st.draft || {
+      camion: '', remorca: '', kmInc: '0', kmSf: '0', cantInc: '0', cantSf: '0',
+      mentiuni: '', puncte: [], alimentari: [], achizitii: [], orderIds: [], summary: ''
+    };
+    if (kind === 'fuel') { draft.alimentari = draft.alimentari || []; draft.alimentari.push(newRow); }
+    else { draft.achizitii = draft.achizitii || []; draft.achizitii.push(newRow); }
+    st.draft = draft;
+    try { sessionStorage.setItem(SS_KEY, JSON.stringify(st)); } catch (_) {}
+  }
+
+  // ── TANULÁS: a sofőr által megerősített (esetleg javított) mezőket
+  // elküldjük a szervernek, hogy a receipt_scan_samples-be kerüljenek
+  // template-ként. Legközelebb ugyanattól a kereskedőtől (MOL/OMV/
+  // Kaufland stb.) beérkező bonok pontosabban kiolvasódnak — a Gemini
+  // few-shot promptja tartalmazni fogja a mostani mezőket. Best-effort:
+  // hiba esetén NEM törünk semmit (a piszkozatba már bekerült a sor).
+  try {
+    // Az eredeti queue-tétel valuta-ja (a modal-ban nem szerkeszthető)
+    var _q = rcptQueueLoad(), _origVal = null;
+    for (var _i = 0; _i < _q.length; _i++) {
+      if (_q[_i].id === _rrCurrentId && _q[_i].fields) { _origVal = _q[_i].fields.valuta || null; break; }
+    }
+    var confirmed = {
+      kind: kind,
+      loc: loc,
+      data: data,
+      plata: plata,
+      suma: parseFloat(suma) || null,
+      valuta: _origVal,
+      tip:    (kind === 'fuel')     ? tip : null,
+      litru:  (kind === 'fuel')     ? (parseFloat(litru) || null) : null,
+      km:     (kind === 'fuel')     ? (parseFloat(km)    || null) : null,
+      produs: (kind === 'purchase') ? produs : null,
+      confidence: 1.0
+    };
+    fetch('/api/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({ functionName: 'confirmReceiptExtraction', arguments: [{ fields: confirmed }] })
+    }).catch(function () { /* best-effort — a UI menete független */ });
+  } catch (_) { /* nincs baj — csak nem tanul ebből a bonból */ }
+
+  toast(t('sof.rr.accepted'), 'ok');
+  rcptQueueRemove(_rrCurrentId);
+  renderPendingReceipts();
+  rrClose();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  var f = document.getElementById('receiptScanFile');
+  if (f) f.addEventListener('change', function () {
+    if (f.files && f.files[0]) scanReceiptStart(f.files[0]);
+  });
+
+  // Ha az előző munkamenetben a fetch nem tudott befejeződni (app leállt,
+  // hálózat megszakadt), a „processing" tétel örökké függőben maradna →
+  // átvisszük „error"-ra, hogy legalább el lehessen vetni. A már ready
+  // (kiolvasott) és error tételek maradnak.
+  var q = rcptQueueLoad();
+  var changed = false;
+  var now = Date.now();
+  for (var i = 0; i < q.length; i++) {
+    if (q[i].status === 'processing' && (now - (q[i].createdAt || 0) > 60000)) {
+      q[i].status = 'error';
+      q[i].error = t('sof.rr.interrupted');
+      changed = true;
+    }
+  }
+  if (changed) rcptQueueStore(q);
+  renderPendingReceipts();
+});
 
 // ============================================================
 // HATÁRÁTLÉPÉS SOROK
@@ -1728,6 +2141,7 @@ document.addEventListener('visibilitychange', function() {
   try { if (typeof loadDashOrders === 'function') loadDashOrders(); } catch(e) {}
   try { if (typeof loadSoferMiniStats === 'function') loadSoferMiniStats(); } catch(e) {}
   try { if (typeof loadMyAssignedVehicle === 'function') loadMyAssignedVehicle(); } catch(e) {}
+  try { if (typeof renderPendingReceipts === 'function') renderPendingReceipts(); } catch(e) {}
 });
 
 // ── Nyelvváltáskor a JS-ből renderelt részek újrarajzolása ──

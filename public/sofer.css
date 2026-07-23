@@ -842,3 +842,58 @@
     animation: spin .6s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── 📷 Bon szkennelés — dashboard kártya + várólista ── */
+  .dash-scan-card {
+    margin: 12px 16px 14px;
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(245,158,11,0.06);
+    border: 1px solid rgba(245,158,11,0.28);
+  }
+  .dash-scan-btn {
+    display: block; width: 100%;
+    padding: 14px 16px;
+    border: 0; border-radius: 12px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff; font-size: 15px; font-weight: 700;
+    cursor: pointer; box-shadow: 0 4px 12px rgba(245,158,11,0.35);
+  }
+  .dash-scan-btn:active { transform: translateY(1px); }
+  .pending-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px; margin-top: 8px;
+    border-radius: 10px;
+    background: var(--bg-2, #141c25);
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+  }
+  .pending-thumb {
+    width: 44px; height: 44px;
+    border-radius: 8px; object-fit: cover;
+    background: rgba(255,255,255,0.05);
+    flex: 0 0 auto;
+  }
+  .pending-body { flex: 1; min-width: 0; }
+  .pending-title { font-size: 13px; font-weight: 700; color: var(--text, #e9eef5); }
+  .pending-sub { font-size: 11.5px; color: var(--muted, #94a3b8); margin-top: 2px; }
+  .pending-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+  .pending-actions .btn-mini {
+    padding: 8px 10px; border-radius: 8px; border: 0;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .btn-mini.ok  { background: linear-gradient(180deg, #16a34a, #15803d); color: #fff; }
+  .btn-mini.err { background: transparent; color: var(--muted, #94a3b8); border: 1px solid var(--border, rgba(255,255,255,0.15)); }
+  .pending-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 10.5px; font-weight: 700; margin-right: 6px;
+  }
+  .pb-processing { background: rgba(59,130,246,0.14); color: #3b82f6; }
+  .pb-ready      { background: rgba(34,197,94,0.14);  color: #16a34a; }
+  .pb-error      { background: rgba(239,68,68,0.14);  color: #dc2626; }
+  .rr-row { display: grid; grid-template-columns: 90px 1fr; gap: 8px; padding: 6px 0; align-items: center; }
+  .rr-row label { font-size: 12.5px; color: var(--muted, #94a3b8); }
+  .rr-row input, .rr-row select {
+    padding: 8px 10px; border-radius: 8px;
+    background: var(--bg-1, #0c1218); border: 1px solid var(--border, rgba(255,255,255,0.12));
+    color: var(--text, #e9eef5); font-size: 13.5px;
+  }
