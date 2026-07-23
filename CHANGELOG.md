@@ -14,6 +14,31 @@
 
 ---
 
+## 2026-07-23 — Fix: bon-scan auto-retry átmeneti hibáknál (429/503/5xx/network) — nem esik le első hibára
+
+### Miért
+A sofőr azt jelezte: fotózás után a queue-tétel „Nem sikerült beolvasni a bont" hibára esett és nem próbálta újra. A régi kód az első hibára `error` státuszra váltott (nem különböztette meg az átmeneti / végleges hibákat), és nem próbálta újra.
+
+### Mi történt
+1. **Új `_scanReceiptTry(id, payload, attempt)` (`public/sofer.js`)** — a `scanReceiptStart` most csak elindítja az első próbát, a fetch-loop külön függvényben él. Rekurzív: sikertelenség esetén saját magát hívja +1 `attempt`-tel.
+2. **Átmeneti hibák → retry, legfeljebb 3× (backoff 0s → 5s → 15s ≈ 20s max)**:
+   - HTTP 429 (kvóta/rate-limit), 503 (Gemini túlterhelés), 5xx (belső hiba) — a szerver a `status`-t hozzácsatolja a válaszhoz.
+   - Hálózati hiba (`.catch`) — mindig átmeneti.
+3. **Végleges hibák → azonnali error, NINCS retry**: 400 (rossz kérés), 403 (tiltás), egyéb 4xx (pl. `Serviciul AI nu este configurat`, `Functie AI nedisponibila`, `Format nesuportat`). Ezeknél az újrapróbálás értelmetlen.
+4. **UI visszajelzés**: a queue-tétel a retry alatt `processing` státuszban marad (nem villog error-t); a badge mutatja a próbálkozás-számot („⏳ Feldolgozás… (2/3)"); a cím „🔄 Újrapróbálkozás…" szöveget mutat. A payload (base64) végig a closure-ban él — nem kell újra fotózni.
+5. **Cleanup küszöb bumpolva 60s → 3 perc** — hogy a legrosszabb esetben (3 retry × 30s Gemini timeout + 20s backoff ≈ 110s) se törjük meg egy még FUTÓ folyamatot a page-load védőháló.
+6. **Új i18n**: `sof.rr.retrying` (RO+HU). Cache-bust `?v=20260723retry` (sofer.html/js/css + i18n.js).
+
+### Miért így
+- **Átmeneti vs. végleges elválasztása** azért fontos, hogy ne pörögjön értelmetlenül 3-szor egy 400-as hibán (a szerver ugyanazt válaszolja), viszont egy Gemini 503 vagy 4G-drop után rögtön ne feladja.
+- **Rövid backoff** (5s + 15s), hogy a sofőr még mindig a képernyőn legyen, amikor a szám ready-re vált.
+- **A payload memóriában marad** (nem tároljuk localStorage-ban) — biztonságos + nem foglal helyet. Cserébe: ha a sofőr a retry közben bezárja az app-ot, a payload elvész → a 3 perces cleanup magától „error"-ra állítja.
+
+### Regresszió-védelem
+- 701 Jest zöld (szerver-oldal érintetlen — csak kliens `sofer.js`).
+
+---
+
 ## 2026-07-23 — ÚJ: külön `ai-bon-scan` feature-flag + admin/manager önkiszolgáló BE/KI kapcsoló a Menetlevelek fülön + betanult minták nézet/törlés + sofőr főoldalon a gomb csak ha be van kapcsolva
 
 ### Miért
