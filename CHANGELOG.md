@@ -14,6 +14,31 @@
 
 ---
 
+## 2026-07-23 — FIX: bon-scan „nem működik" a sofőr főoldalon — retired/paid modellek kiszedve a láncból + 404-tolerancia
+
+### Miért
+A sofőr jelezte: az előző körös lánc-bővítés (PR #287, 6 → 11 modell) ÓTA a bon-scanner nem működik. Egy már működő platform HTML-doku (`geminidoc.html`) egy egyszerűbb 6-modellos ingyenes láncot mutat (a HTML explicit kimondja: „Fizetős modell — `gemini-pro`/`ultra`/`1.5-pro` — szándékosan nincs a listában"). Innen jött az össze-hasonlítás.
+
+### Gyökérok
+Az előző körben (PR #287) a láncba bekerült pro/exp/1.5-pro modellek jelentős része **retired vagy fizetős**:
+- `gemini-1.5-flash` / `-flash-8b` / `-1.5-pro` / `-1.5-pro-002` — Google 2025-09-24-én deprecated-elte, sok esetben 404-et ad.
+- `gemini-2.0-flash-exp` / `gemini-exp-1206` — kísérleti/preview, gyakran 404.
+- `gemini-2.5-pro` — GA, de mikroszkopikus ingyenes keret (2 RPM / 50 RPD).
+
+A régi `extractJson` viszont **csak 429/503-on** ugrott tovább a következő modellre. A 4 flash után az első visszavont modell 404-et dobott → azonnali `throw` → a lánc leállt, a maradék modellek sose futottak, a felhasználó „nem sikerült beolvasni"-t kapott.
+
+### Mit csinál
+1. **`lib/geminiJson.js` `DEFAULT_MODELS` 11 → 6 stabil ingyenes flash modell** (a HTML `FREE_CHAIN`-hez igazítva): `2.0-flash`, `2.0-flash-lite`, `2.5-flash`, `2.5-flash-lite`, `1.5-flash`, `1.5-flash-8b`. Pro / experimental / exp-1206 kikerült.
+2. **`extractJson` fallback-lista bővítve 404 + 500-zal**: a 429/503 mellé (a callGemini már 3-szor retryzott 5xx-re — a persistent 500 „next model"; a 404 = „ez a modell erre a kulcsra / régióra nem elérhető", pl. később visszavont modell). A 400/401/403 továbbra is azonnal áll (a bemenet/auth a hibás, nem a modell).
+3. **`tests/unit/geminiJson.test.js`** új eset: 404 az elsőn → továbblép a következő modellre (regresszió-védelem a jövőbeli lánc-változtatások ellen).
+
+### Miért így
+- A HTML-alapú lánc STABIL: csak azok a modellek, amelyeknek gyakorlatilag garantált ingyenes napi kerete van — 6 × ~1500 RPD keret bőven fedi egy közepes flotta bon-forgalmát (~9000/nap).
+- A 404-tolerancia **defenzív**: ha a jövőben egy modell visszavonódik és nem vesszük észre, a lánc nem hasal el hangosan — csendben átugrik.
+
+### Regresszió-védelem
+- 237 Jest zöld (tests/unit).
+
 ## 2026-07-23 — Bővítés: Gemini modell-lánc 6 → 11 modell (pro + exp variánsok is) + részletes AI-hiba diagnosztika
 
 ### Miért

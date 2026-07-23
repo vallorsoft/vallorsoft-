@@ -72,6 +72,21 @@ describe('lib/geminiJson', () => {
     expect(global.fetch.mock.calls.length).toBe(1);
   });
 
+  test('404 az elsőn (visszavont modell) → továbblép a következőre', async () => {
+    // A régi lánc (PR #287) ezen ELHASALT: 4 flash után `gemini-1.5-flash`
+    // 2025-09-24 óta visszavonva → 404, és a régi extractJson csak 429/503-on
+    // ugrott. Az új: 404 = "ez a modell nem elérhető ide", megy a következőre.
+    global.fetch
+      .mockImplementationOnce(async () => mockStatus(404, { error: { message: 'models/... not found' } }))
+      .mockImplementationOnce(async () => ({
+        ok: true, status: 200,
+        text: async () => JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"ok":1}' }] } }] }),
+      }));
+    const r = await extractJson({ systemPrompt: 's', parts: [], models: ['retired-model', MODELS[0]] });
+    expect(r.model).toBe(MODELS[0]);
+    expect(global.fetch.mock.calls.length).toBe(2);
+  });
+
   test('minden modell 429 → érthető végső hiba', async () => {
     global.fetch.mockImplementation(async () => mockStatus(429));
     let err;
