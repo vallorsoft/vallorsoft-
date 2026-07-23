@@ -259,10 +259,149 @@ handlers.confirmReceiptExtraction = async function (req, res, args) {
   }
 };
 
+// ─── ÖNKISZOLGÁLÓ FEATURE-KAPCSOLÓ + TANULT MINTÁK KEZELÉS ─────
+//
+// A developer bármelyik cégre bekapcsolhatja a `company_features`-be
+// tetszőleges kulcsot; itt egy KORLÁTOZOTT (fehérlistás) admin/manager
+// self-service utat adunk arra a SAJÁT kulcsra, ami az ő cégük napi
+// üzemeltetéséhez kell (jelenleg: `ai-bon-scan`). Így nem kell a
+// developerre várniuk, ha ki akarják kapcsolni a bon-scanner AI-t.
+// A developer felület továbbra is ELSŐBBSÉGET élvez (ő minden kulcsot
+// kezelhet); ez csak a saját cégüknek szól, csak erre az EGY kulcsra.
+
+const SELF_ALLOWED_KEYS = ['ai-bon-scan'];
+
+function _isAdminOrManager(u) {
+  return !!(u && (u.pozicio === 'Admin' || u.pozicio === 'Manager'));
+}
+
+// A jelenlegi feature-állapot lekérése (cég-override + a plan default is).
+// A UI a kapcsolót ez alapján rajzolja ki. Read-only, Admin/Manager.
+handlers.getBonScanSettings = async function (req, res /*, args */) {
+  try {
+    const u = req.session && req.session.user;
+    if (!_isAdminOrManager(u)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = u.company_id;
+    // A featureEnabled() a teljes hierarchiát (company_features >
+    // plan_features > default:true) figyelembe véve ad választ.
+    const enabled = await featureEnabled(cid, 'ai-bon-scan');
+    // Ha van cég-szintű override, jelöljük — a UI mutathatja: „a cég
+    // felülírta a csomag alapértékét".
+    let override = null;
+    try {
+      const r = await pool.query(
+        'SELECT enabled FROM company_features WHERE company_id = $1 AND feature_key = $2',
+        [cid, 'ai-bon-scan']);
+      if (r.rows.length) override = r.rows[0].enabled;
+    } catch (_) { /* company_features nem létezik / DB hiba → null */ }
+
+    // A cég betanult mintáinak listája (merchantonként egy sor); a UI
+    // itt mutatja, mit tanult meg a rendszer eddig, és honnan törölhet.
+    let samples = [];
+    try {
+      const r2 = await pool.query(
+        `SELECT id, merchant_key, merchant_label, fields, sample_count, updated_at
+           FROM receipt_scan_samples
+          WHERE company_id = $1
+          ORDER BY updated_at DESC`,
+        [cid]);
+      samples = r2.rows;
+    } catch (_) { /* migráció még nem futott → üres lista */ }
+
+    return res.json({ result: { ok: true, enabled: !!enabled, override, samples } });
+  } catch (e) {
+    console.error('getBonScanSettings hiba:', e);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// A saját cégére Admin/Manager BE/KI-kapcsolja a `ai-bon-scan` flag-et.
+// Csak fehérlistás kulcs. Audit-naplózva. A developer felett-nem-áll (a
+// cég-override rögzül; a developer később felülírhatja).
+handlers.setBonScanEnabled = async function (req, res, args) {
+  try {
+    const u = req.session && req.session.user;
+    if (!_isAdminOrManager(u)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = u.company_id;
+    const a = (args && args[0]) ? args[0] : {};
+    // A fehérlista védi a hívást — a jelenlegi API csak `ai-bon-scan`-t
+    // enged; nem lehet ezen keresztül más flag-et állítani.
+    const key = SELF_ALLOWED_KEYS.includes(a.key) ? a.key : 'ai-bon-scan';
+    const enabled = !!a.enabled;
+    try {
+      await pool.query(
+        `INSERT INTO company_features (company_id, feature_key, enabled, updated_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (company_id, feature_key) DO UPDATE
+           SET enabled = EXCLUDED.enabled, updated_at = NOW()`,
+        [cid, key, enabled]);
+    } catch (dbErr) {
+      console.warn('setBonScanEnabled DB hiba:', dbErr.message);
+      return res.json({ result: { ok: false, err: 'Eroare la salvarea setării' } });
+    }
+    try { await audit.fromReq(req, 'feature.set', 'company_feature', String(cid), { key, enabled }); } catch (_) {}
+    return res.json({ result: { ok: true, key, enabled } });
+  } catch (e) {
+    console.error('setBonScanEnabled hiba:', e);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// A sofőr főoldali gombja csak akkor jelenjen meg, ha a cégnél ez a flag
+// be van kapcsolva ÉS van API-kulcs — így nem lát értelmetlen gombot,
+// amitől mindig hibaüzenetet kapna. Bejelentkezett user (Sofer|Admin|
+// Manager). Nem szivárog cég-belső infó (csak a bool).
+handlers.getMyBonScanEnabled = async function (req, res /*, args */) {
+  try {
+    const u = req.session && req.session.user;
+    if (!u) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const allowed = u.pozicio === 'Sofer' || u.pozicio === 'Admin' || u.pozicio === 'Manager';
+    if (!allowed) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = u.company_id;
+    const flag = await featureEnabled(cid, 'ai-bon-scan');
+    const hasKey = !!process.env.GEMINI_API_KEY;
+    // A UI a `usable`-t nézi (a két feltétel együtt); a `flag` és `hasKey`
+    // csak diagnosztikai (a bug-jelentőnek hasznos).
+    return res.json({ result: { ok: true, enabled: !!flag, hasKey, usable: !!(flag && hasKey) } });
+  } catch (e) {
+    console.error('getMyBonScanEnabled hiba:', e);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// Betanult minta törlése (pl. a Gemini rossz merchant-neve alá tanult).
+// Csak Admin/Manager és csak a SAJÁT cégük mintáit (WHERE company_id=$).
+handlers.deleteBonScanSample = async function (req, res, args) {
+  try {
+    const u = req.session && req.session.user;
+    if (!_isAdminOrManager(u)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = u.company_id;
+    const id = parseInt((args && args[0] && args[0].id), 10);
+    if (!Number.isFinite(id) || id <= 0) return res.json({ result: { ok: false, err: 'ID lipsă / invalid.' } });
+    let rowCount = 0;
+    try {
+      const r = await pool.query(
+        'DELETE FROM receipt_scan_samples WHERE id = $1 AND company_id = $2',
+        [id, cid]);
+      rowCount = r.rowCount || 0;
+    } catch (dbErr) {
+      console.warn('deleteBonScanSample DB hiba:', dbErr.message);
+      return res.json({ result: { ok: false, err: 'Eroare la ștergere' } });
+    }
+    if (!rowCount) return res.json({ result: { ok: false, err: 'Nu s-a găsit sau nu aparține firmei tale.' } });
+    try { await audit.fromReq(req, 'receipt.sample.delete', 'receipt_sample', String(id), {}); } catch (_) {}
+    return res.json({ result: { ok: true, deleted: rowCount } });
+  } catch (e) {
+    console.error('deleteBonScanSample hiba:', e);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 // Belső segédek — a teszt eléri, de RPC-n nem hívhatók (nem-enumerable).
 Object.defineProperty(handlers, '_sanitize', { value: sanitize, enumerable: false });
 Object.defineProperty(handlers, '_normalizeMerchant', { value: normalizeMerchant, enumerable: false });
 Object.defineProperty(handlers, '_buildSystemPrompt', { value: buildSystemPrompt, enumerable: false });
 Object.defineProperty(handlers, '_loadCompanySamples', { value: loadCompanySamples, enumerable: false });
+Object.defineProperty(handlers, '_SELF_ALLOWED_KEYS', { value: SELF_ALLOWED_KEYS, enumerable: false });
 
 module.exports = handlers;

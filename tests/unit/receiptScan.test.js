@@ -287,6 +287,96 @@ describe('handlers/receiptScan', () => {
     expect(r.result.noop).toBe(true);
   });
 
+  // ── Önkiszolgáló feature-kapcsoló + tanult minták kezelés ─────
+  function callHandler(name, user, args) {
+    return new Promise((resolve) => {
+      const req = { session: { user } };
+      const res = { json: (p) => resolve(p) };
+      handler[name](req, res, args);
+    });
+  }
+
+  test('getBonScanSettings: sofer NEM → csak admin/manager', async () => {
+    const rk = await callHandler('getBonScanSettings', SOFER, []);
+    expect(rk.result.ok).toBe(false);
+  });
+
+  test('getBonScanSettings: admin → { enabled, override, samples }', async () => {
+    // override lekérdezés → van cég-override „enabled=true"
+    pool.query.mockResolvedValueOnce({ rows: [{ enabled: true }], rowCount: 1 });
+    // samples lekérdezés → 1 minta
+    pool.query.mockResolvedValueOnce({
+      rows: [{ id: 7, merchant_key: 'mol', merchant_label: 'MOL Arad', fields: { kind: 'fuel' }, sample_count: 3, updated_at: new Date() }],
+      rowCount: 1,
+    });
+    const r = await callHandler('getBonScanSettings', ADMIN, []);
+    expect(r.result.ok).toBe(true);
+    expect(r.result.enabled).toBe(true);
+    expect(r.result.override).toBe(true);
+    expect(r.result.samples.length).toBe(1);
+    expect(r.result.samples[0].merchant_label).toBe('MOL Arad');
+  });
+
+  test('setBonScanEnabled: sofer NEM', async () => {
+    const rk = await callHandler('setBonScanEnabled', SOFER, [{ key: 'ai-bon-scan', enabled: false }]);
+    expect(rk.result.ok).toBe(false);
+  });
+
+  test('setBonScanEnabled: admin → UPSERT company_features (whitelist-védett kulcs)', async () => {
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+    // Fehérlistán KÍVÜLI kulcsot próbál → átfordítja `ai-bon-scan`-re
+    const r = await callHandler('setBonScanEnabled', ADMIN, [{ key: 'gps-integracio', enabled: false }]);
+    expect(r.result.ok).toBe(true);
+    expect(r.result.key).toBe('ai-bon-scan');   // felülírva a whitelist-tel
+    expect(r.result.enabled).toBe(false);
+    const [sql, params] = pool.query.mock.calls[0];
+    expect(sql).toMatch(/INSERT INTO company_features/);
+    expect(params[1]).toBe('ai-bon-scan');
+    expect(params[2]).toBe(false);
+  });
+
+  test('deleteBonScanSample: sofer NEM', async () => {
+    const rk = await callHandler('deleteBonScanSample', SOFER, [{ id: 7 }]);
+    expect(rk.result.ok).toBe(false);
+  });
+
+  test('deleteBonScanSample: admin → csak SAJÁT cég sora (WHERE company_id)', async () => {
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+    const r = await callHandler('deleteBonScanSample', ADMIN, [{ id: 7 }]);
+    expect(r.result.ok).toBe(true);
+    expect(r.result.deleted).toBe(1);
+    const [sql, params] = pool.query.mock.calls[0];
+    expect(sql).toMatch(/DELETE FROM receipt_scan_samples/);
+    expect(sql).toMatch(/company_id = \$2/);
+    expect(params).toEqual([7, ADMIN.company_id]);
+  });
+
+  test('deleteBonScanSample: 0 rows törölve → ok:false ("nem a saját cég sora")', async () => {
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    const r = await callHandler('deleteBonScanSample', ADMIN, [{ id: 999 }]);
+    expect(r.result.ok).toBe(false);
+  });
+
+  test('getMyBonScanEnabled: sofer → { enabled, hasKey, usable }', async () => {
+    const r = await callHandler('getMyBonScanEnabled', SOFER, []);
+    expect(r.result.ok).toBe(true);
+    expect(r.result.enabled).toBe(true);      // featureEnabled default true
+    expect(r.result.hasKey).toBe(true);       // beforeEach beállítja GEMINI_API_KEY-t
+    expect(r.result.usable).toBe(true);
+  });
+
+  test('getMyBonScanEnabled: nincs kulcs → usable:false (de a flag lehet true)', async () => {
+    delete process.env.GEMINI_API_KEY;
+    const r = await callHandler('getMyBonScanEnabled', SOFER, []);
+    expect(r.result.ok).toBe(true);
+    expect(r.result.hasKey).toBe(false);
+    expect(r.result.usable).toBe(false);
+  });
+
+  test('WHITELIST: SELF_ALLOWED_KEYS csak ai-bon-scan-t enged (jövőbeli új flag-hez explicit bővítés kell)', () => {
+    expect(handler._SELF_ALLOWED_KEYS).toEqual(['ai-bon-scan']);
+  });
+
   // ── Nem-szivárgás védőháló ──────────────────────────────────────
   test('hibaüzenet 300 karakteren csonkolva (echo-back védelem)', async () => {
     const long = 'x'.repeat(1000);

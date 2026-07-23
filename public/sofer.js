@@ -715,6 +715,37 @@ function addAchRow(a) {
 // NEM tároljuk (méret-korlát); csak egy kis thumbnailt őrzünk meg
 // megjelenítéshez, és a Gemini kiolvasott mezőit.
 // ============================================================
+
+// Ha az admin/manager a Menetlevelek fülön KIKAPCSOLTA az AI-t (vagy
+// nincs GEMINI_API_KEY a szerveren), a főoldali + menetlevél-lépés-2
+// bon-szkennelés gombjai NE látszódjanak — értelmetlen lenne értük
+// koppintani. A szerver oldalán is védve van (scanReceipt tiltás), ez
+// csak a UI-t igazítja. Ha a hívás sikertelen (pl. régi szerver, ahol
+// a getMyBonScanEnabled RPC még nem létezik), inkább MUTATJUK a
+// gombot (biztonságosabb → a szerver úgyis eldönti).
+function applyBonScanVisibility() {
+  fetch('/api/execute', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'getMyBonScanEnabled' })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var r = (d && d.result) || {};
+      // Alapból: mutass — ne rejts pillanatra betöltéskor.
+      var usable = (r.ok === false) ? true : !!r.usable;
+      _setBonScanVisible(usable);
+    })
+    .catch(function () { _setBonScanVisible(true); });
+}
+
+function _setBonScanVisible(visible) {
+  // Főoldali narancs kártya (a dashboard-on)
+  var dashCard = document.querySelector('.dash-scan-card');
+  if (dashCard) dashCard.style.display = visible ? '' : 'none';
+  // A menetlevél 2. lépéses fuel/purchase scan-gombok (`.scan-btn`)
+  var stepBtns = document.querySelectorAll('#fuvarStep2 .scan-btn');
+  stepBtns.forEach(function (b) { b.style.display = visible ? '' : 'none'; });
+}
 var _receiptScanKind = null;     // 'fuel' | 'purchase' | null (dashboardról jött)
 var LS_RCPT_QUEUE_KEY = 'vs_sofer_receipt_queue';
 var RCPT_MAX_ITEMS    = 20;      // a régiek magától kiesnek (FIFO)
@@ -1499,6 +1530,7 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
     loadSoferMiniStats();
     loadMyAssignedVehicle();
     loadGdprNotice();
+    applyBonScanVisibility();
 
   // ── Állapot visszaállítás ──
   var state = stateGet();

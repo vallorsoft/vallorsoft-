@@ -34,7 +34,7 @@ function loadTab(name){
   if(name==='orders-deleted'){ if(typeof loadDeletedOrders==='function') loadDeletedOrders(); }
   if(name==='inbound' && window.InboundOrders) InboundOrders.mount('inboundBox');
   if(name==='client-requests' && window.ClientRequests) ClientRequests.mount('clientReqBox');
-  if(name==='received-fuv'){loadReceivedFuvarlevelek();loadDocSeries();}
+  if(name==='received-fuv'){loadReceivedFuvarlevelek();loadDocSeries();loadBonScanCard();}
   if(name==='driver-docs-pane') loadDriverUploadedDocs();
   if(name==='ecmr' && window.ECmr) ECmr.mount('ecmrBox');
   if(name==='quotes' && window.Quotes) Quotes.mount('quotesBox');
