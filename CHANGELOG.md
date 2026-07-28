@@ -14,6 +14,29 @@
 
 ---
 
+## 2026-07-28 — Sofőr UX-kör: km-validáció, állomás-gomb a kártyán, offline outbox, tartós piszkozat, összecsukható szekciók, helyszín-javaslatok
+
+### Miért
+A sofőr-oldal átvilágítása után a prioritás-lista tételei egy körben. A legsúlyosabb kettő valódi adatvesztés volt:
+
+1. **A telefonos mentés „hosszabb idő után" elvesztette a beírt adatot.** Gyökér: a menetlevél auto-piszkozata `sessionStorage`-ban élt, ami a tab/PWA élettartamáig tart — amint az OS memória-nyomás miatt kilőtte a háttérben lévő appot (telefon-lock után tipikusan percek-órák), MINDEN beírt adat elveszett, és a sofőr elölről kezdhette. `localStorage`-ba csak az explicit „💾 Mentés a telefonra" gomb írt, amit a sofőr nem feltétlenül nyomott meg.
+2. **A hibás km csendben 0-ra vágódott.** A szerver `Math.max(0, kmSf - kmInc)`-et számolt: egy elgépelt záró km (kisebb a kezdőnél) 0 km + 0 fogyasztás lett, figyelmeztetés nélkül — és a hibás menetlevél hivatalos bizonylattá vált (MT-YYYY-XXXX).
+
+### Mit
+1. **TARTÓS piszkozat** — az auto-mentés `sessionStorage` → **per-sofőr `localStorage`** (`vs_sofer_state:<email>`), ugyanaz a kulcs-séma, mint a mentett piszkozatoknál. Túléli az app-kilövést, az újraindítást és a kijelentkezést is (a `stateClear` mostantól a navigációs állapotot dobja, a piszkozatot megtartja). A `sessionStorage`-ba tükrözünk (privát mód / tele tár esetére), és egyszeri migrációval átvesszük a régi munkamenet-értéket. Új **„📄 Van egy megkezdett menetleveled"** folytatás-sáv a menetlevél 1. lépésén, ha a navigációs állapot elveszett volna.
+2. **Kvóta-védelem** — a `_perDriverSetJson` eddig NÉMÁN elnyelte a mentés-hibát: tele localStorage-nál a sofőr azt hitte, mentett, pedig semmi nem íródott ki. Most teli tárnál előbb helyet csinál (bon-thumbnailek eldobása), újrapróbál, és ha még így sem megy, **szól** (`sof.storageFull`).
+3. **Élő km/üzemanyag ellenőrzés** (`#kmFuelCheck`) — megtett km + becsült fogyasztás (L/100km) élőben, a mezők alatt. Negatív km → piros, **blokkoló** (a beküldés a Sosire-dialógus ELŐTT áll meg, hogy ne kelljen feleslegesen kitölteni az érkezést); >5000 km vagy a 20–38 L/100km sávon kívüli fogyasztás → narancs figyelmeztetés; „záró üzemanyag > kezdő + tankolt" → jelzés. Az AdBlue kimarad a fogyasztásból.
+4. **Állomás-gomb az ÖSSZECSUKOTT fuvar-kártyán** — a napi 4× használt művelet („megérkeztem a felrakóhoz" stb.) eddig két koppintás volt (kártya kinyit + gomb). Most a fejlécben is ott a soron következő állomás gombja; `stopPropagation`, tehát nem nyitja ki a kártyát.
+5. **Offline OUTBOX** — a menetlevélnek eddig nem volt auto-újraküldése (a bon-scannernek igen): offline beküldésnél az adat elmentődött, de a sofőrnek KELLETT emlékeznie, hogy visszatérjen. Most a küldésre váró piszkozat „⏳ Küldésre vár" jelzést kap, és a rendszer magától elküldi, amint van hálózat (`online` esemény / app előtérbe kerül / indulás).
+6. **Dokumentum-feltöltés** — a fotó feltöltés ELŐTT lekicsinyítve (max 2000px, JPEG q=0.85; egy mai telefon-fotó nyersen 3–8 MB, base64-ben 4–11 MB → mobilneten lassú, gyakran elhasal, és a `documents.storage_url` base64-ként hízott); **több fájl egyszerre** (`multiple` — egy CMR gyakran 3–4 lap), soros feltöltés haladásjelzővel; a gomb feltöltés alatt **letiltva** (eddig a dupla-koppintás két sort hozott létre).
+7. **AI bon-scan: a gomb nem tűnik el némán** — eddig `usable=false` esetén (nincs `GEMINI_API_KEY` / a cégnél kikapcsolva) a kártya egyszerűen eltűnt, a sofőr csak annyit látott, hogy „nem működik az AI". Most letiltva marad, és kiírja a KONKRÉT okot.
+8. **Összecsukható szekciók** a menetlevél 2. lépésén (pontok / tankolás / kiadás) — a fejlécben a lényeg („3 · 418 L"), az üres szekció alapból csukva → rövidebb, átláthatóbb lap. A mezők a DOM-ban maradnak, tehát minden gyűjtő/validáció/húzás változatlan.
+9. **Helyszín-javaslatok a sofőrnek** — a `getFuvarlevelFieldSuggestions` (eddig Admin/Manager-only) mostantól a sofőrnek is válaszol (ugyanaz a `company_id`-szűrt halmaz: saját cégen belül MÁR beírt értékek, nincs új kitettség). A helyszín/termék mezők natív `<datalist>`-tel kínálják a korábbi értékeket — a sofőr vezetés után, egy kézzel gépel.
+10. **Beküldés-összegző** — a menetlevél MT-YYYY-XXXX sorszámot kap és nem vonható vissza, ezért véglegesítés előtt egy áttekintő modal (időszak, rendszám, km, fogyasztás, pontok/tankolások/kiadások/fuvarok száma).
+11. **`loc_plecare`/`loc_sosire` + helyszín-kötelezőség** — a Plecare/Sosire soron a helyszín is kötelező (a modal bekérte, a kézzel felvett sor kikerülte). Beégetett magyar placeholderek → román alap (RO-alap szabály).
+
+**772 teszt zöld** valódi Postgres 16-tal; minden tétel headless Chromiummal (393px), futó szerverrel élesben verifikálva — köztük a bejelentett hiba pontos szimulációja (tab megszüntetése = app-kilövés → a piszkozat visszaáll). Cache-bust `?v=20260728keep`.
+
 ## 2026-07-28 — Menetlevél: a Plecare/Sosire ÓRÁJA is kötelező (pontos diurna) + a piszkozat többé nem dobja el az órát/fuvar-tageket
 
 ### Miért

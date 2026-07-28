@@ -267,10 +267,19 @@ d('Valódi DB integráció (menetlevelek)', () => {
     expect(sg.alim_plata).toEqual(['Card']);            // distinct (kétszer Card → egyszer)
     expect(sg.ach_produs).toEqual(['Manusi']);
 
-    // Sofőr nem férhet hozzá (Admin/Manager-only)
+    // A sofőr IS kap javaslatot (a menetlevél helyszín-mezőihez) — ugyanaz
+    // a company_id-szűrt halmaz, mint az Adminnál: saját cégen belül MÁR
+    // beírt értékek, nincs új kitettség.
     const sof = makeRes();
     await documents.getFuvarlevelFieldSuggestions(reqAs(SOFER), sof, []);
-    expect(sof.body.result).toEqual({});
+    expect(sof.body.result.numar_camion.sort()).toEqual(['CJ01ABC', 'CJ02XYZ']);
+    expect(sof.body.result.ach_produs).toEqual(['Manusi']);
+
+    // …de idegen szerep (pl. ügyfél-portál felhasználó) továbbra sem.
+    const other = makeRes();
+    await documents.getFuvarlevelFieldSuggestions(
+      reqAs({ id: 9, email: 'x@x.hu', pozicio: 'Konyvelo', company_id: companyId }), other, []);
+    expect(other.body.result).toEqual({});
   });
 
   test('getFuvarlevelFieldSuggestions: nincs cross-tenant szivárgás', async () => {
@@ -283,6 +292,11 @@ d('Valódi DB integráció (menetlevelek)', () => {
     await documents.getFuvarlevelFieldSuggestions(reqAs(ADMIN), res, []);
     const blob = JSON.stringify(res.body.result);
     expect(blob).not.toContain('SECRET99');
+
+    // A sofőr-ág is cégre szűrt (most már ő is kap javaslatot)
+    const sofRes = makeRes();
+    await documents.getFuvarlevelFieldSuggestions(reqAs(SOFER), sofRes, []);
+    expect(JSON.stringify(sofRes.body.result)).not.toContain('SECRET99');
     expect(blob).not.toContain('Titok');
   });
 

@@ -14,31 +14,296 @@ function esc(s) {
 // ============================================================
 var SS_KEY = 'vs_sofer_state';
 
+// ── A menetlevél-piszkozat TARTÓS tárolása ─────────────────────────────
+// KORÁBBAN: `sessionStorage`. Az a tab/PWA élettartamáig él — amint az OS
+// memória-nyomás miatt kilövi a háttérben lévő appot (telefon-lock után
+// tipikusan percek-órák), a sofőr MINDEN beírt adata elveszett, és elölről
+// kellett kezdenie. Csak az explicit „💾 Mentés a telefonra" gomb írt
+// localStorage-ba — amit a sofőr nem feltétlenül nyomott meg.
+//
+// MOSTANTÓL: per-sofőr `localStorage` (ugyanaz a kulcs-séma, mint a
+// mentett piszkozatoknál és a bon-várólistánál) → túléli az app-kilövést,
+// az újraindítást és a kijelentkezést is. A közös telefon nem probléma: a
+// kulcs a bejelentkezett sofőr e-mailjét tartalmazza.
+//
+// Migráció: első olvasáskor átvesszük a régi `sessionStorage`-értéket, ha
+// van (a most futó munkamenet ne vesszen el a frissítéskor).
+function _stateMigrateOnce() {
+  try {
+    if (window._vsStateMigrated) return;
+    window._vsStateMigrated = true;
+    var cur = _perDriverGetJson(SS_KEY, null);
+    if (cur && typeof cur === 'object') return;      // már van tartós érték
+    var legacy = sessionStorage.getItem(SS_KEY);
+    if (legacy) _perDriverSetJson(SS_KEY, JSON.parse(legacy));
+  } catch (e) {}
+}
+
 function stateSave(extra) {
   try {
     var cur = stateGet();
     var merged = Object.assign({}, cur, extra || {});
-    // Sofőr-horgony: a közös telefonon a másik sofőr session-je NE hívja
-    // fel a piszkozatot. A `_meData.email` (authMe után elérhető) mindig
-    // frissítjük — így a leak-védelem tudja, kihez tartozik.
     var _me = (typeof _meData === 'object' && _meData && _meData.email) ? String(_meData.email).toLowerCase() : '';
     if (_me) merged.driverEmail = _me;
-    sessionStorage.setItem(SS_KEY, JSON.stringify(merged));
+    _perDriverSetJson(SS_KEY, merged);
+    // Tükrözés a sessionStorage-ba is: ha a localStorage megtelt vagy a
+    // böngésző tiltja (privát mód), legalább a munkamenet végéig megvan.
+    try { sessionStorage.setItem(SS_KEY, JSON.stringify(merged)); } catch (e) {}
   } catch(e) {}
 }
 
 function stateGet() {
   try {
+    _stateMigrateOnce();
+    var v = _perDriverGetJson(SS_KEY, null);
+    if (v && typeof v === 'object') return v;
     return JSON.parse(sessionStorage.getItem(SS_KEY) || '{}');
   } catch(e) { return {}; }
 }
 
+// Kijelentkezéskor a navigációs állapotot dobjuk, de a PISZKOZATOT NEM —
+// a sofőr kiléphet és később folytathatja. (A per-sofőr kulcs miatt közös
+// telefonon sem látja más.)
 function stateClear() {
-  try { sessionStorage.removeItem(SS_KEY); } catch(e) {}
+  try {
+    var cur = stateGet();
+    var keep = (cur && cur.draft) ? { draft: cur.draft, driverEmail: cur.driverEmail } : {};
+    _perDriverSetJson(SS_KEY, keep);
+    sessionStorage.removeItem(SS_KEY);
+  } catch(e) {}
 }
 
 // Menetlevél piszkozat mentése (debounce 600ms)
 var _draftTimer = null;
+// ============================================================
+// ÖSSZECSUKHATÓ SZEKCIÓK a menetlevél 2. lépésén
+// ============================================================
+// A kitöltő eddig egyetlen, ~10 szekciós hosszú lap volt: telefonon sok
+// görgetés, és nem látszott, hol tart a sofőr. A három „nehéz" szekció
+// (útvonal-pontok / tankolás / kiadás) mostantól összecsukható, és a
+// fejlécben látszik a lényeg (hány sor, mennyi liter/összeg). Alapból az
+// van nyitva, amiben VAN adat — üresen indulva minden csukva, így a lap
+// rövid és átlátható.
+//
+// Pusztán megjelenítés: a mezők a DOM-ban maradnak (csak `display:none`),
+// tehát minden gyűjtő/validáció/húzás változatlanul működik.
+var WB_SECTIONS = [
+  { key: 'puncte', head: 'sof.routePoints',  box: 'puncteContainer',     btns: ['addPunctRow'] },
+  { key: 'alim',   head: 'sof.fuelings',     box: 'alimentariContainer', btns: ['addAlimRow', 'scanReceiptPick'] },
+  { key: 'ach',    head: 'sof.expenses',     box: 'achizitiiContainer',  btns: ['addAchRow', 'scanReceiptPick'] }
+];
+
+function _wbSecCount(key) {
+  var box = document.getElementById(
+    key === 'puncte' ? 'puncteContainer' : key === 'alim' ? 'alimentariContainer' : 'achizitiiContainer');
+  return box ? box.querySelectorAll('.dyn-row').length : 0;
+}
+
+// A fejléc jobb oldalára kerülő rövid összegzés („3 · 418 L").
+function _wbSecSummary(key) {
+  var n = _wbSecCount(key);
+  if (!n) return '';
+  if (key === 'alim') {
+    var l = 0;
+    document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function (r) {
+      l += parseFloat((r.querySelector('.alim-lit') || {}).value) || 0;
+    });
+    return n + (l ? ' · ' + l.toLocaleString(t('sof.locale'), { maximumFractionDigits: 0 }) + ' L' : '');
+  }
+  if (key === 'ach') {
+    var sum = 0;
+    document.querySelectorAll('#achizitiiContainer .dyn-row').forEach(function (r) {
+      sum += parseFloat((r.querySelector('.ach-pret') || {}).value) || 0;
+    });
+    return n + (sum ? ' · ' + sum.toLocaleString(t('sof.locale'), { maximumFractionDigits: 0 }) + ' RON' : '');
+  }
+  return String(n);
+}
+
+function wbSecToggle(key) {
+  var wrap = document.getElementById('wbsec-' + key);
+  if (!wrap) return;
+  var open = !wrap.classList.contains('collapsed');
+  wrap.classList.toggle('collapsed', open);
+  var head = document.getElementById('wbsech-' + key);
+  if (head) {
+    var car = head.querySelector('.wbsec-caret');
+    if (car) car.textContent = open ? '▸' : '▾';
+  }
+}
+
+function wbSecRefresh() {
+  WB_SECTIONS.forEach(function (s) {
+    var el = document.getElementById('wbsecn-' + s.key);
+    if (el) el.textContent = _wbSecSummary(s.key);
+  });
+}
+
+// A meglévő `.section-head` + konténer + gombok köré épít egy burkot.
+// Idempotens: másodszori hívásra csak frissít.
+function wbSecInit() {
+  WB_SECTIONS.forEach(function (s) {
+    if (document.getElementById('wbsec-' + s.key)) return;      // már megvan
+    var box = document.getElementById(s.box);
+    if (!box) return;
+    // A szekció feje: a konténer ELŐTTI `.section-head`.
+    var head = box.previousElementSibling;
+    while (head && !head.classList.contains('section-head')) head = head.previousElementSibling;
+    if (!head) return;
+    // A szekcióhoz tartozó elemek: a KONTÉNER + az utána közvetlenül
+    // következő „➕ hozzáadás" / scan gomb-sorok. SZÁNDÉKOSAN nem a
+    // „következő section-head-ig" szabály: az utolsó szekció (Kiadások)
+    // után nincs több fejléc, így az elnyelné a megjegyzés-mezőt és a
+    // BEKÜLDÉS-GOMBOKAT is — csukott állapotban eltűnnének.
+    var members = [box];
+    var n = box.nextElementSibling;
+    while (n && !n.classList.contains('section-head')) {
+      var isAddRow = n.classList.contains('add-row-btn') || n.querySelector('.add-row-btn');
+      if (!isAddRow) break;
+      members.push(n);
+      n = n.nextElementSibling;
+    }
+
+    var wrap = document.createElement('div');
+    wrap.className = 'wbsec-body';
+    wrap.id = 'wbsec-' + s.key;
+    head.parentNode.insertBefore(wrap, members[0]);
+    members.forEach(function (m) { wrap.appendChild(m); });
+
+    // A fejlécet kattinthatóvá tesszük (a meglévő data-i18n szöveg marad).
+    head.id = 'wbsech-' + s.key;
+    head.classList.add('wbsec-head');
+    head.setAttribute('role', 'button');
+    head.setAttribute('tabindex', '0');
+    var badge = document.createElement('span');
+    badge.className = 'wbsec-count';
+    badge.id = 'wbsecn-' + s.key;
+    head.appendChild(badge);
+    var caret = document.createElement('span');
+    caret.className = 'wbsec-caret';
+    caret.textContent = '▾';
+    head.appendChild(caret);
+    head.addEventListener('click', function () { wbSecToggle(s.key); });
+    head.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); wbSecToggle(s.key); }
+    });
+
+    // Alapállapot: ami üres, az csukva (rövid, átlátható lap).
+    if (!_wbSecCount(s.key)) wbSecToggle(s.key);
+  });
+  wbSecRefresh();
+}
+
+// ============================================================
+// HELYSZÍN-JAVASLATOK (a cég korábbi menetleveleiből)
+// ============================================================
+// A sofőr a helyszín/termék mezőket vezetés után, egy kézzel gépeli. A
+// cég eddigi menetleveleibe MÁR beírt értékeket felkínáljuk natív
+// `<datalist>`-tel (nincs saját legördülő-motor → nem ütközik a sorok
+// húzásos átrendezésével, és mobilon a natív javaslat-sáv jelenik meg).
+// Egyszer töltjük be, a menetlevél 2. lépésének megnyitásakor.
+var _sugCache = null;
+
+function sugLoad() {
+  if (_sugCache) { sugRender(); return; }
+  fetch('/api/execute', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'getFuvarlevelFieldSuggestions' })
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (d) { _sugCache = (d && d.result) || {}; sugRender(); })
+    .catch(function () { _sugCache = {}; });
+}
+
+// A datalist-eket egyszer építjük fel a body végén; az input-ok `list`
+// attribútummal hivatkoznak rájuk (a dinamikus sorok is, létrehozáskor).
+function sugRender() {
+  var s = _sugCache || {};
+  // A handler LAPOS kulcsokat ad (punct_loc / alim_loc / ach_loc / ach_produs).
+  var sets = {
+    'sug-punct-loc': s.punct_loc || [],
+    'sug-alim-loc':  s.alim_loc  || [],
+    'sug-ach-loc':   s.ach_loc   || [],
+    'sug-ach-prod':  s.ach_produs || []
+  };
+  Object.keys(sets).forEach(function (id) {
+    var dl = document.getElementById(id);
+    if (!dl) {
+      dl = document.createElement('datalist');
+      dl.id = id;
+      document.body.appendChild(dl);
+    }
+    var vals = (sets[id] || []).filter(Boolean).slice(0, 300);
+    dl.innerHTML = vals.map(function (v) { return '<option value="' + esc(v) + '">'; }).join('');
+  });
+}
+
+// ============================================================
+// ÉLŐ KM / ÜZEMANYAG ELLENŐRZÉS (a menetlevél 2. lépésén)
+// ============================================================
+// A szerver eddig csendben `Math.max(0, kmSf - kmInc)`-et számolt: egy
+// elgépelt záró km (kisebb a kezdőnél) 0 km + 0 fogyasztás lett, és senki
+// nem szólt. Itt a sofőr AZONNAL látja a megtett km-t és a becsült
+// fogyasztást, mielőtt beküldené.
+var FUEL_MIN_L100 = 20, FUEL_MAX_L100 = 38;   // a reális sáv (mint a havi statisztikánál)
+var KM_SANITY_MAX = 5000;                     // ennél több km egy menetlevélen gyanús
+
+// A jelenlegi űrlap km/üzemanyag adatai + a származtatott értékek.
+function _kmFuelState() {
+  var num = function (id) { var el = document.getElementById(id); return parseFloat(el && el.value) || 0; };
+  var kmInc = num('fKmInc'), kmSf = num('fKmSf');
+  var cantInc = num('fCantInc'), cantSf = num('fCantSf');
+  var tankolt = 0;
+  document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function (row) {
+    // AdBlue NEM üzemanyag a fogyasztás szempontjából
+    var tip = (row.querySelector('.alim-tip') || {}).value;
+    if (tip === 'AdBlue') return;
+    tankolt += parseFloat((row.querySelector('.alim-lit') || {}).value) || 0;
+  });
+  var km = kmSf - kmInc;                       // SZÁNDÉKOSAN lehet negatív → ezt jelezzük
+  var used = cantInc + tankolt - cantSf;
+  var l100 = (km > 0 && used > 0) ? (used * 100 / km) : null;
+  return { kmInc: kmInc, kmSf: kmSf, cantInc: cantInc, cantSf: cantSf,
+           tankolt: tankolt, km: km, used: used, l100: l100 };
+}
+
+// A doboz újrarajzolása. `severity`: 'err' (blokkoló) > 'warn' > '' (rendben).
+function updateKmFuelCheck() {
+  if (typeof wbSecRefresh === 'function') { try { wbSecRefresh(); } catch (e) {} }
+  var box = document.getElementById('kmFuelCheck');
+  if (!box) return;
+  var s = _kmFuelState();
+  // Amíg nincs érdemi adat, ne zavarjuk a sofőrt.
+  if (!s.kmInc && !s.kmSf && !s.cantInc && !s.cantSf && !s.tankolt) {
+    box.style.display = 'none'; return;
+  }
+  var rows = [], sev = '';
+  if (s.kmSf > 0 && s.km < 0) {
+    sev = 'err';
+    rows.push('<div class="km-check-row err">⚠️ ' + esc(t('sof.km.negative')) + '</div>');
+  } else if (s.km > 0) {
+    rows.push('<div class="km-check-row">🛣️ ' + esc(t('sof.km.driven')) + ': <b>' + s.km.toLocaleString(t('sof.locale')) + ' km</b></div>');
+    if (s.km > KM_SANITY_MAX) {
+      if (sev !== 'err') sev = 'warn';
+      rows.push('<div class="km-check-row warn">⚠️ ' + esc(t('sof.km.tooMuch')) + '</div>');
+    }
+  }
+  if (s.used < 0) {
+    if (sev !== 'err') sev = 'warn';
+    rows.push('<div class="km-check-row warn">⚠️ ' + esc(t('sof.km.fuelImpossible')) + '</div>');
+  } else if (s.l100 != null) {
+    var val = s.l100.toFixed(1);
+    var out = (s.l100 < FUEL_MIN_L100 || s.l100 > FUEL_MAX_L100);
+    if (out && sev !== 'err') sev = 'warn';
+    rows.push('<div class="km-check-row' + (out ? ' warn' : '') + '">⛽ ' + esc(t('sof.km.consumption'))
+      + ': <b>' + val + ' L/100km</b>' + (out ? ' — ' + esc(t('sof.km.outOfRange')) : '') + '</div>');
+  }
+  if (!rows.length) { box.style.display = 'none'; return; }
+  box.className = 'km-check' + (sev ? ' ' + sev : '');
+  box.innerHTML = rows.join('');
+  box.style.display = 'block';
+}
+
 // ── KÖZÖS sor-gyűjtők ────────────────────────────────────────────────
 // Egy helyen, mert három hívó használja őket (auto-piszkozat, telefonra
 // mentés, beküldés). Korábban mindhárom SAJÁT másolattal dolgozott, és a
@@ -271,6 +536,68 @@ function deleteLocalDraft(id) {
   toast(t('sof.localDraftDeleted'), '');
 }
 
+// ── „Van egy megkezdett menetleveled" folytatás-sáv ──────────────────
+// A piszkozat mostantól tartósan (localStorage, per-sofőr) él, tehát
+// túléli az app-kilövést. De ha a sofőr nem a menetlevél 2. lépésén volt,
+// amikor az app leállt, az automatikus visszaállítás nem indul — így nem
+// tudná, hogy a munkája megvan. Ez a sáv megmutatja és egy koppintással
+// folytathatóvá teszi.
+function _draftHasContent(dr) {
+  if (!dr) return false;
+  if ((dr.puncte || []).length || (dr.alimentari || []).length || (dr.achizitii || []).length) return true;
+  return !!(dr.camion || dr.remorca || dr.mentiuni
+    || (parseFloat(dr.kmInc) || 0) || (parseFloat(dr.kmSf) || 0));
+}
+
+function renderDraftResume() {
+  var box = document.getElementById('draftResumeBox');
+  if (!box) return;
+  // A 2. lépésen már a piszkozatban vagyunk — nincs mit felajánlani.
+  var step2 = document.getElementById('fuvarStep2');
+  if (step2 && step2.style.display !== 'none') { box.style.display = 'none'; return; }
+  var dr = (stateGet() || {}).draft;
+  if (!_draftHasContent(dr)) { box.style.display = 'none'; return; }
+
+  var bits = [];
+  if ((dr.puncte || []).length)     bits.push('📍 ' + dr.puncte.length);
+  if ((dr.alimentari || []).length) bits.push('⛽ ' + dr.alimentari.length);
+  if ((dr.achizitii || []).length)  bits.push('🛒 ' + dr.achizitii.length);
+  var km = (parseFloat(dr.kmSf) || 0) - (parseFloat(dr.kmInc) || 0);
+  if (km > 0) bits.push('🛣️ ' + km.toLocaleString(t('sof.locale')) + ' km');
+
+  box.innerHTML =
+    '<div class="resume-title">📄 ' + esc(t('sof.resume.title')) + '</div>'
+    + '<div class="resume-sub">' + esc(dr.camion || '') + (bits.length ? (dr.camion ? ' · ' : '') + bits.join(' · ') : '') + '</div>'
+    + '<div class="resume-actions">'
+    + '<button type="button" class="resume-go" onclick="resumeDraft()">' + esc(t('sof.resume.continue')) + '</button>'
+    + '<button type="button" class="resume-drop" onclick="discardDraft()">' + esc(t('sof.resume.discard')) + '</button>'
+    + '</div>';
+  box.style.display = 'block';
+}
+
+// Folytatás: a 2. lépés megnyitása a TELJES mentett tartalommal.
+function resumeDraft() {
+  var dr = (stateGet() || {}).draft;
+  if (!dr) return;
+  document.getElementById('fuvarStep1').style.display = 'none';
+  document.getElementById('fuvarStep2').style.display = 'block';
+  draftRestore(dr);
+  attachDraftListeners();
+  if (typeof sugLoad === 'function')   { try { sugLoad(); }   catch (e) {} }
+  if (typeof wbSecInit === 'function') { try { wbSecInit(); } catch (e) {} }
+  stateSave({ sec: 'fuvar', fuvarStep: 2 });
+  renderDraftResume();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  toast(t('sof.draftRestoredLong'), 'ok');
+}
+
+function discardDraft() {
+  if (!confirm(t('sof.resume.confirmDiscard'))) return;
+  draftClear();
+  renderDraftResume();
+  toast(t('sof.resume.discarded'), '');
+}
+
 // A mentett helyi piszkozatok listája (a menetlevél 1. lépésén; offline is látszik).
 function renderLocalDrafts() {
   var box = document.getElementById('localDraftsBox');
@@ -283,11 +610,23 @@ function renderLocalDrafts() {
   box.innerHTML = arr.map(function (d) {
     var when = '';
     try { when = new Date(d.savedAt).toLocaleString(); } catch (e) {}
+    // Tartalom-összegzés: a puszta „rendszám · első helyszín" alapján nem
+    // lehetett eldönteni, melyik piszkozatot kell megnyitni.
+    var dd = d.data || {};
+    var bits = [];
+    var nP = (dd.puncte || []).length, nA = (dd.alimentari || []).length, nC = (dd.achizitii || []).length;
+    if (nP) bits.push('📍 ' + nP);
+    if (nA) bits.push('⛽ ' + nA);
+    if (nC) bits.push('🛒 ' + nC);
+    var kmDiff = (parseFloat(dd.kmSf) || 0) - (parseFloat(dd.kmInc) || 0);
+    if (kmDiff > 0) bits.push('🛣️ ' + kmDiff.toLocaleString(t('sof.locale')) + ' km');
+    var pendBadge = d.pendingSubmit
+      ? '<span class="draft-pending">⏳ ' + esc(t('sof.outbox.waiting')) + '</span>' : '';
     return '<div class="local-draft-item" style="display:flex;align-items:center;gap:8px;justify-content:space-between;'
       + 'background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.25);border-radius:10px;padding:10px 12px;margin-bottom:8px;">'
       + '<div style="min-width:0;flex:1;" onclick="loadLocalDraft(\'' + d.id + '\')">'
-      + '<div style="font-weight:700;font-size:14px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📄 ' + esc(d.label) + '</div>'
-      + '<div style="font-size:11px;color:var(--muted);">' + esc(when) + '</div></div>'
+      + '<div style="font-weight:700;font-size:14px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📄 ' + esc(d.label) + pendBadge + '</div>'
+      + '<div style="font-size:11px;color:var(--muted);">' + esc(when) + (bits.length ? ' · ' + bits.join(' · ') : '') + '</div></div>'
       + '<button class="btn-mini" onclick="loadLocalDraft(\'' + d.id + '\')" style="padding:8px 12px;border-radius:8px;border:1px solid rgba(59,130,246,0.4);background:rgba(59,130,246,0.12);color:#3b82f6;font-weight:700;">'
       + esc(t('sof.localDraftLoad')) + '</button>'
       + '<button class="btn-mini" onclick="deleteLocalDraft(\'' + d.id + '\')" style="padding:8px 10px;border-radius:8px;border:1px solid rgba(239,68,68,0.35);background:rgba(239,68,68,0.1);color:#ef4444;">🗑</button>'
@@ -335,7 +674,11 @@ function goSec(id) {
 
   stateSave({ sec: id });
   if (id === 'border') loadBorderLog();
-  if (id === 'fuvar')  { loadSoferOrders(); if (typeof renderLocalDrafts === 'function') renderLocalDrafts(); }
+  if (id === 'fuvar')  {
+    loadSoferOrders();
+    if (typeof renderLocalDrafts === 'function') renderLocalDrafts();
+    if (typeof renderDraftResume === 'function') renderDraftResume();
+  }
   if (id === 'docs')   loadDocOrderOptions();
   // A bon-várólista mindkét helyen látszik (főoldal + menetlevél 1. lépés)
   if (id === 'dash' || id === 'fuvar') { if (typeof renderPendingReceipts === 'function') renderPendingReceipts(); }
@@ -500,7 +843,7 @@ function fuvarCreate() {
   // Ha van piszkozatban már Plecare-sor, nem kérdez újra.
   var hasPlecareInDraft = false;
   try {
-    var _st = JSON.parse(sessionStorage.getItem(SS_KEY) || '{}');
+    var _st = stateGet();
     var _dr = _st && _st.draft;
     hasPlecareInDraft = !!(_dr && (_dr.puncte || []).some(function (p) { return p.tip === 'Plecare'; }));
   } catch (_e) {}
@@ -579,7 +922,7 @@ function fuvarStep2(allowEmpty) {
   var _plecare = _pendingPlecare;
   if (!_plecare) {
     try {
-      var _st1 = JSON.parse(sessionStorage.getItem(SS_KEY) || '{}');
+      var _st1 = stateGet();
       var _pl = ((_st1.draft || {}).puncte || []).find(function (p) { return p.tip === 'Plecare'; });
       if (_pl) _plecare = { loc: _pl.loc, date: String(_pl.data || '').slice(0, 10), time: _pl.time || '' };
     } catch (_e2) {}
@@ -615,7 +958,7 @@ function fuvarStep2(allowEmpty) {
   //    egyébként a beküldéskor (submitFuvarlevel) kérdez rá a modal, ott
   //    kerül a puncte végére.
   try {
-    var _st4 = JSON.parse(sessionStorage.getItem(SS_KEY) || '{}');
+    var _st4 = stateGet();
     var _sos = ((_st4.draft || {}).puncte || []).find(function (p) { return p.tip === 'Sosire'; });
     if (_sos) addPunctRow(_sos.loc, 'Sosire', String(_sos.data || '').slice(0, 10), { time: _sos.time });
   } catch (_e3) {}
@@ -634,7 +977,7 @@ function fuvarStep2(allowEmpty) {
   // (a km/rendszám/dátum előtöltés fentebb már megvolt, üres mezőt nem
   // írunk felül).
   try {
-    var _st = JSON.parse(sessionStorage.getItem(SS_KEY) || '{}');
+    var _st = stateGet();
     var _dr = _st && _st.draft;
     if (_dr) {
       (_dr.alimentari || []).forEach(function (a) { addAlimRow(a); });
@@ -644,6 +987,10 @@ function fuvarStep2(allowEmpty) {
 
   // Piszkozat figyeli a változásokat
   attachDraftListeners();
+  // Helyszín-javaslatok (a cég korábbi menetleveleiből) — egyszer töltjük
+  if (typeof sugLoad === 'function') { try { sugLoad(); } catch (e) {} }
+  // Összecsukható szekciók (ami üres, az alapból csukva → rövid lap)
+  if (typeof wbSecInit === 'function') { try { wbSecInit(); } catch (e) {} }
   // Út időpontjai (hidden fIndulasDt/fErkezesDt) szinkron a Plecare/Sosire-ból
   if (typeof _syncTripTimesFromPuncte === 'function') _syncTripTimesFromPuncte();
   stateSave({ fuvarStep: 2 });
@@ -653,6 +1000,7 @@ function fuvarBackStep1() {
   document.getElementById('fuvarStep2').style.display = 'none';
   document.getElementById('fuvarStep1').style.display = 'block';
   stateSave({ fuvarStep: 1 });
+  if (typeof renderDraftResume === 'function') renderDraftResume();
 }
 
 // A menetlevél „Út időpontjai" (kezdő / záró datetime) automatikusan a
@@ -714,6 +1062,22 @@ function attachDraftListeners() {
       el.addEventListener('input', draftSave);
     }
   });
+  // Km / üzemanyag élő ellenőrzés — a négy szám-mezőre + a tankolás-sorokra
+  // (utóbbi a konténer-MutationObserveren és a sorok `oninput`-ján át fut).
+  ['fKmInc','fKmSf','fCantInc','fCantSf'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el && !el._kmCheckBound) {
+      el._kmCheckBound = true;
+      el.addEventListener('input', updateKmFuelCheck);
+    }
+  });
+  var alimBox = document.getElementById('alimentariContainer');
+  if (alimBox && !alimBox._kmCheckBound) {
+    alimBox._kmCheckBound = true;
+    alimBox.addEventListener('input', updateKmFuelCheck);
+    alimBox.addEventListener('change', updateKmFuelCheck);
+  }
+  updateKmFuelCheck();
   // Rendszám kézi módosításakor a kezdő üzemanyag-szintet az új jármű utolsó
   // menetleveléből tölti (csak ha a kezdő mező üres/0 — beírt értéket nem ír felül).
   var camEl = document.getElementById('fCamion');
@@ -774,7 +1138,7 @@ function addPunctRow(locVal, tipVal, dataVal, opts) {
     + '<div class="field"><label>' + t('sof.date') + '</label><input class="input punct-data" type="date" value="' + esc(dataVal || today) + '" onchange="draftSave()"></div>'
     + '<div class="field"><label>' + t('sof.time') + '</label><input class="input punct-time" type="time" value="' + esc(opts.time || '') + '" onchange="draftSave()"></div>'
     + '</div>'
-    + '<div class="field"><label>' + t('sof.localityAddr') + '</label><input class="input punct-loc" placeholder="' + t('sof.punctLocPh') + '" value="' + esc(locVal || '') + '" oninput="draftSave()"></div>';
+    + '<div class="field"><label>' + t('sof.localityAddr') + '</label><input class="input punct-loc" list="sug-punct-loc" placeholder="' + t('sof.punctLocPh') + '" value="' + esc(locVal || '') + '" oninput="draftSave()"></div>';
   document.getElementById('puncteContainer').appendChild(d);
   _punctRenumber();
 }
@@ -1067,8 +1431,39 @@ function _perDriverGetJson(baseKey, defaultVal) {
     return (typeof defaultVal !== 'undefined') ? defaultVal : null;
   } catch (e) { return (typeof defaultVal !== 'undefined') ? defaultVal : null; }
 }
+// A mentés NEM nyelheti el csendben a hibát: ha a localStorage megtelt
+// (a bon-várólista thumbnail-jei a fő fogyasztók), a sofőr azt hinné,
+// hogy mentett — pedig semmi nem íródott ki. Ezért teli tárnál előbb
+// helyet csinálunk (régi bon-thumbnailek eldobása), majd újrapróbáljuk;
+// ha még így sem megy, SZÓLUNK.
+var _quotaWarned = false;
 function _perDriverSetJson(baseKey, val) {
-  try { localStorage.setItem(_driverStoreKey(baseKey), JSON.stringify(val == null ? null : val)); } catch (e) {}
+  var key = _driverStoreKey(baseKey);
+  var payload = JSON.stringify(val == null ? null : val);
+  try {
+    localStorage.setItem(key, payload);
+    return true;
+  } catch (e) {
+    // 1) Helyfelszabadítás: a bon-várólista képei a legnagyobb tételek.
+    try {
+      var q = _perDriverGetJson(LS_RCPT_QUEUE_KEY, []) || [];
+      if (q.length) {
+        q.forEach(function (it) { it.thumb = ''; });          // a thumbnail elhagyható
+        localStorage.setItem(_driverStoreKey(LS_RCPT_QUEUE_KEY), JSON.stringify(q));
+      }
+    } catch (_) {}
+    try {
+      localStorage.setItem(key, payload);
+      return true;
+    } catch (e2) {
+      // 2) Tényleg nincs hely → egyszeri figyelmeztetés a sofőrnek.
+      if (!_quotaWarned) {
+        _quotaWarned = true;
+        try { toast(t('sof.storageFull'), 'err'); } catch (_) {}
+      }
+      return false;
+    }
+  }
 }
 
 // wbLocDialog(kind, cb): kind = 'start' | 'end'; cb(null) = mégse, cb({loc,date,time})
@@ -1131,7 +1526,7 @@ function addAlimRow(a) {
   d.className = 'dyn-row';
   d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
     + '<div class="g2">'
-    + '<div class="field"><label>' + t('sof.location') + '</label><input class="input alim-loc" placeholder="' + t('sof.alimLocPh') + '" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.location') + '</label><input class="input alim-loc" list="sug-alim-loc" placeholder="' + t('sof.alimLocPh') + '" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
     + '<div class="field"><label>' + t('sof.date') + '</label><input class="input alim-data" type="date" value="' + dt + '" onchange="draftSave()"></div>'
     + '</div>'
     + '<div class="g2">'
@@ -1158,9 +1553,9 @@ function addAchRow(a) {
   var d = document.createElement('div');
   d.className = 'dyn-row';
   d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
-    + '<div class="field"><label>' + t('sof.product') + '</label><input class="input ach-prod" placeholder="' + t('sof.achProdPh') + '" value="' + (a.produs || '') + '" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.product') + '</label><input class="input ach-prod" list="sug-ach-prod" placeholder="' + t('sof.achProdPh') + '" value="' + (a.produs || '') + '" oninput="draftSave()"></div>'
     + '<div class="g3">'
-    + '<div class="field"><label>' + t('sof.location') + '</label><input class="input ach-loc" placeholder="' + t('sof.achLocPh') + '" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.location') + '</label><input class="input ach-loc" list="sug-ach-loc" placeholder="' + t('sof.achLocPh') + '" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
     + '<div class="field"><label>' + t('sof.date') + '</label><input class="input ach-data" type="date" value="' + dt + '" onchange="draftSave()"></div>'
     + '<div class="field"><label>' + t('sof.sumRon') + '</label><input class="input ach-pret" type="number" value="' + (a.pret || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
     + '</div>'
@@ -1203,20 +1598,47 @@ function applyBonScanVisibility() {
     .then(function (d) {
       var r = (d && d.result) || {};
       // Alapból: mutass — ne rejts pillanatra betöltéskor.
-      var usable = (r.ok === false) ? true : !!r.usable;
-      _setBonScanVisible(usable);
+      if (r.ok === false) { _setBonScanVisible(true); return; }
+      _setBonScanVisible(!!r.usable, r);
     })
     .catch(function () { _setBonScanVisible(true); });
 }
 
-function _setBonScanVisible(visible) {
-  // Főoldali narancs kártya (a dashboard-on)
+// `visible=false` esetén NEM tüntetjük el némán a gombot: a sofőr csak
+// annyit látna, hogy „nem működik az AI". Helyette letiltva marad, és
+// kiírjuk a KONKRÉT okot (nincs API-kulcs a szerveren / a cégnél ki van
+// kapcsolva) — így a hibajelentés is használható lesz.
+function _setBonScanVisible(visible, diag) {
+  var reason = '';
+  if (!visible && diag) {
+    if (diag.hasKey === false)      reason = t('sof.scan.noKey');
+    else if (diag.enabled === false) reason = t('sof.scan.disabled');
+    else                             reason = t('sof.scan.unavailable');
+  }
+  var applyBtn = function (b) {
+    if (!b) return;
+    b.style.display = '';                       // marad látható, csak tiltott
+    b.disabled = !visible;
+    b.classList.toggle('scan-btn-off', !visible);
+    if (!visible) b.title = reason;
+    else b.removeAttribute('title');
+  };
+  // Főoldali narancs kártya (a dashboard-on) + a menetlevél scan-gombjai
   var dashCard = document.querySelector('.dash-scan-card');
-  if (dashCard) dashCard.style.display = visible ? '' : 'none';
-  // A menetlevél 1. lépéses (egyesített) + 2. lépéses fuel/purchase scan-gombok
-  var stepBtns = document.querySelectorAll('#fuvarStep1 .scan-btn, #fuvarStep2 .scan-btn');
-  stepBtns.forEach(function (b) { b.style.display = visible ? '' : 'none'; });
-  // A menetlevél 1. lépéses várólista-doboz (a főoldali a .dash-scan-card-ban van)
+  if (dashCard) {
+    dashCard.style.display = '';
+    applyBtn(dashCard.querySelector('.dash-scan-btn'));
+    var note = dashCard.querySelector('.scan-off-note');
+    if (!visible) {
+      if (!note) {
+        note = document.createElement('div');
+        note.className = 'scan-off-note';
+        dashCard.appendChild(note);
+      }
+      note.textContent = reason;
+    } else if (note) { note.remove(); }
+  }
+  document.querySelectorAll('#fuvarStep1 .scan-btn, #fuvarStep2 .scan-btn').forEach(applyBtn);
   var step1Pending = document.getElementById('fuvarStep1PendingBox');
   if (step1Pending && !visible) { step1Pending.style.display = 'none'; }
 }
@@ -1583,15 +2005,14 @@ function rrAccept() {
     // A jelenlegi piszkozatot betöltjük (ha van), és hozzáfűzzük az új
     // sort — a fuvarStep2 legközelebbi megnyitásakor a draftRestore() ezt
     // visszaállítja. Ha még nincs draft, alap-vázlatot indítunk.
-    var st = (function () { try { return JSON.parse(sessionStorage.getItem(SS_KEY) || '{}'); } catch (_) { return {}; } })();
+    var st = stateGet();
     var draft = st.draft || {
       camion: '', remorca: '', kmInc: '0', kmSf: '0', cantInc: '0', cantSf: '0',
       mentiuni: '', puncte: [], alimentari: [], achizitii: [], orderIds: [], summary: ''
     };
     if (kind === 'fuel') { draft.alimentari = draft.alimentari || []; draft.alimentari.push(newRow); }
     else { draft.achizitii = draft.achizitii || []; draft.achizitii.push(newRow); }
-    st.draft = draft;
-    try { sessionStorage.setItem(SS_KEY, JSON.stringify(st)); } catch (_) {}
+    stateSave({ draft: draft });
   }
 
   // ── TANULÁS: a sofőr által megerősített (esetleg javított) mezőket
@@ -1766,11 +2187,33 @@ function _renderDiurnaBox(dep, arr, r) {
 // ============================================================
 // MENETLEVÉL BEKÜLDÉS
 // ============================================================
+// A záró km NEM lehet kisebb a kezdőnél — a szerver ezt eddig csendben
+// 0 km-re vágta (0 fogyasztással), és a hibás menetlevél hivatalos
+// bizonylattá vált. Blokkoló; `true` = mehet tovább.
+function _validateKm() {
+  var s = _kmFuelState();
+  if (s.kmSf > 0 && s.km < 0) {
+    toast(t('sof.km.negative'), 'err');
+    updateKmFuelCheck();
+    try {
+      var el = document.getElementById('fKmSf');
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); }
+    } catch (e) {}
+    return false;
+  }
+  return true;
+}
+
 function submitFuvarlevel() {
   // Ha még nincs Sosire (érkezési) sor a puncte-ban, elsőként azt kérdezzük
   // be egy modal-on (a sofőr megadja, hová érkezett). Ha mégse — nem
   // küldünk. Ha van már Sosire, egyből megy a beküldés (retry, vagy a
   // sofőr korábban maga adott hozzá).
+  // A km-ellenőrzés MÉG A SOSIRE-DIALÓGUS ELŐTT fut: különben a sofőr
+  // előbb kitölti az érkezési helyet/időt, és csak utána derülne ki, hogy
+  // a km hibás — felesleges kör.
+  if (!_validateKm()) return;
+
   var hasSosire = false;
   document.querySelectorAll('#puncteContainer .dyn-row').forEach(function (row) {
     if ((row.querySelector('.punct-tip') || {}).value === 'Sosire') hasSosire = true;
@@ -1793,30 +2236,90 @@ function _submitFuvarlevelFinal() {
   // sync — biztosan a legfrissebb értékek kerüljenek a payload-ba.
   if (typeof _syncTripTimesFromPuncte === 'function') _syncTripTimesFromPuncte();
 
-  // A Plecare és a Sosire soron a DÁTUM és az ÓRA is kötelező: ezekből
-  // képződik a diurna-ablak, és a 12:00-szabály miatt az óra a napidíjat
-  // is befolyásolja. Ha a sofőr utólag kiürítette a sor óra-mezőjét,
-  // itt fogjuk meg (a modal-validáció csak a felvételkor futott).
-  var _missing = null;
+  // A Plecare és a Sosire soron a HELYSZÍN, a DÁTUM és az ÓRA is kötelező:
+  // ezekből képződik a diurna-ablak, és a 12:00-szabály miatt az óra a
+  // napidíjat is befolyásolja. A modal mindhármat bekéri, de a sor utólag
+  // szerkeszthető (és kézzel is felvehető) — itt fogjuk meg.
+  var _missing = null, _missingField = null;
   document.querySelectorAll('#puncteContainer .dyn-row').forEach(function (row) {
     if (_missing) return;
     var tip = (row.querySelector('.punct-tip') || {}).value;
     if (tip !== 'Plecare' && tip !== 'Sosire') return;
+    var lv = ((row.querySelector('.punct-loc')  || {}).value || '').trim();
     var dv = (row.querySelector('.punct-data') || {}).value || '';
     var tv = (row.querySelector('.punct-time') || {}).value || '';
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dv) || !/^\d{2}:\d{2}$/.test(tv)) {
-      _missing = row;
-    }
+    if (!lv)                                   { _missing = row; _missingField = '.punct-loc'; }
+    else if (!/^\d{4}-\d{2}-\d{2}$/.test(dv))  { _missing = row; _missingField = '.punct-data'; }
+    else if (!/^\d{2}:\d{2}$/.test(tv))        { _missing = row; _missingField = '.punct-time'; }
   });
   if (_missing) {
-    toast(t('sof.wb.tripTimeMissing'), 'err');
+    toast(t(_missingField === '.punct-loc' ? 'sof.wb.tripLocMissing' : 'sof.wb.tripTimeMissing'), 'err');
     try {
       _missing.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      var el = _missing.querySelector('.punct-time');
+      var el = _missing.querySelector(_missingField);
       if (el) el.focus();
     } catch (e) {}
     return;
   }
+
+  // Utolsó lépés: összegző + megerősítés. A menetlevél MT-YYYY-XXXX
+  // sorszámot kap és nem vonható vissza, ezért a sofőr lássa, mi megy el.
+  wbConfirmOpen();
+}
+
+// ── Beküldés-összegző (mit küldünk el?) ─────────────────────────────
+function wbConfirmOpen() {
+  var m = document.getElementById('wbConfirmModal');
+  var body = document.getElementById('wbConfirmBody');
+  if (!m || !body) { _submitFuvarlevelSend(); return; }   // régi HTML → egyből küld
+
+  var s = _kmFuelState();
+  var puncte = _collectPuncte();
+  var alim = _collectAlim(true), ach = _collectAch(true);
+  var dep = (document.getElementById('fIndulasDt') || {}).value || '';
+  var arr = (document.getElementById('fErkezesDt') || {}).value || '';
+  var fmtDt = function (v) { return v ? String(v).replace('T', ' ') : '—'; };
+  var nf = function (n, unit) {
+    return (isFinite(n) ? n.toLocaleString(t('sof.locale'), { maximumFractionDigits: 1 }) : '0') + (unit || '');
+  };
+  var row = function (label, val, cls) {
+    return '<div class="cf-row' + (cls ? ' ' + cls : '') + '">'
+      + '<span class="cf-lbl">' + esc(label) + '</span>'
+      + '<span class="cf-val">' + esc(val) + '</span></div>';
+  };
+
+  var html = '';
+  html += row(t('sof.cf.trip'), fmtDt(dep) + '  →  ' + fmtDt(arr));
+  html += row(t('sof.cf.plate'),
+    ((document.getElementById('fCamion') || {}).value || '—')
+    + (((document.getElementById('fRemorca') || {}).value) ? ' / ' + document.getElementById('fRemorca').value : ''));
+  html += row(t('sof.km.driven'), nf(s.km, ' km'));
+  if (s.l100 != null) {
+    var outOfRange = (s.l100 < FUEL_MIN_L100 || s.l100 > FUEL_MAX_L100);
+    html += row(t('sof.km.consumption'), s.l100.toFixed(1) + ' L/100km', outOfRange ? 'warn' : '');
+  }
+  html += row(t('sof.cf.points'), String(puncte.length));
+  html += row(t('sof.cf.fuelings'), alim.length + ' · ' + nf(s.tankolt, ' L'));
+  var achSum = 0; ach.forEach(function (a) { achSum += parseFloat(a.pret) || 0; });
+  html += row(t('sof.cf.purchases'), ach.length + (achSum ? ' · ' + nf(achSum, ' RON') : ''));
+  html += row(t('sof.cf.orders'), String((_selectedOrderIds || []).length));
+  body.innerHTML = html;
+  m.style.display = 'flex';
+}
+function wbConfirmCancel() {
+  var m = document.getElementById('wbConfirmModal');
+  if (m) m.style.display = 'none';
+}
+function wbConfirmGo() {
+  wbConfirmCancel();
+  _submitFuvarlevelSend();
+}
+
+// A tényleges beküldés — a validációk és a megerősítő összegző UTÁN fut.
+function _submitFuvarlevelSend() {
+  // Km-ellenőrzés (a `submitFuvarlevel` már lefuttatta a Sosire-dialógus
+  // előtt; itt a közvetlen/retry hívási útra ismételjük meg).
+  if (!_validateKm()) return;
   var fisa = (document.getElementById('fFisa') ? document.getElementById('fFisa').value.trim() : '');
   // Sorszámot a szerver generálja automatikusan
 
@@ -1904,12 +2407,111 @@ function _submitFuvarlevelFinal() {
       toast(t('common.error') + ': ' + (d.err || t('sof.unknown')), 'err');
     }
   }).catch(function() {
-    // Nincs internet a beküldéshez → az adat NE vesszen el: automatikusan
-    // a telefonra mentjük helyi piszkozatként, és jelezzük a sofőrnek.
+    // Nincs internet a beküldéshez → az adat NE vesszen el: a telefonra
+    // mentjük, és KÜLDÉSRE VÁRÓ-ra jelöljük. Innentől a rendszer magától
+    // újrapróbálja (hálózat visszatér / app előtérbe kerül / indulás) —
+    // a sofőrnek nem kell emlékeznie rá.
     saveLocalDraft(true);
-    toast(t('sof.offlineSaved'), 'err');
+    _outboxMark(_curLocalDraftId, true);
+    renderLocalDrafts();
+    toast(t('sof.outbox.queued'), 'err');
   });
 }
+
+// ============================================================
+// KIMENŐ SOR (OUTBOX) — offline beküldés automatikus újraküldése
+// ============================================================
+// A bon-scannernek volt auto-retry-a, a MENETLEVÉLNEK — ami sokkal
+// fontosabb — nem: offline beküldésnél az adat elmentődött a telefonra,
+// de a sofőrnek KELLETT emlékeznie, hogy visszatérjen és újraküldje.
+// Innentől a küldésre váró piszkozatot a rendszer magától megpróbálja
+// elküldeni, amint van hálózat.
+var _outboxBusy = false;
+
+function _outboxMark(id, pending) {
+  if (!id) return;
+  var arr = soferLoadLocalDrafts();
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i].id === id) { arr[i].pendingSubmit = !!pending; break; }
+  }
+  soferStoreLocalDrafts(arr);
+}
+
+function _outboxPending() {
+  return soferLoadLocalDrafts().filter(function (d) { return d.pendingSubmit; });
+}
+
+// Egy tétel elküldése a MENTETT adatból (nem a DOM-ból) — a sofőr közben
+// bármelyik képernyőn lehet, akár másik menetlevelet is szerkeszthet.
+function _outboxSendOne(item, cb) {
+  var d = item && item.data;
+  if (!d) { cb(false); return; }
+  var payload = {
+    numarFisa: d.fisa || '',
+    numarCamion: d.camion, numarRemorca: d.remorca,
+    kmInceput: d.kmInc, kmSfarsit: d.kmSf,
+    locPlecare: '', locSosire: '',
+    indulasDt: d.indulasDt || null, erkezesDt: d.erkezesDt || null,
+    cantInceput: d.cantInc, cantSfarsit: d.cantSf,
+    alteMentiuni: d.mentiuni,
+    puncte: d.puncte || [], alimentari: d.alimentari || [],
+    achizitii: d.achizitii || [], tranzite: [],
+    orderIds: d.orderIds || []
+  };
+  // Az indulási/érkezési helyszín a mentett pontokból, TÍPUS szerint.
+  (payload.puncte || []).forEach(function (p) {
+    if (p.tip === 'Plecare' && !payload.locPlecare) payload.locPlecare = p.loc || '';
+    if (p.tip === 'Sosire') payload.locSosire = p.loc || '';
+  });
+  fetch('/api/fuvarlevel-save', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+    .then(function (r) { return r.json(); })
+    .then(function (res) { cb(!!(res && res.success), res && res.docNumber); })
+    .catch(function () { cb(false); });
+}
+
+// Az összes küldésre váró tétel megpróbálása, egyesével. Sikeres küldés →
+// a helyi piszkozat törlődik (mint a normál beküldésnél).
+function outboxFlush(silent) {
+  if (_outboxBusy) return;
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  var pending = _outboxPending();
+  if (!pending.length) return;
+  _outboxBusy = true;
+  var sent = 0, idx = 0;
+  var next = function () {
+    if (idx >= pending.length) {
+      _outboxBusy = false;
+      renderLocalDrafts();
+      if (sent) {
+        toast(t('sof.outbox.sent', { n: sent }), 'ok');
+        try { loadSoferOrders(); } catch (e) {}
+      }
+      return;
+    }
+    var it = pending[idx++];
+    _outboxSendOne(it, function (ok) {
+      if (ok) {
+        sent++;
+        soferStoreLocalDrafts(soferLoadLocalDrafts().filter(function (x) { return x.id !== it.id; }));
+        if (_curLocalDraftId === it.id) _curLocalDraftId = null;
+      }
+      next();                       // sikertelen → marad a sorban, később újra
+    });
+  };
+  next();
+}
+
+// Kiváltók: hálózat visszatér, app előtérbe kerül, oldal-betöltés.
+window.addEventListener('online', function () { outboxFlush(true); });
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible') outboxFlush(true);
+});
+document.addEventListener('DOMContentLoaded', function () {
+  setTimeout(function () { outboxFlush(true); }, 3000);
+});
 
 // ============================================================
 // IRATOK
@@ -1921,25 +2523,91 @@ function selDocType(el, tip) {
   el.classList.add('sel');
 }
 function previewFile(input) {
-  if (input.files && input.files[0]) {
-    document.getElementById('filePreviewName').textContent = '📎 ' + input.files[0].name;
-    document.getElementById('filePreview').style.display = 'block';
-  }
+  var files = input.files ? Array.prototype.slice.call(input.files) : [];
+  if (!files.length) return;
+  // Több fájl is választható (egy CMR gyakran 3–4 lap) — a nevek felsorolva.
+  var names = files.map(function (f) { return f.name; }).join(', ');
+  document.getElementById('filePreviewName').textContent =
+    '📎 ' + (files.length > 1 ? (files.length + ' × ') : '') + names;
+  document.getElementById('filePreview').style.display = 'block';
 }
+
+// A fotót feltöltés ELŐTT lekicsinyítjük (max 2000px hosszú oldal, JPEG
+// q=0.85): egy mai telefon-fotó nyersen 3–8 MB, base64-ben 4–11 MB — ez
+// mobilneten lassú, gyakran elhasal, és a `documents.storage_url` base64
+// szövegként hízik a DB-ben. 2000px-en az aláírás/pecsét bőven olvasható.
+// PDF-et NEM alakítunk (marad az eredeti).
+var DOC_MAX_DIM = 2000;
+function _docToBase64(file, cb) {
+  if (!file) { cb(null); return; }
+  if (file.type === 'application/pdf' || !/^image\//.test(file.type || '')) {
+    var fr = new FileReader();
+    fr.onload = function () { cb(String(fr.result || '')); };
+    fr.onerror = function () { cb(null); };
+    fr.readAsDataURL(file);
+    return;
+  }
+  var img = new Image();
+  var url = URL.createObjectURL(file);
+  img.onload = function () {
+    try {
+      var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      var scale = Math.min(1, DOC_MAX_DIM / Math.max(w, h));
+      var cw = Math.round(w * scale), ch = Math.round(h * scale);
+      var cv = document.createElement('canvas');
+      cv.width = cw; cv.height = ch;
+      cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+      cb(cv.toDataURL('image/jpeg', 0.85));
+    } catch (e) { cb(null); }
+    finally { URL.revokeObjectURL(url); }
+  };
+  img.onerror = function () { URL.revokeObjectURL(url); cb(null); };
+  img.src = url;
+}
+
+var _docUploading = false;
 function uploadDoc() {
-  var file = document.getElementById('dFile').files[0];
-  if (!file) { toast(t('sof.pickFile'), 'err'); return; }
+  if (_docUploading) return;                      // dupla-koppintás védelem
+  var input = document.getElementById('dFile');
+  var files = (input && input.files) ? Array.prototype.slice.call(input.files) : [];
+  if (!files.length) { toast(t('sof.pickFile'), 'err'); return; }
   var orderId = (document.getElementById('docOrderSel') || {}).value || null;
-  var fr = new FileReader();
-  fr.onload = function(e) {
-    fetch('/api/doc-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ base64: e.target.result, numeFisier: file.name, tip: selDocTip, orderId: orderId }) })
-    .then(function(r) { return r.json(); }).then(function(d) {
-      if (d.success) { toast(t('common.uploaded'), 'ok'); goSec('dash'); }
-      else { toast(t('common.error') + ': ' + (d.err || t('sof.unknown')), 'err'); }
+  var btn = document.querySelector('#filePreview .submit-btn');
+  var nameEl = document.getElementById('filePreviewName');
+  _docUploading = true;
+  if (btn) { btn.disabled = true; }
+
+  var done = 0, failed = 0;
+  var setProgress = function () {
+    if (btn) btn.textContent = t('sof.doc.uploading', { n: done + 1, total: files.length });
+  };
+  var finish = function () {
+    _docUploading = false;
+    if (btn) { btn.disabled = false; btn.textContent = t('sofer.submit'); }
+    if (input) input.value = '';
+    if (nameEl) nameEl.textContent = '';
+    document.getElementById('filePreview').style.display = 'none';
+    if (failed && done) toast(t('sof.doc.partial', { ok: done, bad: failed }), 'err');
+    else if (failed)    toast(t('common.error'), 'err');
+    else { toast(t('common.uploaded'), 'ok'); goSec('dash'); }
+  };
+
+  // Sorosan töltünk fel (nem párhuzamosan): mobilneten megbízhatóbb, és a
+  // haladás is követhető.
+  var next = function (i) {
+    if (i >= files.length) { finish(); return; }
+    setProgress();
+    _docToBase64(files[i], function (b64) {
+      if (!b64) { failed++; done++; next(i + 1); return; }
+      fetch('/api/doc-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64: b64, numeFisier: files[i].name, tip: selDocTip, orderId: orderId }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (!d.success) failed++; })
+      .catch(function () { failed++; })
+      .then(function () { done++; next(i + 1); });
     });
   };
-  fr.readAsDataURL(file);
+  next(0);
 }
 
 // A fuvar-választó feltöltése a sofőr saját (aktív + friss) fuvarjaival.
@@ -2149,22 +2817,16 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
 .then(function(r) { return r.json(); }).then(function(d) {
   if (!d.result) { window.location.href = '/login'; return; }
   _meData = d.result;
-  // sessionStorage-draft leak-védelem közös telefonon: ha az előző
-  // sofőr által otthagyott piszkozat még benne van a tabban, de más
-  // sofőr jelentkezett be, dobjuk. A `stateSave` innentől mindig
-  // hozzáírja a `driverEmail`-t, hogy a következő ellenőrzés menjen.
+  // Leak-védelem közös telefonon: a piszkozat kulcsa mostantól per-sofőr
+  // (`vs_sofer_state:<email>`), tehát másik sofőr eleve nem látja. Ami
+  // maradhatott: a MIGRÁCIÓ előtti, közös `sessionStorage`-érték — ha az
+  // egy MÁSIK sofőré, azt dobjuk, mielőtt a migráció átvenné.
   try {
     var _existing = JSON.parse(sessionStorage.getItem(SS_KEY) || '{}');
     var _ownerEmail = String(_existing.driverEmail || '').toLowerCase();
     var _meEmail = String(_meData.email || '').toLowerCase();
-    if (_ownerEmail && _ownerEmail !== _meEmail) {
+    if (_ownerEmail && _meEmail && _ownerEmail !== _meEmail) {
       sessionStorage.removeItem(SS_KEY);
-    } else {
-      // Első alkalommal (nincs driverEmail) horgonyozzuk a jelenlegihez
-      if (!_ownerEmail && _meEmail) {
-        _existing.driverEmail = _meEmail;
-        sessionStorage.setItem(SS_KEY, JSON.stringify(_existing));
-      }
     }
   } catch (_e) {}
   document.getElementById('meBadge').textContent = d.result.nume;
@@ -2587,9 +3249,17 @@ function renderFuvarCard(o, idx) {
   var msNextIdx = -1;
   for (var _i = 0; _i < MS_STEPS.length; _i++) { if (!o[MS_STEPS[_i].col]) { msNextIdx = _i; break; } }
   var actionBtn = '';
+  // A soron következő állomás-gomb a KINYÍLÓ részben is ott van, DE a
+  // fejlécbe is kikerül (`headActionBtn`): ez a napi 4× használt művelet,
+  // vezetés után, kesztyűs kézzel — ne kelljen előbb kinyitni a kártyát.
+  // `stopPropagation`, hogy a gomb ne csukja ki/be a kártyát.
+  var headActionBtn = '';
   if ((isAlocat || isCurs) && msNextIdx >= 0) {
     actionBtn = '<button class="sh-btn confirm" onclick="driverMilestone(\'' + o.id + '\')">' +
                 '➜ ' + t(MS_STEPS[msNextIdx].key) + '</button>';
+    headActionBtn = '<button class="sh-btn confirm fuvar-head-action" ' +
+      'onclick="event.stopPropagation();driverMilestone(\'' + o.id + '\')">' +
+      '➜ ' + t(MS_STEPS[msNextIdx].key) + '</button>';
   }
   // ⛔ Áru leadása (defekt / pótkocsi-csere) — a kérést a diszpécser igazolja vissza
   var hoPending = o.handover_status === 'Fuggoben';
@@ -2699,6 +3369,7 @@ function renderFuvarCard(o, idx) {
           '<span class="fuvar-headtxt">' + headBits.join(' · ') + '</span>' +
           '<span class="fuvar-expand" id="exp_' + o.id + '">▾</span>' +
         '</div>' +
+        headActionBtn +
       '</div>' +
       details +
     '</div>';
