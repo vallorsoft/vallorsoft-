@@ -704,6 +704,8 @@ function _syncTripTimesFromPuncte() {
     pc._vsTripSyncBound = true;
     pc.addEventListener('change', _syncTripTimesFromPuncte);
     pc.addEventListener('input',  _syncTripTimesFromPuncte);
+    // Ugyanitt kötjük be a pont-sorok átrendezését (hosszan nyomva → húzás).
+    if (typeof _punctDragInit === 'function') _punctDragInit();
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', bind);
@@ -755,7 +757,9 @@ function addPunctRow(locVal, tipVal, dataVal, opts) {
   opts = opts || {};
   punctIdx++;
   var d = document.createElement('div');
-  d.className = 'dyn-row';
+  // `punct-row`: az útvonal-pont sorok átrendezhetők (hosszan nyomva → húzás),
+  // ezért kapnak külön osztályt (a tankolás/vásárlás sorok NEM mozgathatók).
+  d.className = 'dyn-row punct-row';
   if (opts.orderId) d.setAttribute('data-order-id', opts.orderId);
   if (opts.role)    d.setAttribute('data-role', opts.role);
   if (opts.time)    d.setAttribute('data-time', opts.time);
@@ -763,7 +767,12 @@ function addPunctRow(locVal, tipVal, dataVal, opts) {
   // MINDIG ezekkel indul és zárul. A többi típus a régi lista.
   var tipOptions = ['Plecare','Încărcare','Descărcare','Tranzit','Vamă','Parcare','Sosire','Altele'];
   var today = new Date().toISOString().split('T')[0];
-  d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
+  d.innerHTML = '<button class="del-row" onclick="punctRowRemove(this)">✕</button>'
+    // Fogantyú-sáv: sorszám + „húzd" jelzés. A sor BÁRMELY nem-beviteli
+    // része (fogantyú, címkék, üres felület) hosszan nyomva megfogható.
+    + '<div class="punct-grip"><span class="punct-grip-idx"></span>'
+    + '<span class="punct-grip-ico">⠿</span>'
+    + '<span class="punct-grip-hint">' + t('sof.dragHint') + '</span></div>'
     + '<div class="g2">'
     + '<div class="field"><label>' + t('sof.punctType') + '</label><select class="input punct-tip" style="padding:10px 14px;" onchange="draftSave()">'
     + tipOptions.map(function(opt) { return '<option' + (opt === (tipVal || 'Încărcare') ? ' selected' : '') + '>' + opt + '</option>'; }).join('')
@@ -772,6 +781,240 @@ function addPunctRow(locVal, tipVal, dataVal, opts) {
     + '</div>'
     + '<div class="field"><label>' + t('sof.localityAddr') + '</label><input class="input punct-loc" placeholder="' + t('sof.punctLocPh') + '" value="' + esc(locVal || '') + '" oninput="draftSave()"></div>';
   document.getElementById('puncteContainer').appendChild(d);
+  _punctRenumber();
+}
+
+// ============================================================
+// ÚTVONAL-PONTOK ÁTRENDEZÉSE (hosszan nyomva → húzás)
+// ============================================================
+// A sofőr a menetlevél útvonal-pontjait EGYBEN (típus + dátum + helység)
+// mozgathatja: a soron hosszan nyomva a kártya „kiugrik" (kiemelkedik és
+// követi az ujjat), közben egy vízszintes vonal jelzi, MELYIK KÉT PONT KÖZÉ
+// kerül. Felengedésre a sor a jelzett helyre kerül.
+//
+// Miért saját pointer-alapú megoldás a HTML5 drag&drop helyett: a natív DnD
+// mobil böngészőkön gyakorlatilag nem használható (nincs touch-támogatás),
+// a Pointer Events viszont egérrel és érintéssel is ugyanazt az utat járja.
+//
+// A sorrend a mentés szempontjából a DOM-sorrend (a payload-gyűjtők a
+// `#puncteContainer .dyn-row` sorrendjében olvasnak), ezért a csere után
+// elég a `draftSave()` + `_syncTripTimesFromPuncte()` (a Plecare/Sosire
+// horgony változhatott).
+var PUNCT_DRAG_HOLD_MS = 400;   // ennyi ideig kell nyomva tartani a megfogáshoz
+var PUNCT_DRAG_SLOP_PX = 10;    // ennél nagyobb elmozdulás előtte = görgetés
+
+var _punctDrag = null;          // az aktív húzás állapota (null, ha nincs)
+
+// A konténer közvetlen pont-sorai (a húzás-jelző vonal NEM `.dyn-row`).
+function _punctRows() {
+  var pc = document.getElementById('puncteContainer');
+  if (!pc) return [];
+  return Array.prototype.filter.call(pc.children, function (el) {
+    return el.classList && el.classList.contains('dyn-row');
+  });
+}
+
+// A fogantyú sorszám-buborékainak újraszámozása (1..N) — hozzáadás, törlés
+// és átrendezés után.
+function _punctRenumber() {
+  _punctRows().forEach(function (row, i) {
+    var el = row.querySelector('.punct-grip-idx');
+    if (el) el.textContent = String(i + 1);
+  });
+}
+
+// Pont-sor törlése (a ✕ gombról) — a régi inline `parentNode.remove()`
+// helyett, hogy az újraszámozás és az idő-szinkron is lefusson.
+function punctRowRemove(btn) {
+  var row = btn.closest ? btn.closest('.dyn-row') : btn.parentNode;
+  if (row && row.parentNode) row.parentNode.removeChild(row);
+  _punctRenumber();
+  if (typeof _syncTripTimesFromPuncte === 'function') _syncTripTimesFromPuncte();
+  draftSave();
+}
+
+// A görgethető ős (ha a lap nem az ablakkal görög) — az él-közeli
+// automatikus görgetéshez és a húzás közbeni görgetés-korrekcióhoz.
+function _punctScrollEl(el) {
+  var n = el && el.parentNode;
+  while (n && n.nodeType === 1) {
+    var ov = '';
+    try { ov = getComputedStyle(n).overflowY; } catch (e) {}
+    if (/(auto|scroll|overlay)/.test(ov) && n.scrollHeight > n.clientHeight + 2) return n;
+    n = n.parentNode;
+  }
+  return null;
+}
+function _punctScrollTop(st) {
+  return st.scroller ? st.scroller.scrollTop
+                     : (window.pageYOffset || document.documentElement.scrollTop || 0);
+}
+
+function _punctDragInit() {
+  var pc = document.getElementById('puncteContainer');
+  if (!pc || pc._vsDragBound) return;
+  pc._vsDragBound = true;
+  pc.addEventListener('pointerdown', _punctPointerDown);
+  // Hosszan nyomásra a mobil böngésző kontextus-menüt nyitna — húzás közben nem kérünk belőle.
+  pc.addEventListener('contextmenu', function (e) { if (_punctDrag) e.preventDefault(); });
+}
+
+function _punctPointerDown(e) {
+  if (_punctDrag) return;
+  if (e.button != null && e.button !== 0) return;          // csak bal gomb / érintés
+  var tgt = e.target;
+  if (!tgt || !tgt.closest) return;
+  // A beviteli mezőkről NEM indítunk húzást (különben nem lehetne
+  // szerkeszteni/kijelölni) — a fogantyú, a címkék és a sor üres felülete marad.
+  if (tgt.closest('input, select, textarea, button, a')) return;
+  var row = tgt.closest('.punct-row');
+  var pc  = document.getElementById('puncteContainer');
+  if (!row || !pc || row.parentNode !== pc) return;
+  if (_punctRows().length < 2) return;                     // egy sort nincs mihez rendezni
+
+  var st = {
+    row: row, pc: pc,
+    startX: e.clientX, startY: e.clientY, lastY: e.clientY,
+    active: false, timer: null, line: null, before: null,
+    scroller: null, scrollRef: 0, rafPending: false
+  };
+  _punctDrag = st;
+  st.timer = setTimeout(function () { _punctDragActivate(st); }, PUNCT_DRAG_HOLD_MS);
+
+  document.addEventListener('pointermove', _punctPointerMove, { passive: false });
+  document.addEventListener('pointerup', _punctPointerUp);
+  document.addEventListener('pointercancel', _punctPointerCancel);
+  // Nem-passzív touchmove: aktív húzás közben ez tiltja le a lapgörgetést.
+  document.addEventListener('touchmove', _punctTouchGuard, { passive: false });
+}
+
+function _punctTouchGuard(e) {
+  if (_punctDrag && _punctDrag.active && e.cancelable) e.preventDefault();
+}
+
+function _punctDragActivate(st) {
+  if (_punctDrag !== st) return;
+  st.timer = null;
+  st.active = true;
+  st.scroller = _punctScrollEl(st.pc);
+  st.scrollRef = _punctScrollTop(st);
+  st.row.classList.add('punct-dragging');
+  document.body.classList.add('punct-drag-active');
+  if (navigator.vibrate) { try { navigator.vibrate(30); } catch (e) {} }   // tapintható visszajelzés
+  var line = document.createElement('div');
+  line.className = 'punct-drop-line';
+  st.pc.appendChild(line);
+  st.line = line;
+  _punctDragUpdate(st);
+}
+
+// A húzott sor követi az ujjat, és kiszámoljuk, MELYIK sor ELÉ kerülne
+// (`st.before`; `null` = a lista végére). A jelző-vonalat a konténerhez
+// képest abszolút pozicionáljuk — így a sorok nem ugrálnak húzás közben.
+function _punctDragUpdate(st) {
+  var dy = (st.lastY - st.startY) + (_punctScrollTop(st) - st.scrollRef);
+  st.row.style.transform = 'translateY(' + dy + 'px) scale(1.03)';
+
+  var rows = _punctRows().filter(function (r) { return r !== st.row; });
+  var before = null;
+  for (var i = 0; i < rows.length; i++) {
+    var rc = rows[i].getBoundingClientRect();
+    if (st.lastY < rc.top + rc.height / 2) { before = rows[i]; break; }
+  }
+  st.before = before;
+
+  var top;
+  if (before) top = before.offsetTop - 6;
+  else if (rows.length) {
+    var last = rows[rows.length - 1];
+    top = last.offsetTop + last.offsetHeight + 4;
+  } else top = 0;
+  st.line.style.top = top + 'px';
+}
+
+// Az ablak/konténer alsó-felső szélénél automatikus görgetés, hogy hosszú
+// listában is el lehessen jutni a kívánt helyre.
+function _punctAutoScroll(st) {
+  var margin = 90;
+  var vh = window.innerHeight || document.documentElement.clientHeight;
+  var d = 0;
+  if (st.lastY < margin) d = -Math.ceil((margin - st.lastY) / 6);
+  else if (st.lastY > vh - margin) d = Math.ceil((st.lastY - (vh - margin)) / 6);
+  if (!d) return;
+  if (st.scroller) st.scroller.scrollTop += d;
+  else window.scrollBy(0, d);
+}
+
+function _punctPointerMove(e) {
+  var st = _punctDrag;
+  if (!st) return;
+  st.lastY = e.clientY;
+  if (!st.active) {
+    // Még a nyomva-tartás alatt vagyunk: ha a sofőr elmozdítja az ujját,
+    // az görgetési szándék → nem húzunk.
+    if (Math.abs(e.clientY - st.startY) > PUNCT_DRAG_SLOP_PX ||
+        Math.abs(e.clientX - st.startX) > PUNCT_DRAG_SLOP_PX) _punctDragEnd(false);
+    return;
+  }
+  if (e.cancelable) e.preventDefault();
+  if (st.rafPending) return;
+  st.rafPending = true;
+  requestAnimationFrame(function () {
+    st.rafPending = false;
+    if (_punctDrag !== st || !st.active) return;
+    _punctAutoScroll(st);
+    _punctDragUpdate(st);
+  });
+}
+
+function _punctPointerUp() {
+  if (_punctDrag) _punctDragEnd(_punctDrag.active);
+}
+
+// A böngésző elvette a gesztust (pl. rendszer-gesztus, hívás) → NEM rendezünk
+// át; a sor visszaáll a helyére.
+function _punctPointerCancel() {
+  if (_punctDrag) _punctDragEnd(false);
+}
+
+// `commit=true` → a sor a jelzett helyre kerül; `false` → minden marad.
+function _punctDragEnd(commit) {
+  var st = _punctDrag;
+  if (!st) return;
+  _punctDrag = null;
+  if (st.timer) clearTimeout(st.timer);
+  document.removeEventListener('pointermove', _punctPointerMove);
+  document.removeEventListener('pointerup', _punctPointerUp);
+  document.removeEventListener('pointercancel', _punctPointerCancel);
+  document.removeEventListener('touchmove', _punctTouchGuard);
+  if (st.line && st.line.parentNode) st.line.parentNode.removeChild(st.line);
+  st.row.style.transform = '';
+  st.row.classList.remove('punct-dragging');
+  document.body.classList.remove('punct-drag-active');
+  if (!st.active) return;
+  // A felengedést követő „szellem-kattintás" (címke → mező-fókusz) elnyelése.
+  _punctSuppressClick();
+  if (!commit) return;
+  // Sorrend-változás index-alapon (nem `nextSibling`-gel: a konténerben
+  // szövegcsomópont is állhat két sor között).
+  var rows = _punctRows();
+  var curIdx = rows.indexOf(st.row);
+  var tgtIdx = st.before ? rows.indexOf(st.before) : rows.length;
+  if (tgtIdx > curIdx) tgtIdx--;                           // önmagát kivéve
+  if (tgtIdx === curIdx) return;                           // ugyanoda engedte vissza
+  if (st.before) st.pc.insertBefore(st.row, st.before);
+  else           st.pc.appendChild(st.row);
+  _punctRenumber();
+  if (typeof _syncTripTimesFromPuncte === 'function') _syncTripTimesFromPuncte();
+  draftSave();
+  st.row.classList.add('punct-dropped');
+  setTimeout(function () { st.row.classList.remove('punct-dropped'); }, 500);
+}
+
+function _punctSuppressClick() {
+  var sup = function (ev) { ev.stopPropagation(); ev.preventDefault(); };
+  document.addEventListener('click', sup, true);
+  setTimeout(function () { document.removeEventListener('click', sup, true); }, 350);
 }
 
 // A helyi (böngésző) mai dátum YYYY-MM-DD alakban — a per-tétel dátum-mező
