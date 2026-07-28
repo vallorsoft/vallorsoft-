@@ -14,6 +14,23 @@
 
 ---
 
+## 2026-07-28 — Menetlevél: Plecare/Sosire (garaj-garaj) modálok + fuvar felrakási/lerakási dátum autofill + tényleges dátum a fuvar-kártyán
+
+### Miért
+A sofőr eddig kézzel írta be a menetlevélbe a felrakó/lerakó pontokhoz a dátumot, pedig a fuvar kártyáján a diszpécser már megadta a tervezett dátumokat. Emellett a menetlevél nem tükrözte, hogy a nap honnan indult (pl. Garaj-Arcus) és hova ért — a puncte lista rögtön az első felrakóval kezdődött. A fuvarkártyán is csak a tervezett dátum látszott; a sofőr által beírt tényleges rakodási dátum sehol nem jelent meg.
+
+### Mi készült
+1. **Új Plecare + Sosire típus a puncte dropdownban** (`public/sofer.js`) — a `Pont típusa` legördülő `['Plecare','Încărcare','Descărcare','Tranzit','Vamă','Parcare','Sosire','Altele']`; a menetlevél mindig egy Plecare (indulási pont) sorral kezdődik és egy Sosire (érkezési pont) sorral zárul.
+2. **Modal a Plecare-ra a „📄 Menetlevél létrehozása" gombra** (`public/sofer.html` `#wbLocModal` + `public/sofer.js` `wbLocDialog('start', cb)`) — kötelező helyszín (alap: „Garaj-Arcus", localStorage-ban memoriál `vs_sofer_garaj_start`), kötelező dátum (alap: ma), opcionális óra + perc. OK → a puncte-be `Plecare` sor kerül; Mégse → marad az 1. lépésen. Ha a piszkozatban már van Plecare (visszalépés), nem kérdez újra.
+3. **Modal a Sosire-ra a „📤 Menetlevél elküldése" gombra** — ugyanaz a modal, „🏁 Hová érkeztél?" fejléccel + `vs_sofer_garaj_end` memória. Csak a **beküldéskor** kérdez (nem a „💾 Mentés a telefonra" úton). Ha már van Sosire sor (retry), rögtön küld.
+4. **Fuvar felrakási/lerakási dátumok autofill a puncte-ba** — a `fuvarStep2` a kiválasztott fuvarokból generálja az `Incarcare`/`Descarcare` sorokat, és **előtölti a dátumot** a fuvar `data_incarcare`/`data_descarcare` mezőjéből (`_ymdOf`). A sor `data-order-id` + `data-role` (loading/unloading) tag-et kap → a beküldéskor a szerver ez alapján köti vissza a fuvarra.
+5. **Szerver — driver puncte dátumai → `orders.incarcat_at`/`descarcat_at`** (`routes/soferApi.js` `/api/fuvarlevel-save`, INSERT után) — a tagelt puncte-sorokból `UPDATE orders SET incarcat_at|descarcat_at = $data::timestamp WHERE id=$orderId AND company_id=$cid` (multi-tenant kapu; dátum-validáció `YYYY-MM-DD`, 12:00 UTC időzóna-biztosnak). Best-effort — hiba nem buktatja a menetlevél mentését. A **tervezett `data_incarcare`/`data_descarcare` érintetlen** (a diszpécser szemszögéből marad).
+6. **Fuvar-kártya kinyíló részén kettős dátum** (`renderFuvarCard`) — ha a tervezett és tényleges dátum megegyezik / csak egyik van, egy érték látszik; ha eltér, „**Terv.**: 2026-07-28 · **Tényl.**: 2026-07-29" formában (`_fmtDualDate`). A `sof.det.planShort`/`sof.det.actualShort` i18n kulcsok (RO+HU).
+7. **Piszkozat + soferCollectFull** — a puncte-hoz mostantól átmennek az `orderId`/`role`/`time` tag-ek is (session-piszkozat, offline helyi mentés, visszaállítás mind). `draftRestore` ezekkel hívja `addPunctRow`-t → visszalépéskor a Plecare + tagelt felrakó/lerakó sorok megmaradnak.
+8. **10 új i18n kulcs** (`sof.wb.startTitle`/`endTitle`/`startHint`/`endHint`/`loc`/`date`/`time`/`ok`/`locRequired`, `sof.det.planShort`/`actualShort`, RO-alap + HU); cache-bust `sofer.html` `?v=20260728garaj`. Szerver-oldalon egyetlen best-effort UPDATE — **716 Jest zöld**; a modal + tag-áthaladás + szerver-oldali szűrés DOM-shim harnesszel verifikálva.
+
+---
+
 ## 2026-07-28 — Sofőr menetlevél: a 2 létrehozó gomb EGY „📄 Menetlevél létrehozása" gombbá olvasztva + AI bon-kiolvasás ugyanoda
 
 ### Miért
