@@ -4,7 +4,9 @@
 const gemini = require('./gemini');
 const heuristic = require('./heuristic');
 
-// opts: { text, pdfBuffer, pdfName, aiEnabled }
+// opts: { text, pdfBuffer, pdfName, fileBuffer, mimeType, aiEnabled }
+// (a fileBuffer+mimeType az általános — kép VAGY PDF — út; a pdfBuffer a
+//  régi e-mail-intake hívási forma. A gemini-adapter mindkettőt kezeli.)
 async function extractFields(opts) {
   const wantAi = opts.aiEnabled && process.env.GEMINI_API_KEY;
   if (wantAi) {

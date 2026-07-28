@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260723bscan"></script>
+  <script src="/i18n.js?v=20260728ordscan"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -229,6 +229,12 @@
         <div id="ordersImportBtnBox" style="margin:-6px 0 14px;">
           <button class="btn ok" onclick="openOrderImport()" style="padding:8px 14px;font-size:13px;" data-i18n="form.csvImport">📥 CSV import — több fuvar egyszerre</button>
           <span class="text-muted" style="font-size:11px;margin-left:8px;" data-i18n="form.csvImportHint">pl. gyári fuvarlista (.csv) — oszlop-párosítással</span>
+        </div>
+        <div id="ordScanBtnBox" style="margin:-2px 0 16px;">
+          <button class="btn primary" id="ordScanBtn" onclick="orderScanPick()" style="padding:8px 14px;font-size:13px;" data-i18n="form.aiScan">📄 Megrendelő feltöltése + AI kiolvasás</button>
+          <span class="text-muted" style="font-size:11px;margin-left:8px;" data-i18n="form.aiScanHint">PDF / JPG / PNG — az AI kitölti a mezőket, a fájl a fuvarhoz csatolódik</span>
+          <input type="file" id="ordScanInput" accept="application/pdf,image/*" style="display:none;" onchange="orderScanFile(this)">
+          <div id="ordScanStatus" style="margin-top:8px;"></div>
         </div>
         <div class="grid-3">
           <div class="field"><label data-i18n="form.client">Ügyfél / Client</label><input class="input" id="oClient" placeholder="pl. Vallor Logistics" data-sg="client" autocomplete="off">
@@ -1341,7 +1347,7 @@
 <script src="/email-intake-card.js?v=20260616warm2"></script>
 <script src="/feature-catalog.js?v=20260618cgps2"></script>
 <script>window.__pwaInstallDefault=false;</script>
-<script src="/console-shared.js?v=20260723bscan"></script>
+<script src="/console-shared.js?v=20260728ordscan"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 <script src="/console-pages.js?v=20260617b1"></script>
 <!-- ===== INTEGRACIOK (Manager: Ugyfelek + "Hol a kocsi?"; szamlazo/beallitas Admin-only) ===== -->

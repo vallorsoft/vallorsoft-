@@ -53,6 +53,7 @@ const handlers = Object.assign(
   require('../handlers/emailBuilder'),
   require('../handlers/whatsappChat'),
   require('../handlers/receiptScan'),
+  require('../handlers/orderScan'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a
