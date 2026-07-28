@@ -168,6 +168,7 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     // `puncte[i].role` ('loading'|'unloading') tag-ekkel jelöli, hogy a sor
     // melyik fuvar melyik állomását képviseli. Best-effort — hiba nem
     // buktatja a menetlevél mentését. Multi-tenant: mindig cégre szűrt WHERE.
+    const closingOrderIds = [];   // amelyik fuvarra lerakási dátum érkezett → auto-Finalizat
     try {
       for (const p of puncte) {
         if (!p || !p.orderId || !p.role || !p.data) continue;
@@ -185,9 +186,27 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
           `UPDATE orders SET ${col} = $1 WHERE id = $2 AND company_id = $3`,
           [ts, p.orderId, cid]
         );
+        if (col === 'descarcat_at') closingOrderIds.push(p.orderId);
       }
     } catch (uErr) {
       console.error('driver puncte → orders.*_at update hiba (a mentés sikeres):', uErr.message);
+    }
+    // Ha a driver a menetlevélben lerakási dátumot adott meg egy AKTÍV fuvarra
+    // (Alocat / In Curs), a fuvar automatikusan Finalizat státuszra vált —
+    // a `finalized_at` trigger magától fut. Így a főoldali „LEZÁRT FUVAR"
+    // stat is számol a driver-beírt fuvarokkal. Extern / Parkolt / Raktarban
+    // érintetlen (azokat a diszpécser zárja le). Tenant-szűrt.
+    try {
+      if (closingOrderIds.length) {
+        await pool.query(
+          `UPDATE orders SET status = 'Finalizat'
+           WHERE id = ANY($1::text[]) AND company_id = $2
+             AND status IN ('Alocat', 'In Curs')`,
+          [closingOrderIds, cid]
+        );
+      }
+    } catch (cErr) {
+      console.error('driver puncte → auto-Finalizat hiba (a mentés sikeres):', cErr.message);
     }
     res.json({ success: true, id, docNumber: autoDocNumber });
   } catch (err) {

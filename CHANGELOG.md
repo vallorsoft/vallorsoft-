@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-07-28 — Menetlevél: per-sofőr Plecare/Sosire memoriál + a driver-beírt lerakás auto-Finalizat + LEZÁRT FUVAR bucket a `descarcat_at`-ra is
+
+### Miért
+Az előző kör (Plecare/Sosire modálok) a „legutóbbi garaj" értéket **közös** localStorage kulcsban tárolta — ha ugyanazon a telefonon több sofőr is használja az appot, felülírták egymást. A driver által beírt lerakási dátum a fuvarra átment (`descarcat_at`), de a fuvar státusza aktív maradt → a főoldali „LEZÁRT FUVAR" mini-csempe nem számolt a driver-beírt kész fuvarokkal.
+
+### Mi készült
+1. **Per-sofőr Plecare/Sosire memoriál** (`public/sofer.js` `_driverStoreKey` + `_getLastLoc`/`_setLastLoc`) — a `vs_sofer_garaj_start`/`_end` kulcshoz mostantól a bejelentkezett `_meData.email` fűződik: pl. `vs_sofer_garaj_start:peto@example.com`. Ugyanazon a telefonon két sofőr külön értéket lát/ment. **Visszafelé kompatibilis**: ha még nincs per-driver érték, egyszer a régi közös kulcsot használja fallback-ként; onnantól csak a per-driver kulcsba ír (a közös érték érintetlen). DOM-shim harnesszel verifikálva (A ment „Depou-Arad", B ment „Bara-Timisoara", A visszatér → saját érték).
+2. **Auto-Finalizat aktív fuvarokra a driver menetlevél-beküldésekor** (`routes/soferApi.js` `/api/fuvarlevel-save`) — ha a driver puncte-ban `role='unloading'` sor van érvényes dátummal, és az adott fuvar státusza `Alocat`/`In Curs`, a szerver a `descarcat_at` UPDATE után átállítja a státuszt `Finalizat`-ra (a `finalized_at` trigger magától fut). **Extern / Parkolt / Raktarban** érintetlen (azokat a diszpécser zárja). Tenant-szűrt, best-effort — hiba nem buktatja a mentést.
+3. **LEZÁRT FUVAR mini-stat a `descarcat_at`-ra is bucketol** (`handlers/statisticsHandlers.js` `getMySoferStats`) — a hónap-bucket lánc `COALESCE(finalized_at, descarcat_at, data_descarcare, created_at)`; a driver-beírt tényleges lerakás így pontos hónapba kerül akkor is, ha a `finalized_at` trigger utólag más időt írt (pl. késői mentés). A `WHERE status='Finalizat'` szűrés változatlan. **716 Jest zöld**.
+
+---
+
 ## 2026-07-28 — Menetlevél: Plecare/Sosire (garaj-garaj) modálok + fuvar felrakási/lerakási dátum autofill + tényleges dátum a fuvar-kártyán
 
 ### Miért

@@ -741,12 +741,24 @@ function _todayLocalDate(){
 var LS_GARAJ_START = 'vs_sofer_garaj_start';
 var LS_GARAJ_END   = 'vs_sofer_garaj_end';
 var GARAJ_DEFAULT  = 'Garaj-Arcus';
-function _getLastLoc(key) {
-  try { var v = localStorage.getItem(key); return (v && v.trim()) ? v : GARAJ_DEFAULT; }
-  catch (e) { return GARAJ_DEFAULT; }
+// A memoriál sofőrönként külön: a közös telefonra több sofőr is beléphet,
+// az ő „garaj"-uk lehet más. A kulcshoz a bejelentkezett email-t fűzzük;
+// visszafelé kompatibilitás: ha nincs még sofőr-specifikus érték, egyszer
+// átvesszük a régi (közös) kulcsot fallbackként.
+function _driverStoreKey(base) {
+  var email = (typeof _meData === 'object' && _meData && _meData.email) ? String(_meData.email).toLowerCase() : '';
+  return base + (email ? ':' + email : '');
 }
-function _setLastLoc(key, val) {
-  try { if (val && val.trim()) localStorage.setItem(key, val.trim()); } catch (e) {}
+function _getLastLoc(baseKey) {
+  try {
+    var perDriver = localStorage.getItem(_driverStoreKey(baseKey));
+    if (perDriver && perDriver.trim()) return perDriver;
+    var shared = localStorage.getItem(baseKey);       // legacy közös érték
+    return (shared && shared.trim()) ? shared : GARAJ_DEFAULT;
+  } catch (e) { return GARAJ_DEFAULT; }
+}
+function _setLastLoc(baseKey, val) {
+  try { if (val && val.trim()) localStorage.setItem(_driverStoreKey(baseKey), val.trim()); } catch (e) {}
 }
 
 // wbLocDialog(kind, cb): kind = 'start' | 'end'; cb(null) = mégse, cb({loc,date,time})

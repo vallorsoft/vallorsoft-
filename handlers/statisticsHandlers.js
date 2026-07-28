@@ -902,12 +902,15 @@ handlers.getMySoferStats = async function (req, res, args) {
 
     // LEZÁRT FUVAR: a TÉNYLEGES lezárt (Finalizat) fuvarokból, a sofőr saját
     // email-jére kiosztottak. Robusztus hónap-szűrő + előző hónap egyben.
+    // Hónap-bucket lánc: `finalized_at` (trigger; a legpontosabb) →
+    // `descarcat_at` (driver által beírt tényleges lerakás) →
+    // `data_descarcare` (dispatcher tervezett) → `created_at`.
     const ordR = await pool.query(
       `SELECT COUNT(*) FILTER (WHERE status='Finalizat'
-                AND COALESCE(finalized_at, data_descarcare, created_at) >= DATE_TRUNC('month', NOW()))::int AS lezart,
+                AND COALESCE(finalized_at, descarcat_at, data_descarcare, created_at) >= DATE_TRUNC('month', NOW()))::int AS lezart,
               COUNT(*) FILTER (WHERE status='Finalizat'
-                AND COALESCE(finalized_at, data_descarcare, created_at) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')
-                AND COALESCE(finalized_at, data_descarcare, created_at) <  DATE_TRUNC('month', NOW()))::int AS lezart_prev,
+                AND COALESCE(finalized_at, descarcat_at, data_descarcare, created_at) >= DATE_TRUNC('month', NOW() - INTERVAL '1 month')
+                AND COALESCE(finalized_at, descarcat_at, data_descarcare, created_at) <  DATE_TRUNC('month', NOW()))::int AS lezart_prev,
               COUNT(*) FILTER (WHERE status IN ('Alocat','In Curs'))::int AS aktiv
        FROM orders
        WHERE company_id = $1 AND LOWER(email_sofer) = LOWER($2)`,
