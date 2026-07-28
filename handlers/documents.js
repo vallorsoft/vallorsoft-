@@ -637,7 +637,11 @@ handlers.getFuvarlevelFieldSuggestions = async function (req, res, args) {
     try {
       if (!req.session.user) return res.json({ result: {} });
       const me = req.session.user;
-      if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: {} });
+      // A sofőr is kap javaslatot (a menetlevél helyszín-mezőihez): ő gépel
+      // a legrosszabb körülmények közt, vezetés után, egy kézzel. Az adat
+      // ugyanaz a `company_id`-szűrt halmaz, mint az Admin/Managernél —
+      // saját cégen belüli, korábban MÁR beírt értékek, nincs új kitettség.
+      if (!['Admin', 'Manager', 'Sofer'].includes(me.pozicio)) return res.json({ result: {} });
       const cid = me.company_id;
       if (!cid) return res.json({ result: {} });
       const sofors = await pool.query('SELECT email FROM users WHERE company_id = $1', [cid]);

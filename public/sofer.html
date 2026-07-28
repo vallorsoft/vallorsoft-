@@ -12,8 +12,8 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260728hour"></script>
-  <link rel="stylesheet" href="/sofer.css?v=20260728hour">
+  <script src="/i18n.js?v=20260728keep"></script>
+  <link rel="stylesheet" href="/sofer.css?v=20260728keep">
   <script src="/push-client.js?v=20260614qa"></script>
   <!-- Sofor mobil-app: 8 ora idle-limit (vezetes kozben oraig nem koppint a
        kepernyore). A szerver-cookie 7 nap; addig igy nem log ki ejszaka-vezetes
@@ -38,19 +38,25 @@
       border-radius: 10px !important;
     }
 
-    /* Modal-hátterek (áru-leadás + bug report): világosabb fátyol + világos lap */
-    #hoModal, #bugModal {
+    /* Modal-hátterek (áru-leadás + bug report + beküldés-összegző): világosabb fátyol + világos lap */
+    #hoModal, #bugModal, #wbConfirmModal {
       background: rgba(15,23,42,0.45) !important;
       backdrop-filter: blur(5px);
     }
-    #hoModal > div, #bugModal > div {
+    #hoModal > div, #bugModal > div, #wbConfirmModal > div {
       background: #ffffff !important;
       border: 1px solid #e2e8f0 !important;
       border-radius: 20px !important;
       box-shadow: 0 24px 60px rgba(15,23,42,0.22);
     }
     /* A modalokban hardcodolt #fff fejlécek sötétre */
-    #hoModal h3, #bugModal h3 { color: #0f172a !important; }
+    #hoModal h3, #bugModal h3, #wbConfirmModal h3 { color: #0f172a !important; }
+    #wbConfirmModal p { color: #64748b !important; }
+    #wbConfirmModal button[onclick="wbConfirmCancel()"] {
+      border: 1px solid #e2e8f0 !important; background: #fff !important;
+      color: #64748b !important; border-radius: 12px !important;
+    }
+    #wbConfirmOk { border-radius: 12px !important; box-shadow: 0 8px 20px rgba(22,163,74,0.30); }
     /* Modal mégse/küldés gombok */
     #hoModal button[onclick="closeHandover()"],
     #bugModal button[onclick="closeBugReport()"] {
@@ -233,6 +239,8 @@
         <button class="back-btn" onclick="goSec('dash')">←</button>
         <h3 data-i18n="sofer.waybillTitle">📄 Menetlevél</h3>
       </div>
+      <!-- 📄 Megkezdett (auto-mentett) menetlevél folytatása -->
+      <div id="draftResumeBox" class="resume-box" style="display:none;"></div>
       <!-- 💾 Mentett menetlevelek a telefonon (offline is látható) -->
       <div class="section-head" style="margin-top:2px;" data-i18n="sof.localDraftsTitle">📥 Mentett menetlevelek (telefonon)</div>
       <div id="localDraftsBox" style="margin-bottom:14px;"></div>
@@ -276,6 +284,10 @@
         <div class="field"><label data-i18n="sofer.kmStart">Km început</label><input class="input" type="number" id="fKmInc" value="0" inputmode="numeric"></div>
         <div class="field"><label data-i18n="sofer.kmEnd">Km sfârșit</label><input class="input" type="number" id="fKmSf" value="0" inputmode="numeric"></div>
       </div>
+      <!-- Élő ellenőrzés: megtett km + becsült fogyasztás. Azonnal jelez, ha
+           a záró km kisebb a kezdőnél vagy a fogyasztás kilóg a sávból —
+           beküldés ELŐTT, amíg még javítható. -->
+      <div id="kmFuelCheck" class="km-check" style="display:none;"></div>
       <!-- Út időpontjai — a Plecare/Sosire pontok DÁTUMÁBÓL (+ óra:perc,
            ha megadva) automatikusan képződik; nincs külön beírható mező.
            A rejtett input-ok megmaradnak JS-kompatibilitási okból; a
@@ -323,7 +335,7 @@
         <span data-i18n="sof.scanBusy">🔎 Bon feldolgozása AI-val…</span>
       </div>
 
-      <div class="field" style="margin-top:16px;"><label data-i18n="sofer.otherNotes">Alte mențiuni</label><textarea class="textarea" id="fMentiuni" placeholder="Egyéb megjegyzések..." data-i18n-ph="sofer.otherNotesPh"></textarea></div>
+      <div class="field" style="margin-top:16px;"><label data-i18n="sofer.otherNotes">Alte mențiuni</label><textarea class="textarea" id="fMentiuni" placeholder="Alte mențiuni..." data-i18n-ph="sofer.otherNotesPh"></textarea></div>
 
       <div style="font-size:12px;color:var(--muted);margin-top:16px;margin-bottom:6px;" data-i18n="sof.offlineHint">💡 Az adatok a telefonon mentődnek; internet csak a beküldéshez kell.</div>
       <button class="submit-btn" onclick="saveLocalDraft()" style="background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.4);" data-i18n="sof.saveLocal">
@@ -358,8 +370,8 @@
     <div class="upload-area" onclick="document.getElementById('dFile').click()">
       <div style="font-size:40px;">📂</div>
       <div style="font-size:15px; font-weight:600; margin-top:8px;" data-i18n="sofer.tapFile">Koppints a fájl kiválasztásához</div>
-      <div style="font-size:12px; color:var(--muted); margin-top:4px;" data-i18n="sofer.photoOrPdf">Fénykép vagy PDF</div>
-      <input type="file" id="dFile" accept="image/*,application/pdf" onchange="previewFile(this)">
+      <div style="font-size:12px; color:var(--muted); margin-top:4px;" data-i18n="sof.doc.multiHint">Fénykép vagy PDF — több fájl is választható</div>
+      <input type="file" id="dFile" accept="image/*,application/pdf" multiple onchange="previewFile(this)">
     </div>
     <div id="filePreview" style="margin-top:12px; display:none;">
       <div style="background:var(--bg-2); border:1px solid var(--border); border-radius:10px; padding:12px; font-size:13px; color:var(--soft);" id="filePreviewName"></div>
@@ -382,7 +394,7 @@
 </div><!-- /sofer-wrap -->
 
 <script src="/sofer-uit.js?v=20260614qa"></script>
-<script src="/sofer.js?v=20260728hour"></script>
+<script src="/sofer.js?v=20260728keep"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 
 <!-- ── ÁRU LEADÁSA MODAL (sofőr-kérés — admin visszaigazolja) ── -->
@@ -419,7 +431,7 @@
       <div class="field"><label data-i18n="sof.ho.docPages">Dokumentum lapszáma (pl. 10)</label><input class="input" id="hoDocPages" type="number" inputmode="numeric" placeholder="pl. 10" data-i18n-ph="sof.ho.docPagesPh"></div>
       <div style="font-size:12px;color:var(--status-warn);margin-bottom:8px;" data-i18n="sof.ho.photoWarn">📷 Küldés után fotózd le a dokumentumokat az Iratok fülön!</div>
     </div>
-    <div class="field"><label data-i18n="sof.ho.note">Megjegyzés</label><input class="input" id="hoNote" placeholder="pl. defekt, pótkocsi-csere..." data-i18n-ph="sof.ho.notePh"></div>
+    <div class="field"><label data-i18n="sof.ho.note">Megjegyzés</label><input class="input" id="hoNote" placeholder="ex. pană, schimb de remorcă..." data-i18n-ph="sof.ho.notePh"></div>
     <div style="display:flex;gap:10px;margin-top:12px;">
       <button onclick="closeHandover()" style="flex:1;padding:12px;border-radius:8px;border:1px solid var(--border-bright);
         background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;" data-i18n="common.cancel">Mégse</button>
@@ -437,7 +449,7 @@
     <h3 id="wbLocTitle" style="margin:0 0 6px;font-size:17px;color:#fff;"></h3>
     <p id="wbLocHint" style="color:var(--muted);font-size:12.5px;margin-bottom:14px;"></p>
     <div class="field"><label data-i18n="sof.wb.loc">Helyszín *</label>
-      <input class="input" id="wbLocInput" placeholder="pl. Garaj-Arcus"></div>
+      <input class="input" id="wbLocInput" placeholder="ex. Garaj-Arcus" data-i18n-ph="sof.wb.locPh"></div>
     <div class="g2">
       <div class="field"><label data-i18n="sof.wb.date">Dátum *</label>
         <input class="input" id="wbLocDate" type="date"></div>
@@ -452,6 +464,26 @@
     <div style="display:flex;gap:8px;margin-top:16px;">
       <button class="submit-btn" id="wbLocCancel" style="flex:1;background:transparent;border:1px solid var(--border-bright);color:var(--muted);" data-i18n="common.cancel">Mégse</button>
       <button class="submit-btn" id="wbLocOk" style="flex:2;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;" data-i18n="sof.wb.ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ✅ MENETLEVÉL BEKÜLDÉS — összegző + megerősítés ──
+     A menetlevél hivatalos bizonylat (MT-YYYY-XXXX sorszámot kap) és NEM
+     vonható vissza — ezért beküldés előtt megmutatjuk, mi megy el. -->
+<div id="wbConfirmModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);
+  backdrop-filter:blur(6px);align-items:center;justify-content:center;z-index:1000;padding:20px;">
+  <div style="width:min(460px,100%);background:var(--bg-2);border:1px solid var(--border-bright);
+    border-radius:18px;padding:22px;max-height:92vh;overflow-y:auto;">
+    <h3 style="margin:0 0 6px;font-size:17px;color:#fff;" data-i18n="sof.cf.title">✅ Menetlevél beküldése</h3>
+    <p style="color:var(--muted);font-size:12.5px;margin:0 0 14px;" data-i18n="sof.cf.hint">
+      Nézd át, mielőtt elküldöd — a beküldött menetlevél hivatalos bizonylat, nem vonható vissza.</p>
+    <div id="wbConfirmBody"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button onclick="wbConfirmCancel()" style="flex:1;padding:12px;border-radius:8px;border:1px solid var(--border-bright);
+        background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;" data-i18n="sof.cf.back">← Vissza</button>
+      <button id="wbConfirmOk" onclick="wbConfirmGo()" style="flex:2;padding:12px;border-radius:8px;border:none;
+        background:linear-gradient(180deg,#16a34a,#15803d);color:#fff;font-size:14px;font-weight:700;cursor:pointer;" data-i18n="sof.cf.send">📤 Véglegesítés</button>
     </div>
   </div>
 </div>
@@ -488,7 +520,7 @@
     <textarea id="bugText" style="width:100%;min-height:120px;background:rgba(255,255,255,0.04);
       border:1px solid var(--border-bright);border-radius:8px;padding:12px;color:var(--text);
       font-size:14px;font-family:inherit;line-height:1.5;resize:vertical;outline:none;box-sizing:border-box;"
-      placeholder="pl. A határátlépés gombot nyomtam, de nem rögzítette..." data-i18n-ph="sof.bug.ph"></textarea>
+      placeholder="ex. Am apăsat butonul de trecere a frontierei, dar nu a înregistrat..." data-i18n-ph="sof.bug.ph"></textarea>
     <div style="display:flex;gap:10px;margin-top:12px;">
       <button onclick="closeBugReport()" style="flex:1;padding:12px;border-radius:8px;border:1px solid var(--border-bright);
         background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;" data-i18n="common.cancel">Mégse</button>
