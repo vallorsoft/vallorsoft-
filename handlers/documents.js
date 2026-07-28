@@ -7,6 +7,7 @@
 const pool = require('../db');
 const { genDocId } = require('../lib/ids');
 const { calculateDiurna } = require('../lib/diurna');
+const { fetchTripCrossings } = require('../lib/tripCrossings');
 const audit = require('../lib/audit');
 
 const handlers = {};
@@ -567,13 +568,21 @@ handlers.fuvarlevelCreate = async function (req, res, args) {
       const indulasDt = parseDateOnly(d.indulas_date);
       const erkezesDt = parseDateOnly(d.erkezes_date);
 
-      // Diurna: ha az adminban beírt diurna-napok jöttek, azt használjuk; egyébként
-      // az indulás/érkezés dátumból becsüljük (mint a sofőr-beküldésnél).
+      // Diurna: ha az adminban beírt diurna-napok jöttek, azt használjuk (kézi
+      // felülbírálás); egyébként ugyanaz a szabály, mint a sofőr-beküldésnél —
+      // az indulás/érkezés ablak + a kiválasztott sofőr GPS-alapú
+      // határátlépései (`border_crossings`). Így a manuális menetlevél sem
+      // számol vakon INTERN napokat, ha a sofőr valójában külföldön volt.
       let diurnaExt = parseInt(d.diurna_externa || 0) || 0;
       let diurnaInt = parseInt(d.diurna_interna || 0) || 0;
+      let hataratok = [];
       if (!diurnaExt && !diurnaInt && (indulasDt || erkezesDt)) {
         try {
-          const dc = calculateDiurna(d.indulas_date || null, d.erkezes_date || null, []);
+          const tc = emailSofer
+            ? await fetchTripCrossings(pool, emailSofer, d.indulas_date, d.erkezes_date)
+            : { inWindow: [], forCalc: [] };
+          hataratok = tc.inWindow;
+          const dc = calculateDiurna(d.indulas_date || null, d.erkezes_date || null, tc.forCalc);
           diurnaExt = dc.externDays || 0;
           diurnaInt = dc.internDays || 0;
         } catch (_) { /* best-effort */ }
@@ -596,9 +605,9 @@ handlers.fuvarlevelCreate = async function (req, res, args) {
           diurna_externa, diurna_interna,
           cant_inceput, cant_sfarsit, motorina_folosit, total_alim, consum_100,
           alte_mentiuni, alimentari, achizitii, puncte, order_ids,
-          data_completare, indulas_dt, erkezes_dt, total_pret, company_id
+          data_completare, indulas_dt, erkezes_dt, total_pret, company_id, hataratok
         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
-          COALESCE($23::timestamp, NOW()),$24,$25,$26,$27)`,
+          COALESCE($23::timestamp, NOW()),$24,$25,$26,$27,$28)`,
         [
           id, fileName, emailSofer, numeSofer,
           d.numar_camion || null, d.numar_remorca || null, autoDocNumber,
@@ -609,7 +618,8 @@ handlers.fuvarlevelCreate = async function (req, res, args) {
           JSON.stringify(alimentari), JSON.stringify(achizitii), JSON.stringify(puncte),
           JSON.stringify(orderIds),
           dataCompletare, indulasDt, erkezesDt, totalPret,
-          cid   // company_id horgony — túléli a sofőr törlését
+          cid,  // company_id horgony — túléli a sofőr törlését
+          JSON.stringify(hataratok)   // a GPS-ből származó átlépés-napló (lehet üres)
         ]
       );
       return res.json({ result: { ok: true, id, docNumber: autoDocNumber, total_km: totalKm, consum_100: consum100 } });
@@ -722,6 +732,44 @@ handlers.getBorderLogs = async function (req, res, args) {
     } catch (err) {
       console.error('getBorderLogs hiba:', err);
       return res.json({ result: [] });
+    }
+  };
+
+// ─── Menetlevél diurna-előnézet (sofőr) ───────────────────────────────
+// A menetlevélen NINCS kézi határátlépés-bevitel: a sofőr a főoldali két
+// gombbal rögzít (GPS-szel), és a menetlevél Plecare→Sosire ablakában eső
+// rögzítésekből számoljuk a diurnát. Ez a handler UGYANAZT a lekérdezést és
+// UGYANAZT a `calculateDiurna` hívást használja, mint a mentés
+// (`/api/fuvarlevel-save`) — így az előnézet és a mentett érték nem térhet el.
+//
+// Read-only. A napok száma + az átlépés-napló mindenkinek megy; az EXTERN/
+// INTERN napszám (pénzügyi adat) CSAK Admin/Manager-nek — a sofőr felületén
+// a diurna szándékosan nem jelenik meg (mint a menetlevél-PDF-en sem).
+handlers.previewTripDiurna = async function (req, res, args) {
+    try {
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
+      const a = (args && args[0]) || {};
+      const indulasDt = a.indulasDt || null;
+      const erkezesDt = a.erkezesDt || null;
+      if (!indulasDt || !erkezesDt) {
+        return res.json({ result: { ok: true, ready: false, crossings: [], days: 0 } });
+      }
+      const tc = await fetchTripCrossings(pool, req.session.user.email, indulasDt, erkezesDt);
+      const calc = calculateDiurna(indulasDt, erkezesDt, tc.forCalc);
+      const out = {
+        ok: true,
+        ready: true,
+        crossings: tc.inWindow,
+        days: calc.days != null ? calc.days : (calc.externDays + calc.internDays)
+      };
+      if (['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+        out.externDays = calc.externDays;
+        out.internDays = calc.internDays;
+      }
+      return res.json({ result: out });
+    } catch (err) {
+      console.error('previewTripDiurna hiba:', err);
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 

@@ -14,6 +14,22 @@
 
 ---
 
+## 2026-07-28 — Menetlevél: a határátlépés KIZÁRÓLAG a főoldali 2 gombból (GPS) — kézi bevitel megszűnt, a diurna ebből számol
+
+### Miért
+A határátlépés eddig **kétszer** volt bekérve, két egymásról nem tudó rendszerben: a sofőr a határon megnyomta a főoldali „🇷🇴 ROMÁNIA BE / KI" gombot (GPS-koordinátával, `border_crossings` tábla), majd a menetlevél kitöltésekor **ugyanazt az átlépést újra beírta kézzel** (`datetime-local` sorok → `fuvarlevelek.hataratok`). A napidíjat (diurna) a **kézi** bevitel határozta meg — a valós GPS-rögzítést a menetlevél soha nem olvasta be. Ez dupla munka volt, és a pénzt egy elgépelhető, utólag emlékezetből pótolt adat döntötte el.
+
+### Mit
+1. **Kézi bevitel TÖRÖLVE a menetlevélről** — `public/sofer.html`: a „🛂 Határátlépések" szekció + `#hatarContainer` + „➕ Átlépés hozzáadása" gomb eltávolítva. `public/sofer.js`: `addHatarRow()` és `collectHataratok()` törölve, minden hívási pontjukkal együtt (piszkozat-mentés/-visszaállítás, beküldés-payload, űrlap-reset). A kliens **nem küld** többé `hataratok` mezőt.
+2. **Új közös segéd `lib/tripCrossings.js`** — `fetchTripCrossings(pool, email, indulasDt, erkezesDt)`. Az ablak a menetlevél **naptári napjait** fedi (indulás napjának 00:00 → érkezés napjának 23:59), mert a diurna naptári napokban számol és a sofőr a határon gyakran a menetlevélbe írt óra előtt/után koppint. Az `'Iesire'/'Intrare'` → `'OUT'/'IN'` fordítás itt, egy helyen. Multi-tenant: mindig a **bejelentkezett** sofőr e-mailjére szűr (a `border_crossings` e-mail-kulcsú, nincs company_id oszlopa).
+3. **SEED — az ablak előtti utolsó átlépés is beleszámít.** A diurna-motor alapból „Romániában van" állapotból indul; ha a sofőr már az ELŐZŐ menetlevélen kilépett és még nem tért vissza, e nélkül tévesen INTERN napokat számolnánk. A seed a **számításba** bekerül, a menetlevél naplójába **nem** (ott csak az időszak tényleges átlépései látszanak).
+4. **Szerver — `routes/soferApi.js` `/api/fuvarlevel-save`**: a klienstől érkező `hataratok` **szándékosan eldobva** (régi, gyorsítótárazott `sofer.js` még küldhetné); a `fuvarlevelek.hataratok`-ba a GPS-rögzítések kerülnek (`source:'gps'`, hely, irány, időbélyeg), a diurna pedig a **meglévő** `calculateDiurna(dep, arr, crossings)` 12:00-szabályával számol — a számítási logika NEM változott.
+5. **Új handler `previewTripDiurna`** (`handlers/documents.js`) — a menetlevél-űrlap élő előnézete UGYANAZT a lekérdezést és UGYANAZT a `calculateDiurna` hívást használja, mint a mentés → az előnézet és a mentett érték **nem térhet el**. (A régi kliens-oldali becslés `Math.ceil(napok)+1` volt, ami eltért a szerver 12:00-szabályától.) **Szerep-függő válasz:** az EXTERN/INTERN napszám (pénzügyi adat) CSAK Admin/Manager-nek megy — a sofőr a napló + a napok számát látja, a diurna a felületén továbbra sem jelenik meg (mint a menetlevél-PDF-en sem).
+6. **Új olvasható napló-doboz a menetlevélen** (`.diurna-box`, `sofer.css`) — időszak + átlépés-lista (irány-badge, időpont, GPS-helyszín) + magyarázat + nagy „🚛 Határátlépés rögzítése" gomb, ami a főoldali rögzítőre ugrik. Így a sofőr **beküldés előtt** látja, ha lemaradt egy átlépés, és még pótolhatja. Üres időszaknál narancs figyelmeztető állapot.
+7. **Admin kézi menetlevél is egységes** (`fuvarlevelCreate`) — eddig üres átlépés-listával számolt (mindig INTERN); mostantól a kiválasztott sofőr GPS-átlépéseiből, és a naplót is eltárolja. A kézzel beírt diurna-napok felülbírálása változatlanul működik.
+8. **6 új i18n kulcs** (`sof.dr.*`, RO-alap + HU); a beégetett magyar előnézet-szöveg (`'🕐 Út: … nap … határátlépés rögzítve'`) és a `placeholder="Dátum + óra"` megszűnt. Cache-bust `?v=20260728border`.
+9. **Teszt** — új `tests/unit/tripCrossings.test.js` (10 eset: nap-alapú ablak, irány-fordítás, seed be/ki hatása a diurnára, e-mail-szűrés, szerep-függő válasz) + 2 új valódi-DB integrációs eset (`fuvarlevelek-db.test.js`: a kliens hamis `hataratok`-ja NEM használódik; belföldi út → 0 extern nap). A `tests/helpers/real-db.js` `truncateAll` kiegészítve a `border_crossings` táblával (nincs FK a companies-ra → a CASCADE nem vitte, átszivárgott a tesztek közt). **772 teszt zöld** valódi Postgres 16-tal.
+
 ## 2026-07-28 — Sofőr menetlevél: útvonal-pontok átrendezhetők (hosszan nyomva → húzás, beszúrás-jelző vonallal)
 
 ### Miért
