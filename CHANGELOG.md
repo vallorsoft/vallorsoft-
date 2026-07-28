@@ -14,6 +14,21 @@
 
 ---
 
+## 2026-07-28 — Sofőr menetlevél: a 2 létrehozó gomb EGY „📄 Menetlevél létrehozása" gombbá olvasztva + AI bon-kiolvasás ugyanoda
+
+### Miért
+A sofőr menetlevél 1. lépésén KÉT gomb állt egymás alatt („Tovább → Menetlevél kitöltése" és „➕ Menetlevél fuvar nélkül"), pedig a kettő ugyanoda vezet — az egyetlen különbség, hogy van-e bepipálva fuvar. Aki fuvar nélkül akart menetlevelet, annak a második gombot kellett megtalálnia; aki elfelejtett pipálni, hibaüzenetet kapott. Kérés: EGY gomb legyen, ami magától kezeli mindkét esetet (bepipált fuvar → bekerül; nincs pipa → fuvar nélküli menetlevél), és az AI bon/számla-kiolvasás is ide kerüljön.
+
+### Mi készült
+1. **EGY gomb (`public/sofer.html`)** — a két gomb helyén egy „📄 Menetlevél létrehozása" gomb (`fuvarCreate()`), alatta egy halvány magyarázó sor: *„A bejelölt fuvarok bekerülnek a menetlevélbe; pipa nélkül fuvar nélküli menetlevél készül."* Mindkét korábbi gomb tudása megmarad, az útvonal ugyanaz (`fuvarStep2`) — a kiválasztott fuvarok összesítője, a rendszám/km/üzemanyag/dátum-előtöltés és az útvonal-pont generálás változatlan; pipa nélkül a `sof.noOrderSummary` jelzés + kézi kitöltés (a szerver üres `order_ids`-t elfogad, a statisztika a sofőr e-mailjéhez kötődik).
+2. **Nincs többé „jelölj be legalább egy fuvart" akadály** (`public/sofer.js`) — a `fuvarStep2` blokkoló guardja kivéve (az `allowEmpty` paraméter visszafelé-kompatibilitásból marad); a `fuvarNoOrder` megmarad vékony aliasként, hogy a beragadt (gyorsítótárazott) régi `sofer.html` se hasaljon el.
+3. **AI bon-kiolvasás a menetlevél 1. lépésén is** — új „📷 Bon szkennelés (AI)" gomb a létrehozó gomb alatt, a főoldali kártyával AZONOS háttér-feldolgozásra (`scanReceiptPickFromDash()` → ugyanaz a perzisztens `localStorage` várólista, ugyanaz a `scanReceipt` RPC; nincs párhuzamos scan-út). A 2. lépés fuel/purchase scan-gombjai érintetlenek.
+4. **Közös várólista-render** — a `renderPendingReceipts` mostantól MINDEN `.pending-receipts-box` konténerbe rendel (főoldali kártya + új `#fuvarStep1PendingBox`), így a menetlevél-képernyőn is látszik a „⏳ Feldolgozás…" / „Áttekintés" tétel; a `goSec('fuvar')` is újrarajzolja. Az elfogadott sorok ugyanúgy a piszkozatba kerülnek (a `fuvarStep2` visszatölti őket).
+5. **Funkció-kapcsoló tisztelve** — a `_setBonScanVisible` (`ai-bon-scan` flag) az új 1. lépéses gombot és várólista-dobozt is elrejti, ha a cégnél ki van kapcsolva.
+6. **i18n** 3 új kulcs (`sof.createWaybill`, `sof.createWaybillHint`, `sof.scanReceiptAny`, RO-alap + HU); cache-bust `sofer.html` → `i18n.js`/`sofer.js` `?v=20260728wbone`. Szerver-oldal ÉRINTETLEN — **716 Jest zöld**; a többdobozos render DOM-shim harnesszel verifikálva.
+
+---
+
 ## 2026-07-28 — ÚJ: fuvar-kiírás — megrendelő feltöltése (PDF/JPG) + AI kiolvasás → előtöltött mezők + a fájl a fuvarhoz csatolva
 
 ### Miért

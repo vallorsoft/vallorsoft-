@@ -331,7 +331,8 @@ function goSec(id) {
   if (id === 'border') loadBorderLog();
   if (id === 'fuvar')  { loadSoferOrders(); if (typeof renderLocalDrafts === 'function') renderLocalDrafts(); }
   if (id === 'docs')   loadDocOrderOptions();
-  if (id === 'dash')   { if (typeof renderPendingReceipts === 'function') renderPendingReceipts(); }
+  // A bon-várólista mindkét helyen látszik (főoldal + menetlevél 1. lépés)
+  if (id === 'dash' || id === 'fuvar') { if (typeof renderPendingReceipts === 'function') renderPendingReceipts(); }
 }
 
 // ============================================================
@@ -478,19 +479,24 @@ function toggleOrderSel(cb) {
   }
 }
 
-// Menetlevél kiválasztott fuvar nélkül: a sofőr üres fuvar-listával lép a
-// kitöltő lépésre (pl. üres/tervezés-alatti fuvar, magánmenet). A kézi
-// beírt km/rendszám/pont adatokból készül a menetlevél; a szerver üres
-// order_ids-t elfogad, a statisztika a sofőr e-mailjéhez kötődik.
+// EGYETLEN menetlevél-létrehozó belépési pont (a korábbi „Tovább →
+// kitöltés" + „Menetlevél fuvar nélkül" gombok egyesítve): amelyik fuvar
+// be van pipálva, az bekerül; ha egy sincs, fuvar nélküli menetlevél
+// készül (a kézi km/rendszám/pont adatokból; a szerver üres order_ids-t
+// elfogad, a statisztika a sofőr e-mailjéhez kötődik).
+function fuvarCreate() {
+  fuvarStep2(true);
+}
+// Visszafelé kompatibilitás: régi (gyorsítótárazott) sofer.html még ezt hívja.
 function fuvarNoOrder() {
   _selectedOrderIds = [];
   fuvarStep2(true);
 }
 
 function fuvarStep2(allowEmpty) {
-  // allowEmpty === true → kiválasztott fuvar nélkül is folytatható (a „fuvar
-  // nélküli menetlevél" úton); egyébként legalább egy fuvar kell.
-  if (!_selectedOrderIds.length && allowEmpty !== true) { toast(t('sof.pickAtLeastOne'), 'err'); return; }
+  // Az `allowEmpty` paraméter már csak visszafelé-kompatibilitásból van itt:
+  // egyetlen gomb van, és az MINDIG továbbenged — pipa nélkül fuvar nélküli
+  // menetlevél készül (nincs „jelölj be legalább egy fuvart" akadály).
   var selected = _soferOrdersCache.filter(function(o) { return _selectedOrderIds.indexOf(o.id) !== -1; });
   var sumEl = document.getElementById('selectedOrdersSummary');
   if (!selected.length) {
@@ -742,9 +748,12 @@ function _setBonScanVisible(visible) {
   // Főoldali narancs kártya (a dashboard-on)
   var dashCard = document.querySelector('.dash-scan-card');
   if (dashCard) dashCard.style.display = visible ? '' : 'none';
-  // A menetlevél 2. lépéses fuel/purchase scan-gombok (`.scan-btn`)
-  var stepBtns = document.querySelectorAll('#fuvarStep2 .scan-btn');
+  // A menetlevél 1. lépéses (egyesített) + 2. lépéses fuel/purchase scan-gombok
+  var stepBtns = document.querySelectorAll('#fuvarStep1 .scan-btn, #fuvarStep2 .scan-btn');
   stepBtns.forEach(function (b) { b.style.display = visible ? '' : 'none'; });
+  // A menetlevél 1. lépéses várólista-doboz (a főoldali a .dash-scan-card-ban van)
+  var step1Pending = document.getElementById('fuvarStep1PendingBox');
+  if (step1Pending && !visible) { step1Pending.style.display = 'none'; }
 }
 var _receiptScanKind = null;     // 'fuel' | 'purchase' | null (dashboardról jött)
 var LS_RCPT_QUEUE_KEY = 'vs_sofer_receipt_queue';
@@ -951,12 +960,16 @@ function _scanReceiptTry(id, payload, attempt) {
 
 // A főoldali kártya frissítése.
 function renderPendingReceipts() {
-  var box = document.getElementById('pendingReceiptsBox');
-  if (!box) return;
+  // Több konténer is lehet: a főoldali kártya és a menetlevél 1. lépése
+  // (az egyesített „Menetlevél létrehozása" képernyő) — ugyanaz a várólista.
+  var boxes = document.querySelectorAll('.pending-receipts-box');
+  if (!boxes.length) return;
   var q = rcptQueueLoad();
-  if (!q.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
-  box.style.display = 'block';
-  box.innerHTML = q.slice().reverse().map(function (it) {
+  if (!q.length) {
+    boxes.forEach(function (b) { b.style.display = 'none'; b.innerHTML = ''; });
+    return;
+  }
+  var html = q.slice().reverse().map(function (it) {
     var badge = '', title = '';
     if (it.status === 'processing') {
       var attSuffix = (it.attempt && it.maxAttempts)
@@ -992,6 +1005,7 @@ function renderPendingReceipts() {
       + '<div class="pending-actions">' + actions + '</div>'
       + '</div>';
   }).join('');
+  boxes.forEach(function (b) { b.style.display = 'block'; b.innerHTML = html; });
 }
 
 // ─── Review modal — a sofőr átnézheti/javíthatja a mezőket, majd
