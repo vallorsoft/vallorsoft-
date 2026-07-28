@@ -39,47 +39,73 @@ function stateClear() {
 
 // Menetlevél piszkozat mentése (debounce 600ms)
 var _draftTimer = null;
+// ── KÖZÖS sor-gyűjtők ────────────────────────────────────────────────
+// Egy helyen, mert három hívó használja őket (auto-piszkozat, telefonra
+// mentés, beküldés). Korábban mindhárom SAJÁT másolattal dolgozott, és a
+// `draftSave` verziója LEHAGYTA a `time` / `orderId` / `role` mezőket —
+// így egyetlen billentyűleütés (600 ms auto-mentés) után elveszett a
+// Plecare/Sosire ÓRÁJA (12:00-ra esett vissza → rossz diurna) és a
+// fuvar-visszakötés (az `orders.incarcat_at`/`descarcat_at` nem frissült).
+// Innentől mindhárom út UGYANEZT a függvényt hívja → nem tud elcsúszni.
+function _collectPuncte() {
+  var out = [];
+  document.querySelectorAll('#puncteContainer .dyn-row').forEach(function (row) {
+    var p = {
+      tip:  (row.querySelector('.punct-tip')  || {}).value || '',
+      loc:  (row.querySelector('.punct-loc')  || {}).value || '',
+      data: (row.querySelector('.punct-data') || {}).value || '',
+      time: (row.querySelector('.punct-time') || {}).value || ''
+    };
+    var oid  = row.getAttribute('data-order-id');
+    var role = row.getAttribute('data-role');
+    if (oid)  p.orderId = oid;
+    if (role) p.role = role;
+    out.push(p);
+  });
+  return out;
+}
+// `numeric=true` → a számokat számmá alakítjuk (beküldés); egyébként a
+// nyers string marad (piszkozat — a félig beírt érték se vesszen el).
+function _collectAlim(numeric) {
+  var num = function (v) { return numeric ? (parseFloat(v) || 0) : (v || '0'); };
+  var out = [];
+  document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function (row) {
+    out.push({
+      loc:   (row.querySelector('.alim-loc')  || {}).value || '',
+      data:  (row.querySelector('.alim-data') || {}).value || '',
+      tip:   (row.querySelector('.alim-tip')  || {}).value || 'Motorină',
+      litru: num((row.querySelector('.alim-lit')  || {}).value),
+      km:    num((row.querySelector('.alim-km')   || {}).value),
+      plata: (row.querySelector('.alim-plata')|| {}).value || 'Card',
+      suma:  num((row.querySelector('.alim-suma') || {}).value)
+    });
+  });
+  return out;
+}
+function _collectAch(numeric) {
+  var num = function (v) { return numeric ? (parseFloat(v) || 0) : (v || '0'); };
+  var out = [];
+  document.querySelectorAll('#achizitiiContainer .dyn-row').forEach(function (row) {
+    out.push({
+      produs: (row.querySelector('.ach-prod') || {}).value || '',
+      loc:    (row.querySelector('.ach-loc')  || {}).value || '',
+      data:   (row.querySelector('.ach-data') || {}).value || '',
+      pret:   num((row.querySelector('.ach-pret') || {}).value),
+      plata:  (row.querySelector('.ach-plata')|| {}).value || 'Card'
+    });
+  });
+  return out;
+}
+
 function draftSave() {
   clearTimeout(_draftTimer);
   _draftTimer = setTimeout(function() {
     var step2Visible = document.getElementById('fuvarStep2').style.display !== 'none';
     if (!step2Visible) return;
 
-    // Pontok
-    var puncte = [];
-    document.querySelectorAll('#puncteContainer .dyn-row').forEach(function(row) {
-      puncte.push({
-        tip: (row.querySelector('.punct-tip') || {}).value || '',
-        loc: (row.querySelector('.punct-loc') || {}).value || '',
-        data: (row.querySelector('.punct-data') || {}).value || ''
-      });
-    });
-
-    // Tankolások
-    var alimentari = [];
-    document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function(row) {
-      alimentari.push({
-        loc: (row.querySelector('.alim-loc') || {}).value || '',
-        data: (row.querySelector('.alim-data') || {}).value || '',
-        tip: (row.querySelector('.alim-tip') || {}).value || 'Motorină',
-        litru: (row.querySelector('.alim-lit') || {}).value || '0',
-        km: (row.querySelector('.alim-km') || {}).value || '0',
-        plata: (row.querySelector('.alim-plata') || {}).value || 'Card',
-        suma: (row.querySelector('.alim-suma') || {}).value || '0'
-      });
-    });
-
-    // Kiadások
-    var achizitii = [];
-    document.querySelectorAll('#achizitiiContainer .dyn-row').forEach(function(row) {
-      achizitii.push({
-        produs: (row.querySelector('.ach-prod') || {}).value || '',
-        loc: (row.querySelector('.ach-loc') || {}).value || '',
-        data: (row.querySelector('.ach-data') || {}).value || '',
-        pret: (row.querySelector('.ach-pret') || {}).value || '0',
-        plata: (row.querySelector('.ach-plata') || {}).value || 'Card'
-      });
-    });
+    var puncte     = _collectPuncte();
+    var alimentari = _collectAlim(false);
+    var achizitii  = _collectAch(false);
 
     stateSave({
       draft: {
@@ -168,44 +194,9 @@ function soferStoreLocalDrafts(arr) { _perDriverSetJson(LS_DRAFTS_KEY, arr || []
 
 // A teljes menetlevél-űrlap begyűjtése (a beküldött mezők szuperhalmaza).
 function soferCollectFull() {
-  var puncte = [];
-  document.querySelectorAll('#puncteContainer .dyn-row').forEach(function (row) {
-    var punct = {
-      tip: (row.querySelector('.punct-tip') || {}).value || '',
-      loc: (row.querySelector('.punct-loc') || {}).value || '',
-      data: (row.querySelector('.punct-data') || {}).value || ''
-    };
-    // Tag-eket is elmentjük a helyi/piszkozat-visszaállításhoz
-    var oid  = row.getAttribute('data-order-id');
-    var role = row.getAttribute('data-role');
-    var tm   = row.getAttribute('data-time');
-    if (oid)  punct.orderId = oid;
-    if (role) punct.role = role;
-    if (tm)   punct.time = tm;
-    puncte.push(punct);
-  });
-  var alimentari = [];
-  document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function (row) {
-    alimentari.push({
-      loc: (row.querySelector('.alim-loc') || {}).value || '',
-      data: (row.querySelector('.alim-data') || {}).value || '',
-      tip: (row.querySelector('.alim-tip') || {}).value || 'Motorină',
-      litru: (row.querySelector('.alim-lit') || {}).value || '0',
-      km: (row.querySelector('.alim-km') || {}).value || '0',
-      plata: (row.querySelector('.alim-plata') || {}).value || 'Card',
-      suma: (row.querySelector('.alim-suma') || {}).value || '0'
-    });
-  });
-  var achizitii = [];
-  document.querySelectorAll('#achizitiiContainer .dyn-row').forEach(function (row) {
-    achizitii.push({
-      produs: (row.querySelector('.ach-prod') || {}).value || '',
-      loc: (row.querySelector('.ach-loc') || {}).value || '',
-      data: (row.querySelector('.ach-data') || {}).value || '',
-      pret: (row.querySelector('.ach-pret') || {}).value || '0',
-      plata: (row.querySelector('.ach-plata') || {}).value || 'Card'
-    });
-  });
+  var puncte     = _collectPuncte();
+  var alimentari = _collectAlim(false);
+  var achizitii  = _collectAch(false);
   function gv(id) { var el = document.getElementById(id); return el ? el.value : ''; }
   return {
     fisa: gv('fFisa'),
@@ -664,13 +655,13 @@ function fuvarBackStep1() {
   stateSave({ fuvarStep: 1 });
 }
 
-// A menetlevél „Út időpontjai" (kezdő / záró datetime) mostantól automatikusan
-// a Plecare (első ilyen sor) és Sosire (utolsó ilyen sor) dátumából +
-// opcionális óra:percéből képződik → a `fIndulasDt` / `fErkezesDt` hidden
-// input-okba írunk (a `updateDiurnaPreview`, `submitFuvarlevel`, offline
-// draft mind ezeket használja). Óra: `data-time` attribútum ('HH:MM'),
-// hiányában 12:00 (délelőtt indul, este ér — nincs időzóna-csúszás a
-// day-boundary-n). Az érték `datetime-local` formátumú: 'YYYY-MM-DDTHH:MM'.
+// A menetlevél „Út időpontjai" (kezdő / záró datetime) automatikusan a
+// Plecare (első ilyen sor) és Sosire (utolsó ilyen sor) dátumából + ÓRÁJÁBÓL
+// képződik → a `fIndulasDt` / `fErkezesDt` hidden input-okba írunk (a
+// `updateDiurnaPreview`, `submitFuvarlevel`, offline draft mind ezeket
+// használja). Az óra a sor SAJÁT `.punct-time` mezőjéből jön: a Plecare/
+// Sosire modal KÖTELEZŐEN bekéri, és utána a soron javítható is.
+// Az érték `datetime-local` formátumú: 'YYYY-MM-DDTHH:MM'.
 function _syncTripTimesFromPuncte() {
   var rows = document.querySelectorAll('#puncteContainer .dyn-row');
   var plecDt = '', sosDt = '';
@@ -678,7 +669,12 @@ function _syncTripTimesFromPuncte() {
     var tip  = (row.querySelector('.punct-tip')  || {}).value;
     var date = (row.querySelector('.punct-data') || {}).value;
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
-    var time = row.getAttribute('data-time');
+    // Az óra a sor SAJÁT mezőjéből (a Plecare/Sosire modal kötelezően
+    // bekéri, utána itt javítható). A 12:00 fallback már csak a régi,
+    // óra nélkül mentett piszkozatokra vonatkozik — FIGYELEM: pont a
+    // 12:00 az a határ, aminél a diurna az indulás/érkezés napját NEM
+    // számolja, ezért kérjük be kötelezően.
+    var time = (row.querySelector('.punct-time') || {}).value;
     if (!time || !/^\d{2}:\d{2}$/.test(time)) time = '12:00';
     var dt = date + 'T' + time;
     if (tip === 'Plecare' && !plecDt) plecDt = dt;      // első Plecare nyer
@@ -758,7 +754,6 @@ function addPunctRow(locVal, tipVal, dataVal, opts) {
   d.className = 'dyn-row punct-row';
   if (opts.orderId) d.setAttribute('data-order-id', opts.orderId);
   if (opts.role)    d.setAttribute('data-role', opts.role);
-  if (opts.time)    d.setAttribute('data-time', opts.time);
   // Plecare + Sosire: az induló/érkező „garaj" jellegű pontok — a menetlevél
   // MINDIG ezekkel indul és zárul. A többi típus a régi lista.
   var tipOptions = ['Plecare','Încărcare','Descărcare','Tranzit','Vamă','Parcare','Sosire','Altele'];
@@ -769,11 +764,15 @@ function addPunctRow(locVal, tipVal, dataVal, opts) {
     + '<div class="punct-grip"><span class="punct-grip-idx"></span>'
     + '<span class="punct-grip-ico">⠿</span>'
     + '<span class="punct-grip-hint">' + t('sof.dragHint') + '</span></div>'
-    + '<div class="g2">'
     + '<div class="field"><label>' + t('sof.punctType') + '</label><select class="input punct-tip" style="padding:10px 14px;" onchange="draftSave()">'
     + tipOptions.map(function(opt) { return '<option' + (opt === (tipVal || 'Încărcare') ? ' selected' : '') + '>' + opt + '</option>'; }).join('')
     + '</select></div>'
+    // Dátum + ÓRA egy sorban. A Plecare/Sosire óráját a modal kéri be
+    // (kötelező), de itt utólag is javítható — a diurna a 12:00-szabállyal
+    // számol, ezért az óra pontossága a napidíjat befolyásolja.
+    + '<div class="g2">'
     + '<div class="field"><label>' + t('sof.date') + '</label><input class="input punct-data" type="date" value="' + esc(dataVal || today) + '" onchange="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.time') + '</label><input class="input punct-time" type="time" value="' + esc(opts.time || '') + '" onchange="draftSave()"></div>'
     + '</div>'
     + '<div class="field"><label>' + t('sof.localityAddr') + '</label><input class="input punct-loc" placeholder="' + t('sof.punctLocPh') + '" value="' + esc(locVal || '') + '" oninput="draftSave()"></div>';
   document.getElementById('puncteContainer').appendChild(d);
@@ -1082,8 +1081,12 @@ function wbLocDialog(kind, cb) {
   document.getElementById('wbLocHint').textContent  = isStart ? t('sof.wb.startHint')  : t('sof.wb.endHint');
   document.getElementById('wbLocInput').value = lastLoc;
   document.getElementById('wbLocDate').value  = _todayLocalDate();
-  document.getElementById('wbLocHour').value  = '';
-  document.getElementById('wbLocMin').value   = '';
+  // Az óra:perc KÖTELEZŐ, ezért a MOSTANI időt ajánljuk fel alapértéknek:
+  // a sofőr az indulás/érkezés pillanatában nyitja meg ezt a párbeszédet,
+  // így jellemzően csak jóváhagyja. Átírható.
+  var _now = new Date();
+  document.getElementById('wbLocHour').value = String(_now.getHours()).padStart(2, '0');
+  document.getElementById('wbLocMin').value  = String(_now.getMinutes()).padStart(2, '0');
   document.getElementById('wbLocOk').onclick = function () {
     var loc = document.getElementById('wbLocInput').value.trim();
     if (!loc) { toast(t('sof.wb.locRequired'), 'err'); return; }
@@ -1092,14 +1095,19 @@ function wbLocDialog(kind, cb) {
     // sofőr átírhatja; kiürítés + OK = hibaüzenet.
     var date = (document.getElementById('wbLocDate').value || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { toast(t('sof.wb.dateRequired'), 'err'); return; }
-    var hhRaw = document.getElementById('wbLocHour').value;
-    var mmRaw = document.getElementById('wbLocMin').value;
-    var timeStr = '';
-    if (hhRaw !== '' || mmRaw !== '') {
-      var h = parseInt(hhRaw || '0', 10); if (isNaN(h)) h = 0; h = Math.max(0, Math.min(23, h));
-      var mn = parseInt(mmRaw || '0', 10); if (isNaN(mn)) mn = 0; mn = Math.max(0, Math.min(59, mn));
-      timeStr = String(h).padStart(2, '0') + ':' + String(mn).padStart(2, '0');
+    // ÓRA:PERC is KÖTELEZŐ — a diurna 12:00-szabállyal dolgozik (az indulás
+    // napja csak <12:00 esetén számít, az érkezés napja csak >12:00 esetén),
+    // ezért óra nélkül nem lehet pontosan számolni. A régi „üres → 12:00"
+    // alapérték pont a határon állt, és csendben ELDOBTA az első és az
+    // utolsó napot.
+    var hhRaw = String(document.getElementById('wbLocHour').value || '').trim();
+    var mmRaw = String(document.getElementById('wbLocMin').value  || '').trim();
+    if (hhRaw === '' || mmRaw === '') { toast(t('sof.wb.timeRequired'), 'err'); return; }
+    var h = parseInt(hhRaw, 10), mn = parseInt(mmRaw, 10);
+    if (isNaN(h) || isNaN(mn) || h < 0 || h > 23 || mn < 0 || mn > 59) {
+      toast(t('sof.wb.timeInvalid'), 'err'); return;
     }
+    var timeStr = String(h).padStart(2, '0') + ':' + String(mn).padStart(2, '0');
     _setLastLoc(isStart ? LS_GARAJ_START : LS_GARAJ_END, loc);
     m.style.display = 'none';
     cb({ loc: loc, date: date, time: timeStr });
@@ -1784,53 +1792,54 @@ function _submitFuvarlevelFinal() {
   // pontok dátumából automatikusan képződik. Beküldés előtt egy utolsó
   // sync — biztosan a legfrissebb értékek kerüljenek a payload-ba.
   if (typeof _syncTripTimesFromPuncte === 'function') _syncTripTimesFromPuncte();
+
+  // A Plecare és a Sosire soron a DÁTUM és az ÓRA is kötelező: ezekből
+  // képződik a diurna-ablak, és a 12:00-szabály miatt az óra a napidíjat
+  // is befolyásolja. Ha a sofőr utólag kiürítette a sor óra-mezőjét,
+  // itt fogjuk meg (a modal-validáció csak a felvételkor futott).
+  var _missing = null;
+  document.querySelectorAll('#puncteContainer .dyn-row').forEach(function (row) {
+    if (_missing) return;
+    var tip = (row.querySelector('.punct-tip') || {}).value;
+    if (tip !== 'Plecare' && tip !== 'Sosire') return;
+    var dv = (row.querySelector('.punct-data') || {}).value || '';
+    var tv = (row.querySelector('.punct-time') || {}).value || '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dv) || !/^\d{2}:\d{2}$/.test(tv)) {
+      _missing = row;
+    }
+  });
+  if (_missing) {
+    toast(t('sof.wb.tripTimeMissing'), 'err');
+    try {
+      _missing.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      var el = _missing.querySelector('.punct-time');
+      if (el) el.focus();
+    } catch (e) {}
+    return;
+  }
   var fisa = (document.getElementById('fFisa') ? document.getElementById('fFisa').value.trim() : '');
   // Sorszámot a szerver generálja automatikusan
 
-  var puncte = [];
-  document.querySelectorAll('#puncteContainer .dyn-row').forEach(function(row) {
-    var punct = {
-      tip: (row.querySelector('.punct-tip') || {}).value || '',
-      loc: (row.querySelector('.punct-loc') || {}).value || '',
-      data: (row.querySelector('.punct-data') || {}).value || ''
-    };
-    // Fuvar-visszakötő tag-ek: a driver által megadott felrakási/lerakási
-    // dátum a szerveren átmegy az `orders.incarcat_at`/`descarcat_at`-ra.
-    var oid  = row.getAttribute('data-order-id');
-    var role = row.getAttribute('data-role');
-    var tm   = row.getAttribute('data-time');
-    if (oid)  punct.orderId = oid;
-    if (role) punct.role = role;
-    if (tm)   punct.time = tm;
-    puncte.push(punct);
-  });
+  // Fuvar-visszakötő tag-ek (`orderId`/`role`) + a Plecare/Sosire órája is
+  // benne van — a közös gyűjtő adja, ugyanaz, amit a piszkozat ment.
+  var puncte     = _collectPuncte();
+  var alimentari = _collectAlim(true);
+  var achizitii  = _collectAch(true);
 
-  var alimentari = [];
-  document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function(row) {
-    alimentari.push({
-      loc: (row.querySelector('.alim-loc') || {}).value || '',
-      data: (row.querySelector('.alim-data') || {}).value || '',
-      tip: (row.querySelector('.alim-tip') || {}).value || 'Motorină',
-      litru: parseFloat((row.querySelector('.alim-lit') || {}).value) || 0,
-      km: parseFloat((row.querySelector('.alim-km') || {}).value) || 0,
-      plata: (row.querySelector('.alim-plata') || {}).value || 'Card',
-      suma: parseFloat((row.querySelector('.alim-suma') || {}).value) || 0
-    });
-  });
-
-  var achizitii = [];
-  document.querySelectorAll('#achizitiiContainer .dyn-row').forEach(function(row) {
-    achizitii.push({
-      produs: (row.querySelector('.ach-prod') || {}).value || '',
-      loc: (row.querySelector('.ach-loc') || {}).value || '',
-      data: (row.querySelector('.ach-data') || {}).value || '',
-      pret: parseFloat((row.querySelector('.ach-pret') || {}).value) || 0,
-      plata: (row.querySelector('.ach-plata') || {}).value || 'Card'
-    });
-  });
-
-  var locPlecare = puncte.length ? puncte[0].loc : '';
-  var locSosire = puncte.length > 1 ? puncte[puncte.length - 1].loc : '';
+  // Az indulási/érkezési helyszín TÍPUS szerint (nem pozíció szerint): a
+  // pont-sorok húzással átrendezhetők, így a Plecare/Sosire nem feltétlenül
+  // az első/utolsó sor. Fallback a régi pozíció-alapú viselkedésre.
+  var _byTip = function (tip) {
+    for (var i = 0; i < puncte.length; i++) if (puncte[i].tip === tip) return puncte[i];
+    return null;
+  };
+  var _lastByTip = function (tip) {
+    for (var i = puncte.length - 1; i >= 0; i--) if (puncte[i].tip === tip) return puncte[i];
+    return null;
+  };
+  var _pl = _byTip('Plecare'), _so = _lastByTip('Sosire');
+  var locPlecare = _pl ? _pl.loc : (puncte.length ? puncte[0].loc : '');
+  var locSosire  = _so ? _so.loc : (puncte.length > 1 ? puncte[puncte.length - 1].loc : '');
 
   var payload = {
     numarFisa: fisa,
