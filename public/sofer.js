@@ -109,7 +109,10 @@ function draftRestore(draft) {
   document.getElementById('puncteContainer').innerHTML = '';
   punctIdx = 0;
   (draft.puncte || []).forEach(function(p) {
-    addPunctRow(p.loc, p.tip, p.data);
+    // Tag-eket is visszaadjuk (fuvar-visszakötés + Plecare/Sosire idő)
+    addPunctRow(p.loc, p.tip, p.data, {
+      orderId: p.orderId, role: p.role, time: p.time
+    });
   });
 
   // Tankolások visszaállítása
@@ -159,11 +162,19 @@ function soferStoreLocalDrafts(arr) {
 function soferCollectFull() {
   var puncte = [];
   document.querySelectorAll('#puncteContainer .dyn-row').forEach(function (row) {
-    puncte.push({
+    var punct = {
       tip: (row.querySelector('.punct-tip') || {}).value || '',
       loc: (row.querySelector('.punct-loc') || {}).value || '',
       data: (row.querySelector('.punct-data') || {}).value || ''
-    });
+    };
+    // Tag-eket is elmentjük a helyi/piszkozat-visszaállításhoz
+    var oid  = row.getAttribute('data-order-id');
+    var role = row.getAttribute('data-role');
+    var tm   = row.getAttribute('data-time');
+    if (oid)  punct.orderId = oid;
+    if (role) punct.role = role;
+    if (tm)   punct.time = tm;
+    puncte.push(punct);
   });
   var alimentari = [];
   document.querySelectorAll('#alimentariContainer .dyn-row').forEach(function (row) {
@@ -484,8 +495,26 @@ function toggleOrderSel(cb) {
 // be van pipálva, az bekerül; ha egy sincs, fuvar nélküli menetlevél
 // készül (a kézi km/rendszám/pont adatokból; a szerver üres order_ids-t
 // elfogad, a statisztika a sofőr e-mailjéhez kötődik).
+//
+// Első lépésként MINDIG rákérdez az INDULÁSI helyre (Plecare) — a válasz
+// egy `Plecare` sor lesz a puncte-ban (helyszín kötelező, dátum kötelező,
+// óra+perc opcionális). Ha van már mentett/piszkozat Plecare, kihagyja a
+// dialógust. Alap: „Garaj-Arcus" (localStorage-ban memoriál).
+var _pendingPlecare = null;
 function fuvarCreate() {
-  fuvarStep2(true);
+  // Ha van piszkozatban már Plecare-sor, nem kérdez újra.
+  var hasPlecareInDraft = false;
+  try {
+    var _st = JSON.parse(sessionStorage.getItem(SS_KEY) || '{}');
+    var _dr = _st && _st.draft;
+    hasPlecareInDraft = !!(_dr && (_dr.puncte || []).some(function (p) { return p.tip === 'Plecare'; }));
+  } catch (_e) {}
+  if (hasPlecareInDraft) { fuvarStep2(true); return; }
+  wbLocDialog('start', function (res) {
+    if (!res) return;                // Mégse — marad az 1. lépésen
+    _pendingPlecare = res;           // fuvarStep2 innen olvassa
+    fuvarStep2(true);
+  });
 }
 // Visszafelé kompatibilitás: régi (gyorsítótárazott) sofer.html még ezt hívja.
 function fuvarNoOrder() {
@@ -549,20 +578,52 @@ function fuvarStep2(allowEmpty) {
 
   document.getElementById('puncteContainer').innerHTML = '';
   punctIdx = 0;
+
+  // 1) Plecare (indulási pont) — vagy a most bekért (fuvarCreate modal-ból),
+  //    vagy piszkozat-visszaállításkor a mentett Plecare sor.
+  var _plecare = _pendingPlecare;
+  if (!_plecare) {
+    try {
+      var _st1 = JSON.parse(sessionStorage.getItem(SS_KEY) || '{}');
+      var _pl = ((_st1.draft || {}).puncte || []).find(function (p) { return p.tip === 'Plecare'; });
+      if (_pl) _plecare = { loc: _pl.loc, date: String(_pl.data || '').slice(0, 10), time: _pl.time || '' };
+    } catch (_e2) {}
+  }
+  if (_plecare) {
+    addPunctRow(_plecare.loc, 'Plecare', _plecare.date, { time: _plecare.time });
+  }
+  _pendingPlecare = null;
+
+  // 2) A kiválasztott fuvarokból az Incarcare/Descarcare sorok — a DÁTUM a
+  //    fuvar tervezett `data_incarcare`/`data_descarcare`-ből előtöltve
+  //    (a sofőr átírhatja, ha másnap történt). A sorok `data-order-id` +
+  //    `data-role` tag-et kapnak → a beküldéskor a szerver ezekből frissíti
+  //    az `orders.incarcat_at`/`descarcat_at`-ot (tényleges dátum).
   selected.forEach(function(o) {
     var phase = o.waybill_phase;
+    var loadDate = _ymdOf(o.data_incarcare);
+    var unloadDate = _ymdOf(o.data_descarcare);
     if (phase === 'loading') {
       // Alocat / In Curs: csak a felrakási adatok — az Extern fuvarhoz nincs lerakó még
-      if (o.loc_incarcare) addPunctRow(o.loc_incarcare, 'Încărcare');
+      if (o.loc_incarcare) addPunctRow(o.loc_incarcare, 'Încărcare', loadDate, { orderId: o.id, role: 'loading' });
     } else if (phase === 'unloading') {
       // Finalizat, már volt menetlevélbe foglalva (rakodás): csak lerakási adatok
-      if (o.loc_descarcare) addPunctRow(o.loc_descarcare, 'Descărcare');
+      if (o.loc_descarcare) addPunctRow(o.loc_descarcare, 'Descărcare', unloadDate, { orderId: o.id, role: 'unloading' });
     } else {
       // complete vagy ismeretlen: mindkettő (régi viselkedés / egyszerű fuvar)
-      if (o.loc_incarcare) addPunctRow(o.loc_incarcare, 'Încărcare');
-      if (o.loc_descarcare) addPunctRow(o.loc_descarcare, 'Descărcare');
+      if (o.loc_incarcare) addPunctRow(o.loc_incarcare, 'Încărcare', loadDate, { orderId: o.id, role: 'loading' });
+      if (o.loc_descarcare) addPunctRow(o.loc_descarcare, 'Descărcare', unloadDate, { orderId: o.id, role: 'unloading' });
     }
   });
+
+  // 3) Sosire (érkezési pont) — visszalépéskor a piszkozatból visszahozzuk;
+  //    egyébként a beküldéskor (submitFuvarlevel) kérdez rá a modal, ott
+  //    kerül a puncte végére.
+  try {
+    var _st4 = JSON.parse(sessionStorage.getItem(SS_KEY) || '{}');
+    var _sos = ((_st4.draft || {}).puncte || []).find(function (p) { return p.tip === 'Sosire'; });
+    if (_sos) addPunctRow(_sos.loc, 'Sosire', String(_sos.data || '').slice(0, 10), { time: _sos.time });
+  } catch (_e3) {}
 
   document.getElementById('fuvarStep1').style.display = 'none';
   document.getElementById('fuvarStep2').style.display = 'block';
@@ -632,11 +693,23 @@ function attachDraftListeners() {
 // ============================================================
 var alimIdx = 0, achIdx = 0, punctIdx = 0;
 
-function addPunctRow(locVal, tipVal, dataVal) {
+function addPunctRow(locVal, tipVal, dataVal, opts) {
+  // opts (opcionális) — tag-adatok, hogy a driver által megadott felrakási/lerakási
+  // dátum vissza tudja kötni a menetlevél sorát a fuvarra a beküldéskor:
+  //   { orderId, role: 'loading'|'unloading', time: 'HH:MM' }
+  // Plecare/Sosire sorokhoz csak `time` (opcionális, óra:perc). A tag-eket
+  // data-* attribútumként tároljuk a sor <div>-jén, hogy a payload-gyűjtő
+  // (submitFuvarlevel / soferCollectFull) egy helyen olvassa vissza.
+  opts = opts || {};
   punctIdx++;
   var d = document.createElement('div');
   d.className = 'dyn-row';
-  var tipOptions = ['Încărcare','Descărcare','Tranzit','Vamă','Parcare','Altele'];
+  if (opts.orderId) d.setAttribute('data-order-id', opts.orderId);
+  if (opts.role)    d.setAttribute('data-role', opts.role);
+  if (opts.time)    d.setAttribute('data-time', opts.time);
+  // Plecare + Sosire: az induló/érkező „garaj" jellegű pontok — a menetlevél
+  // MINDIG ezekkel indul és zárul. A többi típus a régi lista.
+  var tipOptions = ['Plecare','Încărcare','Descărcare','Tranzit','Vamă','Parcare','Sosire','Altele'];
   var today = new Date().toISOString().split('T')[0];
   d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
     + '<div class="g2">'
@@ -656,6 +729,63 @@ function _todayLocalDate(){
   var d = new Date();
   var p = function(n){ return String(n).padStart(2,'0'); };
   return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+}
+
+// ── Menetlevél Plecare/Sosire dialógus (indulási/érkezési hely) ──
+// A sofőr az ÚJ menetlevél nyitásakor beírja, honnan indul (Plecare); a
+// beküldéskor beírja, hova érkezett (Sosire). Alap: az utoljára használt
+// helyszín (localStorage), első alkalommal „Garaj-Arcus". A dátum kötelező
+// (alap: ma), az óra+perc opcionális. A kitöltött értékek egy új Plecare/
+// Sosire puncte-sort adnak a menetlevélhez, és a cég-szintű memória a
+// KÖVETKEZŐ menetlevélnél is felajánlja.
+var LS_GARAJ_START = 'vs_sofer_garaj_start';
+var LS_GARAJ_END   = 'vs_sofer_garaj_end';
+var GARAJ_DEFAULT  = 'Garaj-Arcus';
+function _getLastLoc(key) {
+  try { var v = localStorage.getItem(key); return (v && v.trim()) ? v : GARAJ_DEFAULT; }
+  catch (e) { return GARAJ_DEFAULT; }
+}
+function _setLastLoc(key, val) {
+  try { if (val && val.trim()) localStorage.setItem(key, val.trim()); } catch (e) {}
+}
+
+// wbLocDialog(kind, cb): kind = 'start' | 'end'; cb(null) = mégse, cb({loc,date,time})
+function wbLocDialog(kind, cb) {
+  var m = document.getElementById('wbLocModal');
+  if (!m) { cb(null); return; }
+  var isStart = (kind === 'start');
+  var lastLoc = isStart ? _getLastLoc(LS_GARAJ_START) : _getLastLoc(LS_GARAJ_END);
+  document.getElementById('wbLocTitle').textContent = isStart ? t('sof.wb.startTitle') : t('sof.wb.endTitle');
+  document.getElementById('wbLocHint').textContent  = isStart ? t('sof.wb.startHint')  : t('sof.wb.endHint');
+  document.getElementById('wbLocInput').value = lastLoc;
+  document.getElementById('wbLocDate').value  = _todayLocalDate();
+  document.getElementById('wbLocHour').value  = '';
+  document.getElementById('wbLocMin').value   = '';
+  document.getElementById('wbLocOk').onclick = function () {
+    var loc = document.getElementById('wbLocInput').value.trim();
+    if (!loc) { toast(t('sof.wb.locRequired'), 'err'); return; }
+    var date = document.getElementById('wbLocDate').value || _todayLocalDate();
+    var hhRaw = document.getElementById('wbLocHour').value;
+    var mmRaw = document.getElementById('wbLocMin').value;
+    var timeStr = '';
+    if (hhRaw !== '' || mmRaw !== '') {
+      var h = parseInt(hhRaw || '0', 10); if (isNaN(h)) h = 0; h = Math.max(0, Math.min(23, h));
+      var mn = parseInt(mmRaw || '0', 10); if (isNaN(mn)) mn = 0; mn = Math.max(0, Math.min(59, mn));
+      timeStr = String(h).padStart(2, '0') + ':' + String(mn).padStart(2, '0');
+    }
+    _setLastLoc(isStart ? LS_GARAJ_START : LS_GARAJ_END, loc);
+    m.style.display = 'none';
+    cb({ loc: loc, date: date, time: timeStr });
+  };
+  document.getElementById('wbLocCancel').onclick = function () {
+    m.style.display = 'none';
+    cb(null);
+  };
+  m.style.display = 'flex';
+  setTimeout(function () {
+    var el = document.getElementById('wbLocInput');
+    if (el) { el.focus(); try { el.select(); } catch (e) {} }
+  }, 100);
 }
 
 function addAlimRow(a) {
@@ -1244,16 +1374,46 @@ function updateDiurnaPreview() {
 // MENETLEVÉL BEKÜLDÉS
 // ============================================================
 function submitFuvarlevel() {
+  // Ha még nincs Sosire (érkezési) sor a puncte-ban, elsőként azt kérdezzük
+  // be egy modal-on (a sofőr megadja, hová érkezett). Ha mégse — nem
+  // küldünk. Ha van már Sosire, egyből megy a beküldés (retry, vagy a
+  // sofőr korábban maga adott hozzá).
+  var hasSosire = false;
+  document.querySelectorAll('#puncteContainer .dyn-row').forEach(function (row) {
+    if ((row.querySelector('.punct-tip') || {}).value === 'Sosire') hasSosire = true;
+  });
+  if (!hasSosire) {
+    wbLocDialog('end', function (res) {
+      if (!res) return;   // Mégse — nem küldünk, marad az űrlap
+      addPunctRow(res.loc, 'Sosire', res.date, { time: res.time });
+      draftSave();
+      _submitFuvarlevelFinal();
+    });
+    return;
+  }
+  _submitFuvarlevelFinal();
+}
+
+function _submitFuvarlevelFinal() {
   var fisa = (document.getElementById('fFisa') ? document.getElementById('fFisa').value.trim() : '');
   // Sorszámot a szerver generálja automatikusan
 
   var puncte = [];
   document.querySelectorAll('#puncteContainer .dyn-row').forEach(function(row) {
-    puncte.push({
+    var punct = {
       tip: (row.querySelector('.punct-tip') || {}).value || '',
       loc: (row.querySelector('.punct-loc') || {}).value || '',
       data: (row.querySelector('.punct-data') || {}).value || ''
-    });
+    };
+    // Fuvar-visszakötő tag-ek: a driver által megadott felrakási/lerakási
+    // dátum a szerveren átmegy az `orders.incarcat_at`/`descarcat_at`-ra.
+    var oid  = row.getAttribute('data-order-id');
+    var role = row.getAttribute('data-role');
+    var tm   = row.getAttribute('data-time');
+    if (oid)  punct.orderId = oid;
+    if (role) punct.role = role;
+    if (tm)   punct.time = tm;
+    puncte.push(punct);
   });
 
   var alimentari = [];
@@ -2028,8 +2188,23 @@ function renderFuvarCard(o, idx) {
     unload: o.loc_descarcare || '',
     note: o.ref || ''
   };
-  var dLoad = fmtFuvarDay(o.data_incarcare);
-  var dUnload = fmtFuvarDay(o.data_descarcare);
+  // Kettős dátum: TERVEZETT (dispatcher `data_incarcare`/`data_descarcare`)
+  // + TÉNYLEGES (a driver menetlevelében beírt vagy az állomás-milestone-ból
+  // származó `incarcat_at`/`descarcat_at`). Ha megegyezik vagy csak egyik van,
+  // egy értéket mutatunk; ha eltér, „Terv.: X · Tényl.: Y" formátumban.
+  var dLoadPlan   = fmtFuvarDay(o.data_incarcare);
+  var dLoadActual = fmtFuvarDay(o.incarcat_at);
+  var dUnloadPlan   = fmtFuvarDay(o.data_descarcare);
+  var dUnloadActual = fmtFuvarDay(o.descarcat_at);
+  function _fmtDualDate(planD, actualD) {
+    if (!planD && !actualD) return '';
+    if (planD && actualD && planD !== actualD) {
+      return t('sof.det.planShort') + ': ' + planD + '  ·  ' + t('sof.det.actualShort') + ': ' + actualD;
+    }
+    return planD || actualD;
+  }
+  var dLoad = _fmtDualDate(dLoadPlan, dLoadActual);
+  var dUnload = _fmtDualDate(dUnloadPlan, dUnloadActual);
   // Egy részlet-sor: címke + érték + 📋 másoló gomb (ha van mit másolni)
   function detRow(labelKey, val, copyKind) {
     if (!val) return '';

@@ -163,6 +163,32 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
         cid   // company_id horgony — túléli a sofőr törlését
       ]
     );
+    // A driver által megadott felrakási/lerakási dátumok átvitele a fuvarra
+    // (orders.incarcat_at/descarcat_at). A kliens `puncte[i].orderId` +
+    // `puncte[i].role` ('loading'|'unloading') tag-ekkel jelöli, hogy a sor
+    // melyik fuvar melyik állomását képviseli. Best-effort — hiba nem
+    // buktatja a menetlevél mentését. Multi-tenant: mindig cégre szűrt WHERE.
+    try {
+      for (const p of puncte) {
+        if (!p || !p.orderId || !p.role || !p.data) continue;
+        const col = p.role === 'loading' ? 'incarcat_at'
+                  : p.role === 'unloading' ? 'descarcat_at'
+                  : null;
+        if (!col) continue;
+        const dateStr = String(p.data).slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
+        // A puncte sor DÁTUM-mezőt tárol (óra nélkül); a nap közepére állítjuk,
+        // hogy a helyi időzóna 00:00-ja ne csúszhasson át az előző napra.
+        const ts = new Date(dateStr + 'T12:00:00Z');
+        if (isNaN(ts.getTime())) continue;
+        await pool.query(
+          `UPDATE orders SET ${col} = $1 WHERE id = $2 AND company_id = $3`,
+          [ts, p.orderId, cid]
+        );
+      }
+    } catch (uErr) {
+      console.error('driver puncte → orders.*_at update hiba (a mentés sikeres):', uErr.message);
+    }
     res.json({ success: true, id, docNumber: autoDocNumber });
   } catch (err) {
     console.error('fuvarlevel-save hiba:', err);
