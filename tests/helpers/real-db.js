@@ -23,8 +23,11 @@ async function loadSchema(pool) {
 
 // A tesztek között üríti a használt táblákat (CASCADE — a függő sorok is).
 async function truncateAll(pool) {
+  // `border_crossings` a sofőr e-mailjéhez kötött (nincs FK a companies-ra),
+  // ezért a CASCADE NEM viszi el — külön kell törölni, különben a menetlevél-
+  // diurna tesztek átszivárognak egymásba.
   await pool.query(
-    'TRUNCATE orders, order_legs, warehouse_items, vehicles, fuvarlevelek, users, companies RESTART IDENTITY CASCADE'
+    'TRUNCATE orders, order_legs, warehouse_items, vehicles, fuvarlevelek, border_crossings, users, companies RESTART IDENTITY CASCADE'
   );
 }
 

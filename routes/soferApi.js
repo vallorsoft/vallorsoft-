@@ -7,6 +7,7 @@ const router = express.Router();
 const pool = require('../db');
 const { requireLogin, requireRole } = require('../middleware/auth');
 const { calculateDiurna } = require('../lib/diurna');
+const { fetchTripCrossings } = require('../lib/tripCrossings');
 const { genDocId } = require('../lib/ids');
 
 router.post('/api/border-cross', async (req, res) => {
@@ -109,14 +110,20 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     } catch (seqErr) {
       console.error('document_series sorszám hiba (a mentés folytatódik):', seqErr.message);
     }
-    // Diurna számítása a sofőr által megadott indulás/érkezés + határátlépések alapján.
+    // Diurna számítása a menetlevél indulás/érkezés ablakából + a sofőr
+    // GPS-alapú határátlépéseiből. A határátlépés KIZÁRÓLAG a főoldali két
+    // gombból származik (`border_crossings`) — a menetlevélen nincs kézi
+    // bevitel, és a klienstől érkező `hataratok` mezőt SZÁNDÉKOSAN eldobjuk
+    // (régi, gyorsítótárazott sofer.js még küldhetné).
     // Hiba esetén 0/0, a menetlevél mentése akkor is fusson.
     let diurnaCalc = { externDays: 0, internDays: 0, crossingLog: [] };
     const indulasDt = d.indulasDt || null;
     const erkezesDt = d.erkezesDt || null;
-    const hataratok = Array.isArray(d.hataratok) ? d.hataratok : [];
+    let hataratok = [];
     try {
-      diurnaCalc = calculateDiurna(indulasDt, erkezesDt, hataratok);
+      const tc = await fetchTripCrossings(pool, req.session.user.email, indulasDt, erkezesDt);
+      hataratok = tc.inWindow;                     // ez kerül a menetlevélbe (napló)
+      diurnaCalc = calculateDiurna(indulasDt, erkezesDt, tc.forCalc);
     } catch (diurnaErr) {
       console.error('diurna számítás hiba (a mentés folytatódik):', diurnaErr.message);
     }

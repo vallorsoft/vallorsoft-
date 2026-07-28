@@ -214,7 +214,8 @@ function soferCollectFull() {
     cantInc: gv('fCantInc'), cantSf: gv('fCantSf'),
     mentiuni: gv('fMentiuni'),
     indulasDt: gv('fIndulasDt'), erkezesDt: gv('fErkezesDt'),
-    hataratok: (typeof collectHataratok === 'function' ? collectHataratok() : []),
+    // `hataratok` NINCS a piszkozatban: a határátlépés a főoldali gombokból
+    // (`border_crossings`) származik, a szerver a beküldéskor gyűjti be.
     puncte: puncte, alimentari: alimentari, achizitii: achizitii,
     orderIds: _selectedOrderIds,
     summary: (document.getElementById('selectedOrdersSummary') || {}).innerHTML || ''
@@ -229,13 +230,8 @@ function soferApplyFull(data) {
   sv('fFisa', data.fisa);
   sv('fIndulasDt', data.indulasDt);
   sv('fErkezesDt', data.erkezesDt);
-  var hc = document.getElementById('hatarContainer');
-  if (hc) {
-    hc.innerHTML = '';
-    (data.hataratok || []).forEach(function (h) {
-      if (typeof addHatarRow === 'function') addHatarRow(h.datetime, h.direction);
-    });
-  }
+  // A határátlépéseket nem a piszkozat hordozza (a szerver gyűjti a
+  // GPS-rögzítésekből) — csak az előnézetet frissítjük az új ablakra.
   if (typeof updateDiurnaPreview === 'function') updateDiurnaPreview();
 }
 
@@ -1656,47 +1652,107 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 // ============================================================
-// HATÁRÁTLÉPÉS SOROK
+// HATÁRÁTLÉPÉS — CSAK a főoldali két gombból (GPS), kézi bevitel NINCS
 // ============================================================
-function addHatarRow(dt, dir) {
-  dt = dt || '';
-  dir = dir || 'OUT';
-  var c = document.getElementById('hatarContainer');
-  var row = document.createElement('div');
-  row.className = 'dynamic-row';
-  row.innerHTML = '<input class="input" type="datetime-local" value="' + dt + '" style="flex:2;" placeholder="Dátum + óra">'
-    + '<select class="select" style="flex:1;">'
-    + '<option value="OUT"' + (dir === 'OUT' ? ' selected' : '') + '>' + t('sofer.crossOut') + '</option>'
-    + '<option value="IN"' + (dir === 'IN' ? ' selected' : '') + '>' + t('sofer.crossIn') + '</option>'
-    + '</select>'
-    + '<button class="del-row-btn" onclick="this.parentElement.remove();updateDiurnaPreview()">✕</button>';
-  c.appendChild(row);
-  row.querySelector('input[type=datetime-local]').addEventListener('change', updateDiurnaPreview);
-  row.querySelector('select').addEventListener('change', updateDiurnaPreview);
-}
-
-function collectHataratok() {
-  var rows = document.querySelectorAll('#hatarContainer .dynamic-row');
-  var result = [];
-  rows.forEach(function(row) {
-    var dt = row.querySelector('input[type=datetime-local]').value;
-    var dir = row.querySelector('select').value;
-    if (dt) result.push({ datetime: dt, direction: dir });
-  });
-  return result.sort(function(a, b) { return a.datetime.localeCompare(b.datetime); });
-}
+// A menetlevélről a kézi „➕ Átlépés hozzáadása" szekció eltávolítva: a
+// sofőr a határon EGY gombot nyom (🇷🇴 BE / 🇷🇴 KI), az GPS-szel rögzül a
+// `border_crossings` táblába, és a diurnát a szerver ebből számolja a
+// menetlevél Plecare→Sosire dátum-ablakában. Itt csak MEGJELENÍTJÜK, mit
+// talált a szerver — így a sofőr beküldés ELŐTT látja, ha lemaradt egy
+// átlépés, és még pótolhatja a főoldali gombbal.
+//
+// Az előnézet UGYANAZT a szerver-számítást kéri le (`previewTripDiurna`),
+// amit a mentés is használ → az előnézet és a mentett érték nem térhet el.
+var _diurnaTimer = null;
+var _diurnaLastKey = '';
 
 function updateDiurnaPreview() {
-  var dep = document.getElementById('fIndulasDt').value;
-  var arr = document.getElementById('fErkezesDt').value;
   var el = document.getElementById('diurnaPreview');
-  if (!dep || !arr) { el.style.display = 'none'; return; }
-  // Kliens oldali gyors előnézet (szerver a mentéskor számol véglegesen)
-  var depD = dep.slice(0, 10), arrD = arr.slice(0, 10);
-  var crossings = collectHataratok();
-  var days = Math.ceil((new Date(arr) - new Date(dep)) / 86400000) + 1;
-  el.style.display = 'block';
-  el.textContent = '🕐 Út: ' + depD + ' → ' + arrD + ' · ' + days + ' nap · ' + crossings.length + ' határátlépés rögzítve';
+  if (!el) return;
+  var dep = (document.getElementById('fIndulasDt') || {}).value || '';
+  var arr = (document.getElementById('fErkezesDt') || {}).value || '';
+
+  if (!dep || !arr) {
+    // Még nincs Plecare/Sosire dátum → megmondjuk, mi hiányzik.
+    _diurnaLastKey = '';
+    el.className = 'diurna-box empty';
+    el.innerHTML = '<div class="diurna-hint">' + esc(t('sof.dr.needDates')) + '</div>';
+    return;
+  }
+
+  // Ugyanarra az ablakra nem kérdezünk újra (a puncte-konténer minden
+  // billentyűleütésre `input` eseményt küld a sync-en át).
+  var key = dep + '|' + arr;
+  if (key === _diurnaLastKey) return;
+  _diurnaLastKey = key;
+
+  clearTimeout(_diurnaTimer);
+  _diurnaTimer = setTimeout(function () {
+    fetch('/api/execute', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ functionName: 'previewTripDiurna', arguments: [{ indulasDt: dep, erkezesDt: arr }] })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var r = (d && d.result) || {};
+        if (!r.ok) { _renderDiurnaBox(dep, arr, null); return; }
+        _renderDiurnaBox(dep, arr, r);
+      })
+      .catch(function () {
+        // Offline: a diurnát a szerver a beküldéskor úgyis kiszámolja —
+        // itt csak jelezzük, hogy most nem tudjuk megmutatni.
+        _diurnaLastKey = '';        // legyen újrapróbálható, ha visszajön a net
+        _renderDiurnaBox(dep, arr, null);
+      });
+  }, 350);
+}
+
+function _renderDiurnaBox(dep, arr, r) {
+  var el = document.getElementById('diurnaPreview');
+  if (!el) return;
+  var depD = String(dep).slice(0, 10), arrD = String(arr).slice(0, 10);
+  var head = '<div class="diurna-window">🕐 ' + esc(depD) + ' → ' + esc(arrD)
+           + (r && r.days ? ' · ' + r.days + ' ' + esc(t('sofer.days')) : '') + '</div>';
+
+  if (!r) {
+    el.className = 'diurna-box';
+    el.innerHTML = head + '<div class="diurna-hint">' + esc(t('sof.dr.offline')) + '</div>';
+    return;
+  }
+
+  var list = r.crossings || [];
+  if (!list.length) {
+    // Nincs átlépés az ablakban — ez lehet teljesen helyes (belföldi út),
+    // de ha külföldön járt, most tudja pótolni. Gomb a főoldali rögzítőre.
+    el.className = 'diurna-box empty';
+    el.innerHTML = head
+      + '<div class="diurna-hint">' + esc(t('sof.dr.none')) + '</div>'
+      + '<button type="button" class="diurna-go" onclick="goSec(\'border\')">'
+      + esc(t('sof.dr.goRecord')) + '</button>';
+    return;
+  }
+
+  var rows = list.map(function (c) {
+    var isIn = c.direction === 'IN';
+    var when = '';
+    try { when = new Date(c.datetime).toLocaleString(t('sof.locale'), {
+      month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); }
+    catch (e) { when = String(c.datetime || ''); }
+    return '<div class="diurna-row">'
+      + '<span class="diurna-dir ' + (isIn ? 'in' : 'out') + '">'
+      + esc(isIn ? t('sofer.crossIn') : t('sofer.crossOut')) + '</span>'
+      + '<span class="diurna-when">' + esc(when) + '</span>'
+      + (c.locatie ? '<span class="diurna-loc">📍 ' + esc(c.locatie) + '</span>' : '')
+      + '</div>';
+  }).join('');
+
+  el.className = 'diurna-box';
+  el.innerHTML = head
+    + '<div class="diurna-count">' + list.length + ' ' + esc(t('sofer.crossingCount')) + '</div>'
+    + rows
+    + '<div class="diurna-hint">' + esc(t('sof.dr.hint')) + '</div>'
+    + '<button type="button" class="diurna-go" onclick="goSec(\'border\')">'
+    + esc(t('sof.dr.goRecord')) + '</button>';
 }
 
 // ============================================================
@@ -1786,7 +1842,9 @@ function _submitFuvarlevelFinal() {
     locSosire: locSosire,
     indulasDt: document.getElementById('fIndulasDt').value || null,
     erkezesDt: document.getElementById('fErkezesDt').value || null,
-    hataratok: collectHataratok(),
+    // `hataratok` NEM megy a payloadban: a szerver a sofőr GPS-rögzítéseiből
+    // (`border_crossings`) gyűjti be az indulás→érkezés ablakra, és abból
+    // számolja a diurnát. Kézi bevitel nincs.
     cantInceput: document.getElementById('fCantInc').value,
     cantSfarsit: document.getElementById('fCantSf').value,
     alteMentiuni: document.getElementById('fMentiuni').value,
@@ -1828,8 +1886,8 @@ function _submitFuvarlevelFinal() {
         document.getElementById('fMentiuni').value = '';
         document.getElementById('fIndulasDt').value = '';
         document.getElementById('fErkezesDt').value = '';
-        document.getElementById('hatarContainer').innerHTML = '';
-        document.getElementById('diurnaPreview').style.display = 'none';
+        _diurnaLastKey = '';
+        if (typeof updateDiurnaPreview === 'function') updateDiurnaPreview();
         alimIdx = 0; achIdx = 0; punctIdx = 0;
         loadSoferOrders();
       }, 500);
@@ -2741,13 +2799,9 @@ function driverOrderStatus(id, status) {
   });
 }
 
-// ── Indulás/Érkezés mezők: change-listener a diurna előnézethez ──
-document.addEventListener('DOMContentLoaded', function() {
-  var depEl = document.getElementById('fIndulasDt');
-  var arrEl = document.getElementById('fErkezesDt');
-  if (depEl) depEl.addEventListener('change', updateDiurnaPreview);
-  if (arrEl) arrEl.addEventListener('change', updateDiurnaPreview);
-});
+// Az indulás/érkezés mezők rejtettek (a Plecare/Sosire pontokból képződnek),
+// ezért nem küldenek `change` eseményt — a diurna-előnézetet a
+// `_syncTripTimesFromPuncte()` hívja közvetlenül, minden ablak-változáskor.
 
 // ── Tab-visszatérés (telefon feléled, PWA elotérbe kerul): frissítjük a
 //    főoldal kritikus blokkjait, hogy a stale UI ne érje váratlanul a sofőrt

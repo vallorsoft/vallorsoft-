@@ -77,7 +77,6 @@ d('Valódi DB integráció (menetlevelek)', () => {
     const res = await request(app).post('/api/fuvarlevel-save').send({
       kmInceput: 1000, kmSfarsit: 1500,
       indulasDt: '2026-01-01T08:00', erkezesDt: '2026-01-03T18:00',
-      hataratok: [{ data: '2026-01-01', dir: 'OUT' }],
       alimentari: [{ loc: 'OMV', litru: 200, plata: 'Card' }],
       puncte: [{ tip: 'Incarcare', loc: 'Cluj' }],
     });
@@ -86,6 +85,58 @@ d('Valódi DB integráció (menetlevelek)', () => {
     const row = (await pool.query('SELECT total_km, indulas_dt, hataratok FROM fuvarlevelek WHERE id = $1', [res.body.id])).rows[0];
     expect(Number(row.total_km)).toBe(500);
     expect(row.indulas_dt).not.toBeNull();
+  });
+
+  // A menetlevélen NINCS kézi határátlépés-bevitel: a diurna a sofőr
+  // főoldali gombjaiból (`border_crossings`) származik, az indulás→érkezés
+  // ablakban. A klienstől érkező `hataratok` mezőt a szerver eldobja.
+  test('POST /api/fuvarlevel-save: a diurna a border_crossings-ból jön, a kliens hataratok-ját NEM használja', async () => {
+    // A sofőr kilép RO-ból 01-01-én, visszatér 01-03-án → közte EXTERN napok.
+    await pool.query(
+      `INSERT INTO border_crossings (email_sofer, nume_sofer, tip, tara, locatie, created_at)
+       VALUES ($1,$2,'Iesire','RO','Nadlac','2026-01-01T09:00:00Z'),
+              ($1,$2,'Intrare','RO','Bors','2026-01-03T20:00:00Z')`,
+      [SOFER.email, SOFER.nume]);
+
+    setUser(SOFER);
+    const res = await request(app).post('/api/fuvarlevel-save').send({
+      kmInceput: 0, kmSfarsit: 100,
+      indulasDt: '2026-01-01T08:00', erkezesDt: '2026-01-03T18:00',
+      // Szándékosan HAMIS kézi adat — a szervernek figyelmen kívül kell hagynia.
+      hataratok: [{ datetime: '2026-01-01T08:00', direction: 'IN' }],
+      puncte: [{ tip: 'Plecare', loc: 'Garaj-Arcus' }],
+    });
+    expect(res.body.success).toBe(true);
+
+    const row = (await pool.query(
+      'SELECT hataratok, diurna_externa, diurna_interna FROM fuvarlevelek WHERE id = $1',
+      [res.body.id])).rows[0];
+
+    // A naplóba a GPS-rögzítések kerültek (2 db), NEM a kliens 1 kézi sora.
+    const log = typeof row.hataratok === 'string' ? JSON.parse(row.hataratok) : row.hataratok;
+    expect(log).toHaveLength(2);
+    expect(log.map(c => c.direction)).toEqual(['OUT', 'IN']);
+    expect(log[0].source).toBe('gps');
+    expect(log[0].locatie).toBe('Nadlac');
+    // …és ebből EXTERN napok születtek (a hamis kézi 'IN' nem nullázta ki).
+    expect(Number(row.diurna_externa)).toBeGreaterThan(0);
+  });
+
+  test('POST /api/fuvarlevel-save: határátlépés nélkül belföldi út (0 extern nap)', async () => {
+    setUser(SOFER);
+    const res = await request(app).post('/api/fuvarlevel-save').send({
+      kmInceput: 0, kmSfarsit: 100,
+      indulasDt: '2026-01-01T08:00', erkezesDt: '2026-01-03T18:00',
+      puncte: [{ tip: 'Plecare', loc: 'Garaj-Arcus' }],
+    });
+    expect(res.body.success).toBe(true);
+    const row = (await pool.query(
+      'SELECT hataratok, diurna_externa, diurna_interna FROM fuvarlevelek WHERE id = $1',
+      [res.body.id])).rows[0];
+    const log = typeof row.hataratok === 'string' ? JSON.parse(row.hataratok) : row.hataratok;
+    expect(log).toHaveLength(0);
+    expect(Number(row.diurna_externa)).toBe(0);
+    expect(Number(row.diurna_interna)).toBeGreaterThan(0);
   });
 
   test('GET /api/pdf-download/:id (Admin): 200 + a menetlevél + cégnév látszik (regresszió: companies.nev)', async () => {

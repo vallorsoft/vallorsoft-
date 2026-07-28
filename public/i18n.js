@@ -712,6 +712,13 @@
     'sofer.crossIn': { hu: '🏠 BE (Intrare în RO)', ro: '🏠 Intrare în RO' },
     'sofer.days': { hu: 'nap', ro: 'zile' },
     'sofer.crossingCount': { hu: 'határátlépés rögzítve', ro: 'treceri înregistrate' },
+    // ── Menetlevél: automatikus határátlépés-napló (a főoldali 2 gombból) ──
+    'sof.dr.head':      { hu: '🛂 Határátlépés (automatikus)', ro: '🛂 Treceri de frontieră (automat)' },
+    'sof.dr.hint':      { hu: 'Ezek a főoldali „Határátlépés" gombbal rögzített átlépéseid ebben az időszakban. A napidíjat ezekből számoljuk — a menetlevélen nem kell (és nem is lehet) kézzel beírni.', ro: 'Acestea sunt trecerile înregistrate cu butonul „Trecere frontieră" de pe pagina principală, în această perioadă. Diurna se calculează din ele — nu trebuie (și nu se poate) completa manual în foaia de parcurs.' },
+    'sof.dr.none':      { hu: 'Ebben az időszakban nincs rögzített határátlépés. Ha külföldön jártál, rögzítsd a főoldali gombbal — a napidíj ebből számolódik.', ro: 'Nu există treceri înregistrate în această perioadă. Dacă ai fost în străinătate, înregistrează-le cu butonul de pe pagina principală — diurna se calculează din ele.' },
+    'sof.dr.needDates': { hu: 'Add meg a Plecare és a Sosire pont dátumát — a határátlépéseket és a napidíjat erre az időszakra számoljuk.', ro: 'Completează data punctelor Plecare și Sosire — trecerile și diurna se calculează pentru această perioadă.' },
+    'sof.dr.goRecord':  { hu: '🚛 Határátlépés rögzítése', ro: '🚛 Înregistrează trecere' },
+    'sof.dr.offline':   { hu: 'Most nem tudjuk lekérni az átlépéseket (nincs internet). A napidíjat a beküldéskor a szerver számolja ki.', ro: 'Momentan nu putem prelua trecerile (fără internet). Diurna se calculează pe server la trimitere.' },
     'sofer.addPoint': { hu: '➕ Pont hozzáadása', ro: '➕ Adaugă punct' },
     'sofer.fuelState': { hu: '🛢 Üzemanyag állapot', ro: '🛢 Stare combustibil' },
     'sofer.cantStart': { hu: 'Kezdő mennyiség (L)', ro: 'Cantitate început (L)' },

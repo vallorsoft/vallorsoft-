@@ -12,8 +12,8 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260728drag"></script>
-  <link rel="stylesheet" href="/sofer.css?v=20260728drag">
+  <script src="/i18n.js?v=20260728border"></script>
+  <link rel="stylesheet" href="/sofer.css?v=20260728border">
   <script src="/push-client.js?v=20260614qa"></script>
   <!-- Sofor mobil-app: 8 ora idle-limit (vezetes kozben oraig nem koppint a
        kepernyore). A szerver-cookie 7 nap; addig igy nem log ki ejszaka-vezetes
@@ -287,13 +287,10 @@
       <input type="hidden" id="fIndulasDt">
       <input type="hidden" id="fErkezesDt">
 
-      <!-- Határátlépések -->
-      <div class="section-head" data-i18n="sofer.borderCrossings">🛂 Határátlépések (Treceri de frontieră)</div>
-      <div id="hatarContainer"></div>
-      <button class="add-row-btn" onclick="addHatarRow()" data-i18n="sofer.addCrossing">➕ Átlépés hozzáadása</button>
-
-      <!-- Diurna előnézet -->
-      <div id="diurnaPreview" style="margin-top:8px;padding:10px 14px;border-radius:10px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);font-size:13px;color:#a5b4fc;display:none;"></div>
+      <!-- Határátlépések — CSAK a főoldali két gombból (GPS), kézzel NEM
+           írható be. Ez a doboz olvasható napló + a diurna alapja. -->
+      <div class="section-head" data-i18n="sof.dr.head">🛂 Határátlépés (automatikus)</div>
+      <div id="diurnaPreview" class="diurna-box"></div>
 
       <!-- Dinamikus útvonal pontok -->
       <div class="section-head" data-i18n="sof.routePoints">📍 Útvonal pontok (Puncte de traseu)</div>
@@ -385,7 +382,7 @@
 </div><!-- /sofer-wrap -->
 
 <script src="/sofer-uit.js?v=20260614qa"></script>
-<script src="/sofer.js?v=20260728drag"></script>
+<script src="/sofer.js?v=20260728border"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 
 <!-- ── ÁRU LEADÁSA MODAL (sofőr-kérés — admin visszaigazolja) ── -->

@@ -962,3 +962,78 @@
     background: var(--bg-1, #0c1218); border: 1px solid var(--border, rgba(255,255,255,0.12));
     color: var(--text, #e9eef5); font-size: 13.5px;
   }
+
+/* ============================================================
+   MENETLEVÉL — automatikus határátlépés-napló (diurna alapja)
+   ------------------------------------------------------------
+   A kézi „➕ Átlépés hozzáadása" szekció megszűnt: a sofőr a
+   főoldali két gombbal rögzít (GPS), és itt csak LÁTJA, mit talált
+   a szerver a menetlevél Plecare→Sosire ablakában. Olvasható napló,
+   nincs beviteli mező.
+   ============================================================ */
+.diurna-box {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.07);
+  border: 1px solid rgba(99, 102, 241, 0.28);
+  font-size: 13px;
+  color: var(--text, #e9eef5);
+}
+.diurna-box.empty {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+.diurna-window {
+  font-weight: 700;
+  font-size: 13.5px;
+  margin-bottom: 6px;
+}
+.diurna-count {
+  font-size: 11.5px;
+  color: var(--muted, #94a3b8);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  margin-bottom: 6px;
+}
+.diurna-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 7px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+.diurna-dir {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.diurna-dir.out { background: rgba(239, 68, 68, 0.14); color: #dc2626; }
+.diurna-dir.in  { background: rgba(34, 197, 94, 0.14); color: #16a34a; }
+.diurna-when { font-size: 12.5px; font-weight: 600; }
+.diurna-loc  { font-size: 11.5px; color: var(--muted, #94a3b8); }
+.diurna-hint {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted, #94a3b8);
+  margin-top: 8px;
+}
+/* Ugrás a főoldali rögzítőre — nagy, ujjbarát cél (a sofőr menet közben
+   veszi észre, hogy lemaradt egy átlépés). */
+.diurna-go {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(59, 130, 246, 0.42);
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  font-size: 13.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
