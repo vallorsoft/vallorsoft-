@@ -14,6 +14,23 @@
 
 ---
 
+## 2026-07-28 — Sofőr: MINDEN localStorage memoria per-sofőr + Plecare/Sosire dátum kötelező + Út időpontjai automatikusan a Plecare/Sosire-ból
+
+### Miért
+Az előző körben csak a Plecare/Sosire garaj-memoriál lett per-sofőr; a **mentett menetlevél-piszkozatok** (`vs_sofer_local_drafts`) és a **bon-scan AI várólista** (`vs_sofer_receipt_queue`) még mindig közös localStorage kulcsban éltek — közös telefonon másik sofőr láthatta/módosíthatta őket. Emellett a menetlevélen a Plecare/Sosire dátum + a régi „Út időpontjai" (Plecare/Sosire datetime-local) redundáns volt: két helyen kellett beírni ugyanazt.
+
+### Mi készült
+1. **Per-sofőr JSON storage helper** (`public/sofer.js` `_perDriverGetJson` / `_perDriverSetJson`) — a `_driverStoreKey(base)` (email-suffixes kulcs) általánosítva: minden a következő menetlevélre megjegyzett localStorage-érték ezen megy át. Legacy fallback: első alkalommal az esetleges közös kulcs átvevődik a per-driver kulcsba, onnantól csak a per-driver kulcsba írunk.
+2. **`soferLoadLocalDrafts`/`soferStoreLocalDrafts` és `rcptQueueLoad`/`rcptQueueStore` átvezetve** a per-driver helper-re. Ugyanazon a telefonon két sofőr külön mentett piszkozatokat és külön AI-scan várólistát lát.
+3. **sessionStorage-draft leak-védelem** — a `stateSave` mostantól `driverEmail: <me.email>` mezőt is ír a piszkozatba; az `authMe` befutása után, ha a sessionStorage-draftban az email nem egyezik a jelenlegi sofőrrel, kidobjuk. Közös telefonon a másik sofőr session-jéből ottragadt piszkozat így nem tér vissza.
+4. **Plecare/Sosire modal DÁTUM kötelező** (`wbLocDialog`) — a `wbLocDate` mostantól strict validált (`YYYY-MM-DD`): a kiürítés + OK toast-hibát dob (`sof.wb.dateRequired`, RO+HU). A helyszín már eddig is kötelező volt; az óra:perc opcionális marad.
+5. **Régi „Út időpontjai" mezők (fIndulasDt/fErkezesDt) automatizálva** — a `public/sofer.html`-ben a két `datetime-local` input `type="hidden"`-re cserélve, a látható szekció informatív magyarázó dobozzá alakítva (RO+HU: „a Plecare/Sosire dátumából számoljuk"). Új `_syncTripTimesFromPuncte()` a Plecare (első) + Sosire (utolsó) sorból képezi az `fIndulasDt` / `fErkezesDt` értékét (`YYYY-MM-DDTHH:MM`, `data-time` attribútum vagy 12:00 default). Delegated `input`/`change` listener a puncte-container-en → a sor-módosítás magától frissíti a rejtett input-okat, a `updateDiurnaPreview` is újrafut.
+6. **Beküldés + piszkozat-visszaállítás sync** — a `_submitFuvarlevelFinal` mindig `_syncTripTimesFromPuncte()`-t hív a payload olvasása előtt; a `fuvarStep2` a puncte-építés után; a `draftRestore` (offline mentés visszaállítás) is. A szerver (`routes/soferApi.js`) érintetlen — ugyanabban a formátumban kapja az `indulasDt`/`erkezesDt`-t, mint eddig.
+7. **A menetlevél sor dátuma közvetlenül szerkeszthető** — a Plecare/Sosire sor `.punct-data` input-ja (a `addPunctRow` DOM-alap) natív `type="date"` mező, kattintásra a rendszer naptára nyílik. A hidden input-ok auto-szinkron miatt a change azonnal hat az Út időpontjaira és a diurna-előnézetre.
+8. **3 új i18n kulcs** (`sof.wb.dateRequired`, `sof.tripTimesAutoHead`, `sof.tripTimesAutoHint`, RO-alap + HU). Cache-bust `?v=20260728pers`. Szerver-oldal ÉRINTETLEN — **716 Jest zöld**; per-driver storage + trip-time-sync DOM-shim harnesszel verifikálva (12 eset zöld: A ment / B nem lát / A visszatér / legacy fallback / óra nélkül → 12:00 / több Plec-Sos első-utolsó nyer / nincs Plec-Sos → üres / rossz dátum → üres).
+
+---
+
 ## 2026-07-28 — Menetlevél: per-sofőr Plecare/Sosire memoriál + a driver-beírt lerakás auto-Finalizat + LEZÁRT FUVAR bucket a `descarcat_at`-ra is
 
 ### Miért

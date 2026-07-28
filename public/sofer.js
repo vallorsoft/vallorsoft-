@@ -18,6 +18,11 @@ function stateSave(extra) {
   try {
     var cur = stateGet();
     var merged = Object.assign({}, cur, extra || {});
+    // Sofőr-horgony: a közös telefonon a másik sofőr session-je NE hívja
+    // fel a piszkozatot. A `_meData.email` (authMe után elérhető) mindig
+    // frissítjük — így a leak-védelem tudja, kihez tartozik.
+    var _me = (typeof _meData === 'object' && _meData && _meData.email) ? String(_meData.email).toLowerCase() : '';
+    if (_me) merged.driverEmail = _me;
     sessionStorage.setItem(SS_KEY, JSON.stringify(merged));
   } catch(e) {}
 }
@@ -134,6 +139,9 @@ function draftRestore(draft) {
   if (draft.summary) {
     document.getElementById('selectedOrdersSummary').innerHTML = draft.summary;
   }
+  // Piszkozat-visszaállítás után újraszámoljuk az „Út időpontjait" a
+  // (frissen visszaadott) Plecare/Sosire sorokból.
+  if (typeof _syncTripTimesFromPuncte === 'function') _syncTripTimesFromPuncte();
 }
 
 function draftClear() {
@@ -150,13 +158,13 @@ function draftClear() {
 var LS_DRAFTS_KEY = 'vs_sofer_local_drafts';
 var _curLocalDraftId = null;
 
-function soferLoadLocalDrafts() {
-  try { return JSON.parse(localStorage.getItem(LS_DRAFTS_KEY) || '[]') || []; }
-  catch (e) { return []; }
-}
-function soferStoreLocalDrafts(arr) {
-  try { localStorage.setItem(LS_DRAFTS_KEY, JSON.stringify(arr || [])); } catch (e) {}
-}
+// A közös JSON-storage helper (`_perDriverGetJson`/`_perDriverSetJson`)
+// lentebb (a `_driverStoreKey`-vel együtt) definiált — mindkettő a
+// bejelentkezett sofőr e-mail-jét fűzi a kulcshoz, így közös telefonon
+// több sofőr külön „memoriát" tart. Visszafelé kompatibilis: első
+// alkalommal az esetleges régi közös kulcs átvevődik fallback-ként.
+function soferLoadLocalDrafts() { return _perDriverGetJson(LS_DRAFTS_KEY, []) || []; }
+function soferStoreLocalDrafts(arr) { _perDriverSetJson(LS_DRAFTS_KEY, arr || []); }
 
 // A teljes menetlevél-űrlap begyűjtése (a beküldött mezők szuperhalmaza).
 function soferCollectFull() {
@@ -649,6 +657,8 @@ function fuvarStep2(allowEmpty) {
 
   // Piszkozat figyeli a változásokat
   attachDraftListeners();
+  // Út időpontjai (hidden fIndulasDt/fErkezesDt) szinkron a Plecare/Sosire-ból
+  if (typeof _syncTripTimesFromPuncte === 'function') _syncTripTimesFromPuncte();
   stateSave({ fuvarStep: 2 });
 }
 
@@ -657,6 +667,48 @@ function fuvarBackStep1() {
   document.getElementById('fuvarStep1').style.display = 'block';
   stateSave({ fuvarStep: 1 });
 }
+
+// A menetlevél „Út időpontjai" (kezdő / záró datetime) mostantól automatikusan
+// a Plecare (első ilyen sor) és Sosire (utolsó ilyen sor) dátumából +
+// opcionális óra:percéből képződik → a `fIndulasDt` / `fErkezesDt` hidden
+// input-okba írunk (a `updateDiurnaPreview`, `submitFuvarlevel`, offline
+// draft mind ezeket használja). Óra: `data-time` attribútum ('HH:MM'),
+// hiányában 12:00 (délelőtt indul, este ér — nincs időzóna-csúszás a
+// day-boundary-n). Az érték `datetime-local` formátumú: 'YYYY-MM-DDTHH:MM'.
+function _syncTripTimesFromPuncte() {
+  var rows = document.querySelectorAll('#puncteContainer .dyn-row');
+  var plecDt = '', sosDt = '';
+  rows.forEach(function (row) {
+    var tip  = (row.querySelector('.punct-tip')  || {}).value;
+    var date = (row.querySelector('.punct-data') || {}).value;
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+    var time = row.getAttribute('data-time');
+    if (!time || !/^\d{2}:\d{2}$/.test(time)) time = '12:00';
+    var dt = date + 'T' + time;
+    if (tip === 'Plecare' && !plecDt) plecDt = dt;      // első Plecare nyer
+    if (tip === 'Sosire')             sosDt  = dt;      // utolsó Sosire nyer
+  });
+  var indEl = document.getElementById('fIndulasDt');
+  var arrEl = document.getElementById('fErkezesDt');
+  if (indEl && indEl.value !== plecDt) indEl.value = plecDt;
+  if (arrEl && arrEl.value !== sosDt)  arrEl.value = sosDt;
+  if (typeof updateDiurnaPreview === 'function') { try { updateDiurnaPreview(); } catch (e) {} }
+}
+// A puncte container változásaira (dropdown / dátum / helyszín módosul)
+// automatikusan szinkronizáljuk a hidden input-okat. Egyetlen delegated
+// listener az egész konténerre — a `.dyn-row`-k dinamikusan jönnek/mennek.
+(function _hookPuncteSync() {
+  function bind() {
+    var pc = document.getElementById('puncteContainer');
+    if (!pc || pc._vsTripSyncBound) return;
+    pc._vsTripSyncBound = true;
+    pc.addEventListener('change', _syncTripTimesFromPuncte);
+    pc.addEventListener('input',  _syncTripTimesFromPuncte);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bind);
+  } else { bind(); }
+})();
 
 // Input változások figyelése → piszkozat auto-mentés
 function attachDraftListeners() {
@@ -761,6 +813,26 @@ function _setLastLoc(baseKey, val) {
   try { if (val && val.trim()) localStorage.setItem(_driverStoreKey(baseKey), val.trim()); } catch (e) {}
 }
 
+// JSON per-driver helper — a mentett menetlevél-piszkozat + AI bon-scan
+// várólista + minden más „a következő menetlevélre megjegyzett" adat
+// ugyanezt a mintát követi. Legacy közös kulcs egyszeri fallback (nem
+// írjuk felül, csak átvesszük a következő mentésig).
+function _perDriverGetJson(baseKey, defaultVal) {
+  try {
+    var perDriver = localStorage.getItem(_driverStoreKey(baseKey));
+    if (perDriver !== null) return JSON.parse(perDriver);
+    var legacy = localStorage.getItem(baseKey);
+    if (legacy !== null) {
+      try { localStorage.setItem(_driverStoreKey(baseKey), legacy); } catch (e) {}
+      return JSON.parse(legacy);
+    }
+    return (typeof defaultVal !== 'undefined') ? defaultVal : null;
+  } catch (e) { return (typeof defaultVal !== 'undefined') ? defaultVal : null; }
+}
+function _perDriverSetJson(baseKey, val) {
+  try { localStorage.setItem(_driverStoreKey(baseKey), JSON.stringify(val == null ? null : val)); } catch (e) {}
+}
+
 // wbLocDialog(kind, cb): kind = 'start' | 'end'; cb(null) = mégse, cb({loc,date,time})
 function wbLocDialog(kind, cb) {
   var m = document.getElementById('wbLocModal');
@@ -776,7 +848,11 @@ function wbLocDialog(kind, cb) {
   document.getElementById('wbLocOk').onclick = function () {
     var loc = document.getElementById('wbLocInput').value.trim();
     if (!loc) { toast(t('sof.wb.locRequired'), 'err'); return; }
-    var date = document.getElementById('wbLocDate').value || _todayLocalDate();
+    // Dátum KÖTELEZŐ — a menetlevél „Út időpontjai" (kezdő/záró dátum)
+    // ebből képződik, ezért nem lehet üres. Az alapérték a ma, de a
+    // sofőr átírhatja; kiürítés + OK = hibaüzenet.
+    var date = (document.getElementById('wbLocDate').value || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { toast(t('sof.wb.dateRequired'), 'err'); return; }
     var hhRaw = document.getElementById('wbLocHour').value;
     var mmRaw = document.getElementById('wbLocMin').value;
     var timeStr = '';
@@ -901,16 +977,14 @@ var _receiptScanKind = null;     // 'fuel' | 'purchase' | null (dashboardról j�
 var LS_RCPT_QUEUE_KEY = 'vs_sofer_receipt_queue';
 var RCPT_MAX_ITEMS    = 20;      // a régiek magától kiesnek (FIFO)
 
-function rcptQueueLoad() {
-  try { return JSON.parse(localStorage.getItem(LS_RCPT_QUEUE_KEY) || '[]') || []; }
-  catch (e) { return []; }
-}
+// A bon-scan várólista sofőrönként külön (`_perDriverGetJson`): egy közös
+// telefonon másik sofőr nem látja/nem tudja elfogadni az előző sofőr
+// scannelt bonjait. Legacy közös kulcs egyszeri fallback (nem íródik
+// felül; a következő mentés már csak a per-driver kulcsba kerül).
+function rcptQueueLoad() { return _perDriverGetJson(LS_RCPT_QUEUE_KEY, []) || []; }
 function rcptQueueStore(arr) {
-  try {
-    // Régi elemek levágása (méret-védelem)
-    var trimmed = (arr || []).slice(-RCPT_MAX_ITEMS);
-    localStorage.setItem(LS_RCPT_QUEUE_KEY, JSON.stringify(trimmed));
-  } catch (e) { /* localStorage tele — csendesen áteresztjük */ }
+  // Régi elemek levágása (méret-védelem — FIFO)
+  _perDriverSetJson(LS_RCPT_QUEUE_KEY, (arr || []).slice(-RCPT_MAX_ITEMS));
 }
 function rcptQueueAdd(item) {
   var q = rcptQueueLoad(); q.push(item); rcptQueueStore(q); return item.id;
@@ -1407,6 +1481,10 @@ function submitFuvarlevel() {
 }
 
 function _submitFuvarlevelFinal() {
+  // Az „Út időpontjai" (fIndulasDt/fErkezesDt) mostantól a Plecare/Sosire
+  // pontok dátumából automatikusan képződik. Beküldés előtt egy utolsó
+  // sync — biztosan a legfrissebb értékek kerüljenek a payload-ba.
+  if (typeof _syncTripTimesFromPuncte === 'function') _syncTripTimesFromPuncte();
   var fisa = (document.getElementById('fFisa') ? document.getElementById('fFisa').value.trim() : '');
   // Sorszámot a szerver generálja automatikusan
 
@@ -1761,6 +1839,24 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
 .then(function(r) { return r.json(); }).then(function(d) {
   if (!d.result) { window.location.href = '/login'; return; }
   _meData = d.result;
+  // sessionStorage-draft leak-védelem közös telefonon: ha az előző
+  // sofőr által otthagyott piszkozat még benne van a tabban, de más
+  // sofőr jelentkezett be, dobjuk. A `stateSave` innentől mindig
+  // hozzáírja a `driverEmail`-t, hogy a következő ellenőrzés menjen.
+  try {
+    var _existing = JSON.parse(sessionStorage.getItem(SS_KEY) || '{}');
+    var _ownerEmail = String(_existing.driverEmail || '').toLowerCase();
+    var _meEmail = String(_meData.email || '').toLowerCase();
+    if (_ownerEmail && _ownerEmail !== _meEmail) {
+      sessionStorage.removeItem(SS_KEY);
+    } else {
+      // Első alkalommal (nincs driverEmail) horgonyozzuk a jelenlegihez
+      if (!_ownerEmail && _meEmail) {
+        _existing.driverEmail = _meEmail;
+        sessionStorage.setItem(SS_KEY, JSON.stringify(_existing));
+      }
+    }
+  } catch (_e) {}
   document.getElementById('meBadge').textContent = d.result.nume;
   if (window.VS_PUSH) VS_PUSH.init(d.result.email, d.result.pozicio);
     // Chat ideiglenesen: WhatsApp-átirányítás — Firebase-chat kikapcsolva.
