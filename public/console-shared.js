@@ -105,6 +105,11 @@ function applyFeatureFlags(){
       // Fuvar CSV-import gomb elrejtése, ha a developer kikapcsolta (alapból be)
       var _impBtn=document.getElementById('ordersImportBtnBox');
       if(_impBtn) _impBtn.style.display = (feats['orders-import']===false) ? 'none' : '';
+      // Fuvar-kiírás „megrendelő feltöltése + AI kiolvasás" gomb — ugyanaz a
+      // csomag-kapcsoló, mint az e-mail-kiolvasásnál (alapból be); a szerver
+      // (handlers/orderScan.js) is ezt a kulcsot kapuzza.
+      var _scanBtn=document.getElementById('ordScanBtnBox');
+      if(_scanBtn) _scanBtn.style.display = (feats['ai-kiolvasas']===false) ? 'none' : '';
     }
     // A sidebar láthatóság (csomag-kapcsoló + sofőr-mód) egy közös számításból —
     // akkor is lefut (sofőr-mód szűrő), ha a funkció-lekérés hibázott.
@@ -730,6 +735,196 @@ function orderImportRun(btn){
   }).catch(function(){ if(btn){btn.disabled=false;} toast(t('cs.importError'),'err'); });
 }
 
+// ============================================================
+//  FUVAR-KIÍRÁS — megrendelő feltöltése + AI kiolvasás
+//  A diszpécser feltölt egy megrendelőt (PDF vagy fotó), az AI kiolvassa
+//  a mezőket (UGYANAZ a rendszer, mint az e-mailben kapott megrendelések
+//  feldolgozása — szerver: handlers/orderScan.js → services/order-ai), és
+//  a kiíró űrlap előtöltődik. A „Fuvarfeladat mentése" után a feltöltött
+//  fájl a fuvar dokumentumai közé kerül (meglévő `orderDocUpload`).
+// ============================================================
+
+// A feltöltött fájl a mentésig itt vár: { fileName, dataUrl } — a create
+// után ebből lesz a fuvar-dokumentum. Sikeres mentés/törlés nullázza.
+var _ordScanPending = null;
+var _ordScanInfo = null;   // a kiolvasás mezőin túli info (CUI/pénznem/megjegyzés)
+
+function orderScanPick(){
+  var i=document.getElementById('ordScanInput');
+  if(i){ i.value=''; i.click(); }
+}
+
+// A fájl kétféle alakban kell: (1) az AI-nak — képnél 1600px-re kicsinyítve
+// JPEG-ként (a nagy mobilfotó belefér a 8 MB-os korlátba), PDF-nél nyersen;
+// (2) a fuvarhoz csatolásra — az EREDETI fájl data-URL-je (a meglévő
+// dokumentum-flow így tárolja, aláírás/letöltés ezzel működik).
+function _ordScanRead(file, cb){
+  var fr=new FileReader();
+  fr.onload=function(){
+    var dataUrl=String(fr.result||'');
+    var comma=dataUrl.indexOf(',');
+    var raw=comma>=0?dataUrl.slice(comma+1):dataUrl;
+    if(file.type==='application/pdf'){
+      cb({ dataUrl:dataUrl, aiMime:'application/pdf', aiData:raw });
+      return;
+    }
+    // Kép: lekicsinyítés canvas-szal (hosszabb oldal max 1600px, JPEG q=0.85)
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+        var scale=Math.min(1,1600/Math.max(w,h));
+        var cw=Math.round(w*scale), ch=Math.round(h*scale);
+        var cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
+        cv.getContext('2d').drawImage(img,0,0,cw,ch);
+        var small=cv.toDataURL('image/jpeg',0.85);
+        var i2=small.indexOf(',');
+        cb({ dataUrl:dataUrl, aiMime:'image/jpeg', aiData:i2>=0?small.slice(i2+1):small });
+      }catch(e){
+        // Ha a canvas elszáll (pl. HEIC, amit a böngésző nem dekódol), az
+        // eredetit küldjük — a Gemini a HEIC-et is olvassa.
+        cb({ dataUrl:dataUrl, aiMime:file.type||'image/jpeg', aiData:raw });
+      }
+    };
+    img.onerror=function(){ cb({ dataUrl:dataUrl, aiMime:file.type||'image/jpeg', aiData:raw }); };
+    img.src=dataUrl;
+  };
+  fr.onerror=function(){ cb(null); };
+  fr.readAsDataURL(file);
+}
+
+function orderScanFile(input){
+  var f=input&&input.files&&input.files[0];
+  if(!f) return;
+  // 8 MB-os szerver-korlát — a kép ugyan lekicsinyítve megy az AI-hoz, de a
+  // csatolmány az eredeti, ezért az eredetin ellenőrizzük.
+  if(f.size>8*1024*1024){ toast(t('cs.os.tooBig'),'err'); return; }
+  var btn=document.getElementById('ordScanBtn');
+  var box=document.getElementById('ordScanStatus');
+  if(btn){ btn.disabled=true; }
+  if(box) box.innerHTML='<div class="glass-soft" style="padding:10px;font-size:12px;">⏳ '+esc(t('cs.os.working'))+'</div>';
+  _ordScanRead(f,function(p){
+    if(!p){ if(btn) btn.disabled=false; if(box) box.innerHTML=''; toast(t('cs.os.readErr'),'err'); return; }
+    gas('scanOrderDocument',[{ mimeType:p.aiMime, data:p.aiData, fileName:f.name }]).then(function(r){
+      if(btn) btn.disabled=false;
+      if(r&&r.ok){
+        _ordScanPending={ fileName:f.name, dataUrl:p.dataUrl };
+        var filled=orderScanFill(r.fields||{});
+        _ordScanInfo=r.fields||{};
+        renderOrdScanStatus({ fileName:f.name, filled:filled, confidence:r.confidence, ai_used:r.ai_used });
+        toast(t('cs.os.done')+filled,'ok');
+      }else{
+        _ordScanPending=null;
+        if(box) box.innerHTML='';
+        toast((r&&r.err)||t('cs.os.aiErr'),'err');
+      }
+    }).catch(function(){
+      if(btn) btn.disabled=false;
+      if(box) box.innerHTML='';
+      _ordScanPending=null;
+      toast(t('cs.os.aiErr'),'err');
+    });
+  });
+}
+
+// A kiolvasott mezők beírása az űrlapra. Csak a NEM üres AI-értékeket írja
+// (a null mezők a meglévő kézi tartalmat nem törlik). Visszatér: hány mező
+// töltődött ki.
+function orderScanFill(f){
+  var n=0;
+  function set(id,val){
+    var el=document.getElementById(id);
+    if(!el||val==null||val==='') return;
+    el.value=val; n++;
+  }
+  set('oClient',f.client);
+  set('oRef',f.ref);
+  set('oPret',f.pret);
+  set('oKm',f.km);
+  set('oSuly',f.suly_kg);
+  set('oHossz',f.hossz_cm); set('oSzel',f.szel_cm); set('oMag',f.mag_cm);
+  set('oLoad',f.loc_incarcare); set('oLoadFirma',f.firma_incarcare);
+  set('oUnload',f.loc_descarcare); set('oUnloadFirma',f.firma_descarcare);
+  // datetime-local: a dátum-csak érték érvénytelen a mezőnek → 00:00-tal
+  // egészítjük ki (a pontos időt a diszpécser állítja).
+  var _dt=function(v){ return /^\d{4}-\d{2}-\d{2}$/.test(v||'')?(v+'T00:00'):v; };
+  set('oLoadDate',_dt(f.data_incarcare));
+  set('oUnloadDate',_dt(f.data_descarcare));
+  // FTL/LTL — a két pipa egymást kizárja (mint kézi kattintásnál)
+  if(f.load_type==='FTL'||f.load_type==='LTL'){
+    var ftl=document.getElementById('oFtl'), ltl=document.getElementById('oLtl');
+    if(ftl) ftl.checked=(f.load_type==='FTL');
+    if(ltl) ltl.checked=(f.load_type==='LTL');
+    n++;
+    if(typeof refreshDimReq==='function') refreshDimReq();
+  }
+  // Rendszám: csak ha a cég flottájában van ilyen jármű (a mezők legördülők).
+  n+=_ordScanPlate('oCamionSelect',f.rendszam_camion);
+  n+=_ordScanPlate('oRemorcaSelect',f.rendszam_remorca);
+  // Km/útvonal-előnézet frissítése a beírt helyszínekből (a kiolvasott km-et
+  // nem írja felül — a recalc csak üres/automata km-et tölt).
+  if(typeof orderRouteRecalc==='function'){ try{ orderRouteRecalc('create'); }catch(e){} }
+  return n;
+}
+
+// Rendszám-illesztés a legördülőhöz (szóköz/kisbetű-független, mint a
+// lib/plate.js normalizePlate a szerveren).
+function _ordScanPlate(selId,plate){
+  var sel=document.getElementById(selId);
+  if(!sel||!plate) return 0;
+  var want=String(plate).toUpperCase().replace(/[^A-Z0-9]/g,'');
+  for(var i=0;i<sel.options.length;i++){
+    var v=String(sel.options[i].value||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if(v&&v===want){ sel.selectedIndex=i; return 1; }
+  }
+  return 0;
+}
+
+function renderOrdScanStatus(o){
+  var box=document.getElementById('ordScanStatus');
+  if(!box) return;
+  var extra=[];
+  var f=_ordScanInfo||{};
+  if(f.client_cui) extra.push('CUI: '+esc(f.client_cui));
+  if(f.valuta) extra.push(esc(t('cs.os.currency'))+': '+esc(f.valuta));
+  if(f.observatii) extra.push(esc(t('cs.os.note'))+': '+esc(String(f.observatii).slice(0,200)));
+  var conf=(o.confidence!=null)?(Math.round(o.confidence*100)+'%'):'—';
+  box.innerHTML='<div class="glass-soft" style="padding:12px;border:1px solid rgba(34,197,94,0.4);font-size:12px;">'
+    +'<div><b style="color:var(--status-ok);">✅ '+esc(t('cs.os.ready'))+'</b> '
+    +'<span class="text-muted">'+esc(o.fileName)+'</span></div>'
+    +'<div class="text-muted" style="margin-top:4px;">'
+    +esc(t('cs.os.filled'))+': <b>'+o.filled+'</b> · '+esc(t('cs.os.conf'))+': '+conf
+    +(o.ai_used?'':' · <span style="color:var(--status-warn);">'+esc(t('cs.os.noAi'))+'</span>')+'</div>'
+    +(extra.length?'<div class="text-muted" style="margin-top:4px;">'+extra.join(' · ')+'</div>':'')
+    +'<label style="display:flex;align-items:center;gap:6px;margin-top:8px;cursor:pointer;">'
+    +'<input type="checkbox" id="ordScanAttach" checked style="width:15px;height:15px;cursor:pointer;"> '
+    +esc(t('cs.os.attach'))+'</label>'
+    +'<button class="btn ghost" onclick="orderScanClear()" style="margin-top:8px;padding:4px 10px;font-size:11px;">🗑 '
+    +esc(t('cs.os.clear'))+'</button>'
+    +'</div>';
+}
+
+function orderScanClear(){
+  _ordScanPending=null; _ordScanInfo=null;
+  var box=document.getElementById('ordScanStatus'); if(box) box.innerHTML='';
+  var i=document.getElementById('ordScanInput'); if(i) i.value='';
+}
+
+// A mentés utáni csatolás: a meglévő `orderDocUpload` RPC-vel (tenant-
+// ellenőrzött) — best-effort, a fuvar már létrejött, ezért hiba esetén csak
+// figyelmeztetünk, nem vonjuk vissza a mentést.
+function _ordScanAttachTo(orderId){
+  if(!_ordScanPending||!orderId) return;
+  var cb=document.getElementById('ordScanAttach');
+  if(cb&&!cb.checked){ orderScanClear(); return; }
+  var p=_ordScanPending;
+  gas('orderDocUpload',[orderId,p.fileName,p.dataUrl]).then(function(r){
+    if(r&&r.ok){ toast(t('cs.os.attached'),'ok'); }
+    else{ toast((r&&r.err)||t('cs.os.attachErr'),'err'); }
+  }).catch(function(){ toast(t('cs.os.attachErr'),'err'); });
+  orderScanClear();
+}
+
 function createOrder(){
   const st=document.querySelector('input[name="oSoferType"]:checked');
   const type=st?st.value:'None';
@@ -767,6 +962,8 @@ function createOrder(){
       else if(r.paired_vehicle)extra=' · '+t('cs.pairedVehicle')+r.paired_vehicle;
       if(r.paired_trailer)extra+=' · '+t('cs.pairedTrailer')+r.paired_trailer;
       toast(t('cs.orderSavedId')+r.id+extra,'ok');
+      // A feltöltött (AI-val kiolvasott) megrendelő csatolása a friss fuvarhoz
+      if(typeof _ordScanAttachTo==='function') _ordScanAttachTo(r.id);
       loadOrders();
       ['oClient','oRef','oPret','oKm','oSuly','oHossz','oSzel','oMag','oLoad','oUnload','oLoadFirma','oUnloadFirma','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
       ['oFtl','oLtl'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});

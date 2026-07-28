@@ -180,6 +180,10 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
     const km = Number(ex.km || 0) || 0;
     const loc_incarcare = String(ex.loc_incarcare || '').trim();
     const loc_descarcare = String(ex.loc_descarcare || '').trim();
+    // Fel-/lerakási cég (feladó/címzett) — a kiolvasás ezeket is adja
+    // (services/order-ai FIELDS); üres = NULL, hossz-korlát mint a comCreate-en.
+    const firma_incarcare = String(ex.firma_incarcare || '').trim().slice(0, 255) || null;
+    const firma_descarcare = String(ex.firma_descarcare || '').trim().slice(0, 255) || null;
     const data_incarcare = ex.data_incarcare || null;
     const data_descarcare = ex.data_descarcare || null;
     // Áru-adatok (a portál-kérés / kiolvasás teljes áru-bevitele → kész fuvar)
@@ -233,12 +237,14 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
         `INSERT INTO orders (id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
            pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
            rendszam_camion, rendszam_remorca, status, company_id,
-           suly_kg, load_type, hossz_cm, szel_cm, mag_cm, client_id, fuvar_no)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)`,
+           suly_kg, load_type, hossz_cm, szel_cm, mag_cm, client_id, fuvar_no,
+           firma_incarcare, firma_descarcare)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
         [id, clientName, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
          pret, km, sofer_type, email_sofer, nume_sofer, firma_extern, telefon_extern, external_driver_id,
          rendszam_camion, rendszam_remorca, status, company_id,
-         suly_kg, load_type, hossz_cm, szel_cm, mag_cm, clientId, fuvar_no]);
+         suly_kg, load_type, hossz_cm, szel_cm, mag_cm, clientId, fuvar_no,
+         firma_incarcare, firma_descarcare]);
       await dbc.query(`UPDATE inbound_orders SET status='approved', created_order_id=$1, updated_at=now() WHERE id=$2 AND company_id=$3`,
         [id, req.params.id, company_id]);
       await dbc.query('COMMIT');
