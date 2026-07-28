@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260723retry"></script>
+  <script src="/i18n.js?v=20260728wbone"></script>
   <link rel="stylesheet" href="/sofer.css?v=20260723retryq">
   <script src="/push-client.js?v=20260614qa"></script>
   <!-- Sofor mobil-app: 8 ora idle-limit (vezetes kozben oraig nem koppint a
@@ -89,7 +89,7 @@
     }
 
     /* Menetlevél fő gombok: az inline piros gradiens → kék/indigó */
-    button.submit-btn[onclick="fuvarStep2()"],
+    button.submit-btn[onclick="fuvarCreate()"],
     button.submit-btn[onclick="submitFuvarlevel()"] {
       background: linear-gradient(135deg,#3b82f6,#6366f1) !important;
       color: #fff !important;
@@ -183,7 +183,7 @@
       <button class="dash-scan-btn" onclick="scanReceiptPickFromDash()" data-i18n="sof.dashScanBtn">
         📷 Bon szkennelés (AI) — háttérben feldolgozódik
       </button>
-      <div id="pendingReceiptsBox" style="display:none;margin-top:12px;"></div>
+      <div id="pendingReceiptsBox" class="pending-receipts-box" style="display:none;margin-top:12px;"></div>
     </div>
 
     <div class="sofer-nav-grid">
@@ -242,13 +242,19 @@
           <div class="spinner" style="margin:0 auto 10px;"></div><span data-i18n="sofer.loadingOrders">Fuvarok betöltése...</span>
         </div>
       </div>
-      <button class="submit-btn" onclick="fuvarStep2()" style="margin-top:16px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;" data-i18n="sofer.nextFill">
-        Tovább → Menetlevél kitöltése
+      <!-- EGY gomb: a bepipált fuvarok bekerülnek; pipa nélkül fuvar nélküli menetlevél -->
+      <button class="submit-btn" onclick="fuvarCreate()" style="margin-top:16px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;" data-i18n="sof.createWaybill">
+        📄 Menetlevél létrehozása
       </button>
-      <!-- Menetlevél kiválasztott fuvar nélkül -->
-      <button class="submit-btn" onclick="fuvarNoOrder()" style="margin-top:10px;background:var(--bg-2);border:1px solid var(--border);color:var(--soft);" data-i18n="sof.noOrderWaybill">
-        ➕ Menetlevél fuvar nélkül
+      <div style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center;" data-i18n="sof.createWaybillHint">
+        A bejelölt fuvarok bekerülnek a menetlevélbe; pipa nélkül fuvar nélküli menetlevél készül.
+      </div>
+      <!-- 📷 Bon/számla kiolvasás (AI) — ugyanaz a háttér-várólista, mint a főoldalon -->
+      <button class="submit-btn scan-btn" id="fuvarStep1ScanBtn" onclick="scanReceiptPickFromDash()" style="margin-top:12px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;" data-i18n="sof.scanReceiptAny">
+        📷 Bon szkennelés (AI)
       </button>
+      <!-- Ugyanaz a perzisztens várólista, mint a főoldalon (közös render) -->
+      <div id="fuvarStep1PendingBox" class="pending-receipts-box" style="display:none;margin-top:12px;"></div>
     </div>
 
     <!-- 2. LÉPÉS: Menetlevél kitöltés -->
@@ -381,7 +387,7 @@
 </div><!-- /sofer-wrap -->
 
 <script src="/sofer-uit.js?v=20260614qa"></script>
-<script src="/sofer.js?v=20260723keepalive"></script>
+<script src="/sofer.js?v=20260728wbone"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 
 <!-- ── ÁRU LEADÁSA MODAL (sofőr-kérés — admin visszaigazolja) ── -->
