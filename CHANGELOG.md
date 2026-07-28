@@ -14,6 +14,23 @@
 
 ---
 
+## 2026-07-28 — Menetlevél: a Plecare/Sosire ÓRÁJA is kötelező (pontos diurna) + a piszkozat többé nem dobja el az órát/fuvar-tageket
+
+### Miért
+Az előző körben a határátlépés a főoldali GPS-gombokból számol, de a diurna-ablak két végpontja (Plecare/Sosire) **óra nélkül** is elmenthető volt — ilyenkor a rendszer **12:00-ra** esett vissza. Ez a lehető legrosszabb alapérték: a 12:00 pontosan az a határ, aminél a `calculateDiurna` az **indulás napját** (`depHour >= 12` → kihagyva) és az **érkezés napját** (`arrHour <= 12` → kihagyva) NEM számolja. Egy valós 06:45 → 20:00 út így 4 nap helyett 3 napot kapott — a sofőr **csendben elvesztett egy nap napidíjat**.
+
+Ráadásul kiderült, hogy a modálban megadott óra amúgy sem élte túl az első billentyűleütést: a `draftSave()` (600 ms-os auto-piszkozat) csak `tip`/`loc`/`data`-t gyűjtött, miközben a `draftRestore()` `time`/`orderId`/`role` mezőket is várt. Az óra tehát **mindig** elveszett — és vele a fuvar-visszakötő tag-ek is, amiktől a beküldés az `orders.incarcat_at`/`descarcat_at`-ot frissíti (a PR #292/#293 funkciója némán elromlott piszkozat-visszatöltés után).
+
+### Mit
+1. **Óra:perc KÖTELEZŐ a Plecare/Sosire modálban** (`wbLocDialog`) — üres vagy érvénytelen (óra 0–23, perc 0–59) érték esetén hibaüzenet, a modal nyitva marad. Két új i18n kulcs (`sof.wb.timeRequired`, `sof.wb.timeInvalid`).
+2. **Alapérték a MOSTANI idő** — a sofőr az indulás/érkezés pillanatában nyitja meg a párbeszédet, így jellemzően csak jóváhagyja. Átírható.
+3. **Az óra láthatóvá és szerkeszthetővé vált a pont-soron** (`.punct-time`, `type="time"`, a dátum mellett). Eddig a modal lefutása után nem lehetett javítani, csak a sor törlésével — pont annál az adatnál, ami a napidíjat befolyásolja.
+4. **KÖZÖS sor-gyűjtők** (`_collectPuncte` / `_collectAlim` / `_collectAch`) — a három korábbi, egymástól eltérő másolat (auto-piszkozat, telefonra mentés, beküldés) helyett EGY forrás. Ez javítja a fenti adatvesztést: a piszkozat mostantól a `time` + `orderId` + `role` mezőket is megőrzi. A beküldés továbbra is számmá alakítja az értékeket (`numeric` kapcsoló), a piszkozat a nyers stringet tartja (a félig beírt szám se vesszen el).
+5. **Beküldés-validáció** — ha a sofőr utólag kiüríti a Plecare/Sosire sor dátum- vagy óra-mezőjét, a beküldés blokkol, a hibás sorra görget és fókuszál (`sof.wb.tripTimeMissing`).
+6. **`loc_plecare` / `loc_sosire` TÍPUS szerint** (nem pozíció szerint) — a PR #295 óta a pont-sorok húzással átrendezhetők, így a Plecare/Sosire nem feltétlenül az első/utolsó sor; a régi `puncte[0]` / `puncte[last]` olvasás rossz helyszínt menthetett. Fallback a régi viselkedésre.
+7. **`_syncTripTimesFromPuncte`** a sor `.punct-time` mezőjéből olvas (a `data-time` attribútum megszűnt — egyetlen igazságforrás). A 12:00 fallback már csak a régi, óra nélkül mentett piszkozatokra vonatkozik.
+8. Cache-bust `?v=20260728hour`. **772 teszt zöld**; a kötelező óra, az érvénytelen-óra blokk, a soron látható óra, az auto-piszkozat óra-megőrzése és a beküldés-blokk headless Chromiummal (393px) élesben verifikálva.
+
 ## 2026-07-28 — Menetlevél: a határátlépés KIZÁRÓLAG a főoldali 2 gombból (GPS) — kézi bevitel megszűnt, a diurna ebből számol
 
 ### Miért
