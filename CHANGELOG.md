@@ -14,6 +14,28 @@
 
 ---
 
+## 2026-07-28 — Bon-scan: a lefotózott bon a kiolvasás elfogadásáig MEGMARAD (IndexedDB) + 15 mp-es holt idő megszüntetve
+
+### Miért
+Kérdés érkezett, hogy a sofőr által feltöltött képet canvas-szal átalakítjuk-e, vagy nyersen kezeljük. **Átalakítjuk** — mindkét feltöltési út canvas-on megy (bon-scan 1600px, dokumentum 2000px, JPEG q=0.85; PDF szándékosan nyers marad). A valódi hiány a kép **megőrzése** volt:
+
+1. **A lefotózott bon elveszett, ha bármi közbejött.** A várólista `localStorage`-ba CSAK a 128px-es thumbnailt írta; a teljes kép kizárólag a `_scanReceiptTry` closure-jében élt. Ha az OS kilőtte a háttérben lévő appot, a sofőr elhagyta a képernyőt, vagy mind a 3 auto-retry elbukott, a fotó **véglegesen** eltűnt: a tétel `error`-ra váltott, ahol egyetlen gomb volt, a ✕. Újra kellett fotózni — csakhogy a `receiptScanFile` input `capture="environment"`-tel a kamerát nyitja, a kép sok készüléken **nem kerül be a galériába**, a papír bon pedig addigra gyakran már a kukában van.
+2. **Minden bon-scan 15 másodpercet várt az ELSŐ kérés előtt.** A `_scanReceiptTry` `var wait = BACKOFFS[attempt] || 15000` sora: `BACKOFFS[0]` értéke `0`, ami **hamis**, így a `||` minden első próbánál 15 000-re váltott. A sofőr ennyit nézte a spinnert, mielőtt bármi elindult volna — ez érdemben hozzájárult a „nem működik a bon-scan" élményhez (a #287–#289 körök más gyökereket javítottak).
+
+### Mi változott (`public/sofer.js`, `i18n.js`, `sofer.html`)
+1. **Teljes kép az IndexedDB-be** (új `_rcptIdbOpen`/`_rcptImgPut`/`_rcptImgGet`/`_rcptImgDel`/`_rcptImgPrune`). **Miért nem localStorage:** egy 1600px-es JPEG base64-je 100–500 KB, a lista max 20 tétel → akár 10 MB, miközben a localStorage kvótája ~5 MB, és azon **osztozik a menetlevél-piszkozattal** — ez volt a #298-as adatvesztés gyökere. Az IndexedDB külön, nagyságrenddel nagyobb tárterület → a piszkozat sosem szorul ki.
+2. **A kép a hálózati hívás ELŐTT mentődik** (`scanReceiptStart`), a tétel `hasImage` jelzőt kap. A kép törlése **egyetlen ponton**, a `rcptQueueRemove`-ban történik — amit az elfogadás (`rrAccept`) és az eldobás (`rrRemove`/`rrDiscard`) is hív → sem idő előtti törlés, sem visszamaradt szemét.
+3. **Új `rrRetry(id)` + 🔄 gomb** az `error` tételen: a megőrzött képből indítja újra a kiolvasást, **újrafotózás nélkül**. A hibaüzenet mellett kiírjuk, hogy a fotó megvan.
+4. **Induláskor magától folytatódik** a megszakadt feldolgozás (`rcptQueueMaint`): a 3 percnél régebben „processing" tétel, ha van képe, újraindul; ha nincs, marad az őszinte `error`. A karbantartás **az authMe UTÁNRA került** — a lista kulcsa per-sofőr (`_driverStoreKey`), így a `_meData` nélkül futó régi hívás a csupasz legacy kulcsról olvasott, azaz a sofőr tételeit meg sem látta.
+5. **Backoff-fix:** `(attempt < BACKOFFS.length) ? BACKOFFS[attempt] : 15000` → az első próba tényleg azonnal indul (0s → 5s → 15s, a komment szerint).
+6. **Takarítás** (`_rcptImgPrune`): a jelenlegi sofőr listájáról már lekerült képek + bármely sofőr 14 napnál régebbi képe. Közös telefonon a **másik sofőr képéhez nem nyúl** (`driver` mező). Ha az IndexedDB nem elérhető (privát mód, régi böngésző), minden a régi módon fut — csak a megőrzés marad el, semmi nem törik el.
+7. **Review-modal:** ha a thumbnailt a localStorage kvóta-védelme eldobta, a megőrzött teljes képből pótoljuk (a sofőr lássa, melyik bont nézi át). 2 új i18n kulcs (`sof.rr.retry`, `sof.rr.photoKept`, RO-alap + HU), cache-bust `?v=20260728img`.
+
+### Teszt
+**772 Jest zöld** (változatlan baseline) + DOM-shim harness az IndexedDB-réteghez (16 eset): kép-megőrzés, a localStorage érintetlensége, újraindítás a tárolt képből, induláskori auto-folytatás, elfogadáskori törlés, kép nélküli tétel őszinte error-ja, közös telefon / másik sofőr izolációja, IndexedDB nélküli kecses leromlás, és a 15 mp-es holt idő hiánya (ez a harness mérte ki a backoff-hibát).
+
+---
+
 ## 2026-07-28 — Sofőr UX-kör: km-validáció, állomás-gomb a kártyán, offline outbox, tartós piszkozat, összecsukható szekciók, helyszín-javaslatok
 
 ### Miért

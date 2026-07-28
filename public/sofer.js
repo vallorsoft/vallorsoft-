@@ -1577,9 +1577,11 @@ function addAchRow(a) {
 // főoldalon — kattintásra elfogadhatók (a menetlevél-piszkozatba
 // kerülnek) vagy elvethetők.
 //
-// Perzisztencia: localStorage (LS_RCPT_QUEUE_KEY). A teljes fotót
-// NEM tároljuk (méret-korlát); csak egy kis thumbnailt őrzünk meg
-// megjelenítéshez, és a Gemini kiolvasott mezőit.
+// Perzisztencia: a metaadat (státusz, kiolvasott mezők, thumbnail) a
+// localStorage-ban (LS_RCPT_QUEUE_KEY), a TELJES fotó pedig az
+// IndexedDB-ben (`_rcptImg*`) — utóbbi addig őrzi, amíg a sofőr el nem
+// fogadja vagy el nem dobja a kiolvasást, így megszakadt feldolgozás
+// után sem kell újra fotózni.
 // ============================================================
 
 // Ha az admin/manager a Menetlevelek fülön KIKAPCSOLTA az AI-t (vagy
@@ -1665,12 +1667,130 @@ function rcptQueueUpdate(id, patch) {
   }
   return null;
 }
+// A tétel véglegesen lekerül a listáról — elfogadva (`rrAccept`) VAGY
+// eldobva (`rrRemove`/`rrDiscard`). Csak ITT töröljük a megőrzött képet
+// is: egyetlen ponton, hogy egyik út se hagyjon szemetet, és egyik se
+// dobja el a fotót idő előtt.
 function rcptQueueRemove(id) {
   var q = rcptQueueLoad().filter(function (x) { return x.id !== id; });
   rcptQueueStore(q);
+  _rcptImgDel(id);
 }
 function rcptNewId() {
   return 'r' + Date.now() + Math.random().toString(36).slice(2, 8);
+}
+
+// ============================================================
+// BON-KÉP MEGŐRZÉS (IndexedDB) — a fotó nem veszhet el, amíg a
+// kiolvasás elfogadva nincs
+// ============================================================
+// Eddig CSAK a 128px-es thumbnail került a localStorage-ba, a teljes kép
+// kizárólag a `_scanReceiptTry` closure-jében élt. Ha az app közben
+// leállt (OS háttér-kilövés), a sofőr elhagyta a képernyőt, vagy mind a
+// 3 retry elbukott, a kép VÉGLEG elveszett: a tétel „error"-ra váltott,
+// ahol csak ✕ volt → újra kellett fotózni, pedig a bon addigra sokszor
+// már a kukában van.
+//
+// Miért IndexedDB és nem localStorage: egy 1600px-es JPEG base64-je
+// 100–500 KB, a várólista max 20 tétel → akár 10 MB. A localStorage
+// kvótája jellemzően 5 MB, és azon OSZTOZIK a menetlevél-piszkozattal —
+// ha a képek megtöltenék, a piszkozat mentése hasalna el, ami pontosan
+// az előző kör (#298) adatvesztésének a gyökere volt. Az IndexedDB
+// kvótája nagyságrenddel nagyobb és külön tárterület → a piszkozat
+// sosem szorul ki miatta.
+//
+// A kép törlése CSAK elfogadáskor (`rrAccept`) vagy kifejezett eldobáskor
+// (`rrRemove`/`rrDiscard`) történik. Ha az IndexedDB nem elérhető (privát
+// mód, régi böngésző), minden a régi módon fut tovább — csak a megőrzés
+// marad el, semmi nem törik el.
+var RCPT_IDB_NAME     = 'vs_sofer_receipts';
+var RCPT_IDB_STORE    = 'images';
+var RCPT_IMG_MAX_DAYS = 14;          // gazdátlan kép végső takarítása
+var _rcptIdb = null, _rcptIdbFailed = false;
+
+function _rcptIdbOpen(cb) {
+  if (_rcptIdb) { cb(_rcptIdb); return; }
+  if (_rcptIdbFailed || typeof indexedDB === 'undefined') { cb(null); return; }
+  try {
+    var req = indexedDB.open(RCPT_IDB_NAME, 1);
+    req.onupgradeneeded = function () {
+      var db = req.result;
+      if (!db.objectStoreNames.contains(RCPT_IDB_STORE)) {
+        db.createObjectStore(RCPT_IDB_STORE, { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = function () { _rcptIdb = req.result; cb(_rcptIdb); };
+    req.onerror   = function () { _rcptIdbFailed = true; cb(null); };
+  } catch (e) { _rcptIdbFailed = true; cb(null); }
+}
+
+// A képet a tétel id-jével tároljuk; a `driver` mező azért kell, hogy a
+// közös telefonon a takarítás ne nyúljon a MÁSIK sofőr képeihez.
+function _rcptImgPut(id, payload, cb) {
+  cb = cb || function () {};
+  _rcptIdbOpen(function (db) {
+    if (!db) { cb(false); return; }
+    try {
+      var tx = db.transaction(RCPT_IDB_STORE, 'readwrite');
+      tx.objectStore(RCPT_IDB_STORE).put({
+        id: id,
+        driver: _driverStoreKey(''),
+        mimeType: payload.mimeType,
+        data: payload.data,
+        savedAt: Date.now()
+      });
+      tx.oncomplete = function () { cb(true); };
+      tx.onerror    = function () { cb(false); };
+      tx.onabort    = function () { cb(false); };
+    } catch (e) { cb(false); }
+  });
+}
+
+function _rcptImgGet(id, cb) {
+  _rcptIdbOpen(function (db) {
+    if (!db) { cb(null); return; }
+    try {
+      var req = db.transaction(RCPT_IDB_STORE, 'readonly').objectStore(RCPT_IDB_STORE).get(id);
+      req.onsuccess = function () {
+        var r = req.result;
+        cb(r && r.data ? { mimeType: r.mimeType, data: r.data } : null);
+      };
+      req.onerror = function () { cb(null); };
+    } catch (e) { cb(null); }
+  });
+}
+
+function _rcptImgDel(id) {
+  _rcptIdbOpen(function (db) {
+    if (!db) return;
+    try { db.transaction(RCPT_IDB_STORE, 'readwrite').objectStore(RCPT_IDB_STORE).delete(id); } catch (e) {}
+  });
+}
+
+// Gazdátlan képek takarítása: amit a JELENLEGI sofőr várólistája már nem
+// tartalmaz (elfogadta/eldobta egy régebbi munkamenetben), plusz bármely
+// sofőr RCPT_IMG_MAX_DAYS-nél régebbi képe (végső védőháló, hogy egy
+// vissza nem térő sofőr képei se hízzanak a végtelenségig).
+function _rcptImgPrune() {
+  _rcptIdbOpen(function (db) {
+    if (!db) return;
+    try {
+      var live = {};
+      rcptQueueLoad().forEach(function (it) { live[it.id] = true; });
+      var me = _driverStoreKey('');
+      var cutoff = Date.now() - RCPT_IMG_MAX_DAYS * 24 * 60 * 60 * 1000;
+      var store = db.transaction(RCPT_IDB_STORE, 'readwrite').objectStore(RCPT_IDB_STORE);
+      var req = store.openCursor();
+      req.onsuccess = function () {
+        var cur = req.result;
+        if (!cur) return;
+        var v = cur.value || {};
+        var mine = (v.driver === me);
+        if ((mine && !live[v.id]) || (v.savedAt || 0) < cutoff) cur.delete();
+        cur.continue();
+      };
+    } catch (e) {}
+  });
 }
 
 // A főoldali „📷 Bon szkennelés" gomb — a Gemini dönti el, tankolás
@@ -1757,7 +1877,8 @@ function scanReceiptStart(file) {
     if (busy) busy.style.display = 'none';
     if (!payload) { toast(t('sof.scanReadErr'), 'err'); return; }
 
-    // Új queue-elem — csak a thumbnailt tároljuk (a nyers base64-et NEM)
+    // Új queue-elem: a localStorage-ba csak a metaadat + a kis thumbnail
+    // megy, a TELJES kép az IndexedDB-be (`_rcptImgPut`).
     var id = rcptNewId();
     rcptQueueAdd({
       id: id,
@@ -1766,15 +1887,39 @@ function scanReceiptStart(file) {
       kindHint: _receiptScanKind, // 'fuel' | 'purchase' | null
       thumb: payload.thumb || '',
       fields: null,
-      error: null
+      error: null,
+      hasImage: false             // az IDB-mentés sikere után igaz
     });
     renderPendingReceipts();
     toast(t('sof.scanQueued'), 'ok');
 
-    // Auto-retry hálózati vagy átmeneti szerver-hibánál (429/503/5xx).
-    // A payload (base64) végig a closure-ban él → a retry a memóriában
-    // meglévő képet küldi újra (nem kell újra fotózni). Nem-átmeneti
-    // hibáknál (400, tiltás, konfig-hiba) azonnal error → NINCS retry.
+    // A képet a HÁLÓZATI hívás ELŐTT tesszük el: ha a fetch közben az OS
+    // kilövi az appot, a fotó akkor is megvan, és a sofőr egy koppintással
+    // újraindíthatja a kiolvasást (nem kell újra fotózni).
+    _rcptImgPut(id, payload, function (saved) {
+      if (saved) { rcptQueueUpdate(id, { hasImage: true }); renderPendingReceipts(); }
+      // Auto-retry hálózati vagy átmeneti szerver-hibánál (429/503/5xx).
+      // Nem-átmeneti hibáknál (400, tiltás, konfig-hiba) azonnal error →
+      // NINCS auto-retry, de a kép megmarad → kézi újrapróbálás lehet.
+      _scanReceiptTry(id, payload, 0);
+    });
+  });
+}
+
+// Kézi újrapróbálás a MEGŐRZÖTT képből — az „error" tétel 🔄 gombja.
+// Nincs újrafotózás: a kép az IndexedDB-ben van a felvétel pillanata óta.
+function rrRetry(id) {
+  var it = rcptQueueLoad().find(function (x) { return x.id === id; });
+  if (!it) return;
+  rcptQueueUpdate(id, { status: 'processing', error: null, attempt: null, maxAttempts: null });
+  renderPendingReceipts();
+  _rcptImgGet(id, function (payload) {
+    if (!payload) {
+      // A kép mégsem elérhető (IDB nincs / kitakarítva) — őszintén megmondjuk.
+      rcptQueueUpdate(id, { status: 'error', error: t('sof.rr.interrupted'), hasImage: false });
+      renderPendingReceipts();
+      return;
+    }
     _scanReceiptTry(id, payload, 0);
   });
 }
@@ -1784,7 +1929,11 @@ function scanReceiptStart(file) {
 function _scanReceiptTry(id, payload, attempt) {
   var MAX_ATTEMPTS = 3;
   var BACKOFFS = [0, 5000, 15000]; // 0s, 5s, 15s — kb. 20 mp max összesen
-  var wait = BACKOFFS[attempt] || 15000;
+  // FIGYELEM: `BACKOFFS[attempt] || 15000` NEM jó — a legelső próbánál
+  // (attempt=0) a tömbérték 0, ami HAMIS, így a `||` 15 000-re váltott:
+  // minden bon-scan 15 másodpercet várt az ELSŐ kérés előtt is. A sofőr
+  // ennyit nézte a pörgő spinnert, mielőtt bármi elindult volna.
+  var wait = (attempt < BACKOFFS.length) ? BACKOFFS[attempt] : 15000;
 
   // A queue-elemet frissítjük, hogy a UI mutassa a próbálkozás-számot.
   if (attempt > 0) {
@@ -1869,6 +2018,8 @@ function renderPendingReceipts() {
     } else {
       badge = '<span class="pending-badge pb-error">' + t('sof.rr.error') + '</span>';
       title = it.error || t('sof.scanFailed');
+      // Ha a fotó megvan, ez NEM zsákutca: jelezzük, hogy elég a 🔄 gomb.
+      if (it.hasImage) title += ' · ' + t('sof.rr.photoKept');
     }
     var timeStr = new Date(it.createdAt).toLocaleTimeString();
     var thumb = it.thumb
@@ -1879,7 +2030,11 @@ function renderPendingReceipts() {
       actions = '<button class="btn-mini ok" onclick="rrOpen(\'' + it.id + '\')">' + t('sof.rr.review') + '</button>'
               + '<button class="btn-mini err" onclick="rrRemove(\'' + it.id + '\')">✕</button>';
     } else if (it.status === 'error') {
-      actions = '<button class="btn-mini err" onclick="rrRemove(\'' + it.id + '\')">✕</button>';
+      // A megőrzött képből egy koppintással újraindítható a kiolvasás.
+      actions = (it.hasImage
+                  ? '<button class="btn-mini ok" onclick="rrRetry(\'' + it.id + '\')">' + t('sof.rr.retry') + '</button>'
+                  : '')
+              + '<button class="btn-mini err" onclick="rrRemove(\'' + it.id + '\')">✕</button>';
     } else {
       actions = '<div class="spinner"></div>';
     }
@@ -1905,9 +2060,19 @@ function rrOpen(id) {
   _rrCurrentId = id;
 
   var thumbEl = document.getElementById('rrThumbWrap');
+  var imgStyle = 'max-width:120px;max-height:120px;border-radius:10px;border:1px solid var(--border);';
   thumbEl.innerHTML = it.thumb
-    ? '<img src="' + it.thumb + '" style="max-width:120px;max-height:120px;border-radius:10px;border:1px solid var(--border);">'
+    ? '<img src="' + it.thumb + '" style="' + imgStyle + '">'
     : '';
+  // Ha a thumbnailt a localStorage kvóta-védelme eldobta (`_perDriverSetJson`),
+  // a megőrzött teljes képből pótoljuk — a sofőr lássa, MELYIK bont nézi át.
+  if (!it.thumb && it.hasImage) {
+    _rcptImgGet(id, function (payload) {
+      if (!payload || _rrCurrentId !== id || !thumbEl) return;
+      thumbEl.innerHTML = '<img src="data:' + payload.mimeType + ';base64,' + payload.data
+                        + '" style="' + imgStyle + '">';
+    });
+  }
 
   var f = it.fields || {};
   var isFuel = it.kind === 'fuel';
@@ -2066,19 +2231,37 @@ document.addEventListener('DOMContentLoaded', function () {
   // (kiolvasott) és error tételek maradnak. Küszöb: 3 perc — hogy a
   // legrosszabb esetben (3 retry × 30s Gemini timeout + 20s backoff)
   // se törjük meg a folyamatot, ami még lehet, hogy csak most fejeződik be.
+  renderPendingReceipts();
+});
+
+// A várólista karbantartása. FONTOS: ezt CSAK az authMe után szabad
+// futtatni — a lista kulcsa per-sofőr (`_driverStoreKey`), és amíg a
+// `_meData` nincs meg, a csupasz (legacy) kulcsról olvasnánk, azaz a
+// sofőr tételeit meg sem látnánk.
+function rcptQueueMaint() {
   var q = rcptQueueLoad();
   var changed = false;
   var now = Date.now();
+  var resume = [];
   for (var i = 0; i < q.length; i++) {
     if (q[i].status === 'processing' && (now - (q[i].createdAt || 0) > 3 * 60 * 1000)) {
-      q[i].status = 'error';
-      q[i].error = t('sof.rr.interrupted');
-      changed = true;
+      if (q[i].hasImage) {
+        // A fotó megvan → nem zsákutca: magától folytatjuk a kiolvasást.
+        resume.push(q[i].id);
+      } else {
+        q[i].status = 'error';
+        q[i].error = t('sof.rr.interrupted');
+        changed = true;
+      }
     }
   }
   if (changed) rcptQueueStore(q);
   renderPendingReceipts();
-});
+  // A megszakadt tételek újraindítása a megőrzött képből (a sofőrnek nem
+  // kell semmit tennie), majd a gazdátlan képek takarítása.
+  resume.forEach(function (id) { rrRetry(id); });
+  _rcptImgPrune();
+}
 
 // ============================================================
 // HATÁRÁTLÉPÉS — CSAK a főoldali két gombból (GPS), kézi bevitel NINCS
@@ -2839,6 +3022,10 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
     loadMyAssignedVehicle();
     loadGdprNotice();
     applyBonScanVisibility();
+    // Bon-várólista karbantartás — csak ITT, a `_meData` ismeretében (a
+    // lista kulcsa per-sofőr): megszakadt feldolgozás folytatása a
+    // megőrzött képből + gazdátlan képek takarítása.
+    rcptQueueMaint();
 
   // ── Állapot visszaállítás ──
   var state = stateGet();

@@ -2539,6 +2539,8 @@
     'sof.rr.confirmDiscard':   { hu: 'Biztos elveted a kiolvasott bont?', ro: 'Sigur renunți la bonul scanat?' },
     'sof.rr.accepted':         { hu: '✅ Bon hozzáadva a menetlevélhez', ro: '✅ Bon adăugat la foaia de parcurs' },
     'sof.rr.interrupted':      { hu: 'A feldolgozás megszakadt — kérlek fotózz újra', ro: 'Procesarea a fost întreruptă — te rugăm fotografiază din nou' },
+    'sof.rr.retry':            { hu: '🔄 Újra', ro: '🔄 Reîncearcă' },
+    'sof.rr.photoKept':        { hu: 'a fotó megvan, nem kell újrafotózni', ro: 'poza este păstrată, nu trebuie refotografiată' },
     'sof.rr.kind':             { hu: 'Típus', ro: 'Tip' },
     'sof.rr.kindFuel':         { hu: 'Tankolás',  ro: 'Alimentare' },
     'sof.rr.kindPurchase':     { hu: 'Vásárlás', ro: 'Achiziție' },
