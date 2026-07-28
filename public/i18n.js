@@ -2438,6 +2438,7 @@
     'sof.noOrderSummary': { hu: '📄 Menetlevél kiválasztott fuvar nélkül', ro: '📄 Foaie de parcurs fără cursă selectată' },
     'sof.selectedOrders': { hu: '{n} fuvar kiválasztva:', ro: '{n} curse selectate:' },
     'sof.punctType': { hu: 'Pont típusa', ro: 'Tip punct' },
+    'sof.dragHint': { hu: 'Tartsd nyomva a mozgatáshoz', ro: 'Ține apăsat pentru a muta' },
     'sof.date': { hu: 'Dátum', ro: 'Dată' },
     'sof.localityAddr': { hu: 'Helység / Cím', ro: 'Localitate / Adresă' },
     'sof.punctLocPh': { hu: 'pl. Budapest, Keleti pu.', ro: 'ex. Arad, Vama Nădlac' },

@@ -672,6 +672,71 @@
     display: flex; align-items: center; justify-content: center;
     touch-action: manipulation;
   }
+  /* ── Útvonal-pont sorok átrendezése (hosszan nyomva → húzás) ── */
+  #puncteContainer { position: relative; }
+  .punct-row .punct-grip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: -2px 0 10px;
+    padding-right: 48px;              /* hely a ✕ törlés-gombnak */
+    font-size: 12px;
+    color: var(--sof-muted);
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .punct-row .punct-grip-idx {
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sof-primary);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .punct-row .punct-grip-ico { font-size: 15px; line-height: 1; opacity: .55; }
+  .punct-row .punct-grip-hint { opacity: .8; }
+  .punct-row label { user-select: none; -webkit-user-select: none; }
+  .punct-row.punct-dragging {
+    z-index: 30;
+    cursor: grabbing;
+    border-color: var(--sof-primary);
+    box-shadow: 0 16px 34px rgba(15,23,42,0.26);
+    will-change: transform;
+  }
+  .punct-row.punct-dragging .punct-grip-hint { visibility: hidden; }
+  .punct-row.punct-dropped { animation: punctDropFlash .5s ease-out; }
+  @keyframes punctDropFlash {
+    from { background: rgba(59,130,246,0.16); }
+    to   { background: var(--sof-card); }
+  }
+  /* A beszúrás helyét jelző vonal — a konténerhez képest abszolút, így a
+     sorok nem ugrálnak húzás közben. */
+  .punct-drop-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--sof-primary);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.18);
+    pointer-events: none;
+    z-index: 25;
+  }
+  .punct-drop-line::before {
+    content: '';
+    position: absolute;
+    left: -3px; top: -3px;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--sof-primary);
+  }
+  body.punct-drag-active { user-select: none; -webkit-user-select: none; }
   .add-row-btn {
     display: flex;
     align-items: center;

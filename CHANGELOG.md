@@ -14,6 +14,25 @@
 
 ---
 
+## 2026-07-28 — Sofőr menetlevél: útvonal-pontok átrendezhetők (hosszan nyomva → húzás, beszúrás-jelző vonallal)
+
+### Miért
+A menetlevél útvonal-pontjai eddig abban a sorrendben álltak, ahogy létrejöttek (Plecare → a kiválasztott fuvarok fel-/lerakásai → Sosire). Ha a sofőr a valóságban más sorrendben járta be a pontokat (pl. két fuvar lerakása felcserélődött), csak úgy tudta javítani, hogy a mezőket egyesével átgépelte. Kérés: a pont **egyben** (típus + dátum + helység) legyen mozgatható, **telefonról főként hosszan nyomva tartva** — a kártya „ugorjon ki", és egy vonal előre jelezze, melyik két pont közé kerül.
+
+### Mit
+1. **`public/sofer.js` — új pointer-alapú átrendező** (`_punctDragInit` + `_punctPointerDown`/`Move`/`Up`/`Cancel`, `_punctDragActivate`/`Update`/`End`). Hosszan nyomva (**400 ms**) a sor „kiugrik" (kiemelt árnyék + `scale(1.03)`, `navigator.vibrate(30)` tapintható visszajelzés) és követi az ujjat; felengedésre a jelzett helyre kerül. Nem a natív HTML5 drag&drop (mobilon használhatatlan), hanem **Pointer Events** → érintés és egér ugyanazon az úton.
+2. **Beszúrás-jelző vonal** (`.punct-drop-line`) — a konténerhez képest **abszolút** pozicionált, így a sorok NEM ugrálnak húzás közben; a cél-pozíció a többi sor függőleges felezőpontjához mérve dől el.
+3. **Görgetés-barát**: a long-press LEJÁRTA ELŐTT >10px elmozdulás = görgetési szándék → nincs húzás. Aktív húzás közben nem-passzív `touchmove` + `preventDefault` tiltja a lapgörgetést, a képernyő szélénél automatikus görgetés fut, és a közben elmozduló görgetés-pozíciót korrigáljuk (nem csúszik ki a sor az ujj alól). `pointercancel` (a böngésző elvette a gesztust) → **nem** rendez át.
+4. **Fogantyú-sáv minden pont-soron** (`.punct-grip`): **sorszám-buborék (1..N)** + `⠿` ikon + „Ține apăsat pentru a muta" jelzés. A húzás a fogantyúról, a címkékről és a sor üres felületéről indul; a **beviteli mezőkről NEM** (a szerkeszthetőség/kijelölés érintetlen).
+5. **Sorrend-változás kezelése**: a payload-gyűjtők eleve DOM-sorrendben olvasnak, ezért a csere után elég a `draftSave()` + `_syncTripTimesFromPuncte()` (az „Út időpontjai" horgony **első Plecare / utolsó Sosire** — átrendezés után változhat) + `_punctRenumber()`. Ha a sofőr ugyanoda engedi vissza a sort, index-alapú összehasonlítás ismeri fel → nincs felesleges mentés. Új `punctRowRemove()` a pont-sor ✕ gombjára (a régi inline `parentNode.remove()` helyett) → törlés után is helyes a számozás + az idő-szinkron.
+6. **`public/sofer.css`** — `.punct-grip`/`.punct-grip-idx`/`.punct-grip-ico`/`.punct-grip-hint`, `.punct-dragging` (kiemelés), `.punct-dropped` (letevés-villanás), `.punct-drop-line` (jelző-vonal), `#puncteContainer{position:relative}` + `user-select:none` a címkéken/húzás közben (nincs szöveg-kijelölés / iOS callout).
+7. **i18n** 1 új kulcs (`sof.dragHint`, RO-alap + HU). Cache-bust `?v=20260728drag` (sofer.html/js/css + i18n.js). A **tankolás/vásárlás sorok NEM mozgathatók** (csak a `punct-row` osztályú pont-sorok), a szerver-oldal **érintetlen**.
+
+### Ellenőrzés
+**716 Jest zöld** (45 suite, 43 valós-DB skip). A húzó-logika DOM-shim harnesszel verifikálva (**22 eset**): sorszámozás, fölfelé/lefelé mozgatás, görgetési szándék elkülönítése, mezőről nem indul húzás, egy sor esetén nincs húzás, ugyanoda visszaengedve nincs mentés, jelző-vonal pozíciója, dragging/drop osztályok, törlés utáni újraszámozás.
+
+---
+
 ## 2026-07-28 — Sofőr: MINDEN localStorage memoria per-sofőr + Plecare/Sosire dátum kötelező + Út időpontjai automatikusan a Plecare/Sosire-ból
 
 ### Miért
