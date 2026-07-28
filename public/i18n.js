@@ -2429,6 +2429,9 @@
     'sof.wb.time':       { hu: 'Óra : perc (opcionális)', ro: 'Oră : minut (opțional)' },
     'sof.wb.ok':         { hu: 'OK', ro: 'OK' },
     'sof.wb.locRequired':{ hu: 'A helyszín megadása kötelező.', ro: 'Locația este obligatorie.' },
+    'sof.wb.dateRequired':{ hu: 'A dátum megadása kötelező.', ro: 'Data este obligatorie.' },
+    'sof.tripTimesAutoHead':{ hu: '🕐 Út időpontjai (automatikus)', ro: '🕐 Timpi cursă (automat)' },
+    'sof.tripTimesAutoHint':{ hu: 'A kezdő és záró időpontot automatikusan a Plecare és Sosire pontok dátumából (+ órájából, ha megadtad) számoljuk. Módosítás: kattints a Plecare / Sosire sor dátumára.', ro: 'Ora de plecare și de sosire se calculează automat din data (+ ora, dacă ai completat) punctelor Plecare și Sosire. Modificare: apasă pe data rândului Plecare / Sosire.' },
     // Kettős dátum a fuvar-kártya kinyíló részén
     'sof.det.planShort':   { hu: 'Terv.', ro: 'Plan.' },
     'sof.det.actualShort': { hu: 'Tényl.', ro: 'Efect.' },
