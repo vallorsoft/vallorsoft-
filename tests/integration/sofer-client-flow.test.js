@@ -407,3 +407,57 @@ describe('per-sofőr storage kulcs formátuma', () => {
     expect(Object.keys(dump).some(k => k === 'vs_sofer_state:peto@ex.hu')).toBe(true);
   });
 });
+
+// ================================================================
+//  Állomás-visszajelzés (driverMilestone) — megerősítés a beküldés
+//  ELŐTT. Az állomás nem vonható vissza (a szerver mindig a
+//  következő üres állomást tölti ki), a gomb pedig a kártya
+//  fejlécén ül → félrenyomásra a fuvar rossz státuszba léphet.
+// ================================================================
+describe('driverMilestone megerősítés', () => {
+  test('confirm=false → nincs hálózati hívás', () => {
+    const urls = [];
+    const sb = load({
+      confirm: () => false,
+      fetch: (u) => { urls.push(String(u)); return Promise.resolve({ json: () => Promise.resolve({ ok: true }) }); }
+    });
+    sb.driverMilestone('ORD1', 0);
+    // (az induláskori authMe-fetch nem számít — csak a milestone-hívást nézzük)
+    expect(urls.filter(u => u.indexOf('/driver-milestone') >= 0)).toEqual([]);
+  });
+
+  test('confirm=true → POST a driver-milestone végpontra', async () => {
+    const urls = [];
+    const sb = load({
+      confirm: () => true,
+      fetch: (u, o) => { urls.push({ u, m: o && o.method }); return Promise.resolve({ json: () => Promise.resolve({ ok: true, step: 'loaded' }) }); }
+    });
+    sb.loadDashOrders = () => {};
+    sb.driverMilestone('ORD1', 1);
+    await tick();
+    const hit = urls.filter(x => String(x.u).indexOf('/driver-milestone') >= 0);
+    expect(hit.length).toBe(1);
+    expect(hit[0].m).toBe('POST');
+    expect(String(hit[0].u)).toContain('/api/orders/ORD1/driver-milestone');
+  });
+
+  test('a kérdés a soron következő állomást nevezi meg', () => {
+    const asked = [];
+    const sb = load({ confirm: (m) => { asked.push(m); return false; } });
+    sb.t = (k, v) => (v && v.act != null) ? (k + '|' + v.act) : k;
+    sb.driverMilestone('ORD1', 2);           // sosit_descarcare_at
+    expect(asked[0]).toBe('sof.ms.confirmAsk|sof.ms.arriveUnload');
+  });
+
+  test('érvénytelen/hiányzó stepIdx → általános kérdés, de továbbra is kérdez', () => {
+    const asked = [];
+    const sb = load({ confirm: (m) => { asked.push(m); return false; } });
+    sb.t = (k, v) => (v && v.act != null) ? (k + '|' + v.act) : k;
+    sb.driverMilestone('ORD1');              // nincs index (régi hívó)
+    sb.driverMilestone('ORD1', 99);          // tartományon kívül
+    expect(asked).toEqual([
+      'sof.ms.confirmAsk|sof.ms.recorded',
+      'sof.ms.confirmAsk|sof.ms.recorded'
+    ]);
+  });
+});
