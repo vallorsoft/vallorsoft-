@@ -2608,6 +2608,10 @@
     'sof.ms.arriveUnload': { hu: 'Megérkeztem a lerakóhoz', ro: 'Am sosit la descărcare' },
     'sof.ms.unloaded': { hu: 'Leürítettem', ro: 'Am descărcat' },
     'sof.ms.recorded': { hu: 'Rögzítve', ro: 'Înregistrat' },
+    'sof.ms.confirmAsk': {
+      hu: 'Biztos, hogy „{act}"?\n\nAz időpont most rögzül és az iroda értesítést kap. Nem vonható vissza.',
+      ro: 'Confirmi „{act}"?\n\nOra se înregistrează acum și biroul este notificat. Nu se poate anula.'
+    },
     'sof.orderAccepted': { hu: '✅ Fuvar elfogadva!', ro: '✅ Cursă acceptată!' },
     'sof.orderCompleted': { hu: '🏁 Fuvar teljesítve! Manager értesítve.', ro: '🏁 Cursă finalizată! Managerul a fost notificat.' },
     'sof.noActiveOrders': { hu: 'Nincs aktív kiosztott fuvar.', ro: 'Nicio cursă activă alocată.' },

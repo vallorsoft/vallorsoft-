@@ -3655,7 +3655,16 @@ var MS_STEPS = [
 
 // Egy gombnyomás → a szerver a következő üres állomást rögzíti (időbélyeg),
 // és értesíti az irodát; az utolsónál a fuvar Finalizat lesz.
-function driverMilestone(id) {
+// FONTOS: az állomás NEM visszavonható (a szerver mindig a KÖVETKEZŐ üres
+// állomást tölti ki), ezért beküldés ELŐTT megerősítést kérünk — a gomb a
+// fuvar-kártya fejlécén ül, vezetés után, kesztyűs kézzel könnyen félrenyomható.
+// A `stepIdx` a kliens által számolt következő állomás (a gomb felirata is
+// ebből jön) — csak a kérdés szövegéhez kell; a döntést továbbra is a szerver
+// hozza. Érvénytelen/hiányzó index esetén általános kérdést teszünk fel.
+function driverMilestone(id, stepIdx) {
+  var step = (typeof stepIdx === 'number' && MS_STEPS[stepIdx]) ? MS_STEPS[stepIdx] : null;
+  var act  = step ? t(step.key) : t('sof.ms.recorded');
+  if (!confirm(t('sof.ms.confirmAsk', { act: act }))) return;
   fetch('/api/orders/' + id + '/driver-milestone', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
   })
@@ -3731,10 +3740,10 @@ function renderFuvarCard(o, idx) {
   // `stopPropagation`, hogy a gomb ne csukja ki/be a kártyát.
   var headActionBtn = '';
   if ((isAlocat || isCurs) && msNextIdx >= 0) {
-    actionBtn = '<button class="sh-btn confirm" onclick="driverMilestone(\'' + o.id + '\')">' +
+    actionBtn = '<button class="sh-btn confirm" onclick="driverMilestone(\'' + o.id + '\',' + msNextIdx + ')">' +
                 '➜ ' + t(MS_STEPS[msNextIdx].key) + '</button>';
     headActionBtn = '<button class="sh-btn confirm fuvar-head-action" ' +
-      'onclick="event.stopPropagation();driverMilestone(\'' + o.id + '\')">' +
+      'onclick="event.stopPropagation();driverMilestone(\'' + o.id + '\',' + msNextIdx + ')">' +
       '➜ ' + t(MS_STEPS[msNextIdx].key) + '</button>';
   }
   // ⛔ Áru leadása (defekt / pótkocsi-csere) — a kérést a diszpécser igazolja vissza

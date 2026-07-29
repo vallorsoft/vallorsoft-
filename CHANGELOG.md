@@ -14,6 +14,25 @@
 
 ---
 
+## 2026-07-29 — Sofőr: az állomás-gomb (odaért / felrakodott / stb.) megerősítést kér (PR #302)
+
+### Miért
+A sofőr fuvar-kártyáján az állomás-léptető gomb (`➜ Megérkeztem a felrakóhoz` / `Felrakodtam` / `Megérkeztem a lerakóhoz` / `Leürítettem`) eddig **egyetlen koppintásra azonnal** rögzítette az időbélyeget és értesítette az irodát. Ez a napi 4× használt művelet, és a gomb a kártya **fejlécén** ül (`fuvar-head-action`) — épp azért, hogy vezetés után, kesztyűs kézzel ne kelljen előbb kinyitni a kártyát; ugyanez teszi könnyen félrenyomhatóvá. Az állomás **nem vonható vissza**: a szerver mindig a következő üres állomást tölti ki, az első `In Curs`-ra, az utolsó `Finalizat`-ra lépteti a fuvart.
+
+### Mi változott
+1. **`public/sofer.js` `driverMilestone(id, stepIdx)`** — a fetch ELŐTT `confirm()`. A kérdés a soron következő állomást nevezi meg („Biztos, hogy »Felrakodtam«?"), és jelzi, hogy az időpont most rögzül + az iroda értesítést kap + nem vonható vissza. A `stepIdx` CSAK a kérdés szövegéhez kell — a döntést továbbra is a **szerver** hozza (a `d.step`-ből jövő toast változatlan). Érvénytelen/hiányzó index (beragadt régi HTML) → általános kérdés, de **kérdez**; némán sosem küld.
+2. **Mindkét hívó** (kinyíló rész `actionBtn` + fejléc-gomb `headActionBtn`) átadja a már kiszámolt `msNextIdx`-et.
+3. **`public/i18n.js`** — új `sof.ms.confirmAsk` kulcs (RO-alap + HU), `{act}` placeholderrel (a `t(key, vars)` már támogatja).
+4. **`public/sofer.html`** — cache-bust `?v=20260728pick` → `?v=20260729msask` (`i18n.js` + `sofer.js`), hogy a beragadt mobil-cache lecserélődjön.
+
+### Nem érintett
+Szerver-oldal és DB változatlan (`routes/ordersRest.js` `POST /api/orders/:id/driver-milestone`); az irodai idővonal (`public/entity-detail.js` saját `_MS_STEPS`, read-only) szintén.
+
+### Teszt
++4 eset a `tests/integration/sofer-client-flow.test.js`-ben (a valódi `public/sofer.js` VM-mel, DOM-stubon): `confirm=false` → **nincs** `/driver-milestone` hívás; `confirm=true` → POST a helyes végpontra; a kérdés a soron következő állomást nevezi meg (`stepIdx=2` → `arriveUnload`); hiányzó/tartományon kívüli `stepIdx` → általános kérdés, de továbbra is kérdez. **859 → 863 Jest zöld** (45 skipped valós-DB).
+
+---
+
 ## 2026-07-29 — Sofőr-funkciók teljes lefedettsége (+84 új teszt) + 2 XSS-fix a naplórenderben + border-cross bemenet-validáció
 
 ### Miért
