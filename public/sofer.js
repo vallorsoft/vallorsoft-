@@ -771,10 +771,14 @@ function loadBorderLog() {
     if (!list.length) { el.innerHTML = '<div style="color:var(--muted);font-size:13px;">' + t('sof.noCross') + '</div>'; return; }
     el.innerHTML = list.slice(0, 20).map(function(l) {
       var dt = l.created_at ? new Date(l.created_at).toLocaleString(t('sof.locale')) : '—';
+      // A `locatie` DB-ből jön (a sofőr saját beküldése), ezért escape-elni
+      // kell — különben egy rosszindulatú `/api/border-cross` hívás tárolt
+      // XSS-t okozna a saját fuvarnaplójában (és bárkinél, aki a listát
+      // megnyitja).
       return '<div class="border-log-item">'
         + '<strong>' + (l.tip === 'Intrare' ? t('sof.crossIn') : t('sof.crossOut')) + '</strong>'
-        + ' — ' + dt
-        + (l.locatie ? '<br><span style="font-size:11px;color:var(--muted);">📍 ' + l.locatie + '</span>' : '')
+        + ' — ' + esc(dt)
+        + (l.locatie ? '<br><span style="font-size:11px;color:var(--muted);">📍 ' + esc(l.locatie) + '</span>' : '')
         + '</div>';
     }).join('');
   });
@@ -2288,12 +2292,18 @@ function renderPendingReceipts() {
     } else if (it.status === 'ready') {
       badge = '<span class="pending-badge pb-ready">' + t('sof.rr.ready') + '</span>';
       var f = it.fields || {};
-      title = (it.kind === 'fuel' ? '⛽ ' : '🛒 ') + (f.loc || '—') + (f.suma != null ? (' · ' + f.suma + ' ' + (f.valuta || '')) : '');
+      // Gemini-kiolvasás → a `loc`/`valuta` mezőt a szerver `_sanitize`
+      // (fehérlistázott max-hossz), DE nem HTML-escape-eli. A `title`
+      // közvetlenül a `innerHTML`-be kerül lentebb, ezért ITT escape kell.
+      title = (it.kind === 'fuel' ? '⛽ ' : '🛒 ') + esc(f.loc || '—')
+            + (f.suma != null ? (' · ' + esc(f.suma) + ' ' + esc(f.valuta || '')) : '');
     } else {
       badge = '<span class="pending-badge pb-error">' + t('sof.rr.error') + '</span>';
-      title = it.error || t('sof.scanFailed');
-      // Ha a fotó megvan, ez NEM zsákutca: jelezzük, hogy elég a 🔄 gomb.
-      if (it.hasImage) title += ' · ' + t('sof.rr.photoKept');
+      // Az `it.error` szerver-oldali hibaüzenet — a `receiptScan.js` 300
+      // karakteren csonkolja, de nem HTML-escape-eli. Escape kell, mert
+      // a `title` közvetlenül `innerHTML`-be kerül.
+      title = esc(it.error || t('sof.scanFailed'));
+      if (it.hasImage) title += ' · ' + esc(t('sof.rr.photoKept'));
     }
     var timeStr = new Date(it.createdAt).toLocaleTimeString();
     var thumb = it.thumb
