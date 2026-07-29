@@ -14,6 +14,25 @@
 
 ---
 
+## 2026-07-28 — Menetlevél: fuvar-picker (a fuvar-lista csak akkor jön elő, amikor kell) + mentett-piszkozat folytat/töröl dialog + kimaradt Finalizat blokkolja a lezárást
+
+### Miért
+A menetlevél 1. lépése eddig egy zsúfolt képernyő volt: minden kiosztott fuvar listája + „Menetlevél létrehozása" gomb + AI-scan + „mentett menetlevél folytatása" sáv. A sofőr rögtön szembesült a fuvar-listával, mielőtt eldöntötte volna, hogy egyáltalán ÚJ menetlevelet készít, vagy a mentettet folytatja. Emellett a mentett piszkozat kezelése is homályos volt: a „Menetlevél létrehozása" gomb bemutatta a fuvar-lista bepipálását, majd a step2-t nyitotta — mentett tartalom + új fuvar keveredett anélkül, hogy a sofőr választhatott volna. Végül a lezárás nem védte magát: ha egy fuvar a menetlevél indulása UTÁN lett elvégezve és kimaradt, a sofőr így véglegesítette az MT-YYYY-XXXX bizonylatot.
+
+### Mi változott (`public/sofer.html`, `sofer.js`, `sofer.css`, `i18n.js`)
+1. **Csak 3 dolog látszik a menetlevél kezdőképernyőjén:** „📄 Menetlevél létrehozása" gomb · „📷 Bon szkennelés (AI)" · a mentett-piszkozat folytatás sáv (ha van). A régi bepipálós fuvar-lista (`#soferOrderList`) `display:none`-nal maradt (a `loadSoferOrders` cache-e ugyanúgy tölt, csak nem rajzol).
+2. **„Menetlevél létrehozása" → mentett piszkozat kezelése.** Ha van megkezdett menetlevél: dialog kérdez. **FOLYTAT** → `resumeDraft()` (rögtön step2), majd megnyílik a picker `continue` módban (a jelenlegi kijelölés pre-checked, add/remove). **TÖRÖL** → két külön koppintás (visszavonhatatlan → biztonsági megerősítés): a piszkozat és a kijelölés is ürül, majd a fresh folyamat indul. **MÉGSE** → semmi nem történik.
+3. **Új fuvar-picker modal** (`#orderPickerModal`, `_openOrderPicker(mode, cb)`): a `_soferOrdersCache`-ből (waybill_visible=true) mutatja a fuvarokat, indulási dátum szerint rendezve. Phase-badge (📤 loading / 📥 unloading) és `⚠️ lezáráshoz kell` jelzés az indulás után elvégzett Finalizat sorokon. „→ Tovább" / „← Mégse" — Mégse a fresh úton visszatart step2-től.
+4. **„✏️ Fuvarok kezelése" gomb a step2-ben** — a picker utólag is nyitható. A visszaadott új kijelölésre a `_applyPickerDiff(newIds)` illeszti a `puncte`-t: levett fuvar tag-elt sorai törlődnek, hozzáadott fuvar Incarcare/Descarcare sorai a Sosire ELÉ kerülnek (a fázis szerint egyet vagy kettőt), a meglévő sorok érintetlenek (a sofőr által beírt dátum/óra nem vész el).
+5. **Lezárási védőháló** (`_validateNoLeftoverOrders`): `submitFuvarlevel` első lépéseként fut. Ha van olyan Finalizat fuvar a `_soferOrdersCache`-ben, aminek `finalized_at > Plecare-dátum` és nincs a menetlevélen, blokkolja a beküldést, err-toasttal figyelmeztet, és rögtön megnyitja a pickert (a sofőr bepipálja, majd újra ráüt a lezárásra). Az indulás előtti Finalizat kimaradása megengedett (történelmi).
+6. **`_plecareStartDay()`** közös segéd (DOM Plecare sor → piszkozat → `_pendingPlecare`) — a lezárás-validáció és a picker `⚠️ lezáráshoz kell` badge is ebből dolgozik → konzisztens ítélet.
+7. **13 új i18n kulcs** (RO-alap + HU), új CSS blokk a picker-modalra (világos kártya, ugyanaz a stílus, mint a többi mobil modal); cache-bust `?v=20260728pick`. Szerver-oldal és DB érintetlen (a `getMySoferOrders` amúgy is visszaadja a `finalized_at`-et, `waybill_phase`-t, `waybill_visible`-t).
+
+### Teszt
+**772 Jest zöld** (változatlan baseline) + DOM-shim harness a picker-fluxusra (18 eset): nincs draft → Plecare + picker + step2; VAN draft/FOLYTAT → resumeDraft + continue picker; VAN draft/TÖRÖL → draft+kijelölés ürül, fresh picker; MÉGSE → semmi nem történik; leftover-validátor kimaradt Finalizatra false + err-toast + picker újranyitása; bepipálva engedi; nincs indulási dátum → engedi.
+
+---
+
 ## 2026-07-28 — Bon-scan: a lefotózott bon a kiolvasás elfogadásáig MEGMARAD (IndexedDB) + 15 mp-es holt idő megszüntetve
 
 ### Miért

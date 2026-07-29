@@ -838,26 +838,300 @@ function toggleOrderSel(cb) {
 // egy `Plecare` sor lesz a puncte-ban (helyszín kötelező, dátum kötelező,
 // óra+perc opcionális). Ha van már mentett/piszkozat Plecare, kihagyja a
 // dialógust. Alap: „Garaj-Arcus" (localStorage-ban memoriál).
+// EGYETLEN menetlevél-létrehozó belépési pont — új folyamat:
+//   1. Ha VAN mentett piszkozat → dialog: „Folytatjuk vagy töröljük?"
+//        FOLYTAT: rögtön a 2. lépésbe ugrunk (resumeDraft), majd a picker
+//                 megnyílik add/remove módban — a már bent lévő fuvarok
+//                 pre-checked, a sofőr hozzáadhat/eltávolíthat.
+//        TÖRÖL:   piszkozat elvetve, üresen indulunk (mintha nem lett
+//                 volna mentett) → Plecare-dialog → picker (fresh).
+//   2. Ha NINCS piszkozat → Plecare-dialog → picker (fresh) → step2.
+//
+// A picker csak akkor jelenik meg, ha tényleg dönteni kell mit rakjunk a
+// menetlevélre — az 1. lépés kezdőképernyője már NEM tartalmazza a
+// fuvar-listát. A picker forrása a `_soferOrdersCache` (getMySoferOrders,
+// waybill_visible=true). Kijelölés nélkül is folytat, DE lezárni csak
+// akkor lehet, ha nincs olyan Finalizat fuvar, amelynek a `finalized_at`-je
+// a menetlevél indulása UTÁN van, és kimaradt (`_validateNoLeftoverOrders`).
 var _pendingPlecare = null;
 function fuvarCreate() {
-  // Ha van piszkozatban már Plecare-sor, nem kérdez újra.
-  var hasPlecareInDraft = false;
-  try {
-    var _st = stateGet();
-    var _dr = _st && _st.draft;
-    hasPlecareInDraft = !!(_dr && (_dr.puncte || []).some(function (p) { return p.tip === 'Plecare'; }));
-  } catch (_e) {}
-  if (hasPlecareInDraft) { fuvarStep2(true); return; }
+  var st = stateGet() || {};
+  if (_draftHasContent(st.draft)) {
+    _draftContinueOrDelete(function (choice) {
+      if (choice === 'continue') _continueSavedDraft();
+      else if (choice === 'delete') { draftClear(); renderDraftResume(); _startFreshWaybill(); }
+      // 'cancel' → nem csinálunk semmit, marad az 1. lépésen
+    });
+    return;
+  }
+  _startFreshWaybill();
+}
+// „Folytat / Töröl / Mégse" dialog. Natív confirm-lánc: első koppintás
+// eldönti (folytat vagy nem); ha nem, MÁSODIK koppintás dönti el, hogy
+// tényleg töröl vagy csak mégse. Ez visszavonhatatlan műveletnél a
+// legszigorúbb: két külön koppintás kell a piszkozat eldobásához.
+function _draftContinueOrDelete(cb) {
+  var wantContinue = confirm(t('sof.draftCont.ask'));
+  if (wantContinue) { cb('continue'); return; }
+  var wantDelete = confirm(t('sof.draftCont.deleteConfirm'));
+  cb(wantDelete ? 'delete' : 'cancel');
+}
+function _startFreshWaybill() {
+  _selectedOrderIds = [];
   wbLocDialog('start', function (res) {
     if (!res) return;                // Mégse — marad az 1. lépésen
     _pendingPlecare = res;           // fuvarStep2 innen olvassa
-    fuvarStep2(true);
+    _openOrderPicker('fresh', function (picked) {
+      if (picked == null) { _pendingPlecare = null; return; }  // Mégse → NE lépjünk step2-be
+      _selectedOrderIds = picked;
+      fuvarStep2(true);
+    });
+  });
+}
+function _continueSavedDraft() {
+  // A resumeDraft már a step2-t nyitja meg + visszatölti a mezőket + puncte-t.
+  resumeDraft();
+  // Picker rögtön utána — MELLÉ tehet még fuvart, vagy leveheti a bent lévőt.
+  _openOrderPicker('continue', function (picked) {
+    if (picked == null) return;      // Mégse → marad a jelenlegi állapot
+    _applyPickerDiff(picked);
   });
 }
 // Visszafelé kompatibilitás: régi (gyorsítótárazott) sofer.html még ezt hívja.
 function fuvarNoOrder() {
   _selectedOrderIds = [];
   fuvarStep2(true);
+}
+
+// „✏️ Fuvarok kezelése" gomb a step2-ből — a picker újranyitása utólag
+// (add/remove). Ugyanaz, mint a continue-ág, csak a felhasználó explicit
+// kérésére.
+function fuvarPickAgain() {
+  _openOrderPicker('continue', function (picked) {
+    if (picked == null) return;
+    _applyPickerDiff(picked);
+  });
+}
+
+// ============================================================
+// FUVAR-PICKER (modal) — a menetlevélre kerülő fuvarok kiválasztása
+// ============================================================
+// A picker a `_soferOrdersCache`-ből dolgozik (getMySoferOrders szűrése:
+// `waybill_visible=true`). A phase-badge mutatja, hogy a fuvar felrakó
+// (loading), lerakó (unloading) vagy egyben megy (complete).
+//   mode='fresh'    → nincs pre-checked
+//   mode='continue' → a jelenlegi `_selectedOrderIds` pre-checked (a
+//                     sofőr hozzáad/levesz)
+// Visszatérés: cb(null) = Mégse, cb([ids]) = az új teljes kijelölés.
+var _opCb = null;
+function _openOrderPicker(mode, cb) {
+  _opCb = cb || function () {};
+  var m = document.getElementById('orderPickerModal');
+  var hint = document.getElementById('opHint');
+  var list = document.getElementById('opList');
+  if (!m || !hint || !list) { _opCb([]); return; }   // régi HTML → csak továbbengedjük
+  var render = function () {
+    var items = _soferOrdersCache.slice();
+    var startDay = _plecareStartDay();
+    hint.textContent = (mode === 'continue')
+      ? t('sof.pick.hintContinue')
+      : t('sof.pick.hintFresh');
+    if (!items.length) {
+      list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:13px;">'
+        + esc(t('sof.pick.empty')) + '</div>';
+      return;
+    }
+    items.sort(function (a, b) {
+      var da = String(a.data_incarcare || a.incarcat_at || a.finalized_at || a.created_at || '');
+      var db = String(b.data_incarcare || b.incarcat_at || b.finalized_at || b.created_at || '');
+      return da.localeCompare(db);
+    });
+    list.innerHTML = items.map(function (o) {
+      var checked = _selectedOrderIds.indexOf(o.id) !== -1;
+      var phaseBadge = '';
+      if (o.waybill_phase === 'loading') {
+        phaseBadge = ' <span class="op-badge op-badge-load">📤 ' + t('sof.phaseLoading') + '</span>';
+      } else if (o.waybill_phase === 'unloading') {
+        phaseBadge = ' <span class="op-badge op-badge-unload">📥 ' + t('sof.phaseUnloading') + '</span>';
+      }
+      var mustBadge = '';
+      if (o.status === 'Finalizat' && startDay && (o.finalized_at || '') > startDay + 'T00:00:00') {
+        mustBadge = ' <span class="op-badge op-badge-must" title="'
+          + esc(t('sof.pick.mustTitle')) + '">⚠️ ' + esc(t('sof.pick.must')) + '</span>';
+      }
+      return '<label class="op-item">'
+        + '<input type="checkbox" value="' + esc(o.id) + '" ' + (checked ? 'checked' : '')
+        + ' onchange="_opToggle(this)">'
+        + '<div class="op-body">'
+        + '<div class="op-head"><b>' + esc(o.client || '—') + '</b>'
+        + ' <span class="op-id">#' + esc(o.id) + '</span>'
+        + phaseBadge + mustBadge + '</div>'
+        + '<div class="op-route">📍 ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—') + '</div>'
+        + (o.rendszam_camion ? '<div class="op-plate">🚛 ' + esc(o.rendszam_camion)
+              + (o.rendszam_remorca ? ' / ' + esc(o.rendszam_remorca) : '') + '</div>' : '')
+        + '</div></label>';
+    }).join('');
+  };
+  if (!_soferOrdersCache.length) {
+    fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ functionName: 'getMySoferOrders' }) })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      _soferOrdersCache = (d.result || []).filter(function (o) { return o.waybill_visible !== false; });
+      render();
+    })
+    .catch(function () { render(); });
+  } else {
+    render();
+  }
+  m.style.display = 'flex';
+}
+function _opToggle(cb) {
+  var id = cb.value;
+  if (cb.checked) {
+    if (_selectedOrderIds.indexOf(id) === -1) _selectedOrderIds.push(id);
+  } else {
+    _selectedOrderIds = _selectedOrderIds.filter(function (x) { return x !== id; });
+  }
+}
+function opAccept() {
+  var m = document.getElementById('orderPickerModal');
+  if (m) m.style.display = 'none';
+  var cb = _opCb; _opCb = null;
+  if (cb) cb(_selectedOrderIds.slice());
+}
+function opCancel() {
+  var m = document.getElementById('orderPickerModal');
+  if (m) m.style.display = 'none';
+  var cb = _opCb; _opCb = null;
+  if (cb) cb(null);
+}
+
+// A menetlevél indulási napja (YYYY-MM-DD) — a Plecare sorból elsősorban
+// (mert az a valódi indulás), különben a piszkozatból, végül a Plecare-
+// dialog eredményéből.
+function _plecareStartDay() {
+  var pc = document.getElementById('puncteContainer');
+  if (pc) {
+    var row = pc.querySelector('.dyn-row');
+    if (row) {
+      var tip = (row.querySelector('.punct-tip') || {}).value;
+      var dv  = (row.querySelector('.punct-data') || {}).value || '';
+      if (tip === 'Plecare' && /^\d{4}-\d{2}-\d{2}$/.test(dv)) return dv;
+    }
+  }
+  try {
+    var st = stateGet(), pl = ((st.draft || {}).puncte || []).find(function (p) { return p.tip === 'Plecare'; });
+    if (pl && pl.data) return String(pl.data).slice(0, 10);
+  } catch (e) {}
+  if (_pendingPlecare && _pendingPlecare.date) return String(_pendingPlecare.date).slice(0, 10);
+  return '';
+}
+
+// Continue módban: a picker új listáját (kijelölések) rávetítjük a step2
+// puncte-sorra. Eltávolítjuk azokat a fuvar-tag-elt sorokat, amiket a
+// sofőr LEVETT; és hozzáadjuk (Sosire ELÉ) azokat, amiket felvett. A
+// meglévő (bent maradó) sorokhoz NEM nyúlunk, hogy a sofőr által beírt
+// dátum/óra ne vesszen el.
+function _applyPickerDiff(newIds) {
+  var pc = document.getElementById('puncteContainer');
+  if (!pc) return;
+  var existing = {};   // orderId → { loading: row, unloading: row }
+  pc.querySelectorAll('.dyn-row').forEach(function (row) {
+    var oid = row.getAttribute('data-order-id');
+    var role = row.getAttribute('data-role');
+    if (!oid || !role) return;
+    existing[oid] = existing[oid] || {};
+    existing[oid][role] = row;
+  });
+  Object.keys(existing).forEach(function (oid) {
+    if (newIds.indexOf(oid) === -1) {
+      Object.keys(existing[oid]).forEach(function (role) {
+        var row = existing[oid][role];
+        if (row && row.parentNode) row.parentNode.removeChild(row);
+      });
+    }
+  });
+  var sosireRow = null;
+  pc.querySelectorAll('.dyn-row').forEach(function (row) {
+    if (sosireRow) return;
+    if ((row.querySelector('.punct-tip') || {}).value === 'Sosire') sosireRow = row;
+  });
+  var _ymdOf = function (v) { return v ? String(v).slice(0, 10) : ''; };
+  var added = 0;
+  newIds.forEach(function (oid) {
+    if (existing[oid]) return;                                    // már bent volt
+    var o = _soferOrdersCache.find(function (x) { return x.id === oid; });
+    if (!o) return;
+    var phase = o.waybill_phase;
+    var loadDate = _ymdOf(o.data_incarcare);
+    var unloadDate = _ymdOf(o.data_descarcare);
+    var toAdd = [];
+    if (phase === 'loading') {
+      if (o.loc_incarcare) toAdd.push([o.loc_incarcare, 'Încărcare', loadDate, { orderId: o.id, role: 'loading' }]);
+    } else if (phase === 'unloading') {
+      if (o.loc_descarcare) toAdd.push([o.loc_descarcare, 'Descărcare', unloadDate, { orderId: o.id, role: 'unloading' }]);
+    } else {
+      if (o.loc_incarcare)  toAdd.push([o.loc_incarcare,  'Încărcare',  loadDate,   { orderId: o.id, role: 'loading' }]);
+      if (o.loc_descarcare) toAdd.push([o.loc_descarcare, 'Descărcare', unloadDate, { orderId: o.id, role: 'unloading' }]);
+    }
+    toAdd.forEach(function (args) {
+      addPunctRow(args[0], args[1], args[2], args[3]);
+      var lastRow = pc.lastElementChild;
+      if (sosireRow && lastRow !== sosireRow) { pc.insertBefore(lastRow, sosireRow); }
+    });
+    added += toAdd.length;
+  });
+  _punctRenumber();
+  if (typeof _syncTripTimesFromPuncte === 'function') _syncTripTimesFromPuncte();
+  _refreshSelectedOrdersSummary();
+  draftSave();
+  if (added) toast(t('sof.pick.added', { n: added }), 'ok');
+}
+
+// A step2 tetején lévő „✅ N fuvar" összesítő újrarajzolása a jelenlegi
+// `_selectedOrderIds` + `_soferOrdersCache` alapján. A `fuvarStep2` első
+// beépítéskor már beállítja; a picker utólagos módosításnál ezt hívjuk.
+function _refreshSelectedOrdersSummary() {
+  var sumEl = document.getElementById('selectedOrdersSummary');
+  if (!sumEl) return;
+  var selected = _soferOrdersCache.filter(function (o) { return _selectedOrderIds.indexOf(o.id) !== -1; });
+  if (!selected.length) {
+    sumEl.innerHTML = '<b style="color:#fff;">' + t('sof.noOrderSummary') + '</b>';
+    return;
+  }
+  sumEl.innerHTML = '<b style="color:#fff;">✅ ' + t('sof.selectedOrders', { n: selected.length }) + '</b><br>'
+    + selected.map(function (o) {
+        return '• ' + esc(o.client || '—') + ': ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—');
+      }).join('<br>');
+}
+
+// Lezárási védőháló: ha a `_soferOrdersCache`-ban van olyan Finalizat
+// fuvar, ami az indulási nap UTÁN lett elvégezve (`finalized_at > startDay`),
+// és nincs a menetlevélen (`_selectedOrderIds` és a puncte-tag-ek sem
+// tartalmazzák), NEM engedjük lezárni. A sofőrnek felkínáljuk a pickert.
+// Az indulás előtti Finalizat fuvarok kimaradása megengedett (történelmi).
+function _validateNoLeftoverOrders() {
+  var startDay = _plecareStartDay();
+  if (!startDay) return true;             // nincs indulási nap → nem tudunk értékelni, engedjük
+  var onWaybill = {};
+  _selectedOrderIds.forEach(function (id) { onWaybill[id] = true; });
+  var pc = document.getElementById('puncteContainer');
+  if (pc) {
+    pc.querySelectorAll('.dyn-row[data-order-id]').forEach(function (row) {
+      onWaybill[row.getAttribute('data-order-id')] = true;
+    });
+  }
+  var missing = _soferOrdersCache.filter(function (o) {
+    if (o.status !== 'Finalizat') return false;
+    if (onWaybill[o.id]) return false;
+    var f = o.finalized_at || '';
+    return f && f > startDay + 'T00:00:00';
+  });
+  if (!missing.length) return true;
+  toast(t('sof.pick.leftover', { n: missing.length }), 'err');
+  fuvarPickAgain();
+  return false;
 }
 
 function fuvarStep2(allowEmpty) {
@@ -2396,6 +2670,11 @@ function submitFuvarlevel() {
   // előbb kitölti az érkezési helyet/időt, és csak utána derülne ki, hogy
   // a km hibás — felesleges kör.
   if (!_validateKm()) return;
+  // Lezárási védőháló: az indulás UTÁN elvégzett Finalizat fuvar nem
+  // maradhat kimaradva. Ha van ilyen, felkínáljuk a pickert (a validátor
+  // maga hívja meg), és most nem küldünk. A sofőr a pickerben pipálja
+  // be, majd újra ráüt a beküldés gombra.
+  if (typeof _validateNoLeftoverOrders === 'function' && !_validateNoLeftoverOrders()) return;
 
   var hasSosire = false;
   document.querySelectorAll('#puncteContainer .dyn-row').forEach(function (row) {
