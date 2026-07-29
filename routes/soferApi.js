@@ -14,17 +14,28 @@ router.post('/api/border-cross', async (req, res) => {
   try {
     if (!req.session.user) return res.json({ success: false, err: 'Nu sunteti autentificat' });
     const { tip, tara, locatie, gps_lat, gps_lng } = req.body;
+    // Bemenet-védelem: `tip` fehérlista (a schema.sql-en VARCHAR(20) volt,
+    // csendes megcsonkolás lett belőle); a `tara`/`locatie` hossz-korlát a
+    // schema-oszlop szélességéhez igazodik; a `gps_lat`/`lng` numerikusan
+    // ellenőrzött (NaN/Infinity/tartományon kívüli érték kizárva). Ez a
+    // teljes védelme a `borderLogList` renderrel párban áll (esc a
+    // kliensen), de itt is szigorítunk, hogy a DB-ben csak legit érték
+    // legyen.
+    const tipSafe = (tip === 'Intrare' || tip === 'Iesire') ? tip : 'Iesire';
+    const taraSafe = tara ? String(tara).slice(0, 50) : null;
+    const locSafe = locatie ? String(locatie).slice(0, 255) : null;
+    const validGps = (v) => {
+      const n = parseFloat(v);
+      return (Number.isFinite(n) && Math.abs(n) <= 180) ? n : null;
+    };
     await pool.query(
       `INSERT INTO border_crossings (email_sofer, nume_sofer, tip, tara, locatie, gps_lat, gps_lng)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         req.session.user.email,
         req.session.user.nume,
-        tip || 'Iesire',
-        tara || null,
-        locatie || null,
-        gps_lat ? parseFloat(gps_lat) : null,
-        gps_lng ? parseFloat(gps_lng) : null
+        tipSafe, taraSafe, locSafe,
+        validGps(gps_lat), validGps(gps_lng)
       ]
     );
     res.json({ success: true });

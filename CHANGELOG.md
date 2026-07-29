@@ -14,6 +14,50 @@
 
 ---
 
+## 2026-07-29 — Sofőr-funkciók teljes lefedettsége (+84 új teszt) + 2 XSS-fix a naplórenderben + border-cross bemenet-validáció
+
+### Miért
+Kérés: „csinálj teszteket minden sofőr-funkcióval, és javítsd a hibákat, mostantól élesbe hibamentesen". A #299/#300 kör után átvizsgáltam, mit tesztel már valami (getMySoferOrders, scanReceipt, handover-lánc, GDPR export, getFuvarlevelFieldSuggestions, getMySoferStats, tripCrossings stb.) és mit nem — a hiánylistát pótoltam, közben találtam két valódi hibát.
+
+### Hozzáadott tesztek
+
+**`tests/integration/sofer-handlers.test.js` (+37 eset):**
+- `getMyAssignedVehicle` — szerep-kapu (csak Sofer), cég+email kisbetűs illesztés, DB-hiba kecses lezárás.
+- `getLastVehicleReadings` — Sofer/Admin/Manager engedélyezett, rendszám normalizálása („B 123" → „B123"), újabb GPS-snapshot **felülír** menetlevél-értéket, régebbi NEM ír felül, snapshot-lekérdezés hibája nem buktatja el (best-effort).
+- `previewTripDiurna` — bejelentkezés-kapu, hiányzó dátum → ready:false, sofőrnek **nem** látszik externDays/internDays (csak Admin/Managernek).
+- `getBonScanSettings` / `setBonScanEnabled` / `deleteBonScanSample` — szerep-kapu, `SELF_ALLOWED_KEYS` fehérlista (ismeretlen kulcs → `ai-bon-scan`-re esik), samples-lekérdezés hibatűrése, idegen cég mintája nem törölhető (rowCount=0), az érvénytelen id (0/negatív/NaN/string) elutasítva.
+- `getMyBonScanEnabled` — bejelentkezés-kapu, idegen szerep (Konyvelo) tiltva, GEMINI_API_KEY hiányában `hasKey:false`+`usable:false`.
+- `getMyPrivacyNotice` — nincs notice → notice:null, friss ack → acknowledged:true, régi ack az újabb frissítéshez → acknowledged:false.
+- `ackPrivacyNotice` — X-Forwarded-For első IP-je kerül be, company_id+user_id+kind='privacy_notice' a WHERE-ben.
+
+**`tests/integration/sofer-routes.test.js` (+30 eset):**
+- `POST /api/border-cross` — bejelentkezés-kapu, DB-hívás session-adatokkal (email/nume a szerverről), gps lat/lng parseFloat, hiányzó tip → 'Iesire' default.
+- `POST /api/doc-upload` — orderId nélkül safeOrderId=null, **idegen cég fuvar-ID → NULL-ra vág** (nincs cross-tenant csatolás, ownership-check WHERE-je cégre szűrt), saját cég fuvar-ID megőrzve.
+- `GET /api/doc-download/:id` — Sofer csak SAJÁT dokumentumot lát (WHERE tartalmazza az email-szűrőt), Admin/Manager cégen belül minden dokumentumot, data-URL PDF → inline, nyers base64 → attachment, üres storage_url → 404.
+- `POST /api/orders/:id/driver-status` — nem-Sofer 403, érvénytelen státusz → nem hívja a DB-t, tulajdon-ellenőrzés WHERE-je (id + company_id + LOWER(email)), happy path (In Curs → UPDATE + push).
+- `POST /api/orders/:id/driver-milestone` — nem-Sofer 403, idegen fuvar → tulajdon-ellenőrzés, Finalizat/Anulat/Parkolt/Raktarban → nem léptet, minden állomás kész → hibaüzenet, első állomás → status='In Curs', utolsó → status='Finalizat', köztes állomás NEM módosít státuszt, Extern státuszból a 2. állomásnál nem lép In Curs-ra.
+
+**`tests/integration/sofer-client-flow.test.js` (+20 eset):**
+Kliens-oldali `public/sofer.js` VM-alapú futtatása minimál DOM-stubbal:
+- `fuvarCreate` fluxus (nincs draft / FOLYTAT / TÖRÖL / MÉGSE), `_opToggle` bejelöl/levesz, `opAccept` / `opCancel`.
+- `_validateNoLeftoverOrders` — nincs indulási nap → engedi, indulás UTÁN elvégzett Finalizat → false + err-toast + picker újranyitása, INDULÁS ELŐTT elvégzett Finalizat kimaradása engedve, bepipálva engedi.
+- IndexedDB képmegőrzés (#299 regresszió-védelem) — `_rcptImgPut/Get/Del` körforgás, `rcptQueueRemove` egyetlen ponton törli a képet, `_rcptImgPrune` MÁS sofőr képéhez nem nyúl, IndexedDB nélkül kecses leromlás.
+- Offline outbox — `_outboxSendOne` a locPlecare/locSosire-t TÍPUS szerint tölti (nem első/utolsó), `outboxFlush` pending tétel sikeres → törlődik, offline állapotban nem próbálkozik.
+- Per-sofőr storage kulcs: `vs_sofer_state:<email>` formátumban él.
+
+### 2 valós XSS-javítás és 1 bemenet-szigorítás
+
+**`public/sofer.js` `loadBorderLog`** — a `border_crossings.locatie` DB-ből jön (a sofőr saját beküldése), és eddig **escape nélkül** került `innerHTML`-be. Rosszindulatú `/api/border-cross` hívás (nem a kliensről, hanem közvetlen POST) tárolt XSS-t okozhatott a sofőr saját fuvarnaplójában. Javítás: `esc(l.locatie)`.
+
+**`public/sofer.js` `renderPendingReceipts`** — a bon-scan kártya cím/hibaüzenet mezői (`f.loc`, `f.suma`, `f.valuta`, `it.error`) Gemini-válaszból/szerver-hibaüzenetből jönnek. A `_sanitize` fehérlistázza a hosszot, de HTML-t **nem** escape-el, viszont a `title` közvetlenül `innerHTML`-be került. Javítás: `esc(...)` mindenütt.
+
+**`routes/soferApi.js` `POST /api/border-cross`** — a `tip` mezőt eddig szabadon fogadta (VARCHAR(20) → csendes megcsonkolás), a `gps_lat/lng`-t `parseFloat`-tal (`NaN`/`Infinity`/tartományon kívüli érték is a DB-be kerülhetett), és a `locatie` hossz-korlát sem volt. Szigorítás: `tip` fehérlista (`Intrare`/`Iesire`, egyébként `Iesire` default), `tara`→50 char, `locatie`→255 char, `gps_lat`/`gps_lng` `|n| ≤ 180 && Number.isFinite`, különben NULL.
+
+### Teszt
+**856 → 859 Jest zöld** (7 skipped valós-DB, változatlan baseline). +84 új teszt, +3 zöld a bemenet-validáció szigorítása után is (nincs regresszió). Napirend: CHANGELOG.md, CLAUDE.md, AUDIT.md (18. lépés — a két XSS-fix + border-cross bemenet-védelem).
+
+---
+
 ## 2026-07-28 — Menetlevél: fuvar-picker (a fuvar-lista csak akkor jön elő, amikor kell) + mentett-piszkozat folytat/töröl dialog + kimaradt Finalizat blokkolja a lezárást
 
 ### Miért
