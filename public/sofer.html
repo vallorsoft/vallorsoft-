@@ -12,8 +12,8 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260728img"></script>
-  <link rel="stylesheet" href="/sofer.css?v=20260728img">
+  <script src="/i18n.js?v=20260728pick"></script>
+  <link rel="stylesheet" href="/sofer.css?v=20260728pick">
   <script src="/push-client.js?v=20260614qa"></script>
   <!-- Sofor mobil-app: 8 ora idle-limit (vezetes kozben oraig nem koppint a
        kepernyore). A szerver-cookie 7 nap; addig igy nem log ki ejszaka-vezetes
@@ -244,18 +244,22 @@
       <!-- 💾 Mentett menetlevelek a telefonon (offline is látható) -->
       <div class="section-head" style="margin-top:2px;" data-i18n="sof.localDraftsTitle">📥 Mentett menetlevelek (telefonon)</div>
       <div id="localDraftsBox" style="margin-bottom:14px;"></div>
-      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;" data-i18n="sofer.pickOrders">Jelöld be a fuvarokat amelyeket ebbe a menetlevélbe szeretnél:</div>
-      <div id="soferOrderList">
-        <div style="text-align:center;padding:30px;color:var(--muted);">
-          <div class="spinner" style="margin:0 auto 10px;"></div><span data-i18n="sofer.loadingOrders">Fuvarok betöltése...</span>
-        </div>
-      </div>
-      <!-- EGY gomb: a bepipált fuvarok bekerülnek; pipa nélkül fuvar nélküli menetlevél -->
-      <button class="submit-btn" onclick="fuvarCreate()" style="margin-top:16px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;" data-i18n="sof.createWaybill">
+      <!-- A fuvar-lista NEM itt látszik: a „Menetlevél létrehozása" gomb
+           után jön elő egy külön kártyán (picker modal), és csak akkor,
+           amikor tényleg rá kell tenni valamit a menetlevélre. A régi
+           #soferOrderList display:none-nal maradt, mert a `loadSoferOrders`
+           még ide renderelt volna — a cache-t továbbra is tölti. -->
+      <div id="soferOrderList" style="display:none;"></div>
+      <!-- EGY gomb: menetlevél létrehozása. Ha van mentett piszkozat →
+           előbb kérdez (folytat/töröl). Ezután a picker jön fel a
+           fuvarokkal (elvégzett-de-nem-menetlevélen), és csak azután
+           lép a 2. kitöltő lépésbe. Pipa nélkül is folytat, de LEZÁRNI
+           csak akkor lehet, ha nincs kimaradt, dátum utáni Finalizat. -->
+      <button class="submit-btn" onclick="fuvarCreate()" style="margin-top:2px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;" data-i18n="sof.createWaybill">
         📄 Menetlevél létrehozása
       </button>
-      <div style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center;" data-i18n="sof.createWaybillHint">
-        A bejelölt fuvarok bekerülnek a menetlevélbe; pipa nélkül fuvar nélküli menetlevél készül.
+      <div style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center;" data-i18n="sof.createWaybillHint2">
+        A fuvarokat a következő lépésben pipálod be a listából.
       </div>
       <!-- 📷 Bon/számla kiolvasás (AI) — ugyanaz a háttér-várólista, mint a főoldalon -->
       <button class="submit-btn scan-btn" id="fuvarStep1ScanBtn" onclick="scanReceiptPickFromDash()" style="margin-top:12px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;" data-i18n="sof.scanReceiptAny">
@@ -272,8 +276,14 @@
         <h3 data-i18n="sofer.fillTitle">📄 Menetlevél kitöltése</h3>
       </div>
 
-      <!-- Kiválasztott fuvarok összesítő -->
-      <div id="selectedOrdersSummary" style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.3);border-radius:12px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--soft);"></div>
+      <!-- Kiválasztott fuvarok összesítő + „✏️ Fuvarok kezelése" gomb —
+           a picker utólag is nyitható (menetlevél megkezdése után is
+           hozzáadható/levehető fuvar; a beszúrás a Sosire elé kerül). -->
+      <div id="selectedOrdersSummary" style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.3);border-radius:12px;padding:10px 14px;margin-bottom:8px;font-size:12px;color:var(--soft);"></div>
+      <button type="button" class="submit-btn" onclick="fuvarPickAgain()"
+              style="width:100%;margin-bottom:14px;background:transparent;color:var(--soft);
+                     border:1px dashed rgba(59,130,246,0.5);padding:10px;border-radius:12px;font-size:13px;"
+              data-i18n="sof.manageOrders">✏️ Fuvarok kezelése (hozzáadás/eltávolítás)</button>
 
       <!-- Număr fișă + Cursa Săptămânii eltávolítva - rendszer generálja automatikusan, cégenként sorszámozva (MT-YYYY-XXXX) -->
       <div class="g2">
@@ -394,7 +404,7 @@
 </div><!-- /sofer-wrap -->
 
 <script src="/sofer-uit.js?v=20260614qa"></script>
-<script src="/sofer.js?v=20260728img"></script>
+<script src="/sofer.js?v=20260728pick"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 
 <!-- ── ÁRU LEADÁSA MODAL (sofőr-kérés — admin visszaigazolja) ── -->
@@ -503,6 +513,30 @@
         background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;" data-i18n="sof.rr.discard">✕ Elvetés</button>
       <button onclick="rrAccept()" style="flex:2;padding:12px;border-radius:8px;border:none;
         background:linear-gradient(180deg,#16a34a,#15803d);color:#fff;font-size:14px;font-weight:700;cursor:pointer;" data-i18n="sof.rr.accept">✓ Elfogadás</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 📋 FUVAR-PICKER — a menetlevél kezdésekor + utólag is ── -->
+<!-- A picker CSAK akkor jelenik meg, ha a sofőr rákoppintott a
+     „Menetlevél létrehozása" gombra (fresh) VAGY step2-ben a
+     „✏️ Fuvarok kezelése" gombra (add/remove). A lista tartalma a
+     _soferOrdersCache már szűrt (waybill_visible=true) sorai — azaz
+     ami a menetlevélbe még beírható. Csak elvégzett (Finalizat) fuvar
+     kimaradása blokkolja a lezárást, ha a menetlevél kezdete UTÁN
+     lett elvégezve (submit-időben validál a JS). -->
+<div id="orderPickerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);
+  backdrop-filter:blur(6px);align-items:center;justify-content:center;z-index:1000;padding:20px;">
+  <div style="width:min(520px,100%);background:var(--bg-2);border:1px solid var(--border-bright);
+    border-radius:18px;padding:22px;max-height:92vh;overflow-y:auto;">
+    <h3 style="margin:0 0 6px;font-size:17px;color:#fff;" data-i18n="sof.pick.title">📋 Fuvarok a menetlevélre</h3>
+    <p id="opHint" style="color:var(--muted);font-size:12.5px;margin:0 0 12px;"></p>
+    <div id="opList" style="max-height:52vh;overflow-y:auto;"></div>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button onclick="opCancel()" style="flex:1;padding:12px;border-radius:8px;border:1px solid var(--border-bright);
+        background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;" data-i18n="sof.pick.cancel">← Mégse</button>
+      <button onclick="opAccept()" style="flex:2;padding:12px;border-radius:8px;border:none;
+        background:linear-gradient(180deg,#3b82f6,#2563eb);color:#fff;font-size:14px;font-weight:700;cursor:pointer;" data-i18n="sof.pick.next">→ Tovább</button>
     </div>
   </div>
 </div>
