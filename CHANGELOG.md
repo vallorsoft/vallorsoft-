@@ -14,6 +14,24 @@
 
 ---
 
+## 2026-07-29 — Sofőr: a határátlépés BE/KI gomb is megerősítést kér (PR #PRNO)
+
+### Miért
+Ugyanaz a minta, mint az állomás-gomboknál (PR #302), a második egykoppintásos, visszavonhatatlan műveletre. A `🇷🇴 ROMÁNIA BE` / `KI` gomb eddig azonnal rögzítette az átlépést a jelenlegi idővel + GPS-pozícióval. A sofőr a saját felületéről **nem tudja törölni** a rossz sort, és a menetlevél **diurnáját KÖZVETLENÜL ebből számoljuk** (`lib/tripCrossings.js` → `calculateDiurna` 12:00-szabály) — egy félrenyomott BE/KI a napidíjat (extern/intern napok) rontja el, ami pénzben mérhető hiba.
+
+### Mi változott
+1. **`public/sofer.js` `sendBorderCross(tip, tara)`** — a rögzítés (és a GPS-lekérés) ELŐTT `confirm()`. A kérdés az **irányt** nevezi meg (`sof.crossIn` / `sof.crossOut`), és jelzi, hogy most rögzül az idő + GPS-pozíció, ebből számoljuk a diurnát, és nem vonható vissza. Mégse → **még GPS-t sem kér** (nincs felesleges pozíció-lekérés).
+2. **`public/i18n.js`** — új `sof.crossConfirmAsk` kulcs (RO-alap + HU), `{act}` placeholderrel. A szöveg szándékosan KÜLÖN az állomás-gombokétól (ott „az iroda értesítést kap", itt a diurna a tét).
+3. **`public/sofer.html`** — cache-bust `?v=20260729msask` → `?v=20260729ask2` (`i18n.js` + `sofer.js`).
+
+### Nem érintett
+Szerver-oldal és DB változatlan (`routes/soferApi.js` `POST /api/border-cross` + a PR #300-as bemenet-szigorítás); a menetlevél „🚛 Határátlépés rögzítése" gombja továbbra is csak a rögzítő-képernyőre navigál (`goSec('border')`), maga nem ír.
+
+### Teszt
++3 eset a `tests/integration/sofer-client-flow.test.js`-ben: `confirm=false` → **nincs** `/api/border-cross` hívás ÉS nincs `getCurrentPosition`; `confirm=true` → POST a helyes `tip`/`tara` payloaddal; a kérdés külön nevezi meg a BE-t és a KI-t. **863 → 866 Jest zöld** (45 skipped valós-DB).
+
+---
+
 ## 2026-07-29 — Sofőr: az állomás-gomb (odaért / felrakodott / stb.) megerősítést kér (PR #302)
 
 ### Miért

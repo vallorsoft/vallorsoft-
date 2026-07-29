@@ -727,7 +727,13 @@ function goSec(id) {
 // ============================================================
 // HATÁRÁTLÉPÉS
 // ============================================================
+// Megerősítés a rögzítés ELŐTT (mint az állomás-gomboknál): a határátlépés a
+// sofőr felületéről NEM vonható vissza, és a menetlevél diurnáját (extern/intern
+// napok) KÖZVETLENÜL ebből számoljuk (`lib/tripCrossings.js` + `calculateDiurna`)
+// — egy félrenyomott BE/KI a napidíjat rontja el. A kérdés az irányt nevezi meg.
 function sendBorderCross(tip, tara) {
+  var act = (tip === 'Intrare') ? t('sof.crossIn') : t('sof.crossOut');
+  if (!confirm(t('sof.crossConfirmAsk', { act: act }))) return;
   var statusEl = document.getElementById('gpsStatus');
   statusEl.innerHTML = '<div class="gps-badge"><span class="spinner"></span> ' + t('sof.gpsFetch') + '</div>';
 
