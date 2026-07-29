@@ -14,6 +14,27 @@
 
 ---
 
+## 2026-07-29 — Fuvar-menetlevél életciklus: kötelező elhelyezés + azonnali eltűnés + dátum a pickerben
+
+### Miért
+A sofőr oldalon a Finalizat fuvarok a menetlevélbe helyezés után türelmi ideig (3 nap / 15 perc) látszottak a picker-ben — ez zavaró volt és felesleges. Emellett a fuvar-picker modal CMD-azonosítót mutatott, ami a sofőrnek semmitmondó; a felrakási/lerakási dátum informatívabb.
+
+### Változások
+
+1. **`handlers/orders.js` `getMySoferOrders`** — `waybill_visible` egyszerűsítve:
+   - **Finalizat + 0 menetlevél = `true`** — KÖTELEZŐEN rá kell tenni menetlevélre (nem kerülheti el).
+   - **Finalizat + ≥1 menetlevél = `false`** — AZONNAL eltűnik (nincs 3 napos / 15 perces türelmi idő).
+   - **Aktív státuszok** (Alocat/In Curs/Parkolt/Raktarban) = `true` (változatlan).
+   - `waybill_phase` egyszerűsítve: `loading` (aktív) / `unloading` (Finalizat, menetlevél nélkül) / `complete`.
+   - `dash_visible` érintetlen (csak Alocat/In Curs = true).
+
+2. **`public/sofer.js` `_openOrderPicker`** — a fuvar-kártyán a `#CMD-XXXXXXXXX` helyett a **felrakási → lerakási dátum** jelenik meg (`📅 2026-07-28 → 2026-07-30`), `data_incarcare`/`data_descarcare`-ból.
+
+### Tesztek
+859 Jest zöld (7 skipped valós-DB). Nincs regresszió.
+
+---
+
 ## 2026-07-29 — Sofőr-funkciók teljes lefedettsége (+84 új teszt) + 2 XSS-fix a naplórenderben + border-cross bemenet-validáció
 
 ### Miért
