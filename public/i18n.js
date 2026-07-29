@@ -2417,6 +2417,10 @@
     'sof.noCross': { hu: 'Nincs még átlépés rögzítve.', ro: 'Nicio trecere înregistrată încă.' },
     'sof.crossIn': { hu: '🇷🇴 Belépés', ro: '🇷🇴 Intrare' },
     'sof.crossOut': { hu: '🇷🇴 Kilépés', ro: '🇷🇴 Ieșire' },
+    'sof.crossConfirmAsk': {
+      hu: 'Biztos, hogy „{act}"?\n\nMost rögzül a jelenlegi idővel és GPS-pozícióval, és ebből számoljuk a diurnát. Nem vonható vissza.',
+      ro: 'Confirmi „{act}"?\n\nSe înregistrează acum, cu ora și poziția GPS curentă, și stă la baza calculului diurnei. Nu se poate anula.'
+    },
     'sof.locale': { hu: 'hu-HU', ro: 'ro-RO' },
     'sof.noWaybillOrders': { hu: 'Nincs menetlevélbe vehető fuvar.', ro: 'Nu există curse disponibile pentru foaia de parcurs.' },
     'sof.pickAtLeastOne': { hu: 'Jelölj be legalább egy fuvart!', ro: 'Bifează cel puțin o cursă!' },

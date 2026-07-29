@@ -461,3 +461,50 @@ describe('driverMilestone megerősítés', () => {
     ]);
   });
 });
+
+// ================================================================
+//  Határátlépés (sendBorderCross) — megerősítés a rögzítés ELŐTT.
+//  Az átlépés a sofőr felületéről nem vonható vissza, és a menetlevél
+//  diurnáját (extern/intern napok) KÖZVETLENÜL ebből számoljuk.
+// ================================================================
+describe('sendBorderCross megerősítés', () => {
+  test('confirm=false → nincs hálózati hívás (és GPS-t sem kér)', () => {
+    const urls = [];
+    let geo = 0;
+    const sb = load({
+      confirm: () => false,
+      fetch: (u) => { urls.push(String(u)); return Promise.resolve({ json: () => Promise.resolve({ success: true }) }); }
+    });
+    sb.navigator.geolocation = { getCurrentPosition: () => { geo++; } };
+    sb.sendBorderCross('Iesire', 'RO');
+    expect(urls.filter(u => u.indexOf('/api/border-cross') >= 0)).toEqual([]);
+    expect(geo).toBe(0);
+  });
+
+  test('confirm=true → POST az /api/border-cross végpontra a helyes iránnyal', async () => {
+    const calls = [];
+    const sb = load({
+      confirm: () => true,
+      fetch: (u, o) => { calls.push({ u: String(u), o }); return Promise.resolve({ json: () => Promise.resolve({ success: true }) }); }
+    });
+    sb.loadBorderLog = () => {};
+    sb.sendBorderCross('Intrare', 'RO');
+    await tick();
+    const hit = calls.filter(c => c.u.indexOf('/api/border-cross') >= 0);
+    expect(hit.length).toBe(1);
+    expect(hit[0].o.method).toBe('POST');
+    expect(JSON.parse(hit[0].o.body)).toMatchObject({ tip: 'Intrare', tara: 'RO' });
+  });
+
+  test('a kérdés az irányt nevezi meg (BE / KI külön)', () => {
+    const asked = [];
+    const sb = load({ confirm: (m) => { asked.push(m); return false; } });
+    sb.t = (k, v) => (v && v.act != null) ? (k + '|' + v.act) : k;
+    sb.sendBorderCross('Intrare', 'RO');
+    sb.sendBorderCross('Iesire', 'RO');
+    expect(asked).toEqual([
+      'sof.crossConfirmAsk|sof.crossIn',
+      'sof.crossConfirmAsk|sof.crossOut'
+    ]);
+  });
+});
