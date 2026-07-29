@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-07-29 — Sofőr-felület: saját megerősítő modal + kontraszt-kör + fázis-vezérelt fel-/lerakás (PR #PRNO)
+## 2026-07-29 — Sofőr-felület: saját megerősítő modal + kontraszt-kör + fázis-vezérelt fel-/lerakás (PR #304)
 
 ### Miért
 Három kérés egy körben: (1) a megerősítés a natív `confirm()` helyett a felület saját stílusában; (2) a teljes sofőr-felület legyen kontrasztos — a gombok tűnjenek ki, a menetlevél legyen egyértelmű, és ami lenyílik, azon legyen látható lenyíló-ikon; (3) a kiosztott fuvar kártyáján felrakodás előtt CSAK a felrakó látszódjon (a lerakó külön lenyitható), felrakodás után forduljon — és a megbízó cég neve ne jelenjen meg.
