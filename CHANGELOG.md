@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-07-29 — Sofőr: a határátlépés BE/KI gomb is megerősítést kér (PR #PRNO)
+## 2026-07-29 — Sofőr: a határátlépés BE/KI gomb is megerősítést kér (PR #303)
 
 ### Miért
 Ugyanaz a minta, mint az állomás-gomboknál (PR #302), a második egykoppintásos, visszavonhatatlan műveletre. A `🇷🇴 ROMÁNIA BE` / `KI` gomb eddig azonnal rögzítette az átlépést a jelenlegi idővel + GPS-pozícióval. A sofőr a saját felületéről **nem tudja törölni** a rossz sort, és a menetlevél **diurnáját KÖZVETLENÜL ebből számoljuk** (`lib/tripCrossings.js` → `calculateDiurna` 12:00-szabály) — egy félrenyomott BE/KI a napidíjat (extern/intern napok) rontja el, ami pénzben mérhető hiba.
