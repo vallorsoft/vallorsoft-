@@ -14,6 +14,27 @@
 
 ---
 
+## 2026-07-29 — Sofőr-felület: saját megerősítő modal + kontraszt-kör + fázis-vezérelt fel-/lerakás (PR #PRNO)
+
+### Miért
+Három kérés egy körben: (1) a megerősítés a natív `confirm()` helyett a felület saját stílusában; (2) a teljes sofőr-felület legyen kontrasztos — a gombok tűnjenek ki, a menetlevél legyen egyértelmű, és ami lenyílik, azon legyen látható lenyíló-ikon; (3) a kiosztott fuvar kártyáján felrakodás előtt CSAK a felrakó látszódjon (a lerakó külön lenyitható), felrakodás után forduljon — és a megbízó cég neve ne jelenjen meg.
+
+### Mi változott
+1. **Saját megerősítő modal** (`#sofConfirmModal` + `sofConfirm(opts, onOk)` / `sofConfirmOk()` / `sofConfirmCancel()`): ikon + cím + magyarázat + két, egymástól jól elkülönülő gomb (semleges „Mégse" · hangsúlyos, `tone` szerint színezett igen). Az állomás-léptetés (`driverMilestone`) és a határátlépés (`sendBorderCross`) ezt használja; a tényleges művelet a `_driverMilestoneGo` / `_sendBorderCrossGo` ágon fut, tehát az „igen" nélkül SEMMI nem megy ki (a határátlépésnél GPS-lekérés sem). Ha a modal hiányozna a DOM-ból (beragadt régi HTML), a `sofConfirm` a natív `confirm()`-ra esik vissza — némán sosem hajtjuk végre a műveletet.
+2. **Kontraszt-kör** (`public/sofer.css`, additív blokk a fájl VÉGÉN, könnyen visszavonható): erősebb tokenek (`--sof-border` #e2e8f0 → #cbd5e1, `--sof-muted` #64748b → #475569); a másodlagos gombok fehér helyett halvány-tinta kitöltést + 1.5px markáns keretet + sötét feliratot kaptak (`.sh-btn`, `.fd-copy`, `.add-row-btn`, `.back-btn`), az „⛔ Áru leadása" borostyán lett (a halvány lila felirat fehér alapon gyakorlatilag eltűnt); űrlap-címkék sötétebbek/vastagabbak, mezők 1.5px kerettel + erősebb fókusz-gyűrűvel; szekció-fejlécek sötét felirat + bal oldali gradiens akcent-csík; státusz-pirulák telített háttérrel.
+3. **Egységes lenyíló-ikon**: minden összecsukható elem (fuvar-kártya fej, menetlevél-szekciók, fel-/lerakás blokk) kerek, keretes chevron-jelzőt kapott — **csukva ▸, nyitva ▾** (eddig a kártyafej ▾/▴-t használt, a szekciók ▸/▾-t).
+4. **Fázis-vezérelt fuvar-kártya** (`renderFuvarCard`): a fel- és lerakás külön összecsukható blokk (`fdPhaseSec` + `toggleFuvarSec(id, kind)`). Amíg nincs `incarcat_at`, a **felrakás** van nyitva és elöl, a lerakó egy koppintással lenyitható; felrakodás után a **lerakás** kerül előre nyitva, a felrakó marad lenyithatóként. A csukott fejlécen ott a helyszín-összegzés, hogy egy pillantásból látszódjon.
+5. **A megbízó cég neve (`orders.client`) sehol nem jelenik meg a sofőrnek** — sem a kártyán (meta-sor + korábbi `fd-firma`), sem a fuvar-pickerben, sem a menetlevél kiválasztott-fuvarok összegzőjében (helyette a fuvar-szám ill. a felrakó → lerakó útvonal azonosít). A **felrakó/lerakó cég** (`firma_incarcare` / `firma_descarcare`) továbbra is látszik — az a sofőr munkája.
+6. **i18n**: a `sof.ms.confirmAsk` / `sof.crossConfirmAsk` egysoros kulcsok cím + magyarázat párra bomlottak (`sof.ms.confirmTitle`/`Msg`, `sof.crossConfirmTitle`/`Msg`), + `sof.cfm.yes`. Cache-bust `?v=20260729ui` (`i18n.js`, `sofer.js`, `sofer.css`).
+
+### Nem érintett
+Szerver-oldal és DB változatlan. A `getMySoferOrders` már eddig is visszaadta a 4 állomás-időbélyeget, ezért a fázis-váltás új lekérdezés nélkül működik.
+
+### Teszt
+`tests/integration/sofer-client-flow.test.js` — a 7 régi `confirm()`-alapú eset átírva a modalra, +5 új: a hívás önmagában nem küld (modal nyílik) · Mégse → semmi · Igen → POST · a modal címe a soron következő állomást / az irányt nevezi meg · fallback-ág; továbbá a `renderFuvarCard` fázis-logikája (nyitott/csukott blokk + sorrend), a megbízó-név hiánya és a `toggleFuvarSec` ikon-váltása. **866 → 871 Jest zöld** (45 skipped valós-DB). Vizuális ellenőrzés headless Chromiummal (393 px), a VALÓDI `renderFuvarCard`-kimenettel és a valódi `sofer.css`-szel.
+
+---
+
 ## 2026-07-29 — Sofőr: a határátlépés BE/KI gomb is megerősítést kér (PR #303)
 
 ### Miért

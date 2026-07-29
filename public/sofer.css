@@ -1197,3 +1197,294 @@
 
 /* Sötét téma-tolerancia — a mobil-app fejléc/main sötét lehet, a
    modal viszont világos marad (a többi modal is így viselkedik). */
+
+/* ============================================================
+   KONTRASZT-KÖR (2026-07-29) — a teljes sofőr-felület
+   ------------------------------------------------------------
+   A felület világos-prémium skinje szép volt, de vezetés után,
+   napfényben, kesztyűs kézzel HALVÁNY: a másodlagos gombok fehér
+   alapon vékony világosszürke kerettel „eltűntek", a mezők
+   címkéi/keretei alig látszottak, és nem volt egyértelmű, mi
+   nyitható le. Ez a blokk CSAK a kontrasztot/olvashatóságot
+   erősíti (szín, keret, vastagság, ikon) — semmilyen elrendezés,
+   ID, JS vagy adat nem változik. A fájl VÉGÉN áll, tehát felülírja
+   a korábbi szabályokat, és egyben könnyen visszavonható.
+   ============================================================ */
+
+/* ── 1) Erősebb alap-tokenek (sötétebb muted + látható keretek) ── */
+.sofer-wrap,
+.toast-wrap,
+#hoModal, #bugModal, #wbLocModal, #wbConfirmModal,
+#receiptReviewModal, #orderPickerModal, #sofConfirmModal {
+  --sof-border:      #cbd5e1;   /* volt #e2e8f0 — alig látszott */
+  --sof-border-soft: #dbe3ec;
+  --sof-muted:       #475569;   /* volt #64748b — kis betűnél halvány */
+  --border:          #cbd5e1;
+  --border-bright:   #94a3b8;
+  --muted:           #475569;
+}
+
+/* ── 2) Gombok: minden gomb „kitűnjön" ──
+   Az elsődleges marad a gradiens; a MÁSODLAGOS gombok fehér helyett
+   halvány-kék kitöltést + markáns keretet + sötét feliratot kapnak. */
+.sofer-wrap .sh-btn {
+  border: 1.5px solid #94a3b8;
+  background: linear-gradient(180deg, #f8fafc, #eef2f7);
+  color: #0f172a;
+  font-weight: 800;
+  min-height: 50px;
+  box-shadow: 0 2px 6px rgba(15,23,42,0.10);
+}
+.sofer-wrap .sh-btn.uit {
+  border-color: #6366f1;
+  background: linear-gradient(180deg, #eef2ff, #e0e7ff);
+  color: #3730a3;
+}
+.sofer-wrap .sh-btn.confirm {
+  border: 1.5px solid #1d4ed8;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(37,99,235,0.42);
+}
+.sofer-wrap .sh-btn.resume {
+  border: 1.5px solid #15803d;
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(22,163,74,0.38);
+}
+.sofer-wrap .sh-btn.ho {
+  border-color: #d97706;
+  background: linear-gradient(180deg, #fffbeb, #fef3c7);
+  color: #92400e;
+}
+.sofer-wrap .fuvar-actions { flex-wrap: wrap; }
+
+/* Másoló-gomb + „➕ hozzáadás" sor: látható keret, erősebb tinta */
+.sofer-wrap .fd-copy {
+  border: 1.5px solid #94a3b8;
+  background: linear-gradient(180deg, #ffffff, #f1f5f9);
+  color: #0f172a;
+}
+.sofer-wrap .add-row-btn {
+  border: 2px dashed #7c9cc4;
+  background: rgba(59,130,246,0.10);
+  color: #1d4ed8;
+  font-weight: 800;
+  min-height: 50px;
+}
+.sofer-wrap .submit-btn {
+  border: 1.5px solid rgba(29,78,216,0.55);
+  box-shadow: 0 12px 26px rgba(37,99,235,0.40);
+}
+.sofer-wrap .back-btn,
+.sofer-wrap .sofer-back-btn { border: 1.5px solid #94a3b8; color: #0f172a; }
+
+/* ── 3) Űrlap: olvasható címke + látható mező-keret ── */
+.sofer-wrap .field label {
+  color: #334155;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+.sofer-wrap .input,
+.sofer-wrap .textarea,
+.sofer-wrap select.input {
+  border: 1.5px solid #94a3b8;
+  color: #0f172a;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.06);
+}
+.sofer-wrap .input::placeholder,
+.sofer-wrap .textarea::placeholder { color: #64748b; }
+.sofer-wrap .input:focus,
+.sofer-wrap .textarea:focus,
+.sofer-wrap select.input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.20);
+}
+.sofer-wrap .dyn-row {
+  border: 1.5px solid #cbd5e1;
+  box-shadow: 0 3px 10px rgba(15,23,42,0.07);
+}
+
+/* ── 4) Szekció-fejléc: sötét felirat + bal oldali akcent-csík ── */
+.sofer-wrap .section-head {
+  color: #0f172a;
+  font-size: 12px;
+  border-bottom: 2px solid #cbd5e1;
+  padding-left: 10px;
+  position: relative;
+}
+.sofer-wrap .section-head::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 1px; bottom: 8px;
+  width: 4px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #3b82f6, #6366f1);
+}
+.sofer-wrap .sec-title h3 { color: #0f172a; }
+
+/* ── 5) LENYÍLÓ-IKON: minden összecsukható elem kap egy jól látható,
+       kerek chevron-jelzőt (fuvar-kártya fej, menetlevél-szekciók,
+       fel-/lerakás blokk). Nyitva ▾, csukva ▸ — a JS állítja. ── */
+.sofer-wrap .fuvar-expand,
+.sofer-wrap .wbsec-caret,
+.sofer-wrap .fd-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px; height: 26px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1.5px solid #94a3b8;
+  background: #f1f5f9;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+.sofer-wrap .section-head.wbsec-head { color: #0f172a; }
+.sofer-wrap .wbsec-count {
+  color: #1e293b;
+  background: rgba(59,130,246,0.16);
+  border: 1px solid rgba(59,130,246,0.35);
+  font-weight: 800;
+}
+
+/* ── 6) Fuvar-kártya: erősebb keret + kiemelt fejléc ── */
+.sofer-wrap .fuvar-card {
+  border: 1.5px solid #cbd5e1;
+  box-shadow: 0 4px 14px rgba(15,23,42,0.09);
+}
+.sofer-wrap .fuvar-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sofer-wrap .fuvar-destination {
+  flex: 1 1 100%; min-width: 0; margin-bottom: 0; font-size: 15.5px;
+  flex-wrap: nowrap;              /* a lenyíló-ikon a szöveg mellett marad */
+}
+.sofer-wrap .fuvar-headtxt { color: #0f172a; font-weight: 800; flex: 1 1 auto; min-width: 0; }
+.sofer-wrap .fuvar-num { align-self: flex-start; margin-top: 2px; }
+.sofer-wrap .fuvar-expand { align-self: flex-start; margin-top: 1px; }
+/* A fejléc-gomb (soron következő állomás) külön sorban, teljes szélességben:
+   ez a legtöbbet nyomott gomb, vezetés után, kesztyűs kézzel. */
+.sofer-wrap .fuvar-head-action { flex: 1 1 100%; margin-top: 10px; }
+.sofer-wrap .fuvar-meta { color: #475569; font-weight: 600; }
+.sofer-wrap .fuvar-details { border-top: 2px dashed #cbd5e1; }
+
+/* Fel-/lerakás összecsukható blokk (a fázis szerint nyílik) */
+.sofer-wrap .fd-coll {
+  border: 1.5px solid #cbd5e1;
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.sofer-wrap .fd-coll.open {
+  background: #fff;
+  border-color: #2563eb;
+  box-shadow: 0 2px 10px rgba(37,99,235,0.14);
+}
+.sofer-wrap .fd-sec-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 900;
+  color: #1d4ed8;
+  margin-bottom: 0;
+  min-height: 34px;
+  cursor: default;
+}
+.sofer-wrap .fd-coll .fd-sec-h { cursor: pointer; user-select: none; -webkit-user-select: none; }
+.sofer-wrap .fd-coll.open .fd-sec-h { margin-bottom: 8px; }
+.sofer-wrap .fd-sec-t { flex: 0 0 auto; }
+.sofer-wrap .fd-sec-sum {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 12.5px; font-weight: 700; color: #475569;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-align: right;
+}
+.sofer-wrap .fd-coll.open .fd-sec-sum { display: none; }
+.sofer-wrap .fd-lbl { color: #475569; font-weight: 700; }
+.sofer-wrap .fd-val { color: #0f172a; font-weight: 700; font-size: 14.5px; }
+.sofer-wrap .fd-ms-row { color: #475569; }
+.sofer-wrap .fd-ms-row.done { color: #0f172a; }
+
+/* ── 7) Státusz-pirulák: erősebb kontraszt ── */
+.sofer-wrap .fuvar-status      { font-size: 10.5px; font-weight: 800; border-width: 1.5px; }
+.sofer-wrap .fuvar-status.ok   { color: #15803d; border-color: #22c55e; background: #dcfce7; }
+.sofer-wrap .fuvar-status.warn { color: #92400e; border-color: #f59e0b; background: #fef3c7; }
+
+/* ── 8) Megerősítő modal (a natív confirm() helyett) ──
+   Nagy, egymástól jól elkülönülő gombok: a „Mégse" semleges és
+   keskenyebb, az „Igen" hangsúlyos — vezetés után se lehessen
+   véletlenül igent nyomni. */
+#sofConfirmModal {
+  position: fixed; inset: 0; z-index: 1200;
+  align-items: center; justify-content: center;
+  padding: 20px;
+  background: rgba(15,23,42,0.62);
+  backdrop-filter: blur(6px);
+}
+#sofConfirmModal .sof-modal-card {
+  width: min(420px, 100%);
+  background: #fff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 20px;
+  padding: 24px 22px 20px;
+  box-shadow: 0 26px 60px rgba(15,23,42,0.30);
+  text-align: center;
+}
+#sofConfirmModal .sof-cf-ico {
+  font-size: 34px;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+#sofConfirmModal .sof-cf-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+#sofConfirmModal .sof-cf-msg {
+  margin: 0 0 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #475569;
+  font-weight: 600;
+}
+#sofConfirmModal .sof-cf-btns { display: flex; gap: 10px; }
+#sofConfirmModal .sof-cf-btn {
+  min-height: 54px;
+  padding: 14px 12px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+  font-family: inherit;
+}
+#sofConfirmModal .sof-cf-btn.cancel {
+  flex: 1;
+  border: 1.5px solid #94a3b8;
+  background: #f1f5f9;
+  color: #334155;
+}
+#sofConfirmModal .sof-cf-btn.ok {
+  flex: 1.6;
+  border: 1.5px solid #1d4ed8;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(37,99,235,0.38);
+}
+#sofConfirmModal .sof-cf-btn.ok.tone-ok {
+  border-color: #15803d;
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  box-shadow: 0 10px 22px rgba(22,163,74,0.36);
+}
+#sofConfirmModal .sof-cf-btn.ok.tone-danger {
+  border-color: #b91c1c;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 10px 22px rgba(239,68,68,0.36);
+}
+#sofConfirmModal .sof-cf-btn:active { transform: scale(0.98); }

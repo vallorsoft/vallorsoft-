@@ -12,8 +12,8 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260729ask2"></script>
-  <link rel="stylesheet" href="/sofer.css?v=20260728pick">
+  <script src="/i18n.js?v=20260729ui"></script>
+  <link rel="stylesheet" href="/sofer.css?v=20260729ui">
   <script src="/push-client.js?v=20260614qa"></script>
   <!-- Sofor mobil-app: 8 ora idle-limit (vezetes kozben oraig nem koppint a
        kepernyore). A szerver-cookie 7 nap; addig igy nem log ki ejszaka-vezetes
@@ -404,7 +404,7 @@
 </div><!-- /sofer-wrap -->
 
 <script src="/sofer-uit.js?v=20260614qa"></script>
-<script src="/sofer.js?v=20260729ask2"></script>
+<script src="/sofer.js?v=20260729ui"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 
 <!-- ── ÁRU LEADÁSA MODAL (sofőr-kérés — admin visszaigazolja) ── -->
@@ -474,6 +474,23 @@
     <div style="display:flex;gap:8px;margin-top:16px;">
       <button class="submit-btn" id="wbLocCancel" style="flex:1;background:transparent;border:1px solid var(--border-bright);color:var(--muted);" data-i18n="common.cancel">Mégse</button>
       <button class="submit-btn" id="wbLocOk" style="flex:2;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;" data-i18n="sof.wb.ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ❓ ÁLTALÁNOS MEGERŐSÍTŐ MODAL (a natív confirm() helyett) ──
+     A visszavonhatatlan sofőr-műveletek (állomás-léptetés, határátlépés)
+     kérdése a felület saját stílusában — nagy, jól elkülönülő gombokkal,
+     hogy vezetés után, kesztyűs kézzel se lehessen véletlenül igent nyomni.
+     A szöveget a `sofConfirm()` tölti (public/sofer.js). -->
+<div id="sofConfirmModal" class="sof-modal" style="display:none;">
+  <div class="sof-modal-card">
+    <div class="sof-cf-ico" id="sofConfirmIco">❓</div>
+    <h3 class="sof-cf-title" id="sofConfirmTitle"></h3>
+    <p class="sof-cf-msg" id="sofConfirmMsg"></p>
+    <div class="sof-cf-btns">
+      <button class="sof-cf-btn cancel" id="sofConfirmCancelBtn" onclick="sofConfirmCancel()" data-i18n="common.cancel">Mégse</button>
+      <button class="sof-cf-btn ok" id="sofConfirmOkBtn" onclick="sofConfirmOk()" data-i18n="sof.cfm.yes">Igen</button>
     </div>
   </div>
 </div>

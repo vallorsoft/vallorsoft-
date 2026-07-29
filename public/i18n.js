@@ -2417,10 +2417,12 @@
     'sof.noCross': { hu: 'Nincs még átlépés rögzítve.', ro: 'Nicio trecere înregistrată încă.' },
     'sof.crossIn': { hu: '🇷🇴 Belépés', ro: '🇷🇴 Intrare' },
     'sof.crossOut': { hu: '🇷🇴 Kilépés', ro: '🇷🇴 Ieșire' },
-    'sof.crossConfirmAsk': {
-      hu: 'Biztos, hogy „{act}"?\n\nMost rögzül a jelenlegi idővel és GPS-pozícióval, és ebből számoljuk a diurnát. Nem vonható vissza.',
-      ro: 'Confirmi „{act}"?\n\nSe înregistrează acum, cu ora și poziția GPS curentă, și stă la baza calculului diurnei. Nu se poate anula.'
+    'sof.crossConfirmTitle': { hu: 'Biztos, hogy „{act}"?', ro: 'Confirmi „{act}"?' },
+    'sof.crossConfirmMsg': {
+      hu: 'Most rögzül a jelenlegi idővel és GPS-pozícióval, és ebből számoljuk a diurnát. Nem vonható vissza.',
+      ro: 'Se înregistrează acum, cu ora și poziția GPS curentă, și stă la baza calculului diurnei. Nu se poate anula.'
     },
+    'sof.cfm.yes': { hu: 'Igen', ro: 'Da' },
     'sof.locale': { hu: 'hu-HU', ro: 'ro-RO' },
     'sof.noWaybillOrders': { hu: 'Nincs menetlevélbe vehető fuvar.', ro: 'Nu există curse disponibile pentru foaia de parcurs.' },
     'sof.pickAtLeastOne': { hu: 'Jelölj be legalább egy fuvart!', ro: 'Bifează cel puțin o cursă!' },
@@ -2612,9 +2614,10 @@
     'sof.ms.arriveUnload': { hu: 'Megérkeztem a lerakóhoz', ro: 'Am sosit la descărcare' },
     'sof.ms.unloaded': { hu: 'Leürítettem', ro: 'Am descărcat' },
     'sof.ms.recorded': { hu: 'Rögzítve', ro: 'Înregistrat' },
-    'sof.ms.confirmAsk': {
-      hu: 'Biztos, hogy „{act}"?\n\nAz időpont most rögzül és az iroda értesítést kap. Nem vonható vissza.',
-      ro: 'Confirmi „{act}"?\n\nOra se înregistrează acum și biroul este notificat. Nu se poate anula.'
+    'sof.ms.confirmTitle': { hu: 'Biztos, hogy „{act}"?', ro: 'Confirmi „{act}"?' },
+    'sof.ms.confirmMsg': {
+      hu: 'Az időpont most rögzül és az iroda értesítést kap. Nem vonható vissza.',
+      ro: 'Ora se înregistrează acum și biroul este notificat. Nu se poate anula.'
     },
     'sof.orderAccepted': { hu: '✅ Fuvar elfogadva!', ro: '✅ Cursă acceptată!' },
     'sof.orderCompleted': { hu: '🏁 Fuvar teljesítve! Manager értesítve.', ro: '🏁 Cursă finalizată! Managerul a fost notificat.' },
