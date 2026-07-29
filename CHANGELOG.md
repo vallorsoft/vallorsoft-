@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-07-29 — Menetlevél: a „✏️ Fuvarok kezelése" gomb kitűnő, tömör kék lett (PR #PRNO)
+## 2026-07-29 — Menetlevél: a „✏️ Fuvarok kezelése" gomb kitűnő, tömör kék lett (PR #305)
 
 ### Miért
 A menetlevél 2. lépésén a „✏️ Fuvarok kezelése (hozzáadás/eltávolítás)" szaggatott keretes, átlátszó „szellem-gomb" volt (`background:transparent`, 1px dashed) — a világos lapon alig látszott, pedig ez nyitja a fuvar-pickert, és a lezárási védőháló (`_validateNoLeftoverOrders`) is ide küldi vissza a sofőrt.
