@@ -248,21 +248,17 @@ handlers.getMySoferOrders = async function (req, res, args) {
                   WHEN o.status IN ('Alocat', 'In Curs') THEN true
                   ELSE false
                 END AS dash_visible,
-                -- waybill_visible (menetlevél picker): mint dash_visible — amíg NINCS
-                -- menetlevél, a fuvar SOSEM esik ki (különben nem lehetne menetlevelet készíteni)
+                -- waybill_visible: aktív → mindig; Finalizat menetlevél
+                -- nélkül → KÖTELEZŐEN rá kell tenni; ha ≥1 menetlevélen
+                -- már rajta van → AZONNAL eltűnik (nincs türelmi idő).
                 CASE
                   WHEN o.status IN ('Alocat', 'In Curs', 'Parkolt', 'Raktarban') THEN true
                   WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) = 0 THEN true
-                  WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) >= 2
-                    THEN wb.waybill_last >= NOW() - INTERVAL '15 minutes'
-                  WHEN o.status = 'Finalizat'
-                    THEN COALESCE(o.finalized_at, o.updated_at) >= NOW() - INTERVAL '3 days'
                   ELSE false
                 END AS waybill_visible,
-                -- waybill_phase: loading (Alocat/InCurs) / unloading (Finalizat+1×) / complete (Finalizat+2×)
                 CASE
-                  WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) >= 1 THEN 'unloading'
                   WHEN o.status IN ('Alocat', 'In Curs', 'Parkolt', 'Raktarban') THEN 'loading'
+                  WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) = 0 THEN 'unloading'
                   ELSE 'complete'
                 END AS waybill_phase
            FROM orders o
