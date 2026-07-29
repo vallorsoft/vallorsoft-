@@ -1488,3 +1488,22 @@
   box-shadow: 0 10px 22px rgba(239,68,68,0.36);
 }
 #sofConfirmModal .sof-cf-btn:active { transform: scale(0.98); }
+
+/* „✏️ Fuvarok kezelése (hozzáadás/eltávolítás)" a menetlevél 2. lépésén.
+   Eddig szaggatott keretes, átlátszó „szellem-gomb" volt — a világos lapon
+   alig látszott, pedig ez nyitja a fuvar-pickert (lezáráskor kötelező is
+   lehet). Most tömör, a beküldő gombbal AZONOS családú, de sötétebb/hidegebb
+   kék árnyalat: egyértelműen gomb, de nem versenyez a fő művelettel. */
+.sofer-wrap .submit-btn.wb-manage {
+  width: 100%;
+  margin-top: 0;
+  margin-bottom: 14px;
+  padding: 14px;
+  font-size: 14.5px;
+  font-weight: 800;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #0ea5e9, #0369a1);
+  border: 1.5px solid #075985;
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(3,105,161,0.34);
+}

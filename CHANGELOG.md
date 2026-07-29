@@ -14,6 +14,20 @@
 
 ---
 
+## 2026-07-29 — Menetlevél: a „✏️ Fuvarok kezelése" gomb kitűnő, tömör kék lett (PR #PRNO)
+
+### Miért
+A menetlevél 2. lépésén a „✏️ Fuvarok kezelése (hozzáadás/eltávolítás)" szaggatott keretes, átlátszó „szellem-gomb" volt (`background:transparent`, 1px dashed) — a világos lapon alig látszott, pedig ez nyitja a fuvar-pickert, és a lezárási védőháló (`_validateNoLeftoverOrders`) is ide küldi vissza a sofőrt.
+
+### Mi változott
+1. **`public/sofer.html`** — a beégetett inline stílus lekerült a gombról, helyette `class="submit-btn wb-manage"`. (Az `onclick`/`data-i18n` változatlan.)
+2. **`public/sofer.css`** — új `.submit-btn.wb-manage`: tömör, a beküldő gombbal AZONOS családú, de **sötétebb/hidegebb kék** (`#0ea5e9 → #0369a1`, 1.5px `#075985` keret, kék glow). Így egyértelműen gomb és kitűnik, de nem versenyez a fő művelettel (a „📄 Menetlevél létrehozása" / „📤 Véglegesítés" marad a kék-indigó gradiens).
+3. Cache-bust `?v=20260729ui` → `?v=20260729wbm`.
+
+**Szerver-oldal, DB és minden JS-logika érintetlen** — tisztán megjelenés. **871 Jest zöld** (45 skipped valós-DB), headless Chromium (393 px) vizuális ellenőrzéssel.
+
+---
+
 ## 2026-07-29 — Sofőr-felület: saját megerősítő modal + kontraszt-kör + fázis-vezérelt fel-/lerakás (PR #304)
 
 ### Miért
