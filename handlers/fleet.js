@@ -157,6 +157,10 @@ handlers.vehicleUpdate = async function (req, res, args) {
       if (f.tunnel_category !== undefined)    { updates.push(`tunnel_category = $${i++}`);    values.push(_enumOrNull(f.tunnel_category, TUNNEL_CATS)); }
       if (f.hazardous_goods !== undefined)    { updates.push(`hazardous_goods = $${i++}`);    values.push(_enumOrNull(f.hazardous_goods, HAZMAT_KINDS)); }
       if (f.fuel_per_100km !== undefined)     { updates.push(`fuel_per_100km = $${i++}`);     values.push(_numOrNull(f.fuel_per_100km)); }
+      // Üzemanyag-szint GPS-korrekció (+/- L). NULL = nincs korrekció (nyers érték).
+      // A sofőr menetlevél „⛽ GPS-üzemanyag" gombja ezzel igazítja ki a lekért
+      // tartály-szintet MIELŐTT a menetlevélbe kerül.
+      if (f.fuel_correction_l !== undefined)  { updates.push(`fuel_correction_l = $${i++}`);  values.push(_numOrNull(f.fuel_correction_l)); }
 
       // --- Pótkocsi rakodási felület (NEM a teljes járműméret) ---
       if (f.trailer_kind !== undefined)       { updates.push(`trailer_kind = $${i++}`);       values.push(_enumOrNull(f.trailer_kind, TRAILER_KINDS)); }

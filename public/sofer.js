@@ -3237,6 +3237,89 @@ function prefillWaybillReadings(plate) {
 function prefillFuelStart(plate) { return prefillWaybillReadings(plate); }
 
 // ============================================================
+// ZÁRÓ Km / ZÁRÓ üzemanyag lekérése ÉLŐ GPS-ből (sofőr gombja)
+// ------------------------------------------------------------
+// A sofőr a menetlevél 2. lépésén a „📍 GPS" gombbal a záró km-óra
+// állását, a „⛽ GPS" gombbal a záró tartály-szintet (litert) tudja
+// betölteni a hozzárendelt vontató CargoTrack-adataiból. A záró
+// mezőt FELÜLÍRJA (ez EXPLICIT sofőr-akció, nem csendes prefill),
+// és kilövi az `input` eventet, hogy a #kmFuelCheck valós idejű
+// ellenőrzés + az auto-piszkozat is újrafusson. A tartály-szint
+// KORRIGÁLT érték (a szerver alkalmazza a jármű `fuel_correction_l`
+// offsetjét — a nyers GPS-érték sosem megy ki a kliensbe).
+//
+// Rendszám-forrás: elsődlegesen a #fCamion beviteli mező (amit a
+// menetlevél-form eleve előtölt a kiosztott vontatóból); ha üres,
+// visszaesünk a `_myAssignedVehicle` cache-re. Rendszám nélkül a
+// gomb toastol és nem hív. Sofőrnek CSAK a saját párosított
+// vontatójára ad választ a szerver (más jármű nem elérhető).
+// ============================================================
+
+// Közös segéd: rendszám az űrlapról vagy a kiosztásból.
+function _sofPlateForGps() {
+  var el = document.getElementById('fCamion');
+  var v = el && String(el.value || '').trim();
+  if (v) return v;
+  if (_myAssignedVehicle && _myAssignedVehicle.rendszam_camion) {
+    return String(_myAssignedVehicle.rendszam_camion).trim();
+  }
+  return '';
+}
+
+// Közös segéd: gomb-zár + spinner + válasz-toast — csökkenti a
+// duplikált Promise-kezelést a két függvény között (km / fuel).
+function _sofGpsFetch(btnId, onOk) {
+  var plate = _sofPlateForGps();
+  if (!plate) { toast(t('sof.gpsNoPlate'), 'err'); return; }
+  var btn = document.getElementById(btnId);
+  var orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'getCurrentGpsReadings', arguments: [plate] }) })
+  .then(function(r) { return r.json(); }).then(function(d) {
+    var res = d && d.result;
+    if (!res || !res.ok) { toast((res && res.err) || t('sof.gpsError'), 'err'); return; }
+    if (!res.available) { toast((res && res.err) || t('sof.gpsNoData'), 'err'); return; }
+    onOk(res);
+  }).catch(function() { toast(t('sof.gpsError'), 'err'); })
+  .then(function() { if (btn) { btn.disabled = false; btn.textContent = orig; } });
+}
+
+// 📍 Záró km lekérése GPS-ből → #fKmSf (az élő km-óra állás, nyers).
+function fetchGpsEndKm() {
+  _sofGpsFetch('btnGpsKmEnd', function(res) {
+    if (res.mileage == null) { toast(t('sof.gpsNoKm'), 'err'); return; }
+    var el = document.getElementById('fKmSf');
+    if (!el) return;
+    var val = Math.round(Number(res.mileage));
+    el.value = String(val);
+    // Kiváltjuk az `input` eventet, hogy a #kmFuelCheck (élő ellenőrzés)
+    // és a draftSave (600ms debounce) is újrafusson.
+    try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+    if (typeof draftSave === 'function') { try { draftSave(); } catch (e) {} }
+    toast(t('sof.gpsKmFetched', { val: val }), 'ok');
+  });
+}
+
+// ⛽ Záró üzemanyag-szint lekérése GPS-ből → #fCantSf. A szerver már
+// KORRIGÁLT értéket ad (a jármű `fuel_correction_l` offsetjével); a
+// sofőr csak a valós tartály-szintet látja, a nyers GPS-értéket soha.
+function fetchGpsEndFuel() {
+  _sofGpsFetch('btnGpsFuelEnd', function(res) {
+    if (res.fuel_level == null) { toast(t('sof.gpsNoFuel'), 'err'); return; }
+    var el = document.getElementById('fCantSf');
+    if (!el) return;
+    // 1 tizedesjegyre kerekítjük (a szerver már 1 tizedesig kerekít,
+    // itt is konzisztensen mutatjuk — a mező egészet is elfogad).
+    var val = Math.round(Number(res.fuel_level) * 10) / 10;
+    el.value = String(val);
+    try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+    if (typeof draftSave === 'function') { try { draftSave(); } catch (e) {} }
+    toast(t('sof.gpsFuelFetched', { val: val }), 'ok');
+  });
+}
+
+// ============================================================
 // SAJÁT HAVI MINI-STATISZTIKA (főoldal) — motivációs összegző
 // ============================================================
 function loadSoferMiniStats() {

@@ -7,7 +7,7 @@
 const pool = require('../db');
 const { genDocId } = require('../lib/ids');
 const { nextFuvarNo, resolveOrderSeries } = require('../lib/orderNo');
-const { getPositions } = require('../lib/vehiclePositions');
+const { getPositions, getReadingsForPlate } = require('../lib/vehiclePositions');
 const audit = require('../lib/audit');
 const planLimits = require('../lib/planLimits');
 const { featureEnabled } = require('../lib/featureEnabled');
@@ -387,6 +387,71 @@ handlers.getLastVehicleReadings = async function (req, res, args) {
     } catch (err) {
       console.error('getLastVehicleReadings hiba:', err);
       return res.json({ result: { ok: false } });
+    }
+  };
+
+// ─── AKTUÁLIS GPS-olvasás egy járműhöz (menetlevél záró km / üzemanyag) ───
+// A sofőr menetlevél „lekérés GPS-ből" gombjai (📍 záró km, ⛽ záró
+// üzemanyag) hívják. Az élő CargoTrack pozíció mileage-t és fuel_level-t is
+// ad; ezt cégen belül feloldjuk, majd a jármű `fuel_correction_l` mezőjével
+// kiigazítjuk az üzemanyag-szintet MIELŐTT a kliensbe kerül (a nyers érték
+// SOSEM megy ki — a sofőr csak a valós tartály-szintet lássa).
+//
+// Kapu: Sofer|Admin|Manager. Sofőr esetén EXTRA szigor: csak akkor kap
+// GPS-adatot, ha a jármű `assigned_driver_email` a bejelentkezett sofőrre
+// mutat — más sofőr autójához NEM fér hozzá. Admin/Manager cégen belül
+// bármely SAJÁT vontatóra kérheti (statisztikai/hibakeresési célra).
+// Multi-tenant: rendszám cégen belül keresve, cross-tenant szivárgás nincs.
+handlers.getCurrentGpsReadings = async function (req, res, args) {
+    try {
+      if (!req.session.user || !['Sofer', 'Admin', 'Manager'].includes(req.session.user.pozicio)) {
+        return res.json({ result: { ok: false, err: 'Acces interzis' } });
+      }
+      const cid = req.session.user.company_id;
+      const plate = normalizePlate(Array.isArray(args) ? args[0] : args);
+      if (!cid || !plate) return res.json({ result: { ok: true, available: false } });
+
+      // Feloldjuk a járművet cégen belül (aktív Vontato) — a fuel_correction_l
+      // + a sofőr-hozzárendelés ellenőrzéséhez. Rendszám-normalizált illesztés.
+      const vr = await pool.query(
+        `SELECT id, fuel_correction_l, assigned_driver_email
+           FROM vehicles
+          WHERE company_id = $1 AND tip = 'Vontato'
+            AND UPPER(REGEXP_REPLACE(COALESCE(rendszam,''), '[^A-Za-z0-9]', '', 'g')) = $2
+          LIMIT 1`, [cid, plate]);
+      const veh = vr.rows[0];
+      if (!veh) return res.json({ result: { ok: true, available: false, err: 'Vehicul negăsit' } });
+
+      if (req.session.user.pozicio === 'Sofer') {
+        const email = String(req.session.user.email || '').toLowerCase();
+        const assigned = String(veh.assigned_driver_email || '').toLowerCase();
+        if (!assigned || assigned !== email) {
+          return res.json({ result: { ok: true, available: false, err: 'Nu ai acest vehicul asignat' } });
+        }
+      }
+
+      const st = await getReadingsForPlate(cid, plate);
+      if (!st || !st.available) return res.json({ result: { ok: true, available: false } });
+
+      // Üzemanyag-korrekció: raw + offset. NULL/hiányzó korrekció = 0 (nyers érték).
+      // Negatív display-értéket 0-ra csippentünk (nem lehet a tankban -3 liter).
+      let fuel_level = st.fuel_level;
+      const corr = (veh.fuel_correction_l != null && isFinite(parseFloat(veh.fuel_correction_l)))
+        ? parseFloat(veh.fuel_correction_l) : 0;
+      if (fuel_level != null) {
+        fuel_level = Math.round((fuel_level + corr) * 10) / 10;
+        if (fuel_level < 0) fuel_level = 0;
+      }
+
+      return res.json({ result: {
+        ok: true, available: true,
+        mileage: st.mileage,       // km-óra állás (nyers, korrekció nélkül — a km-nél nincs eltérés)
+        fuel_level: fuel_level,    // MÁR korrigált — ezt írja be a sofőr menetlevele
+        datetime: st.datetime,
+      } });
+    } catch (err) {
+      console.error('getCurrentGpsReadings hiba:', err);
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
 

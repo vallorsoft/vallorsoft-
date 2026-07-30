@@ -36,6 +36,15 @@ jest.mock('../../lib/tripCrossings', () => ({
   }))
 }));
 
+// A `getReadingsForPlate` élő CargoTrack-hívást csinálna → mockolva, hogy
+// a `getCurrentGpsReadings` szerep-kapuját + fuel_correction alkalmazását
+// tudjuk tisztán tesztelni. A `getPositions` érintetlen (nem hívjuk).
+jest.mock('../../lib/vehiclePositions', () => ({
+  getPositions: jest.fn(),
+  getReadingsForPlate: jest.fn(),
+}));
+const vehPos = require('../../lib/vehiclePositions');
+
 function makeRes() {
   const res = { body: null, statusCode: 200 };
   res.json = (o) => { res.body = o; return res; };
@@ -156,6 +165,131 @@ describe('getLastVehicleReadings', () => {
     const res = makeRes();
     await orders.getLastVehicleReadings(reqAs(DRIVER), res, ['B123']);
     expect(res.body.result).toEqual({ ok: true, fuel: 240, km: 456000, level: 240 });
+  });
+});
+
+// ================================================================
+//  getCurrentGpsReadings — élő GPS-lekérés a menetlevél
+//  „📍 GPS" (záró km) és „⛽ GPS" (záró üzemanyag) gombjához.
+//  A fuel_level a jármű `fuel_correction_l` offsetjével korrigált.
+//  Sofőr csak a saját (assigned) járművére kérhet adatot.
+// ================================================================
+describe('getCurrentGpsReadings', () => {
+  beforeEach(() => { vehPos.getReadingsForPlate.mockReset(); });
+
+  test('idegen szerep (Konyvelo) tiltva', async () => {
+    const res = makeRes();
+    await orders.getCurrentGpsReadings(reqAs({ pozicio: 'Konyvelo', company_id: 1 }), res, ['B123']);
+    expect(res.body.result.ok).toBe(false);
+    expect(vehPos.getReadingsForPlate).not.toHaveBeenCalled();
+  });
+
+  test('bejelentkezés nélkül tiltva', async () => {
+    const res = makeRes();
+    await orders.getCurrentGpsReadings(reqAs(null), res, ['B123']);
+    expect(res.body.result.ok).toBe(false);
+  });
+
+  test('üres rendszám → available:false, nincs DB-hívás', async () => {
+    const res = makeRes();
+    await orders.getCurrentGpsReadings(reqAs(DRIVER), res, ['']);
+    expect(res.body.result).toEqual({ ok: true, available: false });
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  test('sofőr, jármű nem található → available:false', async () => {
+    pool.query.mockResolvedValueOnce(rows([]));   // vehicles: nincs találat
+    const res = makeRes();
+    await orders.getCurrentGpsReadings(reqAs(DRIVER), res, ['B999']);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.available).toBe(false);
+    expect(vehPos.getReadingsForPlate).not.toHaveBeenCalled();
+  });
+
+  test('sofőr, MÁS sofőrhöz kiosztott jármű → available:false (nincs GPS-hívás)', async () => {
+    pool.query.mockResolvedValueOnce(rows([{ id: 5, fuel_correction_l: null, assigned_driver_email: 'masiksofor@ceg.hu' }]));
+    const res = makeRes();
+    await orders.getCurrentGpsReadings(reqAs(DRIVER), res, ['B123']);
+    expect(res.body.result.available).toBe(false);
+    expect(vehPos.getReadingsForPlate).not.toHaveBeenCalled();
+  });
+
+  test('sofőr, saját járműve, korrekció nélkül → nyers fuel_level megy vissza', async () => {
+    pool.query.mockResolvedValueOnce(rows([{ id: 5, fuel_correction_l: null, assigned_driver_email: 'sofor@ceg.hu' }]));
+    vehPos.getReadingsForPlate.mockResolvedValueOnce({ ok: true, available: true, mileage: 456789, fuel_level: 500, datetime: '2026-07-30T10:00:00Z' });
+    const res = makeRes();
+    await orders.getCurrentGpsReadings(reqAs(DRIVER), res, ['B 123']);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.available).toBe(true);
+    expect(res.body.result.mileage).toBe(456789);
+    expect(res.body.result.fuel_level).toBe(500);
+  });
+
+  test('sofőr, saját járműve, NEGATÍV korrekció (−20 L) → GPS 500 − 20 = 480 L', async () => {
+    pool.query.mockResolvedValueOnce(rows([{ id: 5, fuel_correction_l: -20, assigned_driver_email: 'sofor@ceg.hu' }]));
+    vehPos.getReadingsForPlate.mockResolvedValueOnce({ ok: true, available: true, mileage: 456789, fuel_level: 500 });
+    const res = makeRes();
+    await orders.getCurrentGpsReadings(reqAs(DRIVER), res, ['B123']);
+    expect(res.body.result.fuel_level).toBe(480);
+    expect(res.body.result.mileage).toBe(456789);
+  });
+
+  test('sofőr, saját járműve, POZITÍV korrekció (+15 L) → GPS 300 + 15 = 315 L', async () => {
+    pool.query.mockResolvedValueOnce(rows([{ id: 5, fuel_correction_l: 15, assigned_driver_email: 'sofor@ceg.hu' }]));
+    vehPos.getReadingsForPlate.mockResolvedValueOnce({ ok: true, available: true, mileage: 100, fuel_level: 300 });
+    const res = makeRes();
+    await orders.getCurrentGpsReadings(reqAs(DRIVER), res, ['B123']);
+    expect(res.body.result.fuel_level).toBe(315);
+  });
+
+  test('nagyon nagy negatív korrekció NEM eredményez negatív fuel_level-t (0-ra vág)', async () => {
+    pool.query.mockResolvedValueOnce(rows([{ id: 5, fuel_correction_l: -600, assigned_driver_email: 'sofor@ceg.hu' }]));
+    vehPos.getReadingsForPlate.mockResolvedValueOnce({ ok: true, available: true, mileage: 100, fuel_level: 400 });
+    const res = makeRes();
+    await orders.getCurrentGpsReadings(reqAs(DRIVER), res, ['B123']);
+    expect(res.body.result.fuel_level).toBe(0);
+  });
+
+  test('Admin: nincs assigned-check, bármely cégen belüli járműre kérhet GPS-t', async () => {
+    pool.query.mockResolvedValueOnce(rows([{ id: 5, fuel_correction_l: -10, assigned_driver_email: 'masiksofor@ceg.hu' }]));
+    vehPos.getReadingsForPlate.mockResolvedValueOnce({ ok: true, available: true, mileage: 111, fuel_level: 200 });
+    const res = makeRes();
+    await orders.getCurrentGpsReadings(reqAs(ADMIN), res, ['B123']);
+    expect(res.body.result.available).toBe(true);
+    expect(res.body.result.fuel_level).toBe(190);
+  });
+
+  test('GPS-adat elérhető, de fuel_level nincs → mileage kimegy, fuel_level null', async () => {
+    pool.query.mockResolvedValueOnce(rows([{ id: 5, fuel_correction_l: -20, assigned_driver_email: 'sofor@ceg.hu' }]));
+    vehPos.getReadingsForPlate.mockResolvedValueOnce({ ok: true, available: true, mileage: 456789, fuel_level: null });
+    const res = makeRes();
+    await orders.getCurrentGpsReadings(reqAs(DRIVER), res, ['B123']);
+    expect(res.body.result.mileage).toBe(456789);
+    expect(res.body.result.fuel_level).toBeNull();
+  });
+
+  test('a GPS nem elérhető (getReadingsForPlate available:false) → available:false a válaszban', async () => {
+    pool.query.mockResolvedValueOnce(rows([{ id: 5, fuel_correction_l: null, assigned_driver_email: 'sofor@ceg.hu' }]));
+    vehPos.getReadingsForPlate.mockResolvedValueOnce({ ok: true, available: false });
+    const res = makeRes();
+    await orders.getCurrentGpsReadings(reqAs(DRIVER), res, ['B123']);
+    expect(res.body.result.available).toBe(false);
+  });
+
+  test('a rendszám a vehicles-lekérdezésbe NORMALIZÁLVA kerül', async () => {
+    pool.query.mockResolvedValueOnce(rows([]));
+    const res = makeRes();
+    await orders.getCurrentGpsReadings(reqAs(DRIVER), res, ['b 1-2-3 vlr']);
+    // A második paraméter (query args) a normalizált rendszám
+    expect(pool.query.mock.calls[0][1]).toEqual([1, 'B123VLR']);
+  });
+
+  test('DB-hiba → ok:false (nem szivárog stack)', async () => {
+    pool.query.mockRejectedValueOnce(new Error('db down'));
+    const res = makeRes();
+    await orders.getCurrentGpsReadings(reqAs(DRIVER), res, ['B123']);
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toBe('Eroare de server');
   });
 });
 

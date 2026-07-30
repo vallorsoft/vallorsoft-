@@ -14,6 +14,42 @@
 
 ---
 
+## 2026-07-30 — Sofőr menetlevél: záró km + záró üzemanyag EGY-GOMBOS lekérése GPS-ből (tartály-szint korrekcióval)
+
+### Miért
+A sofőr a menetlevél lezárásakor eddig kézzel írta be a záró km-óra állást és a záró üzemanyag-szintet — a vontatón álló műszerről leolvasva, gyakran memóriából. Fárasztó és hibaforrás (elgépelt km → hamis fogyasztás → sofőr-figyelmeztetés). A CargoTrack GPS eddig is szolgáltatta mind a két értéket (`mileage` + `fuel_level`) — ezt egy gombra le lehet kérni. A tartály-szintnél viszont a GPS gyakran eltér a valóstól (érzékelő-kalibráció, tartály-forma), ezért az admin jármű-adatlapon +/- literes korrekció adható, amit a szerver AUTOMATIKUSAN alkalmaz mielőtt a sofőr látja.
+
+### Változások
+
+1. **`db/vehicle-fuel-correction.sql`** (ÚJ, idempotens): `vehicles.fuel_correction_l NUMERIC(6,1)` — a GPS-mért tartály-szint és a valós tartály-szint közti fix eltérés (liter, +/-, NULL = nincs korrekció, csak Vontatóra értelmezett). NEM a L/100km fogyasztás — az továbbra is a `fuel_per_100km` mezőben.
+2. **`lib/vehiclePositions.js`** — új exportált `getReadingsForPlate(cid, plate)`: cégen belül a rendszám-normalizált CargoTrack-lekérés (mileage + fuel_level + datetime). NEM cache-elt (a `getPositions` térkép-cache érintetlen). Multi-tenant szűrés, best-effort (nincs GPS/nincs kulcs → `available:false`).
+3. **`handlers/orders.js`** — új `getCurrentGpsReadings(plate)` RPC:
+   - Kapu: **Sofer|Admin|Manager**.
+   - **Sofőr EXTRA szigor:** csak akkor kap választ, ha a jármű `assigned_driver_email` a bejelentkezett sofőrre mutat → más sofőr autójának GPS-adata NEM elérhető.
+   - A `fuel_level` a jármű `fuel_correction_l` offsetjével **KORRIGÁLVA** megy vissza (a nyers GPS-érték SOSEM kerül a kliensbe). Negatív display 0-ra vág.
+   - Példa: GPS 500 L + korrekció −20 L = a sofőr 480 L-t lát.
+4. **`handlers/fleet.js` `vehicleUpdate`** — új `fuel_correction_l` mező fogadva a jármű-adatlap mentésekor. `vehicleList` (SELECT *) automatikusan visszaadja.
+5. **Admin/Manager jármű-modal** (`admin.html` + `manager.html`) — új „GPS tartály-szint korrekció (L)" mező a Fogyasztás (L/100km) MELLETT, egyértelmű hint-szöveggel (NEM a fogyasztás; a sofőr menetlevél „⛽ GPS" gombjához alkalmazzuk); `console-shared.js` `editVehicle` betölti, `saveVehicle` küldi.
+6. **Sofőr menetlevél** (`public/sofer.html`) — új **📍 GPS** gomb a záró km (`fKmSf`) mellett + új **⛽ GPS** gomb a záró üzemanyag (`fCantSf`) mellett; közös `.gps-input-row` + `.gps-fetch-btn` CSS (zöld gradiens, kompakt, ujjbarát, disabled állapot).
+7. **Sofőr JS** (`public/sofer.js`) — új `fetchGpsEndKm()` / `fetchGpsEndFuel()`:
+   - Rendszám a `#fCamion` mezőből vagy a `_myAssignedVehicle` cache-ből.
+   - Közös `_sofGpsFetch(btnId, onOk)` helper: gomb-zár + spinner + `getCurrentGpsReadings` RPC + toast.
+   - Sikerre a mezőt **FELÜLÍRJA** (ez EXPLICIT sofőr-akció, nem csendes prefill), kilövi az `input` eventet (a `#kmFuelCheck` élő ellenőrzés + `draftSave` újrafut).
+8. **i18n** (`public/i18n.js`) — 11 új kulcs (RO-alap + HU): `vm.fuelCorr` + `vm.fuelCorrHint` (jármű-modal); `sof.gpsGetKmHint` / `sof.gpsGetFuelHint` (tooltip), `sof.gpsNoPlate` / `sof.gpsNoData` / `sof.gpsNoKm` / `sof.gpsNoFuel` / `sof.gpsError` (hiba-toastok), `sof.gpsKmFetched` / `sof.gpsFuelFetched` (`{val}` placeholder — sikeres toast).
+9. **Teszt** (`tests/integration/sofer-handlers.test.js`) — új `getCurrentGpsReadings` describe blokk 13 eset: szerep-kapu (Konyvelo tiltva, bejelentkezés nélkül tiltva), üres rendszám → available:false, jármű nem található, MÁS sofőrhöz kiosztott jármű (nincs GPS-hívás!), sofőr saját járműve korrekció nélkül, negatív korrekció (−20 → 480), pozitív korrekció (+15 → 315), nagyon nagy negatív → 0-ra vág, Admin/Manager nincs assigned-check, csak mileage van (fuel_level:null), GPS nem elérhető, rendszám-normalizálás („b 1-2-3 vlr" → „B123VLR"), DB-hiba (nincs stack-szivárgás).
+10. **Cache-bust** `?v=20260730gps` (sofer.html/js/css, admin.html/manager.html i18n + console-shared).
+
+### Kompatibilitás
+- Nincs törésváltozás. Ha nincs `fuel_correction_l` megadva, a nyers GPS-érték megy a sofőrhöz (mint eddig lenne, ha lenne ilyen gomb).
+- Ha a jármű nincs CargoTrack-hoz párosítva / nincs `gps-integracio` flag → a gomb kilövi a hiba-toastot („Nincs friss GPS-adat…"), a sofőr kézzel folytathatja.
+- A `fuel_per_100km` (fogyasztás) mező ÉS a korábbi `getLastVehicleReadings` (kezdő km + kezdő üzemanyag prefill előző menetlevélből) VÁLTOZATLAN.
+
+### PR & Teszt
+- Branch: `claude/sofor-gps-fuel-buttons-ibwcix`
+- **840 Jest zöld** (45 skipped valós-DB), require-sweep 82 modul 0 hiba.
+
+---
+
 ## 2026-07-29 — Fuvar-menetlevél életciklus: kötelező elhelyezés + azonnali eltűnés + dátum a pickerben
 
 ### Miért
