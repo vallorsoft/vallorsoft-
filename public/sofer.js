@@ -1026,7 +1026,8 @@ function _openOrderPicker(mode, cb) {
         + '<input type="checkbox" value="' + esc(o.id) + '" ' + (checked ? 'checked' : '')
         + ' onchange="_opToggle(this)">'
         + '<div class="op-body">'
-        + '<div class="op-head"><b class="op-id">#' + esc(o.id) + '</b>'
+        + '<div class="op-head"><b>' + esc(o.client || '—') + '</b>'
+        + ' <span class="op-id">📅 ' + esc((o.data_incarcare||'').slice(0,10) || '—') + ' → ' + esc((o.data_descarcare||'').slice(0,10) || '—') + '</span>'
         + phaseBadge + mustBadge + '</div>'
         + '<div class="op-route">📍 ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—') + '</div>'
         + (o.rendszam_camion ? '<div class="op-plate">🚛 ' + esc(o.rendszam_camion)
