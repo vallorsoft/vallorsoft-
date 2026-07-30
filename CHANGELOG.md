@@ -35,6 +35,78 @@ A sofőr oldalon a Finalizat fuvarok a menetlevélbe helyezés után türelmi id
 
 ---
 
+## 2026-07-29 — Menetlevél: a „✏️ Fuvarok kezelése" gomb kitűnő, tömör kék lett (PR #305)
+
+### Miért
+A menetlevél 2. lépésén a „✏️ Fuvarok kezelése (hozzáadás/eltávolítás)" szaggatott keretes, átlátszó „szellem-gomb" volt (`background:transparent`, 1px dashed) — a világos lapon alig látszott, pedig ez nyitja a fuvar-pickert, és a lezárási védőháló (`_validateNoLeftoverOrders`) is ide küldi vissza a sofőrt.
+
+### Mi változott
+1. **`public/sofer.html`** — a beégetett inline stílus lekerült a gombról, helyette `class="submit-btn wb-manage"`. (Az `onclick`/`data-i18n` változatlan.)
+2. **`public/sofer.css`** — új `.submit-btn.wb-manage`: tömör, a beküldő gombbal AZONOS családú, de **sötétebb/hidegebb kék** (`#0ea5e9 → #0369a1`, 1.5px `#075985` keret, kék glow). Így egyértelműen gomb és kitűnik, de nem versenyez a fő művelettel (a „📄 Menetlevél létrehozása" / „📤 Véglegesítés" marad a kék-indigó gradiens).
+3. Cache-bust `?v=20260729ui` → `?v=20260729wbm`.
+
+**Szerver-oldal, DB és minden JS-logika érintetlen** — tisztán megjelenés. **871 Jest zöld** (45 skipped valós-DB), headless Chromium (393 px) vizuális ellenőrzéssel.
+
+---
+
+## 2026-07-29 — Sofőr-felület: saját megerősítő modal + kontraszt-kör + fázis-vezérelt fel-/lerakás (PR #304)
+
+### Miért
+Három kérés egy körben: (1) a megerősítés a natív `confirm()` helyett a felület saját stílusában; (2) a teljes sofőr-felület legyen kontrasztos — a gombok tűnjenek ki, a menetlevél legyen egyértelmű, és ami lenyílik, azon legyen látható lenyíló-ikon; (3) a kiosztott fuvar kártyáján felrakodás előtt CSAK a felrakó látszódjon (a lerakó külön lenyitható), felrakodás után forduljon — és a megbízó cég neve ne jelenjen meg.
+
+### Mi változott
+1. **Saját megerősítő modal** (`#sofConfirmModal` + `sofConfirm(opts, onOk)` / `sofConfirmOk()` / `sofConfirmCancel()`): ikon + cím + magyarázat + két, egymástól jól elkülönülő gomb (semleges „Mégse" · hangsúlyos, `tone` szerint színezett igen). Az állomás-léptetés (`driverMilestone`) és a határátlépés (`sendBorderCross`) ezt használja; a tényleges művelet a `_driverMilestoneGo` / `_sendBorderCrossGo` ágon fut, tehát az „igen" nélkül SEMMI nem megy ki (a határátlépésnél GPS-lekérés sem). Ha a modal hiányozna a DOM-ból (beragadt régi HTML), a `sofConfirm` a natív `confirm()`-ra esik vissza — némán sosem hajtjuk végre a műveletet.
+2. **Kontraszt-kör** (`public/sofer.css`, additív blokk a fájl VÉGÉN, könnyen visszavonható): erősebb tokenek (`--sof-border` #e2e8f0 → #cbd5e1, `--sof-muted` #64748b → #475569); a másodlagos gombok fehér helyett halvány-tinta kitöltést + 1.5px markáns keretet + sötét feliratot kaptak (`.sh-btn`, `.fd-copy`, `.add-row-btn`, `.back-btn`), az „⛔ Áru leadása" borostyán lett (a halvány lila felirat fehér alapon gyakorlatilag eltűnt); űrlap-címkék sötétebbek/vastagabbak, mezők 1.5px kerettel + erősebb fókusz-gyűrűvel; szekció-fejlécek sötét felirat + bal oldali gradiens akcent-csík; státusz-pirulák telített háttérrel.
+3. **Egységes lenyíló-ikon**: minden összecsukható elem (fuvar-kártya fej, menetlevél-szekciók, fel-/lerakás blokk) kerek, keretes chevron-jelzőt kapott — **csukva ▸, nyitva ▾** (eddig a kártyafej ▾/▴-t használt, a szekciók ▸/▾-t).
+4. **Fázis-vezérelt fuvar-kártya** (`renderFuvarCard`): a fel- és lerakás külön összecsukható blokk (`fdPhaseSec` + `toggleFuvarSec(id, kind)`). Amíg nincs `incarcat_at`, a **felrakás** van nyitva és elöl, a lerakó egy koppintással lenyitható; felrakodás után a **lerakás** kerül előre nyitva, a felrakó marad lenyithatóként. A csukott fejlécen ott a helyszín-összegzés, hogy egy pillantásból látszódjon.
+5. **A megbízó cég neve (`orders.client`) sehol nem jelenik meg a sofőrnek** — sem a kártyán (meta-sor + korábbi `fd-firma`), sem a fuvar-pickerben, sem a menetlevél kiválasztott-fuvarok összegzőjében (helyette a fuvar-szám ill. a felrakó → lerakó útvonal azonosít). A **felrakó/lerakó cég** (`firma_incarcare` / `firma_descarcare`) továbbra is látszik — az a sofőr munkája.
+6. **i18n**: a `sof.ms.confirmAsk` / `sof.crossConfirmAsk` egysoros kulcsok cím + magyarázat párra bomlottak (`sof.ms.confirmTitle`/`Msg`, `sof.crossConfirmTitle`/`Msg`), + `sof.cfm.yes`. Cache-bust `?v=20260729ui` (`i18n.js`, `sofer.js`, `sofer.css`).
+
+### Nem érintett
+Szerver-oldal és DB változatlan. A `getMySoferOrders` már eddig is visszaadta a 4 állomás-időbélyeget, ezért a fázis-váltás új lekérdezés nélkül működik.
+
+### Teszt
+`tests/integration/sofer-client-flow.test.js` — a 7 régi `confirm()`-alapú eset átírva a modalra, +5 új: a hívás önmagában nem küld (modal nyílik) · Mégse → semmi · Igen → POST · a modal címe a soron következő állomást / az irányt nevezi meg · fallback-ág; továbbá a `renderFuvarCard` fázis-logikája (nyitott/csukott blokk + sorrend), a megbízó-név hiánya és a `toggleFuvarSec` ikon-váltása. **866 → 871 Jest zöld** (45 skipped valós-DB). Vizuális ellenőrzés headless Chromiummal (393 px), a VALÓDI `renderFuvarCard`-kimenettel és a valódi `sofer.css`-szel.
+
+---
+
+## 2026-07-29 — Sofőr: a határátlépés BE/KI gomb is megerősítést kér (PR #303)
+
+### Miért
+Ugyanaz a minta, mint az állomás-gomboknál (PR #302), a második egykoppintásos, visszavonhatatlan műveletre. A `🇷🇴 ROMÁNIA BE` / `KI` gomb eddig azonnal rögzítette az átlépést a jelenlegi idővel + GPS-pozícióval. A sofőr a saját felületéről **nem tudja törölni** a rossz sort, és a menetlevél **diurnáját KÖZVETLENÜL ebből számoljuk** (`lib/tripCrossings.js` → `calculateDiurna` 12:00-szabály) — egy félrenyomott BE/KI a napidíjat (extern/intern napok) rontja el, ami pénzben mérhető hiba.
+
+### Mi változott
+1. **`public/sofer.js` `sendBorderCross(tip, tara)`** — a rögzítés (és a GPS-lekérés) ELŐTT `confirm()`. A kérdés az **irányt** nevezi meg (`sof.crossIn` / `sof.crossOut`), és jelzi, hogy most rögzül az idő + GPS-pozíció, ebből számoljuk a diurnát, és nem vonható vissza. Mégse → **még GPS-t sem kér** (nincs felesleges pozíció-lekérés).
+2. **`public/i18n.js`** — új `sof.crossConfirmAsk` kulcs (RO-alap + HU), `{act}` placeholderrel. A szöveg szándékosan KÜLÖN az állomás-gombokétól (ott „az iroda értesítést kap", itt a diurna a tét).
+3. **`public/sofer.html`** — cache-bust `?v=20260729msask` → `?v=20260729ask2` (`i18n.js` + `sofer.js`).
+
+### Nem érintett
+Szerver-oldal és DB változatlan (`routes/soferApi.js` `POST /api/border-cross` + a PR #300-as bemenet-szigorítás); a menetlevél „🚛 Határátlépés rögzítése" gombja továbbra is csak a rögzítő-képernyőre navigál (`goSec('border')`), maga nem ír.
+
+### Teszt
++3 eset a `tests/integration/sofer-client-flow.test.js`-ben: `confirm=false` → **nincs** `/api/border-cross` hívás ÉS nincs `getCurrentPosition`; `confirm=true` → POST a helyes `tip`/`tara` payloaddal; a kérdés külön nevezi meg a BE-t és a KI-t. **863 → 866 Jest zöld** (45 skipped valós-DB).
+
+---
+
+## 2026-07-29 — Sofőr: az állomás-gomb (odaért / felrakodott / stb.) megerősítést kér (PR #302)
+
+### Miért
+A sofőr fuvar-kártyáján az állomás-léptető gomb (`➜ Megérkeztem a felrakóhoz` / `Felrakodtam` / `Megérkeztem a lerakóhoz` / `Leürítettem`) eddig **egyetlen koppintásra azonnal** rögzítette az időbélyeget és értesítette az irodát. Ez a napi 4× használt művelet, és a gomb a kártya **fejlécén** ül (`fuvar-head-action`) — épp azért, hogy vezetés után, kesztyűs kézzel ne kelljen előbb kinyitni a kártyát; ugyanez teszi könnyen félrenyomhatóvá. Az állomás **nem vonható vissza**: a szerver mindig a következő üres állomást tölti ki, az első `In Curs`-ra, az utolsó `Finalizat`-ra lépteti a fuvart.
+
+### Mi változott
+1. **`public/sofer.js` `driverMilestone(id, stepIdx)`** — a fetch ELŐTT `confirm()`. A kérdés a soron következő állomást nevezi meg („Biztos, hogy »Felrakodtam«?"), és jelzi, hogy az időpont most rögzül + az iroda értesítést kap + nem vonható vissza. A `stepIdx` CSAK a kérdés szövegéhez kell — a döntést továbbra is a **szerver** hozza (a `d.step`-ből jövő toast változatlan). Érvénytelen/hiányzó index (beragadt régi HTML) → általános kérdés, de **kérdez**; némán sosem küld.
+2. **Mindkét hívó** (kinyíló rész `actionBtn` + fejléc-gomb `headActionBtn`) átadja a már kiszámolt `msNextIdx`-et.
+3. **`public/i18n.js`** — új `sof.ms.confirmAsk` kulcs (RO-alap + HU), `{act}` placeholderrel (a `t(key, vars)` már támogatja).
+4. **`public/sofer.html`** — cache-bust `?v=20260728pick` → `?v=20260729msask` (`i18n.js` + `sofer.js`), hogy a beragadt mobil-cache lecserélődjön.
+
+### Nem érintett
+Szerver-oldal és DB változatlan (`routes/ordersRest.js` `POST /api/orders/:id/driver-milestone`); az irodai idővonal (`public/entity-detail.js` saját `_MS_STEPS`, read-only) szintén.
+
+### Teszt
++4 eset a `tests/integration/sofer-client-flow.test.js`-ben (a valódi `public/sofer.js` VM-mel, DOM-stubon): `confirm=false` → **nincs** `/driver-milestone` hívás; `confirm=true` → POST a helyes végpontra; a kérdés a soron következő állomást nevezi meg (`stepIdx=2` → `arriveUnload`); hiányzó/tartományon kívüli `stepIdx` → általános kérdés, de továbbra is kérdez. **859 → 863 Jest zöld** (45 skipped valós-DB).
+
+---
+
 ## 2026-07-29 — Sofőr-funkciók teljes lefedettsége (+84 új teszt) + 2 XSS-fix a naplórenderben + border-cross bemenet-validáció
 
 ### Miért

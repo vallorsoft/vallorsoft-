@@ -75,6 +75,52 @@ function stateClear() {
 
 // Menetlevél piszkozat mentése (debounce 600ms)
 var _draftTimer = null;
+
+// ============================================================
+// MEGERŐSÍTŐ MODAL (a natív `confirm()` helyett)
+// ============================================================
+// A visszavonhatatlan műveleteknél (állomás-léptetés, határátlépés) a
+// rendszer-dialógus helyett a felület SAJÁT modalja kérdez: nagy, egymástól
+// jól elkülönülő gombok (a „Mégse" semleges, az „Igen" hangsúlyos), hogy
+// vezetés után, kesztyűs kézzel se lehessen véletlenül igent nyomni.
+//
+// Használat: `sofConfirm({ title, msg, ok, tone }, function(){ ...igen ág... })`
+// A `tone` a megerősítő gomb színe: 'primary' (alap) | 'danger' | 'ok'.
+var _sofConfirmCb = null;
+function sofConfirm(opts, onOk) {
+  opts = opts || {};
+  var m = document.getElementById('sofConfirmModal');
+  // Nincs modal a DOM-ban (régi, beragadt HTML) → visszaesünk a natív
+  // kérdésre: SOSEM hajtjuk végre némán a visszavonhatatlan műveletet.
+  if (!m) {
+    if (confirm((opts.title ? opts.title + '\n\n' : '') + (opts.msg || ''))) { if (onOk) onOk(); }
+    return;
+  }
+  var ico = document.getElementById('sofConfirmIco');
+  var ttl = document.getElementById('sofConfirmTitle');
+  var msg = document.getElementById('sofConfirmMsg');
+  var ok  = document.getElementById('sofConfirmOkBtn');
+  if (ico) ico.textContent = opts.ico || '❓';
+  if (ttl) ttl.textContent = opts.title || '';
+  if (msg) msg.textContent = opts.msg || '';
+  if (ok) {
+    ok.textContent = opts.ok || t('sof.cfm.yes');
+    ok.className = 'sof-cf-btn ok tone-' + (opts.tone || 'primary');
+  }
+  _sofConfirmCb = onOk || null;
+  m.style.display = 'flex';
+}
+function sofConfirmCancel() {
+  var m = document.getElementById('sofConfirmModal');
+  if (m) m.style.display = 'none';
+  _sofConfirmCb = null;
+}
+function sofConfirmOk() {
+  var cb = _sofConfirmCb;
+  sofConfirmCancel();
+  if (cb) cb();
+}
+
 // ============================================================
 // ÖSSZECSUKHATÓ SZEKCIÓK a menetlevél 2. lépésén
 // ============================================================
@@ -727,7 +773,20 @@ function goSec(id) {
 // ============================================================
 // HATÁRÁTLÉPÉS
 // ============================================================
+// Megerősítés a rögzítés ELŐTT (mint az állomás-gomboknál): a határátlépés a
+// sofőr felületéről NEM vonható vissza, és a menetlevél diurnáját (extern/intern
+// napok) KÖZVETLENÜL ebből számoljuk (`lib/tripCrossings.js` + `calculateDiurna`)
+// — egy félrenyomott BE/KI a napidíjat rontja el. A kérdés az irányt nevezi meg.
 function sendBorderCross(tip, tara) {
+  var act = (tip === 'Intrare') ? t('sof.crossIn') : t('sof.crossOut');
+  sofConfirm({
+    ico: '🛂',
+    title: t('sof.crossConfirmTitle', { act: act }),
+    msg: t('sof.crossConfirmMsg'),
+    ok: act
+  }, function () { _sendBorderCrossGo(tip, tara); });
+}
+function _sendBorderCrossGo(tip, tara) {
   var statusEl = document.getElementById('gpsStatus');
   statusEl.innerHTML = '<div class="gps-badge"><span class="spinner"></span> ' + t('sof.gpsFetch') + '</div>';
 
@@ -815,7 +874,7 @@ function loadSoferOrders() {
       return '<label style="display:flex;align-items:flex-start;gap:12px;background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;">'
         + '<input type="checkbox" value="' + o.id + '" ' + (checked ? 'checked' : '') + ' onchange="toggleOrderSel(this)" style="margin-top:3px;width:18px;height:18px;accent-color:#3b82f6;flex-shrink:0;">'
         + '<div>'
-        + '<div style="font-weight:700;font-size:14px;color:#fff;">' + esc(o.client || '—') + ' <span style="font-size:11px;color:var(--muted);">#' + o.id + '</span> <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,0.1);">' + esc(o.status||'—') + '</span>' + phaseBadge + '</div>'
+        + '<div style="font-weight:700;font-size:14px;color:#fff;">' + '<span style="font-size:11px;color:var(--muted);">#' + o.id + '</span> <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,0.1);">' + esc(o.status||'—') + '</span>' + phaseBadge + '</div>'
         + '<div style="font-size:12px;color:var(--soft);margin-top:3px;">📍 ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—') + '</div>'
         + (o.rendszam_camion ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">🚛 ' + esc(o.rendszam_camion) + (o.rendszam_remorca ? ' / ' + esc(o.rendszam_remorca) : '') + '</div>' : '')
         + '</div></label>';
@@ -1106,7 +1165,7 @@ function _refreshSelectedOrdersSummary() {
   }
   sumEl.innerHTML = '<b style="color:#fff;">✅ ' + t('sof.selectedOrders', { n: selected.length }) + '</b><br>'
     + selected.map(function (o) {
-        return '• ' + esc(o.client || '—') + ': ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—');
+        return '• ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—');
       }).join('<br>');
 }
 
@@ -1149,7 +1208,7 @@ function fuvarStep2(allowEmpty) {
   } else {
   sumEl.innerHTML = '<b style="color:#fff;">✅ ' + t('sof.selectedOrders', { n: selected.length }) + '</b><br>'
     + selected.map(function(o) {
-        return '• ' + esc(o.client || '—') + ': ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—');
+        return '• ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—');
       }).join('<br>');
   }
 
@@ -3655,7 +3714,24 @@ var MS_STEPS = [
 
 // Egy gombnyomás → a szerver a következő üres állomást rögzíti (időbélyeg),
 // és értesíti az irodát; az utolsónál a fuvar Finalizat lesz.
-function driverMilestone(id) {
+// FONTOS: az állomás NEM visszavonható (a szerver mindig a KÖVETKEZŐ üres
+// állomást tölti ki), ezért beküldés ELŐTT megerősítést kérünk — a gomb a
+// fuvar-kártya fejlécén ül, vezetés után, kesztyűs kézzel könnyen félrenyomható.
+// A `stepIdx` a kliens által számolt következő állomás (a gomb felirata is
+// ebből jön) — csak a kérdés szövegéhez kell; a döntést továbbra is a szerver
+// hozza. Érvénytelen/hiányzó index esetén általános kérdést teszünk fel.
+function driverMilestone(id, stepIdx) {
+  var step = (typeof stepIdx === 'number' && MS_STEPS[stepIdx]) ? MS_STEPS[stepIdx] : null;
+  var act  = step ? t(step.key) : t('sof.ms.recorded');
+  sofConfirm({
+    ico: '🚚',
+    title: t('sof.ms.confirmTitle', { act: act }),
+    msg: t('sof.ms.confirmMsg'),
+    ok: act,
+    tone: 'ok'
+  }, function () { _driverMilestoneGo(id); });
+}
+function _driverMilestoneGo(id) {
   fetch('/api/orders/' + id + '/driver-milestone', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
   })
@@ -3671,6 +3747,21 @@ function driverMilestone(id) {
   .catch(function () { toast(t('sof.errOccurred'), 'err'); });
 }
 
+// A kártyán belüli fel-/lerakás blokk ki-/becsukása (`kind`: 'load'|'unload').
+// Az alapállapotot a fuvar fázisa adja (lásd `renderFuvarCard`), de a sofőr
+// bármikor átkapcsolhatja — a másik szekciót NEM csukjuk be helyette
+// (előfordul, hogy egyszerre kell látni a felrakó és a lerakó címét).
+function toggleFuvarSec(id, kind) {
+  var body  = document.getElementById('fdbody_' + kind + '_' + id);
+  var caret = document.getElementById('fdcar_' + kind + '_' + id);
+  var sec   = document.getElementById('fdsec_' + kind + '_' + id);
+  if (!body) return;
+  var open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (caret) caret.textContent = open ? '▸' : '▾';
+  if (sec && sec.classList) sec.classList.toggle('open', !open);
+}
+
 // Kattintásra a kártya részletei ki-/becsukódnak (felrakás/lerakás + megjegyzés).
 function toggleFuvarDetails(id) {
   var el = document.getElementById('det_' + id);
@@ -3678,7 +3769,8 @@ function toggleFuvarDetails(id) {
   if (!el) return;
   var open = el.style.display !== 'none';
   el.style.display = open ? 'none' : 'block';
-  if (arr) arr.textContent = open ? '▾' : '▴';
+  // Egységes lenyíló-ikon az egész felületen: csukva ▸, nyitva ▾.
+  if (arr) arr.textContent = open ? '▸' : '▾';
 }
 
 // Egy mező (felrakó/lerakó helyszín vagy megjegyzés) vágólapra másolása.
@@ -3731,10 +3823,10 @@ function renderFuvarCard(o, idx) {
   // `stopPropagation`, hogy a gomb ne csukja ki/be a kártyát.
   var headActionBtn = '';
   if ((isAlocat || isCurs) && msNextIdx >= 0) {
-    actionBtn = '<button class="sh-btn confirm" onclick="driverMilestone(\'' + o.id + '\')">' +
+    actionBtn = '<button class="sh-btn confirm" onclick="driverMilestone(\'' + o.id + '\',' + msNextIdx + ')">' +
                 '➜ ' + t(MS_STEPS[msNextIdx].key) + '</button>';
     headActionBtn = '<button class="sh-btn confirm fuvar-head-action" ' +
-      'onclick="event.stopPropagation();driverMilestone(\'' + o.id + '\')">' +
+      'onclick="event.stopPropagation();driverMilestone(\'' + o.id + '\',' + msNextIdx + ')">' +
       '➜ ' + t(MS_STEPS[msNextIdx].key) + '</button>';
   }
   // ⛔ Áru leadása (defekt / pótkocsi-csere) — a kérést a diszpécser igazolja vissza
@@ -3743,7 +3835,10 @@ function renderFuvarCard(o, idx) {
   if (hoPending) {
     hoBtn = '<span class="fuvar-status warn">' + t('sof.handoverPending') + (o.handover_loc ? ' @ ' + esc(o.handover_loc) : '') + '</span>';
   } else if (isAlocat || isCurs) {
-    hoBtn = '<button class="sh-btn" style="border:1px solid rgba(99,102,241,0.5);color:#a5b4fc;background:rgba(99,102,241,0.12);" ' +
+    // Kivételes művelet (defekt / pótkocsi-csere) — borostyán, hogy egyértelműen
+    // elváljon a napi állomás-gombtól, de olvasható maradjon (a régi halvány
+    // lila felirat fehér alapon gyakorlatilag eltűnt napfényben).
+    hoBtn = '<button class="sh-btn ho" ' +
       'onclick="openHandover(\'' + o.id + '\')" title="' + t('sof.handoverBtnTitle') + '">' + t('sof.ho.title') + '</button>';
   }
   // Kattintható részletek forrás-adatai (biztonságos map, nem HTML-attribútum)
@@ -3778,39 +3873,59 @@ function renderFuvarCard(o, idx) {
     return '<div class="fd-row"><div class="fd-cell"><span class="fd-lbl">' + t(labelKey) + '</span>' +
            '<span class="fd-val">' + esc(val) + '</span></div>' + btn + '</div>';
   }
-  // Meta-sor (#szám, ügyfél, kamion, státusz) — a KINYÍLÓ részbe kerül,
-  // hogy összecsukott állapotban CSAK a fel-/lerakó cím látszódjon.
+  // Meta-sor (#szám, kamion, státusz) — a KINYÍLÓ részbe kerül, hogy
+  // összecsukott állapotban CSAK a fel-/lerakó cím látszódjon.
+  // A MEGBÍZÓ (`o.client`) NEVE SZÁNDÉKOSAN SEHOL nem jelenik meg a sofőr
+  // kártyáján: a sofőrnek a fel-/lerakó helyszín és az ottani cég a munkája,
+  // a megrendelő cég neve nem tartozik rá (és csak zajt visz a kártyára).
   var metaHtml =
     '<div class="fuvar-meta">' +
       '<span>#' + o.id + '</span>' +
-      (o.client ? '<span>' + esc(o.client) + '</span>' : '') +
       (truck ? '<span>' + truck + '</span>' : '') +
       '<span class="fuvar-status ' + statusCls + '">' + statusTxt + '</span>' +
     '</div>';
+  // ── Fázis-vezérelt fel-/lerakás blokk ──────────────────────────
+  // Amíg NINCS felrakodva, a sofőrt a FELRAKÁS érdekli → az van nyitva, a
+  // lerakó egy koppintással lenyitható. Felrakodás után (`incarcat_at`)
+  // fordul: a LERAKÁS nyílik ki, a felrakó marad lenyithatóként (pl. ha
+  // vissza kell nézni a felrakó címét). Mindkettő bármikor ki-/becsukható.
+  var loadedDone = !!o.incarcat_at;
+  // Egy összecsukható fel-/lerakás szekció. `open` = alapból nyitva.
+  function fdPhaseSec(kind, ico, headKey, sumTxt, rowsHtml, open) {
+    var bid = 'fdbody_' + kind + '_' + o.id;
+    var cid = 'fdcar_' + kind + '_' + o.id;
+    return '<div class="fd-sec fd-coll' + (open ? ' open' : '') + '" id="fdsec_' + kind + '_' + o.id + '">' +
+      '<div class="fd-sec-h" role="button" tabindex="0" ' +
+           'onclick="toggleFuvarSec(\'' + o.id + '\',\'' + kind + '\')" ' +
+           'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleFuvarSec(\'' + o.id + '\',\'' + kind + '\');}">' +
+        '<span class="fd-sec-t">' + ico + ' ' + t(headKey) + '</span>' +
+        (sumTxt ? '<span class="fd-sec-sum">' + esc(sumTxt) + '</span>' : '') +
+        '<span class="fd-caret" id="' + cid + '">' + (open ? '▾' : '▸') + '</span>' +
+      '</div>' +
+      '<div class="fd-sec-b" id="' + bid + '"' + (open ? '' : ' style="display:none"') + '>' + rowsHtml + '</div>' +
+    '</div>';
+  }
+  var loadSec = fdPhaseSec('load', '⬆️', 'sof.det.loading', o.loc_incarcare,
+    detRow('sof.det.company', o.firma_incarcare, null) +
+    detRow('sof.det.location', o.loc_incarcare, 'load') +
+    detRow('sof.det.date', dLoad, null), !loadedDone);
+  var unloadSec = fdPhaseSec('unload', '⬇️', 'sof.det.unloading', o.loc_descarcare,
+    detRow('sof.det.company', o.firma_descarcare, null) +
+    detRow('sof.det.location', o.loc_descarcare, 'unload') +
+    detRow('sof.det.date', dUnload, null), loadedDone);
   var details =
     '<div class="fuvar-details" id="det_' + o.id + '" style="display:none">' +
       metaHtml +
-      (o.client ? '<div class="fd-firma">🏢 ' + esc(o.client) + '</div>' : '') +
-      '<div class="fd-sec">' +
-        '<div class="fd-sec-h">⬆️ ' + t('sof.det.loading') + '</div>' +
-        detRow('sof.det.company', o.firma_incarcare, null) +
-        detRow('sof.det.location', o.loc_incarcare, 'load') +
-        detRow('sof.det.date', dLoad, null) +
-      '</div>' +
-      '<div class="fd-sec">' +
-        '<div class="fd-sec-h">⬇️ ' + t('sof.det.unloading') + '</div>' +
-        detRow('sof.det.company', o.firma_descarcare, null) +
-        detRow('sof.det.location', o.loc_descarcare, 'unload') +
-        detRow('sof.det.date', dUnload, null) +
-      '</div>' +
+      // Felrakodás után a LERAKÁS kerül előre — az a soron következő feladat.
+      (loadedDone ? (unloadSec + loadSec) : (loadSec + unloadSec)) +
       (o.ref ? '<div class="fd-sec">' +
-        '<div class="fd-sec-h">📝 ' + t('sof.det.note') + '</div>' +
+        '<div class="fd-sec-h"><span class="fd-sec-t">📝 ' + t('sof.det.note') + '</span></div>' +
         detRow('sof.det.note', o.ref, 'note') +
       '</div>' : '') +
       // Állomás-idővonal: a 4 lépés + időbélyeg (✅ kész / ○ hátra).
       // Finalizat fuvarnál CSAK akkor, ha van rögzített állomás (különben üres ○○○○).
       ((!isParked && !isWh && (isAlocat || isCurs || MS_STEPS.some(function(s){return o[s.col];}))) ? '<div class="fd-sec">' +
-        '<div class="fd-sec-h">🚚 ' + t('sof.ms.progress') + '</div>' +
+        '<div class="fd-sec-h"><span class="fd-sec-t">🚚 ' + t('sof.ms.progress') + '</span></div>' +
         MS_STEPS.map(function (s) {
           var done = o[s.col];
           return '<div class="fd-ms-row' + (done ? ' done' : '') + '">' +
@@ -3843,7 +3958,7 @@ function renderFuvarCard(o, idx) {
         '<div class="fuvar-destination">' +
           (num ? '<span class="fuvar-num">#' + num + '</span>' : '') +
           '<span class="fuvar-headtxt">' + headBits.join(' · ') + '</span>' +
-          '<span class="fuvar-expand" id="exp_' + o.id + '">▾</span>' +
+          '<span class="fuvar-expand" id="exp_' + o.id + '">▸</span>' +
         '</div>' +
         headActionBtn +
       '</div>' +

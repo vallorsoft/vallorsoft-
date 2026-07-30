@@ -407,3 +407,163 @@ describe('per-sofőr storage kulcs formátuma', () => {
     expect(Object.keys(dump).some(k => k === 'vs_sofer_state:peto@ex.hu')).toBe(true);
   });
 });
+
+// ================================================================
+//  Megerősítő modal (sofConfirm) — a natív confirm() helyett a
+//  felület saját modalja kérdez a visszavonhatatlan műveleteknél.
+//  Az „igen" ág CSAK a modal OK gombjára fut le.
+// ================================================================
+describe('driverMilestone megerősítés (saját modal)', () => {
+  test('a hívás önmagában NEM küld — előbb megnyílik a modal', () => {
+    const urls = [];
+    const sb = load({ fetch: (u) => { urls.push(String(u)); return Promise.resolve({ json: () => Promise.resolve({ ok: true }) }); } });
+    sb.driverMilestone('ORD1', 0);
+    expect(sb.document._registry.sofConfirmModal.style.display).toBe('flex');
+    expect(urls.filter(u => u.indexOf('/driver-milestone') >= 0)).toEqual([]);
+  });
+
+  test('Mégse → modal zárul, semmi nem megy ki', () => {
+    const urls = [];
+    const sb = load({ fetch: (u) => { urls.push(String(u)); return Promise.resolve({ json: () => Promise.resolve({ ok: true }) }); } });
+    sb.driverMilestone('ORD1', 0);
+    sb.sofConfirmCancel();
+    expect(sb.document._registry.sofConfirmModal.style.display).toBe('none');
+    expect(urls.filter(u => u.indexOf('/driver-milestone') >= 0)).toEqual([]);
+  });
+
+  test('Igen → POST a driver-milestone végpontra, modal zárul', async () => {
+    const calls = [];
+    const sb = load({ fetch: (u, o) => { calls.push({ u: String(u), m: o && o.method }); return Promise.resolve({ json: () => Promise.resolve({ ok: true, step: 'loaded' }) }); } });
+    sb.loadDashOrders = () => {};
+    sb.driverMilestone('ORD1', 1);
+    sb.sofConfirmOk();
+    await tick();
+    const hit = calls.filter(c => c.u.indexOf('/driver-milestone') >= 0);
+    expect(hit.length).toBe(1);
+    expect(hit[0].m).toBe('POST');
+    expect(hit[0].u).toContain('/api/orders/ORD1/driver-milestone');
+    expect(sb.document._registry.sofConfirmModal.style.display).toBe('none');
+  });
+
+  test('a modal címe a soron következő állomást nevezi meg', () => {
+    const sb = load({});
+    sb.t = (k, v) => (v && v.act != null) ? (k + '|' + v.act) : k;
+    sb.driverMilestone('ORD1', 2);           // sosit_descarcare_at
+    expect(sb.document._registry.sofConfirmTitle.textContent).toBe('sof.ms.confirmTitle|sof.ms.arriveUnload');
+  });
+
+  test('érvénytelen/hiányzó stepIdx → általános kérdés, de továbbra is kérdez', () => {
+    const sb = load({});
+    sb.t = (k, v) => (v && v.act != null) ? (k + '|' + v.act) : k;
+    sb.driverMilestone('ORD1');
+    expect(sb.document._registry.sofConfirmTitle.textContent).toBe('sof.ms.confirmTitle|sof.ms.recorded');
+    sb.driverMilestone('ORD1', 99);
+    expect(sb.document._registry.sofConfirmTitle.textContent).toBe('sof.ms.confirmTitle|sof.ms.recorded');
+  });
+});
+
+describe('sendBorderCross megerősítés (saját modal)', () => {
+  test('a hívás önmagában nem rögzít és GPS-t sem kér', () => {
+    const urls = [];
+    let geo = 0;
+    const sb = load({ fetch: (u) => { urls.push(String(u)); return Promise.resolve({ json: () => Promise.resolve({ success: true }) }); } });
+    sb.navigator.geolocation = { getCurrentPosition: () => { geo++; } };
+    sb.sendBorderCross('Iesire', 'RO');
+    expect(sb.document._registry.sofConfirmModal.style.display).toBe('flex');
+    expect(urls.filter(u => u.indexOf('/api/border-cross') >= 0)).toEqual([]);
+    expect(geo).toBe(0);
+  });
+
+  test('Igen → POST az /api/border-cross végpontra a helyes iránnyal', async () => {
+    const calls = [];
+    const sb = load({ fetch: (u, o) => { calls.push({ u: String(u), o }); return Promise.resolve({ json: () => Promise.resolve({ success: true }) }); } });
+    sb.loadBorderLog = () => {};
+    sb.sendBorderCross('Intrare', 'RO');
+    sb.sofConfirmOk();
+    await tick();
+    const hit = calls.filter(c => c.u.indexOf('/api/border-cross') >= 0);
+    expect(hit.length).toBe(1);
+    expect(hit[0].o.method).toBe('POST');
+    expect(JSON.parse(hit[0].o.body)).toMatchObject({ tip: 'Intrare', tara: 'RO' });
+  });
+
+  test('a modal címe az irányt nevezi meg (BE / KI külön)', () => {
+    const sb = load({});
+    sb.t = (k, v) => (v && v.act != null) ? (k + '|' + v.act) : k;
+    sb.sendBorderCross('Intrare', 'RO');
+    expect(sb.document._registry.sofConfirmTitle.textContent).toBe('sof.crossConfirmTitle|sof.crossIn');
+    sb.sofConfirmCancel();
+    sb.sendBorderCross('Iesire', 'RO');
+    expect(sb.document._registry.sofConfirmTitle.textContent).toBe('sof.crossConfirmTitle|sof.crossOut');
+  });
+});
+
+// ================================================================
+//  Fuvar-kártya: fázis-vezérelt fel-/lerakás + a megbízó neve sehol
+// ================================================================
+describe('renderFuvarCard fázis-logika', () => {
+  const ORDER = {
+    id: 'ORD9', status: 'In Curs',
+    client: 'TITKOS MEGBIZO SRL',
+    firma_incarcare: 'Alfa Depo', loc_incarcare: 'Arad',
+    firma_descarcare: 'Beta Raktar', loc_descarcare: 'Budapest',
+    data_incarcare: '2026-07-28', data_descarcare: '2026-07-30',
+    rendszam_camion: 'B123XYZ'
+  };
+  const body = (html, kind) => {
+    // a `fdbody_<kind>_<id>` div nyitva van-e (nincs rajta display:none)
+    const m = html.match(new RegExp('id="fdbody_' + kind + '_ORD9"([^>]*)>'));
+    return m ? !/display:none/.test(m[1]) : null;
+  };
+
+  test('felrakodás ELŐTT: a felrakás nyitva, a lerakó lecsukva (de lenyitható)', () => {
+    const sb = load({});
+    const html = sb.renderFuvarCard(ORDER, 1);
+    expect(body(html, 'load')).toBe(true);
+    expect(body(html, 'unload')).toBe(false);
+    // sorrend: előbb a felrakás
+    expect(html.indexOf('fdsec_load_ORD9')).toBeLessThan(html.indexOf('fdsec_unload_ORD9'));
+    // a lecsukott szekció is kattintható (van rajta toggle + caret)
+    expect(html).toContain("toggleFuvarSec('ORD9','unload')");
+    expect(html).toContain('id="fdcar_unload_ORD9"');
+  });
+
+  test('felrakodás UTÁN: a lerakás nyitva és elöl, a felrakó lecsukva marad elérhető', () => {
+    const sb = load({});
+    const html = sb.renderFuvarCard(Object.assign({}, ORDER, { incarcat_at: '2026-07-28T09:10:00Z' }), 1);
+    expect(body(html, 'unload')).toBe(true);
+    expect(body(html, 'load')).toBe(false);
+    expect(html.indexOf('fdsec_unload_ORD9')).toBeLessThan(html.indexOf('fdsec_load_ORD9'));
+    expect(html).toContain("toggleFuvarSec('ORD9','load')");
+  });
+
+  test('a megbízó cég neve SEHOL nem jelenik meg a kártyán', () => {
+    const sb = load({});
+    const a = sb.renderFuvarCard(ORDER, 1);
+    const b = sb.renderFuvarCard(Object.assign({}, ORDER, { incarcat_at: '2026-07-28T09:10:00Z' }), 2);
+    expect(a).not.toContain('TITKOS MEGBIZO');
+    expect(b).not.toContain('TITKOS MEGBIZO');
+    // a fel-/lerakó cég viszont IGEN (az a sofőr munkája)
+    expect(a).toContain('Alfa Depo');
+    expect(a).toContain('Beta Raktar');
+  });
+
+  test('toggleFuvarSec ki-/becsukja a szekciót és állítja a lenyíló ikont', () => {
+    const sb = load({});
+    sb.renderFuvarCard(ORDER, 1);
+    const reg = sb.document._registry;
+    // A stub-DOM az első getElementById-ra hozza létre az elemet (a render
+    // csak HTML-stringet ad vissza) — a szekció-elemeket előre „kikérjük".
+    ['fdbody_unload_ORD9', 'fdcar_unload_ORD9', 'fdsec_unload_ORD9']
+      .forEach(id => sb.document.getElementById(id));
+    reg['fdbody_unload_ORD9'].style.display = 'none';       // csukott kiindulás
+    sb.toggleFuvarSec('ORD9', 'unload');
+    expect(reg['fdbody_unload_ORD9'].style.display).toBe('block');
+    expect(reg['fdcar_unload_ORD9'].textContent).toBe('▾');
+    expect(reg['fdsec_unload_ORD9'].classList.contains('open')).toBe(true);
+    sb.toggleFuvarSec('ORD9', 'unload');
+    expect(reg['fdbody_unload_ORD9'].style.display).toBe('none');
+    expect(reg['fdcar_unload_ORD9'].textContent).toBe('▸');
+    expect(reg['fdsec_unload_ORD9'].classList.contains('open')).toBe(false);
+  });
+});
