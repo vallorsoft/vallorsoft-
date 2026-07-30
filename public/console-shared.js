@@ -1058,6 +1058,7 @@ function editVehicle(id){
   _vset('vehEditTunnel', v.tunnel_category||'');
   _vset('vehEditHazmat', v.hazardous_goods||'');
   _vset('vehEditFuel', v.fuel_per_100km);
+  _vset('vehEditFuelCorr', v.fuel_correction_l);
   // Rakodási felület — csak pótkocsinál; üres mezőknél alapértelmezés előtöltve
   var cargoWrap=document.getElementById('vehTrailerCargoWrap');
   if(cargoWrap){
@@ -3259,6 +3260,7 @@ function saveVehicle(){
     tunnel_category:_vget('vehEditTunnel'),
     hazardous_goods:_vget('vehEditHazmat'),
     fuel_per_100km:_vget('vehEditFuel'),
+    fuel_correction_l:_vget('vehEditFuelCorr'),
   };
   // Rakodási felület — csak pótkocsinál küldjük
   if(document.getElementById('vehEditTip').value==='Potkocsi'){
