@@ -3062,6 +3062,11 @@
     'fed.notes': { hu: 'Megjegyzések', ro: 'Mențiuni' },
     'fed.pdfView': { hu: '👁 PDF nézet', ro: '👁 Vizualizare PDF' },
     'fed.save': { hu: '💾 Mentés', ro: '💾 Salvează' },
+    // ── Menetlevél TÖRLÉSE (Admin/Manager, dupla confirm) ──
+    'fed.delete': { hu: '🗑️ Törlés', ro: '🗑️ Șterge' },
+    'fed.confirmDelete': { hu: 'Biztosan törlöd a menetlevelet ({s})? Ez a művelet VISSZAVONHATATLAN.', ro: 'Sigur ștergi foaia de parcurs ({s})? Această acțiune este IREVERSIBILĂ.' },
+    'fed.confirmDelete2': { hu: 'Utolsó megerősítés: a menetlevél véglegesen törlődik és eltűnik a statisztikából. Folytatod?', ro: 'Confirmare finală: foaia se șterge definitiv și dispare din statistici. Continui?' },
+    'fed.deleted': { hu: '🗑️ Menetlevél törölve.', ro: '🗑️ Foaie ștearsă.' },
     // ── Kézi menetlevél-készítés (Admin/Manager) ──
     'fed.addNew': { hu: '➕ Új menetlevél', ro: '➕ Foaie nouă' },
     'fed.createTitle': { hu: '➕ Új menetlevél', ro: '➕ Foaie de parcurs nouă' },

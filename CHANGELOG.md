@@ -14,6 +14,35 @@
 
 ---
 
+## 2026-08-04 — Admin/Manager: beküldött menetlevél TÖRLÉSE (VÉGLEGES, cascade + audit)
+
+### Miért
+Eddig a menetlevél-szerkesztő modalban csak Mentés/PDF-nézet gomb volt; a hibásan beküldött vagy duplán rögzített menetlevelet csak DB-hozzáféréssel lehetett törölni. Ez a kör kliens+szerver oldalról is megnyitja a törlést Admin/Manager számára, kettős megerősítéssel, és a menetlevél-életciklust helyesen visszaállítja (a fuvar újra menetlevél-mentesnek látszik).
+
+### Változások
+
+1. **`handlers/documents.js`** új `fuvarlevelDelete(id)` (Admin/Manager, cégre szűrve, audit):
+   - **Ownership + tenant kapu**: a menetlevél a saját cégé (`company_id = $2` VAGY `email_sofer ∈ users(company_id=$2)`).
+   - **Fő törlés**: `DELETE FROM fuvarlevelek WHERE id=$1 AND …`.
+   - **Cascade — `order_stops.waybilled_at` reset**: a menetlevél `order_ids` tömbjében szereplő minden fuvarra megnézzük, van-e MÁS menetlevél a cégen belül, ami hivatkozza (`order_ids @> to_jsonb($oid)`). Ha nincs → az adott fuvar `order_stops.waybilled_at`-je NULL-ra áll → a fuvar újra megjelenik a sofőr menetlevél-pickerében (PR #308 `waybill_visible` logika). A stop `done_at` (sofőr milestone) érintetlen; az `orders.status` sem módosul (a státusz-gépet a sofőr milestone-ja vezérli). Best-effort — a fő törlést nem buktathatja.
+   - **POD-fotók** (`documents.order_id`) NEM törlődnek — azok fuvarhoz kötődnek, nem menetlevélhez.
+   - **Audit-napló** `waybill.delete` (numar_fisa + email_sofer + order_ids + released_orders + stops_reset).
+
+2. **UI — admin.html / manager.html** — új 🗑️ Törlés gomb a menetlevél-szerkesztő modal láblécében (`#feDeleteBtn`, `.btn.danger`), alapból rejtve; a `feApplyMode('edit')` mutatja (create módban rejtve marad).
+
+3. **`public/console-shared.js`** — új `deleteFuvEdit()`: dupla `confirm()` (RO+HU, `s` = numar_fisa placeholderrel), `gas('fuvarlevelDelete',[id])`, sikeres esetben toast + `closeFuvEdit()` + `loadReceivedFuvarlevelek()` + `loadMissingWaybills()` frissítés (a fuvar most újra a hiányzó-menetlevél sávon jelenhet meg). A `feApplyMode` a törlő gombot is együtt kezeli a PDF-gombbal (create → rejtve, edit → látszik).
+
+4. **`public/i18n.js`** — 4 új kulcs (`fed.delete`, `fed.confirmDelete{s}`, `fed.confirmDelete2`, `fed.deleted`), RO-alap + HU-váltó. Cache-bust `console-shared.js`/`i18n.js` `?v=20260730gps` → `?v=20260804wbdel` (admin.html + manager.html).
+
+5. **Teszt** — `tests/integration/documents.test.js` új `fuvarlevelDelete` describe (+6 eset): Sofer nem hívhatja · id hiányzik · nem lét / más cég → hiba · sikeres törlés + cascade (order_stops reset, released_orders) · másik menetlevél még hivatkozza → stopok érintetlenek · üres order_ids → csak fő törlés + audit · cross-tenant védelem (company_id=99 SELECT-be) · cascade hiba best-effort (fő törlés sikeres marad).
+
+### Hatás
+- **859 Jest zöld** (851 → 859; 45 skipped valós-DB). Nincs regresszió.
+- Egyetlen új handler + kliens gomb; a menetlevél-életciklus konzisztens marad (törlés után a fuvar visszakerül a picker-be, ha egyetlen másik menetlevélen sem szerepel).
+- Nincs séma-változás.
+
+---
+
 ## 2026-08-04 — Fuvar több felrakó/lerakó pont (multi-drop) + menetlevél-láthatóság bug-fix
 
 ### Miért
