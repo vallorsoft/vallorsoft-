@@ -489,6 +489,95 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
     }
   };
 
+// Menetlevél VÉGLEGES törlése (Admin/Manager, cégre szűrve).
+// A menetlevél sor eltűnik a statisztikából + a listából. Ha egy érintett
+// fuvar (order_ids-ban) egyetlen menetlevélen sem szerepel többé (a cégen
+// belül), a fuvar stopjainak `waybilled_at`-jét visszaállítjuk NULL-ra —
+// így a fuvar újra megjelenik a sofőr menetlevél-pickerében (PR #308
+// "waybill_visible" logikája). A stop `done_at` (a sofőr által rögzített
+// tényleges idő) érintetlen marad; a `orders.status` sem módosul (állapot-
+// gép a sofőr milestone-alapján). A POD-fotók (`documents`, `order_id`-hez
+// kötve) NEM törlődnek. Audit-naplózott, best-effort.
+handlers.fuvarlevelDelete = async function (req, res, args) {
+    try {
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
+      const me = req.session.user;
+      if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+      const cid = me.company_id;
+      const id = Array.isArray(args) ? args[0] : args;
+      if (!id) return res.json({ result: { ok: false, err: 'Identificator lipsa' } });
+
+      // Jogosultság + létezés: csak saját cég menetlevele. A `order_ids`-t
+      // KELL, mert a törlés utáni cascade ebből dolgozik.
+      const own = await pool.query(
+        `SELECT id, numar_fisa, email_sofer, order_ids
+           FROM fuvarlevelek
+          WHERE id = $1 AND (company_id = $2 OR email_sofer IN (SELECT email FROM users WHERE company_id = $2))`,
+        [id, cid]
+      );
+      if (!own.rows.length) return res.json({ result: { ok: false, err: 'Nu a fost gasit / acces interzis' } });
+      const row = own.rows[0];
+      const orderIds = Array.isArray(row.order_ids) ? row.order_ids.map(x => String(x)).filter(Boolean) : [];
+
+      // 1) Menetlevél sor törlése (a fő művelet).
+      const del = await pool.query(
+        `DELETE FROM fuvarlevelek
+          WHERE id = $1 AND (company_id = $2 OR email_sofer IN (SELECT email FROM users WHERE company_id = $2))`,
+        [id, cid]
+      );
+      if (!del.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost gasit' } });
+
+      // 2) Cascade: az érintett fuvarok közül azokat, amiket EGYETLEN másik
+      //    menetlevél sem tartalmaz a cégen belül → a stopjaik `waybilled_at`
+      //    NULL-ra állítása. Így a fuvar újra megjelenik a sofőr menetlevél-
+      //    pickerében. Best-effort — a fő törlést nem buktathatja.
+      let stopsReset = 0;
+      const releasedOrders = [];
+      try {
+        for (const oid of orderIds) {
+          const other = await pool.query(
+            `SELECT 1
+               FROM fuvarlevelek
+              WHERE (company_id = $1 OR email_sofer IN (SELECT email FROM users WHERE company_id = $1))
+                AND order_ids @> to_jsonb($2::text)
+              LIMIT 1`,
+            [cid, oid]
+          );
+          if (other.rows.length) continue; // másik menetlevélen szerepel → hagyjuk
+          const s = await pool.query(
+            `UPDATE order_stops
+                SET waybilled_at = NULL,
+                    updated_at   = NOW()
+              WHERE order_id = $1 AND company_id = $2
+                AND waybilled_at IS NOT NULL`,
+            [oid, cid]
+          );
+          if (s.rowCount) {
+            stopsReset += s.rowCount;
+            releasedOrders.push(oid);
+          }
+        }
+      } catch (cErr) {
+        console.error('fuvarlevelDelete cascade (order_stops) hiba (a fő törlés sikeres):', cErr.message);
+      }
+
+      try {
+        await audit.fromReq(req, 'waybill.delete', 'fuvarlevel', id, {
+          numar_fisa: row.numar_fisa,
+          email_sofer: row.email_sofer,
+          order_ids: orderIds,
+          released_orders: releasedOrders,
+          stops_reset: stopsReset,
+        });
+      } catch (_) {}
+
+      return res.json({ result: { ok: true, id, stops_reset: stopsReset, released_orders: releasedOrders } });
+    } catch (err) {
+      console.error('fuvarlevelDelete hiba:', err);
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
+    }
+  };
+
 // Menetlevél KÉZI létrehozása (Admin/Manager). Pont úgy viselkedik, mint egy
 // beküldött menetlevél szerkesztése: a derivált mezőket szerveroldalon
 // számoljuk, és a sor a statisztikába is ugyanúgy beleszámít (a tenant-kötés

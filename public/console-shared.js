@@ -2494,12 +2494,15 @@ function feApplyMode(mode){
   _fuvMode=mode;
   var pickRow=document.getElementById('feDriverPickRow');
   var pdfBtn=document.getElementById('fePdfBtn');
+  var delBtn=document.getElementById('feDeleteBtn');
   var title=document.getElementById('feTitle');
   // A sofőr-választó MINDKÉT módban látszik: create → új menetlevél sofőrje;
   // edit → a menetlevél átköthető egy aktuális sofőrre (statisztika-horgony),
   // pl. a törölt sofőrtől visszakapott menetleveleknél.
   if(pickRow) pickRow.style.display='';
   if(pdfBtn) pdfBtn.style.display=(mode==='create')?'none':'';
+  // Törlés csak létező (mentett) menetlevélen — create módban rejtve.
+  if(delBtn) delBtn.style.display=(mode==='create')?'none':'';
   if(title) title.textContent=(mode==='create')?t('fed.createTitle'):t('fed.title');
 }
 
@@ -2799,6 +2802,37 @@ function saveFuvEdit(){
   gas('fuvarlevelUpdate',[id,payload]).then(function(r){
     if(r&&r.ok){toast(t('cs.waybillSaved'),'ok');closeFuvEdit();loadReceivedFuvarlevelek();}
     else toast(r&&r.err||'Szerver hiba','err');
+  });
+}
+
+// Menetlevél VÉGLEGES törlése (Admin/Manager). Dupla megerősítés, mert
+// visszavonhatatlan és statisztikát is érint. A szerver a cascade-t is elvégzi
+// (az érintett fuvarok stopjainak `waybilled_at`-je resetelődik, ha egyetlen
+// másik menetlevél sem tartalmazza őket) → a fuvar újra a sofőr-pickerbe kerül.
+function deleteFuvEdit(){
+  var id=(document.getElementById('feId')||{}).value||'';
+  if(!id) return;
+  var serie=(document.getElementById('feNumarFisa')||{}).value
+         || (document.getElementById('feSeria')||{}).textContent || id;
+  if(!confirm(t('fed.confirmDelete',{s:String(serie)}))) return;
+  if(!confirm(t('fed.confirmDelete2'))) return;
+  var btn=document.getElementById('feDeleteBtn');
+  if(btn) btn.disabled=true;
+  gas('fuvarlevelDelete',[id]).then(function(r){
+    if(btn) btn.disabled=false;
+    if(r&&r.ok){
+      toast(t('fed.deleted'),'ok');
+      closeFuvEdit();
+      loadReceivedFuvarlevelek();
+      // Ha a "hiányzó menetlevél" teendő-sáv látszik (az érintett fuvar
+      // most újra menetlevél-mentesnek számít), frissítjük.
+      if(typeof loadMissingWaybills==='function'){ try{ loadMissingWaybills(); }catch(_){} }
+    } else {
+      toast((r&&r.err)||t('common.serverError'),'err');
+    }
+  }).catch(function(){
+    if(btn) btn.disabled=false;
+    toast(t('common.serverError'),'err');
   });
 }
 
