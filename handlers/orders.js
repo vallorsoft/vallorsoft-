@@ -13,6 +13,7 @@ const planLimits = require('../lib/planLimits');
 const { featureEnabled } = require('../lib/featureEnabled');
 const { hasPerm } = require('./permissions');
 const { normalizePlate } = require('../lib/plate');
+const orderStops = require('../lib/orderStops');
 
 const handlers = {};
 
@@ -135,14 +136,24 @@ handlers.getOrderById = async function (req, res, args) {
       );
       const order = or.rows[0] || null;
       let legs = [];
+      let stops = [];
       if (order) {
         const lr = await pool.query(
           'SELECT * FROM order_legs WHERE order_id = $1 ORDER BY leg_number',
           [id]
         );
         legs = lr.rows;
+        const sr = await pool.query(
+          `SELECT id, kind, stop_index, loc, firma, data, ref,
+                  arrived_at, done_at, waybilled_at
+             FROM order_stops
+            WHERE order_id = $1 AND company_id = $2
+            ORDER BY (kind = 'pickup') DESC, stop_index ASC`,
+          [id, cid]
+        );
+        stops = sr.rows;
       }
-      return res.json({ result: order, legs });
+      return res.json({ result: order, legs, stops });
     } catch (err) {
       console.error('getOrderById hiba:', err);
       return res.json({ result: null, legs: [] });
@@ -171,7 +182,25 @@ handlers.comList = async function (req, res, args) {
                  ) AS legs_json
           FROM order_legs l
           WHERE l.order_id = o.id
-        ) legs ON true`;
+        ) legs ON true
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*)::int AS stop_count,
+                 COUNT(*) FILTER (WHERE s.kind = 'pickup')::int   AS pickup_count,
+                 COUNT(*) FILTER (WHERE s.kind = 'delivery')::int AS delivery_count,
+                 JSON_AGG(JSON_BUILD_OBJECT(
+                   'id',           s.id,
+                   'kind',         s.kind,
+                   'stop_index',   s.stop_index,
+                   'loc',          s.loc,
+                   'firma',        s.firma,
+                   'data',         s.data,
+                   'arrived_at',   s.arrived_at,
+                   'done_at',      s.done_at,
+                   'waybilled_at', s.waybilled_at
+                 ) ORDER BY (s.kind = 'pickup') DESC, s.stop_index ASC) AS stops_json
+          FROM order_stops s
+          WHERE s.order_id = o.id
+        ) sst ON true`;
       let r;
       if (me.pozicio === 'Admin' || me.pozicio === 'Manager') {
         r = await pool.query(
@@ -187,7 +216,11 @@ handlers.comList = async function (req, res, args) {
                   (SELECT COUNT(*)::int FROM order_uit_codes u
                      WHERE u.order_id = o.id AND u.company_id = o.company_id AND u.status <> 'stopped') AS uit_active_count,
                   COALESCE(legs.leg_count, 0) AS leg_count,
-                  COALESCE(legs.legs_json, '[]'::json) AS legs_json
+                  COALESCE(legs.legs_json, '[]'::json) AS legs_json,
+                  COALESCE(sst.stop_count, 0)     AS stop_count,
+                  COALESCE(sst.pickup_count, 0)   AS pickup_count,
+                  COALESCE(sst.delivery_count, 0) AS delivery_count,
+                  COALESCE(sst.stops_json, '[]'::json) AS stops_json
            FROM orders o ${legsSubquery}
            LEFT JOIN clients cl ON cl.id = o.client_id AND cl.company_id = o.company_id
            WHERE o.company_id = $1 AND o.status <> 'Anulat'
@@ -204,7 +237,11 @@ handlers.comList = async function (req, res, args) {
                   o.firma_extern, o.telefon_extern, o.rendszam_camion, o.rendszam_remorca,
                   o.load_type,
                   COALESCE(legs.leg_count, 0) AS leg_count,
-                  COALESCE(legs.legs_json, '[]'::json) AS legs_json
+                  COALESCE(legs.legs_json, '[]'::json) AS legs_json,
+                  COALESCE(sst.stop_count, 0)     AS stop_count,
+                  COALESCE(sst.pickup_count, 0)   AS pickup_count,
+                  COALESCE(sst.delivery_count, 0) AS delivery_count,
+                  COALESCE(sst.stops_json, '[]'::json) AS stops_json
            FROM orders o ${legsSubquery}
            WHERE o.company_id = $1 AND LOWER(o.email_sofer) = LOWER($2)
            ORDER BY o.created_at DESC LIMIT 500`,
@@ -222,16 +259,29 @@ handlers.getMySoferOrders = async function (req, res, args) {
     try {
       if (!req.session.user) return res.json({ result: [] });
       const me = req.session.user;
-      // finalized_at: a Finalizat időbélyege (menetlevél-picker kiöregítéséhez).
-      // waybill_at: a legkorábbi mentett menetlevél dátuma, amin szerepel a fuvar
-      //   (a fuvarlevelek.order_ids JSONB tömb tartalmazza-e a fuvar id-jét).
-      // dash_visible: SZIGORÚAN csak élő fuvar (Alocat/In Curs) — ami a
-      //   sofőr keze alatt van. A Finalizat, Parkolt, Raktarban mind
-      //   „lezárt/leadott" a sofőr szempontjából → a főoldalról KIESIK,
-      //   kizárólag a menetlevél-picker-ben marad (waybill_visible).
-      //   Felhasználói kérés: az elvégzett + tényleges parkolásba/raktárba
-      //   került fuvar csak a menetlevélben legyen látható.
-      // waybill_visible: minden kiosztott fuvar, DE a mentett menetlevél után csak 3 napig.
+      // waybill_at / waybill_last / waybill_count: a régi (fuvar-szintű)
+      //   menetlevél-hivatkozás — visszafelé kompatibilis lista/UI-hoz.
+      //
+      // stops (JSONB tömb): a fuvar felrakási / lerakási pontjai (order_stops).
+      //   Minden stop kap egy waybilled_at-ot amikor rákerül egy menetlevél
+      //   puncte-tömbjére (a stopId szerint). Ez alapján számítjuk:
+      //
+      // dash_visible: SZIGORÚAN csak élő aktív fuvar (Alocat/In Curs) →
+      //   a sofőr keze alatt van. A Finalizat/Parkolt/Raktarban ide sosem
+      //   kerül vissza; azok kizárólag a menetlevél-pickerben maradnak.
+      //
+      // waybill_visible (BUG-FIX 2026-07-30): a fuvar addig marad a menetlevél
+      //   pickerben, AMÍG VAN OLYAN STOP-JA, AMI NEM WAYBILLED. Így egy péntek
+      //   este beadott menetlevél, ami csak a felrakást tartalmazza, hétfői
+      //   lerakás → Finalizat után is látható marad, mert a delivery stop
+      //   waybilled_at IS NULL. Amikor MINDEN stop waybilled → azonnal
+      //   eltűnik a pickerből (nincs türelmi idő).
+      //   Fallback: ha egy fuvarnak nincs egyetlen stopja sem (nem migrált
+      //   sor), a régi szabály: aktív → látható; Finalizat → menetlevél-
+      //   számláló alapján.
+      //
+      // waybill_phase: 'loading' amíg pickup-stop kell menetlevélre,
+      //   'unloading' amíg delivery-stop kell, 'complete' ha minden waybilled.
       const r = await pool.query(
         `SELECT o.id, o.client, o.ref, o.loc_incarcare, o.loc_descarcare, o.km,
                 o.data_incarcare, o.data_descarcare,
@@ -241,24 +291,33 @@ handlers.getMySoferOrders = async function (req, res, args) {
                 o.handover_status, o.handover_type, o.handover_loc,
                 o.finalized_at,
                 wb.waybill_at, wb.waybill_last, COALESCE(wb.waybill_count, 0) AS waybill_count,
-                -- dash_visible: CSAK élő aktív fuvar (Alocat/In Curs). A
-                -- Finalizat + Parkolt + Raktarban SOHA nem látszik a főoldalon
-                -- (menetlevél-picker-ben viszont igen, waybill_visible).
+                COALESCE(st.stops_json, '[]'::json) AS stops,
+                COALESCE(st.stop_count, 0)          AS stop_count,
+                COALESCE(st.wb_open_pickup, 0)      AS wb_open_pickup,
+                COALESCE(st.wb_open_delivery, 0)    AS wb_open_delivery,
                 CASE
                   WHEN o.status IN ('Alocat', 'In Curs') THEN true
                   ELSE false
                 END AS dash_visible,
-                -- waybill_visible: aktív → mindig; Finalizat menetlevél
-                -- nélkül → KÖTELEZŐEN rá kell tenni; ha ≥1 menetlevélen
-                -- már rajta van → AZONNAL eltűnik (nincs türelmi idő).
                 CASE
                   WHEN o.status IN ('Alocat', 'In Curs', 'Parkolt', 'Raktarban') THEN true
-                  WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) = 0 THEN true
+                  WHEN COALESCE(st.stop_count, 0) > 0
+                       AND COALESCE(st.wb_open_pickup, 0) + COALESCE(st.wb_open_delivery, 0) > 0
+                       THEN true
+                  WHEN COALESCE(st.stop_count, 0) = 0
+                       AND o.status = 'Finalizat'
+                       AND COALESCE(wb.waybill_count, 0) = 0
+                       THEN true
                   ELSE false
                 END AS waybill_visible,
                 CASE
-                  WHEN o.status IN ('Alocat', 'In Curs', 'Parkolt', 'Raktarban') THEN 'loading'
-                  WHEN o.status = 'Finalizat' AND COALESCE(wb.waybill_count, 0) = 0 THEN 'unloading'
+                  WHEN COALESCE(st.wb_open_pickup, 0) > 0 THEN 'loading'
+                  WHEN COALESCE(st.wb_open_delivery, 0) > 0 THEN 'unloading'
+                  WHEN COALESCE(st.stop_count, 0) = 0
+                       AND o.status IN ('Alocat', 'In Curs', 'Parkolt', 'Raktarban') THEN 'loading'
+                  WHEN COALESCE(st.stop_count, 0) = 0
+                       AND o.status = 'Finalizat'
+                       AND COALESCE(wb.waybill_count, 0) = 0 THEN 'unloading'
                   ELSE 'complete'
                 END AS waybill_phase
            FROM orders o
@@ -269,6 +328,25 @@ handlers.getMySoferOrders = async function (req, res, args) {
                FROM fuvarlevelek f
               WHERE f.order_ids ? o.id::text
            ) wb ON true
+           LEFT JOIN LATERAL (
+             SELECT COUNT(*)::int AS stop_count,
+                    COUNT(*) FILTER (WHERE s.kind = 'pickup'   AND s.waybilled_at IS NULL)::int AS wb_open_pickup,
+                    COUNT(*) FILTER (WHERE s.kind = 'delivery' AND s.waybilled_at IS NULL)::int AS wb_open_delivery,
+                    JSON_AGG(JSON_BUILD_OBJECT(
+                      'id',           s.id,
+                      'kind',         s.kind,
+                      'stop_index',   s.stop_index,
+                      'loc',          s.loc,
+                      'firma',        s.firma,
+                      'data',         s.data,
+                      'ref',          s.ref,
+                      'arrived_at',   s.arrived_at,
+                      'done_at',      s.done_at,
+                      'waybilled_at', s.waybilled_at
+                    ) ORDER BY s.kind DESC, s.stop_index ASC) AS stops_json
+               FROM order_stops s
+              WHERE s.order_id = o.id
+           ) st ON true
           WHERE o.company_id = $1 AND LOWER(o.email_sofer) = LOWER($2)
           ORDER BY o.created_at DESC`,
         [me.company_id, me.email]
@@ -554,6 +632,17 @@ handlers.comCreate = async function (req, res, args) {
         ]
       );
 
+      // Fuvar stopok (pickup + delivery) — több felrakó/lerakó pont támogatása.
+      // Ha a kliens nem küldött stops-tömböt, a top-szintű loc_incarcare/
+      // loc_descarcare-ból generálódik egy pickup#0 és egy delivery#0
+      // (visszafelé kompatibilis a régi klienssel). A trigger fogja szinkronba
+      // hozni a orders.*_at mirror-mezőket (jelenleg még mind NULL — a stopok
+      // csak a fuvar-kiírás időpontjában rögzülnek).
+      try {
+        const norm = orderStops.normalizeStops(o);
+        await orderStops.replaceStopsForOrder(pool, id, company_id, norm);
+      } catch (e) { console.error('order-stops beszúrás hiba (fuvar mentve, de stopok nem):', e); }
+
       return res.json({ result: {
         ok: true, id: id, fuvar_no: fuvar_no,
         paired_driver: pair.autoPaired === 'driver' ? (nume_sofer || email_sofer) : null,
@@ -662,6 +751,12 @@ handlers.bulkCreateOrders = async function (req, res, args) {
            firma_extern, telefon_extern, external_driver_id,
            rendszam_camion, rendszam_remorca, status, cid, suly_kg, load_type,
            hossz_cm, szel_cm, mag_cm, import_extra ? JSON.stringify(import_extra) : null, fuvar_no]);
+        // Import-út: stopok a top-szintű mezőkből (a CSV oszlop-párosító
+        // egyelőre nem tud több felrakó/lerakó pontot). Best-effort.
+        try {
+          const norm = orderStops.normalizeStops(o);
+          await orderStops.replaceStopsForOrder(pool, id, cid, norm);
+        } catch (e) { console.error('order-stops import hiba (a sor mentve):', e); }
         inserted++; ids.push(id);
       } catch (rowErr) {
         failed.push({ row: idx + 1, err: (rowErr && rowErr.message) || 'hiba' });
@@ -765,19 +860,42 @@ handlers.comUpdate = async function (req, res, args) {
       if (o.marfa_currency !== undefined) { updates.push(`marfa_currency = $${i++}`); values.push(['RON', 'EUR'].includes(o.marfa_currency) ? o.marfa_currency : 'RON'); }
       if (o.needs_uit !== undefined) { updates.push(`needs_uit = $${i++}`); values.push(!!o.needs_uit); }
 
-      if (updates.length === 0) {
+      const hasStopsPayload = Array.isArray(o.pickups) || Array.isArray(o.deliveries) || Array.isArray(o.stops);
+      const hasTopStopFields = ['loc_incarcare','loc_descarcare','firma_incarcare','firma_descarcare','data_incarcare','data_descarcare']
+        .some((k) => o[k] !== undefined);
+
+      // Ha csak sofőrt/státuszt/árat módosítanak és a stops-mezők nincsenek
+      // érintve, nincs SQL — az updates lista üres → régi hibaüzenet.
+      // Viszont ha csak a stopokat módosítják (pl. új lerakási pontot vesznek fel),
+      // a stops-tömb önmagában is érvényes szerkesztés → engedjük tovább.
+      if (updates.length === 0 && !hasStopsPayload) {
         return res.json({ result: { ok: false, err: 'Nimic de modificat.' } });
       }
 
-      updates.push(`updated_at = NOW()`);
-      values.push(id);
-      values.push(req.session.user.company_id);
-      const sql = `UPDATE orders SET ${updates.join(', ')} WHERE id = $${i} AND company_id = $${i + 1}`;
-      const r = await pool.query(sql, values);
-
-      if (r.rowCount === 0) {
-        return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit.' } });
+      if (updates.length > 0) {
+        updates.push(`updated_at = NOW()`);
+        values.push(id);
+        values.push(req.session.user.company_id);
+        const sql = `UPDATE orders SET ${updates.join(', ')} WHERE id = $${i} AND company_id = $${i + 1}`;
+        const r = await pool.query(sql, values);
+        if (r.rowCount === 0) {
+          return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit.' } });
+        }
       }
+
+      // Stopok kezelése — a orders.*_at mirror-mezőket a trigger frissíti.
+      // A régi kliens (nincs stops-tömb) top-szintű loc_incarcare/loc_descarcare
+      // szerkesztéskor a pickup#0/delivery#0 stopot upsertelünk (visszafelé
+      // kompat). Új kliens teljes stops-tömböt küld → replaceStopsForOrder.
+      try {
+        if (hasStopsPayload) {
+          const norm = orderStops.normalizeStops(o);
+          await orderStops.replaceStopsForOrder(pool, id, req.session.user.company_id, norm);
+        } else if (hasTopStopFields) {
+          await orderStops.syncSingleStopFromTopFields(pool, id, req.session.user.company_id, o);
+        }
+      } catch (e) { console.error('order-stops update hiba (a fuvar mentve):', e); }
+
       // ha a státusz elhagyja a Raktarban-t (kézi váltás is), az aktív
       // raktári tétel kiadva — ne ragadjon bent a Raktár fülön
       if (o.status !== undefined && o.status !== 'Raktarban') {

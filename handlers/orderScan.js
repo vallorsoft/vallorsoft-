@@ -70,6 +70,18 @@ function sanitize(f) {
     const s = _str(v, 20);
     return s ? s.toUpperCase() : null;
   };
+  // Multi-drop: a pickups[]/deliveries[] tömböt is fehérlistázott mezőkre
+  // szűkítjük, per-stop max 20 sorra korlátozva. Ha üres, kihagyjuk (a kliens
+  // a top-szintű loc_incarcare/loc_descarcare-ból generál 1+1 stopot).
+  const _stopSanit = (arr) => {
+    if (!Array.isArray(arr)) return null;
+    const out = arr.slice(0, 20).map((s) => ({
+      loc:   _str(s && s.loc, 200),
+      firma: _str(s && s.firma, 200),
+      data:  _date(s && s.data),
+    })).filter((s) => s.loc || s.firma || s.data);
+    return out.length ? out : null;
+  };
   return {
     client: _str(j.client, 200),
     client_cui: _str(j.client_cui, 30),
@@ -91,6 +103,8 @@ function sanitize(f) {
     rendszam_camion: plate(j.rendszam_camion),
     rendszam_remorca: plate(j.rendszam_remorca),
     observatii: _str(j.observatii, 500),
+    pickups:    _stopSanit(j.pickups),
+    deliveries: _stopSanit(j.deliveries),
   };
 }
 

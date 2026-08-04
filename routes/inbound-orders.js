@@ -255,6 +255,20 @@ router.post('/api/inbound-orders/:id/approve', requireLogin, requireRole('Admin'
       dbc.release();
     }
 
+    // Több felrakó / lerakó pont — az AI-kiolvasás pickups[]/deliveries[]
+    // tömbje (services/order-ai FIELDS). Ha üres, a top-szintű loc_incarcare/
+    // loc_descarcare-ból egyet-egyet generálunk (a helper végzi).
+    try {
+      const orderStops = require('../lib/orderStops');
+      const norm = orderStops.normalizeStops({
+        pickups: ex.pickups, deliveries: ex.deliveries,
+        loc_incarcare, loc_descarcare,
+        firma_incarcare, firma_descarcare,
+        data_incarcare, data_descarcare,
+      });
+      await orderStops.replaceStopsForOrder(pool, id, company_id, norm);
+    } catch (e) { console.error('order-stops (approve) hiba (a fuvar mentve):', e); }
+
     // Automata útvonal-km a fuvarlistára — ha az 'order-route-map' kapcsoló be van
     // (alapból BE; csak explicit enabled=false kapcsolja ki). A beolvasott km-et NEM
     // írja felül; az automata km a route_geo-ban tárolódik, a fuvarlista a beolvasott

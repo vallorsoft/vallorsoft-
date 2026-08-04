@@ -70,14 +70,16 @@ describe('getOrderById', () => {
     expect(params).toEqual(['CMD-X', CID]);
   });
 
-  test('sikeres lekérés — order + legs', async () => {
+  test('sikeres lekérés — order + legs + stops', async () => {
     setUser(ADMIN);
     pool.query
       .mockResolvedValueOnce(rows([{ id: 'CMD-1', client: 'X', status: 'Alocat' }]))
-      .mockResolvedValueOnce(rows([{ leg_number: 1 }, { leg_number: 2 }]));
+      .mockResolvedValueOnce(rows([{ leg_number: 1 }, { leg_number: 2 }]))
+      .mockResolvedValueOnce(rows([{ id: 10, kind: 'pickup', stop_index: 0 }, { id: 11, kind: 'delivery', stop_index: 0 }]));
     const res = await call('getOrderById', ['CMD-1']);
     expect(res.body.result.id).toBe('CMD-1');
     expect(res.body.legs).toHaveLength(2);
+    expect(res.body.stops).toHaveLength(2);
   });
 });
 

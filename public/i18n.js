@@ -543,6 +543,12 @@
     'form.phLen': { hu: 'Hossz', ro: 'Lungime' },
     'form.phWid': { hu: 'Szél.', ro: 'Lățime' },
     'form.phHei': { hu: 'Mag.', ro: 'Înălțime' },
+    'form.extraStopsHead': { hu: 'TÖBB FELRAKÁSI / LERAKÁSI PONT (opcionális)', ro: 'MAI MULTE PUNCTE DE ÎNCĂRCARE / DESCĂRCARE (opțional)' },
+    'form.addPickup': { hu: '➕ Felrakó', ro: '➕ Punct încărcare' },
+    'form.addDelivery': { hu: '➕ Lerakó', ro: '➕ Punct descărcare' },
+    'form.pickupExtra': { hu: '➕ Felrakó', ro: '➕ Încărcare' },
+    'form.deliveryExtra': { hu: '➕ Lerakó', ro: '➕ Descărcare' },
+    'form.locPh': { hu: 'Helyszín', ro: 'Locație' },
     'form.loadLoc': { hu: 'Felrakás helye', ro: 'Loc încărcare' },
     'form.loadFirma': { hu: 'Felrakási cég', ro: 'Firmă încărcare' },
     'form.loadTime': { hu: 'Felrakás ideje', ro: 'Data încărcării' },
@@ -2628,6 +2634,20 @@
       hu: 'Az időpont most rögzül és az iroda értesítést kap. Nem vonható vissza.',
       ro: 'Ora se înregistrează acum și biroul este notificat. Nu se poate anula.'
     },
+    'sof.ms.confirmStop': {
+      hu: 'A(z) „{loc}" pontnál rögzül az időpont. Nem vonható vissza.',
+      ro: 'Ora se înregistrează la punctul „{loc}". Nu se poate anula.'
+    },
+    'sof.ms.nextStep': { hu: 'Következő állomás', ro: 'Etapa următoare' },
+    'sof.ms.chooseStop': { hu: 'Melyik pontot választod?', ro: 'Ce punct alegi?' },
+    'sof.ms.chooseStopMsg': {
+      hu: 'Több pont van — koppints arra, amelyiknél most vagy.',
+      ro: 'Sunt mai multe puncte — apasă pe cel la care ești acum.'
+    },
+    'sof.ms.allDone': { hu: 'Minden állomás rögzítve.', ro: 'Toate etapele înregistrate.' },
+    'sof.det.pickup': { hu: 'Felrakó', ro: 'Încărcare' },
+    'sof.det.delivery': { hu: 'Lerakó', ro: 'Descărcare' },
+    'sof.det.stops': { hu: 'pont', ro: 'puncte' },
     'sof.orderAccepted': { hu: '✅ Fuvar elfogadva!', ro: '✅ Cursă acceptată!' },
     'sof.orderCompleted': { hu: '🏁 Fuvar teljesítve! Manager értesítve.', ro: '🏁 Cursă finalizată! Managerul a fost notificat.' },
     'sof.noActiveOrders': { hu: 'Nincs aktív kiosztott fuvar.', ro: 'Nicio cursă activă alocată.' },

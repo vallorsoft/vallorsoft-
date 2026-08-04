@@ -14,7 +14,47 @@
 
 ---
 
-## 2026-07-30 — Sofőr menetlevél: záró km + záró üzemanyag EGY-GOMBOS lekérése GPS-ből (tartály-szint korrekcióval)
+## 2026-08-04 — Fuvar több felrakó/lerakó pont (multi-drop) + menetlevél-láthatóság bug-fix
+
+### Miért
+Két hiány egyszerre:
+1. **Bug**: ha egy fuvar `In Curs` állapotban került menetlevélbe (csak a felrakási pontja), pénteken beküldve, hétfőn lerakódott → `Finalizat`, a sofőr csak pénteken foglalkozik a menetlevéllel, de a fuvar addigra **eltűnt a menetlevél-pickerből** (mert már ≥1 menetlevélen szerepelt). A záró lerakási pontot már nem lehetett rögzíteni. Adatvesztés.
+2. **Új funkció**: eddig egy fuvar CSAK 1 felrakási + 1 lerakási címet tárolt (`orders.loc_incarcare` / `loc_descarcare`). A valóságban gyakori az 1 felrakás → N (2-5-10) lerakási pontos fuvar; ehhez kézzel több fuvart kellett kiírni, ami statisztikailag/számlázásban rossz.
+
+### Változások
+
+1. **`db/order-stops.sql`** (ÚJ, idempotens) — `order_stops` tábla (kind = 'pickup'|'delivery', stop_index, loc, firma, data, ref, arrived_at, done_at, waybilled_at). A régi `orders.loc_incarcare/loc_descarcare/data_*/firma_*/sosit_*_at/incarcat_at/descarcat_at` mezők visszamenőleges kompatibilitás miatt MEGMARADNAK, származékként; egy `AFTER INSERT/UPDATE/DELETE ON order_stops` trigger tartja szinkronban őket (első pickup / utolsó delivery mint mirror; a `descarcat_at` csak akkor NOT NULL, ha ÖSSZES delivery done). Backfill: minden meglévő fuvarhoz 1 pickup#0 + 1 delivery#0 a régi top-mezőkből, időbélyegekkel; és a meglévő menetlevelek `puncte`-jából `waybilled_at` visszatöltés (orderId+role → kind).
+
+2. **`lib/orderStops.js`** (ÚJ) — közös helper: `normalizeStops(o)` (pickups[]/deliveries[]/stops[] vagy top-fields fallback), `replaceStopsForOrder(db,orderId,cid,norm)` (törlés + upsert, az arrived_at/done_at/waybilled_at megőrzésével azonos kind+stop_index-en), `syncSingleStopFromTopFields(...)` (a régi kliens top-mező szerkesztésekor a pickup#0/delivery#0 stopot frissíti). Multi-tenant + input-validáció (255 char, 20 sor/kind).
+
+3. **`handlers/orders.js`** — `comCreate`, `bulkCreateOrders`, `comUpdate`: elfogadják a `pickups[]`/`deliveries[]`/`stops[]` payloadot; ha nincs, top-szintű mezőkből legacy 1+1 stop. `comUpdate` „csak stops-módosítás" is érvényes szerkesztés. `getOrderById` visszaadja a `stops` tömböt. `comList` és `getMySoferOrders` LATERAL JOIN-nal `stops_json`, `stop_count`, `pickup_count`, `delivery_count`, `wb_open_pickup`, `wb_open_delivery` mezőket ad.
+
+4. **Bug-fix — `getMySoferOrders` `waybill_visible`** (a fő kérés): a fuvar addig marad a menetlevél-pickerben, AMÍG VAN OLYAN STOP-JA, AMI NEM WAYBILLED (`waybilled_at IS NULL`). A régi „≥1 menetlevél → azonnal eltűnik" viselkedés eltűnt. Amikor MINDEN stop waybilled → azonnal eltűnik (nincs türelmi idő). Fallback: ha nincs egyetlen stop sem (nem-migrált sor), a régi szabály. Új `waybill_phase`: 'loading' amíg pickup-stop kell, 'unloading' amíg delivery-stop kell, 'complete' ha minden waybilled.
+
+5. **`routes/ordersRest.js`** — új `POST /api/orders/:id/stop-event` `{stopId,event:'arrive'|'done'}`: ownership + tenant védett per-stop léptetés; első pickup arrive-nál `Disponibil/Alocat/Extern → In Curs`; ÖSSZES delivery done után `→ Finalizat`. A régi `POST /api/orders/:id/driver-milestone` MEGMARAD (visszafelé kompat): ha van legalább 1 order_stops sor, automatikusan a per-stop útra vált (szerver dönti el a következő nyitott stopot); ha nincs (nem-migrált/mock), a régi 4-fix-oszlopos ág fut.
+
+6. **Sofőr-kártya UI** (`public/sofer.js` `renderFuvarCard`): a fuvar-kártya kinyíló része a `o.stops` alapján listázza az ÖSSZES pickup/delivery pontot (státusz-badge-dzsel: ✅ done / 📍 arrived / ○ todo). Az „állomás-gomb" az új `driverStopAction(orderId)`-t hívja: ha 1 opció van, mint eddig (confirm → POST /stop-event); ha több (több nyitott delivery), új `sofChoice()` előugró választó modal (nagy gombok függőlegesen — vezetés után is nyomható). A régi `driverMilestone` fallback nem-migrált fuvaroknál. A `getMySoferOrders` válasz `_soferOrdersCache`-ben tárolva.
+
+7. **`public/sofer.html`** — új `#sofChoiceModal` (stop-választó, több nyitott delivery-nél). Cache-bust `?v=20260730multi` (sofer.html/js/css/i18n).
+
+8. **`public/sofer.css`** — új `.fd-stop-block` (stop-kártya a kinyíló részben), `.fd-stop-done/arrived/todo` státusz-badge-ek. A `#sofChoiceModal` gombjai teljes szélességben, egymás alatt.
+
+9. **Admin/manager fuvar-kiíró és -szerkesztő UI** (`public/admin.html`, `manager.html`, `console-shared.js`): új „TÖBB FELRAKÁSI / LERAKÁSI PONT (opcionális)" blokk mind a kiíró (`#oExtraStopsBox`/`#oExtraStopsList`), mind a szerkesztő (`#oeExtraStopsList`) modálban. Új `addExtraStopRow(kind, listId, seed)`, `_collectExtraStops(listId)`, `populateExtraStopsFromOrder(order, listId)` a `console-shared.js`-ben. Az első pickup / delivery a top-szintű mezőkben marad (visszafelé kompat); az extra sorok generálják a további `pickups[]`/`deliveries[]` elemeket. `createOrder` és `saveOrderEdit` küldi a payload-ba.
+
+10. **AI kiolvasás** (`services/order-ai/gemini.js`): a `FIELDS` bővítve `pickups`/`deliveries` tömbökre + a prompt tanítja: „DACĂ SUNT MAI MULTE PUNCTE de încărcare / descărcare (ex. 1 încărcare + 5 descărcări), completează pickups[] și deliveries[] cu obiecte { loc, firma, data }". `handlers/orderScan.js` `sanitize` fehérlistázza a stopokat (255 char, 20 sor limit, csak loc/firma/data mező). `routes/inbound-orders.js` `/approve` a `ex.pickups`/`ex.deliveries`-t átadja az `orderStops.replaceStopsForOrder`-nek (best-effort, a fuvar mentése akkor is fut ha a stops elhasal).
+
+11. **Menetlevél** (`public/sofer.js` + `routes/soferApi.js`): a puncte-sorok mostantól `data-stop-id` attribútumot is kapnak; a `_collectPuncte` visszaadja `stopId`-vel. Új közös `_buildWaybillPuncteForOrder(o)` — a `waybilled_at IS NULL` stopokat listázza (multi-stop-aware). A `/api/fuvarlevel-save` szerver: minden `puncte[i]`-re, ha van `stopId` (ownership-védett), az `order_stops` konkrét sorát jelöli done_at + waybilled_at-tel; ha nincs, az első még-nem-waybilled kind-ű stopra esik (fallback: legacy `orders.*_at` beírás nem-migrált sorra). A trigger frissíti a mirror mezőket; az auto-Finalizat léptetés csak akkor, ha az `orders.descarcat_at IS NOT NULL` (ÖSSZES delivery done a trigger által számolva).
+
+12. **i18n** — új kulcsok: `sof.ms.confirmStop`, `sof.ms.nextStep`, `sof.ms.chooseStop(Msg)`, `sof.ms.allDone`, `sof.det.pickup/delivery/stops`, `form.extraStopsHead`, `form.addPickup/addDelivery`, `form.pickupExtra/deliveryExtra`, `form.locPh` (RO-alap + HU).
+
+13. **Tesztek** — új: `tests/unit/orderStops.test.js` (7 eset: normalizeStops + replaceStopsForOrder mock DB), `tests/unit/get-my-sofer-orders-stops.test.js` (3 eset: SQL a stops LATERAL JOIN-nal + wb_open_* mezők + DB-hiba). Frissítve: `tests/integration/sofer-routes.test.js` (a legacy driver-milestone teszteknél extra `order_stops` üres SELECT mock), `tests/integration/orders-handover.test.js` (`getOrderById` új `stops` mező), `tests/unit/orderScan.test.js` (fehérlista + `pickups`/`deliveries` kulcsok). **851 Jest zöld** (843 → 851).
+
+### Példa a bug-fix működésére (Peto-eset)
+- Péntek 18:00: sofőr menetlevél-picker: fuvar #123 megjelenik `waybill_phase=loading`; sofőr felrakási pontot rakja fel, beküldi menetlevél → `waybilled_at` a pickup#0-ra. `wb_open_pickup=0`, `wb_open_delivery=1` → `waybill_visible=true`.
+- Hétfő reggel: sofőr a lerakóhoz ér, koppint az állomás-gombra → delivery#0 done_at. Trigger frissíti `orders.descarcat_at`-ot → státusz `Finalizat`.
+- Péntek 20:00 (következő menetlevél): a fuvar #123 MÉG MINDIG látszik a menetlevél-pickerben (`waybill_phase=unloading`, `wb_open_delivery=1`), a sofőr felrakja a lerakási pontot, beküldi. Ekkor `wb_open_delivery=0` → `waybill_visible=false` → azonnal eltűnik.
+
+
 
 ### Miért
 A sofőr a menetlevél lezárásakor eddig kézzel írta be a záró km-óra állást és a záró üzemanyag-szintet — a vontatón álló műszerről leolvasva, gyakran memóriából. Fárasztó és hibaforrás (elgépelt km → hamis fogyasztás → sofőr-figyelmeztetés). A CargoTrack GPS eddig is szolgáltatta mind a két értéket (`mileage` + `fuel_level`) — ezt egy gombra le lehet kérni. A tartály-szintnél viszont a GPS gyakran eltér a valóstól (érzékelő-kalibráció, tartály-forma), ezért az admin jármű-adatlapon +/- literes korrekció adható, amit a szerver AUTOMATIKUSAN alkalmaz mielőtt a sofőr látja.

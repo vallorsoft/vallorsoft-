@@ -1546,3 +1546,27 @@
   box-shadow: none;
   opacity: 0.7;
 }
+
+/* ── Több felrakó / lerakó pont — stop-blokkok a fuvar-kártya kinyíló részében ── */
+.fd-stop-block {
+  border: 1px solid var(--sof-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: rgba(255,255,255,0.55);
+}
+.fd-stop-block:last-child { margin-bottom: 0; }
+.fd-stop-h {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--sof-muted); margin-bottom: 6px;
+}
+.fd-stop-h b { color: var(--sof-fg); font-size: 13.5px; }
+.fd-stop-done { color: #16a34a; font-size: 16px; }
+.fd-stop-arrived { color: #f59e0b; font-size: 16px; }
+.fd-stop-todo { color: #94a3b8; font-size: 16px; }
+
+/* Stop-választó modal — a gombok teljes szélességben, egymás alatt */
+#sofChoiceModal .sof-cf-btns { max-height: 60vh; overflow-y: auto; }
+#sofChoiceModal .sof-cf-btn.ok {
+  text-align: left; padding: 14px 16px; font-size: 15px; line-height: 1.35;
+}
