@@ -154,8 +154,8 @@ describe('handlers/orderScan — scanOrderDocument', () => {
     expect(r.result.fields.hacker_field).toBeUndefined();
     expect(Object.keys(r.result.fields).sort()).toEqual([
       'client', 'client_cui', 'data_descarcare', 'data_incarcare',
-      'firma_descarcare', 'firma_incarcare', 'hossz_cm', 'km', 'load_type',
-      'loc_descarcare', 'loc_incarcare', 'mag_cm', 'observatii', 'pret',
+      'deliveries', 'firma_descarcare', 'firma_incarcare', 'hossz_cm', 'km', 'load_type',
+      'loc_descarcare', 'loc_incarcare', 'mag_cm', 'observatii', 'pickups', 'pret',
       'ref', 'rendszam_camion', 'rendszam_remorca', 'suly_kg', 'szel_cm', 'valuta',
     ]);
   });

@@ -275,9 +275,10 @@ describe('POST /api/orders/:id/driver-milestone', () => {
       sosit_descarcare_at: '2026-07-01T15:00Z',
       descarcat_at: '2026-07-01T17:00Z'
     }]});
+    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });   // order_stops: üres → legacy ág
     const res = await request(app).post('/api/orders/CMD-1/driver-milestone').send({});
     expect(res.body.ok).toBe(false);
-    expect(pool.query).toHaveBeenCalledTimes(1);   // csak a SELECT
+    expect(pool.query).toHaveBeenCalledTimes(2);   // SELECT orders + SELECT order_stops (üres)
   });
   test('1. állomás: Alocat → In Curs, sosit_incarcare_at kap időt', async () => {
     setUser(fixtures.sofer);
@@ -285,10 +286,11 @@ describe('POST /api/orders/:id/driver-milestone', () => {
       id: 'CMD-1', client: 'ACME', status: 'Alocat',
       sosit_incarcare_at: null, incarcat_at: null, sosit_descarcare_at: null, descarcat_at: null
     }]});
+    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });   // order_stops: üres → legacy ág
     pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
     const res = await request(app).post('/api/orders/CMD-1/driver-milestone').send({});
     expect(res.body).toEqual({ ok: true, step: 'arriveLoad', finalized: false });
-    const upd = pool.query.mock.calls[1][0];
+    const upd = pool.query.mock.calls[2][0];
     expect(upd).toMatch(/sosit_incarcare_at = NOW\(\)/);
     expect(upd).toMatch(/status = 'In Curs'/);
   });
@@ -301,10 +303,11 @@ describe('POST /api/orders/:id/driver-milestone', () => {
       sosit_descarcare_at: '2026-07-01T15:00Z',
       descarcat_at: null
     }]});
+    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });   // order_stops: üres → legacy ág
     pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
     const res = await request(app).post('/api/orders/CMD-1/driver-milestone').send({});
     expect(res.body).toEqual({ ok: true, step: 'unloaded', finalized: true });
-    const upd = pool.query.mock.calls[1][0];
+    const upd = pool.query.mock.calls[2][0];
     expect(upd).toMatch(/descarcat_at = NOW\(\)/);
     expect(upd).toMatch(/status = 'Finalizat'/);
   });
@@ -315,10 +318,11 @@ describe('POST /api/orders/:id/driver-milestone', () => {
       sosit_incarcare_at: '2026-07-01T08:00Z',
       incarcat_at: null, sosit_descarcare_at: null, descarcat_at: null
     }]});
+    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });   // order_stops: üres → legacy ág
     pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
     const res = await request(app).post('/api/orders/CMD-1/driver-milestone').send({});
     expect(res.body).toEqual({ ok: true, step: 'loaded', finalized: false });
-    const upd = pool.query.mock.calls[1][0];
+    const upd = pool.query.mock.calls[2][0];
     expect(upd).toMatch(/incarcat_at = NOW\(\)/);
     expect(upd).not.toMatch(/status =/);   // NINCS státuszváltás közben
   });
@@ -331,10 +335,11 @@ describe('POST /api/orders/:id/driver-milestone', () => {
       sosit_incarcare_at: '2026-07-01T08:00Z',   // idx=0 kész → idx=1 következik
       incarcat_at: null, sosit_descarcare_at: null, descarcat_at: null
     }]});
+    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });   // order_stops: üres → legacy ág
     pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
     const res = await request(app).post('/api/orders/CMD-1/driver-milestone').send({});
     expect(res.body.step).toBe('loaded');
-    const upd = pool.query.mock.calls[1][0];
+    const upd = pool.query.mock.calls[2][0];
     expect(upd).not.toMatch(/status = 'In Curs'/);
   });
 });

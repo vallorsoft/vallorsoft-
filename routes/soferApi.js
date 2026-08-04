@@ -181,46 +181,82 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
         cid   // company_id horgony — túléli a sofőr törlését
       ]
     );
-    // A driver által megadott felrakási/lerakási dátumok átvitele a fuvarra
-    // (orders.incarcat_at/descarcat_at). A kliens `puncte[i].orderId` +
-    // `puncte[i].role` ('loading'|'unloading') tag-ekkel jelöli, hogy a sor
-    // melyik fuvar melyik állomását képviseli. Best-effort — hiba nem
-    // buktatja a menetlevél mentését. Multi-tenant: mindig cégre szűrt WHERE.
-    const closingOrderIds = [];   // amelyik fuvarra lerakási dátum érkezett → auto-Finalizat
+    // A driver által megadott felrakási/lerakási dátumok átvitele a
+    // konkrét order_stops sorra (per-stop menetlevél-jelölés). A kliens
+    // `puncte[i].orderId` + `puncte[i].role` ('loading'|'unloading') +
+    // (új:) `puncte[i].stopId` tag-ekkel jelöli, hogy a sor melyik fuvar
+    // melyik konkrét stopjához tartozik. Ha nincs stopId (régi kliens vagy
+    // 1-1 pontos fuvar), az első még nem waybill-ezett kind-ű stopra írjuk.
+    // A `orders.*_at` mirror mezőket a trigger frissíti. Best-effort;
+    // multi-tenant: mindig cégre szűrt WHERE.
+    const _waybilledOrders = new Set(); // amelyik fuvar puncte-sort kapott
     try {
       for (const p of puncte) {
         if (!p || !p.orderId || !p.role || !p.data) continue;
-        const col = p.role === 'loading' ? 'incarcat_at'
-                  : p.role === 'unloading' ? 'descarcat_at'
-                  : null;
-        if (!col) continue;
+        const kind = p.role === 'loading' ? 'pickup'
+                  : p.role === 'unloading' ? 'delivery' : null;
+        if (!kind) continue;
         const dateStr = String(p.data).slice(0, 10);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
         // A puncte sor DÁTUM-mezőt tárol (óra nélkül); a nap közepére állítjuk,
         // hogy a helyi időzóna 00:00-ja ne csúszhasson át az előző napra.
         const ts = new Date(dateStr + 'T12:00:00Z');
         if (isNaN(ts.getTime())) continue;
-        await pool.query(
-          `UPDATE orders SET ${col} = $1 WHERE id = $2 AND company_id = $3`,
-          [ts, p.orderId, cid]
-        );
-        if (col === 'descarcat_at') closingOrderIds.push(p.orderId);
+
+        // 1) Cél stop kiválasztása: preferált stopId ownership-ellenőrzéssel
+        let stopId = null;
+        if (p.stopId) {
+          const chk = await pool.query(
+            `SELECT id FROM order_stops
+              WHERE id = $1 AND order_id = $2 AND company_id = $3 AND kind = $4`,
+            [p.stopId, p.orderId, cid, kind]);
+          if (chk.rows.length) stopId = chk.rows[0].id;
+        }
+        // 2) Fallback: első még nem waybill-ezett kind-ű stop
+        if (!stopId) {
+          const nx = await pool.query(
+            `SELECT id FROM order_stops
+              WHERE order_id = $1 AND company_id = $2 AND kind = $3
+                AND waybilled_at IS NULL
+              ORDER BY stop_index ASC LIMIT 1`,
+            [p.orderId, cid, kind]);
+          if (nx.rows.length) stopId = nx.rows[0].id;
+        }
+
+        if (stopId) {
+          // Per-stop rögzítés — a trigger frissíti a orders.*_at mirror-mezőket.
+          await pool.query(
+            `UPDATE order_stops
+                SET done_at = COALESCE(done_at, $1),
+                    waybilled_at = COALESCE(waybilled_at, $1),
+                    updated_at = NOW()
+              WHERE id = $2`,
+            [ts, stopId]);
+        } else {
+          // Legacy fallback: nem-migrált fuvar (nincs egy stop se) — a régi
+          // orders.*_at mezőt frissítjük direktben (mint a régi kód).
+          const col = kind === 'pickup' ? 'incarcat_at' : 'descarcat_at';
+          await pool.query(
+            `UPDATE orders SET ${col} = $1 WHERE id = $2 AND company_id = $3`,
+            [ts, p.orderId, cid]);
+        }
+        _waybilledOrders.add(p.orderId);
       }
     } catch (uErr) {
-      console.error('driver puncte → orders.*_at update hiba (a mentés sikeres):', uErr.message);
+      console.error('driver puncte → stops/orders update hiba (a mentés sikeres):', uErr.message);
     }
-    // Ha a driver a menetlevélben lerakási dátumot adott meg egy AKTÍV fuvarra
-    // (Alocat / In Curs), a fuvar automatikusan Finalizat státuszra vált —
-    // a `finalized_at` trigger magától fut. Így a főoldali „LEZÁRT FUVAR"
-    // stat is számol a driver-beírt fuvarokkal. Extern / Parkolt / Raktarban
-    // érintetlen (azokat a diszpécser zárja le). Tenant-szűrt.
+    // Ha ÖSSZES delivery done_at be van állítva → a trigger updateli az
+    // orders.descarcat_at-ot NOT NULL-ra, és a státusz Finalizat lehet.
+    // Aktív fuvar (Alocat/In Curs) descarcat_at IS NOT NULL → Finalizat.
+    // Extern/Parkolt/Raktarban érintetlen (azokat a diszpécser zárja le).
     try {
-      if (closingOrderIds.length) {
+      if (_waybilledOrders.size) {
         await pool.query(
           `UPDATE orders SET status = 'Finalizat'
            WHERE id = ANY($1::text[]) AND company_id = $2
-             AND status IN ('Alocat', 'In Curs')`,
-          [closingOrderIds, cid]
+             AND status IN ('Alocat', 'In Curs')
+             AND descarcat_at IS NOT NULL`,
+          [Array.from(_waybilledOrders), cid]
         );
       }
     } catch (cErr) {

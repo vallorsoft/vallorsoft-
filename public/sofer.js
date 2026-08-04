@@ -369,11 +369,53 @@ function _collectPuncte() {
     };
     var oid  = row.getAttribute('data-order-id');
     var role = row.getAttribute('data-role');
+    var stopId = row.getAttribute('data-stop-id');
     if (oid)  p.orderId = oid;
     if (role) p.role = role;
+    if (stopId) p.stopId = stopId;
     out.push(p);
   });
   return out;
+}
+// Egy fuvar puncte-sorai a menetlevélhez. Multi-stop: minden még nem
+// waybill-ezett stopot felveszünk (pickup → 'Încărcare' role='loading';
+// delivery → 'Descărcare' role='unloading'), stopId-vel tag-elve. Ha nincs
+// stops-tömb (nem-migrált fuvar), a legacy loc_incarcare/loc_descarcare +
+// waybill_phase alapján esünk vissza a régi 1-1 pontos viselkedésre.
+// Visszaadott alak: [[loc, tip, data (YYYY-MM-DD), opts], …]
+function _buildWaybillPuncteForOrder(o) {
+  var ymd = function (v) { return v ? String(v).slice(0, 10) : ''; };
+  var stops = Array.isArray(o && o.stops) ? o.stops : [];
+  if (stops.length) {
+    var pickups = stops.filter(function (s) { return s.kind === 'pickup'   && !s.waybilled_at; })
+                      .sort(function (a, b) { return a.stop_index - b.stop_index; });
+    var deliveries = stops.filter(function (s) { return s.kind === 'delivery' && !s.waybilled_at; })
+                      .sort(function (a, b) { return a.stop_index - b.stop_index; });
+    var out = [];
+    pickups.forEach(function (s) {
+      if (s.loc) out.push([s.loc, 'Încărcare', ymd(s.data) || ymd(o.data_incarcare),
+                          { orderId: o.id, role: 'loading', stopId: s.id }]);
+    });
+    deliveries.forEach(function (s) {
+      if (s.loc) out.push([s.loc, 'Descărcare', ymd(s.data) || ymd(o.data_descarcare),
+                          { orderId: o.id, role: 'unloading', stopId: s.id }]);
+    });
+    return out;
+  }
+  // Legacy fallback
+  var phase = o.waybill_phase;
+  var loadDate = ymd(o.data_incarcare);
+  var unloadDate = ymd(o.data_descarcare);
+  var res = [];
+  if (phase === 'loading') {
+    if (o.loc_incarcare) res.push([o.loc_incarcare, 'Încărcare', loadDate, { orderId: o.id, role: 'loading' }]);
+  } else if (phase === 'unloading') {
+    if (o.loc_descarcare) res.push([o.loc_descarcare, 'Descărcare', unloadDate, { orderId: o.id, role: 'unloading' }]);
+  } else {
+    if (o.loc_incarcare)  res.push([o.loc_incarcare,  'Încărcare',  loadDate,   { orderId: o.id, role: 'loading' }]);
+    if (o.loc_descarcare) res.push([o.loc_descarcare, 'Descărcare', unloadDate, { orderId: o.id, role: 'unloading' }]);
+  }
+  return res;
 }
 // `numeric=true` → a számokat számmá alakítjuk (beküldés); egyébként a
 // nyers string marad (piszkozat — a félig beírt érték se vesszen el).
@@ -451,9 +493,10 @@ function draftRestore(draft) {
   document.getElementById('puncteContainer').innerHTML = '';
   punctIdx = 0;
   (draft.puncte || []).forEach(function(p) {
-    // Tag-eket is visszaadjuk (fuvar-visszakötés + Plecare/Sosire idő)
+    // Tag-eket is visszaadjuk (fuvar-visszakötés + Plecare/Sosire idő +
+    // multi-stop stopId)
     addPunctRow(p.loc, p.tip, p.data, {
-      orderId: p.orderId, role: p.role, time: p.time
+      orderId: p.orderId, role: p.role, stopId: p.stopId, time: p.time
     });
   });
 
@@ -1126,18 +1169,7 @@ function _applyPickerDiff(newIds) {
     if (existing[oid]) return;                                    // már bent volt
     var o = _soferOrdersCache.find(function (x) { return x.id === oid; });
     if (!o) return;
-    var phase = o.waybill_phase;
-    var loadDate = _ymdOf(o.data_incarcare);
-    var unloadDate = _ymdOf(o.data_descarcare);
-    var toAdd = [];
-    if (phase === 'loading') {
-      if (o.loc_incarcare) toAdd.push([o.loc_incarcare, 'Încărcare', loadDate, { orderId: o.id, role: 'loading' }]);
-    } else if (phase === 'unloading') {
-      if (o.loc_descarcare) toAdd.push([o.loc_descarcare, 'Descărcare', unloadDate, { orderId: o.id, role: 'unloading' }]);
-    } else {
-      if (o.loc_incarcare)  toAdd.push([o.loc_incarcare,  'Încărcare',  loadDate,   { orderId: o.id, role: 'loading' }]);
-      if (o.loc_descarcare) toAdd.push([o.loc_descarcare, 'Descărcare', unloadDate, { orderId: o.id, role: 'unloading' }]);
-    }
+    var toAdd = _buildWaybillPuncteForOrder(o);
     toAdd.forEach(function (args) {
       addPunctRow(args[0], args[1], args[2], args[3]);
       var lastRow = pc.lastElementChild;
@@ -1269,26 +1301,14 @@ function fuvarStep2(allowEmpty) {
   }
   _pendingPlecare = null;
 
-  // 2) A kiválasztott fuvarokból az Incarcare/Descarcare sorok — a DÁTUM a
-  //    fuvar tervezett `data_incarcare`/`data_descarcare`-ből előtöltve
-  //    (a sofőr átírhatja, ha másnap történt). A sorok `data-order-id` +
-  //    `data-role` tag-et kapnak → a beküldéskor a szerver ezekből frissíti
-  //    az `orders.incarcat_at`/`descarcat_at`-ot (tényleges dátum).
+  // 2) A kiválasztott fuvarokból a puncte-sorok — a KÖZÖS
+  //    `_buildWaybillPuncteForOrder(o)` kezeli a multi-stop esetet is: minden
+  //    olyan stopot felvesz, amit még nem waybill-eztünk (waybilled_at IS NULL),
+  //    és tag-eli a stopId-vel. A régi (nem-migrált) fuvarra legacy loc_*/data_*.
   selected.forEach(function(o) {
-    var phase = o.waybill_phase;
-    var loadDate = _ymdOf(o.data_incarcare);
-    var unloadDate = _ymdOf(o.data_descarcare);
-    if (phase === 'loading') {
-      // Alocat / In Curs: csak a felrakási adatok — az Extern fuvarhoz nincs lerakó még
-      if (o.loc_incarcare) addPunctRow(o.loc_incarcare, 'Încărcare', loadDate, { orderId: o.id, role: 'loading' });
-    } else if (phase === 'unloading') {
-      // Finalizat, már volt menetlevélbe foglalva (rakodás): csak lerakási adatok
-      if (o.loc_descarcare) addPunctRow(o.loc_descarcare, 'Descărcare', unloadDate, { orderId: o.id, role: 'unloading' });
-    } else {
-      // complete vagy ismeretlen: mindkettő (régi viselkedés / egyszerű fuvar)
-      if (o.loc_incarcare) addPunctRow(o.loc_incarcare, 'Încărcare', loadDate, { orderId: o.id, role: 'loading' });
-      if (o.loc_descarcare) addPunctRow(o.loc_descarcare, 'Descărcare', unloadDate, { orderId: o.id, role: 'unloading' });
-    }
+    _buildWaybillPuncteForOrder(o).forEach(function (args) {
+      addPunctRow(args[0], args[1], args[2], args[3]);
+    });
   });
 
   // 3) Sosire (érkezési pont) — visszalépéskor a piszkozatból visszahozzuk;
@@ -1455,6 +1475,9 @@ function addPunctRow(locVal, tipVal, dataVal, opts) {
   d.className = 'dyn-row punct-row';
   if (opts.orderId) d.setAttribute('data-order-id', opts.orderId);
   if (opts.role)    d.setAttribute('data-role', opts.role);
+  // Multi-drop: a konkrét order_stop id — így a menetlevél-mentés a stopId
+  // szerint tudja waybilled-nek jelölni (nem csak az elsőt kind-en belül).
+  if (opts.stopId)  d.setAttribute('data-stop-id', opts.stopId);
   // Plecare + Sosire: az induló/érkező „garaj" jellegű pontok — a menetlevél
   // MINDIG ezekkel indul és zárul. A többi típus a régi lista.
   var tipOptions = ['Plecare','Încărcare','Descărcare','Tranzit','Vamă','Parcare','Sosire','Altele'];
@@ -3830,6 +3853,123 @@ function _driverMilestoneGo(id) {
   .catch(function () { toast(t('sof.errOccurred'), 'err'); });
 }
 
+// ── Több felrakó/lerakó pont — új stop-event úton ─────────────
+// Az `o.stops` (getMySoferOrders) alapján kiszámoljuk a lehetséges következő
+// eseményeket. Ha csak egy lehet, azonnal megerősítést kérünk (mint eddig);
+// ha több (pl. 5 lerakási pont, még mind nyitva), előugró választó.
+// A pickup fázis szigorúan sorrendben megy (általában 1 pickup van), a
+// delivery fázisban a sofőr választhatja, melyik pontra érkezett/tett be.
+function _computeNextStopOptions(o) {
+  var stops = Array.isArray(o.stops) ? o.stops : [];
+  if (!stops.length) return null; // legacy fallback
+  var pickups = stops.filter(function (s) { return s.kind === 'pickup'; })
+                     .sort(function (a, b) { return a.stop_index - b.stop_index; });
+  var deliveries = stops.filter(function (s) { return s.kind === 'delivery'; })
+                     .sort(function (a, b) { return a.stop_index - b.stop_index; });
+  var opts = [];
+  var allPickupsDone = pickups.every(function (p) { return !!p.done_at; });
+  if (pickups.length && !allPickupsDone) {
+    for (var i = 0; i < pickups.length; i++) {
+      var p = pickups[i];
+      if (!p.arrived_at) { opts.push({ stop: p, event: 'arrive' }); break; }
+      if (!p.done_at)    { opts.push({ stop: p, event: 'done' });   break; }
+    }
+  } else {
+    for (var j = 0; j < deliveries.length; j++) {
+      var d = deliveries[j];
+      if (!d.arrived_at) opts.push({ stop: d, event: 'arrive' });
+      else if (!d.done_at) opts.push({ stop: d, event: 'done' });
+    }
+  }
+  return opts;
+}
+function _stopEventLabel(opt) {
+  var kind = opt.stop.kind;
+  var ev = opt.event;
+  var key = kind === 'pickup'
+    ? (ev === 'arrive' ? 'sof.ms.arriveLoad' : 'sof.ms.loaded')
+    : (ev === 'arrive' ? 'sof.ms.arriveUnload' : 'sof.ms.unloaded');
+  return t(key);
+}
+// Új „gomb-értesítő": a fuvar-kártya fejlécének + részlet-panelének
+// állomás-gombja hívja. Az `o` (a fuvar-objektum) alapján dönt.
+function driverStopAction(orderId) {
+  var o = (_soferOrdersCache || []).filter(function (x) { return x.id === orderId; })[0];
+  if (!o) return;
+  var opts = _computeNextStopOptions(o);
+  if (opts === null) {
+    // Legacy fuvar (nincs stops-tömb): a régi 4-lépéses szerver-út.
+    return driverMilestone(orderId, -1);
+  }
+  if (!opts.length) { toast(t('sof.ms.allDone') || 'Toate etapele înregistrate.', 'ok'); return; }
+  if (opts.length === 1) {
+    var opt = opts[0];
+    var act = _stopEventLabel(opt);
+    var stopName = opt.stop.loc || ('#' + (opt.stop.stop_index + 1));
+    sofConfirm({
+      ico: opt.stop.kind === 'pickup' ? '📦' : '📍',
+      title: t('sof.ms.confirmTitle', { act: act }),
+      msg: t('sof.ms.confirmStop', { loc: stopName }) || (act + ' — ' + stopName),
+      ok: act, tone: 'ok'
+    }, function () { _soferStopEventGo(orderId, opt.stop.id, opt.event); });
+    return;
+  }
+  // Több nyitott lehetőség → választó modal
+  sofChoice(orderId, opts);
+}
+function _soferStopEventGo(orderId, stopId, event) {
+  fetch('/api/orders/' + orderId + '/stop-event', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ stopId: stopId, event: event })
+  })
+  .then(function (r) { return r.json(); })
+  .then(function (d) {
+    if (d && d.ok) {
+      toast('✅ ' + t('sof.ms.recorded'), 'ok');
+      loadDashOrders();
+    } else { toast((d && d.err) || t('sof.errOccurred'), 'err'); }
+  })
+  .catch(function () { toast(t('sof.errOccurred'), 'err'); });
+}
+
+// A stop-választó modal betöltője. Nagy gombokat rak függőlegesen — vezetés
+// után, kesztyűs kézzel is jól nyomható.
+function sofChoice(orderId, opts) {
+  var m = document.getElementById('sofChoiceModal');
+  if (!m) {
+    // Fallback: ha valamiért a modal HTML nincs betöltve, natív dialógot
+    // adunk — némán ne hajtson végre.
+    var label = opts.map(function (o, i) { return (i + 1) + ') ' + _stopEventLabel(o) + ' — ' + (o.stop.loc || '#' + (o.stop.stop_index + 1)); }).join('\n');
+    var pick = window.prompt(label, '1');
+    var n = parseInt(pick, 10);
+    if (!isFinite(n) || n < 1 || n > opts.length) return;
+    var op = opts[n - 1];
+    _soferStopEventGo(orderId, op.stop.id, op.event);
+    return;
+  }
+  var host = document.getElementById('sofChoiceBtns');
+  host.innerHTML = '';
+  opts.forEach(function (op) {
+    var btn = document.createElement('button');
+    btn.className = 'sof-cf-btn ok';
+    var stopName = op.stop.loc || ('#' + (op.stop.stop_index + 1));
+    var kindIco = op.stop.kind === 'pickup' ? '📦' : '📍';
+    btn.textContent = kindIco + ' ' + _stopEventLabel(op) + ' — ' + stopName;
+    btn.onclick = function () {
+      sofChoiceCancel();
+      _soferStopEventGo(orderId, op.stop.id, op.event);
+    };
+    host.appendChild(btn);
+  });
+  m.style.display = 'flex';
+}
+function sofChoiceCancel() {
+  var m = document.getElementById('sofChoiceModal');
+  if (m) m.style.display = 'none';
+}
+// Globális cache a fuvar-objektumokhoz (a stop-választónak kell)
+var _soferOrdersCache = [];
+
 // A kártyán belüli fel-/lerakás blokk ki-/becsukása (`kind`: 'load'|'unload').
 // Az alapállapotot a fuvar fázisa adja (lásd `renderFuvarCard`), de a sofőr
 // bármikor átkapcsolhatja — a másik szekciót NEM csukjuk be helyette
@@ -3895,22 +4035,33 @@ function renderFuvarCard(o, idx) {
                 : isWh ? (t('sof.statusWarehouse') + (o.handover_loc ? ' @ ' + esc(o.handover_loc) : ''))
                 : esc(o.status || 'Alocat');
   var truck = o.rendszam_camion ? ('🚛 ' + esc(o.rendszam_camion) + (o.rendszam_remorca ? ' / ' + esc(o.rendszam_remorca) : '')) : '';
-  // Állomás-gomb: EGY gomb, ami a következő üres állomást mutatja; a szerver
-  // rögzíti az időbélyeget és lépteti (utolsónál Finalizat). Csak aktív fuvaron.
+  // Állomás-gomb: a fuvar aktuális állapota alapján a driverStopAction dönti
+  // el, hogy egyértelmű léptetés vagy több-választós előugró ablak. Nem-migrált
+  // fuvarnál (nincs o.stops) a régi driverMilestone-hoz esik vissza.
+  var _stopOpts = (typeof _computeNextStopOptions === 'function') ? _computeNextStopOptions(o) : null;
   var msNextIdx = -1;
   for (var _i = 0; _i < MS_STEPS.length; _i++) { if (!o[MS_STEPS[_i].col]) { msNextIdx = _i; break; } }
   var actionBtn = '';
-  // A soron következő állomás-gomb a KINYÍLÓ részben is ott van, DE a
-  // fejlécbe is kikerül (`headActionBtn`): ez a napi 4× használt művelet,
-  // vezetés után, kesztyűs kézzel — ne kelljen előbb kinyitni a kártyát.
-  // `stopPropagation`, hogy a gomb ne csukja ki/be a kártyát.
   var headActionBtn = '';
-  if ((isAlocat || isCurs) && msNextIdx >= 0) {
-    actionBtn = '<button class="sh-btn confirm" onclick="driverMilestone(\'' + o.id + '\',' + msNextIdx + ')">' +
-                '➜ ' + t(MS_STEPS[msNextIdx].key) + '</button>';
-    headActionBtn = '<button class="sh-btn confirm fuvar-head-action" ' +
-      'onclick="event.stopPropagation();driverMilestone(\'' + o.id + '\',' + msNextIdx + ')">' +
-      '➜ ' + t(MS_STEPS[msNextIdx].key) + '</button>';
+  if ((isAlocat || isCurs)) {
+    var actLabel = '', actHandler = '';
+    if (_stopOpts && _stopOpts.length) {
+      // Új stop-alapú út
+      if (_stopOpts.length === 1) actLabel = _stopEventLabel(_stopOpts[0]);
+      else actLabel = t('sof.ms.nextStep');
+      actHandler = 'driverStopAction(\'' + o.id + '\')';
+    } else if (_stopOpts === null && msNextIdx >= 0) {
+      // Legacy 4-lépéses fallback (nincs stops-tömb, régi kliens/DB)
+      actLabel = t(MS_STEPS[msNextIdx].key);
+      actHandler = 'driverMilestone(\'' + o.id + '\',' + msNextIdx + ')';
+    }
+    if (actHandler) {
+      actionBtn = '<button class="sh-btn confirm" onclick="' + actHandler + '">' +
+                  '➜ ' + esc(actLabel) + '</button>';
+      headActionBtn = '<button class="sh-btn confirm fuvar-head-action" ' +
+        'onclick="event.stopPropagation();' + actHandler + '">' +
+        '➜ ' + esc(actLabel) + '</button>';
+    }
   }
   // ⛔ Áru leadása (defekt / pótkocsi-csere) — a kérést a diszpécser igazolja vissza
   var hoPending = o.handover_status === 'Fuggoben';
@@ -3988,14 +4139,58 @@ function renderFuvarCard(o, idx) {
       '<div class="fd-sec-b" id="' + bid + '"' + (open ? '' : ' style="display:none"') + '>' + rowsHtml + '</div>' +
     '</div>';
   }
-  var loadSec = fdPhaseSec('load', '⬆️', 'sof.det.loading', o.loc_incarcare,
-    detRow('sof.det.company', o.firma_incarcare, null) +
-    detRow('sof.det.location', o.loc_incarcare, 'load') +
-    detRow('sof.det.date', dLoad, null), !loadedDone);
-  var unloadSec = fdPhaseSec('unload', '⬇️', 'sof.det.unloading', o.loc_descarcare,
-    detRow('sof.det.company', o.firma_descarcare, null) +
-    detRow('sof.det.location', o.loc_descarcare, 'unload') +
-    detRow('sof.det.date', dUnload, null), loadedDone);
+  // Több felrakó / lerakó pont — a o.stops tömbből építjük fel a szekciókat.
+  // Ha nincs stops-tömb (nem-migrált fuvar), a régi top-szintű mezőkből.
+  var _pickups = Array.isArray(o.stops) ? o.stops.filter(function (s) { return s.kind === 'pickup'; })
+                                              .sort(function (a, b) { return a.stop_index - b.stop_index; }) : [];
+  var _deliveries = Array.isArray(o.stops) ? o.stops.filter(function (s) { return s.kind === 'delivery'; })
+                                                 .sort(function (a, b) { return a.stop_index - b.stop_index; }) : [];
+  function _stopStatusBadge(s) {
+    if (s.done_at) return '<span class="fd-stop-done" title="' + esc(fmtFuvarDateTime(s.done_at)) + '">✅</span>';
+    if (s.arrived_at) return '<span class="fd-stop-arrived" title="' + esc(fmtFuvarDateTime(s.arrived_at)) + '">📍</span>';
+    return '<span class="fd-stop-todo">○</span>';
+  }
+  function _stopRows(s) {
+    return detRow('sof.det.company',  s.firma, null) +
+           detRow('sof.det.location', s.loc, null) +
+           detRow('sof.det.date',     fmtFuvarDay(s.data), null);
+  }
+  var loadSec, unloadSec;
+  if (_pickups.length) {
+    var loadSum = _pickups.length === 1
+      ? (_pickups[0].loc || '')
+      : ((_pickups[0].loc || '') + ' (+' + (_pickups.length - 1) + ')');
+    var loadBody = _pickups.map(function (s, i) {
+      return '<div class="fd-stop-block">' +
+        '<div class="fd-stop-h">' + _stopStatusBadge(s) + ' <b>' + t('sof.det.pickup') + ' #' + (i + 1) + '</b></div>' +
+        _stopRows(s) +
+      '</div>';
+    }).join('');
+    loadSec = fdPhaseSec('load', '⬆️', 'sof.det.loading', loadSum, loadBody, !loadedDone);
+  } else {
+    loadSec = fdPhaseSec('load', '⬆️', 'sof.det.loading', o.loc_incarcare,
+      detRow('sof.det.company', o.firma_incarcare, null) +
+      detRow('sof.det.location', o.loc_incarcare, 'load') +
+      detRow('sof.det.date', dLoad, null), !loadedDone);
+  }
+  if (_deliveries.length) {
+    var lastDel = _deliveries[_deliveries.length - 1];
+    var unloadSum = _deliveries.length === 1
+      ? (lastDel.loc || '')
+      : (lastDel.loc || '') + ' (' + _deliveries.length + ' ' + t('sof.det.stops') + ')';
+    var unloadBody = _deliveries.map(function (s, i) {
+      return '<div class="fd-stop-block">' +
+        '<div class="fd-stop-h">' + _stopStatusBadge(s) + ' <b>' + t('sof.det.delivery') + ' #' + (i + 1) + '</b></div>' +
+        _stopRows(s) +
+      '</div>';
+    }).join('');
+    unloadSec = fdPhaseSec('unload', '⬇️', 'sof.det.unloading', unloadSum, unloadBody, loadedDone);
+  } else {
+    unloadSec = fdPhaseSec('unload', '⬇️', 'sof.det.unloading', o.loc_descarcare,
+      detRow('sof.det.company', o.firma_descarcare, null) +
+      detRow('sof.det.location', o.loc_descarcare, 'unload') +
+      detRow('sof.det.date', dUnload, null), loadedDone);
+  }
   var details =
     '<div class="fuvar-details" id="det_' + o.id + '" style="display:none">' +
       metaHtml +
@@ -4113,6 +4308,8 @@ function loadDashOrders() {
   .then(function(r){ return r.json(); })
   .then(function(d){
     var list = d.result || [];
+    // Globális cache — a stop-választó modal a fuvar-objektumot innen olvassa.
+    _soferOrdersCache = list;
     var el = document.getElementById('kiosztottList');
     if (!el) return;
     // Dashboard: CSAK élő aktív fuvar (Alocat/In Curs). A Finalizat + Parkolt

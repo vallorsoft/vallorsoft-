@@ -12,8 +12,8 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260730gps"></script>
-  <link rel="stylesheet" href="/sofer.css?v=20260730gps">
+  <script src="/i18n.js?v=20260730multi"></script>
+  <link rel="stylesheet" href="/sofer.css?v=20260730multi">
   <script src="/push-client.js?v=20260614qa"></script>
   <!-- Sofor mobil-app: 8 ora idle-limit (vezetes kozben oraig nem koppint a
        kepernyore). A szerver-cookie 7 nap; addig igy nem log ki ejszaka-vezetes
@@ -414,7 +414,7 @@
 </div><!-- /sofer-wrap -->
 
 <script src="/sofer-uit.js?v=20260614qa"></script>
-<script src="/sofer.js?v=20260730gps"></script>
+<script src="/sofer.js?v=20260730multi"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 
 <!-- ── ÁRU LEADÁSA MODAL (sofőr-kérés — admin visszaigazolja) ── -->
@@ -501,6 +501,23 @@
     <div class="sof-cf-btns">
       <button class="sof-cf-btn cancel" id="sofConfirmCancelBtn" onclick="sofConfirmCancel()" data-i18n="common.cancel">Mégse</button>
       <button class="sof-cf-btn ok" id="sofConfirmOkBtn" onclick="sofConfirmOk()" data-i18n="sof.cfm.yes">Igen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── STOP-VÁLASZTÓ MODAL (több lerakó / felrakó) ──
+     Ha a fuvarnak több lerakási pontja van és a sofőr rákoppint az „állomás"
+     gombra, itt választ, hogy melyik pontnál végezte el az eseményt (arrive
+     vagy done). A választás után `_soferStopEventGo(orderId, stopId, event)`
+     rögzíti a szervernek. A gombokat a `sofChoice()` tölti (public/sofer.js). -->
+<div id="sofChoiceModal" class="sof-modal" style="display:none;">
+  <div class="sof-modal-card">
+    <div class="sof-cf-ico" id="sofChoiceIco">📍</div>
+    <h3 class="sof-cf-title" id="sofChoiceTitle" data-i18n="sof.ms.chooseStop">Melyik pontot választod?</h3>
+    <p class="sof-cf-msg" id="sofChoiceMsg" data-i18n="sof.ms.chooseStopMsg">Több lerakási pont van — koppints arra, amelyiknél most vagy.</p>
+    <div class="sof-cf-btns" id="sofChoiceBtns" style="flex-direction:column;gap:10px;"></div>
+    <div style="text-align:center;margin-top:10px;">
+      <button class="sof-cf-btn cancel" onclick="sofChoiceCancel()" data-i18n="common.cancel">Mégse</button>
     </div>
   </div>
 </div>

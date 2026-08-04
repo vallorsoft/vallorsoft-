@@ -20,6 +20,10 @@ const FIELDS = [
   'data_incarcare', 'data_descarcare', 'pret', 'valuta', 'km', 'greutate',
   'load_type', 'hossz_cm', 'szel_cm', 'mag_cm',
   'rendszam_camion', 'rendszam_remorca', 'observatii',
+  // Több felrakó / lerakó pont (multi-drop). Ha csak egy-egy van a
+  // dokumentumban, a legacy loc_incarcare/firma_incarcare/data_incarcare
+  // mezőket használjuk; ha többet, a `pickups`/`deliveries` tömböket.
+  'pickups', 'deliveries',
 ];
 
 const PROMPT =
@@ -27,10 +31,14 @@ const PROMPT =
   'extrage DOAR un obiect JSON cu cheile exacte: ' + FIELDS.join(', ') + '. ' +
   'Reguli: datele în format ISO (YYYY-MM-DD); pret și km și greutate ca numere (fără text); ' +
   'valuta ca RON/EUR; rendszam = numere de înmatriculare; ' +
-  'loc_incarcare / loc_descarcare = localitatea de încărcare / descărcare; ' +
+  'loc_incarcare / loc_descarcare = localitatea de încărcare / descărcare (primul punct); ' +
   'firma_incarcare / firma_descarcare = denumirea firmei de la locul de încărcare / descărcare (expeditor / destinatar), NU clientul care comandă; ' +
   'load_type = "FTL" pentru marfă completă sau "LTL" pentru grupaj (dacă nu reiese clar, null); ' +
   'hossz_cm / szel_cm / mag_cm = dimensiunile mărfii în CENTIMETRI (convertește din m/mm dacă e nevoie); ' +
+  'DACĂ SUNT MAI MULTE PUNCTE de încărcare / descărcare (ex. 1 încărcare + 5 descărcări), ' +
+  'completează pickups[] și deliveries[] cu obiecte { loc, firma, data } — ' +
+  'primul element trebuie să corespundă cu loc_incarcare/loc_descarcare de mai sus. ' +
+  'Dacă e un singur punct, lasă pickups/deliveries = null. ' +
   'câmpurile necunoscute = null. ' +
   'Adaugă "confidence" (0..1) = cât de sigur ești în ansamblu. Răspunde STRICT cu JSON, fără text în plus.';
 

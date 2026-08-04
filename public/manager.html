@@ -266,6 +266,17 @@
           <div class="field"><label data-i18n="form.unloadFirma">Lerakási cég</label><input class="input" id="oUnloadFirma" placeholder="opcionális" data-i18n-ph="form.firmaPh" data-sg="firma_descarcare" autocomplete="off"></div>
           <div class="field"><label data-i18n="form.unloadTime">Lerakás ideje</label><input class="input" id="oUnloadDate" type="datetime-local"></div>
         </div>
+        <!-- ── További lerakási / felrakási pontok (multi-drop) ── -->
+        <div id="oExtraStopsBox" style="margin-top:14px;padding:12px;border:1px dashed var(--border);border-radius:10px;background:rgba(255,255,255,0.03);">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div style="font-size:13px;color:var(--muted);font-weight:600;" data-i18n="form.extraStopsHead">TÖBB FELRAKÁSI / LERAKÁSI PONT (opcionális)</div>
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="btn ghost" onclick="addExtraStopRow('pickup','oExtraStopsList')" data-i18n="form.addPickup">➕ Felrakó</button>
+              <button type="button" class="btn ghost" onclick="addExtraStopRow('delivery','oExtraStopsList')" data-i18n="form.addDelivery">➕ Lerakó</button>
+            </div>
+          </div>
+          <div id="oExtraStopsList" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
         <div style="margin-top:20px; margin-bottom:12px;">
           <div style="font-size:13px; color:var(--muted); font-weight:600; margin-bottom:10px;" data-i18n="form.driverType">SOFŐR TÍPUSA</div>
           <div style="display:flex; gap:16px; flex-wrap:wrap;">
@@ -1237,6 +1248,19 @@
       </div>
       <div id="oeLegsList" style="display:flex;flex-direction:column;gap:8px;"></div>
     </div>
+
+    <!-- Multi-drop: további felrakó / lerakó pontok a szerkesztőben -->
+    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:12px;flex-wrap:wrap;">
+        <div style="font-weight:700;color:#fff;" data-i18n="form.extraStopsHead">TÖBB FELRAKÁSI / LERAKÁSI PONT (opcionális)</div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn ghost" onclick="addExtraStopRow('pickup','oeExtraStopsList')" data-i18n="form.addPickup">➕ Felrakó</button>
+          <button type="button" class="btn ghost" onclick="addExtraStopRow('delivery','oeExtraStopsList')" data-i18n="form.addDelivery">➕ Lerakó</button>
+        </div>
+      </div>
+      <div id="oeExtraStopsList" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+
     <div style="display:flex;gap:10px;margin-top:16px;">
       <button class="btn ghost col" onclick="closeOrderEditModal()" data-i18n="common.cancel">Mégse</button>
       <button class="btn primary col" onclick="saveOrderEdit()" data-i18n="edit.save">💾 Mentés</button>

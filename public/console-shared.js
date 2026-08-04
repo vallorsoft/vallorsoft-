@@ -928,6 +928,20 @@ function _ordScanAttachTo(orderId){
 function createOrder(){
   const st=document.querySelector('input[name="oSoferType"]:checked');
   const type=st?st.value:'None';
+  // Több felrakási / lerakási pont: az első felrakó/lerakó a top-szintű
+  // mezőkből, a további sorok az „Extra pontok" blokkból (`oExtraStopsList`).
+  const extra = _collectExtraStops('oExtraStopsList');
+  const pickups = [];
+  const deliveries = [];
+  const _loadTop = { loc: document.getElementById('oLoad').value.trim(),
+    firma: (document.getElementById('oLoadFirma')||{}).value ? document.getElementById('oLoadFirma').value.trim() : null,
+    data: document.getElementById('oLoadDate').value || null };
+  const _unloadTop = { loc: document.getElementById('oUnload').value.trim(),
+    firma: (document.getElementById('oUnloadFirma')||{}).value ? document.getElementById('oUnloadFirma').value.trim() : null,
+    data: document.getElementById('oUnloadDate').value || null };
+  if (_loadTop.loc || _loadTop.firma || _loadTop.data) pickups.push(_loadTop);
+  if (_unloadTop.loc || _unloadTop.firma || _unloadTop.data) deliveries.push(_unloadTop);
+  extra.forEach((s) => (s.kind === 'pickup' ? pickups : deliveries).push({ loc: s.loc, firma: s.firma, data: s.data }));
   const p={
     client:document.getElementById('oClient').value.trim(),
     ref:document.getElementById('oRef').value.trim(),
@@ -940,12 +954,14 @@ function createOrder(){
     szel_cm:(document.getElementById('oSzel')||{}).value||null,
     mag_cm:(document.getElementById('oMag')||{}).value||null,
     route_geo:buildRouteGeo('create'),
-    loc_incarcare:document.getElementById('oLoad').value.trim(),
-    loc_descarcare:document.getElementById('oUnload').value.trim(),
-    firma_incarcare:(document.getElementById('oLoadFirma')||{}).value ? document.getElementById('oLoadFirma').value.trim() : null,
-    firma_descarcare:(document.getElementById('oUnloadFirma')||{}).value ? document.getElementById('oUnloadFirma').value.trim() : null,
-    data_incarcare:document.getElementById('oLoadDate').value||null,
-    data_descarcare:document.getElementById('oUnloadDate').value||null,
+    loc_incarcare:_loadTop.loc,
+    loc_descarcare:_unloadTop.loc,
+    firma_incarcare:_loadTop.firma,
+    firma_descarcare:_unloadTop.firma,
+    data_incarcare:_loadTop.data,
+    data_descarcare:_unloadTop.data,
+    pickups: pickups,
+    deliveries: deliveries,
     sofer_type:type==='None'?null:type,
     rendszam_camion:document.getElementById('oCamionSelect').value||null,
     rendszam_remorca:document.getElementById('oRemorcaSelect').value||null,
@@ -966,6 +982,7 @@ function createOrder(){
       if(typeof _ordScanAttachTo==='function') _ordScanAttachTo(r.id);
       loadOrders();
       ['oClient','oRef','oPret','oKm','oSuly','oHossz','oSzel','oMag','oLoad','oUnload','oLoadFirma','oUnloadFirma','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+      const _el=document.getElementById('oExtraStopsList'); if(_el) _el.innerHTML='';
       ['oFtl','oLtl'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
       refreshDimReq();
       if(typeof resetRouteState==='function')resetRouteState('create');
@@ -4850,6 +4867,10 @@ function openOrderEdit(id) {
     .then(r=>r.json()).then(function(d) {
       var o = d.result;
       var legs = d.legs || [];
+      var stops = d.stops || [];
+      // A többi lerakási / felrakási pont a szerkesztő „Extra pontok" blokkjába
+      if (o) { o.stops = stops; }
+      if (typeof populateExtraStopsFromOrder === 'function') populateExtraStopsFromOrder({ stops: stops }, 'oeExtraStopsList');
       if (!o) { toast(t('common.notFound'),'err'); return; }
 
       document.getElementById('oeClient').value = o.client||'';
@@ -5084,6 +5105,21 @@ function saveOrderEdit() {
   // Ha nem Extern a fuvar, az elavult alvállalkozói telefonszám/külső-sofőr-id
   // törlődjön a DB-ből (a szerkesztő ezeket nem rögzíti, csak nullázza).
   if (soferType !== 'Extern') { payload.telefon_extern = null; payload.external_driver_id = null; }
+  // Több felrakó / lerakó pont (multi-drop) — az első pár a top-szintű
+  // mezőkben marad (visszafelé kompat), a többi az „Extra pontok" blokkból.
+  var _extra = (typeof _collectExtraStops === 'function') ? _collectExtraStops('oeExtraStopsList') : [];
+  var _pk = [], _de = [];
+  var _pkTop = { loc: payload.loc_incarcare, firma: payload.firma_incarcare || null, data: payload.data_incarcare };
+  var _deTop = { loc: payload.loc_descarcare, firma: payload.firma_descarcare || null, data: payload.data_descarcare };
+  if (_pkTop.loc || _pkTop.firma || _pkTop.data) _pk.push(_pkTop);
+  if (_deTop.loc || _deTop.firma || _deTop.data) _de.push(_deTop);
+  _extra.forEach(function (s) { (s.kind === 'pickup' ? _pk : _de).push({ loc: s.loc, firma: s.firma, data: s.data }); });
+  // CSAK akkor küldjük a stops-mezőket, ha van értelmes tartalom (különben a
+  // szerver egyáltalán nem érinti a stops-táblát — csak a top-fields sync).
+  if (_pk.length || _de.length || _extra.length) {
+    payload.pickups = _pk;
+    payload.deliveries = _de;
+  }
   // A már létező fuvart nem blokkoljuk: a típus üresen maradhat.
   // Csak ha LTL-re állítják, akkor kötelezők a méretek.
   if(payload.load_type==='LTL' && (!payload.hossz_cm||!payload.szel_cm||!payload.mag_cm)){toast(t('cs.ltlDimsReq'),'err');return;}
@@ -5672,4 +5708,61 @@ function deleteBonScanSample(id) {
     if (typeof toast === 'function') toast(t('bscan.deleted'), 'ok');
     loadBonScanCard();
   });
+}
+
+// ============================================================
+//  Extra stops (multi-drop) — a fuvar-kiíró alján dinamikus sorok.
+//  Az első felrakó/lerakó pár a régi top-szintű mezőkben marad
+//  (visszafelé kompat); az extra sorok generálják a további
+//  pickups[]/deliveries[] elemeket. A createOrder + saveOrderEdit
+//  ezekből építi a stops-tömböt.
+// ============================================================
+function addExtraStopRow(kind, listId, seed) {
+  const list = document.getElementById(listId);
+  if (!list) return;
+  seed = seed || {};
+  const row = document.createElement('div');
+  row.className = 'oe-extra-row';
+  row.dataset.kind = kind;
+  const kindLabel = kind === 'pickup' ? (t('form.pickupExtra') || '➕ Felrakó') : (t('form.deliveryExtra') || '➕ Lerakó');
+  row.style.cssText = 'display:grid;grid-template-columns:auto 2fr 1.5fr 1fr auto;gap:8px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:8px;background:rgba(255,255,255,0.02);';
+  row.innerHTML =
+    '<span style="font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;">' + kindLabel + '</span>' +
+    '<input class="input oe-x-loc" placeholder="' + (t('form.locPh') || 'Helyszín') + '" value="' + (seed.loc ? String(seed.loc).replace(/"/g,'&quot;') : '') + '">' +
+    '<input class="input oe-x-firma" placeholder="' + (t('form.firmaPh') || 'Cég (opc)') + '" value="' + (seed.firma ? String(seed.firma).replace(/"/g,'&quot;') : '') + '">' +
+    '<input class="input oe-x-data" type="date" value="' + (seed.data ? String(seed.data).slice(0,10) : '') + '">' +
+    '<button type="button" class="btn ghost" style="padding:6px 10px;" onclick="this.parentNode.remove()" title="' + (t('common.delete') || 'Törlés') + '">✕</button>';
+  list.appendChild(row);
+}
+function _collectExtraStops(listId) {
+  const list = document.getElementById(listId);
+  if (!list) return [];
+  const rows = list.querySelectorAll('.oe-extra-row');
+  const out = [];
+  rows.forEach(function (r) {
+    const kind = r.dataset.kind === 'pickup' ? 'pickup' : 'delivery';
+    const loc = (r.querySelector('.oe-x-loc') || {}).value || '';
+    const firma = (r.querySelector('.oe-x-firma') || {}).value || '';
+    const data = (r.querySelector('.oe-x-data') || {}).value || '';
+    if (loc.trim() || firma.trim() || data) {
+      out.push({ kind, loc: loc.trim() || null, firma: firma.trim() || null, data: data || null });
+    }
+  });
+  return out;
+}
+// A menetlevél-szerkesztő megnyitásakor a már mentett stopok betöltése az
+// „Extra pontok" blokkba (a top-szintű mezőkbe az első pár került, a több
+// pickup/delivery innen jön). Az `openOrderEdit` hívja, ha a fuvarnak több
+// stopja van.
+function populateExtraStopsFromOrder(order, listId) {
+  const list = document.getElementById(listId);
+  if (!list) return;
+  list.innerHTML = '';
+  const stops = Array.isArray(order && order.stops) ? order.stops : [];
+  if (!stops.length) return;
+  const pickups = stops.filter(function (s) { return s.kind === 'pickup'; }).sort(function (a, b) { return a.stop_index - b.stop_index; });
+  const deliveries = stops.filter(function (s) { return s.kind === 'delivery'; }).sort(function (a, b) { return a.stop_index - b.stop_index; });
+  // Az első pickup / delivery a top-szintű mezőkbe került, a többi ide.
+  pickups.slice(1).forEach(function (s) { addExtraStopRow('pickup', listId, s); });
+  deliveries.slice(1).forEach(function (s) { addExtraStopRow('delivery', listId, s); });
 }
