@@ -14,6 +14,28 @@
 
 ---
 
+## 2026-08-05 — Statisztika 2.0 (PR #5): 📈 Operáció fül (SLA + Funnel + Vásárlások)
+
+### Miért
+A Statisztika operatív mutatói (SLA/életciklus, fuvar-státusz funnel, vásárlások) korábban 3 külön fülön éltek. A v2 vázon EGY „Operáció" fül alá 3 sub-tabra konszolidálva.
+
+### Változások
+1. **`public/stats-v2/pages/ops.js`** (ÚJ, ~230 sor) — `VS_STATS_V2.registerTab('ops', {...})`. 3 belső sub-tab:
+   - **⏱️ SLA** — 4 KPI (kézbesítési arány, lemondási arány, kiszámlázási arány, átlag tranzit nap) + havi lezárt/törölt oszlopdiagram.
+   - **🔻 Funnel** — vizuális fuvar-státusz funnel (kiírt → felrakóhoz → felrakva → lerakóhoz → leürít), gradiens-sáv az első lépéshez viszonyított %-kal + konverziós % lépések között; alatta táblázat az átlagos lépés-időkkel (perc/óra/nap auto-formázás) + teljes átfutás órákban.
+   - **🛒 Vásárlások** — 2 KPI (össz + darabszám) + havi vásárlások oszlopdiagram + Top 10 termék + Top 10 sofőr tábla.
+2. **`public/stats-v2/shell.css`** — új `.sv2-fnl*` blokk (funnel: 200/1fr/100 rács, indigó→lila gradiens-sáv, mobil-adaptív).
+3. **Adatforrás**: a MEGLÉVŐ `getSlaStats` + `getOrderFunnel` + `getPurchaseStats` handlerek — nincs új szerver-oldal.
+4. **`public/admin.html`** + **`public/manager.html`** — `ops.js` include, cache-bust `?v=20260805e`.
+5. **`public/i18n.js`** — 27 új `sv2.ops.*` kulcs (RO-alap + HU).
+
+### Tesztek
+- **884 Jest zöld** (nincs regresszió) — a PR tisztán frontend.
+
+Cache-bust: `stats-v2/pages/ops.js` + `shell.css` `?v=20260805e`.
+
+---
+
 ## 2026-08-05 — Statisztika 2.0 (PR #4): 💰 Pénzügy fül (3 belső tab)
 
 ### Miért
