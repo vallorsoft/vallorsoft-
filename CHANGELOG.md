@@ -14,6 +14,27 @@
 
 ---
 
+## 2026-08-05 — Statisztika 2.0 (PR #2): 🏠 Áttekintés fül újraépítve (Executive dashboard)
+
+### Miért
+A PR #1-ben felállított v2 váz alá az első valódi tartalom: egy „10 mp alatt látszik minden" főoldal a régi 4 csempés Áttekintés helyett — KPI-tornyok spark-line-nal + trend Δ-vel, insight-sáv (top 3 fejlemény, kattintva a megfelelő fülre ugrik), havi bevétel/költség/eredmény idősor, top 5 ügyfél + top 5 útvonal, kattintható teendő-lista. Külön szerver-oldal NEM kell — a MEGLÉVŐ `getStatsOverview` + `getClientStats` + `getServiceForecast` + `getCarrierApAging` handlerekre épít (a PR #3 egyetlen `getInsights`-be fogja összegyűjteni).
+
+### Változások
+1. **`public/stats-v2/pages/overview.js`** (ÚJ, ~260 sor) — `VS_STATS_V2.registerTab('overview', {...})`-en át regisztrálva. 4 KPI-torony (bevétel + spark + Δ%, lezárt fuvar, cég-átlag fogyasztás, kintlévőség vagy anomáliák — jog-alapú), insight-sáv (getStatsOverview.alerts + service forecast sürgős + AP-öregítés 60+ nap → top 3 fejlemény kattintható link a megfelelő tabhoz), grafikon (havi bevétel + költség + eredmény ha van `eur_ron_rate`), top 5 ügyfél + top 5 útvonal, teendő-lista (severity szín: danger/warn/info).
+2. **`public/stats-v2/shell.css`** — új PR #2 blokk: `.sv2-kpi-grid`/`.sv2-kpi` (bal-oldali akcens-csík, hover-emelés, spark), `.sv2-insight`/`.sv2-insight-ok`, `.sv2-grid-2col` (900px alatt 1 oszlop), `.sv2-todos`/`.sv2-todo-{danger,warn,info}`, `.sv2-rank`, `.sv2-chart-wrap`. Világos + sötét téma.
+3. **`public/admin.html`** + **`public/manager.html`** — új `pages/overview.js?v=20260805b` include; cache-bust `shell.css?v=20260805b`.
+4. **`public/i18n.js`** — 30 új `sv2.ov.*` kulcs (RO-alap + HU).
+
+### Biztonság / adatszivárgás
+Nincs új szerver-út — a meglévő handlerek `_isAdminOrManager` kapui + `_canSeeFinance` pénzügy-védelme érvényben van; a Sofer a `stats-v2` fület egyáltalán nem éri el (menü-elrejtés + `statsV2Init` kapu).
+
+### Tesztek
+- **875 Jest zöld** (a PR #1 tesztjei benn, PR #2 tisztán frontend — külön unit-teszt nincs; a lap élő adatokon rendereleődik). Nincs regresszió; require-sweep 130 modul 0 hiba.
+
+Cache-bust: `stats-v2/pages/overview.js` + `shell.css` `?v=20260805b`.
+
+---
+
 ## 2026-08-05 — Statisztika 2.0 (PR #1): közös váz + globális szűrő + mentett nézetek + KPI cél-értékek
 
 ### Miért
