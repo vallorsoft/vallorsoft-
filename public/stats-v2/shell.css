@@ -386,6 +386,71 @@
   box-shadow: 0 1px 3px rgba(15,23,42,0.10);
 }
 
+/* ── Jármű-kártyák (PR #6 — Flotta) ────────────────────── */
+[data-pane="stats-v2"] .sv2-veh-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--sv2-gap);
+  margin-bottom: var(--sv2-gap);
+}
+[data-pane="stats-v2"] .sv2-veh-card {
+  padding: 14px 16px;
+  border-radius: var(--sv2-radius);
+  background: var(--bg-panel-raised, #141c25);
+  border: 1px solid var(--glass-border-dark, rgba(255,255,255,0.08));
+  border-left: 4px solid var(--sv2-ok);
+  transition: transform .15s, box-shadow .15s;
+}
+[data-pane="stats-v2"] .sv2-veh-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+}
+.main-content[data-theme="light"] [data-pane="stats-v2"] .sv2-veh-card {
+  background: #fff;
+  border-color: rgba(15,23,42,0.06);
+  box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+}
+[data-pane="stats-v2"] .sv2-veh-card.sv2-veh-warn { border-left-color: var(--sv2-warn); }
+[data-pane="stats-v2"] .sv2-veh-card.sv2-veh-danger { border-left-color: var(--sv2-danger); }
+[data-pane="stats-v2"] .sv2-veh-card.sv2-veh-inactive { border-left-color: var(--text-muted); opacity: 0.7; }
+
+[data-pane="stats-v2"] .sv2-veh-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 4px;
+}
+[data-pane="stats-v2"] .sv2-veh-plate {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 15px; font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+}
+[data-pane="stats-v2"] .sv2-veh-badge {
+  font-size: 10px; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 8px; font-weight: 700;
+}
+[data-pane="stats-v2"] .sv2-veh-badge-ok {
+  background: rgba(34,197,94,0.15); color: var(--sv2-ok);
+}
+[data-pane="stats-v2"] .sv2-veh-badge-off {
+  background: rgba(148,163,184,0.15); color: var(--text-muted);
+}
+[data-pane="stats-v2"] .sv2-veh-model {
+  font-size: 11px; color: var(--text-muted); margin-bottom: 10px;
+}
+[data-pane="stats-v2"] .sv2-veh-kpis {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+[data-pane="stats-v2"] .sv2-veh-kpis .k {
+  font-size: 15px; font-weight: 700; color: var(--text-primary);
+  line-height: 1.1;
+}
+[data-pane="stats-v2"] .sv2-veh-kpis .l {
+  font-size: 10px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.3px;
+  margin-top: 2px;
+}
+[data-pane="stats-v2"] .sv2-veh-kpis .hint { text-transform: none; opacity: 0.7; }
+
 /* ── Funnel (PR #5 — Operáció) ─────────────────────────── */
 [data-pane="stats-v2"] .sv2-fnl {
   display: flex; flex-direction: column; gap: 8px; padding: 4px 0;
