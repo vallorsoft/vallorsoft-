@@ -182,13 +182,33 @@
     }).join('');
     if (!vehR) vehR = '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:20px;">' + $t('sv2.ov.noData') + '</td></tr>';
 
+    // Export (PR #9)
+    var exportBtn = window.VS_STATS_V2_EXPORT ? VS_STATS_V2_EXPORT.button({
+      data: (f.jarmuvek || []).map(function (v) {
+        var c = parseFloat(v.km) > 0 ? (parseFloat(v.motorina) / parseFloat(v.km)) * 100 : 0;
+        return {
+          rendszam: v.rendszam, menetlevelek: v.menetlevelek, km: v.km,
+          liter: v.motorina, consum_100: Math.round(c * 10) / 10,
+          nevleges: v.nevleges,
+        };
+      }),
+      columns: [
+        { key: 'rendszam', label: 'Nr.' }, { key: 'menetlevelek', label: 'FML' },
+        { key: 'km', label: 'Km' }, { key: 'liter', label: 'Litri' },
+        { key: 'consum_100', label: 'L/100km' }, { key: 'nevleges', label: 'Nominal' },
+      ],
+      filename: 'consum-flota-' + new Date().toISOString().slice(0, 10) + '.csv',
+    }) : '';
+
     return kpiHtml
       + '<div class="sv2-panel">'
       +   '<div class="sv2-panel-head"><div class="sv2-panel-title">📈 ' + $t('sv2.fl.pFuelMon') + '</div></div>'
       +   '<div class="sv2-chart-wrap"><canvas id="sv2FlFuel"></canvas></div>'
       + '</div>'
       + '<div class="sv2-panel">'
-      +   '<div class="sv2-panel-head"><div class="sv2-panel-title">🚚 ' + $t('sv2.fl.pFuelVeh') + '</div></div>'
+      +   '<div class="sv2-panel-head"><div class="sv2-panel-title">🚚 ' + $t('sv2.fl.pFuelVeh') + '</div>'
+      +     '<div style="display:flex;gap:8px;">' + exportBtn + '</div>'
+      +   '</div>'
       +   '<div style="overflow-x:auto;"><table class="table">'
       +     '<thead><tr><th>' + $t('st.cPlate') + '</th>'
       +       '<th style="text-align:right;">' + $t('sv2.fl.wb') + '</th>'

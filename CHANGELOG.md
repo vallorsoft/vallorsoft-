@@ -14,6 +14,27 @@
 
 ---
 
+## 2026-08-05 — Statisztika 2.0 (PR #9): 📥 Egységes export-központ + nyomtatás-optimalizált nézet
+
+### Miért
+Eddig minden oldalnak volt ad-hoc CSV-exportja, kezelése inkonzisztens. Új közös `VS_STATS_V2_EXPORT` modul: egy `.button({...})` hívás — a hozzá tartozó menü automatikusan CSV / JSON / nyomtatás gombokat kínál.
+
+### Változások
+1. **`public/stats-v2/exporter.js`** (ÚJ, ~110 sor) — publikus API `VS_STATS_V2_EXPORT.{csv, json, copy, print, button, _menu, _doCsv, _doJson, _doPrint}`. A CSV BOM-mel (Excel-barát), a JSON pretty-printelve. A `button({data, columns, filename})` egy `<button>` HTML-t ad — click → floating menü, ami a 3 opciót kínálja.
+2. **`public/stats-v2/shell.css`** — új `.sv2-exp-btn` + `.sv2-exp-menu` blokk (téma-érzékeny hover); print-mode media query, ami a szűrő-sávot és a tab-sort elrejti nyomtatáskor.
+3. **Bekötés** (mintaként a főbb táblákhoz — a többi oldalt inkrementálisan lehet bővíteni ugyanezzel a pattern-nel):
+   - `pages/finance.js` — a Kintlévőség sub-tab „Nyitott fuvarok (fizetetlen)" tábla export-gombot kap
+   - `pages/people.js` — a Sofőr teljesítmény tábla export-gombot kap
+   - `pages/fleet.js` — a Járművenkénti fogyasztás tábla export-gombot kap
+4. **`public/admin.html`** + **`public/manager.html`** — `exporter.js` include ELÖL, cache-bust `?v=20260805i`.
+
+### Tesztek
+- **884 Jest zöld** — tisztán frontend.
+
+Cache-bust: `stats-v2/exporter.js` + `shell.css` + érintett `pages/*.js` `?v=20260805i`.
+
+---
+
 ## 2026-08-05 — Statisztika 2.0 (PR #8): 🎯 Cél-értékek UI + KPI-torony cél-jelzés
 
 ### Miért

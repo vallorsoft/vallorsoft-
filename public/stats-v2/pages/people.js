@@ -141,9 +141,29 @@
               cons ? $t('sv2.pp.kAvgConsumSub', { n: cmpThreshold }) : '', '#f59e0b')
       + '</div>';
 
+    // Export (PR #9)
+    var exportBtn = window.VS_STATS_V2_EXPORT ? VS_STATS_V2_EXPORT.button({
+      data: soforok.map(function (s) {
+        return {
+          nev: s.nume || s.email,
+          fuvar: s.fuvarok, lezart: s.lezart,
+          km: s.total_km, bevetel: s.bevetel,
+          consum_100: s.consum_100,
+        };
+      }),
+      columns: [
+        { key: 'nev', label: 'Șofer' }, { key: 'fuvar', label: 'Curse' },
+        { key: 'lezart', label: 'Finalizate' }, { key: 'km', label: 'Km' },
+        { key: 'bevetel', label: 'Venit (EUR)' }, { key: 'consum_100', label: 'L/100km' },
+      ],
+      filename: 'soferi-' + new Date().toISOString().slice(0, 10) + '.csv',
+    }) : '';
+
     return kpiHtml + searchBox($t('sv2.pp.searchDrivers'))
       + '<div class="sv2-panel">'
-      +   '<div class="sv2-panel-head"><div class="sv2-panel-title">👤 ' + $t('sv2.pp.pDrivers') + '</div></div>'
+      +   '<div class="sv2-panel-head"><div class="sv2-panel-title">👤 ' + $t('sv2.pp.pDrivers') + '</div>'
+      +     '<div style="display:flex;gap:8px;">' + exportBtn + '</div>'
+      +   '</div>'
       +   '<div style="overflow-x:auto;"><table class="table">'
       +     '<thead><tr>'
       +       '<th>' + $t('sv2.pp.cDriver') + '</th>'
