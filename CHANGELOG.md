@@ -14,6 +14,29 @@
 
 ---
 
+## 2026-08-05 — Statisztika 2.0 (PR #6): 🚚 Flotta fül (jármű-kártyák + üzemanyag + állásidő + CO₂)
+
+### Miért
+A régi Statisztikában a flotta 3-4 fülre volt szétszórva (Jármű kihasználtság, Fogyasztás, CO₂, Járművek fülön az állásidő + szerviz-előrejelzés). Egy Flotta fül alá 4 sub-tabra konszolidálva, kliens-oldali keresővel.
+
+### Változások
+1. **`public/stats-v2/pages/fleet.js`** (ÚJ, ~330 sor) — `VS_STATS_V2.registerTab('fleet', {...})`. 4 belső sub-tab:
+   - **🚚 Áttekintés** — 3 KPI (össz jármű, bevétel, km) + kliens-oldali kereső (rendszám/márka) + jármű-kártya rács (kártyánként rendszám monospace + aktív/inaktív badge + márka/model/év + 4 mini-KPI: fuvar, km, L/100km ± névleges, EUR); bal-oldali státusz-csík: zöld=OK, sárga=fogyasztás >15% eltérés, piros=>30%, szürke=inaktív.
+   - **⛽ Fogyasztás** — 2 KPI (össz L + költség + RON/L) + havi tankolás oszlop (Motorină + AdBlue stacked) + jármű-fogyasztás tábla (menetlevelek, km, L, L/100km, névleges, eltérés % badge).
+   - **💤 Állásidő + szerviz** — 3 KPI (átlag üres nap, sürgős szerviz, közelgő) + üres napok tábla (rendszám, szüne(te)k, átlag/össz/max nap) + szerviz-előrejelzés tábla (aktuális km, esedékesség km/dátum, hátralévő hét severity badge).
+   - **🌱 CO₂** — 4 KPI (össz t CO₂, tankolt L, kg/100km, fa-egyenérték) + havi CO₂ oszlop + Top 10 jármű CO₂ tábla.
+2. **`public/stats-v2/shell.css`** — új `.sv2-veh-*` blokk (jármű-kártya rács, státusz-csík változatok, aktív/inaktív badge, 2-oszlopos mini-KPI grid, hover-emelés).
+3. **Adatforrás**: MEGLÉVŐ `getVehicleStats` + `getFuelStats` + `getVehicleIdleStats` + `getServiceForecast` + `getCo2Report` — nincs új szerver-oldal.
+4. **`public/admin.html`** + **`public/manager.html`** — `fleet.js` include, cache-bust `?v=20260805f`.
+5. **`public/i18n.js`** — 41 új `sv2.fl.*` kulcs (RO-alap + HU).
+
+### Tesztek
+- **884 Jest zöld** (nincs regresszió) — tisztán frontend.
+
+Cache-bust: `stats-v2/pages/fleet.js` + `shell.css` `?v=20260805f`.
+
+---
+
 ## 2026-08-05 — Statisztika 2.0 (PR #5): 📈 Operáció fül (SLA + Funnel + Vásárlások)
 
 ### Miért
