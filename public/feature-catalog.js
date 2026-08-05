@@ -35,6 +35,11 @@ window.VS_FEATURES = [
   { key: 'stats-clients',    label: 'Statisztika — Ügyfél riport', group: 'Statisztika & Riport' },
   { key: 'stats-co2',        label: 'Statisztika — CO₂ riport',    group: 'Statisztika & Riport' },
   { key: 'stats-sla',        label: 'Statisztika — SLA & életciklus', group: 'Statisztika & Riport' },
+  // ── Statisztika 2.0 (v2) — új váz, mentett nézetekkel, cél-értékekkel.
+  // A régi stats-* fülek külön kapcsolók maradnak; a cég átmenetileg mindkettőt
+  // láthatja (a legacy PR #11-ig marad). A v2 fő tabjai (overview/finance/…)
+  // ugyanezen a `stats-v2` kulcson keresztül aktívak.
+  { key: 'stats-v2',         label: 'Statisztika 2.0 (új) 📊',      group: 'Statisztika & Riport' },
   { key: 'decont',           label: 'Sofőr-elszámolás (decont)',   group: 'Fuvarozás & Logisztika' },
   { key: 'invoices-out',     label: 'Kimenő számlák 📤',           group: 'Pénzügy' },
   { key: 'invoices-in',      label: 'Bejövő számlák (alvállalkozói) 📥', group: 'Pénzügy' },

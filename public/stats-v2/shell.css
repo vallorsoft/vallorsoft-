@@ -1,0 +1,217 @@
+/* ============================================================
+   VallorSoft — Statisztika 2.0 (v2) — VÁZ + SZŰRŐ + MENTETT NÉZETEK
+   Konzolra szűkítve ([data-pane="stats-v2"]).
+   A többi pane / a régi stats.js érintetlen.
+   ============================================================ */
+
+[data-pane="stats-v2"] {
+  --sv2-radius: 16px;
+  --sv2-radius-sm: 10px;
+  --sv2-gap: 14px;
+  --sv2-accent: #6366f1;
+  --sv2-accent-2: #a855f7;
+  --sv2-danger: #ef4444;
+  --sv2-warn: #f59e0b;
+  --sv2-ok: #22c55e;
+}
+
+/* ── Fent ragadó szűrő-sáv ─────────────────────────────────── */
+.sv2-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  margin-bottom: var(--sv2-gap);
+  border-radius: var(--sv2-radius);
+  background: var(--bg-panel-raised, #141c25);
+  border: 1px solid var(--glass-border-dark, rgba(255,255,255,0.08));
+  backdrop-filter: saturate(1.1) blur(6px);
+}
+
+.main-content[data-theme="light"] [data-pane="stats-v2"] .sv2-topbar {
+  background: #fff;
+  border-color: rgba(15,23,42,0.08);
+  box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+}
+
+.sv2-topbar .sv2-lbl {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted, #8a97a8);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.sv2-topbar .select, .sv2-topbar .input {
+  padding: 8px 10px;
+  font-size: 13px;
+  max-width: 180px;
+}
+
+.sv2-topbar .sv2-spacer { flex: 1; }
+
+.sv2-topbar .btn {
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sv2-topbar .btn.sv2-primary {
+  background: linear-gradient(135deg, var(--sv2-accent), var(--sv2-accent-2));
+  color: #fff;
+  border: none;
+}
+
+/* ── Tab-sor ───────────────────────────────────────────────── */
+.sv2-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: var(--sv2-gap);
+  border-bottom: 1px solid var(--glass-border-dark, rgba(255,255,255,0.08));
+  padding: 0 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.main-content[data-theme="light"] [data-pane="stats-v2"] .sv2-tabs {
+  border-color: rgba(15,23,42,0.08);
+}
+
+.sv2-tab {
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #8a97a8);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+}
+.sv2-tab:hover { color: var(--text-primary, #e9eef5); }
+.sv2-tab.active {
+  color: var(--sv2-accent);
+  border-bottom-color: var(--sv2-accent);
+}
+.sv2-tab .sv2-tab-emoji { margin-right: 6px; }
+
+/* ── Mentett nézetek dropdown ─────────────────────────────── */
+.sv2-views {
+  position: relative;
+}
+.sv2-views-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 280px;
+  background: var(--bg-panel-raised, #141c25);
+  border: 1px solid var(--glass-border-dark, rgba(255,255,255,0.1));
+  border-radius: var(--sv2-radius-sm);
+  padding: 6px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  display: none;
+  z-index: 20;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.main-content[data-theme="light"] [data-pane="stats-v2"] .sv2-views-menu {
+  background: #fff;
+  border-color: rgba(15,23,42,0.1);
+  box-shadow: 0 10px 30px rgba(15,23,42,0.12);
+}
+.sv2-views.open .sv2-views-menu { display: block; }
+
+.sv2-view-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.sv2-view-row:hover { background: rgba(99,102,241,0.10); }
+.sv2-view-row .sv2-view-name { flex: 1; font-weight: 600; }
+.sv2-view-row .sv2-view-meta { font-size: 11px; color: var(--text-muted); }
+.sv2-view-row .sv2-view-shared::before { content: '🔗'; margin-right: 4px; opacity: 0.6; }
+.sv2-view-row .sv2-view-del {
+  border: none; background: transparent; color: var(--sv2-danger);
+  cursor: pointer; padding: 4px 6px; font-size: 14px; border-radius: 6px;
+}
+.sv2-view-row .sv2-view-del:hover { background: rgba(239,68,68,0.15); }
+
+.sv2-views-empty {
+  padding: 14px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.sv2-views-newrow {
+  padding: 10px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+}
+.main-content[data-theme="light"] [data-pane="stats-v2"] .sv2-views-newrow {
+  border-color: rgba(15,23,42,0.06);
+}
+.sv2-views-newrow .input { flex: 1; min-width: 140px; padding: 7px 9px; font-size: 12px; }
+
+/* ── Panel-vászon (közös kártya) ───────────────────────────── */
+.sv2-panel {
+  padding: 18px;
+  margin-bottom: var(--sv2-gap);
+  border-radius: var(--sv2-radius);
+  background: var(--bg-panel-raised, #141c25);
+  border: 1px solid var(--glass-border-dark, rgba(255,255,255,0.08));
+}
+.main-content[data-theme="light"] [data-pane="stats-v2"] .sv2-panel {
+  background: #fff;
+  border-color: rgba(15,23,42,0.06);
+  box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+}
+
+.sv2-panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+}
+.sv2-panel-title {
+  font-size: 15px; font-weight: 700;
+  color: var(--text-primary);
+}
+.sv2-panel-sub { font-size: 12px; color: var(--text-muted); }
+
+/* ── Segéd üzenet-doboz + üres állapot ─────────────────────── */
+.sv2-empty {
+  padding: 30px;
+  text-align: center;
+  color: var(--text-muted);
+  border: 1px dashed rgba(255,255,255,0.08);
+  border-radius: var(--sv2-radius);
+  font-size: 13px;
+}
+.main-content[data-theme="light"] [data-pane="stats-v2"] .sv2-empty {
+  border-color: rgba(15,23,42,0.12);
+}
+
+.sv2-hint {
+  padding: 10px 14px;
+  background: rgba(99,102,241,0.10);
+  border: 1px solid rgba(99,102,241,0.25);
+  border-radius: var(--sv2-radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  margin-bottom: var(--sv2-gap);
+}
+
+/* ── Mobil finomítás ──────────────────────────────────────── */
+@media (max-width: 640px) {
+  .sv2-topbar { padding: 10px 12px; }
+  .sv2-topbar .sv2-lbl { display: none; }
+  .sv2-topbar .select, .sv2-topbar .input { max-width: 100%; }
+  .sv2-tab { padding: 8px 10px; font-size: 13px; }
+}

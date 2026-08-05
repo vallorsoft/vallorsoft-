@@ -14,6 +14,25 @@
 
 ---
 
+## 2026-08-05 — Statisztika 2.0 (PR #1): közös váz + globális szűrő + mentett nézetek + KPI cél-értékek
+
+### Miért
+A jelenlegi 7-9 füles / 23-handleres Statisztika oldal átláthatatlan: minden fülnek külön szűrője van, nincs mentett nézet, nincs cél-érték, nincs egységes összehasonlítás („vs. előző időszak"). A teljes újraépítés első lépése egy közös v2 váz — a régi fülek érintetlenek, párhuzamosan futnak, amíg az új fő tabok (Áttekintés/Pénzügy/Flotta/Emberek/Operáció) fel nem épülnek a következő PR-ekben.
+
+### Változások
+1. **`db/stats-v2-init.sql`** (ÚJ, idempotens) — 3 tábla: `stats_views` (mentett nézet: config JSONB, is_shared), `stats_goals` (KPI cél-értékek per metric_key + period, `UNIQUE (company_id, metric_key, period)`), `stats_report_schedules` (időzített PDF-riport a PR #10-hez, most még üres).
+2. **`handlers/statsV2.js`** (ÚJ, `routes/execute.js`-be regisztrálva) — 7 handler: `statsV2Init` (kezdeti csomag: szerep, pénzügy-jog, tab-lista, cél-értékek), `statsView{List,Save,Delete}`, `statsGoal{List,Set,Delete}`. Multi-tenant: minden lekérdezés `company_id`-szűrt, paraméteres SQL, audit. Saját nézet szerkeszthető; megosztottat csak a létrehozó vagy Admin írhat. Cél-értéket csak Admin állíthat. Config-korlát 32 KB, `metric_key`/`period` fehérlista.
+3. **`public/stats-v2/shell.js`** (ÚJ, ~280 sor) — a v2 KÖZÖS váz: fent ragadó szűrő-sáv (időszak-preset ma/hét/hó/előző/negyedév/12h/év/egyedi + összehasonlítás vs. előző időszak / vs. előző év), fő tab-sor (Áttekintés/Pénzügy/Flotta/Emberek/Operáció), mentett nézetek dropdown (betöltés/mentés/törlés). Publikus API `VS_STATS_V2.registerTab(key, {label, render, onFilter?})` — a következő PR-ek ezen keresztül regisztrálják a tab-tartalmakat. Az egyes tab-tartalmak placeholderrel jelzik, hogy a következő körben érkeznek.
+4. **`public/stats-v2/shell.css`** (ÚJ) — v2-specifikus stílusok (`[data-pane="stats-v2"]`-re szűkített), világos + sötét téma, mobil-adaptív, sticky topbar, saved-views dropdown.
+5. **`public/admin.html`** + **`public/manager.html`** — új sidebar-tétel „📊 Statisztika 2.0" (`data-tab="stats-v2"`) a régi Statisztika főmenü tetejére; új `stats-v2` pane + CSS/JS include. **`admin.js`** + **`manager.js`** `loadTab` — stats-v2 → `VS_STATS_V2.load()`.
+6. **`public/feature-catalog.js`** — új `stats-v2` kulcs (a régi `stats-*` kulcsok érintetlenek → a cég átmenetileg mindkettőt láthatja).
+7. **`public/i18n.js`** — 32 új `sv2.*` + `nav.statsV2` kulcs (RO-alap + HU).
+8. **Teszt** — `tests/unit/statsV2.test.js` (ÚJ, 23 eset): szerep-kapuk (Sofer tiltva, Manager pénzügy-jog nélkül), tenant-izoláció (más cég sora nem elérhető), tulajdon-védelem (más user nézetét Manager nem írhatja, Admin igen), cross-tenant védelem, cél-értékek fehérlistája + upsert. **898 Jest zöld** (875 → 898); require-sweep 130 modul 0 hiba.
+
+Cache-bust: `stats-v2/shell.js`+`shell.css` `?v=20260805a`.
+
+---
+
 ## 2026-08-04 — Fuvar több felrakó/lerakó pont (multi-drop) + menetlevél-láthatóság bug-fix
 
 ### Miért

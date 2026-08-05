@@ -60,6 +60,7 @@ function loadTab(name){
   if(name==='elofizetesek') loadElofizetesek();
   if(name==='internal-drivers') loadInternalDrivers();
   if(name==='clients' && window.ClientsPage){ ClientsPage.mount('clientsBox'); if(typeof loadClientPortalAccess==='function') loadClientPortalAccess(); }
+  if(name==='stats-v2' && window.VS_STATS_V2){ VS_STATS_V2.load(); return; }
   if(name && name.indexOf('stats-')===0 && window.VS_STATS) VS_STATS.load(name);
   if(['expiries','service-log','decont','fuel-import'].indexOf(name)!==-1 && window.FleetExtra) FleetExtra.load(name);
   if(name==='orders-planner' && window.Planner) Planner.load();
