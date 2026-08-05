@@ -14,6 +14,28 @@
 
 ---
 
+## 2026-08-05 — Statisztika 2.0 (PR #7): 👥 Emberek fül (Sofőrök · Ügyfelek · Alvállalkozók)
+
+### Miért
+A régi Statisztikában a Sofőr teljesítmény + Ügyfél riport 2 külön fülön élt, a fogyasztás-összehasonlítás egy 3.-on — a kliens-oldali kereső egyik táblán sem működött. Új Emberek fül alá 3 sub-tabra konszolidálva, mindegyik táblához azonos gépelős kereső.
+
+### Változások
+1. **`public/stats-v2/pages/people.js`** (ÚJ, ~230 sor) — `VS_STATS_V2.registerTab('people', {...})`. 3 belső sub-tab:
+   - **👤 Sofőrök** — 3 KPI (aktív sofőrök, össz bevétel, cég-átlag fogyasztás küszöbbel) + kereső mező (név/e-mail) + teljesítmény-tábla avatar-monogrammal (determinisztikus szín, névből hash-elt): fuvar/lezárt/km/bevétel/L100km/**Δ vs. cég-átlag** (küszöb ±2.5 L/100km fölött ⚠️ warn háttérrel) / eredmény (EUR profit, ha van eur_ron_rate).
+   - **🏢 Ügyfelek** — KPI-k + kereső (név/CUI) + avatar-os tábla: fuvar/lezárt/km/bevétel + (pénzügy-joggal) kintlévőség + átlag fizetési nap.
+   - **🚚 Alvállalkozók** — placeholder-panel, ami átirányít a Pénzügy fül AP tabra (ott van a lényeg).
+2. **`public/stats-v2/shell.css`** — új `.sv2-avatar` blokk (28×28 kör, monogram, kliens-oldali determinisztikus szín).
+3. **Adatforrás**: MEGLÉVŐ `getDriverStats` + `getClientStats` + `getSoferConsumptionOverview` (a cég-átlag + Δ számításhoz) — nincs új szerver-oldal. A `finance` mező védi a pénzügyi oszlopokat (Manager engedély nélkül nem látja).
+4. **`public/admin.html`** + **`public/manager.html`** — `people.js` include, cache-bust `?v=20260805g`.
+5. **`public/i18n.js`** — 23 új `sv2.pp.*` kulcs (RO-alap + HU).
+
+### Tesztek
+- **884 Jest zöld** — tisztán frontend.
+
+Cache-bust: `stats-v2/pages/people.js` + `shell.css` `?v=20260805g`.
+
+---
+
 ## 2026-08-05 — Statisztika 2.0 (PR #6): 🚚 Flotta fül (jármű-kártyák + üzemanyag + állásidő + CO₂)
 
 ### Miért

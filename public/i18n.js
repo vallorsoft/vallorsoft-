@@ -1601,6 +1601,32 @@
     'sv2.fl.pCo2Veh': { hu: 'Járművenként', ro: 'Pe vehicul' },
     'sv2.fl.co2Unavail': { hu: 'CO₂-riport nem elérhető (nincs üzemanyagkártya-adat).', ro: 'Raportul CO₂ nu este disponibil (fără date card combustibil).' },
 
+    // Emberek (PR #7)
+    'sv2.pp.tDrivers': { hu: 'Sofőrök', ro: 'Șoferi' },
+    'sv2.pp.tClients': { hu: 'Ügyfelek', ro: 'Clienți' },
+    'sv2.pp.tCarriers': { hu: 'Alvállalkozók', ro: 'Subcontractori' },
+    'sv2.pp.searchDrivers': { hu: '🔍 Sofőr keresése (név / e-mail)…', ro: '🔍 Caută șofer (nume / e-mail)…' },
+    'sv2.pp.searchClients': { hu: '🔍 Ügyfél keresése (név / CUI)…', ro: '🔍 Caută client (nume / CUI)…' },
+    'sv2.pp.kActive': { hu: 'Aktív sofőrök', ro: 'Șoferi activi' },
+    'sv2.pp.kRev': { hu: 'Bevétel', ro: 'Venit' },
+    'sv2.pp.kAvgConsum': { hu: 'Cég-átlag fogyasztás', ro: 'Consum mediu companie' },
+    'sv2.pp.kAvgConsumSub': { hu: 'küszöb ±{n} L/100km', ro: 'prag ±{n} L/100km' },
+    'sv2.pp.pDrivers': { hu: 'Sofőr teljesítmény', ro: 'Performanță șoferi' },
+    'sv2.pp.pClients': { hu: 'Ügyfél lista', ro: 'Listă clienți' },
+    'sv2.pp.cDriver': { hu: 'Sofőr', ro: 'Șofer' },
+    'sv2.pp.cClient': { hu: 'Ügyfél', ro: 'Client' },
+    'sv2.pp.cOrders': { hu: 'Fuvar', ro: 'Curse' },
+    'sv2.pp.cRev': { hu: 'Bevétel (EUR)', ro: 'Venit (EUR)' },
+    'sv2.pp.cProfit': { hu: 'Eredmény (EUR)', ro: 'Profit (EUR)' },
+    'sv2.pp.cOutstanding': { hu: 'Kintlévőség', ro: 'Restanțe' },
+    'sv2.pp.cAvgPay': { hu: 'Átlag fiz. nap', ro: 'Zile medii plată' },
+    'sv2.pp.vsAvg': { hu: 'vs. átlag', ro: 'vs. medie' },
+    'sv2.pp.kClients': { hu: 'Ügyfelek', ro: 'Clienți' },
+    'sv2.pp.kOutstanding': { hu: 'Összes kintlévőség', ro: 'Total restanțe' },
+    'sv2.pp.carrierTitle': { hu: 'Alvállalkozó-statisztika', ro: 'Statistici subcontractori' },
+    'sv2.pp.carrierHint': { hu: 'Az alvállalkozói AP-öregítés és a bejövő számlák a Pénzügy fülön elérhetők.', ro: 'AP-ul subcontractorilor și facturile primite sunt în fila Financiar.' },
+    'sv2.pp.gotoAp': { hu: 'Pénzügy → AP', ro: 'Financiar → AP' },
+
     // ── Statisztika (stats.js) ──
     // Szűrősáv + közös
     'st.refresh': { hu: '🔄 Frissítés', ro: '🔄 Reîmprospătare' },
