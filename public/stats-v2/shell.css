@@ -350,6 +350,42 @@
 [data-pane="stats-v2"] .sv2-todo-ico { flex: 0 0 auto; font-size: 15px; }
 [data-pane="stats-v2"] .sv2-todo-txt { flex: 1; color: var(--text-primary); }
 
+/* ── Belső (sub-)tab sáv — Pénzügy fül és követői ──────── */
+[data-pane="stats-v2"] .sv2-subtabs {
+  display: flex; gap: 4px;
+  margin-bottom: var(--sv2-gap);
+  padding: 4px;
+  border-radius: var(--sv2-radius-sm);
+  background: rgba(120,120,120,0.08);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+[data-pane="stats-v2"] .sv2-subtab {
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+[data-pane="stats-v2"] .sv2-subtab:hover {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.05);
+}
+[data-pane="stats-v2"] .sv2-subtab.active {
+  background: var(--bg-panel-raised, #1a222d);
+  color: var(--sv2-accent);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+}
+.main-content[data-theme="light"] [data-pane="stats-v2"] .sv2-subtab.active {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.10);
+}
+
 /* ── Top-5 tábla-rangsor ────────────────────────────────── */
 [data-pane="stats-v2"] .sv2-rank {
   width: 32px; text-align: center;

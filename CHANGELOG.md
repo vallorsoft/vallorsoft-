@@ -14,6 +14,28 @@
 
 ---
 
+## 2026-08-05 — Statisztika 2.0 (PR #4): 💰 Pénzügy fül (3 belső tab)
+
+### Miért
+A Pénzügy a régi Statisztikában egyetlen zsúfolt lapon élt (KPI-k + havi bevétel + öregítés + kintlévő fuvarok tábla + AP mind egyszerre). A v2 vázon 3 belső tabra bontva: Bevétel, Kintlévőség, Alvállalkozói AP — mindegyik saját fókusszal.
+
+### Változások
+1. **`public/stats-v2/pages/finance.js`** (ÚJ, ~280 sor) — `VS_STATS_V2.registerTab('finance', {...})`-en át. Belső sub-tab sáv (`.sv2-subtabs`) 3 gombbal:
+   - **📊 Bevétel** — 3 KPI (bevétel + EUR/km, km, átlag fizetési idő) + havi bevétel/beszedett oszlopdiagram + beszedési arány % (line, 0-100 skálán).
+   - **⏳ Kintlévőség** — 4 KPI (össz + 0-30 zöld / 31-60 sárga / 60+ piros) + doughnut chart + top 8 legnagyobb kintlévőség lista (severity szín) + top 30 nyitott fuvar tábla (client, összeg, fizetve, maradék, lezárva, esedékesség + lejárt/napok badge).
+   - **📥 Alvállalkozói AP** — 4 KPI (össz + 0-30/31-60/60+) + doughnut + top 30 alvállalkozói nyitott számla tábla.
+2. **`public/stats-v2/shell.css`** — új `.sv2-subtabs`/`.sv2-subtab.active` blokk (téma-érzékeny: sötét kártya kiemelés vs. világos árnyék).
+3. **Adatforrás**: a MEGLÉVŐ `getFinanceStats` + `getCarrierApAging` handlerek — nincs új szerver-oldal. A pénzügyi jog kliens- és szerver-oldalon is védve: Manager `_canSeeFinance` engedély nélkül `🔒 nincs hozzáférés" üzenetet kap.
+4. **`public/admin.html`** + **`public/manager.html`** — `finance.js` include; cache-bust `shell.css` + `finance.js` `?v=20260805d`.
+5. **`public/i18n.js`** — 27 új `sv2.fin.*` kulcs (RO-alap + HU).
+
+### Tesztek
+- **884 Jest zöld** (nincs regresszió). A PR tisztán frontend — új szerver-teszt nincs; a pénzügy-védelmet a meglévő `getFinanceStats` tesztjei és a PR #1 `statsV2` tesztjei fedik.
+
+Cache-bust: `stats-v2/pages/finance.js` + `shell.css` `?v=20260805d`.
+
+---
+
 ## 2026-08-05 — Statisztika 2.0 (PR #3): `getStatsInsights` aggregátor (anomália-központ)
 
 ### Miért
