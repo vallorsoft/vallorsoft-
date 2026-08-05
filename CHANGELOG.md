@@ -14,6 +14,42 @@
 
 ---
 
+## 2026-08-05 — Statisztika 2.0 (PR #11): Legacy stats-menü elrejtve + záró dokumentálás
+
+### Miért
+A PR #1–#10 során a stats-v2 mint párhuzamos rendszer épült fel a régi `stats.js` mellé, hogy semmit ne törjön. Most, hogy mind az 5 fő tab kész, a régi 8 legacy sub-menü tétel elrejthető — az új rendszer az elsődleges (és egyetlen felkínált) statisztika-belépési pont.
+
+### Változások
+1. **`public/admin.html`** + **`public/manager.html`** — a Statisztika főmenü alól törölve a 8 legacy sub-tab (`stats-overview`, `stats-fuel`, `stats-purchases`, `stats-drivers`, `stats-vehicles`, `stats-clients`, `stats-co2`, `stats-sla`); marad az egyetlen aktív bejegyzés: `📊 Statisztika 2.0` (`stats-v2`).
+2. **NEM eltávolítva** (rollback + biztonság miatt):
+   - `public/stats.js` (~1500 sor) — továbbra is betöltődik, mert a `stats-permissions` handler-lookup (Admin-only jogosultság-kezelő) benne él.
+   - A régi 8 `.pane[data-pane="stats-*"]` div-ek — a HTML-ben maradnak, csak a menü nem hivatkozik rájuk. Fallback deep-link-hez / kliens-oldali navigációhoz működnek.
+   - `handlers/statisticsHandlers.js` a MEGLÉVŐ 23 handlerével — a stats-v2 oldalak MIND erre épülnek (get StatsOverview, getFinanceStats, getCarrierApAging, getVehicleStats, getFuelStats, getVehicleIdleStats, getServiceForecast, getCo2Report, getSlaStats, getOrderFunnel, getPurchaseStats, getDriverStats, getClientStats, getSoferConsumptionOverview).
+3. **CLAUDE.md „Felületek és kinézet" `Statisztika & Riport` szekció újraírva** a stats-v2 új architektúrára — 5 fő tab, közös váz, új handlerek (statsV2/statsInsights/statsReports), új táblák (stats_views/stats_goals/stats_report_schedules), scheduler bekötés.
+
+### Cache-bust
+Nincs új v-verzió — a HTML-módosítás önmagában elég (böngésző-frissítés).
+
+### Tesztek
+- **898 Jest zöld** (nincs regresszió) — a régi menü tételeinek elrejtése kizárólag HTML-szerkesztés.
+
+### Statisztika 2.0 tervezett 11 PR mindegyike KÉSZ:
+| # | Cím | Merge-elt PR |
+|---|---|---|
+| 1 | Alap: közös váz + globális szűrő + mentett nézetek infra | #308-311 sorozat |
+| 2 | 🏠 Áttekintés fül (Executive dashboard) | #311 |
+| 3 | getStatsInsights aggregátor (anomália-központ) | #312 |
+| 4 | 💰 Pénzügy fül (3 sub-tab) | #313 |
+| 5 | 📈 Operáció fül (SLA + Funnel + Vásárlások) | #314 |
+| 6 | 🚚 Flotta fül (jármű-kártyák + üzemanyag + CO₂) | #315 |
+| 7 | 👥 Emberek fül (Sofőrök · Ügyfelek · Alvállalkozók) | #316 |
+| 8 | 🎯 Cél-értékek UI + KPI-torony cél-jelzés | #317 |
+| 9 | 📥 Egységes export-központ + nyomtatás-optimalizált nézet | #318 |
+| 10 | 📧 Időzített e-mail riportok | #319 |
+| 11 | Legacy stats-menü elrejtve + záró dokumentálás | ez a PR |
+
+---
+
 ## 2026-08-05 — Statisztika 2.0 (PR #10): 📧 Időzített e-mail riportok
 
 ### Miért
