@@ -14,6 +14,31 @@
 
 ---
 
+## 2026-08-05 — Statisztika 2.0 (PR #3): `getStatsInsights` aggregátor (anomália-központ)
+
+### Miért
+A PR #2 Áttekintés fül eddig kliens-oldalon fésülte össze 3 külön handler (`getStatsOverview.alerts` + `getServiceForecast` + `getCarrierApAging`) kimenetét — ez korlátozott (nincs benne dokumentum-lejárat, UIT-hiány, lejáró UIT), és a jövőbeni PR-ek (Op / Fleet / People) is ugyanezekhez az anomáliákhoz nyúlnának. Egyetlen szerver-oldali handler: EGY forrás, EGY rendezés (severity + value), 1 fetch a klienstől.
+
+### Változások
+1. **`handlers/statsInsights.js`** (ÚJ, `routes/execute.js`-be regisztrálva) — `getStatsInsights`: 7 anomália-forrás egy handlerbe.
+   - **Fogyasztás-anomália** (fuel_high): jármű 90-napos ténylegese >1.15× névleges (min 300 km). Dev >30% → danger, egyébként warn.
+   - **Lejárt kintlévőség** (ar_overdue): a fizetési határidőn túli, nem fizetett fuvarok.
+   - **Szerviz-előrejelzés** (service_due): a szerviz esedékessége <2 hét → danger, <6 hét → warn (GPS km-óra + havi átlag km alapján).
+   - **AP-öregítés** (ap_60p/ap_31_60): alvállalkozói szállítói számla 60+ nap → danger, 31-60 → warn.
+   - **Dokumentum-lejárat** (doc_expiry): ITP/RCA/tahográf stb. — 7 napon belül lejáró → danger, 30 napon belül → warn, egyébként info.
+   - **Lejáró UIT** (uit_expiring): 2 napon belül lejáró, még nem leállított UIT-kód.
+   - **Hiányzó UIT** (uit_missing): `orders.needs_uit=true`, de nincs aktív kód.
+2. **Válasz-alak**: `{ ok, insights[], count_by_severity{danger,warn,info}, count_by_area{finance,fleet,ops,people}, can_finance }`.
+   Minden insight objektum kliens-barát: `id`, `area`, `severity`, `icon`, `key`, `title`, `detail`, `value`, `tab`, `entity_type`, `entity_id`. A rendezés `severity` (danger > warn > info) + azonos szinten `value` csökkenőleg.
+3. **Adatszivárgás-védelem**: minden lekérdezés `company_id`-szűrt, paraméteres SQL; a pénzügyi mutatók csak `_canSeeFinance` mellett — a Manager pénzügy-jog nélkül csak a nem-pénzügyi anomáliákat kapja. Az opcionális táblák (`order_uit_codes`, `document_expiries`, `gps_month_end_snapshots`) körül try/catch → migráció-tudatos, hiba esetén az adott forrás csendben üresre esik.
+4. **`public/stats-v2/pages/overview.js`** — átáll az új `getStatsInsights`-re; ha nincs elérhető (átmeneti deploy előtt), a régi 3-handleres legacy összefésülés a fallback (`collectInsightsLegacy`).
+5. **Bug-fix a rendezésben**: a `SEV_ORDER['danger']=0` érték a `||` operátorral falsy-ként `9`-re esett volna (a `danger` a rendezés végére került volna); `??` (nullish coalescing) javítva.
+6. **Teszt** (`tests/unit/statsInsights.test.js`, 9 új eset): szerep-védelem (Sofer tiltva, Manager pénzügy-jog nélkül nem lát finance-t), üres források kezelés, rendezés (danger > warn > value), Admin bypass pénzügyi mutatókkal, multi-tenant company_id-vizsgálat. **884 Jest zöld** (875 → 884); require-sweep +1 modul (131 összesen), 0 hiba.
+
+Cache-bust: `stats-v2/pages/overview.js` `?v=20260805c`.
+
+---
+
 ## 2026-08-05 — Statisztika 2.0 (PR #2): 🏠 Áttekintés fül újraépítve (Executive dashboard)
 
 ### Miért

@@ -150,12 +150,37 @@
     }).join('') + '</ul>';
   }
 
-  // ── Insights + Todos gyűjtése getStatsOverview + kiegészítők ──
-  // A PR #3 majd 1 handlerbe fogja tolni; addig itt fésüljük össze.
-  function collectInsights(ovR, svcR, apR) {
+  // ── Insights → megjelenítési formázás ──────────────────
+  // A PR #3 óta a szerver egyetlen `getStatsInsights` handlerben adja
+  // az összes anomáliát (fogyasztás/szerviz/dokumentum-lejárat/UIT/kintlévőség/AP).
+  // A régi legacy fallback megmaradt arra az esetre, ha a szerver még nem
+  // tudja az új handlert (átmeneti deploy előtt).
+  function insightsFromServer(insR) {
+    var list = (insR && insR.insights) || [];
+    // Insight-sáv (top 3, csak danger+warn a legfontosabbak)
+    var insightItems = list.slice(0, 5).map(function (i) {
+      return {
+        icon: i.icon || '⚠️',
+        text: (i.title || '') + (i.detail ? ' — ' + i.detail : ''),
+        tab: i.tab,
+      };
+    });
+    // Teendő-lista (összes, severity szín)
+    var todos = list.map(function (i) {
+      return {
+        icon: i.icon || '•',
+        text: (i.title || '') + (i.detail ? ' — ' + i.detail : ''),
+        severity: i.severity || 'info',
+        tab: i.tab,
+      };
+    });
+    return { insights: insightItems, todos: todos };
+  }
+
+  // ── Legacy fallback: getStatsOverview alerts + serviceForecast + apAging ──
+  function collectInsightsLegacy(ovR, svcR, apR) {
     var insights = [];
     var todos = [];
-    // Fogyasztás-anomália a getStatsOverview alertsból
     (ovR && ovR.alerts || []).forEach(function (a) {
       if (a.type === 'fuel') {
         insights.push({ icon: '⛽', text: $t('sv2.ov.iFuel', { plate: a.rendszam, c: fnum(a.consum, 1), n: fnum(a.nevleges, 1) }), tab: 'fleet' });
@@ -165,21 +190,15 @@
         todos.push({ icon: '💰', text: fnum(a.db, 0) + ' × ' + $t('sv2.ov.tOverdue') + ' (' + fnum(a.osszeg, 0) + ' EUR)', severity: 'danger', tab: 'finance' });
       }
     });
-    // Szerviz-előrejelzés — a sürgős/figyelmeztető rendszámok
     var svcUrgent = ((svcR && svcR.jarmuvek) || []).filter(function (v) { return v.surgos; });
-    var svcWarn   = ((svcR && svcR.jarmuvek) || []).filter(function (v) { return v.figyelmezteto; });
     if (svcUrgent.length) {
       insights.push({ icon: '🔧', text: $t('sv2.ov.iServiceUrgent', { n: svcUrgent.length }), tab: 'fleet' });
       svcUrgent.slice(0, 3).forEach(function (v) {
         todos.push({ icon: '🔧', text: v.rendszam + ' — ' + $t('sv2.ov.tServiceDue') + ' (' + fnum(v.hetek_soonest, 1) + ' hét)', severity: 'danger', tab: 'fleet' });
       });
     }
-    if (svcWarn.length) {
-      todos.push({ icon: '🔧', text: svcWarn.length + ' × ' + $t('sv2.ov.tServiceSoon'), severity: 'warn', tab: 'fleet' });
-    }
-    // Alvállalkozói AP-öregítés — a 60+ napos szám
-    if (apR && apR.rows && apR.rows.length) {
-      var sixty = apR.rows.reduce(function (s, r) { return s + (parseFloat(r.d60p) || 0); }, 0);
+    if (apR && apR.aging) {
+      var sixty = parseFloat(apR.aging.d60p) || 0;
       if (sixty > 0) {
         insights.push({ icon: '📉', text: $t('sv2.ov.iApAging', { sum: fnum(sixty, 0) }), tab: 'finance' });
         todos.push({ icon: '📉', text: $t('sv2.ov.tApAging') + ': ' + fnum(sixty, 0) + ' RON', severity: 'warn', tab: 'finance' });
@@ -199,8 +218,11 @@
     var promises = [
       gas('getStatsOverview', apArgs),
       gas('getClientStats', apArgs),
+      // PR #3 óta EGY handler adja az összes anomáliát; legacy fallback
+      // az alábbi getServiceForecast + getCarrierApAging.
+      gas('getStatsInsights').catch(function () { return null; }),
     ];
-    // Kiegészítő adatok — hiba esetén NULL, nem törik meg az oldalt
+    // Legacy fallback források — ha a getStatsInsights nem elérhető
     promises.push(gas('getServiceForecast').catch(function () { return null; }));
     if (state.can_finance || state.is_admin) {
       promises.push(gas('getCarrierApAging').catch(function () { return null; }));
@@ -211,9 +233,10 @@
     Promise.all(promises).then(function (rs) {
       var ovR = rs[0] || {};
       var clR = rs[1] || {};
-      var svcR = rs[2];
-      var apR = rs[3];
-      _lastData = { ov: ovR, cl: clR, svc: svcR, ap: apR };
+      var insR = rs[2];
+      var svcR = rs[3];
+      var apR = rs[4];
+      _lastData = { ov: ovR, cl: clR, ins: insR, svc: svcR, ap: apR };
       if (!ovR.ok) { box.innerHTML = '<div class="sv2-empty">' + $esc(ovR.err || $t('common.error')) + '</div>'; return; }
       renderInto(box, state);
     });
@@ -269,8 +292,14 @@
       });
     }
 
-    // Insight + teendők egyben
-    var ins = collectInsights(ov, d.svc, d.ap);
+    // Insight + teendők — PR #3 óta EGY handler (getStatsInsights);
+    // ha az szerver nem adta vissza (átmeneti deploy előtt), legacy fallback.
+    var ins;
+    if (d.ins && d.ins.ok) {
+      ins = insightsFromServer(d.ins);
+    } else {
+      ins = collectInsightsLegacy(ov, d.svc, d.ap);
+    }
 
     // Top 5 ügyfél a getClientStats-ból
     var top5clients = ((d.cl && d.cl.ugyfelek) || []).slice(0, 5).map(function (u) {
