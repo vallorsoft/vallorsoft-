@@ -101,6 +101,7 @@
     <div class="menu-group">
       <div class="tab nav-head" id="statsParentTab" onclick="toggleGroup(this)"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span data-i18n="nav.statsHead">Statisztika</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
       <div class="submenu" id="statsSubmenu">
+        <div class="sub-tab" data-tab="stats-v2" data-i18n="nav.statsV2">📊 Statisztika 2.0</div>
         <div class="sub-tab" data-tab="stats-overview" data-i18n="nav.overview">Áttekintés</div>
         <div class="sub-tab" data-tab="stats-fuel" data-i18n="nav.consum">Fogyasztás</div>
         <div class="sub-tab" data-tab="stats-purchases" data-i18n="nav.purchases">Vásárlások</div>
@@ -784,6 +785,7 @@
     <div class="pane hidden" data-pane="orders-planner"><div id="plannerBox"></div></div>
     <div class="pane hidden" data-pane="warehouse"><div id="warehouseBox"></div></div>
 
+    <div class="pane hidden" data-pane="stats-v2"><div id="statsV2Box"></div></div>
     <div class="pane hidden" data-pane="stats-overview"><div id="statsOverviewBox"></div></div>
     <div class="pane hidden" data-pane="stats-finance"><div id="statsFinanceBox"></div></div>
     <div class="pane hidden" data-pane="stats-fuel"><div id="statsFuelBox"></div></div>
@@ -1405,6 +1407,8 @@
 <script src="/order-email.js?v=20260619btn"></script>
 <script src="/email-templates.js?v=20260618tpl2"></script>
 <script src="/stats.js?v=20260722cmp"></script>
+<link rel="stylesheet" href="/stats-v2/shell.css?v=20260805a">
+<script src="/stats-v2/shell.js?v=20260805a"></script>
 <script src="/fleet-extra.js?v=20260618svc"></script>
 <script src="/entity-detail.js?v=20260715ofc"></script>
 <script src="/planner.js?v=20260614qa"></script>
