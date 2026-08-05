@@ -53,6 +53,11 @@
   }
 
   function render(box, state) {
+    // Compare-állapot minden reload-nál nullázódik (Adott range/fül belüli kijelölés)
+    if (window.VS_STATS_V2_CMP) {
+      VS_STATS_V2_CMP.init('drivers');
+      VS_STATS_V2_CMP.init('clients');
+    }
     box.innerHTML = subTabsBar() + '<div class="sv2-empty">' + $t('sv2.ov.loading') + '</div>';
     var apArgs = { from: state.range.from, to: state.range.to };
     Promise.all([
@@ -97,11 +102,37 @@
     var cmpThreshold = cons ? parseFloat(cons.threshold) || 2.5 : 2.5;
 
     var filter = _searchFilter.toLowerCase();
-    var rows = soforok.filter(function (s) {
+    var filteredSofors = soforok.filter(function (s) {
       if (!filter) return true;
       return String(s.nume || '').toLowerCase().indexOf(filter) >= 0
         || String(s.email || '').toLowerCase().indexOf(filter) >= 0;
-    }).map(function (s) {
+    });
+
+    // Compare context — a szűrt sorok mindegyike választható (max 5)
+    if (window.VS_STATS_V2_CMP) {
+      var compareRows = filteredSofors.map(function (s) {
+        var bev = parseFloat(s.bevetel) || 0;
+        var c = consMap[String(s.email || '').toLowerCase()];
+        return {
+          _id: String(s.email || '').toLowerCase(),
+          _label: s.nume || s.email,
+          fuvarok: s.fuvarok, lezart: s.lezart, km: s.total_km,
+          bevetel: bev, consum_100: parseFloat(s.consum_100) || 0,
+          avg_curr: c ? parseFloat(c.avg_curr) || 0 : 0,
+          avg_prev: c ? parseFloat(c.avg_prev) || 0 : 0,
+        };
+      });
+      VS_STATS_V2_CMP.setContext('drivers', compareRows, [
+        { key: 'fuvarok', label: $t('sv2.pp.cOrders'), higherIsBetter: true, dec: 0 },
+        { key: 'lezart', label: $t('st.cClosed'), higherIsBetter: true, dec: 0 },
+        { key: 'km', label: 'Km', higherIsBetter: true, dec: 0 },
+        { key: 'bevetel', label: $t('sv2.pp.cRev'), higherIsBetter: true, dec: 0, unit: 'EUR' },
+        { key: 'consum_100', label: 'L/100km', higherIsBetter: false, dec: 1 },
+        { key: 'avg_curr', label: $t('sof.avgCurr') || 'Avg curr', higherIsBetter: false, dec: 1, unit: 'L/100km' },
+      ]);
+    }
+
+    var rows = filteredSofors.map(function (s) {
       var name = s.nume || s.email;
       var bev = parseFloat(s.bevetel) || 0;
       // Költség RON, bevétel EUR — profit csak árfolyammal
@@ -115,7 +146,12 @@
       var deviation = (avgCurr && cmpAvg) ? Math.round((avgCurr - cmpAvg) * 10) / 10 : null;
       var devClass = deviation != null && Math.abs(deviation) > cmpThreshold ? 'warn' : '';
 
-      return '<tr>'
+      var email = String(s.email || '').toLowerCase();
+      var chk = window.VS_STATS_V2_CMP ? VS_STATS_V2_CMP.chkHtml('drivers', email) : '';
+
+      return '<tr class="sv2-click-row" data-sv2-drv-email="' + $esc(email) + '"'
+        +      ' onclick="VS_STATS_V2_PP._openDriver(\'' + $esc(email).replace(/\'/g, '&#39;') + '\')">'
+        + '<td onclick="event.stopPropagation()" style="text-align:center;">' + chk + '</td>'
         + '<td>' + avatar(name) + '<span style="margin-left:8px;font-weight:600;">' + $esc(name) + '</span></td>'
         + '<td style="text-align:right;">' + fnum(s.fuvarok, 0) + '</td>'
         + '<td style="text-align:right;">' + fnum(s.lezart, 0) + '</td>'
@@ -128,7 +164,7 @@
         + '<td style="text-align:right;">' + (profit != null ? fnum(profit, 0) : '—') + '</td>'
         + '</tr>';
     }).join('');
-    if (!rows) rows = '<tr><td colspan="8" class="text-muted" style="text-align:center;padding:14px;">' + $t('sv2.ov.noData') + '</td></tr>';
+    if (!rows) rows = '<tr><td colspan="9" class="text-muted" style="text-align:center;padding:14px;">' + $t('sv2.ov.noData') + '</td></tr>';
 
     var kpiHtml = ''
       + '<div class="sv2-kpi-grid">'
@@ -166,6 +202,7 @@
       +   '</div>'
       +   '<div style="overflow-x:auto;"><table class="table">'
       +     '<thead><tr>'
+      +       '<th style="width:32px;text-align:center;">✓</th>'
       +       '<th>' + $t('sv2.pp.cDriver') + '</th>'
       +       '<th style="text-align:right;">' + $t('sv2.pp.cOrders') + '</th>'
       +       '<th style="text-align:right;">' + $t('st.cClosed') + '</th>'
@@ -186,12 +223,41 @@
     var finance = !!d.cli.finance;
 
     var filter = _searchFilter.toLowerCase();
-    var rows = ug.filter(function (c) {
+    var filteredCli = ug.filter(function (c) {
       if (!filter) return true;
       return String(c.ugyfel || '').toLowerCase().indexOf(filter) >= 0
         || String(c.cui_cif || '').toLowerCase().indexOf(filter) >= 0;
-    }).map(function (c) {
-      return '<tr>'
+    });
+
+    // Compare context
+    if (window.VS_STATS_V2_CMP) {
+      var cliRows = filteredCli.map(function (c) {
+        return {
+          _id: String(c.client_id || c.id || c.ugyfel),
+          _label: c.ugyfel || '?',
+          fuvarok: c.fuvarok, lezart: c.lezart, km: c.km, bevetel: c.bevetel,
+          kintlevo: c.kintlevo || 0, atlag_fiz: c.atlag_fizetesi_nap || 0,
+        };
+      });
+      var cliMetrics = [
+        { key: 'fuvarok', label: $t('sv2.pp.cOrders'), higherIsBetter: true, dec: 0 },
+        { key: 'lezart', label: $t('st.cClosed'), higherIsBetter: true, dec: 0 },
+        { key: 'km', label: 'Km', higherIsBetter: true, dec: 0 },
+        { key: 'bevetel', label: $t('sv2.pp.cRev'), higherIsBetter: true, dec: 0, unit: 'EUR' },
+      ];
+      if (finance) {
+        cliMetrics.push({ key: 'kintlevo', label: $t('sv2.pp.cOutstanding'), higherIsBetter: false, dec: 0, unit: 'EUR' });
+        cliMetrics.push({ key: 'atlag_fiz', label: $t('sv2.pp.cAvgPay'), higherIsBetter: false, dec: 0, unit: $t('sv2.fl.days') });
+      }
+      VS_STATS_V2_CMP.setContext('clients', cliRows, cliMetrics);
+    }
+
+    var rows = filteredCli.map(function (c) {
+      var cid = String(c.client_id || c.id || c.ugyfel);
+      var chk = window.VS_STATS_V2_CMP ? VS_STATS_V2_CMP.chkHtml('clients', cid) : '';
+      var clickAttr = c.client_id ? ' class="sv2-click-row" onclick="VS_STATS_V2_PP._openClient(' + parseInt(c.client_id, 10) + ')"' : '';
+      return '<tr' + clickAttr + '>'
+        + '<td onclick="event.stopPropagation()" style="text-align:center;">' + chk + '</td>'
         + '<td>' + avatar(c.ugyfel) + '<span style="margin-left:8px;font-weight:600;">' + $esc(c.ugyfel || '?') + '</span>'
         +   (c.cui_cif ? ' <span class="text-muted" style="font-size:11px;">' + $esc(c.cui_cif) + '</span>' : '') + '</td>'
         + '<td style="text-align:right;">' + fnum(c.fuvarok, 0) + '</td>'
@@ -202,7 +268,7 @@
         + (finance ? '<td style="text-align:right;">' + (c.atlag_fizetesi_nap != null ? fnum(c.atlag_fizetesi_nap, 0) + ' ' + $t('sv2.fl.days') : '—') + '</td>' : '')
         + '</tr>';
     }).join('');
-    var colCount = finance ? 7 : 5;
+    var colCount = finance ? 8 : 6;
     if (!rows) rows = '<tr><td colspan="' + colCount + '" class="text-muted" style="text-align:center;padding:14px;">' + $t('sv2.ov.noData') + '</td></tr>';
 
     var kpiHtml = ''
@@ -221,6 +287,7 @@
       +   '<div class="sv2-panel-head"><div class="sv2-panel-title">🏢 ' + $t('sv2.pp.pClients') + '</div></div>'
       +   '<div style="overflow-x:auto;"><table class="table">'
       +     '<thead><tr>'
+      +       '<th style="width:32px;text-align:center;">✓</th>'
       +       '<th>' + $t('sv2.pp.cClient') + '</th>'
       +       '<th style="text-align:right;">' + $t('sv2.pp.cOrders') + '</th>'
       +       '<th style="text-align:right;">' + $t('st.cClosed') + '</th>'
@@ -266,6 +333,12 @@
       _searchFilter = v || '';
       var box = document.getElementById('sv2Body'); if (!box) return;
       renderInto(box);
+    },
+    _openDriver: function (email) {
+      if (window.VS_STATS_V2_DETAIL) VS_STATS_V2_DETAIL.open('driver', { email: email });
+    },
+    _openClient: function (id) {
+      if (window.VS_STATS_V2_DETAIL) VS_STATS_V2_DETAIL.open('client', { id: id });
     },
   };
 

@@ -488,6 +488,131 @@
   border-radius: 8px;
 }
 
+/* ── Drill-in adatlap modal (PR A) ──────────────────────── */
+.sv2-detail-shell { display: flex; flex-direction: column; }
+.sv2-detail-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 22px; border-bottom: 1px solid rgba(120,120,120,0.15);
+  background: linear-gradient(90deg, rgba(99,102,241,0.06), transparent);
+}
+.sv2-detail-title {
+  font-size: 17px; font-weight: 800; color: var(--text-primary);
+}
+.sv2-detail-body { padding: 18px 22px; }
+.sv2-det-cols {
+  display: grid; grid-template-columns: 260px 1fr; gap: 18px;
+}
+@media (max-width: 720px) {
+  .sv2-det-cols { grid-template-columns: 1fr; }
+}
+.sv2-det-meta {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 14px;
+  background: rgba(120,120,120,0.05);
+  border-radius: 10px;
+  align-self: flex-start;
+}
+.sv2-det-row {
+  display: flex; justify-content: space-between; gap: 8px;
+  padding: 6px 0; border-bottom: 1px dashed rgba(120,120,120,0.15);
+  font-size: 13px;
+}
+.sv2-det-row:last-child { border-bottom: none; }
+.sv2-det-row .l { color: var(--text-muted); font-weight: 600; }
+.sv2-det-row .v { color: var(--text-primary); text-align: right; word-break: break-word; }
+.sv2-det-kpi-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px;
+}
+.sv2-det-kpi {
+  padding: 10px; border-radius: 8px;
+  background: var(--bg-panel-raised, #1a222d);
+  text-align: center;
+}
+.main-content[data-theme="light"] .sv2-det-kpi {
+  background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,0.06);
+}
+.sv2-det-kpi .l { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 3px; }
+.sv2-det-kpi .v { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.sv2-det-kpi .s { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+.sv2-det-main { display: flex; flex-direction: column; gap: 14px; }
+.sv2-det-panel {
+  padding: 14px;
+  background: var(--bg-panel-raised, #1a222d);
+  border-radius: 10px;
+}
+.main-content[data-theme="light"] .sv2-det-panel {
+  background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,0.06);
+}
+.sv2-det-panel-h {
+  font-size: 13px; font-weight: 700; color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+/* Kattintható sorok jelzése (people/fleet táblákon) */
+[data-pane="stats-v2"] .sv2-click-row { cursor: pointer; transition: background .12s; }
+[data-pane="stats-v2"] .sv2-click-row:hover { background: rgba(99,102,241,0.08); }
+
+/* ── Multi-select összehasonlítás (PR B) ────────────────── */
+[data-pane="stats-v2"] .sv2-sel-chk {
+  width: 16px; height: 16px; cursor: pointer;
+  accent-color: var(--sv2-accent);
+}
+.sv2-compare-bar {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  z-index: 9997;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #fff;
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(99,102,241,0.4);
+  display: flex; align-items: center; gap: 12px;
+  font-weight: 700;
+  animation: sv2SlideUp .2s ease;
+}
+@keyframes sv2SlideUp {
+  from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+.sv2-compare-bar button {
+  padding: 6px 14px; border: none;
+  background: rgba(255,255,255,0.22); color: #fff;
+  border-radius: 999px; font-weight: 700; font-size: 13px;
+  cursor: pointer; transition: background .12s;
+}
+.sv2-compare-bar button:hover { background: rgba(255,255,255,0.35); }
+.sv2-compare-bar button.primary {
+  background: #fff; color: #6366f1;
+}
+
+/* Compare modal — a több entitáshoz egy táblázat */
+.sv2-cmp-table {
+  width: 100%; border-collapse: collapse;
+}
+.sv2-cmp-table th, .sv2-cmp-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(120,120,120,0.15);
+  font-size: 13px;
+}
+.sv2-cmp-table th {
+  text-align: left; color: var(--text-muted);
+  font-weight: 700; font-size: 12px; text-transform: uppercase;
+  background: rgba(120,120,120,0.06);
+}
+.sv2-cmp-table td.metric-lbl {
+  font-weight: 600; color: var(--text-muted); font-size: 12px;
+}
+.sv2-cmp-table td.best {
+  background: rgba(34,197,94,0.12);
+  color: var(--sv2-ok);
+  font-weight: 700;
+}
+.sv2-cmp-table td.worst {
+  background: rgba(239,68,68,0.10);
+  color: var(--sv2-danger);
+  font-weight: 700;
+}
+
 /* ── Avatar (PR #7 — Emberek) ───────────────────────────── */
 [data-pane="stats-v2"] .sv2-avatar {
   display: inline-flex; align-items: center; justify-content: center;

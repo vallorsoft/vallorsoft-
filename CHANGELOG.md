@@ -14,6 +14,46 @@
 
 ---
 
+## 2026-08-05 — Statisztika 2.0 utólagos kör: 🔎 Drill-in adatlap + 🆚 Multi-select összehasonlítás (max 5)
+
+### Miért
+A felhasználó kérése után: egy adott sofőrre / járműre / ügyfélre KATTINTVA a teljes tevékenysége látszódjon (aktív + lezárt fuvarok, dokumentumok, decont, tankolás-történet), és **legalább 5 entitást** ki lehessen jelölni oldalankénti összehasonlításhoz.
+
+### Változások
+
+#### Drill-in adatlap (`public/stats-v2/detail-modal.js` ÚJ, ~230 sor)
+- Publikus API: `VS_STATS_V2_DETAIL.open('driver'|'vehicle'|'client', arg)`
+- A modal a MEGLÉVŐ `handlers/entityDetail.js` handlereket hívja — nincs új szerver-oldal:
+  - **Sofőr**: alap-adatok (e-mail, tel) + lejáratok (badge severity) + előlegek összesítő
+  - **Jármű**: modell/típus/névl. fogyasztás + üzemanyagkártya-összesítő + lejáratok + szerviz-napló + tankolás-történet
+  - **Ügyfél**: CUI/e-mail/fizetési határidő + fuvarok/összbevétel KPI + fuvarok táblája + számlák táblája
+- Read-only — a szerkesztés/számlázás/POD a már létező (auditált) modulokon megy
+- Reszponzív 2-oszlopos vagy 1-oszlopos elrendezés (`.sv2-det-cols`)
+
+#### Multi-select összehasonlítás (`public/stats-v2/compare.js` ÚJ, ~170 sor)
+- Publikus API: `VS_STATS_V2_CMP.{init, toggle, isSel, chkHtml, clear, setContext, openScope, openWith}`
+- **Max 5 sor kijelölhető** ('drivers'/'clients'/'vehicles' külön scope), MIN 2 kell az összehasonlításhoz
+- Kijelöléskor **floating action bar** jelenik meg (jobb alul): `N kijelölve  [Törlés]  [🆚 Összehasonlítás]`
+- Compare modal: minden mutató sorban, entitás oszloponként, **best/worst automatikusan kiemelve** (zöld=legjobb, piros=leggyengébb, a `higherIsBetter` flag alapján)
+
+#### Bekötés
+- **Sofőrök tábla** (`pages/people.js`): checkbox oszlop, sorra kattintás → `_openDriver(email)` → modal; 6 metrika összehasonlítva (fuvar/lezárt/km/bevétel/L100km/avg_curr)
+- **Ügyfelek tábla** (`pages/people.js`): checkbox oszlop, sorra kattintás → `_openClient(id)` → modal; 4-6 metrika (finance-jogtól függően, kintlévőség/átlag fiz. nap)
+- **Jármű-kártyák** (`pages/fleet.js`): kis checkbox a kártya jobb felső sarkában, kártyára kattintva → `_openVehicle(id)` → modal; 7 metrika (fuvar/lezárt/km/bevétel/L100km/üzemanyag/szerviz)
+
+#### Backend kiegészítés
+- **`handlers/statisticsHandlers.js` `getClientStats`**: `MAX(o.client_id) AS client_id` a válaszban — a stats-v2 drill-in modal-hoz kell (az entitás-adatlap id-t vár). A régi kliens érintetlen (új mező, opcionális).
+
+#### CSS + i18n
+- `shell.css`: `.sv2-detail-*` (modal shell + 2-col layout), `.sv2-det-*` (metadata/KPI/panel), `.sv2-click-row` (kattintható sorok hover), `.sv2-sel-chk` (checkbox), `.sv2-compare-bar` (floating action bar animált slide-up-pal), `.sv2-cmp-table` (best/worst highlighting)
+- `i18n.js`: **56 új** kulcs (34 `sv2.det.*` + 8 `sv2.cmp.*`), RO-alap + HU
+- Cache-bust `?v=20260805k`
+
+### Tesztek
+- **898 Jest zöld** — a szerver-oldal minimál kiegészítése (`getClientStats` egy plusz oszlopa) nem törte a meglévő teszteket; a kliens-oldal tisztán frontend.
+
+---
+
 ## 2026-08-05 — Statisztika 2.0 (PR #11): Legacy stats-menü elrejtve + záró dokumentálás
 
 ### Miért
