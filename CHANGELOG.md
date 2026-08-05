@@ -14,6 +14,28 @@
 
 ---
 
+## 2026-08-05 — Statisztika 2.0 (PR #8): 🎯 Cél-értékek UI + KPI-torony cél-jelzés
+
+### Miért
+A PR #1-ben az `stats_goals` tábla + a `statsGoalSet/List/Delete` handlerek felkerültek, de a felhasználó nem tudta kezelni őket a felületről, és a KPI-tornyok sem használták őket. Ez az UI-lezáró.
+
+### Változások
+1. **`public/stats-v2/shell.js`** — új 🎯 gomb a fent ragadó szűrő-sáv jobb szélén (Admin only, `state.is_admin` alapján). Modal: 8 kiválasztható metrika (revenue/profit/closed_orders/active_orders/consum_l100/km_month/utilization/on_time_pct) × 3 időszak (havi/negyedéves/éves) + célérték + pénznem + megjegyzés + törlés. A `statsGoalSet` upsert (UNIQUE per company_id+metric_key+period), a `statsGoalList` frissítés a mentés után. Publikus API: `VS_STATS_V2.getGoal(metric_key, period)`.
+2. **`public/stats-v2/pages/overview.js`** — a KPI-tornyok most a `state.goals`-ból veszik a cél-értéket (revenue / closed_orders / consum_l100). Ha van, egy „Cél: X EUR" alsó sor jelenik meg a spark-line fölött (a PR #2 `kpiTower` `goalRow` már benne volt, csak a `goal:` mező tölti meg).
+3. **`public/i18n.js`** — 24 új `sv2.goals.*` kulcs (RO-alap + HU).
+4. **Cache-bust** `shell.js` + `pages/overview.js` `?v=20260805h`.
+
+### Biztonság
+- 🎯 gomb csak `is_admin` esetén jelenik meg (`statsGoalSet` szerver-oldali Admin-védelme a PR #1 unit-tesztjeivel fedve; a modal csak Admin-nak kínálja fel).
+- Fehérlistán validált metric_key + period a szerveren; kliens is ugyanezt kínálja fel a dropdownokban.
+
+### Tesztek
+- **884 Jest zöld** (nincs regresszió) — a szerver-oldali handlerek a PR #1 `statsV2.test.js`-ben (7 eset a goal-utakhoz) már fedve; a klienshez nincs új szerver-teszt.
+
+Cache-bust: `stats-v2/shell.js` + `pages/overview.js` `?v=20260805h`.
+
+---
+
 ## 2026-08-05 — Statisztika 2.0 (PR #7): 👥 Emberek fül (Sofőrök · Ügyfelek · Alvállalkozók)
 
 ### Miért

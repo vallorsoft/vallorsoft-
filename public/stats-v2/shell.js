@@ -100,6 +100,7 @@
       +   '</select>'
       +   '<span class="sv2-spacer"></span>'
       +   buildViewsMenu()
+      +   (state.is_admin ? '<button class="btn ghost" onclick="VS_STATS_V2._openGoals()" title="' + $esc($t('sv2.goals.title')) + '">🎯</button>' : '')
       +   '<button class="btn ghost" onclick="VS_STATS_V2._refresh()">' + $t('sv2.refresh') + '</button>'
       + '</div>';
   }
@@ -300,7 +301,115 @@
         render();
       });
     },
+
+    // 🎯 Cél-értékek modal — Admin only
+    getGoal: function (metric_key, period) {
+      period = period || 'month';
+      return state.goals.filter(function (g) { return g.metric_key === metric_key && g.period === period; })[0] || null;
+    },
+    _openGoals: function () {
+      if (!state.is_admin) return;
+      gas('statsGoalList').then(function (r) {
+        var goals = (r && r.ok && r.goals) || [];
+        openGoalsModal(goals);
+      });
+    },
+    _saveGoal: function () {
+      var m = document.getElementById('sv2GoalMetric').value;
+      var p = document.getElementById('sv2GoalPeriod').value;
+      var v = document.getElementById('sv2GoalValue').value;
+      var c = document.getElementById('sv2GoalCurrency').value || null;
+      var n = document.getElementById('sv2GoalNote').value || null;
+      if (!m || v === '' || parseFloat(v) < 0) { $toast($t('sv2.goals.errValue'), 'err'); return; }
+      gas('statsGoalSet', [{ metric_key: m, period: p, target_value: parseFloat(v), currency: c, note: n }]).then(function (r) {
+        if (!r || !r.ok) { $toast((r && r.err) || $t('common.error'), 'err'); return; }
+        $toast($t('sv2.goals.saved'), 'ok');
+        // Frissítsük az állapot goals-t
+        gas('statsGoalList').then(function (l) {
+          if (l && l.ok) state.goals = l.goals;
+          VS_STATS_V2._openGoals();
+        });
+      });
+    },
+    _deleteGoal: function (id) {
+      if (!confirm($t('sv2.goals.deleteConfirm'))) return;
+      gas('statsGoalDelete', [id]).then(function (r) {
+        if (!r || !r.ok) { $toast((r && r.err) || $t('common.error'), 'err'); return; }
+        state.goals = state.goals.filter(function (g) { return g.id !== id; });
+        VS_STATS_V2._openGoals();
+      });
+    },
   };
+
+  // ── Cél-értékek modal ─────────────────────────────────
+  function openGoalsModal(goals) {
+    var existing = document.getElementById('sv2GoalsModal');
+    if (existing) existing.remove();
+    var METRICS = [
+      ['revenue', $t('sv2.goals.mRevenue'), 'EUR'],
+      ['profit', $t('sv2.goals.mProfit'), 'EUR'],
+      ['closed_orders', $t('sv2.goals.mClosed'), ''],
+      ['active_orders', $t('sv2.goals.mActive'), ''],
+      ['consum_l100', $t('sv2.goals.mConsum'), ''],
+      ['km_month', $t('sv2.goals.mKm'), ''],
+      ['utilization', $t('sv2.goals.mUtil'), '%'],
+      ['on_time_pct', $t('sv2.goals.mOnTime'), '%'],
+    ];
+    var PERIODS = [
+      ['month', $t('sv2.goals.pMonth')],
+      ['quarter', $t('sv2.goals.pQuarter')],
+      ['year', $t('sv2.goals.pYear')],
+    ];
+    var rows = goals.map(function (g) {
+      var mLabel = (METRICS.filter(function (m) { return m[0] === g.metric_key; })[0] || [])[1] || g.metric_key;
+      var pLabel = (PERIODS.filter(function (p) { return p[0] === g.period; })[0] || [])[1] || g.period;
+      return '<tr>'
+        + '<td>' + $esc(mLabel) + '</td>'
+        + '<td>' + $esc(pLabel) + '</td>'
+        + '<td style="text-align:right;font-weight:700;">' + $esc(String(g.target_value)) + ' ' + $esc(g.currency || '') + '</td>'
+        + '<td class="text-muted" style="font-size:11px;">' + $esc(g.note || '') + '</td>'
+        + '<td><button class="btn ghost" style="padding:4px 10px;font-size:12px;color:var(--sv2-danger);" onclick="VS_STATS_V2._deleteGoal(' + g.id + ')">✕</button></td>'
+        + '</tr>';
+    }).join('');
+    if (!rows) rows = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:14px;">' + $t('sv2.goals.empty') + '</td></tr>';
+
+    var ov = document.createElement('div');
+    ov.id = 'sv2GoalsModal';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    ov.onclick = function (e) { if (e.target === ov) ov.remove(); };
+    ov.innerHTML = ''
+      + '<div class="sv2-panel" style="max-width:820px;width:100%;max-height:90vh;overflow:auto;padding:22px;">'
+      +   '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">'
+      +     '<div class="sv2-panel-title" style="font-size:16px;">🎯 ' + $t('sv2.goals.title') + '</div>'
+      +     '<button class="btn ghost" style="padding:6px 12px;" onclick="this.closest(\'#sv2GoalsModal\').remove()">✕</button>'
+      +   '</div>'
+      +   '<div class="sv2-hint" style="margin-bottom:14px;">' + $t('sv2.goals.hint') + '</div>'
+      +   '<div class="sv2-panel" style="padding:14px;margin-bottom:14px;background:rgba(99,102,241,0.06);">'
+      +     '<div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;">'
+      +       $t('sv2.goals.newGoal') + '</div>'
+      +     '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 100px auto;gap:8px;align-items:center;">'
+      +       '<select class="select" id="sv2GoalMetric">'
+      +         METRICS.map(function (m) { return '<option value="' + m[0] + '" data-cur="' + m[2] + '">' + $esc(m[1]) + '</option>'; }).join('')
+      +       '</select>'
+      +       '<select class="select" id="sv2GoalPeriod">'
+      +         PERIODS.map(function (p) { return '<option value="' + p[0] + '">' + $esc(p[1]) + '</option>'; }).join('')
+      +       '</select>'
+      +       '<input class="input" type="number" step="any" min="0" id="sv2GoalValue" placeholder="' + $esc($t('sv2.goals.valuePh')) + '">'
+      +       '<input class="input" id="sv2GoalCurrency" placeholder="EUR" style="max-width:80px;">'
+      +       '<button class="btn primary" style="padding:8px 16px;" onclick="VS_STATS_V2._saveGoal()">' + $t('sv2.save') + '</button>'
+      +     '</div>'
+      +     '<input class="input" id="sv2GoalNote" placeholder="' + $esc($t('sv2.goals.notePh')) + '" style="margin-top:8px;width:100%;">'
+      +   '</div>'
+      +   '<table class="table"><thead><tr>'
+      +     '<th>' + $t('sv2.goals.cMetric') + '</th>'
+      +     '<th>' + $t('sv2.goals.cPeriod') + '</th>'
+      +     '<th style="text-align:right;">' + $t('sv2.goals.cTarget') + '</th>'
+      +     '<th>' + $t('sv2.goals.cNote') + '</th>'
+      +     '<th></th>'
+      +   '</tr></thead><tbody>' + rows + '</tbody></table>'
+      + '</div>';
+    document.body.appendChild(ov);
+  }
 
   // ── Kliken kívüli kattintás -> views menü bezár ───────────
   document.addEventListener('click', function (ev) {

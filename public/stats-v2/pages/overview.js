@@ -259,23 +259,39 @@
       : null;
     var costSeries = months.map(function (_, i) { return ((fuelSeries[i] || 0) + (purSeries[i] || 0)); });
 
+    // Cél-értékek a KPI-tornyokhoz (a shell adja a state.goals-t)
+    var goals = state.goals || [];
+    function findGoal(metric) {
+      return goals.filter(function (g) { return g.metric_key === metric && g.period === 'month'; })[0] || null;
+    }
+    function goalStr(g) {
+      if (!g) return null;
+      return fnum(g.target_value, 0) + (g.currency ? ' ' + g.currency : '');
+    }
+
     // 4 KPI-torony
+    var revGoal = findGoal('revenue');
+    var closedGoal = findGoal('closed_orders');
+    var consumGoal = findGoal('consum_l100');
     var kpis = [
       {
         label: '💶 ' + $t('sv2.ov.revenue'), color: '#22c55e',
         value: '<b>' + fnum(k.bevetel, 0) + '</b> <span style="font-size:12px;">EUR</span>',
         sub: fnum(k.km, 0) + ' km',
         trend: estimateDelta(revSeries), spark: revSeries.slice(-8),
+        goal: goalStr(revGoal),
       },
       {
         label: '📦 ' + $t('sv2.ov.closed'), color: '#3b82f6',
         value: '<b>' + fnum(k.lezart, 0) + '</b>',
         sub: $t('sv2.ov.ofAll', { n: fnum(k.osszes, 0) }),
+        goal: goalStr(closedGoal),
       },
       {
         label: '⛽ ' + $t('sv2.ov.consum'), color: '#f59e0b',
         value: '<b>' + fnum(k.consum_100, 1) + '</b> <span style="font-size:12px;">L/100km</span>',
         sub: fnum(k.diurna_ext, 0) + ' + ' + fnum(k.diurna_int, 0) + ' ' + $t('sv2.ov.diurnaDays'),
+        goal: goalStr(consumGoal),
       },
     ];
     if (ov.finance) {

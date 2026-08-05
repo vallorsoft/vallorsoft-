@@ -1627,6 +1627,32 @@
     'sv2.pp.carrierHint': { hu: 'Az alvállalkozói AP-öregítés és a bejövő számlák a Pénzügy fülön elérhetők.', ro: 'AP-ul subcontractorilor și facturile primite sunt în fila Financiar.' },
     'sv2.pp.gotoAp': { hu: 'Pénzügy → AP', ro: 'Financiar → AP' },
 
+    // Cél-értékek (PR #8)
+    'sv2.goals.title': { hu: 'KPI cél-értékek', ro: 'Ținte KPI' },
+    'sv2.goals.hint': { hu: 'Cégenkénti KPI-célok — a megfelelő KPI-tornyok a cél alatt/felett jelzik az állapotot.', ro: 'Ținte KPI pe companie — turnurile de KPI arată starea sub/peste țintă.' },
+    'sv2.goals.empty': { hu: 'Nincs beállított cél-érték.', ro: 'Nu sunt ținte configurate.' },
+    'sv2.goals.newGoal': { hu: 'Új cél-érték', ro: 'Țintă nouă' },
+    'sv2.goals.valuePh': { hu: 'Célérték', ro: 'Valoare țintă' },
+    'sv2.goals.notePh': { hu: 'Megjegyzés (opcionális)…', ro: 'Notă (opțional)…' },
+    'sv2.goals.errValue': { hu: 'Érvénytelen értéket adtál meg.', ro: 'Valoare invalidă.' },
+    'sv2.goals.saved': { hu: 'Cél-érték elmentve.', ro: 'Ținta a fost salvată.' },
+    'sv2.goals.deleteConfirm': { hu: 'Biztosan törlöd ezt a cél-értéket?', ro: 'Sigur ștergeți această țintă?' },
+    'sv2.goals.cMetric': { hu: 'Mutató', ro: 'Indicator' },
+    'sv2.goals.cPeriod': { hu: 'Időszak', ro: 'Perioadă' },
+    'sv2.goals.cTarget': { hu: 'Célérték', ro: 'Valoare țintă' },
+    'sv2.goals.cNote': { hu: 'Megjegyzés', ro: 'Notă' },
+    'sv2.goals.mRevenue': { hu: 'Bevétel', ro: 'Venit' },
+    'sv2.goals.mProfit': { hu: 'Eredmény', ro: 'Profit' },
+    'sv2.goals.mClosed': { hu: 'Lezárt fuvarok', ro: 'Curse finalizate' },
+    'sv2.goals.mActive': { hu: 'Aktív fuvarok', ro: 'Curse active' },
+    'sv2.goals.mConsum': { hu: 'Cég-átlag fogyasztás (L/100km)', ro: 'Consum mediu (L/100km)' },
+    'sv2.goals.mKm': { hu: 'Havi km', ro: 'Km lunar' },
+    'sv2.goals.mUtil': { hu: 'Kihasználtság (%)', ro: 'Utilizare (%)' },
+    'sv2.goals.mOnTime': { hu: 'Időben teljesített (%)', ro: 'Livrare la timp (%)' },
+    'sv2.goals.pMonth': { hu: 'Havi', ro: 'Lunar' },
+    'sv2.goals.pQuarter': { hu: 'Negyedéves', ro: 'Trimestrial' },
+    'sv2.goals.pYear': { hu: 'Éves', ro: 'Anual' },
+
     // ── Statisztika (stats.js) ──
     // Szűrősáv + közös
     'st.refresh': { hu: '🔄 Frissítés', ro: '🔄 Reîmprospătare' },
