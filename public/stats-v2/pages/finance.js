@@ -178,6 +178,28 @@
     }).join('');
     if (!rows) rows = '<tr><td colspan="7" class="text-muted" style="text-align:center;padding:20px;">' + $t('sv2.fin.noOut') + '</td></tr>';
 
+    // Export-gomb a nyitott számlák táblához (PR #9)
+    var exportBtn = window.VS_STATS_V2_EXPORT ? VS_STATS_V2_EXPORT.button({
+      data: list.map(function (o) {
+        return {
+          fuvar: o.id, ugyfel: o.client,
+          osszeg: o.pret, fizetve: o.paid_amount,
+          marad: (parseFloat(o.pret) || 0) - (parseFloat(o.paid_amount) || 0),
+          lezarva: o.finalized_at ? new Date(o.finalized_at).toISOString().slice(0, 10) : '',
+          esedekes: o.esedekes ? new Date(o.esedekes).toISOString().slice(0, 10) : '',
+          napok: o.napok, lejart: o.lejart ? 'da' : 'nu',
+        };
+      }),
+      columns: [
+        { key: 'fuvar', label: 'Cursă' }, { key: 'ugyfel', label: 'Client' },
+        { key: 'osszeg', label: 'Sumă' }, { key: 'fizetve', label: 'Plătit' },
+        { key: 'marad', label: 'Rest' }, { key: 'lezarva', label: 'Finalizat' },
+        { key: 'esedekes', label: 'Scadență' }, { key: 'napok', label: 'Zile' },
+        { key: 'lejart', label: 'Expirat' },
+      ],
+      filename: 'restante-' + new Date().toISOString().slice(0, 10) + '.csv',
+    }) : '';
+
     return kpiHtml
       + '<div class="sv2-grid-2col">'
       +   panelWrap('📊 ' + $t('sv2.fin.pAging'),
@@ -186,7 +208,11 @@
       + '</div>'
       + '<div class="sv2-panel">'
       +   '<div class="sv2-panel-head"><div class="sv2-panel-title">📋 ' + $t('sv2.fin.pOpenList') + '</div>'
-      +     '<span class="sv2-panel-sub">' + $t('sv2.fin.top30') + '</span></div>'
+      +     '<div style="display:flex;gap:8px;align-items:center;">'
+      +       '<span class="sv2-panel-sub">' + $t('sv2.fin.top30') + '</span>'
+      +       exportBtn
+      +     '</div>'
+      +   '</div>'
       +   '<div style="overflow-x:auto;"><table class="table">'
       +     '<thead><tr><th>' + $t('st.cOrder') + '</th><th>' + $t('st.cClient') + '</th>'
       +       '<th style="text-align:right;">' + $t('sv2.fin.cAmount') + '</th>'
