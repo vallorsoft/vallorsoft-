@@ -980,4 +980,97 @@ function startCancelReminderScheduler() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler };
+// ============================================================
+//  Statisztika-riport ütemező — PR #10 (Statisztika 2.0)
+//  Naponta egyszer ellenőrzi a `stats_report_schedules` `enabled=true`
+//  sorait; ha az adott schedule (daily/weekly/monthly) alapján esedékes
+//  (last_run_at NULL vagy régebbi mint az intervallum), generál egy
+//  minimalista HTML-riportot és e-mailt küld a `recipients`-nek.
+//  Nem PDF — HTML-body. A jövőben (külön PR) puppeteer-rel PDF-fé rendereljük.
+// ============================================================
+function startStatsReportScheduler() {
+  let email;
+  try { email = require('./email'); } catch (_) { return null; }
+
+  function fmt(x) { const n = parseFloat(x); return isFinite(n) ? n.toLocaleString('hu-HU', { maximumFractionDigits: 0 }) : '0'; }
+
+  async function isDue(row) {
+    if (!row.enabled) return false;
+    const last = row.last_run_at ? new Date(row.last_run_at) : null;
+    if (!last) return true;
+    const now = new Date();
+    const diffH = (now - last) / 3600000;
+    if (row.schedule === 'daily')   return diffH >= 22;
+    if (row.schedule === 'weekly')  return diffH >= 24 * 6.5;
+    if (row.schedule === 'monthly') return diffH >= 24 * 28;
+    return false;
+  }
+
+  function _range() {
+    const to = new Date();
+    const from = new Date(); from.setDate(1); from.setMonth(from.getMonth() - 1);
+    return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+  }
+
+  async function _renderReportHtml(cid, cegNev, { from, to }) {
+    // Egyszerű snapshot — KPI-k a getStatsOverview logikájából, saját query-vel
+    const kpiR = await pool.query(
+      `SELECT COUNT(*) FILTER (WHERE status='Finalizat' AND finalized_at >= $2 AND finalized_at < $3)::int AS lezart,
+              COALESCE(SUM(pret) FILTER (WHERE status='Finalizat' AND finalized_at >= $2 AND finalized_at < $3),0)::numeric AS bevetel,
+              COALESCE(SUM(GREATEST(pret-paid_amount,0)) FILTER (WHERE status='Finalizat' AND payment_status <> 'paid' AND pret > 0),0)::numeric AS kintlevo,
+              COALESCE(SUM(km) FILTER (WHERE status='Finalizat' AND finalized_at >= $2 AND finalized_at < $3),0)::numeric AS km
+       FROM orders WHERE company_id=$1`, [cid, from, to]);
+    const k = kpiR.rows[0] || {};
+    const row = (l, v) => '<tr><td style="padding:8px 14px;border-bottom:1px solid #ece3d8;color:#8a7d6e;">' + l
+      + '</td><td style="padding:8px 14px;border-bottom:1px solid #ece3d8;text-align:right;font-weight:700;">' + v + '</td></tr>';
+    return ''
+      + '<p style="margin:0 0 12px;font-size:15px;"><b>' + _escH(cegNev) + '</b> — perioada <b>' + _escH(from) + '</b> ÷ <b>' + _escH(to) + '</b></p>'
+      + '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:14px;">'
+      +   row('Curse finalizate', fmt(k.lezart) + ' buc')
+      +   row('Venit total', fmt(k.bevetel) + ' EUR')
+      +   row('Km parcurși', fmt(k.km) + ' km')
+      +   row('Restanțe curente', fmt(k.kintlevo) + ' EUR')
+      + '</table>'
+      + '<p style="font-size:12px;color:#b09a82;">Raport detaliat: 📊 Statistici 2.0 în consola VallorSoft.</p>';
+  }
+
+  async function tick() {
+    let schedules;
+    try {
+      ({ rows: schedules } = await pool.query(
+        `SELECT s.*, c.nev AS ceg_nev
+         FROM stats_report_schedules s
+         JOIN companies c ON c.id = s.company_id
+         WHERE s.enabled = TRUE`));
+    } catch (_) { return; }   // tábla migráció előtt
+    for (const s of schedules) {
+      try {
+        if (!(await isDue(s))) continue;
+        const range = _range();
+        const html = await _renderReportHtml(s.company_id, s.ceg_nev, range);
+        const recipients = Array.isArray(s.recipients) ? s.recipients : [];
+        let sentAny = false;
+        for (const r of recipients) {
+          const rr = await email.sendClientEmail({
+            to: r, subject: '📊 VallorSoft — ' + _escH(s.name) + ' (' + s.ceg_nev + ')',
+            html, companyId: s.company_id, mailType: 'stats_report',
+          });
+          if (rr && rr.ok) sentAny = true;
+        }
+        if (sentAny) {
+          await pool.query(`UPDATE stats_report_schedules SET last_run_at=NOW() WHERE id=$1`, [s.id]);
+          console.log('[StatsRiport] #' + s.id + ' cég #' + s.company_id + ' → ' + recipients.length + ' címzett');
+        }
+      } catch (err) {
+        console.error('[StatsRiport] #' + s.id + ' hiba:', err.message);
+      }
+    }
+  }
+
+  setTimeout(tick, 120 * 1000);   // 2 perc múlva először
+  const interval = setInterval(tick, 60 * 60 * 1000);   // óránként (a `isDue` szűr)
+  console.log('[StatsRiport] Statisztika-riport ütemező elindítva.');
+  return interval;
+}
+
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler };

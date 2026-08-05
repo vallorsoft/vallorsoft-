@@ -229,7 +229,7 @@ app.use((err, req, res, next) => {
 });
 
 // E-mail intake (beérkező megrendelések) — csak akkor fut, ha az INTAKE_IMAP_* be van állítva.
-const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler } = require('./services/scheduler');
+const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler } = require('./services/scheduler');
 startIntakeScheduler();
 startExpiryScheduler();
 startGpsMileageScheduler();
@@ -240,6 +240,7 @@ startEFacturaStatusScheduler();
 startTrialExpiryScheduler();       // trial lejárat e-mail értesítő (14. nap)
 startTrialReminderScheduler();     // trial emlékeztető 3d és 1d előtt
 startCancelReminderScheduler();    // lemondás: utolsó-napi emlékeztető + lejárt véglegesítés
+startStatsReportScheduler();       // Statisztika 2.0 időzített riportok (daily/weekly/monthly)
 
 // Opcionális automatikus DB-mentés (alapból KI; BACKUP_ENABLED=true + BACKUP_DIR).
 require('./services/backup').startBackupScheduler();

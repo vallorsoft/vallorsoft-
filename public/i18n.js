@@ -1653,6 +1653,28 @@
     'sv2.goals.pQuarter': { hu: 'Negyedéves', ro: 'Trimestrial' },
     'sv2.goals.pYear': { hu: 'Éves', ro: 'Anual' },
 
+    // Időzített riportok (PR #10)
+    'sv2.rep.title': { hu: 'Időzített e-mail riportok', ro: 'Rapoarte programate prin e-mail' },
+    'sv2.rep.hint': { hu: 'Automatikus statisztika-riport e-mailben, választható gyakorisággal (napi/heti/havi). Csak Admin kezelheti.', ro: 'Raport statistic automat prin e-mail cu frecvență la alegere (zilnic/săptămânal/lunar). Doar Admin.' },
+    'sv2.rep.empty': { hu: 'Nincs időzített riport.', ro: 'Nu există rapoarte programate.' },
+    'sv2.rep.newReport': { hu: 'Új riport', ro: 'Raport nou' },
+    'sv2.rep.namePh': { hu: 'Riport neve (pl. Havi vezetőségi)', ro: 'Nume raport (ex. Lunar de management)' },
+    'sv2.rep.recPh': { hu: 'E-mail címzettek (vesszővel elválasztva)…', ro: 'Destinatari e-mail (separați cu virgulă)…' },
+    'sv2.rep.nameMissing': { hu: 'Add meg a nevet.', ro: 'Introduceți numele.' },
+    'sv2.rep.recMissing': { hu: 'Legalább egy e-mail címzett szükséges.', ro: 'Este necesar cel puțin un destinatar.' },
+    'sv2.rep.saved': { hu: 'Riport-időzítés elmentve.', ro: 'Programarea raportului a fost salvată.' },
+    'sv2.rep.deleteConfirm': { hu: 'Biztosan törlöd ezt a riportot?', ro: 'Sigur ștergeți acest raport?' },
+    'sv2.rep.enabled': { hu: 'Aktív', ro: 'Activ' },
+    'sv2.rep.sDaily': { hu: 'Napi', ro: 'Zilnic' },
+    'sv2.rep.sWeekly': { hu: 'Heti', ro: 'Săptămânal' },
+    'sv2.rep.sMonthly': { hu: 'Havi', ro: 'Lunar' },
+    'sv2.rep.noView': { hu: '— Alap-riport —', ro: '— Raport standard —' },
+    'sv2.rep.cName': { hu: 'Név / Nézet', ro: 'Nume / Vedere' },
+    'sv2.rep.cSchedule': { hu: 'Gyakoriság', ro: 'Frecvență' },
+    'sv2.rep.cRecipients': { hu: 'Címzettek', ro: 'Destinatari' },
+    'sv2.rep.cLastRun': { hu: 'Utoljára futott', ro: 'Ultima rulare' },
+    'sv2.rep.cStatus': { hu: 'Állapot', ro: 'Status' },
+
     // ── Statisztika (stats.js) ──
     // Szűrősáv + közös
     'st.refresh': { hu: '🔄 Frissítés', ro: '🔄 Reîmprospătare' },
