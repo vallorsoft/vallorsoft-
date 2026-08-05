@@ -838,8 +838,12 @@ handlers.getClientStats = async function (req, res, args) {
     const finance = await _canSeeFinance(req);
 
     // Ügyfél = clients-link ha van, különben a szabad-szöveges orders.client
+    // (a client_id-t is visszaadjuk MAX-szal, hogy a stats-v2 drill-in modal-hoz
+    //  az entitás-adatlapot meg tudjuk nyitni; MAX értelmes, mert egy ugyfel-név
+    //  alatt legfeljebb egy értelmes client_id él.)
     const r = await pool.query(
       `SELECT COALESCE(c.denumire, NULLIF(TRIM(o.client),''), '?') AS ugyfel,
+              MAX(o.client_id) AS client_id,
               MAX(c.cui_cif) AS cui_cif, MAX(c.anaf_status) AS anaf_status,
               COUNT(*)::int AS fuvarok,
               COUNT(*) FILTER (WHERE o.status='Finalizat')::int AS lezart,

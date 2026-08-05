@@ -66,6 +66,7 @@
   }
 
   function render(box, state) {
+    if (window.VS_STATS_V2_CMP) VS_STATS_V2_CMP.init('vehicles');
     box.innerHTML = subTabsBar() + '<div class="sv2-empty">' + $t('sv2.ov.loading') + '</div>';
     var apArgs = { from: state.range.from, to: state.range.to };
     Promise.all([
@@ -122,6 +123,28 @@
       +   '</div>'
       + '</div>';
 
+    // Compare context — jármű-id alapján
+    if (window.VS_STATS_V2_CMP) {
+      var vehRows = filtered.map(function (v) {
+        return {
+          _id: String(v.id || v.rendszam),
+          _label: v.rendszam_eredeti || v.rendszam || '?',
+          fuvarok: v.fuvarok, lezart: v.lezart, km: v.km,
+          bevetel: v.bevetel, consum_100: parseFloat(v.consum_100) || 0,
+          uzemanyag_ktg: v.uzemanyag_ktg, szerviz_ktg: v.szerviz_ktg,
+        };
+      });
+      VS_STATS_V2_CMP.setContext('vehicles', vehRows, [
+        { key: 'fuvarok', label: $t('sv2.fl.orders'), higherIsBetter: true, dec: 0 },
+        { key: 'lezart', label: $t('st.cClosed'), higherIsBetter: true, dec: 0 },
+        { key: 'km', label: 'Km', higherIsBetter: true, dec: 0 },
+        { key: 'bevetel', label: $t('sv2.fl.kRev'), higherIsBetter: true, dec: 0, unit: 'EUR' },
+        { key: 'consum_100', label: 'L/100km', higherIsBetter: false, dec: 1 },
+        { key: 'uzemanyag_ktg', label: $t('sv2.fl.fuelCost'), higherIsBetter: false, dec: 0, unit: 'RON' },
+        { key: 'szerviz_ktg', label: 'Szerviz', higherIsBetter: false, dec: 0, unit: 'RON' },
+      ]);
+    }
+
     var cards = filtered.map(function (v) {
       var consum = parseFloat(v.consum_100) || 0;
       var nev = parseFloat(v.nevleges) || 0;
@@ -133,10 +156,16 @@
       }
       var activ = v.activ !== false;
       if (!activ) statusClass = 'sv2-veh-inactive';
-      return '<div class="sv2-veh-card ' + statusClass + '">'
+      var vid = String(v.id || v.rendszam);
+      var chk = window.VS_STATS_V2_CMP ? VS_STATS_V2_CMP.chkHtml('vehicles', vid) : '';
+      var clickable = v.id ? ' onclick="VS_STATS_V2_FLEET._openVehicle(' + parseInt(v.id, 10) + ')" style="cursor:pointer;"' : '';
+      return '<div class="sv2-veh-card ' + statusClass + '"' + clickable + '>'
         + '<div class="sv2-veh-head">'
         +   '<span class="sv2-veh-plate">' + $esc(v.rendszam_eredeti || v.rendszam || '?') + '</span>'
-        +   (activ ? '<span class="sv2-veh-badge sv2-veh-badge-ok">' + $t('sv2.fl.active') + '</span>' : '<span class="sv2-veh-badge sv2-veh-badge-off">' + $t('sv2.fl.inactive') + '</span>')
+        +   '<span style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">'
+        +     (activ ? '<span class="sv2-veh-badge sv2-veh-badge-ok">' + $t('sv2.fl.active') + '</span>' : '<span class="sv2-veh-badge sv2-veh-badge-off">' + $t('sv2.fl.inactive') + '</span>')
+        +     chk
+        +   '</span>'
         + '</div>'
         + '<div class="sv2-veh-model">' + $esc([v.marca, v.model, v.an].filter(Boolean).join(' • ')) + '</div>'
         + '<div class="sv2-veh-kpis">'
@@ -373,6 +402,9 @@
       if (_subTab !== 'overview') return;
       var box = document.getElementById('sv2Body'); if (!box) return;
       renderInto(box);
+    },
+    _openVehicle: function (id) {
+      if (window.VS_STATS_V2_DETAIL) VS_STATS_V2_DETAIL.open('vehicle', { id: id });
     },
   };
 
