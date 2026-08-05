@@ -101,6 +101,7 @@
       +   '<span class="sv2-spacer"></span>'
       +   buildViewsMenu()
       +   (state.is_admin ? '<button class="btn ghost" onclick="VS_STATS_V2._openGoals()" title="' + $esc($t('sv2.goals.title')) + '">🎯</button>' : '')
+      +   (state.is_admin ? '<button class="btn ghost" onclick="VS_STATS_V2._openReports()" title="' + $esc($t('sv2.rep.title')) + '">📧</button>' : '')
       +   '<button class="btn ghost" onclick="VS_STATS_V2._refresh()">' + $t('sv2.refresh') + '</button>'
       + '</div>';
   }
@@ -339,6 +340,54 @@
         VS_STATS_V2._openGoals();
       });
     },
+
+    // 📧 Időzített riportok (PR #10) — Admin only
+    _openReports: function () {
+      if (!state.is_admin) return;
+      Promise.all([
+        gas('statsReportScheduleList'),
+        gas('statsViewList'),
+      ]).then(function (rs) {
+        openReportsModal((rs[0] && rs[0].ok && rs[0].schedules) || [], (rs[1] && rs[1].ok && rs[1].views) || []);
+      });
+    },
+    _saveReport: function () {
+      var name = (document.getElementById('sv2RepName') || {}).value || '';
+      var view_id = (document.getElementById('sv2RepView') || {}).value || null;
+      var schedule = (document.getElementById('sv2RepSched') || {}).value || 'monthly';
+      var rec = (document.getElementById('sv2RepRec') || {}).value || '';
+      var enabled = !!(document.getElementById('sv2RepEn') || {}).checked;
+      if (!name.trim()) { $toast($t('sv2.rep.nameMissing'), 'err'); return; }
+      var recArr = String(rec).split(/[,;\s]+/).filter(Boolean);
+      if (!recArr.length) { $toast($t('sv2.rep.recMissing'), 'err'); return; }
+      gas('statsReportScheduleSave', [{
+        name: name, view_id: view_id ? parseInt(view_id, 10) : null,
+        schedule: schedule, recipients: recArr, enabled: enabled,
+      }]).then(function (r) {
+        if (!r || !r.ok) { $toast((r && r.err) || $t('common.error'), 'err'); return; }
+        $toast($t('sv2.rep.saved'), 'ok');
+        VS_STATS_V2._openReports();
+      });
+    },
+    _deleteReport: function (id) {
+      if (!confirm($t('sv2.rep.deleteConfirm'))) return;
+      gas('statsReportScheduleDelete', [id]).then(function (r) {
+        if (!r || !r.ok) { $toast((r && r.err) || $t('common.error'), 'err'); return; }
+        VS_STATS_V2._openReports();
+      });
+    },
+    _toggleReport: function (id, enabled) {
+      // A meglévő listát újra elmentjük, csak az `enabled`-t módosítva
+      gas('statsReportScheduleList').then(function (l) {
+        if (!l || !l.ok) return;
+        var s = (l.schedules || []).filter(function (x) { return x.id === id; })[0];
+        if (!s) return;
+        gas('statsReportScheduleSave', [{
+          id: id, name: s.name, view_id: s.view_id, schedule: s.schedule,
+          recipients: s.recipients || [], enabled: !!enabled,
+        }]).then(function () { VS_STATS_V2._openReports(); });
+      });
+    },
   };
 
   // ── Cél-értékek modal ─────────────────────────────────
@@ -405,6 +454,77 @@
       +     '<th>' + $t('sv2.goals.cPeriod') + '</th>'
       +     '<th style="text-align:right;">' + $t('sv2.goals.cTarget') + '</th>'
       +     '<th>' + $t('sv2.goals.cNote') + '</th>'
+      +     '<th></th>'
+      +   '</tr></thead><tbody>' + rows + '</tbody></table>'
+      + '</div>';
+    document.body.appendChild(ov);
+  }
+
+  // ── Időzített riportok modal (PR #10) ─────────────────
+  function openReportsModal(schedules, views) {
+    var existing = document.getElementById('sv2ReportsModal');
+    if (existing) existing.remove();
+    var SCHEDS = [
+      ['daily', $t('sv2.rep.sDaily')],
+      ['weekly', $t('sv2.rep.sWeekly')],
+      ['monthly', $t('sv2.rep.sMonthly')],
+    ];
+    var rows = schedules.map(function (s) {
+      var lastRun = s.last_run_at ? new Date(s.last_run_at).toLocaleString('hu-HU') : '—';
+      var schedLabel = (SCHEDS.filter(function (x) { return x[0] === s.schedule; })[0] || [])[1] || s.schedule;
+      var recList = Array.isArray(s.recipients) ? s.recipients.join(', ') : '';
+      return '<tr>'
+        + '<td>' + $esc(s.name) + (s.view_name ? '<div class="text-muted" style="font-size:11px;">' + $esc(s.view_name) + '</div>' : '') + '</td>'
+        + '<td>' + $esc(schedLabel) + '</td>'
+        + '<td style="font-size:12px;">' + $esc(recList) + '</td>'
+        + '<td style="font-size:11px;color:var(--text-muted);">' + lastRun + '</td>'
+        + '<td><label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;">'
+        +   '<input type="checkbox"' + (s.enabled ? ' checked' : '') + ' onchange="VS_STATS_V2._toggleReport(' + s.id + ',this.checked)"> '
+        +   $t('sv2.rep.enabled')
+        + '</label></td>'
+        + '<td><button class="btn ghost" style="padding:4px 10px;font-size:12px;color:var(--sv2-danger);" onclick="VS_STATS_V2._deleteReport(' + s.id + ')">✕</button></td>'
+        + '</tr>';
+    }).join('');
+    if (!rows) rows = '<tr><td colspan="6" class="text-muted" style="text-align:center;padding:14px;">' + $t('sv2.rep.empty') + '</td></tr>';
+
+    var viewOptions = '<option value="">' + $esc($t('sv2.rep.noView')) + '</option>'
+      + views.map(function (v) { return '<option value="' + v.id + '">' + $esc(v.name) + '</option>'; }).join('');
+
+    var ov = document.createElement('div');
+    ov.id = 'sv2ReportsModal';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    ov.onclick = function (e) { if (e.target === ov) ov.remove(); };
+    ov.innerHTML = ''
+      + '<div class="sv2-panel" style="max-width:920px;width:100%;max-height:90vh;overflow:auto;padding:22px;">'
+      +   '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">'
+      +     '<div class="sv2-panel-title" style="font-size:16px;">📧 ' + $t('sv2.rep.title') + '</div>'
+      +     '<button class="btn ghost" style="padding:6px 12px;" onclick="this.closest(\'#sv2ReportsModal\').remove()">✕</button>'
+      +   '</div>'
+      +   '<div class="sv2-hint" style="margin-bottom:14px;">' + $t('sv2.rep.hint') + '</div>'
+      +   '<div class="sv2-panel" style="padding:14px;margin-bottom:14px;background:rgba(99,102,241,0.06);">'
+      +     '<div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;">'
+      +       $t('sv2.rep.newReport') + '</div>'
+      +     '<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:8px;">'
+      +       '<input class="input" id="sv2RepName" placeholder="' + $esc($t('sv2.rep.namePh')) + '">'
+      +       '<select class="select" id="sv2RepSched">'
+      +         SCHEDS.map(function (s) { return '<option value="' + s[0] + '">' + $esc(s[1]) + '</option>'; }).join('')
+      +       '</select>'
+      +       '<select class="select" id="sv2RepView">' + viewOptions + '</select>'
+      +     '</div>'
+      +     '<input class="input" id="sv2RepRec" placeholder="' + $esc($t('sv2.rep.recPh')) + '" style="width:100%;margin-bottom:8px;">'
+      +     '<div style="display:flex;gap:12px;align-items:center;">'
+      +       '<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;">'
+      +         '<input type="checkbox" id="sv2RepEn" checked> ' + $t('sv2.rep.enabled')
+      +       '</label>'
+      +       '<button class="btn primary" style="padding:8px 16px;margin-left:auto;" onclick="VS_STATS_V2._saveReport()">' + $t('sv2.save') + '</button>'
+      +     '</div>'
+      +   '</div>'
+      +   '<table class="table"><thead><tr>'
+      +     '<th>' + $t('sv2.rep.cName') + '</th>'
+      +     '<th>' + $t('sv2.rep.cSchedule') + '</th>'
+      +     '<th>' + $t('sv2.rep.cRecipients') + '</th>'
+      +     '<th>' + $t('sv2.rep.cLastRun') + '</th>'
+      +     '<th>' + $t('sv2.rep.cStatus') + '</th>'
       +     '<th></th>'
       +   '</tr></thead><tbody>' + rows + '</tbody></table>'
       + '</div>';

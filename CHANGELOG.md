@@ -14,6 +14,26 @@
 
 ---
 
+## 2026-08-05 — Statisztika 2.0 (PR #10): 📧 Időzített e-mail riportok
+
+### Miért
+A `stats_report_schedules` tábla (PR #1) eddig üresen élt. Ez a PR bekötötte a full workflow-t: Admin időzítést állít be (napi/heti/havi), a scheduler óránként ellenőrzi az esedékes riportokat, és e-mailben elküldi a KÖZÖS VallorSoft feladó-címről.
+
+### Változások
+1. **`handlers/statsReports.js`** (ÚJ, `routes/execute.js`-be regisztrálva) — `statsReportSchedule{List,Save,Delete}`. Írás **Admin only**, olvasás Admin/Manager. `schedule` fehérlista (`daily`/`weekly`/`monthly`), max 20 címzett, EMAIL_RE-validáció, tenant-védelem (cross-tenant view_id → 0 sor → elutasítás). Audit.
+2. **`services/scheduler.js`** — új `startStatsReportScheduler`: óránként pörgeti a `enabled=true` sorokat; a `isDue()` a `schedule` + `last_run_at` alapján dönt (napi ≥22h, heti ≥6.5nap, havi ≥28nap). Egyszerű HTML-snapshot (előző hó KPI-k: lezárt fuvar / bevétel / km / kintlévőség) — `sendClientEmail`-en (KÖZÖS VallorSoft feladó, mint a monthly report), mailType `stats_report`. Sikeres küldés után `UPDATE last_run_at=NOW()`.
+3. **`server.js`** — `startStatsReportScheduler()` bekötve a többi scheduler mellé.
+4. **UI** (`public/stats-v2/shell.js`) — új 📧 gomb a szűrő-sáv jobb szélén (Admin only, a 🎯 mellett). Modal: név + gyakoriság (napi/heti/havi) + opcionális nézet-kötés + címzett-lista (vesszős) + „Aktív" pipa + „Utoljára futott" oszlop; sor-szintű aktiválás/kikapcsolás pipa + törlés gomb.
+5. **`public/i18n.js`** — 20 új `sv2.rep.*` kulcs (RO-alap + HU).
+6. **Nem PDF** — HTML-body a Brevo/SMTP-n át (a PDF-rendereléshez `puppeteer` kellene, ami ~150MB dependencia + memória; a HTML-riport ma is átmegy az e-mail kliensen).
+
+### Tesztek
+- **`tests/unit/statsReports.test.js`** (ÚJ, 14 új eset): szerep-védelem (Sofer/Manager tiltás), input-validáció (üres név, érvénytelen frekvencia, e-mail nélkül vagy érvénytelen e-mail), cross-tenant védelem (view_id 0 sor + schedule 0 sor), sikeres create/update/delete, string-recipients splitelés e-mail listára. **898 Jest zöld** (884 → 898); require-sweep 132 modul.
+
+Cache-bust: `stats-v2/shell.js` `?v=20260805j`.
+
+---
+
 ## 2026-08-05 — Statisztika 2.0 (PR #9): 📥 Egységes export-központ + nyomtatás-optimalizált nézet
 
 ### Miért
