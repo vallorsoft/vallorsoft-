@@ -74,6 +74,95 @@ describe('comUpdate (fuvar szerkesztés)', () => {
     expect(res.body.result.ok).toBe(false);
     expect(res.body.result.err).toMatch(/gasit|talal|not/i);
   });
+
+  // ── Milestone-időbélyegek (utólagos admin-javítás) ──
+  test('milestone-mezők: érvényes ISO → az UPDATE SET-be kerül; null → SET ... = NULL', async () => {
+    setUser(fixtures.admin);
+    pool.query.mockResolvedValue(rows([]));
+    pool.query.mockResolvedValueOnce(rows([{ status: 'Finalizat' }]));   // Anulat-guard SELECT
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });         // fő UPDATE
+    const at = new Date(Date.now() - 60 * 1000).toISOString();
+    const res = await exec('comUpdate', ['CMD-1', {
+      sosit_descarcare_at: at,
+      descarcat_at: null,   // törlés
+    }]);
+    expect(res.body.result.ok).toBe(true);
+    const [sql, values] = pool.query.mock.calls[1];
+    expect(sql).toMatch(/sosit_descarcare_at = \$\d+::timestamptz/);
+    expect(sql).toMatch(/descarcat_at = NULL/);
+    expect(values).toContain(at);
+  });
+
+  test('milestone-mezők: érvénytelen érték (nem ISO) → némán skip, más mezők mentődnek', async () => {
+    setUser(fixtures.admin);
+    pool.query.mockResolvedValue(rows([]));
+    pool.query.mockResolvedValueOnce(rows([{ status: 'In Curs' }]));
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+    const res = await exec('comUpdate', ['CMD-1', {
+      client: 'Új név',
+      incarcat_at: 'nem-ido',      // érvénytelen — skip
+    }]);
+    expect(res.body.result.ok).toBe(true);
+    const [sql] = pool.query.mock.calls[1];
+    expect(sql).toMatch(/client = \$/);
+    expect(sql).not.toMatch(/incarcat_at/);
+  });
+});
+
+describe('resetOrderMilestones', () => {
+  test('Sofőr → hozzáférés megtagadva', async () => {
+    setUser(fixtures.sofer);
+    const res = await exec('resetOrderMilestones', ['CMD-1']);
+    expect(res.body.result.ok).toBe(false);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  test('Anulált fuvar → nem enged', async () => {
+    setUser(fixtures.admin);
+    pool.query.mockResolvedValueOnce(rows([{ id: 'CMD-1', status: 'Anulat', email_sofer: null }]));
+    const res = await exec('resetOrderMilestones', ['CMD-1']);
+    expect(res.body.result.ok).toBe(false);
+  });
+
+  test('scope="unload" + Finalizat → NULL-ozás + Finalizat→In Curs', async () => {
+    setUser(fixtures.admin);
+    pool.query.mockResolvedValueOnce(rows([{ id: 'CMD-1', status: 'Finalizat', email_sofer: 'a@b.hu' }]));
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 2 });   // order_stops delivery reset
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });   // orders sosit_descarcare/descarcat NULL
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });   // status Finalizat → In Curs
+    const res = await exec('resetOrderMilestones', ['CMD-1', { scope: 'unload' }]);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.status).toBe('In Curs');
+    const stopsSql = pool.query.mock.calls[1][0];
+    expect(stopsSql).toMatch(/UPDATE order_stops[\s\S]+?arrived_at = NULL[\s\S]+?done_at = NULL[\s\S]+?WHERE order_id = \$1 AND company_id = \$2 AND kind = 'delivery'/);
+    const ordersSql = pool.query.mock.calls[2][0];
+    expect(ordersSql).toMatch(/sosit_descarcare_at = NULL/);
+    expect(ordersSql).toMatch(/descarcat_at = NULL/);
+    // NEM érinti a sosit_incarcare_at / incarcat_at-ot (felrakás megmarad)
+    expect(ordersSql).not.toMatch(/sosit_incarcare_at/);
+  });
+
+  test('scope="all" → mind a 4 milestone NULL + státusz Alocat (van email_sofer)', async () => {
+    setUser(fixtures.admin);
+    pool.query.mockResolvedValueOnce(rows([{ id: 'CMD-1', status: 'Finalizat', email_sofer: 'a@b.hu' }]));
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 4 });  // stops (mind reset)
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });  // orders all-NULL
+    pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });  // status
+    const res = await exec('resetOrderMilestones', ['CMD-1', { scope: 'all' }]);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.status).toBe('Alocat');
+    const ordersSql = pool.query.mock.calls[2][0];
+    expect(ordersSql).toMatch(/sosit_incarcare_at = NULL/);
+    expect(ordersSql).toMatch(/incarcat_at = NULL/);
+    expect(ordersSql).toMatch(/descarcat_at = NULL/);
+  });
+
+  test('scope invalid → err', async () => {
+    setUser(fixtures.admin);
+    const res = await exec('resetOrderMilestones', ['CMD-1', { scope: 'bogus' }]);
+    expect(res.body.result.ok).toBe(false);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
 });
 
 describe('getMySoferOrders (sofőr fuvarjai)', () => {

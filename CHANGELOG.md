@@ -14,6 +14,45 @@
 
 ---
 
+## 2026-08-06 — Admin milestone-szerkesztő + 🔁 „Lezárás visszavonása" — a beragadt fuvarok javítására
+
+### Miért
+A PR #322-vel a jövőbeli menetlevél-beküldések már nem tudják automatikusan Finalizat-ra váltani a driver-owned fuvart — DE a **régi bug által már beragadt** fuvarokat javítani kell tudni admin-oldalról. A `CMD-MS8NDEHONVF` kép ezt mutatja: `descarcat_at = 03.08 15:00` (a régi bug tette be a puncte-sor `data:'2026-08-03'`-ból), miközben a driver 05.08 23:43-kor tényleg megérkezett a lerakóhoz — de a `descarcat_at` már be volt égve, így a driver nem tud továbblépni, és a fuvar `Finalizat`-ban ragad inkonzisztens időpontokkal.
+
+### Változások
+
+#### 1) Admin milestone-időbélyeg-szerkesztő (`handlers/orders.js` `comUpdate`)
+- A `comUpdate` új opcionális mezőket fogad: `sosit_incarcare_at`, `incarcat_at`, `sosit_descarcare_at`, `descarcat_at`.
+- ISO string → parseolt `timestamptz` az UPDATE-be; `null` / `''` → `SET oszlop = NULL` (törlés). Érvénytelen érték → némán skip (a többi mező akkor is menthető).
+- Bit-azonos a többi mezővel (`values.push`/`updates.push`), Admin/Manager-only kapu változatlan.
+
+#### 2) 🔁 `resetOrderMilestones(orderId, { scope })` új handler
+- **Admin/Manager only**, cégre szűrt, audit-naplózott.
+- `scope: 'unload'` (alapértelmezett): a **lerakó-ágat teljesen NULL-ra hozza** — `orders.sosit_descarcare_at` + `descarcat_at` + minden `delivery` `order_stops.arrived_at`/`done_at`/`waybilled_at`. Ha a fuvar `Finalizat` volt, `In Curs`-ra visszaáll (`finalized_at` is NULL). A felrakó ág érintetlen.
+- `scope: 'all'`: teljes reset (mind a 4 milestone + minden stop). A státusz az eredeti hozzárendelés szerint (Alocat / Extern / Disponibil).
+- A `order_stops` reset szükséges, mert a mirror-trigger a következő stops-mutációkor visszaírná a NULL-ra állított `orders.*_at`-ot.
+
+#### 3) UI (`public/admin.html` + `manager.html` + `console-shared.js` + `i18n.js`)
+- Fuvar-szerkesztő modal új **„🚚 Sofőr-állomás időpontok"** blokk: 4 `datetime-local` mező, előtöltve a fuvar `sosit_incarcare_at` / `incarcat_at` / `sosit_descarcare_at` / `descarcat_at`-ból (helyi időzóna).
+- **🔁 „Lezárás visszavonása"** gomb (borostyán/warn) a blokk fejlécén — dupla-confirm után `resetOrderMilestones` `scope:'unload'`.
+- Mentéskor (`saveOrderEdit`): a 4 mező bekerül a `comUpdate` payload-jába (üres → `null`, különben ISO).
+- 8 új i18n kulcs (`oe.milestonesHead/Hint/sositIncarcare/incarcat/sositDescarcare/descarcat/resetUnload/resetUnloadConfirm/resetUnloadDone`, RO-alap + HU).
+
+### Teszt
+- **913 Jest zöld** (45 skipped valós-DB, +7 új):
+  - `orders.test.js` +2: `comUpdate` milestone-mezők (érvényes ISO → UPDATE, `null` → SET NULL; érvénytelen → némán skip).
+  - `orders.test.js` +5: `resetOrderMilestones` (Sofer 403, Anulat elutasítás, `unload` NULL-ozás + Finalizat→In Curs, `all` mind + státusz-visszaléptetés, invalid scope).
+- Cache-bust: `console-shared.js?v=20260806mile`, `i18n.js?v=20260806mile` (admin + manager).
+
+### A `CMD-MS8NDEHONVF` javítása
+1. Admin/Manager megnyitja a fuvart „✏️ Editează"-vel.
+2. A „🚚 Sofőr-állomás időpontok" blokkban rákattint a **🔁 „Lezárás visszavonása"** gombra → megerősítés → a lerakó-ág NULL-ozódik, a fuvar `In Curs`-ra visszavált.
+3. A sofőr a fuvar-kártyáján megnyomja a lerakás gombot → idő-picker modal (a PR #322-ből) → beállítja a valós lerakási időt (pl. `06.08 08:30`) → a fuvar `Finalizat` lesz konzisztens időbélyeggel.
+
+Alternatíva a lépés 3 helyett: az admin a blokkban közvetlenül beírja a `descarcat_at`-ot (pl. `06.08 08:30`) és menti — a `comUpdate` beteszi a `orders.descarcat_at`-ot; a fuvar státuszát a Státusz-dropdownon manuálisan is `Finalizat`-ra állíthatja.
+
+---
+
 ## 2026-08-06 — Sofőr-oldali kontrollok: fuvar-lezárás CSAK a sofőr kezében + idő-picker gombokra + session-recovery overlay
 
 ### Miért

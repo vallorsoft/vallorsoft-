@@ -4914,6 +4914,14 @@ function openOrderEdit(id) {
       var oeNuEl=document.getElementById('oeNeedsUit'); if(oeNuEl) oeNuEl.checked=!!o.needs_uit;
       document.getElementById('oeStatus').value = o.status||'Disponibil';
       document.getElementById('oeSoferType').value = o.sofer_type||'';
+      // 🚚 Sofőr-állomás időbélyegek előtöltése (Admin/Manager utólagos
+      // javításához; a driver-oldal ezeket a milestone-gombbal állítja).
+      var _mFields = ['sosit_incarcare_at','incarcat_at','sosit_descarcare_at','descarcat_at'];
+      var _mIds    = ['oeSositIncarcareAt','oeIncarcatAt','oeSositDescarcareAt','oeDescarcatAt'];
+      for (var _mi = 0; _mi < _mFields.length; _mi++) {
+        var _mEl = document.getElementById(_mIds[_mi]);
+        if (_mEl) _mEl.value = feToLocalDtInput(o[_mFields[_mi]]);
+      }
 
       // Térképes útvonal-előnézet állapota a mentett route_geo-ból (ha van + a kapcsoló be)
       if(typeof resetRouteState==='function') resetRouteState('edit');
@@ -5105,6 +5113,21 @@ function saveOrderEdit() {
   // Ha nem Extern a fuvar, az elavult alvállalkozói telefonszám/külső-sofőr-id
   // törlődjön a DB-ből (a szerkesztő ezeket nem rögzíti, csak nullázza).
   if (soferType !== 'Extern') { payload.telefon_extern = null; payload.external_driver_id = null; }
+  // 🚚 Sofőr-állomás időpontok: üres = null (törlés), különben helyi
+  // datetime-local → ISO. A szerver validál (érvénytelen → skip; a többi
+  // mező akkor is mentődik). Csak akkor küldjük, ha a mező LÉTEZIK a DOM-ban.
+  ['oeSositIncarcareAt:sosit_incarcare_at','oeIncarcatAt:incarcat_at',
+   'oeSositDescarcareAt:sosit_descarcare_at','oeDescarcatAt:descarcat_at']
+    .forEach(function (pair) {
+      var parts = pair.split(':');
+      var el = document.getElementById(parts[0]);
+      if (!el) return;
+      var raw = el.value || '';
+      if (raw === '') { payload[parts[1]] = null; return; }
+      var d = new Date(raw);
+      if (!(d instanceof Date) || isNaN(d.getTime())) return;
+      payload[parts[1]] = d.toISOString();
+    });
   // Több felrakó / lerakó pont (multi-drop) — az első pár a top-szintű
   // mezőkben marad (visszafelé kompat), a többi az „Extra pontok" blokkból.
   var _extra = (typeof _collectExtraStops === 'function') ? _collectExtraStops('oeExtraStopsList') : [];
@@ -5130,6 +5153,31 @@ function saveOrderEdit() {
       closeOrderEditModal();
       loadOrders();
     } else { toast(r&&r.err||t('common.error'),'err'); }
+  });
+}
+
+// 🔁 „Lezárás visszavonása" — a lerakó-ágat teljesen NULL-ra hozza
+// (orders.sosit_descarcare_at + descarcat_at + a delivery order_stops
+// arrived_at/done_at/waybilled_at), és ha a fuvar Finalizat volt, In Curs-ra
+// visszaáll. A driver ezután újra megnyomhatja a valós lerakást a
+// fuvar-kártyáról (a fejlesztett idő-picker modalban a valódi időpont is
+// beállítható). Kettős-megerősítéssel — visszavonhatatlan a menetlevél-
+// beküldést előidéző auto-Finalizat javítására.
+function oeResetUnload() {
+  if (!_oeOrderId) return;
+  if (!confirm(t('oe.resetUnloadConfirm') || 'Sigur vrei să anulezi descărcarea? Cursa se întoarce în In Curs, iar șoferul o închide din nou.')) return;
+  gas('resetOrderMilestones', [_oeOrderId, { scope: 'unload' }]).then(function (r) {
+    if (r && r.ok) {
+      toast(t('oe.resetUnloadDone') || '🔁 Lezárás visszavonva. A sofőr újranyomhatja a lerakást.', 'ok');
+      // Az űrlapot frissítsük — a mezőket a szerver most már NULL-ra állította.
+      var _ids = ['oeSositDescarcareAt','oeDescarcatAt'];
+      _ids.forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
+      var st = document.getElementById('oeStatus');
+      if (st && r.status) st.value = r.status;
+      if (typeof loadOrders === 'function') loadOrders();
+    } else {
+      toast((r && r.err) || t('common.error'), 'err');
+    }
   });
 }
 

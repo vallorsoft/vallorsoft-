@@ -860,6 +860,37 @@ handlers.comUpdate = async function (req, res, args) {
       if (o.marfa_currency !== undefined) { updates.push(`marfa_currency = $${i++}`); values.push(['RON', 'EUR'].includes(o.marfa_currency) ? o.marfa_currency : 'RON'); }
       if (o.needs_uit !== undefined) { updates.push(`needs_uit = $${i++}`); values.push(!!o.needs_uit); }
 
+      // ── Admin/Manager: sofőr-állomás időbélyegek szerkesztése ──
+      // A driver-oldali bugok (pl. régi menetlevél-beküldés auto-Finalizat)
+      // után beragadt fuvarok javításához. `null`/`''` → törlés (NULL a
+      // DB-ben); érvényes ISO string → parse-oljuk. Érvénytelen érték =
+      // eldobjuk (a fuvar többi mezője akkor is menthető).
+      //
+      // FONTOS: ha vannak stopok (order_stops), a `orders.*_at` mezőket
+      // a mirror-trigger írja felül a következő stops-mutációkor. Ezért
+      // amikor a top-mezőt NULL-ra állítjuk (pl. auto-Finalizat undo),
+      // a stops.done_at-et is NULL-ra kell állítani — ezt a dedikált
+      // `resetOrderMilestones` handler végzi (lásd lentebb). A comUpdate
+      // csak orders.*_at szintjén dolgozik (bit-azonos a többi mezővel).
+      const _parseMilestoneTs = (v) => {
+        if (v === undefined) return undefined;               // NEM módosítjuk
+        if (v === null || v === '') return null;             // Kézi törlés
+        const d = new Date(String(v));
+        if (!(d instanceof Date) || isNaN(d.getTime())) return undefined; // hibás → skip
+        return d.toISOString();
+      };
+      const _MILE_FIELDS = ['sosit_incarcare_at', 'incarcat_at', 'sosit_descarcare_at', 'descarcat_at'];
+      for (const f of _MILE_FIELDS) {
+        const parsed = _parseMilestoneTs(o[f]);
+        if (parsed === undefined) continue;
+        if (parsed === null) {
+          updates.push(`${f} = NULL`);
+        } else {
+          updates.push(`${f} = $${i++}::timestamptz`);
+          values.push(parsed);
+        }
+      }
+
       const hasStopsPayload = Array.isArray(o.pickups) || Array.isArray(o.deliveries) || Array.isArray(o.stops);
       const hasTopStopFields = ['loc_incarcare','loc_descarcare','firma_incarcare','firma_descarcare','data_incarcare','data_descarcare']
         .some((k) => o[k] !== undefined);
@@ -911,6 +942,114 @@ handlers.comUpdate = async function (req, res, args) {
       return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };
+
+// ─────────────────────────────────────────────────────────────
+// resetOrderMilestones(orderId, { scope })
+//   Admin/Manager only. A beragadt fuvarok javítására — pl. régi
+//   menetlevél-beküldés auto-Finalizat-ra váltotta a fuvart, pedig
+//   a driver még nem rögzítette a valódi lerakást.
+//   `scope`:
+//     'unload'  — a lerakó ág RESETEL: sosit_descarcare_at + descarcat_at
+//                 NULL-ra (mind orders, mind order_stops delivery-eken),
+//                 és ha a státusz Finalizat, akkor In Curs-ra vissza.
+//                 (A felrakó megmarad, a driver csak a lerakást újranyomja.)
+//     'all'     — mind a 4 milestone NULL (arrive/done pickup+delivery), és
+//                 ha volt Finalizat, akkor Alocat/In Curs-ra vissza a
+//                 driver-hozzárendelés függvényében. Ritkán kell.
+//   Multi-tenant: mindig cégre szűrt UPDATE. Audit-naplózva.
+// ─────────────────────────────────────────────────────────────
+handlers.resetOrderMilestones = async function (req, res, args) {
+  try {
+    if (!req.session.user || !['Admin', 'Manager'].includes(req.session.user.pozicio)) {
+      return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    }
+    const orderId = String((args && args[0]) || '').trim();
+    const scope = String((args && args[1] && args[1].scope) || 'unload').toLowerCase();
+    if (!orderId) return res.json({ result: { ok: false, err: 'ID-ul este obligatoriu.' } });
+    if (!['unload', 'all'].includes(scope)) {
+      return res.json({ result: { ok: false, err: 'Scope invalid.' } });
+    }
+    const cid = req.session.user.company_id;
+
+    // Tulajdon-ellenőrzés (cégre szűrve) — belső driver-owned döntéshez is kell
+    const chk = await pool.query(
+      `SELECT id, status, email_sofer FROM orders WHERE id = $1 AND company_id = $2`,
+      [orderId, cid]);
+    if (!chk.rows.length) return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit.' } });
+    const row = chk.rows[0];
+    if (row.status === 'Anulat') {
+      return res.json({ result: { ok: false, err: 'Cursa este anulată.' } });
+    }
+
+    // 1) order_stops resetel (ha van) — a mirror-trigger utána a orders.*_at-ot
+    //    automatikusan NULL-ra hozza. Ha nincs egy stop se, a 2) lépés
+    //    állítja a orders.*_at-ot direktben.
+    if (scope === 'unload') {
+      await pool.query(
+        `UPDATE order_stops
+            SET arrived_at = NULL,
+                done_at = NULL,
+                waybilled_at = NULL,
+                updated_at = NOW()
+          WHERE order_id = $1 AND company_id = $2 AND kind = 'delivery'`,
+        [orderId, cid]);
+      await pool.query(
+        `UPDATE orders
+            SET sosit_descarcare_at = NULL,
+                descarcat_at = NULL,
+                updated_at = NOW()
+          WHERE id = $1 AND company_id = $2`,
+        [orderId, cid]);
+    } else {
+      // 'all' — teljes reset
+      await pool.query(
+        `UPDATE order_stops
+            SET arrived_at = NULL,
+                done_at = NULL,
+                waybilled_at = NULL,
+                updated_at = NOW()
+          WHERE order_id = $1 AND company_id = $2`,
+        [orderId, cid]);
+      await pool.query(
+        `UPDATE orders
+            SET sosit_incarcare_at = NULL,
+                incarcat_at = NULL,
+                sosit_descarcare_at = NULL,
+                descarcat_at = NULL,
+                updated_at = NOW()
+          WHERE id = $1 AND company_id = $2`,
+        [orderId, cid]);
+    }
+
+    // 2) Státusz visszaléptetés — a fuvar-lezárást a driver kezébe adjuk.
+    //    Finalizat → In Curs (mert a legalább felrakás már megtörtént;
+    //    a driver most csak a lerakást fogja megnyomni). 'all' esetében
+    //    ha nincs milestone, a fuvar státusza az eredeti hozzárendelés
+    //    szerint (Alocat, ha van email_sofer; Extern; egyébként Disponibil).
+    let newStatus = row.status;
+    if (row.status === 'Finalizat') newStatus = 'In Curs';
+    if (scope === 'all') {
+      newStatus = row.email_sofer ? 'Alocat' : (row.status === 'Extern' ? 'Extern' : 'Disponibil');
+    }
+    if (newStatus !== row.status) {
+      await pool.query(
+        `UPDATE orders SET status = $1, finalized_at = NULL, updated_at = NOW()
+          WHERE id = $2 AND company_id = $3`,
+        [newStatus, orderId, cid]);
+    }
+
+    // Audit — best-effort
+    try {
+      const audit = require('../lib/audit');
+      await audit.fromReq(req, 'order.reset_milestone', 'order', orderId, { scope, prev_status: row.status, new_status: newStatus });
+    } catch (_) { /* audit hiánya nem buktatja a fő műveletet */ }
+
+    return res.json({ result: { ok: true, status: newStatus } });
+  } catch (err) {
+    console.error('resetOrderMilestones hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
 
 handlers.comDelete = async function (req, res, args) {
     try {

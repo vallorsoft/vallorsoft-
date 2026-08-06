@@ -1181,6 +1181,25 @@
     'cs.ol.mTrack':    { hu: 'Követő-link', ro: 'Link urmărire' },
     'cs.ol.mTplMail':  { hu: 'Sablonból e-mail', ro: 'E-mail din șablon' },
     'cs.ol.mOrderMail':{ hu: 'Email a fuvarról', ro: 'E-mail despre cursă' },
+    // 🚚 Sofőr-állomás időbélyeg szerkesztő (fuvar-szerkesztő modalban)
+    'oe.milestonesHead': { hu: '🚚 Sofőr-állomás időpontok', ro: '🚚 Marcaje șofer (arrive/done)' },
+    'oe.milestonesHint': {
+      hu: 'Üres mező = törlés. A lerakás (Leürített) törlésekor a fuvar Finalizat-ból In Curs-ra vált — a sofőr a fuvar-kártyáról újranyomhatja.',
+      ro: 'Câmp gol = ștergere. La ștergerea descărcării (A descărcat) cursa se întoarce din Finalizat în In Curs — șoferul o reînregistrează din cardul cursei.'
+    },
+    'oe.sositIncarcare': { hu: '📍 Megérkezett a felrakóhoz', ro: '📍 A sosit la încărcare' },
+    'oe.incarcat':       { hu: '📦 Felrakodott',               ro: '📦 A încărcat' },
+    'oe.sositDescarcare':{ hu: '📍 Megérkezett a lerakóhoz',   ro: '📍 A sosit la descărcare' },
+    'oe.descarcat':      { hu: '✅ Leürített',                  ro: '✅ A descărcat' },
+    'oe.resetUnload':    { hu: '🔁 Lezárás visszavonása',      ro: '🔁 Anulează închiderea' },
+    'oe.resetUnloadConfirm': {
+      hu: 'Biztos, hogy visszavonod a lezárást? A fuvar Finalizat-ból In Curs-ra vált, és a sofőr újra megnyomhatja a lerakást a fuvar-kártyáról.',
+      ro: 'Sigur anulezi închiderea? Cursa trece din Finalizat înapoi în In Curs, iar șoferul reînregistrează descărcarea din cardul cursei.'
+    },
+    'oe.resetUnloadDone': {
+      hu: '🔁 Lezárás visszavonva. A sofőr újranyomhatja a lerakást.',
+      ro: '🔁 Închidere anulată. Șoferul poate reînregistra descărcarea.'
+    },
     'oe.title':     { hu: 'Email a fuvarról', ro: 'E-mail despre cursă' },
     'oe.to':        { hu: 'Címzett (bármilyen cím)', ro: 'Destinatar (orice adresă)' },
     'oe.subject':   { hu: 'Tárgy', ro: 'Subiect' },
