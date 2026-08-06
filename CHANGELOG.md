@@ -14,6 +14,51 @@
 
 ---
 
+## 2026-08-06 — Sofőr-oldali kontrollok: fuvar-lezárás CSAK a sofőr kezében + idő-picker gombokra + session-recovery overlay
+
+### Miért
+Egy konkrét fuvarnál (CMD-MS8NDEHONVF) a lerakó tervezett dátuma be volt írva, de a sofőr még nem rögzítette a valódi lerakást — a rendszer mégis automatikusan Finalizat-ra állította. A gyökér: a menetlevél-beküldés (puncte a tervezett dátummal) `done_at`-et állított a stopokra → a `descarcat_at` mirror-mező NOT NULL lett → a végén auto-Finalizat. A menetlevél DOKUMENTUM (fuvar-lista összesítő), nem esemény; belső sofőrnél a tényleges felrakás/lerakás időpontját a driver a fuvar-kártya állomás-gombjaival rögzíti.
+
+A gomb-nyomás körüli UX is bővült: eddig egy sima „biztos?" kérdés jött, ami félrenyomva rögtön rossz időt írt. Új idő-picker modal: mai idő az alapérték, de a sofőr utólag pótolhatja / szerkesztheti a valós időt.
+
+Végül a session-lejáráskori élmény javult a driver-oldalon: eddig azonnal /login-re dobta a felületet, ami félrevezető volt („azt hittem be voltam jelentkezve"). Új saját overlay: „🔌 A munkamenet lejárt" + 🔄 Frissítés / Kilépés — offline állapotban is a szemünk előtt marad a felület.
+
+### Változások
+
+#### 1) Fuvar-lezárás CSAK a sofőr kezében (`routes/soferApi.js`)
+- A `fuvarlevel-save` végpontban új szabály: **belső sofőrhöz kiosztott fuvarnál** (`email_sofer NOT NULL` ÉS státusz nem Extern) a menetlevél puncte-sorai CSAK `waybilled_at`-et állítanak; a `done_at`-et NEM. Így a mirror trigger sem állít `descarcat_at`-ot, és az auto-Finalizat SQL sem fut (a végén az `externOrders` tömbre szűkítve).
+- **Extern / nincs internal driver** esetén a régi viselkedés marad: `done_at` is beállítódik + auto-Finalizat futhat — a külsős fuvarnál ugyanis nincs milestone-gomb.
+- Belső fuvar státuszát a driver az „Elvégeztem" utolsó gomb-nyomásával zárja Finalizat-ra (`routes/ordersRest.js` `_applyStopEvent` — érintetlen).
+- Új regressziós tesztek: `tests/integration/fuvarlevel-save-driver-owned.test.js` (+2 eset, mock-alapú).
+
+#### 2) Idő-picker modal (`sofTimeConfirm`, `public/sofer.js`+`html`+`css`+`i18n.js`)
+- Új `sofTimeModal` HTML + CSS a `sofConfirm` mellett: cím + magyarázó szöveg + `datetime-local` input (mai idő az alapérték, „Most" gombbal újra visszaállítható) + Igen/Mégse.
+- Új kliens-függvények: `sofTimeConfirm(opts, onOk)` (`onOk` egy ISO string-et kap), `sofTimeOk`/`sofTimeCancel`/`sofTimeSetNow`.
+- Átépítve: `driverMilestone`, `driverStopAction` (egy-opció ág), `sofChoice` (több lerakó → először stop-választás, aztán idő-picker), `sendBorderCross` (mindkét irányra).
+- A `_driverMilestoneGo` / `_soferStopEventGo` / `_sendBorderCrossGo` új opcionális `atIso` paraméter → a fetch body-jában `at` ISO-string; üresen hagyva a szerver `NOW()`-t használ.
+- Új i18n kulcsok: `sof.timeConfirm.at`/`now`/`hint` + `sof.sess.*` (session-overlay). A `sof.ms.confirmMsg` / `sof.ms.confirmStop` / `sof.crossConfirmMsg` szövegek frissítve („ha lekésted, lentebb a valós időt beállíthatod").
+
+#### 3) Szerver-oldali `at` bemenet validációja
+- **`routes/ordersRest.js`** új közös `parseAtInput(at)` (`MAX_BACKDATE_MS=7 nap`, `MAX_FUTURE_MS=2 perc`): érvénytelen/hiányzó → `null`, hívó a régi `NOW()`-ra esik vissza. Bekötve: `POST /api/orders/:id/driver-milestone` (mind a per-stop, mind a legacy 4-lépéses ág) és `POST /api/orders/:id/stop-event`.
+- **`routes/soferApi.js`** ugyanez a szűrő `_parseBorderAt(at)`: a `POST /api/border-cross` INSERT-be explicit `created_at`-tal ír, ha kap érvényes ISO-t; egyébként a tábla default `NOW()`-t használ.
+- Új tesztek: `sofer-routes.test.js` (+5 eset — érvényes `at`, jövőbeli/túl régi/nem-ISO → `NOW()`-fallback; border-cross `at` INSERT-be kerül).
+
+#### 4) Session-recovery overlay (`public/session-guard.js` + `public/sofer.js` + `.html` + `.css` + `i18n.js`)
+- A `session-guard.js` új „in-app recovery" ág: ha a hivo oldal beállítja a `window.VS_INAPP_SESSION_RECOVER = true`-t, a `visibilitychange` során expired session esetén NEM redirectel /login-re; helyette meghívja a `window.__vsShowSessionOverlay(reason)`-t. Offline állapotban is (a fetch-hívás előtt) ezt hívjuk.
+- **`sofer.html`** új `#vsSessionOverlay` (🔌 ikon + cím + üzenet + státusz + 🔄 Frissítés / Kilépés gombok). **`sofer.css`** téma-egységes stílus.
+- **`sofer.js`** `VS_INAPP_SESSION_RECOVER = true` + `__vsShowSessionOverlay` + `vsSessionRefresh` (reload) + `vsSessionLogout` (best-effort `authLogout` + `/login`). Új `online` esemény-figyelő: ha a hálózat visszajön ÉS az overlay látszik, csendes `authMe`-t próbál — ha a szerver megismer, bezárul; ha nem, a státusz frissül.
+- Az admin/manager/developer oldalakat NEM érinti (a `VS_INAPP_SESSION_RECOVER` flag ott nem áll be → régi redirect-viselkedés).
+
+### Teszt/verifikáció
+- 906 Jest teszt zöld (45 skipped valós-DB). Új: `fuvarlevel-save-driver-owned.test.js` (+2), `sofer-routes.test.js` (+5), `sofer-client-flow.test.js` átírva (+1 új eset: üres input → nincs `at`).
+- Cache-bust: `sofer.html` → `sofer.js/css/i18n.js?v=20260806evt`, `session-guard.js?v=20260806sess`.
+
+### Ismert korlátok
+- A `parseAtInput` `MAX_BACKDATE_MS = 7 nap` — ha a sofőr ennél régebbi eseményt akar utólag pótolni, a szerver `NOW()`-ra esik vissza (a diszpécser a menetlevél-szerkesztőben tudja korrigálni).
+- A session-overlay offline állapotban valóban csak visszaengedi a felületre — a szerver-akciók (állomás-léptetés, menetlevél-beküldés) továbbra is szerver-hozzáférést igényelnek. A perzisztens localStorage-piszkozat + IndexedDB kép-megőrzés + offline outbox érintetlen.
+
+---
+
 ## 2026-08-05 — Statisztika 2.0 utólagos kör: 🔎 Drill-in adatlap + 🆚 Multi-select összehasonlítás (max 5)
 
 ### Miért

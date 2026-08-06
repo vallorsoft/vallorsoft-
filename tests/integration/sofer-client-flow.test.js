@@ -413,12 +413,18 @@ describe('per-sofőr storage kulcs formátuma', () => {
 //  felület saját modalja kérdez a visszavonhatatlan műveleteknél.
 //  Az „igen" ág CSAK a modal OK gombjára fut le.
 // ================================================================
-describe('driverMilestone megerősítés (saját modal)', () => {
-  test('a hívás önmagában NEM küld — előbb megnyílik a modal', () => {
+// ================================================================
+//  driverMilestone — idő-picker modal (sofTimeConfirm). A régi
+//  sofConfirm helyett a szerver `at` paramétert vár; a modal alap
+//  értéke a MOSTANI idő, de a sofőr utólag pótolhatja. Az Igen
+//  ág CSAK a sofTimeOk gomb után fut.
+// ================================================================
+describe('driverMilestone megerősítés (idő-picker modal)', () => {
+  test('a hívás önmagában NEM küld — előbb megnyílik az idő-picker', () => {
     const urls = [];
     const sb = load({ fetch: (u) => { urls.push(String(u)); return Promise.resolve({ json: () => Promise.resolve({ ok: true }) }); } });
     sb.driverMilestone('ORD1', 0);
-    expect(sb.document._registry.sofConfirmModal.style.display).toBe('flex');
+    expect(sb.document._registry.sofTimeModal.style.display).toBe('flex');
     expect(urls.filter(u => u.indexOf('/driver-milestone') >= 0)).toEqual([]);
   });
 
@@ -426,75 +432,99 @@ describe('driverMilestone megerősítés (saját modal)', () => {
     const urls = [];
     const sb = load({ fetch: (u) => { urls.push(String(u)); return Promise.resolve({ json: () => Promise.resolve({ ok: true }) }); } });
     sb.driverMilestone('ORD1', 0);
-    sb.sofConfirmCancel();
-    expect(sb.document._registry.sofConfirmModal.style.display).toBe('none');
+    sb.sofTimeCancel();
+    expect(sb.document._registry.sofTimeModal.style.display).toBe('none');
     expect(urls.filter(u => u.indexOf('/driver-milestone') >= 0)).toEqual([]);
   });
 
-  test('Igen → POST a driver-milestone végpontra, modal zárul', async () => {
+  test('Igen → POST a driver-milestone végpontra `at` ISO-val, modal zárul', async () => {
     const calls = [];
-    const sb = load({ fetch: (u, o) => { calls.push({ u: String(u), m: o && o.method }); return Promise.resolve({ json: () => Promise.resolve({ ok: true, step: 'loaded' }) }); } });
+    const sb = load({ fetch: (u, o) => { calls.push({ u: String(u), m: o && o.method, body: o && o.body }); return Promise.resolve({ json: () => Promise.resolve({ ok: true, step: 'loaded' }) }); } });
     sb.loadDashOrders = () => {};
     sb.driverMilestone('ORD1', 1);
-    sb.sofConfirmOk();
+    // A modal input értékét a valós kód a mostani helyi időre állította.
+    // Az OK gomb ISO-ra konvertál és beteszi az `at`-ba.
+    sb.sofTimeOk();
     await tick();
     const hit = calls.filter(c => c.u.indexOf('/driver-milestone') >= 0);
     expect(hit.length).toBe(1);
     expect(hit[0].m).toBe('POST');
     expect(hit[0].u).toContain('/api/orders/ORD1/driver-milestone');
-    expect(sb.document._registry.sofConfirmModal.style.display).toBe('none');
+    const body = JSON.parse(hit[0].body || '{}');
+    expect(typeof body.at).toBe('string');
+    expect(body.at).toMatch(/^\d{4}-\d{2}-\d{2}T/); // ISO-formátum
+    expect(sb.document._registry.sofTimeModal.style.display).toBe('none');
+  });
+
+  test('üres input → `at` nem kerül a body-ba (szerver NOW()-t használ)', async () => {
+    const calls = [];
+    const sb = load({ fetch: (u, o) => { calls.push({ u: String(u), body: o && o.body }); return Promise.resolve({ json: () => Promise.resolve({ ok: true }) }); } });
+    sb.loadDashOrders = () => {};
+    sb.driverMilestone('ORD1', 1);
+    // Töröljük az input-ot a jóváhagyás előtt (mint amikor a sofőr
+    // szándékosan üresen hagyta) — a body-ban NEM lesz `at`.
+    sb.document._registry.sofTimeInput.value = '';
+    sb.sofTimeOk();
+    await tick();
+    const hit = calls.filter(c => c.u.indexOf('/driver-milestone') >= 0);
+    expect(hit.length).toBe(1);
+    const body = JSON.parse(hit[0].body || '{}');
+    expect(body.at).toBeUndefined();
   });
 
   test('a modal címe a soron következő állomást nevezi meg', () => {
     const sb = load({});
     sb.t = (k, v) => (v && v.act != null) ? (k + '|' + v.act) : k;
     sb.driverMilestone('ORD1', 2);           // sosit_descarcare_at
-    expect(sb.document._registry.sofConfirmTitle.textContent).toBe('sof.ms.confirmTitle|sof.ms.arriveUnload');
+    expect(sb.document._registry.sofTimeTitle.textContent).toBe('sof.ms.confirmTitle|sof.ms.arriveUnload');
   });
 
   test('érvénytelen/hiányzó stepIdx → általános kérdés, de továbbra is kérdez', () => {
     const sb = load({});
     sb.t = (k, v) => (v && v.act != null) ? (k + '|' + v.act) : k;
     sb.driverMilestone('ORD1');
-    expect(sb.document._registry.sofConfirmTitle.textContent).toBe('sof.ms.confirmTitle|sof.ms.recorded');
+    expect(sb.document._registry.sofTimeTitle.textContent).toBe('sof.ms.confirmTitle|sof.ms.recorded');
     sb.driverMilestone('ORD1', 99);
-    expect(sb.document._registry.sofConfirmTitle.textContent).toBe('sof.ms.confirmTitle|sof.ms.recorded');
+    expect(sb.document._registry.sofTimeTitle.textContent).toBe('sof.ms.confirmTitle|sof.ms.recorded');
   });
 });
 
-describe('sendBorderCross megerősítés (saját modal)', () => {
+describe('sendBorderCross megerősítés (idő-picker modal)', () => {
   test('a hívás önmagában nem rögzít és GPS-t sem kér', () => {
     const urls = [];
     let geo = 0;
     const sb = load({ fetch: (u) => { urls.push(String(u)); return Promise.resolve({ json: () => Promise.resolve({ success: true }) }); } });
     sb.navigator.geolocation = { getCurrentPosition: () => { geo++; } };
     sb.sendBorderCross('Iesire', 'RO');
-    expect(sb.document._registry.sofConfirmModal.style.display).toBe('flex');
+    expect(sb.document._registry.sofTimeModal.style.display).toBe('flex');
     expect(urls.filter(u => u.indexOf('/api/border-cross') >= 0)).toEqual([]);
     expect(geo).toBe(0);
   });
 
-  test('Igen → POST az /api/border-cross végpontra a helyes iránnyal', async () => {
+  test('Igen → POST az /api/border-cross végpontra a helyes iránnyal + `at`', async () => {
     const calls = [];
     const sb = load({ fetch: (u, o) => { calls.push({ u: String(u), o }); return Promise.resolve({ json: () => Promise.resolve({ success: true }) }); } });
     sb.loadBorderLog = () => {};
     sb.sendBorderCross('Intrare', 'RO');
-    sb.sofConfirmOk();
+    sb.sofTimeOk();
     await tick();
     const hit = calls.filter(c => c.u.indexOf('/api/border-cross') >= 0);
     expect(hit.length).toBe(1);
     expect(hit[0].o.method).toBe('POST');
-    expect(JSON.parse(hit[0].o.body)).toMatchObject({ tip: 'Intrare', tara: 'RO' });
+    const body = JSON.parse(hit[0].o.body);
+    expect(body).toMatchObject({ tip: 'Intrare', tara: 'RO' });
+    expect(typeof body.at).toBe('string');
+    expect(body.at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   test('a modal címe az irányt nevezi meg (BE / KI külön)', () => {
     const sb = load({});
     sb.t = (k, v) => (v && v.act != null) ? (k + '|' + v.act) : k;
     sb.sendBorderCross('Intrare', 'RO');
-    expect(sb.document._registry.sofConfirmTitle.textContent).toBe('sof.crossConfirmTitle|sof.crossIn');
-    sb.sofConfirmCancel();
+    expect(sb.document._registry.sofTimeTitle.textContent).toBe('sof.crossConfirmTitle|sof.crossIn');
+    sb.sofTimeCancel();
     sb.sendBorderCross('Iesire', 'RO');
-    expect(sb.document._registry.sofConfirmTitle.textContent).toBe('sof.crossConfirmTitle|sof.crossOut');
+    expect(sb.document._registry.sofTimeTitle.textContent).toBe('sof.crossConfirmTitle|sof.crossOut');
   });
 });
 

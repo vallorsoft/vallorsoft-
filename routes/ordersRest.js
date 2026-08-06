@@ -8,6 +8,27 @@ const pool = require('../db');
 const { requireLogin, requireRole } = require('../middleware/auth');
 const { sendPushToRole } = require('../services/push');
 
+// ── Idő-bemenet validálás a driver-milestone / stop-event / border-cross
+// végpontokhoz. A sofőr az idő-picker modalban jóváhagyja/szerkeszti a
+// mostani időt; utólag pótolhatja is, ha lekésett a gombbal. Csak józan
+// ész-korlátot kényszerítünk: parse-olható ISO és max ~7 nap múlt (a
+// jövőt kicsit engedjük, hogy a kliens-órák pár másodperces „jövője"
+// ne bukjon el). Ha `at` nincs vagy érvénytelen, NULL-t adunk vissza,
+// és a hívó a régi `NOW()`-ra esik vissza.
+const MAX_BACKDATE_MS = 7 * 24 * 60 * 60 * 1000;   // 7 nap
+const MAX_FUTURE_MS   = 2 * 60 * 1000;             // 2 perc előrenéző türelem
+function parseAtInput(at) {
+  if (at === undefined || at === null || at === '') return null;
+  const s = String(at);
+  const d = new Date(s);
+  if (!(d instanceof Date) || isNaN(d.getTime())) return null;
+  const now = Date.now();
+  const t = d.getTime();
+  if (t > now + MAX_FUTURE_MS) return null;
+  if (t < now - MAX_BACKDATE_MS) return null;
+  return d.toISOString();
+}
+
 router.post('/api/orders/:id/quick-status', requireLogin, requireRole('Admin','Manager'), async (req, res) => {
   const { status } = req.body;
   // Ugyanaz a státusz-halmaz, mint a comUpdate-ben (a lista dropdownja
@@ -114,6 +135,9 @@ const MILESTONE_STEPS = [
 ];
 router.post('/api/orders/:id/driver-milestone', requireLogin, requireRole('Sofer'), async (req, res) => {
   const driver = req.session.user;
+  // Opcionális `at` (ISO): a sofőr az idő-picker modalban jóváhagyja/
+  // szerkeszti az időpontot; ha nem küld, `NOW()`-t használunk.
+  const eventAt = parseAtInput(req.body && req.body.at);
   try {
     const check = await pool.query(
       `SELECT id, client, status, sosit_incarcare_at, incarcat_at, sosit_descarcare_at, descarcat_at
@@ -160,7 +184,7 @@ router.post('/api/orders/:id/driver-milestone', requireLogin, requireRole('Sofer
           }
         }
         if (!nextStop) return res.json({ ok: false, err: 'Toate etapele au fost deja înregistrate.' });
-        return _applyStopEvent(req, res, driver, row, nextStop, nextEvent);
+        return _applyStopEvent(req, res, driver, row, nextStop, nextEvent, eventAt);
       }
     } catch (_stopsErr) { hasStops = false; /* fallback a legacy útra */ }
 
@@ -173,9 +197,12 @@ router.post('/api/orders/:id/driver-milestone', requireLogin, requireRole('Sofer
     let setStatus = '';
     if (isFirst && ['Disponibil', 'Alocat', 'Extern'].includes(row.status)) setStatus = ", status = 'In Curs'";
     if (isLast) setStatus = ", status = 'Finalizat'";
+    // Ha a sofőr utólag pótolja, a `eventAt`-ot írjuk NOW() helyett.
+    const tsExpr = eventAt ? `$2::timestamptz` : 'NOW()';
+    const params = eventAt ? [req.params.id, eventAt] : [req.params.id];
     await pool.query(
-      `UPDATE orders SET ${step.col} = NOW()${setStatus}, updated_at = NOW() WHERE id = $1`,
-      [req.params.id]
+      `UPDATE orders SET ${step.col} = ${tsExpr}${setStatus}, updated_at = NOW() WHERE id = $1`,
+      params
     );
     const clientName = row.client || ('#' + req.params.id);
     try {
@@ -208,6 +235,9 @@ router.post('/api/orders/:id/stop-event', requireLogin, requireRole('Sofer'), as
   if (!stopId || !['arrive', 'done'].includes(event)) {
     return res.json({ ok: false, err: 'Parametri invalizi' });
   }
+  // Opcionális `at` — a sofőr az idő-picker modalban jóváhagyja/szerkeszti;
+  // ha érvénytelen vagy hiányzik, NOW()-t használunk.
+  const eventAt = parseAtInput(req.body && req.body.at);
   try {
     const check = await pool.query(
       `SELECT id, client, status FROM orders
@@ -222,7 +252,7 @@ router.post('/api/orders/:id/stop-event', requireLogin, requireRole('Sofer'), as
         WHERE id = $1 AND order_id = $2 AND company_id = $3`,
       [stopId, req.params.id, driver.company_id]);
     if (!sq.rows.length) return res.json({ ok: false, err: 'Stop invalid' });
-    return _applyStopEvent(req, res, driver, row, sq.rows[0], event);
+    return _applyStopEvent(req, res, driver, row, sq.rows[0], event, eventAt);
   } catch (err) {
     console.error('stop-event hiba:', err);
     return res.json({ ok: false, err: 'Eroare de server' });
@@ -233,7 +263,9 @@ router.post('/api/orders/:id/stop-event', requireLogin, requireRole('Sofer'), as
 // Szigorúan sorrend: 'done' csak akkor, ha az 'arrive' már megvolt.
 // Egy pickup arrive-nál Disponibil/Alocat/Extern → In Curs.
 // Minden delivery.done → Finalizat (státusz + orders.finalized_at trigger).
-async function _applyStopEvent(req, res, driver, order, stop, event) {
+// `eventAt` (ISO) opcionális — az idő-picker modalból; ha null, NOW()-t
+// használunk (parseAtInput már validált, ezért itt bátran beemelhetjük).
+async function _applyStopEvent(req, res, driver, order, stop, event, eventAt) {
   try {
     if (event === 'done' && !stop.arrived_at) {
       return res.json({ ok: false, err: 'Trebuie mai întâi să confirmi sosirea (arrive).' });
@@ -247,9 +279,15 @@ async function _applyStopEvent(req, res, driver, order, stop, event) {
 
     // Az esemény rögzítése (a trigger frissíti a orders.*_at mirror mezőket)
     const col = event === 'arrive' ? 'arrived_at' : 'done_at';
-    await pool.query(
-      `UPDATE order_stops SET ${col} = NOW(), updated_at = NOW() WHERE id = $1`,
-      [stop.id]);
+    if (eventAt) {
+      await pool.query(
+        `UPDATE order_stops SET ${col} = $1::timestamptz, updated_at = NOW() WHERE id = $2`,
+        [eventAt, stop.id]);
+    } else {
+      await pool.query(
+        `UPDATE order_stops SET ${col} = NOW(), updated_at = NOW() WHERE id = $1`,
+        [stop.id]);
+    }
 
     // Státusz-léptetés a fuvaron
     // - első pickup arrive esetén: Disponibil/Alocat/Extern → In Curs

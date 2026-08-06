@@ -22,6 +22,25 @@
   var warnBanner   = null;
   var authPingInFlight = false;
 
+  // In-app session-recovery: ha a hivo oldal (pl. sofer.html) beallitja
+  // a window.VS_INAPP_SESSION_RECOVER = true-t, akkor NEM iranyitunk at
+  // /login-re. Helyette a window.__vsShowSessionOverlay(reason)-t hivjuk
+  // meg, ami saját overlay-t mutat („Frissites / Kilepes"). Igy offline
+  // allapotban is a szeme elott marad a felulet, a sofor nem panikol.
+  function _inappRecoverEnabled() {
+    try { return !!window.VS_INAPP_SESSION_RECOVER; } catch(e) { return false; }
+  }
+  function _tryInappRecover(reason) {
+    if (!_inappRecoverEnabled()) return false;
+    try {
+      if (typeof window.__vsShowSessionOverlay === 'function') {
+        window.__vsShowSessionOverlay(reason || 'expired');
+        return true;
+      }
+    } catch(e) {}
+    return false;
+  }
+
   // ---- Aktivitas frissites ----
   function markActivity() {
     lastActivity = Date.now();
@@ -58,6 +77,10 @@
   }
 
   function redirectToLogin(reason) {
+    // In-app recovery mod (sofer.html) — ha a hivo oldal ezt kerte, NEM
+    // navigalunk el; helyette overlay-t mutatunk, hogy a felulet ott
+    // maradjon, es a driver egy Frissites-sel visszakerulhessen.
+    if (_tryInappRecover(reason)) return;
     var url = '/login';
     if (reason === 'idle') url += '?timeout=1';
     window.location.href = url;
@@ -150,6 +173,15 @@
       return;
     }
     if (authPingInFlight) return;
+    // Ha explicit offline vagyunk (navigator.onLine=false), NE tegyunk
+    // meg egy varhatoan bukott hivast — in-app modban rogton mutassuk
+    // meg a recovery overlay-t, hogy a driver tudja, most nem elerheto
+    // a szerver. Nem-in-app modban egyszeruen ne csinaljunk semmit
+    // (redirect nelkul, mint eddig).
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      _tryInappRecover('offline');
+      return;
+    }
     authPingInFlight = true;
     try {
       fetch('/api/execute', {
@@ -164,7 +196,12 @@
         // authMe null-t ad, ha nincs bejelentkezett user (session lejart, torolve).
         if (!d || d.result == null) redirectToLogin('expired');
       })
-      .catch(function() { authPingInFlight = false; /* offline - nem tehetunk semmit */ });
+      .catch(function() {
+        authPingInFlight = false;
+        // Halozati hiba — in-app modban jelezzuk, hogy nem tudtuk
+        // ellenorizni a session-t; a driver egy Frissitesre visszater.
+        _tryInappRecover('offline');
+      });
     } catch(e) { authPingInFlight = false; }
   });
 
