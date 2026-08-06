@@ -9,6 +9,12 @@
 const BASE = 'https://api.fm-track.com';
 const TIMEOUT_MS = 15000;
 
+// Hitelesítési hiba-figyelő (fire-and-forget). Ha 401/403 rövid időn belül
+// tömegesen érkezik, EGY riasztó e-mailt küld a DEV_NOTIFY_EMAIL-re — pl. ha
+// a Ruptela 2026-08-04-i IP-whitelist bevezetése után NEM lettünk a listán,
+// vagy ha az API-kulcs érvénytelenítve lett. Debounce 6 óra.
+const _monitor = require('./cargotrack-monitor');
+
 function mapError(status, body) {
   switch (status) {
     case 400: return 'Cerere greșită (400) — verifică parametrii.';
@@ -39,6 +45,8 @@ async function fmGet(path, params, apiKey, version = '1') {
     });
     if (!res.ok) {
       let body = ''; try { body = await res.text(); } catch (_) {}
+      // 401/403 → whitelist/kulcs-probléma jelzése (fire-and-forget, sosem dob).
+      try { _monitor.recordAuthFailure(res.status); } catch (_) {}
       const err = new Error(mapError(res.status, body)); err.status = res.status; throw err;
     }
     return await res.json();

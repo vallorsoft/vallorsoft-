@@ -14,6 +14,41 @@
 
 ---
 
+## 2026-08-06 — CargoTrack GPS whitelist-figyelő (`services/cargotrack-monitor.js`) + Fly egress IP allokálva
+
+### Miért
+A CargoTrack (Ruptela FM-Track) **2026-08-04-től IP-alapú hozzáférés-védelmet** aktivált a Public API-hoz. 2026-08-20-ig el kellett küldeni a szerver kimenő IP-jét, különben a GPS-integráció (`services/cargotrack.js` → `api.fm-track.com`) lehal. Elvégezve: allokáltunk egy dedikált Fly-egress IPv4-et (`209.71.106.103`) + IPv6-ot (`2a09:8280:e612:1:0:138:b1f1:0`) `fra` régióra, és megküldtük mind CargoTrack-nek, mind Ruptelának. **Utólagos biztonsági háló**: az API-hívások 401/403 státuszainak figyelése — ha mégis kiesnénk a whitelistből, e-mailt kapunk.
+
+### Változások
+
+#### 1) Új Fly.io GitHub Actions workflow (PR #324 + #325)
+- `.github/workflows/fly-egress-ip.yml`: manuálisan indítható (workflow_dispatch), a meglévő `FLY_API_TOKEN` secrettel allokál dedikált egress IP-t.
+- Két mód: `list` (csak listáz), `allocate` (allokál a `fra` régióra).
+- Mobilról használható a GitHub Actions felületről — nem kell Termux/flyctl a telefonra.
+- PR #324 először a deprecated `fly machine egress-ip allocate` (per-gép) paranccsal → PR #325 lecserélte a modern `fly ips allocate-egress -a vallorsoft -r fra` (app-scoped, per-régió) parancsra. Költség: **1 × $3.60/hó** (IPv6 ingyen jár mellé), régiónként max 64 gépet kiszolgál.
+
+#### 2) Új `services/cargotrack-monitor.js` — hitelesítési hiba-figyelő
+- `recordAuthFailure(status)` — a `services/cargotrack.js` `fmGet`-je hívja minden 401/403 válaszra. Fire-and-forget, sosem dob.
+- Rolling window (10 perc) + küszöb (3 hiba) + debounce (6 óra) — egy riasztási burstből EGY e-mail megy, utána 6 órán át néma.
+- Az e-mail a `DEV_NOTIFY_EMAIL` env-re (fallback: `vallorsoft@gmail.com`) megy a KÖZÖS VallorSoft Brevo feladóról (`sendClientEmail`), tartalmazza a valószínű okot (IP-whitelist / kulcs-visszavonás) + a Fly egress IP-t + teendő-listát.
+- Konfigurálható env-vel: `CARGOTRACK_ALERT_WINDOW_MS` / `_THRESHOLD` / `_DEBOUNCE_MS` (alapok: 10 perc / 3 hiba / 6 óra).
+- **Nincs séma-változás, nincs DB-függőség** — process-live in-memory state.
+
+#### 3) `services/cargotrack.js` bekötés
+- Csak 3 sor változás: `const _monitor = require('./cargotrack-monitor')` + `try { _monitor.recordAuthFailure(res.status); } catch(_){}` a `!res.ok` ágban. Az fmGet kimenő viselkedése változatlan (a monitor sosem dob).
+
+### Teszt
+- Új `tests/unit/cargotrack-monitor.test.js` — **10 új eset**: küszöb alatt / küszöb elérésekor / env-fallback / debounce / debounce lejárta után / ablakon kívüli hibák / csak 401-403 / e-mail-küldés dobás elnyelése / nem-számbeli status / `fmGet` integrációs bekötés.
+- **Teljes suite 924 zöld** (913 → 924).
+
+### Fájlok
+- `services/cargotrack.js` (bekötés, 3 sor)
+- `services/cargotrack-monitor.js` (ÚJ, ~90 sor)
+- `tests/unit/cargotrack-monitor.test.js` (ÚJ, ~130 sor)
+- `.github/workflows/fly-egress-ip.yml` (ÚJ; PR #324 + #325 külön PR-ek)
+
+---
+
 ## 2026-08-06 — Admin milestone-szerkesztő + 🔁 „Lezárás visszavonása" — a beragadt fuvarok javítására
 
 ### Miért
