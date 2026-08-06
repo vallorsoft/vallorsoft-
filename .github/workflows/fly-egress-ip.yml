@@ -1,18 +1,24 @@
 name: Fly.io — Egress IP allocate
 
 # EGYSZERI kézi workflow a CargoTrack IP-alapú hozzáférés-védelméhez:
-# dedikált kimenő (egress) IPv4 + IPv6 allokálása a `vallorsoft` app
-# minden gépére, hogy a CargoTrack API-t stabil IP-ről hívjuk.
+# APP-scoped static egress IP allokálása a `vallorsoft` app-hoz a `fra`
+# régióban, hogy a CargoTrack API-t stabil IP-ről hívjuk.
+#
+# ⚠️ FONTOS 2026-os változás: a `fly machine egress-ip allocate` (gépenkénti)
+# DEPRECATED. Helyette az `fly ips allocate-egress` (app-szintű, régiónkénti)
+# a támogatott — 1 IP kiszolgál 64 gépet a régióban, IP-váltás nélkül
+# túléli a gép-recreatiot is.
 #
 # HASZNÁLAT (mobilról):
 #  1) GitHub → Actions fül → bal oldalon „Fly.io — Egress IP allocate"
 #  2) „Run workflow" gomb → mode: „list" (először csak listáz, nem allokál)
-#  3) Ha a lista üres → futtasd újra „allocate" módban
+#  3) Ha üres → futtasd újra „allocate" módban
 #  4) Az utolsó lépés (📤 Küldendő adatok a CargoTrack-nek) log-ja
 #     tartalmazza a kimásolható IPv4/IPv6 sorokat
 #
-# Költség: dedikált egress IPv4 ≈ $2/hó/gép, az IPv6 ingyen.
-# min_machines_running=1 → 1 gép → 1 × $2/hó.
+# Költség: app-scoped egress IPv4 = **$3.60/hó/régió** (óra-alapon számolva),
+# az IPv6 ingyen jár mellé. A vallorsoft app-nak 2 gépe van `fra` régióban →
+# 1 IP kiszolgálja mindkettőt → 1 × $3.60/hó.
 #
 # A workflow SEMMIT nem push-ol vissza a repo-ba, csak a Fly API-t hívja
 # a meglévő FLY_API_TOKEN secrettel. Manuális trigger — nem fut push-ra.
@@ -21,13 +27,18 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'list = csak listázza a jelenlegi egress IP-ket | allocate = allokál minden géphez'
+        description: 'list = csak listázza a jelenlegi egress IP-ket | allocate = allokál a fra régióra'
         required: true
         default: 'list'
         type: choice
         options:
           - list
           - allocate
+      region:
+        description: 'Fly régió-kód (alap: fra — a vallorsoft app tényleges régiója)'
+        required: false
+        default: 'fra'
+        type: string
 
 jobs:
   egress-ip:
@@ -55,58 +66,58 @@ jobs:
           echo "=== fly machine list -a vallorsoft ==="
           flyctl machine list -a vallorsoft
 
-      - name: 🌐 Jelenlegi egress IP-k listája
-        id: current
+      - name: 🌐 Jelenlegi IP-k listája (bejövő + kimenő)
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          echo "=== fly machine egress-ip list -a vallorsoft ==="
-          flyctl machine egress-ip list -a vallorsoft || true
+          echo "=== fly ips list -a vallorsoft ==="
+          flyctl ips list -a vallorsoft || true
+          echo ""
+          echo "=== fly ips list --json -a vallorsoft (típusonként szűrve) ==="
+          flyctl ips list --json -a vallorsoft || true
 
-      - name: ⚡ Egress IP allokálás minden gépre
+      - name: ⚡ App-scoped egress IP allokálás (régióra)
         if: ${{ inputs.mode == 'allocate' }}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          REGION: ${{ inputs.region }}
         run: |
           set -e
-          echo "=== gép-ID-k lekérése ==="
-          MACHINES=$(flyctl machine list -a vallorsoft --json | jq -r '.[].id')
-          if [ -z "$MACHINES" ]; then
-            echo "::error::Nincs futó gép a vallorsoft app-hoz."
-            exit 1
-          fi
-          for MID in $MACHINES; do
-            echo ""
-            echo "=== Allokálás géphez: $MID ==="
-            # --yes: no interaktív prompt; egyszerre v4+v6 jön
-            flyctl machine egress-ip allocate "$MID" -a vallorsoft --yes
-          done
+          echo "=== fly ips allocate-egress -a vallorsoft -r $REGION ==="
+          # A modern, ajánlott parancs. Egy pár (IPv4 + IPv6) allokálódik
+          # a régióra. A régió minden gépe (max 64) ezt fogja használni
+          # kifelé menő kapcsolatokhoz.
+          flyctl ips allocate-egress -a vallorsoft -r "$REGION" --yes
 
-      - name: 🔁 Egress IP-k UTÁN
+      - name: 🔁 IP-k UTÁN (verifikálás)
         if: ${{ inputs.mode == 'allocate' }}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
-          echo "=== fly machine egress-ip list -a vallorsoft (allokálás után) ==="
-          flyctl machine egress-ip list -a vallorsoft
+          echo "=== fly ips list -a vallorsoft (allokálás után) ==="
+          flyctl ips list -a vallorsoft
 
       - name: 📤 Küldendő adatok a CargoTrack-nek
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
         run: |
           echo "════════════════════════════════════════════════════════════════"
-          echo " CargoTrack válasz-levélhez — kimásolható IP-k"
+          echo " CargoTrack válasz-levélhez — kimásolható egress IP-k"
           echo "════════════════════════════════════════════════════════════════"
           echo ""
-          # A `egress-ip list` táblázatos outputjából kiszedjük az IP-oszlopot.
-          # Egyszerű grep az IPv4 és IPv6 mintákra.
-          RAW=$(flyctl machine egress-ip list -a vallorsoft 2>/dev/null || true)
-          echo "$RAW"
+          # A `fly ips list --json` visszaadja a típust (`type`) is,
+          # ami lehet: shared_v4, dedicated_v4, private_v6, egress_v4, egress_v6, stb.
+          # A CargoTrack-nek CSAK a kimenő (egress_*) címek kellenek.
+          RAW_JSON=$(flyctl ips list --json -a vallorsoft 2>/dev/null || echo '[]')
+          echo "Nyers IP-lista (debug):"
+          echo "$RAW_JSON" | jq '.'
           echo ""
-          echo "--- IPv4 címek ---"
-          echo "$RAW" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | sort -u || echo "(nincs)"
+          echo "--- Egress IPv4 (küldendő) ---"
+          echo "$RAW_JSON" | jq -r '.[] | select(.Type == "egress_v4" or .Type == "shared_egress_v4") | .Address' | sort -u \
+            || echo "(nincs — futtasd allocate módban!)"
           echo ""
-          echo "--- IPv6 címek ---"
-          echo "$RAW" | grep -oE '([0-9a-f]{1,4}:){2,}[0-9a-f:]+' | sort -u || echo "(nincs)"
+          echo "--- Egress IPv6 (opcionális, ha CargoTrack elfogadja) ---"
+          echo "$RAW_JSON" | jq -r '.[] | select(.Type == "egress_v6" or .Type == "shared_egress_v6") | .Address' | sort -u \
+            || echo "(nincs)"
           echo ""
           echo "════════════════════════════════════════════════════════════════"
