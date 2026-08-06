@@ -93,6 +93,32 @@ describe('POST /api/border-cross', () => {
     expect(pool.query.mock.calls[0][1][3].length).toBe(50);
     expect(pool.query.mock.calls[0][1][4].length).toBe(255);
   });
+  test('érvényes `at` → INSERT `created_at`-tal ($8) (utólagos pótlás)', async () => {
+    setUser(fixtures.sofer);
+    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
+    const at = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    await request(app).post('/api/border-cross').send({ tip: 'Intrare', tara: 'RO', at });
+    const [sql, params] = pool.query.mock.calls[0];
+    expect(sql).toMatch(/created_at/);
+    expect(sql).toMatch(/\$8::timestamptz/);
+    expect(params[7]).toBe(at);
+  });
+  test('érvénytelen `at` (jövőbeli / túl régi / nem-ISO) → default NOW() (nincs `created_at` az INSERT-ben)', async () => {
+    setUser(fixtures.sofer);
+    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
+    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
+    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
+    // Túl a jövőben
+    await request(app).post('/api/border-cross').send({ tip: 'Intrare', tara: 'RO', at: new Date(Date.now() + 3600e3).toISOString() });
+    // Túl régi
+    await request(app).post('/api/border-cross').send({ tip: 'Iesire', tara: 'RO', at: new Date(Date.now() - 30 * 24 * 3600e3).toISOString() });
+    // Nem-ISO
+    await request(app).post('/api/border-cross').send({ tip: 'Iesire', tara: 'RO', at: 'nem-idobelyeg' });
+    for (let i = 0; i < 3; i++) {
+      const [sql] = pool.query.mock.calls[i];
+      expect(sql).not.toMatch(/created_at/);
+    }
+  });
 });
 
 // ================================================================
@@ -341,5 +367,52 @@ describe('POST /api/orders/:id/driver-milestone', () => {
     expect(res.body.step).toBe('loaded');
     const upd = pool.query.mock.calls[2][0];
     expect(upd).not.toMatch(/status = 'In Curs'/);
+  });
+  // ── Új: `at` idő-paraméter (sofőr utólagos pótlása / szerkesztése) ──
+  test('érvényes `at` (ISO) → az UPDATE $2-be kerül (NOW() helyett)', async () => {
+    setUser(fixtures.sofer);
+    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [{
+      id: 'CMD-1', client: 'A', status: 'Alocat',
+      sosit_incarcare_at: null, incarcat_at: null, sosit_descarcare_at: null, descarcat_at: null
+    }]});
+    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });   // legacy ág
+    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
+    // 5 perccel ezelőtt — bőven a 7 napos ablakon belül
+    const at = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const res = await request(app).post('/api/orders/CMD-1/driver-milestone').send({ at });
+    expect(res.body.ok).toBe(true);
+    const [sql, params] = pool.query.mock.calls[2];
+    expect(sql).toMatch(/sosit_incarcare_at = \$2::timestamptz/);
+    expect(params[1]).toBe(at);
+  });
+  test('jövőbeli `at` (>2 perc) → NOW()-ra esik vissza (nem szenvedjük el a rossz órát)', async () => {
+    setUser(fixtures.sofer);
+    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [{
+      id: 'CMD-1', client: 'A', status: 'Alocat',
+      sosit_incarcare_at: null, incarcat_at: null, sosit_descarcare_at: null, descarcat_at: null
+    }]});
+    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
+    const at = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    const res = await request(app).post('/api/orders/CMD-1/driver-milestone').send({ at });
+    expect(res.body.ok).toBe(true);
+    const [sql, params] = pool.query.mock.calls[2];
+    expect(sql).toMatch(/sosit_incarcare_at = NOW\(\)/);
+    expect(params.length).toBe(1);   // csak az orderId
+  });
+  test('túl régi `at` (>7 nap) → NOW()-ra esik vissza', async () => {
+    setUser(fixtures.sofer);
+    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [{
+      id: 'CMD-1', client: 'A', status: 'Alocat',
+      sosit_incarcare_at: null, incarcat_at: null, sosit_descarcare_at: null, descarcat_at: null
+    }]});
+    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [] });
+    const at = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const res = await request(app).post('/api/orders/CMD-1/driver-milestone').send({ at });
+    expect(res.body.ok).toBe(true);
+    const [sql, params] = pool.query.mock.calls[2];
+    expect(sql).toMatch(/sosit_incarcare_at = NOW\(\)/);
+    expect(params.length).toBe(1);
   });
 });

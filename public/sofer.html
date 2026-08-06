@@ -12,15 +12,15 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260730multi"></script>
-  <link rel="stylesheet" href="/sofer.css?v=20260730multi">
+  <script src="/i18n.js?v=20260806evt"></script>
+  <link rel="stylesheet" href="/sofer.css?v=20260806evt">
   <script src="/push-client.js?v=20260614qa"></script>
   <!-- Sofor mobil-app: 8 ora idle-limit (vezetes kozben oraig nem koppint a
        kepernyore). A szerver-cookie 7 nap; addig igy nem log ki ejszaka-vezetes
        kozben, es a session-guard visibilitychange-en tisztan atiranyit /login-re,
        ha a szerver-session mar tenyleg megszunt. -->
   <script>window.VS_IDLE_LIMIT_MIN = 480;</script>
-  <script src="/session-guard.js?v=20260723retry"></script>
+  <script src="/session-guard.js?v=20260806sess"></script>
   <!-- ── Page-scoped prémium világos skin: az inline (hardcodolt sötét) stílusok olvashatóvá tétele.
        CSAK megjelenés — semmilyen ID/JS/data-i18n nem változik. ── -->
   <style>
@@ -414,7 +414,7 @@
 </div><!-- /sofer-wrap -->
 
 <script src="/sofer-uit.js?v=20260614qa"></script>
-<script src="/sofer.js?v=20260730multi"></script>
+<script src="/sofer.js?v=20260806evt"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 
 <!-- ── ÁRU LEADÁSA MODAL (sofőr-kérés — admin visszaigazolja) ── -->
@@ -501,6 +501,50 @@
     <div class="sof-cf-btns">
       <button class="sof-cf-btn cancel" id="sofConfirmCancelBtn" onclick="sofConfirmCancel()" data-i18n="common.cancel">Mégse</button>
       <button class="sof-cf-btn ok" id="sofConfirmOkBtn" onclick="sofConfirmOk()" data-i18n="sof.cfm.yes">Igen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 🔌 SESSION-LEJÁRT OVERLAY (driver-only) ──
+     A session-guard visibilitychange-nél régen /login-re redirectelt,
+     ami félrevezető volt: a driver azt hitte, hogy „kirúgtak", pedig
+     a felület még mindig ott volt előtte. Itt egy explicit overlay
+     kéri a Frissítés (reload) VAGY a Kilépés műveletet — offline
+     állapotban is látja a felületet, csak az akciók nem futnak. -->
+<div id="vsSessionOverlay" style="display:none;">
+  <div class="vs-so-card">
+    <div class="vs-so-ico">🔌</div>
+    <h3 class="vs-so-title" data-i18n="sof.sess.title">A munkamenet lejárt</h3>
+    <p class="vs-so-msg"   data-i18n="sof.sess.msg">Frissítsd az oldalt, hogy visszakapcsolódj. Ha offline vagy, próbáld újra kicsit később.</p>
+    <div class="vs-so-status" id="vsSessionStatus"></div>
+    <div class="vs-so-btns">
+      <button class="vs-so-btn logout"  id="vsSessionLogoutBtn"  onclick="vsSessionLogout()" data-i18n="sof.sess.logout">Kilépés</button>
+      <button class="vs-so-btn refresh" id="vsSessionRefreshBtn" onclick="vsSessionRefresh()" data-i18n="sof.sess.refresh">🔄 Frissítés</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ⏱️ IDŐ-PICKER MEGERŐSÍTŐ MODAL ──
+     Az állomás-gomboknál (felrakás/lerakás/érkezés) és a határátlépés
+     gomboknál: a szerver nem NOW()-t ír, hanem a modalban jóváhagyott/
+     szerkesztett időt. Alapérték a MOSTANI idő; a sofőr csak leokézza,
+     de ha lekésett (pl. már megtörtént, csak most jut ideje megnyomni),
+     visszamenőleg beállíthatja a valós időt. A `sofTimeConfirm()` tölti
+     (public/sofer.js). -->
+<div id="sofTimeModal" class="sof-modal" style="display:none;">
+  <div class="sof-modal-card">
+    <div class="sof-cf-ico" id="sofTimeIco">⏱️</div>
+    <h3 class="sof-cf-title" id="sofTimeTitle"></h3>
+    <p class="sof-cf-msg" id="sofTimeMsg"></p>
+    <div class="sof-time-row">
+      <label for="sofTimeInput" class="sof-time-label" data-i18n="sof.timeConfirm.at">Időpont</label>
+      <input type="datetime-local" id="sofTimeInput" class="sof-time-input" step="60" />
+      <button type="button" class="sof-time-now" id="sofTimeNowBtn" onclick="sofTimeSetNow()" data-i18n="sof.timeConfirm.now">Most</button>
+    </div>
+    <p class="sof-time-hint" data-i18n="sof.timeConfirm.hint">Ha lekésted, itt beállíthatod a valódi időt.</p>
+    <div class="sof-cf-btns">
+      <button class="sof-cf-btn cancel" onclick="sofTimeCancel()" data-i18n="common.cancel">Mégse</button>
+      <button class="sof-cf-btn ok" id="sofTimeOkBtn" onclick="sofTimeOk()" data-i18n="sof.cfm.yes">Igen</button>
     </div>
   </div>
 </div>

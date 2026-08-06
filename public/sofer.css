@@ -1570,3 +1570,115 @@
 #sofChoiceModal .sof-cf-btn.ok {
   text-align: left; padding: 14px 16px; font-size: 15px; line-height: 1.35;
 }
+
+/* ── ⏱️ Idő-picker modal (állomás-gomb + határátlépés) ──
+   Ugyanaz a kártya-stílus, mint a `#sofConfirmModal` — a modal-alap
+   szabályokat (position/inset/background) a HTML class="sof-modal" hozza
+   a `#sofConfirmModal` szabályaiból örökölve. Itt csak a saját
+   kiegészítéseket adjuk. */
+#sofTimeModal {
+  position: fixed; inset: 0; z-index: 1200;
+  align-items: center; justify-content: center;
+  padding: 20px;
+  background: rgba(15,23,42,0.62);
+  backdrop-filter: blur(6px);
+}
+#sofTimeModal .sof-modal-card {
+  width: min(440px, 100%);
+  background: #fff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 20px;
+  padding: 24px 22px 20px;
+  box-shadow: 0 26px 60px rgba(15,23,42,0.30);
+  text-align: center;
+}
+#sofTimeModal .sof-cf-ico { font-size: 34px; line-height: 1; margin-bottom: 10px; }
+#sofTimeModal .sof-cf-title {
+  margin: 0 0 8px; font-size: 18px; font-weight: 900; color: #0f172a;
+  letter-spacing: -0.01em;
+}
+#sofTimeModal .sof-cf-msg {
+  margin: 0 0 14px; font-size: 13.5px; line-height: 1.5; color: #475569;
+  font-weight: 600;
+}
+#sofTimeModal .sof-time-row {
+  display: flex; align-items: center; gap: 8px; margin: 6px 0 8px;
+  flex-wrap: wrap;
+}
+#sofTimeModal .sof-time-label {
+  font-size: 12.5px; font-weight: 700; color: #475569;
+  min-width: 68px; text-align: left;
+}
+#sofTimeModal .sof-time-input {
+  flex: 1; min-width: 160px;
+  min-height: 46px; padding: 8px 12px;
+  font-size: 16px; font-weight: 700; color: #0f172a;
+  background: #f8fafc; border: 1.5px solid #94a3b8; border-radius: 10px;
+  font-family: inherit;
+}
+#sofTimeModal .sof-time-input:focus {
+  outline: none; border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.20);
+}
+#sofTimeModal .sof-time-now {
+  min-height: 46px; padding: 8px 14px;
+  border: 1.5px solid #0ea5e9; background: #e0f2fe; color: #0369a1;
+  border-radius: 10px; font-size: 13.5px; font-weight: 800; cursor: pointer;
+  font-family: inherit;
+}
+#sofTimeModal .sof-time-now:active { transform: scale(0.98); }
+#sofTimeModal .sof-time-hint {
+  margin: 4px 0 16px; font-size: 12px; color: #64748b; text-align: left;
+}
+#sofTimeModal .sof-cf-btns { display: flex; gap: 10px; }
+#sofTimeModal .sof-cf-btn {
+  min-height: 54px; padding: 14px 12px; border-radius: 14px;
+  font-size: 15px; font-weight: 800; cursor: pointer;
+  touch-action: manipulation; font-family: inherit;
+}
+#sofTimeModal .sof-cf-btn.cancel {
+  flex: 1; border: 1.5px solid #94a3b8; background: #f1f5f9; color: #334155;
+}
+#sofTimeModal .sof-cf-btn.ok {
+  flex: 1.6; border: 1.5px solid #15803d;
+  background: linear-gradient(135deg, #16a34a, #15803d); color: #fff;
+  box-shadow: 0 10px 22px rgba(22,163,74,0.36);
+}
+#sofTimeModal .sof-cf-btn:active { transform: scale(0.98); }
+
+/* ── 🔌 Session-lejárt overlay (driver-oldal) ──
+   Nem redirectel /login-re — a felület itt marad, a driver egy gombbal
+   újratölthet. Offline állapotban is a szemünk előtt van a felület. */
+#vsSessionOverlay {
+  position: fixed; inset: 0; z-index: 2000;
+  background: rgba(15,23,42,0.78);
+  backdrop-filter: blur(6px);
+  display: none; align-items: center; justify-content: center;
+  padding: 20px;
+}
+#vsSessionOverlay .vs-so-card {
+  width: min(400px, 100%);
+  background: #fff; border: 1.5px solid #cbd5e1;
+  border-radius: 20px; padding: 28px 22px 22px;
+  box-shadow: 0 26px 60px rgba(15,23,42,0.40);
+  text-align: center;
+}
+#vsSessionOverlay .vs-so-ico  { font-size: 40px; line-height: 1; margin-bottom: 10px; }
+#vsSessionOverlay .vs-so-title{ margin: 0 0 8px; font-size: 19px; font-weight: 900; color: #0f172a; }
+#vsSessionOverlay .vs-so-msg  { margin: 0 0 18px; font-size: 14px; color: #475569; font-weight: 600; }
+#vsSessionOverlay .vs-so-status { margin: 8px 0 14px; font-size: 12.5px; color: #64748b; }
+#vsSessionOverlay .vs-so-btns { display: flex; gap: 10px; }
+#vsSessionOverlay .vs-so-btn {
+  min-height: 54px; padding: 14px 12px; border-radius: 14px;
+  font-size: 15px; font-weight: 800; cursor: pointer;
+  touch-action: manipulation; font-family: inherit;
+}
+#vsSessionOverlay .vs-so-btn.refresh {
+  flex: 1.6; border: 1.5px solid #1d4ed8;
+  background: linear-gradient(135deg, #2563eb, #4f46e5); color: #fff;
+  box-shadow: 0 10px 22px rgba(37,99,235,0.38);
+}
+#vsSessionOverlay .vs-so-btn.logout {
+  flex: 1; border: 1.5px solid #94a3b8; background: #f1f5f9; color: #334155;
+}
+#vsSessionOverlay .vs-so-btn:active { transform: scale(0.98); }

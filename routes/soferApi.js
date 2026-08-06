@@ -10,10 +10,28 @@ const { calculateDiurna } = require('../lib/diurna');
 const { fetchTripCrossings } = require('../lib/tripCrossings');
 const { genDocId } = require('../lib/ids');
 
+// A sofőr a főoldali „🇷🇴 BE / KI" gombokat idő-picker modalon át erősíti
+// meg: alap a mostani idő, de szerkeszthető, ha lekésett a nyomással.
+// Csak józan ész-korlát (max 7 nap múlt, kb. 2 perc jövő), különben
+// created_at = NOW() marad. A validációhoz ugyanaz a szűrő, mint a
+// milestone/stop-event végpontokban (ordersRest.js parseAtInput).
+const MAX_BACKDATE_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_FUTURE_MS   = 2 * 60 * 1000;
+function _parseBorderAt(at) {
+  if (at === undefined || at === null || at === '') return null;
+  const d = new Date(String(at));
+  if (!(d instanceof Date) || isNaN(d.getTime())) return null;
+  const now = Date.now();
+  const t = d.getTime();
+  if (t > now + MAX_FUTURE_MS) return null;
+  if (t < now - MAX_BACKDATE_MS) return null;
+  return d.toISOString();
+}
+
 router.post('/api/border-cross', async (req, res) => {
   try {
     if (!req.session.user) return res.json({ success: false, err: 'Nu sunteti autentificat' });
-    const { tip, tara, locatie, gps_lat, gps_lng } = req.body;
+    const { tip, tara, locatie, gps_lat, gps_lng, at } = req.body;
     // Bemenet-védelem: `tip` fehérlista (a schema.sql-en VARCHAR(20) volt,
     // csendes megcsonkolás lett belőle); a `tara`/`locatie` hossz-korlát a
     // schema-oszlop szélességéhez igazodik; a `gps_lat`/`lng` numerikusan
@@ -28,16 +46,32 @@ router.post('/api/border-cross', async (req, res) => {
       const n = parseFloat(v);
       return (Number.isFinite(n) && Math.abs(n) <= 180) ? n : null;
     };
-    await pool.query(
-      `INSERT INTO border_crossings (email_sofer, nume_sofer, tip, tara, locatie, gps_lat, gps_lng)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [
-        req.session.user.email,
-        req.session.user.nume,
-        tipSafe, taraSafe, locSafe,
-        validGps(gps_lat), validGps(gps_lng)
-      ]
-    );
+    const eventAt = _parseBorderAt(at);
+    if (eventAt) {
+      await pool.query(
+        `INSERT INTO border_crossings
+           (email_sofer, nume_sofer, tip, tara, locatie, gps_lat, gps_lng, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamptz)`,
+        [
+          req.session.user.email,
+          req.session.user.nume,
+          tipSafe, taraSafe, locSafe,
+          validGps(gps_lat), validGps(gps_lng),
+          eventAt,
+        ]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO border_crossings (email_sofer, nume_sofer, tip, tara, locatie, gps_lat, gps_lng)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          req.session.user.email,
+          req.session.user.nume,
+          tipSafe, taraSafe, locSafe,
+          validGps(gps_lat), validGps(gps_lng)
+        ]
+      );
+    }
     res.json({ success: true });
   } catch (err) {
     console.error('border-cross hiba:', err);
@@ -189,7 +223,39 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     // 1-1 pontos fuvar), az első még nem waybill-ezett kind-ű stopra írjuk.
     // A `orders.*_at` mirror mezőket a trigger frissíti. Best-effort;
     // multi-tenant: mindig cégre szűrt WHERE.
+    //
+    // FONTOS SZABÁLY (2026-08-06, PR: driver-controls-events):
+    //   A menetlevél EGY DOKUMENTUM — nem esemény. A tényleges felrakás/
+    //   lerakás időpontját a belső sofőr a fuvar-kártya állomás-gombjaival
+    //   rögzíti (arrive/done), a menetlevél csak listázza. Ezért:
+    //     - BELSŐ sofőrhöz kiosztott fuvarnál (van `email_sofer`, nem
+    //       Extern) a menetlevél CSAK waybilled_at-et jelöl; a done_at-et
+    //       a driver az „Elvégeztem" gombbal állítja. Auto-Finalizat SEM
+    //       kerül elő ilyenkor — a lezárás a driver kezében marad.
+    //     - EXTERN / nincs internal driver esetén (nincs email_sofer VAGY
+    //       status='Extern') megőrizzük a régi viselkedést: done_at is
+    //       beállítódik a menetlevél dátumára, és a fuvar Finalizat lesz
+    //       (a külsős fuvarnál nincs milestone-gomb).
+    //   Így egy péntek beadott menetlevél, ami a hétfői tervezett lerakást
+    //   is felsorolja, NEM zárja le a fuvart — a driver hétfőn nyomja meg
+    //   a lerakás gombot (a menetlevél-picker türelmi ideje ezt megvárja).
     const _waybilledOrders = new Set(); // amelyik fuvar puncte-sort kapott
+    // Cache: orderId → { driver: bool } (driver=true, ha belső sofőrhöz
+    // van kiosztva ÉS nem Extern → menetlevél NE állítson done_at-et)
+    const _orderMode = new Map();
+    async function _orderIsDriverOwned(orderId) {
+      if (_orderMode.has(orderId)) return _orderMode.get(orderId);
+      const q = await pool.query(
+        `SELECT status, email_sofer FROM orders
+          WHERE id = $1 AND company_id = $2`,
+        [orderId, cid]);
+      const r = q.rows[0];
+      // Belső sofőr: van email_sofer ÉS a státusz nem Extern (a régi
+      // Alocat/In Curs/Parkolt/Raktarban/Finalizat mind belső ág).
+      const owned = !!(r && r.email_sofer && r.status !== 'Extern');
+      _orderMode.set(orderId, owned);
+      return owned;
+    }
     try {
       for (const p of puncte) {
         if (!p || !p.orderId || !p.role || !p.data) continue;
@@ -202,6 +268,8 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
         // hogy a helyi időzóna 00:00-ja ne csúszhasson át az előző napra.
         const ts = new Date(dateStr + 'T12:00:00Z');
         if (isNaN(ts.getTime())) continue;
+
+        const driverOwned = await _orderIsDriverOwned(p.orderId);
 
         // 1) Cél stop kiválasztása: preferált stopId ownership-ellenőrzéssel
         let stopId = null;
@@ -224,17 +292,30 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
         }
 
         if (stopId) {
-          // Per-stop rögzítés — a trigger frissíti a orders.*_at mirror-mezőket.
-          await pool.query(
-            `UPDATE order_stops
-                SET done_at = COALESCE(done_at, $1),
-                    waybilled_at = COALESCE(waybilled_at, $1),
-                    updated_at = NOW()
-              WHERE id = $2`,
-            [ts, stopId]);
-        } else {
-          // Legacy fallback: nem-migrált fuvar (nincs egy stop se) — a régi
-          // orders.*_at mezőt frissítjük direktben (mint a régi kód).
+          if (driverOwned) {
+            // Belső sofőrhöz kiosztott → CSAK waybilled_at. A done_at-et
+            // a driver az „Elvégeztem" milestone-gombbal állítja.
+            await pool.query(
+              `UPDATE order_stops
+                  SET waybilled_at = COALESCE(waybilled_at, $1),
+                      updated_at = NOW()
+                WHERE id = $2`,
+              [ts, stopId]);
+          } else {
+            // Extern / nincs internal driver → done_at is (régi viselkedés).
+            await pool.query(
+              `UPDATE order_stops
+                  SET done_at = COALESCE(done_at, $1),
+                      waybilled_at = COALESCE(waybilled_at, $1),
+                      updated_at = NOW()
+                WHERE id = $2`,
+              [ts, stopId]);
+          }
+        } else if (!driverOwned) {
+          // Legacy fallback CSAK Extern/nincs-driver esetben: nem-migrált
+          // fuvar (nincs egy stop se) — a régi orders.*_at mezőt frissítjük
+          // direktben. Belső sofőrnél ezt is kihagyjuk, hogy a menetlevél
+          // sose lépjen automatikusan Finalizat felé.
           const col = kind === 'pickup' ? 'incarcat_at' : 'descarcat_at';
           await pool.query(
             `UPDATE orders SET ${col} = $1 WHERE id = $2 AND company_id = $3`,
@@ -249,14 +330,19 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     // orders.descarcat_at-ot NOT NULL-ra, és a státusz Finalizat lehet.
     // Aktív fuvar (Alocat/In Curs) descarcat_at IS NOT NULL → Finalizat.
     // Extern/Parkolt/Raktarban érintetlen (azokat a diszpécser zárja le).
+    // FONTOS: ez CSAK a nem-belső-sofőr fuvaroknál fut. Belső sofőr esetén
+    // a lezárást a driver az „Elvégeztem" gomb utolsó megnyomása oldja meg
+    // (routes/ordersRest.js `_applyStopEvent`), így a menetlevél soha nem
+    // tudja lezárni a fuvart a driver akarata nélkül.
     try {
-      if (_waybilledOrders.size) {
+      const externOrders = Array.from(_waybilledOrders).filter((oid) => !_orderMode.get(oid));
+      if (externOrders.length) {
         await pool.query(
           `UPDATE orders SET status = 'Finalizat'
            WHERE id = ANY($1::text[]) AND company_id = $2
              AND status IN ('Alocat', 'In Curs')
              AND descarcat_at IS NOT NULL`,
-          [Array.from(_waybilledOrders), cid]
+          [externOrders, cid]
         );
       }
     } catch (cErr) {

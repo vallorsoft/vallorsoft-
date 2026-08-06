@@ -9,6 +9,79 @@ function esc(s) {
 }
 
 // ============================================================
+// 🔌 SESSION-RECOVERY OVERLAY (session-guard-től hívva)
+// ============================================================
+// A `session-guard.js` a `visibilitychange` során észreveheti, hogy a
+// szerver-session lejárt (`authMe` NULL) vagy offline vagyunk. Ha a
+// hivo oldal beallitja a `VS_INAPP_SESSION_RECOVER = true`-t, akkor
+// NEM redirectel /login-re; ehelyett meghivja a
+// `window.__vsShowSessionOverlay(reason)`-t. Itt egy overlay-t mutatunk
+// két gombbal: 🔄 Frissítés (window.location.reload()) és Kilépés
+// (login-oldalra vissza, ha valóban ki akar lépni). Offline állapotban
+// is látja a felület — az „Elavult" felirat jelzi, hogy amíg a hálózat
+// vissza nem jön, a szerver-akciók nem futnak.
+window.VS_INAPP_SESSION_RECOVER = true;
+window.__vsShowSessionOverlay = function (reason) {
+  try {
+    var ov = document.getElementById('vsSessionOverlay');
+    if (!ov) return;
+    // Már látszik → csak a státuszt frissítjük (pl. offline → online)
+    var st = document.getElementById('vsSessionStatus');
+    var isOnline = (typeof navigator !== 'undefined') ? navigator.onLine : true;
+    var _t = (window.t && typeof t === 'function') ? t : function (k) { return k; };
+    var reasonKey = (reason === 'offline' || !isOnline) ? 'sof.sess.offline'
+                   : (reason === 'idle' ? 'sof.sess.idle' : 'sof.sess.expired');
+    if (st) st.textContent = _t(reasonKey);
+    ov.style.display = 'flex';
+  } catch (e) {}
+};
+function vsSessionRefresh() {
+  // Egyszerű reload — ha valóban van session, a felület újratölt; ha
+  // nincs, a szerver /login-re irányít (a normál login-flow), ami a
+  // sofőr által elvárt viselkedés. Offline állapotban a böngésző hibát
+  // ad → a driver újra kell próbálja, addig a felület megmarad
+  // (nem redirectelünk el neki).
+  try { window.location.reload(); } catch (e) {}
+}
+function vsSessionLogout() {
+  // Explicit kilépés: session-t töröljük szerver-oldalon (best-effort)
+  // és login-oldalra megyünk. Offline esetén csak navigálunk — a
+  // szerver-cookie a következő online belépéskor tisztul.
+  try {
+    fetch('/api/execute', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ functionName: 'authLogout', arguments: [] }),
+      credentials: 'same-origin'
+    }).then(function () { window.location.href = '/login'; })
+      .catch(function () { window.location.href = '/login'; });
+  } catch (e) { window.location.href = '/login'; }
+}
+// Ha az `online` esemény visszajön, próbáljunk csendben ellenőrizni:
+// ha a szerver ismer minket, csukjuk be az overlay-t; ha nem, marad
+// (a driver a Frissítést nyomja meg).
+window.addEventListener('online', function () {
+  var ov = document.getElementById('vsSessionOverlay');
+  if (!ov || ov.style.display !== 'flex') return;
+  try {
+    fetch('/api/execute', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ functionName: 'authMe' }),
+      credentials: 'same-origin'
+    })
+    .then(function (r) { return r.json().catch(function () { return {}; }); })
+    .then(function (d) {
+      if (d && d.result != null) {
+        ov.style.display = 'none';
+      } else {
+        // A session valóban megszűnt — csak a státuszt frissítjük.
+        window.__vsShowSessionOverlay('expired');
+      }
+    })
+    .catch(function () { /* még mindig instabil — hagyjuk az overlay-t */ });
+  } catch (e) {}
+});
+
+// ============================================================
 // SESSION STATE — oldal frissítés utáni visszaállítás
 // sessionStorage: csak ugyanazon a fülön él, új fülön üres
 // ============================================================
@@ -119,6 +192,84 @@ function sofConfirmOk() {
   var cb = _sofConfirmCb;
   sofConfirmCancel();
   if (cb) cb();
+}
+
+// ============================================================
+// ⏱️ Idő-picker megerősítő modal — állomás-gomb + határátlépés
+// ============================================================
+// A `sofConfirm` helyett használjuk, ha a szerver esemény-időt vár:
+// alap az AKTUÁLIS idő (mai nap, hh:mm), de a sofőr szerkesztheti, ha
+// lekésett a nyomással (pl. már megtörtént a lerakás, csak most tudja
+// megnyomni). „Most" gombbal újra a mostani időre állítható. A callback
+// egy ISO string-et kap (pl. "2026-08-06T14:32:00.000Z"), vagy null-t,
+// ha a sofőr üresen hagyta (a szerver ilyenkor NOW()-t használ).
+//
+// Használat: `sofTimeConfirm({ title, msg, ok, ico }, function(atIso){ ... })`
+var _sofTimeCb = null;
+function _sofPad2(n) { n = Number(n); return (n < 10 ? '0' : '') + n; }
+function _sofLocalDatetimeValue(d) {
+  // datetime-local input-formátum: YYYY-MM-DDTHH:MM (helyi idő,
+  // időzóna nélkül) — a böngésző így renderelja.
+  return d.getFullYear() + '-' + _sofPad2(d.getMonth() + 1) + '-' + _sofPad2(d.getDate())
+       + 'T' + _sofPad2(d.getHours()) + ':' + _sofPad2(d.getMinutes());
+}
+function sofTimeSetNow() {
+  var inp = document.getElementById('sofTimeInput');
+  if (inp) inp.value = _sofLocalDatetimeValue(new Date());
+}
+function sofTimeCancel() {
+  var m = document.getElementById('sofTimeModal');
+  if (m) m.style.display = 'none';
+  _sofTimeCb = null;
+}
+function sofTimeOk() {
+  var cb = _sofTimeCb;
+  var inp = document.getElementById('sofTimeInput');
+  var raw = inp ? inp.value : '';
+  var iso = null;
+  if (raw) {
+    // A datetime-local input mindig helyi időt ad → új Date() helyesen
+    // parseolja (böngésző helyi zónája). ISO-ra a `.toISOString()` UTC-t
+    // ad, amit a szerver `::timestamptz`-ként fogad el.
+    var d = new Date(raw);
+    if (d instanceof Date && !isNaN(d.getTime())) iso = d.toISOString();
+  }
+  sofTimeCancel();
+  if (cb) cb(iso);
+}
+function sofTimeConfirm(opts, onOk) {
+  opts = opts || {};
+  var m = document.getElementById('sofTimeModal');
+  // Nincs modal (régi, beragadt HTML) → egyszerű megerősítés fallback,
+  // NOW() küldés (null ISO); soha ne hajtsuk végre némán, ha a sofőr
+  // nem hagyja jóvá.
+  if (!m) {
+    if (confirm((opts.title ? opts.title + '\n\n' : '') + (opts.msg || ''))) {
+      if (onOk) onOk(null);
+    }
+    return;
+  }
+  var ico = document.getElementById('sofTimeIco');
+  var ttl = document.getElementById('sofTimeTitle');
+  var msg = document.getElementById('sofTimeMsg');
+  var ok  = document.getElementById('sofTimeOkBtn');
+  if (ico) ico.textContent = opts.ico || '⏱️';
+  if (ttl) ttl.textContent = opts.title || '';
+  if (msg) msg.textContent = opts.msg || '';
+  if (ok) ok.textContent = opts.ok || t('sof.cfm.yes');
+  // Input alap: a MAI idő (kényelmes, csak leokéz); szerkeszthető, ha
+  // pár perccel korábban történt / lekésett. A `max` a mostani + 1 óra
+  // (pár perces jövőt engedünk a szerver +2 perces türelmén belül;
+  // a szerver úgyis validál).
+  var inp = document.getElementById('sofTimeInput');
+  if (inp) {
+    var now = new Date();
+    inp.value = _sofLocalDatetimeValue(now);
+    var max = new Date(now.getTime() + 60 * 60 * 1000);
+    inp.max = _sofLocalDatetimeValue(max);
+  }
+  _sofTimeCb = onOk || null;
+  m.style.display = 'flex';
 }
 
 // ============================================================
@@ -822,23 +973,27 @@ function goSec(id) {
 // — egy félrenyomott BE/KI a napidíjat rontja el. A kérdés az irányt nevezi meg.
 function sendBorderCross(tip, tara) {
   var act = (tip === 'Intrare') ? t('sof.crossIn') : t('sof.crossOut');
-  sofConfirm({
+  // Idő-picker modal — a diurna-ablak szempontjából a beírt óra:perc
+  // (BE/KI) DÖNTŐ, ezért engedjük a sofőrnek utólag pótolni is.
+  sofTimeConfirm({
     ico: '🛂',
     title: t('sof.crossConfirmTitle', { act: act }),
     msg: t('sof.crossConfirmMsg'),
     ok: act
-  }, function () { _sendBorderCrossGo(tip, tara); });
+  }, function (atIso) { _sendBorderCrossGo(tip, tara, atIso); });
 }
-function _sendBorderCrossGo(tip, tara) {
+function _sendBorderCrossGo(tip, tara, atIso) {
   var statusEl = document.getElementById('gpsStatus');
   statusEl.innerHTML = '<div class="gps-badge"><span class="spinner"></span> ' + t('sof.gpsFetch') + '</div>';
 
   function doSend(lat, lng) {
+    var payload = { tip: tip, tara: tara, gps_lat: lat, gps_lng: lng,
+      locatie: (lat != null && lng != null) ? (lat.toFixed(4) + ', ' + lng.toFixed(4)) : null };
+    if (atIso) payload.at = atIso;
     fetch('/api/border-cross', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tip: tip, tara: tara, gps_lat: lat, gps_lng: lng,
-        locatie: lat ? (lat.toFixed(4) + ', ' + lng.toFixed(4)) : null })
+      body: JSON.stringify(payload)
     }).then(function(r) { return r.json(); }).then(function(d) {
       if (d.success) {
         toast(tip === 'Intrare' ? t('sof.roInSaved') : t('sof.roOutSaved'), 'ok');
@@ -3829,17 +3984,20 @@ var MS_STEPS = [
 function driverMilestone(id, stepIdx) {
   var step = (typeof stepIdx === 'number' && MS_STEPS[stepIdx]) ? MS_STEPS[stepIdx] : null;
   var act  = step ? t(step.key) : t('sof.ms.recorded');
-  sofConfirm({
+  // Idő-picker modal: alap a MOSTANI idő, de szerkeszthető, ha a sofőr
+  // lekésett a nyomással (utólag pótolja a valós időt). A szerver az
+  // `at` paramétert használja NOW() helyett.
+  sofTimeConfirm({
     ico: '🚚',
     title: t('sof.ms.confirmTitle', { act: act }),
     msg: t('sof.ms.confirmMsg'),
-    ok: act,
-    tone: 'ok'
-  }, function () { _driverMilestoneGo(id); });
+    ok: act
+  }, function (atIso) { _driverMilestoneGo(id, atIso); });
 }
-function _driverMilestoneGo(id) {
+function _driverMilestoneGo(id, atIso) {
   fetch('/api/orders/' + id + '/driver-milestone', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(atIso ? { at: atIso } : {})
   })
   .then(function (r) { return r.json(); })
   .then(function (d) {
@@ -3904,23 +4062,30 @@ function driverStopAction(orderId) {
   if (!opts.length) { toast(t('sof.ms.allDone') || 'Toate etapele înregistrate.', 'ok'); return; }
   if (opts.length === 1) {
     var opt = opts[0];
-    var act = _stopEventLabel(opt);
-    var stopName = opt.stop.loc || ('#' + (opt.stop.stop_index + 1));
-    sofConfirm({
-      ico: opt.stop.kind === 'pickup' ? '📦' : '📍',
-      title: t('sof.ms.confirmTitle', { act: act }),
-      msg: t('sof.ms.confirmStop', { loc: stopName }) || (act + ' — ' + stopName),
-      ok: act, tone: 'ok'
-    }, function () { _soferStopEventGo(orderId, opt.stop.id, opt.event); });
+    _soferStopConfirmPrompt(orderId, opt);
     return;
   }
   // Több nyitott lehetőség → választó modal
   sofChoice(orderId, opts);
 }
-function _soferStopEventGo(orderId, stopId, event) {
+// Egy adott stop-opciónál felteszi az idő-picker modalt (alap: mostani
+// idő, szerkeszthető). Igenre a stop-event-et küldi az `at` ISO-val.
+function _soferStopConfirmPrompt(orderId, opt) {
+  var act = _stopEventLabel(opt);
+  var stopName = opt.stop.loc || ('#' + (opt.stop.stop_index + 1));
+  sofTimeConfirm({
+    ico: opt.stop.kind === 'pickup' ? '📦' : '📍',
+    title: t('sof.ms.confirmTitle', { act: act }),
+    msg: t('sof.ms.confirmStop', { loc: stopName }) || (act + ' — ' + stopName),
+    ok: act
+  }, function (atIso) { _soferStopEventGo(orderId, opt.stop.id, opt.event, atIso); });
+}
+function _soferStopEventGo(orderId, stopId, event, atIso) {
+  var payload = { stopId: stopId, event: event };
+  if (atIso) payload.at = atIso;
   fetch('/api/orders/' + orderId + '/stop-event', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ stopId: stopId, event: event })
+    body: JSON.stringify(payload)
   })
   .then(function (r) { return r.json(); })
   .then(function (d) {
@@ -3944,7 +4109,7 @@ function sofChoice(orderId, opts) {
     var n = parseInt(pick, 10);
     if (!isFinite(n) || n < 1 || n > opts.length) return;
     var op = opts[n - 1];
-    _soferStopEventGo(orderId, op.stop.id, op.event);
+    _soferStopConfirmPrompt(orderId, op);
     return;
   }
   var host = document.getElementById('sofChoiceBtns');
@@ -3957,7 +4122,8 @@ function sofChoice(orderId, opts) {
     btn.textContent = kindIco + ' ' + _stopEventLabel(op) + ' — ' + stopName;
     btn.onclick = function () {
       sofChoiceCancel();
-      _soferStopEventGo(orderId, op.stop.id, op.event);
+      // Stop kiválasztva → idő-picker modal a jóváhagyáshoz/szerkesztéshez
+      _soferStopConfirmPrompt(orderId, op);
     };
     host.appendChild(btn);
   });

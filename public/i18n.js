@@ -2728,8 +2728,8 @@
     'sof.crossOut': { hu: '🇷🇴 Kilépés', ro: '🇷🇴 Ieșire' },
     'sof.crossConfirmTitle': { hu: 'Biztos, hogy „{act}"?', ro: 'Confirmi „{act}"?' },
     'sof.crossConfirmMsg': {
-      hu: 'Most rögzül a jelenlegi idővel és GPS-pozícióval, és ebből számoljuk a diurnát. Nem vonható vissza.',
-      ro: 'Se înregistrează acum, cu ora și poziția GPS curentă, și stă la baza calculului diurnei. Nu se poate anula.'
+      hu: 'A GPS-pozíció most rögzül; az időpont alapból a mostani, de lentebb szerkeszthető, ha lekésted a nyomással. Ebből számoljuk a diurnát.',
+      ro: 'Poziția GPS se salvează acum; ora este implicit cea curentă, dar mai jos poți corecta dacă ai întârziat cu apăsarea. Din aceasta se calculează diurna.'
     },
     'sof.cfm.yes': { hu: 'Igen', ro: 'Da' },
     'sof.locale': { hu: 'hu-HU', ro: 'ro-RO' },
@@ -2934,13 +2934,30 @@
     'sof.ms.recorded': { hu: 'Rögzítve', ro: 'Înregistrat' },
     'sof.ms.confirmTitle': { hu: 'Biztos, hogy „{act}"?', ro: 'Confirmi „{act}"?' },
     'sof.ms.confirmMsg': {
-      hu: 'Az időpont most rögzül és az iroda értesítést kap. Nem vonható vissza.',
-      ro: 'Ora se înregistrează acum și biroul este notificat. Nu se poate anula.'
+      hu: 'Ha épp most történt, csak nyomj Igent — az időpont az iroda felé is így megy. Ha lekésted, alább beállíthatod a valódi időt.',
+      ro: 'Dacă s-a întâmplat chiar acum, apasă Da — biroul primește această oră. Dacă ai întârziat cu apăsarea, modifică ora reală mai jos.'
     },
     'sof.ms.confirmStop': {
-      hu: 'A(z) „{loc}" pontnál rögzül az időpont. Nem vonható vissza.',
-      ro: 'Ora se înregistrează la punctul „{loc}". Nu se poate anula.'
+      hu: 'A(z) „{loc}" pontnál rögzül az időpont. Ha lekésted, alább pótolhatod a valódi időt.',
+      ro: 'Ora se înregistrează la punctul „{loc}". Dacă ai întârziat, poți corecta ora reală mai jos.'
     },
+    'sof.timeConfirm.at':   { hu: 'Időpont',                 ro: 'Ora' },
+    'sof.timeConfirm.now':  { hu: 'Most',                    ro: 'Acum' },
+    'sof.timeConfirm.hint': {
+      hu: 'Alapból a MOSTANI idő. Ha lekésted a nyomással, itt beállíthatod a valós időt.',
+      ro: 'Implicit ora curentă. Dacă ai întârziat cu apăsarea, setează aici ora reală.'
+    },
+    // 🔌 Session-lejárt overlay (in-app recovery a driver-oldalon)
+    'sof.sess.title':   { hu: 'A munkamenet lejárt',         ro: 'Sesiunea a expirat' },
+    'sof.sess.msg':     {
+      hu: 'Frissítsd az oldalt, hogy visszakapcsolódj. Ha offline vagy, próbáld újra kicsit később.',
+      ro: 'Reîmprospătează pagina pentru a te reconecta. Dacă ești offline, mai încearcă în câteva momente.'
+    },
+    'sof.sess.refresh': { hu: '🔄 Frissítés',                ro: '🔄 Reîmprospătează' },
+    'sof.sess.logout':  { hu: 'Kilépés',                     ro: 'Ieșire' },
+    'sof.sess.offline': { hu: '📶 Offline vagy — a szerver most nem elérhető.', ro: '📶 Ești offline — serverul nu este disponibil acum.' },
+    'sof.sess.idle':    { hu: '⏳ Inaktivitás miatt le kell frissíteni a munkamenetet.', ro: '⏳ Din cauza inactivității trebuie reînnoită sesiunea.' },
+    'sof.sess.expired': { hu: 'A szerver már nem ismer minket. Frissíts újra bejelentkezéshez.', ro: 'Serverul nu ne mai recunoaște. Reîmprospătează pentru a te autentifica din nou.' },
     'sof.ms.nextStep': { hu: 'Következő állomás', ro: 'Etapa următoare' },
     'sof.ms.chooseStop': { hu: 'Melyik pontot választod?', ro: 'Ce punct alegi?' },
     'sof.ms.chooseStopMsg': {
