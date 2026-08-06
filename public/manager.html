@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260730gps"></script>
+  <script src="/i18n.js?v=20260806mile"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1256,6 +1256,22 @@
       <div id="oeExtraStopsList" style="display:flex;flex-direction:column;gap:8px;"></div>
     </div>
 
+    <!-- 🚚 Sofőr-állomás időbélyegek — utólagos javítás. Régi menetlevél-
+         beküldés auto-Finalizat után beragadt fuvarokhoz. -->
+    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;" id="oeMilestonesBox">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:12px;flex-wrap:wrap;">
+        <div style="font-weight:700;color:#fff;" data-i18n="oe.milestonesHead">🚚 Sofőr-állomás időpontok</div>
+        <button type="button" class="btn ghost" style="padding:6px 12px;font-size:12px;color:#fbbf24;border-color:#f59e0b;" onclick="oeResetUnload()" data-i18n="oe.resetUnload">🔁 Lezárás visszavonása</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;" data-i18n="oe.milestonesHint">Üres mező = törlés. A törléskor a fuvar Finalizat-ból In Curs-ra vált, hogy a sofőr újranyomhassa.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="field"><label data-i18n="oe.sositIncarcare">📍 Megérkezett a felrakóhoz</label><input class="input" id="oeSositIncarcareAt" type="datetime-local"></div>
+        <div class="field"><label data-i18n="oe.incarcat">📦 Felrakodott</label><input class="input" id="oeIncarcatAt" type="datetime-local"></div>
+        <div class="field"><label data-i18n="oe.sositDescarcare">📍 Megérkezett a lerakóhoz</label><input class="input" id="oeSositDescarcareAt" type="datetime-local"></div>
+        <div class="field"><label data-i18n="oe.descarcat">✅ Leürített</label><input class="input" id="oeDescarcatAt" type="datetime-local"></div>
+      </div>
+    </div>
+
     <div style="display:flex;gap:10px;margin-top:16px;">
       <button class="btn ghost col" onclick="closeOrderEditModal()" data-i18n="common.cancel">Mégse</button>
       <button class="btn primary col" onclick="saveOrderEdit()" data-i18n="edit.save">💾 Mentés</button>
@@ -1373,7 +1389,7 @@
 <script src="/email-intake-card.js?v=20260616warm2"></script>
 <script src="/feature-catalog.js?v=20260618cgps2"></script>
 <script>window.__pwaInstallDefault=false;</script>
-<script src="/console-shared.js?v=20260730gps"></script>
+<script src="/console-shared.js?v=20260806mile"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 <script src="/console-pages.js?v=20260617b1"></script>
 <!-- ===== INTEGRACIOK (Manager: Ugyfelek + "Hol a kocsi?"; szamlazo/beallitas Admin-only) ===== -->
