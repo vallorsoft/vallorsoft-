@@ -14,6 +14,21 @@
 
 ---
 
+## 2026-08-20 — Wizard top-tools: CSV import + AI kiolvasás egymás mellett, hint nélkül (PR #328)
+
+### Miért
+A wizard tetején a két „belépő" gomb (📥 CSV import + 📄 Megrendelő feltöltése + AI kiolvasás) eddig egymás alatt volt, és mindegyik alá ki volt írva egy apró szürke hint (pl. „gyári fuvarlista (.csv) — oszlop-párosítással" / „PDF / JPG / PNG — az AI kitölti a mezőket, a fájl a fuvarhoz csatolódik"). Kérés: legyen a két gomb egymás mellett, és a hint alattuk NE látszódjon — a gomb-felirat elég önmagában.
+
+### Mit
+- **`public/style.css`** `.oc-top-tools` — `flex-direction: column → row` + `flex-wrap: wrap` (mobilon még mindig két sorra tud törni); `align-items: flex-start`. Új szabály: `.oc-top-tools .text-muted { display:none }` — a legacy `#ordersImportBtnBox` + `#ordScanBtnBox` box-okban lévő hint-spaneket elrejti. Az AI-scan élő állapot-doboz (`#ordScanStatus`) továbbra is az AI-gomb ALATT marad, mert az futásidejű visszajelzés.
+- **`public/admin.html` + `manager.html`** — cache-bust `style.css` → `?v=20260820wiz2`.
+
+### Teszt
+- Vizuális ellenőrzés headless Chromiummal — a két gomb egymás mellett a wizard tetején, hint-textek nem látszanak, layout kompakt.
+- Nincs JS-változás → 924 Jest zöld megmarad (a wiz PR-ben már bizonyítva).
+
+---
+
 ## 2026-08-20 — Fuvar-kiírás wizard: 5 lépéses folyamat + PDF-szerű ellenőrző lap (PR #327)
 
 ### Miért
