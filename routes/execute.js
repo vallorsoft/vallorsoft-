@@ -54,6 +54,7 @@ const handlers = Object.assign(
   require('../handlers/whatsappChat'),
   require('../handlers/receiptScan'),
   require('../handlers/orderScan'),
+  require('../handlers/uitScan'),
   require('../handlers/statsV2'),
   require('../handlers/statsInsights'),
   require('../handlers/statsReports'),

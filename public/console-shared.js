@@ -942,6 +942,12 @@ function createOrder(){
   if (_loadTop.loc || _loadTop.firma || _loadTop.data) pickups.push(_loadTop);
   if (_unloadTop.loc || _unloadTop.firma || _unloadTop.data) deliveries.push(_unloadTop);
   extra.forEach((s) => (s.kind === 'pickup' ? pickups : deliveries).push({ loc: s.loc, firma: s.firma, data: s.data }));
+  // UIT-kód (opcionális): a mezőben megjelenített értéket normalizáljuk
+  // (uppercase, csak A-Z0-9, max 16). Ha üres, nem küldünk semmit; ha van,
+  // egy-elemű uit_codes tömb kerül a payloadba (a szerver ide is tud tömböt).
+  var _oUitRaw = (document.getElementById('oUit')||{}).value || '';
+  var _oUitNorm = (window.UitFmt && window.UitFmt.normalize) ? window.UitFmt.normalize(_oUitRaw) : String(_oUitRaw).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,16);
+  var _uitList = _oUitNorm ? [{ uit_code: _oUitNorm }] : [];
   const p={
     client:document.getElementById('oClient').value.trim(),
     ref:document.getElementById('oRef').value.trim(),
@@ -953,6 +959,7 @@ function createOrder(){
     hossz_cm:(document.getElementById('oHossz')||{}).value||null,
     szel_cm:(document.getElementById('oSzel')||{}).value||null,
     mag_cm:(document.getElementById('oMag')||{}).value||null,
+    uit_codes:_uitList,
     route_geo:buildRouteGeo('create'),
     loc_incarcare:_loadTop.loc,
     loc_descarcare:_unloadTop.loc,
@@ -981,7 +988,7 @@ function createOrder(){
       // A feltöltött (AI-val kiolvasott) megrendelő csatolása a friss fuvarhoz
       if(typeof _ordScanAttachTo==='function') _ordScanAttachTo(r.id);
       loadOrders();
-      ['oClient','oRef','oPret','oKm','oSuly','oHossz','oSzel','oMag','oLoad','oUnload','oLoadFirma','oUnloadFirma','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+      ['oClient','oRef','oPret','oKm','oSuly','oHossz','oSzel','oMag','oLoad','oUnload','oLoadFirma','oUnloadFirma','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon','oUit'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
       const _el=document.getElementById('oExtraStopsList'); if(_el) _el.innerHTML='';
       ['oFtl','oLtl'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
       refreshDimReq();
@@ -2101,6 +2108,11 @@ function loadOrderFormData(){
   // jármű/sofőr választásra a párja automatikusan kitöltődik (ha üres)
   const cs=document.getElementById('oCamionSelect');if(cs)cs.onchange=orderFormPairFromVehicle;
   const ds=document.getElementById('oInternDriver');if(ds)ds.onchange=orderFormPairFromDriver;
+  // UIT-mező: auto-uppercase + 4-esével kötőjel, max 16 karakter.
+  var _oUit = document.getElementById('oUit');
+  if (_oUit && window.UitFmt && typeof window.UitFmt.attach === 'function') {
+    try { window.UitFmt.attach(_oUit); } catch (_) {}
+  }
 }
 
 // ── Fuvarok kezelése — interaktív KPI mutató-sáv (vsMetricBand) ──
@@ -5020,9 +5032,85 @@ function openOrderEdit(id) {
       // Legs renderelése
       renderOeLegs(legs);
 
+      // UIT-kódok betöltése + input formázás (auto-uppercase + 4-esével kötőjel)
+      var _oeUitInput = document.getElementById('oeUit');
+      if (_oeUitInput) {
+        _oeUitInput.value = '';
+        if (window.UitFmt && typeof window.UitFmt.attach === 'function') { try { window.UitFmt.attach(_oeUitInput); } catch(_){} }
+      }
+      loadOeUitList();
+
       document.getElementById('orderEditModal').classList.add('open');
     });
   });
+}
+
+// A szerkesztő UIT-blokkja: a fuvarhoz tartozó összes UIT-kód listája (a
+// /api/orders/:id/uit-ról), + törlő gomb, + kép-megnyitás új tabon. Az új
+// UIT hozzáadását az `oeAddUit()` intézi (input → normalize → POST).
+function loadOeUitList() {
+  var wrap = document.getElementById('oeUitList');
+  if (!wrap || !_oeOrderId) return;
+  wrap.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:4px 0;">…</div>';
+  fetch('/api/orders/' + encodeURIComponent(_oeOrderId) + '/uit', { credentials: 'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var items = (d && d.items) || [];
+      if (!items.length) {
+        wrap.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:4px 0;" data-i18n="edit.uitEmpty">Még nincs UIT-kód ehhez a fuvarhoz.</div>';
+        if (window.I18N && I18N.apply) I18N.apply(wrap);
+        return;
+      }
+      wrap.innerHTML = items.map(function (u) {
+        var pretty = (window.UitFmt && window.UitFmt.format) ? window.UitFmt.format(u.uit_code) : u.uit_code;
+        var srcLabel = u.source === 'ai-scan' ? '📷 AI' : '✋';
+        var photoBtn = u.has_photo
+          ? '<a class="btn ghost" style="padding:4px 10px;font-size:11px;text-decoration:none;" target="_blank" rel="noopener" href="/api/uit/' + u.id + '/photo" title="Fotó megnyitása">🖼️</a>'
+          : '';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:rgba(255,255,255,0.03);">' +
+          '<span style="font-family:ui-monospace,monospace;font-weight:700;letter-spacing:.5px;flex:1;word-break:break-all;">' + esc(pretty) + '</span>' +
+          '<span style="color:var(--muted);font-size:11px;" title="' + (u.source === 'ai-scan' ? 'AI-scan' : 'Kézi') + '">' + srcLabel + '</span>' +
+          photoBtn +
+          '<button type="button" class="btn ghost" style="padding:4px 10px;font-size:11px;color:#f87171;" onclick="oeDeleteUit(' + u.id + ')" title="Törlés">✕</button>' +
+        '</div>';
+      }).join('');
+    })
+    .catch(function () { wrap.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:4px 0;">—</div>'; });
+}
+
+function oeAddUit() {
+  var inp = document.getElementById('oeUit');
+  if (!inp || !_oeOrderId) return;
+  var raw = inp.value || '';
+  var norm = (window.UitFmt && window.UitFmt.normalize) ? window.UitFmt.normalize(raw) : String(raw).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,16);
+  if (!norm) { toast(t('cs.uit.needCode')||'Cod UIT lipsă.', 'err'); return; }
+  fetch('/api/orders/' + encodeURIComponent(_oeOrderId) + '/uit', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uit_code: norm })
+  })
+  .then(function (r) { return r.json().then(function(d){ return { ok:r.ok, d:d }; }); })
+  .then(function (o) {
+    if (o.ok) {
+      inp.value = '';
+      toast(t('cs.uit.added')||'UIT hozzáadva.', 'ok');
+      loadOeUitList();
+    } else {
+      toast((o.d && o.d.error) || t('common.error'), 'err');
+    }
+  })
+  .catch(function () { toast(t('common.error'), 'err'); });
+}
+
+function oeDeleteUit(uid) {
+  if (!confirm(t('cs.uit.delConfirm')||'Törlöd ezt a UIT-kódot?')) return;
+  fetch('/api/uit/' + encodeURIComponent(uid), { method: 'DELETE', credentials: 'same-origin' })
+    .then(function (r) { return r.json().then(function(d){ return { ok:r.ok, d:d }; }); })
+    .then(function (o) {
+      if (o.ok) { toast(t('common.deleted')||'Törölve.', 'ok'); loadOeUitList(); }
+      else { toast((o.d && o.d.error) || t('common.error'), 'err'); }
+    })
+    .catch(function () { toast(t('common.error'), 'err'); });
 }
 
 function renderOeLegs(legs) {
