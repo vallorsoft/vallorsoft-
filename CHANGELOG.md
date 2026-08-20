@@ -14,6 +14,41 @@
 
 ---
 
+## 2026-08-20 — Fuvar-kiírás wizard: 5 lépéses folyamat + PDF-szerű ellenőrző lap (PR #327)
+
+### Miért
+Az admin/manager **Fuvar → Kiírás** oldalán eddig egy hosszú, egyoldalas űrlap volt (ügyfél, referencia, sorozat, ár, km, súly, FTL/LTL, méretek, felrakó/lerakó cím+cég+dátum, extra multi-drop pontok külön blokkban, sofőr-radio, belső/külső sofőr, vontató, pótkocsi, egy nagy „Mentés" gomb) — sok mező egyszerre, a több felrakó/lerakó pont pedig egy külön „TÖBB FELRAKÁSI / LERAKÁSI PONT" szekcióban, elszigetelten. Kérés: **lépcsős menetű kiírás** — egyesivel/csoportosítva dobja fel a mezőket, a felrakó/lerakó pontokat pedig **egységes, egymás után adódó kártyaként**, minden ponthoz X-elés (felrakó vagy lerakó) + saját adatok, és a végén egy **PDF-szerű ellenőrző lap** minden szekció mellett „✏️ Javítás" gombbal + a fel/lerakó pontok fel/le átrendezhetők, ha a sorrend nem lenne jó.
+
+### Mit
+1. **Új `public/order-wizard.js`** (~430 sor) — wizard motor:
+   - `ocInit()` átveszi a `.pane[data-pane="orders-form"]`-t: elrejti a legacy `.glass` panelt, létrehozza az `#ocWizardShell`-t (AI-scan + CSV-import a tetején, progress-sáv, 6 step, alul `[← Vissza] [Tovább →]` / `[✅ Fuvar mentése]` nav).
+   - **A legacy `.field`-eket / blokkokat átmozgatja (`.appendChild`) a step-body-kba** — id-k változatlanok, az összes meglévő JS (client-picker, ANAF, autocomplete, jármű/sofőr-választók, `refreshDimReq`, `loadTypeExclusive`, `onSoferTypeChange`, `orderRouteRecalc`) továbbra is működik.
+   - **Step 1 (Ügyfél)** — client-picker + ref + sorozat. **Step 2 (Állomások)** — **SAJÁT UI** kártya-listával (⬆⬇✕ átrendezés + ⬆️ Felrakás / ⬇️ Lerakás X-toggle + helység + cég + dátum + opc. idő; a wizard `vsAttachAutocomplete` + `FavLocations.attachPicker`-t hív a saját input-jaira). **Step 3 (Áru)** — FTL/LTL + súly + méretek. **Step 4 (Kiosztás)** — sofőr-radio + belső/külső sofőr + vontató/pótkocsi. **Step 5 (Ár és távolság)** — ár + km (🗺️).
+   - **`_commitStopsToLegacy()`** — a wizard `_ocStops[]` listáját a Tovább pillanatában a legacy mezőkbe szinkronizálja: első pickup → `oLoad`/`oLoadFirma`/`oLoadDate`, első delivery → `oUnload`/`oUnloadFirma`/`oUnloadDate`, a többi → `oExtraStopsList` a meglévő `addExtraStopRow` hívással. Fordított irányban (`_syncStopsFromLegacyIfEmpty`) az AI-scan / CSV-import által kitöltött legacy mezőket a wizard-listába szippantja.
+   - **Step 6 (Ellenőrzés)** — **PDF-szerű review**: fehér oldal-szerű dokumentum, minden szekció mellett `✏️ Javítás` gomb (`ocGoStep(N)` visszaugrik az adott step-re), a végén nagy `✅ Fuvar mentése` — ami a MEGLÉVŐ `createOrder()`-t hívja (payload/formátum + szerver-oldal 100%-ban változatlan; multi-stop `pickups[]/deliveries[]` a szerverre változatlan). Sikeres mentés után `_ocStops` üres, wizard step 1-re visszaáll.
+   - **Validáció** — step 1: ügyfél kötelező; step 2: legalább 1 felrakó + 1 lerakó; step 3: FTL/LTL kötelező (LTL-nél méretek is), kliens + szerver ugyanaz.
+2. **`public/style.css` wizard blokk** — `.oc-shell` / `.oc-progress` (6 pöttyes sáv, aktív gradiens, kész zöld pipa) / `.oc-step-*` / `.oc-stops` + `.oc-stop-card` (kártya + fel/le/✕ gombok + toggle-sor) / `.oc-review` + `.ocr-doc` (PDF-szerű fehér oldal, sötét téma is), világos + sötét téma-érzékeny, reszponzív ≤820px (progress-címkék elrejtve, kártya 2 oszlop) / ≤520px (kártya 1 oszlop, nav-gombok flex).
+3. **`public/i18n.js`** — 30+ új `oc.*` kulcs (`oc.step1Title`..`oc.step6Title`, `oc.p1`..`oc.p6`, `oc.back`/`next`/`submit`/`edit`, `oc.stopsHint`/`addPickup`/`addDelivery`/`pickup`/`delivery`/`moveUp`/`moveDown`, `oc.stopLoc`/`stopFirma`/`stopDate`/`stopTime`, `oc.noStops`/`needStops`, `oc.reviewTitle`/`reviewHint`, `oc.pickupCount`/`deliveryCount`) — mind RO-alap + HU.
+4. **`public/admin.html` + `manager.html`** — `order-wizard.js` script include a szerep-JS előtt; cache-bust `style.css`/`i18n.js`/`admin.js`/`manager.js` → `?v=20260820wiz`.
+5. **`public/admin.js` + `manager.js`** — a `loadTab('orders-form')` most: `loadOrderFormData(); mountClientPicker(); populateOrderSeriaSelect(); setTimeout(ocInit, 0);` (a wizard mount a legacy mezők DOM-ba kerülése UTÁN fusson).
+
+### Miért működik / miért nem törnek a meglévő funkciók
+- A wizard **kizárólag a UI-t rendezi át** — a `createOrder()` payloadja, a `comCreate`/`bulkCreateOrders`/inbound-`/approve` szerver-oldal érintetlen. A multi-stop `pickups[]/deliveries[]` logika (`db/order-stops.sql`, `lib/orderStops.js`) változatlan.
+- Az id-k (`#oClient`, `#oLoad*`, `#oUnload*`, `#oExtraStopsList`, `#oFtl`/`#oLtl`, `#oInternDriver`, `#oCamionSelect`, `#oExternNume`, stb.) mind megmaradnak → a `client-picker.js`, `orderScanFill()` (AI-kiolvasás), `openQuickVehicle()`, `filterInternDrivers()`, `filterCamions()`, `refreshDimReq()`, `loadTypeExclusive()`, `orderRouteRecalc()` mind ugyanúgy találkoznak a mezőikkel.
+- Az AI-scan (megrendelő PDF feltöltés → Gemini kiolvasás) és a CSV-import gombok a wizard **tetején mindig láthatók** (a legacy `#ordScanBtnBox` + `#ordersImportBtnBox` átmozgatva); a scan a legacy `oLoad`/`oUnload`/... mezőkbe ír, amit a step 2 megnyitásakor a `_syncStopsFromLegacyIfEmpty` a wizard-lista kártyáiba szippant → **a felhasználó a wizardon látja, amit az AI kiolvasott**.
+
+### Teszt
+- **924 Jest zöld** (56 suite, 7 skipped valós-DB) — nincs regresszió a szerver-oldalon (a wizard tisztán kliens).
+- **Szintaxis-check** (`new Function`) — zöld.
+- **Jsdom integrációs teszt** (`scratchpad/wizard-integration.js`): mount + step-body-populálás (client, ref, sorozat / driverType / vehicles / pret / km); wizard-step2 saját UI (`#ocStopsList` létrejön); add-stops (pickup + delivery); ⬆⬇ reorder (index-swap); kind-toggle (pickup↔delivery); validáció: üres ügyfél / hiányzó FTL-LTL → blokkol + toast; `_commitStopsToLegacy` — első pickup a `oLoad`-ba, első delivery a `oUnload`-ba, `oLoadDate=2026-08-25T00:00`, extra delivery a `#oExtraStopsList`-be (`addExtraStopRow` hívva); review-lap tartalma (Test Kft / Arad / Bucuresti / Cluj / FTL) + `ocGoStep(1..5)` edit-gombok mind renderelve — **minden zöld**.
+- **Vizuális ellenőrzés** headless Chromiummal — a wizard-shell, a progress-sáv, a stops-kártyák és a PDF-review együttesen olvasható és arányos (mockup a 2. és 6. lépésről).
+
+### Kompatibilitás
+- **A régi funkciók mind megmaradnak** — csak a menete változott. A tervezőtáblás/radaros kiosztás, az AI-scan, a CSV-import, a szerkesztő-modal (`openOrderEdit`) érintetlen.
+- **Kikapcsolható a wizard?** Nincs feature-flag rá (nem kértél) — a menete végig egységes. Ha később ki kell kapcsolni, elég az `ocInit()` hívást kikommentelni a `loadTab`-okban → a legacy `.glass` visszakerül `display:''`-re.
+
+---
+
 ## 2026-08-06 — CargoTrack GPS whitelist-figyelő (`services/cargotrack-monitor.js`) + Fly egress IP allokálva
 
 ### Miért
