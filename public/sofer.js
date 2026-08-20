@@ -8,6 +8,45 @@ function esc(s) {
                       .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
 
+// Város-név kinyerése teljes címből — a sofőr-felületen mindenhol
+// olvashatóbb, ha a fuvar-sorokban CSAK a városnevet mutatjuk (nem a
+// teljes utca+irsz+ország szöveget). Példa:
+//   "Strada Pictor Rosenthal, 107061, Ploiești, România" → "Ploiești"
+//   "Strada Uzinei, 555400 Copșa Mică"                  → "Copșa Mică"
+// Heurisztika: vesszőnkénti bontás; kihagyjuk a street-prefixes /
+// irányítószám / ország-nevet / önálló házszámot; a maradékból az
+// első nem-üres darab a város (a vezető irszám levágva).
+function _cityOf(loc) {
+  var s = String(loc || '').trim();
+  if (!s) return '';
+  var parts = s.split(',').map(function(p){ return p.trim(); }).filter(Boolean);
+  if (!parts.length) return s;
+  var STREET_RE  = /^(strada|str\.?|bd\.?|b-?dul|bulevardul|calea|șos(eaua)?|sos(eaua)?|șos\.?|sos\.?|aleea|piaț[aă]|piata|cart(ier)?\.?|sat|nr\.?|intrarea|intr\.?|drumul|dr\.?|splaiul|spl\.?|fund[aă]tura|fnd\.?)\b/i;
+  var COUNTRY_RE = /^(rom[aâ]nia|ungaria|magyarorsz[aá]g|hungary|moldova|republica moldova|bulgaria|serbia|srbija|s[eé]rbia|ukraine|ucraina|austria|germania|deutschland|italia|italy|fran[țt]a|france|slovakia|slovacia|slovenia|croa[țt]ia|greece|grecia|poland|polska|polonia|cehia|czech|belgium|belgia|nederland|holland|olanda|luxemburg|switzerland|elve[țt]ia|espa[ñn]a|spania|portugal|portugalia|turkey|turcia|denmark|danemarca|sweden|suedia|norway|norvegia|finland|finlanda|ireland|irlanda|marea britanie|uk|united kingdom)$/i;
+  var POSTAL_RE  = /^\d{3,8}[a-z]?$/i;
+  // Irányítószám-prefixes darab (RO: „cod 527166", HU: „irsz. 4025",
+  // int.: „cp 400000") — a részt kihagyjuk, mert nem város.
+  var POSTAL_PREFIX_RE = /^(cod(ul)?|cp|c\.p\.|postal|irsz\.?|ir\.sz\.?|zip|plz)\s*[:.]?\s*\d{3,8}[a-z]?$/i;
+  // Megye-prefix („jud. Covasna", „judetul Cluj") — a rendszer szerint ez
+  // megye, nem város; de ha semmi más nem marad, ezt megtartjuk fallback-nek.
+  var COUNTY_RE = /^(jud\.?|județul|judetul|megye)\b/i;
+  var countyFallback = '';
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i];
+    if (!p) continue;
+    if (POSTAL_RE.test(p)) continue;
+    if (POSTAL_PREFIX_RE.test(p)) continue;
+    if (COUNTRY_RE.test(p)) continue;
+    if (STREET_RE.test(p)) continue;
+    if (/^\d+[a-z]?$/i.test(p)) continue;
+    if (COUNTY_RE.test(p)) { if (!countyFallback) countyFallback = p; continue; }
+    // Vezető irányítószám levágása a részen belül („555400 Copșa Mică" → „Copșa Mică")
+    var stripped = p.replace(/^\d{3,8}[a-z]?\s+/i, '').trim();
+    if (stripped) return stripped;
+  }
+  return countyFallback || parts[parts.length - 1] || s;
+}
+
 // ============================================================
 // 🔌 SESSION-RECOVERY OVERLAY (session-guard-től hívva)
 // ============================================================
@@ -1069,11 +1108,23 @@ function loadSoferOrders() {
       } else if (o.waybill_phase === 'unloading') {
         phaseBadge = ' <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(99,102,241,0.25);color:#a5b4fc;">📥 ' + t('sof.phaseUnloading') + '</span>';
       }
+      // Olvasható formátum (mint mindenhol a sofőr felületen): felrakás
+      // dátum · cég · város  →  lerakás dátum · város · cég. A belső
+      // CMD-azonosítót SEHOL nem mutatjuk (a sofőr felé zajt visz).
+      var _loadDay   = fmtFuvarDay(o.data_incarcare)   || '';
+      var _unloadDay = fmtFuvarDay(o.data_descarcare)  || '';
+      var _loadCity  = _cityOf(o.loc_incarcare)   || (o.loc_incarcare  || '—');
+      var _unloadCity= _cityOf(o.loc_descarcare)  || (o.loc_descarcare || '—');
+      var _lFirma = (o.firma_incarcare  || '').trim();
+      var _dFirma = (o.firma_descarcare || '').trim();
+      var _pick = [(_loadDay?'📅 '+_loadDay:''), (_lFirma?'🏢 '+_lFirma:''), '📍 '+_loadCity].filter(Boolean).join(' · ');
+      var _drop = [(_unloadDay?'📅 '+_unloadDay:''), '📍 '+_unloadCity, (_dFirma?'🏢 '+_dFirma:'')].filter(Boolean).join(' · ');
       return '<label style="display:flex;align-items:flex-start;gap:12px;background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;">'
-        + '<input type="checkbox" value="' + o.id + '" ' + (checked ? 'checked' : '') + ' onchange="toggleOrderSel(this)" style="margin-top:3px;width:18px;height:18px;accent-color:#3b82f6;flex-shrink:0;">'
+        + '<input type="checkbox" value="' + esc(o.id) + '" ' + (checked ? 'checked' : '') + ' onchange="toggleOrderSel(this)" style="margin-top:3px;width:18px;height:18px;accent-color:#3b82f6;flex-shrink:0;">'
         + '<div>'
-        + '<div style="font-weight:700;font-size:14px;color:#fff;">' + '<span style="font-size:11px;color:var(--muted);">#' + o.id + '</span> <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,0.1);">' + esc(o.status||'—') + '</span>' + phaseBadge + '</div>'
-        + '<div style="font-size:12px;color:var(--soft);margin-top:3px;">📍 ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—') + '</div>'
+        + '<div style="font-weight:700;font-size:13px;color:#fff;">' + esc(_pick) + '</div>'
+        + '<div style="font-size:12px;color:var(--soft);margin-top:2px;">↓ ' + esc(_drop) + '</div>'
+        + '<div style="margin-top:4px;"><span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(255,255,255,0.1);">' + esc(o.status||'—') + '</span>' + phaseBadge + '</div>'
         + (o.rendszam_camion ? '<div style="font-size:11px;color:var(--muted);margin-top:2px;">🚛 ' + esc(o.rendszam_camion) + (o.rendszam_remorca ? ' / ' + esc(o.rendszam_remorca) : '') + '</div>' : '')
         + '</div></label>';
     }).join('');
@@ -1220,14 +1271,26 @@ function _openOrderPicker(mode, cb) {
         mustBadge = ' <span class="op-badge op-badge-must" title="'
           + esc(t('sof.pick.mustTitle')) + '">⚠️ ' + esc(t('sof.pick.must')) + '</span>';
       }
+      // ÚJ olvasható formátum: felrakás dátum · cég · város  →  lerakás dátum · város · cég
+      // (CMD-azonosító a sofőrnek NEM jelenik meg — csak a fuvar tartalma számít)
+      var loadDay   = fmtFuvarDay(o.data_incarcare)   || esc(t('sof.det.date'));
+      var unloadDay = fmtFuvarDay(o.data_descarcare)  || esc(t('sof.det.date'));
+      var loadCity   = _cityOf(o.loc_incarcare)   || (o.loc_incarcare   || '—');
+      var unloadCity = _cityOf(o.loc_descarcare)  || (o.loc_descarcare  || '—');
+      var loadFirma   = (o.firma_incarcare  || '').trim();
+      var unloadFirma = (o.firma_descarcare || '').trim();
+      var pickLine = '📅 ' + esc(loadDay)
+        + (loadFirma  ? ' · 🏢 ' + esc(loadFirma)  : '')
+        + ' · 📍 ' + esc(loadCity);
+      var dropLine = '📅 ' + esc(unloadDay)
+        + ' · 📍 ' + esc(unloadCity)
+        + (unloadFirma ? ' · 🏢 ' + esc(unloadFirma) : '');
       return '<label class="op-item">'
         + '<input type="checkbox" value="' + esc(o.id) + '" ' + (checked ? 'checked' : '')
         + ' onchange="_opToggle(this)">'
         + '<div class="op-body">'
-        + '<div class="op-head"><b>' + esc(o.client || '—') + '</b>'
-        + ' <span class="op-id">📅 ' + esc((o.data_incarcare||'').slice(0,10) || '—') + ' → ' + esc((o.data_descarcare||'').slice(0,10) || '—') + '</span>'
-        + phaseBadge + mustBadge + '</div>'
-        + '<div class="op-route">📍 ' + esc(o.loc_incarcare || '—') + ' → ' + esc(o.loc_descarcare || '—') + '</div>'
+        + '<div class="op-head">' + pickLine + phaseBadge + mustBadge + '</div>'
+        + '<div class="op-route">↓ ' + dropLine + '</div>'
         + (o.rendszam_camion ? '<div class="op-plate">🚛 ' + esc(o.rendszam_camion)
               + (o.rendszam_remorca ? ' / ' + esc(o.rendszam_remorca) : '') + '</div>' : '')
         + '</div></label>';
@@ -3330,10 +3393,21 @@ function loadDocOrderOptions() {
     body: JSON.stringify({ functionName: 'getMySoferOrders' }) })
   .then(function(r) { return r.json(); }).then(function(d) {
     var list = (d.result || []).filter(function(o) { return o.waybill_visible !== false; });
+    // Olvasható fuvar-címke: felrakás dátum · cég · város  →  lerakás dátum · város · cég
+    // (belső CMD-azonosító a sofőr felé sehol nem jelenik meg — az érték a select-en marad)
     sel.innerHTML = '<option value="">' + t('sofer.docNoOrder') + '</option>'
       + list.map(function(o) {
-          return '<option value="' + o.id + '">' + o.id + ' — '
-            + (o.loc_incarcare || '?') + ' → ' + (o.loc_descarcare || '?') + '</option>';
+          var loadDay   = fmtFuvarDay(o.data_incarcare)  || '';
+          var unloadDay = fmtFuvarDay(o.data_descarcare) || '';
+          var loadCity   = _cityOf(o.loc_incarcare)   || (o.loc_incarcare   || '?');
+          var unloadCity = _cityOf(o.loc_descarcare)  || (o.loc_descarcare  || '?');
+          var loadFirma   = (o.firma_incarcare  || '').trim();
+          var unloadFirma = (o.firma_descarcare || '').trim();
+          var left  = [loadDay,  loadFirma,  loadCity ].filter(Boolean).join(' · ');
+          var right = [unloadDay, unloadCity, unloadFirma].filter(Boolean).join(' · ');
+          return '<option value="' + esc(o.id) + '">'
+            + esc(left || '?') + '  →  ' + esc(right || '?')
+            + '</option>';
         }).join('');
   }).catch(function() {});
 }
@@ -4273,14 +4347,15 @@ function renderFuvarCard(o, idx) {
     return '<div class="fd-row"><div class="fd-cell"><span class="fd-lbl">' + t(labelKey) + '</span>' +
            '<span class="fd-val">' + esc(val) + '</span></div>' + btn + '</div>';
   }
-  // Meta-sor (#szám, kamion, státusz) — a KINYÍLÓ részbe kerül, hogy
-  // összecsukott állapotban CSAK a fel-/lerakó cím látszódjon.
+  // Meta-sor (kamion, státusz) — a KINYÍLÓ részbe kerül, hogy összecsukott
+  // állapotban CSAK a fel-/lerakó adatai látszódjanak.
   // A MEGBÍZÓ (`o.client`) NEVE SZÁNDÉKOSAN SEHOL nem jelenik meg a sofőr
   // kártyáján: a sofőrnek a fel-/lerakó helyszín és az ottani cég a munkája,
   // a megrendelő cég neve nem tartozik rá (és csak zajt visz a kártyára).
+  // A belső CMD-azonosító sem jelenik meg — a fuvart a felrakás dátuma/
+  // helyszíne/cége és a lerakás dátuma/helyszíne/cége azonosítja.
   var metaHtml =
     '<div class="fuvar-meta">' +
-      '<span>#' + o.id + '</span>' +
       (truck ? '<span>' + truck + '</span>' : '') +
       '<span class="fuvar-status ' + statusCls + '">' + statusTxt + '</span>' +
     '</div>';
@@ -4387,21 +4462,38 @@ function renderFuvarCard(o, idx) {
         hoBtn +
       '</div>' +
     '</div>';
-  // Összecsukott állapot: #-badge (sorszám) + felrakás dátuma + felrakási hely
-  // + nyíl. Kattintásra kinyílik (megnő a kártya) a többi infóval, a fejlécre
-  // újra kattintva összecsukható. A lerakó/további részlet a `details`-ben van.
+  // Összecsukott állapot: #-badge (sorszám) + felrakás (dátum · cég · város)
+  // → lerakás (dátum · város · cég) + nyíl. Kattintásra kinyílik (megnő a
+  // kártya) a többi infóval, a fejlécre újra kattintva összecsukható. A
+  // teljes cím + további részlet a `details`-ben van. CMD-azonosító a sofőr
+  // felé SEHOL sem jelenik meg — az összecsukott fejléc a fuvar tartalmát
+  // önmagában azonosítja (dátumok, felrakó/lerakó cég + város).
   var num = (typeof idx === 'number' && idx > 0) ? idx : null;
-  var loadDay = fmtFuvarDay(o.data_incarcare);
-  var headBits = [];
-  if (loadDay) headBits.push('📅 ' + esc(loadDay));
-  headBits.push('📍 ' + esc(o.loc_incarcare || '—'));
+  var loadDayShort   = fmtFuvarDay(o.data_incarcare);
+  var unloadDayShort = fmtFuvarDay(o.data_descarcare);
+  var loadCity   = _cityOf(o.loc_incarcare)   || (o.loc_incarcare   || '—');
+  var unloadCity = _cityOf(o.loc_descarcare)  || (o.loc_descarcare  || '—');
+  var loadFirmaS   = (o.firma_incarcare  || '').trim();
+  var unloadFirmaS = (o.firma_descarcare || '').trim();
+  var pickBits = [];
+  if (loadDayShort) pickBits.push('📅 ' + esc(loadDayShort));
+  if (loadFirmaS)   pickBits.push('🏢 ' + esc(loadFirmaS));
+  pickBits.push('📍 ' + esc(loadCity));
+  var dropBits = [];
+  if (unloadDayShort) dropBits.push('📅 ' + esc(unloadDayShort));
+  dropBits.push('📍 ' + esc(unloadCity));
+  if (unloadFirmaS)   dropBits.push('🏢 ' + esc(unloadFirmaS));
+  var headTxt =
+    '<span class="fuvar-head-pick">' + pickBits.join(' · ') + '</span>' +
+    '<span class="fuvar-head-arrow"> → </span>' +
+    '<span class="fuvar-head-drop">' + dropBits.join(' · ') + '</span>';
   return '' +
     '<div class="fuvar-card">' +
       '<div class="fuvar-head" role="button" tabindex="0" onclick="toggleFuvarDetails(\'' + o.id + '\')" ' +
            'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleFuvarDetails(\'' + o.id + '\');}">' +
         '<div class="fuvar-destination">' +
           (num ? '<span class="fuvar-num">#' + num + '</span>' : '') +
-          '<span class="fuvar-headtxt">' + headBits.join(' · ') + '</span>' +
+          '<span class="fuvar-headtxt">' + headTxt + '</span>' +
           '<span class="fuvar-expand" id="exp_' + o.id + '">▸</span>' +
         '</div>' +
         headActionBtn +

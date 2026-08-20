@@ -14,6 +14,27 @@
 
 ---
 
+## 2026-08-20 — Sofőr fuvar-lista + kezelés-tábla átláthatóság: CMD-azonosító helyett dátum · cég · város
+
+### Miért
+A sofőr felület három helyén (dokumentum-feltöltő fuvar-választó, menetlevél-picker modal, főoldali fuvar-kártya) a fuvart a belső, véletlen `orders.id` (pl. `CMD-MT181GD5NBL`) + teljes utca+irsz+ország cím azonosította. Ez a mobil-viewporton (kis fuvar-választón is) 2-3 sort tolt egyetlen fuvarra, a CMD-kód semmit nem mondott a sofőrnek, a hosszú cím pedig eltakarta a lényeget (mikor · kinek · hova). Kérés: helyette **felrakás dátum · cég · város → lerakás dátum · város · cég**; a rendszer maga ismerje fel a város-nevet a teljes címből (a fuvar-űrlapon nincs külön város-mező). Emellett a fuvar-kezelés (admin/manager) első cellájában a „CMD-szám" mostantól **kizárólag a rendszer által kiosztott, ember-olvasható `fuvar_no`** (CMD-YYYY-XXXX) — a belső, véletlen id NEM kerül a cellába.
+
+### Mit
+- **`public/sofer.js`** — új `_cityOf(loc)` heurisztika (a fejléc-`esc` mellett): vesszőnkénti bontás, kiszűri a street-prefixeket (`Strada`/`Bd.`/`Calea`/`Aleea`/`Sat`/`Cart.`/…), az irányítószámot (önmagában és „555400 Copșa Mică" vezetéken), az ország-nevet (RO/HU/DE/…), a „cod NNNNNN" / „cp NNNNNN" / „irsz." típusú postal-prefixet és az önálló házszámot; az első maradék rész a város. Ha csak megye („Jud. Covasna") marad, azt tartja fallback-nek. Backward-compat: csak-város input érintetlen. 13 verifikációs eset zöld.
+- **Menetlevél-picker modal** (`_openOrderPicker`, `sofer.js`): op-item eddigi `<b>o.client</b> 📅 date → date` + `📍 loc_incarcare → loc_descarcare` helyett új kétsoros olvasható formátum — `📅 dátum · 🏢 firma_incarcare · 📍 város  ↓  📅 dátum · 📍 város · 🏢 firma_descarcare`. Fázis-badge / „⚠️ lezáráshoz kell" / rendszám érintetlen.
+- **Dokumentum-feltöltő fuvar-választó** (`loadDocOrderOptions`, `sofer.js`): a `<option>` szöveg mostantól `dátum · cég · város  →  dátum · város · cég` — a value (`o.id`) változatlan, tehát a fetch payload érintetlen.
+- **Sofőr főoldali fuvar-kártya** (`renderFuvarCard`, `sofer.js`): összecsukott fejléc új felépítése — `#N` sorszám-badge + `<span class="fuvar-head-pick">…</span> → <span class="fuvar-head-drop">…</span>`; a `📅 nap · 🏢 cég · 📍 város` mindkét oldalon. Bővített nézet (`metaHtml`) — kiszedve az `<span>#o.id</span>` (belső CMD-azonosító), marad a kamion + státusz. A `sof.det.company`/`sof.det.date` már meglévő i18n kulcsokat használjuk.
+- **(Rejtett) `loadSoferOrders` lista** (`sofer.js`): a `soferOrderList` DOM display:none-ban van (PR #294 óta), de a jövőbeli visszakapcsolhatóság miatt itt is átvezetve az olvasható formátumra.
+- **Fuvar kezelés (admin/manager) idCell** (`renderFilteredOrders`, `console-shared.js`): `c.fuvar_no ? '<b>'+fuvar_no+'</b>' : '<b class="text-muted">—</b>'` — a régi fallback (belső véletlen `orders.id` a cellába) törölve; támogatáshoz továbbra is a `title` tooltipben marad. A régi „Cancelled orders" fuvarlista `idCell`-e (`getCancelledOrders`) érintetlen — az is `fuvar_no`-t részesíti előnyben; visszaesési fallback ott marad, mert az anulált fuvar szerkeszthetetlen.
+- **`public/sofer.css`** — új `.fuvar-headtxt .fuvar-head-pick/.fuvar-head-drop/.fuvar-head-arrow` szabályok: asztalon egysoros ` → ` nyíllal, `@media (max-width:640px)` alatt a felrakás és lerakás külön sorra, a nyíl középre. Nincs layout-változás a többi elemen.
+- **Cache-bust**: `sofer.html` `sofer.js`+`sofer.css` `?v=20260820rocity`; `admin.html`+`manager.html` `console-shared.js?v=20260820rocity`.
+
+### Teszt
+- **924 Jest zöld** (nincs regresszió). A `_cityOf` heurisztika 13 külön eset (RO/HU/rövid/hosszú/házszám/megye-fallback/„cod NNNNNN") mind zöld.
+- Node-harnesszel a `_openOrderPicker` sor-renderelő stringje verifikálva a screenshoton szereplő címekkel (`Strada Pictor Rosenthal, 107061, Ploiești, România` → `Ploiești`; `Strada Uzinei, 555400 Copșa Mică` → `Copșa Mică`; `Strada Poetului 101B, 310479, Arad, România` → `Arad`).
+
+---
+
 ## 2026-08-20 — Wizard top-tools: kompakt egy-soros elrendezés mobilon és PC-n (PR #329)
 
 ### Miért

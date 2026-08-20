@@ -4628,12 +4628,14 @@ function renderFilteredOrders(list) {
     var editBtn = isCancelled
       ? '<button class="btn ghost vs-act-edit" title="'+t('cs.ol.cancelledLocked')+'" disabled style="opacity:.5;cursor:not-allowed;">✏️</button>'
       : '<button class="btn primary vs-act-edit" title="'+t('cs.ol.mEdit')+'" onclick="openOrderEdit(\''+c.id+'\')">✏️</button>';
-    // Első cella: az ember-olvasható fuvar-szám (CMD-YYYY-XXXX) látszik, ha van;
-    // a belső azonosító (orders.id) tooltipben elérhető (támogatáshoz). Régi,
-    // fuvar_no nélküli fuvarnál visszaesik a belső id-re.
+    // Első cella: KIZÁRÓLAG az ember-olvasható fuvar-szám (CMD-YYYY-XXXX) —
+    // ez a mi rendszerünk fuvar-száma. A belső, véletlen `orders.id` (pl.
+    // CMD-MT181GD5NBL) NEM jelenik meg a felületen, csak a cella tooltipjében
+    // marad támogatási célból. Ha valamiért nincs fuvar_no (nem migrált sor),
+    // „—" jelenik meg — a belső azonosító akkor sem szivárog ki cellába.
     var idCell = c.fuvar_no
       ? '<b>'+esc(c.fuvar_no)+'</b>'
-      : '<b>'+esc(String(c.id))+'</b>';
+      : '<b class="text-muted">—</b>';
     // data-label a cellákon: sofőr-módban mobilon a táblázat kártyás nézetté
     // alakul, és a label (Ügyfél/Útvonal/…) a cella elé kerül (CSS ::before).
     return '<tr class="vsl-orow vsl-orow-'+sc+'"'+rowStyle+'><td class="vsl-orow-first" data-label="'+t('list.colId')+'" title="'+esc(String(c.id))+'">'+idCell+'</td><td data-label="'+t('list.colClient')+'">'+clientCell+'</td>'+
