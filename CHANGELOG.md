@@ -14,6 +14,22 @@
 
 ---
 
+## 2026-08-20 — Wizard top-tools: kompakt egy-soros elrendezés mobilon és PC-n (PR #329)
+
+### Miért
+A PR #328 után a két „belépő" gomb (📄 AI kiolvasás + 📥 CSV import) egymás mellé került, DE mobil-viewporton (390px) a `flex-wrap: wrap` engedte őket alá törni, és a hosszú feliratok kilógtak a viewportról. Kérés: mobilon is mindig egymás mellett, kompaktabb, a felirat 2 sorban is elférjen.
+
+### Mit
+- **`public/style.css`** `.oc-top-tools` `flex-wrap: wrap → nowrap` (mindig egy sorban); a boxok `flex:1 1 0 + min-width:0 + display:flex; flex-direction:column` (az AI-status doboz az AI-gomb ALATT marad, nem szélesíti a row-t). Gombok kisebbek (`padding:8px 10px !important; font-size:12px !important; line-height:1.25 !important; min-height:48px; box-sizing:border-box`), és a felirat sortörhető (`white-space:normal !important; word-break:break-word; overflow-wrap:anywhere`) — a „Megrendelő feltöltése + AI kiolvasás" / „CSV import — több fuvar egyszerre" szépen 2 sorban ül.
+- **Mobil-tuning** `@media (max-width:520px)`: `.oc-shell` `padding:22→14px; border-radius:16→12px`; `.oc-top-tools` `gap:8→6px`; gombok `padding:8×6px; font-size:11px; min-height:52px`. A shell-en `box-sizing:border-box; max-width:100%; overflow:hidden` — soha nem lóg túl a viewporton.
+- **`public/admin.html` + `manager.html`** — cache-bust `style.css` → `?v=20260820wiz3`.
+
+### Teszt
+- Vizuális ellenőrzés headless Chromiummal — 480px szélességű viewporton a shell 453px, mindkét gomb 209px, felirat 2 sorra tördel, semmi nem lóg túl; 1400px-en egy soros, kompakt.
+- Nincs JS-változás → tesztek változatlanul zöldek.
+
+---
+
 ## 2026-08-20 — Wizard top-tools: CSV import + AI kiolvasás egymás mellett, hint nélkül (PR #328)
 
 ### Miért
