@@ -1693,3 +1693,41 @@
   flex: 1; border: 1.5px solid #94a3b8; background: #f1f5f9; color: #334155;
 }
 #vsSessionOverlay .vs-so-btn:active { transform: scale(0.98); }
+
+/* ── Lerakónkénti UIT-gomb (multi-drop, 2026-08-20/2) ────────────────
+   A UIT-gomb minden lerakó-sor végén megjelenik (bezárható modalt nyit
+   `SoferUit.open(orderId, stopId)`-val). Kompakt zöld gomb, a stophoz
+   kötött UIT-ok darabszáma badge-en. Legacy (nem-migrált) fuvarnál is
+   ugyanígy jelenik meg, csak stopId nélkül. */
+.sofer-wrap .fd-uit-row {
+  justify-content: flex-start;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(15,23,42,0.08);
+}
+.sofer-wrap .fd-uit-btn {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  border: 1.5px solid #16a34a;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(22,163,74,0.28);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  touch-action: manipulation;
+}
+.sofer-wrap .fd-uit-btn:active { transform: scale(0.98); }
+.sofer-wrap .fd-uit-badge {
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  min-width: 22px; height: 22px;
+  padding: 0 6px;
+  background: rgba(255,255,255,0.24);
+  color: #fff;
+  border-radius: 11px;
+  font-size: 12px; font-weight: 800;
+}
