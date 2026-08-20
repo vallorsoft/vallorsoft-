@@ -1361,9 +1361,20 @@
   flex: 1 1 100%; min-width: 0; margin-bottom: 0; font-size: 15.5px;
   flex-wrap: nowrap;              /* a lenyíló-ikon a szöveg mellett marad */
 }
-.sofer-wrap .fuvar-headtxt { color: #0f172a; font-weight: 800; flex: 1 1 auto; min-width: 0; }
+.sofer-wrap .fuvar-headtxt { color: #0f172a; font-weight: 800; flex: 1 1 auto; min-width: 0; line-height: 1.35; }
 .sofer-wrap .fuvar-num { align-self: flex-start; margin-top: 2px; }
 .sofer-wrap .fuvar-expand { align-self: flex-start; margin-top: 1px; }
+/* Kétsoros fejléc — felrakás („pick") sor + nyíl + lerakás („drop") sor —
+   mobilon a nyíl elé tördel, hogy a hosszú város/cégnevek is beférjenek. */
+.sofer-wrap .fuvar-headtxt .fuvar-head-pick,
+.sofer-wrap .fuvar-headtxt .fuvar-head-drop { display: inline; }
+.sofer-wrap .fuvar-headtxt .fuvar-head-arrow { color: #64748b; font-weight: 700; padding: 0 2px; }
+.sofer-wrap .fuvar-headtxt .fuvar-head-drop { color: #334155; font-weight: 700; }
+@media (max-width: 640px) {
+  .sofer-wrap .fuvar-headtxt .fuvar-head-pick,
+  .sofer-wrap .fuvar-headtxt .fuvar-head-drop { display: block; }
+  .sofer-wrap .fuvar-headtxt .fuvar-head-arrow { display: block; margin: 2px 0; }
+}
 /* A fejléc-gomb (soron következő állomás) külön sorban, teljes szélességben:
    ez a legtöbbet nyomott gomb, vezetés után, kesztyűs kézzel. */
 .sofer-wrap .fuvar-head-action { flex: 1 1 100%; margin-top: 10px; }
