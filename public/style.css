@@ -1837,3 +1837,179 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   body.vs-dm #langSwitch button{ padding:7px 8px; font-size:12px; border-radius:9px; }
   body.vs-dm .vs-bread #vsBreadCurrent{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FUVAR-KIÍRÁS WIZARD (order-wizard.js) — a `.pane[data-pane="orders-form"]`-en
+   Lépcsős folyamat + PDF-szerű ellenőrző lap. A legacy `.glass` panelt a JS
+   `display:none`-ra állítja, a wizard-shell veszi át. Világos + sötét téma.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Shell */
+.oc-shell{
+  background:var(--panel, #fff);
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:16px;
+  padding:22px;
+  box-shadow:0 2px 12px rgba(15,23,42,0.04);
+  margin-bottom:18px;
+}
+.main-content[data-theme="dark"] .oc-shell,
+.oc-shell{ /* öröklésre hagyjuk — a .glass tokenjeit használjuk */ }
+
+.oc-top-tools{ display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+.oc-top-tools > div{ margin:0 !important; } /* felülírja a legacy inline margin-t */
+
+/* Progress-sáv */
+.oc-progress{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:6px; margin:6px 0 22px; padding:0 4px;
+}
+.oc-pdot{
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  min-width:70px; cursor:pointer; user-select:none;
+}
+.oc-pn{
+  width:32px; height:32px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--panel-raised, #f1f5f9); color:var(--muted, #64748b);
+  border:2px solid var(--border, #e2e8f0);
+  font-weight:700; font-size:14px; transition:all 0.18s ease;
+}
+.oc-pl{ font-size:11px; color:var(--muted, #64748b); font-weight:600; text-align:center; }
+.oc-pdot.active .oc-pn{
+  background:linear-gradient(135deg,#3b82f6,#6366f1); color:#fff;
+  border-color:#3b82f6; box-shadow:0 4px 12px rgba(59,130,246,0.35);
+}
+.oc-pdot.active .oc-pl{ color:var(--text-primary, #0f172a); }
+.oc-pdot.done .oc-pn{ background:#22c55e; color:#fff; border-color:#22c55e; }
+.oc-pdot.done .oc-pl{ color:#22c55e; }
+.oc-pline{ flex:1; height:2px; background:var(--border, #e2e8f0); border-radius:1px; }
+.oc-pdot.done ~ .oc-pline{ background:#22c55e; }
+
+/* Step head */
+.oc-step-head{ display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+.oc-step-num{
+  width:36px; height:36px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg,#3b82f6,#6366f1); color:#fff;
+  font-weight:700; font-size:16px; box-shadow:0 4px 12px rgba(59,130,246,0.3);
+}
+.oc-step-title{ margin:0; font-size:20px; font-weight:700; color:var(--text-primary, #0f172a); }
+
+/* Step content */
+.oc-step-content{ min-height:180px; }
+.oc-hint{
+  padding:10px 14px; background:rgba(59,130,246,0.08);
+  border-left:3px solid #3b82f6; border-radius:8px;
+  color:var(--text-primary, #0f172a); font-size:13px; margin-bottom:14px;
+}
+
+/* Nav */
+.oc-nav{
+  display:flex; align-items:center; gap:10px;
+  margin-top:22px; padding-top:16px; border-top:1px solid var(--border, #e2e8f0);
+}
+.oc-nav-spacer{ flex:1; }
+.oc-nav .btn{ min-width:110px; }
+
+/* ─── Step 2: állomás-kártyák ─── */
+.oc-stops{ display:flex; flex-direction:column; gap:10px; margin-bottom:14px; }
+.oc-empty{ padding:22px; text-align:center; color:var(--muted, #64748b); font-size:14px; border:2px dashed var(--border, #e2e8f0); border-radius:12px; }
+
+.oc-stop-card{
+  border:1px solid var(--border, #e2e8f0); border-radius:12px;
+  background:var(--panel-raised, #f8fafc); padding:14px;
+}
+.oc-stop-top{
+  display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;
+}
+.oc-badge{
+  display:inline-flex; align-items:center; gap:4px;
+  padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700;
+}
+.oc-badge.pickup{ background:rgba(34,197,94,0.15); color:#15803d; border:1px solid rgba(34,197,94,0.3); }
+.oc-badge.delivery{ background:rgba(239,68,68,0.15); color:#b91c1c; border:1px solid rgba(239,68,68,0.3); }
+
+/* Toggle (⬆️ Felrakás / ⬇️ Lerakás) */
+.oc-stop-toggle{
+  display:inline-flex; border:1px solid var(--border, #e2e8f0);
+  border-radius:8px; overflow:hidden; margin-left:4px;
+}
+.oc-toggle-btn{
+  padding:6px 12px; font-size:12px; font-weight:600;
+  background:transparent; color:var(--muted, #64748b);
+  border:0; cursor:pointer; transition:all 0.15s;
+}
+.oc-toggle-btn.on{ background:linear-gradient(135deg,#3b82f6,#6366f1); color:#fff; }
+.oc-toggle-btn:not(.on):hover{ background:rgba(59,130,246,0.08); }
+
+/* ⬆️/⬇️/✕ rendezés-gombok */
+.oc-stop-ord{ display:inline-flex; gap:4px; margin-left:auto; }
+.oc-ord-btn{
+  width:32px; height:32px; border-radius:8px;
+  border:1px solid var(--border, #e2e8f0); background:#fff;
+  cursor:pointer; font-size:14px; color:var(--text-primary, #0f172a);
+  display:flex; align-items:center; justify-content:center;
+  transition:all 0.15s;
+}
+.oc-ord-btn:hover:not(:disabled){ background:rgba(59,130,246,0.08); border-color:#3b82f6; }
+.oc-ord-btn:disabled{ opacity:0.35; cursor:not-allowed; }
+.oc-ord-btn.danger{ color:#dc2626; }
+.oc-ord-btn.danger:hover{ background:rgba(239,68,68,0.12); border-color:#ef4444; }
+
+.oc-stop-grid{
+  display:grid; grid-template-columns:2fr 1.5fr 1fr 1fr; gap:10px;
+}
+.oc-field{ display:flex; flex-direction:column; gap:4px; }
+.oc-field label{ font-size:11px; color:var(--muted, #64748b); font-weight:600; }
+.oc-stops-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+
+/* Reszponzív (tablet/mobil) */
+@media (max-width:820px){
+  .oc-progress{ gap:2px; }
+  .oc-pdot{ min-width:auto; }
+  .oc-pl{ display:none; }
+  .oc-stop-grid{ grid-template-columns:1fr 1fr; }
+  .oc-stop-top{ flex-direction:column; align-items:stretch; }
+  .oc-stop-ord{ margin-left:0; margin-top:6px; justify-content:flex-end; }
+}
+@media (max-width:520px){
+  .oc-stop-grid{ grid-template-columns:1fr; }
+  .oc-nav .btn{ min-width:auto; flex:1; }
+}
+
+/* ─── Review lap (PDF-szerű) ─── */
+.oc-review{ padding:0; }
+.ocr-doc{
+  background:#fff; color:#0f172a;
+  border:1px solid #e2e8f0; border-radius:12px;
+  padding:28px 32px; box-shadow:0 8px 24px rgba(15,23,42,0.08);
+  max-width:820px; margin:0 auto;
+}
+.main-content[data-theme="dark"] .ocr-doc{ background:#0f172a; color:#e2e8f0; border-color:#334155; }
+.ocr-doc-head{ border-bottom:2px solid #3b82f6; padding-bottom:12px; margin-bottom:20px; }
+.ocr-doc-title{ font-size:22px; font-weight:800; color:#0f172a; }
+.main-content[data-theme="dark"] .ocr-doc-title{ color:#e2e8f0; }
+.ocr-doc-hint{ font-size:12px; color:#64748b; margin-top:4px; }
+
+.ocr-sec{ padding:14px 0; border-bottom:1px dashed #e2e8f0; }
+.ocr-sec:last-child{ border-bottom:0; }
+.main-content[data-theme="dark"] .ocr-sec{ border-bottom-color:#334155; }
+.ocr-sec-head{ display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.ocr-sec-title{ font-size:15px; font-weight:700; display:flex; align-items:center; gap:8px; flex:1; }
+.ocr-sec-num{
+  width:26px; height:26px; border-radius:50%;
+  background:linear-gradient(135deg,#3b82f6,#6366f1); color:#fff;
+  font-size:12px; font-weight:700;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.ocr-edit{ padding:5px 12px !important; font-size:12px !important; min-width:auto !important; min-height:auto !important; }
+.ocr-sec-body{ padding-left:36px; font-size:14px; line-height:1.6; }
+.ocr-row{ margin-bottom:2px; }
+.ocr-row b{ color:#64748b; font-weight:600; margin-right:6px; }
+.main-content[data-theme="dark"] .ocr-row b{ color:#94a3b8; }
+.ocr-stops{ margin:6px 0 0; padding-left:20px; }
+.ocr-stops li{ padding:4px 0; }
+.ocr-when{ color:#64748b; font-size:12px; margin-left:6px; }
+.ocr-sub{ font-size:12px; color:#64748b; margin-left:22px; }
+.ocr-stops-summary{ margin-bottom:6px; font-size:13px; color:#64748b; }
