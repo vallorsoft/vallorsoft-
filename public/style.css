@@ -1856,8 +1856,13 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .main-content[data-theme="dark"] .oc-shell,
 .oc-shell{ /* öröklésre hagyjuk — a .glass tokenjeit használjuk */ }
 
-.oc-top-tools{ display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
-.oc-top-tools > div{ margin:0 !important; } /* felülírja a legacy inline margin-t */
+/* A két „belépő" gomb (📥 CSV import + 📄 AI kiolvasás) EGYMÁS MELLETT a wizard
+   tetején — a hozzájuk tartozó legacy hint-szövegeket (`.text-muted`) elrejtjük
+   (a gomb-felirat elég önmagában). A scan-állapot doboz (`#ordScanStatus`) az
+   AI-gomb alatt marad, mert az élő visszajelzést ad. */
+.oc-top-tools{ display:flex; flex-direction:row; flex-wrap:wrap; gap:10px; margin-bottom:16px; align-items:flex-start; }
+.oc-top-tools > div{ margin:0 !important; flex:0 0 auto; } /* felülírja a legacy inline margin-t */
+.oc-top-tools .text-muted{ display:none; } /* rejtett a "pl. gyári fuvarlista..." és "PDF / JPG / PNG..." hint */
 
 /* Progress-sáv */
 .oc-progress{
