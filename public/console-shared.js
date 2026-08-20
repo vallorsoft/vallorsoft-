@@ -5062,15 +5062,16 @@ function loadOeUitList() {
         return;
       }
       wrap.innerHTML = items.map(function (u) {
-        var pretty = (window.UitFmt && window.UitFmt.format) ? window.UitFmt.format(u.uit_code) : u.uit_code;
+        var prettyCode = (window.UitFmt && window.UitFmt.format) ? window.UitFmt.format(u.uit_code) : u.uit_code;
         var srcLabel = u.source === 'ai-scan' ? '📷 AI' : '✋';
         var photoBtn = u.has_photo
           ? '<a class="btn ghost" style="padding:4px 10px;font-size:11px;text-decoration:none;" target="_blank" rel="noopener" href="/api/uit/' + u.id + '/photo" title="Fotó megnyitása">🖼️</a>'
           : '';
         return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:rgba(255,255,255,0.03);">' +
-          '<span style="font-family:ui-monospace,monospace;font-weight:700;letter-spacing:.5px;flex:1;word-break:break-all;">' + esc(pretty) + '</span>' +
+          '<span style="font-family:ui-monospace,monospace;font-weight:700;letter-spacing:.5px;flex:1;word-break:break-all;">' + esc(prettyCode) + '</span>' +
           '<span style="color:var(--muted);font-size:11px;" title="' + (u.source === 'ai-scan' ? 'AI-scan' : 'Kézi') + '">' + srcLabel + '</span>' +
           photoBtn +
+          '<button type="button" class="btn ghost" style="padding:4px 10px;font-size:11px;color:#93c5fd;" onclick="oeCopyUit(\'' + esc(prettyCode) + '\')" title="Vágólapra másolás">📋</button>' +
           '<button type="button" class="btn ghost" style="padding:4px 10px;font-size:11px;color:#f87171;" onclick="oeDeleteUit(' + u.id + ')" title="Törlés">✕</button>' +
         '</div>';
       }).join('');
@@ -5111,6 +5112,29 @@ function oeDeleteUit(uid) {
       else { toast((o.d && o.d.error) || t('common.error'), 'err'); }
     })
     .catch(function () { toast(t('common.error'), 'err'); });
+}
+
+// UIT-kód vágólapra másolása (a szerkesztő UIT-listáján). A `text`
+// a MÁR formázott (XXXX-XXXX-...) string. Clipboard API + textarea-fallback.
+function oeCopyUit(text) {
+  var done = function (ok) { toast(ok ? (t('cs.uit.copied')||'UIT vágólapra másolva.') : (t('cs.uit.copyFail')||'Nem sikerült a másolás.'), ok?'ok':'err'); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function(){ done(true); }).catch(function(){ done(_oeUitCopyFallback(text)); });
+      return;
+    }
+  } catch (_) {}
+  done(_oeUitCopyFallback(text));
+}
+function _oeUitCopyFallback(text) {
+  try {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.top = '-1000px';
+    document.body.appendChild(ta); ta.select();
+    var ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return !!ok;
+  } catch (_) { return false; }
 }
 
 function renderOeLegs(legs) {

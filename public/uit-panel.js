@@ -1,12 +1,14 @@
 // public/uit-panel.js — RO e-Transport UIT-kezelő modal (Admin/Manager).
 // Globál: window.UitPanel.open(orderId, rendszam)
 //
-// Változás (2026-08-20):
-//   - A UIT-kód auto-formázva íródik (nagybetű + 4-esével kötőjel, max 16
-//     alfanumerikus). A window.UitFmt.attach()-csal.
-//   - 📷 „Fotó" gomb: papírra írt UIT-ot lefotózza, a Gemini AI kiolvassa,
-//     minden felismert kódot KÜLÖN sorként ment (a fotót mindegyikhez).
-//   - A meglévő deep-link gomb marad — de csak megnyitáshoz, nem küld.
+// A UIT-kód auto-formázva íródik (nagybetű + 4-esével kötőjel, max 16
+// alfanumerikus). A window.UitFmt.attach()-csal élő formázás.
+//
+// Minden kód mellett: 📋 vágólap-másoló + ✕ törlő. A 📷 gomb papírra írt
+// UIT-ot lefotózza, a Gemini AI kiolvassa, minden felismert kódot KÜLÖN
+// sorként ment (a fotó mindegyikhez csatolva).
+//
+// Deep-link / GPS-szolgáltatói átirányítás NINCS.
 window.UitPanel = (function () {
 
   function ensureStyle() {
@@ -22,22 +24,21 @@ window.UitPanel = (function () {
       .uit-code{font-family:ui-monospace,monospace;font-weight:700;letter-spacing:.5px;flex:1;min-width:150px;word-break:break-all;color:#fff}
       .uit-src{color:#9fb0c3;font-size:11px}
       .uit-b{cursor:pointer;border:1px solid;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;background:transparent;white-space:nowrap}
-      .uit-b--go{color:#4ade80;border-color:rgba(34,197,94,.5)}
+      .uit-b--copy{color:#93c5fd;border-color:rgba(59,130,246,.5)}
       .uit-b--del{color:#f87171;border-color:rgba(239,68,68,.5)}
-      .uit-b--photo{color:#93c5fd;border-color:rgba(59,130,246,.5)}
+      .uit-b--photo{color:#a5b4fc;border-color:rgba(129,140,248,.5)}
       .uit-b--photo a{color:inherit;text-decoration:none;display:inline-block}
       .uit-add-wrap{border-top:1px dashed rgba(255,255,255,.15);padding-top:12px;margin-top:8px}
       .uit-add{display:flex;gap:6px;flex-wrap:wrap;align-items:stretch}
       .uit-in{flex:1;min-width:180px;background:#070b10;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 10px;color:#e9eef5;font-family:ui-monospace,monospace;text-transform:uppercase;font-size:14px;letter-spacing:.5px}
       .uit-save{cursor:pointer;background:#3b82f6;color:#fff;border:0;border-radius:8px;padding:9px 14px;font-weight:700;white-space:nowrap}
       .uit-cam{cursor:pointer;background:#f59e0b;color:#0c1218;border:0;border-radius:8px;padding:9px 14px;font-weight:700;white-space:nowrap}
-      .uit-cam[disabled]{opacity:.6;cursor:progress}
+      .uit-cam[disabled],.uit-save[disabled]{opacity:.6;cursor:progress}
       .uit-status{font-size:12px;color:#9fb0c3;margin-top:6px;min-height:16px}
       .uit-status.err{color:#fca5a5}
       .uit-status.ok{color:#86efac}
       .uit-foot{display:flex;justify-content:flex-end;margin-top:14px}
       .uit-close{cursor:pointer;background:transparent;color:#9fb0c3;border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:8px 14px}
-      .uit-note{font-size:11px;color:#9fb0c3;margin:10px 0 0;border-top:1px dashed rgba(255,255,255,.12);padding-top:10px}
       .uit-empty{color:#9fb0c3;font-size:13px;padding:6px 2px}`;
     document.head.appendChild(s);
   }
@@ -53,17 +54,24 @@ window.UitPanel = (function () {
   const norm = (c) => (window.UitFmt && window.UitFmt.normalize) ? window.UitFmt.normalize(c) : String(c || '').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,16);
   function notify(msg) { if (typeof window.toast === 'function') window.toast(msg); else alert(msg); }
 
-  // A UIT-kódhoz tartozó deep-link megnyitása új ablakban (a fuvar-adatok + UIT-kód előtöltve).
-  async function openLink(orderId, code) {
+  // Vágólap — Clipboard API + textarea-fallback.
+  function copyToClipboard(text) {
     try {
-      const d = await api('POST', '/api/execute', { functionName: 'getUitDeeplink', arguments: [orderId, code] });
-      const r = d && d.result;
-      if (r && r.ok && r.url) { window.open(r.url, '_blank', 'noopener'); return true; }
-      notify('A developer még nem állított be deep-link sablont ehhez a GPS-szolgáltatóhoz.');
-    } catch (_) {
-      notify('A developer még nem állított be deep-link sablont ehhez a GPS-szolgáltatóhoz.');
-    }
-    return false;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text).then(() => true).catch(() => copyFallback(text));
+      }
+    } catch (_) {}
+    return Promise.resolve(copyFallback(text));
+  }
+  function copyFallback(text) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.top = '-1000px';
+      document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (_) { return false; }
   }
 
   // ── Kamera / fotó → base64 ──
@@ -109,7 +117,7 @@ window.UitPanel = (function () {
     ov.innerHTML =
       '<div class="uit-box">' +
         '<div class="uit-h"><h3>🚛 UIT-kódok — ' + esc(orderId) + '</h3></div>' +
-        '<p class="uit-sub">Jármű: <b>' + (esc(rendszam) || '—') + '</b> · RO e-Transport. Egy fuvarhoz több UIT is rögzíthető.</p>' +
+        '<p class="uit-sub">Jármű: <b>' + (esc(rendszam) || '—') + '</b> · Egy fuvarhoz több UIT is rögzíthető.</p>' +
         '<div id="uit-list"><div class="uit-empty">Betöltés…</div></div>' +
         '<div class="uit-add-wrap">' +
           '<div class="uit-add">' +
@@ -119,8 +127,6 @@ window.UitPanel = (function () {
           '</div>' +
           '<div class="uit-status" id="uit-stat"></div>' +
         '</div>' +
-        '<p class="uit-note">A UIT-kód max 16 alfanumerikus karakter (a beírás közben automatikusan tagolódik). ' +
-          'A „📷 Fotó" gombbal papírra írt kódot lefotózhatsz — az AI kiolvassa, minden kódot külön sorként ment.</p>' +
         '<div class="uit-foot"><button class="uit-close" id="uit-closebtn">Bezárás</button></div>' +
       '</div>';
     document.body.appendChild(ov);
@@ -152,17 +158,27 @@ window.UitPanel = (function () {
           '<span class="uit-code">' + esc(pretty(u.uit_code)) + '</span>' +
           '<span class="uit-src" title="' + (u.source==='ai-scan'?'AI-kiolvasás':'Kézi beírás') + '">' + srcLabel + '</span>' +
           photoBtn +
-          '<button class="uit-b uit-b--go" data-act="open" title="Deep-link">🔗</button>' +
+          '<button class="uit-b uit-b--copy" data-act="copy" title="Vágólapra másolás">📋</button>' +
           '<button class="uit-b uit-b--del" data-act="del" title="Törlés">✕</button>' +
         '</div>';
       }).join('');
       ov.querySelectorAll('.uit-row [data-act]').forEach(function (btn) {
         btn.addEventListener('click', async function () {
-          const row = btn.closest('.uit-row'); const id = row.dataset.id; const code = row.dataset.code; const act = btn.dataset.act;
+          const row = btn.closest('.uit-row');
+          const id = row.dataset.id;
+          const code = row.dataset.code;
+          const act = btn.dataset.act;
           btn.disabled = true;
           try {
-            if (act === 'del') { await api('DELETE', '/api/uit/' + encodeURIComponent(id)); await render(); }
-            else { await openLink(orderId, code); btn.disabled = false; }
+            if (act === 'copy') {
+              const ok = await copyToClipboard(pretty(code));
+              notify(ok ? 'UIT vágólapra másolva.' : 'Nem sikerült a másolás.');
+              btn.disabled = false;
+            } else if (act === 'del') {
+              if (!confirm('Törlöd ezt a UIT-kódot?')) { btn.disabled = false; return; }
+              await api('DELETE', '/api/uit/' + encodeURIComponent(id));
+              await render();
+            }
           } catch (e) { notify(e.message); btn.disabled = false; }
         });
       });
