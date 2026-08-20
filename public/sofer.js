@@ -4315,12 +4315,36 @@ function renderFuvarCard(o, idx) {
     hoBtn = '<button class="sh-btn ho" ' +
       'onclick="openHandover(\'' + o.id + '\')" title="' + t('sof.handoverBtnTitle') + '">' + t('sof.ho.title') + '</button>';
   }
-  // Kattintható részletek forrás-adatai (biztonságos map, nem HTML-attribútum)
-  _fuvarCopy[o.id] = {
+  // Kattintható részletek forrás-adatai (biztonságos map, nem HTML-attribútum).
+  // Legacy top-szintű mezők (nem-migrált fuvarnál) + minden per-stop mező (loc/firma)
+  // per-kind + per-index kulccsal, hogy multi-drop fuvarnál minden felrakó/lerakó
+  // helyszínét ÉS cégét külön lehessen másolni. Kulcs-séma:
+  //   'load' / 'unload' / 'load_firma' / 'unload_firma'         → legacy top
+  //   'pickup_0_loc' / 'pickup_0_firma' / 'delivery_2_loc' …    → per-stop
+  //   'note'                                                    → megjegyzés (ref)
+  var _fc = {
     load: o.loc_incarcare || '',
     unload: o.loc_descarcare || '',
+    load_firma: (o.firma_incarcare || '').trim(),
+    unload_firma: (o.firma_descarcare || '').trim(),
     note: o.ref || ''
   };
+  if (Array.isArray(o.stops)) {
+    var _pIdx = 0, _dIdx = 0;
+    o.stops.slice().sort(function (a, b) { return (a.stop_index || 0) - (b.stop_index || 0); })
+      .forEach(function (s) {
+        if (s.kind === 'pickup') {
+          _fc['pickup_' + _pIdx + '_loc']   = s.loc  || '';
+          _fc['pickup_' + _pIdx + '_firma'] = (s.firma || '').trim();
+          _pIdx++;
+        } else if (s.kind === 'delivery') {
+          _fc['delivery_' + _dIdx + '_loc']   = s.loc  || '';
+          _fc['delivery_' + _dIdx + '_firma'] = (s.firma || '').trim();
+          _dIdx++;
+        }
+      });
+  }
+  _fuvarCopy[o.id] = _fc;
   // Kettős dátum: TERVEZETT (dispatcher `data_incarcare`/`data_descarcare`)
   // + TÉNYLEGES (a driver menetlevelében beírt vagy az állomás-milestone-ból
   // származó `incarcat_at`/`descarcat_at`). Ha megegyezik vagy csak egyik van,
@@ -4391,9 +4415,13 @@ function renderFuvarCard(o, idx) {
     if (s.arrived_at) return '<span class="fd-stop-arrived" title="' + esc(fmtFuvarDateTime(s.arrived_at)) + '">📍</span>';
     return '<span class="fd-stop-todo">○</span>';
   }
-  function _stopRows(s) {
-    return detRow('sof.det.company',  s.firma, null) +
-           detRow('sof.det.location', s.loc, null) +
+  // A per-stop rows: a helyszín ÉS a cég is másolható vágólapra (📋). Kulcs:
+  // 'pickup_<i>_loc' / 'pickup_<i>_firma' (a _fc map-be előre feltöltve).
+  function _stopRows(s, kind, idx) {
+    var firmaKey = kind + '_' + idx + '_firma';
+    var locKey   = kind + '_' + idx + '_loc';
+    return detRow('sof.det.company',  s.firma, s.firma ? firmaKey : null) +
+           detRow('sof.det.location', s.loc,   s.loc   ? locKey   : null) +
            detRow('sof.det.date',     fmtFuvarDay(s.data), null);
   }
   var loadSec, unloadSec;
@@ -4404,13 +4432,13 @@ function renderFuvarCard(o, idx) {
     var loadBody = _pickups.map(function (s, i) {
       return '<div class="fd-stop-block">' +
         '<div class="fd-stop-h">' + _stopStatusBadge(s) + ' <b>' + t('sof.det.pickup') + ' #' + (i + 1) + '</b></div>' +
-        _stopRows(s) +
+        _stopRows(s, 'pickup', i) +
       '</div>';
     }).join('');
     loadSec = fdPhaseSec('load', '⬆️', 'sof.det.loading', loadSum, loadBody, !loadedDone);
   } else {
     loadSec = fdPhaseSec('load', '⬆️', 'sof.det.loading', o.loc_incarcare,
-      detRow('sof.det.company', o.firma_incarcare, null) +
+      detRow('sof.det.company', o.firma_incarcare, o.firma_incarcare ? 'load_firma' : null) +
       detRow('sof.det.location', o.loc_incarcare, 'load') +
       detRow('sof.det.date', dLoad, null), !loadedDone);
   }
@@ -4422,13 +4450,13 @@ function renderFuvarCard(o, idx) {
     var unloadBody = _deliveries.map(function (s, i) {
       return '<div class="fd-stop-block">' +
         '<div class="fd-stop-h">' + _stopStatusBadge(s) + ' <b>' + t('sof.det.delivery') + ' #' + (i + 1) + '</b></div>' +
-        _stopRows(s) +
+        _stopRows(s, 'delivery', i) +
       '</div>';
     }).join('');
     unloadSec = fdPhaseSec('unload', '⬇️', 'sof.det.unloading', unloadSum, unloadBody, loadedDone);
   } else {
     unloadSec = fdPhaseSec('unload', '⬇️', 'sof.det.unloading', o.loc_descarcare,
-      detRow('sof.det.company', o.firma_descarcare, null) +
+      detRow('sof.det.company', o.firma_descarcare, o.firma_descarcare ? 'unload_firma' : null) +
       detRow('sof.det.location', o.loc_descarcare, 'unload') +
       detRow('sof.det.date', dUnload, null), loadedDone);
   }

@@ -14,6 +14,24 @@
 
 ---
 
+## 2026-08-20 — Sofőr fuvar-kártya: 📋 vágólap-másoló gomb visszatért a felrakó/lerakó cégre és címre (multi-drop is)
+
+### Miért
+Az előző körben (CMD → olvasható formátum) a sofőr fuvar-kártyájának kinyíló részén ELTŰNT a 📋 vágólap-másoló gomb a helyszín, cég és megjegyzés mezőkről — pedig ez a napi művelet (a sofőr a felrakó/lerakó cég címét beteszi a navigációba). Gyökér-ok: a MIGRÁLT (multi-drop) fuvarok a `_stopRows(s)` úton mennek, amely `copyKind=null`-t adott át a `detRow`-nak → a `soferCopy` gomb suppress-elődött. A régi (nem-migrált) fuvarnál a legacy ág `'load'`/`'unload'` copyKind-et adott — ott működött, de a cég-mezőre AZ SEM.
+
+### Mit
+- **`public/sofer.js`** `_fuvarCopy[o.id]` bővítése — a legacy `load`/`unload`/`note` mellett új kulcsok: `load_firma`/`unload_firma` (legacy cég-nevekhez), és minden per-stop `pickup_<i>_loc`/`pickup_<i>_firma`/`delivery_<i>_loc`/`delivery_<i>_firma` (a `o.stops` tömbből, `pickup`/`delivery` szeparált 0-alapú indexszel, `stop_index` szerint rendezve). Így multi-drop fuvarnál MINDEN felrakó/lerakó cége és címe külön másolható.
+- **`_stopRows(s, kind, idx)`** aláírás-bővítés: a helyszín ÉS a cég 📋-gombja csak akkor jelenik meg, ha a mező nem üres (`s.firma ? firmaKey : null`). A dátumhoz továbbra sincs 📋-gomb (nem szokás vágólapra tenni).
+- **Legacy (nem-migrált) ág** — `loadSec`/`unloadSec` `detRow('sof.det.company', …)` mostantól `'load_firma'`/`'unload_firma'` kulcsot ad üres cégnél `null`-lal (nem villan felesleges gomb). A `note` (`ref`) továbbra is másolható.
+- **`soferCopy(id, kind)`** változatlan (map-lookup + Clipboard API + textarea-fallback + toast) — a bővítés az adat-oldalon van.
+- **Cache-bust**: `sofer.html` `sofer.js` → `?v=20260820copy`. `soferCopy` XSS-biztos marad: a kulcs (a copyKind string) beépített, nem user-input; az érték a MAP-ből jön, HTML-escape a toast-szövegre nem kell (a Clipboard API nem HTML-t másol).
+
+### Teszt
+- **924 Jest zöld** (nincs regresszió).
+- Kézi trace: multi-drop fuvar (`o.stops = [{pickup,idx:0,loc:'Arad',firma:'ACME'},{delivery,idx:1,loc:'Cluj',firma:'Beta'}]`) → `_fuvarCopy[id]` tartalmaz `pickup_0_loc='Arad'`/`pickup_0_firma='ACME'`/`delivery_0_loc='Cluj'`/`delivery_0_firma='Beta'` → mindegyikre 📋 megjelenik, kattintásra a `soferCopy` a helyes szöveget másolja.
+
+---
+
 ## 2026-08-20 — Sofőr fuvar-lista + kezelés-tábla átláthatóság: CMD-azonosító helyett dátum · cég · város
 
 ### Miért
