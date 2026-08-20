@@ -4420,9 +4420,22 @@ function renderFuvarCard(o, idx) {
   function _stopRows(s, kind, idx) {
     var firmaKey = kind + '_' + idx + '_firma';
     var locKey   = kind + '_' + idx + '_loc';
-    return detRow('sof.det.company',  s.firma, s.firma ? firmaKey : null) +
-           detRow('sof.det.location', s.loc,   s.loc   ? locKey   : null) +
-           detRow('sof.det.date',     fmtFuvarDay(s.data), null);
+    var out =
+      detRow('sof.det.company',  s.firma, s.firma ? firmaKey : null) +
+      detRow('sof.det.location', s.loc,   s.loc   ? locKey   : null) +
+      detRow('sof.det.date',     fmtFuvarDay(s.data), null);
+    // Lerakónként külön 🚛 UIT gomb (multi-drop: minden lerakóhoz külön
+    // UIT-kódot lehet felvinni). A badge a stophoz kötött UIT-ok darabszáma.
+    if (kind === 'delivery' && s && s.id) {
+      var uitN = parseInt(s.uit_count || 0, 10);
+      var badge = uitN > 0 ? ' <span class="fd-uit-badge">' + uitN + '</span>' : '';
+      out += '<div class="fd-row fd-uit-row">' +
+        '<button type="button" class="sh-btn uit fd-uit-btn" ' +
+          'onclick="SoferUit.open(\'' + o.id + '\',' + s.id + ')" ' +
+          'title="' + t('sof.uitTitle') + '">🚛 UIT' + badge + '</button>' +
+      '</div>';
+    }
+    return out;
   }
   var loadSec, unloadSec;
   if (_pickups.length) {
@@ -4455,10 +4468,19 @@ function renderFuvarCard(o, idx) {
     }).join('');
     unloadSec = fdPhaseSec('unload', '⬇️', 'sof.det.unloading', unloadSum, unloadBody, loadedDone);
   } else {
+    // Legacy (nem-migrált) fuvar — 1 lerakó, stop_id nincs. A UIT-gomb
+    // ilyenkor is jelenik meg, stop_id nélkül (fuvar-szintű UIT-modal).
+    var _legacyUitN = parseInt(o.uit_free_count || 0, 10);
+    var _legacyBadge = _legacyUitN > 0 ? ' <span class="fd-uit-badge">' + _legacyUitN + '</span>' : '';
     unloadSec = fdPhaseSec('unload', '⬇️', 'sof.det.unloading', o.loc_descarcare,
       detRow('sof.det.company', o.firma_descarcare, o.firma_descarcare ? 'unload_firma' : null) +
       detRow('sof.det.location', o.loc_descarcare, 'unload') +
-      detRow('sof.det.date', dUnload, null), loadedDone);
+      detRow('sof.det.date', dUnload, null) +
+      '<div class="fd-row fd-uit-row">' +
+        '<button type="button" class="sh-btn uit fd-uit-btn" ' +
+          'onclick="SoferUit.open(\'' + o.id + '\')" ' +
+          'title="' + t('sof.uitTitle') + '">🚛 UIT' + _legacyBadge + '</button>' +
+      '</div>', loadedDone);
   }
   var details =
     '<div class="fuvar-details" id="det_' + o.id + '" style="display:none">' +
@@ -4482,10 +4504,9 @@ function renderFuvarCard(o, idx) {
           '</div>';
         }).join('') +
       '</div>' : '') +
-      // Akciógombok (UIT / állomás-léptetés / áru-leadás) — szintén a
-      // kinyíló részben, hogy összecsukva tiszta legyen a kártya.
+      // Akciógombok (állomás-léptetés / áru-leadás) — a UIT-gomb most
+      // LERAKÓNKÉNT jelenik meg a lerakó-sorban (multi-drop), nem itt.
       '<div class="fuvar-actions">' +
-        '<button class="sh-btn uit" onclick="SoferUit.open(\'' + o.id + '\')" title="' + t('sof.uitTitle') + '">🚛 UIT</button>' +
         actionBtn +
         hoBtn +
       '</div>' +

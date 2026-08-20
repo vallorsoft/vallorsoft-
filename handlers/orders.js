@@ -296,6 +296,7 @@ handlers.getMySoferOrders = async function (req, res, args) {
                 COALESCE(st.stop_count, 0)          AS stop_count,
                 COALESCE(st.wb_open_pickup, 0)      AS wb_open_pickup,
                 COALESCE(st.wb_open_delivery, 0)    AS wb_open_delivery,
+                COALESCE(uc.uit_free_count, 0)      AS uit_free_count,
                 CASE
                   WHEN o.status IN ('Alocat', 'In Curs') THEN true
                   ELSE false
@@ -343,11 +344,24 @@ handlers.getMySoferOrders = async function (req, res, args) {
                       'ref',          s.ref,
                       'arrived_at',   s.arrived_at,
                       'done_at',      s.done_at,
-                      'waybilled_at', s.waybilled_at
+                      'waybilled_at', s.waybilled_at,
+                      'uit_count',    COALESCE((
+                        SELECT COUNT(*)::int FROM order_uit_codes u
+                         WHERE u.company_id = o.company_id
+                           AND u.order_id = o.id
+                           AND u.stop_id = s.id
+                      ), 0)
                     ) ORDER BY s.kind DESC, s.stop_index ASC) AS stops_json
                FROM order_stops s
               WHERE s.order_id = o.id
            ) st ON true
+           LEFT JOIN LATERAL (
+             SELECT COUNT(*)::int AS uit_free_count
+               FROM order_uit_codes u
+              WHERE u.company_id = o.company_id
+                AND u.order_id = o.id
+                AND u.stop_id IS NULL
+           ) uc ON true
           WHERE o.company_id = $1 AND LOWER(o.email_sofer) = LOWER($2)
           ORDER BY o.created_at DESC`,
         [me.company_id, me.email]

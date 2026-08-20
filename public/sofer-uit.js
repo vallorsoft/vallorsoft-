@@ -26,6 +26,7 @@ window.SoferUit = (function () {
       '.su-row{display:flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:11px 12px;margin-bottom:9px;flex-wrap:wrap;background:rgba(255,255,255,0.03)}' +
       '.su-code{font-family:ui-monospace,monospace;font-weight:700;letter-spacing:.6px;flex:1;min-width:150px;word-break:break-all;color:#fff}' +
       '.su-src{color:#9fb0c3;font-size:11px}' +
+      '.su-scope{color:#93c5fd;font-size:11px}' +
       '.su-btn{cursor:pointer;border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;background:transparent;color:#e2e8f0;white-space:nowrap}' +
       '.su-btn.copy{color:#93c5fd;border-color:rgba(59,130,246,.5)}' +
       '.su-btn.del{color:#f87171;border-color:rgba(239,68,68,.5)}' +
@@ -120,13 +121,18 @@ window.SoferUit = (function () {
     });
   }
 
-  function open(orderId) {
+  function open(orderId, stopId) {
     ensureStyle();
+    // A stopId opcionális: ha megadva, csak az adott lerakó UIT-jait szűri
+    // (+ a stop_id=NULL fuvar-szintűeket); ha nincs, minden UIT látszik.
+    var sid = (stopId != null && isFinite(stopId)) ? parseInt(stopId, 10) : null;
+    var qsuffix = sid ? ('?stop_id=' + encodeURIComponent(sid)) : '';
+    var subTitle = sid ? 'A KIVÁLASZTOTT lerakóhoz tartozó UIT-kódok.' : 'A fuvarhoz tartozó UIT-kódok.';
     var ov = document.createElement('div'); ov.className = 'su-ov';
     ov.innerHTML =
       '<div class="su-box">' +
         '<div class="su-h"><h3>🚛 UIT-kódok</h3><button class="su-x" id="suX" title="Bezárás">&times;</button></div>' +
-        '<p class="su-sub">A fuvarhoz tartozó UIT-kódok. Új kódot beírhatsz kézzel, vagy papírról fotózással (📷 gomb — az AI kiolvassa).</p>' +
+        '<p class="su-sub">' + esc(subTitle) + ' Új kódot beírhatsz kézzel, vagy papírról fotózással (📷 gomb — az AI kiolvassa).</p>' +
         '<div id="suList"><div class="su-empty">Betöltés…</div></div>' +
         '<div id="suAddWrap"></div>' +
       '</div>';
@@ -147,12 +153,22 @@ window.SoferUit = (function () {
         var photoBtn = u.has_photo
           ? '<span class="su-btn photo"><a href="/api/uit/' + u.id + '/photo" target="_blank" rel="noopener" title="Fotó megnyitása">🖼️</a></span>'
           : '';
+        // A sofőr CSAK a SAJÁT bevitelét törölheti (created_by_me flag a
+        // szervertől). A menedzser által kiíráskor beírt kódnál a törlő
+        // gomb el van rejtve.
+        var delBtn = u.created_by_me
+          ? '<button class="su-btn del" data-act="del" title="Törlés">🗑️</button>'
+          : '';
+        // Fuvar-szintű UIT (stop_id=NULL) más lerakónál is látható → apró
+        // jelzés a felhasználónak, hogy „közös".
+        var scopeBadge = (sid && u.stop_id == null) ? '<span class="su-scope" title="Fuvar-szintű (minden lerakóra)">🌐</span>' : '';
         return '<div class="su-row" data-id="' + esc(u.id) + '" data-code="' + esc(u.uit_code) + '">' +
           '<span class="su-code">' + esc(codeStr) + '</span>' +
           '<span class="su-src" title="' + (u.source==='ai-scan'?'AI-kiolvasás':'Kézi beírás') + '">' + srcLabel + '</span>' +
+          scopeBadge +
           photoBtn +
           '<button class="su-btn copy" data-act="copy" title="Vágólapra másolás">📋</button>' +
-          '<button class="su-btn del" data-act="del" title="Törlés">🗑️</button>' +
+          delBtn +
         '</div>';
       }).join('');
       ov.querySelectorAll('.su-row [data-act]').forEach(function(btn){
@@ -202,7 +218,9 @@ window.SoferUit = (function () {
         var b = $('suSave'); b.disabled = true;
         setStat('Mentés…');
         try {
-          await api('POST', '/api/sofer/orders/' + encodeURIComponent(orderId) + '/uit', { uit_code: code, source: 'manual' });
+          var payload = { uit_code: code, source: 'manual' };
+          if (sid) payload.stop_id = sid;
+          await api('POST', '/api/sofer/orders/' + encodeURIComponent(orderId) + '/uit', payload);
           $('suNew').value = '';
           setStat('Mentve.', 'ok');
           if (typeof window.__soferUitChanged === 'function') window.__soferUitChanged();
@@ -238,12 +256,14 @@ window.SoferUit = (function () {
             var savedCount = 0, dupCount = 0, errCount = 0;
             for (var i = 0; i < codes.length; i++) {
               try {
-                await api('POST', '/api/sofer/orders/' + encodeURIComponent(orderId) + '/uit', {
+                var pl = {
                   uit_code: codes[i],
                   source: 'ai-scan',
                   photo_b64: shrunk.b64,
                   photo_mime: shrunk.mime
-                });
+                };
+                if (sid) pl.stop_id = sid;
+                await api('POST', '/api/sofer/orders/' + encodeURIComponent(orderId) + '/uit', pl);
                 savedCount++;
               } catch (e) {
                 if (/deja inregistrat|already/i.test(e.message)) dupCount++;
@@ -270,7 +290,7 @@ window.SoferUit = (function () {
 
     async function load(){
       try {
-        var data = await api('GET', '/api/sofer/orders/' + encodeURIComponent(orderId) + '/uit');
+        var data = await api('GET', '/api/sofer/orders/' + encodeURIComponent(orderId) + '/uit' + qsuffix);
         renderList(data.items || []);
         renderAdd(); // mindig újrarajzol, hogy az input üres legyen
       } catch (e) {
