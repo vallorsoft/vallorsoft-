@@ -14,6 +14,7 @@ const { featureEnabled } = require('../lib/featureEnabled');
 const { hasPerm } = require('./permissions');
 const { normalizePlate } = require('../lib/plate');
 const orderStops = require('../lib/orderStops');
+const { normalizeUit, isValidUit } = require('../lib/uitFormat');
 
 const handlers = {};
 
@@ -642,6 +643,24 @@ handlers.comCreate = async function (req, res, args) {
         const norm = orderStops.normalizeStops(o);
         await orderStops.replaceStopsForOrder(pool, id, company_id, norm);
       } catch (e) { console.error('order-stops beszúrás hiba (fuvar mentve, de stopok nem):', e); }
+
+      // UIT-kódok (opcionális, több) — a diszpécser a kiíráskor beírja.
+      // Best-effort: hiba esetén a fuvar mentve marad, a UIT-eket a szerkesztőben
+      // vagy a UIT-panelen (⋯ menü) utólag felviheti.
+      try {
+        const uitList = Array.isArray(o.uit_codes) ? o.uit_codes : [];
+        for (let i = 0; i < uitList.length; i++) {
+          const raw = uitList[i] && (uitList[i].uit_code || uitList[i].code || uitList[i]);
+          const uit = normalizeUit(raw);
+          if (!isValidUit(uit)) continue;
+          await pool.query(
+            `INSERT INTO order_uit_codes (company_id, order_id, uit_code, rendszam, provider,
+                                          created_by, source)
+             VALUES ($1,$2,$3,$4,$5,$6,'manual')
+             ON CONFLICT (company_id, order_id, uit_code) DO NOTHING`,
+            [company_id, id, uit, rendszam_camion || null, 'cargotrack', req.session.user.id]);
+        }
+      } catch (e) { console.error('UIT-kódok beszúrás hiba (fuvar mentve, de UIT nem):', e); }
 
       return res.json({ result: {
         ok: true, id: id, fuvar_no: fuvar_no,

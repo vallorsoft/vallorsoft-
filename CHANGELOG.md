@@ -14,6 +14,38 @@
 
 ---
 
+## 2026-08-20 — UIT-kód egyszerűsítés: 1 kitölthető mező kiíráskor + több UIT / fuvar + 📷 fotó→AI kiolvasás + képmegőrzés
+
+### Miért
+A régi UIT-kezelés több lépcsős volt (deep-link a szolgáltatóhoz, sofőr csak 0 UIT-ig adhatott hozzá, minden bevitel eltérő formátumú). A napi gyakorlat egyszerűbb: a diszpécser a fuvar-kiíráskor egy mezőbe beírja a UIT-ot, a sofőr a fuvar-kártyáján a 🚛 UIT gombra kattintva egy bezárható ablakban látja, és papírról több kódot is felvihet — kézzel vagy 📷 fotóval, az AI-kiolvasás mindegyiket felismeri.
+
+### Mit
+- **Új `lib/uitFormat.js` + `public/uit-format.js`** — közös UIT-formázó: normalizál (uppercase + csak A-Z0-9 + max 16 kar.), formáz („XXXX-XXXX-XXXX-XXXX", 4-esével kötőjel), és az input-mezőre köti az élő formázást (kurzor-pozíció-megőrzéssel). A DB-be normalizált forma kerül, a felület mindig formázottan mutatja.
+- **Új `handlers/uitScan.js` (`scanUitFromImage` RPC, registry-be regisztrálva)** — a papírra írt UIT-ot Gemini-vel kiolvasás; `codes[]` tömböt ad (több kód/fotó, duplikátum-szűrt, ≤ 20). Kapuk: Sofer|Admin|Manager + `ai-kiolvasas` csomag-flag + `GEMINI_API_KEY`. Max 8 MB, kép-only (PDF nem). Audit CSAK metaadat (a base64 SOHA nem kerül logba/DB-be).
+- **`routes/uit.js` bővítés** — a bemenetet `normalizeUit` szűri (kötőjelek/szóközök kivágva); a `/api/orders/:id/uit` (Admin/Manager) és `/api/sofer/orders/:id/uit` (Sofer) elfogad `photo_b64`/`photo_mime`/`source` mezőket; a sofőr MOSTANTÓL TÖBB UIT-ot is felvihet (a régi „csak ha 0 van" korlát megszűnt); új `GET /api/uit/:uid/photo` a képet inline data-URL-ként adja, auth-védett.
+- **`db/order-uit-photo.sql`** (idempotens migráció) — `order_uit_codes` új oszlopai: `photo_b64 TEXT`, `photo_mime TEXT`, `source TEXT DEFAULT 'manual'`. Auto-fut induláskor.
+- **`handlers/orders.js` `comCreate`** — új `uit_codes` payload-mező (array); a fuvar mentése után best-effort UIT-beszúrás `order_uit_codes`-ba (`source='manual'`). Hibaesetén a fuvar mentve marad, a UIT-et utólag is felviheti.
+- **`public/admin.html` + `public/manager.html`** — fuvar-kiírás űrlap új `#oUit` mezője (auto-format), és a fuvar-szerkesztő (`orderEditModal`) új UIT-blokkja: input + ➕ Hozzáadás + lista a meglévőkről (kép-linkkel + törlővel). A `console-shared.js` `createOrder` és `openOrderEdit`/`loadOeUitList`/`oeAddUit`/`oeDeleteUit` bekötve.
+- **`public/order-wizard.js`** — a Step 5 (Ár és távolság → most „Ár, távolság és UIT") elfogadja a `#oUit` mezőt; a review-lapon is szerepel a formázott UIT.
+- **`public/sofer-uit.js`** — teljes átírás: bezárható modal (💠 X gomb, backdrop-click), lista a fuvar UIT-jaival (📷 AI vs. ✋ kézi + 🖼️ fotó-megnyitás + 🔗 deep-link), új „📷 Fotó" gomb (mobil-kamera → canvas 1600px JPEG q=0.85 → Gemini → minden felismert kódra külön mentés a fotóval). Élő formázás (`UitFmt.attach`) az input-on.
+- **`public/uit-panel.js`** — ugyanazon UX az Admin/Manager oldalon (⋯ → UIT-kódok gomb). Egységes stílus, kép-megnyitás, 📷 gomb, deep-link.
+- **`public/i18n.js`** — új kulcsok: `form.uit`/`form.uitHint`/`form.uitPh`, `edit.uit`/`edit.uitHint`/`edit.uitAdd`/`edit.uitEmpty`, `cs.uit.needCode`/`cs.uit.added`/`cs.uit.delConfirm` (RO-alap + HU). Az `oc.step5Title` „Ár, távolság és UIT" névre bővült.
+- **Cache-bust**: `admin.html` + `manager.html` + `sofer.html` — `i18n.js`/`console-shared.js`/`sofer-uit.js`/`uit-panel.js`/`order-wizard.js` → `?v=20260820uit`, `uit-format.js` bekötve.
+
+### Teszt
+- **947 Jest zöld** (926 → 947, +21 új):
+  - `tests/unit/uit-format.test.js` (11): normalizál (kötőjel/szóköz/ékezet/max 16), formáz (4-es blokkok), validál (üres/kizárólag jelek → invalid).
+  - `tests/unit/uit-scan.test.js` (10): szerep/env/csomag kapuk, MIME-fehérlista, `_sanitize` (kötőjel-eltávolítás, duplikátum-szűrés, hosszú lista → 20-ra vág), Gemini mock-út (siker + 429 hiba).
+- **135 modul require-sweep zöld**; **17 web-smoke** eset zöld — a `routes/uit.js` új végpontjai (`/api/uit/:uid/photo`) és a `handlers/uitScan.js` a route-listába tisztán bemount.
+
+### Biztonság / adatszivárgás
+- Minden UIT-lekérdezés `company_id`-szűrt; a `_sanitizePhoto` MIME-white-list + méret-limit (8 MB).
+- A fotó tárolt formája base64 az `order_uit_codes.photo_b64`-ban, csak auth-védett endpoint (`/api/uit/:uid/photo`) adja ki, ownership-ellenőrzéssel.
+- A Gemini-hívás base64-je SOHA nem kerül audit-logba/DB-be — csak a hívás alatt él memóriában.
+- A UIT-input hosszkorlát a szerveroldalon (`normalizeUit` → 16 kar.) is érvényes (kliens-oldali maxLength=19 csak UX).
+
+---
+
 ## 2026-08-20 — Sofőr fuvar-kártya: 📋 vágólap-másoló gomb visszatért a felrakó/lerakó cégre és címre (multi-drop is)
 
 ### Miért

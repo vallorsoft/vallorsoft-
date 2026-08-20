@@ -55,7 +55,8 @@
     vehicles:   { step: 4, sel: null, type: 'special-vehicles' },
     // step 5
     pret:    { step: 5, sel: '#oPret',     type: 'field' },
-    km:      { step: 5, sel: '#oKm',       type: 'field' }
+    km:      { step: 5, sel: '#oKm',       type: 'field' },
+    uit:     { step: 5, sel: '#oUit',      type: 'field' }
   };
 
   function _closestField(el) {
@@ -581,7 +582,9 @@
 
           _sec('5', T('oc.step5Title', 'Ár és távolság'),
             '<div class="ocr-row"><b>' + esc(T('form.price', 'Ár')) + ':</b> ' + (v.pret ? esc(v.pret) : '—') + '</div>' +
-            '<div class="ocr-row"><b>' + esc(T('form.km', 'Távolság')) + ':</b> ' + (v.km ? esc(v.km) + ' km' : '—') + '</div>'
+            '<div class="ocr-row"><b>' + esc(T('form.km', 'Távolság')) + ':</b> ' + (v.km ? esc(v.km) + ' km' : '—') + '</div>' +
+            '<div class="ocr-row"><b>' + esc(T('form.uit', 'UIT-kód')) + ':</b> ' +
+              (v.uit ? esc(((window.UitFmt && window.UitFmt.format) ? window.UitFmt.format(v.uit) : v.uit)) : '—') + '</div>'
           ) +
 
         '</div>' +
@@ -626,6 +629,7 @@
       series_prefix: seriesPrefix,
       pret: _v('oPret'),
       km: _v('oKm'),
+      uit: _v('oUit'),
       suly_kg: _v('oSuly'),
       load_type: lt,
       hossz_cm: _v('oHossz'), szel_cm: _v('oSzel'), mag_cm: _v('oMag'),
