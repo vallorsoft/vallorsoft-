@@ -666,6 +666,8 @@
     'cs.uit.needCode': { hu: 'A UIT-kód kötelező.', ro: 'Codul UIT este obligatoriu.' },
     'cs.uit.added': { hu: 'UIT hozzáadva.', ro: 'UIT adăugat.' },
     'cs.uit.delConfirm': { hu: 'Törlöd ezt a UIT-kódot?', ro: 'Ștergi acest cod UIT?' },
+    'cs.uit.copied': { hu: 'UIT vágólapra másolva.', ro: 'UIT copiat în clipboard.' },
+    'cs.uit.copyFail': { hu: 'Nem sikerült a másolás.', ro: 'Copierea a eșuat.' },
     // GDPR / adatvédelem
     'gdpr.title': { hu: '🔒 GDPR / Adatvédelem', ro: '🔒 GDPR / Protecția datelor' },
     'gdpr.hint': { hu: 'A munkavállalói GPS-követés csak előzetes tájékoztatás mellett jogszerű (Legea 190/2018). Az itt megadott tájékoztatót a sofőröknek belépéskor vissza kell igazolniuk.', ro: 'Monitorizarea GPS a angajaților este legală doar cu informare prealabilă (Legea 190/2018). Notificarea de mai jos trebuie confirmată de șoferi la autentificare.' },
