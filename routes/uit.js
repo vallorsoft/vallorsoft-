@@ -200,4 +200,23 @@ router.post('/api/sofer/orders/:id/uit', requireLogin, requireRole('Sofer'), asy
   } catch (e) { console.error('POST /api/sofer/orders/:id/uit hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
+// TÖRLÉS (sofőr) — CSAK a saját (email_sofer) fuvarjához tartozó UIT-ot
+// törölheti. Ownership-védett: a UIT sorát a soferOwnsOrder-hez kötjük
+// (order_id join a UIT-sorral, és az adott fuvar a belépett sofőrre mutat).
+router.delete('/api/sofer/uit/:uid', requireLogin, requireRole('Sofer'), async (req, res) => {
+  try {
+    const r = await pool.query(
+      `DELETE FROM order_uit_codes u
+         USING orders o
+         WHERE u.id = $1
+           AND u.company_id = $2
+           AND u.order_id = o.id
+           AND o.company_id = $2
+           AND LOWER(o.email_sofer) = LOWER($3)`,
+      [req.params.uid, own(req), req.session.user.email]);
+    if (!r.rowCount) return res.status(404).json({ error: 'Nu a fost gasit sau nu apartine cursei tale.' });
+    res.json({ ok: true });
+  } catch (e) { console.error('DELETE /api/sofer/uit/:uid hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
+});
+
 module.exports = router;

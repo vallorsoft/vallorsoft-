@@ -4,13 +4,13 @@
 //   - a sofőr CSAK a saját fuvarja UIT-jait látja/kezeli (a backend őrzi);
 //   - a UIT-kódot 4-esével kötőjellel megjelenítjük, beíráskor automatikusan
 //     nagybetűs és kötőjeles (window.UitFmt.attach), max 16 alfanumerikus;
-//   - TÖBB UIT-kód is felvihető (2026-08-20-tól — a diszpécser által
-//     előzőleg beírt kódok maradnak, a sofőr új sort ad hozzá);
-//   - „📷 Fotó → AI" gomb: a papírra írt UIT-ot kamerával felveszi, a
-//     Gemini kiolvassa, minden felismert kódot KÜLÖN UIT-ként ment (a
-//     fotó másolata mindegyik sorhoz csatolva → megnyitható, letölthető);
-//   - a régi „deep-link" (`getUitDeeplink`) továbbra is elérhető: ha a
-//     developer beállított provider-URL-t, a 🔗 gomb új tabon nyitja.
+//   - TÖBB UIT-kód is felvihető ugyanahhoz a fuvarhoz;
+//   - „📷 Fotó" gomb: a papírra írt UIT-ot kamerával felveszi, a Gemini
+//     kiolvassa, minden felismert kódot KÜLÖN sorként ment (a fotó
+//     mindegyikhez csatolva → megnyitható, letölthető);
+//   - MINDEN kód mellett: 📋 vágólap-másoló + 🗑️ törlő (a sofőr törölheti
+//     a saját fuvarja UIT-jait, a szerver ownership-védett).
+//   - Deep-link / GPS-szolgáltatói átirányítás NINCS.
 window.SoferUit = (function () {
 
   function ensureStyle() {
@@ -27,20 +27,19 @@ window.SoferUit = (function () {
       '.su-code{font-family:ui-monospace,monospace;font-weight:700;letter-spacing:.6px;flex:1;min-width:150px;word-break:break-all;color:#fff}' +
       '.su-src{color:#9fb0c3;font-size:11px}' +
       '.su-btn{cursor:pointer;border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;background:transparent;color:#e2e8f0;white-space:nowrap}' +
-      '.su-btn.go{color:#4ade80;border-color:rgba(34,197,94,.5)}' +
+      '.su-btn.copy{color:#93c5fd;border-color:rgba(59,130,246,.5)}' +
       '.su-btn.del{color:#f87171;border-color:rgba(239,68,68,.5)}' +
-      '.su-btn.photo{color:#93c5fd;border-color:rgba(59,130,246,.5)}' +
+      '.su-btn.photo{color:#a5b4fc;border-color:rgba(129,140,248,.5)}' +
       '.su-btn.photo a{color:inherit;text-decoration:none;display:inline-block}' +
       '.su-add{display:flex;flex-direction:column;gap:8px;margin-top:6px;border-top:1px dashed rgba(255,255,255,.15);padding-top:12px}' +
       '.su-add-row{display:flex;gap:7px;flex-wrap:wrap;align-items:stretch}' +
       '.su-in{flex:1;min-width:180px;background:#070d14;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:11px;color:#fff;font-family:ui-monospace,monospace;text-transform:uppercase;font-size:15px;letter-spacing:.6px}' +
       '.su-save{background:#3b82f6;color:#fff;border:0;border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer;white-space:nowrap}' +
       '.su-cam{background:#f59e0b;color:#0f1722;border:0;border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}' +
-      '.su-cam[disabled]{opacity:.6;cursor:progress}' +
+      '.su-cam[disabled],.su-save[disabled]{opacity:.6;cursor:progress}' +
       '.su-status{font-size:12px;color:#9fb0c3;min-height:16px}' +
       '.su-status.err{color:#fca5a5}' +
       '.su-status.ok{color:#86efac}' +
-      '.su-note{font-size:11px;color:#9fb0c3;margin:12px 0 0;border-top:1px dashed rgba(255,255,255,.12);padding-top:10px}' +
       '.su-empty{color:#9fb0c3;font-size:13px;padding:8px 2px}';
     document.head.appendChild(s);
   }
@@ -56,15 +55,24 @@ window.SoferUit = (function () {
   }
   function notify(msg) { if (typeof window.toast === 'function') window.toast(msg); else alert(msg); }
 
-  // A UIT-kód deep-linkjének megnyitása (ha a provider beállított sablonnal
-  // rendelkezik). Best-effort; hiba/nincs beállítva → néma.
-  async function openLink(orderId, code) {
+  // Vágólapra másolás — Clipboard API + textarea-fallback (mobil Safari).
+  function copyToClipboard(text) {
     try {
-      var d = await api('POST', '/api/execute', { functionName: 'getUitDeeplink', arguments: [orderId, code] });
-      var r = d && d.result;
-      if (r && r.ok && r.url) { window.open(r.url, '_blank', 'noopener'); return true; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text).then(function () { return true; }).catch(function () { return copyFallback(text); });
+      }
     } catch (_) {}
-    return false;
+    return Promise.resolve(copyFallback(text));
+  }
+  function copyFallback(text) {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.top = '-1000px';
+      document.body.appendChild(ta); ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (_) { return false; }
   }
 
   // ── Fotó → base64 (kamera). Egyetlen file-input, capture=environment
@@ -118,11 +126,9 @@ window.SoferUit = (function () {
     ov.innerHTML =
       '<div class="su-box">' +
         '<div class="su-h"><h3>🚛 UIT-kódok</h3><button class="su-x" id="suX" title="Bezárás">&times;</button></div>' +
-        '<p class="su-sub">RO e-Transport · a fuvarhoz rögzített UIT-kódok. Új kódot beírhatsz vagy lefotózhatsz.</p>' +
+        '<p class="su-sub">A fuvarhoz tartozó UIT-kódok. Új kódot beírhatsz kézzel, vagy papírról fotózással (📷 gomb — az AI kiolvassa).</p>' +
         '<div id="suList"><div class="su-empty">Betöltés…</div></div>' +
         '<div id="suAddWrap"></div>' +
-        '<p class="su-note">A UIT-kód max 16 karakter (alfanumerikus). Több kód is felvihető ugyanahhoz a fuvarhoz. ' +
-          'A 📷 gombbal a papírra írt UIT-ot lefotózhatod — az AI kiolvassa, a fotó megőrződik.</p>' +
       '</div>';
     document.body.appendChild(ov);
     var $ = function(id){ return ov.querySelector('#'+id); };
@@ -141,19 +147,33 @@ window.SoferUit = (function () {
         var photoBtn = u.has_photo
           ? '<span class="su-btn photo"><a href="/api/uit/' + u.id + '/photo" target="_blank" rel="noopener" title="Fotó megnyitása">🖼️</a></span>'
           : '';
-        return '<div class="su-row" data-code="' + esc(u.uit_code) + '">' +
+        return '<div class="su-row" data-id="' + esc(u.id) + '" data-code="' + esc(u.uit_code) + '">' +
           '<span class="su-code">' + esc(codeStr) + '</span>' +
           '<span class="su-src" title="' + (u.source==='ai-scan'?'AI-kiolvasás':'Kézi beírás') + '">' + srcLabel + '</span>' +
           photoBtn +
-          '<button class="su-btn go" data-act="open" title="Deep-link a szolgáltatói portálra">🔗</button>' +
+          '<button class="su-btn copy" data-act="copy" title="Vágólapra másolás">📋</button>' +
+          '<button class="su-btn del" data-act="del" title="Törlés">🗑️</button>' +
         '</div>';
       }).join('');
-      ov.querySelectorAll('.su-row [data-act="open"]').forEach(function(btn){
+      ov.querySelectorAll('.su-row [data-act]').forEach(function(btn){
         btn.addEventListener('click', async function(){
-          var code = btn.closest('.su-row').dataset.code;
+          var row = btn.closest('.su-row');
+          var id = row.dataset.id;
+          var code = row.dataset.code;
+          var act = btn.dataset.act;
           btn.disabled = true;
-          var ok = await openLink(orderId, code);
-          if (!ok) notify('Deep-link nincs beállítva (a developer állítja a GPS-szolgáltatónál).');
+          try {
+            if (act === 'copy') {
+              var ok = await copyToClipboard(pretty(code));
+              notify(ok ? 'UIT vágólapra másolva.' : 'Nem sikerült a másolás.');
+            } else if (act === 'del') {
+              if (!confirm('Törlöd ezt a UIT-kódot?')) { btn.disabled = false; return; }
+              await api('DELETE', '/api/sofer/uit/' + encodeURIComponent(id));
+              if (typeof window.__soferUitChanged === 'function') window.__soferUitChanged();
+              await load();
+              return;
+            }
+          } catch (e) { notify(e.message); }
           btn.disabled = false;
         });
       });
