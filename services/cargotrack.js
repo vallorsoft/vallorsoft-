@@ -106,14 +106,37 @@ function _pickVoltage(o) {
   if (!o) return null;
   const keys = [
     'external_voltage', 'power_supply_voltage', 'ext_voltage', 'main_voltage',
-    'vehicle_battery_voltage', 'battery_voltage_ext',
-    'battery_voltage', 'voltage',
+    'vehicle_battery_voltage', 'battery_voltage_ext', 'power_voltage', 'input_voltage',
+    'pwr_voltage', 'ubatt', 'u_batt', 'main_power', 'battery_voltage', 'voltage',
   ];
   for (const k of keys) {
     const v = o[k];
     if (v != null && isFinite(parseFloat(v))) return parseFloat(v);
   }
+  // Smart fallback: bármi ami *volt* mintát tartalmaz, ÉS 8–32V közötti érték
+  // (11V-os merülő akkutól 32V-os töltési csúcsig — 12V és 24V rendszer is elfér).
+  // Ezzel a Ruptela eszközfüggő névtorzításai (pl. `AIN1_calc_voltage`) is jönnek.
+  for (const k of Object.keys(o)) {
+    if (!/volt/i.test(k)) continue;
+    const v = parseFloat(o[k]);
+    if (isFinite(v) && v >= 8 && v <= 32) return v;
+  }
   return null;
+}
+
+// Diagnosztika (egyszeri per process indítás): ha a battery_voltage null-t
+// eredményez egy jármű esetében, EGYSZER logoljuk a `calc` és `raw` bemenetek
+// KULCSAIT (értékek nélkül — nem szivárog GPS-adat). Így a Fly.io logból
+// pontosan látszik, milyen néven adja a te eszközöd. Debounce: object_id-nkénti
+// once, hogy ne teljen tele a log.
+const _voltDiagSeen = new Set();
+function _logMissingVoltage(objectId, calc, raw) {
+  if (!objectId || _voltDiagSeen.has(objectId)) return;
+  _voltDiagSeen.add(objectId);
+  const calcKeys = calc ? Object.keys(calc).sort() : [];
+  const rawKeys  = raw  ? Object.keys(raw).sort()  : [];
+  console.log('[CargoTrack] Nincs felismert akku-feszültség mező. object_id=' + objectId +
+              ' calc_keys=[' + calcKeys.join(',') + '] raw_keys=[' + rawKeys.join(',') + ']');
 }
 
 async function getLatestStatus(apiKey, objectId, lookbackHours = 6) {
@@ -137,7 +160,11 @@ async function getLatestStatus(apiKey, objectId, lookbackHours = 6) {
     mileage: calc.mileage,
     rpm: calc.rpm,
     // Jármű akku-feszültsége (12V-os autó vagy 24V-os teherautó — a nyers V)
-    battery_voltage: _pickVoltage(calc) != null ? _pickVoltage(calc) : _pickVoltage(raw),
+    battery_voltage: (function() {
+      const v = _pickVoltage(calc) != null ? _pickVoltage(calc) : _pickVoltage(raw);
+      if (v == null) _logMissingVoltage(last.object_id, calc, raw);
+      return v;
+    })(),
   };
 }
 
