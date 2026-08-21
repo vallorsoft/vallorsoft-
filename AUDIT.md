@@ -9,6 +9,16 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 19. lépés — Szerviz halasztás + elvégezve: multi-tenant tranzakció + fehérlistás JSONB (2026-08-21) ✅ KÉSZ
+A szerviz-esedékesség kezelése kapott két új írási művelet (halasztás + elvégezve/lezárás). Mindkettő **cégre szűrt**, tulajdon-ellenőrzött, audit-elt, és a bemenet fehérlistázva.
+
+- **Cégre-szűrés minden úton:** `servicePostpone` `UPDATE ... WHERE id=$1 AND company_id=$2 AND closed_at IS NULL` (ismeretlen id / idegen cég / lezárt sor → 0 sor → hiba, nincs mellékhatás). `serviceComplete` tranzakcióban: `SELECT ... FOR UPDATE WHERE id=$1 AND company_id=$2 AND closed_at IS NULL` → csak a jelen cég nyitott sora zárolódik; az INSERT új sor a SELECT-tel felderített `vehicle_id`-vel (nem kliens-adatból), így a kliens NEM tud másik cég `vehicle_id`-jét beszúrni.
+- **Fehérlistás JSONB** (`_normalizeServiceItems`): a bejövő `items[]` tömb elemei csak akkor kerülnek a DB-be, ha a `key` a `SERVICE_ITEM_SET` (17 kulcs). Duplikátumok szűrve, `note` ≤120 char, max 32 tétel. Ismeretlen kulcs csendesen dobva → nincs JSONB-injekció, nincs kontrollálatlan tartalom.
+- **Szerep-kapu ELŐBB, mint DB-kapcsolat:** a `serviceComplete` az `_isAdminOrManager` + `id`-parsz kaput a `pool.connect()` ELŐTT futtatja — jogosulatlan hívás nem foglal kapcsolatot (kis DoS-védelem is).
+- **Tranzakció + hibakezelés:** BEGIN → SELECT FOR UPDATE → INSERT → UPDATE → COMMIT. Bármely lépés hibája `ROLLBACK` + `client.release()` a `catch`-ben (kettős védőháló, mindkét try-catch-nél). Sikeres COMMIT után audit-bejegyzés (a régi + új id-vel, tétel-számmal, KÖV. esedékességgel).
+- **Nem érint más területet:** a `computeServiceDueAlerts` (dashboard + scheduler push/e-mail) a `s.closed_at IS NULL` szűrővel bővült → lezárt sor SOSEM jelez tovább, nincs zombie-riasztás. Új migráció (`db/service-postpone-and-items.sql`) idempotens, csak új mezőket ad hozzá (nincs meglévő adat-átírás).
+- **Teszt:** `tests/integration/service-postpone-complete.test.js` (+9 eset — szerep-tiltás, üres bemenet, sikeres halasztás cégre-szűrt WHERE-rel, lezárt/idegen sor visszautasítás, tranzakciós ROLLBACK, teljes lifecycle a fehérlista alkalmazásával, multi-tenant SELECT WHERE, `serviceList` új mezők) → **957 Jest zöld** (948 → 957).
+
 ### 18. lépés — Sofőr-oldal átvilágítás: 2 tárolt XSS + border-cross bemenet-védelem (2026-07-29) ✅ KÉSZ
 A „csinálj teszteket minden sofőr-funkcióval, mostantól élesbe hibamentesen" körben a lefedettség kiegészítése (+84 új Jest-eset) közben két valódi tárolt XSS derült ki a mobil-appon, és egy elfogadatlanul laza bemenet a `POST /api/border-cross` route-on. Egyik sem tenant-átjárás, de mindegyik a sofőr saját eszközén, a saját munkamenetében rossz állapotot idézett elő.
 

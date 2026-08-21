@@ -7,8 +7,47 @@
 //  Minden lekérdezés company_id-re szűr (multi-tenant).
 // ============================================================
 const pool = require('../db');
+const audit = require('../lib/audit');
 
 const handlers = {};
+
+// ────────────────────────────────────────────────────────────
+//  Szerviz-tétel fehérlista (checklist a "elvégezve" gombhoz).
+//  A gyakori kamion-szerviz elemek — az UI ezeket pipálhatja.
+//  Az 'other' mindig szabad-szöveggel jár (label a JSONB-ben).
+//  A szerver CSAK ezeket a kulcsokat fogadja el; ismeretlen dobva.
+// ────────────────────────────────────────────────────────────
+const SERVICE_ITEM_KEYS = [
+  'oil', 'oil_filter', 'fuel_filter', 'air_filter', 'pollen_filter',
+  'adblue_filter', 'air_dryer_filter', 'brake_pads', 'brake_disc',
+  'coolant', 'transmission_oil', 'differential_oil', 'tires',
+  'wipers', 'battery', 'timing_belt', 'other'
+];
+const SERVICE_ITEM_SET = new Set(SERVICE_ITEM_KEYS);
+
+// A kliens által küldött tétel-tömböt validálja + normalizálja.
+// Beérkezés: [{key:'oil'}, {key:'other', note:'egyeb...'}].
+// Kimenet: ugyanez, de csak a fehérlistán levő kulcsokkal, note<=120 char.
+function _normalizeServiceItems(raw) {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const it of raw) {
+    if (!it || typeof it !== 'object') continue;
+    const k = String(it.key || '').trim().toLowerCase();
+    if (!SERVICE_ITEM_SET.has(k)) continue;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const row = { key: k };
+    if (it.note != null) {
+      const n = String(it.note).trim().slice(0, 120);
+      if (n) row.note = n;
+    }
+    out.push(row);
+    if (out.length >= 32) break;
+  }
+  return out;
+}
 
 // Szerviz-esedékesség riasztási küszöbök (km- és dátum-alapú emlékeztető):
 //  - SERVICE_WARN_KM: ennyi km-rel a `next_due_km` előtt (vagy ha már túllépte) jelez
@@ -163,14 +202,17 @@ handlers.serviceList = async function (req, res, args) {
     if (Number.isFinite(vehicleId)) { params.push(vehicleId); where += ' AND s.vehicle_id = $2'; }
     const r = await pool.query(
       `SELECT s.id, s.vehicle_id, v.rendszam, s.service_date, s.km, s.category,
-              s.description, s.cost_ron, s.next_due_date, s.next_due_km
+              s.description, s.cost_ron, s.next_due_date, s.next_due_km,
+              COALESCE(s.items, '[]'::jsonb) AS items,
+              COALESCE(s.postpone_count, 0) AS postpone_count,
+              s.last_postponed_at, s.closed_at, s.closed_by_service_id
        FROM vehicle_service_log s
        JOIN vehicles v ON v.id = s.vehicle_id
        WHERE ${where}
        ORDER BY s.service_date DESC, s.id DESC LIMIT 300`,
       params
     );
-    return res.json({ result: { ok: true, items: r.rows } });
+    return res.json({ result: { ok: true, items: r.rows, item_keys: SERVICE_ITEM_KEYS } });
   } catch (err) {
     console.error('serviceList hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
@@ -189,14 +231,18 @@ handlers.serviceCreate = async function (req, res, args) {
     const vr = await pool.query('SELECT id FROM vehicles WHERE id=$1 AND company_id=$2', [vehicleId, cid]);
     if (!vr.rows.length) return res.json({ result: { ok: false, err: 'Vehiculul nu a fost gasit.' } });
     const num = (x) => { const n = parseFloat(x); return Number.isFinite(n) ? n : null; };
-    await pool.query(
+    const items = _normalizeServiceItems(f.items);
+    const ins = await pool.query(
       `INSERT INTO vehicle_service_log
-         (company_id, vehicle_id, service_date, km, category, description, cost_ron, next_due_date, next_due_km)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+         (company_id, vehicle_id, service_date, km, category, description, cost_ron, next_due_date, next_due_km, items)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) RETURNING id`,
       [cid, vehicleId, f.service_date || new Date(), num(f.km), f.category || 'javitas',
-       String(f.description || '').trim() || null, num(f.cost_ron), f.next_due_date || null, num(f.next_due_km)]
+       String(f.description || '').trim() || null, num(f.cost_ron), f.next_due_date || null, num(f.next_due_km),
+       JSON.stringify(items)]
     );
-    return res.json({ result: { ok: true } });
+    audit.fromReq(req, 'service.create', 'vehicle_service_log', ins.rows[0].id,
+      { vehicle_id: vehicleId, item_count: items.length });
+    return res.json({ result: { ok: true, id: ins.rows[0].id } });
   } catch (err) {
     console.error('serviceCreate hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
@@ -214,6 +260,141 @@ handlers.serviceDelete = async function (req, res, args) {
     return res.json({ result: { ok: !!r.rowCount, err: r.rowCount ? undefined : 'Nu a fost gasit.' } });
   } catch (err) {
     console.error('serviceDelete hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ────────────────────────────────────────────────────────────
+//  „🕐 Halasztás" — a szerviz esedékességét arrébb tolja.
+//  args: [id, { next_due_date?, next_due_km?, note? }]
+//  Legalább egyik új mező (dátum vagy km) kötelező; a régi sor
+//  megmarad (folytonos rekord), a next_due_* mezők felülíródnak,
+//  postpone_count++, last_postponed_at=NOW(), last_alert_at=NULL
+//  (hogy a scheduler újra tudja jelezni a KÖVETKEZŐ esedékességnél).
+//  Multi-tenant: WHERE id=$1 AND company_id=$2.
+// ────────────────────────────────────────────────────────────
+handlers.servicePostpone = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const id = parseInt(args[0], 10);
+    if (!Number.isFinite(id)) return res.json({ result: { ok: false, err: 'ID invalid.' } });
+    const f = _arg([args[1]]);
+    const num = (x) => { const n = parseFloat(x); return Number.isFinite(n) ? n : null; };
+    const nextKm = num(f.next_due_km);
+    const nextDate = (f.next_due_date && String(f.next_due_date).trim()) || null;
+    if (nextKm == null && !nextDate) {
+      return res.json({ result: { ok: false, err: 'Este necesar cel puțin km sau dată nouă.' } });
+    }
+    // A régi note-ot megőrizzük, a halasztás okát opcionálisan hozzáfűzzük.
+    const noteAdd = String(f.note || '').trim().slice(0, 200);
+    const r = await pool.query(
+      `UPDATE vehicle_service_log
+       SET next_due_date = COALESCE($3, next_due_date),
+           next_due_km   = COALESCE($4, next_due_km),
+           postpone_count = COALESCE(postpone_count, 0) + 1,
+           last_postponed_at = NOW(),
+           last_alert_at = NULL,
+           description = CASE
+             WHEN $5 = '' THEN description
+             WHEN description IS NULL OR description = '' THEN 'Amânat: ' || $5
+             ELSE description || E'\n[Amânat] ' || $5
+           END
+       WHERE id = $1 AND company_id = $2 AND closed_at IS NULL
+       RETURNING id, vehicle_id, next_due_date, next_due_km, postpone_count`,
+      [id, cid, nextDate, nextKm, noteAdd]
+    );
+    if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost găsit sau este deja închis.' } });
+    audit.fromReq(req, 'service.postpone', 'vehicle_service_log', id,
+      { next_due_date: nextDate, next_due_km: nextKm, postpone_count: r.rows[0].postpone_count });
+    return res.json({ result: { ok: true, item: r.rows[0] } });
+  } catch (err) {
+    console.error('servicePostpone hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ────────────────────────────────────────────────────────────
+//  „✅ Elvégezve" — a régi esedékességet lezárja + új szerviz-sort ír.
+//  args: [id, {
+//    service_date?, km?, cost_ron?, description?, category?,
+//    items:[{key,note?}],           // fehérlistás pipa-lista
+//    next_due_date?, next_due_km?   // KÖVETKEZŐ esedékesség (mikor jelezzen újra)
+//  }]
+//  A tranzakcióban: (a) a régi sor `closed_at=NOW()`+`closed_by_service_id`,
+//  a next_due_* nullázódik (nem jelez tovább); (b) INSERT új
+//  vehicle_service_log a most elvégzett munkával; az új sor kapja a friss
+//  next_due_date / next_due_km értéket → a scheduler ettől figyeli tovább.
+//  Multi-tenant + tulajdon-ellenőrzés. Audit a régi ÉS az új id-vel.
+// ────────────────────────────────────────────────────────────
+handlers.serviceComplete = async function (req, res, args) {
+  // ELŐBB szerep-/bemenet-ellenőrzés, hogy fölöslegesen ne foglaljunk DB-kapcsolatot.
+  if (!_isAdminOrManager(req)) return _deny(res);
+  const cid = req.session.user.company_id;
+  const id = parseInt(args[0], 10);
+  if (!Number.isFinite(id)) return res.json({ result: { ok: false, err: 'ID invalid.' } });
+  const f = _arg([args[1]]);
+  const num = (x) => { const n = parseFloat(x); return Number.isFinite(n) ? n : null; };
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // A régi sor ellenőrzése + jármű átvétele (tulajdon + még nyitva)
+    const old = await client.query(
+      `SELECT id, vehicle_id FROM vehicle_service_log
+       WHERE id = $1 AND company_id = $2 AND closed_at IS NULL FOR UPDATE`,
+      [id, cid]
+    );
+    if (!old.rowCount) {
+      await client.query('ROLLBACK'); client.release();
+      return res.json({ result: { ok: false, err: 'Nu a fost găsit sau este deja închis.' } });
+    }
+    const vehicleId = old.rows[0].vehicle_id;
+
+    const items = _normalizeServiceItems(f.items);
+    const svDate = f.service_date || new Date();
+    const svKm = num(f.km);
+    const svCost = num(f.cost_ron);
+    const svCat = f.category || 'karbantartas';
+    const svDesc = String(f.description || '').trim() || null;
+    const nextDate = (f.next_due_date && String(f.next_due_date).trim()) || null;
+    const nextKm = num(f.next_due_km);
+
+    // (b) Új szerviz-sor
+    const ins = await client.query(
+      `INSERT INTO vehicle_service_log
+         (company_id, vehicle_id, service_date, km, category, description, cost_ron,
+          next_due_date, next_due_km, items)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)
+       RETURNING id`,
+      [cid, vehicleId, svDate, svKm, svCat, svDesc, svCost,
+       nextDate, nextKm, JSON.stringify(items)]
+    );
+    const newId = ins.rows[0].id;
+
+    // (a) Régi sor lezárása — next_due_* nullázódik, hogy ne jelezzen tovább
+    await client.query(
+      `UPDATE vehicle_service_log
+       SET closed_at = NOW(),
+           closed_by_service_id = $3,
+           next_due_km = NULL,
+           next_due_date = NULL,
+           last_alert_at = NULL
+       WHERE id = $1 AND company_id = $2`,
+      [id, cid, newId]
+    );
+
+    await client.query('COMMIT');
+    client.release();
+
+    audit.fromReq(req, 'service.complete', 'vehicle_service_log', id,
+      { closed_by: newId, vehicle_id: vehicleId, item_count: items.length,
+        next_due_date: nextDate, next_due_km: nextKm });
+    return res.json({ result: { ok: true, closed_id: id, new_id: newId } });
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch (_) {}
+    try { client.release(); } catch (_) {}
+    console.error('serviceComplete hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
@@ -245,6 +426,7 @@ async function computeServiceDueAlerts(cid, opts) {
          FROM vehicle_service_log s
          JOIN vehicles v ON v.id = s.vehicle_id
          WHERE s.company_id = $1
+           AND s.closed_at IS NULL
            AND (s.next_due_km IS NOT NULL OR s.next_due_date IS NOT NULL)
          ORDER BY s.vehicle_id, s.service_date DESC NULLS LAST, s.id DESC
        ),

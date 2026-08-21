@@ -166,9 +166,37 @@
   // ════════════════════════════════════════════════════════
   //  2) SZERVIZ & KARBANTARTÁS
   // ════════════════════════════════════════════════════════
+  // A szerver által küldött fehérlista fallbackje (ha a serviceList
+  // válaszban nincs item_keys — pl. régi cache miatt).
+  var SVC_ITEM_KEYS_FALLBACK = [
+    'oil', 'oil_filter', 'fuel_filter', 'air_filter', 'pollen_filter',
+    'adblue_filter', 'air_dryer_filter', 'brake_pads', 'brake_disc',
+    'coolant', 'transmission_oil', 'differential_oil', 'tires',
+    'wipers', 'battery', 'timing_belt', 'other'
+  ];
+  var _svLastItems = [];   // a serviceList utolsó eredménye (a modal használja)
+  var _svItemKeys = SVC_ITEM_KEYS_FALLBACK.slice();
+  var _svModalItemId = null;   // épp nyitott sor id (Halasztás/Elvégezve modal)
+
   function serviceCats() {
     return [['olajcsere', t('fe.sv.cat.oil')], ['gumi', t('fe.sv.cat.tire')], ['javitas', t('fe.sv.cat.repair')],
       ['karbantartas', t('fe.sv.cat.maint')], ['egyeb', t('fe.sv.cat.other')]];
+  }
+
+  // Segéd: egy szerviz-tétel keresése — először a szerviz-napló betöltött
+  // listájából, aztán a vezérlőpult riasztás-listájából (dashboardról nyílt modal).
+  function _svFindItem(id) {
+    var idN = parseInt(id, 10);
+    for (var i = 0; i < _svLastItems.length; i++) {
+      if (parseInt(_svLastItems[i].id, 10) === idN) return _svLastItems[i];
+    }
+    // Fallback: dashboard-riasztás cache
+    if (window._svAlertCache && Array.isArray(window._svAlertCache)) {
+      for (var j = 0; j < window._svAlertCache.length; j++) {
+        if (parseInt(window._svAlertCache[j].id, 10) === idN) return window._svAlertCache[j];
+      }
+    }
+    return null;
   }
 
   function loadServiceLog() {
@@ -180,6 +208,8 @@
       if (!r || !r.ok) { box.innerHTML = '<div class="text-muted" style="padding:20px;">' + esc((r && r.err) || t('fe.errMigrate')) + '</div>'; return; }
       var vehicles = (Array.isArray(rs[1]) ? rs[1] : []);
       var items = r.items || [];
+      _svLastItems = items;   // a Halasztás/Elvégezve modal használja
+      _svItemKeys = (r.item_keys && r.item_keys.length) ? r.item_keys : SVC_ITEM_KEYS_FALLBACK;
       var catLbl = {}; serviceCats().forEach(function (c) { catLbl[c[0]] = c[1]; });
 
       var formHtml =
@@ -200,16 +230,54 @@
         + '</div>';
 
       var rows = items.map(function (it) {
-        return '<tr>'
+        var isClosed = !!it.closed_at;
+        var hasOpen = !isClosed && (it.next_due_date || it.next_due_km != null);
+        var descHtml = esc(it.description || '—');
+        // Pipált tételek badge (rövid) — teljes lista tooltipben
+        if (Array.isArray(it.items) && it.items.length) {
+          var lbls = it.items.map(function (x) {
+            var lb = t('fe.sv.item.' + x.key) || x.key;
+            return x.note ? lb + ' (' + esc(x.note) + ')' : lb;
+          });
+          descHtml += ' <span class="sv-items-badge" title="' + esc(lbls.join(', ')) + '" '
+            + 'style="display:inline-block;padding:1px 8px;margin-left:6px;background:rgba(34,197,94,0.15);color:#16a34a;'
+            + 'border:1px solid rgba(34,197,94,0.35);border-radius:999px;font-size:11px;font-weight:600;">'
+            + '✓ ' + it.items.length + ' ' + t('fe.sv.itemsShort')
+            + '</span>';
+        }
+        if (isClosed) {
+          descHtml += ' <span class="sv-closed-badge" style="display:inline-block;padding:1px 8px;margin-left:6px;'
+            + 'background:rgba(148,163,184,0.2);color:#64748b;border:1px solid rgba(148,163,184,0.4);'
+            + 'border-radius:999px;font-size:11px;font-weight:600;">🔒 ' + t('fe.sv.closed') + '</span>';
+        }
+        if ((it.postpone_count || 0) > 0 && !isClosed) {
+          descHtml += ' <span class="sv-post-badge" title="' + esc(t('fe.sv.postponeCountTip')) + '" '
+            + 'style="display:inline-block;padding:1px 8px;margin-left:6px;background:rgba(245,158,11,0.15);color:#d97706;'
+            + 'border:1px solid rgba(245,158,11,0.35);border-radius:999px;font-size:11px;font-weight:600;">'
+            + '🕐 ' + it.postpone_count + '×</span>';
+        }
+        var actions = '';
+        if (hasOpen) {
+          actions = '<button class="btn ghost" style="padding:4px 10px;font-size:12px;margin-right:4px;" '
+            + 'onclick="FleetExtra.svOpenPostpone(' + it.id + ')">🕐 ' + t('fe.sv.postponeBtn') + '</button>'
+            + '<button class="btn primary" style="padding:4px 10px;font-size:12px;margin-right:4px;" '
+            + 'onclick="FleetExtra.svOpenComplete(' + it.id + ')">✅ ' + t('fe.sv.doneBtn') + '</button>';
+        }
+        actions += '<button class="btn danger" style="padding:4px 10px;font-size:12px;" '
+          + 'onclick="FleetExtra.svDelete(' + it.id + ')">✕</button>';
+
+        return '<tr' + (isClosed ? ' style="opacity:0.75;"' : '') + '>'
           + '<td><b class="text-primary">' + esc(it.rendszam) + '</b></td>'
           + '<td>' + d2(it.service_date) + '</td>'
           + '<td style="text-align:right;">' + (it.km != null ? n2(it.km, 0) : '—') + '</td>'
           + '<td>' + (catLbl[it.category] || esc(it.category || '—')) + '</td>'
-          + '<td>' + esc(it.description || '—') + '</td>'
+          + '<td>' + descHtml + '</td>'
           + '<td style="text-align:right;font-weight:700;">' + (it.cost_ron != null ? n2(it.cost_ron, 0) : '—') + '</td>'
           + '<td class="text-muted" style="font-size:12px;">'
-          + (it.next_due_date ? '📅 ' + d2(it.next_due_date) : '') + (it.next_due_km ? ' 🛣 ' + n2(it.next_due_km, 0) + ' km' : '') + '</td>'
-          + '<td style="text-align:right;"><button class="btn danger" style="padding:4px 10px;font-size:12px;" onclick="FleetExtra.svDelete(' + it.id + ')">✕</button></td>'
+          + (it.next_due_date ? '📅 ' + d2(it.next_due_date) : '') + (it.next_due_km ? ' 🛣 ' + n2(it.next_due_km, 0) + ' km' : '')
+          + (!it.next_due_date && !it.next_due_km ? '—' : '')
+          + '</td>'
+          + '<td style="text-align:right;white-space:nowrap;">' + actions + '</td>'
           + '</tr>';
       }).join('') || '<tr><td colspan="8" class="text-muted" style="text-align:center;padding:18px;">' + t('fe.sv.noItems') + '</td></tr>';
 
@@ -246,6 +314,236 @@
     gas('serviceDelete', [id]).then(function (r) {
       if (r && r.ok) { toast(t('common.deleted'), 'ok'); loadServiceLog(); }
       else toast((r && r.err) || t('common.error'), 'err');
+    });
+  }
+
+  // ────────────────────────────────────────────────────────
+  //  🔧 Szerviz esedékesség — DÖNTÉS modal (Halasztás vagy Elvégezve)
+  //  Egyetlen közös overlay (#svAlertModal), a fejlécen két nagy gomb;
+  //  az egyik kiválasztása felnyitja a hozzá tartozó formot ugyanott.
+  //  Onnan a szerver a rezidens `servicePostpone` / `serviceComplete` RPC-t
+  //  hívja; sikeres válasz után a dashboard sáv + szerviz-napló újratöltődik.
+  // ────────────────────────────────────────────────────────
+  function _svEnsureModal() {
+    if (document.getElementById('svAlertModal')) return;
+    // A projekt konvenciója: .modal-back a szülő overlay (.open osztály nyitja),
+    // belül .modal.glass a tényleges tartalom-doboz.
+    var m = document.createElement('div');
+    m.id = 'svAlertModal';
+    m.className = 'modal-back';
+    m.setAttribute('role', 'dialog');
+    m.innerHTML =
+      '<div class="modal glass" style="width:min(640px,100%);max-height:92vh;overflow-y:auto;padding:22px;">'
+    +   '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">'
+    +     '<h3 id="svamTitle" class="text-primary" style="margin:0;font-size:18px;">🔧</h3>'
+    +     '<button class="btn ghost" style="padding:4px 10px;" onclick="FleetExtra.svCloseModal()">✕</button>'
+    +   '</div>'
+    +   '<div id="svamInfo" class="text-muted" style="font-size:13px;margin-bottom:12px;"></div>'
+    +   '<div id="svamBody"></div>'
+    + '</div>';
+    // A háttérre kattintva (de a modal tartalmára nem) bezár:
+    m.addEventListener('click', function (ev) { if (ev.target === m) svCloseModal(); });
+    document.body.appendChild(m);
+  }
+
+  function svCloseModal() {
+    var m = document.getElementById('svAlertModal');
+    if (m) m.classList.remove('open');
+    _svModalItemId = null;
+  }
+
+  function _svOpen(id) {
+    _svEnsureModal();
+    var it = _svFindItem(id);
+    if (!it) { toast(t('common.notFound') || 'Nu a fost găsit', 'err'); return null; }
+    _svModalItemId = parseInt(id, 10);
+    var m = document.getElementById('svAlertModal');
+    m.classList.add('open');
+    var info = document.getElementById('svamInfo');
+    var infoBits = [];
+    if (it.rendszam) infoBits.push('🚛 <b class="text-primary">' + esc(it.rendszam) + '</b>');
+    if (it.marca || it.tip) infoBits.push(esc([it.marca, it.tip].filter(Boolean).join(' ')));
+    // Az esedékesség: km-alapú (kmLeft) vagy dátum-alapú
+    if (it.km_left != null) {
+      var s = it.km_left < 0
+        ? '<span style="color:var(--status-danger);font-weight:700;">' + t('fe.dash.kmOver', { n: Math.abs(it.km_left).toLocaleString('hu-HU') }) + '</span>'
+        : '<span style="color:var(--status-warn);font-weight:700;">' + t('fe.dash.kmLeft', { n: it.km_left.toLocaleString('hu-HU') }) + '</span>';
+      infoBits.push(s);
+    } else if (it.days_left != null) {
+      var d = it.days_left < 0
+        ? '<span style="color:var(--status-danger);font-weight:700;">' + t('fe.dash.expired') + '</span>'
+        : '<span style="color:var(--status-warn);font-weight:700;">' + t('fe.dash.days', { n: it.days_left }) + '</span>';
+      infoBits.push(d);
+    }
+    if (it.next_due_km != null) infoBits.push(t('fe.sv.currentNextKm') + ': <b>' + n2(it.next_due_km, 0) + ' km</b>');
+    if (it.next_due_date) infoBits.push(t('fe.sv.currentNextDate') + ': <b>' + d2(it.next_due_date) + '</b>');
+    info.innerHTML = infoBits.join(' · ');
+    return it;
+  }
+
+  // A "chip"-re (dashboard) kattintva megnyílik a döntés-választó:
+  // egy fejléc + két nagy gomb (Halasztás / Elvégezve).
+  function svOpenDecide(id) {
+    var it = _svOpen(id); if (!it) return;
+    document.getElementById('svamTitle').innerHTML = '🔧 ' + t('fe.sv.decideTitle');
+    document.getElementById('svamBody').innerHTML =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px;">'
+    +   '<button class="btn ghost" style="padding:22px 12px;font-size:14px;font-weight:700;" '
+    +     'onclick="FleetExtra.svOpenPostpone(' + _svModalItemId + ')">🕐 ' + t('fe.sv.postponeBtn')
+    +     '<div class="text-muted" style="font-weight:400;font-size:12px;margin-top:4px;">' + t('fe.sv.postponeHint') + '</div></button>'
+    +   '<button class="btn primary" style="padding:22px 12px;font-size:14px;font-weight:700;" '
+    +     'onclick="FleetExtra.svOpenComplete(' + _svModalItemId + ')">✅ ' + t('fe.sv.doneBtn')
+    +     '<div style="font-weight:400;font-size:12px;margin-top:4px;opacity:0.85;">' + t('fe.sv.doneHint') + '</div></button>'
+    + '</div>';
+  }
+
+  // ── Halasztás form ─────────────────────────────────────
+  function svOpenPostpone(id) {
+    var it = _svOpen(id); if (!it) return;
+    document.getElementById('svamTitle').innerHTML = '🕐 ' + t('fe.sv.postponeTitle');
+    // Az alap-értékek a jelenlegi esedékességből + presetek biztosítanak gyors kitöltést.
+    var curDate = it.next_due_date ? String(it.next_due_date).slice(0, 10) : '';
+    var curKm = (it.next_due_km != null ? it.next_due_km : '');
+    document.getElementById('svamBody').innerHTML =
+      '<div class="field" style="margin:0 0 10px;"><label>' + t('fe.sv.newDate') + '</label>'
+    +   '<input class="input" id="svPostDate" type="date" value="' + esc(curDate) + '"></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">'
+    +   '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="FleetExtra.svPostDatePreset(7)">+7</button>'
+    +   '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="FleetExtra.svPostDatePreset(14)">+14</button>'
+    +   '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="FleetExtra.svPostDatePreset(30)">+30 ' + t('fe.sv.days') + '</button>'
+    +   '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="FleetExtra.svPostDatePreset(60)">+60</button>'
+    +   '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="FleetExtra.svPostDatePreset(90)">+90</button>'
+    + '</div>'
+    + '<div class="field" style="margin:0 0 10px;"><label>' + t('fe.sv.newKm') + '</label>'
+    +   '<input class="input" id="svPostKm" type="number" value="' + esc(String(curKm)) + '" placeholder="pl. 555000"></div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">'
+    +   '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="FleetExtra.svPostKmPreset(1000)">+1 000</button>'
+    +   '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="FleetExtra.svPostKmPreset(2000)">+2 000</button>'
+    +   '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="FleetExtra.svPostKmPreset(5000)">+5 000</button>'
+    +   '<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="FleetExtra.svPostKmPreset(10000)">+10 000</button>'
+    + '</div>'
+    + '<div class="field" style="margin:0 0 12px;"><label>' + t('fe.sv.postponeNote') + '</label>'
+    +   '<input class="input" id="svPostNote" placeholder="' + esc(t('fe.sv.postponeNotePh')) + '"></div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;">'
+    +   '<button class="btn ghost" onclick="FleetExtra.svCloseModal()">' + t('common.cancel') + '</button>'
+    +   '<button class="btn primary" onclick="FleetExtra.svSubmitPostpone()">🕐 ' + t('fe.sv.postponeSubmit') + '</button>'
+    + '</div>';
+  }
+
+  function svPostDatePreset(days) {
+    var el = document.getElementById('svPostDate'); if (!el) return;
+    var base = el.value ? new Date(el.value + 'T00:00:00') : new Date();
+    // Ha üres volt, mai naptól számít; ha volt érték, ahhoz ad hozzá.
+    if (isNaN(base.getTime())) base = new Date();
+    base.setDate(base.getDate() + parseInt(days, 10));
+    el.value = base.toISOString().slice(0, 10);
+  }
+  function svPostKmPreset(km) {
+    var el = document.getElementById('svPostKm'); if (!el) return;
+    var cur = parseInt(el.value, 10);
+    if (!isFinite(cur)) cur = 0;
+    el.value = String(cur + parseInt(km, 10));
+  }
+
+  function svSubmitPostpone() {
+    if (!_svModalItemId) return;
+    var d = (document.getElementById('svPostDate') || {}).value || null;
+    var km = (document.getElementById('svPostKm') || {}).value || null;
+    var note = (document.getElementById('svPostNote') || {}).value || '';
+    if (!d && !km) { toast(t('fe.sv.needDateOrKm'), 'err'); return; }
+    gas('servicePostpone', [_svModalItemId, { next_due_date: d, next_due_km: km, note: note }]).then(function (r) {
+      if (!r || !r.ok) { toast((r && r.err) || t('common.error'), 'err'); return; }
+      toast(t('fe.sv.postponed'), 'ok');
+      svCloseModal();
+      if (typeof renderDashServiceAlert === 'function') renderDashServiceAlert();
+      // Ha nyitva van a szerviz-napló, frissítjük — másképp majd megnyitáskor.
+      if (document.getElementById('serviceLogBox')) loadServiceLog();
+    });
+  }
+
+  // ── Elvégezve form ─────────────────────────────────────
+  function svOpenComplete(id) {
+    var it = _svOpen(id); if (!it) return;
+    document.getElementById('svamTitle').innerHTML = '✅ ' + t('fe.sv.doneTitle');
+    var today = new Date().toISOString().slice(0, 10);
+    // Új esedékesség preset: dátum +365 nap, km alapból +40 000 az aktuálisból
+    // (a felhasználó felülírhatja; a szerver csak a beírt értéket használja).
+    var suggestKm = '';
+    if (it.current_km != null) suggestKm = String(parseInt(it.current_km, 10) + 40000);
+    else if (it.next_due_km != null) suggestKm = String(parseInt(it.next_due_km, 10) + 40000);
+    var oneYear = new Date(); oneYear.setDate(oneYear.getDate() + 365);
+    var suggestDate = oneYear.toISOString().slice(0, 10);
+
+    var itemChecks = _svItemKeys.filter(function (k) { return k !== 'other'; }).map(function (k) {
+      return '<label style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--glass-border-dark,rgba(255,255,255,0.1));border-radius:8px;cursor:pointer;background:rgba(255,255,255,0.02);">'
+        + '<input type="checkbox" class="sv-do-chk" value="' + k + '" style="margin:0;">'
+        + '<span style="font-size:13px;">' + esc(t('fe.sv.item.' + k) || k) + '</span></label>';
+    }).join('');
+
+    document.getElementById('svamBody').innerHTML =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">'
+    +   '<div class="field" style="margin:0;"><label>' + t('fe.sv.date') + '</label>'
+    +     '<input class="input" id="svDoDate" type="date" value="' + today + '"></div>'
+    +   '<div class="field" style="margin:0;"><label>' + t('fe.sv.km') + '</label>'
+    +     '<input class="input" id="svDoKm" type="number" placeholder="pl. 450000"></div>'
+    +   '<div class="field" style="margin:0;grid-column:span 2;"><label>' + t('fe.sv.desc') + '</label>'
+    +     '<input class="input" id="svDoDesc" placeholder="' + esc(t('fe.sv.descPh')) + '"></div>'
+    +   '<div class="field" style="margin:0;"><label>' + t('fe.sv.cost') + '</label>'
+    +     '<input class="input" id="svDoCost" type="number" step="0.01" placeholder="0"></div>'
+    +   '<div class="field" style="margin:0;"><label>' + t('fe.sv.type') + '</label><select class="select" id="svDoCat">'
+    +     serviceCats().map(function (c) { return '<option value="' + c[0] + '">' + esc(c[1]) + '</option>'; }).join('')
+    +   '</select></div>'
+    + '</div>'
+    + '<div style="margin-bottom:6px;font-weight:600;font-size:13px;">' + t('fe.sv.itemsHead') + ':</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px;margin-bottom:10px;">'
+    +   itemChecks
+    + '</div>'
+    + '<div class="field" style="margin:0 0 14px;"><label>' + t('fe.sv.item.other') + ' — ' + t('fe.sv.otherNote') + '</label>'
+    +   '<input class="input" id="svDoOtherNote" placeholder="' + esc(t('fe.sv.otherNotePh')) + '"></div>'
+    + '<div style="border-top:1px dashed var(--glass-border-dark,rgba(255,255,255,0.15));padding-top:12px;margin-bottom:12px;">'
+    +   '<div style="font-weight:600;font-size:13px;margin-bottom:6px;">📌 ' + t('fe.sv.nextHead') + '</div>'
+    +   '<div class="text-muted" style="font-size:12px;margin-bottom:8px;">' + t('fe.sv.nextHint') + '</div>'
+    +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'
+    +     '<div class="field" style="margin:0;"><label>' + t('fe.sv.nextDate') + '</label>'
+    +       '<input class="input" id="svDoNextDate" type="date" value="' + suggestDate + '"></div>'
+    +     '<div class="field" style="margin:0;"><label>' + t('fe.sv.nextKm') + '</label>'
+    +       '<input class="input" id="svDoNextKm" type="number" value="' + esc(suggestKm) + '" placeholder="pl. 490000"></div>'
+    +   '</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;">'
+    +   '<button class="btn ghost" onclick="FleetExtra.svCloseModal()">' + t('common.cancel') + '</button>'
+    +   '<button class="btn primary" onclick="FleetExtra.svSubmitComplete()">✅ ' + t('fe.sv.doneSubmit') + '</button>'
+    + '</div>';
+  }
+
+  function svSubmitComplete() {
+    if (!_svModalItemId) return;
+    var items = [];
+    var checks = document.querySelectorAll('#svAlertModal .sv-do-chk');
+    for (var i = 0; i < checks.length; i++) {
+      if (checks[i].checked) items.push({ key: checks[i].value });
+    }
+    var otherNote = ((document.getElementById('svDoOtherNote') || {}).value || '').trim();
+    if (otherNote) items.push({ key: 'other', note: otherNote });
+    var payload = {
+      service_date: (document.getElementById('svDoDate') || {}).value || null,
+      km:           (document.getElementById('svDoKm') || {}).value || null,
+      description:  (document.getElementById('svDoDesc') || {}).value || null,
+      cost_ron:     (document.getElementById('svDoCost') || {}).value || null,
+      category:     (document.getElementById('svDoCat') || {}).value || null,
+      next_due_date:(document.getElementById('svDoNextDate') || {}).value || null,
+      next_due_km:  (document.getElementById('svDoNextKm') || {}).value || null,
+      items: items
+    };
+    if (!payload.next_due_date && !payload.next_due_km) {
+      if (!confirm(t('fe.sv.noNextConfirm'))) return;
+    }
+    gas('serviceComplete', [_svModalItemId, payload]).then(function (r) {
+      if (!r || !r.ok) { toast((r && r.err) || t('common.error'), 'err'); return; }
+      toast(t('fe.sv.completed'), 'ok');
+      svCloseModal();
+      if (typeof renderDashServiceAlert === 'function') renderDashServiceAlert();
+      if (document.getElementById('serviceLogBox')) loadServiceLog();
     });
   }
 
@@ -569,7 +867,12 @@
     if (!box) return;
     gas('getServiceDueAlerts').then(function (r) {
       if (!r || !r.ok || !(r.items || []).length) { box.innerHTML = ''; return; }
+      // A modalnak (svOpenPostpone/Complete) forrás — a lista teljes tartalma,
+      // hogy a szerviz-napló betöltése nélkül is elérje.
+      window._svAlertCache = r.items;
       var over = r.items.filter(function (i) { return (i.km_left != null && i.km_left < 0) || (i.days_left != null && i.days_left < 0); });
+      // Minden érintett jármű egy KATTINTHATÓ chip: rákattintva a szerviz-modal
+      // nyílik erre a konkrét szervizre (Halasztás vagy Elvégezve).
       var rows = r.items.slice(0, 6).map(function (i) {
         var txt, col;
         if (i.km_left != null) {
@@ -577,14 +880,20 @@
           else { txt = t('fe.dash.kmLeft', { n: i.km_left.toLocaleString('hu-HU') }); col = 'var(--status-warn)'; }
         } else if (i.days_left < 0) { txt = t('fe.dash.expired'); col = 'var(--status-danger)'; }
         else { txt = t('fe.dash.days', { n: i.days_left }); col = 'var(--status-warn)'; }
-        return '<span style="white-space:nowrap;font-size:12px;">🔧 <b>' + esc(i.rendszam || '') + '</b> '
+        return '<span class="sv-chip" title="' + esc(t('fe.dash.chipTip')) + '" '
+          + 'style="white-space:nowrap;font-size:12px;padding:4px 8px;border-radius:8px;'
+          + 'background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);cursor:pointer;" '
+          + 'onclick="event.stopPropagation();FleetExtra.svOpenDecide(' + i.id + ')">'
+          + '🔧 <b>' + esc(i.rendszam || '') + '</b> '
           + '<span style="color:' + col + ';font-weight:700;">' + txt + '</span></span>';
-      }).join(' · ');
+      }).join(' ');
       box.innerHTML = '<div class="glass" style="padding:12px 16px;margin-bottom:16px;border:1px solid '
-        + (over.length ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.4)') + ';cursor:pointer;display:flex;gap:10px;align-items:center;flex-wrap:wrap;" onclick="activateTab(\'service-log\')">'
-        + '<span style="font-size:18px;">🔧</span>'
-        + '<b class="text-primary" style="font-size:13px;">' + t('fe.dash.serviceDue', { n: r.items.length }) + ':</b> ' + rows
-        + ' <span class="text-muted" style="font-size:12px;margin-left:auto;">' + t('fe.dash.toService') + '</span></div>';
+        + (over.length ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.4)') + ';display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
+        + '<span style="font-size:18px;cursor:pointer;" onclick="activateTab(\'service-log\')">🔧</span>'
+        + '<b class="text-primary" style="font-size:13px;cursor:pointer;" onclick="activateTab(\'service-log\')">'
+        + t('fe.dash.serviceDue', { n: r.items.length }) + ':</b> ' + rows
+        + ' <span class="text-muted" style="font-size:12px;margin-left:auto;cursor:pointer;" onclick="activateTab(\'service-log\')">'
+        + t('fe.dash.toService') + '</span></div>';
     }).catch(function () { box.innerHTML = ''; });
   }
 
@@ -600,6 +909,12 @@
     dashServiceAlert: renderDashServiceAlert,
     expEntityChange: expEntityChange, expSave: expSave, expEdit: expEdit, expDelete: expDelete,
     svSave: svSave, svDelete: svDelete,
+    // Szerviz-esedékesség modal (Halasztás / Elvégezve)
+    svOpenDecide: svOpenDecide,
+    svOpenPostpone: svOpenPostpone, svPostDatePreset: svPostDatePreset, svPostKmPreset: svPostKmPreset,
+    svSubmitPostpone: svSubmitPostpone,
+    svOpenComplete: svOpenComplete, svSubmitComplete: svSubmitComplete,
+    svCloseModal: svCloseModal,
     dcLoad: dcLoad, dcSaveRates: dcSaveRates, advSave: advSave, advDelete: advDelete,
     fcParse: fcParse, fcImport: fcImport,
   };
