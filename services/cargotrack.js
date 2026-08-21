@@ -97,6 +97,25 @@ async function fetchLatestInWindow(apiKey, objectId, hours) {
 // Aktuális állapot (v2): pozíció + üzemanyag + fogyasztás + km — a LEGFRISSEBB rekord.
 // Előbb rövid, friss ablakot kérünk (hogy aktív járműnél tényleg az aktuális pozíció
 // jöjjön), és csak ha üres, tágítunk fokozatosan a teljes visszatekintésig.
+// Akkumulátor-feszültség kinyerése defenzív mezőnév-listával — a Ruptela
+// eszközök eszközfüggően eltérő kulcsokon adják vissza (external_voltage,
+// power_supply_voltage stb.). Ha egyik sem jön, null → a felület elrejti.
+// Elsőbbség: konkrét név → általánosabb; a calculated_inputs mellett a
+// raw_inputs bemenetet is átnézzük fallbackként.
+function _pickVoltage(o) {
+  if (!o) return null;
+  const keys = [
+    'external_voltage', 'power_supply_voltage', 'ext_voltage', 'main_voltage',
+    'vehicle_battery_voltage', 'battery_voltage_ext',
+    'battery_voltage', 'voltage',
+  ];
+  for (const k of keys) {
+    const v = o[k];
+    if (v != null && isFinite(parseFloat(v))) return parseFloat(v);
+  }
+  return null;
+}
+
 async function getLatestStatus(apiKey, objectId, lookbackHours = 6) {
   let last = await fetchLatestInWindow(apiKey, objectId, 0.5);   // 30 perc (aktív jármű)
   if (!last) last = await fetchLatestInWindow(apiKey, objectId, 2);            // 2 óra
@@ -104,6 +123,7 @@ async function getLatestStatus(apiKey, objectId, lookbackHours = 6) {
   if (!last) return null;
   const pos = last.position || {};
   const calc = (last.inputs && last.inputs.calculated_inputs) || last.calculated_inputs || {};
+  const raw  = (last.inputs && last.inputs.raw_inputs) || last.raw_inputs || {};
   return {
     object_id: last.object_id,
     datetime: last.datetime,
@@ -116,6 +136,8 @@ async function getLatestStatus(apiKey, objectId, lookbackHours = 6) {
     fuel_consumption: calc.fuel_consumption, // fogyasztás
     mileage: calc.mileage,
     rpm: calc.rpm,
+    // Jármű akku-feszültsége (12V-os autó vagy 24V-os teherautó — a nyers V)
+    battery_voltage: _pickVoltage(calc) != null ? _pickVoltage(calc) : _pickVoltage(raw),
   };
 }
 

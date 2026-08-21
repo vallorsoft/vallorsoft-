@@ -540,6 +540,8 @@ handlers.getCurrentGpsReadings = async function (req, res, args) {
         ok: true, available: true,
         mileage: st.mileage,       // km-óra állás (nyers, korrekció nélkül — a km-nél nincs eltérés)
         fuel_level: fuel_level,    // MÁR korrigált — ezt írja be a sofőr menetlevele
+        battery_voltage: (st.battery_voltage != null && isFinite(parseFloat(st.battery_voltage)))
+          ? parseFloat(st.battery_voltage) : null,   // jármű akku V (nyers; a felület elrejti ha null)
         datetime: st.datetime,
       } });
     } catch (err) {

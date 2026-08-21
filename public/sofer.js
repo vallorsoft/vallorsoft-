@@ -3454,6 +3454,44 @@ function loadMyAssignedVehicle() {
       + rem
       + '</div></div>';
     box.style.display = '';
+    // Élő akku-feszültség lekérése háttérben (best-effort — a kártya már látszik).
+    // A CargoTrack eszközfüggően adja vissza; ha nincs, csendben elmarad.
+    _loadMyVehicleBattery(v.rendszam_camion);
+  }).catch(function() {});
+}
+
+// ─── Élő akku-feszültség a jármű-kártyához ──────────────────────
+// A `getCurrentGpsReadings` handler visszaadja a jármű-akku V értékét
+// (eszközfüggő; ha a CargoTrack nem adja, `battery_voltage=null`, semmit
+// sem mutatunk). Kettős küszöb: >20V → 24V-os teherautó (warn <22.5,
+// danger <22.0), különben 12V-os (warn <12.0, danger <11.5). A cége +
+// tulajdon-ellenőrzés szerver-oldalon (sofőr csak saját autójára kap).
+function _loadMyVehicleBattery(plate) {
+  if (!plate) return;
+  fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'getCurrentGpsReadings', arguments: [plate] }) })
+  .then(function(r) { return r.json(); }).then(function(d) {
+    var res = d && d.result;
+    if (!res || !res.ok || !res.available) return;
+    var v = (res.battery_voltage != null) ? parseFloat(res.battery_voltage) : null;
+    if (v == null || !isFinite(v)) return;
+    var box = document.getElementById('myVehicleBox');
+    if (!box || box.style.display === 'none') return;
+    var inner = box.firstElementChild;
+    if (!inner) return;
+    var isTruck = v > 20;                                   // 24V rendszer heurisztika
+    var warn = isTruck ? v < 22.5 : v < 12.0;
+    var danger = isTruck ? v < 22.0 : v < 11.5;
+    var color = danger ? '#dc2626' : (warn ? '#d97706' : '#0f172a');
+    var warnTxt = (warn || danger) ? ' <span style="color:#d97706;font-size:12px;">— ' + esc(t('sof.battWarn')) + '</span>' : '';
+    // Ha már van akku-sor (pl. nyelvváltás után újrafutott), leváltjuk.
+    var old = inner.querySelector('.sof-batt-line');
+    if (old) old.parentNode.removeChild(old);
+    var line = document.createElement('div');
+    line.className = 'sof-batt-line';
+    line.style.cssText = 'margin-top:6px;font-size:13px;color:#334155;';
+    line.innerHTML = '🔋 <b style="color:' + color + ';">' + v.toFixed(1) + ' V</b>' + warnTxt;
+    inner.appendChild(line);
   }).catch(function() {});
 }
 

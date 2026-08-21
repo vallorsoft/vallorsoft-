@@ -14,6 +14,27 @@
 
 ---
 
+## 2026-08-21 — Sofőr főoldal: élő jármű-akkumulátor feszültség a kiosztott jármű kártyán (CargoTrack GPS-ből)
+
+### Miért
+A sofőr csak az útközben derül ki, ha az akkumulátor gyengül (téli hidegben kritikus). A CargoTrack (Ruptela FM-Track) `coordinates` végpont a `calculated_inputs`-ban visszaadja a jármű akku-feszültségét — csak nem húztuk ki. Egy sor a saját jármű-kártyán elég ahhoz, hogy a sofőr induláskor lássa („🔋 12.4 V"), gyenge érték esetén figyelmeztetést kapjon.
+
+### Mit
+- **`services/cargotrack.js` `getLatestStatus` bővítés** — új `battery_voltage` mező a válaszban. Defenzív mezőnév-lista (`external_voltage`/`power_supply_voltage`/`ext_voltage`/`main_voltage`/`vehicle_battery_voltage`/`battery_voltage_ext`/`battery_voltage`/`voltage`) mind a `calculated_inputs` mind a `raw_inputs` bemenetből — a Ruptela eszközök eszközfüggően eltérő kulcsokon adják vissza. Ha egyik sem jön → null → a felület elrejti.
+- **`lib/vehiclePositions.js` `getReadingsForPlate`** — átadja a `battery_voltage`-et; az `available` gate kiterjed rá (voltage-only eszköz sem esik ki „nem elérhető"-re).
+- **`handlers/orders.js` `getCurrentGpsReadings`** — visszaadja a nyers `battery_voltage`-et (nincs korrekció, mint a fuel-nél; a kliens dönti el a küszöböt).
+- **`public/sofer.js`** — új `_loadMyVehicleBattery(plate)` a `loadMyAssignedVehicle` VÉGÉN meghívva (best-effort, a jármű-kártya már látszik amikor kér); ha van érték, egy `.sof-batt-line` sor kerül a kártya végére: 🔋 X.X V, kettős küszöb-heurisztikával (>20V → 24V teherautó rendszer, warn <22.5V / danger <22.0V; ≤20V → 12V rendszer, warn <12.0V / danger <11.5V), színes érték + „acumulator slab" figyelmeztetés-badge. Ha a CargoTrack nem adja az értéket (eszközfüggő), a kártya változatlan.
+- **Új i18n kulcs `sof.battWarn`** (RO „acumulator slab" / HU „gyenge akkumulátor"); cache-bust `sofer.js` + `i18n.js` `?v=20260821batt`.
+
+### Nem érinti
+- Az admin/manager Vezérlőpult térképe és a `getPositions` (nem hozza a voltage-et — a Vezérlőpult célja a pozíció-áttekintés, nem az eszköz-diagnosztika). A menetlevél záró km / fuel-lekérés érintetlen.
+- Szerep-kapu változatlan: sofőr CSAK a saját kiosztott vontatójára kap voltage-et; admin/manager bármelyik cégen belüli vontatóra. Nincs cross-tenant szivárgás.
+
+### Teszt
+`getReadingsForPlate` mockolt a meglévő `sofer-handlers.test.js`-ben (a `battery_voltage` opcionális) → **947 Jest zöld** (45 skip valós-DB). Új teszt nem kellett; a felület a null-t elrejti (a régi mockok null-t adnak → a kártyához nem kerül új sor).
+
+---
+
 ## 2026-08-20 — UIT-kód egyszerűsítés: 1 kitölthető mező kiíráskor + több UIT / fuvar + 📷 fotó→AI kiolvasás + képmegőrzés
 
 ### Miért

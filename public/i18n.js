@@ -2801,6 +2801,7 @@
     'sof.noWaybillOrders': { hu: 'Nincs menetlevélbe vehető fuvar.', ro: 'Nu există curse disponibile pentru foaia de parcurs.' },
     'sof.pickAtLeastOne': { hu: 'Jelölj be legalább egy fuvart!', ro: 'Bifează cel puțin o cursă!' },
     'sof.myVehicle': { hu: 'Nekem kiosztott jármű', ro: 'Vehiculul meu alocat' },
+    'sof.battWarn': { hu: 'gyenge akkumulátor', ro: 'acumulator slab' },
     'sof.backExitHint': { hu: 'Nyomd meg mégegyszer a kilépéshez', ro: 'Apasă din nou pentru ieșire' },
     'sof.noOrderWaybill': { hu: '➕ Menetlevél fuvar nélkül', ro: '➕ Foaie de parcurs fără cursă' },
     'sof.createWaybill': { hu: '📄 Menetlevél létrehozása', ro: '📄 Creează foaie de parcurs' },
