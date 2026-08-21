@@ -144,19 +144,51 @@ process.on('unhandledRejection', () => {});
 // ================================================================
 //  fuvarCreate + picker + apply-diff + validáció
 // ================================================================
-describe('fuvarCreate + picker fluxus', () => {
-  test('nincs draft → wbLocDialog + picker megjelenik', async () => {
+describe('fuvarCreate + auto-collect fluxus', () => {
+  // 2026-08-21: fresh menetlevél NEM nyit pickert; a Plecare után
+  // automatikusan begyűjti az elvégzett (done_at NOT NULL, waybilled_at IS
+  // NULL) stopokat, és egyenesen step2-re lép.
+  test('nincs draft → wbLocDialog + auto-collect + fuvarStep2 (picker NEM nyílik)', async () => {
     const dialogs = [];
     const sb = load({ confirm: (m) => { dialogs.push(m); return false; } });
     sb.wbLocDialog = (kind, cb) => { dialogs.push('wb:' + kind); cb({ loc: 'Garaj', date: '2026-07-01', time: '08:00' }); };
-    sb.fuvarStep2 = () => {};
-    sb._soferOrdersCache = [{ id: 'X', client: 'A', loc_incarcare: 'p', loc_descarcare: 'q', status: 'Alocat', waybill_visible: true, waybill_phase: 'loading' }];
+    let step2Called = false;
+    sb.fuvarStep2 = () => { step2Called = true; };
+    sb._soferOrdersCache = [{
+      id: 'X', client: 'A', loc_incarcare: 'p', loc_descarcare: 'q',
+      status: 'In Curs', waybill_visible: true, waybill_phase: 'loading',
+      stops: [
+        { id: 's1', kind: 'pickup',   stop_index: 0, loc: 'p', done_at: '2026-07-01T09:00:00', waybilled_at: null },
+        { id: 's2', kind: 'delivery', stop_index: 0, loc: 'q', done_at: null,                    waybilled_at: null }
+      ]
+    }];
     sb.fuvarCreate();
     expect(dialogs).toContain('wb:start');
-    expect(sb.document._registry.orderPickerModal.style.display).toBe('flex');
+    expect(step2Called).toBe(true);
+    // A picker NEM nyílik meg fresh-módban
+    expect(sb.document.getElementById('orderPickerModal').style.display).not.toBe('flex');
+    // Auto-collect az elvégzett pickup-ot felvette
+    expect(sb._selectedOrderIds).toEqual(['X']);
+    expect(sb._autoStopFilter && sb._autoStopFilter.byOrder && sb._autoStopFilter.byOrder.X.s1).toBe(true);
+    expect(sb._autoStopFilter.byOrder.X.s2).toBeUndefined(); // nyitott stop kimarad
   });
 
-  test('mentett draft → FOLYTAT (első confirm=true): resumeDraft + continue picker', () => {
+  test('nincs draft, semmi elvégzett → auto-collect üres, mégis step2 (üres menetlevél)', async () => {
+    const sb = load({ confirm: () => false });
+    sb.wbLocDialog = (kind, cb) => cb({ loc: 'Garaj', date: '2026-07-01', time: '08:00' });
+    let step2Called = false;
+    sb.fuvarStep2 = () => { step2Called = true; };
+    sb._soferOrdersCache = [{
+      id: 'X', status: 'Alocat', waybill_visible: true, waybill_phase: 'loading',
+      stops: [{ id: 's1', kind: 'pickup', stop_index: 0, loc: 'p', done_at: null, waybilled_at: null }]
+    }];
+    sb.fuvarCreate();
+    expect(step2Called).toBe(true);
+    expect(sb._selectedOrderIds).toEqual([]);
+    expect(sb._autoStopFilter).toBe(null);
+  });
+
+  test('mentett draft → FOLYTAT: resumeDraft, picker NEM nyílik', () => {
     const sb = load({ confirm: () => true });
     sb._soferOrdersCache = [{ id: 'X', client: 'A', loc_incarcare: 'p', loc_descarcare: 'q', status: 'Alocat', waybill_visible: true, waybill_phase: 'loading' }];
     sb._selectedOrderIds = ['X'];
@@ -165,21 +197,36 @@ describe('fuvarCreate + picker fluxus', () => {
     sb.resumeDraft = () => { resumed = true; };
     sb.fuvarCreate();
     expect(resumed).toBe(true);
-    expect(sb.document._registry.orderPickerModal.style.display).toBe('flex');
+    // A picker NEM nyílik meg automatikusan; a sofőr utólag a
+    // „✏️ Fuvarok kezelése" gombbal hívhatja elő.
+    expect(sb.document.getElementById('orderPickerModal').style.display).not.toBe('flex');
   });
 
-  test('mentett draft → TÖRÖL (1.=nem, 2.=igen): ürül + fresh folyamat', () => {
+  test('mentett draft → TÖRÖL (1.=nem, 2.=igen): ürül + fresh auto-collect', () => {
     let n = 0;
     const sb = load({ confirm: () => (++n, n !== 1) });   // 1: nem, 2: igen
-    sb._soferOrdersCache = [{ id: 'X', client: 'A', loc_incarcare: 'p', loc_descarcare: 'q', status: 'Alocat', waybill_visible: true, waybill_phase: 'loading' }];
+    sb._soferOrdersCache = [{
+      id: 'X', client: 'A', loc_incarcare: 'p', loc_descarcare: 'q',
+      status: 'In Curs', waybill_visible: true, waybill_phase: 'unloading',
+      stops: [
+        { id: 's1', kind: 'pickup',   stop_index: 0, loc: 'p', done_at: '2026-07-05T09:00:00', waybilled_at: '2026-07-04T12:00:00' },
+        { id: 's2', kind: 'delivery', stop_index: 0, loc: 'q', done_at: '2026-07-05T14:00:00', waybilled_at: null }
+      ]
+    }];
     sb._selectedOrderIds = ['X'];
     sb.stateSave({ draft: { puncte: [{ tip: 'Plecare', loc: 'G', data: '2026-07-01' }] } });
     sb.wbLocDialog = (k, cb) => cb({ loc: 'G', date: '2026-07-05', time: '09:00' });
-    sb.fuvarStep2 = () => {};
+    let step2Called = false;
+    sb.fuvarStep2 = () => { step2Called = true; };
     sb.fuvarCreate();
     expect((sb.stateGet() || {}).draft).toBeFalsy();
-    expect(sb._selectedOrderIds.length).toBe(0);
-    expect(sb.document._registry.orderPickerModal.style.display).toBe('flex');
+    expect(step2Called).toBe(true);
+    // Csak a még nem waybill-ezett elvégzett delivery kerül be
+    expect(sb._selectedOrderIds).toEqual(['X']);
+    expect(sb._autoStopFilter.byOrder.X.s2).toBe(true);
+    expect(sb._autoStopFilter.byOrder.X.s1).toBeUndefined(); // már waybill-ezve
+    // Picker NEM nyílik meg fresh úton
+    expect(sb.document.getElementById('orderPickerModal').style.display).not.toBe('flex');
   });
 
   test('mentett draft → MÉGSE (mindkét confirm=false): semmi nem történik', () => {

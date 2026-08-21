@@ -14,6 +14,35 @@
 
 ---
 
+## 2026-08-21 — Sofőr menetlevél: elvégzett állomások automatikus felvétele (nincs pipálgatás)
+
+### Miért
+A menetlevél kezdésekor a sofőr eddig egy pickerben kézzel pipálta ki, melyik fuvarok kerüljenek fel — közben a rendszer már tudta a sofőr állomás-gombjaiból (📍 odaért / 📦 elvégezte), hogy melyik felrakás/lerakás elvégzett. Kérés: a Plecare után automatikusan tegye fel az elvégzett (`done_at NOT NULL`, `waybilled_at IS NULL`) állomásokat, a Plecare pillanata után. A picker csak explicit „✏️ Fuvarok kezelése" gombra nyíljon.
+
+### Mi történik most
+1. **`_startFreshWaybill`** (fresh menetlevél) — Plecare-dialog után NEM nyit pickert. Meghívja az új `_autoCollectCompletedStops()`-ot: végigmegy a `_soferOrdersCache`-en, összeszedi a `done_at NOT NULL && !waybilled_at && done_at >= plecareStartIso` stopokat. Ebből épül a `_selectedOrderIds` és az új `_autoStopFilter = { since, byOrder: { orderId: {stopId:true,...} } }`.
+2. **`_buildWaybillPuncteForOrder(o, filter)`** — új `filter` paraméter. Ha be van állítva, csak a filter által engedélyezett stopokat rakja fel (auto-collect: csak elvégzett; picker-diff: filter nélkül, teljes nem-waybill-ezett stopokkal). Így egy multi-stop fuvarnál a még NYITOTT lerakás nem szennyezi be a menetlevelet — az a következő kör témája, amikor a sofőr azt is elvégzi.
+3. **`fuvarStep2`** — az `_autoStopFilter`-t átadja a `_buildWaybillPuncteForOrder`-nek. A Plecare és Sosire sor a régi módon jön (Plecare-dialog / draft-restore / submit-modal), közé kerülnek az elvégzett állomások (típus + helyszín + dátum).
+4. **`_continueSavedDraft`** — a piszkozat folytatásakor sem nyílik automatikusan a picker; a mentett rows úgy maradnak, ahogy voltak. A sofőr utólag a step2 „✏️ Fuvarok kezelése" gombjával hívhatja elő a pickert (`fuvarPickAgain`).
+5. **`_plecareStartIso()`** új segéd — Plecare időpont ISO stringben a stop-szűréshez (`YYYY-MM-DDTHH:MM:SS`). Prioritás: `_pendingPlecare` (frissen bekért) → DOM Plecare sor → `_plecareStartDay()`. Óra nélkül `00:00`.
+6. **Visszavonhatóság kézben:** ha a sofőr félrenyomta az állomás-gombot, az admin a PR #322 „🔁 Lezárás visszavonása" + sofőr új idő-picker modal (PR-ok az elmúlt körökből) továbbra is működik. Az `_autoStopFilter` csak a jelenlegi menetlevél felépítésére hat, DB-ben nem tárolódik.
+
+### Felület
+- **Fresh menetlevél:** „📄 Menetlevél létrehozása" → Plecare-modal → EGYENESEN step2 (picker átugorva). Toast az első pillanatban: „✅ N elvégzett fuvar automatikusan hozzáadva" VAGY „Nincs Plecare óta elvégzett fuvar — üresen kezdesz".
+- **Utólagos módosítás:** step2-ben „✏️ Fuvarok kezelése" gombbal a picker felnyílik (mint korábban), a diff filter nélkül dolgozik → a hozzáadott új fuvar TELJES nem-waybill-ezett stopokkal jön (a sofőr tudatosan felveszi a nyitott állomásokat is).
+- **Piszkozat folytatása:** a picker automatikus felnyílása megszűnt — a mentett rows megmaradnak, a sofőr utólag módosíthatja.
+
+### Fájlok
+- `public/sofer.js` — új `_autoStopFilter`, `_autoCollectCompletedStops()`, `_plecareStartIso()`; `_startFreshWaybill` / `_continueSavedDraft` / `fuvarNoOrder` / submit-success mind reseteli az `_autoStopFilter`-t; `_buildWaybillPuncteForOrder(o, filter)`; `fuvarStep2` átadja a filtert.
+- `public/i18n.js` — 2 új kulcs: `sof.auto.added`, `sof.auto.empty` (RO-alap + HU).
+- `public/sofer.html` — cache-bust `?v=20260821autowb` (sofer.js + i18n.js).
+- `tests/integration/sofer-client-flow.test.js` — 4 érintett teszt frissítve az új viselkedésre + 1 új eset (auto-collect üres → step2 mégis megnyílik).
+
+### Teszt
+- `npm test`: **948 Jest zöld** (45 skip valós-DB), sofer-client-flow suite 34/34 zöld (33 → 34, +1 új eset). Nincs regresszió.
+
+---
+
 ## 2026-08-21 — Sofőr főoldal: élő jármű-akkumulátor feszültség a kiosztott jármű kártyán (CargoTrack GPS-ből)
 
 ### Miért

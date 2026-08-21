@@ -2945,6 +2945,8 @@
     'sof.pick.mustTitle':      { hu: 'Az indulás után elvégzett fuvar — ha kimarad, nem tudod lezárni a menetlevelet.', ro: 'Cursă finalizată după plecare — dacă lipsește, nu poți închide foaia.' },
     'sof.pick.added':          { hu: '{n} sor hozzáadva a menetlevélhez', ro: '{n} rânduri adăugate pe foaie' },
     'sof.pick.leftover':       { hu: '{n} elvégzett fuvar hiányzik — jelöld be a lezáráshoz.', ro: '{n} curse finalizate lipsesc — bifează-le pentru a finaliza.' },
+    'sof.auto.added':          { hu: '✅ {n} elvégzett fuvar automatikusan hozzáadva. Ha kell, a „✏️ Fuvarok kezelése" gombbal módosíthatod.', ro: '✅ {n} curse finalizate au fost adăugate automat. Poți modifica cu butonul „✏️ Gestionează cursele".' },
+    'sof.auto.empty':          { hu: 'Nincs Plecare óta elvégzett fuvar — üresen kezdesz. A „✏️ Fuvarok kezelése" gombbal fuvart adhatsz hozzá.', ro: 'Nu ai curse finalizate după plecare — începi cu foaia goală. Poți adăuga curse cu „✏️ Gestionează cursele".' },
     'sof.rr.kind':             { hu: 'Típus', ro: 'Tip' },
     'sof.rr.kindFuel':         { hu: 'Tankolás',  ro: 'Alimentare' },
     'sof.rr.kindPurchase':     { hu: 'Vásárlás', ro: 'Achiziție' },

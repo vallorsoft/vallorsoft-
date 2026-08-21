@@ -573,13 +573,27 @@ function _collectPuncte() {
 // stops-tömb (nem-migrált fuvar), a legacy loc_incarcare/loc_descarcare +
 // waybill_phase alapján esünk vissza a régi 1-1 pontos viselkedésre.
 // Visszaadott alak: [[loc, tip, data (YYYY-MM-DD), opts], …]
-function _buildWaybillPuncteForOrder(o) {
+//
+// `filter` (opcionális): { byOrder: { orderId: { stopId: true, ... } } }
+//   Ha meg van adva, a stops-ágban CSAK azokat a stopokat vesszük fel,
+//   amelyeket a filter kifejezetten engedélyez. Használat: az
+//   auto-kiválasztás (_autoCollectCompletedStops) csak az elvégzett
+//   (done_at NOT NULL) állomásokat rakja fel; a többi (nyitott) stop nem
+//   kerül a menetlevélre a Plecare pillanatában. A picker-alapú út
+//   (`_applyPickerDiff`) filter nélkül hív → a régi teljes-stopos
+//   viselkedést kapja (a sofőr kézzel dönt).
+function _buildWaybillPuncteForOrder(o, filter) {
   var ymd = function (v) { return v ? String(v).slice(0, 10) : ''; };
+  var stopMatchesFilter = function (s) {
+    if (!filter || !filter.byOrder) return true;
+    var m = filter.byOrder[o.id];
+    return !!(m && m[s.id]);
+  };
   var stops = Array.isArray(o && o.stops) ? o.stops : [];
   if (stops.length) {
-    var pickups = stops.filter(function (s) { return s.kind === 'pickup'   && !s.waybilled_at; })
+    var pickups = stops.filter(function (s) { return s.kind === 'pickup'   && !s.waybilled_at && stopMatchesFilter(s); })
                       .sort(function (a, b) { return a.stop_index - b.stop_index; });
-    var deliveries = stops.filter(function (s) { return s.kind === 'delivery' && !s.waybilled_at; })
+    var deliveries = stops.filter(function (s) { return s.kind === 'delivery' && !s.waybilled_at && stopMatchesFilter(s); })
                       .sort(function (a, b) { return a.stop_index - b.stop_index; });
     var out = [];
     pickups.forEach(function (s) {
@@ -592,6 +606,10 @@ function _buildWaybillPuncteForOrder(o) {
     });
     return out;
   }
+  // Legacy fallback ágon a filter nem érvényes (nincs stopId, amire szűrjünk).
+  // Ha a hívó filter-el jött (auto-collect), és a fuvarnak nincs stopja,
+  // csak akkor engedjük tovább, ha az egész fuvar szerepel a filterben.
+  if (filter && filter.byOrder && !filter.byOrder[o.id]) return [];
   // Legacy fallback
   var phase = o.waybill_phase;
   var loadDate = ymd(o.data_incarcare);
@@ -1166,6 +1184,15 @@ function toggleOrderSel(cb) {
 // akkor lehet, ha nincs olyan Finalizat fuvar, amelynek a `finalized_at`-je
 // a menetlevél indulása UTÁN van, és kimaradt (`_validateNoLeftoverOrders`).
 var _pendingPlecare = null;
+// Auto-collect (2026-08-21): a fresh menetlevél Plecare után NEM a pickert
+// nyitja, hanem automatikusan begyűjti azokat a stopokat, amiket a sofőr
+// már elvégzett (done_at NOT NULL) és még nincs waybill-ezve — a Plecare
+// dátumától számítva. Az `_autoStopFilter` a fuvarStep2-nek adja át, hogy
+// a `_buildWaybillPuncteForOrder` csak ezeket a stopokat rakja fel; az
+// ugyanahhoz a fuvarhoz tartozó, még NYITOTT stopok nem szennyezik be
+// a menetlevelet. Picker-alapú add/remove (fuvarPickAgain) törli a filter-t,
+// hogy a sofőr kézi választása pontosan érvényesüljön.
+var _autoStopFilter = null;
 function fuvarCreate() {
   var st = stateGet() || {};
   if (_draftHasContent(st.draft)) {
@@ -1190,34 +1217,124 @@ function _draftContinueOrDelete(cb) {
 }
 function _startFreshWaybill() {
   _selectedOrderIds = [];
+  _autoStopFilter = null;
   wbLocDialog('start', function (res) {
     if (!res) return;                // Mégse — marad az 1. lépésen
     _pendingPlecare = res;           // fuvarStep2 innen olvassa
-    _openOrderPicker('fresh', function (picked) {
-      if (picked == null) { _pendingPlecare = null; return; }  // Mégse → NE lépjünk step2-be
-      _selectedOrderIds = picked;
+    // AUTO-COLLECT: nem nyitunk pickert. Begyűjtjük az összes már
+    // elvégzett (done_at NOT NULL) és még nem waybill-ezett stopot a
+    // Plecare pillanatától; ebből építjük a `_selectedOrderIds`-t és
+    // az `_autoStopFilter`-t, majd egyenesen step2-re lépünk.
+    var proceed = function () {
+      _autoCollectCompletedStops();
+      var added = _selectedOrderIds.length;
       fuvarStep2(true);
-    });
+      if (added) {
+        // Kis késleltetés — a step2 render UTÁN mutassuk a toastot.
+        setTimeout(function () { toast(t('sof.auto.added', { n: added }), 'ok'); }, 100);
+      } else {
+        setTimeout(function () { toast(t('sof.auto.empty'), 'info'); }, 100);
+      }
+    };
+    if (!_soferOrdersCache.length) {
+      fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ functionName: 'getMySoferOrders' }) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        _soferOrdersCache = (d.result || []).filter(function (o) { return o.waybill_visible !== false; });
+        proceed();
+      })
+      .catch(function () { proceed(); });
+    } else {
+      proceed();
+    }
   });
 }
+
+// A menetlevél kezdéskor: a sofőr által már ELVÉGZETT (done_at NOT NULL)
+// és még nem waybill-ezett stopokat automatikusan a menetlevélbe teszi.
+// Csak azokat a stopokat vesszük fel, amelyek done_at-je >= a Plecare
+// pillanata (Plecare előtti "elveszett" elvégzett stop nem szennyezi
+// be az új menetlevelet — az történelmi, külön kezelendő). Egy fuvarhoz
+// tartozó NYITOTT (done_at IS NULL) stopok kimaradnak — a következő
+// menetlevélen kerülnek fel, amikor a sofőr azokat is elvégzi.
+function _autoCollectCompletedStops() {
+  var sinceIso = _plecareStartIso();
+  var orderIds = [];
+  var byOrder = {};
+  _soferOrdersCache.forEach(function (o) {
+    if (o && o.waybill_visible === false) return;
+    var stops = Array.isArray(o.stops) ? o.stops : [];
+    var picked = {};
+    var any = false;
+    stops.forEach(function (s) {
+      if (!s || !s.done_at || s.waybilled_at) return;
+      if (sinceIso && String(s.done_at) < sinceIso) return;
+      picked[s.id] = true;
+      any = true;
+    });
+    if (any) {
+      orderIds.push(o.id);
+      byOrder[o.id] = picked;
+    }
+  });
+  _selectedOrderIds = orderIds;
+  _autoStopFilter = orderIds.length ? { since: sinceIso, byOrder: byOrder } : null;
+}
+
+// Plecare időpont ISO-ban a stop-szűréshez. Prioritás:
+//   1) _pendingPlecare (frissen bekért érték a wbLocDialog-ból)
+//   2) DOM-ban lévő Plecare sor (piszkozat visszatöltés utáni állapot)
+// Óra nélkül 00:00-t használ (a nap eleje = "Plecare után minden").
+function _plecareStartIso() {
+  var day = '';
+  var timeStr = '00:00';
+  if (_pendingPlecare && _pendingPlecare.date) {
+    day = String(_pendingPlecare.date).slice(0, 10);
+    if (_pendingPlecare.time && /^\d{1,2}:\d{2}$/.test(_pendingPlecare.time)) {
+      timeStr = _pendingPlecare.time.length === 4 ? '0' + _pendingPlecare.time : _pendingPlecare.time;
+    }
+  } else {
+    day = _plecareStartDay();
+    var pc = document.getElementById('puncteContainer');
+    if (pc) {
+      var row = pc.querySelector('.dyn-row');
+      if (row) {
+        var tip = (row.querySelector('.punct-tip') || {}).value;
+        var tv  = (row.querySelector('.punct-time') || {}).value || '';
+        if (tip === 'Plecare' && /^\d{1,2}:\d{2}$/.test(tv)) {
+          timeStr = tv.length === 4 ? '0' + tv : tv;
+        }
+      }
+    }
+  }
+  if (!day) return '';
+  return day + 'T' + timeStr + ':00';
+}
 function _continueSavedDraft() {
+  // A meglévő piszkozat sorai már a stopokra vannak tag-elve; nincs
+  // szükség auto-filterre — a picker (ha nyílik) filter nélkül dolgozik.
+  _autoStopFilter = null;
   // A resumeDraft már a step2-t nyitja meg + visszatölti a mezőket + puncte-t.
   resumeDraft();
-  // Picker rögtön utána — MELLÉ tehet még fuvart, vagy leveheti a bent lévőt.
-  _openOrderPicker('continue', function (picked) {
-    if (picked == null) return;      // Mégse → marad a jelenlegi állapot
-    _applyPickerDiff(picked);
-  });
+  // Piszkozat folytatásakor NEM nyitjuk meg automatikusan a pickert —
+  // a sofőr a step2-ben lévő „✏️ Fuvarok kezelése" gombbal utólag
+  // hozzáadhat/levehet fuvart, ha szükséges. A folytatás önmagában
+  // hallgatólagosan érvényben tartja a mentett kijelöléseket.
 }
 // Visszafelé kompatibilitás: régi (gyorsítótárazott) sofer.html még ezt hívja.
 function fuvarNoOrder() {
   _selectedOrderIds = [];
+  _autoStopFilter = null;
   fuvarStep2(true);
 }
 
 // „✏️ Fuvarok kezelése" gomb a step2-ből — a picker újranyitása utólag
 // (add/remove). Ugyanaz, mint a continue-ág, csak a felhasználó explicit
-// kérésére.
+// kérésére. A picker megnyitása megtartja az auto-filtert a MEGLÉVŐ
+// (már beszúrt) sorokra, de az UTÁN hozzáadott új fuvarok TELJES nem-
+// waybill-ezett stopokkal jönnek (_applyPickerDiff filter nélkül hív) —
+// mert a sofőr így kézzel, tudatosan felveszi a nyitott állomásokat is.
 function fuvarPickAgain() {
   _openOrderPicker('continue', function (picked) {
     if (picked == null) return;
@@ -1520,11 +1637,15 @@ function fuvarStep2(allowEmpty) {
   _pendingPlecare = null;
 
   // 2) A kiválasztott fuvarokból a puncte-sorok — a KÖZÖS
-  //    `_buildWaybillPuncteForOrder(o)` kezeli a multi-stop esetet is: minden
-  //    olyan stopot felvesz, amit még nem waybill-eztünk (waybilled_at IS NULL),
-  //    és tag-eli a stopId-vel. A régi (nem-migrált) fuvarra legacy loc_*/data_*.
+  //    `_buildWaybillPuncteForOrder(o, filter)` kezeli a multi-stop esetet
+  //    is: minden olyan stopot felvesz, amit még nem waybill-eztünk
+  //    (waybilled_at IS NULL), és tag-eli a stopId-vel. A régi (nem-migrált)
+  //    fuvarra legacy loc_*/data_*.
+  //    Ha `_autoStopFilter` be van állítva (fresh menetlevél auto-collect
+  //    útján érkeztünk), csak a filter által engedélyezett — vagyis a már
+  //    ELVÉGZETT — stopok kerülnek fel; a fuvar még nyitott stopjai nem.
   selected.forEach(function(o) {
-    _buildWaybillPuncteForOrder(o).forEach(function (args) {
+    _buildWaybillPuncteForOrder(o, _autoStopFilter).forEach(function (args) {
       addPunctRow(args[0], args[1], args[2], args[3]);
     });
   });
@@ -3153,6 +3274,7 @@ function _submitFuvarlevelSend() {
         if (typeof renderLocalDrafts === 'function') renderLocalDrafts();
       }
       _selectedOrderIds = [];
+      _autoStopFilter = null;
       goSec('dash');
       setTimeout(function() {
         document.getElementById('fuvarStep1').style.display = '';
