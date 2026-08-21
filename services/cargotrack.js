@@ -133,10 +133,16 @@ const _voltDiagSeen = new Set();
 function _logMissingVoltage(objectId, calc, raw) {
   if (!objectId || _voltDiagSeen.has(objectId)) return;
   _voltDiagSeen.add(objectId);
-  const calcKeys = calc ? Object.keys(calc).sort() : [];
-  const rawKeys  = raw  ? Object.keys(raw).sort()  : [];
+  // Numerikus mezők értékét is loggoljuk — a nyers érték segíti a diagnózist
+  // (pl. state_of_charge = 12.6 → valójában voltage; = 85 → SOC %; custom_input_N
+  // = 12.4 → valószínűleg feszültség; stb.). Nem szivárog GPS-adat (a pos külön).
+  const dump = (o) => o ? Object.keys(o).sort().map(k => {
+    const v = o[k];
+    if (typeof v === 'number' && isFinite(v)) return k + '=' + v;
+    return k;
+  }).join(',') : '';
   console.log('[CargoTrack] Nincs felismert akku-feszültség mező. object_id=' + objectId +
-              ' calc_keys=[' + calcKeys.join(',') + '] raw_keys=[' + rawKeys.join(',') + ']');
+              ' calc={' + dump(calc) + '} raw={' + dump(raw) + '}');
 }
 
 async function getLatestStatus(apiKey, objectId, lookbackHours = 6) {
@@ -165,6 +171,11 @@ async function getLatestStatus(apiKey, objectId, lookbackHours = 6) {
       if (v == null) _logMissingVoltage(last.object_id, calc, raw);
       return v;
     })(),
+    // Akku-töltöttség (%) — Ruptela `state_of_charge`. EV-nél az EV-akku SOC-ja;
+    // hagyományos jármű esetén sok konfiguráció közvetve (fogyasztás-alapú) becsli.
+    // Fallback, ha a voltage nem elérhető (mint a Peto-fuvarozó Actros esetén).
+    state_of_charge: (calc.state_of_charge != null && isFinite(parseFloat(calc.state_of_charge)))
+      ? parseFloat(calc.state_of_charge) : null,
   };
 }
 

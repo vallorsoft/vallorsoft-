@@ -542,6 +542,8 @@ handlers.getCurrentGpsReadings = async function (req, res, args) {
         fuel_level: fuel_level,    // MÁR korrigált — ezt írja be a sofőr menetlevele
         battery_voltage: (st.battery_voltage != null && isFinite(parseFloat(st.battery_voltage)))
           ? parseFloat(st.battery_voltage) : null,   // jármű akku V (nyers; a felület elrejti ha null)
+        state_of_charge: (st.state_of_charge != null && isFinite(parseFloat(st.state_of_charge)))
+          ? parseFloat(st.state_of_charge) : null,   // akku-töltöttség % (fallback ha voltage null)
         datetime: st.datetime,
       } });
     } catch (err) {

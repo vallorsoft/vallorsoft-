@@ -3473,24 +3473,39 @@ function _loadMyVehicleBattery(plate) {
   .then(function(r) { return r.json(); }).then(function(d) {
     var res = d && d.result;
     if (!res || !res.ok || !res.available) return;
-    var v = (res.battery_voltage != null) ? parseFloat(res.battery_voltage) : null;
-    if (v == null || !isFinite(v)) return;
     var box = document.getElementById('myVehicleBox');
     if (!box || box.style.display === 'none') return;
     var inner = box.firstElementChild;
     if (!inner) return;
-    var isTruck = v > 20;                                   // 24V rendszer heurisztika
-    var warn = isTruck ? v < 22.5 : v < 12.0;
-    var danger = isTruck ? v < 22.0 : v < 11.5;
-    var color = danger ? '#dc2626' : (warn ? '#d97706' : '#0f172a');
-    var warnTxt = (warn || danger) ? ' <span style="color:#d97706;font-size:12px;">— ' + esc(t('sof.battWarn')) + '</span>' : '';
     // Ha már van akku-sor (pl. nyelvváltás után újrafutott), leváltjuk.
     var old = inner.querySelector('.sof-batt-line');
     if (old) old.parentNode.removeChild(old);
+
+    var html = '';
+    // Elsőbbség: nyers feszültség, ha az eszköz adja
+    var v = (res.battery_voltage != null) ? parseFloat(res.battery_voltage) : null;
+    if (v != null && isFinite(v)) {
+      var isTruck = v > 20;                                   // 24V rendszer heurisztika
+      var warn = isTruck ? v < 22.5 : v < 12.0;
+      var danger = isTruck ? v < 22.0 : v < 11.5;
+      var color = danger ? '#dc2626' : (warn ? '#d97706' : '#0f172a');
+      var warnTxt = (warn || danger) ? ' <span style="color:#d97706;font-size:12px;">— ' + esc(t('sof.battWarn')) + '</span>' : '';
+      html = '🔋 <b style="color:' + color + ';">' + v.toFixed(1) + ' V</b>' + warnTxt;
+    } else {
+      // Fallback: akku-töltöttség % (Ruptela `state_of_charge`), ha 0–100 sávban van
+      var soc = (res.state_of_charge != null) ? parseFloat(res.state_of_charge) : null;
+      if (soc == null || !isFinite(soc) || soc < 0 || soc > 100) return;
+      var socWarn = soc < 40;
+      var socDanger = soc < 20;
+      var socColor = socDanger ? '#dc2626' : (socWarn ? '#d97706' : '#0f172a');
+      var socWarnTxt = (socWarn || socDanger) ? ' <span style="color:#d97706;font-size:12px;">— ' + esc(t('sof.battWarn')) + '</span>' : '';
+      html = '🔋 <b style="color:' + socColor + ';">' + Math.round(soc) + '%</b>' + socWarnTxt;
+    }
+
     var line = document.createElement('div');
     line.className = 'sof-batt-line';
     line.style.cssText = 'margin-top:6px;font-size:13px;color:#334155;';
-    line.innerHTML = '🔋 <b style="color:' + color + ';">' + v.toFixed(1) + ' V</b>' + warnTxt;
+    line.innerHTML = html;
     inner.appendChild(line);
   }).catch(function() {});
 }
