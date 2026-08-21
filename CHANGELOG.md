@@ -14,6 +14,45 @@
 
 ---
 
+## 2026-08-21 — Szerviz-napló: Halasztás / Elvégezve modal + pipálható tétel-lista + jelzés-újratervezés
+
+### Miért
+Amikor a rendszer szerviz-esedékességet jelez (vezérlőpult sárga/piros sáv „🔧 Revizii scadente"), eddig csak egy `activateTab('service-log')` link volt — a felhasználó átment a szerviz-naplóra és kézzel új sort írt. Nem volt gyors út **halasztani** (pl. „még 2000 km múlva"), és nem volt strukturált mód rögzíteni, MIT csinált (olaj + olajszűrő + levegőszűrő stb.) — csak szabad szöveget.
+
+### Mit tesz
+1. **Vezérlőpult riasztási sáv chip-jei kattinthatók** (`renderDashServiceAlert`) — minden érintett jármű `🔧 rendszám — X km túllépve` chip-je gombként viselkedik: rákattintva a szerviz-esedékesség **döntés-modalja** nyílik (Halasztás vagy Elvégezve). A többi szó (🔧 ikon, cím) a szerviz-naplóra ugrik (régi viselkedés).
+2. **Szerviz-napló táblán is új gombok** — minden nyitott (nem `closed_at`, van `next_due_*`) sornál `🕐 Halasztás` + `✅ Elvégezve` gomb a törlő mellett. Lezárt sor `🔒 Lezárva` badge, halasztott sor `🕐 N×` badge (postpone_count), pipált tételek `✓ N tétel` badge (tooltip a teljes lista).
+3. **Halasztás-modal** — új dátum + új km mező + preset gombok (`+7 / +14 / +30 / +60 / +90 nap`, `+1000 / +2000 / +5000 / +10000 km`) + opc. megjegyzés (az `[Amânat] …` a leírás végére csatolódik, a régi tartalmat NEM írja felül). A régi sor `next_due_*` felülíródik, `postpone_count++`, `last_alert_at=NULL` (a scheduler újra tud jelezni a KÖVETKEZŐ esedékességnél).
+4. **Elvégezve-modal** — dátum + km + leírás + költség + kategória + **pipálható tétel-lista** (Olaj / Olajszűrő / Üzemanyag-szűrő motorina / Levegőszűrő / Pollenszűrő / AdBlue szűrő / Levegőszárító szűrő / Fékbetét / Féktárcsa / Hűtőfolyadék / Váltóolaj / Differenciálolaj / Gumi / Ablaktörlő / Akkumulátor / Vezérműszíj) + `Egyéb` szabad-szöveg — 16 fehérlistás kulcs + `other`. A modal alján **következő esedékesség** blokk (új `next_due_date` + `next_due_km`, alapból mai + 1 év / aktuális km + 40 000 — felülírható). Ha egyik sincs kitöltve, dupla-confirm.
+5. **A régi sor megmarad** — `closed_at=NOW()`, `closed_by_service_id=új_id`, `next_due_*=NULL` (a scheduler többé nem jelez rá); az új sor önálló bejegyzés a most elvégzett munkával + saját köv. esedékességgel — a szerviz-napló így teljes történetet mutat.
+
+### Szerver
+- **Új migráció `db/service-postpone-and-items.sql`** (idempotens): `vehicle_service_log.items JSONB DEFAULT '[]'` (pipált tételek fehérlistás kulccsal + `other` szabad-szöveg note), `postpone_count INTEGER DEFAULT 0`, `last_postponed_at TIMESTAMPTZ`, `closed_at TIMESTAMPTZ`, `closed_by_service_id INTEGER REFERENCES vehicle_service_log(id) ON DELETE SET NULL`.
+- **`handlers/fleetCompliance.js` — 2 új RPC handler** (Admin/Manager, cégre szűrt, audit-elt, `_isAdminOrManager` szerep-kapu):
+  - `servicePostpone(id, {next_due_date?, next_due_km?, note?})` — `UPDATE vehicle_service_log SET next_due_* = COALESCE(...), postpone_count++, last_postponed_at=NOW(), last_alert_at=NULL WHERE id=$1 AND company_id=$2 AND closed_at IS NULL`. Legalább egyik új érték (dátum vagy km) kötelező. A régi `description`-höz `[Amânat] <note>` fűződik (nem írja felül).
+  - `serviceComplete(id, {service_date, km, cost_ron, description, category, items[], next_due_date, next_due_km})` — **tranzakcióban**: (a) `SELECT FOR UPDATE` cégre szűrve + `closed_at IS NULL`, (b) `INSERT` új sor a most elvégzett munkával + a friss `next_due_*` értékkel, (c) `UPDATE` régi sor `closed_at=NOW(), closed_by_service_id=<új_id>, next_due_km=NULL, next_due_date=NULL, last_alert_at=NULL`. A `_normalizeServiceItems` a bemenetet fehérlistázza (`SERVICE_ITEM_SET` — 17 kulcs), duplikátumokat szűr, note ≤120 char, max 32 tétel.
+- **`serviceList` bővítve** — visszaadja az `items`, `postpone_count`, `last_postponed_at`, `closed_at`, `closed_by_service_id` mezőket + a válasz-tetején `item_keys` fehérlistát (a kliens innen tudja a modal-checkboxokat renderelni). A régi hívók visszafelé-kompatibilisek.
+- **`serviceCreate` kiterjesztve** — új `items` mező (opc.), ugyanaz a `_normalizeServiceItems` fehérlistával, audit-elve.
+- **`computeServiceDueAlerts`** — a `last_srv` WITH-CTE bővült `AND s.closed_at IS NULL`-lel → lezárt sor SOSEM jelez tovább (a scheduler push/e-mail/dashboard mind ebből dolgozik).
+
+### Kliens
+- **`public/fleet-extra.js`** — új közös segédek: `SVC_ITEM_KEYS_FALLBACK` (17 kulcs), `_svLastItems` + `_svItemKeys` + `_svModalItemId` state, `_svFindItem(id)` (szerviz-napló cache + dashboard riasztás-cache), `_svEnsureModal()` (a projekt `.modal-back` + `.modal.glass` mintája + kattintás-a-háttérre-bezár), `svCloseModal`, `_svOpen(id)` (fejléc-info: rendszám + márka/típus + km/dátum-esedékesség). Új publikus API: `svOpenDecide`, `svOpenPostpone`, `svPostDatePreset`, `svPostKmPreset`, `svSubmitPostpone`, `svOpenComplete`, `svSubmitComplete`, `svCloseModal`.
+- **`renderDashServiceAlert`** — a chip-ek `svOpenDecide(id)`-ot hívnak (`event.stopPropagation()`), a többi kattintás a szerviz-naplóra ugrik. A dashboard `window._svAlertCache = r.items` — a modal a szerviz-napló betöltése nélkül is elérheti a jármű-adatokat.
+- **`loadServiceLog` táblán** — új badge-ek (`✓ N tétel` / `🔒 Lezárva` / `🕐 N×`), a sor-akciók helyén 🕐 Halasztás + ✅ Elvégezve + ✕ Törlés; a lezárt sorok `opacity:0.75`.
+- **`public/i18n.js`** — 45 új i18n kulcs (`fe.sv.decideTitle`/`postponeBtn`/`postponeHint`/`doneBtn`/`doneHint`/`postponeTitle`/`newDate`/`newKm`/`days`/`postponeNote`/`postponeNotePh`/`postponeSubmit`/`needDateOrKm`/`postponed`/`doneTitle`/`descPh`/`itemsHead`/`itemsShort`/`otherNote`/`otherNotePh`/`nextHead`/`nextHint`/`noNextConfirm`/`doneSubmit`/`completed`/`closed`/`postponeCountTip`/`currentNextKm`/`currentNextDate` + 17 `fe.sv.item.*` tétel-címke + `fe.dash.chipTip`) — RO-alap + HU. Cache-bust: `admin.html`/`manager.html` `i18n.js?v=20260821svcpost` + `fleet-extra.js?v=20260821svcpost`.
+
+### Biztonság + Multi-tenant
+- Minden új SQL `company_id=$X`-re szűr; a `serviceComplete` `SELECT FOR UPDATE` + `INSERT` + `UPDATE` cégre-szűrt tranzakcióban → idegen cég sora sosem érinthető.
+- `_normalizeServiceItems` fehérlistázza a beérkező tömböt (ismeretlen kulcs csendesen eldobva, note ≤120 char, max 32 tétel) → nincs JSONB-injekció.
+- `_isAdminOrManager` szerep-kapu ELŐBB, MINT `pool.connect()` (nincs kapcsolat-foglalás jogosulatlan hívásra).
+- Audit minden íráson (`service.postpone`/`service.complete`/`service.create` — a régi + új id-vel + tétel-számmal).
+
+### Teszt
+- Új `tests/integration/service-postpone-complete.test.js` — 9 új eset: Sofer-tiltás, üres bemenet, sikeres halasztás (`postpone_count++`, `last_alert_at=NULL`, cégre szűrt WHERE), lezárt/idegen sor visszautasítása, Sofer serviceComplete-tiltás, tranzakciós ROLLBACK üres SELECT-nél, teljes lifecycle (BEGIN → SELECT → INSERT → UPDATE → COMMIT + fehérlista alkalmazása + `closed_by_service_id`), multi-tenant SELECT WHERE, `serviceList` visszaadja az `items` + `item_keys` mezőt.
+- **957 Jest zöld** (948 → 957, 45 skip valós-DB), nincs regresszió.
+
+---
+
 ## 2026-08-21 — Sofőr menetlevél: elvégzett állomások automatikus felvétele (nincs pipálgatás)
 
 ### Miért
