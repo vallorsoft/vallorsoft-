@@ -3481,26 +3481,18 @@ function _loadMyVehicleBattery(plate) {
     var old = inner.querySelector('.sof-batt-line');
     if (old) old.parentNode.removeChild(old);
 
-    var html = '';
-    // Elsőbbség: nyers feszültség, ha az eszköz adja
+    // CSAK a nyers feszültséget mutatjuk. A `state_of_charge` fallback kikapcsolva,
+    // mert a valós Ruptela-flottán mindig 0-t adott (nem-EV jármű, indirekt becslés
+    // sincs konfigurálva) — a „🔋 0%" félrevezető volt. A voltage-hez CargoTrack-nél
+    // kell engedélyeztetni az `external_voltage` firmware/config-ot.
     var v = (res.battery_voltage != null) ? parseFloat(res.battery_voltage) : null;
-    if (v != null && isFinite(v)) {
-      var isTruck = v > 20;                                   // 24V rendszer heurisztika
-      var warn = isTruck ? v < 22.5 : v < 12.0;
-      var danger = isTruck ? v < 22.0 : v < 11.5;
-      var color = danger ? '#dc2626' : (warn ? '#d97706' : '#0f172a');
-      var warnTxt = (warn || danger) ? ' <span style="color:#d97706;font-size:12px;">— ' + esc(t('sof.battWarn')) + '</span>' : '';
-      html = '🔋 <b style="color:' + color + ';">' + v.toFixed(1) + ' V</b>' + warnTxt;
-    } else {
-      // Fallback: akku-töltöttség % (Ruptela `state_of_charge`), ha 0–100 sávban van
-      var soc = (res.state_of_charge != null) ? parseFloat(res.state_of_charge) : null;
-      if (soc == null || !isFinite(soc) || soc < 0 || soc > 100) return;
-      var socWarn = soc < 40;
-      var socDanger = soc < 20;
-      var socColor = socDanger ? '#dc2626' : (socWarn ? '#d97706' : '#0f172a');
-      var socWarnTxt = (socWarn || socDanger) ? ' <span style="color:#d97706;font-size:12px;">— ' + esc(t('sof.battWarn')) + '</span>' : '';
-      html = '🔋 <b style="color:' + socColor + ';">' + Math.round(soc) + '%</b>' + socWarnTxt;
-    }
+    if (v == null || !isFinite(v)) return;
+    var isTruck = v > 20;                                   // 24V rendszer heurisztika
+    var warn = isTruck ? v < 22.5 : v < 12.0;
+    var danger = isTruck ? v < 22.0 : v < 11.5;
+    var color = danger ? '#dc2626' : (warn ? '#d97706' : '#0f172a');
+    var warnTxt = (warn || danger) ? ' <span style="color:#d97706;font-size:12px;">— ' + esc(t('sof.battWarn')) + '</span>' : '';
+    var html = '🔋 <b style="color:' + color + ';">' + v.toFixed(1) + ' V</b>' + warnTxt;
 
     var line = document.createElement('div');
     line.className = 'sof-batt-line';
