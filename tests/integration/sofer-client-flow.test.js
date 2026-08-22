@@ -644,3 +644,163 @@ describe('renderFuvarCard fázis-logika', () => {
     expect(reg['fdsec_unload_ORD9'].classList.contains('open')).toBe(false);
   });
 });
+
+// ================================================================
+//  ORPHAN BIN + pending-add popup + rrAccept fallback + orphan-range
+// ================================================================
+describe('orphan bin — árva tankolás/vásárlás sorok megőrzése', () => {
+  test('rrAccept: nincs draft ÉS nincs step2 → orphan binbe, NEM üres draft', async () => {
+    const sb = load({});
+    await tick();
+    sb._meData = { email: 'a@x.hu' };
+    // Kész scannelt bon a queue-ban (fuel)
+    const id = sb.rcptNewId();
+    sb.rcptQueueAdd({ id, createdAt: Date.now(), status: 'ready', kind: 'fuel', hasImage: false,
+      fields: { loc: 'MOL Arad', data: '2026-08-19', tip: 'Motorină', litru: 50, km: 12345, plata: 'Card', suma: 380, valuta: 'RON' } });
+    // A rrOpen-t nem kell hívnunk, mert a rrAccept közvetlenül a modal-mezőkből olvas —
+    // stubold a DOM inputokat, majd hívd meg a rrAccept-et.
+    sb._rrCurrentId = id;
+    const reg = sb.document._registry;
+    const setV = (i, v) => { const el = sb.document.getElementById(i); el.value = v; };
+    setV('rrKind', 'fuel');
+    setV('rrLoc',  'MOL Arad');
+    setV('rrData', '2026-08-19');
+    setV('rrSuma', '380');
+    setV('rrPlata','Card');
+    setV('rrTip',  'Motorină');
+    setV('rrLitru','50');
+    setV('rrKm',   '12345');
+    // step2 rejtve marad — a getElementById defaultja üres style
+    sb.document.getElementById('fuvarStep2').style.display = 'none';
+    sb.rrAccept();
+    await tick(10);
+    // A draft NEM keletkezett üresen
+    expect((sb.stateGet() || {}).draft).toBeFalsy();
+    // Az orphan binbe került a fuel-sor
+    const bin = sb.orphanLoad();
+    expect(bin.alim.length).toBe(1);
+    expect(bin.alim[0].loc).toBe('MOL Arad');
+    expect(bin.ach.length).toBe(0);
+  });
+
+  test('rrAccept: van megkezdett draft ÉS nincs step2 → a draftba kerül, orphan érintetlen', async () => {
+    const sb = load({});
+    await tick();
+    sb._meData = { email: 'a@x.hu' };
+    sb.stateSave({ draft: { camion: 'B1', puncte: [], alimentari: [], achizitii: [] } });
+    const id = sb.rcptNewId();
+    sb.rcptQueueAdd({ id, createdAt: Date.now(), status: 'ready', kind: 'purchase', hasImage: false,
+      fields: { loc: 'Kaufland', data: '2026-08-19', produs: 'apa', suma: 12, valuta: 'RON', plata: 'Cash' } });
+    sb._rrCurrentId = id;
+    const setV = (i, v) => { sb.document.getElementById(i).value = v; };
+    setV('rrKind', 'purchase');
+    setV('rrLoc',  'Kaufland');
+    setV('rrData', '2026-08-19');
+    setV('rrProdus','apa');
+    setV('rrSuma', '12');
+    setV('rrPlata','Cash');
+    sb.document.getElementById('fuvarStep2').style.display = 'none';
+    sb.rrAccept();
+    await tick(10);
+    const dr = (sb.stateGet() || {}).draft;
+    expect(dr && Array.isArray(dr.achizitii) && dr.achizitii.length).toBe(1);
+    expect(dr.achizitii[0].loc).toBe('Kaufland');
+    // Orphan bin változatlan
+    expect(sb.orphanCount()).toBe(0);
+  });
+
+  test('fuvarCreate DELETE-ág: a draft alim/ach átmentődik az orphan binbe', () => {
+    let n = 0;
+    const sb = load({ confirm: () => (++n, n !== 1) });   // 1: nem, 2: igen (delete)
+    sb._meData = { email: 'a@x.hu' };
+    sb.stateSave({ draft: {
+      puncte: [{ tip: 'Plecare', loc: 'G', data: '2026-07-01' }],
+      alimentari: [{ loc: 'MOL', data: '2026-07-01', tip: 'Motorină', litru: '50', km: '100', plata: 'Card', suma: '380' }],
+      achizitii:  [{ produs: 'apa', loc: 'K', data: '2026-07-01', pret: '10', plata: 'Cash' }]
+    } });
+    sb.wbLocDialog = (k, cb) => cb({ loc: 'G', date: '2026-07-05', time: '09:00' });
+    sb.fuvarStep2 = () => {};
+    sb.fuvarCreate();
+    expect((sb.stateGet() || {}).draft).toBeFalsy();     // draft törölve
+    const bin = sb.orphanLoad();
+    expect(bin.alim.length).toBe(1);
+    expect(bin.ach.length).toBe(1);
+    expect(bin.alim[0].loc).toBe('MOL');
+    expect(bin.ach[0].produs).toBe('apa');
+  });
+
+  test('discardDraft: átmenti az orphan binbe és megjegyzi a felhasználónak', () => {
+    const sb = load({ confirm: () => true });
+    sb._meData = { email: 'a@x.hu' };
+    sb.stateSave({ draft: {
+      alimentari: [{ loc: 'OMV', data: '2026-08-10', tip: 'Motorină', litru: '40', suma: '300', plata: 'Card', km: '0' }],
+      achizitii: []
+    } });
+    sb.discardDraft();
+    expect((sb.stateGet() || {}).draft).toBeFalsy();
+    const bin = sb.orphanLoad();
+    expect(bin.alim.length).toBe(1);
+    expect(bin.alim[0].loc).toBe('OMV');
+  });
+
+  test('orphanSaveFromDraft: üres sor NEM kerül át (csak a valódi tartalmú)', () => {
+    const sb = load({});
+    sb._meData = { email: 'a@x.hu' };
+    const added = sb.orphanSaveFromDraft({
+      alimentari: [
+        { loc: '', data: '', tip: 'Motorină', litru: '0', km: '0', plata: 'Card', suma: '0' },   // üres → skip
+        { loc: 'MOL', data: '2026-07-01', tip: 'Motorină', litru: '50', suma: '380', plata: 'Card', km: '0' }
+      ],
+      achizitii: [
+        { produs: '', loc: '', data: '', pret: '0', plata: 'Card' }   // üres → skip
+      ]
+    });
+    expect(added).toBe(1);
+    const bin = sb.orphanLoad();
+    expect(bin.alim.length).toBe(1);
+    expect(bin.ach.length).toBe(0);
+  });
+
+  test('_orphanRangeItems: csak a Plecare–Sosire DÁTUM (óra nem) közé eső sorokat adja', () => {
+    const sb = load({});
+    sb._meData = { email: 'a@x.hu' };
+    sb.orphanStore({
+      alim: [
+        { loc: 'A', data: '2026-07-01', litru: '10', suma: '80' },   // in range
+        { loc: 'B', data: '2026-06-25', litru: '10', suma: '80' },   // out of range
+        { loc: 'C', data: '2026-07-05', litru: '10', suma: '80' }    // in range (utolsó nap)
+      ],
+      ach: [
+        { produs: 'v', loc: 'X', data: '2026-07-06', pret: '10' }    // out (utana)
+      ]
+    });
+    sb.document.getElementById('fIndulasDt').value = '2026-07-01T08:00';
+    sb.document.getElementById('fErkezesDt').value = '2026-07-05T18:00';
+    const items = sb._orphanRangeItems();
+    expect(items.length).toBe(2);
+    expect(items.every(i => i.kind === 'fuel')).toBe(true);
+  });
+
+  test('openPendingAddModal: üres orphan+queue → azonnal callback, modal NEM nyílik', () => {
+    const sb = load({});
+    sb._meData = { email: 'a@x.hu' };
+    let called = false;
+    sb.openPendingAddModal(function () { called = true; });
+    expect(called).toBe(true);
+    expect(sb.document.getElementById('pendingAddModal').style.display).not.toBe('flex');
+  });
+
+  test('openPendingAddModal: van orphan tétel → modal megnyílik, callback NEM azonnal', () => {
+    const sb = load({});
+    sb._meData = { email: 'a@x.hu' };
+    sb.orphanStore({ alim: [{ loc: 'MOL', data: '2026-07-01', litru: '50', suma: '380' }], ach: [] });
+    let called = false;
+    sb.openPendingAddModal(function () { called = true; });
+    expect(called).toBe(false);   // vár a sofőr döntésére
+    expect(sb.document.getElementById('pendingAddModal').style.display).toBe('flex');
+    // pendingAddSkip → cb fut, orphan érintetlen
+    sb.pendingAddSkip();
+    expect(called).toBe(true);
+    expect(sb.orphanCount()).toBe(1);   // Skip = a tételek maradnak
+  });
+});

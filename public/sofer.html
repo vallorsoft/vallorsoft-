@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260821autowb"></script>
+  <script src="/i18n.js?v=20260822orphan"></script>
   <link rel="stylesheet" href="/sofer.css?v=20260820uit3">
   <script src="/push-client.js?v=20260614qa"></script>
   <!-- Sofor mobil-app: 8 ora idle-limit (vezetes kozben oraig nem koppint a
@@ -239,11 +239,16 @@
         <button class="back-btn" onclick="goSec('dash')">←</button>
         <h3 data-i18n="sofer.waybillTitle">📄 Menetlevél</h3>
       </div>
-      <!-- 📄 Megkezdett (auto-mentett) menetlevél folytatása -->
+      <!-- 📄 Megkezdett (auto-mentett) menetlevél folytatása.
+           A rendszer AUTOMATIKUSAN menti amit beírsz, amíg be nem küldöd
+           vagy ki nem törlöd — nincs külön „mentett" és „elkezdett":
+           minden megkezdett menetlevél magától tovább él az újranyitásig. -->
       <div id="draftResumeBox" class="resume-box" style="display:none;"></div>
-      <!-- 💾 Mentett menetlevelek a telefonon (offline is látható) -->
-      <div class="section-head" style="margin-top:2px;" data-i18n="sof.localDraftsTitle">📥 Mentett menetlevelek (telefonon)</div>
-      <div id="localDraftsBox" style="margin-bottom:14px;"></div>
+      <!-- Rejtett hordozó a legacy renderLocalDrafts hívásokhoz (offline
+           outbox mechanizmus még használja a soferLoadLocalDrafts array-t
+           pendingSubmit=true jelzővel; a manuális „mentett menetlevél"
+           UI eltávolítva). -->
+      <div id="localDraftsBox" style="display:none;"></div>
       <!-- A fuvar-lista NEM itt látszik: a „Menetlevél létrehozása" gomb
            után jön elő egy külön kártyán (picker modal), és csak akkor,
            amikor tényleg rá kell tenni valamit a menetlevélre. A régi
@@ -357,10 +362,7 @@
 
       <div class="field" style="margin-top:16px;"><label data-i18n="sofer.otherNotes">Alte mențiuni</label><textarea class="textarea" id="fMentiuni" placeholder="Alte mențiuni..." data-i18n-ph="sofer.otherNotesPh"></textarea></div>
 
-      <div style="font-size:12px;color:var(--muted);margin-top:16px;margin-bottom:6px;" data-i18n="sof.offlineHint">💡 Az adatok a telefonon mentődnek; internet csak a beküldéshez kell.</div>
-      <button class="submit-btn" onclick="saveLocalDraft()" style="background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.4);" data-i18n="sof.saveLocal">
-        💾 Mentés a telefonra
-      </button>
+      <div style="font-size:12px;color:var(--muted);margin-top:16px;margin-bottom:6px;" data-i18n="sof.offlineHint">💡 A rendszer automatikusan menti amit beírsz — nem kell külön mentened, csak folytathatod bármikor.</div>
       <button class="submit-btn" onclick="submitFuvarlevel()" style="background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;margin-top:10px;" data-i18n="sofer.sendWaybill">
         📤 Menetlevél elküldése
       </button>
@@ -415,7 +417,7 @@
 
 <script src="/uit-format.js?v=20260820uit3"></script>
 <script src="/sofer-uit.js?v=20260820uit3"></script>
-<script src="/sofer.js?v=20260821autowb"></script>
+<script src="/sofer.js?v=20260822orphan"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 
 <!-- ── ÁRU LEADÁSA MODAL (sofőr-kérés — admin visszaigazolja) ── -->
@@ -626,6 +628,56 @@
         background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;" data-i18n="sof.pick.cancel">← Mégse</button>
       <button onclick="opAccept()" style="flex:2;padding:12px;border-radius:8px;border:none;
         background:linear-gradient(180deg,#3b82f6,#2563eb);color:#fff;font-size:14px;font-weight:700;cursor:pointer;" data-i18n="sof.pick.next">→ Tovább</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 📋 KORÁBBI TANKOLÁS/VÁSÁRLÁS — új menetlevél kezdésekor ── -->
+<!-- Ha a sofőr korábban scannelt bont (AI kiolvasta) VAGY beírt egy
+     tankolás/vásárlás sort, de a menetlevél még nem létezett (vagy
+     törölte a piszkozatot), a rendszer az orphan binben őrizte. A
+     menetlevél Plecare-je után itt felajánljuk hozzáadásra. -->
+<div id="pendingAddModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);
+  backdrop-filter:blur(6px);align-items:center;justify-content:center;z-index:1000;padding:20px;">
+  <div style="width:min(520px,100%);background:var(--bg-2);border:1px solid var(--border-bright);
+    border-radius:18px;padding:22px;max-height:92vh;overflow-y:auto;">
+    <h3 style="margin:0 0 6px;font-size:17px;color:#fff;" data-i18n="sof.pa.title">📋 Korábbi tétel — hozzáadod?</h3>
+    <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px;" data-i18n="sof.pa.hint">
+      Kiválaszthatod, mely scannelt bon és mentett tétel kerüljön ebbe a menetlevélbe.</p>
+    <div style="display:flex;gap:8px;margin-bottom:10px;">
+      <button type="button" onclick="pendingAddSelectAll(true)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border-bright);background:transparent;color:var(--muted);font-size:13px;cursor:pointer;" data-i18n="sof.pa.all">Mind</button>
+      <button type="button" onclick="pendingAddSelectAll(false)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border-bright);background:transparent;color:var(--muted);font-size:13px;cursor:pointer;" data-i18n="sof.pa.none">Egy sem</button>
+    </div>
+    <div id="pendingAddList" style="max-height:52vh;overflow-y:auto;"></div>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button onclick="pendingAddSkip()" style="flex:1;padding:12px;border-radius:8px;border:1px solid var(--border-bright);
+        background:transparent;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;" data-i18n="sof.pa.skip">Kihagyás</button>
+      <button onclick="pendingAddConfirm()" style="flex:2;padding:12px;border-radius:8px;border:none;
+        background:linear-gradient(180deg,#16a34a,#15803d);color:#fff;font-size:14px;font-weight:700;cursor:pointer;" data-i18n="sof.pa.add">✓ Hozzáadás</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ⚠️ ORPHAN BIN — beküldés előtti dátum-egyezés figyelmeztetés ── -->
+<!-- Ha az orphan binben van olyan tétel, aminek DÁTUMA (óra nem számít)
+     az indulás–érkezés ablakba esik, a beküldés előtt szólunk: a sofőr
+     eldönti, hozzáadja a menetlevélhez VAGY törli a binből (nem ide
+     tartozik). Mégse = folytatás módosítás nélkül (a bin változatlan). -->
+<div id="orphRangeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);
+  backdrop-filter:blur(6px);align-items:center;justify-content:center;z-index:1000;padding:20px;">
+  <div style="width:min(520px,100%);background:var(--bg-2);border:1px solid var(--border-bright);
+    border-radius:18px;padding:22px;max-height:92vh;overflow-y:auto;">
+    <h3 style="margin:0 0 6px;font-size:17px;color:#fff;" data-i18n="sof.or.title">⚠️ Mentett tétel a menetlevél időszakában</h3>
+    <p style="color:var(--muted);font-size:12.5px;margin:0 0 12px;" data-i18n="sof.or.hint">
+      Van olyan korábbi tankolás vagy vásárlás sor, aminek dátuma az indulás és érkezés napja közé esik. Hozzáadod a menetlevélhez, vagy törlöd (ha mégsem ide tartozik)?</p>
+    <div id="orphRangeList" style="max-height:52vh;overflow-y:auto;"></div>
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+      <button onclick="orphRangeCancel()" style="flex:1;min-width:110px;padding:12px;border-radius:8px;border:1px solid var(--border-bright);
+        background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;" data-i18n="sof.or.cancel">Mégse</button>
+      <button onclick="orphRangeDelete()" style="flex:1;min-width:110px;padding:12px;border-radius:8px;border:1px solid rgba(239,68,68,0.4);
+        background:rgba(239,68,68,0.10);color:#ef4444;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="sof.or.delete">🗑 Törlés</button>
+      <button onclick="orphRangeAdd()" style="flex:2;min-width:130px;padding:12px;border-radius:8px;border:none;
+        background:linear-gradient(180deg,#16a34a,#15803d);color:#fff;font-size:13px;font-weight:700;cursor:pointer;" data-i18n="sof.or.add">✓ Hozzáadás</button>
     </div>
   </div>
 </div>
