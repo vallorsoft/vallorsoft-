@@ -5247,3 +5247,189 @@ window.onLangChange = function(lang) {
     if (_meData && cv && cv.style.display !== 'none') soferShowContactList(_meData);
   } catch(e) {}
 };
+
+// ============================================================
+// PULL-TO-REFRESH — lehúzással frissítés (mint natív mobil app / PWA)
+// ============================================================
+// A body-n `overscroll-behavior:none` blokkolja a natív böngésző-PTR-t
+// (szándékos, hogy az app ne frissüljön véletlenül el a menetlevél-form
+// billentyűzet-visszapattanásán); helyette saját, egyszerű implementáció:
+// a látható `.pane-sofer` (fő görgethető panel) tetején — ha a scrollTop
+// 0 és a sofőr lefelé húz — egy pill animáció jelenik meg. Küszöb fölött
+// elengedéskor újratölti az aktív szekció adatait.
+//
+// Csak érintőképernyős eszközön aktív (touch). Blokkolva: bevitel közben,
+// nyitott modal-ban, folyamatban lévő frissítés alatt.
+(function initSoferPullToRefresh() {
+  var hasTouch = ('ontouchstart' in window) || (navigator && navigator.maxTouchPoints > 0);
+  if (!hasTouch) return;
+
+  var THRESHOLD = 70;          // px a küszöb (lassított útból!)
+  var MAX_PULL  = 120;         // px maximum húzási táv
+  var DAMP      = 0.5;         // súrlódás — a natív érzethez
+  var pill = null;
+  var startY = 0, currentY = 0;
+  var pulling = false, active = false, refreshing = false;
+  var currentPane = null;
+
+  function ensurePill() {
+    if (pill) return;
+    pill = document.createElement('div');
+    pill.className = 'sof-ptr';
+    pill.innerHTML = '<span class="sof-ptr-icon">↓</span><span class="sof-ptr-text"></span>';
+    document.body.appendChild(pill);
+  }
+
+  function setState(state, dist) {
+    if (!pill) ensurePill();
+    var iconEl = pill.querySelector('.sof-ptr-icon');
+    var textEl = pill.querySelector('.sof-ptr-text');
+    if (state === 'idle') {
+      pill.style.transform = 'translate(-50%, -60px)';
+      pill.style.opacity = '0';
+      pill.classList.remove('ready', 'refresh');
+      return;
+    }
+    var y = Math.min(dist, MAX_PULL);
+    pill.style.transform = 'translate(-50%, ' + Math.max(4, y - 30) + 'px)';
+    pill.style.opacity = String(Math.min(1, dist / 40));
+    if (state === 'pull') {
+      pill.classList.remove('ready', 'refresh');
+      iconEl.textContent = '↓';
+      textEl.textContent = (typeof t === 'function') ? t('sof.ptr.pull') : 'Húzd le a frissítéshez';
+    } else if (state === 'ready') {
+      pill.classList.add('ready');
+      pill.classList.remove('refresh');
+      iconEl.textContent = '↑';
+      textEl.textContent = (typeof t === 'function') ? t('sof.ptr.release') : 'Elengedéskor frissítés';
+    } else if (state === 'refresh') {
+      pill.classList.add('refresh');
+      pill.classList.remove('ready');
+      iconEl.innerHTML = '<span class="spinner"></span>';
+      textEl.textContent = (typeof t === 'function') ? t('sof.ptr.refreshing') : 'Frissítés…';
+      pill.style.transform = 'translate(-50%, 40px)';
+      pill.style.opacity = '1';
+    }
+  }
+
+  function visiblePane() {
+    var panes = document.querySelectorAll('.pane-sofer');
+    for (var i = 0; i < panes.length; i++) {
+      if (!panes[i].classList.contains('hidden')) return panes[i];
+    }
+    return null;
+  }
+
+  function isModalOpen() {
+    // Nyitott modal (display:flex) — a PTR blokkolva; a modal-belüli
+    // görgetést ne befolyásolja.
+    var modalIds = ['hoModal', 'bugModal', 'wbConfirmModal', 'receiptReviewModal',
+                    'orderPickerModal', 'wbLocModal', 'sofConfirmModal', 'sofTimeModal',
+                    'sofChoiceModal', 'pendingAddModal', 'orphRangeModal'];
+    for (var i = 0; i < modalIds.length; i++) {
+      var m = document.getElementById(modalIds[i]);
+      if (m && m.style && m.style.display === 'flex') return true;
+    }
+    return false;
+  }
+
+  function refreshCurrent() {
+    var pane = currentPane || visiblePane();
+    setState('refresh', THRESHOLD);
+    // Az aktív szekció adat-betöltői. Az egyes handlerek async fetch-ek —
+    // a UI 900 ms után visszaáll, ami elég a legtöbb hálózati kérésre.
+    try {
+      if (!pane) return;
+      var id = pane.id;
+      if (id === 'sec-dash') {
+        if (typeof loadDashOrders === 'function')        loadDashOrders();
+        if (typeof loadSoferMiniStats === 'function')    loadSoferMiniStats();
+        if (typeof loadMyAssignedVehicle === 'function') loadMyAssignedVehicle();
+        if (typeof renderPendingReceipts === 'function') renderPendingReceipts();
+        if (typeof applyBonScanVisibility === 'function') applyBonScanVisibility();
+      } else if (id === 'sec-fuvar') {
+        // Csak a fuvar-választó lépésen frissítünk (a step2 űrlap-adatait
+        // NEM bántjuk — a piszkozat élne, de a listát nem kell újratölteni).
+        var step2 = document.getElementById('fuvarStep2');
+        if (!step2 || step2.style.display === 'none') {
+          if (typeof loadSoferOrders === 'function')       loadSoferOrders();
+          if (typeof renderDraftResume === 'function')     renderDraftResume();
+          if (typeof renderPendingReceipts === 'function') renderPendingReceipts();
+        }
+      } else if (id === 'sec-border') {
+        if (typeof loadBorderLog === 'function') loadBorderLog();
+      } else if (id === 'sec-docs') {
+        if (typeof loadDocOrderOptions === 'function') loadDocOrderOptions();
+      }
+      // sec-chat: WhatsApp-átirányítós (nincs mit frissíteni)
+    } catch (_) {}
+    setTimeout(function () {
+      setState('idle', 0);
+      refreshing = false;
+    }, 900);
+  }
+
+  function onStart(e) {
+    if (refreshing) return;
+    // Ne indítson űrlap-bevitel közben (input/textarea/select) — a
+    // billentyűzet fókusz + görgetés zavarása.
+    var tgt = e.target || {};
+    var tag = String(tgt.tagName || '').toUpperCase();
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tgt.isContentEditable) return;
+    if (isModalOpen()) return;
+    var pane = visiblePane();
+    if (!pane) return;
+    if ((pane.scrollTop || 0) > 0) return;
+    var touch = (e.touches && e.touches[0]) || e;
+    startY = touch.clientY;
+    currentY = startY;
+    pulling = true;
+    active = false;
+    currentPane = pane;
+  }
+
+  function onMove(e) {
+    if (!pulling || refreshing) return;
+    var touch = (e.touches && e.touches[0]) || e;
+    currentY = touch.clientY;
+    var dy = currentY - startY;
+    // Ha közben a sofőr feljebb görgette (a scroll már nem 0), megszakad.
+    if (currentPane && currentPane.scrollTop > 0) {
+      pulling = false;
+      if (active) setState('idle', 0);
+      active = false;
+      return;
+    }
+    if (dy <= 0) {
+      if (active) setState('idle', 0);
+      active = false;
+      return;
+    }
+    if (!active) { active = true; ensurePill(); }
+    // preventDefault csak akkor, ha valóban lefelé húzzuk (a scroll
+    // fölött vagyunk) — így a görgetés máshol érintetlen.
+    try { e.preventDefault(); } catch (_) {}
+    var dist = Math.min(dy * DAMP, MAX_PULL);
+    setState(dist >= THRESHOLD ? 'ready' : 'pull', dist);
+  }
+
+  function onEnd() {
+    if (!pulling) return;
+    pulling = false;
+    if (!active) return;
+    var dy = currentY - startY;
+    var dist = dy * DAMP;
+    if (dist >= THRESHOLD) {
+      refreshing = true;
+      refreshCurrent();
+    } else {
+      setState('idle', 0);
+    }
+    active = false;
+  }
+
+  document.addEventListener('touchstart',  onStart, { passive: true });
+  document.addEventListener('touchmove',   onMove,  { passive: false });
+  document.addEventListener('touchend',    onEnd,   { passive: true });
+  document.addEventListener('touchcancel', onEnd,   { passive: true });
+})();

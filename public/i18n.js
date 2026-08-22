@@ -2996,6 +2996,10 @@
     'sof.or.delete':           { hu: '🗑 Törlés', ro: '🗑 Șterge' },
     'sof.or.add':              { hu: '✓ Hozzáadás', ro: '✓ Adaugă' },
     'sof.or.confirmDelete':    { hu: 'Biztosan törlöd a bepipált tételeket? Ezek NEM kerülnek a menetlevélre, és a mentett tárolóból is törlődnek.', ro: 'Sigur ștergi pozițiile bifate? NU vor fi adăugate la foaie și vor fi șterse și din memorie.' },
+    // ── Pull-to-refresh (lehúzással frissítés, mint natív mobilban) ──
+    'sof.ptr.pull':            { hu: 'Húzd le a frissítéshez', ro: 'Trage în jos pentru reîmprospătare' },
+    'sof.ptr.release':         { hu: 'Elengedéskor frissítés', ro: 'Eliberează pentru reîmprospătare' },
+    'sof.ptr.refreshing':      { hu: 'Frissítés…', ro: 'Se reîmprospătează…' },
     'sof.createWaybillHint2':  { hu: 'A fuvarokat a következő lépésben pipálod be a listából.', ro: 'Vei bifa cursele în pasul următor, dintr-o listă.' },
     'sof.manageOrders':        { hu: '✏️ Fuvarok kezelése (hozzáadás/eltávolítás)', ro: '✏️ Gestionează cursele (adaugă/elimină)' },
     'sof.draftCont.ask':       { hu: 'Van egy megkezdett menetleveled. FOLYTATOD? (Mégse = TÖRLÉS választása)', ro: 'Ai o foaie de parcurs începută. CONTINUI? (Anulează = alege ȘTERGERE)' },

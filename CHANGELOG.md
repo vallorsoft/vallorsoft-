@@ -14,6 +14,32 @@
 
 ---
 
+## 2026-08-22 — Sofőr: lehúzással frissítés (pull-to-refresh, natív PWA-érzet)
+
+### Miért
+A sofőr felület mobil PWA-ban (kezdőképernyőre telepítve) a natív böngésző pull-to-refresh-t elveszti — a `body`-n szándékos `overflow:hidden` + `overscroll-behavior:none` blokkolja (különben a menetlevél-form billentyűzet-visszapattanása véletlenül refresh-hez vezetne). A sofőrök jelezték, hogy a többi mobil-appban ezt megszokták → új adat lekérésére most az al-menük közötti nav-kattintás vagy az app újranyitás kell.
+
+### Mit tesz
+1. **Új közös pull-to-refresh** (`initSoferPullToRefresh` IIFE a `public/sofer.js` végén) — a látható `.pane-sofer` (fő görgethető panel) tetején, ha a `scrollTop === 0` és a sofőr lefelé húz, egy pill jelenik meg középen felül: `↓ Húzd le a frissítéshez` → küszöb (70 px lassított útból) fölött zöld gradiensre vált `↑ Elengedéskor frissítés` → elengedéskor spinner + `Frissítés…`.
+2. **Aktív szekció szerinti újratöltés** — `sec-dash` esetén `loadDashOrders` + `loadSoferMiniStats` + `loadMyAssignedVehicle` + `renderPendingReceipts` + `applyBonScanVisibility`; `sec-fuvar`-nál (csak step1-en) `loadSoferOrders` + `renderDraftResume` + `renderPendingReceipts` — a step2 menetlevél-űrlap adatait NEM bántja; `sec-border` → `loadBorderLog`; `sec-docs` → `loadDocOrderOptions`; `sec-chat` (WhatsApp-átirányítós) érintetlen.
+3. **Blokkolt esetek** — folyamatban lévő frissítés, nyitott modal (`hoModal`/`bugModal`/`wbConfirmModal`/`receiptReviewModal`/`orderPickerModal`/`wbLocModal`/`sofConfirmModal`/`sofTimeModal`/`sofChoiceModal`/`pendingAddModal`/`orphRangeModal`), bevitel közben (INPUT/TEXTAREA/SELECT/contentEditable). Ha a húzás közben a sofőr feljebb görget (scrollTop > 0), a PTR megszakad.
+4. **Csak érintőképernyős eszközön aktív** — `hasTouch` = `'ontouchstart' in window || navigator.maxTouchPoints > 0`; asztali gépnél az IIFE azonnal return-ol, semmi nem történik.
+5. **CSS** (`public/sofer.css` új blokk): `.sof-ptr` pill (fixed top center, kék→zöld gradiens ready/refresh állapotban, `env(safe-area-inset-top)` figyelembevétel a notchos telefonokhoz), `@keyframes sof-ptr-spin` a spinnerhez. A pill `pointer-events:none` — nem zavarja meg a görgetést, csak vizuális.
+6. **Sub-mp visszatérés** — a `refreshCurrent` fire-and-forget indítja a betöltőket, 900 ms után a pill visszahúzódik és unlockolja a következő húzást. A háttérben az egyes handlerek folytatják az adatlekérést és renderelést a saját ütemükben.
+
+### Szerver / DB
+- **Nincs séma-változás, nincs új szerver-handler** — tisztán kliens-oldali fluxus a meglévő `load*` handlereket használva.
+
+### Kliens
+- **`public/sofer.js`** — új `initSoferPullToRefresh` IIFE a fájl végén (~185 sor): `ensurePill` / `setState` / `visiblePane` / `isModalOpen` / `refreshCurrent` / `onStart` / `onMove` / `onEnd` (touch event handlerek), THRESHOLD/MAX_PULL/DAMP konstansok.
+- **`public/sofer.css`** — új `.sof-ptr` + `.sof-ptr.ready` + `.sof-ptr.refresh` + `.sof-ptr-icon` + `@keyframes sof-ptr-spin` blokk a fájl végén.
+- **`public/i18n.js`** — 3 új kulcs (`sof.ptr.pull`, `sof.ptr.release`, `sof.ptr.refreshing`, RO-alap + HU). Cache-bust `sofer.html` `sofer.js`+`sofer.css`+`i18n.js` `?v=20260822ptr`.
+
+### Teszt
+- Szintaxis-ellenőrzés + teljes suite: **965 Jest zöld** (nincs regresszió, 42/42 sofer-client-flow zöld). A PTR IIFE a teszt-sandboxban azonnal return-ol (`hasTouch` = false → nincs touch-event a JSDOM-mentes stubban), így nincs mit tesztelni belőle unit-szinten; a hozzáférhető szempontok (tartja a `_meData`-t stb.) érintetlenek.
+
+---
+
 ## 2026-08-22 — Sofőr menetlevél: bon-scan orphan bin, „mentett" és „elkezdett" menetlevél összeolvasztása, pending-add popup
 
 ### Miért
