@@ -14,6 +14,34 @@
 
 ---
 
+## 2026-08-22 — Sofőr menetlevél: bon-scan orphan bin, „mentett" és „elkezdett" menetlevél összeolvasztása, pending-add popup
+
+### Miért
+Ha a sofőr rácsapott a `📷 Bon szkennelés (AI)` gombra, DE közben nem volt megkezdett menetlevele, a rendszer az `rrAccept`-nél **automatikusan létrehozott egy teljesen üres draft-ot** csak azért, hogy legyen hová tenni a scannelt tétel. Ez a következő menetlevél-nyitáskor mint „megkezdett menetlevél" jelent meg és folytatásra kínálta magát. Ráadásul volt egy külön „Mentett menetlevelek (telefonon)" szekció is (a manuális `saveLocalDraft`-hoz), ami két szinte azonos rendszert működtetett párhuzamosan → tipikus zavaró élmény. Ha a sofőr törölte a piszkozatot, a beírt / bon-alapú tankolás/vásárlás sorok **elvesztek**.
+
+### Mit tesz
+1. **Az `rrAccept` NEM hoz létre üres draft-ot** többé. Ha nincs step2 és nincs megkezdett draft → a scannelt tétel az **orphan binbe** (`vs_sofer_orphan_items`, per-sofőr localStorage) kerül. Van megkezdett draft → mint eddig, oda kerül.
+2. **A menetlevél Plecare-je után új „📋 Korábbi tétel — hozzáadod?" popup** — az orphan bin sorai + a queue ready-státuszú scannelt bonjai egyetlen listában, alapból mind pipálva, `Mind` / `Egy sem` gyors-választással. `✓ Hozzáadás`: a kijelöltek a szerkesztőbe kerülnek + a forrásból (bin / queue + kép) törlődnek. `Kihagyás`: érintetlen, a beküldés előtt még egyszer szólunk.
+3. **A törölt draft tankolás/vásárlás sorai megmaradnak** — `fuvarCreate` „TÖRLÉS"-ága és `discardDraft` egyaránt az orphan binbe menti az alim/ach sorokat, MIELŐTT a draft-ot törli (csak a valódi tartalmú sorokat, üres „➕" sorokat kihagyva). A következő menetlevél nyitásakor a popup magától felajánlja őket.
+4. **„Mentett menetlevelek (telefonon)" szekció eltávolítva** — a sofer.html-ből a szakasz-fejléc + lista + a step2 `💾 Mentés a telefonra` gomb kikerült. Csak az automatikusan-mentett draft él (per-sofőr localStorage-ban, éppúgy mint eddig), tehát a sofőr NEM lát külön „mentett" és „elkezdett" listát. Az offline outbox mechanizmus háttérben tovább használja a `soferLoadLocalDrafts` array-t `pendingSubmit=true` jelzővel — funkcionálisan érintetlen, csak nincs manuális UI hozzá.
+5. **Beküldés előtti figyelmeztetés** — a `_submitFuvarlevelFinal`-ban, a `wbConfirmOpen` ELŐTT: ha az orphan binben van olyan tétel, aminek DÁTUMA (óra nem számít, ahogy a felhasználó kérte) az indulás–érkezés napok közé esik, a `orphRangeModal` felugrik. A sofőr eldönti: `✓ Hozzáadás` (a menetlevélre + törlés a binből) / `🗑 Törlés` (nem ide tartozik, dupla-confirm-mel törli a binből) / `Mégse` (folytatja a beküldést, a bin változatlan).
+
+### Szerver / DB
+- **Nincs séma-változás, nincs új szerver-handler** — a fluxus tisztán kliens-oldali. A meglévő `scanReceipt` / `confirmReceiptExtraction` / `fuvarlevel-save` végpontok érintetlenek.
+
+### Kliens
+- **`public/sofer.js`** — új orphan-bin szekció (`LS_ORPHAN_KEY`, `orphanLoad/Store/AddAlim/AddAch/ClearAll/Count/SaveFromDraft`); új pending-add popup szekció (`_pendingAddRows` állapot, `_receiptToRow`, `_collectPendingAddItems`, `openPendingAddModal`, `pendingAddSelectAll`, `pendingAddConfirm`, `pendingAddSkip`, `_pendingAddClose`); új orphan-range szekció (`_orphanRangeItems`, `_openOrphanRangeModal`, `orphRangeAdd`, `orphRangeDelete`, `orphRangeCancel`, `_closeOrphRange`). Módosítva: `rrAccept` (no-draft → orphan bin), `fuvarCreate` (delete-ág → `orphanSaveFromDraft`), `discardDraft` (ua.), `_startFreshWaybill` (Plecare után `openPendingAddModal` → `fuvarStep2`), `fuvarStep2` (a `_pendingAddRows` konzumálása az alim/ach konténerbe), `_submitFuvarlevelFinal` (orphan-range check a `wbConfirmOpen` előtt).
+- **`public/sofer.html`** — `#localDraftsBox` szekció-fejléc eltávolítva, a hordozó div `display:none`-ra váltva (a legacy `renderLocalDrafts` hívások nem törnek). `💾 Mentés a telefonra` gomb kivéve a step2-ből. Új modálok: `#pendingAddModal` (📋 Korábbi tétel — hozzáadod?) és `#orphRangeModal` (⚠️ Mentett tétel a menetlevél időszakában) — a projekt sof-modal mintáját követve (glass, ujjbarát gombok, világos/sötét téma).
+- **`public/i18n.js`** — 15 új kulcs (`sof.pa.*` × 8 + `sof.or.*` × 6 + `sof.resume.discarded` átfogalmazva); az `sof.offlineHint` szöveg is átfogalmazva („nincs mentett vs. elkezdett — csak elkezdett" konvencióhoz igazítva). Cache-bust: `sofer.html` `sofer.js`+`i18n.js` `?v=20260822orphan`.
+
+### Teszt
+- **`tests/integration/sofer-client-flow.test.js`** +8 új eset a `describe('orphan bin — árva tankolás/vásárlás sorok megőrzése')`-ben: (a) rrAccept nincs draft → orphan binbe, NEM keletkezik üres draft; (b) rrAccept van draft → a draftba, orphan érintetlen; (c) `fuvarCreate` DELETE-ág → alim/ach az orphan binbe; (d) `discardDraft` → alim/ach átmenődik; (e) `orphanSaveFromDraft` üres sort NEM ment; (f) `_orphanRangeItems` DÁTUM-alapú (nem óra) szűrés; (g) `openPendingAddModal` üres kollekcióra azonnal callback; (h) van orphan → modal nyílik, `pendingAddSkip` → cb + bin érintetlen. **965 Jest zöld** (957 → 965, +8; 7 skip valós-DB), nincs regresszió.
+
+### Jövőbeli takarítás (nem sürgős)
+- A `saveLocalDraft` / `loadLocalDraft` / `deleteLocalDraft` / `renderLocalDrafts` függvények megmaradtak (az offline outbox mechanizmus + a `renderLocalDrafts()` hívások a kódban), de UI-ból eltávolítva. Ha az offline outbox-ot később külön adat-struktúrára cseréljük, ezek is elhagyhatók.
+
+---
+
 ## 2026-08-21 — Szerviz-napló: Halasztás / Elvégezve modal + pipálható tétel-lista + jelzés-újratervezés
 
 ### Miért

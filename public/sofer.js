@@ -890,6 +890,13 @@ function resumeDraft() {
 
 function discardDraft() {
   if (!confirm(t('sof.resume.confirmDiscard'))) return;
+  // Törlés előtt a tankolás/vásárlás sorokat átmentjük az orphan binbe,
+  // hogy a következő menetlevél kezdésekor a popup felajánlja őket
+  // (a sofőr által beírt/bon-alapú adat így soha nem vész el egy törléstől).
+  try {
+    var dr = (stateGet() || {}).draft;
+    if (dr) orphanSaveFromDraft(dr);
+  } catch (_) {}
   draftClear();
   renderDraftResume();
   toast(t('sof.resume.discarded'), '');
@@ -1198,7 +1205,15 @@ function fuvarCreate() {
   if (_draftHasContent(st.draft)) {
     _draftContinueOrDelete(function (choice) {
       if (choice === 'continue') _continueSavedDraft();
-      else if (choice === 'delete') { draftClear(); renderDraftResume(); _startFreshWaybill(); }
+      else if (choice === 'delete') {
+        // Törlés előtt a tankolás/vásárlás sorokat átmentjük az orphan
+        // binbe — a következő menetlevél kezdésekor a popup felajánlja
+        // hozzáadásra (a sofőr által beírt/bon-alapú adat nem vész el).
+        try { orphanSaveFromDraft(st.draft); } catch (_) {}
+        draftClear();
+        renderDraftResume();
+        _startFreshWaybill();
+      }
       // 'cancel' → nem csinálunk semmit, marad az 1. lépésen
     });
     return;
@@ -1228,13 +1243,17 @@ function _startFreshWaybill() {
     var proceed = function () {
       _autoCollectCompletedStops();
       var added = _selectedOrderIds.length;
-      fuvarStep2(true);
-      if (added) {
-        // Kis késleltetés — a step2 render UTÁN mutassuk a toastot.
-        setTimeout(function () { toast(t('sof.auto.added', { n: added }), 'ok'); }, 100);
-      } else {
-        setTimeout(function () { toast(t('sof.auto.empty'), 'info'); }, 100);
-      }
+      // Popup: van korábban scannelt / árva tankolás-vásárlás sor?
+      // A `openPendingAddModal` a kiválasztottakat a `_pendingAddRows`-ba
+      // teszi, amit a `fuvarStep2` az alim/ach konténerbe olvas.
+      openPendingAddModal(function () {
+        fuvarStep2(true);
+        if (added) {
+          setTimeout(function () { toast(t('sof.auto.added', { n: added }), 'ok'); }, 100);
+        } else {
+          setTimeout(function () { toast(t('sof.auto.empty'), 'info'); }, 100);
+        }
+      });
     };
     if (!_soferOrdersCache.length) {
       fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1249,6 +1268,163 @@ function _startFreshWaybill() {
       proceed();
     }
   });
+}
+
+// A menetlevél kezdésekor felajánljuk az orphan bin + a ready-státuszú
+// scannelt bonok hozzáadását az új menetlevélhez. A sofőr pipálja, mi
+// kerüljön be. Kihagyáskor a tételek a helyükön maradnak (a beküldés
+// előtt még egyszer szólunk, ha date-ben belelógnak az útba).
+//
+//  cb() — hívjuk mindenképpen a folytatás előtt (popup zárult).
+//
+// A kiválasztott sorokat a `_pendingAddRows` globális változóba tesszük;
+// a `fuvarStep2` az alim/ach konténerek kiürítése UTÁN olvassa be.
+var _pendingAddRows = null;   // { alim: [], ach: [] } vagy null
+
+// A ready-státuszú scannelt bon a queue-ból alim/ach sorrá konvertálva.
+function _receiptToRow(it) {
+  var f = (it && it.fields) || {};
+  var today = (typeof _todayLocalDate === 'function') ? _todayLocalDate() : '';
+  var kind = it.kind || (f.kind === 'fuel' ? 'fuel' : 'purchase');
+  if (kind === 'fuel') {
+    return {
+      _rid: it.id, _rk: 'fuel',
+      loc:   f.loc  || '',
+      data:  f.data || today,
+      tip:   (f.tip === 'AdBlue' ? 'AdBlue' : 'Motorină'),
+      litru: (f.litru != null ? String(f.litru) : '0'),
+      km:    (f.km    != null ? String(f.km)    : '0'),
+      plata: f.plata || 'Card',
+      suma:  (f.suma  != null ? String(f.suma)  : '0')
+    };
+  }
+  return {
+    _rid: it.id, _rk: 'purchase',
+    produs: f.produs || '',
+    loc:    f.loc  || '',
+    data:   f.data || today,
+    pret:   (f.suma != null ? String(f.suma) : '0'),
+    plata:  f.plata || 'Card'
+  };
+}
+
+// A hozzáadható tételek listája: orphan bin sorai + a queue ready sorai
+// egy egységes listaként. `src` mutatja a forrást (bin/queue).
+function _collectPendingAddItems() {
+  var out = [];
+  var bin = orphanLoad();
+  (bin.alim || []).forEach(function (a, i) { out.push({ src: 'bin', kind: 'fuel',     idx: i, row: a }); });
+  (bin.ach  || []).forEach(function (a, i) { out.push({ src: 'bin', kind: 'purchase', idx: i, row: a }); });
+  var q = rcptQueueLoad();
+  q.forEach(function (it) {
+    if (it && it.status === 'ready') {
+      var row = _receiptToRow(it);
+      out.push({ src: 'queue', kind: row._rk, id: it.id, row: row });
+    }
+  });
+  return out;
+}
+
+// Popup megnyitása. Ha nincs hozzáadható tétel → azonnal `cb()`.
+function openPendingAddModal(cb) {
+  var items = _collectPendingAddItems();
+  if (!items.length) { _pendingAddRows = null; if (typeof cb === 'function') cb(); return; }
+  var m = document.getElementById('pendingAddModal');
+  var list = document.getElementById('pendingAddList');
+  if (!m || !list) {
+    // Régi HTML (még nem cache-frissítve) → nem blokkolunk, mint eddig.
+    _pendingAddRows = null;
+    if (typeof cb === 'function') cb();
+    return;
+  }
+  _pendingAddCb = cb || function () {};
+  _pendingAddItems = items;
+  // Alap: mindegyik pipálva (a sofőr könnyen indíthat mindet vagy leszedhet)
+  list.innerHTML = items.map(function (it, i) {
+    var r = it.row || {};
+    var icon = (it.kind === 'fuel') ? '⛽' : '🛒';
+    var kindLabel = (it.kind === 'fuel') ? t('sof.rr.kindFuel') : t('sof.rr.kindPurchase');
+    var srcBadge = (it.src === 'queue')
+      ? '<span class="pa-src pa-src-q">📷 ' + esc(t('sof.rr.kindPurchase') === kindLabel ? '' : '') + esc(t('sof.pa.srcScan')) + '</span>'
+      : '<span class="pa-src pa-src-b">' + esc(t('sof.pa.srcSaved')) + '</span>';
+    var d = r.data ? esc(String(r.data).slice(0, 10)) : '—';
+    var sumNum = (it.kind === 'fuel') ? (parseFloat(r.suma) || 0) : (parseFloat(r.pret) || 0);
+    var sum = '';
+    if (sumNum) { try { sum = sumNum.toLocaleString(t('sof.locale')) + ' RON'; } catch (_) { sum = String(sumNum) + ' RON'; } }
+    var loc = r.loc || r.produs || '—';
+    var extra = '';
+    if (it.kind === 'fuel') {
+      var lit = parseFloat(r.litru) || 0;
+      if (lit) extra = lit + ' L';
+    } else if (r.produs && r.loc) {
+      extra = esc(r.loc);
+    }
+    return '<label class="pa-item">'
+      + '<input type="checkbox" class="pa-chk" data-idx="' + i + '" checked>'
+      + '<div class="pa-body">'
+      + '<div class="pa-head">' + icon + ' ' + esc(loc) + ' ' + srcBadge + '</div>'
+      + '<div class="pa-sub">📅 ' + d + (sum ? ' · 💵 ' + esc(sum) : '') + (extra ? ' · ' + extra : '') + '</div>'
+      + '</div>'
+      + '</label>';
+  }).join('');
+  m.style.display = 'flex';
+}
+
+var _pendingAddCb = null;
+var _pendingAddItems = [];
+
+// „Mind" / „Semmi" gyors-pipa a popupban.
+function pendingAddSelectAll(on) {
+  document.querySelectorAll('#pendingAddList .pa-chk').forEach(function (cb) { cb.checked = !!on; });
+}
+
+function pendingAddConfirm() {
+  var selected = [];
+  document.querySelectorAll('#pendingAddList .pa-chk').forEach(function (cb) {
+    if (cb.checked) {
+      var i = parseInt(cb.getAttribute('data-idx'), 10);
+      if (!isNaN(i) && _pendingAddItems[i]) selected.push(_pendingAddItems[i]);
+    }
+  });
+  // A kiválasztott tételeket a fuvarStep2-nek átadjuk, ÉS eltávolítjuk
+  // a forrásból (orphan bin / queue). Ha bin: idx-alapján töröljük.
+  // Ha queue: rcptQueueRemove (a kép is takarítódik).
+  var rowsAlim = [], rowsAch = [];
+  var binDelAlim = {}, binDelAch = {};
+  var queueDelIds = [];
+  selected.forEach(function (it) {
+    if (it.src === 'bin') {
+      if (it.kind === 'fuel') binDelAlim[it.idx] = true;
+      else                    binDelAch[it.idx]  = true;
+    } else if (it.src === 'queue') {
+      queueDelIds.push(it.id);
+    }
+    if (it.kind === 'fuel') rowsAlim.push(it.row);
+    else                    rowsAch.push(it.row);
+  });
+  // Orphan bin — törlés indexek szerint
+  var bin = orphanLoad();
+  bin.alim = (bin.alim || []).filter(function (_a, i) { return !binDelAlim[i]; });
+  bin.ach  = (bin.ach  || []).filter(function (_a, i) { return !binDelAch[i];  });
+  orphanStore(bin);
+  // Queue — id-alapján töröljük (a kép is)
+  queueDelIds.forEach(function (id) { try { rcptQueueRemove(id); } catch (_) {} });
+  _pendingAddRows = (rowsAlim.length || rowsAch.length) ? { alim: rowsAlim, ach: rowsAch } : null;
+  _pendingAddClose();
+}
+
+function pendingAddSkip() {
+  // Kihagyás — a tételek a helyükön maradnak; a beküldés előtt még
+  // egyszer szólunk, ha date-ben belelógnak az útba.
+  _pendingAddRows = null;
+  _pendingAddClose();
+}
+
+function _pendingAddClose() {
+  var m = document.getElementById('pendingAddModal');
+  if (m) m.style.display = 'none';
+  var cb = _pendingAddCb; _pendingAddCb = null; _pendingAddItems = [];
+  if (typeof cb === 'function') cb();
 }
 
 // A menetlevél kezdéskor: a sofőr által már ELVÉGZETT (done_at NOT NULL)
@@ -1680,6 +1856,18 @@ function fuvarStep2(allowEmpty) {
       (_dr.achizitii  || []).forEach(function (a) { addAchRow(a); });
     }
   } catch (_e) { /* nincs érvényes piszkozat — üresen indul */ }
+
+  // Pending-add popup által kiválasztott tételek: orphan binből + ready
+  // scannelt bonokból származó sorok. A `_pendingAddRows`-ban gyűjtöttük
+  // össze, itt a DOM-ba tesszük, majd egy `draftSave`-vel biztosítjuk,
+  // hogy a következő auto-piszkozatba is bekerüljenek.
+  if (_pendingAddRows) {
+    var _add = _pendingAddRows;
+    _pendingAddRows = null;
+    (_add.alim || []).forEach(function (a) { addAlimRow(a); });
+    (_add.ach  || []).forEach(function (a) { addAchRow(a);  });
+    try { draftSave(); } catch (_) {}
+  }
 
   // Piszkozat figyeli a változásokat
   attachDraftListeners();
@@ -2380,6 +2568,56 @@ function rcptNewId() {
 }
 
 // ============================================================
+// ORPHAN BIN — árva tankolás/vásárlás sorok, amiknek nincs (még) menetlevele
+// ============================================================
+// Ha a sofőr scannel egy bont VAGY kézzel írt be tankolást/vásárlást,
+// de közben törli / még nincs menetlevele, ez az adat NEM veszhet el:
+// az orphan bin megőrzi a sort, és a következő menetlevél kezdésekor
+// egy popup ablakban felajánljuk hozzáadásra. Ha be sem rakja, akkor a
+// menetlevél beküldése előtt még egyszer szólunk, ha a sor dátuma az
+// indulás–érkezés ablakba esik (date-only, nem óra).
+// Formátum: { alim: [{loc,data,tip,litru,km,plata,suma}], ach: [{...}] }
+var LS_ORPHAN_KEY = 'vs_sofer_orphan_items';
+
+function orphanLoad() {
+  var o = _perDriverGetJson(LS_ORPHAN_KEY, { alim: [], ach: [] }) || {};
+  return { alim: Array.isArray(o.alim) ? o.alim : [], ach: Array.isArray(o.ach) ? o.ach : [] };
+}
+function orphanStore(o) {
+  _perDriverSetJson(LS_ORPHAN_KEY, {
+    alim: (o && Array.isArray(o.alim)) ? o.alim : [],
+    ach:  (o && Array.isArray(o.ach))  ? o.ach  : []
+  });
+}
+function orphanAddAlim(row) { var o = orphanLoad(); o.alim.push(row); orphanStore(o); }
+function orphanAddAch(row)  { var o = orphanLoad(); o.ach.push(row);  orphanStore(o); }
+function orphanClearAll()   { orphanStore({ alim: [], ach: [] }); }
+function orphanCount()      { var o = orphanLoad(); return (o.alim.length + o.ach.length); }
+
+// Az aktuális draft alim/ach sorait az orphan binbe menti (törlés/discard
+// előtt hívjuk). Csak a valódi tartalmú sorokat vesszük fel — az üresen
+// hagyott „➕ hozzáadás" sorokat kihagyjuk, hogy ne szemeteljenek.
+function orphanSaveFromDraft(draft) {
+  if (!draft) return 0;
+  var added = 0;
+  var alim = Array.isArray(draft.alimentari) ? draft.alimentari : [];
+  var ach  = Array.isArray(draft.achizitii)  ? draft.achizitii  : [];
+  alim.forEach(function (a) {
+    if (!a) return;
+    var hasContent = (a.loc || a.data ||
+                      (parseFloat(a.litru) || 0) || (parseFloat(a.km) || 0) ||
+                      (parseFloat(a.suma)  || 0));
+    if (hasContent) { orphanAddAlim(a); added++; }
+  });
+  ach.forEach(function (a) {
+    if (!a) return;
+    var hasContent = (a.loc || a.data || a.produs || (parseFloat(a.pret) || 0));
+    if (hasContent) { orphanAddAch(a); added++; }
+  });
+  return added;
+}
+
+// ============================================================
 // BON-KÉP MEGŐRZÉS (IndexedDB) — a fotó nem veszhet el, amíg a
 // kiolvasás elfogadva nincs
 // ============================================================
@@ -2862,9 +3100,13 @@ function rrAccept() {
   }
 
   // Ha a menetlevél 2. lépés (fuvarStep2) nyitva van → közvetlenül a DOM-ba
-  // teszem a sort (és a draftSave menti automatikusan). Különben a
-  // sessionStorage-i piszkozatot módosítom közvetlenül, hogy a következő
-  // fuvarStep2 megnyitásakor ott legyen a sor.
+  // teszem a sort (és a draftSave menti automatikusan). Ha step2 nem nyitva,
+  // DE van megkezdett draft (a sofőr félbehagyta) → a draft alimentari/
+  // achizitii listájához fűzöm, hogy a következő megnyitásnál látszódjon.
+  // Ha NINCS draft ÉS nincs step2 → NEM hozunk létre üres draft-ot csak
+  // ezért; az adat az orphan binbe kerül, és a következő menetlevél
+  // kezdésekor felajánljuk hozzáadásra. (Így nem keletkezik "árva" üres
+  // menetlevél-piszkozat, ami folyton felajánlja a folytatást.)
   var step2 = document.getElementById('fuvarStep2');
   var step2Visible = step2 && step2.style.display !== 'none';
   if (step2Visible && ((kind === 'fuel' && typeof addAlimRow === 'function')
@@ -2872,17 +3114,19 @@ function rrAccept() {
     if (kind === 'fuel') addAlimRow(newRow); else addAchRow(newRow);
     try { draftSave(); } catch (_) {}
   } else {
-    // A jelenlegi piszkozatot betöltjük (ha van), és hozzáfűzzük az új
-    // sort — a fuvarStep2 legközelebbi megnyitásakor a draftRestore() ezt
-    // visszaállítja. Ha még nincs draft, alap-vázlatot indítunk.
     var st = stateGet();
-    var draft = st.draft || {
-      camion: '', remorca: '', kmInc: '0', kmSf: '0', cantInc: '0', cantSf: '0',
-      mentiuni: '', puncte: [], alimentari: [], achizitii: [], orderIds: [], summary: ''
-    };
-    if (kind === 'fuel') { draft.alimentari = draft.alimentari || []; draft.alimentari.push(newRow); }
-    else { draft.achizitii = draft.achizitii || []; draft.achizitii.push(newRow); }
-    stateSave({ draft: draft });
+    if (st && st.draft) {
+      // Van megkezdett menetlevél → beleillesztjük az új sort a piszkozatba.
+      var draft = st.draft;
+      if (kind === 'fuel') { draft.alimentari = draft.alimentari || []; draft.alimentari.push(newRow); }
+      else { draft.achizitii = draft.achizitii || []; draft.achizitii.push(newRow); }
+      stateSave({ draft: draft });
+    } else {
+      // Nincs menetlevél — orphan binbe, majd a következő menetlevél
+      // kezdésekor a popup felajánlja hozzáadásra.
+      if (kind === 'fuel') orphanAddAlim(newRow);
+      else                 orphanAddAch(newRow);
+    }
   }
 
   // ── TANULÁS: a sofőr által megerősített (esetleg javított) mezőket
@@ -3155,9 +3399,134 @@ function _submitFuvarlevelFinal() {
     return;
   }
 
+  // Beküldés előtt: ha az orphan binben van olyan (korábban félbehagyott
+  // / bon-alapú) tankolás vagy vásárlás sor, aminek DÁTUMA az indulás–
+  // érkezés napok közé esik (óra nem számít), a rendszer szól. A sofőr
+  // eldönti: hozzáadja a menetlevélhez VAGY törli a binből (nyilván nem
+  // ide tartozik). Ha nincs ilyen sor → azonnal tovább az összegzőre.
+  var _orphRange = _orphanRangeItems();
+  if (_orphRange.length) {
+    _openOrphanRangeModal(_orphRange, function () {
+      // A sofőr döntése után folytatjuk a beküldést a normál módon
+      // (a modal action-jai vagy hozzáadtak/töröltek, vagy nem).
+      wbConfirmOpen();
+    });
+    return;
+  }
+
   // Utolsó lépés: összegző + megerősítés. A menetlevél MT-YYYY-XXXX
   // sorszámot kap és nem vonható vissza, ezért a sofőr lássa, mi megy el.
   wbConfirmOpen();
+}
+
+// Az orphan binből azokat a sorokat adja vissza, amiknek dátuma az
+// aktuális indulás–érkezés DÁTUM-ablakba esik (óra nem számít, ahogy
+// a felhasználó kérte). Formátum: [{ src:'bin', kind, idx, row }].
+function _orphanRangeItems() {
+  var dep = (document.getElementById('fIndulasDt') || {}).value || '';
+  var arr = (document.getElementById('fErkezesDt') || {}).value || '';
+  var depD = dep ? String(dep).slice(0, 10) : '';
+  var arrD = arr ? String(arr).slice(0, 10) : '';
+  if (!depD || !arrD) return [];
+  // Ha valaki fordítva írta be, az összehasonlítás legyen szimmetrikus
+  var lo = depD, hi = arrD;
+  if (lo > hi) { var _tmp = lo; lo = hi; hi = _tmp; }
+  var bin = orphanLoad();
+  var res = [];
+  (bin.alim || []).forEach(function (a, i) {
+    var d = a && a.data ? String(a.data).slice(0, 10) : '';
+    if (d && d >= lo && d <= hi) res.push({ src: 'bin', kind: 'fuel', idx: i, row: a });
+  });
+  (bin.ach || []).forEach(function (a, i) {
+    var d = a && a.data ? String(a.data).slice(0, 10) : '';
+    if (d && d >= lo && d <= hi) res.push({ src: 'bin', kind: 'purchase', idx: i, row: a });
+  });
+  return res;
+}
+
+var _orphRangeCb = null;
+var _orphRangeItemsCache = [];
+
+function _openOrphanRangeModal(items, cb) {
+  var m = document.getElementById('orphRangeModal');
+  var list = document.getElementById('orphRangeList');
+  if (!m || !list) { if (typeof cb === 'function') cb(); return; }   // régi HTML
+  _orphRangeCb = cb || function () {};
+  _orphRangeItemsCache = items || [];
+  list.innerHTML = items.map(function (it, i) {
+    var r = it.row || {};
+    var icon = (it.kind === 'fuel') ? '⛽' : '🛒';
+    var d = r.data ? esc(String(r.data).slice(0, 10)) : '—';
+    var sumNum = (it.kind === 'fuel') ? (parseFloat(r.suma) || 0) : (parseFloat(r.pret) || 0);
+    var sum = '';
+    if (sumNum) { try { sum = sumNum.toLocaleString(t('sof.locale')) + ' RON'; } catch (_) { sum = String(sumNum) + ' RON'; } }
+    var loc = r.loc || r.produs || '—';
+    return '<label class="pa-item">'
+      + '<input type="checkbox" class="or-chk" data-i="' + i + '" checked>'
+      + '<div class="pa-body">'
+      + '<div class="pa-head">' + icon + ' ' + esc(loc) + '</div>'
+      + '<div class="pa-sub">📅 ' + d + (sum ? ' · 💵 ' + esc(sum) : '') + '</div>'
+      + '</div>'
+      + '</label>';
+  }).join('');
+  m.style.display = 'flex';
+}
+
+function orphRangeAdd() {
+  // A pipáltakat hozzáadja a menetlevélhez (a DOM-ba is, hogy a beküldő
+  // gyűjtő látni fogja őket), és törli az orphan binből.
+  var selIdx = [];
+  document.querySelectorAll('#orphRangeList .or-chk').forEach(function (cb) {
+    if (cb.checked) selIdx.push(parseInt(cb.getAttribute('data-i'), 10));
+  });
+  var toRemoveAlim = {}, toRemoveAch = {};
+  selIdx.forEach(function (i) {
+    var it = _orphRangeItemsCache[i];
+    if (!it) return;
+    if (it.kind === 'fuel') { addAlimRow(it.row); toRemoveAlim[it.idx] = true; }
+    else                    { addAchRow(it.row);  toRemoveAch[it.idx]  = true; }
+  });
+  var bin = orphanLoad();
+  bin.alim = (bin.alim || []).filter(function (_a, i) { return !toRemoveAlim[i]; });
+  bin.ach  = (bin.ach  || []).filter(function (_a, i) { return !toRemoveAch[i];  });
+  orphanStore(bin);
+  try { draftSave(); } catch (_) {}
+  _closeOrphRange();
+}
+
+function orphRangeDelete() {
+  // A pipáltakat TÖRLI az orphan binből (nem tartoznak ide) — nem kerülnek
+  // a menetlevélre.
+  if (!confirm(t('sof.or.confirmDelete'))) return;
+  var selIdx = [];
+  document.querySelectorAll('#orphRangeList .or-chk').forEach(function (cb) {
+    if (cb.checked) selIdx.push(parseInt(cb.getAttribute('data-i'), 10));
+  });
+  var toRemoveAlim = {}, toRemoveAch = {};
+  selIdx.forEach(function (i) {
+    var it = _orphRangeItemsCache[i];
+    if (!it) return;
+    if (it.kind === 'fuel') toRemoveAlim[it.idx] = true;
+    else                    toRemoveAch[it.idx]  = true;
+  });
+  var bin = orphanLoad();
+  bin.alim = (bin.alim || []).filter(function (_a, i) { return !toRemoveAlim[i]; });
+  bin.ach  = (bin.ach  || []).filter(function (_a, i) { return !toRemoveAch[i];  });
+  orphanStore(bin);
+  _closeOrphRange();
+}
+
+function orphRangeCancel() {
+  // Mégse: sem nem adja hozzá, sem nem törli (a bin változatlan);
+  // folytatás a beküldő összegzővel.
+  _closeOrphRange();
+}
+
+function _closeOrphRange() {
+  var m = document.getElementById('orphRangeModal');
+  if (m) m.style.display = 'none';
+  var cb = _orphRangeCb; _orphRangeCb = null; _orphRangeItemsCache = [];
+  if (typeof cb === 'function') cb();
 }
 
 // ── Beküldés-összegző (mit küldünk el?) ─────────────────────────────
