@@ -14,6 +14,36 @@
 
 ---
 
+## 2026-08-23 — Sofőr: interaktív első-belépéses BEMUTATÓ (DEMÓ fuvarral) + „🎓 Bemutatás" gomb az újranyitáshoz
+
+### Miért
+Az új sofőrt eddig kézzel kellett betanítani a felületre — mi micsoda, mi függ össze mivel, mit ne bántson. Volt aki az „állomás-gombot" nem merte megnyomni, mert nem tudta hogy VISSZAVONHATATLAN, más a menetlevelet nem találta meg, harmadik a bon-scannerről nem tudott. Kérés: **az első regisztrációba legyen példa fuvar és példa menetlevél is, hogy tényleg nyomogassa végig, és legyen „Demó" gomb, amivel bármikor újranyithatja** — így képzés nélkül is megtanulja magától.
+
+### Mit tesz
+1. **Új önálló modul `public/sofer-tour.js`** (~700 sor, IIFE) — `window.SoferTour = { start(force), stop(), isDone(), resetSeen(), demoIntercept(kind, action), _next(), _prev(), _reflow() }`. Semmi új szerver-oldal; tisztán kliens.
+2. **DEMÓ fuvar injektálva a főoldali `_soferOrdersCache`-be** (`id: 'CMD-DEMO-001'`, `_isDemo: true`, Cluj-Napoca → București, DEMO-01/DEMO-02 rendszám, FTL 22 000 kg, 2 stop-tömb). A rendes `renderFuvarCard` renderelni tudja; a wrapper `data-order-id` + `data-tour-demo="1"` markert kap, a kártya tetejére napnyugta gradiens **📚 DEMÓ** badge kerül — sose téveszti össze valós fuvarral.
+3. **14 lépéses coach-mark walkthrough** (RO-alap + HU): 👋 Welcome center-card → topbar/nyelvváltó → kiosztott fuvarok szekció → DEMÓ kártya kinyitása (várja a valódi klikket) → állomás-gomb (várja a valódi klikket, léptet: 📍→📦→📍→✅) → 🛂 Határátlépés menü → 🇷🇴 RO BE gomb (várja a klikket) → 📄 Menetlevél menü → „📄 Menetlevél létrehozása" gomb → 📷 Bon szkennelés (AI) → 📁 Iratok/CMR → 💬 Chat → ↓ Pull-to-refresh → 🐛 Bug FAB → 🎉 Kész center-card.
+4. **Interaktív, tényleg végigkoppintható** — a lépések nagy része (kártya-kinyitás, állomás-gomb, határátlépés BE, menetlevél/iratok/chat nav) a valódi UI-elemre vár koppintás-figyelővel (globális `click` capture). A sofőr **tényleg megnyomja** a valós gombot; a demó-intercept guardolja, hogy ne menjen a szerverre.
+5. **Demó-intercept 6 kritikus akcióra** (`driverStopAction`, `driverMilestone`, `sendBorderCross`, `submitFuvarlevel`, `uploadDoc`, `submitHandover`): a `sofer.js` a függvény elején hívja a `SoferTour.demoIntercept()`-et — ha aktív tour vagy DEMÓ id, azonnal `return` (nincs fetch, nincs bizonylat, nincs riasztás), csak egy „✅ DEMÓ: …" toast + auto-továbblép a következő lépésre. A DEMÓ id-re a védőháló akkor is él, ha a tour már véget ért (racing-védelem).
+6. **Az állomás-gomb a DEMÓ kártyán is „élőben" léptet vizuálisan** — a `driverStopAction`-ba tett intercept-ág a demó `stops` tömbjén elvégzi a lokális lépést (`arrived_at`/`done_at` NOW), és újrarajzolja a kártyát → a következő gomb-felirat is stimmel (📍→📦→📍→✅), a sofőr érezhető visszajelzést kap.
+7. **„🎓 Bemutatás" nav-kártya a főoldal grid-jén** (a Kilépés fölött) — kék-indigó szaggatott keretes; koppintásra `SoferTour.start(true)` → az adott sofőr bármikor újranyithatja tanulásra. `localStorage['vs_sofer_tour_done:<email>'] = '1'` csak azt jelzi, hogy egyszer már látta (auto-start feltétele) — nem tiltja az újrafuttatást.
+8. **Első belépés auto-start** — a `sofer.js` `authMe.then()` végén, a `_meData` betöltése után 1.2 s késleltetéssel: ha `!SoferTour.isDone()` ÉS a GDPR-banner nem látszik (annak elsőbbsége van) → `SoferTour.start(true)`. Aki már látta, nem kap újra automatán, csak ha rákoppint a gombra.
+9. **Overlay UX** — teljes-képernyős fátyol + spotlight-lyuk a célon (átengedi a valós koppintást) + tooltip-kártya (progressbar, cím, magyarázat, opcionális callout, Vissza/Tovább gombok + halvány „Kihagyom a bemutatót" link). A tooltip a cél alatt/fölött pozicionál (viewport-tudatos), a spotlight körül pulzáló sárga gyűrű. Center-card a welcome/kész lépéshez. Nyelvváltásra `_reflow()` újrarajzol.
+
+### Szerver / DB
+- **Nincs séma-változás, nincs új szerver-handler** — tisztán kliens-oldali. A demó SEMMILYEN valós adatot nem hoz létre (a demó-intercept a fetch előtt jár).
+
+### Kliens
+- **ÚJ `public/sofer-tour.js`** (~700 sor). Cache-bust `?v=20260823tour`.
+- **`public/sofer.html`** — új `<div class="sofer-nav-card" id="soferTourNavCard">🎓 Bemutatás</div>` a nav-grid-en (Kilépés fölött); új `<script src="/sofer-tour.js?v=20260823tour"></script>` a `sofer.js` után; `i18n.js` cache-bust `?v=20260823tour`.
+- **`public/sofer.js`** — (a) auto-start ág az `authMe.then()`-ben (1.2 s után, GDPR-banner elsőbbség); (b) demó-intercept guard a 6 kritikus akció elején (`driverStopAction`, `driverMilestone`, `sendBorderCross`, `submitFuvarlevel`, `uploadDoc`, `submitHandover`); (c) `renderFuvarCard` a wrapperre `data-order-id="…"` + demó esetén `data-tour-demo="1"` + tetejére `.st-demo-badge` — a tour így találja meg a kártyát és a benne lévő valós gombokat.
+- **`public/i18n.js`** — **48 új `sof.tour.*` kulcs** (RO-alap + HU): navigációs feliratok (`navBtn`, `demoBadge`, `demoRef`, `demoToast`, `next`/`prev`/`skip`/`stop`), és a 15 lépés címei + törzsei + calloutjai (`s0.title`/`s0.body`/`s0.start`, `s1.title/body`, …, `s14.title/body/close`).
+
+### Teszt
+- **ÚJ `tests/integration/sofer-tour.test.js` (10 új eset)**: IIFE hibamentesen betölt és exportálja az API-t; `isDone`/`resetSeen`/`stop(true)` perzisztencia; `start()` a welcome center-modalt a body-hoz csatolja (VallorSoft + Kezdés szöveg); `_next()` × 2 → DEMÓ fuvar bekerül a cache-be, `_isDemo=true`, kirenderelődik a `#kiosztottList`-be `data-tour-demo="1"` markerrel; `stop()` eltávolítja a DEMÓ fuvart ÉS a tour DOM-ot; `demoIntercept` aktív tour alatt border/waybill/doc/handover→true, egyéb→false; tour NÉLKÜL a DEMÓ id-re továbbra is true (védőháló); regresszió-védelem: a sofer.js 6 kritikus útján és a `renderFuvarCard`-ban ott vannak az intercept-hívások + a demó-markerek; az auto-start ág is bent van. **975 Jest zöld** (előző 965 → 975, +10; nincs regresszió).
+
+---
+
 ## 2026-08-22 — Sofőr: lehúzással frissítés (pull-to-refresh, natív PWA-érzet)
 
 ### Miért

@@ -3148,6 +3148,71 @@
     'sof.phaseLoading': { hu: 'Felrakás', ro: 'Încărcare' },
     'sof.phaseUnloading': { hu: 'Lerakás', ro: 'Descărcare' },
 
+    // ── SOFŐR ONBOARDING / BEMUTATÓ (SoferTour) ──
+    // RO alap + HU. Rövid, egyértelmű mondatok — a vezetés utáni /
+    // kesztyűs helyzetre optimalizálva. A DEMÓ fuvar tényleg
+    // nyomogatható, semmi nem megy a szerverre.
+    'sof.tour.navBtn':      { hu: 'Bemutatás',                 ro: 'Prezentare' },
+    'sof.tour.demoBadge':   { hu: '📚 DEMÓ — tanuláshoz',       ro: '📚 DEMO — pentru învățare' },
+    'sof.tour.demoRef':     { hu: '📚 DEMÓ — csak tanuláshoz. Nyomogasd nyugodtan, semmi nem kerül a szerverre.', ro: '📚 DEMO — doar pentru învățare. Apasă liniștit, nimic nu se trimite la server.' },
+    'sof.tour.demoToast':   { hu: 'DEMÓ',                       ro: 'DEMO' },
+    'sof.tour.next':        { hu: 'Tovább →',                   ro: 'Continuă →' },
+    'sof.tour.prev':        { hu: '← Vissza',                   ro: '← Înapoi' },
+    'sof.tour.skip':        { hu: 'Kihagyom',                   ro: 'Sar peste' },
+    'sof.tour.skipStep':    { hu: 'Kihagyom →',                 ro: 'Sar →' },
+    'sof.tour.stop':        { hu: 'Kihagyom a bemutatót',       ro: 'Închide prezentarea' },
+    // 0 — WELCOME
+    'sof.tour.s0.title':    { hu: '👋 Üdv a VallorSoft-ban!',   ro: '👋 Bun venit la VallorSoft!' },
+    'sof.tour.s0.body':     { hu: 'Ez egy kb. 2 perces bemutató. Végigmegyünk egy DEMÓ fuvaron — tényleg nyomogathatod a gombokat, semmi nem kerül a szerverre. Ha bármikor mégse akarod, a „Kihagyom" gombbal befejezed.', ro: 'Aceasta este o prezentare de ~2 minute. Vom parcurge o cursă DEMO — poți apăsa butoanele fără grijă, nimic nu se trimite la server. Poți renunța oricând cu „Sar peste".' },
+    'sof.tour.s0.start':    { hu: 'Kezdés →',                   ro: 'Începe →' },
+    // 1 — TOPBAR
+    'sof.tour.s1.title':    { hu: 'Ez a főoldalad',             ro: 'Aceasta este pagina ta principală' },
+    'sof.tour.s1.body':     { hu: 'A logóra bármikor koppintva ide térsz vissza. Jobbra a nyelvet válthatod (RO/HU) és látod a nevedet.', ro: 'Apăsând pe logo revii oricând aici. În dreapta poți schimba limba (RO/HU) și vezi numele tău.' },
+    // 2 — KIOSZTOTT FUVAROK
+    'sof.tour.s2.title':    { hu: 'Ide jönnek a fuvaraid',      ro: 'Aici apar cursele tale' },
+    'sof.tour.s2.body':     { hu: 'Amit a diszpécser rád oszt, itt jelenik meg. Most raktunk ide egy DEMÓ fuvart, hogy tudd, hogy néz ki.', ro: 'Ce îți alocă dispecerul apare aici. Am adăugat o cursă DEMO ca să vezi cum arată.' },
+    'sof.tour.s2.callout':  { hu: 'Az igazi fuvaron a felrakó/lerakó címét és dátumát látod majd.', ro: 'Pe o cursă reală vei vedea adresa de încărcare/descărcare și data.' },
+    // 3 — KÁRTYA KINYITÁS
+    'sof.tour.s3.title':    { hu: 'Koppints a fuvar-kártyára',  ro: 'Apasă pe cardul cursei' },
+    'sof.tour.s3.body':     { hu: 'Kinyitja a részleteket: ügyfél, felrakási / lerakási cím + cég, dátum, súly, referencia — minden, amit a diszpécser megadott.', ro: 'Se deschid detaliile: client, adresa de încărcare / descărcare + firmă, data, greutatea, referința — tot ce a introdus dispecerul.' },
+    // 4 — ÁLLOMÁS-GOMB
+    'sof.tour.s4.title':    { hu: 'Az „állomás-gomb" — a legfontosabb', ro: 'Butonul „stație" — cel mai important' },
+    'sof.tour.s4.body':     { hu: 'Ezzel léptet a fuvar. A rendszer eldönti, mi jön: 📍 felrakóhoz értem → 📦 felrakódtam → 📍 lerakóhoz értem → ✅ leürítettem. Az iroda azonnal látja.', ro: 'Cu acest buton avansează cursa. Sistemul decide ce urmează: 📍 am ajuns la încărcare → 📦 am încărcat → 📍 am ajuns la descărcare → ✅ am descărcat. Biroul vede imediat.' },
+    'sof.tour.s4.callout':  { hu: 'Koppints rá és próbáld ki — DEMÓ, nem küld semmit.', ro: 'Apasă și încearcă — este DEMO, nu trimite nimic.' },
+    // 5 — NAV: HATÁRÁTLÉPÉS
+    'sof.tour.s5.title':    { hu: '🛂 Határátlépés — napidíj automata', ro: '🛂 Trecere frontieră — diurnă automată' },
+    'sof.tour.s5.body':     { hu: 'RO határon átléptél? Itt jelzed BE / KI. A rendszer a napidíjat (diurna) EBBŐL számolja — a menetlevélbe már be van írva.', ro: 'Ai trecut frontiera RO? Aici semnalezi INTRARE / IEȘIRE. Sistemul calculează diurna din asta — apare deja pe foaia de parcurs.' },
+    // 6 — HATÁR BE
+    'sof.tour.s6.title':    { hu: 'Koppints a 🇷🇴 RO BE gombra', ro: 'Apasă pe butonul 🇷🇴 RO INTRARE' },
+    'sof.tour.s6.body':     { hu: 'Kérdez, mikor léptél át (mostani idő az alap; ha lekésted, javíthatod), majd rögzíti. DEMÓ — nem küldjük el.', ro: 'Te întreabă când ai trecut (implicit acum; dacă ai întârziat, poți corecta), apoi înregistrează. DEMO — nu trimitem nimic.' },
+    // 7 — NAV: MENETLEVÉL
+    'sof.tour.s7.title':    { hu: '📄 Menetlevél',              ro: '📄 Foaie de parcurs' },
+    'sof.tour.s7.body':     { hu: 'A napi/heti út dokumentálása: km-óra, tankolás, vásárlások, útvonal pontok. A rendszer AUTOMATIKUSAN menti, amit beírsz — nem kell külön mentened.', ro: 'Documentarea cursei zilnice/săptămânale: km, alimentări, achiziții, puncte de traseu. Sistemul salvează AUTOMAT ce introduci — nu trebuie să salvezi manual.' },
+    // 8 — MENETLEVÉL LÉTREHOZÁS
+    'sof.tour.s8.title':    { hu: 'Így indítod: „📄 Menetlevél létrehozása"', ro: 'Așa începi: „📄 Creează foaie de parcurs"' },
+    'sof.tour.s8.body':     { hu: 'Először megkérdezi, honnan indulsz (Plecare). Utána egy listából bepipálod, melyik elvégzett fuvar kerüljön a menetlevélbe (vagy hagyod üresen).', ro: 'Întâi te întreabă de unde pleci (Plecare). Apoi bifezi dintr-o listă ce curse finalizate intră pe foaie (sau lași gol).' },
+    'sof.tour.s8.callout':  { hu: 'Ne nyomj rá most — csak nézzük meg. A „Tovább" gombbal továbblépünk.', ro: 'Nu apăsa acum — doar ne uităm. Cu „Continuă" mergem mai departe.' },
+    // 9 — BON SCAN
+    'sof.tour.s9.title':    { hu: '📷 Bon szkennelés (AI)',      ro: '📷 Scanare bon (AI)' },
+    'sof.tour.s9.body':     { hu: 'Fotózd le a tankolós vagy vásárlós bont — az AI kiolvassa (helyszín, dátum, összeg, liter, kártya/készpénz). Nem kell begépelni. Ha kilépnél a képernyőről, háttérben tovább dolgozik.', ro: 'Fotografiază bonul de la alimentare sau cumpărare — AI-ul îl citește (loc, dată, sumă, litri, card/numerar). Nu trebuie să tastezi. Dacă părăsești ecranul, lucrează în fundal.' },
+    'sof.tour.s9.callout':  { hu: 'A főoldalról is elérhető (dashboard tetején).', ro: 'Disponibil și din pagina principală (sus).' },
+    // 10 — NAV: IRATOK
+    'sof.tour.s10.title':   { hu: '📁 Iratok / CMR',            ro: '📁 Documente / CMR' },
+    'sof.tour.s10.body':    { hu: 'CMR / aláírt POD / Számla / Vám / Egyéb — fotózol vagy PDF-et választasz. TÖBB fájl egyszerre is mehet. POD-nál a fuvart is válaszd ki (opcionális).', ro: 'CMR / POD semnat / Factură / Vamă / Altele — fotografiezi sau alegi PDF. MAI MULTE fișiere odată. La POD alege și cursa (opțional).' },
+    // 11 — NAV: CHAT
+    'sof.tour.s11.title':   { hu: '💬 Chat',                     ro: '💬 Chat' },
+    'sof.tour.s11.body':    { hu: 'A cég WhatsApp-számát nyitja meg (a diszpécser állítja be). Így küldesz üzenetet, képet közvetlenül.', ro: 'Deschide numărul de WhatsApp al firmei (setat de dispecer). Astfel trimiți mesaje și poze direct.' },
+    // 12 — PTR
+    'sof.tour.s12.title':   { hu: '↓ Húzd le → frissítés',      ro: '↓ Trage în jos → reîmprospătare' },
+    'sof.tour.s12.body':    { hu: 'A képernyő tetején (ahol nem görgethető feljebb) húzd le az ujjaddal → a lap frissül, ahogy a natív telefonos appokban. Új fuvarnál ez kell.', ro: 'În partea de sus a ecranului (unde nu se mai poate derula) trage cu degetul în jos → pagina se reîmprospătează, ca în aplicațiile native. Pentru o cursă nouă asta ai nevoie.' },
+    // 13 — BUG FAB
+    'sof.tour.s13.title':   { hu: '🐛 Ha valami nem működik',   ro: '🐛 Dacă ceva nu funcționează' },
+    'sof.tour.s13.body':    { hu: 'A jobb alsó sarokban lévő 🐛 gombra koppints, írd le mi történt — a fejlesztő azonnal megkapja. Vezetés után is használható, nagy gomb.', ro: 'Apasă butonul 🐛 din dreapta jos, descrie ce s-a întâmplat — ajunge imediat la dezvoltator. Se poate folosi și după condus, buton mare.' },
+    // 14 — DONE
+    'sof.tour.s14.title':   { hu: '🎉 Ennyi!',                   ro: '🎉 Gata!' },
+    'sof.tour.s14.body':    { hu: 'A DEMÓ fuvar eltűnt. A főoldalról a „🎓 Bemutatás" gombbal BÁRMIKOR újranyithatod ezt a bemutatót — nyugodtan tanulj vele. Sok sikert az úton!', ro: 'Cursa DEMO a dispărut. Din pagina principală poți redeschide ORICÂND prezentarea cu butonul „🎓 Prezentare" — învață în ritmul tău. Drum bun!' },
+    'sof.tour.s14.close':   { hu: 'Bezárás',                     ro: 'Închide' },
+
     // ── Developer felület ──
     'dev.menu': { hu: 'Menü', ro: 'Meniu' },
     'dev.tabDash': { hu: '📊 Áttekintés', ro: '📊 Prezentare generală' },
