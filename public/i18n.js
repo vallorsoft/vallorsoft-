@@ -3161,6 +3161,7 @@
     'sof.tour.skip':        { hu: 'Kihagyom',                   ro: 'Sar peste' },
     'sof.tour.skipStep':    { hu: 'Kihagyom →',                 ro: 'Sar →' },
     'sof.tour.stop':        { hu: 'Kihagyom a bemutatót',       ro: 'Închide prezentarea' },
+    'sof.tour.tapReal':     { hu: 'Koppints a kiemelt gombra, vagy nyomd a „Tovább"-ot.', ro: 'Apasă butonul evidențiat sau apasă „Continuă".' },
     // 0 — WELCOME
     'sof.tour.s0.title':    { hu: '👋 Üdv a VallorSoft-ban!',   ro: '👋 Bun venit la VallorSoft!' },
     'sof.tour.s0.body':     { hu: 'Ez egy kb. 2 perces bemutató. Végigmegyünk egy DEMÓ fuvaron — tényleg nyomogathatod a gombokat, semmi nem kerül a szerverre. Ha bármikor mégse akarod, a „Kihagyom" gombbal befejezed.', ro: 'Aceasta este o prezentare de ~2 minute. Vom parcurge o cursă DEMO — poți apăsa butoanele fără grijă, nimic nu se trimite la server. Poți renunța oricând cu „Sar peste".' },

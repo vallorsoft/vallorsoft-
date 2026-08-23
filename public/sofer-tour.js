@@ -168,25 +168,36 @@
       + '.st-spot.pulse::after{content:"";position:absolute;inset:-6px;border-radius:18px;'
       + '  border:3px solid #fbbf24;animation:st-pulse 1.4s ease-in-out infinite;pointer-events:none;}'
       + '@keyframes st-pulse{0%,100%{opacity:.9;transform:scale(1);}50%{opacity:.35;transform:scale(1.08);}}'
-      // Tooltip-kártya
+      // Tooltip-kártya — MAX-magasság + belső görgetés (kicsi képernyőn
+      // hosszú szövegű lépésnél sem lóg ki a viewport-ból; a sticky
+      // footerben lévő gombok mindig látszódnak).
       + '.st-tip{position:fixed;z-index:9992;max-width:min(360px,92vw);background:#fff;color:#0f172a;'
-      + '  border-radius:16px;box-shadow:0 20px 50px rgba(15,23,42,0.35);padding:16px 18px;'
-      + '  font-family:inherit;font-size:14px;line-height:1.5;transition:top .22s ease, left .22s ease;}'
+      + '  border-radius:16px;box-shadow:0 20px 50px rgba(15,23,42,0.35);padding:14px 16px;'
+      + '  font-family:inherit;font-size:14px;line-height:1.5;transition:top .22s ease, left .22s ease;'
+      + '  display:flex;flex-direction:column;max-height:calc(100vh - 24px);'
+      + '  box-sizing:border-box;}'
+      + '.st-tip .st-body{overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0;'
+      + '  padding-right:2px;}'
       + '.st-tip .st-progress{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px;'
-      + '  color:#64748b;font-weight:700;letter-spacing:.4px;}'
+      + '  color:#64748b;font-weight:700;letter-spacing:.4px;flex:0 0 auto;}'
       + '.st-tip .st-bar{flex:1;height:5px;background:#e2e8f0;border-radius:99px;overflow:hidden;}'
       + '.st-tip .st-bar>i{display:block;height:100%;background:linear-gradient(90deg,#3b82f6,#6366f1);'
       + '  transition:width .3s ease;}'
       + '.st-tip h4{margin:0 0 6px;font-size:16px;line-height:1.3;color:#0f172a;font-weight:800;}'
-      + '.st-tip p{margin:0 0 12px;color:#334155;}'
+      + '.st-tip p{margin:0 0 10px;color:#334155;}'
       + '.st-tip .st-callout{font-size:12.5px;color:#0369a1;background:#f0f9ff;border-left:3px solid #38bdf8;'
-      + '  padding:8px 10px;border-radius:6px;margin:6px 0 12px;}'
-      + '.st-btns{display:flex;gap:8px;flex-wrap:wrap;}'
-      + '.st-btn{flex:1;min-width:100px;padding:11px 14px;border-radius:10px;border:0;font-weight:700;'
-      + '  font-size:14px;cursor:pointer;font-family:inherit;}'
-      + '.st-btn.primary{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;}'
+      + '  padding:8px 10px;border-radius:6px;margin:6px 0 10px;}'
+      + '.st-tip .st-waitHint{font-size:11.5px;color:#f97316;margin:2px 0 8px;font-weight:600;}'
+      + '.st-tip .st-footer{flex:0 0 auto;padding-top:10px;margin-top:8px;'
+      + '  border-top:1px solid #f1f5f9;background:#fff;position:sticky;bottom:0;}'
+      + '.st-btns{display:flex;gap:6px;flex-wrap:wrap;}'
+      + '.st-btn{flex:1;min-width:80px;padding:10px 12px;border-radius:10px;border:0;font-weight:700;'
+      + '  font-size:13.5px;cursor:pointer;font-family:inherit;line-height:1.15;}'
+      + '.st-btn.primary{background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;'
+      + '  box-shadow:0 6px 14px rgba(59,130,246,0.35);}'
       + '.st-btn.ghost{background:#f1f5f9;color:#475569;}'
-      + '.st-btn.skip{background:transparent;color:#94a3b8;font-weight:600;font-size:12px;flex:0 0 auto;}'
+      + '.st-btn.skip{background:transparent;color:#94a3b8;font-weight:600;font-size:11.5px;'
+      + '  flex:0 0 auto;padding:8px 6px;margin-top:6px;width:100%;}'
       + '.st-tip .st-arrow{position:absolute;width:14px;height:14px;background:#fff;transform:rotate(45deg);}'
       // DEMO-badge a fuvar-kártyán (a valós rendertől megkülönbözteti)
       + '.st-demo-badge{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.4px;'
@@ -270,24 +281,41 @@
     setTimeout(function(){
       var th = t.offsetHeight || 200;
       var top, left;
+      // A `max-height: calc(100vh - 24px)` a CSS-ben már gondoskodik
+      // róla, hogy a tooltip belül scrollál — így a mérete sosem
+      // haladja meg a viewport-magasságot. A pozicionálás garantálja,
+      // hogy a tooltip 100%-ban a viewporton belül van.
       if (!rect) {
         // Nincs anchor → középre.
-        top  = Math.max(20, (vh - th) / 2);
+        top  = Math.max(12, (vh - th) / 2);
         left = Math.max(10, (vw - tw) / 2);
       } else {
-        // Preferáltan a cél ALATT; ha nem fér, FÖLÖTT.
-        var spaceBelow = vh - rect.bottom;
-        var spaceAbove = rect.top;
-        if (spaceBelow >= th + 24 || spaceBelow >= spaceAbove) {
-          top = rect.bottom + 16;
+        // Preferáltan a cél ALATT; ha nem fér, FÖLÖTT; ha egyik sem,
+        // középre (a spotlight-lyuk átengedi a klikket a valós gombra,
+        // a sticky footer-ben a „Tovább" gomb kézi léptetést ad).
+        var spaceBelow = vh - rect.bottom - 12; // safety pad
+        var spaceAbove = rect.top - 12;
+        if (spaceBelow >= th + 16) {
+          top = rect.bottom + 12;
+        } else if (spaceAbove >= th + 16) {
+          top = rect.top - th - 12;
+        } else if (spaceBelow >= spaceAbove) {
+          // Nem fér el se alul se felül teljesen — a tooltip belül scrollál,
+          // csak győződjünk meg, hogy a viewport-on belül van.
+          top = Math.max(12, rect.bottom + 12);
+          if (top + th > vh - 12) top = Math.max(12, vh - th - 12);
         } else {
-          top = Math.max(12, rect.top - th - 16);
+          top = Math.max(12, rect.top - th - 12);
+          if (top < 12) top = 12;
         }
         // Vízszintesen próbáljuk a cél alá centrálni, de ne lógjon ki.
         left = rect.left + rect.width / 2 - tw / 2;
         if (left < 10) left = 10;
         if (left + tw > vw - 10) left = vw - tw - 10;
       }
+      // Extra biztonság — végső bound-check
+      if (top < 12) top = 12;
+      if (top + th > vh - 12) top = Math.max(12, vh - th - 12);
       t.style.top  = top  + 'px';
       t.style.left = left + 'px';
     }, 10);
@@ -345,8 +373,8 @@
       waitTargetClick: function(target){
         // Bárhol kattint a demó kártyán belül → tovább.
         return target && (target.closest && target.closest('[data-tour-demo="1"]'));
-      },
-      nextLabel: T('sof.tour.next', 'Kihagyom →')
+      }
+      // (nextLabel törölve — az univerzális default „Tovább →" jó ide is)
     },
     // 4 — Állomás-gomb (a fejlécen)
     {
@@ -533,7 +561,12 @@
   function _renderTooltip(st) {
     if (!_tip) return;
     var progress = Math.round(((_state.stepIdx) / (STEPS.length - 1)) * 100);
-    var html = ''
+    // A tooltip két részre bomlik: (1) `.st-body` — görgethető törzs
+    // (progressbar + cím + magyarázat + callout + waitHint); (2)
+    // `.st-footer` — sticky lábléc a gombokkal, MINDIG látszik. Így ha
+    // a szöveg + képernyő nem fér el, a sofőr belül scrollál és a
+    // gombok akkor is elérhetők.
+    var bodyHtml = ''
       + '<div class="st-progress">'
       +   '<span>' + (_state.stepIdx + 1) + ' / ' + STEPS.length + '</span>'
       +   '<div class="st-bar"><i style="width:' + progress + '%;"></i></div>'
@@ -541,24 +574,27 @@
       + '<h4>' + _esc(st.title) + '</h4>'
       + '<p>' + _esc(st.body) + '</p>'
       + (st.callout ? '<div class="st-callout">' + _esc(st.callout) + '</div>' : '')
-      + '<div class="st-btns">';
+      + (st.waitClick ? '<div class="st-waitHint">👉 ' + _esc(T('sof.tour.tapReal', 'Koppints a kiemelt gombra, vagy nyomd a „Tovább"-ot.')) + '</div>' : '');
+
+    var btnsHtml = '<div class="st-btns">';
     if (_state.stepIdx > 0) {
-      html += '<button class="st-btn ghost" onclick="SoferTour._prev()">' + _esc(T('sof.tour.prev', '← Vissza')) + '</button>';
+      btnsHtml += '<button class="st-btn ghost" onclick="SoferTour._prev()">' + _esc(T('sof.tour.prev', '← Vissza')) + '</button>';
     }
-    if (st.waitClick) {
-      // Csak kihagyó gomb — a fő cselekvés a valódi klikk.
-      html += '<button class="st-btn ghost" onclick="SoferTour._next()">' + _esc(st.nextLabel || T('sof.tour.skipStep', 'Kihagyom →')) + '</button>';
-    } else {
-      html += '<button class="st-btn primary" onclick="SoferTour._next()">' + _esc(st.nextLabel || T('sof.tour.next', 'Tovább →')) + '</button>';
-    }
-    html += '</div>';
-    // Skip mindig elérhető (kis szürke) — kivéve az utolsó lépésen.
+    // MINDEN nem-utolsó lépéshez van „Tovább" primary — a waitClick
+    // esetén is (ha a sofőr nem találja a kiemelt gombot / nem működik
+    // a click-fogó, kézzel léphet). Csak welcome/kész lépésen egyedi
+    // label (Kezdés / Bezárás).
+    btnsHtml += '<button class="st-btn primary" onclick="SoferTour._next()">'
+             + _esc(st.nextLabel || T('sof.tour.next', 'Tovább →')) + '</button>';
+    btnsHtml += '</div>';
+    // Skip csak nem az utolsón (ott a „Bezárás" a primary).
     if (_state.stepIdx < STEPS.length - 1) {
-      html += '<div style="text-align:center;margin-top:8px;">'
-           + '<button class="st-btn skip" onclick="SoferTour.stop()">' + _esc(T('sof.tour.stop', 'Kihagyom a bemutatót')) + '</button>'
-           + '</div>';
+      btnsHtml += '<button class="st-btn skip" onclick="SoferTour.stop()">'
+               + _esc(T('sof.tour.stop', 'Kihagyom a bemutatót')) + '</button>';
     }
-    _tip.innerHTML = html;
+
+    _tip.innerHTML = '<div class="st-body">' + bodyHtml + '</div>'
+                   + '<div class="st-footer">' + btnsHtml + '</div>';
   }
 
   function _renderCenterCard(st) {
