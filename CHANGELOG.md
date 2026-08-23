@@ -14,6 +14,35 @@
 
 ---
 
+## 2026-08-23 — Sofőr bemutató UX-fix: tooltip max-magasság + belső scroll + sticky footer, MINDEN lépésen „Tovább" gomb
+
+### Miért
+A PR #344 után a sofőr jelezte, hogy a bemutató alatt „van ami kiesik a képernyőből és nem katintható tovább". Két gyökér:
+1. A tooltip `position: fixed` volt magasság-korlát nélkül — hosszú szövegű + calloutos lépésen kis képernyőn (alacsony viewport) a Vissza/Tovább/Kihagyom gombsor lelógott a viewport-ból, elérhetetlen lett.
+2. A `waitClick` lépéseken nem volt „Tovább" primary gomb — csak a valódi kiemelt gomb megkoppintása léptetett (vagy a Kihagyom, ami leállította a teljes tour-t). Ha a sofőr nem találta / nem tudta megnyomni a kiemelt gombot (pl. a spotlight alatt más elemre koppint), beragadt.
+
+### Mit tesz
+1. **`.st-tip` átalakítás** — `display: flex; flex-direction: column; max-height: calc(100vh - 24px); box-sizing: border-box`. A tartalom két részre bomlik:
+   - **`.st-body`** — görgethető törzs (`overflow-y: auto`, `min-height: 0`): progressbar + cím + magyarázat + callout + „👉 Koppints a kiemelt gombra vagy nyomd a Tovább-ot" hint. Ha a szöveg nem fér, itt scrollál.
+   - **`.st-footer`** — sticky lábléc (`position: sticky; bottom: 0; background: #fff`): a Vissza/Tovább gombsor + halvány „Kihagyom a bemutatót" link MINDIG látszik.
+2. **MINDEN nem-utolsó lépésen primary „Tovább →" gomb** — a `waitClick` esetekben is (eddig csak a Kihagyom volt). Ha a sofőr nem találja a kiemelt gombot vagy a spotlight nem működik, kézzel léphet. A valódi klikk továbbra is működik (spotlight átengedi + capture-listener léptet).
+3. **`_positionTooltip` finomítás** — új „egyik sem fér el" fallback: ha se alul se felül nem fér a teljes tooltip, viewport-belülre kényszerítjük (`top = max(12, vh - th - 12)`), és a belső scroll biztosítja, hogy minden elérhető.
+4. **Kompaktabb tooltip** — kisebb padding (14/16), kisebb betű (13.5px a gombokon, 11.5px a hint-en), 80px min-width a gombokon (kis képernyőn három gomb is elfér egy sorban).
+5. **1 új i18n kulcs** (`sof.tour.tapReal`, RO+HU) + cache-bust `sofer.html` `?v=20260823tour2`.
+
+### Szerver / DB
+- Nincs változás — tisztán kliens-oldali CSS + JS finomítás.
+
+### Kliens
+- **`public/sofer-tour.js`** — CSS blokk a `.st-tip`-re és gyerekeire átírva (max-height, flex, sticky footer); `_renderTooltip` szétosztva `.st-body` + `.st-footer` szerkezetre; `_positionTooltip` új „nem fér el" fallback ág.
+- **`public/i18n.js`** — új `sof.tour.tapReal` (RO+HU).
+- **`public/sofer.html`** — `sofer-tour.js` + `i18n.js` cache-bust `?v=20260823tour2`.
+
+### Teszt
+- Szintaxis-ellenőrzés + teljes suite: **975 Jest zöld** (nincs regresszió); a `sofer-tour.test.js` mind a 10 esete zöld (a struktúra-változás visszafelé kompatibilis — a `SoferTour` API és a demó-injekció viselkedése azonos).
+
+---
+
 ## 2026-08-23 — Sofőr: interaktív első-belépéses BEMUTATÓ (DEMÓ fuvarral) + „🎓 Bemutatás" gomb az újranyitáshoz
 
 ### Miért
