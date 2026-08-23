@@ -14,6 +14,32 @@
 
 ---
 
+## 2026-08-23 — Sofőr bemutató: átlátszó overlay (a valós app végig látszik) + „Bemutatás" gomb dupla széles
+
+### Miért
+Sofőr visszajelzés: „nem lett a legjobb mert elhomályosítja a hátteret nem a valós appot mutassa be plusz a bemutato gomb dupla szeles legyen". Két gyökér-ok:
+1. Az overlay `rgba(15,23,42,0.62)` fátylat rakott a valós app-ra, és a spotlight `box-shadow: 0 0 0 9999px rgba(...,0.62)` a lyukon kívül is elsötétített → a sofőr a bemutatóban nem a valós felületet látta, hanem egy sötét fátyolt egy kis lyukkal.
+2. A „🎓 Bemutatás" nav-kártya csak egy oszlopot foglalt a 2-oszlopos gridben — apró volt, könnyen elveszett.
+
+### Mit tesz
+1. **Overlay teljesen átlátszó** — `background: transparent` (a `pointer-events: auto` marad, hogy a mellé-kattintást elfogja és ne kattintson a sofőr másra véletlenül a spotlighton kívül).
+2. **Spotlight 4-rétegű vastag narancs kiemelés** (`box-shadow`) — belső narancs keret + fehér kontraszt-gyűrű + narancs glow + széles halo → a valós app végig látszik, a spotlight a fátyol nélkül is jól kiugrik.
+3. **Pulzáló gyűrű erősebb** — nagyobb (`scale 1.15`) és halványabb (`opacity 0.3`) alsó pontig, hogy fátyol nélkül is figyelemfelkeltő legyen.
+4. **„🎓 Bemutatás" nav-kártya dupla széles** — `style="grid-column: 1 / -1"` (teljes szélesség egy sorban). Konzisztencia miatt a **Kilépés kártya is span 2**-re állítva → két nagy sáv a nav-grid alján a Határátlépés/Menetlevél/Iratok/Chat 2×2 rácsa alatt.
+5. **Cache-bust** `sofer.html` `?v=20260823tour3`.
+
+### Szerver / DB
+- Nincs változás — tisztán kliens-oldali CSS + inline stílus.
+
+### Kliens
+- **`public/sofer-tour.js`** — `.st-ov` `background` `rgba(15,23,42,0.62)` → `transparent`, `backdrop-filter:blur(3px)` törölve. `.st-spot` `box-shadow` átírva 4-rétegűre (narancs keret + fehér gyűrű + glow + halo, a `9999px` sötétítő fátyol EL). `.st-spot.pulse::after` `scale(1.08)`→`scale(1.15)`, `opacity .35`→`.3`.
+- **`public/sofer.html`** — a `#soferTourNavCard` + a `logout` nav-kártya inline `style="grid-column: 1 / -1"`; script cache-bust `?v=20260823tour3`.
+
+### Teszt
+- **975 Jest zöld** (nincs regresszió). A tour-teszt visszafelé kompatibilis (a demó-injekció és a `SoferTour` API viselkedése azonos, csak a megjelenés változott).
+
+---
+
 ## 2026-08-23 — Sofőr bemutató UX-fix: tooltip max-magasság + belső scroll + sticky footer, MINDEN lépésen „Tovább" gomb
 
 ### Miért

@@ -156,18 +156,27 @@
     var s = document.createElement('style');
     s.id = 'sofer-tour-style';
     s.textContent = ''
-      // Teljes-képernyős, félig-átlátszó fátyol.
-      + '.st-ov{position:fixed;inset:0;background:rgba(15,23,42,0.62);backdrop-filter:blur(3px);z-index:9990;'
+      // Overlay — ÁTLÁTSZÓ (nem homályosítjuk el a valós appot). Csak a
+      // mellé-kattintást fogja el (`pointer-events:auto`), hogy a sofőr
+      // ne kattintson véletlenül másra és essen ki a lépésből. A valós
+      // felület végig látszik alatta.
+      + '.st-ov{position:fixed;inset:0;background:transparent;z-index:9990;'
       + '  transition:opacity .18s ease;opacity:0;pointer-events:auto;}'
       + '.st-ov.on{opacity:1;}'
-      // Reflektor-ablak (spotlight) — abszolút pozicionált, kikeretezi a célt,
-      // átengedi a koppintást a mögötte lévő valódi gombra.
+      // Reflektor-ablak (spotlight) — a cél elem köré rajzolt VASTAG
+      // narancs keret + kettős glow (belső + külső). Nincs sötét fátyol
+      // rajta kívül — a valós appot mutatjuk. A pulzáló gyűrű még
+      // jobban kiemeli, hogy hová kell koppintani.
       + '.st-spot{position:fixed;z-index:9991;border-radius:14px;pointer-events:none;'
-      + '  box-shadow:0 0 0 4px #f59e0b, 0 0 0 9999px rgba(15,23,42,0.62);'
+      + '  box-shadow:'
+      +     '0 0 0 4px #f59e0b,'                      /* belső narancs keret */
+      +     '0 0 0 7px rgba(255,255,255,0.9),'        /* fehér kontraszt-gyűrű */
+      +     '0 0 24px 8px rgba(245,158,11,0.55),'     /* külső narancs glow */
+      +     '0 0 60px 20px rgba(245,158,11,0.25);'    /* széles halo */
       + '  transition:top .22s ease, left .22s ease, width .22s ease, height .22s ease;}'
       + '.st-spot.pulse::after{content:"";position:absolute;inset:-6px;border-radius:18px;'
       + '  border:3px solid #fbbf24;animation:st-pulse 1.4s ease-in-out infinite;pointer-events:none;}'
-      + '@keyframes st-pulse{0%,100%{opacity:.9;transform:scale(1);}50%{opacity:.35;transform:scale(1.08);}}'
+      + '@keyframes st-pulse{0%,100%{opacity:.9;transform:scale(1);}50%{opacity:.3;transform:scale(1.15);}}'
       // Tooltip-kártya — MAX-magasság + belső görgetés (kicsi képernyőn
       // hosszú szövegű lépésnél sem lóg ki a viewport-ból; a sticky
       // footerben lévő gombok mindig látszódnak).
