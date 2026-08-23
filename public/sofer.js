@@ -1036,6 +1036,12 @@ function goSec(id) {
 // napok) KÖZVETLENÜL ebből számoljuk (`lib/tripCrossings.js` + `calculateDiurna`)
 // — egy félrenyomott BE/KI a napidíjat rontja el. A kérdés az irányt nevezi meg.
 function sendBorderCross(tip, tara) {
+  // ── SoferTour demó-intercept: a bemutató alatt a határátlépés-gombot
+  //    csak vizuálisan próbáljuk — semmit nem küldünk a szervernek.
+  if (window.SoferTour && window.SoferTour.demoIntercept &&
+      window.SoferTour.demoIntercept('border', (tip === 'Intrare' ? 'RO BE' : 'RO KI'))) {
+    return;
+  }
   var act = (tip === 'Intrare') ? t('sof.crossIn') : t('sof.crossOut');
   // Idő-picker modal — a diurna-ablak szempontjából a beírt óra:perc
   // (BE/KI) DÖNTŐ, ezért engedjük a sofőrnek utólag pótolni is.
@@ -3337,6 +3343,12 @@ function _validateKm() {
 }
 
 function submitFuvarlevel() {
+  // ── SoferTour demó-intercept: a bemutató alatt a menetlevél-küldést
+  //    nem hajtjuk végre (élesben MT-YYYY-XXXX sorszámot kapna).
+  if (window.SoferTour && window.SoferTour.demoIntercept &&
+      window.SoferTour.demoIntercept('waybill', 'Menetlevél beküldés')) {
+    return;
+  }
   // Ha még nincs Sosire (érkezési) sor a puncte-ban, elsőként azt kérdezzük
   // be egy modal-on (a sofőr megadja, hová érkezett). Ha mégse — nem
   // küldünk. Ha van már Sosire, egyből megy a beküldés (retry, vagy a
@@ -3831,6 +3843,12 @@ function _docToBase64(file, cb) {
 var _docUploading = false;
 function uploadDoc() {
   if (_docUploading) return;                      // dupla-koppintás védelem
+  // ── SoferTour demó-intercept: bemutató alatt a dokumentum nem
+  //    kerül a szerverre — csak vizuálisan próbáljuk.
+  if (window.SoferTour && window.SoferTour.demoIntercept &&
+      window.SoferTour.demoIntercept('doc', 'Dokumentum feltöltés')) {
+    return;
+  }
   var input = document.getElementById('dFile');
   var files = (input && input.files) ? Array.prototype.slice.call(input.files) : [];
   if (!files.length) { toast(t('sof.pickFile'), 'err'); return; }
@@ -4245,6 +4263,19 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
     // lista kulcsa per-sofőr): megszakadt feldolgozás folytatása a
     // megőrzött képből + gazdátlan képek takarítása.
     rcptQueueMaint();
+    // ── ELSŐ BELÉPÉS: interaktív bemutató (SoferTour) ──
+    // Ha még sosem látta ez a sofőr, ~1.2s után elindul a tour (a
+    // dashboard render legyen kész). A GDPR-banner elsőbbséget élvez —
+    // ha látszik, kihagyjuk (majd a „🎓 Bemutatás" gombbal újranyithatja).
+    try {
+      setTimeout(function(){
+        if (!window.SoferTour) return;
+        var gdpr = document.getElementById('gdprBanner');
+        var gdprVisible = gdpr && gdpr.style.display !== 'none';
+        if (gdprVisible) return;
+        if (!SoferTour.isDone()) SoferTour.start(true);
+      }, 1200);
+    } catch (_) {}
 
   // ── Állapot visszaállítás ──
   var state = stateGet();
@@ -4592,6 +4623,11 @@ var MS_STEPS = [
 // ebből jön) — csak a kérdés szövegéhez kell; a döntést továbbra is a szerver
 // hozza. Érvénytelen/hiányzó index esetén általános kérdést teszünk fel.
 function driverMilestone(id, stepIdx) {
+  // ── SoferTour demó-intercept: a DEMÓ fuvarra a szerverre NEM megyünk.
+  if (window.SoferTour && window.SoferTour.demoIntercept &&
+      window.SoferTour.demoIntercept(id, 'Állomás-léptetés (legacy)')) {
+    return;
+  }
   var step = (typeof stepIdx === 'number' && MS_STEPS[stepIdx]) ? MS_STEPS[stepIdx] : null;
   var act  = step ? t(step.key) : t('sof.ms.recorded');
   // Idő-picker modal: alap a MOSTANI idő, de szerkeszthető, ha a sofőr
@@ -4662,6 +4698,37 @@ function _stopEventLabel(opt) {
 // Új „gomb-értesítő": a fuvar-kártya fejlécének + részlet-panelének
 // állomás-gombja hívja. Az `o` (a fuvar-objektum) alapján dönt.
 function driverStopAction(orderId) {
+  // ── SoferTour demó-intercept: a DEMÓ fuvarra vonatkozó állomás-léptetés
+  //    NEM megy a szerverre — a tour toastol és auto-továbblép.
+  //    Emellett a demó `stops` tömbjén elvégezzük a lokális léptetést,
+  //    hogy a következő „állomás-gomb" felirat is stimmeljen (📍 → 📦 →
+  //    📍 → ✅), ha a sofőr még koppintgat.
+  if (window.SoferTour && window.SoferTour.demoIntercept &&
+      window.SoferTour.demoIntercept(orderId, 'Állomás-léptetés')) {
+    try {
+      var demo = (_soferOrdersCache || []).filter(function(x){ return x.id === orderId; })[0];
+      if (demo && Array.isArray(demo.stops)) {
+        for (var _i = 0; _i < demo.stops.length; _i++) {
+          var _s = demo.stops[_i];
+          if (!_s.arrived_at) { _s.arrived_at = new Date().toISOString(); break; }
+          if (!_s.done_at)    { _s.done_at    = new Date().toISOString(); break; }
+        }
+        if (typeof loadDashOrders === 'function' && demo.stops.every(function(s){ return s.done_at; })) {
+          demo.status = 'Finalizat';
+        }
+        // Újrarender a főoldalon (a rendes render-út a cache-ből).
+        var el = document.getElementById('kiosztottList');
+        if (el && typeof renderFuvarCard === 'function') {
+          var active = _soferOrdersCache.filter(function(o){
+            if (typeof o.dash_visible === 'boolean') return o.dash_visible;
+            return o.status === 'Alocat' || o.status === 'In Curs';
+          }).slice().reverse();
+          el.innerHTML = active.map(function(o, i){ return renderFuvarCard(o, i + 1); }).join('') || el.innerHTML;
+        }
+      }
+    } catch (_e) {}
+    return;
+  }
   var o = (_soferOrdersCache || []).filter(function (x) { return x.id === orderId; })[0];
   if (!o) return;
   var opts = _computeNextStopOptions(o);
@@ -5072,8 +5139,14 @@ function renderFuvarCard(o, idx) {
     '<span class="fuvar-head-pick">' + pickBits.join(' · ') + '</span>' +
     '<span class="fuvar-head-arrow"> → </span>' +
     '<span class="fuvar-head-drop">' + dropBits.join(' · ') + '</span>';
+  // A `data-order-id` + (demó esetén) `data-tour-demo="1"` a SoferTour-nak
+  // kell — a bemutató a demó kártyán belül várja a valós kattintást
+  // (állomás-gomb, kártya-kinyitás).
+  var _wrapAttrs = ' data-order-id="' + esc(o.id) + '"' + (o._isDemo ? ' data-tour-demo="1"' : '');
+  var _demoHead  = o._isDemo ? '<div class="st-demo-badge">' + esc(t('sof.tour.demoBadge') || '📚 DEMO — tanuláshoz') + '</div>' : '';
   return '' +
-    '<div class="fuvar-card">' +
+    '<div class="fuvar-card"' + _wrapAttrs + '>' +
+      _demoHead +
       '<div class="fuvar-head" role="button" tabindex="0" onclick="toggleFuvarDetails(\'' + o.id + '\')" ' +
            'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleFuvarDetails(\'' + o.id + '\');}">' +
         '<div class="fuvar-destination">' +
@@ -5106,6 +5179,14 @@ function hoTypeChange() {
   document.getElementById('hoWhBlock').style.display = tt === 'warehouse' ? 'block' : 'none';
 }
 function submitHandover() {
+  // ── SoferTour demó-intercept: bemutató alatt / DEMÓ fuvarra NEM
+  //    küldünk kérést az irodának. Bezárjuk a modalt és toastolunk.
+  if (window.SoferTour && window.SoferTour.demoIntercept &&
+      (window.SoferTour.demoIntercept('handover', 'Áru leadás')
+        || (_hoOid && String(_hoOid).indexOf('DEMO') === 0))) {
+    try { document.getElementById('hoModal').style.display = 'none'; } catch(_){}
+    return;
+  }
   var type = (document.querySelector('input[name="hoType"]:checked') || {}).value;
   var loc = document.getElementById('hoLoc').value.trim();
   if (!loc) { toast(t('sof.ho.locRequired'), 'err'); return; }
