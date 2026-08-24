@@ -202,12 +202,13 @@
       +   _stepCard(4, 'oc.step4Title', 'Kiosztás (sofőr + jármű)', 'ocStepBody4')
       +   _stepCard(5, 'oc.step5Title', 'Ár, távolság és UIT', 'ocStepBody5')
       +   _stepCard(6, 'oc.step6Title', 'Ellenőrzés és mentés', 'ocStepBody6')
-      + '</div>'
-      + '<div class="oc-nav">'
-      +   '<button type="button" class="btn ghost" id="ocBtnBack" onclick="ocPrev()"><span data-i18n="oc.back">← Vissza</span></button>'
-      +   '<div class="oc-nav-spacer"></div>'
-      +   '<button type="button" class="btn primary" id="ocBtnNext" onclick="ocNext()"><span data-i18n="oc.next">Tovább →</span></button>'
-      +   '<button type="button" class="btn primary" id="ocBtnSubmit" style="display:none;" onclick="ocSubmit()"><span data-i18n="oc.submit">✅ Fuvar mentése</span></button>'
+      // A nav a .oc-body gyereke — a _refreshView a nyitott card után helyezi.
+      +   '<div class="oc-nav" id="ocNav">'
+      +     '<button type="button" class="btn ghost" id="ocBtnBack" onclick="ocPrev()"><span data-i18n="oc.back">← Vissza</span></button>'
+      +     '<div class="oc-nav-spacer"></div>'
+      +     '<button type="button" class="btn primary" id="ocBtnNext" onclick="ocNext()"><span data-i18n="oc.next">Tovább →</span></button>'
+      +     '<button type="button" class="btn primary" id="ocBtnSubmit" style="display:none;" onclick="ocSubmit()"><span data-i18n="oc.submit">✅ Fuvar mentése</span></button>'
+      +   '</div>'
       + '</div>';
   }
 
@@ -243,13 +244,24 @@
 
     // Card-állapotok: done (bar látszik) | open (head+content) | pending (bar szürkén)
     var cards = shell.querySelectorAll('.oc-step-card');
+    var openCard = null;
     Array.prototype.forEach.call(cards, function (card) {
       var n = parseInt(card.getAttribute('data-step'), 10);
       var state = (n < OC.step) ? 'done' : (n === OC.step ? 'open' : 'pending');
       card.setAttribute('data-state', state);
       // Ha done → frissítsük a bar-összegzést a legfrissebb adatokból
       if (state === 'done') _renderStepBarSummary(n);
+      if (state === 'open') openCard = card;
     });
+
+    // Nav a nyitott card KÖZVETLEN utána — a jövőbeli (pending) step-bar-ok
+    // csak a nav ALATT jelennek meg. Természetes olvasás-irány: kész lépések ▸
+    // aktuális card ▸ Tovább gomb ▸ mi jön még. A `.oc-nav` DOM-mozgatva a
+    // helyére; ha nincs open card (fallback), az `.oc-body` végén marad.
+    var navEl = document.getElementById('ocNav');
+    if (navEl && openCard && openCard.nextSibling !== navEl) {
+      openCard.parentNode.insertBefore(navEl, openCard.nextSibling);
+    }
 
     // Nav gombok
     var back = document.getElementById('ocBtnBack');
