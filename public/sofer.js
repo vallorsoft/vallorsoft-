@@ -4676,23 +4676,41 @@ function _driverMilestoneGo(id, atIso) {
 function _computeNextStopOptions(o) {
   var stops = Array.isArray(o.stops) ? o.stops : [];
   if (!stops.length) return null; // legacy fallback
-  var pickups = stops.filter(function (s) { return s.kind === 'pickup'; })
-                     .sort(function (a, b) { return a.stop_index - b.stop_index; });
-  var deliveries = stops.filter(function (s) { return s.kind === 'delivery'; })
-                     .sort(function (a, b) { return a.stop_index - b.stop_index; });
+  // ── INTERLEAVED: a fuvar-beviteli SORRENDBEN járjuk végig ──
+  // A `seq_index` a bevitel sorrendje (0..N-1); ha nincs (régi sor migráció
+  // előttről), fallback: pickup-ok elöl (kind DESC), majd stop_index ASC.
+  var seq = stops.slice().sort(function (a, b) {
+    var A = (a && a.seq_index != null) ? a.seq_index : 999999;
+    var B = (b && b.seq_index != null) ? b.seq_index : 999999;
+    if (A !== B) return A - B;
+    var ak = a && a.kind === 'pickup' ? 0 : 1;
+    var bk = b && b.kind === 'pickup' ? 0 : 1;
+    if (ak !== bk) return ak - bk;
+    return (a && a.stop_index || 0) - (b && b.stop_index || 0);
+  });
+  // Az első még nem lezárt stop a következő akció horgonya.
+  var idx = -1;
+  for (var i = 0; i < seq.length; i++) { if (!seq[i].done_at) { idx = i; break; } }
+  if (idx < 0) return [];
+  var cur = seq[idx];
   var opts = [];
-  var allPickupsDone = pickups.every(function (p) { return !!p.done_at; });
-  if (pickups.length && !allPickupsDone) {
-    for (var i = 0; i < pickups.length; i++) {
-      var p = pickups[i];
-      if (!p.arrived_at) { opts.push({ stop: p, event: 'arrive' }); break; }
-      if (!p.done_at)    { opts.push({ stop: p, event: 'done' });   break; }
-    }
-  } else {
-    for (var j = 0; j < deliveries.length; j++) {
-      var d = deliveries[j];
-      if (!d.arrived_at) opts.push({ stop: d, event: 'arrive' });
-      else if (!d.done_at) opts.push({ stop: d, event: 'done' });
+  // Ha még nem érkezett meg → érkezés választható. Ha megérkezett de nincs
+  // elvégezve → elvégzés. Ha a következő szomszédos stop-ok is delivery-k
+  // ÉS mindegyik felrakó lezárult, a sofőr választhat közülük (mint eddig
+  // a több lerakós ág).
+  if (!cur.arrived_at) opts.push({ stop: cur, event: 'arrive' });
+  else if (!cur.done_at) opts.push({ stop: cur, event: 'done' });
+  // Extra ág: ha a jelenlegi delivery, és utána is delivery(k) jönnek úgy,
+  // hogy minden pickup már done → mindegyik nyitva választható.
+  if (cur.kind === 'delivery') {
+    var allPickupsDone = seq.filter(function (s) { return s.kind === 'pickup'; }).every(function (p) { return !!p.done_at; });
+    if (allPickupsDone) {
+      for (var j = idx + 1; j < seq.length; j++) {
+        var s2 = seq[j];
+        if (s2.kind !== 'delivery') break;
+        if (!s2.arrived_at) opts.push({ stop: s2, event: 'arrive' });
+        else if (!s2.done_at) opts.push({ stop: s2, event: 'done' });
+      }
     }
   }
   return opts;
@@ -5019,10 +5037,29 @@ function renderFuvarCard(o, idx) {
   }
   // Több felrakó / lerakó pont — a o.stops tömbből építjük fel a szekciókat.
   // Ha nincs stops-tömb (nem-migrált fuvar), a régi top-szintű mezőkből.
-  var _pickups = Array.isArray(o.stops) ? o.stops.filter(function (s) { return s.kind === 'pickup'; })
-                                              .sort(function (a, b) { return a.stop_index - b.stop_index; }) : [];
-  var _deliveries = Array.isArray(o.stops) ? o.stops.filter(function (s) { return s.kind === 'delivery'; })
-                                                 .sort(function (a, b) { return a.stop_index - b.stop_index; }) : [];
+  // A bevitel INTERLEAVED sorrendje `seq_index` alapján visszatükrözve.
+  var _seqStops = Array.isArray(o.stops) ? o.stops.slice().sort(function (a, b) {
+    var A = (a && a.seq_index != null) ? a.seq_index : 999999;
+    var B = (b && b.seq_index != null) ? b.seq_index : 999999;
+    if (A !== B) return A - B;
+    var ak = a && a.kind === 'pickup' ? 0 : 1;
+    var bk = b && b.kind === 'pickup' ? 0 : 1;
+    if (ak !== bk) return ak - bk;
+    return (a && a.stop_index || 0) - (b && b.stop_index || 0);
+  }) : [];
+  var _pickups = _seqStops.filter(function (s) { return s.kind === 'pickup'; });
+  var _deliveries = _seqStops.filter(function (s) { return s.kind === 'delivery'; });
+  // Interleaved-e a bevitel? (pl. pu → de → pu). Ha igen VAGY 3+ stop van,
+  // egyetlen sorrend-listát mutatunk (nem kétszekciós ⬆️/⬇️ blokkot), hogy
+  // a sofőr pontosan a beírás rendjében lássa a fuvart.
+  var _interleaved = false;
+  var _sawKindSwitch = 0;
+  for (var _ii = 1; _ii < _seqStops.length; _ii++) {
+    if (_seqStops[_ii].kind !== _seqStops[_ii - 1].kind) _sawKindSwitch++;
+  }
+  // 1× kind-váltás = klasszikus pu…pu→de…de (nem interleaved).
+  // 2+ kind-váltás = valódi interleaved (pu→de→pu VAGY de→pu→de stb.).
+  if (_sawKindSwitch >= 2) _interleaved = true;
   function _stopStatusBadge(s) {
     if (s.done_at) return '<span class="fd-stop-done" title="' + esc(fmtFuvarDateTime(s.done_at)) + '">✅</span>';
     if (s.arrived_at) return '<span class="fd-stop-arrived" title="' + esc(fmtFuvarDateTime(s.arrived_at)) + '">📍</span>';
@@ -5095,11 +5132,38 @@ function renderFuvarCard(o, idx) {
           'title="' + t('sof.uitTitle') + '">🚛 UIT' + _legacyBadge + '</button>' +
       '</div>', loadedDone);
   }
+  // ── INTERLEAVED: ha a bevitel sorrendje pu↔de↔pu(↔de) — egyetlen sorrend-
+  // szekciót renderelünk, a fuvart úgy mutatva, ahogy a diszpécser beírta.
+  // Klasszikus (1 fel + 1 lerakó, vagy tisztán pu…→de…) esetben marad a jól
+  // ismert kétszekciós ⬆️/⬇️ elrendezés.
+  var routeSec = '';
+  if (_interleaved && _seqStops.length) {
+    // A `_stopRows` firma+loc kulcsai a `_fc` map-ben már ott vannak (per-kind
+    // + per-index feltöltve fentebb) — itt csak a kind-en belüli sorszámot
+    // számoljuk vissza, hogy a másoló-gomb kulcsai stimmeljenek.
+    var _pIdx2 = 0, _dIdx2 = 0;
+    var routeBody = _seqStops.map(function (s) {
+      var k = s.kind;
+      var i = (k === 'pickup') ? _pIdx2++ : _dIdx2++;
+      var kIco = k === 'pickup' ? '⬆️' : '⬇️';
+      var kLbl = k === 'pickup' ? t('sof.det.pickup') : t('sof.det.delivery');
+      var seqN = (s && s.seq_index != null) ? (s.seq_index + 1) : '';
+      return '<div class="fd-stop-block fd-stop-seq">' +
+        '<div class="fd-stop-h">' + _stopStatusBadge(s) +
+          ' <b>' + (seqN ? seqN + '. ' : '') + kIco + ' ' + kLbl + ' #' + (i + 1) + '</b>' +
+        '</div>' +
+        _stopRows(s, k, i) +
+      '</div>';
+    }).join('');
+    var routeSum = _seqStops.length + ' ' + (t('sof.det.stops') || 'stop');
+    routeSec = fdPhaseSec('route', '🛣️', 'sof.det.route', routeSum, routeBody, true);
+  }
   var details =
     '<div class="fuvar-details" id="det_' + o.id + '" style="display:none">' +
       metaHtml +
-      // Felrakodás után a LERAKÁS kerül előre — az a soron következő feladat.
-      (loadedDone ? (unloadSec + loadSec) : (loadSec + unloadSec)) +
+      // Interleaved fuvar: egyetlen sorrend-szekció (a diszpécser bevitele).
+      // Klasszikus fuvar: felrakodás előtt fel-, utána lerakó-szekció elöl.
+      (_interleaved ? routeSec : (loadedDone ? (unloadSec + loadSec) : (loadSec + unloadSec))) +
       (o.ref ? '<div class="fd-sec">' +
         '<div class="fd-sec-h"><span class="fd-sec-t">📝 ' + t('sof.det.note') + '</span></div>' +
         detRow('sof.det.note', o.ref, 'note') +

@@ -98,9 +98,43 @@ describe('lib/orderStops.replaceStopsForOrder', () => {
     expect(db.calls[0].sql).toMatch(/^SELECT id, kind, stop_index/);
     expect(db.calls[1].sql).toMatch(/^DELETE FROM order_stops/);
     expect(db.calls[2].sql).toMatch(/INSERT INTO order_stops/);
-    // Az arrived_at 'ts1' átvitetődött a pickup#0-ra ($9)
-    expect(db.calls[2].params[8]).toBe('ts1');
+    // Új oszlop-sorrend: (order_id, company_id, kind, stop_index, seq_index,
+    // loc, firma, data, ref, arrived_at, done_at, waybilled_at) → arrived_at $10.
+    expect(db.calls[2].params[9]).toBe('ts1');
     // A delivery új stop, arrived_at NULL
-    expect(db.calls[3].params[8]).toBeNull();
+    expect(db.calls[3].params[9]).toBeNull();
+    // seq_index a bevitel sorrendje szerint: pickup 0, delivery 1
+    expect(db.calls[2].params[4]).toBe(0);
+    expect(db.calls[3].params[4]).toBe(1);
+  });
+
+  test('stops[] ordered — interleaved sorrend megőrizve seq_index-ben', async () => {
+    const db = mockDb();
+    // A hívók (comCreate/comUpdate) mostantól normalizeStops-t hívnak: adjunk
+    // egy INTERLEAVED bevitelt, és ellenőrizzük, hogy a seq_index a bevitel
+    // sorrendjét tükrözi (nem a kind-alapú csoportosítást).
+    const n = orderStops.normalizeStops({
+      stops: [
+        { kind: 'pickup',   loc: 'P1' },
+        { kind: 'delivery', loc: 'D1' },
+        { kind: 'pickup',   loc: 'P2' },
+        { kind: 'delivery', loc: 'D2' },
+      ],
+    });
+    expect(n.seq.map((s) => s.kind)).toEqual(['pickup', 'delivery', 'pickup', 'delivery']);
+    expect(n.seq.map((s) => s.seq_index)).toEqual([0, 1, 2, 3]);
+    // kind-en belüli stop_index továbbra is 0-alapú
+    expect(n.pickups.map((s) => s.stop_index)).toEqual([0, 1]);
+    expect(n.deliveries.map((s) => s.stop_index)).toEqual([0, 1]);
+
+    await orderStops.replaceStopsForOrder(db, 'CMD-2', 42, n);
+    // 1 SELECT + 1 DELETE + 4 INSERT
+    expect(db.calls.length).toBe(6);
+    // seq_index a bevitel sorrendjében kerül a DB-be ($5)
+    const seqIndexes = db.calls.slice(2).map((c) => c.params[4]);
+    expect(seqIndexes).toEqual([0, 1, 2, 3]);
+    // A megfelelő kind is a helyén ($3)
+    const kinds = db.calls.slice(2).map((c) => c.params[2]);
+    expect(kinds).toEqual(['pickup', 'delivery', 'pickup', 'delivery']);
   });
 });

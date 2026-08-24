@@ -14,6 +14,28 @@
 
 ---
 
+## 2026-08-24 — Fuvar-kiírás: állomás-sorrend megőrzése (interleaved) + autocomplete mostantól MINDEN cím-/cég-mezőn
+
+### Miért
+A diszpécser bevitele „2 felrakó → 5 lerakó → 3 felrakó → 1 lerakó" sorrendben eddig ELVESZETT: a szerver a `order_stops` táblát kind-en belüli `stop_index` szerint tárolta, a sofőr felülete pedig két külön szekcióban (ELÖL az ÖSSZES felrakó, HÁTUL az ÖSSZES lerakó) rendelte. A sofőrnek nem volt látható a bevitel valós sorrendje, és „ugyanaz a cím" második beírása is a hátsó szakaszba került → úgy tűnt, „nem enged duplikálni". Emellett a wizard step 2 + Extra stops sorok nem használták a `getOrderFieldSuggestions` autocomplete-et, tehát a korábban beírt cím/cég ott NEM javasolódott.
+
+### Mit tesz
+1. **Új `order_stops.seq_index` oszlop** (`db/order-stops-seq.sql`, idempotens migráció) — GLOBÁLIS bevitel-sorrend (0..N-1) a fuvaron belül. A kind-en belüli `stop_index` megmarad (mirror-trigger és per-kind indexelés arra épül). Backfill: régi soroknál `pickups-elöl, deliveries-utána` — bit-azonos a régi UI-val.
+2. **`lib/orderStops.js` `normalizeStops(o)` — ordered `stops[]` bemenet elsőbbség** — a szerver mostantól elsőként az `o.stops[]` egyetlen ordered tömbjét használja (megőrzi az interleaved sorrendet). A régi `pickups[]/deliveries[]` út visszamenőleg működik (fallback). A visszaadott `normalized` új `seq` mezőt tartalmaz (a bevitel sorrendje). `replaceStopsForOrder` INSERT-el `seq_index`-et.
+3. **`handlers/orders.js`** — `getMySoferOrders` / `getOrderById` / `comList` JSON_AGG mostantól `seq_index`-et is olvas és `ORDER BY COALESCE(s.seq_index, 999999) ASC` szerint rendez. A régi kind DESC / stop_index ASC csak fallback.
+4. **`public/order-wizard.js` `_commitStopsToLegacy`** — publikálja az `OC.stops` interleaved tömbjét `window.__ocStopsSeq`-be; a top-mezőkbe a BEVITEL SORRENDJÉBEN első pickup + első delivery kerül; az `oExtraStopsList` sorai szintén DOM-hű interleaved rendben (nem pickups-elöl-deliveries-utána). `_syncStopsFromLegacyIfEmpty` elsősorban a `__ocStopsSeq`-ből tölt vissza (Vissza/Tovább lépés).
+5. **`public/console-shared.js` `createOrder` / `saveOrderEdit`** — küldi az új ordered `stops[]` payloadot (a wizard-ból VAGY top+extras DOM-sorrendből). A régi `pickups[]/deliveries[]` mezőket is elküldjük visszafelé kompatibilis fallback-ként. `populateExtraStopsFromOrder` a szerkesztő újratöltésénél `seq_index` szerint iterál, és pontosan azt a pickup/delivery-t hagyja ki, amely a top-mezőket tükrözi (stop_index=0 pickup + MAX(stop_index) delivery) — nincs duplikáció, a sorrend megőrizve.
+6. **`public/sofer.js` `renderFuvarCard`** — új `_seqStops` (seq_index szerinti sorrend). Ha 2+ kind-váltás történik a sorrendben (valódi interleaved, pl. pu→de→pu), egyetlen 🛣️ „Útvonal (a diszpécser sorrendjében)" szekció, minden stop kind-badge + státusz + `stop_index` #-szám + `seq_index` sorszámmal. Klasszikus fuvarnál (1 fel + 1 lerakó vagy pu…→de…) marad a jól ismert kétszekciós ⬆️/⬇️ elrendezés. `_computeNextStopOptions` szintén seq_index szerint jár: az első nem-lezárt stop a következő akció horgonya.
+7. **Autocomplete kiterjesztése** — a `getOrderFieldSuggestions` (`handlers/orders.js`) új UNIÓS `loc` és `firma` kulcsokat is visszaad: minden korábbi fuvar `loc_incarcare`/`loc_descarcare`/`order_stops.loc` és `firma_incarcare`/`firma_descarcare`/`order_stops.firma` értékét EGY listába uniózva. A wizard step 2 inputjai (`ocStopLoc_i`/`ocStopFirma_i`) és az `addExtraStopRow` új extra-sorok `data-sg="loc"`/`data-sg="firma"` attribútumot kapnak → a közös `ensureOrderSgDelegate` legördülő automatikusan felkínálja ugyanazokat a javaslatokat, mint a top-mezőknél. Az extra-sorok Photon-autocomplete-et + ⭐ FavLocations pickert is kapnak (kind-hű szűrés: pickup→load, delivery→unload).
+8. **Duplikáció mostantól explicit engedélyezett** — a fenti fix mellékhatása: ugyanazt a mentett helyet több stop-on bármikor kiválasztható; ugyanaz a cím/cég többször beírható (autocomplete csak javasol, sosem tilt).
+
+### Fájl-lista
+- Új: `db/order-stops-seq.sql`.
+- Módosított: `lib/orderStops.js`, `handlers/orders.js`, `public/order-wizard.js`, `public/console-shared.js`, `public/sofer.js`, `public/i18n.js` (`sof.det.route` új kulcs RO+HU), `public/admin.html`+`manager.html`+`sofer.html` cache-bust `?v=20260824seq`.
+- Teszt: `tests/unit/orderStops.test.js` — új „stops[] ordered — interleaved sorrend megőrizve seq_index-ben" eset (4-stop interleaved bevitel → seq_index [0,1,2,3] + kind [pu,de,pu,de]); a régi replaceStopsForOrder-teszt oszlop-sorrend frissítve (arrived_at $10). **981 Jest zöld** (0 törött, 45 skipped valós-DB).
+
+---
+
 ## 2026-08-24 — Sofőr BEMUTATÓ V2 — teljes újratervezés: önálló `/sofer-demo` sandbox oldal (mindenben nyomogatható)
 
 ### Miért
