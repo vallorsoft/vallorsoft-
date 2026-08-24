@@ -20,7 +20,8 @@
     step: 1,
     maxStep: 6,           // 5 kitöltő lépés + 1 review
     stops: [],            // [{kind:'pickup'|'delivery', loc, firma, data, time}]
-    _acId: 0              // wizard-input azonosító
+    _acId: 0,             // wizard-input azonosító
+    openStopIdx: 0        // step 2 akkordeon: melyik állomás nyitva (0-alapú)
   };
 
   // ── Segéd: i18n (fallback a magyar szöveggel) ──
@@ -163,34 +164,44 @@
   }
 
   function _shellHtml() {
+    // Minden lépés önálló card: .oc-step-card > (nyitva: .oc-step-head + .oc-step-content) |
+    //                                          (csukva: .oc-step-bar egyetlen soros összegzés)
+    // A wizard motor a .oc-step-card-on 'state' osztályt kapcsol: 'open' | 'done' | 'pending'
+    // 'done'  → csak a bar látszik (kattintható → ocGoStep visszalép)
+    // 'open'  → head + content
+    // 'pending' → csak a bar látszik szürkébben (nem kattintható)
+    function _stepCard(n, titleKey, titleDef, bodyId) {
+      return ''
+        + '<div class="oc-step-card" data-step="' + n + '" data-state="pending">'
+        +   '<div class="oc-step-bar" onclick="ocStepBarClick(' + n + ')">'
+        +     '<div class="oc-step-bar-num"><span class="oc-sb-idx">' + (n < 6 ? n : '✓') + '</span></div>'
+        +     '<div class="oc-step-bar-body">'
+        +       '<div class="oc-step-bar-title" data-i18n="' + titleKey + '">' + esc(titleDef) + '</div>'
+        +       '<div class="oc-step-bar-sum" id="ocStepSum' + n + '"></div>'
+        +     '</div>'
+        +     '<div class="oc-step-bar-act">'
+        +       '<span class="oc-step-bar-edit" title="' + esc(T('oc.edit', 'Javítás')) + '">✏️</span>'
+        +     '</div>'
+        +   '</div>'
+        +   '<div class="oc-step-open">'
+        +     '<div class="oc-step-head">'
+        +       '<span class="oc-step-num">' + (n < 6 ? n : '✓') + '</span>'
+        +       '<h3 class="oc-step-title" data-i18n="' + titleKey + '">' + esc(titleDef) + '</h3>'
+        +     '</div>'
+        +     '<div class="oc-step-content" id="' + bodyId + '"></div>'
+        +   '</div>'
+        + '</div>';
+    }
     return ''
       + '<div id="ocTopTools" class="oc-top-tools"></div>'
       + '<div class="oc-progress" id="ocProgress"></div>'
       + '<div class="oc-body">'
-      +   '<div class="oc-step" data-step="1">'
-      +     '<div class="oc-step-head"><span class="oc-step-num">1</span><h3 class="oc-step-title" data-i18n="oc.step1Title">Ügyfél</h3></div>'
-      +     '<div class="oc-step-content" id="ocStepBody1"></div>'
-      +   '</div>'
-      +   '<div class="oc-step" data-step="2">'
-      +     '<div class="oc-step-head"><span class="oc-step-num">2</span><h3 class="oc-step-title" data-i18n="oc.step2Title">Állomások (felrakók / lerakók)</h3></div>'
-      +     '<div class="oc-step-content" id="ocStepBody2"></div>'
-      +   '</div>'
-      +   '<div class="oc-step" data-step="3">'
-      +     '<div class="oc-step-head"><span class="oc-step-num">3</span><h3 class="oc-step-title" data-i18n="oc.step3Title">Áru</h3></div>'
-      +     '<div class="oc-step-content" id="ocStepBody3"></div>'
-      +   '</div>'
-      +   '<div class="oc-step" data-step="4">'
-      +     '<div class="oc-step-head"><span class="oc-step-num">4</span><h3 class="oc-step-title" data-i18n="oc.step4Title">Kiosztás (sofőr + jármű)</h3></div>'
-      +     '<div class="oc-step-content" id="ocStepBody4"></div>'
-      +   '</div>'
-      +   '<div class="oc-step" data-step="5">'
-      +     '<div class="oc-step-head"><span class="oc-step-num">5</span><h3 class="oc-step-title" data-i18n="oc.step5Title">Ár és távolság</h3></div>'
-      +     '<div class="oc-step-content" id="ocStepBody5"></div>'
-      +   '</div>'
-      +   '<div class="oc-step" data-step="6">'
-      +     '<div class="oc-step-head"><span class="oc-step-num">✓</span><h3 class="oc-step-title" data-i18n="oc.step6Title">Ellenőrzés és mentés</h3></div>'
-      +     '<div class="oc-step-content" id="ocStepBody6"></div>'
-      +   '</div>'
+      +   _stepCard(1, 'oc.step1Title', 'Ügyfél', 'ocStepBody1')
+      +   _stepCard(2, 'oc.step2Title', 'Állomások (felrakók / lerakók)', 'ocStepBody2')
+      +   _stepCard(3, 'oc.step3Title', 'Áru', 'ocStepBody3')
+      +   _stepCard(4, 'oc.step4Title', 'Kiosztás (sofőr + jármű)', 'ocStepBody4')
+      +   _stepCard(5, 'oc.step5Title', 'Ár, távolság és UIT', 'ocStepBody5')
+      +   _stepCard(6, 'oc.step6Title', 'Ellenőrzés és mentés', 'ocStepBody6')
       + '</div>'
       + '<div class="oc-nav">'
       +   '<button type="button" class="btn ghost" id="ocBtnBack" onclick="ocPrev()"><span data-i18n="oc.back">← Vissza</span></button>'
@@ -230,10 +241,14 @@
       prog.innerHTML = out;
     }
 
-    // Step-láthatóság
-    var steps = shell.querySelectorAll('.oc-step');
-    Array.prototype.forEach.call(steps, function (s) {
-      s.style.display = (String(s.dataset.step) === String(OC.step)) ? 'block' : 'none';
+    // Card-állapotok: done (bar látszik) | open (head+content) | pending (bar szürkén)
+    var cards = shell.querySelectorAll('.oc-step-card');
+    Array.prototype.forEach.call(cards, function (card) {
+      var n = parseInt(card.getAttribute('data-step'), 10);
+      var state = (n < OC.step) ? 'done' : (n === OC.step ? 'open' : 'pending');
+      card.setAttribute('data-state', state);
+      // Ha done → frissítsük a bar-összegzést a legfrissebb adatokból
+      if (state === 'done') _renderStepBarSummary(n);
     });
 
     // Nav gombok
@@ -259,8 +274,73 @@
     // Ha a step 3-ra léptünk, a méret-kötelező jelzés frissítése (a legacy JS is használja).
     if (OC.step === 3 && typeof refreshDimReq === 'function') { try { refreshDimReq(); } catch (e) {} }
 
-    // Reszponzív: felgörget a step-body tetejére, hogy ne kelljen felgörgetni.
-    try { shell.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+    // Reszponzív: az aktuálisan nyitott step tetejére görget (hogy a felette
+    // lévő bar-ok között ne kelljen felgörgetni).
+    try {
+      var openCard = shell.querySelector('.oc-step-card[data-state="open"]');
+      var target = openCard || shell;
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) {}
+  }
+
+  // ── Bar-kattintás: visszaugrik a lépéshez (csak done → open átjárás) ──
+  function ocStepBarClick(n) {
+    if (n === OC.step) return;      // nyitva van, nincs teendő
+    if (n > OC.step) return;        // jövőbeli lépés: még nem érhető el
+    ocGoStep(n);
+  }
+
+  // ── Egyetlen step bar-jának összegző-szövegét frissíti (done állapotban). ──
+  function _renderStepBarSummary(n) {
+    var el = document.getElementById('ocStepSum' + n);
+    if (!el) return;
+    var v = _readAllLegacy();
+    var txt = '';
+    if (n === 1) {
+      var parts = [];
+      if (v.client) parts.push(v.client);
+      if (v.ref) parts.push(v.ref);
+      if (v.series_prefix) parts.push(v.series_prefix);
+      txt = parts.join(' · ') || esc(T('oc.empty', '(üres)'));
+    } else if (n === 2) {
+      var pu = OC.stops.filter(function (s) { return s.kind === 'pickup'; }).length;
+      var de = OC.stops.filter(function (s) { return s.kind === 'delivery'; }).length;
+      if (!pu && !de) { txt = esc(T('oc.noStops', 'Nincs állomás')); }
+      else {
+        // Első pickup helyszín → első delivery helyszín + darabszám
+        var first = OC.stops[0], last = OC.stops[OC.stops.length - 1];
+        var route = [];
+        if (first && first.loc) route.push(first.loc);
+        if (last && last !== first && last.loc) route.push(last.loc);
+        var count = ' · ' + pu + '⬆ / ' + de + '⬇';
+        txt = esc(route.join(' → ')) + count;
+      }
+    } else if (n === 3) {
+      var t3 = [];
+      if (v.load_type) t3.push(v.load_type);
+      if (v.suly_kg) t3.push(v.suly_kg + ' kg');
+      if (v.hossz_cm && v.szel_cm && v.mag_cm) t3.push(v.hossz_cm + '×' + v.szel_cm + '×' + v.mag_cm);
+      txt = t3.length ? esc(t3.join(' · ')) : esc(T('oc.empty', '(üres)'));
+    } else if (n === 4) {
+      var t4 = [];
+      if (v.sofer_type === 'Intern' && v.nume_sofer) t4.push(esc(v.nume_sofer));
+      else if (v.sofer_type === 'Extern') {
+        var eb = [];
+        if (v.nume_sofer) eb.push(esc(v.nume_sofer));
+        if (v.firma_extern) eb.push(esc(v.firma_extern));
+        t4.push(eb.join(' / ') || esc(T('form.externDriver', 'Külső')));
+      } else t4.push(esc(T('form.noDriver', 'Sofőr nélkül')));
+      if (v.rendszam_camion) t4.push('🚚 ' + esc(v.rendszam_camion));
+      if (v.rendszam_remorca) t4.push('🚛 ' + esc(v.rendszam_remorca));
+      txt = t4.join(' · ');
+    } else if (n === 5) {
+      var t5 = [];
+      if (v.pret) t5.push(v.pret);
+      if (v.km) t5.push(v.km + ' km');
+      if (v.uit) t5.push('UIT ' + esc(((window.UitFmt && window.UitFmt.format) ? window.UitFmt.format(v.uit) : v.uit)));
+      txt = t5.length ? t5.join(' · ') : esc(T('oc.empty', '(üres)'));
+    }
+    el.innerHTML = txt;
   }
 
   // ── Lépés-navigáció ──
@@ -326,12 +406,12 @@
     var host = document.getElementById('ocStepBody2');
     if (!host) return;
     host.innerHTML =
-      '<div class="oc-hint">' + esc(T('oc.stopsHint',
-        'Add hozzá minden felrakó/lerakó pontot. A ⬆️/⬇️ gombokkal átrendezheted a sorrendet.')) + '</div>' +
+      '<div class="oc-hint">' + esc(T('oc.stopsHintAcc',
+        'Add hozzá az állomásokat a bevitel sorrendjében. Csak EGY nyílt egyszerre — új állomás hozzáadásával az előző összecsukódik. A km-számítás a felsorolás sorrendjében fűzi össze az összeset.')) + '</div>' +
       '<div id="ocStopsList" class="oc-stops"></div>' +
       '<div class="oc-stops-actions">' +
-        '<button type="button" class="btn ghost" onclick="ocStopAdd(\'pickup\')">➕ ' + esc(T('oc.addPickup', 'Felrakó')) + '</button>' +
-        '<button type="button" class="btn ghost" onclick="ocStopAdd(\'delivery\')">➕ ' + esc(T('oc.addDelivery', 'Lerakó')) + '</button>' +
+        '<button type="button" class="btn ghost" onclick="ocStopAdd(\'pickup\')">➕ ⬆️ ' + esc(T('oc.addPickup', 'Felrakó')) + '</button>' +
+        '<button type="button" class="btn ghost" onclick="ocStopAdd(\'delivery\')">➕ ⬇️ ' + esc(T('oc.addDelivery', 'Lerakó')) + '</button>' +
       '</div>';
     _renderStopsList();
   }
@@ -343,28 +423,57 @@
       list.innerHTML = '<div class="oc-empty">' + esc(T('oc.noStops', 'Még nincs egy állomás sem — add hozzá az első felrakót.')) + '</div>';
       return;
     }
+    // Akkordeon: EGYSZERRE egyetlen állomás-kártya nyitva (openStopIdx),
+    // a többi összecsukott bar. A bar-ra kattintva nyílik, a Tovább / új
+    // stop hozzáadás automatikusan zárja az előzőt.
+    if (OC.openStopIdx == null || OC.openStopIdx >= OC.stops.length) OC.openStopIdx = OC.stops.length - 1;
+
     list.innerHTML = OC.stops.map(function (s, i) {
-      var badge = (s.kind === 'pickup')
-        ? '<span class="oc-badge pickup">⬆️ ' + esc(T('oc.pickup', 'Felrakás')) + '</span>'
-        : '<span class="oc-badge delivery">⬇️ ' + esc(T('oc.delivery', 'Lerakás')) + '</span>';
+      var isOpen = (i === OC.openStopIdx);
+      var kindIcon = (s.kind === 'pickup') ? '⬆️' : '⬇️';
+      var kindLabel = (s.kind === 'pickup')
+        ? esc(T('oc.pickup', 'Felrakás'))
+        : esc(T('oc.delivery', 'Lerakás'));
+      var badge = '<span class="oc-badge ' + (s.kind === 'pickup' ? 'pickup' : 'delivery') + '">'
+        + kindIcon + ' ' + kindLabel + '</span>';
+
+      // Összecsukott bar-tartalom (rövid összefoglaló)
+      var barSum = '';
+      var sumParts = [];
+      if (s.loc) sumParts.push('📍 ' + esc(s.loc));
+      if (s.firma) sumParts.push('🏢 ' + esc(s.firma));
+      if (s.data) {
+        var dt = esc((s.data || '').slice(0, 10)) + (s.time ? ' ' + esc(s.time) : '');
+        sumParts.push('📅 ' + dt);
+      }
+      barSum = sumParts.length ? sumParts.join(' · ')
+        : '<i class="oc-empty-sub">' + esc(T('oc.stopEmpty', 'kitöltésre vár')) + '</i>';
+
+      // BAR (mindig ott van; open állapotban rejtett)
+      var barHtml = ''
+        + '<div class="oc-stop-bar" onclick="ocStopOpen(' + i + ')">'
+        +   '<div class="oc-stop-bar-num">#' + (i + 1) + '</div>'
+        +   '<div class="oc-stop-bar-badge">' + badge + '</div>'
+        +   '<div class="oc-stop-bar-sum">' + barSum + '</div>'
+        +   '<div class="oc-stop-bar-act">'
+        +     '<button type="button" class="oc-ord-btn" onclick="event.stopPropagation();ocStopMove(' + i + ',-1)" title="' + esc(T('oc.moveUp', 'Feljebb')) + '"' + (i === 0 ? ' disabled' : '') + '>⬆</button>'
+        +     '<button type="button" class="oc-ord-btn" onclick="event.stopPropagation();ocStopMove(' + i + ',1)" title="' + esc(T('oc.moveDown', 'Lejjebb')) + '"' + (i === OC.stops.length - 1 ? ' disabled' : '') + '>⬇</button>'
+        +     '<button type="button" class="oc-ord-btn danger" onclick="event.stopPropagation();ocStopRemove(' + i + ')" title="' + esc(T('common.delete', 'Törlés')) + '">✕</button>'
+        +     '<span class="oc-stop-bar-edit" title="' + esc(T('oc.edit', 'Javítás')) + '">✏️</span>'
+        +   '</div>'
+        + '</div>';
+
+      // NYITOTT tartalom
       var acId = 'ocStopLoc_' + i;
       var acDdId = 'ocStopLocDD_' + i;
       var firmaId = 'ocStopFirma_' + i;
-      // A helyszín + ⭐ mentett hely gomb + autocomplete. A `data-sg` attribútum
-      // az UNIÓS `loc`/`firma` javaslat-kulcsra mutat (ld. getOrderFieldSuggestions):
-      // bármelyik korábbi fuvarban beírt cím/cég az ÖSSZES stop-mezőn javasolt.
-      return ''
-        + '<div class="oc-stop-card" data-idx="' + i + '">'
+      var openHtml = ''
+        + '<div class="oc-stop-open">'
         +   '<div class="oc-stop-top">'
         +     badge
         +     '<div class="oc-stop-toggle">'
         +       '<button type="button" class="oc-toggle-btn' + (s.kind === 'pickup' ? ' on' : '') + '" onclick="ocStopSetKind(' + i + ',\'pickup\')">⬆️ ' + esc(T('oc.pickup', 'Felrakás')) + '</button>'
         +       '<button type="button" class="oc-toggle-btn' + (s.kind === 'delivery' ? ' on' : '') + '" onclick="ocStopSetKind(' + i + ',\'delivery\')">⬇️ ' + esc(T('oc.delivery', 'Lerakás')) + '</button>'
-        +     '</div>'
-        +     '<div class="oc-stop-ord">'
-        +       '<button type="button" class="oc-ord-btn" onclick="ocStopMove(' + i + ',-1)" title="' + esc(T('oc.moveUp', 'Feljebb')) + '"' + (i === 0 ? ' disabled' : '') + '>⬆</button>'
-        +       '<button type="button" class="oc-ord-btn" onclick="ocStopMove(' + i + ',1)" title="' + esc(T('oc.moveDown', 'Lejjebb')) + '"' + (i === OC.stops.length - 1 ? ' disabled' : '') + '>⬇</button>'
-        +       '<button type="button" class="oc-ord-btn danger" onclick="ocStopRemove(' + i + ')" title="' + esc(T('common.delete', 'Törlés')) + '">✕</button>'
         +     '</div>'
         +   '</div>'
         +   '<div class="oc-stop-grid">'
@@ -385,6 +494,15 @@
         +       '<input class="input oc-in-time" type="time" value="' + esc(s.time || '') + '">'
         +     '</div>'
         +   '</div>'
+        +   '<div class="oc-stop-close-row">'
+        +     '<button type="button" class="btn ghost" onclick="ocStopCollapse()">' + esc(T('oc.stopCollapse', '▲ Bezárás')) + '</button>'
+        +   '</div>'
+        + '</div>';
+
+      return ''
+        + '<div class="oc-stop-card' + (isOpen ? ' open' : ' collapsed') + '" data-idx="' + i + '">'
+        +   barHtml
+        +   openHtml
         + '</div>';
     }).join('');
 
@@ -423,25 +541,47 @@
     try { if (typeof ocSgLoad === 'function') ocSgLoad(); } catch (e) {}
   }
 
-  // ── Állomás-műveletek ──
+  // ── Állomás-műveletek (accordion-tudatos) ──
   function ocStopAdd(kind) {
+    // Új stop hozzáadása → az előző (nyitva lévő) automatikusan bezáródik,
+    // az új nyílik meg.
     OC.stops.push({ kind: (kind === 'pickup' ? 'pickup' : 'delivery'), loc: '', firma: '', data: '', time: '' });
+    OC.openStopIdx = OC.stops.length - 1;
     _renderStopsList();
   }
   function ocStopRemove(i) {
     if (i < 0 || i >= OC.stops.length) return;
     OC.stops.splice(i, 1);
+    // openStopIdx normalizálás
+    if (OC.stops.length === 0) OC.openStopIdx = null;
+    else if (OC.openStopIdx >= OC.stops.length) OC.openStopIdx = OC.stops.length - 1;
+    else if (OC.openStopIdx > i) OC.openStopIdx--;
     _renderStopsList();
   }
   function ocStopMove(i, dir) {
     var j = i + dir;
     if (j < 0 || j >= OC.stops.length) return;
     var tmp = OC.stops[i]; OC.stops[i] = OC.stops[j]; OC.stops[j] = tmp;
+    // openStopIdx követi a mozgatást, ha a mozgatott elem volt nyitva
+    if (OC.openStopIdx === i) OC.openStopIdx = j;
+    else if (OC.openStopIdx === j) OC.openStopIdx = i;
     _renderStopsList();
   }
   function ocStopSetKind(i, kind) {
     if (i < 0 || i >= OC.stops.length) return;
     OC.stops[i].kind = (kind === 'pickup' ? 'pickup' : 'delivery');
+    _renderStopsList();
+  }
+  // Akkordeon: adott állomás nyitása (a többi automatikusan bezáródik)
+  function ocStopOpen(i) {
+    if (i < 0 || i >= OC.stops.length) return;
+    if (OC.openStopIdx === i) { OC.openStopIdx = null; }
+    else { OC.openStopIdx = i; }
+    _renderStopsList();
+  }
+  // Nyitott bezárása (▲ Bezárás gomb)
+  function ocStopCollapse() {
+    OC.openStopIdx = null;
     _renderStopsList();
   }
 
@@ -623,9 +763,10 @@
             '<div class="ocr-row"><b>' + esc(T('form.trailerPlate', 'Pótkocsi')) + ':</b> ' + esc(v.rendszam_remorca || '—') + '</div>'
           ) +
 
-          _sec('5', T('oc.step5Title', 'Ár és távolság'),
+          _sec('5', T('oc.step5Title', 'Ár, távolság és UIT'),
             '<div class="ocr-row"><b>' + esc(T('form.price', 'Ár')) + ':</b> ' + (v.pret ? esc(v.pret) : '—') + '</div>' +
             '<div class="ocr-row"><b>' + esc(T('form.km', 'Távolság')) + ':</b> ' + (v.km ? esc(v.km) + ' km' : '—') + '</div>' +
+            _legsBreakdownHtml() +
             '<div class="ocr-row"><b>' + esc(T('form.uit', 'UIT-kód')) + ':</b> ' +
               (v.uit ? esc(((window.UitFmt && window.UitFmt.format) ? window.UitFmt.format(v.uit) : v.uit)) : '—') + '</div>'
           ) +
@@ -714,6 +855,52 @@
     try { console.log('[wizard]', msg); } catch (e) {}
   }
 
+  // ── Szakasz-bontás (leg-breakdown) a review-lapra, ha van multi-stop chain ──
+  // A `_rmState.create.legs` a `orderRouteRecalc` sikeres válaszából érkezik
+  // (console-shared.js `st.legs = r.legs`); itt csak megjelenítjük.
+  function _legsBreakdownHtml() {
+    var st = (typeof window._rmState === 'object' && window._rmState && window._rmState.create) || null;
+    var legs = st && Array.isArray(st.legs) ? st.legs : [];
+    if (!legs || legs.length < 2) return '';   // 1 szakasz = egyszerű útvonal, nem érdekes
+    var rows = legs.map(function (leg, i) {
+      var fromShort = _cityShort(leg.fromLabel);
+      var toShort = _cityShort(leg.toLabel);
+      var km = (leg.km != null) ? (leg.km + ' km') : '—';
+      return '<div class="ocr-leg-row"><span class="ocr-leg-idx">#' + (i + 1) + '</span>' +
+        '<span class="ocr-leg-path">📍 ' + esc(fromShort) + ' → ' + esc(toShort) + '</span>' +
+        '<span class="ocr-leg-km">' + esc(km) + '</span></div>';
+    }).join('');
+    return '<div class="ocr-legs">' +
+      '<div class="ocr-legs-head">' + esc(T('oc.legsHead', 'Szakaszok (a bevitel sorrendjében)')) + ' — ' +
+        legs.length + ' ' + esc(T('oc.legsUnit', 'szakasz')) + '</div>' +
+      rows +
+      '</div>';
+  }
+  // A label első jelentős darabja (városnév) — a bontás olvashatóbb így.
+  function _cityShort(label) {
+    if (!label) return '—';
+    var parts = String(label).split(',').map(function (p) { return p.trim(); }).filter(Boolean);
+    if (!parts.length) return String(label);
+    // Kihagyjuk az utca-prefixet („Strada", „Bd." stb.) és az irszámot, ha az első darab az
+    var STREET = /^(strada|str\.?|bd\.?|bulevardul|calea|aleea|piata|sat|sos\.?)\s/i;
+    var POSTAL = /^\d{3,6}(\s|$)/;
+    for (var i = 0; i < parts.length; i++) {
+      if (STREET.test(parts[i]) || POSTAL.test(parts[i])) continue;
+      return parts[i];
+    }
+    return parts[0];
+  }
+
+  // Callback a console-shared.js `orderRouteRecalc` végén — ha a review lap
+  // nyitva van, újrarajzoljuk (hogy az új leg-bontás megjelenjen).
+  window.__ocOnRouteChanged = function (which, result) {
+    try {
+      if (which !== 'create') return;
+      if (OC.step !== 6) return;    // review nincs nyitva → majd következő nyitáskor
+      _renderReview();
+    } catch (_) {}
+  };
+
   // ── Publikus API (globálisan az onclick-hez) ──
   window.ocInit = ocInit;
   window.ocGoStep = ocGoStep;
@@ -724,4 +911,7 @@
   window.ocStopRemove = ocStopRemove;
   window.ocStopMove = ocStopMove;
   window.ocStopSetKind = ocStopSetKind;
+  window.ocStopOpen = ocStopOpen;
+  window.ocStopCollapse = ocStopCollapse;
+  window.ocStepBarClick = ocStepBarClick;
 })();

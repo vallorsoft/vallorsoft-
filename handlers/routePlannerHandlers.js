@@ -385,7 +385,7 @@ handlers.orderRouteEstimate = async function (req, res, args) {
     const a = Array.isArray(args) ? (args[0] || {}) : (args || {});
     const est = await estimateRoute(a.waypoints, cid);
     return res.json({ result: { ok: true, km: est.km, durationSeconds: est.durationSeconds,
-      polyline: est.polyline, waypoints: est.waypoints } });
+      polyline: est.polyline, waypoints: est.waypoints, legs: est.legs || [] } });
   } catch (err) {
     console.error('orderRouteEstimate hiba:', err);
     return res.json({ result: { ok: false, err: (err && err.message) || 'Eroare de server la calculul rutei.' } });

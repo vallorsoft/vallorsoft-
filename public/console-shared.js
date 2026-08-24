@@ -311,7 +311,7 @@ var RM_CFG = {
   create: { load:'oLoad',    loadDD:'oLoadDD',     unload:'oUnload',   unloadDD:'oUnloadDD',   km:'oKm',  btn:'oMapBtn'  },
   edit:   { load:'oeLocInc', loadDD:'oeLocIncDD',  unload:'oeLocDesc', unloadDD:'oeLocDescDD', km:'oeKm', btn:'oeMapBtn' },
 };
-function _rmFresh(){ return { via:[], km:null, dur:null, polyline:[], waypoints:[], kmAuto:true, lastKey:null }; }
+function _rmFresh(){ return { via:[], km:null, dur:null, polyline:[], waypoints:[], legs:[], kmAuto:true, lastKey:null }; }
 var _rmState = { create:_rmFresh(), edit:_rmFresh() };
 var _rmLeaflet=null, _rmLayers=null, _rmWhich=null, _rmClickAdds=false;
 
@@ -384,12 +384,55 @@ function initOrderMapFeature(){
   });
 }
 
+// Multi-stop tudatos waypoint-építés a fuvar-útvonal-számoláshoz.
+// A pontokat MINDIG a bevitel (seq_index) sorrendjében fűzi össze:
+//   • create: `window.__ocStopsSeq` (wizard közvetlen igazságforrás) HA elérhető,
+//     különben top felrakó + `#oExtraStopsList` DOM-sorrend + top lerakó.
+//   • edit:   top felrakó + `#oeExtraStopsList` DOM-sorrend (= seq-sorrend) +
+//     top lerakó.
+// Ha nincs extra állomás (klasszikus 1 felrakó + 1 lerakó), akkor a régi
+// viselkedés: felrakó → térkép-`via` pontok → lerakó (a `via` pontok csak
+// köztespontos km-finomításra vannak, NEM megállók).
 function _rmBuildWps(which){
   var c=RM_CFG[which], st=_rmState[which];
   var loadEl=document.getElementById(c.load), unloadEl=document.getElementById(c.unload);
   var load=((loadEl||{}).value||'').trim();
   var unload=((unloadEl||{}).value||'').trim();
   if(!load||!unload) return null;
+
+  // 1) Wizard: `__ocStopsSeq` a bevitel sorrendjében — közvetlen igazságforrás.
+  if (which === 'create' && Array.isArray(window.__ocStopsSeq) && window.__ocStopsSeq.length >= 2) {
+    var wSeq = window.__ocStopsSeq
+      .filter(function(s){ return s && String(s.loc||'').trim(); })
+      .map(function(s){
+        var wp = { type: (s.kind === 'pickup' ? 'loading' : 'unloading'), address: String(s.loc||'').trim() };
+        if (s.lat != null && s.lng != null) { wp.lat = Number(s.lat); wp.lng = Number(s.lng); }
+        return wp;
+      });
+    if (wSeq.length >= 2) return wSeq;
+  }
+
+  // 2) DOM extras (create + edit): top felrakó → extras (DOM-sorrend) → top lerakó.
+  var extraListId = (which === 'edit') ? 'oeExtraStopsList' : 'oExtraStopsList';
+  var extraList = document.getElementById(extraListId);
+  var extraRows = extraList ? extraList.querySelectorAll('.oe-extra-row') : [];
+  if (extraRows.length > 0) {
+    var chain = [];
+    var lTop = { type:'loading', address: load };
+    if (loadEl && loadEl._vsLat != null) { lTop.lat = loadEl._vsLat; lTop.lng = loadEl._vsLng; }
+    chain.push(lTop);
+    Array.prototype.forEach.call(extraRows, function(r){
+      var kind = (r.dataset.kind === 'pickup') ? 'loading' : 'unloading';
+      var addr = ((r.querySelector('.oe-x-loc')||{}).value||'').trim();
+      if (addr) chain.push({ type: kind, address: addr });
+    });
+    var uTop = { type:'unloading', address: unload };
+    if (unloadEl && unloadEl._vsLat != null) { uTop.lat = unloadEl._vsLat; uTop.lng = unloadEl._vsLng; }
+    chain.push(uTop);
+    return chain;
+  }
+
+  // 3) Klasszikus: 1 felrakó + (opc.) térkép-via-pontok + 1 lerakó.
   var lWp={type:'loading',address:load};
   if(loadEl && loadEl._vsLat!=null){ lWp.lat=loadEl._vsLat; lWp.lng=loadEl._vsLng; }
   var uWp={type:'unloading',address:unload};
@@ -411,10 +454,12 @@ function orderRouteRecalc(which){
   st.lastKey=key;
   gas('orderRouteEstimate',[{waypoints:wps}]).then(function(r){
     if(!r||!r.ok){ return; }  // csendben — a kézi km marad
-    st.km=r.km; st.dur=r.durationSeconds; st.polyline=r.polyline||[]; st.waypoints=r.waypoints||[];
+    st.km=r.km; st.dur=r.durationSeconds; st.polyline=r.polyline||[]; st.waypoints=r.waypoints||[]; st.legs=r.legs||[];
     var kmEl=document.getElementById(c.km);
     if(kmEl && (st.kmAuto || !String(kmEl.value||'').trim())){ kmEl.value=r.km; st.kmAuto=true; }
     var btn=document.getElementById(c.btn); if(btn) btn.style.display='';
+    // Wizard review-lap tud jelezni ha friss adat van → re-render
+    try { if (typeof window.__ocOnRouteChanged === 'function') window.__ocOnRouteChanged(which, r); } catch(_) {}
     if(_rmWhich===which){ routeMapDraw(which); renderRouteVia(which); }
   }).catch(function(){});
 }
