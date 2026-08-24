@@ -2195,3 +2195,79 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   .oc-stop-bar-sum{ font-size:12px; width:100%; order:3; }
   .oc-stop-bar-act .oc-ord-btn{ width:28px; height:28px; font-size:12px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Comenzi tábla — Routena-mintás tömör redesign (2026-08-24)
+   Csak megjelenés — a table markup + funkciók érintetlenek.
+   Sűrűbb sorok, erősebb hover-visszajelzés, sticky gyors-szűrő chip-sáv.
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* Sticky chip-sáv a fuvar-listához */
+.vs-chip-bar{
+  display:flex; gap:6px; margin-bottom:12px;
+  padding:8px 4px; flex-wrap:wrap;
+  position:sticky; top:0; z-index:5;
+  background:var(--panel, #fff);
+  border-radius:10px;
+}
+.main-content[data-theme="dark"] .vs-chip-bar{ background:#0c1218; }
+
+.vs-chip{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 12px; border-radius:999px;
+  border:1.5px solid var(--border, #e2e8f0);
+  background:transparent; color:var(--text-primary, #0f172a);
+  font-size:12px; font-weight:600; cursor:pointer;
+  transition:all 0.15s;
+  white-space:nowrap;
+}
+.vs-chip:hover{ border-color:#3b82f6; background:rgba(59,130,246,0.06); }
+.vs-chip .vs-chip-ico{ font-size:13px; }
+.vs-chip .vs-chip-n{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:22px; height:20px; padding:0 6px;
+  background:rgba(148,163,184,0.18);
+  color:var(--muted, #64748b);
+  border-radius:999px; font-size:11px; font-weight:700;
+}
+.vs-chip.active{
+  background:linear-gradient(135deg,#3b82f6,#6366f1);
+  border-color:#3b82f6;
+  color:#fff;
+  box-shadow:0 2px 8px -2px rgba(59,130,246,0.4);
+}
+.vs-chip.active .vs-chip-n{
+  background:rgba(255,255,255,0.28);
+  color:#fff;
+}
+
+/* Kompaktabb sorok — a #tblOrders-re szűkítve */
+#tblOrders tbody td{
+  padding:8px 10px !important;
+  font-size:12.5px;
+  line-height:1.4;
+}
+#tblOrders thead th{
+  padding:9px 10px;
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:0.4px;
+  font-weight:700;
+  color:var(--muted, #64748b);
+}
+#tblOrders tbody tr{ transition:background 0.12s; }
+#tblOrders tbody tr:nth-child(even) td{ background:rgba(148,163,184,0.04); }
+.main-content[data-theme="dark"] #tblOrders tbody tr:nth-child(even) td{ background:rgba(255,255,255,0.02); }
+#tblOrders tbody tr:hover td{ background:rgba(59,130,246,0.07) !important; }
+.main-content[data-theme="dark"] #tblOrders tbody tr:hover td{ background:rgba(59,130,246,0.10) !important; }
+
+/* A státusz-pill enyhén árnyékos, hover-kiemelős marad — nincs változás.
+   A vsl-orow-first bal-akcent-csík mostantól kicsit szélesebb (4px vs 3px)
+   hogy a tömörebb sorban is jól látszódjon. */
+#tblOrders tr.vsl-orow .vsl-orow-first{ border-left-width:4px !important; }
+
+@media (max-width:520px){
+  .vs-chip-bar{ padding:6px 2px; gap:4px; overflow-x:auto; flex-wrap:nowrap; }
+  .vs-chip{ padding:5px 10px; font-size:11px; flex-shrink:0; }
+  .vs-chip .vs-chip-n{ min-width:18px; height:18px; font-size:10px; }
+}
