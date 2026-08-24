@@ -47,6 +47,12 @@ router.get('/manager', requirePageLogin, requirePageRole('Manager', 'Admin'), fu
 router.get('/sofer', requirePageLogin, requirePageRole('Sofer', 'Admin', 'Manager'), function(req, res) {
   res.sendFile(path.join(__dirname, '..', 'public', 'sofer.html'));
 });
+// Sofőr DEMO / oktató sandbox (bejelentkezett sofőr / admin / manager).
+// Önálló oldal, saját state-tel — semmi nem megy a szerverre. A valós
+// felülettel identikus stílusú mini-app, végigkoppintható lépésekkel.
+router.get('/sofer-demo', requirePageLogin, requirePageRole('Sofer', 'Admin', 'Manager'), function(req, res) {
+  res.sendFile(path.join(__dirname, '..', 'public', 'sofer-demo.html'));
+});
 router.get('/konyvelo', requirePageLogin, requirePageRole('Konyvelo', 'Admin'), async function(req, res) {
   const ok = await featureEnabled(req.session.user.company_id, 'konyvelo-szerepkor');
   if (!ok) return res.redirect(req.session.user.pozicio === 'Admin' ? '/admin' : '/login');

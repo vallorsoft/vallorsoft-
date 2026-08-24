@@ -14,6 +14,36 @@
 
 ---
 
+## 2026-08-24 — Sofőr BEMUTATÓ V2 — teljes újratervezés: önálló `/sofer-demo` sandbox oldal (mindenben nyomogatható)
+
+### Miért
+Sofőr visszajelzés: **„nem használható ez, nem lehet szimulálni a használatot"**. A valós felületre rakott overlay-tour (PR #344 → #346) alapvetően nem működött jól — a demó fuvart injektáltuk a valós cache-be, a valós fetch-eket próbáltuk mockolni interceptekkel, ami sok ponton szivárogó és félrevezető volt. A sofőr nem tudta „megélni" a felületet.
+
+### Mit tesz — TELJES ÚJRATERVEZÉS
+1. **Új önálló oldal `/sofer-demo`** (`public/sofer-demo.html`, ~800 sor standalone HTML+CSS+JS) — a valós felülettől TELJESEN ELSZIGETELT sandbox. Nincs backend-hívás; minden lokális `in-memory` state-ben él. A sofőr TÉNYLEG végigkoppintja: kártya kinyit, állomás-gomb léptet (📍→📦→📍→✅ vizuálisan), határátlépés BE/KI mock napló, menetlevél mock kitöltés (km, mentés-toast), iratok, chat, PTR, bug FAB.
+2. **Telefon-mockup a képernyő közepén** — sötét telefon-keret, világos képernyő a valós sofer-felület stílusában (fejléc + kártyák + nagy gombok). Bal oldalon (asztalon) vagy alul (mobilon) egy magyarázat-panel: „N/12 lépés" progressbar + cím + törzs + hint + Vissza/Tovább/Kihagyás gombok.
+3. **12 lépéses interaktív wizard**: (1) Welcome → (2) Főoldal áttekintés → (3) Fuvar-kártya kinyit → (4) Állomás-gomb (kattintásra léptet) → (5) Menü-áttekintés → (6) Határátlépés (kattintásra napló) → (7) Menetlevél → (8) „Menetlevél létrehozása" (kattintásra 2. lépés form) → (9) Iratok → (10) Chat → (11) PTR (pill villan) → (12) 🎉 Kész + „Nyisd meg az igazi appot" gomb.
+4. **A wizard reagál a mockup-interakcióra** — az interaktív lépéseken (`waitAction: true`): ha a sofőr rákoppint a mockup megfelelő gombjára, a wizard AUTOMATIKUSAN továbblép; ha nem találja, a jobb oldalon „Tovább →" gombbal kézzel is léphet.
+5. **Auto-átirányítás első belépéskor** — `sofer.js` az `authMe.then()`-ben: ha `!localStorage['vs_sofer_demo_seen']` és a GDPR-banner nem látszik és nincs mentett menetlevél-piszkozat → 1.2 s után `window.location.href = '/sofer-demo'`. A demó Kilépés gombja beállítja a `vs_sofer_demo_seen=1` jelzőt, így legközelebb már nem irányít újra.
+6. **„🎓 Bemutatás" nav-kártya a főoldalon** — a `/sofer-demo`-ra ugrik (nem indít overlay-tour-t). Bárki bármikor újranyithatja tanulásra.
+7. **Régi overlay-tour ELTÁVOLÍTVA a valós appról** — a `sofer-tour.js` betöltése kikerült a `sofer.html`-ből (a fájl a diszken marad opcionális törléshez); a `sofer.js`-ben az intercept-guardok (`window.SoferTour && …`) biztonságosan false-ra esnek, tehát a valós fetch-ek tisztán futnak.
+
+### Szerver / DB
+- **1 új route** `routes/pages.js`: `GET /sofer-demo` `Sofer|Admin|Manager` szerep-védelemmel, statikus HTML-t szolgál ki. Nincs séma-változás, nincs új handler.
+
+### Kliens
+- **ÚJ `public/sofer-demo.html`** — önálló standalone oldal (HTML + CSS + JS + fallback szótár).
+- **`public/sofer.html`** — a „🎓 Bemutatás" nav-kártya `onclick` `/sofer-demo`-ra ugrik; a `sofer-tour.js` betöltés kivéve; cache-bust `?v=20260824demo`.
+- **`public/sofer.js`** — az `authMe.then()` auto-start ág átirányít `/sofer-demo`-ra (a régi `SoferTour.start(true)` helyett), figyelembe véve a `vs_sofer_demo_seen` localStorage jelzőt + GDPR-banner + mentett draft.
+- **`routes/pages.js`** — új `/sofer-demo` route.
+
+### Teszt
+- **ÚJ `tests/integration/sofer-demo-page.test.js`** (5 új eset): route regisztrálva Sofer/Admin/Manager védelemmel; HTML fő struktúra (mockup + 5 scene + wizard nav + Kilépés → `/sofer`); mind a 12 wizard-lépés i18n kulcsa; inline JS szintaxis-tiszta + minden publikus fn exportálva; VM-ben boot: `guideNext` / `mockNavToScene` / `mockBorderTap` / `mockStopStep` / `mockWbCreate` / `mockToast` hibamentesen fut.
+- **Frissítve `tests/integration/sofer-tour.test.js`**: az auto-start regressziós teszt most a `/sofer-demo` átirányítást ellenőrzi (`vs_sofer_demo_seen` + `window.location.href = '/sofer-demo'`) a régi `SoferTour.start(true)` helyett.
+- **980 Jest zöld** (előző 975 → 980, +5 új demo-teszt), 45 skip valós-DB. Nincs regresszió.
+
+---
+
 ## 2026-08-23 — Sofőr bemutató: átlátszó overlay (a valós app végig látszik) + „Bemutatás" gomb dupla széles
 
 ### Miért

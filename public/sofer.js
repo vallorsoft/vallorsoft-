@@ -4263,17 +4263,27 @@ fetch('/api/execute', { method: 'POST', headers: { 'Content-Type': 'application/
     // lista kulcsa per-sofőr): megszakadt feldolgozás folytatása a
     // megőrzött képből + gazdátlan képek takarítása.
     rcptQueueMaint();
-    // ── ELSŐ BELÉPÉS: interaktív bemutató (SoferTour) ──
-    // Ha még sosem látta ez a sofőr, ~1.2s után elindul a tour (a
-    // dashboard render legyen kész). A GDPR-banner elsőbbséget élvez —
-    // ha látszik, kihagyjuk (majd a „🎓 Bemutatás" gombbal újranyithatja).
+    // ── ELSŐ BELÉPÉS: átirányítás a /sofer-demo sandbox-ra ──
+    // A jelenlegi appra rárakott overlay-tour helyett önálló DEMO oldal —
+    // ott minden gomb tényleg működik (lokális state), semmi nem megy
+    // a szerverre. Csak akkor irányítunk, ha:
+    //  - ez a sofőr még sosem látta (`vs_sofer_demo_seen` localStorage)
+    //  - a GDPR-banner NEM látszik (annak elsőbbsége van)
+    //  - nincs mentett menetlevél-piszkozat (nem szakítjuk meg)
+    // A „🎓 Bemutatás" nav-kártyával bárki bármikor újranyithatja.
     try {
       setTimeout(function(){
-        if (!window.SoferTour) return;
+        var seen = false;
+        try { seen = localStorage.getItem('vs_sofer_demo_seen') === '1'; } catch(_){}
+        if (seen) return;
         var gdpr = document.getElementById('gdprBanner');
-        var gdprVisible = gdpr && gdpr.style.display !== 'none';
-        if (gdprVisible) return;
-        if (!SoferTour.isDone()) SoferTour.start(true);
+        if (gdpr && gdpr.style.display !== 'none') return;
+        // Draft-előfoglalás (nyitott menetlevél) — hagyjuk békén.
+        try {
+          var st = stateGet && stateGet();
+          if (st && st.draft) return;
+        } catch(_){}
+        window.location.href = '/sofer-demo';
       }, 1200);
     } catch (_) {}
 
