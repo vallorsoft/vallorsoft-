@@ -3106,6 +3106,7 @@
     'sof.det.delivery': { hu: 'Lerakó', ro: 'Descărcare' },
     'sof.det.stops': { hu: 'pont', ro: 'puncte' },
     'sof.det.route': { hu: 'Útvonal (a diszpécser sorrendjében)', ro: 'Traseu (în ordinea dispecerului)' },
+    'sof.det.next': { hu: 'ez jön', ro: 'urmează' },
     'sof.orderAccepted': { hu: '✅ Fuvar elfogadva!', ro: '✅ Cursă acceptată!' },
     'sof.orderCompleted': { hu: '🏁 Fuvar teljesítve! Manager értesítve.', ro: '🏁 Cursă finalizată! Managerul a fost notificat.' },
     'sof.noActiveOrders': { hu: 'Nincs aktív kiosztott fuvar.', ro: 'Nicio cursă activă alocată.' },

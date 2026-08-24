@@ -14,6 +14,26 @@
 
 ---
 
+## 2026-08-24 — Sofőr fuvar-kártya: multi-stop akkordeon — minden stop külön csukható, alapból CSAK a következő van nyitva
+
+### Miért
+A multi-drop fuvarnál (interleaved: pu→de→pu…) a „🛣️ Útvonal (a diszpécser sorrendjében)" szekció **egyszerre az ÖSSZES stopot** kinyitva mutatta — a sofőrnek végig kellett görgetnie a listát, hogy megtudja, épp mi jön. A stopok között nem volt hierarchia; a következő teendő nem ugrott ki.
+
+### Mit tesz
+1. **`public/sofer.js` `renderFuvarCard` (interleaved ág)** — minden `.fd-stop-block.fd-stop-seq` mostantól **egyénileg összecsukható** (`fd-stop-coll`); a fejlécen státusz-badge + kind-ikon + `stop_index` # + `seq_index` sorszám mellé kompakt összegzés (📍 város · 🏢 cég) került, hogy csukott állapotban is azonosítható. Az első nem-elvégzett (`!done_at`) stop kap **narancs „ez jön / urmează" badge**-et + kék halo keretet, ÉS alapból nyitva van; az összes többi csukva.
+2. **Új `toggleFuvarStop(orderId, seqIdx)` (`public/sofer.js`)** — akkordeon: másik stop nyitásakor a korábban nyitva lévő automatikusan bezáródik. A `fdstop_<orderId>_<seqIdx>` prefix miatt más fuvar stopjai érintetlenek. Enter/Space is működik (billentyűzet-elérhetőség).
+3. **`public/sofer.css`** — új `.fd-stop-coll` blokk: kattintható fejléc hover-rel, chevron ▸/▾ a fejléc jobb szélén, kompakt sum-sor csukott állapotban, „ez jön" narancs pilula (`.fd-stop-next`), és a nyitott stop kártya diszkrét kék keret + halo (`0 0 0 2px rgba(96,165,250,0.15)`) — egy pillantással kiderül, épp mi jön.
+4. **i18n** — 1 új kulcs (`sof.det.next`, RO+HU). Cache-bust `sofer.html` `?v=20260824stopacc` (i18n.js + sofer.js + sofer.css).
+5. **Nem érintett** — klasszikus fuvar (1 fel + 1 lerakó, VAGY tisztán pu…→de…) marad a jól ismert kétszekciós ⬆️/⬇️ elrendezésben (fázis-vezérelt open/close); a fuvar-kártya összecsukott fejléce (dátum · cég · város) érintetlen; állomás-idővonal (🚚 Fuvar állapota) érintetlen; állomás-akciógomb (`driverStopAction`) érintetlen; multi-drop UIT-gomb minden lerakónál a kinyitott stop-blokkban látszik (mint eddig).
+
+### Regresszió-védelem
+- `tests/integration/sofer-client-flow.test.js` + `sofer-tour.test.js` — **52 zöld** (nincs regresszió az állomás-léptetésben / draft-restore / offline outbox / demó-intercept fluxusokban).
+
+### Kockázat
+Alacsony — tisztán kliens-oldali render + CSS + egy új top-level segéd (`toggleFuvarStop`); szerver-oldal, DB és háló-hívás érintetlen.
+
+---
+
 ## 2026-08-24 — Fuvar-kiírás: állomás-sorrend megőrzése (interleaved) + autocomplete mostantól MINDEN cím-/cég-mezőn
 
 ### Miért
