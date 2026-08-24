@@ -4856,6 +4856,39 @@ function toggleFuvarSec(id, kind) {
   if (sec && sec.classList) sec.classList.toggle('open', !open);
 }
 
+// Multi-stop akkordeon: egy adott stop ki-/becsukása a fuvar-kártya
+// „Útvonal (a diszpécser sorrendjében)" szekciójában. Másik stop
+// nyitásakor a korábban nyitva lévő automatikusan bezáródik → mindig
+// EGY nyitott stop → egyértelmű, épp mi jön.
+function toggleFuvarStop(orderId, seqIdx) {
+  var body  = document.getElementById('fdstop_' + orderId + '_' + seqIdx);
+  if (!body) return;
+  var caret = document.getElementById('fdstopc_' + orderId + '_' + seqIdx);
+  var sec   = document.getElementById('fdstops_' + orderId + '_' + seqIdx);
+  var wasOpen = body.style.display !== 'none';
+  // Először CSUKJUK be az ÖSSZES többi stopot ugyanezen fuvaron
+  // (akkordeon-viselkedés). A `fdstop_<orderId>_` prefix csak ehhez a
+  // fuvarhoz tartozik, így másik fuvar stopjai érintetlenek.
+  var prefix = 'fdstop_' + orderId + '_';
+  var all = document.querySelectorAll('[id^="' + prefix + '"]');
+  for (var i = 0; i < all.length; i++) {
+    var el = all[i];
+    if (el === body) continue;
+    if (el.style.display !== 'none') {
+      el.style.display = 'none';
+      var idNum = el.id.substring(prefix.length);
+      var otherCaret = document.getElementById('fdstopc_' + orderId + '_' + idNum);
+      var otherSec   = document.getElementById('fdstops_' + orderId + '_' + idNum);
+      if (otherCaret) otherCaret.textContent = '▸';
+      if (otherSec && otherSec.classList) otherSec.classList.remove('open');
+    }
+  }
+  // Majd a célt átbillentjük (ha nyitva volt → csuk; ha csukva → nyit).
+  body.style.display = wasOpen ? 'none' : 'block';
+  if (caret) caret.textContent = wasOpen ? '▸' : '▾';
+  if (sec && sec.classList) sec.classList.toggle('open', !wasOpen);
+}
+
 // Kattintásra a kártya részletei ki-/becsukódnak (felrakás/lerakás + megjegyzés).
 function toggleFuvarDetails(id) {
   var el = document.getElementById('det_' + id);
@@ -5131,23 +5164,55 @@ function renderFuvarCard(o, idx) {
   // szekciót renderelünk, a fuvart úgy mutatva, ahogy a diszpécser beírta.
   // Klasszikus (1 fel + 1 lerakó, vagy tisztán pu…→de…) esetben marad a jól
   // ismert kétszekciós ⬆️/⬇️ elrendezés.
+  // Multi-stop akkordeon: MINDEN stop külön ki-/becsukható, alapból CSAK a
+  // következő (első nem-elvégzett stop) van nyitva; másik nyitásakor a
+  // korábban nyitva lévő automatikusan becsukódik → mindig egyértelmű, épp
+  // mi jön.
   var routeSec = '';
   if (_interleaved && _seqStops.length) {
+    // A „következő" stop = az első olyan, aminek nincs `done_at`. Ha minden
+    // stop kész, egyik sincs alapból nyitva (a fuvar Finalizat felé tart).
+    var _nextSeqIdx = -1;
+    for (var _ni = 0; _ni < _seqStops.length; _ni++) {
+      if (!_seqStops[_ni].done_at) { _nextSeqIdx = _ni; break; }
+    }
     // A `_stopRows` firma+loc kulcsai a `_fc` map-ben már ott vannak (per-kind
     // + per-index feltöltve fentebb) — itt csak a kind-en belüli sorszámot
     // számoljuk vissza, hogy a másoló-gomb kulcsai stimmeljenek.
     var _pIdx2 = 0, _dIdx2 = 0;
-    var routeBody = _seqStops.map(function (s) {
+    var routeBody = _seqStops.map(function (s, si) {
       var k = s.kind;
       var i = (k === 'pickup') ? _pIdx2++ : _dIdx2++;
       var kIco = k === 'pickup' ? '⬆️' : '⬇️';
       var kLbl = k === 'pickup' ? t('sof.det.pickup') : t('sof.det.delivery');
       var seqN = (s && s.seq_index != null) ? (s.seq_index + 1) : '';
-      return '<div class="fd-stop-block fd-stop-seq">' +
-        '<div class="fd-stop-h">' + _stopStatusBadge(s) +
+      var isOpen = (si === _nextSeqIdx);
+      var isNextBadge = isOpen ? ' <span class="fd-stop-next">' + (t('sof.det.next') || '') + '</span>' : '';
+      // Összecsukott fejléc-összegzés: város · cég — hogy a sofőr nyitás
+      // nélkül is tudja, melyik stop.
+      var sumCity  = _cityOf(s.loc) || (s.loc || '');
+      var sumFirma = (s.firma || '').trim();
+      var sumBits = [];
+      if (sumCity)  sumBits.push('📍 ' + esc(sumCity));
+      if (sumFirma) sumBits.push('🏢 ' + esc(sumFirma));
+      var sumHtml = sumBits.length ? '<span class="fd-stop-sum">' + sumBits.join(' · ') + '</span>' : '';
+      var stopBodyId  = 'fdstop_' + o.id + '_' + si;
+      var stopCaretId = 'fdstopc_' + o.id + '_' + si;
+      var stopSecId   = 'fdstops_' + o.id + '_' + si;
+      return '<div class="fd-stop-block fd-stop-seq fd-stop-coll' + (isOpen ? ' open' : '') + '" id="' + stopSecId + '">' +
+        '<div class="fd-stop-h" role="button" tabindex="0" ' +
+             'data-stop-toggle="1" ' +
+             'onclick="toggleFuvarStop(\'' + o.id + '\',' + si + ')" ' +
+             'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleFuvarStop(\'' + o.id + '\',' + si + ');}">' +
+          _stopStatusBadge(s) +
           ' <b>' + (seqN ? seqN + '. ' : '') + kIco + ' ' + kLbl + ' #' + (i + 1) + '</b>' +
+          isNextBadge +
+          sumHtml +
+          '<span class="fd-caret fd-stop-caret" id="' + stopCaretId + '">' + (isOpen ? '▾' : '▸') + '</span>' +
         '</div>' +
-        _stopRows(s, k, i) +
+        '<div class="fd-stop-b" id="' + stopBodyId + '"' + (isOpen ? '' : ' style="display:none"') + '>' +
+          _stopRows(s, k, i) +
+        '</div>' +
       '</div>';
     }).join('');
     var routeSum = _seqStops.length + ' ' + (t('sof.det.stops') || 'stop');

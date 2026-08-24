@@ -1576,6 +1576,66 @@
 .fd-stop-arrived { color: #f59e0b; font-size: 16px; }
 .fd-stop-todo { color: #94a3b8; font-size: 16px; }
 
+/* Multi-stop akkordeon — minden stop külön ki-/becsukható; alapból csak a
+   következő stop van nyitva. Fejléc kattintható (kurzor + hover), a fejléc
+   jobb szélén ▸/▾ chevron, „ez jön" narancs badge a soron következőn,
+   összecsukott állapotban a fejlécen kompakt város · cég összegzés. */
+.fd-stop-block.fd-stop-coll > .fd-stop-h {
+  cursor: pointer;
+  user-select: none;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 0;
+  padding: 4px 2px;
+  border-radius: 8px;
+  transition: background 120ms ease;
+}
+.fd-stop-block.fd-stop-coll > .fd-stop-h:hover,
+.fd-stop-block.fd-stop-coll > .fd-stop-h:focus-visible {
+  background: rgba(59,130,246,0.08);
+  outline: none;
+}
+.fd-stop-block.fd-stop-coll.open > .fd-stop-h {
+  margin-bottom: 6px;
+}
+.fd-stop-block.fd-stop-coll .fd-stop-caret {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--sof-muted);
+  min-width: 16px;
+  text-align: center;
+}
+.fd-stop-block.fd-stop-coll .fd-stop-sum {
+  font-size: 12.5px;
+  color: var(--sof-muted);
+  flex: 1 1 100%;
+  padding-left: 24px;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fd-stop-block.fd-stop-coll.open .fd-stop-sum {
+  display: none;
+}
+.fd-stop-block.fd-stop-coll .fd-stop-next {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f59e0b, #d97706);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 2px rgba(217,119,6,0.35);
+}
+/* A soron következő stop kártya diszkrét kék keret + halo → egy pillantással
+   kiderül, épp mi jön. */
+.fd-stop-block.fd-stop-coll.open {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(96,165,250,0.15);
+}
+
 /* Stop-választó modal — a gombok teljes szélességben, egymás alatt */
 #sofChoiceModal .sof-cf-btns { max-height: 60vh; overflow-y: auto; }
 #sofChoiceModal .sof-cf-btn.ok {
