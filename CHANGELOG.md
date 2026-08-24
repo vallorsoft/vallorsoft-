@@ -14,6 +14,28 @@
 
 ---
 
+## 2026-08-24 — Wizard: nav-gomb közvetlen a nyitott card alá + kontraszt-javítás (chip / step-bar / stop-bar / .ocr-legs)
+
+### Miért
+Két visszajelzés a PR #350–#351 után: (1) a Tovább/Vissza nav-sáv a wizard aljára ragadt — a nyitott card ALATT rögtön a jövőbeli (pending) step-bar-ok jöttek, nem a Tovább gomb. Természetes olvasás-irány: kész lépések ▸ aktuális card ▸ Tovább gomb ▸ mi jön még. (2) Több kontraszt-hiba a nemrég bevezetett elemeken: a nyitott stop bar-ja `opacity:0.4`-en szinte olvashatatlan volt; a pending step-bar `opacity:0.55`-nél is túl halvány; sötét témán a `.oc-stop-card` régi `#f8fafc` háttere feltűnő mismatch a `#0f172a` step-card ellenében.
+
+### Mit
+
+1. **Nav-gomb áthelyezés** (`public/order-wizard.js`) — a `.oc-nav` mostantól a `.oc-body` gyereke `id="ocNav"`-val. A `_refreshView` végén DOM-mozgatva a jelenlegi nyitott `.oc-step-card` KÖZVETLEN utána (`openCard.parentNode.insertBefore(navEl, openCard.nextSibling)`). Ha nincs nyitott card (fallback: OC.step=6+ review), a nav a body végén marad.
+2. **Nav vizuális erősítés** (`style.css`) — a nav most sáv-szerű padding (12px 4px), a border-top felül elhagyva (nem kell választóvonal, a card kerete jelöli a határt). A primary „Tovább" gomb kap egy erős kék gradient + shadow-t (`0 4px 12px -3px rgba(59,130,246,0.4)`); hover-nél `translateY(-1px)`.
+3. **Pending step-bar opacity** 0.55 → 0.72. A `_stepBarSum` szöveg is átvált `var(--muted)`-re a pending állapotban (a done-nál `#334155`/`#cbd5e1` — erős olvashatóság). A pending card kap egy `background:transparent` + finom szürke `.oc-sb-idx` badge-et.
+4. **Sötét-mód `.oc-stop-card`** — a régi `#f8fafc` háttér lecserélve `rgba(255,255,255,0.03)`-ra, border `rgba(255,255,255,0.10)`-re. Nyitott állapotban `rgba(59,130,246,0.06)` háttér + `#3b82f6` border (kiemelt aktív). A toggle/ord gombok és field-label sötét-mód színei is javítva.
+5. **Nyitott stop-bar opacity** 0.4 → 0.85 (a nyitott állomás fejlécén a bar szinte olvashatatlan volt).
+6. **`.vs-chip` erősítés** — explicit `background:#ffffff` + `color:#0f172a` a világos módra (nem függ a `--panel` fallbacktől); hover `#1d4ed8` kék szín + `rgba(59,130,246,0.08)` háttér. Sötét-mód: `rgba(255,255,255,0.05)` bg, `#e2e8f0` szöveg, hover `#93c5fd`. A chip-n badge kontrasztosabb `#e2e8f0`/`#475569`.
+7. **`.vs-chip-bar` sötét-mód bg** `#0c1218` → `#111c30` (matches `--bg-panel-raised`) — kevésbé feltűnő átmenet a `.glass` felett.
+8. **`.ocr-legs` (leg-breakdown) erősítés** — bg `0.06` → `0.08` (világos) / `0.10` → `0.12` (sötét); border `0.18` → `0.25` / `0.25` → `0.35`. Head szín `#3b82f6` → `#2563eb` (világos) / új `#93c5fd` (sötét); km-szám `#3b82f6` → `#1d4ed8` / `#60a5fa` (sötét). A leg-sorra explicit `color: #0f172a` (világos) / `#e2e8f0` (sötét) — nem függ tokenektől.
+9. **Nincs séma-, szerver- vagy handler-változás.** Cache-bust `?v=20260824navcnt` (style.css + order-wizard.js) mind admin.html + manager.html.
+
+### Teszt
+- Szintaxis-check `order-wizard.js` — zöld
+- **981 Jest zöld** (0 törött, 45 skipped valós-DB)
+- Vizuális ellenőrzés élesben (mindkét téma)
+
 ## 2026-08-24 — Comenzi (fuvar-kezelés) tábla: sticky chip-szűrő + súly-badge + tömörebb sorok (Routena-tömör kinézet)
 
 ### Miért
