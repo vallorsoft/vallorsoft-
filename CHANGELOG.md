@@ -14,6 +14,29 @@
 
 ---
 
+## 2026-08-24 — Comenzi (fuvar-kezelés) tábla: sticky chip-szűrő + súly-badge + tömörebb sorok (Routena-tömör kinézet)
+
+### Miért
+A fuvar-lista funkcionálisan erős (oszlop-átméretezés/átrendezés, csekbox+tömeges letöltés, státusz-inline-váltó, radar), de vizuálisan zsúfoltabb volt mint a Routena — sok fehér-tér és szín-inkonzisztencia. Kérés: kompaktabb kinézet, gyors-szűrő chipek (Aktív / Kiosztásra vár / Extern / Lezárt / Áru-leadás / Törölt), és a Marfă cellába a meglévő FTL/LTL+méret mellé a súly is jelenjen meg.
+
+### Mit
+1. **Kompaktabb sorok** (`style.css`) — `#tblOrders tbody td` padding 8px 10px + font-size 12.5px + line-height 1.4; fejléc uppercase 11px betű. Zebra `nth-child(even)` halvány szürke + erősebb kék hover (téma-érzékeny). Bal-akcens-csík 3px→4px hogy a tömörebb sorban is jól látszódjon.
+2. **Sticky chip-szűrő** (`console-shared.js` + `admin.html`/`manager.html`) — új `renderOrdersChipBar` a `renderOrdersMetricBand` után hívva. 7 chip: Mind · Aktív · Kiosztásra vár · Alvállalkozói · Lezárt · Áru-leadás · Törölt. Élő darabszám a chip-en. Sticky (`position:sticky; top:0`), horizontal scroll mobilon. Aktív chip lila gradiens.
+3. **Chip-filter logika** (`filterOrders`) — új `window._orderChipFilter` állapot + `_ORDER_CHIP_GROUPS` mapping csoport → státusz-lista (pl. `active: ['Alocat','In Curs','Extern']`). Additív a meglévő szöveges + státusz-dropdown szűrővel; nincs új szerver-hívás. `chipOrdersFilter(key)` átvált, `renderOrdersChipBar` újrarajzol.
+4. **Marfă súly-badge** (`loadTypeBadge`) — új harmadik paraméter `weightKg`. Ha van (>0), lila `⚖ 14 000 kg` pill jelenik meg az FTL/LTL badge mellett és a méret előtt. `ro-RO` locale-lel formázva (14 000). `renderFilteredOrders` átadja a `c.suly_kg`-ot.
+5. **A `filterOrders` `fuvar_no`-t is keres** — eddig csak a belső `orders.id`-re szűrt szöveges keresésre; mostantól az ember-olvasható `CMD-YYYY-XXXX` fuvar-számra is.
+6. **i18n** — 8 új kulcs: `list.chipAll/chipActive/chipAvailable/chipExtern/chipFinalized/chipHandover/chipCancelled` + `cs.tt.cargoWeight`. RO-alap+HU. Cache-bust `?v=20260824comenzi` (style.css + console-shared.js + i18n.js) mind admin.html + manager.html.
+
+### Amit NEM változtat
+- Szerver-oldal érintetlen — pusztán kliens megjelenés + kliens-szűrés
+- A meglévő `orderSearch` + `orderStatusFilter` dropdown megmarad, a chip csak MELLÉ jön (additív szűrő)
+- Oszlop-átméretezés/átrendezés + kijelölés + tömeges letöltés + státusz-inline-váltó változatlan
+- A KPI-band (Összes/Aktív/Vár/Lezárt) érintetlen
+
+### Teszt
+- **981 Jest zöld** (0 törött, 45 skipped valós-DB)
+- Szintaxis-check `console-shared.js` + `i18n.js` — zöld
+
 ## 2026-08-24 — Fuvar-kiírás: cardosított wizard + Step 2 akkordeon + multi-stop route & toll (seq-order)
 
 ### Miért

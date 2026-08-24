@@ -607,11 +607,14 @@ function refreshDimReq(){
   });
 }
 // fuvarlista-badge: FTL = teljes áru (kék), LTL = részrakomány (sárga) + méret
-function loadTypeBadge(lt, dims){
+function loadTypeBadge(lt, dims, weightKg){
+  var w = (weightKg && Number(weightKg) > 0)
+    ? ' <span class="badge" style="font-size:10px;padding:1px 6px;background:rgba(139,92,246,0.15);color:#7c3aed;border:1px solid rgba(139,92,246,0.3);" title="'+t('cs.tt.cargoWeight')+'">⚖ '+esc(String(Number(weightKg).toLocaleString('ro-RO')))+' kg</span>'
+    : '';
   var d = dims ? ' <span class="badge" style="font-size:10px;padding:1px 6px;background:rgba(255,255,255,0.06);color:var(--text-muted);" title="'+t('cs.tt.cargoSize')+'">📐 '+dims+'</span>' : '';
-  if(lt==='FTL')return ' <span class="badge info" title="'+t('cs.tt.ftl')+'" style="font-size:10px;padding:1px 6px;">FTL</span>'+d;
-  if(lt==='LTL')return ' <span class="badge warn" title="'+t('cs.tt.ltl')+'" style="font-size:10px;padding:1px 6px;">LTL</span>'+d;
-  return d;
+  if(lt==='FTL')return ' <span class="badge info" title="'+t('cs.tt.ftl')+'" style="font-size:10px;padding:1px 6px;">FTL</span>'+w+d;
+  if(lt==='LTL')return ' <span class="badge warn" title="'+t('cs.tt.ltl')+'" style="font-size:10px;padding:1px 6px;">LTL</span>'+w+d;
+  return w+d;
 }
 // h×sz×m cm string a méretekből (vagy üres)
 function dimStr(h,w,m){ return (h&&w&&m)?(h+'×'+w+'×'+m):''; }
@@ -1192,13 +1195,44 @@ function filterExternDrivers(){const q=document.getElementById('oExternSearch').
 
 function filterInternDrivers(){const q=document.getElementById('oInternSearch').value.toLowerCase();renderInternDrivers(internDriversCache.filter(u=>u.nume.toLowerCase().includes(q)||u.email.toLowerCase().includes(q)));}
 
+// Kliens-oldali gyors-szűrő chip-ek (Aktív / Kiosztásra vár / Extern / Lezárt / Törölt / Áru-leadás)
+// Az aktuális chip állapota `_orderChipFilter`-ben él; a chip-ekre kattintva
+// átvált; a `filterOrders` az érték szerinti státusz-csoportot alkalmazza a
+// szöveges + dropdown-szűrő MELLETT (additív). 'all' = nincs chip-szűrés.
+window._orderChipFilter = window._orderChipFilter || 'all';
+var _ORDER_CHIP_GROUPS = {
+  'all':       null,                                       // minden
+  'active':    ['Alocat', 'In Curs', 'Extern'],            // aktív ~ dolgozik rajta
+  'available': ['Disponibil'],                              // kiosztásra vár
+  'extern':    ['Extern'],                                  // csak külsős
+  'finalized': ['Finalizat'],                               // lezárt
+  'cancelled': ['Anulat'],                                  // törölt
+  'handover':  ['Parkolt', 'Raktarban']                    // áru-leadás (megszakított)
+};
+function chipOrdersFilter(key) {
+  if (!Object.prototype.hasOwnProperty.call(_ORDER_CHIP_GROUPS, key)) key = 'all';
+  window._orderChipFilter = key;
+  // Vizuális aktív-állapot
+  try {
+    var chips = document.querySelectorAll('#ordersChipBar .vs-chip[data-chip]');
+    Array.prototype.forEach.call(chips, function (c) {
+      c.classList.toggle('active', c.getAttribute('data-chip') === key);
+    });
+  } catch (_) {}
+  filterOrders();
+}
 function filterOrders() {
   var q = ((document.getElementById('orderSearch')||{}).value||'').toLowerCase();
   var st = (document.getElementById('orderStatusFilter')||{}).value||'';
+  var chipKey = window._orderChipFilter || 'all';
+  var chipStatuses = _ORDER_CHIP_GROUPS[chipKey] || null;
   var filtered = _ordersAllCache.filter(function(c){
-    var txt = [c.id,c.client,c.ref,c.loc_incarcare,c.loc_descarcare,
+    var txt = [c.id,c.fuvar_no,c.client,c.ref,c.loc_incarcare,c.loc_descarcare,
                c.email_sofer,c.nume_sofer,c.rendszam_camion].join(' ').toLowerCase();
-    return (!q||txt.includes(q))&&(!st||c.status===st);
+    if (q && !txt.includes(q)) return false;
+    if (st && c.status !== st) return false;
+    if (chipStatuses && chipStatuses.indexOf(c.status) === -1) return false;
+    return true;
   });
   renderFilteredOrders(filtered);
 }
@@ -2202,6 +2236,40 @@ function renderOrdersMetricBand(list){
     { l: t('list.kpiWaiting'), v: varakozo, sub: 'Disponibil' },
     { l: t('list.kpiClosed'),  v: lezart,   sub: 'Finalizat' }
   ]);
+  // A chip-sávot is frissítjük (a chipek darabszám-értékei a friss listából jönnek)
+  renderOrdersChipBar(list);
+}
+
+// Gyors-szűrő chip-sáv a fuvar-lista fölé (sticky) — a _ORDER_CHIP_GROUPS
+// alapján rendereli a chipeket a friss list-tel számolt darabszámokkal.
+// Kliens-oldali szűrés (nincs új hálózati hívás).
+function renderOrdersChipBar(list) {
+  var bar = document.getElementById('ordersChipBar');
+  if (!bar) return;
+  list = Array.isArray(list) ? list : (_ordersAllCache || []);
+  function countOf(statuses) {
+    if (!statuses) return list.length;
+    return list.filter(function (c) { return statuses.indexOf(c.status) !== -1; }).length;
+  }
+  var chips = [
+    { key: 'all',       label: t('list.chipAll'),       ico: '📋', statuses: null },
+    { key: 'active',    label: t('list.chipActive'),    ico: '🚚', statuses: _ORDER_CHIP_GROUPS.active },
+    { key: 'available', label: t('list.chipAvailable'), ico: '⏳', statuses: _ORDER_CHIP_GROUPS.available },
+    { key: 'extern',    label: t('list.chipExtern'),    ico: '🤝', statuses: _ORDER_CHIP_GROUPS.extern },
+    { key: 'finalized', label: t('list.chipFinalized'), ico: '✅', statuses: _ORDER_CHIP_GROUPS.finalized },
+    { key: 'handover',  label: t('list.chipHandover'),  ico: '⛔', statuses: _ORDER_CHIP_GROUPS.handover },
+    { key: 'cancelled', label: t('list.chipCancelled'), ico: '🗑', statuses: _ORDER_CHIP_GROUPS.cancelled }
+  ];
+  var active = window._orderChipFilter || 'all';
+  bar.innerHTML = chips.map(function (ch) {
+    var n = countOf(ch.statuses);
+    var cls = 'vs-chip vs-chip-' + ch.key + (ch.key === active ? ' active' : '');
+    return '<button type="button" class="' + cls + '" data-chip="' + ch.key + '" onclick="chipOrdersFilter(\'' + ch.key + '\')">' +
+      '<span class="vs-chip-ico">' + ch.ico + '</span>' +
+      '<span class="vs-chip-lbl">' + esc(ch.label) + '</span>' +
+      '<span class="vs-chip-n">' + n + '</span>' +
+      '</button>';
+  }).join('');
 }
 
 // A fuvar-kiíró sorozat-választójának feltöltése (alapértelmezett kijelölve).
@@ -4575,7 +4643,7 @@ function renderFilteredOrders(list) {
         '<span class="vsl-route-pt">'+esc(c.loc_incarcare||'—')+'</span>'+
         '<span class="vsl-route-link" aria-hidden="true"><span class="vsl-route-pin">📍</span></span>'+
         '<span class="vsl-route-pt vsl-route-dst">'+esc(c.loc_descarcare||'—')+'</span>'+
-      '</span>'+loadTypeBadge(c.load_type, dimStr(c.hossz_cm,c.szel_cm,c.mag_cm));
+      '</span>'+loadTypeBadge(c.load_type, dimStr(c.hossz_cm,c.szel_cm,c.mag_cm), c.suly_kg);
     // RO e-Transport: ha a fuvar UIT-kötelezettnek jelölt, de nincs aktív UIT-kódja → figyelmeztetés
     if (c.needs_uit && !(parseInt(c.uit_active_count,10)>0)) {
       routeCell += ' <span class="badge err" style="font-size:10px;padding:1px 6px;white-space:nowrap;" title="'+t('cs.ol.uitMissingTitle')+'">⚠️ '+t('cs.ol.uitMissing')+'</span>';

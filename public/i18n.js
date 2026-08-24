@@ -628,6 +628,13 @@
     'list.title': { hu: 'Fuvarfeladatok kezelése', ro: 'Gestionare curse' },
     'list.kpiWaiting': { hu: 'Kiosztásra vár', ro: 'Așteaptă alocare' },
     'list.kpiClosed': { hu: 'Lezárt', ro: 'Finalizate' },
+    'list.chipAll': { hu: 'Mind', ro: 'Toate' },
+    'list.chipActive': { hu: 'Aktív', ro: 'Active' },
+    'list.chipAvailable': { hu: 'Kiosztásra vár', ro: 'De alocat' },
+    'list.chipExtern': { hu: 'Alvállalkozói', ro: 'Externe' },
+    'list.chipFinalized': { hu: 'Lezárt', ro: 'Finalizate' },
+    'list.chipHandover': { hu: 'Áru-leadás', ro: 'Marfă predată' },
+    'list.chipCancelled': { hu: 'Törölt', ro: 'Anulate' },
     'list.searchPh': { hu: '🔍 Ügyfél, sofőr, ID...', ro: '🔍 Client, șofer, ID...' },
     'list.allStatus': { hu: 'Minden státusz', ro: 'Toate statusurile' },
     'list.colId': { hu: 'ID', ro: 'ID' },
@@ -1360,6 +1367,7 @@
 
     // Tooltipek
     'cs.tt.cargoSize': { hu: 'Rakomány-méret (h×sz×m cm)', ro: 'Dimensiune marfă (l×l×î cm)' },
+    'cs.tt.cargoWeight': { hu: 'Rakomány-súly (kg)', ro: 'Greutate marfă (kg)' },
     'cs.tt.ftl': { hu: 'Full Truck Load — teljes rakomány', ro: 'Full Truck Load — marfă completă' },
     'cs.tt.ltl': { hu: 'Less Than Truckload — részrakomány', ro: 'Less Than Truckload — grupaj' },
     'cs.tt.gpsLinked': { hu: 'A jármű GPS-re van kötve (CargoTrack)', ro: 'Vehiculul e conectat la GPS (CargoTrack)' },
