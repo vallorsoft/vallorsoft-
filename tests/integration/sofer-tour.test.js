@@ -326,8 +326,11 @@ describe('SoferTour — sofőr onboarding bemutató', () => {
     expect(SOFER_SRC).toMatch(/st-demo-badge/);
   });
 
-  test('az első belépés auto-start ága bent van a sofer.js-ben', () => {
-    // Regresszió-védelem: az authMe-után SoferTour.start(true) blokk.
-    expect(SOFER_SRC).toMatch(/if\s*\(!SoferTour\.isDone\(\)\)\s*SoferTour\.start\(true\)/);
+  test('az első belépés auto-átirányítja a /sofer-demo sandbox-ra', () => {
+    // Regresszió-védelem: az authMe-után átirányítás /sofer-demo-ra ha
+    // a sofőr még sosem látta (vs_sofer_demo_seen localStorage kulcs).
+    // A GDPR-banner elsőbbséget élvez, és a mentett draft nem szakad meg.
+    expect(SOFER_SRC).toMatch(/vs_sofer_demo_seen/);
+    expect(SOFER_SRC).toMatch(/window\.location\.href\s*=\s*'\/sofer-demo'/);
   });
 });
