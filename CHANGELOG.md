@@ -14,6 +14,33 @@
 
 ---
 
+## 2026-08-24 — Fuvar-kiírás: cardosított wizard + Step 2 akkordeon + multi-stop route & toll (seq-order)
+
+### Miért
+Két kifogás a Routena-összehasonlításból: (1) a fuvar-kiírás wizard még sok mezőt egyszerre mutatott keret nélkül; (2) a km- és útdíj-számítás CSAK az első felrakó és első lerakó közti távolságot adta — a multi-drop fuvar többi állomását teljesen ignorálta. A kliens `_rmBuildWps` csak a top-mezőket és a térkép-`via` pontokat használta; a wizard extra állomásait (`window.__ocStopsSeq` és `#oExtraStopsList`) átugrotta. A backend `estimateRoute` már tudott N pontos láncot, csak nem kapta meg.
+
+### Mit
+
+1. **Wizard cardosítás** (`public/order-wizard.js` + `style.css`) — minden 6 lépés önálló `.oc-step-card` (1.5px keret, 14px sugarú sarok, bal-oldali akcent-csík). Három állapot per card: `open` (nyitva, kék akcent + kiemelt keret), `done` (előző lépés, zöld akcent, csak 1-soros összegző bar), `pending` (jövőbeli lépés, halvány bar, nem kattintható). A done bar-ra kattintva vissza lehet ugrani (mint az `ocGoStep`).
+2. **Step-bar tartalom** (`_renderStepBarSummary`) — minden lépés kiírja a lényeget 1 sorban: 1. Ügyfél + Referencia · 2. Első helyszín → Utolsó helyszín + felrakó/lerakó darabszám · 3. FTL/LTL · Súly · Méret · 4. Sofőr · vontató · pótkocsi · 5. Ár · km · UIT. A ✏️ jelzi hogy kattintható.
+3. **Step 2 állomás-akkordeon** — az `.oc-stop-card` mostantól `open` VAGY `collapsed` állapotú; alapból csak EGY nyitva egyszerre (`OC.openStopIdx`). Új állomás hozzáadásakor az előző automatikusan bezáródik → az új nyílik. Csukott állomás egy soros bar: `#N · badge · 📍 helyszín · 🏢 cég · 📅 dátum · [⬆⬇✕✏️]`. Kattintásra az adott bar nyílik és bezárja az előzőt. Nyitott állomásban új „▲ Bezárás" gomb.
+4. **Multi-stop route + toll (seq-order)** — `console-shared.js` `_rmBuildWps` mostantól három forrásból tud waypoint-láncot építeni (prioritás sorrendben): (a) `window.__ocStopsSeq` — wizard közvetlen igazságforrás, a bevitel (seq_index) sorrendjében; (b) top-mezők + `#oExtraStopsList` (create) vagy `#oeExtraStopsList` (edit) DOM-sorrendben — top felrakó FIRST, extras a DOM-ban látott sorrendben, top lerakó LAST; (c) klasszikus 1 felrakó + térkép-`via` pontok + 1 lerakó (fallback). A számítás MINDIG a megadott sorrendben fűzi össze — semmilyen geográfiai optimalizálás.
+5. **Backend leg-breakdown** (`lib/routeEstimate.js`) — `estimateRoute` visszaad `legs: [{fromLabel, toLabel, km, durationSeconds}]` tömböt is; waypoint-limit 9 → 20 (OSRM fair-use határon belül; egy tipikus multi-drop fuvar 3-5 stop, komplex esetek 10-15). `handlers/routePlannerHandlers.js` `orderRouteEstimate` átadja a `legs` tömböt.
+6. **Toll (`estimateToll`)** — a handler már eddig is a `route_geo.waypoints` alapján dolgozott, ami mostantól MINDEN stopot tartalmaz (az `orderRouteRecalc` sikeres válasza után az `st.waypoints` kimenti a `buildRouteGeo` révén az `orders.route_geo`-ba a szerkesztő 💾 gomb hatására). Multi-stop chain esetén az országonkénti km-bontás pontosan a teljes láncra vonatkozik.
+7. **Review-lap szakasz-bontás** — Step 5 új panel (`.ocr-legs`): ha ≥2 szakasz (multi-stop), listázza őket sorszámmal (`#1 · Cluj → Timișoara · 500 km`, `#2 · Timișoara → Wien · 700 km` …); a `_cityShort` heurisztika kiszűri az utca-prefixet és irszámot a jobb olvashatóság kedvéért. A `window.__ocOnRouteChanged` callback (a `orderRouteRecalc` végén hívva) frissíti a review-t ha nyitva van.
+8. **i18n** — 7 új kulcs (`oc.stopsHintAcc`, `oc.stopCollapse`, `oc.stopEmpty`, `oc.empty`, `oc.legsHead`, `oc.legsUnit`; a `oc.stopsHint` felváltva). RO-alap + HU pár. Cache-bust `?v=20260824wcard` — `style.css`, `console-shared.js`, `order-wizard.js`, `i18n.js` mind (admin.html + manager.html).
+
+### Amit NEM változtat
+- Szerver-oldali fuvar-mentés (`comCreate`, multi-stop payload, `stops[]` seq_index) érintetlen — a wizard továbbra is a legacy `createOrder()`-t hívja
+- A `_commitStopsToLegacy` viselkedés változatlan (top-mezőkbe elsőnek beírt pickup/delivery, `#oExtraStopsList`-be a többi interleaved-sorrendben)
+- A klasszikus 1 felrakó + 1 lerakó fuvar-flow változatlan, a térkép-`via` funkció megmarad
+- A többi 4 pane (Beérkező, Ügyfél kérések, stb.) nincs érintve
+
+### Teszt
+- Szintaxis-check mind az 5 módosított JS-fájlra (order-wizard.js, console-shared.js, routeEstimate.js, routePlannerHandlers.js, i18n.js) — zöld
+- **981 Jest zöld** (0 törött, 45 skipped valós-DB); nincs regresszió
+- Vizuális ellenőrzés a jelenlegi cache-bust utáni élesben teendő
+
 ## 2026-08-24 — Sofőr fuvar-kártya: multi-stop akkordeon — minden stop külön csukható, alapból CSAK a következő van nyitva
 
 ### Miért

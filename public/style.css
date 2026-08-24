@@ -2043,3 +2043,155 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .ocr-when{ color:#64748b; font-size:12px; margin-left:6px; }
 .ocr-sub{ font-size:12px; color:#64748b; margin-left:22px; }
 .ocr-stops-summary{ margin-bottom:6px; font-size:13px; color:#64748b; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Wizard — cardosított lépések + akkordeon
+   Bevezetve: 2026-08-24 (Routena-mintás letisztultság + Step 2 akkordeon)
+   A régi `.oc-step` szabályok érintetlenek — az új szerkezet `.oc-step-card`
+   wrappert használ három állapottal: [data-state="open"|"done"|"pending"].
+   ─────────────────────────────────────────────────────────────────────── */
+
+.oc-body{ display:flex; flex-direction:column; gap:14px; margin-bottom:20px; }
+
+/* Kártya-alap: fehér card + akcent-csík balra */
+.oc-step-card{
+  position:relative;
+  background:var(--panel, #fff);
+  border:1px solid var(--border, #e2e8f0);
+  border-radius:14px;
+  overflow:hidden;
+  transition:box-shadow 0.2s, border-color 0.2s;
+}
+.oc-step-card::before{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:4px;
+  background:transparent; transition:background 0.2s;
+}
+
+.main-content[data-theme="dark"] .oc-step-card{ background:#0f172a; border-color:#334155; }
+
+/* Nyitott (aktuális) lépés — kiemelt keret + kék akcent */
+.oc-step-card[data-state="open"]{
+  border-color:#3b82f6;
+  box-shadow:0 4px 16px rgba(59,130,246,0.10);
+}
+.oc-step-card[data-state="open"]::before{ background:linear-gradient(180deg,#3b82f6,#6366f1); }
+.oc-step-card[data-state="open"] .oc-step-bar{ display:none; }
+.oc-step-card[data-state="open"] .oc-step-open{ display:block; }
+
+/* Befejezett (előző) lépés — zöld akcent, csak a bar látszik */
+.oc-step-card[data-state="done"]::before{ background:#22c55e; }
+.oc-step-card[data-state="done"] .oc-step-bar{ display:flex; cursor:pointer; }
+.oc-step-card[data-state="done"] .oc-step-bar:hover{ background:rgba(34,197,94,0.06); }
+.oc-step-card[data-state="done"] .oc-step-open{ display:none; }
+.oc-step-card[data-state="done"] .oc-sb-idx{ background:#22c55e; color:#fff; border-color:#22c55e; }
+
+/* Jövőbeli lépés — halvány, nem kattintható */
+.oc-step-card[data-state="pending"] .oc-step-bar{ display:flex; opacity:0.55; cursor:not-allowed; }
+.oc-step-card[data-state="pending"] .oc-step-open{ display:none; }
+.oc-step-card[data-state="pending"] .oc-sb-idx{ background:transparent; color:var(--muted, #64748b); border-color:var(--border, #e2e8f0); }
+
+/* Bar (összecsukott lépés) */
+.oc-step-bar{
+  display:none; align-items:center; gap:12px;
+  padding:12px 16px 12px 20px;
+}
+.oc-step-bar-num{ flex:0 0 auto; }
+.oc-sb-idx{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:28px; height:28px; border-radius:50%;
+  border:2px solid #22c55e; background:#22c55e; color:#fff;
+  font-weight:800; font-size:13px;
+}
+.oc-step-bar-body{ flex:1; min-width:0; display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
+.oc-step-bar-title{ font-weight:700; font-size:14px; color:var(--text-primary, #0f172a); }
+.oc-step-bar-sum{
+  font-size:13px; color:var(--muted, #64748b);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  max-width:100%;
+}
+.oc-step-bar-act{ flex:0 0 auto; display:flex; align-items:center; gap:6px; }
+.oc-step-bar-edit{ font-size:14px; opacity:0.6; }
+.oc-step-card[data-state="done"] .oc-step-bar:hover .oc-step-bar-edit{ opacity:1; }
+
+/* Nyitott lépés wrapper (head + content) */
+.oc-step-open{ padding:20px 24px 24px; }
+.oc-step-open .oc-step-head{ margin-bottom:16px; }
+
+/* ─── Step 2 — állomás-akkordeon (bar vs open) ─── */
+
+/* Alaphelyzet: a .oc-stop-card az új változatban .open vagy .collapsed */
+.oc-stop-card.open{ padding:0; }
+.oc-stop-card.open .oc-stop-bar{ display:flex; opacity:0.4; }
+.oc-stop-card.open .oc-stop-bar-act{ opacity:0.35; }
+.oc-stop-card.open .oc-stop-open{ display:block; padding:14px; }
+
+.oc-stop-card.collapsed{ padding:0; }
+.oc-stop-card.collapsed .oc-stop-bar{ display:flex; cursor:pointer; }
+.oc-stop-card.collapsed .oc-stop-bar:hover{ background:rgba(59,130,246,0.06); }
+.oc-stop-card.collapsed .oc-stop-open{ display:none; }
+
+/* A stop-bar egyetlen sora */
+.oc-stop-bar{
+  display:none; align-items:center; gap:10px; padding:10px 14px;
+  border-radius:12px; transition:background 0.15s;
+}
+.oc-stop-bar-num{
+  flex:0 0 auto; font-weight:800; font-size:13px;
+  color:var(--muted, #64748b); min-width:26px;
+}
+.oc-stop-bar-badge{ flex:0 0 auto; }
+.oc-stop-bar-sum{
+  flex:1; min-width:0; font-size:13px; color:var(--text-primary, #0f172a);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.oc-stop-bar-act{ flex:0 0 auto; display:flex; gap:4px; align-items:center; }
+.oc-stop-bar-edit{ font-size:14px; opacity:0.6; margin-left:4px; }
+.oc-stop-card.collapsed .oc-stop-bar:hover .oc-stop-bar-edit{ opacity:1; }
+
+/* Bezárás gomb-sor a nyitott stopban */
+.oc-stop-close-row{ display:flex; justify-content:flex-end; margin-top:12px; }
+.oc-stop-close-row .btn{ font-size:12px; padding:6px 12px; }
+
+.oc-empty-sub{ color:var(--muted, #94a3b8); font-style:italic; }
+
+/* ─── Review — szakasz-bontás (leg breakdown) ─── */
+.ocr-legs{
+  margin:10px 0 6px; padding:10px 12px;
+  background:rgba(59,130,246,0.06);
+  border:1px solid rgba(59,130,246,0.18);
+  border-radius:10px;
+}
+.main-content[data-theme="dark"] .ocr-legs{
+  background:rgba(59,130,246,0.10);
+  border-color:rgba(59,130,246,0.25);
+}
+.ocr-legs-head{ font-size:12px; font-weight:700; color:#3b82f6; margin-bottom:6px; text-transform:uppercase; letter-spacing:0.4px; }
+.ocr-leg-row{
+  display:flex; align-items:center; gap:10px;
+  padding:4px 0; font-size:13px;
+  border-top:1px dashed rgba(148,163,184,0.25);
+}
+.ocr-leg-row:first-of-type{ border-top:0; }
+.ocr-leg-idx{
+  flex:0 0 auto; font-weight:700; color:var(--muted, #64748b);
+  font-family:'JetBrains Mono', 'Consolas', monospace;
+  font-size:11px; min-width:26px;
+}
+.ocr-leg-path{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ocr-leg-km{ flex:0 0 auto; font-weight:700; color:#3b82f6; }
+
+/* ─── Reszponzív (tablet/mobil) ─── */
+@media (max-width:820px){
+  .oc-step-open{ padding:14px 16px 18px; }
+  .oc-step-bar{ padding:10px 12px 10px 16px; }
+  .oc-step-bar-body{ gap:6px; }
+  .oc-step-bar-sum{ font-size:12px; }
+}
+@media (max-width:520px){
+  .oc-step-open{ padding:12px 12px 16px; }
+  .oc-step-bar{ padding:10px 10px 10px 14px; gap:8px; }
+  .oc-step-bar-body{ flex-direction:column; align-items:flex-start; gap:2px; }
+  .oc-stop-bar{ padding:9px 10px; gap:6px; flex-wrap:wrap; }
+  .oc-stop-bar-sum{ font-size:12px; width:100%; order:3; }
+  .oc-stop-bar-act .oc-ord-btn{ width:28px; height:28px; font-size:12px; }
+}
