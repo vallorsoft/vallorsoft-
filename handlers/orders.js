@@ -145,11 +145,13 @@ handlers.getOrderById = async function (req, res, args) {
         );
         legs = lr.rows;
         const sr = await pool.query(
-          `SELECT id, kind, stop_index, loc, firma, data, ref,
+          `SELECT id, kind, stop_index, seq_index, loc, firma, data, ref,
                   arrived_at, done_at, waybilled_at
              FROM order_stops
             WHERE order_id = $1 AND company_id = $2
-            ORDER BY (kind = 'pickup') DESC, stop_index ASC`,
+            ORDER BY COALESCE(seq_index, 999999) ASC,
+                     (kind = 'pickup') DESC,
+                     stop_index ASC`,
           [id, cid]
         );
         stops = sr.rows;
@@ -192,13 +194,16 @@ handlers.comList = async function (req, res, args) {
                    'id',           s.id,
                    'kind',         s.kind,
                    'stop_index',   s.stop_index,
+                   'seq_index',    s.seq_index,
                    'loc',          s.loc,
                    'firma',        s.firma,
                    'data',         s.data,
                    'arrived_at',   s.arrived_at,
                    'done_at',      s.done_at,
                    'waybilled_at', s.waybilled_at
-                 ) ORDER BY (s.kind = 'pickup') DESC, s.stop_index ASC) AS stops_json
+                 ) ORDER BY COALESCE(s.seq_index, 999999) ASC,
+                             (s.kind = 'pickup') DESC,
+                             s.stop_index ASC) AS stops_json
           FROM order_stops s
           WHERE s.order_id = o.id
         ) sst ON true`;
@@ -338,6 +343,7 @@ handlers.getMySoferOrders = async function (req, res, args) {
                       'id',           s.id,
                       'kind',         s.kind,
                       'stop_index',   s.stop_index,
+                      'seq_index',    s.seq_index,
                       'loc',          s.loc,
                       'firma',        s.firma,
                       'data',         s.data,
@@ -351,7 +357,9 @@ handlers.getMySoferOrders = async function (req, res, args) {
                            AND u.order_id = o.id
                            AND u.stop_id = s.id
                       ), 0)
-                    ) ORDER BY s.kind DESC, s.stop_index ASC) AS stops_json
+                    ) ORDER BY COALESCE(s.seq_index, 999999) ASC,
+                                s.kind DESC,
+                                s.stop_index ASC) AS stops_json
                FROM order_stops s
               WHERE s.order_id = o.id
            ) st ON true
@@ -1659,8 +1667,17 @@ handlers.getOrderFieldSuggestions = async function (req, res, args) {
     if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: {} });
     const cid = me.company_id;
     if (!cid) return res.json({ result: {} });
+    // A cég ÖSSZES nem-Anulat fuvarából — top-szintű mezők + per-stop mezők
+    // (order_stops.loc/firma) is bekerülnek, hogy egy multi-drop bevitel után
+    // a következő fuvar autocompletéje is látja őket. Az uniós `loc` és `firma`
+    // kulcs a kliens „bármelyik cím-/cégmező bárhonnan" javaslatához.
     const r = await pool.query(
-      `SELECT
+      `WITH s AS (
+         SELECT loc AS stop_loc, firma AS stop_firma
+           FROM order_stops
+          WHERE company_id = $1
+       )
+       SELECT
          array_agg(DISTINCT client)           FILTER (WHERE COALESCE(TRIM(client),'')           <> '') AS client,
          array_agg(DISTINCT ref)              FILTER (WHERE COALESCE(TRIM(ref),'')              <> '') AS ref,
          array_agg(DISTINCT loc_incarcare)    FILTER (WHERE COALESCE(TRIM(loc_incarcare),'')    <> '') AS loc_incarcare,
@@ -1671,12 +1688,22 @@ handlers.getOrderFieldSuggestions = async function (req, res, args) {
          array_agg(DISTINCT firma_extern)     FILTER (WHERE COALESCE(TRIM(firma_extern),'')     <> '') AS firma_extern,
          array_agg(DISTINCT telefon_extern)   FILTER (WHERE COALESCE(TRIM(telefon_extern),'')   <> '') AS telefon_extern,
          array_agg(DISTINCT rendszam_camion)  FILTER (WHERE COALESCE(TRIM(rendszam_camion),'')  <> '') AS rendszam_camion,
-         array_agg(DISTINCT rendszam_remorca) FILTER (WHERE COALESCE(TRIM(rendszam_remorca),'') <> '') AS rendszam_remorca
+         array_agg(DISTINCT rendszam_remorca) FILTER (WHERE COALESCE(TRIM(rendszam_remorca),'') <> '') AS rendszam_remorca,
+         (SELECT array_agg(DISTINCT stop_loc)   FROM s WHERE COALESCE(TRIM(stop_loc),'')   <> '') AS stops_loc,
+         (SELECT array_agg(DISTINCT stop_firma) FROM s WHERE COALESCE(TRIM(stop_firma),'') <> '') AS stops_firma
        FROM orders WHERE company_id = $1 AND status <> 'Anulat'`,
       [cid]
     );
     const row = r.rows[0] || {};
     const cap = (a) => (Array.isArray(a) ? a.filter(Boolean).sort((x, y) => String(x).localeCompare(String(y))).slice(0, 300) : []);
+    // Uniós `loc` és `firma`: bármely helyszín-/cégmezőn beírt érték minden
+    // ugyanolyan típusú mezőnél javasolt (a user kérése: „mostantól minden
+    // lehetőségnél"). Kliens-oldalon a wizard/extra sorok ezt kérdezik le.
+    const _mergeUniq = (...arrs) => {
+      const set = new Set();
+      arrs.forEach((a) => { if (Array.isArray(a)) a.forEach((v) => { if (v) set.add(String(v)); }); });
+      return Array.from(set).sort((x, y) => x.localeCompare(y)).slice(0, 300);
+    };
     return res.json({ result: {
       client:           cap(row.client),
       ref:              cap(row.ref),
@@ -1689,6 +1716,11 @@ handlers.getOrderFieldSuggestions = async function (req, res, args) {
       telefon_extern:   cap(row.telefon_extern),
       rendszam_camion:  cap(row.rendszam_camion),
       rendszam_remorca: cap(row.rendszam_remorca),
+      // Uniós kulcsok (top + minden per-stop bevitel): a kliens a wizard
+      // step 2 + extra-stops mezőire ezeket használja, hogy egy multi-drop
+      // fuvar 3. felrakóján is felkínálódjon az 1. felrakón beírt cím.
+      loc:              _mergeUniq(row.loc_incarcare, row.loc_descarcare, row.stops_loc),
+      firma:            _mergeUniq(row.firma_incarcare, row.firma_descarcare, row.stops_firma),
     } });
   } catch (err) {
     console.error('getOrderFieldSuggestions hiba:', err);

@@ -349,7 +349,10 @@
         : '<span class="oc-badge delivery">⬇️ ' + esc(T('oc.delivery', 'Lerakás')) + '</span>';
       var acId = 'ocStopLoc_' + i;
       var acDdId = 'ocStopLocDD_' + i;
-      // A helyszín + ⭐ mentett hely gomb + autocomplete
+      var firmaId = 'ocStopFirma_' + i;
+      // A helyszín + ⭐ mentett hely gomb + autocomplete. A `data-sg` attribútum
+      // az UNIÓS `loc`/`firma` javaslat-kulcsra mutat (ld. getOrderFieldSuggestions):
+      // bármelyik korábbi fuvarban beírt cím/cég az ÖSSZES stop-mezőn javasolt.
       return ''
         + '<div class="oc-stop-card" data-idx="' + i + '">'
         +   '<div class="oc-stop-top">'
@@ -367,11 +370,11 @@
         +   '<div class="oc-stop-grid">'
         +     '<div class="oc-field">'
         +       '<label>' + esc(T('oc.stopLoc', 'Helység / cím')) + '</label>'
-        +       '<div class="vs-ac-wrap"><input class="input oc-in-loc" id="' + acId + '" placeholder="' + esc(T('form.locPh', 'Helység')) + '" value="' + esc(s.loc || '') + '" autocomplete="off"><div class="vs-ac-dd" id="' + acDdId + '"></div></div>'
+        +       '<div class="vs-ac-wrap"><input class="input oc-in-loc" id="' + acId + '" data-sg="loc" placeholder="' + esc(T('form.locPh', 'Helység')) + '" value="' + esc(s.loc || '') + '" autocomplete="off"><div class="vs-ac-dd" id="' + acDdId + '"></div></div>'
         +     '</div>'
         +     '<div class="oc-field">'
         +       '<label>' + esc(T('oc.stopFirma', 'Cég (felrakó/lerakó)')) + '</label>'
-        +       '<input class="input oc-in-firma" placeholder="' + esc(T('form.firmaPh', 'Cég neve')) + '" value="' + esc(s.firma || '') + '">'
+        +       '<input class="input oc-in-firma" id="' + firmaId + '" data-sg="firma" placeholder="' + esc(T('form.firmaPh', 'Cég neve')) + '" value="' + esc(s.firma || '') + '" autocomplete="off">'
         +     '</div>'
         +     '<div class="oc-field">'
         +       '<label>' + esc(T('oc.stopDate', 'Dátum')) + '</label>'
@@ -403,11 +406,21 @@
         var ddId = 'ocStopLocDD_' + i;
         try { vsAttachAutocomplete(acId, ddId, function () { /* pick-callback: nincs teendő */ }); } catch (e) {}
       }
-      // ⭐ Mentett helyek picker
+      // ⭐ Mentett helyek picker — a stop kind-hez illő szűrő
+      // (pickup → load, delivery → unload). Ha kind vált, a picker-gomb marad
+      // (a `_favPickerBound` őr csak egyszer köti); a kind csak új render-nél
+      // számít, így új szűrő kell → a bind-guardot resetáljuk kind-váltásnál.
       if (loc && window.FavLocations && typeof FavLocations.attachPicker === 'function') {
-        try { FavLocations.attachPicker(loc.id, 'load'); } catch (e) {}
+        try {
+          var favKind = OC.stops[i].kind === 'pickup' ? 'load' : 'unload';
+          FavLocations.attachPicker(loc.id, favKind);
+        } catch (e) {}
       }
     });
+    // A `data-sg` inputokra a KÖZÖS delegált autocomplete (console-shared.js
+    // `ensureOrderSgDelegate`) automatikusan felfut fókusz/gépeléskor.
+    // Előmelegítés: ha még nincs betöltve a javaslat-map, elindítjuk.
+    try { if (typeof ocSgLoad === 'function') ocSgLoad(); } catch (e) {}
   }
 
   // ── Állomás-műveletek ──
@@ -433,31 +446,49 @@
   }
 
   // ── Szinkronizáció a legacy id-kbe (Tovább / lép a review-ra) ──
+  // Az interleaved sorrend (2 felrakó → 5 lerakó → 3 felrakó → 1 lerakó) végig
+  // megőrzött: a legacy top-mezőkbe a SORREND SZERINTI első pickup / delivery
+  // kerül; az `oExtraStopsList` sorai az OC.stops interleaved rendjében (az
+  // első pickup / delivery kihagyásával). A createOrder az OC.stops-ból küldi
+  // az ordered `stops[]`-ot a szervernek (`window.__ocStopsSeq`-en át).
   function _commitStopsToLegacy() {
-    // A legacy struktúra: az első pickup a `oLoad*` mezőkbe, az első delivery
-    // a `oUnload*` mezőkbe; a többi az `oExtraStopsList`-be (addExtraStopRow-val).
-    var pu = OC.stops.filter(function (s) { return s.kind === 'pickup'; });
-    var de = OC.stops.filter(function (s) { return s.kind === 'delivery'; });
+    // Publikáljuk a jelenlegi (interleaved) sorrendet a createOrder-nek. Ez a
+    // szerver oldalán az `orders.stops[]` payloadba kerül, ami a `seq_index`-et
+    // megőrzi az `order_stops` táblában → a sofőr is így látja.
+    window.__ocStopsSeq = OC.stops.map(function (s) {
+      return { kind: s.kind, loc: s.loc || '', firma: s.firma || '', data: s.data || '', time: s.time || '' };
+    });
 
-    // Első pickup → oLoad
-    _setVal('oLoad', (pu[0] && pu[0].loc) || '');
-    _setVal('oLoadFirma', (pu[0] && pu[0].firma) || '');
-    _setVal('oLoadDate', _mkDtLocal(pu[0]));
-    // Első delivery → oUnload
-    _setVal('oUnload', (de[0] && de[0].loc) || '');
-    _setVal('oUnloadFirma', (de[0] && de[0].firma) || '');
-    _setVal('oUnloadDate', _mkDtLocal(de[0]));
+    // Legacy top-mezők — az OC.stops-ban ELSŐKÉNT talált pickup / delivery.
+    // (Nem a listákra bontott „első pickup / első delivery" — hanem a bevitel
+    // sorrendjében az első előfordulás. Ez konzisztens a `seq_index`-szel.)
+    var firstPu = null, firstDe = null;
+    for (var i = 0; i < OC.stops.length; i++) {
+      var st = OC.stops[i];
+      if (!firstPu && st.kind === 'pickup')   firstPu = st;
+      if (!firstDe && st.kind === 'delivery') firstDe = st;
+      if (firstPu && firstDe) break;
+    }
+    _setVal('oLoad',       (firstPu && firstPu.loc) || '');
+    _setVal('oLoadFirma',  (firstPu && firstPu.firma) || '');
+    _setVal('oLoadDate',   _mkDtLocal(firstPu));
+    _setVal('oUnload',      (firstDe && firstDe.loc) || '');
+    _setVal('oUnloadFirma', (firstDe && firstDe.firma) || '');
+    _setVal('oUnloadDate',  _mkDtLocal(firstDe));
 
-    // Extra pontok
+    // Extra pontok — a bevitel sorrendjében (interleaved), a top-mezőkbe
+    // került első pickup + első delivery kihagyásával. Így a `_collectExtraStops`
+    // DOM-sorrendben olvassa vissza őket, ha valamiért a stops[] nem érne el
+    // a szerverre (legacy fallback).
     var extraList = document.getElementById('oExtraStopsList');
     if (extraList) {
       extraList.innerHTML = '';
       if (typeof addExtraStopRow === 'function') {
-        pu.slice(1).forEach(function (s) {
-          addExtraStopRow('pickup', 'oExtraStopsList', { loc: s.loc, firma: s.firma, data: s.data });
-        });
-        de.slice(1).forEach(function (s) {
-          addExtraStopRow('delivery', 'oExtraStopsList', { loc: s.loc, firma: s.firma, data: s.data });
+        var sawPu = false, sawDe = false;
+        OC.stops.forEach(function (s) {
+          if (s.kind === 'pickup' && !sawPu) { sawPu = true; return; }
+          if (s.kind === 'delivery' && !sawDe) { sawDe = true; return; }
+          addExtraStopRow(s.kind, 'oExtraStopsList', { loc: s.loc, firma: s.firma, data: s.data });
         });
       }
     }
@@ -469,8 +500,20 @@
 
   // Fordítva: ha a legacy mezőkben már van adat (AI-scan / szerkesztés
   // közbeni visszalépés utáni beolvasás) és a wizard-lista üres — szinkronizál.
+  // Előnyben az interleaved __ocStopsSeq (a Tovább/Vissza megőrzi a sorrendet).
   function _syncStopsFromLegacyIfEmpty() {
     if (OC.stops.length > 0) return;
+    // 1) Ha az előző step Tovább-ja már publikálta az interleaved sorrendet,
+    //    onnan pontosan visszaállítjuk (nem a DOM-ból, ami két szakaszra van vágva).
+    if (Array.isArray(window.__ocStopsSeq) && window.__ocStopsSeq.length) {
+      OC.stops = window.__ocStopsSeq.map(function (s) {
+        return { kind: s.kind === 'pickup' ? 'pickup' : 'delivery',
+                 loc: s.loc || '', firma: s.firma || '', data: s.data || '', time: s.time || '' };
+      });
+      _renderStopsList();
+      return;
+    }
+    // 2) Egyébként legacy top-mezők + DOM extra-sorok (AI-scan / import).
     var arr = [];
     var loadLoc = (document.getElementById('oLoad') || {}).value || '';
     var loadFirma = (document.getElementById('oLoadFirma') || {}).value || '';
@@ -655,6 +698,7 @@
       var cn = (document.getElementById('oClient') || {}).value;
       if (!cn) {
         OC.stops = [];
+        try { window.__ocStopsSeq = null; } catch (e) {}
         _renderStopsList();
         OC.step = 1;
         _refreshView();
