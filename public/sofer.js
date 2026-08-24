@@ -5049,17 +5049,12 @@ function renderFuvarCard(o, idx) {
   }) : [];
   var _pickups = _seqStops.filter(function (s) { return s.kind === 'pickup'; });
   var _deliveries = _seqStops.filter(function (s) { return s.kind === 'delivery'; });
-  // Interleaved-e a bevitel? (pl. pu → de → pu). Ha igen VAGY 3+ stop van,
-  // egyetlen sorrend-listát mutatunk (nem kétszekciós ⬆️/⬇️ blokkot), hogy
-  // a sofőr pontosan a beírás rendjében lássa a fuvart.
-  var _interleaved = false;
-  var _sawKindSwitch = 0;
-  for (var _ii = 1; _ii < _seqStops.length; _ii++) {
-    if (_seqStops[_ii].kind !== _seqStops[_ii - 1].kind) _sawKindSwitch++;
-  }
-  // 1× kind-váltás = klasszikus pu…pu→de…de (nem interleaved).
-  // 2+ kind-váltás = valódi interleaved (pu→de→pu VAGY de→pu→de stb.).
-  if (_sawKindSwitch >= 2) _interleaved = true;
+  // Multi-stop fuvarnál (3+ stop) MINDIG egyetlen sorrend-listát mutatunk,
+  // hogy a sofőr pontosan a beírás rendjében lássa a fuvart — akkor is, ha
+  // a bevitel véletlen „csoportosan" történt (pu, pu, pu, de, de). Klasszikus
+  // 1 felrakó + 1 lerakó (max 2 stop) marad a jól ismert kétszekciós
+  // ⬆️/⬇️ elrendezésben.
+  var _interleaved = (_seqStops.length >= 3);
   function _stopStatusBadge(s) {
     if (s.done_at) return '<span class="fd-stop-done" title="' + esc(fmtFuvarDateTime(s.done_at)) + '">✅</span>';
     if (s.arrived_at) return '<span class="fd-stop-arrived" title="' + esc(fmtFuvarDateTime(s.arrived_at)) + '">📍</span>';
