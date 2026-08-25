@@ -14,6 +14,36 @@
 
 ---
 
+## 2026-08-25 — Sofőr jármű-kártya: márka helyett Online/Offline állapot-pirula + koppintásra újratölt (PR #TBD)
+
+### Miért
+A sofőr jelezte, hogy „pár perc után ha visszalépek, ki kell jelentkeznem és vissza, hogy élő adatot lássak". A meglévő védőháló (visibilitychange-alapú refresh + 8 órás session, offline overlay) csak akkor sül el, ha ténylegesen tab-váltás történik — telefonon PWA-ban, ha végig előtérben van, sosem futott. A sofőrnek NEM volt vizuális visszajelzése arról, hogy a kliens tudja-e érni a szervert, és NEM tudta explicit módon frissíteni kijelentkezés nélkül.
+
+### Mit
+1. **`public/sofer.js` `loadMyAssignedVehicle`** — a jármű-kártya vontató-során a márka-mező (`.mv-brand` „Mercedes Actros") helyére kompakt Online/Offline állapot-gomb (`#myVehStatusBtn`) kerül. `onclick="vehStatusClick()"`, ARIA-label a szerep-JS-ből.
+2. **Új `_vehStatus*` helper-blokk** (`sofer.js`): `_vehStatusSet(state)` festi a gombot (`is-online`/`is-offline`/`is-checking`); `_vehStatusPing(cb)` a `/healthz`-re fetchel (AbortController 6 mp timeout, `cache:'no-store'`); `_vehStatusStart()` idempotens indító — böngésző-`online`/`offline` események + első ping 5 mp múlva + 45 mp-es időzített ping (kihagyva ha `document.hidden`, kímélet + mobil-throttle). Automatikusan indul a `loadMyAssignedVehicle` végén.
+3. **`vehStatusClick()`** — 2 mp debounce (`_vehStatusLastPingAt`); `_vehStatusSet('checking')` → `_vehStatusPing`. Ha OK → `is-online` + azonnal újratölti: `loadDashOrders`, `loadSoferMiniStats`, `loadMyAssignedVehicle`, `renderPendingReceipts` (mind `try/catch`-ben, hogy hiányzó fn ne buktassa) + „Frissítve" toast. Ha hibás → `is-offline` + „Fără conexiune la server" toast. Kijelentkezés-belépés MÁR NEM SZÜKSÉGES az élő adathoz.
+4. **`public/sofer.css`** új `.mv-status-btn` blokk (`.sofer-wrap #myVehicleBox` szűkítéssel): kompakt pirula (5×10 px padding, 999px border-radius, uppercase 11.5px, 700 font-weight), 8×8 px `.mv-status-dot`. Online = halványzöld `rgba(22,163,74,0.10)` + 1.5px keret + zöld pont halo (24V-os teherautó akkumulátor színszabályhoz igazodik). Offline = borostyán `rgba(217,119,6,0.14)` + kettős keret + shadow + halvány pulzus (`@keyframes mvStatusPulse`) — szelíd de feltűnő. Checking = kék, gyorsabb pulzus.
+5. **`public/i18n.js`** 5 új kulcs (`sof.stateOnline`/`stateOffline`/`stateChecking`/`stateOfflineHint`/`refreshed`, RO-alap + HU); cache-bust `sofer.html` `i18n.js`+`sofer.css`+`sofer.js` `?v=20260825onstat`.
+6. **Miért `/healthz`, nem `/api/execute`?** A `routes/health.js` `/healthz`-je auth nélküli, gyors JSON — nem terheli az RPC-t; egy sikeres válasz elegendő „a szerver él" jelzésnek. A cél NEM az adat-frissítés per se (azt a koppintás-triggerelt `loadDash*` teszi), csak a rendelkezésre-állás ellenőrzése.
+
+### Fájlok / végpontok
+- **Kliens**: `public/sofer.js` (a `loadMyAssignedVehicle` render-blokkja + új ~90 sor `_vehStatus*` helper), `public/sofer.css` (+75 sor, `.mv-brand` blokk után), `public/i18n.js` (+5 kulcs).
+- **HTML cache-bust**: `sofer.html` mindhárom eszközre `?v=20260825onstat`.
+- **Szerver / DB érintetlen** — a `/healthz` már régóta él (`server.js:149`).
+
+### Nem érintett
+- A `_soferOrdersCache` és a többi cache érintetlen — a manuális frissítés az explicit koppintás. Az önmagától történő 45 mp-es ping CSAK az állapot-jelzőt frissíti, NEM tölt le fuvar-listát (kímélet + adatforgalom).
+- A `vsSyncDriverModeUI` / admin-oldali jármű-kártya (`console-shared.js`) érintetlen — csak a sofőr-nézet gombja.
+- A `_loadMyVehicleBattery` (🔋 sor) érintetlen — továbbra is a jármű-kártya alján, best-effort.
+
+### Teszt
+- **981 Jest zöld** (`npx jest --runInBand`, 8 sofőr-suite / 173 sofőr-teszt zöld) — nincs regresszió.
+- Node syntax-check zöld (`node --check public/sofer.js`+`i18n.js`).
+- A meglévő `session-guard.js` overlay (`window.__vsShowSessionOverlay`) érintetlen — csak akkor lő, ha a szerver-session ténylegesen lejárt; a pirula ettől független (hálózati elérhetőség jelzése).
+
+---
+
 ## 2026-08-25 — Sofőr multi-stop lista: elvégzett (✅) stopok 1-sor magasak → nyitott stop jobban kiemelkedik (PR #364)
 
 ### Miért

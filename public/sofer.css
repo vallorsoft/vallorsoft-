@@ -2487,6 +2487,73 @@
   white-space: nowrap;
   max-width: 55%;
 }
+/* ── Online/Offline állapot-pirula a márka-mező helyén ──
+   Kompakt, szelíd, de feltűnő: kis pont + rövid szöveg. Zöld = online,
+   borostyán (halvány pulzus) = offline → a sofőr látja, ha nem élő az
+   adat, és koppintással frissíthet (vehStatusClick a JS-ben). */
+.sofer-wrap #myVehicleBox .mv-status-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1.5px solid transparent;
+  background: transparent;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: pointer;
+  line-height: 1;
+  transition: transform .12s ease, box-shadow .18s ease, background .18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.sofer-wrap #myVehicleBox .mv-status-btn:active {
+  transform: scale(0.96);
+}
+.sofer-wrap #myVehicleBox .mv-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 8px;
+}
+/* Online — halványzöld, diszkrét */
+.sofer-wrap #myVehicleBox .mv-status-btn.is-online {
+  background: rgba(22,163,74,0.10);
+  border-color: rgba(22,163,74,0.35);
+  color: #15803d;
+}
+.sofer-wrap #myVehicleBox .mv-status-btn.is-online .mv-status-dot {
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22,163,74,0.14);
+}
+/* Offline — borostyán, feltűnőbb, halvány pulzus a ponton */
+.sofer-wrap #myVehicleBox .mv-status-btn.is-offline {
+  background: rgba(217,119,6,0.14);
+  border-color: rgba(217,119,6,0.55);
+  color: #b45309;
+  box-shadow: 0 1px 6px rgba(217,119,6,0.20);
+}
+.sofer-wrap #myVehicleBox .mv-status-btn.is-offline .mv-status-dot {
+  background: #d97706;
+  animation: mvStatusPulse 1.6s ease-in-out infinite;
+}
+/* Ellenőrzés folyamatban — kék, semleges */
+.sofer-wrap #myVehicleBox .mv-status-btn.is-checking {
+  background: rgba(37,99,235,0.10);
+  border-color: rgba(37,99,235,0.40);
+  color: #1d4ed8;
+}
+.sofer-wrap #myVehicleBox .mv-status-btn.is-checking .mv-status-dot {
+  background: #2563eb;
+  animation: mvStatusPulse 1.0s ease-in-out infinite;
+}
+@keyframes mvStatusPulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(217,119,6,0.55); }
+  50%     { box-shadow: 0 0 0 6px rgba(217,119,6,0.00); }
+}
 .sofer-wrap #myVehicleBox .sof-batt-line {
   border-top: 1px dashed rgba(37,99,235,0.20);
   margin-top: 4px;
