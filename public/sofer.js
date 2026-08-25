@@ -2023,16 +2023,18 @@ function addPunctRow(locVal, tipVal, dataVal, opts) {
   var initTime = opts.time || '';
   var initCity = (typeof _cityOf === 'function' && _cityOf(locVal || '')) || (locVal || '—');
   d.innerHTML =
-    // ── ÖSSZECSUKOTT ÖSSZEFOGLALÓ SÁV — egy sorban #N · város · dátum ·
-    //    óra + ✏️ szerkeszt + ✕ törlés. A sáv üres részén hosszan nyomva
+    // ── ÖSSZECSUKOTT ÖSSZEFOGLALÓ SÁV — CSAK #N · város · dátum
+    //    (óra NEM), + ✏️ szerkeszt + ✕ törlés. Város + dátum két
+    //    kissebb betűs sorra tördel, ha nem fér egy sorba — a kártya
+    //    magassága ugyanaz marad. A sáv üres részén hosszan nyomva
     //    átrendezhető (a húzó logika `.punct-row`-ra célzik).
       '<div class="punct-summary" onclick="punctRowExpand(this)">'
     +   '<span class="punct-sum-grip" title="' + esc(t('sof.dragHint')) + '">⠿</span>'
     +   '<span class="punct-sum-idx"></span>'
-    +   '<span class="punct-sum-city">' + esc(initCity) + '</span>'
-    +   '<span class="punct-sum-meta"><span class="punct-sum-date">' + esc(initDate) + '</span>'
-    +     (initTime ? '<span class="punct-sum-time">' + esc(initTime) + '</span>' : '<span class="punct-sum-time"></span>')
-    +   '</span>'
+    +   '<div class="punct-sum-body">'
+    +     '<span class="punct-sum-city">' + esc(initCity) + '</span>'
+    +     '<span class="punct-sum-date">' + esc(initDate) + '</span>'
+    +   '</div>'
     +   '<button type="button" class="punct-sum-edit" onclick="event.stopPropagation();punctRowExpand(this)" title="' + esc(t('sof.editRow')) + '">✏️</button>'
     +   '<button type="button" class="punct-sum-del" onclick="event.stopPropagation();punctRowRemove(this)" title="✕">✕</button>'
     + '</div>'
@@ -2083,17 +2085,14 @@ function _updatePunctSummary(el) {
   if (!row) return;
   var loc = row.querySelector('.punct-loc');
   var data = row.querySelector('.punct-data');
-  var time = row.querySelector('.punct-time');
   var sumCity = row.querySelector('.punct-sum-city');
   var sumDate = row.querySelector('.punct-sum-date');
-  var sumTime = row.querySelector('.punct-sum-time');
   if (sumCity && loc) {
     var v = loc.value || '';
     var city = (typeof _cityOf === 'function' && _cityOf(v)) || (v || '—');
     sumCity.textContent = city;
   }
   if (sumDate && data) sumDate.textContent = data.value || '';
-  if (sumTime && time) sumTime.textContent = time.value || '';
 }
 
 // ============================================================

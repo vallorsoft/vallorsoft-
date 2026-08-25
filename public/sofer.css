@@ -2178,31 +2178,37 @@
   display: inline-flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.sofer-wrap #fuvarStep2 .punct-sum-city {
+/* Város + dátum egy MINI-oszlopban — a városnév egyben, alatta a dátum.
+   Így hosszú városnév se hasal el, és a sor magassága nem nő. */
+.sofer-wrap #fuvarStep2 .punct-sum-body {
   flex: 1 1 auto;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  line-height: 1.15;
+}
+.sofer-wrap #fuvarStep2 .punct-sum-city {
   font-weight: 800; color: #0f172a;
-  font-size: 13.5px;
+  font-size: 13px;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
-.sofer-wrap #fuvarStep2 .punct-sum-meta {
-  display: inline-flex; align-items: baseline; gap: 6px;
-  flex-shrink: 0;
-  font-size: 12px; color: #475569;
+.sofer-wrap #fuvarStep2 .punct-sum-date {
+  font-size: 11px;
+  color: #475569;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
-}
-.sofer-wrap #fuvarStep2 .punct-sum-date { font-weight: 700; }
-.sofer-wrap #fuvarStep2 .punct-sum-time:not(:empty)::before {
-  content: '·'; padding-right: 6px; color: #94a3b8;
 }
 .sofer-wrap #fuvarStep2 .punct-sum-edit,
 .sofer-wrap #fuvarStep2 .punct-sum-del {
   flex-shrink: 0;
-  min-width: 36px; min-height: 36px;
-  padding: 4px 8px;
+  min-width: 34px; min-height: 34px;
+  padding: 4px 6px;
   border-radius: 9px;
-  font-size: 14px; font-weight: 700;
+  font-size: 13px; font-weight: 700;
   cursor: pointer;
   touch-action: manipulation;
 }
@@ -2250,5 +2256,17 @@
   border: 1.5px solid #64748b;
   background: #fff;
   box-shadow: 0 2px 6px rgba(15,23,42,0.06);
+}
+
+/* ── Feltételes határátlépés-kártya (2026-08-25/4) ────────────────
+   A `.diurna-box.empty` állapot addig él, amíg (a) nincs Plecare/
+   Sosire dátum, vagy (b) van dátum, de az ablakban nincs átlépés.
+   Mindkét esetben a menetlevél kitöltése közben feleslegesen
+   foglalna helyet — modern böngészők `:has()`-szel csendben elrejtik
+   a wrappert. Amint valós átlépés érkezik (a szerver-válaszra), a
+   `#diurnaPreview` elveszti az `.empty` osztályt → a kártya
+   automatikusan megjelenik. */
+.sofer-wrap #fuvarStep2 .wb-card.wb-border-card:has(> #diurnaPreview.empty) {
+  display: none;
 }
 
