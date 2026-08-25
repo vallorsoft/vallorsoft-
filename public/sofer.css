@@ -2086,3 +2086,169 @@
 /* ── Fuvar-lista tétel (a step1 folytatás-sáv) — kisebb padding ── */
 #fuvarStep1 .resume-box { padding: 11px 13px; }
 
+/* ============================================================
+   WB-CARD — kártyás szekciók a menetlevél 2. lépésén (2026-08-25/3)
+   Minden logikai szekció (jármű+km, út időpontjai, határátlépés,
+   útvonal-pontok, üzemanyag, tankolások, kiadások, jegyzet) sötét
+   kontúrú kártyába kerül, hogy a lenyithatók/blokkok ne folyjanak
+   össze. A `.section-head` a kártya-fejlécként ül belül.
+   ============================================================ */
+.sofer-wrap #fuvarStep2 .wb-card {
+  background: #fff;
+  border: 1.5px solid #64748b;         /* sötét kontúr — a szekciók KIÜGYNEK */
+  border-radius: 14px;
+  padding: 14px 12px 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 3px 10px rgba(15,23,42,0.08);
+}
+/* A kártyán belül a section-head már NEM kell hogy határt húzzon —
+   a kártya kerete teszi meg. */
+.sofer-wrap #fuvarStep2 .wb-card > .section-head {
+  margin-top: 0;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+.sofer-wrap #fuvarStep2 .wb-card > .section-head:only-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+/* Az utolsó gyerek (add-row-btn / g2 / mező) alsó margóját csökkentjük,
+   hogy ne legyen üres hézag a kártya alján. */
+.sofer-wrap #fuvarStep2 .wb-card > *:last-child {
+  margin-bottom: 0;
+}
+
+/* ============================================================
+   PUNCT-ROW ÖSSZECSUKOTT ÖSSZEFOGLALÓ (2026-08-25/3)
+   Amikor egy pontnak van már helysége/dátuma (behozott adat), az
+   alapból CSUKVA jelenik meg — egyetlen sorban:
+     ⠿  ①  Város · dátum · óra  [✏️] [✕]
+   Kattintásra (VAGY ✏️) kinyílik a teljes szerkesztő. A drag/húzás
+   ugyanúgy működik: a sor bárhonnan hosszan nyomható (kivéve gombok).
+   ============================================================ */
+.sofer-wrap #fuvarStep2 .dyn-row.punct-row {
+  border: 1.5px solid #64748b;         /* sötétebb kontúr */
+  background: #fff;
+  padding: 10px 12px;
+  box-shadow: 0 2px 6px rgba(15,23,42,0.06);
+}
+.sofer-wrap #fuvarStep2 .dyn-row.punct-row .punct-summary {
+  display: none;
+}
+.sofer-wrap #fuvarStep2 .dyn-row.punct-row .punct-body {
+  display: block;
+}
+/* CSUKOTT állapot */
+.sofer-wrap #fuvarStep2 .dyn-row.punct-row.collapsed {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  background: linear-gradient(180deg, #f8fafc, #eef2f7);
+}
+.sofer-wrap #fuvarStep2 .dyn-row.punct-row.collapsed .punct-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+}
+.sofer-wrap #fuvarStep2 .dyn-row.punct-row.collapsed .punct-body {
+  display: none;
+}
+/* A törlő ✕ gomb csak a nyitott (body) verzióban látszik — a csukott
+   summary saját ✕-t hoz. */
+.sofer-wrap #fuvarStep2 .dyn-row.punct-row.collapsed .del-row {
+  display: none;
+}
+
+/* Summary sáv elemek */
+.sofer-wrap #fuvarStep2 .punct-sum-grip {
+  color: #94a3b8; font-size: 14px;
+  cursor: grab;
+  padding: 0 4px;
+  user-select: none; -webkit-user-select: none;
+  flex-shrink: 0;
+}
+.sofer-wrap #fuvarStep2 .punct-sum-idx {
+  min-width: 24px; height: 24px;
+  border-radius: 999px;
+  background: #3b82f6; color: #fff;
+  font-size: 12px; font-weight: 800;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.sofer-wrap #fuvarStep2 .punct-sum-city {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 800; color: #0f172a;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.sofer-wrap #fuvarStep2 .punct-sum-meta {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  flex-shrink: 0;
+  font-size: 12px; color: #475569;
+  font-variant-numeric: tabular-nums;
+}
+.sofer-wrap #fuvarStep2 .punct-sum-date { font-weight: 700; }
+.sofer-wrap #fuvarStep2 .punct-sum-time:not(:empty)::before {
+  content: '·'; padding-right: 6px; color: #94a3b8;
+}
+.sofer-wrap #fuvarStep2 .punct-sum-edit,
+.sofer-wrap #fuvarStep2 .punct-sum-del {
+  flex-shrink: 0;
+  min-width: 36px; min-height: 36px;
+  padding: 4px 8px;
+  border-radius: 9px;
+  font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.sofer-wrap #fuvarStep2 .punct-sum-edit {
+  border: 1.5px solid #3b82f6;
+  background: rgba(59,130,246,0.10);
+  color: #1d4ed8;
+}
+.sofer-wrap #fuvarStep2 .punct-sum-edit:active { transform: scale(0.96); }
+.sofer-wrap #fuvarStep2 .punct-sum-del {
+  border: 1.5px solid #ef4444;
+  background: rgba(239,68,68,0.10);
+  color: #b91c1c;
+}
+.sofer-wrap #fuvarStep2 .punct-sum-del:active { transform: scale(0.96); }
+
+/* ── „▲ csukás" gomb a nyitott törzsben, a drag-fogantyú mellett ── */
+.sofer-wrap #fuvarStep2 .punct-collapse-btn {
+  margin-left: auto;
+  padding: 4px 12px;
+  min-height: 32px;
+  border-radius: 8px;
+  border: 1.5px solid #cbd5e1;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  touch-action: manipulation;
+}
+.sofer-wrap #fuvarStep2 .punct-collapse-btn:active { transform: scale(0.96); }
+
+/* Nyitott állapotban a drag-fogantyú továbbra is ott van, csak jobbra ült
+   a „csukás" gomb. */
+.sofer-wrap #fuvarStep2 .punct-row:not(.collapsed) .punct-grip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 0;
+}
+
+/* Alim / ach sorok is kapják meg a sötétebb kontúrt (konzisztencia) */
+.sofer-wrap #fuvarStep2 #alimentariContainer .dyn-row,
+.sofer-wrap #fuvarStep2 #achizitiiContainer .dyn-row {
+  border: 1.5px solid #64748b;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(15,23,42,0.06);
+}
+

@@ -2006,6 +2006,9 @@ function addPunctRow(locVal, tipVal, dataVal, opts) {
   // `punct-row`: az útvonal-pont sorok átrendezhetők (hosszan nyomva → húzás),
   // ezért kapnak külön osztályt (a tankolás/vásárlás sorok NEM mozgathatók).
   d.className = 'dyn-row punct-row';
+  // Alapból CSUKVA, ha van pre-fill helység (behozott adat) → egy-soros
+  // összefoglaló + ✏️ szerkesztés. Új üres sor NYITVA marad.
+  if (locVal) d.classList.add('collapsed');
   if (opts.orderId) d.setAttribute('data-order-id', opts.orderId);
   if (opts.role)    d.setAttribute('data-role', opts.role);
   // Multi-drop: a konkrét order_stop id — így a menetlevél-mentés a stopId
@@ -2015,25 +2018,82 @@ function addPunctRow(locVal, tipVal, dataVal, opts) {
   // MINDIG ezekkel indul és zárul. A többi típus a régi lista.
   var tipOptions = ['Plecare','Încărcare','Descărcare','Tranzit','Vamă','Parcare','Sosire','Altele'];
   var today = new Date().toISOString().split('T')[0];
-  d.innerHTML = '<button class="del-row" onclick="punctRowRemove(this)">✕</button>'
-    // Fogantyú-sáv: sorszám + „húzd" jelzés. A sor BÁRMELY nem-beviteli
-    // része (fogantyú, címkék, üres felület) hosszan nyomva megfogható.
-    + '<div class="punct-grip"><span class="punct-grip-idx"></span>'
-    + '<span class="punct-grip-ico">⠿</span>'
-    + '<span class="punct-grip-hint">' + t('sof.dragHint') + '</span></div>'
-    + '<div class="field"><label>' + t('sof.punctType') + '</label><select class="input punct-tip" style="padding:10px 14px;" onchange="draftSave()">'
-    + tipOptions.map(function(opt) { return '<option' + (opt === (tipVal || 'Încărcare') ? ' selected' : '') + '>' + opt + '</option>'; }).join('')
-    + '</select></div>'
-    // Dátum + ÓRA egy sorban. A Plecare/Sosire óráját a modal kéri be
-    // (kötelező), de itt utólag is javítható — a diurna a 12:00-szabállyal
-    // számol, ezért az óra pontossága a napidíjat befolyásolja.
-    + '<div class="g2">'
-    + '<div class="field"><label>' + t('sof.date') + '</label><input class="input punct-data" type="date" value="' + esc(dataVal || today) + '" onchange="draftSave()"></div>'
-    + '<div class="field"><label>' + t('sof.time') + '</label><input class="input punct-time" type="time" value="' + esc(opts.time || '') + '" onchange="draftSave()"></div>'
+  var initTip = tipVal || 'Încărcare';
+  var initDate = dataVal || today;
+  var initTime = opts.time || '';
+  var initCity = (typeof _cityOf === 'function' && _cityOf(locVal || '')) || (locVal || '—');
+  d.innerHTML =
+    // ── ÖSSZECSUKOTT ÖSSZEFOGLALÓ SÁV — egy sorban #N · város · dátum ·
+    //    óra + ✏️ szerkeszt + ✕ törlés. A sáv üres részén hosszan nyomva
+    //    átrendezhető (a húzó logika `.punct-row`-ra célzik).
+      '<div class="punct-summary" onclick="punctRowExpand(this)">'
+    +   '<span class="punct-sum-grip" title="' + esc(t('sof.dragHint')) + '">⠿</span>'
+    +   '<span class="punct-sum-idx"></span>'
+    +   '<span class="punct-sum-city">' + esc(initCity) + '</span>'
+    +   '<span class="punct-sum-meta"><span class="punct-sum-date">' + esc(initDate) + '</span>'
+    +     (initTime ? '<span class="punct-sum-time">' + esc(initTime) + '</span>' : '<span class="punct-sum-time"></span>')
+    +   '</span>'
+    +   '<button type="button" class="punct-sum-edit" onclick="event.stopPropagation();punctRowExpand(this)" title="' + esc(t('sof.editRow')) + '">✏️</button>'
+    +   '<button type="button" class="punct-sum-del" onclick="event.stopPropagation();punctRowRemove(this)" title="✕">✕</button>'
     + '</div>'
-    + '<div class="field"><label>' + t('sof.localityAddr') + '</label><input class="input punct-loc" list="sug-punct-loc" placeholder="' + t('sof.punctLocPh') + '" value="' + esc(locVal || '') + '" oninput="draftSave()"></div>';
+    // ── SZERKESZTŐ TÖRZS — mezők + drag-fogantyú + „csukás" gomb.
+    + '<div class="punct-body">'
+    +   '<button class="del-row" onclick="punctRowRemove(this)">✕</button>'
+    +   '<div class="punct-grip">'
+    +     '<span class="punct-grip-idx"></span>'
+    +     '<span class="punct-grip-ico">⠿</span>'
+    +     '<span class="punct-grip-hint">' + t('sof.dragHint') + '</span>'
+    +     '<button type="button" class="punct-collapse-btn" onclick="punctRowCollapse(this)" title="' + esc(t('sof.collapseRow')) + '">▲</button>'
+    +   '</div>'
+    +   '<div class="field"><label>' + t('sof.punctType') + '</label><select class="input punct-tip" onchange="draftSave();_updatePunctSummary(this)">'
+    +   tipOptions.map(function(opt) { return '<option' + (opt === initTip ? ' selected' : '') + '>' + opt + '</option>'; }).join('')
+    +   '</select></div>'
+    // Dátum + ÓRA egy sorban.
+    +   '<div class="g2">'
+    +     '<div class="field"><label>' + t('sof.date') + '</label><input class="input punct-data" type="date" value="' + esc(initDate) + '" onchange="draftSave();_updatePunctSummary(this)"></div>'
+    +     '<div class="field"><label>' + t('sof.time') + '</label><input class="input punct-time" type="time" value="' + esc(initTime) + '" onchange="draftSave();_updatePunctSummary(this)"></div>'
+    +   '</div>'
+    +   '<div class="field"><label>' + t('sof.localityAddr') + '</label><input class="input punct-loc" list="sug-punct-loc" placeholder="' + t('sof.punctLocPh') + '" value="' + esc(locVal || '') + '" oninput="draftSave();_updatePunctSummary(this)"></div>'
+    + '</div>';
   document.getElementById('puncteContainer').appendChild(d);
   _punctRenumber();
+}
+
+// ── Sor kibontása / összecsukása ─────────────────────────────
+// A sofőr a `#N város · dátum` összefoglaló sorra kattintva (VAGY a ✏️
+// gombra) kinyitja szerkeszteni, a törzsben lévő ▲ „csukás" gombbal
+// visszazárja. Az `.collapsed` osztály állítása CSS-en át rejt/mutat.
+function punctRowExpand(el) {
+  var row = el && el.closest ? el.closest('.dyn-row.punct-row') : null;
+  if (row) row.classList.remove('collapsed');
+}
+function punctRowCollapse(el) {
+  var row = el && el.closest ? el.closest('.dyn-row.punct-row') : null;
+  if (!row) return;
+  row.classList.add('collapsed');
+  _updatePunctSummary(row);
+}
+
+// ── Összefoglaló sáv frissítése ─────────────────────────────
+// A szerkesztő-mezők (`.punct-loc`, `.punct-data`, `.punct-time`)
+// bármely change-e után újrarenderel: helység `_cityOf`-fal városra vág,
+// dátum + óra változatlanul.
+function _updatePunctSummary(el) {
+  var row = el && el.closest ? el.closest('.dyn-row.punct-row') : (el && el.classList && el.classList.contains('punct-row') ? el : null);
+  if (!row) return;
+  var loc = row.querySelector('.punct-loc');
+  var data = row.querySelector('.punct-data');
+  var time = row.querySelector('.punct-time');
+  var sumCity = row.querySelector('.punct-sum-city');
+  var sumDate = row.querySelector('.punct-sum-date');
+  var sumTime = row.querySelector('.punct-sum-time');
+  if (sumCity && loc) {
+    var v = loc.value || '';
+    var city = (typeof _cityOf === 'function' && _cityOf(v)) || (v || '—');
+    sumCity.textContent = city;
+  }
+  if (sumDate && data) sumDate.textContent = data.value || '';
+  if (sumTime && time) sumTime.textContent = time.value || '';
 }
 
 // ============================================================
@@ -2067,9 +2127,12 @@ function _punctRows() {
 }
 
 // A fogantyú sorszám-buborékainak újraszámozása (1..N) — hozzáadás, törlés
-// és átrendezés után.
+// és átrendezés után. Frissíti mind a szerkesztő-fogantyút, mind az
+// összefoglaló-sáv számozását.
 function _punctRenumber() {
   _punctRows().forEach(function (row, i) {
+    var sumIdx = row.querySelector('.punct-sum-idx');
+    if (sumIdx) sumIdx.textContent = String(i + 1);
     var el = row.querySelector('.punct-grip-idx');
     if (el) el.textContent = String(i + 1);
   });
