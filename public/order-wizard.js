@@ -499,11 +499,11 @@
         +   '<div class="oc-stop-grid">'
         +     '<div class="oc-field">'
         +       '<label>' + esc(T('oc.stopLoc', 'Helység / cím')) + '</label>'
-        +       '<div class="vs-ac-wrap"><input class="input oc-in-loc" id="' + acId + '" data-sg="loc" placeholder="' + esc(T('form.locPh', 'Helység')) + '" value="' + esc(s.loc || '') + '" autocomplete="off"><div class="vs-ac-dd" id="' + acDdId + '"></div></div>'
+        +       '<div class="vs-ac-wrap"><input class="input oc-in-loc" id="' + acId + '" name="vsord_wzloc_' + i + '" data-sg="loc" placeholder="' + esc(T('form.locPh', 'Helység')) + '" value="' + esc(s.loc || '') + '" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"><div class="vs-ac-dd" id="' + acDdId + '"></div></div>'
         +     '</div>'
         +     '<div class="oc-field">'
         +       '<label>' + esc(T('oc.stopFirma', 'Cég (felrakó/lerakó)')) + '</label>'
-        +       '<input class="input oc-in-firma" id="' + firmaId + '" data-sg="firma" placeholder="' + esc(T('form.firmaPh', 'Cég neve')) + '" value="' + esc(s.firma || '') + '" autocomplete="off">'
+        +       '<input class="input oc-in-firma" id="' + firmaId + '" name="vsord_wzfirma_' + i + '" data-sg="firma" placeholder="' + esc(T('form.firmaPh', 'Cég neve')) + '" value="' + esc(s.firma || '') + '" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other">'
         +     '</div>'
         +     '<div class="oc-field">'
         +       '<label>' + esc(T('oc.stopDate', 'Dátum')) + '</label>'
@@ -562,12 +562,26 @@
   }
 
   // ── Állomás-műveletek (accordion-tudatos) ──
+  // Segéd: a nyitott stop-card középre görgetése (a new-stop + accordion-nyit
+  // fluxusban a képernyő nem ugrott a kitöltendő részhez — a step-card szintű
+  // scroll nem érte el; itt a stop-card magára görgetünk).
+  function _scrollToOpenStop() {
+    try {
+      requestAnimationFrame(function () {
+        var open = document.querySelector('#ocStopsList .oc-stop-card.open');
+        if (open && typeof open.scrollIntoView === 'function') {
+          open.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    } catch (e) {}
+  }
   function ocStopAdd(kind) {
     // Új stop hozzáadása → az előző (nyitva lévő) automatikusan bezáródik,
     // az új nyílik meg.
     OC.stops.push({ kind: (kind === 'pickup' ? 'pickup' : 'delivery'), loc: '', firma: '', data: '', time: '' });
     OC.openStopIdx = OC.stops.length - 1;
     _renderStopsList();
+    _scrollToOpenStop();
   }
   function ocStopRemove(i) {
     if (i < 0 || i >= OC.stops.length) return;
@@ -598,6 +612,7 @@
     if (OC.openStopIdx === i) { OC.openStopIdx = null; }
     else { OC.openStopIdx = i; }
     _renderStopsList();
+    _scrollToOpenStop();
   }
   // Nyitott bezárása (▲ Bezárás gomb)
   function ocStopCollapse() {

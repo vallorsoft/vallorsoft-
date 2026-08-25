@@ -612,6 +612,8 @@
     'form.tractorPlate': { hu: 'Vontató rendszám', ro: 'Nr. cap tractor' },
     'form.trailerPlate': { hu: 'Pótkocsi rendszám', ro: 'Nr. remorcă' },
     'form.newShort': { hu: '+ Új', ro: '+ Nou' },
+    'form.addVehicleBtn': { hu: '+ Jármű hozzáadása', ro: '+ Adaugă vehicul' },
+    'form.addTrailerBtn': { hu: '+ Pótkocsi hozzáadása', ro: '+ Adaugă remorcă' },
     'form.notSet': { hu: '— Nincs megadva —', ro: '— Neselectat —' },
     'form.saveOrder': { hu: 'Fuvarfeladat mentése', ro: 'Salvează cursa' },
     'form.searchName': { hu: 'Keresés névben / cégben...', ro: 'Căutare după nume / firmă...' },
