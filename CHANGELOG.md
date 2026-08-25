@@ -14,6 +14,33 @@
 
 ---
 
+## 2026-08-25 — Sofőr felület: teljes kontraszt + szimmetria kör (PR #360)
+
+### Miért
+A sofőr felület kártyái, keretei, gombjai és modáljai stílusban keveredtek — helyenként vékony (1px) halvány szürke keret (`#e2e8f0`) alig látszott a világos háttéren, a címke-szövegek muted-szürkéje (`#64748b`) beleolvadt a fehér card-okba, és a padding-értékek nem egyeztek (különböző kártya-típusok között 13-15px vegyesen). Kérés: a teljes sofőr-oldal legyen KONTRASZTOSABB és SZIMMETRIKUSABB.
+
+### Mit
+1. **`public/sofer.css` — új „KONTRASZT + SZIMMETRIA KÖR" blokk a fájl VÉGÉN** (~230 sor, additív; a scope `.sofer-wrap` + a toast/modal wrapperekre szűkítve → más felületet nem érint; a fájl végén → felülíró jogán él).
+2. **Design-tokenek per-scope felülírva:** `--sof-border` `#e2e8f0` → **`#94a3b8`** (jól látható kék-szürke); `--sof-border-soft` `#eef2f7` → **`#cbd5e1`**; `--sof-muted` `#64748b` → **`#334155`** (címke/metaadat kontraszt++).
+3. **Kártyák uniform 1.5px keret + egységes shadow-lépcső:** `.sofer-glass` / `.fuvar-card` / `.sof-mstat` / `.dyn-row` / `#myVehicleBox`. Padding-ritmus: glass+fuvar 16px, mstat 14px 6px, dyn-row 14px; border-radius 16/14/14. Nav-kártyák szintén 1.5px + hover-glow; logout-kártya piros keret `#fca5a5`.
+4. **Formok:** `.input` / `.textarea` / `select.input` **1.5px** keret; szöveg `#0f172a` + font-weight 600; placeholder `#64748b`; fókusz `#1d4ed8` kék + 4px 20% glow. Címkék (`.field label` / `.section-head` / `.sof-mstat-lbl` / `.fd-lbl` / `.kiosztott-title`) `#334155` — jól olvasható.
+5. **Gombok uniform 48px min-height** (`.sofer-btn` / `.sh-btn` / `.back-btn`); ghost/secondary 1.5px szürke keret + tinta-kitöltés, aktív állapotban `#f1f5f9`; primary mélyebb kék gradient `#2563eb → #4f46e5` + `0 8px 22px rgba(37,99,235,0.36)` glow; resume zöld gradient `#16a34a → #15803d`. Fuvar-akciógombok gap 8→10px szimmetriára; `.sh-btn` padding 12px 14px.
+6. **Fuvar-kártya részletek:** 1.5px szaggatott szeparátor a details-nél; `.fd-sec-h` mélyebb kék `#1d4ed8` (jobban kiválik a fehér card-ból); `.fd-firma` / `.fd-val` tömör fekete `#0f172a`; `.fd-ms-row.done` szintén `#0f172a`; időpontok `#1d4ed8`. Fuvar-szám pill mélyebb kék gradient `#2563eb → #1d4ed8`. Státusz-pilulák 1.5px keret + font-weight 800.
+7. **Toast + modálok** (9 modal: sofConfirm / sofTime / sofChoice / wbConfirm / wbLoc / orderPicker / receiptReview / pendingAdd / orphRange / hoModal / bugModal): egységes 1.5px `#94a3b8` keret + `0 20px 55px rgba(15,23,42,0.28)` shadow. Toast tömör ok/err színek (`#15803d` / `#b91c1c` szöveg, `#16a34a` / `#dc2626` keret).
+8. **Bug FAB:** 1.5px sárga `#f59e0b` keret + erősebb shadow. **PTR pill:** 1.5px + font-weight 700.
+9. **Havi mini-statisztika:** gap 4→6px szimmetria; `.sof-mstat-val` `#0f172a`; `.sof-mstat-prev` `#475569` + font-weight 600 (olvashatóbb kontraszt).
+10. **Menetlevél step2 punct sum pill-ek:** mélyebb kék `#1d4ed8` index-buborék; edit gomb `#1d4ed8`/`#1e3a8a`; del gomb `#dc2626`/`#991b1b`.
+
+### Fájlok / végpontok
+- **Kliens**: `public/sofer.css` (+230 sor a fájl végén, kontraszt + szimmetria pass); `public/sofer.html` cache-bust `sofer.css?v=20260825wbcard2` → `?v=20260825contrast`.
+- **Szerver / DB / handler érintetlen** — tisztán megjelenés.
+
+### Ellenőrzés
+- **981 Jest zöld** (61/68 suite, 45 skip valós-DB) — nincs regresszió.
+- A blokk `.sofer-wrap` + toast/modal wrapperekre szűkítve → az admin/manager/routing/portál/carrier felületet NEM érinti.
+
+---
+
 ## 2026-08-25 — Fuvar-kiírás wizard: Vissza+Tovább a nyitott card BELSEJÉBEN + auto-center + kontrasztos keret (PR #358)
 
 ### Miért
