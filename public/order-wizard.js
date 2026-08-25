@@ -254,20 +254,27 @@
       if (state === 'open') openCard = card;
     });
 
-    // Nav a nyitott card KÖZVETLEN utána — a jövőbeli (pending) step-bar-ok
-    // csak a nav ALATT jelennek meg. Természetes olvasás-irány: kész lépések ▸
-    // aktuális card ▸ Tovább gomb ▸ mi jön még. A `.oc-nav` DOM-mozgatva a
-    // helyére; ha nincs open card (fallback), az `.oc-body` végén marad.
+    // Nav a nyitott card BELSEJÉBE (a `.oc-step-open` végére) — így a Vissza/
+    // Tovább gombok a card részei, természetes olvasás-irány: kész lépések ▸
+    // aktuális card (fejléc + tartalom + navigáció) ▸ jövőbeli pending bar-ok.
     var navEl = document.getElementById('ocNav');
-    if (navEl && openCard && openCard.nextSibling !== navEl) {
-      openCard.parentNode.insertBefore(navEl, openCard.nextSibling);
+    if (navEl && openCard) {
+      var openWrap = openCard.querySelector('.oc-step-open');
+      if (openWrap && navEl.parentNode !== openWrap) {
+        openWrap.appendChild(navEl);
+      }
     }
 
-    // Nav gombok
+    // Nav gombok — a Vissza mostantól MINDIG látszik (a Tovább mellett),
+    // step 1-en disabled állapotban. Így vizuális pár, a felhasználó látja,
+    // hogy vissza-lépési lehetőség van.
     var back = document.getElementById('ocBtnBack');
     var next = document.getElementById('ocBtnNext');
     var subm = document.getElementById('ocBtnSubmit');
-    if (back) back.style.visibility = (OC.step > 1) ? 'visible' : 'hidden';
+    if (back) {
+      back.style.visibility = 'visible';
+      back.disabled = (OC.step <= 1);
+    }
     if (OC.step === OC.maxStep) {
       if (next) next.style.display = 'none';
       if (subm) subm.style.display = '';
@@ -286,12 +293,13 @@
     // Ha a step 3-ra léptünk, a méret-kötelező jelzés frissítése (a legacy JS is használja).
     if (OC.step === 3 && typeof refreshDimReq === 'function') { try { refreshDimReq(); } catch (e) {} }
 
-    // Reszponzív: az aktuálisan nyitott step tetejére görget (hogy a felette
-    // lévő bar-ok között ne kelljen felgörgetni).
+    // Reszponzív: az aktuálisan nyitott step a képernyő KÖZEPÉN jelenik meg
+    // (block:'center') → step-váltás után nem kell külön scrollolni; mobilon
+    // is olvasható marad a fejléc + tartalom + az inline nav-gombok.
     try {
-      var openCard = shell.querySelector('.oc-step-card[data-state="open"]');
-      var target = openCard || shell;
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      var openCardScroll = shell.querySelector('.oc-step-card[data-state="open"]');
+      var target = openCardScroll || shell;
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch (e) {}
   }
 
