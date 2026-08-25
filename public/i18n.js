@@ -2894,6 +2894,8 @@
     'sof.selectedOrders': { hu: '{n} fuvar kiválasztva:', ro: '{n} curse selectate:' },
     'sof.punctType': { hu: 'Pont típusa', ro: 'Tip punct' },
     'sof.dragHint': { hu: 'Tartsd nyomva a mozgatáshoz', ro: 'Ține apăsat pentru a muta' },
+    'sof.editRow': { hu: 'Sor szerkesztése', ro: 'Editează rândul' },
+    'sof.collapseRow': { hu: 'Összecsukás', ro: 'Restrânge' },
     'sof.date': { hu: 'Dátum', ro: 'Dată' },
     'sof.time': { hu: 'Óra', ro: 'Oră' },
     'sof.wb.locPh': { hu: 'pl. Garaj-Arcus', ro: 'ex. Garaj-Arcus' },
