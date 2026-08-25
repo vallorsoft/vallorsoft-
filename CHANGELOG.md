@@ -14,6 +14,47 @@
 
 ---
 
+## 2026-08-25 — Fuvar-kezelés + Fuvar-kiírás: kontraszt + szimmetria kör (admin+manager, PR #367)
+
+### Miért
+A `/admin` és `/manager` konzol **Fuvar-kezelés** (`orders-list`) és **Fuvar-kiírás** (`orders-form`) paneljén a tábla fejléc-színe (`#64748b`) alig olvasható volt a világos háttér előtt, a sor-elválasztók (1px halvány) beleolvadtak, a fuvar-szám cella nem emelkedett ki, a sor-akció gombok (✏️ + ⋯) eltérő méretűek voltak, a chip-számláló háttere túl halvány, a fuvar-kiírás mezői vegyes magasságúak (input+select+datetime-local eltérő min-height), a címkék (`.field label` `#64748b muted`) alig különböztek a placeholderektől.
+
+### Mit
+1. **Új „KONTRASZT + SZIMMETRIA KÖR" additív blokk a `public/style.css` VÉGÉN** (~230 sor). Scope: KIZÁRÓLAG `.main-content .pane[data-pane="orders-list"]` + `[data-pane="orders-form"]` + `[data-pane="orders-deleted"]` — más felület nem érintett (felülíró jogán él).
+2. **Táblázat fejléc** (`#tblOrders thead th`) — szín `#64748b → #334155` (világos) / `#e2e8f0` (sötét), `font-weight:700`, letter-spacing 0.5px, alsó keret 1.5px `#cbd5e1`. A törölt fuvarok tábla is (`#tblOrdersDeleted`).
+3. **Tbody sor-elválasztó** 1px halvány → **1.5px** `#e2e8f0` (világos) / `rgba(255,255,255,0.08)` (sötét); zebra kicsit erősebb (0.04 → 0.07). Sor-hover változatlan.
+4. **Fuvar-szám cella** (`td.vsl-orow-first`) — `font-weight:800`, `color:#0f172a`/`#f1f5f9`, letter-spacing 0.2px, `font-size:13px`; a `text-muted` „—" szín érintetlen. **Bal-akcens csík 4→5px**.
+5. **Státusz-pirula** (`select.vsl-pill`) — 1.5px keret, min-width 88px, +5px vertikális padding, `font-weight:800`.
+6. **Sofőr-avatar** 22→24px + jobb shadow; sofőr-név `font-weight:600` + `#0f172a`/`#f1f5f9`.
+7. **Sor-akció gombok (✏️ + ⋯)** — 1.5px keret, **uniform 38×34px** min-méret, 6px margin-left a ⋯-re, `td.vs-row-actions` min-width 96px, `display:inline-flex; align-items:center; justify-content:center` (a két gomb szimmetrikus).
+8. **Chip-bar** (`.vs-chip`) — 1.5px keret, 7×13px padding, min-height 32px. **Chip-számláló** (`.vs-chip-n`) `#cbd5e1` bg + `#1e293b` szöveg + 1px `#94a3b8` keret (aktív chipen fehér átlátszó). Sötét-módra külön override.
+9. **Kereső-sáv** — `#orderSearch` + `#orderStatusFilter` + reset gomb **uniform 40px min-height**, 1.5px keret, placeholder `#64748b` (világos) / `#94a3b8` (sötét).
+10. **Metric-band ↔ chip-bar** egyenletes **14px** margin-bottom (a tábla előtti ritmus szimmetrikus).
+11. **Sticky kijelölt-fuvar sáv** (`#orderSelBar`) — 1.5px keret `rgba(37,99,235,0.55)`, 14×20px padding, `border-radius:14px`, `#orderSelCount` `font-size:14px` + `font-weight:800`, `.btn` min-height 38px + 1.5px keret + `font-weight:700`.
+12. **Fuvar-kiírás pane — címkék** (`.field label`) — `color:#334155`, `font-weight:600`, `font-size:13px`.
+13. **Fuvar-kiírás mezők** (`.input`/`.select`/`.textarea`) — **uniform 46px min-height**, 1.5px keret, `font-weight:500`; placeholder kontraszt (`#94a3b8` / sötét `#64748b`).
+14. **„TÖBB FELRAKÁSI / LERAKÁSI PONT" doboz** (`#oExtraStopsBox`) — 1.5px dashed keret, fejléc-cím `#334155` + `font-weight:700`.
+15. **Sofőr-típus radio** (Intern/Extern/None) — 17×17px, `accent-color:#3b82f6`. Belső/Extern lista + vontató/pótkocsi legördülő 1.5px keret + 6×8px padding.
+16. **„Fuvarfeladat mentése" gomb** — 52px magas, `font-size:15px`, `font-weight:800`, `letter-spacing:0.3px`, kék-narancs shadow (`0 6px 20px rgba(246,113,30,0.28)`).
+17. **AI-scan + CSV-import gombok** (`#ordScanBtnBox`, `#ordersImportBtnBox`) — uniform 40px min-height + 1.5px keret + 10px sarok + `font-weight:700`.
+18. **Cache-bust**: `admin.html` + `manager.html` `style.css?v=20260825navin → ?v=20260825ordfix`.
+
+### Fájlok
+- `public/style.css` — ~230 sor additív blokk a fájl végén (a meglévő szabályok érintetlenek → visszavonható).
+- `public/admin.html` + `public/manager.html` — cache-bust.
+
+### Nem érintett
+- HTML struktúra / szerver-oldal / DB — teljesen érintetlen (tisztán megjelenítés).
+- `.vsl-*` osztályok inline stílus-logikája (a státusz `bgMap` háttér/szín/keret az inline style-ból jön; itt csak a keret-vastagságot / min-width-et / betűket erősítjük).
+- Sofőr felület, Statisztika, Beállítások, Tervezőtábla — a pane-szintű scope miatt nem érvényesülnek.
+- A táblázat funkciói (méretezés, oszlop-átrendezés, kijelölés, dropdown, sticky selection bar) érintetlenek — a scope-olás vizuális felülíró réteg.
+
+### Teszt
+- **981 Jest zöld** (`npx jest --runInBand`, nincs regresszió; 45 skipped valós-DB).
+- CSS zárójel-egyensúly ellenőrizve (934 open / 934 close).
+
+---
+
 ## 2026-08-25 — Sofőr jármű-kártya: márka helyett Online/Offline állapot-pirula + koppintásra újratölt (PR #TBD)
 
 ### Miért
