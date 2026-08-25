@@ -1841,3 +1841,235 @@
   animation: sof-ptr-spin 0.7s linear infinite;
 }
 @keyframes sof-ptr-spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   DEMO-STYLE MENETLEVÉL (2026-08-25) — a valós #fuvarStep2 a
+   /sofer-demo mockup arányosabb, letisztult kinézetére szabva.
+   Csak megjelenés — funkció/ID/JS érintetlen; a fájl VÉGÉN áll,
+   felülírja a fenti szabályokat, és könnyen visszavonható.
+   ------------------------------------------------------------
+   Cél: kompakt vertikális ritmus, halkabb szekció-fejlécek,
+   nem-uppercase címkék, kisebb padding-ok, arányosabb dyn-row
+   kártyák — mindezt úgy, hogy az iOS auto-zoom védelem megmarad
+   (input >= 15px), és a touch-célok min. 44px maradnak.
+   ============================================================ */
+
+/* ── Kompaktabb mező-ritmus a menetlevél lépéseiben ── */
+#fuvarStep2 .field,
+#fuvarStep1 .field { margin-bottom: 10px; }
+
+.sofer-wrap #fuvarStep2 .field label,
+.sofer-wrap #fuvarStep1 .field label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: none;
+  letter-spacing: normal;
+  margin-bottom: 4px;
+}
+
+.sofer-wrap #fuvarStep2 .input,
+.sofer-wrap #fuvarStep2 .textarea,
+.sofer-wrap #fuvarStep2 select.input,
+.sofer-wrap #fuvarStep1 .input,
+.sofer-wrap #fuvarStep1 .textarea,
+.sofer-wrap #fuvarStep1 select.input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 15px;              /* iOS-biztos zóna: <=14px → zoom bug */
+  font-weight: 600;
+  border: 1.5px solid #cbd5e1;
+  background: #fff;
+  color: #0f172a;
+}
+.sofer-wrap #fuvarStep2 .textarea { min-height: 64px; }
+
+/* ── 2-oszlopos rács szorosabb réssel ── */
+#fuvarStep2 .g2 { gap: 8px; }
+
+/* ── Szekció-fejléc: letisztult (fekete tinta, halkabb elválasztó) ── */
+.sofer-wrap #fuvarStep2 .section-head,
+.sofer-wrap #fuvarStep1 .section-head {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+  text-transform: none;
+  letter-spacing: normal;
+  margin: 14px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sofer-wrap #fuvarStep2 .section-head::before,
+.sofer-wrap #fuvarStep1 .section-head::before {
+  top: 2px; bottom: 6px;
+  width: 3px;
+}
+
+/* ── Auto-info hint (Út időpontjai) — indigo pill, mint a demo .p-hint ── */
+#fuvarStep2 .field[style*="dashed rgba(99,102,241"],
+#fuvarStep2 .field.wb-hint-box {
+  margin-bottom: 8px !important;
+  padding: 8px 10px !important;
+  font-size: 11.5px !important;
+  border-radius: 10px !important;
+}
+
+/* ── Diurna doboz: kompakt sárga pill (a demo szerint) ── */
+#fuvarStep2 .diurna-box {
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(254, 240, 138, 0.32);
+  border: 1px dashed #fde047;
+  color: #713f12;
+  font-size: 12px;
+}
+#fuvarStep2 .diurna-box.empty {
+  background: rgba(245, 158, 11, 0.10);
+  border-color: rgba(245, 158, 11, 0.42);
+  color: #92400e;
+}
+#fuvarStep2 .diurna-window {
+  font-size: 12.5px;
+  margin-bottom: 4px;
+  color: #713f12;
+}
+#fuvarStep2 .diurna-count {
+  color: #92400e;
+  font-size: 10.5px;
+  margin-bottom: 4px;
+}
+#fuvarStep2 .diurna-row { padding: 5px 0; }
+#fuvarStep2 .diurna-hint {
+  font-size: 11px;
+  color: #78350f;
+  margin-top: 6px;
+}
+#fuvarStep2 .diurna-go {
+  margin-top: 8px;
+  padding: 9px 12px;
+  font-size: 12.5px;
+}
+
+/* ── Kiválasztott fuvarok összegző — kompakt kék pill ── */
+#fuvarStep2 #selectedOrdersSummary {
+  padding: 8px 10px !important;
+  border-radius: 10px !important;
+  font-size: 11.5px !important;
+  margin-bottom: 6px !important;
+  color: #1e293b !important;
+}
+
+/* ── „Fuvarok kezelése" gomb — kompaktabb ── */
+.sofer-wrap #fuvarStep2 .submit-btn.wb-manage {
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 10px;
+  width: auto;
+  min-height: 40px;
+}
+
+/* ── Dinamikus sorok (punct / alim / ach): arányos kártya ── */
+.sofer-wrap #fuvarStep2 .dyn-row {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.05);
+}
+.sofer-wrap #fuvarStep2 .dyn-row .field { margin-bottom: 8px; }
+.sofer-wrap #fuvarStep2 .dyn-row .field:last-child { margin-bottom: 0; }
+.sofer-wrap #fuvarStep2 .dyn-row .del-row {
+  top: 4px; right: 4px;
+  font-size: 18px;
+  min-width: 36px; min-height: 36px;
+}
+
+/* Punct-row fogantyú kompaktabb */
+#fuvarStep2 .punct-row .punct-grip {
+  padding: 2px 40px 2px 0;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+#fuvarStep2 .punct-row .punct-grip-idx {
+  min-width: 20px; height: 20px;
+  font-size: 11px;
+}
+
+/* Punct-row .g2 dátum + óra — szorosabb rés */
+#fuvarStep2 .dyn-row .g2 { gap: 6px; }
+
+/* ── Add-row + scan-btn kompaktabb — de min-height 44px (touch) ── */
+.sofer-wrap #fuvarStep2 .add-row-btn,
+.sofer-wrap #fuvarStep1 .add-row-btn {
+  padding: 10px 12px;
+  font-size: 13px;
+  border-radius: 10px;
+  min-height: 44px;
+  border-width: 1.5px;
+  border-style: dashed;
+}
+
+/* ── Fő beküld-gomb: arányosabb magasság ── */
+.sofer-wrap #fuvarStep2 > .submit-btn,
+.sofer-wrap #fuvarStep1 > .submit-btn {
+  padding: 14px;
+  font-size: 15.5px;
+  border-radius: 13px;
+  margin-top: 10px;
+}
+.sofer-wrap #fuvarStep2 > .submit-btn.scan-btn,
+.sofer-wrap #fuvarStep1 > .submit-btn.scan-btn {
+  padding: 12px;
+  font-size: 14px;
+}
+
+/* ── GPS-lekérő gomb (Km / Üzemanyag mellett) — kompaktabb ── */
+#fuvarStep2 .gps-input-row { gap: 5px; }
+#fuvarStep2 .gps-input-row .gps-fetch-btn {
+  min-width: 66px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  border-radius: 10px;
+}
+
+/* ── Km / üzemanyag ellenőrzés — kisebb tipográfia ── */
+#fuvarStep2 .km-check {
+  font-size: 12.5px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  margin-top: 4px;
+}
+#fuvarStep2 .km-check-row { padding: 2px 0; }
+
+/* ── Sec-title (Menetlevél kitöltése fejléc) — halkabb ── */
+#fuvarStep2 .sec-title h3,
+#fuvarStep1 .sec-title h3 { font-size: 16px; }
+
+/* ── Résmargin a beküldés-hint sorra ── */
+#fuvarStep2 [data-i18n="sof.offlineHint"] {
+  margin-top: 12px !important;
+  margin-bottom: 4px !important;
+  font-size: 11px !important;
+}
+
+/* ── Wbsec (össze-csukható szekciók) fejlécén a caret + count kompaktabb ── */
+.sofer-wrap #fuvarStep2 .section-head.wbsec-head {
+  padding-right: 4px;
+}
+.sofer-wrap #fuvarStep2 .wbsec-count {
+  font-size: 10.5px;
+  padding: 2px 8px;
+}
+.sofer-wrap #fuvarStep2 .wbsec-caret {
+  width: 22px; height: 22px;
+  font-size: 11px;
+  border-width: 1.5px;
+}
+
+/* ── Fuvar-lista tétel (a step1 folytatás-sáv) — kisebb padding ── */
+#fuvarStep1 .resume-box { padding: 11px 13px; }
+
