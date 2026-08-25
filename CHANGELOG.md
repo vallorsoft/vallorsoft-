@@ -14,6 +14,28 @@
 
 ---
 
+## 2026-08-25 — Fuvar-kiírás wizard: Vissza+Tovább a nyitott card BELSEJÉBEN + auto-center + kontrasztos keret (PR #358)
+
+### Miért
+A fuvar-kiírás 6-lépéses wizardján a nav-sáv (Vissza + Tovább / ✅ Mentés) a nyitott step-card ALATT lebegett, elkülönült elemként (`.oc-nav` a `.oc-body` közvetlen gyereke, DOM-mozgatva a nyitott card mögé). A képen látszik: a „Tovább" gomb a card KERETÉN KÍVÜL, jobb alul lóg. Kérés: a gomb a card része legyen, mellette a Vissza gomb, és step-váltás után az új card a képernyő közepén jelenjen meg (ne kelljen csúsztatni), plusz a card-kerete legyen kontrasztosabb.
+
+### Mit
+1. **`public/order-wizard.js` `_refreshView`** — a `#ocNav` mostantól a nyitott `.oc-step-card` `.oc-step-open` végére DOM-mozgatva (`openWrap.appendChild(navEl)`), nem a card mellé. Így a Vissza + Tovább gomb a card részévé válik.
+2. **Vissza gomb mindig látszik** — `back.style.visibility = 'visible'`, `back.disabled = (OC.step <= 1)`. Step 1-en disabled (opacity 0.45), de vizuálisan ott van a Tovább mellett → a felhasználó látja, hogy vissza-lépési lehetőség létezik.
+3. **Auto-center step-váltáskor** — `scrollIntoView({behavior:'smooth', block:'center'})` (eddig `block:'start'` volt). Mobilon a Tovább kattintás után az új nyitott card a képernyő KÖZEPÉN jelenik meg — nem kell külön csúsztatni.
+4. **Kontrasztosabb kártya-keretek** (`public/style.css`) — `.oc-step-card` alap keret 1px → 2px, szín `var(--border, #e2e8f0)` → `#94a3b8` szürke; nyitott step-card `border-color: #2563eb` (eddig `#3b82f6`), erősebb kék glow (`box-shadow 0 6px 22px rgba(37,99,235,0.18)`), akcent-csík 4px → 5px, szín gradient `#2563eb → #4f46e5`. Done state: zöld (`#16a34a`) keret+akcent. Pending state: szaggatott szürke (`border-style: dashed`). Sötét-módra külön overrideok (`#60a5fa` open, `#475569` pending).
+5. **Nav belső elrendezés** (`.oc-nav`) — felül elválasztó vonal (`border-top: 1px solid rgba(148,163,184,0.35)`), `padding: 14px 0 4px; margin-top: 18px`; a Vissza (ghost) gomb 1.5px szürke keretes tinta-kitöltéssel (világos+sötét téma külön), disabled állapotban opacity 0.45.
+
+### Fájlok / végpontok
+- **Kliens**: `public/order-wizard.js` (`_refreshView` DOM-mozgatás + `scrollIntoView block:'center'`), `public/style.css` (kontraszt-kör). Cache-bust: `?v=20260825navin` (order-wizard.js + style.css az admin.html/manager.html-ben).
+- **Szerver / DB / handler érintetlen** — tisztán a `.pane[data-pane="orders-form"]` wizardját érinti.
+
+### Ellenőrzés
+- **981 Jest zöld** (61/68 suite, 45 skip valós-DB) — nincs regresszió; `node -c public/order-wizard.js` szintaxis OK.
+- Kézi ellenőrzés (élesben): `/admin` és `/manager` → Fuvarok → Fuvar kiírás → Tovább kattintás → új card a képernyő közepén, a Vissza+Tovább gombok a card belsejében, a card-kerete kontrasztos (kék 2px + akcent-csík).
+
+---
+
 ## 2026-08-25 — Sofőr DEMÓ FIX: a `data-i18n` kulcsok most tényleg megjelennek (kulcs-ütközés + regisztráció-hiány)
 
 ### Miért
