@@ -44,8 +44,8 @@ describe('/sofer-demo — sofőr DEMÓ sandbox oldal', () => {
     // A STEPS tömb 13 elemű (12 → 13-ra bővült a menetlevél-mezők bemutató lépéssel),
     // minden lépéshez tartozik title/body/hint kulcs.
     for (var i = 0; i < 13; i++) {
-      expect(HTML_SRC).toMatch(new RegExp('dm\\.g\\.s' + i + '\\.title'));
-      expect(HTML_SRC).toMatch(new RegExp('dm\\.g\\.s' + i + '\\.body'));
+      expect(HTML_SRC).toMatch(new RegExp('demo\\.g\\.s' + i + '\\.title'));
+      expect(HTML_SRC).toMatch(new RegExp('demo\\.g\\.s' + i + '\\.body'));
     }
     // Interakciós scene-ek (waitAction jelöltek): openCard, stopBtn, borderTap, waybillCreate
     expect(HTML_SRC).toMatch(/waitAction:\s*true/);

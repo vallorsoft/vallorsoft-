@@ -14,6 +14,25 @@
 
 ---
 
+## 2026-08-25 — Sofőr DEMÓ FIX: a `data-i18n` kulcsok most tényleg megjelennek (kulcs-ütközés + regisztráció-hiány)
+
+### Miért
+Az előző kör (PR #353) után a sofőr még mindig nyers kulcs-neveket látott a mockupban (`dm.mock.allocated`, `dm.badge`, `dm.brandNote` stb.), és a bemutató kilépés-gombján „Teljes nézet" jelent meg. Két gyökér-ok:
+1. **Kulcs-ütközés**: a `dm.*` prefix már foglalt volt az i18n.js közös DICT-jében (`dm.enter=Sofőr mód`, `dm.exit=Teljes nézet` a driver-mode togglenek) — a demo `dm.exit=← Ieșire` felülíródott az `Teljes nézet`-re.
+2. **Regisztráció-hiány**: az inline `_DM_FALLBACK` szótár csak a wizard-panel `_t()` függvényén át élt; az `i18n.js` `applyI18n()` a `[data-i18n]` attribútumokat a KÖZÖS `DICT`-ből olvasta — ahol a `dm.mock.*` / `dm.badge` kulcsok NEM léteztek → nyers kulcs jelent meg minden mockup-elemen.
+
+### Mit
+1. **`public/sofer-demo.html`** — mind a 261 `dm.*` előfordulás átnevezve `demo.*`-ra (261 sorban) `sed`-del: `dm.mock.*` → `demo.mock.*`, `dm.g.*` → `demo.g.*`, `dm.guide.*` → `demo.guide.*`, `dm.badge`/`dm.brandNote`/`dm.exit` → `demo.*`. A `dm.enter`/`dm.exit` (driver-mode toggle) az i18n.js-ben érintetlen.
+2. **Új `DEMO_DICT` (RO + HU)** — 138 kulcs, mind a mockup, mind a wizard-panel; a valós Romanian felirat + magyar párja. A régi RO-only fallback szótár helyett most nyelvváltásra is helyesen reagál.
+3. **Regisztráció az `i18n.js` közös DICT-jébe** — az inline script tetején (SZINKRON, még a DOMContentLoaded ELŐTT — mert az inline script a body VÉGÉN van, tehát parse-time során fut, mielőtt `i18n.js` `boot()`-ja az `applyI18n(document)`-tel elkezdi olvasni a `[data-i18n]`-eket). `Object.keys(DEMO_DICT).forEach(function(k){ window.I18N.dict[k] = DEMO_DICT[k]; });`
+4. **`window._DM_FALLBACK`** most a `DEMO_DICT.ro` értékekből derivált (a HU-t a valós i18n intézi) — az inline `_t()` biztonsági fallback marad, ha az `i18n.js` valamiért nem érné el.
+5. **~150 sor holt kód törölve** (a régi RO-only fallback szótár, ami mostantól redundáns).
+6. **`tests/integration/sofer-demo-page.test.js`** — a 13 wizard-lépés elvárás `dm.g.s*` → `demo.g.s*`-ra frissítve. **5/5 teszt zöld.**
+
+Cache-bust: `i18n.js?v=20260825demofix`. **981 Jest zöld** (nincs regresszió). Csak a `/sofer-demo` oldalt érinti.
+
+---
+
 ## 2026-08-25 — Sofőr DEMÓ: a nevek/mezők a valós felülethez igazítva + realista menetlevél-mockup
 
 ### Miért
