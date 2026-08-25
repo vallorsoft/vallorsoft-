@@ -2270,3 +2270,233 @@
   display: none;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   KONTRASZT + SZIMMETRIA KÖR (2026-08-25)
+   ─────────────────────────────────────────────────────────────────────────
+   A teljes sofőr-felület egységes, kontrasztos megjelenést kap:
+   – vastagabb (1.5px) és sötétebb (#94a3b8) kártya-keretek,
+   – kék akcens (#1e3a8a) fókusz + prémium fókuszgyűrű,
+   – szimmetrikus kártya-padding + border-radius mindenütt,
+   – uniform gomb-magasság (48px) + vastagabb keret a másodlagos gombokon,
+   – erősebb címke- és metadata-kontraszt (#334155 a régi #64748b helyett).
+   Kizárólag `.sofer-wrap` / a sofőr-oldalon élő szelektorokra szűkítve,
+   hogy más felületet ne érintsen. A blokk a fájl VÉGÉN van → felülír.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Design-token felülírás (per-scope) ── */
+.sofer-wrap,
+.toast-wrap,
+#hoModal, #bugModal,
+#sofConfirmModal, #sofTimeModal, #sofChoiceModal,
+#wbConfirmModal, #wbLocModal,
+#orderPickerModal, #receiptReviewModal,
+#pendingAddModal, #orphRangeModal {
+  --sof-border:      #94a3b8;   /* volt #e2e8f0 → most sötétebb, jól látható */
+  --sof-border-soft: #cbd5e1;   /* volt #eef2f7 → most kontrasztosabb */
+  --sof-muted:       #334155;   /* volt #64748b → szöveg-olvashatóság ++ */
+}
+
+/* ── Kártyák: uniform padding + 1.5px kék-szürke keret + egységes shadow ── */
+.sofer-wrap .sofer-glass,
+.sofer-wrap .fuvar-card,
+.sofer-wrap .sof-mstat,
+.sofer-wrap .dyn-row,
+.sofer-wrap #myVehicleBox {
+  border: 1.5px solid var(--sof-border);
+  box-shadow: 0 3px 10px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
+}
+.sofer-wrap .sofer-glass,
+.sofer-wrap .fuvar-card {
+  border-radius: 16px;
+  padding: 16px;                /* szimmetrikus térköz mindkettőn */
+}
+.sofer-wrap .sof-mstat {
+  border-radius: 14px;
+  padding: 14px 6px;
+}
+.sofer-wrap .dyn-row {
+  border-radius: 14px;
+  padding: 14px;
+}
+
+/* Nav-kártyák: erősebb keret + hover glow, egységes belső magasság */
+.sofer-wrap .sofer-nav-card {
+  border: 1.5px solid var(--sof-border);
+  box-shadow: 0 6px 20px rgba(15,23,42,0.08), 0 1px 3px rgba(15,23,42,0.05);
+}
+.sofer-wrap .sofer-nav-card:active {
+  border-color: var(--sof-primary);
+  box-shadow: 0 2px 8px rgba(37,99,235,0.15);
+}
+.sofer-wrap .sofer-nav-card.logout {
+  border: 1.5px solid #fca5a5;
+}
+
+/* ── Fejléc-jelvények ── */
+.sofer-wrap #meBadge,
+.sofer-wrap #langSwitch.sofer-lang button {
+  border-width: 1.5px;
+  color: #334155;
+  font-weight: 700;
+}
+
+/* ── Formok: vastagabb keret + erősebb fókusz ── */
+.sofer-wrap .input,
+.sofer-wrap .textarea,
+.sofer-wrap select.input {
+  border: 1.5px solid var(--sof-border);
+  color: #0f172a;
+  font-weight: 600;
+}
+.sofer-wrap .input::placeholder,
+.sofer-wrap .textarea::placeholder { color: #64748b; }
+.sofer-wrap .input:focus,
+.sofer-wrap .textarea:focus,
+.sofer-wrap select.input:focus {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 0 4px rgba(29,78,216,0.20);
+}
+.sofer-wrap .field label,
+.sofer-wrap .section-head,
+.sofer-wrap .sof-mstat-lbl,
+.sofer-wrap .fd-lbl,
+.sofer-wrap .kiosztott-title {
+  color: #334155;               /* volt --sof-muted → jobb kontraszt */
+}
+.sofer-wrap .section-head {
+  border-bottom: 1.5px solid var(--sof-border);
+}
+
+/* ── Gombok: uniform min-height 48px + vastagabb keret + szimm. padding ── */
+.sofer-wrap .sofer-btn,
+.sofer-wrap .sh-btn,
+.sofer-wrap .back-btn {
+  min-height: 48px;
+  font-weight: 700;
+}
+.sofer-wrap .sofer-btn.ghost,
+.sofer-wrap .sh-btn:not(.confirm):not(.resume),
+.sofer-wrap .back-btn {
+  border: 1.5px solid var(--sof-border);
+  color: #0f172a;
+  background: #fff;
+}
+.sofer-wrap .sofer-btn.ghost:active,
+.sofer-wrap .sh-btn:not(.confirm):not(.resume):active,
+.sofer-wrap .back-btn:active {
+  border-color: #64748b;
+  background: #f1f5f9;
+}
+.sofer-wrap .sofer-btn.primary,
+.sofer-wrap .sh-btn.confirm {
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  box-shadow: 0 8px 22px rgba(37,99,235,0.36);
+}
+.sofer-wrap .sh-btn.resume {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  box-shadow: 0 8px 22px rgba(22,163,74,0.34);
+}
+
+/* Fuvar-akciógombok: szimmetrikus gap + uniform padding-inline */
+.sofer-wrap .fuvar-actions {
+  gap: 10px;
+}
+.sofer-wrap .sh-btn {
+  padding: 12px 14px;
+  border-radius: 12px;
+}
+
+/* ── Fuvar-kártya részletek: erősebb szeparátorok + kontrasztos alcím ── */
+.sofer-wrap .fuvar-details {
+  border-top: 1.5px dashed var(--sof-border);
+  padding-top: 14px; margin-top: 14px;
+}
+.sofer-wrap .fd-sec-h {
+  color: #1d4ed8;               /* mélyebb kék, jobb ki-nézet a fehér card-on */
+}
+.sofer-wrap .fd-firma,
+.sofer-wrap .fd-val {
+  color: #0f172a;
+}
+.sofer-wrap .fd-copy {
+  border: 1.5px solid var(--sof-border);
+}
+.sofer-wrap .fuvar-num {
+  background: linear-gradient(180deg, #2563eb, #1d4ed8);   /* mélyebb kék pill */
+}
+
+/* Státusz-pilulák: erősebb keret, kontrasztos betű */
+.sofer-wrap .fuvar-status {
+  border-width: 1.5px;
+  font-weight: 800;
+}
+
+/* ── Állomás-idővonal — a done sor sötétebb szürke szöveggel ── */
+.sofer-wrap .fd-ms-row { color: #475569; }
+.sofer-wrap .fd-ms-row.done { color: #0f172a; }
+.sofer-wrap .fd-ms-time { color: #1d4ed8; }
+
+/* ── Havi mini-statisztika: szimmetrikus 4px gap + egységes belső ritmus ── */
+.sofer-wrap .sof-mstat-grid { gap: 6px; }
+.sofer-wrap .sof-mstat-val { color: #0f172a; }
+.sofer-wrap .sof-mstat-prev { color: #475569; font-weight: 600; }
+
+/* ── Sec-title (sticky) — vastagabb visszagomb + tömör árnyék ── */
+.sofer-wrap .back-btn {
+  border: 1.5px solid var(--sof-border);
+  box-shadow: 0 2px 6px rgba(15,23,42,0.08);
+}
+.sofer-wrap .sec-title h3 {
+  color: #0f172a;
+}
+
+/* ── Toast: vastagabb keret + kontrasztos színek ── */
+.toast-wrap .toast {
+  border: 1.5px solid var(--sof-border);
+  font-weight: 700;
+  color: #0f172a;
+}
+.toast-wrap .toast.ok  { border-color: #16a34a; color: #15803d; }
+.toast-wrap .toast.err { border-color: #dc2626; color: #b91c1c; }
+
+/* ── Modálok (dialogusok, picker-listák, konfirmok): egységes 1.5px keret ── */
+#sofConfirmModal .modal,
+#sofTimeModal .modal,
+#sofChoiceModal .modal,
+#wbConfirmModal .modal,
+#wbLocModal .modal,
+#orderPickerModal .modal,
+#receiptReviewModal .modal,
+#pendingAddModal .modal,
+#orphRangeModal .modal,
+#hoModal .modal,
+#bugModal .modal {
+  border: 1.5px solid #94a3b8;
+  box-shadow: 0 20px 55px rgba(15,23,42,0.28);
+}
+
+/* ── 🐛 FAB — kontrasztos keret, hogy fehér háttéren is jól látszik ── */
+#bugFab {
+  border: 1.5px solid #f59e0b;
+  box-shadow: 0 10px 24px rgba(245,158,11,0.30), 0 2px 6px rgba(15,23,42,0.14);
+}
+
+/* ── PTR pill — vastagabb, olvashatóbb ── */
+.sof-ptr { border-width: 1.5px !important; font-weight: 700 !important; }
+
+/* ── Kiosztott üres állapot — kicsit sötétebb, hogy ne olvadjon a háttérbe ── */
+.sofer-wrap .kiosztott-empty { color: #475569; }
+.sofer-wrap .fuvar-meta { color: #475569; }
+.sofer-wrap .fuvar-expand { color: #475569; }
+
+/* ── Összegző pill-ek a menetlevél step2-ben: uniform padding ── */
+.sofer-wrap #fuvarStep2 .punct-sum-city { color: #0f172a; }
+.sofer-wrap #fuvarStep2 .punct-sum-date { color: #334155; }
+.sofer-wrap #fuvarStep2 .punct-sum-idx { background: #1d4ed8; }
+.sofer-wrap #fuvarStep2 .punct-sum-edit {
+  border-color: #1d4ed8; color: #1e3a8a;
+}
+.sofer-wrap #fuvarStep2 .punct-sum-del {
+  border-color: #dc2626; color: #991b1b;
+}
+
