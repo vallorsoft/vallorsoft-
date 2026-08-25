@@ -5,7 +5,7 @@
 //  felülettel identikus stílusú, saját state-tel, semmi nem megy
 //  a szerverre. Ez a teszt biztosítja, hogy:
 //    - a route auth mögött van (Sofer/Admin/Manager)
-//    - az oldal HTML-je 12 wizard-lépést tartalmaz
+//    - az oldal HTML-je 13 wizard-lépést tartalmaz
 //    - a mock felület állapotgépe hibamentesen bootol (VM-ben)
 // ============================================================
 const fs = require('fs');
@@ -40,11 +40,12 @@ describe('/sofer-demo — sofőr DEMÓ sandbox oldal', () => {
     expect(HTML_SRC).toMatch(/window\.location\.href\s*=\s*'\/sofer'/);
   });
 
-  test('a 12 wizard-lépés (STEPS) mind definiálva van', () => {
-    // A STEPS tömb 12 elemű, minden lépéshez tartozik title/body/hint kulcs.
-    for (var i = 0; i < 12; i++) {
-      expect(HTML_SRC).toMatch(new RegExp('dm\\.g\\.s' + i + '\\.title'));
-      expect(HTML_SRC).toMatch(new RegExp('dm\\.g\\.s' + i + '\\.body'));
+  test('a 13 wizard-lépés (STEPS) mind definiálva van', () => {
+    // A STEPS tömb 13 elemű (12 → 13-ra bővült a menetlevél-mezők bemutató lépéssel),
+    // minden lépéshez tartozik title/body/hint kulcs.
+    for (var i = 0; i < 13; i++) {
+      expect(HTML_SRC).toMatch(new RegExp('demo\\.g\\.s' + i + '\\.title'));
+      expect(HTML_SRC).toMatch(new RegExp('demo\\.g\\.s' + i + '\\.body'));
     }
     // Interakciós scene-ek (waitAction jelöltek): openCard, stopBtn, borderTap, waybillCreate
     expect(HTML_SRC).toMatch(/waitAction:\s*true/);

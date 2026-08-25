@@ -14,6 +14,54 @@
 
 ---
 
+## 2026-08-25 — Sofőr DEMÓ FIX: a `data-i18n` kulcsok most tényleg megjelennek (kulcs-ütközés + regisztráció-hiány)
+
+### Miért
+Az előző kör (PR #353) után a sofőr még mindig nyers kulcs-neveket látott a mockupban (`dm.mock.allocated`, `dm.badge`, `dm.brandNote` stb.), és a bemutató kilépés-gombján „Teljes nézet" jelent meg. Két gyökér-ok:
+1. **Kulcs-ütközés**: a `dm.*` prefix már foglalt volt az i18n.js közös DICT-jében (`dm.enter=Sofőr mód`, `dm.exit=Teljes nézet` a driver-mode togglenek) — a demo `dm.exit=← Ieșire` felülíródott az `Teljes nézet`-re.
+2. **Regisztráció-hiány**: az inline `_DM_FALLBACK` szótár csak a wizard-panel `_t()` függvényén át élt; az `i18n.js` `applyI18n()` a `[data-i18n]` attribútumokat a KÖZÖS `DICT`-ből olvasta — ahol a `dm.mock.*` / `dm.badge` kulcsok NEM léteztek → nyers kulcs jelent meg minden mockup-elemen.
+
+### Mit
+1. **`public/sofer-demo.html`** — mind a 261 `dm.*` előfordulás átnevezve `demo.*`-ra (261 sorban) `sed`-del: `dm.mock.*` → `demo.mock.*`, `dm.g.*` → `demo.g.*`, `dm.guide.*` → `demo.guide.*`, `dm.badge`/`dm.brandNote`/`dm.exit` → `demo.*`. A `dm.enter`/`dm.exit` (driver-mode toggle) az i18n.js-ben érintetlen.
+2. **Új `DEMO_DICT` (RO + HU)** — 138 kulcs, mind a mockup, mind a wizard-panel; a valós Romanian felirat + magyar párja. A régi RO-only fallback szótár helyett most nyelvváltásra is helyesen reagál.
+3. **Regisztráció az `i18n.js` közös DICT-jébe** — az inline script tetején (SZINKRON, még a DOMContentLoaded ELŐTT — mert az inline script a body VÉGÉN van, tehát parse-time során fut, mielőtt `i18n.js` `boot()`-ja az `applyI18n(document)`-tel elkezdi olvasni a `[data-i18n]`-eket). `Object.keys(DEMO_DICT).forEach(function(k){ window.I18N.dict[k] = DEMO_DICT[k]; });`
+4. **`window._DM_FALLBACK`** most a `DEMO_DICT.ro` értékekből derivált (a HU-t a valós i18n intézi) — az inline `_t()` biztonsági fallback marad, ha az `i18n.js` valamiért nem érné el.
+5. **~150 sor holt kód törölve** (a régi RO-only fallback szótár, ami mostantól redundáns).
+6. **`tests/integration/sofer-demo-page.test.js`** — a 13 wizard-lépés elvárás `dm.g.s*` → `demo.g.s*`-ra frissítve. **5/5 teszt zöld.**
+
+Cache-bust: `i18n.js?v=20260825demofix`. **981 Jest zöld** (nincs regresszió). Csak a `/sofer-demo` oldalt érinti.
+
+---
+
+## 2026-08-25 — Sofőr DEMÓ: a nevek/mezők a valós felülethez igazítva + realista menetlevél-mockup
+
+### Miért
+Sofőr visszajelzés a `/sofer-demo` sandbox oldalról: (1) a nav-gombok feliratai kevertek a valódival („Frontieră" a demóban vs. „Trecere frontieră" élesben; „Foaie parcurs" vs. „Foaie de parcurs"; „Documente" vs. „Documente / CMR"); (2) a fuvar-kártya a mockupban a MEGBÍZÓ nevét („Client: DEMO Client SRL") mutatta — de a valós `renderFuvarCard` szándékosan SEHOL nem jeleníti meg a `o.client`-et (kommentbe rögzítve); (3) a menetlevél-bemutató 3 mezőre redukálva (Km început, Km sfârșit, Alte mențiuni) — az éles menetlevél viszont 8 szekcióval fut: vontató+pótkocsi rendszám, km-óra + GPS gomb, Timpi cursă (automat), Treceri frontieră (automat + diurna), Puncte de traseu (Plecare/Încărcare/Descărcare/Sosire típusokkal), Stare combustibil + GPS, Alimentări, Achiziții, Alte mențiuni. A sofőr tehát belépéskor teljesen mást lát, mint amit a demóban gyakorolt.
+
+### Mit
+
+1. **`public/sofer-demo.html` (~910 sor) teljes újraírás** — a mockup mind a nav-gombok, mind a fuvar-kártya, mind a menetlevél-kitöltő a valós Romanian felirat + szerkezet szerint épül fel.
+2. **Nav-gomb feliratok szinkronizálva** a valós `sofer.navBorder=Trecere frontieră` / `sofer.navWaybill=Foaie de parcurs` / `sofer.navDocs=Documente / CMR` (RO) i18n kulcsokkal — a `dm.mock.nav*` fallback szótár is frissítve.
+3. **Fuvar-kártya realista szerkezete**: (a) fejléc: `#1 badge + 📅 azi · 📍 Cluj-Napoca` + `↓ 📅 mâine · 📍 București` (matches valós `_cityOf` + kettős fel-/lerakás sor), (b) kinyíló panel: `🚛` rendszám sor + `⚖️` súly+FTL, majd KÜLÖN `⬆️ Încărcare` és `⬇️ Descărcare` szekció (mint a valós `.p-fd-sec-h` + `.p-fd-sec-b`) — Firmă / Adresă / Dată mezőkkel. **A megbízó (`o.client`) neve SEHOL nem jelenik meg** (megfelel a valós renderFuvarCard komment-rögzített szabálynak). (c) az állomás-idővonal (📍→📦→📍→✅) és az `⛔ Predare marfă` gomb is ott van, mint élesben.
+4. **„Nekem kiosztott jármű" kártya** hozzáadva a scene tetejére (mint a valós `#myVehicleBox`) — vontató + pótkocsi rendszám monospace formában.
+5. **Menetlevél STEP 2 teljes újraírás** — a mockup pontosan a valós `sofer.html` `#fuvarStep2` szerkezetét tükrözi:
+   - Kiválasztott fuvarok összesítő sáv + „✏️ Gestionare curse" gomb
+   - Vontató+pótkocsi rendszám (Număr camion / remorcă)
+   - Km început / sfârșit (📍 GPS mező-ikon)
+   - „🕐 Timpi cursă (automat)" info-doboz
+   - „🛂 Treceri frontieră (automat)" + diurna-példa doboz
+   - „📍 Puncte de traseu" — 4 példa-sor típus-badge-ekkel (`Plecare` kék / `Încărcare` zöld / `Descărcare` piros / `Sosire` lila) + `➕ Adaugă punct` gomb
+   - „🛢 Stare combustibil" — Cantitate început/sfârșit (⛽ GPS gomb)
+   - „⛽ Alimentări" — példa-sor (MOL Cluj · 150 L · Card flotă · 900 RON) + `➕ Adaugă alimentare` + `📷 Scanare bon (AI)` gomb
+   - „🛒 Achiziții" — példa-sor (Kaufland · Apă · Numerar · 45 RON) + add + scan
+   - „Alte mențiuni" textarea + „💡 Salvare automată" hint
+6. **Wizard 12 → 13 lépés** — új `dm.g.s8` lépés a menetlevél MEZŐINEK bemutatására: „Ce câmpuri sunt pe foaia de parcurs" — végigmutatja a scene-en, mit lát a sofőr, és bátorítja, hogy próbáljon rá minden szekcióra (mind kattintható a mockupban). A régi lépések 8-11 → 9-12-re csúsztak.
+7. **`tests/integration/sofer-demo-page.test.js`** — a „12 wizard-lépés" elvárás → „13"-ra; a for-loop `i < 12` → `i < 13`. **5/5 teszt zöld.**
+
+Cache-bust: `sofer-demo.html` inline `i18n.js?v=20260825demo`. Nincs séma-változás, nincs új szerver-handler, nincs új i18n kulcs (a `_DM_FALLBACK` szótár tartalmazza az összes új demo-feliratot). **Csak a `/sofer-demo` oldalt érinti** — a valós `/sofer` felület érintetlen.
+
+---
+
 ## 2026-08-24 — Wizard: nav-gomb közvetlen a nyitott card alá + kontraszt-javítás (chip / step-bar / stop-bar / .ocr-legs)
 
 ### Miért
