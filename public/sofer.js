@@ -4012,11 +4012,12 @@ function loadMyAssignedVehicle() {
     if (!box) return;
     if (!_myAssignedVehicle || !_myAssignedVehicle.rendszam_camion) { box.style.display = 'none'; return; }
     var v = _myAssignedVehicle;
-    var brand = v.marca ? esc(v.marca) + (v.model ? ' ' + esc(v.model) : '') : '';
-    // Új szerkezet: strukturált 2-soros kártya (vontató + pótkocsi külön sorban),
-    // uniform 24px ikon-oszloppal — így a plate + brand vízszintesen igazodik.
-    // A CSS a `.sofer-wrap #myVehicleBox` szabályokból jön (keret, shadow), a
-    // belső szerkezetnek `.mv-*` osztályokat adunk (nincs inline stílus-halmozás).
+    // A márka-mező helyére a jármű-kártya jobb szélére egy kis Online/Offline
+    // állapot-pirula kerül (`#myVehStatusBtn`). Alapból zöld „Online"; háttérben
+    // ping-eli a szervert (`_vehStatusStart`) és `online`/`offline` eseményekre
+    // is reagál. Ha offline, koppintásra ellenőriz + frissíti az adatokat
+    // (loadDash/loadMini/loadMyAssignedVehicle) → NEM kell újralépni belépéssel,
+    // mint eddig, hogy élő adatot lássunk. A CSS `.mv-status-btn`-nel.
     var trailerRow = v.rendszam_remorca
       ? '<div class="mv-row"><span class="mv-ico">🚛</span><span class="mv-plate">' + esc(v.rendszam_remorca) + '</span></div>'
       : '';
@@ -4026,7 +4027,11 @@ function loadMyAssignedVehicle() {
         '<div class="mv-row">' +
           '<span class="mv-ico">🚚</span>' +
           '<span class="mv-plate">' + esc(v.rendszam_camion) + '</span>' +
-          (brand ? '<span class="mv-brand">' + brand + '</span>' : '') +
+          '<button type="button" id="myVehStatusBtn" class="mv-status-btn is-online" ' +
+            'onclick="vehStatusClick()" aria-label="' + esc(t('sof.stateOnline')) + '">' +
+            '<span class="mv-status-dot"></span>' +
+            '<span class="mv-status-txt">' + esc(t('sof.stateOnline')) + '</span>' +
+          '</button>' +
         '</div>' +
         trailerRow +
       '</div>';
@@ -4034,8 +4039,108 @@ function loadMyAssignedVehicle() {
     // Élő akku-feszültség lekérése háttérben (best-effort — a kártya már látszik).
     // A CargoTrack eszközfüggően adja vissza; ha nincs, csendben elmarad.
     _loadMyVehicleBattery(v.rendszam_camion);
+    // Élő állapot-figyelő indítása (idempotens — csak első alkalommal indít).
+    if (typeof _vehStatusStart === 'function') { try { _vehStatusStart(); } catch(e) {} }
   }).catch(function() {});
 }
+
+// ─── Online/Offline állapot-pirula a jármű-kártyán ──────────────────
+// A `#myVehStatusBtn` gomb (a márka-mező helyén) mutatja, hogy a kliens
+// tudja-e érni a szervert. Alapból zöld „Online"; háttér-ping (45 mp),
+// `online`/`offline` böngésző-események, és a visibilitychange (tab-vissza)
+// együtt frissítik. Offline állapotban koppintás → azonnali ping;
+// ha megvan a szerver, visszavált Online-ra ÉS frissíti a főoldali adatokat
+// (loadDashOrders + loadSoferMiniStats + loadMyAssignedVehicle) → a sofőr
+// azonnal élő adatot lát, NEM kell kijelentkezni + belépni.
+var _vehStatusState = 'online';        // 'online' | 'offline' | 'checking'
+var _vehStatusTimer = null;
+var _vehStatusStarted = false;
+var _vehStatusLastPingAt = 0;
+
+function _vehStatusPaint() {
+  var btn = document.getElementById('myVehStatusBtn');
+  if (!btn) return;
+  var txt = btn.querySelector('.mv-status-txt');
+  btn.classList.remove('is-online', 'is-offline', 'is-checking');
+  var key;
+  if (_vehStatusState === 'offline')      { btn.classList.add('is-offline');  key = 'sof.stateOffline'; }
+  else if (_vehStatusState === 'checking'){ btn.classList.add('is-checking'); key = 'sof.stateChecking'; }
+  else                                    { btn.classList.add('is-online');   key = 'sof.stateOnline'; }
+  var label = t(key);
+  if (txt) txt.textContent = label;
+  btn.setAttribute('aria-label', label);
+}
+
+function _vehStatusSet(state) {
+  if (_vehStatusState === state) return;
+  _vehStatusState = state;
+  _vehStatusPaint();
+}
+
+// Könnyű ping a szerverhez. A `/healthz` auth nélküli, gyors végpont
+// (routes/health.js). AbortController-rel 6 mp-es timeout — mobil-hálón
+// a fetch némán tudna „lógni". `cache:'no-store'` — CDN/SW ne adja vissza
+// stale-ből OK-t.
+function _vehStatusPing(cb) {
+  var now = Date.now();
+  _vehStatusLastPingAt = now;
+  var ctrl = null;
+  var to = null;
+  try { ctrl = new AbortController(); to = setTimeout(function(){ try { ctrl.abort(); } catch(e){} }, 6000); } catch(e) {}
+  fetch('/healthz', { method: 'GET', cache: 'no-store', credentials: 'same-origin', signal: ctrl ? ctrl.signal : undefined })
+    .then(function(r) { if (to) clearTimeout(to); if (typeof cb === 'function') cb(!!(r && r.ok)); })
+    .catch(function()  { if (to) clearTimeout(to); if (typeof cb === 'function') cb(false); });
+}
+
+function _vehStatusStart() {
+  if (_vehStatusStarted) return;
+  _vehStatusStarted = true;
+  // Böngésző-események: azonnali reakció offline/online váltásra.
+  try {
+    window.addEventListener('offline', function() { _vehStatusSet('offline'); });
+    window.addEventListener('online',  function() { _vehStatusPing(function(ok){ _vehStatusSet(ok ? 'online' : 'offline'); }); });
+  } catch(e) {}
+  // Első ping ~5 mp múlva (az oldal induláskor amúgy is fetch-el; ne torlódjon).
+  setTimeout(function() {
+    if (navigator && navigator.onLine === false) { _vehStatusSet('offline'); return; }
+    _vehStatusPing(function(ok){ _vehStatusSet(ok ? 'online' : 'offline'); });
+  }, 5000);
+  // Rendszeres ping 45 mp-enként — a márka-mező helyén ülő pirula így
+  // magától mutatja a valós állapotot, nem várunk explicit felhasználói
+  // interakcióra. Ha a lap háttérben van (document.hidden), kihagyjuk
+  // (kímélet + a mobil OS amúgy is throttolná).
+  _vehStatusTimer = setInterval(function() {
+    if (document && document.hidden) return;
+    if (navigator && navigator.onLine === false) { _vehStatusSet('offline'); return; }
+    _vehStatusPing(function(ok){ _vehStatusSet(ok ? 'online' : 'offline'); });
+  }, 45000);
+}
+
+// Koppintás a pirulára — offline-ban ellenőriz és frissít; online-ban is
+// kézi frissítést indít (a sofőr azt jelzi, „most akarok friss adatot").
+function vehStatusClick() {
+  // Debounce — 2 mp-en belül a második koppintás ne lőjön újabb ping-et.
+  if (Date.now() - _vehStatusLastPingAt < 2000) return;
+  _vehStatusSet('checking');
+  _vehStatusPing(function(ok) {
+    _vehStatusSet(ok ? 'online' : 'offline');
+    if (ok) {
+      // A szerver él → azonnal frissítjük a főoldali kártyákat, hogy a sofőr
+      // élő adatot lásson (a stale kliens-cache — pl. `_soferOrdersCache` —
+      // felülíródik a friss szerver-válasszal). A `sec-dash`-en lévő elemek
+      // szimpla `try/catch`-ban, mert ha nincs valamelyik, ne akadjon meg.
+      try { if (typeof loadDashOrders === 'function') loadDashOrders(); } catch(e) {}
+      try { if (typeof loadSoferMiniStats === 'function') loadSoferMiniStats(); } catch(e) {}
+      try { if (typeof loadMyAssignedVehicle === 'function') loadMyAssignedVehicle(); } catch(e) {}
+      try { if (typeof renderPendingReceipts === 'function') renderPendingReceipts(); } catch(e) {}
+      try { if (typeof toast === 'function') toast(t('sof.refreshed'), 'ok'); } catch(e) {}
+    } else {
+      try { if (typeof toast === 'function') toast(t('sof.stateOfflineHint'), 'warn'); } catch(e) {}
+    }
+  });
+}
+// Publikálás inline `onclick`-hez (a HTML-ben `vehStatusClick()` hívjuk).
+try { window.vehStatusClick = vehStatusClick; } catch(e) {}
 
 // ─── Élő akku-feszültség a jármű-kártyához ──────────────────────
 // A `getCurrentGpsReadings` handler visszaadja a jármű-akku V értékét
