@@ -1884,8 +1884,19 @@
 }
 .sofer-wrap #fuvarStep2 .textarea { min-height: 64px; }
 
-/* ── 2-oszlopos rács szorosabb réssel ── */
-#fuvarStep2 .g2 { gap: 8px; }
+/* ── 2-oszlopos rács szorosabb réssel — telefonon IS 2 oszlop ──
+   A közös style.css a max-width:600px-nél `.g2 { grid-template-columns:1fr
+   !important }` szabállyal a rácsot egy oszlopra tömörítené, de a demón a
+   Vontató/Pótkocsi/Kezdő km/Záró km MINDIG egymás mellett van — így a
+   valós felület is szorosan olvasható marad. */
+#fuvarStep2 .g2,
+#fuvarStep1 .g2 {
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px;
+}
+#fuvarStep2 .dyn-row .g2 {
+  grid-template-columns: 1fr 1fr !important;
+}
 
 /* ── Szekció-fejléc: letisztult (fekete tinta, halkabb elválasztó) ── */
 .sofer-wrap #fuvarStep2 .section-head,
@@ -1963,13 +1974,15 @@
   color: #1e293b !important;
 }
 
-/* ── „Fuvarok kezelése" gomb — kompaktabb ── */
+/* ── „Fuvarok kezelése" gomb — kompakt, KÖZÉPRE (nem tölti a teljes sort) ── */
 .sofer-wrap #fuvarStep2 .submit-btn.wb-manage {
-  padding: 10px 14px;
+  padding: 10px 18px;
   font-size: 13px;
-  margin-bottom: 10px;
+  margin: 0 auto 10px;
   width: auto;
+  min-width: 220px;
   min-height: 40px;
+  display: block;
 }
 
 /* ── Dinamikus sorok (punct / alim / ach): arányos kártya ── */
