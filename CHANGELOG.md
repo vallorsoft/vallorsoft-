@@ -14,6 +14,35 @@
 
 ---
 
+## 2026-08-25 — Sofőr DEMÓ: a nevek/mezők a valós felülethez igazítva + realista menetlevél-mockup
+
+### Miért
+Sofőr visszajelzés a `/sofer-demo` sandbox oldalról: (1) a nav-gombok feliratai kevertek a valódival („Frontieră" a demóban vs. „Trecere frontieră" élesben; „Foaie parcurs" vs. „Foaie de parcurs"; „Documente" vs. „Documente / CMR"); (2) a fuvar-kártya a mockupban a MEGBÍZÓ nevét („Client: DEMO Client SRL") mutatta — de a valós `renderFuvarCard` szándékosan SEHOL nem jeleníti meg a `o.client`-et (kommentbe rögzítve); (3) a menetlevél-bemutató 3 mezőre redukálva (Km început, Km sfârșit, Alte mențiuni) — az éles menetlevél viszont 8 szekcióval fut: vontató+pótkocsi rendszám, km-óra + GPS gomb, Timpi cursă (automat), Treceri frontieră (automat + diurna), Puncte de traseu (Plecare/Încărcare/Descărcare/Sosire típusokkal), Stare combustibil + GPS, Alimentări, Achiziții, Alte mențiuni. A sofőr tehát belépéskor teljesen mást lát, mint amit a demóban gyakorolt.
+
+### Mit
+
+1. **`public/sofer-demo.html` (~910 sor) teljes újraírás** — a mockup mind a nav-gombok, mind a fuvar-kártya, mind a menetlevél-kitöltő a valós Romanian felirat + szerkezet szerint épül fel.
+2. **Nav-gomb feliratok szinkronizálva** a valós `sofer.navBorder=Trecere frontieră` / `sofer.navWaybill=Foaie de parcurs` / `sofer.navDocs=Documente / CMR` (RO) i18n kulcsokkal — a `dm.mock.nav*` fallback szótár is frissítve.
+3. **Fuvar-kártya realista szerkezete**: (a) fejléc: `#1 badge + 📅 azi · 📍 Cluj-Napoca` + `↓ 📅 mâine · 📍 București` (matches valós `_cityOf` + kettős fel-/lerakás sor), (b) kinyíló panel: `🚛` rendszám sor + `⚖️` súly+FTL, majd KÜLÖN `⬆️ Încărcare` és `⬇️ Descărcare` szekció (mint a valós `.p-fd-sec-h` + `.p-fd-sec-b`) — Firmă / Adresă / Dată mezőkkel. **A megbízó (`o.client`) neve SEHOL nem jelenik meg** (megfelel a valós renderFuvarCard komment-rögzített szabálynak). (c) az állomás-idővonal (📍→📦→📍→✅) és az `⛔ Predare marfă` gomb is ott van, mint élesben.
+4. **„Nekem kiosztott jármű" kártya** hozzáadva a scene tetejére (mint a valós `#myVehicleBox`) — vontató + pótkocsi rendszám monospace formában.
+5. **Menetlevél STEP 2 teljes újraírás** — a mockup pontosan a valós `sofer.html` `#fuvarStep2` szerkezetét tükrözi:
+   - Kiválasztott fuvarok összesítő sáv + „✏️ Gestionare curse" gomb
+   - Vontató+pótkocsi rendszám (Număr camion / remorcă)
+   - Km început / sfârșit (📍 GPS mező-ikon)
+   - „🕐 Timpi cursă (automat)" info-doboz
+   - „🛂 Treceri frontieră (automat)" + diurna-példa doboz
+   - „📍 Puncte de traseu" — 4 példa-sor típus-badge-ekkel (`Plecare` kék / `Încărcare` zöld / `Descărcare` piros / `Sosire` lila) + `➕ Adaugă punct` gomb
+   - „🛢 Stare combustibil" — Cantitate început/sfârșit (⛽ GPS gomb)
+   - „⛽ Alimentări" — példa-sor (MOL Cluj · 150 L · Card flotă · 900 RON) + `➕ Adaugă alimentare` + `📷 Scanare bon (AI)` gomb
+   - „🛒 Achiziții" — példa-sor (Kaufland · Apă · Numerar · 45 RON) + add + scan
+   - „Alte mențiuni" textarea + „💡 Salvare automată" hint
+6. **Wizard 12 → 13 lépés** — új `dm.g.s8` lépés a menetlevél MEZŐINEK bemutatására: „Ce câmpuri sunt pe foaia de parcurs" — végigmutatja a scene-en, mit lát a sofőr, és bátorítja, hogy próbáljon rá minden szekcióra (mind kattintható a mockupban). A régi lépések 8-11 → 9-12-re csúsztak.
+7. **`tests/integration/sofer-demo-page.test.js`** — a „12 wizard-lépés" elvárás → „13"-ra; a for-loop `i < 12` → `i < 13`. **5/5 teszt zöld.**
+
+Cache-bust: `sofer-demo.html` inline `i18n.js?v=20260825demo`. Nincs séma-változás, nincs új szerver-handler, nincs új i18n kulcs (a `_DM_FALLBACK` szótár tartalmazza az összes új demo-feliratot). **Csak a `/sofer-demo` oldalt érinti** — a valós `/sofer` felület érintetlen.
+
+---
+
 ## 2026-08-24 — Wizard: nav-gomb közvetlen a nyitott card alá + kontraszt-javítás (chip / step-bar / stop-bar / .ocr-legs)
 
 ### Miért

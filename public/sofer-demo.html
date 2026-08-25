@@ -3,22 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>VallorSoft — DEMÓ / Ghid interactiv</title>
+  <title>VallorSoft — DEMO / Ghid interactiv</title>
   <meta name="theme-color" content="#0a0f15">
-  <script src="/i18n.js?v=20260824demo"></script>
+  <script src="/i18n.js?v=20260825demo"></script>
   <style>
     /* ────────────────────────────────────────────────────────────────
        SOFŐR DEMÓ — önálló, standalone sandbox.
        - Nincs backend-hívás; minden lokális state-ben él (in-memory).
        - Sofőr-módú stílus, telefon-mockup a képernyő közepén.
-       - 12 interaktív scene — a sofőr TÉNYLEG végigkoppintja.
+       - A telefon-mockup és a menetlevél-mockup PONTOSAN a valós
+         felület mezőit / feliratait tükrözi (matches sofer.html +
+         renderFuvarCard). A card SOSEM mutatja a megbízó nevét — mint
+         a valós felület — és a menetlevél kitöltő ugyanazokat a
+         mezőket kínálja mint az éles (puncte, cantitate, alimentări,
+         achiziții, alte mențiuni).
        ──────────────────────────────────────────────────────────────── */
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; font-family: 'Inter', -apple-system, Segoe UI, Roboto, sans-serif;
       background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%); color: #0f172a; min-height: 100vh; }
     a { color: inherit; text-decoration: none; }
 
-    /* ─── Felső DEMÓ-sáv ─── */
+    /* ─── Felső DEMO-sáv ─── */
     .demo-topbar { position: sticky; top: 0; z-index: 100;
       background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #1e293b;
       padding: 10px 16px; display: flex; align-items: center; justify-content: space-between;
@@ -41,10 +46,10 @@
     .phone { position: sticky; top: 70px; background: #0f172a; border-radius: 36px;
       padding: 14px; box-shadow: 0 30px 60px rgba(15,23,42,0.35), 0 0 0 8px rgba(15,23,42,0.08);
       max-width: 400px; margin: 0 auto; }
-    @media (max-width: 900px) { .phone { position: relative; top: 0; max-width: 320px; } }
-    .phone-screen { background: #f8fafc; border-radius: 24px; overflow: hidden; min-height: 620px;
+    @media (max-width: 900px) { .phone { position: relative; top: 0; max-width: 340px; } }
+    .phone-screen { background: #f8fafc; border-radius: 24px; overflow: hidden; min-height: 680px;
       display: flex; flex-direction: column; }
-    @media (max-width: 480px) { .phone-screen { min-height: 560px; } }
+    @media (max-width: 480px) { .phone-screen { min-height: 620px; } }
 
     /* ─── Telefon-fejléc (sofőr mód mása) ─── */
     .p-header { padding: 12px 14px; display: flex; align-items: center; justify-content: space-between;
@@ -58,7 +63,15 @@
     .p-section { display: none; }
     .p-section.active { display: block; }
 
-    /* Fuvar-kártya (mock) */
+    /* Nekem kiosztott jármű box (mint a valós #myVehicleBox) */
+    .p-veh-box { background: linear-gradient(135deg,#eff6ff,#e0e7ff);
+      border: 1px solid #c7d2fe; border-radius: 12px; padding: 10px 12px;
+      font-size: 12px; color: #1e293b; margin-bottom: 10px; }
+    .p-veh-box .veh-title { font-size: 10.5px; color: #4f46e5; font-weight: 700;
+      letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 3px; }
+    .p-veh-box .veh-plates { font-weight: 700; }
+
+    /* Fuvar-kártya (mock — a renderFuvarCard szerkezetét tükrözi) */
     .p-fuvar-title { font-size: 12px; font-weight: 800; color: #64748b; letter-spacing: 0.4px;
       margin: 4px 0 8px; display: flex; align-items: center; gap: 6px; }
     .p-fuvar-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; margin-bottom: 10px;
@@ -71,19 +84,30 @@
     .p-fuvar-head-txt { flex: 1; min-width: 0; }
     .p-fuvar-head-txt .num { display: inline-block; background: #eff6ff; color: #1d4ed8;
       font-weight: 800; font-size: 11px; padding: 2px 7px; border-radius: 99px; margin-right: 6px; }
-    .p-fuvar-head-txt .route { font-size: 12px; color: #0f172a; margin-top: 4px; }
+    .p-fuvar-head-txt .head-pick { font-size: 12.5px; color: #0f172a; font-weight: 600; }
+    .p-fuvar-head-txt .head-drop { font-size: 12.5px; color: #334155; margin-top: 3px; }
     .p-fuvar-expand { color: #94a3b8; font-size: 16px; transition: transform 0.2s; }
     .p-fuvar-card.open .p-fuvar-expand { transform: rotate(90deg); }
     .p-fuvar-details { display: none; padding: 0 12px 12px; border-top: 1px solid #f1f5f9; }
     .p-fuvar-card.open .p-fuvar-details { display: block; padding-top: 10px; }
     .p-fuvar-details .row { display: flex; align-items: center; gap: 6px; font-size: 12px;
       color: #334155; margin: 4px 0; }
-    .p-fuvar-details .row .icon { color: #94a3b8; }
-    .p-stops { margin-top: 10px; }
-    .p-stop { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; }
-    .p-stop.done { color: #16a34a; text-decoration: line-through; }
+    .p-fuvar-details .row .icon { color: #94a3b8; min-width: 16px; }
+
+    /* Fel-/lerakás blokk (mint a valós fd-sec) */
+    .p-fd-sec { border: 1px solid #e2e8f0; border-radius: 10px; margin-top: 8px; overflow: hidden; }
+    .p-fd-sec-h { padding: 8px 10px; background: #f8fafc; font-size: 11.5px; font-weight: 700;
+      color: #475569; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 6px; }
+    .p-fd-sec-b { padding: 8px 10px; font-size: 12px; color: #0f172a; }
+    .p-fd-sec-b .fd-lbl { color: #64748b; font-size: 11px; margin-right: 4px; }
+
+    /* Állomás-idővonal */
+    .p-stops { margin-top: 10px; background: #f8fafc; border-radius: 8px; padding: 8px 10px; }
+    .p-stop { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12px; }
+    .p-stop.done { color: #16a34a; }
     .p-stop-mark { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center;
-      justify-content: center; font-size: 10px; background: #f1f5f9; color: #94a3b8; flex-shrink: 0; }
+      justify-content: center; font-size: 10px; background: #f1f5f9; color: #94a3b8; flex-shrink: 0;
+      font-weight: 700; }
     .p-stop.done .p-stop-mark { background: #dcfce7; color: #16a34a; }
     .p-stop.now .p-stop-mark { background: #dbeafe; color: #1d4ed8; animation: pulse-blue 1.4s ease-in-out infinite; }
     @keyframes pulse-blue { 0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.4); }
@@ -102,10 +126,13 @@
       box-shadow: 0 8px 18px rgba(22,163,74,0.32); }
     .p-btn.warn { background: linear-gradient(135deg,#f59e0b,#d97706); color: #fff;
       box-shadow: 0 8px 18px rgba(245,158,11,0.30); }
+    .p-btn.ho { background: linear-gradient(135deg,#c026d3,#a21caf); color: #fff;
+      box-shadow: 0 8px 18px rgba(162,28,175,0.32); font-size: 12.5px; padding: 10px; }
     .p-btn.ro-in { background: linear-gradient(135deg,#3b82f6,#1d4ed8); color: #fff;
       box-shadow: 0 8px 18px rgba(29,78,216,0.35); font-size: 15px; padding: 16px; }
     .p-btn.ro-out { background: linear-gradient(135deg,#f59e0b,#c2410c); color: #fff;
       box-shadow: 0 8px 18px rgba(194,65,12,0.32); font-size: 15px; padding: 16px; }
+    .p-btn.small { padding: 8px 12px; font-size: 12px; }
     .p-btn.disabled { opacity: 0.5; cursor: not-allowed; }
 
     /* Nav grid */
@@ -126,12 +153,49 @@
       transform 0.25s ease; pointer-events: none; z-index: 50; max-width: 85%; text-align: center; }
     .p-toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    /* Menetlevél / iratok mock mezők */
+    /* Menetlevél mezők (mint a valós .field .input) */
     .p-field { margin-bottom: 10px; }
-    .p-field label { display: block; font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 4px; }
-    .p-field input { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
-      font-size: 14px; font-family: inherit; background: #fff; color: #0f172a; }
-    .p-field input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+    .p-field label { display: block; font-size: 11.5px; font-weight: 700; color: #64748b; margin-bottom: 4px; }
+    .p-field .input, .p-field input, .p-field select, .p-field textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+      font-size: 13.5px; font-family: inherit; background: #fff; color: #0f172a; }
+    .p-field input:focus, .p-field select:focus, .p-field textarea:focus {
+      outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+    .p-g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .p-section-head { font-size: 13px; font-weight: 800; color: #0f172a; margin: 14px 0 8px;
+      display: flex; align-items: center; gap: 6px; }
+    .p-hint { font-size: 11px; color: #64748b; padding: 8px 10px; border-radius: 8px;
+      background: rgba(99,102,241,0.08); border: 1px dashed rgba(99,102,241,0.35); margin: 4px 0 10px; }
+    .p-hint.info { background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.30); color: #075985; }
+    .p-diurna { padding: 8px 10px; border-radius: 8px; background: #fefce8; border: 1px dashed #fde047;
+      font-size: 11.5px; color: #713f12; margin: 4px 0 10px; }
+
+    /* GPS mező-ikon (mint a .gps-input-row) */
+    .p-gps-row { display: flex; gap: 6px; align-items: stretch; }
+    .p-gps-row input { flex: 1; }
+    .p-gps-btn { padding: 0 12px; border-radius: 8px; border: 1px solid #86efac;
+      background: linear-gradient(135deg,#dcfce7,#bbf7d0); color: #14532d;
+      font-size: 12px; font-weight: 700; cursor: pointer; }
+
+    /* Puncte de traseu / Alimentări / Achiziții — sor */
+    .p-row-block { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; background: #fff;
+      margin-bottom: 6px; font-size: 12px; }
+    .p-row-block .rb-head { font-weight: 700; color: #1e293b; margin-bottom: 4px; font-size: 12px;
+      display: flex; align-items: center; justify-content: space-between; }
+    .p-row-block .rb-tag { display: inline-block; padding: 2px 7px; border-radius: 99px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.3px; }
+    .p-row-block .rb-tag.plecare { background: #dbeafe; color: #1d4ed8; }
+    .p-row-block .rb-tag.inc     { background: #dcfce7; color: #15803d; }
+    .p-row-block .rb-tag.desc    { background: #fee2e2; color: #b91c1c; }
+    .p-row-block .rb-tag.sosire  { background: #ede9fe; color: #6d28d9; }
+    .p-row-block .rb-tag.fuel    { background: #fef3c7; color: #92400e; }
+    .p-row-block .rb-tag.purch   { background: #fce7f3; color: #9d174d; }
+    .p-row-block .rb-line { color: #475569; margin-top: 3px; }
+    .p-add-btn { display: block; width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px dashed #cbd5e1;
+      background: #f8fafc; color: #475569; font-size: 12px; font-weight: 700; cursor: pointer; margin-top: 6px; }
+    .p-scan-btn { display: block; width: 100%; padding: 9px 12px; border-radius: 8px; border: 0;
+      background: linear-gradient(135deg,#f59e0b,#d97706); color: #fff; font-size: 12px; font-weight: 700;
+      cursor: pointer; margin-top: 6px; }
 
     /* PTR pill (mock) */
     .p-ptr { display: flex; align-items: center; justify-content: center; gap: 6px;
@@ -154,8 +218,6 @@
     .guide p { margin: 0 0 12px; color: #334155; font-size: 14px; line-height: 1.55; }
     .guide .g-hint { background: #f0f9ff; border-left: 3px solid #38bdf8; padding: 10px 12px;
       border-radius: 6px; font-size: 13px; color: #075985; margin: 8px 0 14px; }
-    .guide .g-hint.warn { background: #fff7ed; border-left-color: #f97316; color: #9a3412; }
-    .guide .g-hint.ok { background: #f0fdf4; border-left-color: #22c55e; color: #14532d; }
     .g-progress { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
     .g-progress .g-bar { flex: 1; height: 6px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
     .g-progress .g-bar > i { display: block; height: 100%; background: linear-gradient(90deg,#3b82f6,#6366f1);
@@ -182,7 +244,7 @@
 
 <div class="demo-topbar">
   <div class="brand">
-    <span class="badge" data-i18n="dm.badge">DEMÓ</span>
+    <span class="badge" data-i18n="dm.badge">DEMO</span>
     <span data-i18n="dm.brandNote">Ghid interactiv — nimic nu se salvează pe server</span>
   </div>
   <div style="display: flex; gap: 8px; align-items: center;">
@@ -199,51 +261,76 @@
 
       <div class="p-header">
         <div class="p-logo">vallor<span>Soft</span></div>
-        <div class="p-me" id="pMeBadge">Demó Sofőr</div>
+        <div class="p-me" id="pMeBadge" data-i18n="dm.mock.meBadge">Șofer DEMO</div>
       </div>
 
       <div class="p-body">
 
         <!-- ── SCENE: DASHBOARD (aktív alapból) ── -->
         <div class="p-section active" data-scene="dash">
+          <!-- Nekem kiosztott jármű (mint a valós #myVehicleBox) -->
+          <div class="p-veh-box">
+            <div class="veh-title" data-i18n="dm.mock.myVeh">🚚 Vehiculul tău</div>
+            <div class="veh-plates">CV 12 DEMO <span style="color:#64748b;font-weight:600;">/</span> CV 34 DEMO</div>
+          </div>
+
           <div class="p-fuvar-title">▪ <span data-i18n="dm.mock.allocated">Curse alocate</span></div>
           <div class="p-fuvar-card" id="mockFuvarCard">
             <div class="p-demo-badge" data-i18n="dm.mock.demoTag">📚 DEMO — pentru învățare</div>
             <div class="p-fuvar-head" onclick="mockToggleCard()">
               <div class="p-fuvar-head-txt">
-                <div><span class="num">#1</span><span data-i18n="dm.mock.pickShort">📅 azi · 📍 Cluj-Napoca</span></div>
-                <div class="route" data-i18n="dm.mock.dropShort">↓ 📅 mâine · 📍 București</div>
+                <div class="head-pick"><span class="num">#1</span><span data-i18n="dm.mock.headPick">📅 azi · 📍 Cluj-Napoca</span></div>
+                <div class="head-drop" data-i18n="dm.mock.headDrop">↓ 📅 mâine · 📍 București</div>
               </div>
               <div class="p-fuvar-expand">▸</div>
             </div>
             <div class="p-fuvar-details">
-              <div class="row"><span class="icon">🏢</span><span data-i18n="dm.mock.client">Client: DEMO Client SRL</span></div>
-              <div class="row"><span class="icon">⚖️</span><span data-i18n="dm.mock.weight">22 000 kg · FTL</span></div>
-              <div class="row"><span class="icon">🚛</span><span data-i18n="dm.mock.plates">DEMO-01 / DEMO-02</span></div>
+              <div class="row"><span class="icon">🚛</span><span data-i18n="dm.mock.plates">CV 12 DEMO / CV 34 DEMO</span></div>
+              <div class="row"><span class="icon">⚖️</span><span data-i18n="dm.mock.weight">⚖ 22 000 kg · FTL</span></div>
+
+              <!-- Fel-/lerakás blokk (mint a valós fd-sec-h + fd-sec-b) -->
+              <div class="p-fd-sec">
+                <div class="p-fd-sec-h">⬆️ <span data-i18n="dm.mock.pickHead">Încărcare</span></div>
+                <div class="p-fd-sec-b">
+                  <div><span class="fd-lbl" data-i18n="dm.mock.company">Firmă:</span><span data-i18n="dm.mock.pickCompany">DEMO Logistic SRL</span></div>
+                  <div><span class="fd-lbl" data-i18n="dm.mock.address">Adresă:</span><span data-i18n="dm.mock.pickAddr">Cluj-Napoca, Str. Depozit 12</span></div>
+                  <div><span class="fd-lbl" data-i18n="dm.mock.date">Dată:</span><span data-i18n="dm.mock.pickDate">azi</span></div>
+                </div>
+              </div>
+              <div class="p-fd-sec">
+                <div class="p-fd-sec-h">⬇️ <span data-i18n="dm.mock.dropHead">Descărcare</span></div>
+                <div class="p-fd-sec-b">
+                  <div><span class="fd-lbl" data-i18n="dm.mock.company">Firmă:</span><span data-i18n="dm.mock.dropCompany">DEMO Distribuție SA</span></div>
+                  <div><span class="fd-lbl" data-i18n="dm.mock.address">Adresă:</span><span data-i18n="dm.mock.dropAddr">București, Șos. Industriei 8</span></div>
+                  <div><span class="fd-lbl" data-i18n="dm.mock.date">Dată:</span><span data-i18n="dm.mock.dropDate">mâine</span></div>
+                </div>
+              </div>
+
               <div class="p-stops" id="mockStops">
-                <!-- JS generálja: 4 állomás, done_at animációval -->
+                <!-- JS generálja: 4 állomás -->
               </div>
               <button class="p-btn primary" id="mockStopBtn" onclick="mockStopStep()">➜ <span data-i18n="dm.mock.arriveLoad">Am ajuns la încărcare</span></button>
+              <button class="p-btn ho" onclick="mockToast('⛔ Predare marfă (DEMO)')" data-i18n="dm.mock.hoBtn">⛔ Predare marfă</button>
             </div>
           </div>
 
           <div class="p-nav-grid">
             <div class="p-nav-card" onclick="mockNavToScene('border')">
-              <div class="ico">🚛</div><div class="lbl" data-i18n="dm.mock.navBorder">Frontieră</div>
+              <div class="ico">🚛</div><div class="lbl" data-i18n="dm.mock.navBorder">Trecere frontieră</div>
             </div>
             <div class="p-nav-card" onclick="mockNavToScene('waybill')">
-              <div class="ico">📄</div><div class="lbl" data-i18n="dm.mock.navWaybill">Foaie parcurs</div>
+              <div class="ico">📄</div><div class="lbl" data-i18n="dm.mock.navWaybill">Foaie de parcurs</div>
             </div>
             <div class="p-nav-card" onclick="mockNavToScene('docs')">
-              <div class="ico">📁</div><div class="lbl" data-i18n="dm.mock.navDocs">Documente</div>
+              <div class="ico">📁</div><div class="lbl" data-i18n="dm.mock.navDocs">Documente / CMR</div>
             </div>
             <div class="p-nav-card" onclick="mockNavToScene('chat')">
               <div class="ico">💬</div><div class="lbl" data-i18n="dm.mock.navChat">Chat</div>
             </div>
-            <div class="p-nav-card wide" style="background: linear-gradient(135deg,#eff6ff,#e0e7ff); border: 1.5px dashed #6366f1;" onclick="mockToast('✨ Ez a bemutató — most itt vagy!')">
+            <div class="p-nav-card wide" style="background: linear-gradient(135deg,#eff6ff,#e0e7ff); border: 1.5px dashed #6366f1;" onclick="mockToast('✨ Ești aici — în prezentare!')">
               <div class="ico">🎓</div><div class="lbl" data-i18n="dm.mock.navTour">Prezentare</div>
             </div>
-            <div class="p-nav-card logout wide" onclick="mockToast('🚪 Kilépés (DEMÓ)')">
+            <div class="p-nav-card logout wide" onclick="mockToast('🚪 Ieșire (DEMO)')">
               <div class="ico">🚪</div><div class="lbl" data-i18n="dm.mock.navLogout">Ieșire</div>
             </div>
           </div>
@@ -252,7 +339,7 @@
         <!-- ── SCENE: HATÁRÁTLÉPÉS ── -->
         <div class="p-section" data-scene="border">
           <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-            <button class="p-btn secondary" style="width: auto; padding: 8px 12px; margin: 0;" onclick="mockNavToScene('dash')">←</button>
+            <button class="p-btn secondary small" style="width: auto; margin: 0;" onclick="mockNavToScene('dash')">←</button>
             <h3 style="margin: 0; font-size: 16px;" data-i18n="dm.mock.borderTitle">🛂 Trecere frontieră</h3>
           </div>
           <button class="p-btn ro-in" onclick="mockBorderTap('in')">🇷🇴 <span data-i18n="dm.mock.roIn">ROMÂNIA INTRARE</span></button>
@@ -266,45 +353,151 @@
         <!-- ── SCENE: MENETLEVÉL ── -->
         <div class="p-section" data-scene="waybill">
           <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-            <button class="p-btn secondary" style="width: auto; padding: 8px 12px; margin: 0;" onclick="mockNavToScene('dash')">←</button>
+            <button class="p-btn secondary small" style="width: auto; margin: 0;" onclick="mockNavToScene('dash')">←</button>
             <h3 style="margin: 0; font-size: 16px;" data-i18n="dm.mock.wbTitle">📄 Foaie de parcurs</h3>
           </div>
+
+          <!-- STEP 1 (fuvarStep1 megfelelője) -->
           <div id="mockWbStep1">
             <button class="p-btn primary" onclick="mockWbCreate()">📄 <span data-i18n="dm.mock.wbCreate">Creează foaie de parcurs</span></button>
-            <button class="p-btn warn" onclick="mockToast('📷 Fotózz egy bont — az AI kiolvassa')">📷 <span data-i18n="dm.mock.wbScan">Scanare bon (AI)</span></button>
-            <div style="font-size: 11px; color: #64748b; margin-top: 8px; text-align: center;" data-i18n="dm.mock.wbHint">Bifezi cursele în pasul următor.</div>
+            <div style="font-size: 11px; color: #64748b; margin-top: 6px; text-align: center;" data-i18n="dm.mock.wbHint">Vei bifa cursele în pasul următor, dintr-o listă.</div>
+            <button class="p-btn warn" style="margin-top: 12px;" onclick="mockToast('📷 Alege un bon — AI îl citește')">📷 <span data-i18n="dm.mock.wbScan">Scanare bon (AI)</span></button>
           </div>
+
+          <!-- STEP 2 (fuvarStep2 megfelelője — a valós felület mezői) -->
           <div id="mockWbStep2" style="display: none;">
-            <div class="p-field">
-              <label data-i18n="dm.mock.wbKmStart">Km început</label>
-              <input type="number" value="123456" onchange="mockToast('Salvat automat')">
+            <!-- Kiválasztott fuvarok összesítő + fuvarok kezelése (mint a valós #selectedOrdersSummary) -->
+            <div style="background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.3);
+                        border-radius: 10px; padding: 8px 10px; margin-bottom: 8px;
+                        font-size: 11.5px; color: #1e293b;" data-i18n="dm.mock.wbSelSum">
+              1 cursă selectată · Cluj-Napoca → București
             </div>
-            <div class="p-field">
-              <label data-i18n="dm.mock.wbKmEnd">Km sfârșit</label>
-              <input type="number" value="123890" onchange="mockToast('Salvat automat')">
+            <button class="p-btn secondary small" style="width: auto; margin: 0 0 12px;" onclick="mockToast('✏️ Deschide selectorul de curse (DEMO)')" data-i18n="dm.mock.wbManage">✏️ Gestionare curse</button>
+
+            <!-- Vontató + pótkocsi (mint a valós fCamion / fRemorca) -->
+            <div class="p-g2">
+              <div class="p-field">
+                <label data-i18n="dm.mock.wbCamion">Număr camion</label>
+                <input class="input" value="CV 12 DEMO" onchange="mockToast('Salvat automat')">
+              </div>
+              <div class="p-field">
+                <label data-i18n="dm.mock.wbRemorca">Număr remorcă</label>
+                <input class="input" value="CV 34 DEMO" onchange="mockToast('Salvat automat')">
+              </div>
             </div>
-            <div class="p-field">
+
+            <!-- Km început / sfârșit + GPS gomb -->
+            <div class="p-g2">
+              <div class="p-field">
+                <label data-i18n="dm.mock.wbKmStart">Km început</label>
+                <input class="input" type="number" value="123456" onchange="mockToast('Salvat automat')">
+              </div>
+              <div class="p-field">
+                <label data-i18n="dm.mock.wbKmEnd">Km sfârșit</label>
+                <div class="p-gps-row">
+                  <input class="input" type="number" value="123890" onchange="mockToast('Salvat automat')">
+                  <button class="p-gps-btn" onclick="mockToast('📍 Km preluat din GPS (DEMO)')">📍 GPS</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Út időpontjai — mint a valós auto-info box -->
+            <div class="p-section-head" data-i18n="dm.mock.wbTripHead">🕐 Timpi cursă (automat)</div>
+            <div class="p-hint" data-i18n="dm.mock.wbTripHint">Se calculează automat din datele Plecare și Sosire (+ ora, dacă e completată).</div>
+
+            <!-- Határátlépés — auto (mint a valós #diurnaPreview) -->
+            <div class="p-section-head" data-i18n="dm.mock.wbBorderHead">🛂 Treceri frontieră (automat)</div>
+            <div class="p-diurna" data-i18n="dm.mock.wbDiurna">3 zile diurnă externă (calculat din trecerile GPS)</div>
+
+            <!-- Puncte de traseu — mint a valós puncteContainer + típusok (Plecare/Încărcare/Descărcare/Sosire) -->
+            <div class="p-section-head" data-i18n="dm.mock.wbRouteHead">📍 Puncte de traseu</div>
+            <div class="p-row-block">
+              <div class="rb-head"><span class="rb-tag plecare" data-i18n="dm.mock.tagPlecare">Plecare</span><span style="font-size:11px;color:#64748b;">azi · 06:00</span></div>
+              <div class="rb-line" data-i18n="dm.mock.ptPlecare">Garaj-Arcus</div>
+            </div>
+            <div class="p-row-block">
+              <div class="rb-head"><span class="rb-tag inc" data-i18n="dm.mock.tagInc">Încărcare</span><span style="font-size:11px;color:#64748b;">azi · 10:30</span></div>
+              <div class="rb-line" data-i18n="dm.mock.ptInc">Cluj-Napoca — DEMO Logistic SRL</div>
+            </div>
+            <div class="p-row-block">
+              <div class="rb-head"><span class="rb-tag desc" data-i18n="dm.mock.tagDesc">Descărcare</span><span style="font-size:11px;color:#64748b;">mâine · 09:00</span></div>
+              <div class="rb-line" data-i18n="dm.mock.ptDesc">București — DEMO Distribuție SA</div>
+            </div>
+            <div class="p-row-block">
+              <div class="rb-head"><span class="rb-tag sosire" data-i18n="dm.mock.tagSosire">Sosire</span><span style="font-size:11px;color:#64748b;">mâine · 18:00</span></div>
+              <div class="rb-line" data-i18n="dm.mock.ptSosire">Garaj-Arcus</div>
+            </div>
+            <button class="p-add-btn" onclick="mockToast('➕ Punct nou adăugat (DEMO)')" data-i18n="dm.mock.wbAddPt">➕ Adaugă punct</button>
+
+            <!-- Üzemanyag állapot — mint a valós fCantInc / fCantSf + GPS -->
+            <div class="p-section-head" data-i18n="dm.mock.wbFuelHead">🛢 Stare combustibil</div>
+            <div class="p-g2">
+              <div class="p-field">
+                <label data-i18n="dm.mock.wbCantStart">Cantitate început (L)</label>
+                <input class="input" type="number" value="180" onchange="mockToast('Salvat automat')">
+              </div>
+              <div class="p-field">
+                <label data-i18n="dm.mock.wbCantEnd">Cantitate sfârșit (L)</label>
+                <div class="p-gps-row">
+                  <input class="input" type="number" value="220" onchange="mockToast('Salvat automat')">
+                  <button class="p-gps-btn" onclick="mockToast('⛽ Nivel combustibil din GPS (DEMO)')">⛽ GPS</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Alimentări (Tankolások) — mint a valós -->
+            <div class="p-section-head" data-i18n="dm.mock.wbAlimHead">⛽ Alimentări</div>
+            <div class="p-row-block">
+              <div class="rb-head"><span class="rb-tag fuel" data-i18n="dm.mock.tagAlim">Alimentare</span><span style="font-size:11px;color:#64748b;">azi · 08:15</span></div>
+              <div class="rb-line" data-i18n="dm.mock.alim1">MOL Cluj · 150 L Motorină · Card flotă · 900 RON</div>
+            </div>
+            <button class="p-add-btn" onclick="mockToast('➕ Alimentare nouă (DEMO)')" data-i18n="dm.mock.wbAddAlim">➕ Adaugă alimentare</button>
+            <button class="p-scan-btn" onclick="mockToast('📷 Scanare bon alimentare (DEMO)')" data-i18n="dm.mock.wbScanFuel">📷 Scanare bon (AI)</button>
+
+            <!-- Achiziții (Kiadások) -->
+            <div class="p-section-head" data-i18n="dm.mock.wbAchHead">🛒 Achiziții</div>
+            <div class="p-row-block">
+              <div class="rb-head"><span class="rb-tag purch" data-i18n="dm.mock.tagAch">Achiziție</span><span style="font-size:11px;color:#64748b;">azi · 12:30</span></div>
+              <div class="rb-line" data-i18n="dm.mock.ach1">Kaufland București · Apă / gustare · Numerar · 45 RON</div>
+            </div>
+            <button class="p-add-btn" onclick="mockToast('➕ Achiziție nouă (DEMO)')" data-i18n="dm.mock.wbAddAch">➕ Adaugă achiziție</button>
+            <button class="p-scan-btn" onclick="mockToast('📷 Scanare bon achiziție (DEMO)')" data-i18n="dm.mock.wbScanPurch">📷 Scanare bon (AI)</button>
+
+            <!-- Alte mențiuni -->
+            <div class="p-field" style="margin-top: 12px;">
               <label data-i18n="dm.mock.wbNotes">Alte mențiuni</label>
-              <input type="text" placeholder="ex. drum bun" onchange="mockToast('Salvat automat')">
+              <textarea rows="2" placeholder="ex. drum bun" onchange="mockToast('Salvat automat')" data-i18n-ph="dm.mock.wbNotesPh"></textarea>
             </div>
+
+            <div style="font-size: 11px; color: #64748b; margin: 6px 0 4px; text-align: center;" data-i18n="dm.mock.wbAutoSave">💡 Salvare automată — nu trebuie să apeși nimic.</div>
+
             <button class="p-btn ok" onclick="mockToast('✅ Foaie trimisă (DEMO — nu s-a trimis nimic real)')">📤 <span data-i18n="dm.mock.wbSubmit">Trimite foaia</span></button>
-            <button class="p-btn secondary" onclick="mockNavToScene('waybill'); document.getElementById('mockWbStep1').style.display=''; document.getElementById('mockWbStep2').style.display='none';" data-i18n="dm.mock.wbBack">← Înapoi</button>
+            <button class="p-btn secondary" onclick="mockWbBackStep1()" data-i18n="dm.mock.wbBack">← Înapoi</button>
           </div>
         </div>
 
         <!-- ── SCENE: IRATOK ── -->
         <div class="p-section" data-scene="docs">
           <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-            <button class="p-btn secondary" style="width: auto; padding: 8px 12px; margin: 0;" onclick="mockNavToScene('dash')">←</button>
-            <h3 style="margin: 0; font-size: 16px;" data-i18n="dm.mock.docsTitle">📁 Documente / CMR</h3>
+            <button class="p-btn secondary small" style="width: auto; margin: 0;" onclick="mockNavToScene('dash')">←</button>
+            <h3 style="margin: 0; font-size: 16px;" data-i18n="dm.mock.docsTitle">📷 Încărcare documente</h3>
           </div>
           <div class="p-nav-grid" style="grid-template-columns: 1fr 1fr 1fr;">
-            <div class="p-nav-card" onclick="mockToast('CMR selectat')"><div class="ico">📦</div><div class="lbl">CMR</div></div>
-            <div class="p-nav-card" onclick="mockToast('POD selectat')"><div class="ico">✍️</div><div class="lbl">POD</div></div>
-            <div class="p-nav-card" onclick="mockToast('Factură selectat')"><div class="ico">🧾</div><div class="lbl" data-i18n="dm.mock.invoice">Factură</div></div>
+            <div class="p-nav-card" onclick="mockToast('CMR ales')"><div class="ico">📦</div><div class="lbl">CMR</div></div>
+            <div class="p-nav-card" onclick="mockToast('POD ales')"><div class="ico">✍️</div><div class="lbl">POD</div></div>
+            <div class="p-nav-card" onclick="mockToast('Factură aleasă')"><div class="ico">🧾</div><div class="lbl" data-i18n="dm.mock.invoice">Factură</div></div>
+            <div class="p-nav-card" onclick="mockToast('Vamă ales')"><div class="ico">🏛</div><div class="lbl" data-i18n="dm.mock.customs">Vamă</div></div>
+            <div class="p-nav-card" onclick="mockToast('Altele ales')"><div class="ico">📎</div><div class="lbl" data-i18n="dm.mock.other">Altele</div></div>
+          </div>
+          <div class="p-field" style="margin-top: 12px;">
+            <label data-i18n="dm.mock.docPickOrder">Cursă (opțional — recomandat pentru POD):</label>
+            <select class="input">
+              <option data-i18n="dm.mock.docNoOrder">— Fără cursă —</option>
+              <option>#1 · Cluj-Napoca → București (DEMO)</option>
+            </select>
           </div>
           <div style="background: #fff; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 24px 12px;
-            text-align: center; margin-top: 12px; cursor: pointer;" onclick="mockToast('📷 Alege fișier (DEMO)')">
+            text-align: center; margin-top: 8px; cursor: pointer;" onclick="mockToast('📷 Alege fișier (DEMO)')">
             <div style="font-size: 36px;">📂</div>
             <div style="font-weight: 700; margin-top: 6px;" data-i18n="dm.mock.docPick">Atinge pentru a alege fișier</div>
             <div style="font-size: 11px; color: #64748b; margin-top: 4px;" data-i18n="dm.mock.docHint">Poză sau PDF — mai multe deodată</div>
@@ -314,7 +507,7 @@
         <!-- ── SCENE: CHAT ── -->
         <div class="p-section" data-scene="chat">
           <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-            <button class="p-btn secondary" style="width: auto; padding: 8px 12px; margin: 0;" onclick="mockNavToScene('dash')">←</button>
+            <button class="p-btn secondary small" style="width: auto; margin: 0;" onclick="mockNavToScene('dash')">←</button>
             <h3 style="margin: 0; font-size: 16px;" data-i18n="dm.mock.chatTitle">💬 Chat</h3>
           </div>
           <div style="text-align: center; padding: 24px 12px;">
@@ -341,12 +534,12 @@
   <!-- ═════════════════ MAGYARÁZAT PANEL (JOBB OLDAL) ═════════════════ -->
   <div class="guide">
     <div class="g-progress">
-      <div class="g-num" id="gStepNum">1 / 12</div>
+      <div class="g-num" id="gStepNum">1 / 13</div>
       <div class="g-bar"><i id="gBar" style="width: 8%;"></i></div>
     </div>
-    <div class="g-step-tag" id="gStepTag" data-i18n="dm.guide.welcomeTag">PRIMII PAȘI</div>
+    <div class="g-step-tag" id="gStepTag" data-i18n="dm.guide.tagWelcome">PRIMII PAȘI</div>
     <h2 id="gTitle" data-i18n="dm.g.s0.title">👋 Bun venit!</h2>
-    <p id="gBody" data-i18n="dm.g.s0.body">Vom parcurge împreună aplicația cu o cursă DEMO. Toate butoanele funcționează — ce apeși aici nu ajunge la server.</p>
+    <p id="gBody" data-i18n="dm.g.s0.body">Vom parcurge împreună aplicația cu o cursă DEMO.</p>
     <div class="g-hint" id="gHint" data-i18n="dm.g.s0.hint">💡 Apasă „Continuă →" pentru a începe.</div>
 
     <div class="g-nav">
@@ -361,6 +554,9 @@
 <script>
 // ══════════════════════════════════════════════════════════════════
 //  SOFŐR DEMÓ — állapotgép + scene-vezetés
+//  A telefon-mockup és a menetlevél-mockup PONTOSAN a valós felület
+//  mezőit / feliratait tükrözi. Ha az éles UI mezői változnak, ezt is
+//  frissíteni kell (sofer.html + renderFuvarCard sofer.js-ben).
 // ══════════════════════════════════════════════════════════════════
 
 // ── Kilépés (vissza a valós app-ra) ──
@@ -394,24 +590,23 @@ window.mockNavToScene = mockNavToScene;
 function mockToggleCard() {
   var c = document.getElementById('mockFuvarCard');
   c.classList.toggle('open');
-  // Első kinyitáskor 4 állomás előtöltése.
   var stopsWrap = document.getElementById('mockStops');
   if (c.classList.contains('open') && stopsWrap.innerHTML.trim() === '') {
     mockRenderStops();
   }
-  // Ha a wizard a 3-as (kártya-kinyitás) lépésen van és a sofőr kinyitotta → tovább.
+  // Ha a wizard a kártya-kinyitás lépésén van és a sofőr kinyitotta → tovább.
   if (_state.step === 2 && c.classList.contains('open')) {
     setTimeout(function(){ guideNext(); }, 500);
   }
 }
 window.mockToggleCard = mockToggleCard;
 
-// ── 4 állomás rendering + léptetés ──
+// ── 4 állomás rendering + léptetés (mint a valós MS_STEPS) ──
 var STOP_STEPS = [
-  { key: 'arriveLoad',  icon: '📍', label: 'Ajuns la încărcare' },
-  { key: 'loaded',      icon: '📦', label: 'Am încărcat' },
-  { key: 'arriveUnload',icon: '📍', label: 'Ajuns la descărcare' },
-  { key: 'unloaded',    icon: '✅', label: 'Am descărcat' }
+  { key: 'arriveLoad',   icon: '📍', label: 'Am ajuns la încărcare' },
+  { key: 'loaded',       icon: '📦', label: 'Am încărcat' },
+  { key: 'arriveUnload', icon: '📍', label: 'Am ajuns la descărcare' },
+  { key: 'unloaded',     icon: '✅', label: 'Am descărcat' }
 ];
 var _currentStopIdx = 0;
 function mockRenderStops() {
@@ -427,7 +622,6 @@ function mockRenderStops() {
          + '</div>';
   }
   w.innerHTML = html;
-  // Következő gomb-felirat
   var btn = document.getElementById('mockStopBtn');
   if (_currentStopIdx >= STOP_STEPS.length) {
     btn.innerHTML = '✅ ' + (window.t ? window.t('dm.mock.stopAllDone') : 'Toate etapele finalizate');
@@ -444,7 +638,6 @@ function mockStopStep() {
   mockRenderStops();
   var s = STOP_STEPS[_currentStopIdx - 1];
   mockToast('✅ ' + s.label + ' — ' + new Date().toTimeString().slice(0, 5));
-  // Ha a wizard a 4-es (állomás-gomb) lépésen van → tovább az első koppintás után.
   if (_state.step === 3) {
     setTimeout(function(){ guideNext(); }, 900);
   }
@@ -462,7 +655,6 @@ function mockBorderTap(dir) {
   listEl.innerHTML = _borderLog.slice(0, 5).map(function(e){
     return '<div style="padding:4px 0; border-top:1px solid #f1f5f9;"><strong>' + e.label + '</strong> — ' + e.time + '</div>';
   }).join('');
-  // Wizard 6-os lépés (határátlépés kipróbálása) → tovább.
   if (_state.step === 5) {
     setTimeout(function(){ guideNext(); }, 900);
   }
@@ -474,28 +666,27 @@ function mockWbCreate() {
   document.getElementById('mockWbStep1').style.display = 'none';
   document.getElementById('mockWbStep2').style.display = '';
   mockToast('📄 ' + (window.t ? window.t('dm.mock.wbOpened') : 'Foaia deschisă'));
-  // Wizard 8-as lépés (menetlevél létrehozás) → tovább.
   if (_state.step === 7) {
     setTimeout(function(){ guideNext(); }, 900);
   }
 }
 window.mockWbCreate = mockWbCreate;
+function mockWbBackStep1() {
+  document.getElementById('mockWbStep1').style.display = '';
+  document.getElementById('mockWbStep2').style.display = 'none';
+}
+window.mockWbBackStep1 = mockWbBackStep1;
 
 // ══════════════════════════════════════════════════════════════════
-//  WIZARD (12 lépés)
+//  WIZARD (13 lépés — a valós felület menüi/mezői szerint)
 // ══════════════════════════════════════════════════════════════════
 var _state = { step: 0 };
 
-// Lépések: mindegyik meghatároz egy `scene`-t (a telefon-mockup melyik
-// pane-je legyen aktív), és a szöveg / hint-kulcsokat. Bizonyos
-// lépéseknél a Next auto-elsütődik a mockup-interakcióra (mockStopStep,
-// mockBorderTap, mockWbCreate stb. mind hívnak guideNext-et).
 var STEPS = [
   { id: 'welcome',   scene: 'dash', tag: 'dm.guide.tagWelcome',   title: 'dm.g.s0.title',   body: 'dm.g.s0.body',   hint: 'dm.g.s0.hint' },
   { id: 'dashboard', scene: 'dash', tag: 'dm.guide.tagOverview',  title: 'dm.g.s1.title',   body: 'dm.g.s1.body',   hint: 'dm.g.s1.hint' },
   { id: 'openCard',  scene: 'dash', tag: 'dm.guide.tagCard',      title: 'dm.g.s2.title',   body: 'dm.g.s2.body',   hint: 'dm.g.s2.hint',  waitAction: true },
   { id: 'stopBtn',   scene: 'dash', tag: 'dm.guide.tagStopBtn',   title: 'dm.g.s3.title',   body: 'dm.g.s3.body',   hint: 'dm.g.s3.hint',  waitAction: true, onEnter: function(){
-      // Biztosítjuk, hogy a kártya nyitva legyen és a stops rendered.
       var c = document.getElementById('mockFuvarCard');
       if (c && !c.classList.contains('open')) c.classList.add('open');
       if (document.getElementById('mockStops').innerHTML.trim() === '') mockRenderStops();
@@ -504,19 +695,24 @@ var STEPS = [
   { id: 'borderTap', scene: 'border', tag: 'dm.guide.tagBorderTap', title: 'dm.g.s5.title', body: 'dm.g.s5.body',   hint: 'dm.g.s5.hint',  waitAction: true },
   { id: 'waybillNav', scene: 'dash', tag: 'dm.guide.tagWaybill',  title: 'dm.g.s6.title',   body: 'dm.g.s6.body',   hint: 'dm.g.s6.hint' },
   { id: 'waybillCreate', scene: 'waybill', tag: 'dm.guide.tagWaybillCreate', title: 'dm.g.s7.title', body: 'dm.g.s7.body', hint: 'dm.g.s7.hint', waitAction: true, onEnter: function(){
-      // Reset — mindig az 1. lépés látszódjon.
       document.getElementById('mockWbStep1').style.display = '';
       document.getElementById('mockWbStep2').style.display = 'none';
     } },
-  { id: 'docs',     scene: 'docs',  tag: 'dm.guide.tagDocs',      title: 'dm.g.s8.title',  body: 'dm.g.s8.body',   hint: 'dm.g.s8.hint' },
-  { id: 'chat',     scene: 'chat',  tag: 'dm.guide.tagChat',      title: 'dm.g.s9.title',  body: 'dm.g.s9.body',   hint: 'dm.g.s9.hint' },
-  { id: 'ptr',      scene: 'dash',  tag: 'dm.guide.tagPtr',       title: 'dm.g.s10.title', body: 'dm.g.s10.body',  hint: 'dm.g.s10.hint', onEnter: function(){
-      // PTR pill vizuálisan mutassa magát 3 másodpercre.
+  // ÚJ LÉPÉS: a menetlevél MEZŐIT bemutatjuk (nem csak km+jegyzet). A step2
+  // már látszik (a #7 lépés végén a sofőr rákoppintott a „Creează…"-ra).
+  { id: 'waybillFields', scene: 'waybill', tag: 'dm.guide.tagWaybillFields', title: 'dm.g.s8.title', body: 'dm.g.s8.body', hint: 'dm.g.s8.hint', onEnter: function(){
+      // Biztosítjuk, hogy a step2 nyitva legyen — pl. ha visszaléptek.
+      document.getElementById('mockWbStep1').style.display = 'none';
+      document.getElementById('mockWbStep2').style.display = '';
+    } },
+  { id: 'docs',     scene: 'docs',  tag: 'dm.guide.tagDocs',      title: 'dm.g.s9.title',  body: 'dm.g.s9.body',   hint: 'dm.g.s9.hint' },
+  { id: 'chat',     scene: 'chat',  tag: 'dm.guide.tagChat',      title: 'dm.g.s10.title', body: 'dm.g.s10.body',  hint: 'dm.g.s10.hint' },
+  { id: 'ptr',      scene: 'dash',  tag: 'dm.guide.tagPtr',       title: 'dm.g.s11.title', body: 'dm.g.s11.body',  hint: 'dm.g.s11.hint', onEnter: function(){
       var p = document.getElementById('mockPtr');
       p.style.display = '';
       setTimeout(function(){ p.style.display = 'none'; }, 4500);
     } },
-  { id: 'done',     scene: 'dash',  tag: 'dm.guide.tagDone',      title: 'dm.g.s11.title', body: 'dm.g.s11.body',  hint: 'dm.g.s11.hint' }
+  { id: 'done',     scene: 'dash',  tag: 'dm.guide.tagDone',      title: 'dm.g.s12.title', body: 'dm.g.s12.body',  hint: 'dm.g.s12.hint' }
 ];
 
 function guideRender() {
@@ -543,7 +739,6 @@ function guideRender() {
 
   prev.disabled = _state.step === 0;
 
-  // Utolsó lépésen a Next „Nyisd meg az igazi appot"-ra vált.
   if (_state.step === STEPS.length - 1) {
     next.textContent = _t('dm.guide.finish');
     next.setAttribute('data-i18n', 'dm.guide.finish');
@@ -554,10 +749,7 @@ function guideRender() {
     next.onclick = function(){ guideNext(); };
   }
 
-  // Scene-váltás (ha kell)
   if (st.scene) mockNavToScene(st.scene);
-
-  // onEnter callback
   if (typeof st.onEnter === 'function') { try { st.onEnter(); } catch(_){} }
 }
 function guideNext() {
@@ -580,11 +772,12 @@ function _t(k) {
     var v = window.t(k);
     if (v && v !== k) return v;
   }
-  // beépített fallback szótár, ha az i18n nem érte el ezeket a kulcsokat
   return (window._DM_FALLBACK && window._DM_FALLBACK[k]) || k;
 }
 
-// Beépített fallback szótár (RO — alap; ha az i18n.js-ben nincs kulcs)
+// Beépített fallback szótár (RO — alap; ha az i18n.js-ben nincs kulcs).
+// A feliratok PONTOSAN a valós felület (sofer.html + i18n.js) román
+// szövegeire épülnek — így a sofőr ugyanazt látja itt is, ott is.
 window._DM_FALLBACK = {
   'dm.badge': 'DEMO',
   'dm.brandNote': 'Ghid interactiv — nimic nu se salvează pe server',
@@ -593,65 +786,85 @@ window._DM_FALLBACK = {
   'dm.guide.prev': '← Înapoi',
   'dm.guide.exit': 'Închide prezentarea',
   'dm.guide.finish': '🎉 Deschide aplicația reală',
-  'dm.guide.tagWelcome':    'PRIMII PAȘI',
-  'dm.guide.tagOverview':   'PAGINA PRINCIPALĂ',
-  'dm.guide.tagCard':       'CURSE',
-  'dm.guide.tagStopBtn':    'STAȚIE',
-  'dm.guide.tagBorderNav':  'MENIU',
-  'dm.guide.tagBorderTap':  'FRONTIERĂ',
-  'dm.guide.tagWaybill':    'FOAIE DE PARCURS',
-  'dm.guide.tagWaybillCreate': 'CREARE FOAIE',
-  'dm.guide.tagDocs':       'DOCUMENTE',
-  'dm.guide.tagChat':       'COMUNICARE',
-  'dm.guide.tagPtr':        'REÎMPROSPĂTARE',
-  'dm.guide.tagDone':       'GATA',
+  'dm.guide.tagWelcome':        'PRIMII PAȘI',
+  'dm.guide.tagOverview':       'PAGINA PRINCIPALĂ',
+  'dm.guide.tagCard':           'CURSE',
+  'dm.guide.tagStopBtn':        'STAȚIE',
+  'dm.guide.tagBorderNav':      'MENIU',
+  'dm.guide.tagBorderTap':      'FRONTIERĂ',
+  'dm.guide.tagWaybill':        'FOAIE DE PARCURS',
+  'dm.guide.tagWaybillCreate':  'CREARE FOAIE',
+  'dm.guide.tagWaybillFields':  'CÂMPURI FOAIE',
+  'dm.guide.tagDocs':           'DOCUMENTE',
+  'dm.guide.tagChat':           'COMUNICARE',
+  'dm.guide.tagPtr':            'REÎMPROSPĂTARE',
+  'dm.guide.tagDone':           'GATA',
+
   'dm.g.s0.title':  '👋 Bun venit!',
   'dm.g.s0.body':   'Vom parcurge împreună aplicația cu o cursă DEMO. Toate butoanele funcționează în această pagină — ce apeși aici nu ajunge la server. Poți învăța în ritmul tău.',
   'dm.g.s0.hint':   '💡 Apasă „Continuă →" pentru a începe.',
   'dm.g.s1.title':  'Aceasta este pagina ta principală',
-  'dm.g.s1.body':   'Aici vezi cursele alocate ție. Sus e antetul cu numele tău, jos sunt butoanele pentru meniuri (Frontieră, Foaie de parcurs, Documente, Chat).',
+  'dm.g.s1.body':   'Sus vezi vehiculul care ți-a fost alocat (camion + remorcă), apoi cursele alocate ție. Jos ai meniurile: Trecere frontieră, Foaie de parcurs, Documente / CMR și Chat.',
   'dm.g.s1.hint':   'În telefon apare o cursă DEMO — arată la fel cu o cursă reală.',
   'dm.g.s2.title':  'Apasă pe cardul cursei DEMO',
-  'dm.g.s2.body':   'Fiecare cursă se poate deschide apăsând pe ea. Se afișează detaliile: client, adresa de încărcare/descărcare, greutatea, numărul de înmatriculare.',
+  'dm.g.s2.body':   'Fiecare cursă se poate deschide apăsând pe cap. Vezi acolo: adresa de încărcare și descărcare, firma expeditor/destinatar, data, greutatea și numărul de înmatriculare. Numele clientului (beneficiarul) NU apare — nu ai nevoie de el.',
   'dm.g.s2.hint':   '👉 Apasă cardul din telefonul din stânga. Sau apasă „Continuă →" să sari peste.',
   'dm.g.s3.title':  'Butonul „stație" — cel mai important',
-  'dm.g.s3.body':   'Cu acest buton avansează cursa prin 4 etape: 📍 am ajuns la încărcare → 📦 am încărcat → 📍 am ajuns la descărcare → ✅ am descărcat. Sistemul înregistrează timpul, biroul vede imediat.',
+  'dm.g.s3.body':   'Cu acest buton avansezi cursa prin 4 etape: 📍 am ajuns la încărcare → 📦 am încărcat → 📍 am ajuns la descărcare → ✅ am descărcat. Sistemul înregistrează timpul, biroul vede imediat.',
   'dm.g.s3.hint':   '👉 Apasă butonul „➜ Am ajuns la încărcare" din telefon. Îl poți apăsa de mai multe ori — vezi cum avansează.',
   'dm.g.s4.title':  'Meniul de mai jos',
-  'dm.g.s4.body':   'Din meniul de sub cursă intri în restul funcțiilor: Frontieră (pentru trecerea graniței), Foaie de parcurs (documentarea cursei), Documente (poze CMR/POD), Chat (WhatsApp).',
-  'dm.g.s4.hint':   '👉 Apasă butonul „🚛 Frontieră" pentru pasul următor.',
+  'dm.g.s4.body':   'Din meniul de sub cursă intri în restul funcțiilor: Trecere frontieră, Foaie de parcurs, Documente / CMR și Chat (WhatsApp).',
+  'dm.g.s4.hint':   '👉 Apasă butonul „🚛 Trecere frontieră" pentru pasul următor.',
   'dm.g.s5.title':  '🇷🇴 Trecere frontieră',
   'dm.g.s5.body':   'Dacă ai trecut frontiera RO, apasă INTRARE sau IEȘIRE. Sistemul calculează diurna DIN ACESTE APĂSĂRI — cu cât apeși mai corect, cu atât diurna e mai exactă. Se înregistrează automat pe foaia de parcurs.',
   'dm.g.s5.hint':   '👉 Apasă unul din butoanele mari 🇷🇴 din telefon. Vezi cum apare în „Ultimele treceri".',
   'dm.g.s6.title':  '📄 Foaie de parcurs',
-  'dm.g.s6.body':   'Foaia de parcurs este documentarea zilnică / săptămânală a cursei: kilometri, alimentări, achiziții, puncte de traseu. Sistemul salvează AUTOMAT ce introduci — nu trebuie să salvezi manual.',
-  'dm.g.s6.hint':   '👉 Deschide meniul Foaie de parcurs (apasă în telefon).',
+  'dm.g.s6.body':   'Foaia de parcurs este documentarea cursei: kilometri, alimentări, achiziții și puncte de traseu. Sistemul salvează AUTOMAT ce introduci — nu trebuie să salvezi manual.',
+  'dm.g.s6.hint':   '👉 Apasă „📄 Foaie de parcurs" în telefon.',
   'dm.g.s7.title':  'Așa începi o foaie nouă',
-  'dm.g.s7.body':   'Apasă „Creează foaie de parcurs". Te întreabă întâi de unde pleci, apoi bifezi ce curse finalizate intră pe foaie. Poți lăsa și gol pentru o foaie fără cursă.',
-  'dm.g.s7.hint':   '👉 Apasă „📄 Creează foaie de parcurs" în telefon — apar câmpurile de km și mențiuni.',
-  'dm.g.s8.title':  '📁 Documente / CMR',
-  'dm.g.s8.body':   'Aici trimiți poze de documente: CMR / POD semnat / Factură / Vamă / Altele. Poți alege MAI MULTE fișiere odată. La POD este bine să alegi și cursa (opțional).',
-  'dm.g.s8.hint':   '📸 Un simplu pas: alegi tipul → apeși zona de fișiere → gata.',
-  'dm.g.s9.title':  '💬 Chat',
-  'dm.g.s9.body':   'Butonul de chat deschide numărul de WhatsApp al firmei tale (setat de dispecer). Astfel trimiți mesaje și poze direct dispecerului — fără altă aplicație.',
-  'dm.g.s9.hint':   '📱 Simplu: apasă și deschide WhatsApp.',
-  'dm.g.s10.title': '↓ Trage în jos → reîmprospătare',
-  'dm.g.s10.body':  'În partea de sus a ecranului (unde nu se mai poate derula) trage cu degetul în jos → pagina se reîmprospătează, ca în aplicațiile native ale telefonului. Pentru o cursă nouă asta ai nevoie.',
-  'dm.g.s10.hint':  '🔄 Vezi pillula din telefon — apare când tragi în jos.',
-  'dm.g.s11.title': '🎉 Gata!',
-  'dm.g.s11.body':  'Ai văzut totul. În partea de jos-dreapta a aplicației reale ai butonul 🐛 pentru raportarea unei erori — apasă-l oricând. Din pagina principală poți redeschide oricând această prezentare cu butonul „🎓 Prezentare".',
-  'dm.g.s11.hint':  '✨ Drum bun! Apasă butonul de mai jos pentru a intra în aplicația reală.',
+  'dm.g.s7.body':   'Apasă „Creează foaie de parcurs". Sistemul te întreabă întâi Plecarea (unde pornești, ex. Garaj-Arcus), apoi bifezi ce curse au intrat pe foaie. Poți lăsa gol pentru o foaie fără cursă.',
+  'dm.g.s7.hint':   '👉 Apasă „📄 Creează foaie de parcurs" în telefon — apar câmpurile de completat.',
+  'dm.g.s8.title':  'Ce câmpuri sunt pe foaia de parcurs',
+  'dm.g.s8.body':   'Foaia de parcurs are EXACT ce vezi în telefon: numărul camionului și al remorcii, Km început / sfârșit (📍 GPS preia automat), timpi cursă și treceri frontieră (automat), puncte de traseu (Plecare / Încărcare / Descărcare / Sosire — cu dată și oră), stare combustibil (⛽ GPS preia automat), alimentări și achiziții (poți scana bonul cu 📷 AI) și alte mențiuni. Tot ce apeși aici e SALVAT AUTOMAT.',
+  'dm.g.s8.hint':   '💡 Alergează prin toate secțiunile în telefon — apasă câmpurile, adaugă un punct, apasă scan bon. Nimic nu ajunge la server.',
+  'dm.g.s9.title':  '📁 Documente / CMR',
+  'dm.g.s9.body':   'Aici trimiți poze de documente: CMR / POD semnat / Factură / Vamă / Altele. Poți alege MAI MULTE fișiere odată. La POD este bine să alegi și cursa (opțional).',
+  'dm.g.s9.hint':   '📸 Un simplu pas: alegi tipul → apeși zona de fișiere → gata.',
+  'dm.g.s10.title': '💬 Chat',
+  'dm.g.s10.body':  'Butonul de chat deschide numărul de WhatsApp al firmei tale (setat de dispecer). Astfel trimiți mesaje și poze direct dispecerului — fără altă aplicație.',
+  'dm.g.s10.hint':  '📱 Simplu: apasă și deschide WhatsApp.',
+  'dm.g.s11.title': '↓ Trage în jos → reîmprospătare',
+  'dm.g.s11.body':  'În partea de sus a ecranului (unde nu se mai poate derula) trage cu degetul în jos → pagina se reîmprospătează, ca în aplicațiile native ale telefonului.',
+  'dm.g.s11.hint':  '🔄 Vezi pillula din telefon — apare când tragi în jos.',
+  'dm.g.s12.title': '🎉 Gata!',
+  'dm.g.s12.body':  'Ai văzut totul. În partea de jos-dreapta a aplicației reale ai butonul 🐛 pentru raportarea unei erori — apasă-l oricând. Din pagina principală poți redeschide oricând această prezentare cu butonul „🎓 Prezentare".',
+  'dm.g.s12.hint':  '✨ Drum bun! Apasă butonul de mai jos pentru a intra în aplicația reală.',
+
+  // Telefon-mockup — a valós Romanian feliratok szerint
+  'dm.mock.meBadge': 'Șofer DEMO',
+  'dm.mock.myVeh': '🚚 Vehiculul tău',
   'dm.mock.allocated': 'Curse alocate',
   'dm.mock.demoTag': '📚 DEMO — pentru învățare',
-  'dm.mock.pickShort': '📅 azi · 📍 Cluj-Napoca',
-  'dm.mock.dropShort': '↓ 📅 mâine · 📍 București',
-  'dm.mock.client': 'Client: DEMO Client SRL',
-  'dm.mock.weight': '22 000 kg · FTL',
-  'dm.mock.plates': 'DEMO-01 / DEMO-02',
+  'dm.mock.headPick': '📅 azi · 📍 Cluj-Napoca',
+  'dm.mock.headDrop': '↓ 📅 mâine · 📍 București',
+  'dm.mock.plates': 'CV 12 DEMO / CV 34 DEMO',
+  'dm.mock.weight': '⚖ 22 000 kg · FTL',
+  'dm.mock.pickHead': 'Încărcare',
+  'dm.mock.dropHead': 'Descărcare',
+  'dm.mock.company': 'Firmă:',
+  'dm.mock.address': 'Adresă:',
+  'dm.mock.date': 'Dată:',
+  'dm.mock.pickCompany': 'DEMO Logistic SRL',
+  'dm.mock.pickAddr': 'Cluj-Napoca, Str. Depozit 12',
+  'dm.mock.pickDate': 'azi',
+  'dm.mock.dropCompany': 'DEMO Distribuție SA',
+  'dm.mock.dropAddr': 'București, Șos. Industriei 8',
+  'dm.mock.dropDate': 'mâine',
   'dm.mock.arriveLoad': 'Am ajuns la încărcare',
-  'dm.mock.navBorder': 'Frontieră',
-  'dm.mock.navWaybill': 'Foaie parcurs',
-  'dm.mock.navDocs': 'Documente',
+  'dm.mock.hoBtn': '⛔ Predare marfă',
+  'dm.mock.navBorder': 'Trecere frontieră',
+  'dm.mock.navWaybill': 'Foaie de parcurs',
+  'dm.mock.navDocs': 'Documente / CMR',
   'dm.mock.navChat': 'Chat',
   'dm.mock.navTour': 'Prezentare',
   'dm.mock.navLogout': 'Ieșire',
@@ -663,15 +876,52 @@ window._DM_FALLBACK = {
   'dm.mock.wbTitle': '📄 Foaie de parcurs',
   'dm.mock.wbCreate': 'Creează foaie de parcurs',
   'dm.mock.wbScan': 'Scanare bon (AI)',
-  'dm.mock.wbHint': 'Bifezi cursele în pasul următor.',
+  'dm.mock.wbHint': 'Vei bifa cursele în pasul următor, dintr-o listă.',
+  'dm.mock.wbSelSum': '1 cursă selectată · Cluj-Napoca → București',
+  'dm.mock.wbManage': '✏️ Gestionare curse',
+  'dm.mock.wbCamion': 'Număr camion',
+  'dm.mock.wbRemorca': 'Număr remorcă',
   'dm.mock.wbKmStart': 'Km început',
   'dm.mock.wbKmEnd': 'Km sfârșit',
+  'dm.mock.wbTripHead': '🕐 Timpi cursă (automat)',
+  'dm.mock.wbTripHint': 'Se calculează automat din datele Plecare și Sosire (+ ora, dacă e completată).',
+  'dm.mock.wbBorderHead': '🛂 Treceri frontieră (automat)',
+  'dm.mock.wbDiurna': '3 zile diurnă externă (calculat din trecerile GPS)',
+  'dm.mock.wbRouteHead': '📍 Puncte de traseu',
+  'dm.mock.tagPlecare': 'Plecare',
+  'dm.mock.tagInc': 'Încărcare',
+  'dm.mock.tagDesc': 'Descărcare',
+  'dm.mock.tagSosire': 'Sosire',
+  'dm.mock.ptPlecare': 'Garaj-Arcus',
+  'dm.mock.ptInc': 'Cluj-Napoca — DEMO Logistic SRL',
+  'dm.mock.ptDesc': 'București — DEMO Distribuție SA',
+  'dm.mock.ptSosire': 'Garaj-Arcus',
+  'dm.mock.wbAddPt': '➕ Adaugă punct',
+  'dm.mock.wbFuelHead': '🛢 Stare combustibil',
+  'dm.mock.wbCantStart': 'Cantitate început (L)',
+  'dm.mock.wbCantEnd': 'Cantitate sfârșit (L)',
+  'dm.mock.wbAlimHead': '⛽ Alimentări',
+  'dm.mock.tagAlim': 'Alimentare',
+  'dm.mock.alim1': 'MOL Cluj · 150 L Motorină · Card flotă · 900 RON',
+  'dm.mock.wbAddAlim': '➕ Adaugă alimentare',
+  'dm.mock.wbScanFuel': '📷 Scanare bon (AI)',
+  'dm.mock.wbAchHead': '🛒 Achiziții',
+  'dm.mock.tagAch': 'Achiziție',
+  'dm.mock.ach1': 'Kaufland București · Apă / gustare · Numerar · 45 RON',
+  'dm.mock.wbAddAch': '➕ Adaugă achiziție',
+  'dm.mock.wbScanPurch': '📷 Scanare bon (AI)',
   'dm.mock.wbNotes': 'Alte mențiuni',
+  'dm.mock.wbNotesPh': 'ex. drum bun',
+  'dm.mock.wbAutoSave': '💡 Salvare automată — nu trebuie să apeși nimic.',
   'dm.mock.wbSubmit': 'Trimite foaia',
   'dm.mock.wbBack': '← Înapoi',
   'dm.mock.wbOpened': 'Foaia deschisă',
-  'dm.mock.docsTitle': '📁 Documente / CMR',
+  'dm.mock.docsTitle': '📷 Încărcare documente',
   'dm.mock.invoice': 'Factură',
+  'dm.mock.customs': 'Vamă',
+  'dm.mock.other': 'Altele',
+  'dm.mock.docPickOrder': 'Cursă (opțional — recomandat pentru POD):',
+  'dm.mock.docNoOrder': '— Fără cursă —',
   'dm.mock.docPick': 'Atinge pentru a alege fișier',
   'dm.mock.docHint': 'Poză sau PDF — mai multe deodată',
   'dm.mock.chatTitle': '💬 Chat',
