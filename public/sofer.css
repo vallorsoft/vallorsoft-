@@ -1636,6 +1636,66 @@
   box-shadow: 0 0 0 2px rgba(96,165,250,0.15);
 }
 
+/* ── DONE stopok: 1-sor magas kompakt kártya (2026-08-25) ──────────────
+   Az elvégzett (`.fd-stop-done` ✅ badge) stopok EGYETLEN sorra zsugorodnak,
+   hogy a nyitott (aktuális, „ez jön") stop vizuálisan jobban kiugorjon.
+   Modern böngészők `:has()`-szel a szülő-kártyát célozzák; nincs JS-változás.
+   – Fejléc-elemek egy sorban (nowrap), a summary inline (ellipzises).
+   – Kisebb padding + halványabb háttér + zöldes akcens-keret bal oldalon.
+   – A nyitott (soron következő) stop teljes 2-soros kártya marad, kék glow-val. */
+.fd-stop-block.fd-stop-coll:has(.fd-stop-done):not(.open) {
+  padding: 6px 10px 6px 12px;
+  margin-bottom: 6px;
+  background: rgba(34,197,94,0.05);
+  border-color: rgba(34,197,94,0.28);
+  border-left: 3px solid #16a34a;
+  opacity: 0.88;
+}
+.fd-stop-block.fd-stop-coll:has(.fd-stop-done):not(.open) > .fd-stop-h {
+  flex-wrap: nowrap;
+  padding: 2px 0;
+  gap: 6px;
+  font-size: 12px;
+  overflow: hidden;
+}
+.fd-stop-block.fd-stop-coll:has(.fd-stop-done):not(.open) > .fd-stop-h b {
+  font-size: 12.5px;
+  white-space: nowrap;
+  color: #334155;                  /* halványabb → a fókusz a nyitott stopra kerül */
+  font-weight: 700;
+}
+.fd-stop-block.fd-stop-coll:has(.fd-stop-done):not(.open) .fd-stop-sum {
+  flex: 1 1 auto;
+  padding-left: 6px;
+  margin-top: 0;
+  font-size: 11.5px;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fd-stop-block.fd-stop-coll:has(.fd-stop-done):not(.open) .fd-stop-done {
+  font-size: 14px;
+}
+.fd-stop-block.fd-stop-coll:has(.fd-stop-done):not(.open) .fd-stop-caret {
+  font-size: 12px;
+}
+
+/* Pending stopok (○ todo): kicsit halványabb, mint alap — a done + open
+   kombináció mellett vizuális ritmust ad. */
+.fd-stop-block.fd-stop-coll:has(.fd-stop-todo):not(.open) {
+  opacity: 0.92;
+}
+
+/* Az open (soron következő) stop kártya kicsit hangsúlyosabb padding + shadow,
+   hogy a kompakt done kártyák között jól kiemelkedjen. */
+.fd-stop-block.fd-stop-coll.open {
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: rgba(59,130,246,0.04);
+  box-shadow: 0 0 0 2px rgba(96,165,250,0.20), 0 4px 12px rgba(59,130,246,0.10);
+}
+
 /* Stop-választó modal — a gombok teljes szélességben, egymás alatt */
 #sofChoiceModal .sof-cf-btns { max-height: 60vh; overflow-y: auto; }
 #sofChoiceModal .sof-cf-btn.ok {
