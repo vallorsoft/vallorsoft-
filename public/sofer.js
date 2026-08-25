@@ -4012,18 +4012,24 @@ function loadMyAssignedVehicle() {
     if (!box) return;
     if (!_myAssignedVehicle || !_myAssignedVehicle.rendszam_camion) { box.style.display = 'none'; return; }
     var v = _myAssignedVehicle;
-    var rem = v.rendszam_remorca
-      ? '<span style="margin-left:14px;">🚛 <b style="color:#0f172a;">' + esc(v.rendszam_remorca) + '</b></span>'
+    var brand = v.marca ? esc(v.marca) + (v.model ? ' ' + esc(v.model) : '') : '';
+    // Új szerkezet: strukturált 2-soros kártya (vontató + pótkocsi külön sorban),
+    // uniform 24px ikon-oszloppal — így a plate + brand vízszintesen igazodik.
+    // A CSS a `.sofer-wrap #myVehicleBox` szabályokból jön (keret, shadow), a
+    // belső szerkezetnek `.mv-*` osztályokat adunk (nincs inline stílus-halmozás).
+    var trailerRow = v.rendszam_remorca
+      ? '<div class="mv-row"><span class="mv-ico">🚛</span><span class="mv-plate">' + esc(v.rendszam_remorca) + '</span></div>'
       : '';
-    box.innerHTML = '<div style="background:linear-gradient(180deg,rgba(59,130,246,0.10),rgba(99,102,241,0.06));'
-      + 'border:1px solid rgba(59,130,246,0.30);border-radius:14px;padding:12px 14px;margin-bottom:14px;">'
-      + '<div style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px;">'
-      + t('sof.myVehicle') + '</div>'
-      + '<div style="font-size:16px;color:#1e293b;">'
-      + '🚚 <b style="color:#0f172a;">' + esc(v.rendszam_camion) + '</b>'
-      + (v.marca ? ' <span style="font-size:12px;color:#64748b;">' + esc(v.marca) + (v.model ? ' ' + esc(v.model) : '') + '</span>' : '')
-      + rem
-      + '</div></div>';
+    box.innerHTML =
+      '<div class="mv-card">' +
+        '<div class="mv-head">' + t('sof.myVehicle') + '</div>' +
+        '<div class="mv-row">' +
+          '<span class="mv-ico">🚚</span>' +
+          '<span class="mv-plate">' + esc(v.rendszam_camion) + '</span>' +
+          (brand ? '<span class="mv-brand">' + brand + '</span>' : '') +
+        '</div>' +
+        trailerRow +
+      '</div>';
     box.style.display = '';
     // Élő akku-feszültség lekérése háttérben (best-effort — a kártya már látszik).
     // A CargoTrack eszközfüggően adja vissza; ha nincs, csendben elmarad.

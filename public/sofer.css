@@ -2332,6 +2332,109 @@
   border: 1.5px solid #fca5a5;
 }
 
+/* ── Teljes-szélességű nav-kártyák egységes ROW-elrendezésben ──
+   A Bemutatás (`#soferTourNavCard`) és a Kilépés (`.logout`) is teljes szélességű.
+   Eddig a Bemutatás oszlopos elrendezésben nagy, magas tömbként ült; a Kilépés
+   kompakt sor. Most MINDKETTŐ kompakt sor (ikon BAL, felirat KÖZÉPEN) → vizuális
+   szimmetria: az „egyéni sorok" ugyanúgy néznek ki. */
+.sofer-wrap .sofer-nav-card#soferTourNavCard {
+  flex-direction: row;
+  gap: 12px;
+  max-height: 74px;
+  flex-shrink: 0;
+  justify-content: center;
+}
+.sofer-wrap .sofer-nav-card#soferTourNavCard::before { display: none; }
+.sofer-wrap .sofer-nav-card#soferTourNavCard .nav-icon {
+  width: 44px; height: 44px;
+  border-radius: 14px;
+  box-shadow: 0 6px 14px rgba(59,130,246,0.28);
+}
+.sofer-wrap .sofer-nav-card#soferTourNavCard .nav-label {
+  padding: 0;
+  text-align: left;
+}
+
+/* Kilépés kártya belső ritmusa: az ikon + felirat pár középre kerül (nem a szélek felé),
+   így vizuálisan egyezik a Bemutatás sorral. */
+.sofer-wrap .sofer-nav-card.logout {
+  justify-content: center;
+}
+.sofer-wrap .sofer-nav-card.logout .nav-label {
+  padding: 0;
+  text-align: left;
+}
+
+/* ── Nekem kiosztott jármű kártya (`#myVehicleBox` > `.mv-card`) ──
+   Strukturált 2-soros elrendezés: vontató + pótkocsi külön sorban,
+   uniform 24px ikon-oszloppal, hogy a plate-ek FÜGGŐLEGESEN igazodjanak.
+   A kártya-keret + shadow a fenti `#myVehicleBox` közös szabályt kapja. */
+/* A `.mv-card` viszi a teljes vizuális réteget (keret + shadow + gradient bg),
+   így a külső üres `#myVehicleBox` div-re nem kell keret. */
+.sofer-wrap #myVehicleBox {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.sofer-wrap #myVehicleBox .mv-card {
+  background: linear-gradient(180deg, rgba(37,99,235,0.09), rgba(99,102,241,0.06));
+  border: 1.5px solid rgba(37,99,235,0.30);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 3px 10px rgba(37,99,235,0.10), 0 1px 2px rgba(15,23,42,0.04);
+}
+.sofer-wrap #myVehicleBox .mv-head {
+  font-size: 11px;
+  color: #334155;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 8px;
+}
+.sofer-wrap #myVehicleBox .mv-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 15px;
+  line-height: 1.2;
+}
+.sofer-wrap #myVehicleBox .mv-row + .mv-row {
+  border-top: 1px dashed rgba(37,99,235,0.20);
+  margin-top: 4px;
+  padding-top: 7px;
+}
+.sofer-wrap #myVehicleBox .mv-ico {
+  flex: 0 0 24px;
+  width: 24px;
+  text-align: center;
+  font-size: 17px;
+  line-height: 1;
+}
+.sofer-wrap #myVehicleBox .mv-plate {
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.sofer-wrap #myVehicleBox .mv-brand {
+  font-size: 12.5px;
+  color: #475569;
+  font-weight: 600;
+  margin-left: auto;              /* jobb szélre — plate + brand szimmetriája */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 55%;
+}
+.sofer-wrap #myVehicleBox .sof-batt-line {
+  border-top: 1px dashed rgba(37,99,235,0.20);
+  margin-top: 4px;
+  padding-top: 7px;
+  font-size: 13px;
+  color: #334155;
+}
+
 /* ── Fejléc-jelvények ── */
 .sofer-wrap #meBadge,
 .sofer-wrap #langSwitch.sofer-lang button {
