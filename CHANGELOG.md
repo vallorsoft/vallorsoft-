@@ -14,6 +14,28 @@
 
 ---
 
+## 2026-08-25 — Sofőr főoldal szimmetria fix: kiosztott jármű 2-soros kártya + teljes-szélességű nav-kártyák uniform row-elrendezésben (PR #362)
+
+### Miért
+A sofőr főoldalon két vizuális aszimmetria maradt a #360 kontraszt-kör után:
+1. A **„Nekem kiosztott jármű"** kártyán a vontató + pótkocsi plate egyetlen sorban lógott inline stílusokkal — nem-igazított, „vegyes" kép (a képen: `B104VLR Mercedes Actros ... CJ36VSN` széthúzva).
+2. A **teljes-szélességű nav-kártyák** stílus-eltérése: a `Bemutatás` oszlopos (icon TOP + label BOTTOM, nagy magas tömb), a `Kilépés` viszont kompakt sor (icon LEFT + label center) — vizuális párbaj, egymás alatt asszimetrikus.
+
+### Mit
+1. **`public/sofer.js` `loadMyAssignedVehicle`** — az inline HTML kicserélve strukturált `.mv-card > .mv-row × 2` elrendezésre, uniform 24px ikon-oszloppal: sor 1 `🚚 [tractor plate]` + `Mercedes Actros` a jobb szélen, sor 2 `🚛 [trailer plate]`. A plate-ek FÜGGŐLEGESEN igazodnak; a `.mv-brand` `margin-left:auto` + `text-overflow:ellipsis` hosszú márka-névre. Szaggatott elválasztó a sorok közt (a battery-sor előtt is).
+2. **`public/sofer.css` új blokk a fájl VÉGÉN** (a #360 KONTRASZT+SZIMMETRIA kör után) — `.mv-*` szabályok (kék gradient bg, 1.5px kék keret, tömör shadow, ikon 24px oszlop, plate `font-weight:800; letter-spacing:0.02em; font-variant-numeric:tabular-nums`).
+3. **Teljes-szélességű nav-kártyák uniform row-elrendezésben**: `#soferTourNavCard`-ra ugyanaz a `flex-direction:row; max-height:74px; justify-content:center` layout jár, mint a `.logout`-ra; a `nav-label` mindkettőn `text-align:left; padding:0`. Ikon 44×44px, border-radius 14 — uniform méret + ritmus. A Kilépés is `justify-content:center` (a pár középre húzódik).
+4. **`sofer.js?v=20260825symfix` + `sofer.css?v=20260825symfix`** cache-bust.
+
+### Fájlok / végpontok
+- **Kliens**: `public/sofer.js` (`loadMyAssignedVehicle` renderer), `public/sofer.css` (~90 sor a fájl végén), `public/sofer.html` (cache-bust ×2).
+- **Szerver / DB / handler érintetlen**.
+
+### Ellenőrzés
+- **981 Jest zöld** (61/68 suite, 45 skip valós-DB) — nincs regresszió.
+
+---
+
 ## 2026-08-25 — Sofőr felület: teljes kontraszt + szimmetria kör (PR #360)
 
 ### Miért
