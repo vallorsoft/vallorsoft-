@@ -6,8 +6,8 @@
   <title data-i18n="title.admin">vallorSoft - Admin Console</title>
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="/style.css?v=20260825ordfix">
-  <script src="/i18n.js?v=20260824comenzi"></script>
+  <link rel="stylesheet" href="/style.css?v=20260825ordfix2">
+  <script src="/i18n.js?v=20260825ordfix2"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -236,7 +236,7 @@
           <div id="ordScanStatus" style="margin-top:8px;"></div>
         </div>
         <div class="grid-3">
-          <div class="field"><label data-i18n="form.client">Ügyfél / Client</label><input class="input" id="oClient" placeholder="pl. Vallor Logistics" data-sg="client" autocomplete="off">
+          <div class="field"><label data-i18n="form.client">Ügyfél / Client</label><input class="input" id="oClient" name="vsord_client" placeholder="pl. Vallor Logistics" data-sg="client" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other">
             <div style="margin-top:6px;"><div id="clientPickerBox"></div><input type="hidden" id="orderClientId" name="client_id"></div>
             <div style="font-size:11px;color:var(--muted);margin-top:4px;" data-i18n="form.clientHint">Vagy válassz a mentett ügyfelek közül (ANAF-ellenőrzött adatok, számlázáshoz).</div>
           </div>
@@ -258,11 +258,11 @@
               <input class="input" id="oMag" type="number" min="0" placeholder="Mag." data-i18n-ph="form.phHei">
             </div>
           </div>
-          <div class="field"><label data-i18n="form.loadLoc">Felrakás helye</label><div class="vs-ac-wrap"><input class="input" id="oLoad" placeholder="pl. Budapest (HU)" autocomplete="off"><div class="vs-ac-dd" id="oLoadDD"></div></div></div>
-          <div class="field"><label data-i18n="form.loadFirma">Felrakási cég</label><input class="input" id="oLoadFirma" placeholder="opcionális" data-i18n-ph="form.firmaPh" data-sg="firma_incarcare" autocomplete="off"></div>
+          <div class="field"><label data-i18n="form.loadLoc">Felrakás helye</label><div class="vs-ac-wrap"><input class="input" id="oLoad" name="vsord_loadloc" placeholder="pl. Budapest (HU)" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"><div class="vs-ac-dd" id="oLoadDD"></div></div></div>
+          <div class="field"><label data-i18n="form.loadFirma">Felrakási cég</label><input class="input" id="oLoadFirma" name="vsord_loadfirma" placeholder="opcionális" data-i18n-ph="form.firmaPh" data-sg="firma_incarcare" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"></div>
           <div class="field"><label data-i18n="form.loadTime">Felrakás ideje</label><input class="input" id="oLoadDate" type="datetime-local"></div>
-          <div class="field"><label data-i18n="form.unloadLoc">Lerakás helye</label><div class="vs-ac-wrap"><input class="input" id="oUnload" placeholder="pl. Bucharest (RO)" autocomplete="off"><div class="vs-ac-dd" id="oUnloadDD"></div></div></div>
-          <div class="field"><label data-i18n="form.unloadFirma">Lerakási cég</label><input class="input" id="oUnloadFirma" placeholder="opcionális" data-i18n-ph="form.firmaPh" data-sg="firma_descarcare" autocomplete="off"></div>
+          <div class="field"><label data-i18n="form.unloadLoc">Lerakás helye</label><div class="vs-ac-wrap"><input class="input" id="oUnload" name="vsord_unloadloc" placeholder="pl. Bucharest (RO)" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"><div class="vs-ac-dd" id="oUnloadDD"></div></div></div>
+          <div class="field"><label data-i18n="form.unloadFirma">Lerakási cég</label><input class="input" id="oUnloadFirma" name="vsord_unloadfirma" placeholder="opcionális" data-i18n-ph="form.firmaPh" data-sg="firma_descarcare" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"></div>
           <div class="field"><label data-i18n="form.unloadTime">Lerakás ideje</label><input class="input" id="oUnloadDate" type="datetime-local"></div>
           <div class="field" style="grid-column:1/-1;">
             <label><span data-i18n="form.uit">🚛 UIT-kód (RO e-Transport)</span> <span style="color:var(--muted);font-weight:400;font-size:11px;" data-i18n="form.uitHint">— opcionális, max 16 karakter, 4-esével kötőjellel</span></label>
@@ -291,35 +291,37 @@
         <div id="oInternBlock" style="display:none; margin-bottom:14px;">
           <div class="field">
             <label data-i18n="form.selectIntern">Belső sofőr kiválasztása</label>
-            <input class="input" id="oInternSearch" placeholder="Keresés..." oninput="filterInternDrivers()" style="margin-bottom:6px;">
+            <input class="input" id="oInternSearch" name="vsord_internsearch" placeholder="Keresés..." oninput="filterInternDrivers()" style="margin-bottom:6px;" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other">
             <select class="select" id="oInternDriver" size="4" style="height:auto;"></select>
           </div>
         </div>
         <div id="oExternBlock" style="display:none; margin-bottom:14px;">
           <div class="field">
             <label data-i18n="form.prevExtern">Korábbi külső sofőr (opcionális)</label>
-            <input class="input" id="oExternSearch" placeholder="Keresés névben / cégben..." oninput="filterExternDrivers()" style="margin-bottom:6px;">
+            <input class="input" id="oExternSearch" name="vsord_externsearch" placeholder="Keresés névben / cégben..." oninput="filterExternDrivers()" style="margin-bottom:6px;" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other">
             <select class="select" id="oExternSelect" size="3" style="height:auto;" onchange="fillExternDriver()">
               <option value="" data-i18n="form.newDriverManual">— Új sofőr beírása kézzel —</option>
             </select>
           </div>
           <div class="grid-3" style="margin-top:10px;">
-            <div class="field"><label data-i18n="form.driverName">Sofőr neve</label><input class="input" id="oExternNume" placeholder="Nagy János" data-sg="nume_sofer" autocomplete="off"></div>
-            <div class="field"><label data-i18n="form.companyName">Cég neve</label><input class="input" id="oExternFirma" placeholder="XY Trans Kft" data-sg="firma_extern" autocomplete="off"></div>
-            <div class="field"><label data-i18n="form.phone">Telefon</label><input class="input" id="oExternTelefon" placeholder="+40 ..." data-sg="telefon_extern" autocomplete="off"></div>
+            <div class="field"><label data-i18n="form.driverName">Sofőr neve</label><input class="input" id="oExternNume" name="vsord_externnume" placeholder="Nagy János" data-sg="nume_sofer" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"></div>
+            <div class="field"><label data-i18n="form.companyName">Cég neve</label><input class="input" id="oExternFirma" name="vsord_externfirma" placeholder="XY Trans Kft" data-sg="firma_extern" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"></div>
+            <div class="field"><label data-i18n="form.phone">Telefon</label><input class="input" id="oExternTelefon" name="vsord_externtel" placeholder="+40 ..." data-sg="telefon_extern" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"></div>
           </div>
         </div>
         <div style="margin-top:10px;">
           <div class="grid-2">
             <div class="field">
-            <label><span data-i18n="form.tractorPlate">Vontató rendszám</span> <button class="btn ok" onclick="openQuickVehicle('Vontato')" style="padding:2px 8px;font-size:11px;margin-left:8px;" data-i18n="form.newShort">+ Új</button></label>
-<input class="input" id="oCamionSearch" placeholder="Keresés..." oninput="filterCamions()" style="margin-bottom:6px;">
-<select class="select" id="oCamionSelect" size="3" style="height:auto;"><option value="" data-i18n="o.selNone">— Nincs megadva —</option></select>  
+              <label data-i18n="form.tractorPlate">Vontató rendszám</label>
+              <input class="input" id="oCamionSearch" name="vsord_camsearch" placeholder="Keresés..." oninput="filterCamions()" style="margin-bottom:6px;" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other">
+              <select class="select" id="oCamionSelect" size="3" style="height:auto;"><option value="" data-i18n="o.selNone">— Nincs megadva —</option></select>
+              <button class="btn ok vs-veh-add" onclick="openQuickVehicle('Vontato')" data-i18n="form.addVehicleBtn">+ Jármű hozzáadása</button>
             </div>
             <div class="field">
-            <label><span data-i18n="form.trailerPlate">Pótkocsi rendszám</span> <button class="btn ok" onclick="openQuickVehicle('Potkocsi')" style="padding:2px 8px;font-size:11px;margin-left:8px;" data-i18n="form.newShort">+ Új</button></label>
-<input class="input" id="oRemorcaSearch" placeholder="Keresés..." oninput="filterRemorcas()" style="margin-bottom:6px;">
-<select class="select" id="oRemorcaSelect" size="3" style="height:auto;"><option value="" data-i18n="o.selNone">— Nincs megadva —</option></select>  
+              <label data-i18n="form.trailerPlate">Pótkocsi rendszám</label>
+              <input class="input" id="oRemorcaSearch" name="vsord_remsearch" placeholder="Keresés..." oninput="filterRemorcas()" style="margin-bottom:6px;" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other">
+              <select class="select" id="oRemorcaSelect" size="3" style="height:auto;"><option value="" data-i18n="o.selNone">— Nincs megadva —</option></select>
+              <button class="btn ok vs-veh-add" onclick="openQuickVehicle('Potkocsi')" data-i18n="form.addTrailerBtn">+ Pótkocsi hozzáadása</button>
             </div>
           </div>
         </div>
@@ -1272,12 +1274,12 @@
     <div id="oeImportExtra" style="margin:8px 0;"></div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div class="field"><label data-i18n="edit.client">Ügyfél</label><input class="input" id="oeClient" data-sg="client" autocomplete="off"></div>
+      <div class="field"><label data-i18n="edit.client">Ügyfél</label><input class="input" id="oeClient" name="vsoe_client" data-sg="client" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"></div>
       <div class="field"><label data-i18n="form.ref">Referencia</label><input class="input" id="oeRef" data-sg="ref" autocomplete="off"></div>
-      <div class="field"><label data-i18n="edit.loadLoc">Rakodás helye</label><div class="vs-ac-wrap"><input class="input" id="oeLocInc" autocomplete="off"><div class="vs-ac-dd" id="oeLocIncDD"></div></div></div>
-      <div class="field"><label data-i18n="form.loadFirma">Felrakási cég</label><input class="input" id="oeFirmaInc" placeholder="opcionális" data-i18n-ph="form.firmaPh" data-sg="firma_incarcare" autocomplete="off"></div>
-      <div class="field"><label data-i18n="form.unloadLoc">Lerakás helye</label><div class="vs-ac-wrap"><input class="input" id="oeLocDesc" autocomplete="off"><div class="vs-ac-dd" id="oeLocDescDD"></div></div></div>
-      <div class="field"><label data-i18n="form.unloadFirma">Lerakási cég</label><input class="input" id="oeFirmaDesc" placeholder="opcionális" data-i18n-ph="form.firmaPh" data-sg="firma_descarcare" autocomplete="off"></div>
+      <div class="field"><label data-i18n="edit.loadLoc">Rakodás helye</label><div class="vs-ac-wrap"><input class="input" id="oeLocInc" name="vsoe_locinc" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"><div class="vs-ac-dd" id="oeLocIncDD"></div></div></div>
+      <div class="field"><label data-i18n="form.loadFirma">Felrakási cég</label><input class="input" id="oeFirmaInc" name="vsoe_firmainc" placeholder="opcionális" data-i18n-ph="form.firmaPh" data-sg="firma_incarcare" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"></div>
+      <div class="field"><label data-i18n="form.unloadLoc">Lerakás helye</label><div class="vs-ac-wrap"><input class="input" id="oeLocDesc" name="vsoe_locdesc" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"><div class="vs-ac-dd" id="oeLocDescDD"></div></div></div>
+      <div class="field"><label data-i18n="form.unloadFirma">Lerakási cég</label><input class="input" id="oeFirmaDesc" name="vsoe_firmadesc" placeholder="opcionális" data-i18n-ph="form.firmaPh" data-sg="firma_descarcare" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"></div>
       <div class="field"><label data-i18n="edit.loadDate">Rakodás dátuma</label><input class="input" id="oeDataInc" type="date"></div>
       <div class="field"><label data-i18n="edit.unloadDate">Lerakás dátuma</label><input class="input" id="oeDataDesc" type="date"></div>
       <div class="field"><label data-i18n="edit.price">Ár (EUR)</label><input class="input" id="oePret" type="number"></div>
@@ -1367,8 +1369,8 @@
             <option value="" data-i18n="edit.choose">— Válassz —</option>
           </select>
         </div>
-        <div class="field" id="oeExternWrap" style="display:none;"><label data-i18n="edit.externName">Extern sofőr neve</label><input class="input" id="oeNumeSoferExtern" data-sg="nume_sofer" autocomplete="off"></div>
-        <div class="field" id="oeExternFirmaWrap" style="display:none;"><label data-i18n="edit.externFirm">Extern cég</label><input class="input" id="oeFirmaExtern" data-sg="firma_extern" autocomplete="off"></div>
+        <div class="field" id="oeExternWrap" style="display:none;"><label data-i18n="edit.externName">Extern sofőr neve</label><input class="input" id="oeNumeSoferExtern" name="vsoe_externnume" data-sg="nume_sofer" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"></div>
+        <div class="field" id="oeExternFirmaWrap" style="display:none;"><label data-i18n="edit.externFirm">Extern cég</label><input class="input" id="oeFirmaExtern" name="vsoe_externfirma" data-sg="firma_extern" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"></div>
         <div class="field"><label data-i18n="form.tractorPlate">Vontató rendszám</label>
           <select class="select" id="oeCamion">
             <option value="" data-i18n="edit.noneDash">— Nincs —</option>
@@ -1537,7 +1539,7 @@
 
 <script src="/feature-catalog.js?v=20260618cgps2"></script>
 <script>window.__pwaInstallDefault=false;</script>
-<script src="/console-shared.js?v=20260824comenzi"></script>
+<script src="/console-shared.js?v=20260825ordfix2"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 <script src="/console-pages.js?v=20260617b1"></script>
 <!-- ===== INTEGRACIOK (Ugyfelek / CargoTrack / Szamlazas) ===== -->
@@ -1583,7 +1585,7 @@
 <script src="/fleet-extra.js?v=20260821svcpost"></script>
 <script src="/entity-detail.js?v=20260715ofc"></script>
 <script src="/planner.js?v=20260614qa"></script>
-<script src="/order-wizard.js?v=20260825navin"></script>
+<script src="/order-wizard.js?v=20260825ordfix2"></script>
 <script src="/admin.js?v=20260820wiz"></script>
 <script src="/global-search.js?v=20260614qa"></script>
  <!-- ── BUG REPORT FAB ── -->

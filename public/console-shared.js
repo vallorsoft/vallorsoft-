@@ -6031,10 +6031,10 @@ function addExtraStopRow(kind, listId, seed) {
   row.innerHTML =
     '<span style="font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;">' + kindLabel + '</span>' +
     '<div class="vs-ac-wrap">' +
-      '<input class="input oe-x-loc" id="' + locId + '" data-sg="loc" placeholder="' + (t('form.locPh') || 'Helyszín') + '" value="' + (seed.loc ? String(seed.loc).replace(/"/g,'&quot;') : '') + '" autocomplete="off">' +
+      '<input class="input oe-x-loc" id="' + locId + '" name="' + locId + '" data-sg="loc" placeholder="' + (t('form.locPh') || 'Helyszín') + '" value="' + (seed.loc ? String(seed.loc).replace(/"/g,'&quot;') : '') + '" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other">' +
       '<div class="vs-ac-dd" id="' + ddId + '"></div>' +
     '</div>' +
-    '<input class="input oe-x-firma" id="' + firmaId + '" data-sg="firma" placeholder="' + (t('form.firmaPh') || 'Cég (opc)') + '" value="' + (seed.firma ? String(seed.firma).replace(/"/g,'&quot;') : '') + '" autocomplete="off">' +
+    '<input class="input oe-x-firma" id="' + firmaId + '" name="' + firmaId + '" data-sg="firma" placeholder="' + (t('form.firmaPh') || 'Cég (opc)') + '" value="' + (seed.firma ? String(seed.firma).replace(/"/g,'&quot;') : '') + '" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other">' +
     '<input class="input oe-x-data" type="date" value="' + (seed.data ? String(seed.data).slice(0,10) : '') + '">' +
     '<button type="button" class="btn ghost" style="padding:6px 10px;" onclick="this.parentNode.remove()" title="' + (t('common.delete') || 'Törlés') + '">✕</button>';
   list.appendChild(row);

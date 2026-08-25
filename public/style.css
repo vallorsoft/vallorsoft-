@@ -2665,3 +2665,179 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .main-content[data-theme="dark"] .pane[data-pane="orders-form"] div[data-i18n="form.driverType"]{
   color:#cbd5e1 !important;
 }
+
+/* ════════════════════════════════════════════════════════════
+   KONTRASZT + SZIMMETRIA — 2. KÖR (Kiosztás step 4 fókusszal)
+   ────
+   Gyökér: (a) a „SOFŐR TÍPUSA" alatti 3 radio-label INLINE stílusa
+   `color:var(--text)` volt, ami a light-témán `#e9eef5` (majdnem
+   fehér) → alig olvashatóak. (b) A `<select size="3/4">` listák
+   kiválasztott sora csak halvány kék rendszer-highlight → nem
+   egyértelmű, hogy mit választott ki. Kérés: kontraszt + a
+   sor legyen keretes/pipálva.
+   ════════════════════════════════════════════════════════════ */
+
+/* ── SOFŐR TÍPUSA radio-label szöveg — az inline `color:var(--text)`
+   felülírása (a `--text` = #e9eef5 majdnem fehér, ami light-témán
+   olvashatatlan). A `label > span[data-i18n]` kap magas kontrasztot,
+   a label maga is fallback-ként. ── */
+.main-content .pane[data-pane="orders-form"] label span[data-i18n="form.internDriver"],
+.main-content .pane[data-pane="orders-form"] label span[data-i18n="form.externDriver"],
+.main-content .pane[data-pane="orders-form"] label span[data-i18n="form.noDriver"]{
+  color:#0f172a !important;
+  font-weight:600 !important;
+  font-size:14px !important;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] label span[data-i18n="form.internDriver"],
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] label span[data-i18n="form.externDriver"],
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] label span[data-i18n="form.noDriver"]{
+  color:#f1f5f9 !important;
+}
+
+/* ── SOFŐR TÍPUSA radio maga — nagyobb + narancs accent ── */
+.main-content .pane[data-pane="orders-form"] input[name="oSoferType"]{
+  width:20px !important; height:20px !important;
+  accent-color:#f6711e !important;
+  cursor:pointer;
+  vertical-align:middle;
+}
+
+/* ══ Sofőr + jármű választó listák (`<select size>`) ══
+   `#oInternDriver` (size=4), `#oExternSelect`/`#oCamionSelect`/
+   `#oRemorcaSelect` (size=3). Kell: erős 2px keret, magas sorok,
+   kiválasztott sor EGYÉRTELMŰ (narancs gradiens bg + fehér félkövér
+   szöveg + baloldali fehér inset), fókuszban jól látszik.
+   Csak a fuvar-kiírás pane-en (más felület érintetlen). */
+.main-content .pane[data-pane="orders-form"] #oInternDriver,
+.main-content .pane[data-pane="orders-form"] #oExternSelect,
+.main-content .pane[data-pane="orders-form"] #oCamionSelect,
+.main-content .pane[data-pane="orders-form"] #oRemorcaSelect{
+  border-width:2px !important;
+  border-color:#cbd5e1 !important;
+  border-radius:12px !important;
+  padding:6px !important;
+  min-height:110px;
+  background:#ffffff;
+  font-size:14px;
+  cursor:pointer;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] #oInternDriver,
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] #oExternSelect,
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] #oCamionSelect,
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] #oRemorcaSelect{
+  border-color:rgba(255,255,255,0.20) !important;
+  background:#1e1812;
+}
+.main-content .pane[data-pane="orders-form"] #oInternDriver:focus,
+.main-content .pane[data-pane="orders-form"] #oExternSelect:focus,
+.main-content .pane[data-pane="orders-form"] #oCamionSelect:focus,
+.main-content .pane[data-pane="orders-form"] #oRemorcaSelect:focus{
+  border-color:#f6711e !important;
+  box-shadow:0 0 0 4px rgba(246,113,30,0.20) !important;
+  outline:none;
+}
+
+/* Sor-magasság + padding a listák elemeinek */
+.main-content .pane[data-pane="orders-form"] #oInternDriver option,
+.main-content .pane[data-pane="orders-form"] #oExternSelect option,
+.main-content .pane[data-pane="orders-form"] #oCamionSelect option,
+.main-content .pane[data-pane="orders-form"] #oRemorcaSelect option{
+  padding:9px 12px !important;
+  font-size:13.5px !important;
+  border-radius:8px !important;
+  color:#0f172a !important;
+  background:#ffffff !important;
+  margin:2px 0;
+  border:1.5px solid transparent;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] #oInternDriver option,
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] #oExternSelect option,
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] #oCamionSelect option,
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] #oRemorcaSelect option{
+  color:#f1f5f9 !important;
+  background:#1e1812 !important;
+}
+
+/* Hover — világos narancs érintés */
+.main-content .pane[data-pane="orders-form"] #oInternDriver option:hover,
+.main-content .pane[data-pane="orders-form"] #oExternSelect option:hover,
+.main-content .pane[data-pane="orders-form"] #oCamionSelect option:hover,
+.main-content .pane[data-pane="orders-form"] #oRemorcaSelect option:hover{
+  background:rgba(246,113,30,0.10) !important;
+  border-color:rgba(246,113,30,0.35);
+}
+
+/* ★ KIVÁLASZTOTT sor — feltűnő narancs→korall gradiens + fehér
+   félkövér szöveg + 2px narancs keret. Egyértelmű, hogy „ez van
+   kiválasztva". A `!important` a natív rendszer-highlight
+   felülírásához kell. Egy `<option>` layout-attribútumainak stílusa
+   ~korlátozott, de background/color/font-weight/border MŰKÖDIK
+   Chrome/Firefox/Safari-ban `size > 1` esetén. */
+.main-content .pane[data-pane="orders-form"] #oInternDriver option:checked,
+.main-content .pane[data-pane="orders-form"] #oExternSelect option:checked,
+.main-content .pane[data-pane="orders-form"] #oCamionSelect option:checked,
+.main-content .pane[data-pane="orders-form"] #oRemorcaSelect option:checked{
+  background:linear-gradient(90deg,#f6711e 0%,#f6517b 100%) !important;
+  background-color:#f6711e !important;
+  color:#ffffff !important;
+  font-weight:800 !important;
+  border:2px solid #e8620f !important;
+  box-shadow:inset 4px 0 0 rgba(255,255,255,0.55);
+  text-shadow:0 1px 2px rgba(0,0,0,0.25);
+}
+
+/* Nem-kiválasztott (`:not(:checked)`) diszkrét bal-akcens
+   csík — így a nem-választott sorok is „kártyaszerűbben" néznek ki */
+.main-content .pane[data-pane="orders-form"] #oInternDriver option:not(:checked),
+.main-content .pane[data-pane="orders-form"] #oExternSelect option:not(:checked),
+.main-content .pane[data-pane="orders-form"] #oCamionSelect option:not(:checked),
+.main-content .pane[data-pane="orders-form"] #oRemorcaSelect option:not(:checked){
+  box-shadow:inset 3px 0 0 rgba(148,163,184,0.35);
+}
+
+/* ── A jármű-választó keresők (#oCamionSearch/#oRemorcaSearch/
+   #oInternSearch/#oExternSearch) uniform 40px min-height + 1.5px keret ── */
+.main-content .pane[data-pane="orders-form"] #oCamionSearch,
+.main-content .pane[data-pane="orders-form"] #oRemorcaSearch,
+.main-content .pane[data-pane="orders-form"] #oInternSearch,
+.main-content .pane[data-pane="orders-form"] #oExternSearch{
+  min-height:40px !important;
+  border-width:1.5px !important;
+  font-weight:500 !important;
+}
+
+/* ── „+ Jármű hozzáadása" / „+ Pótkocsi hozzáadása" gomb — SZÉLES + ALACSONY.
+   A régi kis kék „+ Új" gomb (label-en belül) volt — vertikálisan elnyúlt
+   a layout. Új: teljes szélességű, kompakt sor a select ALATT. ── */
+.main-content .pane[data-pane="orders-form"] .vs-veh-add{
+  display:block !important;
+  width:100% !important;
+  margin-top:8px !important;
+  padding:9px 14px !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  min-height:38px !important;
+  border-radius:10px !important;
+  border-width:1.5px !important;
+  letter-spacing:0.2px;
+}
+.main-content .pane[data-pane="orders-form"] .vs-veh-add:hover{
+  transform:translateY(-1px);
+  filter:brightness(1.05);
+}
+
+/* ── Belső/Extern sofőr blokk + jármű blokk kompaktabb ritmus:
+   ne hagyjon nagy közöket egymás közt ── */
+.main-content .pane[data-pane="orders-form"] #oInternBlock,
+.main-content .pane[data-pane="orders-form"] #oExternBlock{
+  margin-bottom:10px !important;
+}
+.main-content .pane[data-pane="orders-form"] .grid-2 > .field{
+  margin-bottom:8px !important;
+}
+.main-content .pane[data-pane="orders-form"] .field{
+  gap:4px !important;
+}
+.main-content .pane[data-pane="orders-form"] .grid-2{
+  gap:12px !important;
+}
