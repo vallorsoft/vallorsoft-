@@ -14,6 +14,27 @@
 
 ---
 
+## 2026-08-25 — Sofőr multi-stop lista: elvégzett (✅) stopok 1-sor magasak → nyitott stop jobban kiemelkedik (PR #364)
+
+### Miért
+A kiosztott multi-stop fuvar-kártyán az elvégzett (`✅` `.fd-stop-done`) stopok 2 sor magasak voltak (badge/label + kompakt summary a következő sorban, mert a `.fd-stop-sum` `flex:1 1 100%` új sorra tört). A képen látszik: 8+ stop hosszú listában a done sorok bevonzják a szemet, a valódi cselekvést igénylő nyitott „ez jön" stop kevésbé emelkedik ki.
+
+### Mit
+1. **`public/sofer.css` új `:has()` szabályok** (nincs JS-változás, a szülő `.fd-stop-block.fd-stop-coll` kártyát célozzuk a gyerek `.fd-stop-done` alapján — modern böngészők, Chrome 105+ / Safari 15.4+, a sofőr PWA célközönségén magas lefedettségű):
+   - **Done stopok 1-sor kompakt** (`:has(.fd-stop-done):not(.open)`) — fejléc `flex-wrap:nowrap`, summary INLINE (`flex:1 1 auto; padding-left:6px`) ellipzises, 6px padding, `margin-bottom:6px`, halvány zöld háttér `rgba(34,197,94,0.05)` + 3px zöld bal-akcens keret `#16a34a`, opacity 0.88; betűk kisebbek (title 12.5px szín `#334155`, sum 11.5px szín `#64748b`) → visszahúzódik.
+   - **Open stop hangsúlyosabb** (`.fd-stop-block.fd-stop-coll.open`) — 12px padding, `margin-bottom:12px`, halvány kék bg + kettős shadow (`0 0 0 2px rgba(96,165,250,0.20), 0 4px 12px rgba(59,130,246,0.10)`). A kompakt done sorok között felnyomja a fókuszt.
+   - **Pending stopok** (`:has(.fd-stop-todo):not(.open)`) opacity 0.92 — finom vizuális ritmus, közel a normálhoz.
+
+### Fájlok / végpontok
+- **Kliens**: `public/sofer.css` (+60 sor a fájl végén), `public/sofer.html` cache-bust `sofer.css?v=20260825symfix` → `?v=20260825done1r`.
+- **Szerver / DB / JS érintetlen** — tisztán CSS `:has()` szelektor.
+- Csak `.fd-stop-block.fd-stop-coll` szelektorokat érint (multi-stop akkordeon a fuvar-kártya kinyíló részében); klasszikus 1 felrakó + 1 lerakó fuvar érintetlen.
+
+### Ellenőrzés
+- **981 Jest zöld** (61/68 suite, 45 skip valós-DB) — nincs regresszió.
+
+---
+
 ## 2026-08-25 — Sofőr főoldal szimmetria fix: kiosztott jármű 2-soros kártya + teljes-szélességű nav-kártyák uniform row-elrendezésben (PR #362)
 
 ### Miért
