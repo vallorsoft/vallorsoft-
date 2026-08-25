@@ -2369,3 +2369,299 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   .vs-chip{ padding:5px 10px; font-size:11px; flex-shrink:0; }
   .vs-chip .vs-chip-n{ min-width:18px; height:18px; font-size:10px; }
 }
+
+/* ════════════════════════════════════════════════════════════
+   KONTRASZT + SZIMMETRIA KÖR — Fuvar-kezelés + Fuvar-kiírás
+   (admin + manager, mindkét téma). Additív, a fájl VÉGÉN áll —
+   felülír, ha kell. Scope: KIZÁRÓLAG a két pane
+   (orders-list + orders-form), hogy más felületet ne érintsen.
+   ──
+   Cél: (1) olvashatóbb kontraszt (fejléc szín, sor-elválasztó,
+   akciógomb-keret, chip-számláló, form-mezők keret+címke,
+   fuvar-szám cella); (2) szimmetrikusabb ritmus (metric-band ↔
+   chip-bar ↔ tábla egyenletes gap; kereső-sáv + akció-gombok
+   uniform magassága; form-mezők egységes 46px min-height +
+   1.5px keret; sticky selection bar uniform padding).
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Közös TÁBLA-fejléc (Fuvar-kezelés + Törölt fuvarok) — jobb kontraszt ── */
+.main-content .pane[data-pane="orders-list"] #tblOrders thead th,
+.main-content .pane[data-pane="orders-deleted"] #tblOrdersDeleted thead th{
+  color:#334155;
+  font-weight:700;
+  letter-spacing:0.5px;
+  border-bottom:1.5px solid #cbd5e1;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-list"] #tblOrders thead th,
+.main-content[data-theme="dark"] .pane[data-pane="orders-deleted"] #tblOrdersDeleted thead th{
+  color:#e2e8f0;
+  border-bottom-color:rgba(255,255,255,0.14);
+}
+
+/* ── Táblázat sor-elválasztó erősítés (1px → 1.5px kontrasztos) ── */
+.main-content .pane[data-pane="orders-list"] #tblOrders tbody td,
+.main-content .pane[data-pane="orders-deleted"] #tblOrdersDeleted tbody td{
+  border-bottom:1.5px solid #e2e8f0;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-list"] #tblOrders tbody td,
+.main-content[data-theme="dark"] .pane[data-pane="orders-deleted"] #tblOrdersDeleted tbody td{
+  border-bottom-color:rgba(255,255,255,0.08);
+}
+
+/* ── Zebra kontraszt kicsit erősebb ── */
+.main-content .pane[data-pane="orders-list"] #tblOrders tbody tr:nth-child(even) td{
+  background:rgba(148,163,184,0.07);
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-list"] #tblOrders tbody tr:nth-child(even) td{
+  background:rgba(255,255,255,0.035);
+}
+
+/* ── Fuvar-szám cella (első oszlop) — erősebb kontraszt ── */
+.main-content .pane[data-pane="orders-list"] #tblOrders td.vsl-orow-first{
+  font-weight:800;
+  color:#0f172a;
+  font-size:13px;
+  letter-spacing:0.2px;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-list"] #tblOrders td.vsl-orow-first{
+  color:#f1f5f9;
+}
+.main-content .pane[data-pane="orders-list"] #tblOrders td.vsl-orow-first .text-muted{
+  color:#94a3b8;
+}
+
+/* ── Bal-akcens csík 4px → 5px (feltűnőbb, konzisztens a sofőr-oldalon
+   is használt 5px akcenssel) ── */
+.main-content .pane[data-pane="orders-list"] #tblOrders tr.vsl-orow .vsl-orow-first{
+  border-left-width:5px !important;
+}
+
+/* ── Státusz-pirula (select.vsl-pill) — 1.5px keret + kontrasztosabb betű
+   (a bg/color inline stílusból jön; itt a keret vastagságát/hover-t erősítjük) ── */
+.main-content .pane[data-pane="orders-list"] #tblOrders select.vsl-pill{
+  border-width:1.5px !important;
+  min-width:88px;
+  padding-top:5px;
+  padding-bottom:5px;
+  font-weight:800;
+}
+
+/* ── Sofőr-avatar — kicsit nagyobb + jobb kontraszt ── */
+.main-content .pane[data-pane="orders-list"] #tblOrders .vsl-av{
+  width:24px; height:24px; font-size:11px;
+  box-shadow:0 2px 6px -2px rgba(15,23,42,0.5);
+}
+.main-content .pane[data-pane="orders-list"] #tblOrders .vsl-driver-name{
+  font-weight:600;
+  color:#0f172a;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-list"] #tblOrders .vsl-driver-name{
+  color:#f1f5f9;
+}
+
+/* ── Sor-akció gombok (✏️ + ⋯) — uniform szimmetrikus méret ── */
+.main-content .pane[data-pane="orders-list"] #tblOrders td.vs-row-actions{
+  white-space:nowrap;
+  min-width:96px;
+}
+.main-content .pane[data-pane="orders-list"] #tblOrders td.vs-row-actions .vs-act-edit,
+.main-content .pane[data-pane="orders-list"] #tblOrders td.vs-row-actions .vs-act-more{
+  min-width:38px;
+  min-height:34px;
+  padding:6px 10px;
+  font-size:14px;
+  border-width:1.5px;
+  border-radius:9px;
+  vertical-align:middle;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+.main-content .pane[data-pane="orders-list"] #tblOrders td.vs-row-actions .vs-act-more{
+  margin-left:6px;
+}
+
+/* ── Chip-bar — 1.5px vastag keret + jobb chip-számláló kontraszt ── */
+.main-content .pane[data-pane="orders-list"] .vs-chip{
+  border-width:1.5px;
+  padding:7px 13px;
+  min-height:32px;
+}
+.main-content .pane[data-pane="orders-list"] .vs-chip .vs-chip-n{
+  min-width:24px; height:22px;
+  background:#cbd5e1;
+  color:#1e293b;
+  font-weight:800;
+  border:1px solid #94a3b8;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-list"] .vs-chip .vs-chip-n{
+  background:rgba(255,255,255,0.16);
+  color:#f1f5f9;
+  border-color:rgba(255,255,255,0.22);
+}
+.main-content .pane[data-pane="orders-list"] .vs-chip.active .vs-chip-n{
+  background:rgba(255,255,255,0.32);
+  color:#ffffff;
+  border-color:rgba(255,255,255,0.55);
+}
+
+/* ── Kereső-sáv (search + status-filter + reset gomb) — uniform 40px magasság,
+   1.5px keret, egyenletes vízszintes ritmus ── */
+.main-content .pane[data-pane="orders-list"] #orderSearch,
+.main-content .pane[data-pane="orders-list"] #orderStatusFilter{
+  min-height:40px;
+  border-width:1.5px;
+  font-weight:600;
+}
+.main-content .pane[data-pane="orders-list"] #orderSearch::placeholder{
+  color:#64748b;
+  opacity:1;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-list"] #orderSearch::placeholder{
+  color:#94a3b8;
+}
+.main-content .pane[data-pane="orders-list"] .btn.ghost[onclick*="resetOrderColumns"]{
+  min-height:40px;
+  border-width:1.5px;
+}
+
+/* ── Metric band + chip bar + tábla közti szimmetrikus rés ── */
+.main-content .pane[data-pane="orders-list"] #ordersMetricBand{ margin-bottom:14px !important; }
+.main-content .pane[data-pane="orders-list"] #ordersChipBar{ margin-bottom:14px !important; }
+
+/* ── Sticky kijelölt-fuvar sáv — uniform padding + magasabb kontraszt keret ── */
+.main-content .pane[data-pane="orders-list"] #orderSelBar > div{
+  padding:14px 20px !important;
+  border-width:1.5px !important;
+  border-color:rgba(37,99,235,0.55) !important;
+  border-radius:14px !important;
+  gap:14px !important;
+}
+.main-content .pane[data-pane="orders-list"] #orderSelBar #orderSelCount{
+  font-size:14px !important;
+  font-weight:800 !important;
+  letter-spacing:0.2px;
+}
+.main-content .pane[data-pane="orders-list"] #orderSelBar .btn{
+  min-height:38px;
+  border-width:1.5px;
+  padding:8px 16px !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+}
+
+/* ── Törölt fuvarok pane — tábla és bal-akcens konzisztens ── */
+.main-content .pane[data-pane="orders-deleted"] #tblOrdersDeleted tbody td{
+  color:#64748b;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-deleted"] #tblOrdersDeleted tbody td{
+  color:#94a3b8;
+}
+
+/* ════════════════════════════════════════════════════════════
+   FUVAR-KIÍRÁS pane (orders-form) — kontraszt + szimmetria
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Címkék (label) erősebb kontraszttal ── */
+.main-content .pane[data-pane="orders-form"] .field label{
+  color:#334155;
+  font-weight:600;
+  font-size:13px;
+  letter-spacing:0.1px;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] .field label{
+  color:#cbd5e1;
+}
+
+/* ── Mezők (input + select) — uniform 46px min-height, 1.5px keret ── */
+.main-content .pane[data-pane="orders-form"] .field .input,
+.main-content .pane[data-pane="orders-form"] .field .select,
+.main-content .pane[data-pane="orders-form"] .field .textarea{
+  min-height:46px;
+  border-width:1.5px;
+  font-weight:500;
+}
+.main-content .pane[data-pane="orders-form"] .field .input::placeholder{
+  color:#94a3b8;
+  opacity:1;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] .field .input::placeholder{
+  color:#64748b;
+}
+
+/* ── Mező-alatti hint-szöveg jobb kontraszt ── */
+.main-content .pane[data-pane="orders-form"] .field div[style*="font-size:11px"]{
+  color:#64748b !important;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] .field div[style*="font-size:11px"]{
+  color:#94a3b8 !important;
+}
+
+/* ── Autocomplete-lenyíló (Photon) uniform kontraszt keret ── */
+.main-content .pane[data-pane="orders-form"] .vs-ac-dd{
+  border-width:1.5px !important;
+}
+
+/* ── Sofőr-típus radio-sor (Intern / Extern / None) egyenletes ritmus ── */
+.main-content .pane[data-pane="orders-form"] input[name="oSoferType"]{
+  width:17px; height:17px; cursor:pointer;
+  accent-color:#3b82f6;
+  vertical-align:middle;
+}
+
+/* ── Belső / Extern sofőr-lista (size=4/3) uniform kinézet ── */
+.main-content .pane[data-pane="orders-form"] #oInternDriver,
+.main-content .pane[data-pane="orders-form"] #oExternSelect,
+.main-content .pane[data-pane="orders-form"] #oCamionSelect,
+.main-content .pane[data-pane="orders-form"] #oRemorcaSelect{
+  border-width:1.5px;
+  padding:6px 8px;
+}
+
+/* ── „TÖBB FELRAKÁSI / LERAKÁSI PONT" doboz — 1.5px dashed + halvány warm bg ── */
+.main-content .pane[data-pane="orders-form"] #oExtraStopsBox{
+  border-width:1.5px !important;
+  border-color:#cbd5e1 !important;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] #oExtraStopsBox{
+  border-color:rgba(255,255,255,0.18) !important;
+  background:rgba(255,255,255,0.02) !important;
+}
+.main-content .pane[data-pane="orders-form"] #oExtraStopsBox > div > div:first-child{
+  color:#334155 !important;
+  font-weight:700 !important;
+  letter-spacing:0.2px;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] #oExtraStopsBox > div > div:first-child{
+  color:#cbd5e1 !important;
+}
+
+/* ── Mentés-gomb (Fuvarfeladat mentése) — magasabb + erősebb ── */
+.main-content .pane[data-pane="orders-form"] > .glass > button.btn.primary[onclick*="createOrder"]{
+  min-height:52px;
+  font-size:15px;
+  font-weight:800;
+  letter-spacing:0.3px;
+  border-width:1.5px;
+  border-radius:12px;
+  box-shadow:0 6px 20px rgba(246,113,30,0.28);
+}
+
+/* ── AI-scan + CSV-import gombok uniform méret ── */
+.main-content .pane[data-pane="orders-form"] #ordersImportBtnBox .btn,
+.main-content .pane[data-pane="orders-form"] #ordScanBtnBox .btn{
+  min-height:40px;
+  border-width:1.5px;
+  border-radius:10px;
+  font-weight:700;
+}
+
+/* ── SOFŐR TÍPUSA fejléc-címke jobb kontraszt ── */
+.main-content .pane[data-pane="orders-form"] div[style*="SOFŐR"],
+.main-content .pane[data-pane="orders-form"] div[data-i18n="form.driverType"]{
+  color:#334155 !important;
+  font-weight:700 !important;
+}
+.main-content[data-theme="dark"] .pane[data-pane="orders-form"] div[data-i18n="form.driverType"]{
+  color:#cbd5e1 !important;
+}
