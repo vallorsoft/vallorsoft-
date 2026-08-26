@@ -10,6 +10,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Manuális indítás (GitHub UI: Actions → CI → "Run workflow", vagy API).
+  # Kell ha a fő futás `startup_failure`-rel elhal (pl. `concurrency:
+  # cancel-in-progress` mellett a rerun 0 jobbal indul), és nem akarunk üres
+  # commitot pushni csak azért, hogy a Fly-deploy újra elinduljon.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
