@@ -2841,3 +2841,176 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .main-content .pane[data-pane="orders-form"] .grid-2{
   gap:12px !important;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ADMIN + MANAGER SIDEBAR — VILÁGOS + MODERN + KONTRASZTOS + SZIMMETRIKUS
+   (a fájl VÉGÉN, felülíró jogán él — érvényteleníti a korábbi sötét/meleg
+   sidebar-tokeneket; kizárólag a .sidebar szelektort érinti, más felületet
+   és a sofőr-módot NEM.)
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Alap háttér + jobb szegély — világos slate paletta */
+.sidebar{
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%) !important;
+  border-right: 1.5px solid #cbd5e1 !important;
+  padding: 22px 14px !important;
+  gap: 3px !important;
+}
+
+/* Logó és alcím — sötét kontrasztos szöveg világos háttéren */
+.sidebar .vs-logo{ color:#0f172a; }
+.sidebar .vs-logo .vallor{ color:#0f172a !important; text-shadow:none; }
+.sidebar .vs-logo .soft{
+  color:#4f46e5 !important;
+  text-shadow: 0 0 12px rgba(79,70,229,0.20) !important;
+}
+.sidebar .sidebar-subtitle{
+  color:#64748b !important;
+  font-weight:700 !important;
+  letter-spacing:0.4px;
+  text-transform:uppercase;
+  font-size:10.5px !important;
+}
+
+/* Menü-csoportok — konzisztens (szimmetrikus) függőleges ritmus */
+.sidebar .menu-group{ gap:2px !important; margin-bottom:2px; }
+.sidebar .menu-title{
+  color:#94a3b8 !important; font-size:10.5px !important;
+  letter-spacing:1px; padding-left:12px; margin:8px 0 4px;
+}
+
+/* ── FŐMENÜ (level 1) ── egyforma magas, közepesen kontrasztos, kerek sarok */
+.sidebar .tab,
+.sidebar a.tab-link{
+  padding: 11px 13px !important;
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+  font-size: 13.5px !important;
+  color: #1e293b !important;
+  min-height: 42px;
+  display: flex; align-items: center; gap: 11px;
+  border: 1px solid transparent !important;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, transform 0.10s ease;
+  text-decoration: none;
+}
+.sidebar .tab:hover,
+.sidebar a.tab-link:hover{
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+.sidebar .tab:active{ transform: translateY(1px); }
+
+/* Aktív főmenü — telített indigó gradiens, fehér felirat, finom glow */
+.sidebar .tab.active{
+  background: linear-gradient(180deg, #4f46e5 0%, #4338ca 100%) !important;
+  color: #ffffff !important;
+  border-color: #4338ca !important;
+  box-shadow: 0 3px 10px rgba(79,70,229,0.28), 0 1px 2px rgba(15,23,42,0.10) !important;
+}
+.sidebar .tab.active .nav-ico,
+.sidebar .tab.active .nav-chev{ color: #ffffff !important; opacity: 1 !important; }
+.sidebar a.tab-link.active{
+  background: linear-gradient(180deg, #4f46e5 0%, #4338ca 100%) !important;
+  color: #ffffff !important;
+  border-color: #4338ca !important;
+  box-shadow: 0 3px 10px rgba(79,70,229,0.28) !important;
+}
+
+/* Nav-ikon (SVG, currentColor) — világosban kellemesen olvasható */
+.sidebar .nav-ico{
+  width: 18px; height: 18px; flex: 0 0 auto;
+  opacity: 0.85; color: currentColor;
+}
+.sidebar .tab:hover .nav-ico{ opacity: 1; }
+
+/* Chevron — halvány slate, aktívnál/nyitottnál sötétebb */
+.sidebar .nav-head{ cursor: pointer; }
+.sidebar .nav-head .nav-chev{
+  width: 14px; height: 14px; flex: 0 0 auto;
+  color: #64748b; opacity: 0.75;
+  transition: transform .18s ease, opacity .14s ease, color .14s ease;
+  margin-left: 4px;
+}
+.sidebar .nav-head:hover .nav-chev{ color:#334155; opacity: 1; }
+.sidebar .menu-group.open .nav-head .nav-chev{ transform: rotate(180deg); color:#334155; opacity:1; }
+.sidebar .menu-group.open .nav-head{
+  background: rgba(148,163,184,0.14) !important;
+  border-color: #cbd5e1 !important;
+}
+.sidebar .menu-group.open .nav-head:hover{ background:#e2e8f0 !important; }
+
+/* Amikor az aktív főmenü egyben nyitott nav-head is → az indigó gradiens marad */
+.sidebar .menu-group.open .nav-head.active{
+  background: linear-gradient(180deg, #4f46e5 0%, #4338ca 100%) !important;
+}
+.sidebar .menu-group.open .nav-head.active .nav-chev{ color:#fff !important; }
+
+/* ── ALMENÜ (level 2) ── behúzott, dedikált vezérlő-vonallal → szimmetria */
+.sidebar .submenu{
+  padding: 4px 0 6px 10px !important;
+  margin: 2px 0 6px 4px !important;
+  border-left: 2px solid #e2e8f0;
+  gap: 2px !important;
+}
+.sidebar .sub-tab{
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  color: #475569 !important;
+  min-height: 36px;
+  display: flex; align-items: center;
+  border: 1px solid transparent !important;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, padding 0.10s ease;
+}
+.sidebar .sub-tab:hover{
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Aktív almenü — világos indigó-tinta + bal akcent-csík, sötét indigó felirat */
+.sidebar .sub-tab.active{
+  background: #e0e7ff !important;
+  color: #3730a3 !important;
+  font-weight: 700 !important;
+  border-left: 3px solid #4f46e5 !important;
+  padding-left: 9px !important;
+  box-shadow: inset 0 0 0 1px rgba(79,70,229,0.10);
+}
+
+/* Fókusz-gyűrű (billentyűzet) — akadálymentesség + prof. érzet */
+.sidebar .tab:focus-visible,
+.sidebar .sub-tab:focus-visible,
+.sidebar a.tab-link:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(79,70,229,0.28), 0 1px 2px rgba(15,23,42,0.06) !important;
+}
+
+/* Alsó szekció (meBadge + Kilépés) — világos, kontrasztos */
+.sidebar > div[style*="border-top"]{
+  border-top-color: #cbd5e1 !important;
+}
+.sidebar #meBadge{ color:#475569 !important; font-weight:600; }
+.sidebar .btn.ghost.block{
+  background: #ffffff !important;
+  border: 1.5px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04) !important;
+}
+.sidebar .btn.ghost.block:hover{
+  background: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+}
+
+/* Görgetősáv — visszafogott, világos slate */
+.sidebar::-webkit-scrollbar{ width: 8px; }
+.sidebar::-webkit-scrollbar-thumb{ background: #cbd5e1; border-radius: 8px; }
+.sidebar::-webkit-scrollbar-thumb:hover{ background: #94a3b8; }
+.sidebar::-webkit-scrollbar-track{ background: transparent; }
+
+/* Sofőr-mód (body.vs-dm) — a driver-mode saját nagyítás/off-canvas rétege
+   érintetlen; a színek viszont a fenti világos palettát öröklik automatikusan
+   (nincs külön override szükséges — az !important-ok a driver-mode fölé is
+   érvényesek). */

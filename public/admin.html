@@ -6,8 +6,8 @@
   <title data-i18n="title.admin">vallorSoft - Admin Console</title>
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="/style.css?v=20260825ordfix2">
-  <script src="/i18n.js?v=20260825ordfix2"></script>
+  <link rel="stylesheet" href="/style.css?v=20260826navlight">
+  <script src="/i18n.js?v=20260826navlight"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -49,13 +49,13 @@
       <div class="submenu" id="ordersSubmenu">
         <div class="sub-tab" data-tab="orders-form" data-i18n="nav.ordersForm">Kiírás</div>
         <div class="sub-tab" data-tab="orders-list" data-i18n="nav.ordersList">Kezelés</div>
-        <div class="sub-tab" data-tab="orders-deleted" data-i18n="nav.ordersDeleted">🗑️ Törölt fuvarok</div>
+        <div class="sub-tab" data-tab="orders-deleted" data-i18n="nav.ordersDeleted">Törölt fuvarok</div>
         <div class="sub-tab" data-tab="orders-done" data-i18n="nav.ordersDone">Teljesített fuvarok</div>
-        <div class="sub-tab" data-tab="quotes" data-i18n="nav.quotes">📝 Árajánlatok</div>
-        <div class="sub-tab" data-tab="orders-planner" data-i18n="nav.planner">📅 Tervezőtábla</div>
+        <div class="sub-tab" data-tab="quotes" data-i18n="nav.quotes">Árajánlatok</div>
+        <div class="sub-tab" data-tab="orders-planner" data-i18n="nav.planner">Tervezőtábla</div>
         <a href="/utvonaltervezes" class="sub-tab tab-link" data-i18n="nav.routePlanning">Útvonaltervezés</a>
         <div class="sub-tab" data-tab="inbound" data-i18n="nav.inbound">Megrendelések</div>
-        <div class="sub-tab" data-tab="client-requests" data-i18n="nav.clientRequests">📋 Ügyfél kérések</div>
+        <div class="sub-tab" data-tab="client-requests" data-i18n="nav.clientRequests">Ügyfél kérések</div>
       </div>
     </div>
     <!-- 3. Flotta (üzemanyagkártya ide átkerült) -->
@@ -66,9 +66,9 @@
         <div class="sub-tab" data-tab="internal-drivers" data-i18n="nav.internalDrivers">Belső sofőrök</div>
         <div class="sub-tab" data-tab="external-drivers" data-i18n="nav.externalDrivers">Külső sofőrök</div>
         <div class="sub-tab" data-tab="active-fleet" data-i18n="nav.activeFleet">Aktív flotta</div>
-        <div class="sub-tab" data-tab="expiries" data-i18n="nav.expiries">⏰ Lejáratok</div>
-        <div class="sub-tab" data-tab="service-log" data-i18n="nav.service">🔧 Szerviz & karbantartás</div>
-        <div class="sub-tab" data-tab="fuel-import" data-i18n="nav.fuelCard">⛽ Üzemanyagkártya</div>
+        <div class="sub-tab" data-tab="expiries" data-i18n="nav.expiries">Lejáratok</div>
+        <div class="sub-tab" data-tab="service-log" data-i18n="nav.service">Szerviz & karbantartás</div>
+        <div class="sub-tab" data-tab="fuel-import" data-i18n="nav.fuelCard">Üzemanyagkártya</div>
       </div>
     </div>
     <!-- 4. Pénzügy (a Statisztikából kiemelve) -->
@@ -76,10 +76,10 @@
       <div class="tab nav-head" id="financeParentTab" onclick="toggleGroup(this)"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg><span data-i18n="nav.financeHead">Pénzügy</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
       <div class="submenu">
         <div class="sub-tab" data-tab="stats-finance" data-i18n="nav.finance">Pénzügy</div>
-        <div class="sub-tab" data-tab="invoices-out" data-i18n="nav.invoicesOut">📤 Kimenő számlák</div>
-        <div class="sub-tab" data-tab="invoices-in" data-i18n="nav.invoicesIn">📥 Bejövő számlák</div>
-        <div class="sub-tab" data-tab="bnr-rate" data-i18n="nav.bnrRate">💱 BNR árfolyam</div>
-        <div class="sub-tab" data-tab="payment-schedule" data-i18n="nav.paymentSchedule">📅 Fizetési ütemterv</div>
+        <div class="sub-tab" data-tab="invoices-out" data-i18n="nav.invoicesOut">Kimenő számlák</div>
+        <div class="sub-tab" data-tab="invoices-in" data-i18n="nav.invoicesIn">Bejövő számlák</div>
+        <div class="sub-tab" data-tab="bnr-rate" data-i18n="nav.bnrRate">BNR árfolyam</div>
+        <div class="sub-tab" data-tab="payment-schedule" data-i18n="nav.paymentSchedule">Fizetési ütemterv</div>
         <div class="sub-tab" data-tab="decont" data-i18n="nav.decont">Sofőr-elszámolás</div>
       </div>
     </div>
@@ -93,15 +93,15 @@
       <div class="submenu">
         <div class="sub-tab" data-tab="received-fuv" data-i18n="nav.waybills">Fuvarlevelek</div>
         <div class="sub-tab" data-tab="driver-docs-pane" data-i18n="nav.driverDocs">Feltöltött Iratok & CMR-ek</div>
-        <div class="sub-tab" data-tab="ecmr" data-i18n="nav.ecmr">📝 e-CMR</div>
-        <div class="sub-tab" data-tab="warehouse" data-i18n="nav.warehouse">📦 Raktár</div>
+        <div class="sub-tab" data-tab="ecmr" data-i18n="nav.ecmr">e-CMR</div>
+        <div class="sub-tab" data-tab="warehouse" data-i18n="nav.warehouse">Raktár</div>
       </div>
     </div>
     <!-- 7. Statisztika (a Pénzügy + decont külön csoportba került) -->
     <div class="menu-group">
       <div class="tab nav-head" id="statsParentTab" onclick="toggleGroup(this)"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span data-i18n="nav.statsHead">Statisztika</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
       <div class="submenu" id="statsSubmenu">
-        <div class="sub-tab" data-tab="stats-v2" data-i18n="nav.statsV2">📊 Statisztika 2.0</div>
+        <div class="sub-tab" data-tab="stats-v2" data-i18n="nav.statsV2">Statisztika 2.0</div>
         <!-- ── LEGACY (PR #11): a régi 8 fül elrejtve; a stats.js még betöltődik
              a stats-permissions handler-lookuphoz. A pane-ok is életben maradnak,
              hogy a legacy fallback (deep-link, kliens-oldali navigáció) továbbra
@@ -118,24 +118,24 @@
       <div class="submenu">
         <div class="sub-tab" data-tab="users" data-i18n="nav.staff">Munkatársak kezelése</div>
         <div class="sub-tab" data-tab="invites" data-i18n="nav.invites">Meghívókódok</div>
-        <div class="sub-tab" data-tab="stats-permissions" data-i18n="nav.permissions">🔐 Jogosultságok</div>
+        <div class="sub-tab" data-tab="stats-permissions" data-i18n="nav.permissions">Jogosultságok</div>
         <div class="sub-tab" data-tab="integrations" data-i18n="nav.integrations">Integrációk</div>
         <div class="sub-tab" data-tab="signature" data-i18n="nav.signature">Aláírás és Bélyegző</div>
-        <div class="sub-tab" data-tab="notifications" data-i18n="nav.notifications">🔔 Értesítések</div>
-        <div class="sub-tab" data-tab="mail-log" data-i18n="nav.mailLog">✉️ Levél-napló</div>
-        <div class="sub-tab" data-tab="email-templates" data-i18n="nav.emailTemplates">✉️ E-mail sablonok</div>
-        <a href="/email-builder" class="sub-tab tab-link" data-tab="email-builder" data-i18n="nav.emailBuilder">📧 E-mail szerkesztő & kiküldés</a>
+        <div class="sub-tab" data-tab="notifications" data-i18n="nav.notifications">Értesítések</div>
+        <div class="sub-tab" data-tab="mail-log" data-i18n="nav.mailLog">Levél-napló</div>
+        <div class="sub-tab" data-tab="email-templates" data-i18n="nav.emailTemplates">E-mail sablonok</div>
+        <a href="/email-builder" class="sub-tab tab-link" data-tab="email-builder" data-i18n="nav.emailBuilder">E-mail szerkesztő & kiküldés</a>
       </div>
     </div>
     <!-- 10. Beállítások -->
     <div class="menu-group" style="margin-top:auto;">
       <div class="tab nav-head" onclick="toggleGroup(this)"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span data-i18n="nav.settings">Beállítások</span><svg class="nav-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
       <div class="submenu">
-        <div class="sub-tab" data-tab="settings" data-i18n="nav.account">👤 Fiók</div>
-        <div class="sub-tab" data-tab="company-settings" data-i18n="nav.companySettings">🏢 Cég & arculat</div>
-        <div class="sub-tab" data-tab="pdf-settings" data-i18n="nav.pdfSettings">📄 PDF-sablonok</div>
-        <div class="sub-tab" data-tab="elofizetesek" data-i18n="nav.subscription">💳 Előfizetés</div>
-        <div class="sub-tab" data-tab="fav-locations" data-i18n="nav.favLocations">⭐ Kedvenc helyszínek</div>
+        <div class="sub-tab" data-tab="settings" data-i18n="nav.account">Fiók</div>
+        <div class="sub-tab" data-tab="company-settings" data-i18n="nav.companySettings">Cég & arculat</div>
+        <div class="sub-tab" data-tab="pdf-settings" data-i18n="nav.pdfSettings">PDF-sablonok</div>
+        <div class="sub-tab" data-tab="elofizetesek" data-i18n="nav.subscription">Előfizetés</div>
+        <div class="sub-tab" data-tab="fav-locations" data-i18n="nav.favLocations">Kedvenc helyszínek</div>
       </div>
     </div>
     <div style="padding:10px 12px; border-top:1px solid var(--border); margin-top:8px;">
