@@ -14,6 +14,45 @@
 
 ---
 
+## 2026-08-26 — Admin/Manager főmenü: világos + modern + kontrasztos + szimmetrikus sidebar + almenü-emojik eltávolítva
+
+### Miért
+Az admin/manager sidebar sötét (espresso/navy) volt, aszimmetrikus behúzásokkal és eltérő kontraszttal; az almenü-feliratok elején (📊/📥/🗑️/⏰/⛽/📝 stb.) színes emoji-ikonok versenyeztek a főmenü egységes monokróm SVG ikonjaival — vizuális zaj, kevésbé „profi”.
+
+### Mit
+1. **Új sidebar-arculat** (`public/style.css` fájl VÉGÉN, felülíró jogán él, ~170 sor, KIZÁRÓLAG `.sidebar`-ra szűkítve — más felületet és a sofőr-módot NEM érinti):
+   - **Világos slate paletta**: háttér `linear-gradient(180deg,#f8fafc 0%,#eef2f7 100%)`, jobb szegély 1.5px `#cbd5e1` — felülírja a korábbi sötét/meleg `!important` blokkokat.
+   - **Kontrasztos szöveg**: főmenü `#1e293b` (weight 600), almenü `#475569` (weight 500), aktív almenü `#3730a3` (indigó-900, weight 700), hover mindig `#0f172a`.
+   - **Aktív főmenü** telített indigó gradiens (`#4f46e5 → #4338ca`) fehér felirattal + 10px indigó glow — jól kiugrik a világos alapból.
+   - **Aktív almenü** világos indigó-tinta (`#e0e7ff`) + 3px bal akcent-csík (`#4f46e5`) — sofőr-mód azonos.
+   - **Szimmetrikus ritmus**: minden főmenü 42px min-height + 11×13px padding, minden almenü 36px min-height + 8×12px padding; menü-csoport gap 2px; almenü indentálva 12px-en, saját `border-left:2px #e2e8f0` vezérlővonallal — professzionális egyenletesség.
+   - **Chevron** kompakt (14px), halvány slate normál, sötétebb hover/nyitott állapotban; nyitott csoport-fejléc szubtilis háttér-tinta.
+   - **Fókusz-gyűrű** (3px indigó, 28% opacity) minden interaktív elemen — billentyűzet-elérhetőség.
+   - **Kilépés gomb + meBadge** világos tokenek (fehér bg + slate keret + `#0f172a` felirat).
+   - **Görgetősáv** slate-en, visszafogott.
+2. **Almenü-emojik eltávolítása** — `public/i18n.js` (RO+HU) + `public/admin.html` + `public/manager.html` fallback-szövegek:
+   - Fuvarok: 🗑️/📝/📅/📋 kivéve (Törölt fuvarok · Árajánlatok · Tervezőtábla · Ügyfél kérések).
+   - Flotta: ⏰/🔧/⛽ kivéve (Lejáratok · Szerviz & karbantartás · Üzemanyagkártya).
+   - Pénzügy: 📤/📥/💱/📅 kivéve (Kimenő számlák · Bejövő számlák · BNR árfolyam · Fizetési ütemterv).
+   - Dokumentumok: 📝/📦 kivéve (e-CMR · Raktár).
+   - Statisztika: 📊 kivéve (Statisztika 2.0).
+   - Adminisztráció: 🔐/🔔/✉️/📧 kivéve (Jogosultságok · Értesítések · Levél-napló · E-mail sablonok · E-mail szerkesztő & kiküldés). Manager: 📥 „E-mail feldolgozás" is emoji nélkül.
+   - Beállítások: 👤/🏢/📄/💳/⭐ kivéve (Fiók · Cég & arculat · PDF-sablonok · Előfizetés · Kedvenc helyszínek).
+   - A **főmenü monokróm SVG ikonjai VÁLTOZATLANOK** (Vezérlőpult, Fuvarok, Flotta, Pénzügy, Ügyfelek, Dokumentumok, Statisztika, Chat, Adminisztráció, Beállítások — mind currentColor, egységes vonalvastagsággal, aktívnál fehér).
+3. **Cache-bust**: `admin.html`/`manager.html` `style.css` + `i18n.js` `?v=20260825ordfix2` → `?v=20260826navlight`.
+
+### Fájlok
+- `public/style.css` (+173 sor: új „Admin+Manager Sidebar" blokk a fájl végén).
+- `public/i18n.js` (~24 `nav.*` kulcs — RO+HU emoji-strip).
+- `public/admin.html` (~26 fallback szöveg + cache-bust).
+- `public/manager.html` (~24 fallback szöveg + cache-bust).
+- **Nincs séma-változás, nincs új szerver-út, nincs új handler.** Tisztán megjelenés.
+
+### Teszt
+- **981 Jest zöld** (61/68 suite, 45 skipped valós-DB). Nincs regresszió — a `data-tab` kulcsok, `pane`-ek, `toggleGroup`/`activateTab`/`applyFeatureFlags`/menü-logika mind érintetlen.
+
+---
+
 ## 2026-08-25 — Fuvar-kiírás: wizard stop-scroll + autofill blokk + Kiosztás step 4 kontraszt + jármű-hozzáadás gomb (PR #369)
 
 ### Miért (4 sofőr-visszajelzés)
