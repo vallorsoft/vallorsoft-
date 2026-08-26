@@ -2730,3 +2730,172 @@
   border-color: #dc2626; color: #991b1b;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   📋 „Korábbi tétel — hozzáadod?" (#pendingAddModal) +
+   ⚠️ „Mentett tétel a menetlevél időszakában" (#orphRangeModal)
+   KONTRASZT-KÖR — világos modal, minden betű kontrasztos
+   ─────────────────────────────────────────────────────────────────────────
+   Gyökér: a modal HTML-je `background:var(--bg-2)` (sötét) inline stílust
+   használ, a lista-tételeknek (.pa-item/.pa-head/.pa-sub) semmilyen CSS
+   szabálya nem volt, a fejlécek/gombok pedig `var(--muted)` (= #334155
+   a sofer-scope alatt) színt kaptak → sötét szöveg sötét háttéren, alig
+   olvashatóan. Ezt a blokk a fájl VÉGÉN álló felülíró jogán javítja:
+   a modalt VILÁGOS palettára állítja (a rest of sofer redesign nyelvén)
+   + minden betűt sötét kontrasztos slate-re. ══════════════════════════ */
+
+/* Inner box (a modal-backdrop első <div> gyereke) — VILÁGOS bg + éles keret */
+#pendingAddModal > div,
+#orphRangeModal > div {
+  background: #ffffff !important;
+  border: 1.5px solid #94a3b8 !important;
+  box-shadow: 0 24px 60px rgba(15,23,42,0.32) !important;
+  color: #0f172a;
+}
+
+/* Fejléc + magyarázó szöveg — sötét slate, jól olvasható */
+#pendingAddModal h3,
+#orphRangeModal h3 {
+  color: #0f172a !important;
+  font-weight: 800 !important;
+}
+#pendingAddModal p,
+#orphRangeModal p {
+  color: #334155 !important;
+  font-weight: 500 !important;
+  line-height: 1.45;
+}
+
+/* „Mind" / „Egy sem" quick-select gombok — látható keret + sötét szöveg */
+#pendingAddModal button[onclick^="pendingAddSelectAll"] {
+  background: #f8fafc !important;
+  border: 1.5px solid #94a3b8 !important;
+  color: #0f172a !important;
+  font-weight: 700 !important;
+  min-height: 40px;
+  transition: background .12s ease, border-color .12s ease, transform .10s ease;
+}
+#pendingAddModal button[onclick^="pendingAddSelectAll"]:hover {
+  background: #e2e8f0 !important;
+  border-color: #475569 !important;
+}
+#pendingAddModal button[onclick^="pendingAddSelectAll"]:active { transform: translateY(1px); }
+
+/* Alsó fő-gombok — sötét kilépés-szöveg a világos „Kihagyás" gombon */
+#pendingAddModal button[onclick="pendingAddSkip()"],
+#orphRangeModal button[onclick="orphRangeCancel()"] {
+  background: #f8fafc !important;
+  border: 1.5px solid #94a3b8 !important;
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+#pendingAddModal button[onclick="pendingAddSkip()"]:hover,
+#orphRangeModal button[onclick="orphRangeCancel()"]:hover {
+  background: #e2e8f0 !important;
+  border-color: #475569 !important;
+}
+/* „✓ Hozzáadás" zöld gomb — kontrasztosabb fehér felirat + finom shadow */
+#pendingAddModal button[onclick="pendingAddConfirm()"],
+#orphRangeModal button[onclick="orphRangeAdd()"] {
+  background: linear-gradient(135deg,#16a34a,#15803d) !important;
+  border: 1.5px solid #15803d !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 6px 16px rgba(22,163,74,0.35) !important;
+}
+/* 🗑 Törlés — piros akcent */
+#orphRangeModal button[onclick="orphRangeDelete()"] {
+  background: #fee2e2 !important;
+  border: 1.5px solid #dc2626 !important;
+  color: #991b1b !important;
+  font-weight: 800 !important;
+}
+
+/* ── LISTA-TÉTELEK (.pa-item, .or-item) — kártyás megjelenítés + kontraszt ── */
+#pendingAddList,
+#orphRangeList {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 2px;
+}
+#pendingAddList .pa-item,
+#orphRangeList .or-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background .12s ease, border-color .12s ease, box-shadow .12s ease;
+}
+#pendingAddList .pa-item:hover,
+#orphRangeList .or-item:hover {
+  background: #eef2f7;
+  border-color: #64748b;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.08);
+}
+/* Kijelölt sor (bepipálva) — halvány zöld/indigó ünneplés */
+#pendingAddList .pa-item:has(.pa-chk:checked),
+#orphRangeList .or-item:has(.or-chk:checked) {
+  background: #ecfdf5;
+  border-color: #16a34a;
+  box-shadow: inset 3px 0 0 #16a34a, 0 2px 6px rgba(22,163,74,0.10);
+}
+
+/* Checkbox — kontrasztos, ujjbarát */
+#pendingAddList .pa-chk,
+#orphRangeList .or-chk {
+  width: 20px; height: 20px;
+  flex: 0 0 auto;
+  accent-color: #16a34a;
+  cursor: pointer;
+  margin-top: 2px;
+}
+
+/* Törzs — cím + al-sor egymás alatt, mind kontrasztos */
+#pendingAddList .pa-body,
+#orphRangeList .or-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#pendingAddList .pa-head,
+#orphRangeList .or-head {
+  color: #0f172a !important;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.3;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+#pendingAddList .pa-sub,
+#orphRangeList .or-sub {
+  color: #334155 !important;
+  font-weight: 500;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+/* Forrás-badge (📷 scan / 💾 mentett) — két erős, olvasható tinta */
+#pendingAddList .pa-src {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  border: 1.5px solid transparent;
+  white-space: nowrap;
+}
+#pendingAddList .pa-src-q {   /* 📷 scannelt bon */
+  background: #ffedd5;
+  color: #9a3412;
+  border-color: #f97316;
+}
+#pendingAddList .pa-src-b {   /* 💾 mentett tétel */
+  background: #dbeafe;
+  color: #1e3a8a;
+  border-color: #3b82f6;
+}
+
