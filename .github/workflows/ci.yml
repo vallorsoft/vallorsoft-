@@ -63,7 +63,9 @@ jobs:
     name: Deploy to Fly.io
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # A #375 után workflow_dispatch is trigger — engedjük ott is deployolni,
+    # különben a manuális indítás SKIP-eli a Fly-lépést (mint a run #706).
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
 
     steps:
       - uses: actions/checkout@v4
