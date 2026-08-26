@@ -14,6 +14,51 @@
 
 ---
 
+## 2026-08-25 — Fuvar-kiírás: wizard stop-scroll + autofill blokk + Kiosztás step 4 kontraszt + jármű-hozzáadás gomb (PR #369)
+
+### Miért (4 sofőr-visszajelzés)
+1. A step 2 „➕ Felrakó / ➕ Lerakó" kattintáskor az új stop-kártya NEM jött láthatóba (a step-váltás már középre görget, de a stop-hozzáadás nem).
+2. A böngésző (Chrome/Safari) email + jelszó autofilt kínált a felrakó/lerakó CÉG és HELY mezőkön („mint a bejelentkezéskor").
+3. A step 4 („Kiosztás") „SOFŐR TÍPUSA" 3 radio-label szövege (Belső/Külső/Sofőr nélkül) alig olvasható a light-témán.
+4. A „SOFŐR TÍPUSA" alatti sofőr + jármű + pótkocsi választó listákban rákattintva „nem látszik egyértelműen hogy kilett választva" — csak halvány kék rendszer-highlight. Plusz: a régi „+ Új" kis kék gomb a `<label>`-en belül vertikálisan elnyújtotta a layoutot; kérés SZÉLESEBB de ALACSONYABB gomb „Jármű hozzáadás" / „Pótkocsi hozzáadás" felirattal + kompaktabb ritmus (nincs több nagy köz).
+
+### Mit
+1. **`public/order-wizard.js`** — új `_scrollToOpenStop()` helper (`requestAnimationFrame` + `scrollIntoView({block:'center'})`), hívva a `ocStopAdd` és `ocStopOpen` (akkordeon-nyit) után. A step 2 új stop-kártya mostantól automatikusan a képernyő közepére görget.
+2. **Autofill BLOKK** — `autocomplete="off"` → `autocomplete="new-password"` (spec-alapú override, Chrome/Safari/Firefox respectelik) + `data-lpignore="true"` (LastPass) + `data-1p-ignore` (1Password) + `data-form-type="other"` (Chrome hint) + egyedi `name` attribútum (`vsord_*` / `vsoe_*` a jelszókezelő-minta-felismerés blokkolásához). Érintett mezők:
+   - **Fuvar-kiírás pane** (`admin.html` + `manager.html`): `oClient`, `oLoad`, `oLoadFirma`, `oUnload`, `oUnloadFirma`, `oExternNume`, `oExternFirma`, `oExternTelefon`, `oCamionSearch`, `oRemorcaSearch`, `oInternSearch`, `oExternSearch`.
+   - **Fuvar-szerkesztő modal** (admin+manager): `oeClient`, `oeLocInc`, `oeLocDesc`, `oeFirmaInc`, `oeFirmaDesc`, `oeNumeSoferExtern`, `oeFirmaExtern`.
+   - **Dinamikus generátorok**: `order-wizard.js` `_renderStopsList` `oc-in-loc`/`oc-in-firma`; `console-shared.js` `addExtraStopRow` `oe-x-loc`/`oe-x-firma`.
+3. **`public/style.css` — Kiosztás step 4 KONTRASZT + KIVÁLASZTÁS-KIEMELÉS** (a fájl végi additív blokk kiegészítése, `.pane[data-pane="orders-form"]` scope):
+   - „SOFŐR TÍPUSA" 3 radio-label szövege az inline `color:var(--text)` = `#e9eef5` (majdnem fehér) felülírva `#0f172a`-ra (light) / `#f1f5f9`-re (dark), `font-weight:600`. Radio maga 20×20px + narancs accent.
+   - `<select size>` listák (`#oInternDriver`, `#oExternSelect`, `#oCamionSelect`, `#oRemorcaSelect`) 2px keret + 12px sarok + 110px min-height; fókuszkor narancs keret + 4px 20% glow.
+   - `option` sor padding 9×12px, 13.5px betű, 8px sarok; hover halvány narancs érintés.
+   - **★ Kiválasztott sor** (`option:checked`) — feltűnő narancs→korall gradiens bg (`linear-gradient(90deg,#f6711e,#f6517b)`) + fehér `font-weight:800` szöveg + 2px narancs keret + baloldali fehér inset (`box-shadow:inset 4px 0 0 rgba(255,255,255,0.55)`) + `text-shadow`. Nem-kiválasztott sorokon diszkrét szürke bal-akcens (`inset 3px 0 0 rgba(148,163,184,0.35)`) → kártyaszerű ritmus. A `<option>` styling korlátozott, de `background`/`color`/`font-weight`/`border` MŰKÖDIK Chrome/Firefox/Safari-ban `size > 1` esetén.
+4. **„+ Új" → „+ Jármű / Pótkocsi hozzáadása" gomb** (`admin.html` + `manager.html` + `i18n.js`):
+   - HTML: a gomb KIVÉVE a `<label>`-ből, a `<select>` ALATT teljes szélességű, kompakt sor. Label mostantól tiszta szöveg (`data-i18n="form.tractorPlate/trailerPlate"`).
+   - i18n: 2 új kulcs `form.addVehicleBtn` = „+ Adaugă vehicul" / „+ Jármű hozzáadása"; `form.addTrailerBtn` = „+ Adaugă remorcă" / „+ Pótkocsi hozzáadása" (RO-alap + HU).
+   - CSS `.vs-veh-add`: `display:block; width:100%; margin-top:8px; padding:9×14px; min-height:38px; font-weight:700; 1.5px keret; 10px sarok; hover translateY(-1px)`.
+   - Kompaktabb ritmus a jármű-blokkban (nincs több nagy köz): `#oInternBlock`/`#oExternBlock` `margin-bottom:10px`; `.grid-2 > .field` `margin-bottom:8px`; `.field` `gap:4px`; `.grid-2` `gap:12px`.
+5. **Cache-bust**: `style.css` / `i18n.js` / `console-shared.js` / `order-wizard.js` mind `?v=20260825ordfix2` (admin.html + manager.html).
+
+### Fájlok
+- `public/order-wizard.js` (+ ~15 sor: `_scrollToOpenStop` helper + `ocStopAdd`/`ocStopOpen` hívások; a wizard stop-inputok autofill-blokkja).
+- `public/console-shared.js` (`addExtraStopRow` extra-sor autofill-blokk).
+- `public/style.css` (+ ~130 sor: 2. KONTRASZT + SZIMMETRIA blokk — radio-labelek, `<select size>` + `option:checked` kiemelés, `.vs-veh-add` gomb, kompakt ritmus).
+- `public/admin.html` + `public/manager.html`: (a) minden érintett cég/hely input autofill-hardened; (b) tractor + trailer field-blokk restrukturálva a széles gombbal; (c) cache-bust.
+- `public/i18n.js` (+ 2 kulcs: `form.addVehicleBtn`, `form.addTrailerBtn`).
+
+### Nem érintett
+- Wizard-motor `_findLegacyEl` (a `#oCamionSelect`/`#oRemorcaSelect` id-k változatlanok, az `.grid-2` szülő is; a step 4 body-ba mozgatás továbbra is működik).
+- Szerver / DB / handlerek — nincsenek érintve, tisztán megjelenítés.
+- Sofőr felület, Statisztika, más pane-ek — a scope-olt CSS csak a fuvar-kiírás pane-en érvényesül.
+
+### Teszt
+- **981 Jest zöld** (`npx jest --runInBand`, nincs regresszió; 45 skipped valós-DB).
+- Node syntax-check: `order-wizard.js` + `console-shared.js` + `i18n.js` zöld.
+- CSS zárójel-egyensúly: 952 open / 952 close.
+
+---
+
 ## 2026-08-25 — Fuvar-kezelés + Fuvar-kiírás: kontraszt + szimmetria kör (admin+manager, PR #367)
 
 ### Miért
