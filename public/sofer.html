@@ -12,8 +12,8 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260826cegadat"></script>
-  <link rel="stylesheet" href="/sofer.css?v=20260826cegadat">
+  <script src="/i18n.js?v=20260826cegduo"></script>
+  <link rel="stylesheet" href="/sofer.css?v=20260826cegduo">
   <script src="/push-client.js?v=20260614qa"></script>
   <!-- Sofor mobil-app: 8 ora idle-limit (vezetes kozben oraig nem koppint a
        kepernyore). A szerver-cookie 7 nap; addig igy nem log ki ejszaka-vezetes
@@ -205,11 +205,19 @@
       <div class="sofer-nav-card" onclick="openWhatsAppFromChatCard()">
         <span class="nav-icon">💬</span><span class="nav-label" data-i18n="sofer.navChat">Chat</span>
       </div>
-      <div class="sofer-nav-card" id="soferTourNavCard" onclick="window.location.href='/sofer-demo'">
-        <span class="nav-icon">🎓</span><span class="nav-label" data-i18n="sof.tour.navBtn">Bemutatás</span>
-      </div>
-      <div class="sofer-nav-card" id="soferCompanyInfoCard" onclick="openCompanyInfo()">
-        <span class="nav-icon">🏢</span><span class="nav-label" data-i18n="sof.ci.navBtn">Cégadatok</span>
+      <!-- Bemutatás + Cégadatok — egyetlen kártyaként (közös keret + shadow),
+           középen halvány függőleges elválasztóval. Így egy "duó" gomb a két
+           akció, dizájnosabb és jobban tükrözi a két funkció rokon szerepét
+           (tanulás vs. gyors info-lookup). Az ID-k megmaradnak a fél-kártyákon,
+           hogy az onclick-ek és a stílus-szabályok (nav-icon szín, aktív állapot)
+           tovább működjenek. -->
+      <div class="sofer-nav-card sofer-nav-duo" style="grid-column: 1 / -1;">
+        <div class="sofer-nav-half" id="soferTourNavCard" onclick="window.location.href='/sofer-demo'">
+          <span class="nav-icon">🎓</span><span class="nav-label" data-i18n="sof.tour.navBtn">Bemutatás</span>
+        </div>
+        <div class="sofer-nav-half" id="soferCompanyInfoCard" onclick="openCompanyInfo()">
+          <span class="nav-icon">🏢</span><span class="nav-label" data-i18n="sof.ci.navBtn">Cégadatok</span>
+        </div>
       </div>
       <div class="sofer-nav-card logout" style="grid-column: 1 / -1;" onclick="logoutSofer()">
         <span class="nav-icon">🚪</span><span class="nav-label" data-i18n="common.logout">Kilépés</span>
@@ -438,7 +446,7 @@
 
 <script src="/uit-format.js?v=20260820uit3"></script>
 <script src="/sofer-uit.js?v=20260820uit3"></script>
-<script src="/sofer.js?v=20260826cegadat"></script>
+<script src="/sofer.js?v=20260826cegduo"></script>
 <!-- sofer-tour.js kivéve — a bemutató önálló /sofer-demo oldalon fut.
      A sofer.js `SoferTour.demoIntercept` hívásai biztonságos guarddal
      élnek (window.SoferTour && …), tehát a hiánya nem hasal el. -->

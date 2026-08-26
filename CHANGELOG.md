@@ -14,6 +14,20 @@
 
 ---
 
+## 2026-08-26 — Sofőr főoldal: Bemutatás + Cégadatok EGYETLEN kártya (közös keret + halvány elválasztó)
+
+**Kérés:** a két különálló gomb kerete olvadjon össze, nézzen ki egy nagy gombként, csak középen egy halvány vonal válassza el (dizájnosabb).
+
+**Változás:**
+- `public/sofer.html`: a két `.sofer-nav-card` (`#soferTourNavCard` + `#soferCompanyInfoCard`) egy közös `<div class="sofer-nav-card sofer-nav-duo">` wrapperbe került, benne két `<div class="sofer-nav-half">`. Az ID-k a fél-kártyákra kerültek, így az `onclick` és az ikon-szín szabályok érintetlenek.
+- `public/sofer.css`: új `.sofer-nav-duo` szabályok — a wrapper viszi a keretet + shadow-t + sheen-t; a `.sofer-nav-half` csupasz háttéren ül, ikon BAL + felirat KÖZÉPEN elrendezéssel. Elválasztó: `border-right: 1px solid rgba(148,163,184,0.35)` a bal fél-kártyán (nem rács-gap → a keret tömör marad). Hover: halvány kék háttér (`rgba(59,130,246,0.05)`); active: scale(0.965) + kissé sötétebb bg — a scale a fél-kártyán fut, nem az egészen (különben mindkét gomb együtt villanna).
+- Ikonok: bemutató **kék→indigó** (`--sof-primary` → `--sof-accent`), cégadatok **teal→zöld** (`#0d9488` → `#059669`) — első ránézésre elválik a két akció, holott közös keret.
+- Mobil-optimalizálás: `@media (max-width: 380px)` — 8px padding + 14px felirat, hogy a szoros telefonon se szoruljon szét.
+
+**Cache-bust:** `?v=20260826cegduo` (sofer.html: i18n.js + sofer.js + sofer.css). **981 Jest zöld** (nincs regresszió). Csak megjelenés-változás, funkció-érintetlen.
+
+---
+
 ## 2026-08-26 — Sofőr főoldal: új „🏢 Cégadatok" gomb + számlázási/azonosító mezők (vásárlásnál számlához)
 
 **Gyökér:** a sofőr vásárláskor gyakran nem tudja fejből a cég CUI-ját, Reg.Com. számát vagy IBAN-ját — kellett egy gomb, ami egy kattintással előhozza a cég ÖSSZES számlázási adatát vágólapra másolható formában. A "🎓 Bemutatás" gomb eddig teljes szélességű sáv volt (grid-column: 1/-1) — most fél szélességű, mellette az új "🏢 Cégadatok" gomb.

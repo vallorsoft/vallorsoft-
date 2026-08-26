@@ -2901,41 +2901,100 @@
 
 /* ══════════════════════════════════════════════════════════════
    🏢 CÉGADATOK NAV-GOMB + MODAL (2026-08-26)
-   A „Bemutatás" (#soferTourNavCard) gomb eddig teljes szélességű
-   sáv volt (grid-column: 1/-1). Most a Cégadatok (#soferCompanyInfoCard)
-   gombbal PÁROSAN, oszlopos rácsban áll — mindkettő fél szélességű
-   (a 2-oszlopos .sofer-nav-grid alap-rendjében), a "kompakt sor"
-   layouttal (ikon BAL, felirat KÖZÉPEN). A Kilépés kártya továbbra
-   is teljes szélességű sáv marad alattuk.
+   A „Bemutatás" (#soferTourNavCard) és „Cégadatok" (#soferCompanyInfoCard)
+   gomb EGYETLEN kártyaként jelenik meg: közös keret + shadow + sheen,
+   középen egyetlen halvány függőleges vonal választja el a két akciót.
+   HTML: <div class="sofer-nav-card sofer-nav-duo">
+           <div class="sofer-nav-half" id="soferTourNavCard">…</div>
+           <div class="sofer-nav-half" id="soferCompanyInfoCard">…</div>
+         </div>
+   A wrapper viszi a `.sofer-nav-card` alap-stílust (keret/shadow/sheen);
+   a fél-kártyák csak a hover/aktív visszajelzést + a saját ikon-színüket
+   viszik. A Kilépés kártya továbbra is teljes szélességű sáv alattuk.
    ══════════════════════════════════════════════════════════════ */
-.sofer-wrap .sofer-nav-card#soferTourNavCard,
-.sofer-wrap .sofer-nav-card#soferCompanyInfoCard {
-  grid-column: auto;             /* a fentebbi #soferTourNavCard 1/-1 override-ját elveti */
-  flex-direction: row;
-  gap: 10px;
+.sofer-wrap .sofer-nav-card.sofer-nav-duo {
+  /* A wrapper NEM viszi a nav-card flex-oszlop tartalom-elrendezést;
+     helyette 2 oszlop 1fr | 1fr rácsba osztja a két fél-kártyát. */
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 0;              /* a fél-kártyák viszik a belső paddingot */
+  overflow: hidden;        /* a hover-háttér ne szivárogjon ki a keretből */
   max-height: 74px;
   flex-shrink: 0;
-  justify-content: center;
 }
-.sofer-wrap .sofer-nav-card#soferTourNavCard::before,
-.sofer-wrap .sofer-nav-card#soferCompanyInfoCard::before { display: none; }
-.sofer-wrap .sofer-nav-card#soferTourNavCard .nav-icon,
-.sofer-wrap .sofer-nav-card#soferCompanyInfoCard .nav-icon {
+/* A wrapper aktív állapotát töröljük — a valódi click a fél-kártyán történik,
+   így a scale-visszajelzés is ott menjen (különben mindkét gomb együtt villan). */
+.sofer-wrap .sofer-nav-card.sofer-nav-duo:active {
+  transform: none;
+  box-shadow: 0 6px 18px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04);
+  border-color: var(--sof-border);
+}
+
+/* Fél-kártya belső elrendezése — ikon BAL, felirat KÖZÉPEN, sor-elrendezés,
+   ugyanaz a ritmus mint az egykori kompakt Bemutatás/Kilépés sor. */
+.sofer-wrap .sofer-nav-duo .sofer-nav-half {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background .14s ease, transform .14s cubic-bezier(.2,.8,.2,1);
+  z-index: 1;              /* a fél-kártya háttere a wrapper sheen fölé */
+}
+/* Halvány elválasztó a két fél-kártya között — bal félre `border-right`
+   (nem a rács `gap`, hogy semmi ne szakítsa a wrapper kereten belüli tömör
+   érzetét). Csendes-szürke, nem konkurál a márkaszínekkel. */
+.sofer-wrap .sofer-nav-duo .sofer-nav-half:first-child {
+  border-right: 1px solid rgba(148, 163, 184, 0.35);
+}
+.sofer-wrap .sofer-nav-duo .sofer-nav-half:hover {
+  background: rgba(59, 130, 246, 0.05);
+}
+.sofer-wrap .sofer-nav-duo .sofer-nav-half:active {
+  transform: scale(0.965) translateY(1px);
+  background: rgba(37, 99, 235, 0.10);
+}
+/* Ikon-korong — 44×44, mint eddig; a bemutató kék→indigo, a cégadatok
+   teal→zöld, hogy első ránézésre is elváljon a két akció ikonja. */
+.sofer-wrap .sofer-nav-duo .sofer-nav-half .nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 44px; height: 44px;
   border-radius: 14px;
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.sofer-wrap .sofer-nav-duo #soferTourNavCard .nav-icon {
+  background: linear-gradient(135deg, var(--sof-primary), var(--sof-accent));
   box-shadow: 0 6px 14px rgba(59,130,246,0.28);
 }
-.sofer-wrap .sofer-nav-card#soferTourNavCard .nav-label,
-.sofer-wrap .sofer-nav-card#soferCompanyInfoCard .nav-label {
+.sofer-wrap .sofer-nav-duo #soferCompanyInfoCard .nav-icon {
+  background: linear-gradient(135deg, #0d9488, #059669);
+  box-shadow: 0 6px 14px rgba(13,148,136,0.30);
+}
+.sofer-wrap .sofer-nav-duo .sofer-nav-half .nav-label {
   padding: 0;
   text-align: left;
   font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
 }
-/* Cégadatok gombnak külön akcens — teal→zöld gradient (megkülönböztetve
-   a bemutató kék→indigo gradientjétől), így első ránézésre elválik. */
-.sofer-wrap .sofer-nav-card#soferCompanyInfoCard .nav-icon {
-  background: linear-gradient(135deg, #0d9488, #059669);
-  box-shadow: 0 6px 14px rgba(13,148,136,0.30);
+/* Mobil-optimalizálás: keskeny kijelzőn a felirat még mindig
+   olvasható maradjon, ne szoruljon az ikon mellé. */
+@media (max-width: 380px) {
+  .sofer-wrap .sofer-nav-duo .sofer-nav-half {
+    padding: 10px 8px;
+    gap: 8px;
+  }
+  .sofer-wrap .sofer-nav-duo .sofer-nav-half .nav-label { font-size: 14px; }
 }
 
 /* ── Cégadatok modal (#companyInfoModal) ──
