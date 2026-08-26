@@ -3014,3 +3014,26 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
    érintetlen; a színek viszont a fenti világos palettát öröklik automatikusan
    (nincs külön override szükséges — az !important-ok a driver-mode fölé is
    érvényesek). */
+
+/* ── MOBIL DRAWER FIX ──
+   A fenti .sidebar `padding: 22px 14px !important` az asztali nézetre való;
+   mobilon (≤768px) a sidebar off-canvas drawerré válik és a fix mob-topbar
+   (~56–84px + safe-area) eltakarná az első menüpontot. Itt visszaadjuk a
+   fejléc alá eső top-paddinget, hogy a Vezérlőpult (első aktív menüpont)
+   ne csússzon a topbar alá. */
+@media (max-width: 768px){
+  .sidebar{
+    padding-top: calc(88px + env(safe-area-inset-top, 0px)) !important;
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* Sofőr-mód tablet-drawer (769–1024px): a body.vs-dm-en a sidebar szintén
+   off-canvas és a mob-topbar fixen ül; ott is legyen elég top-padding. */
+@media (min-width: 769px) and (max-width: 1024px){
+  body.vs-dm .sidebar{
+    padding-top: calc(88px + env(safe-area-inset-top, 0px)) !important;
+  }
+}
