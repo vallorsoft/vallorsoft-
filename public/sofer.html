@@ -12,8 +12,8 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="stylesheet" href="/style.css?v=20260716mobfix">
-  <script src="/i18n.js?v=20260826pacon"></script>
-  <link rel="stylesheet" href="/sofer.css?v=20260826pacon">
+  <script src="/i18n.js?v=20260826cegadat"></script>
+  <link rel="stylesheet" href="/sofer.css?v=20260826cegadat">
   <script src="/push-client.js?v=20260614qa"></script>
   <!-- Sofor mobil-app: 8 ora idle-limit (vezetes kozben oraig nem koppint a
        kepernyore). A szerver-cookie 7 nap; addig igy nem log ki ejszaka-vezetes
@@ -205,8 +205,11 @@
       <div class="sofer-nav-card" onclick="openWhatsAppFromChatCard()">
         <span class="nav-icon">💬</span><span class="nav-label" data-i18n="sofer.navChat">Chat</span>
       </div>
-      <div class="sofer-nav-card" id="soferTourNavCard" style="grid-column: 1 / -1;" onclick="window.location.href='/sofer-demo'">
+      <div class="sofer-nav-card" id="soferTourNavCard" onclick="window.location.href='/sofer-demo'">
         <span class="nav-icon">🎓</span><span class="nav-label" data-i18n="sof.tour.navBtn">Bemutatás</span>
+      </div>
+      <div class="sofer-nav-card" id="soferCompanyInfoCard" onclick="openCompanyInfo()">
+        <span class="nav-icon">🏢</span><span class="nav-label" data-i18n="sof.ci.navBtn">Cégadatok</span>
       </div>
       <div class="sofer-nav-card logout" style="grid-column: 1 / -1;" onclick="logoutSofer()">
         <span class="nav-icon">🚪</span><span class="nav-label" data-i18n="common.logout">Kilépés</span>
@@ -435,7 +438,7 @@
 
 <script src="/uit-format.js?v=20260820uit3"></script>
 <script src="/sofer-uit.js?v=20260820uit3"></script>
-<script src="/sofer.js?v=20260826pacon"></script>
+<script src="/sofer.js?v=20260826cegadat"></script>
 <!-- sofer-tour.js kivéve — a bemutató önálló /sofer-demo oldalon fut.
      A sofer.js `SoferTour.demoIntercept` hívásai biztonságos guarddal
      élnek (window.SoferTour && …), tehát a hiánya nem hasal el. -->
@@ -586,6 +589,31 @@
     <div class="sof-cf-btns" id="sofChoiceBtns" style="flex-direction:column;gap:10px;"></div>
     <div style="text-align:center;margin-top:10px;">
       <button class="sof-cf-btn cancel" onclick="sofChoiceCancel()" data-i18n="common.cancel">Mégse</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 🏢 CÉGADATOK MODAL ──
+     A sofőr főoldalán a „🏢 Cégadatok" gombra megjelenő olvasható
+     kártya: a cég ÖSSZES számlázási/azonosító adata (nev, CUI, Reg.Com.,
+     EUID, cím, IBAN, bank, kapcsolat) — a bolti vásárlásnál/hivatalos
+     ügyintézésnél a boltosnak/adminisztrátornak mutatható. Minden
+     sornál 📋 másoló gomb. Az adatokat az Admin/Manager tölti a
+     Beállítások → Cég & arculat panelen. -->
+<div id="companyInfoModal" class="sof-modal" style="display:none;">
+  <div class="sof-modal-card ci-card">
+    <div class="ci-head">
+      <div class="ci-head-ico">🏢</div>
+      <div>
+        <h3 class="ci-head-title" data-i18n="sof.ci.title">Cégadatok</h3>
+        <p class="ci-head-msg" data-i18n="sof.ci.msg">Vásárlásnál/számlaigénylésnél mutasd a boltosnak/adminisztrátornak.</p>
+      </div>
+    </div>
+    <div id="companyInfoBody" class="ci-body">
+      <div class="ci-loading" data-i18n="sofer.loadingDots">Betöltés...</div>
+    </div>
+    <div class="sof-cf-btns" style="margin-top:12px;">
+      <button class="sof-cf-btn cancel" onclick="closeCompanyInfo()" data-i18n="sof.ci.close">Bezárás</button>
     </div>
   </div>
 </div>

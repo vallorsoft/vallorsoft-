@@ -5011,6 +5011,103 @@ function sofChoiceCancel() {
   var m = document.getElementById('sofChoiceModal');
   if (m) m.style.display = 'none';
 }
+
+// ═══════════════════════════════════════════════════════════════
+// 🏢 CÉGADATOK MODAL — a főoldali "Cégadatok" nav-kártyához.
+// A sofőr vásárláskor/számla-igényléskor a boltos elé tudja tenni
+// a cég hivatalos adatait — nem kell fejből mondania. A mezőket az
+// Admin/Manager tölti a "Cég & arculat" panelen. Read-only,
+// company_id szerint tenant-szűrt szerver-oldalon (getMyCompanyInfo).
+// ═══════════════════════════════════════════════════════════════
+var _ciCache = null; // 📋 másoló gomb closure-nélküli hivatkozáshoz — a fent
+// definiált globális `esc()`-et (sofer.js:6) használja HTML-escape-hez.
+function openCompanyInfo() {
+  var m = document.getElementById('companyInfoModal');
+  if (!m) return;
+  m.style.display = 'flex';
+  var body = document.getElementById('companyInfoBody');
+  if (body) body.innerHTML = '<div class="ci-loading">' + t('sofer.loadingDots') + '</div>';
+  fetch('/api/execute', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'getMyCompanyInfo', arguments: [] })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    var r = (d && d.result) || {};
+    if (!r.ok) {
+      _ciCache = null;
+      if (body) body.innerHTML = '<div class="ci-empty">' + esc(r.err || t('sof.ci.loadErr')) + '</div>';
+      return;
+    }
+    _ciCache = r;
+    _ciRenderCard(r);
+  }).catch(function(){
+    _ciCache = null;
+    if (body) body.innerHTML = '<div class="ci-empty">' + t('sof.ci.loadErr') + '</div>';
+  });
+}
+function closeCompanyInfo() {
+  var m = document.getElementById('companyInfoModal');
+  if (m) m.style.display = 'none';
+}
+function _ciRenderCard(r) {
+  var body = document.getElementById('companyInfoBody');
+  if (!body) return;
+  // Sorrend: azonosítók (számlához kell) → cím → banki → kapcsolat.
+  // Csak nem-üres sorok jelennek meg; ha egy adat sincs, üzenet.
+  var tvaLabel = null;
+  if (r.tvaPlatitor === true)  tvaLabel = t('sof.ci.tvaYes');
+  else if (r.tvaPlatitor === false) tvaLabel = t('sof.ci.tvaNo');
+  var rows = [
+    { k:'nev',           label: t('sof.ci.nev'),           v: r.nev },
+    { k:'cui',           label: t('sof.ci.cui'),           v: r.cui },
+    { k:'regCom',        label: t('sof.ci.regCom'),        v: r.regCom },
+    { k:'euid',          label: t('sof.ci.euid'),          v: r.euid },
+    { k:'tvaPlatitor',   label: t('sof.ci.tvaPlatitor'),   v: tvaLabel, copy:false },
+    { k:'capitalSocial', label: t('sof.ci.capitalSocial'), v: r.capitalSocial },
+    { k:'adresa',        label: t('sof.ci.adresa'),        v: r.adresa },
+    { k:'iban',          label: t('sof.ci.iban'),          v: r.iban },
+    { k:'banca',         label: t('sof.ci.banca'),         v: r.banca },
+    { k:'igazgatoNev',   label: t('sof.ci.igazgatoNev'),   v: r.igazgatoNev },
+    { k:'emailContact',  label: t('sof.ci.emailContact'),  v: r.emailContact },
+    { k:'telefon',       label: t('sof.ci.telefon'),       v: r.telefon },
+    { k:'website',       label: t('sof.ci.website'),       v: r.website },
+  ].filter(function(x){ return x.v != null && String(x.v).trim() !== ''; });
+  if (!rows.length) {
+    body.innerHTML = '<div class="ci-empty">' + t('sof.ci.empty') + '</div>';
+    return;
+  }
+  var html = rows.map(function(x){
+    var copyBtn = (x.copy === false) ? '' :
+      '<button class="ci-copy" onclick="ciCopy(\'' + x.k + '\')" title="' + t('sof.det.copy') + '">📋</button>';
+    return '<div class="ci-row">' +
+      '<div class="ci-lbl">' + esc(x.label) + '</div>' +
+      '<div class="ci-val-wrap">' +
+        '<div class="ci-val">' + esc(x.v) + '</div>' +
+        copyBtn +
+      '</div>' +
+    '</div>';
+  }).join('');
+  body.innerHTML = html;
+}
+function ciCopy(field) {
+  if (!_ciCache) return;
+  var txt = _ciCache[field];
+  if (!txt) { toast(t('sof.det.nothingToCopy'), 'err'); return; }
+  txt = String(txt);
+  var done = function(){ toast(t('sof.det.copied'), 'ok'); };
+  var fallback = function() {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta); done();
+    } catch (e) { toast(t('sof.det.copyFail'), 'err'); }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(done).catch(fallback);
+  } else { fallback(); }
+}
+
 // Globális cache a fuvar-objektumokhoz (a stop-választónak kell)
 var _soferOrdersCache = [];
 

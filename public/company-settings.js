@@ -71,6 +71,49 @@ window.CompanySettings = (function () {
             '<div style="font-size:12px;color:var(--muted);padding:9px 0;">' + tt('comset.billingNote', 'A számla-széria, TVA% és pénznem a Számlázó integráció (provider) beállításában él — ott módosítható.') + '</div></div>' +
         '</div>' +
 
+        // ── SZÁMLÁZÁSI / AZONOSÍTÓ MEZŐK ──
+        // Ezek jelennek meg a sofőr főoldali „🏢 Cégadatok" kártyáján is
+        // (getMyCompanyInfo). A bolti vásárlásnál/hivatalos ügyintézésnél a
+        // sofőr a boltos elé tudja tenni; itt tölti/tartja karban az Admin.
+        '<h3 class="h-title" style="font-size:15px;margin:18px 0 10px;">' + tt('comset.invoiceHead', '🧾 Számlázási adatok') + '</h3>' +
+        '<p style="color:var(--muted);font-size:12px;margin:0 0 10px;">' + tt('comset.invoiceIntro', 'Ezek az adatok jelennek meg a sofőr főoldalán a „Cégadatok" gomb alatt is — vásárlásnál a boltos ezekből írja a céges számlát.') + '</p>' +
+        '<div class="grid-2" style="gap:14px;">' +
+          '<div class="field"><label>' + tt('comset.inv.cui', 'CUI / CIF') + '</label>' +
+            '<input class="input" id="csCui" maxlength="20" value="' + esc(d.cui || '') + '"' + disabled + ' placeholder="RO47859317"></div>' +
+          '<div class="field"><label>' + tt('comset.inv.regCom', 'Nr. Reg. Com.') + '</label>' +
+            '<input class="input" id="csRegCom" maxlength="30" value="' + esc(d.regCom || '') + '"' + disabled + ' placeholder="J2023000114142"></div>' +
+          '<div class="field"><label>' + tt('comset.inv.euid', 'EUID') + '</label>' +
+            '<input class="input" id="csEuid" maxlength="50" value="' + esc(d.euid || '') + '"' + disabled + ' placeholder="ROONRC.J2023000114142"></div>' +
+          '<div class="field"><label>' + tt('comset.inv.tvaPlatitor', 'TVA-fizető (plătitor de TVA)') + '</label>' +
+            '<select class="input" id="csTvaPlatitor"' + disabled + '>' +
+              '<option value=""' + (d.tvaPlatitor == null ? ' selected' : '') + '>' + tt('comset.inv.tvaUnset', '—') + '</option>' +
+              '<option value="true"' + (d.tvaPlatitor === true ? ' selected' : '') + '>' + tt('sof.ci.tvaYes', 'Da (plătitor TVA)') + '</option>' +
+              '<option value="false"' + (d.tvaPlatitor === false ? ' selected' : '') + '>' + tt('sof.ci.tvaNo', 'Nu (neplătitor TVA)') + '</option>' +
+            '</select></div>' +
+          '<div class="field"><label>' + tt('comset.inv.capitalSocial', 'Capital social') + '</label>' +
+            '<input class="input" id="csCapitalSocial" maxlength="50" value="' + esc(d.capitalSocial || '') + '"' + disabled + ' placeholder="200 RON"></div>' +
+          '<div class="field"><label>' + tt('comset.inv.website', 'Website') + '</label>' +
+            '<input class="input" id="csWebsite" maxlength="200" value="' + esc(d.website || '') + '"' + disabled + ' placeholder="https://..."></div>' +
+        '</div>' +
+        '<div class="field" style="margin-top:10px;"><label>' + tt('comset.inv.adresa', 'Sediu social (cím)') + '</label>' +
+          '<textarea class="textarea" id="csAdresa" rows="2" maxlength="500"' + disabled + ' placeholder="Sat Arcus, Cart. Poiana Arcusului nr. 102, jud. Covasna">' + esc(d.adresa || '') + '</textarea>' +
+        '</div>' +
+        '<div class="grid-2" style="gap:14px;margin-top:2px;">' +
+          '<div class="field"><label>' + tt('comset.inv.iban', 'IBAN') + '</label>' +
+            '<input class="input" id="csIban" maxlength="40" value="' + esc(d.iban || '') + '"' + disabled + ' placeholder="RO00 BANK 0000 0000 0000 0000"></div>' +
+          '<div class="field"><label>' + tt('comset.inv.banca', 'Bank neve') + '</label>' +
+            '<input class="input" id="csBanca" maxlength="120" value="' + esc(d.banca || '') + '"' + disabled + '></div>' +
+        '</div>' +
+        '<h3 class="h-title" style="font-size:15px;margin:18px 0 10px;">' + tt('comset.contactHead', '📞 Kapcsolat') + '</h3>' +
+        '<div class="grid-3" style="gap:14px;">' +
+          '<div class="field"><label>' + tt('comset.inv.igazgatoNev', 'Ügyvezető') + '</label>' +
+            '<input class="input" id="csIgazgatoNev" maxlength="255" value="' + esc(d.igazgatoNev || '') + '"' + disabled + '></div>' +
+          '<div class="field"><label>' + tt('comset.inv.emailContact', 'E-mail') + '</label>' +
+            '<input class="input" id="csEmailContact" type="email" maxlength="255" value="' + esc(d.emailContact || '') + '"' + disabled + '></div>' +
+          '<div class="field"><label>' + tt('comset.inv.telefon', 'Telefon') + '</label>' +
+            '<input class="input" id="csTelefon" maxlength="50" value="' + esc(d.telefon || '') + '"' + disabled + '></div>' +
+        '</div>' +
+
         // ── SZÁMOZÁS ──
         '<h3 class="h-title" style="font-size:15px;margin:18px 0 10px;">' + tt('comset.numberingHead', '📋 Számozás') + '</h3>' +
         '<div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;">' +
@@ -208,11 +251,29 @@ window.CompanySettings = (function () {
 
   function save() {
     var hex = ((_root.querySelector('#csBrandColorHex') || {}).value || '').trim();
+    var qv = function(id){ var el = _root.querySelector(id); return el ? (el.value || '') : ''; };
     var payload = {
       brandColor: hex || null,
-      pdfHeaderText: (_root.querySelector('#csPdfHeader') || {}).value || '',
-      eurRonRate: (_root.querySelector('#csEurRon') || {}).value || '',
-      waybillPrefix: ((_root.querySelector('#csWaybillPrefix') || {}).value || '').trim(),
+      pdfHeaderText: qv('#csPdfHeader'),
+      eurRonRate: qv('#csEurRon'),
+      waybillPrefix: qv('#csWaybillPrefix').trim(),
+      // Számlázási + kapcsolat mezők — a szerver csak azt írja, amit
+      // ténylegesen küldünk (hasOwnProperty ellenőrzéssel). Az üres
+      // string a mezőt NULL-ra állítja (törli), ezt szándékosan
+      // engedjük — a sofőr ne lásson tegnapi értéket, ha az admin
+      // kitörölte a mezőt.
+      cui: qv('#csCui').trim(),
+      regCom: qv('#csRegCom').trim(),
+      euid: qv('#csEuid').trim(),
+      adresa: qv('#csAdresa').trim(),
+      iban: qv('#csIban').trim(),
+      banca: qv('#csBanca').trim(),
+      capitalSocial: qv('#csCapitalSocial').trim(),
+      tvaPlatitor: qv('#csTvaPlatitor'),   // '', 'true', 'false' → szerver _bool3
+      website: qv('#csWebsite').trim(),
+      igazgatoNev: qv('#csIgazgatoNev').trim(),
+      emailContact: qv('#csEmailContact').trim(),
+      telefon: qv('#csTelefon').trim(),
     };
     gas('saveCompanySettings', [payload]).then(function (r) {
       if (r && r.ok) {
