@@ -2899,3 +2899,154 @@
   border-color: #3b82f6;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   🏢 CÉGADATOK NAV-GOMB + MODAL (2026-08-26)
+   A „Bemutatás" (#soferTourNavCard) gomb eddig teljes szélességű
+   sáv volt (grid-column: 1/-1). Most a Cégadatok (#soferCompanyInfoCard)
+   gombbal PÁROSAN, oszlopos rácsban áll — mindkettő fél szélességű
+   (a 2-oszlopos .sofer-nav-grid alap-rendjében), a "kompakt sor"
+   layouttal (ikon BAL, felirat KÖZÉPEN). A Kilépés kártya továbbra
+   is teljes szélességű sáv marad alattuk.
+   ══════════════════════════════════════════════════════════════ */
+.sofer-wrap .sofer-nav-card#soferTourNavCard,
+.sofer-wrap .sofer-nav-card#soferCompanyInfoCard {
+  grid-column: auto;             /* a fentebbi #soferTourNavCard 1/-1 override-ját elveti */
+  flex-direction: row;
+  gap: 10px;
+  max-height: 74px;
+  flex-shrink: 0;
+  justify-content: center;
+}
+.sofer-wrap .sofer-nav-card#soferTourNavCard::before,
+.sofer-wrap .sofer-nav-card#soferCompanyInfoCard::before { display: none; }
+.sofer-wrap .sofer-nav-card#soferTourNavCard .nav-icon,
+.sofer-wrap .sofer-nav-card#soferCompanyInfoCard .nav-icon {
+  width: 44px; height: 44px;
+  border-radius: 14px;
+  box-shadow: 0 6px 14px rgba(59,130,246,0.28);
+}
+.sofer-wrap .sofer-nav-card#soferTourNavCard .nav-label,
+.sofer-wrap .sofer-nav-card#soferCompanyInfoCard .nav-label {
+  padding: 0;
+  text-align: left;
+  font-size: 15px;
+}
+/* Cégadatok gombnak külön akcens — teal→zöld gradient (megkülönböztetve
+   a bemutató kék→indigo gradientjétől), így első ránézésre elválik. */
+.sofer-wrap .sofer-nav-card#soferCompanyInfoCard .nav-icon {
+  background: linear-gradient(135deg, #0d9488, #059669);
+  box-shadow: 0 6px 14px rgba(13,148,136,0.30);
+}
+
+/* ── Cégadatok modal (#companyInfoModal) ──
+   A `sof-modal` alaposztályt (`display:none`→`flex` toggle) használja;
+   a kártya szélesebb és görgethető (sok mező is beleférjen). */
+#companyInfoModal {
+  position: fixed; inset: 0; z-index: 1200;
+  align-items: center; justify-content: center;
+  padding: 20px;
+  background: rgba(15,23,42,0.62);
+  backdrop-filter: blur(6px);
+}
+#companyInfoModal .sof-modal-card.ci-card {
+  width: min(480px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: #fff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 20px;
+  padding: 20px 20px 16px;
+  box-shadow: 0 26px 60px rgba(15,23,42,0.30);
+  text-align: left;
+}
+#companyInfoModal .ci-head {
+  display: flex; gap: 12px; align-items: center;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1.5px solid #e2e8f0;
+}
+#companyInfoModal .ci-head-ico {
+  flex: 0 0 46px; width: 46px; height: 46px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0d9488, #059669);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 6px 14px rgba(13,148,136,0.30);
+}
+#companyInfoModal .ci-head-title {
+  margin: 0 0 2px;
+  font-size: 18px;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+#companyInfoModal .ci-head-msg {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: #64748b;
+  font-weight: 500;
+}
+#companyInfoModal .ci-body {
+  display: flex; flex-direction: column;
+  gap: 8px;
+}
+#companyInfoModal .ci-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+#companyInfoModal .ci-lbl {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+#companyInfoModal .ci-val-wrap {
+  display: flex; gap: 8px; align-items: center;
+}
+#companyInfoModal .ci-val {
+  flex: 1; min-width: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+  word-break: break-word;
+  font-variant-numeric: tabular-nums;
+}
+#companyInfoModal .ci-copy {
+  flex: 0 0 auto;
+  min-width: 40px; min-height: 40px;
+  border-radius: 10px;
+  border: 1.5px solid #94a3b8;
+  background: #fff;
+  color: #334155;
+  font-size: 18px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background .12s ease, border-color .12s ease;
+}
+#companyInfoModal .ci-copy:active {
+  background: #e0f2fe;
+  border-color: #0284c7;
+}
+#companyInfoModal .ci-loading,
+#companyInfoModal .ci-empty {
+  padding: 20px 10px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13.5px;
+}
+#companyInfoModal .ci-empty {
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
+  border-radius: 10px;
+  color: #92400e;
+  font-weight: 600;
+}
+

@@ -14,6 +14,34 @@
 
 ---
 
+## 2026-08-26 — Sofőr főoldal: új „🏢 Cégadatok" gomb + számlázási/azonosító mezők (vásárlásnál számlához)
+
+**Gyökér:** a sofőr vásárláskor gyakran nem tudja fejből a cég CUI-ját, Reg.Com. számát vagy IBAN-ját — kellett egy gomb, ami egy kattintással előhozza a cég ÖSSZES számlázási adatát vágólapra másolható formában. A "🎓 Bemutatás" gomb eddig teljes szélességű sáv volt (grid-column: 1/-1) — most fél szélességű, mellette az új "🏢 Cégadatok" gomb.
+
+**Új mezők (`db/company-invoice-info.sql`, idempotens):** `companies.cui/reg_com/euid/adresa/iban/banca/capital_social/tva_platitor/website`. A `nev/igazgato_nev/email_contact/telefon` már eddig is megvolt. Új mezők mind opcionálisak (NULL) — a meglévő cégeket nem töri.
+
+**Handler (`handlers/companySettings.js`):**
+- **`getMyCompanyInfo`** (ÚJ, Sofer|Admin|Manager) — read-only, `req.session.user.company_id` szerint tenant-szűrt; visszaadja az összes hivatalos adatot a sofőr modaljához. Az `eur_ron_rate`, PDF-fejléc, logó, menetlevél-prefix szándékosan NEM kerül át (nem a sofőr dolga).
+- **`getCompanySettings`** kibővítve az új mezőkkel az Admin/Manager panelhez.
+- **`saveCompanySettings`** kibővítve — `hasOwnProperty` alapon csak azt írja, amit ténylegesen küldünk; IBAN normalizálás (uppercase, csak alfanumerikus), TVA három-állapotú (true/false/null). Audit `changedFields` mezővel.
+
+**Sofőr UI (`public/sofer.html` + `sofer.js` + `sofer.css`):**
+- Új `#soferCompanyInfoCard` nav-kártya (teal→zöld akcens, megkülönböztetve a bemutató kék→indigo színétől).
+- A `#soferTourNavCard` `grid-column: 1/-1` override VISSZAVÉVE → a Bemutatás + Cégadatok gomb PÁROSAN fér el a 2-oszlopos rácsban.
+- Új `#companyInfoModal` — a `sof-modal` mintát követi (backdrop-blur + fehér kártya), scrollozható, ci-row-elrendezés (címke + érték + 📋 másoló gomb per mező).
+- `openCompanyInfo()` / `closeCompanyInfo()` / `_ciRenderCard()` / `ciCopy(field)` — a másoló gomb a meglévő `soferCopy` mintát követi (Clipboard API + textarea fallback).
+- Cache-bust `?v=20260826cegadat` (i18n.js + sofer.js + sofer.css + sofer.html scriptjei).
+
+**Admin/Manager UI (`public/company-settings.js`):** a Beállítások → Cég & arculat panel új „🧾 Számlázási adatok" + „📞 Kapcsolat" szekciókkal — CUI/Reg.Com./EUID/TVA-fizető/Capital social/Website + Adresa (textarea) + IBAN/Bank + Ügyvezető/E-mail/Telefon. Csak Admin írhat (Manager csak megnéz, mint eddig). Cache-bust `?v=20260826cegadat` (admin.html + manager.html).
+
+**i18n (`public/i18n.js`):** 20 új `sof.ci.*` kulcs (RO-alap + HU) + 15 új `comset.inv.*` kulcs (RO-alap + HU). A `sof.ci.tvaYes/tvaNo` labeleket az admin form is használja a `<select>` opcióiban.
+
+**Teszt:** **981 Jest zöld** (nincs regresszió), 135 require-sweep zöld. A meglévő `tests/integration/company-settings.test.js` 25 esete zöld (a `hasOwnProperty`-alapú részleges update visszafelé kompatibilis: ha a kliens csak a régi mezőket küldi, az új mezők érintetlenek).
+
+**Kapcsolódó fájlok:** `db/company-invoice-info.sql` (új), `handlers/companySettings.js`, `public/sofer.html`, `public/sofer.js`, `public/sofer.css`, `public/company-settings.js`, `public/i18n.js`, `public/admin.html`, `public/manager.html`.
+
+---
+
 ## 2026-08-26 — Admin/Manager főmenü: világos + modern + kontrasztos + szimmetrikus sidebar + almenü-emojik eltávolítva
 
 ### Miért
