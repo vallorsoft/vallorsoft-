@@ -3015,6 +3015,86 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
    (nincs külön override szükséges — az !important-ok a driver-mode fölé is
    érvényesek). */
 
+/* ── ELVÁLASZTÓ VONALAK — menü/almenü sorai közé ──
+   Cél: a menüpontok NE mosódjanak össze; minden sor legyen külön „doboz”.
+   Három szint:
+   1. Csoportok között (menu-group ↔ menu-group) — látható 1px `#cbd5e1` vonal
+      + kis függőleges levegő; a Beállítások (auto-margin) alá NEM megy alsó
+      elválasztó (`margin-top:auto` a legvégén ül).
+   2. Egy csoporton belüli főmenü-tabok között — halványabb 1px `#e2e8f0`.
+   3. Almenü-tételek között — még halványabb 1px `#eef2f7`, hogy az almenü
+      saját (2px indigó) bal-vezérlővonala továbbra is a fő elem legyen.
+   A vonalakat MINDIG `+` szomszéd-szelektorral tesszük (első elem soha nem
+   kap felső vonalat), és sosem az aktív főmenü ALÁ (mert az indigó gradiens
+   ott a hangsúly). */
+
+/* Csoportok közti elválasztó (a menu-group tetején felső vonal, kivéve
+   az elsőn) — a menü egészét vizuális blokkokra bontja. */
+.sidebar .menu-group + .menu-group{
+  border-top: 1px solid #cbd5e1;
+  padding-top: 6px;
+  margin-top: 4px;
+}
+
+/* Csoporton belüli főmenü-tabok közti halvány elválasztó (pl. Vezérlőpult +
+   Operatív központ). Csak akkor rajzoljuk, ha az ELŐZŐ tab nem-aktív —
+   különben az indigó pill fölé húzna vékony vonalat. */
+.sidebar .menu-group .tab + .tab,
+.sidebar .menu-group .tab + a.tab-link,
+.sidebar .menu-group a.tab-link + .tab,
+.sidebar .menu-group a.tab-link + a.tab-link{
+  position: relative;
+}
+.sidebar .menu-group .tab + .tab::before,
+.sidebar .menu-group .tab + a.tab-link::before,
+.sidebar .menu-group a.tab-link + .tab::before,
+.sidebar .menu-group a.tab-link + a.tab-link::before{
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: 8px; right: 8px;
+  height: 1px;
+  background: #e2e8f0;
+  pointer-events: none;
+}
+
+/* Almenü-tételek közti halvány elválasztó — az almenü saját 2px indigó
+   bal-vezérlővonala mellett szubtilisan bontja a sorokat. */
+.sidebar .submenu .sub-tab + .sub-tab,
+.sidebar .submenu a.sub-tab + .sub-tab,
+.sidebar .submenu .sub-tab + a.sub-tab,
+.sidebar .submenu a.sub-tab + a.sub-tab{
+  position: relative;
+}
+.sidebar .submenu .sub-tab + .sub-tab::before,
+.sidebar .submenu a.sub-tab + .sub-tab::before,
+.sidebar .submenu .sub-tab + a.sub-tab::before,
+.sidebar .submenu a.sub-tab + a.sub-tab::before{
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 8px; right: 8px;
+  height: 1px;
+  background: #eef2f7;
+  pointer-events: none;
+}
+
+/* Az almenü tetején (közvetlenül a főmenü-fejléc alatt) EXTRA térköz +
+   egy erősebb elválasztó — a nyitott csoport tartalma vizuálisan
+   „bekötve” marad a fejléchez, mégis külön blokként. */
+.sidebar .menu-group.open .submenu{
+  border-top: 1px solid #e2e8f0;
+  padding-top: 6px !important;
+  margin-top: 4px !important;
+}
+
+/* Aktív főmenü fölött NE látszódjon a csoport-elválasztó, mert az indigó
+   pill fölött vékony szürke csík vizuálisan „levágná” a gombot. */
+.sidebar .menu-group.open:has(.nav-head.active) + .menu-group,
+.sidebar .menu-group:has(> .tab.active:not(.nav-head)) + .menu-group{
+  border-top-color: transparent;
+}
+
 /* ── MOBIL DRAWER FIX ──
    A fenti .sidebar `padding: 22px 14px !important` az asztali nézetre való;
    mobilon (≤768px) a sidebar off-canvas drawerré válik és a fix mob-topbar
