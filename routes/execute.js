@@ -58,6 +58,7 @@ const handlers = Object.assign(
   require('../handlers/statsV2'),
   require('../handlers/statsInsights'),
   require('../handlers/statsReports'),
+  require('../handlers/orderAssignment'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a

@@ -47,6 +47,17 @@ window.CompanySettings = (function () {
               (d.hasLogo ? ' <button class="btn ghost" id="csLogoDel"' + disabled + ' style="padding:5px 12px;font-size:12px;">' + tt('comset.logoDel', '🗑️ Logó törlése') + '</button>' : '') +
               '<div style="font-size:11px;color:var(--muted);margin-top:4px;">' + tt('comset.logoHint', 'PNG/JPG, max ~3 MB.') + '</div>' +
             '</div>' +
+            // ── PECSÉT (Comanda de Transport záró blokkjához) ──
+            '<div class="field" style="margin-top:14px;"><label>' + tt('comset.stamp', 'Céges pecsét') + '</label>' +
+              '<div id="csStampPreviewWrap" style="margin:6px 0 8px;min-height:48px;">' +
+                (d.hasStamp
+                  ? '<img id="csStampImg" alt="stamp" style="max-height:80px;max-width:200px;border-radius:8px;background:#fff;padding:6px;">'
+                  : '<span style="color:var(--muted);font-size:13px;" id="csStampNone">' + tt('comset.noStamp', 'Nincs feltöltött pecsét.') + '</span>') +
+              '</div>' +
+              '<input type="file" id="csStampFile" accept="image/*"' + disabled + ' style="font-size:12px;">' +
+              (d.hasStamp ? ' <button class="btn ghost" id="csStampDel"' + disabled + ' style="padding:5px 12px;font-size:12px;">' + tt('comset.stampDel', '🗑️ Pecsét törlése') + '</button>' : '') +
+              '<div style="font-size:11px;color:var(--muted);margin-top:4px;">' + tt('comset.stampHint', 'PNG átlátszó háttérrel ajánlott. A Comanda de Transport záró blokkjában és jövőbeli PDF-eken jelenik meg.') + '</div>' +
+            '</div>' +
           '</div>' +
           '<div>' +
             '<div class="field"><label>' + tt('comset.brandColor', 'Márka-szín') + '</label>' +
@@ -143,6 +154,8 @@ window.CompanySettings = (function () {
       root.querySelector('#csSaveBtn').addEventListener('click', save);
       var lf = root.querySelector('#csLogoFile'); if (lf) lf.addEventListener('change', uploadLogo);
       var ld = root.querySelector('#csLogoDel'); if (ld) ld.addEventListener('click', delLogo);
+      var sf = root.querySelector('#csStampFile'); if (sf) sf.addEventListener('change', uploadStamp);
+      var sd = root.querySelector('#csStampDel'); if (sd) sd.addEventListener('click', delStamp);
     }
     // Logó-előnézet betöltése a hitelesített végpontról (dataUri, nem szivárog kifelé).
     if (d.hasLogo) {
@@ -150,6 +163,14 @@ window.CompanySettings = (function () {
       if (img) {
         fetch('/api/branding/logo').then(function (r) { return r.json(); }).then(function (lg) {
           if (lg && lg.has && lg.dataUri) img.src = lg.dataUri;
+        }).catch(function () {});
+      }
+    }
+    if (d.hasStamp) {
+      var simg = root.querySelector('#csStampImg');
+      if (simg) {
+        fetch('/api/branding/stamp').then(function (r) { return r.json(); }).then(function (lg) {
+          if (lg && lg.has && lg.dataUri) simg.src = lg.dataUri;
         }).catch(function () {});
       }
     }
@@ -306,6 +327,31 @@ window.CompanySettings = (function () {
     if (!confirm(tt('comset.logoDelConfirm', 'Biztosan törlöd a logót?'))) return;
     fetch('/api/branding/logo', { method: 'DELETE' }).then(function (r) { return r.json(); }).then(function (d) {
       if (d && d.ok) { toast(tt('comset.logoDeleted', 'Logó törölve'), 'ok'); mount(_root.id); }
+      else toast(tt('common.error', 'Hiba'), 'err');
+    }).catch(function () { toast(tt('common.error', 'Hiba'), 'err'); });
+  }
+
+  function uploadStamp() {
+    var fi = _root.querySelector('#csStampFile');
+    if (!fi || !fi.files.length) return;
+    var f = fi.files[0];
+    var fr = new FileReader();
+    fr.onload = function (e) {
+      fetch('/api/branding/stamp', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64: e.target.result, mime: f.type || 'image/png' }),
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d && d.ok) { toast(tt('comset.stampSaved', 'Pecsét mentve'), 'ok'); mount(_root.id); }
+        else toast((d && d.error) || tt('common.error', 'Hiba'), 'err');
+      }).catch(function () { toast(tt('common.error', 'Hiba'), 'err'); });
+    };
+    fr.readAsDataURL(f);
+  }
+
+  function delStamp() {
+    if (!confirm(tt('comset.stampDelConfirm', 'Biztosan törlöd a pecsétet?'))) return;
+    fetch('/api/branding/stamp', { method: 'DELETE' }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d && d.ok) { toast(tt('comset.stampDeleted', 'Pecsét törölve'), 'ok'); mount(_root.id); }
       else toast(tt('common.error', 'Hiba'), 'err');
     }).catch(function () { toast(tt('common.error', 'Hiba'), 'err'); });
   }

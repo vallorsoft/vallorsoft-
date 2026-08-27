@@ -14,6 +14,32 @@
 
 ---
 
+## 2026-08-27 — ÚJ: Comanda de Transport (megbízás) — kártyás wizard + PDF-előnézet + cég-pecsét
+
+**Gyökér:** külsős (Extern) és sofőr-nélküli fuvarnál eddig nem volt bekötött módja annak, hogy a diszpécser hivatalos megrendelőt/megbízást (Comanda de Transport) küldjön az alvállalkozónak. A felhasználó a saját sablonját (4 oldalas VallorSoft Comanda de Transport) küldte referenciának — a rendszer most ezt reprodukálja, a fuvar-adatokat előtölti, a szerkeszthető mezőket kártyás wizardban (a fuvar-kiírás vizuális mintáját követve) kéri, és a PDF-et élő előnézettel + a fuvar dokumentumaihoz csatolva állítja elő.
+
+**Új infra:**
+- **`db/order-assignments.sql`** (ÚJ, idempotens): `order_assignments` tábla — egy fuvarhoz egy megbízás (`UNIQUE (order_id)`), `number_source` (`'auto'|'custom'`) + `custom_number`, `carrier_id` + `carrier_snapshot` JSONB, `price`/`currency`/`payment_term_days`, mind a többi mező `fields` JSONB-ben (stops per stop_id, vehicle: tip_camion + truck_kinds + DA/NU flags + alte_specificatii, driver: name+phone), `rendered_pdf_base64` + `signed_pdf_base64` (client-side pdf-lib-bel).
+- **`db/carriers-reg-com-adresa.sql`** (ÚJ, idempotens): `carriers.reg_com` + `carriers.adresa` — a bal felső fejléc-blokkhoz hiányzó két mező.
+- **`db/company-branding-stamp.sql`** (ÚJ, idempotens): `company_branding.stamp_base64` + `stamp_mime` — cég-szintű körpecsét (a per-user `stamps` táblát NEM érinti — az a menetlevél-aláírás pecsétje).
+- **`routes/client-mail.js`**: új `/api/branding/stamp` GET/POST/DELETE (a logó-mintát követve, multi-tenant).
+
+**Handler (`handlers/orderAssignment.js`, registry-be regisztrálva):** `orderAssignmentGet` (előtöltő snapshot: fuvar + carrier join + stops + companies + company_branding logo/stamp jelző + meglévő megbízás), `orderAssignmentCarriers` (aktív cég-carrier lista), `orderAssignmentSave` (upsert + mező-fehérlista + `fields` JSONB méret-korlát 32 KB + PDF méret-korlát ~3 MB + cross-tenant védelem), `orderAssignmentGetPdf`, `orderAssignmentSaveSigned` (aláírt+lepecsételt PDF a meglévő `buildSignedPdf` mintán), `orderAssignmentAttachToDocs` (a kész PDF-et a fuvar `order_documents` közé is teszi), `orderAssignmentDelete`. Mind Admin/Manager, `company_id`-szűrt, paraméteres, audit-naplózott. **Csak Extern/sofőr-nélküli fuvarra** — a szerver a fuvar `email_sofer`-t is ellenőrzi (defense in depth).
+
+**Kliens (`public/order-assignment.js`, kb. 620 sor):** teljes képernyős modal, benne a fuvar-kiírás (`.oc-step-card` / `.oc-progress` / `.oc-nav`) vizuális mintáját követő **6 lépéses kártyás wizard**: 📋 Alap-adatok (Comanda Nr. auto/saját váltó, alvállalkozó legördülő az `orderAssignmentCarriers`-ből, ár + pénznem + fizetési határidő) · ⬆️ Felrakási pontok (minden `order_stops` pickup önálló kártya: adresa/firma read-only + interval/paleti/tip_palet/kg/metri/referinta/instructiuni szerkeszthető) · ⬇️ Lerakási pontok (ugyanígy delivery stopokra) · 🚛 Jármű + felszerelés (TIP Camion szabadszöveg + Standard/Mega/Frigo/Prelata/… kamion-típus chipek + 9 DA/NU flag + alte specificatii) · 👤 Sofőr (név + telefon) · 📄 Ellenőrzés + PDF (💾 Mentés + letöltés · 💾 Csak mentés · 📎 Csatolás a fuvarhoz · ✉️ E-mail alvállalkozónak · 🗑 Megbízás törlése). A PDF-render `pdf-lib`-bel (már betöltve a admin/manager.html-ben) 4 A4 oldal: fejléc + INCARCARE/DESCARCARE per stop + DETALII + T&C 1–5 + 5–10 + Tarif + Termen + záró aláíró blokk pecséttel; a cég logója + pecsétje a `company_branding`-ból automatikusan. A Metri Podea alap FTL→13.6 m; LTL→a fuvar `hossz_cm/100`. **Élő PDF-előnézet** a Step 6 iframe-jében.
+
+**UI-bekötés (`public/console-shared.js`):** új `📄 Megbízás (Comanda de Transport)` gomb a fuvar `⋯` menüben — CSAK ha `!c.email_sofer` (nincs belső sofőr kiosztva). A gomb `OrderAssignment.open(orderId)`-t hív.
+
+**Cég-pecsét feltöltés (`public/company-settings.js`):** a Beállítások → Cég & arculat panelen a logó mellé bekerült a „Céges pecsét" mező (`csStampFile`/`csStampImg`/`csStampDel`), `uploadStamp`/`delStamp` a `/api/branding/stamp` REST-en. A `getCompanySettings` handler bővítve `hasStamp`/`stampMime`-mel. A meglévő logó-feltöltés + `stamps` (per-user) tábla érintetlen.
+
+**Cache-bust:** `?v=20260827oa` (style.css + i18n.js + console-shared.js), `?v=20260827oa` (order-assignment.js ÚJ), `?v=20260827stamp` (company-settings.js). **996 Jest zöld** (981 → 996, +15 új eset `tests/integration/order-assignment.test.js`: szerep-kapuk, tenant-izoláció, cross-tenant védelem, csak Extern/sofőr-nélküli szűrés, mező-fehérlista, custom_number validáció, INSERT/UPDATE ágak).
+
+**Multi-tenant + biztonság:** minden lekérdezés paraméteres + `company_id`-szűrt; a fuvar-tulajdon a save/get/attach ELŐTT ellenőrzött (a #94 audit tanulsága szerint); a `fields` JSONB fehérlistázva (`TRUCK_KINDS`/`FLAG_KEYS`/`STOP_FIELDS`); a PDF/rendered_pdf_base64 méret-korlátos (~3 MB); a szerver a `pdf-lib`-et NEM használja (klienses render), így nincs új npm-függőség.
+
+**Utólagos kör (kérésre):** minden szerkesztő-mező egyetlen wizard-felületen, a fuvar-kiírás kártyás mintáját követő stílusban, erős kontraszttal (CSS `.oa-*` szabályok a `style.css` végén, additív blokk).
+
+---
+
 ## 2026-08-26 — Sofőr főoldal duo-kártya finomítás + PWA-visszatérés session-overlay
 
 **Két sofőr-visszajelzés a #377 kör után:**
