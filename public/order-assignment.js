@@ -613,203 +613,12 @@
   function setAlte(v){ OA.payload.fields.vehicle.alte_specificatii = v || ''; }
   function setDriver(k, v){ OA.payload.fields.driver[k] = v || ''; }
 
-  // ── PDF-generálás (pdf-lib, kliens-oldal) ────────────────
-  // A layout: 4 oldal — 1: fejléc + INCARCARE/DESCARCARE + DETALII;
-  // 2: 1.–5. jogi pontok; 3: 5.–10. jogi pontok + „Tarif"+„Termen";
-  // 4: záró aláíró blokk + pecsét.
-  async function _generatePdfBytes(){
-    if (typeof PDFLib === 'undefined') throw new Error('PDFLib not loaded');
-    var pdfDoc = await PDFLib.PDFDocument.create();
-    var page1 = pdfDoc.addPage([595.28, 841.89]);   // A4
-    var page2 = pdfDoc.addPage([595.28, 841.89]);
-    var page3 = pdfDoc.addPage([595.28, 841.89]);
-    var page4 = pdfDoc.addPage([595.28, 841.89]);
-    // A pdf-lib beépített (WinAnsi) fontja NEM támogatja az árvíztűrő román
-    // ékezeteket (ă/â/ș/ț/ș/î) → StandardFonts.Helvetica-val a WinAnsiEncoding
-    // hibát dob. Egyszerűsítés: minden szöveget WinAnsi-kompatibilis
-    // változatra alakítunk (ékezetek helyettesítve). Nyomtatáskor egy
-    // közepesen olvasható RO szöveget adunk; a jövőben egy TTF (Roboto)
-    // beágyazása oldja meg a teljes UTF-8-at.
-    var font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-    var bold = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
-    var oblique = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaOblique);
-
-    function ascii(s){ return String(s||'')
-      .replace(/[ăâáà]/g,'a').replace(/[ĂÂÁÀ]/g,'A')
-      .replace(/[éèê]/g,'e').replace(/[ÉÈÊ]/g,'E')
-      .replace(/[íì]/g,'i').replace(/[ÍÌ]/g,'I').replace(/[îÎ]/g,'i')
-      .replace(/[óòô]/g,'o').replace(/[ÓÒÔ]/g,'O')
-      .replace(/[úù]/g,'u').replace(/[ÚÙ]/g,'U')
-      .replace(/[șş]/g,'s').replace(/[ȘŞ]/g,'S')
-      .replace(/[țţ]/g,'t').replace(/[ȚŢ]/g,'T')
-      .replace(/[őő]/g,'o').replace(/[ŐŐ]/g,'O')
-      .replace(/[űű]/g,'u').replace(/[ŰŰ]/g,'U'); }
-
-    function drawText(page, text, x, y, size, useFont){
-      page.drawText(ascii(text), { x: x, y: y, size: size, font: useFont || font, color: PDFLib.rgb(0,0,0) });
-    }
-    function drawWrapped(page, text, x, y, size, maxW, useFont){
-      var f = useFont || font;
-      var words = ascii(text).split(/\s+/);
-      var line = '';
-      var yy = y;
-      for (var i=0; i<words.length; i++){
-        var trial = line ? (line + ' ' + words[i]) : words[i];
-        var w = f.widthOfTextAtSize(trial, size);
-        if (w > maxW && line){
-          page.drawText(line, { x:x, y:yy, size:size, font:f, color:PDFLib.rgb(0,0,0) });
-          yy -= size * 1.25; line = words[i];
-        } else {
-          line = trial;
-        }
-      }
-      if (line){ page.drawText(line, { x:x, y:yy, size:size, font:f, color:PDFLib.rgb(0,0,0) }); yy -= size * 1.25; }
-      return yy;
-    }
-    function drawRect(page, x, y, w, h, opts){
-      page.drawRectangle(Object.assign({ x:x, y:y, width:w, height:h, borderColor:PDFLib.rgb(0.55,0.55,0.55), borderWidth:0.6 }, opts||{}));
-    }
-
-    var co = (OA.data && OA.data.company) || {};
-    var o  = (OA.data && OA.data.order) || {};
-    var p  = OA.payload;
-    var c  = OA.carriers.find(function(x){ return x.id === p.carrier_id; }) || {};
-    var comandaNr = (p.number_source === 'custom' && p.custom_number) ? p.custom_number : (o.fuvar_no || o.id || '');
-
-    // ── OLDAL 1 — fejléc + incarcare + descarcare + detalii
-    // Fejléc
-    drawText(page1, 'Comanda de Transport', 40, 800, 14, bold);
-    drawText(page1, 'Comanda Nr.:  ' + comandaNr, 40, 782, 12, bold);
-    drawText(page1, 'Pagina: 1/4', 500, 20, 9);
-
-    // Logó (jobb felső)
-    try {
-      if (co.has_logo) {
-        var r = await fetch('/api/branding/logo', { credentials:'same-origin' }).then(function(r){ return r.json(); });
-        if (r && r.dataUri) {
-          var isPng = /^data:image\/png/.test(r.dataUri);
-          var bytes = await fetch(r.dataUri).then(function(x){ return x.arrayBuffer(); });
-          var img = isPng ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
-          var scale = 100 / Math.max(img.width, img.height);
-          var w = img.width * scale, h = img.height * scale;
-          page1.drawImage(img, { x: 555 - w, y: 780, width: w, height: h });
-        }
-      }
-    } catch(e){ console.warn('logo embed failed', e); }
-
-    // Két kártya: bal = alvállalkozó (kitöltve), jobb = a MI cégünk
-    // Bal
-    drawRect(page1, 40, 660, 250, 100);
-    drawText(page1, 'Numele firma: ' + (c.nev||''), 46, 745, 9, bold);
-    drawText(page1, 'Adresa: ' + (c.adresa||''), 46, 730, 8);
-    drawText(page1, 'Cod fiscal: ' + (c.cui||''), 46, 715, 8);
-    drawText(page1, 'Nr.Inm. O.R.C.: ' + (c.reg_com||''), 46, 700, 8);
-    drawText(page1, 'Telefon: ' + (c.telefon||''), 46, 685, 8);
-    drawText(page1, 'Email: ' + (c.email||''), 46, 670, 8);
-
-    // Jobb (a mi cégünk)
-    drawRect(page1, 305, 660, 250, 100);
-    drawText(page1, co.nev || '', 311, 745, 9, bold);
-    drawText(page1, 'Judet/Localitate: ' + (co.adresa ? (co.adresa.split(',')[0]||'') : ''), 311, 730, 8);
-    drawText(page1, 'Adresa: ' + (co.adresa||''), 311, 715, 8);
-    drawText(page1, 'Cod fiscal: ' + (co.cui||''), 311, 700, 8);
-    drawText(page1, 'Nr.Inm. O.R.C.: ' + (co.reg_com||''), 311, 685, 8);
-    drawText(page1, 'Telefon: ' + (co.telefon||''), 311, 670, 8);
-    drawText(page1, 'Email: ' + (co.email_contact||''), 311, 655, 8);
-
-    // INCARCARE — sorok
-    drawText(page1, 'INCARCARE', 40, 640, 11, bold);
-    var yy = 622;
-    // Fejléc-sor
-    drawRect(page1, 40, yy, 515, 14, { color: PDFLib.rgb(0.93,0.93,0.93) });
-    drawText(page1, 'Adresa', 46, yy+3, 8, bold);
-    drawText(page1, 'Data', 260, yy+3, 8, bold);
-    drawText(page1, 'Interval', 305, yy+3, 8, bold);
-    drawText(page1, 'Paleti', 355, yy+3, 8, bold);
-    drawText(page1, 'Tip', 390, yy+3, 8, bold);
-    drawText(page1, 'Kg', 425, yy+3, 8, bold);
-    drawText(page1, 'M.Podea', 460, yy+3, 8, bold);
-    yy -= 4;
-    (p.fields.stops.pickups || []).forEach(function(row, idx){
-      yy -= 18;
-      drawRect(page1, 40, yy, 515, 18);
-      drawText(page1, String(idx+1)+'. '+(row._loc||''), 46, yy+5, 8);
-      drawText(page1, row._data||'', 260, yy+5, 8);
-      drawText(page1, row.interval||'', 305, yy+5, 8);
-      drawText(page1, row.paleti||'', 355, yy+5, 8);
-      drawText(page1, row.tip_palet||'', 390, yy+5, 8);
-      drawText(page1, row.kg||'', 425, yy+5, 8);
-      drawText(page1, row.metri||'', 460, yy+5, 8);
-      if (row.referinta){ yy -= 12; drawText(page1, 'Referinta: '+row.referinta, 46, yy+2, 7, oblique); }
-      if (row.instructiuni){ yy -= 12; drawText(page1, 'Instr.: '+row.instructiuni, 46, yy+2, 7, oblique); }
-    });
-
-    // DESCARCARE
-    yy -= 22;
-    drawText(page1, 'DESCARCARE', 40, yy, 11, bold);
-    yy -= 14;
-    drawRect(page1, 40, yy, 515, 14, { color: PDFLib.rgb(0.93,0.93,0.93) });
-    drawText(page1, 'Adresa', 46, yy+3, 8, bold);
-    drawText(page1, 'Data', 260, yy+3, 8, bold);
-    drawText(page1, 'Interval', 305, yy+3, 8, bold);
-    drawText(page1, 'Paleti', 355, yy+3, 8, bold);
-    drawText(page1, 'Tip', 390, yy+3, 8, bold);
-    drawText(page1, 'Kg', 425, yy+3, 8, bold);
-    drawText(page1, 'M.Podea', 460, yy+3, 8, bold);
-    yy -= 4;
-    (p.fields.stops.deliveries || []).forEach(function(row, idx){
-      yy -= 18;
-      drawRect(page1, 40, yy, 515, 18);
-      drawText(page1, String(idx+1)+'. '+(row._loc||''), 46, yy+5, 8);
-      drawText(page1, row._data||'', 260, yy+5, 8);
-      drawText(page1, row.interval||'', 305, yy+5, 8);
-      drawText(page1, row.paleti||'', 355, yy+5, 8);
-      drawText(page1, row.tip_palet||'', 390, yy+5, 8);
-      drawText(page1, row.kg||'', 425, yy+5, 8);
-      drawText(page1, row.metri||'', 460, yy+5, 8);
-      if (row.referinta){ yy -= 12; drawText(page1, 'Referinta: '+row.referinta, 46, yy+2, 7, oblique); }
-      if (row.instructiuni){ yy -= 12; drawText(page1, 'Instr.: '+row.instructiuni, 46, yy+2, 7, oblique); }
-    });
-
-    // DETALII TRANSPORT
-    yy -= 22;
-    drawText(page1, 'DETALII TRANSPORT:', 40, yy, 11, bold);
-    yy -= 14;
-    var kinds = (p.fields.vehicle.truck_kinds || []).map(function(k){ return k.charAt(0).toUpperCase()+k.slice(1); }).join(' / ');
-    drawText(page1, 'Nr. Camion: '+(o.rendszam_camion_extern || o.rendszam_camion || '……..'), 40, yy, 9);
-    yy -= 12;
-    drawText(page1, 'TIP Camion: '+(p.fields.vehicle.tip_camion||'')+(kinds?' · '+kinds:''), 40, yy, 9);
-    yy -= 12;
-    drawText(page1, 'Regim transport: '+(o.load_type||'FTL'), 40, yy, 9);
-    yy -= 12;
-    var F = p.fields.vehicle.flags;
-    var flagPairs = [
-      ['2 soferi', F.doi_soferi], ['Podea goala', F.podea_goala], ['Chingi', F.chingi],
-      ['Presuri antiderapante', F.presuri], ['Coltare', F.coltare], ['Paleti schimb', F.paleti_schimb],
-      ['Termodiagrama printabila', F.termodiagrama], ['Cablu vamal', F.cablu_vamal], ['ADR', F.adr]
-    ];
-    flagPairs.forEach(function(pair, i){
-      var col = i % 3;
-      var row = Math.floor(i/3);
-      var x = 40 + col*180;
-      var yLine = yy - row*12;
-      drawText(page1, pair[0]+': '+(pair[1]?'DA':'NU'), x, yLine, 8);
-    });
-    yy -= (Math.ceil(flagPairs.length/3) * 12) + 6;
-    if (p.fields.vehicle.alte_specificatii){
-      drawText(page1, 'Alte specificatii: ', 40, yy, 9, bold);
-      yy = drawWrapped(page1, p.fields.vehicle.alte_specificatii, 40, yy-12, 8, 515);
-    }
-    yy -= 6;
-    drawText(page1, 'Nume sofer: '+(p.fields.driver.name||''), 40, yy, 9);
-    drawText(page1, 'Telefon sofer: '+(p.fields.driver.phone||''), 300, yy, 9);
-
-    // ── OLDAL 2 — jogi pontok 1–5
-    drawText(page2, 'Comanda de Transport', 40, 800, 12, bold);
-    drawText(page2, 'Comanda Nr.:  ' + comandaNr, 40, 785, 10, bold);
-    drawText(page2, 'Pagina: 2/4', 500, 20, 9);
-    var yy2 = 760;
-    var LEGAL_1 = [
+  // ── Alapértelmezett sablon (a jelenlegi hardcoded szövegek — a
+  // Beállítások → Comanda de Transport sablon szerkesztő ezekre esik
+  // vissza, ha egy mezőt sem írt át az admin). Egy mező NULL-ja is
+  // erre a szótárra esik vissza → mindig van olvasható PDF.
+  var DEFAULT_TEMPLATE = {
+    legalTerms: [
       '1. COMANDA DE TRANSPORT',
       '1.1. Tariful contine toate elementele pretului cuvenit carausului, completare carnet TIR si scrisoare CMR, cheltuieli accesorii, cheltuieli de vama, precum si orice alte cheltuieli survenite de la incheierea contractului si pana la eliberare.',
       '1.2. Clauzele contractului de transport nu se negocieaza, comanda se va confirma in scris de transportator in termen de doua ore de la primire, fara rezerve sau obiectiuni.',
@@ -828,21 +637,7 @@
       '3.3. Ora de incarcare/descarcare este cel din comanda de transport sau fereastra de incarcare confirmata in scris.',
       '3.4. La primirea marfii transportatorul este obligat sa verifice: exactitatea mentiunilor din CMR, starea aparenta a marfii si a ambalajului.',
       '3.5. Transportatorul are obligatia sa asiste/participe atat la incarcare cat si la descarcare.',
-      '3.6. Aranjarea si asigurarea marfii este sarcina Transportatorului.'
-    ];
-    LEGAL_1.forEach(function(par){
-      var isTitle = /^\d+\./.test(par) && par.length < 40;
-      var f = isTitle ? bold : font;
-      yy2 = drawWrapped(page2, par, 40, yy2, 8, 515, f);
-      yy2 -= 4;
-    });
-
-    // ── OLDAL 3 — jogi pontok 4–10 + tarif + termen de plata
-    drawText(page3, 'Comanda de Transport', 40, 800, 12, bold);
-    drawText(page3, 'Comanda Nr.:  ' + comandaNr, 40, 785, 10, bold);
-    drawText(page3, 'Pagina: 3/4', 500, 20, 9);
-    var yy3 = 760;
-    var LEGAL_2 = [
+      '3.6. Aranjarea si asigurarea marfii este sarcina Transportatorului.',
       '4. NEPREZENTARE, INTARZIERE, ABANDON',
       '4.1. Neprezentarea la incarcare se penalizeaza cu pana la 100% din pretul de transport conform comenzii de transport.',
       '4.2. Intarzierea transportatorului la operatiunile de incarcare/descarcare se penalizeaza cu 250 euro/fiecare 24 ore incepute.',
@@ -859,35 +654,401 @@
       '9. DIVERSE',
       '9.1. Obligatiile Beneficiarului asumate nu sunt datorate cata vreme clientul acestuia nu achita contravaloarea transportului.',
       '9.10. Orice litigiu se va deferi spre solutionare instantelor judecatoresti competente din Sfantu Gheorghe, judetul Covasna, Romania.'
+    ].join('\n'),
+    footerNote: 'Contravaloarea facturii se va achita numai daca impreuna cu documentele de transport se trimite si comanda confirmata in original (toate paginile stampilate) si bon de palet daca este cazul.',
+    importantNote: 'IMPORTANT! Confirmarea trebuie trimisa pe fax sau e-mail inainte de incarcare.',
+    cuStima: 'Cu stima',
+    confirmareLbl: 'CONFIRMARE TRANSPORTATOR',
+    semnaturaLbl: 'Semnatura si stampila',
+    sectHead: { incarcare: 'INCARCARE', descarcare: 'DESCARCARE', detalii: 'DETALII TRANSPORT:' }
+  };
+
+  // Sablon-feloldás: mezőnkénti fallback a defaultra (üres sablon,
+  // vagy csak részben átírt sablon esetén sem tűnik el semmi).
+  function _resolveTemplate(){
+    var co = (OA.data && OA.data.company) || {};
+    var t = co.order_assignment_template || {};
+    var d = DEFAULT_TEMPLATE;
+    var sh = (t.sectHead && typeof t.sectHead === 'object') ? t.sectHead : {};
+    return {
+      legalTerms:    (t.legalTerms    && String(t.legalTerms).trim())    || d.legalTerms,
+      footerNote:    (t.footerNote    && String(t.footerNote).trim())    || d.footerNote,
+      importantNote: (t.importantNote && String(t.importantNote).trim()) || d.importantNote,
+      cuStima:       (t.cuStima       && String(t.cuStima).trim())       || d.cuStima,
+      confirmareLbl: (t.confirmareLbl && String(t.confirmareLbl).trim()) || d.confirmareLbl,
+      semnaturaLbl:  (t.semnaturaLbl  && String(t.semnaturaLbl).trim())  || d.semnaturaLbl,
+      sectHead: {
+        incarcare:  (sh.incarcare  && String(sh.incarcare).trim())  || d.sectHead.incarcare,
+        descarcare: (sh.descarcare && String(sh.descarcare).trim()) || d.sectHead.descarcare,
+        detalii:    (sh.detalii    && String(sh.detalii).trim())    || d.sectHead.detalii
+      }
+    };
+  }
+
+  // Publikus a Beállítások szerkesztőnek (Reset gomb + placeholder).
+  function getDefaultTemplate(){ return DEFAULT_TEMPLATE; }
+
+  // ── PDF-generálás (pdf-lib, kliens-oldal) ────────────────
+  // Layout: A4 (595.28 x 841.89 pt), 1 cm margó minden oldalon
+  // (~28.35 pt). Az oldalak dinamikusan bővülnek — a szövegek
+  // sorra tördelődnek (drawWrapped), a szakaszok automatikusan
+  // új oldalra kerülnek, ha a maradék hely kevés (ensureSpace).
+  // Semmi nem lóg túl: minden tábla-cella szintén tördelve.
+  async function _generatePdfBytes(){
+    if (typeof PDFLib === 'undefined') throw new Error('PDFLib not loaded');
+    var pdfDoc = await PDFLib.PDFDocument.create();
+
+    // Lapméret + 1 cm margó
+    var PAGE_W = 595.28, PAGE_H = 841.89, M = 28.35;
+    var CONTENT_W = PAGE_W - 2*M;
+    var TOP_Y = PAGE_H - M;             // rajzolási y max
+    var BOTTOM_Y = M + 22;              // láb (page-num) fölött 22 pt tartalék
+    var pages = [];
+    function addPage(){
+      var p = pdfDoc.addPage([PAGE_W, PAGE_H]);
+      pages.push(p);
+      return p;
+    }
+    var page = addPage();
+    var y = TOP_Y;
+    // A pdf-lib beépített (WinAnsi) fontja NEM támogatja az árvíztűrő román
+    // ékezeteket (ă/â/ș/ț/î) → ASCII-változatra fordítunk.
+    var font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+    var bold = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+    var oblique = await pdfDoc.embedFont(PDFLib.StandardFonts.HelveticaOblique);
+
+    function ascii(s){ return String(s||'')
+      .replace(/[ăâáà]/g,'a').replace(/[ĂÂÁÀ]/g,'A')
+      .replace(/[éèê]/g,'e').replace(/[ÉÈÊ]/g,'E')
+      .replace(/[íì]/g,'i').replace(/[ÍÌ]/g,'I').replace(/[îÎ]/g,'i')
+      .replace(/[óòô]/g,'o').replace(/[ÓÒÔ]/g,'O')
+      .replace(/[úù]/g,'u').replace(/[ÚÙ]/g,'U')
+      .replace(/[șş]/g,'s').replace(/[ȘŞ]/g,'S')
+      .replace(/[țţ]/g,'t').replace(/[ȚŢ]/g,'T')
+      .replace(/[őő]/g,'o').replace(/[ŐŐ]/g,'O')
+      .replace(/[űű]/g,'u').replace(/[ŰŰ]/g,'U'); }
+
+    // Új oldalra ugrás — a fő „y" flow-változó frissül.
+    function ensureSpace(needed){
+      if (y - needed < BOTTOM_Y) { page = addPage(); y = TOP_Y; }
+    }
+    function drawTextAt(pg, text, x, ty, size, useFont){
+      pg.drawText(ascii(text), { x:x, y:ty, size:size, font: useFont||font, color: PDFLib.rgb(0,0,0) });
+    }
+    // Egyszerű ki-rajzolás a KÖVETKEZŐ sorra (flow y-ra) — auto oldal-törés.
+    function drawLine(text, x, size, useFont){
+      var f = useFont || font;
+      var lh = size * 1.35;
+      ensureSpace(lh);
+      pg = page;
+      pg.drawText(ascii(text), { x:x, y:y - size + 2, size:size, font:f, color: PDFLib.rgb(0,0,0) });
+      y -= lh;
+    }
+    var pg = page; // aktuális oldal-mutató (a helperek frissítik)
+
+    // Wrapped szöveg-blokk rajzolása X-től MAXW szélességgel, AUTO
+    // oldal-töréssel — a hosszú bekezdés több oldalra is átfolyhat.
+    function drawWrappedFlow(text, x, size, maxW, useFont){
+      var f = useFont || font;
+      var lh = size * 1.35;
+      // Sorokra bontás \n mentén, majd szó-szintű tördelés.
+      var paragraphs = ascii(text||'').split(/\n/);
+      for (var pi=0; pi<paragraphs.length; pi++){
+        var words = paragraphs[pi].split(/\s+/).filter(Boolean);
+        var line = '';
+        for (var i=0; i<words.length; i++){
+          var trial = line ? (line + ' ' + words[i]) : words[i];
+          var w = f.widthOfTextAtSize(trial, size);
+          if (w > maxW && line){
+            ensureSpace(lh);
+            page.drawText(line, { x:x, y:y - size + 2, size:size, font:f, color:PDFLib.rgb(0,0,0) });
+            y -= lh;
+            line = words[i];
+          } else {
+            line = trial;
+          }
+        }
+        if (line){
+          ensureSpace(lh);
+          page.drawText(line, { x:x, y:y - size + 2, size:size, font:f, color:PDFLib.rgb(0,0,0) });
+          y -= lh;
+        } else if (paragraphs[pi] === '') {
+          // üres sor = kis térköz
+          y -= lh * 0.5;
+        }
+      }
+    }
+    function drawRect(pgRef, x, ry, w, h, opts){
+      pgRef.drawRectangle(Object.assign({ x:x, y:ry, width:w, height:h, borderColor:PDFLib.rgb(0.55,0.55,0.55), borderWidth:0.6 }, opts||{}));
+    }
+    // Wrapping helper — visszaadja a szöveg TÖRDELT sorait (tábla-cellához).
+    function wrapLines(text, size, maxW, useFont){
+      var f = useFont || font;
+      var out = [];
+      var paragraphs = ascii(text||'').split(/\n/);
+      for (var pi=0; pi<paragraphs.length; pi++){
+        var words = paragraphs[pi].split(/\s+/).filter(Boolean);
+        var line = '';
+        for (var i=0; i<words.length; i++){
+          var trial = line ? (line + ' ' + words[i]) : words[i];
+          if (f.widthOfTextAtSize(trial, size) > maxW && line){
+            out.push(line); line = words[i];
+          } else { line = trial; }
+        }
+        if (line) out.push(line);
+        else if (paragraphs[pi] === '') out.push('');
+      }
+      return out;
+    }
+
+    var co = (OA.data && OA.data.company) || {};
+    var o  = (OA.data && OA.data.order) || {};
+    var p  = OA.payload;
+    var c  = OA.carriers.find(function(x){ return x.id === p.carrier_id; }) || {};
+    var comandaNr = (p.number_source === 'custom' && p.custom_number) ? p.custom_number : (o.fuvar_no || o.id || '');
+    var TPL = _resolveTemplate();
+
+    // ── FEJLÉC — minden oldal tetején (page-num a végén íródik).
+    function drawHeader(){
+      page.drawText(ascii('Comanda de Transport'), { x:M, y:PAGE_H - M - 12, size:13, font:bold, color:PDFLib.rgb(0,0,0) });
+      page.drawText(ascii('Comanda Nr.:  ' + comandaNr), { x:M, y:PAGE_H - M - 28, size:11, font:bold, color:PDFLib.rgb(0,0,0) });
+    }
+    drawHeader();
+    y = PAGE_H - M - 44;
+
+    // Logó (jobb felső) — a margón belül.
+    try {
+      if (co.has_logo) {
+        var lr = await fetch('/api/branding/logo', { credentials:'same-origin' }).then(function(r){ return r.json(); });
+        if (lr && lr.dataUri) {
+          var isPng = /^data:image\/png/.test(lr.dataUri);
+          var bytesL = await fetch(lr.dataUri).then(function(x){ return x.arrayBuffer(); });
+          var imgL = isPng ? await pdfDoc.embedPng(bytesL) : await pdfDoc.embedJpg(bytesL);
+          var scale = 90 / Math.max(imgL.width, imgL.height);
+          var lw = imgL.width * scale, lh = imgL.height * scale;
+          page.drawImage(imgL, { x: PAGE_W - M - lw, y: PAGE_H - M - lh - 4, width: lw, height: lh });
+        }
+      }
+    } catch(e){ console.warn('logo embed failed', e); }
+
+    // ── KÉT KÁRTYA (alvállalkozó | mi cégünk) — a tartalmuk tördelten
+    //    fér el a kártya belsejében; a magasság dinamikus a soroktól.
+    var GAP = 12;
+    var cardW = (CONTENT_W - GAP) / 2;
+    var cardX1 = M, cardX2 = M + cardW + GAP;
+    var cardTopY = y;
+    var cardPad = 6;
+
+    function cardLines(pairs){
+      // pairs: [[label,value,bold?] ...]  → tördelve, sorok tömbje
+      var out = [];
+      pairs.forEach(function(pair){
+        var label = pair[0], val = pair[1], isBold = !!pair[2];
+        var full = label ? (label + ': ' + (val||'')) : (val||'');
+        var f = isBold ? bold : font;
+        var lines = wrapLines(full, 8.2, cardW - cardPad*2, f);
+        if (!lines.length) lines = [''];
+        lines.forEach(function(ln, i){ out.push({ text: ln, font: (i===0 && isBold) ? bold : font }); });
+      });
+      return out;
+    }
+    var leftPairs = [
+      ['Numele firma', c.nev || '', true],
+      ['Adresa', c.adresa || ''],
+      ['Cod fiscal', c.cui || ''],
+      ['Nr.Inm. O.R.C.', c.reg_com || ''],
+      ['Telefon', c.telefon || ''],
+      ['Email', c.email || '']
     ];
-    LEGAL_2.forEach(function(par){
-      var isTitle = /^\d+\./.test(par) && par.length < 60;
+    var rightPairs = [
+      ['', co.nev || '', true],
+      ['Judet/Localitate', (co.adresa ? (co.adresa.split(',')[0]||'') : '')],
+      ['Adresa', co.adresa || ''],
+      ['Cod fiscal', co.cui || ''],
+      ['Nr.Inm. O.R.C.', co.reg_com || ''],
+      ['Telefon', co.telefon || ''],
+      ['Email', co.email_contact || '']
+    ];
+    var leftLines = cardLines(leftPairs);
+    var rightLines = cardLines(rightPairs);
+    var maxRows = Math.max(leftLines.length, rightLines.length);
+    var rowH = 11;
+    var cardH = cardPad*2 + maxRows * rowH;
+    // Rajzold a kereteket
+    drawRect(page, cardX1, cardTopY - cardH, cardW, cardH);
+    drawRect(page, cardX2, cardTopY - cardH, cardW, cardH);
+    // Rajzold a sorokat
+    function drawCard(lines, x0){
+      var cy = cardTopY - cardPad - 8;
+      lines.forEach(function(ln){
+        page.drawText(ascii(ln.text), { x:x0 + cardPad, y:cy, size:8.2, font:ln.font, color:PDFLib.rgb(0,0,0) });
+        cy -= rowH;
+      });
+    }
+    drawCard(leftLines, cardX1);
+    drawCard(rightLines, cardX2);
+    y = cardTopY - cardH - 14;
+
+    // ── INCARCARE tábla ─────────────────────────────────────
+    // Oszlopok arányosan a CONTENT_W-hez (a régi 515 → CONTENT_W).
+    // Adresa (kb 42%), Data (12%), Interval (10%), Paleti (7%), Tip (8%),
+    // Kg (8%), M.Podea (13%)  → összeg ~100%.
+    var COL_RATIOS = [0.42, 0.12, 0.10, 0.07, 0.08, 0.08, 0.13];
+    var COL_HEADS = ['Adresa','Data','Interval','Paleti','Tip','Kg','M.Podea'];
+    var COL_KEYS  = ['_loc','_data','interval','paleti','tip_palet','kg','metri'];
+    var CELL_PAD = 3;
+
+    function drawTableHead(headerText){
+      ensureSpace(30);
+      page.drawText(ascii(headerText), { x:M, y:y - 10, size:11, font:bold, color:PDFLib.rgb(0,0,0) });
+      y -= 16;
+      // Fejléc sáv
+      ensureSpace(14);
+      drawRect(page, M, y - 12, CONTENT_W, 12, { color: PDFLib.rgb(0.93,0.93,0.93) });
+      var cx = M;
+      for (var i=0; i<COL_HEADS.length; i++){
+        var cw = CONTENT_W * COL_RATIOS[i];
+        page.drawText(ascii(COL_HEADS[i]), { x:cx + CELL_PAD, y:y - 9, size:7.5, font:bold, color:PDFLib.rgb(0,0,0) });
+        cx += cw;
+      }
+      y -= 14;
+    }
+
+    function drawTableRow(row, idx){
+      // Cellák tördelése + a sor magassága a legmagasabb cellához igazodik.
+      var cellLinesArr = [];
+      var cx = M;
+      for (var i=0; i<COL_KEYS.length; i++){
+        var cw = CONTENT_W * COL_RATIOS[i];
+        var raw = (i===0 ? (String(idx+1)+'. ') : '') + (row[COL_KEYS[i]] || '');
+        var lines = wrapLines(raw, 7.5, cw - CELL_PAD*2, font);
+        if (!lines.length) lines = [''];
+        cellLinesArr.push({ x:cx, w:cw, lines:lines });
+        cx += cw;
+      }
+      var maxL = 1;
+      cellLinesArr.forEach(function(cc){ if (cc.lines.length > maxL) maxL = cc.lines.length; });
+      var rH = Math.max(14, maxL * 10 + 4);
+      // Extra sorok (referinta / instructiuni) becslés
+      var extraH = 0;
+      if (row.referinta) extraH += 10;
+      if (row.instructiuni) extraH += 10;
+      ensureSpace(rH + extraH + 2);
+      drawRect(page, M, y - rH, CONTENT_W, rH);
+      cellLinesArr.forEach(function(cc){
+        var ly = y - 9;
+        cc.lines.forEach(function(ln){
+          page.drawText(ascii(ln), { x:cc.x + CELL_PAD, y:ly, size:7.5, font:font, color:PDFLib.rgb(0,0,0) });
+          ly -= 10;
+        });
+      });
+      y -= rH;
+      if (row.referinta){
+        drawWrappedFlow('Referinta: ' + row.referinta, M + 4, 7, CONTENT_W - 8, oblique);
+      }
+      if (row.instructiuni){
+        drawWrappedFlow('Instr.: ' + row.instructiuni, M + 4, 7, CONTENT_W - 8, oblique);
+      }
+      y -= 2;
+    }
+
+    drawTableHead(TPL.sectHead.incarcare);
+    (p.fields.stops.pickups || []).forEach(drawTableRow);
+
+    y -= 8;
+    drawTableHead(TPL.sectHead.descarcare);
+    (p.fields.stops.deliveries || []).forEach(drawTableRow);
+
+    // ── DETALII TRANSPORT ───────────────────────────────────
+    y -= 10;
+    ensureSpace(24);
+    page.drawText(ascii(TPL.sectHead.detalii), { x:M, y:y - 10, size:11, font:bold, color:PDFLib.rgb(0,0,0) });
+    y -= 16;
+    var kinds = (p.fields.vehicle.truck_kinds || []).map(function(k){ return k.charAt(0).toUpperCase()+k.slice(1); }).join(' / ');
+    drawWrappedFlow('Nr. Camion: '+(o.rendszam_camion_extern || o.rendszam_camion || '……..'), M, 9, CONTENT_W);
+    drawWrappedFlow('TIP Camion: '+(p.fields.vehicle.tip_camion||'')+(kinds?' · '+kinds:''), M, 9, CONTENT_W);
+    drawWrappedFlow('Regim transport: '+(o.load_type||'FTL'), M, 9, CONTENT_W);
+
+    // Flag-ek 3 oszlopban, a margóhoz igazítva.
+    var F = p.fields.vehicle.flags;
+    var flagPairs = [
+      ['2 soferi', F.doi_soferi], ['Podea goala', F.podea_goala], ['Chingi', F.chingi],
+      ['Presuri antiderapante', F.presuri], ['Coltare', F.coltare], ['Paleti schimb', F.paleti_schimb],
+      ['Termodiagrama printabila', F.termodiagrama], ['Cablu vamal', F.cablu_vamal], ['ADR', F.adr]
+    ];
+    var flagColW = CONTENT_W / 3;
+    var flagRows = Math.ceil(flagPairs.length / 3);
+    ensureSpace(flagRows * 12 + 4);
+    for (var fi=0; fi<flagPairs.length; fi++){
+      var col = fi % 3;
+      var rowI = Math.floor(fi/3);
+      var fx = M + col * flagColW;
+      var fy = y - 8 - rowI * 12;
+      // Cellán belül tördelt címke — hogy a hosszú „Termodiagrama printabila" ne csússzon.
+      var flagText = flagPairs[fi][0] + ': ' + (flagPairs[fi][1]?'DA':'NU');
+      var lines2 = wrapLines(flagText, 8, flagColW - 4, font);
+      page.drawText(ascii(lines2[0] || flagText), { x:fx, y:fy, size:8, font:font, color:PDFLib.rgb(0,0,0) });
+    }
+    y -= flagRows * 12 + 4;
+
+    if (p.fields.vehicle.alte_specificatii){
+      ensureSpace(14);
+      page.drawText(ascii('Alte specificatii:'), { x:M, y:y - 8, size:9, font:bold, color:PDFLib.rgb(0,0,0) });
+      y -= 12;
+      drawWrappedFlow(p.fields.vehicle.alte_specificatii, M, 8, CONTENT_W);
+    }
+    y -= 4;
+    drawWrappedFlow('Nume sofer: '+(p.fields.driver.name||'')+'    |    Telefon sofer: '+(p.fields.driver.phone||''), M, 9, CONTENT_W);
+
+    // ── JOGI SZÖVEG (sablon-alapú, auto-tördelés + oldal-törés)
+    // Új oldalra ugrunk a legal szöveg elé, hogy vizuálisan elkülönüljön.
+    page = addPage(); y = TOP_Y; drawHeader(); y = PAGE_H - M - 44;
+    var legalParagraphs = String(TPL.legalTerms || '').split(/\n/);
+    legalParagraphs.forEach(function(par){
+      if (!par.trim()) { y -= 6; return; }
+      // Cím-sor felismerés: „N.", „N.N." kezdet ÉS rövid → bold.
+      var isTitle = /^\d+\.\s+[A-ZĂÂÎȘȚ]/.test(par) && par.length < 60;
       var f = isTitle ? bold : font;
-      yy3 = drawWrapped(page3, par, 40, yy3, 8, 515, f);
-      yy3 -= 4;
+      drawWrappedFlow(par, M, 8, CONTENT_W, f);
+      y -= 3;
     });
 
-    yy3 -= 10;
-    drawText(page3, 'Tarif convenit: '+(p.price!=null? p.price : '——')+' '+(p.currency||'EUR')+', pretul nu include tva.', 40, yy3, 10, bold);
-    yy3 -= 16;
-    drawText(page3, 'Termen de plata: '+(p.payment_term_days!=null?p.payment_term_days:30)+' zile calendaristice de la data primirii documentelor de transport in original.', 40, yy3, 10);
+    // ── TARIF + TERMEN DE PLATA ─────────────────────────────
+    y -= 8;
+    ensureSpace(30);
+    drawWrappedFlow('Tarif convenit: '+(p.price!=null? p.price : '——')+' '+(p.currency||'EUR')+', pretul nu include tva.', M, 10, CONTENT_W, bold);
+    y -= 4;
+    drawWrappedFlow('Termen de plata: '+(p.payment_term_days!=null?p.payment_term_days:30)+' zile calendaristice de la data primirii documentelor de transport in original.', M, 10, CONTENT_W);
 
-    // ── OLDAL 4 — záró aláíró blokk + pecsét
-    drawText(page4, 'Comanda de Transport', 40, 800, 12, bold);
-    drawText(page4, 'Comanda Nr.:  ' + comandaNr, 40, 785, 10, bold);
-    drawText(page4, 'Pagina: 4/4', 500, 20, 9);
-    drawText(page4, 'Contravaloarea facturii se va achita numai daca impreuna cu documentele de transport se trimite si comanda confirmata in original (toate paginile stampilate) si bon de palet daca este cazul.', 40, 750, 9);
-    // Cu stima (jobb oldal)
-    drawText(page4, 'Cu stima', 350, 700, 12, oblique);
-    drawText(page4, 'CONFIRMARE TRANSPORTATOR', 40, 680, 10, bold);
-    drawText(page4, 'Semnatura si stampila', 350, 680, 10, bold);
+    // ── ZÁRÓ ALÁÍRÓ BLOKK + PECSÉT — új oldalon.
+    page = addPage(); y = TOP_Y; drawHeader(); y = PAGE_H - M - 44;
+    drawWrappedFlow(TPL.footerNote, M, 9, CONTENT_W);
+    y -= 20;
+    // Cu stima jobbra + két címke (2 oszlop, mindegyik CONTENT_W/2)
+    var half = CONTENT_W / 2;
+    ensureSpace(60);
+    // Cu stima
+    var cuLines = wrapLines(TPL.cuStima, 12, half - 8, oblique);
+    var startY = y - 12;
+    cuLines.forEach(function(ln, i){
+      page.drawText(ascii(ln), { x:M + half + 4, y: startY - i*14, size:12, font:oblique, color:PDFLib.rgb(0,0,0) });
+    });
+    y = startY - cuLines.length*14 - 6;
 
-    // Aláíró (a mi cégünk): igazgato_nev / telefon / email_contact
-    drawText(page4, co.igazgato_nev || '', 40, 660, 10, bold);
-    drawText(page4, 'Nr. Tel: ' + (co.telefon || ''), 40, 646, 9);
-    drawText(page4, 'Email: '   + (co.email_contact || ''), 40, 632, 9);
+    ensureSpace(30);
+    var confLines = wrapLines(TPL.confirmareLbl, 10, half - 8, bold);
+    var semnLines = wrapLines(TPL.semnaturaLbl, 10, half - 8, bold);
+    var maxLbl = Math.max(confLines.length, semnLines.length);
+    confLines.forEach(function(ln, i){ page.drawText(ascii(ln), { x:M, y:y - 10 - i*12, size:10, font:bold, color:PDFLib.rgb(0,0,0) }); });
+    semnLines.forEach(function(ln, i){ page.drawText(ascii(ln), { x:M + half + 4, y:y - 10 - i*12, size:10, font:bold, color:PDFLib.rgb(0,0,0) }); });
+    y -= 10 + maxLbl*12 + 4;
 
-    // Pecsét (ha van)
+    // Aláíró (a mi cégünk): tördelten a bal félbe.
+    drawWrappedFlow(co.igazgato_nev || '', M, 10, half - 4, bold);
+    drawWrappedFlow('Nr. Tel: ' + (co.telefon || ''), M, 9, half - 4);
+    drawWrappedFlow('Email: ' + (co.email_contact || ''), M, 9, half - 4);
+
+    // Pecsét (jobb félbe, a Semnatura alá — a mai y-ból mérve visszalépünk).
     try {
       if (co.has_stamp) {
         var s = await fetch('/api/branding/stamp', { credentials:'same-origin' }).then(function(r){ return r.json(); });
@@ -895,14 +1056,27 @@
           var isPng2 = /^data:image\/png/.test(s.dataUri);
           var sb = await fetch(s.dataUri).then(function(x){ return x.arrayBuffer(); });
           var simg = isPng2 ? await pdfDoc.embedPng(sb) : await pdfDoc.embedJpg(sb);
-          var scale2 = 120 / Math.max(simg.width, simg.height);
+          var scale2 = 110 / Math.max(simg.width, simg.height);
           var sw = simg.width * scale2, sh = simg.height * scale2;
-          page4.drawImage(simg, { x: 400, y: 560, width: sw, height: sh, opacity: 0.9 });
+          // A pecsétet a jobb félben helyezzük, a Semnatura si stampila alatt.
+          var sx = M + half + 4 + (half - 4 - sw) / 2;
+          var sy = y - sh - 8;
+          if (sy < BOTTOM_Y + 12) { page = addPage(); y = TOP_Y; drawHeader(); y = PAGE_H - M - 44; sy = y - sh - 8; }
+          page.drawImage(simg, { x: sx, y: sy, width: sw, height: sh, opacity: 0.9 });
         }
       }
     } catch(e){ console.warn('stamp embed failed', e); }
 
-    drawText(page4, 'IMPORTANT! Confirmarea trebuie trimisa pe fax sau e-mail inainte de incarcare.', 100, 520, 10, oblique);
+    y -= 40;
+    drawWrappedFlow(TPL.importantNote, M, 10, CONTENT_W, oblique);
+
+    // ── LÁB — page-num minden oldalra ("Pagina: N/M")
+    var total = pages.length;
+    for (var pn=0; pn<pages.length; pn++){
+      var footer = 'Pagina: ' + (pn+1) + '/' + total;
+      var fw = font.widthOfTextAtSize(ascii(footer), 9);
+      pages[pn].drawText(ascii(footer), { x: PAGE_W - M - fw, y: M / 2, size:9, font:font, color:PDFLib.rgb(0.3,0.3,0.3) });
+    }
 
     var bytes = await pdfDoc.save();
     return bytes;
@@ -994,6 +1168,10 @@
     setTipCamion: setTipCamion, toggleKind: toggleKind, setFlag: setFlag, setAlte: setAlte,
     setDriver: setDriver,
     saveOnly: saveOnly, saveAndDownload: saveAndDownload, attachToOrder: attachToOrder,
-    emailToCarrier: emailToCarrier, deleteAssign: deleteAssign, finish: finish
+    emailToCarrier: emailToCarrier, deleteAssign: deleteAssign, finish: finish,
+    // A Beállítások szerkesztőnek: a jelenlegi (hardcoded) alapértelmezett
+    // sablon-értékek, hogy a „Reset alapértelmezettre" gomb és a placeholderek
+    // szinkronban legyenek a PDF-generátorral (EGY forrás — nincs másolgatás).
+    getDefaultTemplate: getDefaultTemplate
   };
 })();

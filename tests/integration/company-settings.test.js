@@ -308,3 +308,98 @@ describe('pdfTemplateSave', () => {
     expect(String(sql)).toMatch(/INSERT INTO pdf_templates.*ON CONFLICT.*DO UPDATE/is);
   });
 });
+
+// ═══ getOrderAssignmentTemplate / saveOrderAssignmentTemplate ══
+describe('order assignment template', () => {
+  test('Sofer nem érheti el (getOrderAssignmentTemplate)', async () => {
+    setUser({ ...fixtures.sofer, company_id: CID });
+    const res = await call('getOrderAssignmentTemplate', []);
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/interzis/i);
+  });
+
+  test('Manager olvashat, canEdit=false, null template friss cégen', async () => {
+    setUser(MANAGER);
+    pool.query.mockResolvedValueOnce(rows([{ order_assignment_template: null }]));
+    const res = await call('getOrderAssignmentTemplate', []);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.template).toBe(null);
+    expect(res.body.result.canEdit).toBe(false);
+  });
+
+  test('Admin olvashat, canEdit=true, mentett template visszajön', async () => {
+    setUser(ADMIN);
+    const tpl = { legalTerms: '1.1 saját ...', sectHead: { incarcare: 'RAKODÁS' } };
+    pool.query.mockResolvedValueOnce(rows([{ order_assignment_template: tpl }]));
+    const res = await call('getOrderAssignmentTemplate', []);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.template).toEqual(tpl);
+    expect(res.body.result.canEdit).toBe(true);
+  });
+
+  test('Manager NEM mentheti', async () => {
+    setUser(MANAGER);
+    const res = await call('saveOrderAssignmentTemplate', [{ template: { footerNote: 'x' } }]);
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/interzis/i);
+  });
+
+  test('Admin mentés — fehérlistázott mezők átmennek, ismeretlen mező kimarad', async () => {
+    setUser(ADMIN);
+    pool.query
+      .mockResolvedValueOnce({ rowCount: 1 })   // UPDATE
+      .mockResolvedValueOnce({ rowCount: 1 }); // audit
+    const res = await call('saveOrderAssignmentTemplate', [{
+      template: {
+        legalTerms: '1. My legal',
+        footerNote: 'F',
+        importantNote: 'IMP',
+        cuStima: 'Salut',
+        confirmareLbl: 'C',
+        semnaturaLbl: 'S',
+        sectHead: { incarcare: 'INC', descarcare: 'DESC', detalii: 'DET' },
+        // Ismeretlen — nem szabad átmenjen:
+        hackerField: 'DROP TABLE users;'
+      }
+    }]);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.template).toEqual({
+      legalTerms: '1. My legal',
+      footerNote: 'F',
+      importantNote: 'IMP',
+      cuStima: 'Salut',
+      confirmareLbl: 'C',
+      semnaturaLbl: 'S',
+      sectHead: { incarcare: 'INC', descarcare: 'DESC', detalii: 'DET' },
+    });
+    const call0 = pool.query.mock.calls[0];
+    expect(String(call0[0])).toMatch(/UPDATE companies SET order_assignment_template/i);
+    // A JSON stringben ne legyen ott a "hackerField":
+    expect(String(call0[1][0])).not.toMatch(/hackerField/);
+  });
+
+  test('Reset (reset:true) NULL-ra állít', async () => {
+    setUser(ADMIN);
+    pool.query
+      .mockResolvedValueOnce({ rowCount: 1 })   // UPDATE ... = NULL
+      .mockResolvedValueOnce({ rowCount: 1 }); // audit
+    const res = await call('saveOrderAssignmentTemplate', [{ reset: true }]);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.template).toBe(null);
+    const [sql, params] = pool.query.mock.calls[0];
+    expect(String(sql)).toMatch(/SET order_assignment_template=NULL/i);
+    expect(params).toEqual([CID]);
+  });
+
+  test('Üres payload = reset (NULL) — nem tárol {}-t', async () => {
+    setUser(ADMIN);
+    pool.query
+      .mockResolvedValueOnce({ rowCount: 1 })
+      .mockResolvedValueOnce({ rowCount: 1 });
+    const res = await call('saveOrderAssignmentTemplate', [{ template: { legalTerms: '', footerNote: null } }]);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.template).toBe(null);
+    const [sql] = pool.query.mock.calls[0];
+    expect(String(sql)).toMatch(/SET order_assignment_template=NULL/i);
+  });
+});

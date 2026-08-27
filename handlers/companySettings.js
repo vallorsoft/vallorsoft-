@@ -191,6 +191,91 @@ handlers.saveCompanySettings = async function (req, res, args) {
   }
 };
 
+// ── Comanda de Transport SABLON (Admin/Manager olvasás, Admin írás) ──
+// Fehérlistázott mezők: minden text-mező, `sectHead` almező.
+// A NULL/hiányzó mező a kliens-oldali `DEFAULT_TEMPLATE`-re esik vissza —
+// egyetlen mező is átírható, a többi marad default.
+const OA_TEXT_FIELDS = ['legalTerms', 'footerNote', 'importantNote', 'cuStima', 'confirmareLbl', 'semnaturaLbl'];
+const OA_SECT_HEAD_FIELDS = ['incarcare', 'descarcare', 'detalii'];
+const OA_MAX_TEXT = 20000;      // egyetlen mezőre (legalTerms is belefér)
+const OA_MAX_SHORT = 400;       // rövid label-ek
+
+function _cleanText(x, max) {
+  if (x == null) return null;
+  const s = String(x).replace(/\r\n/g, '\n').trim();
+  if (!s) return null;
+  return s.slice(0, max);
+}
+
+function _normalizeOaTemplate(a) {
+  if (!a || typeof a !== 'object') return null;
+  const out = {};
+  // Csak a valóban tartalommal rendelkező mezőket vesszük fel — null/üres
+  // string a defaultra esik vissza, ezért felesleges tárolni.
+  OA_TEXT_FIELDS.forEach((k) => {
+    if (Object.prototype.hasOwnProperty.call(a, k)) {
+      const v = _cleanText(a[k], k === 'legalTerms' || k === 'footerNote' ? OA_MAX_TEXT : OA_MAX_SHORT);
+      if (v != null) out[k] = v;
+    }
+  });
+  if (a.sectHead && typeof a.sectHead === 'object') {
+    const sh = {};
+    OA_SECT_HEAD_FIELDS.forEach((k) => {
+      if (Object.prototype.hasOwnProperty.call(a.sectHead, k)) {
+        const v = _cleanText(a.sectHead[k], OA_MAX_SHORT);
+        if (v != null) sh[k] = v;
+      }
+    });
+    if (Object.keys(sh).length) out.sectHead = sh;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+handlers.getOrderAssignmentTemplate = async function (req, res) {
+  try {
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = _user(req).company_id;
+    const r = await pool.query('SELECT order_assignment_template FROM companies WHERE id=$1', [cid]);
+    const tpl = (r.rows[0] && r.rows[0].order_assignment_template) || null;
+    return res.json({ result: { ok: true, template: tpl, canEdit: _admin(req) } });
+  } catch (err) {
+    console.error('getOrderAssignmentTemplate hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.saveOrderAssignmentTemplate = async function (req, res, args) {
+  try {
+    if (!_admin(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = _user(req).company_id;
+    const a = (args && args[0]) || {};
+    // `reset:true` → teljesen visszaáll a defaultra (NULL az oszlopban).
+    if (a.reset === true) {
+      await pool.query('UPDATE companies SET order_assignment_template=NULL WHERE id=$1', [cid]);
+      audit.fromReq(req, 'company.oa_template_reset', 'company', cid, {});
+      return res.json({ result: { ok: true, template: null } });
+    }
+    const clean = _normalizeOaTemplate(a.template || a);
+    // `clean` lehet null (üres bemenet) → tekintsük resetnek.
+    if (!clean) {
+      await pool.query('UPDATE companies SET order_assignment_template=NULL WHERE id=$1', [cid]);
+      audit.fromReq(req, 'company.oa_template_reset', 'company', cid, {});
+      return res.json({ result: { ok: true, template: null } });
+    }
+    await pool.query(
+      'UPDATE companies SET order_assignment_template=$1 WHERE id=$2',
+      [JSON.stringify(clean), cid]
+    );
+    audit.fromReq(req, 'company.oa_template_save', 'company', cid, {
+      keys: Object.keys(clean),
+    });
+    return res.json({ result: { ok: true, template: clean } });
+  } catch (err) {
+    console.error('saveOrderAssignmentTemplate hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 // ── Sofőr főoldali „Cégadatok" kártya adatszolgáltatója ──
 // Read-only, minden bejelentkezett cég-userre (Sofer|Admin|Manager),
 // SAJÁT cégre szűrve (`req.session.user.company_id`). Célja: a sofőr

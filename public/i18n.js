@@ -1337,6 +1337,22 @@
     'comset.stampHint':   { hu: 'PNG átlátszó háttérrel ajánlott. A Comanda de Transport záró blokkjában és jövőbeli PDF-eken jelenik meg.', ro: 'Recomandat PNG cu fundal transparent. Apare în blocul de confirmare al Comenzii de Transport și pe alte PDF-uri viitoare.' },
     'comset.stampSaved':  { hu: 'Pecsét mentve', ro: 'Ștampilă salvată' },
     'comset.stampDeleted':{ hu: 'Pecsét törölve', ro: 'Ștampilă ștearsă' },
+    // 📄 Comanda de Transport SABLON — cégenkénti szerkesztő
+    'comset.oaHead':         { hu: '📄 Comanda de Transport sablon', ro: '📄 Șablon Comandă de Transport' },
+    'comset.oaIntro':        { hu: 'A megbízás (Comanda de Transport) PDF-en megjelenő ÁLLANDÓ szövegek — jogi feltételek, láb-jegyzet, aláíró blokk. Üres mező = a jelenlegi alapértelmezett szöveg. A dinamikus adatok (fuvar-szám, cím, dátum, ár) automatikusan a fuvar-kiírásból jönnek — itt csak a rögzített szövegeket lehet átírni.', ro: 'Textele FIXE ale PDF-ului Comanda de Transport — clauze juridice, notă de subsol, bloc de semnătură. Câmp gol = textul implicit actual. Datele dinamice (nr. cursă, adrese, date, tarif) se preiau automat din cursă — aici modifici doar textele fixe.' },
+    'comset.oa.sectIncarcare':  { hu: 'INCARCARE fejléc', ro: 'Antet ÎNCĂRCARE' },
+    'comset.oa.sectDescarcare': { hu: 'DESCARCARE fejléc', ro: 'Antet DESCĂRCARE' },
+    'comset.oa.sectDetalii':    { hu: 'DETALII TRANSPORT fejléc', ro: 'Antet DETALII TRANSPORT' },
+    'comset.oa.legalTerms':     { hu: 'Jogi feltételek (paragrafusok, egy sor = egy bekezdés)', ro: 'Clauze juridice (paragrafe, o linie = un paragraf)' },
+    'comset.oa.legalTermsHint': { hu: 'A megbízás jogi része (1. – 9.10.). Új bekezdés = új sor. A hosszú sorok automatikusan tördelődnek a PDF-en; ha egy oldalra nem fér ki, a következő oldalra folyik át (nem lóg ki).', ro: 'Partea juridică (1. – 9.10.). Paragraf nou = linie nouă. Rândurile lungi se împart automat în PDF; dacă nu încap pe o pagină, textul continuă pe următoarea (nu depășește marginile).' },
+    'comset.oa.footerNote':     { hu: 'Láb-jegyzet a záró oldalon', ro: 'Notă de subsol pe pagina finală' },
+    'comset.oa.importantNote':  { hu: 'IMPORTANT! — figyelmeztetés a záró oldalon', ro: 'IMPORTANT! — avertisment pe pagina finală' },
+    'comset.oa.cuStima':        { hu: '„Cu stima" (üdvözlő)', ro: '„Cu stimă" (salut)' },
+    'comset.oa.confirmareLbl':  { hu: 'Konfirmáció-cím', ro: 'Titlu confirmare transportator' },
+    'comset.oa.semnaturaLbl':   { hu: 'Aláírás/pecsét-cím', ro: 'Titlu semnătură și ștampilă' },
+    'comset.oa.save':           { hu: 'Sablon mentése', ro: 'Salvează șablonul' },
+    'comset.oa.reset':          { hu: 'Vissza az alapértelmezettre', ro: 'Revino la textul implicit' },
+    'comset.oa.resetConfirm':   { hu: 'Biztosan visszaállítod az alapértelmezett szövegre? A saját szerkesztésed elveszik.', ro: 'Sigur revii la textul implicit? Modificările tale se pierd.' },
     // 🚚 Sofőr-állomás időbélyeg szerkesztő (fuvar-szerkesztő modalban)
     'oe.milestonesHead': { hu: '🚚 Sofőr-állomás időpontok', ro: '🚚 Marcaje șofer (arrive/done)' },
     'oe.milestonesHint': {

@@ -123,6 +123,7 @@ handlers.orderAssignmentGet = async function (req, res, args) {
       `SELECT co.nev, co.igazgato_nev, co.email_contact, co.telefon,
               co.cui, co.reg_com, co.euid, co.adresa, co.iban, co.banca,
               co.capital_social, co.tva_platitor, co.website,
+              co.order_assignment_template,
               cb.logo_base64 IS NOT NULL AS has_logo,
               cb.stamp_base64 IS NOT NULL AS has_stamp,
               cb.brand_color

@@ -1,0 +1,34 @@
+-- ============================================================
+--  VallorSoft — Comanda de Transport SABLON (cégenkénti)
+--  ------------------------------------------------------------
+--  A Comanda de Transport (megbízás) PDF-en megjelenő ÁLLANDÓ
+--  szövegek (jogi feltételek 1.1 – 9.10, fejléc-szekciók, láb,
+--  aláíró blokk, IMPORTANT-jegyzet) cégenként átírhatók a
+--  Beállítások → Comanda de Transport sablon szerkesztőben.
+--
+--  NULL érték = alapértelmezett szöveg (public/order-assignment.js
+--  `DEFAULT_TEMPLATE`). Minden mező opcionális, nincs kényszerítés
+--  — így egy sablon üres oszlopa AUTOMATIKUSAN a jelenlegi
+--  hardcoded default szöveget adja vissza (nem törik meg a régi
+--  megbízások megjelenése sem).
+--
+--  Struktúra (JSONB):
+--    {
+--      legalTerms:    "1. COMANDA DE TRANSPORT\n1.1. …",  // teljes jogi szöveg (paragrafusok \n-nel)
+--      footerNote:    "Contravaloarea facturii …",
+--      importantNote: "IMPORTANT! Confirmarea …",
+--      cuStima:       "Cu stima",
+--      confirmareLbl: "CONFIRMARE TRANSPORTATOR",
+--      semnaturaLbl:  "Semnatura si stampila",
+--      sectHead: {
+--        incarcare:  "INCARCARE",
+--        descarcare: "DESCARCARE",
+--        detalii:    "DETALII TRANSPORT:"
+--      }
+--    }
+--
+--  Idempotens.
+-- ============================================================
+
+ALTER TABLE companies
+  ADD COLUMN IF NOT EXISTS order_assignment_template JSONB;

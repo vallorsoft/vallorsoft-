@@ -136,6 +136,13 @@ window.CompanySettings = (function () {
         '<div style="margin-top:8px;font-size:12px;color:var(--muted);" id="csSeriesPreview"></div>' +
         '<div id="csOrderSeriesBox" style="margin-top:6px;"></div>' +
 
+        // ── COMANDA DE TRANSPORT SABLON — cégenkénti szerkesztés ──
+        '<h3 class="h-title" style="font-size:15px;margin:22px 0 10px;">' + tt('comset.oaHead', '📄 Comanda de Transport sablon') + '</h3>' +
+        '<p style="color:var(--muted);font-size:12px;margin:0 0 10px;max-width:760px;">' + tt('comset.oaIntro', 'A megbízás (Comanda de Transport) PDF-en megjelenő ÁLLANDÓ szövegek — jogi feltételek, láb-jegyzet, aláíró blokk. Üres mező = a jelenlegi alapértelmezett szöveg. A dinamikus adatok (fuvar-szám, cím, dátum, ár) automatikusan a fuvar-kiírásból jönnek — itt csak a rögzített szövegeket lehet átírni.') + '</p>' +
+        '<div id="csOaTemplateBox" style="max-width:920px;">' +
+          '<div style="color:var(--muted);font-size:12px;padding:6px 0;">…</div>' +
+        '</div>' +
+
         (_canEdit
           ? '<div style="margin-top:22px;"><button class="btn primary" id="csSaveBtn" style="padding:11px 26px;">💾 ' + tt('common.save', 'Mentés') + '</button></div>'
           : '');
@@ -176,6 +183,142 @@ window.CompanySettings = (function () {
     }
     previewSeries();
     renderOrderSeries();
+    renderOaTemplate();
+  }
+
+  // ── Comanda de Transport SABLON — cégenkénti szerkesztő ──
+  // A `getOrderAssignmentTemplate` a mentett template-et hozza (részleges,
+  // csak az átírt mezőket tárolja); a hiányzókat a kliens-oldali
+  // `OrderAssignment.getDefaultTemplate()` alapértékkel jelenítjük meg
+  // placeholderként. Ez EGY forrás a PDF-generátorral (az alapszöveg
+  // sosem tér el a két oldalon).
+  var _oaCurrentTpl = {};
+
+  function _oaDefaults() {
+    try {
+      if (window.OrderAssignment && typeof window.OrderAssignment.getDefaultTemplate === 'function') {
+        return window.OrderAssignment.getDefaultTemplate() || {};
+      }
+    } catch (e) {}
+    return {
+      legalTerms: '', footerNote: '', importantNote: '',
+      cuStima: 'Cu stima', confirmareLbl: 'CONFIRMARE TRANSPORTATOR',
+      semnaturaLbl: 'Semnatura si stampila',
+      sectHead: { incarcare: 'INCARCARE', descarcare: 'DESCARCARE', detalii: 'DETALII TRANSPORT:' }
+    };
+  }
+
+  function renderOaTemplate() {
+    if (!_root) return;
+    var box = _root.querySelector('#csOaTemplateBox');
+    if (!box) return;
+    box.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:6px 0;">…</div>';
+    gas('getOrderAssignmentTemplate').then(function (r) {
+      if (!r || !r.ok) { box.innerHTML = ''; return; }
+      var tpl = r.template || {};
+      _oaCurrentTpl = tpl;
+      var canEdit = !!r.canEdit;
+      var d = _oaDefaults();
+      var sh = tpl.sectHead || {};
+      var dh = d.sectHead || {};
+      var dis = canEdit ? '' : ' disabled';
+      // A textarea VALUE-ja a mentett érték (üres = mentetlen, akkor a
+      // placeholderen látszik az alapértelmezett szöveg → a felhasználó
+      // pontosan tudja mihez képest szerkesztene).
+      function ta(id, label, defVal, curVal, rows, hint) {
+        return '<div class="field" style="margin-bottom:14px;">' +
+          '<label style="font-weight:600;">' + esc(label) + '</label>' +
+          (hint ? '<div style="font-size:11px;color:var(--muted);margin:2px 0 4px;">' + esc(hint) + '</div>' : '') +
+          '<textarea class="textarea" id="' + id + '" rows="' + rows + '" placeholder="' + esc(defVal || '') + '"' + dis + ' style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.4;">' + esc(curVal || '') + '</textarea>' +
+          '</div>';
+      }
+      function inp(id, label, defVal, curVal) {
+        return '<div class="field" style="margin-bottom:12px;">' +
+          '<label style="font-weight:600;">' + esc(label) + '</label>' +
+          '<input class="input" id="' + id + '" maxlength="400" value="' + esc(curVal || '') + '" placeholder="' + esc(defVal || '') + '"' + dis + '>' +
+          '</div>';
+      }
+      box.innerHTML = '' +
+        // Szekció-fejlécek
+        '<div class="grid-3" style="gap:14px;">' +
+          inp('csOaSectIncarcare', tt('comset.oa.sectIncarcare', 'INCARCARE fejléc'), dh.incarcare, sh.incarcare) +
+          inp('csOaSectDescarcare', tt('comset.oa.sectDescarcare', 'DESCARCARE fejléc'), dh.descarcare, sh.descarcare) +
+          inp('csOaSectDetalii', tt('comset.oa.sectDetalii', 'DETALII TRANSPORT fejléc'), dh.detalii, sh.detalii) +
+        '</div>' +
+
+        // Jogi szöveg (a fő tartalom)
+        ta('csOaLegalTerms',
+          tt('comset.oa.legalTerms', 'Jogi feltételek (paragrafusok, egy sor = egy bekezdés)'),
+          d.legalTerms, tpl.legalTerms,
+          20,
+          tt('comset.oa.legalTermsHint', 'A megbízás jogi része (1. – 9.10.). Új bekezdés = új sor. A hosszú sorok automatikusan tördelődnek a PDF-en; ha egy oldalra nem fér ki, a következő oldalra folyik át (nem lóg ki).')) +
+
+        // Láb-jegyzet + IMPORTANT
+        ta('csOaFooterNote',
+          tt('comset.oa.footerNote', 'Láb-jegyzet a záró oldalon'),
+          d.footerNote, tpl.footerNote,
+          3) +
+        ta('csOaImportantNote',
+          tt('comset.oa.importantNote', 'IMPORTANT! — figyelmeztetés a záró oldalon'),
+          d.importantNote, tpl.importantNote,
+          2) +
+
+        // Aláíró blokk
+        '<div class="grid-3" style="gap:14px;">' +
+          inp('csOaCuStima', tt('comset.oa.cuStima', '„Cu stima" (üdvözlő)'), d.cuStima, tpl.cuStima) +
+          inp('csOaConfirmareLbl', tt('comset.oa.confirmareLbl', 'Konfirmáció-cím'), d.confirmareLbl, tpl.confirmareLbl) +
+          inp('csOaSemnaturaLbl', tt('comset.oa.semnaturaLbl', 'Aláírás/pecsét-cím'), d.semnaturaLbl, tpl.semnaturaLbl) +
+        '</div>' +
+
+        (canEdit
+          ? '<div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;">' +
+              '<button class="btn primary" style="padding:9px 20px;" onclick="CompanySettings.oaSave()">💾 ' + tt('comset.oa.save', 'Sablon mentése') + '</button>' +
+              '<button class="btn ghost" style="padding:9px 20px;" onclick="CompanySettings.oaReset()">↺ ' + tt('comset.oa.reset', 'Vissza az alapértelmezettre') + '</button>' +
+            '</div>'
+          : '');
+    }).catch(function () { box.innerHTML = ''; });
+  }
+
+  function _oaCollect() {
+    if (!_root) return null;
+    var q = function (id) { var el = _root.querySelector(id); return el ? el.value : ''; };
+    // Üres string = tekintsük NULL-nak (visszaesik a defaultra a szerveren
+    // is + a PDF-generátor `_resolveTemplate`-jében is).
+    function nn(v) { v = (v == null ? '' : String(v)).trim(); return v || null; }
+    var out = {
+      legalTerms: nn(q('#csOaLegalTerms')),
+      footerNote: nn(q('#csOaFooterNote')),
+      importantNote: nn(q('#csOaImportantNote')),
+      cuStima: nn(q('#csOaCuStima')),
+      confirmareLbl: nn(q('#csOaConfirmareLbl')),
+      semnaturaLbl: nn(q('#csOaSemnaturaLbl')),
+      sectHead: {
+        incarcare: nn(q('#csOaSectIncarcare')),
+        descarcare: nn(q('#csOaSectDescarcare')),
+        detalii: nn(q('#csOaSectDetalii'))
+      }
+    };
+    return out;
+  }
+
+  function oaSave() {
+    var payload = _oaCollect(); if (!payload) return;
+    gas('saveOrderAssignmentTemplate', [{ template: payload }]).then(function (r) {
+      if (r && r.ok) {
+        toast(tt('common.saved', 'Mentve'), 'ok');
+        renderOaTemplate();
+      } else toast((r && r.err) || tt('common.error', 'Hiba'), 'err');
+    }).catch(function () { toast(tt('common.error', 'Hiba'), 'err'); });
+  }
+
+  function oaReset() {
+    if (!confirm(tt('comset.oa.resetConfirm', 'Biztosan visszaállítod az alapértelmezett szövegre? A saját szerkesztésed elveszik.'))) return;
+    gas('saveOrderAssignmentTemplate', [{ reset: true }]).then(function (r) {
+      if (r && r.ok) {
+        toast(tt('common.saved', 'Mentve'), 'ok');
+        renderOaTemplate();
+      } else toast((r && r.err) || tt('common.error', 'Hiba'), 'err');
+    }).catch(function () { toast(tt('common.error', 'Hiba'), 'err'); });
   }
 
   // ── Fuvar-sorozatok (fuvar-szám előtagok) kezelője ──
@@ -370,5 +513,6 @@ window.CompanySettings = (function () {
     mount: mount, previewSeries: previewSeries,
     seriesAdd: seriesAdd, seriesRename: seriesRename,
     seriesDefault: seriesDefault, seriesDelete: seriesDelete,
+    oaSave: oaSave, oaReset: oaReset,
   };
 })();

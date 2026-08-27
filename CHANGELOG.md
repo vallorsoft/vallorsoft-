@@ -14,6 +14,26 @@
 
 ---
 
+## 2026-08-27 — Comanda de Transport PDF: 1 cm margó minden oldalon + auto oldal-törés + a jogi szöveg cégenként szerkeszthető (Beállítások)
+
+**Kérés:** „ilyen megrendelot keszit legyen a lapnak jobb bal felso es also 1cm margolya essemmi ne logjon kitorje a sorokat ha nm fer el plusz a megrendelő teljes szöveget lehessen modositani a jelenlegi legyen az alapertelmezett a modositast bealitasokba lehessen".
+
+**1) Új DB-oszlop** (`db/order-assignment-template.sql`, idempotens): `companies.order_assignment_template JSONB`. NULL = defaultra esik vissza — a régi cégek/megbízások érintetlenek. A schema egyszerű: `{ legalTerms, footerNote, importantNote, cuStima, confirmareLbl, semnaturaLbl, sectHead:{incarcare, descarcare, detalii} }`. Egyetlen mező is átírható, a többi továbbra is default.
+
+**2) Új handlerek** (`handlers/companySettings.js`, RPC): `getOrderAssignmentTemplate` (Admin/Manager olvashat) + `saveOrderAssignmentTemplate` (Admin ír, audit-naplózott, fehérlistázott mezők, ismeretlen kulcs — `hackerField` stb. — a JSON-ba SEM kerül; text-korlátok: 20 000 char a legalTerms/footerNote-ra, 400 char rövid label-ekre; üres/csupa-null input = NULL = default; `reset:true` explicit reset). Az `orderAssignmentGet` mostantól a válaszban visszaadja a `company.order_assignment_template`-et is (nincs külön fetch a PDF-render előtt).
+
+**3) PDF-generátor átírás** (`public/order-assignment.js` `_generatePdfBytes`): **1 cm margó (28.35 pt) minden oldalon** minden szövegre és képre (logó, pecsét, tábla-keret, page-num). A tartalom-szélesség `539.28 pt`; **semmi nem lóg túl**: minden szöveg `drawWrappedFlow`-val fut (a hosszú bekezdés több oldalra átfolyik `ensureSpace(needed) → addPage()`-en át), a tábla-cellák (Adresa/Data/Interval/Paleti/Tip/Kg/M.Podea) `wrapLines`-szal tördelnek, a sor-magasság a legmagasabb cellához igazodik. Nincs többé „levágott vég" (mint a régi „…jud. Covasna, Roman" vagy „(toate pa" a képen), és nincs fix 4 oldal — a tartalom dönti el, hány oldal lesz. Az oldal-számláló a végén posztolódik minden oldalra „Pagina: N/M" formában.
+
+**4) Új közös alapértelmezett-forrás**: `DEFAULT_TEMPLATE` a `public/order-assignment.js` IIFE-jében, publikus `OrderAssignment.getDefaultTemplate()` API-val — EGY forrás a PDF-generátor + Beállítások szerkesztő placeholderek + Reset-gomb között (nincs másolgatás; ha egyszer módosul, mindkét helyen szinkron marad). Az `_resolveTemplate()` mezőnkénti fallback-kal dolgozik: egy üres mező sem tűnhet el.
+
+**5) Új Beállítások-szekció** (`public/company-settings.js` + `getOrderAssignmentTemplate`/`saveOrderAssignmentTemplate` gas-hívások): a Cég & arculat alá új **📄 Comanda de Transport sablon** kártya — jogi szöveg nagyméretű textarea (20 sor, monospace), láb-jegyzet, IMPORTANT, „Cu stima", két aláíró-cím, plusz a 3 szekció-fejléc (INCARCARE/DESCARCARE/DETALII TRANSPORT). Placeholder = az alapértelmezett szöveg → a felhasználó látja mihez képest szerkeszt. Két gomb: **💾 Sablon mentése** + **↺ Vissza az alapértelmezettre** (dupla-confirm-mel). Manager csak olvashat (a szerver-kapu Admin-only írás).
+
+**6) i18n** 15 új `comset.oa*` kulcs (RO-alap + HU). Cache-bust: `i18n.js?v=20260827oatpl`, `company-settings.js?v=20260827oatpl`, `order-assignment.js?v=20260827oatpl`.
+
+**7) Teszt**: `tests/integration/company-settings.test.js` +7 új eset (szerep-kapuk, whitelist, ismeretlen mező eldobása, reset explicit, üres payload = reset, null/undefined mezők ki, `getOrderAssignmentTemplate` visszaadja a mentett tpl-t). **1004 Jest zöld** (997 → 1004), nincs regresszió.
+
+---
+
 ## 2026-08-27 — FIX: Fuvar-wizard autocomplete-választás — a talalat írja felül az OC.stops állapotot (ne csak az input.value-t)
 
 **Gyökér:** a sofőr/manager azt jelezte, hogy a fuvar-kiírás Step 2-n a felrakó/lerakó cím-mezőnél az autocomplete-találatra kattintva az input mezőn LÁTSZIK a helyes teljes cím (pl. „Întorsura Buzăului, Întorsura Buzăului, Covasna, RO"), DE a Step 6 (Ellenőrzés) csak a beírt szöveget mutatja (pl. „intorsura b"). Ugyanígy a ⭐ mentett helyek pickerénél.
