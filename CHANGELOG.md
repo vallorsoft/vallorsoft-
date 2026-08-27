@@ -14,6 +14,20 @@
 
 ---
 
+## 2026-08-27 — FIX: Fuvar-wizard autocomplete-választás — a talalat írja felül az OC.stops állapotot (ne csak az input.value-t)
+
+**Gyökér:** a sofőr/manager azt jelezte, hogy a fuvar-kiírás Step 2-n a felrakó/lerakó cím-mezőnél az autocomplete-találatra kattintva az input mezőn LÁTSZIK a helyes teljes cím (pl. „Întorsura Buzăului, Întorsura Buzăului, Covasna, RO"), DE a Step 6 (Ellenőrzés) csak a beírt szöveget mutatja (pl. „intorsura b"). Ugyanígy a ⭐ mentett helyek pickerénél.
+
+**Ok:** a `vsAttachAutocomplete` (`public/console-shared.js`) `mousedown`-jában az `input.value = el.getAttribute('data-label')` PROGRAMOZOTT értékadást csinál, ami — az HTML5 spec szerint — **nem trigger-el `input` eventet**. A `public/order-wizard.js` `_renderStopsList()` (l. 536) viszont az `input` eseményre bindolja az `OC.stops[i].loc = loc.value` szinkront → a wizard-állapotban a KÉZI beírás marad, a `_commitStopsToLegacy()` a régi értékkel dolgozik, és a review + a mentett fuvar is a rossz értéket kapja.
+
+**Fix — közös autocomplete-motor bővítése (érinti a wizard step 2 stopjait ÉS a klasszikus fuvar-kiírás/szerkesztő top-mezőit):**
+- **`public/console-shared.js`** `vsAttachAutocomplete` mousedown-jában: az `input.value` beállítása után `dispatchEvent(new Event('input', {bubbles:true}))` + `change` — a külső listenerek (`OC.stops[i].loc = value`, `draftSave`, `orderRouteRecalc`) magától lefutnak a helyes új értékkel. A saját input-listenerünket új `_vsAcSuppress` flag védi a rekurzió + `_vsLat` törlés + fölösleges fetch ellen (elején: `if (input._vsAcSuppress) return;`).
+- **`public/fav-locations.js`** `attachPicker` mousedown-jában UGYANEZ (a ⭐ mentett helyek pickerénél is), az `_vsAcSuppress` flag ugyanúgy védi a közös autocomplete-motort.
+
+**Cache-bust** `?v=20260827acfix` (console-shared.js + fav-locations.js + style.css + i18n.js). **997 Jest zöld** (nincs regresszió; a fix additív, csak új default-hamis flag-et vezet be és 1 új dispatch-hívást tesz a MEGLÉVŐ pick-branchbe). Csak megjelenés / helyes állapot-szinkronizáció, DB nem érintett.
+
+---
+
 ## 2026-08-27 — Alvállalkozó űrlap: ANAF-gomb + Reg.Com. + Adresa mezők (mint az ügyfélnél)
 
 **Gyökér:** a Comanda de Transport-kör (PR #379) hozzáadta a `carriers.reg_com` + `carriers.adresa` oszlopokat a DB-hez, DE az admin/manager alvállalkozó űrlapján nem volt sem ANAF-gomb, sem szerkeszthető mező ezekhez → az új alvállalkozónál kézzel kellett átvezetni a CUI + Reg.Com. + Adresa adatokat (miközben az ügyfél-oldalon már régóta van ANAF-lekérdezés). Kérés: legyen az alvállalkozó felvitelnél is ANAF-gomb, mint az ügyfélnél.
