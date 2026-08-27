@@ -68,6 +68,22 @@ describe('carrierSave', () => {
     expect(params[1]).toBe('Új Fuvarozó SRL');
   });
 
+  test('reg_com + adresa mezők beszúrva (ANAF-előtöltés eredménye)', async () => {
+    setUser(ADMIN);
+    pool.query.mockResolvedValueOnce(rows([{ id: 43 }]));
+    const res = await call('carrierSave', [{
+      nev: 'ANAF-cég SRL', cui: 'RO123', reg_com: 'J40/1/2020',
+      adresa: 'Str. Test 1, Cluj, Jud. Cluj, 400001',
+    }]);
+    expect(res.body.result.ok).toBe(true);
+    const [sql, params] = pool.query.mock.calls[0];
+    expect(String(sql)).toMatch(/INSERT INTO carriers/i);
+    expect(String(sql)).toMatch(/reg_com/);
+    expect(String(sql)).toMatch(/adresa/);
+    // A `reg_com` és `adresa` a params végén (a 12. és 13. paraméter)
+    expect(params).toEqual(expect.arrayContaining(['J40/1/2020', 'Str. Test 1, Cluj, Jud. Cluj, 400001']));
+  });
+
   test('meglévő átírása (id megadva) — csak saját cégében', async () => {
     setUser(ADMIN);
     // Nincs group_id → csak 1 query (az UPDATE)

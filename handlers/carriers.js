@@ -55,6 +55,7 @@ handlers.carrierSave = async function (req, res, args) {
     const f = {
       nev, cui: _str(a.cui, 40), email: _str(a.email, 255), telefon: _str(a.telefon, 50),
       iban: _str(a.iban, 40), nota: _str(a.nota, 1000),
+      reg_com: _str(a.reg_com, 60), adresa: _str(a.adresa, 500),
       payment_term_days: a.payment_term_days != null && a.payment_term_days !== '' ? parseInt(a.payment_term_days, 10) : 30,
       cmr_insurance_expiry: a.cmr_insurance_expiry || null,
       aktiv: a.aktiv === undefined ? true : !!a.aktiv,
@@ -65,24 +66,26 @@ handlers.carrierSave = async function (req, res, args) {
       if (groupId !== undefined) {
         r = await pool.query(
           `UPDATE carriers SET nev=$1, cui=$2, email=$3, telefon=$4, iban=$5, nota=$6,
-             payment_term_days=$7, cmr_insurance_expiry=$8, aktiv=$9, group_id=$10
-           WHERE id=$11 AND company_id=$12`,
-          [f.nev, f.cui, f.email, f.telefon, f.iban, f.nota, f.payment_term_days, f.cmr_insurance_expiry, f.aktiv, groupId, id, cid]);
+             payment_term_days=$7, cmr_insurance_expiry=$8, aktiv=$9, group_id=$10,
+             reg_com=$11, adresa=$12
+           WHERE id=$13 AND company_id=$14`,
+          [f.nev, f.cui, f.email, f.telefon, f.iban, f.nota, f.payment_term_days, f.cmr_insurance_expiry, f.aktiv, groupId, f.reg_com, f.adresa, id, cid]);
       } else {
         r = await pool.query(
           `UPDATE carriers SET nev=$1, cui=$2, email=$3, telefon=$4, iban=$5, nota=$6,
-             payment_term_days=$7, cmr_insurance_expiry=$8, aktiv=$9
-           WHERE id=$10 AND company_id=$11`,
-          [f.nev, f.cui, f.email, f.telefon, f.iban, f.nota, f.payment_term_days, f.cmr_insurance_expiry, f.aktiv, id, cid]);
+             payment_term_days=$7, cmr_insurance_expiry=$8, aktiv=$9,
+             reg_com=$10, adresa=$11
+           WHERE id=$12 AND company_id=$13`,
+          [f.nev, f.cui, f.email, f.telefon, f.iban, f.nota, f.payment_term_days, f.cmr_insurance_expiry, f.aktiv, f.reg_com, f.adresa, id, cid]);
       }
       if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost găsit.' } });
       audit.fromReq(req, 'carrier.update', 'carrier', id, { nev: f.nev });
       return res.json({ result: { ok: true, id } });
     }
     const ins = await pool.query(
-      `INSERT INTO carriers (company_id, nev, cui, email, telefon, iban, nota, payment_term_days, cmr_insurance_expiry, aktiv, group_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-      [cid, f.nev, f.cui, f.email, f.telefon, f.iban, f.nota, f.payment_term_days, f.cmr_insurance_expiry, f.aktiv, groupId === undefined ? null : groupId]);
+      `INSERT INTO carriers (company_id, nev, cui, email, telefon, iban, nota, payment_term_days, cmr_insurance_expiry, aktiv, group_id, reg_com, adresa)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
+      [cid, f.nev, f.cui, f.email, f.telefon, f.iban, f.nota, f.payment_term_days, f.cmr_insurance_expiry, f.aktiv, groupId === undefined ? null : groupId, f.reg_com, f.adresa]);
     audit.fromReq(req, 'carrier.create', 'carrier', ins.rows[0].id, { nev: f.nev });
     return res.json({ result: { ok: true, id: ins.rows[0].id } });
   } catch (err) { console.error('carrierSave hiba:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
