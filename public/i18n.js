@@ -3198,6 +3198,15 @@
     'sof.ms.arriveUnload': { hu: 'Megérkeztem a lerakóhoz', ro: 'Am sosit la descărcare' },
     'sof.ms.unloaded': { hu: 'Leürítettem', ro: 'Am descărcat' },
     'sof.ms.recorded': { hu: 'Rögzítve', ro: 'Înregistrat' },
+    // Utólagos idő-korrekció EGY konkrét stopon (per-stop idővonal ✏️ gomb)
+    'sof.ms.editHint':  { hu: 'Idő javítása', ro: 'Corectează timpul' },
+    'sof.ms.editTitle': { hu: 'Idő javítása — {act}', ro: 'Corectare timp — {act}' },
+    'sof.ms.editMsg':   {
+      hu: 'Állítsd be a valós időt (max 7 nap múltba). Az iroda automatikusan értesül.',
+      ro: 'Setează timpul real (max 7 zile în trecut). Biroul este notificat automat.'
+    },
+    'sof.ms.editSave':  { hu: '💾 Mentés', ro: '💾 Salvează' },
+    'sof.ms.editedOk':  { hu: 'Idő javítva', ro: 'Timp corectat' },
     'sof.ms.confirmTitle': { hu: 'Biztos, hogy „{act}"?', ro: 'Confirmi „{act}"?' },
     'sof.ms.confirmMsg': {
       hu: 'Ha épp most történt, csak nyomj Igent — az időpont az iroda felé is így megy. Ha lekésted, alább beállíthatod a valódi időt.',

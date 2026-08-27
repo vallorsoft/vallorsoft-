@@ -297,14 +297,22 @@ function sofTimeConfirm(opts, onOk) {
   if (ttl) ttl.textContent = opts.title || '';
   if (msg) msg.textContent = opts.msg || '';
   if (ok) ok.textContent = opts.ok || t('sof.cfm.yes');
-  // Input alap: a MAI idő (kényelmes, csak leokéz); szerkeszthető, ha
-  // pár perccel korábban történt / lekésett. A `max` a mostani + 1 óra
-  // (pár perces jövőt engedünk a szerver +2 perces türelmén belül;
-  // a szerver úgyis validál).
+  // Input alap: az `opts.initialIso` ha megadva (pl. utólagos szerkesztés
+  // már rögzített időpontra), különben a MAI idő (kényelmes, csak leokéz);
+  // szerkeszthető, ha pár perccel korábban történt / lekésett. A `max` a
+  // mostani + 1 óra (pár perces jövőt engedünk a szerver +2 perces
+  // türelmén belül; a szerver úgyis validál).
   var inp = document.getElementById('sofTimeInput');
   if (inp) {
     var now = new Date();
-    inp.value = _sofLocalDatetimeValue(now);
+    var initV = null;
+    if (opts.initialIso) {
+      try {
+        var di = new Date(opts.initialIso);
+        if (di instanceof Date && !isNaN(di.getTime())) initV = _sofLocalDatetimeValue(di);
+      } catch (e) {}
+    }
+    inp.value = initV || _sofLocalDatetimeValue(now);
     var max = new Date(now.getTime() + 60 * 60 * 1000);
     inp.max = _sofLocalDatetimeValue(max);
   }
@@ -4841,6 +4849,46 @@ function _driverMilestoneGo(id, atIso) {
   .catch(function () { toast(t('sof.errOccurred'), 'err'); });
 }
 
+// ── Utólagos idő-korrekció EGY konkrét stopon (📍 sosire / 📦 done) ──
+// A fuvar-kártyán a per-stop idővonal minden sorára ott a kis ✏️ gomb;
+// megnyomásra idő-picker modal (a jelenlegi értékkel előtöltve), Ok után
+// a szerver a `stop-edit` végponton frissíti a `arrived_at` vagy `done_at`
+// oszlopot. Sorrend-konzisztencia: done_at szerkesztése az arrived_at-et
+// is beállítja, ha az még üres volt (szerver-oldalon lefedve).
+function editStopTime(orderId, stopId, field, currentIso, labelKey) {
+  // Bemutató alatt / DEMÓ fuvarra a szerverre NEM megyünk (SoferTour intercept).
+  if (window.SoferTour && window.SoferTour.demoIntercept &&
+      window.SoferTour.demoIntercept(orderId, 'Stop idő korrekció')) {
+    return;
+  }
+  if (!orderId || !stopId || !['arrived_at', 'done_at'].includes(field)) return;
+  var actLbl = t(labelKey || 'sof.ms.recorded');
+  sofTimeConfirm({
+    ico: '✏️',
+    title: t('sof.ms.editTitle', { act: actLbl }) || ('Idő javítása — ' + actLbl),
+    msg: t('sof.ms.editMsg') || 'Állítsd be a valós időt. Az iroda automatikusan értesül.',
+    ok: t('sof.ms.editSave') || '💾 Mentés',
+    initialIso: currentIso || null
+  }, function (atIso) {
+    if (!atIso) return; // Mégse
+    fetch('/api/orders/' + orderId + '/stop-edit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stopId: stopId, field: field, at: atIso })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d && d.ok) {
+        toast('✏️ ' + (t('sof.ms.editedOk') || 'Idő javítva'), 'ok');
+        loadDashOrders();
+      } else {
+        toast((d && d.err) || t('sof.errOccurred'), 'err');
+      }
+    })
+    .catch(function () { toast(t('sof.errOccurred'), 'err'); });
+  });
+}
+
 // ── Több felrakó/lerakó pont — új stop-event úton ─────────────
 // Az `o.stops` (getMySoferOrders) alapján kiszámoljuk a lehetséges következő
 // eseményeket. Ha csak egy lehet, azonnal megerősítést kérünk (mint eddig);
@@ -5535,17 +5583,31 @@ function renderFuvarCard(o, idx) {
                     kindIco + ' <b>' + esc(kindTxt) + ' #' + kindNo + '</b>' +
                     (cityShort ? ' · <span class="fd-ms-city">📍 ' + esc(cityShort) + '</span>' : '') +
                   '</div>';
+                // ✏️ Utólagos idő-javítás gomb — csak akkor mutatjuk, ha a
+                // sor időbélyegét már rögzítettük (különben a `stop-event`
+                // úttal állítja be a sofőr először). Bezárt (Anulat) fuvart
+                // a szerver úgyis nem enged; kliens-oldalon nem szűrünk.
+                var arrKey = s.kind === 'pickup' ? 'sof.ms.arriveLoad' : 'sof.ms.arriveUnload';
+                var doneKey = s.kind === 'pickup' ? 'sof.ms.loaded' : 'sof.ms.unloaded';
+                var editArrBtn = s.arrived_at ?
+                  '<button type="button" class="fd-ms-edit" title="' + esc(t('sof.ms.editHint') || 'Idő javítása') + '"' +
+                  ' onclick="event.stopPropagation();editStopTime(\'' + o.id + '\',' + s.id + ',\'arrived_at\',\'' + esc(s.arrived_at) + '\',\'' + arrKey + '\')">✏️</button>' : '';
+                var editDoneBtn = s.done_at ?
+                  '<button type="button" class="fd-ms-edit" title="' + esc(t('sof.ms.editHint') || 'Idő javítása') + '"' +
+                  ' onclick="event.stopPropagation();editStopTime(\'' + o.id + '\',' + s.id + ',\'done_at\',\'' + esc(s.done_at) + '\',\'' + doneKey + '\')">✏️</button>' : '';
                 var rowArr =
                   '<div class="fd-ms-row' + (s.arrived_at ? ' done' : '') + '">' +
                     '<span class="fd-ms-ico">' + (s.arrived_at ? '✅' : '○') + '</span>' +
                     '<span class="fd-ms-lbl">📍 ' + esc(arrLbl) + '</span>' +
                     (s.arrived_at ? '<span class="fd-ms-time">' + esc(fmtFuvarDateTime(s.arrived_at)) + '</span>' : '') +
+                    editArrBtn +
                   '</div>';
                 var rowDone =
                   '<div class="fd-ms-row' + (s.done_at ? ' done' : '') + '">' +
                     '<span class="fd-ms-ico">' + (s.done_at ? '✅' : '○') + '</span>' +
                     '<span class="fd-ms-lbl">' + (s.kind === 'pickup' ? '📦 ' : '✅ ') + esc(doneLbl) + '</span>' +
                     (s.done_at ? '<span class="fd-ms-time">' + esc(fmtFuvarDateTime(s.done_at)) + '</span>' : '') +
+                    editDoneBtn +
                   '</div>';
                 return '<div class="fd-ms-group' + subCls + '">' + groupHead + rowArr + rowDone + '</div>';
               }).join('');
