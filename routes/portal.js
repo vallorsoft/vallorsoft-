@@ -151,13 +151,17 @@ router.get('/api/portal/orders', requireClient, async (req, res) => {
       [cu.company_id, cu.client_id, cu.client_nev || '']);
     const orders = r.rows;
 
-    // letölthető dokumentumok a fuvarokhoz (POD/CMR/visszaigazolás) — egy lekérdezés
+    // letölthető dokumentumok a fuvarokhoz (POD/CMR/visszaigazolás) — CSAK az
+    // ELKÜLDÖTT (`shared_with_client=TRUE`) fájlok. A diszpécser a fuvar ✉️
+    // „Email a fuvarról" úton állítja be a jelzőt; ami nincs elküldve, azt
+    // az ügyfél NEM látja / nem tudja letölteni.
     const ids = orders.map((o) => o.id);
     const docsByOrder = {};
     if (ids.length) {
       const dr = await pool.query(
         `SELECT id, order_id, file_name, (signed_base64 IS NOT NULL) AS signed
          FROM order_documents WHERE order_id = ANY($1::text[]) AND company_id = $2
+           AND shared_with_client = TRUE
          ORDER BY id`, [ids, cu.company_id]);
       dr.rows.forEach((d) => {
         (docsByOrder[d.order_id] = docsByOrder[d.order_id] || []).push(
@@ -166,11 +170,14 @@ router.get('/api/portal/orders', requireClient, async (req, res) => {
     }
     orders.forEach((o) => { o.documents = docsByOrder[o.id] || []; });
 
-    // POD-fotók (sofőr által csatolt, a 'documents' táblában) — szintén letölthető
+    // POD-fotók (sofőr által csatolt, a 'documents' táblában) — szintén CSAK
+    // az elküldött fotók (`shared_with_client=TRUE`).
     const podByOrder = {};
     if (ids.length) {
       const pr = await pool.query(
-        `SELECT id, order_id, file_name, tip FROM documents WHERE order_id = ANY($1::text[]) ORDER BY id`, [ids]);
+        `SELECT id, order_id, file_name, tip FROM documents
+          WHERE order_id = ANY($1::text[]) AND shared_with_client = TRUE
+          ORDER BY id`, [ids]);
       pr.rows.forEach((d) => {
         (podByOrder[d.order_id] = podByOrder[d.order_id] || []).push({ id: d.id, name: d.file_name || 'fotografie', tip: d.tip });
       });
@@ -245,6 +252,7 @@ router.get('/api/portal/document/:docId', requireClient, async (req, res) => {
        FROM order_documents od
        JOIN orders o ON o.id = od.order_id AND o.company_id = od.company_id
        WHERE od.id = $1 AND od.company_id = $2
+         AND od.shared_with_client = TRUE
          AND ( o.client_id = $3 OR (o.client_id IS NULL AND LOWER(o.client) = LOWER($4)) )`,
       [docId, cu.company_id, cu.client_id, cu.client_nev || '']);
     if (!r.rows.length) return res.status(404).send('Nu a fost gasit.');
@@ -270,7 +278,8 @@ router.get('/api/portal/pod/:id', requireClient, async (req, res) => {
     const r = await pool.query(
       `SELECT d.file_name, d.storage_url FROM documents d
        JOIN orders o ON o.id = d.order_id AND o.company_id = $2
-       WHERE d.id = $1 AND ( o.client_id = $3 OR (o.client_id IS NULL AND LOWER(o.client) = LOWER($4)) )`,
+       WHERE d.id = $1 AND d.shared_with_client = TRUE
+         AND ( o.client_id = $3 OR (o.client_id IS NULL AND LOWER(o.client) = LOWER($4)) )`,
       [id, cu.company_id, cu.client_id, cu.client_nev || '']);
     if (!r.rows.length) return res.status(404).send('Nu a fost gasit.');
     const s = String(r.rows[0].storage_url || '');
