@@ -3157,3 +3157,22 @@
 .sofer-wrap .fd-ms-group-h.fd-ms-active b { color: #92400e; }
 .sofer-wrap .fd-ms-city { color: #475569; }
 .sofer-wrap .fd-ms-group .fd-ms-row { padding: 3px 0 3px 4px; }
+
+/* ✏️ Utólagos idő-javítás gomb — a per-stop idővonal során (2026-08-27) */
+.sofer-wrap .fd-ms-edit {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  padding: 3px 8px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.sofer-wrap .fd-ms-edit:hover {
+  background: #eff6ff;
+  border-color: #2563eb;
+  color: #1d4ed8;
+}
