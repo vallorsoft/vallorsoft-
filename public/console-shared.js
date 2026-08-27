@@ -321,6 +321,11 @@ function vsAttachAutocomplete(inputId, ddId, onPick){
   if(!input||!dd||input._vsAcBound) return; input._vsAcBound=true;
   var timer=null;
   input.addEventListener('input', function(){
+    // Ha a mostani `input`-esemény MI MAGUNK dispatcholtuk egy autocomplete-
+    // találat választása után, NEM töröljük a koordinátákat + nem indítunk új
+    // fetchet — csak a KÜLSŐ listenereknek (pl. wizard OC.stops[i].loc = value)
+    // engedjük lefutni a helyes új értékkel.
+    if (input._vsAcSuppress) return;
     var q=input.value.trim(); if(timer)clearTimeout(timer);
     input._vsLat=null; input._vsLng=null; // kézi gépelés törli a cached koordinátát
     if(q.length<3){ dd.classList.remove('open'); dd.innerHTML=''; return; }
@@ -336,6 +341,15 @@ function vsAttachAutocomplete(inputId, ddId, onPick){
           Array.prototype.forEach.call(dd.querySelectorAll('.vs-ac-item'), function(el){
             el.addEventListener('mousedown', function(e){ e.preventDefault();
               input.value=el.getAttribute('data-label');
+              // A külső listenerek (wizard OC.stops[i].loc = loc.value, draftSave,
+              // orderRouteRecalc trigger stb.) `input` eventre vannak bindolva —
+              // programozott `input.value=`-nak nincs eventje, ezért kézzel
+              // dispatcholjuk. A saját input-handlerünket az `_vsAcSuppress`
+              // flag védi a rekurzió / _vsLat-törlés / új fetch ellen.
+              input._vsAcSuppress = true;
+              try { input.dispatchEvent(new Event('input', { bubbles: true })); } catch(_) {}
+              try { input.dispatchEvent(new Event('change', { bubbles: true })); } catch(_) {}
+              input._vsAcSuppress = false;
               var lat=parseFloat(el.getAttribute('data-lat')), lng=parseFloat(el.getAttribute('data-lng'));
               input._vsLat=isNaN(lat)?null:lat; input._vsLng=isNaN(lng)?null:lng;
               dd.classList.remove('open'); dd.innerHTML='';

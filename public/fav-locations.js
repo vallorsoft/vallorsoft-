@@ -155,6 +155,14 @@ window.FavLocations = (function () {
         el.addEventListener('mousedown', function (ev) {
           ev.preventDefault();
           input.value = el.getAttribute('data-addr');
+          // A külső listenerek (pl. wizard OC.stops[i].loc = loc.value) `input`
+          // eventre bindolnak — programozott value=`-nak nincs eventje, ezért
+          // kézzel dispatcholjuk. A vsAttachAutocomplete a `_vsAcSuppress`
+          // flag-gel védekezik a saját input-handlerének rekurziója ellen.
+          input._vsAcSuppress = true;
+          try { input.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+          try { input.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
+          input._vsAcSuppress = false;
           var lat = parseFloat(el.getAttribute('data-lat'));
           var lng = parseFloat(el.getAttribute('data-lng'));
           input._vsLat = isNaN(lat) ? null : lat;
