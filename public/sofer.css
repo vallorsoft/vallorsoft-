@@ -2914,13 +2914,33 @@
    ══════════════════════════════════════════════════════════════ */
 .sofer-wrap .sofer-nav-card.sofer-nav-duo {
   /* A wrapper NEM viszi a nav-card flex-oszlop tartalom-elrendezést;
-     helyette 2 oszlop 1fr | 1fr rácsba osztja a két fél-kártyát. */
+     helyette 2 oszlop 1fr | 1fr rácsba osztja a két fél-kártyát.
+     Kisebb max-magasság mint a többi navi kártya (a duo két sor helyett
+     egyetlen kompakt sor). */
   display: grid;
   grid-template-columns: 1fr 1fr;
   padding: 0;              /* a fél-kártyák viszik a belső paddingot */
   overflow: hidden;        /* a hover-háttér ne szivárogjon ki a keretből */
-  max-height: 74px;
+  min-height: 58px;
+  max-height: 62px;
+  position: relative;      /* a középvonal ::after-hez horgony */
   flex-shrink: 0;
+}
+/* GARANTÁLT KÖZÉPVONAL — pseudo-elem a wrapper közepén (nem `border-right`
+   a bal félen, ami elvenne 1px-t a bal oszlopból és így vizuálisan
+   ELTOLNÁ a rácsot: a bal fél 0.5px-kel kisebb lenne, mint a jobb).
+   Így a rács tényleg 50-50, a vonal pontosan az 50%-nál. */
+.sofer-wrap .sofer-nav-card.sofer-nav-duo::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 12%;
+  bottom: 12%;
+  width: 1px;
+  background: rgba(148, 163, 184, 0.35);
+  transform: translateX(-0.5px);   /* félbe kerül a pixel */
+  pointer-events: none;
+  z-index: 2;
 }
 /* A wrapper aktív állapotát töröljük — a valódi click a fél-kártyán történik,
    így a scale-visszajelzés is ott menjen (különben mindkét gomb együtt villan). */
@@ -2939,18 +2959,13 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 6px 10px;
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
   transition: background .14s ease, transform .14s cubic-bezier(.2,.8,.2,1);
   z-index: 1;              /* a fél-kártya háttere a wrapper sheen fölé */
-}
-/* Halvány elválasztó a két fél-kártya között — bal félre `border-right`
-   (nem a rács `gap`, hogy semmi ne szakítsa a wrapper kereten belüli tömör
-   érzetét). Csendes-szürke, nem konkurál a márkaszínekkel. */
-.sofer-wrap .sofer-nav-duo .sofer-nav-half:first-child {
-  border-right: 1px solid rgba(148, 163, 184, 0.35);
+  min-width: 0;            /* a fél-kártya soha ne lökje szét a rácsot */
 }
 .sofer-wrap .sofer-nav-duo .sofer-nav-half:hover {
   background: rgba(59, 130, 246, 0.05);
@@ -2959,16 +2974,16 @@
   transform: scale(0.965) translateY(1px);
   background: rgba(37, 99, 235, 0.10);
 }
-/* Ikon-korong — 44×44, mint eddig; a bemutató kék→indigo, a cégadatok
-   teal→zöld, hogy első ránézésre is elváljon a két akció ikonja. */
+/* Ikon-korong — 40×40 (a wrapper alacsonyabb magasságához igazítva,
+   így a kártya kompakt marad; korábbi 44px túl-tömött lett). */
 .sofer-wrap .sofer-nav-duo .sofer-nav-half .nav-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px; height: 44px;
-  border-radius: 14px;
+  width: 40px; height: 40px;
+  border-radius: 12px;
   color: #fff;
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1;
   flex-shrink: 0;
 }
