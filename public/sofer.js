@@ -5499,19 +5499,69 @@ function renderFuvarCard(o, idx) {
         '<div class="fd-sec-h"><span class="fd-sec-t">📝 ' + t('sof.det.note') + '</span></div>' +
         detRow('sof.det.note', o.ref, 'note') +
       '</div>' : '') +
-      // Állomás-idővonal: a 4 lépés + időbélyeg (✅ kész / ○ hátra).
+      // Állomás-idővonal:
+      //   • Multi-drop (van o.stops): STOPONKÉNT 2 sor (📍 megérkeztem + 📦/✅ elvégeztem),
+      //     kind/sorszám/városrövidítés jelzéssel; az első nem-lezárt stop kiemelve
+      //     (narancs „ez jön" akcent). Ha egy stop mindkét mérföldköve kész,
+      //     magától „ugrik" a következőre (compact ✅ Kész sor, ha akarjuk).
+      //   • Legacy (nincs o.stops, csak top-mezők): a régi 4 lépés (backfilled fuvar).
       // Finalizat fuvarnál CSAK akkor, ha van rögzített állomás (különben üres ○○○○).
-      ((!isParked && !isWh && (isAlocat || isCurs || MS_STEPS.some(function(s){return o[s.col];}))) ? '<div class="fd-sec">' +
-        '<div class="fd-sec-h"><span class="fd-sec-t">🚚 ' + t('sof.ms.progress') + '</span></div>' +
-        MS_STEPS.map(function (s) {
-          var done = o[s.col];
-          return '<div class="fd-ms-row' + (done ? ' done' : '') + '">' +
-            '<span class="fd-ms-ico">' + (done ? '✅' : '○') + '</span>' +
-            '<span class="fd-ms-lbl">' + t(s.key) + '</span>' +
-            (done ? '<span class="fd-ms-time">' + esc(fmtFuvarDateTime(o[s.col])) + '</span>' : '') +
-          '</div>';
-        }).join('') +
-      '</div>' : '') +
+      ((!isParked && !isWh && (
+          (Array.isArray(o.stops) && o.stops.length && (isAlocat || isCurs || o.stops.some(function(s){return s.arrived_at || s.done_at;}))) ||
+          (isAlocat || isCurs || MS_STEPS.some(function(s){return o[s.col];}))
+        )) ?
+        '<div class="fd-sec">' +
+          '<div class="fd-sec-h"><span class="fd-sec-t">🚚 ' + t('sof.ms.progress') + '</span></div>' +
+          (Array.isArray(o.stops) && o.stops.length ?
+            // ── PER-STOP: minden stopnak külön 2 sor ──
+            (function () {
+              // Első nem-lezárt (done_at IS NULL) stop = „aktív" — ezt kiemeljük.
+              var activeIdx = -1;
+              for (var _mi = 0; _mi < _seqStops.length; _mi++) {
+                if (!_seqStops[_mi].done_at) { activeIdx = _mi; break; }
+              }
+              // Kind-en belüli sorszámhoz (#1, #2 …) számláló
+              var puNo = 0, deNo = 0;
+              return _seqStops.map(function (s, si) {
+                var kindNo = (s.kind === 'pickup') ? (++puNo) : (++deNo);
+                var kindIco  = s.kind === 'pickup' ? '⬆️' : '⬇️';
+                var kindTxt  = t(s.kind === 'pickup' ? 'sof.det.pickup' : 'sof.det.delivery') || (s.kind === 'pickup' ? 'Felrakó' : 'Lerakó');
+                var doneLbl  = t(s.kind === 'pickup' ? 'sof.ms.loaded' : 'sof.ms.unloaded');
+                var arrLbl   = t(s.kind === 'pickup' ? 'sof.ms.arriveLoad' : 'sof.ms.arriveUnload');
+                var cityShort = (typeof _cityOf === 'function' ? _cityOf(s.loc) : '') || (s.loc || '');
+                var subCls = (si === activeIdx) ? ' fd-ms-active' : (s.done_at ? ' fd-ms-doneall' : '');
+                var groupHead =
+                  '<div class="fd-ms-group-h' + subCls + '">' +
+                    kindIco + ' <b>' + esc(kindTxt) + ' #' + kindNo + '</b>' +
+                    (cityShort ? ' · <span class="fd-ms-city">📍 ' + esc(cityShort) + '</span>' : '') +
+                  '</div>';
+                var rowArr =
+                  '<div class="fd-ms-row' + (s.arrived_at ? ' done' : '') + '">' +
+                    '<span class="fd-ms-ico">' + (s.arrived_at ? '✅' : '○') + '</span>' +
+                    '<span class="fd-ms-lbl">📍 ' + esc(arrLbl) + '</span>' +
+                    (s.arrived_at ? '<span class="fd-ms-time">' + esc(fmtFuvarDateTime(s.arrived_at)) + '</span>' : '') +
+                  '</div>';
+                var rowDone =
+                  '<div class="fd-ms-row' + (s.done_at ? ' done' : '') + '">' +
+                    '<span class="fd-ms-ico">' + (s.done_at ? '✅' : '○') + '</span>' +
+                    '<span class="fd-ms-lbl">' + (s.kind === 'pickup' ? '📦 ' : '✅ ') + esc(doneLbl) + '</span>' +
+                    (s.done_at ? '<span class="fd-ms-time">' + esc(fmtFuvarDateTime(s.done_at)) + '</span>' : '') +
+                  '</div>';
+                return '<div class="fd-ms-group' + subCls + '">' + groupHead + rowArr + rowDone + '</div>';
+              }).join('');
+            })()
+            :
+            // ── LEGACY 4 lépés (backfilled 1+1 fuvar) ──
+            MS_STEPS.map(function (s) {
+              var done = o[s.col];
+              return '<div class="fd-ms-row' + (done ? ' done' : '') + '">' +
+                '<span class="fd-ms-ico">' + (done ? '✅' : '○') + '</span>' +
+                '<span class="fd-ms-lbl">' + t(s.key) + '</span>' +
+                (done ? '<span class="fd-ms-time">' + esc(fmtFuvarDateTime(o[s.col])) + '</span>' : '') +
+              '</div>';
+            }).join('')
+          ) +
+        '</div>' : '') +
       // Akciógombok (állomás-léptetés / áru-leadás) — a UIT-gomb most
       // LERAKÓNKÉNT jelenik meg a lerakó-sorban (multi-drop), nem itt.
       '<div class="fuvar-actions">' +

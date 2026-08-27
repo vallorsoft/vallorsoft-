@@ -3124,3 +3124,36 @@
   font-weight: 600;
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Per-stop állomás-idővonal (multi-drop) — bevezetve: 2026-08-27
+   Minden stopnak KÜLÖN kis csoport: fejléc (kind #N · város) + 2 al-sor
+   (📍 Megérkeztem / 📦 Felrakodtam vagy ✅ Leürítettem). Az AKTÍV (első
+   nem-lezárt) csoport narancs bal-akcens csíkkal + halvány sárga háttérrel;
+   a teljesen kész csoportok tompábbak (opacity 0.75). A `.fd-ms-row`
+   szabályokat NEM módosítjuk — a legacy 4-lépés is működik.
+   ─────────────────────────────────────────────────────────────────────── */
+.sofer-wrap .fd-ms-group {
+  margin: 6px 0;
+  padding: 6px 8px 6px 10px;
+  border-left: 3px solid transparent;
+  border-radius: 8px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.sofer-wrap .fd-ms-group + .fd-ms-group { border-top: 1px dashed rgba(148,163,184,0.25); padding-top: 8px; }
+.sofer-wrap .fd-ms-group.fd-ms-doneall { opacity: 0.72; }
+.sofer-wrap .fd-ms-group.fd-ms-active {
+  background: rgba(249, 115, 22, 0.06);
+  border-left-color: #f97316;
+}
+.sofer-wrap .fd-ms-group-h {
+  font-size: 12.5px;
+  color: #334155;
+  margin-bottom: 4px;
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+}
+.sofer-wrap .fd-ms-group-h b { color: #0f172a; font-weight: 700; }
+.sofer-wrap .fd-ms-group-h.fd-ms-active { color: #b45309; }
+.sofer-wrap .fd-ms-group-h.fd-ms-active b { color: #92400e; }
+.sofer-wrap .fd-ms-city { color: #475569; }
+.sofer-wrap .fd-ms-group .fd-ms-row { padding: 3px 0 3px 4px; }
