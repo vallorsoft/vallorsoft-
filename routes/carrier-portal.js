@@ -104,8 +104,12 @@ router.get('/api/carrier/orders', requireCarrier, async (req, res) => {
     const ids = orders.map((o) => o.id);
     const docsByOrder = {};
     if (ids.length) {
-      // a diszpécser által a fuvarhoz csatolt dokumentumok (megrendelés-visszaigazolás stb.)
-      const od = await pool.query(`SELECT id, order_id, file_name FROM order_documents WHERE order_id = ANY($1::text[]) AND company_id=$2 ORDER BY id`, [ids, cu.company_id]);
+      // A diszpécser által a fuvarhoz csatolt dokumentumok (megrendelés-visszaigazolás
+      // stb.) — CSAK az ELKÜLDÖTT (`shared_with_carrier=TRUE`) fájlok. A diszpécser
+      // a fuvar ✉️ „Email a fuvarról" úton állítja be a jelzőt; ami nincs elküldve,
+      // azt az alvállalkozó NEM látja / nem tudja letölteni. A `carrier_documents`
+      // (amit maga az alvállalkozó töltött fel) nem érintett — a saját dolga.
+      const od = await pool.query(`SELECT id, order_id, file_name FROM order_documents WHERE order_id = ANY($1::text[]) AND company_id=$2 AND shared_with_carrier = TRUE ORDER BY id`, [ids, cu.company_id]);
       od.rows.forEach((d) => { (docsByOrder[d.order_id] = docsByOrder[d.order_id] || []).push({ id: d.id, name: d.file_name || 'document.pdf', src: 'order' }); });
       // az alvállalkozó által feltöltött dokumentumok
       const cd = await pool.query(`SELECT id, order_id, file_name FROM carrier_documents WHERE carrier_id=$1 AND company_id=$2 AND order_id = ANY($3::text[]) ORDER BY id`, [cu.carrier_id, cu.company_id, ids]);
@@ -261,7 +265,8 @@ router.get('/api/carrier/order-doc/:id', requireCarrier, async (req, res) => {
     const r = await pool.query(
       `SELECT od.file_name, od.original_base64, od.signed_base64 FROM order_documents od
        JOIN orders o ON o.id=od.order_id AND o.company_id=od.company_id
-       WHERE od.id=$1 AND od.company_id=$2 AND o.carrier_id=$3`,
+       WHERE od.id=$1 AND od.company_id=$2 AND o.carrier_id=$3
+         AND od.shared_with_carrier = TRUE`,
       [parseInt(req.params.id, 10), cu.company_id, cu.carrier_id]);
     if (!r.rows.length) return res.status(404).send('Nu a fost gasit.');
     const b64 = r.rows[0].signed_base64 || r.rows[0].original_base64;

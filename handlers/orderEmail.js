@@ -399,6 +399,88 @@ handlers.sendOrderEmail = async function (req, res, args) {
     });
 
     if (!sent || !sent.ok) return res.json({ result: { ok: false, err: (sent && sent.error) || 'Eroare la trimitere' } });
+
+    // ── Megosztás-jelzők beállítása (a sikeres, NEM-teszt küldés után) ──
+    // Ha a címzett a fuvarhoz tartozó ÜGYFÉL-portál user, a küldött order_documents
+    // / documents (POD) fájlokra `shared_with_client=TRUE` kerül; ha a címzett
+    // az ALVÁLLALKOZÓ-portál user, `shared_with_carrier=TRUE`. Csak a KIPIPÁLT
+    // + SIKERESEN feloldott csatolmányokra állítjuk (skipped nem). Best-effort:
+    // hiba esetén sem buktatjuk a válaszút — az e-mail már ki lett küldve.
+    if (!isTest && attachments.length > 0) {
+      try {
+        // Ki-kit: a to_email pontosan (case-insensitive) az ügyfél vagy az
+        // alvállalkozó portál-userének címét kell egyeznie a FUVARHOZ tartozó
+        // client/carrier alatt (semmi „ha valakinek van ilyen e-mailje" —
+        // szigorúan a fuvar-linked kontextusban).
+        const toLc = toEmail.toLowerCase();
+        var isClientRecipient = false;
+        var isCarrierRecipient = false;
+        try {
+          var cx = await pool.query(
+            `SELECT 1 FROM client_users cu
+              JOIN orders o ON o.company_id = cu.company_id
+                AND (o.client_id = cu.client_id
+                     OR (o.client_id IS NULL AND LOWER(o.client) = LOWER(cu.client_nev)))
+              WHERE cu.company_id = $1 AND LOWER(cu.email) = $2 AND o.id = $3
+              LIMIT 1`,
+            [cid, toLc, orderId]);
+          isClientRecipient = cx.rows.length > 0;
+        } catch (_) { /* client_users tábla hiányában kihagyjuk */ }
+        try {
+          var cr = await pool.query(
+            `SELECT 1 FROM carrier_users cu
+              JOIN orders o ON o.company_id = cu.company_id AND o.carrier_id = cu.carrier_id
+              WHERE cu.company_id = $1 AND LOWER(cu.email) = $2 AND o.id = $3
+              LIMIT 1`,
+            [cid, toLc, orderId]);
+          isCarrierRecipient = cr.rows.length > 0;
+        } catch (_) { /* carrier_users tábla hiányában kihagyjuk */ }
+
+        if (isClientRecipient || isCarrierRecipient) {
+          // A kipipált, feloldott kulcsokból gyűjtsük ki, mit vittünk el.
+          var odIds = [], podIds = [];
+          selAtt.forEach(function (key) {
+            var k = String(key || '');
+            var mOd  = k.match(/^od-(\d+)-(original|signed)$/);
+            var mPod = k.match(/^pod-(\d+)$/);
+            if (mOd)  odIds.push(parseInt(mOd[1], 10));
+            if (mPod) podIds.push(parseInt(mPod[1], 10));
+          });
+          odIds = Array.from(new Set(odIds.filter(function (n) { return Number.isFinite(n); })));
+          podIds = Array.from(new Set(podIds.filter(function (n) { return Number.isFinite(n); })));
+
+          if (isClientRecipient) {
+            if (odIds.length) {
+              await pool.query(
+                `UPDATE order_documents SET shared_with_client=TRUE, shared_with_client_at=NOW()
+                  WHERE id = ANY($1::bigint[]) AND company_id=$2`,
+                [odIds, cid]);
+            }
+            if (podIds.length) {
+              await pool.query(
+                `UPDATE documents SET shared_with_client=TRUE, shared_with_client_at=NOW()
+                  WHERE id = ANY($1::bigint[]) AND order_id=$2`,
+                [podIds, String(orderId)]);
+            }
+          }
+          if (isCarrierRecipient) {
+            if (odIds.length) {
+              await pool.query(
+                `UPDATE order_documents SET shared_with_carrier=TRUE, shared_with_carrier_at=NOW()
+                  WHERE id = ANY($1::bigint[]) AND company_id=$2`,
+                [odIds, cid]);
+            }
+            if (podIds.length) {
+              await pool.query(
+                `UPDATE documents SET shared_with_carrier=TRUE, shared_with_carrier_at=NOW()
+                  WHERE id = ANY($1::bigint[]) AND order_id=$2`,
+                [podIds, String(orderId)]);
+            }
+          }
+        }
+      } catch (e) { console.error('order.email share-flag hiba (nem-blokkoló):', e); }
+    }
+
     return res.json({ result: { ok: true, attachments: attachments.length, skipped: skipped } });
   } catch (err) {
     console.error('sendOrderEmail hiba:', err);
