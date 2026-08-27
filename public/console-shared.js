@@ -4753,6 +4753,14 @@ function renderFilteredOrders(list) {
         'onclick="vsSendOrderTplMail(\''+c.id+'\');closeOrderActions()">'+
         '<span class="vs-act-ico">📧</span><span class="vs-act-lbl">'+t('cs.ol.mTplMail')+'</span></button>';
     }
+    // 📄 Comanda de Transport (megbízás) — CSAK ha nincs belső sofőr KIOSZTVA
+    // (Extern fuvar vagy „None"/sofőr nélküli); a szerver-oldali handler is
+    // ellenőrzi (defense in depth).
+    if (window.OrderAssignment && !c.email_sofer) {
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mAssignment','Comanda de Transport')+'" '+
+        'onclick="OrderAssignment.open(\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">📄</span><span class="vs-act-lbl">'+t('cs.ol.mAssignment','Comanda de Transport')+'</span></button>';
+    }
     // ⛔ Áru leadása (megszakítás) — elválasztó után, danger színnel; aktív fuvaron
     if (!isCancelled && (c.status==='Alocat'||c.status==='In Curs') && c.handover_status!=='Fuggoben') {
       menuItems += '<div class="vs-act-sep"></div>'+

@@ -48,6 +48,39 @@ router.delete('/api/branding/logo', requireLogin, requireRole('Admin', 'Manager'
   catch (e) { console.error('DELETE /api/branding/logo hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
+// ---------- Cég-pecsét (Comanda de Transport + jövőbeli PDF-ek) ----------
+// A meglévő logó-endpointtal AZONOS minta; a `company_branding.stamp_*`
+// oszlopokat kezeli (nem a per-user `stamps` táblát!). Multi-tenant szűrés.
+router.get('/api/branding/stamp', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT stamp_base64, stamp_mime, updated_at FROM company_branding WHERE company_id=$1`, [own(req)]);
+    const has = !!(rows[0] && rows[0].stamp_base64);
+    res.json({ has, mime: has ? rows[0].stamp_mime : null, dataUri: has ? `data:${rows[0].stamp_mime};base64,${rows[0].stamp_base64}` : null });
+  } catch (e) { console.error('GET /api/branding/stamp hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
+});
+router.post('/api/branding/stamp', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
+  let b64 = String(req.body.base64 || '');
+  const mime = String(req.body.mime || 'image/png');
+  b64 = b64.replace(/^data:[^;]+;base64,/, '');
+  if (!b64) return res.status(400).json({ error: 'Lipseste imaginea.' });
+  if (b64.length > 4 * 1024 * 1024) return res.status(413).json({ error: 'Stampila este prea mare (max ~3 MB).' });
+  try {
+    await pool.query(
+      `INSERT INTO company_branding (company_id, stamp_base64, stamp_mime, updated_at)
+       VALUES ($1,$2,$3,now())
+       ON CONFLICT (company_id) DO UPDATE SET stamp_base64=$2, stamp_mime=$3, updated_at=now()`,
+      [own(req), b64, mime]);
+    res.json({ ok: true });
+  } catch (e) { console.error('POST /api/branding/stamp hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
+});
+router.delete('/api/branding/stamp', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
+  try {
+    // Csak a pecsét oszlopokat nullázza — a logót és a többi mezőt nem érinti.
+    await pool.query(`UPDATE company_branding SET stamp_base64=NULL, stamp_mime=NULL, updated_at=now() WHERE company_id=$1`, [own(req)]);
+    res.json({ ok: true });
+  } catch (e) { console.error('DELETE /api/branding/stamp hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
+});
+
 // ---------- E-mail sablonok (CRUD) ----------
 router.get('/api/email-templates', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   try {

@@ -75,7 +75,7 @@ handlers.getCompanySettings = async function (req, res) {
       pool.query(`SELECT nev, igazgato_nev, email_contact, telefon, eur_ron_rate,
                          cui, reg_com, euid, adresa, iban, banca, capital_social, tva_platitor, website
                     FROM companies WHERE id=$1`, [cid]),
-      pool.query('SELECT brand_color, pdf_header_text, logo_mime, (logo_base64 IS NOT NULL) AS has_logo, updated_at FROM company_branding WHERE company_id=$1', [cid]),
+      pool.query('SELECT brand_color, pdf_header_text, logo_mime, stamp_mime, (logo_base64 IS NOT NULL) AS has_logo, (stamp_base64 IS NOT NULL) AS has_stamp, updated_at FROM company_branding WHERE company_id=$1', [cid]),
       pool.query('SELECT prefix, current_seq FROM document_series WHERE company_id=$1 AND doc_type=$2 AND year=$3', [cid, 'MT', year]),
     ]);
 
@@ -102,6 +102,8 @@ handlers.getCompanySettings = async function (req, res) {
       pdfHeaderText: b.pdf_header_text || null,
       hasLogo: !!b.has_logo,
       logoMime: b.logo_mime || null,
+      hasStamp: !!b.has_stamp,
+      stampMime: b.stamp_mime || null,
       logoUpdatedAt: b.updated_at || null,
       eurRonRate: c.eur_ron_rate != null ? Number(c.eur_ron_rate) : null,
       waybillPrefix: s.prefix || 'MT',
