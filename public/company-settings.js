@@ -202,7 +202,9 @@ window.CompanySettings = (function () {
     } catch (e) {}
     return {
       legalTerms: '', footerNote: '', importantNote: '',
-      cuStima: 'Cu stima', confirmareLbl: 'CONFIRMARE TRANSPORTATOR',
+      cuStima: 'Cu stima',
+      beneficiarLbl: 'BENEFICIAR (Emitent comanda)',
+      confirmareLbl: 'CONFIRMARE TRANSPORTATOR',
       semnaturaLbl: 'Semnatura si stampila',
       sectHead: { incarcare: 'INCARCARE', descarcare: 'DESCARCARE', detalii: 'DETALII TRANSPORT:' }
     };
@@ -263,11 +265,15 @@ window.CompanySettings = (function () {
           d.importantNote, tpl.importantNote,
           2) +
 
-        // Aláíró blokk
-        '<div class="grid-3" style="gap:14px;">' +
-          inp('csOaCuStima', tt('comset.oa.cuStima', '„Cu stima" (üdvözlő)'), d.cuStima, tpl.cuStima) +
-          inp('csOaConfirmareLbl', tt('comset.oa.confirmareLbl', 'Konfirmáció-cím'), d.confirmareLbl, tpl.confirmareLbl) +
-          inp('csOaSemnaturaLbl', tt('comset.oa.semnaturaLbl', 'Aláírás/pecsét-cím'), d.semnaturaLbl, tpl.semnaturaLbl) +
+        // Aláíró blokk — magyarázat: BAL = beneficiar (mi), JOBB = transportator (carrier)
+        '<div style="font-size:12px;color:var(--muted);margin:4px 0 6px;">' + esc(tt('comset.oa.signHint', 'A záró oldalon KÉT oszlop lesz: bal = BENEFICIAR (mi cégünk, saját pecséttel), jobb = CONFIRMARE TRANSPORTATOR (üres hely az alvállalkozó aláírásának/pecsétjének).')) + '</div>' +
+        '<div class="grid-2" style="gap:14px;">' +
+          inp('csOaBeneficiarLbl', tt('comset.oa.beneficiarLbl', 'BAL oszlop címe (Beneficiar — mi)'), d.beneficiarLbl, tpl.beneficiarLbl) +
+          inp('csOaConfirmareLbl', tt('comset.oa.confirmareLbl', 'JOBB oszlop címe (Confirmare Transportator — az alvállalkozó)'), d.confirmareLbl, tpl.confirmareLbl) +
+        '</div>' +
+        '<div class="grid-2" style="gap:14px;">' +
+          inp('csOaCuStima', tt('comset.oa.cuStima', '„Cu stima" (a mi üdvözlőnk a bal oszlopban)'), d.cuStima, tpl.cuStima) +
+          inp('csOaSemnaturaLbl', tt('comset.oa.semnaturaLbl', 'Aláírás/pecsét-cím (mindkét oszlopban)'), d.semnaturaLbl, tpl.semnaturaLbl) +
         '</div>' +
 
         (canEdit
@@ -290,6 +296,7 @@ window.CompanySettings = (function () {
       footerNote: nn(q('#csOaFooterNote')),
       importantNote: nn(q('#csOaImportantNote')),
       cuStima: nn(q('#csOaCuStima')),
+      beneficiarLbl: nn(q('#csOaBeneficiarLbl')),
       confirmareLbl: nn(q('#csOaConfirmareLbl')),
       semnaturaLbl: nn(q('#csOaSemnaturaLbl')),
       sectHead: {

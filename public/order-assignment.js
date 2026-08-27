@@ -658,6 +658,7 @@
     footerNote: 'Contravaloarea facturii se va achita numai daca impreuna cu documentele de transport se trimite si comanda confirmata in original (toate paginile stampilate) si bon de palet daca este cazul.',
     importantNote: 'IMPORTANT! Confirmarea trebuie trimisa pe fax sau e-mail inainte de incarcare.',
     cuStima: 'Cu stima',
+    beneficiarLbl: 'BENEFICIAR (Emitent comanda)',
     confirmareLbl: 'CONFIRMARE TRANSPORTATOR',
     semnaturaLbl: 'Semnatura si stampila',
     sectHead: { incarcare: 'INCARCARE', descarcare: 'DESCARCARE', detalii: 'DETALII TRANSPORT:' }
@@ -675,6 +676,7 @@
       footerNote:    (t.footerNote    && String(t.footerNote).trim())    || d.footerNote,
       importantNote: (t.importantNote && String(t.importantNote).trim()) || d.importantNote,
       cuStima:       (t.cuStima       && String(t.cuStima).trim())       || d.cuStima,
+      beneficiarLbl: (t.beneficiarLbl && String(t.beneficiarLbl).trim()) || d.beneficiarLbl,
       confirmareLbl: (t.confirmareLbl && String(t.confirmareLbl).trim()) || d.confirmareLbl,
       semnaturaLbl:  (t.semnaturaLbl  && String(t.semnaturaLbl).trim())  || d.semnaturaLbl,
       sectHead: {
@@ -1020,35 +1022,89 @@
     y -= 4;
     drawWrappedFlow('Termen de plata: '+(p.payment_term_days!=null?p.payment_term_days:30)+' zile calendaristice de la data primirii documentelor de transport in original.', M, 10, CONTENT_W);
 
-    // ── ZÁRÓ ALÁÍRÓ BLOKK + PECSÉT — új oldalon.
+    // ── ZÁRÓ ALÁÍRÓ BLOKK — új oldalon.
+    // KÉT egyenlő oszlop:
+    //   BAL  = BENEFICIAR (mi, Vallor) — cégadat + „Cu stima" + a MI pecsétünk
+    //   JOBB = TRANSPORTATOR (az alvállalkozó) — cégadata + ÜRES aláíró hely
+    // (A régi verzió hibás volt: „CONFIRMARE TRANSPORTATOR" cím alá a
+    //  MI cégadatunk került, és a carrier-nek nem maradt hely aláírni.)
     page = addPage(); y = TOP_Y; drawHeader(); y = PAGE_H - M - 44;
     drawWrappedFlow(TPL.footerNote, M, 9, CONTENT_W);
-    y -= 20;
-    // Cu stima jobbra + két címke (2 oszlop, mindegyik CONTENT_W/2)
+    y -= 16;
+
     var half = CONTENT_W / 2;
-    ensureSpace(60);
-    // Cu stima
-    var cuLines = wrapLines(TPL.cuStima, 12, half - 8, oblique);
-    var startY = y - 12;
-    cuLines.forEach(function(ln, i){
-      page.drawText(ascii(ln), { x:M + half + 4, y: startY - i*14, size:12, font:oblique, color:PDFLib.rgb(0,0,0) });
+    var colGap = 12;
+    var colW = (CONTENT_W - colGap) / 2;
+    var leftX = M;
+    var rightX = M + colW + colGap;
+
+    // Két oszlop-fejléc egy sorban (BENEFICIAR | CONFIRMARE TRANSPORTATOR).
+    ensureSpace(28);
+    var benLines = wrapLines(TPL.beneficiarLbl, 10, colW, bold);
+    var confLines = wrapLines(TPL.confirmareLbl, 10, colW, bold);
+    var headRows = Math.max(benLines.length, confLines.length);
+    benLines.forEach(function(ln, i){ page.drawText(ascii(ln), { x:leftX,  y:y - 10 - i*12, size:10, font:bold, color:PDFLib.rgb(0,0,0) }); });
+    confLines.forEach(function(ln, i){ page.drawText(ascii(ln), { x:rightX, y:y - 10 - i*12, size:10, font:bold, color:PDFLib.rgb(0,0,0) }); });
+    y -= 10 + headRows*12 + 6;
+
+    // Alá vékony aláhúzás mindkét oszlop alá (vizuális elkülönítés)
+    page.drawLine({ start:{x:leftX, y:y}, end:{x:leftX+colW, y:y}, thickness:0.6, color:PDFLib.rgb(0.55,0.55,0.55) });
+    page.drawLine({ start:{x:rightX, y:y}, end:{x:rightX+colW, y:y}, thickness:0.6, color:PDFLib.rgb(0.55,0.55,0.55) });
+    y -= 6;
+
+    // Két oszlopnyi cégadat — közös helper (nem folyik át a másik oszlopba).
+    function drawColLines(text, x, size, isBold){
+      var f = isBold ? bold : font;
+      var lines = wrapLines(text || '', size, colW - 2, f);
+      return lines.map(function(ln){ return { text: ln, font: f, size: size }; });
+    }
+    // BAL — BENEFICIAR (mi)
+    var leftBlocks = []
+      .concat(drawColLines(co.nev || '', 10, true))
+      .concat(drawColLines('Ügyvezető: ' + (co.igazgato_nev || '—'), 9, false))
+      .concat(drawColLines('Adresa: ' + (co.adresa || '—'), 9, false))
+      .concat(drawColLines('CUI: ' + (co.cui || '—') + (co.reg_com ? '  ·  Reg.Com.: ' + co.reg_com : ''), 9, false))
+      .concat(drawColLines('Tel: ' + (co.telefon || '—'), 9, false))
+      .concat(drawColLines('Email: ' + (co.email_contact || '—'), 9, false));
+    // JOBB — TRANSPORTATOR (az alvállalkozó)
+    var rightBlocks = []
+      .concat(drawColLines(c.nev || '—', 10, true))
+      .concat(drawColLines('Adresa: ' + (c.adresa || '—'), 9, false))
+      .concat(drawColLines('CUI: ' + (c.cui || '—') + (c.reg_com ? '  ·  Reg.Com.: ' + c.reg_com : ''), 9, false))
+      .concat(drawColLines('Tel: ' + (c.telefon || '—'), 9, false))
+      .concat(drawColLines('Email: ' + (c.email || '—'), 9, false));
+
+    // Rajzoljuk a két oszlopot egymás mellé.
+    var maxRows = Math.max(leftBlocks.length, rightBlocks.length);
+    ensureSpace(maxRows * 12 + 10);
+    var blockStartY = y;
+    for (var bi = 0; bi < maxRows; bi++){
+      if (leftBlocks[bi])  page.drawText(ascii(leftBlocks[bi].text),  { x:leftX,  y:blockStartY - 10 - bi*12, size:leftBlocks[bi].size,  font:leftBlocks[bi].font,  color:PDFLib.rgb(0,0,0) });
+      if (rightBlocks[bi]) page.drawText(ascii(rightBlocks[bi].text), { x:rightX, y:blockStartY - 10 - bi*12, size:rightBlocks[bi].size, font:rightBlocks[bi].font, color:PDFLib.rgb(0,0,0) });
+    }
+    y = blockStartY - 10 - maxRows*12 - 6;
+
+    // „Cu stima" — a bal oszlopban (a beneficiar-tól jön).
+    ensureSpace(20);
+    var cuLines = wrapLines(TPL.cuStima, 11, colW, oblique);
+    cuLines.forEach(function(ln, i){ page.drawText(ascii(ln), { x:leftX, y:y - 10 - i*14, size:11, font:oblique, color:PDFLib.rgb(0,0,0) }); });
+    y -= 10 + cuLines.length*14 + 6;
+
+    // „Semnatura si stampila" mindkét oszlop alján.
+    ensureSpace(18);
+    var semnLines = wrapLines(TPL.semnaturaLbl, 9, colW, bold);
+    var semnRows = semnLines.length;
+    semnLines.forEach(function(ln, i){
+      page.drawText(ascii(ln), { x:leftX,  y:y - 10 - i*11, size:9, font:bold, color:PDFLib.rgb(0,0,0) });
+      page.drawText(ascii(ln), { x:rightX, y:y - 10 - i*11, size:9, font:bold, color:PDFLib.rgb(0,0,0) });
     });
-    y = startY - cuLines.length*14 - 6;
+    y -= 10 + semnRows*11 + 4;
 
-    ensureSpace(30);
-    var confLines = wrapLines(TPL.confirmareLbl, 10, half - 8, bold);
-    var semnLines = wrapLines(TPL.semnaturaLbl, 10, half - 8, bold);
-    var maxLbl = Math.max(confLines.length, semnLines.length);
-    confLines.forEach(function(ln, i){ page.drawText(ascii(ln), { x:M, y:y - 10 - i*12, size:10, font:bold, color:PDFLib.rgb(0,0,0) }); });
-    semnLines.forEach(function(ln, i){ page.drawText(ascii(ln), { x:M + half + 4, y:y - 10 - i*12, size:10, font:bold, color:PDFLib.rgb(0,0,0) }); });
-    y -= 10 + maxLbl*12 + 4;
-
-    // Aláíró (a mi cégünk): tördelten a bal félbe.
-    drawWrappedFlow(co.igazgato_nev || '', M, 10, half - 4, bold);
-    drawWrappedFlow('Nr. Tel: ' + (co.telefon || ''), M, 9, half - 4);
-    drawWrappedFlow('Email: ' + (co.email_contact || ''), M, 9, half - 4);
-
-    // Pecsét (jobb félbe, a Semnatura alá — a mai y-ból mérve visszalépünk).
+    // A BAL oszlopba a MI pecsétünk (ha van). A JOBB oszlop ÜRESEN
+    // marad — oda kerül majd az alvállalkozó aláírása/pecsétje.
+    var stampBottomLeftY = y;    // hova ér le a bal pecsét alja
+    var STAMP_BOX_H = 110;       // reservált hely mindkét oszlop alá
+    ensureSpace(STAMP_BOX_H + 8);
     try {
       if (co.has_stamp) {
         var s = await fetch('/api/branding/stamp', { credentials:'same-origin' }).then(function(r){ return r.json(); });
@@ -1056,18 +1112,34 @@
           var isPng2 = /^data:image\/png/.test(s.dataUri);
           var sb = await fetch(s.dataUri).then(function(x){ return x.arrayBuffer(); });
           var simg = isPng2 ? await pdfDoc.embedPng(sb) : await pdfDoc.embedJpg(sb);
-          var scale2 = 110 / Math.max(simg.width, simg.height);
+          var scale2 = 100 / Math.max(simg.width, simg.height);
           var sw = simg.width * scale2, sh = simg.height * scale2;
-          // A pecsétet a jobb félben helyezzük, a Semnatura si stampila alatt.
-          var sx = M + half + 4 + (half - 4 - sw) / 2;
-          var sy = y - sh - 8;
-          if (sy < BOTTOM_Y + 12) { page = addPage(); y = TOP_Y; drawHeader(); y = PAGE_H - M - 44; sy = y - sh - 8; }
+          var sx = leftX + (colW - sw) / 2;
+          var sy = y - sh - 6;
           page.drawImage(simg, { x: sx, y: sy, width: sw, height: sh, opacity: 0.9 });
+          stampBottomLeftY = sy;
         }
       }
     } catch(e){ console.warn('stamp embed failed', e); }
 
-    y -= 40;
+    // A JOBB oszlopba egy „aláíró terület" keret — legyen látható helye
+    // a carrier-nek az aláírásra/pecsétjükre.
+    var boxTop = y - 4;
+    var boxH = STAMP_BOX_H;
+    var boxBottom = boxTop - boxH;
+    page.drawRectangle({
+      x: rightX, y: boxBottom, width: colW, height: boxH,
+      borderColor: PDFLib.rgb(0.75,0.75,0.75), borderWidth: 0.6,
+      borderDashArray: [3, 3]
+    });
+    // Halvány jelzés a keret alján, hogy hova kell aláírni.
+    page.drawText(ascii('(spatiu pentru semnatura si stampila transportatorului)'),
+      { x: rightX + 6, y: boxBottom + 6, size:7, font:oblique, color:PDFLib.rgb(0.55,0.55,0.55) });
+
+    // A y-t levisszük annyira, hogy az IMPORTANT-jegyzet a keret ALÁ kerüljön.
+    y = Math.min(stampBottomLeftY, boxBottom) - 14;
+
+    ensureSpace(30);
     drawWrappedFlow(TPL.importantNote, M, 10, CONTENT_W, oblique);
 
     // ── LÁB — page-num minden oldalra ("Pagina: N/M")

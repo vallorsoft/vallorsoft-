@@ -195,7 +195,7 @@ handlers.saveCompanySettings = async function (req, res, args) {
 // Fehérlistázott mezők: minden text-mező, `sectHead` almező.
 // A NULL/hiányzó mező a kliens-oldali `DEFAULT_TEMPLATE`-re esik vissza —
 // egyetlen mező is átírható, a többi marad default.
-const OA_TEXT_FIELDS = ['legalTerms', 'footerNote', 'importantNote', 'cuStima', 'confirmareLbl', 'semnaturaLbl'];
+const OA_TEXT_FIELDS = ['legalTerms', 'footerNote', 'importantNote', 'cuStima', 'beneficiarLbl', 'confirmareLbl', 'semnaturaLbl'];
 const OA_SECT_HEAD_FIELDS = ['incarcare', 'descarcare', 'detalii'];
 const OA_MAX_TEXT = 20000;      // egyetlen mezőre (legalTerms is belefér)
 const OA_MAX_SHORT = 400;       // rövid label-ek

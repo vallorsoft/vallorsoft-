@@ -14,6 +14,23 @@
 
 ---
 
+## 2026-08-27 — FIX: Comanda de Transport aláíró blokk — BENEFICIAR (mi) balra, TRANSPORTATOR (alvállalkozó) jobbra + üres aláíró keret az alvállalkozónak
+
+**Gyökér:** a záró oldalon a bal oszlop „CONFIRMARE TRANSPORTATOR" cím ALATT a MI cégünk (Vallor) neve/telefonja/e-mailje jelent meg, plusz a MI pecsétünk — mintha mi lennénk a Transportator. A jobb oldalon csak a „Semnatura si stampila" felirat maradt, üres — az alvállalkozónak (a valódi Transportatornak) semennyi hely nem maradt aláírni/pecsételni.
+
+**Fix (`public/order-assignment.js` `_generatePdfBytes` záró aláíró blokk):** teljes újraírás. Két EGYENLŐ oszlop, minden cím a helyén:
+- **BAL = BENEFICIAR (mi, Vallor):** új `beneficiarLbl` fejléc (default: „BENEFICIAR (Emitent comanda)") + a mi cégnevünk / ügyvezető / cím / CUI+Reg.Com. / tel / email + „Cu stima" alá + a **mi pecsétünk** középre (ha van feltöltve).
+- **JOBB = TRANSPORTATOR (az alvállalkozó):** „CONFIRMARE TRANSPORTATOR" fejléc + a **carrier** cégneve / cím / CUI+Reg.Com. / tel / email + „Semnatura si stampila" felirat + szaggatott keretes **üres aláíró terület** (kb. 110 pt magas) halvány „(spatiu pentru semnatura si stampila transportatorului)" magyarázattal.
+- Mindkét oszlop alatt aláhúzás a fejléc és a cégadat között.
+
+**Új sablon-mező** `beneficiarLbl` (default „BENEFICIAR (Emitent comanda)") — felvéve az `OA_TEXT_FIELDS` fehérlistába a szerveren; a `_resolveTemplate()` a defaultra esik vissza, ha nincs átírva.
+
+**Beállítások UI** (`public/company-settings.js`): magyarázat sáv „a záró oldalon KÉT oszlop lesz: bal = BENEFICIAR (mi), jobb = TRANSPORTATOR (alvállalkozó, üres aláíró hely)". Új mező: **BAL oszlop címe (Beneficiar — mi)**. A **JOBB oszlop címe** átcímkézve „(Confirmare Transportator — az alvállalkozó)". A régi 3-oszlopos elrendezés 2×2-re állt.
+
+**i18n** 5 új/frissített kulcs (`comset.oa.beneficiarLbl`, `signHint` + `cuStima`/`confirmareLbl`/`semnaturaLbl` pontosított magyarázatokkal, RO+HU). Cache-bust `?v=20260827sigfix`. **1004 Jest zöld** (a `beneficiarLbl` fehérlista-teszttel bővítve), nincs regresszió.
+
+---
+
 ## 2026-08-27 — Comanda de Transport PDF: 1 cm margó minden oldalon + auto oldal-törés + a jogi szöveg cégenként szerkeszthető (Beállítások)
 
 **Kérés:** „ilyen megrendelot keszit legyen a lapnak jobb bal felso es also 1cm margolya essemmi ne logjon kitorje a sorokat ha nm fer el plusz a megrendelő teljes szöveget lehessen modositani a jelenlegi legyen az alapertelmezett a modositast bealitasokba lehessen".
