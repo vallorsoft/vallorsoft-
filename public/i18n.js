@@ -1337,6 +1337,17 @@
     'comset.stampHint':   { hu: 'PNG átlátszó háttérrel ajánlott. A Comanda de Transport záró blokkjában és jövőbeli PDF-eken jelenik meg.', ro: 'Recomandat PNG cu fundal transparent. Apare în blocul de confirmare al Comenzii de Transport și pe alte PDF-uri viitoare.' },
     'comset.stampSaved':  { hu: 'Pecsét mentve', ro: 'Ștampilă salvată' },
     'comset.stampDeleted':{ hu: 'Pecsét törölve', ro: 'Ștampilă ștearsă' },
+    // ── Fuvar-szerkesztő: egységes állomás-lista (interleaved)
+    'oe.stopsTitle': { hu: '📍 Állomások (fel-/lerakási pontok)', ro: '📍 Puncte de oprire (încărcare/descărcare)' },
+    'oe.stopsHint':  {
+      hu: 'A sorrend a bevitel sorrendjét tükrözi — a sofőr ebben járja végig. ⬆⬇ gombokkal átrendezhető, a típus (fel/le) a nyitott kártyán váltható.',
+      ro: 'Ordinea urmează secvența de introducere — șoferul o parcurge exact așa. Rearanjabile cu ⬆⬇, tipul (încărcare/descărcare) comutabil pe cardul deschis.'
+    },
+    'oe.stopsEmpty': { hu: 'Még nincs állomás. Adj hozzá felrakót ⬆️ vagy lerakót ⬇️.', ro: 'Încă niciun punct. Adaugă încărcare ⬆️ sau descărcare ⬇️.' },
+    'oe.stopLoc': { hu: 'Helyszín', ro: 'Locație' },
+    'oe.stopFirma': { hu: 'Cég', ro: 'Firmă' },
+    'oe.stopDate': { hu: 'Dátum', ro: 'Dată' },
+    'oe.stopDeleteConfirm': { hu: 'Törlöd ezt az állomást?', ro: 'Ștergi acest punct de oprire?' },
     // 🚚 Sofőr-állomás időbélyeg szerkesztő (fuvar-szerkesztő modalban)
     'oe.milestonesHead': { hu: '🚚 Sofőr-állomás időpontok', ro: '🚚 Marcaje șofer (arrive/done)' },
     'oe.milestonesHint': {

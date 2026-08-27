@@ -6,8 +6,8 @@
   <title data-i18n="title.manager">vallorSoft - Manager Console</title>
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="/style.css?v=20260827acfix">
-  <script src="/i18n.js?v=20260827acfix"></script>
+  <link rel="stylesheet" href="/style.css?v=20260827oestop">
+  <script src="/i18n.js?v=20260827oestop"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1161,12 +1161,12 @@
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
       <div class="field"><label data-i18n="edit.client">Ügyfél</label><input class="input" id="oeClient" name="vsoe_client" data-sg="client" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"></div>
       <div class="field"><label data-i18n="form.ref">Referencia</label><input class="input" id="oeRef" data-sg="ref" autocomplete="off"></div>
-      <div class="field"><label data-i18n="edit.loadLoc">Rakodás helye</label><div class="vs-ac-wrap"><input class="input" id="oeLocInc" name="vsoe_locinc" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"><div class="vs-ac-dd" id="oeLocIncDD"></div></div></div>
-      <div class="field"><label data-i18n="form.loadFirma">Felrakási cég</label><input class="input" id="oeFirmaInc" name="vsoe_firmainc" placeholder="opcionális" data-i18n-ph="form.firmaPh" data-sg="firma_incarcare" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"></div>
-      <div class="field"><label data-i18n="form.unloadLoc">Lerakás helye</label><div class="vs-ac-wrap"><input class="input" id="oeLocDesc" name="vsoe_locdesc" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"><div class="vs-ac-dd" id="oeLocDescDD"></div></div></div>
-      <div class="field"><label data-i18n="form.unloadFirma">Lerakási cég</label><input class="input" id="oeFirmaDesc" name="vsoe_firmadesc" placeholder="opcionális" data-i18n-ph="form.firmaPh" data-sg="firma_descarcare" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other"></div>
-      <div class="field"><label data-i18n="edit.loadDate">Rakodás dátuma</label><input class="input" id="oeDataInc" type="date"></div>
-      <div class="field"><label data-i18n="edit.unloadDate">Lerakás dátuma</label><input class="input" id="oeDataDesc" type="date"></div>
+      <!-- Legacy top-mezők: rejtve, a Section „Állomások" kártya-listája
+           az igazságforrás; ezeket a `_oeSyncLegacy` írja az első pickup /
+           utolsó delivery értékéből (backward compat: oeAddLeg + _rmBuildWps + kliens-oldali route-recalc olvassa). -->
+      <input type="hidden" id="oeLocInc"><input type="hidden" id="oeFirmaInc">
+      <input type="hidden" id="oeLocDesc"><input type="hidden" id="oeFirmaDesc">
+      <input type="hidden" id="oeDataInc"><input type="hidden" id="oeDataDesc">
       <div class="field"><label data-i18n="edit.price">Ár (EUR)</label><input class="input" id="oePret" type="number"></div>
       <div class="field"><label data-i18n="edit.km">Km</label><div class="vs-km-row"><input class="input" id="oeKm" type="number"><button type="button" class="btn ghost vs-map-btn" id="oeMapBtn" title="Útvonal-előnézet térképen" data-i18n-title="o.mapPreviewTitle" style="display:none;">🗺️</button></div></div>
       <div class="field"><label data-i18n="edit.weight">Súly (kg)</label><input class="input" id="oeSuly" type="number" min="0"></div>
@@ -1262,16 +1262,23 @@
       <div id="oeLegsList" style="display:flex;flex-direction:column;gap:8px;"></div>
     </div>
 
-    <!-- Multi-drop: további felrakó / lerakó pontok a szerkesztőben -->
-    <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:14px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:12px;flex-wrap:wrap;">
-        <div style="font-weight:700;color:#fff;" data-i18n="form.extraStopsHead">TÖBB FELRAKÁSI / LERAKÁSI PONT (opcionális)</div>
-        <div style="display:flex;gap:8px;">
-          <button type="button" class="btn ghost" onclick="addExtraStopRow('pickup','oeExtraStopsList')" data-i18n="form.addPickup">➕ Felrakó</button>
-          <button type="button" class="btn ghost" onclick="addExtraStopRow('delivery','oeExtraStopsList')" data-i18n="form.addDelivery">➕ Lerakó</button>
+    <!-- ÁLLOMÁSOK — EGYETLEN interleaved lista (fel-/lerakási pontok
+         a BEVITEL sorrendjében). Az `_OES.list` az igazságforrás; a Mentés
+         a stops[] payloadot ebből építi (a szerver `seq_index` szerint őrzi
+         → a sofőr felülete is így látja). A top-mezők (oeLocInc/Desc)
+         auto-szinkronizált hidden inputok. -->
+    <div class="oe-sec" id="oeStopsSection">
+      <div class="oe-sec-head">
+        <div class="oe-sec-title"><span class="oe-sec-num">2</span> <span data-i18n="oe.stopsTitle">📍 Állomások</span></div>
+        <div class="oe-sec-actions">
+          <button type="button" class="btn primary" style="padding:8px 14px;" onclick="oeStopAdd('pickup')"><span data-i18n="oc.addPickup">⬆️ Felrakó</span></button>
+          <button type="button" class="btn primary" style="padding:8px 14px;" onclick="oeStopAdd('delivery')"><span data-i18n="oc.addDelivery">⬇️ Lerakó</span></button>
         </div>
       </div>
-      <div id="oeExtraStopsList" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <div id="oeStopsList" class="oe-stops"></div>
+      <div class="oe-stops-hint" data-i18n="oe.stopsHint">A sorrend számít — a sofőr ebben a rendben járja végig. ⬆️⬇️ gombokkal átrendezhető, a típus (fel/le) a nyitott kártyán váltható.</div>
+      <!-- Régi extras lista rejtve — pár helyen még DOM-alapon olvassa a kód -->
+      <div id="oeExtraStopsList" style="display:none;"></div>
     </div>
 
     <!-- 🚚 Sofőr-állomás időbélyegek — utólagos javítás. Régi menetlevél-
@@ -1407,7 +1414,7 @@
 <script src="/email-intake-card.js?v=20260616warm2"></script>
 <script src="/feature-catalog.js?v=20260618cgps2"></script>
 <script>window.__pwaInstallDefault=false;</script>
-<script src="/console-shared.js?v=20260827acfix"></script>
+<script src="/console-shared.js?v=20260827oestop"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 <script src="/console-pages.js?v=20260617b1"></script>
 <!-- ===== INTEGRACIOK (Manager: Ugyfelek + "Hol a kocsi?"; szamlazo/beallitas Admin-only) ===== -->
@@ -1421,7 +1428,7 @@
 <script src="/uit-panel.js?v=20260820uit3"></script>
 <script src="/ecmr.js?v=20260616ecmr"></script>
 <script src="/quotes.js?v=20260617c5"></script>
-<script src="/fav-locations.js?v=20260827acfix"></script>
+<script src="/fav-locations.js?v=20260827oestop"></script>
 <script src="/company-settings.js?v=20260827stamp"></script>
 <script src="/pdf-gallery.js?v=20260617tpl2"></script>
 <script src="/pdf-settings.js?v=20260617tpl"></script>
