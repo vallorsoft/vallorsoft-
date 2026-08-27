@@ -263,6 +263,9 @@ function closeModal(){document.getElementById('userModal').classList.remove('ope
 
 function closeOrderEditModal() {
   document.getElementById('orderEditModal').classList.remove('open');
+  // Az egységes állomás-lista állapotát is takarítjuk — a következő megnyitás
+  // tiszta lappal indul (openOrderEdit → _oeInitStopsFromOrder újratölti).
+  try { window._OES = { list: [], openIdx: 0, _uid: 0 }; window.__oeStopsSeq = null; } catch (e) {}
 }
 
 function closeQuickVehicle() {
@@ -414,9 +417,12 @@ function _rmBuildWps(which){
   var unload=((unloadEl||{}).value||'').trim();
   if(!load||!unload) return null;
 
-  // 1) Wizard: `__ocStopsSeq` a bevitel sorrendjében — közvetlen igazságforrás.
-  if (which === 'create' && Array.isArray(window.__ocStopsSeq) && window.__ocStopsSeq.length >= 2) {
-    var wSeq = window.__ocStopsSeq
+  // 1) Wizard (create) VAGY edit: az interleaved seq közvetlen igazságforrás
+  //    (`__ocStopsSeq` a wizard step 2-ből, `__oeStopsSeq` az edit modal
+  //    egységes állomás-listájából). Ez őrzi a bevitel sorrendjét.
+  var seqSrc = (which === 'create') ? window.__ocStopsSeq : window.__oeStopsSeq;
+  if (Array.isArray(seqSrc) && seqSrc.length >= 2) {
+    var wSeq = seqSrc
       .filter(function(s){ return s && String(s.loc||'').trim(); })
       .map(function(s){
         var wp = { type: (s.kind === 'pickup' ? 'loading' : 'unloading'), address: String(s.loc||'').trim() };
@@ -426,7 +432,7 @@ function _rmBuildWps(which){
     if (wSeq.length >= 2) return wSeq;
   }
 
-  // 2) DOM extras (create + edit): top felrakó → extras (DOM-sorrend) → top lerakó.
+  // 2) DOM extras (create fallback): top felrakó → extras (DOM-sorrend) → top lerakó.
   var extraListId = (which === 'edit') ? 'oeExtraStopsList' : 'oExtraStopsList';
   var extraList = document.getElementById(extraListId);
   var extraRows = extraList ? extraList.querySelectorAll('.oe-extra-row') : [];
@@ -5092,10 +5098,15 @@ function openOrderEdit(id) {
       var o = d.result;
       var legs = d.legs || [];
       var stops = d.stops || [];
-      // A többi lerakási / felrakási pont a szerkesztő „Extra pontok" blokkjába
       if (o) { o.stops = stops; }
-      if (typeof populateExtraStopsFromOrder === 'function') populateExtraStopsFromOrder({ stops: stops }, 'oeExtraStopsList');
       if (!o) { toast(t('common.notFound'),'err'); return; }
+      // ÚJ: egységes állomás-kártyák (interleaved, EGYETLEN igazságforrás).
+      // MINDEN stop bekerül (nincs top/extras szétvágás → a bevitel sorrendje
+      // pontosan megőrzött, a régi „mixup" bug megszűnik).
+      if (typeof _oeInitStopsFromOrder === 'function') _oeInitStopsFromOrder(o, stops);
+      // Régi extras lista ürítése (rejtett, de takarítunk — nehogy egy elavult
+      // sor a _rmBuildWps DOM-ágába kerüljön).
+      var _oeEx = document.getElementById('oeExtraStopsList'); if (_oeEx) _oeEx.innerHTML = '';
 
       document.getElementById('oeClient').value = o.client||'';
       document.getElementById('oeRef').value = o.ref||'';
@@ -5452,19 +5463,26 @@ function saveOrderEdit() {
       if (!(d instanceof Date) || isNaN(d.getTime())) return;
       payload[parts[1]] = d.toISOString();
     });
-  // Több felrakó / lerakó pont (multi-drop) — az INTERLEAVED sorrend megőrizve.
-  // A top-mezőkbe a bevitel sorrendjében ELSŐ pickup / delivery kerül, a többi
-  // az „Extra pontok" blokkból DOM-sorrendben. A szerver a `stops[]` ordered
-  // tömböt a `seq_index`-be írja (lib/orderStops.js `normalizeStops`).
-  var _extra = (typeof _collectExtraStops === 'function') ? _collectExtraStops('oeExtraStopsList') : [];
-  var _seq = [];
-  var _pkTop = { kind: 'pickup', loc: payload.loc_incarcare, firma: payload.firma_incarcare || null, data: payload.data_incarcare };
-  var _deTop = { kind: 'delivery', loc: payload.loc_descarcare, firma: payload.firma_descarcare || null, data: payload.data_descarcare };
-  if (_pkTop.loc || _pkTop.firma || _pkTop.data) _seq.push(_pkTop);
-  if (_deTop.loc || _deTop.firma || _deTop.data) _seq.push(_deTop);
-  _extra.forEach(function (s) { _seq.push({ kind: s.kind, loc: s.loc, firma: s.firma, data: s.data }); });
-  // CSAK akkor küldjük a stops-mezőt, ha van értelmes tartalom.
-  if (_seq.length) payload.stops = _seq;
+  // ÚJ: az `_OES.list` egyetlen igazságforrás — a bevitel sorrendjét (interleaved)
+  // pontosan tükrözi a payload `stops[]`-je. A szerver `seq_index`-be írja
+  // (lib/orderStops.js `normalizeStops`), és a sofőr is ebben látja.
+  // A régi „top felrakó + top lerakó + extras" modell megszűnt — az volt a
+  // sorrend-mixup gyökére (a save mindig top-elöl rakta a felrakót + delivery-t,
+  // a maradékot utána, feldarabolva az eredeti interleaved sorrendet).
+  var _seq = (typeof _oeCollectStops === 'function') ? _oeCollectStops() : [];
+  if (_seq.length) {
+    payload.stops = _seq;
+    // A top-mezőket a szerver-oldali `syncSingleStopFromTopFields` viszont
+    // felülírná a stops-alapú tükröt — hogy a mirror-trigger kizárólagosan
+    // dolgozzon, a top-mezőket EGYÁLTALÁN ne küldjük (undefined = NEM írja
+    // a `comUpdate`; a mirror-trigger a stops[]-ből tükrözi ezeket).
+    delete payload.loc_incarcare;
+    delete payload.loc_descarcare;
+    delete payload.firma_incarcare;
+    delete payload.firma_descarcare;
+    delete payload.data_incarcare;
+    delete payload.data_descarcare;
+  }
   // A már létező fuvart nem blokkoljuk: a típus üresen maradhat.
   // Csak ha LTL-re állítják, akkor kötelezők a méretek.
   if(payload.load_type==='LTL' && (!payload.hossz_cm||!payload.szel_cm||!payload.mag_cm)){toast(t('cs.ltlDimsReq'),'err');return;}
@@ -6173,4 +6191,279 @@ function populateExtraStopsFromOrder(order, listId) {
     if (s.kind === 'delivery' && (s.stop_index || 0) === maxDeIdx) return;
     addExtraStopRow(s.kind, listId, s);
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  Fuvar-szerkesztő állomás-kártyák (interleaved, EGYETLEN igazságforrás)
+//  ────────────────────────────────────────────────────────────────────────
+//  Bevezetve: 2026-08-27 — a régi „top felrakó + top lerakó + extras" modell
+//  a bevitel sorrendjét ELVESZTETTE (a save mindig top-elöl rakta a felrakót
+//  + a delivery-t, a maradékot utána). Az új modell egy kártya-lista (`_OES.list`)
+//  minden stopot a bevitel sorrendjében őriz. A save ebből építi a `stops[]`
+//  payloadot; a legacy top-mezők (oeLocInc/Desc/Data/Firma) hidden inputként
+//  auto-szinkronizálva vannak az első pickup / utolsó delivery értékére
+//  (visszafelé kompat: oeAddLeg + _rmBuildWps + kliens-oldali route-recalc).
+// ═══════════════════════════════════════════════════════════════════════════
+window._OES = window._OES || { list: [], openIdx: 0, _uid: 0 };
+
+// Segéd: egy stop-kártya HTML-je (nyitott vagy csukott, seq-jelöléssel).
+function _oeRenderStops() {
+  var list = document.getElementById('oeStopsList');
+  if (!list) return;
+  var stops = _OES.list;
+  if (!stops.length) {
+    list.innerHTML = '<div class="oe-stops-empty" data-i18n="oe.stopsEmpty">Még nincs állomás. Adj hozzá felrakót ⬆️ vagy lerakót ⬇️.</div>';
+    // Sync legacy: minden top-mező üresre
+    _oeSyncLegacyFromList();
+    if (window.I18N && typeof I18N.apply === 'function') { try { I18N.apply(); } catch(e) {} }
+    return;
+  }
+  if (_OES.openIdx == null || _OES.openIdx >= stops.length) _OES.openIdx = stops.length - 1;
+
+  var puCount = 0, deCount = 0;
+  var puNum = [], deNum = [];
+  stops.forEach(function (s) {
+    if (s.kind === 'pickup') { puCount++; puNum.push(puCount); }
+    else { deCount++; deNum.push(deCount); }
+  });
+
+  var last = stops.length - 1;
+  list.innerHTML = stops.map(function (s, i) {
+    var open = (i === _OES.openIdx);
+    var isPu = (s.kind === 'pickup');
+    var kindLabel = isPu ? (t('oc.pickup') || 'Felrakó') : (t('oc.delivery') || 'Lerakó');
+    var kindIcon = isPu ? '⬆️' : '⬇️';
+    var numInKind = isPu ? puNum[i] : deNum[i];
+    var badgeHtml = '<span class="oe-badge ' + s.kind + '">' + kindIcon + ' ' + esc(kindLabel) + ' #' + numInKind + '</span>';
+    var sumLoc = esc(s.loc || (t('oc.stopEmpty') || '(üres)'));
+    var sumFirma = s.firma ? ' · <b>🏢</b> ' + esc(s.firma) : '';
+    var sumDate = s.data ? ' · <b>📅</b> ' + esc(s.data) : '';
+    var uid = 'oes_' + (s._uid || (s._uid = ++_OES._uid));
+    var locId = uid + '_loc', ddId = uid + '_dd', firmaId = uid + '_firma', dataId = uid + '_data';
+
+    var barHtml =
+      '<div class="oe-stop-bar" onclick="oeStopOpen(' + i + ')" role="button" tabindex="0"' +
+        ' onkeypress="if(event.key===\'Enter\'||event.key===\' \')oeStopOpen(' + i + ')">' +
+        '<span class="oe-stop-idx">#' + (i + 1) + '</span>' +
+        badgeHtml +
+        '<div class="oe-stop-sum"><span class="oe-sum-loc">📍 <b>' + sumLoc + '</b>' + sumFirma + sumDate + '</span></div>' +
+        '<div class="oe-ord" onclick="event.stopPropagation()">' +
+          '<button type="button" class="oe-ord-btn" ' + (i === 0 ? 'disabled' : '') +
+            ' onclick="oeStopMove(' + i + ',-1)" title="' + esc(t('oc.moveUp') || 'Feljebb') + '">⬆</button>' +
+          '<button type="button" class="oe-ord-btn" ' + (i === last ? 'disabled' : '') +
+            ' onclick="oeStopMove(' + i + ',1)" title="' + esc(t('oc.moveDown') || 'Lejjebb') + '">⬇</button>' +
+          '<button type="button" class="oe-ord-btn danger" onclick="oeStopRemove(' + i + ')" title="' + esc(t('common.delete') || 'Törlés') + '">✕</button>' +
+        '</div>' +
+      '</div>';
+
+    // Nyitott lap
+    var openHtml = '';
+    if (open) {
+      openHtml =
+        '<div class="oe-stop-open">' +
+          '<div class="oe-toggle" role="group">' +
+            '<button type="button" class="oe-toggle-btn ' + (isPu ? 'on' : '') + '" onclick="oeStopKind(' + i + ',\'pickup\')">⬆️ ' + esc(t('oc.pickup') || 'Felrakó') + '</button>' +
+            '<button type="button" class="oe-toggle-btn ' + (isPu ? '' : 'on') + '" onclick="oeStopKind(' + i + ',\'delivery\')">⬇️ ' + esc(t('oc.delivery') || 'Lerakó') + '</button>' +
+          '</div>' +
+          '<div class="oe-stop-grid">' +
+            '<div class="field">' +
+              '<label>📍 ' + esc(t('oe.stopLoc')) + '</label>' +
+              '<div class="vs-ac-wrap">' +
+                '<input class="input" id="' + locId + '" data-sg="loc" placeholder="' + esc(t('form.locPh')) + '" value="' + esc(s.loc || '') + '" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other">' +
+                '<div class="vs-ac-dd" id="' + ddId + '"></div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="field">' +
+              '<label>🏢 ' + esc(t('oe.stopFirma')) + '</label>' +
+              '<input class="input" id="' + firmaId + '" data-sg="firma" placeholder="' + esc(t('form.firmaPh')) + '" value="' + esc(s.firma || '') + '" autocomplete="new-password" data-lpignore="true" data-1p-ignore data-form-type="other">' +
+            '</div>' +
+            '<div class="field">' +
+              '<label>📅 ' + esc(t('oe.stopDate')) + '</label>' +
+              '<input class="input" id="' + dataId + '" type="date" value="' + esc((s.data || '').slice(0,10)) + '">' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    }
+    return '<div class="oe-stop-card ' + (open ? 'open' : '') + '" data-stop-idx="' + i + '">' + barHtml + openHtml + '</div>';
+  }).join('');
+
+  // Handlers a nyitott lap mezőire — a stop-listát élőben szinkronizáljuk
+  var openStop = _OES.list[_OES.openIdx];
+  if (openStop) {
+    var uid = 'oes_' + openStop._uid;
+    var locEl = document.getElementById(uid + '_loc');
+    var firmaEl = document.getElementById(uid + '_firma');
+    var dataEl = document.getElementById(uid + '_data');
+    var ddId = uid + '_dd';
+    if (locEl) {
+      locEl.addEventListener('input', function () {
+        openStop.loc = locEl.value;
+        openStop._lat = null; openStop._lng = null;
+        _oeSyncLegacyFromList();
+      });
+      // Photon autocomplete + ⭐ mentett helyek
+      try {
+        if (typeof vsAttachAutocomplete === 'function') {
+          vsAttachAutocomplete(uid + '_loc', ddId, function (loc) {
+            // A `vsAttachAutocomplete` mousedown-ja már beírja az input.value-t
+            // és `_vsLat`/`_vsLng`-t is beállítja; az `input` esemény triggert-el.
+            openStop.loc = loc && loc.value ? loc.value : locEl.value;
+            if (loc && loc.lat != null) { openStop._lat = Number(loc.lat); openStop._lng = Number(loc.lng); }
+            _oeSyncLegacyFromList();
+            _oeRenderStops(); // csukott sáv-összegzés is frissüljön
+          });
+        }
+      } catch (e) {}
+      try {
+        if (window.FavLocations && typeof FavLocations.attachPicker === 'function') {
+          FavLocations.attachPicker(uid + '_loc', openStop.kind === 'pickup' ? 'load' : 'unload');
+        }
+      } catch (e) {}
+    }
+    if (firmaEl) {
+      firmaEl.addEventListener('input', function () {
+        openStop.firma = firmaEl.value;
+        _oeSyncLegacyFromList();
+      });
+    }
+    if (dataEl) {
+      dataEl.addEventListener('input', function () {
+        openStop.data = dataEl.value;
+        _oeSyncLegacyFromList();
+      });
+    }
+  }
+
+  _oeSyncLegacyFromList();
+  if (window.I18N && typeof I18N.apply === 'function') { try { I18N.apply(); } catch(e) {} }
+}
+
+// A legacy hidden inputok (oeLocInc/Desc/Data/Firma) auto-szinkronja: az
+// első pickup + utolsó delivery értékéből — így `oeAddLeg` és `_rmBuildWps`
+// klasszikus ága is működik (a `stops[]` payload viszont TELJES sorrendet küld).
+function _oeSyncLegacyFromList() {
+  var stops = _OES.list;
+  var firstPu = null, lastDe = null;
+  stops.forEach(function (s) {
+    if (!firstPu && s.kind === 'pickup') firstPu = s;
+    if (s.kind === 'delivery') lastDe = s;
+  });
+  var setVal = function (id, v) { var el = document.getElementById(id); if (el) el.value = v || ''; };
+  setVal('oeLocInc',  firstPu ? (firstPu.loc || '')   : '');
+  setVal('oeFirmaInc', firstPu ? (firstPu.firma || '') : '');
+  setVal('oeDataInc',  firstPu ? (firstPu.data || '') : '');
+  setVal('oeLocDesc',  lastDe ? (lastDe.loc || '')   : '');
+  setVal('oeFirmaDesc', lastDe ? (lastDe.firma || '') : '');
+  setVal('oeDataDesc',  lastDe ? (lastDe.data || '') : '');
+  // Publikáljuk a szekvenciát a route-recalcnak (analóg a wizard __ocStopsSeq-jével)
+  window.__oeStopsSeq = stops.map(function (s) {
+    var o = { kind: s.kind, loc: s.loc || '', firma: s.firma || '', data: s.data || '' };
+    if (s._lat != null && s._lng != null) { o.lat = s._lat; o.lng = s._lng; }
+    return o;
+  });
+}
+
+function oeStopAdd(kind) {
+  if (!_OES.list) _OES.list = [];
+  _OES.list.push({ kind: (kind === 'pickup' ? 'pickup' : 'delivery'), loc: '', firma: '', data: '' });
+  _OES.openIdx = _OES.list.length - 1;
+  _oeRenderStops();
+}
+function oeStopRemove(i) {
+  if (i < 0 || i >= _OES.list.length) return;
+  if (!confirm(t('oe.stopDeleteConfirm'))) return;
+  _OES.list.splice(i, 1);
+  if (_OES.list.length === 0) _OES.openIdx = 0;
+  else if (_OES.openIdx >= _OES.list.length) _OES.openIdx = _OES.list.length - 1;
+  else if (_OES.openIdx > i) _OES.openIdx--;
+  _oeRenderStops();
+}
+function oeStopMove(i, dir) {
+  var j = i + dir;
+  if (j < 0 || j >= _OES.list.length) return;
+  var tmp = _OES.list[i]; _OES.list[i] = _OES.list[j]; _OES.list[j] = tmp;
+  if (_OES.openIdx === i) _OES.openIdx = j;
+  else if (_OES.openIdx === j) _OES.openIdx = i;
+  _oeRenderStops();
+}
+function oeStopKind(i, kind) {
+  if (i < 0 || i >= _OES.list.length) return;
+  _OES.list[i].kind = (kind === 'pickup' ? 'pickup' : 'delivery');
+  _oeRenderStops();
+}
+function oeStopOpen(i) {
+  if (i < 0 || i >= _OES.list.length) return;
+  _OES.openIdx = i;
+  _oeRenderStops();
+}
+
+// A `openOrderEdit` hívja: a szerver `stops[]`-jából (seq_index szerint
+// rendezve) inicializálja a listát. MINDEN stop bekerül (nincs top/extras
+// szétvágás → a bevitel sorrendje pontosan megőrzött). Régi (nem-migrált)
+// fuvarnál, ha a `stops[]` üres, a top-mezőkből képezünk egy pickup + egy
+// delivery kártyát (legacy 1+1 fuvar).
+function _oeInitStopsFromOrder(order, stops) {
+  _OES.list = [];
+  _OES.openIdx = 0;
+  _OES._uid = 0;
+  var arr = Array.isArray(stops) ? stops.slice() : [];
+  arr.sort(function (a, b) {
+    var A = (a && a.seq_index != null) ? a.seq_index : 999999;
+    var B = (b && b.seq_index != null) ? b.seq_index : 999999;
+    if (A !== B) return A - B;
+    var ak = a && a.kind === 'pickup' ? 0 : 1;
+    var bk = b && b.kind === 'pickup' ? 0 : 1;
+    if (ak !== bk) return ak - bk;
+    return (a && a.stop_index || 0) - (b && b.stop_index || 0);
+  });
+  arr.forEach(function (s) {
+    _OES.list.push({
+      kind: s.kind === 'pickup' ? 'pickup' : 'delivery',
+      loc: s.loc || '',
+      firma: s.firma || '',
+      data: s.data ? String(s.data).slice(0,10) : '',
+      _lat: null, _lng: null
+    });
+  });
+  // Legacy fallback: ha nincs stops[] (régi fuvar), a top-mezőkből képezzük.
+  if (_OES.list.length === 0 && order) {
+    if (order.loc_incarcare || order.firma_incarcare || order.data_incarcare) {
+      _OES.list.push({
+        kind: 'pickup',
+        loc: order.loc_incarcare || '',
+        firma: order.firma_incarcare || '',
+        data: order.data_incarcare ? String(order.data_incarcare).slice(0,10) : '',
+      });
+    }
+    if (order.loc_descarcare || order.firma_descarcare || order.data_descarcare) {
+      _OES.list.push({
+        kind: 'delivery',
+        loc: order.loc_descarcare || '',
+        firma: order.firma_descarcare || '',
+        data: order.data_descarcare ? String(order.data_descarcare).slice(0,10) : '',
+      });
+    }
+  }
+  _OES.openIdx = _OES.list.length ? _OES.list.length - 1 : 0;
+  _oeRenderStops();
+}
+
+// A save-nak: a `_OES.list`-ből épített `stops[]` payload (kliens-oldali
+// tisztítás — üres kártyák kihagyva; a szerver `lib/orderStops.js` szintén
+// szűr, de itt is kiszűrjük, hogy ne küldjünk zajt).
+function _oeCollectStops() {
+  var out = [];
+  (_OES.list || []).forEach(function (s) {
+    var loc = (s.loc || '').trim();
+    var firma = (s.firma || '').trim();
+    var data = (s.data || '').trim();
+    if (!loc && !firma && !data) return; // teljesen üres — kihagy
+    out.push({
+      kind: s.kind === 'pickup' ? 'pickup' : 'delivery',
+      loc: loc || null,
+      firma: firma || null,
+      data: data || null,
+    });
+  });
+  return out;
 }

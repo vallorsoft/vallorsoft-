@@ -3238,3 +3238,176 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .oa-preview-actions .btn{ font-weight: 700; padding: 10px 16px; }
 .oa-empty{ padding: 20px; text-align: center; color: #64748b; font-style: italic; }
 
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Fuvar-szerkesztő MODAL: szekciózott + kártyás állomás-lista
+   ──────────────────────────────────────────────────────────
+   Bevezetve: 2026-08-27 — a régi „top felrakó + top lerakó + extra pontok"
+   fel-le szétvágott elrendezés helyett EGYETLEN, egyértelmű állomás-lista
+   a bevitel sorrendjében (mint a fuvar-kiíró wizard step 2-je), és a modal
+   többi szekciója kártyás bontással — világos + sötét módban is jól látható.
+   Scope: `#orderEditModal` — más felület érintetlen.
+   ─────────────────────────────────────────────────────────────────────── */
+#orderEditModal .oe-sec{
+  background:#fff; border:1.5px solid #cbd5e1; border-radius:14px;
+  padding:16px 18px; margin-bottom:14px;
+  box-shadow:0 2px 8px -4px rgba(15,23,42,0.08);
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-sec{
+  background:#0f172a; border-color:#334155;
+  box-shadow:0 2px 10px -4px rgba(0,0,0,0.35);
+}
+#orderEditModal .oe-sec-head{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; flex-wrap:wrap; margin-bottom:14px;
+  padding-bottom:10px; border-bottom:1.5px solid #e2e8f0;
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-sec-head{ border-bottom-color:#334155; }
+#orderEditModal .oe-sec-title{
+  font-size:15px; font-weight:800; color:#0f172a;
+  display:flex; align-items:center; gap:8px;
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-sec-title{ color:#e2e8f0; }
+#orderEditModal .oe-sec-num{
+  width:26px; height:26px; border-radius:50%;
+  background:linear-gradient(135deg,#2563eb,#4f46e5); color:#fff;
+  font-size:12px; font-weight:800;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+#orderEditModal .oe-sec-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+
+/* Régi top felrakó/lerakó inputok elrejtése — hidden fallback marad DOM-ban.
+   (oeAddLeg + _rmBuildWps + orderRouteRecalc régi útvonala olvassa őket.) */
+#orderEditModal .oe-legacy-hidden{ display:none !important; }
+
+/* ─── Új: egységes állomás-kártyák (interleaved lista) ─── */
+#orderEditModal .oe-stops{ display:flex; flex-direction:column; gap:10px; }
+#orderEditModal .oe-stops-empty{
+  padding:22px; text-align:center; color:#64748b; font-size:14px;
+  border:2px dashed #cbd5e1; border-radius:12px;
+  background:#f8fafc;
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-stops-empty{
+  background:rgba(255,255,255,0.02); border-color:#475569; color:#94a3b8;
+}
+#orderEditModal .oe-stop-card{
+  border:1.5px solid #cbd5e1; border-radius:12px;
+  background:#f8fafc; overflow:hidden;
+  transition:border-color 0.15s, box-shadow 0.15s;
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-stop-card{
+  background:rgba(255,255,255,0.03); border-color:#475569;
+}
+#orderEditModal .oe-stop-card.open{
+  border-color:#2563eb; box-shadow:0 4px 14px -4px rgba(37,99,235,0.25);
+  background:#fff;
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-stop-card.open{
+  background:rgba(37,99,235,0.06); border-color:#60a5fa;
+}
+/* Csukott sáv */
+#orderEditModal .oe-stop-bar{
+  display:flex; align-items:center; gap:10px;
+  padding:10px 12px; cursor:pointer; flex-wrap:wrap;
+  transition:background 0.15s;
+}
+#orderEditModal .oe-stop-bar:hover{ background:rgba(37,99,235,0.05); }
+#orderEditModal .oe-stop-card.open .oe-stop-bar{ padding:12px 14px 8px; cursor:default; }
+#orderEditModal .oe-stop-idx{
+  min-width:26px; height:26px; border-radius:8px;
+  display:inline-flex; align-items:center; justify-content:center;
+  background:#e2e8f0; color:#0f172a; font-size:12px; font-weight:800;
+  padding:0 8px;
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-stop-idx{ background:#334155; color:#e2e8f0; }
+#orderEditModal .oe-badge{
+  display:inline-flex; align-items:center; gap:4px;
+  padding:4px 10px; border-radius:999px; font-size:11.5px; font-weight:700;
+}
+#orderEditModal .oe-badge.pickup{
+  background:rgba(34,197,94,0.15); color:#15803d; border:1px solid rgba(34,197,94,0.4);
+}
+#orderEditModal .oe-badge.delivery{
+  background:rgba(239,68,68,0.15); color:#b91c1c; border:1px solid rgba(239,68,68,0.4);
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-badge.pickup{
+  background:rgba(34,197,94,0.18); color:#4ade80; border-color:rgba(34,197,94,0.5);
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-badge.delivery{
+  background:rgba(239,68,68,0.18); color:#fca5a5; border-color:rgba(239,68,68,0.5);
+}
+#orderEditModal .oe-stop-sum{
+  flex:1; min-width:0; display:flex; gap:10px; align-items:center;
+  font-size:13px; color:#334155; overflow:hidden;
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-stop-sum{ color:#cbd5e1; }
+#orderEditModal .oe-stop-sum b{ color:#0f172a; font-weight:700; }
+.main-content[data-theme="dark"] #orderEditModal .oe-stop-sum b{ color:#e2e8f0; }
+#orderEditModal .oe-stop-sum .oe-sum-loc{
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%;
+}
+/* Nyitott állomás-lap */
+#orderEditModal .oe-stop-open{ display:none; padding:0 14px 14px; }
+#orderEditModal .oe-stop-card.open .oe-stop-open{ display:block; }
+#orderEditModal .oe-toggle{
+  display:inline-flex; border:1.5px solid #cbd5e1;
+  border-radius:8px; overflow:hidden; margin-bottom:12px;
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-toggle{ border-color:#475569; }
+#orderEditModal .oe-toggle-btn{
+  padding:8px 14px; font-size:12.5px; font-weight:700;
+  background:transparent; color:#475569; border:0; cursor:pointer;
+  transition:background 0.15s;
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-toggle-btn{ color:#cbd5e1; }
+#orderEditModal .oe-toggle-btn.on{
+  background:linear-gradient(135deg,#2563eb,#4f46e5); color:#fff;
+}
+#orderEditModal .oe-toggle-btn:not(.on):hover{ background:rgba(37,99,235,0.08); }
+#orderEditModal .oe-stop-grid{
+  display:grid; grid-template-columns:2fr 1.5fr 1fr; gap:10px;
+}
+#orderEditModal .oe-stop-grid .field{ margin:0; }
+#orderEditModal .oe-stop-grid label{
+  font-size:11.5px; color:#475569; font-weight:600; margin-bottom:4px;
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-stop-grid label{ color:#94a3b8; }
+/* Rendezés gombok (⬆⬇✕) — csukott sávban jobbra */
+#orderEditModal .oe-ord{ display:inline-flex; gap:4px; margin-left:auto; }
+#orderEditModal .oe-ord-btn{
+  width:30px; height:30px; border-radius:7px;
+  border:1.5px solid #cbd5e1; background:#fff;
+  cursor:pointer; font-size:13px; color:#0f172a;
+  display:inline-flex; align-items:center; justify-content:center;
+  transition:all 0.15s;
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-ord-btn{
+  background:#0b1220; border-color:#475569; color:#e2e8f0;
+}
+#orderEditModal .oe-ord-btn:hover:not(:disabled){
+  background:rgba(37,99,235,0.08); border-color:#2563eb;
+}
+#orderEditModal .oe-ord-btn:disabled{ opacity:0.35; cursor:not-allowed; }
+#orderEditModal .oe-ord-btn.danger{ color:#dc2626; }
+#orderEditModal .oe-ord-btn.danger:hover:not(:disabled){
+  background:rgba(220,38,38,0.10); border-color:#dc2626;
+}
+#orderEditModal .oe-stops-actions{
+  display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;
+  padding-top:12px; border-top:1px dashed #e2e8f0;
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-stops-actions{ border-top-color:#334155; }
+#orderEditModal .oe-stops-hint{
+  font-size:11.5px; color:#64748b; margin-top:6px; line-height:1.45;
+}
+.main-content[data-theme="dark"] #orderEditModal .oe-stops-hint{ color:#94a3b8; }
+
+/* Reszponzív */
+@media (max-width:820px){
+  #orderEditModal .oe-stop-grid{ grid-template-columns:1fr 1fr; }
+}
+@media (max-width:520px){
+  #orderEditModal .oe-stop-grid{ grid-template-columns:1fr; }
+  #orderEditModal .oe-ord{ margin-left:0; margin-top:6px; width:100%; justify-content:flex-end; }
+}
+
