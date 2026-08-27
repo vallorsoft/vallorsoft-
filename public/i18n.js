@@ -1260,6 +1260,15 @@
     'cs.ol.mTplMail':  { hu: 'Sablonból e-mail', ro: 'E-mail din șablon' },
     'cs.ol.mOrderMail':{ hu: 'Email a fuvarról', ro: 'E-mail despre cursă' },
     'cs.ol.mAssignment': { hu: 'Megbízás (PDF)', ro: 'Comandă de Transport' },
+    // Alvállalkozó űrlap — ANAF gomb + új mezők (Reg.Com. + Adresa)
+    'cs.ca.regCom':       { hu: 'Nr. Reg. Com.', ro: 'Nr. Reg. Com.' },
+    'cs.ca.adresa':       { hu: 'Cím (Adresa)', ro: 'Adresa' },
+    'cs.ca.anafHint':     { hu: 'Cégadatok lekérdezése ANAF-ból', ro: 'Preluare date firmă din ANAF' },
+    'cs.ca.anafFetching': { hu: 'ANAF lekérdezés…', ro: 'Interogare ANAF…' },
+    'cs.ca.anafFilled':   { hu: 'Kitöltve ANAF-ból', ro: 'Completat din ANAF' },
+    'cs.ca.anafNotFound': { hu: 'Az ANAF nem talált ilyen CUI-t.', ro: 'ANAF nu a găsit acest CUI.' },
+    'cs.ca.anafError':    { hu: 'Nem sikerült az ANAF-lekérdezés.', ro: 'Interogarea ANAF a eșuat.' },
+    'cs.ca.cuiRequired':  { hu: 'Adj meg egy CUI-t az ANAF-lekérdezéshez.', ro: 'Introdu un CUI pentru interogare ANAF.' },
     // ── Comanda de Transport (megbízás) — RO-alap + HU ──
     'oa.title':          { hu: 'Megbízás (Comanda de Transport)', ro: 'Comanda de Transport' },
     'oa.step1':          { hu: '📋 Alap-adatok', ro: '📋 Date de bază' },

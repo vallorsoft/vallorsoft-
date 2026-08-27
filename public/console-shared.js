@@ -1769,14 +1769,20 @@ function renderCarriers(){
     +'<div class="text-muted" style="font-size:12.5px;margin-bottom:14px;">'+t('cs.ca.hint')+'</div>'
     +'<div class="grid-3" style="margin-bottom:12px;">'
     +'<div class="field"><label>'+t('cs.ca.companyName')+'</label><input class="input" id="caNev"></div>'
-    +'<div class="field"><label>'+t('cs.ca.cui')+'</label><input class="input" id="caCui"></div>'
+    +'<div class="field"><label>'+t('cs.ca.cui')+'</label>'
+      +'<div style="display:flex;gap:6px;"><input class="input" id="caCui" style="flex:1;">'
+      +'<button type="button" class="btn ghost" id="caAnafBtn" onclick="carrierAnafLookup()" title="'+t('cs.ca.anafHint','Cégadatok lekérdezése ANAF-ból')+'" style="padding:6px 12px;font-weight:700;">ANAF</button></div>'
+      +'<div id="caAnafMsg" style="font-size:11px;margin-top:4px;color:var(--muted);"></div>'
+    +'</div>'
+    +'<div class="field"><label>'+t('cs.ca.regCom','Nr. Reg. Com.')+'</label><input class="input" id="caRegCom" placeholder="J40/1/2020"></div>'
     +'<div class="field"><label>'+t('common.email')+'</label><input class="input" id="caEmail"></div>'
     +'<div class="field"><label>'+t('form.phone')+'</label><input class="input" id="caTel"></div>'
     +'<div class="field"><label>'+t('cs.ca.payTerm')+'</label><input class="input" id="caTerm" type="number" value="30"></div>'
     +'<div class="field"><label>'+t('cs.ca.cmrExpiry')+'</label><input class="input" id="caCmr" type="date"></div>'
     +'<div class="field"><label>IBAN</label><input class="input" id="caIban"></div>'
     +'<div class="field"><label>'+t('cs.cg.group')+'</label><select class="select" id="caGroup">'+_carrierGroupOptions('')+'</select></div>'
-    +'<div class="field"><label>'+t('fld.note')+'</label><input class="input" id="caNota"></div>'
+    +'<div class="field" style="grid-column:span 3;"><label>'+t('cs.ca.adresa','Adresa')+'</label><input class="input" id="caAdresa" placeholder="Str., nr., localitate, judet, cod postal"></div>'
+    +'<div class="field" style="grid-column:span 3;"><label>'+t('fld.note')+'</label><input class="input" id="caNota"></div>'
     +'</div>'
     +'<input type="hidden" id="caId"><button class="btn primary" onclick="carrierSaveUi()">'+t('cs.ca.saveBtn')+'</button> <button class="btn ghost" onclick="carrierFormReset()">'+t('cs.ca.newEmpty')+'</button>'
     +'<div id="carrierInviteLink" style="margin-top:12px;"></div>'
@@ -1803,7 +1809,7 @@ function carrierGroupDeleteUi(id){
 function carrierSetGroupUi(carrierId, groupId){
   gas('carrierSetGroup',[carrierId, groupId||null]).then(function(r){ if(r&&r.ok){ toast(t('common.saved'),'ok'); loadCarriers(); } else toast((r&&r.err)||t('common.error'),'err'); });
 }
-function carrierFormReset(){ ['caNev','caCui','caEmail','caTel','caIban','caNota'].forEach(function(i){var e=document.getElementById(i);if(e)e.value='';}); var t=document.getElementById('caTerm');if(t)t.value='30'; var c=document.getElementById('caCmr');if(c)c.value=''; var id=document.getElementById('caId');if(id)id.value=''; var g=document.getElementById('caGroup');if(g)g.value=''; }
+function carrierFormReset(){ ['caNev','caCui','caEmail','caTel','caIban','caNota','caRegCom','caAdresa'].forEach(function(i){var e=document.getElementById(i);if(e)e.value='';}); var t=document.getElementById('caTerm');if(t)t.value='30'; var c=document.getElementById('caCmr');if(c)c.value=''; var id=document.getElementById('caId');if(id)id.value=''; var g=document.getElementById('caGroup');if(g)g.value=''; var m=document.getElementById('caAnafMsg');if(m){m.textContent='';m.style.color='var(--muted)';} }
 function carrierEditUi(i){
   var c=(window._carriersCache||[])[i]; if(!c) return;
   document.getElementById('caId').value=c.id;
@@ -1811,7 +1817,10 @@ function carrierEditUi(i){
   document.getElementById('caEmail').value=c.email||''; document.getElementById('caTel').value=c.telefon||'';
   document.getElementById('caTerm').value=c.payment_term_days||30; document.getElementById('caCmr').value=c.cmr_insurance_expiry?String(c.cmr_insurance_expiry).slice(0,10):'';
   document.getElementById('caIban').value=c.iban||''; document.getElementById('caNota').value=c.nota||'';
+  var rc=document.getElementById('caRegCom'); if(rc) rc.value=c.reg_com||'';
+  var ad=document.getElementById('caAdresa'); if(ad) ad.value=c.adresa||'';
   var grp=document.getElementById('caGroup'); if(grp) grp.value=c.group_id||'';
+  var m=document.getElementById('caAnafMsg');if(m){m.textContent='';m.style.color='var(--muted)';}
   document.getElementById('carriersBox').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function carrierSaveUi(){
@@ -1820,9 +1829,52 @@ function carrierSaveUi(){
     telefon:document.getElementById('caTel').value.trim(), payment_term_days:document.getElementById('caTerm').value,
     cmr_insurance_expiry:document.getElementById('caCmr').value||null, iban:document.getElementById('caIban').value.trim(),
     group_id:(document.getElementById('caGroup')||{}).value||'',
+    reg_com:(document.getElementById('caRegCom')||{}).value?document.getElementById('caRegCom').value.trim():'',
+    adresa:(document.getElementById('caAdresa')||{}).value?document.getElementById('caAdresa').value.trim():'',
     nota:document.getElementById('caNota').value.trim() };
   if(!p.nev){ toast(t('cs.companyNameReq'),'err'); return; }
   gas('carrierSave',[p]).then(function(r){ if(r&&r.ok){ toast(t('cs.carrierSaved'),'ok'); carrierFormReset(); loadCarriers(); loadCarrierAp(); } else toast((r&&r.err)||t('common.error'),'err'); });
+}
+// ANAF-lekérdezés az alvállalkozó CUI-ja alapján (a MEGLÉVŐ /api/clients/anaf
+// végpontot használjuk — közös `services/clients.js` `anafLookup`). A cegnév,
+// Reg.Com., adresa (utca+házszám+helység+megye+irsz), és telefon
+// automatikusan előtöltődik; a kézi értékeket csak akkor írja felül, ha
+// üres a mező (nem-destruktív). A gomb kettős-nyomás ellen zárva marad.
+function carrierAnafLookup(){
+  var cuiEl = document.getElementById('caCui'); if(!cuiEl) return;
+  var cui = cuiEl.value.trim(); if(!cui){ toast(t('cs.ca.cuiRequired','Adj meg egy CUI-t az ANAF-lekérdezéshez.'),'err'); return; }
+  var btn = document.getElementById('caAnafBtn');
+  var msg = document.getElementById('caAnafMsg');
+  if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  if(msg){ msg.style.color='var(--muted)'; msg.textContent = t('cs.ca.anafFetching','ANAF lekérdezés…'); }
+  function setBack(){ if(btn){ btn.disabled=false; btn.textContent='ANAF'; } }
+  fetch('/api/clients/anaf?cui=' + encodeURIComponent(cui), { credentials:'same-origin' })
+    .then(function(r){ return r.json(); })
+    .then(function(r){
+      if (!r || !r.found) {
+        if(msg){ msg.style.color='var(--status-danger,#dc2626)'; msg.textContent = (r && r.error) || t('cs.ca.anafNotFound','Az ANAF nem talált ilyen CUI-t.'); }
+        setBack(); return;
+      }
+      // Csak üres mezőkbe töltünk — a kézi javításokat nem írjuk felül.
+      function fill(id, val){ var e = document.getElementById(id); if(e && !e.value && val) e.value = val; }
+      fill('caNev', r.name);
+      fill('caTel', r.phone);
+      fill('caRegCom', r.regCom);
+      fill('caAdresa', r.address);
+      // Aktív/inaktív + TVA státusz jelzés (nem hiba, csak információ)
+      var flags = [];
+      if (r.vatPayer) flags.push('TVA'); else flags.push('non-TVA');
+      if (r.active === false) flags.push('INACTIV');
+      if(msg){
+        msg.style.color = r.active === false ? 'var(--status-warn,#f59e0b)' : 'var(--status-ok,#22c55e)';
+        msg.textContent = t('cs.ca.anafFilled','Kitöltve ANAF-ból')+' · '+flags.join(' · ');
+      }
+      setBack();
+    })
+    .catch(function(){
+      if(msg){ msg.style.color='var(--status-danger,#dc2626)'; msg.textContent = t('cs.ca.anafError','Nem sikerült az ANAF-lekérdezés.'); }
+      setBack();
+    });
 }
 function carrierDeleteUi(id){
   if(!confirm(t('cs.ca.delConfirm'))) return;

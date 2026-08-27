@@ -14,6 +14,19 @@
 
 ---
 
+## 2026-08-27 — Alvállalkozó űrlap: ANAF-gomb + Reg.Com. + Adresa mezők (mint az ügyfélnél)
+
+**Gyökér:** a Comanda de Transport-kör (PR #379) hozzáadta a `carriers.reg_com` + `carriers.adresa` oszlopokat a DB-hez, DE az admin/manager alvállalkozó űrlapján nem volt sem ANAF-gomb, sem szerkeszthető mező ezekhez → az új alvállalkozónál kézzel kellett átvezetni a CUI + Reg.Com. + Adresa adatokat (miközben az ügyfél-oldalon már régóta van ANAF-lekérdezés). Kérés: legyen az alvállalkozó felvitelnél is ANAF-gomb, mint az ügyfélnél.
+
+**Változás — közös REST-végpont újrahasználva, nincs új handler:**
+- **`public/console-shared.js`** — a Külső sofőrök fül alvállalkozó űrlapja bővítve: (a) új `Nr. Reg. Com.` mező (`caRegCom`) a CUI mellett; (b) új teljes-szélességű `Adresa` mező (`caAdresa`); (c) a CUI mező mellé `ANAF` gomb + státusz-sor. Új `carrierAnafLookup()` — a MEGLÉVŐ `/api/clients/anaf` REST-végpontot hívja (a `services/clients.js` `anafLookup` közös, ANAF v9 API), és a válasz `name/regCom/address/phone` mezőit tölti elő a formra. Nem-destruktív: csak ÜRES mezőt ír (a kézi módosításokat nem írja felül). Duplakattintás elleni gomb-zár, TVA/aktivitás státusz-jelzés (zöld/piros/borostyán színnel).
+- **`handlers/carriers.js`** — `carrierSave` bővítve `reg_com` + `adresa` mezőkkel (INSERT + UPDATE ágakban); mind a paraméteres SQL, mind a mező-fehérlista tiszteletben tartva. A `carrierList` már `SELECT c.*`, tehát a mezők automatikusan visszajönnek (az `_carriersCache` alapján a `carrierEditUi` előtölti).
+- **A Comanda de Transport (PR #379)** azonnal profitál: az ANAF-ból lekért adatok az `orderAssignmentGet` `carrier` snapshotjába kerülnek, és a PDF-be automatikusan.
+
+**i18n** 8 új `cs.ca.*` kulcs (RO-alap + HU): `regCom`, `adresa`, `anafHint`, `anafFetching`, `anafFilled`, `anafNotFound`, `anafError`, `cuiRequired`. **Cache-bust** `?v=20260827canaf` (i18n.js + console-shared.js + style.css). **997 Jest zöld** (996 → 997, +1 új eset a `carriers.test.js`-ben: reg_com + adresa mezők INSERT-jének regressziós védelme).
+
+---
+
 ## 2026-08-27 — ÚJ: Comanda de Transport (megbízás) — kártyás wizard + PDF-előnézet + cég-pecsét
 
 **Gyökér:** külsős (Extern) és sofőr-nélküli fuvarnál eddig nem volt bekötött módja annak, hogy a diszpécser hivatalos megrendelőt/megbízást (Comanda de Transport) küldjön az alvállalkozónak. A felhasználó a saját sablonját (4 oldalas VallorSoft Comanda de Transport) küldte referenciának — a rendszer most ezt reprodukálja, a fuvar-adatokat előtölti, a szerkeszthető mezőket kártyás wizardban (a fuvar-kiírás vizuális mintáját követve) kéri, és a PDF-et élő előnézettel + a fuvar dokumentumaihoz csatolva állítja elő.
