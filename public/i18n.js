@@ -3135,6 +3135,10 @@
     'sof.sess.offline': { hu: '📶 Offline vagy — a szerver most nem elérhető.', ro: '📶 Ești offline — serverul nu este disponibil acum.' },
     'sof.sess.idle':    { hu: '⏳ Inaktivitás miatt le kell frissíteni a munkamenetet.', ro: '⏳ Din cauza inactivității trebuie reînnoită sesiunea.' },
     'sof.sess.expired': { hu: 'A szerver már nem ismer minket. Frissíts újra bejelentkezéshez.', ro: 'Serverul nu ne mai recunoaște. Reîmprospătează pentru a te autentifica din nou.' },
+    // A PWA/tab visszatérés-utáni overlay (session-guard.js visibilitychange
+    // → visible ág, ha 30+ mp-ig hidden volt). MINDIG felugorjon, hogy a
+    // Frissítéssel élő adathoz jusson a sofőr — sose ragadjon be cache.
+    'sof.sess.resume':  { hu: '🔄 Visszatértél az apphoz — friss adatért koppints a Frissítésre.', ro: '🔄 Te-ai întors în aplicație — apasă Reîmprospătează pentru date în timp real.' },
     'sof.ms.nextStep': { hu: 'Következő állomás', ro: 'Etapa următoare' },
     'sof.ms.chooseStop': { hu: 'Melyik pontot választod?', ro: 'Ce punct alegi?' },
     'sof.ms.chooseStopMsg': {

@@ -21,6 +21,13 @@
   var warned       = false;
   var warnBanner   = null;
   var authPingInFlight = false;
+  // A PWA/tab background-ba kerülésének időbélyege — a visibilitychange
+  // `visible` ágán ebből számoljuk, mennyi ideig volt hidden. Ha bőven
+  // huzamosabb (in-app recovery mód alatt legalább `HIDDEN_MIN_RECOVER_MS`),
+  // MINDIG mutatjuk az overlay-t → a Frissítés gombbal a sofőr egy koppintással
+  // friss adatért megy vissza a szerverhez (nem beragadt cache).
+  var hiddenAt = 0;
+  var HIDDEN_MIN_RECOVER_MS = 30 * 1000;  // 30 mp — egy villanás/push-notif nem trigger, egy valódi bezárás igen
 
   // In-app session-recovery: ha a hivo oldal (pl. sofer.html) beallitja
   // a window.VS_INAPP_SESSION_RECOVER = true-t, akkor NEM iranyitunk at
@@ -166,11 +173,31 @@
   //           azonnal atiranyitas /login-re (nem kell a felhasznalonak
   //           manualisan Kilepest nyomnia).
   document.addEventListener('visibilitychange', function() {
+    // Hidden-ba kerülés: rögzítjük az időbélyeget, hogy a visszatéréskor
+    // el tudjuk dönteni, mennyi ideig volt a lap háttérben.
+    if (document.visibilityState === 'hidden') {
+      hiddenAt = Date.now();
+      return;
+    }
     if (document.visibilityState !== 'visible') return;
     var idle = Date.now() - lastActivity;
     if (idle >= IDLE_LIMIT_MS) {
       doLogout('idle');
       return;
+    }
+    // ── In-app recovery (sofőr PWA): ha a lap ELÉG SOKÁIG (30+ mp) volt
+    // hidden-ben, MINDIG mutassuk az overlay-t. Így amikor a sofőr a PWA-ból
+    // kilép és visszalép, egyértelmű "🔄 Frissítés" gombbal élő adatért megy
+    // a szerverhez — sosem hisz beragadt cache-nek, sosem gondolja, hogy
+    // "offline" a szerver, ha valójában csak a cache-t nézi. Rövid (< 30 mp)
+    // háttér-villanás (push-notification, gyors app-switch) nem trigger.
+    if (_inappRecoverEnabled() && hiddenAt > 0) {
+      var hiddenFor = Date.now() - hiddenAt;
+      hiddenAt = 0;
+      if (hiddenFor >= HIDDEN_MIN_RECOVER_MS) {
+        _tryInappRecover('resume');
+        return;
+      }
     }
     if (authPingInFlight) return;
     // Ha explicit offline vagyunk (navigator.onLine=false), NE tegyunk

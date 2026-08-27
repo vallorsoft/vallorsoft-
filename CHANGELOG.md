@@ -14,6 +14,22 @@
 
 ---
 
+## 2026-08-26 — Sofőr főoldal duo-kártya finomítás + PWA-visszatérés session-overlay
+
+**Két sofőr-visszajelzés a #377 kör után:**
+1. **Duo-kártya vonal-eltolódás + túl magas:** a `border-right` a bal fél-kártyán 1px-t elvett a bal oszlopból (a `grid-template-columns: 1fr 1fr` a rács szélességét egyenlőre osztotta, de a border ezt aszimmetrikussá tette); plusz a `padding: 10px 12px` + 44px ikon együtt túl magas kártyát adott.
+2. **PWA-visszatérés élő adathoz:** a sofőr PWA-ból kilépve és később visszalépve gyakran a cache-elt régi állapotot látta ("offline" érzés). Kellett egy garantált friss-adat-kérés a visszatéréskor.
+
+**Változás:**
+- **`public/sofer.css`**: a `border-right` helyett `.sofer-nav-card.sofer-nav-duo::after` pseudo-elem — `position: absolute; left: 50%; top: 12%; bottom: 12%; width: 1px; transform: translateX(-0.5px)` → a rács szélessége 50-50 marad, a vonal pontosan az 50%-nál (nem érinti az oszlopokat, nincs 1px eltolás). Wrapper `min-height: 58px; max-height: 62px` (74→62); ikon `44×44` → `40×40`; fél-kártya padding `10px 12px` → `6px 10px`. Kompakt, harmonikus.
+- **`public/session-guard.js`**: új `hiddenAt` időbélyeg + `HIDDEN_MIN_RECOVER_MS = 30 * 1000` küszöb. A `visibilitychange` → `hidden` ágon rögzítjük a hidden-be-kerülés idejét; a `visible` ágon, ha `VS_INAPP_SESSION_RECOVER` (csak sofőr!) ÉS a hidden-ben töltött idő ≥30 mp → mindenképp `_tryInappRecover('resume')` (az overlay felugrik). Rövid háttér-villanás (push, app-switch <30 mp) nem trigger. Nem-sofőr felületet (admin/manager/developer) nem érint.
+- **`public/sofer.js`**: `__vsShowSessionOverlay` a `resume` reason-t is kezeli.
+- **`public/i18n.js`**: új `sof.sess.resume` (RO+HU): „🔄 Visszatértél az apphoz — friss adatért koppints a Frissítésre.".
+
+**Cache-bust:** `?v=20260826duofix` (i18n.js + sofer.js + sofer.css + session-guard.js). **981 Jest zöld**, nincs regresszió. A Frissítés gomb változatlan — `window.location.reload()`, ami a network-first service worker miatt friss HTML+JS-t kap, tehát friss fuvar-adatot is.
+
+---
+
 ## 2026-08-26 — Sofőr főoldal: Bemutatás + Cégadatok EGYETLEN kártya (közös keret + halvány elválasztó)
 
 **Kérés:** a két különálló gomb kerete olvadjon össze, nézzen ki egy nagy gombként, csak középen egy halvány vonal válassza el (dizájnosabb).

@@ -69,7 +69,8 @@ window.__vsShowSessionOverlay = function (reason) {
     var isOnline = (typeof navigator !== 'undefined') ? navigator.onLine : true;
     var _t = (window.t && typeof t === 'function') ? t : function (k) { return k; };
     var reasonKey = (reason === 'offline' || !isOnline) ? 'sof.sess.offline'
-                   : (reason === 'idle' ? 'sof.sess.idle' : 'sof.sess.expired');
+                   : (reason === 'idle' ? 'sof.sess.idle'
+                   : (reason === 'resume' ? 'sof.sess.resume' : 'sof.sess.expired'));
     if (st) st.textContent = _t(reasonKey);
     ov.style.display = 'flex';
   } catch (e) {}
