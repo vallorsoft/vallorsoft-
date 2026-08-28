@@ -604,13 +604,21 @@ function _buildWaybillPuncteForOrder(o, filter) {
                       .sort(function (a, b) { return a.stop_index - b.stop_index; });
     var deliveries = stops.filter(function (s) { return s.kind === 'delivery' && !s.waybilled_at && stopMatchesFilter(s); })
                       .sort(function (a, b) { return a.stop_index - b.stop_index; });
+    // 2026-08-27 fix: a menetlevél MINDIG a SOFŐR által rögzített (valós)
+    // dátumot használja — a done_at (elvégezte) ELSŐBBSÉGGEL, arrived_at
+    // (megérkezett) FALLBACK-kel, csak ha egyik sincs, a tervezett s.data,
+    // majd az orders.data_incarcare/descarcare. Így a menetlevélre a valós
+    // fel-/lerakási időpont kerül (nem a diszpécser tervezett dátuma).
+    var pickTime = function (s, plannedTop) {
+      return ymd(s.done_at) || ymd(s.arrived_at) || ymd(s.data) || ymd(plannedTop);
+    };
     var out = [];
     pickups.forEach(function (s) {
-      if (s.loc) out.push([s.loc, 'Încărcare', ymd(s.data) || ymd(o.data_incarcare),
+      if (s.loc) out.push([s.loc, 'Încărcare', pickTime(s, o.data_incarcare),
                           { orderId: o.id, role: 'loading', stopId: s.id }]);
     });
     deliveries.forEach(function (s) {
-      if (s.loc) out.push([s.loc, 'Descărcare', ymd(s.data) || ymd(o.data_descarcare),
+      if (s.loc) out.push([s.loc, 'Descărcare', pickTime(s, o.data_descarcare),
                           { orderId: o.id, role: 'unloading', stopId: s.id }]);
     });
     return out;
@@ -619,10 +627,13 @@ function _buildWaybillPuncteForOrder(o, filter) {
   // Ha a hívó filter-el jött (auto-collect), és a fuvarnak nincs stopja,
   // csak akkor engedjük tovább, ha az egész fuvar szerepel a filterben.
   if (filter && filter.byOrder && !filter.byOrder[o.id]) return [];
-  // Legacy fallback
+  // Legacy fallback (nincs order_stops sor)
+  // 2026-08-27 fix: itt is a SOFŐR által rögzített időbélyeg elsőbbséggel —
+  // orders.incarcat_at → sosit_incarcare_at → data_incarcare (tervezett),
+  // ugyanígy a lerakó ágon.
   var phase = o.waybill_phase;
-  var loadDate = ymd(o.data_incarcare);
-  var unloadDate = ymd(o.data_descarcare);
+  var loadDate = ymd(o.incarcat_at) || ymd(o.sosit_incarcare_at) || ymd(o.data_incarcare);
+  var unloadDate = ymd(o.descarcat_at) || ymd(o.sosit_descarcare_at) || ymd(o.data_descarcare);
   var res = [];
   if (phase === 'loading') {
     if (o.loc_incarcare) res.push([o.loc_incarcare, 'Încărcare', loadDate, { orderId: o.id, role: 'loading' }]);
