@@ -5882,8 +5882,12 @@ function driverOrderStatus(id, status) {
 //    (új kiosztott fuvar, sofőr↔jármű váltás, havi mini-statisztika). A
 //    session-guard oldalán a szerver-session-t is ellenőrizzük ugyanekkor
 //    (visibilitychange → authMe ping → tiszta redirect ha halott).
-//    Csak a főoldalon (sec-dash), hogy a menetlevél-piszkozat/beírt űrlap
-//    NE nulázódjon a listák újratöltésétől. Rate-limit: legfeljebb 20 mp-enként.
+//    2026-08-27: bővítve — ha step2 (menetlevél-kitöltés) nyitva van,
+//    a szerver-oldali fuvar-változásokat (admin/manager utólagos szerkesztés)
+//    AUTOMATIKUSAN átvezetjük a piszkozatra (`_syncDraftFromServerOrders`).
+//    Ez CSAK a be nem küldött draft-ra hat; a MÁR beküldött menetlevélet
+//    a rendszer sosem módosítja automatikusan — csak manuális szerkesztéssel.
+//    Rate-limit: legfeljebb 20 mp-enként.
 var _visRefreshLastAt = 0;
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState !== 'visible') return;
@@ -5891,12 +5895,104 @@ document.addEventListener('visibilitychange', function() {
   if (now - _visRefreshLastAt < 20000) return;
   _visRefreshLastAt = now;
   var dashSec = document.getElementById('sec-dash');
+  var step2 = document.getElementById('fuvarStep2');
+  var step2Open = step2 && step2.style.display !== 'none';
+  if (step2Open) {
+    // Menetlevél-piszkozat auto-sync a szerver friss fuvar-adataiból.
+    // Az alim/ach/km/mentiuni user-mezőket NEM bántja — csak a puncte
+    // sorokat a `data-order-id`/`data-stop-id` alapján frissíti.
+    try { if (typeof _syncDraftFromServerOrders === 'function') _syncDraftFromServerOrders(); } catch(e) {}
+    return; // step2 alatt a főoldali refresh nem kell
+  }
   if (!dashSec || dashSec.classList.contains('hidden')) return;
   try { if (typeof loadDashOrders === 'function') loadDashOrders(); } catch(e) {}
   try { if (typeof loadSoferMiniStats === 'function') loadSoferMiniStats(); } catch(e) {}
   try { if (typeof loadMyAssignedVehicle === 'function') loadMyAssignedVehicle(); } catch(e) {}
   try { if (typeof renderPendingReceipts === 'function') renderPendingReceipts(); } catch(e) {}
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  DRAFT AUTO-SYNC — a szerver friss stops[] adatait átvezeti a nyitott
+//  step2 puncte-sorokba (be nem küldött menetlevél).
+//  ────────────────────────────────────────────────────────────────────────
+//  Ha az admin/manager a fuvar-szerkesztőben stopot ad/vesz/áthelyez, vagy a
+//  sofőr per-stop idő-korrekciót csinál, az AZONNAL érvényes lesz a
+//  piszkozaton is (visibility change / manuális trigger). CSAK a
+//  `data-order-id` (tehát fuvarhoz kötött) sorokat cseréli le; a Plecare/
+//  Sosire + a sofőr által kézzel felvett tag nélküli sorok érintetlenek.
+//  A user-mezők (alim/ach/km/mentiuni) érintetlenek — csak a puncte-tömb
+//  fuvar-eredetű sorai frissülnek.
+// ═══════════════════════════════════════════════════════════════════════════
+function _syncDraftFromServerOrders() {
+  // Ha nincs kiválasztott fuvar a piszkozaton, nincs mit szinkronizálni
+  var selIds = (typeof _selectedOrderIds !== 'undefined' && Array.isArray(_selectedOrderIds))
+    ? _selectedOrderIds.slice() : [];
+  if (!selIds.length) return;
+  fetch('/api/execute', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ functionName: 'getMySoferOrders', arguments: [] })
+  })
+  .then(function (r) { return r.json(); })
+  .then(function (d) {
+    var fresh = (d && d.result) ? d.result : [];
+    if (!Array.isArray(fresh) || !fresh.length) return;
+    // Frissítsük a cache-t IS, hogy a picker/step2 további interakcióknál is
+    // a friss adatot használja.
+    _soferOrdersCache = fresh.filter(function (o) { return o.waybill_visible !== false; });
+    var pc = document.getElementById('puncteContainer');
+    if (!pc) return;
+    var changedIds = [];
+    selIds.forEach(function (oid) {
+      var freshO = fresh.find(function (x) { return x.id === oid; });
+      if (!freshO) return;
+      // Az aktuális DOM sorok stop-id + loc + data hash-e vs. a friss stops[]
+      var domRows = Array.prototype.slice.call(pc.querySelectorAll('.dyn-row[data-order-id="' + oid + '"]'));
+      var domSet = domRows.map(function (r) {
+        return [
+          r.getAttribute('data-stop-id') || '',
+          r.getAttribute('data-role') || '',
+          ((r.querySelector('.punct-loc') || {}).value || '').trim().toLowerCase(),
+          ((r.querySelector('.punct-date') || {}).value || '').slice(0, 10)
+        ].join('|');
+      }).sort().join(';');
+      // Friss server-oldali várható sorok — csak azok, amiket a
+      // `_buildWaybillPuncteForOrder` most is felvenne.
+      var freshRows = _buildWaybillPuncteForOrder(freshO);
+      var freshSet = freshRows.map(function (args) {
+        var meta = args[3] || {};
+        return [
+          (meta.stopId != null ? String(meta.stopId) : ''),
+          (meta.role || ''),
+          String(args[0] || '').trim().toLowerCase(),
+          String(args[2] || '').slice(0, 10)
+        ].join('|');
+      }).sort().join(';');
+      if (domSet !== freshSet) changedIds.push(oid);
+    });
+    if (!changedIds.length) return;
+    // Változás → az érintett fuvarok sorait a friss adatokból újraépítjük.
+    changedIds.forEach(function (oid) {
+      // 1. Régi order-tag sorok törlése (data-order-id egyezés)
+      Array.prototype.slice.call(pc.querySelectorAll('.dyn-row[data-order-id="' + oid + '"]'))
+        .forEach(function (r) { if (r.parentNode) r.parentNode.removeChild(r); });
+      // 2. Friss sorok felvétele
+      var freshO = _soferOrdersCache.find(function (x) { return x.id === oid; });
+      if (!freshO) return;
+      _buildWaybillPuncteForOrder(freshO).forEach(function (args) {
+        addPunctRow(args[0], args[1], args[2], args[3]);
+      });
+    });
+    // 3. Dátum-rendezés (Plecare elöl, Sosire hátul, közte kronologikus)
+    if (typeof _sortPuncteByDate === 'function') _sortPuncteByDate();
+    if (typeof _punctRenumber === 'function') _punctRenumber();
+    if (typeof _syncTripTimesFromPuncte === 'function') _syncTripTimesFromPuncte();
+    if (typeof draftSave === 'function') draftSave();
+    if (typeof toast === 'function') {
+      toast('🔄 ' + (t('sof.draftAutoSynced') || 'A fuvar módosult — a menetlevél sorai frissítve.'), 'ok');
+    }
+  })
+  .catch(function () { /* csendes — a next visibility újra próbál */ });
+}
 
 // ── Nyelvváltáskor a JS-ből renderelt részek újrarajzolása ──
 // (a static data-i18n elemeket a motor magától frissíti; itt a dinamikus
