@@ -1714,11 +1714,49 @@ function _applyPickerDiff(newIds) {
     });
     added += toAdd.length;
   });
+  // 2026-08-27: az újonnan hozzáadott sorokat is DÁTUM szerint rendezzük
+  // (a Plecare-t elöl, a Sosire-t hátul tartva). Így a picker-diff útján
+  // hozzáadott fuvar-stopjai is a valós utazási sorrendben jelennek meg.
+  _sortPuncteByDate();
   _punctRenumber();
   if (typeof _syncTripTimesFromPuncte === 'function') _syncTripTimesFromPuncte();
   _refreshSelectedOrdersSummary();
   draftSave();
   if (added) toast(t('sof.pick.added', { n: added }), 'ok');
+}
+
+// A puncte-sorok DÁTUM szerinti rendezése (Plecare elöl, Sosire hátul).
+// A közti (Incarcare/Descarcare) sorokat a `.punct-date` értéke alapján
+// növekvő rendbe rakja. Egyező dátum → megőrzi az eredeti sorrendet
+// (stable Array.prototype.sort). Üres dátum a Sosire elé, de a többi
+// dátumozott után.
+function _sortPuncteByDate() {
+  var pc = document.getElementById('puncteContainer');
+  if (!pc) return;
+  var rows = Array.prototype.slice.call(pc.querySelectorAll('.dyn-row'));
+  var plecare = null, sosire = null;
+  var mid = [];
+  rows.forEach(function (r) {
+    var tip = (r.querySelector('.punct-tip') || {}).value || '';
+    if (tip === 'Plecare' && !plecare) { plecare = r; return; }
+    if (tip === 'Sosire' && !sosire) { sosire = r; return; }
+    mid.push(r);
+  });
+  // Stabil sort: eredeti pozíciót visszük tie-breakhez
+  mid.forEach(function (r, i) { r.__origIdx = i; });
+  mid.sort(function (a, b) {
+    var ad = ((a.querySelector('.punct-date') || {}).value || '').slice(0, 10);
+    var bd = ((b.querySelector('.punct-date') || {}).value || '').slice(0, 10);
+    if (!ad && bd) return 1;
+    if (ad && !bd) return -1;
+    if (ad !== bd) return ad < bd ? -1 : 1;
+    return a.__origIdx - b.__origIdx;
+  });
+  // Reinsert: Plecare → middle (sorted) → Sosire
+  pc.innerHTML = '';
+  if (plecare) pc.appendChild(plecare);
+  mid.forEach(function (r) { delete r.__origIdx; pc.appendChild(r); });
+  if (sosire) pc.appendChild(sosire);
 }
 
 // A step2 tetején lévő „✅ N fuvar" összesítő újrarajzolása a jelenlegi
@@ -1846,10 +1884,38 @@ function fuvarStep2(allowEmpty) {
   //    Ha `_autoStopFilter` be van állítva (fresh menetlevél auto-collect
   //    útján érkeztünk), csak a filter által engedélyezett — vagyis a már
   //    ELVÉGZETT — stopok kerülnek fel; a fuvar még nyitott stopjai nem.
-  selected.forEach(function(o) {
-    _buildWaybillPuncteForOrder(o, _autoStopFilter).forEach(function (args) {
-      addPunctRow(args[0], args[1], args[2], args[3]);
+  //
+  //    2026-08-27: a fuvarok stopjait EGY tömbbe gyűjtjük és DÁTUM szerint
+  //    rendezzük (YYYY-MM-DD asc). Több fuvar esetén így a valós utazási
+  //    sorrend látszik (pl. F1 lerakása 08-25, F2 felrakása 08-24 → F2
+  //    felrakása előre kerül). Tie-break: eredeti bevitel-sorrend
+  //    (fuvar-sorrend, majd pickup a delivery elé).
+  var _mid = [];
+  var _oIdx = 0;
+  selected.forEach(function (o) {
+    var forOrder = _buildWaybillPuncteForOrder(o, _autoStopFilter);
+    forOrder.forEach(function (args, inIdx) {
+      // args: [loc, tip, dateYmd, meta]
+      _mid.push({ args: args, orderOrder: _oIdx, inOrderIdx: inIdx });
     });
+    _oIdx++;
+  });
+  _mid.sort(function (a, b) {
+    var ad = String(a.args[2] || '');
+    var bd = String(b.args[2] || '');
+    // Üres dátum a végére, hogy ne bolondítsa a Plecare/Sosire-t.
+    if (!ad && bd) return 1;
+    if (ad && !bd) return -1;
+    if (ad !== bd) return ad < bd ? -1 : 1;
+    // Egyező dátum → bevitel-sorrend + pickup-előbb
+    if (a.orderOrder !== b.orderOrder) return a.orderOrder - b.orderOrder;
+    var ap = a.args[3] && a.args[3].role === 'loading' ? 0 : 1;
+    var bp = b.args[3] && b.args[3].role === 'loading' ? 0 : 1;
+    if (ap !== bp) return ap - bp;
+    return a.inOrderIdx - b.inOrderIdx;
+  });
+  _mid.forEach(function (row) {
+    addPunctRow(row.args[0], row.args[1], row.args[2], row.args[3]);
   });
 
   // 3) Sosire (érkezési pont) — visszalépéskor a piszkozatból visszahozzuk;
