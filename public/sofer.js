@@ -4766,12 +4766,17 @@ function submitBugReport(){
 
 // ── Kiosztott fuvarok a főoldalon ────────────────────────
 // A dashboard görgetését CSAK a #soferWrap-en kapcsoljuk (a body marad
-// overflow:hidden — ez az app-shell alapja). Van fuvar → görgethető dashboard.
+// overflow:hidden — ez az app-shell alapja).
+// 2026-08-27 fix: MINDIG scrollable — a mini-statisztika + scan-btn + „Nincs
+// aktív kiosztott fuvar" empty-state esetén is elég sok tartalom van; korábban
+// (orders=0) a `#sec-dash` overflow:hidden mellett a nav-kártyák (flex:1)
+// összenyomódtak, csak az ikonok látszottak. A `scrollable` állapot enable-eli
+// az `#sec-dash overflow-y:auto`-t + a min-height:44vh-t a nav-grid-en → a
+// kártyák természetes méretűek, az oldal görget, ha kell.
 function updateScrollBehavior(orders) {
   var wrap = document.getElementById('soferWrap');
   if (!wrap) return;
-  if (orders && orders.length > 0) wrap.classList.add('scrollable');
-  else wrap.classList.remove('scrollable');
+  wrap.classList.add('scrollable');
 }
 
 // Kártya-kattintással kinyíló részletek másolható szövegei (biztonságos:
