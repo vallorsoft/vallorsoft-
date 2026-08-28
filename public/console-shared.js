@@ -5469,6 +5469,11 @@ function saveOrderEdit() {
   // A régi „top felrakó + top lerakó + extras" modell megszűnt — az volt a
   // sorrend-mixup gyökére (a save mindig top-elöl rakta a felrakót + delivery-t,
   // a maradékot utána, feldarabolva az eredeti interleaved sorrendet).
+  // Per-stop milestone-időbélyegek (multi-drop). Ha aktív a per-stop editor,
+  // gyűjtjük és küldjük — a szerver `comUpdate` a `stop_milestones` payload
+  // alapján frissíti az `order_stops.arrived_at`/`done_at` mezőket.
+  var _sms = (typeof _oeCollectStopMilestones === 'function') ? _oeCollectStopMilestones() : null;
+  if (_sms && _sms.length) payload.stop_milestones = _sms;
   var _seq = (typeof _oeCollectStops === 'function') ? _oeCollectStops() : [];
   if (_seq.length) {
     payload.stops = _seq;
@@ -6220,12 +6225,16 @@ function _oeRenderStops() {
   }
   if (_OES.openIdx == null || _OES.openIdx >= stops.length) _OES.openIdx = stops.length - 1;
 
-  var puCount = 0, deCount = 0;
-  var puNum = [], deNum = [];
-  stops.forEach(function (s) {
-    if (s.kind === 'pickup') { puCount++; puNum.push(puCount); }
-    else { deCount++; deNum.push(deCount); }
-  });
+  // Per-kind sorszám (#1, #2, ...) — a bevitel-sorrendben, kind-en belül
+  // növekedő. Régi bug: a puNum/deNum tömböt csak a matching kind-hez
+  // pushed → az outer index (i) alapú lookup NaN-t adott az elsőn kívül.
+  // Fix: index-map (outerIdx → kindNo), a stops-listát egyszer végigjárjuk.
+  var kindNoByIdx = new Array(stops.length);
+  var _puC = 0, _deC = 0;
+  for (var _i = 0; _i < stops.length; _i++) {
+    if (stops[_i].kind === 'pickup') { _puC++; kindNoByIdx[_i] = _puC; }
+    else { _deC++; kindNoByIdx[_i] = _deC; }
+  }
 
   var last = stops.length - 1;
   list.innerHTML = stops.map(function (s, i) {
@@ -6233,7 +6242,7 @@ function _oeRenderStops() {
     var isPu = (s.kind === 'pickup');
     var kindLabel = isPu ? (t('oc.pickup') || 'Felrakó') : (t('oc.delivery') || 'Lerakó');
     var kindIcon = isPu ? '⬆️' : '⬇️';
-    var numInKind = isPu ? puNum[i] : deNum[i];
+    var numInKind = kindNoByIdx[i];
     var badgeHtml = '<span class="oe-badge ' + s.kind + '">' + kindIcon + ' ' + esc(kindLabel) + ' #' + numInKind + '</span>';
     var sumLoc = esc(s.loc || (t('oc.stopEmpty') || '(üres)'));
     var sumFirma = s.firma ? ' · <b>🏢</b> ' + esc(s.firma) : '';
@@ -6335,6 +6344,7 @@ function _oeRenderStops() {
   }
 
   _oeSyncLegacyFromList();
+  if (typeof _oeRenderPerStopMilestones === 'function') _oeRenderPerStopMilestones();
   if (window.I18N && typeof I18N.apply === 'function') { try { I18N.apply(); } catch(e) {} }
 }
 
@@ -6418,10 +6428,15 @@ function _oeInitStopsFromOrder(order, stops) {
   });
   arr.forEach(function (s) {
     _OES.list.push({
+      // MEGŐRIZZÜK a stop_id-t + a sofőr-rögzített időbélyegeket, hogy az
+      // admin/manager a per-stop milestone-szerkesztőben tudja javítani őket.
+      stop_id: s.id != null ? Number(s.id) : null,
       kind: s.kind === 'pickup' ? 'pickup' : 'delivery',
       loc: s.loc || '',
       firma: s.firma || '',
       data: s.data ? String(s.data).slice(0,10) : '',
+      arrived_at: s.arrived_at || null,
+      done_at: s.done_at || null,
       _lat: null, _lng: null
     });
   });
@@ -6446,6 +6461,106 @@ function _oeInitStopsFromOrder(order, stops) {
   }
   _OES.openIdx = _OES.list.length ? _OES.list.length - 1 : 0;
   _oeRenderStops();
+}
+
+// ── PER-STOP MILESTONE EDITOR (multi-drop fuvarhoz) ──────────
+// Minden stopnak 2 datetime-local mezőt renderelünk (📍 arrived_at +
+// 📦/✅ done_at). A #oeMilestonesPerStop konténerbe rakjuk (a legacy
+// 4-slot grid alatt), és a legacy blokkot elrejtjük ha ≥2 stopon van
+// per-stop adat. Így a bit-azonos 1+1 fuvar (backfilled pickup#0/
+// delivery#0) marad a 4-slot módban, a multi-drop viszont per-stop lesz.
+// A save `stop_milestones: [{stopId, arrived_at, done_at}]` payloadot
+// gyűjt és küldi a comUpdate-nak; a szerver az order_stops-ba írja.
+function _oeRenderPerStopMilestones() {
+  var host = document.getElementById('oeMilestonesPerStop');
+  var legacy = document.getElementById('oeMilestonesLegacy');
+  if (!host) return;
+  var stops = (_OES && _OES.list) || [];
+  // Multi-drop kritérium: 3+ stop VAGY ≥2 pickup / ≥2 delivery.
+  var puC = 0, deC = 0;
+  stops.forEach(function (s) { if (s.kind === 'pickup') puC++; else deC++; });
+  var isMulti = stops.length >= 3 || puC >= 2 || deC >= 2;
+  if (!isMulti) {
+    host.innerHTML = '';
+    host.style.display = 'none';
+    if (legacy) legacy.style.display = '';
+    return;
+  }
+  host.style.display = 'flex';
+  if (legacy) legacy.style.display = 'none';
+  var kindNoByIdx = new Array(stops.length);
+  var _pu = 0, _de = 0;
+  for (var i = 0; i < stops.length; i++) {
+    if (stops[i].kind === 'pickup') { _pu++; kindNoByIdx[i] = _pu; }
+    else { _de++; kindNoByIdx[i] = _de; }
+  }
+  host.innerHTML = stops.map(function (s, i) {
+    if (!s.stop_id) {
+      // Új (még nem-mentett) stop: nincs stopId → nem tudjuk az order_stops-hoz
+      // kötni. Csak a mentés UTÁN lesz szerkeszthető az idő. Placeholder-rel jelezzük.
+      var pkKind = s.kind === 'pickup';
+      return '<div class="oe-ms-card oe-ms-new" data-i18n-title="oe.msNewHint" title="' +
+        esc(t('oe.msNewHint') || 'Előbb mentsd el ezt az új állomást — utána szerkeszthető az idő.') + '">' +
+        '<div class="oe-ms-head"><span class="oe-stop-idx">#' + (i + 1) + '</span>' +
+        '<span class="oe-badge ' + s.kind + '">' + (pkKind ? '⬆️' : '⬇️') + ' ' + esc(pkKind ? (t('oc.pickup')||'Felrakó') : (t('oc.delivery')||'Lerakó')) + ' #' + kindNoByIdx[i] + '</span>' +
+        '<span class="oe-ms-new-lbl">' + esc(t('oe.msNewLbl') || '(új — előbb mentsd)') + '</span></div></div>';
+    }
+    var pkKind = s.kind === 'pickup';
+    var arrLbl = pkKind ? (t('oe.sositIncarcare') || '📍 Megérkezett a felrakóhoz') : (t('oe.sositDescarcare') || '📍 Megérkezett a lerakóhoz');
+    var doneLbl = pkKind ? (t('oe.incarcat') || '📦 Felrakodott') : (t('oe.descarcat') || '✅ Leürített');
+    var arrVal = feToLocalDtInput(s.arrived_at);
+    var doneVal = feToLocalDtInput(s.done_at);
+    var arrId = 'oeMsArr_' + s.stop_id;
+    var doneId = 'oeMsDone_' + s.stop_id;
+    return '<div class="oe-ms-card" data-stop-id="' + s.stop_id + '">' +
+      '<div class="oe-ms-head">' +
+        '<span class="oe-stop-idx">#' + (i + 1) + '</span>' +
+        '<span class="oe-badge ' + s.kind + '">' + (pkKind ? '⬆️' : '⬇️') + ' ' + esc(pkKind ? (t('oc.pickup')||'Felrakó') : (t('oc.delivery')||'Lerakó')) + ' #' + kindNoByIdx[i] + '</span>' +
+        (s.loc ? '<span class="oe-ms-loc">📍 ' + esc(s.loc.split(',')[0] || s.loc) + '</span>' : '') +
+      '</div>' +
+      '<div class="oe-ms-grid">' +
+        '<div class="field"><label>' + esc(arrLbl) + '</label><input class="input" id="' + arrId + '" type="datetime-local" value="' + esc(arrVal) + '" data-stop-id="' + s.stop_id + '" data-ms-field="arrived_at"></div>' +
+        '<div class="field"><label>' + esc(doneLbl) + '</label><input class="input" id="' + doneId + '" type="datetime-local" value="' + esc(doneVal) + '" data-stop-id="' + s.stop_id + '" data-ms-field="done_at"></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  if (window.I18N && typeof I18N.apply === 'function') { try { I18N.apply(); } catch(e) {} }
+}
+
+// Az `saveOrderEdit` hívja: összegyűjti a stop_milestones payloadot.
+// A szerver `comUpdate` új opcionális `stop_milestones: [{stopId, arrived_at, done_at}]`
+// mezője alapján az `order_stops`-ba írja. Csak akkor küldjük, ha a per-stop
+// blokk aktív (multi-drop) és van legalább 1 érvényes stop_id-vel bíró sor.
+function _oeCollectStopMilestones() {
+  var host = document.getElementById('oeMilestonesPerStop');
+  if (!host || host.style.display === 'none') return null;
+  var out = [];
+  var cards = host.querySelectorAll('.oe-ms-card[data-stop-id]');
+  Array.prototype.forEach.call(cards, function (card) {
+    var stopId = parseInt(card.getAttribute('data-stop-id'), 10);
+    if (!Number.isFinite(stopId)) return;
+    var arrEl = card.querySelector('[data-ms-field="arrived_at"]');
+    var doneEl = card.querySelector('[data-ms-field="done_at"]');
+    var entry = { stopId: stopId };
+    if (arrEl) {
+      var arrRaw = arrEl.value || '';
+      if (arrRaw === '') entry.arrived_at = null;
+      else {
+        var da = new Date(arrRaw);
+        if (da instanceof Date && !isNaN(da.getTime())) entry.arrived_at = da.toISOString();
+      }
+    }
+    if (doneEl) {
+      var doneRaw = doneEl.value || '';
+      if (doneRaw === '') entry.done_at = null;
+      else {
+        var dd = new Date(doneRaw);
+        if (dd instanceof Date && !isNaN(dd.getTime())) entry.done_at = dd.toISOString();
+      }
+    }
+    out.push(entry);
+  });
+  return out.length ? out : null;
 }
 
 // A save-nak: a `_OES.list`-ből épített `stops[]` payload (kliens-oldali

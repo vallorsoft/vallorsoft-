@@ -1348,6 +1348,9 @@
     'oe.stopFirma': { hu: 'Cég', ro: 'Firmă' },
     'oe.stopDate': { hu: 'Dátum', ro: 'Dată' },
     'oe.stopDeleteConfirm': { hu: 'Törlöd ezt az állomást?', ro: 'Ștergi acest punct de oprire?' },
+    // Per-stop milestone editor (multi-drop fuvar — admin/manager)
+    'oe.msNewLbl':  { hu: '(új — előbb mentsd)', ro: '(nou — salvează întâi)' },
+    'oe.msNewHint': { hu: 'Előbb mentsd el ezt az új állomást — utána szerkeszthető az idő.', ro: 'Salvează întâi acest punct nou — apoi timpul devine editabil.' },
     // 🚚 Sofőr-állomás időbélyeg szerkesztő (fuvar-szerkesztő modalban)
     'oe.milestonesHead': { hu: '🚚 Sofőr-állomás időpontok', ro: '🚚 Marcaje șofer (arrive/done)' },
     'oe.milestonesHint': {

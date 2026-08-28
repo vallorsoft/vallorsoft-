@@ -959,6 +959,50 @@ handlers.comUpdate = async function (req, res, args) {
         }
       }
 
+      // Per-stop milestone-időbélyegek (multi-drop admin/manager utólagos
+      // szerkesztés). ELŐBB fut, mint a replaceStopsForOrder — hogy a DB-ben
+      // már az új arrived_at/done_at legyen, amit a replace prevMap-je aztán
+      // (kind + stop_index) alapján megőriz. Csak érvényes ISO / null → SQL.
+      // Nem érvényes vagy nem-tulajdon stopId → csendes skip.
+      try {
+        if (Array.isArray(o.stop_milestones) && o.stop_milestones.length) {
+          for (const m of o.stop_milestones.slice(0, 50)) {
+            if (!m || typeof m !== 'object') continue;
+            const sid = parseInt(m.stopId, 10);
+            if (!Number.isFinite(sid)) continue;
+            const updates = [];
+            const values = [];
+            let j = 1;
+            const parseTs = (v) => {
+              if (v === undefined) return undefined;
+              if (v === null || v === '') return null;
+              const d = new Date(String(v));
+              if (!(d instanceof Date) || isNaN(d.getTime())) return undefined;
+              return d.toISOString();
+            };
+            const arr = parseTs(m.arrived_at);
+            const done = parseTs(m.done_at);
+            if (arr !== undefined) {
+              if (arr === null) updates.push(`arrived_at = NULL`);
+              else { updates.push(`arrived_at = $${j++}::timestamptz`); values.push(arr); }
+            }
+            if (done !== undefined) {
+              if (done === null) updates.push(`done_at = NULL`);
+              else { updates.push(`done_at = $${j++}::timestamptz`); values.push(done); }
+            }
+            if (!updates.length) continue;
+            updates.push(`updated_at = NOW()`);
+            values.push(sid);
+            values.push(id);
+            values.push(req.session.user.company_id);
+            await pool.query(
+              `UPDATE order_stops SET ${updates.join(', ')}
+                WHERE id = $${j} AND order_id = $${j + 1} AND company_id = $${j + 2}`,
+              values);
+          }
+        }
+      } catch (e) { console.error('stop_milestones update hiba (a fuvar mentve):', e); }
+
       // Stopok kezelése — a orders.*_at mirror-mezőket a trigger frissíti.
       // A régi kliens (nincs stops-tömb) top-szintű loc_incarcare/loc_descarcare
       // szerkesztéskor a pickup#0/delivery#0 stopot upsertelünk (visszafelé
