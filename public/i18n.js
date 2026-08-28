@@ -3022,6 +3022,7 @@
     'sof.resume.confirmDiscard': { hu: 'Biztosan eldobod a megkezdett menetlevelet? A beírt tankolás/vásárlás sorok megmaradnak — a következő menetlevélnél felajánljuk hozzáadásra.', ro: 'Sigur renunți la foaia de parcurs începută? Alimentările și achizițiile introduse se păstrează — la următoarea foaie ți le oferim spre adăugare.' },
     'sof.resume.discarded': { hu: 'A megkezdett menetlevél eldobva. Ha volt benne tankolás/vásárlás, a következő menetlevélnél felajánljuk.', ro: 'Foaia de parcurs începută a fost ștearsă. Dacă avea alimentări/achiziții, ți le oferim la următoarea foaie.' },
     'sof.draftRestoredLong': { hu: '📄 Folytatod a korábban megkezdett menetlevelet.', ro: '📄 Continui foaia de parcurs începută anterior.' },
+    'sof.draftAutoSynced':   { hu: 'A fuvar módosult — a menetlevél sorai frissítve.', ro: 'Cursa s-a modificat — punctele foii de parcurs au fost actualizate.' },
     // ── Beküldés-összegző (megerősítés a véglegesítés előtt) ──
     'sof.cf.title':     { hu: '✅ Menetlevél beküldése', ro: '✅ Trimiterea foii de parcurs' },
     'sof.cf.hint':      { hu: 'Nézd át, mielőtt elküldöd — a beküldött menetlevél hivatalos bizonylat, nem vonható vissza.', ro: 'Verifică înainte de trimitere — foaia de parcurs trimisă este un document oficial și nu poate fi retrasă.' },
