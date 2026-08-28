@@ -3489,3 +3489,25 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
    szabályokra fentebb feleslegessé válik (a modal mindig világos-forma-stílust
    kap), de érintetlen marad — nem aktiválódik. */
 
+
+/* Per-stop milestone-editor a fuvar-szerkesztő modalban (multi-drop) — 2026-08-27 */
+#orderEditModal .oe-ms-card{
+  border:1.5px solid #cbd5e1; border-radius:12px; padding:10px 12px;
+  background:#ffffff;
+}
+#orderEditModal .oe-ms-card.oe-ms-new{ background:#fef3c7; border-color:#fcd34d; }
+#orderEditModal .oe-ms-head{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  margin-bottom:8px; padding-bottom:6px; border-bottom:1px dashed #e2e8f0;
+}
+#orderEditModal .oe-ms-loc{ font-size:12.5px; color:#475569; font-weight:600; }
+#orderEditModal .oe-ms-new-lbl{ font-size:11.5px; color:#92400e; font-style:italic; }
+#orderEditModal .oe-ms-grid{
+  display:grid; grid-template-columns:1fr 1fr; gap:10px;
+}
+#orderEditModal .oe-ms-grid label{
+  font-size:11.5px; color:#334155; font-weight:600; margin-bottom:4px; display:block;
+}
+@media (max-width:520px){
+  #orderEditModal .oe-ms-grid{ grid-template-columns:1fr; }
+}
