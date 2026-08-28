@@ -84,6 +84,13 @@
   }
   .sofer-wrap.scrollable #sec-dash { overflow-y: auto; }
   .sofer-wrap.scrollable .sofer-nav-grid { min-height: 44vh; }
+  /* 2026-08-27 fix: minden nav-kártyának garantált min-height, hogy az ikon
+     ÉS a felirat mindig kiférjen (nem összenyomódás a szűkös helyen). A
+     korábbi `min-height: 0 + flex:1` az empty-state-nél összenyomta a
+     kártyákat, csak az ikonok látszottak. */
+  .sofer-wrap.scrollable .sofer-nav-card { min-height: 110px; }
+  .sofer-wrap.scrollable .sofer-nav-card.sofer-nav-duo,
+  .sofer-wrap.scrollable .sofer-nav-card.logout { min-height: 62px; }
 
   /* ── Felső sáv ── */
   .sofer-header {
