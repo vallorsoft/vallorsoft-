@@ -1331,6 +1331,14 @@
     'oa.errSave':        { hu: 'Nem sikerült menteni', ro: 'Eroare la salvare' },
     'oa.errLoad':        { hu: 'Nem sikerült betölteni', ro: 'Nu s-a putut încărca' },
     'oa.errPdf':         { hu: 'Nem sikerült generálni a PDF-et', ro: 'Nu s-a putut genera PDF' },
+    // Előnézet: PDF.js canvas-render + „nyisd meg új ablakban" fallback
+    'oa.previewLoading': { hu: 'Előnézet készül…', ro: 'Se generează previzualizarea…' },
+    'oa.previewReady':   { hu: '✓ Előnézet kész — mobilon is olvasható', ro: '✓ Previzualizarea este gata — se vede și pe telefon' },
+    'oa.previewFail':    { hu: 'Beágyazott előnézet nem elérhető — használd a fenti gombokat', ro: 'Previzualizarea încorporată nu este disponibilă — folosește butoanele de mai sus' },
+    'oa.previewNotReady':{ hu: 'Az előnézet még nem kész.', ro: 'Previzualizarea încă nu este gata.' },
+    'oa.previewFallback':{ hu: 'A böngésző nem tudja beágyazottan megjeleníteni a PDF-et. Használd a gombokat: megnyithatod új ablakban vagy letöltheted.', ro: 'Browserul nu poate afișa PDF-ul încorporat. Folosește butoanele: îl poți deschide într-o filă nouă sau descărca.' },
+    'oa.openInNewTab':   { hu: 'Megnyitás új ablakban', ro: 'Deschide într-o filă nouă' },
+    'oa.downloadPdf':    { hu: 'PDF letöltése', ro: 'Descarcă PDF' },
     'oa.attached':       { hu: 'Csatolva a fuvar dokumentumaihoz.', ro: 'Atașat la documentele cursei.' },
     'oa.emailManual':    { hu: 'A dokumentum a fuvar dokumentumai között — a fuvar menüjéből küldheted el.', ro: 'Documentul este în documentele cursei — îl poți trimite din meniul cursei.' },
     // Pecsét (Comanda de Transport aláíró blokkjához)

@@ -14,6 +14,25 @@
 
 ---
 
+## 2026-08-27 — Comanda de Transport ELŐNÉZET mobil-fix: PDF.js canvas-render (iframe helyett) — telefonon is olvasható + „Megnyitás új ablakban" gomb
+
+**Kérés:** „es az elonezetet telefonon nem nyitja meg mert nem tamogatott ezt kitudod javitani?".
+
+**Gyökér:** a Step 6 PDF-előnézet `<iframe src="blob:…">` mintát használt. Ez desktop Chrome/Firefox-on működik, de az **iOS Safari** és az **Android Chrome egyes verziói** nem jelenítik meg beágyazottan a blob-URL PDF-eket — a sofőr/manager egy üres/fehér iframe-et lát, „nem támogatott" jelzéssel vagy semmit. A PDF letöltés-gomb működött, de a WYSIWYG-előnézet — ami a lényeg — a mobilra kiesett.
+
+**Fix (`public/order-assignment.js` `_generatePdfPreview` + új helpers):**
+1. **Új PDF.js canvas-render** — a generált PDF-et `pdfjsLib.getDocument({data: bytes})` betölti, majd MINDEN oldalt egy külön `<canvas>`-ra renderel (retina-tiszta `devicePixelRatio 2×`, a viewport-hoz igazított szélesség). Ez **képként** jelenik meg, amit az összes böngésző támogat — iOS Safari, Android Chrome, asztali böngészők egyaránt. Minden oldal fölött kis `N / M` oldalszám-badge (kék pill, világos/sötét téma-tudatos).
+2. **Új `openInNewTab()` publikus API** — a blob-URL-t új tabban nyitja (`window.open`); popup-tiltás esetén automatikus letöltés-fallback. Mobilon: iOS Safari-n a natív PDF-nézőt indítja, Android Chrome-on a beépített nézőt.
+3. **Új `downloadPdf()` publikus API** — a PDF-et közvetlenül letölti (`data:application/pdf;base64,…` + `download` attribútum) mentés nélkül. A mentett verzió továbbra is a „💾 Mentés + PDF letöltése" gombbal érhető el.
+4. **Fejlécen két új gomb**: **🔗 Megnyitás új ablakban** + **⬇️ PDF letöltése** — ezek MINDIG működnek, akkor is, ha a canvas-render valamiért elhasal (fallback biztonsági háló). A status-sáv jelzi: „✓ Előnézet kész — mobilon is olvasható" vagy „Beágyazott előnézet nem elérhető — használd a fenti gombokat".
+5. **Fallback UI** — ha PDF.js hiba (nagyon régi böngésző, blokkolt CDN), a `.oa-preview-box`-ban egy központos 📄 ikon + magyarázat jelenik meg: „A böngésző nem tudja beágyazottan megjeleníteni…". A gombok fent továbbra is elérhetők.
+
+**Új CSS** (~50 sor a `style.css` VÉGÉN, `#oaModal`-ra szűkítve): `.oa-preview-tools` sáv (világos szürke bg + 2px keret), `.oa-prev-tool` gombok, `.oa-preview-box` (világosszürke háttér + görgethető max 72vh), `.oa-prev-canvas` (fehér lap + shadow + finom keret), `.oa-prev-pgnum` oldalszám-badge, `.oa-prev-fallback` központos szöveg. Mind világos + sötét téma-tudatos.
+
+**i18n** 7 új kulcs (`oa.previewLoading`/`Ready`/`Fail`/`NotReady`/`Fallback` + `oa.openInNewTab`/`downloadPdf`, RO+HU). Cache-bust `?v=20260827mobilep` (style.css + i18n.js + order-assignment.js). **1004 Jest zöld**, nincs regresszió.
+
+---
+
 ## 2026-08-27 — Comanda de Transport: menüből törölhető + szerkeszthető + a modal kontraszt-fixe (minden felirat/gomb egyértelmű, jól látható)
 
 **Kérés:** „lehessen kitorolni a fuvartol a mengrendelest es szerkeszteni is + plusz a generalasnal kontraszt hibak vannak javitsd minden legyen egyertelmu és atgondolt jol lathato".

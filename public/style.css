@@ -3370,3 +3370,54 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #oaModal #oaPdfPreview{ border: 2px solid #cbd5e1 !important; box-shadow: 0 4px 12px rgba(15,23,42,.08); }
 .main-content[data-theme="dark"] #oaModal #oaPdfPreview{ border-color: #475569 !important; }
 
+/* PDF.js canvas-előnézet — MINDEN eszközön (mobil is) működik.
+   Az iframe helyett most oldalanként egy <canvas> jelenik meg
+   képként; az iOS Safari / Android Chrome PDF-korlát nem érinti. */
+#oaModal .oa-preview-tools{
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding: 8px 10px; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 10px;
+}
+.main-content[data-theme="dark"] #oaModal .oa-preview-tools{ background: #0b1220; border-color: #334155; }
+#oaModal .oa-preview-tools .btn.oa-prev-tool{
+  background: #ffffff !important; color: #0f172a !important; border: 2px solid #cbd5e1 !important;
+  font-weight: 700; padding: 8px 14px;
+}
+#oaModal .oa-preview-tools .btn.oa-prev-tool:hover{ border-color: #2563eb !important; background: #eff6ff !important; }
+.main-content[data-theme="dark"] #oaModal .oa-preview-tools .btn.oa-prev-tool{
+  background: #0f172a !important; color: #f1f5f9 !important; border-color: #475569 !important;
+}
+#oaModal .oa-prev-status{ font-size: 12px; color: #475569; font-weight: 600; margin-left: 4px; }
+.main-content[data-theme="dark"] #oaModal .oa-prev-status{ color: #cbd5e1; }
+
+#oaModal .oa-preview-box{
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  background: #e5e7eb; padding: 12px; border: 2px solid #cbd5e1; border-radius: 12px;
+  max-height: 72vh; overflow-y: auto;
+}
+.main-content[data-theme="dark"] #oaModal .oa-preview-box{ background: #1e293b; border-color: #475569; }
+#oaModal .oa-prev-loading{
+  padding: 40px 20px; text-align: center; color: #475569; font-weight: 700; font-size: 14px;
+}
+.main-content[data-theme="dark"] #oaModal .oa-prev-loading{ color: #cbd5e1; }
+#oaModal .oa-prev-progress{ padding: 20px; color: #475569; font-weight: 600; }
+.main-content[data-theme="dark"] #oaModal .oa-prev-progress{ color: #cbd5e1; }
+
+#oaModal .oa-prev-pgnum{
+  font-size: 11px; font-weight: 700; color: #475569; padding: 2px 10px;
+  background: #ffffff; border-radius: 999px; border: 1px solid #cbd5e1;
+}
+.main-content[data-theme="dark"] #oaModal .oa-prev-pgnum{ background: #0f172a; color: #cbd5e1; border-color: #475569; }
+#oaModal .oa-prev-canvas{
+  max-width: 100%; height: auto; background: #ffffff;
+  box-shadow: 0 6px 20px rgba(15,23,42,.15); border-radius: 4px;
+  border: 1px solid #d1d5db;
+}
+.main-content[data-theme="dark"] #oaModal .oa-prev-canvas{ box-shadow: 0 6px 20px rgba(0,0,0,.4); border-color: #64748b; }
+
+#oaModal .oa-prev-fallback{
+  padding: 40px 20px; text-align: center; display: flex; flex-direction: column; gap: 14px; align-items: center;
+}
+#oaModal .oa-prev-fallback-ico{ font-size: 48px; }
+#oaModal .oa-prev-fallback-msg{ color: #334155; font-weight: 600; max-width: 460px; line-height: 1.5; }
+.main-content[data-theme="dark"] #oaModal .oa-prev-fallback-msg{ color: #cbd5e1; }
+

@@ -524,6 +524,12 @@
 
   function _step6Html(){
     var ex = OA.data && OA.data.existing;
+    // Az előnézet KÉT módban készül:
+    //   1) PDF.js canvas-render (minden eszközön, mobilon is működik).
+    //      Ez a fő nézet — az `iframe` NEM megbízható mobilon
+    //      (iOS Safari / Android Chrome nem jelenít meg blob-PDF-et).
+    //   2) Fallback: „Megnyitás új ablakban / Letöltés" gombok, ha
+    //      PDF.js hiba lenne. Külön külön mindig elérhetők.
     return ''+
       '<div class="oa-preview-wrap">'+
         '<div class="oa-preview-actions">'+
@@ -533,8 +539,13 @@
           '<button type="button" class="btn" onclick="OrderAssignment.emailToCarrier()">✉️ '+esc(t('oa.emailToCarrier','Trimite alv.'))+'</button>'+
           (ex ? '<button type="button" class="btn danger" onclick="OrderAssignment.deleteAssign()">🗑 '+esc(t('oa.deleteAssign','Sterge comanda'))+'</button>' : '')+
         '</div>'+
-        '<div class="oa-preview-box">'+
-          '<iframe id="oaPdfPreview" title="PDF preview" style="width:100%;height:70vh;border:1px solid var(--vs-border,#cbd5e1);border-radius:10px;background:#fff;"></iframe>'+
+        '<div class="oa-preview-tools">'+
+          '<button type="button" class="btn oa-prev-tool" onclick="OrderAssignment.openInNewTab()">🔗 '+esc(t('oa.openInNewTab','Megnyitás új ablakban'))+'</button>'+
+          '<button type="button" class="btn oa-prev-tool" onclick="OrderAssignment.downloadPdf()">⬇️ '+esc(t('oa.downloadPdf','PDF letöltése'))+'</button>'+
+          '<span class="oa-prev-status" id="oaPrevStatus"></span>'+
+        '</div>'+
+        '<div class="oa-preview-box" id="oaPdfPreviewBox">'+
+          '<div class="oa-prev-loading" id="oaPrevLoading">⏳ '+esc(t('oa.previewLoading','Előnézet készül…'))+'</div>'+
         '</div>'+
       '</div>';
   }
@@ -1161,18 +1172,109 @@
   }
 
   async function _generatePdfPreview(){
-    var iframe = document.getElementById('oaPdfPreview'); if (!iframe) return;
+    // Fő nézet: PDF.js canvas-render — minden eszközön működik (iframe
+    // NEM megbízható mobilon, ott „Kattints a letöltéshez" oldalra visz).
+    var box = document.getElementById('oaPdfPreviewBox');
+    var status = document.getElementById('oaPrevStatus');
+    if (!box) return;
     try {
       var bytes = await _generatePdfBytes();
       OA._lastPdfBytes = bytes;
-      var blob = new Blob([bytes], { type: 'application/pdf' });
+      // Blob-URL a „Megnyitás új ablakban" + „Letöltés" gombokhoz.
       if (OA._renderedPdfBlobUrl) try { URL.revokeObjectURL(OA._renderedPdfBlobUrl); } catch(e){}
+      var blob = new Blob([bytes], { type: 'application/pdf' });
       OA._renderedPdfBlobUrl = URL.createObjectURL(blob);
-      iframe.src = OA._renderedPdfBlobUrl;
+      await _renderPdfPagesToCanvases(bytes, box);
+      if (status) status.textContent = t('oa.previewReady','Előnézet kész — mobilon is olvasható');
     } catch(err) {
       console.error('PDF preview error:', err);
-      toast(t('oa.errPdf', 'Nu s-a putut genera PDF.'), 'err');
+      // Fallback UI a boxban: ha a canvas-render megbukott, tegyünk oda
+      // egy jól látható „Nyisd meg / Töltsd le" üzenetet — a gombok
+      // fent továbbra is működnek.
+      if (box) {
+        box.innerHTML = '<div class="oa-prev-fallback">'+
+          '<div class="oa-prev-fallback-ico">📄</div>'+
+          '<div class="oa-prev-fallback-msg">'+esc(t('oa.previewFallback','A böngésző nem tudja beágyazottan megjeleníteni a PDF-et. Használd a gombokat: megnyithatod új ablakban vagy letöltheted.'))+'</div>'+
+          '</div>';
+      }
+      if (status) status.textContent = t('oa.previewFail','Beágyazott előnézet nem elérhető — használd a fenti gombokat');
     }
+  }
+
+  // PDF.js render: minden oldalt egy `<canvas>`-ra rajzolunk, mert a
+  // mobil böngészők (iOS Safari, Android Chrome egyes verziói) az
+  // `<iframe src="blob:…">` PDF-et NEM jelenítik meg beágyazva. Canvas
+  // képként minden eszközön megjelenik. A méret a viewport-hoz igazodik
+  // (retina-tiszta a `devicePixelRatio`-val).
+  async function _renderPdfPagesToCanvases(bytes, container){
+    if (!window.pdfjsLib) throw new Error('pdf.js missing');
+    if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+    container.innerHTML = '';
+    // Külön betöltési jelző, hogy több oldalnál is látszódjon a progress.
+    var progress = document.createElement('div');
+    progress.className = 'oa-prev-progress';
+    progress.textContent = '⏳ ' + t('oa.previewLoading','Előnézet készül…');
+    container.appendChild(progress);
+
+    var pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+    var pageCount = pdf.numPages;
+    // A tartalom-szélességhez igazított render-szélesség (a modal-ban).
+    var containerW = Math.max(300, container.clientWidth - 4);
+    var dpr = Math.min(window.devicePixelRatio || 1, 2); // 2× elég
+
+    for (var i = 1; i <= pageCount; i++){
+      var page = await pdf.getPage(i);
+      var vpBase = page.getViewport({ scale: 1 });
+      var scale = containerW / vpBase.width;
+      var vp = page.getViewport({ scale: scale });
+      var canvas = document.createElement('canvas');
+      canvas.className = 'oa-prev-canvas';
+      canvas.width = Math.floor(vp.width * dpr);
+      canvas.height = Math.floor(vp.height * dpr);
+      canvas.style.width = Math.floor(vp.width) + 'px';
+      canvas.style.height = Math.floor(vp.height) + 'px';
+      var ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      // Az első oldal betöltésekor húzzuk le a „készül…" jelzőt.
+      if (i === 1) { try { progress.remove(); } catch(e){} }
+      container.appendChild(canvas);
+      // Kis oldalszám-badge minden oldal fölé.
+      var lbl = document.createElement('div');
+      lbl.className = 'oa-prev-pgnum';
+      lbl.textContent = i + ' / ' + pageCount;
+      container.insertBefore(lbl, canvas);
+    }
+    try { progress.remove(); } catch(e){}
+  }
+
+  // Új ablakban megnyitás — mobilon és desktopon egyaránt működik.
+  // A böngésző natív PDF-nézőjét használjuk (iOS: „Megnyitás" gomb).
+  function openInNewTab(){
+    if (!OA._renderedPdfBlobUrl) { toast(t('oa.previewNotReady','Az előnézet még nem kész.'), 'err'); return; }
+    try {
+      var w = window.open(OA._renderedPdfBlobUrl, '_blank');
+      if (!w) {
+        // Popup-tiltás — fallback letöltésre.
+        downloadPdf();
+      }
+    } catch(e) {
+      downloadPdf();
+    }
+  }
+
+  // Letöltés — a mentés nélkül csak lokálisan.
+  function downloadPdf(){
+    if (!OA._lastPdfBytes) { toast(t('oa.previewNotReady','Az előnézet még nem kész.'), 'err'); return; }
+    var b64 = _bytesToBase64(OA._lastPdfBytes);
+    var a = document.createElement('a');
+    a.href = 'data:application/pdf;base64,' + b64;
+    a.download = 'Comanda-' + (OA.orderId || 'transport') + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ try { a.remove(); } catch(e){} }, 500);
   }
 
   // ── Akciók ───────────────────────────────────────────────
@@ -1241,6 +1343,10 @@
     setDriver: setDriver,
     saveOnly: saveOnly, saveAndDownload: saveAndDownload, attachToOrder: attachToOrder,
     emailToCarrier: emailToCarrier, deleteAssign: deleteAssign, finish: finish,
+    // Mobil-barát előnézet-akciók: a beágyazott iframe PDF-et NEM
+    // jelenít meg iOS Safari-n és Android Chrome egyes verzióin;
+    // ezek a gombok mindig működnek.
+    openInNewTab: openInNewTab, downloadPdf: downloadPdf,
     // A Beállítások szerkesztőnek: a jelenlegi (hardcoded) alapértelmezett
     // sablon-értékek, hogy a „Reset alapértelmezettre" gomb és a placeholderek
     // szinkronban legyenek a PDF-generátorral (EGY forrás — nincs másolgatás).
