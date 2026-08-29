@@ -3227,6 +3227,23 @@ function cancelOrder(id){
   }).catch(function(){ toast(t('common.connError'), 'err'); });
 }
 
+// A fuvar-listán a ⋯ menüből meghívva — csak a Comanda de Transport
+// (megbízás) dokumentumot törli a fuvarról, a fuvar érintetlen marad.
+// Dupla-confirm: elsődleges + „biztosan?" (defense against fat-fingering).
+function vsDeleteOrderAssignment(id){
+  if (!id) return;
+  if (!confirm(t('cs.cf.deleteAssignment','Sigur stergi Comanda de Transport atasata acestei curse? (Cursa nu se sterge.)'))) return;
+  if (!confirm(t('cs.cf.deleteAssignment2','Ultima confirmare — Comanda de Transport se sterge definitiv.'))) return;
+  gas('orderAssignmentDelete', [String(id)]).then(function(r){
+    if (r && r.ok) {
+      toast(t('common.deleted','Törölve'), 'ok');
+      if (typeof loadOrders === 'function') loadOrders();
+    } else {
+      toast((r && r.err) || t('common.error','Hiba'), 'err');
+    }
+  }).catch(function(){ toast(t('common.connError','Kapcsolati hiba'), 'err'); });
+}
+
 // ── Törölt fuvarok almenü: lista + visszaállítás ────────────────────────
 // A pane a fő fuvar-listáról kizárt Anulat státuszú fuvarokat mutatja
 // (getCancelledOrders). Visszaállítás: Anulat → Disponibil (restoreOrder).
@@ -4822,10 +4839,22 @@ function renderFilteredOrders(list) {
     // 📄 Comanda de Transport (megbízás) — CSAK ha nincs belső sofőr KIOSZTVA
     // (Extern fuvar vagy „None"/sofőr nélküli); a szerver-oldali handler is
     // ellenőrzi (defense in depth).
+    // Ha MÁR van megbízás: két külön menüpont — Szerkesztés + Törlés
+    // (a törlés dupla-confirm-mel, az `orderAssignmentDelete` handleren át;
+    //  a fuvar érintetlen marad, csak a megbízás dokumentum tűnik el).
     if (window.OrderAssignment && !c.email_sofer) {
-      menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mAssignment','Comanda de Transport')+'" '+
-        'onclick="OrderAssignment.open(\''+c.id+'\');closeOrderActions()">'+
-        '<span class="vs-act-ico">📄</span><span class="vs-act-lbl">'+t('cs.ol.mAssignment','Comanda de Transport')+'</span></button>';
+      if (c.has_assignment) {
+        menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mAssignmentEdit','Comanda de Transport szerkesztése')+'" '+
+          'onclick="OrderAssignment.open(\''+c.id+'\');closeOrderActions()">'+
+          '<span class="vs-act-ico">✏️</span><span class="vs-act-lbl">'+t('cs.ol.mAssignmentEdit','Megbízás szerkesztése')+'</span></button>';
+        menuItems += '<button class="vs-act-item danger" role="menuitem" title="'+t('cs.ol.mAssignmentDelete','Megbízás törlése')+'" '+
+          'onclick="vsDeleteOrderAssignment(\''+c.id+'\');closeOrderActions()">'+
+          '<span class="vs-act-ico">🗑</span><span class="vs-act-lbl">'+t('cs.ol.mAssignmentDelete','Megbízás törlése')+'</span></button>';
+      } else {
+        menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mAssignment','Comanda de Transport')+'" '+
+          'onclick="OrderAssignment.open(\''+c.id+'\');closeOrderActions()">'+
+          '<span class="vs-act-ico">📄</span><span class="vs-act-lbl">'+t('cs.ol.mAssignment','Comanda de Transport')+'</span></button>';
+      }
     }
     // ⛔ Áru leadása (megszakítás) — elválasztó után, danger színnel; aktív fuvaron
     if (!isCancelled && (c.status==='Alocat'||c.status==='In Curs') && c.handover_status!=='Fuggoben') {

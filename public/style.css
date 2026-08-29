@@ -3238,3 +3238,135 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .oa-preview-actions .btn{ font-weight: 700; padding: 10px 16px; }
 .oa-empty{ padding: 20px; text-align: center; color: #64748b; font-style: italic; }
 
+/* ================================================================
+   Comanda de Transport modal — KONTRASZT + OLVASHATÓSÁG KÖR
+   ----------------------------------------------------------------
+   Kizárólag a #oaModal scope-jában érvényes felülírások — a többi
+   felületet nem érinti (felülíró jogán él). Cél: minden felirat/
+   gomb egyértelműen olvasható legyen világos ÉS sötét témán is.
+   ================================================================ */
+/* Címkék: sötétebb szürke a fehér kártyán (WCAG AA+ elérése) */
+#oaModal .oa-lbl{ color: #334155; font-weight: 700; font-size: 12.5px; letter-spacing: .3px; text-transform: uppercase; }
+#oaModal.main-content[data-theme="dark"] .oa-lbl,
+.main-content[data-theme="dark"] #oaModal .oa-lbl{ color: #cbd5e1; }
+
+/* Hint-szövegek: olvashatóbb, halvány szürkéből közepes tinta */
+#oaModal .oa-hint{ color: #475569; font-size: 12px; font-weight: 500; }
+.main-content[data-theme="dark"] #oaModal .oa-hint{ color: #94a3b8; }
+
+/* Üres állapotok: legalább közepes kontraszt */
+#oaModal .oa-empty{ color: #475569; font-weight: 600; }
+.main-content[data-theme="dark"] #oaModal .oa-empty{ color: #94a3b8; }
+
+/* Stop-blokk fejléc (⬆️ Punct de incarcare #1): erősebb kék + aláhúzás */
+#oaModal .oa-stop-head{ color: #1d4ed8; font-weight: 800; font-size: 15px;
+  padding-bottom: 8px; border-bottom: 1.5px solid rgba(37,99,235,.25); margin-bottom: 10px; }
+.main-content[data-theme="dark"] #oaModal .oa-stop-head{ color: #93c5fd; border-bottom-color: rgba(147,197,253,.28); }
+
+/* Beviteli mezők: 1.5 → 2 px keret + explicit színek, minden állapotban jól látszik */
+#oaModal .oa-input{ border-width: 2px; border-color: #cbd5e1; color: #0f172a; font-weight: 500; }
+#oaModal .oa-input:hover:not(:focus){ border-color: #94a3b8; }
+#oaModal .oa-input::placeholder{ color: #94a3b8; opacity: 1; }
+.main-content[data-theme="dark"] #oaModal .oa-input{ border-color: #475569; color: #f1f5f9; }
+.main-content[data-theme="dark"] #oaModal .oa-input:hover:not(:focus){ border-color: #64748b; }
+.main-content[data-theme="dark"] #oaModal .oa-input::placeholder{ color: #64748b; }
+
+/* Read-only mező (adresa/firma/data a stop-kártyán) — szürkésebb bg, de a szöveg TÖMÖR sötét */
+#oaModal .oa-ro{ background: #f1f5f9; color: #0f172a; border: 2px solid #cbd5e1; font-weight: 600; }
+.main-content[data-theme="dark"] #oaModal .oa-ro{ background: #1e293b; color: #f1f5f9; border-color: #475569; }
+#oaModal .oa-input.oa-ro-inp{ background: #f1f5f9; color: #0f172a; font-weight: 600; }
+.main-content[data-theme="dark"] #oaModal .oa-input.oa-ro-inp{ background: #1e293b; color: #f1f5f9; }
+
+/* Kártyák: kompakt, jó árnyék, kontrasztos keret */
+#oaModal .oa-card{ border: 2px solid #e2e8f0; background: #ffffff; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+.main-content[data-theme="dark"] #oaModal .oa-card{ background: #0f172a; border-color: #334155; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+
+/* Rádió-választó (Numarul comenzii: Automat / Numar propriu) — jól olvasható */
+#oaModal .oa-radio{ color: #0f172a; font-weight: 600; padding: 10px 12px; border: 2px solid #cbd5e1; border-radius: 10px; background: #fff; }
+#oaModal .oa-radio:hover{ border-color: #94a3b8; background: #f8fafc; }
+#oaModal .oa-radio input{ accent-color: #2563eb; width: 18px; height: 18px; }
+.main-content[data-theme="dark"] #oaModal .oa-radio{ color: #f1f5f9; background: #0b1220; border-color: #475569; }
+.main-content[data-theme="dark"] #oaModal .oa-radio:hover{ background: #101827; }
+
+/* Kamion-típus chip-ek (Standard / Mega / Frigo / …) — bekapcsolt = feltűnő */
+#oaModal .oa-chip{ font-weight: 700; padding: 8px 14px; border-width: 2px; }
+#oaModal .oa-chip:hover:not(.on){ border-color: #2563eb; background: #eff6ff; }
+#oaModal .oa-chip.on{ box-shadow: 0 4px 12px rgba(37,99,235,.35); }
+.main-content[data-theme="dark"] #oaModal .oa-chip:hover:not(.on){ background: rgba(96,165,250,.12); border-color: #60a5fa; }
+
+/* DA/NU sorok (Echipare) — a felirat kontrasztosabb, DA=zöld, NU=piros a bekapcsolt oldalon */
+#oaModal .oa-flag-row{ padding: 10px 12px; border: 2px solid #e2e8f0; }
+.main-content[data-theme="dark"] #oaModal .oa-flag-row{ border-color: #334155; }
+#oaModal .oa-flag-lbl{ color: #0f172a; font-weight: 700; font-size: 13.5px; }
+.main-content[data-theme="dark"] #oaModal .oa-flag-lbl{ color: #f1f5f9; }
+#oaModal .oa-yn{ font-weight: 700; padding: 6px 14px; border-width: 2px; min-width: 56px; text-align: center; justify-content: center; }
+#oaModal .oa-yn:not(.on){ color: #64748b; background: #f8fafc; border-color: #cbd5e1; }
+.main-content[data-theme="dark"] #oaModal .oa-yn:not(.on){ color: #94a3b8; background: #0b1220; border-color: #475569; }
+#oaModal .oa-yn.on{ box-shadow: 0 2px 6px rgba(22,163,74,.35); }
+
+/* Step-progress felső sáv címkéi — sokszor „elveszett szürke" volt */
+#oaModal .oc-pl{ color: #475569; font-weight: 700; }
+.main-content[data-theme="dark"] #oaModal .oc-pl{ color: #cbd5e1; }
+#oaModal .oc-pdot.active .oc-pl{ color: #1d4ed8; }
+.main-content[data-theme="dark"] #oaModal .oc-pdot.active .oc-pl{ color: #93c5fd; }
+
+/* Step-card done bar összegzője (visszakattintható „bezárt" kártya) */
+#oaModal .oc-step-bar-title{ color: #0f172a; font-weight: 800; font-size: 14.5px; }
+.main-content[data-theme="dark"] #oaModal .oc-step-bar-title{ color: #f1f5f9; }
+#oaModal .oc-step-bar-sum{ color: #334155; font-weight: 600; }
+.main-content[data-theme="dark"] #oaModal .oc-step-bar-sum{ color: #cbd5e1; }
+#oaModal .oc-step-card[data-state="pending"] .oc-step-bar-title{ color: #64748b; }
+#oaModal .oc-step-card[data-state="pending"] .oc-sb-idx{ color: #475569; background: #f1f5f9; border-color: #cbd5e1; }
+.main-content[data-theme="dark"] #oaModal .oc-step-card[data-state="pending"] .oc-sb-idx{ color: #94a3b8; }
+
+/* Step-open cím (📋 Date de baza …) — a kis szám és a cím együtt jól látszódik */
+#oaModal .oc-step-num{ background: linear-gradient(135deg,#2563eb,#4f46e5); color: #fff; box-shadow: 0 3px 10px rgba(37,99,235,.35); }
+#oaModal .oc-step-title{ color: #0f172a; font-weight: 800; }
+.main-content[data-theme="dark"] #oaModal .oc-step-title{ color: #f1f5f9; }
+
+/* Nav-gombok (Vissza / Tovább / ✅ Mentés) — a legfontosabbak markánsak */
+#oaModal .oc-nav .btn.primary{
+  background: linear-gradient(135deg,#2563eb,#4f46e5) !important;
+  color: #fff !important; border: none !important; font-weight: 800;
+  box-shadow: 0 6px 18px rgba(37,99,235,.35);
+}
+#oaModal .oc-nav .btn.primary:hover:not(:disabled){ transform: translateY(-1px); box-shadow: 0 8px 22px rgba(37,99,235,.45); }
+#oaModal .oc-nav .btn.ghost{
+  background: #ffffff !important; color: #0f172a !important; border: 2px solid #cbd5e1 !important; font-weight: 700;
+}
+#oaModal .oc-nav .btn.ghost:hover:not(:disabled){ border-color: #94a3b8 !important; background: #f8fafc !important; }
+.main-content[data-theme="dark"] #oaModal .oc-nav .btn.ghost{
+  background: #0b1220 !important; color: #f1f5f9 !important; border-color: #475569 !important;
+}
+
+/* Modal fejléc — cím + almezők (Comanda de Transport · CMD-2026-…) */
+#oaModal .oa-modal-title{ color: #0f172a; font-weight: 800; }
+.main-content[data-theme="dark"] #oaModal .oa-modal-title{ color: #f1f5f9; }
+#oaModal .oa-modal-title .oa-sub{ color: #475569 !important; font-weight: 600 !important; }
+.main-content[data-theme="dark"] #oaModal .oa-modal-title .oa-sub{ color: #cbd5e1 !important; }
+#oaModal .oa-modal-head{ background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%); border-bottom: 2px solid #e2e8f0; }
+.main-content[data-theme="dark"] #oaModal .oa-modal-head{ background: linear-gradient(180deg, #0b1220 0%, #0f172a 100%); border-bottom-color: #334155; }
+#oaModal .oa-modal-head .btn.ghost{ min-width: 40px; padding: 8px 12px; font-weight: 800; font-size: 16px; }
+
+/* Preview akciógombok (Salveaza + descarca / Doar salveaza / Ataseaza / Trimite alv. / Sterge) */
+#oaModal .oa-preview-actions .btn{ font-weight: 800; border-width: 2px; letter-spacing: .2px; }
+#oaModal .oa-preview-actions .btn.primary{
+  background: linear-gradient(135deg,#2563eb,#4f46e5) !important; color: #fff !important;
+  border: none !important; box-shadow: 0 4px 12px rgba(37,99,235,.35);
+}
+#oaModal .oa-preview-actions .btn:not(.primary):not(.danger){
+  background: #ffffff !important; color: #0f172a !important; border: 2px solid #cbd5e1 !important;
+}
+#oaModal .oa-preview-actions .btn:not(.primary):not(.danger):hover{ background: #f8fafc !important; border-color: #94a3b8 !important; }
+.main-content[data-theme="dark"] #oaModal .oa-preview-actions .btn:not(.primary):not(.danger){
+  background: #0b1220 !important; color: #f1f5f9 !important; border-color: #475569 !important;
+}
+#oaModal .oa-preview-actions .btn.danger{
+  background: #dc2626 !important; color: #fff !important; border: none !important;
+  box-shadow: 0 4px 12px rgba(220,38,38,.30);
+}
+
+/* PDF-előnézet iframe kerete — látható elválasztás */
+#oaModal #oaPdfPreview{ border: 2px solid #cbd5e1 !important; box-shadow: 0 4px 12px rgba(15,23,42,.08); }
+.main-content[data-theme="dark"] #oaModal #oaPdfPreview{ border-color: #475569 !important; }
+

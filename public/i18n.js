@@ -1259,7 +1259,11 @@
     'cs.ol.mTrack':    { hu: 'Követő-link', ro: 'Link urmărire' },
     'cs.ol.mTplMail':  { hu: 'Sablonból e-mail', ro: 'E-mail din șablon' },
     'cs.ol.mOrderMail':{ hu: 'Email a fuvarról', ro: 'E-mail despre cursă' },
-    'cs.ol.mAssignment': { hu: 'Megbízás (PDF)', ro: 'Comandă de Transport' },
+    'cs.ol.mAssignment': { hu: 'Megbízás készítése', ro: 'Creează Comanda de Transport' },
+    'cs.ol.mAssignmentEdit': { hu: 'Megbízás szerkesztése', ro: 'Editează Comanda de Transport' },
+    'cs.ol.mAssignmentDelete': { hu: 'Megbízás törlése', ro: 'Șterge Comanda de Transport' },
+    'cs.cf.deleteAssignment': { hu: 'Biztosan törlöd a fuvarhoz csatolt Comanda de Transport-ot? (A fuvar érintetlen marad.)', ro: 'Sigur ștergi Comanda de Transport atașată acestei curse? (Cursa nu se șterge.)' },
+    'cs.cf.deleteAssignment2': { hu: 'Utolsó megerősítés — a Comanda de Transport véglegesen törlődik.', ro: 'Ultima confirmare — Comanda de Transport se șterge definitiv.' },
     // Alvállalkozó űrlap — ANAF gomb + új mezők (Reg.Com. + Adresa)
     'cs.ca.regCom':       { hu: 'Nr. Reg. Com.', ro: 'Nr. Reg. Com.' },
     'cs.ca.adresa':       { hu: 'Cím (Adresa)', ro: 'Adresa' },

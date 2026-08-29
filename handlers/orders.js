@@ -221,6 +221,8 @@ handlers.comList = async function (req, res, args) {
                   o.needs_uit,
                   (SELECT COUNT(*)::int FROM order_uit_codes u
                      WHERE u.order_id = o.id AND u.company_id = o.company_id AND u.status <> 'stopped') AS uit_active_count,
+                  EXISTS(SELECT 1 FROM order_assignments oa
+                     WHERE oa.order_id = o.id AND oa.company_id = o.company_id) AS has_assignment,
                   COALESCE(legs.leg_count, 0) AS leg_count,
                   COALESCE(legs.legs_json, '[]'::json) AS legs_json,
                   COALESCE(sst.stop_count, 0)     AS stop_count,

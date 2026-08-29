@@ -14,6 +14,36 @@
 
 ---
 
+## 2026-08-27 — Comanda de Transport: menüből törölhető + szerkeszthető + a modal kontraszt-fixe (minden felirat/gomb egyértelmű, jól látható)
+
+**Kérés:** „lehessen kitorolni a fuvartol a mengrendelest es szerkeszteni is + plusz a generalasnal kontraszt hibak vannak javitsd minden legyen egyertelmu és atgondolt jol lathato".
+
+**1) Menüből törölhető + szerkeszthető** (`public/console-shared.js` `renderFilteredOrders`):
+- Új `has_assignment` mező a `comList` válaszában (`handlers/orders.js`): `EXISTS(SELECT 1 FROM order_assignments ... WHERE order_id=o.id AND company_id=o.company_id)` — cégre szűrt, per-sor.
+- A fuvar ⋯ menüjében a régi „📄 Comanda de Transport" gomb feltétele bővült: **ha MÁR van megbízás** → két külön menüpont látszik — **✏️ Megbízás szerkesztése** (a meglévő `OrderAssignment.open`, ami a meglévőt betölti) + **🗑 Megbízás törlése** (danger színű, új `vsDeleteOrderAssignment` helper). Ha NINCS → az eddigi „📄 Megbízás készítése" gomb.
+- **Új `vsDeleteOrderAssignment(id)` helper** (`console-shared.js`): **dupla-confirm** (fat-finger védelem) → `orderAssignmentDelete` handler (already existed, Admin/Manager, cégre szűrt, audit) → sikeres törléskor toast + `loadOrders()` frissítés. A fuvar érintetlen marad, csak a megbízás dokumentum tűnik el.
+
+**2) Kontraszt + olvashatóság kör** (`public/style.css`, additív blokk a fájl VÉGÉN, `#oaModal`-ra szűkítve → más felületet nem érint, felülíró jogán él, ~110 sor):
+- **Címkék** (`.oa-lbl`) `#64748b → #334155` + `font-weight:700` + uppercase 12.5px letter-spacing (WCAG AA+ elérése fehér kártyán).
+- **Hint-szövegek** (`.oa-hint`) `#64748b → #475569` + `font-weight:500`.
+- **Stop-blokk fejléc** (⬆️ Punct de incarcare #1) `#2563eb → #1d4ed8` + 1.5px alsó keret, olvashatóbb.
+- **Beviteli mezők** 1.5px → 2px keret, explicit `color:#0f172a`, placeholder `#94a3b8` (nem eltűnő halvány).
+- **Kártyák** (`.oa-card`) 1.5 → 2px keret, subtle shadow.
+- **Rádió-választó** (Numarul comenzii Automat/Numar propriu) 2px keret + hover + 18×18 kék accent radio.
+- **Kamion-típus chip-ek** 2px keret + hover kék bg + bekapcsolt chip glow shadow.
+- **DA/NU kapcsolók** 2px keret, `.oa-yn.on` glow shadow; `.oa-flag-lbl` `#0f172a` bold.
+- **Step-progress sáv** címkék `#475569` (nem eltűnő szürke), aktív dot `#1d4ed8` bold.
+- **Step-card done bar** cím `#0f172a font-weight:800`, összegző `#334155`; pending kártya jelzés is kontrasztos.
+- **Step-open cím** (📋 Date de baza …) — a kis szám gradiens kék→lila glow + cím `#0f172a` bold.
+- **Nav-gombok** — Vissza/Tovább/Mentés — a primary kék-lila gradiens + shadow, ghost 2px keret + hover; sötét témán is jól olvasható.
+- **Modal fejléc** — cím + alcím jól elkülönül; subtile gradiens háttér.
+- **Preview akciógombok** — 2px keret + `font-weight:800`; primary gradiens; danger piros glow; ghost fehér/sötét-tinta.
+- **PDF-előnézet iframe** 2px keret + shadow.
+
+**3) i18n** 5 új kulcs (`cs.ol.mAssignmentEdit`/`Delete`, `cs.cf.deleteAssignment`/`Assignment2`, `cs.ol.mAssignment` finomítva „Megbízás készítése"-re, RO+HU). Cache-bust `?v=20260827oadel` (style.css + console-shared.js + i18n.js). **1004 Jest zöld** (a `comList` új `has_assignment` mezőre a valós-DB integrációs teszt fut le éles környezetben; unit-szinten a jelenlegi 1004 zöld).
+
+---
+
 ## 2026-08-27 — FIX: Comanda de Transport aláíró blokk — BENEFICIAR (mi) balra, TRANSPORTATOR (alvállalkozó) jobbra + üres aláíró keret az alvállalkozónak
 
 **Gyökér:** a záró oldalon a bal oszlop „CONFIRMARE TRANSPORTATOR" cím ALATT a MI cégünk (Vallor) neve/telefonja/e-mailje jelent meg, plusz a MI pecsétünk — mintha mi lennénk a Transportator. A jobb oldalon csak a „Semnatura si stampila" felirat maradt, üres — az alvállalkozónak (a valódi Transportatornak) semennyi hely nem maradt aláírni/pecsételni.
