@@ -14,6 +14,26 @@
 
 ---
 
+## 2026-08-27 — Sofőr főoldal mobil-scroll fix: a telefon böngésző-panelje NEM takarja el többé a Kilépés gombot
+
+**Kérés:** „sofer oldalon nezd at nem scrololhato teljesen igy a telefon gomb panelje alul eltakarja a kilepo gombot".
+
+**Gyökér:** a sofőr főoldal (`#sec-dash`) `overflow:hidden` volt, csak akkor lett görgethető, ha volt aktív fuvar (`.sofer-wrap.scrollable`). A `.sofer-nav-grid` `flex:1`-gyel kitöltötte a `.sofer-wrap` alját, aminek `height:100dvh` mérete van, DE a telefon böngésző-panelje (iOS Safari alsó eszközsáv ~50 pt, Android Chrome alsó nav-sáv + gesture bar ~54 pt) átfedésben van a `100dvh` alsó szélével sok készüléken → a Kilépés kártya vizuálisan a browser-panel alá esett, és nem lehetett aláérni (nincs görgetés).
+
+**Fix (`public/sofer.css`):**
+1. **`#sec-dash` MINDIG görgethető** (`overflow-y:auto` + `overscroll-behavior:contain` + `-webkit-overflow-scrolling:touch`) — nem csak akkor, ha van fuvar. Így a felhasználó bármikor felfelé görgetheti a tartalmat a browser-panel alól.
+2. **Bőkezű alsó tartalék**: `padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px))` az `#sec-dash`-en → a browser-UI + a home indicator együtt sem tudja lefedni a Kilépés kártyát. A `.pane-sofer` (menetlevél/dokumentum/határátlépés stb. nézetek) padding-bottomja `70px` → `calc(100px + env(safe-area-inset-bottom, 0px))` — konzisztens.
+3. **`.sofer-wrap`** `padding-bottom: max(12px, env(safe-area-inset-bottom))` → `0` — a görgethető `#sec-dash` maga tartalékol; a wrap nem tolja fel a tartalmat.
+4. **`min-height:100dvh`** hozzáadva a `.sofer-wrap`-hez `height` mellé — régebbi böngészőn is legalább `100vh`.
+5. **`.sofer-wrap.scrollable #sec-dash { overflow-y:auto }` szabály törölve** — az `#sec-dash` most már mindig görget. A `.scrollable`-alapú `min-height:44vh` a nav-gridre megmarad (a fuvar-kártya látszik felül).
+6. **`scroll-padding-bottom:40px`** a `.pane-sofer`-en — natív scroll-into-view a browser-panel felett áll meg.
+
+**Miért működik minden készüléken:** `env(safe-area-inset-bottom)` iPhone-on 34 pt (home indicator), Androidon a 3-gombos nav-sáv magassága; ehhez +100 pt fix tartalék hozzáadva → iOS Safari (~50 pt eszközsáv + 34 pt indicator = 84 pt) és Android Chrome (~54 pt nav-sáv + 24 pt gesture = 78 pt) mindig kisebb. Ha valamiért a browser-panel elfedi az alját, a `overflow-y:auto` miatt egyszerűen felfelé görgethető.
+
+**Cache-bust** `sofer.css?v=20260827sofscr`. **1004 Jest zöld**, tisztán CSS-változás, admin/manager/könyvelő felület érintetlen.
+
+---
+
 ## 2026-08-27 — Comanda de Transport ELŐNÉZET mobil-fix: PDF.js canvas-render (iframe helyett) — telefonon is olvasható + „Megnyitás új ablakban" gomb
 
 **Kérés:** „es az elonezetet telefonon nem nyitja meg mert nem tamogatott ezt kitudod javitani?".
