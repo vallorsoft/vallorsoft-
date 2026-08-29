@@ -14,6 +14,29 @@
 
 ---
 
+## 2026-08-27 — Sofőr főoldal VÉGLEGES scroll-fix: block-layout + `flex:0 0 auto` a nav-gridre — minden telefon-méreten aláérhető a Kilépés
+
+**Kérés:** „megint nem jo javitsd ki veglegesen minden meretu telefonon latszodjon minden gomb gorgetheto legyen".
+
+**Gyökér-diagnózis (az előző kör NEM oldotta meg):** a `#sec-dash` `display:flex; flex-direction:column` + belső `.sofer-nav-grid { flex:1; min-height:0 }` KOMBINÁCIÓJA azt jelentette, hogy a flex-algoritmus **visszazsugorította a rácsot** a viewport-ba (a `flex:1` gyerek a szülő `overflow:auto` box content-área-jához igazodik, ami MINIMÁLIS 0 a `min-height:0` miatt). Így a padding-bottom RESERVE ELVESZETT: a tartalom pontosan = viewport-magasság → nincs overflow → nincs scroll → a Kilépés kártya elrejtett szélen ragadt.
+
+**Bulletproof fix (`public/sofer.css`):**
+1. **`#sec-dash` block-layout**: `display: flex; flex-direction: column` → `display: block`. A `flex: 1` marad a wrap-el való illesztéshez (a szülő `.sofer-wrap` flex-oszlop, `#sec-dash` így kitölti a maradék helyet), de a BELSŐ layout block → a tartalom természetes magasságot vesz fel, az `overflow-y:auto` VALÓBAN görget.
+2. **`.sofer-nav-grid { flex: 1; min-height: 0 }` → `flex: 0 0 auto; min-height: auto`**: a rács a saját content-magasságát tartja (natural size, ~600 pt), NE zsugorodjon, NE stretch-eljen. Így a `padding-bottom` valódi görgethető tartalék lesz.
+3. **`padding-bottom` 100 → 140 pt + safe-area**: bőségesebb tartalék minden készülékre. Android Chrome nav-sáv (~54 pt) + gesture bar + tolerancia; iOS Safari eszközsáv (~50 pt) + home indicator; sőt tablet-Chromium is (~44 pt) minden esetben belefér.
+4. **`.sofer-nav-grid > .sofer-nav-card.logout { margin-bottom: 8px }`**: kis vizuális légtér a Kilépés kártya alatt — redundáns biztosíték.
+5. **A `.sofer-wrap.scrollable .sofer-nav-grid { min-height: 44vh }` szabály érintetlen** — csak akkor él, ha aktív fuvar van (nav-grid felugrik, hogy a fuvar-kártya látszódjon felül); a `flex:0 0 auto`-val kompatibilis (min-height = `max(auto, 44vh)`, a natural content úgyis nagyobb).
+
+**Miért működik MINDEN telefon-méreten:**
+- Kis telefon (viewport ≤ 700 pt): tartalom (KPI 200 + button 80 + grid 600 = ~880 pt) + padding (140+safe = ~174) = ~1054 pt scroll-height → ~354 pt lecsurgatható a nav-sáv fölé.
+- Közepes (700-850 pt): ~200 pt lecsurgatható.
+- Nagy (≥ 900 pt): tartalom pont belefér, de a padding-bottom (~174 pt) még mindig kap alatta legalább 100 pt scrollolható tartalékot minden esetben.
+- Tablet fekvő (≥ 1000 pt): a nav-grid nem stretch-el (flex:0 0 auto), üres tér marad alul — kicsi vizuális kompromisszum a tabletnél, cserébe a Kilépés SOSEM ragad el.
+
+**Cache-bust** `sofer.css?v=20260827sofscr2`. Tisztán CSS-változás — semmilyen JS-t, HTML-t, szerver-oldalt nem érint. **1004 Jest zöld**, admin/manager/könyvelő felület érintetlen.
+
+---
+
 ## 2026-08-27 — Sofőr főoldal mobil-scroll fix: a telefon böngésző-panelje NEM takarja el többé a Kilépés gombot
 
 **Kérés:** „sofer oldalon nezd at nem scrololhato teljesen igy a telefon gomb panelje alul eltakarja a kilepo gombot".

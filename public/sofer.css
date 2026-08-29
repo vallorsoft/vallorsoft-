@@ -174,24 +174,40 @@
      így a telefon böngésző-panelje (iOS Safari eszközsáv, Android Chrome
      nav-sáv) alá csúszó Kilépés gomb mindig aláérhető felfelé görgetve.
      A padding-bottom bőségesen tartalékol a browser-UI + safe-area-hoz. */
+  /* VÉGLEGES SCROLL-FIX (minden telefon-méret) — a Kilépés gomb MINDEN
+     készüléken elérhető görgetéssel.
+     Elv: a #sec-dash BLOCK-layout (nem flex), így az `overflow-y:auto`
+     valóban a tartalom (nav-grid + padding-bottom) magasságához igazodik.
+     Régen: display:flex + flex:1 nav-grid → a grid visszazsugorodott a
+     viewport-ba, nem volt overflow, a Kilépés a browser-nav-sáv alá esett.
+     Most: block-layout + generous padding-bottom (140 pt + safe-area) →
+     minden telefonon lehet aláérni scrollolással.
+     `overscroll-behavior: contain` — a scroll megáll a doboznál (nincs
+     akaratlan lap-reload iOS pull-to-refresh miatt). */
   #sec-dash {
-    display: flex;
-    flex-direction: column;
+    display: block;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
   }
 
-  /* Nav kártya rács — nagy érintési felületek, prémium big-card */
+  /* Nav kártya rács — a rács a saját content-magasságát tartja
+     (flex:0 0 auto), NE zsugorodjon, NE stretch-eljen. Így a padding-
+     bottom valódi görgethető tartalék a browser-panel alá. */
   .sofer-nav-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
-    flex: 1;
-    min-height: 0;
+    flex: 0 0 auto;
+    min-height: auto;
+  }
+  /* Utolsó kártya (Kilépés) alá kis extra margó — hogy vizuálisan is
+     legyen légtér a browser-panel fölött (redundáns padding-tartalék). */
+  .sofer-nav-grid > .sofer-nav-card.logout {
+    margin-bottom: 8px;
   }
   .sofer-nav-card {
     position: relative;
