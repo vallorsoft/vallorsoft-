@@ -656,28 +656,40 @@
     var driver = _dcDrivers.find(function (u) { return u.email === email; }) || { email: email };
     _dcCurrent = { email: email, nume: driver.nume || email, from: from, to: to };
 
+    // Kulcs elv: a JÁRANDÓSÁG-FELVITEL kártya + a KIFIZETÉS-gombok MINDIG
+    // renderelődnek — függetlenül attól, hogy a getDriverBalance / earningList
+    // / paymentList hívások sikeresen visszatérnek-e. Ha a szerver-oldali
+    // migráció még nem futott le / a hívás elhasal, csak az egyenleg-csempéken
+    // látszik „—" — a felvitel-form és a kifizetés-gombok akkor is elérhetők.
+    // A régi menetlevél-alapú kassza-blokkot innen kivettük (a felhasználó
+    // szerint értéktelen a UI-hoz — csak zavart a modern funkciók keresésénél).
     Promise.all([
-      gas('getDriverBalance',  [{ email: email, from: from, to: to }]),
-      gas('earningList',       [{ email: email, from: from, to: to }]),
-      gas('paymentList',       [{ email: email, from: from, to: to }]),
-      gas('getDriverSettlement',[{ email: email, from: from, to: to }]),
-      gas('advanceList',       [{ email: email, from: from, to: to }])
+      gas('getDriverBalance', [{ email: email, from: from, to: to }]).catch(function () { return { ok: false }; }),
+      gas('earningList',      [{ email: email, from: from, to: to }]).catch(function () { return { ok: false, items: [] }; }),
+      gas('paymentList',      [{ email: email, from: from, to: to }]).catch(function () { return { ok: false, items: [] }; }),
     ]).then(function (rs) {
-      var bal = rs[0], earn = rs[1], pay = rs[2], set = rs[3], adv = rs[4];
-      if (!bal || !bal.ok) {
-        out.innerHTML = '<div class="text-muted" style="padding:20px;">'
-          + esc((bal && bal.err) || t('common.error')) + '</div>';
-        return;
-      }
-      _dcBalance = bal;
+      var bal  = rs[0] || { ok: false };
+      var earn = rs[1] || { ok: false, items: [] };
+      var pay  = rs[2] || { ok: false, items: [] };
+
+      // Egyenleg-kártya adatai: ha bal.ok, akkor a szerver-válasz; egyébként
+      // üres struktúra (a csempék „0 EUR / 0 RON"-t mutatnak + „nem elérhető"
+      // BNR-sorral). Nincs teljes hiba-oldal → a felvitel-form még használható.
+      _dcBalance = bal.ok ? bal : {
+        ok: false,
+        balance: { eur: 0, ron: 0, ron_all: null },
+        earned:  { eur: 0, ron: 0, count: 0 },
+        paid:    { eur: 0, ron: 0, count: 0 },
+        bnr_rate: null,
+      };
 
       // ── 1) EGYENLEG-KÁRTYA (járandóság / kifizetve / hátralék) ──
-      var balHtml = _dcBalanceCard(bal);
+      var balHtml = _dcBalanceCard(_dcBalance);
 
-      // ── 2) JÁRANDÓSÁG-FELVITEL kártya ──
+      // ── 2) JÁRANDÓSÁG-FELVITEL kártya (MINDIG megjelenik) ──
       var earnFormHtml = _dcEarningForm(email);
 
-      // ── 3) JÁRANDÓSÁG LISTA + KIFIZETÉS LISTA (két kártya) ──
+      // ── 3) JÁRANDÓSÁG-LISTA + KIFIZETÉS-LISTA (kártyák) ──
       var earnItems = (earn && earn.items) || [];
       var payItems  = (pay  && pay.items)  || [];
       var listsHtml =
@@ -686,17 +698,13 @@
         + panel('💸 ' + t('fe.pm.listTitle') + ' (' + payItems.length + ')',  _dcPaymentListHtml(payItems))
         + '</div>';
 
-      // ── 4) LEGACY: menetlevél-alapú kassza-egyenleg (előlegek + készpénz-költések + diurna) ──
-      var legacyHtml = (set && set.ok) ? _dcLegacyBlock(set, adv) : '';
-
       out.innerHTML =
         panel('👤 ' + esc(_dcCurrent.nume) + ' — ' + d2(from) + ' → ' + d2(to),
           balHtml,
           '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="window.print()">'
             + t('fe.print') + '</button>')
         + earnFormHtml
-        + listsHtml
-        + legacyHtml;
+        + listsHtml;
 
       // Live-számoló bekötése (qty × unit)
       _dcBindLiveCalc();
