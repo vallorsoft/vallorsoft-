@@ -3703,3 +3703,274 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 @media (max-width:420px){
   #decontBox .dc-tiles{ grid-template-columns:1fr; }
 }
+
+/* ============================================================
+   SOFŐR-AKTIVITÁS (driver-activity.js) — kártyás 2-oszlopos
+   nézet, tiszta és profi. Scope: #driverActivityBox + #daLightbox.
+   Világos + sötét téma kompatibilis, reszponzív.
+   ============================================================ */
+#driverActivityBox .da-header{
+  display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap;
+  justify-content:space-between;
+}
+#driverActivityBox .da-range{
+  display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;
+}
+#driverActivityBox .da-grid{
+  display:grid; grid-template-columns:360px 1fr; gap:16px; margin-top:16px;
+  align-items:flex-start;
+}
+@media (max-width:960px){
+  #driverActivityBox .da-grid{ grid-template-columns:1fr; }
+}
+
+/* ── Bal oszlop: sofőr-kártyák ─────────────────────────── */
+#driverActivityBox .da-search-wrap{
+  display:flex; gap:10px; align-items:center; margin-bottom:12px;
+}
+#driverActivityBox .da-search{ flex:1; }
+#driverActivityBox .da-count{ font-size:12px; }
+
+#driverActivityBox .da-driver-list{
+  display:flex; flex-direction:column; gap:10px;
+}
+#driverActivityBox .da-driver-card{
+  padding:14px; border-radius:14px;
+  border:1.5px solid #cbd5e1; background:#ffffff;
+  cursor:pointer; transition:transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+  box-shadow:0 1px 2px rgba(15,23,42,0.05);
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-driver-card{
+  background:rgba(255,255,255,0.03); border-color:rgba(148,163,184,0.35);
+}
+#driverActivityBox .da-driver-card:hover{
+  border-color:var(--brand-indigo, #6366f1);
+  transform:translateY(-1px);
+  box-shadow:0 4px 12px rgba(99,102,241,0.15);
+}
+#driverActivityBox .da-driver-card.is-active{
+  border-color:var(--brand-indigo, #6366f1); border-width:2px;
+  box-shadow:0 4px 14px rgba(99,102,241,0.25);
+}
+#driverActivityBox .da-driver-head{
+  display:flex; gap:10px; align-items:center; margin-bottom:10px;
+}
+#driverActivityBox .da-driver-name{ flex:1; min-width:0; }
+#driverActivityBox .da-driver-nume{
+  font-size:14.5px; font-weight:700; color:#0f172a;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-driver-nume{ color:#e2e8f0; }
+#driverActivityBox .da-driver-email{
+  font-size:11.5px; color:#64748b;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+#driverActivityBox .da-driver-kpis{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:6px;
+  padding:8px; border-radius:10px;
+  background:rgba(148,163,184,0.08);
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-driver-kpis{
+  background:rgba(255,255,255,0.04);
+}
+#driverActivityBox .da-kpi{
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+}
+#driverActivityBox .da-kpi-v{
+  font-size:15px; font-weight:800; color:#0f172a; font-variant-numeric:tabular-nums;
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-kpi-v{ color:#f1f5f9; }
+#driverActivityBox .da-kpi-l{
+  font-size:10.5px; color:#64748b; font-weight:600; letter-spacing:0.2px;
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-kpi-l{ color:#94a3b8; }
+#driverActivityBox .da-driver-foot{ margin-top:10px; font-size:12px; }
+#driverActivityBox .da-last{ color:var(--status-info); font-weight:600; }
+#driverActivityBox .da-last.da-none{ color:#94a3b8; font-weight:500; font-style:italic; }
+
+/* Avatar (közös a bal + jobb oszlopban) */
+#driverActivityBox .da-avatar{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:38px; height:38px; border-radius:50%;
+  color:#fff; font-weight:700; font-size:14px; letter-spacing:0.3px;
+  flex-shrink:0;
+}
+
+/* ── Jobb oszlop: fejléc + timeline + fotók ─────────────── */
+#driverActivityBox .da-empty{
+  padding:36px 20px; text-align:center; color:#64748b; font-size:14px;
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-empty{ color:#94a3b8; }
+
+#driverActivityBox .da-detail-head{ padding:18px; margin-bottom:14px; }
+#driverActivityBox .da-detail-headtop{
+  display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+  margin-bottom:14px;
+}
+#driverActivityBox .da-detail-headtop .da-avatar{
+  width:52px; height:52px; font-size:18px;
+}
+#driverActivityBox .da-detail-nume{
+  font-size:18px; font-weight:800; color:#0f172a;
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-detail-nume{ color:#f1f5f9; }
+#driverActivityBox .da-detail-email{
+  font-size:12.5px; color:#64748b;
+}
+
+/* Számláló chip-ek (esemény-típus szűrő) */
+#driverActivityBox .da-cnt-wrap{
+  display:flex; gap:6px; flex-wrap:wrap;
+}
+#driverActivityBox .da-cnt-chip{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 10px; border-radius:999px;
+  border:1.5px solid #cbd5e1; background:#ffffff;
+  font-size:12.5px; color:#334155;
+  cursor:pointer; transition:transform .1s ease, background .1s ease;
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-cnt-chip{
+  background:rgba(255,255,255,0.04); border-color:rgba(148,163,184,0.35); color:#e2e8f0;
+}
+#driverActivityBox .da-cnt-chip:hover{ transform:translateY(-1px); }
+#driverActivityBox .da-cnt-chip b{ font-weight:800; font-variant-numeric:tabular-nums; }
+#driverActivityBox .da-cnt-chip.is-active{
+  background:var(--brand-indigo, #6366f1); border-color:var(--brand-indigo, #6366f1); color:#fff;
+}
+#driverActivityBox .da-cnt-chip.is-empty{ opacity:0.55; }
+#driverActivityBox .da-cnt-l{ font-size:11px; opacity:0.85; }
+
+/* Szekció-cím */
+#driverActivityBox .da-section-title{
+  font-size:14px; font-weight:800; color:#0f172a; margin-bottom:12px;
+  letter-spacing:0.2px;
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-section-title{ color:#f1f5f9; }
+
+/* Timeline */
+#driverActivityBox .da-timeline-wrap{ padding:18px; margin-bottom:14px; }
+#driverActivityBox .da-timeline{
+  display:flex; flex-direction:column;
+  position:relative;
+}
+#driverActivityBox .da-timeline::before{
+  content:""; position:absolute; left:19px; top:8px; bottom:8px;
+  width:2px; background:rgba(148,163,184,0.35);
+}
+#driverActivityBox .da-ev{
+  display:flex; gap:12px; padding:10px 0; position:relative;
+}
+#driverActivityBox .da-ev-ico{
+  flex-shrink:0; width:40px; height:40px; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center;
+  background:#f1f5f9; border:2px solid #cbd5e1; font-size:18px; z-index:1;
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-ev-ico{
+  background:#1e293b; border-color:rgba(148,163,184,0.35);
+}
+/* Típus-specifikus háttér a körre */
+#driverActivityBox .da-ev-milestone .da-ev-ico{ background:#dbeafe; border-color:#93c5fd; }
+#driverActivityBox .da-ev-waybill   .da-ev-ico{ background:#e0e7ff; border-color:#a5b4fc; }
+#driverActivityBox .da-ev-fuel      .da-ev-ico{ background:#fef3c7; border-color:#fcd34d; }
+#driverActivityBox .da-ev-purchase  .da-ev-ico{ background:#fce7f3; border-color:#f9a8d4; }
+#driverActivityBox .da-ev-photo     .da-ev-ico{ background:#dcfce7; border-color:#86efac; }
+#driverActivityBox .da-ev-uit       .da-ev-ico{ background:#e0f2fe; border-color:#7dd3fc; }
+#driverActivityBox .da-ev-border    .da-ev-ico{ background:#fed7aa; border-color:#fdba74; }
+#driverActivityBox .da-ev-bug       .da-ev-ico{ background:#fee2e2; border-color:#fca5a5; }
+#driverActivityBox .da-ev-handover  .da-ev-ico{ background:#fed7aa; border-color:#fb923c; }
+
+#driverActivityBox .da-ev-body{ flex:1; min-width:0; padding:2px 0; }
+#driverActivityBox .da-ev-head{
+  display:flex; justify-content:space-between; gap:10px; align-items:baseline;
+  flex-wrap:wrap;
+}
+#driverActivityBox .da-ev-title{
+  font-size:13.5px; font-weight:700; color:#0f172a; flex:1; min-width:0;
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-ev-title{ color:#e2e8f0; }
+#driverActivityBox .da-ev-order{
+  display:inline-block; margin-left:8px;
+  font-size:11px; font-weight:700; letter-spacing:0.3px;
+  padding:2px 7px; border-radius:999px;
+  background:var(--brand-indigo, #6366f1); color:#fff;
+}
+#driverActivityBox .da-ev-when{
+  font-size:11.5px; color:#64748b; white-space:nowrap; font-variant-numeric:tabular-nums;
+}
+#driverActivityBox .da-ev-sub{
+  font-size:12.5px; color:#475569; margin-top:2px;
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-ev-sub{ color:#94a3b8; }
+#driverActivityBox .da-ev-photo-btn{
+  padding:3px 9px; font-size:11px; margin-left:6px;
+}
+
+/* Fotó-galéria */
+#driverActivityBox .da-photos{ padding:18px; margin-bottom:14px; }
+#driverActivityBox .da-photo-grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:10px;
+}
+#driverActivityBox .da-photo{
+  border-radius:10px; overflow:hidden; cursor:pointer;
+  border:1.5px solid #cbd5e1; background:#f8fafc;
+  transition:transform .12s ease, box-shadow .12s ease;
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-photo{
+  background:rgba(255,255,255,0.04); border-color:rgba(148,163,184,0.35);
+}
+#driverActivityBox .da-photo:hover{
+  transform:translateY(-2px);
+  box-shadow:0 6px 18px rgba(15,23,42,0.15);
+}
+#driverActivityBox .da-photo img{
+  width:100%; height:120px; object-fit:cover; display:block;
+}
+#driverActivityBox .da-photo-cap{
+  padding:6px 8px; font-size:11px; color:#475569; text-align:center;
+  border-top:1px solid rgba(148,163,184,0.28);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-photo-cap{ color:#94a3b8; }
+
+/* Lightbox */
+#daLightbox .da-lb-modal{
+  width:min(1000px,96vw); max-height:96vh; padding:18px; overflow:hidden;
+  display:flex; flex-direction:column;
+}
+#daLightbox .da-lb-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding-bottom:10px; border-bottom:1.5px solid rgba(148,163,184,0.28);
+  margin-bottom:12px;
+}
+#daLightbox .da-lb-title{ font-weight:700; font-size:14px; }
+#daLightbox .da-lb-body{
+  flex:1; display:flex; align-items:center; justify-content:center;
+  gap:8px; overflow:hidden; min-height:0;
+}
+#daLightbox .da-lb-body img{
+  max-width:100%; max-height:70vh; object-fit:contain;
+  border-radius:8px;
+}
+#daLightbox .da-lb-nav{
+  width:44px; height:44px; border-radius:50%;
+  border:1.5px solid rgba(148,163,184,0.35); background:rgba(255,255,255,0.9);
+  cursor:pointer; font-size:22px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.main-content[data-theme="dark"] #daLightbox .da-lb-nav{
+  background:rgba(30,41,59,0.9); color:#e2e8f0;
+}
+#daLightbox .da-lb-nav:hover{ transform:scale(1.05); }
+#daLightbox .da-lb-foot{
+  display:flex; justify-content:space-between; align-items:center;
+  padding-top:10px; margin-top:10px; border-top:1.5px solid rgba(148,163,184,0.28);
+  font-size:12.5px; color:#64748b;
+}
+
+@media (max-width:640px){
+  #driverActivityBox .da-driver-kpis{ grid-template-columns:repeat(2,1fr); }
+  #driverActivityBox .da-detail-nume{ font-size:16px; }
+  #driverActivityBox .da-photo img{ height:100px; }
+}
