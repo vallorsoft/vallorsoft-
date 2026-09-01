@@ -1618,47 +1618,68 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   body.vs-dm .main-content{ width:100%; }
 }
 
-/* Sofőr mód: a KIÍRT FUVAROK táblázata mobil-kártyás nézet (≤1024px).
-   A fejléc rejtve, minden sor egy kártya, a cellák a data-label alapján
-   címkézve. A checkbox-oszlop (tömeges kijelölés — asztali funkció) rejtve. */
+/* MOBILRA MINDENKIRE (nem csak sofőr-módban): a KIÍRT FUVAROK táblázata
+   ≤1024px-en kártyás nézet — a fejléc rejtve, minden sor egy kártya,
+   cellák a data-label alapján címkézve. Asztali (>1024px) nézet változatlan
+   → megmarad az „Excel-jelleg". A checkbox-oszlop (tömeges kijelölés —
+   asztali funkció) mobilon rejtve. */
 @media (max-width:1024px){
-  body.vs-dm #tblOrders{ table-layout:auto !important; width:100%; min-width:0 !important; }
-  body.vs-dm #tblOrders thead{ display:none; }
-  body.vs-dm #tblOrders tbody{ display:block; }
-  body.vs-dm #tblOrders tr.vsl-orow{
+  #tblOrders{ table-layout:auto !important; width:100%; min-width:0 !important; }
+  #tblOrders thead{ display:none; }
+  #tblOrders tbody{ display:block; }
+  #tblOrders tr.vsl-orow{
     display:grid; grid-template-columns:1fr 1fr; column-gap:14px; row-gap:0;
     margin:0 0 14px; padding:12px 14px 8px;
-    border:1px solid #e8e0d4; border-radius:14px; background:#ffffff;
+    border:1.5px solid #e2e8f0; border-radius:14px; background:#ffffff;
     box-shadow:0 2px 12px rgba(0,0,0,.07);
+    position:relative; overflow:hidden;
   }
+  /* Bal akcens-csík a fuvar-státusz szín szerint — vizuálisan azonnal
+     látszik az állapot (mint a vezérlőpult kártyás nézetén). */
+  #tblOrders tr.vsl-orow::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
+    background:#94a3b8;
+  }
+  #tblOrders tr.vsl-orow-ok::before   { background:var(--status-ok,     #22c55e); }
+  #tblOrders tr.vsl-orow-warn::before { background:var(--status-warn,   #f59e0b); }
+  #tblOrders tr.vsl-orow-info::before { background:var(--status-info,   #3b82f6); }
+  #tblOrders tr.vsl-orow-err::before  { background:var(--status-danger, #ef4444); }
+  #tblOrders tr.vsl-orow-park::before { background:#14b8a6; }
+  #tblOrders tr.vsl-orow-wh::before   { background:#f97316; }
   /* 2 mező soronként (rövidebb, áttekinthetőbb kártya) — a hosszú/rich cellák
      (Útvonal, Sofőr, Műveletek) teljes szélességben, a rövidek 2 oszlopban. */
-  body.vs-dm #tblOrders td:nth-child(3),   /* Útvonal */
-  body.vs-dm #tblOrders td:nth-child(6),   /* Sofőr */
-  body.vs-dm #tblOrders td.vs-row-actions{ grid-column:1 / -1; }
-  body.vs-dm .main-content[data-theme="dark"] #tblOrders tr.vsl-orow{
-    background:#141c25; border-color:rgba(255,255,255,.09); box-shadow:0 2px 12px rgba(0,0,0,.35);
+  #tblOrders td:nth-child(3),   /* Útvonal */
+  #tblOrders td:nth-child(6),   /* Sofőr */
+  #tblOrders td.vs-row-actions{ grid-column:1 / -1; }
+  .main-content[data-theme="dark"] #tblOrders tr.vsl-orow{
+    background:#141c25; border-color:rgba(255,255,255,.15); box-shadow:0 2px 12px rgba(0,0,0,.35);
   }
-  body.vs-dm #tblOrders td{
+  #tblOrders td{
     display:block; width:auto !important; max-width:100% !important;
     padding:7px 0; border:0; border-bottom:1px solid rgba(120,120,120,.15);
     text-align:left; white-space:normal;
   }
-  body.vs-dm #tblOrders td[data-label]::before{
+  #tblOrders td[data-label]::before{
     content:attr(data-label); display:block; margin-bottom:3px;
     font-size:11px; font-weight:800; letter-spacing:.03em; text-transform:uppercase;
     color:var(--text-muted);
   }
-  body.vs-dm #tblOrders td.vsl-orow-first{ font-size:17px; }
+  #tblOrders td.vsl-orow-first{ font-size:17px; }
   /* Műveletek sor: gombok balra, nagy tapintható méret, nincs alsó vonal */
-  body.vs-dm #tblOrders td.vs-row-actions{
+  #tblOrders td.vs-row-actions{
     display:flex; gap:10px; align-items:center; border-bottom:0; padding-top:10px;
   }
-  body.vs-dm #tblOrders td.vs-row-actions .btn{ min-height:44px; padding:9px 16px; font-size:15px; }
+  #tblOrders td.vs-row-actions .btn{ min-height:44px; padding:9px 16px; font-size:15px; }
   /* Checkbox-oszlop (utolsó cella) rejtve a kártyás nézetben */
-  body.vs-dm #tblOrders tr.vsl-orow td:last-child{ display:none; }
+  #tblOrders tr.vsl-orow td:last-child{ display:none; }
   /* Az útvonal rich tartalma törhet, ne fusson ki a kártyából */
-  body.vs-dm #tblOrders .vsl-route{ flex-wrap:wrap; }
+  #tblOrders .vsl-route{ flex-wrap:wrap; }
+  /* A táblázatot körülvevő oszlop-átméretező fogantyú (asztali funkció)
+     mobilon értelmetlen — elrejtjük, hogy ne zavarjon. */
+  #tblOrders .col-resizer{ display:none !important; }
+  /* Az id-cellát tömör monospace-re állítjuk, hogy a CMD-YYYY-XXXX
+     azonosító ne törjön 2 sorra. */
+  #tblOrders td.vsl-orow-first b{ font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:15px; }
 }
 
 /* Sofőr mód: a fuvar-KIÍRÁS (és minden űrlap) telefonon EGY OSZLOPBAN —
