@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-09-01 — Fuvar-kezelés tábla mobilon MINDENKINEK kártyás (nem csak sofőr-módban)
+
+**Gyökér:** a Fuvar-kezelés (`orders-list`) táblázata mobilon (≤1024px) tovább ült a vízszintesen görgethető „Excel-nézetben" — az oszlopok szűken átcsúsztak egymáson, alig lehetett kiolvasni. A kártyás nézet MÁR MEG VOLT ÍRVA a CSS-ben, de `body.vs-dm` (sofőr-mód) scope-ba zárva → csak akkor élt, ha a felhasználó a 🚚 sofőr-mód kapcsolót aktiválta.
+
+1. **`public/style.css`** — a `@media (max-width:1024px)` kártyás blokkról leszedve a `body.vs-dm` gate → minden admin/manager látja a kártyás nézetet mobilon. Asztali (>1024px) nézet VÁLTOZATLAN → megmarad az Excel-jelleg (méretezhető, átrendezhető oszlopok, tömeges kijelölés).
+2. **Bal akcens-csík** hozzáadva a mobil kártyákhoz fuvar-státusz szín szerint (`vsl-orow-ok/warn/info/err/park/wh` → zöld / sárga / kék / piros / teal / narancs) — konzisztens a Vezérlőpult „Legutóbbi fuvarok" kártyás nézetével.
+3. **Mobil finomságok**: keret 1.5px kontrasztosabb (`#e2e8f0`); a `.col-resizer` (oszlop-átméretező fogantyú, asztali funkció) mobilon `display:none` — nem zavarja a kártyát; az id-cella monospace + 15px → a CMD-YYYY-XXXX azonosító nem törik 2 sorra.
+4. **Nincs JS/HTML változás** — a `data-label` attribútumok, `renderFilteredOrders` és a többi funkció (státusz-dropdown, ⋯ menü, oszlop-drag-resize, tömeges kijelölés) érintetlen. Tisztán CSS-only kör.
+5. **Cache-bust** `?v=20260901ordcard` (admin/manager: style.css). **1033 Jest zöld** (nincs regresszió, CSS-only változás).
+
+---
+
 ## 2026-09-01 — Vezérlőpult „Legutóbbi fuvarok" — kártyás + felrakó cím + kliens + kattintható milestone-idővonal
 
 **Gyökér:** a Vezérlőpult „Legutóbbi fuvarok" táblája a fuvar CMD-azonosítójával kezdődött (érdektelen), az útvonalból csak az „úticélt" mutatta, a megbízót (client) sehol nem jelezte, és a fuvar-státuszból csak a nyers szó látszott — nem volt látható, hogy az adott aktív fuvar épp hol tart. Telefonon a táblázat oszlopai átcsúsztak egymáson (screenshot-jelöltekkel).
