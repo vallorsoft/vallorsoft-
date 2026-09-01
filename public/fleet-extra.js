@@ -605,14 +605,17 @@
       // Sofőr-választó kártya
       var selectorCard = panel(t('fe.dc.title'),
         '<div class="dc-toolbar">'
+        // Sofőr-választásra AZONNAL betölti a járandóság + kifizetés + egyenleg
+        // nézetet — nem kell külön az „Elszámolás" gombot lenyomni. Az időszak-
+        // változtatás is autoload (csak ha már van választott sofőr).
         + '<div class="field" style="margin:0;flex:1;min-width:200px;"><label>' + t('fe.dc.driverReq') + '</label>'
-        +   '<select class="select" id="dcDriver">' + _dcDriverOptions() + '</select></div>'
+        +   '<select class="select" id="dcDriver" onchange="FleetExtra.dcLoad()">' + _dcDriverOptions() + '</select></div>'
         + '<div class="field" style="margin:0;"><label>' + t('fe.dc.periodFrom') + '</label>'
-        +   '<input class="input" id="dcFrom" type="date" value="' + mr.from + '"></div>'
+        +   '<input class="input" id="dcFrom" type="date" value="' + mr.from + '" onchange="FleetExtra._dcMaybeReload()"></div>'
         + '<div class="field" style="margin:0;"><label>' + t('fe.dc.periodTo') + '</label>'
-        +   '<input class="input" id="dcTo" type="date" value="' + mr.to + '"></div>'
-        + '<button class="btn primary" style="height:42px;" onclick="FleetExtra.dcLoad()">'
-        +   t('fe.dc.calc') + '</button>'
+        +   '<input class="input" id="dcTo" type="date" value="' + mr.to + '" onchange="FleetExtra._dcMaybeReload()"></div>'
+        + '<button class="btn primary" style="height:42px;" onclick="FleetExtra.dcLoad()" title="' + t('fe.dc.calc') + '">'
+        +   '🔄 ' + t('fe.dc.calc') + '</button>'
         + '</div>'
         + '<div class="dc-bnr-line">'
         +   '<span>🏦 <b>' + t('fe.dc.bnrToday') + ':</b> '
@@ -628,12 +631,25 @@
     });
   }
 
+  // Csak akkor tölt újra, ha már van választott sofőr — így az időszak-
+  // mezők onchange autoload-ja nem villantja fel a „Válassz sofőrt" toastot.
+  function _dcMaybeReload() {
+    var email = (document.getElementById('dcDriver') || {}).value;
+    if (email) dcLoad();
+  }
+
   // A sofőr összes fontos kártyája (egyenleg + felvitel + listák + legacy)
   function dcLoad() {
     var email = (document.getElementById('dcDriver') || {}).value;
     var from = (document.getElementById('dcFrom') || {}).value;
     var to = (document.getElementById('dcTo') || {}).value;
-    if (!email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    // Üres sofőr-kiválasztás (pl. „— Válassz —" opció) → csendben nulláz;
+    // NEM dob toastot, mert az onchange autoload is ide fut és villogna.
+    if (!email) {
+      var out0 = document.getElementById('dcResult');
+      if (out0) out0.innerHTML = '';
+      return;
+    }
     var out = document.getElementById('dcResult');
     out.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">' + t('fe.calcing') + '</div>';
 
@@ -1437,7 +1453,8 @@
     svSubmitPostpone: svSubmitPostpone,
     svOpenComplete: svOpenComplete, svSubmitComplete: svSubmitComplete,
     svCloseModal: svCloseModal,
-    dcLoad: dcLoad, dcSaveRates: dcSaveRates, advSave: advSave, advDelete: advDelete,
+    dcLoad: dcLoad, _dcMaybeReload: _dcMaybeReload,
+    dcSaveRates: dcSaveRates, advSave: advSave, advDelete: advDelete,
     // Új: járandóság + kifizetés + kártyás decont
     dcEarnKindChange: dcEarnKindChange,
     dcEarnRecalc: dcEarnRecalc,
