@@ -6,8 +6,8 @@
   <title data-i18n="title.manager">vallorSoft - Manager Console</title>
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="/style.css?v=20260901scan">
-  <script src="/i18n.js?v=20260901scan"></script>
+  <link rel="stylesheet" href="/style.css?v=20260901dashcards">
+  <script src="/i18n.js?v=20260901dashcards"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -185,13 +185,8 @@
               <div class="text-primary" style="font-size:15px;font-weight:700;" data-i18n="dash.recentOrders">Legutóbbi fuvarok</div>
               <span class="dash-link" onclick="activateTab('orders-list')" data-i18n="dash.allOrders">Összes fuvar →</span>
             </div>
-            <div style="overflow-x:auto;">
-              <table class="table" id="dashRecentOrders">
-                <thead><tr><th data-i18n="dash.colOrder">Fuvar</th><th data-i18n="dash.colDest">Úticél</th><th data-i18n="dash.colDriver">Sofőr</th><th data-i18n="dash.colStatus">Státusz</th><th data-i18n="dash.colDate">Dátum</th></tr></thead>
-                <tbody id="dashRecentOrdersBody">
-                  <tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;" data-i18n="dash.loading">Betöltés...</td></tr>
-                </tbody>
-              </table>
+            <div id="dashRecentOrdersBody" class="dro-list">
+              <div class="text-muted" style="text-align:center;padding:18px;" data-i18n="dash.loading">Betöltés...</div>
             </div>
           </div>
            <!-- Jármű státusz összesítő -->
@@ -1420,7 +1415,7 @@
 <script src="/email-intake-card.js?v=20260616warm2"></script>
 <script src="/feature-catalog.js?v=20260618cgps2"></script>
 <script>window.__pwaInstallDefault=false;</script>
-<script src="/console-shared.js?v=20260827msperstopoe"></script>
+<script src="/console-shared.js?v=20260901dashcards"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 <script src="/console-pages.js?v=20260617b1"></script>
 <!-- ===== INTEGRACIOK (Manager: Ugyfelek + "Hol a kocsi?"; szamlazo/beallitas Admin-only) ===== -->

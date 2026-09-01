@@ -89,10 +89,21 @@ handlers.getRecentOrders = async function (req, res, args) {
     if (!Number.isFinite(limit) || limit <= 0) limit = 8;
     if (limit > 50) limit = 50;
 
+    // Az opcionális milestone-oszlopokat (sosit_*_at / incarcat_at /
+    // descarcat_at) `to_jsonb(o) ->> 'kulcs'` mintával olvassuk — így
+    // ha egy migráció valamelyik cég-DB-jén még nem futott le, a mező
+    // NULL-ra esik és a lekérdezés NEM hasal el. Client (megbízó) +
+    // data_incarcare (tervezett felrakási dátum) + fuvar_no is bekerül.
     const { rows } = await pool.query(
       `SELECT o.id, o.loc_incarcare, o.loc_descarcare,
+              o.client, o.data_incarcare, o.data_descarcare,
               o.nume_sofer, o.email_sofer, u.nume AS driver_user_name,
-              o.status, o.created_at
+              o.status, o.created_at,
+              (to_jsonb(o) ->> 'fuvar_no')            AS fuvar_no,
+              (to_jsonb(o) ->> 'sosit_incarcare_at')  AS sosit_incarcare_at,
+              (to_jsonb(o) ->> 'incarcat_at')         AS incarcat_at,
+              (to_jsonb(o) ->> 'sosit_descarcare_at') AS sosit_descarcare_at,
+              (to_jsonb(o) ->> 'descarcat_at')        AS descarcat_at
        FROM orders o
        LEFT JOIN users u
          ON LOWER(u.email) = LOWER(o.email_sofer) AND u.company_id = o.company_id
