@@ -443,6 +443,55 @@ handlers.getDriverActivity = async function (req, res, args) {
       }
     } catch (_e) {}
 
+    // F/1) AI-scannelt bonok — pending (menetlevélben még nincs) + attached
+    //  Az admin/manager itt láthatja azokat a bonokat is, amelyeket a sofőr
+    //  már lefotózott + az AI kiolvasott, de MÉG NINCSENEK menetlevélben.
+    //  Az `status='attached'` sorok azok, amelyeket a sofőr utólag illesztett.
+    //  A pending-eknél a UI figyelmeztető színt/badge-et használ ("☁️ csak
+    //  felhőben"), az attached-nél normál színt ("📄 menetlevélben").
+    try {
+      const rsR = await pool.query(
+        `SELECT id, kind, fields, status, waybill_id, scanned_at, attached_at,
+                CASE WHEN thumb_b64 IS NOT NULL THEN true ELSE false END AS has_thumb
+           FROM driver_receipt_scans
+          WHERE company_id = $1
+            AND LOWER(email_sofer) = $2
+            AND status IN ('pending', 'attached')
+            AND scanned_at >= $3::date
+            AND scanned_at < ($4::date + 1)
+          ORDER BY scanned_at DESC
+          LIMIT 200`,
+        [cid, email, from, to]
+      );
+      for (const r of rsR.rows) {
+        const f = r.fields || {};
+        const isFuel = r.kind === 'fuel';
+        const isPending = r.status === 'pending';
+        const subtitle = (f.loc || '') +
+          (isFuel && f.tip ? ' · ' + f.tip : '') +
+          (isFuel && f.litru ? ' · ' + f.litru + ' L' : '') +
+          (!isFuel && f.produs ? ' · ' + f.produs : '') +
+          (f.suma ? ' · ' + f.suma + ' ' + (f.valuta || '') : '') +
+          (f.plata ? ' · ' + f.plata : '');
+        events.push({
+          at: r.scanned_at,
+          type: isPending ? (isFuel ? 'fuel_pending' : 'purchase_pending')
+                          : (isFuel ? 'fuel' : 'purchase'),
+          icon: isFuel ? '⛽' : '🛒',
+          title: (isFuel ? 'Tankolás' : 'Vásárlás') +
+                 (isPending ? ' — ☁️ csak felhőben' : ' — 📄 menetlevélben'),
+          subtitle,
+          meta: {
+            source: 'scan', scan_id: r.id, waybill_id: r.waybill_id || null,
+            pending: isPending, has_thumb: !!r.has_thumb,
+          },
+        });
+      }
+    } catch (e) {
+      // Régi séma-eltérés → csendes noop.
+      console.warn('getDriverActivity pending-scans query hiba:', e.message);
+    }
+
     // F) Bug-jelzések a sofőrtől
     try {
       const bR = await pool.query(
@@ -473,7 +522,11 @@ handlers.getDriverActivity = async function (req, res, args) {
     });
 
     // Összefoglaló számláló (a fejléc-KPI-hez)
-    const counts = { milestone: 0, waybill: 0, fuel: 0, purchase: 0, photo: 0, uit: 0, border: 0, bug: 0 };
+    const counts = {
+      milestone: 0, waybill: 0, fuel: 0, purchase: 0,
+      fuel_pending: 0, purchase_pending: 0,
+      photo: 0, uit: 0, border: 0, bug: 0,
+    };
     for (const ev of events) { if (counts[ev.type] != null) counts[ev.type]++; }
 
     return res.json({ result: {

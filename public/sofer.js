@@ -3044,7 +3044,12 @@ function _scanReceiptTry(id, payload, attempt) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ functionName: 'scanReceipt', arguments: [{
-        mimeType: payload.mimeType, data: payload.data
+        mimeType: payload.mimeType, data: payload.data,
+        // Kicsi (128px) thumbnail — a szerver ELMENTI a `driver_receipt_scans`
+        // pending sorába, hogy az admin/manager a Sofőr-aktivitás nézetben
+        // lássa (a teljes kép SOSEM kerül DB-be). Ha a payload nem ad
+        // thumb-ot (PDF), üres string → a szerver NULL-t ment.
+        thumb_b64: (payload.thumb || '').slice(0, 200000)
       }] })
     })
       .then(function (r) { return r.json(); })
@@ -3055,7 +3060,15 @@ function _scanReceiptTry(id, payload, attempt) {
           var kind = (f.kind === 'fuel' || f.kind === 'purchase')
             ? f.kind
             : (_receiptScanKind || 'purchase');
-          rcptQueueUpdate(id, { status: 'ready', fields: f, kind: kind, attempt: null, maxAttempts: null });
+          rcptQueueUpdate(id, {
+            status: 'ready', fields: f, kind: kind,
+            // A szerver-oldali pending sor azonosítója — később a rrAccept
+            // ezzel jelöli a rekordot 'attached'-re (menetlevél-hivatkozással),
+            // a rrDiscard pedig 'deleted'-re → az admin-oldali Sofőr-aktivitás
+            // nézetben pontosan látszik, mi lett a bonnal.
+            pending_id: r.pending_id || null,
+            attempt: null, maxAttempts: null,
+          });
           renderPendingReceipts();
           return;
         }
@@ -3227,6 +3240,25 @@ function rrDiscard() {
 }
 
 function rrRemove(id) {
+  // Ha a szerveren van pending sor (pending_id), soft-delete-jük is,
+  // hogy az admin/manager Sofőr-aktivitás nézetből kikerüljön.
+  try {
+    var q = rcptQueueLoad();
+    for (var i = 0; i < q.length; i++) {
+      if (q[i].id === id && q[i].pending_id) {
+        fetch('/api/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          keepalive: true,
+          body: JSON.stringify({
+            functionName: 'deletePendingReceipt',
+            arguments: [{ id: q[i].pending_id }]
+          })
+        }).catch(function () { /* best-effort */ });
+        break;
+      }
+    }
+  } catch (_) {}
   rcptQueueRemove(id);
   renderPendingReceipts();
 }
@@ -3315,6 +3347,30 @@ function rrAccept() {
       body: JSON.stringify({ functionName: 'confirmReceiptExtraction', arguments: [{ fields: confirmed }] })
     }).catch(function () { /* best-effort — a UI menete független */ });
   } catch (_) { /* nincs baj — csak nem tanul ebből a bonból */ }
+
+  // Szerver-oldalon jelöljük "attached"-nek a pending sort (ha van
+  // pending_id). A waybill_id még nem ismert (a menetlevél csak most
+  // került piszkozatba); a szerver a state=attached-et állítja, a
+  // waybill_id NULL marad addig, amíg a menetlevél be nincs küldve.
+  // (A driverActivity nézetben az attached már látszik "menetlevélben"
+  // állapottal, ami elég a sofőr-aktivitás fő céljához.)
+  try {
+    var _q2 = rcptQueueLoad(), _pid = null;
+    for (var _j = 0; _j < _q2.length; _j++) {
+      if (_q2[_j].id === _rrCurrentId && _q2[_j].pending_id) { _pid = _q2[_j].pending_id; break; }
+    }
+    if (_pid) {
+      fetch('/api/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        body: JSON.stringify({
+          functionName: 'attachPendingReceipt',
+          arguments: [{ id: _pid }]
+        })
+      }).catch(function () { /* best-effort */ });
+    }
+  } catch (_) {}
 
   toast(t('sof.rr.accepted'), 'ok');
   rcptQueueRemove(_rrCurrentId);

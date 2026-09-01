@@ -184,7 +184,16 @@ describe('getDriverActivity', () => {
       { id: 3, tip: 'Iesire',  tara: 'RO', locatie: 'Nadlac', gps_lat: 46, gps_lng: 21, created_at: '2026-01-10T13:00:00Z' },
       { id: 4, tip: 'Intrare', tara: 'RO', locatie: 'Nadlac', gps_lat: 46, gps_lng: 21, created_at: '2026-01-12T07:00:00Z' },
     ]));
-    // 7) bug_reports — 1
+    // 7) driver_receipt_scans — 1 pending tankolás (nincs menetlevélben) + 1 attached vásárlás
+    pool.query.mockResolvedValueOnce(rows([
+      { id: 11, kind: 'fuel', fields: { loc: 'OMV Cluj', tip: 'Motorină', litru: 300, suma: 1500, valuta: 'RON' },
+        status: 'pending',  waybill_id: null,           scanned_at: '2026-01-11T09:00:00Z',
+        attached_at: null,  has_thumb: true },
+      { id: 12, kind: 'purchase', fields: { loc: 'Kaufland', produs: 'kave', suma: 20, valuta: 'RON' },
+        status: 'attached', waybill_id: 'MT-2026-0001', scanned_at: '2026-01-11T10:00:00Z',
+        attached_at: '2026-01-11T12:00:00Z', has_thumb: false },
+    ]));
+    // 8) bug_reports — 1
     pool.query.mockResolvedValueOnce(rows([
       { id: 9, szoveg: 'Az app fagy', oldal: 'sofer', created_at: '2026-01-11T16:00:00Z' },
     ]));
@@ -196,13 +205,18 @@ describe('getDriverActivity', () => {
     expect(res.body.result.ok).toBe(true);
     const events = res.body.result.events;
 
-    // 4 milestone + 1 waybill + 1 fuel + 1 purchase + 1 photo + 1 uit + 2 border + 1 bug = 12
-    expect(events.length).toBe(12);
+    // 4 milestone + 1 waybill + 1 fuel + 1 purchase + 1 photo + 1 uit + 2 border
+    // + 1 fuel_pending + 1 purchase (attached scan) + 1 bug = 14
+    expect(events.length).toBe(14);
     const counts = res.body.result.counts;
     expect(counts.milestone).toBe(4);
     expect(counts.waybill).toBe(1);
+    // fuel: 1 a menetlevélből
     expect(counts.fuel).toBe(1);
-    expect(counts.purchase).toBe(1);
+    // purchase: 1 a menetlevélből + 1 attached scan
+    expect(counts.purchase).toBe(2);
+    // fuel_pending: 1 pending scan (nincs menetlevélben)
+    expect(counts.fuel_pending).toBe(1);
     expect(counts.photo).toBe(1);
     expect(counts.uit).toBe(1);
     expect(counts.border).toBe(2);
@@ -237,6 +251,7 @@ describe('getDriverActivity', () => {
       .mockRejectedValueOnce(new Error('documents fallback dob'))       // documents fallback (users-join) is dob
       // UIT nem hívódik (orderIds üres) → nincs mock
       .mockRejectedValueOnce(new Error('border_crossings hiba'))        // border dob
+      .mockRejectedValueOnce(new Error('driver_receipt_scans hiba'))    // pending scans dob (új sub-query)
       .mockRejectedValueOnce(new Error('bug_reports hiba'));            // bug dob
 
     const res = await request(app).post('/api/execute').send({
@@ -261,6 +276,7 @@ describe('getDriverActivity', () => {
       .mockResolvedValueOnce(rows([]))                                                    // waybills üres
       .mockResolvedValueOnce(rows([]))                                                    // documents üres
       .mockResolvedValueOnce(rows([]))                                                    // border üres
+      .mockResolvedValueOnce(rows([]))                                                    // driver_receipt_scans üres
       .mockResolvedValueOnce(rows([]));                                                   // bug üres
 
     const res = await request(app).post('/api/execute').send({
