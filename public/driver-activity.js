@@ -245,14 +245,16 @@
 
     var kpiPills =
       '<div class="da-cnt-wrap">'
-      + _cntChip('milestone', '📍', counts.milestone || 0, t('da.type.milestone'))
-      + _cntChip('waybill',   '📄', counts.waybill   || 0, t('da.type.waybill'))
-      + _cntChip('fuel',      '⛽', counts.fuel      || 0, t('da.type.fuel'))
-      + _cntChip('purchase',  '🛒', counts.purchase  || 0, t('da.type.purchase'))
-      + _cntChip('photo',     '📷', counts.photo     || 0, t('da.type.photo'))
-      + _cntChip('uit',       '🛣️', counts.uit      || 0, t('da.type.uit'))
-      + _cntChip('border',    '🛂', counts.border    || 0, t('da.type.border'))
-      + _cntChip('bug',       '🐛', counts.bug       || 0, t('da.type.bug'))
+      + _cntChip('milestone',        '📍', counts.milestone        || 0, t('da.type.milestone'))
+      + _cntChip('waybill',          '📄', counts.waybill          || 0, t('da.type.waybill'))
+      + _cntChip('fuel',             '⛽', counts.fuel             || 0, t('da.type.fuel'))
+      + _cntChip('purchase',         '🛒', counts.purchase         || 0, t('da.type.purchase'))
+      + _cntChip('fuel_pending',     '☁️', counts.fuel_pending     || 0, t('da.type.fuel_pending'), 'warn')
+      + _cntChip('purchase_pending', '☁️', counts.purchase_pending || 0, t('da.type.purchase_pending'), 'warn')
+      + _cntChip('photo',            '📷', counts.photo            || 0, t('da.type.photo'))
+      + _cntChip('uit',              '🛣️', counts.uit             || 0, t('da.type.uit'))
+      + _cntChip('border',           '🛂', counts.border           || 0, t('da.type.border'))
+      + _cntChip('bug',              '🐛', counts.bug              || 0, t('da.type.bug'))
       + '</div>';
 
     var head =
@@ -314,11 +316,21 @@
           photoBtn = ' <a href="' + esc(ev.meta.url) + '" target="_blank" rel="noopener" '
             + 'class="btn ghost da-ev-photo-btn" onclick="event.stopPropagation();">🔍 ' + t('da.open') + '</a>';
         }
+        // AI-scan pending vs attached badge (a sofőr fényképezte-e csak
+        // felhőbe, vagy már bekerült a menetlevélbe).
+        var scanBadge = '';
+        if (ev.meta && ev.meta.source === 'scan') {
+          if (ev.meta.pending) {
+            scanBadge = ' <span class="da-scan-badge da-scan-pending">' + esc(t('da.cloud')) + '</span>';
+          } else {
+            scanBadge = ' <span class="da-scan-badge da-scan-attached">' + esc(t('da.attached')) + '</span>';
+          }
+        }
         return '<div class="da-ev da-ev-' + esc(ev.type) + '">'
           + '<div class="da-ev-ico">' + (ev.icon || '•') + '</div>'
           + '<div class="da-ev-body">'
           +   '<div class="da-ev-head">'
-          +     '<div class="da-ev-title">' + esc(ev.title || '') + orderTag + '</div>'
+          +     '<div class="da-ev-title">' + esc(ev.title || '') + orderTag + scanBadge + '</div>'
           +     '<div class="da-ev-when" title="' + esc(_fmtDateTime(ev.at)) + '">' + esc(_fmtDateTime(ev.at)) + '</div>'
           +   '</div>'
           +   subtitle + photoBtn
@@ -335,10 +347,11 @@
     right.innerHTML = head + photoHtml + timelineHtml;
   }
 
-  function _cntChip(key, ico, n, label) {
+  function _cntChip(key, ico, n, label, tone) {
     var isActive = (_typeFilter === key);
     var isEmpty = (n === 0);
-    return '<button class="da-cnt-chip ' + (isActive ? 'is-active' : '') + ' ' + (isEmpty ? 'is-empty' : '') + '" '
+    var toneClass = tone ? ' da-cnt-' + tone : '';
+    return '<button class="da-cnt-chip ' + (isActive ? 'is-active' : '') + ' ' + (isEmpty ? 'is-empty' : '') + toneClass + '" '
       + 'title="' + esc(label) + '" '
       + 'onclick="DriverActivity.toggleType(\'' + key + '\')">'
       + ico + ' <b>' + n + '</b> <span class="da-cnt-l">' + esc(label) + '</span>'

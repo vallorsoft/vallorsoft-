@@ -3974,3 +3974,40 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   #driverActivityBox .da-detail-nume{ font-size:16px; }
   #driverActivityBox .da-photo img{ height:100px; }
 }
+
+/* AI-scan pending vs attached — Sofőr-aktivitás timeline badge + warn-chip */
+#driverActivityBox .da-scan-badge{
+  display:inline-block; margin-left:8px;
+  padding:2px 7px; border-radius:999px;
+  font-size:10.5px; font-weight:700; letter-spacing:0.2px;
+  vertical-align:middle;
+}
+#driverActivityBox .da-scan-pending{
+  background:#fef3c7; color:#92400e; border:1px solid #fcd34d;
+}
+#driverActivityBox .da-scan-attached{
+  background:#dcfce7; color:#166534; border:1px solid #86efac;
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-scan-pending{
+  background:rgba(245,158,11,0.15); color:#fde68a; border-color:rgba(245,158,11,0.5);
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-scan-attached{
+  background:rgba(34,197,94,0.15); color:#bbf7d0; border-color:rgba(34,197,94,0.5);
+}
+/* Warn-tónusú számláló-chip a pending kategóriákhoz */
+#driverActivityBox .da-cnt-chip.da-cnt-warn:not(.is-empty){
+  border-color:var(--status-warn, #f59e0b);
+  color:#92400e;
+  background:#fef3c7;
+}
+.main-content[data-theme="dark"] #driverActivityBox .da-cnt-chip.da-cnt-warn:not(.is-empty){
+  background:rgba(245,158,11,0.15); color:#fde68a;
+}
+#driverActivityBox .da-cnt-chip.da-cnt-warn.is-active{
+  background:var(--status-warn, #f59e0b); color:#fff; border-color:var(--status-warn, #f59e0b);
+}
+/* Pending esemény idővonal ikon-köre — sárga akcens */
+#driverActivityBox .da-ev-fuel_pending .da-ev-ico,
+#driverActivityBox .da-ev-purchase_pending .da-ev-ico{
+  background:#fef3c7; border-color:#fcd34d;
+}

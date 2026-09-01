@@ -178,15 +178,45 @@ handlers.scanReceipt = async function (req, res, args) {
     try {
       const { json, model } = await extractJson({ systemPrompt, parts });
       const fields = sanitize(json);
+
+      // Szerver-oldali "pending" nyilvántartás — hogy az admin/manager a
+      // Sofőr-aktivitás nézetben látni tudja: a sofőrnek van-e még
+      // menetlevélbe be nem tett bonja. Best-effort — ha a tábla nem
+      // létezik / DB-hiba, a scan-válasz nem törik. Thumbnail-t az
+      // opcionális `a.thumb_b64` mezőből mentjük (128×128 JPEG a kliens
+      // canvasáról; a teljes kép SOHA nem kerül DB-be).
+      let pendingId = null;
+      try {
+        const email = String(u.email || '').toLowerCase();
+        const kind = (fields.kind === 'fuel' || fields.kind === 'purchase')
+          ? fields.kind : 'other';
+        const thumb = (typeof a.thumb_b64 === 'string' && a.thumb_b64.length < 200000)
+          ? a.thumb_b64 : null; // max ~150 KB thumbnail
+        const ins = await pool.query(
+          `INSERT INTO driver_receipt_scans
+             (company_id, email_sofer, kind, fields, thumb_b64, status, created_by)
+           VALUES ($1, $2, $3, $4::jsonb, $5, 'pending', $6)
+           RETURNING id`,
+          [cid, email, kind, JSON.stringify(fields), thumb, u.email]
+        );
+        pendingId = ins.rows[0] && ins.rows[0].id;
+      } catch (dbErr) {
+        // A driver-receipt-scans tábla hiányozhat egy régebbi cég-DB-n
+        // (a migráció még nem futott le) → csendes noop.
+        console.warn('scanReceipt pending INSERT skip:', dbErr.message);
+      }
+
       try {
         // Audit-napló: CSAK metaadat (modell + kind + confidence + minta-szám).
         // A base64 kép SOHA nem kerül audit-logba / DB-be — csak a Gemini
         // hívás alatt él memóriában, utána GC.
-        await audit.fromReq(req, 'receipt.scan', 'receipt', null, {
+        await audit.fromReq(req, 'receipt.scan', 'receipt', pendingId, {
           model, kind: fields.kind, confidence: fields.confidence, samples_used: samples.length,
         });
       } catch (_) { /* audit best-effort */ }
-      return res.json({ result: { ok: true, fields, model, learned_from: samples.length } });
+      return res.json({ result: {
+        ok: true, fields, model, learned_from: samples.length, pending_id: pendingId,
+      } });
     } catch (e) {
       // Diagnosztika: minden AI-hiba naplózva a szerveren (bővített részletek)
       // — a base64 SOHA nem kerül a naplóba (csak státusz + üzenet + attempts).
@@ -395,6 +425,138 @@ handlers.deleteBonScanSample = async function (req, res, args) {
     return res.json({ result: { ok: true, deleted: rowCount } });
   } catch (e) {
     console.error('deleteBonScanSample hiba:', e);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ═════════════════════════════════════════════════════════════
+//  Pending bon-scan élet-ciklus (sofőr + admin/manager)
+//   - listPendingReceipts: mit lát a sofőr saját maga vagy az admin
+//     egy adott sofőrről (Sofőr-aktivitás nézetben)
+//   - attachPendingReceipt: a menetlevélbe illesztéskor jelölés
+//     (state: pending → attached, waybill_id + attached_at)
+//   - deletePendingReceipt: soft-delete (state: pending → deleted)
+//  Multi-tenant: minden SQL company_id-szűrt. Cross-tenant:
+//   - Sofer csak SAJÁT email-jét éri el (LOWER-normalizálva);
+//   - Admin/Manager a cégen belül bármelyik sofőrét.
+// ═════════════════════════════════════════════════════════════
+
+function _isSofer(req) { return req.session && req.session.user && req.session.user.pozicio === 'Sofer'; }
+// Az _isAdminOrManager(u) segéd fentebb már definiált — user-objektumra;
+// itt req-objektumra van szükségünk, ezért egy vékony wrappert használunk.
+function _isAdminOrManagerReq(req) {
+  return _isAdminOrManager(req && req.session && req.session.user);
+}
+
+handlers.listPendingReceipts = async function (req, res, args) {
+  try {
+    const u = req.session && req.session.user;
+    if (!u) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = u.company_id;
+    const a = (args && args[0]) ? args[0] : {};
+    // Sofer csak sajátot; Admin/Manager kérheti bármelyik cég-sofőrét (email param).
+    const email = _isSofer(req)
+      ? String(u.email || '').toLowerCase()
+      : String(a.email || '').trim().toLowerCase();
+    if (!email) return res.json({ result: { ok: false, err: 'Email lipsă.' } });
+    const statuses = Array.isArray(a.status) && a.status.length
+      ? a.status.filter((s) => ['pending', 'attached', 'deleted'].includes(s))
+      : ['pending'];
+    let items = [];
+    try {
+      const r = await pool.query(
+        `SELECT id, kind, fields, status, waybill_id, scanned_at, attached_at, deleted_at,
+                CASE WHEN thumb_b64 IS NOT NULL THEN true ELSE false END AS has_thumb
+           FROM driver_receipt_scans
+          WHERE company_id = $1
+            AND LOWER(email_sofer) = $2
+            AND status = ANY($3::text[])
+          ORDER BY scanned_at DESC
+          LIMIT 200`,
+        [cid, email, statuses]
+      );
+      items = r.rows;
+    } catch (e) {
+      // Régi séma-eltérés (migráció nem futott le) → üres lista.
+      console.warn('listPendingReceipts skip:', e.message);
+    }
+    return res.json({ result: { ok: true, items } });
+  } catch (e) {
+    console.error('listPendingReceipts hiba:', e);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.attachPendingReceipt = async function (req, res, args) {
+  try {
+    const u = req.session && req.session.user;
+    if (!u) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = u.company_id;
+    const a = (args && args[0]) ? args[0] : {};
+    const id = parseInt(a.id, 10);
+    const waybillId = String(a.waybill_id || '').trim().slice(0, 20) || null;
+    if (!Number.isFinite(id)) return res.json({ result: { ok: false, err: 'ID invalid.' } });
+
+    // Sofer csak sajátot; Admin/Manager a cég bármelyik pending sorát.
+    const emailGate = _isSofer(req)
+      ? 'AND LOWER(email_sofer) = LOWER($3)'
+      : '';
+    const params = [id, cid];
+    if (_isSofer(req)) params.push(u.email);
+    params.push(waybillId);
+    try {
+      const r = await pool.query(
+        `UPDATE driver_receipt_scans
+            SET status='attached', waybill_id=$${params.length}, attached_at=NOW(), updated_at=NOW()
+          WHERE id = $1 AND company_id = $2 AND status = 'pending' ${emailGate}
+          RETURNING id`,
+        params
+      );
+      if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu s-a găsit sau nu mai este pending.' } });
+      try { await audit.fromReq(req, 'receipt.attach', 'receipt', String(id), { waybill_id: waybillId }); } catch (_) {}
+      return res.json({ result: { ok: true } });
+    } catch (e) {
+      console.warn('attachPendingReceipt DB hiba:', e.message);
+      return res.json({ result: { ok: false, err: 'Eroare la actualizare' } });
+    }
+  } catch (e) {
+    console.error('attachPendingReceipt hiba:', e);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.deletePendingReceipt = async function (req, res, args) {
+  try {
+    const u = req.session && req.session.user;
+    if (!u) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = u.company_id;
+    const a = (args && args[0]) ? args[0] : {};
+    const id = parseInt(a.id || (Array.isArray(args) ? args[0] : args), 10);
+    if (!Number.isFinite(id)) return res.json({ result: { ok: false, err: 'ID invalid.' } });
+
+    const emailGate = _isSofer(req)
+      ? 'AND LOWER(email_sofer) = LOWER($3)'
+      : '';
+    const params = [id, cid];
+    if (_isSofer(req)) params.push(u.email);
+
+    try {
+      const r = await pool.query(
+        `UPDATE driver_receipt_scans
+            SET status='deleted', deleted_at=NOW(), updated_at=NOW()
+          WHERE id = $1 AND company_id = $2 AND status <> 'attached' ${emailGate}
+          RETURNING id`,
+        params
+      );
+      if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu s-a găsit sau este atașat la o foaie.' } });
+      try { await audit.fromReq(req, 'receipt.delete', 'receipt', String(id), {}); } catch (_) {}
+      return res.json({ result: { ok: true } });
+    } catch (e) {
+      console.warn('deletePendingReceipt DB hiba:', e.message);
+      return res.json({ result: { ok: false, err: 'Eroare la ștergere' } });
+    }
+  } catch (e) {
+    console.error('deletePendingReceipt hiba:', e);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };

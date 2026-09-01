@@ -387,6 +387,11 @@
     'da.type.uit':       { ro: 'Coduri UIT', hu: 'UIT kód' },
     'da.type.border':    { ro: 'Treceri frontieră', hu: 'Határátlépés' },
     'da.type.bug':       { ro: 'Raportări bug', hu: 'Bug jelzés' },
+    // AI-scannelt bonok — pending vs attached
+    'da.type.fuel_pending':     { ro: 'Alim. (☁️ pending)', hu: 'Tank. (☁️ várakozó)' },
+    'da.type.purchase_pending': { ro: 'Achiz. (☁️ pending)', hu: 'Vás. (☁️ várakozó)' },
+    'da.cloud':          { ro: '☁️ Doar în cloud (nu în foaie)', hu: '☁️ Csak felhőben (menetlevélben még nincs)' },
+    'da.attached':       { ro: '📄 În foaia de parcurs', hu: '📄 Menetlevélben' },
 
     'bnr.title': { hu: '💱 BNR EUR/RON árfolyam', ro: '💱 Curs valutar BNR EUR/RON' },
     'bnr.sub': { hu: 'A Román Nemzeti Bank napi referencia-árfolyama és a cég tárolt árfolyama.', ro: 'Cursul de referință zilnic al BNR și cursul stocat al companiei.' },
