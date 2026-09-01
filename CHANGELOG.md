@@ -14,6 +14,19 @@
 
 ---
 
+## 2026-09-01 — Vezérlőpult „Legutóbbi fuvarok" — kártyás + felrakó cím + kliens + kattintható milestone-idővonal
+
+**Gyökér:** a Vezérlőpult „Legutóbbi fuvarok" táblája a fuvar CMD-azonosítójával kezdődött (érdektelen), az útvonalból csak az „úticélt" mutatta, a megbízót (client) sehol nem jelezte, és a fuvar-státuszból csak a nyers szó látszott — nem volt látható, hogy az adott aktív fuvar épp hol tart. Telefonon a táblázat oszlopai átcsúsztak egymáson (screenshot-jelöltekkel).
+
+1. **`handlers/dashboard.js` `getRecentOrders` bővítés** — az opcionális oszlopokat (`fuvar_no`, `sosit_incarcare_at`, `incarcat_at`, `sosit_descarcare_at`, `descarcat_at`) `to_jsonb(o) ->> 'kulcs'` mintával olvassuk (hiányzó oszlop → NULL, nem exception); új mezők: `client` (megbízó), `data_incarcare` / `data_descarcare` (tervezett dátumok), `fuvar_no` (ember-olvasható). Ez a UI kártyás nézetéhez elegendő adatot ad.
+2. **`public/console-shared.js` `loadDashRecentOrders` teljes átírás** — a `<table>` helyett kártyás lista (`.dro-card`): fejléc (📍 felrakó cím → 📍 lerakó cím + dátum), meta-sor (🏢 megbízó · 👤 sofőr · #CMD-2026-XXXX), lábléc (státusz-pilula + ▾ toggle). A kártyák bal-akcens-csík színe a fuvar-státusztól függ (zöld = Finalizat, sárga = In Curs, kék = Alocat, piros = Anulat/Disponibil). XSS-mentes: minden felhasználó-adat `esc()`-elve, milestone-adat globális gyorsítótárban (index-alapú).
+3. **Kattintható kártya → lenyíló milestone-idővonal** (akkordeon: egyszerre EGY nyitva). Új globális `toggleDashOrder(idx)`: a 4 fix milestone-lépést jeleníti meg (📍 odaért felrakóhoz / 📦 felrakva / 📍 odaért lerakóhoz / ✅ lerakva) idővonalon: elvégzett lépés zöld akcens + kipipálva + időbélyeggel; a **következő** lépés (ha aktív fuvar) narancs pulzáló keret + „ez jön" felirattal → az admin egy pillantással látja, épp hol tart a sofőr. Tervezett fel-/lerakási dátumok is látszanak. Lábléc-gomb: „Megnyitás a fuvar-kezelésben →".
+4. **CSS** (`style.css` végén ~140 sor, `#dashRecentOrdersBody` scope): kártya-hover elmozdítás, `is-open` állapot indigó vastag keret, dro-tone akcens-csík (4 státusz-szín), milestone-lépések színes ikon-körökkel, done/next/todo állapot-stílusok, reszponzív (≤640px: cím max-width 180px, meta-id lekerül a jobb szélről). Világos + sötét téma külön.
+5. **`admin.html` + `manager.html`**: a régi `<table id="dashRecentOrders">` markup helyett `<div id="dashRecentOrdersBody" class="dro-list">` — a JS renderli a kártyákat. **i18n** 8 új `dash.ms.*` kulcs (RO-alap + HU). Cache-bust `?v=20260901dashcards` (style.css + i18n.js + console-shared.js).
+6. **Teszt** — `tests/integration/dashboard-stats.test.js` +2 új eset: (a) SELECT tartalmazza `loc_incarcare` + `client` + 4 milestone-oszlopot `to_jsonb`-vel + `company_id`-szűrő; (b) válasz-mezők (a kliens innen renderel — regresszió-őr). **1033 Jest zöld** (1031 → 1033, +2 új).
+
+---
+
 ## 2026-09-01 — ÚJ: AI-scannelt bonok nyilvántartása (☁️ csak felhőben vs 📄 menetlevélben)
 
 **Gyökér:** a sofőr fényképezett bonja + AI-kiolvasott mezői eddig KIZÁRÓLAG a telefon localStorage-ában éltek, amíg a sofőr be nem illesztette a menetlevélbe. Az admin/manager nem látta, hogy a sofőrnek van-e olyan bonja, amit már kifényképezett + AI kiolvasott, de még nincs menetlevélben (pl. útközben, este). Ezek a Sofőr-aktivitás nézetből is hiányoztak.

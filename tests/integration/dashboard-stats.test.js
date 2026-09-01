@@ -97,6 +97,51 @@ describe('getRecentOrders', () => {
     expect(res.body.result.ok).toBe(false);
     expect(pool.query).not.toHaveBeenCalled();
   });
+
+  test('SELECT tartalmazza a milestone-oszlopokat + client + loc_incarcare a kártyás nézethez', async () => {
+    setUser(ADMIN);
+    pool.query.mockResolvedValueOnce(rows([]));
+    await call('getRecentOrders', [5]);
+    const sql = pool.query.mock.calls[0][0];
+    // A vezérlőpult kártyás Legutóbbi fuvarok nézete ezekhez a mezőkhöz köti
+    // a felrakó címét, megbízót és a 4 milestone-idővonal-lépést.
+    expect(sql).toMatch(/loc_incarcare/i);
+    expect(sql).toMatch(/loc_descarcare/i);
+    expect(sql).toMatch(/o\.client/i);
+    expect(sql).toMatch(/data_incarcare/i);
+    expect(sql).toMatch(/sosit_incarcare_at/i);
+    expect(sql).toMatch(/incarcat_at/i);
+    expect(sql).toMatch(/sosit_descarcare_at/i);
+    expect(sql).toMatch(/descarcat_at/i);
+    // Az opcionális oszlopok to_jsonb-vel: NULL-ozódnak, ha a migráció nem futott.
+    expect(sql).toMatch(/to_jsonb\(o\)/i);
+    // company_id szűrő (multi-tenant)
+    expect(sql).toMatch(/company_id = \$1/i);
+  });
+
+  test('válasz a milestone-mezőket is visszaadja (a kliens innen renderel)', async () => {
+    setUser(ADMIN);
+    pool.query.mockResolvedValueOnce(rows([{
+      id: 'CMD-1', fuvar_no: 'CMD-2026-0001',
+      loc_incarcare: 'Cluj', loc_descarcare: 'Bucuresti',
+      client: 'ACME Trans', data_incarcare: '2026-01-10', data_descarcare: '2026-01-12',
+      nume_sofer: 'Peto', email_sofer: 'peto@ceg.hu', driver_user_name: 'Peto',
+      status: 'In Curs', created_at: '2026-01-10T08:00:00Z',
+      sosit_incarcare_at: '2026-01-10T09:00:00Z',
+      incarcat_at:        '2026-01-10T11:00:00Z',
+      sosit_descarcare_at: null, descarcat_at: null,
+    }]));
+    const res = await call('getRecentOrders', [8]);
+    expect(res.body.result.ok).toBe(true);
+    const o = res.body.result.orders[0];
+    expect(o.loc_incarcare).toBe('Cluj');
+    expect(o.client).toBe('ACME Trans');
+    expect(o.fuvar_no).toBe('CMD-2026-0001');
+    expect(o.sosit_incarcare_at).toBe('2026-01-10T09:00:00Z');
+    expect(o.incarcat_at).toBe('2026-01-10T11:00:00Z');
+    expect(o.sosit_descarcare_at).toBe(null);
+    expect(o.descarcat_at).toBe(null);
+  });
 });
 
 // ═══ getVehicleStatusSummary ═════════════════════════════════

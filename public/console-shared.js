@@ -3945,35 +3945,140 @@ var DASH_STATUS_MAP = {
   'Extern':     { c: 'info', k: 'status.Extern' },
   'Anulat':     { c: 'err',  k: 'status.Anulat' }
 };
+// A vezérlőpult „Legutóbbi fuvarok" kártyás lista.
+// Egy kártya:
+//   • bal-akcens: státusz-szín (ok/warn/info/err)
+//   • fejléc:  📍 felrakó cím  →  📍 lerakó cím
+//   • sor 1:   🏢 megbízó (client) · 👤 sofőr
+//   • sor 2:   státusz-pilula · dátum (jobbra)
+//   • kattintható → lenyíló: 4-lépéses milestone-idővonal
+//     (📍 felrakóhoz ért / 📦 felrakva / 📍 lerakóhoz ért / ✅ lerakva)
+//     időbélyegekkel — látszik, épp hol tart a fuvar.
 function loadDashRecentOrders() {
-  var tb = document.getElementById('dashRecentOrdersBody');
-  if (!tb) return;
+  var box = document.getElementById('dashRecentOrdersBody');
+  if (!box) return;
   gas('getRecentOrders', [8]).then(function (r) {
     if (!r || !r.ok) {
-      tb.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">' + t('dash.loadFail') + '</td></tr>';
+      box.innerHTML = '<div class="text-muted" style="text-align:center;padding:18px;">' + t('dash.loadFail') + '</div>';
       return;
     }
     var list = r.orders || [];
     if (!list.length) {
-      tb.innerHTML = '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:18px;">' + t('dash.noOrders') + '</td></tr>';
+      box.innerHTML = '<div class="text-muted" style="text-align:center;padding:18px;">' + t('dash.noOrders') + '</div>';
       return;
     }
-    tb.innerHTML = list.map(function (o) {
+    // Sor-adatot XSS-mentesen (esc-elve) HTML-be, milestone-adatot
+    // a globális gyorsítótárban tartjuk (id-index alapján) — nem
+    // ágyazódik onclick attribútumba.
+    window._dashOrdersCache = list;
+    box.innerHTML = list.map(function (o, idx) {
       var drv = o.nume_sofer || o.driver_user_name || o.email_sofer || '—';
-      var dest = o.loc_descarcare || '—';
+      var pick = o.loc_incarcare || '—';
+      var drop = o.loc_descarcare || '—';
+      var client = o.client || '';
       var sm = DASH_STATUS_MAP[o.status] || { c: 'info' };
       var smt = sm.k ? t(sm.k) : (o.status || '—');
-      var dt = o.created_at ? new Date(o.created_at).toLocaleDateString('hu-HU') : '—';
-      return '<tr>'
-        + '<td><b class="text-primary">' + esc(String(o.id)) + '</b></td>'
-        + '<td>' + esc(dest) + '</td>'
-        + '<td>' + esc(drv) + '</td>'
-        + '<td><span class="badge ' + sm.c + '">' + esc(smt) + '</span></td>'
-        + '<td class="text-muted">' + dt + '</td>'
-        + '</tr>';
+      var dt = o.created_at ? new Date(o.created_at).toLocaleDateString('ro-RO') : '—';
+      var label = o.fuvar_no ? o.fuvar_no : String(o.id);
+      return '<div class="dro-card dro-tone-' + esc(sm.c || 'info') + '" '
+        +   'onclick="toggleDashOrder(' + idx + ')" '
+        +   'role="button" tabindex="0" data-dro-id="' + esc(String(o.id)) + '">'
+        +   '<div class="dro-head">'
+        +     '<div class="dro-route">'
+        +       '<span class="dro-pick">📍 ' + esc(pick) + '</span>'
+        +       '<span class="dro-arrow">→</span>'
+        +       '<span class="dro-drop">📍 ' + esc(drop) + '</span>'
+        +     '</div>'
+        +     '<span class="dro-date">' + dt + '</span>'
+        +   '</div>'
+        +   '<div class="dro-meta">'
+        +     (client ? '<span class="dro-meta-item">🏢 <b>' + esc(client) + '</b></span>' : '')
+        +     '<span class="dro-meta-item">👤 ' + esc(drv) + '</span>'
+        +     '<span class="dro-meta-item dro-meta-id">#' + esc(label) + '</span>'
+        +   '</div>'
+        +   '<div class="dro-foot">'
+        +     '<span class="badge ' + sm.c + '">' + esc(smt) + '</span>'
+        +     '<span class="dro-toggle" aria-hidden="true">▾</span>'
+        +   '</div>'
+        +   '<div class="dro-body" id="droBody' + idx + '" hidden></div>'
+        + '</div>';
     }).join('');
   });
 }
+
+// A kártya lenyílásakor a milestone-idővonal rendelődik ki a cache-ből.
+window.toggleDashOrder = function (idx) {
+  var list = window._dashOrdersCache || [];
+  var o = list[idx];
+  if (!o) return;
+  var body = document.getElementById('droBody' + idx);
+  if (!body) return;
+  var isOpen = !body.hidden;
+  // Az összes többit becsukjuk (egy nyitva egyszerre — akkordeon-jelleg).
+  document.querySelectorAll('#dashRecentOrdersBody .dro-body').forEach(function (b) {
+    if (b !== body) { b.hidden = true; }
+  });
+  document.querySelectorAll('#dashRecentOrdersBody .dro-card').forEach(function (c) {
+    c.classList.remove('is-open');
+  });
+  if (isOpen) { body.hidden = true; return; } // toggle: zárva
+  body.hidden = false;
+  body.parentElement.classList.add('is-open');
+
+  // Milestone-idővonal: 4 fix lépés, mindegyik ✅/○ + időbélyeg (ha van)
+  var steps = [
+    { key: 'sosit_incarcare_at',  ico: '📍', lbl: t('dash.ms.arrivedPick') || 'Odaért felrakóhoz' },
+    { key: 'incarcat_at',         ico: '📦', lbl: t('dash.ms.loaded')      || 'Felrakva' },
+    { key: 'sosit_descarcare_at', ico: '📍', lbl: t('dash.ms.arrivedDrop') || 'Odaért lerakóhoz' },
+    { key: 'descarcat_at',        ico: '✅', lbl: t('dash.ms.unloaded')    || 'Lerakva' },
+  ];
+  var fmtDt = function (x) {
+    if (!x) return '';
+    var d = new Date(x);
+    return d.toLocaleDateString('ro-RO') + ' ' +
+           d.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+  };
+  // A pillanatnyi állapot: az utolsó ✅ lépés utáni a következő (nyíl vagy „vár")
+  var lastDoneIdx = -1;
+  steps.forEach(function (s, i) { if (o[s.key]) lastDoneIdx = i; });
+
+  var stepsHtml = steps.map(function (s, i) {
+    var val = o[s.key];
+    var stateClass, when;
+    if (val) { stateClass = 'is-done'; when = fmtDt(val); }
+    else if (i === lastDoneIdx + 1 && o.status !== 'Finalizat' && o.status !== 'Anulat') {
+      stateClass = 'is-next'; when = t('dash.ms.next') || 'ez jön';
+    } else { stateClass = 'is-todo'; when = ''; }
+    return '<div class="dro-step ' + stateClass + '">'
+      + '<div class="dro-step-ico">' + s.ico + '</div>'
+      + '<div class="dro-step-body">'
+      +   '<div class="dro-step-lbl">' + esc(s.lbl) + '</div>'
+      +   (when ? '<div class="dro-step-when">' + esc(when) + '</div>' : '')
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  var extraInfo = '';
+  if (o.data_incarcare) {
+    var d1 = new Date(o.data_incarcare).toLocaleDateString('ro-RO');
+    extraInfo += '<span class="dro-info-item">📅 ' +
+      (t('dash.ms.plannedPick') || 'Tervezett felrakás') + ': <b>' + esc(d1) + '</b></span>';
+  }
+  if (o.data_descarcare) {
+    var d2 = new Date(o.data_descarcare).toLocaleDateString('ro-RO');
+    extraInfo += '<span class="dro-info-item">📅 ' +
+      (t('dash.ms.plannedDrop') || 'Tervezett lerakás') + ': <b>' + esc(d2) + '</b></span>';
+  }
+
+  body.innerHTML =
+    (extraInfo ? '<div class="dro-info">' + extraInfo + '</div>' : '') +
+    '<div class="dro-steps">' + stepsHtml + '</div>' +
+    '<div class="dro-actions">' +
+      '<button class="btn ghost" onclick="event.stopPropagation(); activateTab(\'orders-list\');">' +
+        (t('dash.ms.openList') || 'Megnyitás a fuvar-kezelésben') + ' →' +
+      '</button>' +
+    '</div>';
+};
 
 /* ── Jármű státusz összesítő ── */
 function loadDashVehicleSummary() {
