@@ -14,6 +14,29 @@
 
 ---
 
+## 2026-08-27 — Sofőr főoldal: S25 Ultra + Samsung One UI Chrome scroll-fix (svh + 220 pt padding)
+
+**Kérés:** „s25 ultra samsungon meg mindig nem jo azota nem jo miota van a bemutato es ceg adatok gomb".
+
+**Gyökér-diagnózis (a `sofscr2` kör NEM volt elég Samsung S25 Ultra + One UI Chrome-ra):**
+- **`100dvh` oszcillál** Samsung One UI Chrome-on: scroll közben a URL-bar animál (nő/csökken), a `dvh` érték is változik → a `.sofer-wrap` magassága ugrál → a Kilépés kártya a nav-panel alá és vissza ugrál.
+- **Samsung One UI Chrome bottom-bar** vastagabb, mint más Androidoknál: alsó Chrome-toolbar (~48 pt) + gesture bar (~24 pt) + esetleges hint-sáv (~60 pt) → **worst-case ~132 pt** overlay. Az előző 140 pt-os padding-bottom EPP CSAK ELFÉRT, tolerancia nélkül. A Bemutatás + Cégadatok row hozzáadása (PR #377) után a nav-grid ~62 pt-tal tovább nőtt, így a Kilépés utolsó pixel-sora éppen a nav-panel alá esett.
+
+**Bulletproof S25 fix (`public/sofer.css`):**
+1. **`.sofer-wrap` `100dvh → 100svh`** (StaticViewportHeight): mindig a legkisebb viewport-tal számol (URL-bar látható állapot). NEM oszcillál a bar animációjával — a Kilépés fixen ugyanabban a pozícióban marad. `100vh` fallback régi böngészőre.
+2. **`#sec-dash` padding-bottom 140 → 220 pt** + safe-area: bőségesebb tartalék minden Samsung/iOS worst-case-re (48 bar + 24 gesture + 60 hint + 60 tolerancia = 192 → felfelé kerekítve 220).
+3. **`.pane-sofer` padding-bottom 100 → 220 pt** + safe-area: konzisztens minden aloldalon (menetlevél/határátlépés/iratok stb.).
+4. **`scroll-padding-bottom 40 → 60 pt`**: natív `scrollIntoView` a browser-panel felett még biztosabban áll meg.
+
+**Miért működik ezúttal S25 Ultra-n is:**
+- `100svh` mindig a legkisebb viewport → sosem lesz „túl nagy" a wrap → sosem tolódik a Kilépés a látható zóna alá.
+- 220+safe pt padding-bottom > 132 pt Samsung worst-case overlay → **90+ pt szabad görgetési tartalék** marad, ami messze bőven elég a Kilépés kártya (58-74 pt) számára.
+- Konzisztens minden aloldalon (nemcsak a Vezérlőpulton).
+
+**Cache-bust** `sofer.css?v=20260827s25fix`. Tisztán CSS. **1004 Jest zöld**.
+
+---
+
 ## 2026-08-27 — Sofőr főoldal VÉGLEGES scroll-fix: block-layout + `flex:0 0 auto` a nav-gridre — minden telefon-méreten aláérhető a Kilépés
 
 **Kérés:** „megint nem jo javitsd ki veglegesen minden meretu telefonon latszodjon minden gomb gorgetheto legyen".

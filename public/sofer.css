@@ -68,18 +68,20 @@
   }
 
   /* ── Fő konténer ── */
-  /* height:100dvh a modern dinamikus viewport (Safari, Chrome), min-height
-     ugyanez, hogy régi böngésző is legalább 100vh-t adjon vissza. A wrap
-     alján NEM adunk plusz padding-bottom-ot — a görgethető .pane-sofer
-     tartalékol elegendő helyet, hogy a Kilépés se kerüljön a browser-UI
-     alá. Így a Kilépés kártya mindig aláérhető scrollal. */
+  /* Viewport-magasság: 100svh = STATIC smallest viewport (mindig a
+     legkisebb — URL-bar látható állapotban). NEM oszcillál Samsung
+     One UI Chrome-on, ahol a `dvh` a scroll közben nő/csökken →
+     Kilépés kártya ugrál a nav-panel alá és vissza.
+     `100vh` fallback ha az svh nem támogatott (régi Chrome). */
   .sofer-wrap {
     position: relative;
     z-index: 1;
     display: flex;
     flex-direction: column;
-    height: 100dvh;
-    min-height: 100dvh;
+    height: 100vh;
+    height: 100svh;
+    min-height: 100vh;
+    min-height: 100svh;
     max-width: 560px;
     margin: 0 auto;
     padding: 0 14px;
@@ -191,7 +193,12 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+    /* Bőségesebb tartalék: Samsung One UI Chrome bottom-bar (~48 pt)
+       + gesture bar (~24 pt) + Chrome-hint/toolbar (~60 pt) + tolerancia
+       ~= 220 pt. Plusz safe-area-inset-bottom minden iOS/Android
+       készülékre. A Kilépés-gomb ezzel biztosan aláérhető scrollal
+       S25 Ultra + One UI + Samsung Internet / Chrome kombináción is. */
+    padding-bottom: calc(220px + env(safe-area-inset-bottom, 0px));
   }
 
   /* Nav kártya rács — a rács a saját content-magasságát tartja
@@ -449,11 +456,11 @@
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(220px + env(safe-area-inset-bottom, 0px));
     /* Tartsuk fenn a scrollolást akkor is, ha a tartalom kevés — a
        felhasználó mozgathassa lefelé az utolsó kártyát a browser-UI
        alól. A padding-bottom miatt így is nem lóg túl vizuálisan. */
-    scroll-padding-bottom: 40px;
+    scroll-padding-bottom: 60px;
   }
 
   #sec-chat { padding-bottom: 0; overflow: hidden; }
