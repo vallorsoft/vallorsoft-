@@ -14,6 +14,19 @@
 
 ---
 
+## 2026-09-01 — FIX: Sofőr-aktivitás — a fő orders SELECT ne döntse le a nézetet ("Eroare de server")
+
+**Gyökér:** a `getDriverActivity` fő `orders` lekérdezése direktben SELECT-elte az opcionális oszlopokat (`fuvar_no`, `sosit_incarcare_at`, `incarcat_at`, `sosit_descarcare_at`, `descarcat_at`, `handover_status/at/location`). Ha egy cég DB-jén valamelyik migráció még nem futott le (`db/order-fuvar-no.sql`, `db/order-driver-milestones.sql`, `db/cargo-handover.sql`), a Postgres `column "X" does not exist` hibát dobott → az outer catch az egész választ „Eroare de server"-re csavarta, a sofőrre kattintva üres jobb-panel volt.
+
+1. **`handlers/driverActivity.js` átdolgozva RESILIENT módra** — minden aggregátor sub-query saját `try/catch`-ben (users cross-tenant check kivétel: ott „nem található" a helyes válasz). Az outer catch is részletes stack-trace-t logol szerver-oldalon.
+2. **Fő `orders` SELECT: opcionális oszlopok `to_jsonb(o) ->> 'kulcs'` mintával** — így ha a `fuvar_no`/`sosit_*_at`/`incarcat_at`/`descarcat_at`/`handover_*` oszlopok NEM léteznek a DB-n, a mező NULL-ra esik és a lekérdezés fut tovább; direktben csak az abszolút stabil oszlopokra hivatkozunk (`id`, `company_id`, `email_sofer`, `status`, `client`, `loc_*`, `data_*`, `created_at`).
+3. **`fuvarlevelek` (waybills) SELECT**: az `erkezes_dt`/`indulas_dt` opcionális oszlopok is `to_jsonb(f) ->> 'kulcs'` mintával; a rendezés a stabil `data_completare`-n megy. Az `order_ids @> to_jsonb($3::text[])` és `?|` egyszerre próbál (kompatibilitás a JSONB-formátumokkal).
+4. **`documents` SELECT**: két lépcsős fallback — először közvetlen `company_id` szűrő; ha nincs oszlop (2026-07-16 előtti cég-DB), fallback `users`-join a sofőr-emailre → `company_id`-re. Az `order_id` is `to_jsonb`-ből olvasva.
+5. **Diagnosztika**: minden sub-query saját `console.error`-ral logolja a hibaüzenetet a Render/Fly logokban (a kliens felé továbbra is csak generikus „Eroare de server" megy — nincs stack-trace szivárgás).
+6. **Teszt** (`tests/integration/driver-activity.test.js` +1 új regresszió-őr): „resilience: az orders SELECT hasal → orders üres, DE a többi forrás fut és ok:true" — pontosan a bug-esetet fedi. **1021 Jest zöld** (1020 → 1021).
+
+---
+
 ## 2026-09-01 — ÚJ: 🎬 Sofőr-aktivitás menü — kártyás timeline + fotó-galéria fuvaronként
 
 **Gyökér:** eddig szétszórtan volt látható, hogy egy sofőr adott fuvaron mit fotózott, mit írt be, mit csinált — a menetlevél a Fuvarlevelek fülön, a fotók a fuvar-adatlap-modalon, az UIT-kódok külön panelben. Az admin/manager nem tudott egy oldalról rálátni a sofőr napjára/hetére. Kérés: új menüpont ahol egy sofőr összes aktivitását egyben lehet átfutni, kártyásan.
