@@ -48,6 +48,7 @@ window.VS_FEATURES = [
   { key: 'orders-done',      label: 'Teljesített fuvarok',         group: 'Fuvarozás & Logisztika' },
   { key: 'quotes',           label: 'Árajánlatok 📝',              group: 'Fuvarozás & Logisztika' },
   { key: 'active-fleet',     label: 'Aktív flotta',                group: 'Flotta & Megfelelés' },
+  { key: 'sofer-activity',   label: 'Sofőr-aktivitás',             group: 'Flotta & Megfelelés' },
   // 'tracking': nem menüpont, hanem a fuvarlista 🌍 gombja (publikus ügyfél
   // követő-link) — a kapcsoló a gombot és a link-generálást tiltja.
   { key: 'tracking',         label: 'Ügyfél tracking-link (🌍)',   group: 'Fuvarozás & Logisztika' },
