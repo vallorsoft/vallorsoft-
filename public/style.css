@@ -3511,3 +3511,195 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 @media (max-width:520px){
   #orderEditModal .oe-ms-grid{ grid-template-columns:1fr; }
 }
+
+/* ============================================================
+   SOFŐR-ELSZÁMOLÁS 2.0 — kártyás decont (járandóság + kifizetés)
+   Csak a #decontBox pane-re szűkítve. Kontrasztos, kártyás,
+   világos + sötét téma kompatibilis. Additív blokk (könnyen
+   visszavonható).
+   ============================================================ */
+#decontBox .dc-toolbar{
+  display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;
+  margin-bottom:8px;
+}
+#decontBox .dc-toolbar .field{ flex:0 0 auto; }
+#decontBox .dc-toolbar .field:first-child{ flex:1 1 200px; }
+
+/* BNR-sor: külön, minden kártyán ugyanaz a stílus */
+#decontBox .dc-bnr-line{
+  display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+  padding:10px 14px; margin-top:10px;
+  background:rgba(148,163,184,0.08); border:1px solid rgba(148,163,184,0.28);
+  border-radius:10px; font-size:13px;
+}
+.main-content[data-theme="dark"] #decontBox .dc-bnr-line{
+  background:rgba(255,255,255,0.04); border-color:rgba(148,163,184,0.30);
+}
+#decontBox .dc-bnr-val{ font-weight:800; color:var(--status-info); }
+
+/* Egyenleg-csempék (6 db rács) */
+#decontBox .dc-tiles{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  gap:10px; margin-bottom:12px;
+}
+#decontBox .dc-tile{
+  padding:14px 16px; border-radius:14px; border:1.5px solid #cbd5e1;
+  background:#ffffff;
+  display:flex; flex-direction:column; gap:6px;
+  box-shadow:0 1px 2px rgba(15,23,42,0.05);
+}
+.main-content[data-theme="dark"] #decontBox .dc-tile{
+  background:rgba(255,255,255,0.03); border-color:rgba(148,163,184,0.35);
+}
+#decontBox .dc-tile-l{
+  font-size:12px; font-weight:700; letter-spacing:0.3px;
+  color:#334155; text-transform:uppercase;
+}
+.main-content[data-theme="dark"] #decontBox .dc-tile-l{ color:#94a3b8; }
+#decontBox .dc-tile-v{
+  font-size:20px; font-weight:800; line-height:1.15; font-variant-numeric:tabular-nums;
+}
+#decontBox .dc-tile-cur{
+  font-size:12px; color:#64748b; font-weight:600; margin-left:2px;
+}
+.main-content[data-theme="dark"] #decontBox .dc-tile-cur{ color:#94a3b8; }
+/* Tone-akcens csík a csempe bal oldalán */
+#decontBox .dc-tile{ position:relative; overflow:hidden; }
+#decontBox .dc-tile::before{
+  content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
+  background:#94a3b8;
+}
+#decontBox .dc-tone-ok::before{     background:var(--status-ok); }
+#decontBox .dc-tone-warn::before{   background:var(--status-warn); }
+#decontBox .dc-tone-danger::before{ background:var(--status-danger); }
+#decontBox .dc-tone-info::before{   background:var(--status-info); }
+
+/* Kifizetés-gombok (2 nagy, közeliek) */
+#decontBox .dc-pay-actions{
+  display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;
+}
+#decontBox .dc-pay-actions .btn{
+  min-height:44px; padding:10px 18px; font-weight:700;
+}
+
+/* Járandóság-felvitel űrlap */
+#decontBox .dc-earn-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:10px; align-items:end;
+}
+#decontBox .dc-earn-foot{
+  display:flex; gap:14px; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; margin-top:12px;
+  padding:12px 14px;
+  background:rgba(34,197,94,0.06); border:1.5px solid rgba(34,197,94,0.28);
+  border-radius:12px;
+}
+.main-content[data-theme="dark"] #decontBox .dc-earn-foot{
+  background:rgba(34,197,94,0.09); border-color:rgba(34,197,94,0.35);
+}
+#decontBox .dc-earn-total{
+  font-size:18px; font-weight:800; color:var(--status-ok);
+  font-variant-numeric:tabular-nums;
+}
+#decontBox .dc-earn-total > span:first-of-type{ margin-right:2px; }
+
+/* Kétoszlopos lista-rács (járandóság + kifizetés egymás mellett) */
+#decontBox .dc-two-col{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr));
+  gap:14px;
+}
+#decontBox .dc-table-wrap{
+  overflow-x:auto; -webkit-overflow-scrolling:touch;
+}
+#decontBox .dc-list-table{ min-width:520px; }
+#decontBox .dc-list-table td, #decontBox .dc-list-table th{ vertical-align:middle; }
+
+/* Járandóság-típus pirula */
+#decontBox .dc-kind-pill{
+  display:inline-block; padding:2px 9px; border-radius:999px;
+  font-size:11.5px; font-weight:700; letter-spacing:0.2px;
+  background:#e2e8f0; color:#0f172a; border:1px solid #cbd5e1;
+}
+.main-content[data-theme="dark"] #decontBox .dc-kind-pill{
+  background:rgba(255,255,255,0.05); color:#e2e8f0; border-color:rgba(148,163,184,0.35);
+}
+#decontBox .dc-kind-bonus{   background:#fef3c7; color:#92400e; border-color:#fcd34d; }
+#decontBox .dc-kind-diurna{  background:#dbeafe; color:#1e40af; border-color:#93c5fd; }
+#decontBox .dc-kind-per_diem{background:#e0e7ff; color:#3730a3; border-color:#a5b4fc; }
+#decontBox .dc-kind-salary{  background:#dcfce7; color:#166534; border-color:#86efac; }
+#decontBox .dc-kind-premium{ background:#fce7f3; color:#9f1239; border-color:#f9a8d4; }
+#decontBox .dc-kind-holiday{ background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
+.main-content[data-theme="dark"] #decontBox .dc-kind-bonus,
+.main-content[data-theme="dark"] #decontBox .dc-kind-diurna,
+.main-content[data-theme="dark"] #decontBox .dc-kind-per_diem,
+.main-content[data-theme="dark"] #decontBox .dc-kind-salary,
+.main-content[data-theme="dark"] #decontBox .dc-kind-premium,
+.main-content[data-theme="dark"] #decontBox .dc-kind-holiday{
+  background:rgba(255,255,255,0.06); color:#e2e8f0;
+}
+
+/* Kifizetés-módszer pirula */
+#decontBox .dc-method{
+  display:inline-block; padding:2px 9px; border-radius:999px;
+  font-size:11.5px; font-weight:700; letter-spacing:0.2px;
+  background:#e2e8f0; color:#0f172a; border:1px solid #cbd5e1;
+}
+#decontBox .dc-method-cash{ background:#dcfce7; color:#166534; border-color:#86efac; }
+#decontBox .dc-method-bank{ background:#dbeafe; color:#1e40af; border-color:#93c5fd; }
+#decontBox .dc-method-card{ background:#fef3c7; color:#92400e; border-color:#fcd34d; }
+.main-content[data-theme="dark"] #decontBox .dc-method-cash,
+.main-content[data-theme="dark"] #decontBox .dc-method-bank,
+.main-content[data-theme="dark"] #decontBox .dc-method-card,
+.main-content[data-theme="dark"] #decontBox .dc-method{
+  background:rgba(255,255,255,0.06); color:#e2e8f0;
+}
+
+/* Kifizetés-modal */
+#dcPayModal .dc-pay-modal{
+  width:min(720px,100%); max-height:92vh; overflow-y:auto; padding:22px;
+}
+#dcPayModal .dc-pay-head{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  margin-bottom:14px; padding-bottom:12px;
+  border-bottom:1.5px solid rgba(148,163,184,0.28);
+}
+#dcPayModal .dc-pay-balance{
+  display:flex; gap:14px; flex-wrap:wrap;
+  padding:12px 14px; margin-bottom:14px;
+  background:rgba(59,130,246,0.06); border:1.5px solid rgba(59,130,246,0.28);
+  border-radius:12px; font-size:14px;
+}
+.main-content[data-theme="dark"] #dcPayModal .dc-pay-balance{
+  background:rgba(59,130,246,0.09); border-color:rgba(59,130,246,0.35);
+}
+#dcPayModal .dc-pay-bal-line{ display:flex; align-items:center; gap:6px; }
+#dcPayModal .dc-pay-bal-line .dc-warn{ color:var(--status-danger); }
+#dcPayModal .dc-pay-form{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:10px; align-items:end;
+}
+#dcPayModal .dc-pay-bnr{
+  display:flex; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap;
+  padding:10px 14px; margin-top:14px;
+  background:rgba(148,163,184,0.08); border:1px solid rgba(148,163,184,0.28);
+  border-radius:10px; font-size:13px;
+}
+.main-content[data-theme="dark"] #dcPayModal .dc-pay-bnr{
+  background:rgba(255,255,255,0.04); border-color:rgba(148,163,184,0.30);
+}
+#dcPayModal .dc-pay-preview{ font-size:14px; color:var(--text-primary); font-variant-numeric:tabular-nums; }
+#dcPayModal .dc-pay-foot{
+  display:flex; gap:10px; justify-content:flex-end; margin-top:16px;
+  padding-top:14px; border-top:1.5px solid rgba(148,163,184,0.28);
+}
+#dcPayModal .dc-pay-foot .btn.ok{ min-height:44px; padding:10px 20px; font-weight:700; }
+
+/* Reszponzív finomhangolás */
+@media (max-width:640px){
+  #decontBox .dc-tiles{ grid-template-columns:repeat(2,1fr); }
+  #decontBox .dc-tile-v{ font-size:17px; }
+  #decontBox .dc-two-col{ grid-template-columns:1fr; }
+}
+@media (max-width:420px){
+  #decontBox .dc-tiles{ grid-template-columns:1fr; }
+}

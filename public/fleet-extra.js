@@ -549,46 +549,566 @@
 
   // ════════════════════════════════════════════════════════
   //  3) SOFŐR-ELSZÁMOLÁS (DECONT)
+  //     Új adat-modell:
+  //       - Járandóság (driver_earnings): amivel a cég tartozik
+  //         (bónusz, diurna, per_diem, prémium, ünnep, egyéb),
+  //         quantity × unit_amount live-számolással, EUR VAGY RON.
+  //       - Kifizetés (driver_payments): egy kattintással
+  //         részleges/teljes kifizetés EUR/RON választással,
+  //         BNR-árfolyam a kifizetés pillanatában elmentve.
+  //       - Legacy: driver_advances (készpénz-előleg a menetlevél
+  //         költések ellenében) — külön blokkban marad.
   // ════════════════════════════════════════════════════════
   var _dcDrivers = [];
+  var _dcCurrent = null;   // az aktuálisan megnyitott sofőr {email,nume}
+  var _dcBnr = null;       // legfrissebb BNR-árfolyam (informatív)
+  var _dcBalance = null;   // getDriverBalance válasza (a kifizetés-modálhoz)
 
   function monthRange() {
     var now = new Date();
     var from = new Date(now.getFullYear(), now.getMonth(), 1);
     return { from: from.toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) };
   }
+  function today() { return new Date().toISOString().slice(0, 10); }
+
+  // Sofőr-választó (opciók) — előtöltéssel
+  function _dcDriverOptions(selectedEmail) {
+    return '<option value="">' + t('fe.choose') + '</option>'
+      + _dcDrivers.map(function (u) {
+        var sel = (selectedEmail && u.email === selectedEmail) ? ' selected' : '';
+        return '<option value="' + esc(u.email) + '"' + sel + '>' + esc(u.nume || u.email) + '</option>';
+      }).join('');
+  }
+
+  // Járandóság-típus katalógus + ikon (RO-alap, i18n cimkékkel)
+  function _dcKindOptions(selectedKind) {
+    var kinds = ['bonus', 'diurna', 'per_diem', 'salary', 'premium', 'holiday', 'other'];
+    return kinds.map(function (k) {
+      var sel = (selectedKind === k) ? ' selected' : '';
+      return '<option value="' + k + '"' + sel + '>' + esc(t('fe.de.kind.' + k)) + '</option>';
+    }).join('');
+  }
 
   function loadDecont() {
     var box = document.getElementById('decontBox');
     if (!box) return;
     box.innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
-    gas('getInternalDrivers').then(function (list) {
-      _dcDrivers = Array.isArray(list) ? list : [];
+    Promise.all([
+      gas('getInternalDrivers'),
+      gas('getBnrRate').catch(function () { return null; })
+    ]).then(function (rs) {
+      _dcDrivers = Array.isArray(rs[0]) ? rs[0] : [];
+      var bnr = rs[1] && rs[1].bnr_rate != null ? Number(rs[1].bnr_rate) : null;
+      _dcBnr = bnr;
       var mr = monthRange();
-      box.innerHTML =
-        panel(t('fe.dc.title'),
-          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end;">'
-          + '<div class="field" style="margin:0;"><label>' + t('fe.dc.driverReq') + '</label><select class="select" id="dcDriver">'
-          + '<option value="">' + t('fe.choose') + '</option>'
-          + _dcDrivers.map(function (u) { return '<option value="' + esc(u.email) + '">' + esc(u.nume || u.email) + '</option>'; }).join('')
-          + '</select></div>'
-          + '<div class="field" style="margin:0;"><label>' + t('fe.dc.periodFrom') + '</label><input class="input" id="dcFrom" type="date" value="' + mr.from + '"></div>'
-          + '<div class="field" style="margin:0;"><label>' + t('fe.dc.periodTo') + '</label><input class="input" id="dcTo" type="date" value="' + mr.to + '"></div>'
-          + '<button class="btn primary" style="height:42px;" onclick="FleetExtra.dcLoad()">' + t('fe.dc.calc') + '</button>'
-          + '</div>')
-        + panel(t('fe.dc.advTitle'),
-          '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end;">'
-          + '<div class="field" style="margin:0;"><label>' + t('fe.dc.driverReq') + '</label><select class="select" id="advDriver">'
-          + '<option value="">' + t('fe.choose') + '</option>'
-          + _dcDrivers.map(function (u) { return '<option value="' + esc(u.email) + '">' + esc(u.nume || u.email) + '</option>'; }).join('')
-          + '</select></div>'
-          + '<div class="field" style="margin:0;"><label>' + t('fe.dc.amountReq') + '</label><input class="input" id="advAmount" type="number" step="0.01" placeholder="0"></div>'
-          + '<div class="field" style="margin:0;"><label>' + t('fe.dc.date') + '</label><input class="input" id="advDate" type="date" value="' + new Date().toISOString().slice(0, 10) + '"></div>'
-          + '<div class="field" style="margin:0;"><label>' + t('fld.note') + '</label><input class="input" id="advNote" placeholder="' + t('fe.dc.advNotePh') + '"></div>'
-          + '<button class="btn ok" style="height:42px;" onclick="FleetExtra.advSave()">' + t('fe.dc.advSaveBtn') + '</button>'
-          + '</div>')
-        + '<div id="dcResult"></div>';
+
+      // Sofőr-választó kártya
+      var selectorCard = panel(t('fe.dc.title'),
+        '<div class="dc-toolbar">'
+        + '<div class="field" style="margin:0;flex:1;min-width:200px;"><label>' + t('fe.dc.driverReq') + '</label>'
+        +   '<select class="select" id="dcDriver">' + _dcDriverOptions() + '</select></div>'
+        + '<div class="field" style="margin:0;"><label>' + t('fe.dc.periodFrom') + '</label>'
+        +   '<input class="input" id="dcFrom" type="date" value="' + mr.from + '"></div>'
+        + '<div class="field" style="margin:0;"><label>' + t('fe.dc.periodTo') + '</label>'
+        +   '<input class="input" id="dcTo" type="date" value="' + mr.to + '"></div>'
+        + '<button class="btn primary" style="height:42px;" onclick="FleetExtra.dcLoad()">'
+        +   t('fe.dc.calc') + '</button>'
+        + '</div>'
+        + '<div class="dc-bnr-line">'
+        +   '<span>🏦 <b>' + t('fe.dc.bnrToday') + ':</b> '
+        +     (bnr != null
+              ? '<span class="dc-bnr-val">1 EUR = ' + n2(bnr, 4) + ' RON</span>'
+              : '<span class="text-muted">' + t('fe.dc.bnrNa') + '</span>')
+        +   '</span>'
+        +   '<span class="text-muted" style="font-size:12px;">' + t('fe.dc.bnrHint') + '</span>'
+        + '</div>'
+      );
+
+      box.innerHTML = selectorCard + '<div id="dcResult"></div>';
     });
+  }
+
+  // A sofőr összes fontos kártyája (egyenleg + felvitel + listák + legacy)
+  function dcLoad() {
+    var email = (document.getElementById('dcDriver') || {}).value;
+    var from = (document.getElementById('dcFrom') || {}).value;
+    var to = (document.getElementById('dcTo') || {}).value;
+    if (!email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    var out = document.getElementById('dcResult');
+    out.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">' + t('fe.calcing') + '</div>';
+
+    var driver = _dcDrivers.find(function (u) { return u.email === email; }) || { email: email };
+    _dcCurrent = { email: email, nume: driver.nume || email, from: from, to: to };
+
+    Promise.all([
+      gas('getDriverBalance',  [{ email: email, from: from, to: to }]),
+      gas('earningList',       [{ email: email, from: from, to: to }]),
+      gas('paymentList',       [{ email: email, from: from, to: to }]),
+      gas('getDriverSettlement',[{ email: email, from: from, to: to }]),
+      gas('advanceList',       [{ email: email, from: from, to: to }])
+    ]).then(function (rs) {
+      var bal = rs[0], earn = rs[1], pay = rs[2], set = rs[3], adv = rs[4];
+      if (!bal || !bal.ok) {
+        out.innerHTML = '<div class="text-muted" style="padding:20px;">'
+          + esc((bal && bal.err) || t('common.error')) + '</div>';
+        return;
+      }
+      _dcBalance = bal;
+
+      // ── 1) EGYENLEG-KÁRTYA (járandóság / kifizetve / hátralék) ──
+      var balHtml = _dcBalanceCard(bal);
+
+      // ── 2) JÁRANDÓSÁG-FELVITEL kártya ──
+      var earnFormHtml = _dcEarningForm(email);
+
+      // ── 3) JÁRANDÓSÁG LISTA + KIFIZETÉS LISTA (két kártya) ──
+      var earnItems = (earn && earn.items) || [];
+      var payItems  = (pay  && pay.items)  || [];
+      var listsHtml =
+        '<div class="dc-two-col">'
+        + panel('📥 ' + t('fe.de.listTitle') + ' (' + earnItems.length + ')', _dcEarningListHtml(earnItems))
+        + panel('💸 ' + t('fe.pm.listTitle') + ' (' + payItems.length + ')',  _dcPaymentListHtml(payItems))
+        + '</div>';
+
+      // ── 4) LEGACY: menetlevél-alapú kassza-egyenleg (előlegek + készpénz-költések + diurna) ──
+      var legacyHtml = (set && set.ok) ? _dcLegacyBlock(set, adv) : '';
+
+      out.innerHTML =
+        panel('👤 ' + esc(_dcCurrent.nume) + ' — ' + d2(from) + ' → ' + d2(to),
+          balHtml,
+          '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="window.print()">'
+            + t('fe.print') + '</button>')
+        + earnFormHtml
+        + listsHtml
+        + legacyHtml;
+
+      // Live-számoló bekötése (qty × unit)
+      _dcBindLiveCalc();
+    });
+  }
+
+  // ── Egyenleg-kártya: színes csempék EUR + RON + kombinált RON ──
+  function _dcBalanceCard(bal) {
+    var b = bal.balance || {};
+    var e = bal.earned || {};
+    var p = bal.paid || {};
+    var bnr = bal.bnr_rate;
+
+    function tile(label, val, cur, tone) {
+      // tone: 'ok'|'warn'|'danger'|'info'|'muted'
+      var color = tone === 'ok' ? 'var(--status-ok)'
+        : tone === 'danger' ? 'var(--status-danger)'
+        : tone === 'warn' ? 'var(--status-warn)'
+        : tone === 'info' ? 'var(--status-info)'
+        : 'var(--text-primary)';
+      var suf = cur ? ' <span class="dc-tile-cur">' + esc(cur) + '</span>' : '';
+      return '<div class="dc-tile dc-tone-' + esc(tone || 'muted') + '">'
+        + '<div class="dc-tile-l">' + label + '</div>'
+        + '<div class="dc-tile-v" style="color:' + color + ';">' + n2(val, 2) + suf + '</div>'
+        + '</div>';
+    }
+
+    var eurTone = (b.eur || 0) > 0 ? 'danger' : ((b.eur || 0) < 0 ? 'ok' : 'muted');
+    var ronTone = (b.ron || 0) > 0 ? 'danger' : ((b.ron || 0) < 0 ? 'ok' : 'muted');
+
+    var tiles =
+      '<div class="dc-tiles">'
+      +   tile('📥 ' + t('fe.de.earnedEur'), e.eur || 0, 'EUR', 'info')
+      +   tile('📥 ' + t('fe.de.earnedRon'), e.ron || 0, 'RON', 'info')
+      +   tile('💸 ' + t('fe.pm.paidEur'),   p.eur || 0, 'EUR', 'muted')
+      +   tile('💸 ' + t('fe.pm.paidRon'),   p.ron || 0, 'RON', 'muted')
+      +   tile('⚖️ ' + t('fe.dc.balEur'),    b.eur || 0, 'EUR', eurTone)
+      +   tile('⚖️ ' + t('fe.dc.balRon'),    b.ron || 0, 'RON', ronTone)
+      + '</div>';
+
+    var ronAll = b.ron_all;
+    var payButtons =
+      '<div class="dc-pay-actions">'
+      + '<button class="btn primary" onclick="FleetExtra.dcOpenPayment(\'partial\')">💵 '
+        + t('fe.pm.payPartial') + '</button>'
+      + '<button class="btn ok" onclick="FleetExtra.dcOpenPayment(\'full\')">✅ '
+        + t('fe.pm.payFull') + '</button>'
+      + '</div>';
+
+    var bnrLine = '<div class="dc-bnr-line">'
+      + '<span>🏦 <b>' + t('fe.dc.bnrToday') + ':</b> '
+      +   (bnr != null
+          ? '<span class="dc-bnr-val">1 EUR = ' + n2(bnr, 4) + ' RON</span>'
+          : '<span class="text-muted">' + t('fe.dc.bnrNa') + '</span>')
+      + '</span>'
+      + (ronAll != null && bnr != null
+          ? '<span style="margin-left:auto;">' + t('fe.dc.balCombined') + ': <b>'
+             + n2(ronAll, 2) + ' RON</b> <span class="text-muted" style="font-size:12px;">('
+             + t('fe.dc.combinedNote') + ')</span></span>'
+          : '')
+      + '</div>';
+
+    return tiles + bnrLine + payButtons;
+  }
+
+  // ── Járandóság-felvitel kártya (kind + qty × unit_amount + currency) ──
+  function _dcEarningForm(email) {
+    var todayStr = today();
+    var body =
+      '<div class="dc-earn-grid">'
+      + '<div class="field" style="margin:0;"><label>' + t('fe.de.kindLbl') + '</label>'
+      +   '<select class="select" id="deKind" onchange="FleetExtra.dcEarnKindChange()">'
+      +   _dcKindOptions('bonus') + '</select></div>'
+      + '<div class="field" style="margin:0;"><label>' + t('fe.de.labelLbl') + '</label>'
+      +   '<input class="input" id="deLabel" placeholder="' + t('fe.de.labelPh') + '"></div>'
+      + '<div class="field" style="margin:0;"><label>' + t('fe.de.dateLbl') + '</label>'
+      +   '<input class="input" id="deDate" type="date" value="' + todayStr + '"></div>'
+      + '<div class="field" style="margin:0;"><label>' + t('fe.de.qtyLbl') + '</label>'
+      +   '<input class="input" id="deQty" type="number" min="0.01" step="0.01" value="1" oninput="FleetExtra.dcEarnRecalc()"></div>'
+      + '<div class="field" style="margin:0;"><label>' + t('fe.de.unitLbl') + '</label>'
+      +   '<input class="input" id="deUnit" type="number" min="0.01" step="0.01" placeholder="0.00" oninput="FleetExtra.dcEarnRecalc()"></div>'
+      + '<div class="field" style="margin:0;"><label>' + t('fe.de.currencyLbl') + '</label>'
+      +   '<select class="select" id="deCur">'
+      +     '<option value="RON">RON</option><option value="EUR">EUR</option></select></div>'
+      + '<div class="field" style="margin:0;grid-column:1/-1;"><label>' + t('fld.note') + '</label>'
+      +   '<input class="input" id="deNote" placeholder="' + t('fe.de.notePh') + '"></div>'
+      + '</div>'
+      + '<div class="dc-earn-foot">'
+      + '  <div class="dc-earn-total">= <span id="deTotal">0.00</span> <span id="deTotalCur">RON</span></div>'
+      + '  <button class="btn ok" onclick="FleetExtra.dcEarnSave()">💾 ' + t('fe.de.saveBtn') + '</button>'
+      + '</div>'
+      + '<p class="text-muted" style="font-size:12px;margin:8px 0 0;">' + t('fe.de.hint') + '</p>';
+    return panel('➕ ' + t('fe.de.newTitle'), body);
+  }
+
+  // Live-számoló: qty × unit
+  function _dcBindLiveCalc() {
+    dcEarnKindChange();
+    dcEarnRecalc();
+  }
+
+  function dcEarnKindChange() {
+    var k = (document.getElementById('deKind') || {}).value;
+    // Néhány típusnál értelmes alapérték az UNIT-ra: pl. per_diem = 70 RON/nap default nincs — üresen hagyjuk;
+    // a mezők értékét nem írjuk felül, csak a placeholdert testreszabjuk.
+    var labelInput = document.getElementById('deLabel');
+    if (labelInput && !labelInput.value) {
+      labelInput.placeholder = t('fe.de.lblPh_' + k) || t('fe.de.labelPh');
+    }
+    // Cur alapérték: bonus/premium/holiday = EUR, a többi = RON
+    var cur = document.getElementById('deCur');
+    if (cur && cur.dataset.userSet !== '1') {
+      var isEur = (k === 'bonus' || k === 'premium' || k === 'holiday');
+      cur.value = isEur ? 'EUR' : 'RON';
+      dcEarnRecalc();
+    }
+    if (cur) { cur.addEventListener('change', function () { cur.dataset.userSet = '1'; dcEarnRecalc(); }, { once: true }); }
+  }
+
+  function dcEarnRecalc() {
+    var q = parseFloat((document.getElementById('deQty')  || {}).value) || 0;
+    var u = parseFloat((document.getElementById('deUnit') || {}).value) || 0;
+    var c = (document.getElementById('deCur') || {}).value || 'RON';
+    var totalEl = document.getElementById('deTotal');
+    var curEl = document.getElementById('deTotalCur');
+    if (totalEl) totalEl.textContent = n2(Math.round(q * u * 100) / 100, 2);
+    if (curEl) curEl.textContent = c;
+  }
+
+  function dcEarnSave() {
+    if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    var f = {
+      email_sofer: _dcCurrent.email,
+      earning_date: (document.getElementById('deDate') || {}).value,
+      kind: (document.getElementById('deKind') || {}).value,
+      label: (document.getElementById('deLabel') || {}).value,
+      quantity: (document.getElementById('deQty') || {}).value,
+      unit_amount: (document.getElementById('deUnit') || {}).value,
+      currency: (document.getElementById('deCur') || {}).value,
+      note: (document.getElementById('deNote') || {}).value,
+    };
+    if (!parseFloat(f.quantity) || !parseFloat(f.unit_amount)) {
+      toast(t('fe.de.invalidAmount'), 'err'); return;
+    }
+    gas('earningCreate', [f]).then(function (r) {
+      if (r && r.ok) {
+        toast(t('fe.de.saved'), 'ok');
+        // Űrlap tisztítás (label + qty visszaáll 1-re + unit üres)
+        var lab = document.getElementById('deLabel'); if (lab) lab.value = '';
+        var qty = document.getElementById('deQty'); if (qty) qty.value = '1';
+        var uni = document.getElementById('deUnit'); if (uni) uni.value = '';
+        var note = document.getElementById('deNote'); if (note) note.value = '';
+        dcLoad();
+      } else toast((r && r.err) || t('common.error'), 'err');
+    });
+  }
+
+  function _dcEarningListHtml(items) {
+    if (!items.length) {
+      return '<div class="text-muted" style="padding:14px;text-align:center;">' + t('fe.de.empty') + '</div>';
+    }
+    var rows = items.map(function (it) {
+      return '<tr>'
+        + '<td>' + d2(it.earning_date) + '</td>'
+        + '<td><span class="dc-kind-pill dc-kind-' + esc(it.kind || 'other') + '">'
+        +   esc(t('fe.de.kind.' + (it.kind || 'other'))) + '</span></td>'
+        + '<td>' + esc(it.label || '—') + '</td>'
+        + '<td style="text-align:right;">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
+        + '<td style="text-align:right;font-weight:700;">' + n2(it.total_amount, 2)
+        +   ' <span class="dc-tile-cur">' + esc(it.currency || 'RON') + '</span></td>'
+        + '<td style="text-align:right;">'
+        +   '<button class="btn danger" style="padding:3px 9px;font-size:12px;" '
+        +     'onclick="FleetExtra.dcEarnDelete(' + it.id + ')">✕</button></td>'
+        + '</tr>';
+    }).join('');
+    return '<div class="dc-table-wrap"><table class="table dc-list-table">'
+      + '<thead><tr>'
+      + '<th>' + t('fe.de.colDate') + '</th>'
+      + '<th>' + t('fe.de.colKind') + '</th>'
+      + '<th>' + t('fe.de.colLabel') + '</th>'
+      + '<th style="text-align:right;">' + t('fe.de.colCalc') + '</th>'
+      + '<th style="text-align:right;">' + t('fe.de.colTotal') + '</th>'
+      + '<th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  function _dcPaymentListHtml(items) {
+    if (!items.length) {
+      return '<div class="text-muted" style="padding:14px;text-align:center;">' + t('fe.pm.empty') + '</div>';
+    }
+    var rows = items.map(function (it) {
+      var methodPill = '<span class="dc-method dc-method-' + esc(it.method || 'cash') + '">'
+        + esc(t('fe.pm.method.' + (it.method || 'cash'))) + '</span>';
+      var bnrCell = it.bnr_rate != null
+        ? '<span class="text-muted" style="font-size:12px;">1 EUR = ' + n2(it.bnr_rate, 4) + '</span>'
+        : '<span class="text-muted" style="font-size:12px;">—</span>';
+      var ronCell = it.amount_ron != null
+        ? '<span class="text-muted" style="font-size:12px;">= ' + n2(it.amount_ron, 2) + ' RON</span>'
+        : '';
+      return '<tr>'
+        + '<td>' + d2(it.paid_at) + '</td>'
+        + '<td>' + methodPill + '</td>'
+        + '<td style="text-align:right;font-weight:700;">' + n2(it.amount, 2)
+        +   ' <span class="dc-tile-cur">' + esc(it.currency || 'RON') + '</span></td>'
+        + '<td>' + bnrCell + ' ' + ronCell + '</td>'
+        + '<td>' + esc(it.note || '') + '</td>'
+        + '<td style="text-align:right;">'
+        +   '<button class="btn danger" style="padding:3px 9px;font-size:12px;" '
+        +     'onclick="FleetExtra.dcPayDelete(' + it.id + ')">✕</button></td>'
+        + '</tr>';
+    }).join('');
+    return '<div class="dc-table-wrap"><table class="table dc-list-table">'
+      + '<thead><tr>'
+      + '<th>' + t('fe.pm.colDate') + '</th>'
+      + '<th>' + t('fe.pm.colMethod') + '</th>'
+      + '<th style="text-align:right;">' + t('fe.pm.colAmount') + '</th>'
+      + '<th>' + t('fe.pm.colRate') + '</th>'
+      + '<th>' + t('fld.note') + '</th>'
+      + '<th></th>'
+      + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  function dcEarnDelete(id) {
+    if (!confirm(t('fe.de.delConfirm'))) return;
+    gas('earningDelete', [{ id: id }]).then(function (r) {
+      if (r && r.ok) { toast(t('common.deleted'), 'ok'); dcLoad(); }
+      else toast((r && r.err) || t('common.error'), 'err');
+    });
+  }
+  function dcPayDelete(id) {
+    if (!confirm(t('fe.pm.delConfirm'))) return;
+    gas('paymentDelete', [{ id: id }]).then(function (r) {
+      if (r && r.ok) { toast(t('common.deleted'), 'ok'); dcLoad(); }
+      else toast((r && r.err) || t('common.error'), 'err');
+    });
+  }
+
+  // ── Kifizetés-modal (részleges/teljes; EUR/RON toggle, BNR-előnézet) ──
+  function _dcEnsurePayModal() {
+    if (document.getElementById('dcPayModal')) return;
+    var m = document.createElement('div');
+    m.id = 'dcPayModal';
+    m.className = 'modal-back';
+    m.setAttribute('role', 'dialog');
+    m.innerHTML =
+      '<div class="modal glass dc-pay-modal">'
+      +   '<div class="dc-pay-head">'
+      +     '<h3 id="dcPayTitle" class="text-primary" style="margin:0;font-size:18px;">💵</h3>'
+      +     '<button class="btn ghost" style="padding:4px 10px;" onclick="FleetExtra.dcClosePayment()">✕</button>'
+      +   '</div>'
+      +   '<div id="dcPayBody"></div>'
+      + '</div>';
+    m.addEventListener('click', function (ev) { if (ev.target === m) dcClosePayment(); });
+    document.body.appendChild(m);
+  }
+  function dcClosePayment() {
+    var m = document.getElementById('dcPayModal');
+    if (m) m.classList.remove('open');
+  }
+
+  // mode: 'partial' | 'full'
+  function dcOpenPayment(mode) {
+    if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    if (!_dcBalance) { toast(t('fe.dc.loadFirst'), 'err'); return; }
+    _dcEnsurePayModal();
+    var m = document.getElementById('dcPayModal');
+    var t_ = document.getElementById('dcPayTitle');
+    var b = document.getElementById('dcPayBody');
+    var bal = _dcBalance.balance || {};
+    var bnr = _dcBalance.bnr_rate;
+
+    // Default: EUR ha van hátralékos EUR, egyébként RON
+    var defaultCur = (bal.eur || 0) > 0 ? 'EUR' : 'RON';
+    var defaultAmount = 0;
+    if (mode === 'full') {
+      defaultAmount = defaultCur === 'EUR' ? (bal.eur || 0) : (bal.ron || 0);
+      if (defaultAmount < 0) defaultAmount = 0;
+    }
+
+    t_.textContent = (mode === 'full' ? '✅ ' : '💵 ')
+      + t(mode === 'full' ? 'fe.pm.modalFull' : 'fe.pm.modalPartial')
+      + ' — ' + (_dcCurrent.nume || _dcCurrent.email);
+
+    b.innerHTML =
+      '<div class="dc-pay-balance">'
+      +   '<div class="dc-pay-bal-line"><span>' + t('fe.dc.balEur') + ':</span> '
+      +     '<b class="' + ((bal.eur || 0) > 0 ? 'dc-warn' : '') + '">'
+      +     n2(bal.eur || 0, 2) + ' EUR</b></div>'
+      +   '<div class="dc-pay-bal-line"><span>' + t('fe.dc.balRon') + ':</span> '
+      +     '<b class="' + ((bal.ron || 0) > 0 ? 'dc-warn' : '') + '">'
+      +     n2(bal.ron || 0, 2) + ' RON</b></div>'
+      + '</div>'
+      + '<div class="dc-pay-form">'
+      +   '<div class="field" style="margin:0;"><label>' + t('fe.pm.paidAt') + '</label>'
+      +     '<input class="input" id="dcPayDate" type="date" value="' + today() + '"></div>'
+      +   '<div class="field" style="margin:0;"><label>' + t('fe.pm.currencyLbl') + '</label>'
+      +     '<select class="select" id="dcPayCur" onchange="FleetExtra.dcPayCurChange()">'
+      +       '<option value="RON"' + (defaultCur === 'RON' ? ' selected' : '') + '>RON</option>'
+      +       '<option value="EUR"' + (defaultCur === 'EUR' ? ' selected' : '') + '>EUR</option>'
+      +     '</select></div>'
+      +   '<div class="field" style="margin:0;"><label>' + t('fe.pm.amount') + '</label>'
+      +     '<input class="input" id="dcPayAmount" type="number" min="0.01" step="0.01" '
+      +       'value="' + (defaultAmount > 0 ? n2(defaultAmount, 2).replace(/[^\d.,-]/g,'').replace(',', '.') : '') + '" '
+      +       'oninput="FleetExtra.dcPayRecalc()"></div>'
+      +   '<div class="field" style="margin:0;"><label>' + t('fe.pm.methodLbl') + '</label>'
+      +     '<select class="select" id="dcPayMethod">'
+      +       '<option value="cash">' + esc(t('fe.pm.method.cash')) + '</option>'
+      +       '<option value="bank">' + esc(t('fe.pm.method.bank')) + '</option>'
+      +       '<option value="card">' + esc(t('fe.pm.method.card')) + '</option>'
+      +       '<option value="other">' + esc(t('fe.pm.method.other')) + '</option>'
+      +     '</select></div>'
+      +   '<div class="field" style="margin:0;grid-column:1/-1;"><label>' + t('fld.note') + '</label>'
+      +     '<input class="input" id="dcPayNote" placeholder="' + t('fe.pm.notePh') + '"></div>'
+      + '</div>'
+      + '<div class="dc-pay-bnr">'
+      +   '<div>🏦 <b>' + t('fe.dc.bnrToday') + ':</b> '
+      +     (bnr != null
+          ? '<span class="dc-bnr-val">1 EUR = ' + n2(bnr, 4) + ' RON</span>'
+          : '<span class="text-muted">' + t('fe.dc.bnrNa') + '</span>')
+      +   '</div>'
+      +   '<div class="dc-pay-preview" id="dcPayPreview"></div>'
+      + '</div>'
+      + '<div class="dc-pay-foot">'
+      +   '<button class="btn ghost" onclick="FleetExtra.dcClosePayment()">' + t('common.cancel') + '</button>'
+      +   '<button class="btn ok" onclick="FleetExtra.dcPaySubmit()">✅ ' + t('fe.pm.saveBtn') + '</button>'
+      + '</div>';
+
+    m.classList.add('open');
+    dcPayRecalc();
+  }
+
+  function dcPayCurChange() {
+    // Ha a felhasználó valutát vált, az összeget nem írjuk felül (a szokás EUR→RON navigáció ellen)
+    dcPayRecalc();
+  }
+
+  function dcPayRecalc() {
+    var amount = parseFloat((document.getElementById('dcPayAmount') || {}).value) || 0;
+    var cur = (document.getElementById('dcPayCur') || {}).value || 'RON';
+    var bnr = _dcBnr;
+    var el = document.getElementById('dcPayPreview');
+    if (!el) return;
+    if (!amount) { el.innerHTML = ''; return; }
+    if (cur === 'EUR' && bnr) {
+      el.innerHTML = '≈ <b>' + n2(amount * bnr, 2) + ' RON</b> '
+        + '<span class="text-muted" style="font-size:12px;">(' + t('fe.pm.previewNote') + ')</span>';
+    } else if (cur === 'RON' && bnr) {
+      el.innerHTML = '≈ <b>' + n2(amount / bnr, 2) + ' EUR</b> '
+        + '<span class="text-muted" style="font-size:12px;">(' + t('fe.pm.previewNote') + ')</span>';
+    } else {
+      el.innerHTML = '';
+    }
+  }
+
+  function dcPaySubmit() {
+    if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    var f = {
+      email_sofer: _dcCurrent.email,
+      paid_at: (document.getElementById('dcPayDate') || {}).value,
+      amount: (document.getElementById('dcPayAmount') || {}).value,
+      currency: (document.getElementById('dcPayCur') || {}).value,
+      method: (document.getElementById('dcPayMethod') || {}).value,
+      note: (document.getElementById('dcPayNote') || {}).value,
+    };
+    if (!parseFloat(f.amount) || parseFloat(f.amount) <= 0) {
+      toast(t('fe.pm.invalidAmount'), 'err'); return;
+    }
+    gas('paymentCreate', [f]).then(function (r) {
+      if (r && r.ok) {
+        toast(t('fe.pm.saved'), 'ok');
+        dcClosePayment();
+        dcLoad();
+      } else toast((r && r.err) || t('common.error'), 'err');
+    });
+  }
+
+  // ── Legacy: menetlevél-alapú kassza-egyenleg (előlegek + Cash + diurna) ──
+  function _dcLegacyBlock(r, advs) {
+    advs = (advs && advs.items) || [];
+    var bal = parseFloat(r.kassza_egyenleg) || 0;
+    var tiles =
+      '<div style="margin-bottom:12px;">' + vsMetricBand([
+        { l: '💵 ' + t('fe.dc.advGiven', { n: r.eloleg_db }), v: n2(r.eloleg_total, 0) + ' RON' },
+        { l: '🛒 ' + t('fe.dc.cashSpend'), v: n2(r.cash_koltes, 0) + ' RON' },
+        { l: '⚖️ ' + t('fe.dc.balance', { s: (bal >= 0 ? t('fe.dc.toCompany') : t('fe.dc.toDriver')) }), v: n2(bal, 0) + ' RON' },
+        { l: '🗓️ ' + t('fe.dc.diurnaEnt', { e: r.diurna.ext_nap, i: r.diurna.int_nap }), v: (r.diurna.total != null ? n2(r.diurna.total, 0) + ' RON' : '—') }
+      ], { tall: true }) + '</div>';
+
+    var rateNote = (r.diurna.total == null && typeof VS_ROLE !== 'undefined' && VS_ROLE === 'admin')
+      ? '<div class="glass-soft" style="padding:12px 14px;margin-bottom:14px;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
+        + '<span>' + t('fe.dc.ratesLabel') + '</span>'
+        + '<input class="input" id="dcRateExt" type="number" step="0.01" placeholder="' + t('fe.dc.extPh') + '" style="max-width:110px;padding:6px 10px;">'
+        + '<input class="input" id="dcRateInt" type="number" step="0.01" placeholder="' + t('fe.dc.intPh') + '" style="max-width:110px;padding:6px 10px;">'
+        + '<button class="btn primary" style="padding:6px 12px;font-size:12px;" onclick="FleetExtra.dcSaveRates()">' + t('common.save') + '</button>'
+        + '<span class="text-muted" style="font-size:11px;">' + t('fe.dc.ratesHint') + '</span></div>'
+      : '';
+
+    var ktgRows = (r.koltesek || []).map(function (k) {
+      return '<tr><td>' + esc(k.plata) + '</td><td style="text-align:right;">' + n2(k.db, 0) + '</td><td style="text-align:right;font-weight:700;">' + n2(k.osszeg, 0) + '</td></tr>';
+    }).join('') || '<tr><td colspan="3" class="text-muted" style="text-align:center;padding:12px;">' + t('fe.dc.noSpend') + '</td></tr>';
+
+    var advRows = advs.map(function (a) {
+      return '<tr><td>' + d2(a.given_at) + '</td><td style="text-align:right;font-weight:700;">' + n2(a.amount, 0) + ' ' + esc(a.currency || 'RON') + '</td>'
+        + '<td>' + esc(a.note || '—') + '</td><td class="text-muted" style="font-size:12px;">' + esc(a.created_by || '') + '</td>'
+        + '<td style="text-align:right;"><button class="btn danger" style="padding:3px 9px;font-size:12px;" onclick="FleetExtra.advDelete(' + a.id + ')">✕</button></td></tr>';
+    }).join('') || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:12px;">' + t('fe.dc.noAdv') + '</td></tr>';
+
+    var advFormHtml = panel('➕ ' + t('fe.dc.advTitle'),
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end;">'
+      + '<div class="field" style="margin:0;"><label>' + t('fe.dc.amountReq') + '</label>'
+      +   '<input class="input" id="advAmount" type="number" step="0.01" placeholder="0"></div>'
+      + '<div class="field" style="margin:0;"><label>' + t('fe.dc.date') + '</label>'
+      +   '<input class="input" id="advDate" type="date" value="' + today() + '"></div>'
+      + '<div class="field" style="margin:0;"><label>' + t('fld.note') + '</label>'
+      +   '<input class="input" id="advNote" placeholder="' + t('fe.dc.advNotePh') + '"></div>'
+      + '<button class="btn ok" style="height:42px;" onclick="FleetExtra.advSave()">' + t('fe.dc.advSaveBtn') + '</button>'
+      + '</div>');
+
+    return panel('🧾 ' + t('fe.dc.legacyTitle'),
+      tiles + rateNote
+      + '<div class="text-muted" style="font-size:12px;margin-bottom:12px;">' + t('fe.dc.period', { km: n2(r.km, 0), db: n2(r.menetlevelek, 0) }) + '</div>'
+      + advFormHtml
+      + '<div class="dc-two-col">'
+      + panel(t('fe.dc.spendByMethod'),
+        '<table class="table"><thead><tr><th>' + t('fe.dc.colMethod') + '</th><th style="text-align:right;">' + t('fe.dc.colItem') + '</th><th style="text-align:right;">' + t('fe.dc.colSum') + '</th></tr></thead><tbody>' + ktgRows + '</tbody></table>')
+      + panel(t('fe.dc.advances'),
+        '<table class="table"><thead><tr><th>' + t('fe.dc.date') + '</th><th style="text-align:right;">' + t('fe.dc.colSumRon') + '</th><th>' + t('fld.note') + '</th><th>' + t('fe.dc.colGiver') + '</th><th></th></tr></thead><tbody>' + advRows + '</tbody></table>')
+      + '</div>');
   }
 
   function dcLoad() {
@@ -658,19 +1178,21 @@
   }
 
   function advSave() {
+    // Az előleg-űrlap már NEM tartalmaz külön sofőr-választót; a jelenleg
+    // megnyitott sofőrhöz köti (dcLoad után _dcCurrent be van állítva).
+    var email = _dcCurrent && _dcCurrent.email;
+    if (!email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
     var f = {
-      email_sofer: (document.getElementById('advDriver') || {}).value,
+      email_sofer: email,
       amount: (document.getElementById('advAmount') || {}).value,
       given_at: (document.getElementById('advDate') || {}).value,
       note: (document.getElementById('advNote') || {}).value,
     };
-    if (!f.email_sofer) { toast(t('fe.dc.pickDriver'), 'err'); return; }
     gas('advanceCreate', [f]).then(function (r) {
       if (r && r.ok) {
         toast(t('fe.dc.advSaved'), 'ok');
         var a = document.getElementById('advAmount'); if (a) a.value = '';
-        // ha épp ennek a sofőrnek az elszámolása látszik, frissítjük
-        if ((document.getElementById('dcDriver') || {}).value === f.email_sofer) dcLoad();
+        dcLoad();
       } else toast((r && r.err) || t('common.error'), 'err');
     });
   }
@@ -916,6 +1438,17 @@
     svOpenComplete: svOpenComplete, svSubmitComplete: svSubmitComplete,
     svCloseModal: svCloseModal,
     dcLoad: dcLoad, dcSaveRates: dcSaveRates, advSave: advSave, advDelete: advDelete,
+    // Új: járandóság + kifizetés + kártyás decont
+    dcEarnKindChange: dcEarnKindChange,
+    dcEarnRecalc: dcEarnRecalc,
+    dcEarnSave: dcEarnSave,
+    dcEarnDelete: dcEarnDelete,
+    dcOpenPayment: dcOpenPayment,
+    dcClosePayment: dcClosePayment,
+    dcPayCurChange: dcPayCurChange,
+    dcPayRecalc: dcPayRecalc,
+    dcPaySubmit: dcPaySubmit,
+    dcPayDelete: dcPayDelete,
     fcParse: fcParse, fcImport: fcImport,
   };
 })();

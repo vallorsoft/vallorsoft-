@@ -690,6 +690,297 @@ handlers.getDriverSettlement = async function (req, res, args) {
 };
 
 // ════════════════════════════════════════════════════════════
+//  3b) SOFŐR-JÁRANDÓSÁG (earnings) + KIFIZETÉS (payments)
+//  amivel a cég TARTOZIK a sofőrnek + amit ténylegesen KIFIZETETT
+//  EUR/RON választható; kifizetéskor BNR-árfolyam mentve
+//  Multi-tenant: minden SQL company_id-szűrt, paraméteres.
+// ════════════════════════════════════════════════════════════
+const { fetchBnrEurRon } = require('../services/bnr');
+
+const EARNING_KINDS = new Set(['bonus', 'diurna', 'per_diem', 'salary', 'premium', 'holiday', 'other']);
+const PAYMENT_METHODS = new Set(['cash', 'bank', 'card', 'other']);
+const CURRENCIES = new Set(['RON', 'EUR']);
+
+function _cur(x) {
+  const c = String(x || 'RON').toUpperCase();
+  return CURRENCIES.has(c) ? c : 'RON';
+}
+function _num(x) { const n = parseFloat(x); return Number.isFinite(n) ? n : null; }
+function _round2(n) { return Math.round(n * 100) / 100; }
+function _round4(n) { return Math.round(n * 10000) / 10000; }
+
+// GET — cégre + időszakra + sofőrre szűrt járandóság-lista
+handlers.earningList = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const a = _arg(args);
+    const params = [cid];
+    let where = 'company_id = $1';
+    if (a.email) { params.push(String(a.email).toLowerCase()); where += ` AND LOWER(email_sofer) = $${params.length}`; }
+    if (a.from)  { params.push(a.from); where += ` AND earning_date >= $${params.length}`; }
+    if (a.to)    { params.push(a.to);   where += ` AND earning_date <= $${params.length}`; }
+    const r = await pool.query(
+      `SELECT id, email_sofer, earning_date, kind, label, quantity, unit_amount,
+              total_amount, currency, note, created_by, created_at
+         FROM driver_earnings
+        WHERE ${where}
+        ORDER BY earning_date DESC, id DESC
+        LIMIT 500`,
+      params
+    );
+    return res.json({ result: { ok: true, items: r.rows } });
+  } catch (err) {
+    console.error('earningList hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// POST — új járandóság: kind + label + quantity × unit_amount + currency
+handlers.earningCreate = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const f = _arg(args);
+    const email = String(f.email_sofer || '').trim().toLowerCase();
+    if (!email) return res.json({ result: { ok: false, err: 'Selecteaza un sofer!' } });
+
+    // Sofőr a saját céghez tartozik-e (cross-tenant védelem)
+    const ur = await pool.query(
+      'SELECT 1 FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2', [email, cid]);
+    if (!ur.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
+
+    const kind = EARNING_KINDS.has(String(f.kind || '').toLowerCase())
+      ? String(f.kind).toLowerCase() : 'other';
+    const label = String(f.label || '').trim().slice(0, 120) || null;
+    const currency = _cur(f.currency);
+
+    const qty = _num(f.quantity);
+    const unit = _num(f.unit_amount);
+    if (qty == null || qty <= 0) return res.json({ result: { ok: false, err: 'Cantitate invalida.' } });
+    if (unit == null || unit <= 0) return res.json({ result: { ok: false, err: 'Suma unitara invalida.' } });
+    const total = _round2(qty * unit);
+
+    const date = f.earning_date || new Date().toISOString().slice(0, 10);
+    const note = String(f.note || '').trim().slice(0, 500) || null;
+
+    const ins = await pool.query(
+      `INSERT INTO driver_earnings
+         (company_id, email_sofer, earning_date, kind, label, quantity,
+          unit_amount, total_amount, currency, note, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       RETURNING id`,
+      [cid, email, date, kind, label, qty, unit, total, currency, note, req.session.user.email]
+    );
+    try { audit.fromReq(req, 'earning.create', 'driver_earnings', ins.rows[0].id,
+      { email_sofer: email, kind, total, currency }); } catch (_e) {}
+    return res.json({ result: { ok: true, id: ins.rows[0].id, total, currency } });
+  } catch (err) {
+    console.error('earningCreate hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.earningDelete = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const id = parseInt(_arg(args).id || (Array.isArray(args) ? args[0] : args), 10);
+    if (!Number.isFinite(id)) return res.json({ result: { ok: false, err: 'ID invalid' } });
+    const r = await pool.query(
+      'DELETE FROM driver_earnings WHERE id=$1 AND company_id=$2',
+      [id, req.session.user.company_id]
+    );
+    if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost gasit.' } });
+    try { audit.fromReq(req, 'earning.delete', 'driver_earnings', id, {}); } catch (_e) {}
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('earningDelete hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// GET — kifizetések listája sofőrre + időszakra
+handlers.paymentList = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const a = _arg(args);
+    const params = [cid];
+    let where = 'company_id = $1';
+    if (a.email) { params.push(String(a.email).toLowerCase()); where += ` AND LOWER(email_sofer) = $${params.length}`; }
+    if (a.from)  { params.push(a.from); where += ` AND paid_at >= $${params.length}`; }
+    if (a.to)    { params.push(a.to);   where += ` AND paid_at <= $${params.length}`; }
+    const r = await pool.query(
+      `SELECT id, email_sofer, paid_at, amount, currency, bnr_rate, amount_ron,
+              method, note, created_by, created_at
+         FROM driver_payments
+        WHERE ${where}
+        ORDER BY paid_at DESC, id DESC
+        LIMIT 500`,
+      params
+    );
+    return res.json({ result: { ok: true, items: r.rows } });
+  } catch (err) {
+    console.error('paymentList hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// POST — kifizetés rögzítése; BNR-árfolyam a KIFIZETÉS pillanatában
+handlers.paymentCreate = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const f = _arg(args);
+    const email = String(f.email_sofer || '').trim().toLowerCase();
+    if (!email) return res.json({ result: { ok: false, err: 'Selecteaza un sofer!' } });
+
+    const ur = await pool.query(
+      'SELECT 1 FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2', [email, cid]);
+    if (!ur.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
+
+    const amount = _num(f.amount);
+    if (amount == null || amount <= 0) return res.json({ result: { ok: false, err: 'Suma invalida.' } });
+    const currency = _cur(f.currency);
+    const method = PAYMENT_METHODS.has(String(f.method || '').toLowerCase())
+      ? String(f.method).toLowerCase() : 'cash';
+    const date = f.paid_at || new Date().toISOString().slice(0, 10);
+    const note = String(f.note || '').trim().slice(0, 500) || null;
+
+    // BNR-árfolyam a kifizetés pillanatában; hiba/lekérés-hiány = null
+    let bnrRate = _num(f.bnr_rate_override);
+    if (bnrRate == null) {
+      try { bnrRate = await fetchBnrEurRon(); } catch (_e) { bnrRate = null; }
+    }
+    bnrRate = bnrRate != null ? _round4(bnrRate) : null;
+
+    // RON-ban is elmentjük az összeget könnyű összesítéshez
+    let amountRon = null;
+    if (currency === 'RON') amountRon = _round2(amount);
+    else if (currency === 'EUR' && bnrRate) amountRon = _round2(amount * bnrRate);
+
+    const ins = await pool.query(
+      `INSERT INTO driver_payments
+         (company_id, email_sofer, paid_at, amount, currency, bnr_rate,
+          amount_ron, method, note, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       RETURNING id`,
+      [cid, email, date, amount, currency, bnrRate, amountRon, method, note, req.session.user.email]
+    );
+    try { audit.fromReq(req, 'payment.create', 'driver_payments', ins.rows[0].id,
+      { email_sofer: email, amount, currency, bnr_rate: bnrRate, method }); } catch (_e) {}
+    return res.json({ result: {
+      ok: true, id: ins.rows[0].id, amount, currency, bnr_rate: bnrRate, amount_ron: amountRon
+    } });
+  } catch (err) {
+    console.error('paymentCreate hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.paymentDelete = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const id = parseInt(_arg(args).id || (Array.isArray(args) ? args[0] : args), 10);
+    if (!Number.isFinite(id)) return res.json({ result: { ok: false, err: 'ID invalid' } });
+    const r = await pool.query(
+      'DELETE FROM driver_payments WHERE id=$1 AND company_id=$2',
+      [id, req.session.user.company_id]
+    );
+    if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost gasit.' } });
+    try { audit.fromReq(req, 'payment.delete', 'driver_payments', id, {}); } catch (_e) {}
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('paymentDelete hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// GET — sofőr egyenlege: járandóság - kifizetés (EUR + RON külön + RON-ban egyesítve)
+// A járandóság saját valutában marad; a kifizetés a kifizetéskori BNR-en RON-ra váltva.
+// A "kombinált RON" a hivatalos jelenlegi BNR-en számol az EUR-járandóságokra
+// (illusztratív egyenleg — a valós tartozás valutában marad).
+handlers.getDriverBalance = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const a = _arg(args);
+    const email = String(a.email || '').trim().toLowerCase();
+    if (!email) return res.json({ result: { ok: false, err: 'Selecteaza un sofer!' } });
+    const from = a.from || '1970-01-01';
+    const to   = a.to   || '2999-12-31';
+
+    // Sofőr a saját céghez tartozik-e
+    const ur = await pool.query(
+      'SELECT nume FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2', [email, cid]);
+    if (!ur.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
+
+    // Járandóság valuta szerint
+    const eR = await pool.query(
+      `SELECT COALESCE(currency,'RON') AS currency,
+              COALESCE(SUM(total_amount),0)::numeric AS total,
+              COUNT(*)::int AS db
+         FROM driver_earnings
+        WHERE company_id=$1 AND LOWER(email_sofer)=$2
+          AND earning_date >= $3 AND earning_date <= $4
+        GROUP BY 1`,
+      [cid, email, from, to]
+    );
+    // Kifizetés valuta szerint + RON-egyesítve (a kifizetéskori BNR alapján)
+    const pR = await pool.query(
+      `SELECT COALESCE(currency,'RON') AS currency,
+              COALESCE(SUM(amount),0)::numeric AS total,
+              COALESCE(SUM(amount_ron),0)::numeric AS total_ron,
+              COUNT(*)::int AS db
+         FROM driver_payments
+        WHERE company_id=$1 AND LOWER(email_sofer)=$2
+          AND paid_at >= $3 AND paid_at <= $4
+        GROUP BY 1`,
+      [cid, email, from, to]
+    );
+
+    const earned = { EUR: 0, RON: 0, count: 0 };
+    for (const row of eR.rows) {
+      const c = _cur(row.currency);
+      earned[c] = (earned[c] || 0) + parseFloat(row.total || 0);
+      earned.count += parseInt(row.db, 10) || 0;
+    }
+    const paid = { EUR: 0, RON: 0, count: 0, ron_total: 0 };
+    for (const row of pR.rows) {
+      const c = _cur(row.currency);
+      paid[c] = (paid[c] || 0) + parseFloat(row.total || 0);
+      paid.count += parseInt(row.db, 10) || 0;
+      paid.ron_total += parseFloat(row.total_ron || 0);
+    }
+
+    // Aktuális BNR — a fennmaradó EUR-tartozás informatív RON-értékéhez
+    let bnrRate = null;
+    try { bnrRate = await fetchBnrEurRon(); } catch (_e) { bnrRate = null; }
+    bnrRate = bnrRate != null ? _round4(bnrRate) : null;
+
+    const balEur = _round2((earned.EUR || 0) - (paid.EUR || 0));
+    const balRon = _round2((earned.RON || 0) - (paid.RON || 0));
+    // "Illusztratív" RON-egyenleg: EUR-tartozás mai BNR-en + RON-tartozás
+    const balRonAll = bnrRate != null
+      ? _round2(balEur * bnrRate + balRon)
+      : null;
+
+    return res.json({ result: {
+      ok: true,
+      sofer: { email, nume: ur.rows[0].nume },
+      earned: { eur: _round2(earned.EUR), ron: _round2(earned.RON), count: earned.count },
+      paid:   { eur: _round2(paid.EUR),   ron: _round2(paid.RON),   count: paid.count,
+                paid_ron_total: _round2(paid.ron_total) },
+      balance: { eur: balEur, ron: balRon, ron_all: balRonAll },
+      bnr_rate: bnrRate
+    } });
+  } catch (err) {
+    console.error('getDriverBalance hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ════════════════════════════════════════════════════════════
 //  4) ÜZEMANYAGKÁRTYA-IMPORT (OMV/MOL/DKV/Eurowag CSV)
 // ════════════════════════════════════════════════════════════
 const _fcCrypto = require('crypto');
