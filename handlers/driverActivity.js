@@ -177,28 +177,46 @@ handlers.getDriverActivity = async function (req, res, args) {
     const to   = a.to   || r.to;
     const orderId = a.orderId ? String(a.orderId) : null;
 
-    // Fuvarok listája a szűrő-legördülőhöz + timeline-fő-események
-    // (a fuvar-ellenőrzés cégre + sofőrre + Anulat kizárás + időszak szerint)
-    const ordersR = await pool.query(
-      `SELECT id, fuvar_no, client, loc_incarcare, loc_descarcare,
-              data_incarcare, data_descarcare, status,
-              sosit_incarcare_at, incarcat_at, sosit_descarcare_at, descarcat_at,
-              handover_status, handover_at, handover_location
-         FROM orders
-        WHERE company_id = $1
-          AND LOWER(email_sofer) = $2
-          AND status <> 'Anulat'
-          AND (
-            ($3::text IS NOT NULL AND id = $3)
-            OR ($3::text IS NULL
-                AND COALESCE(data_incarcare, created_at::date) >= $4::date
-                AND COALESCE(data_incarcare, created_at::date) <= $5::date)
-          )
-        ORDER BY COALESCE(data_incarcare, created_at::date) DESC, id DESC
-        LIMIT 200`,
-      [cid, email, orderId, from, to]
-    );
-    const orders = ordersR.rows;
+    // Fuvarok listája a szűrő-legördülőhöz + timeline-fő-események.
+    // Az opcionális oszlopokat (fuvar_no, sosit_*_at, incarcat_at, descarcat_at,
+    // handover_*) `to_jsonb(o)->>'kulcs'` mintával olvassuk — így ha egy oszlop
+    // nem létezik a cég DB-jén (nem futott migráció), az adott mező NULL lesz,
+    // és a lekérdezés NEM hasal el. Csak az abszolút alapvető oszlopokra
+    // hivatkozunk direktben (id, company_id, email_sofer, status, client,
+    // loc_*, data_*, created_at) — ezek régóta minden cégnél léteznek.
+    let orders = [];
+    try {
+      const ordersR = await pool.query(
+        `SELECT o.id, o.client,
+                o.loc_incarcare, o.loc_descarcare,
+                o.data_incarcare, o.data_descarcare, o.status,
+                (to_jsonb(o) ->> 'fuvar_no')            AS fuvar_no,
+                (to_jsonb(o) ->> 'sosit_incarcare_at')  AS sosit_incarcare_at,
+                (to_jsonb(o) ->> 'incarcat_at')         AS incarcat_at,
+                (to_jsonb(o) ->> 'sosit_descarcare_at') AS sosit_descarcare_at,
+                (to_jsonb(o) ->> 'descarcat_at')        AS descarcat_at,
+                (to_jsonb(o) ->> 'handover_status')     AS handover_status,
+                (to_jsonb(o) ->> 'handover_at')         AS handover_at,
+                (to_jsonb(o) ->> 'handover_location')   AS handover_location
+           FROM orders o
+          WHERE o.company_id = $1
+            AND LOWER(o.email_sofer) = $2
+            AND o.status <> 'Anulat'
+            AND (
+              ($3::text IS NOT NULL AND o.id = $3)
+              OR ($3::text IS NULL
+                  AND COALESCE(o.data_incarcare, o.created_at::date) >= $4::date
+                  AND COALESCE(o.data_incarcare, o.created_at::date) <= $5::date)
+            )
+          ORDER BY COALESCE(o.data_incarcare, o.created_at::date) DESC, o.id DESC
+          LIMIT 200`,
+        [cid, email, orderId, from, to]
+      );
+      orders = ordersR.rows;
+    } catch (e) {
+      // Régi séma / hiányzó oszlop: log, de a többi forrás még adhat adatot.
+      console.error('getDriverActivity orders query hiba:', e.message);
+    }
     const orderIds = orders.map((o) => o.id);
 
     const events = [];
@@ -233,31 +251,41 @@ handlers.getDriverActivity = async function (req, res, args) {
       }
     }
 
-    // B) Menetlevél-beküldések + a benne lévő tankolás/vásárlás/puncte sorok külön eseményként
+    // B) Menetlevél-beküldések + a benne lévő tankolás/vásárlás sorok külön eseményként
     //    A menetlevél maga = 1 fő esemény; a sorok külön kis események a saját dátumukon.
-    const wbWhere = orderIds.length
-      ? `WHERE company_id=$1 AND LOWER(email_sofer)=$2
-           AND (order_ids ?| $3 OR ($3::text[] IS NULL))`
-      : `WHERE company_id=$1 AND LOWER(email_sofer)=$2
-           AND COALESCE(erkezes_dt, indulas_dt, data_completare) >= $4::date
-           AND COALESCE(erkezes_dt, indulas_dt, data_completare) < ($5::date + 1)`;
-    const wbParams = orderIds.length
-      ? [cid, email, orderIds]
-      : [cid, email, null, from, to];
-
+    //    Robusztus fallback: ha a `company_id` oszlop nincs, users-joinnal próbáljuk
+    //    (a régi fuvarlevelek táblák így kötődtek a céghez).
+    //    Az erkezes_dt/indulas_dt opcionális oszlopok — to_jsonb-vel biztonságosan.
     let wbR = { rows: [] };
     try {
+      const wbWhere = orderIds.length
+        ? `WHERE f.company_id=$1 AND LOWER(f.email_sofer)=$2
+             AND (f.order_ids @> to_jsonb($3::text[]) OR f.order_ids ?| $3::text[])`
+        : `WHERE f.company_id=$1 AND LOWER(f.email_sofer)=$2
+             AND COALESCE(
+                   (to_jsonb(f) ->> 'erkezes_dt')::timestamptz,
+                   (to_jsonb(f) ->> 'indulas_dt')::timestamptz,
+                   f.data_completare
+                 ) >= $4::date
+             AND COALESCE(
+                   (to_jsonb(f) ->> 'erkezes_dt')::timestamptz,
+                   (to_jsonb(f) ->> 'indulas_dt')::timestamptz,
+                   f.data_completare
+                 ) < ($5::date + 1)`;
+      const wbParams = orderIds.length ? [cid, email, orderIds] : [cid, email, null, from, to];
       wbR = await pool.query(
-        `SELECT id, data_completare, erkezes_dt, indulas_dt, numar_camion, numar_remorca,
-                total_km, alte_mentiuni, alimentari, achizitii, puncte, order_ids
-           FROM fuvarlevelek
+        `SELECT f.id, f.data_completare, f.numar_camion, f.numar_remorca,
+                f.total_km, f.alte_mentiuni, f.alimentari, f.achizitii, f.puncte, f.order_ids,
+                (to_jsonb(f) ->> 'erkezes_dt') AS erkezes_dt,
+                (to_jsonb(f) ->> 'indulas_dt') AS indulas_dt
+           FROM fuvarlevelek f
           ${wbWhere}
-          ORDER BY COALESCE(erkezes_dt, indulas_dt, data_completare) DESC
+          ORDER BY f.data_completare DESC
           LIMIT 200`,
         wbParams
       );
-    } catch (_e) {
-      // Régi séma-eltérés best-effort: üres lista.
+    } catch (e) {
+      console.error('getDriverActivity waybills query hiba:', e.message);
       wbR = { rows: [] };
     }
 
@@ -301,23 +329,52 @@ handlers.getDriverActivity = async function (req, res, args) {
     }
 
     // C) Fotók (POD / CMR / bon-scan képek) — `documents` táblából
+    //    `documents.company_id` a 2026-07-16 óta létezik (fuvarlevelek-documents-company-id.sql);
+    //    fallback: users-join a sofőr-email → company_id-re, hogy régebbi cég-DB-n is menjen.
     let dR = { rows: [] };
     try {
       const dParams = orderIds.length
         ? [cid, email, orderIds]
         : [cid, email, null, from, to];
       const dWhere = orderIds.length
-        ? `WHERE company_id=$1 AND LOWER(email_sofer)=$2 AND (order_id = ANY($3))`
-        : `WHERE company_id=$1 AND LOWER(email_sofer)=$2
-             AND created_at >= $4::date AND created_at < ($5::date + 1)`;
+        ? `WHERE d.company_id=$1 AND LOWER(d.email_sofer)=$2 AND (d.order_id = ANY($3))`
+        : `WHERE d.company_id=$1 AND LOWER(d.email_sofer)=$2
+             AND d.created_at >= $4::date AND d.created_at < ($5::date + 1)`;
       dR = await pool.query(
-        `SELECT id, tip, file_name, order_id, created_at
-           FROM documents ${dWhere}
-          ORDER BY created_at DESC
+        `SELECT d.id, d.tip, d.file_name,
+                (to_jsonb(d) ->> 'order_id') AS order_id,
+                d.created_at
+           FROM documents d ${dWhere}
+          ORDER BY d.created_at DESC
           LIMIT 300`,
         dParams
       );
-    } catch (_e) { dR = { rows: [] }; }
+    } catch (e) {
+      // Fallback: régebbi cég-DB, ahol a documents.company_id még hiányzik → users-join
+      try {
+        const dParams2 = orderIds.length
+          ? [cid, email, orderIds]
+          : [cid, email, null, from, to];
+        const dWhere2 = orderIds.length
+          ? `AND (d.order_id = ANY($3))`
+          : `AND d.created_at >= $4::date AND d.created_at < ($5::date + 1)`;
+        dR = await pool.query(
+          `SELECT d.id, d.tip, d.file_name,
+                  (to_jsonb(d) ->> 'order_id') AS order_id,
+                  d.created_at
+             FROM documents d
+             JOIN users u ON LOWER(u.email) = LOWER(d.email_sofer)
+            WHERE u.company_id = $1
+              AND LOWER(d.email_sofer) = $2 ${dWhere2}
+            ORDER BY d.created_at DESC
+            LIMIT 300`,
+          dParams2
+        );
+      } catch (e2) {
+        console.error('getDriverActivity documents fallback hiba:', e2.message);
+        dR = { rows: [] };
+      }
+    }
 
     for (const d of dR.rows) {
       const url = '/api/doc-download/' + d.id;
@@ -434,7 +491,9 @@ handlers.getDriverActivity = async function (req, res, args) {
       from, to, orderId,
     } });
   } catch (err) {
-    console.error('getDriverActivity hiba:', err);
+    // Részletes napló szerver-oldalon, hogy a valódi ok látszódjon;
+    // a kliens felé generikus üzenet (nincs stack-trace szivárgás).
+    console.error('getDriverActivity hiba:', err && err.stack ? err.stack : err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };

@@ -234,6 +234,7 @@ describe('getDriverActivity', () => {
       .mockResolvedValueOnce(rows([]))                                  // orders üres
       .mockResolvedValueOnce(rows([]))                                  // waybills üres
       .mockRejectedValueOnce(new Error('documents séma-eltérés'))       // documents dob
+      .mockRejectedValueOnce(new Error('documents fallback dob'))       // documents fallback (users-join) is dob
       // UIT nem hívódik (orderIds üres) → nincs mock
       .mockRejectedValueOnce(new Error('border_crossings hiba'))        // border dob
       .mockRejectedValueOnce(new Error('bug_reports hiba'));            // bug dob
@@ -245,5 +246,31 @@ describe('getDriverActivity', () => {
     expect(res.body.result.ok).toBe(true);
     expect(res.body.result.events).toEqual([]);
     expect(res.body.result.photos).toEqual([]);
+  });
+
+  test('resilience: az orders SELECT hasal → orders üres, DE a többi forrás fut és ok:true', async () => {
+    // Ez a regresszió-védelem a "sofőrre kattintva Eroare de server" bug ellen.
+    // A fő orders lekérdezés (első sub-query) esetleg egy hiányzó oszlopon hasal
+    // el (pl. régi cég-DB, ahol egy migráció nem futott le). A handler-nek NEM
+    // szabad az egészet 500-nal ledöntenie — üres orders + a többi forrás fut.
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ id: 1, email: 'p@ceg.hu', nume: 'P', tel: null }])) // users
+      .mockRejectedValueOnce(new Error('column "handover_status" does not exist'))       // orders dob
+      .mockResolvedValueOnce(rows([]))                                                    // waybills üres
+      .mockResolvedValueOnce(rows([]))                                                    // documents üres
+      .mockResolvedValueOnce(rows([]))                                                    // border üres
+      .mockResolvedValueOnce(rows([]));                                                   // bug üres
+
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getDriverActivity',
+      arguments: [{ email: 'p@ceg.hu' }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.orders).toEqual([]);
+    expect(res.body.result.events).toEqual([]);
+    // A driver adatai visszaérkeznek
+    expect(res.body.result.driver.email).toBe('p@ceg.hu');
   });
 });
