@@ -9,6 +9,18 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 20. lépés — Decont oficial: sofőr alapbér mentés/olvasás — cross-tenant védelem + validáció + audit (2026-09-02, PR #407) ✅ KÉSZ
+
+A kiegészítő „📑 Decont oficial" dokumentum új szerkeszthető mezőt (nettó havi alapbér, RON) kapott per sofőr. A hozzá tartozó két RPC (`getDriverBaseSalary`, `setDriverBaseSalary`) a cég-izoláció + audit + bemenet-védelem szabályait a jelenlegi minta szerint betartja; a `getMonthlySettlementSheet` válasz-bővítése best-effort try/catch mögött (migráció-hiánynál `null` — nem hasal el, nem szivárogtat).
+
+- **Cross-tenant védelem minden úton:** `getDriverBaseSalary` `SELECT ... WHERE LOWER(email)=LOWER($1) AND company_id=$2` (ismeretlen sofőr / idegen cég → 0 sor → RO hibaválasz, nincs mellékhatás). `setDriverBaseSalary` `UPDATE users SET net_base_salary_ron=$1 WHERE LOWER(email)=LOWER($2) AND company_id=$3 RETURNING net_base_salary_ron` — a `WHERE` a cég-ellenőrzést AZ UPDATE-en végzi; ha 0 sor jön vissza (idegen sofőr vagy idegen cég), RO hiba, nincs írás. A `sendSettlementSheetEmail` cross-tenant védelme (címzett saját cég-sofőrje kell legyen) változatlan.
+- **Szerep-kapu ELŐBB, mint DB-kapcsolat:** `_isAdminOrManager(req)` ellenőrzés a `pool.query` ELŐTT (Sofer nem éri el az RPC-t; DoS-védelem is).
+- **Bemenet-védelem:** `email` → `String().trim().toLowerCase()` + kötelező. `base_salary_ron` → `parseFloat` + `Number.isFinite` + 0 ≤ n ≤ 100 000 RON. Üres / `null` → engedélyezett (a mező NULL-ra állítja a DB-ben; a kliens ilyenkor a 2700 default-ra esik vissza). Ismeretlen mező NEM kerül SQL-be (a fehérlistás UPDATE csak `net_base_salary_ron`-t ír).
+- **Audit-napló:** `audit.fromReq(req, 'driver_settlement.base_salary_set', 'user', 0, { email, value })` — a cég/sofőr/érték hármas megőrizve; a lekérés (get) NEM audit-elt (read-only, nincs mellékhatás).
+- **Migráció-idempotencia:** `db/driver-net-base-salary.sql` `ADD COLUMN IF NOT EXISTS` + feltételes `UPDATE ... WHERE net_base_salary_ron IS NULL AND pozicio='Sofer'` (a nem-sofőrök `NULL` maradnak; kettős futás sem duplikál). A `getMonthlySettlementSheet` új mező-hozzáférése try/catch mögött — migráció nélküli DB-n visszaesik a régi 3-oszlopos SELECT-re, `net_base_salary_ron: null`-lal.
+- **Nincs adatszivárgás:** a válasz-mező (`driver.net_base_salary_ron`) csak Admin/Manager felé megy (`getMonthlySettlementSheet` kapuja `_isAdminOrManager`); a sofőr saját felülete nem éri el. A hivatalos elszámolás e-mail-küldése (`sendSettlementSheetEmail`) továbbra is csak a saját cég sofőrjéhez engedett.
+- **Nincs regresszió:** 1060 Jest zöld (nincs új teszt-fájl a PR-ben; a `settlement-sheet.test.js` mock-ja az új mezőt is elviseli a `try/catch` fallback miatt). A régi „📄 Decont lunar" gomb + dokumentum + fizetés-funkciók érintetlenek.
+
 ### 19. lépés — Szerviz halasztás + elvégezve: multi-tenant tranzakció + fehérlistás JSONB (2026-08-21) ✅ KÉSZ
 A szerviz-esedékesség kezelése kapott két új írási művelet (halasztás + elvégezve/lezárás). Mindkettő **cégre szűrt**, tulajdon-ellenőrzött, audit-elt, és a bemenet fehérlistázva.
 

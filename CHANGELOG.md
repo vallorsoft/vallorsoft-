@@ -14,6 +14,25 @@
 
 ---
 
+## 2026-09-02 — Sofőr-elszámolás: új „📑 Decont oficial" (hivatalos elszámolás) dokumentum — PR #407
+
+**Kérés:** kiegészítő nyomtatható lap a meglévő „📄 Decont lunar" MELLETT — a jelenlegi felület/számítás/gomb/dokumentum/fizetési funkciók MIND változatlanok. Az új „Decont oficial" ugyanabból az adatból (diurna + bónusz + rakodás/kirakodás + vasárnapi indulás + egyéb + EUR + RON + BNR), plus szerkeszthető nettó havi alapbér, kiszámolja az „alapbéren felül fizetendő EUR" összeget.
+
+1. **DB — `db/driver-net-base-salary.sql`** (ÚJ, idempotens, auto-fut): `users.net_base_salary_ron NUMERIC(10,2) DEFAULT 2700`. A default nem hardcodolt a kódba — sofőrönként egyedileg állítható; a meglévő sofőrök is megkapják a 2700 alapértéket UPDATE-tel.
+2. **Backend (`handlers/fleetCompliance.js`)** — a `getMonthlySettlementSheet` válaszban a `driver.net_base_salary_ron` mező is (best-effort try/catch — migráció-hiánynál `null` + kliens 2700 default). Két új RPC (registry-autoregisztrálva a `fleetCompliance` modulon át):
+   - `getDriverBaseSalary({email})` — Admin/Manager, `company_id`-szűrt, visszaadja `base_salary_ron` + `default_ron:2700`.
+   - `setDriverBaseSalary({email, base_salary_ron})` — Admin/Manager, cross-tenant védelem (`WHERE LOWER(email)=$1 AND company_id=$2`), 0…100 000 RON validáció, audit `driver_settlement.base_salary_set`.
+3. **UI (`public/fleet-extra-v2.js`)** — új **📑 Decont oficial** gomb a meglévő 📄 Decont lunar MELLETT (nem helyette). Modal ugyanazokkal a preset/from/to szűrőkkel (`E hó/Múlt hó/Negyedév/Év eleje óta/Utolsó 12 hó`) + hivatalos fejléc (cég **logó + pecsét** — a Decont lunar-lappal AZONOS szerkezet, `company_branding`-ből). A tételes táblázat MINDEN járandóság-sort tartalmaz (diurna, bónusz, rakodás/kirakodás, vasárnapi indulás, egyéb) — semmi duplikálás, semmi kétszeri számítás; ugyanaz az adatforrás.
+4. **Szerkeszthető mezők a lapon** (`no-print` — nyomtatásba/e-mailbe NEM kerül):
+   - **Nettó havi alapbér** (RON, alapérték 2700 vagy a szerver-oldali mentett érték) — `💾 Salvează salariul` → `setDriverBaseSalary`.
+   - **BNR EUR/RON** (élő szerver-BNR alapból, ha nem elérhető: pirula-warn + kézi felülírható).
+5. **Összegzés-blokk + kiemelt záró blokk** (mind 2 tizedes): Teljes EUR-járandóság · Teljes RON-járandóság · Alkalmazott BNR · **Teljes havi nettó járandóság RON** · **Nettó alapbér RON** · **⭐ Alapbéren felül fizetendő EUR**.
+6. **Számítás**: `total_ron = tot_eur × BNR + tot_ron` → `above_base_eur = (total_ron − base_salary_ron) / BNR`. Példa: 1730 EUR + 1000 RON + BNR 5,20 → 9996 RON össz. nettó → 2700 alapbér → **1403,08 EUR** alapbéren felül fizetendő.
+7. **🖨️ Nyomtatás/PDF** + **✉️ E-mail** — a `no-print` osztályos szerkesztő-sáv (alapbér + BNR-override) e-mailbe kivágva a klónból (`clone.querySelectorAll('.no-print')` → törlés), nyomtatásba `@media print{.no-print{display:none!important}}` szűri; a KÖZÖS `sendSettlementSheetEmail` RPC-re küld (cross-tenant védelem változatlan).
+8. **i18n** — 20 új `fe.stof.*` kulcs (RO-alap + HU). Cache-bust `?v=20260902dcof` (admin.html + manager.html — i18n.js + fleet-extra-v2.js). **1060 Jest zöld**, nincs regresszió; a Decont lunar-lap (📄) érintetlen.
+
+---
+
 ## 2026-09-02 — Sofőr-elszámolás lap: tetszőleges időszak-választó (nem csak 1 hónap: negyedév / év / egyedi)
 
 **Gyökér:** a PR #405 lezárása után a lap MINDIG egyetlen naptári hónapra volt szűkítve — a diszpécser nem tudott negyedéves / féléves / éves / tetszőleges intervallumra nyomtatni. Kérés: `from/to` dátum-választó + preset-gombok.
