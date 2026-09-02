@@ -80,6 +80,10 @@ describe('getMonthlySettlementSheet', () => {
     pool.query
       .mockResolvedValueOnce(rows([{ email: 'sofer@ceg.hu', nume: 'Peto', tel: '+40700111222' }])) // users
       .mockResolvedValueOnce(rows([{ nev: 'CegKft', cui: 'RO1', adresa: 'Str', telefon: '111', email_contact: 'a@b.ro' }])) // companies
+      .mockResolvedValueOnce(rows([{                                                                        // company_branding
+        logo_base64: 'AAAA', logo_mime: 'image/png',
+        stamp_base64: 'BBBB', stamp_mime: 'image/jpeg',
+      }]))
       .mockResolvedValueOnce(rows([                                                                        // earnings
         { id: 1, earning_date: '2026-08-05', kind: 'bonus',   label: 'x', quantity: 1, unit_amount: 500, total_amount: 500, currency: 'EUR', note: null },
         { id: 2, earning_date: '2026-08-12', kind: 'diurna',  label: 'y', quantity: 6, unit_amount: 70,  total_amount: 420, currency: 'RON', note: null },
@@ -109,14 +113,38 @@ describe('getMonthlySettlementSheet', () => {
     // Kombinált RON = 300 × 5.05 + 420 = 1935
     expect(res.body.result.totals.balance.ron_all).toBe(1935);
     expect(res.body.result.totals.bnr_rate).toBe(5.05);
-    // Az earnings + payments query cégre szűrt
-    const eSql = pool.query.mock.calls[2][0];
-    const eParams = pool.query.mock.calls[2][1];
+    // Az earnings + payments query cégre szűrt (mock-call[3] = earnings,
+    // mert a chain: users → companies → company_branding → earnings → payments)
+    const eSql = pool.query.mock.calls[3][0];
+    const eParams = pool.query.mock.calls[3][1];
     expect(eSql).toMatch(/FROM driver_earnings/i);
     expect(eSql).toMatch(/company_id=\$1/i);
     expect(eParams[0]).toBe(fixtures.admin.company_id);
     expect(eParams[2]).toBe('2026-08-01');
     expect(eParams[3]).toBe('2026-08-31');
+
+    // Branding-adatok data URI-ként jönnek vissza a válaszban
+    expect(res.body.result.company.logo_data_uri).toBe('data:image/png;base64,AAAA');
+    expect(res.body.result.company.stamp_data_uri).toBe('data:image/jpeg;base64,BBBB');
+  });
+
+  test('company_branding SELECT dob → válasz OK, logo/stamp NULL', async () => {
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValueOnce(null);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ email: 'sofer@ceg.hu', nume: 'Peto', tel: null }]))
+      .mockResolvedValueOnce(rows([{ nev: 'CegKft' }]))
+      .mockRejectedValueOnce(new Error('column stamp_base64 does not exist'))  // régi migráció
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getMonthlySettlementSheet',
+      arguments: [{ email: 'sofer@ceg.hu', year: 2026, month: 8 }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.company.logo_data_uri).toBe(null);
+    expect(res.body.result.company.stamp_data_uri).toBe(null);
   });
 
   test('február utolsó napja szökőév-tudatos (2024-02-29)', async () => {
@@ -126,6 +154,7 @@ describe('getMonthlySettlementSheet', () => {
     pool.query
       .mockResolvedValueOnce(rows([{ email: 'sofer@ceg.hu', nume: 'Peto', tel: null }]))
       .mockResolvedValueOnce(rows([{ nev: 'CegKft' }]))
+      .mockResolvedValueOnce(rows([]))     // company_branding — üres (nincs logó/pecsét)
       .mockResolvedValueOnce(rows([]))
       .mockResolvedValueOnce(rows([]));
     const res = await request(app).post('/api/execute').send({

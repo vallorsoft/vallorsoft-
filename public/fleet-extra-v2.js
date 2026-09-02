@@ -1635,22 +1635,35 @@
     var totE = tot.earned || {}, totP = tot.paid || {}, totB = tot.balance || {};
     var bnr = tot.bnr_rate;
 
+    // Hivatalos fejléc: logó (bal) + cég-adatok (közép) + dokumentum-badge (jobb)
+    // Alatta 2px sötét vonal — hogy hivatalos legyen. A logó cell-je csak ha van
+    // feltöltött logó (`c.logo_data_uri` a szerver-oldali `company_branding`-ből).
+    var logoCell = c.logo_data_uri
+      ? '<td style="vertical-align:middle;width:96px;padding-right:16px;">'
+        + '<img src="' + esc(c.logo_data_uri) + '" alt="" '
+        +   'style="max-width:88px;max-height:80px;display:block;">'
+        + '</td>'
+      : '';
     return '<div class="dc-sheet-doc">'
-      // Fejléc: cég + időszak
-      + '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;">'
+      // FIX HIVATALOS FEJLÉC (logó + cég + doktípus-badge)
+      + '<table style="width:100%;border-collapse:collapse;">'
       +   '<tr>'
-      +     '<td style="vertical-align:top;">'
-      +       '<div style="font-size:18px;font-weight:800;color:#0f172a;">' + esc(c.nev || '') + '</div>'
+      +     logoCell
+      +     '<td style="vertical-align:middle;">'
+      +       '<div style="font-size:20px;font-weight:800;color:#0f172a;letter-spacing:0.2px;">' + esc(c.nev || '') + '</div>'
       +       compAdresa + compMetaLine
       +     '</td>'
-      +     '<td style="vertical-align:top;text-align:right;">'
-      +       '<div style="display:inline-block;padding:8px 14px;background:#2563eb;color:#fff;border-radius:8px;font-weight:800;font-size:14px;">'
-      +         t('fe.st.title') + ' · ' + esc(monthLbl)
+      +     '<td style="vertical-align:middle;text-align:right;width:220px;">'
+      +       '<div style="display:inline-block;padding:9px 16px;background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;border-radius:8px;font-weight:800;font-size:14px;letter-spacing:0.3px;">'
+      +         t('fe.st.title')
       +       '</div>'
-      +       '<div style="font-size:11px;color:#6b7280;margin-top:6px;">' + t('fe.st.period') + ': ' + d2(p.from) + ' → ' + d2(p.to) + '</div>'
+      +       '<div style="font-size:13px;color:#0f172a;font-weight:700;margin-top:6px;">' + esc(monthLbl) + '</div>'
+      +       '<div style="font-size:11px;color:#6b7280;margin-top:2px;">' + t('fe.st.period') + ': ' + d2(p.from) + ' → ' + d2(p.to) + '</div>'
       +     '</td>'
       +   '</tr>'
       + '</table>'
+      // Elválasztó vonal a fejléc alatt (hivatalos kinézet)
+      + '<div style="height:0;border-top:2px solid #0f172a;margin:12px 0 16px;"></div>'
       // Sofőr adatok
       + '<div style="padding:10px 14px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:8px;margin-bottom:14px;">'
       +   '<div style="font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:0.4px;">' + t('fe.st.driver') + '</div>'
@@ -1716,14 +1729,23 @@
         : '')
       +   '</table>'
       + '</div>'
-      // Aláíró blokk
-      + '<table style="width:100%;border-collapse:collapse;margin-top:32px;">'
+      // Aláíró blokk (cég-oldalon a pecsét ráégetve — ha van feltöltve)
+      + '<table style="width:100%;border-collapse:collapse;margin-top:36px;">'
       +   '<tr>'
-      +     '<td style="width:50%;vertical-align:top;padding-right:16px;">'
+      +     '<td style="width:50%;vertical-align:top;padding-right:16px;height:110px;">'
+      +       '<div style="height:70px;"></div>' // aláírás-hely (üres kép-tér)
       +       '<div style="border-top:1.5px solid #0f172a;padding-top:6px;font-size:11px;color:#475569;">' + t('fe.st.signDriver') + '</div>'
       +       '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + esc(d.nume) + '</div>'
       +     '</td>'
-      +     '<td style="width:50%;vertical-align:top;padding-left:16px;">'
+      +     '<td style="width:50%;vertical-align:top;padding-left:16px;height:110px;position:relative;">'
+      +       // Cég pecsét — a signature-vonal FÖLÖTT középen, ha van feltöltve;
+      +       // ha nincs, üres tér marad (kézzel bepecsételhető nyomtatáskor).
+      +       (c.stamp_data_uri
+        ? '<div style="height:70px;text-align:center;">'
+          + '<img src="' + esc(c.stamp_data_uri) + '" alt="" '
+          + 'style="max-height:68px;max-width:120px;opacity:0.85;">'
+          + '</div>'
+        : '<div style="height:70px;"></div>')
       +       '<div style="border-top:1.5px solid #0f172a;padding-top:6px;font-size:11px;color:#475569;">' + t('fe.st.signCompany') + '</div>'
       +       '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + esc(c.nev || '') + '</div>'
       +     '</td>'
