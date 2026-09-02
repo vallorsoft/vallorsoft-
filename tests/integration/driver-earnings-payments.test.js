@@ -83,6 +83,7 @@ describe('earningCreate', () => {
     const pool = require('../../db');
     pool.query
       .mockResolvedValueOnce(rows([{ ok: 1 }]))          // sofőr létezik
+      .mockResolvedValueOnce(rows([]))                    // driver_earning_kinds — üres (nincs egyéni)
       .mockResolvedValueOnce(rows([{ id: 77 }]));        // INSERT
     const res = await request(app).post('/api/execute').send({
       functionName: 'earningCreate',
@@ -101,8 +102,8 @@ describe('earningCreate', () => {
     expect(res.body.result.total).toBe(420);
     expect(res.body.result.currency).toBe('EUR');
 
-    const insertSql = pool.query.mock.calls[1][0];
-    const insertParams = pool.query.mock.calls[1][1];
+    const insertSql = pool.query.mock.calls[2][0];
+    const insertParams = pool.query.mock.calls[2][1];
     expect(insertSql).toMatch(/INSERT INTO driver_earnings/i);
     // Rendezés: company_id, email, date, kind, label, qty, unit, total, currency, note, created_by
     expect(insertParams[0]).toBe(fixtures.admin.company_id);
@@ -112,6 +113,159 @@ describe('earningCreate', () => {
     expect(insertParams[7]).toBe(420);        // TOTAL a szervertől
     expect(insertParams[8]).toBe('EUR');
     expect(insertParams[10]).toBe(fixtures.admin.email);
+  });
+
+  test('egyéni típus (driver_earning_kinds-ben) elfogadva, nem esik "other"-re', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ ok: 1 }]))                   // sofőr létezik
+      .mockResolvedValueOnce(rows([{ key: 'craciun' }]))           // egyéni kind
+      .mockResolvedValueOnce(rows([{ id: 88 }]));                  // INSERT
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningCreate',
+      arguments: [{
+        email_sofer: 'sofer@ceg.hu',
+        kind: 'CRACIUN',        // kisbetűs-normalizálás után egyezik
+        quantity: 1, unit_amount: 200, currency: 'RON',
+      }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    const insertParams = pool.query.mock.calls[2][1];
+    expect(insertParams[3]).toBe('craciun');
+  });
+
+  test('migráció-hiány: driver_earning_kinds SELECT dob → csak beépítettek + kind fehérlistázás fut tovább', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ ok: 1 }]))                   // sofőr létezik
+      .mockRejectedValueOnce(new Error('relation not found'))      // kinds SELECT dob
+      .mockResolvedValueOnce(rows([{ id: 99 }]));                  // INSERT
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningCreate',
+      arguments: [{
+        email_sofer: 'sofer@ceg.hu',
+        kind: 'bonus',           // beépített → átmegy
+        quantity: 1, unit_amount: 50, currency: 'EUR',
+      }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    const insertParams = pool.query.mock.calls[2][1];
+    expect(insertParams[3]).toBe('bonus');
+  });
+});
+
+// ═════════════════════════════════════════════
+//  earningKindList / Create / Delete (egyéni típusok)
+// ═════════════════════════════════════════════
+describe('earningKind* — egyéni típus-kezelő', () => {
+  test('earningKindList Sofer → Acces interzis', async () => {
+    setUser(fixtures.sofer);
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningKindList', arguments: [],
+    });
+    expect(res.body.result.ok).toBe(false);
+  });
+
+  test('earningKindList Admin → company_id-szűrt SELECT + builtin lista', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query.mockResolvedValueOnce(rows([
+      { id: 1, key: 'craciun', label_ro: 'Bonus de Crăciun', label_hu: 'Karácsonyi bónusz' },
+    ]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningKindList', arguments: [],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.items.length).toBe(1);
+    expect(res.body.result.items[0].key).toBe('craciun');
+    expect(Array.isArray(res.body.result.builtin)).toBe(true);
+    expect(res.body.result.builtin).toContain('bonus');
+
+    const sql = pool.query.mock.calls[0][0];
+    const params = pool.query.mock.calls[0][1];
+    expect(sql).toMatch(/FROM driver_earning_kinds/i);
+    expect(sql).toMatch(/WHERE company_id = \$1/i);
+    expect(params[0]).toBe(fixtures.admin.company_id);
+  });
+
+  test('earningKindCreate: érvénytelen key → hiba, nem INSERT-el', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningKindCreate',
+      arguments: [{ key: 'x', label_ro: 'Egy karakter' }], // <2 karakter → tiltva
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/Cheia/i);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  test('earningKindCreate: beépített key-t nem lehet felülírni', async () => {
+    setUser(fixtures.admin);
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningKindCreate',
+      arguments: [{ key: 'bonus', label_ro: 'Rossz label' }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/predefinit/i);
+  });
+
+  test('earningKindCreate: érvényes payload → INSERT ON CONFLICT UPSERT', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query.mockResolvedValueOnce(rows([{ id: 42 }]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningKindCreate',
+      arguments: [{ key: 'CRACIUN!', label_ro: 'Bonus de Crăciun', label_hu: 'Karácsonyi bónusz' }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.id).toBe(42);
+    expect(res.body.result.key).toBe('craciun');  // sanitize: lowercase + drop `!`
+    const sql = pool.query.mock.calls[0][0];
+    const params = pool.query.mock.calls[0][1];
+    expect(sql).toMatch(/INSERT INTO driver_earning_kinds/i);
+    expect(sql).toMatch(/ON CONFLICT/i);
+    expect(params[0]).toBe(fixtures.admin.company_id);
+    expect(params[1]).toBe('craciun');
+    expect(params[2]).toBe('Bonus de Crăciun');
+    expect(params[3]).toBe('Karácsonyi bónusz');
+  });
+
+  test('earningKindDelete: beépítettet nem lehet törölni', async () => {
+    setUser(fixtures.admin);
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningKindDelete', arguments: [{ key: 'bonus' }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/predefinit/i);
+  });
+
+  test('earningKindDelete: cross-tenant védelem — WHERE company_id + key', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 7 }] });
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningKindDelete', arguments: [{ key: 'craciun' }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    const sql = pool.query.mock.calls[0][0];
+    const params = pool.query.mock.calls[0][1];
+    expect(sql).toMatch(/DELETE FROM driver_earning_kinds/i);
+    expect(sql).toMatch(/company_id=\$1/i);
+    expect(params[0]).toBe(fixtures.admin.company_id);
+    expect(params[1]).toBe('craciun');
+  });
+
+  test('earningKindDelete: idegen key → 0 sor → hiba', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningKindDelete', arguments: [{ key: 'nemletezo' }],
+    });
+    expect(res.body.result.ok).toBe(false);
   });
 });
 
