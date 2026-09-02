@@ -3773,14 +3773,34 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   background:rgba(59,130,246,0.09);
 }
 #dcSheetModal .dc-sheet-picker{
-  display:flex; align-items:center; gap:8px; flex:1 1 auto; flex-wrap:wrap;
+  display:flex; flex-direction:column; gap:8px; flex:1 1 auto; min-width:0;
 }
-#dcSheetModal .dc-sheet-picker label{
+#dcSheetModal .dc-sheet-presets{
+  display:flex; gap:6px; flex-wrap:wrap;
+}
+#dcSheetModal .dc-sheet-presets .dc-preset{
+  padding:4px 10px; font-size:12px; min-height:30px;
+  border:1.5px solid rgba(148,163,184,0.35); border-radius:8px;
+  color:#334155; background:transparent;
+}
+.main-content[data-theme="dark"] #dcSheetModal .dc-sheet-presets .dc-preset{
+  color:#cbd5e1; border-color:rgba(148,163,184,0.45);
+}
+#dcSheetModal .dc-sheet-presets .dc-preset:hover{ background:rgba(59,130,246,0.08); }
+#dcSheetModal .dc-sheet-presets .dc-preset.active{
+  background:linear-gradient(135deg,#2563eb,#1e40af); color:#fff;
+  border-color:#1e40af; font-weight:700;
+  box-shadow:0 3px 10px rgba(37,99,235,0.28);
+}
+#dcSheetModal .dc-sheet-range{
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+}
+#dcSheetModal .dc-sheet-range label{
   font-size:12px; color:#475569; font-weight:600;
 }
-.main-content[data-theme="dark"] #dcSheetModal .dc-sheet-picker label{ color:#cbd5e1; }
-#dcSheetModal .dc-sheet-picker .select{
-  padding:6px 10px; min-height:36px; font-size:13px;
+.main-content[data-theme="dark"] #dcSheetModal .dc-sheet-range label{ color:#cbd5e1; }
+#dcSheetModal .dc-sheet-range .input{
+  padding:6px 10px; min-height:36px; font-size:13px; max-width:170px;
 }
 #dcSheetModal .dc-sheet-actions{
   display:flex; gap:8px; flex-wrap:wrap;

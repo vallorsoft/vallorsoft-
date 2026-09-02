@@ -147,6 +147,83 @@ describe('getMonthlySettlementSheet', () => {
     expect(res.body.result.company.stamp_data_uri).toBe(null);
   });
 
+  test('from+to elfogadva (tetszőleges időszak); a válasz period.from/to = bemenet', async () => {
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValueOnce(null);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ email: 'sofer@ceg.hu', nume: 'Peto', tel: null }]))
+      .mockResolvedValueOnce(rows([{ nev: 'CegKft' }]))
+      .mockResolvedValueOnce(rows([]))                 // company_branding
+      .mockResolvedValueOnce(rows([]))                 // earnings
+      .mockResolvedValueOnce(rows([]));                // payments
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getMonthlySettlementSheet',
+      arguments: [{ email: 'sofer@ceg.hu', from: '2026-01-01', to: '2026-12-31' }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.period.from).toBe('2026-01-01');
+    expect(res.body.result.period.to).toBe('2026-12-31');
+    // Éves időszak → nem egy naptári hónap, year/month NULL
+    expect(res.body.result.period.year).toBe(null);
+    expect(res.body.result.period.month).toBe(null);
+    // Az earnings query WHERE cégre szűrt + a from/to paraméterek
+    const eParams = pool.query.mock.calls[3][1];
+    expect(eParams[0]).toBe(fixtures.admin.company_id);
+    expect(eParams[2]).toBe('2026-01-01');
+    expect(eParams[3]).toBe('2026-12-31');
+  });
+
+  test('from+to pontos naptári hónap → year+month kitöltve', async () => {
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValueOnce(null);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ email: 'sofer@ceg.hu', nume: 'Peto', tel: null }]))
+      .mockResolvedValueOnce(rows([{ nev: 'CegKft' }]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getMonthlySettlementSheet',
+      arguments: [{ email: 'sofer@ceg.hu', from: '2026-08-01', to: '2026-08-31' }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.period.year).toBe(2026);
+    expect(res.body.result.period.month).toBe(8);
+  });
+
+  test('from > to → hiba', async () => {
+    setUser(fixtures.admin);
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getMonthlySettlementSheet',
+      arguments: [{ email: 'sofer@ceg.hu', from: '2026-12-31', to: '2026-01-01' }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/începu[tț]|sf[aâ]r[șs]it/i);
+  });
+
+  test('intervallum > 2 év → hiba', async () => {
+    setUser(fixtures.admin);
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getMonthlySettlementSheet',
+      arguments: [{ email: 'sofer@ceg.hu', from: '2020-01-01', to: '2026-01-01' }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/prea mare|max 2 ani/i);
+  });
+
+  test('érvénytelen ISO from → visszaesik year+month útra (ha az van), különben hiba', async () => {
+    setUser(fixtures.admin);
+    // Sem érvényes from+to, sem year+month → year/month validáció hibázik
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getMonthlySettlementSheet',
+      arguments: [{ email: 'sofer@ceg.hu', from: 'ma', to: 'holnap' }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/[Aa]n invalid/);
+  });
+
   test('február utolsó napja szökőév-tudatos (2024-02-29)', async () => {
     setUser(fixtures.admin);
     fetchBnrEurRon.mockResolvedValueOnce(null);

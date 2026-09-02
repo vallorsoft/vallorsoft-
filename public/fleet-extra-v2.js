@@ -1525,10 +1525,19 @@
       '<div class="modal glass dc-sheet-modal">'
       +   '<div class="dc-sheet-toolbar">'
       +     '<div class="dc-sheet-picker">'
-      +       '<label>' + t('fe.st.year') + '</label>'
-      +       '<select class="select" id="dcStYear" onchange="FleetExtra.dcSheetReload()"></select>'
-      +       '<label>' + t('fe.st.month') + '</label>'
-      +       '<select class="select" id="dcStMonth" onchange="FleetExtra.dcSheetReload()"></select>'
+      +       '<div class="dc-sheet-presets">'
+      +         '<button type="button" class="btn ghost dc-preset" data-preset="thisMonth" onclick="FleetExtra.dcSheetPreset(\'thisMonth\')">' + t('fe.st.pThisMonth') + '</button>'
+      +         '<button type="button" class="btn ghost dc-preset" data-preset="lastMonth" onclick="FleetExtra.dcSheetPreset(\'lastMonth\')">' + t('fe.st.pLastMonth') + '</button>'
+      +         '<button type="button" class="btn ghost dc-preset" data-preset="quarter"   onclick="FleetExtra.dcSheetPreset(\'quarter\')">'   + t('fe.st.pQuarter')   + '</button>'
+      +         '<button type="button" class="btn ghost dc-preset" data-preset="ytd"       onclick="FleetExtra.dcSheetPreset(\'ytd\')">'       + t('fe.st.pYtd')       + '</button>'
+      +         '<button type="button" class="btn ghost dc-preset" data-preset="year"      onclick="FleetExtra.dcSheetPreset(\'year\')">'      + t('fe.st.pYear')      + '</button>'
+      +       '</div>'
+      +       '<div class="dc-sheet-range">'
+      +         '<label>' + t('fe.st.from') + '</label>'
+      +         '<input class="input" type="date" id="dcStFrom" onchange="FleetExtra.dcSheetReload()">'
+      +         '<label>' + t('fe.st.to') + '</label>'
+      +         '<input class="input" type="date" id="dcStTo"   onchange="FleetExtra.dcSheetReload()">'
+      +       '</div>'
       +     '</div>'
       +     '<div class="dc-sheet-actions">'
       +       '<button class="btn ok" onclick="FleetExtra.dcSheetPrint()">🖨️ ' + t('fe.st.print') + '</button>'
@@ -1545,39 +1554,94 @@
     var m = document.getElementById('dcSheetModal');
     if (m) m.classList.remove('open');
   }
+  // ISO YYYY-MM-DD formázó UTC-alapon (a date input `value` mezője ilyet vár)
+  function _dcIsoDate(d) {
+    var y = d.getUTCFullYear(), m = d.getUTCMonth() + 1, day = d.getUTCDate();
+    return y + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+  }
+  // Preset → { from, to } (mai naphoz viszonyítva, mindig UTC-alapon)
+  function _dcPresetRange(key) {
+    var now = new Date();
+    var Y = now.getUTCFullYear(), M = now.getUTCMonth();
+    if (key === 'thisMonth') {
+      var f = new Date(Date.UTC(Y, M, 1));
+      var l = new Date(Date.UTC(Y, M + 1, 0));
+      return { from: _dcIsoDate(f), to: _dcIsoDate(l) };
+    }
+    if (key === 'lastMonth') {
+      var f2 = new Date(Date.UTC(Y, M - 1, 1));
+      var l2 = new Date(Date.UTC(Y, M, 0));
+      return { from: _dcIsoDate(f2), to: _dcIsoDate(l2) };
+    }
+    if (key === 'quarter') {
+      var qStart = Math.floor(M / 3) * 3;
+      var f3 = new Date(Date.UTC(Y, qStart, 1));
+      var l3 = new Date(Date.UTC(Y, qStart + 3, 0));
+      return { from: _dcIsoDate(f3), to: _dcIsoDate(l3) };
+    }
+    if (key === 'ytd') {
+      var f4 = new Date(Date.UTC(Y, 0, 1));
+      return { from: _dcIsoDate(f4), to: _dcIsoDate(now) };
+    }
+    if (key === 'year') {
+      // Az elmúlt 12 hónap (naptári év = jan.01–dec.31 helyett rolling 12M)
+      var f5 = new Date(Date.UTC(Y - 1, M + 1, 1));
+      var l5 = new Date(Date.UTC(Y, M + 1, 0));
+      return { from: _dcIsoDate(f5), to: _dcIsoDate(l5) };
+    }
+    return null;
+  }
+  function dcSheetPreset(key) {
+    var r = _dcPresetRange(key);
+    if (!r) return;
+    var fEl = document.getElementById('dcStFrom');
+    var tEl = document.getElementById('dcStTo');
+    if (fEl) fEl.value = r.from;
+    if (tEl) tEl.value = r.to;
+    // Aktív preset vizuális jelzés
+    var all = document.querySelectorAll('#dcSheetModal .dc-preset');
+    for (var i = 0; i < all.length; i++) all[i].classList.toggle('active', all[i].dataset.preset === key);
+    dcSheetReload();
+  }
   function dcOpenSettlement() {
     if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
     _dcEnsureSheetModal();
     var m = document.getElementById('dcSheetModal');
-    // Év + hónap select-ek feltöltése (alap: mai hónap)
-    var now = new Date();
-    var yEl = document.getElementById('dcStYear');
-    var mEl = document.getElementById('dcStMonth');
-    if (yEl && !yEl.dataset.filled) {
-      var years = [];
-      for (var y = now.getFullYear(); y >= now.getFullYear() - 4; y--) years.push(y);
-      yEl.innerHTML = years.map(function (y) { return '<option value="' + y + '">' + y + '</option>'; }).join('');
-      yEl.value = String(now.getFullYear());
-      yEl.dataset.filled = '1';
-    }
-    if (mEl && !mEl.dataset.filled) {
-      mEl.innerHTML = _MONTHS_RO.map(function (name, i) {
-        return '<option value="' + (i + 1) + '">' + (i + 1) + '. ' + name + '</option>';
-      }).join('');
-      mEl.value = String(now.getMonth() + 1);
-      mEl.dataset.filled = '1';
+    // Alapérték: e havi időszak (elmúlt "hónap" preset a leggyakoribb, de a
+    // MAI hónap jó default: a diszpécser gyakran menet közben nézi az aktuális
+    // állást). Csak egyszer előtöltjük — ha a felhasználó módosít, marad.
+    var fEl = document.getElementById('dcStFrom');
+    var tEl = document.getElementById('dcStTo');
+    if (fEl && !fEl.value) {
+      var r0 = _dcPresetRange('thisMonth');
+      fEl.value = r0.from;
+      if (tEl) tEl.value = r0.to;
+      var thisBtn = document.querySelector('#dcSheetModal .dc-preset[data-preset="thisMonth"]');
+      if (thisBtn) thisBtn.classList.add('active');
     }
     m.classList.add('open');
     dcSheetReload();
   }
   function dcSheetReload() {
     if (!_dcCurrent || !_dcCurrent.email) return;
-    var y = parseInt((document.getElementById('dcStYear') || {}).value, 10);
-    var mo = parseInt((document.getElementById('dcStMonth') || {}).value, 10);
+    var from = (document.getElementById('dcStFrom') || {}).value;
+    var to   = (document.getElementById('dcStTo')   || {}).value;
     var body = document.getElementById('dcSheetBody');
     if (!body) return;
+    if (!from || !to) { body.innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.st.pickPeriod') + '</div>'; return; }
+    // A kézi input módosítást a preset-jelzés kikapcsolja (ne látszódjon aktív preset,
+    // ami már nem igaz)
+    var all = document.querySelectorAll('#dcSheetModal .dc-preset.active');
+    // (a `dcSheetPreset` kezeli az aktiválást; itt csak a kézi módosításra reagálunk)
+    if (all.length && !all[0].dataset._justSet) {
+      for (var i = 0; i < all.length; i++) {
+        var p = all[i].dataset.preset;
+        var pr = _dcPresetRange(p);
+        if (!pr || pr.from !== from || pr.to !== to) all[i].classList.remove('active');
+      }
+    }
     body.innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
-    gas('getMonthlySettlementSheet', [{ email: _dcCurrent.email, year: y, month: mo }]).then(function (r) {
+    gas('getMonthlySettlementSheet', [{ email: _dcCurrent.email, from: from, to: to }]).then(function (r) {
       if (!r || !r.ok) { body.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">' + esc((r && r.err) || t('common.error')) + '</div>'; return; }
       _dcSheet = r;
       body.innerHTML = _dcRenderSheetHtml(r);
@@ -1588,7 +1652,11 @@
   // Table-alapú (e-mail-biztos), inline stílusokkal (a Gmail/Outlook is elviszi).
   function _dcRenderSheetHtml(r) {
     var d = r.driver, p = r.period, c = r.company, tot = r.totals || {};
-    var monthLbl = _dcMonthLabel(p.year, p.month);
+    // Az időszak-cimke: ha pontosan egy naptári hónap (a szerver kitölti a
+    // year+month-ot ilyenkor is), hónapnév-évet mutatunk; egyébként a napi
+    // formátumú intervallumot (`2026-01-01 → 2026-12-31`).
+    var isSingleMonth = (p.year && p.month);
+    var monthLbl = isSingleMonth ? _dcMonthLabel(p.year, p.month) : (d2(p.from) + ' → ' + d2(p.to));
     var lang = (window.I18N && window.I18N.getLang && window.I18N.getLang()) || 'ro';
 
     // Járandóság-sorok
@@ -1653,12 +1721,14 @@
       +       '<div style="font-size:20px;font-weight:800;color:#0f172a;letter-spacing:0.2px;">' + esc(c.nev || '') + '</div>'
       +       compAdresa + compMetaLine
       +     '</td>'
-      +     '<td style="vertical-align:middle;text-align:right;width:220px;">'
+      +     '<td style="vertical-align:middle;text-align:right;width:230px;">'
       +       '<div style="display:inline-block;padding:9px 16px;background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;border-radius:8px;font-weight:800;font-size:14px;letter-spacing:0.3px;">'
-      +         t('fe.st.title')
+      +         t(isSingleMonth ? 'fe.st.title' : 'fe.st.titleRange')
       +       '</div>'
       +       '<div style="font-size:13px;color:#0f172a;font-weight:700;margin-top:6px;">' + esc(monthLbl) + '</div>'
-      +       '<div style="font-size:11px;color:#6b7280;margin-top:2px;">' + t('fe.st.period') + ': ' + d2(p.from) + ' → ' + d2(p.to) + '</div>'
+      +       (isSingleMonth
+        ? '<div style="font-size:11px;color:#6b7280;margin-top:2px;">' + t('fe.st.period') + ': ' + d2(p.from) + ' → ' + d2(p.to) + '</div>'
+        : '')
       +     '</td>'
       +   '</tr>'
       + '</table>'
@@ -1838,6 +1908,7 @@
     dcOpenSettlement: dcOpenSettlement,
     dcSheetClose: dcSheetClose,
     dcSheetReload: dcSheetReload,
+    dcSheetPreset: dcSheetPreset,
     dcSheetPrint: dcSheetPrint,
     dcSheetEmail: dcSheetEmail,
     fcParse: fcParse, fcImport: fcImport,
