@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-09-02 — BNR árfolyam-lekérés robusztusabbá + Decont oficial: last-manual BNR fallback — PR #408
+
+**Gyökér:** felhasználói jelzés a Decont oficial modalon: „BNR árfolyam nem elérhető". Diagnózis: (a) a `services/bnr.js` régi implementációja raw `https.get` + `req.setTimeout` szemantikailag laza, User-Agent nélkül, szigorú regex; néhány WAF a minimális UA-t 403-mal blokkolja; és (b) a BNR néha `<Rate multiplier="1" currency="EUR">…` szintaxist ír, amit a régi `<Rate currency="EUR">…` regex nem talál el. (c) A modal sem tudta segíteni a felhasználót, ha a BNR végérvényesen elérhetetlen: minden nyitáskor vakon kellett beírnia a mai értéket.
+
+1. **Szerver — `services/bnr.js`** teljes újraírás: **`fetch` (Node 22 natív)** + `AbortController` + 10 mp timeout; valós böngésző-tudatos **User-Agent** + Accept-* headerek; **attribútum-tudatos regex** (két minta: attribútum-sorrend független, tetszőleges szóközök); **fallback endpoint** (`nbrfxrates.xml` elhal → `nbrfxrates10days.xml` próba); **7 napos last-known-good cache** (ha a BNR ideiglenesen 403-at/timeoutot ad, a legutóbbi ismert árfolyamot adjuk vissza a napló figyelmeztetésével — jobb egy pár napos érték, mint semmi); részletes logolás (HTTP status, első 200 char válasz-body a szótöréshez).
+2. **Új `_extractEurRate(xml)` export** egység-teszthez — 7 minta zöld (nyers, szóközös, `multiplier` elöl/hátul, USD-negatív, garbage, üres).
+3. **Kliens (`public/fleet-extra-v2.js`)** — a Decont oficial modalban: az utolsó, kézzel beírt BNR-érték elmentődik a `localStorage`-ba (`vs_dc_of_bnr_manual`); a következő nyitáskor, ha a szerver-BNR akkor sem elérhető, az érték előre kitöltve. BNR-forrás sorrend: kézi override (jelenlegi ülés) → szerver-BNR → last-manual. Új sárga jelző-sáv, ha a BNR a last-manual-ból jön (jelzi, hogy ellenőrizze/frissítse).
+4. **Diagnosztika** a fejlesztői környezetben: a BNR.ro HTTP 403-at ad valós böngésző User-Agentre is (a proxy-allowlist blokkolja itt, ami Fly.io-n nincs, de éles környezetben is előfordulhat WAF-változás/időszakos IP-block miatt). A last-known-good cache + kliens-oldali last-manual pontosan az ilyen alkalmi elérhetetlenséget hidalja át.
+5. Cache-bust `?v=20260902bnr` (admin.html + manager.html). **1060 Jest zöld**, nincs regresszió.
+
+---
+
 ## 2026-09-02 — Sofőr-elszámolás: új „📑 Decont oficial" (hivatalos elszámolás) dokumentum — PR #407
 
 **Kérés:** kiegészítő nyomtatható lap a meglévő „📄 Decont lunar" MELLETT — a jelenlegi felület/számítás/gomb/dokumentum/fizetési funkciók MIND változatlanok. Az új „Decont oficial" ugyanabból az adatból (diurna + bónusz + rakodás/kirakodás + vasárnapi indulás + egyéb + EUR + RON + BNR), plus szerkeszthető nettó havi alapbér, kiszámolja az „alapbéren felül fizetendő EUR" összeget.
