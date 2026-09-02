@@ -1887,6 +1887,24 @@
   var _dcOfBaseSal = null;    // aktuálisan szerkesztett nettó alapbér (RON)
   var _dcOfBnrOverride = null; // ha a felhasználó kézzel írja be a BNR-t
 
+  // Az utolsó kézi BNR-érték a böngészőben (per-cég) — ha a szerver BNR-t
+  // sosem tud lekérni (proxy/WAF-block/időszakos hiba), a felhasználó ne
+  // vakon írja be minden nyitáskor a mai árfolyamot; a legutóbbi általa
+  // beírt érték előre kitöltésre kerül.
+  function _dcOfLastManualBnr() {
+    try {
+      var v = localStorage.getItem('vs_dc_of_bnr_manual');
+      var n = v != null ? parseFloat(v) : NaN;
+      return (isFinite(n) && n > 0) ? n : null;
+    } catch (_e) { return null; }
+  }
+  function _dcOfSaveManualBnr(v) {
+    try {
+      var n = parseFloat(v);
+      if (isFinite(n) && n > 0) localStorage.setItem('vs_dc_of_bnr_manual', String(n));
+    } catch (_e) {}
+  }
+
   function _dcOfEnsureSheetModal() {
     if (document.getElementById('dcOfSheetModal')) return;
     var m = document.createElement('div');
@@ -1981,10 +1999,17 @@
     var monthLbl = isSingleMonth ? _dcMonthLabel(p.year, p.month) : (d2(p.from) + ' → ' + d2(p.to));
     var lang = (window.I18N && window.I18N.getLang && window.I18N.getLang()) || 'ro';
 
-    // A tényleges BNR: kézi override elsőbbség, különben szerver-oldali mai BNR
+    // A tényleges BNR: kézi override elsőbbség → szerver-oldali mai BNR →
+    // utolsó, a böngészőbe elmentett kézi érték (per-cég localStorage, ha a
+    // szerver-BNR végérvényesen elérhetetlen, pl. proxy/WAF-blokk élesen).
     var bnrSrv = tot.bnr_rate;
+    var bnrLastManual = _dcOfLastManualBnr();
     var bnr = (_dcOfBnrOverride != null && isFinite(_dcOfBnrOverride) && _dcOfBnrOverride > 0)
-      ? Number(_dcOfBnrOverride) : (bnrSrv != null ? Number(bnrSrv) : null);
+      ? Number(_dcOfBnrOverride)
+      : (bnrSrv != null ? Number(bnrSrv)
+        : (bnrLastManual != null ? bnrLastManual : null));
+    // Jelezzük, hogy honnan jön a BNR (a warn-sáv szövegéhez)
+    var bnrFromLastManual = (bnr != null && bnrSrv == null && _dcOfBnrOverride == null);
 
     var baseSal = (_dcOfBaseSal != null && isFinite(_dcOfBaseSal)) ? Number(_dcOfBaseSal) : 2700;
 
@@ -2044,7 +2069,9 @@
       +   '</div>'
       + (bnr == null
         ? '<div style="flex:1 1 100%;padding:8px 10px;background:#fee2e2;border:1.5px solid #fca5a5;border-radius:6px;font-size:12px;color:#7f1d1d;">' + t('fe.stof.bnrMissing') + '</div>'
-        : '')
+        : (bnrFromLastManual
+          ? '<div style="flex:1 1 100%;padding:6px 10px;background:#fef9c3;border:1px solid #fde047;border-radius:6px;font-size:11px;color:#78350f;">⚠️ Curs BNR de la ultima introducere manuală (' + n2(bnr, 4) + ') — actualizează-l dacă e nevoie.</div>'
+          : ''))
       +   '<div style="display:flex;gap:6px;align-items:center;">'
       +     '<label style="font-size:11px;color:#78350f;font-weight:700;">' + t('fe.stof.bnrEditLbl') + '</label>'
       +     '<input class="input" type="number" step="0.0001" min="0.1" max="20" id="dcOfBnrInput" value="' + (bnr != null ? esc(String(bnr)) : '') + '" style="width:110px;" oninput="FleetExtra.dcOfBnrChange(this.value)">'
@@ -2191,6 +2218,9 @@
   function dcOfBnrChange(val) {
     var n = parseFloat(val);
     _dcOfBnrOverride = (isFinite(n) && n > 0) ? n : null;
+    // A kézzel beírt érték elmentve localStorage-ba — a következő nyitáskor
+    // előre kitöltésre kerül, ha a szerver-BNR akkor sem elérhető.
+    if (_dcOfBnrOverride != null) _dcOfSaveManualBnr(_dcOfBnrOverride);
     // csak a body újrarendelése — a picker/toolbar érintetlen marad
     if (_dcOfSheet) {
       var body = document.getElementById('dcOfSheetBody');
