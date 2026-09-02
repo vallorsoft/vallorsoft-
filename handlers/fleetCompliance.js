@@ -915,6 +915,147 @@ handlers.getDriverBalance = async function (req, res, args) {
   }
 };
 
+// ═════════════════════════════════════════════════════════════
+//  Havi elszámolás-lap (settlement sheet) — PDF/nyomtatható +
+//  e-mail. Admin/Manager csak; company_id-szűrt; a driver sofőr
+//  a saját céghez kell tartozzon (cross-tenant védelem).
+//  Két RPC: adat-lekérés (kliens rendereli) + e-mail küldés.
+// ═════════════════════════════════════════════════════════════
+handlers.getMonthlySettlementSheet = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const a = _arg(args);
+    const email = String(a.email || '').trim().toLowerCase();
+    if (!email) return res.json({ result: { ok: false, err: 'Selecteaza un sofer!' } });
+
+    // Év + hónap validálás (1..12, 2000..2100)
+    const year  = parseInt(a.year, 10);
+    const month = parseInt(a.month, 10);
+    if (!Number.isFinite(year)  || year  < 2000 || year  > 2100) return res.json({ result: { ok: false, err: 'An invalid.' } });
+    if (!Number.isFinite(month) || month < 1    || month > 12  ) return res.json({ result: { ok: false, err: 'Lună invalidă.' } });
+
+    // Sofőr a saját céghez tartozik-e (cross-tenant védelem)
+    const ur = await pool.query(
+      'SELECT email, nume, tel FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2',
+      [email, cid]);
+    if (!ur.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
+    const driver = ur.rows[0];
+
+    // Időszak: az adott hónap első napja → utolsó napja
+    const pad = n => (n < 10 ? '0' : '') + n;
+    const from = year + '-' + pad(month) + '-01';
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const to = year + '-' + pad(month) + '-' + pad(lastDay);
+
+    // Cég adatai — fejlécbe (best-effort)
+    let company = { nev: '', cui: null, adresa: null, telefon: null, email_contact: null };
+    try {
+      const cR = await pool.query(
+        'SELECT nev, cui, adresa, telefon, email_contact FROM companies WHERE id=$1', [cid]);
+      if (cR.rows.length) company = Object.assign(company, cR.rows[0]);
+    } catch (_e) { /* opc. oszlopok — mindenképp legyen nev */ }
+
+    // Járandóság-sorok az időszakra
+    const eR = await pool.query(
+      `SELECT id, earning_date, kind, label, quantity, unit_amount, total_amount, currency, note
+         FROM driver_earnings
+        WHERE company_id=$1 AND LOWER(email_sofer)=$2
+          AND earning_date >= $3 AND earning_date <= $4
+        ORDER BY earning_date ASC, id ASC`,
+      [cid, email, from, to]);
+    // Kifizetés-sorok az időszakra
+    const pR = await pool.query(
+      `SELECT id, paid_at, method, amount, currency, bnr_rate, amount_ron, note
+         FROM driver_payments
+        WHERE company_id=$1 AND LOWER(email_sofer)=$2
+          AND paid_at >= $3 AND paid_at <= $4
+        ORDER BY paid_at ASC, id ASC`,
+      [cid, email, from, to]);
+
+    // Összegzés valuta szerint (a szerver-oldali igazságforrás)
+    const earned = { EUR: 0, RON: 0 };
+    for (const r of eR.rows) {
+      const c = _cur(r.currency);
+      earned[c] = (earned[c] || 0) + parseFloat(r.total_amount || 0);
+    }
+    const paid = { EUR: 0, RON: 0 };
+    for (const r of pR.rows) {
+      const c = _cur(r.currency);
+      paid[c] = (paid[c] || 0) + parseFloat(r.amount || 0);
+    }
+    // Mai BNR — a kombinált RON-egyenleg informatív számításához
+    let bnrRate = null;
+    try { bnrRate = await fetchBnrEurRon(); } catch (_e) { bnrRate = null; }
+    bnrRate = bnrRate != null ? _round4(bnrRate) : null;
+
+    const balEur = _round2((earned.EUR || 0) - (paid.EUR || 0));
+    const balRon = _round2((earned.RON || 0) - (paid.RON || 0));
+    const balRonAll = bnrRate != null ? _round2(balEur * bnrRate + balRon) : null;
+
+    return res.json({ result: {
+      ok: true,
+      driver: { email: driver.email, nume: driver.nume || driver.email, tel: driver.tel || null },
+      period: { year, month, from, to },
+      company,
+      earnings: eR.rows,
+      payments: pR.rows,
+      totals: {
+        earned: { eur: _round2(earned.EUR), ron: _round2(earned.RON), count: eR.rows.length },
+        paid:   { eur: _round2(paid.EUR),   ron: _round2(paid.RON),   count: pR.rows.length },
+        balance:{ eur: balEur, ron: balRon, ron_all: balRonAll },
+        bnr_rate: bnrRate,
+      },
+    } });
+  } catch (err) {
+    console.error('getMonthlySettlementSheet hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// E-mail küldés a KÖZÖS VallorSoft feladóról (a cég Brevo-konfigurációja
+// NEM kell — ez rendszer-értesítés). A HTML törzset a kliens építi a
+// getMonthlySettlementSheet válaszából (egy forrás, csak megjelenítés).
+handlers.sendSettlementSheetEmail = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const a = _arg(args);
+    const to = String(a.to || '').trim().toLowerCase();
+    const html = String(a.html || '');
+    const subject = String(a.subject || '').trim().slice(0, 200) || 'Decont lunar';
+
+    if (!/^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/.test(to)) {
+      return res.json({ result: { ok: false, err: 'Adresă e-mail invalidă.' } });
+    }
+    if (html.length < 20 || html.length > 200000) {
+      return res.json({ result: { ok: false, err: 'Corpul e-mailului lipsește sau este prea mare.' } });
+    }
+    // A címzett a saját céghez tartozó sofőr KELL hogy legyen (cross-tenant
+    // védelem — az admin nem küldhet külsős címre a rendszer feladójával).
+    const ur = await pool.query(
+      'SELECT 1 FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2', [to, cid]);
+    if (!ur.rows.length) {
+      return res.json({ result: { ok: false, err: 'Destinatarul nu este șofer al firmei.' } });
+    }
+
+    const email = require('../services/email');
+    const r = await email.sendClientEmail({
+      to,
+      subject,
+      html,
+      companyId: cid,
+      mailType: 'settlement',
+    });
+    if (!r || !r.ok) return res.json({ result: { ok: false, err: r && r.error ? r.error : 'Eroare la trimitere' } });
+    try { audit.fromReq(req, 'settlement.email', 'driver_settlement', 0, { to, subject }); } catch (_e) {}
+    return res.json({ result: { ok: true, messageId: r.messageId } });
+  } catch (err) {
+    console.error('sendSettlementSheetEmail hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 // ════════════════════════════════════════════════════════════
 //  4) ÜZEMANYAGKÁRTYA-IMPORT (OMV/MOL/DKV/Eurowag CSV)
 // ════════════════════════════════════════════════════════════

@@ -14,6 +14,20 @@
 
 ---
 
+## 2026-09-02 — Sofőr-elszámolás: 📄 havi elszámolás-lap (nyomtatható + PDF + e-mail)
+
+**Gyökér:** a decont felület már mutatja a járandóság + kifizetés + hátralék adatokat, de nem volt olyan **nyomtatható artefaktum**, amit a sofőr aláírhat (havi zárás), és nem lehetett egy kattintással e-mailben elküldeni neki. Kellett egy egy-oldalas cég-fejléces összesítő.
+
+1. **`handlers/fleetCompliance.js`** — 2 új RPC (Admin/Manager, cégre szűrt, cross-tenant védelem, audit):
+   - **`getMonthlySettlementSheet({email, year, month})`** — az adott sofőr adott hónapjához a fejléc (cég neve + CUI + cím + telefon), sofőr-adatok (név + email + tel), tételes járandóság-lista, tételes kifizetés-lista, összesítés valuta szerint + BNR-egyesített hátralék RON-ban. Év/hónap validáció (2000..2100 / 1..12), február szökőév-tudatos (2024-02-29 helyesen 29 nap).
+   - **`sendSettlementSheetEmail({to, subject, html})`** — a kliens által renderelt HTML-t elküldi a KÖZÖS VallorSoft feladóról (`services/email.sendClientEmail`). **Cross-tenant védelem:** a címzett csak a saját cég sofőrje lehet (a szerver `users WHERE company_id` ellenőrzést fut). Méret-korlát (20…200 000 char), EMAIL_RE-validáció.
+2. **UI (`public/fleet-extra-v2.js`)** — új **📄 Havi elszámolás** gomb a decont fejlécében (a régi "Print" helyett). Modal év/hónap-választóval → `getMonthlySettlementSheet` lekéri az adatokat → cég-fejléces táblázatos HTML-doc renderelődik (fehér lap, e-mail-biztos táblázat, inline stílusok). Két gomb: **🖨️ Imprimă/PDF** — új ablakban a doc-tartalom, `window.print()` → böngésző Nyomtatás → „Mentés PDF-be" adja a valódi PDF-et (nincs puppeteer/pdf-lib függőség). **✉️ Trimite pe e-mail** — a sofőr saját e-mail-címére alap-előtöltve, prompt-tal módosítható, majd a szerver a fenti védőháló mögött továbbküldi.
+3. **CSS** (`style.css`, `#dcSheetModal` scope): kompakt toolbar (év + hónap + akciók), scrollozható body, mindig-fehér doc-táblázat (nyomtatás-barát még sötét témán is), ≤640px teljes-képernyős. **i18n** 23 új kulcs (`fe.st.*`, RO-alap + HU).
+4. **Kártya-kompatibilitás:** az egyéni járandóság-típusok (PR #403) mind a preview-ban, mind a nyomtatott lapon a saját `label_ro`/`label_hu` cimkével jelennek meg (nem az ismeretlen key-jel).
+5. **Teszt** — új `tests/integration/settlement-sheet.test.js` (+11 eset: szerep-kapu, év/hónap-validáció, cross-tenant védelem, szökőév-limit, valuta-szerint összesítés + kombinált RON; e-mail: érvénytelen címzett, túl rövid html, cross-tenant védelem, sikeres küldés companyId+mailType='settlement', küldési hiba átadása). **1054 Jest zöld** (1043 → 1054, +11). Cache-bust `?v=20260902sheet`.
+
+---
+
 ## 2026-09-02 — Sofőr-elszámolás: sor-szintű 💰 kifizetés + egyéni járandóság-típusok (⚙️ kezelő)
 
 **Gyökér:** két hiány maradt a járandóság-listán: (a) nem lehetett egyetlen tétel összegével közvetlenül kifizetni (végig kellett menni a Részleges kifizetés modálon, kézzel átírva az összeget); (b) a járandóság-típus csak a 7 beépítettre volt szűkítve (bonus/diurna/per_diem/salary/premium/holiday/other) — a cégspecifikus tételeknek (pl. „Karácsonyi bónusz", „Hűség-bónusz", „Külföldi kiküldetés-átalány") nem volt saját típusa.
