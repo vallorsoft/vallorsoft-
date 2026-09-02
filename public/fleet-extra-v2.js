@@ -729,9 +729,14 @@
       out.innerHTML =
         panel('🆕 ' + esc(_dcCurrent.nume) + ' — ' + t('fe.dc.settleV2', 'elszámolás 2.0') + ' (' + d2(from) + ' → ' + d2(to) + ')',
           balHtml,
-          '<button class="btn primary" style="padding:6px 14px;font-size:12px;" '
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
+          + '<button class="btn primary" style="padding:6px 14px;font-size:12px;" '
           +   'onclick="FleetExtra.dcOpenSettlement()" title="' + t('fe.st.openTitle') + '">'
-          +   '📄 ' + t('fe.st.openBtn') + '</button>')
+          +   '📄 ' + t('fe.st.openBtn') + '</button>'
+          + '<button class="btn ok" style="padding:6px 14px;font-size:12px;" '
+          +   'onclick="FleetExtra.dcOpenOfficialSettlement()" title="' + t('fe.stof.openTitle') + '">'
+          +   '📑 ' + t('fe.stof.openBtn') + '</button>'
+          + '</div>')
         + earnFormHtml
         + listsHtml;
 
@@ -1868,6 +1873,398 @@
     });
   }
 
+  // ════════════════════════════════════════════════════════
+  //  📑 DECONT OFICIAL (hivatalos elszámolás)
+  //  Kiegészítő nyomtatható dokumentum a Decont lunar mellett.
+  //  A jelenlegi Decont lunar UI/számítás/gomb VÁLTOZATLAN marad.
+  //  Adatforrás: ugyanaz a `getMonthlySettlementSheet` (járandóság-
+  //  tételek + BNR + valuta-összegek), plus szerkeszthető nettó
+  //  havi alapbér (per sofőr, alap 2700 RON — `users.net_base_salary_ron`).
+  //  Számítás: total_ron = tot_eur × BNR + tot_ron;
+  //            above_base_eur = (total_ron − base_salary_ron) / BNR
+  // ════════════════════════════════════════════════════════
+  var _dcOfSheet = null;      // legutóbbi getMonthlySettlementSheet válasz
+  var _dcOfBaseSal = null;    // aktuálisan szerkesztett nettó alapbér (RON)
+  var _dcOfBnrOverride = null; // ha a felhasználó kézzel írja be a BNR-t
+
+  function _dcOfEnsureSheetModal() {
+    if (document.getElementById('dcOfSheetModal')) return;
+    var m = document.createElement('div');
+    m.id = 'dcOfSheetModal';
+    m.className = 'modal-back';
+    m.setAttribute('role', 'dialog');
+    m.innerHTML =
+      '<div class="modal glass dc-sheet-modal">'
+      +   '<div class="dc-sheet-toolbar">'
+      +     '<div class="dc-sheet-picker">'
+      +       '<div class="dc-sheet-presets">'
+      +         '<button type="button" class="btn ghost dc-of-preset" data-preset="thisMonth" onclick="FleetExtra.dcOfSheetPreset(\'thisMonth\')">' + t('fe.st.pThisMonth') + '</button>'
+      +         '<button type="button" class="btn ghost dc-of-preset" data-preset="lastMonth" onclick="FleetExtra.dcOfSheetPreset(\'lastMonth\')">' + t('fe.st.pLastMonth') + '</button>'
+      +         '<button type="button" class="btn ghost dc-of-preset" data-preset="quarter"   onclick="FleetExtra.dcOfSheetPreset(\'quarter\')">'   + t('fe.st.pQuarter')   + '</button>'
+      +         '<button type="button" class="btn ghost dc-of-preset" data-preset="ytd"       onclick="FleetExtra.dcOfSheetPreset(\'ytd\')">'       + t('fe.st.pYtd')       + '</button>'
+      +         '<button type="button" class="btn ghost dc-of-preset" data-preset="year"      onclick="FleetExtra.dcOfSheetPreset(\'year\')">'      + t('fe.st.pYear')      + '</button>'
+      +       '</div>'
+      +       '<div class="dc-sheet-range">'
+      +         '<label>' + t('fe.st.from') + '</label>'
+      +         '<input class="input" type="date" id="dcOfStFrom" onchange="FleetExtra.dcOfSheetReload()">'
+      +         '<label>' + t('fe.st.to') + '</label>'
+      +         '<input class="input" type="date" id="dcOfStTo"   onchange="FleetExtra.dcOfSheetReload()">'
+      +       '</div>'
+      +     '</div>'
+      +     '<div class="dc-sheet-actions">'
+      +       '<button class="btn ok" onclick="FleetExtra.dcOfSheetPrint()">🖨️ ' + t('fe.st.print') + '</button>'
+      +       '<button class="btn primary" onclick="FleetExtra.dcOfSheetEmail()">✉️ ' + t('fe.st.email') + '</button>'
+      +       '<button class="btn ghost" onclick="FleetExtra.dcOfSheetClose()">✕</button>'
+      +     '</div>'
+      +   '</div>'
+      +   '<div class="dc-sheet-body" id="dcOfSheetBody"></div>'
+      + '</div>';
+    m.addEventListener('click', function (ev) { if (ev.target === m) dcOfSheetClose(); });
+    document.body.appendChild(m);
+  }
+  function dcOfSheetClose() {
+    var m = document.getElementById('dcOfSheetModal');
+    if (m) m.classList.remove('open');
+  }
+  function dcOfSheetPreset(key) {
+    var r = _dcPresetRange(key);
+    if (!r) return;
+    var fEl = document.getElementById('dcOfStFrom');
+    var tEl = document.getElementById('dcOfStTo');
+    if (fEl) fEl.value = r.from;
+    if (tEl) tEl.value = r.to;
+    var all = document.querySelectorAll('#dcOfSheetModal .dc-of-preset');
+    for (var i = 0; i < all.length; i++) all[i].classList.toggle('active', all[i].dataset.preset === key);
+    dcOfSheetReload();
+  }
+  function dcOpenOfficialSettlement() {
+    if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    _dcOfEnsureSheetModal();
+    var m = document.getElementById('dcOfSheetModal');
+    var fEl = document.getElementById('dcOfStFrom');
+    var tEl = document.getElementById('dcOfStTo');
+    if (fEl && !fEl.value) {
+      var r0 = _dcPresetRange('thisMonth');
+      fEl.value = r0.from;
+      if (tEl) tEl.value = r0.to;
+      var thisBtn = document.querySelector('#dcOfSheetModal .dc-of-preset[data-preset="thisMonth"]');
+      if (thisBtn) thisBtn.classList.add('active');
+    }
+    _dcOfBnrOverride = null; // új nyitáskor a szerver-BNR-t használjuk alapból
+    m.classList.add('open');
+    dcOfSheetReload();
+  }
+  function dcOfSheetReload() {
+    if (!_dcCurrent || !_dcCurrent.email) return;
+    var from = (document.getElementById('dcOfStFrom') || {}).value;
+    var to   = (document.getElementById('dcOfStTo')   || {}).value;
+    var body = document.getElementById('dcOfSheetBody');
+    if (!body) return;
+    if (!from || !to) { body.innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.st.pickPeriod') + '</div>'; return; }
+    body.innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
+    gas('getMonthlySettlementSheet', [{ email: _dcCurrent.email, from: from, to: to }]).then(function (r) {
+      if (!r || !r.ok) { body.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">' + esc((r && r.err) || t('common.error')) + '</div>'; return; }
+      _dcOfSheet = r;
+      // Alapbér: szerver → default 2700 (soha nem hardcodolva a render-be)
+      var srvBase = r.driver && r.driver.net_base_salary_ron;
+      _dcOfBaseSal = (srvBase != null) ? Number(srvBase) : 2700;
+      body.innerHTML = _dcRenderOfficialHtml(r);
+    });
+  }
+
+  // A NYOMTATHATÓ HTML — nyomtatásba és e-mailbe is ugyanez megy.
+  // Ugyanazokat a fejléc-elemeket használja, mint a Decont lunar-lap
+  // (logó + cégadatok + doktípus-badge + elválasztó vonal + aláíró blokk).
+  function _dcRenderOfficialHtml(r) {
+    var d = r.driver, p = r.period, c = r.company, tot = r.totals || {};
+    var isSingleMonth = (p.year && p.month);
+    var monthLbl = isSingleMonth ? _dcMonthLabel(p.year, p.month) : (d2(p.from) + ' → ' + d2(p.to));
+    var lang = (window.I18N && window.I18N.getLang && window.I18N.getLang()) || 'ro';
+
+    // A tényleges BNR: kézi override elsőbbség, különben szerver-oldali mai BNR
+    var bnrSrv = tot.bnr_rate;
+    var bnr = (_dcOfBnrOverride != null && isFinite(_dcOfBnrOverride) && _dcOfBnrOverride > 0)
+      ? Number(_dcOfBnrOverride) : (bnrSrv != null ? Number(bnrSrv) : null);
+
+    var baseSal = (_dcOfBaseSal != null && isFinite(_dcOfBaseSal)) ? Number(_dcOfBaseSal) : 2700;
+
+    var totE = tot.earned || {};
+    var totEur = Number(totE.eur || 0);
+    var totRon = Number(totE.ron || 0);
+
+    // Számítás (csak ha BNR elérhető)
+    var totalMonthlyRon = (bnr != null) ? (totEur * bnr + totRon) : null;
+    var aboveBaseEur = (bnr != null && totalMonthlyRon != null && bnr > 0)
+      ? (totalMonthlyRon - baseSal) / bnr : null;
+
+    // Járandóság-tételes tábla — MINDEN diurna/bónusz/rakodás/etc.
+    var eRows = (r.earnings || []).map(function (it) {
+      var kindKey = it.kind || 'other';
+      var kindLbl;
+      if (_dcBuiltinKinds.indexOf(kindKey) >= 0) kindLbl = t('fe.de.kind.' + kindKey);
+      else {
+        var f = _dcCustomKinds.find(function (k) { return k.key === kindKey; });
+        kindLbl = f ? ((lang === 'hu' && f.label_hu) ? f.label_hu : (f.label_ro || kindKey)) : kindKey;
+      }
+      return '<tr>'
+        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + d2(it.earning_date) + '</td>'
+        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(kindLbl) + '</td>'
+        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(it.label || '—') + '</td>'
+        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
+        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">'
+        +   n2(it.total_amount, 2) + ' ' + esc(it.currency || 'RON') + '</td>'
+        + '</tr>';
+    }).join('') || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#6b7280;font-style:italic;">' + t('fe.de.empty') + '</td></tr>';
+
+    // Cég-fejléc (metasor + adresa)
+    var compMeta = [];
+    if (c.cui) compMeta.push('CUI: ' + esc(c.cui));
+    if (c.telefon) compMeta.push('Tel: ' + esc(c.telefon));
+    if (c.email_contact) compMeta.push(esc(c.email_contact));
+    var compMetaLine = compMeta.length ? '<div style="font-size:11px;color:#6b7280;margin-top:2px;">' + compMeta.join(' · ') + '</div>' : '';
+    var compAdresa = c.adresa ? '<div style="font-size:11px;color:#6b7280;">' + esc(c.adresa) + '</div>' : '';
+    var logoCell = c.logo_data_uri
+      ? '<td style="vertical-align:middle;width:96px;padding-right:16px;">'
+        + '<img src="' + esc(c.logo_data_uri) + '" alt="" '
+        +   'style="max-width:88px;max-height:80px;display:block;">'
+        + '</td>'
+      : '';
+
+    // Alapbér-szerkesztő sáv (csak képernyőn látszik, nyomtatásból kimarad)
+    var salaryEditor =
+      '<div class="dc-of-editor no-print" style="margin:0 0 14px;padding:10px 14px;background:#fef3c7;border:1.5px solid #fbbf24;border-radius:8px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;">'
+      +   '<div>'
+      +     '<div style="font-size:11px;color:#78350f;text-transform:uppercase;letter-spacing:0.4px;font-weight:700;">' + t('fe.stof.baseSalary') + '</div>'
+      +     '<div style="font-size:10px;color:#92400e;">' + t('fe.stof.baseSalaryHint') + '</div>'
+      +   '</div>'
+      +   '<div style="display:flex;gap:6px;align-items:center;">'
+      +     '<input class="input" type="number" step="0.01" min="0" max="100000" id="dcOfBaseSalInput" value="' + esc(String(baseSal)) + '" style="width:120px;">'
+      +     '<span style="font-weight:700;color:#78350f;">RON</span>'
+      +     '<button class="btn primary" style="padding:6px 12px;font-size:12px;" onclick="FleetExtra.dcOfSaveBase()">' + t('fe.stof.saveSalary') + '</button>'
+      +   '</div>'
+      + (bnr == null
+        ? '<div style="flex:1 1 100%;padding:8px 10px;background:#fee2e2;border:1.5px solid #fca5a5;border-radius:6px;font-size:12px;color:#7f1d1d;">' + t('fe.stof.bnrMissing') + '</div>'
+        : '')
+      +   '<div style="display:flex;gap:6px;align-items:center;">'
+      +     '<label style="font-size:11px;color:#78350f;font-weight:700;">' + t('fe.stof.bnrEditLbl') + '</label>'
+      +     '<input class="input" type="number" step="0.0001" min="0.1" max="20" id="dcOfBnrInput" value="' + (bnr != null ? esc(String(bnr)) : '') + '" style="width:110px;" oninput="FleetExtra.dcOfBnrChange(this.value)">'
+      +   '</div>'
+      + '</div>';
+
+    // Összegzés-blokk (a kiemelt zárósor)
+    var sumBlock =
+      '<div style="margin-top:18px;padding:14px 18px;border:2px solid #0f766e;border-radius:10px;background:#f0fdfa;">'
+      +   '<div style="font-size:13px;font-weight:700;color:#134e4a;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px;">'
+      +     '📊 ' + t('fe.stof.summary') + '</div>'
+      +   '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      +     '<tr>'
+      +       '<td style="padding:5px 0;">' + t('fe.stof.totalEur') + ':</td>'
+      +       '<td style="padding:5px 0;text-align:right;font-weight:700;">' + n2(totEur, 2) + ' EUR</td>'
+      +     '</tr>'
+      +     '<tr>'
+      +       '<td style="padding:5px 0;">' + t('fe.stof.totalRon') + ':</td>'
+      +       '<td style="padding:5px 0;text-align:right;font-weight:700;">' + n2(totRon, 2) + ' RON</td>'
+      +     '</tr>'
+      +     '<tr>'
+      +       '<td style="padding:5px 0;color:#475569;">' + t('fe.stof.bnrUsed') + ':</td>'
+      +       '<td style="padding:5px 0;text-align:right;font-weight:700;color:#475569;">'
+      +         (bnr != null ? ('1 EUR = ' + n2(bnr, 4) + ' RON') : '—')
+      +       '</td>'
+      +     '</tr>'
+      +   '</table>'
+      +   '<div style="margin-top:10px;padding-top:10px;border-top:1.5px dashed #14b8a6;">'
+      +     '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
+      +       '<tr>'
+      +         '<td style="padding:6px 0;font-weight:700;">' + t('fe.stof.totalMonthlyRon') + ':</td>'
+      +         '<td style="padding:6px 0;text-align:right;font-weight:800;color:#0f766e;font-size:16px;">'
+      +           (totalMonthlyRon != null ? n2(totalMonthlyRon, 2) + ' RON' : '—')
+      +         '</td>'
+      +       '</tr>'
+      +       '<tr>'
+      +         '<td style="padding:6px 0;">' + t('fe.stof.netBaseRon') + ':</td>'
+      +         '<td style="padding:6px 0;text-align:right;font-weight:700;">' + n2(baseSal, 2) + ' RON</td>'
+      +       '</tr>'
+      +       '<tr>'
+      +         '<td style="padding:8px 0;border-top:2px solid #0f766e;font-weight:800;font-size:15px;color:#7c2d12;">'
+      +           '⭐ ' + t('fe.stof.aboveBaseEur') + ':'
+      +         '</td>'
+      +         '<td style="padding:8px 0;border-top:2px solid #0f766e;text-align:right;font-weight:900;font-size:18px;color:#7c2d12;">'
+      +           (aboveBaseEur != null ? n2(aboveBaseEur, 2) + ' EUR' : '—')
+      +         '</td>'
+      +       '</tr>'
+      +     '</table>'
+      +   '</div>'
+      +   '<div style="margin-top:8px;font-size:10px;color:#475569;font-style:italic;">' + t('fe.stof.formulaHint') + '</div>'
+      + '</div>';
+
+    // KIEMELT ZÁRÓ BLOKK a doksi végén (nagybetűs)
+    var finalHighlight =
+      '<div style="margin-top:20px;padding:16px 20px;border:2.5px solid #7c2d12;border-radius:10px;background:#fff7ed;">'
+      +   '<div style="font-size:16px;font-weight:800;color:#7c2d12;line-height:1.9;">'
+      +     '<div>' + t('fe.stof.netBaseRon') + ': <span style="float:right;">' + n2(baseSal, 2) + ' RON</span></div>'
+      +     '<div>' + t('fe.stof.aboveBaseEur') + ': <span style="float:right;">' + (aboveBaseEur != null ? n2(aboveBaseEur, 2) + ' EUR' : '—') + '</span></div>'
+      +     '<div style="border-top:1.5px solid #7c2d12;padding-top:6px;margin-top:6px;">'
+      +       t('fe.stof.totalMonthlyRon') + ': <span style="float:right;">' + (totalMonthlyRon != null ? n2(totalMonthlyRon, 2) + ' RON' : '—') + '</span>'
+      +     '</div>'
+      +   '</div>'
+      + '</div>';
+
+    return '<div class="dc-sheet-doc dc-of-doc">'
+      // HIVATALOS FEJLÉC (ugyanaz a szerkezet, mint a Decont lunar-lapon)
+      + '<table style="width:100%;border-collapse:collapse;">'
+      +   '<tr>'
+      +     logoCell
+      +     '<td style="vertical-align:middle;">'
+      +       '<div style="font-size:20px;font-weight:800;color:#0f172a;letter-spacing:0.2px;">' + esc(c.nev || '') + '</div>'
+      +       compAdresa + compMetaLine
+      +     '</td>'
+      +     '<td style="vertical-align:middle;text-align:right;width:230px;">'
+      +       '<div style="display:inline-block;padding:9px 16px;background:linear-gradient(135deg,#0f766e,#134e4a);color:#fff;border-radius:8px;font-weight:800;font-size:14px;letter-spacing:0.3px;">'
+      +         t(isSingleMonth ? 'fe.stof.title' : 'fe.stof.titleRange')
+      +       '</div>'
+      +       '<div style="font-size:13px;color:#0f172a;font-weight:700;margin-top:6px;">' + esc(monthLbl) + '</div>'
+      +       (isSingleMonth
+        ? '<div style="font-size:11px;color:#6b7280;margin-top:2px;">' + t('fe.st.period') + ': ' + d2(p.from) + ' → ' + d2(p.to) + '</div>'
+        : '')
+      +     '</td>'
+      +   '</tr>'
+      + '</table>'
+      + '<div style="height:0;border-top:2px solid #0f172a;margin:12px 0 16px;"></div>'
+      // Sofőr adatok
+      + '<div style="padding:10px 14px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:8px;margin-bottom:14px;">'
+      +   '<div style="font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:0.4px;">' + t('fe.st.driver') + '</div>'
+      +   '<div style="font-size:15px;font-weight:700;color:#0f172a;">' + esc(d.nume) + '</div>'
+      +   '<div style="font-size:11px;color:#6b7280;">' + esc(d.email) + (d.tel ? ' · ' + esc(d.tel) : '') + '</div>'
+      + '</div>'
+      // Alapbér-szerkesztő (csak képernyőn, nyomtatásban NEM látszik)
+      + salaryEditor
+      // Tételes részletezés
+      + '<div style="font-size:14px;font-weight:700;color:#0f172a;margin:12px 0 6px;">📋 ' + t('fe.stof.detailsTitle') + ' (' + (r.earnings || []).length + ')</div>'
+      + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+      +   '<thead><tr style="background:#ccfbf1;color:#134e4a;">'
+      +     '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colDate') + '</th>'
+      +     '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colKind') + '</th>'
+      +     '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colLabel') + '</th>'
+      +     '<th style="padding:6px 8px;text-align:right;">' + t('fe.de.colCalc') + '</th>'
+      +     '<th style="padding:6px 8px;text-align:right;">' + t('fe.de.colTotal') + '</th>'
+      +   '</tr></thead>'
+      +   '<tbody>' + eRows + '</tbody>'
+      +   '<tfoot><tr style="background:#f1f5f9;font-weight:800;">'
+      +     '<td colspan="4" style="padding:8px;text-align:right;">' + t('fe.st.totalEarned') + ':</td>'
+      +     '<td style="padding:8px;text-align:right;">'
+      +       n2(totEur, 2) + ' EUR &nbsp; · &nbsp; ' + n2(totRon, 2) + ' RON'
+      +     '</td>'
+      +   '</tr></tfoot>'
+      + '</table>'
+      // Összegzés-blokk
+      + sumBlock
+      // Kiemelt záró blokk
+      + finalHighlight
+      // Aláíró blokk (ugyanaz, mint a Decont lunar-lapon)
+      + '<table style="width:100%;border-collapse:collapse;margin-top:36px;">'
+      +   '<tr>'
+      +     '<td style="width:50%;vertical-align:top;padding-right:16px;height:110px;">'
+      +       '<div style="height:70px;"></div>'
+      +       '<div style="border-top:1.5px solid #0f172a;padding-top:6px;font-size:11px;color:#475569;">' + t('fe.st.signDriver') + '</div>'
+      +       '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + esc(d.nume) + '</div>'
+      +     '</td>'
+      +     '<td style="width:50%;vertical-align:top;padding-left:16px;height:110px;position:relative;">'
+      +       (c.stamp_data_uri
+        ? '<div style="height:70px;text-align:center;">'
+          + '<img src="' + esc(c.stamp_data_uri) + '" alt="" '
+          + 'style="max-height:68px;max-width:120px;opacity:0.85;">'
+          + '</div>'
+        : '<div style="height:70px;"></div>')
+      +       '<div style="border-top:1.5px solid #0f172a;padding-top:6px;font-size:11px;color:#475569;">' + t('fe.st.signCompany') + '</div>'
+      +       '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + esc(c.nev || '') + '</div>'
+      +     '</td>'
+      +   '</tr>'
+      + '</table>'
+      // Lábléc
+      + '<div style="margin-top:24px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:10px;color:#94a3b8;text-align:center;">'
+      +   t('fe.stof.footNote') + ' · VallorSoft'
+      + '</div>'
+      + '</div>';
+  }
+
+  // Kézi BNR-változás: csak a helyi state-ben tároljuk, majd re-render.
+  function dcOfBnrChange(val) {
+    var n = parseFloat(val);
+    _dcOfBnrOverride = (isFinite(n) && n > 0) ? n : null;
+    // csak a body újrarendelése — a picker/toolbar érintetlen marad
+    if (_dcOfSheet) {
+      var body = document.getElementById('dcOfSheetBody');
+      if (body) body.innerHTML = _dcRenderOfficialHtml(_dcOfSheet);
+    }
+  }
+
+  // Alapbér-mentés (per sofőr, `users.net_base_salary_ron`).
+  // Best-effort: siker után újrarenderelünk, kudarcnál toast + state visszaáll.
+  function dcOfSaveBase() {
+    if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    var inp = document.getElementById('dcOfBaseSalInput');
+    if (!inp) return;
+    var v = parseFloat(inp.value);
+    if (!isFinite(v) || v < 0 || v > 100000) {
+      toast(t('fe.stof.baseSalary') + ' — invalid (0…100000)', 'err');
+      return;
+    }
+    gas('setDriverBaseSalary', [{ email: _dcCurrent.email, base_salary_ron: v }]).then(function (r) {
+      if (!r || !r.ok) { toast((r && r.err) || t('common.error'), 'err'); return; }
+      _dcOfBaseSal = (r.base_salary_ron != null) ? Number(r.base_salary_ron) : 2700;
+      // Frissítjük a driver-mezőt is a cache-elt válaszban, hogy újranyitáskor is ezt lássa
+      if (_dcOfSheet && _dcOfSheet.driver) _dcOfSheet.driver.net_base_salary_ron = _dcOfBaseSal;
+      toast(t('fe.stof.salarySaved'), 'ok');
+      var body = document.getElementById('dcOfSheetBody');
+      if (body && _dcOfSheet) body.innerHTML = _dcRenderOfficialHtml(_dcOfSheet);
+    });
+  }
+
+  function dcOfSheetPrint() {
+    if (!_dcOfSheet) { toast(t('fe.st.loadFirst'), 'err'); return; }
+    var doc = document.querySelector('#dcOfSheetBody .dc-of-doc');
+    if (!doc) { toast(t('fe.st.loadFirst'), 'err'); return; }
+    var w = window.open('', '_blank');
+    if (!w) { toast(t('fe.st.popupBlocked'), 'err'); return; }
+    var lang = (window.I18N && window.I18N.getLang && window.I18N.getLang()) || 'ro';
+    var title = t('fe.stof.title') + ' — ' + (_dcOfSheet.driver.nume || '') + ' — '
+      + (_dcOfSheet.period.year && _dcOfSheet.period.month
+        ? _dcMonthLabel(_dcOfSheet.period.year, _dcOfSheet.period.month)
+        : (_dcOfSheet.period.from + ' → ' + _dcOfSheet.period.to));
+    w.document.write(
+      '<!doctype html><html lang="' + lang + '"><head><meta charset="utf-8"><title>' + esc(title) + '</title>'
+      + '<style>body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#0f172a;background:#fff;}'
+      + '@page{size:A4;margin:14mm;}'
+      + '@media print{body{margin:0;} .no-print{display:none!important;}}'
+      + '.no-print{}'
+      + '</style></head><body>' + doc.outerHTML + '</body></html>'
+    );
+    w.document.close();
+    setTimeout(function () { try { w.focus(); w.print(); } catch (_e) {} }, 200);
+  }
+
+  function dcOfSheetEmail() {
+    if (!_dcOfSheet) { toast(t('fe.st.loadFirst'), 'err'); return; }
+    var doc = document.querySelector('#dcOfSheetBody .dc-of-doc');
+    if (!doc) { toast(t('fe.st.loadFirst'), 'err'); return; }
+    // Az alapbér-szerkesztő ne menjen ki e-mailben — kivágjuk a doc klónjából
+    var clone = doc.cloneNode(true);
+    var editors = clone.querySelectorAll('.no-print');
+    for (var i = 0; i < editors.length; i++) editors[i].parentNode.removeChild(editors[i]);
+    var toDefault = _dcOfSheet.driver.email || '';
+    var to = window.prompt(t('fe.st.emailPrompt'), toDefault);
+    if (!to) return;
+    to = String(to).trim().toLowerCase();
+    var perLbl = (_dcOfSheet.period.year && _dcOfSheet.period.month)
+      ? _dcMonthLabel(_dcOfSheet.period.year, _dcOfSheet.period.month)
+      : (_dcOfSheet.period.from + ' → ' + _dcOfSheet.period.to);
+    var subject = t('fe.stof.emailSubject') + ' · ' + perLbl + ' · ' + _dcOfSheet.driver.nume;
+    gas('sendSettlementSheetEmail', [{ to: to, subject: subject, html: clone.outerHTML }]).then(function (r) {
+      if (r && r.ok) toast(t('fe.st.emailSent'), 'ok');
+      else toast((r && r.err) || t('common.error'), 'err');
+    });
+  }
+
   // ── Publikus API ────────────────────────────────────────
   window.FleetExtra = {
     load: function (name) {
@@ -1911,6 +2308,15 @@
     dcSheetPreset: dcSheetPreset,
     dcSheetPrint: dcSheetPrint,
     dcSheetEmail: dcSheetEmail,
+    // Decont oficial (📑 hivatalos elszámolás — alapbéren felül fizetendő)
+    dcOpenOfficialSettlement: dcOpenOfficialSettlement,
+    dcOfSheetClose: dcOfSheetClose,
+    dcOfSheetReload: dcOfSheetReload,
+    dcOfSheetPreset: dcOfSheetPreset,
+    dcOfSheetPrint: dcOfSheetPrint,
+    dcOfSheetEmail: dcOfSheetEmail,
+    dcOfSaveBase: dcOfSaveBase,
+    dcOfBnrChange: dcOfBnrChange,
     fcParse: fcParse, fcImport: fcImport,
   };
 })();

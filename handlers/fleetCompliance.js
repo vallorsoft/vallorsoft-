@@ -968,11 +968,23 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
     }
 
     // Sofőr a saját céghez tartozik-e (cross-tenant védelem)
-    const ur = await pool.query(
-      'SELECT email, nume, tel FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2',
-      [email, cid]);
-    if (!ur.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
-    const driver = ur.rows[0];
+    // A `net_base_salary_ron` a „Decont oficial" alapbér-mezőjéhez (best-effort:
+    // ha a migráció még nem futott, `null` → az UI a 2700-as default-ot használja).
+    let driverRow;
+    try {
+      const ur = await pool.query(
+        'SELECT email, nume, tel, net_base_salary_ron FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2',
+        [email, cid]);
+      if (!ur.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
+      driverRow = ur.rows[0];
+    } catch (_e) {
+      const urFb = await pool.query(
+        'SELECT email, nume, tel FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2',
+        [email, cid]);
+      if (!urFb.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
+      driverRow = Object.assign({ net_base_salary_ron: null }, urFb.rows[0]);
+    }
+    const driver = driverRow;
 
     // Cég adatai — fejlécbe (best-effort)
     let company = { nev: '', cui: null, adresa: null, telefon: null, email_contact: null };
@@ -1036,9 +1048,21 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
     const balRon = _round2((earned.RON || 0) - (paid.RON || 0));
     const balRonAll = bnrRate != null ? _round2(balEur * bnrRate + balRon) : null;
 
+    // Nettó alapbér RON — a „Decont oficial" alapbér-mezőjéhez. NULL →
+    // a kliens 2700 default-ot használ (visszafelé kompatibilis, ha a
+    // driver-net-base-salary migráció még nem futott le).
+    const baseSalaryRon = driver.net_base_salary_ron != null
+      ? _round2(parseFloat(driver.net_base_salary_ron))
+      : null;
+
     return res.json({ result: {
       ok: true,
-      driver: { email: driver.email, nume: driver.nume || driver.email, tel: driver.tel || null },
+      driver: {
+        email: driver.email,
+        nume: driver.nume || driver.email,
+        tel: driver.tel || null,
+        net_base_salary_ron: baseSalaryRon,
+      },
       period: { year, month, from, to },
       company,
       earnings: eR.rows,
@@ -1095,6 +1119,75 @@ handlers.sendSettlementSheetEmail = async function (req, res, args) {
     return res.json({ result: { ok: true, messageId: r.messageId } });
   } catch (err) {
     console.error('sendSettlementSheetEmail hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ────────────────────────────────────────────────────────────
+//  Sofőr nettó havi alapbér (RON) — a „Decont oficial" alapbér-mezőjéhez.
+//  Alapérték 2700 RON (a `driver-net-base-salary.sql` migrációban),
+//  cégenként/sofőrönként egyedileg állítható. A meglévő „Decont lunar"-t
+//  NEM érinti; kizárólag a hivatalos elszámolás számításához használatos.
+//  Admin/Manager csak; company_id-szűrt (cross-tenant védelem).
+// ────────────────────────────────────────────────────────────
+handlers.getDriverBaseSalary = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const a = _arg(args);
+    const email = String(a.email || '').trim().toLowerCase();
+    if (!email) return res.json({ result: { ok: false, err: 'Selecteaza un sofer!' } });
+    try {
+      const r = await pool.query(
+        'SELECT net_base_salary_ron FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2',
+        [email, cid]);
+      if (!r.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
+      const v = r.rows[0].net_base_salary_ron;
+      return res.json({ result: {
+        ok: true,
+        base_salary_ron: v != null ? _round2(parseFloat(v)) : null,
+        default_ron: 2700,
+      } });
+    } catch (_e) {
+      // Migráció még nem futott — a default-ot adjuk vissza
+      return res.json({ result: { ok: true, base_salary_ron: null, default_ron: 2700 } });
+    }
+  } catch (err) {
+    console.error('getDriverBaseSalary hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.setDriverBaseSalary = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const a = _arg(args);
+    const email = String(a.email || '').trim().toLowerCase();
+    if (!email) return res.json({ result: { ok: false, err: 'Selecteaza un sofer!' } });
+    const rawVal = a.base_salary_ron;
+    let val = null;
+    if (rawVal != null && rawVal !== '') {
+      const n = parseFloat(rawVal);
+      if (!Number.isFinite(n) || n < 0 || n > 100000) {
+        return res.json({ result: { ok: false, err: 'Salariu invalid (0…100000 RON).' } });
+      }
+      val = _round2(n);
+    }
+    const r = await pool.query(
+      `UPDATE users SET net_base_salary_ron = $1
+        WHERE LOWER(email)=LOWER($2) AND company_id=$3
+        RETURNING net_base_salary_ron`,
+      [val, email, cid]);
+    if (!r.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
+    try { audit.fromReq(req, 'driver_settlement.base_salary_set', 'user', 0, { email, value: val }); } catch (_e) {}
+    return res.json({ result: {
+      ok: true,
+      base_salary_ron: r.rows[0].net_base_salary_ron != null
+        ? _round2(parseFloat(r.rows[0].net_base_salary_ron)) : null,
+    } });
+  } catch (err) {
+    console.error('setDriverBaseSalary hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
