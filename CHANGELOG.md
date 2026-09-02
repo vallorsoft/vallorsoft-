@@ -14,6 +14,17 @@
 
 ---
 
+## 2026-09-02 — Sofőr-elszámolás lap: hivatalos fejléc — cég logója + pecsétje + elválasztó vonal
+
+**Gyökér:** az előző körben (PR #404) elkészült havi elszámolás-lap tisztán szöveges volt — a cég logója és pecsétje NEM került rá, pedig a `company_branding` táblában mindkettőt tároljuk (PR #379 óta). Egy „hivatalos" dokumentumon a logó a fejlécben + a pecsét az aláíró blokkban alapelvárás.
+
+1. **`handlers/fleetCompliance.js` `getMonthlySettlementSheet`** — a válasz bővítve a cég `logo_data_uri` + `stamp_data_uri` mezőjével: a `company_branding.logo_base64/mime` + `stamp_base64/mime` alapján inline `data:` URI-ként. Best-effort try/catch — hiányos migráció / üres branding esetén `null` (a lap ilyenkor logó/pecsét nélkül, változatlanul renderelődik).
+2. **Frontend (`public/fleet-extra-v2.js`)** — új hivatalos fejléc: **BAL: cég logója** (max 88×80px) · **KÖZÉP: cég neve** nagyban + CUI/adresa/tel/e-mail alatta · **JOBB: kék gradiens dokumentum-badge** ("Fișă de decont lunar") + hónap-név + időszak. Alatta **2px sötét vonal** választja el a törzstől — hivatalos kinézet. Az aláíró blokkban a **cég-oldalon a pecsét ráégetve** (max 68×120px, 0.85 opacity) a signature-line FÖLÖTT — ha van feltöltve; ha nincs, üres tér marad, hogy nyomtatás után kézzel bepecsételhető legyen.
+3. **Adatátvitel:** a data URI-t inline használjuk mind a preview-ban, mind a nyomtató ablakban (`window.open`), mind az e-mail HTML-ben — nincs cross-origin függés, Outlook is látja (nem blokkolja külső képként).
+4. **Teszt** — `tests/integration/settlement-sheet.test.js`: a sikeres válasz-eset kibővítve a `company_branding` mock-kal + a válaszban ellenőrzött `logo_data_uri`/`stamp_data_uri` (`data:image/png;base64,AAAA` / `data:image/jpeg;base64,BBBB`); új eset a migráció-hiányra (a branding SELECT dob → `null` visszaadva, a válasz OK). **1055 Jest zöld** (1054 → 1055, +1 új). Cache-bust `?v=20260902sheet2`.
+
+---
+
 ## 2026-09-02 — Sofőr-elszámolás: 📄 havi elszámolás-lap (nyomtatható + PDF + e-mail)
 
 **Gyökér:** a decont felület már mutatja a járandóság + kifizetés + hátralék adatokat, de nem volt olyan **nyomtatható artefaktum**, amit a sofőr aláírhat (havi zárás), és nem lehetett egy kattintással e-mailben elküldeni neki. Kellett egy egy-oldalas cég-fejléces összesítő.

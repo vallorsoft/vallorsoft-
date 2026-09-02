@@ -956,6 +956,23 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
       if (cR.rows.length) company = Object.assign(company, cR.rows[0]);
     } catch (_e) { /* opc. oszlopok — mindenképp legyen nev */ }
 
+    // Cég branding — logó + pecsét inline data URI-ként (a print-ablak és az
+    // e-mail is így biztonságos: nincs cross-origin függés, Outlook is látja).
+    // Best-effort: hiányos migráció / üres branding esetén NULL marad.
+    let branding = { logo: null, stamp: null };
+    try {
+      const bR = await pool.query(
+        `SELECT logo_base64, logo_mime, stamp_base64, stamp_mime
+           FROM company_branding WHERE company_id=$1`, [cid]);
+      if (bR.rows.length) {
+        const b = bR.rows[0];
+        if (b.logo_base64)  branding.logo  = 'data:' + (b.logo_mime  || 'image/png') + ';base64,' + b.logo_base64;
+        if (b.stamp_base64) branding.stamp = 'data:' + (b.stamp_mime || 'image/png') + ';base64,' + b.stamp_base64;
+      }
+    } catch (_e) { /* company_branding tábla hiányozhat régi cégeknél */ }
+    company.logo_data_uri  = branding.logo;
+    company.stamp_data_uri = branding.stamp;
+
     // Járandóság-sorok az időszakra
     const eR = await pool.query(
       `SELECT id, earning_date, kind, label, quantity, unit_amount, total_amount, currency, note
