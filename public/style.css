@@ -3760,63 +3760,63 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 }
 
 /* ── Havi elszámolás-lap (settlement) modal ── */
-#dcSheetModal .dc-sheet-modal{
+#dcSheetModal .dc-sheet-modal, #dcOfSheetModal .dc-sheet-modal {
   width:min(880px,100%); max-height:94vh; overflow:hidden;
   display:flex; flex-direction:column; padding:0;
 }
-#dcSheetModal .dc-sheet-toolbar{
+#dcSheetModal .dc-sheet-toolbar, #dcOfSheetModal .dc-sheet-toolbar {
   display:flex; align-items:center; gap:12px; flex-wrap:wrap;
   padding:14px 18px; border-bottom:1.5px solid rgba(148,163,184,0.28);
   background:rgba(59,130,246,0.05);
 }
-.main-content[data-theme="dark"] #dcSheetModal .dc-sheet-toolbar{
+.main-content[data-theme="dark"] #dcSheetModal .dc-sheet-toolbar, .main-content[data-theme="dark"] #dcOfSheetModal .dc-sheet-toolbar {
   background:rgba(59,130,246,0.09);
 }
-#dcSheetModal .dc-sheet-picker{
+#dcSheetModal .dc-sheet-picker, #dcOfSheetModal .dc-sheet-picker {
   display:flex; flex-direction:column; gap:8px; flex:1 1 auto; min-width:0;
 }
-#dcSheetModal .dc-sheet-presets{
+#dcSheetModal .dc-sheet-presets, #dcOfSheetModal .dc-sheet-presets {
   display:flex; gap:6px; flex-wrap:wrap;
 }
-#dcSheetModal .dc-sheet-presets .dc-preset{
+#dcSheetModal .dc-sheet-presets .dc-preset, #dcOfSheetModal .dc-sheet-presets .dc-preset {
   padding:4px 10px; font-size:12px; min-height:30px;
   border:1.5px solid rgba(148,163,184,0.35); border-radius:8px;
   color:#334155; background:transparent;
 }
-.main-content[data-theme="dark"] #dcSheetModal .dc-sheet-presets .dc-preset{
+.main-content[data-theme="dark"] #dcSheetModal .dc-sheet-presets .dc-preset, .main-content[data-theme="dark"] #dcOfSheetModal .dc-sheet-presets .dc-preset {
   color:#cbd5e1; border-color:rgba(148,163,184,0.45);
 }
-#dcSheetModal .dc-sheet-presets .dc-preset:hover{ background:rgba(59,130,246,0.08); }
-#dcSheetModal .dc-sheet-presets .dc-preset.active{
+#dcSheetModal .dc-sheet-presets .dc-preset:hover, #dcOfSheetModal .dc-sheet-presets .dc-preset:hover { background:rgba(59,130,246,0.08); }
+#dcSheetModal .dc-sheet-presets .dc-preset.active, #dcOfSheetModal .dc-sheet-presets .dc-preset.active {
   background:linear-gradient(135deg,#2563eb,#1e40af); color:#fff;
   border-color:#1e40af; font-weight:700;
   box-shadow:0 3px 10px rgba(37,99,235,0.28);
 }
-#dcSheetModal .dc-sheet-range{
+#dcSheetModal .dc-sheet-range, #dcOfSheetModal .dc-sheet-range {
   display:flex; gap:8px; align-items:center; flex-wrap:wrap;
 }
-#dcSheetModal .dc-sheet-range label{
+#dcSheetModal .dc-sheet-range label, #dcOfSheetModal .dc-sheet-range label {
   font-size:12px; color:#475569; font-weight:600;
 }
-.main-content[data-theme="dark"] #dcSheetModal .dc-sheet-range label{ color:#cbd5e1; }
-#dcSheetModal .dc-sheet-range .input{
+.main-content[data-theme="dark"] #dcSheetModal .dc-sheet-range label, .main-content[data-theme="dark"] #dcOfSheetModal .dc-sheet-range label { color:#cbd5e1; }
+#dcSheetModal .dc-sheet-range .input, #dcOfSheetModal .dc-sheet-range .input {
   padding:6px 10px; min-height:36px; font-size:13px; max-width:170px;
 }
-#dcSheetModal .dc-sheet-actions{
+#dcSheetModal .dc-sheet-actions, #dcOfSheetModal .dc-sheet-actions {
   display:flex; gap:8px; flex-wrap:wrap;
 }
-#dcSheetModal .dc-sheet-actions .btn{
+#dcSheetModal .dc-sheet-actions .btn, #dcOfSheetModal .dc-sheet-actions .btn {
   padding:6px 14px; font-size:13px; min-height:36px;
 }
-#dcSheetModal .dc-sheet-body{
+#dcSheetModal .dc-sheet-body, #dcOfSheetModal .dc-sheet-body {
   flex:1 1 auto; overflow-y:auto; padding:22px;
   background:#f1f5f9;
 }
-.main-content[data-theme="dark"] #dcSheetModal .dc-sheet-body{
+.main-content[data-theme="dark"] #dcSheetModal .dc-sheet-body, .main-content[data-theme="dark"] #dcOfSheetModal .dc-sheet-body {
   background:#1e293b;
 }
 /* A doc-táblázat mindig FEHÉR (nyomtatás-barát), akár sötét témán is */
-#dcSheetModal .dc-sheet-doc{
+#dcSheetModal .dc-sheet-doc, #dcOfSheetModal .dc-sheet-doc {
   background:#fff; color:#0f172a;
   padding:28px 32px; border-radius:8px;
   box-shadow:0 4px 18px rgba(15,23,42,0.12);
@@ -3824,9 +3824,9 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   font-family:Arial,Helvetica,sans-serif;
 }
 @media (max-width:640px){
-  #dcSheetModal .dc-sheet-modal{ max-height:100vh; height:100vh; }
-  #dcSheetModal .dc-sheet-body{ padding:12px; }
-  #dcSheetModal .dc-sheet-doc{ padding:16px; }
+  #dcSheetModal .dc-sheet-modal, #dcOfSheetModal .dc-sheet-modal { max-height:100vh; height:100vh; }
+  #dcSheetModal .dc-sheet-body, #dcOfSheetModal .dc-sheet-body { padding:12px; }
+  #dcSheetModal .dc-sheet-doc, #dcOfSheetModal .dc-sheet-doc { padding:16px; }
 }
 
 /* Reszponzív finomhangolás */
