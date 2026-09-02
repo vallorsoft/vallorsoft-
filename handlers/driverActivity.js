@@ -551,4 +551,360 @@ handlers.getDriverActivity = async function (req, res, args) {
   }
 };
 
+// ────────────────────────────────────────────────────────────
+//  3) Jármű-lista + gyors KPI (áttekintő rács kártyáihoz)
+//     Jármű-oldali nézet a Sofőr-aktivitás menüben (👤/🚛 toggle).
+// ────────────────────────────────────────────────────────────
+handlers.getActivityVehicles = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const a = _arg(args);
+    const r = _defaultRange();
+    const from = a.from || r.from;
+    const to   = a.to   || r.to;
+
+    // Járművek a cégből — a `vehicles` táblából alap-mezők + kiosztott sofőr.
+    // Az opcionális `assigned_driver_email` migráció-tudatos (to_jsonb).
+    let vehicles = [];
+    try {
+      const vR = await pool.query(
+        `SELECT v.id, v.rendszam,
+                (to_jsonb(v) ->> 'marca')                  AS marca,
+                (to_jsonb(v) ->> 'tip')                    AS tip,
+                (to_jsonb(v) ->> 'assigned_driver_email')  AS assigned_driver_email,
+                (to_jsonb(v) ->> 'default_trailer_id')     AS default_trailer_id
+           FROM vehicles v
+          WHERE v.company_id = $1
+          ORDER BY v.rendszam`,
+        [cid]
+      );
+      vehicles = vR.rows;
+    } catch (e) {
+      console.error('getActivityVehicles vehicles hiba:', e.message);
+    }
+    if (!vehicles.length) return res.json({ result: { ok: true, items: [], from, to } });
+
+    // A jármű-hozzárendelt sofőr nevét feloldjuk a `users` táblából (cégre szűrt)
+    const assignedEmails = vehicles
+      .map((v) => v.assigned_driver_email)
+      .filter((e) => !!e)
+      .map((e) => e.toLowerCase());
+    let userMap = {};
+    if (assignedEmails.length) {
+      try {
+        const uR = await pool.query(
+          `SELECT LOWER(email) AS email, nume
+             FROM users
+            WHERE company_id = $1 AND LOWER(email) = ANY($2)`,
+          [cid, assignedEmails]
+        );
+        for (const u of uR.rows) userMap[u.email] = u.nume;
+      } catch (_e) {}
+    }
+
+    const plates = vehicles.map((v) => v.rendszam);
+
+    // Fuvar-darabszám + utolsó milestone rendszámonként
+    let orM = {};
+    try {
+      const orR = await pool.query(
+        `SELECT UPPER(REPLACE(rendszam_camion, ' ', '')) AS plate,
+                COUNT(*)::int AS order_count,
+                MAX(GREATEST(
+                  COALESCE((to_jsonb(o) ->> 'sosit_incarcare_at')::timestamptz, 'epoch'::timestamptz),
+                  COALESCE((to_jsonb(o) ->> 'incarcat_at')::timestamptz, 'epoch'::timestamptz),
+                  COALESCE((to_jsonb(o) ->> 'sosit_descarcare_at')::timestamptz, 'epoch'::timestamptz),
+                  COALESCE((to_jsonb(o) ->> 'descarcat_at')::timestamptz, 'epoch'::timestamptz)
+                )) AS last_ms_at
+           FROM orders o
+          WHERE o.company_id = $1
+            AND o.rendszam_camion IS NOT NULL
+            AND o.status <> 'Anulat'
+            AND COALESCE(o.data_incarcare, o.created_at::date) >= $2::date
+            AND COALESCE(o.data_incarcare, o.created_at::date) <= $3::date
+          GROUP BY 1`,
+        [cid, from, to]
+      );
+      for (const row of orR.rows) orM[row.plate] = row;
+    } catch (e) { console.warn('getActivityVehicles orders hiba:', e.message); }
+
+    // Menetlevél-darabszám + tankolt liter + km rendszámonként (vontatóra köti)
+    let wbM = {};
+    try {
+      const wbR = await pool.query(
+        `SELECT UPPER(REPLACE(numar_camion, ' ', '')) AS plate,
+                COUNT(*)::int AS waybill_count,
+                COALESCE(SUM(total_km), 0)::numeric AS km,
+                COALESCE(SUM(
+                  (SELECT COALESCE(SUM((a.elem->>'litru')::numeric), 0)
+                     FROM jsonb_array_elements(f.alimentari) a(elem))
+                ), 0)::numeric AS fuel_l,
+                MAX(COALESCE(erkezes_dt, indulas_dt, data_completare)) AS last_wb_at
+           FROM fuvarlevelek f
+          WHERE company_id = $1
+            AND numar_camion IS NOT NULL
+            AND COALESCE(erkezes_dt, indulas_dt, data_completare) >= $2::date
+            AND COALESCE(erkezes_dt, indulas_dt, data_completare) < ($3::date + 1)
+          GROUP BY 1`,
+        [cid, from, to]
+      );
+      for (const row of wbR.rows) wbM[row.plate] = row;
+    } catch (e) { console.warn('getActivityVehicles waybills hiba:', e.message); }
+
+    // Normalizált plate lookup (szóköz-mentes, nagybetűs)
+    const normPlate = (p) => String(p || '').toUpperCase().replace(/\s+/g, '');
+    function maxDate(a1, a2) {
+      const ds = [a1, a2].filter(Boolean).map((x) => new Date(x).getTime());
+      if (!ds.length) return null;
+      return new Date(Math.max.apply(null, ds)).toISOString();
+    }
+
+    const items = vehicles.map((v) => {
+      const np = normPlate(v.rendszam);
+      const o = orM[np] || {};
+      const w = wbM[np] || {};
+      const drvEmail = (v.assigned_driver_email || '').toLowerCase();
+      return {
+        rendszam: v.rendszam,
+        marca: v.marca || null,
+        tip: v.tip || null,
+        assigned_driver_email: v.assigned_driver_email || null,
+        assigned_driver_name: drvEmail && userMap[drvEmail] ? userMap[drvEmail] : null,
+        order_count: o.order_count || 0,
+        waybill_count: w.waybill_count || 0,
+        km: Number(w.km) || 0,
+        fuel_l: Number(w.fuel_l) || 0,
+        last_activity_at: maxDate(o.last_ms_at, w.last_wb_at),
+      };
+    });
+
+    return res.json({ result: { ok: true, items, from, to } });
+  } catch (err) {
+    console.error('getActivityVehicles hiba:', err && err.stack ? err.stack : err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ────────────────────────────────────────────────────────────
+//  4) Egy jármű aktivitás-idővonala (fuvar-milestone-ok + menetlevél
+//     tankolás/vásárlás + üzemanyagkártya-import + szerviz-események)
+// ────────────────────────────────────────────────────────────
+handlers.getVehicleActivity = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const a = _arg(args);
+    const rendszam = String(a.rendszam || '').trim();
+    if (!rendszam) return res.json({ result: { ok: false, err: 'Rendszam lipsă.' } });
+
+    // Cross-tenant védelem: a jármű a saját céghez tartozik-e
+    let vehicle = null;
+    try {
+      const vR = await pool.query(
+        `SELECT v.id, v.rendszam,
+                (to_jsonb(v) ->> 'marca')                 AS marca,
+                (to_jsonb(v) ->> 'tip')                   AS tip,
+                (to_jsonb(v) ->> 'an')                    AS an,
+                (to_jsonb(v) ->> 'assigned_driver_email') AS assigned_driver_email
+           FROM vehicles v
+          WHERE v.company_id = $1
+            AND UPPER(REPLACE(v.rendszam, ' ', '')) = UPPER(REPLACE($2, ' ', ''))
+          LIMIT 1`,
+        [cid, rendszam]
+      );
+      vehicle = vR.rows[0] || null;
+    } catch (e) { console.warn('getVehicleActivity vehicle hiba:', e.message); }
+    if (!vehicle) return res.json({ result: { ok: false, err: 'Vehicul negăsit.' } });
+
+    const r = _defaultRange();
+    const from = a.from || r.from;
+    const to   = a.to   || r.to;
+
+    const events = [];
+
+    // A) Fuvar-milestone-ok — a jármű rendszámára szűrve (vontató)
+    let orders = [];
+    try {
+      const oR = await pool.query(
+        `SELECT o.id, o.client, o.loc_incarcare, o.loc_descarcare,
+                o.data_incarcare, o.status,
+                o.email_sofer, o.nume_sofer,
+                (to_jsonb(o) ->> 'fuvar_no')            AS fuvar_no,
+                (to_jsonb(o) ->> 'sosit_incarcare_at')  AS sosit_incarcare_at,
+                (to_jsonb(o) ->> 'incarcat_at')         AS incarcat_at,
+                (to_jsonb(o) ->> 'sosit_descarcare_at') AS sosit_descarcare_at,
+                (to_jsonb(o) ->> 'descarcat_at')        AS descarcat_at
+           FROM orders o
+          WHERE o.company_id = $1
+            AND UPPER(REPLACE(o.rendszam_camion, ' ', '')) = UPPER(REPLACE($2, ' ', ''))
+            AND o.status <> 'Anulat'
+            AND COALESCE(o.data_incarcare, o.created_at::date) >= $3::date
+            AND COALESCE(o.data_incarcare, o.created_at::date) <= $4::date
+          ORDER BY COALESCE(o.data_incarcare, o.created_at::date) DESC, o.id DESC
+          LIMIT 200`,
+        [cid, rendszam, from, to]
+      );
+      orders = oR.rows;
+    } catch (e) { console.warn('getVehicleActivity orders hiba:', e.message); }
+
+    for (const o of orders) {
+      const label = (o.fuvar_no ? o.fuvar_no : o.id);
+      const sub = (o.loc_incarcare || '?') + ' → ' + (o.loc_descarcare || '?');
+      const drvSuffix = o.nume_sofer ? (' — 👤 ' + o.nume_sofer) : '';
+      if (o.sosit_incarcare_at) events.push({
+        at: o.sosit_incarcare_at, type: 'milestone', icon: '📍',
+        title: 'Megérkezett a felrakóhoz' + drvSuffix, subtitle: sub, order_label: label,
+      });
+      if (o.incarcat_at) events.push({
+        at: o.incarcat_at, type: 'milestone', icon: '📦',
+        title: 'Felrakva' + drvSuffix, subtitle: sub, order_label: label,
+      });
+      if (o.sosit_descarcare_at) events.push({
+        at: o.sosit_descarcare_at, type: 'milestone', icon: '📍',
+        title: 'Megérkezett a lerakóhoz' + drvSuffix, subtitle: sub, order_label: label,
+      });
+      if (o.descarcat_at) events.push({
+        at: o.descarcat_at, type: 'milestone', icon: '✅',
+        title: 'Leürítve' + drvSuffix, subtitle: sub, order_label: label,
+      });
+    }
+
+    // B) Menetlevél-tankolás + vásárlás sorok
+    let waybills = [];
+    try {
+      const wR = await pool.query(
+        `SELECT id, data_completare, nume_sofer, email_sofer,
+                total_km, alimentari, achizitii,
+                (to_jsonb(f) ->> 'erkezes_dt') AS erkezes_dt,
+                (to_jsonb(f) ->> 'indulas_dt') AS indulas_dt
+           FROM fuvarlevelek f
+          WHERE company_id = $1
+            AND UPPER(REPLACE(numar_camion, ' ', '')) = UPPER(REPLACE($2, ' ', ''))
+            AND COALESCE(erkezes_dt, indulas_dt, data_completare) >= $3::date
+            AND COALESCE(erkezes_dt, indulas_dt, data_completare) < ($4::date + 1)
+          ORDER BY data_completare DESC
+          LIMIT 200`,
+        [cid, rendszam, from, to]
+      );
+      waybills = wR.rows;
+    } catch (e) { console.warn('getVehicleActivity waybills hiba:', e.message); }
+
+    for (const w of waybills) {
+      const effAt = w.erkezes_dt || w.indulas_dt || w.data_completare;
+      const drvSuffix = w.nume_sofer ? (' — 👤 ' + w.nume_sofer) : '';
+      events.push({
+        at: effAt, type: 'waybill', icon: '📄',
+        title: 'Menetlevél' + drvSuffix,
+        subtitle: '#' + (w.id || '') + (w.total_km ? ' · ' + Number(w.total_km).toLocaleString('ro-RO') + ' km' : ''),
+      });
+      (Array.isArray(w.alimentari) ? w.alimentari : []).forEach((it) => {
+        const at = it && it.data ? (String(it.data).length <= 10 ? it.data + 'T12:00:00Z' : it.data) : effAt;
+        events.push({
+          at, type: 'fuel', icon: '⛽',
+          title: 'Tankolás (menetlevél)' + drvSuffix,
+          subtitle: (it.loc || '') + (it.litru ? ' · ' + it.litru + ' L' : '') +
+                    (it.suma ? ' · ' + it.suma + ' ' + (it.valuta || '') : ''),
+        });
+      });
+      (Array.isArray(w.achizitii) ? w.achizitii : []).forEach((it) => {
+        const at = it && it.data ? (String(it.data).length <= 10 ? it.data + 'T12:00:00Z' : it.data) : effAt;
+        events.push({
+          at, type: 'purchase', icon: '🛒',
+          title: 'Vásárlás (menetlevél)' + drvSuffix,
+          subtitle: (it.loc || '') + (it.produs ? ' · ' + it.produs : '') +
+                    (it.pret ? ' · ' + it.pret + ' ' + (it.valuta || '') : ''),
+        });
+      });
+    }
+
+    // C) Üzemanyagkártya-tranzakciók (fuel_card_transactions) — best-effort
+    try {
+      const fcR = await pool.query(
+        `SELECT tx_date, product, qty_l, amount_ron, source
+           FROM fuel_card_transactions
+          WHERE company_id = $1
+            AND UPPER(REPLACE(rendszam, ' ', '')) = UPPER(REPLACE($2, ' ', ''))
+            AND tx_date >= $3::date AND tx_date <= $4::date
+          ORDER BY tx_date DESC
+          LIMIT 200`,
+        [cid, rendszam, from, to]
+      );
+      for (const f of fcR.rows) {
+        events.push({
+          at: f.tx_date, type: 'fuel_card', icon: '💳',
+          title: 'Üzemanyagkártya — ' + (f.source || ''),
+          subtitle: (f.product || '') + (f.qty_l ? ' · ' + Number(f.qty_l) + ' L' : '') +
+                    (f.amount_ron ? ' · ' + Number(f.amount_ron).toLocaleString('ro-RO') + ' RON' : ''),
+        });
+      }
+    } catch (_e) {}
+
+    // D) Szerviz-események (vehicle_service_log)
+    try {
+      const svR = await pool.query(
+        `SELECT service_date, km, category, description, cost_ron
+           FROM vehicle_service_log
+          WHERE company_id = $1
+            AND vehicle_id = $2
+            AND service_date >= $3::date AND service_date <= $4::date
+          ORDER BY service_date DESC
+          LIMIT 100`,
+        [cid, vehicle.id, from, to]
+      );
+      for (const s of svR.rows) {
+        events.push({
+          at: s.service_date, type: 'service', icon: '🔧',
+          title: 'Szerviz — ' + (s.category || '?'),
+          subtitle: (s.description ? String(s.description).slice(0, 200) : '') +
+                    (s.km ? ' · ' + Number(s.km).toLocaleString('ro-RO') + ' km' : '') +
+                    (s.cost_ron ? ' · ' + Number(s.cost_ron).toLocaleString('ro-RO') + ' RON' : ''),
+        });
+      }
+    } catch (_e) {}
+
+    // Rendezés — legújabb elöl
+    events.sort((x, y) => {
+      const ta = x.at ? new Date(x.at).getTime() : 0;
+      const tb = y.at ? new Date(y.at).getTime() : 0;
+      return tb - ta;
+    });
+
+    const counts = { milestone: 0, waybill: 0, fuel: 0, purchase: 0, fuel_card: 0, service: 0 };
+    for (const ev of events) { if (counts[ev.type] != null) counts[ev.type]++; }
+
+    // Melyik sofőrök használták az adott jármű időszakát? (a listához + fejlécbe)
+    const driverMap = {};
+    for (const o of orders) {
+      const em = (o.email_sofer || '').toLowerCase();
+      if (em) driverMap[em] = o.nume_sofer || em;
+    }
+    for (const w of waybills) {
+      const em = (w.email_sofer || '').toLowerCase();
+      if (em && !driverMap[em]) driverMap[em] = w.nume_sofer || em;
+    }
+    const usedDrivers = Object.keys(driverMap).map((em) => ({ email: em, nume: driverMap[em] }));
+
+    return res.json({ result: {
+      ok: true,
+      vehicle: {
+        rendszam: vehicle.rendszam,
+        marca: vehicle.marca, tip: vehicle.tip, an: vehicle.an,
+        assigned_driver_email: vehicle.assigned_driver_email,
+      },
+      orders: orders.map((o) => ({
+        id: o.id, fuvar_no: o.fuvar_no, client: o.client,
+        loc_incarcare: o.loc_incarcare, loc_descarcare: o.loc_descarcare,
+        data_incarcare: o.data_incarcare, status: o.status,
+        nume_sofer: o.nume_sofer,
+      })),
+      used_drivers: usedDrivers,
+      events, counts, from, to,
+    } });
+  } catch (err) {
+    console.error('getVehicleActivity hiba:', err && err.stack ? err.stack : err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 module.exports = handlers;
