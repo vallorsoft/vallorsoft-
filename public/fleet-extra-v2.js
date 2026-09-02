@@ -698,8 +698,10 @@
         + panel('💸 ' + t('fe.pm.listTitle') + ' (' + payItems.length + ')',  _dcPaymentListHtml(payItems))
         + '</div>';
 
+      // Vizuális marker: „🆕 v2" a fejlécben, hogy egyértelmű legyen a
+      // felhasználónak, hogy az új verziót látja (nem a cachelt régit).
       out.innerHTML =
-        panel('👤 ' + esc(_dcCurrent.nume) + ' — ' + d2(from) + ' → ' + d2(to),
+        panel('🆕 ' + esc(_dcCurrent.nume) + ' — ' + t('fe.dc.settleV2', 'elszámolás 2.0') + ' (' + d2(from) + ' → ' + d2(to) + ')',
           balHtml,
           '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="window.print()">'
             + t('fe.print') + '</button>')
