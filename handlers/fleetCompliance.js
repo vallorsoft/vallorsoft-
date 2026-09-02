@@ -929,11 +929,43 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
     const email = String(a.email || '').trim().toLowerCase();
     if (!email) return res.json({ result: { ok: false, err: 'Selecteaza un sofer!' } });
 
-    // Év + hónap validálás (1..12, 2000..2100)
-    const year  = parseInt(a.year, 10);
-    const month = parseInt(a.month, 10);
-    if (!Number.isFinite(year)  || year  < 2000 || year  > 2100) return res.json({ result: { ok: false, err: 'An invalid.' } });
-    if (!Number.isFinite(month) || month < 1    || month > 12  ) return res.json({ result: { ok: false, err: 'Lună invalidă.' } });
+    // Időszak: két elfogadott formátum, visszafelé kompatibilisen —
+    //   (a) from+to (YYYY-MM-DD) — TETSZŐLEGES időszak, max 2 év
+    //   (b) year+month — az adott hónap 1. és utolsó napja (legacy)
+    // Ha mindkettő megvan, a from+to nyer (a felhasználó explicit kérése).
+    const pad = n => (n < 10 ? '0' : '') + n;
+    const ISO = /^\d{4}-\d{2}-\d{2}$/;
+    let from, to, year = null, month = null;
+    if (typeof a.from === 'string' && typeof a.to === 'string' && ISO.test(a.from) && ISO.test(a.to)) {
+      from = a.from; to = a.to;
+      const dF = new Date(from + 'T00:00:00Z');
+      const dT = new Date(to   + 'T00:00:00Z');
+      if (isNaN(dF) || isNaN(dT)) return res.json({ result: { ok: false, err: 'Interval invalid.' } });
+      if (dF > dT) return res.json({ result: { ok: false, err: 'Data de început este după data de sfârșit.' } });
+      const daysDiff = Math.round((dT - dF) / 86400000);
+      if (daysDiff > 366 * 2)  return res.json({ result: { ok: false, err: 'Interval prea mare (max 2 ani).' } });
+      const yF = dF.getUTCFullYear();
+      if (yF < 2000 || yF > 2100) return res.json({ result: { ok: false, err: 'An invalid.' } });
+      // Ha az intervallum PONTOSAN egy naptári hónapot fed, kitöltjük year/month-ot
+      // (a fejléc hónapnév-badge használja).
+      if (dF.getUTCDate() === 1) {
+        const lastOfMonth = new Date(Date.UTC(dF.getUTCFullYear(), dF.getUTCMonth() + 1, 0));
+        if (dT.getUTCFullYear() === lastOfMonth.getUTCFullYear()
+            && dT.getUTCMonth() === lastOfMonth.getUTCMonth()
+            && dT.getUTCDate() === lastOfMonth.getUTCDate()) {
+          year  = dF.getUTCFullYear();
+          month = dF.getUTCMonth() + 1;
+        }
+      }
+    } else {
+      year  = parseInt(a.year, 10);
+      month = parseInt(a.month, 10);
+      if (!Number.isFinite(year)  || year  < 2000 || year  > 2100) return res.json({ result: { ok: false, err: 'An invalid.' } });
+      if (!Number.isFinite(month) || month < 1    || month > 12  ) return res.json({ result: { ok: false, err: 'Lună invalidă.' } });
+      from = year + '-' + pad(month) + '-01';
+      const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      to = year + '-' + pad(month) + '-' + pad(lastDay);
+    }
 
     // Sofőr a saját céghez tartozik-e (cross-tenant védelem)
     const ur = await pool.query(
@@ -941,12 +973,6 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
       [email, cid]);
     if (!ur.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
     const driver = ur.rows[0];
-
-    // Időszak: az adott hónap első napja → utolsó napja
-    const pad = n => (n < 10 ? '0' : '') + n;
-    const from = year + '-' + pad(month) + '-01';
-    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-    const to = year + '-' + pad(month) + '-' + pad(lastDay);
 
     // Cég adatai — fejlécbe (best-effort)
     let company = { nev: '', cui: null, adresa: null, telefon: null, email_contact: null };

@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-09-02 — Sofőr-elszámolás lap: tetszőleges időszak-választó (nem csak 1 hónap: negyedév / év / egyedi)
+
+**Gyökér:** a PR #405 lezárása után a lap MINDIG egyetlen naptári hónapra volt szűkítve — a diszpécser nem tudott negyedéves / féléves / éves / tetszőleges intervallumra nyomtatni. Kérés: `from/to` dátum-választó + preset-gombok.
+
+1. **`handlers/fleetCompliance.js` `getMonthlySettlementSheet`** — új input-forma: `from` + `to` (`YYYY-MM-DD`) elfogadva a régi `year` + `month` MELLETT. Validáció: mindkettő valid ISO, `from ≤ to`, max **2 év** intervallum (spam-védelem), `year >= 2000` (a `from` alapján). Ha az intervallum pontosan EGY naptári hónap, `period.year`/`period.month` is kitöltve — a fejléc-badge ilyenkor a hónapnév-évet mutatja, egyébként a napi intervallumot.
+2. **Kliens `public/fleet-extra-v2.js`** — a régi év + hónap `<select>` helyett új eszköztár: 5 preset-gomb (**E hó · Múlt hó · Negyedév · Év eleje óta · Utolsó 12 hó**) + két `<input type="date">` (from/to). A preset-gombok kék gradiens active-állapotúak; kézi input-módosítás automatikusan levág a preset-jelzésről. Az alap-állapot mindig az „E hó". A doc-fejléc-badge intelligensen vált: naptári hónap → „Fișă de decont lunar" + hónapnév-év; egyéb → „Fișă de decont" + `2026-01-01 → 2026-12-31`.
+3. **CSS** (`style.css`, `#dcSheetModal` scope): kompakt 2-soros toolbar (fent presetek, alul from/to + akciók), aktív preset kék gradiens + shadow, reszponzív a mobiltól asztalig.
+4. **i18n** — 10 új kulcs (`fe.st.titleRange`, `fe.st.from/to`, `fe.st.pickPeriod`, `fe.st.pThisMonth/pLastMonth/pQuarter/pYtd/pYear`, RO-alap + HU). A régi `fe.st.openBtn` cimke „Decont lunar" → **„Decont"** (magyar: „Elszámolás"), mert már nem szűkül hónapra.
+5. **Teszt** — `settlement-sheet.test.js` +5 új eset: `from+to` tetszőleges év fogadva; pontos naptári hónap → `year+month` kitöltve; `from > to` hiba; > 2 év hiba; érvénytelen ISO string → visszaesik year+month útra és annak validációja hibáz. **1060 Jest zöld** (1055 → 1060, +5). Cache-bust `?v=20260902range`.
+
+---
+
 ## 2026-09-02 — Sofőr-elszámolás lap: hivatalos fejléc — cég logója + pecsétje + elválasztó vonal
 
 **Gyökér:** az előző körben (PR #404) elkészült havi elszámolás-lap tisztán szöveges volt — a cég logója és pecsétje NEM került rá, pedig a `company_branding` táblában mindkettőt tároljuk (PR #379 óta). Egy „hivatalos" dokumentumon a logó a fejlécben + a pecsét az aláíró blokkban alapelvárás.
