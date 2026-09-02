@@ -563,6 +563,10 @@
   var _dcCurrent = null;   // az aktuálisan megnyitott sofőr {email,nume}
   var _dcBnr = null;       // legfrissebb BNR-árfolyam (informatív)
   var _dcBalance = null;   // getDriverBalance válasza (a kifizetés-modálhoz)
+  // Egyéni járandóság-típusok gyorsítótára: [{key, label_ro, label_hu}, ...]
+  // A `earningKindList` handler tölti (Admin/Manager), a beépített 7 mellé.
+  var _dcCustomKinds = [];
+  var _dcBuiltinKinds = ['bonus', 'diurna', 'per_diem', 'salary', 'premium', 'holiday', 'other'];
 
   function monthRange() {
     var now = new Date();
@@ -580,13 +584,34 @@
       }).join('');
   }
 
-  // Járandóság-típus katalógus + ikon (RO-alap, i18n cimkékkel)
+  // Járandóság-típus katalógus + ikon (RO-alap, i18n cimkékkel).
+  // A beépített 7 (bonus/diurna/per_diem/salary/premium/holiday/other) MELLÉ
+  // sorolja a cég saját egyéni típusait (`_dcCustomKinds` cache). A cache-t az
+  // `_dcLoadKinds()` tölti a `earningKindList` handlerből — a `loadDecont`-ban
+  // egyetlen fetch, utána szinkron a form renderelésénél.
   function _dcKindOptions(selectedKind) {
-    var kinds = ['bonus', 'diurna', 'per_diem', 'salary', 'premium', 'holiday', 'other'];
-    return kinds.map(function (k) {
+    var lang = (window.I18N && window.I18N.getLang && window.I18N.getLang()) || 'ro';
+    var builtin = _dcBuiltinKinds.map(function (k) {
       var sel = (selectedKind === k) ? ' selected' : '';
       return '<option value="' + k + '"' + sel + '>' + esc(t('fe.de.kind.' + k)) + '</option>';
     }).join('');
+    var custom = _dcCustomKinds.map(function (r) {
+      var sel = (selectedKind === r.key) ? ' selected' : '';
+      var label = (lang === 'hu' && r.label_hu) ? r.label_hu : (r.label_ro || r.key);
+      return '<option value="' + esc(r.key) + '"' + sel + '>' + esc(label) + '</option>';
+    }).join('');
+    return builtin + custom;
+  }
+
+  // Egyéni típusok betöltése (best-effort — DB-hiba/migráció-hiány esetén üres)
+  function _dcLoadKinds() {
+    return gas('earningKindList').then(function (r) {
+      if (r && r.ok && Array.isArray(r.items)) {
+        _dcCustomKinds = r.items;
+        if (Array.isArray(r.builtin) && r.builtin.length) _dcBuiltinKinds = r.builtin;
+      }
+      return _dcCustomKinds;
+    }).catch(function () { return _dcCustomKinds; });
   }
 
   function loadDecont() {
@@ -595,7 +620,8 @@
     box.innerHTML = '<div class="text-muted" style="padding:30px;text-align:center;">' + t('fe.loading') + '</div>';
     Promise.all([
       gas('getInternalDrivers'),
-      gas('getBnrRate').catch(function () { return null; })
+      gas('getBnrRate').catch(function () { return null; }),
+      _dcLoadKinds()                            // egyéni típusok előtöltése
     ]).then(function (rs) {
       _dcDrivers = Array.isArray(rs[0]) ? rs[0] : [];
       var bnr = rs[1] && rs[1].bnr_rate != null ? Number(rs[1].bnr_rate) : null;
@@ -778,8 +804,14 @@
     var body =
       '<div class="dc-earn-grid">'
       + '<div class="field" style="margin:0;"><label>' + t('fe.de.kindLbl') + '</label>'
-      +   '<select class="select" id="deKind" onchange="FleetExtra.dcEarnKindChange()">'
-      +   _dcKindOptions('bonus') + '</select></div>'
+      +   '<div class="dc-kind-row">'
+      +     '<select class="select" id="deKind" onchange="FleetExtra.dcEarnKindChange()">'
+      +     _dcKindOptions('bonus') + '</select>'
+      +     '<button type="button" class="btn ghost dc-kind-add" '
+      +       'onclick="FleetExtra.dcKindManage()" title="' + t('fe.dk.manageTitle') + '">'
+      +       '⚙️</button>'
+      +   '</div>'
+      + '</div>'
       + '<div class="field" style="margin:0;"><label>' + t('fe.de.labelLbl') + '</label>'
       +   '<input class="input" id="deLabel" placeholder="' + t('fe.de.labelPh') + '"></div>'
       + '<div class="field" style="margin:0;"><label>' + t('fe.de.dateLbl') + '</label>'
@@ -869,15 +901,31 @@
       return '<div class="text-muted" style="padding:14px;text-align:center;">' + t('fe.de.empty') + '</div>';
     }
     var rows = items.map(function (it) {
+      // Kind-cimke: egyéni típusnál a saját label_ro/hu, beépítettnél az i18n kulcs
+      var kindLabel;
+      var kindKey = it.kind || 'other';
+      if (_dcBuiltinKinds.indexOf(kindKey) >= 0) {
+        kindLabel = t('fe.de.kind.' + kindKey);
+      } else {
+        var found = _dcCustomKinds.find(function (r) { return r.key === kindKey; });
+        var lang = (window.I18N && window.I18N.getLang && window.I18N.getLang()) || 'ro';
+        kindLabel = found ? ((lang === 'hu' && found.label_hu) ? found.label_hu : (found.label_ro || kindKey)) : kindKey;
+      }
+      var pillClass = _dcBuiltinKinds.indexOf(kindKey) >= 0 ? kindKey : 'other';
+      var amount = Number(it.total_amount) || 0;
+      var cur = it.currency || 'RON';
       return '<tr>'
         + '<td>' + d2(it.earning_date) + '</td>'
-        + '<td><span class="dc-kind-pill dc-kind-' + esc(it.kind || 'other') + '">'
-        +   esc(t('fe.de.kind.' + (it.kind || 'other'))) + '</span></td>'
+        + '<td><span class="dc-kind-pill dc-kind-' + esc(pillClass) + '">'
+        +   esc(kindLabel) + '</span></td>'
         + '<td>' + esc(it.label || '—') + '</td>'
         + '<td style="text-align:right;">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
-        + '<td style="text-align:right;font-weight:700;">' + n2(it.total_amount, 2)
-        +   ' <span class="dc-tile-cur">' + esc(it.currency || 'RON') + '</span></td>'
-        + '<td style="text-align:right;">'
+        + '<td style="text-align:right;font-weight:700;">' + n2(amount, 2)
+        +   ' <span class="dc-tile-cur">' + esc(cur) + '</span></td>'
+        + '<td style="text-align:right;white-space:nowrap;">'
+        +   '<button class="btn ok" style="padding:3px 9px;font-size:12px;margin-right:4px;" '
+        +     'title="' + t('fe.pm.payRow') + '" '
+        +     'onclick="FleetExtra.dcPayRow(' + it.id + ',' + amount + ',\'' + esc(cur) + '\')">💰</button>'
         +   '<button class="btn danger" style="padding:3px 9px;font-size:12px;" '
         +     'onclick="FleetExtra.dcEarnDelete(' + it.id + ')">✕</button></td>'
         + '</tr>';
@@ -941,6 +989,157 @@
     gas('paymentDelete', [{ id: id }]).then(function (r) {
       if (r && r.ok) { toast(t('common.deleted'), 'ok'); dcLoad(); }
       else toast((r && r.err) || t('common.error'), 'err');
+    });
+  }
+
+  // ── Sor-szintű gyors kifizetés: a járandóság-tétel összegével + valutájával ──
+  // Ugyanazt a `dcOpenPayment` modált nyitjuk (partial módban), majd az összeg +
+  // valuta mezőt az adott tétel értékére állítjuk. A note-ba is előtöltjük a
+  // sor címkéjét, hogy vissza lehessen keresni, MELYIK járandóságra ment ki.
+  function dcPayRow(earningId, amount, currency) {
+    if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    if (!_dcBalance) { toast(t('fe.dc.loadFirst'), 'err'); return; }
+    dcOpenPayment('partial');
+    // A modal DOM-mezői ekkor már léteznek
+    setTimeout(function () {
+      var amt = document.getElementById('dcPayAmount');
+      var cur = document.getElementById('dcPayCur');
+      var note = document.getElementById('dcPayNote');
+      if (amt) { amt.value = String(amount); }
+      if (cur) { cur.value = currency || 'RON'; cur.dataset.userSet = '1'; }
+      if (note && !note.value) { note.value = t('fe.pm.rowNotePrefix') + ' #' + earningId; }
+      dcPayRecalc();
+    }, 0);
+  }
+
+  // ── Egyéni járandóság-típusok kezelője (modal: lista + új-form) ──
+  function _dcEnsureKindModal() {
+    if (document.getElementById('dcKindModal')) return;
+    var m = document.createElement('div');
+    m.id = 'dcKindModal';
+    m.className = 'modal-back';
+    m.setAttribute('role', 'dialog');
+    m.innerHTML =
+      '<div class="modal glass dc-kind-modal">'
+      +   '<div class="dc-pay-head">'
+      +     '<h3 class="text-primary" style="margin:0;font-size:18px;">⚙️ '
+      +       t('fe.dk.title') + '</h3>'
+      +     '<button class="btn ghost" style="padding:4px 10px;" '
+      +       'onclick="FleetExtra.dcKindClose()">✕</button>'
+      +   '</div>'
+      +   '<div id="dcKindBody"></div>'
+      + '</div>';
+    m.addEventListener('click', function (ev) { if (ev.target === m) dcKindClose(); });
+    document.body.appendChild(m);
+  }
+  function dcKindClose() {
+    var m = document.getElementById('dcKindModal');
+    if (m) m.classList.remove('open');
+  }
+  // Modal megnyitása — friss lista + új-forma
+  function dcKindManage() {
+    _dcEnsureKindModal();
+    _dcLoadKinds().then(_dcRenderKindModal);
+    var m = document.getElementById('dcKindModal');
+    if (m) m.classList.add('open');
+  }
+  function _dcRenderKindModal() {
+    var b = document.getElementById('dcKindBody');
+    if (!b) return;
+    var lang = (window.I18N && window.I18N.getLang && window.I18N.getLang()) || 'ro';
+    // Beépített 7 (törölhetetlen) — csak megjelenítés
+    var builtinRows = _dcBuiltinKinds.map(function (k) {
+      return '<tr>'
+        + '<td><span class="dc-kind-pill dc-kind-' + esc(k) + '">' + esc(t('fe.de.kind.' + k)) + '</span></td>'
+        + '<td class="text-muted" style="font-family:monospace;font-size:11px;">' + esc(k) + '</td>'
+        + '<td class="text-muted" style="font-size:11px;">' + t('fe.dk.builtin') + '</td>'
+        + '<td></td>'
+        + '</tr>';
+    }).join('');
+    // Egyéni — 🗑 gombbal törölhető
+    var customRows = _dcCustomKinds.length
+      ? _dcCustomKinds.map(function (r) {
+          var label = (lang === 'hu' && r.label_hu) ? r.label_hu : (r.label_ro || r.key);
+          return '<tr>'
+            + '<td><span class="dc-kind-pill dc-kind-other">' + esc(label) + '</span></td>'
+            + '<td class="text-muted" style="font-family:monospace;font-size:11px;">' + esc(r.key) + '</td>'
+            + '<td class="text-muted" style="font-size:11px;">' + t('fe.dk.custom') + '</td>'
+            + '<td style="text-align:right;">'
+            +   '<button class="btn danger" style="padding:3px 9px;font-size:12px;" '
+            +     'onclick="FleetExtra.dcKindDelete(\'' + esc(r.key) + '\')">🗑</button>'
+            + '</td></tr>';
+        }).join('')
+      : '<tr><td colspan="4" class="text-muted" style="text-align:center;padding:12px;">'
+        + t('fe.dk.noCustom') + '</td></tr>';
+
+    b.innerHTML =
+      '<div class="dc-kind-list-wrap">'
+      +   '<table class="table dc-kind-list">'
+      +     '<thead><tr>'
+      +       '<th>' + t('fe.dk.colLabel') + '</th>'
+      +       '<th>' + t('fe.dk.colKey') + '</th>'
+      +       '<th>' + t('fe.dk.colSource') + '</th>'
+      +       '<th></th>'
+      +     '</tr></thead>'
+      +     '<tbody>' + builtinRows + customRows + '</tbody>'
+      +   '</table>'
+      + '</div>'
+      + '<div class="dc-kind-add-form">'
+      +   '<h4 style="margin:14px 0 8px;font-size:14px;">' + t('fe.dk.addTitle') + '</h4>'
+      +   '<div class="dc-kind-add-grid">'
+      +     '<div class="field" style="margin:0;">'
+      +       '<label>' + t('fe.dk.keyLbl') + '</label>'
+      +       '<input class="input" id="dkKey" maxlength="30" placeholder="' + t('fe.dk.keyPh') + '">'
+      +     '</div>'
+      +     '<div class="field" style="margin:0;">'
+      +       '<label>' + t('fe.dk.labelRoLbl') + '</label>'
+      +       '<input class="input" id="dkLabelRo" maxlength="120" placeholder="' + t('fe.dk.labelRoPh') + '">'
+      +     '</div>'
+      +     '<div class="field" style="margin:0;">'
+      +       '<label>' + t('fe.dk.labelHuLbl') + '</label>'
+      +       '<input class="input" id="dkLabelHu" maxlength="120" placeholder="' + t('fe.dk.labelHuPh') + '">'
+      +     '</div>'
+      +     '<button class="btn ok" style="margin-top:22px;" onclick="FleetExtra.dcKindCreate()">💾 '
+      +       t('fe.dk.saveBtn') + '</button>'
+      +   '</div>'
+      +   '<p class="text-muted" style="font-size:11px;margin:8px 0 0;">' + t('fe.dk.hint') + '</p>'
+      + '</div>';
+  }
+  function dcKindCreate() {
+    var key = ((document.getElementById('dkKey') || {}).value || '').toLowerCase().trim();
+    var labelRo = ((document.getElementById('dkLabelRo') || {}).value || '').trim();
+    var labelHu = ((document.getElementById('dkLabelHu') || {}).value || '').trim();
+    if (key.length < 2) { toast(t('fe.dk.errKey'), 'err'); return; }
+    if (!labelRo) { toast(t('fe.dk.errRo'), 'err'); return; }
+    gas('earningKindCreate', [{ key: key, label_ro: labelRo, label_hu: labelHu }]).then(function (r) {
+      if (r && r.ok) {
+        toast(t('common.saved'), 'ok');
+        _dcLoadKinds().then(function () {
+          _dcRenderKindModal();
+          // A járandóság-form kind-selectjét is frissítjük az új típussal
+          var sel = document.getElementById('deKind');
+          if (sel) {
+            var prev = sel.value;
+            sel.innerHTML = _dcKindOptions(prev);
+          }
+        });
+      } else toast((r && r.err) || t('common.error'), 'err');
+    });
+  }
+  function dcKindDelete(key) {
+    if (!confirm(t('fe.dk.delConfirm'))) return;
+    gas('earningKindDelete', [{ key: key }]).then(function (r) {
+      if (r && r.ok) {
+        toast(t('common.deleted'), 'ok');
+        _dcLoadKinds().then(function () {
+          _dcRenderKindModal();
+          var sel = document.getElementById('deKind');
+          if (sel) {
+            var prev = sel.value;
+            sel.innerHTML = _dcKindOptions(prev === key ? 'bonus' : prev);
+          }
+        });
+      } else toast((r && r.err) || t('common.error'), 'err');
     });
   }
 
@@ -1326,6 +1525,12 @@
     dcPayRecalc: dcPayRecalc,
     dcPaySubmit: dcPaySubmit,
     dcPayDelete: dcPayDelete,
+    // Sor-szintű kifizetés (💰) + egyéni típus-kezelő (⚙️)
+    dcPayRow: dcPayRow,
+    dcKindManage: dcKindManage,
+    dcKindClose: dcKindClose,
+    dcKindCreate: dcKindCreate,
+    dcKindDelete: dcKindDelete,
     fcParse: fcParse, fcImport: fcImport,
   };
 })();

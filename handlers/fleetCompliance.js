@@ -587,8 +587,17 @@ handlers.earningCreate = async function (req, res, args) {
       'SELECT 1 FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2', [email, cid]);
     if (!ur.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
 
-    const kind = EARNING_KINDS.has(String(f.kind || '').toLowerCase())
-      ? String(f.kind).toLowerCase() : 'other';
+    // Kind fehérlista: a beépített 7 + a cég egyéni típusai
+    // (driver_earning_kinds tábla). A kliens-küldte kulcsot lowercase-eljük,
+    // és fehérlistázzuk a KETTŐBŐL egyesített halmaz alapján. Ismeretlen → 'other'.
+    let allowedKinds = new Set(EARNING_KINDS);
+    try {
+      const kR = await pool.query(
+        'SELECT key FROM driver_earning_kinds WHERE company_id = $1', [cid]);
+      for (const row of kR.rows) allowedKinds.add(String(row.key).toLowerCase());
+    } catch (_e) { /* migráció még nem futott — csak a beépítettek maradnak */ }
+    const kindRaw = String(f.kind || '').toLowerCase();
+    const kind = allowedKinds.has(kindRaw) ? kindRaw : 'other';
     const label = String(f.label || '').trim().slice(0, 120) || null;
     const currency = _cur(f.currency);
 
@@ -632,6 +641,95 @@ handlers.earningDelete = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('earningDelete hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ═════════════════════════════════════════════
+//  Járandóság-típusok (egyéni + beépített)
+// ═════════════════════════════════════════════
+// GET — a cég egyéni típusai + a 7 beépített
+handlers.earningKindList = async function (req, res) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    let items = [];
+    try {
+      const r = await pool.query(
+        `SELECT id, key, label_ro, label_hu, created_by, created_at
+           FROM driver_earning_kinds
+          WHERE company_id = $1
+          ORDER BY label_ro`,
+        [cid]
+      );
+      items = r.rows;
+    } catch (_e) { /* migráció még nem futott */ }
+    return res.json({ result: { ok: true, items,
+      builtin: Array.from(EARNING_KINDS) } });
+  } catch (err) {
+    console.error('earningKindList hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// POST — új egyéni típus (Admin/Manager, cégre szűrt)
+// A key kisbetűs slug (a-z0-9_-), max 30 char; nem ütközhet a beépített 7-tel.
+handlers.earningKindCreate = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const f = _arg(args);
+    const key = String(f.key || '').toLowerCase().replace(/[^a-z0-9_\-]/g, '').slice(0, 30);
+    if (!key || key.length < 2) return res.json({ result: { ok: false, err: 'Cheia (key) invalidă. Minim 2 caractere, doar a-z, 0-9, _ sau -.' } });
+    if (EARNING_KINDS.has(key)) return res.json({ result: { ok: false, err: 'Cheia coincide cu un tip predefinit.' } });
+    const labelRo = String(f.label_ro || '').trim().slice(0, 120);
+    const labelHu = String(f.label_hu || '').trim().slice(0, 120) || null;
+    if (!labelRo) return res.json({ result: { ok: false, err: 'Eticheta RO obligatorie.' } });
+    try {
+      const ins = await pool.query(
+        `INSERT INTO driver_earning_kinds
+           (company_id, key, label_ro, label_hu, created_by)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (company_id, key) DO UPDATE
+            SET label_ro = EXCLUDED.label_ro,
+                label_hu = EXCLUDED.label_hu
+         RETURNING id`,
+        [cid, key, labelRo, labelHu, req.session.user.email]
+      );
+      try { audit.fromReq(req, 'earning.kind.save', 'driver_earning_kinds', ins.rows[0].id,
+        { key, label_ro: labelRo }); } catch (_e) {}
+      return res.json({ result: { ok: true, id: ins.rows[0].id, key, label_ro: labelRo, label_hu: labelHu } });
+    } catch (dbErr) {
+      console.warn('earningKindCreate DB hiba:', dbErr.message);
+      return res.json({ result: { ok: false, err: 'Eroare la salvare (migrația poate lipsi).' } });
+    }
+  } catch (err) {
+    console.error('earningKindCreate hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+handlers.earningKindDelete = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const f = _arg(args);
+    const key = String(f.key || '').toLowerCase();
+    if (!key) return res.json({ result: { ok: false, err: 'Cheia lipsă.' } });
+    if (EARNING_KINDS.has(key)) return res.json({ result: { ok: false, err: 'Tipul predefinit nu poate fi șters.' } });
+    try {
+      const r = await pool.query(
+        'DELETE FROM driver_earning_kinds WHERE company_id=$1 AND key=$2 RETURNING id',
+        [req.session.user.company_id, key]
+      );
+      if (!r.rowCount) return res.json({ result: { ok: false, err: 'Nu a fost găsit.' } });
+      try { audit.fromReq(req, 'earning.kind.delete', 'driver_earning_kinds', r.rows[0].id, { key }); } catch (_e) {}
+      return res.json({ result: { ok: true } });
+    } catch (dbErr) {
+      console.warn('earningKindDelete DB hiba:', dbErr.message);
+      return res.json({ result: { ok: false, err: 'Eroare la ștergere' } });
+    }
+  } catch (err) {
+    console.error('earningKindDelete hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };

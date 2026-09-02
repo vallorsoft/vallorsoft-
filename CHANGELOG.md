@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-09-02 — Sofőr-elszámolás: sor-szintű 💰 kifizetés + egyéni járandóság-típusok (⚙️ kezelő)
+
+**Gyökér:** két hiány maradt a járandóság-listán: (a) nem lehetett egyetlen tétel összegével közvetlenül kifizetni (végig kellett menni a Részleges kifizetés modálon, kézzel átírva az összeget); (b) a járandóság-típus csak a 7 beépítettre volt szűkítve (bonus/diurna/per_diem/salary/premium/holiday/other) — a cégspecifikus tételeknek (pl. „Karácsonyi bónusz", „Hűség-bónusz", „Külföldi kiküldetés-átalány") nem volt saját típusa.
+
+1. **`db/driver-earning-kinds.sql`** (ÚJ, idempotens): `driver_earning_kinds` — cégenkénti egyéni típusok (`key` slug + `label_ro`/`label_hu` cimke; `UNIQUE (company_id, key)`). Multi-tenant, cascade a `companies`-re.
+2. **`handlers/fleetCompliance.js`** — 3 új RPC (Admin/Manager, cégre szűrt, audit): **`earningKindList`** (a cég egyéni típusai + a 7 beépített `builtin` tömb), **`earningKindCreate`** (kulcs-validáció `[a-z0-9_-]{2,30}`, beépített kulcs felülírása tiltva, ON CONFLICT UPDATE upsert-tel, RO-címke kötelező), **`earningKindDelete`** (WHERE `company_id`+`key` → cross-tenant védelem; beépített nem törölhető, a meglévő rekordok érintetlenek maradnak). Az **`earningCreate`** fehérlistája dinamikusan bővül a `driver_earning_kinds` cég-soraival; migráció-hiánynál csak a beépítettek maradnak (best-effort try/catch).
+3. **Kliens (`public/fleet-extra-v2.js`)**: (a) **sor-szintű 💰 kifizetés-gomb** a járandóság-lista minden során, az ✕ mellett — a `dcOpenPayment('partial')` modált nyitja + az adott tétel `amount` + `currency` értékére állítja az összeg-mezőt és a valutát, note-ba az érintett tétel-azonosítót (`dcPayRow`). (b) **⚙️ típus-kezelő gomb** a felvitel-form kind-selectje mellett → `dcKindManage()` modal: 7 beépített (törölhetetlen) + egyéni típusok táblázatban, alul „Új típus" form (kulcs + RO-cimke + HU-cimke). Az `_dcLoadKinds()` a `loadDecont` betöltésekor egyszer megy le → a form-render szinkron.
+4. **CSS** (`style.css`, `#decontBox` + `#dcKindModal` scope): kompakt `dc-kind-row` (select + ⚙️ gomb egy sorban), zöld gradiens `dc-list-table .btn.ok` (💰), modal-fejléc + reszponzív rács (`dc-kind-add-grid` ≤720px 1-oszlopos). **i18n** 26 új kulcs (`fe.pm.payRow`/`fe.pm.rowNotePrefix` + `fe.dk.*` RO-alap + HU).
+5. **Teszt** (`tests/integration/driver-earnings-payments.test.js` +10 új eset: `earningCreate` új `driver_earning_kinds` SELECT-tel a mock-láncban, egyéni kind elfogadás, migráció-hiány fallback, `earningKindList/Create/Delete` szerep-kapu + validáció + cross-tenant védelem). **1043 Jest zöld** (1033 → 1043). Cache-bust `?v=20260902kinds` (admin/manager: style.css + i18n.js + fleet-extra-v2.js).
+
+---
+
 ## 2026-09-01 — Fuvar-kezelés tábla mobilon MINDENKINEK kártyás (nem csak sofőr-módban)
 
 **Gyökér:** a Fuvar-kezelés (`orders-list`) táblázata mobilon (≤1024px) tovább ült a vízszintesen görgethető „Excel-nézetben" — az oszlopok szűken átcsúsztak egymáson, alig lehetett kiolvasni. A kártyás nézet MÁR MEG VOLT ÍRVA a CSS-ben, de `body.vs-dm` (sofőr-mód) scope-ba zárva → csak akkor élt, ha a felhasználó a 🚚 sofőr-mód kapcsolót aktiválta.
