@@ -1990,6 +1990,79 @@
     });
   }
 
+  // A summary + kiemelt záró blokk EGY külön HTML-forrásból; a
+  // `dcOfBnrChange`/`dcOfSaveBase` élőben újrarajzolja a `#dcOfSummaryBox`-ba
+  // (az input-ok érintetlenek maradnak — a fókusz megőrizve, folyamatos gépelés).
+  function _dcOfBuildSummaryHtml(r, baseSal, bnr) {
+    var tot = r.totals || {};
+    var totE = tot.earned || {};
+    var totEur = Number(totE.eur || 0);
+    var totRon = Number(totE.ron || 0);
+    var totalMonthlyRon = (bnr != null) ? (totEur * bnr + totRon) : null;
+    var aboveBaseEur = (bnr != null && totalMonthlyRon != null && bnr > 0)
+      ? (totalMonthlyRon - baseSal) / bnr : null;
+
+    // Összegzés-blokk
+    var sumBlock =
+      '<div style="margin-top:18px;padding:14px 18px;border:2px solid #0f766e;border-radius:10px;background:#f0fdfa;color:#0f172a;">'
+      +   '<div style="font-size:13px;font-weight:700;color:#134e4a;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px;">'
+      +     '📊 ' + t('fe.stof.summary') + '</div>'
+      +   '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      +     '<tr>'
+      +       '<td style="padding:5px 0;">' + t('fe.stof.totalEur') + ':</td>'
+      +       '<td style="padding:5px 0;text-align:right;font-weight:700;">' + n2(totEur, 2) + ' EUR</td>'
+      +     '</tr>'
+      +     '<tr>'
+      +       '<td style="padding:5px 0;">' + t('fe.stof.totalRon') + ':</td>'
+      +       '<td style="padding:5px 0;text-align:right;font-weight:700;">' + n2(totRon, 2) + ' RON</td>'
+      +     '</tr>'
+      +     '<tr>'
+      +       '<td style="padding:5px 0;color:#475569;">' + t('fe.stof.bnrUsed') + ':</td>'
+      +       '<td style="padding:5px 0;text-align:right;font-weight:700;color:#475569;">'
+      +         (bnr != null ? ('1 EUR = ' + n2(bnr, 4) + ' RON') : '—')
+      +       '</td>'
+      +     '</tr>'
+      +   '</table>'
+      +   '<div style="margin-top:10px;padding-top:10px;border-top:1.5px dashed #14b8a6;">'
+      +     '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
+      +       '<tr>'
+      +         '<td style="padding:6px 0;font-weight:700;">' + t('fe.stof.totalMonthlyRon') + ':</td>'
+      +         '<td style="padding:6px 0;text-align:right;font-weight:800;color:#0f766e;font-size:16px;">'
+      +           (totalMonthlyRon != null ? n2(totalMonthlyRon, 2) + ' RON' : '—')
+      +         '</td>'
+      +       '</tr>'
+      +       '<tr>'
+      +         '<td style="padding:6px 0;">' + t('fe.stof.netBaseRon') + ':</td>'
+      +         '<td style="padding:6px 0;text-align:right;font-weight:700;">' + n2(baseSal, 2) + ' RON</td>'
+      +       '</tr>'
+      +       '<tr>'
+      +         '<td style="padding:8px 0;border-top:2px solid #0f766e;font-weight:800;font-size:15px;color:#7c2d12;">'
+      +           '⭐ ' + t('fe.stof.aboveBaseEur') + ':'
+      +         '</td>'
+      +         '<td style="padding:8px 0;border-top:2px solid #0f766e;text-align:right;font-weight:900;font-size:18px;color:#7c2d12;">'
+      +           (aboveBaseEur != null ? n2(aboveBaseEur, 2) + ' EUR' : '—')
+      +         '</td>'
+      +       '</tr>'
+      +     '</table>'
+      +   '</div>'
+      +   '<div style="margin-top:8px;font-size:10px;color:#475569;font-style:italic;">' + t('fe.stof.formulaHint') + '</div>'
+      + '</div>';
+
+    // Kiemelt záró blokk
+    var finalHighlight =
+      '<div style="margin-top:20px;padding:16px 20px;border:2.5px solid #7c2d12;border-radius:10px;background:#fff7ed;color:#7c2d12;">'
+      +   '<div style="font-size:16px;font-weight:800;color:#7c2d12;line-height:1.9;">'
+      +     '<div>' + t('fe.stof.netBaseRon') + ': <span style="float:right;">' + n2(baseSal, 2) + ' RON</span></div>'
+      +     '<div>' + t('fe.stof.aboveBaseEur') + ': <span style="float:right;">' + (aboveBaseEur != null ? n2(aboveBaseEur, 2) + ' EUR' : '—') + '</span></div>'
+      +     '<div style="border-top:1.5px solid #7c2d12;padding-top:6px;margin-top:6px;">'
+      +       t('fe.stof.totalMonthlyRon') + ': <span style="float:right;">' + (totalMonthlyRon != null ? n2(totalMonthlyRon, 2) + ' RON' : '—') + '</span>'
+      +     '</div>'
+      +   '</div>'
+      + '</div>';
+
+    return sumBlock + finalHighlight;
+  }
+
   // A NYOMTATHATÓ HTML — nyomtatásba és e-mailbe is ugyanez megy.
   // Ugyanazokat a fejléc-elemeket használja, mint a Decont lunar-lap
   // (logó + cégadatok + doktípus-badge + elválasztó vonal + aláíró blokk).
@@ -2055,31 +2128,44 @@
         + '</td>'
       : '';
 
-    // Alapbér-szerkesztő sáv (csak képernyőn látszik, nyomtatásból kimarad)
+    // Alapbér- + BNR-szerkesztő sáv (csak képernyőn látszik, nyomtatásból kimarad).
+    // FONTOS: az input-ok explicit fehér-BG + sötét-szöveg stílust kapnak (nem
+    // `.input` osztályt), hogy a sötét téma se tudja kicsavarni; mustársárga
+    // (#fef3c7) + espresso (#78350f) mindig-fehér doc-háttéren, jól olvasható.
+    // A BNR `oninput` CSAK a summary-t frissíti — az input DOM-fókusza megmarad
+    // (előző körben az egész body-t újrarendereltük → minden karakter után
+    // elveszett a fókusz és „nem lehetett beírni"; ezt a `dcOfBnrChange`
+    // javította — itt az inputokat is fókusz-barátra hoztuk).
     var salaryEditor =
-      '<div class="dc-of-editor no-print" style="margin:0 0 14px;padding:10px 14px;background:#fef3c7;border:1.5px solid #fbbf24;border-radius:8px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;">'
-      +   '<div>'
-      +     '<div style="font-size:11px;color:#78350f;text-transform:uppercase;letter-spacing:0.4px;font-weight:700;">' + t('fe.stof.baseSalary') + '</div>'
+      '<div class="dc-of-editor no-print" style="margin:0 0 14px;padding:12px 14px;background:#fef3c7;border:2px solid #d97706;border-radius:10px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;color:#78350f;">'
+      +   '<div style="flex:0 0 auto;">'
+      +     '<div style="font-size:11px;color:#78350f;text-transform:uppercase;letter-spacing:0.5px;font-weight:800;">' + t('fe.stof.baseSalary') + '</div>'
       +     '<div style="font-size:10px;color:#92400e;">' + t('fe.stof.baseSalaryHint') + '</div>'
       +   '</div>'
-      +   '<div style="display:flex;gap:6px;align-items:center;">'
-      +     '<input class="input" type="number" step="0.01" min="0" max="100000" id="dcOfBaseSalInput" value="' + esc(String(baseSal)) + '" style="width:120px;">'
-      +     '<span style="font-weight:700;color:#78350f;">RON</span>'
-      +     '<button class="btn primary" style="padding:6px 12px;font-size:12px;" onclick="FleetExtra.dcOfSaveBase()">' + t('fe.stof.saveSalary') + '</button>'
+      +   '<div style="display:flex;gap:6px;align-items:center;flex:0 0 auto;">'
+      +     '<input type="number" step="0.01" min="0" max="100000" id="dcOfBaseSalInput" value="' + esc(String(baseSal)) + '" style="width:130px;padding:6px 10px;border:1.5px solid #d97706;border-radius:6px;background:#fff;color:#0f172a;font-size:14px;font-weight:700;">'
+      +     '<span style="font-weight:800;color:#78350f;font-size:13px;">RON</span>'
+      +     '<button type="button" class="btn primary" style="padding:6px 12px;font-size:12px;" onclick="FleetExtra.dcOfSaveBase()">' + t('fe.stof.saveSalary') + '</button>'
       +   '</div>'
       + (bnr == null
-        ? '<div style="flex:1 1 100%;padding:8px 10px;background:#fee2e2;border:1.5px solid #fca5a5;border-radius:6px;font-size:12px;color:#7f1d1d;">' + t('fe.stof.bnrMissing') + '</div>'
+        ? '<div style="flex:1 1 100%;padding:8px 10px;background:#fee2e2;border:1.5px solid #ef4444;border-radius:6px;font-size:12px;color:#7f1d1d;font-weight:600;">' + t('fe.stof.bnrMissing') + '</div>'
         : (bnrFromLastManual
-          ? '<div style="flex:1 1 100%;padding:6px 10px;background:#fef9c3;border:1px solid #fde047;border-radius:6px;font-size:11px;color:#78350f;">⚠️ Curs BNR de la ultima introducere manuală (' + n2(bnr, 4) + ') — actualizează-l dacă e nevoie.</div>'
+          ? '<div style="flex:1 1 100%;padding:7px 10px;background:#fef9c3;border:1.5px solid #ca8a04;border-radius:6px;font-size:11px;color:#713f12;font-weight:600;">⚠️ Curs BNR de la ultima introducere manuală (' + n2(bnr, 4) + ') — actualizează-l dacă e nevoie.</div>'
           : ''))
-      +   '<div style="display:flex;gap:6px;align-items:center;">'
-      +     '<label style="font-size:11px;color:#78350f;font-weight:700;">' + t('fe.stof.bnrEditLbl') + '</label>'
-      +     '<input class="input" type="number" step="0.0001" min="0.1" max="20" id="dcOfBnrInput" value="' + (bnr != null ? esc(String(bnr)) : '') + '" style="width:110px;" oninput="FleetExtra.dcOfBnrChange(this.value)">'
+      +   '<div style="display:flex;gap:6px;align-items:center;flex:0 0 auto;">'
+      +     '<label for="dcOfBnrInput" style="font-size:11px;color:#78350f;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;">' + t('fe.stof.bnrEditLbl') + '</label>'
+      +     '<input type="number" step="0.0001" min="0.1" max="20" id="dcOfBnrInput" placeholder="ex. 5.20" value="' + (bnr != null ? esc(String(bnr)) : '') + '" style="width:120px;padding:6px 10px;border:1.5px solid #d97706;border-radius:6px;background:#fff;color:#0f172a;font-size:14px;font-weight:700;" oninput="FleetExtra.dcOfBnrChange(this.value)">'
       +   '</div>'
       + '</div>';
 
-    // Összegzés-blokk (a kiemelt zárósor)
-    var sumBlock =
+    // Összegzés-blokk (a kiemelt zárósor) — külön változó, mert a
+    // `dcOfBnrChange`/`dcOfSaveBase` élőben újrarajzolja a `#dcOfSummaryBox`
+    // konténerbe (az editor-sáv és az input-ok érintetlenek maradnak).
+    var summaryHtml = _dcOfBuildSummaryHtml(r, baseSal, bnr);
+    // A régi inline `sumBlock` és `finalHighlight` innentől üres (a HTML a
+    // `summaryHtml` alatt egyben — `_dcOfBuildSummaryHtml`).
+    var sumBlock = '', finalHighlight = '';
+    var _unused_legacy_sumBlock =
       '<div style="margin-top:18px;padding:14px 18px;border:2px solid #0f766e;border-radius:10px;background:#f0fdfa;">'
       +   '<div style="font-size:13px;font-weight:700;color:#134e4a;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px;">'
       +     '📊 ' + t('fe.stof.summary') + '</div>'
@@ -2124,8 +2210,10 @@
       +   '<div style="margin-top:8px;font-size:10px;color:#475569;font-style:italic;">' + t('fe.stof.formulaHint') + '</div>'
       + '</div>';
 
-    // KIEMELT ZÁRÓ BLOKK a doksi végén (nagybetűs)
-    var finalHighlight =
+    // KIEMELT ZÁRÓ BLOKK — a régi inline verzió itt csak referencia (a valódi
+    // renderelést `_dcOfBuildSummaryHtml` végzi); a változó `_unused_*` névre
+    // átnevezve, hogy ne írja felül a fenti üres `finalHighlight`-ot.
+    var _unused_legacy_finalHighlight =
       '<div style="margin-top:20px;padding:16px 20px;border:2.5px solid #7c2d12;border-radius:10px;background:#fff7ed;">'
       +   '<div style="font-size:16px;font-weight:800;color:#7c2d12;line-height:1.9;">'
       +     '<div>' + t('fe.stof.netBaseRon') + ': <span style="float:right;">' + n2(baseSal, 2) + ' RON</span></div>'
@@ -2183,10 +2271,10 @@
       +     '</td>'
       +   '</tr></tfoot>'
       + '</table>'
-      // Összegzés-blokk
-      + sumBlock
-      // Kiemelt záró blokk
-      + finalHighlight
+      // Összegzés-blokk + Kiemelt záró blokk — dinamikusan cserélhető konténer;
+      // a `dcOfBnrChange`/`dcOfSaveBase` innen frissít, az editor-sáv érintetlen
+      // (megőrzött input DOM-fókusz → a felhasználó folyamatosan gépelhet).
+      + '<div id="dcOfSummaryBox">' + summaryHtml + '</div>'
       // Aláíró blokk (ugyanaz, mint a Decont lunar-lapon)
       + '<table style="width:100%;border-collapse:collapse;margin-top:36px;">'
       +   '<tr>'
@@ -2221,11 +2309,26 @@
     // A kézzel beírt érték elmentve localStorage-ba — a következő nyitáskor
     // előre kitöltésre kerül, ha a szerver-BNR akkor sem elérhető.
     if (_dcOfBnrOverride != null) _dcOfSaveManualBnr(_dcOfBnrOverride);
-    // csak a body újrarendelése — a picker/toolbar érintetlen marad
-    if (_dcOfSheet) {
-      var body = document.getElementById('dcOfSheetBody');
-      if (body) body.innerHTML = _dcRenderOfficialHtml(_dcOfSheet);
-    }
+    // CSAK a summary-blokk újrarajzolása — az editor-sáv és a BNR-input DOM-ja
+    // érintetlen marad → a fókusz megmarad és a felhasználó folyamatosan gépelhet
+    // (előző hiba: az egész body újrarenderelése minden karakter után elvette
+    // a fókuszt → „nem lehet beírni").
+    _dcOfRefreshSummary();
+  }
+
+  function _dcOfRefreshSummary() {
+    if (!_dcOfSheet) return;
+    var box = document.getElementById('dcOfSummaryBox');
+    if (!box) return;
+    var tot = _dcOfSheet.totals || {};
+    var bnrSrv = tot.bnr_rate;
+    var bnrLastManual = _dcOfLastManualBnr();
+    var bnr = (_dcOfBnrOverride != null && isFinite(_dcOfBnrOverride) && _dcOfBnrOverride > 0)
+      ? Number(_dcOfBnrOverride)
+      : (bnrSrv != null ? Number(bnrSrv)
+        : (bnrLastManual != null ? bnrLastManual : null));
+    var baseSal = (_dcOfBaseSal != null && isFinite(_dcOfBaseSal)) ? Number(_dcOfBaseSal) : 2700;
+    box.innerHTML = _dcOfBuildSummaryHtml(_dcOfSheet, baseSal, bnr);
   }
 
   // Alapbér-mentés (per sofőr, `users.net_base_salary_ron`).
@@ -2245,8 +2348,8 @@
       // Frissítjük a driver-mezőt is a cache-elt válaszban, hogy újranyitáskor is ezt lássa
       if (_dcOfSheet && _dcOfSheet.driver) _dcOfSheet.driver.net_base_salary_ron = _dcOfBaseSal;
       toast(t('fe.stof.salarySaved'), 'ok');
-      var body = document.getElementById('dcOfSheetBody');
-      if (body && _dcOfSheet) body.innerHTML = _dcRenderOfficialHtml(_dcOfSheet);
+      // Csak a summary-t rajzoljuk újra — az editor-sáv (és bármely fókuszos input) érintetlen
+      _dcOfRefreshSummary();
     });
   }
 
