@@ -14,6 +14,28 @@
 
 ---
 
+## 2026-09-03 — ÚJ MODUL: Költség-kalkulátor (Valorcalc-integráció Vallorsoftba)
+
+**Kérés:** „ellenorizd hogy a vallorsoftba az admin,manager oldalra egy fonenupontnak betudjuke rakni a teljes valorcalc ot ,onnan kezdve nm kellene kulon vallorcalc legyen egy lenne az egész" → „csinaljuk meg de igy hogy tudjon kulon beirasra is dolgozni plusz egy katintassal atalithato legyenn az altalam bevitt adatokbol dolgozasra es minden kalkulaciot levezetest fixen vegyel át".
+
+A külön futó **Vallorcalc Next.js-app** (`/home/user/vallorcalc/`) beolvasztva az admin+manager konzolba egyetlen új főmenüként — a kalkulátor a régi **kézi bevitellel** dolgozik, és **egyetlen kattintással átvált** „Vallorsoft-fuvar" módra: kiválasztasz egy fuvart → a rendszer az `orders`/`vehicles`/`users`/`toll_cost`/BNR-adatokból előtölt mindent (a mezők utána is szabadon felülírhatók). Az eredeti számítás/derivations FIXEN átvéve — a `lib/calc-engine.ts` bit-pontos JS-portja `lib/calcEngine.js`-ként él (18 új Jest zöld a bemenet–kimenet védelmére).
+
+1. **`lib/calcEngine.js`** (ÚJ, port) — a Vallorcalc `src/lib/calc-engine.ts` + `src/lib/vat.ts` szó szerinti JS-portja: VAT_RATE=0.21, prorateCost (km/idő-alap + intervallum-fallback), calculate (vontató+pótkocsi+sofőr+cég-költségek, üzemanyag per_liter/fixed, acciza+üzemanyag-kedvezmény, útdíj, freight-alapú profit), computeFreightRevenue. Új tesztek: `tests/unit/calcEngine.test.js` (+18 eset — az összes derivations regresszió-védett).
+
+2. **`db/valorcalc-init.sql`** (ÚJ, idempotens migráció) — 5 új tábla, mind `company_id`-vel: `vehicle_cost_items` (a meglévő `vehicles.id`-re kapcsol, vontató+pótkocsi közösen; km/idő-alap + intervallum + amount_lei + is_gross), `driver_cost_items` (a meglévő `users pozicio=Sofer`-re — éves összeg), `company_cost_items` (cégenkénti fix), `company_calc_settings` (annual_km_target/working_weeks/excisa/fuel-discount — a Vallorcalc SystemSettings singleton multi-tenant változata), `cost_calculations` (mentett kalkulációk → fuvarhoz linkelhető, `serial_no` YYYYMMDD-NNN, teljes result_json). **A Vallorcalc Truck/Trailer/Driver modellek NEM másolódnak be** — a Vallorsoft `vehicles`+`users` az igazságforrás (nem duplikálunk).
+
+3. **`handlers/costCalculator.js`** (ÚJ, `routes/execute.js`-be regisztrálva) — **18 új RPC**, mind Admin/Manager, `company_id`-szűrt, paraméteres SQL, audit-naplózott (`valorcalc.*` akciók), cross-tenant védelem (a hivatkozott jármű/sofőr/fuvar tulajdonjogát a szerver mindig ellenőrzi INSERT/UPDATE előtt): `vcalcVehicleCostList/Save/Delete`, `vcalcDriverCostList/Save/Delete`, `vcalcCompanyCostList/Save/Delete`, `vcalcSettingsGet/Save` (Save csak Admin), `vcalcPrefillFromOrder` (a KAPCSOLÓS „Vallorsoft-adatok" mód szíve — egyetlen RPC visszaadja a fuvarból + hozzárendelt járműből + BNR-ből az összes előtöltendő értéket), `vcalcCalculate` (az igazi kalkuláció + opcionális `save`), `vcalcCalcList/Get/Delete`, `vcalcOrderPicker`, `vcalcRefLists`.
+
+4. **`public/cost-calculator.js`** (ÚJ, ~800 sor) — 6 al-oldal (`vcalc-run` · `vcalc-saved` · `vcalc-vehicle-costs` · `vcalc-driver-costs` · `vcalc-company-costs` · `vcalc-settings`). A **Kalkuláció oldal** tetején radio-választó: `Manuális bevitel` (alap) VS `Vallorsoft-fuvar` — kapcsolásra megjelenik a fuvar-picker; kiválasztásra a `vcalcPrefillFromOrder` RPC-vel MINDEN mezőt előtölt (km, napok = data_incarcare→data_descarcare különbség, vontató+pótkocsi rendszám alapján `vehicles`-ből, sofőr `email_sofer` alapján, jármű fuel_per_100km, `toll_cost_eur`, aktív vontatók száma, BNR EUR/LEI a cég `eur_ron_rate`-ből → élő BNR-ből, freight-bevétel `orders.pret`). Bármi kézzel felülírható. `Kalkulálás` → nem-mentett előnézet; `Mentés` → serial_no + `cost_calculations` sor + audit.
+
+5. **Menü + panes** — `public/admin.html` + `public/manager.html`: új „📊 Költség-kalkulátor" main-menu csoport (Finance után, Ügyfelek előtt) 6 sub-tabbel, ikonos SVG-vel. 6 új pane (`data-pane="vcalc-*"`). `admin.js` + `manager.js` `loadTab` bekötés: `if (name.indexOf('vcalc-')===0) loadCostCalculator(name)`.
+
+6. **`public/feature-catalog.js`** — 6 új kulcs a „Költség-kalkulátor" csoportban (developer cégenként ki/be tudja kapcsolni). **`public/i18n.js`** — **~100 új `nav.vcalc*` + `vcalc.*` kulcs** (RO-alap + HU). Cache-bust `?v=20260903vcalc1` (admin.html + manager.html i18n + cost-calculator.js). **1080 Jest zöld** (1060 → 1080, +18 új calcEngine + 2 orthogonális). Nincs regresszió.
+
+**Nyeresége az integrációnak (a külön Vallorcalc-hoz képest):** a kalkulátor a valós fuvar-adatokból dolgozik (közös DB → nincs kettős bevitel); a Pénzügy/Statisztika oldalak megkaphatják a teljes költség-oldalt (értékcsökkenés + biztosítás + sofőr-bér arányos része); a multi-tenant + audit + GDPR + előfizetés-limit + i18n „ingyen" jár; a Vallorcalc singleton `SystemSettings` cégenkénti táblává vált.
+
+---
+
 ## 2026-09-03 — Decont oficial: diurna EUR mellett a RON-egyenérték is (BNR-en) — PR #414
 
 **Kérés:** „a diurna oszeg melle vagy ala ird be az euro erteket is es a bnrs arfolyamu lejt is." Az előző kör (PR #413) letisztázta a lapot Salariu de bază + Diurna kettősre; most a Diurna EUR érték MELLÉ / ALÁ jöjjön be a BNR-árfolyamon számított RON-egyenérték is — a sofőr azonnal lássa mindkét formátumban.

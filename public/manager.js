@@ -64,6 +64,7 @@ function loadTab(name){
   if(name==='sofer-activity' && window.DriverActivity) DriverActivity.mount('driverActivityBox');
   if(name==='orders-planner' && window.Planner) Planner.load();
   if(name==='warehouse') loadWarehouseTab();
+  if(typeof loadCostCalculator==='function' && name && name.indexOf('vcalc-')===0) loadCostCalculator(name);
   if(name==='billing'){
     if(window.EmailIntakeCard) EmailIntakeCard.mount('emailIntakeCardBox', {readOnly:true});
   }
