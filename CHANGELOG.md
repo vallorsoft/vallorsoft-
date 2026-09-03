@@ -14,6 +14,20 @@
 
 ---
 
+## 2026-09-03 — Sofőr személyes adatok a Decont oficial fejlécén + tételes részletezés a nyomtatásból KI — PR #410
+
+**Két kérés:** (1) a sofőr adatlapján megadható legyen a **szerződés száma**, **CNP** (személyi szám), **személyi ig. sorozat + szám** — egyszer megadva mentődik, és a Decont oficial hivatalos elszámolás fejlécére automatikusan bekerül. (2) A Decont oficial NYOMTATÁSBÓL vedd ki a tételes részletezést (a képernyőn megmarad); a sima „📄 Decont lunar" nyomtatás ÉRINTETLEN.
+
+1. **DB — `db/driver-personal-data.sql`** (ÚJ, idempotens): `users.contract_no VARCHAR(60)`, `cnp VARCHAR(30)`, `id_series VARCHAR(10)`, `id_number VARCHAR(20)`. Mind opcionális, régi cégeknél NULL marad.
+2. **Backend (`handlers/users.js`)**: `getInternalDrivers` + `userListAll` bővítve a 4 új mezővel (best-effort try/catch fallback a régi SELECT-re). `userUpdate` mostantól fogadja a 4 új mezőt CSAK ha a cél user `pozicio='Sofer'` — fehérlistán validált, paraméteres, hossz-korlátos (`.slice(0, max)`), üres → NULL (a mező törölhető). A meglévő szerep-kapu változatlan.
+3. **Backend (`handlers/fleetCompliance.js` `getMonthlySettlementSheet`)**: 3-lépcsős try/catch a driver-SELECT-en (új teljes → `net_base_salary_ron`-only → alap 3-mezős). A válasz `driver` objektum minden esetben tartalmazza a 4 új mezőt (null-lal, ha a DB-ben hiányoznak).
+4. **UI (`public/admin.html` + `public/manager.html`)**: user-modal új `#uSoferBox` doboz — Sofer szerepnél megjelenik, egyéb szerepnél elrejtve. 2×2 grid: Szerződés száma · CNP · Ig. sorozat · Ig. szám.
+5. **UI (`public/admin.js` + `public/manager.js`)**: `editUser` betölti a 4 új mezőt (élő szerep-váltásra reagál a pozíció-selecten); `saveUser` CSAK Sofer-nél küldi őket.
+6. **Decont oficial rendering (`public/fleet-extra-v2.js`)**: sofőr-fejléc bővítve a 4 új mezővel (csak ha nem üresek — hiányos sofőrnél változatlan); formátum: `Nr. contract: X · CNP: Y · CI seria/nr.: XX 123456`. A tételes részletezés blokk (`📋 Detalii tetțele`) mostantól `no-print` osztályos DIV-ben — a nyomtatott PDF-ből és e-mailből kimarad, csak a képernyőn látszik ellenőrzésre. Az `@media print{.no-print{display:none!important}}` már be volt kötve a print-ablakba, az e-mail-küldés is `.no-print` elemeket kivágja a klónból. **A sima „Decont lunar" (`_dcRenderSheetHtml`) tételes táblája ÉRINTETLEN** — ott továbbra is nyomtatásba kerül.
+7. **i18n** — 3 új `fe.stof.contractNo`/`cnp`/`idDoc` (fejléc) + 5 új `um.driverPersonal`/`contractNo`/`cnp`/`idSeries`/`idNumber` (user-szerkesztő). Mind RO-alap + HU. Cache-bust `?v=20260903drvinfo`. **1060 Jest zöld**, nincs regresszió.
+
+---
+
 ## 2026-09-02 — Decont oficial: input-fókusz megőrzése beíráskor + kontraszt-fix sötét témán — PR #409
 
 **Gyökér:** felhasználói jelzés (képernyőkép): a Decont oficial modalon a BNR-mezőbe **nem lehetett folyamatosan beírni**, és a mustársárga szerkesztő-sáv **sötét háttéren lógott** (elveszve). Két külön ok: (a) az `oninput="dcOfBnrChange(this.value)"` az egész body-t (`#dcOfSheetBody.innerHTML = _dcRenderOfficialHtml(_dcOfSheet)`) újrarendezte minden karakter után → az input elveszítette a fókuszt; (b) a `.dc-sheet-doc { background:#fff }` CSS-e csak a régi `#dcSheetModal`-ra volt szabva, a `#dcOfSheetModal` (Decont oficial) NEM örökölte, így a doc-container sötét téma esetén a sötét `.dc-sheet-body`-ban lógott, kontraszt nélkül.
