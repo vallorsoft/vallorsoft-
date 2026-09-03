@@ -970,19 +970,31 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
     // Sofőr a saját céghez tartozik-e (cross-tenant védelem)
     // A `net_base_salary_ron` a „Decont oficial" alapbér-mezőjéhez (best-effort:
     // ha a migráció még nem futott, `null` → az UI a 2700-as default-ot használja).
+    // A sofőr személyes adatai (`contract_no`/`cnp`/`id_series`/`id_number`) a
+    // `driver-personal-data.sql` migrációból jönnek — a Decont oficial fejlécére.
+    // Kettős fallback: (1) új teljes SELECT; (2) csak-net_base_salary_ron; (3) alap
+    // 3-mezős SELECT — így a hiányos DB-jű cégeknél sem hasal el a lap.
     let driverRow;
     try {
       const ur = await pool.query(
-        'SELECT email, nume, tel, net_base_salary_ron FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2',
+        'SELECT email, nume, tel, net_base_salary_ron, contract_no, cnp, id_series, id_number FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2',
         [email, cid]);
       if (!ur.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
       driverRow = ur.rows[0];
-    } catch (_e) {
-      const urFb = await pool.query(
-        'SELECT email, nume, tel FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2',
-        [email, cid]);
-      if (!urFb.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
-      driverRow = Object.assign({ net_base_salary_ron: null }, urFb.rows[0]);
+    } catch (_e1) {
+      try {
+        const ur2 = await pool.query(
+          'SELECT email, nume, tel, net_base_salary_ron FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2',
+          [email, cid]);
+        if (!ur2.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
+        driverRow = Object.assign({ contract_no: null, cnp: null, id_series: null, id_number: null }, ur2.rows[0]);
+      } catch (_e2) {
+        const urFb = await pool.query(
+          'SELECT email, nume, tel FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2',
+          [email, cid]);
+        if (!urFb.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
+        driverRow = Object.assign({ net_base_salary_ron: null, contract_no: null, cnp: null, id_series: null, id_number: null }, urFb.rows[0]);
+      }
     }
     const driver = driverRow;
 
@@ -1062,6 +1074,10 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
         nume: driver.nume || driver.email,
         tel: driver.tel || null,
         net_base_salary_ron: baseSalaryRon,
+        contract_no: driver.contract_no || null,
+        cnp: driver.cnp || null,
+        id_series: driver.id_series || null,
+        id_number: driver.id_number || null,
       },
       period: { year, month, from, to },
       company,

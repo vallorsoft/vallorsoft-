@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260902range">
-  <script src="/i18n.js?v=20260902focus"></script>
+  <script src="/i18n.js?v=20260903drvinfo"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1056,6 +1056,15 @@
     <div class="field"><label data-i18n="um.position">Pozíció</label><select class="select" id="uPoz"><option>Admin</option><option>Manager</option><option>Sofer</option></select></div>
     <div class="field"><label data-i18n="um.newPwd">Új jelszó</label><input class="input" id="uPwd" type="password" placeholder="Hagyja üresen, ha nem változik" data-i18n-ph="um.newPwdPh"></div>
     <div class="field"><label data-i18n="um.newPwd2">Új jelszó megerősítése</label><input class="input" id="uPwd2" type="password" placeholder="Ismételje meg az új jelszót" data-i18n-ph="um.newPwd2Ph"></div>
+    <div id="uSoferBox" style="display:none;margin-top:8px;padding:10px 12px;background:rgba(148,163,184,0.08);border:1.5px solid rgba(148,163,184,0.35);border-radius:8px;">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:8px;" data-i18n="um.driverPersonal">Sofőr személyes adatai (Decont oficial)</div>
+      <div class="grid-2">
+        <div class="field"><label data-i18n="um.contractNo">Szerződés száma</label><input class="input" id="uContractNo" maxlength="60" autocomplete="off"></div>
+        <div class="field"><label data-i18n="um.cnp">CNP / Személyi szám</label><input class="input" id="uCnp" maxlength="30" autocomplete="off"></div>
+        <div class="field"><label data-i18n="um.idSeries">Személyi ig. sorozat</label><input class="input" id="uIdSeries" maxlength="10" autocomplete="off"></div>
+        <div class="field"><label data-i18n="um.idNumber">Személyi ig. szám</label><input class="input" id="uIdNumber" maxlength="20" autocomplete="off"></div>
+      </div>
+    </div>
     <div class="row" style="margin-top:14px; display:flex; gap:10px;"><button class="btn ghost col" onclick="closeModal()" data-i18n="common.cancel">Mégse</button><button class="btn primary col" onclick="saveUser()" data-i18n="common.save">Mentés</button></div>
   </div>
 </div>
@@ -1592,7 +1601,7 @@
 <script src="/stats-v2/pages/ops.js?v=20260805e"></script>
 <script src="/stats-v2/pages/fleet.js?v=20260805k"></script>
 <script src="/stats-v2/pages/people.js?v=20260805k"></script>
-<script src="/fleet-extra-v2.js?v=20260902focus"></script>
+<script src="/fleet-extra-v2.js?v=20260903drvinfo"></script>
 <script src="/driver-activity.js?v=20260901scan"></script>
 <script src="/entity-detail.js?v=20260715ofc"></script>
 <script src="/planner.js?v=20260614qa"></script>

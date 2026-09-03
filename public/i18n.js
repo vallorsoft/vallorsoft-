@@ -2661,6 +2661,9 @@
     'fe.stof.emailSubject': { ro: 'Decont oficial', hu: 'Hivatalos elszámolás' },
     'fe.stof.bnrMissing':   { ro: '⚠️ Cursul BNR nu este disponibil — introdu-l manual pentru calcul.', hu: '⚠️ A BNR árfolyam nem elérhető — kézzel írd be a számításhoz.' },
     'fe.stof.bnrEditLbl':   { ro: 'Curs BNR manual (RON/EUR)', hu: 'BNR árfolyam kézzel (RON/EUR)' },
+    'fe.stof.contractNo':   { ro: 'Nr. contract', hu: 'Szerződés száma' },
+    'fe.stof.cnp':          { ro: 'CNP', hu: 'CNP / Személyi szám' },
+    'fe.stof.idDoc':        { ro: 'CI seria / nr.', hu: 'Szem. ig. sorozat / szám' },
 
     // Üzemanyagkártya
     'fe.fc.title': { hu: '⛽ Üzemanyagkártya-kivonat importálása (OMV / MOL / DKV / Eurowag / egyéb CSV)', ro: '⛽ Import extras card carburant (OMV / MOL / DKV / Eurowag / alt CSV)' },
@@ -3875,6 +3878,13 @@
     'um.newPwdPh': { hu: 'Hagyja üresen, ha nem változik', ro: 'Lăsați gol dacă nu se schimbă' },
     'um.newPwd2': { hu: 'Új jelszó megerősítése', ro: 'Confirmă parola nouă' },
     'um.newPwd2Ph': { hu: 'Ismételje meg az új jelszót', ro: 'Repetați parola nouă' },
+    // Sofőr személyes adatai — a „Decont oficial" hivatalos elszámolás fejlécéhez.
+    // A sofőr adatlapján egyszer megadva, minden későbbi hivatalos elszámolás fejlécére bekerül.
+    'um.driverPersonal': { ro: 'Date personale șofer (Decont oficial)', hu: 'Sofőr személyes adatai (Decont oficial)' },
+    'um.contractNo': { ro: 'Nr. contract muncă', hu: 'Munkaszerződés száma' },
+    'um.cnp':        { ro: 'CNP', hu: 'CNP / Személyi szám' },
+    'um.idSeries':   { ro: 'CI — seria', hu: 'Szem. ig. sorozat' },
+    'um.idNumber':   { ro: 'CI — număr', hu: 'Szem. ig. szám' },
 
     // ── Jármű-szerkesztő modal (vehicleModal) ──
     'vm.title': { hu: 'Jármű szerkesztése', ro: 'Editare vehicul' },

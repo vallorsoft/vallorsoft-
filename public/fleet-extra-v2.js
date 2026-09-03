@@ -2245,32 +2245,52 @@
       +   '</tr>'
       + '</table>'
       + '<div style="height:0;border-top:2px solid #0f172a;margin:12px 0 16px;"></div>'
-      // Sofőr adatok
-      + '<div style="padding:10px 14px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:8px;margin-bottom:14px;">'
-      +   '<div style="font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:0.4px;">' + t('fe.st.driver') + '</div>'
-      +   '<div style="font-size:15px;font-weight:700;color:#0f172a;">' + esc(d.nume) + '</div>'
-      +   '<div style="font-size:11px;color:#6b7280;">' + esc(d.email) + (d.tel ? ' · ' + esc(d.tel) : '') + '</div>'
-      + '</div>'
+      // Sofőr adatok — a személyes mezők (`contract_no`/`cnp`/`id_series`+`id_number`)
+      // a sofőr adatlapján egyszer megadva jönnek (users tábla, `driver-personal-data.sql`),
+      // és a hivatalos elszámolás fejlécében is szerepelnek (munkaügyi + könyvelési nyomtatvány).
+      // Csak akkor jelennek meg, ha ki van töltve → régi/hiányos sofőrnél a lap változatlan.
+      + (function () {
+          var lines = [];
+          if (d.contract_no) lines.push('<span style="color:#475569;">' + t('fe.stof.contractNo') + ':</span> <b>' + esc(d.contract_no) + '</b>');
+          if (d.cnp)         lines.push('<span style="color:#475569;">' + t('fe.stof.cnp')        + ':</span> <b>' + esc(d.cnp) + '</b>');
+          var idBits = [];
+          if (d.id_series) idBits.push(esc(d.id_series));
+          if (d.id_number) idBits.push(esc(d.id_number));
+          if (idBits.length) lines.push('<span style="color:#475569;">' + t('fe.stof.idDoc') + ':</span> <b>' + idBits.join(' ') + '</b>');
+          var personalHtml = lines.length
+            ? '<div style="font-size:11px;color:#0f172a;margin-top:6px;line-height:1.7;">' + lines.join(' &nbsp; · &nbsp; ') + '</div>'
+            : '';
+          return '<div style="padding:10px 14px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:8px;margin-bottom:14px;">'
+            + '<div style="font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:0.4px;">' + t('fe.st.driver') + '</div>'
+            + '<div style="font-size:15px;font-weight:700;color:#0f172a;">' + esc(d.nume) + '</div>'
+            + '<div style="font-size:11px;color:#6b7280;">' + esc(d.email) + (d.tel ? ' · ' + esc(d.tel) : '') + '</div>'
+            + personalHtml
+            + '</div>';
+        })()
       // Alapbér-szerkesztő (csak képernyőn, nyomtatásban NEM látszik)
       + salaryEditor
-      // Tételes részletezés
-      + '<div style="font-size:14px;font-weight:700;color:#0f172a;margin:12px 0 6px;">📋 ' + t('fe.stof.detailsTitle') + ' (' + (r.earnings || []).length + ')</div>'
-      + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-      +   '<thead><tr style="background:#ccfbf1;color:#134e4a;">'
-      +     '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colDate') + '</th>'
-      +     '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colKind') + '</th>'
-      +     '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colLabel') + '</th>'
-      +     '<th style="padding:6px 8px;text-align:right;">' + t('fe.de.colCalc') + '</th>'
-      +     '<th style="padding:6px 8px;text-align:right;">' + t('fe.de.colTotal') + '</th>'
-      +   '</tr></thead>'
-      +   '<tbody>' + eRows + '</tbody>'
-      +   '<tfoot><tr style="background:#f1f5f9;font-weight:800;">'
-      +     '<td colspan="4" style="padding:8px;text-align:right;">' + t('fe.st.totalEarned') + ':</td>'
-      +     '<td style="padding:8px;text-align:right;">'
-      +       n2(totEur, 2) + ' EUR &nbsp; · &nbsp; ' + n2(totRon, 2) + ' RON'
-      +     '</td>'
-      +   '</tr></tfoot>'
-      + '</table>'
+      // Tételes részletezés — CSAK KÉPERNYŐN (`no-print`); a hivatalos nyomtatott
+      // változatban NEM szerepel (a sofőrnek a summary elég). A sima „Decont lunar"
+      // (`_dcRenderSheetHtml`) tételes táblája ÉRINTETLEN — ott továbbra is nyomtatásba kerül.
+      + '<div class="no-print">'
+      +   '<div style="font-size:14px;font-weight:700;color:#0f172a;margin:12px 0 6px;">📋 ' + t('fe.stof.detailsTitle') + ' (' + (r.earnings || []).length + ')</div>'
+      +   '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+      +     '<thead><tr style="background:#ccfbf1;color:#134e4a;">'
+      +       '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colDate') + '</th>'
+      +       '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colKind') + '</th>'
+      +       '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colLabel') + '</th>'
+      +       '<th style="padding:6px 8px;text-align:right;">' + t('fe.de.colCalc') + '</th>'
+      +       '<th style="padding:6px 8px;text-align:right;">' + t('fe.de.colTotal') + '</th>'
+      +     '</tr></thead>'
+      +     '<tbody>' + eRows + '</tbody>'
+      +     '<tfoot><tr style="background:#f1f5f9;font-weight:800;">'
+      +       '<td colspan="4" style="padding:8px;text-align:right;">' + t('fe.st.totalEarned') + ':</td>'
+      +       '<td style="padding:8px;text-align:right;">'
+      +         n2(totEur, 2) + ' EUR &nbsp; · &nbsp; ' + n2(totRon, 2) + ' RON'
+      +       '</td>'
+      +     '</tr></tfoot>'
+      +   '</table>'
+      + '</div>'
       // Összegzés-blokk + Kiemelt záró blokk — dinamikusan cserélhető konténer;
       // a `dcOfBnrChange`/`dcOfSaveBase` innen frissít, az editor-sáv érintetlen
       // (megőrzött input DOM-fókusz → a felhasználó folyamatosan gépelhet).

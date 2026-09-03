@@ -34,11 +34,23 @@ handlers.userListAll = async function (req, res, args) {
       }
       const cid = req.session.user.company_id;
       if (!cid) return res.json({ result: [] });
-      const r = await pool.query(
-        'SELECT id, nume, email, tel, pozicio FROM users WHERE company_id = $1 AND (pozicio_dev IS NOT TRUE) ORDER BY id',
-        [cid]
-      );
-      return res.json({ result: r.rows });
+      // A Sofer sorokra a `contract_no`/`cnp`/`id_series`/`id_number` is bekerül,
+      // hogy a Munkatársak fül szerkesztő űrlapja is előtölthesse (nem csak a
+      // Belső sofőrök fül `getInternalDrivers`-e). Best-effort fallback a régi
+      // 5-oszlopos SELECT-re, ha a `driver-personal-data.sql` migráció még nem futott.
+      try {
+        const r = await pool.query(
+          'SELECT id, nume, email, tel, pozicio, contract_no, cnp, id_series, id_number FROM users WHERE company_id = $1 AND (pozicio_dev IS NOT TRUE) ORDER BY id',
+          [cid]
+        );
+        return res.json({ result: r.rows });
+      } catch (_e) {
+        const rFb = await pool.query(
+          'SELECT id, nume, email, tel, pozicio FROM users WHERE company_id = $1 AND (pozicio_dev IS NOT TRUE) ORDER BY id',
+          [cid]
+        );
+        return res.json({ result: rFb.rows });
+      }
     } catch (e) {
       console.error(e);
       return res.json({ result: [] });
@@ -51,13 +63,27 @@ handlers.getInternalDrivers = async function (req, res, args) {
         return res.json({ result: [] });
       }
       const cid = req.session.user.company_id;
-      const r = await pool.query(
-        `SELECT id, nume, email, tel FROM users
-         WHERE company_id = $1 AND pozicio = 'Sofer'
-         ORDER BY nume`,
-        [cid]
-      );
-      return res.json({ result: r.rows });
+      // A `contract_no`/`cnp`/`id_series`/`id_number` a `driver-personal-data.sql`
+      // migrációból jön — a Decont oficial fejlécéhez. Best-effort: migráció
+      // hiányában visszaesünk a régi (4-mezős) SELECT-re, hogy ne törjön a lista.
+      try {
+        const r = await pool.query(
+          `SELECT id, nume, email, tel, contract_no, cnp, id_series, id_number
+             FROM users
+            WHERE company_id = $1 AND pozicio = 'Sofer'
+            ORDER BY nume`,
+          [cid]
+        );
+        return res.json({ result: r.rows });
+      } catch (_e) {
+        const rFb = await pool.query(
+          `SELECT id, nume, email, tel FROM users
+             WHERE company_id = $1 AND pozicio = 'Sofer'
+             ORDER BY nume`,
+          [cid]
+        );
+        return res.json({ result: rFb.rows });
+      }
     } catch (e) {
       console.error('getInternalDrivers hiba:', e);
       return res.json({ result: [] });
@@ -159,6 +185,30 @@ handlers.userUpdate = async function (req, res, args) {
         const hash = await bcrypt.hash(fields.jelszo, 10);
         updates.push(`password_hash = $${i++}`);
         values.push(hash);
+      }
+
+      // Sofőr személyes adatok — a „Decont oficial" hivatalos fejlécéhez.
+      // Csak Sofer szerepnél írhatók (a szerkesztő űrlap úgyis csak akkor mutatja);
+      // paraméteres SQL, hossz-korlát a séma szerinti VARCHAR-ekhez igazítva.
+      // Üres string → NULL (a mező törölhető). Ismeretlen kulcs SQL-be sosem kerül.
+      if (targetUser.pozicio === 'Sofer') {
+        const _norm = (v, max) => {
+          if (v == null) return null;
+          const s = String(v).trim();
+          return s ? s.slice(0, max) : null;
+        };
+        const PERSONAL = [
+          ['contract_no', 60],
+          ['cnp',         30],
+          ['id_series',   10],
+          ['id_number',   20],
+        ];
+        for (const [key, max] of PERSONAL) {
+          if (Object.prototype.hasOwnProperty.call(fields, key)) {
+            updates.push(`${key} = $${i++}`);
+            values.push(_norm(fields[key], max));
+          }
+        }
       }
 
       if (updates.length === 0) {
