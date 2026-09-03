@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-09-03 — Decont oficial: „Salariu de bază" + „Diurna" elnevezés, apró-betűs magyarázatok kivéve — PR #411
+
+**Kérés:** „elnevezese legyen a netto bernek salariu de baza es a restnek pedig Diurna (semmi egyeb ne irja mit mibol miert szamol apro betukel se)". A Decont oficial összegző + kiemelt záró blokkja csak a két új felirattal és a számokkal marad — a képlet-magyarázat és az alapbér-hint eltűnik. A számítás, BNR-kezelés, alapbér-mentés, tételes részletezés a képernyőn, és a sima „Decont lunar" (📄) érintetlen.
+
+1. **i18n (`public/i18n.js`)** — 2 kulcs átnevezve, 2 kulcs üresre (a hívási pontok maradnak, de semmit sem rendernek): `fe.stof.netBaseRon`: `Salariu net (bază)` → **`Salariu de bază`** (RO+HU egyaránt); `fe.stof.aboveBaseEur`: `De plătit peste salariu` → **`Diurna`** (RO+HU); `fe.stof.baseSalaryHint` és `fe.stof.formulaHint` → üres string (nincs többé apró magyarázó sor).
+2. **Rendering (`public/fleet-extra-v2.js`)** — 3 hint `<div>` teljesen kivéve, hogy akkor se maradjon üres tér, ha a kulcs újra tartalmat kapna: (a) `_dcOfBuildSummaryHtml`-en belüli `formulaHint` div az összegző alatt; (b) az alapbér-editor sárga sávjában a `baseSalaryHint` sor (a nagybetűs felirat marad); (c) a legacy dead-code blokk (`_unused_legacy_finalHighlight` szomszédságában) `formulaHint`-je.
+3. **Cache-bust** `?v=20260903drvinfo` → **`?v=20260903labels`** (`public/admin.html` + `public/manager.html`, mindkét `i18n.js` + `fleet-extra-v2.js` scriptre). **1060 Jest zöld**, nincs regresszió. Szerver-oldal / DB / handlerek érintetlenek.
+
+---
+
 ## 2026-09-03 — Sofőr személyes adatok a Decont oficial fejlécén + tételes részletezés a nyomtatásból KI — PR #410
 
 **Két kérés:** (1) a sofőr adatlapján megadható legyen a **szerződés száma**, **CNP** (személyi szám), **személyi ig. sorozat + szám** — egyszer megadva mentődik, és a Decont oficial hivatalos elszámolás fejlécére automatikusan bekerül. (2) A Decont oficial NYOMTATÁSBÓL vedd ki a tételes részletezést (a képernyőn megmarad); a sima „📄 Decont lunar" nyomtatás ÉRINTETLEN.
