@@ -14,6 +14,17 @@
 
 ---
 
+## 2026-09-03 — Decont oficial: érthetőbb, hivatalos elrendezés — komponens-bontás + vonal áthelyezés — PR #412
+
+**Két igazítás a nyomtatott / e-mailben küldött hivatalos elszámoláson**, amit a sofőr kap kézhez — a felhasználó kérése: „nezd at ird oda »din«, RON stb. amitol erthetobb lesz hogy enyi euro enyi lej ez enyi oszesen lejben és akkor kifizetés ezen az alapon salar baza net és diurna. vagy ahogyan torvenyesebb mert ezt adjuk a sofőrnek."
+
+1. **Elválasztó vonal áthelyezve** (`public/fleet-extra-v2.js` `_dcOfBuildSummaryHtml`) — a régi vonal a `Salariu de bază` és a `Diurna` közé esett; mostantól a `Total net lunar (RON)` és a `Salariu de bază` KÖZÉ. A Salariu + Diurna vonal nélkül egy blokkban — a lap szerkezete pontosan azt tükrözi, amit a felhasználó kért: **komponensek → total → vonal → kifizetés jogcímei**. Mind az összegzésben, mind a kiemelt záró blokkban.
+2. **Komponens-bontás a Total alatt** — románul: `din X EUR × <BNR> + Y RON`. A sofőr azonnal látja, honnan jött az összeg (nem kell fejben kiszámolnia). A `compFromRo` string BNR-elérhetőség függvényében jelenik meg.
+3. **Diurna RON-egyenérték** — a `⭐ Diurna: X EUR` sor mellett kompakt `(≈ Y RON)` jelzés, hogy az EUR összeg lej-értéke se kelljen fejben átszámolni.
+4. **Untouched:** számítás (`total_ron = tot_eur × BNR + tot_ron`, `above_base_eur = (total_ron − base) / BNR`), BNR-kezelés (élő + last-manual fallback), alapbér-mentés (`net_base_salary_ron` per sofőr, 2700 RON default), tételes részletezés a képernyőn, `no-print` a nyomtatásból (BNR-editor + alapbér-editor), sima „Decont lunar" (📄). Cache-bust `?v=20260903labels` → `?v=20260903clear`. **1060 Jest zöld**.
+
+---
+
 ## 2026-09-03 — Decont oficial: „Salariu de bază" + „Diurna" elnevezés, apró-betűs magyarázatok kivéve — PR #411
 
 **Kérés:** „elnevezese legyen a netto bernek salariu de baza es a restnek pedig Diurna (semmi egyeb ne irja mit mibol miert szamol apro betukel se)". A Decont oficial összegző + kiemelt záró blokkja csak a két új felirattal és a számokkal marad — a képlet-magyarázat és az alapbér-hint eltűnik. A számítás, BNR-kezelés, alapbér-mentés, tételes részletezés a képernyőn, és a sima „Decont lunar" (📄) érintetlen.
