@@ -2008,9 +2008,12 @@
     var totalMonthlyRon = (bnr != null) ? (totEur * bnr + totRon) : null;
     var aboveBaseEur = (bnr != null && totalMonthlyRon != null && bnr > 0)
       ? (totalMonthlyRon - baseSal) / bnr : null;
+    var aboveBaseRon = (aboveBaseEur != null && bnr != null) ? (aboveBaseEur * bnr) : null;
 
     // Egyetlen tiszta összegző blokk — hivatalos hangvétel a sofőrnek adandó
     // dokumentumhoz. Nincs Total EUR / Total RON / bontás / képlet.
+    // A diurna sor EUR + RON-egyenérték (BNR-en) — a sofőr azonnal lássa
+    // mindkét formátumban a napidíját.
     return ''
       + '<div style="margin-top:18px;padding:16px 20px;border:2.5px solid #7c2d12;border-radius:10px;background:#fff7ed;color:#0f172a;">'
       +   '<div style="font-size:13px;font-weight:800;color:#7c2d12;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.4px;">'
@@ -2023,9 +2026,10 @@
       +       '</td>'
       +     '</tr>'
       +     '<tr>'
-      +       '<td style="padding:8px 0;border-top:1.5px solid #fdba74;font-weight:700;color:#0f172a;">' + t('fe.stof.aboveBaseEur') + ':</td>'
+      +       '<td style="padding:8px 0;border-top:1.5px solid #fdba74;font-weight:700;color:#0f172a;vertical-align:top;">' + t('fe.stof.aboveBaseEur') + ':</td>'
       +       '<td style="padding:8px 0;border-top:1.5px solid #fdba74;text-align:right;font-weight:900;font-size:17px;color:#0f172a;">'
       +         (aboveBaseEur != null ? n2(aboveBaseEur, 2) + ' EUR' : '—')
+      +         (aboveBaseRon != null ? '<div style="font-size:13px;font-weight:700;color:#78350f;margin-top:3px;">= ' + n2(aboveBaseRon, 2) + ' RON</div>' : '')
       +       '</td>'
       +     '</tr>'
       +   '</table>'
@@ -2066,6 +2070,7 @@
     var totalMonthlyRon = (bnr != null) ? (totEur * bnr + totRon) : null;
     var aboveBaseEur = (bnr != null && totalMonthlyRon != null && bnr > 0)
       ? (totalMonthlyRon - baseSal) / bnr : null;
+    var aboveBaseRon = (aboveBaseEur != null && bnr != null) ? (aboveBaseEur * bnr) : null;
 
     // Járandóság-tételes tábla — MINDEN diurna/bónusz/rakodás/etc.
     var eRows = (r.earnings || []).map(function (it) {
@@ -2169,11 +2174,12 @@
       +         '<td style="padding:6px 0;text-align:right;font-weight:700;">' + n2(baseSal, 2) + ' RON</td>'
       +       '</tr>'
       +       '<tr>'
-      +         '<td style="padding:8px 0;border-top:2px solid #0f766e;font-weight:800;font-size:15px;color:#7c2d12;">'
+      +         '<td style="padding:8px 0;border-top:2px solid #0f766e;font-weight:800;font-size:15px;color:#7c2d12;vertical-align:top;">'
       +           '⭐ ' + t('fe.stof.aboveBaseEur') + ':'
       +         '</td>'
       +         '<td style="padding:8px 0;border-top:2px solid #0f766e;text-align:right;font-weight:900;font-size:18px;color:#7c2d12;">'
       +           (aboveBaseEur != null ? n2(aboveBaseEur, 2) + ' EUR' : '—')
+      +           (aboveBaseRon != null ? '<div style="font-size:14px;font-weight:800;color:#78350f;margin-top:3px;">= ' + n2(aboveBaseRon, 2) + ' RON</div>' : '')
       +         '</td>'
       +       '</tr>'
       +     '</table>'
