@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-09-03 — Decont oficial: a papíron csak Salariu de bază + Diurna — háttér-számítás, tiszta RO/HU — PR #413
+
+**Kérés:** „a rendszerunk automatan vonja le hatterben az euro oszegbol a beirt alap fizetest es a papiron mar ugy jelenjen meg mint alap plusz diurna". Példa: 1700 EUR + 1000 RON @ BNR 5,20, alapbér 2700 RON → háttér 9840 RON → 7140 RON diurna → **1373,08 EUR**. A papíron csak **Salariu de bază: 2 700,00 RON + Diurna: 1 373,08 EUR** látszik. Plusz: „ha RO akkor minden RO, ha HU akkor minden HU".
+
+1. **`public/fleet-extra-v2.js` `_dcOfBuildSummaryHtml` teljesen újraírva** — a Total EUR + Total RON + BNR + „din X EUR × BNR + Y RON" bontás + a régi kettős sumBlock+finalHighlight blokk mind KIVÉVE. Egy tiszta 2-soros blokk marad: `Salariu de bază` (RON, a mentett `net_base_salary_ron` — default 2700) + `Diurna` (EUR, `(total_ron − base) / BNR` háttérszámítás). Alul apró `Curs BNR aplicat: 1 EUR = X.XXXX RON` lábjegyzet ellenőrzéshez.
+2. **i18n RO/HU keveredés tisztítás (`public/i18n.js`)**: `fe.stof.summary` RO `Sumar hivatalos elszámolás` (kevert) → **`Sumar decont oficial`** (tiszta RO); `fe.stof.baseSalary` + `netBaseRon` HU `Salariu de bază` → **`Alapbér`**; `fe.stof.aboveBaseEur` HU `Diurna` → **`Napidíj`**; `fe.stof.detailsTitle` RO `Detalii tetțele` (elgépelés) → **`Detalii pe rânduri`**; `openTitle` + `footNote` frissítve a tiszta jogcímekre.
+3. **Untouched**: számítás (a szerver-válasz `totals.earned.{eur,ron}` érintetlen — csak a MEGJELENÍTÉS változik), BNR-kezelés (élő + last-manual fallback), alapbér-mentés (`net_base_salary_ron` per sofőr, 2700 RON default), tételes részletezés a képernyőn, `no-print` a nyomtatásból (BNR-editor + alapbér-editor), sima „Decont lunar" (📄). Cache-bust `?v=20260903clear` → `?v=20260903paper`. **1060 Jest zöld**.
+
+---
+
 ## 2026-09-03 — Decont oficial: érthetőbb, hivatalos elrendezés — komponens-bontás + vonal áthelyezés — PR #412
 
 **Két igazítás a nyomtatott / e-mailben küldött hivatalos elszámoláson**, amit a sofőr kap kézhez — a felhasználó kérése: „nezd at ird oda »din«, RON stb. amitol erthetobb lesz hogy enyi euro enyi lej ez enyi oszesen lejben és akkor kifizetés ezen az alapon salar baza net és diurna. vagy ahogyan torvenyesebb mert ezt adjuk a sofőrnek."
