@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-09-03 — Decont oficial: diurna EUR mellett a RON-egyenérték is (BNR-en) — PR #414
+
+**Kérés:** „a diurna oszeg melle vagy ala ird be az euro erteket is es a bnrs arfolyamu lejt is." Az előző kör (PR #413) letisztázta a lapot Salariu de bază + Diurna kettősre; most a Diurna EUR érték MELLÉ / ALÁ jöjjön be a BNR-árfolyamon számított RON-egyenérték is — a sofőr azonnal lássa mindkét formátumban.
+
+1. **`public/fleet-extra-v2.js` `_dcOfBuildSummaryHtml`** — új `aboveBaseRon = aboveBaseEur × bnr` változó a képernyőn megjelenő összegzőben. A Diurna cellába az `X EUR` alá halvány kiegészítő `= Y RON` sor kerül (font-size:13px, `color:#78350f`), a címke-cella `vertical-align:top` — a kettős érték szimmetrikus marad. Példa: `1 373,08 EUR` napidíj @ BNR 5,20 → „1 373,08 EUR / = 7 140,02 RON".
+2. **`_dcRenderOfficialHtml` kiemelt záró blokk (⭐ Diurna sor)** — ugyanaz a bővítés a nyomtatható lapon (font-size:14px, `font-weight:800`) → a `🖨️ Imprimă/PDF` és `✉️ Email` úton is a kettős érték megy ki. Nincs séma-változás, nincs új handler, nincs új i18n kulcs.
+3. **Untouched**: számítás (`total_ron = tot_eur × BNR + tot_ron` → `above_base_eur = (total_ron − base) / BNR`), BNR-kezelés (kézi override → szerver-BNR → last-manual), alapbér-mentés (`net_base_salary_ron` per sofőr, 2700 default), tételes részletezés a képernyőn, `no-print` a nyomtatásból (BNR-editor + alapbér-editor), sima „Decont lunar" (📄) érintetlen. Cache-bust `?v=20260903paper` → `?v=20260903diurnaRon` (admin.html + manager.html a `fleet-extra-v2.js` + `i18n.js` include-okon). **1060 Jest zöld**.
+
+---
+
 ## 2026-09-03 — Decont oficial: a papíron csak Salariu de bază + Diurna — háttér-számítás, tiszta RO/HU — PR #413
 
 **Kérés:** „a rendszerunk automatan vonja le hatterben az euro oszegbol a beirt alap fizetest es a papiron mar ugy jelenjen meg mint alap plusz diurna". Példa: 1700 EUR + 1000 RON @ BNR 5,20, alapbér 2700 RON → háttér 9840 RON → 7140 RON diurna → **1373,08 EUR**. A papíron csak **Salariu de bază: 2 700,00 RON + Diurna: 1 373,08 EUR** látszik. Plusz: „ha RO akkor minden RO, ha HU akkor minden HU".
