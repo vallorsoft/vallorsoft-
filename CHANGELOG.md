@@ -14,6 +14,17 @@
 
 ---
 
+## 2026-09-02 — Decont oficial: input-fókusz megőrzése beíráskor + kontraszt-fix sötét témán — PR #409
+
+**Gyökér:** felhasználói jelzés (képernyőkép): a Decont oficial modalon a BNR-mezőbe **nem lehetett folyamatosan beírni**, és a mustársárga szerkesztő-sáv **sötét háttéren lógott** (elveszve). Két külön ok: (a) az `oninput="dcOfBnrChange(this.value)"` az egész body-t (`#dcOfSheetBody.innerHTML = _dcRenderOfficialHtml(_dcOfSheet)`) újrarendezte minden karakter után → az input elveszítette a fókuszt; (b) a `.dc-sheet-doc { background:#fff }` CSS-e csak a régi `#dcSheetModal`-ra volt szabva, a `#dcOfSheetModal` (Decont oficial) NEM örökölte, így a doc-container sötét téma esetén a sötét `.dc-sheet-body`-ban lógott, kontraszt nélkül.
+
+1. **Fix #1 — input-fókusz megőrzése (`public/fleet-extra-v2.js`)**: új `_dcOfBuildSummaryHtml(r, baseSal, bnr)` külön HTML-forrás a summary + kiemelt záró blokkra; új `_dcOfRefreshSummary()` — CSAK a `#dcOfSummaryBox` innerHTML-jét frissíti (az editor-sáv és a BNR/alapbér-inputok DOM-ja érintetlen marad). A `dcOfBnrChange` és `dcOfSaveBase` mostantól ezt hívják → az input fókusza NEM veszik el, a felhasználó folyamatosan gépelhet, és a summary értékek élőben frissülnek.
+2. **Fix #2 — CSS-kontraszt (`public/style.css`)**: a `#dcSheetModal .dc-sheet-*` szabályok (modal/toolbar/picker/presets/range/actions/body/DOC — ~19 szelektor) kiterjesztve `#dcOfSheetModal .dc-sheet-*`-ra is (sed-alapú csoportos kiterjesztés). A doc-container mostantól fehér BG + espresso szöveg mindkét modalban, sötét témán is (a `.dc-sheet-body` sötét szürke, a `.dc-sheet-doc` fehér lap benne — így a mustársárga szerkesztő-sáv jól olvasható).
+3. **Az editor-sáv inputjai** explicit fehér-BG + sötét-szöveg + espresso-keret stílust kapnak (nem `.input` osztályt), hogy a sötét téma se csavarja ki őket; a keret vastagabb (2px), a mustársárga panel-keret is (2px `#d97706`), és a BNR-inputra placeholder `ex. 5.20` került (a felhasználó nem vakon írja be a mai árfolyamot).
+4. Cache-bust `?v=20260902focus` (admin.html + manager.html). **1060 Jest zöld**, nincs regresszió.
+
+---
+
 ## 2026-09-02 — BNR árfolyam-lekérés robusztusabbá + Decont oficial: last-manual BNR fallback — PR #408
 
 **Gyökér:** felhasználói jelzés a Decont oficial modalon: „BNR árfolyam nem elérhető". Diagnózis: (a) a `services/bnr.js` régi implementációja raw `https.get` + `req.setTimeout` szemantikailag laza, User-Agent nélkül, szigorú regex; néhány WAF a minimális UA-t 403-mal blokkolja; és (b) a BNR néha `<Rate multiplier="1" currency="EUR">…` szintaxist ír, amit a régi `<Rate currency="EUR">…` regex nem talál el. (c) A modal sem tudta segíteni a felhasználót, ha a BNR végérvényesen elérhetetlen: minden nyitáskor vakon kellett beírnia a mai értéket.
