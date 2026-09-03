@@ -121,6 +121,13 @@ function editUser(u){
   uPoz.value = u.pozicio;
   uPwd.value = '';
   if (document.getElementById('uPwd2')) document.getElementById('uPwd2').value = '';
+  // Sofőr személyes adatai (Decont oficial fejlécéhez) — csak Sofer szerepnél
+  var _sb = document.getElementById('uSoferBox');
+  if (_sb) _sb.style.display = (u.pozicio === 'Sofer') ? '' : 'none';
+  var _cn = document.getElementById('uContractNo'); if (_cn) _cn.value = u.contract_no || '';
+  var _cnp = document.getElementById('uCnp'); if (_cnp) _cnp.value = u.cnp || '';
+  var _is = document.getElementById('uIdSeries'); if (_is) _is.value = u.id_series || '';
+  var _in = document.getElementById('uIdNumber'); if (_in) _in.value = u.id_number || '';
 
   const isSelf = u.email.toLowerCase() === myEmail.toLowerCase();
 
@@ -154,6 +161,13 @@ function saveUser(){
     if (uPwd.value !== p2m) { toast('Cele două parole nu coincid.', 'err'); return; }
     if (!vsPwValid(uPwd.value)) { toast(VS_PW_ERR, 'err'); return; }
     f.jelszo = uPwd.value;
+  }
+  // Sofőr személyes adatok (Decont oficial fejlécéhez) — csak Sofer-nél küldjük (szerver is szűri)
+  if (uPoz.value === 'Sofer') {
+    var _cn = document.getElementById('uContractNo'); if (_cn) f.contract_no = _cn.value || '';
+    var _cnp = document.getElementById('uCnp'); if (_cnp) f.cnp = _cnp.value || '';
+    var _is = document.getElementById('uIdSeries'); if (_is) f.id_series = _is.value || '';
+    var _in = document.getElementById('uIdNumber'); if (_in) f.id_number = _in.value || '';
   }
   gas('userUpdate', [uEmail.value, f]).then(r => {
     if (r && r.ok) {

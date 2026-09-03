@@ -118,7 +118,22 @@ function deleteUser(email, nev){
     }
   });
 }
-function editUser(u){uNume.value=u.nume;uEmail.value=u.email;uTel.value=u.tel||'';uPoz.value=u.pozicio;uPwd.value='';if(document.getElementById('uPwd2'))document.getElementById('uPwd2').value='';document.getElementById('userModal').classList.add('open');}
+function editUser(u){
+  uNume.value=u.nume;uEmail.value=u.email;uTel.value=u.tel||'';uPoz.value=u.pozicio;uPwd.value='';
+  if(document.getElementById('uPwd2'))document.getElementById('uPwd2').value='';
+  // Sofőr személyes adatai (Decont oficial fejlécéhez) — csak Sofer szerepnél
+  var _sb=document.getElementById('uSoferBox');
+  var _show=(u.pozicio==='Sofer');
+  if(_sb)_sb.style.display=_show?'':'none';
+  var _cn=document.getElementById('uContractNo');if(_cn)_cn.value=u.contract_no||'';
+  var _cnp=document.getElementById('uCnp');if(_cnp)_cnp.value=u.cnp||'';
+  var _is=document.getElementById('uIdSeries');if(_is)_is.value=u.id_series||'';
+  var _in=document.getElementById('uIdNumber');if(_in)_in.value=u.id_number||'';
+  // Élő szerep-váltás — ha a felhasználó Sofer-re állítja, jelenjen meg a doboz
+  var _pz=document.getElementById('uPoz');
+  if(_pz && !_pz._vsBound){_pz._vsBound=true;_pz.addEventListener('change',function(){var s=document.getElementById('uSoferBox');if(s)s.style.display=(_pz.value==='Sofer')?'':'none';});}
+  document.getElementById('userModal').classList.add('open');
+}
 function saveUser(){
   var f={nume:uNume.value,tel:uTel.value,pozicio:uPoz.value};
   if(uPwd.value){
@@ -126,6 +141,13 @@ function saveUser(){
     if(uPwd.value!==p2){toast('Cele două parole nu coincid.','err');return;}
     if(!vsPwValid(uPwd.value)){toast(VS_PW_ERR,'err');return;}
     f.jelszo=uPwd.value;
+  }
+  // Sofőr személyes adatok — csak Sofer szerepnél küldjük (szerver is szűri).
+  if(uPoz.value==='Sofer'){
+    var _cn=document.getElementById('uContractNo');if(_cn)f.contract_no=_cn.value||'';
+    var _cnp=document.getElementById('uCnp');if(_cnp)f.cnp=_cnp.value||'';
+    var _is=document.getElementById('uIdSeries');if(_is)f.id_series=_is.value||'';
+    var _in=document.getElementById('uIdNumber');if(_in)f.id_number=_in.value||'';
   }
   gas('userUpdate',[uEmail.value,f]).then(()=>{toast('Sikeresen mentve!','ok');closeModal();loadUsers();loadDash();});
 }
