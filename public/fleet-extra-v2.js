@@ -1994,6 +1994,13 @@
   // `dcOfBnrChange`/`dcOfSaveBase` élőben újrarajzolja a `#dcOfSummaryBox`-ba
   // (az input-ok érintetlenek maradnak — a fókusz megőrizve, folyamatos gépelés).
   function _dcOfBuildSummaryHtml(r, baseSal, bnr) {
+    // A rendszer a háttérben elvégzi a mögöttes számítást:
+    //   total_ron  = total_eur × BNR + total_ron  (a sofőr valós járandósága)
+    //   diurna_eur = (total_ron − salariu_de_bază) / BNR
+    // A papírra CSAK a két jogcím kerül ki: Salariu de bază + Diurna.
+    // (Példa: 1700 EUR + 1000 RON @ BNR 5,20, bază 2700 RON →
+    //   9840 RON össz → 7140 RON diurna → 1373,08 EUR. A papír csak
+    //   „2700 RON alapbér + 1373,08 EUR diurna"-t mutat.)
     var tot = r.totals || {};
     var totE = tot.earned || {};
     var totEur = Number(totE.eur || 0);
@@ -2001,80 +2008,31 @@
     var totalMonthlyRon = (bnr != null) ? (totEur * bnr + totRon) : null;
     var aboveBaseEur = (bnr != null && totalMonthlyRon != null && bnr > 0)
       ? (totalMonthlyRon - baseSal) / bnr : null;
-    var aboveBaseRon = (aboveBaseEur != null && bnr != null) ? (aboveBaseEur * bnr) : null;
 
-    // Az összetevők románul (dokumentum a sofőrnek megy — érthetőség + hivatalos hangnem)
-    var compFromRo = (bnr != null)
-      ? ('din ' + n2(totEur, 2) + ' EUR × ' + n2(bnr, 4) + ' + ' + n2(totRon, 2) + ' RON')
-      : '';
-
-    // ÖSSZEGZÉS: elöl az összetevők (EUR + RON + curs), majd a KÖZÖS VONAL,
-    // utána a kifizetés jogcímei (Salariu de bază net + Diurna) — vonal
-    // NINCS a Salariu és a Diurna között (a felhasználó kérése szerint).
-    var sumBlock =
-      '<div style="margin-top:18px;padding:14px 18px;border:2px solid #0f766e;border-radius:10px;background:#f0fdfa;color:#0f172a;">'
-      +   '<div style="font-size:13px;font-weight:700;color:#134e4a;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px;">'
+    // Egyetlen tiszta összegző blokk — hivatalos hangvétel a sofőrnek adandó
+    // dokumentumhoz. Nincs Total EUR / Total RON / bontás / képlet.
+    return ''
+      + '<div style="margin-top:18px;padding:16px 20px;border:2.5px solid #7c2d12;border-radius:10px;background:#fff7ed;color:#0f172a;">'
+      +   '<div style="font-size:13px;font-weight:800;color:#7c2d12;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.4px;">'
       +     '📊 ' + t('fe.stof.summary') + '</div>'
-      +   '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      +   '<table style="width:100%;border-collapse:collapse;font-size:15px;">'
       +     '<tr>'
-      +       '<td style="padding:5px 0;">' + t('fe.stof.totalEur') + ':</td>'
-      +       '<td style="padding:5px 0;text-align:right;font-weight:700;">' + n2(totEur, 2) + ' EUR</td>'
-      +     '</tr>'
-      +     '<tr>'
-      +       '<td style="padding:5px 0;">' + t('fe.stof.totalRon') + ':</td>'
-      +       '<td style="padding:5px 0;text-align:right;font-weight:700;">' + n2(totRon, 2) + ' RON</td>'
-      +     '</tr>'
-      +     '<tr>'
-      +       '<td style="padding:5px 0;color:#475569;">' + t('fe.stof.bnrUsed') + ':</td>'
-      +       '<td style="padding:5px 0;text-align:right;font-weight:700;color:#475569;">'
-      +         (bnr != null ? ('1 EUR = ' + n2(bnr, 4) + ' RON') : '—')
+      +       '<td style="padding:8px 0;font-weight:700;color:#0f172a;">' + t('fe.stof.netBaseRon') + ':</td>'
+      +       '<td style="padding:8px 0;text-align:right;font-weight:900;font-size:17px;color:#0f172a;">'
+      +         n2(baseSal, 2) + ' RON'
       +       '</td>'
       +     '</tr>'
       +     '<tr>'
-      +       '<td style="padding:8px 0 6px;font-weight:700;font-size:14px;">' + t('fe.stof.totalMonthlyRon') + ':'
-      +         (compFromRo ? '<div style="font-size:11px;color:#475569;font-weight:500;margin-top:2px;">' + compFromRo + '</div>' : '')
-      +       '</td>'
-      +       '<td style="padding:8px 0 6px;text-align:right;font-weight:800;color:#0f766e;font-size:16px;vertical-align:top;">'
-      +         (totalMonthlyRon != null ? n2(totalMonthlyRon, 2) + ' RON' : '—')
+      +       '<td style="padding:8px 0;border-top:1.5px solid #fdba74;font-weight:700;color:#0f172a;">' + t('fe.stof.aboveBaseEur') + ':</td>'
+      +       '<td style="padding:8px 0;border-top:1.5px solid #fdba74;text-align:right;font-weight:900;font-size:17px;color:#0f172a;">'
+      +         (aboveBaseEur != null ? n2(aboveBaseEur, 2) + ' EUR' : '—')
       +       '</td>'
       +     '</tr>'
       +   '</table>'
-      +   '<div style="margin-top:10px;padding-top:12px;border-top:2px solid #0f766e;">'
-      +     '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
-      +       '<tr>'
-      +         '<td style="padding:6px 0;font-weight:700;">' + t('fe.stof.netBaseRon') + ':</td>'
-      +         '<td style="padding:6px 0;text-align:right;font-weight:700;">' + n2(baseSal, 2) + ' RON</td>'
-      +       '</tr>'
-      +       '<tr>'
-      +         '<td style="padding:6px 0;font-weight:800;font-size:15px;color:#7c2d12;">⭐ ' + t('fe.stof.aboveBaseEur') + ':</td>'
-      +         '<td style="padding:6px 0;text-align:right;font-weight:900;font-size:16px;color:#7c2d12;">'
-      +           (aboveBaseEur != null ? n2(aboveBaseEur, 2) + ' EUR' : '—')
-      +           (aboveBaseRon != null ? '<div style="font-size:11px;color:#475569;font-weight:600;">≈ ' + n2(aboveBaseRon, 2) + ' RON</div>' : '')
-      +         '</td>'
-      +       '</tr>'
-      +     '</table>'
-      +   '</div>'
+      + (bnr != null
+        ? '<div style="margin-top:10px;font-size:11px;color:#78350f;opacity:0.75;">' + t('fe.stof.bnrUsed') + ': 1 EUR = ' + n2(bnr, 4) + ' RON</div>'
+        : '')
       + '</div>';
-
-    // Kiemelt záró blokk (nyomtatott lapon nagyobb): felül a Total (a
-    // hivatkozási alap), VONAL, majd a két kifizetés-jogcím külön sorban —
-    // vonal NINCS a Salariu és a Diurna között.
-    var finalHighlight =
-      '<div style="margin-top:20px;padding:16px 20px;border:2.5px solid #7c2d12;border-radius:10px;background:#fff7ed;color:#7c2d12;">'
-      +   '<div style="font-size:16px;font-weight:800;color:#7c2d12;line-height:1.9;">'
-      +     '<div>' + t('fe.stof.totalMonthlyRon') + ': <span style="float:right;">' + (totalMonthlyRon != null ? n2(totalMonthlyRon, 2) + ' RON' : '—') + '</span></div>'
-      +     (compFromRo ? '<div style="font-size:11px;color:#7c2d12;font-weight:500;margin-top:-4px;opacity:0.85;">' + compFromRo + '</div>' : '')
-      +     '<div style="border-top:2px solid #7c2d12;padding-top:8px;margin-top:8px;">'
-      +       t('fe.stof.netBaseRon') + ': <span style="float:right;">' + n2(baseSal, 2) + ' RON</span>'
-      +     '</div>'
-      +     '<div>' + t('fe.stof.aboveBaseEur') + ': <span style="float:right;">'
-      +       (aboveBaseEur != null ? n2(aboveBaseEur, 2) + ' EUR' : '—')
-      +       (aboveBaseRon != null ? ' <span style="font-size:12px;font-weight:600;opacity:0.75;">(≈ ' + n2(aboveBaseRon, 2) + ' RON)</span>' : '')
-      +     '</span></div>'
-      +   '</div>'
-      + '</div>';
-
-    return sumBlock + finalHighlight;
   }
 
   // A NYOMTATHATÓ HTML — nyomtatásba és e-mailbe is ugyanez megy.
