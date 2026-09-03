@@ -2045,7 +2045,6 @@
       +       '</tr>'
       +     '</table>'
       +   '</div>'
-      +   '<div style="margin-top:8px;font-size:10px;color:#475569;font-style:italic;">' + t('fe.stof.formulaHint') + '</div>'
       + '</div>';
 
     // Kiemelt záró blokk
@@ -2140,7 +2139,6 @@
       '<div class="dc-of-editor no-print" style="margin:0 0 14px;padding:12px 14px;background:#fef3c7;border:2px solid #d97706;border-radius:10px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;color:#78350f;">'
       +   '<div style="flex:0 0 auto;">'
       +     '<div style="font-size:11px;color:#78350f;text-transform:uppercase;letter-spacing:0.5px;font-weight:800;">' + t('fe.stof.baseSalary') + '</div>'
-      +     '<div style="font-size:10px;color:#92400e;">' + t('fe.stof.baseSalaryHint') + '</div>'
       +   '</div>'
       +   '<div style="display:flex;gap:6px;align-items:center;flex:0 0 auto;">'
       +     '<input type="number" step="0.01" min="0" max="100000" id="dcOfBaseSalInput" value="' + esc(String(baseSal)) + '" style="width:130px;padding:6px 10px;border:1.5px solid #d97706;border-radius:6px;background:#fff;color:#0f172a;font-size:14px;font-weight:700;">'
@@ -2207,7 +2205,6 @@
       +       '</tr>'
       +     '</table>'
       +   '</div>'
-      +   '<div style="margin-top:8px;font-size:10px;color:#475569;font-style:italic;">' + t('fe.stof.formulaHint') + '</div>'
       + '</div>';
 
     // KIEMELT ZÁRÓ BLOKK — a régi inline verzió itt csak referencia (a valódi
