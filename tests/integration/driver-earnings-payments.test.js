@@ -433,3 +433,78 @@ describe('list & delete cross-tenant', () => {
     expect(params[1]).toBe(fixtures.admin.company_id);
   });
 });
+
+// ═════════════════════════════════════════════
+//  Migráció-tolerancia: ha a tábla/oszlop hiányzik, az INSERT hibája nem
+//  egy generikus „Eroare de server" — a felhasználó pontos üzenetet lát,
+//  ami elárulja, hogy szerver-restart kell a migrációhoz.
+// ═════════════════════════════════════════════
+describe('Migráció-tolerancia — driver_earnings/driver_payments/users.net_base_salary_ron', () => {
+  test('paymentCreate: driver_payments tábla hiánya → egyértelmű üzenet', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    fetchBnrEurRon.mockResolvedValueOnce(5.20);
+    pool.query.mockResolvedValueOnce(rows([{ '?column?': 1 }])); // users OK
+    pool.query.mockRejectedValueOnce(new Error('relation "driver_payments" does not exist'));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'paymentCreate',
+      arguments: [{ email_sofer: 'sofer@ceg.hu', amount: 500, currency: 'RON', method: 'cash' }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/driver_payments|migrațiile/i);
+  });
+
+  test('earningCreate: driver_earnings tábla hiánya → egyértelmű üzenet', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query.mockResolvedValueOnce(rows([{ '?column?': 1 }])); // users OK
+    pool.query.mockResolvedValueOnce(rows([])); // driver_earning_kinds üres
+    pool.query.mockRejectedValueOnce(new Error('relation "driver_earnings" does not exist'));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningCreate',
+      arguments: [{ email_sofer: 'sofer@ceg.hu', quantity: 1, unit_amount: 100, currency: 'RON' }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/driver_earnings|migrațiile/i);
+  });
+
+  test('setDriverBaseSalary: net_base_salary_ron oszlop hiánya → egyértelmű üzenet', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query.mockResolvedValueOnce(rows([{ '?column?': 1 }])); // users tulaj-ellenőrzés OK
+    pool.query.mockRejectedValueOnce(new Error('column "net_base_salary_ron" does not exist'));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'setDriverBaseSalary',
+      arguments: [{ email: 'sofer@ceg.hu', base_salary_ron: 2700 }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/net_base_salary_ron|migrațiile/i);
+  });
+
+  test('setDriverBaseSalary: idegen sofőr → nu a fost gasit (nem az UPDATE dob)', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query.mockResolvedValueOnce(rows([])); // users lekérdezés üres
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'setDriverBaseSalary',
+      arguments: [{ email: 'kulso@masikceg.hu', base_salary_ron: 2700 }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/nu a fost gasit/i);
+    // NEM az UPDATE lép hatályba
+    expect(pool.query.mock.calls.length).toBe(1);
+  });
+
+  test('setDriverBaseSalary: sikeres mentés (regresszió-őr)', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query.mockResolvedValueOnce(rows([{ '?column?': 1 }])); // users OK
+    pool.query.mockResolvedValueOnce(rows([{ net_base_salary_ron: '2700.00' }]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'setDriverBaseSalary',
+      arguments: [{ email: 'sofer@ceg.hu', base_salary_ron: 2700 }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.base_salary_ron).toBe(2700);
+  });
+});
