@@ -14,6 +14,21 @@
 
 ---
 
+## 2026-09-04 — Költség-kalkulátor: 🎯 Alapértelmezett Valorcalc-tételek betöltő gombok (jármű + sofőr + cég)
+
+**Kérés:** „nem lehet kiadasokat soferekhez irni sem autokhoz sem cegekhez a jelenlegi kiadasokat amikkel dolgozik a vallorcalc vedd at tedd be" — a Vallorcalc-ban használt alapértelmezett költség-tétel-készletek (Truck: gumi/szerviz/RCA/CASCO/fékbetét/féktárcsa/lízing/karbantartás/váratlan · Trailer: gumi/RCA/CASCO/fékbetét/féktárcsa/lízing · Driver: fizetés/napidíj/adók) beolvasztva a Vallorsoft költség-kalkulátorba EGY GOMBBAL betölthetőként.
+
+**Változások:**
+1. **`handlers/costCalculator.js`** — 3 új RPC (Admin/Manager, `company_id`-szűrt, cross-tenant védelem, audit): `vcalcVehicleCostSeedDefaults({vehicle_id, replace})` — a MEGLÉVŐ `vehicles.tip` alapján dönt truck vs trailer defaultról (`_isTrailerVehicle` heurisztika: `remorc`/`pótkocsi`/`potkocsi`/`trailer` szubstring); `vcalcDriverCostSeedDefaults({driver_id, replace})`; `vcalcCompanyCostSeedDefaults({replace})` — általános RO transzport-cég sablon (Iroda/Könyvelő/Adminisztrátor bér/Kommunikáció/Banki költség/Licencek). Új `DEFAULT_TRUCK_COSTS` (9 tétel), `DEFAULT_TRAILER_COSTS` (6), `DEFAULT_DRIVER_COSTS` (3) konstansok — bit-pontos átvétel a Vallorcalc `TruckForm.tsx`/`TrailerForm.tsx`/`DriverForm.tsx`-ből.
+2. **`replace` opció**: `true` → törli az adott jármű/sofőr/cég meglévő tételeit ELŐTT, majd betölti a defaultokat; `false` → csak hozzáadja (a régiek megmaradnak). A UI dupla-confirm-mel kínál választást (hozzáad / lecserél / mégse).
+3. **UI (`public/cost-calculator.js`)** — új „🎯 Alapértelmezett tételek" gomb minden jármű-blokk fejlécén, minden sofőr-blokk fejlécén, és a Cég-költségek fejléc-toolbarban. Kattintásra confirm-dialógus (van vs nincs tétel esetre külön szöveg), majd az érintett listát azonnal újrarendereli. Vontatóra a truck-, pótkocsira a trailer-készlet töltődik automatikusan.
+4. **`public/i18n.js`** +7 új kulcs (`vcalc.seed.load`/`hint`/`confirmAdd`/`confirmReplace`/`confirmReplaceForce`/`done` + `vcalc.f.itemsShort`, RO-alap + HU). Cache-bust `?v=20260904seed` (admin.html + manager.html: cost-calculator.js + i18n.js).
+5. **1080 Jest zöld**, nincs regresszió. Nincs séma-változás — a MEGLÉVŐ `vehicle_cost_items` / `driver_cost_items` / `company_cost_items` táblákra ír (2026-09-03 kör óta idempotens migráció `db/valorcalc-init.sql`).
+
+**Fontos:** ez pontosan azt teszi, amit a Vallorcalc új jármű/sofőr felviteléhez a `DEFAULT_*_COSTS` konstans automatikusan felkínált (előtöltött szerkesztőben) — a Vallorsoft integrációnál viszont a jármű/sofőr már máshol létezett (Járművek + Belső sofőrök fül), ezért itt EGY GOMBRA kell rábökni, hogy a Vallorcalc-mintás alap-tételek bekerüljenek. Ezután a user szabadon módosítja/kiegészíti/törli őket ugyanabban a felületben mint eddig.
+
+---
+
 ## 2026-09-04 — Költség-kalkulátor: 🔗 jármű-alapú auto-párosítás + 👁 mentett részletek + 📄 PDF letöltés
 
 **Kérés:** „igen rakj at mindent (a jarmu parositast is atveheti a rendszerbol vagy kezzi parositas helyben) stb miutan ezekkel kesz vagy es nincs egyebb akkorr pr es merg a main be" — a Költség-kalkulátor modul (2026-09-03) 3 hiányzó darabjának pótlása → PR + merge.

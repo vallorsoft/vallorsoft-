@@ -255,6 +255,125 @@ handlers.vcalcCompanyCostDelete = async function (req, res, args) {
 };
 
 // ═══════════════════════════════════════════════════════════
+//  3.5) VALORCALC ALAPÉRTELMEZETT TÉTELEK — betöltő
+//  A Vallorcalc DEFAULT_TRUCK_COSTS / DEFAULT_TRAILER_COSTS /
+//  DEFAULT_DRIVER_COSTS bit-pontos átemelése (adatvezérelt).
+// ═══════════════════════════════════════════════════════════
+
+const DEFAULT_TRUCK_COSTS = [
+  { name: 'Gumiabroncs',       basis_type: 'km',   interval_km: 240000, interval_months: null, amount_lei: 12600, is_gross: true },
+  { name: 'Szerviz (revisie)', basis_type: 'km',   interval_km:  80000, interval_months: null, amount_lei:  2450, is_gross: true },
+  { name: 'RCA biztosítás',    basis_type: 'time', interval_km: null,   interval_months: 12,   amount_lei: 12000, is_gross: true },
+  { name: 'CASCO biztosítás',  basis_type: 'time', interval_km: null,   interval_months: 12,   amount_lei:  7200, is_gross: true },
+  { name: 'Fékbetét',          basis_type: 'time', interval_km: null,   interval_months: 12,   amount_lei:  1000, is_gross: true },
+  { name: 'Féktárcsa',         basis_type: 'time', interval_km: null,   interval_months: 24,   amount_lei:  2000, is_gross: true },
+  { name: 'Lízing',            basis_type: 'time', interval_km: null,   interval_months:  1,   amount_lei:  4300, is_gross: true },
+  { name: 'Karbantartás',      basis_type: 'time', interval_km: null,   interval_months: 12,   amount_lei:  7000, is_gross: true },
+  { name: 'Váratlan szerviz',  basis_type: 'time', interval_km: null,   interval_months: 12,   amount_lei: 15000, is_gross: true },
+];
+const DEFAULT_TRAILER_COSTS = [
+  { name: 'Gumiabroncs',      basis_type: 'km',   interval_km: 240000, interval_months: null, amount_lei: 10800, is_gross: true },
+  { name: 'RCA biztosítás',   basis_type: 'time', interval_km: null,   interval_months: 12,   amount_lei:   500, is_gross: true },
+  { name: 'CASCO biztosítás', basis_type: 'time', interval_km: null,   interval_months: 12,   amount_lei:  2200, is_gross: true },
+  { name: 'Fékbetét',         basis_type: 'time', interval_km: null,   interval_months: 12,   amount_lei:  1650, is_gross: true },
+  { name: 'Féktárcsa',        basis_type: 'time', interval_km: null,   interval_months: 24,   amount_lei:  3450, is_gross: true },
+  { name: 'Lízing',           basis_type: 'time', interval_km: null,   interval_months:  1,   amount_lei:  2150, is_gross: true },
+];
+const DEFAULT_DRIVER_COSTS = [
+  { name: 'Fizetés (bruttó)',   amount_lei: 5000, is_gross: true  },
+  { name: 'Napidíj (diurna)',   amount_lei: 9000, is_gross: false },
+  { name: 'Alkalmazott adók',   amount_lei: 2070, is_gross: false },
+];
+
+function _isTrailerVehicle(veh) {
+  const t = String(veh && veh.tip || '').toLowerCase();
+  return t.indexOf('remorc') !== -1 || t.indexOf('pótkocsi') !== -1 || t.indexOf('potkocsi') !== -1 || t.indexOf('trailer') !== -1;
+}
+
+// args: [{ vehicle_id, replace? }]
+handlers.vcalcVehicleCostSeedDefaults = async function (req, res, args) {
+  try {
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = _cid(req);
+    const a = (args && args[0]) || {};
+    const vehicle_id = _int(a.vehicle_id);
+    if (!vehicle_id) return res.json({ result: { ok: false, err: 'Vehicul lipsă' } });
+    const vr = await pool.query('SELECT id, rendszam, marca, tip FROM vehicles WHERE id=$1 AND company_id=$2', [vehicle_id, cid]);
+    if (vr.rowCount === 0) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const veh = vr.rows[0];
+    const defaults = _isTrailerVehicle(veh) ? DEFAULT_TRAILER_COSTS : DEFAULT_TRUCK_COSTS;
+    if (a.replace) await pool.query('DELETE FROM vehicle_cost_items WHERE vehicle_id=$1 AND company_id=$2', [vehicle_id, cid]);
+    let inserted = 0;
+    for (const it of defaults) {
+      await pool.query(
+        `INSERT INTO vehicle_cost_items (company_id, vehicle_id, name, basis_type, interval_km, interval_months, amount_lei, is_gross)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [cid, vehicle_id, it.name, it.basis_type, it.interval_km, it.interval_months, it.amount_lei, it.is_gross]
+      );
+      inserted++;
+    }
+    try { await audit.fromReq(req, 'valorcalc.vehicle_cost_seed', 'vehicle', String(vehicle_id), { inserted, kind: _isTrailerVehicle(veh) ? 'trailer' : 'truck', replaced: !!a.replace }); } catch {}
+    return res.json({ result: { ok: true, inserted, kind: _isTrailerVehicle(veh) ? 'trailer' : 'truck' } });
+  } catch (err) { console.error('vcalcVehicleCostSeedDefaults:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
+};
+
+// args: [{ driver_id, replace? }]
+handlers.vcalcDriverCostSeedDefaults = async function (req, res, args) {
+  try {
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = _cid(req);
+    const a = (args && args[0]) || {};
+    const driver_id = _int(a.driver_id);
+    if (!driver_id) return res.json({ result: { ok: false, err: 'Șofer lipsă' } });
+    if (!(await _ownDriver(cid, driver_id))) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    if (a.replace) await pool.query('DELETE FROM driver_cost_items WHERE driver_id=$1 AND company_id=$2', [driver_id, cid]);
+    let inserted = 0;
+    for (const it of DEFAULT_DRIVER_COSTS) {
+      await pool.query(
+        `INSERT INTO driver_cost_items (company_id, driver_id, name, amount_lei, is_gross)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [cid, driver_id, it.name, it.amount_lei, it.is_gross]
+      );
+      inserted++;
+    }
+    try { await audit.fromReq(req, 'valorcalc.driver_cost_seed', 'driver', String(driver_id), { inserted, replaced: !!a.replace }); } catch {}
+    return res.json({ result: { ok: true, inserted } });
+  } catch (err) { console.error('vcalcDriverCostSeedDefaults:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
+};
+
+// args: [{ replace? }]
+handlers.vcalcCompanyCostSeedDefaults = async function (req, res, args) {
+  try {
+    if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const cid = _cid(req);
+    const a = (args && args[0]) || {};
+    // A Vallorcalc-ban NEM voltak hardcodolt cég-defaultok — a felhasználó
+    // maga vitte fel. Itt egy általános RO transzport-cég sablon-készletet
+    // adunk, amit később bármikor módosíthat / törölhet.
+    const DEFAULTS = [
+      { name: 'Iroda bérleti díja',    basis_type: 'time', interval_months:  1, amount_lei:  1500, is_gross: true },
+      { name: 'Könyvelő',              basis_type: 'time', interval_months:  1, amount_lei:  1200, is_gross: true },
+      { name: 'Adminisztrátor bér',    basis_type: 'time', interval_months:  1, amount_lei:  4000, is_gross: true },
+      { name: 'Kommunikáció (tel/net)',basis_type: 'time', interval_months:  1, amount_lei:   400, is_gross: true },
+      { name: 'Banki költségek',       basis_type: 'time', interval_months:  1, amount_lei:   250, is_gross: true },
+      { name: 'Licenc-ek (soft/CMR)',  basis_type: 'time', interval_months: 12, amount_lei:  3000, is_gross: true },
+    ];
+    if (a.replace) await pool.query('DELETE FROM company_cost_items WHERE company_id=$1', [cid]);
+    let inserted = 0;
+    for (const it of DEFAULTS) {
+      await pool.query(
+        `INSERT INTO company_cost_items (company_id, name, basis_type, interval_months, amount_lei, is_gross)
+         VALUES ($1,$2,$3,$4,$5,$6)`,
+        [cid, it.name, it.basis_type, it.interval_months, it.amount_lei, it.is_gross]
+      );
+      inserted++;
+    }
+    try { await audit.fromReq(req, 'valorcalc.company_cost_seed', 'company', String(cid), { inserted, replaced: !!a.replace }); } catch {}
+    return res.json({ result: { ok: true, inserted } });
+  } catch (err) { console.error('vcalcCompanyCostSeedDefaults:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
+};
+
+// ═══════════════════════════════════════════════════════════
 //  4) KALKULÁTOR-BEÁLLÍTÁSOK (cégenkénti)
 // ═══════════════════════════════════════════════════════════
 

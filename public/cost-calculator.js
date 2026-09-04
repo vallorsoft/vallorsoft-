@@ -61,9 +61,12 @@
     } else {
       for (const g of Object.values(grouped)) {
         html.push(`<div class="glass-soft" style="margin:12px 0;padding:14px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <b>${esc(g.vehicle.rendszam)}</b> <span class="text-muted">${esc(g.vehicle.marca || '')} ${esc(g.vehicle.tip || '')}</span>
-            <span class="badge">${g.items.length} tétel</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+            <div><b>${esc(g.vehicle.rendszam)}</b> <span class="text-muted">${esc(g.vehicle.marca || '')} ${esc(g.vehicle.tip || '')}</span></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span class="badge">${g.items.length} ${t('vcalc.f.itemsShort','tétel')}</span>
+              <button class="btn small" data-vci-seed="${g.vehicle.id}" title="${t('vcalc.seed.hint','Valorcalc alapértelmezett tételek betöltése')}">🎯 ${t('vcalc.seed.load','Alapértelmezett tételek')}</button>
+            </div>
           </div>`);
         if (!g.items.length) html.push(`<p class="text-muted" style="font-size:12px" data-i18n="vcalc.vehCosts.noItems">Nincs költség-tétel.</p>`);
         else html.push(`<table class="table" style="font-size:12.5px"><thead><tr>
@@ -88,6 +91,23 @@
       if (!confirm(t('vcalc.confirmDelete', 'Biztosan törlöd?'))) return;
       const r = await gas('vcalcVehicleCostDelete', [{ id: Number(b.dataset.vciDel) }]);
       if (r && r.ok) renderVehicleCosts(); else alert(r && r.err || 'Hiba');
+    });
+    box.querySelectorAll('[data-vci-seed]').forEach(b => b.onclick = async () => {
+      const veh = refs.vehicles.find(v => String(v.id) === b.dataset.vciSeed);
+      if (!veh) return;
+      const has = grouped[veh.id] && grouped[veh.id].items.length > 0;
+      const msg = has
+        ? t('vcalc.seed.confirmReplace', 'Ehhez a járműhöz már vannak tételek. Betöltjük az alapértelmezett Valorcalc-tételeket a jelenlegiek MELLÉ? (Kattints Mégse-re, ha az összeset le akarod cserélni.)')
+        : t('vcalc.seed.confirmAdd', 'Betöltjük az alapértelmezett Valorcalc-tételeket ehhez a járműhöz?');
+      if (!confirm(msg)) {
+        if (has && confirm(t('vcalc.seed.confirmReplaceForce', 'Lecseréled az ÖSSZES jelenlegi tételt az alapértelmezettre? (visszavonhatatlan)'))) {
+          const r = await gas('vcalcVehicleCostSeedDefaults', [{ vehicle_id: Number(b.dataset.vciSeed), replace: true }]);
+          if (r && r.ok) { alert(t('vcalc.seed.done','Betöltve') + ': ' + r.inserted); renderVehicleCosts(); } else alert(r && r.err || 'Hiba');
+        }
+        return;
+      }
+      const r = await gas('vcalcVehicleCostSeedDefaults', [{ vehicle_id: Number(b.dataset.vciSeed), replace: false }]);
+      if (r && r.ok) { alert(t('vcalc.seed.done','Betöltve') + ': ' + r.inserted); renderVehicleCosts(); } else alert(r && r.err || 'Hiba');
     });
     if (window.I18N && window.I18N.apply) window.I18N.apply();
   }
@@ -157,9 +177,12 @@
     if (!refs.drivers.length) html.push(`<p class="text-muted" data-i18n="vcalc.drvCosts.noDrivers">Nincs belső sofőr. Vidd fel őket a Belső sofőrök fülön.</p>`);
     else for (const g of Object.values(grouped)) {
       html.push(`<div class="glass-soft" style="margin:12px 0;padding:14px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <b>${esc(g.driver.nume || '')}</b> <span class="text-muted">${esc(g.driver.email)}</span>
-          <span class="badge">${g.items.length} tétel</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+          <div><b>${esc(g.driver.nume || '')}</b> <span class="text-muted">${esc(g.driver.email)}</span></div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span class="badge">${g.items.length} ${t('vcalc.f.itemsShort','tétel')}</span>
+            <button class="btn small" data-dci-seed="${g.driver.id}" title="${t('vcalc.seed.hint','Valorcalc alapértelmezett tételek betöltése')}">🎯 ${t('vcalc.seed.load','Alapértelmezett tételek')}</button>
+          </div>
         </div>`);
       if (!g.items.length) html.push(`<p class="text-muted" style="font-size:12px" data-i18n="vcalc.vehCosts.noItems">Nincs költség-tétel.</p>`);
       else html.push(`<table class="table" style="font-size:12.5px"><thead><tr>
@@ -176,6 +199,23 @@
       if (!confirm(t('vcalc.confirmDelete', 'Biztosan törlöd?'))) return;
       const r = await gas('vcalcDriverCostDelete', [{ id: Number(b.dataset.dciDel) }]);
       if (r && r.ok) renderDriverCosts(); else alert(r && r.err || 'Hiba');
+    });
+    box.querySelectorAll('[data-dci-seed]').forEach(b => b.onclick = async () => {
+      const drv = refs.drivers.find(d => String(d.id) === b.dataset.dciSeed);
+      if (!drv) return;
+      const has = grouped[drv.id] && grouped[drv.id].items.length > 0;
+      const msg = has
+        ? t('vcalc.seed.confirmReplace', 'Ehhez a sofőrhöz már vannak tételek. Betöltjük az alapértelmezett Valorcalc-tételeket a jelenlegiek MELLÉ? (Kattints Mégse-re, ha az összeset le akarod cserélni.)')
+        : t('vcalc.seed.confirmAdd', 'Betöltjük az alapértelmezett Valorcalc-tételeket ehhez a sofőrhöz?');
+      if (!confirm(msg)) {
+        if (has && confirm(t('vcalc.seed.confirmReplaceForce', 'Lecseréled az ÖSSZES jelenlegi tételt az alapértelmezettre? (visszavonhatatlan)'))) {
+          const r = await gas('vcalcDriverCostSeedDefaults', [{ driver_id: Number(b.dataset.dciSeed), replace: true }]);
+          if (r && r.ok) { alert(t('vcalc.seed.done','Betöltve') + ': ' + r.inserted); renderDriverCosts(); } else alert(r && r.err || 'Hiba');
+        }
+        return;
+      }
+      const r = await gas('vcalcDriverCostSeedDefaults', [{ driver_id: Number(b.dataset.dciSeed), replace: false }]);
+      if (r && r.ok) { alert(t('vcalc.seed.done','Betöltve') + ': ' + r.inserted); renderDriverCosts(); } else alert(r && r.err || 'Hiba');
     });
     if (window.I18N && window.I18N.apply) window.I18N.apply();
   }
@@ -221,7 +261,10 @@
     if (!box) return;
     box.innerHTML = `<div class="glass"><h2 class="h-title">🏢 <span data-i18n="vcalc.coCosts.title">Cég-költségek</span></h2>
       <p class="text-muted" data-i18n="vcalc.coCosts.hint">Cég-szintű fix költségek (könyvelés, iroda, szoftver, adók, ügyvezetői bér). A rendszer szétosztja őket az aktív vontatók számára.</p>
-      <div style="margin-bottom:12px"><button class="btn primary" id="cciAdd" data-i18n="vcalc.coCosts.add">+ Új cég-költség</button></div>
+      <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn primary" id="cciAdd" data-i18n="vcalc.coCosts.add">+ Új cég-költség</button>
+        <button class="btn" id="cciSeed" title="${t('vcalc.seed.hint','Valorcalc alapértelmezett tételek betöltése')}">🎯 ${t('vcalc.seed.load','Alapértelmezett tételek')}</button>
+      </div>
       <div id="cciBox">${t('vcalc.loading', 'Betöltés…')}</div></div>`;
     const list = (await gas('vcalcCompanyCostList', [{}])) || { ok: true, items: [] };
     const items = list.items || [];
@@ -238,6 +281,21 @@
         <td><button class="btn small" data-cci-edit="${it.id}">✎</button>
             <button class="btn small danger" data-cci-del="${it.id}">🗑</button></td></tr>`).join('')}</tbody></table>`;
     document.getElementById('cciAdd').onclick = () => openCciModal(null);
+    document.getElementById('cciSeed').onclick = async () => {
+      const has = items.length > 0;
+      const msg = has
+        ? t('vcalc.seed.confirmReplace', 'Már vannak cég-tételek. Betöltjük az alapértelmezett Valorcalc-tételeket a jelenlegiek MELLÉ? (Kattints Mégse-re, ha az összeset le akarod cserélni.)')
+        : t('vcalc.seed.confirmAdd', 'Betöltjük az alapértelmezett Valorcalc cég-tételeket?');
+      if (!confirm(msg)) {
+        if (has && confirm(t('vcalc.seed.confirmReplaceForce', 'Lecseréled az ÖSSZES jelenlegi tételt az alapértelmezettre? (visszavonhatatlan)'))) {
+          const r = await gas('vcalcCompanyCostSeedDefaults', [{ replace: true }]);
+          if (r && r.ok) { alert(t('vcalc.seed.done','Betöltve') + ': ' + r.inserted); renderCompanyCosts(); } else alert(r && r.err || 'Hiba');
+        }
+        return;
+      }
+      const r = await gas('vcalcCompanyCostSeedDefaults', [{ replace: false }]);
+      if (r && r.ok) { alert(t('vcalc.seed.done','Betöltve') + ': ' + r.inserted); renderCompanyCosts(); } else alert(r && r.err || 'Hiba');
+    };
     cbox.querySelectorAll('[data-cci-edit]').forEach(b => b.onclick = () => { const it = items.find(x => String(x.id) === b.dataset.cciEdit); if (it) openCciModal(it); });
     cbox.querySelectorAll('[data-cci-del]').forEach(b => b.onclick = async () => {
       if (!confirm(t('vcalc.confirmDelete', 'Biztosan törlöd?'))) return;
