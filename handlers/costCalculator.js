@@ -643,7 +643,7 @@ handlers.vcalcRefLists = async function (req, res) {
     if (!_am(req)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = _cid(req);
     const [vehR, drvR] = await Promise.all([
-      pool.query('SELECT id, rendszam, marca, tip, fuel_per_100km FROM vehicles WHERE company_id=$1 ORDER BY rendszam', [cid]),
+      pool.query('SELECT id, rendszam, marca, tip, fuel_per_100km, assigned_driver_email, default_trailer_id FROM vehicles WHERE company_id=$1 ORDER BY rendszam', [cid]),
       pool.query("SELECT id, nume, email FROM users WHERE company_id=$1 AND pozicio='Sofer' ORDER BY nume", [cid]),
     ]);
     return res.json({ result: { ok: true, vehicles: vehR.rows, drivers: drvR.rows } });

@@ -383,7 +383,11 @@
         <h3 data-i18n="vcalc.run.vehSec">Jármű + sofőr</h3>
         <div class="grid-2">
           <div class="field"><label data-i18n="vcalc.run.truck">Vontató</label>
-            <select id="vcTruck"><option value="">—</option>${refs.vehicles.map(v => `<option value="${v.id}"${String(F.truck_vehicle_id) === String(v.id) ? ' selected' : ''}>${esc(v.rendszam)} — ${esc(v.marca || '')}</option>`).join('')}</select></div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <select id="vcTruck" style="flex:1"><option value="">—</option>${refs.vehicles.map(v => `<option value="${v.id}"${String(F.truck_vehicle_id) === String(v.id) ? ' selected' : ''}>${esc(v.rendszam)} — ${esc(v.marca || '')}</option>`).join('')}</select>
+              <button class="btn small" id="vcAutoPair" title="${t('vcalc.run.autoPairHint', 'Kiválasztott vontatóból: pótkocsi + sofőr auto-kitöltés')}" data-i18n="vcalc.run.autoPair">🔗 Auto-párosítás</button>
+            </div>
+          </div>
           <div class="field"><label data-i18n="vcalc.run.trailer">Pótkocsi</label>
             <select id="vcTrailer"><option value="">—</option>${refs.vehicles.map(v => `<option value="${v.id}"${String(F.trailer_vehicle_id) === String(v.id) ? ' selected' : ''}>${esc(v.rendszam)}</option>`).join('')}</select></div>
         </div>
@@ -463,6 +467,7 @@
     body.querySelector('#vcTollAdd').onclick = () => { F.tolls.push({ description: '', amount: '', input_currency: 'eur' }); renderCalcBody(); };
     body.querySelector('#vcCalc').onclick = () => runCalc(false);
     body.querySelector('#vcSave').onclick = () => runCalc(true);
+    const apBtn = body.querySelector('#vcAutoPair'); if (apBtn) apBtn.onclick = autoPairFromTruck;
     renderFuelBody(); renderTolls();
     if (window.I18N && window.I18N.apply) window.I18N.apply();
   }
@@ -522,14 +527,11 @@
     if (save && r.serial_no) alert(t('vcalc.run.saved', 'Mentve') + ': ' + r.serial_no);
   }
 
-  function renderResult(res, serial) {
-    const el = document.getElementById('vcResult'); if (!el) return;
+  function _resultTableHtml(res) {
     const lines = (res.lines || []).map(l => `<tr><td>${esc(l.name)}</td><td>${fmt(l.netLei)}</td><td>${fmt(l.vatLei)}</td><td>${fmt(l.grossLei)}</td></tr>`).join('');
     const profitHtml = res.profitNet != null ? `<tr class="${res.profitNet >= 0 ? 'ok' : 'danger'}"><td colspan="2"><b>${t('vcalc.res.profit', 'Profit')}</b></td>
       <td colspan="2"><b>${fmt(res.profitNet)} LEI · ${fmt(res.profitEur)} EUR</b></td></tr>` : '';
-    el.innerHTML = `<div class="glass-soft" style="padding:14px;margin-top:12px">
-      <h3>${t('vcalc.res.title', 'Eredmény')} ${serial ? `<span class="badge">${esc(serial)}</span>` : ''}</h3>
-      <table class="table"><thead><tr><th data-i18n="vcalc.res.item">Tétel</th><th>Nettó LEI</th><th>ÁFA LEI</th><th>Bruttó LEI</th></tr></thead>
+    return `<table class="table"><thead><tr><th data-i18n="vcalc.res.item">Tétel</th><th>Nettó LEI</th><th>ÁFA LEI</th><th>Bruttó LEI</th></tr></thead>
       <tbody>${lines}
         <tr><td><b>${t('vcalc.res.fuel', 'Üzemanyag')}</b></td><td>${fmt(res.fuelNet)}</td><td>${fmt(res.fuelVat)}</td><td>${fmt(res.fuelGross)}</td></tr>
         ${res.discountNet ? `<tr><td>${t('vcalc.res.discount', 'Kedvezmény')}</td><td>-${fmt(res.discountNet)}</td><td>0</td><td>-${fmt(res.discountNet)}</td></tr>` : ''}
@@ -537,8 +539,154 @@
         <tr style="font-weight:800"><td>${t('vcalc.res.total', 'Összesen')}</td><td>${fmt(res.totalNet)}</td><td>${fmt(res.totalVat)}</td><td>${fmt(res.totalGross)}</td></tr>
         <tr class="text-muted"><td colspan="2">EUR-ban</td><td colspan="2">${fmt(res.totalNetEur)} nettó · ${fmt(res.totalGrossEur)} bruttó</td></tr>
         ${profitHtml}
-      </tbody></table></div>`;
+      </tbody></table>`;
+  }
+
+  function renderResult(res, serial, meta) {
+    const el = document.getElementById('vcResult'); if (!el) return;
+    STATE.lastResult = { res, serial: serial || '', meta: meta || null };
+    el.innerHTML = `<div class="glass-soft" style="padding:14px;margin-top:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <h3 style="margin:0">${t('vcalc.res.title', 'Eredmény')} ${serial ? `<span class="badge">${esc(serial)}</span>` : ''}</h3>
+        <div style="display:flex;gap:6px">
+          <button class="btn small" id="vcPrintPdf" data-i18n="vcalc.res.printPdf">📄 PDF letöltés</button>
+        </div>
+      </div>
+      ${_resultTableHtml(res)}</div>`;
+    const b = document.getElementById('vcPrintPdf');
+    if (b) b.onclick = () => exportResultToPdf(STATE.lastResult);
     if (window.I18N && window.I18N.apply) window.I18N.apply();
+  }
+
+  // ─── Auto-párosítás vontatóból (assigned_driver_email + default_trailer_id) ─
+  function autoPairFromTruck() {
+    const refs = STATE.refs || { vehicles: [], drivers: [] };
+    if (!F.truck_vehicle_id) { alert(t('vcalc.run.errPickTruck', 'Előbb válassz vontatót')); return; }
+    const truck = refs.vehicles.find(v => String(v.id) === String(F.truck_vehicle_id));
+    if (!truck) return;
+    const changes = [];
+    // Pótkocsi
+    if (truck.default_trailer_id) {
+      const tr = refs.vehicles.find(v => String(v.id) === String(truck.default_trailer_id));
+      if (tr) { F.trailer_vehicle_id = tr.id; changes.push('🚛 ' + tr.rendszam); }
+    }
+    // Sofőr (assigned_driver_email → driver id)
+    if (truck.assigned_driver_email) {
+      const drv = refs.drivers.find(d => (d.email || '').toLowerCase() === String(truck.assigned_driver_email).toLowerCase());
+      if (drv && !F.driver_ids.includes(drv.id)) { F.driver_ids.push(drv.id); changes.push('👤 ' + (drv.nume || drv.email)); }
+    }
+    // Alap fogyasztás
+    if (truck.fuel_per_100km && !F.fuel_l_per_100km) { F.fuel_l_per_100km = truck.fuel_per_100km; changes.push('⛽ ' + truck.fuel_per_100km + ' L/100km'); }
+    if (!changes.length) alert(t('vcalc.run.autoPairNone', 'Ehhez a vontatóhoz nincs beállítva pár (Belső sofőrök fülön a jármű-modálban állítható).'));
+    else alert(t('vcalc.run.autoPairDone', 'Auto-kitöltve: ') + changes.join(', '));
+    renderCalcBody();
+  }
+
+  // ─── Saved calc — detail modal ─────────────────────────────
+  async function openSavedDetail(id) {
+    const r = await gas('vcalcCalcGet', [{ id: Number(id) }]);
+    if (!r || !r.ok) { alert(r && r.err || 'Hiba'); return; }
+    const c = r.calc || {};
+    const res = c.result_json || {};
+    const meta = { serial: c.serial_no || '', name: c.name || '', trip_km: c.trip_km, trip_days: c.trip_days, created_at: c.created_at, order_id: c.order_id || '' };
+    const back = document.createElement('div'); back.className = 'modal-back'; back.style.zIndex = 10010;
+    back.innerHTML = `<div class="modal glass" style="max-width:820px;max-height:90vh;overflow:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <h3 style="margin:0">💾 ${esc(c.name || t('vcalc.saved.title','Mentett kalkuláció'))} <span class="badge">${esc(c.serial_no || '')}</span></h3>
+        <div style="display:flex;gap:6px">
+          <button class="btn small" id="vcdPdf">📄 PDF</button>
+          <button class="btn small ghost" id="vcdClose">✕</button>
+        </div>
+      </div>
+      <div class="text-muted" style="font-size:12px;margin-bottom:8px">
+        ${new Date(c.created_at).toLocaleString('ro-RO')} · ${fmt(c.trip_km, 0)} km · ${c.trip_days} ${t('vcalc.res.days','nap')}${c.order_id ? ' · <span class="badge">'+esc(c.order_id)+'</span>' : ''}
+      </div>
+      ${_resultTableHtml(res)}
+    </div>`;
+    document.body.appendChild(back);
+    back.querySelector('#vcdClose').onclick = () => back.remove();
+    back.onclick = e => { if (e.target === back) back.remove(); };
+    back.querySelector('#vcdPdf').onclick = () => exportResultToPdf({ res, serial: c.serial_no || '', meta });
+    if (window.I18N && window.I18N.apply) window.I18N.apply();
+  }
+
+  // ─── PDF export (pdf-lib) ──────────────────────────────────
+  async function exportResultToPdf(pack) {
+    if (!pack || !pack.res) { alert('Nincs adat'); return; }
+    if (typeof PDFLib === 'undefined') { alert('PDF könyvtár nincs betöltve'); return; }
+    const res = pack.res, serial = pack.serial || '', meta = pack.meta || {};
+    // ASCII-safe (Helvetica WinAnsi nem tudja az árvíztűrőt)
+    const A = s => String(s == null ? '' : s).replace(/ă|â|Ă|Â/g, 'a').replace(/î|Î/g, 'i').replace(/ș|ş|Ș|Ş/g, 's').replace(/ț|ţ|Ț|Ţ/g, 't').replace(/ő|Ő/g, 'o').replace(/ű|Ű/g, 'u').replace(/[^\x00-\x7F]/g, '');
+    const pdf = await PDFLib.PDFDocument.create();
+    const page = pdf.addPage([595, 842]); // A4
+    const font = await pdf.embedFont(PDFLib.StandardFonts.Helvetica);
+    const bold = await pdf.embedFont(PDFLib.StandardFonts.HelveticaBold);
+    const black = PDFLib.rgb(0.05, 0.05, 0.05);
+    const grey = PDFLib.rgb(0.45, 0.45, 0.45);
+    let y = 800;
+    const draw = (text, opts) => {
+      opts = opts || {};
+      page.drawText(A(text), { x: opts.x || 40, y: y, size: opts.size || 10, font: opts.bold ? bold : font, color: opts.color || black });
+    };
+    // Fejléc
+    draw('CALCUL COST FUVAR', { size: 18, bold: true });
+    y -= 24;
+    if (serial) { draw('Serial: ' + serial, { size: 11, bold: true, color: grey }); y -= 16; }
+    if (meta.name) { draw(meta.name, { size: 12 }); y -= 16; }
+    const infoLine = [
+      meta.trip_km ? (fmt(meta.trip_km, 0) + ' km') : '',
+      meta.trip_days ? (meta.trip_days + ' zile') : '',
+      meta.order_id ? ('Cursa: ' + meta.order_id) : '',
+      meta.created_at ? ('Data: ' + new Date(meta.created_at).toLocaleDateString('ro-RO')) : (new Date().toLocaleDateString('ro-RO'))
+    ].filter(Boolean).join(' · ');
+    draw(infoLine, { size: 10, color: grey }); y -= 20;
+    // Elválasztó vonal
+    page.drawLine({ start: { x: 40, y: y }, end: { x: 555, y: y }, thickness: 1, color: grey });
+    y -= 18;
+    // Tétel-tábla fejléc
+    const cols = [{ x: 40, w: 235, label: 'Descriere' }, { x: 275, w: 90, label: 'Net LEI', right: true }, { x: 365, w: 90, label: 'TVA LEI', right: true }, { x: 455, w: 100, label: 'Brut LEI', right: true }];
+    cols.forEach(c => page.drawText(A(c.label), { x: c.right ? (c.x + c.w - font.widthOfTextAtSize(A(c.label), 9)) : c.x, y: y, size: 9, font: bold, color: grey }));
+    y -= 4;
+    page.drawLine({ start: { x: 40, y: y }, end: { x: 555, y: y }, thickness: 0.5, color: grey });
+    y -= 12;
+    // Sorok
+    const drawRow = (name, n, v, g, boldRow) => {
+      const f = boldRow ? bold : font;
+      page.drawText(A(name), { x: 40, y: y, size: 9, font: f, color: black });
+      [{ v: fmt(n), x: cols[1] }, { v: fmt(v), x: cols[2] }, { v: fmt(g), x: cols[3] }].forEach(cell => {
+        const w = f.widthOfTextAtSize(cell.v, 9);
+        page.drawText(cell.v, { x: cell.x.x + cell.x.w - w, y: y, size: 9, font: f, color: black });
+      });
+      y -= 13;
+      if (y < 80) { const p = pdf.addPage([595, 842]); y = 800; }
+    };
+    (res.lines || []).forEach(l => drawRow(l.name || '', l.netLei || 0, l.vatLei || 0, l.grossLei || 0));
+    drawRow('Combustibil', res.fuelNet || 0, res.fuelVat || 0, res.fuelGross || 0, true);
+    if (res.discountNet) drawRow('Discount', -Math.abs(res.discountNet), 0, -Math.abs(res.discountNet));
+    if (res.tollNet) { page.drawText(A('Taxe drum (net)'), { x: 40, y: y, size: 9, font: font, color: black });
+      const tv = fmt(res.tollNet), tw = font.widthOfTextAtSize(tv, 9);
+      page.drawText(tv, { x: cols[1].x + cols[1].w - tw, y: y, size: 9, font: font, color: black }); y -= 13; }
+    // Total sor
+    page.drawLine({ start: { x: 40, y: y + 4 }, end: { x: 555, y: y + 4 }, thickness: 0.5, color: grey });
+    drawRow('TOTAL', res.totalNet || 0, res.totalVat || 0, res.totalGross || 0, true);
+    y -= 4;
+    draw('In EUR: ' + fmt(res.totalNetEur) + ' net · ' + fmt(res.totalGrossEur) + ' brut', { size: 10, color: grey }); y -= 18;
+    // Profit
+    if (res.profitNet != null) {
+      const pColor = res.profitNet >= 0 ? PDFLib.rgb(0.1, 0.55, 0.15) : PDFLib.rgb(0.75, 0.1, 0.1);
+      page.drawText(A('PROFIT: ' + fmt(res.profitNet) + ' LEI  ·  ' + fmt(res.profitEur) + ' EUR'), { x: 40, y: y, size: 13, font: bold, color: pColor });
+      y -= 24;
+    }
+    // Lábléc
+    page.drawText(A('Generat de VallorSoft · ' + new Date().toLocaleString('ro-RO')), { x: 40, y: 30, size: 8, font: font, color: grey });
+    // Letöltés
+    const bytes = await pdf.save();
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'calcul_' + (serial || 'fara-serial') + '.pdf';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -564,7 +712,11 @@
         <td>${fmt(it.trip_km, 0)}</td><td>${it.trip_days}</td>
         <td>${fmt(it.total_net_eur)}</td>
         <td class="${(it.profit_eur || 0) >= 0 ? 'ok' : 'danger'}">${it.profit_eur != null ? fmt(it.profit_eur) : '—'}</td>
-        <td><button class="btn small danger" data-cc-del="${it.id}">🗑</button></td></tr>`).join('')}</tbody></table>`;
+        <td style="white-space:nowrap">
+          <button class="btn small" data-cc-open="${it.id}" title="${t('vcalc.saved.open','Megnyitás')}">👁</button>
+          <button class="btn small danger" data-cc-del="${it.id}">🗑</button>
+        </td></tr>`).join('')}</tbody></table>`;
+    document.querySelectorAll('[data-cc-open]').forEach(b => b.onclick = () => openSavedDetail(b.dataset.ccOpen));
     document.querySelectorAll('[data-cc-del]').forEach(b => b.onclick = async () => {
       if (!confirm(t('vcalc.confirmDelete', 'Biztosan törlöd?'))) return;
       const r = await gas('vcalcCalcDelete', [{ id: Number(b.dataset.ccDel) }]);

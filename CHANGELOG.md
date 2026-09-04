@@ -14,6 +14,20 @@
 
 ---
 
+## 2026-09-04 — Költség-kalkulátor: 🔗 jármű-alapú auto-párosítás + 👁 mentett részletek + 📄 PDF letöltés
+
+**Kérés:** „igen rakj at mindent (a jarmu parositast is atveheti a rendszerbol vagy kezzi parositas helyben) stb miutan ezekkel kesz vagy es nincs egyebb akkorr pr es merg a main be" — a Költség-kalkulátor modul (2026-09-03) 3 hiányzó darabjának pótlása → PR + merge.
+
+**Változások:**
+1. **🔗 „Auto-párosítás a járműből"** (`public/cost-calculator.js` `autoPairFromTruck`) — a Vontató legördülő mellett új gomb: a kiválasztott vontató `assigned_driver_email` (Belső sofőrök fülön beállított sofőr-hozzárendelés) + `default_trailer_id` (a Vontatóhoz párosított alapértelmezett pótkocsi) + `fuel_per_100km` mezőit AUTOMATIKUSAN kitölti a kalkulációs űrlapba. Nincs új adatmodell, nincs új tábla — a MEGLÉVŐ `vehicles` oszlopokra épül (semmit nem duplikálunk). Toast visszajelzés a betöltött értékekkel.
+2. **`handlers/costCalculator.js` `vcalcRefLists`** — `SELECT` kiegészítve `assigned_driver_email` + `default_trailer_id` oszlopokkal (mindkettő eddig is létezett a `vehicles`-en). Company_id-szűrés változatlan.
+3. **👁 Mentett kalkuláció megnyitása** (`openSavedDetail`) — a Mentett kalkulációk tábla új 👁 gombja megnyit egy modal-t (`.modal-back`+`.modal.glass` projekt-minta): fejléc + serial + név + km/napok/dátum/order_id + a TELJES eredmény-tábla (tétel-lista + üzemanyag + kedvezmény + útdíj + Total + EUR + Profit) újrarenderelve a mentett `result_json` alapján. Használja a meglévő `vcalcCalcGet` RPC-t (nincs új szerver-oldal). Kikapcsoló X + backdrop-klikk.
+4. **📄 PDF letöltés** (`exportResultToPdf`, `pdf-lib`, kliens-oldal) — új gomb A KALKULÁCIÓ VÉGÉN + A MENTETT-DETAIL MODAL-BAN: A4 PDF Helvetica fontos, ASCII-safe (a román ékezetek átírva, mint a többi projekt-PDF-nél — `order-assignment.js` mintája). Fejléc (CALCUL COST FUVAR + serial + név + km/napok/dátum) + tétel-tábla (Descriere / Net LEI / TVA LEI / Brut LEI) + Combustibil sor bold + opc. Discount/Toll + TOTAL sor bold + EUR-egyenérték + Profit blokk (zöld/piros). Blob-download `calcul_<serial>.pdf` néven.
+5. **`public/i18n.js`** +8 új kulcs (`vcalc.run.autoPair`/`autoPairHint`/`autoPairNone`/`autoPairDone`/`errPickTruck` + `vcalc.res.printPdf`/`days` + `vcalc.saved.open`), mind RO-alap + HU. Cache-bust `?v=20260903vcalc2` (admin.html + manager.html — cost-calculator.js + i18n.js).
+6. **1080 Jest zöld** (regresszió: nincs), szerver-oldalon 1 handler-oszlop bővítés, DB-változás NINCS. A `pdf-lib` már régóta a projekt része (`admin.html` + `manager.html` cdnjs-ről tölti, pl. `order-assignment.js` is használja).
+
+---
+
 ## 2026-09-03 — ÚJ MODUL: Költség-kalkulátor (Valorcalc-integráció Vallorsoftba)
 
 **Kérés:** „ellenorizd hogy a vallorsoftba az admin,manager oldalra egy fonenupontnak betudjuke rakni a teljes valorcalc ot ,onnan kezdve nm kellene kulon vallorcalc legyen egy lenne az egész" → „csinaljuk meg de igy hogy tudjon kulon beirasra is dolgozni plusz egy katintassal atalithato legyenn az altalam bevitt adatokbol dolgozasra es minden kalkulaciot levezetest fixen vegyel át".
