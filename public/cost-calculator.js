@@ -63,8 +63,9 @@
         html.push(`<div class="glass-soft" style="margin:12px 0;padding:14px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
             <div><b>${esc(g.vehicle.rendszam)}</b> <span class="text-muted">${esc(g.vehicle.marca || '')} ${esc(g.vehicle.tip || '')}</span></div>
-            <div style="display:flex;gap:6px;align-items:center">
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
               <span class="badge">${g.items.length} ${t('vcalc.f.itemsShort','tétel')}</span>
+              <button class="btn small primary" data-vci-add-veh="${g.vehicle.id}" title="${t('vcalc.vehCosts.addForThis','Új költség-tétel ehhez a járműhöz')}">➕ ${t('vcalc.f.newItem','Új tétel')}</button>
               <button class="btn small" data-vci-seed="${g.vehicle.id}" title="${t('vcalc.seed.hint','Valorcalc alapértelmezett tételek betöltése')}">🎯 ${t('vcalc.seed.load','Alapértelmezett tételek')}</button>
             </div>
           </div>`);
@@ -84,6 +85,9 @@
     }
     document.getElementById('vciBox').innerHTML = html.join('');
     document.getElementById('vciAdd').onclick = () => openVciModal(null, refs);
+    box.querySelectorAll('[data-vci-add-veh]').forEach(b => b.onclick = () => {
+      openVciModal(null, refs, Number(b.dataset.vciAddVeh));
+    });
     box.querySelectorAll('[data-vci-edit]').forEach(b => b.onclick = () => {
       const it = items.find(x => String(x.id) === b.dataset.vciEdit); if (it) openVciModal(it, refs);
     });
@@ -112,12 +116,13 @@
     if (window.I18N && window.I18N.apply) window.I18N.apply();
   }
 
-  function openVciModal(it, refs) {
+  function openVciModal(it, refs, preselectVehicleId) {
+    const selectedVehId = it ? it.vehicle_id : (preselectVehicleId || (refs.vehicles[0] && refs.vehicles[0].id) || null);
     const m = document.createElement('div'); m.className = 'modal-back';
     m.innerHTML = `<div class="modal glass" style="max-width:520px">
       <h3>${it ? t('vcalc.vehCosts.edit', 'Költség-tétel szerkesztése') : t('vcalc.vehCosts.add', '+ Új költség-tétel')}</h3>
       <div class="field"><label data-i18n="vcalc.f.vehicle">Jármű</label>
-        <select id="vciVeh">${refs.vehicles.map(v => `<option value="${v.id}"${it && it.vehicle_id === v.id ? ' selected' : ''}>${esc(v.rendszam)} — ${esc(v.marca || '')} ${esc(v.tip || '')}</option>`).join('')}</select></div>
+        <select id="vciVeh">${refs.vehicles.map(v => `<option value="${v.id}"${selectedVehId === v.id ? ' selected' : ''}>${esc(v.rendszam)} — ${esc(v.marca || '')} ${esc(v.tip || '')}</option>`).join('')}</select></div>
       <div class="field"><label data-i18n="vcalc.f.name">Név</label>
         <input id="vciName" class="input" value="${esc(it?.name || '')}" placeholder="pl. RCA, ITP, gumi, olajcsere"></div>
       <div class="grid-2">
@@ -179,8 +184,9 @@
       html.push(`<div class="glass-soft" style="margin:12px 0;padding:14px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
           <div><b>${esc(g.driver.nume || '')}</b> <span class="text-muted">${esc(g.driver.email)}</span></div>
-          <div style="display:flex;gap:6px;align-items:center">
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <span class="badge">${g.items.length} ${t('vcalc.f.itemsShort','tétel')}</span>
+            <button class="btn small primary" data-dci-add-drv="${g.driver.id}" title="${t('vcalc.drvCosts.addForThis','Új költség-tétel ehhez a sofőrhöz')}">➕ ${t('vcalc.f.newItem','Új tétel')}</button>
             <button class="btn small" data-dci-seed="${g.driver.id}" title="${t('vcalc.seed.hint','Valorcalc alapértelmezett tételek betöltése')}">🎯 ${t('vcalc.seed.load','Alapértelmezett tételek')}</button>
           </div>
         </div>`);
@@ -194,6 +200,9 @@
     }
     document.getElementById('dciBox').innerHTML = html.join('');
     document.getElementById('dciAdd').onclick = () => openDciModal(null, refs);
+    box.querySelectorAll('[data-dci-add-drv]').forEach(b => b.onclick = () => {
+      openDciModal(null, refs, Number(b.dataset.dciAddDrv));
+    });
     box.querySelectorAll('[data-dci-edit]').forEach(b => b.onclick = () => { const it = items.find(x => String(x.id) === b.dataset.dciEdit); if (it) openDciModal(it, refs); });
     box.querySelectorAll('[data-dci-del]').forEach(b => b.onclick = async () => {
       if (!confirm(t('vcalc.confirmDelete', 'Biztosan törlöd?'))) return;
@@ -220,12 +229,13 @@
     if (window.I18N && window.I18N.apply) window.I18N.apply();
   }
 
-  function openDciModal(it, refs) {
+  function openDciModal(it, refs, preselectDriverId) {
+    const selectedDrvId = it ? it.driver_id : (preselectDriverId || (refs.drivers[0] && refs.drivers[0].id) || null);
     const m = document.createElement('div'); m.className = 'modal-back';
     m.innerHTML = `<div class="modal glass" style="max-width:520px">
       <h3>${it ? t('vcalc.drvCosts.edit', 'Sofőr-költség szerkesztése') : t('vcalc.drvCosts.add', '+ Új sofőr-költség')}</h3>
       <div class="field"><label data-i18n="vcalc.f.driver">Sofőr</label>
-        <select id="dciDrv">${refs.drivers.map(d => `<option value="${d.id}"${it && it.driver_id === d.id ? ' selected' : ''}>${esc(d.nume || d.email)}</option>`).join('')}</select></div>
+        <select id="dciDrv">${refs.drivers.map(d => `<option value="${d.id}"${selectedDrvId === d.id ? ' selected' : ''}>${esc(d.nume || d.email)}</option>`).join('')}</select></div>
       <div class="field"><label data-i18n="vcalc.f.name">Név</label>
         <input id="dciName" class="input" value="${esc(it?.name || '')}" placeholder="pl. havi bér × 12"></div>
       <div class="grid-2">

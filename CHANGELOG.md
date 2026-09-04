@@ -14,6 +14,19 @@
 
 ---
 
+## 2026-09-04 — Költség-kalkulátor: ➕ „Új tétel" gomb közvetlenül minden jármű + sofőr blokk fejlécén (előre-kiválasztott entitás)
+
+**Kérés:** „lehessen hozaadni az autokhoz,szemelyekhez,ceghez a kiadásokat es szerkeszteni" — a CRUD már működött (top-fej „+ Új költség-tétel" gomb + modal jármű-választóval), DE a UX nem volt intuitív: az admin nem látta közvetlenül a jármű/sofőr kártyáján, hogyan adjon hozzá tételt EHHEZ a járműhöz — végig kellett görgetnie a felső gombig és ott kiválasztani a járművet a dropdownból.
+
+**Megoldás — `public/cost-calculator.js`:**
+1. **`renderVehicleCosts`** — minden jármű-blokk fejlécébe (a 🎯 seed gomb MELLÉ) új **➕ „Új tétel"** kék `primary` kis gomb (`data-vci-add-veh="<id>"`). Kattintásra: `openVciModal(null, refs, vehicleId)` → a modal jármű-`<select>`-je AZONNAL az aktuális járműre áll, a többi mező üresen. A **felső** `#vciAdd` gomb megmarad (visszafelé kompatibilis, üres-lista védőháló).
+2. **`renderDriverCosts`** — ugyanez a mintát: sofőr-blokk fejlécén ➕ „Új tétel" (`data-dci-add-drv="<id>"`) → `openDciModal(null, refs, driverId)` sofőr-előválasztással.
+3. **`openVciModal(it, refs, preselectVehicleId)`** — új opcionális 3. paraméter. `selectedVehId = it ? it.vehicle_id : (preselectVehicleId || firstVehicleId)`. A `<select>` `option`-jai `selectedVehId === v.id` alapján kapják a `selected` attribútumot. A meglévő edit-út (id-vel hívva) érintetlen.
+4. **`openDciModal(it, refs, preselectDriverId)`** — analóg minta a sofőr-modalra.
+5. **Cég-oldal** (`renderCompanyCosts`) érintetlen: egy cég van csak, a felső „+ Új cég-költség" mellett a 🎯 seed gomb — nem kell per-entitás add-gomb.
+
+**i18n `public/i18n.js`** +3 új kulcs (RO-alap + HU): `vcalc.f.newItem` (`Element nou` / `Új tétel`), `vcalc.vehCosts.addForThis`, `vcalc.drvCosts.addForThis` (tooltip a gombhoz). Cache-bust `?v=20260904seed` → `?v=20260904addbtn` (admin.html + manager.html: i18n.js + cost-calculator.js). **1080 Jest zöld** (nincs regresszió), nincs séma-változás, nincs új szerver-handler — a meglévő `vcalcVehicleCostSave` / `vcalcDriverCostSave` / delete RPC-ket használjuk változatlan payload-formátummal.
+
 ## 2026-09-04 — Költség-kalkulátor: 🎯 Alapértelmezett Valorcalc-tételek betöltő gombok (jármű + sofőr + cég)
 
 **Kérés:** „nem lehet kiadasokat soferekhez irni sem autokhoz sem cegekhez a jelenlegi kiadasokat amikkel dolgozik a vallorcalc vedd at tedd be" — a Vallorcalc-ban használt alapértelmezett költség-tétel-készletek (Truck: gumi/szerviz/RCA/CASCO/fékbetét/féktárcsa/lízing/karbantartás/váratlan · Trailer: gumi/RCA/CASCO/fékbetét/féktárcsa/lízing · Driver: fizetés/napidíj/adók) beolvasztva a Vallorsoft költség-kalkulátorba EGY GOMBBAL betölthetőként.
