@@ -461,10 +461,13 @@ handlers.vcalcPrefillFromOrder = async function (req, res, args) {
     const cid = _cid(req);
     const orderId = _str((args && args[0] || {}).order_id, 20);
     if (!orderId) return res.json({ result: { ok: false, err: 'ID cursă lipsă' } });
+    // FIGYELEM: `toll_cost` opcionális oszlop (db/order-toll.sql migráció) — `to_jsonb(o)`
+    // mintával olvassuk, így hiányzó oszlop → NULL (nem exception).
     const o = await pool.query(
       `SELECT id, client, ref, loc_incarcare, loc_descarcare, data_incarcare, data_descarcare,
-              pret, km, email_sofer, rendszam_camion, rendszam_remorca, toll_cost
-       FROM orders WHERE id=$1 AND company_id=$2`, [orderId, cid]
+              pret, km, email_sofer, rendszam_camion, rendszam_remorca,
+              (to_jsonb(o) ->> 'toll_cost') AS toll_cost
+       FROM orders o WHERE id=$1 AND company_id=$2`, [orderId, cid]
     );
     if (o.rowCount === 0) return res.json({ result: { ok: false, err: 'Cursă necunoscută' } });
     const ord = o.rows[0];
@@ -483,10 +486,18 @@ handlers.vcalcPrefillFromOrder = async function (req, res, args) {
       if (Number.isFinite(diff) && diff > 0) tripDays = diff;
     }
 
-    // Aktív vontatók számlálása (a cég-költség szétosztásához)
-    const av = await pool.query(
-      "SELECT COUNT(*)::int AS n FROM vehicles WHERE company_id=$1 AND (active IS NULL OR active=true)", [cid]
-    );
+    // Aktív VONTATÓK számlálása (a cég-költség szétosztásához).
+    // FIGYELEM: az oszlop neve `activ` (RO), NEM `active` — a régi kód `active`-ot használt,
+    // ami `column does not exist` hibát dobott → az egész prefill „Eroare de server"-t adott.
+    // Ha valamiért mégis dobna (idegen séma, hiányzó `activ` oszlop egy régi DB-n),
+    // ne bukjon el a teljes prefill — csendes fallback: legalább 1 aktív vontató.
+    let activeTrucks = 1;
+    try {
+      const av = await pool.query(
+        "SELECT COUNT(*)::int AS n FROM vehicles WHERE company_id=$1 AND tip='Vontato' AND COALESCE(activ, true) = true", [cid]
+      );
+      activeTrucks = (av.rows[0] && av.rows[0].n) || 1;
+    } catch (avErr) { console.warn('vcalcPrefillFromOrder active-trucks count:', avErr.message); }
 
     // BNR: cég override → élő BNR → 5.0 fallback
     let bnr = null;
@@ -511,7 +522,7 @@ handlers.vcalcPrefillFromOrder = async function (req, res, args) {
       truck: truck,           // {id, rendszam, marca, tip, fuel_per_100km} vagy null
       trailer: trailer,
       driver: driver,         // {id, nume, email} vagy null
-      active_trucks: (av.rows[0] && av.rows[0].n) || 1,
+      active_trucks: activeTrucks,
       bnr_eur_lei: Number(bnr),
     } });
   } catch (err) { console.error('vcalcPrefillFromOrder:', err); return res.json({ result: { ok: false, err: 'Eroare de server' } }); }
