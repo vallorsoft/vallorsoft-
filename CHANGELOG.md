@@ -14,6 +14,23 @@
 
 ---
 
+## 2026-09-04 — Sofőr-elszámolás: migráció-tolerancia + diagnosztikus hibaüzenetek (payment/earning/base_salary), PR #419
+
+**Kérés:** „most amig ezt tesztelem addig nezd át es javitsd ki a sofer elszamolast a vallorsoftba mert nem lehet kifizetest berakni elmenteni".
+
+**Gyökér:** a Sofőr-elszámolás (decont) `paymentCreate`, `earningCreate` és `setDriverBaseSalary` handlerei egyetlen `try/catch` blokkal értek véget → hiányzó tábla/oszlop (nem futott migráció) esetén a felhasználó generikus **„Eroare de server"**-t kapott, és nem lehetett kifizetést/járandóságot/alapbért menteni. Ez pontosan az a mintázat, ami a PR #418 (`vehicles.active` → `activ`) hibáját okozta — a felhasználó számára ugyanaz a tünet.
+
+**Fix (`handlers/fleetCompliance.js`):**
+1. **`paymentCreate`** — az INSERT külön `try/catch`: hiányzó `driver_payments` tábla/oszlop → „Tabela driver_payments lipsește — reporneste serverul pentru a rula migrațiile." Egyéb DB-hiba: „Eroare la salvarea plății." (nem generikus „Eroare de server").
+2. **`earningCreate`** — ugyanez a mintázat a `driver_earnings`-re.
+3. **`setDriverBaseSalary`** — (a) előbb sofőr-tulaj-ellenőrzés (mint `getDriverBaseSalary`-nél már régóta), (b) az UPDATE külön `try/catch`: hiányzó `users.net_base_salary_ron` oszlop → egyértelmű üzenet.
+
+**Symmetria** — a `getDriverBaseSalary` már eleve migráció-toleráns volt; a set-oldal is az lett.
+
+**Teszt** (`tests/integration/driver-earnings-payments.test.js` +5 új eset): tábla/oszlop hiány → egyértelmű üzenet mindhárom handleren; `setDriverBaseSalary` idegen sofőr → `nu a fost gasit` az UPDATE ELŐTT; sikeres alapbér-mentés regresszió-őr. **1089 Jest zöld** (1084 → 1089).
+
+Nincs séma-változás, nincs kliens-változás, nincs új handler.
+
 ## 2026-09-04 — FIX: Költség-kalkulátor „Vallorsoft-fuvar" mód „Eroare de server" — `vehicles.active` → `activ` (RO oszlopnév)
 
 **Gyökér:** a Költség-kalkulátor `🧮 Kalkuláció` oldalán „Vallorsoft-fuvar" módra váltás + fuvar-választás → `Eroare de server`, a UI-n nem töltődött be az előtöltés (km/napok/vontató/sofőr/BNR/útdíj/freight-bevétel). A `handlers/costCalculator.js` `vcalcPrefillFromOrder` az aktív vontatók számlálásához a NEM létező `vehicles.active` oszlopot használta — a valós oszlopnév **`activ`** (RO, `schema.sql:14`). Postgres → `column "active" does not exist` → catch → generikus szerver-hiba a klienshez.
