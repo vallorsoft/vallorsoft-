@@ -14,6 +14,17 @@
 
 ---
 
+## 2026-09-04 — FIX: Költség-kalkulátor „Vallorsoft-fuvar" mód „Eroare de server" — `vehicles.active` → `activ` (RO oszlopnév)
+
+**Gyökér:** a Költség-kalkulátor `🧮 Kalkuláció` oldalán „Vallorsoft-fuvar" módra váltás + fuvar-választás → `Eroare de server`, a UI-n nem töltődött be az előtöltés (km/napok/vontató/sofőr/BNR/útdíj/freight-bevétel). A `handlers/costCalculator.js` `vcalcPrefillFromOrder` az aktív vontatók számlálásához a NEM létező `vehicles.active` oszlopot használta — a valós oszlopnév **`activ`** (RO, `schema.sql:14`). Postgres → `column "active" does not exist` → catch → generikus szerver-hiba a klienshez.
+
+**Fix (`handlers/costCalculator.js`):**
+1. **`SELECT ... FROM vehicles WHERE ... active=true`** → **`... WHERE ... tip='Vontato' AND COALESCE(activ, true) = true`**. Az `activ` a valós oszlop; `tip='Vontato'` szűrő pontosít (a cég-költség csak vontatókra oszlik szét).
+2. **Defenzív try/catch** az active-trucks SELECT körül — még ha egy idegen sémán `activ` sem létezne (történelmi DB), akkor is `activeTrucks = 1` fallback, nem hasal el a teljes prefill. `console.warn` a szervernaplóba.
+3. **`orders.toll_cost` opcionális oszlop** (a `db/order-toll.sql` migráció után jött be) — a SELECT `to_jsonb(o) ->> 'toll_cost'` mintával olvassuk, így hiányzó oszlop → NULL nem exception. A többi mező (id/client/ref/loc_*/data_*/pret/km/email_sofer/rendszam_*) mind a `schema.sql` alap-mezője.
+
+**Teszt** — új `tests/integration/vcalc-prefill.test.js` (+4 mock-eset): (a) sikeres prefill 3 aktív vontatóval, a SELECT `activ`-ot használ nem `active`-ot; (b) active-trucks SELECT dob → fallback 1 (prefill NEM hasal el); (c) ismeretlen order → „Cursă necunoscută"; (d) Sofer szerep → tiltva. **1084 Jest zöld** (1080 → 1084). Nincs séma-változás, nincs új handler, nincs kliens-változás — tisztán szerver-oldali javítás.
+
 ## 2026-09-04 — Költség-kalkulátor: ➕ „Új tétel" gomb közvetlenül minden jármű + sofőr blokk fejlécén (előre-kiválasztott entitás)
 
 **Kérés:** „lehessen hozaadni az autokhoz,szemelyekhez,ceghez a kiadásokat es szerkeszteni" — a CRUD már működött (top-fej „+ Új költség-tétel" gomb + modal jármű-választóval), DE a UX nem volt intuitív: az admin nem látta közvetlenül a jármű/sofőr kártyáján, hogyan adjon hozzá tételt EHHEZ a járműhöz — végig kellett görgetnie a felső gombig és ott kiválasztani a járművet a dropdownból.
