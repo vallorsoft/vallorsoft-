@@ -221,6 +221,13 @@
     'vcalc.res.printPdf': { hu: '📄 PDF letöltés', ro: '📄 Descarcă PDF' },
     'vcalc.res.days': { hu: 'nap', ro: 'zile' },
     'vcalc.saved.open': { hu: 'Megnyitás', ro: 'Deschide' },
+    'vcalc.seed.load': { hu: 'Alapértelmezett tételek', ro: 'Elemente implicite' },
+    'vcalc.seed.hint': { hu: 'Valorcalc alapértelmezett tételek betöltése (biztosítás/gumi/lízing stb.)', ro: 'Încarcă elementele implicite Valorcalc (RCA/anvelope/leasing etc.)' },
+    'vcalc.seed.confirmAdd': { hu: 'Betöltjük az alapértelmezett Valorcalc-tételeket?', ro: 'Încărcăm elementele implicite Valorcalc?' },
+    'vcalc.seed.confirmReplace': { hu: 'Már vannak tételek. Betöltjük az alapértelmezetteket a jelenlegiek MELLÉ? (Mégse → csere lehetőség)', ro: 'Există deja elemente. Le adăugăm pe cele implicite ALĂTURI de cele existente? (Anulează → posibilitate de înlocuire)' },
+    'vcalc.seed.confirmReplaceForce': { hu: 'Lecseréled az ÖSSZES jelenlegi tételt az alapértelmezettre? (visszavonhatatlan)', ro: 'Înlocuiești TOATE elementele existente cu cele implicite? (ireversibil)' },
+    'vcalc.seed.done': { hu: 'Betöltve', ro: 'Încărcat' },
+    'vcalc.f.itemsShort': { hu: 'tétel', ro: 'element' },
     // Értesítési központ + Levél-napló (Adminisztráció)
     'nav.notifications': { hu: 'Értesítések', ro: 'Notificări' },
     'nav.mailLog': { hu: 'Levél-napló', ro: 'Jurnal e-mail' },
