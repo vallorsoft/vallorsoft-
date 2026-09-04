@@ -85,4 +85,11 @@ window.VS_FEATURES = [
   { key: 'gps-integracio',       label: 'GPS integráció 📡',            group: 'Adminisztráció' },
   { key: 'szamlazas-integracio', label: 'Számlázó integráció 🧾',        group: 'Adminisztráció' },
   { key: 'konyvelo-szerepkor',   label: 'Könyvelő szerepkör 📚',        group: 'Adminisztráció' },
+  // ── Költség-kalkulátor (Valorcalc-integráció) ──
+  { key: 'vcalc-run',             label: 'Költség-kalkulátor 🧮',       group: 'Költség-kalkulátor' },
+  { key: 'vcalc-saved',           label: 'Mentett kalkulációk 💾',      group: 'Költség-kalkulátor' },
+  { key: 'vcalc-vehicle-costs',   label: 'Jármű-költségek 🚚',          group: 'Költség-kalkulátor' },
+  { key: 'vcalc-driver-costs',    label: 'Sofőr-költségek 👤',          group: 'Költség-kalkulátor' },
+  { key: 'vcalc-company-costs',   label: 'Cég-költségek 🏢',            group: 'Költség-kalkulátor' },
+  { key: 'vcalc-settings',        label: 'Kalkulátor-beállítások ⚙️',    group: 'Költség-kalkulátor' },
 ];
