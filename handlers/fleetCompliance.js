@@ -610,14 +610,23 @@ handlers.earningCreate = async function (req, res, args) {
     const date = f.earning_date || new Date().toISOString().slice(0, 10);
     const note = String(f.note || '').trim().slice(0, 500) || null;
 
-    const ins = await pool.query(
-      `INSERT INTO driver_earnings
-         (company_id, email_sofer, earning_date, kind, label, quantity,
-          unit_amount, total_amount, currency, note, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-       RETURNING id`,
-      [cid, email, date, kind, label, qty, unit, total, currency, note, req.session.user.email]
-    );
+    let ins;
+    try {
+      ins = await pool.query(
+        `INSERT INTO driver_earnings
+           (company_id, email_sofer, earning_date, kind, label, quantity,
+            unit_amount, total_amount, currency, note, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         RETURNING id`,
+        [cid, email, date, kind, label, qty, unit, total, currency, note, req.session.user.email]
+      );
+    } catch (dbErr) {
+      console.warn('earningCreate INSERT hiba:', dbErr.message);
+      const msg = /relation .+ does not exist|column .+ does not exist/i.test(dbErr.message || '')
+        ? 'Tabela driver_earnings lipsește — reporneste serverul pentru a rula migrațiile.'
+        : 'Eroare la salvarea drepturilor.';
+      return res.json({ result: { ok: false, err: msg } });
+    }
     try { audit.fromReq(req, 'earning.create', 'driver_earnings', ins.rows[0].id,
       { email_sofer: email, kind, total, currency }); } catch (_e) {}
     return res.json({ result: { ok: true, id: ins.rows[0].id, total, currency } });
@@ -794,14 +803,25 @@ handlers.paymentCreate = async function (req, res, args) {
     if (currency === 'RON') amountRon = _round2(amount);
     else if (currency === 'EUR' && bnrRate) amountRon = _round2(amount * bnrRate);
 
-    const ins = await pool.query(
-      `INSERT INTO driver_payments
-         (company_id, email_sofer, paid_at, amount, currency, bnr_rate,
-          amount_ron, method, note, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       RETURNING id`,
-      [cid, email, date, amount, currency, bnrRate, amountRon, method, note, req.session.user.email]
-    );
+    let ins;
+    try {
+      ins = await pool.query(
+        `INSERT INTO driver_payments
+           (company_id, email_sofer, paid_at, amount, currency, bnr_rate,
+            amount_ron, method, note, created_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         RETURNING id`,
+        [cid, email, date, amount, currency, bnrRate, amountRon, method, note, req.session.user.email]
+      );
+    } catch (dbErr) {
+      console.warn('paymentCreate INSERT hiba:', dbErr.message);
+      // A tábla-/oszlop-hiány (migráció még nem futott) egyértelmű üzenet;
+      // más DB-hiba is diagnosztikusabb marad, mint egy sima „Eroare de server".
+      const msg = /relation .+ does not exist|column .+ does not exist/i.test(dbErr.message || '')
+        ? 'Tabela driver_payments lipsește — reporneste serverul pentru a rula migrațiile.'
+        : 'Eroare la salvarea plății.';
+      return res.json({ result: { ok: false, err: msg } });
+    }
     try { audit.fromReq(req, 'payment.create', 'driver_payments', ins.rows[0].id,
       { email_sofer: email, amount, currency, bnr_rate: bnrRate, method }); } catch (_e) {}
     return res.json({ result: {
@@ -1190,17 +1210,31 @@ handlers.setDriverBaseSalary = async function (req, res, args) {
       }
       val = _round2(n);
     }
-    const r = await pool.query(
-      `UPDATE users SET net_base_salary_ron = $1
-        WHERE LOWER(email)=LOWER($2) AND company_id=$3
-        RETURNING net_base_salary_ron`,
-      [val, email, cid]);
-    if (!r.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
+    // Migráció-tolerancia: ha a `net_base_salary_ron` oszlop még nem létezik
+    // (db/driver-net-base-salary.sql nem futott), a `getDriverBaseSalary`
+    // symmetriája szerint ne dobjunk generikus „Eroare de server"-t — előbb
+    // ellenőrizzük a sofőr létezését (multi-tenant), és csak akkor próbáljuk
+    // az UPDATE-et. Az oszlop-hiba egyértelmű hibaüzenetet ad vissza.
+    const own = await pool.query(
+      'SELECT 1 FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2', [email, cid]);
+    if (!own.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
+    let updated = null;
+    try {
+      const r = await pool.query(
+        `UPDATE users SET net_base_salary_ron = $1
+          WHERE LOWER(email)=LOWER($2) AND company_id=$3
+          RETURNING net_base_salary_ron`,
+        [val, email, cid]);
+      updated = r.rows[0] && r.rows[0].net_base_salary_ron;
+    } catch (dbErr) {
+      console.warn('setDriverBaseSalary migráció-hiány:', dbErr.message);
+      return res.json({ result: { ok: false,
+        err: 'Coloana net_base_salary_ron lipsește — reporneste serverul pentru a rula migrațiile.' } });
+    }
     try { audit.fromReq(req, 'driver_settlement.base_salary_set', 'user', 0, { email, value: val }); } catch (_e) {}
     return res.json({ result: {
       ok: true,
-      base_salary_ron: r.rows[0].net_base_salary_ron != null
-        ? _round2(parseFloat(r.rows[0].net_base_salary_ron)) : null,
+      base_salary_ron: updated != null ? _round2(parseFloat(updated)) : null,
     } });
   } catch (err) {
     console.error('setDriverBaseSalary hiba:', err);
