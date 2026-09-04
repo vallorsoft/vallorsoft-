@@ -228,6 +228,9 @@
     'vcalc.seed.confirmReplaceForce': { hu: 'Lecseréled az ÖSSZES jelenlegi tételt az alapértelmezettre? (visszavonhatatlan)', ro: 'Înlocuiești TOATE elementele existente cu cele implicite? (ireversibil)' },
     'vcalc.seed.done': { hu: 'Betöltve', ro: 'Încărcat' },
     'vcalc.f.itemsShort': { hu: 'tétel', ro: 'element' },
+    'vcalc.f.newItem': { hu: 'Új tétel', ro: 'Element nou' },
+    'vcalc.vehCosts.addForThis': { hu: 'Új költség-tétel ehhez a járműhöz', ro: 'Adaugă cost pentru acest vehicul' },
+    'vcalc.drvCosts.addForThis': { hu: 'Új költség-tétel ehhez a sofőrhöz', ro: 'Adaugă cost pentru acest șofer' },
     // Értesítési központ + Levél-napló (Adminisztráció)
     'nav.notifications': { hu: 'Értesítések', ro: 'Notificări' },
     'nav.mailLog': { hu: 'Levél-napló', ro: 'Jurnal e-mail' },
