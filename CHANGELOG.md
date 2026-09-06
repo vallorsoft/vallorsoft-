@@ -14,6 +14,24 @@
 
 ---
 
+## 2026-09-06 — Sofőr-elszámolás: kifizetéshez kézzel is beírható BNR-árfolyam (auto-fallback esetén), PR #421
+
+**Kérés:** „kifizeteseknel a bnr arfolyamot nem irja ki legyen lehetoseg kezzel bnr arfolyamot írni kifizeteseknel ha nem tudja automatikusan a rendszer".
+
+**Fix (`public/fleet-extra-v2.js` `dcOpenPayment`):**
+1. A régi read-only BNR-blokk átírva editable inputra (`#dcPayBnr`, `type=number`, `step=0.0001`, prefix „1 EUR =" + suffix „RON", 110px right-aligned).
+2. **Prioritás sorrend:** szerver-BNR → közös last-manual localStorage-érték (`vs_dc_of_bnr_manual`, Decont oficial-lal osztva) → üres. Mustársárga warn pirula jelzi, ha (a) fallback-ből tölt vagy (b) egyáltalán nincs érték.
+3. Új `_dcPayBnrValue()` + `dcPayBnrChange()` helper → `dcPayRecalc` mostantól a kézi értéket preferálja (`bnr = _dcPayBnrValue() ?? _dcBnr`); a preview élőben újraszámol.
+4. **`dcPaySubmit`** — új `bnr_rate_override` mező a payload-ban (a szerver-oldali `paymentCreate` már korábban elfogadta). Sikeres mentés után perzisztálás `_dcOfSaveManualBnr()`-rel — a következő nyitáskor előre kitöltve.
+
+**CSS (`public/style.css`):** `#dcPayModal .dc-pay-bnr` átalakítva single-row flex → column layout (`.dc-pay-bnr-row` + `.dc-pay-bnr-input`), új `.dc-pay-bnr-warn` mustársárga pirula (világos + sötét téma), `.dc-pay-bnr-hint` magyarázó szöveg. Kompatibilis a meglévő `#dcPayPreview` élő előnézettel.
+
+**i18n:** 2 új kulcs — `fe.pm.bnrHint` („Poți edita cursul manual dacă BNR nu este disponibil sau vrei alt curs pentru această plată." / „A BNR-t kézzel is átírhatod, ha nem elérhető vagy más árfolyamot szeretnél ehhez a kifizetéshez."), `fe.pm.bnrLastManual` („Ultima valoare introdusă manual" / „Utolsó kézi érték").
+
+**Cache-bust:** `admin.html` + `manager.html` — `style.css`/`i18n.js`/`fleet-extra-v2.js` `?v=20260906paybnr`.
+
+Nincs séma-változás, nincs új handler; a szerver már korábban elfogadta a `bnr_rate_override`-et. **1089 Jest zöld** (nincs regresszió).
+
 ## 2026-09-04 — Sofőr-elszámolás: migráció-tolerancia + diagnosztikus hibaüzenetek (payment/earning/base_salary), PR #419
 
 **Kérés:** „most amig ezt tesztelem addig nezd át es javitsd ki a sofer elszamolast a vallorsoftba mert nem lehet kifizetest berakni elmenteni".
