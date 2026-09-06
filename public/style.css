@@ -3700,15 +3700,41 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   gap:10px; align-items:end;
 }
 #dcPayModal .dc-pay-bnr{
-  display:flex; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap;
-  padding:10px 14px; margin-top:14px;
+  display:flex; flex-direction:column; gap:8px;
+  padding:12px 14px; margin-top:14px;
   background:rgba(148,163,184,0.08); border:1px solid rgba(148,163,184,0.28);
   border-radius:10px; font-size:13px;
 }
 .main-content[data-theme="dark"] #dcPayModal .dc-pay-bnr{
   background:rgba(255,255,255,0.04); border-color:rgba(148,163,184,0.30);
 }
-#dcPayModal .dc-pay-preview{ font-size:14px; color:var(--text-primary); font-variant-numeric:tabular-nums; }
+/* BNR-sor: címke + input-blokk + opcionális figyelmeztető pirula */
+#dcPayModal .dc-pay-bnr-row{
+  display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+}
+#dcPayModal .dc-pay-bnr-row > label{ font-weight:600; flex:0 0 auto; }
+#dcPayModal .dc-pay-bnr-input{
+  display:inline-flex; align-items:center; gap:6px; flex:0 0 auto;
+}
+#dcPayModal .dc-pay-bnr-prefix,
+#dcPayModal .dc-pay-bnr-suffix{ color:var(--text-muted); font-weight:600; font-size:13px; }
+#dcPayModal #dcPayBnr{
+  width:110px; text-align:right; font-variant-numeric:tabular-nums;
+  padding:8px 10px; min-height:38px; font-weight:600;
+}
+#dcPayModal .dc-pay-bnr-warn{
+  display:inline-flex; align-items:center; gap:4px;
+  padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700;
+  background:rgba(245,158,11,0.15); color:#b45309; border:1px solid rgba(245,158,11,0.45);
+}
+.main-content[data-theme="dark"] #dcPayModal .dc-pay-bnr-warn{
+  background:rgba(245,158,11,0.20); color:#fbbf24; border-color:rgba(245,158,11,0.55);
+}
+#dcPayModal .dc-pay-bnr-hint{ line-height:1.4; }
+#dcPayModal .dc-pay-preview{
+  font-size:14px; color:var(--text-primary); font-variant-numeric:tabular-nums;
+  min-height:20px;
+}
 #dcPayModal .dc-pay-foot{
   display:flex; gap:10px; justify-content:flex-end; margin-top:16px;
   padding-top:14px; border-top:1.5px solid rgba(148,163,184,0.28);
