@@ -1226,14 +1226,45 @@
       +   '<div class="field" style="margin:0;grid-column:1/-1;"><label>' + t('fld.note') + '</label>'
       +     '<input class="input" id="dcPayNote" placeholder="' + t('fe.pm.notePh') + '"></div>'
       + '</div>'
-      + '<div class="dc-pay-bnr">'
-      +   '<div>🏦 <b>' + t('fe.dc.bnrToday') + ':</b> '
-      +     (bnr != null
-          ? '<span class="dc-bnr-val">1 EUR = ' + n2(bnr, 4) + ' RON</span>'
-          : '<span class="text-muted">' + t('fe.dc.bnrNa') + '</span>')
-      +   '</div>'
-      +   '<div class="dc-pay-preview" id="dcPayPreview"></div>'
-      + '</div>'
+      // 🏦 BNR-árfolyam — MOSTANTÓL SZERKESZTHETŐ input:
+      // (a) automatikusan lekért érték → előtöltve, felülírható;
+      // (b) auto-fetch elhasal → utolsó kézi érték (localStorage, közös a
+      //     Decont oficial-lal) → felülírható; sárga jelző-badge;
+      // (c) semmilyen fallback → üres, a sofőr kézzel írja be.
+      // A szerver `paymentCreate` már régóta fogadja a `bnr_rate_override`-et
+      // — csak a UI-t adjuk hozzá.
+      + (function () {
+          var lastManual = _dcOfLastManualBnr();  // közös perzisztens érték
+          var initial = (bnr != null) ? bnr : (lastManual != null ? lastManual : '');
+          var source = (bnr != null) ? 'auto'
+                     : (lastManual != null ? 'manual' : 'none');
+          var badge = '';
+          if (source === 'manual') {
+            badge = ' <span class="dc-pay-bnr-warn" title="' + esc(t('fe.pm.bnrLastManual')) + '">'
+                    + '⚠️ ' + esc(t('fe.pm.bnrLastManual')) + '</span>';
+          } else if (source === 'none') {
+            badge = ' <span class="dc-pay-bnr-warn" title="' + esc(t('fe.dc.bnrNa')) + '">'
+                    + '⚠️ ' + esc(t('fe.dc.bnrNa')) + '</span>';
+          }
+          return '<div class="dc-pay-bnr">'
+            +   '<div class="dc-pay-bnr-row">'
+            +     '<label for="dcPayBnr">🏦 <b>' + t('fe.dc.bnrToday') + ':</b></label>'
+            +     '<div class="dc-pay-bnr-input">'
+            +       '<span class="dc-pay-bnr-prefix">1 EUR =</span>'
+            +       '<input class="input" id="dcPayBnr" type="number" '
+            +         'min="0" step="0.0001" placeholder="ex. 5.20" '
+            +         'value="' + (initial !== '' ? n2(initial, 4).replace(',', '.') : '') + '" '
+            +         'oninput="FleetExtra.dcPayBnrChange()">'
+            +       '<span class="dc-pay-bnr-suffix">RON</span>'
+            +     '</div>'
+            +     badge
+            +   '</div>'
+            +   '<div class="dc-pay-bnr-hint text-muted" style="font-size:12px;">'
+            +     esc(t('fe.pm.bnrHint'))
+            +   '</div>'
+            +   '<div class="dc-pay-preview" id="dcPayPreview"></div>'
+            + '</div>';
+        })()
       + '<div class="dc-pay-foot">'
       +   '<button class="btn ghost" onclick="FleetExtra.dcClosePayment()">' + t('common.cancel') + '</button>'
       +   '<button class="btn ok" onclick="FleetExtra.dcPaySubmit()">✅ ' + t('fe.pm.saveBtn') + '</button>'
@@ -1248,10 +1279,25 @@
     dcPayRecalc();
   }
 
+  // A modalban lévő BNR-input aktuális értéke (üres → null; érvénytelen → null).
+  function _dcPayBnrValue() {
+    var el = document.getElementById('dcPayBnr');
+    if (!el) return null;
+    var n = parseFloat(el.value);
+    return (isFinite(n) && n > 0) ? n : null;
+  }
+
+  function dcPayBnrChange() {
+    // Élő RON↔EUR előnézet a kézi értékre.
+    dcPayRecalc();
+  }
+
   function dcPayRecalc() {
     var amount = parseFloat((document.getElementById('dcPayAmount') || {}).value) || 0;
     var cur = (document.getElementById('dcPayCur') || {}).value || 'RON';
-    var bnr = _dcBnr;
+    // Az input-mező mindig NYER; ha üres, esetleg fallback a _dcBnr-re.
+    var bnr = _dcPayBnrValue();
+    if (bnr == null) bnr = _dcBnr;
     var el = document.getElementById('dcPayPreview');
     if (!el) return;
     if (!amount) { el.innerHTML = ''; return; }
@@ -1268,6 +1314,7 @@
 
   function dcPaySubmit() {
     if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    var bnrOverride = _dcPayBnrValue();
     var f = {
       email_sofer: _dcCurrent.email,
       paid_at: (document.getElementById('dcPayDate') || {}).value,
@@ -1275,10 +1322,19 @@
       currency: (document.getElementById('dcPayCur') || {}).value,
       method: (document.getElementById('dcPayMethod') || {}).value,
       note: (document.getElementById('dcPayNote') || {}).value,
+      // Kézi BNR override — a szerver-oldali `paymentCreate` már fogadja
+      // (`bnr_rate_override`). Ha nincs érték, a szerver megpróbálja lekérni
+      // automatikusan; ha az sem sikerül, a rekordban null marad — de a
+      // sofőr ilyenkor is látja a bevitel-formán a figyelmeztetést.
+      bnr_rate_override: bnrOverride,
     };
     if (!parseFloat(f.amount) || parseFloat(f.amount) <= 0) {
       toast(t('fe.pm.invalidAmount'), 'err'); return;
     }
+    // A sofőr által beírt utolsó BNR-értéket megőrizzük (közös kulcs a
+    // Decont oficial-lal — a KETTŐ ugyanazt jelenti: "amit a felhasználó
+    // legutóbb ismert BNR-nek beírt"). Így legközelebbi nyitáskor előtöltve.
+    if (bnrOverride != null) { _dcOfSaveManualBnr(bnrOverride); }
     gas('paymentCreate', [f]).then(function (r) {
       if (r && r.ok) {
         toast(t('fe.pm.saved'), 'ok');
@@ -2422,6 +2478,7 @@
     dcClosePayment: dcClosePayment,
     dcPayCurChange: dcPayCurChange,
     dcPayRecalc: dcPayRecalc,
+    dcPayBnrChange: dcPayBnrChange,
     dcPaySubmit: dcPaySubmit,
     dcPayDelete: dcPayDelete,
     // Sor-szintű kifizetés (💰) + egyéni típus-kezelő (⚙️)
