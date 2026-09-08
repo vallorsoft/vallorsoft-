@@ -402,19 +402,44 @@ describe('getDriverBalance', () => {
 //  List + Delete (multi-tenant védelem)
 // ═════════════════════════════════════════════
 describe('list & delete cross-tenant', () => {
-  test('earningList: company_id-szűrt WHERE', async () => {
+  test('earningList: company_id-szűrt WHERE + kifizetett csoportba került tételek kihagyva', async () => {
     setUser(fixtures.admin);
     const pool = require('../../db');
+    // 1) information_schema check: tábla létezik
+    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] });
+    // 2) fő SELECT (üres eredmény)
     pool.query.mockResolvedValueOnce(rows([]));
     await request(app).post('/api/execute').send({
       functionName: 'earningList',
       arguments: [{ email: 'sofer@ceg.hu', from: '2026-01-01', to: '2026-12-31' }],
     });
-    const sql = pool.query.mock.calls[0][0];
-    const params = pool.query.mock.calls[0][1];
+    // A tábla-létezés check az elsőnek fut
+    const sqlSchema = pool.query.mock.calls[0][0];
+    expect(sqlSchema).toMatch(/information_schema\.tables/i);
+    expect(sqlSchema).toMatch(/driver_payment_group_items/i);
+    // A fő SELECT-nek tartalmaznia kell a NOT IN kizárást
+    const sql = pool.query.mock.calls[1][0];
+    const params = pool.query.mock.calls[1][1];
     expect(sql).toMatch(/FROM driver_earnings/i);
     expect(sql).toMatch(/company_id = \$1/i);
+    expect(sql).toMatch(/NOT IN \(SELECT earning_id FROM driver_payment_group_items\)/i);
     expect(params[0]).toBe(fixtures.admin.company_id);
+  });
+
+  test('earningList: migráció-tolerancia — driver_payment_group_items nincs → nincs NOT IN kizárás', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    // 1) information_schema check: tábla NEM létezik
+    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    // 2) fő SELECT
+    pool.query.mockResolvedValueOnce(rows([]));
+    await request(app).post('/api/execute').send({
+      functionName: 'earningList',
+      arguments: [{ email: 'sofer@ceg.hu' }],
+    });
+    const sql = pool.query.mock.calls[1][0];
+    expect(sql).toMatch(/FROM driver_earnings/i);
+    expect(sql).not.toMatch(/NOT IN \(SELECT earning_id FROM driver_payment_group_items\)/i);
   });
 
   test('paymentDelete: idegen id → 0 sor → hiba', async () => {
