@@ -724,6 +724,9 @@
         + panel('💸 ' + t('fe.pm.listTitle') + ' (' + payItems.length + ')',  _dcPaymentListHtml(payItems))
         + '</div>';
 
+      // Sticky sáv a multi-select-hez: mindig a DOM-ban, csak .open osztály kapcsol
+      var selBar = '<div id="dcSelBar" class="dc-sel-bar"></div>';
+
       // Vizuális marker: „🆕 v2" a fejlécben, hogy egyértelmű legyen a
       // felhasználónak, hogy az új verziót látja (nem a cachelt régit).
       out.innerHTML =
@@ -738,7 +741,8 @@
           +   '📑 ' + t('fe.stof.openBtn') + '</button>'
           + '</div>')
         + earnFormHtml
-        + listsHtml;
+        + listsHtml
+        + selBar;
 
       // Live-számoló bekötése (qty × unit)
       _dcBindLiveCalc();
@@ -902,10 +906,104 @@
     });
   }
 
+  // Kijelölt earning-ID-k a csoportos kifizetéshez.
+  // Sofőr-váltásra + dcLoad-nál ürítjük (a set az aktuális sofőrhöz tartozik).
+  var _dcSelectedEarnings = {}; // { earningId: {amount, currency, kind, label, date, unit, qty} }
+  var _dcLastEarnItems = [];    // aktuálisan renderelt items (a "kijelöl mind"-hez)
+
+  function dcSelClear() {
+    _dcSelectedEarnings = {};
+    var email = _dcCurrent && _dcCurrent.email;
+    if (email) dcLoad();
+  }
+  function dcSelToggle(id, amount, cur) {
+    if (_dcSelectedEarnings[id]) delete _dcSelectedEarnings[id];
+    else {
+      // A teljes item-adatot elmentjük (a group-modálban név/dátum/típus is kell)
+      var it = _dcLastEarnItems.find(function (x) { return x.id === id; });
+      _dcSelectedEarnings[id] = it
+        ? {
+            amount: Number(it.total_amount) || 0,
+            currency: String(it.currency || 'RON').toUpperCase(),
+            kind: it.kind || 'other',
+            label: it.label || '',
+            date: it.earning_date,
+            qty: Number(it.quantity) || 0,
+            unit: Number(it.unit_amount) || 0,
+          }
+        : { amount: Number(amount) || 0, currency: String(cur || 'RON').toUpperCase() };
+    }
+    // Cél-sor visuális állapot-toggle a re-render nélkül (kis UX gyorsítás)
+    var cb = document.querySelector('.dc-sel-cb[onchange*="dcSelToggle(' + id + ',"]');
+    if (cb) {
+      var tr = cb.closest('tr');
+      if (tr) tr.classList.toggle('dc-row-selected', !!_dcSelectedEarnings[id]);
+    }
+    _dcSelRefreshBar();
+  }
+  function dcSelToggleAll() {
+    var items = _dcLastEarnItems;
+    var allSelected = items.length && items.every(function (it) { return _dcSelectedEarnings[it.id]; });
+    if (allSelected) _dcSelectedEarnings = {};
+    else {
+      items.forEach(function (it) {
+        _dcSelectedEarnings[it.id] = {
+          amount: Number(it.total_amount) || 0,
+          currency: String(it.currency || 'RON').toUpperCase(),
+          kind: it.kind || 'other',
+          label: it.label || '',
+          date: it.earning_date,
+          qty: Number(it.quantity) || 0,
+          unit: Number(it.unit_amount) || 0,
+        };
+      });
+    }
+    // Újrarender (a checkboxok + akcent-sor állapot)
+    var email = _dcCurrent && _dcCurrent.email;
+    if (email) dcLoad();
+  }
+  function _dcSelSums() {
+    var sums = { eur: 0, ron: 0, count: 0 };
+    Object.keys(_dcSelectedEarnings).forEach(function (id) {
+      var it = _dcSelectedEarnings[id];
+      var cur = it.currency;
+      if (cur === 'EUR') sums.eur += it.amount;
+      else if (cur === 'RON') sums.ron += it.amount;
+      sums.count += 1;
+    });
+    return sums;
+  }
+  function _dcSelRefreshBar() {
+    var bar = document.getElementById('dcSelBar');
+    if (!bar) return;
+    var s = _dcSelSums();
+    if (!s.count) { bar.classList.remove('open'); return; }
+    bar.classList.add('open');
+    var parts = [];
+    if (s.eur) parts.push('<b>' + n2(s.eur, 2) + ' EUR</b>');
+    if (s.ron) parts.push('<b>' + n2(s.ron, 2) + ' RON</b>');
+    var sumHtml = parts.length ? parts.join(' + ') : '<b>0</b>';
+    bar.innerHTML =
+      '<span class="dc-sel-count">' + s.count + ' ' + t('fe.pg.selected') + '</span>'
+      + '<span class="dc-sel-sums">Σ ' + sumHtml + '</span>'
+      + '<button class="btn ghost" onclick="FleetExtra.dcSelClear()">'
+      +   t('common.cancel') + '</button>'
+      + '<button class="btn primary" onclick="FleetExtra.dcOpenGroupPay()">💰 '
+      +   t('fe.pg.payBtn') + '</button>';
+  }
+
   function _dcEarningListHtml(items) {
+    _dcLastEarnItems = items || [];
     if (!items.length) {
+      _dcSelectedEarnings = {};
       return '<div class="text-muted" style="padding:14px;text-align:center;">' + t('fe.de.empty') + '</div>';
     }
+    // A kijelölésből kihagyjuk azokat, amik már nem szerepelnek (pl. hónap-váltás után)
+    var validIds = new Set(items.map(function (x) { return String(x.id); }));
+    Object.keys(_dcSelectedEarnings).forEach(function (id) {
+      if (!validIds.has(String(id))) delete _dcSelectedEarnings[id];
+    });
+    var allSelected = items.every(function (it) { return _dcSelectedEarnings[it.id]; });
     var rows = items.map(function (it) {
       // Kind-cimke: egyéni típusnál a saját label_ro/hu, beépítettnél az i18n kulcs
       var kindLabel;
@@ -920,7 +1018,11 @@
       var pillClass = _dcBuiltinKinds.indexOf(kindKey) >= 0 ? kindKey : 'other';
       var amount = Number(it.total_amount) || 0;
       var cur = it.currency || 'RON';
-      return '<tr>'
+      var checked = _dcSelectedEarnings[it.id] ? ' checked' : '';
+      return '<tr class="' + (_dcSelectedEarnings[it.id] ? 'dc-row-selected' : '') + '">'
+        + '<td style="text-align:center;width:32px;">'
+        +   '<input type="checkbox" class="dc-sel-cb"' + checked
+        +   ' onchange="FleetExtra.dcSelToggle(' + it.id + ',' + amount + ',\'' + esc(cur) + '\')"></td>'
         + '<td>' + d2(it.earning_date) + '</td>'
         + '<td><span class="dc-kind-pill dc-kind-' + esc(pillClass) + '">'
         +   esc(kindLabel) + '</span></td>'
@@ -936,8 +1038,14 @@
         +     'onclick="FleetExtra.dcEarnDelete(' + it.id + ')">✕</button></td>'
         + '</tr>';
     }).join('');
+    // A refresh a render UTÁN mikrotaszkban fusson (a bar akkor már a DOM-ban van)
+    setTimeout(_dcSelRefreshBar, 0);
     return '<div class="dc-table-wrap"><table class="table dc-list-table">'
       + '<thead><tr>'
+      + '<th style="text-align:center;width:32px;">'
+      +   '<input type="checkbox" class="dc-sel-cb"' + (allSelected ? ' checked' : '')
+      +   ' title="' + t('fe.pg.selectAll') + '"'
+      +   ' onchange="FleetExtra.dcSelToggleAll()"></th>'
       + '<th>' + t('fe.de.colDate') + '</th>'
       + '<th>' + t('fe.de.colKind') + '</th>'
       + '<th>' + t('fe.de.colLabel') + '</th>'
@@ -960,14 +1068,26 @@
       var ronCell = it.amount_ron != null
         ? '<span class="text-muted" style="font-size:12px;">= ' + n2(it.amount_ron, 2) + ' RON</span>'
         : '';
+      // Ha a payment egy csoport része → 🖨️ nyomtatás-gomb (a csoport-lapot mutatja).
+      // A group_id-t a szerver-oldali paymentList SELECT visszaadja (a driver_payments
+      // migrációval kapott group_id oszlopból). Régi sor → NULL → nincs gomb.
+      var groupBtn = it.group_id
+        ? '<button class="btn ghost dc-print-btn" style="padding:3px 9px;font-size:12px;margin-right:4px;" '
+          + 'title="' + t('fe.pg.printGroup') + '" '
+          + 'onclick="FleetExtra.dcGroupPrint(' + it.group_id + ')">🖨️</button>'
+        : '';
+      var groupBadge = it.group_id
+        ? ' <span class="dc-pg-badge" title="' + t('fe.pg.partOfGroup') + '">#' + esc(it.group_id) + '</span>'
+        : '';
       return '<tr>'
-        + '<td>' + d2(it.paid_at) + '</td>'
+        + '<td>' + d2(it.paid_at) + groupBadge + '</td>'
         + '<td>' + methodPill + '</td>'
         + '<td style="text-align:right;font-weight:700;">' + n2(it.amount, 2)
         +   ' <span class="dc-tile-cur">' + esc(it.currency || 'RON') + '</span></td>'
         + '<td>' + bnrCell + ' ' + ronCell + '</td>'
         + '<td>' + esc(it.note || '') + '</td>'
-        + '<td style="text-align:right;">'
+        + '<td style="text-align:right;white-space:nowrap;">'
+        +   groupBtn
         +   '<button class="btn danger" style="padding:3px 9px;font-size:12px;" '
         +     'onclick="FleetExtra.dcPayDelete(' + it.id + ')">✕</button></td>'
         + '</tr>';
@@ -1343,6 +1463,445 @@
       } else toast((r && r.err) || t('common.error'), 'err');
     });
   }
+
+  // ═════════════════════════════════════════════════════════════
+  //  Csoportos kifizetés modal (multi-select tétel + több fiz. mód)
+  // ═════════════════════════════════════════════════════════════
+  // A kezelő N tételt (EUR/RON vegyesen) kijelöl a járandóság-listán,
+  // itt megjeleníti őket + hozzáadja a fizetési sorokat (1..M):
+  //   pl. 1620 EUR utalás + 1900 RON készpénz.
+  // A modal ELŐTT a tételek `_dcSelectedEarnings`-ben állnak.
+  // Beküldés: `earningPaymentGroupCreate({email, earning_ids, payments, note, paid_at})`.
+
+  // Új fizetési sor DOM-tervezet: mód + összeg + valuta + BNR + megjegyzés + törlés.
+  // Az `idx` a friss egyedi sor-index (a DOM-ban `data-idx`-ként), csak az újrarender
+  // idejére stabil (a submit a DOM-ból olvas, nem index-alapon).
+  function _dcPgPayRow(idx, initCur, initAmount, initMethod) {
+    var lastManual = _dcOfLastManualBnr();
+    return '<div class="dc-pg-payrow" data-idx="' + idx + '">'
+      +   '<select class="select dc-pg-method">'
+      +     '<option value="cash">' + esc(t('fe.pm.method.cash')) + '</option>'
+      +     '<option value="bank"' + (initMethod === 'bank' ? ' selected' : '') + '>' + esc(t('fe.pm.method.bank')) + '</option>'
+      +     '<option value="card"' + (initMethod === 'card' ? ' selected' : '') + '>' + esc(t('fe.pm.method.card')) + '</option>'
+      +     '<option value="other"' + (initMethod === 'other' ? ' selected' : '') + '>' + esc(t('fe.pm.method.other')) + '</option>'
+      +   '</select>'
+      +   '<input class="input dc-pg-amount" type="number" min="0.01" step="0.01" '
+      +     'placeholder="0.00" '
+      +     'value="' + (initAmount != null && initAmount > 0 ? String(initAmount) : '') + '" '
+      +     'oninput="FleetExtra.dcPgRecalc()">'
+      +   '<select class="select dc-pg-cur" onchange="FleetExtra.dcPgRecalc()">'
+      +     '<option value="RON"' + (initCur === 'RON' ? ' selected' : '') + '>RON</option>'
+      +     '<option value="EUR"' + (initCur === 'EUR' ? ' selected' : '') + '>EUR</option>'
+      +   '</select>'
+      +   '<input class="input dc-pg-bnr" type="number" min="0" step="0.0001" '
+      +     'placeholder="BNR" '
+      +     'value="' + (lastManual != null ? String(lastManual) : '') + '" '
+      +     'oninput="FleetExtra.dcPgRecalc()" '
+      +     'title="' + t('fe.pg.bnrTitle') + '">'
+      +   '<input class="input dc-pg-note" placeholder="' + t('fe.pm.notePh') + '">'
+      +   '<button class="btn danger dc-pg-rm" onclick="FleetExtra.dcPgRemoveRow(this)" '
+      +     'title="' + t('common.delete') + '">✕</button>'
+      + '</div>';
+  }
+
+  // Modal létrehozása (egyszer, cache-elve)
+  function _dcPgEnsureModal() {
+    if (document.getElementById('dcPgModal')) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'modal-back';
+    wrap.id = 'dcPgModal';
+    wrap.innerHTML =
+      '<div class="modal glass dc-pg-modal">'
+      +   '<div class="modal-h">'
+      +     '<h2 id="dcPgTitle">💰 ' + t('fe.pg.title') + '</h2>'
+      +     '<button class="modal-close" onclick="FleetExtra.dcPgClose()">✕</button>'
+      +   '</div>'
+      +   '<div class="modal-b" id="dcPgBody"></div>'
+      + '</div>';
+    document.body.appendChild(wrap);
+  }
+
+  function dcOpenGroupPay() {
+    var ids = Object.keys(_dcSelectedEarnings);
+    if (!ids.length) { toast(t('fe.pg.pickSome'), 'err'); return; }
+    if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    _dcPgEnsureModal();
+    var m = document.getElementById('dcPgModal');
+    var b = document.getElementById('dcPgBody');
+    var t_ = document.getElementById('dcPgTitle');
+    t_.textContent = '💰 ' + t('fe.pg.title') + ' — ' + (_dcCurrent.nume || _dcCurrent.email);
+
+    // Kijelölt tételek tábla (a group-payment-en pontosan ezek lesznek)
+    var sums = _dcSelSums();
+    var itemsRows = ids.map(function (id) {
+      var it = _dcSelectedEarnings[id];
+      var kindLabel;
+      var kindKey = it.kind || 'other';
+      if (_dcBuiltinKinds.indexOf(kindKey) >= 0) kindLabel = t('fe.de.kind.' + kindKey);
+      else {
+        var found = _dcCustomKinds.find(function (r) { return r.key === kindKey; });
+        var lang = (window.I18N && window.I18N.getLang && window.I18N.getLang()) || 'ro';
+        kindLabel = found ? ((lang === 'hu' && found.label_hu) ? found.label_hu : (found.label_ro || kindKey)) : kindKey;
+      }
+      return '<tr>'
+        + '<td>' + d2(it.date) + '</td>'
+        + '<td><span class="dc-kind-pill dc-kind-' + esc(_dcBuiltinKinds.indexOf(kindKey) >= 0 ? kindKey : 'other') + '">'
+        +   esc(kindLabel) + '</span></td>'
+        + '<td>' + esc(it.label || '—') + '</td>'
+        + '<td style="text-align:right;">' + n2(it.qty || 0, 2) + ' × ' + n2(it.unit || 0, 2) + '</td>'
+        + '<td style="text-align:right;font-weight:700;">' + n2(it.amount, 2)
+        +   ' <span class="dc-tile-cur">' + esc(it.currency) + '</span></td>'
+        + '</tr>';
+    }).join('');
+    var itemsTable =
+      '<div class="dc-pg-items">'
+      +   '<h3>📋 ' + t('fe.pg.selectedItems') + ' (' + ids.length + ')</h3>'
+      +   '<div class="dc-table-wrap"><table class="table dc-list-table">'
+      +     '<thead><tr>'
+      +       '<th>' + t('fe.de.colDate') + '</th>'
+      +       '<th>' + t('fe.de.colKind') + '</th>'
+      +       '<th>' + t('fe.de.colLabel') + '</th>'
+      +       '<th style="text-align:right;">' + t('fe.de.colCalc') + '</th>'
+      +       '<th style="text-align:right;">' + t('fe.de.colTotal') + '</th>'
+      +     '</tr></thead><tbody>' + itemsRows + '</tbody></table></div>'
+      +   '<div class="dc-pg-sums">Σ '
+      +     (sums.eur ? '<b>' + n2(sums.eur, 2) + ' EUR</b>' : '')
+      +     (sums.eur && sums.ron ? ' + ' : '')
+      +     (sums.ron ? '<b>' + n2(sums.ron, 2) + ' RON</b>' : '')
+      +   '</div>'
+      + '</div>';
+
+    // Fizetési sorok — alapból egy sor, a legnagyobb valuta-egyenleg összegével
+    var defaultCur = sums.eur >= sums.ron ? 'EUR' : 'RON';
+    var defaultAmount = defaultCur === 'EUR' ? sums.eur : sums.ron;
+    var paysHtml =
+      '<div class="dc-pg-pays">'
+      +   '<h3>💵 ' + t('fe.pg.paymentsTitle') + '</h3>'
+      +   '<div class="dc-pg-payhead">'
+      +     '<span>' + t('fe.pm.methodLbl') + '</span>'
+      +     '<span>' + t('fe.pm.amount') + '</span>'
+      +     '<span>' + t('fe.pm.currencyLbl') + '</span>'
+      +     '<span>BNR</span>'
+      +     '<span>' + t('fld.note') + '</span>'
+      +     '<span></span>'
+      +   '</div>'
+      +   '<div id="dcPgPaysBox">'
+      +     _dcPgPayRow(0, defaultCur, defaultAmount, 'bank')
+      +   '</div>'
+      +   '<button class="btn ghost dc-pg-addrow" onclick="FleetExtra.dcPgAddRow()">➕ '
+      +     t('fe.pg.addPayment') + '</button>'
+      + '</div>';
+
+    // Élő egyenleg-előnézet
+    var balHtml =
+      '<div class="dc-pg-balance">'
+      +   '<div class="dc-pg-bal-block">'
+      +     '<div class="dc-pg-bal-label">' + t('fe.pg.toPay') + ' (EUR)</div>'
+      +     '<div class="dc-pg-bal-val" id="dcPgToPayEur">' + n2(sums.eur, 2) + '</div>'
+      +   '</div>'
+      +   '<div class="dc-pg-bal-block">'
+      +     '<div class="dc-pg-bal-label">' + t('fe.pg.paid') + ' (EUR)</div>'
+      +     '<div class="dc-pg-bal-val" id="dcPgPaidEur">0.00</div>'
+      +   '</div>'
+      +   '<div class="dc-pg-bal-block">'
+      +     '<div class="dc-pg-bal-label">' + t('fe.pg.toPay') + ' (RON)</div>'
+      +     '<div class="dc-pg-bal-val" id="dcPgToPayRon">' + n2(sums.ron, 2) + '</div>'
+      +   '</div>'
+      +   '<div class="dc-pg-bal-block">'
+      +     '<div class="dc-pg-bal-label">' + t('fe.pg.paid') + ' (RON)</div>'
+      +     '<div class="dc-pg-bal-val" id="dcPgPaidRon">0.00</div>'
+      +   '</div>'
+      +   '<div class="dc-pg-bal-block dc-pg-bal-total">'
+      +     '<div class="dc-pg-bal-label">' + t('fe.pg.combinedRon') + '</div>'
+      +     '<div class="dc-pg-bal-val" id="dcPgCombRon">—</div>'
+      +   '</div>'
+      + '</div>';
+
+    // Fejléc (dátum + megjegyzés)
+    var headHtml =
+      '<div class="dc-pg-head">'
+      +   '<div class="field" style="margin:0;">'
+      +     '<label>' + t('fe.pm.paidAt') + '</label>'
+      +     '<input class="input" id="dcPgDate" type="date" value="' + today() + '">'
+      +   '</div>'
+      +   '<div class="field" style="margin:0;flex:1;">'
+      +     '<label>' + t('fld.note') + '</label>'
+      +     '<input class="input" id="dcPgNote" placeholder="' + t('fe.pg.notePh') + '">'
+      +   '</div>'
+      + '</div>';
+
+    // Foot: submit + close
+    var footHtml =
+      '<div class="dc-pg-foot">'
+      +   '<button class="btn ghost" onclick="FleetExtra.dcPgClose()">' + t('common.cancel') + '</button>'
+      +   '<button class="btn ok" onclick="FleetExtra.dcPgSubmit()">✅ ' + t('fe.pg.saveBtn') + '</button>'
+      + '</div>';
+
+    b.innerHTML = headHtml + itemsTable + paysHtml + balHtml + footHtml;
+    m.classList.add('open');
+    dcPgRecalc();
+  }
+
+  function dcPgClose() {
+    var m = document.getElementById('dcPgModal');
+    if (m) m.classList.remove('open');
+  }
+
+  function dcPgAddRow() {
+    var box = document.getElementById('dcPgPaysBox');
+    if (!box) return;
+    // Új sor: alap valuta = RON (a diverse-fizetés általában így), üres összeg
+    var idx = box.querySelectorAll('.dc-pg-payrow').length;
+    box.insertAdjacentHTML('beforeend', _dcPgPayRow(idx, 'RON', null, 'cash'));
+    dcPgRecalc();
+  }
+
+  function dcPgRemoveRow(btn) {
+    var box = document.getElementById('dcPgPaysBox');
+    if (!box) return;
+    if (box.querySelectorAll('.dc-pg-payrow').length <= 1) {
+      toast(t('fe.pg.needOne'), 'err');
+      return;
+    }
+    var row = btn.closest('.dc-pg-payrow');
+    if (row) row.remove();
+    dcPgRecalc();
+  }
+
+  // Élő összegzés: kijelölt tételek Σ vs. fizetve Σ, valutánként és RON-egyesítve
+  function dcPgRecalc() {
+    var sums = _dcSelSums();
+    var paid = { eur: 0, ron: 0, ron_all: 0 };
+    var rows = document.querySelectorAll('#dcPgPaysBox .dc-pg-payrow');
+    rows.forEach(function (r) {
+      var amount = parseFloat((r.querySelector('.dc-pg-amount') || {}).value) || 0;
+      var cur = (r.querySelector('.dc-pg-cur') || {}).value || 'RON';
+      var bnr = parseFloat((r.querySelector('.dc-pg-bnr') || {}).value);
+      if (cur === 'EUR') {
+        paid.eur += amount;
+        if (isFinite(bnr) && bnr > 0) paid.ron_all += amount * bnr;
+      } else {
+        paid.ron += amount;
+        paid.ron_all += amount;
+      }
+    });
+    // A tartozás RON-egyenértékét is számoljuk (informatív) — az első nem-üres sor
+    // BNR-jét használjuk közös átváltásra; ha nincs, csak RON-részt mutatunk.
+    var firstBnr = null;
+    rows.forEach(function (r) {
+      if (firstBnr != null) return;
+      var b = parseFloat((r.querySelector('.dc-pg-bnr') || {}).value);
+      if (isFinite(b) && b > 0) firstBnr = b;
+    });
+    var toPayRonAll = sums.ron + (firstBnr ? sums.eur * firstBnr : 0);
+    var el;
+    if ((el = document.getElementById('dcPgToPayEur'))) el.textContent = n2(sums.eur, 2);
+    if ((el = document.getElementById('dcPgToPayRon'))) el.textContent = n2(sums.ron, 2);
+    if ((el = document.getElementById('dcPgPaidEur')))  el.textContent = n2(paid.eur, 2);
+    if ((el = document.getElementById('dcPgPaidRon')))  el.textContent = n2(paid.ron, 2);
+    if ((el = document.getElementById('dcPgCombRon'))) {
+      if (firstBnr) {
+        var diff = paid.ron_all - toPayRonAll;
+        el.innerHTML = n2(paid.ron_all, 2) + ' / ' + n2(toPayRonAll, 2)
+          + ' <span class="' + (Math.abs(diff) < 0.01 ? 'dc-pg-ok' : (diff < 0 ? 'dc-pg-short' : 'dc-pg-over')) + '">'
+          + (diff >= 0 ? '+' : '') + n2(diff, 2) + '</span>';
+      } else {
+        el.textContent = '—';
+      }
+    }
+  }
+
+  function dcPgSubmit() {
+    var ids = Object.keys(_dcSelectedEarnings).map(function (x) { return parseInt(x, 10); });
+    if (!ids.length) { toast(t('fe.pg.pickSome'), 'err'); return; }
+    var rows = document.querySelectorAll('#dcPgPaysBox .dc-pg-payrow');
+    if (!rows.length) { toast(t('fe.pg.needOne'), 'err'); return; }
+    var payments = [];
+    var invalid = false;
+    var lastManualToSave = null;
+    rows.forEach(function (r) {
+      if (invalid) return;
+      var amount = parseFloat((r.querySelector('.dc-pg-amount') || {}).value);
+      if (!isFinite(amount) || amount <= 0) { invalid = true; return; }
+      var cur = (r.querySelector('.dc-pg-cur') || {}).value || 'RON';
+      var method = (r.querySelector('.dc-pg-method') || {}).value || 'cash';
+      var bnrRaw = parseFloat((r.querySelector('.dc-pg-bnr') || {}).value);
+      var bnr = (isFinite(bnrRaw) && bnrRaw > 0) ? bnrRaw : null;
+      if (bnr != null && lastManualToSave == null) lastManualToSave = bnr;
+      var note = (r.querySelector('.dc-pg-note') || {}).value || '';
+      payments.push({ amount: amount, currency: cur, method: method, bnr_rate: bnr, note: note });
+    });
+    if (invalid) { toast(t('fe.pm.invalidAmount'), 'err'); return; }
+    if (!payments.length) { toast(t('fe.pg.needOne'), 'err'); return; }
+
+    var payload = {
+      email_sofer: _dcCurrent.email,
+      paid_at: (document.getElementById('dcPgDate') || {}).value || null,
+      note: (document.getElementById('dcPgNote') || {}).value || null,
+      earning_ids: ids,
+      payments: payments,
+    };
+    if (lastManualToSave != null) { _dcOfSaveManualBnr(lastManualToSave); }
+    gas('earningPaymentGroupCreate', [payload]).then(function (r) {
+      if (r && r.ok) {
+        toast(t('fe.pg.saved'), 'ok');
+        _dcSelectedEarnings = {};
+        dcPgClose();
+        dcLoad();
+        // Opcionális: azonnal ajánljuk fel a nyomtatást
+        setTimeout(function () {
+          if (confirm(t('fe.pg.printPrompt'))) dcGroupPrint(r.group_id);
+        }, 250);
+      } else toast((r && r.err) || t('common.error'), 'err');
+    });
+  }
+
+  // ─── Csoportos kifizetés nyomtatása ──────────────────────────
+  //  A `earningPaymentGroupGet(id)` visszaadja a csoport minden adatát;
+  //  új ablakban renderelünk egy fehér-lap HTML-t (fejléc + tételek táblázat +
+  //  fizetési módok táblázat + valuta-összegzés + aláíró blokk), és
+  //  `window.print()`-elünk (a böngésző "Mentés PDF-be" is működik).
+  function dcGroupPrint(groupId) {
+    if (!groupId) { toast(t('common.error'), 'err'); return; }
+    gas('earningPaymentGroupGet', [{ id: groupId }]).then(function (r) {
+      if (!r || !r.ok) { toast((r && r.err) || t('common.error'), 'err'); return; }
+      _dcGroupPrintRender(r);
+    });
+  }
+
+  function _dcGroupPrintRender(r) {
+    var g = r.group || {};
+    var dr = r.driver || {};
+    var items = r.items || [];
+    var pays = r.payments || [];
+    var eSum = (r.summary && r.summary.earnings_by_currency) || {};
+    var pSum = (r.summary && r.summary.payments_by_currency) || {};
+
+    // ASCII-safe címek nélkül a print-ablakba írunk minden stílust inline-ban,
+    // hogy ne függjön az app CSS-től (window.open új dokumentumon fut).
+    var css =
+      'body{font-family:"Inter",system-ui,-apple-system,sans-serif;color:#1e1812;background:#faf6f0;padding:20px 24px;font-size:13px;}'
+      + '.doc{background:#fff;padding:26px 30px;max-width:820px;margin:0 auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);}'
+      + '.h{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1e1812;padding-bottom:12px;margin-bottom:16px;}'
+      + '.h h1{margin:0 0 4px;font-size:20px;font-weight:800;}'
+      + '.h .sub{font-size:12px;color:#555;}'
+      + '.badge{display:inline-block;padding:6px 14px;background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;border-radius:10px;font-weight:700;font-size:14px;}'
+      + 'h2{font-size:15px;margin:18px 0 8px;color:#1e1812;font-weight:700;}'
+      + 'table{width:100%;border-collapse:collapse;margin:6px 0 12px;font-size:12px;}'
+      + 'th,td{padding:7px 10px;text-align:left;border-bottom:1px solid #e5e7eb;}'
+      + 'th{background:#f3f4f6;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.4px;font-size:11px;}'
+      + 'td.r,th.r{text-align:right;}'
+      + '.tot{background:#fef3c7;font-weight:800;}'
+      + '.tot td{border-top:2px solid #f59e0b;border-bottom:none;padding:9px 10px;}'
+      + '.pill{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;background:#e0f2fe;color:#0369a1;}'
+      + '.pill-cash{background:#d1fae5;color:#065f46;}'
+      + '.pill-bank{background:#dbeafe;color:#1e40af;}'
+      + '.pill-card{background:#e9d5ff;color:#6b21a8;}'
+      + '.pill-other{background:#f3f4f6;color:#374151;}'
+      + '.sig{display:flex;justify-content:space-between;margin-top:32px;gap:40px;}'
+      + '.sig div{flex:1;text-align:center;}'
+      + '.sig .line{border-top:1px solid #1e1812;padding-top:6px;font-size:11px;}'
+      + '.note{background:#fef9c3;padding:10px 12px;border-left:3px solid #f59e0b;font-size:12px;margin:8px 0 12px;color:#78350f;}'
+      + '@media print{body{background:#fff;padding:0;}.doc{box-shadow:none;padding:16px 20px;}}';
+
+    // Tételek táblázat
+    var itemRows = items.map(function (it) {
+      var kindKey = it.kind || 'other';
+      var kindLabel;
+      if (_dcBuiltinKinds.indexOf(kindKey) >= 0) kindLabel = t('fe.de.kind.' + kindKey);
+      else {
+        var found = _dcCustomKinds.find(function (x) { return x.key === kindKey; });
+        var lang = (window.I18N && window.I18N.getLang && window.I18N.getLang()) || 'ro';
+        kindLabel = found ? ((lang === 'hu' && found.label_hu) ? found.label_hu : (found.label_ro || kindKey)) : kindKey;
+      }
+      return '<tr>'
+        + '<td>' + d2(it.earning_date) + '</td>'
+        + '<td>' + esc(kindLabel) + '</td>'
+        + '<td>' + esc(it.label || '—') + '</td>'
+        + '<td class="r">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
+        + '<td class="r"><b>' + n2(it.total_amount, 2) + ' ' + esc(it.currency || 'RON') + '</b></td>'
+        + '</tr>';
+    }).join('');
+    // Tételek összegzés-sorai valutánként
+    var eSumRows = Object.keys(eSum).map(function (cur) {
+      return '<tr class="tot"><td colspan="4" class="r">Σ ' + esc(cur) + ':</td>'
+        + '<td class="r">' + n2(eSum[cur], 2) + ' ' + esc(cur) + '</td></tr>';
+    }).join('');
+
+    // Fizetési sorok
+    var payRows = pays.map(function (p) {
+      var mc = (p.method || 'cash');
+      var ronCell = p.amount_ron != null
+        ? n2(p.amount_ron, 2) + ' RON'
+        : '—';
+      var bnrCell = p.bnr_rate != null
+        ? '1 EUR = ' + n2(p.bnr_rate, 4)
+        : '—';
+      return '<tr>'
+        + '<td><span class="pill pill-' + esc(mc) + '">' + esc(t('fe.pm.method.' + mc)) + '</span></td>'
+        + '<td class="r"><b>' + n2(p.amount, 2) + ' ' + esc(p.currency || 'RON') + '</b></td>'
+        + '<td>' + bnrCell + '</td>'
+        + '<td class="r">' + ronCell + '</td>'
+        + '<td>' + esc(p.note || '') + '</td>'
+        + '</tr>';
+    }).join('');
+    // Fizetve összegzés-sorai valutánként
+    var pSumRows = Object.keys(pSum).map(function (cur) {
+      return '<tr class="tot"><td class="r">Σ ' + esc(cur) + ':</td>'
+        + '<td class="r">' + n2(pSum[cur], 2) + ' ' + esc(cur) + '</td>'
+        + '<td colspan="3"></td></tr>';
+    }).join('');
+
+    var noteBlock = g.note
+      ? '<div class="note"><b>' + t('fld.note') + ':</b> ' + esc(g.note) + '</div>'
+      : '';
+
+    var html =
+      '<!doctype html><html><head><meta charset="utf-8">'
+      + '<title>' + t('fe.pg.printTitle') + ' — ' + esc(dr.nume || dr.email || '') + '</title>'
+      + '<style>' + css + '</style></head><body><div class="doc">'
+      + '<div class="h">'
+      +   '<div>'
+      +     '<h1>' + t('fe.pg.printTitle') + '</h1>'
+      +     '<div class="sub">' + t('fe.pg.groupNr') + ': #' + esc(g.id) + '</div>'
+      +     '<div class="sub"><b>' + esc(dr.nume || '') + '</b> — ' + esc(dr.email || '') + '</div>'
+      +   '</div>'
+      +   '<div><span class="badge">' + d2(g.paid_at) + '</span></div>'
+      + '</div>'
+      + noteBlock
+      + '<h2>📋 ' + t('fe.pg.selectedItems') + ' (' + items.length + ')</h2>'
+      + '<table>'
+      +   '<thead><tr>'
+      +     '<th>' + t('fe.de.colDate') + '</th>'
+      +     '<th>' + t('fe.de.colKind') + '</th>'
+      +     '<th>' + t('fe.de.colLabel') + '</th>'
+      +     '<th class="r">' + t('fe.de.colCalc') + '</th>'
+      +     '<th class="r">' + t('fe.de.colTotal') + '</th>'
+      +   '</tr></thead><tbody>' + itemRows + eSumRows + '</tbody></table>'
+      + '<h2>💵 ' + t('fe.pg.paymentsTitle') + ' (' + pays.length + ')</h2>'
+      + '<table>'
+      +   '<thead><tr>'
+      +     '<th>' + t('fe.pm.methodLbl') + '</th>'
+      +     '<th class="r">' + t('fe.pm.amount') + '</th>'
+      +     '<th>BNR</th>'
+      +     '<th class="r">' + t('fe.pg.equivRon') + '</th>'
+      +     '<th>' + t('fld.note') + '</th>'
+      +   '</tr></thead><tbody>' + payRows + pSumRows + '</tbody></table>'
+      + '<div class="sig">'
+      +   '<div><div class="line">' + t('fe.pg.signDriver') + '</div></div>'
+      +   '<div><div class="line">' + t('fe.pg.signCompany') + '</div></div>'
+      + '</div>'
+      + '</div>'
+      + '<script>setTimeout(function(){window.print();},400);<\/script>'
+      + '</body></html>';
+
+    var w = window.open('', '_blank', 'width=900,height=1100');
+    if (!w) { toast(t('common.error'), 'err'); return; }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  }
+
   // ════════════════════════════════════════════════════════
   //  4) ÜZEMANYAGKÁRTYA-IMPORT (generikus CSV + oszlop-párosítás)
   // ════════════════════════════════════════════════════════
@@ -2503,6 +3062,17 @@
     dcOfSheetEmail: dcOfSheetEmail,
     dcOfSaveBase: dcOfSaveBase,
     dcOfBnrChange: dcOfBnrChange,
+    // Csoportos kifizetés (multi-select + több fiz. mód + print)
+    dcSelToggle: dcSelToggle,
+    dcSelToggleAll: dcSelToggleAll,
+    dcSelClear: dcSelClear,
+    dcOpenGroupPay: dcOpenGroupPay,
+    dcPgClose: dcPgClose,
+    dcPgAddRow: dcPgAddRow,
+    dcPgRemoveRow: dcPgRemoveRow,
+    dcPgRecalc: dcPgRecalc,
+    dcPgSubmit: dcPgSubmit,
+    dcGroupPrint: dcGroupPrint,
     fcParse: fcParse, fcImport: fcImport,
   };
 })();
