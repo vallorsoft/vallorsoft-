@@ -557,11 +557,24 @@ handlers.earningList = async function (req, res, args) {
     if (a.email) { params.push(String(a.email).toLowerCase()); where += ` AND LOWER(email_sofer) = $${params.length}`; }
     if (a.from)  { params.push(a.from); where += ` AND earning_date >= $${params.length}`; }
     if (a.to)    { params.push(a.to);   where += ` AND earning_date <= $${params.length}`; }
+    // A kifizetett (csoportba került) tételek eltűnnek a listáról — a csoport
+    // a payment-listán jelenik meg, a nyomtatható lapról vissza is nézhető.
+    // Best-effort NOT IN — hiányzó tábla (nem futott migráció) → csendes fallback,
+    // a lista mint eddig, minden earning-tel.
+    let excludeSql = '';
+    try {
+      const exR = await pool.query(
+        `SELECT 1 FROM information_schema.tables
+          WHERE table_name = 'driver_payment_group_items' LIMIT 1`);
+      if (exR.rowCount) {
+        excludeSql = ' AND id NOT IN (SELECT earning_id FROM driver_payment_group_items)';
+      }
+    } catch (_e) { /* migráció-tudatos: ha nincs, marad üres */ }
     const r = await pool.query(
       `SELECT id, email_sofer, earning_date, kind, label, quantity, unit_amount,
               total_amount, currency, note, created_by, created_at
          FROM driver_earnings
-        WHERE ${where}
+        WHERE ${where}${excludeSql}
         ORDER BY earning_date DESC, id DESC
         LIMIT 500`,
       params
