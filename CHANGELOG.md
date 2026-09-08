@@ -14,6 +14,45 @@
 
 ---
 
+## 2026-09-08 — Sofőr-elszámolás: multi-select csoportos kifizetés (vegyes EUR/RON tételek + több fiz. mód + nyomtatás), PR #423
+
+**Kérés:** „szuksegem van egy olyanra hogy kijelolom melyik teteleket szeretnem fizetni (akar euros es lejes teteleket egyhelyen) es a vegen a kifizeteshez lehessen berakni hogy euroba vagy lejben volt fizetve es az oszeget de lehessen ugy ha peldaul van 5tetel euro osszesen 1800euro plusz 2 tetel ron oszesen 1000lej akkor kijeloles utan lehessen beirni peldaul 1620 utalassal … es euroban +hozaadas ujabb kifizetesi eszkoz 1900 keszpenz … es lejben igy osszese csoportositja a tételeket (pont ugy mint a hivatalos elszamolo lap nyomtatasnal) es nyomtathato is legyen az adott kifizetes nyomtatasnal mutassa a teteleket + a kifizetes módját pl. x oszeg euroban utalva es y osszeg lejben készpénzben"
+
+**DB (`db/driver-payment-groups.sql` — ÚJ, idempotens):**
+- `driver_payment_groups` (cégenkénti csoport, `email_sofer`+`paid_at`+`note`+`created_by`).
+- `driver_payment_group_items` (`UNIQUE (earning_id)` — egy earning egyszerre EGY csoportban).
+- `driver_payments.group_id` opcionális FK (`ON DELETE SET NULL`).
+
+**Backend (`handlers/fleetCompliance.js` — 4 új RPC):** mind Admin/Manager, `company_id`-szűrt, paraméteres SQL, cross-tenant védelem az INSERT ELŐTT (sofőr + minden earning tulajdon-ellenőrzés), audit.
+1. **`earningPaymentGroupCreate`** — tranzakcióban (`BEGIN`/`COMMIT`/`ROLLBACK`); `payment.method` fehérlista (`cash`/`bank`/`card`/`other`); BNR auto-fetch ha nincs `bnr_rate` a payment sorban (`fetchBnrEurRon` — 1× cache-elve, nem hívja meg minden sorra); `amount_ron` szerver-oldal (`EUR × BNR`, `RON` = amount); max 100 earning + 10 payment sor; migráció-hiány → diagnosztikus üzenet (mint PR #419); UNIQUE conflict → „deja incluse intr-un alt grup".
+2. **`earningPaymentGroupGet`** — driver-`nume` + items (earning-mezőkkel) + payments + `earnings_by_currency`/`payments_by_currency` összegzések.
+3. **`earningPaymentGroupList`** — opcionális email/from/to szűrő + `earnings_count`/`payments_count` sub-select-ek; best-effort try/catch (migráció-hiánynál üres).
+4. **`earningPaymentGroupDelete`** — payments + group törlése (CASCADE a group_items-en; earnings megmaradnak, csak kikerülnek a csoportból).
+
+A `paymentList` SELECT bővítve `(to_jsonb(driver_payments) ->> 'group_id')::int AS group_id` mintával — migráció-tolerancia.
+
+**Frontend (`public/fleet-extra-v2.js`):**
+1. **Multi-select ⭐:** új `_dcSelectedEarnings` állapot (map earning_id → {amount, currency, kind, label, date, qty, unit}); checkbox oszlop a járandóság-listán (select-all a fejlécen `dcSelToggleAll`); kijelölt sor `.dc-row-selected` kék akcens-csík.
+2. **Sticky sáv** (`#dcSelBar`, kék→lila gradient, fixed bottom): „N tétel kijelölve · X EUR / Y RON · [Kijelölés törlése] [💵 Kijelölés kifizetése]" — csak akkor jelenik meg, ha van kijelölt.
+3. **`#dcPgModal` csoportos kifizetés modal:** fejléc (dátum + megjegyzés), kijelölt tételek táblázat valuta-összegzésekkel; rács-alapú payment-sor (method-select + amount + currency + BNR + note + törlés); `➕ Új fizetési mód` (min 1); élő egyenleg-blokk (Fizetendő EUR/RON + Fizetve EUR/RON + kombinált RON diff-színnel — zöld ha OK, borostyán ha eltér). BNR pre-fill `_dcOfLastManualBnr()`-ből (a Decont oficial-lal osztott last-manual localStorage — PR #421).
+4. **Nyomtatás:** sikeres mentés után 🖨️ prompt → új ablakos szám-lap (`_dcGroupPrintRender`): fejléc-badge + sofőr név/email + `#N` csoport-szám + tételek táblázat + fizetési módok táblázat method-pirulával/BNR/amount_ron/note + aláíró blokk sofőr + cég oldalon. Inline CSS, `window.print()` automatikusan.
+5. **A meglévő payment-listán** soronkénti 🖨️ gomb + `#N` badge, ha a payment egy csoport része (`group_id` alapján).
+6. FleetExtra namespace 10 új export: `dcSelToggle`, `dcSelToggleAll`, `dcSelClear`, `dcOpenGroupPay`, `dcPgClose`, `dcPgAddRow`, `dcPgRemoveRow`, `dcPgRecalc`, `dcPgSubmit`, `dcGroupPrint`.
+
+**CSS (`public/style.css`):** `#dcSelBar` sticky gradient sáv (min-height 40, uniform gombok, mobil ≤720px teljes-szélesség), `.dc-row-selected` kék akcens-csík, `#dcPgModal` (max-width 780px), `.dc-pg-payrow` grid-template `1.2fr 1fr 0.7fr 1fr 1.4fr auto`, `.dc-pg-balance` gradient blokk (`.dc-pg-diff-ok` zöld / `.dc-pg-diff-warn` borostyán), `.dc-pg-badge` kék chip, `.dc-print-btn`. Világos + sötét téma külön.
+
+**i18n (`public/i18n.js`):** +23 új `fe.pg.*` kulcs (RO-alap + HU): sticky-sáv (`selBar`, `selBarClear`, `selBarPay`, `selNone`), modal (`title`, `itemsHead`, `paysHead`, `addPay`, `removePay`, `needOnePay`, `toPay`, `paid`, `combinedRon`, `saveBtn`, `notePh`, `saved`, `printPrompt`, `printBtn`, `partOfGroup`), nyomtatás (`printTitle`, `groupNr`, `equivRon`, `signDriver`, `signCompany`).
+
+**Cache-bust:** `?v=20260906paybnr` → `?v=20260908paygroup` (admin.html + manager.html: style.css + i18n.js + fleet-extra-v2.js).
+
+**Teszt:** új `tests/integration/payment-groups.test.js` — **15 új eset**: szerep-kapu (Sofer denied); validáció (üres email, üres earning_ids, üres payments, érvénytelen összeg); cross-tenant (idegen cég sofőre / earning); sikeres tranzakció (2 earning + 2 payment EUR + RON, BNR auto-fetch, `amount_ron` helyes: 1620×5.20=8424); migráció-hiány → ROLLBACK + diagnosztikus üzenet; conflict (earning már másik csoportban); Get/Delete szerep-kapu + ID validáció.
+
+**1104 Jest zöld** (1089 → 1104, +15). Nincs regresszió: a `paymentCreate` szoló út érintetlen (a régi Részleges/Teljes kifizetés-modal + a sor-szintű 💰 kifizetés + Decont oficial lap mind változatlan).
+
+**Deploy után él automatikusan** (Fly.io main-merge → `db/*.sql` induláskor auto-fut, `schema_migrations` könyveléssel).
+
+---
+
 ## 2026-09-06 — Sofőr-elszámolás: kifizetéshez kézzel is beírható BNR-árfolyam (auto-fallback esetén), PR #421
 
 **Kérés:** „kifizeteseknel a bnr arfolyamot nem irja ki legyen lehetoseg kezzel bnr arfolyamot írni kifizeteseknel ha nem tudja automatikusan a rendszer".
