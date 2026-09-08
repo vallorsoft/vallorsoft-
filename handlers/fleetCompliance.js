@@ -754,9 +754,12 @@ handlers.paymentList = async function (req, res, args) {
     if (a.email) { params.push(String(a.email).toLowerCase()); where += ` AND LOWER(email_sofer) = $${params.length}`; }
     if (a.from)  { params.push(a.from); where += ` AND paid_at >= $${params.length}`; }
     if (a.to)    { params.push(a.to);   where += ` AND paid_at <= $${params.length}`; }
+    // A `group_id` opcionális oszlop (a driver-payment-groups migráció adja
+    // hozzá); `to_jsonb`-vel olvasva NULL-t kapunk, ha még nem futott.
     const r = await pool.query(
       `SELECT id, email_sofer, paid_at, amount, currency, bnr_rate, amount_ron,
-              method, note, created_by, created_at
+              method, note, created_by, created_at,
+              (to_jsonb(driver_payments) ->> 'group_id')::int AS group_id
          FROM driver_payments
         WHERE ${where}
         ORDER BY paid_at DESC, id DESC
@@ -847,6 +850,301 @@ handlers.paymentDelete = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('paymentDelete hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ═════════════════════════════════════════════════════════════
+//  Csoportos kifizetés (multi-select tétel + több fizetési mód)
+// ═════════════════════════════════════════════════════════════
+// A sofőr-elszámolás felületen a kezelő KIJELÖL N tételt (driver_earnings,
+// vegyes EUR/RON), majd egy modálban 1..M fizetési sort ad meg
+// (mindegyik: mód + összeg + valuta + BNR + megjegyzés). Egy csoport.
+//
+// Tranzakcióban:
+//   1) driver_payment_groups INSERT
+//   2) driver_payment_group_items INSERT minden earning_id-re
+//      (a UNIQUE (earning_id) miatt egy earning egyszerre egy csoportba
+//       tartozhat; ha máshol volt, a beszúrás elhasal → ROLLBACK).
+//   3) driver_payments INSERT minden fizetési sorra, group_id-vel.
+//
+// Cross-tenant védelem:
+//   - A sofőr a saját céghez tartozik-e (users lookup).
+//   - MINDEN earning_id a cégé ÉS ehhez a sofőrhöz kötött.
+
+handlers.earningPaymentGroupCreate = async function (req, res, args) {
+  const client = await pool.connect();
+  try {
+    if (!_isAdminOrManager(req)) { client.release(); return _deny(res); }
+    const cid = req.session.user.company_id;
+    const f = _arg(args);
+    const email = String(f.email_sofer || '').trim().toLowerCase();
+    if (!email) { client.release(); return res.json({ result: { ok: false, err: 'Selecteaza un sofer!' } }); }
+
+    // Bemenet: earning_ids[] + payments[{method,amount,currency,bnr_rate,note?}]
+    const rawIds = Array.isArray(f.earning_ids) ? f.earning_ids : [];
+    const earningIds = [...new Set(rawIds.map(x => parseInt(x, 10)).filter(Number.isFinite))];
+    if (!earningIds.length) { client.release(); return res.json({ result: { ok: false, err: 'Selecteaza cel putin un drept.' } }); }
+    if (earningIds.length > 100) { client.release(); return res.json({ result: { ok: false, err: 'Prea multe drepturi selectate (max 100).' } }); }
+
+    const rawPays = Array.isArray(f.payments) ? f.payments : [];
+    if (!rawPays.length) { client.release(); return res.json({ result: { ok: false, err: 'Adauga cel putin o modalitate de plata.' } }); }
+    if (rawPays.length > 10) { client.release(); return res.json({ result: { ok: false, err: 'Prea multe modalitati de plata (max 10).' } }); }
+
+    // Fizetési sorok fehérlistán validálva
+    const payments = [];
+    let bnrCache = null;
+    for (const p of rawPays) {
+      const amount = _num(p && p.amount);
+      if (amount == null || amount <= 0) { client.release(); return res.json({ result: { ok: false, err: 'Suma invalida la o modalitate.' } }); }
+      const currency = _cur(p && p.currency);
+      const method = PAYMENT_METHODS.has(String((p && p.method) || '').toLowerCase())
+        ? String(p.method).toLowerCase() : 'cash';
+      let bnrRate = _num(p && p.bnr_rate);
+      if (bnrRate == null) {
+        if (bnrCache == null) {
+          try { bnrCache = await fetchBnrEurRon(); } catch (_e) { bnrCache = null; }
+        }
+        bnrRate = bnrCache;
+      }
+      bnrRate = bnrRate != null ? _round4(bnrRate) : null;
+      let amountRon = null;
+      if (currency === 'RON') amountRon = _round2(amount);
+      else if (currency === 'EUR' && bnrRate) amountRon = _round2(amount * bnrRate);
+      const note = String((p && p.note) || '').trim().slice(0, 500) || null;
+      payments.push({ amount: _round2(amount), currency, bnr_rate: bnrRate, amount_ron: amountRon, method, note });
+    }
+
+    const paidAt = f.paid_at || new Date().toISOString().slice(0, 10);
+    const groupNote = String(f.note || '').trim().slice(0, 500) || null;
+
+    // Sofőr a saját céghez tartozik-e
+    const ur = await client.query(
+      'SELECT 1 FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2', [email, cid]);
+    if (!ur.rows.length) { client.release(); return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } }); }
+
+    // MINDEN earning a cégé ÉS a sofőré?
+    const eR = await client.query(
+      `SELECT id FROM driver_earnings
+        WHERE id = ANY($1::int[])
+          AND company_id = $2
+          AND LOWER(email_sofer) = LOWER($3)`,
+      [earningIds, cid, email]
+    );
+    if (eR.rowCount !== earningIds.length) {
+      client.release();
+      return res.json({ result: { ok: false, err: 'Unele drepturi selectate nu apartin acestui sofer sau firma.' } });
+    }
+
+    // Már csoportban van bármelyik? (UNIQUE (earning_id) — a második beszúrás
+    // amúgy elhasalna, de a hiba mostantól diagnosztikus.)
+    try {
+      const conflict = await client.query(
+        `SELECT gi.earning_id FROM driver_payment_group_items gi
+         WHERE gi.earning_id = ANY($1::int[])`,
+        [earningIds]
+      );
+      if (conflict.rowCount) {
+        client.release();
+        return res.json({ result: { ok: false, err: 'Unele drepturi sunt deja incluse intr-un alt grup de plata.' } });
+      }
+    } catch (_e) { /* tábla-hiány = migráció nem futott — az INSERT úgyis szólni fog */ }
+
+    // Tranzakció
+    await client.query('BEGIN');
+    let groupId;
+    try {
+      const g = await client.query(
+        `INSERT INTO driver_payment_groups
+           (company_id, email_sofer, paid_at, note, created_by)
+         VALUES ($1,$2,$3,$4,$5)
+         RETURNING id`,
+        [cid, email, paidAt, groupNote, req.session.user.email]
+      );
+      groupId = g.rows[0].id;
+
+      for (const eid of earningIds) {
+        await client.query(
+          `INSERT INTO driver_payment_group_items (group_id, earning_id)
+           VALUES ($1, $2)`,
+          [groupId, eid]
+        );
+      }
+
+      const paymentIds = [];
+      for (const p of payments) {
+        const ins = await client.query(
+          `INSERT INTO driver_payments
+             (company_id, email_sofer, paid_at, amount, currency, bnr_rate,
+              amount_ron, method, note, created_by, group_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+           RETURNING id`,
+          [cid, email, paidAt, p.amount, p.currency, p.bnr_rate,
+           p.amount_ron, p.method, p.note, req.session.user.email, groupId]
+        );
+        paymentIds.push(ins.rows[0].id);
+      }
+
+      await client.query('COMMIT');
+      try { audit.fromReq(req, 'payment.group.create', 'driver_payment_groups', groupId,
+        { email_sofer: email, earnings: earningIds.length, payments: payments.length }); } catch (_e) {}
+      client.release();
+      return res.json({ result: { ok: true, group_id: groupId, payment_ids: paymentIds } });
+    } catch (dbErr) {
+      try { await client.query('ROLLBACK'); } catch (_e) {}
+      client.release();
+      console.warn('earningPaymentGroupCreate DB hiba:', dbErr.message);
+      const msg = /relation .+ does not exist|column .+ does not exist/i.test(dbErr.message || '')
+        ? 'Tabelele pentru grup de plati lipsesc — reporneste serverul pentru a rula migrațiile.'
+        : (/UNIQUE|duplicate key/i.test(dbErr.message || '')
+           ? 'Unele drepturi sunt deja incluse intr-un alt grup de plata.'
+           : 'Eroare la salvarea grupului de plata.');
+      return res.json({ result: { ok: false, err: msg } });
+    }
+  } catch (err) {
+    try { client.release(); } catch (_e) {}
+    console.error('earningPaymentGroupCreate hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// GET — egy csoport részletei (nyomtatáshoz + megnyitáshoz)
+// Visszaad: group, items[] (earning-mezőkkel), payments[] (payment-mezőkkel),
+// summary { earnings_by_currency, payments_by_currency, driver }.
+handlers.earningPaymentGroupGet = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const a = _arg(args);
+    const id = parseInt(a.id, 10);
+    if (!Number.isFinite(id)) return res.json({ result: { ok: false, err: 'ID invalid' } });
+
+    const g = await pool.query(
+      `SELECT id, email_sofer, paid_at, note, created_by, created_at
+         FROM driver_payment_groups
+        WHERE id=$1 AND company_id=$2`,
+      [id, cid]
+    );
+    if (!g.rows.length) return res.json({ result: { ok: false, err: 'Grupul de plata nu a fost gasit.' } });
+    const group = g.rows[0];
+
+    // Sofőr adatok (név a nyomtatáshoz)
+    let driver = { email: group.email_sofer, nume: null };
+    try {
+      const ur = await pool.query(
+        'SELECT nume FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2',
+        [group.email_sofer, cid]);
+      if (ur.rows.length) driver.nume = ur.rows[0].nume;
+    } catch (_e) {}
+
+    // Kijelölt tételek (a group_items → earnings join)
+    const itemsR = await pool.query(
+      `SELECT e.id, e.earning_date, e.kind, e.label, e.quantity,
+              e.unit_amount, e.total_amount, e.currency, e.note
+         FROM driver_payment_group_items gi
+         JOIN driver_earnings e ON e.id = gi.earning_id
+        WHERE gi.group_id = $1 AND e.company_id = $2
+        ORDER BY e.earning_date, e.id`,
+      [id, cid]
+    );
+
+    // Fizetési sorok (a group-hoz)
+    const paysR = await pool.query(
+      `SELECT id, paid_at, amount, currency, bnr_rate, amount_ron,
+              method, note, created_by, created_at
+         FROM driver_payments
+        WHERE group_id = $1 AND company_id = $2
+        ORDER BY id`,
+      [id, cid]
+    );
+
+    // Összegzés valuta szerint
+    const eByCur = {};
+    for (const it of itemsR.rows) {
+      const cur = String(it.currency || 'RON').toUpperCase();
+      eByCur[cur] = (eByCur[cur] || 0) + Number(it.total_amount || 0);
+    }
+    const pByCur = {};
+    for (const p of paysR.rows) {
+      const cur = String(p.currency || 'RON').toUpperCase();
+      pByCur[cur] = (pByCur[cur] || 0) + Number(p.amount || 0);
+    }
+
+    return res.json({ result: {
+      ok: true,
+      group, driver,
+      items: itemsR.rows,
+      payments: paysR.rows,
+      summary: {
+        earnings_by_currency: Object.fromEntries(Object.entries(eByCur).map(([k, v]) => [k, _round2(v)])),
+        payments_by_currency: Object.fromEntries(Object.entries(pByCur).map(([k, v]) => [k, _round2(v)]))
+      }
+    } });
+  } catch (err) {
+    console.error('earningPaymentGroupGet hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// GET — a cég összes csoportos kifizetése (sofőrre + időszakra szűrhető)
+handlers.earningPaymentGroupList = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const a = _arg(args);
+    const params = [cid];
+    let where = 'g.company_id = $1';
+    if (a.email) { params.push(String(a.email).toLowerCase()); where += ` AND LOWER(g.email_sofer) = $${params.length}`; }
+    if (a.from)  { params.push(a.from); where += ` AND g.paid_at >= $${params.length}`; }
+    if (a.to)    { params.push(a.to);   where += ` AND g.paid_at <= $${params.length}`; }
+    try {
+      const r = await pool.query(
+        `SELECT g.id, g.email_sofer, g.paid_at, g.note, g.created_by, g.created_at,
+                (SELECT COUNT(*)::int FROM driver_payment_group_items gi WHERE gi.group_id=g.id) AS earnings_count,
+                (SELECT COUNT(*)::int FROM driver_payments p WHERE p.group_id=g.id) AS payments_count
+           FROM driver_payment_groups g
+          WHERE ${where}
+          ORDER BY g.paid_at DESC, g.id DESC
+          LIMIT 200`,
+        params
+      );
+      return res.json({ result: { ok: true, items: r.rows } });
+    } catch (dbErr) {
+      console.warn('earningPaymentGroupList DB hiba:', dbErr.message);
+      // Migráció nem futott → üres lista, ne törje az UI-t
+      return res.json({ result: { ok: true, items: [] } });
+    }
+  } catch (err) {
+    console.error('earningPaymentGroupList hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// DELETE — csoport törlése (a hozzá tartozó driver_payments-eket is,
+// a group_items-t az ON DELETE CASCADE takarítja). A driver_earnings-eket
+// NEM töröljük — csak "kijönnek" a csoportból.
+handlers.earningPaymentGroupDelete = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const id = parseInt(_arg(args).id, 10);
+    if (!Number.isFinite(id)) return res.json({ result: { ok: false, err: 'ID invalid' } });
+
+    // A csoport-tulaj ellenőrzés
+    const gR = await pool.query(
+      'SELECT 1 FROM driver_payment_groups WHERE id=$1 AND company_id=$2',
+      [id, cid]);
+    if (!gR.rows.length) return res.json({ result: { ok: false, err: 'Nu a fost gasit.' } });
+
+    // A hozzá tartozó payments törlése (company_id-re szűrt is)
+    await pool.query('DELETE FROM driver_payments WHERE group_id=$1 AND company_id=$2', [id, cid]);
+    // A csoport törlése (ON DELETE CASCADE → group_items is takarítódik)
+    await pool.query('DELETE FROM driver_payment_groups WHERE id=$1 AND company_id=$2', [id, cid]);
+
+    try { audit.fromReq(req, 'payment.group.delete', 'driver_payment_groups', id, {}); } catch (_e) {}
+    return res.json({ result: { ok: true } });
+  } catch (err) {
+    console.error('earningPaymentGroupDelete hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
