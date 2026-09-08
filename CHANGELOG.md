@@ -14,6 +14,24 @@
 
 ---
 
+## 2026-09-08 — Sofőr-elszámolás csoportos kifizetés: nyomtatás i18n-kulcsok javítása + kifizetett tétel eltűnik a járandóság-listáról, PR #425
+
+**Kérés** (a `Csoportos_kifizet_s_visszaigazol_sa___Gondos_Imre.PDF` alapján): „rendben most nezd meg van par ertelmetlen szó ezt javitsd ki + a jarandosagokbol elkell tunjon az a tetel amelyik ki lett fizetve".
+
+**Két hiba a PR #423 után:**
+
+1. **Nyers i18n-kulcs-nevek a nyomtatott lapon** — a fejléceken `fe.pg.selectedItems (3)` és `fe.pg.paymentsTitle (2)` volt látható a szöveg helyett. Gyökér: a PR #423-ban létrehozott kulcsok neve NEM egyezett a JS-ben hívott névvel (a `fleet-extra-v2.js` `selectedItems`/`paymentsTitle`/`addPayment` néven kéri, az i18n-ben `itemsHead`/`paysHead`/`addPay` volt) → a `t()` a nem-létező kulcshoz magát a kulcs-nevet adta fallback-ként. **`public/i18n.js`** 10 kulcs átnevezve a JS-ben ténylegesen használt névre + új `fe.pg.bnrTitle` (BNR blokk); nem-használt variánsok (`selBar`, `selBarClear`, `removePay`) törölve. Verifikáció: `grep -oE "'fe\.pg\.[a-zA-Z]+'"` a JS-ben vs. i18n-ben → 0 lóg, 0 unused.
+
+2. **A kifizetett earning eltűnik a járandóság-listáról** — a `handlers/fleetCompliance.js` `earningList` mostantól kihagyja azokat az earning-eket, amelyek `driver_payment_group_items`-be kerültek (`AND id NOT IN (SELECT earning_id FROM driver_payment_group_items)`). A csoport a payment-listán marad és a 🖨️ gombbal visszanyomtatható → nem vész el az adat, csak a járandóság-lista tisztul. **Migráció-tolerancia**: `information_schema.tables` létezés-check → hiányzó tábla (nem futott migráció) → csendes fallback, a lista mint eddig, minden earning-tel.
+
+**Teszt** (`tests/integration/driver-earnings-payments.test.js`): +1 új eset (migráció-hiány → nincs NOT IN); a meglévő `earningList` test frissítve a 2-lépéses query-lánchoz (schema-check + fő SELECT + NOT IN kizárás verifikációja). **1105 Jest zöld** (1104 → 1105, +1 net).
+
+**Cache-bust**: `admin.html` + `manager.html` `?v=20260908paygroup` → `?v=20260908pgfix` (style.css + i18n.js + fleet-extra-v2.js).
+
+**Nem érintett:** a csoportos kifizetés core funkciója (tranzakció, BNR auto-fetch, cross-tenant védelem, Get/List/Delete RPC-k, print-lap adat-forrás), az `earningPaymentGroupGet` a `driver_payment_group_items`-en keresztül olvassa a csoport tételeit (a NOT IN csak a *lista*-nézetet szűri, nem a csoport-belsőt), a Decont oficial + sor-szintű 💰 kifizetés + `paymentCreate` szoló út.
+
+---
+
 ## 2026-09-08 — Sofőr-elszámolás: multi-select csoportos kifizetés (vegyes EUR/RON tételek + több fiz. mód + nyomtatás), PR #423
 
 **Kérés:** „szuksegem van egy olyanra hogy kijelolom melyik teteleket szeretnem fizetni (akar euros es lejes teteleket egyhelyen) es a vegen a kifizeteshez lehessen berakni hogy euroba vagy lejben volt fizetve es az oszeget de lehessen ugy ha peldaul van 5tetel euro osszesen 1800euro plusz 2 tetel ron oszesen 1000lej akkor kijeloles utan lehessen beirni peldaul 1620 utalassal … es euroban +hozaadas ujabb kifizetesi eszkoz 1900 keszpenz … es lejben igy osszese csoportositja a tételeket (pont ugy mint a hivatalos elszamolo lap nyomtatasnal) es nyomtathato is legyen az adott kifizetes nyomtatasnal mutassa a teteleket + a kifizetes módját pl. x oszeg euroban utalva es y osszeg lejben készpénzben"
