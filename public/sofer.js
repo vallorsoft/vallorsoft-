@@ -47,6 +47,22 @@ function _cityOf(loc) {
   return countyFallback || parts[parts.length - 1] || s;
 }
 
+// A stop-cég nevéből rövid „azonosítót" képez az állomás-gombhoz.
+// Szabály (felhasználó által kért): az első szót vesszük; ha az első szó
+// kevesebb mint 3 karakter, akkor a második szót is (pl. „SC Allianz" → „SC Allianz",
+// „Alianz Kft" → „Alianz", „TA Trans" → „TA Trans"). Vessző előtti részt nézünk
+// (a második telephely / megjegyzés-rész nem érdekel).
+function _firmaShort(firma) {
+  var s = String(firma || '').trim();
+  if (!s) return '';
+  s = s.split(',')[0].trim();
+  if (!s) return '';
+  var tokens = s.split(/\s+/).filter(Boolean);
+  if (!tokens.length) return '';
+  if (tokens[0].length >= 3) return tokens[0];
+  return tokens.slice(0, 2).join(' ');
+}
+
 // ============================================================
 // 🔌 SESSION-RECOVERY OVERLAY (session-guard-től hívva)
 // ============================================================
@@ -5078,10 +5094,40 @@ function _computeNextStopOptions(o) {
 function _stopEventLabel(opt) {
   var kind = opt.stop.kind;
   var ev = opt.event;
-  var key = kind === 'pickup'
+  // Alap-kulcs (fallback, ha nincs sem város, sem cégnév a stopon)
+  var fbKey = kind === 'pickup'
     ? (ev === 'arrive' ? 'sof.ms.arriveLoad' : 'sof.ms.loaded')
     : (ev === 'arrive' ? 'sof.ms.arriveUnload' : 'sof.ms.unloaded');
-  return t(key);
+  var loc = opt.stop && opt.stop.loc  ? opt.stop.loc  : '';
+  var fr  = opt.stop && opt.stop.firma ? opt.stop.firma : '';
+  var city  = (typeof _cityOf === 'function' ? _cityOf(loc) : '') || '';
+  var firma = _firmaShort(fr);
+  if (!city && !firma) return t(fbKey);
+  var lang = (window.I18N && typeof I18N.get === 'function') ? I18N.get() : 'ro';
+  // Bázis-ige minden esethez (semmi „a felrakóhoz" — a valós helyet írjuk ki)
+  var VERBS = {
+    hu: { arriveLoad: 'Megérkeztem', loaded: 'Felrakodtam',
+          arriveUnload: 'Megérkeztem', unloaded: 'Leürítettem' },
+    ro: { arriveLoad: 'Am sosit',    loaded: 'Am încărcat',
+          arriveUnload: 'Am sosit',  unloaded: 'Am descărcat' }
+  };
+  var actKey = kind === 'pickup' ? (ev === 'arrive' ? 'arriveLoad' : 'loaded')
+                                 : (ev === 'arrive' ? 'arriveUnload' : 'unloaded');
+  var verb = (VERBS[lang === 'hu' ? 'hu' : 'ro'] || VERBS.ro)[actKey];
+  var tail;
+  if (lang === 'hu') {
+    // arrive → „…, X céghez"; done → „…, X cégnél"
+    var firmaSuffix = ev === 'arrive' ? ' céghez' : ' cégnél';
+    if (city && firma)      tail = city + ', ' + firma + firmaSuffix;
+    else if (city)          tail = city;
+    else                    tail = firma + firmaSuffix;
+  } else {
+    // RO: „la <város>, firma <cég>"
+    if (city && firma)      tail = 'la ' + city + ', firma ' + firma;
+    else if (city)          tail = 'la ' + city;
+    else                    tail = 'la firma ' + firma;
+  }
+  return verb + ' ' + tail;
 }
 // Új „gomb-értesítő": a fuvar-kártya fejlécének + részlet-panelének
 // állomás-gombja hívja. Az `o` (a fuvar-objektum) alapján dönt.
