@@ -772,7 +772,8 @@ handlers.paymentList = async function (req, res, args) {
     const r = await pool.query(
       `SELECT id, email_sofer, paid_at, amount, currency, bnr_rate, amount_ron,
               method, note, created_by, created_at,
-              (to_jsonb(driver_payments) ->> 'group_id')::int AS group_id
+              (to_jsonb(driver_payments) ->> 'group_id')::int AS group_id,
+              (paid_at > CURRENT_DATE) AS is_scheduled
          FROM driver_payments
         WHERE ${where}
         ORDER BY paid_at DESC, id DESC
@@ -904,7 +905,14 @@ handlers.earningPaymentGroupCreate = async function (req, res, args) {
     if (!rawPays.length) { client.release(); return res.json({ result: { ok: false, err: 'Adauga cel putin o modalitate de plata.' } }); }
     if (rawPays.length > 10) { client.release(); return res.json({ result: { ok: false, err: 'Prea multe modalitati de plata (max 10).' } }); }
 
-    // Fizetési sorok fehérlistán validálva
+    const groupPaidAt = f.paid_at || new Date().toISOString().slice(0, 10);
+    const groupNote = String(f.note || '').trim().slice(0, 500) || null;
+    // ISO-dátum-validálás (YYYY-MM-DD) — a per-fizetési dátumhoz
+    const _isoDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) ? s : null;
+    const _today = () => new Date().toISOString().slice(0, 10);
+
+    // Fizetési sorok fehérlistán validálva; új: per-sor paid_at (jövőbeli
+    // dátum = SCHEDULED, a balance-ba csak az esedékesség után számít).
     const payments = [];
     let bnrCache = null;
     for (const p of rawPays) {
@@ -925,11 +933,13 @@ handlers.earningPaymentGroupCreate = async function (req, res, args) {
       if (currency === 'RON') amountRon = _round2(amount);
       else if (currency === 'EUR' && bnrRate) amountRon = _round2(amount * bnrRate);
       const note = String((p && p.note) || '').trim().slice(0, 500) || null;
-      payments.push({ amount: _round2(amount), currency, bnr_rate: bnrRate, amount_ron: amountRon, method, note });
+      // Per-sor paid_at fallback: (1) sor paid_at → (2) csoport paid_at
+      const paidAt = _isoDate(p && p.paid_at) || groupPaidAt;
+      // Ha a sor paid_at MÚLTBELI vagy MAI → már "kifizetett" → email nem kell
+      // Ha JÖVŐBELI → scheduled → az esedékesség napján küld a scheduler
+      const isFuture = paidAt > _today();
+      payments.push({ amount: _round2(amount), currency, bnr_rate: bnrRate, amount_ron: amountRon, method, note, paid_at: paidAt, due_email_sent: !isFuture });
     }
-
-    const paidAt = f.paid_at || new Date().toISOString().slice(0, 10);
-    const groupNote = String(f.note || '').trim().slice(0, 500) || null;
 
     // Sofőr a saját céghez tartozik-e
     const ur = await client.query(
@@ -972,7 +982,7 @@ handlers.earningPaymentGroupCreate = async function (req, res, args) {
            (company_id, email_sofer, paid_at, note, created_by)
          VALUES ($1,$2,$3,$4,$5)
          RETURNING id`,
-        [cid, email, paidAt, groupNote, req.session.user.email]
+        [cid, email, groupPaidAt, groupNote, req.session.user.email]
       );
       groupId = g.rows[0].id;
 
@@ -984,17 +994,34 @@ handlers.earningPaymentGroupCreate = async function (req, res, args) {
         );
       }
 
+      // Az `due_email_sent` oszlop új (db/driver-payment-due-email.sql); ha
+      // a migráció még nem futott, a második INSERT-tel esünk vissza (nélküle).
       const paymentIds = [];
       for (const p of payments) {
-        const ins = await client.query(
-          `INSERT INTO driver_payments
-             (company_id, email_sofer, paid_at, amount, currency, bnr_rate,
-              amount_ron, method, note, created_by, group_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-           RETURNING id`,
-          [cid, email, paidAt, p.amount, p.currency, p.bnr_rate,
-           p.amount_ron, p.method, p.note, req.session.user.email, groupId]
-        );
+        let ins;
+        try {
+          ins = await client.query(
+            `INSERT INTO driver_payments
+               (company_id, email_sofer, paid_at, amount, currency, bnr_rate,
+                amount_ron, method, note, created_by, group_id, due_email_sent)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+             RETURNING id`,
+            [cid, email, p.paid_at, p.amount, p.currency, p.bnr_rate,
+             p.amount_ron, p.method, p.note, req.session.user.email, groupId, p.due_email_sent]
+          );
+        } catch (colErr) {
+          if (/due_email_sent.*does not exist/i.test(colErr.message || '')) {
+            ins = await client.query(
+              `INSERT INTO driver_payments
+                 (company_id, email_sofer, paid_at, amount, currency, bnr_rate,
+                  amount_ron, method, note, created_by, group_id)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+               RETURNING id`,
+              [cid, email, p.paid_at, p.amount, p.currency, p.bnr_rate,
+               p.amount_ron, p.method, p.note, req.session.user.email, groupId]
+            );
+          } else { throw colErr; }
+        }
         paymentIds.push(ins.rows[0].id);
       }
 
@@ -1061,36 +1088,62 @@ handlers.earningPaymentGroupGet = async function (req, res, args) {
       [id, cid]
     );
 
-    // Fizetési sorok (a group-hoz)
+    // Fizetési sorok (a group-hoz) — is_scheduled: paid_at > ma → SCHEDULED
     const paysR = await pool.query(
       `SELECT id, paid_at, amount, currency, bnr_rate, amount_ron,
-              method, note, created_by, created_at
+              method, note, created_by, created_at,
+              (paid_at > CURRENT_DATE) AS is_scheduled
          FROM driver_payments
         WHERE group_id = $1 AND company_id = $2
-        ORDER BY id`,
+        ORDER BY paid_at, id`,
       [id, cid]
     );
 
-    // Összegzés valuta szerint
+    // Cég-adatok + branding (logó, pecsét) — a fejléces papír-hoz
+    let company = { nev: '', cui: null, adresa: null, telefon: null, email_contact: null };
+    try {
+      const cR = await pool.query(
+        'SELECT nev, cui, adresa, telefon, email_contact FROM companies WHERE id=$1', [cid]);
+      if (cR.rows.length) company = Object.assign(company, cR.rows[0]);
+    } catch (_e) {}
+    let branding = { logo: null, stamp: null };
+    try {
+      const bR = await pool.query(
+        `SELECT logo_base64, logo_mime, stamp_base64, stamp_mime
+           FROM company_branding WHERE company_id=$1`, [cid]);
+      if (bR.rows.length) {
+        const b = bR.rows[0];
+        if (b.logo_base64)  branding.logo  = 'data:' + (b.logo_mime  || 'image/png') + ';base64,' + b.logo_base64;
+        if (b.stamp_base64) branding.stamp = 'data:' + (b.stamp_mime || 'image/png') + ';base64,' + b.stamp_base64;
+      }
+    } catch (_e) {}
+    company.logo_data_uri  = branding.logo;
+    company.stamp_data_uri = branding.stamp;
+
+    // Összegzés valuta szerint — a JÖVŐBELI (scheduled) fizetéseket KÜLÖN sávban
+    // számoljuk, hogy a papíron/UI-n „effective" (mai + múlt) + „scheduled" külön látszódjon.
     const eByCur = {};
     for (const it of itemsR.rows) {
       const cur = String(it.currency || 'RON').toUpperCase();
       eByCur[cur] = (eByCur[cur] || 0) + Number(it.total_amount || 0);
     }
-    const pByCur = {};
+    const pByCur = {};       // effektív (mai + múltbeli)
+    const pSchedByCur = {};  // jövőbeli scheduled
     for (const p of paysR.rows) {
       const cur = String(p.currency || 'RON').toUpperCase();
-      pByCur[cur] = (pByCur[cur] || 0) + Number(p.amount || 0);
+      const bucket = p.is_scheduled ? pSchedByCur : pByCur;
+      bucket[cur] = (bucket[cur] || 0) + Number(p.amount || 0);
     }
 
     return res.json({ result: {
       ok: true,
-      group, driver,
+      group, driver, company,
       items: itemsR.rows,
       payments: paysR.rows,
       summary: {
         earnings_by_currency: Object.fromEntries(Object.entries(eByCur).map(([k, v]) => [k, _round2(v)])),
-        payments_by_currency: Object.fromEntries(Object.entries(pByCur).map(([k, v]) => [k, _round2(v)]))
+        payments_by_currency: Object.fromEntries(Object.entries(pByCur).map(([k, v]) => [k, _round2(v)])),
+        scheduled_by_currency: Object.fromEntries(Object.entries(pSchedByCur).map(([k, v]) => [k, _round2(v)]))
       }
     } });
   } catch (err) {
@@ -1192,7 +1245,10 @@ handlers.getDriverBalance = async function (req, res, args) {
         GROUP BY 1`,
       [cid, email, from, to]
     );
-    // Kifizetés valuta szerint + RON-egyesítve (a kifizetéskori BNR alapján)
+    // Kifizetés valuta szerint + RON-egyesítve (a kifizetéskori BNR alapján).
+    // JÖVŐBELI (scheduled) fizetéseket EXPLICITE kihagyjuk (paid_at > CURRENT_DATE)
+    // → a balance-ba csak az EFFEKTÍV (múltbeli + mai) fizetés számít.
+    // Külön lekérdezéssel a scheduled-összeget is visszaadjuk informatívan.
     const pR = await pool.query(
       `SELECT COALESCE(currency,'RON') AS currency,
               COALESCE(SUM(amount),0)::numeric AS total,
@@ -1201,6 +1257,19 @@ handlers.getDriverBalance = async function (req, res, args) {
          FROM driver_payments
         WHERE company_id=$1 AND LOWER(email_sofer)=$2
           AND paid_at >= $3 AND paid_at <= $4
+          AND paid_at <= CURRENT_DATE
+        GROUP BY 1`,
+      [cid, email, from, to]
+    );
+    // Scheduled — a felhasználó látja a UI-n, de a balance-ba NEM számít
+    const pSchR = await pool.query(
+      `SELECT COALESCE(currency,'RON') AS currency,
+              COALESCE(SUM(amount),0)::numeric AS total,
+              COUNT(*)::int AS db
+         FROM driver_payments
+        WHERE company_id=$1 AND LOWER(email_sofer)=$2
+          AND paid_at >= $3 AND paid_at <= $4
+          AND paid_at > CURRENT_DATE
         GROUP BY 1`,
       [cid, email, from, to]
     );
@@ -1217,6 +1286,12 @@ handlers.getDriverBalance = async function (req, res, args) {
       paid[c] = (paid[c] || 0) + parseFloat(row.total || 0);
       paid.count += parseInt(row.db, 10) || 0;
       paid.ron_total += parseFloat(row.total_ron || 0);
+    }
+    const scheduled = { EUR: 0, RON: 0, count: 0 };
+    for (const row of pSchR.rows) {
+      const c = _cur(row.currency);
+      scheduled[c] = (scheduled[c] || 0) + parseFloat(row.total || 0);
+      scheduled.count += parseInt(row.db, 10) || 0;
     }
 
     // Aktuális BNR — a fennmaradó EUR-tartozás informatív RON-értékéhez
@@ -1237,6 +1312,7 @@ handlers.getDriverBalance = async function (req, res, args) {
       earned: { eur: _round2(earned.EUR), ron: _round2(earned.RON), count: earned.count },
       paid:   { eur: _round2(paid.EUR),   ron: _round2(paid.RON),   count: paid.count,
                 paid_ron_total: _round2(paid.ron_total) },
+      scheduled: { eur: _round2(scheduled.EUR), ron: _round2(scheduled.RON), count: scheduled.count },
       balance: { eur: balEur, ron: balRon, ron_all: balRonAll },
       bnr_rate: bnrRate
     } });
