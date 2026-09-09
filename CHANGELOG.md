@@ -14,6 +14,19 @@
 
 ---
 
+## 2026-09-09 — FIX: aláírás/pecsét MINDEN OLDALRA ráégetés — rejtett item méret-mérés + csoport-szinkron húzás/átméretezés, branch `claude/multi-page-signature-fix`
+
+**Kérés:** „most sem tudok egy pl. 2-5-10oldalas pdfet pecsetelni minden oldalon es letolteni utana" — az előző kör (PR #431) csak a UI-t + placement-et adta, de a valódi ráégetés nem működött a nem-aktuális oldalakon.
+
+1. **Gyökér-bug (`buildSignedPdf`):** a nem-aktuális oldal item-jei `display:none`-nal rejtettek (a `renderSignPage` így vált oldal-nézetet), de a `buildSignedPdf` `offsetWidth`/`offsetHeight`-tel mért méretet — rejtett elemnél ez **0**, tehát a `pdf-lib` `drawImage`-be 0×0-s kép került → láthatatlan pecsét mind a 2-5-10 oldalon, csak az aktuális oldalon látszott.
+2. **Fix (`buildSignedPdf`, `public/console-shared.js`):** a loop ELŐTT minden rejtett (`display:'none'`) item-et `visibility:hidden + display:block`-ra kapcsol (mérhető marad, de a képernyőn nem villan fel), majd a loop után helyreállítja. Kép-betöltés kivárása `Promise.all(img.onload)` mintával (a dataURL cache-elt sync eset gyakori, de a defenzív wait garantálja a helyes `offsetHeight`-et).
+3. **UX-bug: a felhasználó csak az aktuális oldalt látja — a húzás/átméretezés eddig CSAK azt az item-et mozgatta, a többi oldal item-je maradt az alap `left:40 top:40 width:160`-on** → a nyomtatott PDF-en oldalanként más helyen jelent volna meg. Új **csoport-szinkron:** minden több-oldalas placement egyedi `groupId`-t oszt szét (`sg-<ts>-<rand>`), a `createDraggableItem` `moveDrag`/`doResize` most a `_getGroup()`-on át iterál és a csoport-testvéreket is szinkronban tartja. A ✕ delete az egész csoportot törli (a több-oldalas placement mint egység).
+4. **`_placeOnSelectedPages`** — új: >1 oldal esetén `groupId`-t generál, 1 oldalnál `null` (backward compat). A visszatérés a scope-objektum (a hívó a `sel.pages.length`-t olvassa a toast-hoz).
+5. **`createDraggableItem(dataUrl, type, pageNum?, groupId?)`** — új opcionális 4. paraméter; a régi 2 és 3-arg hívás változatlan (`groupId=null`). Visszatérés: a létrehozott item (a hívó gyűjtheti).
+6. Cache-bust `?v=20260909sigmulti` → `?v=20260909sigfix` (admin.html + manager.html). **1133 Jest zöld** (tisztán frontend, nincs regresszió). Verifikáció: shim-harness az első 6 esetre zöld (aktuális/minden/tartomány/groupId/delete-cascade/érvénytelen); a `display:none` méréshez valós böngésző kell (a shim `style.cssText` parseolást nem támogat).
+
+---
+
 ## 2026-09-09 — Aláírás/pecsét signModal: több oldalra egyszerre ráégetés (aktuális / minden / egyedi tartomány), branch `claude/multi-page-signature-stamp`
 
 **Kérés:** „es egy kis javitas lehesen gyszerre tobb oldalra ra égetni ratenni alairast vagy pecsétet ez itt a fomenuben is es a fuvarok dokumentumaiban is". Az „Aláírás és pecsét" menü PDF-munkatere és a fuvarok dokumentumainak aláíró modalja (közös signModal) eddig csak az AKTUÁLIS oldalra tett aláírást/pecsétet — több oldalas PDF-nél oldalanként újra kellett elhelyezni.

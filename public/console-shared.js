@@ -214,16 +214,23 @@ function _getSelectedSignPages(){
   return { ok:true, pages:[cur], scope:'current' };
 }
 
-// Közös helper: item elhelyezése a kijelölt oldal(ak)ra. A visszatérés
-// bool — sikeres volt-e legalább egy oldalra rakni.
+// Közös helper: item elhelyezése a kijelölt oldal(ak)ra. Ha >1 oldal, közös
+// `groupId`-t oszt szét — a húzás/átméretezés/törlés minden testvérre él.
+// Visszatérés: a scope-objektum ({ok, pages, scope}) vagy false, ha érvénytelen.
 function _placeOnSelectedPages(dataUrl, type){
   var sel = _getSelectedSignPages();
   if (!sel.ok || !sel.pages.length){
     toast(t('cs.sgPagesInvalid')||'Interval de pagini invalid.','err');
     return false;
   }
+  var groupId = null;
+  if (sel.pages.length > 1) {
+    // Egyedi group-azonosító (random + timestamp) — a csoport csak a klienses
+    // állapotban él (nem perzisztált), a `_getGroup()` filter-je használja.
+    groupId = 'sg-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  }
   for (var i=0; i<sel.pages.length; i++){
-    createDraggableItem(dataUrl, type, sel.pages[i]);
+    createDraggableItem(dataUrl, type, sel.pages[i], groupId);
   }
   return sel;
 }
@@ -4577,6 +4584,31 @@ async function buildSignedPdf(){
   const pages = pdfDoc.getPages();
   const stage = document.getElementById('signPdfStage');
 
+  // Fontos: az OFF-PAGE (nem-aktuális oldalhoz tartozó) item-eket
+  // `display:none` rejti, ilyenkor viszont az offsetWidth/Height 0 → a
+  // pdf-lib-be 0×0-s képet rajzolnánk (láthatatlan). Mérés előtt mind az
+  // ÖSSZES item-et láthatóvá (de vizuálisan rejtve) tesszük, majd
+  // helyreállítjuk. Egyben biztosítjuk, hogy a kép betöltődött (offsetHeight
+  // csak akkor helyes).
+  const _restore = [];
+  for (const it of placedItems) {
+    const el = it.el;
+    if (!el) continue;
+    if (el.style.display === 'none') {
+      _restore.push({ el, prevDisplay: el.style.display, prevVis: el.style.visibility });
+      el.style.visibility = 'hidden';   // láthatatlan marad a képernyőn
+      el.style.display = 'block';        // de mérhető a layout
+    }
+  }
+  // Kép-betöltés bevárása minden item-nél (dataURL cached — sync eset gyakori,
+  // de a defenzív wait garantálja a helyes offsetHeight-et).
+  await Promise.all(placedItems.map(it => new Promise(res => {
+    const img = it.el && it.el.querySelector('img');
+    if (!img || img.complete) return res();
+    img.onload = () => res();
+    img.onerror = () => res();
+  })));
+
   for(const it of placedItems){
     const page = pages[it.pageNum-1];
     if(!page) continue;
@@ -4604,6 +4636,12 @@ async function buildSignedPdf(){
     const pngBytes = await fetch(it.dataUrl).then(r=>r.arrayBuffer());
     const png = await pdfDoc.embedPng(pngBytes);
     page.drawImage(png, {x:pdfX, y:pdfY, width:pdfW, height:pdfH});
+  }
+
+  // Rejtett item-ek DOM-állapotának helyreállítása (mérés-hack visszavonása).
+  for (const r of _restore) {
+    r.el.style.display = r.prevDisplay;
+    r.el.style.visibility = r.prevVis;
   }
 
   const out = await pdfDoc.save();
@@ -5428,7 +5466,7 @@ function _downloadSelectedOrdersBuild(_pdfTpl) {
   toast(t('cs.downloadedLegs'), 'ok');
 }
 
-function createDraggableItem(dataUrl, type, pageNum){
+function createDraggableItem(dataUrl, type, pageNum, groupId){
   const stage = document.getElementById('signPdfStage');
   const box = document.createElement('div');
   // A KIVÁLASZTOTT (nem az aktuális) oldal item-jét azonnal elrejtjük, ha
@@ -5455,8 +5493,22 @@ function createDraggableItem(dataUrl, type, pageNum){
     +'text-align:center;background:#e44;color:#fff;border-radius:50%;cursor:pointer;font-size:12px;';
   box.appendChild(del);
 
-  const item={pageNum: targetPage, type, dataUrl, el:box};
-  del.onclick=(e)=>{ e.stopPropagation(); box.remove(); placedItems=placedItems.filter(x=>x!==item); };
+  const item={pageNum: targetPage, type, dataUrl, el:box, groupId: groupId || null};
+  // Csoport-testvérek gyűjtése: ha `groupId` van, a húzás/átméretezés/törlés
+  // az EGÉSZ csoportra érvényes (több oldalra tett aláírás/pecsét egyszerre
+  // pozicionálható a látható oldalon). A `_getGroup()` mindig frissen olvassa
+  // ki a placedItems-ből, hogy a törölt tag-ek is kiessenek.
+  const _getGroup = ()=> item.groupId
+    ? placedItems.filter(x => x.groupId === item.groupId)
+    : [item];
+
+  // ✕: a csoport ÖSSZES testvérét törli (a több-oldalas placement mint egység).
+  del.onclick=(e)=>{
+    e.stopPropagation();
+    const grp = _getGroup();
+    grp.forEach(g => { if (g.el) g.el.remove(); });
+    placedItems = placedItems.filter(x => !grp.includes(x));
+  };
 
   let dragging=false, dragOX=0, dragOY=0;
   const startDrag=(cx,cy)=>{ dragging=true; const r=box.getBoundingClientRect(); dragOX=cx-r.left; dragOY=cy-r.top; };
@@ -5467,6 +5519,14 @@ function createDraggableItem(dataUrl, type, pageNum){
     x=Math.max(0,Math.min(x, stage.clientWidth-box.offsetWidth));
     y=Math.max(0,Math.min(y, stage.clientHeight-box.offsetHeight));
     box.style.left=x+'px'; box.style.top=y+'px';
+    // Csoport-szinkron: a többi (nem-látható) oldal item-ei is ugyanoda.
+    if (item.groupId) {
+      _getGroup().forEach(g => {
+        if (g === item || !g.el) return;
+        g.el.style.left = box.style.left;
+        g.el.style.top  = box.style.top;
+      });
+    }
   };
   box.addEventListener('mousedown',e=>{ if(e.target===handle) return; e.preventDefault(); startDrag(e.clientX,e.clientY); });
   box.addEventListener('touchstart',e=>{ if(e.target===handle) return; startDrag(e.touches[0].clientX,e.touches[0].clientY); },{passive:true});
@@ -5478,7 +5538,18 @@ function createDraggableItem(dataUrl, type, pageNum){
   let resizing=false, startW=0, startX=0;
   handle.addEventListener('mousedown',e=>{ e.stopPropagation(); resizing=true; startW=box.offsetWidth; startX=e.clientX; });
   handle.addEventListener('touchstart',e=>{ e.stopPropagation(); resizing=true; startW=box.offsetWidth; startX=e.touches[0].clientX; },{passive:true});
-  const doResize=(cx)=>{ if(!resizing) return; let w=Math.max(40, startW+(cx-startX)); box.style.width=w+'px'; };
+  const doResize=(cx)=>{
+    if(!resizing) return;
+    let w=Math.max(40, startW+(cx-startX));
+    box.style.width=w+'px';
+    // Csoport-szinkron átméretezés (magasság az img-től auto).
+    if (item.groupId) {
+      _getGroup().forEach(g => {
+        if (g === item || !g.el) return;
+        g.el.style.width = w+'px';
+      });
+    }
+  };
   window.addEventListener('mousemove',e=>doResize(e.clientX));
   window.addEventListener('touchmove',e=>{ if(resizing){ e.preventDefault(); doResize(e.touches[0].clientX);} },{passive:false});
   window.addEventListener('mouseup',()=>resizing=false);
@@ -5486,6 +5557,7 @@ function createDraggableItem(dataUrl, type, pageNum){
 
   stage.appendChild(box);
   placedItems.push(item);
+  return item;
 }
 
 function openOrderEdit(id) {
