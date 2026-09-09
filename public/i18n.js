@@ -2727,6 +2727,18 @@
     'fe.pg.equivRon':     { ro: '≈ RON la curs', hu: '≈ RON árfolyamon' },
     'fe.pg.signDriver':   { ro: 'Semnătura șoferului', hu: 'Sofőr aláírása' },
     'fe.pg.signCompany':  { ro: 'Ștampila și semnătura firmei', hu: 'Cég pecsétje és aláírása' },
+    'fe.pg.groupDate':    { ro: 'Data grupului', hu: 'Csoport dátuma' },
+    'fe.pg.payDate':      { ro: 'Data plății', hu: 'Fizetési dátum' },
+    'fe.pg.paidAtTitle':  { ro: 'Data efectivă a plății (viitoare = programată)', hu: 'Kifizetés tényleges dátuma (jövőbeli = ütemezett)' },
+    'fe.pg.scheduled':    { ro: 'Programată', hu: 'Ütemezett' },
+    'fe.pg.scheduledFor': { ro: 'Programată pentru', hu: 'Ütemezve erre' },
+    'fe.pg.scheduledSum': { ro: 'Programate', hu: 'Ütemezve' },
+    'fe.pg.paidNow':      { ro: 'Plătite acum', hu: 'Most fizetve' },
+    'fe.pg.printFooter':  { ro: 'Document generat automat — confirmare plată', hu: 'Automatikusan generált dokumentum — kifizetés-visszaigazolás' },
+    'fe.pg.withStamp':    { ro: 'Cu ștampilă', hu: 'Pecséttel' },
+    'fe.pg.stampOn':      { ro: 'Ștampilă activă', hu: 'Pecsét bekapcsolva' },
+    'fe.pg.stampOff':     { ro: 'Ștampilă dezactivată', hu: 'Pecsét kikapcsolva' },
+    'fe.pg.emailDueSubject': { ro: 'Plăți scadente astăzi ({date}) — {n} plată', hu: 'Ma esedékes kifizetések ({date}) — {n} tétel' },
 
     // Egyéni járandóság-típusok (⚙️ kezelő)
     'fe.dk.title':       { ro: 'Tipuri de câștig', hu: 'Járandóság-típusok' },

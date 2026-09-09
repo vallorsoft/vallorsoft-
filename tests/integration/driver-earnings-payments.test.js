@@ -373,7 +373,8 @@ describe('getDriverBalance', () => {
     const pool = require('../../db');
     // 1) sofőr létezik (nume)
     // 2) earnings valuta-bontás
-    // 3) payments valuta-bontás
+    // 3) payments valuta-bontás (effective — paid_at <= today)
+    // 4) scheduled payments (paid_at > today, informatívan)
     pool.query
       .mockResolvedValueOnce(rows([{ nume: 'Peto' }]))
       .mockResolvedValueOnce(rows([
@@ -382,7 +383,8 @@ describe('getDriverBalance', () => {
       ]))
       .mockResolvedValueOnce(rows([
         { currency: 'EUR', total: 200, total_ron: 1010, db: 1 },
-      ]));
+      ]))
+      .mockResolvedValueOnce(rows([]));
     const res = await request(app).post('/api/execute').send({
       functionName: 'getDriverBalance',
       arguments: [{ email: 'sofer@ceg.hu' }],

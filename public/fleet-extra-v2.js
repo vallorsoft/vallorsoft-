@@ -1478,6 +1478,7 @@
   // idejére stabil (a submit a DOM-ból olvas, nem index-alapon).
   function _dcPgPayRow(idx, initCur, initAmount, initMethod) {
     var lastManual = _dcOfLastManualBnr();
+    var todayIso = new Date().toISOString().slice(0, 10);
     return '<div class="dc-pg-payrow" data-idx="' + idx + '">'
       +   '<select class="select dc-pg-method">'
       +     '<option value="cash">' + esc(t('fe.pm.method.cash')) + '</option>'
@@ -1498,6 +1499,10 @@
       +     'value="' + (lastManual != null ? String(lastManual) : '') + '" '
       +     'oninput="FleetExtra.dcPgRecalc()" '
       +     'title="' + t('fe.pg.bnrTitle') + '">'
+      +   '<input class="input dc-pg-paidat" type="date" '
+      +     'value="' + todayIso + '" '
+      +     'title="' + t('fe.pg.paidAtTitle') + '" '
+      +     'oninput="FleetExtra.dcPgRecalc()">'
       +   '<input class="input dc-pg-note" placeholder="' + t('fe.pm.notePh') + '">'
       +   '<button class="btn danger dc-pg-rm" onclick="FleetExtra.dcPgRemoveRow(this)" '
       +     'title="' + t('common.delete') + '">✕</button>'
@@ -1729,7 +1734,12 @@
       var bnr = (isFinite(bnrRaw) && bnrRaw > 0) ? bnrRaw : null;
       if (bnr != null && lastManualToSave == null) lastManualToSave = bnr;
       var note = (r.querySelector('.dc-pg-note') || {}).value || '';
-      payments.push({ amount: amount, currency: cur, method: method, bnr_rate: bnr, note: note });
+      // Per-fizetési dátum (YYYY-MM-DD); jövőbeli dátum = SCHEDULED (a szerver
+      // dedig-hű az esedékesség napján küld e-mailt). Üres/érvénytelen → mai nap.
+      var paidAtEl = r.querySelector('.dc-pg-paidat');
+      var paidAtVal = paidAtEl && paidAtEl.value && /^\d{4}-\d{2}-\d{2}$/.test(paidAtEl.value)
+        ? paidAtEl.value : null;
+      payments.push({ amount: amount, currency: cur, method: method, bnr_rate: bnr, note: note, paid_at: paidAtVal });
     });
     if (invalid) { toast(t('fe.pm.invalidAmount'), 'err'); return; }
     if (!payments.length) { toast(t('fe.pg.needOne'), 'err'); return; }
@@ -1772,39 +1782,92 @@
   function _dcGroupPrintRender(r) {
     var g = r.group || {};
     var dr = r.driver || {};
+    var comp = r.company || {};
     var items = r.items || [];
     var pays = r.payments || [];
     var eSum = (r.summary && r.summary.earnings_by_currency) || {};
-    var pSum = (r.summary && r.summary.payments_by_currency) || {};
+    var pSum = (r.summary && r.summary.payments_by_currency) || {};       // ténylegesen fizetve
+    var pSchedSum = (r.summary && r.summary.scheduled_by_currency) || {}; // ütemezett
+
+    // Cég-fejléc adatok (`company_branding` + `companies`); best-effort — hiányzik → üres.
+    var withStamp = _dcPgPrintWithStamp !== false;  // toggle: default ON
 
     // ASCII-safe címek nélkül a print-ablakba írunk minden stílust inline-ban,
     // hogy ne függjön az app CSS-től (window.open új dokumentumon fut).
     var css =
       'body{font-family:"Inter",system-ui,-apple-system,sans-serif;color:#1e1812;background:#faf6f0;padding:20px 24px;font-size:13px;}'
-      + '.doc{background:#fff;padding:26px 30px;max-width:820px;margin:0 auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);}'
-      + '.h{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1e1812;padding-bottom:12px;margin-bottom:16px;}'
-      + '.h h1{margin:0 0 4px;font-size:20px;font-weight:800;}'
-      + '.h .sub{font-size:12px;color:#555;}'
-      + '.badge{display:inline-block;padding:6px 14px;background:linear-gradient(135deg,#2563eb,#4f46e5);color:#fff;border-radius:10px;font-weight:700;font-size:14px;}'
+      + '.doc{background:#fff;padding:26px 30px;max-width:860px;margin:0 auto;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);}'
+      + '.lh-tbl{width:100%;border-collapse:collapse;}'
+      + '.lh-logo{vertical-align:middle;width:96px;padding-right:16px;}'
+      + '.lh-logo img{max-width:88px;max-height:80px;display:block;}'
+      + '.lh-mid{vertical-align:middle;}'
+      + '.lh-mid .nev{font-size:19px;font-weight:800;color:#0f172a;letter-spacing:0.2px;}'
+      + '.lh-mid .meta{font-size:11px;color:#6b7280;margin-top:2px;}'
+      + '.lh-right{vertical-align:middle;text-align:right;width:240px;}'
+      + '.badge{display:inline-block;padding:8px 16px;background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;border-radius:8px;font-weight:800;font-size:13px;letter-spacing:0.3px;}'
+      + '.divider{height:0;border-top:2px solid #0f172a;margin:12px 0 16px;}'
+      + '.hdrsub{font-size:12px;color:#334155;margin:4px 0;}'
       + 'h2{font-size:15px;margin:18px 0 8px;color:#1e1812;font-weight:700;}'
-      + 'table{width:100%;border-collapse:collapse;margin:6px 0 12px;font-size:12px;}'
-      + 'th,td{padding:7px 10px;text-align:left;border-bottom:1px solid #e5e7eb;}'
-      + 'th{background:#f3f4f6;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.4px;font-size:11px;}'
+      + 'table.tbl{width:100%;border-collapse:collapse;margin:6px 0 12px;font-size:12px;}'
+      + 'table.tbl th,table.tbl td{padding:7px 10px;text-align:left;border-bottom:1px solid #e5e7eb;}'
+      + 'table.tbl th{background:#f3f4f6;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.4px;font-size:11px;}'
       + 'td.r,th.r{text-align:right;}'
       + '.tot{background:#fef3c7;font-weight:800;}'
       + '.tot td{border-top:2px solid #f59e0b;border-bottom:none;padding:9px 10px;}'
+      + '.sched{background:#fffbeb;}'
+      + '.sched td{color:#78350f;}'
+      + '.sched-badge{display:inline-block;padding:2px 8px;background:#fbbf24;color:#78350f;border-radius:6px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.4px;margin-left:6px;}'
       + '.pill{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;background:#e0f2fe;color:#0369a1;}'
       + '.pill-cash{background:#d1fae5;color:#065f46;}'
       + '.pill-bank{background:#dbeafe;color:#1e40af;}'
       + '.pill-card{background:#e9d5ff;color:#6b21a8;}'
       + '.pill-other{background:#f3f4f6;color:#374151;}'
-      + '.sig{display:flex;justify-content:space-between;margin-top:32px;gap:40px;}'
-      + '.sig div{flex:1;text-align:center;}'
-      + '.sig .line{border-top:1px solid #1e1812;padding-top:6px;font-size:11px;}'
       + '.note{background:#fef9c3;padding:10px 12px;border-left:3px solid #f59e0b;font-size:12px;margin:8px 0 12px;color:#78350f;}'
+      + '.sig-tbl{width:100%;border-collapse:collapse;margin-top:36px;}'
+      + '.sig-cell{width:50%;vertical-align:top;height:110px;}'
+      + '.sig-cell.left{padding-right:16px;}'
+      + '.sig-cell.right{padding-left:16px;position:relative;}'
+      + '.sig-space{height:70px;text-align:center;}'
+      + '.sig-space img{max-height:68px;max-width:120px;opacity:0.85;}'
+      + '.sig-line{border-top:1.5px solid #0f172a;padding-top:6px;font-size:11px;color:#475569;}'
+      + '.sig-name{font-size:12px;color:#94a3b8;margin-top:2px;}'
+      + '.foot{margin-top:24px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:10px;color:#94a3b8;text-align:center;}'
       + '@media print{body{background:#fff;padding:0;}.doc{box-shadow:none;padding:16px 20px;}}';
 
-    // Tételek táblázat
+    // Cég-fejléc (letterhead) — logó + cég-adatok + doc-badge
+    var logoCell = comp.logo_data_uri
+      ? '<td class="lh-logo"><img src="' + esc(comp.logo_data_uri) + '" alt=""></td>'
+      : '';
+    var compMeta = [];
+    if (comp.cui) compMeta.push('CUI ' + esc(comp.cui));
+    if (comp.reg_com) compMeta.push('J ' + esc(comp.reg_com));
+    if (comp.telefon) compMeta.push('☏ ' + esc(comp.telefon));
+    var compMetaHtml = compMeta.length ? '<div class="meta">' + compMeta.join(' · ') + '</div>' : '';
+    var compAdrHtml = comp.adresa ? '<div class="meta">' + esc(comp.adresa) + '</div>' : '';
+    var letterhead =
+      '<table class="lh-tbl"><tr>'
+      +   logoCell
+      +   '<td class="lh-mid">'
+      +     '<div class="nev">' + esc(comp.nev || '') + '</div>'
+      +     compAdrHtml + compMetaHtml
+      +   '</td>'
+      +   '<td class="lh-right">'
+      +     '<div class="badge">' + t('fe.pg.printTitle') + '</div>'
+      +     '<div class="hdrsub"><b>#' + esc(g.id) + '</b></div>'
+      +     '<div class="hdrsub">' + t('fe.pg.groupDate') + ': ' + d2(g.paid_at) + '</div>'
+      +   '</td>'
+      + '</tr></table>'
+      + '<div class="divider"></div>';
+
+    // Sofőr-blokk
+    var driverBlock =
+      '<div style="padding:10px 14px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:8px;margin-bottom:14px;">'
+      +   '<div style="font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:0.4px;">' + t('fe.st.driver') + '</div>'
+      +   '<div style="font-size:15px;font-weight:700;color:#0f172a;">' + esc(dr.nume || '') + '</div>'
+      +   '<div style="font-size:11px;color:#6b7280;">' + esc(dr.email || '') + '</div>'
+      + '</div>';
+
+    // Tételek táblázat (változatlan)
     var itemRows = items.map(function (it) {
       var kindKey = it.kind || 'other';
       var kindLabel;
@@ -1822,22 +1885,21 @@
         + '<td class="r"><b>' + n2(it.total_amount, 2) + ' ' + esc(it.currency || 'RON') + '</b></td>'
         + '</tr>';
     }).join('');
-    // Tételek összegzés-sorai valutánként
     var eSumRows = Object.keys(eSum).map(function (cur) {
       return '<tr class="tot"><td colspan="4" class="r">Σ ' + esc(cur) + ':</td>'
         + '<td class="r">' + n2(eSum[cur], 2) + ' ' + esc(cur) + '</td></tr>';
     }).join('');
 
-    // Fizetési sorok
+    // Fizetési sorok — per-payment paid_at + SCHEDULED badge, ha jövőbeli
     var payRows = pays.map(function (p) {
       var mc = (p.method || 'cash');
-      var ronCell = p.amount_ron != null
-        ? n2(p.amount_ron, 2) + ' RON'
-        : '—';
-      var bnrCell = p.bnr_rate != null
-        ? '1 EUR = ' + n2(p.bnr_rate, 4)
-        : '—';
-      return '<tr>'
+      var ronCell = p.amount_ron != null ? n2(p.amount_ron, 2) + ' RON' : '—';
+      var bnrCell = p.bnr_rate != null ? '1 EUR = ' + n2(p.bnr_rate, 4) : '—';
+      var schedBadge = p.is_scheduled
+        ? ' <span class="sched-badge">' + t('fe.pg.scheduled') + '</span>' : '';
+      var rowCls = p.is_scheduled ? 'sched' : '';
+      return '<tr class="' + rowCls + '">'
+        + '<td>' + d2(p.paid_at) + schedBadge + '</td>'
         + '<td><span class="pill pill-' + esc(mc) + '">' + esc(t('fe.pm.method.' + mc)) + '</span></td>'
         + '<td class="r"><b>' + n2(p.amount, 2) + ' ' + esc(p.currency || 'RON') + '</b></td>'
         + '<td>' + bnrCell + '</td>'
@@ -1845,10 +1907,14 @@
         + '<td>' + esc(p.note || '') + '</td>'
         + '</tr>';
     }).join('');
-    // Fizetve összegzés-sorai valutánként
     var pSumRows = Object.keys(pSum).map(function (cur) {
-      return '<tr class="tot"><td class="r">Σ ' + esc(cur) + ':</td>'
+      return '<tr class="tot"><td colspan="2" class="r">Σ ' + t('fe.pg.paidNow') + ' (' + esc(cur) + '):</td>'
         + '<td class="r">' + n2(pSum[cur], 2) + ' ' + esc(cur) + '</td>'
+        + '<td colspan="3"></td></tr>';
+    }).join('');
+    var pSchedSumRows = Object.keys(pSchedSum).map(function (cur) {
+      return '<tr class="sched"><td colspan="2" class="r">Σ ' + t('fe.pg.scheduledSum') + ' (' + esc(cur) + '):</td>'
+        + '<td class="r"><b>' + n2(pSchedSum[cur], 2) + ' ' + esc(cur) + '</b></td>'
         + '<td colspan="3"></td></tr>';
     }).join('');
 
@@ -1856,21 +1922,20 @@
       ? '<div class="note"><b>' + t('fld.note') + ':</b> ' + esc(g.note) + '</div>'
       : '';
 
+    // Aláíró blokk (cég-pecsét ráégetve — ha van és toggle be)
+    var stampCell = (withStamp && comp.stamp_data_uri)
+      ? '<div class="sig-space"><img src="' + esc(comp.stamp_data_uri) + '" alt=""></div>'
+      : '<div class="sig-space"></div>';
+
     var html =
       '<!doctype html><html><head><meta charset="utf-8">'
       + '<title>' + t('fe.pg.printTitle') + ' — ' + esc(dr.nume || dr.email || '') + '</title>'
       + '<style>' + css + '</style></head><body><div class="doc">'
-      + '<div class="h">'
-      +   '<div>'
-      +     '<h1>' + t('fe.pg.printTitle') + '</h1>'
-      +     '<div class="sub">' + t('fe.pg.groupNr') + ': #' + esc(g.id) + '</div>'
-      +     '<div class="sub"><b>' + esc(dr.nume || '') + '</b> — ' + esc(dr.email || '') + '</div>'
-      +   '</div>'
-      +   '<div><span class="badge">' + d2(g.paid_at) + '</span></div>'
-      + '</div>'
+      + letterhead
+      + driverBlock
       + noteBlock
       + '<h2>📋 ' + t('fe.pg.selectedItems') + ' (' + items.length + ')</h2>'
-      + '<table>'
+      + '<table class="tbl">'
       +   '<thead><tr>'
       +     '<th>' + t('fe.de.colDate') + '</th>'
       +     '<th>' + t('fe.de.colKind') + '</th>'
@@ -1879,18 +1944,28 @@
       +     '<th class="r">' + t('fe.de.colTotal') + '</th>'
       +   '</tr></thead><tbody>' + itemRows + eSumRows + '</tbody></table>'
       + '<h2>💵 ' + t('fe.pg.paymentsTitle') + ' (' + pays.length + ')</h2>'
-      + '<table>'
+      + '<table class="tbl">'
       +   '<thead><tr>'
+      +     '<th>' + t('fe.pg.payDate') + '</th>'
       +     '<th>' + t('fe.pm.methodLbl') + '</th>'
       +     '<th class="r">' + t('fe.pm.amount') + '</th>'
       +     '<th>BNR</th>'
       +     '<th class="r">' + t('fe.pg.equivRon') + '</th>'
       +     '<th>' + t('fld.note') + '</th>'
-      +   '</tr></thead><tbody>' + payRows + pSumRows + '</tbody></table>'
-      + '<div class="sig">'
-      +   '<div><div class="line">' + t('fe.pg.signDriver') + '</div></div>'
-      +   '<div><div class="line">' + t('fe.pg.signCompany') + '</div></div>'
-      + '</div>'
+      +   '</tr></thead><tbody>' + payRows + pSumRows + pSchedSumRows + '</tbody></table>'
+      + '<table class="sig-tbl"><tr>'
+      +   '<td class="sig-cell left">'
+      +     '<div class="sig-space"></div>'
+      +     '<div class="sig-line">' + t('fe.pg.signDriver') + '</div>'
+      +     '<div class="sig-name">' + esc(dr.nume || '') + '</div>'
+      +   '</td>'
+      +   '<td class="sig-cell right">'
+      +     stampCell
+      +     '<div class="sig-line">' + t('fe.pg.signCompany') + '</div>'
+      +     '<div class="sig-name">' + esc(comp.nev || '') + '</div>'
+      +   '</td>'
+      + '</tr></table>'
+      + '<div class="foot">' + t('fe.pg.printFooter') + ' · VallorSoft</div>'
       + '</div>'
       + '<script>setTimeout(function(){window.print();},400);<\/script>'
       + '</body></html>';
@@ -1900,6 +1975,19 @@
     w.document.open();
     w.document.write(html);
     w.document.close();
+  }
+
+  // Cég-pecsét toggle per-print (localStorage-ban őrzött, alapból BE).
+  var _dcPgPrintWithStamp = (function () {
+    try {
+      var v = localStorage.getItem('vs_dc_pg_print_stamp');
+      return v == null ? true : v === 'true';
+    } catch (e) { return true; }
+  })();
+  function dcPgToggleStamp() {
+    _dcPgPrintWithStamp = !_dcPgPrintWithStamp;
+    try { localStorage.setItem('vs_dc_pg_print_stamp', String(_dcPgPrintWithStamp)); } catch (e) {}
+    toast(_dcPgPrintWithStamp ? t('fe.pg.stampOn') : t('fe.pg.stampOff'), 'ok');
   }
 
   // ════════════════════════════════════════════════════════
@@ -3073,6 +3161,7 @@
     dcPgRecalc: dcPgRecalc,
     dcPgSubmit: dcPgSubmit,
     dcGroupPrint: dcGroupPrint,
+    dcPgToggleStamp: dcPgToggleStamp,
     fcParse: fcParse, fcImport: fcImport,
   };
 })();

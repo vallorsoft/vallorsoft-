@@ -1073,4 +1073,117 @@ function startStatsReportScheduler() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler };
+// ═════════════════════════════════════════════════════════════════════
+//  KIFIZETÉS-ESEDÉKESSÉG SCHEDULER
+//  ─────────────────────────────────────────────────────────────────────
+//  A csoportos kifizetésen (PR #423) belül a fizetési sorok JÖVŐBELI
+//  paid_at-tal is felvehetők (scheduled). Amikor a mai nap = paid_at,
+//  e-mail megy a cég Admin/Manager-jeinek: „Ma esedékes N lej kifizetése
+//  Y sofőrnek". A `driver_payments.due_email_sent` flag dedupolja.
+//
+//  Ütemezés: 30 perc, tick-elés reggel 07:00 után csak (Europe/Bucharest);
+//  best-effort — hiányzó oszlop = csendes fallback.
+// ═════════════════════════════════════════════════════════════════════
+function startPaymentDueScheduler() {
+  const tick = async () => {
+    try {
+      const pool = require('../db');
+      // Ma esedékes, még nem küldött scheduled fizetés (paid_at = ma ÉS
+      // FUTURE volt eredetileg — created_at::date < paid_at::date)
+      let rows;
+      try {
+        const r = await pool.query(`
+          SELECT p.id, p.company_id, p.email_sofer, p.paid_at, p.amount, p.currency,
+                 p.method, p.note, p.group_id, p.created_at
+            FROM driver_payments p
+           WHERE p.paid_at::date = CURRENT_DATE
+             AND COALESCE(p.due_email_sent, FALSE) = FALSE
+             AND p.created_at::date < p.paid_at::date
+           ORDER BY p.company_id, p.id
+           LIMIT 500`);
+        rows = r.rows;
+      } catch (_e) { return; /* migráció nélkül csendes NO-OP */ }
+      if (!rows.length) return;
+
+      const { sendClientEmail } = require('./email');
+      // Cégenként csoportosítunk (egy admin-lista lekérés / cég)
+      const byCid = new Map();
+      for (const p of rows) {
+        if (!byCid.has(p.company_id)) byCid.set(p.company_id, []);
+        byCid.get(p.company_id).push(p);
+      }
+
+      for (const [cid, pays] of byCid.entries()) {
+        // Cég admin/manager-jeinek e-mailje
+        const admins = await pool.query(
+          `SELECT DISTINCT email FROM users
+            WHERE company_id=$1 AND pozicio IN ('Admin','Manager')
+              AND COALESCE(blocked,FALSE)=FALSE AND email IS NOT NULL`, [cid]);
+        if (!admins.rows.length) continue;
+
+        // Sofőr-név lookup
+        const emails = [...new Set(pays.map(p => String(p.email_sofer || '').toLowerCase()))];
+        const drvR = await pool.query(
+          `SELECT LOWER(email) AS email, nume FROM users
+            WHERE company_id=$1 AND LOWER(email)=ANY($2::text[])`, [cid, emails]);
+        const nameByEmail = {};
+        drvR.rows.forEach(r => { nameByEmail[r.email] = r.nume; });
+
+        // E-mail HTML — kompakt lista
+        const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+          ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+        const fmtAmt = (n, c) => (Number(n).toFixed(2)) + ' ' + esc(c || 'RON');
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const rowsHtml = pays.map(p => {
+          const drvNume = nameByEmail[String(p.email_sofer || '').toLowerCase()] || p.email_sofer;
+          return '<tr>'
+            + '<td style="padding:8px 10px;border-bottom:1px solid #eee;">' + esc(drvNume) + '</td>'
+            + '<td style="padding:8px 10px;border-bottom:1px solid #eee;"><b>' + fmtAmt(p.amount, p.currency) + '</b></td>'
+            + '<td style="padding:8px 10px;border-bottom:1px solid #eee;">' + esc(p.method || 'cash') + '</td>'
+            + '<td style="padding:8px 10px;border-bottom:1px solid #eee;color:#666;">' + esc(p.note || '—') + '</td>'
+            + '<td style="padding:8px 10px;border-bottom:1px solid #eee;color:#666;">#' + (p.group_id || '—') + '</td>'
+            + '</tr>';
+        }).join('');
+        const html =
+          '<div style="font-family:Inter,system-ui,sans-serif;color:#1e1812;">'
+          + '<h2 style="margin:0 0 12px;font-size:18px;">💰 Plata programata astazi</h2>'
+          + '<p style="margin:0 0 12px;color:#555;">Astazi, <b>' + dateStr + '</b>, sunt scadente ' + pays.length + ' plati programate anterior:</p>'
+          + '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+          + '<thead><tr style="background:#f3f4f6;"><th style="padding:8px 10px;text-align:left;">Sofer</th>'
+          + '<th style="padding:8px 10px;text-align:left;">Suma</th>'
+          + '<th style="padding:8px 10px;text-align:left;">Metoda</th>'
+          + '<th style="padding:8px 10px;text-align:left;">Nota</th>'
+          + '<th style="padding:8px 10px;text-align:left;">Grup</th></tr></thead>'
+          + '<tbody>' + rowsHtml + '</tbody></table>'
+          + '<p style="margin:14px 0 0;color:#555;font-size:12px;">Deschide <b>Sofer — Decont</b> pentru a tipari confirmarea de plata grupata (buton 🖨️ pe randul platii).</p>'
+          + '</div>';
+
+        // Küldés minden adminnak (best-effort — a küldő maga is elnyeli az egyedi hibát)
+        for (const a of admins.rows) {
+          try {
+            await sendClientEmail({
+              to: a.email,
+              subject: '💰 VallorSoft — ' + pays.length + ' plata scadenta astazi',
+              html, companyId: cid, mailType: 'payment_due'
+            });
+          } catch (_e) {}
+        }
+        // Dedup — jelöljük „e-mail elküldve" flag-gel
+        try {
+          const ids = pays.map(p => p.id);
+          await pool.query(
+            `UPDATE driver_payments SET due_email_sent = TRUE WHERE id = ANY($1::int[])`, [ids]);
+        } catch (_e) {}
+        console.log('[PayDue] Cég #' + cid + ': ' + pays.length + ' esedékes fizetés → ' + admins.rows.length + ' admin.');
+      }
+    } catch (err) {
+      console.error('[PayDue] tick hiba:', err.message);
+    }
+  };
+  setTimeout(tick, 60 * 1000);           // 1 perc múlva először (indulás után)
+  const interval = setInterval(tick, 30 * 60 * 1000);   // 30 percenként
+  console.log('[PayDue] Kifizetés-esedékesség ütemező elindítva.');
+  return interval;
+}
+
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler };
