@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260908pgletter">
-  <script src="/i18n.js?v=20260909sigws"></script>
+  <script src="/i18n.js?v=20260909sigmulti"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1298,6 +1298,18 @@
         <button class="btn ok" style="width:100%;margin-top:8px;padding:10px;" onclick="addSavedSigToPage()" data-i18n="sg.addSavedSig">➕ Mentett aláírás hozzáadása</button>
       </div>
 
+       <!-- 2c. Melyik oldal(ak)ra? (alap: aktuális) -->
+      <div class="glass-soft" style="padding:14px;">
+        <div style="font-weight:600;color:#fff;margin-bottom:8px;" data-i18n="sg.pagesTitle">🗂️ Melyik oldal(ak)ra?</div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;font-size:13px;color:#fff;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="sgPageScope" value="current" checked onchange="_sgPagesToggle()"> <span data-i18n="sg.pagesCurrent">Aktuális oldal</span></label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="sgPageScope" value="all" onchange="_sgPagesToggle()"> <span data-i18n="sg.pagesAll">Minden oldal</span></label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="sgPageScope" value="range" onchange="_sgPagesToggle()"> <span data-i18n="sg.pagesCustom">Egyedi:</span></label>
+          <input type="text" id="sgPageRange" placeholder="pl. 1,3-5" data-i18n-ph="sg.pagesPh" style="flex:1;min-width:120px;padding:6px 10px;background:#fff;color:#000;border:1px solid #ccc;border-radius:6px;" disabled>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;" data-i18n="sg.pagesHint">A ➕ Hozzáad / Pecsét / Mentett aláírás gomb erre a kiválasztásra érvényes — így egyszerre több oldalra is rátehető.</div>
+      </div>
+
        <!-- 3. PDF előnézet -->
       <div class="glass-soft" style="padding:14px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
@@ -1607,7 +1619,7 @@
 
 <script src="/feature-catalog.js?v=20260618cgps2"></script>
 <script>window.__pwaInstallDefault=false;</script>
-<script src="/console-shared.js?v=20260909sigws"></script>
+<script src="/console-shared.js?v=20260909sigmulti"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 <script src="/console-pages.js?v=20260617b1"></script>
 <!-- ===== INTEGRACIOK (Ugyfelek / CargoTrack / Szamlazas) ===== -->
@@ -1657,7 +1669,7 @@
 <script src="/order-wizard.js?v=20260825ordfix2"></script>
 <script src="/order-assignment.js?v=20260827oaflow"></script>
 <script src="/cost-calculator.js?v=20260904addbtn"></script>
-<script src="/admin.js?v=20260909sigws"></script>
+<script src="/admin.js?v=20260909sigmulti"></script>
 <script src="/global-search.js?v=20260614qa"></script>
  <!-- ── BUG REPORT FAB ── -->
 <button onclick="openBugReport()" title="Hibajelentés küldése"

@@ -14,6 +14,20 @@
 
 ---
 
+## 2026-09-09 — Aláírás/pecsét signModal: több oldalra egyszerre ráégetés (aktuális / minden / egyedi tartomány), branch `claude/multi-page-signature-stamp`
+
+**Kérés:** „es egy kis javitas lehesen gyszerre tobb oldalra ra égetni ratenni alairast vagy pecsétet ez itt a fomenuben is es a fuvarok dokumentumaiban is". Az „Aláírás és pecsét" menü PDF-munkatere és a fuvarok dokumentumainak aláíró modalja (közös signModal) eddig csak az AKTUÁLIS oldalra tett aláírást/pecsétet — több oldalas PDF-nél oldalanként újra kellett elhelyezni.
+
+1. **UI (`public/admin.html` + `manager.html` signModal)** — új „🗂️ Melyik oldal(ak)ra?" kártya a rajzolós/pecsét/mentett aláírás blokk után, a PDF-előnézet ELÉ. 3 radio: **Aktuális oldal** (alap) · **Minden oldal** · **Egyedi** (mellette input, alapból tiltva; a radio-választásra engedélyeződik + fókuszba ugrik). Az input pl. `1,3-5` — vesszős/pontosvesszős/whitespace-elválasztók + range-jelölés. Alul rövid magyarázó sor.
+2. **`public/console-shared.js`** — új `_sgPagesToggle` (radio → range-input enabled/disabled) + `_sgPagesReset` (openSignModal-ban hívva) + `_getSelectedSignPages()` (parseolás, tartomány-validáció 1..signTotalPages, duplák eldobása, sorbaszedés) + `_placeOnSelectedPages(dataUrl, type)` közös helper. A 3 add-funkció (`addSignatureToPage`/`addStampToPage`/`addSavedSigToPage`) mostantól ezt hívja — 1..N oldalra egyben `createDraggableItem`-el tesz item-et. A toast többoldalas esetén jelzi az oldalszámot („(N oldal)").
+3. **`createDraggableItem(dataUrl, type, pageNum?)` opcionális 3. paraméter** — a `pageNum` alapból `signCurrentPage` (backward compat), különben a megadott oldalra köti. Új: ha a KIVÁLASZTOTT oldal nem azonos a jelenleg renderelttel, az item alapból `display:none` (a `renderSignPage` amúgy is helyre teszi oldal-váltásnál, de így nincs 1 frame felvillanás).
+4. **buildSignedPdf érintetlen** — a meglévő `for(const it of placedItems)` loop mindegyik item-et a saját `pageNum`-jára rajzolja `pdf-lib`-bel, így az admin/manager PDF-munkatér ÉS a fuvar-dokumentumok aláírás/pecsét ráégetése automatikusan több oldalra megy.
+5. **i18n `public/i18n.js`** — 8 új kulcs (`sg.pagesTitle`/`pagesCurrent`/`pagesAll`/`pagesCustom`/`pagesPh`/`pagesHint` + `cs.sgPagesInvalid`/`cs.sgPagesUnit`), RO-alap + HU.
+6. **Cache-bust** `?v=20260909sigws` → `?v=20260909sigmulti` (admin.html + manager.html — i18n.js + console-shared.js + admin.js/manager.js).
+7. **Teszt** — tisztán frontend, nincs új szerver-oldali kód. A meglévő teljes suite **1133 Jest zöld** (nincs regresszió); a signModal DOM-változás a régi `documents.test.js` (`stampGet`/`stampSave` legacy 24/24) + `pdf-workspace.test.js` (szeparált mezők + workspace RPC-k, 27/27) érintetlen.
+
+---
+
 ## 2026-09-09 — Aláírás és pecsét menü: közvetlen dokumentum-pecsételés/aláírás + aláírás és pecsét EGYIDŐBEN menthető, PR (branch: `claude/signature-seal-document-management-5orqva`)
 
 **Kérés:** „az admin manager oldalon az alairas es pecsét menupontba kellene egy olyan hogy dokumentumokat tudjak direktbe pecsetelni,alairni ott helyben feltolteni es elkesziteni utana meg letolteni. ezeket a dokumentumokat elég 1napig tárolni utana torlodhetnek is. es egyszerre lehessen alairast is menteni es pecsetet is ne ugy mint most hogy vagy ez vagy az".

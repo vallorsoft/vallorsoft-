@@ -155,11 +155,87 @@ window.onLangChange = function(){
   } catch(e){}
 };
 
+// A signModal „Melyik oldal(ak)ra?" panel range-input engedélyezése/tiltása
+// a radio-csoport állapotától. Új dokumentum-nyitáskor resetel is (current).
+function _sgPagesToggle(){
+  var radios = document.querySelectorAll('input[name="sgPageScope"]');
+  var scope = 'current';
+  for (var i=0; i<radios.length; i++){ if (radios[i].checked){ scope = radios[i].value; break; } }
+  var inp = document.getElementById('sgPageRange');
+  if (!inp) return;
+  var enabled = (scope === 'range');
+  inp.disabled = !enabled;
+  inp.style.opacity = enabled ? '1' : '0.6';
+  if (enabled){ try { inp.focus(); } catch(_){} }
+}
+function _sgPagesReset(){
+  var cur = document.querySelector('input[name="sgPageScope"][value="current"]');
+  if (cur) cur.checked = true;
+  var inp = document.getElementById('sgPageRange');
+  if (inp){ inp.value = ''; inp.disabled = true; inp.style.opacity = '0.6'; }
+}
+
+// Kiválasztott oldal-scope kiolvasása a signModal radio-csoportjából.
+// Visszatérés: {ok, pages:[Number,...], scope:'current'|'all'|'range'|'invalid'}.
+// A 'range' input parseolása is itt fut (1,3-5 → [1,3,4,5]); duplák kiszűrve,
+// az oldal-tartományból (1..signTotalPages) esők eldobva, végül sorbaszedve.
+function _getSelectedSignPages(){
+  var total = Math.max(1, signTotalPages|0);
+  var cur = Math.min(Math.max(1, signCurrentPage|0), total);
+  var radios = document.querySelectorAll('input[name="sgPageScope"]');
+  var scope = 'current';
+  for (var i=0; i<radios.length; i++){ if (radios[i].checked){ scope = radios[i].value; break; } }
+  if (scope === 'all'){
+    var all=[]; for (var p=1; p<=total; p++) all.push(p);
+    return { ok:true, pages: all, scope:'all' };
+  }
+  if (scope === 'range'){
+    var raw = (document.getElementById('sgPageRange')||{value:''}).value || '';
+    var parts = String(raw).split(/[,;\s]+/).filter(Boolean);
+    if (!parts.length) return { ok:false, pages:[], scope:'invalid' };
+    var set = new Set();
+    for (var i=0; i<parts.length; i++){
+      var seg = parts[i].trim();
+      var m = /^(\d+)\s*-\s*(\d+)$/.exec(seg);
+      if (m){
+        var a = parseInt(m[1],10), b = parseInt(m[2],10);
+        if (!isFinite(a) || !isFinite(b)) continue;
+        if (a > b){ var t2=a; a=b; b=t2; }
+        for (var k=a; k<=b; k++){ if (k>=1 && k<=total) set.add(k); }
+      } else {
+        var n = parseInt(seg,10);
+        if (isFinite(n) && n>=1 && n<=total) set.add(n);
+      }
+    }
+    if (!set.size) return { ok:false, pages:[], scope:'invalid' };
+    var arr = Array.from(set).sort(function(a,b){ return a-b; });
+    return { ok:true, pages: arr, scope:'range' };
+  }
+  return { ok:true, pages:[cur], scope:'current' };
+}
+
+// Közös helper: item elhelyezése a kijelölt oldal(ak)ra. A visszatérés
+// bool — sikeres volt-e legalább egy oldalra rakni.
+function _placeOnSelectedPages(dataUrl, type){
+  var sel = _getSelectedSignPages();
+  if (!sel.ok || !sel.pages.length){
+    toast(t('cs.sgPagesInvalid')||'Interval de pagini invalid.','err');
+    return false;
+  }
+  for (var i=0; i<sel.pages.length; i++){
+    createDraggableItem(dataUrl, type, sel.pages[i]);
+  }
+  return sel;
+}
+
 function addStampToPage(){
   if(!pdfDocProxy){ toast(t('cs.pdfFirst'),'err'); return; }
   if(!savedStampBase64){ toast(t('cs.noStamp'),'err'); return; }
-  createDraggableItem(savedStampBase64,'stamp');
-  toast(t('cs.stampAdded'),'ok');
+  var sel = _placeOnSelectedPages(savedStampBase64,'stamp');
+  if(!sel) return;
+  var msg = t('cs.stampAdded');
+  if(sel.pages.length > 1) msg += ' (' + sel.pages.length + ' ' + (t('cs.sgPagesUnit')||'oldal') + ')';
+  toast(msg,'ok');
 }
 
 // Mentett aláírás (az admin/manager „Aláírás és pecsét" oldalon rajzolt +
@@ -168,8 +244,11 @@ function addStampToPage(){
 function addSavedSigToPage(){
   if(!pdfDocProxy){ toast(t('cs.pdfFirst'),'err'); return; }
   if(!window._savedSigForModal){ toast(t('cs.noSavedSig')||'Nu ai o semnătură salvată.','err'); return; }
-  createDraggableItem(window._savedSigForModal,'sign');
-  toast(t('cs.sigAdded'),'ok');
+  var sel = _placeOnSelectedPages(window._savedSigForModal,'sign');
+  if(!sel) return;
+  var msg = t('cs.sigAdded');
+  if(sel.pages.length > 1) msg += ' (' + sel.pages.length + ' ' + (t('cs.sgPagesUnit')||'oldal') + ')';
+  toast(msg,'ok');
 }
 
 // ────────────────────────────────────────────────────────────
@@ -4484,8 +4563,11 @@ function addSignatureToPage(){
   if(!pdfDocProxy){ toast(t('cs.pdfFirst'),'err'); return; }
   const blank=document.createElement('canvas'); blank.width=signCanvasEl.width; blank.height=signCanvasEl.height;
   if(signCanvasEl.toDataURL()===blank.toDataURL()){ toast(t('cs.drawSigFirst'),'err'); return; }
-  createDraggableItem(signCanvasEl.toDataURL('image/png'),'sign');
-  toast(t('cs.sigAdded'),'ok');
+  var sel = _placeOnSelectedPages(signCanvasEl.toDataURL('image/png'),'sign');
+  if(!sel) return;
+  var msg = t('cs.sigAdded');
+  if(sel.pages.length > 1) msg += ' (' + sel.pages.length + ' ' + (t('cs.sgPagesUnit')||'oldal') + ')';
+  toast(msg,'ok');
 }
 
 async function buildSignedPdf(){
@@ -4826,6 +4908,7 @@ function openSignModal(docId,which){
   placedItems.forEach(it=>{ if(it.el) it.el.remove(); });
   placedItems=[];
   pdfDocProxy=null; pdfRawBytes=null; signCurrentPage=1; signTotalPages=1;
+  if(typeof _sgPagesReset==='function') _sgPagesReset();
   document.getElementById('signPageInfo').textContent=t('cs.loadingLower');
 
   document.getElementById('signStampImg').style.display='none';
@@ -5345,11 +5428,17 @@ function _downloadSelectedOrdersBuild(_pdfTpl) {
   toast(t('cs.downloadedLegs'), 'ok');
 }
 
-function createDraggableItem(dataUrl, type){
+function createDraggableItem(dataUrl, type, pageNum){
   const stage = document.getElementById('signPdfStage');
   const box = document.createElement('div');
+  // A KIVÁLASZTOTT (nem az aktuális) oldal item-jét azonnal elrejtjük, ha
+  // épp másik oldal van renderelve — a `renderSignPage` a pageNum alapján
+  // mutat/rejt, de a friss item alapból `display:''` értékkel kerülne DOM-ba.
+  var targetPage = (typeof pageNum === 'number' && pageNum > 0) ? pageNum : signCurrentPage;
+  var visible = (targetPage === signCurrentPage);
   box.style.cssText='position:absolute;left:40px;top:40px;width:160px;border:2px dashed #2d7;'
-    +'cursor:move;touch-action:none;background:rgba(255,255,255,0.15);box-sizing:border-box;';
+    +'cursor:move;touch-action:none;background:rgba(255,255,255,0.15);box-sizing:border-box;'
+    +(visible ? '' : 'display:none;');
   const img = document.createElement('img');
   img.src=dataUrl;
   img.style.cssText='width:100%;display:block;pointer-events:none;user-select:none;';
@@ -5366,7 +5455,7 @@ function createDraggableItem(dataUrl, type){
     +'text-align:center;background:#e44;color:#fff;border-radius:50%;cursor:pointer;font-size:12px;';
   box.appendChild(del);
 
-  const item={pageNum:signCurrentPage, type, dataUrl, el:box};
+  const item={pageNum: targetPage, type, dataUrl, el:box};
   del.onclick=(e)=>{ e.stopPropagation(); box.remove(); placedItems=placedItems.filter(x=>x!==item); };
 
   let dragging=false, dragOX=0, dragOY=0;
