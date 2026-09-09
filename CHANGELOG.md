@@ -14,6 +14,41 @@
 
 ---
 
+## 2026-09-09 — Sofőr-elszámolás csoportos kifizetés: fejléces papír + X-elhető cég-pecsét + per-payment kifizetési dátum + ütemezett kifizetés email-emlékeztetővel, PR #427
+
+**Kérés:** „csinald meg es x-elheto legyen a ceges bélyegző + a tetelek kifizetesekor ne egyseges kifizetesi ido legyen hanem minden uj tetelnek legyen kifizetesi datuma hozzáadása … amig a beirt datumot nem eri el az idő addig ne mutassa kifizetettnek … amint arra a datumra kerulunk … kuldjon az adminnak egy emailt … hogy ma esedekes a kifizetese x osszegnek es x személynek". Három összefüggő új képesség a csoportos kifizetés (PR #423) papírján:
+
+### (A) Fejléces lap + X-elhető cég-pecsét
+- **`_dcGroupPrintRender`** teljesen újraírva a Decont oficial (PR #405) hivatalos fejléc-mintájára: BAL cég-logó (max 88×80) · KÖZÉP cégnév nagyban + CUI/Reg.Com./adresa/telefon · JOBB kék gradiens badge (`Confirmare de plată grupată` + `#N` + dátum). Alatta 2px sötét elválasztó vonal.
+- Aláíró blokkban a cég-oldalon a **pecsét ráégetve** (max 68×120px, 0.85 opacity) a signature-line FÖLÖTT — a `company_branding.stamp_base64` data-URI-ból, ha van feltöltve.
+- **X-elhető cég-pecsét**: új `dcPgToggleStamp` (localStorage `vs_dc_pg_print_stamp`, alapból ON) — a nyomtatásból/PDF-ből egy kattintással kihagyható, ha a lapot kézzel bepecsételik utólag.
+- **`earningPaymentGroupGet`** válasz bővítve `company` mezővel (`nev/cui/reg_com/adresa/telefon/logo_data_uri/stamp_data_uri`). Best-effort try/catch — hiányos migráció esetén `null`, a nyomtatás akkor is működik.
+
+### (B) Per-payment kifizetési dátum + jövőbeli = ÜTEMEZETT
+- **Új migráció `db/driver-payment-due-email.sql`** (idempotens): `driver_payments.due_email_sent BOOLEAN DEFAULT FALSE` — a múltbeli/mai sorok backfill-jével TRUE-ra (nincs visszamenőleges e-mail-spam) + partial index a `WHERE due_email_sent=FALSE` seprésre.
+- `driver_payments.paid_at` (DATE) mostantól **kettős szerep**: múltbeli/mai = **tényleges** fizetés (a balance-ba számít), jövőbeli = **ÜTEMEZETT** (a balance-ba NEM számít, esedékesség napján e-mail megy). **NINCS séma-változás**, csak szemantikai bővítés + a boolean flag.
+- **`earningPaymentGroupCreate`** — payment payload új opcionális `paid_at` mező (per-fizetési-mód), a `group.paid_at`-ra fallback; INSERT külön try/catch a `due_email_sent` oszlopra (migráció-hiánynál csendes fallback INSERT nélküle).
+- **`earningPaymentGroupGet`** — payment SELECT bővítve `(paid_at > CURRENT_DATE) AS is_scheduled` + valuta-összegek külön `paid`/`scheduled` bucketba (UI + nyomtatás mindkettőt mutatja).
+- **`getDriverBalance`** — a payment-összeg `AND paid_at <= CURRENT_DATE` szűrővel csak a tényleges kifizetést számolja a balance-ba; új külön query a scheduled-összegre → új `scheduled: {eur, ron, count}` válaszmező (informatív, UI-n mutatható).
+- **`paymentList`** SELECT új `(paid_at > CURRENT_DATE) AS is_scheduled` oszlop — a fizetési naplón is látszik az ütemezett tétel.
+- **UI** (`_dcPgPayRow` + `dcPgSubmit`): minden fizetési sorban új `<input class="dc-pg-paidat" type="date">` (mai default, `YYYY-MM-DD` validáció); a payload küldi a per-sor `paid_at`-et.
+- **Print-lap** új „Data plății" oszlop a fizetési táblán + `.sched` sáv-jelölő minden jövőbeli soron „ÜTEMEZETT" badge-dzsel + külön `Σ Programate` sor a szumma alatt.
+
+### (C) Automatikus e-mail az esedékesség napján
+- Új **`services/scheduler.js` `startPaymentDueScheduler`**: 30 percenként (első futás +60 s) sepri a `driver_payments`-t: `paid_at::date = CURRENT_DATE AND due_email_sent = FALSE AND created_at::date < paid_at::date` (csak ELŐRE-ütemezett sor kap emlékeztetőt, nem az azonnali fizetés).
+- Sofőrönként+cégenként csoportosított HTML-táblázatos e-mail megy a cég Admin/Manager felhasználóinak (`sendClientEmail` — KÖZÖS VallorSoft feladó, ugyanaz mint a szerviz-esedékesség scheduler). Táblázat: sofőr · összeg · fizetési mód · megjegyzés · csoport #N.
+- Sikeres küldés után `UPDATE driver_payments SET due_email_sent=TRUE` (idempotencia — sosem küld duplán).
+- Best-effort try/catch — migráció-hiány esetén csendes no-op, a rendszer többi része nem törik. `server.js`-be bekötve a többi scheduler közé.
+
+### Teszt + i18n + cache-bust
+- 14 új `fe.pg.*` i18n kulcs (RO-alap + HU): `groupDate`, `payDate`, `paidAtTitle`, `scheduled`, `scheduledFor`, `scheduledSum`, `paidNow`, `printFooter`, `withStamp`, `stampOn`, `stampOff`, `emailDueSubject`.
+- `getDriverBalance` teszt kiegészítve az új scheduled-query mockjával. **1105 Jest zöld** (nincs regresszió).
+- Cache-bust `?v=20260908pgfix` → `?v=20260908pgletter` (admin.html + manager.html — style.css + i18n.js + fleet-extra-v2.js).
+
+**Nem érintett:** a `paymentCreate` szoló út (sor-szintű 💰) + Decont oficial + az azonnali (mai) fizetések logikája változatlan; multi-tenant `company_id`-szűrés, paraméteres SQL, cross-tenant védelem, audit-napló, RO-alap+HU i18n mind betartva.
+
+---
+
 ## 2026-09-08 — Sofőr-elszámolás csoportos kifizetés: nyomtatás i18n-kulcsok javítása + kifizetett tétel eltűnik a járandóság-listáról, PR #425
 
 **Kérés** (a `Csoportos_kifizet_s_visszaigazol_sa___Gondos_Imre.PDF` alapján): „rendben most nezd meg van par ertelmetlen szó ezt javitsd ki + a jarandosagokbol elkell tunjon az a tetel amelyik ki lett fizetve".
