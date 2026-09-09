@@ -12,6 +12,9 @@ const audit = require('../lib/audit');
 
 const handlers = {};
 
+// Legacy: a menetlevél PDF-ébe (routes/soferApi.js /api/pdf-download) a
+// `stamps.base64_png`-t ragasztjuk rá — ezt visszafelé kompatibilisen adjuk.
+// Az új admin/manager UI a `sigAssetsGet`-et használja a szeparált mezőkkel.
 handlers.stampGet = async function (req, res, args) {
     try {
       if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
@@ -27,6 +30,10 @@ handlers.stampGet = async function (req, res, args) {
     }
   };
 
+// Legacy: régi kliens (adminSigCanvas + saveAdminSigFile) egyetlen képet küld,
+// és a menetlevél PDF ráégetéshez a base64_png-t olvassuk. Az új szeparált
+// mezőkbe (signature_base64 / stamp_base64) NEM tudjuk eldönteni, hogy
+// aláírás vagy pecsét — ezért CSAK a legacy base64_png-t frissítjük itt.
 handlers.stampSave = async function (req, res, args) {
     try {
       if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
@@ -43,6 +50,84 @@ handlers.stampSave = async function (req, res, args) {
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('stampSave hiba:', err);
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
+    }
+  };
+
+// ────────────────────────────────────────────────────────────
+// ÚJ: aláírás + pecsét SZEPARÁLT tárolása (a régi tábla két új
+// oszlopa — signature_base64, stamp_base64). A user egyidejűleg
+// menthet aláírást ÉS pecsétet (a régi legacy csak egyet tudott).
+// A legacy `base64_png`-t is szinkronban tartjuk a pecséttel, hogy
+// a sofőr menetlevél PDF ráégetése változatlan képet kapjon.
+// ────────────────────────────────────────────────────────────
+handlers.sigAssetsGet = async function (req, res) {
+    try {
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
+      const email = req.session.user.email;
+      const r = await pool.query(
+        'SELECT signature_base64, stamp_base64, base64_png FROM stamps WHERE email = $1',
+        [email]
+      );
+      if (!r.rows.length) {
+        return res.json({ result: { ok: true, signature: null, stamp: null } });
+      }
+      const row = r.rows[0];
+      // A régi base64_png fallback pecsétként (backfill előtti sorok).
+      const stamp = row.stamp_base64 || row.base64_png || null;
+      return res.json({ result: { ok: true, signature: row.signature_base64 || null, stamp } });
+    } catch (err) {
+      console.error('sigAssetsGet hiba:', err);
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
+    }
+  };
+
+// args[0]: { signature?: string|null, stamp?: string|null }
+// Csak a MEGADOTT mezőket írja (undefined = változatlan, null = törlés).
+// Egy hívással menthet ALÁÍRÁST ÉS PECSÉTET is (a régi „vagy-vagy" helyett).
+handlers.sigAssetsSave = async function (req, res, args) {
+    try {
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
+      const email = req.session.user.email;
+      const payload = args[0] || {};
+      const hasSig = Object.prototype.hasOwnProperty.call(payload, 'signature');
+      const hasStamp = Object.prototype.hasOwnProperty.call(payload, 'stamp');
+      if (!hasSig && !hasStamp) {
+        return res.json({ result: { ok: false, err: 'Date lipsa' } });
+      }
+      // Data URL méret-korlát (~1.5 MB base64 ≈ ~1 MB kép) — a PNG bőven belefér.
+      const MAX = 1500000;
+      const sig = hasSig ? (payload.signature == null ? null : String(payload.signature)) : undefined;
+      const stamp = hasStamp ? (payload.stamp == null ? null : String(payload.stamp)) : undefined;
+      if (sig && sig.length > MAX) return res.json({ result: { ok: false, err: 'Imagine prea mare' } });
+      if (stamp && stamp.length > MAX) return res.json({ result: { ok: false, err: 'Imagine prea mare' } });
+
+      // Sor létezésének biztosítása
+      await pool.query(
+        `INSERT INTO stamps (email, updated_at) VALUES ($1, NOW())
+         ON CONFLICT (email) DO NOTHING`,
+        [email]
+      );
+
+      const sets = [];
+      const vals = [email];
+      let idx = 2;
+      if (hasSig) {
+        sets.push(`signature_base64 = $${idx++}`);
+        vals.push(sig);
+      }
+      if (hasStamp) {
+        sets.push(`stamp_base64 = $${idx++}`);
+        vals.push(stamp);
+        // Legacy szinkron: a menetlevél PDF ráégetés a base64_png-t olvassa.
+        sets.push(`base64_png = $${idx++}`);
+        vals.push(stamp);
+      }
+      sets.push('updated_at = NOW()');
+      await pool.query(`UPDATE stamps SET ${sets.join(', ')} WHERE email = $1`, vals);
+      return res.json({ result: { ok: true } });
+    } catch (err) {
+      console.error('sigAssetsSave hiba:', err);
       return res.json({ result: { ok: false, err: 'Eroare de server' } });
     }
   };

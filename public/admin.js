@@ -53,7 +53,7 @@ function loadTab(name){
   if(name==='orders-done'){ if(typeof loadOrdersDone==='function') loadOrdersDone(); }
   if(name==='active-fleet'){ if(typeof loadActiveFleet==='function') loadActiveFleet(); }
   if(name==='chat'){ if(typeof loadWhatsappChatPane==='function') loadWhatsappChatPane(); }
-  if(name==='signature') initAdminSigCanvas();
+  if(name==='signature'){ initAdminSigCanvas(); if(typeof loadPdfWorkspaceList==='function') loadPdfWorkspaceList(); }
   if(name==='settings') loadSettingsPane();
   if(name==='company-settings' && window.CompanySettings) CompanySettings.mount('companySettingsBox');
   if(name==='pdf-settings' && window.PdfSettings) PdfSettings.mount('pdfSettingsBox');

@@ -162,6 +162,155 @@ function addStampToPage(){
   toast(t('cs.stampAdded'),'ok');
 }
 
+// Mentett aláírás (az admin/manager „Aláírás és pecsét" oldalon rajzolt +
+// mentett kép) elhelyezése — a Beállításban rajzolt aláírás újra és újra
+// felhasználható; a signModal saját canvas-a a rajzolós inline aláírás.
+function addSavedSigToPage(){
+  if(!pdfDocProxy){ toast(t('cs.pdfFirst'),'err'); return; }
+  if(!window._savedSigForModal){ toast(t('cs.noSavedSig')||'Nu ai o semnătură salvată.','err'); return; }
+  createDraggableItem(window._savedSigForModal,'sign');
+  toast(t('cs.sigAdded'),'ok');
+}
+
+// ────────────────────────────────────────────────────────────
+// PDF munkatér — közvetlen dokumentum feltöltés/aláírás/letöltés
+// az „Aláírás és pecsét" oldalon. A tárolás 24 óráig tart (a
+// szerver-ütemező takarít). Kizárólag Admin/Manager.
+// ────────────────────────────────────────────────────────────
+function pdfWsUpload(){
+  var fi = document.getElementById('pdfWsFile');
+  if(!fi || !fi.files.length){ toast(t('cs.pickPdfFirst')||'Selectati un fisier PDF.','err'); return; }
+  var f = fi.files[0];
+  if(!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf'){
+    toast(t('cs.pdfOnly')||'Doar PDF acceptat.','err'); return;
+  }
+  if(f.size > 15 * 1024 * 1024){
+    toast(t('cs.fileTooLarge')||'Fisier prea mare (max 15 MB).','err'); return;
+  }
+  var fr = new FileReader();
+  fr.onload = function(e){
+    var payload = { file_name: f.name, base64: e.target.result };
+    gas('pdfWorkspaceUpload',[payload]).then(function(r){
+      if(r && r.ok){
+        toast(t('cs.uploaded')||'Incarcat.','ok');
+        fi.value = '';
+        loadPdfWorkspaceList();
+      } else {
+        toast((r && r.err) || t('common.error'), 'err');
+      }
+    });
+  };
+  fr.readAsDataURL(f);
+}
+
+function loadPdfWorkspaceList(){
+  var box = document.getElementById('pdfWsList');
+  if(!box) return;
+  box.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px;">'+(t('cs.loading')||'Se incarca...')+'</div>';
+  gas('pdfWorkspaceList').then(function(r){
+    if(!r || !r.ok){ box.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px;">'+esc((r&&r.err)||'—')+'</div>'; return; }
+    var rows = r.docs || [];
+    if(!rows.length){
+      box.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:10px;">'+(t('sig.wsEmpty')||'Nu ai documente în spațiul de lucru.')+'</div>';
+      return;
+    }
+    var _fmtSize = function(b){
+      if(!b) return '—';
+      if(b<1024) return b+' B';
+      if(b<1024*1024) return (b/1024).toFixed(1)+' KB';
+      return (b/1024/1024).toFixed(2)+' MB';
+    };
+    var _remain = function(createdIso){
+      try {
+        var created = new Date(createdIso).getTime();
+        var expires = created + 24*3600*1000;
+        var left = expires - Date.now();
+        if(left <= 0) return (t('sig.wsExpired')||'Expirat');
+        var hours = Math.floor(left/3600000);
+        var mins  = Math.floor((left%3600000)/60000);
+        if(hours>0) return (t('sig.wsRemains')||'Rămas:')+' '+hours+'h '+mins+'m';
+        return (t('sig.wsRemains')||'Rămas:')+' '+mins+'m';
+      } catch(e){ return '—'; }
+    };
+    var html = '<table class="table" style="width:100%;font-size:13px;">'
+      + '<thead><tr>'
+      + '<th style="text-align:left;">'+(t('sig.wsCFile')||'Fișier')+'</th>'
+      + '<th style="text-align:right;">'+(t('sig.wsCSize')||'Mărime')+'</th>'
+      + '<th>'+(t('sig.wsCStatus')||'Stare')+'</th>'
+      + '<th>'+(t('sig.wsCRetention')||'Retenție')+'</th>'
+      + '<th style="text-align:right;">'+(t('sig.wsCActions')||'Acțiuni')+'</th>'
+      + '</tr></thead><tbody>'
+      + rows.map(function(d){
+        var actions = ''
+          + '<button class="btn primary" style="padding:4px 10px;margin-right:4px;" onclick="openPdfWorkspaceSign(\''+esc(d.id)+'\')">'+(t('sig.wsSign')||'✍️ Semnare')+'</button>'
+          + (d.has_signed
+              ? '<button class="btn ok" style="padding:4px 10px;margin-right:4px;" onclick="pdfWsDownload(\''+esc(d.id)+'\',\'signed\')">'+(t('sig.wsDlSigned')||'⬇️ Semnat')+'</button>'
+              : '<button class="btn ghost" style="padding:4px 10px;margin-right:4px;" onclick="pdfWsDownload(\''+esc(d.id)+'\',\'original\')">'+(t('sig.wsDlOrig')||'⬇️ Original')+'</button>')
+          + '<button class="btn danger" style="padding:4px 10px;" onclick="pdfWsDelete(\''+esc(d.id)+'\')">🗑</button>';
+        return '<tr>'
+          + '<td>'+esc(d.file_name||'—')+(d.has_signed?' <span class="badge ok" style="margin-left:6px;">'+(t('sig.wsBadgeSigned')||'aláírt')+'</span>':'')+'</td>'
+          + '<td style="text-align:right;">'+_fmtSize(d.file_size)+'</td>'
+          + '<td>'+(d.has_signed?('<span style="color:#22c55e;">✓ '+(t('sig.wsSigned')||'Semnat')+'</span>'):('<span style="color:var(--muted);">'+(t('sig.wsPending')||'Nefinalizat')+'</span>'))+'</td>'
+          + '<td>'+esc(_remain(d.created_at))+'</td>'
+          + '<td style="text-align:right;white-space:nowrap;">'+actions+'</td>'
+          + '</tr>';
+      }).join('')
+      + '</tbody></table>';
+    box.innerHTML = html;
+  });
+}
+
+function pdfWsDownload(id, which){
+  gas('pdfWorkspaceGet',[id, which||'original']).then(function(r){
+    if(!r || !r.ok || !r.base64){ toast((r && r.err) || t('cs.downloadError'), 'err'); return; }
+    var base = (r.fileName||'document').replace(/\.[^.]+$/,'');
+    var a = document.createElement('a');
+    a.href = r.base64;
+    a.download = (which==='signed'?'semnat_':'')+base+'.pdf';
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+}
+
+function pdfWsDelete(id){
+  if(!confirm(t('sig.wsDelConfirm')||'Sigur ștergi acest document din spațiul de lucru?')) return;
+  gas('pdfWorkspaceDelete',[id]).then(function(r){
+    if(r && r.ok){ toast(t('cs.deleted')||'Șters.','ok'); loadPdfWorkspaceList(); }
+    else{ toast((r && r.err) || t('common.error'), 'err'); }
+  });
+}
+
+// A signModal újrahasználásával nyitunk aláírót a munkatér-dokumentumra.
+// A `_signMode='workspace'` billenti a `burnAndSaveDoc`-ot a workspace-mentésre.
+function openPdfWorkspaceSign(id){
+  // Először meghívjuk az `openSignModal`-t egy „workspace" jelzővel — a modal
+  // maga csak a doc-tartalmat tölti be, a mentés-módot mi állítjuk utána.
+  openSignModal(id, 'original');
+  window._signMode = 'workspace';
+  // Az `openSignModal` az `orderDocGet`-tel próbál PDF-et tölteni; nálunk ez
+  // hibázni fog → felülírjuk a fetch-ágat egy késleltetett közvetlen tölt.
+  // Legegyszerűbb: közvetlenül átírjuk a PDF forrását a `pdfWorkspaceGet`-ből.
+  setTimeout(function(){
+    gas('pdfWorkspaceGet',[id,'original']).then(async function(r){
+      if(!r || !r.ok || !r.base64){ toast((r&&r.err)||t('cs.pdfLoadError'),'err'); return; }
+      try{
+        var b64 = r.base64.indexOf(',')>=0 ? r.base64.split(',')[1] : r.base64;
+        var bin = atob(b64);
+        pdfRawBytes = new Uint8Array(bin.length);
+        for(var i=0;i<bin.length;i++) pdfRawBytes[i]=bin.charCodeAt(i);
+        pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        pdfDocProxy = await pdfjsLib.getDocument({data: pdfRawBytes.slice()}).promise;
+        signTotalPages = pdfDocProxy.numPages;
+        signCurrentPage = 1;
+        // Régi placedItems takarítás (az openSignModal is takarított, de a
+        // bejövő orderDocGet-hívás közben esetleg még maradt tétel).
+        placedItems.forEach(function(it){ if(it.el) it.el.remove(); });
+        placedItems = [];
+        await renderSignPage(signCurrentPage);
+      }catch(err){ console.error(err); toast(t('cs.pdfOpenFail'),'err'); }
+    });
+  }, 60);
+}
+
 async function burnAndDownloadDoc(){
   toast(t('cs.burning'),'');
   const dataUrl = await buildSignedPdf();
@@ -176,6 +325,15 @@ async function burnAndSaveDoc(){
   toast(t('cs.burning'),'');
   const dataUrl = await buildSignedPdf();
   if(!dataUrl) return;
+  // Munkatér-mód: pdf_workspace_docs sorba mentünk (24h), majd frissítjük a listát.
+  var mode = (typeof _signMode === 'string') ? _signMode : 'order';
+  if(mode === 'workspace'){
+    gas('pdfWorkspaceSaveSigned',[currentDocId,dataUrl]).then(function(r){
+      if(r && r.ok){ toast(t('cs.savedToSystem'),'ok'); closeSignModal(); if(typeof loadPdfWorkspaceList==='function') loadPdfWorkspaceList(); }
+      else{ toast((r&&r.err)||t('cs.saveError'),'err'); }
+    });
+    return;
+  }
   gas('orderDocSaveSigned',[currentDocId,dataUrl]).then(r=>{
     if(r.ok){ toast(t('cs.savedToSystem'),'ok'); loadDocList(currentDocOrderId); closeSignModal(); }
     else{ toast(r.err||t('cs.saveError'),'err'); }
@@ -1308,7 +1466,28 @@ function initFirebaseChatPanel(me){
     });
 }
 
-function loadAdminSigPreview(){gas('stampGet').then(r=>{if(r&&r.ok&&r.base64){document.getElementById('adminSigPreview').src=r.base64;document.getElementById('adminSigPreview').style.display='block';document.getElementById('noSigText').style.display='none';}});}
+// Mindkét képet (aláírás + pecsét) betölti a szeparált mezőkből.
+// A régi UI-hozzáférés (adminSigPreview + noSigText) a PECSÉTET jeleníti meg
+// (backward compat), az új adminSigOnly + noSigOnlyText az ALÁÍRÁST.
+function loadAdminSigPreview(){
+  gas('sigAssetsGet').then(function(r){
+    if(!r||!r.ok) return;
+    // Pecsét-előnézet (a régi „aktuális bélyegző" doboz)
+    var stImg = document.getElementById('adminSigPreview');
+    var stTxt = document.getElementById('noSigText');
+    if(stImg && stTxt){
+      if(r.stamp){ stImg.src = r.stamp; stImg.style.display='block'; stTxt.style.display='none'; }
+      else       { stImg.removeAttribute('src'); stImg.style.display='none'; stTxt.style.display='inline'; }
+    }
+    // Aláírás-előnézet (új doboz a rajzoló kártya alatt)
+    var sgImg = document.getElementById('adminSigOnly');
+    var sgTxt = document.getElementById('noSigOnlyText');
+    if(sgImg && sgTxt){
+      if(r.signature){ sgImg.src = r.signature; sgImg.style.display='block'; sgTxt.style.display='none'; }
+      else           { sgImg.removeAttribute('src'); sgImg.style.display='none'; sgTxt.style.display='inline'; }
+    }
+  });
+}
 
 function loadBorderLogs(){gas('getBorderLogs').then(list=>{document.querySelector('#tblBorderLogs tbody').innerHTML=list.map(l=>`<tr><td>${l.created_at?new Date(l.created_at).toLocaleString('hu-HU'):'—'}</td><td>${esc(l.nume_sofer||l.email_sofer||'—')}</td><td><span class="badge warn">${esc(l.tip||'—')}</span></td><td>${l.gps_lat?('📍 '+parseFloat(l.gps_lat).toFixed(4)+', '+parseFloat(l.gps_lng).toFixed(4)):'GPS n/a'}</td></tr>`).join('');});}
 
@@ -3402,9 +3581,30 @@ function revokeInv(kod){
   gas('invRevoke',[kod]).then(r=>{if(r.ok){toast(t('cs.revoked'),'ok');loadInvites();}else{toast(r.err||t('common.error'),'err');}});
 }
 
-function saveAdminSigDraw(){var dataUrl=sigCanvas.toDataURL('image/png');gas('stampSave',[dataUrl]).then(()=>{toast(t('cs.sigSaved'),'ok');loadAdminSigPreview();});}
+function saveAdminSigDraw(){
+  if(!sigCanvas) return;
+  // Üres canvas ellenőrzés — nehogy üres képet mentsünk aláírásnak.
+  var blank=document.createElement('canvas'); blank.width=sigCanvas.width; blank.height=sigCanvas.height;
+  if(sigCanvas.toDataURL()===blank.toDataURL()){ toast(t('cs.drawSigFirst'),'err'); return; }
+  var dataUrl=sigCanvas.toDataURL('image/png');
+  gas('sigAssetsSave',[{signature:dataUrl}]).then(function(r){
+    if(r&&r.ok){ toast(t('cs.sigSaved'),'ok'); loadAdminSigPreview(); }
+    else       { toast((r&&r.err)||t('common.error'),'err'); }
+  });
+}
 
-function saveAdminSigFile(){var fi=document.getElementById('sigFile');if(!fi.files.length)return;var fr=new FileReader();fr.onload=function(e){gas('stampSave',[e.target.result]).then(()=>{toast(t('cs.stampSaved'),'ok');loadAdminSigPreview();});};fr.readAsDataURL(fi.files[0]);}
+function saveAdminSigFile(){
+  var fi=document.getElementById('sigFile');
+  if(!fi||!fi.files.length){ toast(t('cs.pickPngFirst')||'Selectati fisier PNG.','err'); return; }
+  var fr=new FileReader();
+  fr.onload=function(e){
+    gas('sigAssetsSave',[{stamp:e.target.result}]).then(function(r){
+      if(r&&r.ok){ toast(t('cs.stampSaved'),'ok'); loadAdminSigPreview(); }
+      else       { toast((r&&r.err)||t('common.error'),'err'); }
+    });
+  };
+  fr.readAsDataURL(fi.files[0]);
+}
 
 function saveDocSeries() {
   var prefix = ((document.getElementById('docSeriesPrefix')||{}).value||'').trim();
@@ -4620,6 +4820,7 @@ function gdprSaveSettings(){
 
 function openSignModal(docId,which){
   currentDocId=docId;
+  window._signMode = 'order';
   document.getElementById('signModal').classList.add('open');
 
   placedItems.forEach(it=>{ if(it.el) it.el.remove(); });
@@ -4630,12 +4831,25 @@ function openSignModal(docId,which){
   document.getElementById('signStampImg').style.display='none';
   document.getElementById('signNoStamp').style.display='inline';
   savedStampBase64=null;
-  gas('stampGet').then(r=>{
-    if(r&&r.ok&&r.base64){
-      savedStampBase64=r.base64;
-      document.getElementById('signStampImg').src=r.base64;
+  window._savedSigForModal = null;
+  // Mentett aláírás előnézete (új blokk a signModal-ban) — alaphelyzet
+  var _sIm = document.getElementById('signSavedSigImg');
+  var _sTx = document.getElementById('signNoSavedSig');
+  if(_sIm) _sIm.style.display='none';
+  if(_sTx) _sTx.style.display='inline';
+  // Egy hívással hozzuk a szeparált aláírást ÉS a pecsétet is.
+  gas('sigAssetsGet').then(function(r){
+    if(!r||!r.ok) return;
+    if(r.stamp){
+      savedStampBase64 = r.stamp;
+      document.getElementById('signStampImg').src = r.stamp;
       document.getElementById('signStampImg').style.display='block';
       document.getElementById('signNoStamp').style.display='none';
+    }
+    if(r.signature){
+      window._savedSigForModal = r.signature;
+      if(_sIm){ _sIm.src = r.signature; _sIm.style.display='block'; }
+      if(_sTx){ _sTx.style.display='none'; }
     }
   });
 
