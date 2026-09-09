@@ -1186,4 +1186,33 @@ function startPaymentDueScheduler() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler };
+// ================================================================
+//  PDF munkatér — 24h retention takarítás.
+//  A `pdf_workspace_docs` sorokat az admin/manager „Aláírás és
+//  pecsét" oldal `pdfWorkspaceUpload` handlerén át hozza létre.
+//  A tábla per-user + 24h retention → itt hat óránként töröljük a
+//  lejárt sorokat (best-effort; ha a tábla még nincs migrálva,
+//  csendben skippel).
+// ================================================================
+function startPdfWorkspaceCleanup() {
+  const tick = async () => {
+    try {
+      const r = await pool.query(
+        `DELETE FROM pdf_workspace_docs
+          WHERE created_at < NOW() - INTERVAL '24 hours'`);
+      if (r.rowCount > 0) {
+        console.log(`[PdfWorkspace] Törölve ${r.rowCount} lejárt munkatér-dokumentum.`);
+      }
+    } catch (err) {
+      // Migráció-hiány → csendes skip, ne szemetelje a logot.
+      if (err && err.code === '42P01') return;
+      console.error('[PdfWorkspace] takarítás hiba:', err.message);
+    }
+  };
+  setTimeout(tick, 90 * 1000);           // 1.5 perc múlva először
+  const interval = setInterval(tick, 6 * 60 * 60 * 1000); // 6 óránként
+  console.log('[PdfWorkspace] 24h retention takarító elindítva.');
+  return interval;
+}
+
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup };

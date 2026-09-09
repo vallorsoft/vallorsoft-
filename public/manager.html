@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20260908pgletter">
-  <script src="/i18n.js?v=20260908pgletter"></script>
+  <script src="/i18n.js?v=20260909sigws"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -731,17 +731,37 @@
         <div class="glass" style="padding:22px;">
           <h3 data-i18n="sig.drawTitle">Digitális Aláírás Rajzolása</h3>
           <canvas class="sig-pad" id="adminSigCanvas"></canvas>
-          <div class="row" style="margin-top:12px; display:flex; gap:10px;"><button class="btn ghost col" onclick="clearAdminSig()" data-i18n="sig.clear">Törlés</button><button class="btn ok col" onclick="saveAdminSigDraw()" data-i18n="sig.save">Mentés</button></div>
+          <div class="row" style="margin-top:12px; display:flex; gap:10px;">
+            <button class="btn ghost col" onclick="clearAdminSig()" data-i18n="sig.clear">Törlés</button>
+            <button class="btn ok col" onclick="saveAdminSigDraw()" data-i18n="sig.saveSig">Aláírás mentése</button>
+          </div>
+          <div style="background:#fff; display:inline-block; padding:8px; border-radius:10px; margin-top:12px; min-width:180px;">
+            <img id="adminSigOnly" style="max-height:70px; display:none;">
+            <span id="noSigOnlyText" style="color:#000;font-size:12px;" data-i18n="sig.noSig">Nincs mentett aláírás.</span>
+          </div>
         </div>
         <div class="glass" style="padding:22px;">
           <h3 data-i18n="sig.stampTitle">Bélyegző feltöltése (PNG)</h3>
           <input type="file" id="sigFile" class="input" accept="image/png" style="margin-top:20px;">
           <button class="btn primary block" onclick="saveAdminSigFile()" style="margin-top:24px;" data-i18n="sig.stampSave">Bélyegző mentése</button>
+          <div style="background:#fff; display:inline-block; padding:8px; border-radius:10px; margin-top:12px; min-width:180px;">
+            <img id="adminSigPreview" style="max-height:70px; display:none;">
+            <span id="noSigText" style="color:#000;font-size:12px;" data-i18n="sig.notSaved">Nincs mentve.</span>
+          </div>
         </div>
       </div>
-      <div class="glass" style="padding:22px; margin-top:16px; text-align:center;">
-        <h3 data-i18n="sig.previewTitle">Aktuális bélyegző előnézete</h3>
-        <div style="background:#fff; display:inline-block; padding:10px; border-radius:12px; min-width:200px;"><img id="adminSigPreview" style="max-height:100px; display:none;"><span id="noSigText" style="color:#000;" data-i18n="sig.notSaved">Nincs mentve.</span></div>
+
+      <!-- Közvetlen PDF munkatér: feltöltés + aláírás/pecsét + letöltés (24h retention) -->
+      <div class="glass" style="padding:22px; margin-top:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <h3 style="margin:0;" data-i18n="sig.wsTitle">📄 Dokumentum aláírása / pecsételése</h3>
+          <span style="font-size:12px;color:var(--muted);" data-i18n="sig.wsHint">A feltöltött PDF-eket 24 óráig tároljuk, utána automatikusan törlődnek.</span>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center;">
+          <input type="file" id="pdfWsFile" class="input" accept="application/pdf" style="flex:1;min-width:220px;">
+          <button class="btn primary" onclick="pdfWsUpload()" data-i18n="sig.wsUpload">⬆️ Feltöltés</button>
+        </div>
+        <div id="pdfWsList" style="margin-top:14px;"></div>
       </div>
     </div>
 
@@ -1154,6 +1174,16 @@
         <button class="btn primary" style="width:100%;margin-top:8px;padding:10px;" onclick="addStampToPage()">➕ Pecsét hozzáadása</button>
       </div>
 
+       <!-- 2b. Mentett aláírás -->
+      <div class="glass-soft" style="padding:14px;">
+        <div style="font-weight:600;color:#fff;margin-bottom:8px;">2b. Mentett aláírás</div>
+        <div id="savedSigPreviewWrap" style="background:#fff;padding:8px;border-radius:8px;text-align:center;min-height:60px;">
+          <img id="signSavedSigImg" style="max-height:70px;display:none;">
+          <span id="signNoSavedSig" style="color:#999;font-size:12px;">Nincs mentett aláírás.</span>
+        </div>
+        <button class="btn ok" style="width:100%;margin-top:8px;padding:10px;" onclick="addSavedSigToPage()">➕ Mentett aláírás hozzáadása</button>
+      </div>
+
        <!-- 3. PDF előnézet -->
       <div class="glass-soft" style="padding:14px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
@@ -1443,7 +1473,7 @@
 <script src="/email-intake-card.js?v=20260616warm2"></script>
 <script src="/feature-catalog.js?v=20260618cgps2"></script>
 <script>window.__pwaInstallDefault=false;</script>
-<script src="/console-shared.js?v=20260901dashcards"></script>
+<script src="/console-shared.js?v=20260909sigws"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 <script src="/console-pages.js?v=20260617b1"></script>
 <!-- ===== INTEGRACIOK (Manager: Ugyfelek + "Hol a kocsi?"; szamlazo/beallitas Admin-only) ===== -->
@@ -1488,7 +1518,7 @@
 <script src="/order-wizard.js?v=20260825ordfix2"></script>
 <script src="/order-assignment.js?v=20260827oaflow"></script>
 <script src="/cost-calculator.js?v=20260904addbtn"></script>
-<script src="/manager.js?v=20260820wiz"></script>
+<script src="/manager.js?v=20260909sigws"></script>
 <script src="/global-search.js?v=20260614fg"></script>
 
  <!-- ── BUG REPORT FAB ── -->
