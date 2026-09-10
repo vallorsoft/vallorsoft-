@@ -2064,10 +2064,14 @@
     var logoCell = comp.logo_data_uri
       ? '<td class="lh-logo"><img src="' + esc(comp.logo_data_uri) + '" alt=""></td>'
       : '';
+    // Egységes hivatalos fejléc-sor — CUI · J (Reg.Com.) · ☏ tel · ✉ email
+    // (mindhárom dokumentum-render — group / lunar / oficial — ugyanezt a
+    // kompozíciót használja, hogy vizuálisan egységes legyen a papír).
     var compMeta = [];
     if (comp.cui) compMeta.push('CUI ' + esc(comp.cui));
     if (comp.reg_com) compMeta.push('J ' + esc(comp.reg_com));
     if (comp.telefon) compMeta.push('☏ ' + esc(comp.telefon));
+    if (comp.email_contact) compMeta.push('✉ ' + esc(comp.email_contact));
     var compMetaHtml = compMeta.length ? '<div class="meta">' + compMeta.join(' · ') + '</div>' : '';
     var compAdrHtml = comp.adresa ? '<div class="meta">' + esc(comp.adresa) + '</div>' : '';
     var letterhead =
@@ -2786,11 +2790,14 @@
         + '</tr>';
     }).join('') || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#6b7280;font-style:italic;">' + t('fe.pm.empty') + '</td></tr>';
 
-    // Cég-fejléc sor (adresa/CUI/tel opcionális)
+    // Egységes hivatalos cég-fejléc — CUI · J (Reg.Com.) · ☏ tel · ✉ email
+    // + adresa külön sorban. A csoportos bizonylat, a Decont lunar és a Decont
+    // oficial mind ugyanezt a szimbólum-készletet és sorrendet használja.
     var compMeta = [];
-    if (c.cui) compMeta.push('CUI: ' + esc(c.cui));
-    if (c.telefon) compMeta.push('Tel: ' + esc(c.telefon));
-    if (c.email_contact) compMeta.push(esc(c.email_contact));
+    if (c.cui) compMeta.push('CUI ' + esc(c.cui));
+    if (c.reg_com) compMeta.push('J ' + esc(c.reg_com));
+    if (c.telefon) compMeta.push('☏ ' + esc(c.telefon));
+    if (c.email_contact) compMeta.push('✉ ' + esc(c.email_contact));
     var compMetaLine = compMeta.length ? '<div style="font-size:11px;color:#6b7280;margin-top:2px;">' + compMeta.join(' · ') + '</div>' : '';
     var compAdresa = c.adresa ? '<div style="font-size:11px;color:#6b7280;">' + esc(c.adresa) + '</div>' : '';
 

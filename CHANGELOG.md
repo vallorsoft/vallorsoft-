@@ -14,7 +14,28 @@
 
 ---
 
-## 2026-09-10 — Sofőr-elszámolás: 10 szétszórt nyomtatás-gomb → EGY „📄 Nyomtatás / Dokumentum" belépő + wizard dokumentum-választóval, branch `claude/signature-seal-document-management-5orqva`
+## 2026-09-10 — Sofőr-elszámolás: 10 szétszórt nyomtatás-gomb → EGY „📄 Nyomtatás / Dokumentum" belépő + wizard dokumentum-választóval, MINDEN dokumentum egységes hivatalos fejléccel, branch `claude/signature-seal-document-management-5orqva`
+
+### Fejléces papír — minden dokumentum egységes fejléccel (follow-up)
+
+**Kérés:** „az oszes dok. legyen fejlecezve".
+
+**Diagnózis:** a 3 dokumentum-render (`_dcRenderSheetHtml` / `_dcRenderOfficialHtml` / `_dcGroupPrintRender`) mind fejléces volt, DE két inkonzisztencia:
+- A **csoportos bizonylat** `c.reg_com`-ot használt a fejlécben — DE a szerver `earningPaymentGroupGet` SELECT-je NEM tartalmazta a `reg_com` oszlopot → mindig hiányzott a J-sorszám.
+- A **Decont lunar** + **Decont oficial** fejlécén nem szerepelt Reg.Com. (a szerver sem küldte).
+- A **csoportos bizonylat** fejlécéből viszont hiányzott az **email_contact** (a szerver küldte, csak nem jelenítettük meg).
+
+**Fix — szerver:** `handlers/fleetCompliance.js` mindkét handler (`earningPaymentGroupGet` + `getMonthlySettlementSheet`) SQL-je bővítve `reg_com`-mal + a default company objektumba is bekerült a `reg_com: null` mező (best-effort try/catch, migráció-tolerancia).
+
+**Fix — kliens:** mindhárom rendererben egységes hivatalos fejléc-meta sor `CUI · J · ☏ tel · ✉ email` (`fleet-extra-v2.js`). Group renderer megkapta az email-t, Sheet + Oficial renderek megkapták a Reg.Com.-ot. Minden szimbólum egységes (CUI szó nélkül csak érték, J prefixszel a bíróság-szerinti bejegyzés, ☏ + ✉ ikonokkal).
+
+**Adresa** külön sorban marad mindenütt (a fejléc olvashatóbb így).
+
+**Semmi új i18n** — a szimbólumok nyelv-függetlenek. Cache-bust változatlan `?v=20260910docpick` (ugyanaz a PR-en belüli follow-up).
+
+**1138 Jest zöld** — nincs regresszió, a mock-ok nem ellenőrzik az oszlop-listát.
+
+### Alap-kör — EGY „📄 Nyomtatás / Dokumentum" belépő (PR #436 első commit)
 
 **Kérés:** „az elszamolasnal lassan 10gomb van nyomtatasra egysem egyertelmu mit csinal egyszerusitsd le tudjon mindent de ne legyen komplikalt peldaul nyomtatashoz lepve adja a lehetoseget mit nyomtasunk es hogyan stb". Az elszámolás UI 10 nyomtatás/dokumentum-belépőt tartalmazott szétszórtan, egyik sem egyértelmű.
 
