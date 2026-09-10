@@ -1473,8 +1473,18 @@ var _ORDER_CHIP_GROUPS = {
   'cancelled': ['Anulat'],                                  // törölt
   'handover':  ['Parkolt', 'Raktarban']                    // áru-leadás (megszakított)
 };
+// Post-delivery szűrők (Finalizat fuvaron a dokumentum-nyomkövetés hiányai).
+// Ezek a _ORDER_CHIP_GROUPS státusz-fehérlistán FELÜL egy egyedi predikátumot
+// alkalmaznak — a szűrő logika a `filterOrders`-ben.
+var _ORDER_PD_FILTERS = {
+  'pd_no_invoice':   function(c){ return c.status === 'Finalizat' && !(c.invoice_no && String(c.invoice_no).trim()); },
+  'pd_pending_post': function(c){ return c.status === 'Finalizat' && !c.postal_sent_at; },
+  'pd_pending_pay':  function(c){ return c.status === 'Finalizat' && (c.payment_status_ext || 'pending') !== 'paid'; }
+};
 function chipOrdersFilter(key) {
-  if (!Object.prototype.hasOwnProperty.call(_ORDER_CHIP_GROUPS, key)) key = 'all';
+  var validPd = Object.prototype.hasOwnProperty.call(_ORDER_PD_FILTERS, key);
+  var validStatus = Object.prototype.hasOwnProperty.call(_ORDER_CHIP_GROUPS, key);
+  if (!validPd && !validStatus) key = 'all';
   window._orderChipFilter = key;
   // Vizuális aktív-állapot
   try {
@@ -1489,13 +1499,15 @@ function filterOrders() {
   var q = ((document.getElementById('orderSearch')||{}).value||'').toLowerCase();
   var st = (document.getElementById('orderStatusFilter')||{}).value||'';
   var chipKey = window._orderChipFilter || 'all';
-  var chipStatuses = _ORDER_CHIP_GROUPS[chipKey] || null;
+  var chipStatuses = Object.prototype.hasOwnProperty.call(_ORDER_CHIP_GROUPS, chipKey) ? _ORDER_CHIP_GROUPS[chipKey] : null;
+  var chipPredicate = Object.prototype.hasOwnProperty.call(_ORDER_PD_FILTERS, chipKey) ? _ORDER_PD_FILTERS[chipKey] : null;
   var filtered = _ordersAllCache.filter(function(c){
     var txt = [c.id,c.fuvar_no,c.client,c.ref,c.loc_incarcare,c.loc_descarcare,
                c.email_sofer,c.nume_sofer,c.rendszam_camion].join(' ').toLowerCase();
     if (q && !txt.includes(q)) return false;
     if (st && c.status !== st) return false;
     if (chipStatuses && chipStatuses.indexOf(c.status) === -1) return false;
+    if (chipPredicate && !chipPredicate(c)) return false;
     return true;
   });
   renderFilteredOrders(filtered);
@@ -2594,6 +2606,9 @@ function renderOrdersChipBar(list) {
     if (!statuses) return list.length;
     return list.filter(function (c) { return statuses.indexOf(c.status) !== -1; }).length;
   }
+  function countPd(pred) {
+    return list.filter(function(c){ return pred(c); }).length;
+  }
   var chips = [
     { key: 'all',       label: t('list.chipAll'),       ico: '📋', statuses: null },
     { key: 'active',    label: t('list.chipActive'),    ico: '🚚', statuses: _ORDER_CHIP_GROUPS.active },
@@ -2603,8 +2618,15 @@ function renderOrdersChipBar(list) {
     { key: 'handover',  label: t('list.chipHandover'),  ico: '⛔', statuses: _ORDER_CHIP_GROUPS.handover },
     { key: 'cancelled', label: t('list.chipCancelled'), ico: '🗑', statuses: _ORDER_CHIP_GROUPS.cancelled }
   ];
+  // Post-delivery chip-ek: csak akkor jelennek meg, ha van legalább 1 Finalizat
+  // fuvar, aminek van teendője (különben feleslegesen nyomná a UI-t).
+  var pdChips = [
+    { key: 'pd_no_invoice',   label: t('list.chipNoInvoice')||'Számlára vár',  ico: '🧾', pred: _ORDER_PD_FILTERS.pd_no_invoice },
+    { key: 'pd_pending_post', label: t('list.chipPendingPost')||'Postára vár', ico: '📬', pred: _ORDER_PD_FILTERS.pd_pending_post },
+    { key: 'pd_pending_pay',  label: t('list.chipPendingPay')||'Fizetésre vár', ico: '💶', pred: _ORDER_PD_FILTERS.pd_pending_pay }
+  ];
   var active = window._orderChipFilter || 'all';
-  bar.innerHTML = chips.map(function (ch) {
+  var html = chips.map(function (ch) {
     var n = countOf(ch.statuses);
     var cls = 'vs-chip vs-chip-' + ch.key + (ch.key === active ? ' active' : '');
     return '<button type="button" class="' + cls + '" data-chip="' + ch.key + '" onclick="chipOrdersFilter(\'' + ch.key + '\')">' +
@@ -2613,6 +2635,17 @@ function renderOrdersChipBar(list) {
       '<span class="vs-chip-n">' + n + '</span>' +
       '</button>';
   }).join('');
+  var pdHtml = pdChips.map(function (ch) {
+    var n = countPd(ch.pred);
+    if (n === 0 && ch.key !== active) return ''; // csak nem-üres chip
+    var cls = 'vs-chip vs-chip-pd vs-chip-' + ch.key + (ch.key === active ? ' active' : '');
+    return '<button type="button" class="' + cls + '" data-chip="' + ch.key + '" onclick="chipOrdersFilter(\'' + ch.key + '\')">' +
+      '<span class="vs-chip-ico">' + ch.ico + '</span>' +
+      '<span class="vs-chip-lbl">' + esc(ch.label) + '</span>' +
+      '<span class="vs-chip-n">' + n + '</span>' +
+      '</button>';
+  }).join('');
+  bar.innerHTML = html + (pdHtml ? '<span class="vs-chip-sep" aria-hidden="true"></span>' + pdHtml : '');
 }
 
 // A fuvar-kiíró sorozat-választójának feltöltése (alapértelmezett kijelölve).
@@ -5247,6 +5280,151 @@ function _vsSoferInlineApply(orderId, payload){
 }
 window.vsSoferInlineOpen = vsSoferInlineOpen;
 
+// ───────────────────────────────────────────────────────────────
+//  Dokumentum-nyomkövetés modal — post-delivery lifecycle a Finalizat fuvaron.
+//  Mezők: számlaszám, posta cím, posta elküldve/átvéve, fizetési státusz + dátum,
+//         megjegyzés. Kézi mentés + „Számla-státusz lekérése" gomb (FGO/getInvoice).
+//  Kliens-oldal a `_ordersAllCache`-ből olvassa a jelenlegi értékeket → azonnal
+//  megnyílik, nincs plusz szerver-hívás. Mentés `setOrderPostDelivery`; státusz-
+//  lekérés `checkInvoicePaidExternal`.
+// ───────────────────────────────────────────────────────────────
+function vsPostDeliveryOpen(orderId){
+  var c = (window._ordersAllCache || []).find(function(x){ return String(x.id) === String(orderId); });
+  if(!c){ toast(t('common.notFound')||'Nem található', 'err'); return; }
+  vsPostDeliveryClose();
+  var back = document.createElement('div');
+  back.id = 'vsPdModalBack';
+  back.className = 'modal-back';
+  back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9998;padding:16px;';
+  var box = document.createElement('div');
+  box.className = 'modal glass';
+  box.style.cssText = 'max-width:640px;width:100%;max-height:88vh;overflow:auto;padding:20px;border-radius:14px;';
+  var head = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'+
+    '<div>'+
+      '<h3 style="margin:0;font-size:16px;">📋 '+esc(t('cs.pd.title')||'Dokumentum-nyomkövetés')+'</h3>'+
+      '<div style="font-size:12px;color:var(--muted);margin-top:2px;">'+esc(c.fuvar_no||c.id)+' · '+esc(c.client||'—')+'</div>'+
+    '</div>'+
+    '<button type="button" class="btn ghost" onclick="vsPostDeliveryClose()" style="font-size:20px;line-height:1;padding:4px 10px;">×</button>'+
+  '</div>';
+  var payStatus = c.payment_status_ext || 'pending';
+  var payChecked = c.payment_ext_checked_at ? (' · '+(t('cs.pd.checkedAt')||'utoljára')+': '+new Date(c.payment_ext_checked_at).toLocaleString()) : '';
+  var paySource = c.payment_ext_source ? (' ('+esc(c.payment_ext_source)+')') : '';
+  var body =
+    '<div class="vs-pd-form">'+
+      '<div class="vs-pd-row">'+
+        '<label class="vs-pd-lbl">🧾 '+esc(t('cs.pd.invoiceNo')||'Számlaszám')+'</label>'+
+        '<input class="input" id="vsPdInvNo" type="text" maxlength="50" placeholder="pl. FCT001234" value="'+esc(c.invoice_no||'')+'">'+
+      '</div>'+
+      '<div class="vs-pd-row">'+
+        '<label class="vs-pd-lbl">📍 '+esc(t('cs.pd.postalAddr')||'Posta cím')+'</label>'+
+        '<textarea class="textarea" id="vsPdPostAddr" rows="2" maxlength="500" placeholder="'+esc(t('cs.pd.postalPh')||'Cím kifizetéshez / posta kiküldéshez')+'">'+esc(c.postal_address||'')+'</textarea>'+
+      '</div>'+
+      '<div class="vs-pd-row vs-pd-row-2col">'+
+        '<div><label class="vs-pd-lbl">📬 '+esc(t('cs.pd.postSent')||'Posta elküldve')+'</label>'+
+          '<input class="input" id="vsPdPostSent" type="date" value="'+esc(c.postal_sent_at||'')+'"></div>'+
+        '<div><label class="vs-pd-lbl">📥 '+esc(t('cs.pd.postRecv')||'Posta átvéve')+'</label>'+
+          '<input class="input" id="vsPdPostRecv" type="date" value="'+esc(c.postal_received_at||'')+'"></div>'+
+      '</div>'+
+      '<div class="vs-pd-row vs-pd-row-2col">'+
+        '<div><label class="vs-pd-lbl">💶 '+esc(t('cs.pd.payStatus')||'Fizetési státusz')+'</label>'+
+          '<select class="select" id="vsPdPayStatus">'+
+            '<option value="pending"'+(payStatus==='pending'?' selected':'')+'>⏳ '+esc(t('cs.pd.psPending')||'Fizetésre vár')+'</option>'+
+            '<option value="paid"'+(payStatus==='paid'?' selected':'')+'>✓ '+esc(t('cs.pd.psPaid')||'Kifizetve')+'</option>'+
+            '<option value="delayed"'+(payStatus==='delayed'?' selected':'')+'>⚠️ '+esc(t('cs.pd.psDelayed')||'Késés / részleges')+'</option>'+
+          '</select>'+
+        '</div>'+
+        '<div><label class="vs-pd-lbl">📅 '+esc(t('cs.pd.payReceived')||'Beérkezés dátuma')+'</label>'+
+          '<input class="input" id="vsPdPayReceived" type="date" value="'+esc(c.payment_received_at||'')+'"></div>'+
+      '</div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-top:-6px;">'+esc(t('cs.pd.paySrc')||'Forrás')+paySource+payChecked+'</div>'+
+      '<div class="vs-pd-row">'+
+        '<label class="vs-pd-lbl">📝 '+esc(t('cs.pd.notes')||'Megjegyzés')+'</label>'+
+        '<textarea class="textarea" id="vsPdNotes" rows="2" maxlength="2000" placeholder="'+esc(t('cs.pd.notesPh')||'pl. „Sürgetve emailben 09.15-én"')+'">'+esc(c.post_notes||'')+'</textarea>'+
+      '</div>'+
+      '<div class="vs-pd-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;justify-content:space-between;align-items:center;">'+
+        '<button type="button" class="btn ghost" id="vsPdCheckFgo" title="'+esc(t('cs.pd.checkFgoTitle')||'Lekéri a számla fizetési státuszát a számlázó providertől')+'">🔄 '+esc(t('cs.pd.checkFgo')||'Számla-státusz lekérése')+'</button>'+
+        '<div style="display:flex;gap:8px;">'+
+          '<button type="button" class="btn ghost" onclick="vsPostDeliveryClose()">'+esc(t('common.cancel')||'Mégse')+'</button>'+
+          '<button type="button" class="btn primary" id="vsPdSave">💾 '+esc(t('common.save')||'Mentés')+'</button>'+
+        '</div>'+
+      '</div>'+
+      '<div id="vsPdStat" class="vs-pd-stat"></div>'+
+    '</div>';
+  box.innerHTML = head + body;
+  back.appendChild(box);
+  document.body.appendChild(back);
+  back.addEventListener('click', function(e){ if(e.target === back) vsPostDeliveryClose(); });
+  var statEl = document.getElementById('vsPdStat');
+  function setStat(m, cls){ if(!statEl) return; statEl.textContent = m||''; statEl.className = 'vs-pd-stat' + (cls?(' '+cls):''); }
+  document.getElementById('vsPdSave').addEventListener('click', function(){
+    var payload = {
+      order_id: orderId,
+      invoice_no: document.getElementById('vsPdInvNo').value.trim(),
+      postal_address: document.getElementById('vsPdPostAddr').value.trim(),
+      postal_sent_at: document.getElementById('vsPdPostSent').value || null,
+      postal_received_at: document.getElementById('vsPdPostRecv').value || null,
+      payment_status_ext: document.getElementById('vsPdPayStatus').value,
+      payment_received_at: document.getElementById('vsPdPayReceived').value || null,
+      post_notes: document.getElementById('vsPdNotes').value.trim()
+    };
+    setStat(t('common.saving')||'Mentés…', '');
+    gas('setOrderPostDelivery', [payload]).then(function(r){
+      if(r && r.ok){
+        // Cache-frissítés (nem futtatunk teljes loadOrders-t modal alatt).
+        var idx = window._ordersAllCache.findIndex(function(x){ return String(x.id) === String(orderId); });
+        if(idx >= 0){
+          Object.assign(window._ordersAllCache[idx], {
+            invoice_no: payload.invoice_no || null,
+            postal_address: payload.postal_address || null,
+            postal_sent_at: payload.postal_sent_at,
+            postal_received_at: payload.postal_received_at,
+            payment_status_ext: payload.payment_status_ext,
+            payment_received_at: payload.payment_received_at,
+            post_notes: payload.post_notes || null,
+            payment_ext_source: 'manual'
+          });
+        }
+        toast(t('common.saved')||'Mentve.', 'ok');
+        vsPostDeliveryClose();
+        // A fuvarlista + chip-sáv frissítése.
+        filterOrders();
+      } else {
+        setStat((r && r.err) || (t('common.error')||'Hiba'), 'err');
+      }
+    }).catch(function(){ setStat(t('common.error')||'Hiba', 'err'); });
+  });
+  document.getElementById('vsPdCheckFgo').addEventListener('click', function(){
+    var inv = document.getElementById('vsPdInvNo').value.trim();
+    if(!inv){ setStat(t('cs.pd.needInvFirst')||'Előbb írd be a számlaszámot és mentsd.', 'err'); return; }
+    setStat(t('cs.pd.checking')||'Lekérdezés…', '');
+    // Először mentsük az esetlegesen bevitt számlaszámot (különben a szerver a régit
+    // kérné le vagy nem találná meg).
+    gas('setOrderPostDelivery', [{ order_id: orderId, invoice_no: inv }]).then(function(){
+      return gas('checkInvoicePaidExternal', [{ order_id: orderId }]);
+    }).then(function(r){
+      if(r && r.ok){
+        setStat((t('cs.pd.checkResult')||'Eredmény')+': '+r.status+(r.value?(' ('+r.paid+'/'+r.value+')'):''), 'ok');
+        // Legördülő + cache friss
+        var sel = document.getElementById('vsPdPayStatus'); if(sel) sel.value = r.status;
+        var idx = window._ordersAllCache.findIndex(function(x){ return String(x.id) === String(orderId); });
+        if(idx >= 0){ window._ordersAllCache[idx].payment_status_ext = r.status; window._ordersAllCache[idx].payment_ext_source = 'fgo'; }
+      } else {
+        setStat((r && r.err) || (t('common.error')||'Hiba'), 'err');
+      }
+    }).catch(function(){ setStat(t('common.error')||'Hiba', 'err'); });
+  });
+  // ESC bezár
+  document.addEventListener('keydown', _vsPdEsc, true);
+}
+function _vsPdEsc(e){ if(e.key === 'Escape') vsPostDeliveryClose(); }
+function vsPostDeliveryClose(){
+  var el = document.getElementById('vsPdModalBack');
+  if(el && el.parentNode) el.parentNode.removeChild(el);
+  document.removeEventListener('keydown', _vsPdEsc, true);
+}
+window.vsPostDeliveryOpen = vsPostDeliveryOpen;
+window.vsPostDeliveryClose = vsPostDeliveryClose;
+
 // 📧 Sablonból e-mail egy fuvarhoz — a fuvar adatait a _ordersAllCache-ből
 // olvassa (idézőjel-biztos: nem inline-interpolált), és a közös dialógust nyitja.
 function vsSendOrderTplMail(orderId) {
@@ -5428,6 +5606,23 @@ function renderFilteredOrders(list) {
         'onclick="openPaymentModal(\''+c.id+'\');closeOrderActions()">'+
         '<span class="vs-act-ico">💰</span><span class="vs-act-lbl">'+t('cs.ol.mPay')+'</span>'+
         '<span class="vs-act-ind" style="color:'+_pCol+';">'+(_ps==='paid'?'✓':'●')+'</span></button>';
+    }
+    // 📋 Dokumentum-nyomkövetés (post-delivery) — CSAK Finalizat fuvaron.
+    // Számla, posta cím, posta elküldve/átvéve, fizetés (kézi + provider-lekérés).
+    // Jobbra 3 mini-pötty: számlaszám / posta elküldve / posta átvéve — a hiányzók pirosak.
+    if (c.status==='Finalizat') {
+      var _pdInv = !!(c.invoice_no && String(c.invoice_no).trim());
+      var _pdPst = !!(c.postal_sent_at);
+      var _pdRcv = !!(c.postal_received_at);
+      var _pdPay = c.payment_status_ext || 'pending';
+      var _pdPayCol = _pdPay === 'paid' ? '#4ade80' : (_pdPay === 'delayed' ? '#fbbf24' : '#f87171');
+      var _pdInd = '<span class="vs-pd-mini" title="'+esc(t('cs.pd.miniInv')||'Számla')+'" style="color:'+(_pdInv?'#4ade80':'#f87171')+';">🧾</span>'+
+                   '<span class="vs-pd-mini" title="'+esc(t('cs.pd.miniPst')||'Posta elküldve')+'" style="color:'+(_pdPst?'#4ade80':'#f87171')+';">📬</span>'+
+                   '<span class="vs-pd-mini" title="'+esc(t('cs.pd.miniPay')||'Fizetés')+'" style="color:'+_pdPayCol+';">💶</span>';
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+esc(t('cs.pd.title')||'Dokumentum-nyomkövetés')+'" '+
+        'onclick="vsPostDeliveryOpen(\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">📋</span><span class="vs-act-lbl">'+esc(t('cs.pd.mLabel')||'Post-livrare')+'</span>'+
+        '<span class="vs-act-ind" style="display:inline-flex;gap:2px;">'+_pdInd+'</span></button>';
     }
     // 🌍 Ügyfél tracking-link (prémium funkció-kapcsoló: 'tracking')
     if (!(window._vsFeatures && window._vsFeatures['tracking']===false)) {

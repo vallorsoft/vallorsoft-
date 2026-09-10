@@ -4742,3 +4742,25 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   border:1px solid rgba(239,68,68,0.35); border-radius:8px;
 }
 .vs-drv-swap-clear:hover{ background:rgba(239,68,68,0.18); }
+
+/* ─────────────────────────────────────────────────────────
+   Dokumentum-nyomkövetés (Post-delivery) — modal + fuvarsor mini-jelzők
+   ───────────────────────────────────────────────────────── */
+.vs-pd-form .vs-pd-row{ display:flex; flex-direction:column; gap:5px; margin-bottom:10px; }
+.vs-pd-form .vs-pd-row-2col{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+@media (max-width:520px){ .vs-pd-form .vs-pd-row-2col{ grid-template-columns:1fr; } }
+.vs-pd-form .vs-pd-lbl{ font-size:12px; font-weight:700; color:var(--text-primary,#0f172a); }
+.main-content[data-theme="dark"] .vs-pd-form .vs-pd-lbl{ color:#e9eef5; }
+.vs-pd-stat{ font-size:12.5px; margin-top:10px; min-height:18px; }
+.vs-pd-stat.ok{ color:#16a34a; }
+.vs-pd-stat.err{ color:#dc2626; }
+
+/* A fuvartáblás sor-menü „📋 Post-livrare" gombjának 3 mini-pötty jelzője */
+.vs-pd-mini{ font-size:11px; letter-spacing:1px; line-height:1; }
+
+/* Post-delivery chip-ek elkülönítő függőleges vonal */
+.vs-chip-sep{
+  display:inline-block; width:1px; height:22px; margin:0 4px;
+  background:rgba(148,163,184,0.35); vertical-align:middle;
+}
+.vs-chip-pd{ font-weight:700; }
