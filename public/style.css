@@ -4549,3 +4549,118 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   #dcSelBar .dc-sel-actions{ width: 100%; }
   #dcSelBar .dc-sel-actions button{ flex: 1; }
 }
+
+/* ============================================================
+   📄 Dokumentum-választó modal (fleet-extra-v2.js dcOpenDocPicker)
+   EGY belépő a Sofőr-elszámoláson: „📄 Nyomtatás / Dokumentum" gomb
+   megnyitja ezt a picker-modalt — 4 nagy kártya (Decont lunar /
+   Decont oficial / Kifizetés-történet / Csoportos bizonylat).
+   ============================================================ */
+#dcDocPickerModal .dc-doc-picker{
+  max-width: 640px; width: 96%; padding: 20px 22px;
+}
+#dcDocPickerModal .dc-doc-head{
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+#dcDocPickerModal .dc-doc-title{
+  font-size: 18px; font-weight: 800; color: var(--text-primary);
+}
+#dcDocPickerModal .dc-doc-sub{
+  font-size: 13px; color: var(--text-muted); margin-bottom: 16px;
+}
+#dcDocPickerModal .dc-doc-cards{
+  display: grid; gap: 10px;
+}
+#dcDocPickerModal .dc-doc-card{
+  display: grid; grid-template-columns: 46px 1fr 24px;
+  align-items: center; gap: 14px;
+  padding: 14px 16px; border-radius: 12px;
+  border: 1.5px solid #cbd5e1; background: #ffffff;
+  cursor: pointer; text-align: left;
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+.main-content[data-theme="dark"] #dcDocPickerModal .dc-doc-card{
+  background: rgba(255,255,255,0.03); border-color: rgba(148,163,184,0.35);
+}
+#dcDocPickerModal .dc-doc-card:hover{
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(15,23,42,0.10);
+}
+#dcDocPickerModal .dc-doc-card.dc-doc-acc-blue:hover{   border-color: #3b82f6; }
+#dcDocPickerModal .dc-doc-card.dc-doc-acc-green:hover{  border-color: #10b981; }
+#dcDocPickerModal .dc-doc-card.dc-doc-acc-amber:hover{  border-color: #d97706; }
+#dcDocPickerModal .dc-doc-card.dc-doc-acc-purple:hover{ border-color: #8b5cf6; }
+#dcDocPickerModal .dc-doc-ico{
+  font-size: 30px; text-align: center;
+  width: 46px; height: 46px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+#dcDocPickerModal .dc-doc-acc-blue   .dc-doc-ico{ background: rgba(59,130,246,0.12); }
+#dcDocPickerModal .dc-doc-acc-green  .dc-doc-ico{ background: rgba(16,185,129,0.12); }
+#dcDocPickerModal .dc-doc-acc-amber  .dc-doc-ico{ background: rgba(217,119,6,0.12); }
+#dcDocPickerModal .dc-doc-acc-purple .dc-doc-ico{ background: rgba(139,92,246,0.14); }
+#dcDocPickerModal .dc-doc-t{
+  font-size: 15px; font-weight: 800; color: var(--text-primary); margin-bottom: 2px;
+}
+#dcDocPickerModal .dc-doc-d{
+  font-size: 12.5px; color: var(--text-muted); line-height: 1.4;
+}
+#dcDocPickerModal .dc-doc-arrow{
+  font-size: 22px; color: #94a3b8; text-align: center; font-weight: 400;
+}
+
+/* Csoportos bizonylat sub-picker (gombok listája) */
+#dcDocPickerModal .dc-doc-groups{
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 60vh; overflow-y: auto; padding-right: 4px;
+}
+#dcDocPickerModal .dc-doc-group-row{
+  display: grid; grid-template-columns: 58px 1fr auto 32px;
+  align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px;
+  border: 1.5px solid #cbd5e1; background: #ffffff;
+  cursor: pointer; text-align: left; font-size: 13px;
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+.main-content[data-theme="dark"] #dcDocPickerModal .dc-doc-group-row{
+  background: rgba(255,255,255,0.03); border-color: rgba(148,163,184,0.35);
+}
+#dcDocPickerModal .dc-doc-group-row:hover{
+  transform: translateY(-1px); border-color: #8b5cf6;
+  box-shadow: 0 4px 12px rgba(139,92,246,0.15);
+}
+#dcDocPickerModal .dc-doc-group-badge{
+  display: inline-block; padding: 3px 9px;
+  background: linear-gradient(135deg,#3b82f6,#6366f1); color: #fff;
+  border-radius: 999px; font-size: 11px; font-weight: 800;
+}
+#dcDocPickerModal .dc-doc-group-date{
+  color: var(--text-primary); font-weight: 600;
+}
+#dcDocPickerModal .dc-doc-group-sum{
+  color: var(--text-muted); font-weight: 600; font-variant-numeric: tabular-nums;
+}
+#dcDocPickerModal .dc-doc-group-arrow{
+  font-size: 18px; text-align: center;
+}
+#dcDocPickerModal .dc-doc-loading,
+#dcDocPickerModal .dc-doc-empty{
+  padding: 20px; text-align: center; color: var(--text-muted);
+  font-style: italic; font-size: 13px;
+}
+
+@media (max-width: 720px) {
+  #dcDocPickerModal .dc-doc-picker{ padding: 16px 14px; }
+  #dcDocPickerModal .dc-doc-card{
+    grid-template-columns: 40px 1fr 20px; gap: 10px; padding: 12px 12px;
+  }
+  #dcDocPickerModal .dc-doc-ico{ width: 40px; height: 40px; font-size: 24px; }
+  #dcDocPickerModal .dc-doc-t{ font-size: 14px; }
+  #dcDocPickerModal .dc-doc-d{ font-size: 11.5px; }
+  #dcDocPickerModal .dc-doc-group-row{
+    grid-template-columns: 44px 1fr; gap: 8px;
+  }
+  #dcDocPickerModal .dc-doc-group-sum,
+  #dcDocPickerModal .dc-doc-group-arrow{ display: none; }
+}

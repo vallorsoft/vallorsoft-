@@ -2650,6 +2650,28 @@
     // Sofőr-elszámolás: járandóság + kifizetés (BNR-alapú) — új kártyás nézet
     'fe.dc.bnrToday':   { ro: 'Curs BNR curent', hu: 'Mai BNR árfolyam' },
     'fe.dc.bnrNa':      { ro: 'indisponibil temporar', hu: 'jelenleg nem elérhető' },
+    // 📄 EGY belépő — dokumentum-választó wizard a Sofőr-elszámoláson.
+    // A régi 4 szétszórt gomb (Decont lunar / Decont oficial / Kifizetés-történet
+    // / Csoportos bizonylat) helyett egyetlen „📄 Nyomtatás / Dokumentum" gomb
+    // nyitja ezt a picker-modalt — a user itt választ MIT nyomtat.
+    'fe.doc.openBtn':      { ro: 'Nyomtatás / Dokumentum', hu: 'Nyomtatás / Dokumentum' },
+    'fe.doc.openTitle':    { ro: 'Alege document de printat sau trimis pe email', hu: 'Válassz dokumentumot nyomtatáshoz vagy e-mailhez' },
+    'fe.doc.title':        { ro: 'Ce document imprimăm?', hu: 'Milyen dokumentumot nyomtassunk?' },
+    'fe.doc.subtitle':     { ro: 'Alege tipul de document — apoi decizi cum îl trimiți (printare / email).', hu: 'Válaszd a dokumentum-típust — utána eldöntöd, hogyan küldöd (nyomtatás / e-mail).' },
+    'fe.doc.close':        { ro: 'Închide', hu: 'Bezárás' },
+    'fe.doc.back':         { ro: 'Înapoi', hu: 'Vissza' },
+    'fe.doc.loading':      { ro: 'Se încarcă…', hu: 'Betöltés…' },
+    'fe.doc.err':          { ro: 'Eroare la încărcare', hu: 'Hiba a betöltéskor' },
+    'fe.doc.lunarT':       { ro: 'Decont lunar', hu: 'Havi elszámolás' },
+    'fe.doc.lunarD':       { ro: 'Foaia detaliată — drepturi + plăți + rest de plată.', hu: 'Tételes lap — járandóság + kifizetés + hátralék.' },
+    'fe.doc.oficialT':     { ro: 'Decont oficial', hu: 'Hivatalos elszámolás' },
+    'fe.doc.oficialD':     { ro: 'Foaia oficială (Salariu de bază + Diurna) — dată șoferului.', hu: 'Hivatalos papír (Alapbér + Napidíj) — a sofőrnek adva.' },
+    'fe.doc.historyT':     { ro: 'Istoric plăți', hu: 'Kifizetés-történet' },
+    'fe.doc.historyD':     { ro: 'Doar lista plăților (preselect: ultimele 12 luni).', hu: 'Csak a kifizetés-lista (alapból: utolsó 12 hó).' },
+    'fe.doc.groupT':       { ro: 'O plată de grup', hu: 'Egy csoportos kifizetés' },
+    'fe.doc.groupD':       { ro: 'Bon pentru un anumit grup de plată — alegi din listă.', hu: 'Egy adott csoportos kifizetés bizonylata — listából választva.' },
+    'fe.doc.groupSubtitle':{ ro: 'Alege grupul de plată pe care vrei să-l imprimi.', hu: 'Válaszd ki a nyomtatandó csoportos kifizetést.' },
+    'fe.doc.groupEmpty':   { ro: 'Nu există plăți de grup înregistrate pentru acest șofer.', hu: 'Ehhez a sofőrhöz nincs csoportos kifizetés rögzítve.' },
     // BNR-forrás chip — a szerver megmondja, honnan jött a ráta:
     //   'live'     → nem jelenítünk chipet (alap eset)
     //   'company'  → a cég `eur_ron_rate` beállításából
