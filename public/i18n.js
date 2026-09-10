@@ -2650,6 +2650,12 @@
     // Sofőr-elszámolás: járandóság + kifizetés (BNR-alapú) — új kártyás nézet
     'fe.dc.bnrToday':   { ro: 'Curs BNR curent', hu: 'Mai BNR árfolyam' },
     'fe.dc.bnrNa':      { ro: 'indisponibil temporar', hu: 'jelenleg nem elérhető' },
+    // BNR-forrás chip — a szerver megmondja, honnan jött a ráta:
+    //   'live'     → nem jelenítünk chipet (alap eset)
+    //   'company'  → a cég `eur_ron_rate` beállításából
+    //   'payments' → a legutóbbi rögzített kifizetés BNR-jéből (audit-lánc)
+    'fe.dc.bnrSrcCompany':  { ro: 'setare firmă', hu: 'cég-beállításból' },
+    'fe.dc.bnrSrcPayments': { ro: 'ultima plată', hu: 'utolsó kifizetésből' },
     'fe.dc.bnrHint':    { ro: 'Cursul din momentul plății se salvează la fiecare tranzacție.', hu: 'A kifizetés pillanatában érvényes árfolyam minden tranzakciónál mentődik.' },
     'fe.dc.balEur':     { ro: 'Rest de plată (EUR)', hu: 'Hátralék (EUR)' },
     'fe.dc.balRon':     { ro: 'Rest de plată (RON)', hu: 'Hátralék (RON)' },
@@ -2854,6 +2860,13 @@
     'fe.stof.saveSalary':   { ro: '💾 Salvează', hu: '💾 Mentés' },
     'fe.stof.salarySaved':  { ro: '✅ Salvat', hu: '✅ Mentve' },
     'fe.stof.summary':      { ro: 'Sumar decont oficial', hu: 'Hivatalos elszámolás összegzése' },
+    // Tétel-összesítés blokk a hivatalos papíron — az EUR-tételek összegét
+    // BNR-en RON-ba átszámolva is kiírja (a sofőr azonnal lássa mindkét
+    // formátumban); a kombinált RON csak akkor jelenik meg, ha van EUR ÉS RON.
+    'fe.stof.itemsTotalsTitle':  { ro: 'Sumar drepturi', hu: 'Járandóság-tételek összesítése' },
+    'fe.stof.itemsTotalEur':     { ro: 'Total drepturi (EUR)', hu: 'Járandóság összesen (EUR)' },
+    'fe.stof.itemsTotalRon':     { ro: 'Total drepturi (RON)', hu: 'Járandóság összesen (RON)' },
+    'fe.stof.itemsCombinedRon':  { ro: 'Total combinat în RON (la curs BNR)', hu: 'Kombinált összesen RON-ban (BNR árfolyamon)' },
     'fe.stof.totalEur':     { ro: 'Total EUR', hu: 'Teljes EUR' },
     'fe.stof.totalRon':     { ro: 'Total RON', hu: 'Teljes RON' },
     'fe.stof.bnrUsed':      { ro: 'Curs BNR aplicat', hu: 'Alkalmazott BNR árfolyam' },

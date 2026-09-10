@@ -137,6 +137,9 @@ describe('getMonthlySettlementSheet', () => {
       .mockResolvedValueOnce(rows([{ nev: 'CegKft' }]))
       .mockRejectedValueOnce(new Error('column stamp_base64 does not exist'))  // régi migráció
       .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      // _getEffectiveBnr fallback: cég-ráta + utolsó kifizetés BNR-je üres
+      .mockResolvedValueOnce(rows([{ eur_ron_rate: null }]))
       .mockResolvedValueOnce(rows([]));
     const res = await request(app).post('/api/execute').send({
       functionName: 'getMonthlySettlementSheet',
@@ -156,7 +159,10 @@ describe('getMonthlySettlementSheet', () => {
       .mockResolvedValueOnce(rows([{ nev: 'CegKft' }]))
       .mockResolvedValueOnce(rows([]))                 // company_branding
       .mockResolvedValueOnce(rows([]))                 // earnings
-      .mockResolvedValueOnce(rows([]));                // payments
+      .mockResolvedValueOnce(rows([]))                 // payments
+      // _getEffectiveBnr fallback: cég-ráta + utolsó kifizetés BNR-je üres
+      .mockResolvedValueOnce(rows([{ eur_ron_rate: null }]))
+      .mockResolvedValueOnce(rows([]));
     const res = await request(app).post('/api/execute').send({
       functionName: 'getMonthlySettlementSheet',
       arguments: [{ email: 'sofer@ceg.hu', from: '2026-01-01', to: '2026-12-31' }],
@@ -183,6 +189,9 @@ describe('getMonthlySettlementSheet', () => {
       .mockResolvedValueOnce(rows([{ nev: 'CegKft' }]))
       .mockResolvedValueOnce(rows([]))
       .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([]))
+      // _getEffectiveBnr fallback (cég-ráta + utolsó kifizetés) — üres
+      .mockResolvedValueOnce(rows([{ eur_ron_rate: null }]))
       .mockResolvedValueOnce(rows([]));
     const res = await request(app).post('/api/execute').send({
       functionName: 'getMonthlySettlementSheet',
