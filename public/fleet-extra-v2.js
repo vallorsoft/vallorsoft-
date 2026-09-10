@@ -729,16 +729,17 @@
 
       // Vizuális marker: „🆕 v2" a fejlécben, hogy egyértelmű legyen a
       // felhasználónak, hogy az új verziót látja (nem a cachelt régit).
+      // EGY belépő — a régi „Decont lunar" + „Decont oficial" gomb helyett.
+      // Kattintásra dokumentum-választó modal (Decont lunar / Decont oficial /
+      // Kifizetés-történet / Csoportos bizonylat) — a user maga választ, hogy
+      // MIT nyomtat/e-mailez, és onnan a meglévő modal-motorok jönnek elő.
       out.innerHTML =
         panel('🆕 ' + esc(_dcCurrent.nume) + ' — ' + t('fe.dc.settleV2', 'elszámolás 2.0') + ' (' + d2(from) + ' → ' + d2(to) + ')',
           balHtml,
           '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
           + '<button class="btn primary" style="padding:6px 14px;font-size:12px;" '
-          +   'onclick="FleetExtra.dcOpenSettlement()" title="' + t('fe.st.openTitle') + '">'
-          +   '📄 ' + t('fe.st.openBtn') + '</button>'
-          + '<button class="btn ok" style="padding:6px 14px;font-size:12px;" '
-          +   'onclick="FleetExtra.dcOpenOfficialSettlement()" title="' + t('fe.stof.openTitle') + '">'
-          +   '📑 ' + t('fe.stof.openBtn') + '</button>'
+          +   'onclick="FleetExtra.dcOpenDocPicker()" title="' + t('fe.doc.openTitle') + '">'
+          +   '📄 ' + t('fe.doc.openBtn') + '</button>'
           + '</div>')
         + earnFormHtml
         + listsHtml
@@ -815,15 +816,16 @@
         + '</span></div>';
     }
 
+    // Az egyenleg-akciósor csak KIFIZETÉS-műveleteket tart: részleges + teljes.
+    // A dokumentumok/nyomtatás egyetlen belépő (📄 Dokumentum) a panel-fejlécen,
+    // ott jön elő a dokumentum-választó (Decont lunar / Decont oficial /
+    // Kifizetés-történet / Csoportos bizonylat) — nincs 10 szétszórt gomb.
     var payButtons =
       '<div class="dc-pay-actions">'
       + '<button class="btn primary" onclick="FleetExtra.dcOpenPayment(\'partial\')">💵 '
         + t('fe.pm.payPartial') + '</button>'
       + '<button class="btn ok" onclick="FleetExtra.dcOpenPayment(\'full\')">✅ '
         + t('fe.pm.payFull') + '</button>'
-      + '<button class="btn ghost" onclick="FleetExtra.dcOpenPayHistory()" title="'
-        + t('fe.ph.openTitle') + '">🧾 '
-        + t('fe.ph.openBtn') + '</button>'
       + '</div>';
 
     // BNR-forrás jelzés — a szerver megmondja, honnan jött a ráta (live/company/payments/null).
@@ -2062,10 +2064,14 @@
     var logoCell = comp.logo_data_uri
       ? '<td class="lh-logo"><img src="' + esc(comp.logo_data_uri) + '" alt=""></td>'
       : '';
+    // Egységes hivatalos fejléc-sor — CUI · J (Reg.Com.) · ☏ tel · ✉ email
+    // (mindhárom dokumentum-render — group / lunar / oficial — ugyanezt a
+    // kompozíciót használja, hogy vizuálisan egységes legyen a papír).
     var compMeta = [];
     if (comp.cui) compMeta.push('CUI ' + esc(comp.cui));
     if (comp.reg_com) compMeta.push('J ' + esc(comp.reg_com));
     if (comp.telefon) compMeta.push('☏ ' + esc(comp.telefon));
+    if (comp.email_contact) compMeta.push('✉ ' + esc(comp.email_contact));
     var compMetaHtml = compMeta.length ? '<div class="meta">' + compMeta.join(' · ') + '</div>' : '';
     var compAdrHtml = comp.adresa ? '<div class="meta">' + esc(comp.adresa) + '</div>' : '';
     var letterhead =
@@ -2538,6 +2544,132 @@
     for (var i = 0; i < all.length; i++) all[i].classList.toggle('active', all[i].dataset.preset === key);
     dcSheetReload();
   }
+  // ════════════════════════════════════════════════════════
+  //  📄 EGY BELÉPŐ: DOKUMENTUM-VÁLASZTÓ WIZARD
+  //  A régi 4 különálló belépő gomb (Decont lunar / Decont oficial /
+  //  Kifizetés-történet + soronkénti csoport-nyomtatás) helyett EGYETLEN
+  //  „📄 Dokumentum" gomb nyitja ezt a picker-modalt. A user itt választ:
+  //  MIT nyomtat, és onnan a MEGLÉVŐ modal-motorok jönnek elő (Decont lunar
+  //  sheet-modal + Decont oficial modal + payments-only sheet-modal + a
+  //  csoportos bizonylat print-window). Az „Egy csoportos kifizetés"-nél
+  //  sub-picker jelenik meg a sofőr korábbi csoportos bizonylataiból.
+  // ════════════════════════════════════════════════════════
+  function _dcEnsureDocPickerModal() {
+    if (document.getElementById('dcDocPickerModal')) return;
+    var m = document.createElement('div');
+    m.id = 'dcDocPickerModal';
+    m.className = 'modal-back';
+    m.setAttribute('role', 'dialog');
+    m.innerHTML =
+      '<div class="modal glass dc-doc-picker">'
+      +   '<div class="dc-doc-head">'
+      +     '<div class="dc-doc-title">📄 ' + t('fe.doc.title') + '</div>'
+      +     '<button class="btn ghost" onclick="FleetExtra.dcDocPickerClose()" title="' + t('fe.doc.close') + '">✕</button>'
+      +   '</div>'
+      +   '<div class="dc-doc-sub" id="dcDocPickerSub">' + t('fe.doc.subtitle') + '</div>'
+      +   '<div class="dc-doc-cards" id="dcDocCards"></div>'
+      +   '<div class="dc-doc-groups" id="dcDocGroups" hidden></div>'
+      + '</div>';
+    m.addEventListener('click', function (ev) { if (ev.target === m) dcDocPickerClose(); });
+    document.body.appendChild(m);
+  }
+  function dcDocPickerClose() {
+    var m = document.getElementById('dcDocPickerModal');
+    if (m) m.classList.remove('open');
+  }
+  function _dcDocCardHtml(icon, title, desc, onclickJs, accent) {
+    return '<button type="button" class="dc-doc-card dc-doc-acc-' + esc(accent || 'blue') + '" onclick="' + onclickJs + '">'
+      + '<div class="dc-doc-ico">' + icon + '</div>'
+      + '<div class="dc-doc-txt">'
+      +   '<div class="dc-doc-t">' + esc(title) + '</div>'
+      +   '<div class="dc-doc-d">' + esc(desc) + '</div>'
+      + '</div>'
+      + '<div class="dc-doc-arrow">›</div>'
+      + '</button>';
+  }
+  function dcOpenDocPicker() {
+    if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    _dcEnsureDocPickerModal();
+    // Alap-nézet — 4 kártya
+    var cards = document.getElementById('dcDocCards');
+    var groups = document.getElementById('dcDocGroups');
+    var sub = document.getElementById('dcDocPickerSub');
+    cards.hidden = false;
+    groups.hidden = true;
+    sub.textContent = t('fe.doc.subtitle');
+    cards.innerHTML =
+        _dcDocCardHtml('📄', t('fe.doc.lunarT'),    t('fe.doc.lunarD'),
+          "FleetExtra.dcDocPickerGo('lunar')", 'blue')
+      + _dcDocCardHtml('📑', t('fe.doc.oficialT'),  t('fe.doc.oficialD'),
+          "FleetExtra.dcDocPickerGo('oficial')", 'green')
+      + _dcDocCardHtml('🧾', t('fe.doc.historyT'),  t('fe.doc.historyD'),
+          "FleetExtra.dcDocPickerGo('history')", 'amber')
+      + _dcDocCardHtml('💸', t('fe.doc.groupT'),    t('fe.doc.groupD'),
+          "FleetExtra.dcDocPickerGo('group')", 'purple');
+    document.getElementById('dcDocPickerModal').classList.add('open');
+  }
+  function dcDocPickerGo(kind) {
+    dcDocPickerClose();
+    if (kind === 'lunar')   { dcOpenSettlement();          return; }
+    if (kind === 'oficial') { dcOpenOfficialSettlement();  return; }
+    if (kind === 'history') { dcOpenPayHistory();          return; }
+    if (kind === 'group')   { _dcOpenGroupPicker();        return; }
+  }
+  // Csoportos bizonylat sub-picker: a sofőr legutóbbi csoportos kifizetéseit
+  // listázza — kattintásra a MEGLÉVŐ `dcGroupPrint` a print-ablakot nyitja.
+  function _dcOpenGroupPicker() {
+    _dcEnsureDocPickerModal();
+    var m = document.getElementById('dcDocPickerModal');
+    var cards = document.getElementById('dcDocCards');
+    var groups = document.getElementById('dcDocGroups');
+    var sub = document.getElementById('dcDocPickerSub');
+    cards.hidden = true;
+    groups.hidden = false;
+    sub.innerHTML = '<span style="cursor:pointer;color:var(--status-info);text-decoration:underline;" '
+      + 'onclick="FleetExtra.dcOpenDocPicker()">← ' + t('fe.doc.back') + '</span> · ' + t('fe.doc.groupSubtitle');
+    groups.innerHTML = '<div class="dc-doc-loading">' + t('fe.doc.loading') + '</div>';
+    m.classList.add('open');
+    // A cég összes csoportját listázzuk sofőrre szűrve (last 24 hó).
+    var today = new Date();
+    var toStr = today.toISOString().slice(0, 10);
+    var from = new Date(today.getFullYear() - 2, today.getMonth(), today.getDate());
+    var fromStr = from.toISOString().slice(0, 10);
+    gas('earningPaymentGroupList', [{
+      email: _dcCurrent.email, from: fromStr, to: toStr
+    }]).then(function (r) {
+      if (!r || !r.ok) {
+        groups.innerHTML = '<div class="dc-doc-empty">' + esc((r && r.err) || t('fe.doc.err')) + '</div>';
+        return;
+      }
+      var arr = (r.groups || r.items || []).slice(0, 60);
+      if (!arr.length) {
+        groups.innerHTML = '<div class="dc-doc-empty">' + t('fe.doc.groupEmpty') + '</div>';
+        return;
+      }
+      groups.innerHTML = arr.map(function (g) {
+        var date = g.pay_date || g.paid_at || g.created_at || '';
+        if (date && date.length > 10) date = date.slice(0, 10);
+        var eur = g.total_eur != null ? Number(g.total_eur) : null;
+        var ron = g.total_ron != null ? Number(g.total_ron) : null;
+        var sums = [];
+        if (eur != null && eur > 0) sums.push(n2(eur, 2) + ' EUR');
+        if (ron != null && ron > 0) sums.push(n2(ron, 2) + ' RON');
+        return '<button type="button" class="dc-doc-group-row" onclick="FleetExtra.dcDocPickerPrintGroup(' + Number(g.id) + ')">'
+          + '<span class="dc-doc-group-badge">#' + Number(g.id) + '</span>'
+          + '<span class="dc-doc-group-date">📅 ' + esc(date || '—') + '</span>'
+          + '<span class="dc-doc-group-sum">' + (sums.join(' · ') || '—') + '</span>'
+          + '<span class="dc-doc-group-arrow">🖨️</span>'
+          + '</button>';
+      }).join('');
+    }).catch(function () {
+      groups.innerHTML = '<div class="dc-doc-empty">' + t('fe.doc.err') + '</div>';
+    });
+  }
+  function dcDocPickerPrintGroup(id) {
+    dcDocPickerClose();
+    dcGroupPrint(id);
+  }
+
   function dcOpenSettlement() {
     if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
     _dcSheetMode = 'full';
@@ -2658,11 +2790,14 @@
         + '</tr>';
     }).join('') || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#6b7280;font-style:italic;">' + t('fe.pm.empty') + '</td></tr>';
 
-    // Cég-fejléc sor (adresa/CUI/tel opcionális)
+    // Egységes hivatalos cég-fejléc — CUI · J (Reg.Com.) · ☏ tel · ✉ email
+    // + adresa külön sorban. A csoportos bizonylat, a Decont lunar és a Decont
+    // oficial mind ugyanezt a szimbólum-készletet és sorrendet használja.
     var compMeta = [];
-    if (c.cui) compMeta.push('CUI: ' + esc(c.cui));
-    if (c.telefon) compMeta.push('Tel: ' + esc(c.telefon));
-    if (c.email_contact) compMeta.push(esc(c.email_contact));
+    if (c.cui) compMeta.push('CUI ' + esc(c.cui));
+    if (c.reg_com) compMeta.push('J ' + esc(c.reg_com));
+    if (c.telefon) compMeta.push('☏ ' + esc(c.telefon));
+    if (c.email_contact) compMeta.push('✉ ' + esc(c.email_contact));
     var compMetaLine = compMeta.length ? '<div style="font-size:11px;color:#6b7280;margin-top:2px;">' + compMeta.join(' · ') + '</div>' : '';
     var compAdresa = c.adresa ? '<div style="font-size:11px;color:#6b7280;">' + esc(c.adresa) + '</div>' : '';
 
@@ -3440,6 +3575,12 @@
     dcKindClose: dcKindClose,
     dcKindCreate: dcKindCreate,
     dcKindDelete: dcKindDelete,
+    // 📄 EGY belépő — dokumentum-választó wizard (Decont lunar / Decont oficial /
+    // Kifizetés-történet / Csoportos bizonylat). Régi 10 szétszórt gomb helyett.
+    dcOpenDocPicker: dcOpenDocPicker,
+    dcDocPickerClose: dcDocPickerClose,
+    dcDocPickerGo: dcDocPickerGo,
+    dcDocPickerPrintGroup: dcDocPickerPrintGroup,
     // Havi elszámolás-lap (📄 PDF/nyomtatható + e-mail)
     dcOpenSettlement: dcOpenSettlement,
     // 🧾 Kifizetés-történet (payments-only mód, ugyanaz a sheet-modal)

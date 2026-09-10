@@ -14,6 +14,73 @@
 
 ---
 
+## 2026-09-10 — Sofőr-elszámolás: 10 szétszórt nyomtatás-gomb → EGY „📄 Nyomtatás / Dokumentum" belépő + wizard dokumentum-választóval, MINDEN dokumentum egységes hivatalos fejléccel, branch `claude/signature-seal-document-management-5orqva`
+
+### Fejléces papír — minden dokumentum egységes fejléccel (follow-up)
+
+**Kérés:** „az oszes dok. legyen fejlecezve".
+
+**Diagnózis:** a 3 dokumentum-render (`_dcRenderSheetHtml` / `_dcRenderOfficialHtml` / `_dcGroupPrintRender`) mind fejléces volt, DE két inkonzisztencia:
+- A **csoportos bizonylat** `c.reg_com`-ot használt a fejlécben — DE a szerver `earningPaymentGroupGet` SELECT-je NEM tartalmazta a `reg_com` oszlopot → mindig hiányzott a J-sorszám.
+- A **Decont lunar** + **Decont oficial** fejlécén nem szerepelt Reg.Com. (a szerver sem küldte).
+- A **csoportos bizonylat** fejlécéből viszont hiányzott az **email_contact** (a szerver küldte, csak nem jelenítettük meg).
+
+**Fix — szerver:** `handlers/fleetCompliance.js` mindkét handler (`earningPaymentGroupGet` + `getMonthlySettlementSheet`) SQL-je bővítve `reg_com`-mal + a default company objektumba is bekerült a `reg_com: null` mező (best-effort try/catch, migráció-tolerancia).
+
+**Fix — kliens:** mindhárom rendererben egységes hivatalos fejléc-meta sor `CUI · J · ☏ tel · ✉ email` (`fleet-extra-v2.js`). Group renderer megkapta az email-t, Sheet + Oficial renderek megkapták a Reg.Com.-ot. Minden szimbólum egységes (CUI szó nélkül csak érték, J prefixszel a bíróság-szerinti bejegyzés, ☏ + ✉ ikonokkal).
+
+**Adresa** külön sorban marad mindenütt (a fejléc olvashatóbb így).
+
+**Semmi új i18n** — a szimbólumok nyelv-függetlenek. Cache-bust változatlan `?v=20260910docpick` (ugyanaz a PR-en belüli follow-up).
+
+**1138 Jest zöld** — nincs regresszió, a mock-ok nem ellenőrzik az oszlop-listát.
+
+### Alap-kör — EGY „📄 Nyomtatás / Dokumentum" belépő (PR #436 első commit)
+
+**Kérés:** „az elszamolasnal lassan 10gomb van nyomtatasra egysem egyertelmu mit csinal egyszerusitsd le tudjon mindent de ne legyen komplikalt peldaul nyomtatashoz lepve adja a lehetoseget mit nyomtasunk es hogyan stb". Az elszámolás UI 10 nyomtatás/dokumentum-belépőt tartalmazott szétszórtan, egyik sem egyértelmű.
+
+### Előző állapot (inventár)
+
+- Panel-fejléc: 📄 **Decont lunar** + 📑 **Decont oficial** (2 gomb)
+- Egyenleg-akciósor: 💵 Részleges + ✅ Teljes + 🧾 **Kifizetés-történet** (3 gomb — a 🧾 dokumentum-belépő volt)
+- Payment-lista minden group-fejlécén: 🖨️ Csoport-nyomtatás (per csoport)
+- Decont lunar sheet-modal: 🖨️ Print + ✉️ E-mail (2 gomb)
+- Decont oficial modal: 🖨️ Print + ✉️ E-mail (2 gomb)
+
+### Új állapot — EGY belépő + wizard
+
+**Panel-fejléc:** a 2 dokumentum-gomb HELYETT egyetlen kék **„📄 Nyomtatás / Dokumentum"** primary gomb → `dcOpenDocPicker()`.
+
+**Egyenleg-akciósor tisztítva:** csak a kifizetés-műveletek maradnak (💵 Részleges + ✅ Teljes). A 🧾 gomb kikerült.
+
+**Új picker-modal (`#dcDocPickerModal`)** — 4 nagy kártya színes akcenttel (kék/zöld/borostyán/lila):
+1. 📄 **Decont lunar** (kék) — Tételes lap: járandóság + kifizetés + hátralék
+2. 📑 **Decont oficial** (zöld) — Hivatalos papír: Salariu de bază + Diurna
+3. 🧾 **Kifizetés-történet** (borostyán) — Csak kifizetés-lista, alapból rolling 12 hó
+4. 💸 **Egy csoportos kifizetés** (lila) — Sub-picker: a sofőr legutóbbi csoportos bizonylatai listából (utolsó 2 év, max 60), kattintásra `dcGroupPrint(id)`
+
+Kattintás után a MEGLÉVŐ render-motorok jönnek (`dcOpenSettlement`/`dcOpenOfficialSettlement`/`dcOpenPayHistory`/`dcGroupPrint`), ott a sheet-modal saját 🖨️ Print + ✉️ Email gombjaival dönt a felhasználó a KÜLDÉSMÓDRÓL. Semmi új render-logika — 3-lépéses fluxus: 1. Kattint a belépőre · 2. Kiválasztja MIT nyomtat · 3. Az előjövő sheet-modal 🖨️/✉️ gombjával küld.
+
+**Payment-lista soronkénti 🖨️ MEGMARAD** kényelmi rövidítésként — közvetlen `dcGroupPrint` (a wizard 4. opciója ehhez a hosszabb út a keresésre).
+
+### Új CSS (`public/style.css`)
+
+`#dcDocPickerModal .dc-doc-*` blokk: nagy kártyás grid (46px ikon-oszlop + cím+leírás + jobb-nyíl), 4 akcent-szín (`dc-doc-acc-blue/green/amber/purple`), hover-emelés + akcens-keret, világos + sötét téma, mobil ≤720px 40px ikon + kompakt padding + a summary/nyíl elrejtve a group-picker sorokban.
+
+### Új i18n (16 kulcs)
+
+`fe.doc.openBtn/openTitle/title/subtitle/close/back/loading/err` + `fe.doc.lunarT/lunarD` + `fe.doc.oficialT/oficialD` + `fe.doc.historyT/historyD` + `fe.doc.groupT/groupD/groupSubtitle/groupEmpty` — RO-alap + HU.
+
+### Új publikus API + cache-bust
+
+`FleetExtra.dcOpenDocPicker/dcDocPickerClose/dcDocPickerGo/dcDocPickerPrintGroup` — a 4 új export. Cache-bust `?v=20260910bnrfb` → `?v=20260910docpick` (admin.html + manager.html — style.css + i18n.js + fleet-extra-v2.js).
+
+### Teszt
+
+**1138 Jest zöld** — tisztán kliens-oldali refaktor (belépő-átcsoportosítás + új picker-modal), nincs szerver-változás, nincs séma-változás, nincs regresszió. A meglévő rendering-motorok teljesen érintetlenek.
+
+---
+
 ## 2026-09-10 — Sofőr-elszámolás: BNR-fallback-lánc (élő → cég-ráta → utolsó kifizetés) → cross-settlement akkor is fut, ha az élő BNR épp elérhetetlen + hivatalos papíron a járandóság-tételek RON-összesítése a BNR-en, branch `claude/signature-seal-document-management-5orqva`
 
 **Kérés (képernyőképpel — Gondos Imre / Peto):** „lejben lett kifizetve euros tétel es nem vonta le bnr arfolyamon az euróból hanem inkabb minuszba tette a lejes kifizetest ezt javitsd ki mert le kell vonja ha egyszer kilett fizetve az euros tetel es a papira a tetelek oszesitesenel irja fel az euro oszeget lejben is bnr arfolyamon". A képernyőn: 500 EUR jár + 45 RON jár, 0 EUR + 937 RON fizetve → hátralék EUR 500 (piros), hátralék RON −892 (túlfizetés), „Mai BNR árfolyam: jelenleg nem elérhető" — a PR #433-ben bevezetett cross-settlement nem futott le, mert az élő BNR pillanatnyilag nem érkezett be, és nem volt fallback.

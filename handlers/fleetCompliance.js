@@ -1134,10 +1134,10 @@ handlers.earningPaymentGroupGet = async function (req, res, args) {
     );
 
     // Cég-adatok + branding (logó, pecsét) — a fejléces papír-hoz
-    let company = { nev: '', cui: null, adresa: null, telefon: null, email_contact: null };
+    let company = { nev: '', cui: null, reg_com: null, adresa: null, telefon: null, email_contact: null };
     try {
       const cR = await pool.query(
-        'SELECT nev, cui, adresa, telefon, email_contact FROM companies WHERE id=$1', [cid]);
+        'SELECT nev, cui, reg_com, adresa, telefon, email_contact FROM companies WHERE id=$1', [cid]);
       if (cR.rows.length) company = Object.assign(company, cR.rows[0]);
     } catch (_e) {}
     let branding = { logo: null, stamp: null };
@@ -1476,10 +1476,10 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
     const driver = driverRow;
 
     // Cég adatai — fejlécbe (best-effort)
-    let company = { nev: '', cui: null, adresa: null, telefon: null, email_contact: null };
+    let company = { nev: '', cui: null, reg_com: null, adresa: null, telefon: null, email_contact: null };
     try {
       const cR = await pool.query(
-        'SELECT nev, cui, adresa, telefon, email_contact FROM companies WHERE id=$1', [cid]);
+        'SELECT nev, cui, reg_com, adresa, telefon, email_contact FROM companies WHERE id=$1', [cid]);
       if (cR.rows.length) company = Object.assign(company, cR.rows[0]);
     } catch (_e) { /* opc. oszlopok — mindenképp legyen nev */ }
 
