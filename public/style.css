@@ -4466,6 +4466,66 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #decontBox .dc-print-btn:hover{ background: rgba(37,99,235,0.10); border-color: #2563eb; color: #1e40af; }
 .main-content[data-theme="dark"] #decontBox .dc-print-btn{ color: #cbd5e1; border-color: rgba(148,163,184,0.4); }
 
+/* ═══════════════════════════════════════════════════════════
+ * Csoport-kifizetés sor a payment-listán (kattintható, lenyíló)
+ * ═══════════════════════════════════════════════════════════ */
+#decontBox tr.dc-pg-row{
+  cursor: pointer;
+  background: linear-gradient(90deg, rgba(37,99,235,0.05), rgba(139,92,246,0.05));
+  transition: background 0.15s ease;
+}
+#decontBox tr.dc-pg-row:hover{
+  background: linear-gradient(90deg, rgba(37,99,235,0.12), rgba(139,92,246,0.12));
+}
+#decontBox tr.dc-pg-row.open{
+  background: linear-gradient(90deg, rgba(37,99,235,0.18), rgba(139,92,246,0.18));
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+#decontBox tr.dc-pg-row .dc-pg-chevron{
+  display: inline-block; margin-left: 4px; color: #64748b; font-weight: 800;
+  transition: transform 0.15s ease;
+}
+#decontBox tr.dc-pg-row.open .dc-pg-chevron{
+  transform: rotate(90deg); color: #2563eb;
+}
+#decontBox .dc-pg-cnt{
+  display: inline-block; margin-left: 4px; padding: 1px 6px;
+  border-radius: 8px; font-size: 11px; font-weight: 800;
+  background: rgba(37,99,235,0.15); color: #1e40af;
+  border: 1px solid rgba(37,99,235,0.3);
+}
+.main-content[data-theme="dark"] #decontBox .dc-pg-cnt{
+  color: #93c5fd; background: rgba(59,130,246,0.20); border-color: rgba(147,197,253,0.4);
+}
+#decontBox .dc-method.dc-method-multi{
+  background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff;
+  padding: 2px 8px; border-radius: 8px; font-size: 12px; font-weight: 700;
+}
+#decontBox tr.dc-pg-detail-row td{ background: rgba(15,23,42,0.02); padding: 0 !important; }
+.main-content[data-theme="dark"] #decontBox tr.dc-pg-detail-row td{ background: rgba(255,255,255,0.03); }
+#decontBox .dc-pg-detail-inner{
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 16px;
+  border-left: 3px solid #2563eb;
+}
+#decontBox .dc-pg-detail-sec .dc-pg-detail-h{
+  font-size: 13px; font-weight: 800; color: #1e40af;
+  margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px;
+}
+.main-content[data-theme="dark"] #decontBox .dc-pg-detail-sec .dc-pg-detail-h{ color: #93c5fd; }
+#decontBox .dc-pg-mini{ font-size: 12.5px; }
+#decontBox .dc-pg-mini th{
+  background: rgba(37,99,235,0.08); color: #334155;
+  font-size: 11px; padding: 6px 8px;
+}
+.main-content[data-theme="dark"] #decontBox .dc-pg-mini th{
+  background: rgba(59,130,246,0.15); color: #cbd5e1;
+}
+#decontBox .dc-pg-mini td{ padding: 5px 8px; }
+@media (max-width: 720px){
+  #decontBox tr.dc-pg-row .dc-pg-cnt{ font-size: 10px; padding: 1px 5px; }
+  #decontBox .dc-pg-detail-inner{ padding: 10px 8px; }
+}
+
 @media (max-width: 720px){
   #dcPgModal .dc-pg-payrow{
     grid-template-columns: 1fr 1fr;
