@@ -5,7 +5,10 @@
 
 const pool = require('../../db');
 jest.mock('../../db', () => ({ query: jest.fn() }));
-jest.mock('../../services/bnr', () => ({ fetchBnrEurRon: jest.fn().mockResolvedValue(null) }), { virtual: true });
+// FIX (2026-09-10): a `{ virtual: true }` flag hibásan viselkedik egy LÉTEZŐ
+// modulon (services/bnr.js létezik) — CI-ben nem intercept-eli a require-t
+// → a valós BNR API-t hívja → 5 mp-es teszt-timeout. Létező modulra sima mock.
+jest.mock('../../services/bnr', () => ({ fetchBnrEurRon: jest.fn().mockResolvedValue(null) }));
 
 const handlers = require('../../handlers/costCalculator');
 
