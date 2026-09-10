@@ -249,6 +249,7 @@ var _chatCurrentRoom=null,_chatUnsubscribe=null,_roomsSnapData={};
 // ============================================================
 var _oeOrderId = null;
 var _oeSoferCache = [], _oeCamionCache = [], _oeRemorcaCache = [];
+var _oeUitStops = []; // lerakó-stopok a nyitott fuvarhoz (UIT stop-választóhoz)
 
 /* ── Mobil sidebar (hamburger) ── */
 // Tab és sub-tab kattintasra mobilon bezarul a sidebar

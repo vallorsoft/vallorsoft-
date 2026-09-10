@@ -285,6 +285,7 @@ var _chatCurrentRoom=null,_chatUnsubscribe=null,_roomsSnapData={};
 // FUVAR SZERKESZTŐ MODAL
 // ============================================================
 var _oeOrderId=null,_oeSoferCache=[],_oeCamionCache=[],_oeRemorcaCache=[];
+var _oeUitStops = []; // lerakó-stopok a nyitott fuvarhoz (UIT stop-választóhoz)
 /* ── Mobil sidebar (hamburger) ── */
 document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(el) {
   el.addEventListener('click', function() {

@@ -209,6 +209,9 @@ handlers.comList = async function (req, res, args) {
         ) sst ON true`;
       let r;
       if (me.pozicio === 'Admin' || me.pozicio === 'Manager') {
+        // Post-delivery mezők (order-post-delivery.sql) — best-effort: ha az
+        // oszlopok még nem léteznek (migráció-hiány), a `to_jsonb(o) ->> ...`
+        // NULL-t ad vissza a mezőnév helyett (NEM dob column-exists hibát).
         r = await pool.query(
           `SELECT o.id, o.fuvar_no, o.client, o.ref, o.loc_incarcare, o.loc_descarcare,
                   o.pret, o.km, o.status, o.sofer_type, o.email_sofer, o.nume_sofer,
@@ -221,6 +224,15 @@ handlers.comList = async function (req, res, args) {
                   o.needs_uit,
                   (SELECT COUNT(*)::int FROM order_uit_codes u
                      WHERE u.order_id = o.id AND u.company_id = o.company_id AND u.status <> 'stopped') AS uit_active_count,
+                  to_jsonb(o) ->> 'invoice_no'           AS invoice_no,
+                  to_jsonb(o) ->> 'postal_address'       AS postal_address,
+                  to_jsonb(o) ->> 'postal_sent_at'       AS postal_sent_at,
+                  to_jsonb(o) ->> 'postal_received_at'   AS postal_received_at,
+                  to_jsonb(o) ->> 'payment_status_ext'   AS payment_status_ext,
+                  to_jsonb(o) ->> 'payment_received_at'  AS payment_received_at,
+                  to_jsonb(o) ->> 'post_notes'           AS post_notes,
+                  to_jsonb(o) ->> 'payment_ext_checked_at' AS payment_ext_checked_at,
+                  to_jsonb(o) ->> 'payment_ext_source'   AS payment_ext_source,
                   COALESCE(legs.leg_count, 0) AS leg_count,
                   COALESCE(legs.legs_json, '[]'::json) AS legs_json,
                   COALESCE(sst.stop_count, 0)     AS stop_count,

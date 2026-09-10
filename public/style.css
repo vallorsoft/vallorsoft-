@@ -4664,3 +4664,103 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   #dcDocPickerModal .dc-doc-group-sum,
   #dcDocPickerModal .dc-doc-group-arrow{ display: none; }
 }
+
+/* ─────────────────────────────────────────────────────────
+   Utolsó aktivitás chip (Belső sofőrök tábla oszlopa)
+   Zöld = <24 óra · sárga = <7 nap · szürke = régebbi/soha
+   ───────────────────────────────────────────────────────── */
+.vs-la{
+  display:inline-block; padding:3px 10px;
+  border-radius:999px; font-size:12px; font-weight:700;
+  letter-spacing:.2px; white-space:nowrap;
+  border:1px solid transparent; font-variant-numeric:tabular-nums;
+}
+.vs-la-green{  background:rgba(34,197,94,0.15);  color:#16a34a; border-color:rgba(34,197,94,0.35); }
+.vs-la-yellow{ background:rgba(245,158,11,0.15); color:#b45309; border-color:rgba(245,158,11,0.35); }
+.vs-la-gray{   background:rgba(148,163,184,0.15); color:#475569; border-color:rgba(148,163,184,0.35); }
+.vs-la-never{  color:#94a3b8; font-weight:500; }
+.main-content[data-theme="dark"] .vs-la-green{  color:#86efac; }
+.main-content[data-theme="dark"] .vs-la-yellow{ color:#fbbf24; }
+.main-content[data-theme="dark"] .vs-la-gray{   color:#cbd5e1; }
+
+/* ─────────────────────────────────────────────────────────
+   Inline sofőr csere popover (fuvartáblán a sofőr név-cella)
+   ───────────────────────────────────────────────────────── */
+.vsl-driver-clickable{
+  cursor:pointer; text-decoration:underline dotted;
+  text-decoration-color:rgba(148,163,184,0.5);
+  text-underline-offset:3px; border-radius:4px; padding:1px 3px;
+}
+.vsl-driver-clickable:hover{ background:rgba(37,99,235,0.10); text-decoration-color:#2563eb; }
+.main-content[data-theme="dark"] .vsl-driver-clickable:hover{ background:rgba(96,165,250,0.15); }
+.vs-drv-swap-pop{
+  position:fixed; z-index:9999; width:300px; max-height:320px;
+  background:#ffffff; color:#0f172a;
+  border:1.5px solid #cbd5e1; border-radius:12px;
+  box-shadow:0 12px 32px rgba(15,23,42,0.20);
+  display:flex; flex-direction:column;
+  font-size:13px;
+}
+.vs-drv-swap-pop[data-theme="dark"]{
+  background:#0c1218; color:#e9eef5; border-color:rgba(148,163,184,0.35);
+}
+.vs-drv-swap-pop[data-theme="dark"] .vs-drv-swap-search{
+  border-color:rgba(148,163,184,0.35);
+}
+.vs-drv-swap-head{
+  display:flex; gap:6px; align-items:center;
+  padding:8px 8px 6px; border-bottom:1px solid rgba(148,163,184,0.25);
+}
+.vs-drv-swap-search{
+  flex:1; min-width:0; padding:6px 10px; font-size:13px;
+  border:1px solid #cbd5e1; border-radius:8px; background:transparent; color:inherit;
+}
+.vs-drv-swap-search:focus{ outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.15); }
+.vs-drv-swap-x{
+  cursor:pointer; border:0; background:transparent; color:inherit;
+  font-size:20px; line-height:1; padding:2px 8px; border-radius:6px;
+}
+.vs-drv-swap-x:hover{ background:rgba(148,163,184,0.15); }
+.vs-drv-swap-body{ flex:1; overflow:auto; padding:4px; }
+.vs-drv-swap-item{
+  display:flex; align-items:center; gap:8px; width:100%;
+  padding:7px 8px; cursor:pointer;
+  background:transparent; border:0; border-radius:8px;
+  color:inherit; text-align:left; font-size:13px;
+}
+.vs-drv-swap-item:hover{ background:rgba(37,99,235,0.10); }
+.vs-drv-swap-pop[data-theme="dark"] .vs-drv-swap-item:hover{ background:rgba(96,165,250,0.12); }
+.vs-drv-swap-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.vs-drv-swap-la{ font-size:11px; flex-shrink:0; }
+.vs-drv-swap-empty{ padding:16px; text-align:center; color:#64748b; font-size:12.5px; }
+.vs-drv-swap-foot{
+  padding:6px 8px; border-top:1px solid rgba(148,163,184,0.25);
+}
+.vs-drv-swap-clear{
+  width:100%; padding:6px 10px; font-size:12.5px; font-weight:700;
+  cursor:pointer; background:rgba(239,68,68,0.10); color:#dc2626;
+  border:1px solid rgba(239,68,68,0.35); border-radius:8px;
+}
+.vs-drv-swap-clear:hover{ background:rgba(239,68,68,0.18); }
+
+/* ─────────────────────────────────────────────────────────
+   Dokumentum-nyomkövetés (Post-delivery) — modal + fuvarsor mini-jelzők
+   ───────────────────────────────────────────────────────── */
+.vs-pd-form .vs-pd-row{ display:flex; flex-direction:column; gap:5px; margin-bottom:10px; }
+.vs-pd-form .vs-pd-row-2col{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+@media (max-width:520px){ .vs-pd-form .vs-pd-row-2col{ grid-template-columns:1fr; } }
+.vs-pd-form .vs-pd-lbl{ font-size:12px; font-weight:700; color:var(--text-primary,#0f172a); }
+.main-content[data-theme="dark"] .vs-pd-form .vs-pd-lbl{ color:#e9eef5; }
+.vs-pd-stat{ font-size:12.5px; margin-top:10px; min-height:18px; }
+.vs-pd-stat.ok{ color:#16a34a; }
+.vs-pd-stat.err{ color:#dc2626; }
+
+/* A fuvartáblás sor-menü „📋 Post-livrare" gombjának 3 mini-pötty jelzője */
+.vs-pd-mini{ font-size:11px; letter-spacing:1px; line-height:1; }
+
+/* Post-delivery chip-ek elkülönítő függőleges vonal */
+.vs-chip-sep{
+  display:inline-block; width:1px; height:22px; margin:0 4px;
+  background:rgba(148,163,184,0.35); vertical-align:middle;
+}
+.vs-chip-pd{ font-weight:700; }
