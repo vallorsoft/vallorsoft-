@@ -2655,6 +2655,19 @@
     'fe.dc.balRon':     { ro: 'Rest de plată (RON)', hu: 'Hátralék (RON)' },
     'fe.dc.balCombined':{ ro: 'Total combinat', hu: 'Kombinált összesen' },
     'fe.dc.combinedNote':{ ro: 'EUR convertit la BNR curent', hu: 'EUR mai BNR-en átszámolva' },
+    // Cross-currency beszámítás — RON-túlfizetés → EUR-adósság csökkentés
+    // (és fordítva). A mai BNR-en számol; a magyarázó sor az egyenleg-kártya
+    // alatt jelenik meg, csak akkor, ha ténylegesen történt átváltás.
+    'fe.dc.crossTitle':  { ro: 'Compensare între valute', hu: 'Cross-valuta beszámítás' },
+    'fe.dc.crossRonToEur': { ro: 'Surplus RON aplicat pe restanța EUR', hu: 'RON-túlfizetés levonva az EUR-járandóságból' },
+    'fe.dc.crossEurToRon': { ro: 'Surplus EUR aplicat pe restanța RON', hu: 'EUR-túlfizetés levonva a RON-járandóságból' },
+    'fe.dc.crossAt':      { ro: 'la BNR', hu: 'BNR-en' },
+    'fe.dc.crossRaw':     { ro: 'brut', hu: 'nyers' },
+    // 🧾 Kifizetés-történet — a payments-only nyomtatható dokumentum
+    'fe.ph.openBtn':      { ro: 'Istoric plăți', hu: 'Kifizetés-történet' },
+    'fe.ph.openTitle':    { ro: 'Deschide istoricul plăților ca document oficial', hu: 'Kifizetés-történet nyomtatható hivatalos papírként' },
+    'fe.ph.docTitle':     { ro: 'ISTORIC PLĂȚI', hu: 'KIFIZETÉS-TÖRTÉNET' },
+    'fe.ph.emailSubject': { ro: 'Istoric plăți șofer', hu: 'Sofőr kifizetés-történet' },
     'fe.dc.loadFirst':  { ro: 'Încarcă mai întâi decontul șoferului.', hu: 'Előbb töltsd be a sofőr elszámolását.' },
     'fe.dc.legacyTitle':{ ro: 'Casă & foi de parcurs (versiunea clasică)', hu: 'Kassza & menetlevelek (klasszikus nézet)' },
 

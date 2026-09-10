@@ -784,12 +784,46 @@
       + '</div>';
 
     var ronAll = b.ron_all;
+
+    // Cross-currency beszámítás magyarázat — csak akkor jelenik meg, ha volt átváltás
+    var crossHtml = '';
+    var cRonToEur = b.cross_ron_to_eur || 0;
+    var cEurToRon = b.cross_eur_to_ron || 0;
+    if (cRonToEur > 0 && bnr != null) {
+      var eurRaw = b.eur_raw != null ? b.eur_raw : (b.eur || 0);
+      var ronRaw = b.ron_raw != null ? b.ron_raw : (b.ron || 0);
+      var ronApplied = _round2Local(cRonToEur * bnr);
+      crossHtml = '<div class="dc-cross-line">'
+        + '<span>🔁 <b>' + t('fe.dc.crossTitle') + ':</b> '
+        + t('fe.dc.crossRonToEur', 'RON-túlfizetés levonva EUR-jár.-ból')
+        + ' — ' + n2(ronApplied, 2) + ' RON → ' + n2(cRonToEur, 2) + ' EUR '
+        + '<span class="text-muted" style="font-size:12px;">('
+        + t('fe.dc.crossAt') + ' 1 EUR = ' + n2(bnr, 4) + ' RON; '
+        + t('fe.dc.crossRaw') + ': ' + n2(eurRaw, 2) + ' EUR / ' + n2(ronRaw, 2) + ' RON)</span>'
+        + '</span></div>';
+    } else if (cEurToRon > 0 && bnr != null) {
+      var eurRaw2 = b.eur_raw != null ? b.eur_raw : (b.eur || 0);
+      var ronRaw2 = b.ron_raw != null ? b.ron_raw : (b.ron || 0);
+      var eurApplied = _round2Local(cEurToRon / bnr);
+      crossHtml = '<div class="dc-cross-line">'
+        + '<span>🔁 <b>' + t('fe.dc.crossTitle') + ':</b> '
+        + t('fe.dc.crossEurToRon', 'EUR-túlfizetés levonva RON-jár.-ból')
+        + ' — ' + n2(eurApplied, 2) + ' EUR → ' + n2(cEurToRon, 2) + ' RON '
+        + '<span class="text-muted" style="font-size:12px;">('
+        + t('fe.dc.crossAt') + ' 1 EUR = ' + n2(bnr, 4) + ' RON; '
+        + t('fe.dc.crossRaw') + ': ' + n2(eurRaw2, 2) + ' EUR / ' + n2(ronRaw2, 2) + ' RON)</span>'
+        + '</span></div>';
+    }
+
     var payButtons =
       '<div class="dc-pay-actions">'
       + '<button class="btn primary" onclick="FleetExtra.dcOpenPayment(\'partial\')">💵 '
         + t('fe.pm.payPartial') + '</button>'
       + '<button class="btn ok" onclick="FleetExtra.dcOpenPayment(\'full\')">✅ '
         + t('fe.pm.payFull') + '</button>'
+      + '<button class="btn ghost" onclick="FleetExtra.dcOpenPayHistory()" title="'
+        + t('fe.ph.openTitle') + '">🧾 '
+        + t('fe.ph.openBtn') + '</button>'
       + '</div>';
 
     var bnrLine = '<div class="dc-bnr-line">'
@@ -805,8 +839,11 @@
           : '')
       + '</div>';
 
-    return tiles + bnrLine + payButtons;
+    return tiles + crossHtml + bnrLine + payButtons;
   }
+
+  // Kliens-oldali 2-jegyű kerekítés (a szerveres _round2 hívása helyett)
+  function _round2Local(v) { return Math.round((+v || 0) * 100) / 100; }
 
   // ── Járandóság-felvitel kártya (kind + qty × unit_amount + currency) ──
   function _dcEarningForm(email) {
@@ -2213,6 +2250,9 @@
   //  ezzel az azonos HTML-lel megy a KÖZÖS VallorSoft feladóról.
   // ════════════════════════════════════════════════════════
   var _dcSheet = null; // legutóbbi getMonthlySettlementSheet válasz
+  // Sheet render mód: 'full' = teljes decont (járandóság+kifizetés+egyenleg);
+  // 'payments-only' = 🧾 Kifizetés-történet (csak kifizetés-tábla + kifizetve total).
+  var _dcSheetMode = 'full';
   var _MONTHS_RO = ['Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie'];
   var _MONTHS_HU = ['Január','Február','Március','Április','Május','Június','Július','Augusztus','Szeptember','Október','November','December'];
 
@@ -2313,6 +2353,7 @@
   }
   function dcOpenSettlement() {
     if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    _dcSheetMode = 'full';
     _dcEnsureSheetModal();
     var m = document.getElementById('dcSheetModal');
     // Alapérték: e havi időszak (elmúlt "hónap" preset a leggyakoribb, de a
@@ -2326,6 +2367,35 @@
       if (tEl) tEl.value = r0.to;
       var thisBtn = document.querySelector('#dcSheetModal .dc-preset[data-preset="thisMonth"]');
       if (thisBtn) thisBtn.classList.add('active');
+    }
+    m.classList.add('open');
+    dcSheetReload();
+  }
+
+  // 🧾 Kifizetés-történet — a felhasználó által kért „csak fejléces hivatalos
+  // papírként" nyomtatható kifizetés-lista tetszőleges időszakra. Ugyanaz a
+  // modal, ugyanaz a `getMonthlySettlementSheet` handler; a render átvált
+  // payments-only módra (nincs járandóság-tábla, nincs egyenleg-blokk,
+  // a fejléc-badge új szöveggel + „Rolling 12M" preset alapból).
+  function dcOpenPayHistory() {
+    if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    _dcSheetMode = 'payments-only';
+    _dcEnsureSheetModal();
+    var m = document.getElementById('dcSheetModal');
+    // A kifizetés-történet defaultja a rolling 12 hónap (a felhasználó
+    // kifejezetten 1 éves nyomtatást kért; a szélesebb intervallum a szerver
+    // 2 éves korlátjáig kézzel is bővíthető). MINDIG felülírja a mezőt, hogy
+    // a Decont lunar-ból váltás után is a rolling 12M kerüljön be.
+    var fEl = document.getElementById('dcStFrom');
+    var tEl = document.getElementById('dcStTo');
+    if (fEl && tEl) {
+      var r0 = _dcPresetRange('year');
+      fEl.value = r0.from;
+      tEl.value = r0.to;
+      var actives = document.querySelectorAll('#dcSheetModal .dc-preset.active');
+      for (var i = 0; i < actives.length; i++) actives[i].classList.remove('active');
+      var yearBtn = document.querySelector('#dcSheetModal .dc-preset[data-preset="year"]');
+      if (yearBtn) yearBtn.classList.add('active');
     }
     m.classList.add('open');
     dcSheetReload();
@@ -2366,6 +2436,7 @@
     var isSingleMonth = (p.year && p.month);
     var monthLbl = isSingleMonth ? _dcMonthLabel(p.year, p.month) : (d2(p.from) + ' → ' + d2(p.to));
     var lang = (window.I18N && window.I18N.getLang && window.I18N.getLang()) || 'ro';
+    var payOnly = (_dcSheetMode === 'payments-only');
 
     // Járandóság-sorok
     var eRows = (r.earnings || []).map(function (it) {
@@ -2430,11 +2501,12 @@
       +       compAdresa + compMetaLine
       +     '</td>'
       +     '<td style="vertical-align:middle;text-align:right;width:230px;">'
-      +       '<div style="display:inline-block;padding:9px 16px;background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;border-radius:8px;font-weight:800;font-size:14px;letter-spacing:0.3px;">'
-      +         t(isSingleMonth ? 'fe.st.title' : 'fe.st.titleRange')
+      +       '<div style="display:inline-block;padding:9px 16px;background:linear-gradient(135deg,'
+      +         (payOnly ? '#16a34a,#15803d' : '#2563eb,#1e40af') + ');color:#fff;border-radius:8px;font-weight:800;font-size:14px;letter-spacing:0.3px;">'
+      +         t(payOnly ? 'fe.ph.docTitle' : (isSingleMonth ? 'fe.st.title' : 'fe.st.titleRange'))
       +       '</div>'
       +       '<div style="font-size:13px;color:#0f172a;font-weight:700;margin-top:6px;">' + esc(monthLbl) + '</div>'
-      +       (isSingleMonth
+      +       (isSingleMonth && !payOnly
         ? '<div style="font-size:11px;color:#6b7280;margin-top:2px;">' + t('fe.st.period') + ': ' + d2(p.from) + ' → ' + d2(p.to) + '</div>'
         : '')
       +     '</td>'
@@ -2448,24 +2520,25 @@
       +   '<div style="font-size:15px;font-weight:700;color:#0f172a;">' + esc(d.nume) + '</div>'
       +   '<div style="font-size:11px;color:#6b7280;">' + esc(d.email) + (d.tel ? ' · ' + esc(d.tel) : '') + '</div>'
       + '</div>'
-      // Járandóság-tábla
-      + '<div style="font-size:14px;font-weight:700;color:#0f172a;margin:12px 0 6px;">📥 ' + t('fe.st.earningsTitle') + ' (' + (r.earnings || []).length + ')</div>'
-      + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-      +   '<thead><tr style="background:#e0e7ff;color:#1e293b;">'
-      +     '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colDate') + '</th>'
-      +     '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colKind') + '</th>'
-      +     '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colLabel') + '</th>'
-      +     '<th style="padding:6px 8px;text-align:right;">' + t('fe.de.colCalc') + '</th>'
-      +     '<th style="padding:6px 8px;text-align:right;">' + t('fe.de.colTotal') + '</th>'
-      +   '</tr></thead>'
-      +   '<tbody>' + eRows + '</tbody>'
-      +   '<tfoot><tr style="background:#f1f5f9;font-weight:800;">'
-      +     '<td colspan="4" style="padding:8px;text-align:right;">' + t('fe.st.totalEarned') + ':</td>'
-      +     '<td style="padding:8px;text-align:right;">'
-      +       n2(totE.eur || 0, 2) + ' EUR &nbsp; · &nbsp; ' + n2(totE.ron || 0, 2) + ' RON'
-      +     '</td>'
-      +   '</tr></tfoot>'
-      + '</table>'
+      // Járandóság-tábla — payments-only módban KIHAGYVA
+      + (payOnly ? '' :
+        '<div style="font-size:14px;font-weight:700;color:#0f172a;margin:12px 0 6px;">📥 ' + t('fe.st.earningsTitle') + ' (' + (r.earnings || []).length + ')</div>'
+        + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+        +   '<thead><tr style="background:#e0e7ff;color:#1e293b;">'
+        +     '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colDate') + '</th>'
+        +     '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colKind') + '</th>'
+        +     '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colLabel') + '</th>'
+        +     '<th style="padding:6px 8px;text-align:right;">' + t('fe.de.colCalc') + '</th>'
+        +     '<th style="padding:6px 8px;text-align:right;">' + t('fe.de.colTotal') + '</th>'
+        +   '</tr></thead>'
+        +   '<tbody>' + eRows + '</tbody>'
+        +   '<tfoot><tr style="background:#f1f5f9;font-weight:800;">'
+        +     '<td colspan="4" style="padding:8px;text-align:right;">' + t('fe.st.totalEarned') + ':</td>'
+        +     '<td style="padding:8px;text-align:right;">'
+        +       n2(totE.eur || 0, 2) + ' EUR &nbsp; · &nbsp; ' + n2(totE.ron || 0, 2) + ' RON'
+        +     '</td>'
+        +   '</tr></tfoot>'
+        + '</table>')
       // Kifizetés-tábla
       + '<div style="font-size:14px;font-weight:700;color:#0f172a;margin:16px 0 6px;">💸 ' + t('fe.st.paymentsTitle') + ' (' + (r.payments || []).length + ')</div>'
       + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
@@ -2484,29 +2557,31 @@
       +     '</td>'
       +   '</tr></tfoot>'
       + '</table>'
-      // Egyenleg-kártya
-      + '<div style="margin-top:18px;padding:14px 18px;border:2px solid #2563eb;border-radius:10px;background:#eff6ff;">'
-      +   '<div style="font-size:13px;font-weight:700;color:#1e40af;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">'
-      +     '⚖️ ' + t('fe.st.balance') + '</div>'
-      +   '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
-      +     '<tr>'
-      +       '<td style="padding:4px 0;">' + t('fe.dc.balEur') + ':</td>'
-      +       '<td style="padding:4px 0;text-align:right;font-weight:800;color:' + ((totB.eur || 0) > 0 ? '#dc2626' : '#16a34a') + ';">'
-      +         n2(totB.eur || 0, 2) + ' EUR</td>'
-      +     '</tr>'
-      +     '<tr>'
-      +       '<td style="padding:4px 0;">' + t('fe.dc.balRon') + ':</td>'
-      +       '<td style="padding:4px 0;text-align:right;font-weight:800;color:' + ((totB.ron || 0) > 0 ? '#dc2626' : '#16a34a') + ';">'
-      +         n2(totB.ron || 0, 2) + ' RON</td>'
-      +     '</tr>'
-      +     (totB.ron_all != null && bnr != null
-        ? '<tr><td style="padding:4px 0;border-top:1px dashed #93c5fd;color:#475569;font-size:12px;">'
-          + t('fe.dc.balCombined') + ' <span style="color:#94a3b8;">(BNR 1 EUR = ' + n2(bnr, 4) + ')</span>:</td>'
-          + '<td style="padding:4px 0;border-top:1px dashed #93c5fd;text-align:right;font-weight:800;color:#1e40af;font-size:15px;">'
-          + n2(totB.ron_all, 2) + ' RON</td></tr>'
-        : '')
-      +   '</table>'
-      + '</div>'
+      // Egyenleg-kártya — payments-only módban KIHAGYVA (a történet-nyomtatás
+      // csak a kifizetéseket dokumentálja, egyenleget nem)
+      + (payOnly ? '' :
+        '<div style="margin-top:18px;padding:14px 18px;border:2px solid #2563eb;border-radius:10px;background:#eff6ff;">'
+        +   '<div style="font-size:13px;font-weight:700;color:#1e40af;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">'
+        +     '⚖️ ' + t('fe.st.balance') + '</div>'
+        +   '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
+        +     '<tr>'
+        +       '<td style="padding:4px 0;">' + t('fe.dc.balEur') + ':</td>'
+        +       '<td style="padding:4px 0;text-align:right;font-weight:800;color:' + ((totB.eur || 0) > 0 ? '#dc2626' : '#16a34a') + ';">'
+        +         n2(totB.eur || 0, 2) + ' EUR</td>'
+        +     '</tr>'
+        +     '<tr>'
+        +       '<td style="padding:4px 0;">' + t('fe.dc.balRon') + ':</td>'
+        +       '<td style="padding:4px 0;text-align:right;font-weight:800;color:' + ((totB.ron || 0) > 0 ? '#dc2626' : '#16a34a') + ';">'
+        +         n2(totB.ron || 0, 2) + ' RON</td>'
+        +     '</tr>'
+        +     (totB.ron_all != null && bnr != null
+          ? '<tr><td style="padding:4px 0;border-top:1px dashed #93c5fd;color:#475569;font-size:12px;">'
+            + t('fe.dc.balCombined') + ' <span style="color:#94a3b8;">(BNR 1 EUR = ' + n2(bnr, 4) + ')</span>:</td>'
+            + '<td style="padding:4px 0;border-top:1px dashed #93c5fd;text-align:right;font-weight:800;color:#1e40af;font-size:15px;">'
+            + n2(totB.ron_all, 2) + ' RON</td></tr>'
+          : '')
+        +   '</table>'
+        + '</div>')
       // Aláíró blokk (cég-oldalon a pecsét ráégetve — ha van feltöltve)
       + '<table style="width:100%;border-collapse:collapse;margin-top:36px;">'
       +   '<tr>'
@@ -2545,7 +2620,10 @@
     var w = window.open('', '_blank');
     if (!w) { toast(t('fe.st.popupBlocked'), 'err'); return; }
     var lang = (window.I18N && window.I18N.getLang && window.I18N.getLang()) || 'ro';
-    var title = t('fe.st.title') + ' — ' + (_dcSheet.driver.nume || '') + ' — ' + _dcMonthLabel(_dcSheet.period.year, _dcSheet.period.month);
+    var _p = _dcSheet.period || {};
+    var _perLbl = (_p.year && _p.month) ? _dcMonthLabel(_p.year, _p.month) : (d2(_p.from) + ' → ' + d2(_p.to));
+    var _tKey = (_dcSheetMode === 'payments-only') ? 'fe.ph.docTitle' : 'fe.st.title';
+    var title = t(_tKey) + ' — ' + (_dcSheet.driver.nume || '') + ' — ' + _perLbl;
     w.document.write(
       '<!doctype html><html lang="' + lang + '"><head><meta charset="utf-8"><title>' + esc(title) + '</title>'
       + '<style>body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#0f172a;background:#fff;}'
@@ -2569,7 +2647,10 @@
     var to = window.prompt(t('fe.st.emailPrompt'), toDefault);
     if (!to) return;
     to = String(to).trim().toLowerCase();
-    var subject = t('fe.st.emailSubject') + ' · ' + _dcMonthLabel(_dcSheet.period.year, _dcSheet.period.month) + ' · ' + _dcSheet.driver.nume;
+    var _p2 = _dcSheet.period || {};
+    var _perLbl2 = (_p2.year && _p2.month) ? _dcMonthLabel(_p2.year, _p2.month) : (d2(_p2.from) + ' → ' + d2(_p2.to));
+    var _sKey = (_dcSheetMode === 'payments-only') ? 'fe.ph.emailSubject' : 'fe.st.emailSubject';
+    var subject = t(_sKey) + ' · ' + _perLbl2 + ' · ' + _dcSheet.driver.nume;
     gas('sendSettlementSheetEmail', [{ to: to, subject: subject, html: doc.outerHTML }]).then(function (r) {
       if (r && r.ok) toast(t('fe.st.emailSent'), 'ok');
       else toast((r && r.err) || t('common.error'), 'err');
@@ -3136,6 +3217,8 @@
     dcKindDelete: dcKindDelete,
     // Havi elszámolás-lap (📄 PDF/nyomtatható + e-mail)
     dcOpenSettlement: dcOpenSettlement,
+    // 🧾 Kifizetés-történet (payments-only mód, ugyanaz a sheet-modal)
+    dcOpenPayHistory: dcOpenPayHistory,
     dcSheetClose: dcSheetClose,
     dcSheetReload: dcSheetReload,
     dcSheetPreset: dcSheetPreset,

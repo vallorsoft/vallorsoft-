@@ -398,6 +398,97 @@ describe('getDriverBalance', () => {
     expect(res.body.result.balance.ron_all).toBe(1515);
     expect(res.body.result.bnr_rate).toBe(5.05);
   });
+
+  test('cross-currency: EUR jár + RON túlfizetés → RON felesleg beszámítva EUR-ra', async () => {
+    // Peto-eset (a felhasználó képernyőképéből):
+    // Járandóság: 510 EUR + 45 RON; Kifizetve: 0 EUR + 937 RON; BNR: 5.05
+    // Raw: bal_eur = 510, bal_ron = -892 (túlfizetés)
+    // Cross: 892 / 5.05 = 176.6337 EUR → 176.63 EUR-t levonunk az EUR-ból
+    //        892 - 176.6337 * 5.05 ≈ 0 (0.0001 közelítés)
+    // Végleges: bal_eur ≈ 333.37, bal_ron ≈ 0
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValueOnce(5.05);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ nume: 'Peto' }]))
+      .mockResolvedValueOnce(rows([
+        { currency: 'EUR', total: 510, db: 3 },
+        { currency: 'RON', total: 45,  db: 1 },
+      ]))
+      .mockResolvedValueOnce(rows([
+        { currency: 'RON', total: 937, total_ron: 937, db: 2 },
+      ]))
+      .mockResolvedValueOnce(rows([]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getDriverBalance',
+      arguments: [{ email: 'sofer@ceg.hu' }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.earned.eur).toBe(510);
+    expect(res.body.result.earned.ron).toBe(45);
+    expect(res.body.result.paid.eur).toBe(0);
+    expect(res.body.result.paid.ron).toBe(937);
+    // Beszámolt (végső) egyenleg — a mezők most a settled értékek
+    expect(res.body.result.balance.eur).toBeCloseTo(333.37, 1);
+    expect(Math.abs(res.body.result.balance.ron)).toBeLessThan(0.5);
+    // Cross-settlement audit-mező
+    expect(res.body.result.balance.cross_ron_to_eur).toBeCloseTo(176.63, 1);
+    expect(res.body.result.balance.cross_eur_to_ron).toBe(0);
+    // Raw (beszámolás előtti) értékek is megvannak
+    expect(res.body.result.balance.eur_raw).toBe(510);
+    expect(res.body.result.balance.ron_raw).toBe(-892);
+  });
+
+  test('cross-currency: RON jár + EUR túlfizetés → EUR felesleg beszámítva RON-ra', async () => {
+    // Fordított irány: 100 EUR jár + 1000 RON jár; 300 EUR fizetve (200 túl)
+    // Raw: bal_eur = -200, bal_ron = 1000
+    // 200 EUR × 5.00 = 1000 RON credit → teljesen fedezi
+    // Végleges: bal_eur = 0, bal_ron = 0
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValueOnce(5.00);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ nume: 'X' }]))
+      .mockResolvedValueOnce(rows([
+        { currency: 'EUR', total: 100,  db: 1 },
+        { currency: 'RON', total: 1000, db: 1 },
+      ]))
+      .mockResolvedValueOnce(rows([
+        { currency: 'EUR', total: 300, total_ron: 1500, db: 1 },
+      ]))
+      .mockResolvedValueOnce(rows([]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getDriverBalance',
+      arguments: [{ email: 'sofer@ceg.hu' }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(Math.abs(res.body.result.balance.eur)).toBeLessThan(0.01);
+    expect(Math.abs(res.body.result.balance.ron)).toBeLessThan(0.01);
+    expect(res.body.result.balance.cross_eur_to_ron).toBe(1000);
+    expect(res.body.result.balance.eur_raw).toBe(-200);
+    expect(res.body.result.balance.ron_raw).toBe(1000);
+  });
+
+  test('cross-currency: BNR nem elérhető → nincs beszámítás, raw = settled', async () => {
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockRejectedValueOnce(new Error('nincs net'));
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ nume: 'X' }]))
+      .mockResolvedValueOnce(rows([{ currency: 'EUR', total: 510, db: 1 }]))
+      .mockResolvedValueOnce(rows([{ currency: 'RON', total: 937, total_ron: 937, db: 1 }]))
+      .mockResolvedValueOnce(rows([]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getDriverBalance',
+      arguments: [{ email: 'sofer@ceg.hu' }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.balance.eur).toBe(510);      // változatlan (nincs BNR)
+    expect(res.body.result.balance.ron).toBe(-937);
+    expect(res.body.result.balance.cross_ron_to_eur).toBe(0);
+    expect(res.body.result.balance.cross_eur_to_ron).toBe(0);
+    expect(res.body.result.bnr_rate).toBeNull();
+  });
 });
 
 // ═════════════════════════════════════════════
