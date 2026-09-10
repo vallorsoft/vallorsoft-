@@ -14,7 +14,21 @@
 
 ---
 
-## 2026-09-10 — Sofőr-elszámolás: EUR-tartozás beszámítása RON-túlfizetésből (mai BNR) + 🧾 Kifizetés-történet nyomtatható hivatalos papírként, branch `claude/signature-seal-document-management-5orqva`
+## 2026-09-10 — Sofőr-elszámolás: csoportos kifizetés a payment-listán EGY sorban + kattintásra lenyíló részletek (tételek + fiz. módok), branch `claude/signature-seal-document-management-5orqva`
+
+**Kérés:** „most egy olyant javits ha tobb tételt fizetünk ki a sofernek akkor a kifizeteseknel ne a teteleket mutasa hanem egy kizos kifizetest es arra rakatintva lenyiloan mutasa a teteleket". Eddig egy csoportos kifizetés (`earningPaymentGroupCreate` — pl. 1620 EUR utalás + 1900 EUR készpénz + 1000 RON készpénz = 3 `driver_payments` sor) 3 külön sorként jelent meg a payment-listán — a lista telivé vált, nehezen áttekinthető.
+
+1. **Kliens (`public/fleet-extra-v2.js` `_dcPaymentListHtml` refaktor):** a payment-lista `group_id` szerint csoportosít. Csoport nélküli szóló kifizetés VÁLTOZATLAN egy-soros marad; csoportos kifizetés (`group_id != null`) MOSTANTÓL egy összevont csoport-fejlécsor: `dátum + #groupId + ×N badge` · **egyedi módszerek listája** (lila-indigó gradiens `dc-method-multi` pilulában) · **összeg-mix** EUR + RON dupla formátumban (pl. „1620 EUR · 1000 RON") · `▸ chevron`. Kattintásra becsukható, mellette a MEGLÉVŐ 🖨️ Csoport-nyomtatás gomb változatlan (`event.stopPropagation`-nel elválasztva a sor-kattintástól).
+2. **Lenyíló részlet-panel** (`dc-pg-detail-row`) — lazy-load első nyitáskor (`gas('earningPaymentGroupGet', [{id}])`); a szerver már eleve visszaadja a `items`+`payments`+`group`+`driver`+`company` mezőket, nincs új szerver-handler. A panel 2 mini-tábla: **📥 Járandóság-tételek a csoportban** (dátum · kind-pirula · címke · qty×unit · összeg+valuta) + **💸 Fizetési módok** (dátum · method-pirula · összeg+valuta · BNR · RON-egyenérték · megjegyzés). A cache `body.dataset.loaded` — újranyitáskor nem tölt újra.
+3. **Új `dcPgToggleRow(gid)` (`public/fleet-extra-v2.js`)** — csoport-sor kinyitás/becsukás + `.open` osztály (a chevron `▸ → ▾` transform-mel forog, kiemelt kék→lila gradiens háttér). Regisztrálva a `window.FleetExtra` publikus API-ban.
+4. **CSS (`public/style.css` `#decontBox tr.dc-pg-row` + hozzátartozó blokk)** — csoport-sor kék→lila 5%-os alap-gradiens, hover 12%, nyitva 18% + 3px bal-akcens `inset box-shadow`; chevron rotate-transition; ×N counter chip; `dc-method-multi` pilula (`#6366f1 → #8b5cf6` gradiens, fehér); részlet-panel bal-3px kék keret + halvány `rgba(15,23,42,0.02)` bg + kompaktabb mini-tábla-fejléc. Világos + sötét téma; `@media 720px` alatt tömörítés.
+5. **i18n** — 4 új kulcs (`fe.pg.clickToExpand`/`rowMethods`/`itemsInGroup`/`paysInGroup`, RO-alap + HU). Cache-bust `?v=20260910crossph` → `?v=20260910paygroup` (admin.html + manager.html — style.css + i18n.js + fleet-extra-v2.js).
+6. **Nem érintett:** sor-szintű ✕ delete a szóló sorokon változatlan; csoport-elemek EGYENKÉNTI törlése az UI-ról szándékosan MEGSZŰNT (a csoport-nyomtatás lap újrahasznosítható a régi `earningPaymentGroupDelete`-tel a teljes csoport törlésére, ha kell). A `earningPaymentGroupGet` handler, a szerver-oldali validáció, a Decont oficial/lunar, a Kifizetés-történet (PR #433) mind érintetlen.
+7. **Teszt** — **1136 Jest zöld** (nincs regresszió — tisztán kliens-oldali UI-változtatás, a szerver + handlerek + adat-alak érintetlen).
+
+---
+
+## 2026-09-10 — Sofőr-elszámolás: EUR-tartozás beszámítása RON-túlfizetésből (mai BNR) + 🧾 Kifizetés-történet nyomtatható hivatalos papírként, PR #433
 
 **Kérés:** „a sofer elszamolasnal ha a sofernek euroba tartozunk es lejbe fizetjuk ki azt is vonja le a jarandosagbol az aznapi bnr árfolyamon + tudjak peldaul 1eves vagy szabad valasztasu kifizetest kinyomtatni csak ugy fejleces hivatalos papirkent". Konkrét Peto-eset a képernyőképéről: 510 EUR + 45 RON járandóság, 0 EUR + 937 RON kifizetve — a régi UI 510 EUR tartozást ÉS −892 RON túlfizetést mutatott (nem számította be egymással).
 

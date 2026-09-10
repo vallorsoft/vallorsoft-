@@ -2766,6 +2766,11 @@
     'fe.pg.printPrompt':  { ro: 'Deschizi tipărirea acum?', hu: 'Megnyitod a nyomtatást?' },
     'fe.pg.printGroup':   { ro: '🖨️ Printează grupul', hu: '🖨️ Csoport nyomtatása' },
     'fe.pg.partOfGroup':  { ro: 'Face parte din plata grupată #{id}', hu: 'A #{id} csoportos kifizetés része' },
+    // Csoport-sor a payment-listán (kattintható, lenyíló)
+    'fe.pg.clickToExpand':{ ro: 'Apasă pentru detalii', hu: 'Kattints a részletekhez' },
+    'fe.pg.rowMethods':   { ro: 'Metode de plată în grup', hu: 'Fizetési módok a csoportban' },
+    'fe.pg.itemsInGroup': { ro: 'Drepturi plătite în grup', hu: 'Csoportban kifizetett tételek' },
+    'fe.pg.paysInGroup':  { ro: 'Metode de plată', hu: 'Fizetési módok' },
     'fe.pg.printTitle':   { ro: 'Confirmare de plată grupată', hu: 'Csoportos kifizetés visszaigazolása' },
     'fe.pg.groupNr':      { ro: 'Grup nr.', hu: 'Csoport szám' },
     'fe.pg.equivRon':     { ro: '≈ RON la curs', hu: '≈ RON árfolyamon' },
