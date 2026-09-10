@@ -1299,9 +1299,38 @@ handlers.getDriverBalance = async function (req, res, args) {
     try { bnrRate = await fetchBnrEurRon(); } catch (_e) { bnrRate = null; }
     bnrRate = bnrRate != null ? _round4(bnrRate) : null;
 
-    const balEur = _round2((earned.EUR || 0) - (paid.EUR || 0));
-    const balRon = _round2((earned.RON || 0) - (paid.RON || 0));
-    // "Illusztratív" RON-egyenleg: EUR-tartozás mai BNR-en + RON-tartozás
+    // Nyers (valuta-specifikus) egyenleg
+    const balEurRaw = _round2((earned.EUR || 0) - (paid.EUR || 0));
+    const balRonRaw = _round2((earned.RON || 0) - (paid.RON || 0));
+
+    // Cross-currency settlement (mai BNR-en) — ha az egyik valutában TÚLFIZETÉS,
+    // a másikban meg TARTOZÁS van, a felesleget beszámítjuk. Példa: 510 EUR jár,
+    // 892 RON túlfizetés → 892 RON / BNR = ~176 EUR levonás → maradt 334 EUR.
+    // A `balance.eur`/`balance.ron` mostantól a beszámolt (végső fizetendő) érték.
+    // A `balance.eur_raw`/`ron_raw` a beszámolás előtti nyers érték (audit-célra).
+    let balEur = balEurRaw;
+    let balRon = balRonRaw;
+    let crossRonToEur = 0;  // ennyi EUR-adóssággal csökkent a RON-túlfizetésből
+    let crossEurToRon = 0;  // ennyi RON-adóssággal csökkent az EUR-túlfizetésből
+    if (bnrRate != null && bnrRate > 0) {
+      if (balEur > 0 && balRon < 0) {
+        const excessRon = -balRon;                // pozitív túlfizetés RON-ban
+        const eurCredit = excessRon / bnrRate;    // ennyi EUR-t fedez
+        const applied = Math.min(balEur, eurCredit);
+        balEur = _round2(balEur - applied);
+        balRon = _round2(balRon + applied * bnrRate);
+        crossRonToEur = _round2(applied);
+      } else if (balRon > 0 && balEur < 0) {
+        const excessEur = -balEur;
+        const ronCredit = excessEur * bnrRate;
+        const applied = Math.min(balRon, ronCredit);
+        balRon = _round2(balRon - applied);
+        balEur = _round2(balEur + applied / bnrRate);
+        crossEurToRon = _round2(applied);
+      }
+    }
+
+    // "Illusztratív" kombinált RON-egyenleg (a beszámolt értékből)
     const balRonAll = bnrRate != null
       ? _round2(balEur * bnrRate + balRon)
       : null;
@@ -1313,7 +1342,12 @@ handlers.getDriverBalance = async function (req, res, args) {
       paid:   { eur: _round2(paid.EUR),   ron: _round2(paid.RON),   count: paid.count,
                 paid_ron_total: _round2(paid.ron_total) },
       scheduled: { eur: _round2(scheduled.EUR), ron: _round2(scheduled.RON), count: scheduled.count },
-      balance: { eur: balEur, ron: balRon, ron_all: balRonAll },
+      balance: {
+        eur: balEur, ron: balRon, ron_all: balRonAll,
+        eur_raw: balEurRaw, ron_raw: balRonRaw,
+        cross_ron_to_eur: crossRonToEur,
+        cross_eur_to_ron: crossEurToRon
+      },
       bnr_rate: bnrRate
     } });
   } catch (err) {
