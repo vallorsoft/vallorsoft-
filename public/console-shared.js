@@ -1619,20 +1619,25 @@ function loadInternalDrivers(){
   gas('getDriverVehicleAssignments').then(function(r){
     var tbody = document.querySelector('#tblInternalDrivers tbody');
     if(!tbody) return;
-    if(!r || !r.ok){ tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">'+t('common.loadError')+'</td></tr>'; return; }
+    if(!r || !r.ok){ tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">'+t('common.loadError')+'</td></tr>'; return; }
     var list = r.drivers||[];
     var vehicles = r.vehicles||[];
     var trailers = r.trailers||[];
     if(!list.length){
-      tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;">'+t('cs.noIntDriver')+'</td></tr>';
+      tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px;">'+t('cs.noIntDriver')+'</td></tr>';
       return;
     }
-    // fejléc-frissítés (Jármű oszlop hozzáadása, ha még nincs)
+    // fejléc-frissítés (Jármű oszlop hozzáadása, ha még nincs).
+    // Az „Utolsó aktivitás" oszlop már a HTML-ben szerepel (5. helyen); a jármű
+    // oszlopot az „Utolsó aktivitás" ELÉ (3. helyre a Telefon után) illesztjük.
     var thead = document.querySelector('#tblInternalDrivers thead tr');
-    if(thead && thead.children.length === 4){
+    if(thead && !thead.querySelector('th[data-vs-veh-col]')){
       var th = document.createElement('th');
+      th.setAttribute('data-vs-veh-col', '1');
       th.textContent = t('cs.assignedVehicle');
-      thead.insertBefore(th, thead.children[3]);
+      // A "Utolsó aktivitás" fejléc a 4. cella (index 3) → elé rakjuk.
+      var beforeTh = thead.children[3] || null;
+      thead.insertBefore(th, beforeTh);
     }
     // XSS-védelem: a sor-adatot gyorsítótárból (index alapján) adjuk át, NEM HTML-attribútumba ágyazva
     window._vsIntDrvCache = list;
@@ -1671,6 +1676,7 @@ function loadInternalDrivers(){
         +gpsBadge
         +trailerSel
         +'</td>'
+        +'<td>'+vsLastActivityChip(d.last_activity_at)+'</td>'
         +'<td>'
         +'<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="EntityDetail.openDriver(window._vsIntDrvCache['+i+'].email, window._vsIntDrvCache['+i+'].nume)">'+t('ed.details')+'</button> '
         +'<button class="btn ghost" style="padding:4px 10px;font-size:12px;" onclick="editUser(window._vsIntDrvCache['+i+'])">'+t('cs.edit')+'</button> '
@@ -5079,6 +5085,168 @@ function vsAvatar(name){
 }
 window.vsAvatar = vsAvatar;
 
+// Utolsó aktivitás → színes chip: „X perce" / „Y órája" / „Z napja".
+// Zöld: <24 óra · Sárga: <7 nap · Szürke: régebbi vagy soha.
+// A tooltip a teljes ISO-időbélyeget mutatja (helyi formátum).
+function vsLastActivityChip(iso){
+  if(!iso) return '<span class="vs-la vs-la-never" title="'+esc(t('cs.dr.laNeverTip')||'Soha nem volt aktivitás')+'">—</span>';
+  var d = new Date(iso);
+  var ms = Date.now() - d.getTime();
+  if(!isFinite(ms) || ms < 0) return '<span class="vs-la vs-la-never">—</span>';
+  var mm = Math.floor(ms/60000);
+  var hh = Math.floor(ms/3600000);
+  var dd = Math.floor(ms/86400000);
+  var label, cls;
+  if(mm < 60){ label = t('cs.dr.laMinAgo',{n:mm||0}) || (mm+' perce'); cls = 'vs-la-green'; }
+  else if(hh < 24){ label = t('cs.dr.laHourAgo',{n:hh}) || (hh+' órája'); cls = 'vs-la-green'; }
+  else if(dd < 7){ label = t('cs.dr.laDayAgo',{n:dd}) || (dd+' napja'); cls = 'vs-la-yellow'; }
+  else{ label = t('cs.dr.laDayAgo',{n:dd}) || (dd+' napja'); cls = 'vs-la-gray'; }
+  var full = '';
+  try { full = d.toLocaleString(); } catch(_){ full = String(iso); }
+  return '<span class="vs-la '+cls+'" title="'+esc(full)+'">'+esc(label)+'</span>';
+}
+window.vsLastActivityChip = vsLastActivityChip;
+
+// ───────────────────────────────────────────────────────────────
+//  Inline sofőr csere popover — a fuvartáblán a sofőr névre kattintva.
+//  Használható: Admin/Manager, csak Intern/None fuvarra (Extern → szerkesztő).
+//  Backend: `comUpdate` — a szerver kezel status-léptetést + auto-párosítást.
+//  Cache: window._vsDrvSwapCache (getInternalDrivers). Első nyitáskor kérjük le.
+// ───────────────────────────────────────────────────────────────
+window._vsDrvSwapCache = null;
+function _vsDrvSwapEnsure(cb){
+  if(Array.isArray(window._vsDrvSwapCache)){ cb(window._vsDrvSwapCache); return; }
+  gas('getInternalDrivers').then(function(list){
+    window._vsDrvSwapCache = Array.isArray(list) ? list : [];
+    cb(window._vsDrvSwapCache);
+  }).catch(function(){ window._vsDrvSwapCache = []; cb([]); });
+}
+function _vsSoferInlineClose(){
+  var el = document.getElementById('vsSoferSwapPop');
+  if(el && el.parentNode){ el.parentNode.removeChild(el); }
+  document.removeEventListener('click', _vsSoferInlineOutside, true);
+  document.removeEventListener('keydown', _vsSoferInlineEsc, true);
+}
+function _vsSoferInlineOutside(e){
+  var pop = document.getElementById('vsSoferSwapPop');
+  if(!pop) return;
+  if(pop.contains(e.target)) return;
+  // Ha az anchor újra megkattintja, a click-handler előbb bezárja (toggle);
+  // ezt itt is támogatjuk: kattintás bárhol máshol → zárás.
+  _vsSoferInlineClose();
+}
+function _vsSoferInlineEsc(e){ if(e.key === 'Escape') _vsSoferInlineClose(); }
+function vsSoferInlineOpen(evt, orderId, anchor){
+  if(evt && evt.stopPropagation) evt.stopPropagation();
+  var existing = document.getElementById('vsSoferSwapPop');
+  if(existing){
+    var wasAnchor = existing.getAttribute('data-anchor-oid') === String(orderId);
+    _vsSoferInlineClose();
+    if(wasAnchor) return; // toggle: 2. kattintás → csak becsuk
+  }
+  _vsDrvSwapEnsure(function(drivers){
+    var pop = document.createElement('div');
+    pop.id = 'vsSoferSwapPop';
+    pop.setAttribute('data-anchor-oid', String(orderId));
+    pop.className = 'vs-drv-swap-pop';
+    // Téma tükrözése a body-ra csatolt popoveren (a téma a .main-content-en él).
+    try {
+      var _mc = document.getElementById('mainContent');
+      if(_mc){ pop.setAttribute('data-theme', _mc.getAttribute('data-theme') || 'light'); }
+    } catch(_){}
+    var rect = anchor.getBoundingClientRect();
+    // Pozicionálás: az anchor alá, ha nem fér el → fölé.
+    var W = 300, H = 320;
+    var top = rect.bottom + 4;
+    var left = rect.left;
+    if(top + H > window.innerHeight - 8) top = Math.max(8, rect.top - H - 4);
+    if(left + W > window.innerWidth - 8) left = Math.max(8, window.innerWidth - W - 8);
+    pop.style.top = top + 'px';
+    pop.style.left = left + 'px';
+    var opts = drivers.map(function(d){
+      var label = (d.nume || d.email || '—');
+      return '<button type="button" class="vs-drv-swap-item" data-email="'+esc(d.email)+'" data-nume="'+esc(d.nume||'')+'">'+
+        vsAvatar(d.nume||'')+'<span class="vs-drv-swap-name">'+esc(label)+'</span>'+
+        '<span class="vs-drv-swap-la">'+vsLastActivityChip(d.last_activity_at)+'</span>'+
+      '</button>';
+    }).join('');
+    if(!opts) opts = '<div class="vs-drv-swap-empty">'+esc(t('cs.noIntDriver')||'Nincs belső sofőr.')+'</div>';
+    pop.innerHTML =
+      '<div class="vs-drv-swap-head">'+
+        '<input type="search" class="vs-drv-swap-search" placeholder="'+esc(t('cs.dr.searchPh')||'Keresés név/e-mail…')+'" autocomplete="off">'+
+        '<button type="button" class="vs-drv-swap-x" title="'+esc(t('common.close')||'Bezárás')+'">×</button>'+
+      '</div>'+
+      '<div class="vs-drv-swap-body">'+opts+'</div>'+
+      '<div class="vs-drv-swap-foot">'+
+        '<button type="button" class="vs-drv-swap-clear">🚫 '+esc(t('cs.dr.swapClear')||'Kiosztás törlése')+'</button>'+
+      '</div>';
+    document.body.appendChild(pop);
+    var search = pop.querySelector('.vs-drv-swap-search');
+    var body = pop.querySelector('.vs-drv-swap-body');
+    function _filter(){
+      var q = (search.value||'').trim().toLowerCase();
+      body.querySelectorAll('.vs-drv-swap-item').forEach(function(btn){
+        var name = (btn.getAttribute('data-nume')||'').toLowerCase();
+        var em = (btn.getAttribute('data-email')||'').toLowerCase();
+        btn.style.display = (!q || name.indexOf(q)>=0 || em.indexOf(q)>=0) ? '' : 'none';
+      });
+    }
+    search.addEventListener('input', _filter);
+    setTimeout(function(){ try { search.focus(); } catch(_){} }, 20);
+    // Kiválasztás → comUpdate. A státuszt CSAK akkor küldjük, ha az aktuális
+    // fuvar még `Disponibil` (első kiosztás), vagy a sofőr törlésekor →
+    // Disponibil-ra állítunk. Már-Alocat/In Curs fuvarnál sofőr-cserekor a
+    // státuszhoz nem nyúlunk (megőrizzük az aktuálisat).
+    var curOrder = (window._ordersAllCache || []).find(function(x){ return String(x.id) === String(orderId); });
+    var curStatus = curOrder ? curOrder.status : null;
+    body.addEventListener('click', function(e){
+      var btn = e.target.closest && e.target.closest('.vs-drv-swap-item');
+      if(!btn) return;
+      e.preventDefault(); e.stopPropagation();
+      var email = btn.getAttribute('data-email');
+      var nume = btn.getAttribute('data-nume');
+      var payload = { email_sofer: email, nume_sofer: nume, sofer_type: 'Intern' };
+      // Első kiosztás: Disponibil-ról léptessük Alocat-ra (a szerver Disponibil→Alocat
+      // logikáját triggereljük). Egyébként érintetlen.
+      if (curStatus === 'Disponibil' || !curStatus) payload.status = 'Disponibil';
+      _vsSoferInlineApply(orderId, payload);
+    });
+    // Törlés (kiosztás bontása) → sofőr-mezők NULL. A státuszt csak akkor
+    // állítjuk Disponibil-ra, ha az aktuális Alocat/Extern (a kiosztás bontása
+    // logikus lépés). In Curs/Finalizat fuvar sofőrét nem javasoljuk törölni,
+    // de ha megteszik, a státuszhoz akkor sem nyúlunk (adatvesztés-védelem).
+    pop.querySelector('.vs-drv-swap-clear').addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      var payload = { email_sofer: null, nume_sofer: null, sofer_type: null };
+      if (curStatus === 'Alocat' || curStatus === 'Extern') payload.status = 'Disponibil';
+      _vsSoferInlineApply(orderId, payload);
+    });
+    pop.querySelector('.vs-drv-swap-x').addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      _vsSoferInlineClose();
+    });
+    // Kívüli kattintás / Esc → bezár
+    setTimeout(function(){
+      document.addEventListener('click', _vsSoferInlineOutside, true);
+      document.addEventListener('keydown', _vsSoferInlineEsc, true);
+    }, 0);
+  });
+}
+function _vsSoferInlineApply(orderId, payload){
+  _vsSoferInlineClose();
+  gas('comUpdate', [orderId, payload]).then(function(r){
+    if(r && r.ok){
+      toast(t('cs.dr.swapSaved')||'Kiosztás mentve.', 'ok');
+      if(typeof loadOrders === 'function') loadOrders();
+    } else {
+      toast((r && r.err) || (t('common.error')||'Hiba'), 'err');
+    }
+  }).catch(function(){
+    toast(t('common.error')||'Hiba', 'err');
+  });
+}
+window.vsSoferInlineOpen = vsSoferInlineOpen;
+
 // 📧 Sablonból e-mail egy fuvarhoz — a fuvar adatait a _ordersAllCache-ből
 // olvassa (idézőjel-biztos: nem inline-interpolált), és a közös dialógust nyitja.
 function vsSendOrderTplMail(orderId) {
@@ -5189,7 +5357,19 @@ function renderFilteredOrders(list) {
     // Sofőr cella: kör monogram-avatar (csak kinézet) + alap sofőr + váltások badge-del.
     // Az avatar a sofőr nevéből képzett 1-2 betű, determinisztikus színnel; a név
     // szövege/adat-logikája változatlan.
-    var soferCell = vslAvatar(soferInfo)+'<span class="vsl-driver-name">'+esc(soferInfo)+'</span>';
+    //
+    // Inline sofőr csere: a név-span kattinthatóvá válik BELSŐ (Intern vagy még
+    // ki nem osztott) fuvarra, Admin/Manager oldalán — kattintásra kereshető
+    // popover nyílik a cég belső sofőrjeivel + „Kiosztás törlése". Extern
+    // fuvarnál (cégnév) NEM kattintható → a szerkesztőben cserélhető.
+    var soferClickable = !isCancelled && c.sofer_type !== 'Extern';
+    var soferSpanCls = 'vsl-driver-name' + (soferClickable ? ' vsl-driver-clickable' : '');
+    var soferSpanAttr = soferClickable
+      ? ' onclick="vsSoferInlineOpen(event, \''+c.id+'\', this)" role="button" tabindex="0" '+
+        'title="'+esc(t('cs.ol.swapDriverTitle')||'Sofőr cserélése / kiosztása')+'" '+
+        'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();vsSoferInlineOpen(event, \''+c.id+'\', this);}"'
+      : '';
+    var soferCell = vslAvatar(soferInfo)+'<span class="'+soferSpanCls+'"'+soferSpanAttr+'>'+esc(soferInfo)+'</span>';
     if (legCount > 0) {
       soferCell += ' <span style="font-size:10px;background:rgba(99,102,241,0.15);color:#4f46e5;border:1px solid rgba(99,102,241,0.3);border-radius:6px;padding:1px 6px;white-space:nowrap;">+'+legCount+t('cs.ol.legBadge')+'</span>';
       soferCell += '<div style="margin-top:4px;">';
@@ -5580,6 +5760,9 @@ function openOrderEdit(id) {
       var stops = d.stops || [];
       if (o) { o.stops = stops; }
       if (!o) { toast(t('common.notFound'),'err'); return; }
+      // UIT stop-választóhoz cache-eljük a lerakó-stopokat (kind='delivery').
+      _oeUitStops = stops.filter(function(s){ return s && s.kind === 'delivery'; });
+      _oePopulateUitStopSelect();
       // ÚJ: egységes állomás-kártyák (interleaved, EGYETLEN igazságforrás).
       // MINDEN stop bekerül (nincs top/extras szétvágás → a bevitel sorrendje
       // pontosan megőrzött, a régi „mixup" bug megszűnik).
@@ -5749,6 +5932,28 @@ function openOrderEdit(id) {
 // A szerkesztő UIT-blokkja: a fuvarhoz tartozó összes UIT-kód listája (a
 // /api/orders/:id/uit-ról), + törlő gomb, + kép-megnyitás új tabon. Az új
 // UIT hozzáadását az `oeAddUit()` intézi (input → normalize → POST).
+//
+// Per-stop UIT (multi-drop): a lista stop szerint csoportosítva jelenik meg
+// — a fuvar-szintű (stop_id=NULL) blokk elöl, majd minden lerakó („Descărcare #N")
+// külön blokkban a hozzá tartozó UIT-okkal. Új UIT-nál a `oeUitStop` select
+// dönti el, melyik lerakóhoz kerüljön.
+function _oePopulateUitStopSelect() {
+  var sel = document.getElementById('oeUitStop');
+  if (!sel) return;
+  var stops = Array.isArray(_oeUitStops) ? _oeUitStops : [];
+  var opts = ['<option value="" data-i18n="edit.uitStopFree">' +
+    (t('edit.uitStopFree')||'Fuvar-szintű (minden lerakóra)') + '</option>'];
+  stops.forEach(function (s, i) {
+    var loc = s && s.loc ? String(s.loc) : '—';
+    var label = (t('sof.det.delivery')||'Lerakó') + ' #' + (i+1) + ' · ' + loc;
+    opts.push('<option value="' + esc(s.id) + '">' + esc(label) + '</option>');
+  });
+  sel.innerHTML = opts.join('');
+  // Ha csak 1 lerakó van, az alapértelmezett a "Fuvar-szintű" marad — a
+  // menedzser rendszerint kiíráskor általánosat ír be, a per-stop kötést
+  // csak multi-drop-nál akarja.
+}
+
 function loadOeUitList() {
   var wrap = document.getElementById('oeUitList');
   if (!wrap || !_oeOrderId) return;
@@ -5762,7 +5967,20 @@ function loadOeUitList() {
         if (window.I18N && I18N.apply) I18N.apply(wrap);
         return;
       }
-      wrap.innerHTML = items.map(function (u) {
+      // Csoportosítás: NULL (fuvar-szintű) + stop_id-nkénti bucket.
+      var stops = Array.isArray(_oeUitStops) ? _oeUitStops : [];
+      var stopMap = {};
+      stops.forEach(function (s, i) { stopMap[s.id] = { idx: i, loc: s.loc || '—' }; });
+      var freeItems = [];
+      var perStop = {}; // stop_id -> [items]
+      items.forEach(function (u) {
+        if (u.stop_id == null) freeItems.push(u);
+        else {
+          if (!perStop[u.stop_id]) perStop[u.stop_id] = [];
+          perStop[u.stop_id].push(u);
+        }
+      });
+      function _row(u) {
         var prettyCode = (window.UitFmt && window.UitFmt.format) ? window.UitFmt.format(u.uit_code) : u.uit_code;
         var srcLabel = u.source === 'ai-scan' ? '📷 AI' : '✋';
         var photoBtn = u.has_photo
@@ -5775,7 +5993,33 @@ function loadOeUitList() {
           '<button type="button" class="btn ghost" style="padding:4px 10px;font-size:11px;color:#93c5fd;" onclick="oeCopyUit(\'' + esc(prettyCode) + '\')" title="Vágólapra másolás">📋</button>' +
           '<button type="button" class="btn ghost" style="padding:4px 10px;font-size:11px;color:#f87171;" onclick="oeDeleteUit(' + u.id + ')" title="Törlés">✕</button>' +
         '</div>';
-      }).join('');
+      }
+      function _grpHeader(title, sub) {
+        return '<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.3px;margin:6px 0 2px;text-transform:uppercase;">' +
+          esc(title) + (sub ? ' <span style="color:var(--text-primary,#e9eef5);font-weight:500;text-transform:none;">· ' + esc(sub) + '</span>' : '') +
+        '</div>';
+      }
+      var html = '';
+      if (freeItems.length) {
+        html += _grpHeader(t('edit.uitGrpFree')||'🌐 Fuvar-szintű (minden lerakóra)', '');
+        html += freeItems.map(_row).join('');
+      }
+      // Stop-alapú csoportok — a stops sorrendjében (nem a UIT bevitel sorrendjében).
+      stops.forEach(function (s, i) {
+        var arr = perStop[s.id];
+        if (!arr || !arr.length) return;
+        html += _grpHeader((t('sof.det.delivery')||'Lerakó') + ' #' + (i+1), s.loc || '—');
+        html += arr.map(_row).join('');
+      });
+      // Árva sorok: olyan stop_id-jű UIT, amit már nem talál a stops listában
+      // (elméletileg nem lehet, mert a FK ON DELETE SET NULL, de védőháló).
+      Object.keys(perStop).forEach(function (sid) {
+        if (!stopMap[sid]) {
+          html += _grpHeader((t('edit.uitGrpOrphan')||'⚠️ Ismeretlen lerakó'), sid);
+          html += perStop[sid].map(_row).join('');
+        }
+      });
+      wrap.innerHTML = html;
     })
     .catch(function () { wrap.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:4px 0;">—</div>'; });
 }
@@ -5786,10 +6030,14 @@ function oeAddUit() {
   var raw = inp.value || '';
   var norm = (window.UitFmt && window.UitFmt.normalize) ? window.UitFmt.normalize(raw) : String(raw).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,16);
   if (!norm) { toast(t('cs.uit.needCode')||'Cod UIT lipsă.', 'err'); return; }
+  var stopSel = document.getElementById('oeUitStop');
+  var body = { uit_code: norm };
+  var sid = stopSel && stopSel.value ? parseInt(stopSel.value, 10) : null;
+  if (sid && Number.isFinite(sid) && sid > 0) body.stop_id = sid;
   fetch('/api/orders/' + encodeURIComponent(_oeOrderId) + '/uit', {
     method: 'POST', credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ uit_code: norm })
+    body: JSON.stringify(body)
   })
   .then(function (r) { return r.json().then(function(d){ return { ok:r.ok, d:d }; }); })
   .then(function (o) {

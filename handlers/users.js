@@ -66,23 +66,62 @@ handlers.getInternalDrivers = async function (req, res, args) {
       // A `contract_no`/`cnp`/`id_series`/`id_number` a `driver-personal-data.sql`
       // migrációból jön — a Decont oficial fejlécéhez. Best-effort: migráció
       // hiányában visszaesünk a régi (4-mezős) SELECT-re, hogy ne törjön a lista.
+      //
+      // `last_activity_at` — a sofőr legutóbbi eseménye a rendszerben (3 forrás
+      //   közül a legfrissebb): menetlevél `data_completare`, `border_crossings`,
+      //   `order_stops.done_at`. LATERAL sub-query, hogy a fő lista sose törjön
+      //   ha valamelyik tábla nincs migrálva. NULL, ha még nem volt semmi.
+      const actLateral = `
+        LEFT JOIN LATERAL (
+          SELECT MAX(ts) AS last_activity_at FROM (
+            SELECT MAX(f.data_completare) AS ts
+              FROM fuvarlevelek f
+              WHERE LOWER(f.email_sofer) = LOWER(u.email)
+            UNION ALL
+            SELECT MAX(bc.created_at) AS ts
+              FROM border_crossings bc
+              WHERE LOWER(bc.email_sofer) = LOWER(u.email)
+            UNION ALL
+            SELECT MAX(s.done_at) AS ts
+              FROM order_stops s
+              JOIN orders o ON o.id = s.order_id AND o.company_id = u.company_id
+              WHERE LOWER(o.email_sofer) = LOWER(u.email)
+                AND s.done_at IS NOT NULL
+          ) t
+        ) act ON true`;
       try {
         const r = await pool.query(
-          `SELECT id, nume, email, tel, contract_no, cnp, id_series, id_number
-             FROM users
-            WHERE company_id = $1 AND pozicio = 'Sofer'
-            ORDER BY nume`,
+          `SELECT u.id, u.nume, u.email, u.tel, u.contract_no, u.cnp, u.id_series, u.id_number,
+                  act.last_activity_at
+             FROM users u
+             ${actLateral}
+            WHERE u.company_id = $1 AND u.pozicio = 'Sofer'
+            ORDER BY u.nume`,
           [cid]
         );
         return res.json({ result: r.rows });
       } catch (_e) {
-        const rFb = await pool.query(
-          `SELECT id, nume, email, tel FROM users
-             WHERE company_id = $1 AND pozicio = 'Sofer'
-             ORDER BY nume`,
-          [cid]
-        );
-        return res.json({ result: rFb.rows });
+        // Ha bármi (pl. hiányzó tábla/oszlop a LATERAL-ben, vagy a driver-personal-data
+        // migráció még nem futott) → egyszerűbb query, aktivitás nélkül.
+        try {
+          const r2 = await pool.query(
+            `SELECT u.id, u.nume, u.email, u.tel, act.last_activity_at
+               FROM users u
+               ${actLateral}
+              WHERE u.company_id = $1 AND u.pozicio = 'Sofer'
+              ORDER BY u.nume`,
+            [cid]
+          );
+          return res.json({ result: r2.rows });
+        } catch (_e2) {
+          const rFb = await pool.query(
+            `SELECT id, nume, email, tel FROM users
+               WHERE company_id = $1 AND pozicio = 'Sofer'
+               ORDER BY nume`,
+            [cid]
+          );
+          return res.json({ result: rFb.rows });
+        }
       }
     } catch (e) {
       console.error('getInternalDrivers hiba:', e);
