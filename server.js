@@ -229,7 +229,7 @@ app.use((err, req, res, next) => {
 });
 
 // E-mail intake (beérkező megrendelések) — csak akkor fut, ha az INTAKE_IMAP_* be van állítva.
-const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup } = require('./services/scheduler');
+const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler } = require('./services/scheduler');
 startIntakeScheduler();
 startExpiryScheduler();
 startGpsMileageScheduler();
@@ -243,6 +243,8 @@ startCancelReminderScheduler();    // lemondás: utolsó-napi emlékeztető + le
 startStatsReportScheduler();       // Statisztika 2.0 időzített riportok (daily/weekly/monthly)
 startPaymentDueScheduler();        // Sofőr csoportos kifizetés: scheduled paid_at napján e-mail az adminnak
 startPdfWorkspaceCleanup();        // Aláírás/pecsét munkatér: >24h dokumentumok törlése (6 óránként)
+startMorningDigestScheduler();     // Reggeli összefoglaló (cégenként állítható, alap 07:00 Europe/Bucharest)
+startGpsDailyTrackScheduler();     // Napi GPS útvonal (breadcrumb) — 10 percenként, mozgás-szűrővel
 
 // Opcionális automatikus DB-mentés (alapból KI; BACKUP_ENABLED=true + BACKUP_DIR).
 require('./services/backup').startBackupScheduler();

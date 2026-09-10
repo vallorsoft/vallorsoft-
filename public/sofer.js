@@ -2532,6 +2532,23 @@ function wbLocDialog(kind, cb) {
   document.getElementById('wbLocTitle').textContent = isStart ? t('sof.wb.startTitle') : t('sof.wb.endTitle');
   document.getElementById('wbLocHint').textContent  = isStart ? t('sof.wb.startHint')  : t('sof.wb.endHint');
   document.getElementById('wbLocInput').value = lastLoc;
+  // GPS-alapú javaslat gomb — csak akkor jelenik meg, ha a sofőrnek van
+  // kiosztott járműve GPS-integrációval, és van érvényes reverse-geo cím.
+  // A gomb egy kattintással a jelenlegi helyszínt írja az input-ba.
+  var _gpsBtn = document.getElementById('wbLocGpsBtn');
+  if (_gpsBtn) {
+    var _addr = (_myAssignedVehicle && _myAssignedVehicle.current_address) || '';
+    if (_addr) {
+      _gpsBtn.style.display = '';
+      _gpsBtn.textContent = '📍 ' + t('sof.wb.gpsSuggestBtn', { addr: _addr });
+      _gpsBtn.onclick = function () {
+        var el = document.getElementById('wbLocInput'); if (el) el.value = _addr;
+      };
+    } else {
+      _gpsBtn.style.display = 'none';
+      _gpsBtn.onclick = null;
+    }
+  }
   document.getElementById('wbLocDate').value  = _todayLocalDate();
   // Az óra:perc KÖTELEZŐ, ezért a MOSTANI időt ajánljuk fel alapértéknek:
   // a sofőr az indulás/érkezés pillanatában nyitja meg ezt a párbeszédet,

@@ -6,8 +6,8 @@
   <title data-i18n="title.manager">vallorSoft - Manager Console</title>
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="/style.css?v=20260910r2">
-  <script src="/i18n.js?v=20260910r2"></script>
+  <link rel="stylesheet" href="/style.css?v=20260910r4">
+  <script src="/i18n.js?v=20260910r4"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -66,6 +66,7 @@
         <div class="sub-tab" data-tab="internal-drivers" data-i18n="nav.internalDrivers">Belső sofőrök</div>
         <div class="sub-tab" data-tab="external-drivers" data-i18n="nav.externalDrivers">Külső sofőrök</div>
         <div class="sub-tab" data-tab="active-fleet" data-i18n="nav.activeFleet">Aktív flotta</div>
+        <div class="sub-tab" data-tab="gps-daily-track" data-i18n="nav.gpsDaily">Napi útvonal (GPS)</div>
         <div class="sub-tab" data-tab="sofer-activity" data-i18n="nav.driverActivity">Sofőr-aktivitás</div>
         <div class="sub-tab" data-tab="expiries" data-i18n="nav.expiries">Lejáratok</div>
         <div class="sub-tab" data-tab="service-log" data-i18n="nav.service">Szerviz & karbantartás</div>
@@ -143,6 +144,7 @@
         <div class="sub-tab" data-tab="settings" data-i18n="nav.account">Fiók</div>
         <div class="sub-tab" data-tab="company-settings" data-i18n="nav.companySettings">Cég & arculat</div>
         <div class="sub-tab" data-tab="pdf-settings" data-i18n="nav.pdfSettings">PDF-sablonok</div>
+        <div class="sub-tab" data-tab="morning-digest" data-i18n="nav.morningDigest">Reggeli összefoglaló</div>
         <div class="sub-tab" data-tab="fav-locations" data-i18n="nav.favLocations">Kedvenc helyszínek</div>
       </div>
     </div>
@@ -662,6 +664,9 @@
     <!-- ── Sofőr-aktivitás (Flotta) — kártyás timeline + fotók fuvaronként ── -->
     <div class="pane hidden" data-pane="sofer-activity"><div id="driverActivityBox"></div></div>
 
+    <!-- ── Napi GPS útvonal (breadcrumb + Leaflet) ── -->
+    <div class="pane hidden" data-pane="gps-daily-track"><div id="gpsDailyTrackBox"></div></div>
+
     <!-- ── Aktív flotta (Flotta) — saját Leaflet térkép (#fleetMap, NEM dashMap) ── -->
     <div class="pane hidden" data-pane="active-fleet">
       <div class="glass" style="padding:22px;">
@@ -873,6 +878,11 @@
     <!-- PDF-sablonok pane -->
     <div class="pane hidden" data-pane="pdf-settings">
       <div id="pdfSettingsBox"></div>
+    </div>
+
+    <!-- Reggeli összefoglaló pane -->
+    <div class="pane hidden" data-pane="morning-digest">
+      <div id="morningDigestBox"></div>
     </div>
 
     <div class="pane hidden" data-pane="settings">
@@ -1488,7 +1498,7 @@
 <script src="/email-intake-card.js?v=20260616warm2"></script>
 <script src="/feature-catalog.js?v=20260618cgps2"></script>
 <script>window.__pwaInstallDefault=false;</script>
-<script src="/console-shared.js?v=20260910r2"></script>
+<script src="/console-shared.js?v=20260910r4"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 <script src="/console-pages.js?v=20260617b1"></script>
 <!-- ===== INTEGRACIOK (Manager: Ugyfelek + "Hol a kocsi?"; szamlazo/beallitas Admin-only) ===== -->
@@ -1506,6 +1516,8 @@
 <script src="/company-settings.js?v=20260827stamp"></script>
 <script src="/pdf-gallery.js?v=20260617tpl2"></script>
 <script src="/pdf-settings.js?v=20260617tpl"></script>
+<script src="/morning-digest.js?v=20260910r4"></script>
+<script src="/gps-daily-track.js?v=20260910r4"></script>
 <script src="/invoice-modal.js?v=20260614qa"></script>
 <script src="/invoices-out.js?v=20260618tpl2"></script>
 <script src="/payment-schedule.js?v=20260617c3"></script>

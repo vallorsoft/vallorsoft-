@@ -416,7 +416,30 @@ handlers.getMyAssignedVehicle = async function (req, res, args) {
            AND v.tip = 'Vontato' AND v.activ = TRUE
          ORDER BY v.rendszam LIMIT 1`,
         [cid, email]);
-      return res.json({ result: { ok: true, assigned: r.rows.length ? r.rows[0] : null } });
+      const row = r.rows.length ? r.rows[0] : null;
+      // GPS-pozíció + reverse-geo cím (Plecare pre-fill a menetlevélhez). Best-
+      // effort: ha nincs GPS-integráció / kulcs / párosítás, csak a jármű-adat
+      // megy vissza (a kliens akkor a mentett garázs-helyre esik vissza).
+      if (row) {
+        try {
+          const vp = require('../lib/vehiclePositions');
+          const rev = require('../lib/reverseGeo');
+          // getPositions cégre szűrve, aktív járművekre.
+          const posResp = await vp.getPositions(cid);
+          const positions = (posResp && Array.isArray(posResp.positions)) ? posResp.positions : [];
+          const plate = String(row.rendszam_camion || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+          const pos = positions.find(p =>
+            String(p.rendszam || '').toUpperCase().replace(/[^A-Z0-9]/g, '') === plate) || null;
+          if (pos && pos.lat != null && pos.lng != null) {
+            row.current_lat = Number(pos.lat);
+            row.current_lng = Number(pos.lng);
+            row.current_datetime = pos.datetime || null;
+            const rg = await rev.reverseGeocode(row.current_lat, row.current_lng, 'ro');
+            if (rg && rg.address) row.current_address = rg.address;
+          }
+        } catch (_) { /* csendben elnyeljük — a menetlevél garázs-fallback nélkül is működik */ }
+      }
+      return res.json({ result: { ok: true, assigned: row } });
     } catch (err) {
       console.error('getMyAssignedVehicle hiba:', err);
       return res.json({ result: { ok: false } });

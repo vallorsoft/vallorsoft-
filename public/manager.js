@@ -55,6 +55,8 @@ function loadTab(name){
     if(name==='internal-drivers') loadInternalDrivers();
     if(name==='company-settings' && window.CompanySettings) CompanySettings.mount('companySettingsBox');
     if(name==='pdf-settings' && window.PdfSettings) PdfSettings.mount('pdfSettingsBox');
+    if(name==='morning-digest' && typeof loadMorningDigest==='function') loadMorningDigest();
+    if(name==='gps-daily-track' && typeof loadGpsDailyTrack==='function') loadGpsDailyTrack();
     if(name==='chat'){ if(typeof loadWhatsappChatPane==='function') loadWhatsappChatPane(); }
     if(name==='signature'){ initAdminSigCanvas(); if(typeof loadPdfWorkspaceList==='function') loadPdfWorkspaceList(); }
   if(name==='clients' && window.ClientsPage){ ClientsPage.mount('clientsBox'); if(typeof loadClientPortalAccess==='function') loadClientPortalAccess(); }
