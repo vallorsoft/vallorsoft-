@@ -826,10 +826,21 @@
         + t('fe.ph.openBtn') + '</button>'
       + '</div>';
 
+    // BNR-forrás jelzés — a szerver megmondja, honnan jött a ráta (live/company/payments/null).
+    // Ha nem élő, halvány chip a mai BNR mögött, hogy a felhasználó lássa: a cross-settlement
+    // biztonsági fallbackből dolgozott (frissítheti a cég-beállításnál, vagy megvárja az élőt).
+    var bnrSrc = bal.bnr_source || (bnr != null ? 'live' : null);
+    var bnrSrcChip = '';
+    if (bnr != null && bnrSrc && bnrSrc !== 'live') {
+      var lbl = (bnrSrc === 'company') ? t('fe.dc.bnrSrcCompany')
+              : (bnrSrc === 'payments') ? t('fe.dc.bnrSrcPayments')
+              : '';
+      if (lbl) bnrSrcChip = ' <span class="dc-bnr-src">' + esc(lbl) + '</span>';
+    }
     var bnrLine = '<div class="dc-bnr-line">'
       + '<span>🏦 <b>' + t('fe.dc.bnrToday') + ':</b> '
       +   (bnr != null
-          ? '<span class="dc-bnr-val">1 EUR = ' + n2(bnr, 4) + ' RON</span>'
+          ? '<span class="dc-bnr-val">1 EUR = ' + n2(bnr, 4) + ' RON</span>' + bnrSrcChip
           : '<span class="text-muted">' + t('fe.dc.bnrNa') + '</span>')
       + '</span>'
       + (ronAll != null && bnr != null
@@ -2957,25 +2968,63 @@
     // A rendszer a háttérben elvégzi a mögöttes számítást:
     //   total_ron  = total_eur × BNR + total_ron  (a sofőr valós járandósága)
     //   diurna_eur = (total_ron − salariu_de_bază) / BNR
-    // A papírra CSAK a két jogcím kerül ki: Salariu de bază + Diurna.
-    // (Példa: 1700 EUR + 1000 RON @ BNR 5,20, bază 2700 RON →
-    //   9840 RON össz → 7140 RON diurna → 1373,08 EUR. A papír csak
-    //   „2700 RON alapbér + 1373,08 EUR diurna"-t mutat.)
+    // A papírra a két jogcím kerül ki: Salariu de bază + Diurna.
+    // Új: fent a járandóság-tételek összesítése — EUR / RON külön + a
+    // BNR-en számolt kombinált RON-érték (a sofőr azonnal lássa, mennyi az
+    // összjárandóság-nyers érték egy pénznemben átszámítva).
     var tot = r.totals || {};
     var totE = tot.earned || {};
     var totEur = Number(totE.eur || 0);
     var totRon = Number(totE.ron || 0);
     var totalMonthlyRon = (bnr != null) ? (totEur * bnr + totRon) : null;
+    var totEurAsRon = (bnr != null) ? (totEur * bnr) : null;
     var aboveBaseEur = (bnr != null && totalMonthlyRon != null && bnr > 0)
       ? (totalMonthlyRon - baseSal) / bnr : null;
     var aboveBaseRon = (aboveBaseEur != null && bnr != null) ? (aboveBaseEur * bnr) : null;
 
-    // Egyetlen tiszta összegző blokk — hivatalos hangvétel a sofőrnek adandó
-    // dokumentumhoz. Nincs Total EUR / Total RON / bontás / képlet.
-    // A diurna sor EUR + RON-egyenérték (BNR-en) — a sofőr azonnal lássa
-    // mindkét formátumban a napidíját.
+    // Tételek összesítése blokk — a HIVATALOS papíron is látszik.
+    // Csak akkor jelenik meg, ha van érdemi tétel-összeg (0-tól különböző);
+    // ha a BNR ismert, a `= Z RON` egyenérték is kiíródik az EUR mellé.
+    var totalsBlockHtml = '';
+    if (totEur > 0 || totRon > 0) {
+      totalsBlockHtml = ''
+        + '<div style="margin-top:14px;padding:14px 18px;border:2px solid #14532d;border-radius:10px;background:#f0fdf4;color:#0f172a;">'
+        +   '<div style="font-size:12px;font-weight:800;color:#14532d;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px;">'
+        +     '📋 ' + t('fe.stof.itemsTotalsTitle') + '</div>'
+        +   '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
+        + (totEur > 0
+          ? '<tr>'
+            + '<td style="padding:6px 0;font-weight:700;color:#0f172a;">' + t('fe.stof.itemsTotalEur') + ':</td>'
+            + '<td style="padding:6px 0;text-align:right;font-weight:800;color:#0f172a;">'
+            +   n2(totEur, 2) + ' EUR'
+            +   (totEurAsRon != null ? '<div style="font-size:12px;font-weight:700;color:#166534;margin-top:2px;">= ' + n2(totEurAsRon, 2) + ' RON</div>' : '')
+            + '</td>'
+            + '</tr>'
+          : '')
+        + (totRon > 0
+          ? '<tr>'
+            + '<td style="padding:6px 0;font-weight:700;color:#0f172a;">' + t('fe.stof.itemsTotalRon') + ':</td>'
+            + '<td style="padding:6px 0;text-align:right;font-weight:800;color:#0f172a;">'
+            +   n2(totRon, 2) + ' RON'
+            + '</td>'
+            + '</tr>'
+          : '')
+        + (totalMonthlyRon != null && (totEur > 0 && totRon > 0)
+          ? '<tr>'
+            + '<td style="padding:8px 0;border-top:1.5px solid #86efac;font-weight:800;color:#14532d;">' + t('fe.stof.itemsCombinedRon') + ':</td>'
+            + '<td style="padding:8px 0;border-top:1.5px solid #86efac;text-align:right;font-weight:900;color:#14532d;font-size:15px;">'
+            +   n2(totalMonthlyRon, 2) + ' RON'
+            + '</td>'
+            + '</tr>'
+          : '')
+        +   '</table>'
+        + '</div>';
+    }
+
+    // Kiemelt záró blokk — hivatalos hangvétel a sofőrnek adandó dokumentumhoz.
     return ''
-      + '<div style="margin-top:18px;padding:16px 20px;border:2.5px solid #7c2d12;border-radius:10px;background:#fff7ed;color:#0f172a;">'
+      + totalsBlockHtml
+      + '<div style="margin-top:14px;padding:16px 20px;border:2.5px solid #7c2d12;border-radius:10px;background:#fff7ed;color:#0f172a;">'
       +   '<div style="font-size:13px;font-weight:800;color:#7c2d12;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.4px;">'
       +     '📊 ' + t('fe.stof.summary') + '</div>'
       +   '<table style="width:100%;border-collapse:collapse;font-size:15px;">'

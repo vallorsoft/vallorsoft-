@@ -546,6 +546,40 @@ function _num(x) { const n = parseFloat(x); return Number.isFinite(n) ? n : null
 function _round2(n) { return Math.round(n * 100) / 100; }
 function _round4(n) { return Math.round(n * 10000) / 10000; }
 
+// Effektív BNR EUR/RON — mindig ad rátát, ha bárhol el van tárolva.
+// Prioritás:
+//   1) élő BNR (services/bnr.js live-fetch + 7 napos last-known-good cache);
+//   2) cég-szintű beállítás (`companies.eur_ron_rate` — a diszpécser is állítja);
+//   3) utolsó rögzített kifizetés BNR-je (`driver_payments.bnr_rate` legfrissebb).
+// Ez biztosítja, hogy a cross-currency beszámítás akkor is működjön, amikor a
+// BNR-endpoint pillanatnyilag elérhetetlen (WAF/proxy/hálózat). Cégre szűrt.
+async function _getEffectiveBnr(cid) {
+  // 1) élő + last-known-good
+  try {
+    const live = await fetchBnrEurRon();
+    if (live != null && Number(live) > 0) return { rate: _round4(Number(live)), source: 'live' };
+  } catch (_) {}
+  // 2) cég-szintű mentett ráta (eur_ron_rate a statisztikához)
+  try {
+    const cR = await pool.query('SELECT eur_ron_rate FROM companies WHERE id=$1', [cid]);
+    const r = cR.rows && cR.rows[0] && cR.rows[0].eur_ron_rate != null ? Number(cR.rows[0].eur_ron_rate) : null;
+    if (r != null && r > 0) return { rate: _round4(r), source: 'company' };
+  } catch (_) {}
+  // 3) utolsó tényleges kifizetés BNR-je (audit-lánc)
+  try {
+    const pR = await pool.query(
+      `SELECT bnr_rate FROM driver_payments
+        WHERE company_id=$1 AND bnr_rate IS NOT NULL AND bnr_rate > 0
+        ORDER BY paid_at DESC NULLS LAST, id DESC
+        LIMIT 1`,
+      [cid]
+    );
+    const r = pR.rows && pR.rows[0] && pR.rows[0].bnr_rate != null ? Number(pR.rows[0].bnr_rate) : null;
+    if (r != null && r > 0) return { rate: _round4(r), source: 'payments' };
+  } catch (_) {}
+  return { rate: null, source: null };
+}
+
 // GET — cégre + időszakra + sofőrre szűrt járandóság-lista
 handlers.earningList = async function (req, res, args) {
   try {
@@ -1294,10 +1328,11 @@ handlers.getDriverBalance = async function (req, res, args) {
       scheduled.count += parseInt(row.db, 10) || 0;
     }
 
-    // Aktuális BNR — a fennmaradó EUR-tartozás informatív RON-értékéhez
-    let bnrRate = null;
-    try { bnrRate = await fetchBnrEurRon(); } catch (_e) { bnrRate = null; }
-    bnrRate = bnrRate != null ? _round4(bnrRate) : null;
+    // Aktuális BNR — a fennmaradó EUR-tartozás informatív RON-értékéhez.
+    // Fallback-lánc (élő → cég-ráta → utolsó kifizetés) — a cross-currency
+    // beszámítás akkor is működik, ha a BNR-endpoint épp elérhetetlen.
+    const bnrInfo = await _getEffectiveBnr(cid);
+    const bnrRate = bnrInfo.rate;
 
     // Nyers (valuta-specifikus) egyenleg
     const balEurRaw = _round2((earned.EUR || 0) - (paid.EUR || 0));
@@ -1348,7 +1383,8 @@ handlers.getDriverBalance = async function (req, res, args) {
         cross_ron_to_eur: crossRonToEur,
         cross_eur_to_ron: crossEurToRon
       },
-      bnr_rate: bnrRate
+      bnr_rate: bnrRate,
+      bnr_source: bnrInfo.source
     } });
   } catch (err) {
     console.error('getDriverBalance hiba:', err);
@@ -1492,10 +1528,11 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
       const c = _cur(r.currency);
       paid[c] = (paid[c] || 0) + parseFloat(r.amount || 0);
     }
-    // Mai BNR — a kombinált RON-egyenleg informatív számításához
-    let bnrRate = null;
-    try { bnrRate = await fetchBnrEurRon(); } catch (_e) { bnrRate = null; }
-    bnrRate = bnrRate != null ? _round4(bnrRate) : null;
+    // Mai BNR — a kombinált RON-egyenleg informatív számításához.
+    // Fallback-lánc (élő → cég-ráta → utolsó kifizetés) — így a hivatalos
+    // paperen mindig van RON-átszámítás, ha bárhol el van tárolva a rátánk.
+    const bnrInfo = await _getEffectiveBnr(cid);
+    const bnrRate = bnrInfo.rate;
 
     const balEur = _round2((earned.EUR || 0) - (paid.EUR || 0));
     const balRon = _round2((earned.RON || 0) - (paid.RON || 0));
@@ -1529,6 +1566,7 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
         paid:   { eur: _round2(paid.EUR),   ron: _round2(paid.RON),   count: pR.rows.length },
         balance:{ eur: balEur, ron: balRon, ron_all: balRonAll },
         bnr_rate: bnrRate,
+        bnr_source: bnrInfo.source,
       },
     } });
   } catch (err) {

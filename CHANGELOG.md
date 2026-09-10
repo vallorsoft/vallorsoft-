@@ -14,6 +14,46 @@
 
 ---
 
+## 2026-09-10 — Sofőr-elszámolás: BNR-fallback-lánc (élő → cég-ráta → utolsó kifizetés) → cross-settlement akkor is fut, ha az élő BNR épp elérhetetlen + hivatalos papíron a járandóság-tételek RON-összesítése a BNR-en, branch `claude/signature-seal-document-management-5orqva`
+
+**Kérés (képernyőképpel — Gondos Imre / Peto):** „lejben lett kifizetve euros tétel es nem vonta le bnr arfolyamon az euróból hanem inkabb minuszba tette a lejes kifizetest ezt javitsd ki mert le kell vonja ha egyszer kilett fizetve az euros tetel es a papira a tetelek oszesitesenel irja fel az euro oszeget lejben is bnr arfolyamon". A képernyőn: 500 EUR jár + 45 RON jár, 0 EUR + 937 RON fizetve → hátralék EUR 500 (piros), hátralék RON −892 (túlfizetés), „Mai BNR árfolyam: jelenleg nem elérhető" — a PR #433-ben bevezetett cross-settlement nem futott le, mert az élő BNR pillanatnyilag nem érkezett be, és nem volt fallback.
+
+### Gyökérok
+
+A PR #433 cross-settlement CSAK akkor futott, ha `bnrRate != null && bnrRate > 0` — a `_getEffectiveBnr` egyetlen forrása az élő BNR (`services/bnr.js`) volt. Ha az endpoint proxy/WAF/hálózat miatt épp nem válaszol, a `services/bnr.js` 7-napos last-known-good cache üres marad az adott folyamatban (minden Fly-instance saját memóriával indul) → a beszámítás nem fut → az UI-n a nyers érték jelenik meg úgy, mintha az operátor félrekönyvelte volna a kifizetést.
+
+### Fix — `handlers/fleetCompliance.js` új `_getEffectiveBnr(cid)` fallback-lánc
+
+Három szintű prioritás, cégre szűrt, paraméteres SQL:
+1. **Élő BNR** — `fetchBnrEurRon()` (a services/bnr.js már eleve 7-napos last-known-good cache-t is használ).
+2. **Cég-szintű beállítás** — `companies.eur_ron_rate` (a diszpécser állítja Beállítások → Cég & arculat pane-en; a statisztika is használja).
+3. **Utolsó tényleges kifizetés BNR-je** — `driver_payments.bnr_rate` legfrissebb NEM-NULL értéke a cégen belül (audit-lánc: amint volt egyszer működő BNR-lekérés + tényleges kifizetés, a rendszer többé sosem esik szét).
+
+A `getDriverBalance` és a `getMonthlySettlementSheet` mindketten ezt hívják. A válasz új `bnr_source` mezője: `'live'`, `'company'`, `'payments'` vagy `null` — a kliens a UI-n láthatóan jelzi, honnan jött a ráta.
+
+**Peto-eset megoldása (a képernyőképből):** 500 EUR + 45 RON jár, 937 RON kifizetve, élő BNR blokk. Ha a cégnél `eur_ron_rate=5.05` be van állítva → cross-settlement fut: 892 RON túlfizetés / 5.05 = 176.63 EUR → 500 − 176.63 = **323.37 EUR hátralék, ~0 RON**. Cég-ráta hiányában az utolsó rögzített kifizetés BNR-je is helyes eredményt ad.
+
+### UI — BNR-forrás jelzés
+
+`public/fleet-extra-v2.js` `_dcBalanceCard` — a mai BNR sor mögé halvány chip kerül, ha a ráta NEM élő: `(setare firmă)` vagy `(ultima plată)`. A `1 EUR = X RON` érték változatlan színnel jelenik meg — a chip csak jelzi, hogy fallback-BNR-ből dolgozunk.
+
+**`public/style.css`** — új `#decontBox .dc-bnr-src` szabály (halvány mustársárga chip, mindkét téma), 999px sarok, 11px font-weight:700.
+
+### Hivatalos papír (Decont oficial) — járandóság-tételek RON-összesítése
+
+**`_dcOfBuildSummaryHtml`** — a Salariu de bază + Diurna blokk FÖLÖTT új „📋 Sumar drepturi" doboz (zöld gradiens, 2px keret): Total drepturi (EUR) + `= Y RON` alá halvány BNR-egyenérték, Total drepturi (RON), és ha mindkét pénznemben van tétel → külön `Total combinat în RON (la curs BNR)` záró sor kiemelten. Csak akkor jelenik meg, ha van érdemi tétel-összeg (0-tól különböző). Nyomtatásba + e-mailbe is bekerül (a summary-blokk mindkettőn megjelenik).
+
+### i18n + cache-bust
+
+`public/i18n.js` — 6 új kulcs (RO-alap + HU): `fe.dc.bnrSrcCompany`/`bnrSrcPayments` + `fe.stof.itemsTotalsTitle`/`itemsTotalEur`/`itemsTotalRon`/`itemsCombinedRon`. Cache-bust `admin.html`/`manager.html`: `?v=20260910paygroup` → `?v=20260910bnrfb`.
+
+### Teszt
+
+`tests/integration/driver-earnings-payments.test.js` — a régi „BNR nem elérhető → nincs beszámítás" tesztet frissítettem a fallback-lánc üres állapotára (cég-ráta + utolsó kifizetés BNR-je mindkettő üres). +2 új eset: (a) élő BNR le, cég-ráta 5.05 → cross-settlement fut a `bnr_source='company'`-vel; (b) élő BNR + cég-ráta üres, DE utolsó kifizetés BNR-je 5.00 → cross-settlement fut a `bnr_source='payments'`-szel.
+`tests/integration/settlement-sheet.test.js` — 3 test a `_getEffectiveBnr` új query-jével bővítve (`fetchBnrEurRon` `null` esetén a cég-ráta + utolsó kifizetés fallback lekérdezéseket mockolják üresre). **1138 Jest zöld** (1136 → 1138, +2 új).
+
+---
+
 ## 2026-09-10 — Sofőr-elszámolás: csoportos kifizetés a payment-listán EGY sorban + kattintásra lenyíló részletek (tételek + fiz. módok), branch `claude/signature-seal-document-management-5orqva`
 
 **Kérés:** „most egy olyant javits ha tobb tételt fizetünk ki a sofernek akkor a kifizeteseknel ne a teteleket mutasa hanem egy kizos kifizetest es arra rakatintva lenyiloan mutasa a teteleket". Eddig egy csoportos kifizetés (`earningPaymentGroupCreate` — pl. 1620 EUR utalás + 1900 EUR készpénz + 1000 RON készpénz = 3 `driver_payments` sor) 3 külön sorként jelent meg a payment-listán — a lista telivé vált, nehezen áttekinthető.

@@ -470,6 +470,7 @@ describe('getDriverBalance', () => {
   });
 
   test('cross-currency: BNR nem elérhető → nincs beszámítás, raw = settled', async () => {
+    // Élő BNR + cég-ráta + utolsó kifizetés MIND üres → tényleg nincs beszámítás.
     setUser(fixtures.admin);
     fetchBnrEurRon.mockRejectedValueOnce(new Error('nincs net'));
     const pool = require('../../db');
@@ -477,6 +478,10 @@ describe('getDriverBalance', () => {
       .mockResolvedValueOnce(rows([{ nume: 'X' }]))
       .mockResolvedValueOnce(rows([{ currency: 'EUR', total: 510, db: 1 }]))
       .mockResolvedValueOnce(rows([{ currency: 'RON', total: 937, total_ron: 937, db: 1 }]))
+      .mockResolvedValueOnce(rows([]))
+      // _getEffectiveBnr fallback-lánc: cég-ráta üres
+      .mockResolvedValueOnce(rows([{ eur_ron_rate: null }]))
+      // _getEffectiveBnr fallback-lánc: utolsó kifizetés BNR-je üres
       .mockResolvedValueOnce(rows([]));
     const res = await request(app).post('/api/execute').send({
       functionName: 'getDriverBalance',
@@ -488,6 +493,73 @@ describe('getDriverBalance', () => {
     expect(res.body.result.balance.cross_ron_to_eur).toBe(0);
     expect(res.body.result.balance.cross_eur_to_ron).toBe(0);
     expect(res.body.result.bnr_rate).toBeNull();
+    expect(res.body.result.bnr_source).toBeNull();
+  });
+
+  test('cross-currency: élő BNR nem elérhető, DE cég-ráta megvan → cross-settlement fut', async () => {
+    // Peto-eset a képernyőképből: 500 EUR jár + 45 RON jár, 937 RON kifizetve.
+    // Élő BNR le van blokkolva (proxy/WAF), de a cégnél `eur_ron_rate=5.05` be van
+    // állítva → a rendszer ebből számol → cross-settlement fut → nem marad
+    // "eur=500, ron=-892" álláspont a képernyőn.
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValueOnce(null);  // élő BNR nem elérhető
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ nume: 'Peto' }]))
+      .mockResolvedValueOnce(rows([
+        { currency: 'EUR', total: 500, db: 5 },
+        { currency: 'RON', total: 45, db: 1 },
+      ]))
+      .mockResolvedValueOnce(rows([
+        { currency: 'RON', total: 937, total_ron: 937, db: 2 },
+      ]))
+      .mockResolvedValueOnce(rows([]))
+      // _getEffectiveBnr: cég-ráta 5.05 → innen jön a fallback-BNR
+      .mockResolvedValueOnce(rows([{ eur_ron_rate: 5.05 }]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getDriverBalance',
+      arguments: [{ email: 'sofer@ceg.hu' }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    // Beszámolt (végső) egyenleg — nem 500 EUR és -892 RON
+    // 892 RON túlfizetés / 5.05 = 176.63 EUR → 500 − 176.63 = 323.37 EUR
+    expect(res.body.result.balance.eur).toBeCloseTo(323.37, 1);
+    expect(Math.abs(res.body.result.balance.ron)).toBeLessThan(0.5);
+    expect(res.body.result.balance.cross_ron_to_eur).toBeCloseTo(176.63, 1);
+    expect(res.body.result.balance.eur_raw).toBe(500);
+    expect(res.body.result.balance.ron_raw).toBe(-892);
+    expect(res.body.result.bnr_rate).toBe(5.05);
+    expect(res.body.result.bnr_source).toBe('company');
+  });
+
+  test('cross-currency: élő BNR + cég-ráta üres, DE utolsó kifizetés BNR-je megvan → cross-settlement fut', async () => {
+    // Fallback-lánc harmadik lépcső: a legutóbbi tényleges kifizetéskor rögzített
+    // BNR (`driver_payments.bnr_rate`) mint audit-lánc. Ez garantálja, hogy amint
+    // volt egyszer működő BNR-lekérés + kifizetés, onnantól a cross-settlement
+    // sosem esik szét — még ha a BNR API-t hetekre kilövik, akkor sem.
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValueOnce(null);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ nume: 'X' }]))
+      .mockResolvedValueOnce(rows([{ currency: 'EUR', total: 100, db: 1 }]))
+      .mockResolvedValueOnce(rows([{ currency: 'RON', total: 500, total_ron: 500, db: 1 }]))
+      .mockResolvedValueOnce(rows([]))
+      // cég-ráta üres
+      .mockResolvedValueOnce(rows([{ eur_ron_rate: null }]))
+      // utolsó kifizetés BNR-je 5.00
+      .mockResolvedValueOnce(rows([{ bnr_rate: 5.00 }]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getDriverBalance',
+      arguments: [{ email: 'sofer@ceg.hu' }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    // 500 RON túlfizetés / 5.00 = 100 EUR → 100 − 100 = 0 EUR, RON is 0
+    expect(Math.abs(res.body.result.balance.eur)).toBeLessThan(0.01);
+    expect(Math.abs(res.body.result.balance.ron)).toBeLessThan(0.01);
+    expect(res.body.result.balance.cross_ron_to_eur).toBeCloseTo(100, 1);
+    expect(res.body.result.bnr_rate).toBe(5.00);
+    expect(res.body.result.bnr_source).toBe('payments');
   });
 });
 

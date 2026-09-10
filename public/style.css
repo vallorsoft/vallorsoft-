@@ -3557,6 +3557,19 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   background:rgba(255,255,255,0.04); border-color:rgba(148,163,184,0.30);
 }
 #decontBox .dc-bnr-val{ font-weight:800; color:var(--status-info); }
+/* Fallback-BNR forrás-chip (cég/utolsó fizetés) — a mai BNR mögött, halványan.
+   Nem hiba-üzenet: a cross-settlement biztonsági rátából dolgozott. */
+#decontBox .dc-bnr-src{
+  display:inline-block; padding:1px 8px; margin-left:6px;
+  font-size:11px; font-weight:700; letter-spacing:0.2px;
+  background:rgba(202,138,4,0.14); color:#78350f;
+  border:1px solid rgba(202,138,4,0.35); border-radius:999px;
+  vertical-align:middle;
+}
+.main-content[data-theme="dark"] #decontBox .dc-bnr-src{
+  background:rgba(202,138,4,0.18); color:#fde68a;
+  border-color:rgba(253,224,71,0.35);
+}
 
 /* Egyenleg-csempék (6 db rács) */
 #decontBox .dc-tiles{
