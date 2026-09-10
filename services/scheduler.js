@@ -1215,4 +1215,295 @@ function startPdfWorkspaceCleanup() {
   return interval;
 }
 
-module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup };
+// ================================================================
+//  REGGELI ÖSSZEFOGLALÓ (napi digest) — cégenkénti kapcsoló + időpont.
+//  Percenként ellenőrzi, hogy egy cég `digest_time`-ja Europe/Bucharest
+//  szerint MOST van-e (±1 perc ablak), és ha ma még nem küldött ki
+//  digest-et (`digest_last_sent_at`), összeállítja a napi képet és
+//  e-mailben megküldi a cég Admin/Manager felhasználóinak + a
+//  `digest_recipients` tömb címeinek. Duplikáció-őr: sikeres küldés
+//  után `digest_last_sent_at=NOW()`; a következő nap előtt új küldés
+//  nincs (naponta max 1× / cég).
+// ================================================================
+function startMorningDigestScheduler() {
+  let email;
+  try { email = require('./email'); } catch (_) { return null; }
+
+  function _fmt(n) { const x = parseInt(n, 10); return isFinite(x) ? x : 0; }
+  function _hu_hm() {
+    // "Europe/Bucharest" időzóna aktuális HH:MM (24 órás formátumban).
+    try {
+      const fmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Bucharest', hour: '2-digit', minute: '2-digit', hour12: false });
+      return fmt.format(new Date()); // "07:00"
+    } catch (_) {
+      const d = new Date();
+      return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+  }
+  function _hu_today() {
+    try {
+      const fmt = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Bucharest' }); // sv-SE = YYYY-MM-DD
+      return fmt.format(new Date());
+    } catch (_) { return new Date().toISOString().slice(0, 10); }
+  }
+
+  async function _buildDigest(cid) {
+    // Aktív fuvarok darabszáma cégre szűrve.
+    const stats = {};
+    try {
+      const r = await pool.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE status IN ('Alocat','In Curs','Extern'))::int AS active_count,
+           COUNT(*) FILTER (WHERE status = 'Disponibil')::int AS available_count,
+           COUNT(*) FILTER (WHERE status IN ('Parkolt','Raktarban'))::int AS handover_count,
+           COUNT(*) FILTER (WHERE status='Finalizat'
+             AND COALESCE(to_jsonb(orders) ->> 'payment_status_ext','pending') <> 'paid')::int AS unpaid_count
+         FROM orders WHERE company_id=$1`, [cid]);
+      Object.assign(stats, r.rows[0] || {});
+    } catch (_) {}
+
+    // Mai felrakások + lerakások (data_incarcare / data_descarcare = ma).
+    const today = _hu_today();
+    let todayPick = [], todayDrop = [];
+    try {
+      const p = await pool.query(
+        `SELECT id, fuvar_no, client, loc_incarcare, rendszam_camion, nume_sofer
+           FROM orders
+          WHERE company_id=$1 AND data_incarcare=$2::date AND status NOT IN ('Anulat')
+          ORDER BY loc_incarcare LIMIT 30`, [cid, today]);
+      todayPick = p.rows;
+    } catch (_) {}
+    try {
+      const d = await pool.query(
+        `SELECT id, fuvar_no, client, loc_descarcare, rendszam_camion, nume_sofer
+           FROM orders
+          WHERE company_id=$1 AND data_descarcare=$2::date AND status NOT IN ('Anulat')
+          ORDER BY loc_descarcare LIMIT 30`, [cid, today]);
+      todayDrop = d.rows;
+    } catch (_) {}
+
+    // Lejáró dokumentumok — 30 nap.
+    let expiries = [];
+    try {
+      const e = await pool.query(
+        `SELECT tip, target_type, target_ref, expires_on
+           FROM document_expiries
+          WHERE company_id=$1
+            AND expires_on IS NOT NULL
+            AND expires_on <= (CURRENT_DATE + INTERVAL '30 days')
+          ORDER BY expires_on LIMIT 40`, [cid]);
+      expiries = e.rows;
+    } catch (_) {}
+
+    // Szerviz-esedékesség (2 hét).
+    let services = [];
+    try {
+      const s = await pool.query(
+        `SELECT vehicle_id, next_due_date, next_due_km
+           FROM vehicle_service_log
+          WHERE company_id=$1 AND closed_at IS NULL
+            AND ((next_due_date IS NOT NULL AND next_due_date <= (CURRENT_DATE + INTERVAL '14 days'))
+              OR next_due_km IS NOT NULL)
+          ORDER BY next_due_date NULLS LAST LIMIT 40`, [cid]);
+      services = s.rows;
+    } catch (_) {}
+
+    return { stats, todayPick, todayDrop, expiries, services };
+  }
+
+  function _renderHtml(companyName, d) {
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[m]));
+    const s = d.stats || {};
+    var html = '<div style="font-family:Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;">';
+    html += '<h2 style="margin:0 0 6px;color:#2563eb;">☀️ Sumar zilnic — ' + esc(companyName) + '</h2>';
+    html += '<div style="color:#64748b;font-size:12.5px;margin-bottom:14px;">' + esc(_hu_today()) + '</div>';
+    // KPI rács
+    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:16px;"><tr>';
+    html += '<td style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;text-align:center;">'+
+      '<div style="font-size:24px;font-weight:800;color:#2563eb;">'+_fmt(s.active_count)+'</div>'+
+      '<div style="font-size:11px;color:#64748b;">Curse active</div></td>';
+    html += '<td style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;text-align:center;">'+
+      '<div style="font-size:24px;font-weight:800;color:#f59e0b;">'+_fmt(s.available_count)+'</div>'+
+      '<div style="font-size:11px;color:#64748b;">De alocat</div></td>';
+    html += '<td style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;text-align:center;">'+
+      '<div style="font-size:24px;font-weight:800;color:#ef4444;">'+_fmt(s.handover_count)+'</div>'+
+      '<div style="font-size:11px;color:#64748b;">Predare marfă</div></td>';
+    html += '<td style="padding:10px;border:1px solid #cbd5e1;border-radius:8px;text-align:center;">'+
+      '<div style="font-size:24px;font-weight:800;color:#dc2626;">'+_fmt(s.unpaid_count)+'</div>'+
+      '<div style="font-size:11px;color:#64748b;">Neîncasat</div></td>';
+    html += '</tr></table>';
+    // Mai felrakások
+    html += '<h3 style="margin:14px 0 6px;font-size:14px;">⬆️ Încărcări azi ('+d.todayPick.length+')</h3>';
+    if (d.todayPick.length) {
+      html += '<table style="width:100%;border-collapse:collapse;font-size:12.5px;">';
+      html += '<tr style="background:#f1f5f9;"><th style="text-align:left;padding:6px 8px;border-bottom:1px solid #cbd5e1;">Nr.</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid #cbd5e1;">Client</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid #cbd5e1;">Loc</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid #cbd5e1;">Auto/Șofer</th></tr>';
+      d.todayPick.forEach(function(o){
+        html += '<tr><td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">'+esc(o.fuvar_no||o.id)+
+          '</td><td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">'+esc(o.client||'—')+
+          '</td><td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">'+esc(o.loc_incarcare||'—')+
+          '</td><td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">'+esc(o.rendszam_camion||'')+' '+esc(o.nume_sofer||'')+'</td></tr>';
+      });
+      html += '</table>';
+    } else html += '<div style="color:#64748b;font-size:12.5px;">— nu sunt încărcări azi.</div>';
+    // Mai lerakások
+    html += '<h3 style="margin:14px 0 6px;font-size:14px;">⬇️ Descărcări azi ('+d.todayDrop.length+')</h3>';
+    if (d.todayDrop.length) {
+      html += '<table style="width:100%;border-collapse:collapse;font-size:12.5px;">';
+      html += '<tr style="background:#f1f5f9;"><th style="text-align:left;padding:6px 8px;border-bottom:1px solid #cbd5e1;">Nr.</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid #cbd5e1;">Client</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid #cbd5e1;">Loc</th><th style="text-align:left;padding:6px 8px;border-bottom:1px solid #cbd5e1;">Auto/Șofer</th></tr>';
+      d.todayDrop.forEach(function(o){
+        html += '<tr><td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">'+esc(o.fuvar_no||o.id)+
+          '</td><td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">'+esc(o.client||'—')+
+          '</td><td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">'+esc(o.loc_descarcare||'—')+
+          '</td><td style="padding:5px 8px;border-bottom:1px solid #e2e8f0;">'+esc(o.rendszam_camion||'')+' '+esc(o.nume_sofer||'')+'</td></tr>';
+      });
+      html += '</table>';
+    } else html += '<div style="color:#64748b;font-size:12.5px;">— nu sunt descărcări azi.</div>';
+    // Lejáratok
+    if (d.expiries && d.expiries.length) {
+      html += '<h3 style="margin:14px 0 6px;font-size:14px;">⏰ Documente expiră în 30 zile ('+d.expiries.length+')</h3>';
+      html += '<ul style="margin:4px 0;padding-left:20px;font-size:12.5px;">';
+      d.expiries.slice(0, 15).forEach(function(x){
+        html += '<li>'+esc(x.tip||'—')+' · '+esc(x.target_ref||'')+' — '+esc(String(x.expires_on).slice(0,10))+'</li>';
+      });
+      if (d.expiries.length > 15) html += '<li style="color:#64748b;">+ '+(d.expiries.length-15)+' altele…</li>';
+      html += '</ul>';
+    }
+    // Szerviz
+    if (d.services && d.services.length) {
+      html += '<h3 style="margin:14px 0 6px;font-size:14px;">🔧 Servicii scadente în 2 săptămâni ('+d.services.length+')</h3>';
+    }
+    html += '<div style="margin-top:20px;padding-top:10px;border-top:1px solid #cbd5e1;color:#94a3b8;font-size:11px;">'+
+      'Sumarul se trimite zilnic conform setărilor. Poți dezactiva sau modifica ora în Setări → 📧 Sumar zilnic.</div>';
+    html += '</div>';
+    return html;
+  }
+
+  async function tick() {
+    // Cégek, ahol be van kapcsolva, és ma még nem küldtünk (Bucharest időzóna).
+    let companies;
+    try {
+      ({ rows: companies } = await pool.query(
+        `SELECT id, nev, digest_time, digest_recipients, digest_last_sent_at
+           FROM companies
+          WHERE COALESCE(digest_enabled, false) = true`));
+    } catch (err) {
+      if (err && err.code === '42703') return; // migráció-hiány → csendes
+      return;
+    }
+    if (!companies.length) return;
+    const nowHm = _hu_hm();
+    const today = _hu_today();
+    for (const c of companies) {
+      try {
+        // Duplikáció-őr: ma már küldtünk-e?
+        const lastSent = c.digest_last_sent_at ? new Date(c.digest_last_sent_at).toISOString().slice(0, 10) : null;
+        if (lastSent === today) continue;
+        // Az időpont HH:MM formában? A `digest_time` PG TIME → '07:00:00' string.
+        const wantHm = String(c.digest_time || '07:00').slice(0, 5);
+        if (nowHm !== wantHm) continue;
+        // Címzettek: cég Admin/Manager userei + digest_recipients extra tömb.
+        const recRow = await pool.query(
+          `SELECT email FROM users WHERE company_id=$1 AND pozicio IN ('Admin','Manager') AND email IS NOT NULL`, [c.id]);
+        const emails = new Set(recRow.rows.map(x => String(x.email).trim().toLowerCase()).filter(Boolean));
+        if (Array.isArray(c.digest_recipients)) {
+          c.digest_recipients.forEach(e => { const s = String(e || '').trim().toLowerCase();
+            if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) emails.add(s); });
+        }
+        if (!emails.size) continue;
+        const digest = await _buildDigest(c.id);
+        const html = _renderHtml(c.nev || '—', digest);
+        const subject = '☀️ Sumar zilnic — ' + (c.nev || 'VallorSoft') + ' — ' + today;
+        // Küldés minden címzettnek (közös VallorSoft feladóról).
+        for (const to of emails) {
+          try {
+            await email.sendClientEmail({ to, subject, html, companyId: c.id, mailType: 'morning_digest' });
+          } catch (e) { console.warn('[MorningDigest] küldés hiba', to, e.message); }
+        }
+        await pool.query(`UPDATE companies SET digest_last_sent_at=NOW() WHERE id=$1`, [c.id]);
+        console.log('[MorningDigest] Elküldve —', c.nev, '(' + emails.size + ' címzett)');
+      } catch (err) {
+        console.warn('[MorningDigest] cégre skip:', c.id, err.message);
+      }
+    }
+  }
+
+  setTimeout(tick, 30 * 1000);            // 30 mp múlva először
+  const interval = setInterval(tick, 60 * 1000); // percenként
+  console.log('[MorningDigest] Reggeli összefoglaló ütemező elindítva (1 perces ciklus).');
+  return interval;
+}
+
+// ================================================================
+//  NAPI GPS ÚTVONAL (breadcrumb) — cégenként/rendszámonként a jármű pozíciója
+//  10 percenként rögzítve. Mozgás-szűrő: csak akkor INSERT-el, ha ≥200 m-rel
+//  eltér az utolsó rögzített pozíciótól (nem szennyezi álló járművek
+//  ismétlődő adatával). Adattakarítás: 7 napnál régebbi sorok törlése.
+// ================================================================
+function startGpsDailyTrackScheduler() {
+  const vehiclePositions = require('../lib/vehiclePositions');
+
+  // Haversine — két lat/lng közti távolság méterben.
+  function _distMeters(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const rad = (d) => d * Math.PI / 180;
+    const dLat = rad(lat2 - lat1);
+    const dLng = rad(lng2 - lng1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  async function _collectForCompany(cid) {
+    // A getPositions cache-elt (30 mp) — nem terhel, ugyanaz mint a Vezérlőpulton.
+    let posResp;
+    try { posResp = await vehiclePositions.getPositions(cid); } catch (_) { return; }
+    if (!posResp || !posResp.gps_configured || !Array.isArray(posResp.positions)) return;
+    for (const p of posResp.positions) {
+      if (!p || p.lat == null || p.lng == null) continue;
+      try {
+        // Utolsó rögzített pozíció az adott járműre (mozgás-szűrő).
+        const last = await pool.query(
+          `SELECT lat, lng FROM gps_daily_positions
+            WHERE company_id=$1 AND rendszam=$2
+            ORDER BY recorded_at DESC LIMIT 1`, [cid, p.rendszam]);
+        if (last.rows.length) {
+          const d = _distMeters(parseFloat(last.rows[0].lat), parseFloat(last.rows[0].lng), p.lat, p.lng);
+          if (d < 200) continue; // <200 m → nem rögzítünk (mozgás-szűrő)
+        }
+        await pool.query(
+          `INSERT INTO gps_daily_positions (company_id, rendszam, lat, lng, speed_kmh, ignition, recorded_at)
+           VALUES ($1,$2,$3,$4,$5,$6, COALESCE($7::timestamptz, NOW()))`,
+          [cid, p.rendszam, p.lat, p.lng,
+           (p.speed != null ? Number(p.speed) : null),
+           (p.ignition != null ? (String(p.ignition).toLowerCase() === 'on' || p.ignition === true) : null),
+           p.datetime || null]);
+      } catch (_) { /* per-jármű hiba ne állítsa le a kört */ }
+    }
+  }
+
+  async function tick() {
+    // Egyszerre az összes GPS-t használó céget lekérdezzük.
+    let companies;
+    try {
+      ({ rows: companies } = await pool.query(
+        `SELECT DISTINCT ci.company_id
+           FROM company_integrations ci
+          WHERE ci.category='gps' AND ci.enabled=true`));
+    } catch (_) { return; }
+    for (const c of companies) {
+      try { await _collectForCompany(c.company_id); } catch (_) {}
+    }
+    // Takarítás: >7 nap.
+    try {
+      const r = await pool.query(
+        `DELETE FROM gps_daily_positions WHERE recorded_at < NOW() - INTERVAL '7 days'`);
+      if (r.rowCount > 0) console.log('[GpsDaily] Törölve', r.rowCount, 'régi pozíció (>7 nap).');
+    } catch (_) {}
+  }
+
+  setTimeout(tick, 60 * 1000);                     // 1 perc múlva először
+  const interval = setInterval(tick, 10 * 60 * 1000); // 10 percenként
+  console.log('[GpsDaily] Napi GPS útvonal-gyűjtő elindítva (10 perces ciklus, ≥200 m mozgás-szűrő).');
+  return interval;
+}
+
+module.exports = { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler };
