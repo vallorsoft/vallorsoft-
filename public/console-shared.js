@@ -118,7 +118,21 @@ function applyFeatureFlags(){
   }).catch(function(){ vsRecomputeSidebar(); vsSyncDriverModeUI(); });
 }
 
+// A navigáció EGYETLEN belépési pontja (menü/almenü kattintás, Operatív
+// központ gyorsgombok, "Sürgős sor" stb. — mind ezt hívja) — itt vezetjük a
+// telefonos VISSZA-gombhoz a "melyik fülről melyikre" history-vermet
+// (lásd a fájl végén az "TELEFONOS VISSZA GOMB" blokkot). `_vsBackSkipPush`
+// akkor `true`, amíg a popstate-handler saját maga navigál vissza — ilyenkor
+// nem tolunk újat a verembe (különben a vissza-navigáció előre is nyomna).
+var _vsTabHistory = [];
+var _vsCurrentTab = null;
+var _vsBackSkipPush = false;
 function activateTab(name){
+  if (!_vsBackSkipPush && _vsCurrentTab && _vsCurrentTab !== name) {
+    _vsTabHistory.push(_vsCurrentTab);
+    if (_vsTabHistory.length > 50) _vsTabHistory.shift(); // ne nőjön korlátlanul
+  }
+  _vsCurrentTab = name;
   document.querySelectorAll('.sidebar .tab, .sidebar .sub-tab').forEach(function(x){x.classList.remove('active');});
   var tabEl=document.querySelector('.sidebar [data-tab="'+name+'"]');
   if(tabEl){
@@ -7541,3 +7555,76 @@ function _oeCollectStops() {
   });
   return out;
 }
+
+// ============================================================
+// TELEFONOS „VISSZA" GOMB (admin/manager) — appon belüli visszalépés,
+// NE lépjen ki a webhelyről. Minden menü/almenü/gyorsgomb ezen az
+// `activateTab()`-on megy át (lásd a fájl elején) → a fülek közti
+// visszalépéshez elég azt a history-vermet visszajátszani.
+// ============================================================
+
+// Bármelyik nyitott modal bezárása. A projekt minden modálja `.modal-back`
+// osztályú — a statikusak (userModal/vehicleModal/fuvEditModal/…) a CSS
+// `.modal-back.open{display:flex}` szabállyal jelennek meg, a dinamikusan
+// body-hoz fűzöttek (pl. vsPdModalBack, opsPdPickBack) inline `display:flex`-
+// fel, `.open` osztály nélkül — ezeket eltávolítjuk a DOM-ból (ugyanazt teszi
+// a saját `Close()`-juk is). Néhány modálnak van extra takarítása (event-
+// listener leiratkozás, állapot-reset) — ezekre ismert close-függvényt hívunk.
+var _VS_MODAL_CLOSE_FN = {
+  userModal: 'closeModal',
+  vehicleModal: 'closeVehicleModal',
+  extDriverModal: 'closeExtDriverModal',
+  quickVehicleModal: 'closeQuickVehicle',
+  docModal: 'closeDocModal',
+  signModal: 'closeSignModal',
+  orderEditModal: 'closeOrderEditModal',
+  fuvEditModal: 'closeFuvEdit',
+  pdfViewModal: 'closePdfView',
+  payModal: 'closePaymentModal',
+  bugModal: 'closeBugReport',
+  vsPdModalBack: 'vsPostDeliveryClose',
+  opsPdPickBack: '_opsPdPickerClose'
+};
+function _vsCloseTopModal(){
+  var backs = document.querySelectorAll('.modal-back');
+  for (var i = 0; i < backs.length; i++) {
+    var el = backs[i];
+    var visible;
+    try { visible = getComputedStyle(el).display !== 'none'; } catch (e) { visible = false; }
+    if (!visible) continue;
+    var fnName = _VS_MODAL_CLOSE_FN[el.id];
+    if (fnName && typeof window[fnName] === 'function') { try { window[fnName](); } catch (e) {} return true; }
+    if (el.classList.contains('open')) { el.classList.remove('open'); return true; }
+    // Dinamikusan body-hoz fűzött modal (nincs 'open' osztálya) → eltávolítás
+    if (el.parentNode) { el.parentNode.removeChild(el); return true; }
+  }
+  return false;
+}
+
+(function initConsoleBackButton(){
+  var _backTs = 0, _exiting = false;
+  function repush(){ try { history.pushState({ vsBack: true }, ''); } catch (e) {} }
+  try { history.pushState({ vsBack: true }, ''); } catch (e) {}   // kezdő csapda-állapot
+  window.addEventListener('popstate', function(){
+    if (_exiting) return;
+    // 1) Nyitott modal → bezárás
+    if (_vsCloseTopModal()) { repush(); return; }
+    // 2) Mobil sidebar-drawer nyitva → bezárás
+    var sb = document.getElementById('mainSidebar');
+    if (sb && sb.classList.contains('mob-open')) { try { closeSidebar(); } catch (e) {} repush(); return; }
+    // 3) Van korábban meglátogatott fül a veremben → vissza arra
+    if (_vsTabHistory.length) {
+      var prev = _vsTabHistory.pop();
+      _vsBackSkipPush = true;
+      try { activateTab(prev); } finally { _vsBackSkipPush = false; }
+      repush(); return;
+    }
+    // 4) Se modal, se fül-történet (a legelső fülön állunk) → dupla-vissza
+    //    (2 mp-en belül) kilép, egyébként csak jelez és a lapon marad.
+    var now = Date.now();
+    if (now - _backTs < 2000) { _exiting = true; try { history.back(); } catch (e) {} return; }
+    _backTs = now;
+    try { toast(t('cs.backExitHint') || 'Apasă din nou înapoi pentru a ieși.', ''); } catch (e) {}
+    repush();
+  });
+})();

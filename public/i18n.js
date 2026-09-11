@@ -1786,6 +1786,7 @@
 
     // ── console-shared.js toast-üzenetek ──
     'cs.pdfFirst': { hu: 'Előbb töltsd be a PDF-et!', ro: 'Încarcă mai întâi PDF-ul!' },
+    'cs.backExitHint': { hu: 'Nyomd meg újra a kilépéshez.', ro: 'Apasă din nou înapoi pentru a ieși.' },
     'cs.noStamp': { hu: 'Nincs mentett pecsét!', ro: 'Nu există ștampilă salvată!' },
     'cs.stampAdded': { hu: 'Pecsét hozzáadva – húzd a helyére', ro: 'Ștampilă adăugată – trage-o la loc' },
     'cs.pickPngFirst': { hu: 'Válassz PNG fájlt.', ro: 'Selectează un fișier PNG.' },
