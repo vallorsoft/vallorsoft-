@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-09-11 — Admin/Manager: telefonos VISSZA-gomb appon belül navigál (PR #442)
+
+**Kérés:** „alitsd be a telefon viszagombja ne kilepjen a webrol hanem ugorjon visza az azelotti részére ezt minden menu es minden pont tudja az admin manager oldalon" — a sofőr felületen már megvolt (`sof.backExitHint`, history.pushState-csapda); az admin/manager konzolra hiányzott.
+
+1. **`console-shared.js` `activateTab(name)`** — a navigáció EGYETLEN belépési pontja (sidebar menü/almenü, Operatív központ gyorsgombok, Sürgős sor stb. mind ezen megy át). Minden váltás előtt a jelenlegi fület egy `_vsTabHistory` verembe teszi (`_vsBackSkipPush` őrzi, hogy a vissza-navigáció saját maga ne toljon újat).
+2. **`_vsCloseTopModal()`** — a projekt összes `.modal-back` modálja generikusan bezárható: a statikus HTML-modálok (`userModal`/`vehicleModal`/`fuvEditModal`/…) a `.open` osztály eltávolításával, a dinamikusan body-hoz fűzöttek (pl. a post-livrare kártya `vsPdModalBack`) eltávolítással a DOM-ból; ismert modáloknál a tényleges close-függvényt hívja (event-listener/állapot-takarítás miatt).
+3. **popstate-kezelő sorrend** (`initConsoleBackButton` IIFE, sofőr-mintát követve): (1) nyitott modal → bezárás; (2) mobil sidebar-drawer nyitva → bezárás; (3) van korábbi fül a veremben → vissza arra; (4) a legelső fülön: dupla-vissza (2 mp-en belül) kilép, egyébként jelez (`cs.backExitHint`) és a lapon marad.
+4. Tisztán kliens-oldali, nincs séma-/szerver-változás. Cache-bust `?v=20260911c`. **1229 Jest zöld** (nincs regresszió).
+
 ## 2026-09-11 — Operatív központ: post-livrare lépés-sorozat kártya (PR #441)
 
 **Kérés:** „surgosegi savba ne a fuvarhoz ugorjon hanem adot fuvarnak legyen egy kartyaja ahol a lepesek vannak egymas utan es mutassa melyik jon es szerkesztesi lehetoseggel. ha fuvarra lepsz is legyen meg a kartya" — a Sürgős sor 📋 post-livrare tételei (számla/posta/fizetés hátralék) eddig csak a fuvarlistát szűrték meg egy chippel (PR #440); most egy konkrét fuvar dokumentum-nyomkövetés kártyáját nyitják meg.
