@@ -1188,6 +1188,12 @@
     // Post-delivery (dokumentum-nyomkövetés) — Finalizat fuvaron követhető
     // számlaszám / posta cím / posta elküldve+átvéve / fizetés + megjegyzés.
     'cs.pd.title': { hu: 'Dokumentum-nyomkövetés', ro: 'Urmărire documente' },
+    'cs.pd.stepFinalized': { hu: 'Fuvar lezárva', ro: 'Cursă finalizată' },
+    'cs.pd.stepInvoice': { hu: 'Számla kiállítva', ro: 'Factură emisă' },
+    'cs.pd.stepPosted': { hu: 'Posta elküldve', ro: 'Poștă trimisă' },
+    'cs.pd.stepPaid': { hu: 'Kifizetve', ro: 'Achitat' },
+    'cs.pd.nextStep': { hu: 'Következő lépés', ro: 'Pasul următor' },
+    'cs.pd.allDone': { hu: 'Minden lépés kész', ro: 'Toți pașii finalizați' },
     'cs.pd.mLabel': { hu: 'Post-livrare', ro: 'Post-livrare' },
     'cs.pd.miniInv': { hu: 'Számla', ro: 'Factură' },
     'cs.pd.miniPst': { hu: 'Posta elküldve', ro: 'Poștă trimisă' },
@@ -2341,6 +2347,9 @@
     'ops.uPdNoInvoice': { hu: 'Lezárt fuvar, nincs számlaszám', ro: 'Cursă finalizată fără nr. factură' },
     'ops.uPdNoPost': { hu: 'Lezárt fuvar, posta nincs elküldve', ro: 'Cursă finalizată, poștă netrimisă' },
     'ops.uPdUnpaid': { hu: 'Lezárt fuvar, nincs kifizetve', ro: 'Cursă finalizată, neîncasată' },
+    'ops.pdPickTitle': { hu: 'Válaszd ki a fuvart', ro: 'Alege cursa' },
+    'ops.pdPickHint': { hu: 'A dokumentum-nyomkövetés kártya az adott fuvarra nyílik meg.', ro: 'Cardul de urmărire documente se deschide pentru cursa selectată.' },
+    'ops.pdPickEmpty': { hu: 'Nincs ilyen fuvar (a lista azóta frissülhetett).', ro: 'Nu există o astfel de cursă (lista s-ar putea să se fi actualizat între timp).' },
     'ops.healthTitle': { hu: 'Operatív mutatók', ro: 'Indicatori operaționali' },
     'ops.hAssigned': { hu: 'Kiosztott fuvarok aránya', ro: 'Rată transporturi alocate' },
     'ops.hWaiting': { hu: 'Kiosztásra vár', ro: 'În așteptare' },
