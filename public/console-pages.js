@@ -257,6 +257,14 @@ function loadFleetSummary(){
   });
 }
 
+// A fuvar-lista chip-szűrőjét beállítja, MIELŐTT a fülre navigál — a Sürgős
+// sor "📋 Post-livrare" tételei egyenesen a szűrt nézetre visznek (nem kell
+// utólag kézzel rákattintani a megfelelő chip-re a fuvarlistán).
+function opsGoOrdersChip(tab, chipKey){
+  try { window._orderChipFilter = chipKey; } catch(e){}
+  activateTab(tab);
+}
+
 /* ════════════════════════════════════════════════════════════
    4) OPERATÍV KÖZPONT (#opsCenterBox) — getOpsCenter
       Diszpécser-vezérlő: gyors-akció kártyák + sürgős sor + egészség-mutató.
@@ -296,13 +304,22 @@ function loadOpsCenter(){
       + actCard('📥', t('ops.actInbound'),   'inbound')
       + actCard('📦', t('ops.actWarehouse'), 'warehouse')
       + actCard('💸', t('ops.actInvoicesIn'),'invoices-in')
+      + actCard('🗺️', t('ops.actGpsDaily'),  'gps-daily-track')
+      + actCard('📧', t('ops.actDigest'),    'morning-digest')
       + '</div>';
 
-    // Sürgős sor — csak a >0 tételek; kattintásra a megfelelő fülre
-    function urgent(ico, lbl, n, tab, sev){
+    // Sürgős sor — csak a >0 tételek; kattintásra a megfelelő fülre.
+    // Az `orderChip` param (opcionális) a fuvarlista chip-szűrőjét is beállítja
+    // navigáció ELŐTT — így a felhasználó egyenesen a szűrt nézetet látja
+    // (📋 Post-livrare hátralék: számla/posta/fizetés), nem kell magának
+    // rákeresnie a chip-sávban.
+    function urgent(ico, lbl, n, tab, sev, orderChip){
       if(!n) return '';
       var bcls = sev === 'danger' ? 'err' : (sev === 'warn' ? 'warn' : 'info');
-      return '<div class="glass" style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;margin-bottom:8px;" onclick="activateTab(\'' + tab + '\')">'
+      var onclick = orderChip
+        ? "opsGoOrdersChip('" + tab + "','" + orderChip + "')"
+        : "activateTab('" + tab + "')";
+      return '<div class="glass" style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;margin-bottom:8px;" onclick="' + onclick + '">'
         + '<div style="font-size:18px;">' + ico + '</div>'
         + '<div style="font-weight:600;" class="text-primary">' + _cpEsc(lbl) + '</div>'
         + '<div style="margin-left:auto;"><span class="badge ' + bcls + '">' + n + '</span></div></div>';
@@ -313,7 +330,10 @@ function loadOpsCenter(){
       + urgent('⏰', t('ops.uLate'),            c.keso || 0,             'orders-list', 'danger')
       + urgent('🧾', t('ops.uDueInvoice'),      c.lejaro_szamla || 0,    'stats-finance', 'warn')
       + urgent('💸', t('ops.uDueApInvoice'),    c.lejaro_ap_szamla || 0, 'invoices-in', 'warn')
-      + urgent('📄', t('ops.uDueDoc'),          c.lejaro_dok || 0,       'expiries', 'warn');
+      + urgent('📄', t('ops.uDueDoc'),          c.lejaro_dok || 0,       'expiries', 'warn')
+      + urgent('🧾', t('ops.uPdNoInvoice'),     c.pd_no_invoice || 0,    'orders-list', 'warn', 'pd_no_invoice')
+      + urgent('📬', t('ops.uPdNoPost'),        c.pd_no_post || 0,       'orders-list', 'warn', 'pd_pending_post')
+      + urgent('💶', t('ops.uPdUnpaid'),        c.pd_unpaid || 0,        'orders-list', 'warn', 'pd_pending_pay');
     if(!queueItems) queueItems = '<div class="text-muted" style="padding:14px;">' + _cpEsc(t('ops.queueEmpty')) + '</div>';
 
     // Egészség-mutató sor — csak a tisztán számolható proxy-k (null = kihagyva)

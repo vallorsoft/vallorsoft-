@@ -104,6 +104,27 @@ handlers.getOpsCenter = async function (req, res, args) {
       lejaroDok = (docR.rows[0] && docR.rows[0].db) || 0;
     } catch (e) { /* document_expiries hiányában 0 */ }
 
+    // 6) Dokumentum-nyomkövetés hátraléka (post-delivery, order-post-delivery.sql) —
+    //    Finalizat fuvarok, amiknek nincs számlaszáma / nincs postázva / nincs
+    //    kifizetve. DIREKT oszlop-hivatkozás (nem to_jsonb) — ha a migráció még
+    //    nem futott, valódi hibát dob, amit a try/catch elkap → 0 (nem mutat
+    //    félrevezetően MINDEN Finalizat fuvart hiányosnak).
+    let pdNoInvoice = 0, pdNoPost = 0, pdUnpaid = 0;
+    try {
+      const pdR = await pool.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE COALESCE(invoice_no,'') = '')::int AS no_invoice,
+           COUNT(*) FILTER (WHERE postal_sent_at IS NULL)::int AS no_post,
+           COUNT(*) FILTER (WHERE COALESCE(payment_status_ext,'pending') <> 'paid')::int AS unpaid
+         FROM orders WHERE company_id = $1 AND status = 'Finalizat'`,
+        [cid]
+      );
+      const pd = pdR.rows[0] || {};
+      pdNoInvoice = pd.no_invoice || 0;
+      pdNoPost = pd.no_post || 0;
+      pdUnpaid = pd.unpaid || 0;
+    } catch (e) { /* order-post-delivery migráció hiányában 0 */ }
+
     // 6) Operatív egészség-mutatók (proxy-k a meglévő adatból):
     //    - kiosztott arány: a kiosztásra váró (Disponibil) fuvarok vs. összes aktív
     //    - flotta-kihasználtság: aktív (úton lévő) jármű / aktív jármű össz.
@@ -153,7 +174,10 @@ handlers.getOpsCenter = async function (req, res, args) {
         hianyzo_fuvarozo: oc.hianyzo_fuvarozo || 0,
         lejaro_szamla: lejaroSzamla,
         lejaro_ap_szamla: lejaroApSzamla,
-        lejaro_dok: lejaroDok
+        lejaro_dok: lejaroDok,
+        pd_no_invoice: pdNoInvoice,
+        pd_no_post: pdNoPost,
+        pd_unpaid: pdUnpaid
       },
       health: {
         assigned_pct: assignedPct,      // kiosztott fuvarok aránya (%) vagy null

@@ -2681,7 +2681,13 @@ function loadOrders(){
     if(!Array.isArray(list))list=[];
     _ordersAllCache = list;
     renderOrdersMetricBand(list);
-    renderFilteredOrders(list);
+    // FONTOS: `filterOrders()`-t hívjuk (nem közvetlenül `renderFilteredOrders`-t) —
+    // ez az aktuálisan beállított chip/keresés/státusz-szűrőt is alkalmazza a
+    // frissen betöltött listára. Enélkül a chip-sáv vizuálisan „aktívnak"
+    // mutatta a korábban kiválasztott chipet, de a táblázat mégis mindent
+    // mutatott volna (pl. az Operatív központ „📋 Post-livrare" sürgős-sor
+    // navigációja a chip-et beállítja, de a tábla nem szűrődött volna).
+    if(typeof filterOrders === 'function') filterOrders(); else renderFilteredOrders(list);
     // A fejléc statikus (a tbody cserélődik); a méretező/átrendező egyszer
     // fűződik fel, az oszlop-SORREND viszont minden render után újra
     // alkalmazódik a friss sorokra.

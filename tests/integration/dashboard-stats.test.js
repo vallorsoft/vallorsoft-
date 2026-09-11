@@ -209,6 +209,7 @@ describe('getOpsCenter', () => {
       .mockResolvedValueOnce(rows([{ db: 4 }])) // lejaro_szamla
       .mockResolvedValueOnce(rows([{ db: 3 }])) // lejaro_ap_szamla
       .mockResolvedValueOnce(rows([{ db: 5 }])) // lejaro_dok
+      .mockResolvedValueOnce(rows([{ no_invoice: 7, no_post: 6, unpaid: 9 }])) // post-delivery hátralék
       .mockResolvedValueOnce(rows([{ varakozo: 2, aktiv: 10 }])) // waitR
       .mockResolvedValueOnce(rows([{ aktiv_jarmu: 8 }])) // fr
       .mockResolvedValueOnce(rows([{ db: 6 }])); // onroad
@@ -217,9 +218,56 @@ describe('getOpsCenter', () => {
     expect(res.body.result.counters.aktiv).toBe(10);
     expect(res.body.result.counters.hianyzo_uit).toBe(2);
     expect(res.body.result.counters.lejaro_szamla).toBe(4);
+    expect(res.body.result.counters.pd_no_invoice).toBe(7);
+    expect(res.body.result.counters.pd_no_post).toBe(6);
+    expect(res.body.result.counters.pd_unpaid).toBe(9);
     expect(res.body.result.health.assigned_pct).toBe(80); // (10-2)/10
     expect(res.body.result.health.utilization_pct).toBe(75); // 6/8
     expect(res.body.result.health.waiting).toBe(2);
+  });
+
+  test('post-delivery lekérdezés company_id + Finalizat státuszra szűrve', async () => {
+    setUser(ADMIN);
+    pool.query
+      .mockResolvedValueOnce(rows([{ aktiv: 0, mai_felrakas: 0, mai_lerakas: 0, keso: 0, hianyzo_fuvarozo: 0 }]))
+      .mockResolvedValueOnce(rows([{ db: 0 }]))
+      .mockResolvedValueOnce(rows([{ db: 0 }]))
+      .mockResolvedValueOnce(rows([{ db: 0 }]))
+      .mockResolvedValueOnce(rows([{ db: 0 }]))
+      .mockResolvedValueOnce(rows([{ no_invoice: 0, no_post: 0, unpaid: 0 }]))
+      .mockResolvedValueOnce(rows([{ varakozo: 0, aktiv: 0 }]))
+      .mockResolvedValueOnce(rows([{ aktiv_jarmu: 0 }]))
+      .mockResolvedValueOnce(rows([{ db: 0 }]));
+    await call('getOpsCenter', []);
+    // A 6. hívás a post-delivery hátralék-lekérdezés.
+    const [sql, params] = pool.query.mock.calls[5];
+    expect(String(sql)).toMatch(/FROM orders WHERE company_id = \$1 AND status = 'Finalizat'/);
+    expect(String(sql)).toMatch(/invoice_no/);
+    expect(String(sql)).toMatch(/postal_sent_at/);
+    expect(String(sql)).toMatch(/payment_status_ext/);
+    expect(params).toEqual([CID]);
+  });
+
+  test('post-delivery migráció-hiány (hiányzó oszlop) → 0-ra esik, a többi számláló érintetlen', async () => {
+    setUser(ADMIN);
+    pool.query
+      .mockResolvedValueOnce(rows([{ aktiv: 5, mai_felrakas: 1, mai_lerakas: 1, keso: 0, hianyzo_fuvarozo: 0 }]))
+      .mockResolvedValueOnce(rows([{ db: 0 }]))
+      .mockResolvedValueOnce(rows([{ db: 0 }]))
+      .mockResolvedValueOnce(rows([{ db: 0 }]))
+      .mockResolvedValueOnce(rows([{ db: 0 }]))
+      .mockRejectedValueOnce(new Error('column "invoice_no" does not exist')) // migráció-hiány
+      .mockResolvedValueOnce(rows([{ varakozo: 0, aktiv: 5 }]))
+      .mockResolvedValueOnce(rows([{ aktiv_jarmu: 3 }]))
+      .mockResolvedValueOnce(rows([{ db: 2 }]));
+    const res = await call('getOpsCenter', []);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.counters.pd_no_invoice).toBe(0);
+    expect(res.body.result.counters.pd_no_post).toBe(0);
+    expect(res.body.result.counters.pd_unpaid).toBe(0);
+    // A többi számláló + health mutató ettől függetlenül helyes marad
+    expect(res.body.result.counters.aktiv).toBe(5);
+    expect(res.body.result.health.waiting).toBe(0);
   });
 });
 
