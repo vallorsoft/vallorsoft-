@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-09-11 — Operatív központ: post-livrare lépés-sorozat kártya (PR #441)
+
+**Kérés:** „surgosegi savba ne a fuvarhoz ugorjon hanem adot fuvarnak legyen egy kartyaja ahol a lepesek vannak egymas utan es mutassa melyik jon es szerkesztesi lehetoseggel. ha fuvarra lepsz is legyen meg a kartya" — a Sürgős sor 📋 post-livrare tételei (számla/posta/fizetés hátralék) eddig csak a fuvarlistát szűrték meg egy chippel (PR #440); most egy konkrét fuvar dokumentum-nyomkövetés kártyáját nyitják meg.
+
+1. **`vsPostDeliveryOpen` (console-shared.js) lépés-sorozat fejléc** — új `_vsPdSteps(c)` helper 4 lépéssel (Fuvar lezárva → Számla kiállítva → Posta elküldve → Kifizetve; `done` a fuvar tényleges mezőiből: `invoice_no`/`postal_sent_at`/`payment_status_ext`), vizuális lánc kör-ikonokkal (✓ zöld / aktuális kék glow / hátralévő szürke) + „➡️ Következő lépés" sor a MEGLÉVŐ szerkeszthető form fölött (a form változatlan — a szerkesztési lehetőség már megvolt).
+2. **Operatív központ (console-pages.js)** — új `opsOpenPostDeliveryQueue(chipKey)`: friss `comList` + `_ORDER_PD_FILTERS` predikátum → 1 találatnál egyenesen `vsPostDeliveryOpen(id)`, többnél egy kis választó-lista (`_opsPdPickerOpen`/`Close`, fuvar-szám+ügyfél+útvonal soronként). A 3 pd-riasztás sor (`urgent()` hívás) mostantól ezt hívja a régi `opsGoOrdersChip` (chip-szűrt lista-navigáció) helyett.
+3. **Ugyanaz a kártya mindkét belépési pontról** — a Fuvarok kezelése lista ⋯ menü „📋 Post-livrare" gombja (változatlan `vsPostDeliveryOpen` hívás) és az Operatív központ Sürgős sora ugyanazt a komponenst nyitja meg, konzisztensen.
+4. **i18n** — 6 új `cs.pd.step*`/`nextStep`/`allDone` + 3 új `ops.pdPick*` kulcs (RO-alap+HU). Cache-bust `?v=20260911b`. Tisztán kliens-oldali, nincs séma-/szerver-változás. **1229 Jest zöld** (nincs regresszió).
+
 ## 2026-09-10 — Sofőr-elszámolás: 10 szétszórt nyomtatás-gomb → EGY „📄 Nyomtatás / Dokumentum" belépő + wizard dokumentum-választóval, MINDEN dokumentum egységes hivatalos fejléccel, branch `claude/signature-seal-document-management-5orqva`
 
 ### Fejléces papír — minden dokumentum egységes fejléccel (follow-up)
