@@ -124,12 +124,22 @@ handlers.checkInvoicePaidExternal = async function (req, res, args) {
     const r = await adapter.getInvoice(serie, numar);
     if (!r.ok) return res.json({ result: { ok: false, err: r.message || 'Provider a returnat eroare.' } });
 
-    // Fizetés-értékek. Az FGO adapter `invoice.value` + `invoice.paid`-t adja
-    // vissza; más adapterek eltérhetnek — bővítés hozzáadható.
-    var value = 0, paid = 0;
-    if (r.invoice) {
-      value = Number(r.invoice.value || r.invoice.total || 0);
-      paid  = Number(r.invoice.paid  || r.invoice.paid_amount || 0);
+    // Fizetés-értékek — a providerenkénti nyers mezőnevek eltérnek (csak FGO
+    // adapter dokumentált `value`/`paid` néven; a többi RAW API-választ ad
+    // vissza, amiben más lehet a kulcsnév). Több lehetséges kulcsnevet
+    // próbálunk sorban; ha EGYIKET sem találjuk, NEM írjuk felül a státuszt
+    // hamis „pending"-re — inkább hibát adunk, hogy a felhasználó tudja: a
+    // provider válaszát nem tudtuk értelmezni (a nyers válasz `raw`-ban van,
+    // fejlesztői diagnosztikához).
+    const inv = r.invoice || {};
+    const _num = (obj, keys) => {
+      for (const k of keys) { if (obj[k] != null && obj[k] !== '') { const n = Number(obj[k]); if (isFinite(n)) return n; } }
+      return null;
+    };
+    const value = _num(inv, ['value', 'total', 'totalAmount', 'amount', 'valoare']);
+    const paid  = _num(inv, ['paid', 'paid_amount', 'paidValue', 'amountPaid', 'valoareAchitata']);
+    if (value == null || paid == null) {
+      return res.json({ result: { ok: false, err: 'Nu s-a putut interpreta răspunsul providerului (' + br.rows[0].provider + ') — structura necunoscută.' } });
     }
     var newStatus = 'pending';
     if (value > 0 && paid >= value) newStatus = 'paid';

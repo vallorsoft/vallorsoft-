@@ -1282,30 +1282,29 @@ function startMorningDigestScheduler() {
       todayDrop = d.rows;
     } catch (_) {}
 
-    // Lejáró dokumentumok — 30 nap.
+    // Lejáró dokumentumok — 30 nap. (`document_expiries` sémája: doc_type,
+    // entity_type, entity_label, expiry_date — lásd db/phase3-modules.sql.)
     let expiries = [];
     try {
       const e = await pool.query(
-        `SELECT tip, target_type, target_ref, expires_on
+        `SELECT doc_type, entity_type, entity_label, expiry_date
            FROM document_expiries
           WHERE company_id=$1
-            AND expires_on IS NOT NULL
-            AND expires_on <= (CURRENT_DATE + INTERVAL '30 days')
-          ORDER BY expires_on LIMIT 40`, [cid]);
+            AND expiry_date IS NOT NULL
+            AND expiry_date <= (CURRENT_DATE + INTERVAL '30 days')
+          ORDER BY expiry_date LIMIT 40`, [cid]);
       expiries = e.rows;
     } catch (_) {}
 
-    // Szerviz-esedékesség (2 hét).
+    // Szerviz-esedékesség — a MEGLÉVŐ, jól tesztelt `computeServiceDueAlerts`
+    // segédfüggvényt hívjuk (handlers/fleetCompliance.js) ahelyett, hogy egy
+    // gyengébb (csak dátum-alapú, GPS/menetlevél-km-becslést nem ismerő) saját
+    // lekérdezést írnánk — ez már a Vezérlőpult-kártyát és a push/e-mail
+    // riasztást is kiszolgálja, ugyanaz a küszöb (2000 km / 30 nap).
     let services = [];
     try {
-      const s = await pool.query(
-        `SELECT vehicle_id, next_due_date, next_due_km
-           FROM vehicle_service_log
-          WHERE company_id=$1 AND closed_at IS NULL
-            AND ((next_due_date IS NOT NULL AND next_due_date <= (CURRENT_DATE + INTERVAL '14 days'))
-              OR next_due_km IS NOT NULL)
-          ORDER BY next_due_date NULLS LAST LIMIT 40`, [cid]);
-      services = s.rows;
+      const { computeServiceDueAlerts } = require('../handlers/fleetCompliance');
+      services = await computeServiceDueAlerts(cid, { onlyStale: false });
     } catch (_) {}
 
     return { stats, todayPick, todayDrop, expiries, services };
@@ -1363,14 +1362,23 @@ function startMorningDigestScheduler() {
       html += '<h3 style="margin:14px 0 6px;font-size:14px;">⏰ Documente expiră în 30 zile ('+d.expiries.length+')</h3>';
       html += '<ul style="margin:4px 0;padding-left:20px;font-size:12.5px;">';
       d.expiries.slice(0, 15).forEach(function(x){
-        html += '<li>'+esc(x.tip||'—')+' · '+esc(x.target_ref||'')+' — '+esc(String(x.expires_on).slice(0,10))+'</li>';
+        html += '<li>'+esc(x.doc_type||'—')+' · '+esc(x.entity_label||'')+' — '+esc(String(x.expiry_date).slice(0,10))+'</li>';
       });
       if (d.expiries.length > 15) html += '<li style="color:#64748b;">+ '+(d.expiries.length-15)+' altele…</li>';
       html += '</ul>';
     }
-    // Szerviz
+    // Szerviz — computeServiceDueAlerts adja vissza (2000 km / 30 nap küszöb).
     if (d.services && d.services.length) {
-      html += '<h3 style="margin:14px 0 6px;font-size:14px;">🔧 Servicii scadente în 2 săptămâni ('+d.services.length+')</h3>';
+      html += '<h3 style="margin:14px 0 6px;font-size:14px;">🔧 Servicii scadente ('+d.services.length+')</h3>';
+      html += '<ul style="margin:4px 0;padding-left:20px;font-size:12.5px;">';
+      d.services.slice(0, 15).forEach(function(s){
+        var bits = [];
+        if (s.km_left != null) bits.push((s.km_left <= 0 ? 'depășit cu ' + Math.abs(s.km_left) : s.km_left) + ' km');
+        if (s.days_left != null) bits.push((s.days_left <= 0 ? 'expirat de ' + Math.abs(s.days_left) : s.days_left) + ' zile');
+        html += '<li>'+esc(s.rendszam||'—')+(s.category?' · '+esc(s.category):'')+' — '+esc(bits.join(' / ')||'—')+'</li>';
+      });
+      if (d.services.length > 15) html += '<li style="color:#64748b;">+ '+(d.services.length-15)+' altele…</li>';
+      html += '</ul>';
     }
     html += '<div style="margin-top:20px;padding-top:10px;border-top:1px solid #cbd5e1;color:#94a3b8;font-size:11px;">'+
       'Sumarul se trimite zilnic conform setărilor. Poți dezactiva sau modifica ora în Setări → 📧 Sumar zilnic.</div>';
@@ -1395,8 +1403,14 @@ function startMorningDigestScheduler() {
     const today = _hu_today();
     for (const c of companies) {
       try {
-        // Duplikáció-őr: ma már küldtünk-e?
-        const lastSent = c.digest_last_sent_at ? new Date(c.digest_last_sent_at).toISOString().slice(0, 10) : null;
+        // Duplikáció-őr: ma már küldtünk-e? FONTOS: a `lastSent`-et is
+        // Europe/Bucharest szerint kell dátumra bontani (nem UTC-ben, mint a
+        // `.toISOString()` tenné) — különben éjfél körüli `digest_time`-nál
+        // vagy DST-váltáskor a UTC-dátum eltolódhat a helyi naptól, és a
+        // kétszeri-küldés elleni védelem hamisan (nem) fogna.
+        const lastSent = c.digest_last_sent_at
+          ? new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Bucharest' }).format(new Date(c.digest_last_sent_at))
+          : null;
         if (lastSent === today) continue;
         // Az időpont HH:MM formában? A `digest_time` PG TIME → '07:00:00' string.
         const wantHm = String(c.digest_time || '07:00').slice(0, 5);

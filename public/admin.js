@@ -188,6 +188,7 @@ gas('authMe').then(u=>{
   if(!u||u.pozicio!=='Admin'){window.location.href='/login';return;}
   document.getElementById('meBadge').textContent=u.nume;
   myEmail=u.email;
+  window._vsCurrentPozicio='Admin'; // közös JS-modulok (pl. morning-digest.js) innen tudják, hogy Admin-e a felhasználó
   // Chat ideiglenesen: WhatsApp-átirányítás — Firebase-panel kikapcsolva.
   // A régi initFirebaseChatPanel a console-shared.js-ben érintetlen; a
   // chat fülön a loadTab betölti a WhatsApp UI-t (loadWhatsappChatPane).

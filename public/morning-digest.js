@@ -3,9 +3,13 @@
 
 (function () {
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[m])); }
+  // `window._vsCurrentPozicio` — az admin.js/manager.js `authMe()` callback-je
+  // állítja be belépéskor ('Admin' vagy 'Manager'; a két oldal külön-külön
+  // gate-eli a szerepet, tehát ott mindig a bejelentkezett user tényleges
+  // szerepe). A morning-digest.js mindkét oldalon betöltődik, de csak az
+  // Admin írhat.
   function _isAdmin() {
-    try { return (window._meData && window._meData.pozicio === 'Admin') || (window.MeData && window.MeData.pozicio === 'Admin'); }
-    catch (_) { return false; }
+    return window._vsCurrentPozicio === 'Admin';
   }
   function _gas(fn, args) {
     return fetch('/api/execute', { method:'POST', headers:{'Content-Type':'application/json'},

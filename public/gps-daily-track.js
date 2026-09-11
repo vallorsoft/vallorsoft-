@@ -24,8 +24,15 @@
 
   var _map = null, _layers = null, _tile = null;
 
+  // FONTOS: a `loadGpsDailyTrack()` minden aloldal-megnyitáskor ÚJRAGENERÁLJA
+  // a `#gpsDailyTrackBox` teljes innerHTML-jét (beleértve a `#gpsDailyMap`
+  // konténert is) — tehát a régi Leaflet-példány (ha `_map` modul-szinten
+  // megmaradt) egy már LEVÁLASZTOTT (detached) DOM-node-ra mutatna. Ezért itt
+  // MINDIG lebontjuk a korábbi térképet, mielőtt egy friss konténerre új
+  // példányt építünk (a `.remove()` Leaflet API leiratkozik minden eseményről
+  // és törli a belső DOM-referenciákat is — nincs memory-leak).
   function _initMap() {
-    if (_map) return _map;
+    if (_map) { try { _map.remove(); } catch (_) {} _map = null; _layers = null; _tile = null; }
     var el = document.getElementById('gpsDailyMap');
     if (!el || typeof L === 'undefined') return null;
     _map = L.map(el, { zoomControl: true }).setView([45.94, 24.97], 7);
