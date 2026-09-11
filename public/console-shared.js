@@ -5294,6 +5294,18 @@ window.vsSoferInlineOpen = vsSoferInlineOpen;
 //  megnyílik, nincs plusz szerver-hívás. Mentés `setOrderPostDelivery`; státusz-
 //  lekérés `checkInvoicePaidExternal`.
 // ───────────────────────────────────────────────────────────────
+// A post-delivery lifecycle lépés-sorozata — a lezárt fuvar dokumentum-útja
+// egymás után: lezárva → számlázva → postázva → kifizetve. A `done` a jelenlegi
+// fuvar-adatból derül (nincs külön tárolt lépés-állapot); a lista mindig
+// ugyanabból a 3 mezőből épül, amit a _ORDER_PD_FILTERS is használ.
+function _vsPdSteps(c){
+  return [
+    { key: 'finalized', label: t('cs.pd.stepFinalized')||'Fuvar lezárva', done: true },
+    { key: 'invoice',   label: t('cs.pd.stepInvoice')||'Számla kiállítva', done: !!(c.invoice_no && String(c.invoice_no).trim()) },
+    { key: 'posted',    label: t('cs.pd.stepPosted')||'Posta elküldve',    done: !!c.postal_sent_at },
+    { key: 'paid',      label: t('cs.pd.stepPaid')||'Kifizetve',           done: (c.payment_status_ext||'pending') === 'paid' }
+  ];
+}
 function vsPostDeliveryOpen(orderId){
   var c = (window._ordersAllCache || []).find(function(x){ return String(x.id) === String(orderId); });
   if(!c){ toast(t('common.notFound')||'Nem található', 'err'); return; }
@@ -5312,6 +5324,24 @@ function vsPostDeliveryOpen(orderId){
     '</div>'+
     '<button type="button" class="btn ghost" onclick="vsPostDeliveryClose()" style="font-size:20px;line-height:1;padding:4px 10px;">×</button>'+
   '</div>';
+  var steps = _vsPdSteps(c);
+  var nextStep = steps.find(function(s){ return !s.done; });
+  var stepsHtml = '<div class="vs-pd-steps" style="display:flex;align-items:stretch;gap:0;margin-bottom:16px;">' +
+    steps.map(function(s, i){
+      var isNext = !s.done && s === nextStep;
+      var color = s.done ? '#16a34a' : (isNext ? '#2563eb' : '#94a3b8');
+      var bg = s.done ? 'rgba(22,163,74,.10)' : (isNext ? 'rgba(37,99,235,.10)' : 'transparent');
+      var icon = s.done ? '✓' : (i+1);
+      var sep = i < steps.length-1 ? '<div style="flex:0 0 18px;display:flex;align-items:center;justify-content:center;color:var(--muted);">›</div>' : '';
+      return '<div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;border-radius:10px;background:'+bg+';border:1.5px solid '+color+(isNext?';box-shadow:0 0 0 3px rgba(37,99,235,.12)':'')+';">'
+        + '<div style="width:24px;height:24px;border-radius:50%;background:'+color+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;">'+icon+'</div>'
+        + '<div style="font-size:11px;text-align:center;font-weight:'+(isNext?'700':'500')+';color:'+(s.done||isNext?'var(--text)':'var(--muted)')+';line-height:1.2;">'+esc(s.label)+'</div>'
+        + '</div>' + sep;
+    }).join('') +
+  '</div>' +
+  (nextStep
+    ? '<div style="font-size:12.5px;color:#2563eb;font-weight:600;margin:-8px 0 14px;">➡️ '+esc(t('cs.pd.nextStep')||'Következő lépés')+': '+esc(nextStep.label)+'</div>'
+    : '<div style="font-size:12.5px;color:#16a34a;font-weight:600;margin:-8px 0 14px;">✓ '+esc(t('cs.pd.allDone')||'Minden lépés kész')+'</div>');
   var payStatus = c.payment_status_ext || 'pending';
   var payChecked = c.payment_ext_checked_at ? (' · '+(t('cs.pd.checkedAt')||'utoljára')+': '+new Date(c.payment_ext_checked_at).toLocaleString()) : '';
   var paySource = c.payment_ext_source ? (' ('+esc(c.payment_ext_source)+')') : '';
@@ -5356,7 +5386,7 @@ function vsPostDeliveryOpen(orderId){
       '</div>'+
       '<div id="vsPdStat" class="vs-pd-stat"></div>'+
     '</div>';
-  box.innerHTML = head + body;
+  box.innerHTML = head + stepsHtml + body;
   back.appendChild(box);
   document.body.appendChild(back);
   back.addEventListener('click', function(e){ if(e.target === back) vsPostDeliveryClose(); });

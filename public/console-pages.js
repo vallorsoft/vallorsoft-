@@ -265,6 +265,71 @@ function opsGoOrdersChip(tab, chipKey){
   activateTab(tab);
 }
 
+// A Sürgős sor 📋 post-livrare tételei (nincs számla / posta / fizetés)
+// mostantól NEM a fuvarlistára ugranak, hanem egyenesen az ÉRINTETT fuvar
+// dokumentum-nyomkövetés kártyáját (vsPostDeliveryOpen) nyitják meg — a
+// kártya lépés-sorozatot mutat (lezárva→számlázva→postázva→kifizetve),
+// jelzi melyik jön, és helyben szerkeszthető. Ha a chipnek több fuvar felel
+// meg, egy kis választó-lista jön fel előbb. A vsPostDeliveryOpen ugyanaz a
+// kártya, ami a Fuvarok kezelése listáról (⋯ menü → 📋 Post-livrare) is
+// elérhető — tehát a kártya oda-vissza konzisztens.
+function opsOpenPostDeliveryQueue(chipKey){
+  if (typeof gas !== 'function') return;
+  gas('comList').then(function(list){
+    if(!Array.isArray(list)) list = [];
+    window._ordersAllCache = list; // a vsPostDeliveryOpen ebből olvas
+    var pred = (typeof _ORDER_PD_FILTERS !== 'undefined') ? _ORDER_PD_FILTERS[chipKey] : null;
+    var matches = pred ? list.filter(pred) : [];
+    if(!matches.length){
+      toast(t('ops.pdPickEmpty')||'Nincs ilyen fuvar (a lista azóta frissülhetett).', 'info');
+      return;
+    }
+    if(matches.length === 1){
+      vsPostDeliveryOpen(matches[0].id);
+      return;
+    }
+    _opsPdPickerOpen(matches);
+  }).catch(function(){
+    toast(t('common.error')||'Hiba', 'err');
+  });
+}
+window.opsOpenPostDeliveryQueue = opsOpenPostDeliveryQueue;
+
+function _opsPdPickerOpen(matches){
+  _opsPdPickerClose();
+  var back = document.createElement('div');
+  back.id = 'opsPdPickBack';
+  back.className = 'modal-back';
+  back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9997;padding:16px;';
+  var box = document.createElement('div');
+  box.className = 'modal glass';
+  box.style.cssText = 'max-width:520px;width:100%;max-height:80vh;overflow:auto;padding:18px;border-radius:14px;';
+  var rows = matches.map(function(c){
+    var route = ((c.loc_incarcare||'') + ' → ' + (c.loc_descarcare||'')).trim();
+    return '<div class="glass" style="padding:10px 12px;cursor:pointer;margin-bottom:8px;" onclick="_opsPdPickerClose();vsPostDeliveryOpen(\'' + String(c.id).replace(/'/g,"\\'") + '\')">'
+      + '<div style="font-weight:700;" class="text-primary">' + _cpEsc(c.fuvar_no||c.id) + ' · ' + _cpEsc(c.client||'—') + '</div>'
+      + '<div style="font-size:12px;color:var(--muted);margin-top:2px;">' + _cpEsc(route) + '</div>'
+      + '</div>';
+  }).join('');
+  box.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+    + '<h3 style="margin:0;font-size:15px;">' + _cpEsc(t('ops.pdPickTitle')||'Válaszd ki a fuvart') + '</h3>'
+    + '<button type="button" class="btn ghost" onclick="_opsPdPickerClose()" style="font-size:20px;line-height:1;padding:4px 10px;">×</button>'
+    + '</div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;">' + _cpEsc(t('ops.pdPickHint')||'') + '</div>'
+    + rows;
+  back.appendChild(box);
+  document.body.appendChild(back);
+  back.addEventListener('click', function(e){ if(e.target === back) _opsPdPickerClose(); });
+  document.addEventListener('keydown', _opsPdPickerEsc, true);
+}
+function _opsPdPickerEsc(e){ if(e.key === 'Escape') _opsPdPickerClose(); }
+function _opsPdPickerClose(){
+  var el = document.getElementById('opsPdPickBack');
+  if(el && el.parentNode) el.parentNode.removeChild(el);
+  document.removeEventListener('keydown', _opsPdPickerEsc, true);
+}
+window._opsPdPickerClose = _opsPdPickerClose;
+
 /* ════════════════════════════════════════════════════════════
    4) OPERATÍV KÖZPONT (#opsCenterBox) — getOpsCenter
       Diszpécser-vezérlő: gyors-akció kártyák + sürgős sor + egészség-mutató.
@@ -309,16 +374,19 @@ function loadOpsCenter(){
       + '</div>';
 
     // Sürgős sor — csak a >0 tételek; kattintásra a megfelelő fülre.
-    // Az `orderChip` param (opcionális) a fuvarlista chip-szűrőjét is beállítja
-    // navigáció ELŐTT — így a felhasználó egyenesen a szűrt nézetet látja
-    // (📋 Post-livrare hátralék: számla/posta/fizetés), nem kell magának
-    // rákeresnie a chip-sávban.
-    function urgent(ico, lbl, n, tab, sev, orderChip){
+    // A `pdChip` param (opcionális) a post-delivery hátralékokra: NEM a
+    // fuvarlistára ugrik, hanem az ÉRINTETT fuvar dokumentum-nyomkövetés
+    // kártyáját nyitja (lépés-sorozat + melyik jön + helyi szerkesztés) —
+    // 1 találatnál egyenesen, több találatnál egy kis választó-lista után
+    // (`opsOpenPostDeliveryQueue`).
+    function urgent(ico, lbl, n, tab, sev, orderChip, pdChip){
       if(!n) return '';
       var bcls = sev === 'danger' ? 'err' : (sev === 'warn' ? 'warn' : 'info');
-      var onclick = orderChip
-        ? "opsGoOrdersChip('" + tab + "','" + orderChip + "')"
-        : "activateTab('" + tab + "')";
+      var onclick = pdChip
+        ? "opsOpenPostDeliveryQueue('" + pdChip + "')"
+        : (orderChip
+          ? "opsGoOrdersChip('" + tab + "','" + orderChip + "')"
+          : "activateTab('" + tab + "')");
       return '<div class="glass" style="padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;margin-bottom:8px;" onclick="' + onclick + '">'
         + '<div style="font-size:18px;">' + ico + '</div>'
         + '<div style="font-weight:600;" class="text-primary">' + _cpEsc(lbl) + '</div>'
@@ -331,9 +399,9 @@ function loadOpsCenter(){
       + urgent('🧾', t('ops.uDueInvoice'),      c.lejaro_szamla || 0,    'stats-finance', 'warn')
       + urgent('💸', t('ops.uDueApInvoice'),    c.lejaro_ap_szamla || 0, 'invoices-in', 'warn')
       + urgent('📄', t('ops.uDueDoc'),          c.lejaro_dok || 0,       'expiries', 'warn')
-      + urgent('🧾', t('ops.uPdNoInvoice'),     c.pd_no_invoice || 0,    'orders-list', 'warn', 'pd_no_invoice')
-      + urgent('📬', t('ops.uPdNoPost'),        c.pd_no_post || 0,       'orders-list', 'warn', 'pd_pending_post')
-      + urgent('💶', t('ops.uPdUnpaid'),        c.pd_unpaid || 0,        'orders-list', 'warn', 'pd_pending_pay');
+      + urgent('🧾', t('ops.uPdNoInvoice'),     c.pd_no_invoice || 0,    null, 'warn', null, 'pd_no_invoice')
+      + urgent('📬', t('ops.uPdNoPost'),        c.pd_no_post || 0,       null, 'warn', null, 'pd_pending_post')
+      + urgent('💶', t('ops.uPdUnpaid'),        c.pd_unpaid || 0,        null, 'warn', null, 'pd_pending_pay');
     if(!queueItems) queueItems = '<div class="text-muted" style="padding:14px;">' + _cpEsc(t('ops.queueEmpty')) + '</div>';
 
     // Egészség-mutató sor — csak a tisztán számolható proxy-k (null = kihagyva)
