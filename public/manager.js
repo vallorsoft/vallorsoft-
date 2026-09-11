@@ -213,6 +213,7 @@ var sigCanvas,sigCtx,isDrawing=false;
 gas('authMe').then(u => {
   if (!u || u.pozicio !== 'Manager') { window.location.href = '/login'; return; }
   myEmail = u.email;
+  window._vsCurrentPozicio = 'Manager'; // közös JS-modulok (pl. morning-digest.js) innen tudják, hogy Admin-e a felhasználó
   document.getElementById('meBadge').textContent = u.nume;
   // Chat ideiglenesen: WhatsApp-átirányítás — Firebase-panel kikapcsolva.
   // A régi initFirebaseChatPanel a console-shared.js-ben érintetlen; a
