@@ -1169,13 +1169,39 @@ function orderScanFill(f){
   set('oKm',f.km);
   set('oSuly',f.suly_kg);
   set('oHossz',f.hossz_cm); set('oSzel',f.szel_cm); set('oMag',f.mag_cm);
-  set('oLoad',f.loc_incarcare); set('oLoadFirma',f.firma_incarcare);
-  set('oUnload',f.loc_descarcare); set('oUnloadFirma',f.firma_descarcare);
+  // Multi-drop (több felrakó vagy több lerakó): ha az AI `pickups[]`/`deliveries[]`
+  // tömböt is adott (2+ elem), akkor az ELSŐ elem a top-mezőkbe (loc_incarcare/
+  // loc_descarcare + firma + data), a TÖBBI pedig az `#oExtraStopsList`-be
+  // `addExtraStopRow`-val. Ha csak egy stop van (1+1), a régi top-mező-út fut.
+  // Fallback: ha a tömb hiányzik / üres, a legacy loc_*/firma_*/data_* mezőkből
+  // olvasunk (a szerver-oldali `services/order-ai/gemini.js` prompt garantálja,
+  // hogy a top-mezők az első elemhez igazodnak, tehát nincs adat-duplikáció).
+  var pickups = Array.isArray(f.pickups) ? f.pickups.filter(function(s){ return s && (s.loc || s.firma || s.data); }) : [];
+  var deliveries = Array.isArray(f.deliveries) ? f.deliveries.filter(function(s){ return s && (s.loc || s.firma || s.data); }) : [];
+  var firstPickup = pickups[0] || { loc: f.loc_incarcare, firma: f.firma_incarcare, data: f.data_incarcare };
+  var firstDelivery = deliveries[0] || { loc: f.loc_descarcare, firma: f.firma_descarcare, data: f.data_descarcare };
+  set('oLoad', firstPickup.loc);        set('oLoadFirma', firstPickup.firma);
+  set('oUnload', firstDelivery.loc);    set('oUnloadFirma', firstDelivery.firma);
   // datetime-local: a dátum-csak érték érvénytelen a mezőnek → 00:00-tal
   // egészítjük ki (a pontos időt a diszpécser állítja).
   var _dt=function(v){ return /^\d{4}-\d{2}-\d{2}$/.test(v||'')?(v+'T00:00'):v; };
-  set('oLoadDate',_dt(f.data_incarcare));
-  set('oUnloadDate',_dt(f.data_descarcare));
+  set('oLoadDate', _dt(firstPickup.data));
+  set('oUnloadDate', _dt(firstDelivery.data));
+  // A többi (2..N) stop az extra-listába. Először tisztítjuk (a scan új
+  // kiolvasás — a korábbi extras hamisak lennének); majd sorrendben pickups,
+  // aztán deliveries — a wizard `_syncStopsFromLegacyIfEmpty` így olvassa.
+  if(typeof addExtraStopRow==='function'){
+    var extraList = document.getElementById('oExtraStopsList');
+    if(extraList) extraList.innerHTML = '';
+    for(var i=1;i<pickups.length;i++){
+      addExtraStopRow('pickup','oExtraStopsList',{ loc: pickups[i].loc||'', firma: pickups[i].firma||'', data: pickups[i].data||'' });
+      n++;
+    }
+    for(var j=1;j<deliveries.length;j++){
+      addExtraStopRow('delivery','oExtraStopsList',{ loc: deliveries[j].loc||'', firma: deliveries[j].firma||'', data: deliveries[j].data||'' });
+      n++;
+    }
+  }
   // FTL/LTL — a két pipa egymást kizárja (mint kézi kattintásnál)
   if(f.load_type==='FTL'||f.load_type==='LTL'){
     var ftl=document.getElementById('oFtl'), ltl=document.getElementById('oLtl');
@@ -1335,6 +1361,17 @@ function createOrder(){
       toast(t('cs.orderSavedId')+r.id+extra,'ok');
       // A feltöltött (AI-val kiolvasott) megrendelő csatolása a friss fuvarhoz
       if(typeof _ordScanAttachTo==='function') _ordScanAttachTo(r.id);
+      // Tanulás: ha az AI-kiolvasás után mentette a fuvart, a mostani (a
+      // diszpécser által átnézett/javított) mezőket eltároljuk sablonként.
+      // A payload `p` (comCreate hívásának bemenete) tartalmazza az összes
+      // stabil mezőt — így a Gemini prompt legközelebb ezekből dolgozik.
+      // Best-effort: hiba esetén a fuvar mentve marad, csak a tanulás
+      // marad ki erre az iterációra (a következő scanre újra próbálkozunk).
+      if(_ordScanInfo){
+        try {
+          gas('confirmOrderScanTemplate',[{ fields: p }]).catch(function(){ /* csendes */ });
+        } catch(_) { /* csendes */ }
+      }
       loadOrders();
       ['oClient','oRef','oPret','oKm','oSuly','oHossz','oSzel','oMag','oLoad','oUnload','oLoadFirma','oUnloadFirma','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon','oUit'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
       const _el=document.getElementById('oExtraStopsList'); if(_el) _el.innerHTML='';

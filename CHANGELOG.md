@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-09-12 — Fuvar-megbízás AI-kiolvasás: multi-drop stops[] felismerés + few-shot tanulás
+
+**Kérés:** „Javits kicsit a megbizas kiolvasasan mert jelenleg ha tobb fel vagy lerako van is csak 1 fel 1 lerakot ismer fel ezt javitsd ki plusz keszitsd el hogy tanuljon kesobb konyebben ismerje fel" — a Fuvar-kiírás oldalon a 📄 AI-kiolvasás egy több felrakós/lerakós megrendelőnél is csak 1+1 pontot töltött elő; és a rendszer nem tanulta meg a visszatérő megbízók formátumát.
+
+1. **Gyökérok — kliens-oldali hézag:** a szerver (`handlers/orderScan.js` `_stopSanit`) MÁR eddig is helyesen visszaadta a `pickups[]`/`deliveries[]` tömböt, és a Gemini-prompt (`services/order-ai/gemini.js`) is kérte azokat multi-stop esetén. Az `orderScanFill` (`public/console-shared.js`) viszont CSAK `f.loc_incarcare`/`f.loc_descarcare` top-mezőket írta be, a `pickups[]`/`deliveries[]` tömböket teljesen figyelmen kívül hagyta. Fix: az első pickup/delivery a top-mezőkbe, a 2..N pedig az `#oExtraStopsList`-be `addExtraStopRow`-val (a wizard `_syncStopsFromLegacyIfEmpty` innen olvassa a step 2-t). Az `oExtraStopsList` scan előtt kiürül (tiszta állapotból indul).
+2. **Prompt-erősítés a multi-stop felismeréshez** (`services/order-ai/gemini.js`) — a Gemini-prompt kifejezetten „OBLIGATORIU" nyelvezettel utasítja a modellt, hogy 2+ pontnál MINDEN elemet írjon be a `pickups[]`/`deliveries[]`-be (nem csak az elsőt), és jelzi, hol keresse (számozott listák, „Loading points" / „Puncte de încărcare" szekciók, több felrakó/lerakó sor a táblában).
+3. **Few-shot tanulás — új `order_scan_samples` tábla** (`db/order-scan-samples.sql`, idempotens): cégenként/ügyfélenként egy sablon (a `client` első jelentős szavából, pl. „Vallor Logistics SRL" → „vallor"). CSAK a STABIL mezőket tanulja (valuta/load_type/tipikus méretek/cégnév-formátum/tipikus stops-szám); a per-fuvar változókat (dátum/ár/km/rendszám) SZÁNDÉKOSAN kihagyja, hogy a Gemini ne másolja őket. Nem személyes adat.
+4. **Új `confirmOrderScanTemplate` RPC** (`handlers/orderScan.js`, Admin/Manager, `ai-kiolvasas` kapu, audit): a `createOrder` sikere után a kliens best-effort meghívja a mentett fuvar mezőivel; `ON CONFLICT DO UPDATE` upsert-tel a `order_scan_samples`-be. A KÖVETKEZŐ scanOrderDocument hívás a cég legutóbbi 5 egyedi ügyfél-mintáját few-shot példaként a Gemini system-prompthoz csatolja („EXEMPLE CONFIRMATE anterior de această firmă") → azonos megbízó megrendelői konzisztensebben olvasódnak.
+5. **Konzisztencia a bon-scannerrel** — ugyanaz a mintázat (`FEWSHOT_MAX=5`, `DISTINCT ON (template_key)`, `normalizeTemplateKey` = első jelentős szó ≥3 kar., diakritikák le), csak megrendelő-sablonra alkalmazva. A `services/order-ai/gemini.js` `extract` új opcionális `samples` paramétere; a `buildPromptWithSamples` szerkeszti a system-promptot; nem-enumerable exportokkal a teszt eléri.
+6. **Multi-tenant védelem** változatlan: minden SQL `company_id`-szűrt + paraméteres; a `_sanitize` nem propagál extra kulcsot a klienshez; a `_stopSanit` per-stop max 20 sorra korlátoz (payload-védelem).
+7. **Teszt** (`tests/unit/orderScan.test.js` +11 új eset: multi-stop pickups[]/deliveries[] visszaadás, dátum-normalizálás, 20-sor korlát, few-shot betöltés + prompt-injektálás, DB-hiba fallback, confirm RPC szerep-kapu + csomag-flag + no-op + template_key normalizálás + DB-hiba). **1240 Jest zöld** (1229 → 1240, +11).
+
 ## 2026-09-11 — Admin/Manager: telefonos VISSZA-gomb appon belül navigál (PR #442)
 
 **Kérés:** „alitsd be a telefon viszagombja ne kilepjen a webrol hanem ugorjon visza az azelotti részére ezt minden menu es minden pont tudja az admin manager oldalon" — a sofőr felületen már megvolt (`sof.backExitHint`, history.pushState-csapda); az admin/manager konzolra hiányzott.

@@ -4,7 +4,9 @@
 //  (`scanOrderDocument`) handler kapuit + a mező-sanitize-t ellenőrizzük;
 //  a Gemini `fetch`-hívása mockolva (nincs valódi HTTP).
 // ============================================================
-jest.mock('../../db', () => require('../helpers/db-mock').pool);
+// A DB-lekérdezéseket mock-oljuk (order_scan_samples SELECT + INSERT).
+const mockDbQuery = jest.fn(async () => ({ rows: [] }));
+jest.mock('../../db', () => ({ query: (...a) => mockDbQuery(...a) }));
 jest.mock('../../lib/audit', () => ({ fromReq: async () => {} }));
 // featureEnabled: tesztenként állítható (alap: engedélyezett)
 let mockFeatureOn = true;
@@ -64,6 +66,8 @@ describe('handlers/orderScan — scanOrderDocument', () => {
   beforeEach(() => {
     process.env.GEMINI_API_KEY = 'test-key';
     mockFeatureOn = true;
+    mockDbQuery.mockReset();
+    mockDbQuery.mockResolvedValue({ rows: [] });
   });
   afterAll(() => {
     if (origKey === undefined) delete process.env.GEMINI_API_KEY;
@@ -181,5 +185,167 @@ describe('handlers/orderScan — scanOrderDocument', () => {
     const r = await call(ADMIN, PDF);
     expect(r.result.ok).toBe(true);
     expect(r.result.ai_used).toBe(false);
+  });
+
+  // ── Multi-stop (2+ felrakó vagy 2+ lerakó) ──
+  it('a pickups[]/deliveries[] tömböt visszaadja a kliensnek', async () => {
+    mockGeminiJson({
+      loc_incarcare: 'Budapest', loc_descarcare: 'Arad',
+      pickups: [
+        { loc: 'Budapest', firma: 'A Kft', data: '2026-07-30' },
+        { loc: 'Debrecen', firma: 'B Kft', data: '2026-07-30' },
+      ],
+      deliveries: [
+        { loc: 'Arad', firma: 'X SRL', data: '2026-07-31' },
+        { loc: 'Timișoara', firma: 'Y SRL', data: '2026-07-31' },
+        { loc: 'Cluj', firma: 'Z SRL', data: '2026-08-01' },
+      ],
+      confidence: 0.9,
+    });
+    const r = await call(ADMIN, IMG);
+    expect(r.result.ok).toBe(true);
+    expect(r.result.fields.pickups).toHaveLength(2);
+    expect(r.result.fields.deliveries).toHaveLength(3);
+    expect(r.result.fields.pickups[1].loc).toBe('Debrecen');
+    expect(r.result.fields.deliveries[2].firma).toBe('Z SRL');
+  });
+
+  it('multi-stop dátumok normalizálva, üres sorok kiesnek', async () => {
+    mockGeminiJson({
+      pickups: [
+        { loc: 'X', data: '2026-07-30T08:00' },
+        { loc: '', firma: '', data: '' },
+        { loc: 'Y', data: 'invalid-date' },
+      ],
+      deliveries: null,
+      confidence: 0.7,
+    });
+    const r = await call(ADMIN, IMG);
+    expect(r.result.fields.pickups).toHaveLength(2);
+    expect(r.result.fields.pickups[0].data).toBe('2026-07-30T08:00');
+    expect(r.result.fields.pickups[1].data).toBeNull();
+    expect(r.result.fields.deliveries).toBeNull();
+  });
+
+  it('multi-stop max 20 sorra korlátozva (payload-védelem)', async () => {
+    const big = Array.from({ length: 50 }, (_, i) => ({ loc: 'City' + i }));
+    mockGeminiJson({ pickups: big, deliveries: big, confidence: 0.5 });
+    const r = await call(ADMIN, IMG);
+    expect(r.result.fields.pickups).toHaveLength(20);
+    expect(r.result.fields.deliveries).toHaveLength(20);
+  });
+
+  // ── Tanulás — few-shot minta betöltés ──
+  it('few-shot: a cég korábbi mintáit lekéri és a prompt-ba fűzi', async () => {
+    // Első SELECT (loadCompanySamples) → 2 minta
+    mockDbQuery.mockResolvedValueOnce({ rows: [
+      { template_label: 'Vallor Logistics SRL', fields: { valuta: 'EUR', load_type: 'FTL', typical_deliveries: 3 }, updated_at: new Date('2026-08-01') },
+      { template_label: 'DHL Freight', fields: { valuta: 'EUR', load_type: 'LTL' }, updated_at: new Date('2026-07-01') },
+    ]});
+    // Elkapjuk a Gemini hívásba küldött system-promptot
+    let capturedBody = null;
+    global.fetch = jest.fn(async (url, opts) => {
+      capturedBody = JSON.parse(opts.body);
+      return { ok: true, status: 200, text: async () => JSON.stringify({
+        candidates: [{ content: { parts: [{ text: JSON.stringify({ client: 'Vallor', confidence: 0.9 }) }] } }],
+      }) };
+    });
+    const r = await call(ADMIN, IMG);
+    expect(r.result.ok).toBe(true);
+    expect(r.result.learned_from).toBe(2);
+    // A system-prompt tartalmazza az EXEMPLE CONFIRMATE szekciót
+    const sysPrompt = capturedBody.systemInstruction.parts[0].text;
+    expect(sysPrompt).toMatch(/EXEMPLE CONFIRMATE/);
+    expect(sysPrompt).toMatch(/Vallor Logistics SRL/);
+    expect(sysPrompt).toMatch(/DHL Freight/);
+  });
+
+  it('few-shot: DB-hiba (tábla hiányzik) → hint nélkül fut', async () => {
+    mockDbQuery.mockRejectedValueOnce(new Error('relation "order_scan_samples" does not exist'));
+    mockGeminiJson({ client: 'Test', confidence: 0.5 });
+    const r = await call(ADMIN, IMG);
+    expect(r.result.ok).toBe(true);
+    expect(r.result.learned_from).toBe(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  confirmOrderScanTemplate — a diszpécser által mentett fuvar
+//  mezőit sablonként eltárolja (few-shot tanulás).
+// ═══════════════════════════════════════════════════════════════
+describe('handlers/orderScan — confirmOrderScanTemplate', () => {
+  beforeEach(() => {
+    mockFeatureOn = true;
+    mockDbQuery.mockReset();
+    mockDbQuery.mockResolvedValue({ rows: [] });
+  });
+
+  function callConfirm(user, args) {
+    return new Promise((resolve) => {
+      const req = { session: { user } };
+      const res = { json: (payload) => resolve(payload) };
+      handler.confirmOrderScanTemplate(req, res, args);
+    });
+  }
+
+  it('sofőrt elutasít', async () => {
+    const r = await callConfirm(SOFER, [{ fields: { client: 'X' } }]);
+    expect(r.result.ok).toBe(false);
+  });
+
+  it('csomag-flag KI → elutasít', async () => {
+    mockFeatureOn = false;
+    const r = await callConfirm(ADMIN, [{ fields: { client: 'X' } }]);
+    expect(r.result.ok).toBe(false);
+    expect(r.result.err).toMatch(/nedisponibila/i);
+  });
+
+  it('client nélkül no-op (nem tanul semmit)', async () => {
+    const r = await callConfirm(ADMIN, [{ fields: {} }]);
+    expect(r.result.ok).toBe(true);
+    expect(r.result.noop).toBe(true);
+    expect(mockDbQuery).not.toHaveBeenCalled();
+  });
+
+  it('template_key az első jelentős szóból (Vallor Logistics SRL → vallor)', async () => {
+    mockDbQuery.mockResolvedValueOnce({ rows: [] }); // INSERT sikeres
+    const r = await callConfirm(ADMIN, [{ fields: {
+      client: 'Vallor Logistics SRL',
+      valuta: 'EUR', load_type: 'FTL',
+      pickups: [{ loc: 'A' }, { loc: 'B' }],
+      deliveries: [{ loc: 'X' }, { loc: 'Y' }, { loc: 'Z' }],
+    }}]);
+    expect(r.result.ok).toBe(true);
+    expect(r.result.template_key).toBe('vallor');
+    expect(mockDbQuery).toHaveBeenCalledTimes(1);
+    // Ellenőrizzük a payload-ot: cid + kulcs + label + stabil mezők
+    const args = mockDbQuery.mock.calls[0][1];
+    expect(args[0]).toBe(1);              // company_id
+    expect(args[1]).toBe('vallor');       // template_key
+    expect(args[2]).toBe('Vallor Logistics SRL'); // template_label
+    const learned = JSON.parse(args[3]);
+    expect(learned.valuta).toBe('EUR');
+    expect(learned.load_type).toBe('FTL');
+    expect(learned.typical_pickups).toBe(2);
+    expect(learned.typical_deliveries).toBe(3);
+  });
+
+  it('rövidítést (SC/SRL) átugrik, a második szót veszi', async () => {
+    // A normalizeTemplateKey helper közvetlen tesztje — csak >=3 hosszú
+    // + betűt tartalmazó szavak; „SC" (2 char) kimarad, „MOL" (3 char) marad.
+    expect(handler._normalizeTemplateKey('SC MOL Romania SA')).toBe('mol');
+    expect(handler._normalizeTemplateKey('SA')).toBe('');           // 2 karakteres kimarad
+    expect(handler._normalizeTemplateKey('12 345 67')).toBe('');    // csak szám → nincs
+    expect(handler._normalizeTemplateKey('')).toBe('');
+    expect(handler._normalizeTemplateKey(null)).toBe('');
+    // Diakritikák le
+    expect(handler._normalizeTemplateKey('Ștefan Trans')).toBe('stefan');
+  });
+
+  it('DB-hiba (migráció nincs) → csendes noop, nem hasal el', async () => {
+    mockDbQuery.mockRejectedValueOnce(new Error('relation does not exist'));
+    const r = await callConfirm(ADMIN, [{ fields: { client: 'DHL' } }]);
+    expect(r.result.ok).toBe(true);
+    expect(r.result.noop).toBe(true);
   });
 });
