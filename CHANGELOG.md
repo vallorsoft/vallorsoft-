@@ -14,6 +14,17 @@
 
 ---
 
+
+## 2026-09-23 — Fuvar-megbízás AI-kiolvasás: több felrakó/lerakó pont + tanulás (elárvult 2026-09-12-i munka átemelve)
+
+**Háttér:** a „Minden legyen a mainbe" ellenőrzésnél kiderült, hogy a 2026-09-12-i `claude/ai-data-usage-documents-l3ozaw` commit (fuvar-megbízás AI: multi-drop + few-shot tanulás) SOSEM került a mainbe. Átemelve (cherry-pick), a jelenlegi mainhez igazítva.
+
+1. **Gyökérok:** a szerver (`handlers/orderScan.js`) már visszaadta a `pickups[]`/`deliveries[]` tömböt, de a kliens `orderScanFill` (`public/console-shared.js`) csak az első felrakót/lerakót írta be → egy több pontos megrendelő feltöltésekor a 2..N. pont ELVESZETT. Fix: az első pont a top-mezőkbe, a többi `addExtraStopRow`-val az `#oExtraStopsList`-be (a wizard step 2 innen veszi át).
+2. **Prompt-erősítés** (`services/order-ai/gemini.js`) a multi-stop felismeréshez.
+3. **Tanulás** — új `db/order-scan-samples.sql` (idempotens, `UNIQUE (company_id, template_key)`) + `confirmOrderScanTemplate` RPC (Admin/Manager, `ai-kiolvasas` kapu, `company_id`-szűrt, paraméteres, audit `order.scan.confirm`): mentés után a megbízó STABIL mezői (valuta/FTL-LTL/méretek/cégnév/tipikus pontszám) sablonként; a következő kiolvasás a cég legutóbbi 5 megbízó-mintáját few-shot példaként kapja. Per-fuvar értékek (dátum/ár/km/rendszám) szándékosan kihagyva.
+4. **Hibajavítás az átemeléskor:** az eredeti kódban a tanulás SOSEM futott volna le — a `createOrder` az `_ordScanInfo`-t az `_ordScanAttachTo` UTÁN ellenőrizte, ami szinkron `orderScanClear()`-rel már `null`-ra állította. A jelzőt most a csatolás ELŐTT rögzítjük (`_learnFromScan`).
+5. Cache-bust `console-shared.js?v=20260923oscan`. **Teszt:** +11 eset (`tests/unit/orderScan.test.js`).
+
 ## 2026-09-23 — FIX: több lerakós fuvaron nem működött a sofőr állomás-gombja (stop-választó modal CSS)
 
 1. **Bejelentés:** a sofőrnél a 4 lerakós fuvaron az állomás-gomb nem csinált semmit, az 1 fel + 1 le fuvaron működött.
