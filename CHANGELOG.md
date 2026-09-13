@@ -14,6 +14,17 @@
 
 ---
 
+## 2026-09-13 — Elszámoltság (allokáció) MINDEN nyomtatható dokumentumon — a Decont lunar egyenleg-kártyája is konzisztens a hivatalos lappal
+
+**Kérés (Vallor Team S.R.L · Gondos Imre — Sofer):** „Most terjeszd az összes nyomtatható dokumentumra, minden kommunikáljon mindennel az elszámoláson belül." Az előző kör (allokáció-alapú elszámoltság) csak a **Decont oficialt** javította; a **Decont lunar** egyenleg-kártyája még a nyers `earned − paid`-ből dolgozott, ami ellentmondó/negatív értéket mutatott (850 EUR / −2447 RON).
+
+1. **Gyökér:** a `_dcRenderSheetHtml` (Decont lunar) záró egyenleg-kártyája a `totals.balance` (`earned − paid`, paid_at-alapú) EUR/RON értékét mutatta piros/zöld színnel → ugyanaz a badarság, amit a hivatalos lapon már kijavítottunk. A járandóság-tételeken nem látszott, melyik van elszámolva.
+2. **Fix (`public/fleet-extra-v2.js` `_dcRenderSheetHtml`):** a nyers egyenleg-kártya helyett **💸 Ebből kifizetve** (slate) + **⚖️ Fennmaradó fizetendő** (kék, sosem negatív) blokk — pontosan a Decont oficiallal AZONOS forrásból (`totals.settled` / `totals.remaining`, allokáció-alapú). A járandóság-táblán az elszámolt tételek `✓ kifizetve` badge-et + halványzöld hátteret kapnak (`is_settled`). Ha a hó minden tétele elszámolt → „✓ kifizetve" záró sor a Fennmaradó blokkban.
+3. **Kifizetés-történet** (`payments-only` mód) — tiszta kifizetés-főkönyv, egyenleg nélkül → érintetlen. **Csoportos bizonylat** (`_dcGroupPrintRender`) — egy konkrét csoportos kifizetés önmagában konzisztens snapshotja → érintetlen. Így mind a 4 dokumentum ugyanazt az elszámoltság-logikát tükrözi vagy szándékosan tiszta kifizetés-doksi.
+4. **Nincs szerver-változás** — a `totals.settled`/`remaining`/`is_settled` már az előző körben elkészült; ez tisztán kliens-oldali, hogy a Decont lunar is ezekből dolgozzon. Cache-bust `?v=20260913allocall` (admin.html + manager.html). **1231 Jest zöld**, nincs regresszió.
+
+---
+
 ## 2026-09-13 — Decont oficial: a HÓ TÉTELEINEK elszámoltsága (allokáció) — nem a fizetés dátuma; solo/részleges kifizetés FIFO a legrégebbi kifizetetlen tételre
 
 **Kérés (Vallor Team S.R.L · Gondos Imre — Sofer):** a hivatalos elszámoló lapon a szeptemberben kifizetett AUGUSZTUSI járandóság ne szerepeljen. „A hivatalosnál az adott hónap járandóságaival dolgozunk csak, és figyelembe vesszük, hogy azokból a tételekből van-e kifizetve akár más időszakban… ha csak sima/részleges kifizetést teszek be, akkor is valahova számolja pl. a legrégebbi elmaradt járandóságokból."

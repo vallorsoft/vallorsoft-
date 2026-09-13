@@ -2766,10 +2766,16 @@
         var f = _dcCustomKinds.find(function (k) { return k.key === kindKey; });
         kindLbl = f ? ((lang === 'hu' && f.label_hu) ? f.label_hu : (f.label_ro || kindKey)) : kindKey;
       }
-      return '<tr>'
+      // ✓ elszámolva badge — ha a tétel (allokáció szerint) kifizetve van.
+      // Ugyanaz a jelölés, mint a Decont oficial tételes tábláján → egységes.
+      var paidMark = it.is_settled
+        ? ' <span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:8px;'
+          + 'background:#dcfce7;color:#166534;font-size:10px;font-weight:800;">✓ ' + t('fe.stof.itemPaid') + '</span>'
+        : '';
+      return '<tr' + (it.is_settled ? ' style="background:#f0fdf4;"' : '') + '>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + d2(it.earning_date) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(kindLbl) + '</td>'
-        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(it.label || '—') + '</td>'
+        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(it.label || '—') + paidMark + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">'
         +   n2(it.total_amount, 2) + ' ' + esc(it.currency || 'RON') + '</td>'
@@ -2801,8 +2807,20 @@
     var compMetaLine = compMeta.length ? '<div style="font-size:11px;color:#6b7280;margin-top:2px;">' + compMeta.join(' · ') + '</div>' : '';
     var compAdresa = c.adresa ? '<div style="font-size:11px;color:#6b7280;">' + esc(c.adresa) + '</div>' : '';
 
-    var totE = tot.earned || {}, totP = tot.paid || {}, totB = tot.balance || {};
+    var totE = tot.earned || {}, totP = tot.paid || {};
     var bnr = tot.bnr_rate;
+    // Allokáció-alapú elszámoltság — a HÓ TÉTELEIBŐL kifizetve vs. fennmaradó
+    // (nem a nyers earned−paid, ami ellentmondó/negatív lehet). Ugyanaz a forrás,
+    // mint a Decont oficialon → a két dokumentum konzisztens.
+    var totS = tot.settled || {}, totR = tot.remaining || {};
+    var settledEur = Number(totS.eur || 0), settledRon = Number(totS.ron || 0);
+    var settledCombinedRon = (totS.combined_ron != null) ? Number(totS.combined_ron)
+      : (bnr != null ? (settledEur * bnr + settledRon) : null);
+    var hasSettled = ((settledCombinedRon != null && settledCombinedRon > 0.005) || settledEur > 0.005 || settledRon > 0.005);
+    var remEur = (totR.eur != null) ? Number(totR.eur) : (Number(totE.eur || 0) - settledEur);
+    var remRon = (totR.ron != null) ? Number(totR.ron) : (Number(totE.ron || 0) - settledRon);
+    var remCombinedRon = (totR.combined_ron != null) ? Number(totR.combined_ron)
+      : (bnr != null ? (remEur * bnr + remRon) : null);
 
     // Hivatalos fejléc: logó (bal) + cég-adatok (közép) + dokumentum-badge (jobb)
     // Alatta 2px sötét vonal — hogy hivatalos legyen. A logó cell-je csak ha van
@@ -2879,28 +2897,53 @@
       +     '</td>'
       +   '</tr></tfoot>'
       + '</table>'
-      // Egyenleg-kártya — payments-only módban KIHAGYVA (a történet-nyomtatás
-      // csak a kifizetéseket dokumentálja, egyenleget nem)
-      + (payOnly ? '' :
-        '<div style="margin-top:18px;padding:14px 18px;border:2px solid #2563eb;border-radius:10px;background:#eff6ff;">'
-        +   '<div style="font-size:13px;font-weight:700;color:#1e40af;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">'
-        +     '⚖️ ' + t('fe.st.balance') + '</div>'
+      // Elszámoltság-kártyák — payments-only módban KIHAGYVA (a történet-nyomtatás
+      // csak a kifizetéseket dokumentálja, egyenleget nem). A régi nyers
+      // earned−paid egyenleg helyett a HÓ TÉTELEINEK allokáció-alapú elszámoltsága:
+      //  💸 Ebből kifizetve (settled) + ⚖️ Fennmaradó fizetendő (remaining) — a
+      // Decont oficiallal AZONOS forrásból (tot.settled / tot.remaining) → a két
+      // dokumentum ugyanazt mutatja. Csak akkor jelenik meg, ha a hó tételeiből
+      // ténylegesen van már elszámolt kifizetés.
+      + (payOnly || !hasSettled ? '' :
+        // 💸 Ebből kifizetve (settled) — slate akcens
+        '<div style="margin-top:18px;padding:14px 18px;border:2px solid #475569;border-radius:10px;background:#f8fafc;">'
+        +   '<div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">'
+        +     '💸 ' + t('fe.stof.paidTitle') + '</div>'
         +   '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
-        +     '<tr>'
-        +       '<td style="padding:4px 0;">' + t('fe.dc.balEur') + ':</td>'
-        +       '<td style="padding:4px 0;text-align:right;font-weight:800;color:' + ((totB.eur || 0) > 0 ? '#dc2626' : '#16a34a') + ';">'
-        +         n2(totB.eur || 0, 2) + ' EUR</td>'
-        +     '</tr>'
-        +     '<tr>'
-        +       '<td style="padding:4px 0;">' + t('fe.dc.balRon') + ':</td>'
-        +       '<td style="padding:4px 0;text-align:right;font-weight:800;color:' + ((totB.ron || 0) > 0 ? '#dc2626' : '#16a34a') + ';">'
-        +         n2(totB.ron || 0, 2) + ' RON</td>'
-        +     '</tr>'
-        +     (totB.ron_all != null && bnr != null
-          ? '<tr><td style="padding:4px 0;border-top:1px dashed #93c5fd;color:#475569;font-size:12px;">'
-            + t('fe.dc.balCombined') + ' <span style="color:#94a3b8;">(BNR 1 EUR = ' + n2(bnr, 4) + ')</span>:</td>'
-            + '<td style="padding:4px 0;border-top:1px dashed #93c5fd;text-align:right;font-weight:800;color:#1e40af;font-size:15px;">'
-            + n2(totB.ron_all, 2) + ' RON</td></tr>'
+        +     (settledEur > 0.005
+          ? '<tr><td style="padding:4px 0;font-weight:700;color:#0f172a;">' + t('fe.pm.paidEur') + ':</td>'
+            + '<td style="padding:4px 0;text-align:right;font-weight:800;color:#0f172a;">' + n2(settledEur, 2) + ' EUR</td></tr>'
+          : '')
+        +     (settledRon > 0.005
+          ? '<tr><td style="padding:4px 0;font-weight:700;color:#0f172a;">' + t('fe.pm.paidRon') + ':</td>'
+            + '<td style="padding:4px 0;text-align:right;font-weight:800;color:#0f172a;">' + n2(settledRon, 2) + ' RON</td></tr>'
+          : '')
+        +     (settledCombinedRon != null && settledCombinedRon > 0.005
+          ? '<tr><td style="padding:6px 0;border-top:1px dashed #cbd5e1;font-weight:800;color:#334155;">' + t('fe.stof.paidCombinedRon') + ':</td>'
+            + '<td style="padding:6px 0;border-top:1px dashed #cbd5e1;text-align:right;font-weight:900;color:#334155;font-size:15px;">' + n2(settledCombinedRon, 2) + ' RON</td></tr>'
+          : '')
+        +   '</table>'
+        + '</div>'
+        // ⚖️ Fennmaradó fizetendő (remaining) — kék akcens, sosem negatív
+        + '<div style="margin-top:14px;padding:16px 20px;border:2.5px solid #1e40af;border-radius:10px;background:#eff6ff;">'
+        +   '<div style="font-size:13px;font-weight:800;color:#1e40af;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px;">'
+        +     '⚖️ ' + t('fe.stof.remainTitle') + '</div>'
+        +   '<table style="width:100%;border-collapse:collapse;font-size:15px;">'
+        +     (remEur > 0.005
+          ? '<tr><td style="padding:6px 0;font-weight:700;color:#0f172a;">' + t('fe.stof.remainEur') + ':</td>'
+            + '<td style="padding:6px 0;text-align:right;font-weight:900;font-size:16px;color:#0f172a;">' + n2(remEur, 2) + ' EUR</td></tr>'
+          : '')
+        +     (remRon > 0.005
+          ? '<tr><td style="padding:6px 0;' + (remEur > 0.005 ? 'border-top:1px solid #bfdbfe;' : '') + 'font-weight:700;color:#0f172a;">' + t('fe.stof.remainRon') + ':</td>'
+            + '<td style="padding:6px 0;' + (remEur > 0.005 ? 'border-top:1px solid #bfdbfe;' : '') + 'text-align:right;font-weight:900;font-size:16px;color:#0f172a;">' + n2(remRon, 2) + ' RON</td></tr>'
+          : '')
+        +     (remCombinedRon != null && bnr != null && (remEur > 0.005 && remRon > 0.005)
+          ? '<tr><td style="padding:8px 0;border-top:1.5px solid #93c5fd;color:#1e40af;font-weight:800;">' + t('fe.stof.remainCombinedRon')
+            + ' <span style="color:#94a3b8;font-weight:400;">(BNR 1 EUR = ' + n2(bnr, 4) + ')</span>:</td>'
+            + '<td style="padding:8px 0;border-top:1.5px solid #93c5fd;text-align:right;font-weight:900;color:#1e40af;font-size:16px;">' + n2(remCombinedRon, 2) + ' RON</td></tr>'
+          : '')
+        +     ((remEur <= 0.005 && remRon <= 0.005)
+          ? '<tr><td colspan="2" style="padding:6px 0;text-align:center;color:#16a34a;font-weight:800;">✓ ' + t('fe.stof.itemPaid') + '</td></tr>'
           : '')
         +   '</table>'
         + '</div>')
