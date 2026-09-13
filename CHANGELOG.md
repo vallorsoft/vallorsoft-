@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-09-13 — Decont oficial: a már kifizetett járandóság feltüntetése + levonása a hivatalos papíron
+
+**Kérés (Vallor Team S.R.L / vallorteam23@gmail.com · Gondos Imre — Sofer · b144vlr@gmail.com):** „Nezd at a sofer elszamolasi nyomtatvanyokat nem vonja ki es nem tunteti fel a mar kifizetett jarandosagot a nyomtatvanyra."
+
+1. **Gyökér:** a **Decont oficial** (Hivatalos elszámolás — `_dcOfBuildSummaryHtml`/`_dcRenderOfficialHtml` a `public/fleet-extra-v2.js`-ben) KIZÁRÓLAG a járandóság-tételek összegéből (`totals.earned`) számolt (Alapbér + Napidíj), és a kifizetéseket (`totals.paid`) teljesen figyelmen kívül hagyta — sem feltüntetve, sem levonva. A feltöltött szeptemberi Gondos Imre-lapon csak 850 EUR + 990 RON járandóság + 2699 RON alapbér + 523,85 EUR napidíj szerepelt, a már kifizetett tételek nélkül. (Az on-screen egyenleg-kártya és a **Decont lunar** viszont MÁR helyesen mutatta a kifizetve/hátralék bontást — csak a hivatalos papír maradt ki.)
+2. **Fix (`_dcOfBuildSummaryHtml`):** a `getMonthlySettlementSheet` válasza már eddig is visszaadta a `totals.paid`-et — most a hivatalos összegzés két új blokkot kap: **💸 Már kifizetve** (slate-akcens; kifizetve EUR / RON + BNR-en kombinált RON) a járandóság-tételek ALATT, és **⚖️ Fennmaradó fizetendő** (kék akcens; járandóság − kifizetve pénznemenként + kombinált RON) a hivatalos összegzés UTÁN. A blokkok csak akkor jelennek meg, ha ténylegesen van kifizetés az időszakban. Az Alapbér + Napidíj sor a teljes havi jogszabályi deklaráció marad; a fennmaradó blokk a valóban átadandó hátralékot mutatja. Nyomtatásba + e-mailbe is bekerül (ugyanaz a HTML).
+3. **i18n** — 6 új `fe.stof.*` kulcs (RO-alap + HU): `paidTitle`/`paidCombinedRon` + `remainTitle`/`remainEur`/`remainRon`/`remainCombinedRon`. Cache-bust `?v=20260913paid` (admin.html + manager.html — fleet-extra-v2.js + i18n.js). Tisztán kliens-oldali (nincs szerver-/séma-változás); **1229 Jest zöld**, nincs regresszió. A Decont lunar (📄), a csoportos bizonylat és az egyenleg-kártya érintetlen.
+
+---
+
 ## 2026-09-11 — Admin/Manager: telefonos VISSZA-gomb appon belül navigál (PR #442)
 
 **Kérés:** „alitsd be a telefon viszagombja ne kilepjen a webrol hanem ugorjon visza az azelotti részére ezt minden menu es minden pont tudja az admin manager oldalon" — a sofőr felületen már megvolt (`sof.backExitHint`, history.pushState-csapda); az admin/manager konzolra hiányzott.

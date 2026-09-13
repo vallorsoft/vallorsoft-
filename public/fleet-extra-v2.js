@@ -3117,6 +3117,21 @@
       ? (totalMonthlyRon - baseSal) / bnr : null;
     var aboveBaseRon = (aboveBaseEur != null && bnr != null) ? (aboveBaseEur * bnr) : null;
 
+    // Már kifizetett járandóság (ugyanabból az időszakból, `getMonthlySettlementSheet`
+    // `totals.paid`). A hivatalos papír eddig ezt teljesen figyelmen kívül hagyta —
+    // most külön blokkban feltüntetjük, és a végén levonva mutatjuk a fennmaradó
+    // fizetendőt (a Decont lunar + az egyenleg-kártya szemantikájával összhangban).
+    var totP = tot.paid || {};
+    var paidEur = Number(totP.eur || 0);
+    var paidRon = Number(totP.ron || 0);
+    var hasPaid = (paidEur > 0 || paidRon > 0);
+    var paidEurAsRon = (bnr != null) ? (paidEur * bnr) : null;
+    var paidCombinedRon = (bnr != null) ? (paidEur * bnr + paidRon) : null;
+    // Fennmaradó fizetendő = járandóság − kifizetve (pénznemenként + kombinált RON)
+    var remainEur = totEur - paidEur;
+    var remainRon = totRon - paidRon;
+    var remainCombinedRon = (bnr != null) ? (totalMonthlyRon - paidCombinedRon) : null;
+
     // Tételek összesítése blokk — a HIVATALOS papíron is látszik.
     // Csak akkor jelenik meg, ha van érdemi tétel-összeg (0-tól különböző);
     // ha a BNR ismert, a `= Z RON` egyenérték is kiíródik az EUR mellé.
@@ -3156,9 +3171,72 @@
         + '</div>';
     }
 
+    // Már kifizetve blokk — slate-akcens, a járandóság-tételek ALATT. Csak akkor
+    // jelenik meg, ha ténylegesen van kifizetés az időszakban.
+    var paidBlockHtml = '';
+    if (hasPaid) {
+      paidBlockHtml = ''
+        + '<div style="margin-top:14px;padding:14px 18px;border:2px solid #475569;border-radius:10px;background:#f8fafc;color:#0f172a;">'
+        +   '<div style="font-size:12px;font-weight:800;color:#334155;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px;">'
+        +     '💸 ' + t('fe.stof.paidTitle') + '</div>'
+        +   '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
+        + (paidEur > 0
+          ? '<tr>'
+            + '<td style="padding:6px 0;font-weight:700;color:#0f172a;">' + t('fe.pm.paidEur') + ':</td>'
+            + '<td style="padding:6px 0;text-align:right;font-weight:800;color:#0f172a;">'
+            +   n2(paidEur, 2) + ' EUR'
+            +   (paidEurAsRon != null ? '<div style="font-size:12px;font-weight:700;color:#475569;margin-top:2px;">= ' + n2(paidEurAsRon, 2) + ' RON</div>' : '')
+            + '</td></tr>'
+          : '')
+        + (paidRon > 0
+          ? '<tr>'
+            + '<td style="padding:6px 0;font-weight:700;color:#0f172a;">' + t('fe.pm.paidRon') + ':</td>'
+            + '<td style="padding:6px 0;text-align:right;font-weight:800;color:#0f172a;">' + n2(paidRon, 2) + ' RON</td></tr>'
+          : '')
+        + (paidCombinedRon != null && paidEur > 0 && paidRon > 0
+          ? '<tr>'
+            + '<td style="padding:8px 0;border-top:1.5px solid #cbd5e1;font-weight:800;color:#334155;">' + t('fe.stof.paidCombinedRon') + ':</td>'
+            + '<td style="padding:8px 0;border-top:1.5px solid #cbd5e1;text-align:right;font-weight:900;color:#334155;font-size:15px;">' + n2(paidCombinedRon, 2) + ' RON</td></tr>'
+          : '')
+        +   '</table>'
+        + '</div>';
+    }
+
+    // Fennmaradó fizetendő blokk — kék akcens (mint az egyenleg-kártya), a
+    // hivatalos összegzés UTÁN. A járandóságból LEVONVA a kifizetést → a valóban
+    // fizetendő hátralék. Csak akkor jelenik meg, ha volt kifizetés.
+    var showRemEur = (totEur > 0 || paidEur > 0);
+    var showRemRon = (totRon > 0 || paidRon > 0);
+    var remainBlockHtml = '';
+    if (hasPaid) {
+      remainBlockHtml = ''
+        + '<div style="margin-top:14px;padding:16px 20px;border:2.5px solid #1e40af;border-radius:10px;background:#eff6ff;color:#0f172a;">'
+        +   '<div style="font-size:13px;font-weight:800;color:#1e40af;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.4px;">'
+        +     '⚖️ ' + t('fe.stof.remainTitle') + '</div>'
+        +   '<table style="width:100%;border-collapse:collapse;font-size:15px;">'
+        + (showRemEur
+          ? '<tr>'
+            + '<td style="padding:8px 0;font-weight:700;color:#0f172a;">' + t('fe.stof.remainEur') + ':</td>'
+            + '<td style="padding:8px 0;text-align:right;font-weight:900;font-size:17px;color:' + (remainEur < -0.005 ? '#16a34a' : '#0f172a') + ';">' + n2(remainEur, 2) + ' EUR</td></tr>'
+          : '')
+        + (showRemRon
+          ? '<tr>'
+            + '<td style="padding:8px 0;' + (showRemEur ? 'border-top:1.5px solid #bfdbfe;' : '') + 'font-weight:700;color:#0f172a;">' + t('fe.stof.remainRon') + ':</td>'
+            + '<td style="padding:8px 0;' + (showRemEur ? 'border-top:1.5px solid #bfdbfe;' : '') + 'text-align:right;font-weight:900;font-size:17px;color:' + (remainRon < -0.005 ? '#16a34a' : '#0f172a') + ';">' + n2(remainRon, 2) + ' RON</td></tr>'
+          : '')
+        + (remainCombinedRon != null && showRemEur && showRemRon
+          ? '<tr>'
+            + '<td style="padding:8px 0;border-top:1.5px solid #bfdbfe;font-weight:800;color:#1e40af;">' + t('fe.stof.remainCombinedRon') + ':</td>'
+            + '<td style="padding:8px 0;border-top:1.5px solid #bfdbfe;text-align:right;font-weight:900;font-size:18px;color:#1e40af;">' + n2(remainCombinedRon, 2) + ' RON</td></tr>'
+          : '')
+        +   '</table>'
+        + '</div>';
+    }
+
     // Kiemelt záró blokk — hivatalos hangvétel a sofőrnek adandó dokumentumhoz.
     return ''
       + totalsBlockHtml
+      + paidBlockHtml
       + '<div style="margin-top:14px;padding:16px 20px;border:2.5px solid #7c2d12;border-radius:10px;background:#fff7ed;color:#0f172a;">'
       +   '<div style="font-size:13px;font-weight:800;color:#7c2d12;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.4px;">'
       +     '📊 ' + t('fe.stof.summary') + '</div>'
@@ -3180,7 +3258,8 @@
       + (bnr != null
         ? '<div style="margin-top:10px;font-size:11px;color:#78350f;opacity:0.75;">' + t('fe.stof.bnrUsed') + ': 1 EUR = ' + n2(bnr, 4) + ' RON</div>'
         : '')
-      + '</div>';
+      + '</div>'
+      + remainBlockHtml;
   }
 
   // A NYOMTATHATÓ HTML — nyomtatásba és e-mailbe is ugyanez megy.
