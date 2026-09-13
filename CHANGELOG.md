@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-09-13 — Decont oficial: a HÓ TÉTELEINEK elszámoltsága (allokáció) — nem a fizetés dátuma; solo/részleges kifizetés FIFO a legrégebbi kifizetetlen tételre
+
+**Kérés (Vallor Team S.R.L · Gondos Imre — Sofer):** a hivatalos elszámoló lapon a szeptemberben kifizetett AUGUSZTUSI járandóság ne szerepeljen. „A hivatalosnál az adott hónap járandóságaival dolgozunk csak, és figyelembe vesszük, hogy azokból a tételekből van-e kifizetve akár más időszakban… ha csak sima/részleges kifizetést teszek be, akkor is valahova számolja pl. a legrégebbi elmaradt járandóságokból."
+
+1. **Gyökér:** a `getMonthlySettlementSheet` a kifizetéseket **`paid_at` (fizetés dátuma)** szerint húzta a hónapra → a szeptemberi lapra felkerült a 3437 RON (köztük a 2500 RON „Avans diurna – Contract 06/30.08.2026", ami AUGUSZTUSI járandóság kifizetése). Ebből lett a badarság: „Fennmaradó fizetendő 850 EUR / −2447 RON" egyszerre.
+2. **Új elv — allokáció (`computeDriverAllocation`, `handlers/fleetCompliance.js`):** a hivatalos lap a **hó TÉTELEINEK elszámoltságát** mutatja, NEM a fizetés dátumát. Globális párosítás: (a) a **csoportos kifizetéshez** (`driver_payment_group_items`) kötött tétel → explicit KIFIZETVE; (b) a **solo/részleges** kifizetések RON-egyenértékben egy pool-t képeznek, amit a **legrégebbi kifizetetlen tételekre FIFO** osztunk. Csak `paid_at <= CURRENT_DATE` (ütemezett jövőbeli nem). Így a szeptemberben kifizetett augusztusi járandóság az **augusztusi tételre száll** (annak dátumára), és a szeptemberi lapot nem szennyezi.
+3. **Válasz új mezői:** `totals.settled` (a hó tételeiből elszámolt EUR/RON + kombinált RON) + `totals.remaining` (a hó KIFIZETETLEN tételei — sosem negatív). A `paid`/`balance` (paid_at-alapú) VÁLTOZATLAN a Decont lunar + Kifizetés-történet lapokhoz. A tételes tábla soronként `is_settled`/`settled_ron` jelzést kap.
+4. **Kliens (`_dcOfBuildSummaryHtml`):** a „💸 Már kifizetve" és „⚖️ Fennmaradó fizetendő" blokk mostantól a `totals.settled`/`remaining`-ből (allokáció), nem a nyers `earned − paid`-ből; a tételes táblán ✓ kifizetve badge az elszámolt tételeken. Az Alapbér + Napidíj a teljes havi deklaráción marad.
+5. **i18n** — átfogalmazott `fe.stof.paidTitle`/`remainTitle` (RO: „…din drepturile lunii" / HU: „A hó tételeiből…") + új `fe.stof.itemPaid` (achitat/kifizetve). Cache-bust `?v=20260913alloc` (admin.html + manager.html). **Teszt:** +2 új eset (`settlement-sheet.test.js`) — FIFO a legrégebbi tételre + augusztusi fizetés nem szennyezi a szeptemberi lapot; **1231 Jest zöld** (1229 → 1231). A Decont lunar és a Kifizetés-történet lap érintetlen.
+
+---
+
 ## 2026-09-13 — Decont oficial: a már kifizetett járandóság feltüntetése + levonása a hivatalos papíron
 
 **Kérés (Vallor Team S.R.L / vallorteam23@gmail.com · Gondos Imre — Sofer · b144vlr@gmail.com):** „Nezd at a sofer elszamolasi nyomtatvanyokat nem vonja ki es nem tunteti fel a mar kifizetett jarandosagot a nyomtatvanyra."

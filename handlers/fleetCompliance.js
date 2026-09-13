@@ -1392,6 +1392,84 @@ handlers.getDriverBalance = async function (req, res, args) {
   }
 };
 
+// ─────────────────────────────────────────────────────────────
+//  Kifizetés-ELSZÁMOLÁS (allokáció) — a sofőr ÖSSZES járandóságát és
+//  kifizetését GLOBÁLISAN párosítja, hogy a hivatalos havi lap a HÓ
+//  TÉTELEINEK elszámoltságát mutassa (NEM a fizetés dátumát):
+//    1) a csoportos kifizetéshez (driver_payment_group_items) kötött
+//       tételek → explicit KIFIZETVE (a felhasználó választotta ki);
+//    2) a solo/részleges kifizetések RON-egyenértékben egy „pool"-t
+//       képeznek, amit a MARADÉK kifizetetlen tételekre osztunk
+//       LEGRÉGEBBITŐL kezdve (FIFO — az elmaradt járandóság előbb rendeződik).
+//  Így a szeptemberben kifizetett AUGUSZTUSI járandóság az augusztusi
+//  tételre száll (annak dátumára), és a szeptemberi lapot nem szennyezi.
+//  Csak a MAI vagy múltbeli (paid_at <= CURRENT_DATE) kifizetés számít
+//  (a jövőbeli ütemezett még nincs kifizetve — PR #427 szemantika).
+//  Visszaad: Map<earning_id, { settled_ron, fully }>.
+async function computeDriverAllocation(cid, email, bnrRate) {
+  const alloc = new Map();
+  const rate = (bnrRate != null && bnrRate > 0) ? bnrRate : null;
+  const r2 = v => Math.round((Number(v) || 0) * 100) / 100;
+  const ronEq = (cur, amt) => (String(cur || 'RON').toUpperCase() === 'RON')
+    ? Number(amt || 0)
+    : (rate != null ? Number(amt || 0) * rate : Number(amt || 0)); // BNR nélkül 1:1 becslés
+  // 1) MINDEN járandóság kronológikus sorrendben (legrégebbi elöl)
+  let earns = [];
+  try {
+    const er = await pool.query(
+      `SELECT id, earning_date, currency, total_amount
+         FROM driver_earnings
+        WHERE company_id=$1 AND LOWER(email_sofer)=$2
+        ORDER BY earning_date ASC, id ASC`,
+      [cid, email]);
+    earns = er.rows;
+  } catch (_e) { return alloc; }
+  // 2) csoportba kötött tételek → explicit KIFIZETVE (migráció-toleráns)
+  const groupedIds = new Set();
+  try {
+    const gi = await pool.query(
+      `SELECT DISTINCT gi.earning_id
+         FROM driver_payment_group_items gi
+         JOIN driver_earnings e ON e.id = gi.earning_id
+        WHERE e.company_id=$1 AND LOWER(e.email_sofer)=$2`,
+      [cid, email]);
+    for (const row of gi.rows) groupedIds.add(row.earning_id);
+  } catch (_e) { /* nincs csoport-tábla — mindent a solo-pool intéz */ }
+  for (const e of earns) {
+    if (groupedIds.has(e.id)) alloc.set(e.id, { settled_ron: ronEq(e.currency, e.total_amount), fully: true });
+  }
+  // 3) solo (nem-csoportos, nem-jövőbeli) kifizetések RON-egyenérték pool-ja
+  let poolRon = 0;
+  try {
+    const pr = await pool.query(
+      `SELECT amount, currency, amount_ron,
+              (to_jsonb(driver_payments) ->> 'group_id') AS group_id
+         FROM driver_payments
+        WHERE company_id=$1 AND LOWER(email_sofer)=$2
+          AND paid_at <= CURRENT_DATE`,
+      [cid, email]);
+    for (const p of pr.rows) {
+      if (p.group_id != null && p.group_id !== '') continue;   // csoportos → a tételei már settled
+      const cur = String(p.currency || 'RON').toUpperCase();
+      const amt = Number(p.amount || 0);
+      poolRon += (cur === 'RON') ? amt
+        : (p.amount_ron != null ? Number(p.amount_ron) : (rate != null ? amt * rate : amt));
+    }
+  } catch (_e) { /* nincs driver_payments — pool marad 0 */ }
+  poolRon = r2(poolRon);
+  // 4) FIFO: a maradék kifizetetlen tételekre osztjuk (legrégebbi elöl)
+  for (const e of earns) {
+    if (poolRon <= 0.005) break;
+    if (alloc.has(e.id)) continue;              // már csoportosan kifizetve
+    const need = ronEq(e.currency, e.total_amount);
+    if (need <= 0) continue;
+    const take = Math.min(poolRon, need);
+    poolRon = r2(poolRon - take);
+    alloc.set(e.id, { settled_ron: r2(take), fully: take >= need - 0.005 });
+  }
+  return alloc;
+}
+
 // ═════════════════════════════════════════════════════════════
 //  Havi elszámolás-lap (settlement sheet) — PDF/nyomtatható +
 //  e-mail. Admin/Manager csak; company_id-szűrt; a driver sofőr
@@ -1523,6 +1601,9 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
       const c = _cur(r.currency);
       earned[c] = (earned[c] || 0) + parseFloat(r.total_amount || 0);
     }
+    // paid_at-alapú kifizetés-összeg — a Decont lunar + Kifizetés-történet
+    // lapokhoz marad (azok az adott időszak PÉNZMOZGÁSÁT dokumentálják).
+    // A HIVATALOS lap NEM ezt használja (lásd lent: allokáció).
     const paid = { EUR: 0, RON: 0 };
     for (const r of pR.rows) {
       const c = _cur(r.currency);
@@ -1537,6 +1618,31 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
     const balEur = _round2((earned.EUR || 0) - (paid.EUR || 0));
     const balRon = _round2((earned.RON || 0) - (paid.RON || 0));
     const balRonAll = bnrRate != null ? _round2(balEur * bnrRate + balRon) : null;
+
+    // ── HIVATALOS lap: a HÓ TÉTELEINEK elszámoltsága (allokáció) ──
+    // Globális párosítás: csoportos link + solo-pool FIFO a legrégebbi
+    // kifizetetlen tételekre. A settled RON-egyenértékben allokálódik,
+    // majd a per-valuta megjelenítéshez visszabontjuk a tétel valutájára.
+    const alloc = await computeDriverAllocation(cid, email, bnrRate);
+    const settledCur = { EUR: 0, RON: 0 };
+    const remainCur  = { EUR: 0, RON: 0 };
+    let settledRon = 0, remainRon = 0;
+    for (const r of eR.rows) {
+      const c = _cur(r.currency);
+      const amt = parseFloat(r.total_amount || 0);
+      const need = (c === 'RON') ? amt : (bnrRate != null ? amt * bnrRate : amt);
+      const a = alloc.get(r.id);
+      const sr = a ? Math.min(a.settled_ron, need) : 0;   // ebből a tételből kifizetve (RON-egyenérték)
+      const rr = _round2(need - sr);                       // ebből a tételből fennmaradó (RON-egyenérték)
+      settledRon += sr; remainRon += rr;
+      if (c === 'RON') { settledCur.RON += sr; remainCur.RON += rr; }
+      else if (bnrRate != null) { settledCur.EUR += sr / bnrRate; remainCur.EUR += rr / bnrRate; }
+      else { settledCur.EUR += sr; remainCur.EUR += rr; }
+      r.settled_ron = _round2(sr);           // per-tétel jelölés a klienshez
+      r.is_settled  = !!(a && a.fully);
+    }
+    const earnedCombinedRon = bnrRate != null
+      ? _round2((earned.EUR || 0) * bnrRate + (earned.RON || 0)) : null;
 
     // Nettó alapbér RON — a „Decont oficial" alapbér-mezőjéhez. NULL →
     // a kliens 2700 default-ot használ (visszafelé kompatibilis, ha a
@@ -1562,7 +1668,11 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
       earnings: eR.rows,
       payments: pR.rows,
       totals: {
-        earned: { eur: _round2(earned.EUR), ron: _round2(earned.RON), count: eR.rows.length },
+        earned: { eur: _round2(earned.EUR), ron: _round2(earned.RON), count: eR.rows.length, combined_ron: earnedCombinedRon },
+        // A HIVATALOS lap ezt a kettőt használja (a hó tételeinek elszámoltsága):
+        settled:   { eur: _round2(settledCur.EUR), ron: _round2(settledCur.RON), combined_ron: _round2(settledRon) },
+        remaining: { eur: _round2(remainCur.EUR),  ron: _round2(remainCur.RON),  combined_ron: _round2(remainRon) },
+        // paid_at-alapú (a Decont lunar + Kifizetés-történet lapokhoz) — VÁLTOZATLAN:
         paid:   { eur: _round2(paid.EUR),   ron: _round2(paid.RON),   count: pR.rows.length },
         balance:{ eur: balEur, ron: balRon, ron_all: balRonAll },
         bnr_rate: bnrRate,

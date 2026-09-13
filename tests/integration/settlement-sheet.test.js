@@ -128,6 +128,85 @@ describe('getMonthlySettlementSheet', () => {
     expect(res.body.result.company.stamp_data_uri).toBe('data:image/jpeg;base64,BBBB');
   });
 
+  // ── HIVATALOS lap: allokáció (settled/remaining a hó tételeiből) ──
+  test('solo/részleges kifizetés a LEGRÉGEBBI kifizetetlen tételre száll (FIFO)', async () => {
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValueOnce(5.0);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ email: 'sofer@ceg.hu', nume: 'Peto', tel: null }]))       // users
+      .mockResolvedValueOnce(rows([{ nev: 'CegKft' }]))                                          // companies
+      .mockResolvedValueOnce(rows([]))                                                           // company_branding
+      .mockResolvedValueOnce(rows([                                                              // earnings (időszak)
+        { id: 1, earning_date: '2026-09-05', kind: 'bonus',  label: 'x', quantity: 1, unit_amount: 500, total_amount: 500, currency: 'EUR', note: null },
+        { id: 2, earning_date: '2026-09-12', kind: 'diurna', label: 'y', quantity: 6, unit_amount: 70,  total_amount: 420, currency: 'RON', note: null },
+      ]))
+      .mockResolvedValueOnce(rows([]))                                                           // payments (paid_at időszak) — a hivatalos lap NEM ezt használja
+      // computeDriverAllocation: earnings-all (kronológikus)
+      .mockResolvedValueOnce(rows([
+        { id: 1, earning_date: '2026-09-05', currency: 'EUR', total_amount: 500 },
+        { id: 2, earning_date: '2026-09-12', currency: 'RON', total_amount: 420 },
+      ]))
+      .mockResolvedValueOnce(rows([]))                                                           // group-items (nincs csoportos)
+      .mockResolvedValueOnce(rows([                                                              // payments-all (solo pool)
+        { amount: 1000, currency: 'RON', amount_ron: null, group_id: null },
+      ]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getMonthlySettlementSheet',
+      arguments: [{ email: 'sofer@ceg.hu', year: 2026, month: 9 }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    const tot = res.body.result.totals;
+    // 1000 RON pool a LEGRÉGEBBI tételre (id=1, EUR 500 → 2500 RON kell): 1000 RON settled
+    expect(tot.settled.combined_ron).toBe(1000);
+    expect(tot.settled.eur).toBe(200);           // 1000 RON / 5.0 (az EUR-tétel valutájára visszabontva)
+    expect(tot.settled.ron).toBe(0);             // a RON-tétel (id=2) érintetlen
+    // Fennmaradó: id=1-ből 1500 RON (=300 EUR) + id=2 teljes 420 RON = 1920 RON kombinált
+    expect(tot.remaining.eur).toBe(300);
+    expect(tot.remaining.ron).toBe(420);
+    expect(tot.remaining.combined_ron).toBe(1920);
+    // earned = settled + remaining (2920 = 1000 + 1920)
+    expect(tot.earned.combined_ron).toBe(2920);
+  });
+
+  test('más hónapra (augusztusra) eső kifizetés NEM szennyezi a szeptemberi lapot', async () => {
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValueOnce(5.0);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ email: 'sofer@ceg.hu', nume: 'Peto', tel: null }]))       // users
+      .mockResolvedValueOnce(rows([{ nev: 'CegKft' }]))                                          // companies
+      .mockResolvedValueOnce(rows([]))                                                           // company_branding
+      .mockResolvedValueOnce(rows([                                                              // earnings (SZEPTEMBER)
+        { id: 2, earning_date: '2026-09-10', kind: 'diurna', label: 'sep', quantity: 1, unit_amount: 990, total_amount: 990, currency: 'RON', note: null },
+      ]))
+      .mockResolvedValueOnce(rows([                                                              // payments (paid_at szeptember)
+        { id: 10, paid_at: '2026-09-11', method: 'cash', amount: 1500, currency: 'RON', bnr_rate: 5.0, amount_ron: 1500, note: null },
+      ]))
+      // computeDriverAllocation: earnings-all (AUGUSZTUS + SZEPTEMBER, legrégebbi elöl)
+      .mockResolvedValueOnce(rows([
+        { id: 1, earning_date: '2026-08-15', currency: 'EUR', total_amount: 300 },   // aug 300 EUR = 1500 RON
+        { id: 2, earning_date: '2026-09-10', currency: 'RON', total_amount: 990 },
+      ]))
+      .mockResolvedValueOnce(rows([]))                                                           // group-items
+      .mockResolvedValueOnce(rows([                                                              // payments-all: 1500 RON solo (szept.)
+        { amount: 1500, currency: 'RON', amount_ron: null, group_id: null },
+      ]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getMonthlySettlementSheet',
+      arguments: [{ email: 'sofer@ceg.hu', year: 2026, month: 9 }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    const tot = res.body.result.totals;
+    // Az 1500 RON a LEGRÉGEBBI (augusztusi) tételt fedezi teljesen → a szeptemberi
+    // lapon 0 elszámolt, a szeptemberi 990 RON teljes egészében fennmaradó.
+    expect(tot.settled.combined_ron).toBe(0);
+    expect(tot.remaining.ron).toBe(990);
+    expect(tot.remaining.combined_ron).toBe(990);
+    // A paid_at-alapú `paid` MEGMARAD a többi laphoz (1500 RON):
+    expect(tot.paid.ron).toBe(1500);
+  });
+
   test('company_branding SELECT dob → válasz OK, logo/stamp NULL', async () => {
     setUser(fixtures.admin);
     fetchBnrEurRon.mockResolvedValueOnce(null);
