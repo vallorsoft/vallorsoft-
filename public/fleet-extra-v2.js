@@ -3117,20 +3117,26 @@
       ? (totalMonthlyRon - baseSal) / bnr : null;
     var aboveBaseRon = (aboveBaseEur != null && bnr != null) ? (aboveBaseEur * bnr) : null;
 
-    // Már kifizetett járandóság (ugyanabból az időszakból, `getMonthlySettlementSheet`
-    // `totals.paid`). A hivatalos papír eddig ezt teljesen figyelmen kívül hagyta —
-    // most külön blokkban feltüntetjük, és a végén levonva mutatjuk a fennmaradó
-    // fizetendőt (a Decont lunar + az egyenleg-kártya szemantikájával összhangban).
-    var totP = tot.paid || {};
-    var paidEur = Number(totP.eur || 0);
-    var paidRon = Number(totP.ron || 0);
-    var hasPaid = (paidEur > 0 || paidRon > 0);
+    // A hivatalos lap a HÓ TÉTELEINEK elszámoltságát mutatja — NEM a fizetés
+    // dátuma szerinti kifizetéseket (azok a Kifizetés-történet lapon vannak).
+    // A szerver `totals.settled`/`totals.remaining` a hó tételeiből allokált:
+    //  - csoportos kifizetéshez kötött tétel → kifizetve;
+    //  - solo/részleges kifizetés → a legrégebbi kifizetetlen tételekre FIFO.
+    // Így nincs negatív/ellentmondó érték, és a más hónapra eső fizetés
+    // nem szennyezi a lapot (az a saját havi tételére száll a dátuma szerint).
+    var totS = tot.settled || {};
+    var totR = tot.remaining || {};
+    var paidEur = Number(totS.eur || 0);
+    var paidRon = Number(totS.ron || 0);
+    var paidCombinedRon = (totS.combined_ron != null) ? Number(totS.combined_ron)
+      : (bnr != null ? (paidEur * bnr + paidRon) : null);
+    var hasPaid = ((paidCombinedRon != null && paidCombinedRon > 0.005) || paidEur > 0.005 || paidRon > 0.005);
     var paidEurAsRon = (bnr != null) ? (paidEur * bnr) : null;
-    var paidCombinedRon = (bnr != null) ? (paidEur * bnr + paidRon) : null;
-    // Fennmaradó fizetendő = járandóság − kifizetve (pénznemenként + kombinált RON)
-    var remainEur = totEur - paidEur;
-    var remainRon = totRon - paidRon;
-    var remainCombinedRon = (bnr != null) ? (totalMonthlyRon - paidCombinedRon) : null;
+    // Fennmaradó fizetendő = a hó KIFIZETETLEN tételei (pénznem + kombinált RON)
+    var remainEur = (totR.eur != null) ? Number(totR.eur) : (totEur - paidEur);
+    var remainRon = (totR.ron != null) ? Number(totR.ron) : (totRon - paidRon);
+    var remainCombinedRon = (totR.combined_ron != null) ? Number(totR.combined_ron)
+      : (bnr != null ? (remainEur * bnr + remainRon) : null);
 
     // Tételek összesítése blokk — a HIVATALOS papíron is látszik.
     // Csak akkor jelenik meg, ha van érdemi tétel-összeg (0-tól különböző);
@@ -3193,7 +3199,7 @@
             + '<td style="padding:6px 0;font-weight:700;color:#0f172a;">' + t('fe.pm.paidRon') + ':</td>'
             + '<td style="padding:6px 0;text-align:right;font-weight:800;color:#0f172a;">' + n2(paidRon, 2) + ' RON</td></tr>'
           : '')
-        + (paidCombinedRon != null && paidEur > 0 && paidRon > 0
+        + (paidCombinedRon != null && paidCombinedRon > 0.005
           ? '<tr>'
             + '<td style="padding:8px 0;border-top:1.5px solid #cbd5e1;font-weight:800;color:#334155;">' + t('fe.stof.paidCombinedRon') + ':</td>'
             + '<td style="padding:8px 0;border-top:1.5px solid #cbd5e1;text-align:right;font-weight:900;color:#334155;font-size:15px;">' + n2(paidCombinedRon, 2) + ' RON</td></tr>'
@@ -3203,10 +3209,11 @@
     }
 
     // Fennmaradó fizetendő blokk — kék akcens (mint az egyenleg-kártya), a
-    // hivatalos összegzés UTÁN. A járandóságból LEVONVA a kifizetést → a valóban
-    // fizetendő hátralék. Csak akkor jelenik meg, ha volt kifizetés.
-    var showRemEur = (totEur > 0 || paidEur > 0);
-    var showRemRon = (totRon > 0 || paidRon > 0);
+    // hivatalos összegzés UTÁN. A hó KIFIZETETLEN tételeinek összege → a valóban
+    // átadandó hátralék (allokáció-alapú, sosem negatív). Csak akkor jelenik
+    // meg, ha a hó tételeiből ténylegesen van már elszámolt kifizetés.
+    var showRemEur = (remainEur > 0.005);
+    var showRemRon = (remainRon > 0.005);
     var remainBlockHtml = '';
     if (hasPaid) {
       remainBlockHtml = ''
@@ -3217,17 +3224,17 @@
         + (showRemEur
           ? '<tr>'
             + '<td style="padding:8px 0;font-weight:700;color:#0f172a;">' + t('fe.stof.remainEur') + ':</td>'
-            + '<td style="padding:8px 0;text-align:right;font-weight:900;font-size:17px;color:' + (remainEur < -0.005 ? '#16a34a' : '#0f172a') + ';">' + n2(remainEur, 2) + ' EUR</td></tr>'
+            + '<td style="padding:8px 0;text-align:right;font-weight:900;font-size:17px;color:#0f172a;">' + n2(remainEur, 2) + ' EUR</td></tr>'
           : '')
         + (showRemRon
           ? '<tr>'
             + '<td style="padding:8px 0;' + (showRemEur ? 'border-top:1.5px solid #bfdbfe;' : '') + 'font-weight:700;color:#0f172a;">' + t('fe.stof.remainRon') + ':</td>'
-            + '<td style="padding:8px 0;' + (showRemEur ? 'border-top:1.5px solid #bfdbfe;' : '') + 'text-align:right;font-weight:900;font-size:17px;color:' + (remainRon < -0.005 ? '#16a34a' : '#0f172a') + ';">' + n2(remainRon, 2) + ' RON</td></tr>'
+            + '<td style="padding:8px 0;' + (showRemEur ? 'border-top:1.5px solid #bfdbfe;' : '') + 'text-align:right;font-weight:900;font-size:17px;color:#0f172a;">' + n2(remainRon, 2) + ' RON</td></tr>'
           : '')
-        + (remainCombinedRon != null && showRemEur && showRemRon
+        + (remainCombinedRon != null
           ? '<tr>'
-            + '<td style="padding:8px 0;border-top:1.5px solid #bfdbfe;font-weight:800;color:#1e40af;">' + t('fe.stof.remainCombinedRon') + ':</td>'
-            + '<td style="padding:8px 0;border-top:1.5px solid #bfdbfe;text-align:right;font-weight:900;font-size:18px;color:#1e40af;">' + n2(remainCombinedRon, 2) + ' RON</td></tr>'
+            + '<td style="padding:8px 0;' + ((showRemEur || showRemRon) ? 'border-top:1.5px solid #bfdbfe;' : '') + 'font-weight:800;color:#1e40af;">' + t('fe.stof.remainCombinedRon') + ':</td>'
+            + '<td style="padding:8px 0;' + ((showRemEur || showRemRon) ? 'border-top:1.5px solid #bfdbfe;' : '') + 'text-align:right;font-weight:900;font-size:18px;color:#1e40af;">' + n2(remainCombinedRon, 2) + ' RON</td></tr>'
           : '')
         +   '</table>'
         + '</div>';
@@ -3304,10 +3311,14 @@
         var f = _dcCustomKinds.find(function (k) { return k.key === kindKey; });
         kindLbl = f ? ((lang === 'hu' && f.label_hu) ? f.label_hu : (f.label_ro || kindKey)) : kindKey;
       }
+      // A hó tétele elszámolt-e (allokáció: csoportos link vagy solo-FIFO)?
+      var paidMark = it.is_settled
+        ? ' <span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;background:#dcfce7;color:#166534;font-size:10px;font-weight:800;">✓ ' + t('fe.stof.itemPaid') + '</span>'
+        : '';
       return '<tr>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + d2(it.earning_date) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(kindLbl) + '</td>'
-        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(it.label || '—') + '</td>'
+        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(it.label || '—') + paidMark + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">'
         +   n2(it.total_amount, 2) + ' ' + esc(it.currency || 'RON') + '</td>'

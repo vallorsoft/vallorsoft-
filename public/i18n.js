@@ -2974,12 +2974,13 @@
     'fe.stof.itemsCombinedRon':  { ro: 'Total combinat în RON (la curs BNR)', hu: 'Kombinált összesen RON-ban (BNR árfolyamon)' },
     // Már kifizetett járandóság blokk + a levonás utáni fennmaradó fizetendő
     // (a hivatalos papír eddig NEM vonta ki és NEM tüntette fel a kifizetéseket).
-    'fe.stof.paidTitle':         { ro: 'Deja plătit', hu: 'Már kifizetve' },
-    'fe.stof.paidCombinedRon':   { ro: 'Total plătit combinat în RON (la curs BNR)', hu: 'Kifizetve összesen RON-ban (BNR árfolyamon)' },
-    'fe.stof.remainTitle':       { ro: 'Rest de plată (după deducerea plăților)', hu: 'Fennmaradó fizetendő (kifizetések levonva)' },
+    'fe.stof.paidTitle':         { ro: 'Deja achitat din drepturile lunii', hu: 'A hó tételeiből már kifizetve' },
+    'fe.stof.paidCombinedRon':   { ro: 'Total achitat combinat în RON (la curs BNR)', hu: 'Kifizetve összesen RON-ban (BNR árfolyamon)' },
+    'fe.stof.remainTitle':       { ro: 'Rest de plată din drepturile lunii', hu: 'A hó tételeiből fennmaradó fizetendő' },
     'fe.stof.remainEur':         { ro: 'Rest de plată (EUR)', hu: 'Fennmaradó fizetendő (EUR)' },
     'fe.stof.remainRon':         { ro: 'Rest de plată (RON)', hu: 'Fennmaradó fizetendő (RON)' },
     'fe.stof.remainCombinedRon': { ro: 'Rest de plată combinat în RON (la curs BNR)', hu: 'Kombinált fennmaradó RON-ban (BNR árfolyamon)' },
+    'fe.stof.itemPaid':          { ro: 'achitat', hu: 'kifizetve' },
     'fe.stof.totalEur':     { ro: 'Total EUR', hu: 'Teljes EUR' },
     'fe.stof.totalRon':     { ro: 'Total RON', hu: 'Teljes RON' },
     'fe.stof.bnrUsed':      { ro: 'Curs BNR aplicat', hu: 'Alkalmazott BNR árfolyam' },
