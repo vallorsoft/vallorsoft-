@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-09-15 — Nyomtatás: többoldalas dokumentum — fejléc MINDEN lapon + a tartalom nem törik szét (mind a 4 decont-nyomtatvány)
+
+**Kérés (Vallor Team S.R.L · Gondos Imre — Sofer):** „ha túl hosszú lenne egy oldal tartalma és átmegy a másik oldalra, akkor ne szétszórtan menjen át, és minden újabb lapnak legyen meg a fejléce — ezt az összes nyomtatványon."
+
+1. **Gyökér:** a nyomtatható decont-dokumentumok (Decont lunar · Decont oficial · Kifizetés-történet · Csoportos bizonylat) egy sík HTML-blokként mentek a nyomtató-ablakba — hosszú tétel-/kifizetés-lista esetén a böngésző a 2. lapra tört, ahol NEM volt cég-fejléc, és a sorok/blokkok középen elszakadhattak.
+2. **Fix — közös running-header (`_VS_PRINT_CSS` + `_vsBuildPrintDoc`, `public/fleet-extra-v2.js`):** a dokumentum fejléce (`.vs-doc-head` — cég-letterhead + doc-badge + elválasztó) egy layout-tábla `<thead>`-jébe kerül, a törzs (`.vs-doc-body`) a `<tbody>`-ba. A böngésző a `display:table-header-group`-ot **minden nyomtatott lap tetején megismétli** → minden újabb lapnak megvan a fejléce. A belső adat-táblák saját `<thead>` oszlop-fejléce is ismétlődik. `tr{page-break-inside:avoid}` + a summary/aláírás-blokkok `break-inside:avoid` → a sorok/blokkok nem törnek szét.
+3. **Bekötés mind a 3 nyomtató-úton:** `dcSheetPrint` (Decont lunar + Kifizetés-történet) és `dcOfSheetPrint` (Decont oficial) a közös `_vsBuildPrintDoc`-ot használja; a `_dcRenderSheetHtml` + `_dcRenderOfficialHtml` a fejlécet `.vs-doc-head`, a törzset `.vs-doc-body` wrapperbe teszi (a képernyős modal + e-mail változatlanul renderel — semleges div-ek). A csoportos bizonylat (`_dcGroupPrintRender`, saját ablak) letterhead-je szintén `vs-print-wrap` thead-be került + no-scatter CSS.
+4. **Verifikáció:** valós headless Chromium `--print-to-pdf` (60 tétel-soros Decont lunar) → **2 oldal**, `pdf-parse`-szal ellenőrizve MINDKÉT lapon ott a cég-fejléc (letterhead + doc-badge) ÉS az oszlop-fejléc; a sorok nem törnek ketté.
+5. **Tisztán kliens-oldali** — nincs szerver-/séma-változás. Cache-bust `?v=20260915print` (admin.html + manager.html). **1231 Jest zöld**, nincs regresszió.
+
+---
+
 ## 2026-09-13 — Elszámoltság (allokáció) MINDEN nyomtatható dokumentumon — a Decont lunar egyenleg-kártyája is konzisztens a hivatalos lappal
 
 **Kérés (Vallor Team S.R.L · Gondos Imre — Sofer):** „Most terjeszd az összes nyomtatható dokumentumra, minden kommunikáljon mindennel az elszámoláson belül." Az előző kör (allokáció-alapú elszámoltság) csak a **Decont oficialt** javította; a **Decont lunar** egyenleg-kártyája még a nyers `earned − paid`-ből dolgozott, ami ellentmondó/negatív értéket mutatott (850 EUR / −2447 RON).

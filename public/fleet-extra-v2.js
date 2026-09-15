@@ -25,6 +25,47 @@
   }
 
   // ════════════════════════════════════════════════════════
+  //  KÖZÖS NYOMTATÁS — többoldalas kezelés (minden decont-dokumentum)
+  //  Cél: ha a tartalom átcsordul a következő lapra, (1) NE törjön szét
+  //  szétszórtan (sor/blokk középen), és (2) MINDEN nyomtatott lap tetején
+  //  ismétlődjön a dokumentum FEJLÉCE (cég-letterhead + doc-badge).
+  //  Technika: a doc `.vs-doc-head` blokkját egy layout-tábla `<thead>`-jébe
+  //  tesszük — a böngésző a `table-header-group`-ot minden lapon megismétli.
+  //  A `break-inside:avoid` a sorokon/blokkokon megakadályozza a szétszórt
+  //  törést; a belső adat-táblák saját `<thead>` oszlop-fejléce is ismétlődik.
+  // ════════════════════════════════════════════════════════
+  var _VS_PRINT_CSS =
+    '*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+    + 'body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:0;color:#0f172a;background:#fff;}'
+    + 'table.vs-print-wrap{width:100%;border-collapse:collapse;}'
+    + '.vs-print-wrap>thead{display:table-header-group;}'   /* fejléc MINDEN lapon */
+    + '.vs-print-wrap>tbody>tr>td,.vs-print-wrap>thead>tr>td{padding:0;vertical-align:top;}'
+    + '.vs-doc-head{padding-bottom:6px;}'
+    + 'thead{display:table-header-group;}'                   /* belső táblák oszlop-fejléce is */
+    + 'tr{page-break-inside:avoid;break-inside:avoid;}'      /* sor sosem törik ketté */
+    + '.vs-doc-head,.dc-sum-block,.dc-sign-block,.dc-keep{page-break-inside:avoid;break-inside:avoid;}'
+    + '@page{size:A4;margin:14mm;}'
+    + '@media print{.no-print{display:none!important;}}';
+
+  // Egységes nyomtatható HTML-t épít a doc-elemből: a `.vs-doc-head` a
+  // layout-tábla thead-jébe (ismétlődő fejléc), a `.vs-doc-body` a tbody-ba.
+  // Ha nincs head/body wrapper (régi struktúra), a teljes doc egyben megy.
+  function _vsBuildPrintDoc(docEl, title, lang) {
+    var headEl = docEl.querySelector('.vs-doc-head');
+    var bodyEl = docEl.querySelector('.vs-doc-body');
+    var body;
+    if (headEl && bodyEl) {
+      body = '<table class="vs-print-wrap"><thead><tr><td>' + headEl.outerHTML + '</td></tr></thead>'
+        + '<tbody><tr><td>' + bodyEl.outerHTML + '</td></tr></tbody></table>';
+    } else {
+      body = docEl.outerHTML;
+    }
+    return '<!doctype html><html lang="' + (lang || 'ro') + '"><head><meta charset="utf-8">'
+      + '<title>' + esc(title || '') + '</title><style>' + _VS_PRINT_CSS + '</style></head><body>'
+      + body + '</body></html>';
+  }
+
+  // ════════════════════════════════════════════════════════
   //  1) LEJÁRATOK & RIASZTÁSOK
   // ════════════════════════════════════════════════════════
   // RO-specifikus, előre gyártott dokumentum-típusok (a fordított címkék render-időben)
@@ -2058,6 +2099,16 @@
       + '.sig-line{border-top:1.5px solid #0f172a;padding-top:6px;font-size:11px;color:#475569;}'
       + '.sig-name{font-size:12px;color:#94a3b8;margin-top:2px;}'
       + '.foot{margin-top:24px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:10px;color:#94a3b8;text-align:center;}'
+      // Többoldalas: a letterhead a `vs-print-wrap` thead-jében → minden lapon
+      // ismétlődik; a sorok/blokkok nem törnek szét (break-inside:avoid).
+      + '.vs-print-wrap{width:100%;border-collapse:collapse;}'
+      + '.vs-print-wrap>thead{display:table-header-group;}'
+      + '.vs-print-wrap>thead>tr>td,.vs-print-wrap>tbody>tr>td{padding:0;vertical-align:top;}'
+      + '.vs-doc-head{padding-bottom:6px;}'
+      + 'table.tbl thead{display:table-header-group;}'
+      + 'table.tbl tr,.sig-tbl tr{page-break-inside:avoid;break-inside:avoid;}'
+      + 'h2{page-break-after:avoid;}'
+      + '.sig-tbl,.note{page-break-inside:avoid;break-inside:avoid;}'
       + '@media print{body{background:#fff;padding:0;}.doc{box-shadow:none;padding:16px 20px;}}';
 
     // Cég-fejléc (letterhead) — logó + cég-adatok + doc-badge
@@ -2161,7 +2212,11 @@
       '<!doctype html><html><head><meta charset="utf-8">'
       + '<title>' + t('fe.pg.printTitle') + ' — ' + esc(dr.nume || dr.email || '') + '</title>'
       + '<style>' + css + '</style></head><body><div class="doc">'
-      + letterhead
+      // A letterhead a running-header thead-jébe kerül → minden nyomtatott
+      // lap tetején ismétlődik; a többi tartalom a tbody-ba.
+      + '<table class="vs-print-wrap">'
+      + '<thead><tr><td><div class="vs-doc-head">' + letterhead + '</div></td></tr></thead>'
+      + '<tbody><tr><td>'
       + driverBlock
       + noteBlock
       + '<h2>📋 ' + t('fe.pg.selectedItems') + ' (' + items.length + ')</h2>'
@@ -2196,6 +2251,7 @@
       +   '</td>'
       + '</tr></table>'
       + '<div class="foot">' + t('fe.pg.printFooter') + ' · VallorSoft</div>'
+      + '</td></tr></tbody></table>'   // vs-print-wrap vége
       + '</div>'
       + '<script>setTimeout(function(){window.print();},400);<\/script>'
       + '</body></html>';
@@ -2832,6 +2888,8 @@
         + '</td>'
       : '';
     return '<div class="dc-sheet-doc">'
+      // ── FEJLÉC (nyomtatáskor minden lapon ismétlődik — .vs-doc-head) ──
+      + '<div class="vs-doc-head">'
       // FIX HIVATALOS FEJLÉC (logó + cég + doktípus-badge)
       + '<table style="width:100%;border-collapse:collapse;">'
       +   '<tr>'
@@ -2854,6 +2912,9 @@
       + '</table>'
       // Elválasztó vonal a fejléc alatt (hivatalos kinézet)
       + '<div style="height:0;border-top:2px solid #0f172a;margin:12px 0 16px;"></div>'
+      + '</div>'  // .vs-doc-head vége
+      // ── TÖRZS (.vs-doc-body) ──
+      + '<div class="vs-doc-body">'
       // Sofőr adatok
       + '<div style="padding:10px 14px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:8px;margin-bottom:14px;">'
       +   '<div style="font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:0.4px;">' + t('fe.st.driver') + '</div>'
@@ -2973,11 +3034,14 @@
       + '<div style="margin-top:24px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:10px;color:#94a3b8;text-align:center;">'
       +   t('fe.st.footNote') + ' · VallorSoft'
       + '</div>'
+      + '</div>'   // .vs-doc-body vége
       + '</div>';
   }
 
   // Nyomtatás: új ablakot nyit a lap-tartalommal (a modal keretei kimaradnak).
   // A böngésző Nyomtatás → Célhely: „Mentés PDF-be" adja a valódi PDF-et.
+  // A `_vsBuildPrintDoc` a fejlécet layout-tábla thead-jébe teszi → minden
+  // nyomtatott lapon ismétlődik + a sorok/blokkok nem törnek szét.
   function dcSheetPrint() {
     if (!_dcSheet) { toast(t('fe.st.loadFirst'), 'err'); return; }
     var doc = document.querySelector('#dcSheetBody .dc-sheet-doc');
@@ -2989,13 +3053,7 @@
     var _perLbl = (_p.year && _p.month) ? _dcMonthLabel(_p.year, _p.month) : (d2(_p.from) + ' → ' + d2(_p.to));
     var _tKey = (_dcSheetMode === 'payments-only') ? 'fe.ph.docTitle' : 'fe.st.title';
     var title = t(_tKey) + ' — ' + (_dcSheet.driver.nume || '') + ' — ' + _perLbl;
-    w.document.write(
-      '<!doctype html><html lang="' + lang + '"><head><meta charset="utf-8"><title>' + esc(title) + '</title>'
-      + '<style>body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#0f172a;background:#fff;}'
-      + '@page{size:A4;margin:14mm;}'
-      + '@media print{body{margin:0;}}'
-      + '</style></head><body>' + doc.outerHTML + '</body></html>'
-    );
+    w.document.write(_vsBuildPrintDoc(doc, title, lang));
     w.document.close();
     // A print-dialógus a kép betöltése után nyíljon (browser-tudatosan)
     setTimeout(function () { try { w.focus(); w.print(); } catch (_e) {} }, 200);
@@ -3478,6 +3536,8 @@
       + '</div>';
 
     return '<div class="dc-sheet-doc dc-of-doc">'
+      // ── FEJLÉC (nyomtatáskor minden lapon ismétlődik — .vs-doc-head) ──
+      + '<div class="vs-doc-head">'
       // HIVATALOS FEJLÉC (ugyanaz a szerkezet, mint a Decont lunar-lapon)
       + '<table style="width:100%;border-collapse:collapse;">'
       +   '<tr>'
@@ -3498,6 +3558,9 @@
       +   '</tr>'
       + '</table>'
       + '<div style="height:0;border-top:2px solid #0f172a;margin:12px 0 16px;"></div>'
+      + '</div>'  // .vs-doc-head vége
+      // ── TÖRZS (.vs-doc-body) ──
+      + '<div class="vs-doc-body">'
       // Sofőr adatok — a személyes mezők (`contract_no`/`cnp`/`id_series`+`id_number`)
       // a sofőr adatlapján egyszer megadva jönnek (users tábla, `driver-personal-data.sql`),
       // és a hivatalos elszámolás fejlécében is szerepelnek (munkaügyi + könyvelési nyomtatvány).
@@ -3572,6 +3635,7 @@
       + '<div style="margin-top:24px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:10px;color:#94a3b8;text-align:center;">'
       +   t('fe.stof.footNote') + ' · VallorSoft'
       + '</div>'
+      + '</div>'   // .vs-doc-body vége
       + '</div>';
   }
 
@@ -3637,14 +3701,7 @@
       + (_dcOfSheet.period.year && _dcOfSheet.period.month
         ? _dcMonthLabel(_dcOfSheet.period.year, _dcOfSheet.period.month)
         : (_dcOfSheet.period.from + ' → ' + _dcOfSheet.period.to));
-    w.document.write(
-      '<!doctype html><html lang="' + lang + '"><head><meta charset="utf-8"><title>' + esc(title) + '</title>'
-      + '<style>body{font-family:Arial,Helvetica,sans-serif;margin:24px;color:#0f172a;background:#fff;}'
-      + '@page{size:A4;margin:14mm;}'
-      + '@media print{body{margin:0;} .no-print{display:none!important;}}'
-      + '.no-print{}'
-      + '</style></head><body>' + doc.outerHTML + '</body></html>'
-    );
+    w.document.write(_vsBuildPrintDoc(doc, title, lang));
     w.document.close();
     setTimeout(function () { try { w.focus(); w.print(); } catch (_e) {} }, 200);
   }
