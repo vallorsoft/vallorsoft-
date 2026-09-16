@@ -1393,6 +1393,94 @@ handlers.getDriverBalance = async function (req, res, args) {
 };
 
 // ─────────────────────────────────────────────────────────────
+//  Sofőr-elszámolás ÁTTEKINTŐ (kártyás landing) — a cég MINDEN belső
+//  sofőrjéhez EGY hívással visszaadja az össz-járandóságot, az effektív
+//  kifizetést és a fennmaradó (cross-currency beszámolt) hátralékot, hogy
+//  az Elszámolás fülre lépve kártyák fogadjanak (ne üres kereső).
+//  Hatékony: 3 csoportos lekérdezés (nem sofőrönként); a fennmaradó
+//  ugyanazzal a képlettel számol, mint a `getDriverBalance` → konzisztens.
+// ─────────────────────────────────────────────────────────────
+handlers.getDriverSettlementOverview = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+
+    // Belső sofőrök (nem tiltott)
+    const dr = await pool.query(
+      `SELECT email, nume, tel FROM users
+        WHERE company_id=$1 AND pozicio='Sofer' AND COALESCE(blocked,false)=false
+        ORDER BY nume NULLS LAST, email`, [cid]);
+    const drivers = dr.rows.map(function (u) {
+      return { email: String(u.email || '').toLowerCase(), nume: u.nume || u.email, tel: u.tel || null,
+        earned: { EUR: 0, RON: 0, count: 0 }, paid: { EUR: 0, RON: 0, count: 0 }, last_paid: null };
+    });
+    const byEmail = {};
+    drivers.forEach(function (d) { byEmail[d.email] = d; });
+
+    // Csoportos, all-time aggregátumok — migráció-toleráns (hiányzó tábla → üres)
+    async function safe(q, p) { try { return (await pool.query(q, p)).rows; } catch (_e) { return []; } }
+
+    const eRows = await safe(
+      `SELECT LOWER(email_sofer) AS email, COALESCE(currency,'RON') AS currency,
+              COALESCE(SUM(total_amount),0)::numeric AS total, COUNT(*)::int AS db
+         FROM driver_earnings WHERE company_id=$1 GROUP BY 1,2`, [cid]);
+    for (const r of eRows) {
+      const d = byEmail[r.email]; if (!d) continue;
+      const c = _cur(r.currency);
+      d.earned[c] = (d.earned[c] || 0) + parseFloat(r.total || 0);
+      d.earned.count += parseInt(r.db, 10) || 0;
+    }
+
+    const pRows = await safe(
+      `SELECT LOWER(email_sofer) AS email, COALESCE(currency,'RON') AS currency,
+              COALESCE(SUM(amount),0)::numeric AS total, COUNT(*)::int AS db,
+              MAX(paid_at) AS last_paid
+         FROM driver_payments
+        WHERE company_id=$1 AND paid_at <= CURRENT_DATE GROUP BY 1,2`, [cid]);
+    for (const r of pRows) {
+      const d = byEmail[r.email]; if (!d) continue;
+      const c = _cur(r.currency);
+      d.paid[c] = (d.paid[c] || 0) + parseFloat(r.total || 0);
+      d.paid.count += parseInt(r.db, 10) || 0;
+      if (r.last_paid && (!d.last_paid || String(r.last_paid) > String(d.last_paid))) d.last_paid = r.last_paid;
+    }
+
+    // Effektív BNR (élő → cég → utolsó kifizetés) — a cross-currency beszámoláshoz
+    const bnrInfo = await _getEffectiveBnr(cid);
+    const bnrRate = bnrInfo.rate;
+
+    const out = drivers.map(function (d) {
+      const balEurRaw = _round2((d.earned.EUR || 0) - (d.paid.EUR || 0));
+      const balRonRaw = _round2((d.earned.RON || 0) - (d.paid.RON || 0));
+      let balEur = balEurRaw, balRon = balRonRaw;
+      if (bnrRate != null && bnrRate > 0) {
+        if (balEur > 0 && balRon < 0) {
+          const applied = Math.min(balEur, (-balRon) / bnrRate);
+          balEur = _round2(balEur - applied); balRon = _round2(balRon + applied * bnrRate);
+        } else if (balRon > 0 && balEur < 0) {
+          const applied = Math.min(balRon, (-balEur) * bnrRate);
+          balRon = _round2(balRon - applied); balEur = _round2(balEur + applied / bnrRate);
+        }
+      }
+      const ronAll = bnrRate != null ? _round2(balEur * bnrRate + balRon) : null;
+      return {
+        email: d.email, nume: d.nume, tel: d.tel,
+        earned: { eur: _round2(d.earned.EUR), ron: _round2(d.earned.RON), count: d.earned.count },
+        paid: { eur: _round2(d.paid.EUR), ron: _round2(d.paid.RON), count: d.paid.count },
+        remaining: { eur: balEur, ron: balRon, ron_all: ronAll },
+        last_paid: d.last_paid,
+        has_activity: (d.earned.count > 0 || d.paid.count > 0)
+      };
+    });
+
+    return res.json({ result: { ok: true, drivers: out, bnr_rate: bnrRate, bnr_source: bnrInfo.source } });
+  } catch (err) {
+    console.error('getDriverSettlementOverview hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
 //  Kifizetés-ELSZÁMOLÁS (allokáció) — a sofőr ÖSSZES járandóságát és
 //  kifizetését GLOBÁLISAN párosítja, hogy a hivatalos havi lap a HÓ
 //  TÉTELEINEK elszámoltságát mutassa (NEM a fizetés dátumát):

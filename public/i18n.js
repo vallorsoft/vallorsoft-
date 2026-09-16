@@ -2765,6 +2765,14 @@
     'fe.dc.balEur':     { ro: 'Rest de plată (EUR)', hu: 'Hátralék (EUR)' },
     'fe.dc.balRon':     { ro: 'Rest de plată (RON)', hu: 'Hátralék (RON)' },
     'fe.dc.balCombined':{ ro: 'Total combinat', hu: 'Kombinált összesen' },
+    // Kártyás elszámolás-landing (sofőr-áttekintő)
+    'fe.dc.searchDriver':  { ro: 'Caută șofer (nume, email, telefon)…', hu: 'Sofőr keresése (név, e-mail, telefon)…' },
+    'fe.dc.hubHint':       { ro: 'Alege un șofer pentru decont detaliat — drepturi, plăți, documente.', hu: 'Válassz egy sofőrt a részletes elszámoláshoz — járandóság, kifizetések, dokumentumok.' },
+    'fe.dc.balRemaining':  { ro: 'Rest de plată', hu: 'Fennmaradó' },
+    'fe.dc.lastPaid':      { ro: 'ultima plată', hu: 'utolsó kifiz.' },
+    'fe.dc.noDrivers':     { ro: 'Nu există șoferi interni. Adaugă-i la „Șoferi interni".', hu: 'Nincs belső sofőr. Add hozzá a „Belső sofőrök" fülön.' },
+    'fe.dc.noMatch':       { ro: 'Niciun șofer nu corespunde căutării.', hu: 'Nincs a keresésnek megfelelő sofőr.' },
+    'fe.dc.backToDrivers': { ro: 'Înapoi la șoferi', hu: 'Vissza a sofőrökhöz' },
     'fe.dc.combinedNote':{ ro: 'EUR convertit la BNR curent', hu: 'EUR mai BNR-en átszámolva' },
     // Cross-currency beszámítás — RON-túlfizetés → EUR-adósság csökkentés
     // (és fordítva). A mai BNR-en számol; a magyarázó sor az egyenleg-kártya
