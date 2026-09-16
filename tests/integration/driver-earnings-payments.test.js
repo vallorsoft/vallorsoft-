@@ -697,4 +697,72 @@ describe('Migráció-tolerancia — driver_earnings/driver_payments/users.net_ba
     expect(res.body.result.ok).toBe(true);
     expect(res.body.result.base_salary_ron).toBe(2700);
   });
+
+  // ═════════════════════════════════════════════
+  //  getDriverSettlementOverview (kártyás landing)
+  // ═════════════════════════════════════════════
+  describe('getDriverSettlementOverview', () => {
+    test('Sofer NEM éri el', async () => {
+      setUser(fixtures.sofer);
+      const res = await request(app).post('/api/execute').send({
+        functionName: 'getDriverSettlementOverview', arguments: [{}],
+      });
+      expect(res.body.result.ok).toBe(false);
+      expect(res.body.result.err).toMatch(/interzis/i);
+    });
+
+    test('Admin: per-sofőr fennmaradó hátralék (cross-currency beszámolva)', async () => {
+      setUser(fixtures.admin);
+      fetchBnrEurRon.mockResolvedValueOnce(5.05);
+      const pool = require('../../db');
+      pool.query
+        // 1) belső sofőrök
+        .mockResolvedValueOnce(rows([
+          { email: 'gondos@ceg.hu', nume: 'Gondos', tel: '0740' },
+          { email: 'uj@ceg.hu',     nume: 'Uj',     tel: null },
+        ]))
+        // 2) earnings grouped (Gondos: 510 EUR + 45 RON; Uj: semmi)
+        .mockResolvedValueOnce(rows([
+          { email: 'gondos@ceg.hu', currency: 'EUR', total: 510, db: 3 },
+          { email: 'gondos@ceg.hu', currency: 'RON', total: 45,  db: 1 },
+        ]))
+        // 3) payments grouped (Gondos: 937 RON túlfizetés)
+        .mockResolvedValueOnce(rows([
+          { email: 'gondos@ceg.hu', currency: 'RON', total: 937, db: 2, last_paid: '2026-09-01' },
+        ]));
+      const res = await request(app).post('/api/execute').send({
+        functionName: 'getDriverSettlementOverview', arguments: [{}],
+      });
+      expect(res.body.result.ok).toBe(true);
+      const list = res.body.result.drivers;
+      expect(list.length).toBe(2);
+      const g = list.find(d => d.email === 'gondos@ceg.hu');
+      // Cross-currency: 510 EUR − 937 RON túlfizetés (/5.05) → ~333.37 EUR / 0 RON
+      expect(g.remaining.eur).toBeCloseTo(333.37, 1);
+      expect(g.remaining.ron).toBeCloseTo(0, 1);
+      expect(g.last_paid).toBe('2026-09-01');
+      expect(g.has_activity).toBe(true);
+      const u = list.find(d => d.email === 'uj@ceg.hu');
+      expect(u.remaining.eur).toBe(0);
+      expect(u.has_activity).toBe(false);
+      expect(res.body.result.bnr_rate).toBe(5.05);
+    });
+
+    test('migráció-tolerancia: hiányzó earnings/payments tábla → üres, de OK', async () => {
+      setUser(fixtures.manager);
+      fetchBnrEurRon.mockResolvedValueOnce(5.0);
+      const pool = require('../../db');
+      pool.query
+        .mockResolvedValueOnce(rows([{ email: 'a@ceg.hu', nume: 'A', tel: null }])) // drivers
+        .mockRejectedValueOnce(new Error('relation "driver_earnings" does not exist'))
+        .mockRejectedValueOnce(new Error('relation "driver_payments" does not exist'));
+      const res = await request(app).post('/api/execute').send({
+        functionName: 'getDriverSettlementOverview', arguments: [{}],
+      });
+      expect(res.body.result.ok).toBe(true);
+      expect(res.body.result.drivers.length).toBe(1);
+      expect(res.body.result.drivers[0].remaining.eur).toBe(0);
+      expect(res.body.result.drivers[0].has_activity).toBe(false);
+    });
+  });
 });

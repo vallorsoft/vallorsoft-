@@ -774,6 +774,20 @@
     }).catch(function () { return _dcCustomKinds; });
   }
 
+  var _dcOverview = [];   // getDriverSettlementOverview eredménye (kártyás landing)
+
+  // Monogram-avatar determinisztikus háttérszínnel (a névből hash-elve)
+  function _dcAvatar(name) {
+    var s = String(name || '?').trim();
+    var initials = s.split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join('').toUpperCase() || '?';
+    var hue = 0; for (var i = 0; i < s.length; i++) hue = (hue * 31 + s.charCodeAt(i)) % 360;
+    return '<span class="dc-av" style="background:hsl(' + hue + ',55%,42%);">' + esc(initials) + '</span>';
+  }
+
+  // ── Elszámolás fül landing: KÁRTYÁS sofőr-áttekintő (nem üres kereső) ──
+  // A cég minden belső sofőrjéhez egy kártya: avatar + név + kontakt +
+  // FENNMARADÓ hátralék (a részletes nézettel azonos, cross-currency beszámolt
+  // érték) + utolsó kifizetés. Kereső csak szűr (a kártyák fogadnak, nem üresség).
   function loadDecont() {
     var box = document.getElementById('decontBox');
     if (!box) return;
@@ -781,41 +795,153 @@
     Promise.all([
       gas('getInternalDrivers'),
       gas('getBnrRate').catch(function () { return null; }),
-      _dcLoadKinds()                            // egyéni típusok előtöltése
+      _dcLoadKinds(),                                              // egyéni típusok előtöltése
+      gas('getDriverSettlementOverview').catch(function () { return { ok: false, drivers: [] }; })
     ]).then(function (rs) {
       _dcDrivers = Array.isArray(rs[0]) ? rs[0] : [];
       var bnr = rs[1] && rs[1].bnr_rate != null ? Number(rs[1].bnr_rate) : null;
       _dcBnr = bnr;
-      var mr = monthRange();
+      var ov = rs[3] || {};
+      if (ov.bnr_rate != null && bnr == null) bnr = Number(ov.bnr_rate);
+      _dcOverview = (ov.ok && Array.isArray(ov.drivers)) ? ov.drivers : [];
 
-      // Sofőr-választó kártya
-      var selectorCard = panel(t('fe.dc.title'),
-        '<div class="dc-toolbar">'
-        // Sofőr-választásra AZONNAL betölti a járandóság + kifizetés + egyenleg
-        // nézetet — nem kell külön az „Elszámolás" gombot lenyomni. Az időszak-
-        // változtatás is autoload (csak ha már van választott sofőr).
-        + '<div class="field" style="margin:0;flex:1;min-width:200px;"><label>' + t('fe.dc.driverReq') + '</label>'
-        +   '<select class="select" id="dcDriver" onchange="FleetExtra.dcLoad()">' + _dcDriverOptions() + '</select></div>'
+      // Ha az áttekintő nem elérhető (migráció-hiány), a belső-sofőr listából
+      // építünk minimál kártyákat (hátralék nélkül) — így SEM üres kereső fogad.
+      if (!_dcOverview.length && _dcDrivers.length) {
+        _dcOverview = _dcDrivers.map(function (u) {
+          return { email: u.email, nume: u.nume || u.email, tel: u.tel || null,
+            earned: null, paid: null, remaining: null, last_paid: null, has_activity: false };
+        });
+      }
+
+      box.innerHTML =
+        panel('👥 ' + t('fe.dc.title'),
+          '<div class="dc-hub-head">'
+          + '<input class="input dc-hub-search" id="dcHubSearch" type="text" '
+          +   'placeholder="🔎 ' + t('fe.dc.searchDriver') + '" '
+          +   'oninput="FleetExtra._dcFilterCards(this.value)">'
+          + '<div class="dc-bnr-line" style="margin:0;">'
+          +   '<span>🏦 <b>' + t('fe.dc.bnrToday') + ':</b> '
+          +     (bnr != null
+                ? '<span class="dc-bnr-val">1 EUR = ' + n2(bnr, 4) + ' RON</span>'
+                : '<span class="text-muted">' + t('fe.dc.bnrNa') + '</span>')
+          +   '</span>'
+          + '</div>'
+          + '</div>'
+          + '<div class="dc-hub-hint text-muted">' + t('fe.dc.hubHint') + '</div>')
+        + '<div id="dcHubGrid" class="dc-hub-grid">' + _dcRenderCards(_dcOverview) + '</div>';
+    });
+  }
+
+  // Egy sofőr-kártya (a landing rácsba). A hátralék színe: piros ha >0 (tartozunk),
+  // zöld ha 0/negatív. A kereső a `data-search` attribútumra szűr.
+  function _dcCardHtml(d) {
+    var rem = d.remaining || null;
+    var remEur = rem ? Number(rem.eur || 0) : 0;
+    var remRon = rem ? Number(rem.ron || 0) : 0;
+    var hasRem = rem && (Math.abs(remEur) > 0.005 || Math.abs(remRon) > 0.005);
+    var tone = !rem ? 'muted' : ((remEur > 0.005 || remRon > 0.005) ? 'danger' : 'ok');
+
+    var remBlock;
+    if (!rem) {
+      remBlock = '<div class="dc-card-rem dc-tone-muted"><span class="dc-card-remlbl">' + t('fe.dc.balRemaining') + '</span>'
+        + '<span class="dc-card-remval">—</span></div>';
+    } else if (!hasRem) {
+      remBlock = '<div class="dc-card-rem dc-tone-ok"><span class="dc-card-remlbl">' + t('fe.dc.balRemaining') + '</span>'
+        + '<span class="dc-card-remval">✓ ' + t('fe.stof.itemPaid') + '</span></div>';
+    } else {
+      var parts = [];
+      if (Math.abs(remEur) > 0.005) parts.push(n2(remEur, 2) + ' <span class="dc-tile-cur">EUR</span>');
+      if (Math.abs(remRon) > 0.005) parts.push(n2(remRon, 2) + ' <span class="dc-tile-cur">RON</span>');
+      remBlock = '<div class="dc-card-rem dc-tone-' + tone + '"><span class="dc-card-remlbl">' + t('fe.dc.balRemaining') + '</span>'
+        + '<span class="dc-card-remval">' + parts.join(' · ') + '</span></div>';
+    }
+
+    var metaBits = [];
+    if (d.tel) metaBits.push('☏ ' + esc(d.tel));
+    if (d.last_paid) metaBits.push('💸 ' + t('fe.dc.lastPaid') + ': ' + d2(d.last_paid));
+    var metaLine = metaBits.length
+      ? '<div class="dc-card-meta">' + metaBits.join(' · ') + '</div>' : '';
+
+    var search = (String(d.nume || '') + ' ' + String(d.email || '') + ' ' + String(d.tel || '')).toLowerCase();
+    return '<button type="button" class="dc-card" data-search="' + esc(search) + '" '
+      + 'onclick="FleetExtra.dcOpenDriver(\'' + esc(d.email) + '\')">'
+      + '<div class="dc-card-top">' + _dcAvatar(d.nume)
+      +   '<div class="dc-card-id"><div class="dc-card-name">' + esc(d.nume || d.email) + '</div>'
+      +     '<div class="dc-card-email">' + esc(d.email) + '</div></div>'
+      +   '<span class="dc-card-arrow" aria-hidden="true">→</span>'
+      + '</div>'
+      + remBlock
+      + metaLine
+      + '</button>';
+  }
+
+  function _dcRenderCards(list) {
+    if (!list || !list.length) {
+      return '<div class="text-muted" style="padding:30px;text-align:center;grid-column:1/-1;">'
+        + t('fe.dc.noDrivers') + '</div>';
+    }
+    // Rendezés: van hátralék elöl (nagyobb kombinált RON), majd név
+    var sorted = list.slice().sort(function (a, b) {
+      var ra = (a.remaining && a.remaining.ron_all != null) ? Math.max(a.remaining.ron_all, 0) : -1;
+      var rb = (b.remaining && b.remaining.ron_all != null) ? Math.max(b.remaining.ron_all, 0) : -1;
+      if (rb !== ra) return rb - ra;
+      return String(a.nume || '').localeCompare(String(b.nume || ''));
+    });
+    return sorted.map(_dcCardHtml).join('');
+  }
+
+  // Kereső: kliens-oldali szűrés a kártya data-search attribútumán (nincs fetch)
+  function _dcFilterCards(q) {
+    var grid = document.getElementById('dcHubGrid');
+    if (!grid) return;
+    var needle = String(q || '').trim().toLowerCase();
+    var cards = grid.querySelectorAll('.dc-card');
+    var shown = 0;
+    for (var i = 0; i < cards.length; i++) {
+      var hit = !needle || (cards[i].getAttribute('data-search') || '').indexOf(needle) >= 0;
+      cards[i].style.display = hit ? '' : 'none';
+      if (hit) shown++;
+    }
+    var empty = grid.querySelector('.dc-hub-empty');
+    if (!shown) {
+      if (!empty) {
+        empty = document.createElement('div');
+        empty.className = 'text-muted dc-hub-empty';
+        empty.style.cssText = 'padding:24px;text-align:center;grid-column:1/-1;';
+        empty.textContent = t('fe.dc.noMatch');
+        grid.appendChild(empty);
+      }
+    } else if (empty) { empty.remove(); }
+  }
+
+  // Egy sofőr kártyájára kattintva → részletes elszámolás-nézet (a MEGLÉVŐ
+  // dcLoad renderel bele). A detail-sávban visszaáll a #dcDriver/#dcFrom/#dcTo,
+  // hogy a meglévő dcLoad/_dcMaybeReload/nyomtatás-motorok változatlanul fussanak.
+  function dcOpenDriver(email) {
+    var box = document.getElementById('decontBox');
+    if (!box) return;
+    var mr = monthRange();
+    box.innerHTML =
+      panel(t('fe.dc.title'),
+        '<div class="dc-detail-bar">'
+        + '<button class="btn ghost dc-back-btn" onclick="FleetExtra.dcBackToDrivers()">← ' + t('fe.dc.backToDrivers') + '</button>'
+        + '<div class="field" style="margin:0;flex:1;min-width:180px;"><label>' + t('fe.dc.driverReq') + '</label>'
+        +   '<select class="select" id="dcDriver" onchange="FleetExtra.dcLoad()">' + _dcDriverOptions(email) + '</select></div>'
         + '<div class="field" style="margin:0;"><label>' + t('fe.dc.periodFrom') + '</label>'
         +   '<input class="input" id="dcFrom" type="date" value="' + mr.from + '" onchange="FleetExtra._dcMaybeReload()"></div>'
         + '<div class="field" style="margin:0;"><label>' + t('fe.dc.periodTo') + '</label>'
         +   '<input class="input" id="dcTo" type="date" value="' + mr.to + '" onchange="FleetExtra._dcMaybeReload()"></div>'
         + '<button class="btn primary" style="height:42px;" onclick="FleetExtra.dcLoad()" title="' + t('fe.dc.calc') + '">'
         +   '🔄 ' + t('fe.dc.calc') + '</button>'
-        + '</div>'
-        + '<div class="dc-bnr-line">'
-        +   '<span>🏦 <b>' + t('fe.dc.bnrToday') + ':</b> '
-        +     (bnr != null
-              ? '<span class="dc-bnr-val">1 EUR = ' + n2(bnr, 4) + ' RON</span>'
-              : '<span class="text-muted">' + t('fe.dc.bnrNa') + '</span>')
-        +   '</span>'
-        +   '<span class="text-muted" style="font-size:12px;">' + t('fe.dc.bnrHint') + '</span>'
-        + '</div>'
-      );
-
-      box.innerHTML = selectorCard + '<div id="dcResult"></div>';
-    });
+        + '</div>')
+      + '<div id="dcResult"></div>';
+    dcLoad();
   }
+
+  // Vissza a kártyás landingre (friss adat — a kártyák a legutóbbi kifizetés
+  // utáni állapotot mutatják).
+  function dcBackToDrivers() { loadDecont(); }
 
   // Csak akkor tölt újra, ha már van választott sofőr — így az időszak-
   // mezők onchange autoload-ja nem villantja fel a „Válassz sofőrt" toastot.
@@ -3936,6 +4062,10 @@
     svOpenComplete: svOpenComplete, svSubmitComplete: svSubmitComplete,
     svCloseModal: svCloseModal,
     dcLoad: dcLoad, _dcMaybeReload: _dcMaybeReload,
+    // Kártyás elszámolás-landing (sofőr-áttekintő)
+    dcOpenDriver: dcOpenDriver,
+    dcBackToDrivers: dcBackToDrivers,
+    _dcFilterCards: _dcFilterCards,
     // Új: járandóság + kifizetés + kártyás decont
     dcEarnKindChange: dcEarnKindChange,
     dcEarnRecalc: dcEarnRecalc,

@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-09-16 — Elszámolás fül: kártyás sofőr-áttekintő landing (nem üres kereső fogad)
+
+**Kérés (Vallor Team S.R.L · Gondos Imre — Sofer):** „ajánlj egy jobb megoldást, valami kártyás kinézetűt — az Elszámolás menüfülre lépve ne a kereső fogadjon és semmi info."
+
+1. **Gyökér:** az Elszámolás fülre lépve eddig egy üres sofőr-`<select>` + időszak-mezők fogadtak, alattuk üres tartalom — a felhasználónak előbb sofőrt kellett választania, hogy bármit lásson.
+2. **Új kártyás landing** (`public/fleet-extra-v2.js` `loadDecont` újraírva): a cég MINDEN belső sofőrjéhez egy kártya — avatar-monogram (névből hash-elt szín) + név + e-mail + **☏ telefon** + **💸 utolsó kifizetés** + **Fennmaradó hátralék** (piros ha tartozunk, zöld ✓ ha rendezve, `—` ha nincs adat). A kártyák a hátralék szerint rendezve (tartozásos elöl). Fent egy **kereső** ami csak szűr (nincs fetch), + a mai BNR-sor. Kártyára kattintva → részletes elszámolás-nézet (a MEGLÉVŐ `dcLoad` renderel bele) egy **„← Vissza a sofőrökhöz"** gombbal + sofőr-választóval + időszakkal.
+3. **Új szerver-handler** `getDriverSettlementOverview` (`handlers/fleetCompliance.js`, Admin/Manager, `company_id`-szűrt): **3 csoportos lekérdezés** (nem sofőrönként) adja az össz-járandóságot + effektív kifizetést + utolsó fizetés dátumát; a **fennmaradó** a `getDriverBalance`-szal AZONOS cross-currency beszámolással számol (`_getEffectiveBnr` fallback-lánc) → a kártya értéke konzisztens a részletes nézettel. Migráció-toleráns (hiányzó tábla → üres, de OK); áttekintő-hiba esetén a kliens a belső-sofőr listából épít minimál kártyákat → SEM üres kereső fogad.
+4. **CSS** (`public/style.css`, `#decontBox` scope): `.dc-hub-grid` reszponzív kártya-rács + `.dc-card`/`.dc-av`/`.dc-card-rem` (tónus-színek), világos + sötét téma; `.dc-detail-bar` a részletes nézet fejléce. **i18n** 7 új `fe.dc.*` kulcs (RO-alap + HU). Cache-bust `?v=20260916dechub`.
+5. **Verifikáció:** valós headless Chromium DOM-teszt (10/10 PASS: kártya-render, hátralék-tónus, rendezés, kereső-szűrés). Új szerver-teszt (`driver-earnings-payments.test.js` +3 eset: szerep-kapu, cross-currency per-sofőr, migráció-tolerancia). **1234 Jest zöld** (1231 → 1234), nincs regresszió.
+
+---
+
 ## 2026-09-16 — Kivehető szakaszok (X-es rendszer) MINDEN decont-nyomtatványon — alapból minden látszik, egyenként kivehető
 
 **Kérés (Vallor Team S.R.L · Gondos Imre — Sofer):** „Legyen lehetőség minden típusú dokumentumnál, hogy alapértelmezettként azt mutassa, amit most, de lehessen kivenni az adott szakaszokat — pl. a Tételek elszámolás vagy bármelyik tábla-szakasz — egy X-es rendszerben."
