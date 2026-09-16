@@ -2997,6 +2997,23 @@
     'fe.stof.cnp':          { ro: 'CNP', hu: 'CNP / Személyi szám' },
     'fe.stof.idDoc':        { ro: 'CI seria / nr.', hu: 'Szem. ig. sorozat / szám' },
 
+    // Szakasz-láthatóság (X-es rendszer) — minden nyomtatványon kivehető szakaszok
+    'fe.sec.barTitle':   { ro: 'Secțiuni afișate (apasă ✕ pentru a scoate)', hu: 'Megjelenített szakaszok (✕-re kattintva kiveheted)' },
+    'fe.sec.hint':       { ro: 'Alegerea se salvează pe acest dispozitiv, per tip de document; se aplică la print și e-mail.', hu: 'A választás ezen az eszközön mentődik, dokumentum-típusonként; a nyomtatásra és az e-mailre is érvényes.' },
+    'fe.sec.driver':     { ro: 'Date șofer', hu: 'Sofőr adatai' },
+    'fe.sec.earnings':   { ro: 'Drepturi (tabel)', hu: 'Járandóság-tábla' },
+    'fe.sec.payments':   { ro: 'Plăți (tabel)', hu: 'Kifizetések-tábla' },
+    'fe.sec.settlement': { ro: 'Sold / decontare', hu: 'Elszámoltság (egyenleg)' },
+    'fe.sec.details':    { ro: 'Detaliere pe rânduri', hu: 'Tételes részletezés' },
+    'fe.sec.totals':     { ro: 'Sumar drepturi', hu: 'Járandóság-összesítő' },
+    'fe.sec.paid':       { ro: 'Deja plătit', hu: 'Már kifizetve' },
+    'fe.sec.summary':    { ro: 'Salariu + Diurna', hu: 'Alapbér + Napidíj' },
+    'fe.sec.remain':     { ro: 'Rest de plată', hu: 'Fennmaradó fizetendő' },
+    'fe.sec.note':       { ro: 'Observație', hu: 'Megjegyzés' },
+    'fe.sec.items':      { ro: 'Drepturi selectate', hu: 'Kiválasztott tételek' },
+    'fe.sec.signature':  { ro: 'Semnături', hu: 'Aláírások' },
+    'fe.sec.footer':     { ro: 'Subsol', hu: 'Lábléc' },
+
     // Üzemanyagkártya
     'fe.fc.title': { hu: '⛽ Üzemanyagkártya-kivonat importálása (OMV / MOL / DKV / Eurowag / egyéb CSV)', ro: '⛽ Import extras card carburant (OMV / MOL / DKV / Eurowag / alt CSV)' },
     'fe.fc.hint': { hu: 'Töltsd fel a kártya-szolgáltató CSV-kivonatát, párosítsd az oszlopokat, és importálj. A kétszeri import nem duplikál (tranzakció-azonosítás). Az összevetés megmutatja, hol tér el a kártyás tankolás a sofőr által beírttól.', ro: 'Încarcă extrasul CSV al furnizorului de card, potrivește coloanele și importă. Importul repetat nu duplică (identificare tranzacție). Comparația arată unde diferă alimentarea pe card de cea introdusă de șofer.' },
