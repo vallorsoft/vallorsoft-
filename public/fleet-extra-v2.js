@@ -47,22 +47,141 @@
     + '@page{size:A4;margin:14mm;}'
     + '@media print{.no-print{display:none!important;}}';
 
+  // A nyomtatásból/e-mailből ELTÁVOLÍTANDÓ elemek egy klónból: a
+  // szakasz-választó sáv (.vs-sec-bar / -slot), a .no-print elemek, és a
+  // felhasználó által kivett szakaszok ([data-sec-hidden="1"]). Így a
+  // rejtett szakaszok nemcsak elrejtve, hanem ki is maradnak a lapról.
+  function _vsStripForOutput(node) {
+    if (!node || !node.querySelectorAll) return;
+    var sel = '.vs-sec-bar,.vs-sec-bar-slot,.no-print,[data-sec-hidden="1"]';
+    var els = node.querySelectorAll(sel);
+    for (var i = els.length - 1; i >= 0; i--) {
+      if (els[i].parentNode) els[i].parentNode.removeChild(els[i]);
+    }
+  }
+
   // Egységes nyomtatható HTML-t épít a doc-elemből: a `.vs-doc-head` a
   // layout-tábla thead-jébe (ismétlődő fejléc), a `.vs-doc-body` a tbody-ba.
   // Ha nincs head/body wrapper (régi struktúra), a teljes doc egyben megy.
+  // A rejtett szakaszokat + a szakasz-választó sávot a klónból kivágjuk.
   function _vsBuildPrintDoc(docEl, title, lang) {
     var headEl = docEl.querySelector('.vs-doc-head');
     var bodyEl = docEl.querySelector('.vs-doc-body');
     var body;
     if (headEl && bodyEl) {
-      body = '<table class="vs-print-wrap"><thead><tr><td>' + headEl.outerHTML + '</td></tr></thead>'
-        + '<tbody><tr><td>' + bodyEl.outerHTML + '</td></tr></tbody></table>';
+      var hClone = headEl.cloneNode(true);
+      var bClone = bodyEl.cloneNode(true);
+      _vsStripForOutput(hClone);
+      _vsStripForOutput(bClone);
+      body = '<table class="vs-print-wrap"><thead><tr><td>' + hClone.outerHTML + '</td></tr></thead>'
+        + '<tbody><tr><td>' + bClone.outerHTML + '</td></tr></tbody></table>';
     } else {
-      body = docEl.outerHTML;
+      var dClone = docEl.cloneNode(true);
+      _vsStripForOutput(dClone);
+      body = dClone.outerHTML;
     }
     return '<!doctype html><html lang="' + (lang || 'ro') + '"><head><meta charset="utf-8">'
       + '<title>' + esc(title || '') + '</title><style>' + _VS_PRINT_CSS + '</style></head><body>'
       + body + '</body></html>';
+  }
+
+  // ════════════════════════════════════════════════════════
+  //  SZAKASZ-LÁTHATÓSÁG (X-es rendszer) — dokumentum-típusonként
+  //  A felhasználó bármely dokumentumon kiveheti az egyes szakaszokat
+  //  (pl. a tételes tábla, a kifizetés-tábla, egy összegző blokk). Alapból
+  //  MINDEN látszik; a rejtett szakaszok id-jét dokumentum-típusonként a
+  //  localStorage őrzi (`vs_dc_sec_hidden:<docType>`). A rejtett szakasz a
+  //  DOM-ban marad (`display:none` + `data-sec-hidden="1"`), de nyomtatásból
+  //  és e-mailből is kiesik (a `_vsStripForOutput`/e-mail-klón kivágja).
+  //  Dokumentum-típusok: 'lunar', 'payhist', 'oficial', 'group'.
+  // ════════════════════════════════════════════════════════
+  var _SEC_KEY_PREFIX = 'vs_dc_sec_hidden:';
+  function _dcSecHiddenSet(docType) {
+    var out = {};
+    try {
+      var a = JSON.parse(localStorage.getItem(_SEC_KEY_PREFIX + docType) || '[]');
+      if (Array.isArray(a)) a.forEach(function (id) { out[id] = true; });
+    } catch (_e) {}
+    return out;
+  }
+  function _dcSecSetHidden(docType, id, hidden) {
+    try {
+      var set = _dcSecHiddenSet(docType);
+      if (hidden) set[id] = true; else delete set[id];
+      localStorage.setItem(_SEC_KEY_PREFIX + docType, JSON.stringify(Object.keys(set)));
+    } catch (_e) {}
+  }
+  // Szakasz-wrapper: a rejtett állapotot render-időben ráégeti a DOM-ra.
+  function _dcSec(docType, id, label, html, hiddenSet) {
+    var hid = hiddenSet || _dcSecHiddenSet(docType);
+    var off = !!hid[id];
+    return '<div class="vs-sec" data-sec="' + esc(id) + '" data-sec-label="' + esc(label) + '"'
+      + (off ? ' data-sec-hidden="1" style="display:none;"' : '') + '>' + html + '</div>';
+  }
+  function _secChipStyle(off) {
+    return 'display:inline-flex;align-items:center;gap:4px;margin:3px;padding:5px 11px;'
+      + 'border-radius:16px;font-size:12px;font-weight:700;cursor:pointer;transition:all .12s;border:1.5px solid '
+      + (off ? '#cbd5e1;background:#f1f5f9;color:#64748b;' : '#2563eb;background:#eff6ff;color:#1e40af;');
+  }
+  // A szakasz-választó sáv belseje (chip-ek) — a slot kapja meg innerHTML-ként.
+  function _dcSecBarInner(docType, secs) {
+    var hid = _dcSecHiddenSet(docType);
+    var chips = secs.map(function (s) {
+      var off = !!hid[s.id];
+      return '<button type="button" class="vs-sec-chip" data-for="' + esc(s.id) + '" data-label="' + esc(s.label) + '" '
+        + 'onclick="FleetExtra.dcSecToggle(\'' + docType + '\',\'' + esc(s.id) + '\')" '
+        + 'style="' + _secChipStyle(off) + '">'
+        + (off ? '➕ ' : '✕ ') + esc(s.label) + '</button>';
+    }).join('');
+    return '<div style="font-size:11px;font-weight:800;color:#475569;text-transform:uppercase;'
+      + 'letter-spacing:0.4px;margin-bottom:5px;">🧩 ' + t('fe.sec.barTitle') + '</div>'
+      + '<div>' + chips + '</div>'
+      + '<div style="font-size:10px;color:#94a3b8;margin-top:5px;">' + t('fe.sec.hint') + '</div>';
+  }
+  // A modal-render után a slot-ba építi a sávot a DOM-ban tényleg jelen lévő
+  // szakaszokból (egy igazságforrás — nincs külön szekció-lista karbantartás).
+  function _dcSecBuildBar(docEl, docType) {
+    if (!docEl) return;
+    var slot = docEl.querySelector('.vs-sec-bar-slot');
+    if (!slot) return;
+    var secs = [];
+    var els = docEl.querySelectorAll('[data-sec]');
+    for (var i = 0; i < els.length; i++) {
+      secs.push({ id: els[i].getAttribute('data-sec'), label: els[i].getAttribute('data-sec-label') || els[i].getAttribute('data-sec') });
+    }
+    slot.innerHTML = secs.length ? _dcSecBarInner(docType, secs) : '';
+  }
+  // Az aktív modal doc-eleme docType szerint (lunar+payhist ugyanaz a modal)
+  function _dcSecDocEl(docType) {
+    if (docType === 'oficial') return document.querySelector('#dcOfSheetBody .dc-of-doc');
+    return document.querySelector('#dcSheetBody .dc-sheet-doc');
+  }
+  // Egy szakasz ki/be kapcsolása: localStorage + DOM display + chip vizuál
+  // (nincs szerver-újratöltés — azonnali, a beírt adat/BNR nem vész el).
+  function dcSecToggle(docType, id) {
+    var willHide = !_dcSecHiddenSet(docType)[id];
+    _dcSecSetHidden(docType, id, willHide);
+    var doc = _dcSecDocEl(docType);
+    if (!doc) return;
+    var els = doc.querySelectorAll('[data-sec="' + id + '"]');
+    for (var i = 0; i < els.length; i++) {
+      els[i].style.display = willHide ? 'none' : '';
+      if (willHide) els[i].setAttribute('data-sec-hidden', '1');
+      else els[i].removeAttribute('data-sec-hidden');
+    }
+    var chips = doc.querySelectorAll('.vs-sec-chip[data-for="' + id + '"]');
+    for (var j = 0; j < chips.length; j++) {
+      var lbl = chips[j].getAttribute('data-label') || '';
+      chips[j].setAttribute('style', _secChipStyle(willHide));
+      chips[j].innerHTML = (willHide ? '➕ ' : '✕ ') + esc(lbl);
+    }
+  }
+  // Közös e-mail-klón tisztító: a szakasz-választó sáv + .no-print + a
+  // felhasználó által kivett szakaszok kimaradnak a kiküldött HTML-ből.
+  function _dcCloneForEmail(docEl) {
+    var clone = docEl.cloneNode(true);
+    _vsStripForOutput(clone);
+    return clone;
   }
 
   // ════════════════════════════════════════════════════════
@@ -2058,6 +2177,8 @@
 
     // Cég-fejléc adatok (`company_branding` + `companies`); best-effort — hiányzik → üres.
     var withStamp = _dcPgPrintWithStamp !== false;  // toggle: default ON
+    // Szakasz-láthatóság (X-es rendszer) — docType 'group', localStorage-ból
+    var gHid = _dcSecHiddenSet('group');
 
     // ASCII-safe címek nélkül a print-ablakba írunk minden stílust inline-ban,
     // hogy ne függjön az app CSS-től (window.open új dokumentumon fut).
@@ -2109,7 +2230,13 @@
       + 'table.tbl tr,.sig-tbl tr{page-break-inside:avoid;break-inside:avoid;}'
       + 'h2{page-break-after:avoid;}'
       + '.sig-tbl,.note{page-break-inside:avoid;break-inside:avoid;}'
-      + '@media print{body{background:#fff;padding:0;}.doc{box-shadow:none;padding:16px 20px;}}';
+      // Szakasz-választó sáv (X-es rendszer) — csak képernyőn, nyomtatásból kimarad
+      + '.vs-sec-bar{margin:0 auto 14px;max-width:860px;padding:10px 12px;background:#f8fafc;border:1.5px dashed #94a3b8;border-radius:10px;}'
+      + '.vs-sec-bar .t{font-size:11px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:5px;}'
+      + '.vs-sec-chip{display:inline-flex;align-items:center;gap:4px;margin:3px;padding:5px 11px;border-radius:16px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid #2563eb;background:#eff6ff;color:#1e40af;}'
+      + '.vs-sec-chip.off{border-color:#cbd5e1;background:#f1f5f9;color:#64748b;}'
+      + '[data-sec-hidden="1"]{display:none!important;}'
+      + '@media print{body{background:#fff;padding:0;}.doc{box-shadow:none;padding:16px 20px;}.no-print,.vs-sec-bar{display:none!important;}}';
 
     // Cég-fejléc (letterhead) — logó + cég-adatok + doc-badge
     var logoCell = comp.logo_data_uri
@@ -2208,18 +2335,8 @@
       ? '<div class="sig-space"><img src="' + esc(comp.stamp_data_uri) + '" alt=""></div>'
       : '<div class="sig-space"></div>';
 
-    var html =
-      '<!doctype html><html><head><meta charset="utf-8">'
-      + '<title>' + t('fe.pg.printTitle') + ' — ' + esc(dr.nume || dr.email || '') + '</title>'
-      + '<style>' + css + '</style></head><body><div class="doc">'
-      // A letterhead a running-header thead-jébe kerül → minden nyomtatott
-      // lap tetején ismétlődik; a többi tartalom a tbody-ba.
-      + '<table class="vs-print-wrap">'
-      + '<thead><tr><td><div class="vs-doc-head">' + letterhead + '</div></td></tr></thead>'
-      + '<tbody><tr><td>'
-      + driverBlock
-      + noteBlock
-      + '<h2>📋 ' + t('fe.pg.selectedItems') + ' (' + items.length + ')</h2>'
+    // Kivehető szakaszok belseje (a `_dcSec` a rejtett állapotot ráégeti)
+    var itemsHtml = '<h2>📋 ' + t('fe.pg.selectedItems') + ' (' + items.length + ')</h2>'
       + '<table class="tbl">'
       +   '<thead><tr>'
       +     '<th>' + t('fe.de.colDate') + '</th>'
@@ -2227,8 +2344,8 @@
       +     '<th>' + t('fe.de.colLabel') + '</th>'
       +     '<th class="r">' + t('fe.de.colCalc') + '</th>'
       +     '<th class="r">' + t('fe.de.colTotal') + '</th>'
-      +   '</tr></thead><tbody>' + itemRows + eSumRows + '</tbody></table>'
-      + '<h2>💵 ' + t('fe.pg.paymentsTitle') + ' (' + pays.length + ')</h2>'
+      +   '</tr></thead><tbody>' + itemRows + eSumRows + '</tbody></table>';
+    var paymentsHtml = '<h2>💵 ' + t('fe.pg.paymentsTitle') + ' (' + pays.length + ')</h2>'
       + '<table class="tbl">'
       +   '<thead><tr>'
       +     '<th>' + t('fe.pg.payDate') + '</th>'
@@ -2237,8 +2354,8 @@
       +     '<th>BNR</th>'
       +     '<th class="r">' + t('fe.pg.equivRon') + '</th>'
       +     '<th>' + t('fld.note') + '</th>'
-      +   '</tr></thead><tbody>' + payRows + pSumRows + pSchedSumRows + '</tbody></table>'
-      + '<table class="sig-tbl"><tr>'
+      +   '</tr></thead><tbody>' + payRows + pSumRows + pSchedSumRows + '</tbody></table>';
+    var sigHtml = '<table class="sig-tbl"><tr>'
       +   '<td class="sig-cell left">'
       +     '<div class="sig-space"></div>'
       +     '<div class="sig-line">' + t('fe.pg.signDriver') + '</div>'
@@ -2249,11 +2366,59 @@
       +     '<div class="sig-line">' + t('fe.pg.signCompany') + '</div>'
       +     '<div class="sig-name">' + esc(comp.nev || '') + '</div>'
       +   '</td>'
-      + '</tr></table>'
-      + '<div class="foot">' + t('fe.pg.printFooter') + ' · VallorSoft</div>'
+      + '</tr></table>';
+    var footGHtml = '<div class="foot">' + t('fe.pg.printFooter') + ' · VallorSoft</div>';
+
+    // Szakasz-választó sáv chip-jei (csak a jelen lévő szakaszokra)
+    var gSecs = [{ id: 'driver', label: t('fe.sec.driver') }];
+    if (g.note) gSecs.push({ id: 'note', label: t('fe.sec.note') });
+    gSecs.push({ id: 'items', label: t('fe.sec.items') });
+    gSecs.push({ id: 'payments', label: t('fe.sec.payments') });
+    gSecs.push({ id: 'signature', label: t('fe.sec.signature') });
+    gSecs.push({ id: 'footer', label: t('fe.sec.footer') });
+    var gBar = '<div class="vs-sec-bar no-print"><div class="t">🧩 ' + t('fe.sec.barTitle') + '</div><div>'
+      + gSecs.map(function (s) {
+          var off = !!gHid[s.id];
+          return '<button type="button" class="vs-sec-chip' + (off ? ' off' : '') + '" data-for="' + esc(s.id) + '" data-label="' + esc(s.label) + '" onclick="vsSecToggle(\'' + esc(s.id) + '\')">'
+            + (off ? '➕ ' : '✕ ') + esc(s.label) + '</button>';
+        }).join('')
+      + '</div><div style="font-size:10px;color:#94a3b8;margin-top:5px;">' + t('fe.sec.hint') + '</div></div>';
+
+    // Kliens-oldali runtime a print-ablakban: a chip-kattintás ki/be kapcsol egy
+    // szakaszt (localStorage `vs_dc_sec_hidden:group`, azonos origin → megosztott
+    // a fő appal). A saved prefs betöltéskor azonnal érvényesül (az auto-print
+    // előtt fut), így a nyomtatvány a beállított szakaszokat tükrözi.
+    var runtime = '<' + 'script>(function(){'
+      + 'var KEY="vs_dc_sec_hidden:group";'
+      + 'function load(){try{var a=JSON.parse(localStorage.getItem(KEY)||"[]");return Array.isArray(a)?a:[];}catch(e){return[];}}'
+      + 'function save(a){try{localStorage.setItem(KEY,JSON.stringify(a));}catch(e){}}'
+      + 'function apply(){var h=load();var s=document.querySelectorAll("[data-sec]");for(var i=0;i<s.length;i++){var id=s[i].getAttribute("data-sec");var off=h.indexOf(id)>=0;s[i].style.display=off?"none":"";if(off)s[i].setAttribute("data-sec-hidden","1");else s[i].removeAttribute("data-sec-hidden");}'
+      + 'var c=document.querySelectorAll(".vs-sec-chip");for(var j=0;j<c.length;j++){var cid=c[j].getAttribute("data-for");var lbl=c[j].getAttribute("data-label")||"";var coff=h.indexOf(cid)>=0;c[j].className="vs-sec-chip"+(coff?" off":"");c[j].textContent=(coff?"\\u2795 ":"\\u2715 ")+lbl;}}'
+      + 'window.vsSecToggle=function(id){var a=load();var i=a.indexOf(id);if(i>=0)a.splice(i,1);else a.push(id);save(a);apply();};'
+      + 'apply();'
+      + '})();<' + '/script>';
+
+    var html =
+      '<!doctype html><html><head><meta charset="utf-8">'
+      + '<title>' + t('fe.pg.printTitle') + ' — ' + esc(dr.nume || dr.email || '') + '</title>'
+      + '<style>' + css + '</style></head><body>'
+      + gBar
+      + '<div class="doc">'
+      // A letterhead a running-header thead-jébe kerül → minden nyomtatott
+      // lap tetején ismétlődik; a többi tartalom a tbody-ba (kivehető szakaszok).
+      + '<table class="vs-print-wrap">'
+      + '<thead><tr><td><div class="vs-doc-head">' + letterhead + '</div></td></tr></thead>'
+      + '<tbody><tr><td>'
+      + _dcSec('group', 'driver', t('fe.sec.driver'), driverBlock, gHid)
+      + (g.note ? _dcSec('group', 'note', t('fe.sec.note'), noteBlock, gHid) : '')
+      + _dcSec('group', 'items', t('fe.sec.items'), itemsHtml, gHid)
+      + _dcSec('group', 'payments', t('fe.sec.payments'), paymentsHtml, gHid)
+      + _dcSec('group', 'signature', t('fe.sec.signature'), sigHtml, gHid)
+      + _dcSec('group', 'footer', t('fe.sec.footer'), footGHtml, gHid)
       + '</td></tr></tbody></table>'   // vs-print-wrap vége
       + '</div>'
-      + '<script>setTimeout(function(){window.print();},400);<\/script>'
+      + runtime
+      + '<' + 'script>setTimeout(function(){window.print();},600);<' + '/script>'
       + '</body></html>';
 
     var w = window.open('', '_blank', 'width=900,height=1100');
@@ -2798,6 +2963,7 @@
       if (!r || !r.ok) { body.innerHTML = '<div class="text-muted" style="padding:20px;text-align:center;">' + esc((r && r.err) || t('common.error')) + '</div>'; return; }
       _dcSheet = r;
       body.innerHTML = _dcRenderSheetHtml(r);
+      _dcSecBuildBar(body.querySelector('.dc-sheet-doc'), (_dcSheetMode === 'payments-only') ? 'payhist' : 'lunar');
     });
   }
 
@@ -2887,11 +3053,14 @@
         +   'style="max-width:88px;max-height:80px;display:block;">'
         + '</td>'
       : '';
-    return '<div class="dc-sheet-doc">'
-      // ── FEJLÉC (nyomtatáskor minden lapon ismétlődik — .vs-doc-head) ──
-      + '<div class="vs-doc-head">'
-      // FIX HIVATALOS FEJLÉC (logó + cég + doktípus-badge)
-      + '<table style="width:100%;border-collapse:collapse;">'
+    // A dokumentum-típus a szakasz-láthatóság kulcsa (a Kifizetés-történet
+    // — payOnly — külön prefekvel a teljes Decont lunartól).
+    var docType = payOnly ? 'payhist' : 'lunar';
+    var hidSet = _dcSecHiddenSet(docType);
+
+    // ── FEJLÉC (nem kivehető szakasz — minden lapon ismétlődik) ──
+    var headHtml =
+      '<table style="width:100%;border-collapse:collapse;">'
       +   '<tr>'
       +     logoCell
       +     '<td style="vertical-align:middle;">'
@@ -2910,19 +3079,20 @@
       +     '</td>'
       +   '</tr>'
       + '</table>'
-      // Elválasztó vonal a fejléc alatt (hivatalos kinézet)
-      + '<div style="height:0;border-top:2px solid #0f172a;margin:12px 0 16px;"></div>'
-      + '</div>'  // .vs-doc-head vége
-      // ── TÖRZS (.vs-doc-body) ──
-      + '<div class="vs-doc-body">'
-      // Sofőr adatok
-      + '<div style="padding:10px 14px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:8px;margin-bottom:14px;">'
+      + '<div style="height:0;border-top:2px solid #0f172a;margin:12px 0 16px;"></div>';
+
+    // ── Kivehető szakaszok (X-es rendszer) ──
+    var secs = [];
+    // Sofőr adatok
+    secs.push({ id: 'driver', label: t('fe.sec.driver'), html:
+      '<div style="padding:10px 14px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:8px;margin-bottom:14px;">'
       +   '<div style="font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:0.4px;">' + t('fe.st.driver') + '</div>'
       +   '<div style="font-size:15px;font-weight:700;color:#0f172a;">' + esc(d.nume) + '</div>'
       +   '<div style="font-size:11px;color:#6b7280;">' + esc(d.email) + (d.tel ? ' · ' + esc(d.tel) : '') + '</div>'
-      + '</div>'
-      // Járandóság-tábla — payments-only módban KIHAGYVA
-      + (payOnly ? '' :
+      + '</div>' });
+    // Járandóság-tábla (Tételek elszámolás) — payments-only módban nincs
+    if (!payOnly) {
+      secs.push({ id: 'earnings', label: t('fe.sec.earnings'), html:
         '<div style="font-size:14px;font-weight:700;color:#0f172a;margin:12px 0 6px;">📥 ' + t('fe.st.earningsTitle') + ' (' + (r.earnings || []).length + ')</div>'
         + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
         +   '<thead><tr style="background:#e0e7ff;color:#1e293b;">'
@@ -2939,9 +3109,11 @@
         +       n2(totE.eur || 0, 2) + ' EUR &nbsp; · &nbsp; ' + n2(totE.ron || 0, 2) + ' RON'
         +     '</td>'
         +   '</tr></tfoot>'
-        + '</table>')
-      // Kifizetés-tábla
-      + '<div style="font-size:14px;font-weight:700;color:#0f172a;margin:16px 0 6px;">💸 ' + t('fe.st.paymentsTitle') + ' (' + (r.payments || []).length + ')</div>'
+        + '</table>' });
+    }
+    // Kifizetés-tábla
+    secs.push({ id: 'payments', label: t('fe.sec.payments'), html:
+      '<div style="font-size:14px;font-weight:700;color:#0f172a;margin:16px 0 6px;">💸 ' + t('fe.st.paymentsTitle') + ' (' + (r.payments || []).length + ')</div>'
       + '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
       +   '<thead><tr style="background:#d1fae5;color:#1e293b;">'
       +     '<th style="padding:6px 8px;text-align:left;">' + t('fe.pm.colDate') + '</th>'
@@ -2957,16 +3129,10 @@
       +       n2(totP.eur || 0, 2) + ' EUR &nbsp; · &nbsp; ' + n2(totP.ron || 0, 2) + ' RON'
       +     '</td>'
       +   '</tr></tfoot>'
-      + '</table>'
-      // Elszámoltság-kártyák — payments-only módban KIHAGYVA (a történet-nyomtatás
-      // csak a kifizetéseket dokumentálja, egyenleget nem). A régi nyers
-      // earned−paid egyenleg helyett a HÓ TÉTELEINEK allokáció-alapú elszámoltsága:
-      //  💸 Ebből kifizetve (settled) + ⚖️ Fennmaradó fizetendő (remaining) — a
-      // Decont oficiallal AZONOS forrásból (tot.settled / tot.remaining) → a két
-      // dokumentum ugyanazt mutatja. Csak akkor jelenik meg, ha a hó tételeiből
-      // ténylegesen van már elszámolt kifizetés.
-      + (payOnly || !hasSettled ? '' :
-        // 💸 Ebből kifizetve (settled) — slate akcens
+      + '</table>' });
+    // Elszámoltság-kártyák — payments-only módban nincs; csak ha van elszámolt
+    if (!payOnly && hasSettled) {
+      secs.push({ id: 'settlement', label: t('fe.sec.settlement'), html:
         '<div style="margin-top:18px;padding:14px 18px;border:2px solid #475569;border-radius:10px;background:#f8fafc;">'
         +   '<div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.4px;">'
         +     '💸 ' + t('fe.stof.paidTitle') + '</div>'
@@ -2985,7 +3151,6 @@
           : '')
         +   '</table>'
         + '</div>'
-        // ⚖️ Fennmaradó fizetendő (remaining) — kék akcens, sosem negatív
         + '<div style="margin-top:14px;padding:16px 20px;border:2.5px solid #1e40af;border-radius:10px;background:#eff6ff;">'
         +   '<div style="font-size:13px;font-weight:800;color:#1e40af;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px;">'
         +     '⚖️ ' + t('fe.stof.remainTitle') + '</div>'
@@ -3007,18 +3172,18 @@
           ? '<tr><td colspan="2" style="padding:6px 0;text-align:center;color:#16a34a;font-weight:800;">✓ ' + t('fe.stof.itemPaid') + '</td></tr>'
           : '')
         +   '</table>'
-        + '</div>')
-      // Aláíró blokk (cég-oldalon a pecsét ráégetve — ha van feltöltve)
-      + '<table style="width:100%;border-collapse:collapse;margin-top:36px;">'
+        + '</div>' });
+    }
+    // Aláíró blokk
+    secs.push({ id: 'signature', label: t('fe.sec.signature'), html:
+      '<table style="width:100%;border-collapse:collapse;margin-top:36px;">'
       +   '<tr>'
       +     '<td style="width:50%;vertical-align:top;padding-right:16px;height:110px;">'
-      +       '<div style="height:70px;"></div>' // aláírás-hely (üres kép-tér)
+      +       '<div style="height:70px;"></div>'
       +       '<div style="border-top:1.5px solid #0f172a;padding-top:6px;font-size:11px;color:#475569;">' + t('fe.st.signDriver') + '</div>'
       +       '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + esc(d.nume) + '</div>'
       +     '</td>'
       +     '<td style="width:50%;vertical-align:top;padding-left:16px;height:110px;position:relative;">'
-      +       // Cég pecsét — a signature-vonal FÖLÖTT középen, ha van feltöltve;
-      +       // ha nincs, üres tér marad (kézzel bepecsételhető nyomtatáskor).
       +       (c.stamp_data_uri
         ? '<div style="height:70px;text-align:center;">'
           + '<img src="' + esc(c.stamp_data_uri) + '" alt="" '
@@ -3029,12 +3194,20 @@
       +       '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + esc(c.nev || '') + '</div>'
       +     '</td>'
       +   '</tr>'
-      + '</table>'
-      // Lábléc
-      + '<div style="margin-top:24px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:10px;color:#94a3b8;text-align:center;">'
+      + '</table>' });
+    // Lábléc
+    secs.push({ id: 'footer', label: t('fe.sec.footer'), html:
+      '<div style="margin-top:24px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:10px;color:#94a3b8;text-align:center;">'
       +   t('fe.st.footNote') + ' · VallorSoft'
-      + '</div>'
-      + '</div>'   // .vs-doc-body vége
+      + '</div>' });
+
+    var bodyInner = secs.map(function (s) { return _dcSec(docType, s.id, s.label, s.html, hidSet); }).join('');
+
+    return '<div class="dc-sheet-doc">'
+      // Szakasz-választó sáv (csak képernyőn — a render után töltjük fel)
+      + '<div class="vs-sec-bar vs-sec-bar-slot no-print" style="margin:0 0 14px;padding:10px 12px;background:#f8fafc;border:1.5px dashed #94a3b8;border-radius:10px;"></div>'
+      + '<div class="vs-doc-head">' + headHtml + '</div>'
+      + '<div class="vs-doc-body">' + bodyInner + '</div>'
       + '</div>';
   }
 
@@ -3074,7 +3247,9 @@
     var _perLbl2 = (_p2.year && _p2.month) ? _dcMonthLabel(_p2.year, _p2.month) : (d2(_p2.from) + ' → ' + d2(_p2.to));
     var _sKey = (_dcSheetMode === 'payments-only') ? 'fe.ph.emailSubject' : 'fe.st.emailSubject';
     var subject = t(_sKey) + ' · ' + _perLbl2 + ' · ' + _dcSheet.driver.nume;
-    gas('sendSettlementSheetEmail', [{ to: to, subject: subject, html: doc.outerHTML }]).then(function (r) {
+    // A szakasz-választó sáv + a kivett szakaszok kimaradnak a kiküldött HTML-ből
+    var clone = _dcCloneForEmail(doc);
+    gas('sendSettlementSheetEmail', [{ to: to, subject: subject, html: clone.outerHTML }]).then(function (r) {
       if (r && r.ok) toast(t('fe.st.emailSent'), 'ok');
       else toast((r && r.err) || t('common.error'), 'err');
     });
@@ -3194,6 +3369,7 @@
       var srvBase = r.driver && r.driver.net_base_salary_ron;
       _dcOfBaseSal = (srvBase != null) ? Number(srvBase) : 2700;
       body.innerHTML = _dcRenderOfficialHtml(r);
+      _dcSecBuildBar(body.querySelector('.dc-of-doc'), 'oficial');
     });
   }
 
@@ -3342,10 +3518,8 @@
     }
 
     // Kiemelt záró blokk — hivatalos hangvétel a sofőrnek adandó dokumentumhoz.
-    return ''
-      + totalsBlockHtml
-      + paidBlockHtml
-      + '<div style="margin-top:14px;padding:16px 20px;border:2.5px solid #7c2d12;border-radius:10px;background:#fff7ed;color:#0f172a;">'
+    var coreBlockHtml =
+      '<div style="margin-top:14px;padding:16px 20px;border:2.5px solid #7c2d12;border-radius:10px;background:#fff7ed;color:#0f172a;">'
       +   '<div style="font-size:13px;font-weight:800;color:#7c2d12;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.4px;">'
       +     '📊 ' + t('fe.stof.summary') + '</div>'
       +   '<table style="width:100%;border-collapse:collapse;font-size:15px;">'
@@ -3366,8 +3540,15 @@
       + (bnr != null
         ? '<div style="margin-top:10px;font-size:11px;color:#78350f;opacity:0.75;">' + t('fe.stof.bnrUsed') + ': 1 EUR = ' + n2(bnr, 4) + ' RON</div>'
         : '')
-      + '</div>'
-      + remainBlockHtml;
+      + '</div>';
+
+    // Az egyes összegző-blokkok kivehető szakaszok (X-es rendszer, docType 'oficial').
+    // Csak a valóban jelen lévő (nem üres) blokkokat csomagoljuk.
+    return ''
+      + (totalsBlockHtml ? _dcSec('oficial', 'totals', t('fe.sec.totals'), totalsBlockHtml) : '')
+      + (paidBlockHtml ? _dcSec('oficial', 'paid', t('fe.sec.paid'), paidBlockHtml) : '')
+      + _dcSec('oficial', 'summary', t('fe.sec.summary'), coreBlockHtml)
+      + (remainBlockHtml ? _dcSec('oficial', 'remain', t('fe.sec.remain'), remainBlockHtml) : '');
   }
 
   // A NYOMTATHATÓ HTML — nyomtatásba és e-mailbe is ugyanez megy.
@@ -3535,7 +3716,76 @@
       +   '</div>'
       + '</div>';
 
+    // Sofőr-adatok szakasz (kivehető)
+    var driverHtml = (function () {
+      var lines = [];
+      if (d.contract_no) lines.push('<span style="color:#475569;">' + t('fe.stof.contractNo') + ':</span> <b>' + esc(d.contract_no) + '</b>');
+      if (d.cnp)         lines.push('<span style="color:#475569;">' + t('fe.stof.cnp')        + ':</span> <b>' + esc(d.cnp) + '</b>');
+      var idBits = [];
+      if (d.id_series) idBits.push(esc(d.id_series));
+      if (d.id_number) idBits.push(esc(d.id_number));
+      if (idBits.length) lines.push('<span style="color:#475569;">' + t('fe.stof.idDoc') + ':</span> <b>' + idBits.join(' ') + '</b>');
+      var personalHtml = lines.length
+        ? '<div style="font-size:11px;color:#0f172a;margin-top:6px;line-height:1.7;">' + lines.join(' &nbsp; · &nbsp; ') + '</div>'
+        : '';
+      return '<div style="padding:10px 14px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:8px;margin-bottom:14px;">'
+        + '<div style="font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:0.4px;">' + t('fe.st.driver') + '</div>'
+        + '<div style="font-size:15px;font-weight:700;color:#0f172a;">' + esc(d.nume) + '</div>'
+        + '<div style="font-size:11px;color:#6b7280;">' + esc(d.email) + (d.tel ? ' · ' + esc(d.tel) : '') + '</div>'
+        + personalHtml
+        + '</div>';
+    })();
+
+    // Tételes részletezés — CSAK KÉPERNYŐN (`no-print`); a hivatalos nyomtatott
+    // változatban amúgy sem szerepel (a sofőrnek a summary elég). Kivehető szakasz.
+    var detailsHtml = '<div class="no-print">'
+      +   '<div style="font-size:14px;font-weight:700;color:#0f172a;margin:12px 0 6px;">📋 ' + t('fe.stof.detailsTitle') + ' (' + (r.earnings || []).length + ')</div>'
+      +   '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+      +     '<thead><tr style="background:#ccfbf1;color:#134e4a;">'
+      +       '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colDate') + '</th>'
+      +       '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colKind') + '</th>'
+      +       '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colLabel') + '</th>'
+      +       '<th style="padding:6px 8px;text-align:right;">' + t('fe.de.colCalc') + '</th>'
+      +       '<th style="padding:6px 8px;text-align:right;">' + t('fe.de.colTotal') + '</th>'
+      +     '</tr></thead>'
+      +     '<tbody>' + eRows + '</tbody>'
+      +     '<tfoot><tr style="background:#f1f5f9;font-weight:800;">'
+      +       '<td colspan="4" style="padding:8px;text-align:right;">' + t('fe.st.totalEarned') + ':</td>'
+      +       '<td style="padding:8px;text-align:right;">'
+      +         n2(totEur, 2) + ' EUR &nbsp; · &nbsp; ' + n2(totRon, 2) + ' RON'
+      +       '</td>'
+      +     '</tr></tfoot>'
+      +   '</table>'
+      + '</div>';
+
+    // Aláíró blokk (kivehető szakasz)
+    var signHtml = '<table style="width:100%;border-collapse:collapse;margin-top:36px;">'
+      +   '<tr>'
+      +     '<td style="width:50%;vertical-align:top;padding-right:16px;height:110px;">'
+      +       '<div style="height:70px;"></div>'
+      +       '<div style="border-top:1.5px solid #0f172a;padding-top:6px;font-size:11px;color:#475569;">' + t('fe.st.signDriver') + '</div>'
+      +       '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + esc(d.nume) + '</div>'
+      +     '</td>'
+      +     '<td style="width:50%;vertical-align:top;padding-left:16px;height:110px;position:relative;">'
+      +       (c.stamp_data_uri
+        ? '<div style="height:70px;text-align:center;">'
+          + '<img src="' + esc(c.stamp_data_uri) + '" alt="" '
+          + 'style="max-height:68px;max-width:120px;opacity:0.85;">'
+          + '</div>'
+        : '<div style="height:70px;"></div>')
+      +       '<div style="border-top:1.5px solid #0f172a;padding-top:6px;font-size:11px;color:#475569;">' + t('fe.st.signCompany') + '</div>'
+      +       '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + esc(c.nev || '') + '</div>'
+      +     '</td>'
+      +   '</tr>'
+      + '</table>';
+
+    var footHtml = '<div style="margin-top:24px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:10px;color:#94a3b8;text-align:center;">'
+      +   t('fe.stof.footNote') + ' · VallorSoft'
+      + '</div>';
+
     return '<div class="dc-sheet-doc dc-of-doc">'
+      // Szakasz-választó sáv (csak képernyőn — a render után töltjük fel)
+      + '<div class="vs-sec-bar vs-sec-bar-slot no-print" style="margin:0 0 14px;padding:10px 12px;background:#f8fafc;border:1.5px dashed #94a3b8;border-radius:10px;"></div>'
       // ── FEJLÉC (nyomtatáskor minden lapon ismétlődik — .vs-doc-head) ──
       + '<div class="vs-doc-head">'
       // HIVATALOS FEJLÉC (ugyanaz a szerkezet, mint a Decont lunar-lapon)
@@ -3561,80 +3811,20 @@
       + '</div>'  // .vs-doc-head vége
       // ── TÖRZS (.vs-doc-body) ──
       + '<div class="vs-doc-body">'
-      // Sofőr adatok — a személyes mezők (`contract_no`/`cnp`/`id_series`+`id_number`)
-      // a sofőr adatlapján egyszer megadva jönnek (users tábla, `driver-personal-data.sql`),
-      // és a hivatalos elszámolás fejlécében is szerepelnek (munkaügyi + könyvelési nyomtatvány).
-      // Csak akkor jelennek meg, ha ki van töltve → régi/hiányos sofőrnél a lap változatlan.
-      + (function () {
-          var lines = [];
-          if (d.contract_no) lines.push('<span style="color:#475569;">' + t('fe.stof.contractNo') + ':</span> <b>' + esc(d.contract_no) + '</b>');
-          if (d.cnp)         lines.push('<span style="color:#475569;">' + t('fe.stof.cnp')        + ':</span> <b>' + esc(d.cnp) + '</b>');
-          var idBits = [];
-          if (d.id_series) idBits.push(esc(d.id_series));
-          if (d.id_number) idBits.push(esc(d.id_number));
-          if (idBits.length) lines.push('<span style="color:#475569;">' + t('fe.stof.idDoc') + ':</span> <b>' + idBits.join(' ') + '</b>');
-          var personalHtml = lines.length
-            ? '<div style="font-size:11px;color:#0f172a;margin-top:6px;line-height:1.7;">' + lines.join(' &nbsp; · &nbsp; ') + '</div>'
-            : '';
-          return '<div style="padding:10px 14px;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:8px;margin-bottom:14px;">'
-            + '<div style="font-size:12px;color:#475569;text-transform:uppercase;letter-spacing:0.4px;">' + t('fe.st.driver') + '</div>'
-            + '<div style="font-size:15px;font-weight:700;color:#0f172a;">' + esc(d.nume) + '</div>'
-            + '<div style="font-size:11px;color:#6b7280;">' + esc(d.email) + (d.tel ? ' · ' + esc(d.tel) : '') + '</div>'
-            + personalHtml
-            + '</div>';
-        })()
-      // Alapbér-szerkesztő (csak képernyőn, nyomtatásban NEM látszik)
+      // Sofőr adatok (kivehető szakasz)
+      + _dcSec('oficial', 'driver', t('fe.sec.driver'), driverHtml)
+      // Alapbér-szerkesztő (csak képernyőn, NEM kivehető szakasz — az adatbevitel eszköze)
       + salaryEditor
-      // Tételes részletezés — CSAK KÉPERNYŐN (`no-print`); a hivatalos nyomtatott
-      // változatban NEM szerepel (a sofőrnek a summary elég). A sima „Decont lunar"
-      // (`_dcRenderSheetHtml`) tételes táblája ÉRINTETLEN — ott továbbra is nyomtatásba kerül.
-      + '<div class="no-print">'
-      +   '<div style="font-size:14px;font-weight:700;color:#0f172a;margin:12px 0 6px;">📋 ' + t('fe.stof.detailsTitle') + ' (' + (r.earnings || []).length + ')</div>'
-      +   '<table style="width:100%;border-collapse:collapse;font-size:12px;">'
-      +     '<thead><tr style="background:#ccfbf1;color:#134e4a;">'
-      +       '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colDate') + '</th>'
-      +       '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colKind') + '</th>'
-      +       '<th style="padding:6px 8px;text-align:left;">' + t('fe.de.colLabel') + '</th>'
-      +       '<th style="padding:6px 8px;text-align:right;">' + t('fe.de.colCalc') + '</th>'
-      +       '<th style="padding:6px 8px;text-align:right;">' + t('fe.de.colTotal') + '</th>'
-      +     '</tr></thead>'
-      +     '<tbody>' + eRows + '</tbody>'
-      +     '<tfoot><tr style="background:#f1f5f9;font-weight:800;">'
-      +       '<td colspan="4" style="padding:8px;text-align:right;">' + t('fe.st.totalEarned') + ':</td>'
-      +       '<td style="padding:8px;text-align:right;">'
-      +         n2(totEur, 2) + ' EUR &nbsp; · &nbsp; ' + n2(totRon, 2) + ' RON'
-      +       '</td>'
-      +     '</tr></tfoot>'
-      +   '</table>'
-      + '</div>'
+      // Tételes részletezés (kivehető szakasz — Tételek elszámolás)
+      + _dcSec('oficial', 'details', t('fe.sec.details'), detailsHtml)
       // Összegzés-blokk + Kiemelt záró blokk — dinamikusan cserélhető konténer;
-      // a `dcOfBnrChange`/`dcOfSaveBase` innen frissít, az editor-sáv érintetlen
-      // (megőrzött input DOM-fókusz → a felhasználó folyamatosan gépelhet).
+      // a `dcOfBnrChange`/`dcOfSaveBase` innen frissít (a benne lévő szakaszok
+      // — totals/paid/summary/remain — a `_dcOfBuildSummaryHtml`-ben kivehetők).
       + '<div id="dcOfSummaryBox">' + summaryHtml + '</div>'
-      // Aláíró blokk (ugyanaz, mint a Decont lunar-lapon)
-      + '<table style="width:100%;border-collapse:collapse;margin-top:36px;">'
-      +   '<tr>'
-      +     '<td style="width:50%;vertical-align:top;padding-right:16px;height:110px;">'
-      +       '<div style="height:70px;"></div>'
-      +       '<div style="border-top:1.5px solid #0f172a;padding-top:6px;font-size:11px;color:#475569;">' + t('fe.st.signDriver') + '</div>'
-      +       '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + esc(d.nume) + '</div>'
-      +     '</td>'
-      +     '<td style="width:50%;vertical-align:top;padding-left:16px;height:110px;position:relative;">'
-      +       (c.stamp_data_uri
-        ? '<div style="height:70px;text-align:center;">'
-          + '<img src="' + esc(c.stamp_data_uri) + '" alt="" '
-          + 'style="max-height:68px;max-width:120px;opacity:0.85;">'
-          + '</div>'
-        : '<div style="height:70px;"></div>')
-      +       '<div style="border-top:1.5px solid #0f172a;padding-top:6px;font-size:11px;color:#475569;">' + t('fe.st.signCompany') + '</div>'
-      +       '<div style="font-size:12px;color:#94a3b8;margin-top:2px;">' + esc(c.nev || '') + '</div>'
-      +     '</td>'
-      +   '</tr>'
-      + '</table>'
-      // Lábléc
-      + '<div style="margin-top:24px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:10px;color:#94a3b8;text-align:center;">'
-      +   t('fe.stof.footNote') + ' · VallorSoft'
-      + '</div>'
+      // Aláíró blokk (kivehető szakasz)
+      + _dcSec('oficial', 'signature', t('fe.sec.signature'), signHtml)
+      // Lábléc (kivehető szakasz)
+      + _dcSec('oficial', 'footer', t('fe.sec.footer'), footHtml)
       + '</div>'   // .vs-doc-body vége
       + '</div>';
   }
@@ -3710,10 +3900,9 @@
     if (!_dcOfSheet) { toast(t('fe.st.loadFirst'), 'err'); return; }
     var doc = document.querySelector('#dcOfSheetBody .dc-of-doc');
     if (!doc) { toast(t('fe.st.loadFirst'), 'err'); return; }
-    // Az alapbér-szerkesztő ne menjen ki e-mailben — kivágjuk a doc klónjából
-    var clone = doc.cloneNode(true);
-    var editors = clone.querySelectorAll('.no-print');
-    for (var i = 0; i < editors.length; i++) editors[i].parentNode.removeChild(editors[i]);
+    // Az alapbér-szerkesztő + szakasz-választó sáv + a kivett szakaszok NEM
+    // mennek ki e-mailben (közös tisztító: .no-print + .vs-sec-bar + [data-sec-hidden]).
+    var clone = _dcCloneForEmail(doc);
     var toDefault = _dcOfSheet.driver.email || '';
     var to = window.prompt(t('fe.st.emailPrompt'), toDefault);
     if (!to) return;
@@ -3789,6 +3978,8 @@
     dcOfSheetEmail: dcOfSheetEmail,
     dcOfSaveBase: dcOfSaveBase,
     dcOfBnrChange: dcOfBnrChange,
+    // Szakasz-láthatóság (X-es rendszer) — a preview-modálok chip-jei hívják
+    dcSecToggle: dcSecToggle,
     // Csoportos kifizetés (multi-select + több fiz. mód + print)
     dcSelToggle: dcSelToggle,
     dcSelToggleAll: dcSelToggleAll,

@@ -14,6 +14,19 @@
 
 ---
 
+## 2026-09-16 — Kivehető szakaszok (X-es rendszer) MINDEN decont-nyomtatványon — alapból minden látszik, egyenként kivehető
+
+**Kérés (Vallor Team S.R.L · Gondos Imre — Sofer):** „Legyen lehetőség minden típusú dokumentumnál, hogy alapértelmezettként azt mutassa, amit most, de lehessen kivenni az adott szakaszokat — pl. a Tételek elszámolás vagy bármelyik tábla-szakasz — egy X-es rendszerben."
+
+1. **Új: dokumentum-szintű szakasz-láthatóság (X-es rendszer).** Minden decont-nyomtatvány tetején (a preview-modálban) egy kis „🧩 Megjelenített szakaszok" sáv jelenik meg csip-ekkel; a felhasználó **✕-re kattintva kivehet** egy szakaszt (pl. a tételes tábla, a kifizetés-tábla, egy összegző blokk, az aláírás vagy a lábléc), **➕-szel visszateheti**. Alapból MINDEN látszik (a jelenlegi kinézet változatlan).
+2. **Perzisztens + dokumentum-típusonként külön** (`localStorage` `vs_dc_sec_hidden:<docType>`, docType ∈ `lunar` / `payhist` / `oficial` / `group`) — a Decont lunar és a Kifizetés-történet külön prefet kap. A rejtett szakasz a DOM-ban marad (`display:none` + `data-sec-hidden="1"`), de **nyomtatásból ÉS e-mailből is kiesik** (a `_vsStripForOutput` a print-klónból, a `_dcCloneForEmail` az e-mail-klónból kivágja a sávot + a `.no-print`-et + a rejtett szakaszokat).
+3. **Közös motor (`public/fleet-extra-v2.js`):** `_dcSec(docType,id,label,html)` a rejtett állapotot render-időben ráégeti; `_dcSecBuildBar(docEl,docType)` a render UTÁN a DOM-ban ténylegesen jelen lévő `[data-sec]` szakaszokból építi a sávot (egy igazságforrás); `dcSecToggle(docType,id)` a chip-kattintásra localStorage + DOM + chip-vizuál (nincs szerver-újratöltés → a beírt BNR/alapbér nem vész el). A `_vsBuildPrintDoc` mostantól klónoz és kivágja a rejtett szakaszokat/sávot.
+4. **Mind a 4 dokumentumon:** Decont lunar (`_dcRenderSheetHtml`) — driver/earnings/payments/settlement/signature/footer; Kifizetés-történet (ugyanaz payOnly) — driver/payments/signature/footer; Decont oficial (`_dcRenderOfficialHtml` + `_dcOfBuildSummaryHtml`) — driver/details/totals/paid/summary/remain/signature/footer; Csoportos bizonylat (`_dcGroupPrintRender`, saját ablak) — a print-ablakba ágyazott önálló runtime (azonos origin → közös localStorage) driver/note/items/payments/signature/footer szakaszokkal + saját chip-sávval.
+5. **i18n** 16 új `fe.sec.*` kulcs (RO-alap + HU). Cache-bust `?v=20260916sections` (admin.html + manager.html — i18n.js + fleet-extra-v2.js).
+6. **Verifikáció:** valós headless Chromium DOM-teszt (15/15 PASS) — render-időben rejtve, print-klón kihagyja a rejtettet + a sávot, running-header megmarad, `dcSecToggle` oda-vissza kapcsol + perzisztál, print a toggle után a helyes szakaszokat tartalmazza. **Tisztán kliens-oldali** — nincs szerver-/séma-változás. **1231 Jest zöld**, nincs regresszió.
+
+---
+
 ## 2026-09-15 — Nyomtatás: többoldalas dokumentum — fejléc MINDEN lapon + a tartalom nem törik szét (mind a 4 decont-nyomtatvány)
 
 **Kérés (Vallor Team S.R.L · Gondos Imre — Sofer):** „ha túl hosszú lenne egy oldal tartalma és átmegy a másik oldalra, akkor ne szétszórtan menjen át, és minden újabb lapnak legyen meg a fejléce — ezt az összes nyomtatványon."
