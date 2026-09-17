@@ -1013,20 +1013,24 @@
       // Sticky sáv a multi-select-hez: mindig a DOM-ban, csak .open osztály kapcsol
       var selBar = '<div id="dcSelBar" class="dc-sel-bar"></div>';
 
-      // Vizuális marker: „🆕 v2" a fejlécben, hogy egyértelmű legyen a
-      // felhasználónak, hogy az új verziót látja (nem a cachelt régit).
-      // EGY belépő — a régi „Decont lunar" + „Decont oficial" gomb helyett.
-      // Kattintásra dokumentum-választó modal (Decont lunar / Decont oficial /
-      // Kifizetés-történet / Csoportos bizonylat) — a user maga választ, hogy
-      // MIT nyomtat/e-mailez, és onnan a meglévő modal-motorok jönnek elő.
+      // EGYETLEN akciósor a panel-fejlécen — a kifizetés + a dokumentumok
+      // egy helyen (nem szétszórva): 💵 Részleges · ✅ Teljes · 📄 Dokumentum.
+      // A dokumentum-gomb a dokumentum-választó modalt nyitja (Decont lunar /
+      // Decont oficial / Kifizetés-történet / Csoportos bizonylat).
+      var headActions =
+        '<div class="dc-head-actions">'
+        + '<button class="btn primary" onclick="FleetExtra.dcOpenPayment(\'partial\')">💵 '
+          + t('fe.pm.payPartial') + '</button>'
+        + '<button class="btn ok" onclick="FleetExtra.dcOpenPayment(\'full\')">✅ '
+          + t('fe.pm.payFull') + '</button>'
+        + '<button class="btn ghost" onclick="FleetExtra.dcOpenDocPicker()" '
+          + 'title="' + t('fe.doc.openTitle') + '">📄 ' + t('fe.doc.openBtn') + '</button>'
+        + '</div>';
+
       out.innerHTML =
-        panel('🆕 ' + esc(_dcCurrent.nume) + ' — ' + t('fe.dc.settleV2', 'elszámolás 2.0') + ' (' + d2(from) + ' → ' + d2(to) + ')',
+        panel('👤 ' + esc(_dcCurrent.nume) + ' — ' + d2(from) + ' → ' + d2(to),
           balHtml,
-          '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
-          + '<button class="btn primary" style="padding:6px 14px;font-size:12px;" '
-          +   'onclick="FleetExtra.dcOpenDocPicker()" title="' + t('fe.doc.openTitle') + '">'
-          +   '📄 ' + t('fe.doc.openBtn') + '</button>'
-          + '</div>')
+          headActions)
         + earnFormHtml
         + listsHtml
         + selBar;
@@ -1043,31 +1047,36 @@
     var p = bal.paid || {};
     var bnr = bal.bnr_rate;
 
-    function tile(label, val, cur, tone) {
-      // tone: 'ok'|'warn'|'danger'|'info'|'muted'
+    // Egy csoportos csempe: EUR + RON egymás alatt, egy címke alatt.
+    // A 6 külön csempe helyett 3 (Járandóság / Kifizetve / Hátralék) —
+    // átláthatóbb, nincs duplikált címke-sor.
+    function gtile(icon, label, eur, ron, tone) {
+      // tone: 'ok'|'danger'|'info'|'muted'
       var color = tone === 'ok' ? 'var(--status-ok)'
         : tone === 'danger' ? 'var(--status-danger)'
-        : tone === 'warn' ? 'var(--status-warn)'
         : tone === 'info' ? 'var(--status-info)'
         : 'var(--text-primary)';
-      var suf = cur ? ' <span class="dc-tile-cur">' + esc(cur) + '</span>' : '';
-      return '<div class="dc-tile dc-tone-' + esc(tone || 'muted') + '">'
-        + '<div class="dc-tile-l">' + label + '</div>'
-        + '<div class="dc-tile-v" style="color:' + color + ';">' + n2(val, 2) + suf + '</div>'
+      return '<div class="dc-gtile dc-tone-' + esc(tone || 'muted') + '">'
+        + '<div class="dc-gtile-l">' + icon + ' ' + label + '</div>'
+        + '<div class="dc-gtile-vals">'
+        +   '<div class="dc-gtile-v" style="color:' + color + ';">' + n2(eur, 2)
+        +     ' <span class="dc-tile-cur">EUR</span></div>'
+        +   '<div class="dc-gtile-v" style="color:' + color + ';">' + n2(ron, 2)
+        +     ' <span class="dc-tile-cur">RON</span></div>'
+        + '</div>'
         + '</div>';
     }
 
-    var eurTone = (b.eur || 0) > 0 ? 'danger' : ((b.eur || 0) < 0 ? 'ok' : 'muted');
-    var ronTone = (b.ron || 0) > 0 ? 'danger' : ((b.ron || 0) < 0 ? 'ok' : 'muted');
+    // Hátralék tónusa: bármelyik pozitív → tartozunk (danger); bármelyik
+    // negatív → túlfizettünk (ok); minden 0 → semleges (muted).
+    var remTone = ((b.eur || 0) > 0 || (b.ron || 0) > 0) ? 'danger'
+      : (((b.eur || 0) < 0 || (b.ron || 0) < 0) ? 'ok' : 'muted');
 
     var tiles =
-      '<div class="dc-tiles">'
-      +   tile('📥 ' + t('fe.de.earnedEur'), e.eur || 0, 'EUR', 'info')
-      +   tile('📥 ' + t('fe.de.earnedRon'), e.ron || 0, 'RON', 'info')
-      +   tile('💸 ' + t('fe.pm.paidEur'),   p.eur || 0, 'EUR', 'muted')
-      +   tile('💸 ' + t('fe.pm.paidRon'),   p.ron || 0, 'RON', 'muted')
-      +   tile('⚖️ ' + t('fe.dc.balEur'),    b.eur || 0, 'EUR', eurTone)
-      +   tile('⚖️ ' + t('fe.dc.balRon'),    b.ron || 0, 'RON', ronTone)
+      '<div class="dc-gtiles">'
+      +   gtile('📥', t('fe.dc.grpEarned'),    e.eur || 0, e.ron || 0, 'info')
+      +   gtile('💸', t('fe.dc.grpPaid'),      p.eur || 0, p.ron || 0, 'muted')
+      +   gtile('⚖️', t('fe.dc.grpRemaining'), b.eur || 0, b.ron || 0, remTone)
       + '</div>';
 
     var ronAll = b.ron_all;
@@ -1102,17 +1111,8 @@
         + '</span></div>';
     }
 
-    // Az egyenleg-akciósor csak KIFIZETÉS-műveleteket tart: részleges + teljes.
-    // A dokumentumok/nyomtatás egyetlen belépő (📄 Dokumentum) a panel-fejlécen,
-    // ott jön elő a dokumentum-választó (Decont lunar / Decont oficial /
-    // Kifizetés-történet / Csoportos bizonylat) — nincs 10 szétszórt gomb.
-    var payButtons =
-      '<div class="dc-pay-actions">'
-      + '<button class="btn primary" onclick="FleetExtra.dcOpenPayment(\'partial\')">💵 '
-        + t('fe.pm.payPartial') + '</button>'
-      + '<button class="btn ok" onclick="FleetExtra.dcOpenPayment(\'full\')">✅ '
-        + t('fe.pm.payFull') + '</button>'
-      + '</div>';
+    // Az akciógombok (kifizetés + dokumentum) a panel-fejlécen egyben —
+    // lásd dcLoad `headActions`. Az egyenleg-kártya csak az egyenleget mutatja.
 
     // BNR-forrás jelzés — a szerver megmondja, honnan jött a ráta (live/company/payments/null).
     // Ha nem élő, halvány chip a mai BNR mögött, hogy a felhasználó lássa: a cross-settlement
@@ -1138,7 +1138,7 @@
           : '')
       + '</div>';
 
-    return tiles + crossHtml + bnrLine + payButtons;
+    return tiles + crossHtml + bnrLine;
   }
 
   // Kliens-oldali 2-jegyű kerekítés (a szerveres _round2 hívása helyett)
