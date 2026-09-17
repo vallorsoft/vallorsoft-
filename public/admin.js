@@ -37,6 +37,7 @@ function loadTab(name){
   if(name==='received-fuv'){loadReceivedFuvarlevelek();loadDocSeries();loadBonScanCard();}
   if(name==='driver-docs-pane') loadDriverUploadedDocs();
   if(name==='ecmr' && window.ECmr) ECmr.mount('ecmrBox');
+  if(name==='doc-register' && window.DocRegister) DocRegister.mount('docRegisterBox');
   if(name==='quotes' && window.Quotes) Quotes.mount('quotesBox');
   if(name==='fav-locations' && window.FavLocations) FavLocations.mount('favLocBox');
   if(name==='users') loadUsers();
