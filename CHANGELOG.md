@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-09-17 — Sofőr-elszámolás részletes nézet összeszedve: tiszta fejléc + 3 csoportos egyenleg-csempe + egyetlen akciósor (nincs duplikáció)
+
+**Kérés (Vallor Team S.R.L · Gondos Imre — Sofer, 2 képpel):** „most ezt az oldalt szedd össze, mert túl szétszórt — átlátható, funkcionális és semmi duplikáció (ez amikor már adott sofőrre léptél)."
+
+1. **Gyökér:** a sofőr-kártyáról belépve (`dcOpenDriver` → `dcLoad`) a részletes elszámolás-nézet szétszórt volt: (a) a panel-fejléc egy **nyers i18n-kulcsot** mutatott (`fe.dc.settleV2` — nem létező kulcs, a `t()`-nek nincs fallback-paramétere → maga a kulcs-név jelent meg) + egy „🆕" fejlesztői jelölő; (b) az egyenleg **6 külön csempe** volt (Járandóság EUR/RON, Kifizetve EUR/RON, Hátralék EUR/RON — duplikált címke-sorok); (c) az akciógombok szétszórva: a 📄 Dokumentum a fejlécen, a 💵 Részleges + ✅ Teljes kifizetés az egyenleg-kártya alján (`dc-pay-actions`).
+2. **Tiszta fejléc** (`dcLoad`): a „🆕 … fe.dc.settleV2" helyett `👤 {sofőr neve} — {tól} → {ig}`. A 3 akciógomb (💵 Részleges · ✅ Teljes · 📄 Dokumentum) EGYETLEN fejléc-akciósorba (`.dc-head-actions`) került.
+3. **3 csoportos egyenleg-csempe** (`_dcBalanceCard`): a 6 csempe helyett 3 (📥 Járandóság összesen / 💸 Kifizetve / ⚖️ Hátralék), mindegyik EUR+RON értékkel egymás alatt egy címke alatt (`.dc-gtiles`/`.dc-gtile`, tónus-akcent). A cross-currency magyarázó sor + BNR-sor + fallback-forrás chip változatlanul megmarad. A `payButtons` innen kikerült (a fejlécbe költözött) → nincs duplikáció.
+4. **CSS** (`public/style.css`, `#decontBox` scope): új `.dc-head-actions` + `.dc-gtiles`/`.dc-gtile`/`.dc-gtile-l`/`.dc-gtile-vals`/`.dc-gtile-v` (világos + sötét téma, reszponzív ≤640px 1 oszlop); a dead `.dc-pay-actions` blokk törölve. Cache-bust `?v=20260917dcdetail` (i18n.js + fleet-extra-v2.js + style.css). **i18n** 3 új `fe.dc.grp*` kulcs (RO-alap + HU).
+5. **Verifikáció:** VM DOM-harness 19/19 PASS (nincs nyers kulcs / nincs „🆕", tiszta fejléc, pontosan 3 csoportos csempe, egyesített akciósor mindhárom gombbal, nincs régi `dc-tiles`/`dc-pay-actions`, cross+BNR+chip megmarad). Tisztán kliens-oldali; **1234 Jest zöld**, nincs regresszió, nincs szerver-/séma-változás.
+
+---
+
 ## 2026-09-16 — Elszámolás fül: kártyás sofőr-áttekintő landing (nem üres kereső fogad)
 
 **Kérés (Vallor Team S.R.L · Gondos Imre — Sofer):** „ajánlj egy jobb megoldást, valami kártyás kinézetűt — az Elszámolás menüfülre lépve ne a kereső fogadjon és semmi info."

@@ -2765,6 +2765,10 @@
     'fe.dc.balEur':     { ro: 'Rest de plată (EUR)', hu: 'Hátralék (EUR)' },
     'fe.dc.balRon':     { ro: 'Rest de plată (RON)', hu: 'Hátralék (RON)' },
     'fe.dc.balCombined':{ ro: 'Total combinat', hu: 'Kombinált összesen' },
+    // Csoportos egyenleg-csempe címkék (Járandóság / Kifizetve / Hátralék — EUR+RON egyben)
+    'fe.dc.grpEarned':    { ro: 'Drepturi totale', hu: 'Járandóság összesen' },
+    'fe.dc.grpPaid':      { ro: 'Plătit', hu: 'Kifizetve' },
+    'fe.dc.grpRemaining': { ro: 'Rest de plată', hu: 'Hátralék' },
     // Kártyás elszámolás-landing (sofőr-áttekintő)
     'fe.dc.searchDriver':  { ro: 'Caută șofer (nume, email, telefon)…', hu: 'Sofőr keresése (név, e-mail, telefon)…' },
     'fe.dc.hubHint':       { ro: 'Alege un șofer pentru decont detaliat — drepturi, plăți, documente.', hu: 'Válassz egy sofőrt a részletes elszámoláshoz — járandóság, kifizetések, dokumentumok.' },
