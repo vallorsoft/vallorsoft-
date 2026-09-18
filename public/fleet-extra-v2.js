@@ -1077,10 +1077,18 @@
 
   // ── Egyenleg-kártya: színes csempék EUR + RON + kombinált RON ──
   function _dcBalanceCard(bal) {
-    var b = bal.balance || {};
     var e = bal.earned || {};
-    var p = bal.paid || {};
     var bnr = bal.bnr_rate;
+    // A KIVÁLASZTOTT IDŐSZAK tételeinek allokáció-alapú elszámoltsága (a
+    // hivatalos lappal AZONOS forrás) — ha a szerver adja, EZT mutatjuk:
+    //   💸 Kifizetve = az időszak tételeire ALLOKÁLT összeg (nem a nyers,
+    //      paid_at szerinti összes kifizetés, amiben más hó tétele is lehet);
+    //   ⚖️ Hátralék  = az időszak tételeiből fennmaradó (valutánként, mint a lapon).
+    // Így a gyors-kimutató ≡ a nyomtatott dokumentum. Ha nincs (régi szerver /
+    // migráció-hiány) → a régi paid/balance mezőkre esünk vissza.
+    var allocMode = !!(bal.settled_period && bal.remaining_period);
+    var p = allocMode ? bal.settled_period : (bal.paid || {});
+    var b = allocMode ? bal.remaining_period : (bal.balance || {});
 
     // Egy csoportos csempe: EUR + RON egymás alatt, egy címke alatt.
     // A 6 külön csempe helyett 3 (Járandóság / Kifizetve / Hátralék) —
@@ -1114,9 +1122,14 @@
       +   gtile('⚖️', t('fe.dc.grpRemaining'), b.eur || 0, b.ron || 0, remTone)
       + '</div>';
 
-    var ronAll = b.ron_all;
+    // Kombinált RON: allokáció-módban a fennmaradó RON-egyenértéke (a lappal
+    // azonos), különben a cross-currency beszámolt egyenleg RON-értéke.
+    var ronAll = allocMode ? b.combined_ron : b.ron_all;
 
-    // Cross-currency beszámítás magyarázat — csak akkor jelenik meg, ha volt átváltás
+    // Cross-currency beszámítás magyarázat — csak akkor jelenik meg, ha volt
+    // átváltás. Allokáció-módban NINCS cross-netting (minden tétel maradéka a
+    // saját valutájában marad, mint a hivatalos lapon) → a `b.cross_*` mezők
+    // hiányoznak → a blokk automatikusan kimarad.
     var crossHtml = '';
     var cRonToEur = b.cross_ron_to_eur || 0;
     var cEurToRon = b.cross_eur_to_ron || 0;

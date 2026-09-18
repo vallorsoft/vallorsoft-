@@ -739,6 +739,49 @@ describe('getDriverBalance', () => {
     expect(res.body.result.bnr_rate).toBe(5.00);
     expect(res.body.result.bnr_source).toBe('payments');
   });
+
+  test('settled_period/remaining_period: az IDŐSZAK tételeit allokáció-alapon számolja (same-month-first) — a szept. kifizetés a szept. tételre megy, nem viszi el az aug. elmaradás', async () => {
+    // Szcenárió: aug. tétel 500 RON (kifizetetlen) + szept. tétel 480 EUR (=2515.2 @5.24).
+    // 3000 RON solo kifizetés szeptemberben. Same-month-first: a szept. tétel
+    // TELJESEN fedezve (2515.2), a maradék (484.8) az augusztusira csordul.
+    // A gyors-kimutató a SZEPT. IDŐSZAKRA: kifizetve = 480 EUR (2515.2 RON),
+    // hátralék = 0 — NEM a nyers 3000 RON (amiben aug. része is benne van).
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValueOnce(5.24);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ nume: 'Peto' }]))                 // users check
+      .mockResolvedValueOnce(rows([{ currency: 'EUR', total: 480, db: 1 }])) // eR (szept. earned)
+      .mockResolvedValueOnce(rows([{ currency: 'RON', total: 3000, total_ron: 3000, db: 1 }])) // pR (szept. paid)
+      .mockResolvedValueOnce(rows([]))                                  // pSchR (scheduled)
+      // _getEffectiveBnr: élő BNR OK (5.24) → nincs DB-hívás
+      // _allocateDriver:
+      .mockResolvedValueOnce(rows([                                    // alloc earnings (ALL)
+        { id: 1, earning_date: '2026-08-15', currency: 'RON', total_amount: 500, kind: 'other', label: 'Aug' },
+        { id: 2, earning_date: '2026-09-12', currency: 'EUR', total_amount: 480, kind: 'salary', label: 'Sal' },
+      ]))
+      .mockResolvedValueOnce(rows([]))                                  // alloc group_items — nincs (solo)
+      .mockResolvedValueOnce(rows([                                    // alloc payments
+        { id: 10, paid_at: '2026-09-11', amount: 3000, currency: 'RON', amount_ron: 3000, group_id: null },
+      ]))
+      .mockResolvedValueOnce(rows([                                    // period earnings (szept.)
+        { id: 2, currency: 'EUR', total_amount: 480 },
+      ]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getDriverBalance',
+      arguments: [{ email: 'sofer@ceg.hu', from: '2026-09-01', to: '2026-09-30' }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    // A régi (nyers) mezők megmaradnak (legacy kifizetés-modál)
+    expect(res.body.result.paid.ron).toBe(3000);
+    // ÚJ: allokáció-alapú időszak-elszámoltság — a szept. tétel teljesen fedezve
+    expect(res.body.result.settled_period).toBeTruthy();
+    expect(res.body.result.settled_period.combined_ron).toBeCloseTo(2515.2, 0);
+    expect(res.body.result.settled_period.eur).toBeCloseTo(480, 1);
+    // Hátralék az IDŐSZAK tételeiből: 0 (nem a nyers −484.8 RON túlfizetés-látszat)
+    expect(res.body.result.remaining_period.combined_ron).toBeCloseTo(0, 1);
+    expect(res.body.result.remaining_period.eur).toBeCloseTo(0, 1);
+  });
 });
 
 // ═════════════════════════════════════════════
