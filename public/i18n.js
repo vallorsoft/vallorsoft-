@@ -2925,6 +2925,25 @@
     'fe.pm.payRow':      { ro: 'Plătește această poziție', hu: 'Kifizetés erre a tételre' },
     'fe.pm.rowNotePrefix':{ro: 'Plată pentru rândul de câștig', hu: 'Kifizetés a járandóság-sorra' },
 
+    // Vezetett kifizetés-allokáció (melyik havi járandóságból mennyit)
+    'fe.al.titlePartial': { ro: 'Plată parțială — alocare pe drepturi', hu: 'Részleges kifizetés — hozzárendelés' },
+    'fe.al.titleFull':    { ro: 'Achitare totală — alocare pe drepturi', hu: 'Teljes kifizetés — hozzárendelés' },
+    'fe.al.hint':         { ro: 'Alege din care drepturi (pe luni) se acoperă plata. Butonul „Auto" completează de la cel mai vechi; poți modifica manual.', hu: 'Válaszd ki, melyik havi járandóságból menjen a kifizetés. Az „Auto" gomb a legrégebbitől tölt ki; kézzel módosítható.' },
+    'fe.al.payHead':      { ro: 'Plata', hu: 'Kifizetés' },
+    'fe.al.autoFill':     { ro: 'Auto (de la cel mai vechi)', hu: 'Auto (legrégebbitől)' },
+    'fe.al.remainLbl':    { ro: 'Rest', hu: 'Hátralék' },
+    'fe.al.staysLbl':     { ro: 'rămâne', hu: 'marad' },
+    'fe.al.paySum':       { ro: 'Plată (RON)', hu: 'Kifizetés (RON)' },
+    'fe.al.allocSum':     { ro: 'Alocat (RON)', hu: 'Allokálva (RON)' },
+    'fe.al.leftover':     { ro: 'Nealocat (avans)', hu: 'Nem allokált (előleg)' },
+    'fe.al.over':         { ro: 'Depășire (redu alocarea)', hu: 'Túllépés (csökkentsd)' },
+    'fe.al.balanced':     { ro: 'Alocat complet', hu: 'Teljesen allokálva' },
+    'fe.al.saveBtn':      { ro: 'Salvează plata', hu: 'Kifizetés mentése' },
+    'fe.al.noUnpaid':     { ro: 'Nu există drepturi neachitate — se deschide plata simplă (avans).', hu: 'Nincs kifizetetlen járandóság — sima (előleg) kifizetés nyílik.' },
+    'fe.al.pickAtLeastOne': { ro: 'Alocă suma pe cel puțin un drept.', hu: 'Ossz el legalább egy tételre.' },
+    'fe.al.coversLbl':    { ro: 'Acoperă', hu: 'Fedezi' },
+    'fe.al.paidThis':     { ro: 'Achitat', hu: 'Fizetve' },
+
     // Csoportos kifizetés (multi-select + vegyes valuta + több fizetési mód)
     'fe.pg.selected':     { ro: 'rânduri selectate', hu: 'tétel kijelölve' },
     'fe.pg.payBtn':       { ro: '💵 Plătește selecția', hu: '💵 Kijelölés kifizetése' },

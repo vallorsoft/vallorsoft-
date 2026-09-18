@@ -234,6 +234,59 @@ describe('earningPaymentGroupCreate', () => {
     expect(res.body.result.err).toMatch(/deja incluse/i);
     expect(client.release).toHaveBeenCalled();
   });
+
+  // ── Vezetett RÉSZLEGES allokáció (allocations[]) ──
+  test('vezetett részleges: allocations → alloc_ron tárolva a group_items-ben', async () => {
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValue(5.20);
+    const pool = require('../../db');
+    const client = { query: jest.fn(), release: jest.fn() };
+    pool.connect = jest.fn().mockResolvedValue(client);
+    client.query
+      .mockResolvedValueOnce(rows([{ '?column?': 1 }]))                          // users
+      .mockResolvedValueOnce(rows([{ id: 5, currency: 'EUR', total_amount: 100 }])) // earnings meta (need=520 RON)
+      .mockResolvedValueOnce(rows([]))                                           // exAlloc — nincs meglévő
+      .mockResolvedValueOnce(rows([]))                                           // BEGIN
+      .mockResolvedValueOnce(rows([{ id: 42 }]))                                 // INSERT groups
+      .mockResolvedValueOnce(rows([]))                                           // INSERT group_items (alloc_ron)
+      .mockResolvedValueOnce(rows([{ id: 101 }]))                                // INSERT payment
+      .mockResolvedValueOnce(rows([]));                                          // COMMIT
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningPaymentGroupCreate',
+      arguments: [{
+        email_sofer: 'x@ceg.hu',
+        allocations: [{ earning_id: 5, alloc_ron: 300 }],       // 300 ≤ 520 need → ok
+        payments: [{ amount: 300, currency: 'RON', method: 'cash' }],
+      }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    const giCall = client.query.mock.calls.find(c => /INSERT INTO driver_payment_group_items/i.test(c[0]));
+    expect(giCall[0]).toMatch(/alloc_ron/i);
+    expect(giCall[1]).toEqual([42, 5, 300]);
+  });
+
+  test('vezetett részleges: túl-allokálás (alloc > hátralék) → elutasítva', async () => {
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValue(5.20);
+    const pool = require('../../db');
+    const client = { query: jest.fn(), release: jest.fn() };
+    pool.connect = jest.fn().mockResolvedValue(client);
+    client.query
+      .mockResolvedValueOnce(rows([{ '?column?': 1 }]))                          // users
+      .mockResolvedValueOnce(rows([{ id: 5, currency: 'RON', total_amount: 100 }])) // earnings meta (need=100 RON)
+      .mockResolvedValueOnce(rows([]));                                          // exAlloc — nincs meglévő
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningPaymentGroupCreate',
+      arguments: [{
+        email_sofer: 'x@ceg.hu',
+        allocations: [{ earning_id: 5, alloc_ron: 150 }],       // 150 > 100 need → over
+        payments: [{ amount: 150, currency: 'RON' }],
+      }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/dep[aă][sșş]/i);        // "depășește"
+    expect(client.release).toHaveBeenCalled();
+  });
 });
 
 // ─────────────────────────────────────────────

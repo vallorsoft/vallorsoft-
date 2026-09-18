@@ -586,34 +586,53 @@ handlers.earningList = async function (req, res, args) {
     if (!_isAdminOrManager(req)) return _deny(res);
     const cid = req.session.user.company_id;
     const a = _arg(args);
+    const email = a.email ? String(a.email).toLowerCase() : null;
     const params = [cid];
     let where = 'company_id = $1';
-    if (a.email) { params.push(String(a.email).toLowerCase()); where += ` AND LOWER(email_sofer) = $${params.length}`; }
+    if (email) { params.push(email); where += ` AND LOWER(email_sofer) = $${params.length}`; }
     if (a.from)  { params.push(a.from); where += ` AND earning_date >= $${params.length}`; }
     if (a.to)    { params.push(a.to);   where += ` AND earning_date <= $${params.length}`; }
-    // A kifizetett (csoportba került) tételek eltűnnek a listáról — a csoport
-    // a payment-listán jelenik meg, a nyomtatható lapról vissza is nézhető.
-    // Best-effort NOT IN — hiányzó tábla (nem futott migráció) → csendes fallback,
-    // a lista mint eddig, minden earning-tel.
-    let excludeSql = '';
-    try {
-      const exR = await pool.query(
-        `SELECT 1 FROM information_schema.tables
-          WHERE table_name = 'driver_payment_group_items' LIMIT 1`);
-      if (exR.rowCount) {
-        excludeSql = ' AND id NOT IN (SELECT earning_id FROM driver_payment_group_items)';
-      }
-    } catch (_e) { /* migráció-tudatos: ha nincs, marad üres */ }
     const r = await pool.query(
       `SELECT id, email_sofer, earning_date, kind, label, quantity, unit_amount,
               total_amount, currency, note, created_by, created_at
          FROM driver_earnings
-        WHERE ${where}${excludeSql}
+        WHERE ${where}
         ORDER BY earning_date DESC, id DESC
         LIMIT 500`,
       params
     );
-    return res.json({ result: { ok: true, items: r.rows } });
+    let items = r.rows;
+    // Allokáció-annotáció (csak ha egy sofőrre szűrünk): a TELJESEN kifizetett
+    // tételek kimaradnak (a csoport/payment-listán láthatók), a RÉSZLEGESEN
+    // fizetettek MARADNAK a hátralékkal (settled_ron/remaining_ron/remaining_cur).
+    // Best-effort — hiányzó migráció esetén annotáció nélkül minden marad.
+    if (email) {
+      try {
+        const bnrInfo = await _getEffectiveBnr(cid);
+        const rate = bnrInfo.rate;
+        const alloc = await computeDriverAllocation(cid, email, rate);
+        if (alloc && alloc.size) {
+          const r2 = v => Math.round((Number(v) || 0) * 100) / 100;
+          const ronEq = (cur, amt) => (String(cur || 'RON').toUpperCase() === 'RON')
+            ? Number(amt || 0) : (rate != null ? Number(amt || 0) * rate : Number(amt || 0));
+          items = items.filter(it => {
+            const info = alloc.get(it.id);
+            if (info && info.fully) return false;         // teljesen kifizetve → ki
+            const need = r2(ronEq(it.currency, it.total_amount));
+            const settled = info ? r2(Math.min(info.settled_ron, need)) : 0;
+            it.total_ron = need;
+            it.settled_ron = settled;
+            it.remaining_ron = r2(need - settled);
+            const cur = String(it.currency || 'RON').toUpperCase();
+            it.remaining_cur = (cur === 'RON') ? it.remaining_ron
+              : (rate != null ? r2(it.remaining_ron / rate) : it.remaining_ron);
+            it.partial = settled > 0.005;                 // részlegesen fizetett?
+            return true;
+          });
+        }
+      } catch (_e) { /* migráció-tudatos: annotáció nélkül minden marad */ }
+    }
+    return res.json({ result: { ok: true, items } });
   } catch (err) {
     console.error('earningList hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
@@ -1000,7 +1019,21 @@ handlers.earningPaymentGroupCreate = async function (req, res, args) {
 
     // Bemenet: earning_ids[] + payments[{method,amount,currency,bnr_rate,note?}]
     const rawIds = Array.isArray(f.earning_ids) ? f.earning_ids : [];
-    const earningIds = [...new Set(rawIds.map(x => parseInt(x, 10)).filter(Number.isFinite))];
+    // Vezetett RÉSZLEGES allokáció (opcionális): allocations[{earning_id, alloc_ron}]
+    // Ha meg van adva → earning-enként tárolt RON-egyenérték (részleges is);
+    // ha nincs → régi „egész tétel" viselkedés (alloc_ron NULL = teljes).
+    const rawAllocs = Array.isArray(f.allocations) ? f.allocations : [];
+    const allocMap = new Map();
+    for (const a of rawAllocs) {
+      const eid = parseInt(a && a.earning_id, 10);
+      const val = _num(a && a.alloc_ron);
+      if (Number.isFinite(eid) && val != null && val > 0) allocMap.set(eid, _round2(val));
+    }
+    const useAlloc = allocMap.size > 0;
+    // Guided módban a tétel-lista az allokációból jön; egyébként az earning_ids-ből.
+    const earningIds = useAlloc
+      ? [...allocMap.keys()]
+      : [...new Set(rawIds.map(x => parseInt(x, 10)).filter(Number.isFinite))];
     if (!earningIds.length) { client.release(); return res.json({ result: { ok: false, err: 'Selecteaza cel putin un drept.' } }); }
     if (earningIds.length > 100) { client.release(); return res.json({ result: { ok: false, err: 'Prea multe drepturi selectate (max 100).' } }); }
 
@@ -1049,9 +1082,10 @@ handlers.earningPaymentGroupCreate = async function (req, res, args) {
       'SELECT 1 FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2', [email, cid]);
     if (!ur.rows.length) { client.release(); return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } }); }
 
-    // MINDEN earning a cégé ÉS a sofőré?
+    // MINDEN earning a cégé ÉS a sofőré? (a currency+total a részleges
+    // allokáció túl-allokálás-ellenőrzéséhez kell; a legacy út nem használja)
     const eR = await client.query(
-      `SELECT id FROM driver_earnings
+      `SELECT id, currency, total_amount FROM driver_earnings
         WHERE id = ANY($1::int[])
           AND company_id = $2
           AND LOWER(email_sofer) = LOWER($3)`,
@@ -1062,19 +1096,67 @@ handlers.earningPaymentGroupCreate = async function (req, res, args) {
       return res.json({ result: { ok: false, err: 'Unele drepturi selectate nu apartin acestui sofer sau firma.' } });
     }
 
-    // Már csoportban van bármelyik? (UNIQUE (earning_id) — a második beszúrás
-    // amúgy elhasalna, de a hiba mostantól diagnosztikus.)
-    try {
-      const conflict = await client.query(
-        `SELECT gi.earning_id FROM driver_payment_group_items gi
-         WHERE gi.earning_id = ANY($1::int[])`,
-        [earningIds]
-      );
-      if (conflict.rowCount) {
-        client.release();
-        return res.json({ result: { ok: false, err: 'Unele drepturi sunt deja incluse intr-un alt grup de plata.' } });
+    // Effektív BNR-ráta a RON-egyenérték számításához (a payments-loop bnrCache-e,
+    // vagy az első megadott per-sor ráta; RON-only kifizetésnél null → EUR 1:1 becslés)
+    let allocRate = (bnrCache != null && bnrCache > 0) ? bnrCache : null;
+    if (allocRate == null) { const pr0 = payments.find(p => p.bnr_rate != null); if (pr0) allocRate = pr0.bnr_rate; }
+    const _needRon = (cur, amt) => (String(cur || 'RON').toUpperCase() === 'RON')
+      ? Number(amt || 0)
+      : (allocRate != null ? Number(amt || 0) * allocRate : Number(amt || 0));
+
+    if (!useAlloc) {
+      // LEGACY „egész tétel" út: már csoportban van bármelyik? → elutasítás
+      try {
+        const conflict = await client.query(
+          `SELECT gi.earning_id FROM driver_payment_group_items gi
+           WHERE gi.earning_id = ANY($1::int[])`,
+          [earningIds]
+        );
+        if (conflict.rowCount) {
+          client.release();
+          return res.json({ result: { ok: false, err: 'Unele drepturi sunt deja incluse intr-un alt grup de plata.' } });
+        }
+      } catch (_e) { /* tábla-hiány = migráció nem futott — az INSERT úgyis szólni fog */ }
+    } else {
+      // VEZETETT részleges út: túl-allokálás ellenőrzés (meglévő + új ≤ a tétel
+      // RON-igénye). A meglévő NULL alloc = teljes (need). Túl-allokálás → hiba.
+      const earnMeta = new Map();
+      for (const row of eR.rows) earnMeta.set(row.id, { currency: row.currency, total: row.total_amount });
+      const existingByEid = new Map();
+      try {
+        const exAlloc = await client.query(
+          `SELECT earning_id, alloc_ron FROM driver_payment_group_items
+            WHERE earning_id = ANY($1::int[])`,
+          [earningIds]
+        );
+        for (const row of exAlloc.rows) {
+          const meta = earnMeta.get(row.earning_id);
+          const need = meta ? _needRon(meta.currency, meta.total) : 0;
+          const add = (row.alloc_ron == null) ? need : Number(row.alloc_ron);
+          existingByEid.set(row.earning_id, _round2((existingByEid.get(row.earning_id) || 0) + add));
+        }
+      } catch (_e) { /* tábla/oszlop-hiány → az INSERT úgyis szól */ }
+      for (const [eid, val] of allocMap) {
+        const meta = earnMeta.get(eid);
+        const need = meta ? _needRon(meta.currency, meta.total) : 0;
+        const existing = existingByEid.get(eid) || 0;
+        if (val > need - existing + 0.02) {
+          client.release();
+          return res.json({ result: { ok: false, err: 'Suma alocată depășește restul de plată al unui drept.' } });
+        }
       }
-    } catch (_e) { /* tábla-hiány = migráció nem futott — az INSERT úgyis szólni fog */ }
+      // A teljes allokáció nem lehet több a kifizetett összegnél (RON-egyenérték)
+      let allocSum = 0; for (const v of allocMap.values()) allocSum += v;
+      let payRon = 0;
+      for (const p of payments) {
+        payRon += (p.amount_ron != null) ? Number(p.amount_ron)
+          : (p.currency === 'RON' ? Number(p.amount) : (allocRate != null ? Number(p.amount) * allocRate : Number(p.amount)));
+      }
+      if (allocSum > payRon + 0.5) {
+        client.release();
+        return res.json({ result: { ok: false, err: 'Suma alocată depășește totalul plății.' } });
+      }
+    }
 
     // Tranzakció
     await client.query('BEGIN');
@@ -1090,11 +1172,19 @@ handlers.earningPaymentGroupCreate = async function (req, res, args) {
       groupId = g.rows[0].id;
 
       for (const eid of earningIds) {
-        await client.query(
-          `INSERT INTO driver_payment_group_items (group_id, earning_id)
-           VALUES ($1, $2)`,
-          [groupId, eid]
-        );
+        if (useAlloc) {
+          await client.query(
+            `INSERT INTO driver_payment_group_items (group_id, earning_id, alloc_ron)
+             VALUES ($1, $2, $3)`,
+            [groupId, eid, allocMap.get(eid) != null ? allocMap.get(eid) : null]
+          );
+        } else {
+          await client.query(
+            `INSERT INTO driver_payment_group_items (group_id, earning_id)
+             VALUES ($1, $2)`,
+            [groupId, eid]
+          );
+        }
       }
 
       // Az `due_email_sent` oszlop új (db/driver-payment-due-email.sql); ha
@@ -1180,16 +1270,30 @@ handlers.earningPaymentGroupGet = async function (req, res, args) {
       if (ur.rows.length) driver.nume = ur.rows[0].nume;
     } catch (_e) {}
 
-    // Kijelölt tételek (a group_items → earnings join)
-    const itemsR = await pool.query(
-      `SELECT e.id, e.earning_date, e.kind, e.label, e.quantity,
-              e.unit_amount, e.total_amount, e.currency, e.note
-         FROM driver_payment_group_items gi
-         JOIN driver_earnings e ON e.id = gi.earning_id
-        WHERE gi.group_id = $1 AND e.company_id = $2
-        ORDER BY e.earning_date, e.id`,
-      [id, cid]
-    );
+    // Kijelölt tételek (a group_items → earnings join) — alloc_ron: ha
+    // részlegesen lett kifizetve, mennyi RON-egyenérték esett erre a tételre.
+    let itemsR;
+    try {
+      itemsR = await pool.query(
+        `SELECT e.id, e.earning_date, e.kind, e.label, e.quantity,
+                e.unit_amount, e.total_amount, e.currency, e.note, gi.alloc_ron
+           FROM driver_payment_group_items gi
+           JOIN driver_earnings e ON e.id = gi.earning_id
+          WHERE gi.group_id = $1 AND e.company_id = $2
+          ORDER BY e.earning_date, e.id`,
+        [id, cid]
+      );
+    } catch (_e) {
+      itemsR = await pool.query(
+        `SELECT e.id, e.earning_date, e.kind, e.label, e.quantity,
+                e.unit_amount, e.total_amount, e.currency, e.note
+           FROM driver_payment_group_items gi
+           JOIN driver_earnings e ON e.id = gi.earning_id
+          WHERE gi.group_id = $1 AND e.company_id = $2
+          ORDER BY e.earning_date, e.id`,
+        [id, cid]
+      );
+    }
 
     // Fizetési sorok (a group-hoz) — is_scheduled: paid_at > ma → SCHEDULED
     const paysR = await pool.query(
@@ -1581,22 +1685,40 @@ async function computeDriverAllocation(cid, email, bnrRate) {
       [cid, email]);
     earns = er.rows;
   } catch (_e) { return alloc; }
-  // 2) csoportba kötött tételek → explicit KIFIZETVE (migráció-toleráns)
-  const groupedIds = new Set();
+  const needById = new Map();
+  for (const e of earns) needById.set(e.id, ronEq(e.currency, e.total_amount));
+
+  // 2) csoport-tételek allokációval: alloc_ron = ennyi RON erre a tételre
+  //    (NULL = TELJES tétel — a régi „egész tétel" viselkedés). Egy tétel
+  //    több csoportban is lehet (részletekben) → earning-enként összegzünk.
+  //    Csoportonként megjegyezzük a tételeket + hogy van-e RÉSZLEGES alloc.
+  const groupedSettled = new Map();       // earning_id -> settled_ron (nem capp-elve még)
+  const groupItems = new Map();           // group_id(str) -> [{earning_id, alloc_ron}]
   try {
     const gi = await pool.query(
-      `SELECT DISTINCT gi.earning_id
+      `SELECT gi.group_id, gi.earning_id, gi.alloc_ron
          FROM driver_payment_group_items gi
          JOIN driver_earnings e ON e.id = gi.earning_id
         WHERE e.company_id=$1 AND LOWER(e.email_sofer)=$2`,
       [cid, email]);
-    for (const row of gi.rows) groupedIds.add(row.earning_id);
-  } catch (_e) { /* nincs csoport-tábla — mindent a solo-pool intéz */ }
-  for (const e of earns) {
-    if (groupedIds.has(e.id)) alloc.set(e.id, { settled_ron: ronEq(e.currency, e.total_amount), fully: true });
+    for (const row of gi.rows) {
+      const gk = String(row.group_id);
+      if (!groupItems.has(gk)) groupItems.set(gk, []);
+      groupItems.get(gk).push(row);
+      const need = needById.get(row.earning_id) || 0;
+      const add = (row.alloc_ron == null) ? need : Number(row.alloc_ron);
+      groupedSettled.set(row.earning_id, (groupedSettled.get(row.earning_id) || 0) + add);
+    }
+  } catch (_e) { /* nincs csoport-tábla / alloc_ron oszlop — mindent a solo-pool intéz */ }
+  for (const [eid, s] of groupedSettled) {
+    const need = needById.get(eid) || 0;
+    const settled = Math.min(r2(s), need);
+    alloc.set(eid, { settled_ron: settled, fully: settled >= need - 0.005 });
   }
-  // 3) solo (nem-csoportos, nem-jövőbeli) kifizetések RON-egyenérték pool-ja
+
+  // 3) kifizetések: solo pool + a RÉSZLEGES csoportok fel-nem-osztott maradéka
   let poolRon = 0;
+  const groupPaidRon = new Map();         // group_id(str) -> effektív kifizetett RON
   try {
     const pr = await pool.query(
       `SELECT amount, currency, amount_ron,
@@ -1606,26 +1728,117 @@ async function computeDriverAllocation(cid, email, bnrRate) {
           AND paid_at <= CURRENT_DATE`,
       [cid, email]);
     for (const p of pr.rows) {
-      if (p.group_id != null && p.group_id !== '') continue;   // csoportos → a tételei már settled
       const cur = String(p.currency || 'RON').toUpperCase();
       const amt = Number(p.amount || 0);
-      poolRon += (cur === 'RON') ? amt
+      const ron = (cur === 'RON') ? amt
         : (p.amount_ron != null ? Number(p.amount_ron) : (rate != null ? amt * rate : amt));
+      if (p.group_id != null && p.group_id !== '') {
+        const gk = String(p.group_id);
+        groupPaidRon.set(gk, (groupPaidRon.get(gk) || 0) + ron);
+      } else {
+        poolRon += ron;                    // önálló (nem-csoportos) kifizetés
+      }
     }
   } catch (_e) { /* nincs driver_payments — pool marad 0 */ }
+  // A RÉSZLEGES csoportok (van non-NULL alloc) fel-nem-osztott maradéka a pool-ba
+  // kerül (FIFO-val a többi tételre); a LEGACY (csupa-NULL) csoport maradékát
+  // NEM bántjuk (megőrizzük a régi viselkedést).
+  for (const [gk, items] of groupItems) {
+    const hasPartial = items.some(it => it.alloc_ron != null);
+    if (!hasPartial) continue;
+    let allocSum = 0;
+    for (const it of items) {
+      const need = needById.get(it.earning_id) || 0;
+      allocSum += (it.alloc_ron == null) ? need : Number(it.alloc_ron);
+    }
+    const leftover = (groupPaidRon.get(gk) || 0) - allocSum;
+    if (leftover > 0.005) poolRon += leftover;
+  }
   poolRon = r2(poolRon);
-  // 4) FIFO: a maradék kifizetetlen tételekre osztjuk (legrégebbi elöl)
+
+  // 4) FIFO: a maradék pool a még kifizetetlen RÉSZre oszlik (legrégebbi elöl)
   for (const e of earns) {
     if (poolRon <= 0.005) break;
-    if (alloc.has(e.id)) continue;              // már csoportosan kifizetve
-    const need = ronEq(e.currency, e.total_amount);
+    const need = needById.get(e.id) || 0;
     if (need <= 0) continue;
-    const take = Math.min(poolRon, need);
+    const already = alloc.has(e.id) ? alloc.get(e.id).settled_ron : 0;
+    const remain = r2(need - already);
+    if (remain <= 0.005) continue;
+    const take = Math.min(poolRon, remain);
     poolRon = r2(poolRon - take);
-    alloc.set(e.id, { settled_ron: r2(take), fully: take >= need - 0.005 });
+    const settled = r2(already + take);
+    alloc.set(e.id, { settled_ron: settled, fully: settled >= need - 0.005 });
   }
   return alloc;
 }
+
+// ═════════════════════════════════════════════════════════════
+//  Járandóság-allokáció ÁLLAPOT (a vezetett kifizetés-modálhoz)
+//  A sofőr MÉG KIFIZETETLEN (vagy részlegesen fizetett) járandóságai,
+//  HÓNAPRA bontva (earning_date szerint, legrégebbi elöl), per-tétel
+//  RON-igény / eddig-kifizetve / hátralék (RON + a tétel valutájában).
+//  Admin/Manager; company_id + sofőr-szűrt. Csak olvasás.
+// ═════════════════════════════════════════════════════════════
+handlers.getDriverEarningAllocation = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const a = _arg(args);
+    const email = String(a.email || '').trim().toLowerCase();
+    if (!email) return res.json({ result: { ok: false, err: 'Selecteaza un sofer!' } });
+    // Sofőr a cégé? (cross-tenant védelem)
+    const ur = await pool.query(
+      'SELECT 1 FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2', [email, cid]);
+    if (!ur.rows.length) return res.json({ result: { ok: false, err: 'Soferul nu a fost gasit.' } });
+
+    const bnrInfo = await _getEffectiveBnr(cid);
+    const rate = bnrInfo.rate;
+    const r2 = v => Math.round((Number(v) || 0) * 100) / 100;
+    const ronEq = (cur, amt) => (String(cur || 'RON').toUpperCase() === 'RON')
+      ? Number(amt || 0) : (rate != null ? Number(amt || 0) * rate : Number(amt || 0));
+
+    let earns = [];
+    try {
+      const er = await pool.query(
+        `SELECT id, earning_date, kind, label, quantity, unit_amount, total_amount, currency, note
+           FROM driver_earnings
+          WHERE company_id=$1 AND LOWER(email_sofer)=$2
+          ORDER BY earning_date ASC, id ASC`,
+        [cid, email]);
+      earns = er.rows;
+    } catch (_e) { earns = []; }
+
+    const alloc = await computeDriverAllocation(cid, email, rate);
+
+    const monthsMap = new Map();  // 'YYYY-MM' -> { key, items[], total_remaining_ron }
+    for (const e of earns) {
+      const need = r2(ronEq(e.currency, e.total_amount));
+      const settled = alloc.has(e.id) ? r2(Math.min(alloc.get(e.id).settled_ron, need)) : 0;
+      const remainRon = r2(need - settled);
+      if (remainRon <= 0.005) continue;   // teljesen kifizetve → nem ajánljuk fel
+      const cur = String(e.currency || 'RON').toUpperCase();
+      const remainCur = (cur === 'RON') ? remainRon : (rate != null ? r2(remainRon / rate) : remainRon);
+      const key = String(e.earning_date || '').slice(0, 7) || '????-??';
+      if (!monthsMap.has(key)) monthsMap.set(key, { key, items: [], total_remaining_ron: 0 });
+      const m = monthsMap.get(key);
+      m.items.push({
+        id: e.id, earning_date: e.earning_date, kind: e.kind, label: e.label,
+        quantity: e.quantity, unit_amount: e.unit_amount, total_amount: e.total_amount,
+        currency: cur, total_ron: need, settled_ron: settled,
+        remaining_ron: remainRon, remaining_cur: remainCur,
+      });
+      m.total_remaining_ron = r2(m.total_remaining_ron + remainRon);
+    }
+    const months = [...monthsMap.values()].sort((x, y) => x.key.localeCompare(y.key)); // legrégebbi elöl
+    return res.json({ result: {
+      ok: true, bnr_rate: rate, bnr_source: bnrInfo.source, months,
+      total_remaining_ron: r2(months.reduce((s, m) => s + m.total_remaining_ron, 0)),
+    } });
+  } catch (err) {
+    console.error('getDriverEarningAllocation hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
 
 // ═════════════════════════════════════════════════════════════
 //  Havi elszámolás-lap (settlement sheet) — PDF/nyomtatható +
@@ -1743,14 +1956,26 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
           AND earning_date >= $3 AND earning_date <= $4
         ORDER BY earning_date ASC, id ASC`,
       [cid, email, from, to]);
-    // Kifizetés-sorok az időszakra
-    const pR = await pool.query(
-      `SELECT id, paid_at, method, amount, currency, bnr_rate, amount_ron, note
-         FROM driver_payments
-        WHERE company_id=$1 AND LOWER(email_sofer)=$2
-          AND paid_at >= $3 AND paid_at <= $4
-        ORDER BY paid_at ASC, id ASC`,
-      [cid, email, from, to]);
+    // Kifizetés-sorok az időszakra (group_id-vel, hogy tudjuk, mit fedez)
+    let pR;
+    try {
+      pR = await pool.query(
+        `SELECT id, paid_at, method, amount, currency, bnr_rate, amount_ron, note,
+                (to_jsonb(driver_payments) ->> 'group_id') AS group_id
+           FROM driver_payments
+          WHERE company_id=$1 AND LOWER(email_sofer)=$2
+            AND paid_at >= $3 AND paid_at <= $4
+          ORDER BY paid_at ASC, id ASC`,
+        [cid, email, from, to]);
+    } catch (_e) {
+      pR = await pool.query(
+        `SELECT id, paid_at, method, amount, currency, bnr_rate, amount_ron, note
+           FROM driver_payments
+          WHERE company_id=$1 AND LOWER(email_sofer)=$2
+            AND paid_at >= $3 AND paid_at <= $4
+          ORDER BY paid_at ASC, id ASC`,
+        [cid, email, from, to]);
+    }
 
     // Összegzés valuta szerint (a szerver-oldali igazságforrás)
     const earned = { EUR: 0, RON: 0 };
@@ -1807,6 +2032,44 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
     const baseSalaryRon = driver.net_base_salary_ron != null
       ? _round2(parseFloat(driver.net_base_salary_ron))
       : null;
+
+    // ── Per-kifizetés FEDEZET (mit fizetett) ──
+    // Minden csoportos kifizetéshez a csoport tételei (melyik járandóságot +
+    // melyik hónapot fedezi). A `covers` a payment-sorra kerül; a szóló (nem-
+    // csoportos, régi) kifizetésnél üres. Best-effort (migráció-tudatos).
+    try {
+      const gids = [...new Set(pR.rows.map(p => p.group_id).filter(g => g != null && g !== '')
+        .map(g => parseInt(g, 10)).filter(Number.isFinite))];
+      if (gids.length) {
+        const covR = await pool.query(
+          `SELECT gi.group_id, gi.alloc_ron, e.earning_date, e.kind, e.label,
+                  e.currency, e.total_amount
+             FROM driver_payment_group_items gi
+             JOIN driver_earnings e ON e.id = gi.earning_id
+            WHERE gi.group_id = ANY($1::int[]) AND e.company_id = $2
+            ORDER BY e.earning_date ASC, e.id ASC`,
+          [gids, cid]);
+        const byGroup = new Map();
+        for (const row of covR.rows) {
+          const gk = String(row.group_id);
+          if (!byGroup.has(gk)) byGroup.set(gk, []);
+          const need = (_cur(row.currency) === 'RON') ? parseFloat(row.total_amount || 0)
+            : (bnrRate != null ? parseFloat(row.total_amount || 0) * bnrRate : parseFloat(row.total_amount || 0));
+          const allocRon = (row.alloc_ron == null) ? _round2(need) : _round2(parseFloat(row.alloc_ron));
+          byGroup.get(gk).push({
+            earning_date: row.earning_date, kind: row.kind, label: row.label,
+            currency: _cur(row.currency), month: String(row.earning_date || '').slice(0, 7),
+            alloc_ron: allocRon,
+          });
+        }
+        for (const p of pR.rows) {
+          const gk = (p.group_id != null && p.group_id !== '') ? String(p.group_id) : null;
+          p.covers = gk && byGroup.has(gk) ? byGroup.get(gk) : [];
+        }
+      } else {
+        for (const p of pR.rows) p.covers = [];
+      }
+    } catch (_e) { for (const p of pR.rows) p.covers = []; }
 
     return res.json({ result: {
       ok: true,
