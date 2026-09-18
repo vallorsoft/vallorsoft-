@@ -269,6 +269,72 @@ describe('earningUpdate', () => {
 });
 
 // ═════════════════════════════════════════════
+//  getDriverEarningAllocation — vezetett kifizetés-modál adatforrás
+// ═════════════════════════════════════════════
+describe('getDriverEarningAllocation', () => {
+  test('Sofer → Acces interzis', async () => {
+    setUser(fixtures.sofer);
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getDriverEarningAllocation',
+      arguments: [{ email: 'x@ceg.hu' }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/interzis/i);
+  });
+
+  test('hónapokra bontja earning_date szerint (legrégebbi elöl) + hátralék RON-ban', async () => {
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValue(5.0);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ '?column?': 1 }]))               // users check
+      .mockResolvedValueOnce(rows([                                    // fő earnings SELECT
+        { id: 5, earning_date: '2026-08-10', kind: 'bonus', label: 'A', quantity: 1, unit_amount: 100, currency: 'EUR', total_amount: 100 },
+        { id: 6, earning_date: '2026-09-05', kind: 'diurna', label: 'B', quantity: 1, unit_amount: 200, currency: 'RON', total_amount: 200 },
+      ]))
+      .mockResolvedValueOnce(rows([                                    // computeDriverAllocation: earnings
+        { id: 5, earning_date: '2026-08-10', currency: 'EUR', total_amount: 100 },
+        { id: 6, earning_date: '2026-09-05', currency: 'RON', total_amount: 200 },
+      ]))
+      .mockResolvedValueOnce(rows([]))                                 // group_items — nincs
+      .mockResolvedValueOnce(rows([]));                                // payments pool — nincs
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getDriverEarningAllocation',
+      arguments: [{ email: 'sofer@ceg.hu' }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.months.map(m => m.key)).toEqual(['2026-08', '2026-09']);
+    expect(res.body.result.months[0].total_remaining_ron).toBeCloseTo(500, 1); // 100 EUR × 5.0
+    expect(res.body.result.months[1].total_remaining_ron).toBeCloseTo(200, 1);
+    // per-tétel valuta-hátralék: aug tétel EUR-ban 100
+    expect(res.body.result.months[0].items[0].remaining_cur).toBeCloseTo(100, 1);
+    expect(res.body.result.months[0].items[0].currency).toBe('EUR');
+  });
+
+  test('teljesen kifizetett tételt nem ajánl fel', async () => {
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValue(5.0);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ '?column?': 1 }]))               // users check
+      .mockResolvedValueOnce(rows([                                    // fő earnings SELECT
+        { id: 5, earning_date: '2026-08-10', kind: 'bonus', label: 'A', quantity: 1, unit_amount: 100, currency: 'RON', total_amount: 100 },
+      ]))
+      .mockResolvedValueOnce(rows([                                    // computeDriverAllocation: earnings
+        { id: 5, earning_date: '2026-08-10', currency: 'RON', total_amount: 100 },
+      ]))
+      .mockResolvedValueOnce(rows([{ group_id: 1, earning_id: 5, alloc_ron: null }])) // teljes group-item
+      .mockResolvedValueOnce(rows([]));                               // payments pool
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getDriverEarningAllocation',
+      arguments: [{ email: 'sofer@ceg.hu' }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.months).toEqual([]); // minden kifizetve → nincs felajánlott hónap
+  });
+});
+
+// ═════════════════════════════════════════════
 //  earningKindList / Create / Delete (egyéni típusok)
 // ═════════════════════════════════════════════
 describe('earningKind* — egyéni típus-kezelő', () => {
@@ -679,44 +745,55 @@ describe('getDriverBalance', () => {
 //  List + Delete (multi-tenant védelem)
 // ═════════════════════════════════════════════
 describe('list & delete cross-tenant', () => {
-  test('earningList: company_id-szűrt WHERE + kifizetett csoportba került tételek kihagyva', async () => {
+  test('earningList: company_id-szűrt WHERE, NINCS NOT IN; teljesen kifizetett kimarad, részleges marad hátralékkal', async () => {
     setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValue(5.0);
     const pool = require('../../db');
-    // 1) information_schema check: tábla létezik
-    pool.query.mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] });
-    // 2) fő SELECT (üres eredmény)
-    pool.query.mockResolvedValueOnce(rows([]));
-    await request(app).post('/api/execute').send({
+    pool.query
+      .mockResolvedValueOnce(rows([                                    // 0) fő SELECT
+        { id: 5, currency: 'EUR', total_amount: 100 },
+        { id: 6, currency: 'EUR', total_amount: 100 },
+      ]))
+      .mockResolvedValueOnce(rows([                                    // 1) alloc: earnings
+        { id: 5, earning_date: '2026-01-01', currency: 'EUR', total_amount: 100 },
+        { id: 6, earning_date: '2026-02-01', currency: 'EUR', total_amount: 100 },
+      ]))
+      .mockResolvedValueOnce(rows([{ group_id: 1, earning_id: 5, alloc_ron: null }])) // 2) group items (id5 teljes)
+      .mockResolvedValueOnce(rows([]));                                // 3) payments pool (üres)
+    const res = await request(app).post('/api/execute').send({
       functionName: 'earningList',
       arguments: [{ email: 'sofer@ceg.hu', from: '2026-01-01', to: '2026-12-31' }],
     });
-    // A tábla-létezés check az elsőnek fut
-    const sqlSchema = pool.query.mock.calls[0][0];
-    expect(sqlSchema).toMatch(/information_schema\.tables/i);
-    expect(sqlSchema).toMatch(/driver_payment_group_items/i);
-    // A fő SELECT-nek tartalmaznia kell a NOT IN kizárást
-    const sql = pool.query.mock.calls[1][0];
-    const params = pool.query.mock.calls[1][1];
+    expect(res.body.result.ok).toBe(true);
+    const sql = pool.query.mock.calls[0][0];
+    const params = pool.query.mock.calls[0][1];
     expect(sql).toMatch(/FROM driver_earnings/i);
     expect(sql).toMatch(/company_id = \$1/i);
-    expect(sql).toMatch(/NOT IN \(SELECT earning_id FROM driver_payment_group_items\)/i);
+    expect(sql).not.toMatch(/NOT IN/i);
     expect(params[0]).toBe(fixtures.admin.company_id);
+    // id5 teljesen kifizetve (legacy full group) → kimarad; id6 marad hátralékkal
+    expect(res.body.result.items.map(i => i.id)).toEqual([6]);
+    expect(res.body.result.items[0].remaining_ron).toBeCloseTo(500, 1); // 100 EUR × 5.0
+    expect(res.body.result.items[0].settled_ron).toBeCloseTo(0, 1);
   });
 
-  test('earningList: migráció-tolerancia — driver_payment_group_items nincs → nincs NOT IN kizárás', async () => {
+  test('earningList: migráció-tolerancia — allokáció-tábla hiánya → minden tétel marad, nincs NOT IN', async () => {
     setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValue(5.0);
     const pool = require('../../db');
-    // 1) information_schema check: tábla NEM létezik
-    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
-    // 2) fő SELECT
-    pool.query.mockResolvedValueOnce(rows([]));
-    await request(app).post('/api/execute').send({
+    pool.query
+      .mockResolvedValueOnce(rows([{ id: 5, currency: 'RON', total_amount: 100 }])) // 0) fő SELECT
+      .mockRejectedValueOnce(new Error('relation "driver_earnings" does not exist')); // 1) alloc earnings SELECT dob
+    const res = await request(app).post('/api/execute').send({
       functionName: 'earningList',
       arguments: [{ email: 'sofer@ceg.hu' }],
     });
-    const sql = pool.query.mock.calls[1][0];
+    expect(res.body.result.ok).toBe(true);
+    const sql = pool.query.mock.calls[0][0];
     expect(sql).toMatch(/FROM driver_earnings/i);
-    expect(sql).not.toMatch(/NOT IN \(SELECT earning_id FROM driver_payment_group_items\)/i);
+    expect(sql).not.toMatch(/NOT IN/i);
+    // allokáció dob → nincs szűrés, minden tétel marad
+    expect(res.body.result.items.map(i => i.id)).toEqual([5]);
   });
 
   test('paymentDelete: idegen id → 0 sor → hiba', async () => {

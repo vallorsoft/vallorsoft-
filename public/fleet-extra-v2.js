@@ -1019,9 +1019,9 @@
       // Decont oficial / Kifizetés-történet / Csoportos bizonylat).
       var headActions =
         '<div class="dc-head-actions">'
-        + '<button class="btn primary" onclick="FleetExtra.dcOpenPayment(\'partial\')">💵 '
+        + '<button class="btn primary" onclick="FleetExtra.dcAllocOpen(\'partial\')">💵 '
           + t('fe.pm.payPartial') + '</button>'
-        + '<button class="btn ok" onclick="FleetExtra.dcOpenPayment(\'full\')">✅ '
+        + '<button class="btn ok" onclick="FleetExtra.dcAllocOpen(\'full\')">✅ '
           + t('fe.pm.payFull') + '</button>'
         + '<button class="btn ghost" onclick="FleetExtra.dcOpenDocPicker()" '
           + 'title="' + t('fe.doc.openTitle') + '">📄 ' + t('fe.doc.openBtn') + '</button>'
@@ -1460,7 +1460,13 @@
       var amount = Number(it.total_amount) || 0;
       var cur = it.currency || 'RON';
       var checked = _dcSelectedEarnings[it.id] ? ' checked' : '';
-      return '<tr class="' + (_dcSelectedEarnings[it.id] ? 'dc-row-selected' : '') + '">'
+      // Részlegesen kifizetett tétel: „fizetve X / marad Y" a hátralékkal
+      var partialNote = (it.partial && it.remaining_cur != null)
+        ? '<div style="font-size:10px;color:#b45309;font-weight:600;">'
+          + t('fe.al.paidThis') + ': ' + n2(it.settled_ron, 2) + ' RON · '
+          + t('fe.al.staysLbl') + ': ' + n2(it.remaining_cur, 2) + ' ' + esc(cur) + '</div>'
+        : '';
+      return '<tr class="' + (_dcSelectedEarnings[it.id] ? 'dc-row-selected' : '') + (it.partial ? ' dc-row-partial' : '') + '">'
         + '<td style="text-align:center;width:32px;">'
         +   '<input type="checkbox" class="dc-sel-cb"' + checked
         +   ' onchange="FleetExtra.dcSelToggle(' + it.id + ',' + amount + ',\'' + esc(cur) + '\')"></td>'
@@ -1470,7 +1476,7 @@
         + '<td>' + esc(it.label || '—') + '</td>'
         + '<td style="text-align:right;">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
         + '<td style="text-align:right;font-weight:700;">' + n2(amount, 2)
-        +   ' <span class="dc-tile-cur">' + esc(cur) + '</span></td>'
+        +   ' <span class="dc-tile-cur">' + esc(cur) + '</span>' + partialNote + '</td>'
         + '<td style="text-align:right;white-space:nowrap;">'
         +   '<button class="btn ok" style="padding:3px 9px;font-size:12px;margin-right:4px;" '
         +     'title="' + t('fe.pm.payRow') + '" '
@@ -1662,13 +1668,16 @@
         var f = (_dcCustomKinds || []).find(function (k) { return k.key === kindKey; });
         kindLbl = f ? ((lang === 'hu' && f.label_hu) ? f.label_hu : (f.label_ro || kindKey)) : kindKey;
       }
+      var allocNote = (it.alloc_ron != null)
+        ? '<div style="font-size:10px;color:#1d4ed8;">' + t('fe.al.paidThis') + ': ' + n2(it.alloc_ron, 2) + ' RON</div>'
+        : '';
       return '<tr>'
         + '<td>' + d2(it.earning_date) + '</td>'
         + '<td><span class="dc-kind-pill dc-kind-' + esc(kindKey) + '">' + esc(kindLbl) + '</span></td>'
         + '<td>' + esc(it.label || '—') + '</td>'
         + '<td style="text-align:right;">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
         + '<td style="text-align:right;font-weight:700;">' + n2(it.total_amount, 2)
-        +   ' <span class="dc-tile-cur">' + esc(it.currency || 'RON') + '</span></td>'
+        +   ' <span class="dc-tile-cur">' + esc(it.currency || 'RON') + '</span>' + allocNote + '</td>'
         + '</tr>';
     }).join('') || '<tr><td colspan="5" class="text-muted" style="padding:10px;text-align:center;">'
         + t('fe.de.empty') + '</td></tr>';
@@ -1739,24 +1748,13 @@
     });
   }
 
-  // ── Sor-szintű gyors kifizetés: a járandóság-tétel összegével + valutájával ──
-  // Ugyanazt a `dcOpenPayment` modált nyitjuk (partial módban), majd az összeg +
-  // valuta mezőt az adott tétel értékére állítjuk. A note-ba is előtöltjük a
-  // sor címkéjét, hogy vissza lehessen keresni, MELYIK járandóságra ment ki.
+  // ── Sor-szintű gyors kifizetés (💰): a vezetett allokáció-modált nyitjuk
+  // az ADOTT tételre fókuszálva (a tétel hátraléka előtöltve, bepipálva).
+  // Innen a kezelő részlegesen is fizethet, és a hozzárendelés a
+  // dokumentumokon is látszik (melyik havi járandóságot fedezi).
   function dcPayRow(earningId, amount, currency) {
     if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
-    if (!_dcBalance) { toast(t('fe.dc.loadFirst'), 'err'); return; }
-    dcOpenPayment('partial');
-    // A modal DOM-mezői ekkor már léteznek
-    setTimeout(function () {
-      var amt = document.getElementById('dcPayAmount');
-      var cur = document.getElementById('dcPayCur');
-      var note = document.getElementById('dcPayNote');
-      if (amt) { amt.value = String(amount); }
-      if (cur) { cur.value = currency || 'RON'; cur.dataset.userSet = '1'; }
-      if (note && !note.value) { note.value = t('fe.pm.rowNotePrefix') + ' #' + earningId; }
-      dcPayRecalc();
-    }, 0);
+    dcAllocOpen('partial', earningId);
   }
 
   // ── Egyéni járandóság-típusok kezelője (modal: lista + új-form) ──
@@ -2082,6 +2080,392 @@
         dcClosePayment();
         dcLoad();
       } else toast((r && r.err) || t('common.error'), 'err');
+    });
+  }
+
+  // ═════════════════════════════════════════════════════════════
+  //  VEZETETT kifizetés-ALLOKÁCIÓ modal (💵 Részleges / ✅ Teljes)
+  //  A felhasználó megadja a kifizetést (összeg + valuta + mód + BNR),
+  //  és eldönti, MELYIK havi járandóság(ok)ból mennyit fizet. A tételek
+  //  HÓNAPRA bontva (earning_date, legrégebbi elöl); a „🔄 Auto" gomb a
+  //  legrégebbitől kezdve előtölti (FIFO), ami kézzel felülírható.
+  //  Minden tételnél látszik: hátralék → ebből fizetve → marad.
+  //  Beküldés: earningPaymentGroupCreate({email, allocations[], payments[]}).
+  //  Az allokáció a tétel SAJÁT valutájában íródik, RON-ban tárolódik.
+  // ═════════════════════════════════════════════════════════════
+  var _dcAlloc = null;
+
+  function _dcEnsureAllocModal() {
+    if (document.getElementById('dcAllocModal')) return;
+    var m = document.createElement('div');
+    m.id = 'dcAllocModal';
+    m.className = 'modal-back';
+    m.setAttribute('role', 'dialog');
+    m.innerHTML =
+      '<div class="modal glass dc-alloc-modal">'
+      +   '<div class="dc-pay-head">'
+      +     '<h3 id="dcAllocTitle" class="text-primary" style="margin:0;font-size:18px;">💵</h3>'
+      +     '<button class="btn ghost" style="padding:4px 10px;" onclick="FleetExtra.dcAllocClose()">✕</button>'
+      +   '</div>'
+      +   '<div id="dcAllocBody"></div>'
+      + '</div>';
+    m.addEventListener('mousedown', function (ev) { if (ev.target === m) dcAllocClose(); });
+    document.body.appendChild(m);
+  }
+  function dcAllocClose() {
+    var m = document.getElementById('dcAllocModal');
+    if (m) m.classList.remove('open');
+    _dcAlloc = null;
+  }
+
+  // Aktuális kifizetés RON-egyenértéke a modal állapotából
+  function _dcAllocPayRon() {
+    if (!_dcAlloc) return 0;
+    var amt = parseFloat(_dcAlloc.pay.amount) || 0;
+    var bnr = parseFloat(_dcAlloc.pay.bnr) || _dcAlloc.bnr || null;
+    return (_dcAlloc.pay.currency === 'RON') ? amt : (bnr != null ? amt * bnr : amt);
+  }
+  function _dcAllocOwnToRon(cur, amt) {
+    var bnr = (_dcAlloc && (parseFloat(_dcAlloc.pay.bnr) || _dcAlloc.bnr)) || null;
+    return (String(cur || 'RON').toUpperCase() === 'RON') ? (amt || 0) : (bnr != null ? (amt || 0) * bnr : (amt || 0));
+  }
+  function _dcAllocRonToOwn(cur, ron) {
+    var bnr = (_dcAlloc && (parseFloat(_dcAlloc.pay.bnr) || _dcAlloc.bnr)) || null;
+    return (String(cur || 'RON').toUpperCase() === 'RON') ? (ron || 0) : (bnr != null ? (ron || 0) / bnr : (ron || 0));
+  }
+  function _round2c(v) { return Math.round((+v || 0) * 100) / 100; }
+  function _dcMonthLabel(key) {
+    if (!/^\d{4}-\d{2}$/.test(key || '')) return key || '—';
+    return key.slice(0, 4) + '. ' + key.slice(5, 7) + '.';
+  }
+  // Egy kifizetés FEDEZETÉNEK olvasható szövege (mit fizetett): hónap szerint
+  // csoportosítva „YYYY. MM.: Típus (címke), …". A dokumentumokon jelenik meg,
+  // hogy MELYIK havi járandóságot fedezte az adott kifizetés.
+  function _dcCoversText(covers) {
+    if (!covers || !covers.length) return '';
+    var byMonth = {};
+    covers.forEach(function (cv) {
+      var mk = cv.month || String(cv.earning_date || '').slice(0, 7);
+      if (!byMonth[mk]) byMonth[mk] = [];
+      var lbl = (_dcBuiltinKinds.indexOf(cv.kind || 'other') >= 0)
+        ? t('fe.de.kind.' + (cv.kind || 'other')) : (cv.kind || 'other');
+      if (cv.label) lbl += ' (' + cv.label + ')';
+      byMonth[mk].push(lbl);
+    });
+    return Object.keys(byMonth).sort().map(function (mk) {
+      return _dcMonthLabel(mk) + ': ' + byMonth[mk].join(', ');
+    }).join(' · ');
+  }
+  // Egy earning aktuális tervezett allokációja (saját valutában)
+  function _dcAllocItemVal(eid) {
+    return (_dcAlloc && _dcAlloc.alloc[eid] != null) ? _dcAlloc.alloc[eid] : 0;
+  }
+
+  // mode: 'partial' | 'full'; focusEarningId: opcionális (sor-szintű 💰)
+  function dcAllocOpen(mode, focusEarningId) {
+    if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    gas('getDriverEarningAllocation', [{ email: _dcCurrent.email }]).then(function (r) {
+      if (!r || !r.ok) { toast((r && r.err) || t('common.error'), 'err'); return; }
+      if (!r.months || !r.months.length) {
+        // Nincs kifizetetlen járandóság → sima (előleg) kifizetés a régi modállal
+        toast(t('fe.al.noUnpaid'), 'info');
+        dcOpenPayment(mode === 'full' ? 'full' : 'partial');
+        return;
+      }
+      var bnr = r.bnr_rate;
+      _dcAlloc = {
+        mode: mode || 'partial',
+        bnr: bnr, bnr_source: r.bnr_source,
+        months: r.months,
+        total_remaining_ron: r.total_remaining_ron,
+        alloc: {},
+        pay: {
+          amount: '', currency: 'RON', method: 'cash',
+          paid_at: today(), bnr: (bnr != null ? bnr : (_dcOfLastManualBnr() || '')),
+        },
+      };
+      // 'full' → alapból a teljes hátralékot fizetjük (RON), FIFO-kitöltve
+      if (mode === 'full') { _dcAlloc.pay.amount = _round2c(r.total_remaining_ron); }
+      // Sor-szintű 💰 → az adott tételre fókusz: azt teljesen betöltjük
+      var focusItem = null;
+      if (focusEarningId != null) {
+        for (var mi = 0; mi < r.months.length && !focusItem; mi++) {
+          focusItem = (r.months[mi].items || []).find(function (x) { return x.id === focusEarningId; }) || null;
+        }
+      }
+      _dcEnsureAllocModal();
+      _dcAllocRender();
+      document.getElementById('dcAllocModal').classList.add('open');
+      if (focusItem) {
+        _dcAlloc.pay.currency = focusItem.currency;
+        _dcAlloc.pay.amount = _round2c(focusItem.remaining_cur);
+        _dcAlloc.alloc[focusItem.id] = _round2c(focusItem.remaining_cur);
+        _dcAllocRender();
+      } else if (mode === 'full') {
+        dcAllocAutoFill();
+      } else {
+        _dcAllocRecalc();
+      }
+    });
+  }
+
+  function _dcAllocRender() {
+    var a = _dcAlloc; if (!a) return;
+    var titleEl = document.getElementById('dcAllocTitle');
+    if (titleEl) titleEl.textContent = (a.mode === 'full' ? '✅ ' : '💵 ')
+      + t(a.mode === 'full' ? 'fe.al.titleFull' : 'fe.al.titlePartial')
+      + ' — ' + (_dcCurrent.nume || _dcCurrent.email);
+
+    var bnrWarn = (a.bnr == null && (parseFloat(a.pay.bnr) || 0) <= 0)
+      ? '<span class="dc-al-warn">⚠️ ' + esc(t('fe.dc.bnrNa')) + '</span>' : '';
+
+    // Kifizetés-kártya (összeg + valuta + mód + dátum + BNR + Auto gomb)
+    var payCard =
+      '<div class="dc-al-card dc-al-paycard">'
+      + '<div class="dc-al-card-h">💰 ' + t('fe.al.payHead') + '</div>'
+      + '<div class="dc-al-pgrid">'
+      +   '<div class="field" style="margin:0;"><label>' + t('fe.pm.amount') + '</label>'
+      +     '<input class="input" id="dcAlAmount" type="number" min="0" step="0.01" value="'
+      +       (a.pay.amount !== '' ? a.pay.amount : '') + '" oninput="FleetExtra.dcAllocPayChange()"></div>'
+      +   '<div class="field" style="margin:0;"><label>' + t('fe.pm.currencyLbl') + '</label>'
+      +     '<select class="select" id="dcAlCur" onchange="FleetExtra.dcAllocPayChange()">'
+      +       '<option value="RON"' + (a.pay.currency === 'RON' ? ' selected' : '') + '>RON</option>'
+      +       '<option value="EUR"' + (a.pay.currency === 'EUR' ? ' selected' : '') + '>EUR</option>'
+      +     '</select></div>'
+      +   '<div class="field" style="margin:0;"><label>' + t('fe.pm.methodLbl') + '</label>'
+      +     '<select class="select" id="dcAlMethod">'
+      +       '<option value="cash">' + esc(t('fe.pm.method.cash')) + '</option>'
+      +       '<option value="bank"' + (a.pay.method === 'bank' ? ' selected' : '') + '>' + esc(t('fe.pm.method.bank')) + '</option>'
+      +       '<option value="card"' + (a.pay.method === 'card' ? ' selected' : '') + '>' + esc(t('fe.pm.method.card')) + '</option>'
+      +       '<option value="other"' + (a.pay.method === 'other' ? ' selected' : '') + '>' + esc(t('fe.pm.method.other')) + '</option>'
+      +     '</select></div>'
+      +   '<div class="field" style="margin:0;"><label>' + t('fe.pm.paidAt') + '</label>'
+      +     '<input class="input" id="dcAlDate" type="date" value="' + esc(a.pay.paid_at) + '"></div>'
+      +   '<div class="field" style="margin:0;"><label>🏦 ' + t('fe.dc.bnrToday') + '</label>'
+      +     '<input class="input" id="dcAlBnr" type="number" min="0" step="0.0001" placeholder="ex. 5.20" value="'
+      +       (a.pay.bnr !== '' && a.pay.bnr != null ? a.pay.bnr : '') + '" oninput="FleetExtra.dcAllocPayChange()"></div>'
+      +   '<div class="field" style="margin:0;grid-column:1/-1;"><label>' + t('fld.note') + '</label>'
+      +     '<input class="input" id="dcAlNote" placeholder="' + t('fe.pm.notePh') + '"></div>'
+      + '</div>'
+      + '<div class="dc-al-payfoot">'
+      +   '<button class="btn ghost" onclick="FleetExtra.dcAllocAutoFill()">🔄 ' + t('fe.al.autoFill') + '</button>'
+      +   bnrWarn
+      + '</div>'
+      + '</div>';
+
+    // Hónap-kártyák (legrégebbi elöl)
+    var monthsHtml = a.months.map(function (m) {
+      var rows = (m.items || []).map(function (it) {
+        var allocVal = _dcAllocItemVal(it.id);
+        var checked = allocVal > 0.005 ? ' checked' : '';
+        var kindLabel = _dcBuiltinKinds.indexOf(it.kind || 'other') >= 0
+          ? t('fe.de.kind.' + (it.kind || 'other')) : (it.kind || 'other');
+        return '<div class="dc-al-item" data-eid="' + it.id + '">'
+          + '<label class="dc-al-chk"><input type="checkbox" id="dcAlChk_' + it.id + '"' + checked
+          +   ' onchange="FleetExtra.dcAllocItemToggle(' + it.id + ')"></label>'
+          + '<div class="dc-al-item-main">'
+          +   '<div class="dc-al-item-t">' + esc(kindLabel) + (it.label ? ' · ' + esc(it.label) : '')
+          +     ' <span class="dc-al-date">' + d2(it.earning_date) + '</span></div>'
+          +   '<div class="dc-al-item-sub">' + t('fe.al.remainLbl') + ': <b>'
+          +     n2(it.remaining_cur, 2) + ' ' + esc(it.currency) + '</b>'
+          +     (it.currency !== 'RON' ? ' <span class="dc-al-ron">(' + n2(it.remaining_ron, 2) + ' RON)</span>' : '')
+          +   '</div>'
+          + '</div>'
+          + '<div class="dc-al-item-pay">'
+          +   '<div class="dc-al-inrow"><input class="input dc-al-amt" id="dcAlItem_' + it.id + '" type="number" min="0" step="0.01" '
+          +     'value="' + (allocVal > 0.005 ? _round2c(allocVal) : '') + '" '
+          +     'data-max="' + _round2c(it.remaining_cur) + '" data-cur="' + esc(it.currency) + '" '
+          +     'oninput="FleetExtra.dcAllocItemInput(' + it.id + ')">'
+          +     '<span class="dc-al-cur">' + esc(it.currency) + '</span></div>'
+          +   '<div class="dc-al-rem" id="dcAlRem_' + it.id + '"></div>'
+          + '</div>'
+          + '</div>';
+      }).join('');
+      return '<div class="dc-al-card dc-al-month">'
+        + '<div class="dc-al-card-h">📅 ' + esc(_dcMonthLabel(m.key))
+        +   ' <span class="dc-al-mrem">' + t('fe.al.remainLbl') + ': ' + n2(m.total_remaining_ron, 2) + ' RON</span></div>'
+        + rows
+        + '</div>';
+    }).join('');
+
+    var summary =
+      '<div class="dc-al-summary" id="dcAlSummary"></div>';
+
+    var foot =
+      '<div class="dc-al-foot">'
+      + '<button class="btn ghost" onclick="FleetExtra.dcAllocClose()">' + t('common.cancel') + '</button>'
+      + '<button class="btn ok" id="dcAlSaveBtn" onclick="FleetExtra.dcAllocSubmit()">✅ ' + t('fe.al.saveBtn') + '</button>'
+      + '</div>';
+
+    var body = document.getElementById('dcAllocBody');
+    if (body) body.innerHTML =
+      '<p class="dc-al-hint text-muted">' + t('fe.al.hint') + '</p>'
+      + payCard + monthsHtml + summary + foot;
+    _dcAllocRecalc();
+  }
+
+  // A kifizetés-mezők állapotba olvasása (nem rendel újra — csak recalc)
+  function _dcAllocReadPay() {
+    if (!_dcAlloc) return;
+    var amt = document.getElementById('dcAlAmount');
+    var cur = document.getElementById('dcAlCur');
+    var met = document.getElementById('dcAlMethod');
+    var dat = document.getElementById('dcAlDate');
+    var bnr = document.getElementById('dcAlBnr');
+    var note = document.getElementById('dcAlNote');
+    if (amt) _dcAlloc.pay.amount = amt.value;
+    if (cur) _dcAlloc.pay.currency = cur.value;
+    if (met) _dcAlloc.pay.method = met.value;
+    if (dat) _dcAlloc.pay.paid_at = dat.value;
+    if (bnr) _dcAlloc.pay.bnr = bnr.value;
+    if (note) _dcAlloc.pay.note = note.value;
+  }
+  function dcAllocPayChange() { _dcAllocReadPay(); _dcAllocRecalc(); }
+
+  // FIFO auto-kitöltés: a kifizetés RON-egyenértékét a legrégebbi tételtől
+  // kezdve szétosztja (kézzel felülírható utána).
+  function dcAllocAutoFill() {
+    if (!_dcAlloc) return;
+    _dcAllocReadPay();
+    var poolRon = _dcAllocPayRon();
+    _dcAlloc.alloc = {};
+    for (var i = 0; i < _dcAlloc.months.length; i++) {
+      var items = _dcAlloc.months[i].items || [];
+      for (var j = 0; j < items.length; j++) {
+        if (poolRon <= 0.005) break;
+        var it = items[j];
+        var need = it.remaining_ron;
+        var take = Math.min(poolRon, need);
+        poolRon = _round2c(poolRon - take);
+        _dcAlloc.alloc[it.id] = _round2c(_dcAllocRonToOwn(it.currency, take));
+      }
+    }
+    _dcAllocRender();
+  }
+
+  // Checkbox: be → a tétel teljes hátralékát betölti; ki → 0
+  function dcAllocItemToggle(eid) {
+    if (!_dcAlloc) return;
+    _dcAllocReadPay();
+    var chk = document.getElementById('dcAlChk_' + eid);
+    var it = _dcAllocFindItem(eid);
+    if (!it) return;
+    if (chk && chk.checked) _dcAlloc.alloc[eid] = _round2c(it.remaining_cur);
+    else delete _dcAlloc.alloc[eid];
+    var inp = document.getElementById('dcAlItem_' + eid);
+    if (inp) inp.value = (_dcAlloc.alloc[eid] != null && _dcAlloc.alloc[eid] > 0.005) ? _round2c(_dcAlloc.alloc[eid]) : '';
+    _dcAllocRecalc();
+  }
+  // Kézi összeg-bevitel egy tételre (saját valutában; hátralékra vágva)
+  function dcAllocItemInput(eid) {
+    if (!_dcAlloc) return;
+    var inp = document.getElementById('dcAlItem_' + eid);
+    var it = _dcAllocFindItem(eid);
+    if (!inp || !it) return;
+    var v = parseFloat(inp.value);
+    if (!isFinite(v) || v < 0) v = 0;
+    var max = _round2c(it.remaining_cur);
+    if (v > max) { v = max; inp.value = max; }   // nem lehet több a hátraléknál
+    if (v > 0.005) _dcAlloc.alloc[eid] = _round2c(v); else delete _dcAlloc.alloc[eid];
+    var chk = document.getElementById('dcAlChk_' + eid);
+    if (chk) chk.checked = v > 0.005;
+    _dcAllocRecalc();
+  }
+  function _dcAllocFindItem(eid) {
+    if (!_dcAlloc) return null;
+    for (var i = 0; i < _dcAlloc.months.length; i++) {
+      var f = (_dcAlloc.months[i].items || []).find(function (x) { return x.id === eid; });
+      if (f) return f;
+    }
+    return null;
+  }
+
+  function _dcAllocRecalc() {
+    if (!_dcAlloc) return;
+    var payRon = _dcAllocPayRon();
+    var allocRon = 0;
+    // per-tétel „marad" frissítés
+    for (var i = 0; i < _dcAlloc.months.length; i++) {
+      var items = _dcAlloc.months[i].items || [];
+      for (var j = 0; j < items.length; j++) {
+        var it = items[j];
+        var ownAlloc = _dcAllocItemVal(it.id);
+        var ronAlloc = _dcAllocOwnToRon(it.currency, ownAlloc);
+        allocRon += ronAlloc;
+        var remEl = document.getElementById('dcAlRem_' + it.id);
+        if (remEl) {
+          if (ownAlloc > 0.005) {
+            var remainAfter = _round2c(it.remaining_cur - ownAlloc);
+            remEl.innerHTML = '<span class="dc-al-paid">−' + n2(ownAlloc, 2) + ' ' + esc(it.currency) + '</span> · '
+              + t('fe.al.staysLbl') + ': <b>' + n2(remainAfter, 2) + ' ' + esc(it.currency) + '</b>';
+          } else { remEl.innerHTML = ''; }
+        }
+      }
+    }
+    allocRon = _round2c(allocRon);
+    var leftover = _round2c(payRon - allocRon);
+    var sumEl = document.getElementById('dcAlSummary');
+    if (sumEl) {
+      var leftClass = leftover < -0.01 ? 'dc-al-over' : (leftover > 0.01 ? 'dc-al-left' : 'dc-al-ok');
+      var leftLabel = leftover < -0.01 ? t('fe.al.over') : (leftover > 0.01 ? t('fe.al.leftover') : t('fe.al.balanced'));
+      sumEl.innerHTML =
+        '<div class="dc-al-sumline"><span>' + t('fe.al.paySum') + ':</span> <b>' + n2(payRon, 2) + ' RON</b></div>'
+        + '<div class="dc-al-sumline"><span>' + t('fe.al.allocSum') + ':</span> <b>' + n2(allocRon, 2) + ' RON</b></div>'
+        + '<div class="dc-al-sumline ' + leftClass + '"><span>' + leftLabel + ':</span> <b>'
+        +   n2(Math.abs(leftover), 2) + ' RON</b></div>';
+    }
+    // Mentés engedélyezése: van allokáció ÉS nincs túl-allokálás a kifizetéshez
+    var saveBtn = document.getElementById('dcAlSaveBtn');
+    if (saveBtn) {
+      var ok = allocRon > 0.005 && leftover >= -0.01;
+      saveBtn.disabled = !ok;
+      saveBtn.style.opacity = ok ? '' : '0.5';
+      saveBtn.style.cursor = ok ? '' : 'not-allowed';
+    }
+  }
+
+  function dcAllocSubmit() {
+    if (!_dcAlloc) return;
+    _dcAllocReadPay();
+    var payAmt = parseFloat(_dcAlloc.pay.amount) || 0;
+    if (payAmt <= 0) { toast(t('fe.pm.invalidAmount'), 'err'); return; }
+    var allocations = [];
+    for (var i = 0; i < _dcAlloc.months.length; i++) {
+      var items = _dcAlloc.months[i].items || [];
+      for (var j = 0; j < items.length; j++) {
+        var it = items[j];
+        var ownAlloc = _dcAllocItemVal(it.id);
+        if (ownAlloc > 0.005) {
+          allocations.push({ earning_id: it.id, alloc_ron: _round2c(_dcAllocOwnToRon(it.currency, ownAlloc)) });
+        }
+      }
+    }
+    if (!allocations.length) { toast(t('fe.al.pickAtLeastOne'), 'err'); return; }
+    var bnrVal = parseFloat(_dcAlloc.pay.bnr) || _dcAlloc.bnr || null;
+    var payload = {
+      email_sofer: _dcCurrent.email,
+      allocations: allocations,
+      paid_at: _dcAlloc.pay.paid_at,
+      note: _dcAlloc.pay.note || '',
+      payments: [{
+        method: _dcAlloc.pay.method,
+        amount: payAmt,
+        currency: _dcAlloc.pay.currency,
+        bnr_rate: bnrVal,
+        paid_at: _dcAlloc.pay.paid_at,
+      }],
+    };
+    if (bnrVal != null) { _dcOfSaveManualBnr(bnrVal); }
+    var btn = document.getElementById('dcAlSaveBtn'); if (btn) btn.disabled = true;
+    gas('earningPaymentGroupCreate', [payload]).then(function (r) {
+      if (r && r.ok) {
+        toast(t('fe.pm.saved'), 'ok');
+        dcAllocClose();
+        dcLoad();
+      } else {
+        toast((r && r.err) || t('common.error'), 'err');
+        if (btn) btn.disabled = false;
+      }
     });
   }
 
@@ -2520,12 +2904,17 @@
         var lang = (window.I18N && window.I18N.getLang && window.I18N.getLang()) || 'ro';
         kindLabel = found ? ((lang === 'hu' && found.label_hu) ? found.label_hu : (found.label_ro || kindKey)) : kindKey;
       }
+      // Ha részlegesen lett kifizetve ebből a csoportból, kiírjuk mennyit
+      // allokáltunk erre a tételre (RON-egyenérték). NULL = teljes tétel.
+      var allocNote = (it.alloc_ron != null)
+        ? '<div style="font-size:10px;color:#1d4ed8;">' + t('fe.al.paidThis') + ': ' + n2(it.alloc_ron, 2) + ' RON</div>'
+        : '';
       return '<tr>'
         + '<td>' + d2(it.earning_date) + '</td>'
         + '<td>' + esc(kindLabel) + '</td>'
         + '<td>' + esc(it.label || '—') + '</td>'
         + '<td class="r">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
-        + '<td class="r"><b>' + n2(it.total_amount, 2) + ' ' + esc(it.currency || 'RON') + '</b></td>'
+        + '<td class="r"><b>' + n2(it.total_amount, 2) + ' ' + esc(it.currency || 'RON') + '</b>' + allocNote + '</td>'
         + '</tr>';
     }).join('');
     var eSumRows = Object.keys(eSum).map(function (cur) {
@@ -3241,16 +3630,21 @@
 
     // Kifizetés-sorok
     var pRows = (r.payments || []).map(function (it) {
+      var covTxt = _dcCoversText(it.covers);
+      var covRow = covTxt
+        ? '<tr><td colspan="5" style="padding:0 8px 8px;border-bottom:1px solid #e5e7eb;color:#1d4ed8;font-size:11px;">'
+          + '↳ ' + t('fe.al.coversLbl') + ': ' + esc(covTxt) + '</td></tr>'
+        : '';
       return '<tr>'
-        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + d2(it.paid_at) + '</td>'
-        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(t('fe.pm.method.' + (it.method || 'cash'))) + '</td>'
-        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">'
+        + '<td style="padding:6px 8px;' + (covTxt ? '' : 'border-bottom:1px solid #e5e7eb;') + '">' + d2(it.paid_at) + '</td>'
+        + '<td style="padding:6px 8px;' + (covTxt ? '' : 'border-bottom:1px solid #e5e7eb;') + '">' + esc(t('fe.pm.method.' + (it.method || 'cash'))) + '</td>'
+        + '<td style="padding:6px 8px;' + (covTxt ? '' : 'border-bottom:1px solid #e5e7eb;') + 'text-align:right;font-weight:700;">'
         +   n2(it.amount, 2) + ' ' + esc(it.currency || 'RON') + '</td>'
-        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;color:#6b7280;font-size:11px;">'
+        + '<td style="padding:6px 8px;' + (covTxt ? '' : 'border-bottom:1px solid #e5e7eb;') + 'text-align:right;color:#6b7280;font-size:11px;">'
         +   (it.bnr_rate != null ? '1 EUR = ' + n2(it.bnr_rate, 4) : '—') + '</td>'
-        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;color:#6b7280;font-size:11px;">'
+        + '<td style="padding:6px 8px;' + (covTxt ? '' : 'border-bottom:1px solid #e5e7eb;') + 'text-align:right;color:#6b7280;font-size:11px;">'
         +   (it.amount_ron != null ? '= ' + n2(it.amount_ron, 2) + ' RON' : '') + '</td>'
-        + '</tr>';
+        + '</tr>' + covRow;
     }).join('') || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#6b7280;font-style:italic;">' + t('fe.pm.empty') + '</td></tr>';
 
     // Egységes hivatalos cég-fejléc — CUI · J (Reg.Com.) · ☏ tel · ✉ email
@@ -4191,6 +4585,15 @@
     dcPayBnrChange: dcPayBnrChange,
     dcPaySubmit: dcPaySubmit,
     dcPayDelete: dcPayDelete,
+    // Vezetett kifizetés-allokáció (💵 Részleges / ✅ Teljes → melyik havi
+    // járandóságból mennyit, FIFO-előtöltéssel, részleges levonással)
+    dcAllocOpen: dcAllocOpen,
+    dcAllocClose: dcAllocClose,
+    dcAllocPayChange: dcAllocPayChange,
+    dcAllocAutoFill: dcAllocAutoFill,
+    dcAllocItemToggle: dcAllocItemToggle,
+    dcAllocItemInput: dcAllocItemInput,
+    dcAllocSubmit: dcAllocSubmit,
     // Sor-szintű kifizetés (💰) + egyéni típus-kezelő (⚙️)
     dcPayRow: dcPayRow,
     dcKindManage: dcKindManage,
