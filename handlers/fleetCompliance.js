@@ -1507,6 +1507,41 @@ handlers.getDriverBalance = async function (req, res, args) {
     const bnrInfo = await _getEffectiveBnr(cid);
     const bnrRate = bnrInfo.rate;
 
+    // ── A KIVÁLASZTOTT IDŐSZAK tételeinek ELSZÁMOLTSÁGA (allokáció) ──
+    // A gyors-kimutató (a UI 3 csempéje) UGYANAZT a motort használja, mint a
+    // hivatalos havi lap (getMonthlySettlementSheet) → a képernyős kártya és a
+    // nyomtatott dokumentum MINDIG egyezik. Így a „kifizetve" az IDŐSZAK
+    // tételeire ténylegesen allokált összeget mutatja (same-month-first), NEM a
+    // nyers, paid_at szerinti összes kifizetést (amiben más hónap tétele is
+    // lehet). Best-effort: ha a motor elhasal, a kliens a régi paid/balance
+    // mezőkre esik vissza.
+    let settledPeriod = null, remainingPeriod = null;
+    try {
+      const { alloc } = await _allocateDriver(cid, email, bnrRate);
+      const perR = await pool.query(
+        `SELECT id, COALESCE(currency,'RON') AS currency, total_amount
+           FROM driver_earnings
+          WHERE company_id=$1 AND LOWER(email_sofer)=$2
+            AND earning_date >= $3 AND earning_date <= $4`,
+        [cid, email, from, to]);
+      const sCur = { EUR: 0, RON: 0 }, rCur = { EUR: 0, RON: 0 };
+      let sRon = 0, rRon = 0;
+      for (const r of perR.rows) {
+        const c = _cur(r.currency);
+        const amt = parseFloat(r.total_amount || 0);
+        const needRon = (c === 'RON') ? amt : (bnrRate != null ? amt * bnrRate : amt);
+        const a = alloc.get(r.id);
+        const sr = a ? Math.min(a.settled_ron, needRon) : 0;
+        const rr = Math.max(0, needRon - sr);
+        sRon += sr; rRon += rr;
+        if (c === 'RON') { sCur.RON += sr; rCur.RON += rr; }
+        else if (bnrRate != null) { sCur.EUR += sr / bnrRate; rCur.EUR += rr / bnrRate; }
+        else { sCur.EUR += sr; rCur.EUR += rr; }
+      }
+      settledPeriod   = { eur: _round2(sCur.EUR), ron: _round2(sCur.RON), combined_ron: _round2(sRon) };
+      remainingPeriod = { eur: _round2(rCur.EUR), ron: _round2(rCur.RON), combined_ron: _round2(rRon) };
+    } catch (_e) { settledPeriod = null; remainingPeriod = null; }
+
     // Nyers (valuta-specifikus) egyenleg
     const balEurRaw = _round2((earned.EUR || 0) - (paid.EUR || 0));
     const balRonRaw = _round2((earned.RON || 0) - (paid.RON || 0));
@@ -1556,6 +1591,11 @@ handlers.getDriverBalance = async function (req, res, args) {
         cross_ron_to_eur: crossRonToEur,
         cross_eur_to_ron: crossEurToRon
       },
+      // Az IDŐSZAK tételeinek allokáció-alapú elszámoltsága (a hivatalos lappal
+      // AZONOS forrás). A UI gyors-kimutató ezt preferálja a nyers paid/balance
+      // helyett → a képernyős kártya ≡ a nyomtatott dokumentum.
+      settled_period: settledPeriod,
+      remaining_period: remainingPeriod,
       bnr_rate: bnrRate,
       bnr_source: bnrInfo.source
     } });

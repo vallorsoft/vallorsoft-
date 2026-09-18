@@ -14,6 +14,17 @@
 
 ---
 
+## 2026-09-18 — FIX: Sofőr-elszámolás gyors-kimutató (a 3 csempe) az IDŐSZAK tételeit allokáció-alapon mutatja — a képernyős kártya ≡ a nyomtatott lap
+
+**Kérés (képpel — a részletes nézet egyenleg-csempéi):** „A kis statisztikai / gyors kimutató nem mutat jól — azt veszi, ami a TELJES összeg volt kiírva és kifizetve, nem a beírt hónapot."
+
+1. **Gyökér:** a `getDriverBalance` (a 📥 JÁRANDÓSÁG / 💸 KIFIZETVE / ⚖️ HÁTRALÉK csempék forrása) az időszakra szűrt ugyan (earning_date / paid_at), de a KIFIZETVE csempe a **nyers, paid_at szerinti ÖSSZES** havi kifizetést mutatta (137+800+2500 = 3437 RON), amiben a más hónap (augusztus) tételére szánt kifizetés is benne volt → a HÁTRALÉK cross-currency beszámítással 793 EUR-t adott. Ez ELTÉRT a most már allokáció-alapú (same-month-first) nyomtatott laptól → a felhasználó két különböző számot látott ugyanarra a sofőrre/hónapra.
+2. **Fix — közös allokáció-motor** (`handlers/fleetCompliance.js` `getDriverBalance`): a válasz két új mezőt kap — `settled_period` + `remaining_period` — amelyeket a `_allocateDriver` motorból számol a KIVÁLASZTOTT IDŐSZAK tételeire (pontosan úgy, ahogy a `getMonthlySettlementSheet`). Így a gyors-kimutató és a hivatalos lap MINDIG egyezik. A régi `paid`/`balance` mező érintetlen (a legacy előleg-kifizetés modál — `dcOpenPayment` — továbbra is arra épül).
+3. **Kliens** (`public/fleet-extra-v2.js` `_dcBalanceCard`): ha a szerver adja a `settled_period`/`remaining_period`-et, a 💸 KIFIZETVE csempe az **időszak tételeire ALLOKÁLT** összeget, a ⚖️ HÁTRALÉK az **időszak tételeiből fennmaradót** mutatja (valutánként, mint a lapon). Allokáció-módban nincs cross-netting (minden tétel maradéka a saját valutájában marad — a lappal azonos); a kombinált RON-sor a `remaining_period.combined_ron`-ból. Régi szerver / migráció-hiány → visszaesik a nyers `paid`/`balance` + cross-currency megjelenítésre.
+4. **Teszt:** `driver-earnings-payments.test.js` +1 eset (same-month-first időszak-allokáció: a szept. kifizetés a szept. tételre megy, a KIFIZETVE 480 EUR = 2515 RON, HÁTRALÉK 0 — nem a nyers 3437). **1270 Jest zöld** (1269 → 1270). Cache-bust `?v=20260918dcperiod` (admin.html + manager.html). Tisztán szerver+kliens megjelenítés, nincs séma-változás.
+
+---
+
 ## 2026-09-18 — FIX: Sofőr-elszámolás — a kifizetés a SAJÁT HAVI járandóságát fedezi előbb (nem viszi el a régebbi hónap elmaradása) + „mit fedez" a SOLO kifizetéseken is
 
 **Kérés (képekkel — Havi elszámolás-lap · Gondos Imre · Szeptember 2026):** „A beállított dátumra nem jól írja a fennmaradt járandóságot — a múlt havi kifizetést leveszi, mert az adott hónapba volt kifizetve a múlt havi járandóság."
