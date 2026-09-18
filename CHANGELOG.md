@@ -14,6 +14,19 @@
 
 ---
 
+## 2026-09-18 — FIX: Sofőr-elszámolás — a kifizetés a SAJÁT HAVI járandóságát fedezi előbb (nem viszi el a régebbi hónap elmaradása) + „mit fedez" a SOLO kifizetéseken is
+
+**Kérés (képekkel — Havi elszámolás-lap · Gondos Imre · Szeptember 2026):** „A beállított dátumra nem jól írja a fennmaradt járandóságot — a múlt havi kifizetést leveszi, mert az adott hónapba volt kifizetve a múlt havi járandóság."
+
+1. **Gyökér:** a `computeDriverAllocation` a solo (nem-csoportos) kifizetéseket EGY globális RON-pool-ként a **legrégebbi kifizetetlen tételtől** kezdve osztotta szét. Így a szeptemberben tett 3 kifizetés (137 + 800 + 2500 = 3437 RON) közül 937 RON az **augusztusi** elmaradásra ment, és szeptember csak 2500-at kapott → a Salariu zilnic tévesen 613,60 RON-t (117,10 EUR) mutatott kifizetve (fennmaradó 362,90 EUR).
+2. **Fix — SAME-MONTH-FIRST allokáció** (`handlers/fleetCompliance.js`, `_allocateDriver`): a solo kifizetés ELŐSZÖR a **saját hónapja** (paid_at hónap) tételeit fedezi (a hónapon belül legrégebbi elöl), és CSAK a maradéka csordul át a többi (jellemzően korábbi) hónap kifizetetlen tételeire (szintén legrégebbi elöl). Az augusztusi elmaradás így csak akkor kap a szeptemberi pénzből, ha szeptember már teljesen rendezve van (túlfizetés-átcsordulás). A csoportos (guided) kifizetések explicit `alloc_ron` pre-elszámolása változatlan; a `getDriverBalance` teljes egyenlege (earned − paid) NEM változik — csak a per-hónap attribúció lesz helyes.
+3. **„Mit fedez" a SOLO kifizetéseken is:** a motor mostantól payment-enkénti fedezetet (`paymentCovers`) is ad → a Havi elszámolás-lap (Decont lunar) minden kifizetés-során megjelenik, MELYIK havi járandóságot fedezte az adott solo kifizetés (eddig csak a csoportos kifizetéseken volt „↳ Fedezi: …"). A `getMonthlySettlementSheet` a `_allocateDriver`-ből tölti a solo `covers`-t.
+4. **Migráció-tolerancia** — a csoport pre-elszámolás mostantól akkor is fut, ha az `alloc_ron` oszlop hiányzik (fallback lekérdezés nélküle, mindent teljesnek véve), így a csoport-tétel sosem esik tévesen a solo átcsordulásba.
+5. **Refaktor:** `computeDriverAllocation` → vékony wrapper a `_allocateDriver({alloc, paymentCovers})` fölött (a régi hívók — `earningList`, `getDriverEarningAllocation` — érintetlenek). `_allocateDriver` NEM-enumerable export (nem hívható `/api/execute`-on, teszt eléri).
+6. **Teszt:** új `tests/unit/driver-allocation.test.js` (+5 eset: same-month-first, a régi 613,60-bug NEM fordul elő, solo `paymentCovers` hónap-helyesség, túlfizetés-átcsordulás, csoport pre-elszámolás sértetlensége). **1269 Jest zöld** (1264 → 1269). Tisztán szerver-oldali, nincs séma-változás, nincs kliens-változás (a lap már rendereli a `covers`-t).
+
+---
+
 ## 2026-09-18 — Sofőr-elszámolás: VEZETETT kifizetés-allokáció (melyik havi járandóságból mennyit) + részleges levonás + „mit fedez" minden dokumentumon
 
 **Kérés:** „A kifizetéseknél (az összes fájlra/dokumentumban) írja ki azt is, MI lett kifizetve — pontosabban melyik havi járandóság lett fedezve az adott kifizetéssel. Ha tétel nélkül, csak a Teljes/Részleges gombra kattintok, kérdezze meg, melyik járandóságból fizetek: elsőként melyik havi, majd adja elő az adott hó járandóságait, beikszelve lehessen fizetni; ha a kifizetés nagyobb, kérdezze a többit is; ha kevesebb egy tételnél, abból levon és mindenhol megjeleníti: levonva X / marad Y. Minden kártyás, jól kontrasztolt és világos (kék/fehér/fekete, mint a fuvar-kiírás)." + FIFO előtöltés a legrégebbitől, ami módosítható; a hónap-bontás a járandóság dátuma szerint.

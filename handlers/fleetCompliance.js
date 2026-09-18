@@ -1655,38 +1655,47 @@ handlers.getDriverSettlementOverview = async function (req, res, args) {
 
 // ─────────────────────────────────────────────────────────────
 //  Kifizetés-ELSZÁMOLÁS (allokáció) — a sofőr ÖSSZES járandóságát és
-//  kifizetését GLOBÁLISAN párosítja, hogy a hivatalos havi lap a HÓ
-//  TÉTELEINEK elszámoltságát mutassa (NEM a fizetés dátumát):
+//  kifizetését párosítja, hogy a hivatalos havi lap a HÓ TÉTELEINEK
+//  elszámoltságát mutassa (NEM a fizetés dátumát):
 //    1) a csoportos kifizetéshez (driver_payment_group_items) kötött
 //       tételek → explicit KIFIZETVE (a felhasználó választotta ki);
-//    2) a solo/részleges kifizetések RON-egyenértékben egy „pool"-t
-//       képeznek, amit a MARADÉK kifizetetlen tételekre osztunk
-//       LEGRÉGEBBITŐL kezdve (FIFO — az elmaradt járandóság előbb rendeződik).
-//  Így a szeptemberben kifizetett AUGUSZTUSI járandóság az augusztusi
-//  tételre száll (annak dátumára), és a szeptemberi lapot nem szennyezi.
+//    2) a solo/részleges kifizetés a SAJÁT HAVI tételeit fedezi ELŐSZÖR
+//       (legrégebbi elöl a hónapon belül), és CSAK a maradéka „csordul át"
+//       a többi (jellemzően korábbi) hónap kifizetetlen tételeire —
+//       szintén legrégebbi elöl. Így a szeptemberben tett kifizetés a
+//       SZEPTEMBERI járandóságot fedezi, nem viszi el az augusztusi
+//       elmaradás (a régi globális FIFO ezt tette → felhasználói panasz).
+//       Az augusztusi elmaradás csak akkor kap a szeptemberi pénzből, ha
+//       szeptember már teljesen rendezve van (túlfizetés-átcsordulás).
 //  Csak a MAI vagy múltbeli (paid_at <= CURRENT_DATE) kifizetés számít
 //  (a jövőbeli ütemezett még nincs kifizetve — PR #427 szemantika).
-//  Visszaad: Map<earning_id, { settled_ron, fully }>.
-async function computeDriverAllocation(cid, email, bnrRate) {
+//  Visszaad: { alloc: Map<earning_id,{settled_ron,fully}>,
+//              paymentCovers: Map<payment_id,[{earning_id,month,kind,label,currency,alloc_ron}]> }
+//  (a paymentCovers a SOLO kifizetésekhez ad „mit fedez" bontást — a
+//   csoportos kifizetések fedezetét a hívó a group_items-ből képezi.)
+async function _allocateDriver(cid, email, bnrRate) {
   const alloc = new Map();
+  const paymentCovers = new Map();
   const rate = (bnrRate != null && bnrRate > 0) ? bnrRate : null;
   const r2 = v => Math.round((Number(v) || 0) * 100) / 100;
   const ronEq = (cur, amt) => (String(cur || 'RON').toUpperCase() === 'RON')
     ? Number(amt || 0)
     : (rate != null ? Number(amt || 0) * rate : Number(amt || 0)); // BNR nélkül 1:1 becslés
+  const monthOf = d => String(d || '').slice(0, 7);
   // 1) MINDEN járandóság kronológikus sorrendben (legrégebbi elöl)
   let earns = [];
   try {
     const er = await pool.query(
-      `SELECT id, earning_date, currency, total_amount
+      `SELECT id, earning_date, currency, total_amount, kind, label
          FROM driver_earnings
         WHERE company_id=$1 AND LOWER(email_sofer)=$2
         ORDER BY earning_date ASC, id ASC`,
       [cid, email]);
     earns = er.rows;
-  } catch (_e) { return alloc; }
+  } catch (_e) { return { alloc, paymentCovers }; }
   const needById = new Map();
-  for (const e of earns) needById.set(e.id, ronEq(e.currency, e.total_amount));
+  const earnById = new Map();
+  for (const e of earns) { needById.set(e.id, ronEq(e.currency, e.total_amount)); earnById.set(e.id, e); }
 
   // 2) csoport-tételek allokációval: alloc_ron = ennyi RON erre a tételre
   //    (NULL = TELJES tétel — a régi „egész tétel" viselkedés). Egy tétel
@@ -1695,12 +1704,28 @@ async function computeDriverAllocation(cid, email, bnrRate) {
   const groupedSettled = new Map();       // earning_id -> settled_ron (nem capp-elve még)
   const groupItems = new Map();           // group_id(str) -> [{earning_id, alloc_ron}]
   try {
-    const gi = await pool.query(
-      `SELECT gi.group_id, gi.earning_id, gi.alloc_ron
-         FROM driver_payment_group_items gi
-         JOIN driver_earnings e ON e.id = gi.earning_id
-        WHERE e.company_id=$1 AND LOWER(e.email_sofer)=$2`,
-      [cid, email]);
+    let gi;
+    try {
+      gi = await pool.query(
+        `SELECT gi.group_id, gi.earning_id, gi.alloc_ron
+           FROM driver_payment_group_items gi
+           JOIN driver_earnings e ON e.id = gi.earning_id
+          WHERE e.company_id=$1 AND LOWER(e.email_sofer)=$2`,
+        [cid, email]);
+    } catch (colErr) {
+      // Migráció-tolerancia: ha az `alloc_ron` oszlop még hiányzik, a csoport
+      // pre-elszámolás akkor SE veszhet el (különben a csoport-tétel a solo
+      // átcsordulásba esne). Fallback: alloc_ron nélkül (mindent TELJESNEK
+      // veszünk = a régi „egész tétel" viselkedés).
+      if (/alloc_ron.*does not exist/i.test(colErr.message || '')) {
+        gi = await pool.query(
+          `SELECT gi.group_id, gi.earning_id, NULL::numeric AS alloc_ron
+             FROM driver_payment_group_items gi
+             JOIN driver_earnings e ON e.id = gi.earning_id
+            WHERE e.company_id=$1 AND LOWER(e.email_sofer)=$2`,
+          [cid, email]);
+      } else { throw colErr; }
+    }
     for (const row of gi.rows) {
       const gk = String(row.group_id);
       if (!groupItems.has(gk)) groupItems.set(gk, []);
@@ -1709,23 +1734,40 @@ async function computeDriverAllocation(cid, email, bnrRate) {
       const add = (row.alloc_ron == null) ? need : Number(row.alloc_ron);
       groupedSettled.set(row.earning_id, (groupedSettled.get(row.earning_id) || 0) + add);
     }
-  } catch (_e) { /* nincs csoport-tábla / alloc_ron oszlop — mindent a solo-pool intéz */ }
+  } catch (_e) { /* nincs csoport-tábla — mindent a solo-elszámolás intéz */ }
   for (const [eid, s] of groupedSettled) {
     const need = needById.get(eid) || 0;
     const settled = Math.min(r2(s), need);
     alloc.set(eid, { settled_ron: settled, fully: settled >= need - 0.005 });
   }
 
-  // 3) kifizetések: solo pool + a RÉSZLEGES csoportok fel-nem-osztott maradéka
-  let poolRon = 0;
-  const groupPaidRon = new Map();         // group_id(str) -> effektív kifizetett RON
+  // A tételenkénti fennmaradó (RON) a csoport-elszámolás UTÁN
+  const remain = new Map();               // earning_id -> fennmaradó RON
+  for (const e of earns) {
+    const need = needById.get(e.id) || 0;
+    const already = alloc.has(e.id) ? alloc.get(e.id).settled_ron : 0;
+    remain.set(e.id, r2(Math.max(0, need - already)));
+  }
+  function _settle(eid, take) {
+    const need = needById.get(eid) || 0;
+    const prev = alloc.has(eid) ? alloc.get(eid).settled_ron : 0;
+    const s = r2(Math.min(prev + take, need));
+    alloc.set(eid, { settled_ron: s, fully: s >= need - 0.005 });
+    remain.set(eid, r2(Math.max(0, need - s)));
+  }
+
+  // 3) SOLO kifizetések (nincs group_id) + a RÉSZLEGES csoportok maradéka.
+  //    A solo kifizetést a paid_at hónapjával tartjuk nyilván → SAJÁT-HÓ ELŐSZÖR.
+  let soloPayments = [];                   // {id, month, ron}
+  const groupPaidRon = new Map();          // group_id(str) -> effektív kifizetett RON
   try {
     const pr = await pool.query(
-      `SELECT amount, currency, amount_ron,
+      `SELECT id, paid_at, amount, currency, amount_ron,
               (to_jsonb(driver_payments) ->> 'group_id') AS group_id
          FROM driver_payments
         WHERE company_id=$1 AND LOWER(email_sofer)=$2
-          AND paid_at <= CURRENT_DATE`,
+          AND paid_at <= CURRENT_DATE
+        ORDER BY paid_at ASC, id ASC`,
       [cid, email]);
     for (const p of pr.rows) {
       const cur = String(p.currency || 'RON').toUpperCase();
@@ -1736,13 +1778,13 @@ async function computeDriverAllocation(cid, email, bnrRate) {
         const gk = String(p.group_id);
         groupPaidRon.set(gk, (groupPaidRon.get(gk) || 0) + ron);
       } else {
-        poolRon += ron;                    // önálló (nem-csoportos) kifizetés
+        soloPayments.push({ id: p.id, month: monthOf(p.paid_at), ron: r2(ron) });
       }
     }
-  } catch (_e) { /* nincs driver_payments — pool marad 0 */ }
-  // A RÉSZLEGES csoportok (van non-NULL alloc) fel-nem-osztott maradéka a pool-ba
-  // kerül (FIFO-val a többi tételre); a LEGACY (csupa-NULL) csoport maradékát
-  // NEM bántjuk (megőrizzük a régi viselkedést).
+  } catch (_e) { /* nincs driver_payments — nincs solo elszámolás */ }
+  // A RÉSZLEGES csoportok (van non-NULL alloc) fel-nem-osztott maradéka egy
+  // átcsorduló pool-ba kerül (a LEGACY, csupa-NULL csoportét NEM bántjuk).
+  let leftoverPool = 0;
   for (const [gk, items] of groupItems) {
     const hasPartial = items.some(it => it.alloc_ron != null);
     if (!hasPartial) continue;
@@ -1751,24 +1793,52 @@ async function computeDriverAllocation(cid, email, bnrRate) {
       const need = needById.get(it.earning_id) || 0;
       allocSum += (it.alloc_ron == null) ? need : Number(it.alloc_ron);
     }
-    const leftover = (groupPaidRon.get(gk) || 0) - allocSum;
-    if (leftover > 0.005) poolRon += leftover;
+    const lo = (groupPaidRon.get(gk) || 0) - allocSum;
+    if (lo > 0.005) leftoverPool += lo;
   }
-  poolRon = r2(poolRon);
+  leftoverPool = r2(leftoverPool);
 
-  // 4) FIFO: a maradék pool a még kifizetetlen RÉSZre oszlik (legrégebbi elöl)
-  for (const e of earns) {
-    if (poolRon <= 0.005) break;
-    const need = needById.get(e.id) || 0;
-    if (need <= 0) continue;
-    const already = alloc.has(e.id) ? alloc.get(e.id).settled_ron : 0;
-    const remain = r2(need - already);
-    if (remain <= 0.005) continue;
-    const take = Math.min(poolRon, remain);
-    poolRon = r2(poolRon - take);
-    const settled = r2(already + take);
-    alloc.set(e.id, { settled_ron: settled, fully: settled >= need - 0.005 });
+  // 4) SAJÁT-HÓ ELŐSZÖR, majd ÁTCSORDULÁS. Payment-enként: előbb a kifizetés
+  //    saját hónapjának tételeit fedezi (legrégebbi elöl), majd a maradék a
+  //    többi hónap kifizetetlen tételeire (legrégebbi elöl). A fedezetet
+  //    payment-enként rögzítjük (paymentCovers) → „mit fedez" a dokumentumon.
+  function _apply(pid, amt, sameMonth, pmonth) {
+    for (const e of earns) {
+      if (amt <= 0.005) break;
+      const em = monthOf(e.earning_date);
+      if (sameMonth ? (em !== pmonth) : (em === pmonth)) continue;
+      const rem = remain.get(e.id) || 0;
+      if (rem <= 0.005) continue;
+      const take = r2(Math.min(amt, rem));
+      amt = r2(amt - take);
+      _settle(e.id, take);
+      if (pid != null) {
+        if (!paymentCovers.has(pid)) paymentCovers.set(pid, []);
+        paymentCovers.get(pid).push({
+          earning_id: e.id, month: em, kind: e.kind, label: e.label,
+          currency: e.currency, alloc_ron: take,
+        });
+      }
+    }
+    return amt;
   }
+  for (const p of soloPayments) {
+    let amt = p.ron;
+    amt = _apply(p.id, amt, true, p.month);     // A) saját hónap előbb
+    amt = _apply(p.id, amt, false, p.month);    // B) átcsordulás a többi hónapra
+    // A) túlfizetés (amt > 0) — nincs több kifizetetlen tétel: figyelmen kívül.
+  }
+  // A részleges-csoport maradéka a legrégebbi kifizetetlen tételre (payment-hez
+  // nem kötött átcsordulás — a fedezetét a csoport group_items-e mutatja).
+  if (leftoverPool > 0.005) _apply(null, leftoverPool, false, '\u0000');
+
+  return { alloc, paymentCovers };
+}
+
+// Visszafelé kompatibilis wrapper — csak az alloc Map-et adja (a régi hívók
+// — earningList, getDriverEarningAllocation — ezt várják).
+async function computeDriverAllocation(cid, email, bnrRate) {
+  const { alloc } = await _allocateDriver(cid, email, bnrRate);
   return alloc;
 }
 
@@ -2005,7 +2075,7 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
     // Globális párosítás: csoportos link + solo-pool FIFO a legrégebbi
     // kifizetetlen tételekre. A settled RON-egyenértékben allokálódik,
     // majd a per-valuta megjelenítéshez visszabontjuk a tétel valutájára.
-    const alloc = await computeDriverAllocation(cid, email, bnrRate);
+    const { alloc, paymentCovers } = await _allocateDriver(cid, email, bnrRate);
     const settledCur = { EUR: 0, RON: 0 };
     const remainCur  = { EUR: 0, RON: 0 };
     let settledRon = 0, remainRon = 0;
@@ -2064,12 +2134,19 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
         }
         for (const p of pR.rows) {
           const gk = (p.group_id != null && p.group_id !== '') ? String(p.group_id) : null;
-          p.covers = gk && byGroup.has(gk) ? byGroup.get(gk) : [];
+          // Csoportos → a group_items fedezete; SOLO → az allokáció-motor
+          // payment-enkénti fedezete (melyik havi tételt fedezte a kifizetés).
+          p.covers = (gk && byGroup.has(gk)) ? byGroup.get(gk)
+            : (paymentCovers.get(p.id) || []);
         }
       } else {
-        for (const p of pR.rows) p.covers = [];
+        // Nincs csoportos kifizetés → SOLO fedezet (mit fizetett) minden sorra.
+        for (const p of pR.rows) p.covers = paymentCovers.get(p.id) || [];
       }
-    } catch (_e) { for (const p of pR.rows) p.covers = []; }
+    } catch (_e) {
+      // Legrosszabb esetben is adjunk SOLO-fedezetet, ha van (best-effort).
+      for (const p of pR.rows) p.covers = (paymentCovers && paymentCovers.get(p.id)) || [];
+    }
 
     return res.json({ result: {
       ok: true,
@@ -2397,3 +2474,6 @@ handlers.getGpsKmComparison = async function (req, res, args) {
 // de require-rel a scheduler eléri (services/scheduler.js).
 module.exports = handlers;
 Object.defineProperty(module.exports, 'computeServiceDueAlerts', { enumerable: false, value: computeServiceDueAlerts });
+// A `_allocateDriver` allokáció-motor NEM-enumerable → NEM hívható /api/execute-on
+// át, de require-rel a teszt eléri (same-month-first solo allokáció verifikáció).
+Object.defineProperty(module.exports, '_allocateDriver', { enumerable: false, value: _allocateDriver });
