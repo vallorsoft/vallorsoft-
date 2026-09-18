@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-09-18 — Sofőr-elszámolás: felvett járandóságok szerkeszthetők (✏️ előugró modal) + összecsukható lista (alap: csukva) + EGY „➕ hozzáadás" gomb modallal
+
+**Kérés:** „Felvett járandóságait a sofőrnek lehessen szerkeszteni előugró ablakkal, szerkesztő gombbal; plusz a teljes felvett járandóságok legyen összecsukható (alapból összecsukva); új járandóság felvételéhez pedig csak EGY hozzáadás gomb legyen, és rákattintva ablakba jöjjön elő a beviteli mező — miután beírtam és mentettem, záródjon az ablak."
+
+1. **Járandóság-szerkesztés (✏️ előugró modal)** — új `earningUpdate` handler (`handlers/fleetCompliance.js`, Admin/Manager, `company_id`-szűrt, cross-tenant védelem): a meglévő tétel módosítása (dátum/típus/címke/mennyiség/egységár/pénznem/megjegyzés), a total szerver-oldalon számolódik (`qty × unit`), a kind-fehérlista a create-tel azonos. A **már kifizetett** (csoportba került) tétel NEM szerkeszthető (best-effort `driver_payment_group_items` check, migráció-tudatos). Audit `earning.update`.
+2. **EGY „➕ Járandóság hozzáadása" gomb + előugró modal** — a régi MINDIG-látszó inline felvitel-kártya helyett egyetlen gomb a lista fejlécén → `dcEarnOpen()` a mezőket egy modálban (`#dcEarnModal`) nyitja; mentés után az ablak **záródik** (`dcEarnClose` a sikeres `earningCreate`/`earningUpdate` után) és a lista frissül. Ugyanaz a modal + mezőkészlet szolgál a felvitelre és a szerkesztésre (`_dcEarnEditId` állapot; a mezők input-ID-i változatlanok, így a live-számoló/típus-váltó/⚙️ típus-kezelő a régi módon dolgozik).
+3. **Összecsukható járandóság-lista (alap: csukva)** — a „📥 Felvett járandóságok" panel fejléce kattintható (chevron ▸/▾), `dcEarnListToggle`; alapból csukva (`_dcEarnListOpen=false`). A lista HTML-je csukva is felépül → a `_dcLastEarnItems` feltöltődik (a szerkesztő-modal előtöltéséhez kell). Minden soron ✏️ szerkesztés gomb a 💰 (sor-kifizetés) és ✕ (törlés) mellett.
+4. **CSS** — új `#dcEarnModal`-scope-os szabályok (a mező-rácsokat eddig `#decontBox`-scope stílusozta; a modal a body-hoz fűzött, ezért itt megismételve: `.dc-earn-grid`/`.dc-earn-foot`/`.dc-earn-total`/`.dc-kind-row`/`.dc-kind-add` + világos/sötét), collapsible fejléc hover. **i18n** 4 új kulcs (`fe.de.addBtn`/`editBtn`/`editTitle`/`updated`, RO-alap + HU). Cache-bust `?v=20260918earnedit`.
+5. **Teszt** — `tests/integration/driver-earnings-payments.test.js` +6 eset (`earningUpdate`: szerep-kapu, érvénytelen id, cross-tenant elutasítás company_id-szűrt SELECT-tel, már-kifizetett tiltás, érvénytelen mennyiség, sikeres UPDATE company_id-szűrt WHERE-rel + szerver-oldali total). **1259 Jest zöld** (1253 → 1259), require-sweep tisztán, nincs regresszió. Tisztán a decont felület — nincs séma-változás.
+
+---
+
 ## 2026-09-17 — ÚJ MODUL: Dokumentum-nyilvántartás (Registru documente) — mappás sorszám-nyilvántartás automatikus számozással + fájlfeltöltéssel + keresővel
 
 **Kérés:** „Kell egy új menü, regiszter — dokumentum-sorszámokat lehessen adni dátummal és automatikus sorszámozással, feltöltésekkel. Könnyen kezelhető, átlátható dok-tárolás. A rendszer kezelje a feltöltött dokumentumokat ÉS dokumentum nélküli sorszámokat is adjon ki adott dokumentum-csoportnak. Legyen kereső, ahol csoportokat (mappákat) kereshetünk és ellenőrizhetjük az addigi számokat."

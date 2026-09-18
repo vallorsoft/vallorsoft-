@@ -998,15 +998,15 @@
       // ── 1) EGYENLEG-KÁRTYA (járandóság / kifizetve / hátralék) ──
       var balHtml = _dcBalanceCard(_dcBalance);
 
-      // ── 2) JÁRANDÓSÁG-FELVITEL kártya (MINDIG megjelenik) ──
-      var earnFormHtml = _dcEarningForm(email);
-
-      // ── 3) JÁRANDÓSÁG-LISTA + KIFIZETÉS-LISTA (kártyák) ──
+      // ── JÁRANDÓSÁG-LISTA (összecsukható, alap: csukva) + KIFIZETÉS-LISTA ──
+      // Új felvitel: EGYETLEN ➕ gomb a lista fejlécén → előugró modal.
       var earnItems = (earn && earn.items) || [];
       var payItems  = (pay  && pay.items)  || [];
+      var addEarnBtn = '<button class="btn ok" style="padding:6px 14px;font-size:13px;" '
+        + 'onclick="FleetExtra.dcEarnOpen()">➕ ' + t('fe.de.addBtn') + '</button>';
       var listsHtml =
         '<div class="dc-two-col">'
-        + panel('📥 ' + t('fe.de.listTitle') + ' (' + earnItems.length + ')', _dcEarningListHtml(earnItems))
+        + _dcEarnCollPanel(earnItems, addEarnBtn)
         + panel('💸 ' + t('fe.pm.listTitle') + ' (' + payItems.length + ')',  _dcPaymentListHtml(payItems))
         + '</div>';
 
@@ -1031,13 +1031,48 @@
         panel('👤 ' + esc(_dcCurrent.nume) + ' — ' + d2(from) + ' → ' + d2(to),
           balHtml,
           headActions)
-        + earnFormHtml
         + listsHtml
         + selBar;
-
-      // Live-számoló bekötése (qty × unit)
-      _dcBindLiveCalc();
     });
+  }
+
+  // ── Összecsukható járandóság-lista panel (alap: csukva) ──
+  // A lista HTML-je MINDIG felépül (akkor is, ha csukva) → a `_dcLastEarnItems`
+  // feltöltődik (a szerkesztő-modal előtöltéséhez kell) + a select-bar frissül.
+  var _dcEarnListOpen = false;
+  function _dcEarnCollPanel(items, extraHead) {
+    var open = _dcEarnListOpen;
+    var title = '📥 ' + t('fe.de.listTitle') + ' (' + items.length + ')';
+    return '<div class="glass dc-earn-coll" style="padding:18px;margin-bottom:14px;">'
+      + '<div class="dc-earn-coll-head" style="display:flex;align-items:center;'
+      +   'justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:'
+      +   (open ? '12px' : '0') + ';">'
+      +   '<div class="text-primary dc-earn-coll-toggle" role="button" tabindex="0" '
+      +     'style="font-size:15px;font-weight:700;cursor:pointer;display:flex;'
+      +     'align-items:center;gap:8px;" onclick="FleetExtra.dcEarnListToggle()" '
+      +     'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();FleetExtra.dcEarnListToggle();}">'
+      +     '<span class="dc-earn-coll-chev" style="display:inline-block;'
+      +       'transition:transform .15s;transform:rotate(' + (open ? 90 : 0) + 'deg);">▸</span>'
+      +     '<span>' + title + '</span>'
+      +   '</div>'
+      +   (extraHead || '')
+      + '</div>'
+      + '<div class="dc-earn-coll-body" style="' + (open ? '' : 'display:none;') + '">'
+      +   _dcEarningListHtml(items)
+      + '</div>'
+      + '</div>';
+  }
+  function dcEarnListToggle() {
+    _dcEarnListOpen = !_dcEarnListOpen;
+    var wrap = document.querySelector('#dcResult .dc-earn-coll');
+    if (!wrap) return;
+    var body = wrap.querySelector('.dc-earn-coll-body');
+    var chev = wrap.querySelector('.dc-earn-coll-chev');
+    var head = wrap.querySelector('.dc-earn-coll-head');
+    if (body) body.style.display = _dcEarnListOpen ? '' : 'none';
+    if (chev) chev.style.transform = 'rotate(' + (_dcEarnListOpen ? 90 : 0) + 'deg)';
+    if (head) head.style.marginBottom = _dcEarnListOpen ? '12px' : '0';
+    if (_dcEarnListOpen) setTimeout(_dcSelRefreshBar, 0);
   }
 
   // ── Egyenleg-kártya: színes csempék EUR + RON + kombinált RON ──
@@ -1144,8 +1179,11 @@
   // Kliens-oldali 2-jegyű kerekítés (a szerveres _round2 hívása helyett)
   function _round2Local(v) { return Math.round((+v || 0) * 100) / 100; }
 
-  // ── Járandóság-felvitel kártya (kind + qty × unit_amount + currency) ──
-  function _dcEarningForm(email) {
+  // ── Járandóság-felvitel/-szerkesztés ŰRLAP-TÖRZS (a modal tölti fel) ──
+  // Csak a mezők + a mentés-lábléc + hint; a panel/modal keret külön van.
+  // Az input-ID-k változatlanok (deKind/deLabel/…), így a dcEarnKindChange /
+  // dcEarnRecalc / dcEarnSave a régi módon dolgozik — most a modálon belül.
+  function _dcEarnFormBody() {
     var todayStr = today();
     var body =
       '<div class="dc-earn-grid">'
@@ -1177,7 +1215,75 @@
       + '  <button class="btn ok" onclick="FleetExtra.dcEarnSave()">💾 ' + t('fe.de.saveBtn') + '</button>'
       + '</div>'
       + '<p class="text-muted" style="font-size:12px;margin:8px 0 0;">' + t('fe.de.hint') + '</p>';
-    return panel('➕ ' + t('fe.de.newTitle'), body);
+    return body;
+  }
+
+  // ── Járandóság előugró modal (felvitel ÉS szerkesztés — ugyanaz a mezőkészlet)
+  //  _dcEarnEditId: null = új felvitel, szám = az adott tétel szerkesztése.
+  var _dcEarnEditId = null;
+
+  function _dcEnsureEarnModal() {
+    if (document.getElementById('dcEarnModal')) return;
+    var m = document.createElement('div');
+    m.id = 'dcEarnModal';
+    m.className = 'modal-back';
+    m.setAttribute('role', 'dialog');
+    m.innerHTML =
+      '<div class="modal glass dc-earn-modal">'
+      +   '<div class="dc-pay-head">'
+      +     '<h3 class="text-primary" id="dcEarnModalTitle" style="margin:0;font-size:18px;">➕ '
+      +       t('fe.de.newTitle') + '</h3>'
+      +     '<button class="btn ghost" style="padding:4px 10px;" '
+      +       'onclick="FleetExtra.dcEarnClose()">✕</button>'
+      +   '</div>'
+      +   '<div id="dcEarnModalBody"></div>'
+      + '</div>';
+    m.addEventListener('mousedown', function (ev) { if (ev.target === m) dcEarnClose(); });
+    document.body.appendChild(m);
+  }
+
+  function dcEarnClose() {
+    var m = document.getElementById('dcEarnModal');
+    if (m) m.classList.remove('open');
+    _dcEarnEditId = null;
+  }
+
+  // id megadva → szerkesztés (előtöltve), enélkül → új járandóság.
+  function dcEarnOpen(id) {
+    if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    _dcEnsureEarnModal();
+    _dcEarnEditId = (id != null) ? id : null;
+
+    var body = document.getElementById('dcEarnModalBody');
+    var title = document.getElementById('dcEarnModalTitle');
+    if (body) body.innerHTML = _dcEarnFormBody();
+    if (title) title.textContent = _dcEarnEditId
+      ? ('✏️ ' + t('fe.de.editTitle'))
+      : ('➕ ' + t('fe.de.newTitle'));
+
+    // Szerkesztés: az aktuális lista-tételből előtöltjük a mezőket
+    if (_dcEarnEditId) {
+      var it = _dcLastEarnItems.find(function (x) { return x.id === _dcEarnEditId; });
+      if (it) {
+        var setV = function (elId, val) { var el = document.getElementById(elId); if (el) el.value = (val == null ? '' : val); };
+        setV('deKind', it.kind || 'other');
+        setV('deLabel', it.label || '');
+        setV('deDate', ymd(it.earning_date));
+        setV('deQty', it.quantity);
+        setV('deUnit', it.unit_amount);
+        setV('deCur', it.currency || 'RON');
+        setV('deNote', it.note || '');
+        // A pénznemet a felhasználó által beállítottnak jelöljük → a
+        // dcEarnKindChange NE írja felül a típus-alapú alapértékkel.
+        var cur = document.getElementById('deCur');
+        if (cur) cur.dataset.userSet = '1';
+      }
+    }
+
+    var m = document.getElementById('dcEarnModal');
+    if (m) m.classList.add('open');
+    // Live-számoló + típus-kezelő bekötése (a mezők most a modálban vannak)
+    _dcBindLiveCalc();
   }
 
   // Live-számoló: qty × unit
@@ -1229,14 +1335,13 @@
     if (!parseFloat(f.quantity) || !parseFloat(f.unit_amount)) {
       toast(t('fe.de.invalidAmount'), 'err'); return;
     }
-    gas('earningCreate', [f]).then(function (r) {
+    var editId = _dcEarnEditId;
+    var fn = editId ? 'earningUpdate' : 'earningCreate';
+    if (editId) f.id = editId;
+    gas(fn, [f]).then(function (r) {
       if (r && r.ok) {
-        toast(t('fe.de.saved'), 'ok');
-        // Űrlap tisztítás (label + qty visszaáll 1-re + unit üres)
-        var lab = document.getElementById('deLabel'); if (lab) lab.value = '';
-        var qty = document.getElementById('deQty'); if (qty) qty.value = '1';
-        var uni = document.getElementById('deUnit'); if (uni) uni.value = '';
-        var note = document.getElementById('deNote'); if (note) note.value = '';
+        toast(editId ? t('fe.de.updated') : t('fe.de.saved'), 'ok');
+        dcEarnClose();   // beírtam + mentettem → az ablak záródik
         dcLoad();
       } else toast((r && r.err) || t('common.error'), 'err');
     });
@@ -1370,7 +1475,11 @@
         +   '<button class="btn ok" style="padding:3px 9px;font-size:12px;margin-right:4px;" '
         +     'title="' + t('fe.pm.payRow') + '" '
         +     'onclick="FleetExtra.dcPayRow(' + it.id + ',' + amount + ',\'' + esc(cur) + '\')">💰</button>'
+        +   '<button class="btn ghost" style="padding:3px 9px;font-size:12px;margin-right:4px;" '
+        +     'title="' + t('fe.de.editBtn') + '" '
+        +     'onclick="FleetExtra.dcEarnOpen(' + it.id + ')">✏️</button>'
         +   '<button class="btn danger" style="padding:3px 9px;font-size:12px;" '
+        +     'title="' + t('common.delete') + '" '
         +     'onclick="FleetExtra.dcEarnDelete(' + it.id + ')">✕</button></td>'
         + '</tr>';
     }).join('');
@@ -4071,6 +4180,10 @@
     dcEarnRecalc: dcEarnRecalc,
     dcEarnSave: dcEarnSave,
     dcEarnDelete: dcEarnDelete,
+    // Járandóság előugró modal (felvitel + szerkesztés) + összecsukható lista
+    dcEarnOpen: dcEarnOpen,
+    dcEarnClose: dcEarnClose,
+    dcEarnListToggle: dcEarnListToggle,
     dcOpenPayment: dcOpenPayment,
     dcClosePayment: dcClosePayment,
     dcPayCurChange: dcPayCurChange,

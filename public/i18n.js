@@ -2848,6 +2848,10 @@
 
     // Járandóság (earnings)
     'fe.de.newTitle':   { ro: 'Adăugare drept (bonus / diurnă / per diem / altele)', hu: 'Járandóság felvitele (bónusz / diurna / per diem / egyéb)' },
+    'fe.de.editTitle':  { ro: 'Editare drept', hu: 'Járandóság szerkesztése' },
+    'fe.de.addBtn':     { ro: '➕ Adaugă drept', hu: '➕ Járandóság hozzáadása' },
+    'fe.de.editBtn':    { ro: 'Editează', hu: 'Szerkesztés' },
+    'fe.de.updated':    { ro: '✅ Drept actualizat', hu: '✅ Járandóság frissítve' },
     'fe.de.listTitle':  { ro: 'Drepturi acordate', hu: 'Felvett járandóságok' },
     'fe.de.kindLbl':    { ro: 'Tip', hu: 'Típus' },
     'fe.de.labelLbl':   { ro: 'Etichetă', hu: 'Címke' },

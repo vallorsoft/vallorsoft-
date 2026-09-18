@@ -3874,6 +3874,47 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   #dcKindModal .dc-kind-add-grid .btn{ margin-top:0!important; }
 }
 
+/* ── Járandóság felvitel/szerkesztés modal (dcEarnModal) ── */
+/* A mezőket a #decontBox-scope-os szabályok stílusozták; a modal a body-hoz
+   fűzött, ezért itt megismételjük a szükséges rácsokat #dcEarnModal-scope-ban. */
+#dcEarnModal .dc-earn-modal{
+  width:min(720px,100%); max-height:92vh; overflow-y:auto; padding:22px;
+}
+#dcEarnModal .dc-pay-head{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  margin-bottom:14px; padding-bottom:12px;
+  border-bottom:1.5px solid rgba(148,163,184,0.28);
+}
+#dcEarnModal .dc-earn-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:10px; align-items:end;
+}
+#dcEarnModal .dc-earn-foot{
+  display:flex; gap:14px; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; margin-top:14px; padding:12px 14px;
+  background:rgba(34,197,94,0.06); border:1.5px solid rgba(34,197,94,0.28);
+  border-radius:12px;
+}
+.main-content[data-theme="dark"] #dcEarnModal .dc-earn-foot{
+  background:rgba(34,197,94,0.09); border-color:rgba(34,197,94,0.35);
+}
+#dcEarnModal .dc-earn-total{
+  font-size:18px; font-weight:800; color:var(--status-ok);
+  font-variant-numeric:tabular-nums;
+}
+#dcEarnModal .dc-earn-total > span:first-of-type{ margin-right:2px; }
+#dcEarnModal .dc-earn-foot .btn.ok{ min-height:44px; padding:10px 20px; font-weight:700; }
+#dcEarnModal .dc-kind-row{ display:flex; gap:6px; align-items:stretch; }
+#dcEarnModal .dc-kind-row > select{ flex:1 1 auto; min-width:0; }
+#dcEarnModal .dc-kind-add{
+  flex:0 0 auto; padding:0 12px; font-size:15px;
+  border:1.5px solid rgba(148,163,184,0.35);
+}
+#dcEarnModal .dc-kind-add:hover{ background:rgba(59,130,246,0.08); }
+
+/* Összecsukható járandóság-lista fejléc (chevron + kattintható cím) */
+#decontBox .dc-earn-coll-toggle:hover{ opacity:0.85; }
+
 /* ── Havi elszámolás-lap (settlement) modal ── */
 #dcSheetModal .dc-sheet-modal, #dcOfSheetModal .dc-sheet-modal {
   width:min(880px,100%); max-height:94vh; overflow:hidden;
