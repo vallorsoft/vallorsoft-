@@ -683,6 +683,75 @@ handlers.earningCreate = async function (req, res, args) {
   }
 };
 
+// PUT — meglévő járandóság szerkesztése (előugró modálból, ✏️ gomb)
+// Ugyanaz a validáció + kind-fehérlista, mint a create-nél. A már kifizetett
+// (csoportba került) tétel NEM szerkeszthető — az összeg-módosítás desyncelné
+// a kifizetés-csoportot (best-effort, migráció-tudatos check).
+handlers.earningUpdate = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const f = _arg(args);
+    const id = parseInt(f.id, 10);
+    if (!Number.isFinite(id)) return res.json({ result: { ok: false, err: 'ID invalid' } });
+
+    // Létezik + a céghez tartozik? (cross-tenant védelem)
+    const cur = await pool.query(
+      'SELECT id FROM driver_earnings WHERE id=$1 AND company_id=$2', [id, cid]);
+    if (!cur.rows.length) return res.json({ result: { ok: false, err: 'Nu a fost gasit.' } });
+
+    // Már kifizetett tétel nem szerkeszthető (best-effort — hiányzó tábla → skip)
+    try {
+      const exR = await pool.query(
+        `SELECT 1 FROM information_schema.tables
+          WHERE table_name = 'driver_payment_group_items' LIMIT 1`);
+      if (exR.rowCount) {
+        const inG = await pool.query(
+          'SELECT 1 FROM driver_payment_group_items WHERE earning_id=$1 LIMIT 1', [id]);
+        if (inG.rowCount) return res.json({ result: { ok: false, err: 'Dreptul este deja plătit — nu poate fi modificat.' } });
+      }
+    } catch (_e) { /* migráció-tudatos */ }
+
+    // Kind fehérlista: a beépített + a cég egyéni típusai (mint create-nél)
+    let allowedKinds = new Set(EARNING_KINDS);
+    try {
+      const kR = await pool.query(
+        'SELECT key FROM driver_earning_kinds WHERE company_id = $1', [cid]);
+      for (const row of kR.rows) allowedKinds.add(String(row.key).toLowerCase());
+    } catch (_e) { /* migráció még nem futott — csak a beépítettek maradnak */ }
+    const kindRaw = String(f.kind || '').toLowerCase();
+    const kind = allowedKinds.has(kindRaw) ? kindRaw : 'other';
+    const label = String(f.label || '').trim().slice(0, 120) || null;
+    const currency = _cur(f.currency);
+    const qty = _num(f.quantity);
+    const unit = _num(f.unit_amount);
+    if (qty == null || qty <= 0) return res.json({ result: { ok: false, err: 'Cantitate invalida.' } });
+    if (unit == null || unit <= 0) return res.json({ result: { ok: false, err: 'Suma unitara invalida.' } });
+    const total = _round2(qty * unit);
+    const date = f.earning_date || new Date().toISOString().slice(0, 10);
+    const note = String(f.note || '').trim().slice(0, 500) || null;
+
+    try {
+      await pool.query(
+        `UPDATE driver_earnings
+            SET earning_date=$1, kind=$2, label=$3, quantity=$4,
+                unit_amount=$5, total_amount=$6, currency=$7, note=$8
+          WHERE id=$9 AND company_id=$10`,
+        [date, kind, label, qty, unit, total, currency, note, id, cid]
+      );
+    } catch (dbErr) {
+      console.warn('earningUpdate UPDATE hiba:', dbErr.message);
+      return res.json({ result: { ok: false, err: 'Eroare la salvarea drepturilor.' } });
+    }
+    try { audit.fromReq(req, 'earning.update', 'driver_earnings', id,
+      { kind, total, currency }); } catch (_e) {}
+    return res.json({ result: { ok: true, id, total, currency } });
+  } catch (err) {
+    console.error('earningUpdate hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 handlers.earningDelete = async function (req, res, args) {
   try {
     if (!_isAdminOrManager(req)) return _deny(res);

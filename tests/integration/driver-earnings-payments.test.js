@@ -157,6 +157,118 @@ describe('earningCreate', () => {
 });
 
 // ═════════════════════════════════════════════
+//  earningUpdate — meglévő járandóság szerkesztése (✏️ modal)
+// ═════════════════════════════════════════════
+describe('earningUpdate', () => {
+  test('Sofer → Acces interzis', async () => {
+    setUser(fixtures.sofer);
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningUpdate',
+      arguments: [{ id: 1, quantity: 1, unit_amount: 10 }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/interzis/i);
+  });
+
+  test('érvénytelen id → hiba', async () => {
+    setUser(fixtures.admin);
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningUpdate',
+      arguments: [{ id: 'nem-szam', quantity: 1, unit_amount: 10 }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/ID invalid/i);
+  });
+
+  test('cross-tenant: idegen id → 0 sor, elutasítás + company_id-szűrt SELECT', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query.mockResolvedValueOnce(rows([])); // SELECT id — nincs ilyen a cégben
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningUpdate',
+      arguments: [{ id: 999, quantity: 1, unit_amount: 10 }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/nu a fost gasit/i);
+    const sql = pool.query.mock.calls[0][0];
+    const params = pool.query.mock.calls[0][1];
+    expect(sql).toMatch(/FROM driver_earnings/i);
+    expect(sql).toMatch(/company_id=\$2/i);
+    expect(params[1]).toBe(fixtures.admin.company_id);
+  });
+
+  test('már kifizetett (csoportba került) tétel → nem szerkeszthető', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ id: 5 }]))                    // SELECT id — létezik
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] }) // information_schema: tábla van
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] }); // csoportban van → paid
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningUpdate',
+      arguments: [{ id: 5, quantity: 2, unit_amount: 10 }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/deja plătit/i);
+  });
+
+  test('érvénytelen quantity → hiba (a tétel létezik + nincs kifizetve)', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ id: 5 }]))                    // SELECT id
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })           // information_schema: nincs tábla → skip paid
+      .mockResolvedValueOnce(rows([]));                           // driver_earning_kinds
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningUpdate',
+      arguments: [{ id: 5, kind: 'bonus', quantity: 0, unit_amount: 10, currency: 'EUR' }],
+    });
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/Cantitate/i);
+  });
+
+  test('sikeres szerkesztés: total szerver-oldalon (qty × unit), UPDATE company_id-szűrt', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ id: 5 }]))                    // SELECT id — létezik
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] }) // information_schema: tábla van
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })           // NINCS csoportban → nem paid
+      .mockResolvedValueOnce(rows([]))                            // driver_earning_kinds — üres
+      .mockResolvedValueOnce(rows([]));                           // UPDATE
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningUpdate',
+      arguments: [{
+        id: 5,
+        earning_date: '2026-02-10',
+        kind: 'ismeretlen',            // ismeretlen → other
+        label: 'Módosított diurna',
+        quantity: 4, unit_amount: 25,  // 4 × 25 = 100
+        currency: 'EUR',
+        note: 'javitva',
+      }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.id).toBe(5);
+    expect(res.body.result.total).toBe(100);
+    expect(res.body.result.currency).toBe('EUR');
+
+    const updSql = pool.query.mock.calls[4][0];
+    const updParams = pool.query.mock.calls[4][1];
+    expect(updSql).toMatch(/UPDATE driver_earnings/i);
+    expect(updSql).toMatch(/company_id=\$10/i);
+    // params: [date, kind, label, qty, unit, total, currency, note, id, cid]
+    expect(updParams[1]).toBe('other');                  // ismeretlen kind → other
+    expect(updParams[3]).toBe(4);                         // quantity
+    expect(updParams[4]).toBe(25);                        // unit
+    expect(updParams[5]).toBe(100);                       // TOTAL a szervertől
+    expect(updParams[6]).toBe('EUR');
+    expect(updParams[8]).toBe(5);                         // id
+    expect(updParams[9]).toBe(fixtures.admin.company_id);
+  });
+});
+
+// ═════════════════════════════════════════════
 //  earningKindList / Create / Delete (egyéni típusok)
 // ═════════════════════════════════════════════
 describe('earningKind* — egyéni típus-kezelő', () => {
