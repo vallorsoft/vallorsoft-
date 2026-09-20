@@ -25,6 +25,8 @@
   var _subTab = 'overview';
   var _lastData = null;
   var _searchFilter = '';
+  // 📋 Menetlevél-bontás (egy jármű, kiválasztott időszak) — külön adat-lekérés
+  var _wbState = null, _wbList = null, _wbVeh = '', _wbReport = null, _wbLoading = false;
 
   function fnum(n, dec) {
     var v = parseFloat(n);
@@ -57,6 +59,7 @@
     var tabs = [
       ['overview',  '🚚 ' + $t('sv2.fl.tOverview')],
       ['fuel',      '⛽ ' + $t('sv2.fl.tFuel')],
+      ['wb',        '📋 ' + $t('sv2.fl.tWaybill')],
       ['idle',      '💤 ' + $t('sv2.fl.tIdle')],
       ['co2',       '🌱 ' + $t('sv2.fl.tCo2')],
     ];
@@ -67,6 +70,9 @@
 
   function render(box, state) {
     if (window.VS_STATS_V2_CMP) VS_STATS_V2_CMP.init('vehicles');
+    // Menetlevél-bontás: az időszak (state.range) változásakor újratöltjük a
+    // jármű-listát; a kiválasztott rendszám megmarad (ha még szerepel a listában).
+    _wbState = state; _wbList = null; _wbReport = null; _wbLoading = false;
     box.innerHTML = subTabsBar() + '<div class="sv2-empty">' + $t('sv2.ov.loading') + '</div>';
     var apArgs = { from: state.range.from, to: state.range.to };
     Promise.all([
@@ -86,11 +92,13 @@
     var html = subTabsBar();
     if (_subTab === 'overview') html += renderOverview(_lastData);
     else if (_subTab === 'fuel') html += renderFuel(_lastData);
+    else if (_subTab === 'wb') html += renderWaybill();
     else if (_subTab === 'idle') html += renderIdle(_lastData);
     else html += renderCo2(_lastData);
     box.innerHTML = html;
     if (_subTab === 'fuel') drawFuel(_lastData);
     else if (_subTab === 'co2') drawCo2(_lastData);
+    else if (_subTab === 'wb' && _wbList === null && !_wbLoading) wbLoadList();
   }
 
   // ── 1. Áttekintés — jármű-kártyák ──────────────────────
@@ -269,6 +277,137 @@
     });
   }
 
+  // ── 2b. Menetlevél-bontás (egy jármű, kiválasztott időszak) ──
+  //  Kizárólag a menetlevelekből (fuvarlevelek): tankolt L + összeg,
+  //  átlagfogyasztás, km, felhasznált üzemanyag, kiadás — menetlevelenként.
+  function wbLoadList() {
+    _wbLoading = true;
+    var st = _wbState || (_lastData && _lastData.state);
+    if (!st) { _wbList = []; _wbLoading = false; return; }
+    gas('getVehicleWaybillReport', { from: st.range.from, to: st.range.to }).then(function (r) {
+      _wbList = (r && r.ok && r.vehicles) || [];
+      _wbLoading = false;
+      if (_wbVeh && _wbList.some(function (v) { return v.rendszam === _wbVeh; })) {
+        wbLoadReport();
+      } else {
+        _wbVeh = ''; _wbReport = null; wbRerender();
+      }
+    }).catch(function () { _wbList = []; _wbLoading = false; wbRerender(); });
+  }
+  function wbLoadReport() {
+    if (!_wbVeh) { _wbReport = null; wbRerender(); return; }
+    _wbLoading = true; wbRerender();
+    var st = _wbState || (_lastData && _lastData.state);
+    gas('getVehicleWaybillReport', { from: st.range.from, to: st.range.to, rendszam: _wbVeh }).then(function (r) {
+      _wbReport = (r && r.ok) ? r : null;
+      _wbLoading = false; wbRerender();
+    }).catch(function () { _wbReport = null; _wbLoading = false; wbRerender(); });
+  }
+  function wbRerender() {
+    if (_subTab !== 'wb') return;
+    var box = document.getElementById('sv2Body'); if (!box) return;
+    box.innerHTML = subTabsBar() + renderWaybill();
+  }
+
+  function renderWaybill() {
+    if (_wbList === null) return '<div class="sv2-empty">' + $t('sv2.ov.loading') + '</div>';
+
+    var opts = '<option value="">' + $esc($t('sv2.fl.wbPick')) + '</option>'
+      + _wbList.map(function (v) {
+          return '<option value="' + $esc(v.rendszam) + '"' + (v.rendszam === _wbVeh ? ' selected' : '') + '>'
+            + $esc(v.rendszam) + ' (' + fnum(v.menetlevelek, 0) + ' ML)</option>';
+        }).join('');
+    var selector = ''
+      + '<div class="sv2-panel" style="padding:12px 16px;">'
+      +   '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">'
+      +     '<label style="font-weight:600;">🚚 ' + $esc($t('sv2.fl.wbVehicle')) + '</label>'
+      +     '<select class="select" style="flex:1;min-width:220px;" onchange="VS_STATS_V2_FLEET._selectVeh(this.value)">' + opts + '</select>'
+      +   '</div>'
+      +   '<div class="sv2-kpi-sub" style="margin-top:6px;">' + $esc($t('sv2.fl.wbHint')) + '</div>'
+      + '</div>';
+
+    if (!_wbList.length) return selector + '<div class="sv2-empty">' + $t('sv2.ov.noData') + '</div>';
+    if (!_wbVeh) return selector + '<div class="sv2-empty">' + $t('sv2.fl.wbSelectPrompt') + '</div>';
+    if (_wbLoading || !_wbReport) return selector + '<div class="sv2-empty">' + $t('sv2.ov.loading') + '</div>';
+
+    var s = _wbReport.summary || {};
+    var rep = _wbReport.report || [];
+
+    var kpiHtml = ''
+      + '<div class="sv2-kpi-grid">'
+      +   sv2Kpi('📄 ' + $t('sv2.fl.wbCount'), fnum(s.menetlevelek, 0), fnum(s.total_km, 0) + ' km', '#3b82f6')
+      +   sv2Kpi('⛽ ' + $t('sv2.fl.wbFueled'), fnum(s.tankolt_litru, 0) + ' <span style="font-size:12px;">L</span>', fnum(s.tankolt_suma, 0) + ' RON', '#f59e0b')
+      +   sv2Kpi('📊 ' + $t('sv2.fl.wbAvg'), fnum(s.avg_consum, 1) + ' <span style="font-size:12px;">L/100km</span>', fnum(s.motorina_folosit, 0) + ' L ' + $t('sv2.fl.wbUsed'), '#6366f1')
+      +   sv2Kpi('🛒 ' + $t('sv2.fl.wbExpense'), fnum(s.kiadas_suma, 0) + ' <span style="font-size:12px;">RON</span>', '', '#ef4444')
+      + '</div>';
+
+    var rowsHtml = rep.map(function (r) {
+      return '<tr>'
+        + '<td>' + (r.eff_date ? new Date(r.eff_date).toLocaleDateString('hu-HU') : '—') + '</td>'
+        + '<td><b>' + $esc(r.numar_fisa || ('#' + r.id)) + '</b></td>'
+        + '<td>' + $esc(r.nume_sofer || '—') + '</td>'
+        + '<td style="text-align:right;">' + fnum(r.total_km, 0) + '</td>'
+        + '<td style="text-align:right;">' + fnum(r.tankolt_litru, 1) + '</td>'
+        + '<td style="text-align:right;">' + fnum(r.tankolt_suma, 0) + '</td>'
+        + '<td style="text-align:right;">' + fnum(r.motorina_folosit, 1) + '</td>'
+        + '<td style="text-align:right;font-weight:700;">' + fnum(r.consum_100, 1) + '</td>'
+        + '<td style="text-align:right;">' + fnum(r.kiadas_suma, 0) + '</td>'
+        + '</tr>';
+    }).join('');
+    if (!rowsHtml) rowsHtml = '<tr><td colspan="9" class="text-muted" style="text-align:center;padding:20px;">' + $t('sv2.ov.noData') + '</td></tr>';
+
+    var footHtml = '<tr style="font-weight:700;border-top:2px solid rgba(120,120,120,0.35);">'
+      + '<td colspan="3">Σ ' + $t('sv2.fl.wbTotal') + '</td>'
+      + '<td style="text-align:right;">' + fnum(s.total_km, 0) + '</td>'
+      + '<td style="text-align:right;">' + fnum(s.tankolt_litru, 1) + '</td>'
+      + '<td style="text-align:right;">' + fnum(s.tankolt_suma, 0) + '</td>'
+      + '<td style="text-align:right;">' + fnum(s.motorina_folosit, 1) + '</td>'
+      + '<td style="text-align:right;">' + fnum(s.avg_consum, 1) + '</td>'
+      + '<td style="text-align:right;">' + fnum(s.kiadas_suma, 0) + '</td>'
+      + '</tr>';
+
+    var exportBtn = window.VS_STATS_V2_EXPORT ? VS_STATS_V2_EXPORT.button({
+      data: rep.map(function (r) {
+        return {
+          data: r.eff_date ? String(r.eff_date).slice(0, 10) : '',
+          numar_fisa: r.numar_fisa || ('#' + r.id),
+          sofer: r.nume_sofer || '',
+          km: r.total_km, litri: r.tankolt_litru, cost_alim: r.tankolt_suma,
+          consumat: r.motorina_folosit, consum_100: r.consum_100, cheltuieli: r.kiadas_suma,
+        };
+      }),
+      columns: [
+        { key: 'data', label: 'Data' }, { key: 'numar_fisa', label: 'FML' },
+        { key: 'sofer', label: 'Sofer' }, { key: 'km', label: 'Km' },
+        { key: 'litri', label: 'Litri' }, { key: 'cost_alim', label: 'Cost aliment. (RON)' },
+        { key: 'consumat', label: 'Consumat (L)' }, { key: 'consum_100', label: 'L/100km' },
+        { key: 'cheltuieli', label: 'Cheltuieli (RON)' },
+      ],
+      filename: 'consum-' + _wbVeh + '-' + new Date().toISOString().slice(0, 10) + '.csv',
+    }) : '';
+
+    return selector + kpiHtml
+      + '<div class="sv2-panel">'
+      +   '<div class="sv2-panel-head"><div class="sv2-panel-title">📋 ' + $t('sv2.fl.wbTableTitle') + ' — ' + $esc(_wbVeh) + '</div>'
+      +     '<div style="display:flex;gap:8px;">' + exportBtn + '</div></div>'
+      +   '<div style="overflow-x:auto;"><table class="table">'
+      +     '<thead><tr>'
+      +       '<th>' + $t('sv2.fl.wbDate') + '</th>'
+      +       '<th>' + $t('sv2.fl.wb') + '</th>'
+      +       '<th>' + $t('sv2.pp.cDriver') + '</th>'
+      +       '<th style="text-align:right;">Km</th>'
+      +       '<th style="text-align:right;">' + $t('sv2.fl.wbFueledShort') + '</th>'
+      +       '<th style="text-align:right;">' + $t('sv2.fl.wbCostShort') + '</th>'
+      +       '<th style="text-align:right;">' + $t('sv2.fl.wbUsedShort') + '</th>'
+      +       '<th style="text-align:right;">L/100km</th>'
+      +       '<th style="text-align:right;">' + $t('sv2.fl.wbExpenseShort') + '</th>'
+      +     '</tr></thead>'
+      +     '<tbody>' + rowsHtml + '</tbody>'
+      +     '<tfoot>' + footHtml + '</tfoot>'
+      +   '</table></div>'
+      + '</div>';
+  }
+
   // ── 3. Állásidő + szerviz ─────────────────────────────
   function renderIdle(d) {
     var idle = d.idle && d.idle.ok ? d.idle.jarmuvek : [];
@@ -405,6 +544,12 @@
     },
     _openVehicle: function (id) {
       if (window.VS_STATS_V2_DETAIL) VS_STATS_V2_DETAIL.open('vehicle', { id: id });
+    },
+    _selectVeh: function (v) {
+      _wbVeh = v || '';
+      _wbReport = null;
+      if (_wbVeh) wbLoadReport();
+      else wbRerender();
     },
   };
 
