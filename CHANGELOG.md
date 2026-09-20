@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-09-20 — Statisztika 2.0 → Flotta: 📋 Menetlevél-bontás fül (egy jármű, kiválasztott időszak, menetlevelenként — kizárólag a menetlevelekből)
+
+**Kérés:** „Statisztika nézeten kellene egy olyan rész, ahol adott járműnek kiválasztott időre (menetlevelenként) megmutatja: mennyibe tankolt, mennyi lett az átlagfogyasztása stb., kiadása… (csak menetlevélből dolgozzon)."
+
+1. **Új szerver-handler** `getVehicleWaybillReport` (`handlers/statisticsHandlers.js`, Admin/Manager, `company_id`-szűrt, paraméteres) — `rendszam` nélkül visszaadja az időszakban menetlevéllel rendelkező jármű-rendszámok listáját (választóhoz); `rendszam`-mal a jármű **menetlevelenkénti** bontását (dátum, menetlevél-szám, sofőr, km, tankolt liter + összeg RON, felhasznált üzemanyag, átlagfogyasztás L/100km, kiadás RON) + egy összegző blokkot (súlyozott átlagfogyasztás = össz. felhasznált / össz. km × 100). **Kizárólag a `fuvarlevelek` táblából** — semmilyen GPS/kártya-forrás. A `FUV_FROM` cég-horgony + `eff_date` (beírt út-dátum) szűrés; JSONB-tömb-védelem (`jsonb_typeof='array'`).
+2. **Új sub-tab** `📋 Menetlevél-bontás` a Statisztika 2.0 → 🚚 Flotta fülön (`public/stats-v2/pages/fleet.js`): jármű-választó (időszakban szereplő rendszámok, ML-számmal) → 4 KPI-csempe (menetlevelek+km / tankolt L+RON / átlagfogyasztás+felhasznált / kiadás RON) + menetlevelenkénti táblázat összegző lábléccel + CSV-export. Az időszak (globális szűrő-sáv) változásakor újratölt, a kiválasztott jármű megmarad, ha még szerepel.
+3. **i18n** 18 új `sv2.fl.*` kulcs (RO-alap + HU). Cache-bust `fleet.js`/`i18n.js` `?v=20260920wbveh` (admin.html + manager.html). **1270 Jest zöld**, nincs séma-változás, nincs regresszió.
+
 ## 2026-09-18 — FIX: Sofőr-elszámolás gyors-kimutató (a 3 csempe) az IDŐSZAK tételeit allokáció-alapon mutatja — a képernyős kártya ≡ a nyomtatott lap
 
 **Kérés (képpel — a részletes nézet egyenleg-csempéi):** „A kis statisztikai / gyors kimutató nem mutat jól — azt veszi, ami a TELJES összeg volt kiírva és kifizetve, nem a beírt hónapot."

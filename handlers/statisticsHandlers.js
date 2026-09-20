@@ -594,6 +594,89 @@ handlers.getFuelStats = async function (req, res, args) {
   }
 };
 
+// ── Egy jármű menetlevél-bontása (kiválasztott időszakra) ────
+// A stats-v2 Flotta → 📋 Menetlevél-bontás fül adatforrása. Egy járműre,
+// a megadott időszakra, MENETLEVELENKÉNT visszaadja: tankolt liter + összeg,
+// átlagfogyasztás (L/100km), km, felhasznált üzemanyag, kiadás — KIZÁRÓLAG a
+// `fuvarlevelek` táblából (semmilyen GPS/kártya-forrás). Plusz egy összegző
+// blokk. `rendszam` nélkül csak a jármű-választó listáját (időszakban szereplő
+// rendszámok) adja vissza. Admin/Manager, company_id-szűrt, paraméteres.
+handlers.getVehicleWaybillReport = async function (req, res, args) {
+  try {
+    if (!_isAdminOrManager(req)) return _deny(res);
+    const cid = req.session.user.company_id;
+    const { from, to } = _range(args);
+    const a = (args && !Array.isArray(args)) ? args : ((args && args[0]) || {});
+    const rendszam = (a.rendszam != null ? String(a.rendszam) : '').trim();
+    const P = [cid, from, to];
+
+    // Jármű-választó: az időszakban menetlevéllel rendelkező rendszámok
+    const vehR = await pool.query(
+      `SELECT f.numar_camion AS rendszam, COUNT(*)::int AS menetlevelek
+       ${FUV_FROM}
+       WHERE f.eff_date >= $2 AND f.eff_date < $3
+         AND f.numar_camion IS NOT NULL AND f.numar_camion <> ''
+       GROUP BY f.numar_camion ORDER BY f.numar_camion`, P
+    );
+
+    if (!rendszam) {
+      return res.json({ result: { ok: true, vehicles: vehR.rows, report: [], summary: null } });
+    }
+
+    // Tömb-védelem: nem-tömb JSONB (pl. {} / NULL) → üres tömb
+    const ARR = (col) =>
+      `(CASE WHEN jsonb_typeof(f.${col})='array' THEN f.${col} ELSE '[]'::jsonb END)`;
+
+    const repR = await pool.query(
+      `SELECT f.id, f.numar_fisa, f.eff_date::date AS eff_date,
+              f.nume_sofer, f.numar_camion,
+              COALESCE(f.km_inceput,0)::numeric   AS km_inceput,
+              COALESCE(f.km_sfarsit,0)::numeric   AS km_sfarsit,
+              COALESCE(f.total_km,0)::numeric     AS total_km,
+              COALESCE(f.cant_inceput,0)::numeric AS cant_inceput,
+              COALESCE(f.cant_sfarsit,0)::numeric AS cant_sfarsit,
+              COALESCE(f.motorina_folosit,0)::numeric AS motorina_folosit,
+              COALESCE(f.consum_100,0)::numeric   AS consum_100,
+              COALESCE((SELECT SUM((al->>'litru')::numeric)
+                        FROM jsonb_array_elements(${ARR('alimentari')}) al),0) AS tankolt_litru,
+              COALESCE((SELECT SUM((al->>'suma')::numeric)
+                        FROM jsonb_array_elements(${ARR('alimentari')}) al),0) AS tankolt_suma,
+              COALESCE((SELECT SUM((ac->>'pret')::numeric)
+                        FROM jsonb_array_elements(${ARR('achizitii')}) ac),0)  AS kiadas_suma
+       ${FUV_FROM}
+       WHERE f.eff_date >= $2 AND f.eff_date < $3
+         AND UPPER(f.numar_camion) = UPPER($4)
+       ORDER BY f.eff_date DESC, f.id DESC`,
+      [cid, from, to, rendszam]
+    );
+
+    // Összegző (súlyozott átlagfogyasztás: össz. felhasznált / össz. km × 100)
+    const rows = repR.rows;
+    const num = (x) => { const v = parseFloat(x); return isFinite(v) ? v : 0; };
+    const sumKm      = rows.reduce((s, r) => s + num(r.total_km), 0);
+    const sumUsed    = rows.reduce((s, r) => s + num(r.motorina_folosit), 0);
+    const sumLitru   = rows.reduce((s, r) => s + num(r.tankolt_litru), 0);
+    const sumFuelCost= rows.reduce((s, r) => s + num(r.tankolt_suma), 0);
+    const sumKiadas  = rows.reduce((s, r) => s + num(r.kiadas_suma), 0);
+    const summary = {
+      menetlevelek: rows.length,
+      total_km: sumKm,
+      motorina_folosit: sumUsed,
+      tankolt_litru: sumLitru,
+      tankolt_suma: sumFuelCost,
+      kiadas_suma: sumKiadas,
+      avg_consum: sumKm > 0 ? Math.round((sumUsed / sumKm * 100) * 100) / 100 : 0,
+    };
+
+    return res.json({ result: {
+      ok: true, vehicles: vehR.rows, rendszam, report: rows, summary,
+    }});
+  } catch (err) {
+    console.error('getVehicleWaybillReport hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 // ── Vásárlások / kiadások (stats-purchases) ──────────────────
 // A vásárlás mostantól PER-TÉTEL dátum szerint sorolódik hónapba — ugyanaz
 // a szabály mint a tankolásnál (lásd fentebb `getFuelStats`).
