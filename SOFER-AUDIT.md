@@ -1,5 +1,11 @@
 # Sofőr felület — átvizsgálás (2026-09-21)
 
+> **STÁTUSZ: az 1–4. hiba JAVÍTVA** (ugyanezen a napon, a feltárás utáni commitban).
+> Az 5–6. pont szándékosan megfigyelés maradt. A javítások részletei a
+> `CHANGELOG.md` 2026-09-21-i bejegyzésében; a biztonsági vonatkozás az
+> `AUDIT.md` 21. lépésében. Regresszió-védelem:
+> `tests/integration/sofer-ui-fixes.test.js` (+11 eset), **1281 Jest zöld**.
+
 Átvizsgált fájlok: `public/sofer.html`, `public/sofer.js` (6330 sor), `public/sofer.css`,
 `public/sofer-uit.js`, `public/uit-format.js`, `routes/soferApi.js`,
 `handlers/receiptScan.js`, `handlers/documents.js` (sofőr-érintett részek).
@@ -13,6 +19,8 @@ meglévő tesztek nem fednek le.
 ---
 
 ## 1. HIBA — Az áru-/tankolás-sorok NEM escape-elik a beírt értéket (adatvesztés + injekció)
+
+**✅ JAVÍTVA** — `esc(...)` mind a kilenc `value="…"` interpolációra (`sofer.js` `addAlimRow`/`addAchRow`).
 
 **Hol:** `public/sofer.js` `addAlimRow()` 2603–2613. sor, `addAchRow()` 2630–2634. sor.
 
@@ -46,6 +54,8 @@ is `esc(locVal || '')`-t használ. Csak a tankolás/vásárlás sor maradt ki.
 
 ## 2. HIBA — A telefonos VISSZA gomb 10 modált nem zár be (beragadt overlay)
 
+**✅ JAVÍTVA** — új `_SOF_MODALS` nyilvántartás + `_sofCloseTopModal()`; a modál-zárás a menetlevél-lépés ELŐTT fut.
+
 **Hol:** `public/sofer.js` `initSoferBackButton()` 1034–1064. sor.
 
 **Mi a baj:** a `popstate`-csapda csak két modált ismer:
@@ -78,6 +88,8 @@ saját `close*` függvényeivel.
 
 ## 3. HIBA — A lehúzással-frissítés (PTR) elrabolja a Cégadatok modál görgetését
 
+**✅ JAVÍTVA** — a PTR `isModalOpen()`-je a közös `_sofAnyModalOpen()`-t hívja, így a `companyInfoModal` is blokkol.
+
 **Hol:** `public/sofer.js` `isModalOpen()` 6218–6229. sor.
 
 **Mi a baj:** a PTR blokkoló modál-listájából hiányzik a `companyInfoModal`:
@@ -104,6 +116,8 @@ hozzá a CUI-hoz/IBAN-hoz, amikor a boltban mutatnia kellene.
 ---
 
 ## 4. HIBA — Elavult cache-bust a MEGOSZTOTT fájlokon (a sofőr régi i18n/CSS-t kap)
+
+**✅ JAVÍTVA** — `i18n.js?v=20260920wbveh`, `style.css?v=20260918payalloc`, `sofer.js?v=20260921sofaudit`.
 
 **Hol:** `public/sofer.html` `<script>`/`<link>` verzió-paraméterek.
 
