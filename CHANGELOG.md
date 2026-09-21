@@ -14,6 +14,25 @@
 
 ---
 
+## 2026-09-21 — Sofőr felület átvizsgálás: 4 hiba feltárva és javítva (escape, vissza-gomb, pull-to-refresh, cache-bust)
+
+**Kérés:** „Sofer oldalt ellenőrizd át és ha hibát kapsz javítsd, először a hibákat tárd fel, hogy legyen kézzelfogható kiinduló, ha sikerült folytasd a kijavítással."
+
+**Feltárás (`SOFER-AUDIT.md`, külön commitban ELŐBB rögzítve):** a kiindulás zöld volt (1270 Jest), nincs szintaxis-hiba, bekötetlen `onclick`, hiányzó i18n-kulcs (347 sofőr-kulcs mind megvan RO+HU-ban) vagy duplikált függvény. A négy megtalált hiba mind futásidejű/viselkedési, amit a meglévő tesztek nem fedtek le.
+
+1. **`addAlimRow` / `addAchRow` — 9 `value="…"` attribútum escape NÉLKÜL** (`public/sofer.js`). A 📷 AI bon-kiolvasás (`rrAccept` → `addAlimRow(f)`) a Gemini által a bonról leolvasott `loc`/`produs` szöveget adta át; egy idézőjeles töltőállomás-név (`MOL "Vest"`) elvágta az attribútumot → a sofőr adata **csonkult egy pénzügyi bizonylaton**, a maradék kósza HTML-attribútummá vált. Elnézés volt, nem szándék: ugyanezeket a mezőket a bon-áttekintő modál (`esc2`) és az útvonal-pont sor (`esc`) MÁR escape-elte. **Fix:** `esc(...)` mind a kilenc interpolációra (`alim-loc/lit/km/suma/data`, `ach-prod/loc/pret/data`).
+2. **Telefonos VISSZA gomb: 12 modálból csak 2-t zárt** (`initSoferBackButton`). A `popstate`-csapda csak a `hoModal`-t és `bugModal`-t ismerte; a maradék tíznél továbbesett a „vissza a főoldalra" ágra → a modál **ott ragadt a főoldal fölött**, elnyelte a koppintásokat, és a függőben lévő callback sosem hívódott meg. Menetlevél 2. lépésén nyitott megerősítő modálnál a lépés bezárult, a modál rajta maradt.
+3. **Pull-to-refresh elrabolta a Cégadatok modál görgetését** (`isModalOpen`). A PTR blokkoló listájából hiányzott a `companyInfoModal`, ami viszont görgethető (`max-height:88vh; overflow-y:auto`) és ~15 mezőt mutat. Nyitott modálnál a `touchmove` `preventDefault`-ja **megbénította a görgetést**, elengedésre pedig újratöltötte a mögöttes főoldalt — pont akkor, amikor a sofőr a boltban a CUI-t/IBAN-t mutatná.
+4. **Elavult cache-bust a MEGOSZTOTT fájlokon** (`public/sofer.html`). `i18n.js?v=20260910r4` és `style.css?v=20260716mobfix`, miközben az admin/manager már `20260920wbveh` / `20260918payalloc`-on állt. Ma még nem okozott látható kárt, de **minden jövőbeli sofőr-érintő i18n/CSS-változás némán elakadt volna** a sofőr telefonján.
+
+**A 2. + 3. javítása EGY közös megoldással** — új `_SOF_MODALS` modál-nyilvántartás (`public/sofer.js`), **egy igazságforrás** mindkét helyre. `_sofAnyModalOpen()` a PTR-nek, `_sofCloseTopModal()` a vissza-gombnak (a legfelső nyitott modált a SAJÁT mégse-útján zárja, hogy a függőben lévő callback is lefusson; ha a záró-függvény dobna, a modál akkor sem ragad a képernyőn). A vissza-gomb csapdájában a modál-zárás mostantól **a menetlevél-lépés ELŐTT** fut. Így egy új modál felvételekor nem lehet az egyik helyen elfelejteni.
+
+**Teszt:** új `tests/integration/sofer-ui-fixes.test.js` (+11 eset) — escape (idézőjel, `<>`, attribútum-injekció, nincs regresszió normál értéken), modál-registry (záró-utak léteznek, nyitott-állapot, legfelső zárul először, hibás záró-függvény esetén is eltűnik) és egy **REGRESSZIÓ-ŐR**, ami a `sofer.html`-ből parse-olja az összes `*Modal` id-t és megköveteli, hogy mind szerepeljen a listában (verifikálva: a `companyInfoModal` kivétele 3 tesztet bukat). **1281 Jest zöld** (1270 → 1281), `npm test` (CI `--runInBand`) tisztán. Nincs szerver-/séma-változás, a javítás tisztán kliens-oldali.
+
+**Nem javítva (megfigyelésként rögzítve a `SOFER-AUDIT.md`-ben):** a `t('sof.locale')` 10 helyen `try/catch` nélkül megy a `toLocaleString`-be (ma nem dob, a kulcs megvan — latens törékenység); a holt Firebase-chat kód (a chat 2026-07-18 óta WhatsApp-átirányítás, minden hivatkozás null-védett).
+
+---
+
 ## 2026-09-20 — Statisztika 2.0 → Flotta: 📋 Menetlevél-bontás fül (egy jármű, kiválasztott időszak, menetlevelenként — kizárólag a menetlevelekből)
 
 **Kérés:** „Statisztika nézeten kellene egy olyan rész, ahol adott járműnek kiválasztott időre (menetlevelenként) megmutatja: mennyibe tankolt, mennyi lett az átlagfogyasztása stb., kiadása… (csak menetlevélből dolgozzon)."

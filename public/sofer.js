@@ -1025,6 +1025,68 @@ function goSec(id) {
 }
 
 // ============================================================
+// KÖZÖS MODÁL-NYILVÁNTARTÁS — EGY igazságforrás
+// ============================================================
+// A sofőr felületen 12 modál van. Két helyen kell tudni róluk:
+//   (a) a telefonos VISSZA gomb csapdájában — a vissza-nyomás a legfelső
+//       nyitott modált zárja be, ne navigáljon el alóla (különben a modál
+//       ott ragad a főoldal fölött, elnyeli a koppintásokat, és a függőben
+//       lévő callback sosem hívódik meg);
+//   (b) a pull-to-refresh blokkolásában — nyitott modál fölött a lehúzás a
+//       modál saját görgetése, nem frissítés (a `touchmove` preventDefault-ja
+//       különben megbénítja a görgethető modálokat, pl. a Cégadatokat).
+// Mindkettő EBBŐL a listából dolgozik, így új modál felvételekor nem lehet
+// az egyik helyen elfelejteni. A sorrend a beágyazottságot követi: a
+// legfelül nyíló (generikus megerősítő) modálok elöl.
+var _SOF_MODALS = [
+  { id: 'sofTimeModal',       close: 'sofTimeCancel' },
+  { id: 'sofConfirmModal',    close: 'sofConfirmCancel' },
+  { id: 'sofChoiceModal',     close: 'sofChoiceCancel' },
+  { id: 'orphRangeModal',     close: 'orphRangeCancel' },
+  { id: 'wbConfirmModal',     close: 'wbConfirmCancel' },
+  { id: 'pendingAddModal',    close: 'pendingAddSkip' },
+  { id: 'wbLocModal',         btn:   'wbLocCancel' },   // a Mégse gomb onclick-je hívja a callback-et
+  { id: 'receiptReviewModal', close: 'rrClose' },
+  { id: 'orderPickerModal',   close: 'opCancel' },
+  { id: 'companyInfoModal',   close: 'closeCompanyInfo' },
+  { id: 'hoModal',            close: 'closeHandover' },
+  { id: 'bugModal',           close: 'closeBugReport' }
+];
+
+// Van-e NYITOTT modál? (a projekt minden sofőr-modálja `display:flex`-szel nyílik)
+function _sofAnyModalOpen() {
+  for (var i = 0; i < _SOF_MODALS.length; i++) {
+    var el = document.getElementById(_SOF_MODALS[i].id);
+    if (el && el.style && el.style.display === 'flex') return true;
+  }
+  return false;
+}
+
+// A legfelső nyitott modál bezárása a SAJÁT mégse-útján (hogy a függőben
+// lévő callback is lefusson `null`-lal, ne maradjon félbehagyott folyamat).
+// `true`, ha tényleg bezárt valamit.
+function _sofCloseTopModal() {
+  for (var i = 0; i < _SOF_MODALS.length; i++) {
+    var m = _SOF_MODALS[i];
+    var el = document.getElementById(m.id);
+    if (!el || !el.style || el.style.display !== 'flex') continue;
+    try {
+      if (m.close && typeof window[m.close] === 'function') { window[m.close](); }
+      else if (m.btn) {
+        var b = document.getElementById(m.btn);
+        if (b && typeof b.onclick === 'function') b.onclick();
+        else el.style.display = 'none';
+      } else { el.style.display = 'none'; }
+    } catch (e) {
+      // A saját záró-út elszállt — a modált akkor se hagyjuk a képernyőn.
+      try { el.style.display = 'none'; } catch (_) {}
+    }
+    return true;
+  }
+  return false;
+}
+
+// ============================================================
 // TELEFONOS „VISSZA" GOMB — appon belüli visszalépés (ne jelentkezzen ki)
 // ============================================================
 // A rendszer-vissza gombot elkapjuk: (1) menetlevél 2. lépésén → vissza az 1.
@@ -1037,17 +1099,18 @@ function goSec(id) {
   try { history.pushState({ vsSofer: true }, ''); } catch(e){}   // kezdő csapda-állapot
   window.addEventListener('popstate', function(){
     if (_exiting) return;
-    // 1) Menetlevél 2. lépés → vissza az 1. lépésre
+    // 1) Nyitott modal → a LEGFELSŐ bezárása (a `_SOF_MODALS` közös listából,
+    //    a modál saját mégse-útján). Ez ELŐBB fut, mint a menetlevél-lépés:
+    //    a 2. lépésen nyitott megerősítő modált előbb kell lezárni, különben
+    //    a lépés bezárul, a modál viszont ott marad fölötte.
+    if (_sofCloseTopModal()) { repush(); return; }
+    // 2) Menetlevél 2. lépés → vissza az 1. lépésre
     var step2 = document.getElementById('fuvarStep2');
     var fuvarSec = document.getElementById('sec-fuvar');
     if (fuvarSec && !fuvarSec.classList.contains('hidden') && step2 && step2.style.display !== 'none') {
       try { fuvarBackStep1(); } catch(e){}
       repush(); return;
     }
-    // 2) Nyitott modal → bezárás (áru-leadás / hibajelentés)
-    var ho = document.getElementById('hoModal'), bug = document.getElementById('bugModal');
-    if (ho && ho.style.display === 'flex')  { try { closeHandover(); }  catch(e){} repush(); return; }
-    if (bug && bug.style.display === 'flex') { try { closeBugReport(); } catch(e){} repush(); return; }
     // 3) Al-oldalon → vissza a főoldalra
     var active = 'dash';
     ['dash','border','fuvar','docs','chat'].forEach(function(s){
@@ -2600,17 +2663,17 @@ function addAlimRow(a) {
   d.className = 'dyn-row';
   d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
     + '<div class="g2">'
-    + '<div class="field"><label>' + t('sof.location') + '</label><input class="input alim-loc" list="sug-alim-loc" placeholder="' + t('sof.alimLocPh') + '" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
-    + '<div class="field"><label>' + t('sof.date') + '</label><input class="input alim-data" type="date" value="' + dt + '" onchange="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.location') + '</label><input class="input alim-loc" list="sug-alim-loc" placeholder="' + t('sof.alimLocPh') + '" value="' + esc(a.loc || '') + '" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.date') + '</label><input class="input alim-data" type="date" value="' + esc(dt) + '" onchange="draftSave()"></div>'
     + '</div>'
     + '<div class="g2">'
     + '<div class="field"><label>' + t('sof.fuelType') + '</label><select class="input alim-tip" style="padding:10px 14px;" onchange="draftSave()"><option' + (a.tip === 'AdBlue' ? '' : ' selected') + '>Motorină</option><option' + (a.tip === 'AdBlue' ? ' selected' : '') + '>AdBlue</option></select></div>'
-    + '<div class="field"><label>' + t('sof.liters') + '</label><input class="input alim-lit" type="number" value="' + (a.litru || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.liters') + '</label><input class="input alim-lit" type="number" value="' + esc(a.litru || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
     + '</div>'
     + '<div class="g3">'
-    + '<div class="field"><label>' + t('sof.km') + '</label><input class="input alim-km" type="number" value="' + (a.km || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.km') + '</label><input class="input alim-km" type="number" value="' + esc(a.km || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
     + '<div class="field"><label>' + t('sof.payment') + '</label><select class="input alim-plata" style="padding:10px 14px;" onchange="draftSave()"><option>Card</option><option>Cash</option><option>Flota Card</option><option>DKV</option></select></div>'
-    + '<div class="field"><label>' + t('sof.sumRon') + '</label><input class="input alim-suma" type="number" value="' + (a.suma || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.sumRon') + '</label><input class="input alim-suma" type="number" value="' + esc(a.suma || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
     + '</div>';
   document.getElementById('alimentariContainer').appendChild(d);
   // Plată visszaállítás
@@ -2627,11 +2690,11 @@ function addAchRow(a) {
   var d = document.createElement('div');
   d.className = 'dyn-row';
   d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
-    + '<div class="field"><label>' + t('sof.product') + '</label><input class="input ach-prod" list="sug-ach-prod" placeholder="' + t('sof.achProdPh') + '" value="' + (a.produs || '') + '" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.product') + '</label><input class="input ach-prod" list="sug-ach-prod" placeholder="' + t('sof.achProdPh') + '" value="' + esc(a.produs || '') + '" oninput="draftSave()"></div>'
     + '<div class="g3">'
-    + '<div class="field"><label>' + t('sof.location') + '</label><input class="input ach-loc" list="sug-ach-loc" placeholder="' + t('sof.achLocPh') + '" value="' + (a.loc || '') + '" oninput="draftSave()"></div>'
-    + '<div class="field"><label>' + t('sof.date') + '</label><input class="input ach-data" type="date" value="' + dt + '" onchange="draftSave()"></div>'
-    + '<div class="field"><label>' + t('sof.sumRon') + '</label><input class="input ach-pret" type="number" value="' + (a.pret || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.location') + '</label><input class="input ach-loc" list="sug-ach-loc" placeholder="' + t('sof.achLocPh') + '" value="' + esc(a.loc || '') + '" oninput="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.date') + '</label><input class="input ach-data" type="date" value="' + esc(dt) + '" onchange="draftSave()"></div>'
+    + '<div class="field"><label>' + t('sof.sumRon') + '</label><input class="input ach-pret" type="number" value="' + esc(a.pret || '0') + '" inputmode="numeric" oninput="draftSave()"></div>'
     + '</div>'
     + '<div class="field"><label>' + t('sof.payment') + '</label><select class="input ach-plata" style="padding:10px 14px;" onchange="draftSave()"><option>Card</option><option>Cash</option><option>Flota Card</option><option>DKV</option></select></div>';
   document.getElementById('achizitiiContainer').appendChild(d);
@@ -6217,15 +6280,12 @@ window.onLangChange = function(lang) {
 
   function isModalOpen() {
     // Nyitott modal (display:flex) — a PTR blokkolva; a modal-belüli
-    // görgetést ne befolyásolja.
-    var modalIds = ['hoModal', 'bugModal', 'wbConfirmModal', 'receiptReviewModal',
-                    'orderPickerModal', 'wbLocModal', 'sofConfirmModal', 'sofTimeModal',
-                    'sofChoiceModal', 'pendingAddModal', 'orphRangeModal'];
-    for (var i = 0; i < modalIds.length; i++) {
-      var m = document.getElementById(modalIds[i]);
-      if (m && m.style && m.style.display === 'flex') return true;
-    }
-    return false;
+    // görgetést ne befolyásolja. A lista a KÖZÖS `_SOF_MODALS`-ból jön
+    // (ugyanaz, amit a vissza-gomb csapdája használ), hogy egy új modál
+    // felvételénél ne lehessen itt elfelejteni: a kimaradt modál görgetését
+    // a `touchmove` preventDefault-ja megbénítaná, elengedésre pedig
+    // újratöltené a modál mögötti panelt.
+    try { return _sofAnyModalOpen(); } catch (_) { return false; }
   }
 
   function refreshCurrent() {

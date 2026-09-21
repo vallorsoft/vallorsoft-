@@ -9,6 +9,16 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 21. lépés — Sofőr felület: attribútum-escape a menetlevél tankolás/vásárlás soraiban + modál-nyilvántartás (2026-09-21) ✅ KÉSZ
+
+A sofőr menetlevél `addAlimRow`/`addAchRow` sorépítői kilenc mezőt escape-elés NÉLKÜL írtak a `value="…"` attribútumba. A forrás nem csak a sofőr saját gépelése: a 📷 **AI bon-kiolvasás** (`handlers/receiptScan.js` → `rrAccept` → `addAlimRow(f)`) a Gemini által a fényképezett bonról leolvasott `loc`/`produs` szöveget adja át. A szerver `_sanitize`-ja **fehérlistáz, de nem escape-el** (szándékosan — a tárolt érték nyers marad), tehát a kliens-oldali escape a védelmi réteg, és az hiányzott.
+
+- **Hatás:** idézőjel az értékben elvágja az attribútumot → a mező csonkul (adatvesztés egy pénzügyi bizonylaton), a maradék pedig HTML-attribútummá értelmeződik. Egy `" onfocus="…" x="` alakú érték valódi eseménykezelőt tudott becsempészni a sofőr saját oldalára (self-XSS a bon-fotó láncán, de a piszkozat-visszatöltésen keresztül perzisztens is).
+- **Fix:** `esc(...)` (a `sofer.js` 6. sorában definiált, `&<>"'`-t is escape-elő segéd) mind a kilenc interpolációra: `alim-loc`, `alim-lit`, `alim-km`, `alim-suma`, `alim-data`, `ach-prod`, `ach-loc`, `ach-pret`, `ach-data`. A szerver-oldal érintetlen (a fehérlista + méret-korlát + audit-metaadat marad).
+- **Konzisztencia:** ugyanezeket a mezőket a bon-áttekintő modál (`esc2`, `sofer.js:3231–3242`) és az útvonal-pont sor (`esc`, `sofer.js:2160`) már escape-elte — az eltérés elnézés volt, nem szándék; most egységes.
+- **Kísérő UI-fix (nem biztonsági):** új `_SOF_MODALS` modál-nyilvántartás EGY igazságforrásként a telefonos vissza-gomb csapdájához (`_sofCloseTopModal`) és a pull-to-refresh blokkolásához (`_sofAnyModalOpen`) — eddig a két lista külön élt és szétcsúszott (a vissza-gomb 12-ből 2 modált ismert, a PTR-ből hiányzott a `companyInfoModal`).
+- **Regresszió-védelem:** `tests/integration/sofer-ui-fixes.test.js` (+11 eset) — escape idézőjelre/`<>`-re/attribútum-injekcióra, és egy őr, ami a `sofer.html`-ből parse-olt ÖSSZES `*Modal` id lefedettségét követeli a listában. **1281 Jest zöld.**
+
 ### 20. lépés — Decont oficial: sofőr alapbér mentés/olvasás — cross-tenant védelem + validáció + audit (2026-09-02, PR #407) ✅ KÉSZ
 
 A kiegészítő „📑 Decont oficial" dokumentum új szerkeszthető mezőt (nettó havi alapbér, RON) kapott per sofőr. A hozzá tartozó két RPC (`getDriverBaseSalary`, `setDriverBaseSalary`) a cég-izoláció + audit + bemenet-védelem szabályait a jelenlegi minta szerint betartja; a `getMonthlySettlementSheet` válasz-bővítése best-effort try/catch mögött (migráció-hiánynál `null` — nem hasal el, nem szivárogtat).
