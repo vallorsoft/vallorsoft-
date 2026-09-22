@@ -620,7 +620,7 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
 
       await pool.query(
         `UPDATE fuvarlevelek SET
-           email_sofer = COALESCE($25, email_sofer),
+           email_sofer = COALESCE($26, email_sofer),
            nume_sofer = $2, numar_camion = $3, numar_remorca = $4, numar_fisa = $5,
            km_inceput = $6, km_sfarsit = $7, total_km = $8,
            diurna_externa = $9, diurna_interna = $10,
@@ -647,7 +647,7 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
           indulasDt,
           erkezesDt,
           totalPret,
-          newEmailSofer   // $25 — új sofőr-horgony (validált cég-user) vagy NULL (marad a régi)
+          newEmailSofer   // $26 — új sofőr-horgony (validált cég-user) vagy NULL (marad a régi)
         ]
       );
       return res.json({ result: { ok: true, total_km: totalKm, consum_100: consum100 } });
