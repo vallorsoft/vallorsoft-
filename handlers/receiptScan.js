@@ -23,6 +23,7 @@
 'use strict';
 
 const pool = require('../db');
+const { normalizeCategory, categoryListForPrompt } = require('../lib/expenseCategories');
 const { extractJson } = require('../lib/geminiJson');
 const { featureEnabled } = require('../lib/featureEnabled');
 const audit = require('../lib/audit');
@@ -40,7 +41,7 @@ const FEWSHOT_MAX = 5;
 const RECEIPT_PROMPT_BASE =
   'Ești un extractor de date din bon fiscal / chitanță (RO/HU/EN) — combustibil sau achiziții. ' +
   'Din imaginea/PDF-ul primit, extrage DOAR un obiect JSON cu cheile exacte: ' +
-  'kind, loc, data, tip, litru, km, plata, suma, valuta, produs, confidence. ' +
+  'kind, loc, data, tip, litru, km, plata, suma, valuta, produs, categorie, confidence. ' +
   'Reguli: ' +
   '- kind = "fuel" dacă bonul este pentru combustibil (Motorină/AdBlue/benzină), altfel "purchase" (mâncare, ulei, spălare, taxe, etc.). ' +
   '- loc = localitatea (fallback: numele stației/magazinului), FĂRĂ adresa completă. ' +
@@ -52,6 +53,14 @@ const RECEIPT_PROMPT_BASE =
   '- suma = totalul plătit ca număr (fără simbol valută, punct pentru zecimale, fără separatori de mii). ' +
   '- valuta = "RON", "EUR", "HUF" sau "USD". ' +
   '- produs = descriere scurtă a articolului doar pentru kind=purchase, altfel null. ' +
+  // A kategória a MENETLEVÉL kiadás-sorának fehérlistás kulcsa: az AI ne
+  // csak leírja a bont, hanem be is sorolja (útdíj / komp / parkolás /
+  // mosás / javítás / alkatrész / szállás / étkezés / bírság / egyéb).
+  '- categorie = pentru kind=purchase, ÎNCADREAZĂ bonul exact într-una dintre valorile: "' + categoryListForPrompt() + '". ' +
+  '  Ghid: rovinietă/vinietă/taxă pod/tunel = taxa_drum; bilet feribot = feribot; parcare/parking = parcare; ' +
+  '  spălătorie camion = spalare; service/manoperă/vulcanizare = reparatie; piese/ulei/filtru/becuri = piese; ' +
+  '  hotel/motel/cazare = cazare; restaurant/fast-food/alimente = mancare; amendă/proces-verbal = amenda; ' +
+  '  orice altceva = altele. Pentru kind=fuel lasă categorie = null. ' +
   '- Câmpurile necunoscute = null. ' +
   '- confidence (0..1) = cât de sigur ești în ansamblu. ' +
   'Răspunde STRICT cu JSON, fără text în plus.';
@@ -79,6 +88,10 @@ function sanitize(json) {
     suma: _num(json && json.suma),
     valuta: _str(json && json.valuta, 8),
     produs: _str(json && json.produs, 200),
+    // Kategória CSAK vásárlásnál értelmes; ismeretlen/hiányzó → `altele`
+    // (a fehérlista a `lib/expenseCategories.js`-ben, a szerver ebből
+    // validál — a Gemini „kreatív" kategóriája sosem kerül be).
+    categorie: kind === 'purchase' ? normalizeCategory(json && json.categorie) : null,
     confidence: (json && typeof json.confidence === 'number') ? json.confidence : null,
   };
 }
@@ -120,7 +133,7 @@ async function loadCompanySamples(cid) {
 }
 
 // A minták FEW-SHOT beépítése a system-promptba. Csak a STABIL mezőket
-// (kind/loc/tip/plata/valuta/produs) mutatjuk példaként — a változókat
+// (kind/loc/tip/plata/valuta/produs/categorie) mutatjuk példaként — a változókat
 // (data/suma/litru/km) nem, hogy a Gemini ne másolja őket.
 function buildSystemPrompt(samples) {
   if (!samples || !samples.length) return RECEIPT_PROMPT_BASE;
@@ -134,6 +147,7 @@ function buildSystemPrompt(samples) {
       plata: f.plata || null,
       valuta: f.valuta || null,
       produs: f.produs || null,
+      categorie: f.categorie || null,
     };
     const label = s.merchant_label || f.loc || 'merchant';
     extra += `${i + 1}. ${label} → ${JSON.stringify(example)}\n`;

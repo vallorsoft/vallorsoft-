@@ -688,7 +688,8 @@ function _collectAch(numeric) {
       loc:    (row.querySelector('.ach-loc')  || {}).value || '',
       data:   (row.querySelector('.ach-data') || {}).value || '',
       pret:   num((row.querySelector('.ach-pret') || {}).value),
-      plata:  (row.querySelector('.ach-plata')|| {}).value || 'Card'
+      plata:  (row.querySelector('.ach-plata')|| {}).value || 'Card',
+      categorie: (row.querySelector('.ach-cat') || {}).value || 'altele'
     });
   });
   return out;
@@ -2690,7 +2691,18 @@ function addAchRow(a) {
   var d = document.createElement('div');
   d.className = 'dyn-row';
   d.innerHTML = '<button class="del-row" onclick="this.parentNode.remove();draftSave()">✕</button>'
+    + '<div class="g2">'
     + '<div class="field"><label>' + t('sof.product') + '</label><input class="input ach-prod" list="sug-ach-prod" placeholder="' + t('sof.achProdPh') + '" value="' + esc(a.produs || '') + '" oninput="draftSave()"></div>'
+    // Kiadás-kategória: a bon-kiolvasó AI már besorolja, a sofőr felülírhatja.
+    // A lista a KÖZÖS `public/expense-cat.js`-ből (szerver-párja: lib/expenseCategories.js).
+    + '<div class="field"><label>' + t('sof.category') + '</label><select class="input ach-cat" style="padding:10px 14px;" onchange="draftSave()">'
+      // Védőháló: ha az `expense-cat.js` nem töltődött be (cache/hálózat),
+      // a kiadás-sor ATTÓL MÉG működjön — a meglévő kategóriát megtartjuk.
+      + (typeof vsExpenseCatOptions === 'function'
+           ? vsExpenseCatOptions(a.categorie)
+           : '<option value="' + esc(a.categorie || 'altele') + '" selected>' + esc(a.categorie || 'altele') + '</option>')
+      + '</select></div>'
+    + '</div>'
     + '<div class="g3">'
     + '<div class="field"><label>' + t('sof.location') + '</label><input class="input ach-loc" list="sug-ach-loc" placeholder="' + t('sof.achLocPh') + '" value="' + esc(a.loc || '') + '" oninput="draftSave()"></div>'
     + '<div class="field"><label>' + t('sof.date') + '</label><input class="input ach-data" type="date" value="' + esc(dt) + '" onchange="draftSave()"></div>'
@@ -3301,6 +3313,13 @@ function rrOpen(id) {
     rows += '<div class="rr-row"><label>' + t('sof.km') + '</label><input id="rrKm" type="number" value="' + esc2(f.km != null ? f.km : 0) + '"></div>';
   } else {
     rows += '<div class="rr-row"><label>' + t('sof.product') + '</label><input id="rrProdus" value="' + esc2(f.produs) + '"></div>';
+    // Az AI által felismert kategória — a sofőr egy koppintással javíthatja.
+    rows += '<div class="rr-row"><label>' + t('sof.category') + '</label>'
+          + '<select id="rrCat">'
+          + (typeof vsExpenseCatOptions === 'function'
+               ? vsExpenseCatOptions(f.categorie)
+               : '<option value="' + esc2(f.categorie || 'altele') + '" selected>' + esc2(f.categorie || 'altele') + '</option>')
+          + '</select></div>';
   }
   rows += '<div class="rr-row"><label>' + t('sof.sumRon') + '</label><input id="rrSuma" type="number" value="' + esc2(f.suma != null ? f.suma : 0) + '"></div>';
   rows += '<div class="rr-row"><label>' + t('sof.payment') + '</label><select id="rrPlata">' + plataOpts + '</select></div>';
@@ -3314,7 +3333,8 @@ function rrOpen(id) {
     // A már beírt közös mezőket megőrizzük (loc/data/suma/plata),
     // hogy a váltás után ne vesszen el a sofőr munkája.
     var cur = { loc: (document.getElementById('rrLoc') || {}).value, data: (document.getElementById('rrData') || {}).value,
-                suma: (document.getElementById('rrSuma') || {}).value, plata: (document.getElementById('rrPlata') || {}).value };
+                suma: (document.getElementById('rrSuma') || {}).value, plata: (document.getElementById('rrPlata') || {}).value,
+                categorie: (document.getElementById('rrCat') || {}).value };
     it2.fields = Object.assign({}, it2.fields || {}, cur);
     rcptQueueUpdate(_rrCurrentId, { kind: it2.kind, fields: it2.fields });
     rrOpen(_rrCurrentId);
@@ -3378,7 +3398,8 @@ function rrAccept() {
     newRow = { loc: loc, data: data, tip: tip, litru: litru, km: km, plata: plata, suma: suma };
   } else {
     var produs = (document.getElementById('rrProdus') || {}).value || '';
-    newRow = { produs: produs, loc: loc, data: data, pret: suma, plata: plata };
+    var categorie = (document.getElementById('rrCat') || {}).value || 'altele';
+    newRow = { produs: produs, loc: loc, data: data, pret: suma, plata: plata, categorie: categorie };
   }
 
   // Ha a menetlevél 2. lépés (fuvarStep2) nyitva van → közvetlenül a DOM-ba

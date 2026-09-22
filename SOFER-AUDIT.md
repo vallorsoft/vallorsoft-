@@ -6,6 +6,14 @@
 > `AUDIT.md` 21. lépésében. Regresszió-védelem:
 > `tests/integration/sofer-ui-fixes.test.js` (+11 eset), **1281 Jest zöld**.
 
+> **2026-09-22 — követő kör.** A menetlevél-javaslatokból megvalósult: a bon-kiolvasó
+> AI **kategória-felismerése**, a **km-folytonosság** admin-oldali összegyűjtött
+> jelzése, a **holt mezők** kivezetése, az **AdBlue külön számolása** (ez nem
+> javaslat volt, hanem egy megtalált hiba), és a menetlevél PDF átállítása a
+> **decont nyomtatási szabályaira** (lapismétlő fejléc/lábléc, nem törő sorok,
+> ismétlődő oszlopnevek). Részletek: `CHANGELOG.md` 2026-09-22, biztonsági
+> vonatkozás: `AUDIT.md` 22. lépés.
+
 Átvizsgált fájlok: `public/sofer.html`, `public/sofer.js` (6330 sor), `public/sofer.css`,
 `public/sofer-uit.js`, `public/uit-format.js`, `routes/soferApi.js`,
 `handlers/receiptScan.js`, `handlers/documents.js` (sofőr-érintett részek).

@@ -7,6 +7,8 @@ const router = express.Router();
 const pool = require('../db');
 const { requireLogin, requireRole } = require('../middleware/auth');
 const { calculateDiurna } = require('../lib/diurna');
+const { computeFuelTotals } = require('../lib/waybillTotals');
+const { normalizeCategory } = require('../lib/expenseCategories');
 const { fetchTripCrossings } = require('../lib/tripCrossings');
 const { genDocId } = require('../lib/ids');
 
@@ -26,6 +28,23 @@ function _parseBorderAt(at) {
   if (t > now + MAX_FUTURE_MS) return null;
   if (t < now - MAX_BACKDATE_MS) return null;
   return d.toISOString();
+}
+
+// A kiadás-sorok kategóriája fehérlistázva (a kliens bármit küldhet; a
+// Gemini bon-kiolvasás is javasol egyet). Ismeretlen → `altele`, így a
+// kiadás sosem vész el amiatt, hogy a kategóriát nem sikerült felismerni.
+// A kiadás-kategória RO felirata a nyomtatott menetlevélre. A kulcsok a
+// `lib/expenseCategories.js` fehérlistájából jönnek; a felület i18n-je
+// (sof.cat.*) ugyanezeket adja RO+HU-ban.
+const CAT_RO = {
+  taxa_drum: 'Taxă drum', feribot: 'Feribot', parcare: 'Parcare',
+  spalare: 'Spălare', reparatie: 'Reparație', piese: 'Piese',
+  cazare: 'Cazare', mancare: 'Mâncare', amenda: 'Amendă', altele: 'Altele'
+};
+
+function normalizeAchizitii(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(a => Object.assign({}, a, { categorie: normalizeCategory(a && a.categorie) }));
 }
 
 router.post('/api/border-cross', async (req, res) => {
@@ -174,13 +193,13 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     }
 
     const totalKm = Math.max(0, Number(d.kmSfarsit || 0) - Number(d.kmInceput || 0));
-    let totalAlim = 0;
     const alimentari = Array.isArray(d.alimentari) ? d.alimentari : [];
-    alimentari.forEach(a => { totalAlim += Number(a.litru || 0); });
     const cantInc = Number(d.cantInceput || 0);
     const cantSf = Number(d.cantSfarsit || 0);
-    const motorinaFolosit = Math.max(0, cantInc + totalAlim - cantSf);
-    const consum100 = totalKm > 0 ? Math.round((motorinaFolosit / totalKm * 100) * 100) / 100 : 0;
+    // Az AdBlue KÜLÖN számít (nem dízel) — a közös `lib/waybillTotals.js`-ben,
+    // hogy a beküldés / admin-szerkesztés / kézi létrehozás ne térhessen el.
+    const { totalAlim, totalAdblue, motorinaFolosit, consum100 } =
+      computeFuelTotals(alimentari, cantInc, cantSf, totalKm);
 
     const puncte = Array.isArray(d.puncte) ? d.puncte : [];
     const orderIds = Array.isArray(d.orderIds) ? d.orderIds : [];
@@ -188,25 +207,24 @@ router.post('/api/fuvarlevel-save', async (req, res) => {
     await pool.query(
       `INSERT INTO fuvarlevelek (
         id, file_name, email_sofer, nume_sofer,
-        numar_camion, numar_remorca, numar_fisa, cursa_saptamanii,
+        numar_camion, numar_remorca, numar_fisa,
         km_inceput, km_sfarsit, total_km,
-        loc_plecare, loc_sosire, loc_desc_tur, loc_inc_retur,
+        loc_plecare, loc_sosire,
         diurna_externa, diurna_interna,
-        cant_inceput, cant_sfarsit, motorina_folosit, total_alim, consum_100,
-        alte_mentiuni, alimentari, achizitii, tranzite, puncte, order_ids,
+        cant_inceput, cant_sfarsit, motorina_folosit, total_alim, total_adblue, consum_100,
+        alte_mentiuni, alimentari, achizitii, puncte, order_ids,
         indulas_dt, erkezes_dt, hataratok, company_id
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)`,
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)`,
       [
         id, fileName, req.session.user.email, req.session.user.nume,
-        d.numarCamion || null, d.numarRemorca || null, autoDocNumber || d.numarFisa || null, d.cursaSaptamanii || null,
+        d.numarCamion || null, d.numarRemorca || null, autoDocNumber || d.numarFisa || null,
         Number(d.kmInceput || 0), Number(d.kmSfarsit || 0), totalKm,
-        d.locPlecare || null, d.locSosire || null, d.locDescTUR || null, d.locIncRETUR || null,
+        d.locPlecare || null, d.locSosire || null,
         diurnaCalc.externDays, diurnaCalc.internDays,  // a sofőr által megadott adatokból számolva
-        cantInc, cantSf, motorinaFolosit, totalAlim, consum100,
+        cantInc, cantSf, motorinaFolosit, totalAlim, totalAdblue, consum100,
         d.alteMentiuni || null,
         JSON.stringify(alimentari),
-        JSON.stringify(Array.isArray(d.achizitii) ? d.achizitii : []),
-        JSON.stringify(Array.isArray(d.tranzite) ? d.tranzite : []),
+        JSON.stringify(normalizeAchizitii(d.achizitii)),
         JSON.stringify(puncte),
         JSON.stringify(orderIds),
         indulasDt ? new Date(indulasDt) : null,
@@ -523,13 +541,14 @@ router.get('/api/pdf-download/:id', async (req, res) => {
         achHtml += `<tr>
           <td>${i+1}. ${escHtml(ach.loc || '—')}</td>
           <td>${_fmtItemDate(ach.data)}</td>
+          <td>${escHtml(CAT_RO[normalizeCategory(ach.categorie)])}</td>
           <td>${escHtml(ach.produs || '—')}</td>
           <td>${escHtml(ach.pret || 0)} RON</td>
           <td>${escHtml(ach.plata || '—')}</td>
         </tr>`;
       });
     } else {
-      achHtml = '<tr><td colspan="5">Nu a fost inregistrata nicio cheltuiala.</td></tr>';
+      achHtml = '<tr><td colspan="6">Nu a fost inregistrata nicio cheltuiala.</td></tr>';
     }
 
     // Fuvar ID-k
@@ -541,13 +560,41 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     <title>${escHtml(f.file_name)}</title>
     <meta charset="UTF-8">
     <style>
+      * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
       body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.5; color:#000; font-size:13px; }
       .header-box { text-align:center; font-weight:bold; font-size:17px; border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:18px; }
       .grid-table { width:100%; border-collapse:collapse; margin-bottom:14px; }
       .grid-table td { border:1px solid #000; padding:5px 7px; vertical-align:top; }
       .grid-table th { border:1px solid #000; padding:5px 7px; background:#e8e8e8; font-weight:bold; text-align:left; }
       .sec-title { font-weight:bold; background:#d0d0d0; text-transform:uppercase; padding:5px 7px; border:1px solid #000; margin-top:14px; margin-bottom:0; font-size:12px; letter-spacing:.5px; }
-      @media print { .no-print { display:none; } body { padding:10px; } }
+
+      /* ─── TÖBBOLDALAS NYOMTATÁS — a decont-nyomtatványok szabályai ───
+         (forras: public/fleet-extra-v2.js _VS_PRINT_CSS)
+         1. A doc-fejléc egy layout-tábla <thead>-jében ül, a lábléc a
+            <tfoot>-ban → a böngésző MINDEN lap tetejére/aljára megismétli.
+         2. Minden belső adat-tábla oszlop-fejléce (<thead>) szintén
+            ismétlődik, ha a tábla átnyúlik a következő oldalra.
+         3. Egy sor SOSEM törik ketté két oldal között.
+         4. Az összetartozó blokkok (fejléc-adatok, fogyasztás-számítás,
+            aláírás) egyben maradnak. */
+      table.vs-print-wrap { width:100%; border-collapse:collapse; }
+      .vs-print-wrap > thead { display:table-header-group; }
+      .vs-print-wrap > tfoot { display:table-footer-group; }
+      .vs-print-wrap > thead > tr > td,
+      .vs-print-wrap > tfoot > tr > td,
+      .vs-print-wrap > tbody > tr > td { padding:0; border:0; vertical-align:top; }
+      thead { display:table-header-group; }
+      tfoot { display:table-footer-group; }
+      tr { page-break-inside:avoid; break-inside:avoid; }
+      .keep, .sign-block, .header-box { page-break-inside:avoid; break-inside:avoid; }
+      .sec-title { page-break-after:avoid; break-after:avoid; }
+      .vs-doc-foot { border-top:1px solid #000; margin-top:6px; padding-top:4px; font-size:10px; color:#444;
+                     display:flex; justify-content:space-between; gap:10px; }
+      @page { size:A4; margin:14mm; }
+      /* Az !important KELL: a gombsav inline display:flex erteke kulonben
+         legyozi az osztaly-szabalyt, es a kepernyos gombok kulon oldalkent
+         rakerulnek a nyomtatott menetlevelre. */
+      @media print { .no-print { display:none !important; } body { padding:0; } }
     </style>
   </head>
   <body>
@@ -555,9 +602,20 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       <button onclick="window.close();setTimeout(function(){if(!window.closed){if(history.length>1){history.back();}else{location.href='/';}}},150);" style="padding:10px 24px;background:#555;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">← Inapoi</button>
       <button onclick="window.print()" style="padding:10px 24px;background:#000;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">🖨️ Tipareste / Salveaza PDF</button>
     </div>
-    <div class="header-box">${escHtml(companyName)}<br><span style="font-size:14px;">Foi de Parcurs</span><br><span style="font-size:15px;color:#b00;letter-spacing:1px;">Serie / Nr.: ${escHtml(f.numar_fisa || '—')}</span></div>
+    <table class="vs-print-wrap">
+    <thead><tr><td>
+      <div class="header-box">${escHtml(companyName)}<br><span style="font-size:14px;">Foi de Parcurs</span><br><span style="font-size:15px;color:#b00;letter-spacing:1px;">Serie / Nr.: ${escHtml(f.numar_fisa || '—')}</span></div>
+    </td></tr></thead>
+    <tfoot><tr><td>
+      <div class="vs-doc-foot">
+        <span>${escHtml(companyName)} · Foaie de parcurs ${escHtml(f.numar_fisa || '—')}</span>
+        <span>${escHtml(f.nume_sofer || '')}${f.numar_camion ? ' · ' + escHtml(f.numar_camion) : ''}</span>
+      </div>
+    </td></tr></tfoot>
+    <tbody><tr><td>
 
-    <table class="grid-table">
+    <table class="grid-table keep">
+      <tbody>
       <tr><td width="50%"><b>Nume șofer:</b> ${escHtml(f.nume_sofer || '—')}</td><td><b>Serie / Număr:</b> ${escHtml(f.numar_fisa || '—')}</td></tr>
       <tr><td><b>Număr camion:</b> ${escHtml(f.numar_camion || '—')}</td><td><b>Număr remorcă:</b> ${escHtml(f.numar_remorca || '—')}</td></tr>
       <tr><td colspan="2"><b>ID-uri cursă:</b> ${orderIdsStr}</td></tr>
@@ -565,40 +623,47 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       <tr><td><b>Km început:</b> ${f.km_inceput || 0} km</td><td><b>Km sfârșit:</b> ${f.km_sfarsit || 0} km</td></tr>
       <tr><td colspan="2"><b>Total kilometri parcurși: ${f.total_km || 0} km</b></td></tr>
       ${isSofer ? '' : `<tr><td><b>Diurnă externă:</b> ${f.diurna_externa || 0} zile</td><td><b>Diurnă internă:</b> ${f.diurna_interna || 0} zile</td></tr>`}
+      </tbody>
     </table>
 
     <div class="sec-title">Puncte de traseu</div>
     <table class="grid-table">
-      <tr><th>#</th><th>Tip</th><th>Localitate / Adresă</th><th>Dată</th></tr>
-      ${puncteHtml}
+      <thead><tr><th>#</th><th>Tip</th><th>Localitate / Adresă</th><th>Dată</th></tr></thead>
+      <tbody>${puncteHtml}</tbody>
     </table>
 
     <div class="sec-title">Alimentări</div>
     <table class="grid-table">
-      <tr><th>Loc</th><th>Data</th><th>Combustibil</th><th>Litri</th><th>Km</th><th>Plată</th><th>Sumă</th></tr>
-      ${alimHtml}
+      <thead><tr><th>Loc</th><th>Data</th><th>Combustibil</th><th>Litri</th><th>Km</th><th>Plată</th><th>Sumă</th></tr></thead>
+      <tbody>${alimHtml}</tbody>
     </table>
 
     <div class="sec-title">Calcul consum combustibil</div>
-    <table class="grid-table">
+    <table class="grid-table keep">
+      <tbody>
       <tr><td><b>Cantitate început:</b> ${f.cant_inceput || 0} L</td><td><b>Cantitate sfârșit:</b> ${f.cant_sfarsit || 0} L</td></tr>
-      <tr><td><b>Total alimentări:</b> ${f.total_alim || 0} L</td><td><b>Motorină folosită:</b> ${f.motorina_folosit || 0} L</td></tr>
+      <tr><td><b>Total motorină alimentată:</b> ${f.total_alim || 0} L</td><td><b>Motorină folosită:</b> ${f.motorina_folosit || 0} L</td></tr>
+      <tr><td><b>Total AdBlue:</b> ${f.total_adblue || 0} L</td><td style="color:#555;">AdBlue nu intră în consumul de motorină.</td></tr>
       <tr><td colspan="2"><b>Consum mediu / 100 km: ${f.consum_100 || 0} L</b></td></tr>
+      </tbody>
     </table>
 
     <div class="sec-title">Achiziții / Cheltuieli</div>
     <table class="grid-table">
-      <tr><th>Loc</th><th>Data</th><th>Produs / Serviciu</th><th>Preț</th><th>Metodă plată</th></tr>
-      ${achHtml}
+      <thead><tr><th>Loc</th><th>Data</th><th>Categorie</th><th>Produs / Serviciu</th><th>Preț</th><th>Metodă plată</th></tr></thead>
+      <tbody>${achHtml}</tbody>
     </table>
 
     <div class="sec-title">Alte mențiuni</div>
-    <div style="border:1px solid #000;padding:10px;min-height:40px;">${escHtml(f.alte_mentiuni || '—')}</div>
+    <div class="keep" style="border:1px solid #000;padding:10px;min-height:40px;">${escHtml(f.alte_mentiuni || '—')}</div>
 
-    <div style="margin-top:30px;display:flex;justify-content:space-between;">
+    <div class="sign-block" style="margin-top:30px;display:flex;justify-content:space-between;">
       <div style="text-align:center;"><div style="border-top:1px solid #000;width:180px;margin:0 auto;padding-top:4px;">Semnătura șofer</div></div>
       <div style="text-align:center;"><div style="border-top:1px solid #000;width:180px;margin:0 auto;padding-top:4px;">Semnătura dispecer</div></div>
     </div>
+
+    </td></tr></tbody>
+    </table>
     <script>
       // Ha in-app iframe-ben (PWA-nézet) nyílik meg, a beágyazó modal adja a
       // Vissza/Nyomtatás vezérlést — rejtsük a saját gombsávot.

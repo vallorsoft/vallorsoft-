@@ -14,6 +14,51 @@
 
 ---
 
+## 2026-09-22 — Menetlevél: AdBlue külön · AI-kategória a bonon · km-folytonosság az adminnak · holt mezők · decont nyomtatási szabályok
+
+**Kérés:** „2-est de a kiolvasas mar ismerje fel hogy mit tartalmaz a bon. 3-as de adminnak jelezze gyujtse osze. 7-est. Az adbluet szamolja külön. Ezmelett a menetlevel kinezeten egy kis valtozast a decont nyomtatasi szabalyait rakd ide is, fejlec lablec, es sort nem tor kozepen ha tablazatot tor akkor a masik oldalon is a tablazat elso sora a sorok neve stb."
+
+### 1. HIBAJAVÍTÁS — az AdBlue dízelként számolódott el
+
+A tankolás-sorok literét **típus nélkül** adta össze a kód, pedig a menetlevél-űrlap két üzemanyag-típust kínál. Egy AdBlue-töltés így a dízel-fogyasztásba került: felnyomta a `motorina_folosit`-ot és a `consum_100`-at. A rendszer máshol MÁR tudta a különbséget (a CO₂-riport kifejezetten kiszűri az AdBlue-t, a `getFuelStats` típus szerint bont) — csak a menetlevél saját száma maradt ki. Valós példa: 500 L dízel + 60 L AdBlue, 2000 km → a régi képlet **38,00 L/100km**-et adott, ami PONT a sofőr-figyelmeztetés küszöbe; helyesen **35,00**.
+
+- **Új `lib/waybillTotals.js`** `computeFuelTotals` — EGY igazságforrás. A képlet eddig **három helyen** élt bájtra azonos másolatban (`routes/soferApi.js` sofőr-beküldés, `handlers/documents.js` `fuvarlevelUpdate` + `fuvarlevelCreate`), és mindhárom ugyanazt a hibát vitte. Mindhárom erre állt át.
+- **Migráció `db/waybill-adblue-split.sql`** (ÚJ, idempotens): `fuvarlevelek.total_adblue` oszlop + a meglévő menetlevelek **visszamenőleges újraszámolása** az `alimentari` JSONB-ből (az az igazságforrás, a derivált oszlopok csak belőle képződnek → a migráció többször is futtatható, `UPDATE 0`-t ad). Valós Postgres 16-on verifikálva: dízel+AdBlue vegyes, típus nélküli sor (= dízel), csak-AdBlue, szóközös „ad blue", üres tömb.
+- **AdBlue-illesztés defenzív**: kis/nagybetű-, ékezet- és szóköz-független, mert a sor jöhet AI bon-kiolvasásból, piszkozat-visszatöltésből vagy admin-szerkesztésből is. Típus nélküli sor = dízel (régi menetlevelek).
+- A tartály-mérleg (`cant_inceput`/`cant_sfarsit`) **kizárólag a dízelre** értelmes — az AdBlue külön tartályban van.
+
+### 2. A bon-kiolvasó AI már felismeri, MIT tartalmaz a bon
+
+- **Új `lib/expenseCategories.js` + `public/expense-cat.js`** — 10 fehérlistás kiadás-kategória (útdíj/matrica · komp · parkolás · mosás · javítás · alkatrész · szállás · étkezés · bírság · egyéb). A két lista szétcsúszását teszt kényszeríti egyezésre.
+- **`handlers/receiptScan.js`** — a Gemini-prompt új `categorie` kulcsot kér, konkrét RO besorolási útmutatóval (rovinietă/taxă pod → `taxa_drum`, service/vulcanizare → `reparatie`, hotel → `cazare` stb.). A `sanitize` fehérlistából validál: ismeretlen → `altele` (a kiadás sosem vész el amiatt, hogy a kategóriát nem sikerült felismerni), tankolásnál `null`.
+- **Tanul is**: a kategória **STABIL** mező (egy adott merchant jellemzően ugyanaz a kategória), ezért bekerült a few-shot példákba — a megerősített minta viszi tovább a következő bonra.
+- **Kliens**: kategória-választó a menetlevél kiadás-során, a bon-áttekintő modálon (az AI javaslata előtöltve, a sofőr javíthatja) és az admin menetlevél-szerkesztőben. Védőháló: ha az `expense-cat.js` nem töltődne be, a sor attól még működik és a meglévő kategória megmarad.
+- **Szerver-oldali fehérlistázás a beszúrás ELŐTT** mindhárom úton (`normalizeAchizitii` / `_normAchizitii`) — a kliens bármit küldhet.
+
+### 3. Km-folytonosság — az adminnak, összegyűjtve
+
+- **Új `getWaybillKmGaps`** (`handlers/documents.js`, Admin/Manager, `company_id`-szűrt, paraméteres, csak olvasás): járművenként végigolvassa a menetleveleket a BEÍRT út-dátum sorrendjében, és kigyűjti, hol nem folytatja a kezdő km az előző záró km-et. `diff > 0` → **hiányzó km** (lekönyveletlen út), `diff < 0` → **átfedés** (elgépelt kezdő km vagy duplikált menetlevél). A rendszám normalizálva párosít (`B 104 VLR` ≡ `B104VLR`), az első menetlevél kimarad, a tűréshatár alapból 1 km (felülírható, 1000-re korlátozva).
+- **UI**: új `#wbKmGapBand` teendő-sáv a FUVARLEVELEK oldalon, a meglévő hiányzó-menetlevél sáv mellett; a sorra kattintva a hibás menetlevél szerkesztője nyílik. Ablak-függvényes lekérdezés valós Postgres 16-on verifikálva.
+
+### 4. Holt mezők kivezetése
+
+A `cursa_saptamanii`, `loc_desc_tur`, `loc_inc_retur` és `tranzite` mezőket a kliens **sosem** töltötte (a `tranzite` fixen üres tömbként ment) — kikerültek a beszúrási útból. Az oszlopok megmaradnak (adatmegőrzés, `schema.sql` érintetlen), csak nem írunk beléjük.
+
+### 5. A menetlevél nyomtatása a decont szabályaival
+
+A decont-nyomtatványok szabályai (`public/fleet-extra-v2.js` `_VS_PRINT_CSS`) átkerültek a menetlevél PDF-jére:
+- **Fejléc + lábléc MINDEN lapon** — a doc-fejléc egy layout-tábla `<thead>`-jébe, a lábléc a `<tfoot>`-ba került, így a böngésző lapról lapra megismétli. A lábléc a cégnevet, a menetlevél-számot, a sofőrt és a rendszámot viszi.
+- **Oszlopnevek ismétlődnek** — minden adat-tábla fejléc-sora `<thead>`-be került, így ha a tábla átnyúlik a következő oldalra, ott is ott a sorok neve.
+- **Sor sosem törik ketté** (`tr{page-break-inside:avoid}`), az összetartozó blokkok (fejléc-adatok, fogyasztás-számítás, aláírás, megjegyzés) egyben maradnak, a szakasz-cím nem szakad el a táblájától.
+- **`@page{size:A4;margin:14mm}`** — a decontokkal azonos laptükör.
+- **Régi hiba menet közben**: a képernyős gombsáv (`.no-print`) inline `display:flex` értéke legyőzte az osztály-szabályt, ezért **minden eddig nyomtatott menetlevélre rákerült egy külön oldalként**. `!important`-tal javítva — a teszt-render 5 oldalról 4-re csökkent.
+- **Új a lapon**: `Total AdBlue` külön sor a fogyasztás-blokkban (jelezve, hogy nem számít a dízel-fogyasztásba) és `Categorie` oszlop a kiadás-táblán (RO felirattal, a fehérlistából).
+- **Verifikáció**: valódi headless Chromium `--print-to-pdf` 90 soros menetlevélen → 4 oldal, `pdf-parse` oldalanként: fejléc + lábléc mind a négyen, az oszlopnevek a folytatás-lapokon is, gombsáv sehol.
+
+**Teszt**: új `tests/unit/waybill-totals.test.js` (8), `tests/unit/expense-categories.test.js` (4, benne 3 regresszió-őr a lista/i18n/PDF-felirat szinkronra), `tests/integration/waybill-km-gaps.test.js` (8), `receiptScan.test.js` +5. **1308 Jest zöld** (1281 → 1308), require-sweep 147 modul tisztán, `npm test` (CI `--runInBand`) zöld. Cache-bust `?v=20260922wb`, a MEGOSZTOTT `i18n.js` mind a 14 oldalon.
+
+---
+
 ## 2026-09-21 — Sofőr felület átvizsgálás: 4 hiba feltárva és javítva (escape, vissza-gomb, pull-to-refresh, cache-bust)
 
 **Kérés:** „Sofer oldalt ellenőrizd át és ha hibát kapsz javítsd, először a hibákat tárd fel, hogy legyen kézzelfogható kiinduló, ha sikerült folytasd a kijavítással."

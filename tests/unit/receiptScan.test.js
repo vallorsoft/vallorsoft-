@@ -386,3 +386,43 @@ describe('handlers/receiptScan', () => {
     expect(r.result.err.length).toBeLessThanOrEqual(300);
   });
 });
+
+// ════════════════════════════════════════════════════════════
+//  KATEGÓRIA-FELISMERÉS — az AI ne csak leírja a bont, sorolja is be
+// ════════════════════════════════════════════════════════════
+describe('bon-kategória felismerés', () => {
+  const { EXPENSE_CATEGORIES } = require('../../lib/expenseCategories');
+  const sanitize = handler._sanitize;
+
+  test('a prompt felsorolja a teljes fehérlistát', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '..', '..', 'handlers', 'receiptScan.js'), 'utf8');
+    // A prompt a `categoryListForPrompt()`-ot használja → a lista sosem
+    // csúszhat el a `lib/expenseCategories.js`-től.
+    expect(src).toMatch(/categorie[^\n]*categoryListForPrompt\(\)/);
+    expect(src).toMatch(/'kind, loc, data, tip, litru, km, plata, suma, valuta, produs, categorie, confidence/);
+  });
+
+  test('vásárlásnál a fehérlistás kategória átmegy', () => {
+    EXPENSE_CATEGORIES.forEach(k => {
+      expect(sanitize({ kind: 'purchase', categorie: k }).categorie).toBe(k);
+    });
+  });
+
+  test('vásárlásnál az ismeretlen kategória → altele (nem vész el a kiadás)', () => {
+    expect(sanitize({ kind: 'purchase', categorie: 'benzinkút-kávé' }).categorie).toBe('altele');
+    expect(sanitize({ kind: 'purchase' }).categorie).toBe('altele');
+  });
+
+  test('tankolásnál nincs kategória', () => {
+    expect(sanitize({ kind: 'fuel', categorie: 'taxa_drum' }).categorie).toBeNull();
+  });
+
+  test('a kategória STABIL mező → a few-shot tanulás példaként mutatja', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '..', '..', 'handlers', 'receiptScan.js'), 'utf8');
+    // Egy adott merchant jellemzően ugyanaz a kategória (MOL → fuel,
+    // parkolóház → parcare), ezért a megerősített minta viszi tovább.
+    expect(src).toMatch(/categorie:\s*f\.categorie\s*\|\|\s*null/);
+  });
+});

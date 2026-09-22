@@ -9,6 +9,16 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 22. lépés — Menetlevél: kiadás-kategória fehérlistázás + AdBlue adat-integritás (2026-09-22) ✅ KÉSZ
+
+Két, egymástól független szál: egy ÚJ bemeneti felület fehérlistázása, és egy meglévő derivált mező adat-integritásának helyreállítása.
+
+- **Kiadás-kategória — fehérlista a beszúrás ELŐTT, mindhárom úton.** A menetlevél vásárlás-sora új `categorie` mezőt kapott, amit HÁROM forrás tölthet: a sofőr választója, az admin szerkesztője, és a **Gemini bon-kiolvasás** (tehát részben modell-generált, azaz nem megbízható bemenet). A `lib/expenseCategories.js` `normalizeCategory` 10 elemű fehérlistája validál a sofőr-beküldésnél (`normalizeAchizitii`), az admin szerkesztésnél és a kézi menetlevélnél (`_normAchizitii`), valamint a scan-válaszban (`sanitize`). Ismeretlen érték → `altele`; a kiadás sosem vész el a besorolás miatt, de „kreatív" kulcs sem kerül a DB-be. A kliens bármit küldhet — a szerver nem hisz neki.
+- **A Gemini-válasz továbbra sem propagál ismeretlen kulcsot** — a `sanitize` fehérlistás mező-készlete változatlan, csak egy új, validált kulccsal bővült. A base64 kép sem naplóba, sem DB-be nem kerül (változatlan).
+- **AdBlue adat-integritás.** A `total_alim` / `motorina_folosit` / `consum_100` derivált mezők TÍPUS NÉLKÜL összegezték a tankolás-litereket, így az AdBlue a dízel-fogyasztásba került. Ez nem csak megjelenítési hiba: ezekből az értékekből indul a sofőrnek szóló figyelmeztetés és a **managernek küldött push** (>2.5 L/100km eltérés), tehát a hibás szám valós riasztást generált. A számítás egyetlen forrásba (`lib/waybillTotals.js`) került, és a `db/waybill-adblue-split.sql` a meglévő sorokat is helyreteszi az `alimentari` JSONB-ből (az az igazságforrás) — idempotensen, valós Postgres 16-on verifikálva.
+- **Új olvasó végpont tenant-izolációja.** A `getWaybillKmGaps` Admin/Manager kapu + `company_id`-szűrt + paraméteres SQL (a tűréshatár is paraméter, nincs string-összefűzés), csak olvasás, teszttel fedve (szerep-kapu, cég-szűrés, paraméterezés, DB-hiba → generikus üzenet stack nélkül).
+- **Regresszió-védelem:** `tests/unit/waybill-totals.test.js`, `tests/unit/expense-categories.test.js` (a kliens/szerver kategória-lista, az i18n és a PDF-felirat szinkronját kényszeríti), `tests/integration/waybill-km-gaps.test.js`. **1308 Jest zöld.**
+
 ### 21. lépés — Sofőr felület: attribútum-escape a menetlevél tankolás/vásárlás soraiban + modál-nyilvántartás (2026-09-21) ✅ KÉSZ
 
 A sofőr menetlevél `addAlimRow`/`addAchRow` sorépítői kilenc mezőt escape-elés NÉLKÜL írtak a `value="…"` attribútumba. A forrás nem csak a sofőr saját gépelése: a 📷 **AI bon-kiolvasás** (`handlers/receiptScan.js` → `rrAccept` → `addAlimRow(f)`) a Gemini által a fényképezett bonról leolvasott `loc`/`produs` szöveget adja át. A szerver `_sanitize`-ja **fehérlistáz, de nem escape-el** (szándékosan — a tárolt érték nyers marad), tehát a kliens-oldali escape a védelmi réteg, és az hiányzott.

@@ -14,6 +14,9 @@ const vm = require('vm');
 const path = require('path');
 const ROOT = path.join(__dirname, '..', '..');
 const SRC  = fs.readFileSync(path.join(ROOT, 'public', 'sofer.js'), 'utf8');
+// A kiadás-kategória választóját a KÖZÖS `public/expense-cat.js` adja —
+// a sandboxba is betöltjük, hogy a valódi renderelési utat mérjük.
+const CATS = fs.readFileSync(path.join(ROOT, 'public', 'expense-cat.js'), 'utf8');
 const HTML = fs.readFileSync(path.join(ROOT, 'public', 'sofer.html'), 'utf8');
 
 function makeStore() {
@@ -63,6 +66,7 @@ function load() {
   sb.window = sb; sb.self = sb; sb.globalThis = sb;
   sb.window.addEventListener = noop;
   vm.createContext(sb);
+  try { vm.runInContext(CATS, sb, { filename: 'expense-cat.js' }); } catch (e) {}
   try { vm.runInContext(SRC, sb, { filename: 'sofer.js' }); } catch (e) { /* top-level authMe */ }
   return sb;
 }
