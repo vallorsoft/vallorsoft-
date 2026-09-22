@@ -6,6 +6,8 @@
 // ============================================================
 const pool = require('../db');
 const { genDocId } = require('../lib/ids');
+const { computeFuelTotals } = require('../lib/waybillTotals');
+const { normalizeCategory } = require('../lib/expenseCategories');
 const { calculateDiurna } = require('../lib/diurna');
 const { fetchTripCrossings } = require('../lib/tripCrossings');
 const audit = require('../lib/audit');
@@ -309,6 +311,77 @@ handlers.getFuvarlevelek = async function (req, res, args) {
 // Azok a LEZÁRT (Finalizat) fuvarok, amelyekhez még EGYETLEN menetlevél sem
 // készült (a fuvar id-ja egyetlen menetlevél order_ids tömbjében sem szerepel).
 // Cégre szűrt, csak olvasás — a manager egy pillantással látja, kit kell nógatni.
+// ── Km-folytonosság: a menetlevelek közti km-rések ÖSSZEGYŰJTVE ─────────
+// A sofőr menetlevelének kezdő km-e előtöltődik (GPS vagy az előző zárás),
+// de felülírható — és ha elgépeli, ma senki nem szól. Ez járművenként
+// végigolvassa a menetleveleket a BEÍRT út-dátum (`eff_date`) sorrendjében,
+// és kigyűjti, ahol a kezdő km nem folytatja az előző záró km-et.
+//   diff > 0 → hiányzó km (két menetlevél közt lekönyveletlen út)
+//   diff < 0 → átfedés (elgépelt kezdő km vagy duplikált menetlevél)
+// Admin/Manager, `company_id`-szűrt, csak olvasás.
+handlers.getWaybillKmGaps = async function (req, res, args) {
+    try {
+      if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
+      const me = req.session.user;
+      if (!['Admin', 'Manager'].includes(me.pozicio)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+      const cid = me.company_id;
+      if (!cid) return res.json({ result: { ok: true, gaps: [], count: 0 } });
+
+      // Tűréshatár km-ben: ennél kisebb eltérést nem jelzünk (kerekítés,
+      // garázs-manőver). Alap 1 km; a hívó szűkítheti/tágíthatja.
+      const a = (Array.isArray(args) ? args[0] : args) || {};
+      let tol = Number(a.tolerance_km);
+      if (!Number.isFinite(tol) || tol < 0) tol = 1;
+      if (tol > 1000) tol = 1000;
+
+      const r = await pool.query(
+        `WITH wb AS (
+           SELECT f.id, f.numar_fisa, f.nume_sofer, f.email_sofer,
+                  UPPER(REGEXP_REPLACE(COALESCE(f.numar_camion,''), '[^A-Za-z0-9]', '', 'g')) AS plate,
+                  f.numar_camion AS plate_raw,
+                  COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) AS eff_date,
+                  COALESCE(f.km_inceput, 0)::numeric AS km_inc,
+                  COALESCE(f.km_sfarsit, 0)::numeric AS km_sf
+           FROM fuvarlevelek f
+           WHERE (f.company_id = $1
+                  OR f.email_sofer IN (SELECT email FROM users WHERE company_id = $1))
+             AND COALESCE(f.numar_camion,'') <> ''
+             AND COALESCE(f.km_inceput,0) > 0
+             AND COALESCE(f.km_sfarsit,0) > 0
+         ), seq AS (
+           SELECT wb.*,
+                  LAG(km_sf)      OVER (PARTITION BY plate ORDER BY eff_date, id) AS prev_km_sf,
+                  LAG(id)         OVER (PARTITION BY plate ORDER BY eff_date, id) AS prev_id,
+                  LAG(numar_fisa) OVER (PARTITION BY plate ORDER BY eff_date, id) AS prev_fisa,
+                  LAG(eff_date)   OVER (PARTITION BY plate ORDER BY eff_date, id) AS prev_date
+           FROM wb
+         )
+         SELECT id, numar_fisa, nume_sofer, email_sofer, plate_raw, eff_date,
+                km_inc, prev_km_sf, prev_id, prev_fisa, prev_date,
+                (km_inc - prev_km_sf) AS diff
+         FROM seq
+         WHERE prev_km_sf IS NOT NULL
+           AND ABS(km_inc - prev_km_sf) > $2
+         ORDER BY eff_date DESC NULLS LAST
+         LIMIT 200`,
+        [cid, tol]);
+
+      const gaps = r.rows.map(x => ({
+        id: x.id, numar_fisa: x.numar_fisa,
+        nume_sofer: x.nume_sofer, email_sofer: x.email_sofer,
+        plate: x.plate_raw, eff_date: x.eff_date,
+        km_inceput: Number(x.km_inc), prev_km_sfarsit: Number(x.prev_km_sf),
+        prev_id: x.prev_id, prev_fisa: x.prev_fisa, prev_date: x.prev_date,
+        diff: Number(x.diff),
+        kind: Number(x.diff) > 0 ? 'gap' : 'overlap'
+      }));
+      return res.json({ result: { ok: true, gaps, count: gaps.length, tolerance_km: tol } });
+    } catch (err) {
+      console.error('getWaybillKmGaps hiba:', err);
+      return res.json({ result: { ok: false, err: 'Eroare de server' } });
+    }
+  };
+
 handlers.getOrdersMissingWaybill = async function (req, res, args) {
     try {
       if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
@@ -465,6 +538,13 @@ handlers.getFuvarlevelDetail = async function (req, res, args) {
 
 // Menetlevél szerkesztése (Admin/Manager, cégre szűrve). A derivált mezőket
 // (total_km, total_alim, motorina_folosit, consum_100) szerveroldalon számoljuk.
+// A menetlevél kiadás-sorainak kategóriája fehérlistázva (közös szabály a
+// sofőr-beküldéssel: ismeretlen érték → `altele`, nem dobjuk el a sort).
+function _normAchizitii(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(a => Object.assign({}, a, { categorie: normalizeCategory(a && a.categorie) }));
+}
+
 handlers.fuvarlevelUpdate = async function (req, res, args) {
     try {
       if (!req.session.user) return res.json({ result: { ok: false, err: 'Nu sunteti autentificat' } });
@@ -488,12 +568,13 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
       const kmInc = Number(d.km_inceput || 0);
       const kmSf  = Number(d.km_sfarsit || 0);
       const totalKm = Math.max(0, kmSf - kmInc);
-      let totalAlim = 0;
-      alimentari.forEach(a => { totalAlim += Number(a.litru || 0); });
+      // AdBlue KÜLÖN (nem dízel) — közös `lib/waybillTotals.js`.
+      let totalAlim = 0, totalAdblue = 0;
       const cantInc = Number(d.cant_inceput || 0);
       const cantSf  = Number(d.cant_sfarsit || 0);
-      const motorinaFolosit = Math.max(0, cantInc + totalAlim - cantSf);
-      const consum100 = totalKm > 0 ? Math.round((motorinaFolosit / totalKm * 100) * 100) / 100 : 0;
+      let motorinaFolosit = 0, consum100 = 0;
+      ({ totalAlim, totalAdblue, motorinaFolosit, consum100 } =
+        computeFuelTotals(alimentari, cantInc, cantSf, totalKm));
 
       // Dátum + fuvar ID-k (Admin/Manager szerkesztheti). Üres/hiányzó → a
       // meglévő érték marad (COALESCE); érvénytelen dátum → szintén marad.
@@ -539,17 +620,18 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
 
       await pool.query(
         `UPDATE fuvarlevelek SET
-           email_sofer = COALESCE($25, email_sofer),
+           email_sofer = COALESCE($26, email_sofer),
            nume_sofer = $2, numar_camion = $3, numar_remorca = $4, numar_fisa = $5,
            km_inceput = $6, km_sfarsit = $7, total_km = $8,
            diurna_externa = $9, diurna_interna = $10,
            cant_inceput = $11, cant_sfarsit = $12, motorina_folosit = $13, total_alim = $14, consum_100 = $15,
-           alte_mentiuni = $16, alimentari = $17, achizitii = $18, puncte = $19,
-           data_completare = COALESCE($20::timestamp, data_completare),
-           order_ids = COALESCE($21::jsonb, order_ids),
-           indulas_dt = COALESCE($22::timestamptz, indulas_dt),
-           erkezes_dt = COALESCE($23::timestamptz, erkezes_dt),
-           total_pret = COALESCE($24::numeric, total_pret)
+           total_adblue = $16,
+           alte_mentiuni = $17, alimentari = $18, achizitii = $19, puncte = $20,
+           data_completare = COALESCE($21::timestamp, data_completare),
+           order_ids = COALESCE($22::jsonb, order_ids),
+           indulas_dt = COALESCE($23::timestamptz, indulas_dt),
+           erkezes_dt = COALESCE($24::timestamptz, erkezes_dt),
+           total_pret = COALESCE($25::numeric, total_pret)
          WHERE id = $1`,
         [
           id,
@@ -557,14 +639,15 @@ handlers.fuvarlevelUpdate = async function (req, res, args) {
           kmInc, kmSf, totalKm,
           parseInt(d.diurna_externa || 0), parseInt(d.diurna_interna || 0),
           cantInc, cantSf, motorinaFolosit, totalAlim, consum100,
+          totalAdblue,
           d.alte_mentiuni || null,
-          JSON.stringify(alimentari), JSON.stringify(achizitii), JSON.stringify(puncte),
+          JSON.stringify(alimentari), JSON.stringify(_normAchizitii(achizitii)), JSON.stringify(puncte),
           dataCompletare,
           orderIds === null ? null : JSON.stringify(orderIds),
           indulasDt,
           erkezesDt,
           totalPret,
-          newEmailSofer   // $25 — új sofőr-horgony (validált cég-user) vagy NULL (marad a régi)
+          newEmailSofer   // $26 — új sofőr-horgony (validált cég-user) vagy NULL (marad a régi)
         ]
       );
       return res.json({ result: { ok: true, total_km: totalKm, consum_100: consum100 } });
@@ -633,12 +716,13 @@ handlers.fuvarlevelCreate = async function (req, res, args) {
       const kmInc = Number(d.km_inceput || 0);
       const kmSf  = Number(d.km_sfarsit || 0);
       const totalKm = Math.max(0, kmSf - kmInc);
-      let totalAlim = 0;
-      alimentari.forEach(a => { totalAlim += Number(a.litru || 0); });
+      // AdBlue KÜLÖN (nem dízel) — közös `lib/waybillTotals.js`.
+      let totalAlim = 0, totalAdblue = 0;
       const cantInc = Number(d.cant_inceput || 0);
       const cantSf  = Number(d.cant_sfarsit || 0);
-      const motorinaFolosit = Math.max(0, cantInc + totalAlim - cantSf);
-      const consum100 = totalKm > 0 ? Math.round((motorinaFolosit / totalKm * 100) * 100) / 100 : 0;
+      let motorinaFolosit = 0, consum100 = 0;
+      ({ totalAlim, totalAdblue, motorinaFolosit, consum100 } =
+        computeFuelTotals(alimentari, cantInc, cantSf, totalKm));
 
       // Dátum (data_completare) — megadható; hiányában NOW() (tábla-alapérték).
       let dataCompletare = null;
@@ -688,19 +772,19 @@ handlers.fuvarlevelCreate = async function (req, res, args) {
           numar_camion, numar_remorca, numar_fisa,
           km_inceput, km_sfarsit, total_km,
           diurna_externa, diurna_interna,
-          cant_inceput, cant_sfarsit, motorina_folosit, total_alim, consum_100,
+          cant_inceput, cant_sfarsit, motorina_folosit, total_alim, total_adblue, consum_100,
           alte_mentiuni, alimentari, achizitii, puncte, order_ids,
           data_completare, indulas_dt, erkezes_dt, total_pret, company_id, hataratok
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
-          COALESCE($23::timestamp, NOW()),$24,$25,$26,$27,$28)`,
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,
+          COALESCE($24::timestamp, NOW()),$25,$26,$27,$28,$29)`,
         [
           id, fileName, emailSofer, numeSofer,
           d.numar_camion || null, d.numar_remorca || null, autoDocNumber,
           kmInc, kmSf, totalKm,
           diurnaExt, diurnaInt,
-          cantInc, cantSf, motorinaFolosit, totalAlim, consum100,
+          cantInc, cantSf, motorinaFolosit, totalAlim, totalAdblue, consum100,
           d.alte_mentiuni || null,
-          JSON.stringify(alimentari), JSON.stringify(achizitii), JSON.stringify(puncte),
+          JSON.stringify(alimentari), JSON.stringify(_normAchizitii(achizitii)), JSON.stringify(puncte),
           JSON.stringify(orderIds),
           dataCompletare, indulasDt, erkezesDt, totalPret,
           cid,  // company_id horgony — túléli a sofőr törlését

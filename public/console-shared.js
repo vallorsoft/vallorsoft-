@@ -2908,6 +2908,7 @@ function fuvAnomalyBadge(f){
 
 function loadReceivedFuvarlevelek(){
   loadMissingWaybills();
+  loadWaybillKmGaps();
   gas('getFuvarlevelek').then(list=>{
     var tb=document.querySelector('#tblReceivedFuv tbody');
     if(!list||list.length===0){tb.innerHTML='<tr><td colspan="5">'+t('cs.noWaybills')+'</td></tr>';return;}
@@ -2943,6 +2944,40 @@ function loadMissingWaybills(){
     band.innerHTML='<div style="border:1px solid rgba(245,158,11,0.45);background:linear-gradient(180deg,rgba(245,158,11,0.10),rgba(245,158,11,0.04));border-radius:14px;padding:12px 16px;">'
       +'<div style="font-weight:700;color:#f59e0b;margin-bottom:2px;">⚠️ '+t('cs.missingWbTitle',{n:r.orders.length})+'</div>'
       +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">'+t('cs.missingWbHint')+'</div>'
+      +items+'</div>';
+    band.style.display='';
+  }).catch(function(){ band.style.display='none'; });
+}
+
+// Km-folytonosság teendő-sáv (Admin/Manager): a menetlevelek közti km-rések
+// ÖSSZEGYŰJTVE, járművenként. A sofőr kezdő km-e előtöltődik, de felülírható
+// — ha elgépeli, eddig senki nem szólt. Piros = hiányzó km (lekönyveletlen
+// út), kék = átfedés (elgépelt kezdő km vagy duplikált menetlevél).
+// A sorra kattintva a hibás menetlevél szerkesztője nyílik.
+function loadWaybillKmGaps(){
+  var band=document.getElementById('wbKmGapBand');
+  if(!band) return;
+  gas('getWaybillKmGaps').then(r=>{
+    if(!r||!r.ok||!Array.isArray(r.gaps)||!r.gaps.length){ band.style.display='none'; band.innerHTML=''; return; }
+    var fmtD=function(d){ try{ return d?new Date(d).toLocaleDateString('hu-HU'):'—'; }catch(_){ return '—'; } };
+    var items=r.gaps.map(function(g){
+      var isGap=g.kind==='gap';
+      var col=isGap?'#ef4444':'#3b82f6';
+      var amount=Math.abs(Number(g.diff)||0).toLocaleString(t('sof.locale'),{maximumFractionDigits:1});
+      var label=isGap?t('wbgap.gap'):t('wbgap.overlap');
+      return '<div onclick="openFuvEdit(\''+esc(g.id)+'\')" style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-top:1px solid rgba(239,68,68,0.18);">'
+        +'<b style="color:'+col+';">'+amount+' '+esc(label)+'</b>'
+        +'<span style="color:var(--text-primary);font-size:12px;font-weight:600;">'+esc(g.plate||'—')+'</span>'
+        +'<span style="color:var(--text-muted);font-size:12px;">'
+          +esc(g.numar_fisa||g.id)+' · '+fmtD(g.eff_date)
+          +(g.nume_sofer?(' · '+esc(g.nume_sofer)):'')
+          +' · '+t('wbgap.prev')+': '+esc(g.prev_km_sfarsit)
+          +' → '+t('wbgap.curr')+': '+esc(g.km_inceput)
+        +'</span></div>';
+    }).join('');
+    band.innerHTML='<div style="border:1px solid rgba(239,68,68,0.45);background:linear-gradient(180deg,rgba(239,68,68,0.10),rgba(239,68,68,0.04));border-radius:14px;padding:12px 16px;">'
+      +'<div style="font-weight:700;color:#ef4444;margin-bottom:2px;">'+t('wbgap.title')+' · '+t('wbgap.count',{n:r.gaps.length})+'</div>'
+      +'<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;">'+t('wbgap.hint')+'</div>'
       +items+'</div>';
     band.style.display='';
   }).catch(function(){ band.style.display='none'; });
@@ -3000,10 +3035,13 @@ function feRowAlim(a){a=a||{};var dt=_feNormItemDate(a.data);return '<div class=
   +'<input class="input fe-a-suma" type="number" placeholder="Sumă" value="'+feEsc(a.suma)+'">'
   +'<button class="btn ghost" style="padding:4px 9px;" onclick="this.parentNode.remove()">✕</button></div>';}
 
-function feRowAch(c){c=c||{};var dt=_feNormItemDate(c.data);return '<div class="fe-row" style="display:grid;grid-template-columns:1.2fr 1fr 1.4fr .8fr .8fr auto;gap:6px;align-items:center;">'
+function feRowAch(c){c=c||{};var dt=_feNormItemDate(c.data);return '<div class="fe-row" style="display:grid;grid-template-columns:1.2fr 1fr 1.4fr 1fr .8fr .8fr auto;gap:6px;align-items:center;">'
   +'<input class="input fe-c-loc" data-sg="ach_loc" placeholder="Loc" value="'+feEsc(c.loc)+'">'
   +'<input class="input fe-c-data" type="date" value="'+feEsc(dt)+'">'
   +'<input class="input fe-c-prod" data-sg="ach_produs" placeholder="Produs" value="'+feEsc(c.produs)+'">'
+  // Kiadás-kategória (közös lista: public/expense-cat.js) — a sofőr/AI által
+  // beállított érték itt is javítható, a szerver fehérlistából validál.
+  +'<select class="input fe-c-cat">'+(typeof vsExpenseCatOptions==='function'?vsExpenseCatOptions(c.categorie):'')+'</select>'
   +'<input class="input fe-c-pret" type="number" placeholder="Preț" value="'+feEsc(c.pret)+'">'
   +'<input class="input fe-c-plata" data-sg="ach_plata" placeholder="Plată" value="'+feEsc(c.plata||'Card')+'">'
   +'<button class="btn ghost" style="padding:4px 9px;" onclick="this.parentNode.remove()">✕</button></div>';}
@@ -3309,7 +3347,7 @@ function saveFuvEdit(){
   var id=document.getElementById('feId').value;
   var puncte=[].map.call(document.querySelectorAll('#fePuncte .fe-row'),function(r){return {tip:r.querySelector('.fe-p-tip').value,loc:r.querySelector('.fe-p-loc').value,data:r.querySelector('.fe-p-data').value};});
   var alimentari=[].map.call(document.querySelectorAll('#feAlim .fe-row'),function(r){return {loc:r.querySelector('.fe-a-loc').value,data:((r.querySelector('.fe-a-data')||{}).value||''),tip:r.querySelector('.fe-a-tip').value,litru:parseFloat(r.querySelector('.fe-a-lit').value)||0,km:parseFloat(r.querySelector('.fe-a-km').value)||0,plata:r.querySelector('.fe-a-plata').value,suma:parseFloat(r.querySelector('.fe-a-suma').value)||0};});
-  var achizitii=[].map.call(document.querySelectorAll('#feAch .fe-row'),function(r){return {loc:r.querySelector('.fe-c-loc').value,data:((r.querySelector('.fe-c-data')||{}).value||''),produs:r.querySelector('.fe-c-prod').value,pret:parseFloat(r.querySelector('.fe-c-pret').value)||0,plata:r.querySelector('.fe-c-plata').value};});
+  var achizitii=[].map.call(document.querySelectorAll('#feAch .fe-row'),function(r){return {loc:r.querySelector('.fe-c-loc').value,data:((r.querySelector('.fe-c-data')||{}).value||''),produs:r.querySelector('.fe-c-prod').value,pret:parseFloat(r.querySelector('.fe-c-pret').value)||0,plata:r.querySelector('.fe-c-plata').value,categorie:((r.querySelector('.fe-c-cat')||{}).value||'altele')};});
   var payload={
     nume_sofer:document.getElementById('feNumeSofer').value,
     numar_fisa:document.getElementById('feNumarFisa').value,
