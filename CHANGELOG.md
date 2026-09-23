@@ -16,6 +16,27 @@
 
 
 
+
+## 2026-09-23 — Sofőr kártya-fejléc: papír-menetlevél stílus (multi-drop haladás egyértelműen)
+
+**Kérés:** „amig a fuvar nincs megnyitva addig teveszto infot ír az elso es utolso stop helyet es ceget ide valami atlathato kellene es ahogy halad a stopokkal valtozo" — az idős sofőr (aki nem ért a technikához) is azonnal értse.
+
+1. **Gyökér:** a fuvar-kártya összecsukott fejléce a régi `first pickup → last delivery` statikát mutatta (`.fuvar-head-pick → .fuvar-head-drop`); multi-drop fuvarnál (pl. 5/6 stop kész) a sofőr még mindig az első felrakót és az utolsó lerakót látta — a valós haladás elveszett.
+2. **Új fejléc — papír-menetlevél stílus** (`public/sofer.js` új `_wbHeader` + `_wbHeaderRow` + `_wbHeaderStops` + `fmtFuvarDayWeekday` segédek): sorszámozott állomás-lista (`1..N`), amit a régi papír fuvarlapról bárki azonnal ért:
+   - **✓** kész állomások (halvány zöld, áthúzott)
+   - **▶ MOST** a soron következő (narancs bal-akcens + kiemelt háttér + pulzáló ▶ ikon)
+   - **○** hátra van (halvány szürke)
+   - Fejléc-számláló: `Fuvar · 5/6 kész`
+   - Sorformátum: „Felrakó — Copșa Mică / Rebat · 09.24 Csütörtök" (nap-név a rövid dátum mellett — az idős sofőr napokban gondolkodik)
+3. **KÉSZ állapot (N/N):** külön hivatalos pecsét-blokk „✓ FUVAR KÉSZ" zöld akcenssel + utolsó lerakó időbélyeggel. Lezárás-momentum.
+4. **Hosszú fuvar (7+ stop):** automatikusan összenyomja a listát — utolsó 2 kész + MOST + következő 2 látszik, közte `… N állomás kihagyva` halvány jelzés. A kártya sosem nő aránytalanul.
+5. **Nem-migrált fuvar** (nincs `o.stops`) → visszaesik a régi `pickBits → dropBits` fejlécre. Nincs adatvesztés.
+6. **CSS** (`public/sofer.css` új `.wb-hd*` blokk, additív): keskeny mobil finomhangolás (MOST-sor betűméret megmarad, többi kompaktabb); sötét mód `@media (prefers-color-scheme:dark)` felülírásokkal. Nincs séma-változás, nincs új szerver-út, nincs új handler.
+7. **i18n** 7 új `sof.wbh.*` kulcs (RO-alap + HU). Cache-bust `sofer.js/css/i18n.js?v=20260923wbhead`.
+8. **Teszt** (`tests/integration/sofer-client-flow.test.js`) +4 új eset: nem-migrált → régi fejléc; multi-drop 6-stop 5/6 → 5 ✓ + 1 ▶ MOST; összes kész → alldone-blokk 1 sorral; 10-stop → utolsó 2 + MOST + következő 2, kihagyott-jelzés. **1380 Jest zöld** (1376 → 1380) valós Postgres 16-tal.
+
+Tisztán kliens-oldali — az állomás-gomb (`driverStopAction`), a stop-választó modal (`sofChoiceModal`), a kártya kinyitott akkordeon-listája (`.fd-stop-block`) mind érintetlen. Verifikáció: headless Chromium 5-állapotú preview + valós DOM harness.
+
 ## 2026-09-23 — Sofőr fejléc-gomb: „következő állomás" helyett a valós helyszín (multi-drop)
 
 **Kérés:** „a soforenek a fuvaroknal a kek gombon ne kovetkezo allomas irjon hanem azt is hogy mi következik"

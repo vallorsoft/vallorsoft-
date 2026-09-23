@@ -869,3 +869,113 @@ describe('renderFuvarCard: állomás-gomb következő állomás címkéje', () =
     expect(m[1]).not.toMatch(/▾/);
   });
 });
+
+// ================================================================
+//  Papír-menetlevél stílusú kártya-fejléc (2026-09-23)
+//  Az idős sofőr a papír fuvarlaphoz szokott — sorszámok, ✓ pipa a kész,
+//  „▶" a soron következőn, halvány „○" a hátra maradóra. Multi-drop
+//  fuvarnál a régi „első felrakó → utolsó lerakó" statika félrevezető
+//  volt — a fejléc most a valós haladást tükrözi.
+// ================================================================
+describe('renderFuvarCard: papír-menetlevél stílusú fejléc', () => {
+  const mkOrder = (stops, opts = {}) => Object.assign({
+    id: 'WB1', status: 'In Curs', client: 'X', rendszam_camion: 'B1',
+    data_incarcare: '2026-09-21', data_descarcare: '2026-09-24',
+    firma_incarcare: 'FelrakoKft', loc_incarcare: 'Ploiești',
+    firma_descarcare: 'Rebat',     loc_descarcare: 'Copșa Mică',
+    stops: stops
+  }, opts);
+
+  test('nem-migrált fuvar (nincs stops) → visszaesik a régi headTxt-re', () => {
+    const sb = load({});
+    const html = sb.renderFuvarCard(mkOrder([]), 1);
+    // Régi felrakó → lerakó összesítő látszik
+    expect(html).toContain('fuvar-head-pick');
+    expect(html).toContain('fuvar-head-arrow');
+    expect(html).toContain('fuvar-head-drop');
+    // Új papír-fejléc NEM
+    expect(html).not.toContain('wb-hd-row');
+  });
+
+  test('multi-drop 6 stop, 5 kész → papír-fejléc: ✓ ✓ ✓ ✓ ✓ ▶ MOST', () => {
+    const sb = load({});
+    const s = (id, kind, seq, loc, firma, done) => ({
+      id: id, kind: kind, seq_index: seq, stop_index: 0,
+      loc: loc, firma: firma,
+      arrived_at: done, done_at: done
+    });
+    const o = mkOrder([
+      s('p1', 'pickup',   0, 'Ploiești',   'Vesna GC',  '2026-09-21T09:00:00'),
+      s('d1', 'delivery', 1, 'Copșa Mică', 'Rebat',     '2026-09-21T14:00:00'),
+      s('p2', 'pickup',   2, 'Arad',       'Vesna GC',  '2026-09-22T09:00:00'),
+      s('d2', 'delivery', 3, 'Copșa Mică', 'Rebat',     '2026-09-22T14:00:00'),
+      s('p3', 'pickup',   4, 'Arad',       'Vesna GC',  '2026-09-24T09:00:00'),
+      s('d3', 'delivery', 5, 'Copșa Mică', 'Rebat',     null)
+    ]);
+    const html = sb.renderFuvarCard(o, 1);
+    // Új papír-fejléc jelen van
+    expect(html).toContain('wb-hd-row');
+    expect(html).toContain('wb-hd-title');
+    // Számláló 5/6
+    expect(html).toMatch(/5\s*\/\s*6/);
+    // 5 kész sor (✓ done)
+    const doneCount = (html.match(/wb-hd-row wb-hd-done/g) || []).length;
+    expect(doneCount).toBe(5);
+    // 1 MOST-sor
+    const curCount = (html.match(/wb-hd-row wb-hd-current/g) || []).length;
+    expect(curCount).toBe(1);
+    // A MOST-sor a 6. sorszámmal
+    expect(html).toMatch(/wb-hd-current[^]*?wb-hd-num[^<]*>6\.</);
+    // A régi statikus „első→utolsó" fejléc kimarad
+    expect(html).not.toContain('fuvar-head-arrow');
+  });
+
+  test('összes kész (6/6) → „✓ FUVAR KÉSZ" hivatalos pecsét-blokk', () => {
+    const sb = load({});
+    const done = '2026-09-24T14:30:00';
+    const s = (id, kind, seq, loc, firma) => ({
+      id: id, kind: kind, seq_index: seq, stop_index: 0,
+      loc: loc, firma: firma, arrived_at: done, done_at: done
+    });
+    const o = mkOrder([
+      s('p1', 'pickup',   0, 'Arad',       'Vesna GC'),
+      s('d1', 'delivery', 1, 'Copșa Mică', 'Rebat')
+    ], { status: 'Finalizat' });
+    const html = sb.renderFuvarCard(o, 1);
+    expect(html).toContain('wb-hd-alldone');
+    // Csak egy sor: az utolsó lerakó (nem az összes stop listázva)
+    const rowCount = (html.match(/wb-hd-row/g) || []).length;
+    expect(rowCount).toBe(1);
+    expect(html).toContain('Copșa Mică');
+    // Számláló 2/2
+    expect(html).toMatch(/2\s*\/\s*2/);
+  });
+
+  test('7+ stop → csak utolsó 2 kész + MOST + következő 2 (kihagyott jelzés)', () => {
+    const sb = load({});
+    const doneIso = '2026-09-24T09:00:00';
+    const s = (i, done) => ({
+      id: 's' + i, kind: (i % 2 === 0 ? 'pickup' : 'delivery'), seq_index: i, stop_index: 0,
+      loc: 'City' + i, firma: 'Firma' + i,
+      arrived_at: done ? doneIso : null, done_at: done ? doneIso : null
+    });
+    // 10 stop, első 5 kész, hatodik a MOST
+    const stops = [];
+    for (let i = 0; i < 10; i++) stops.push(s(i, i < 5));
+    const html = sb.renderFuvarCard(mkOrder(stops), 1);
+    // Számláló 5/10
+    expect(html).toMatch(/5\s*\/\s*10/);
+    // Kihagyott-jelzés MINDKÉT irányban
+    expect(html).toContain('wb-hd-skip');
+    // ELÖL: 3 kihagyva (index 0-2), majd látszik 3-4 (kész) + 5 (MOST)
+    expect(html).toMatch(/…\s*3\s+/);
+    // HÁTUL: 3 kihagyva (index 7-9), előtte 5 (MOST) + 6-7 (pending)
+    expect(html).toMatch(/…\s*3\s+/);
+    // A MOST-sor az index 5. (6. sorszám)
+    expect(html).toMatch(/wb-hd-current[^]*?wb-hd-num[^<]*>6\.</);
+    // Nem az összes 10 sor van kirenderelve (csak kb 5 sor)
+    const rowCount = (html.match(/class="wb-hd-row/g) || []).length;
+    expect(rowCount).toBeLessThanOrEqual(6);
+    expect(rowCount).toBeGreaterThanOrEqual(4);
+  });
+});

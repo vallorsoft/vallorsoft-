@@ -3244,3 +3244,181 @@
   border-color: #2563eb;
   color: #1d4ed8;
 }
+
+/* ================================================================
+   Papír-menetlevél stílusú kártya-fejléc (2026-09-23) — az idős sofőr
+   is azonnal érti. Sorszám (1..N), ✓ pipa a kész állomáson, ▶ nyíl a
+   soron következőn, halvány „○" a hátra maradókon. A MOST-sor
+   narancs bal-akcens + kiemelt háttér — a szem magától odaugrik.
+   Kizárólag a `.fuvar-headtxt`-en belüli `.wb-hd` blokkot érinti; a
+   `.fuvar-head` flex-elrendezés és a `#N` badge változatlan.
+   ================================================================ */
+.sofer-wrap .fuvar-headtxt .wb-hd {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+}
+.sofer-wrap .wb-hd-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #475569;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.sofer-wrap .wb-hd-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: transparent;
+  line-height: 1.3;
+  min-width: 0;
+}
+.sofer-wrap .wb-hd-icon {
+  flex: 0 0 auto;
+  width: 22px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #94a3b8;
+}
+.sofer-wrap .wb-hd-num {
+  flex: 0 0 auto;
+  min-width: 20px;
+  font-weight: 700;
+  color: #64748b;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.sofer-wrap .wb-hd-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sofer-wrap .wb-hd-main-t {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sofer-wrap .wb-hd-main-s {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Állapot szerinti stílus ── */
+/* KÉSZ (✓ zöld): halvány zöld pipa, opacity 0.75 */
+.sofer-wrap .wb-hd-row.wb-hd-done { opacity: 0.72; }
+.sofer-wrap .wb-hd-row.wb-hd-done .wb-hd-icon { color: #16a34a; }
+.sofer-wrap .wb-hd-row.wb-hd-done .wb-hd-main-t {
+  text-decoration: line-through;
+  text-decoration-color: rgba(15, 23, 42, 0.35);
+  color: #334155;
+}
+
+/* MOST (▶ narancs, kiemelt) — a szem magától ide ugrik */
+.sofer-wrap .wb-hd-row.wb-hd-current {
+  background: linear-gradient(90deg, #fff8ed, #fefefe);
+  border-left: 4px solid #f59e0b;
+  padding-left: 10px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-radius: 6px 10px 10px 6px;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.15);
+}
+.sofer-wrap .wb-hd-row.wb-hd-current .wb-hd-icon {
+  color: #d97706;
+  font-size: 17px;
+  animation: wbHdPulse 1.6s ease-in-out infinite;
+}
+.sofer-wrap .wb-hd-row.wb-hd-current .wb-hd-num { color: #b45309; font-weight: 800; }
+.sofer-wrap .wb-hd-row.wb-hd-current .wb-hd-main-t {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: normal;   /* MOST-sornál törhet, hogy hosszú cím se vágódjon */
+}
+.sofer-wrap .wb-hd-row.wb-hd-current .wb-hd-main-s {
+  color: #78350f;
+  font-weight: 600;
+  white-space: normal;
+}
+
+/* HÁTRA VAN (○ halvány) */
+.sofer-wrap .wb-hd-row.wb-hd-pending { opacity: 0.65; }
+.sofer-wrap .wb-hd-row.wb-hd-pending .wb-hd-icon { color: #cbd5e1; }
+.sofer-wrap .wb-hd-row.wb-hd-pending .wb-hd-main-t { color: #64748b; font-weight: 600; }
+
+/* Kihagyott stopok jelzése (7+ stop esetén) */
+.sofer-wrap .wb-hd-skip {
+  padding: 2px 8px 2px 30px;
+  font-size: 11.5px;
+  color: #94a3b8;
+  font-style: italic;
+  font-weight: 500;
+}
+
+/* ✓ FUVAR KÉSZ állapot: zöld akcent, mint egy hivatalos pecsét */
+.sofer-wrap .wb-hd.wb-hd-alldone .wb-hd-title { color: #15803d; }
+.sofer-wrap .wb-hd.wb-hd-alldone .wb-hd-row.wb-hd-done {
+  opacity: 1;
+  background: linear-gradient(90deg, #f0fdf4, #fefefe);
+  border-left: 4px solid #22c55e;
+  padding-left: 10px;
+}
+.sofer-wrap .wb-hd.wb-hd-alldone .wb-hd-row.wb-hd-done .wb-hd-main-t {
+  text-decoration: none;
+  color: #0f172a;
+  font-weight: 700;
+}
+.sofer-wrap .wb-hd.wb-hd-alldone .wb-hd-row.wb-hd-done .wb-hd-icon {
+  color: #15803d;
+  font-size: 17px;
+}
+
+@keyframes wbHdPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.15); }
+}
+
+/* Mobil finomhangolás: keskeny képernyőn a MOST-sor betűméret marad
+   nagy (olvashatóság kesztyűben, napsütésben), a többi kissé kompaktabb */
+@media (max-width: 480px) {
+  .sofer-wrap .wb-hd-row { padding: 5px 6px; }
+  .sofer-wrap .wb-hd-main-t { font-size: 13.5px; }
+  .sofer-wrap .wb-hd-main-s { font-size: 11.5px; }
+  .sofer-wrap .wb-hd-row.wb-hd-current .wb-hd-main-t { font-size: 15px; }
+  .sofer-wrap .wb-hd-row.wb-hd-current .wb-hd-main-s { font-size: 12.5px; }
+}
+
+/* Sötét mód */
+@media (prefers-color-scheme: dark) {
+  .sofer-wrap .wb-hd-title { color: #cbd5e1; }
+  .sofer-wrap .wb-hd-main-t { color: #e2e8f0; }
+  .sofer-wrap .wb-hd-main-s { color: #94a3b8; }
+  .sofer-wrap .wb-hd-row.wb-hd-done .wb-hd-main-t { color: #94a3b8; }
+  .sofer-wrap .wb-hd-row.wb-hd-current {
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.15), rgba(15, 23, 42, 0.3));
+    box-shadow: 0 1px 3px rgba(245, 158, 11, 0.25);
+  }
+  .sofer-wrap .wb-hd-row.wb-hd-current .wb-hd-main-t { color: #fff; }
+  .sofer-wrap .wb-hd-row.wb-hd-current .wb-hd-main-s { color: #fbbf24; }
+  .sofer-wrap .wb-hd-row.wb-hd-pending .wb-hd-main-t { color: #94a3b8; }
+  .sofer-wrap .wb-hd.wb-hd-alldone .wb-hd-row.wb-hd-done {
+    background: linear-gradient(90deg, rgba(34, 197, 94, 0.15), rgba(15, 23, 42, 0.3));
+  }
+  .sofer-wrap .wb-hd.wb-hd-alldone .wb-hd-row.wb-hd-done .wb-hd-main-t { color: #e2e8f0; }
+}
