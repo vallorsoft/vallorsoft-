@@ -1714,6 +1714,56 @@
   box-shadow: 0 0 0 2px rgba(96,165,250,0.20), 0 4px 12px rgba(59,130,246,0.10);
 }
 
+/* Stop-választó modal (több lerakó/felrakó) — HIBAJAVÍTÁS: eddig CSAK a
+   gomb-finomhangolás volt meg, a modal-alap (fixed overlay + kártya) NEM →
+   a `display:flex` után a modal a lap aljára, a normál folyamba került
+   (a body overflow:hidden miatt láthatatlanul) → a több lerakós fuvaron az
+   állomás-gomb „nem csinált semmit". Ugyanaz a keret, mint #sofConfirmModal. */
+#sofChoiceModal {
+  box-sizing: border-box;
+  position: fixed; inset: 0; z-index: 1200;
+  align-items: center; justify-content: center;
+  padding: 20px;
+  background: rgba(15,23,42,0.62);
+  backdrop-filter: blur(6px);
+}
+#sofChoiceModal .sof-modal-card {
+  box-sizing: border-box;
+  width: min(440px, 100%);
+  max-height: calc(100vh - 40px); overflow-y: auto;
+  background: #fff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 20px;
+  padding: 24px 22px 20px;
+  box-shadow: 0 26px 60px rgba(15,23,42,0.30);
+  text-align: center;
+}
+#sofChoiceModal .sof-cf-ico { font-size: 34px; line-height: 1; margin-bottom: 10px; }
+#sofChoiceModal .sof-cf-title {
+  margin: 0 0 8px; font-size: 18px; font-weight: 900; color: #0f172a;
+  letter-spacing: -0.01em;
+}
+#sofChoiceModal .sof-cf-msg {
+  margin: 0 0 16px; font-size: 13.5px; line-height: 1.5; color: #475569;
+  font-weight: 600;
+}
+#sofChoiceModal .sof-cf-btns { display: flex; }
+#sofChoiceModal .sof-cf-btn {
+  box-sizing: border-box; width: 100%; min-height: 54px; padding: 14px 12px; border-radius: 14px;
+  font-size: 15px; font-weight: 800; cursor: pointer;
+  touch-action: manipulation; font-family: inherit;
+}
+#sofChoiceModal .sof-cf-btn.ok {
+  border: 1.5px solid #1d4ed8;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(37,99,235,0.30);
+}
+#sofChoiceModal .sof-cf-btn.cancel {
+  border: 1.5px solid #94a3b8; background: #f1f5f9; color: #334155;
+}
+#sofChoiceModal .sof-cf-btn:active { transform: scale(0.98); }
+
 /* Stop-választó modal — a gombok teljes szélességben, egymás alatt */
 #sofChoiceModal .sof-cf-btns { max-height: 60vh; overflow-y: auto; }
 #sofChoiceModal .sof-cf-btn.ok {

@@ -179,3 +179,19 @@ describe('_SOF_MODALS — közös modál-nyilvántartás', () => {
     expect(m.style.display).toBe('none');
   });
 });
+
+// ── REGRESSZIÓ-ŐR (2026-09-23): minden `class="sof-modal"` modál kapjon
+// saját fixed overlay-t a sofer.css-ben. A #sofChoiceModal-nak (több
+// lerakós fuvar stop-választója) hiányzott → a modal a lap aljára, láthatatlanul
+// renderelődött, az állomás-gomb „nem működött".
+describe('sof-modal overlay CSS', () => {
+  const CSS = fs.readFileSync(path.join(ROOT, 'public', 'sofer.css'), 'utf8');
+  const ids = [...HTML.matchAll(/<div id="([A-Za-z]+Modal)" class="sof-modal[" ]/g)].map(m => m[1]);
+  test('van legalább egy sof-modal (köztük a sofChoiceModal)', () => {
+    expect(ids).toContain('sofChoiceModal');
+  });
+  test.each(ids)('%s: position:fixed overlay a sofer.css-ben', (id) => {
+    const re = new RegExp('#' + id + '\\s*\\{[^}]*position:\\s*fixed', 'm');
+    expect(CSS).toMatch(re);
+  });
+});
