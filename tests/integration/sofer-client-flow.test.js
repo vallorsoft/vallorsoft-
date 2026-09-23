@@ -922,7 +922,7 @@ describe('renderFuvarCard: papír-menetlevél stílusú fejléc', () => {
     expect(html).not.toContain('fuvar-head-arrow');
   });
 
-  test('multi-drop 6 stop, 5 kész — KOMPAKT mód: MOST + utolsó/következő súgás', () => {
+  test('multi-drop 6 stop, 5 kész — KOMPAKT mód: MINDEN kész látszik mini-sorként + MOST kiemelten', () => {
     const sb = load({});
     const s = (id, kind, seq, loc, firma, done) => ({
       id: id, kind: kind, seq_index: seq, stop_index: 0,
@@ -940,17 +940,22 @@ describe('renderFuvarCard: papír-menetlevél stílusú fejléc', () => {
     const html = sb.renderFuvarCard(o, 1);
     expect(html).toContain('wb-hd-title');
     expect(html).toMatch(/5\s*\/\s*6/);
-    // Kompakt mód: pontosan 1 MOST-sor + 1 mini-done súgás (utolsó kész)
+    // Kompakt mód: 1 MOST-sor + MINDEN 5 kész mini-done sorként
     expect((html.match(/wb-hd-row wb-hd-current/g) || []).length).toBe(1);
-    expect((html.match(/wb-hd-mini-done/g) || []).length).toBe(1);
+    expect((html.match(/wb-hd-mini-done/g) || []).length).toBe(5);
     // Nincs következő súgás (a MOST az utolsó — nincs mögötte semmi)
     expect(html).not.toContain('wb-hd-mini-next');
-    // Nincs 5 külön ✓-sor (a teljes lista nem látszik)
+    // A teljes-részletes done sorok NINCSENEK (mini formában látszanak)
     expect((html.match(/wb-hd-row wb-hd-done/g) || []).length).toBe(0);
     // A MOST-sor a 6. sorszámmal
     expect(html).toMatch(/wb-hd-current[^]*?wb-hd-num[^<]*>6\.</);
     // A régi statikus „első→utolsó" fejléc kimarad
     expect(html).not.toContain('fuvar-head-arrow');
+    // A stop 1 („Ploiești") mini-done sorként látszik (a sofőr a régebbi
+    // állomásait is látja, nem csak az utolsót — 2026-09-23-i visszajelzés).
+    // A test-env-ben az i18n nyers kulcsot ad vissza (sof.wbh.pickup) —
+    // a lényeg a sorszám + Ploiești (első kész stop cím).
+    expect(html).toMatch(/wb-hd-mini-done[^]*?1\.[^<]*?Ploiești/);
   });
 
   test('összes kész (6/6) → „✓ FUVAR KÉSZ" hivatalos pecsét-blokk', () => {
@@ -974,7 +979,7 @@ describe('renderFuvarCard: papír-menetlevél stílusú fejléc', () => {
     expect(html).toMatch(/2\s*\/\s*2/);
   });
 
-  test('hosszú fuvar (10 stop) → kompakt: MOST + 1 utolsó + 1 következő + „+N további"', () => {
+  test('hosszú fuvar (10 stop) → kompakt: MINDEN kész látszik + MOST + hátralévők + esetleg „+N további"', () => {
     const sb = load({});
     const doneIso = '2026-09-24T09:00:00';
     const s = (i, done) => ({
@@ -982,46 +987,39 @@ describe('renderFuvarCard: papír-menetlevél stílusú fejléc', () => {
       loc: 'City' + i, firma: 'Firma' + i,
       arrived_at: done ? doneIso : null, done_at: done ? doneIso : null
     });
-    // 10 stop, első 5 kész, hatodik a MOST
+    // 10 stop, első 5 kész, hatodik a MOST, utána 4 pending
     const stops = [];
     for (let i = 0; i < 10; i++) stops.push(s(i, i < 5));
     const html = sb.renderFuvarCard(mkOrder(stops), 1);
     // Számláló 5/10
     expect(html).toMatch(/5\s*\/\s*10/);
-    // Kompakt mód: 1 MOST-sor + 1 mini-done (előző) + 1 mini-next (következő)
+    // Kompakt mód: 1 MOST + MINDEN 5 kész mini-done + 4 hátralévő mini-next
+    // (MAX_PENDING_INLINE=8 → mind belefér, nincs „+N további")
     expect((html.match(/wb-hd-row wb-hd-current/g) || []).length).toBe(1);
-    expect((html.match(/wb-hd-mini-done/g) || []).length).toBe(1);
-    expect((html.match(/wb-hd-mini-next/g) || []).length).toBe(1);
+    expect((html.match(/wb-hd-mini-done/g) || []).length).toBe(5);
+    expect((html.match(/wb-hd-mini-next/g) || []).length).toBe(4);
     // A MOST-sor az index 5. (6. sorszám)
     expect(html).toMatch(/wb-hd-current[^]*?wb-hd-num[^<]*>6\.</);
-    // „+3 további" a hátra maradó 4 stop közül (2 már látszik a next-en)
-    // 10 - (currentIdx=5 + 2) = 3 további stop
-    expect(html).toMatch(/\+3/);
-    // Az összes 10 sor NINCS kirenderelve — pontosan 1 fő sor + 2 mini
-    // (a wrappereken számoljuk, ne a belső `.wb-hd-mini-t`-ken).
-    const rowCount = (html.match(/class="wb-hd-row /g) || []).length +
-                     (html.match(/class="wb-hd-mini /g) || []).length;
-    expect(rowCount).toBeLessThanOrEqual(3);
+    // NINCS „+N további" (mind a 4 hátralévő látszik)
+    expect(html).not.toContain('wb-hd-skip');
   });
 
-  // ── OLDAL-MÉRETEZÉSI szint-őr (mobil-elsőség regresszió-védelem) ──
-  test('mobil-fókusz: a fejléc-magasság 5+ stop esetén NEM nő aránytalanul', () => {
+  // ── OLDAL-MÉRETEZÉSI szint-őr — nagyon hosszú fuvar rövidítése ──
+  test('nagyon hosszú fuvar (15 pending) → MAX_PENDING_INLINE=8 után „+N további" jel', () => {
     const sb = load({});
     const s = (i) => ({ id: 's' + i, kind: 'delivery', seq_index: i, stop_index: 0,
       loc: 'C' + i, firma: 'F' + i, arrived_at: null, done_at: null });
-    // 15 stop, mind nyitva → kompakt módnak kell aktiválódnia
+    // 15 stop, mind nyitva (currentIdx=0)
     const stops = [];
     for (let i = 0; i < 15; i++) stops.push(s(i));
     const html = sb.renderFuvarCard(mkOrder(stops), 1);
-    // A rendered sorok száma korlátozott — a régi 6-sor × 44 = 264px hiba
-    // után ez a szint-őr védi meg a mobil-elsőségű viselkedést.
-    const totalRows = (html.match(/class="wb-hd-row /g) || []).length +
-                      (html.match(/class="wb-hd-mini /g) || []).length;
-    // 15 stop, mind nyitva → currentIdx = 0 → nincs mini-done (előző kész),
-    // van MOST-sor + mini-next (index 1) → 2 wrapper. Ha a limitet
-    // aránytalanul nagyra állítjuk, 15 sor jönne ki, ami betöltené a
-    // képernyőt telefonon — a szint-őr ezt tiltja.
-    expect(totalRows).toBeLessThanOrEqual(3);
+    // 0 kész, 1 MOST + 8 pending mini-next + „+6 további"
+    expect((html.match(/wb-hd-mini-done/g) || []).length).toBe(0);
+    expect((html.match(/wb-hd-row wb-hd-current/g) || []).length).toBe(1);
+    expect((html.match(/wb-hd-mini-next/g) || []).length).toBe(8);
+    // 15 - (currentIdx=0 + 1 MOST + 8 mini-next) = 6 further
+    expect(html).toContain('wb-hd-skip');
+    expect(html).toMatch(/\+6/);
   });
 
   test('MOST-sor: teljes cím + teljes cégnév (nem rövidítve)', () => {

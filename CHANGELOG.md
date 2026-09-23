@@ -14,6 +14,18 @@
 
 ---
 
+## 2026-09-23 — Sofőr kártya-fejléc: MINDEN elvégzett stop VISSZA (a sofőr régebbi állomásait is látja)
+
+**Kérés:** „Eddig mutatta az osszeset most miert nm? A befejezeteket" — a PR #464 kompakt módja (5+ stop) csak az EGY közvetlenül előző kész stopot mutatta mini-sorként; a régebbi kész állomások (1-4) eltűntek.
+
+**Fix (`public/sofer.js` `_wbHeader`):** kompakt módban is végigmegyünk MINDEN elvégzett stopon (`for d = 0..currentIdx-1`) és mindegyiket mini-done sorként rendereljük — ✓ + sorszám + típus + város (`_cityOf` rövidített). A MOST-sor kiemelt marad (`.wb-hd-main-full` teljes cím + cégnév), utána MINDEN hátralévő stop mini-next sorként (`for p = currentIdx+1..N-1`). Nagyon hosszú fuvarnál (`MAX_PENDING_INLINE=8`) a végén „+N további" jelzés — a 20+ stopos fuvar sem nyúlik el vég nélkül.
+
+**Mobil-magasság:** 6-stop fuvar 5 kész + 1 MOST = 5 × ~26px + ~60px ≈ 190px per kártya, 3 kártya ≈ 570px — az első kártya teljesen látszik telefonon, a második nagyrészt. Nagyon hosszú (10-15 stop) fuvarnál a végét a MAX_PENDING_INLINE=8 rövidíti.
+
+**Nem érintett:** ≤4 stop rövid fuvar (teljes papír-lista mindig), MOST-sor teljes cím/cégnév megjelenítése, ALLDONE „✓ FUVAR KÉSZ" pecsét, kinyíló akkordeon-panel (teljes lista + másolás).
+
+**Teszt:** a `renderFuvarCard: papír-menetlevél stílusú fejléc` describe frissítve — a 6-stop kompakt case-ben 5 mini-done + 1 MOST + 0 mini-next elvárás, a 10-stop case-ben 5 done + 1 MOST + 4 pending (nincs skip); új „15-pending nagyon hosszú" case a MAX_PENDING_INLINE=8 + „+6 további" jelzésre. **1335 Jest zöld** (7/7 papír-menetlevél describe). Cache-bust `?v=20260923wbdone`. Headless Chromium 390px preview verifikálva (5 mini-done + MOST + counter „5/6 kész", ~185px kártya-magasság).
+
 
 
 
