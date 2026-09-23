@@ -3958,6 +3958,15 @@
     'sof.det.stops': { hu: 'pont', ro: 'puncte' },
     'sof.det.route': { hu: 'Útvonal (a diszpécser sorrendjében)', ro: 'Traseu (în ordinea dispecerului)' },
     'sof.det.next': { hu: 'ez jön', ro: 'urmează' },
+    // Papír-menetlevél stílusú kártya-fejléc (2026-09-23) — az idős
+    // sofőr a papír fuvarlaphoz szokott sorszámos, pipás listával.
+    'sof.wbh.trip': { hu: 'Fuvar', ro: 'Cursă' },
+    'sof.wbh.pickup': { hu: 'Felrakó', ro: 'Încărcare' },
+    'sof.wbh.delivery': { hu: 'Lerakó', ro: 'Descărcare' },
+    'sof.wbh.doneShort': { hu: 'kész', ro: 'gata' },
+    'sof.wbh.skipped': { hu: 'állomás kihagyva', ro: 'etape omise' },
+    'sof.wbh.done': { hu: '✓ FUVAR KÉSZ', ro: '✓ CURSĂ FINALIZATĂ' },
+    'sof.wbh.lastStop': { hu: 'Utolsó lerakó', ro: 'Ultima descărcare' },
     'sof.orderAccepted': { hu: '✅ Fuvar elfogadva!', ro: '✅ Cursă acceptată!' },
     'sof.orderCompleted': { hu: '🏁 Fuvar teljesítve! Manager értesítve.', ro: '🏁 Cursă finalizată! Managerul a fost notificat.' },
     'sof.noActiveOrders': { hu: 'Nincs aktív kiosztott fuvar.', ro: 'Nicio cursă activă alocată.' },

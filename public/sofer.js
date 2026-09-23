@@ -5043,6 +5043,148 @@ function fmtFuvarDay(v) {
     return d.toLocaleDateString(t('sof.locale'), { year: 'numeric', month: '2-digit', day: '2-digit' });
   } catch (e) { return String(v); }
 }
+// Dátum + nap-név (pl. „09.24 Péntek") — az idős sofőr fejben napokban
+// gondolkodik. Kizárólag a papír-menetlevél fejlécen (`_wbHeader`) használjuk;
+// a többi helyen a rövid dátum marad.
+function fmtFuvarDayWeekday(v) {
+  if (!v) return '';
+  try {
+    var d = new Date(v);
+    if (isNaN(d.getTime())) return String(v);
+    var loc = t('sof.locale');
+    var day = d.toLocaleDateString(loc, { month: '2-digit', day: '2-digit' });
+    var wd  = d.toLocaleDateString(loc, { weekday: 'long' });
+    if (!wd) return day;
+    // Nagy kezdőbetű + betöltéskori diakritika-tolerancia (a `hu-HU` és a
+    // `ro-RO` egyaránt kisbetűvel adja).
+    return day + ' ' + wd.charAt(0).toUpperCase() + wd.slice(1);
+  } catch (e) { return String(v); }
+}
+
+// Papír-menetlevél stílusú fejléc a fuvar-kártya ÖSSZECSUKOTT nézetén.
+// Az idős sofőr a papír fuvarlaphoz szokott: sorszám (1..N), pipa (✓) a
+// kész állomáson, vastag „▶ MOST" nyíl a soron következőn, halvány az
+// utána jövők. Sok stopnál (7+) csak a közeli környezet látszik + „…"
+// jelzés a kihagyott állomásokra — a teljes lista kinyitva a régi
+// akkordeon-panelen (`.fd-stop-block`) elérhető.
+//
+// Kizárólag a kártya-fejlécet érinti; nincs séma-változás, nincs új
+// szerver-út, az állomás-gomb (kék `driverStopAction`) és a kinyíló panel
+// (multi-stop akkordeon) VÁLTOZATLAN.
+function _wbHeaderStops(o) {
+  var stops = Array.isArray(o.stops) ? o.stops : [];
+  if (!stops.length) return null;
+  // Ugyanaz a rendezés, mint a `_seqStops`: bevitel-sorrend (`seq_index`),
+  // fallback kind-first + stop_index.
+  return stops.slice().sort(function (a, b) {
+    var A = (a && a.seq_index != null) ? a.seq_index : 999999;
+    var B = (b && b.seq_index != null) ? b.seq_index : 999999;
+    if (A !== B) return A - B;
+    var ak = a && a.kind === 'pickup' ? 0 : 1;
+    var bk = b && b.kind === 'pickup' ? 0 : 1;
+    if (ak !== bk) return ak - bk;
+    return (a && a.stop_index || 0) - (b && b.stop_index || 0);
+  });
+}
+function _wbHeaderRow(s, num, state) {
+  var city  = _cityOf(s.loc) || (s.loc || '—');
+  var firma = _firmaShort(s.firma || '');
+  var day   = fmtFuvarDayWeekday(s.eff_date || s.data || s.date || '');
+  var kindLbl = s.kind === 'pickup'
+    ? (t('sof.wbh.pickup') || 'Felrakó')
+    : (t('sof.wbh.delivery') || 'Lerakó');
+  var icon = state === 'done'    ? '✓'
+           : state === 'current' ? '▶'
+           :                       '○';
+  var cls = 'wb-hd-row wb-hd-' + state;
+  var main = kindLbl + ' — ' + esc(city);
+  var sub  = [];
+  if (firma) sub.push(esc(firma));
+  if (day)   sub.push(esc(day));
+  return '' +
+    '<div class="' + cls + '">' +
+      '<span class="wb-hd-icon">' + icon + '</span>' +
+      '<span class="wb-hd-num">' + num + '.</span>' +
+      '<span class="wb-hd-main">' +
+        '<span class="wb-hd-main-t">' + esc(main) + '</span>' +
+        (sub.length ? '<span class="wb-hd-main-s">' + sub.join(' · ') + '</span>' : '') +
+      '</span>' +
+    '</div>';
+}
+// A kártya-fejléc új „papír-menetlevél" építője. Visszatérés: HTML-string,
+// vagy `null` ha nem-migrált fuvar (a régi felrakó→lerakó összesítő marad).
+function _wbHeader(o) {
+  var seq = _wbHeaderStops(o);
+  if (!seq || !seq.length) return null;
+  var N = seq.length;
+  // Aktuális stop = első nem-lezárt (`done_at` üres). Ha minden lezárt, N = kész.
+  var currentIdx = -1;
+  for (var i = 0; i < N; i++) { if (!seq[i].done_at) { currentIdx = i; break; } }
+  var allDone = (currentIdx < 0);
+  // ── ÖSSZES KÉSZ állapot ─────────────────────────────────────────────
+  if (allDone) {
+    var last = seq[N - 1];
+    var lastCity  = _cityOf(last.loc) || (last.loc || '—');
+    var lastFirma = _firmaShort(last.firma || '');
+    var doneWhen  = last.done_at ? fmtFuvarDateTime(last.done_at) : '';
+    var doneLine  = t('sof.wbh.done') || '✓ FUVAR KÉSZ';
+    var lastLbl   = t('sof.wbh.lastStop') || 'Utolsó lerakó';
+    return '' +
+      '<div class="wb-hd wb-hd-alldone">' +
+        '<div class="wb-hd-title">' + doneLine + ' · ' + N + '/' + N + '</div>' +
+        '<div class="wb-hd-row wb-hd-done">' +
+          '<span class="wb-hd-icon">✓</span>' +
+          '<span class="wb-hd-main">' +
+            '<span class="wb-hd-main-t">' + esc(lastLbl) + ' — ' + esc(lastCity) + '</span>' +
+            '<span class="wb-hd-main-s">' +
+              (lastFirma ? esc(lastFirma) + (doneWhen ? ' · ' : '') : '') +
+              (doneWhen ? esc(doneWhen) : '') +
+            '</span>' +
+          '</span>' +
+        '</div>' +
+      '</div>';
+  }
+  // ── AKTÍV állapot — mit mutassunk? ─────────────────────────────────
+  // Egyszerű 1+1 fuvar VAGY kevés stop (≤6): MIND látszik. 7+ stopnál csak
+  // az utolsó 2 kész + a MOST + a következő 2 (a többi „… N kihagyva").
+  //
+  // Vizuális elrendezés: minden stop egy sor (`.wb-hd-row`) — ikon,
+  // sorszám, cím, cégnév/dátum. A MOST-sor vastag narancs bal-akcens +
+  // sárgás háttér — vizuálisan azonnal odaugrik a szem.
+  var COMPACT_LIMIT = 6;
+  var rows = [];
+  var doneCount = currentIdx;   // hányat csináltunk (0..N-1)
+  var counterHtml = '<div class="wb-hd-title">' +
+    esc(t('sof.wbh.trip') || 'Fuvar') + ' · ' + doneCount + '/' + N +
+    (doneCount ? ' ' + (t('sof.wbh.doneShort') || 'kész') : '') +
+    '</div>';
+  if (N <= COMPACT_LIMIT) {
+    for (var j = 0; j < N; j++) {
+      var st = (j < currentIdx) ? 'done' : (j === currentIdx ? 'current' : 'pending');
+      rows.push(_wbHeaderRow(seq[j], j + 1, st));
+    }
+  } else {
+    // Utolsó 2 kész (ha van) — pontosan `lastDoneStart`-tól `currentIdx`-ig.
+    var lastDoneStart = Math.max(0, currentIdx - 2);
+    var skippedBefore = lastDoneStart;
+    var nextEnd = Math.min(N, currentIdx + 3); // MOST + 2 következő
+    var skippedAfter = N - nextEnd;
+    if (skippedBefore > 0) {
+      rows.push('<div class="wb-hd-skip">… ' + skippedBefore + ' ' +
+        (t('sof.wbh.skipped') || 'állomás kihagyva') + '</div>');
+    }
+    for (var k = lastDoneStart; k < nextEnd; k++) {
+      var st2 = (k < currentIdx) ? 'done' : (k === currentIdx ? 'current' : 'pending');
+      rows.push(_wbHeaderRow(seq[k], k + 1, st2));
+    }
+    if (skippedAfter > 0) {
+      rows.push('<div class="wb-hd-skip">… ' + skippedAfter + ' ' +
+        (t('sof.wbh.skipped') || 'állomás kihagyva') + '</div>');
+    }
+  }
+  return '<div class="wb-hd">' + counterHtml + rows.join('') + '</div>';
+}
+
 // Időbélyeg (állomás visszaigazolás) — hónap.nap óra:perc.
 function fmtFuvarDateTime(v) {
   if (!v) return '';
@@ -5945,10 +6087,20 @@ function renderFuvarCard(o, idx) {
   if (unloadDayShort) dropBits.push('📅 ' + esc(unloadDayShort));
   dropBits.push('📍 ' + esc(unloadCity));
   if (unloadFirmaS)   dropBits.push('🏢 ' + esc(unloadFirmaS));
-  var headTxt =
+  // ── Új papír-menetlevél stílusú fejléc (2026-09-23) ───────────────
+  // Az idős sofőr könnyen olvasható papír-menetlevélhez szokott: sorszám
+  // (1..N), pipa a kész állomáson, „▶" a soron következőn, halvány a
+  // hátra maradón. Multi-drop fuvarnál a régi „első felrakó → utolsó
+  // lerakó" statika félrevezető volt (a sofőr már 5/6 stopnál járt, de a
+  // kártya továbbra is az elejét mutatta). A `_wbHeader` az `o.stops`-ból
+  // építi az új fejlécet; ha nincs stops (nem-migrált fuvar), null-t ad
+  // → visszaesünk a régi „pickBits → dropBits" összesítőre.
+  var _wbHead = (typeof _wbHeader === 'function') ? _wbHeader(o) : null;
+  var headTxt = _wbHead || (
     '<span class="fuvar-head-pick">' + pickBits.join(' · ') + '</span>' +
     '<span class="fuvar-head-arrow"> → </span>' +
-    '<span class="fuvar-head-drop">' + dropBits.join(' · ') + '</span>';
+    '<span class="fuvar-head-drop">' + dropBits.join(' · ') + '</span>'
+  );
   // A `data-order-id` + (demó esetén) `data-tour-demo="1"` a SoferTour-nak
   // kell — a bemutató a demó kártyán belül várja a valós kattintást
   // (állomás-gomb, kártya-kinyitás).
