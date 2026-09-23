@@ -1023,4 +1023,42 @@ describe('renderFuvarCard: papír-menetlevél stílusú fejléc', () => {
     // képernyőt telefonon — a szint-őr ezt tiltja.
     expect(totalRows).toBeLessThanOrEqual(3);
   });
+
+  test('MOST-sor: teljes cím + teljes cégnév (nem rövidítve)', () => {
+    const sb = load({});
+    const s = (id, kind, seq, loc, firma, done) => ({
+      id: id, kind: kind, seq_index: seq, stop_index: 0,
+      loc: loc, firma: firma, arrived_at: done, done_at: done
+    });
+    // 3-stop rövid fuvar: 1 kész pickup + 1 MOST delivery + 1 pending
+    // A címekben szándékosan hosszú utca-prefix + irszám (a valóságban
+    // az `_cityOf` heurisztika levágná őket) — a MOST-sor NEM vághatja
+    // le, a többi soron SZABAD rövidíteni.
+    const fullAddrCurrent = 'Strada Uzinei 15, 555400 Copșa Mică, jud. Sibiu';
+    const fullFirmaCurrent = 'Rebat Metal Recycling SRL — Sector Industrial Est';
+    const o = mkOrder([
+      s('p1', 'pickup',   0, 'Strada Fabricii 22, 100200 Ploiești', 'Vesna GC Logistics SRL', '2026-09-21T09:00:00'),
+      s('d1', 'delivery', 1, fullAddrCurrent, fullFirmaCurrent, null),
+      s('d2', 'delivery', 2, 'Strada Depoului 5, 550001 Sibiu, jud. Sibiu', 'Depot SRL', null)
+    ]);
+    const html = sb.renderFuvarCard(o, 1);
+    // Csak a fejlécet nézzük — a kártya kinyitott akkordeon-panelje
+    // (`.fd-stop-block`) mindig a teljes címet mutatja (másoláshoz kell).
+    const wbStart = html.indexOf('<div class="wb-hd"');
+    const wbEnd   = html.indexOf('</span><span class="fuvar-expand"', wbStart);
+    expect(wbStart).toBeGreaterThan(-1);
+    const wbBlock = html.substring(wbStart, wbEnd);
+    // Az új teljes-cím szülő-osztály jelen van a fejléc MOST-során
+    expect(wbBlock).toContain('wb-hd-main-full');
+    expect(wbBlock).toContain('wb-hd-main-addr');
+    expect(wbBlock).toContain('wb-hd-main-firma');
+    // A TELJES cím + TELJES cégnév megjelenik a fejléc MOST-blokkjában
+    expect(wbBlock).toContain('Strada Uzinei 15, 555400 Copșa Mică, jud. Sibiu');
+    expect(wbBlock).toContain('Rebat Metal Recycling SRL');
+    // A KÉSZ és PENDING sorok a fejlécen RÖVIDÍTVE látszanak — a fejléc
+    // sem a „Strada Fabricii 22", sem a „Strada Depoului 5" prefixet
+    // nem tartalmazza (a kinyíló panel viszont igen — az más).
+    expect(wbBlock).not.toContain('Strada Fabricii 22');
+    expect(wbBlock).not.toContain('Strada Depoului 5');
+  });
 });
