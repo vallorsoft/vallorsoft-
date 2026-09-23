@@ -804,3 +804,68 @@ describe('orphan bin — árva tankolás/vásárlás sorok megőrzése', () => {
     expect(sb.orphanCount()).toBe(1);   // Skip = a tételek maradnak
   });
 });
+
+// ================================================================
+//  Fejléc-gomb: a KÖVETKEZŐ állomás valós neve (nem „következő állomás")
+//  Bug: 4 lerakós fuvarnál a gombon „Etapa următoare" jelent meg — a sofőr
+//  nem látta, mi jön. Fix: mindig `_stopEventLabel(opts[0])` + több nyitott
+//  esetén `▾` jelzés, hogy nyomásra választó nyílik.
+// ================================================================
+describe('renderFuvarCard: állomás-gomb következő állomás címkéje', () => {
+  const baseOrder = {
+    id: 'MULTI', status: 'In Curs',
+    client: 'Ügyfél', rendszam_camion: 'B123XYZ',
+    firma_incarcare: 'FelrakoKft', loc_incarcare: 'Arad',
+    firma_descarcare: 'Lerako1', loc_descarcare: 'Cluj',
+    data_incarcare: '2026-09-23', data_descarcare: '2026-09-24'
+  };
+
+  test('több nyitott delivery → gomb az ELSŐ nyitott lerakó valós helyét mutatja + ▾', () => {
+    const sb = load({});
+    // 1 pickup (done) + 4 delivery (mind nyitva) — a #460 után is a fejléc
+    // gomb a legjobb esetben „Etapa următoare" volt; itt most Cluj/Lerako1-et
+    // várunk + `▾` jelzést.
+    const o = Object.assign({}, baseOrder, {
+      stops: [
+        { id: 'p1', kind: 'pickup',   stop_index: 0, seq_index: 0,
+          loc: 'Arad', firma: 'FelrakoKft', arrived_at: '2026-09-23T08:00:00', done_at: '2026-09-23T09:00:00' },
+        { id: 'd1', kind: 'delivery', stop_index: 0, seq_index: 1,
+          loc: 'Cluj-Napoca',       firma: 'Lerako1', arrived_at: null, done_at: null },
+        { id: 'd2', kind: 'delivery', stop_index: 1, seq_index: 2,
+          loc: 'Oradea',            firma: 'Lerako2', arrived_at: null, done_at: null },
+        { id: 'd3', kind: 'delivery', stop_index: 2, seq_index: 3,
+          loc: 'Timișoara',         firma: 'Lerako3', arrived_at: null, done_at: null },
+        { id: 'd4', kind: 'delivery', stop_index: 3, seq_index: 4,
+          loc: 'Deva',              firma: 'Lerako4', arrived_at: null, done_at: null }
+      ]
+    });
+    const html = sb.renderFuvarCard(o, 1);
+    // A gomb a következő lerakónál kezdődő állomás valós helyszínével írja
+    // ki a következő teendőt — Cluj (első nyitott delivery érkezése).
+    expect(html).toMatch(/Cluj/);
+    // A ▾ jelzi, hogy több választható lesz a nyomás után
+    expect(html).toContain('▾');
+    // NEM a puszta „következő állomás" / „Etapa următoare" kulcs
+    expect(html).not.toContain('sof.ms.nextStep');
+  });
+
+  test('egyetlen nyitott stop → csak az állomás címke, ▾ nélkül', () => {
+    const sb = load({});
+    const o = Object.assign({}, baseOrder, {
+      stops: [
+        { id: 'p1', kind: 'pickup',   stop_index: 0, seq_index: 0,
+          loc: 'Arad', firma: 'FelrakoKft', arrived_at: '2026-09-23T08:00:00', done_at: '2026-09-23T09:00:00' },
+        { id: 'd1', kind: 'delivery', stop_index: 0, seq_index: 1,
+          loc: 'Cluj-Napoca', firma: 'Lerako1', arrived_at: null, done_at: null }
+      ]
+    });
+    const html = sb.renderFuvarCard(o, 1);
+    expect(html).toMatch(/Cluj/);
+    // Egyetlen opció → nincs választó, nincs ▾ a fejléc-akció-gombon.
+    // A ▾/▸ chevron a szekció-toggle-en előfordul; itt csak a
+    // fuvar-head-action gomb tartalmán ellenőrzünk.
+    const m = html.match(/class="sh-btn confirm fuvar-head-action"[^>]*>([^<]+)</);
+    expect(m).toBeTruthy();
+    expect(m[1]).not.toMatch(/▾/);
+  });
+});
