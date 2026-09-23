@@ -3422,3 +3422,45 @@
   }
   .sofer-wrap .wb-hd.wb-hd-alldone .wb-hd-row.wb-hd-done .wb-hd-main-t { color: #e2e8f0; }
 }
+
+/* Kompakt mód (5+ stop) — 1 soros „utolsó kész" és „következik" súgás
+   a MOST-sor körül. Nagyon alacsonyra tervezve (~24-26px/sor), hogy
+   a teljes fejléc 130px alatt maradjon telefonon. */
+.sofer-wrap .wb-hd-mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  font-size: 12px;
+  line-height: 1.3;
+  min-width: 0;
+}
+.sofer-wrap .wb-hd-mini .wb-hd-icon {
+  width: 22px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+.sofer-wrap .wb-hd-mini-t {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.sofer-wrap .wb-hd-mini-done { opacity: 0.65; }
+.sofer-wrap .wb-hd-mini-done .wb-hd-icon { color: #16a34a; }
+.sofer-wrap .wb-hd-mini-done .wb-hd-mini-t { color: #475569; text-decoration: line-through; text-decoration-color: rgba(15,23,42,0.3); }
+.sofer-wrap .wb-hd-mini-next { opacity: 0.7; }
+.sofer-wrap .wb-hd-mini-next .wb-hd-icon { color: #cbd5e1; font-size: 11px; }
+.sofer-wrap .wb-hd-mini-next .wb-hd-mini-t { color: #64748b; }
+
+@media (max-width: 480px) {
+  .sofer-wrap .wb-hd-mini { padding: 2px 6px; font-size: 11.5px; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .sofer-wrap .wb-hd-mini-done .wb-hd-mini-t { color: #94a3b8; }
+  .sofer-wrap .wb-hd-mini-next .wb-hd-mini-t { color: #94a3b8; }
+}
