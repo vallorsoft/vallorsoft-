@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-09-23 — FIX: több lerakós fuvaron nem működött a sofőr állomás-gombja (stop-választó modal CSS)
+
+1. **Bejelentés:** a sofőrnél a 4 lerakós fuvaron az állomás-gomb nem csinált semmit, az 1 fel + 1 le fuvaron működött.
+2. **Gyökér:** ha a felrakó kész és több lerakó is nyitva van, a gomb a stop-választó modált (`#sofChoiceModal`) nyitja. A `sofer.css`-ben ennek csak a gomb-finomhangolása volt meg, a modal-alap (fixed overlay + kártya) NEM → `display:flex` után a lap aljára, a normál folyamba renderelődött (a body `overflow:hidden` miatt láthatatlanul). A szerver-oldali `stop-event` végpont helyesen működött.
+3. **Fix** (`public/sofer.css`): `#sofChoiceModal` saját fixed overlay + kártya + gombstílus (a `#sofConfirmModal` mintájára, `box-sizing:border-box`, görgethető kártya). Cache-bust `sofer.css?v=20260923stopch`. Headless Chromiumban ellenőrizve.
+4. **Regresszió-őr** (`tests/integration/sofer-ui-fixes.test.js`): a `sofer.html` minden `class="sof-modal"` modáljára megköveteli a `position:fixed` szabályt a `sofer.css`-ben. **1363 Jest zöld**.
+
 ## 2026-09-23 — Sofőr-elszámolás: diurna-napok naptárból + zöld mini-naptár a decontokon
 
 1. **Kérés:** diurna-járandóságnál a mennyiség helyett naptáron lehessen kijelölni a napokat (minden nap = 1 mennyiség, pl. H–Cs = 4 × 80 EUR), és a decont írja ki a napokat dátum szerint, kis naptárral, zölden.
