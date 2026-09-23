@@ -17,6 +17,21 @@
 
 
 
+
+## 2026-09-23 — Sofőr kártya-fejléc: MOBIL-elsőség (kompakt mód 5+ stopnál)
+
+**Kérés:** „Figyelj hogy telefonrol van használva. Oldal mereteket is szamold." — az előző körben (PR #463) elszúrtam: a papír-menetlevél fejléc 6-stop fuvarnál ~310px lett, ami 3 aktív fuvar mellett túltölti a 780px-es sofőr-telefon képernyőjét.
+
+**Számolás:** Samsung A / iPhone SE ≈ 360-390px széles / 780-844px magas. Elérhető tér a főoldali fuvarkártyáknak ~460-500px (top-bar 64 + jármű-kártya 130 + „KIOSZTOTT FUVAROK" fejléc 30 + alsó nav 90 lejön). Régi fejléc: 80-110px / kártya. Új papír-fejléc 6 stopnál: 310px. **3 fuvar × 310px = 930px → csak az első látszott.**
+
+1. **Új szabály** (`public/sofer.js` `_wbHeader`): `FULL_LIMIT = 4` — ≤4 stop teljes lista (belefér ~200px-be), 5+ stop **kompakt mód**.
+2. **Kompakt mód**: fejléc-számláló (24px) + opcionális 1 soros „✓ utolsó kész" mini-súgás (26px) + MOST-sor kiemelten (55px) + opcionális 1 soros „○ következik" súgás (26px) + `+N további` halvány jelzés (20px). Összesen ~110-130px. A teljes lista a kártya kinyitott akkordeon-panelén (`.fd-stop-block`) elérhető marad.
+3. **Új `.wb-hd-mini*` CSS-blokk** (`public/sofer.css`) — vékony 1-soros sor (~24px), ellipzises, halványabb színek, mint a fő MOST-sor. Világos + sötét téma, keskeny mobil finomhangolás.
+4. **1 új i18n** (`sof.wbh.moreAhead`, RO+HU). Cache-bust `?v=20260923wbmob`.
+5. **Teszt** (`tests/integration/sofer-client-flow.test.js`): a régi „6-stop teljes lista" tesztet frissítettem a kompakt módra (1 MOST + 1 mini-done), új „hosszú 10-stop" teszt (1 MOST + 2 mini + `+3 további`), és új **regresszió-őr** ami 15 nyitott stopnál is <=3 sort követel meg (a régi 6-sor × 44 = 264px hiba elkerüléséhez). **1382 Jest zöld** (1380 → 1382, +2 új).
+
+Verifikáció: headless Chromium `390×1400` viewport → 5 állapotú preview, minden kártya ≤130px, 3 aktív fuvar ~400px alatt.
+
 ## 2026-09-23 — Sofőr kártya-fejléc: papír-menetlevél stílus (multi-drop haladás egyértelműen)
 
 **Kérés:** „amig a fuvar nincs megnyitva addig teveszto infot ír az elso es utolso stop helyet es ceget ide valami atlathato kellene es ahogy halad a stopokkal valtozo" — az idős sofőr (aki nem ért a technikához) is azonnal értse.

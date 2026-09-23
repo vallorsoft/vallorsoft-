@@ -3967,6 +3967,7 @@
     'sof.wbh.skipped': { hu: 'állomás kihagyva', ro: 'etape omise' },
     'sof.wbh.done': { hu: '✓ FUVAR KÉSZ', ro: '✓ CURSĂ FINALIZATĂ' },
     'sof.wbh.lastStop': { hu: 'Utolsó lerakó', ro: 'Ultima descărcare' },
+    'sof.wbh.moreAhead': { hu: 'további állomás', ro: 'etape rămase' },
     'sof.orderAccepted': { hu: '✅ Fuvar elfogadva!', ro: '✅ Cursă acceptată!' },
     'sof.orderCompleted': { hu: '🏁 Fuvar teljesítve! Manager értesítve.', ro: '🏁 Cursă finalizată! Managerul a fost notificat.' },
     'sof.noActiveOrders': { hu: 'Nincs aktív kiosztott fuvar.', ro: 'Nicio cursă activă alocată.' },
