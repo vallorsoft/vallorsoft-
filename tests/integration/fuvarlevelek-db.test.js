@@ -149,6 +149,74 @@ d('Valódi DB integráció (menetlevelek)', () => {
     expect(res.text).toContain('Cluj-Napoca');
   });
 
+  // ── A menetlevél a DECONT-nyomtatványok arculatát viseli ──────────────
+  // (hivatalos fejléc: logó · cégnév + CUI/J/☏/✉ meta · gradiens doc-badge
+  //  · 2px elválasztó; aláíró blokk ráégetett cég-pecséttel; közös lábléc)
+  test('GET /api/pdf-download/:id: decont-fejléc — logó + cég-meta + doc-badge + pecsét', async () => {
+    const px = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    await pool.query(
+      `UPDATE companies SET cui='47859317', reg_com='J2023000114142',
+              adresa='Sat Arcus nr. 102, Covasna', telefon='0769532015',
+              email_contact='contact@teszt.ro' WHERE id=$1`, [companyId]);
+    await pool.query(
+      `INSERT INTO company_branding (company_id, logo_base64, logo_mime, stamp_base64, stamp_mime)
+       VALUES ($1,$2,'image/png',$3,'image/png')`, [companyId, px, px]);
+
+    const id = await seedWaybill();
+    setUser(ADMIN);
+    const res = await request(app).get('/api/pdf-download/' + id);
+    expect(res.status).toBe(200);
+
+    // Letterhead-blokk (a nyomtatáskor minden lapon ismétlődő `.vs-doc-head`)
+    expect(res.text).toContain('<div class="vs-doc-head">');
+    expect(res.text).toContain('<td class="lh-logo">');        // logó-cella CSAK ha van logó
+    expect(res.text).toContain('class="doc-badge"');           // kék gradiens doc-badge
+    expect(res.text).toContain('Foaie de parcurs');
+    expect(res.text).toContain('class="lh-rule"');             // 2px sötét elválasztó
+    // Cég-meta ugyanabban a sorrendben/szimbólummal, mint a decontokon
+    expect(res.text).toContain('CUI 47859317');
+    expect(res.text).toContain('J J2023000114142');
+    expect(res.text).toContain('☏ 0769532015');
+    expect(res.text).toContain('✉ contact@teszt.ro');
+    expect(res.text).toContain('Sat Arcus nr. 102, Covasna');
+    // Aláíró blokk: a cég-oldalra a pecsét ráégetve (logó + pecsét = 2 kép)
+    expect((res.text.match(/data:image\/png;base64,/g) || []).length).toBe(2);
+    expect(res.text).toContain('Semnătura șofer');
+    expect(res.text).toContain('Semnătura dispecer');
+  });
+
+  test('GET /api/pdf-download/:id: branding nélküli cégnél a fejléc NEM törik el (nincs logó/pecsét/meta)', async () => {
+    const id = await seedWaybill();                 // nincs company_branding, nincs cui/tel/…
+    setUser(ADMIN);
+    const res = await request(app).get('/api/pdf-download/' + id);
+    expect(res.status).toBe(200);
+    expect(res.text).not.toContain('<td class="lh-logo">');    // logó-cella kimarad
+    expect(res.text).not.toContain('data:image/png;base64,');  // se logó, se pecsét
+    expect(res.text).not.toContain('CUI ');
+    // …de a fejléc gerince ott van
+    expect(res.text).toContain('class="lh-name"');
+    expect(res.text).toContain('Teszt Kft');
+    expect(res.text).toContain('class="doc-badge"');
+  });
+
+  // REGRESSZIÓ-ŐR: a többoldalas nyomtatás szabályai (fejléc/lábléc minden
+  // lapon, sor nem törik ketté) és a gombsáv-elrejtés `!important`-ja — az
+  // utóbbi nélkül a képernyős gombok KÜLÖN OLDALKÉNT kerültek a nyomtatásra.
+  test('GET /api/pdf-download/:id: a többoldalas nyomtatás szabályai megmaradtak', async () => {
+    const id = await seedWaybill();
+    setUser(ADMIN);
+    const res = await request(app).get('/api/pdf-download/' + id);
+    expect(res.text).toContain('table.vs-print-wrap');
+    expect(res.text).toContain('.vs-print-wrap > thead { display:table-header-group; }');
+    expect(res.text).toContain('.vs-print-wrap > tfoot { display:table-footer-group; }');
+    expect(res.text).toMatch(/tr\s*\{\s*page-break-inside:avoid/);
+    expect(res.text).toContain('@page { size:A4; margin:14mm; }');
+    expect(res.text).toMatch(/\.no-print\s*\{\s*display:none\s*!important;?\s*\}/);
+    // a fejléc a thead-ben, a lábléc a tfoot-ban ül
+    expect(res.text).toMatch(/<thead><tr><td>[\s\S]*?vs-doc-head/);
+    expect(res.text).toMatch(/<tfoot><tr><td>[\s\S]*?vs-doc-foot/);
+  });
+
   test('GET /api/pdf-download/:id: a MEZŐ-FELIRATOK csak románok; a BEÍRT ADAT bármilyen nyelvű lehet', async () => {
     // A felhasználó SZÁNDÉKOSAN magyar nyelvű adatot ír be — ez teljesen rendben
     // van, az adat nyelve nem számít. CSAK a sablon feliratainak/címkéinek kell
