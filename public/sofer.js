@@ -5554,9 +5554,17 @@ function renderFuvarCard(o, idx) {
   if ((isAlocat || isCurs)) {
     var actLabel = '', actHandler = '';
     if (_stopOpts && _stopOpts.length) {
-      // Új stop-alapú út
-      if (_stopOpts.length === 1) actLabel = _stopEventLabel(_stopOpts[0]);
-      else actLabel = t('sof.ms.nextStep');
+      // Új stop-alapú út — a gomb felirata MINDIG a leglogikusabb következő
+      // állomás valós helyszínével + cégnevével (`_stopEventLabel` a `_cityOf`
+      // + `_firmaShort`-ból építi). Több választható (multi-drop delivery) →
+      // az első opció címkéje + ▾ jelzés, hogy nyomásra választó nyílik.
+      // Így a sofőr a fejléc-gombon LÁTJA, mi jön, nem csak azt, hogy
+      // „következő állomás".
+      if (_stopOpts.length === 1) {
+        actLabel = _stopEventLabel(_stopOpts[0]);
+      } else {
+        actLabel = _stopEventLabel(_stopOpts[0]) + ' ▾';
+      }
       actHandler = 'driverStopAction(\'' + o.id + '\')';
     } else if (_stopOpts === null && msNextIdx >= 0) {
       // Legacy 4-lépéses fallback (nincs stops-tömb, régi kliens/DB)

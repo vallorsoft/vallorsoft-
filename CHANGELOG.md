@@ -15,6 +15,16 @@
 ---
 
 
+
+## 2026-09-23 — Sofőr fejléc-gomb: „következő állomás" helyett a valós helyszín (multi-drop)
+
+**Kérés:** „a soforenek a fuvaroknal a kek gombon ne kovetkezo allomas irjon hanem azt is hogy mi következik"
+
+1. **Gyökér** (`public/sofer.js` `renderFuvarCard`): a fuvar-kártya fejléc-gombja egyetlen nyitott stopnál a `_stopEventLabel`-ből építette a szöveget (pl. „Am sosit la Cluj, firma Lerako1"), több nyitott delivery esetén viszont a puszta `sof.ms.nextStep` = „Etapa următoare" / „Következő állomás" jelent meg → a sofőr nem látta, mi jön (4 lerakós fuvarnál ez volt az elsődleges panasz a #460 után is).
+2. **Fix:** mindig `_stopEventLabel(opts[0])` (az első nyitott stop valós helye + cég) — több nyitott esetén `▾` jelzés jelzi, hogy nyomásra választó nyílik. Semmi új render-út, semmi új i18n. A `driverStopAction` több opciónál változatlanul a `sofChoiceModal`-t nyitja.
+3. **Teszt** (`tests/integration/sofer-client-flow.test.js`) +2 új eset: multi-drop 4 delivery → gomb Cluj+▾; egy nyitott stop → nincs ▾. **1376 Jest zöld** (1374 → 1376) valós Postgres 16-tal.
+4. Cache-bust `sofer.js?v=20260923nextlbl`. Tisztán kliens-oldali; nincs séma-/szerver-változás.
+
 ## 2026-09-23 — Fuvar-megbízás AI-kiolvasás: több felrakó/lerakó pont + tanulás (elárvult 2026-09-12-i munka átemelve)
 
 **Háttér:** a „Minden legyen a mainbe" ellenőrzésnél kiderült, hogy a 2026-09-12-i `claude/ai-data-usage-documents-l3ozaw` commit (fuvar-megbízás AI: multi-drop + few-shot tanulás) SOSEM került a mainbe. Átemelve (cherry-pick), a jelenlegi mainhez igazítva.
