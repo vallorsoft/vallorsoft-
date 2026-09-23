@@ -1196,6 +1196,111 @@
   // Csak a mezők + a mentés-lábléc + hint; a panel/modal keret külön van.
   // Az input-ID-k változatlanok (deKind/deLabel/…), így a dcEarnKindChange /
   // dcEarnRecalc / dcEarnSave a régi módon dolgozik — most a modálon belül.
+  // ── Diurna-napok (naptárból kijelölt napok) ─────────────────────────────
+  var DC_DAY_KINDS = { diurna: 1, per_diem: 1 };
+  function _dcDaysArr(it) {
+    var d = it && it.days;
+    if (typeof d === 'string') { try { d = JSON.parse(d); } catch (_e) { d = null; } }
+    return Array.isArray(d) ? d.filter(function (x) { return /^\d{4}-\d{2}-\d{2}$/.test(String(x)); }).sort() : [];
+  }
+  function _dcWd() { return String(t('fe.dd.wd') || 'L,M,M,J,V,S,D').split(','); }
+  function _dcMonthName(y, m) {
+    try { return new Date(Date.UTC(y, m, 1)).toLocaleDateString(t('fe.dd.loc') || 'ro-RO', { month: 'long', year: 'numeric', timeZone: 'UTC' }); }
+    catch (_e) { return y + '-' + (m + 1); }
+  }
+  // Kis naptár (inline stílus → nyomtatás/e-mail-biztos): a kijelölt napok zölden.
+  function _dcMiniCalHtml(days) {
+    if (!days || !days.length) return '';
+    var set = {}; days.forEach(function (d) { set[d] = 1; });
+    var months = {}; days.forEach(function (d) { months[d.slice(0, 7)] = 1; });
+    var wd = _dcWd();
+    var out = Object.keys(months).sort().map(function (ym) {
+      var y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1;
+      var first = (new Date(Date.UTC(y, m, 1)).getUTCDay() + 6) % 7;
+      var dim = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+      var cells = [], i;
+      for (i = 0; i < first; i++) cells.push('<td></td>');
+      for (i = 1; i <= dim; i++) {
+        var key = ym + '-' + (i < 10 ? '0' : '') + i;
+        cells.push(set[key]
+          ? '<td style="background:#16a34a;color:#fff;font-weight:700;border-radius:3px;">' + i + '</td>'
+          : '<td style="color:#94a3b8;">' + i + '</td>');
+      }
+      var rows = '';
+      for (i = 0; i < cells.length; i += 7) rows += '<tr>' + cells.slice(i, i + 7).join('') + '</tr>';
+      return '<table class="dc-minical" style="display:inline-table;border-collapse:separate;border-spacing:1px;'
+        + 'font-size:9px;text-align:center;margin:4px 6px 0 0;vertical-align:top;border:1px solid #e5e7eb;border-radius:4px;">'
+        + '<tr><td colspan="7" style="font-weight:700;color:#0f172a;padding:1px 0;">' + esc(_dcMonthName(y, m)) + '</td></tr>'
+        + '<tr>' + wd.map(function (w) { return '<td style="color:#64748b;font-weight:600;width:14px;">' + esc(w) + '</td>'; }).join('') + '</tr>'
+        + rows + '</table>';
+    }).join('');
+    return '<div class="dc-days" style="margin-top:4px;">'
+      + '<div style="font-size:11px;color:#166534;">' + esc(t('fe.dd.days')) + ': '
+      + days.map(function (d) { return d.slice(8, 10) + '.' + d.slice(5, 7); }).join(', ') + '</div>'
+      + out + '</div>';
+  }
+  // Rövid dátum-lista (képernyős listához)
+  function _dcDaysShort(it) {
+    var d = _dcDaysArr(it);
+    return d.length ? '<div style="font-size:11px;color:#16a34a;">📅 '
+      + d.map(function (x) { return x.slice(8, 10) + '.' + x.slice(5, 7); }).join(', ') + '</div>' : '';
+  }
+
+  // ── Naptár-választó a járandóság-modálban ──
+  var _deDays = {};
+  var _deCalYM = null;  // [év, hónap0]
+  function _deDaysList() { return Object.keys(_deDays).sort(); }
+  function dcDaysRender() {
+    var box = document.getElementById('deDaysBox');
+    if (!box) return;
+    var k = (document.getElementById('deKind') || {}).value;
+    var qtyEl = document.getElementById('deQty');
+    if (!DC_DAY_KINDS[k]) {
+      box.style.display = 'none';
+      if (qtyEl) qtyEl.readOnly = false;
+      return;
+    }
+    box.style.display = '';
+    if (!_deCalYM) {
+      var first = _deDaysList()[0] || (document.getElementById('deDate') || {}).value || today();
+      _deCalYM = [+first.slice(0, 4), +first.slice(5, 7) - 1];
+    }
+    var y = _deCalYM[0], m = _deCalYM[1];
+    var firstWd = (new Date(Date.UTC(y, m, 1)).getUTCDay() + 6) % 7;
+    var dim = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    var cells = '', i;
+    for (i = 0; i < firstWd; i++) cells += '<span></span>';
+    for (i = 1; i <= dim; i++) {
+      var key = y + '-' + (m < 9 ? '0' : '') + (m + 1) + '-' + (i < 10 ? '0' : '') + i;
+      cells += '<button type="button" class="dc-dp-day' + (_deDays[key] ? ' on' : '') + '" '
+        + 'onclick="FleetExtra.dcDaysToggle(\'' + key + '\')">' + i + '</button>';
+    }
+    var n = _deDaysList().length;
+    box.innerHTML =
+      '<div class="dc-dp-head">'
+      + '<button type="button" class="btn ghost" onclick="FleetExtra.dcDaysNav(-1)">‹</button>'
+      + '<b>' + esc(_dcMonthName(y, m)) + '</b>'
+      + '<button type="button" class="btn ghost" onclick="FleetExtra.dcDaysNav(1)">›</button></div>'
+      + '<div class="dc-dp-grid">' + _dcWd().map(function (w) { return '<span class="dc-dp-wd">' + esc(w) + '</span>'; }).join('') + cells + '</div>'
+      + '<div class="dc-dp-foot">' + esc(t('fe.dd.selected')) + ': <b>' + n + '</b>'
+      + (n ? ' · <a href="#" onclick="FleetExtra.dcDaysClear();return false;">' + esc(t('fe.dd.clear')) + '</a>' : '')
+      + '</div>';
+    if (qtyEl) {
+      qtyEl.readOnly = n > 0;
+      if (n > 0) qtyEl.value = n;
+    }
+    if (n > 0) { var dEl = document.getElementById('deDate'); if (dEl) dEl.value = _deDaysList()[0]; }
+    dcEarnRecalc();
+  }
+  function dcDaysToggle(key) { if (_deDays[key]) delete _deDays[key]; else _deDays[key] = 1; dcDaysRender(); }
+  function dcDaysNav(dir) {
+    if (!_deCalYM) return;
+    var m = _deCalYM[1] + dir, y = _deCalYM[0];
+    if (m < 0) { m = 11; y--; } else if (m > 11) { m = 0; y++; }
+    _deCalYM = [y, m]; dcDaysRender();
+  }
+  function dcDaysClear() { _deDays = {}; dcDaysRender(); }
+
   function _dcEarnFormBody() {
     var todayStr = today();
     var body =
@@ -1220,6 +1325,7 @@
       + '<div class="field" style="margin:0;"><label>' + t('fe.de.currencyLbl') + '</label>'
       +   '<select class="select" id="deCur">'
       +     '<option value="RON">RON</option><option value="EUR">EUR</option></select></div>'
+      + '<div id="deDaysBox" class="dc-dp" style="display:none;grid-column:1/-1;"></div>'
       + '<div class="field" style="margin:0;grid-column:1/-1;"><label>' + t('fld.note') + '</label>'
       +   '<input class="input" id="deNote" placeholder="' + t('fe.de.notePh') + '"></div>'
       + '</div>'
@@ -1266,6 +1372,7 @@
     if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
     _dcEnsureEarnModal();
     _dcEarnEditId = (id != null) ? id : null;
+    _deDays = {}; _deCalYM = null;
 
     var body = document.getElementById('dcEarnModalBody');
     var title = document.getElementById('dcEarnModalTitle');
@@ -1286,6 +1393,7 @@
         setV('deUnit', it.unit_amount);
         setV('deCur', it.currency || 'RON');
         setV('deNote', it.note || '');
+        _dcDaysArr(it).forEach(function (d) { _deDays[d] = 1; });
         // A pénznemet a felhasználó által beállítottnak jelöljük → a
         // dcEarnKindChange NE írja felül a típus-alapú alapértékkel.
         var cur = document.getElementById('deCur');
@@ -1307,6 +1415,7 @@
 
   function dcEarnKindChange() {
     var k = (document.getElementById('deKind') || {}).value;
+    dcDaysRender();
     // Néhány típusnál értelmes alapérték az UNIT-ra: pl. per_diem = 70 RON/nap default nincs — üresen hagyjuk;
     // a mezők értékét nem írjuk felül, csak a placeholdert testreszabjuk.
     var labelInput = document.getElementById('deLabel');
@@ -1345,6 +1454,10 @@
       currency: (document.getElementById('deCur') || {}).value,
       note: (document.getElementById('deNote') || {}).value,
     };
+    if (DC_DAY_KINDS[f.kind]) {
+      f.days = _deDaysList();
+      if (f.days.length) { f.quantity = f.days.length; f.earning_date = f.days[0]; }
+    }
     if (!parseFloat(f.quantity) || !parseFloat(f.unit_amount)) {
       toast(t('fe.de.invalidAmount'), 'err'); return;
     }
@@ -1486,7 +1599,7 @@
         + '<td>' + d2(it.earning_date) + '</td>'
         + '<td><span class="dc-kind-pill dc-kind-' + esc(pillClass) + '">'
         +   esc(kindLabel) + '</span></td>'
-        + '<td>' + esc(it.label || '—') + '</td>'
+        + '<td>' + esc(it.label || '—') + _dcDaysShort(it) + '</td>'
         + '<td style="text-align:right;">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
         + '<td style="text-align:right;font-weight:700;">' + n2(amount, 2)
         +   ' <span class="dc-tile-cur">' + esc(cur) + '</span>' + partialNote + '</td>'
@@ -1687,7 +1800,7 @@
       return '<tr>'
         + '<td>' + d2(it.earning_date) + '</td>'
         + '<td><span class="dc-kind-pill dc-kind-' + esc(kindKey) + '">' + esc(kindLbl) + '</span></td>'
-        + '<td>' + esc(it.label || '—') + '</td>'
+        + '<td>' + esc(it.label || '—') + _dcDaysShort(it) + '</td>'
         + '<td style="text-align:right;">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
         + '<td style="text-align:right;font-weight:700;">' + n2(it.total_amount, 2)
         +   ' <span class="dc-tile-cur">' + esc(it.currency || 'RON') + '</span>' + allocNote + '</td>'
@@ -2925,7 +3038,7 @@
       return '<tr>'
         + '<td>' + d2(it.earning_date) + '</td>'
         + '<td>' + esc(kindLabel) + '</td>'
-        + '<td>' + esc(it.label || '—') + '</td>'
+        + '<td>' + esc(it.label || '—') + _dcMiniCalHtml(_dcDaysArr(it)) + '</td>'
         + '<td class="r">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
         + '<td class="r"><b>' + n2(it.total_amount, 2) + ' ' + esc(it.currency || 'RON') + '</b>' + allocNote + '</td>'
         + '</tr>';
@@ -3634,7 +3747,7 @@
       return '<tr' + (it.is_settled ? ' style="background:#f0fdf4;"' : '') + '>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + d2(it.earning_date) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(kindLbl) + '</td>'
-        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(it.label || '—') + paidMark + '</td>'
+        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(it.label || '—') + paidMark + _dcMiniCalHtml(_dcDaysArr(it)) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">'
         +   n2(it.total_amount, 2) + ' ' + esc(it.currency || 'RON') + '</td>'
@@ -4242,7 +4355,7 @@
       return '<tr>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + d2(it.earning_date) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(kindLbl) + '</td>'
-        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(it.label || '—') + paidMark + '</td>'
+        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(it.label || '—') + paidMark + _dcMiniCalHtml(_dcDaysArr(it)) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">'
         +   n2(it.total_amount, 2) + ' ' + esc(it.currency || 'RON') + '</td>'
@@ -4584,6 +4697,7 @@
     _dcFilterCards: _dcFilterCards,
     // Új: járandóság + kifizetés + kártyás decont
     dcEarnKindChange: dcEarnKindChange,
+    dcDaysToggle: dcDaysToggle, dcDaysNav: dcDaysNav, dcDaysClear: dcDaysClear,
     dcEarnRecalc: dcEarnRecalc,
     dcEarnSave: dcEarnSave,
     dcEarnDelete: dcEarnDelete,

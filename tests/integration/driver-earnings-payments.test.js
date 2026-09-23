@@ -998,3 +998,50 @@ describe('Migráció-tolerancia — driver_earnings/driver_payments/users.net_ba
     });
   });
 });
+
+// ═════════════════════════════════════════════
+//  Diurna-naptár: kijelölt napok → mennyiség + days JSONB
+// ═════════════════════════════════════════════
+describe('earningCreate — diurna napok naptárból', () => {
+  test('4 kijelölt nap → qty=4, total=4×80, dátum=első nap, days mentve (duplikátum/érvénytelen kiszűrve)', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ ok: 1 }]))   // sofőr
+      .mockResolvedValueOnce(rows([]))             // egyéni típusok
+      .mockResolvedValueOnce(rows([{ id: 90 }]))   // INSERT
+      .mockResolvedValueOnce(rows([]));            // UPDATE days
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningCreate',
+      arguments: [{
+        email_sofer: 'sofer@ceg.hu', kind: 'diurna', quantity: 99, unit_amount: 80, currency: 'EUR',
+        days: ['2026-09-17', '2026-09-14', '2026-09-15', '2026-09-16', '2026-09-15', '2026-02-30', 'rossz'],
+      }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.total).toBe(320);
+    const ins = pool.query.mock.calls[2][1];
+    expect(ins[2]).toBe('2026-09-14');
+    expect(ins[5]).toBe(4);
+    const [upSql, upParams] = pool.query.mock.calls[3];
+    expect(upSql).toMatch(/SET days=\$1::jsonb WHERE id=\$2 AND company_id=\$3/);
+    expect(JSON.parse(upParams[0])).toEqual(['2026-09-14', '2026-09-15', '2026-09-16', '2026-09-17']);
+    expect(upParams[2]).toBe(fixtures.admin.company_id);
+  });
+
+  test('nem napos típusnál (bonus) a days figyelmen kívül → qty a mezőből, days=NULL', async () => {
+    setUser(fixtures.admin);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ ok: 1 }]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([{ id: 91 }]))
+      .mockResolvedValueOnce(rows([]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'earningCreate',
+      arguments: [{ email_sofer: 'sofer@ceg.hu', kind: 'bonus', quantity: 3, unit_amount: 10, days: ['2026-09-14'] }],
+    });
+    expect(res.body.result.total).toBe(30);
+    expect(pool.query.mock.calls[3][1][0]).toBeNull();
+  });
+});

@@ -2890,6 +2890,11 @@
     'fe.de.delConfirm': { ro: 'Ștergi acest drept?', hu: 'Törlöd ezt a járandóságot?' },
     'fe.de.invalidAmount':{ ro: 'Cantitate sau sumă invalidă.', hu: 'Érvénytelen mennyiség vagy összeg.' },
     'fe.de.hint':       { ro: 'Ex: 6 zile × 70 EUR/zi diurnă, sau 3 × 10 EUR bonus. Sistemul multiplică automat cantitatea cu suma unitară.', hu: 'Pl. 6 nap × 70 EUR/nap diurna, vagy 3 × 10 EUR bónusz. A rendszer automatikusan szoroz.' },
+    'fe.dd.wd':         { ro: 'L,M,M,J,V,S,D', hu: 'H,K,Sz,Cs,P,Sz,V' },
+    'fe.dd.loc':        { ro: 'ro-RO', hu: 'hu-HU' },
+    'fe.dd.days':       { ro: 'Zile', hu: 'Napok' },
+    'fe.dd.selected':   { ro: 'Zile selectate (= cantitate)', hu: 'Kijelölt napok (= mennyiség)' },
+    'fe.dd.clear':      { ro: 'Golește', hu: 'Törlés' },
     'fe.de.earnedEur':  { ro: 'Drept total EUR', hu: 'Járandóság összesen EUR' },
     'fe.de.earnedRon':  { ro: 'Drept total RON', hu: 'Járandóság összesen RON' },
 
