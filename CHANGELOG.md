@@ -14,6 +14,70 @@
 
 ---
 
+## 2026-09-23 — Menetlevél-nyomtatvány a DECONT arculatával (hivatalos fejléc · cég-pecsét · lágy táblák)
+
+**Kérés (a kinyomtatott menetlevél PDF-jével):** „Ez nem olyan mint a decont."
+
+**Gyökér:** az előző kör a decont **nyomtatási szabályait** (ismétlődő fejléc/lábléc,
+sor nem törik ketté, oszlopnevek a folytatás-lapon) vitte át a menetlevélre — a
+**kinézetét** nem. A lap így hiába viselkedett helyesen, egy másik vizuális nyelvet
+beszélt: középre zárt fekete szöveg-fejléc logó és cég-törzsadatok nélkül, piros
+sorozatszám, 1px fekete rácsos „hivatali" táblák, `#d0d0d0` szakasz-csíkok, aláírás
+pecsét nélkül. A decontokon ezzel szemben letterhead van (logó · cégnév + CUI/J/☏/✉ ·
+kék gradiens doc-badge · 2px elválasztó), lágy kártya/tábla-nyelv és ráégetett
+cég-pecsét az aláíró blokkban.
+
+**Mit csinál most** (`routes/soferApi.js` `/api/pdf-download/:id`):
+1. **Hivatalos fejléc a decontokkal AZONOS forrásból** — a route mostantól lekéri a
+   `companies` törzsadatait (CUI · Reg.Com. · adresa · telefon · e-mail) és a
+   `company_branding` logóját/pecsétjét data-URI-ként. A meta-sor ugyanazt a
+   szimbólum-készletet és sorrendet használja (`CUI … · J … · ☏ … · ✉ …`), mint a
+   Decont lunar / Decont oficial / csoportos bizonylat.
+2. **Kék gradiens doc-badge** („Foaie de parcurs") + sorozatszám + az út időszaka a
+   fejléc jobb szélén, alatta 2px sötét elválasztó — a decont-badge mintájára.
+3. **Lágy kártya- és tábla-nyelv** a fekete rács helyett: adatkártya
+   (`#f8fafc` + 1.5px `#cbd5e1` + 8px sarok), halvány fejléc-sávos táblák
+   (útvonal indigó, tankolás zöld, kiadás borostyán), 1px `#e5e7eb` sor-elválasztó,
+   jobbra igazított számok, üres tábla dőlt „nincs tétel" sorral.
+4. **Színes pirulák** — az útvonal-pont típusa (Plecare/Încărcare/Descărcare/Sosire)
+   és a kiadás-kategória badge-ként, a decont járandóság-pilluláinak mintájára.
+5. **Fogyasztás-blokk a decont összegző-kártyáiként** — szürke keretes kártya a
+   tartály/tankolás/AdBlue adatokkal, alatta kiemelt kék blokk a
+   „Consum mediu / 100 km" értékkel (mint a decont „fennmaradó fizetendő" blokkja).
+6. **Aláíró blokk ráégetett cég-pecséttel** — 50/50 tábla, a cég oldalán a
+   `company_branding` pecsétje az aláírás-vonal fölött, a vonalak alatt a sofőr
+   neve és a cégnév. Pecsét nélkül üres tér marad (kézzel bepecsételhető).
+7. **Középre zárt lábléc** (`cégnév · Foaie de parcurs <szám> · sofőr · rendszám ·
+   VallorSoft) — a decont láblécének stílusában.
+
+**Nem változott:** az adattartalom, a mezők sorrendje, a diurna-sor szerep-alapú
+elrejtése (a sofőr a saját lapján nem látja), a `no-print` gombsáv viselkedése és a
+teljes többoldalas nyomtatás-szabályrendszer (layout-tábla `thead`/`tfoot`,
+`tr{page-break-inside:avoid}`, `@page A4/14mm`, `.no-print{display:none!important}`).
+
+**Migráció-tolerancia:** a cég-törzsadat- és a branding-lekérdezés külön try/catch —
+régi cégnél (hiányzó oszlop vagy `company_branding` sor) a lap ugyanúgy renderelődik,
+csak a logó/pecsét/meta-sor marad el. Erre külön teszt van.
+
+**Verifikáció:** valós Postgres 16 + valós route + headless Chromium `--print-to-pdf`,
+26 útvonal-ponttal / 12 tankolással / 8 kiadással (3 oldal):
+
+```
+OLDALAK: 3
+ 1. oldal → fejléc:IGEN  badge:IGEN  CUI:IGEN  lábléc:IGEN  gombsáv:nincs
+ 2. oldal → fejléc:IGEN  badge:IGEN  CUI:IGEN  lábléc:IGEN  gombsáv:nincs
+ 3. oldal → fejléc:IGEN  badge:IGEN  CUI:IGEN  lábléc:IGEN  gombsáv:nincs
+```
+
+**Teszt:** +3 eset a `tests/integration/fuvarlevelek-db.test.js`-ben (letterhead
+minden eleme + a 2 ráégetett kép · branding nélküli fallback · regresszió-őr a
+nyomtatás-szabályokra, köztük a gombsáv-elrejtés `!important`-jára).
+**1356 Jest zöld** (1353 → 1356). Tisztán szerver-oldali: nincs séma-változás,
+nincs új handler, nincs kliens-asset — cache-bust nem kell.
+
+---
+
+
 ## 2026-09-22 — Menetlevél: AdBlue külön · AI-kategória a bonon · km-folytonosság az adminnak · holt mezők · decont nyomtatási szabályok
 
 **Kérés:** „2-est de a kiolvasas mar ismerje fel hogy mit tartalmaz a bon. 3-as de adminnak jelezze gyujtse osze. 7-est. Az adbluet szamolja külön. Ezmelett a menetlevel kinezeten egy kis valtozast a decont nyomtatasi szabalyait rakd ide is, fejlec lablec, es sort nem tor kozepen ha tablazatot tor akkor a masik oldalon is a tablazat elso sora a sorok neve stb."

@@ -490,22 +490,75 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     const f = r.rows[0];
     const companyName = f.company_denumire || 'VallorSoft';
 
+    // ── HIVATALOS FEJLÉC-ADATOK (a decont-nyomtatványokkal AZONOS forrás) ──
+    // A cég törzsadatai + a feltöltött logó/pecsét. Best-effort: ha egy régi
+    // cégnél hiányzik az oszlop vagy a `company_branding` sor, a lap attól még
+    // renderelődik (csak a logó/pecsét/meta marad el).
+    const cid = req.session.user.company_id;
+    let comp = { cui: null, reg_com: null, adresa: null, telefon: null, email_contact: null };
+    try {
+      const cR = await pool.query(
+        'SELECT cui, reg_com, adresa, telefon, email_contact FROM companies WHERE id=$1', [cid]);
+      if (cR.rows.length) comp = Object.assign(comp, cR.rows[0]);
+    } catch (_e) { /* régi séma — a meta-sor marad el */ }
+    let logoUri = null, stampUri = null;
+    try {
+      const bR = await pool.query(
+        `SELECT logo_base64, logo_mime, stamp_base64, stamp_mime
+           FROM company_branding WHERE company_id=$1`, [cid]);
+      if (bR.rows.length) {
+        const b = bR.rows[0];
+        if (b.logo_base64)  logoUri  = 'data:' + (b.logo_mime  || 'image/png') + ';base64,' + b.logo_base64;
+        if (b.stamp_base64) stampUri = 'data:' + (b.stamp_mime || 'image/png') + ';base64,' + b.stamp_base64;
+      }
+    } catch (_e) { /* company_branding hiányozhat */ }
+
+    // Meta-sor a cégnév alatt — UGYANAZ a szimbólum-készlet és sorrend, mint a
+    // Decont lunar / Decont oficial / csoportos bizonylat fejlécén.
+    const compMeta = [];
+    if (comp.cui)           compMeta.push('CUI ' + escHtml(comp.cui));
+    if (comp.reg_com)       compMeta.push('J ' + escHtml(comp.reg_com));
+    if (comp.telefon)       compMeta.push('☏ ' + escHtml(comp.telefon));
+    if (comp.email_contact) compMeta.push('✉ ' + escHtml(comp.email_contact));
+
     const alimentari = Array.isArray(f.alimentari) ? f.alimentari : [];
     const achizitii  = Array.isArray(f.achizitii)  ? f.achizitii  : [];
     const puncte     = Array.isArray(f.puncte)      ? f.puncte     : [];
     const orderIds   = Array.isArray(f.order_ids)   ? f.order_ids  : [];
 
+    // Az útvonal-pont típusa színes pirulaként — a decont kind-pilluláinak
+    // mintájára (ott a járandóság-típus kap ilyet). Ismeretlen típus → semleges.
+    const PUNCT_PILL = {
+      'Plecare':     { bg: '#e0e7ff', fg: '#3730a3' },
+      'Încărcare':   { bg: '#dcfce7', fg: '#166534' },
+      'Incarcare':   { bg: '#dcfce7', fg: '#166534' },
+      'Descărcare':  { bg: '#fee2e2', fg: '#991b1b' },
+      'Descarcare':  { bg: '#fee2e2', fg: '#991b1b' },
+      'Sosire':      { bg: '#f1f5f9', fg: '#334155' }
+    };
+    const _punctPill = (tip) => {
+      const key = String(tip || '').trim();
+      const c = PUNCT_PILL[key] || { bg: '#f1f5f9', fg: '#334155' };
+      return '<span style="display:inline-block;padding:2px 9px;border-radius:9px;background:' + c.bg
+        + ';color:' + c.fg + ';font-size:11px;font-weight:800;white-space:nowrap;">' + escHtml(key || '—') + '</span>';
+    };
+
     // Útvonal pontok HTML
     let puncteHtml = '';
     if (puncte.length > 0) {
       puncte.forEach((p, i) => {
-        puncteHtml += `<tr><td>${i+1}.</td><td>${escHtml(p.tip || '—')}</td><td>${escHtml(p.loc || '—')}</td><td>${escHtml(p.data || '—')}</td></tr>`;
+        puncteHtml += `<tr>
+          <td style="color:#94a3b8;font-weight:700;">${i+1}.</td>
+          <td>${_punctPill(p.tip)}</td>
+          <td>${escHtml(p.loc || '—')}</td>
+          <td style="white-space:nowrap;color:#475569;">${escHtml(p.data || '—')}</td>
+        </tr>`;
       });
     } else {
       // Ha nincs puncte, a régi loc_plecare/loc_sosire mutatjuk
-      if (f.loc_plecare) puncteHtml += `<tr><td>1.</td><td>Plecare</td><td>${escHtml(f.loc_plecare)}</td><td>—</td></tr>`;
-      if (f.loc_sosire)  puncteHtml += `<tr><td>2.</td><td>Sosire</td><td>${escHtml(f.loc_sosire)}</td><td>—</td></tr>`;
-      if (!puncteHtml)   puncteHtml  = '<tr><td colspan="4">—</td></tr>';
+      if (f.loc_plecare) puncteHtml += `<tr><td style="color:#94a3b8;font-weight:700;">1.</td><td>${_punctPill('Plecare')}</td><td>${escHtml(f.loc_plecare)}</td><td style="white-space:nowrap;color:#475569;">—</td></tr>`;
+      if (f.loc_sosire)  puncteHtml += `<tr><td style="color:#94a3b8;font-weight:700;">2.</td><td>${_punctPill('Sosire')}</td><td>${escHtml(f.loc_sosire)}</td><td style="white-space:nowrap;color:#475569;">—</td></tr>`;
+      if (!puncteHtml)   puncteHtml  = '<tr class="empty-row"><td colspan="4">Nu a fost inregistrat niciun punct de traseu.</td></tr>';
     }
 
     // Tankolások HTML — külön Loc / Data oszlop (a Data mostantól per-tétel)
@@ -521,17 +574,17 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     if (alimentari.length > 0) {
       alimentari.forEach((a, i) => {
         alimHtml += `<tr>
-          <td>${i+1}. ${escHtml(a.loc || '—')}</td>
-          <td>${_fmtItemDate(a.data)}</td>
+          <td><span style="color:#94a3b8;font-weight:700;">${i+1}.</span> ${escHtml(a.loc || '—')}</td>
+          <td style="white-space:nowrap;color:#475569;">${_fmtItemDate(a.data)}</td>
           <td>${escHtml(a.tip || 'Motorină')}</td>
-          <td>${escHtml(a.litru || 0)} L</td>
-          <td>${escHtml(a.km || 0)} km</td>
+          <td class="num">${escHtml(a.litru || 0)} L</td>
+          <td class="num" style="color:#475569;">${escHtml(a.km || 0)} km</td>
           <td>${escHtml(a.plata || '—')}</td>
-          <td>${a.suma ? escHtml(a.suma) + ' RON' : '—'}</td>
+          <td class="num" style="font-weight:700;">${a.suma ? escHtml(a.suma) + ' RON' : '—'}</td>
         </tr>`;
       });
     } else {
-      alimHtml = '<tr><td colspan="7">Nu a fost inregistrata nicio alimentare.</td></tr>';
+      alimHtml = '<tr class="empty-row"><td colspan="7">Nu a fost inregistrata nicio alimentare.</td></tr>';
     }
 
     // Kiadások HTML — külön Loc / Data oszlop (a Data mostantól per-tétel)
@@ -539,16 +592,16 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     if (achizitii.length > 0) {
       achizitii.forEach((ach, i) => {
         achHtml += `<tr>
-          <td>${i+1}. ${escHtml(ach.loc || '—')}</td>
-          <td>${_fmtItemDate(ach.data)}</td>
-          <td>${escHtml(CAT_RO[normalizeCategory(ach.categorie)])}</td>
+          <td><span style="color:#94a3b8;font-weight:700;">${i+1}.</span> ${escHtml(ach.loc || '—')}</td>
+          <td style="white-space:nowrap;color:#475569;">${_fmtItemDate(ach.data)}</td>
+          <td><span style="display:inline-block;padding:2px 9px;border-radius:9px;background:#fef3c7;color:#92400e;font-size:11px;font-weight:800;white-space:nowrap;">${escHtml(CAT_RO[normalizeCategory(ach.categorie)])}</span></td>
           <td>${escHtml(ach.produs || '—')}</td>
-          <td>${escHtml(ach.pret || 0)} RON</td>
+          <td class="num" style="font-weight:700;">${escHtml(ach.pret || 0)} RON</td>
           <td>${escHtml(ach.plata || '—')}</td>
         </tr>`;
       });
     } else {
-      achHtml = '<tr><td colspan="6">Nu a fost inregistrata nicio cheltuiala.</td></tr>';
+      achHtml = '<tr class="empty-row"><td colspan="6">Nu a fost inregistrata nicio cheltuiala.</td></tr>';
     }
 
     // Fuvar ID-k
@@ -560,13 +613,66 @@ router.get('/api/pdf-download/:id', async (req, res) => {
     <title>${escHtml(f.file_name)}</title>
     <meta charset="UTF-8">
     <style>
+      /* ─── A DECONT-NYOMTATVÁNYOK ARCULATA ───────────────────────────────
+         Forrás: public/fleet-extra-v2.js (_dcRenderSheetHtml + _VS_PRINT_CSS).
+         Ugyanaz a hivatalos fejléc (logó · cégnév + meta · gradiens badge +
+         2px elválasztó), ugyanaz a lágy kártya/tábla-nyelv (szürke keret,
+         halvány fejléc-sáv, 1px sor-elválasztó), ugyanaz az aláíró blokk
+         ráégetett cég-pecséttel és ugyanaz a középre zárt lábléc. */
       * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-      body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.5; color:#000; font-size:13px; }
-      .header-box { text-align:center; font-weight:bold; font-size:17px; border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:18px; }
-      .grid-table { width:100%; border-collapse:collapse; margin-bottom:14px; }
-      .grid-table td { border:1px solid #000; padding:5px 7px; vertical-align:top; }
-      .grid-table th { border:1px solid #000; padding:5px 7px; background:#e8e8e8; font-weight:bold; text-align:left; }
-      .sec-title { font-weight:bold; background:#d0d0d0; text-transform:uppercase; padding:5px 7px; border:1px solid #000; margin-top:14px; margin-bottom:0; font-size:12px; letter-spacing:.5px; }
+      body { font-family: Arial, Helvetica, sans-serif; margin:0; padding:20px; color:#0f172a; background:#fff; font-size:13px; line-height:1.5; }
+
+      /* Fejléc */
+      .lh { width:100%; border-collapse:collapse; }
+      .lh td { vertical-align:middle; padding:0; }
+      .lh-logo { width:96px; padding-right:16px !important; }
+      .lh-name { font-size:20px; font-weight:800; color:#0f172a; letter-spacing:.2px; }
+      .lh-sub { font-size:11px; color:#6b7280; }
+      .lh-right { text-align:right; width:230px; }
+      .doc-badge { display:inline-block; padding:9px 16px; background:linear-gradient(135deg,#2563eb,#1e40af);
+                   color:#fff; border-radius:8px; font-weight:800; font-size:14px; letter-spacing:.3px; }
+      .doc-serial { font-size:13px; color:#0f172a; font-weight:700; margin-top:6px; }
+      .doc-period { font-size:11px; color:#6b7280; margin-top:2px; }
+      .lh-rule { height:0; border-top:2px solid #0f172a; margin:12px 0 16px; }
+
+      /* Kártyák + szakasz-címek */
+      .card { padding:10px 14px; background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:8px; margin-bottom:14px; }
+      .card table { width:100%; border-collapse:collapse; font-size:12.5px; }
+      .card td { padding:4px 0; vertical-align:top; }
+      .card .lbl { color:#475569; }
+      .card b { color:#0f172a; }
+      .sec-title { font-size:14px; font-weight:700; color:#0f172a; margin:16px 0 6px; }
+
+      /* Táblák — a decont tábláinak mintájára */
+      .grid-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:6px; }
+      .grid-table th { padding:6px 8px; text-align:left; color:#1e293b; font-weight:700; }
+      .grid-table td { padding:6px 8px; border-bottom:1px solid #e5e7eb; vertical-align:top; }
+      .grid-table .num { text-align:right; }
+      .tbl-pu thead tr { background:#e0e7ff; }
+      .tbl-al thead tr { background:#d1fae5; }
+      .tbl-ac thead tr { background:#fef3c7; }
+      .empty-row td { padding:12px; text-align:center; color:#6b7280; font-style:italic; border-bottom:0; }
+
+      /* Fogyasztás-blokk — a decont összegző-kártyáinak nyelvén */
+      .sum-block { margin-top:4px; padding:14px 18px; border:2px solid #475569; border-radius:10px; background:#f8fafc; }
+      .sum-block table { width:100%; border-collapse:collapse; font-size:13px; }
+      .sum-block td { padding:4px 0; }
+      .sum-block .k { color:#334155; font-weight:700; }
+      .sum-block .v { text-align:right; font-weight:800; color:#0f172a; }
+      .sum-note { font-size:11px; color:#6b7280; }
+      .sum-hi { margin-top:12px; padding:14px 18px; border:2.5px solid #1e40af; border-radius:10px; background:#eff6ff; }
+      .sum-hi table { width:100%; border-collapse:collapse; font-size:15px; }
+      .sum-hi .k { color:#1e40af; font-weight:800; }
+      .sum-hi .v { text-align:right; font-weight:900; color:#1e40af; font-size:16px; }
+
+      .note-box { padding:10px 14px; background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:8px;
+                  min-height:38px; font-size:12.5px; color:#0f172a; white-space:pre-wrap; }
+
+      /* Aláíró blokk — ráégetett cég-pecséttel (mint a decontokon) */
+      .sign-tbl { width:100%; border-collapse:collapse; margin-top:36px; }
+      .sign-tbl td { width:50%; vertical-align:top; height:110px; }
+      .sign-line { border-top:1.5px solid #0f172a; padding-top:6px; font-size:11px; color:#475569; }
+      .sign-name { font-size:12px; color:#94a3b8; margin-top:2px; }
 
       /* ─── TÖBBOLDALAS NYOMTATÁS — a decont-nyomtatványok szabályai ───
          (forras: public/fleet-extra-v2.js _VS_PRINT_CSS)
@@ -586,10 +692,10 @@ router.get('/api/pdf-download/:id', async (req, res) => {
       thead { display:table-header-group; }
       tfoot { display:table-footer-group; }
       tr { page-break-inside:avoid; break-inside:avoid; }
-      .keep, .sign-block, .header-box { page-break-inside:avoid; break-inside:avoid; }
+      .keep, .sign-tbl, .vs-doc-head, .sum-block, .sum-hi, .card { page-break-inside:avoid; break-inside:avoid; }
       .sec-title { page-break-after:avoid; break-after:avoid; }
-      .vs-doc-foot { border-top:1px solid #000; margin-top:6px; padding-top:4px; font-size:10px; color:#444;
-                     display:flex; justify-content:space-between; gap:10px; }
+      .vs-doc-foot { margin-top:10px; padding-top:6px; border-top:1px solid #e5e7eb;
+                     font-size:10px; color:#94a3b8; text-align:center; }
       @page { size:A4; margin:14mm; }
       /* Az !important KELL: a gombsav inline display:flex erteke kulonben
          legyozi az osztaly-szabalyt, es a kepernyos gombok kulon oldalkent
@@ -599,68 +705,123 @@ router.get('/api/pdf-download/:id', async (req, res) => {
   </head>
   <body>
     <div class="no-print" style="margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;">
-      <button onclick="window.close();setTimeout(function(){if(!window.closed){if(history.length>1){history.back();}else{location.href='/';}}},150);" style="padding:10px 24px;background:#555;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">← Inapoi</button>
-      <button onclick="window.print()" style="padding:10px 24px;background:#000;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:4px;font-size:14px;">🖨️ Tipareste / Salveaza PDF</button>
+      <button onclick="window.close();setTimeout(function(){if(!window.closed){if(history.length>1){history.back();}else{location.href='/';}}},150);" style="padding:10px 24px;background:#475569;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:8px;font-size:14px;">← Inapoi</button>
+      <button onclick="window.print()" style="padding:10px 24px;background:#2563eb;color:#fff;font-weight:bold;cursor:pointer;border:none;border-radius:8px;font-size:14px;">🖨️ Tipareste / Salveaza PDF</button>
     </div>
     <table class="vs-print-wrap">
     <thead><tr><td>
-      <div class="header-box">${escHtml(companyName)}<br><span style="font-size:14px;">Foi de Parcurs</span><br><span style="font-size:15px;color:#b00;letter-spacing:1px;">Serie / Nr.: ${escHtml(f.numar_fisa || '—')}</span></div>
+      <div class="vs-doc-head">
+        <table class="lh"><tr>
+          ${logoUri ? `<td class="lh-logo"><img src="${escHtml(logoUri)}" alt="" style="max-width:88px;max-height:80px;display:block;"></td>` : ''}
+          <td>
+            <div class="lh-name">${escHtml(companyName)}</div>
+            ${comp.adresa ? `<div class="lh-sub">${escHtml(comp.adresa)}</div>` : ''}
+            ${compMeta.length ? `<div class="lh-sub" style="margin-top:2px;">${compMeta.join(' · ')}</div>` : ''}
+          </td>
+          <td class="lh-right">
+            <div class="doc-badge">Foaie de parcurs</div>
+            <div class="doc-serial">${escHtml(f.numar_fisa || '—')}</div>
+            <div class="doc-period">${fmtDateRo(f.indulas_dt)} → ${fmtDateRo(f.erkezes_dt)}</div>
+          </td>
+        </tr></table>
+        <div class="lh-rule"></div>
+      </div>
     </td></tr></thead>
     <tfoot><tr><td>
       <div class="vs-doc-foot">
-        <span>${escHtml(companyName)} · Foaie de parcurs ${escHtml(f.numar_fisa || '—')}</span>
-        <span>${escHtml(f.nume_sofer || '')}${f.numar_camion ? ' · ' + escHtml(f.numar_camion) : ''}</span>
+        ${escHtml(companyName)} · Foaie de parcurs ${escHtml(f.numar_fisa || '—')} · ${escHtml(f.nume_sofer || '')}${f.numar_camion ? ' · ' + escHtml(f.numar_camion) : ''} · VallorSoft
       </div>
     </td></tr></tfoot>
     <tbody><tr><td>
 
-    <table class="grid-table keep">
-      <tbody>
-      <tr><td width="50%"><b>Nume șofer:</b> ${escHtml(f.nume_sofer || '—')}</td><td><b>Serie / Număr:</b> ${escHtml(f.numar_fisa || '—')}</td></tr>
-      <tr><td><b>Număr camion:</b> ${escHtml(f.numar_camion || '—')}</td><td><b>Număr remorcă:</b> ${escHtml(f.numar_remorca || '—')}</td></tr>
-      <tr><td colspan="2"><b>ID-uri cursă:</b> ${orderIdsStr}</td></tr>
-      <tr><td><b>Data plecare:</b> ${fmtDateRo(f.indulas_dt)}</td><td><b>Data sosire:</b> ${fmtDateRo(f.erkezes_dt)}</td></tr>
-      <tr><td><b>Km început:</b> ${f.km_inceput || 0} km</td><td><b>Km sfârșit:</b> ${f.km_sfarsit || 0} km</td></tr>
-      <tr><td colspan="2"><b>Total kilometri parcurși: ${f.total_km || 0} km</b></td></tr>
-      ${isSofer ? '' : `<tr><td><b>Diurnă externă:</b> ${f.diurna_externa || 0} zile</td><td><b>Diurnă internă:</b> ${f.diurna_interna || 0} zile</td></tr>`}
-      </tbody>
-    </table>
+    <div class="card keep">
+      <table>
+        <tr>
+          <td width="50%"><span class="lbl">Nume șofer:</span> <b>${escHtml(f.nume_sofer || '—')}</b></td>
+          <td><span class="lbl">Serie / Număr:</span> <b>${escHtml(f.numar_fisa || '—')}</b></td>
+        </tr>
+        <tr>
+          <td><span class="lbl">Număr camion:</span> <b>${escHtml(f.numar_camion || '—')}</b></td>
+          <td><span class="lbl">Număr remorcă:</span> <b>${escHtml(f.numar_remorca || '—')}</b></td>
+        </tr>
+        <tr><td colspan="2"><span class="lbl">ID-uri cursă:</span> ${orderIdsStr}</td></tr>
+        <tr>
+          <td><span class="lbl">Data plecare:</span> <b>${fmtDateRo(f.indulas_dt)}</b></td>
+          <td><span class="lbl">Data sosire:</span> <b>${fmtDateRo(f.erkezes_dt)}</b></td>
+        </tr>
+        <tr>
+          <td><span class="lbl">Km început:</span> <b>${f.km_inceput || 0} km</b></td>
+          <td><span class="lbl">Km sfârșit:</span> <b>${f.km_sfarsit || 0} km</b></td>
+        </tr>
+        <tr>
+          <td colspan="2" style="border-top:1px dashed #cbd5e1;padding-top:7px;">
+            <span class="lbl">Total kilometri parcurși:</span>
+            <b style="font-size:14px;">${f.total_km || 0} km</b>
+          </td>
+        </tr>
+        ${isSofer ? '' : `<tr>
+          <td><span class="lbl">Diurnă externă:</span> <b>${f.diurna_externa || 0} zile</b></td>
+          <td><span class="lbl">Diurnă internă:</span> <b>${f.diurna_interna || 0} zile</b></td>
+        </tr>`}
+      </table>
+    </div>
 
-    <div class="sec-title">Puncte de traseu</div>
-    <table class="grid-table">
-      <thead><tr><th>#</th><th>Tip</th><th>Localitate / Adresă</th><th>Dată</th></tr></thead>
+    <div class="sec-title">📍 Puncte de traseu (${puncte.length})</div>
+    <table class="grid-table tbl-pu">
+      <thead><tr><th style="width:34px;">#</th><th style="width:110px;">Tip</th><th>Localitate / Adresă</th><th style="width:96px;">Dată</th></tr></thead>
       <tbody>${puncteHtml}</tbody>
     </table>
 
-    <div class="sec-title">Alimentări</div>
-    <table class="grid-table">
-      <thead><tr><th>Loc</th><th>Data</th><th>Combustibil</th><th>Litri</th><th>Km</th><th>Plată</th><th>Sumă</th></tr></thead>
+    <div class="sec-title">⛽ Alimentări (${alimentari.length})</div>
+    <table class="grid-table tbl-al">
+      <thead><tr><th>Loc</th><th style="width:88px;">Data</th><th style="width:92px;">Combustibil</th><th class="num" style="width:62px;">Litri</th><th class="num" style="width:78px;">Km</th><th style="width:88px;">Plată</th><th class="num" style="width:92px;">Sumă</th></tr></thead>
       <tbody>${alimHtml}</tbody>
     </table>
 
-    <div class="sec-title">Calcul consum combustibil</div>
-    <table class="grid-table keep">
-      <tbody>
-      <tr><td><b>Cantitate început:</b> ${f.cant_inceput || 0} L</td><td><b>Cantitate sfârșit:</b> ${f.cant_sfarsit || 0} L</td></tr>
-      <tr><td><b>Total motorină alimentată:</b> ${f.total_alim || 0} L</td><td><b>Motorină folosită:</b> ${f.motorina_folosit || 0} L</td></tr>
-      <tr><td><b>Total AdBlue:</b> ${f.total_adblue || 0} L</td><td style="color:#555;">AdBlue nu intră în consumul de motorină.</td></tr>
-      <tr><td colspan="2"><b>Consum mediu / 100 km: ${f.consum_100 || 0} L</b></td></tr>
-      </tbody>
-    </table>
+    <div class="sec-title">🧮 Calcul consum combustibil</div>
+    <div class="sum-block keep">
+      <table>
+        <tr><td class="k">Cantitate început:</td><td class="v">${f.cant_inceput || 0} L</td>
+            <td class="k" style="padding-left:24px;">Cantitate sfârșit:</td><td class="v">${f.cant_sfarsit || 0} L</td></tr>
+        <tr><td class="k">Total motorină alimentată:</td><td class="v">${f.total_alim || 0} L</td>
+            <td class="k" style="padding-left:24px;">Motorină folosită:</td><td class="v">${f.motorina_folosit || 0} L</td></tr>
+        <tr><td class="k" style="border-top:1px dashed #cbd5e1;padding-top:7px;">Total AdBlue:</td>
+            <td class="v" style="border-top:1px dashed #cbd5e1;padding-top:7px;">${f.total_adblue || 0} L</td>
+            <td colspan="2" class="sum-note" style="border-top:1px dashed #cbd5e1;padding-top:7px;padding-left:24px;">AdBlue nu intră în consumul de motorină.</td></tr>
+      </table>
+    </div>
+    <div class="sum-hi keep">
+      <table><tr>
+        <td class="k">Consum mediu / 100 km</td>
+        <td class="v">${f.consum_100 || 0} L</td>
+      </tr></table>
+    </div>
 
-    <div class="sec-title">Achiziții / Cheltuieli</div>
-    <table class="grid-table">
-      <thead><tr><th>Loc</th><th>Data</th><th>Categorie</th><th>Produs / Serviciu</th><th>Preț</th><th>Metodă plată</th></tr></thead>
+    <div class="sec-title">🛒 Achiziții / Cheltuieli (${achizitii.length})</div>
+    <table class="grid-table tbl-ac">
+      <thead><tr><th>Loc</th><th style="width:88px;">Data</th><th style="width:110px;">Categorie</th><th>Produs / Serviciu</th><th class="num" style="width:92px;">Preț</th><th style="width:96px;">Metodă plată</th></tr></thead>
       <tbody>${achHtml}</tbody>
     </table>
 
-    <div class="sec-title">Alte mențiuni</div>
-    <div class="keep" style="border:1px solid #000;padding:10px;min-height:40px;">${escHtml(f.alte_mentiuni || '—')}</div>
+    <div class="sec-title">📝 Alte mențiuni</div>
+    <div class="note-box keep">${escHtml(f.alte_mentiuni || '—')}</div>
 
-    <div class="sign-block" style="margin-top:30px;display:flex;justify-content:space-between;">
-      <div style="text-align:center;"><div style="border-top:1px solid #000;width:180px;margin:0 auto;padding-top:4px;">Semnătura șofer</div></div>
-      <div style="text-align:center;"><div style="border-top:1px solid #000;width:180px;margin:0 auto;padding-top:4px;">Semnătura dispecer</div></div>
-    </div>
+    <table class="sign-tbl">
+      <tr>
+        <td style="padding-right:16px;">
+          <div style="height:70px;"></div>
+          <div class="sign-line">Semnătura șofer</div>
+          <div class="sign-name">${escHtml(f.nume_sofer || '')}</div>
+        </td>
+        <td style="padding-left:16px;">
+          ${stampUri
+            ? `<div style="height:70px;text-align:center;"><img src="${escHtml(stampUri)}" alt="" style="max-height:68px;max-width:120px;opacity:.85;"></div>`
+            : '<div style="height:70px;"></div>'}
+          <div class="sign-line">Semnătura dispecer</div>
+          <div class="sign-name">${escHtml(companyName)}</div>
+        </td>
+      </tr>
+    </table>
 
     </td></tr></tbody>
     </table>
