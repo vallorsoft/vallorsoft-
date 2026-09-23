@@ -18,6 +18,22 @@
 
 
 
+
+## 2026-09-23 — Sofőr fejléc MOST-sor: teljes cím + teljes cégnév
+
+**Kérés:** „Amelyik epp soron van annal ird ki a teljes cimet es ceg nevet."
+
+1. **Változás** (`public/sofer.js` `_wbHeaderRow`): a MOST-sor (state=`current`) mostantól **teljes** `s.loc` címet és **teljes** `s.firma` cégnevet mutat — nem `_cityOf` (város-heurisztika) és nem `_firmaShort` (rövidítés). Kész és pending sorok rövidítve maradnak (csak kontextus).
+2. **Új sor-elrendezés a MOST-blokkban** (`.wb-hd-main-full`): 4 külön sorra bontva a hosszú román címek olvashatóságáért:
+   - Kind-címke (kis kaptialis, borostyán) — pl. „LERAKÓ"
+   - 📍 teljes cím (nagy, félkövér, törhet)
+   - 🏢 teljes cégnév (közepes, törhet)
+   - 📅 nap-név a dátummal
+3. **CSS** (`public/sofer.css`): új `.wb-hd-main-full` blokk `word-break: break-word` + `white-space: normal` — hosszú „Strada Uzinei 15, 555400 Copșa Mică, jud. Sibiu" cím sem vágódik le. A többi sor változatlan (kompakt egy-soros ellipzises).
+4. **Nincs séma-változás**, nincs új szerver-út. Csak kliens-oldal. Cache-bust `sofer.js/css?v=20260923wbfull`.
+5. **Teszt** (`tests/integration/sofer-client-flow.test.js` +1 új eset): hosszú román cím + hosszú cégnév → a fejléc MOST-blokkjában a TELJES megjelenik, a kész és pending fejléc-sorokban rövidítve. **1383 Jest zöld** (1382 → 1383).
+6. Verifikáció: headless Chromium 390×1150 preview — 3 fuvar-állapot hosszú címekkel, minden olvasható, a kompakt mobil-magasság megőrizve.
+
 ## 2026-09-23 — Sofőr kártya-fejléc: MOBIL-elsőség (kompakt mód 5+ stopnál)
 
 **Kérés:** „Figyelj hogy telefonrol van használva. Oldal mereteket is szamold." — az előző körben (PR #463) elszúrtam: a papír-menetlevél fejléc 6-stop fuvarnál ~310px lett, ami 3 aktív fuvar mellett túltölti a 780px-es sofőr-telefon képernyőjét.

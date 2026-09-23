@@ -3464,3 +3464,63 @@
   .sofer-wrap .wb-hd-mini-done .wb-hd-mini-t { color: #94a3b8; }
   .sofer-wrap .wb-hd-mini-next .wb-hd-mini-t { color: #94a3b8; }
 }
+
+/* MOST-sor teljes cím + teljes cégnév (2026-09-23) — külön sorokba
+   tördelve, hogy hosszú cím + hosszú cégnév is olvashatóan elférjen.
+   A `.wb-hd-main-full` a MOST-sor szülő-columnja; három vagy négy
+   címzés-sor: kind (Felrakó/Lerakó), 📍 teljes cím, 🏢 teljes cégnév,
+   📅 dátum + nap. Mind törhet, egyik sem vágódik ellipzisre. */
+.sofer-wrap .wb-hd-main-full {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 2px 0;
+}
+.sofer-wrap .wb-hd-main-full .wb-hd-main-t {
+  font-weight: 700;
+  color: #b45309;
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+.sofer-wrap .wb-hd-main-full .wb-hd-main-addr {
+  font-weight: 800;
+  color: #0f172a;
+  font-size: 15.5px;
+  line-height: 1.3;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+}
+.sofer-wrap .wb-hd-main-full .wb-hd-main-firma {
+  font-weight: 700;
+  color: #78350f;
+  font-size: 13.5px;
+  line-height: 1.3;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+}
+.sofer-wrap .wb-hd-main-full .wb-hd-main-day {
+  font-weight: 600;
+  color: #78350f;
+  font-size: 12.5px;
+  line-height: 1.3;
+  opacity: 0.85;
+}
+@media (max-width: 480px) {
+  .sofer-wrap .wb-hd-main-full .wb-hd-main-addr { font-size: 15px; }
+  .sofer-wrap .wb-hd-main-full .wb-hd-main-firma { font-size: 13px; }
+}
+@media (prefers-color-scheme: dark) {
+  .sofer-wrap .wb-hd-main-full .wb-hd-main-t    { color: #fbbf24; }
+  .sofer-wrap .wb-hd-main-full .wb-hd-main-addr { color: #fff; }
+  .sofer-wrap .wb-hd-main-full .wb-hd-main-firma{ color: #fed7aa; }
+  .sofer-wrap .wb-hd-main-full .wb-hd-main-day  { color: #fed7aa; }
+}

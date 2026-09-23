@@ -5087,8 +5087,13 @@ function _wbHeaderStops(o) {
   });
 }
 function _wbHeaderRow(s, num, state) {
-  var city  = _cityOf(s.loc) || (s.loc || '—');
-  var firma = _firmaShort(s.firma || '');
+  // A MOST-sor (state='current') a soron következő teendő — a sofőrnek
+  // ehhez a TELJES cím + TELJES cégnév kell (nem rövidítve), hogy
+  // navigáció / hívás nélkül azonnal tudja, hova megy és kihez. A többi
+  // sor (kész / hátra) rövidített marad, mert csak kontextus.
+  var isCurrent = (state === 'current');
+  var loc   = isCurrent ? (s.loc || '—') : (_cityOf(s.loc) || (s.loc || '—'));
+  var firma = isCurrent ? (s.firma || '') : _firmaShort(s.firma || '');
   var day   = fmtFuvarDayWeekday(s.eff_date || s.data || s.date || '');
   var kindLbl = s.kind === 'pickup'
     ? (t('sof.wbh.pickup') || 'Felrakó')
@@ -5097,7 +5102,23 @@ function _wbHeaderRow(s, num, state) {
            : state === 'current' ? '▶'
            :                       '○';
   var cls = 'wb-hd-row wb-hd-' + state;
-  var main = kindLbl + ' — ' + esc(city);
+  // MOST-sor: a cím + cégnév vizuálisan is elválik (külön sorokban,
+  // hogy hosszú cím + hosszú cégnév se tördeljen olvashatatlanná).
+  if (isCurrent) {
+    return '' +
+      '<div class="' + cls + '">' +
+        '<span class="wb-hd-icon">' + icon + '</span>' +
+        '<span class="wb-hd-num">' + num + '.</span>' +
+        '<span class="wb-hd-main wb-hd-main-full">' +
+          '<span class="wb-hd-main-t">' + esc(kindLbl) + '</span>' +
+          '<span class="wb-hd-main-addr">📍 ' + esc(loc) + '</span>' +
+          (firma ? '<span class="wb-hd-main-firma">🏢 ' + esc(firma) + '</span>' : '') +
+          (day   ? '<span class="wb-hd-main-day">📅 '  + esc(day)   + '</span>' : '') +
+        '</span>' +
+      '</div>';
+  }
+  // Kész / hátra: kompakt egy-soros, mint eddig
+  var main = kindLbl + ' — ' + esc(loc);
   var sub  = [];
   if (firma) sub.push(esc(firma));
   if (day)   sub.push(esc(day));
