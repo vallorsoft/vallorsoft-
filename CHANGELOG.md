@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-09-23 — Sofőr-elszámolás: diurna-napok naptárból + zöld mini-naptár a decontokon
+
+1. **Kérés:** diurna-járandóságnál a mennyiség helyett naptáron lehessen kijelölni a napokat (minden nap = 1 mennyiség, pl. H–Cs = 4 × 80 EUR), és a decont írja ki a napokat dátum szerint, kis naptárral, zölden.
+2. **Migráció `db/driver-earning-days.sql`**: `driver_earnings.days JSONB` (NULL = nem napos tétel).
+3. **Szerver** (`handlers/fleetCompliance.js`): új `_normDays` (csak `diurna`/`per_diem`; ISO + valós dátum, egyedi, rendezett, max 62) → `quantity = napok száma`, `earning_date = első nap`, a total szerveren; `earningCreate`/`earningUpdate` külön, migráció-toleráns UPDATE-tel menti (`company_id`-szűrt), audit napszámmal. `earningList` / `getMonthlySettlementSheet` / `earningPaymentGroupGet` visszaadja a `days`-t (`to_jsonb(...)->'days'` → régi DB-n is fut).
+4. **Kliens** (`public/fleet-extra-v2.js`): a járandóság-modálban diurna/napidíj típusnál havi naptár-választó (‹ › lapozás, kattintásra zöld), a mennyiség mező readonly = kijelölt napok; szerkesztéskor visszatöltve. A decont-dokumentumokon (Decont lunar, Decont oficial, Csoportos bizonylat) a tétel alatt dátum-lista + inline-stílusú mini-naptár zöld napokkal (nyomtatás/e-mail-biztos); a képernyős listán rövid dátum-lista.
+5. **i18n** 5 új `fe.dd.*` (RO+HU), CSS `#dcEarnModal .dc-dp*`, cache-bust `?v=20260923ddays`. **Teszt** +2 → **1358 Jest zöld**.
+
 ## 2026-09-23 — Menetlevél-nyomtatvány a DECONT arculatával (hivatalos fejléc · cég-pecsét · lágy táblák)
 
 **Kérés (a kinyomtatott menetlevél PDF-jével):** „Ez nem olyan mint a decont."

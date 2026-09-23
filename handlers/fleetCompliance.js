@@ -534,6 +534,30 @@ handlers.getServiceDueAlerts = async function (req, res) {
 // ════════════════════════════════════════════════════════════
 const { fetchBnrEurRon } = require('../services/bnr');
 
+// Diurna-naptár: a kijelölt napok normalizálása (YYYY-MM-DD, valós dátum,
+// egyedi, rendezett, max 62). Ha nem napos típus vagy üres → null.
+const DAY_KINDS = new Set(['diurna', 'per_diem']);
+function _normDays(arr, kind) {
+  if (!DAY_KINDS.has(kind) || !Array.isArray(arr)) return null;
+  const set = new Set();
+  for (const v of arr) {
+    const d = String(v || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+    const t = new Date(d + 'T00:00:00Z');
+    if (isNaN(t) || t.toISOString().slice(0, 10) !== d) continue;
+    const y = +d.slice(0, 4); if (y < 2000 || y > 2100) continue;
+    set.add(d);
+  }
+  const out = [...set].sort().slice(0, 62);
+  return out.length ? out : null;
+}
+async function _saveDays(id, cid, days) {
+  try {
+    await pool.query('UPDATE driver_earnings SET days=$1::jsonb WHERE id=$2 AND company_id=$3',
+      [days ? JSON.stringify(days) : null, id, cid]);
+  } catch (e) { console.warn('driver_earnings.days mentés kihagyva:', e.message); }
+}
+
 const EARNING_KINDS = new Set(['bonus', 'diurna', 'per_diem', 'salary', 'premium', 'holiday', 'other']);
 const PAYMENT_METHODS = new Set(['cash', 'bank', 'card', 'other']);
 const CURRENCIES = new Set(['RON', 'EUR']);
@@ -594,7 +618,8 @@ handlers.earningList = async function (req, res, args) {
     if (a.to)    { params.push(a.to);   where += ` AND earning_date <= $${params.length}`; }
     const r = await pool.query(
       `SELECT id, email_sofer, earning_date, kind, label, quantity, unit_amount,
-              total_amount, currency, note, created_by, created_at
+              total_amount, currency, note, created_by, created_at,
+              (to_jsonb(driver_earnings) -> 'days') AS days
          FROM driver_earnings
         WHERE ${where}
         ORDER BY earning_date DESC, id DESC
@@ -667,13 +692,14 @@ handlers.earningCreate = async function (req, res, args) {
     const label = String(f.label || '').trim().slice(0, 120) || null;
     const currency = _cur(f.currency);
 
-    const qty = _num(f.quantity);
+    const days = _normDays(f.days, kind);
+    const qty = days ? days.length : _num(f.quantity);
     const unit = _num(f.unit_amount);
     if (qty == null || qty <= 0) return res.json({ result: { ok: false, err: 'Cantitate invalida.' } });
     if (unit == null || unit <= 0) return res.json({ result: { ok: false, err: 'Suma unitara invalida.' } });
     const total = _round2(qty * unit);
 
-    const date = f.earning_date || new Date().toISOString().slice(0, 10);
+    const date = days ? days[0] : (f.earning_date || new Date().toISOString().slice(0, 10));
     const note = String(f.note || '').trim().slice(0, 500) || null;
 
     let ins;
@@ -693,8 +719,9 @@ handlers.earningCreate = async function (req, res, args) {
         : 'Eroare la salvarea drepturilor.';
       return res.json({ result: { ok: false, err: msg } });
     }
+    await _saveDays(ins.rows[0].id, cid, days);
     try { audit.fromReq(req, 'earning.create', 'driver_earnings', ins.rows[0].id,
-      { email_sofer: email, kind, total, currency }); } catch (_e) {}
+      { email_sofer: email, kind, total, currency, days: days ? days.length : 0 }); } catch (_e) {}
     return res.json({ result: { ok: true, id: ins.rows[0].id, total, currency } });
   } catch (err) {
     console.error('earningCreate hiba:', err);
@@ -742,12 +769,13 @@ handlers.earningUpdate = async function (req, res, args) {
     const kind = allowedKinds.has(kindRaw) ? kindRaw : 'other';
     const label = String(f.label || '').trim().slice(0, 120) || null;
     const currency = _cur(f.currency);
-    const qty = _num(f.quantity);
+    const days = _normDays(f.days, kind);
+    const qty = days ? days.length : _num(f.quantity);
     const unit = _num(f.unit_amount);
     if (qty == null || qty <= 0) return res.json({ result: { ok: false, err: 'Cantitate invalida.' } });
     if (unit == null || unit <= 0) return res.json({ result: { ok: false, err: 'Suma unitara invalida.' } });
     const total = _round2(qty * unit);
-    const date = f.earning_date || new Date().toISOString().slice(0, 10);
+    const date = days ? days[0] : (f.earning_date || new Date().toISOString().slice(0, 10));
     const note = String(f.note || '').trim().slice(0, 500) || null;
 
     try {
@@ -762,8 +790,9 @@ handlers.earningUpdate = async function (req, res, args) {
       console.warn('earningUpdate UPDATE hiba:', dbErr.message);
       return res.json({ result: { ok: false, err: 'Eroare la salvarea drepturilor.' } });
     }
+    await _saveDays(id, cid, days);
     try { audit.fromReq(req, 'earning.update', 'driver_earnings', id,
-      { kind, total, currency }); } catch (_e) {}
+      { kind, total, currency, days: days ? days.length : 0 }); } catch (_e) {}
     return res.json({ result: { ok: true, id, total, currency } });
   } catch (err) {
     console.error('earningUpdate hiba:', err);
@@ -1276,7 +1305,7 @@ handlers.earningPaymentGroupGet = async function (req, res, args) {
     try {
       itemsR = await pool.query(
         `SELECT e.id, e.earning_date, e.kind, e.label, e.quantity,
-                e.unit_amount, e.total_amount, e.currency, e.note, gi.alloc_ron
+                e.unit_amount, e.total_amount, e.currency, e.note, (to_jsonb(e) -> 'days') AS days, gi.alloc_ron
            FROM driver_payment_group_items gi
            JOIN driver_earnings e ON e.id = gi.earning_id
           WHERE gi.group_id = $1 AND e.company_id = $2
@@ -1286,7 +1315,7 @@ handlers.earningPaymentGroupGet = async function (req, res, args) {
     } catch (_e) {
       itemsR = await pool.query(
         `SELECT e.id, e.earning_date, e.kind, e.label, e.quantity,
-                e.unit_amount, e.total_amount, e.currency, e.note
+                e.unit_amount, e.total_amount, e.currency, e.note, (to_jsonb(e) -> 'days') AS days
            FROM driver_payment_group_items gi
            JOIN driver_earnings e ON e.id = gi.earning_id
           WHERE gi.group_id = $1 AND e.company_id = $2
@@ -2060,7 +2089,8 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
 
     // Járandóság-sorok az időszakra
     const eR = await pool.query(
-      `SELECT id, earning_date, kind, label, quantity, unit_amount, total_amount, currency, note
+      `SELECT id, earning_date, kind, label, quantity, unit_amount, total_amount, currency, note,
+              (to_jsonb(driver_earnings) -> 'days') AS days
          FROM driver_earnings
         WHERE company_id=$1 AND LOWER(email_sofer)=$2
           AND earning_date >= $3 AND earning_date <= $4
