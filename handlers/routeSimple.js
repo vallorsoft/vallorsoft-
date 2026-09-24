@@ -17,6 +17,11 @@
 // ============================================================
 const maps = require('../lib/mapsProvider');
 const tollEstimate = require('../lib/tollEstimate');
+// Hivatalos HERE flexible polyline dekóder (a project dep-je: `@here/flexpolyline`).
+// A saját, kézzel írt varint-dekóderünk némely HERE-válaszra `flex-poly-version`
+// hibát dobott (a header-formátum árnyalatait nem fedte le), ezért a hivatalos
+// implementációra váltunk. `decode(str) → { polyline: [[lat,lng,z?], ...], … }`.
+const flexPoly = require('@here/flexpolyline');
 
 const UA = 'VallorSoft/1.0 (utvonaltervezo)';
 const TIMEOUT_MS = 20000;
@@ -206,54 +211,14 @@ async function rpAcSearch(req, res, args) {
   }
 }
 
-// ── HERE Flexible Polyline dekóder (kulcs nélküli, tömör implementáció) ───
-// Referencia: https://github.com/heremaps/flexible-polyline (Apache-2.0).
+// ── HERE Flexible Polyline dekóder — hivatalos `@here/flexpolyline` lib ─────
+// A visszatérés {polyline:[[lat,lng,z?], ...], precision, thirdDim, ...}.
+// A Leaflet-nek 2D [lat,lng] tömböt adunk vissza.
 function decodeHereFlex(encoded) {
-  const DECODE_TABLE = [
-    62,-1,-1,-1,63,52,53,54,55,56,57,58,59,60,61,-1,-1,-1,-1,-1,-1,-1,
-    0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,
-    -1,-1,-1,-1,-1,-1,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,
-  ];
-  function decodeChar(c) {
-    const v = c.charCodeAt(0) - 45;
-    if (v < 0 || v >= DECODE_TABLE.length) return -1;
-    return DECODE_TABLE[v];
-  }
-  function decodeUnsignedVarint(chars, idx) {
-    let result = 0n; let shift = 0n;
-    while (idx.i < chars.length) {
-      const b = BigInt(decodeChar(chars[idx.i])); idx.i++;
-      result |= (b & 0x1Fn) << shift;
-      if ((b & 0x20n) === 0n) return result;
-      shift += 5n;
-    }
-    return result;
-  }
-  function decodeSignedVarint(chars, idx) {
-    const r = decodeUnsignedVarint(chars, idx);
-    if ((r & 1n) !== 0n) return -((r >> 1n) + 1n);
-    return r >> 1n;
-  }
-  const idx = { i: 0 };
-  // header: version (5 bit varint), then value = (precision << 4) | (thirdDim << 1) | thirdDimPrecision? — parse a header word.
-  const version = decodeUnsignedVarint(encoded, idx);
-  if (version !== 1n) throw new Error('flex-poly-version');
-  const val = decodeUnsignedVarint(encoded, idx);
-  const precision = Number(val & 15n);
-  const thirdDim = Number((val >> 4n) & 7n);
-  const thirdDimPrec = Number((val >> 7n) & 15n);
-  const factor = Math.pow(10, precision);
-  const factor3 = Math.pow(10, thirdDimPrec);
-  let lat = 0n, lng = 0n, z = 0n;
-  const pts = [];
-  while (idx.i < encoded.length) {
-    lat += decodeSignedVarint(encoded, idx);
-    lng += decodeSignedVarint(encoded, idx);
-    if (thirdDim) z += decodeSignedVarint(encoded, idx);
-    pts.push([Number(lat) / factor, Number(lng) / factor]);
-  }
-  return pts;
-  // (factor3/z használatlan — 2D-t adunk vissza a Leaflet-nek)
+  const r = flexPoly.decode(encoded);
+  const pts = (r && r.polyline) || [];
+  // A hivatalos lib visszaadhatja 3D-vel (thirdDim), de nekünk elég a 2D.
+  return pts.map((p) => [p[0], p[1]]);
 }
 
 // Haversine távolság (méter) két lat/lng pont között
