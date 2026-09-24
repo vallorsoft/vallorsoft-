@@ -134,44 +134,75 @@ async function _nominatimEuropean(q) {
 }
 
 async function _hereAutosuggest(q, key) {
-  // HERE Autosuggest — teljes Európát lefedi (bias EU-központ).
-  // resultType=locality → CSAK települési találatok elsőként.
-  // Külön általános autosuggest is, hogy legyen fallback címekre/POI-kra.
-  // HERE Autosuggest — nincs `lang` restriction, hogy a multi-lang matchelés
-  // működjön (Bécs → Wien, Kolozsvár → Cluj, Prága → Praha stb.)
-  const [locD, allD] = await Promise.all([
+  // HERE hármas keresés párhuzamosan — teljes Európát lefedi (EU-központ bias):
+  //   1. Autosuggest types=area  → csak települések (Wien/Cluj/Karlsruhe)
+  //   2. Autosuggest általános   → cím + POI vegyes találat
+  //   3. Discover                → BEJEGYZETT CÉGEK / POI-k (Kaufland, MOL,
+  //      Shell, McDonald's, DHL-terminálok stb. — mint a Google Places)
+  // Nincs `lang` restriction → a multi-lang matchelés (Bécs → Wien) automatikus.
+  const [locD, allD, discD] = await Promise.all([
     jsonGet('https://autosuggest.search.hereapi.com/v1/autosuggest?q=' + encodeURIComponent(q)
-      + '&at=50,15&limit=8&types=area&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
+      + '&at=50,15&limit=6&types=area&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
     jsonGet('https://autosuggest.search.hereapi.com/v1/autosuggest?q=' + encodeURIComponent(q)
-      + '&at=50,15&limit=10&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
+      + '&at=50,15&limit=6&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
+    jsonGet('https://discover.search.hereapi.com/v1/discover?q=' + encodeURIComponent(q)
+      + '&at=50,15&limit=8&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
   ]);
-  function mapIt(it, isPlace) {
+
+  // Rangsor: (1) települési találat elöl (city/town), (2) POI/cég (Discover
+  // categories mezővel — ipari, tankoló, üzlet), (3) egyéb cím.
+  //   - `resultType`: 'locality' | 'administrativeArea' | 'place' | 'houseNumber' | 'street'
+  //   - `categories`: a Discover ad ilyen tömböt — jelenléte = bejegyzett hely
+  function rankFor(it) {
+    var rt = it.resultType || '';
+    var hasCat = Array.isArray(it.categories) && it.categories.length;
+    if (rt === 'locality' || rt === 'administrativeArea') return 1;  // város-találat
+    if (hasCat) return 2;                                            // bejegyzett cég/POI
+    if (rt === 'place') return 3;                                    // egyéb POI (autosuggest)
+    return 20;                                                       // cím / utca
+  }
+  function mapIt(it) {
+    var label = (it.address && it.address.label) || it.title || '';
+    var title = it.title || label;
+    // Discover-nél a title jellemzően a cég neve; az address.label a valódi cím.
+    // Ha van kategória (bejegyzett hely), a title mellé egy kategória-hint is jó.
+    var catHint = null;
+    if (Array.isArray(it.categories) && it.categories.length) {
+      var c = it.categories[0];
+      catHint = (c && (c.name || c.id)) || null;
+    }
     return {
-      label: (it.address && it.address.label) || it.title,
-      title: it.title,
+      label: label,
+      title: title,
       lat: it.position ? it.position.lat : null,
       lng: it.position ? it.position.lng : null,
-      _rank: isPlace ? 1 : (it.resultType === 'locality' || it.resultType === 'administrativeArea' ? 2 : 20),
+      catHint: catHint,
+      _rank: rankFor(it),
     };
   }
-  const seen = new Set();
-  const out = [];
-  ((locD && locD.items) || []).forEach((it) => {
-    const m = mapIt(it, true);
-    if (!m.label) return;
-    const key = m.label.toLowerCase().slice(0, 80);
-    if (seen.has(key)) return;
-    seen.add(key); out.push(m);
-  });
-  ((allD && allD.items) || []).forEach((it) => {
-    const m = mapIt(it, false);
-    if (!m.label) return;
-    const key = m.label.toLowerCase().slice(0, 80);
-    if (seen.has(key)) return;
-    seen.add(key); out.push(m);
-  });
-  out.sort((a, b) => a._rank - b._rank);
-  return out.map(({ _rank, ...rest }) => rest);
+
+  var seen = new Set();
+  var out = [];
+  function push(items) {
+    (items || []).forEach(function (it) {
+      var m = mapIt(it);
+      if (!m.label) return;
+      // Kulcs: label + kb. koordináta — így az azonos hely, különböző API-kból
+      // származó duplikációja kiesik. (Autosuggest + Discover ugyanazt a
+      // Kaufland-boltot mindkét helyről visszahozhatja.)
+      var k = m.label.toLowerCase().slice(0, 80)
+        + '|' + (m.lat != null ? m.lat.toFixed(3) : '')
+        + '|' + (m.lng != null ? m.lng.toFixed(3) : '');
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push(m);
+    });
+  }
+  push((locD && locD.items) || []);
+  push((discD && discD.items) || []);
+  push((allD && allD.items) || []);
+  out.sort(function (a, b) { return a._rank - b._rank; });
+  return out.map(function (o) { var c = Object.assign({}, o); delete c._rank; return c; });
 }
 
 // ── Server-side keresés-cache (in-memory LRU, kb. 10 perc TTL) ─────────────
@@ -217,6 +248,9 @@ async function rpAcSearch(req, res, args) {
         title: it.title || it.label,
         lat: it.lat != null ? Number(it.lat) : null,
         lng: it.lng != null ? Number(it.lng) : null,
+        // Bejegyzett hely (Discover) kategória-hintje, ha van — a UI kis
+        // pilulaként mutatja, hogy azonnal látszódjon: „🏢 Kaufland" nem cím.
+        catHint: it.catHint || null,
       });
     });
   }
