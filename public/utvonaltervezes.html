@@ -337,29 +337,129 @@ function moveWaypoint(id, delta){
   drawMarkers();
 }
 
+// ===== Kliens-oldali cache + előzmények =====
+// Query → items cache (LRU 10 perc), előzmények (utolsó 40 kiválasztott).
+const RECENT_KEY = 'vs_rp_recent_v1';
+const AC_CLIENT_TTL_MS = 10 * 60 * 1000;
+const _acClientCache = new Map(); // q(lower) -> {ts, items}
+function loadRecent(){
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]') || []; } catch(_) { return []; }
+}
+function pushRecent(item){
+  if (!item || !item.label) return;
+  const list = loadRecent();
+  const norm = (s) => (s||'').toLowerCase();
+  const key = norm(item.label);
+  const filtered = list.filter(x => norm(x.label) !== key);
+  filtered.unshift({ label: item.label, title: item.title || item.label, lat: item.lat, lng: item.lng, ts: Date.now() });
+  const trimmed = filtered.slice(0, 40);
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(trimmed)); } catch(_) {}
+}
+function matchRecent(q){
+  if (!q || q.length < 1) return [];
+  const nq = q.toLowerCase();
+  // A beírt szöveggel EGYEZŐ (nem csak tartalmazó) előzmények elöl,
+  // aztán a substring-egyezők — mindegyik friss dátum szerint.
+  const list = loadRecent();
+  const starts = [], includes = [];
+  list.forEach(it => {
+    const l = (it.label||'').toLowerCase();
+    const t = (it.title||'').toLowerCase();
+    if (l.startsWith(nq) || t.startsWith(nq)) starts.push(it);
+    else if (l.includes(nq) || t.includes(nq)) includes.push(it);
+  });
+  return starts.concat(includes).slice(0, 5); // max 5 előzmény
+}
+
 function attach(w){
   const inp = document.getElementById('in_'+w.id);
   const dd  = document.getElementById('ac_'+w.id);
   if (!inp) return;
+  let inflight = null; // aktuális AbortController (a következő gépeléskor bemutatunk egy újat)
+
+  function renderDropdown(items, extra){
+    if (!items.length){ dd.classList.remove('open'); dd.innerHTML=''; dd._items = []; return; }
+    dd.innerHTML = items.map((it, idx) =>
+      '<div class="wp-ac-item" data-idx="'+idx+'">'
+      + (it._recent ? '<div style="font-size:10px;color:#0891b2;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px;">⏱ Recent</div>' : '')
+      + '<div class="t">'+esc(it.title||it.label)+'</div>'
+      + (it.label && it.label !== it.title ? '<div class="s">'+esc(it.label)+'</div>' : '')
+      + '</div>'
+    ).join('');
+    dd.classList.add('open');
+    dd._items = items;
+    if (extra && extra.loading) {
+      dd.innerHTML += '<div style="padding:6px 12px;font-size:11px;color:#64748b;font-style:italic;text-align:center;">Se caută mai multe rezultate…</div>';
+    }
+  }
+
+  function mergeRecentWithApi(recent, api){
+    // Az API találatokból kivesszük azokat, amik már szerepelnek a recent-ekben
+    const inRecent = new Set(recent.map(r => (r.label||'').toLowerCase()));
+    const rest = (api || []).filter(it => !inRecent.has((it.label||'').toLowerCase()));
+    return recent.map(r => Object.assign({ _recent: true }, r)).concat(rest).slice(0, 10);
+  }
+
   const doSearch = debounce(async () => {
     const q = inp.value.trim();
     w.label = inp.value;
     w.lat = null; w.lng = null;
     updatePlanBtn();
     if (q.length < 2){ dd.classList.remove('open'); dd.innerHTML=''; return; }
-    const r = await gas('rpAcSearch', { q });
-    if (!r.ok || !Array.isArray(r.items) || !r.items.length){ dd.classList.remove('open'); dd.innerHTML=''; return; }
-    dd.innerHTML = r.items.map((it, idx) =>
-      '<div class="wp-ac-item" data-idx="'+idx+'"><div class="t">'+esc(it.title||it.label)+'</div>'
-      + (it.label && it.label !== it.title ? '<div class="s">'+esc(it.label)+'</div>' : '')
-      + '</div>'
-    ).join('');
-    dd.classList.add('open');
-    dd._items = r.items;
-  }, 220);
+
+    // 1. Előzmények azonnal — a hálózati kérés eredménye előtt (latency = 0)
+    const recent = matchRecent(q);
+    // 2. Kliens-oldali cache — ha ugyanezt kerestük az elmúlt 10 percben
+    const cKey = q.toLowerCase();
+    const cached = _acClientCache.get(cKey);
+    const cachedFresh = cached && (Date.now() - cached.ts) < AC_CLIENT_TTL_MS;
+    if (cachedFresh) {
+      renderDropdown(mergeRecentWithApi(recent, cached.items));
+      return;
+    }
+    if (recent.length) renderDropdown(recent, { loading: true }); // előzmény azonnal, API mögé jön
+
+    // 3. Az előző inflight kérést eldobjuk (ne rajzoljuk vissza a régi találatot)
+    if (inflight) { try { inflight.abort(); } catch(_) {} }
+    inflight = new AbortController();
+    const signal = inflight.signal;
+
+    try {
+      const r = await fetch('/api/execute', {
+        method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'same-origin',
+        body: JSON.stringify({ functionName: 'rpAcSearch', arguments: { q } }),
+        signal,
+      });
+      const j = await r.json().catch(() => ({}));
+      const items = (j && j.result && j.result.items) || [];
+      _acClientCache.set(cKey, { ts: Date.now(), items });
+      if (_acClientCache.size > 200) {
+        // LRU: legrégebbi kulcsot dobjuk
+        const oldest = _acClientCache.keys().next().value;
+        if (oldest != null) _acClientCache.delete(oldest);
+      }
+      // Csak akkor rajzolunk, ha a mező még mindig ugyanezt tartalmazza
+      if (inp.value.trim() === q) {
+        renderDropdown(mergeRecentWithApi(recent, items));
+      }
+    } catch (e) {
+      // AbortError → csak lecseréltük, nem hiba
+      if (e.name !== 'AbortError' && !recent.length) {
+        dd.classList.remove('open');
+      }
+    }
+  }, 140); // gyorsabb reakció (220 → 140 ms)
+
   inp.addEventListener('input', doSearch);
   inp.addEventListener('blur', () => setTimeout(() => dd.classList.remove('open'), 200));
-  inp.addEventListener('focus', () => { if (dd.innerHTML) dd.classList.add('open'); });
+  inp.addEventListener('focus', () => {
+    if (dd.innerHTML) dd.classList.add('open');
+    // Focusra üres mezővel: mutassuk a legutóbbi 5 előzményt
+    else if (!inp.value.trim()) {
+      const recent = loadRecent().slice(0, 5);
+      if (recent.length) renderDropdown(recent.map(r => Object.assign({ _recent: true }, r)));
+    }
+  });
   dd.addEventListener('mousedown', (e) => {
     const el = e.target.closest('.wp-ac-item'); if (!el) return;
     const it = (dd._items || [])[Number(el.getAttribute('data-idx'))];
@@ -367,6 +467,7 @@ function attach(w){
     w.label = it.label; w.lat = it.lat; w.lng = it.lng;
     inp.value = it.label;
     dd.classList.remove('open');
+    pushRecent(it); // ✔️ mentés az előzmények közé
     updatePlanBtn();
     drawMarkers();
   });

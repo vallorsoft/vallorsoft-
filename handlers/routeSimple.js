@@ -174,17 +174,44 @@ async function _hereAutosuggest(q, key) {
   return out.map(({ _rank, ...rest }) => rest);
 }
 
+// ── Server-side keresés-cache (in-memory LRU, kb. 10 perc TTL) ─────────────
+// A tervezés közben a felhasználó jellemzően EGY karakterrel bővíti a
+// keresést, így ugyanaz a query előbb-utóbb vissza-visszajön. A cache
+// megtakarít 3 HTTP-hívást (HERE + Photon + Nominatim).
+const _acCache = new Map(); // key: cid + '|' + q(normalized) -> { ts, items }
+const AC_TTL_MS = 10 * 60 * 1000;
+const AC_MAX = 500;
+function _acCacheGet(key) {
+  const e = _acCache.get(key);
+  if (!e) return null;
+  if (Date.now() - e.ts > AC_TTL_MS) { _acCache.delete(key); return null; }
+  // LRU: a friss elemet a Map végére tesszük
+  _acCache.delete(key); _acCache.set(key, e);
+  return e.items;
+}
+function _acCacheSet(key, items) {
+  _acCache.set(key, { ts: Date.now(), items });
+  if (_acCache.size > AC_MAX) {
+    const first = _acCache.keys().next().value;
+    if (first != null) _acCache.delete(first);
+  }
+}
+
 async function rpAcSearch(req, res, args) {
   const q = String((args && args.q) || '').trim();
   if (q.length < 2) return res.json({ result: { ok: true, items: [] } });
   const cid = req.session.user.company_id;
+  const key = cid + '|' + q.toLowerCase();
+  const cached = _acCacheGet(key);
+  if (cached) return res.json({ result: { ok: true, items: cached, cached: true } });
+
   const bucket = [];
   const seen = new Set();
   function push(items) {
     (items || []).forEach((it) => {
-      const key = (it.label || '').toLowerCase().slice(0, 80);
-      if (!it.label || seen.has(key)) return;
-      seen.add(key);
+      const k = (it.label || '').toLowerCase().slice(0, 80);
+      if (!it.label || seen.has(k)) return;
+      seen.add(k);
       bucket.push({
         label: it.label,
         title: it.title || it.label,
@@ -194,18 +221,27 @@ async function rpAcSearch(req, res, args) {
     });
   }
   try {
-    // HERE ha van cég-kulcs — a legpontosabb Európa-lefedettség
+    // Ha van HERE-kulcs, azt kizárólag használjuk (leggyorsabb + legpontosabb).
+    // A Photon/Nominatim csak akkor jön, ha a HERE nem ad eleget.
     const cfg = await maps.getConfig(cid);
     if (cfg.vendor === 'here' && cfg.key) {
-      try { push(await _hereAutosuggest(q, cfg.key)); } catch (_) { /* fallback */ }
+      try {
+        push(await _hereAutosuggest(q, cfg.key));
+      } catch (_) { /* fallback jön alább */ }
+      if (bucket.length >= 5) {
+        const out = bucket.slice(0, 10);
+        _acCacheSet(key, out);
+        return res.json({ result: { ok: true, items: out } });
+      }
     }
-    if (bucket.length < 8) {
-      try { push(await _photonEuropean(q)); } catch (_) { /* fallback */ }
-    }
-    if (bucket.length < 5) {
-      try { push(await _nominatimEuropean(q)); } catch (_) { /* fallback */ }
-    }
-    return res.json({ result: { ok: true, items: bucket.slice(0, 10) } });
+    // HERE nélkül (vagy elégtelen HERE-találat esetén): Photon + Nominatim párhuzamosan.
+    // A `Promise.all` felezi a latenciát az eddigi soros hívásokhoz képest.
+    const [pR, nR] = await Promise.allSettled([_photonEuropean(q), _nominatimEuropean(q)]);
+    if (pR.status === 'fulfilled') push(pR.value);
+    if (nR.status === 'fulfilled' && bucket.length < 8) push(nR.value);
+    const out = bucket.slice(0, 10);
+    _acCacheSet(key, out);
+    return res.json({ result: { ok: true, items: out } });
   } catch (e) {
     return res.json({ result: { ok: false, err: 'Cautare esuata: ' + (e.message || 'necunoscut') } });
   }
