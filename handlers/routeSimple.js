@@ -35,20 +35,108 @@ async function jsonGet(url, headers) {
   } finally { clearTimeout(t); }
 }
 
-// ── Autocomplete ──────────────────────────────────────────────────────────
+// ── Autocomplete — EURÓPAI (nem RO-biased, mint a `mapsProvider`) ────────
+// A `mapsProvider.autocomplete` Photonja RO-centrikus, a Nominatimja pedig
+// countrycodes=ro,hu,md,bg,rs → Karlsruhe/Wien/Milano stb. eltűnik.
+// Az útvonaltervezőben teljes Európát akarunk lefedni, ezért itt saját,
+// szűkítés-mentes lekérdezéseket használunk.
+
+async function _photonEuropean(q) {
+  // Photon EU-centrikus bias, korlátozás NÉLKÜL.
+  const url = 'https://photon.komoot.io/api/?q=' + encodeURIComponent(q)
+    + '&limit=10&lang=en&lat=50&lon=15&location_bias_scale=0.1';
+  const d = await jsonGet(url);
+  const seen = new Set();
+  return ((d && d.features) || []).map((f) => {
+    const p = f.properties || {};
+    const streetAddr = [p.street, p.housenumber].filter(Boolean).join(' ');
+    const main = p.name || streetAddr || p.city || p.country || '';
+    const sub = [streetAddr && streetAddr !== main ? streetAddr : null, p.postcode, p.city, p.state, p.country].filter(Boolean).join(', ');
+    const label = [main, sub].filter((x) => x && x !== main).length ? main + ', ' + sub : (main + (p.country && main !== p.country ? ', ' + p.country : ''));
+    const lat = f.geometry && f.geometry.coordinates ? f.geometry.coordinates[1] : null;
+    const lng = f.geometry && f.geometry.coordinates ? f.geometry.coordinates[0] : null;
+    return { label, title: main || label, lat, lng };
+  }).filter((it) => {
+    if (!it.label) return false;
+    const key = it.label.toLowerCase().slice(0, 80);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function _nominatimEuropean(q) {
+  // Nominatim korlátozás NÉLKÜL, egész Európát/világot lefedve.
+  const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=10&accept-language=en&q='
+    + encodeURIComponent(q);
+  const d = await jsonGet(url, { 'Accept-Language': 'en' });
+  const seen = new Set();
+  return ((Array.isArray(d) ? d : [])).map((it) => {
+    const a = it.address || {};
+    const main = it.name || a.road || (it.display_name || '').split(',')[0] || '';
+    const city = a.city || a.town || a.village || a.municipality || a.county || '';
+    const streetAddr = a.road && a.road !== main ? [a.road, a.house_number].filter(Boolean).join(' ') : null;
+    const sub = [streetAddr, a.postcode, city, a.country].filter(Boolean).join(', ');
+    const label = [main, sub].filter(Boolean).join(', ') || it.display_name || '';
+    const lat = it.lat != null ? parseFloat(it.lat) : null;
+    const lng = it.lon != null ? parseFloat(it.lon) : null;
+    return { label, title: main || label, lat, lng };
+  }).filter((it) => {
+    if (!it.label) return false;
+    const key = it.label.toLowerCase().slice(0, 80);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function _hereAutosuggest(q, key) {
+  // HERE Autosuggest — teljes Európát lefedi, ha van kulcs (bias EU-központ).
+  const url = 'https://autosuggest.search.hereapi.com/v1/autosuggest?q=' + encodeURIComponent(q)
+    + '&at=50,15&limit=10&lang=en&apiKey=' + encodeURIComponent(key);
+  const d = await jsonGet(url);
+  return ((d && d.items) || []).filter((it) => it.address || it.title)
+    .map((it) => ({
+      label: (it.address && it.address.label) || it.title,
+      title: it.title,
+      lat: it.position ? it.position.lat : null,
+      lng: it.position ? it.position.lng : null,
+    }))
+    .filter((it) => it.label);
+}
+
 async function rpAcSearch(req, res, args) {
   const q = String((args && args.q) || '').trim();
   if (q.length < 2) return res.json({ result: { ok: true, items: [] } });
+  const cid = req.session.user.company_id;
+  const bucket = [];
+  const seen = new Set();
+  function push(items) {
+    (items || []).forEach((it) => {
+      const key = (it.label || '').toLowerCase().slice(0, 80);
+      if (!it.label || seen.has(key)) return;
+      seen.add(key);
+      bucket.push({
+        label: it.label,
+        title: it.title || it.label,
+        lat: it.lat != null ? Number(it.lat) : null,
+        lng: it.lng != null ? Number(it.lng) : null,
+      });
+    });
+  }
   try {
-    const items = await maps.autocomplete(req.session.user.company_id, q);
-    // A mapsProvider már gondoskodik a fallback-láncról; a mezőket normalizáljuk.
-    const out = (items || []).slice(0, 8).map((it) => ({
-      label: it.label || it.title || '',
-      title: it.title || it.label || '',
-      lat: it.lat != null ? Number(it.lat) : null,
-      lng: it.lng != null ? Number(it.lng) : null,
-    })).filter((it) => it.label);
-    return res.json({ result: { ok: true, items: out } });
+    // HERE ha van cég-kulcs — a legpontosabb Európa-lefedettség
+    const cfg = await maps.getConfig(cid);
+    if (cfg.vendor === 'here' && cfg.key) {
+      try { push(await _hereAutosuggest(q, cfg.key)); } catch (_) { /* fallback */ }
+    }
+    if (bucket.length < 8) {
+      try { push(await _photonEuropean(q)); } catch (_) { /* fallback */ }
+    }
+    if (bucket.length < 5) {
+      try { push(await _nominatimEuropean(q)); } catch (_) { /* fallback */ }
+    }
+    return res.json({ result: { ok: true, items: bucket.slice(0, 10) } });
   } catch (e) {
     return res.json({ result: { ok: false, err: 'Cautare esuata: ' + (e.message || 'necunoscut') } });
   }
