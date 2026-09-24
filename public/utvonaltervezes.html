@@ -288,6 +288,12 @@
 
 <div id="shell">
   <div id="map"></div>
+  <!-- Térkép-mód váltó (közúti ↔ műhold) — a térkép jobb felső sarkában lebeg -->
+  <button id="mapModeBtn" onclick="setTileMode(_tileMode === 'satellite' ? 'map' : 'satellite')"
+    title="Comută la vedere satelit"
+    style="position:absolute;top:12px;right:12px;z-index:900;padding:8px 12px;background:#fff;border:1.5px solid #cbd5e1;border-radius:9px;box-shadow:0 4px 12px -4px rgba(15,23,42,0.28);font-family:'Inter',system-ui,sans-serif;font-size:13px;font-weight:700;color:#334155;cursor:pointer;line-height:1;">
+    🛰 Satelit
+  </button>
 
   <!-- TOP: kereső + köztes pontok (mobilon bottom sheet-ként viselkedik) -->
   <section id="topPanel">
@@ -410,39 +416,53 @@ function ccName(cc){ const c = ccNorm(cc); return CC_NAME[c] || c; }
 // ===== Térkép =====
 const map = L.map('map', { zoomControl:true }).setView([46.5, 20.0], 5);
 let tileLayer = null;
-function addFallbackTiles(){
-  // Standard OSM csempék — kulcs nélkül, ingyenes.
-  // (A CARTO Voyager 2024-től API-kulcsot kér a legtöbb régióra, ezért kerülhető.)
-  tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+let _hereApiKey = null;
+let _tileMode = 'map'; // 'map' | 'satellite'
+function _osmTiles(){
+  return L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '&copy; OpenStreetMap contributors',
-  }).addTo(map);
+  });
 }
-// HERE raszter-csempék, ha a cégnek van HERE-kulcsa; különben CARTO/OSM fallback.
+function _hereTiles(style){
+  return L.tileLayer(
+    'https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png?apiKey=' + encodeURIComponent(_hereApiKey) + '&style=' + style + '&size=512&features=pois:disabled',
+    { maxZoom: 20, tileSize: 512, zoomOffset: -1,
+      attribution: '&copy; HERE, &copy; OpenStreetMap contributors', errorTileUrl: '' });
+}
+function setTileMode(mode){
+  _tileMode = (mode === 'satellite') ? 'satellite' : 'map';
+  if (tileLayer) { try { map.removeLayer(tileLayer); } catch(_){} }
+  if (_hereApiKey){
+    // HERE styles:
+    //   explore.day  → közúti nézet
+    //   hybrid.day   → műholdas + felirat
+    const style = _tileMode === 'satellite' ? 'hybrid.day' : 'explore.day';
+    tileLayer = _hereTiles(style);
+    tileLayer.on('tileerror', function once(){
+      try { map.removeLayer(tileLayer); } catch(_){}
+      tileLayer.off('tileerror', once);
+      // Ha a műhold csempe nem elérhető (nincs jog), vissza normálra
+      if (_tileMode === 'satellite'){ _tileMode = 'map'; tileLayer = _hereTiles('explore.day'); tileLayer.addTo(map); }
+      else { tileLayer = _osmTiles(); tileLayer.addTo(map); }
+    });
+    tileLayer.addTo(map);
+  } else {
+    tileLayer = _osmTiles(); tileLayer.addTo(map);
+  }
+  // Gomb-jelzés frissítése
+  const btn = document.getElementById('mapModeBtn');
+  if (btn){
+    btn.innerHTML = _tileMode === 'satellite' ? '🗺 Hartă' : '🛰 Satelit';
+    btn.title = _tileMode === 'satellite' ? 'Comută la harta rutieră' : 'Comută la vedere satelit';
+  }
+}
 (async function initTiles(){
   try {
     const r = await fetch('/api/here-config', { credentials:'same-origin' });
     const j = await r.json().catch(() => ({}));
-    if (j && j.apiKey) {
-      // HERE Raster Tile API v3 — style: explore.day (közúti+útjelzés-erős)
-      tileLayer = L.tileLayer(
-        'https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png?apiKey=' + encodeURIComponent(j.apiKey) + '&style=explore.day&size=512&features=pois:disabled',
-        {
-          maxZoom: 20, tileSize: 512, zoomOffset: -1,
-          attribution: '&copy; HERE, &copy; OpenStreetMap contributors',
-          errorTileUrl: '',
-        }
-      );
-      // Ha a HERE-csempe hibázik (403 stb.), csendben esünk vissza CARTO-ra.
-      tileLayer.on('tileerror', function once(){
-        try { map.removeLayer(tileLayer); } catch(_) {}
-        tileLayer.off('tileerror', once);
-        addFallbackTiles();
-      });
-      tileLayer.addTo(map);
-      return;
-    }
-  } catch(_) { /* fallback */ }
-  addFallbackTiles();
+    if (j && j.apiKey) _hereApiKey = j.apiKey;
+  } catch(_) {}
+  setTileMode('map');
 })();
 let routeLayer = null;
 let markerLayer = L.layerGroup().addTo(map);
