@@ -377,23 +377,31 @@ async function planHere(waypoints, key, truck) {
     if (num(p.axleCount)       != null) q.push('vehicle[axleCount]='       + num(p.axleCount));
     if (q.length) truckPart = '&' + q.join('&');
   }
+  // A HERE `alternatives=N` — a fő útvonal MELLÉ N alternatívát ad. Ezekből
+  // választunk gyorsabbat / olcsóbbat / rövidebbet a UI-nak (a fő útvonal
+  // marad „recomandată").  A HERE minden alternatívát külön `routes[i]` sorban
+  // ad vissza, saját summary / tolls / polyline / spans-szal. (Kompatibilis a
+  // waypoint + truck paraméterekkel; `via` esetén nem mindig ad többet, de
+  // ha ad, mind bekerül.)
   const url = 'https://router.hereapi.com/v8/routes?transportMode=' + mode
     + '&origin=' + encodeURIComponent(origin)
     + '&destination=' + encodeURIComponent(destination)
     + (via ? '&' + via : '')
     + truckPart
+    + '&alternatives=3'
     + '&return=polyline,summary,tolls'
     + '&spans=length,countryCode'
     + '&currency=EUR&apikey=' + encodeURIComponent(key);
   const data = await jsonGet(url);
-  const route = data.routes && data.routes[0];
-  if (!route) throw new Error('HERE eroare: nu s-a returnat un traseu');
+  const routes = (data && Array.isArray(data.routes)) ? data.routes : [];
+  if (!routes.length) throw new Error('HERE eroare: nu s-a returnat un traseu');
 
-  const allPoints = [];
-  const kmByCountry = {}; // cc -> meter
-  let totalDurationSec = 0;
-
-  (route.sections || []).forEach((sec) => {
+  // Egyetlen `route` feldolgozása → visszatérési objektum (mint eddig).
+  function processRoute(route) {
+    const allPoints = [];
+    const kmByCountry = {};
+    let totalDurationSec = 0;
+    (route.sections || []).forEach((sec) => {
     const secPts = sec.polyline ? decodeHereFlex(sec.polyline) : [];
     // Ne duplikáljuk a szakasz-határon a közös pontot
     if (allPoints.length && secPts.length) secPts.shift();
@@ -426,16 +434,48 @@ async function planHere(waypoints, key, truck) {
       const cc = '??';
       kmByCountry[cc] = (kmByCountry[cc] || 0) + Number(sec.summary.length || 0);
     }
-    // Elkerüljük a mellékhatást: baseOffset itt informatív, de nem használjuk.
-    void baseOffset;
-  });
+      // Elkerüljük a mellékhatást: baseOffset itt informatív, de nem használjuk.
+      void baseOffset;
+    });
+    // Útdíj — MINDEN pénznemet EUR-ra váltunk.
+    let tollTotal = 0;
+    const tollByCountry = {};
+    (route.sections || []).forEach((sec) => {
+      (sec.tolls || []).forEach((toll) => {
+        const fares = toll.fares || [];
+        if (!fares.length) return;
+        let best = null; let bestCur = 'EUR';
+        fares.forEach((f) => {
+          const v = f.price && f.price.value != null ? parseFloat(f.price.value) : 0;
+          const cur = (f.price && f.price.currency) || 'EUR';
+          if (best == null || v < best) { best = v; bestCur = cur; }
+        });
+        const costEur = toEur(best || 0, bestCur);
+        tollTotal += costEur;
+        const cc = toll.countryCode || '??';
+        tollByCountry[cc] = (tollByCountry[cc] || 0) + costEur;
+      });
+    });
+    const totalMeters = Object.values(kmByCountry).reduce((s, m) => s + m, 0);
+    const byCountry = Object.keys(kmByCountry).sort((a, b) => kmByCountry[b] - kmByCountry[a]).map((cc) => ({
+      cc,
+      km: Math.round((kmByCountry[cc] / 1000) * 10) / 10,
+      tollCost: Math.round((tollByCountry[cc] || 0) * 100) / 100,
+    }));
+    const bounds = computeBounds(allPoints);
+    return {
+      polyline: allPoints,
+      totalKm: Math.round((totalMeters / 1000) * 10) / 10,
+      durationMin: Math.round(totalDurationSec / 60),
+      byCountry,
+      toll: { total: Math.round(tollTotal * 100) / 100, currency: 'EUR' },
+      bounds,
+      source: 'here',
+    };
+  }
 
-  // Útdíj — MINDEN pénznemet EUR-ra váltunk (a HERE lokális pénznemekben ad:
-  // Csehország → CZK, Lengyelország → PLN, Svájc → CHF stb.). A UI egy
-  // egységes EUR-értéket vár, és a felhasználó kézzel megadhat BNR-t a RON-hoz.
-  //
   // Rögzített átváltási arány EUR-ra (nagyságrendileg 2026 eleji szint —
-  // az útdíj-becslés amúgy sem hatósági pontosságú, kézi felülírás mindig kell).
+  // az útdíj-becslés amúgy sem hatósági pontosságú).
   const TO_EUR = {
     EUR: 1, CZK: 0.041, HUF: 0.0026, PLN: 0.23, RON: 0.20, BGN: 0.51,
     HRK: 0.132, CHF: 1.06, GBP: 1.17, DKK: 0.134, SEK: 0.088, NOK: 0.085,
@@ -443,44 +483,60 @@ async function planHere(waypoints, key, truck) {
   };
   function toEur(value, cur) {
     const rate = TO_EUR[String(cur || 'EUR').toUpperCase()];
-    if (rate == null) return value; // ismeretlen pénznem → nem konvertáljuk
+    if (rate == null) return value;
     return value * rate;
   }
-  let tollTotal = 0;
-  const tollByCountry = {};
-  (route.sections || []).forEach((sec) => {
-    (sec.tolls || []).forEach((toll) => {
-      const fares = toll.fares || [];
-      if (!fares.length) return;
-      let best = null; let bestCur = 'EUR';
-      fares.forEach((f) => {
-        const v = f.price && f.price.value != null ? parseFloat(f.price.value) : 0;
-        const cur = (f.price && f.price.currency) || 'EUR';
-        if (best == null || v < best) { best = v; bestCur = cur; }
-      });
-      const costEur = toEur(best || 0, bestCur);
-      tollTotal += costEur;
-      const cc = toll.countryCode || '??';
-      tollByCountry[cc] = (tollByCountry[cc] || 0) + costEur;
-    });
-  });
 
-  const totalMeters = Object.values(kmByCountry).reduce((s, m) => s + m, 0);
-  const byCountry = Object.keys(kmByCountry).sort((a, b) => kmByCountry[b] - kmByCountry[a]).map((cc) => ({
-    cc,
-    km: Math.round((kmByCountry[cc] / 1000) * 10) / 10,
-    tollCost: Math.round((tollByCountry[cc] || 0) * 100) / 100,
-  }));
-  const bounds = computeBounds(allPoints);
-  return {
-    polyline: allPoints,
-    totalKm: Math.round((totalMeters / 1000) * 10) / 10,
-    durationMin: Math.round(totalDurationSec / 60),
-    byCountry,
-    toll: { total: Math.round(tollTotal * 100) / 100, currency: 'EUR' },
-    bounds,
-    source: 'here',
-  };
+  // MINDEN alternatíva feldolgozása
+  const allVariants = routes.map(processRoute).filter((v) => v && v.polyline && v.polyline.length);
+  if (!allVariants.length) throw new Error('HERE eroare: nu s-a returnat un traseu utilizabil');
+
+  // 3 KÜLÖNBÖZŐ opció kiválasztása:
+  //   1. ✅ Recomandată      — a HERE fő útvonala (index 0)
+  //   2. 🚀 Mai rapidă        — a legrövidebb idő (más útvonal, mint a fő)
+  //   3. 💰 Mai ieftină        — a legalacsonyabb útdíj (más útvonal, mint az 1. és 2.)
+  // Ha a HERE nem ad annyi különböző alternatívát, marad a rendelkezésre álló.
+
+  const selected = [];
+  const usedIdx = new Set();
+
+  // 1) Recomandată — a HERE által elsődlegesnek jelölt (index 0)
+  selected.push(Object.assign({}, allVariants[0], { tag: 'recommended' }));
+  usedIdx.add(0);
+
+  // 2) Mai rapidă — a leggyorsabb, ami nincs még kiválasztva
+  let iFast = -1;
+  allVariants.forEach((v, i) => {
+    if (usedIdx.has(i)) return;
+    if (iFast < 0 || v.durationMin < allVariants[iFast].durationMin) iFast = i;
+  });
+  // Csak akkor tesszük hozzá, ha érdemben gyorsabb VAGY nem ugyanaz mint az 1.
+  if (iFast >= 0) {
+    selected.push(Object.assign({}, allVariants[iFast], { tag: 'fast' }));
+    usedIdx.add(iFast);
+  }
+
+  // 3) Mai ieftină — a legalacsonyabb útdíjú, ami nincs még kiválasztva
+  let iCheap = -1;
+  allVariants.forEach((v, i) => {
+    if (usedIdx.has(i)) return;
+    if (iCheap < 0 || (v.toll.total || 0) < (allVariants[iCheap].toll.total || 0)) iCheap = i;
+  });
+  if (iCheap >= 0) {
+    selected.push(Object.assign({}, allVariants[iCheap], { tag: 'cheap' }));
+    usedIdx.add(iCheap);
+  }
+
+  // Ha a HERE csak 1 vagy 2 alternatívát adott (kevés váltó útvonal az EU-ban
+  // felrakó → lerakó között), csak annyi opciónk lesz, amennyit adott.
+
+  selected.forEach((v, i) => { v.index = i; });
+
+  // Visszatérési alak: az első (recomandată) mint a MAIN eredmény, plusz
+  // `alternatives[]` a másik 2 opcióval. A kliens chip-sávot rajzol belőle.
+  const primary = selected[0];
+  primary.alternatives = selected.slice(1);
+  return primary;
 }
 
 // ── OSRM fallback + a cég toll_rates ráta táblájából útdíj-becslés ────────

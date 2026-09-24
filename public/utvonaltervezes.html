@@ -152,6 +152,29 @@
       background:#eef2ff; color:#4338ca; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em;
     }
     .bp-src.osrm { background:#fef3c7; color:#78350f; }
+
+    /* Változat-választó chip-sáv (Google Maps-stílus) */
+    .var-chips { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+    .var-chip {
+      flex: 1 1 140px; min-width: 130px;
+      display: flex; flex-direction: column; align-items: flex-start;
+      padding: 9px 12px 8px;
+      background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px;
+      cursor: pointer; transition: all 0.15s;
+      font-family: inherit; color: #0f172a;
+      text-align: left; box-shadow: 0 1px 2px rgba(15,23,42,0.06);
+    }
+    .var-chip:hover { border-color: #94a3b8; }
+    .var-chip.active { border-color: #4f46e5; background: #eef2ff; box-shadow: 0 4px 12px -4px rgba(79,70,229,0.35); }
+    .var-chip .vc-title {
+      font-size: 11px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #4338ca; margin-bottom: 4px;
+    }
+    .var-chip.rec .vc-title { color: #059669; }
+    .var-chip.fast .vc-title { color: #d97706; }
+    .var-chip.cheap .vc-title { color: #7c3aed; }
+    .var-chip .vc-sub { font-size: 12.5px; font-weight: 600; color: #334155; line-height: 1.35; }
+    .var-chip .vc-toll { font-size: 11.5px; color: #64748b; margin-top: 2px; }
     .kpi-row { display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:12px; }
     @media (max-width: 720px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
     .kpi { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; }
@@ -318,6 +341,8 @@
       <h2>📊 Rezultat</h2>
       <span id="kpiSrc" class="bp-src">—</span>
     </div>
+    <!-- Változat-választó (recomandată / mai rapidă / mai ieftină) — csak HERE-nél jelenik meg -->
+    <div id="varChips" class="var-chips" style="display:none;"></div>
     <div class="kpi-row">
       <div class="kpi"><div class="k">Distanță totală</div><div class="v" id="kpiKm">—</div></div>
       <div class="kpi"><div class="k">Timp estimat</div><div class="v" id="kpiTime">—</div></div>
@@ -791,6 +816,90 @@ function drawMarkers(){
   });
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Változat-választó — 3 alternatíva (recomandată / mai rapidă / mai ieftină)
+// ═══════════════════════════════════════════════════════════════
+const VAR_META = {
+  recommended: { title:'✅ Recomandată', cls:'rec'   },
+  fast:        { title:'🚀 Mai rapidă',  cls:'fast'  },
+  cheap:       { title:'💰 Mai ieftină', cls:'cheap' },
+};
+let _currentVariants = [];
+let _currentVariantIdx = 0;
+
+function renderVarChips(variants){
+  const box = document.getElementById('varChips');
+  if (!box) return;
+  _currentVariants = variants || [];
+  if (!variants || variants.length < 2){ box.innerHTML = ''; box.style.display = 'none'; return; }
+  box.innerHTML = variants.map((v, i) => {
+    const meta = VAR_META[v.tag] || { title:'Alternativă ' + (i+1), cls:'' };
+    const h = Math.floor((v.durationMin||0) / 60);
+    const m = (v.durationMin||0) % 60;
+    const timeTxt = (h ? h + ' h ' : '') + m + ' min';
+    const kmTxt   = (v.totalKm || 0).toFixed(1) + ' km';
+    const tollTxt = ((v.toll && v.toll.total) || 0).toFixed(2) + ' EUR';
+    return '<button class="var-chip ' + meta.cls + (i===0 ? ' active' : '') + '" data-vi="'+i+'">'
+      + '<div class="vc-title">' + meta.title + '</div>'
+      + '<div class="vc-sub">' + kmTxt + ' · ' + timeTxt + '</div>'
+      + '<div class="vc-toll">💶 ' + tollTxt + '</div>'
+      + '</button>';
+  }).join('');
+  box.style.display = '';
+  box.querySelectorAll('.var-chip').forEach((el) => {
+    el.onclick = () => {
+      const idx = Number(el.getAttribute('data-vi')) || 0;
+      applyVariant(_currentVariants[idx], _currentVariants, idx);
+    };
+  });
+}
+
+// Aktív változat megjelenítése a térképen + KPI-k + orszag-tábla
+function applyVariant(v, allVariants, idx){
+  if (!v) return;
+  _currentVariantIdx = idx || 0;
+
+  // Chip active-jelzés frissítése
+  document.querySelectorAll('#varChips .var-chip').forEach((el) => el.classList.remove('active'));
+  const activeChip = document.querySelector('#varChips .var-chip[data-vi="'+_currentVariantIdx+'"]');
+  if (activeChip) activeChip.classList.add('active');
+
+  // Polyline újrarajzolás
+  if (routeLayer) map.removeLayer(routeLayer);
+  const meta = VAR_META[v.tag] || {};
+  const color = meta.cls === 'fast' ? '#d97706' : (meta.cls === 'cheap' ? '#7c3aed' : '#4f46e5');
+  routeLayer = L.polyline(v.polyline, { color: color, weight: 5, opacity: 0.9 }).addTo(map);
+  if (v.bounds){
+    map.fitBounds([[v.bounds.minLat, v.bounds.minLng], [v.bounds.maxLat, v.bounds.maxLng]], { padding: [40, 40] });
+  }
+
+  // KPI-k
+  document.getElementById('kpiKm').textContent = (v.totalKm||0).toFixed(1) + ' km';
+  const h = Math.floor((v.durationMin||0) / 60), m = (v.durationMin||0) % 60;
+  document.getElementById('kpiTime').textContent = (h ? h + ' h ' : '') + m + ' min';
+  document.getElementById('kpiToll').textContent = ((v.toll && v.toll.total) || 0).toFixed(2) + ' EUR';
+  recomputeRon();
+
+  // Ország-bontás tábla
+  const body = document.getElementById('ccBody');
+  const ccTable = document.getElementById('ccTable');
+  if (v.byCountry && v.byCountry.length){
+    const bnr = parseFloat((document.getElementById('bnrInput').value || '').replace(',','.'));
+    body.innerHTML = v.byCountry.map(c => {
+      const eur = c.tollCost || 0;
+      const ron = Number.isFinite(bnr) && bnr > 0 ? (eur * bnr).toFixed(2) + ' RON' : '—';
+      return '<tr><td><span class="cc-flag">'+flagEmoji(c.cc)+'</span>'+esc(ccName(c.cc))+'</td>'
+        +'<td class="num">'+c.km.toFixed(1)+' km</td>'
+        +'<td class="num">'+eur.toFixed(2)+' EUR</td>'
+        +'<td class="num">'+ron+'</td></tr>';
+    }).join('');
+    body.dataset.byCountry = JSON.stringify(v.byCountry);
+    ccTable.style.display = '';
+  } else {
+    ccTable.style.display = 'none';
+  }
+}
+
 async function planRoute(){
   document.getElementById('err').style.display = 'none';
   document.getElementById('bottomPanel').classList.remove('show');
@@ -803,9 +912,6 @@ async function planRoute(){
     const r = await gas('rpPlanRoute', { waypoints: pts, truck: readTruckParams() });
     if (!r.ok){ showErr(r.err || 'Eroare necunoscută'); return; }
 
-    if (routeLayer) map.removeLayer(routeLayer);
-    routeLayer = L.polyline(r.polyline, { color:'#4f46e5', weight:5, opacity:0.85 }).addTo(map);
-
     if (Array.isArray(r.waypoints)){
       r.waypoints.forEach((p, i) => {
         if (waypoints[i]) { waypoints[i].lat = p.lat; waypoints[i].lng = p.lng; waypoints[i].label = p.label || waypoints[i].label; }
@@ -814,38 +920,17 @@ async function planRoute(){
     }
     drawMarkers();
 
-    if (r.bounds){
-      map.fitBounds([[r.bounds.minLat, r.bounds.minLng], [r.bounds.maxLat, r.bounds.maxLng]], { padding: [40, 40] });
-    }
-
-    // KPI-k
-    document.getElementById('kpiKm').textContent = (r.totalKm||0).toFixed(1) + ' km';
-    const h = Math.floor((r.durationMin||0) / 60), m = (r.durationMin||0) % 60;
-    document.getElementById('kpiTime').textContent = (h ? h + ' h ' : '') + m + ' min';
-    document.getElementById('kpiToll').textContent = ((r.toll && r.toll.total) || 0).toFixed(2) + ' EUR';
-    recomputeRon();
+    // Összes változat: primary (r) + alternatives[]. Egyetlen tömb → chip-sáv.
+    const variants = [r].concat(Array.isArray(r.alternatives) ? r.alternatives : []);
+    // Forrás-badge (HERE / OSRM) egyszer
     const srcEl = document.getElementById('kpiSrc');
     srcEl.textContent = r.source === 'here' ? 'HERE' : 'OSRM';
     srcEl.className = 'bp-src' + (r.source === 'here' ? '' : ' osrm');
 
-    // Ország-bontás tábla
-    const body = document.getElementById('ccBody');
-    const ccTable = document.getElementById('ccTable');
-    if (r.byCountry && r.byCountry.length){
-      const bnr = parseFloat((document.getElementById('bnrInput').value || '').replace(',','.'));
-      body.innerHTML = r.byCountry.map(c => {
-        const eur = c.tollCost || 0;
-        const ron = Number.isFinite(bnr) && bnr > 0 ? (eur * bnr).toFixed(2) + ' RON' : '—';
-        return '<tr><td><span class="cc-flag">'+flagEmoji(c.cc)+'</span>'+esc(ccName(c.cc))+'</td>'
-          +'<td class="num">'+c.km.toFixed(1)+' km</td>'
-          +'<td class="num">'+eur.toFixed(2)+' EUR</td>'
-          +'<td class="num">'+ron+'</td></tr>';
-      }).join('');
-      body.dataset.byCountry = JSON.stringify(r.byCountry);
-      ccTable.style.display = '';
-    } else {
-      ccTable.style.display = 'none';
-    }
+    // Chipek renderelése (csak ha >1 változat)
+    renderVarChips(variants);
+    // Első (recomandată) alkalmazása a térképre + KPI-kre
+    applyVariant(variants[0], variants);
 
     const note = document.getElementById('infoNote');
     if (r.noHereKey){
