@@ -1,628 +1,403 @@
 <!DOCTYPE html>
-<html lang="hu">
+<html lang="ro">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title data-i18n="title.routePlanner">vallorSoft - Útvonaltervezés</title>
+  <title>vallorSoft — Planificator rute</title>
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="/style.css?v=20260616warm2">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-  <script src="/i18n.js?v=20260923ddays"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <script src="/session-guard.js?v=20260722sess"></script>
   <style>
-    /* ── Útvonaltervezés — prémium landing-akcentus (kék/indigó). Csak megjelenés.
-       A térkép-csempe (Leaflet) MARAD világos — nem nyúlunk hozzá. ── */
-    .rp-card { padding:18px; margin-bottom:16px; }
-    /* Lágy radiális háttér-fény világos módban (mint a landing hero) */
-    .main-content[data-theme="light"] {
-      background:
-        radial-gradient(1100px 560px at 6% -6%, rgba(251,140,58,0.10), transparent 60%),
-        radial-gradient(900px 520px at 106% 2%, rgba(246,81,123,0.08), transparent 62%),
-        linear-gradient(180deg, #faf6f0 0%, #f3ece2 100%);
+    * { box-sizing: border-box; }
+    html, body { margin:0; padding:0; height:100%; font-family: 'Inter', system-ui, sans-serif; color:#0f172a; background:#f8fafc; }
+    button, input { font-family: inherit; color: inherit; }
+
+    /* ===== SHELL ===== */
+    #shell { position:relative; width:100%; height:100vh; overflow:hidden; }
+    #map { position:absolute; inset:0; z-index:1; }
+
+    /* ===== TOP PANEL (kereső + köztes pontok, a térkép FÖLÖTT) ===== */
+    #topPanel {
+      position:absolute; top:14px; left:14px; z-index:1000;
+      width: 460px; max-width: calc(100% - 28px);
+      background:#ffffff; color:#0f172a;
+      border:1px solid #e2e8f0; border-radius:14px;
+      box-shadow: 0 20px 45px -18px rgba(15,23,42,0.28), 0 6px 14px -8px rgba(15,23,42,0.14);
+      padding:14px 14px 12px;
     }
-    /* Prémium kártya-mélység (világos témában): finom gradiens + felső sheen + lágy árnyék */
-    .main-content[data-theme="light"] .glass {
-      background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%) !important;
-      border: 1px solid #e2e8f0 !important;
-      box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 12px 30px -20px rgba(15,23,42,0.18) !important;
+    .tp-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .tp-head .brand { font-size:16px; font-weight:800; letter-spacing:-0.02em; color:#0f172a; }
+    .tp-head .brand .soft { color:#4f46e5; }
+    .tp-head .back { margin-left:auto; padding:6px 10px; border:1px solid #cbd5e1; border-radius:8px; font-size:12px; color:#334155; background:#fff; cursor:pointer; text-decoration:none; }
+    .tp-head .back:hover { background:#f1f5f9; }
+
+    /* Pontok lista */
+    .wp-list { display:flex; flex-direction:column; gap:7px; }
+    .wp-row { position:relative; display:flex; align-items:stretch; gap:8px; }
+    .wp-pin { flex:0 0 28px; text-align:center; padding-top:9px; font-size:18px; }
+    .wp-input-wrap { flex:1; position:relative; }
+    .wp-input {
+      width:100%; padding:10px 34px 10px 12px;
+      border:1.5px solid #cbd5e1; border-radius:10px;
+      font-size:14px; font-weight:500;
+      background:#ffffff; color:#0f172a;
+      outline:none; transition:border-color 0.15s, box-shadow 0.15s;
     }
-    .main-content[data-theme="light"] .glass.rp-card { position: relative; overflow: hidden; }
-    .main-content[data-theme="light"] .glass.rp-card:before {
-      content:''; position:absolute; inset:0 0 auto 0; height:1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+    .wp-input:focus { border-color:#4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
+    .wp-input::placeholder { color:#94a3b8; font-weight:400; }
+    .wp-clear { position:absolute; right:6px; top:6px; width:26px; height:26px; border:0; background:transparent; color:#94a3b8; font-size:16px; cursor:pointer; border-radius:6px; }
+    .wp-clear:hover { background:#fee2e2; color:#dc2626; }
+
+    /* Autocomplete lenyíló */
+    .wp-ac {
+      position:absolute; top: calc(100% + 3px); left:0; right:0;
+      background:#ffffff; color:#0f172a;
+      border:1px solid #cbd5e1; border-radius:10px;
+      max-height:280px; overflow:auto; z-index:1200;
+      box-shadow: 0 20px 40px -14px rgba(15,23,42,0.32);
+      display:none;
     }
-    /* Elsődleges / akció gomb — kék gradiens + kék glow (mindkét témában) */
-    .rp-card .btn.primary, #rpPlanBtn.btn.primary, #rpModeCar.btn.primary, #rpModeTruck.btn.primary {
-      background: linear-gradient(135deg, #fb8c3a 0%, #f6517b 100%);
-      border: none; color: #fff;
-      box-shadow: 0 1px 1px rgba(15,23,42,0.05), 0 10px 24px -12px rgba(246,113,30,0.7);
-      transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+    .wp-ac.open { display:block; }
+    .wp-ac-item { padding:9px 12px; cursor:pointer; border-bottom:1px solid #f1f5f9; }
+    .wp-ac-item:last-child { border-bottom:0; }
+    .wp-ac-item:hover { background:#eef2ff; }
+    .wp-ac-item .t { font-weight:600; color:#0f172a; font-size:13.5px; }
+    .wp-ac-item .s { color:#475569; font-size:12px; margin-top:1px; }
+
+    /* Gombok */
+    .btn-row { display:flex; gap:8px; margin-top:10px; }
+    .add-wp {
+      padding:9px 12px; border-radius:10px;
+      border:1px dashed #94a3b8; background:transparent;
+      color:#334155; font-size:13px; font-weight:500;
+      cursor:pointer; width:100%; margin-top:8px;
     }
-    .rp-card .btn.primary:hover, #rpPlanBtn.btn.primary:hover, #rpModeCar.btn.primary:hover, #rpModeTruck.btn.primary:hover {
-      filter: brightness(1.04); transform: translateY(-1px);
-      box-shadow: 0 2px 3px rgba(15,23,42,0.06), 0 14px 30px -12px rgba(246,113,30,0.85);
+    .add-wp:hover { border-color:#4f46e5; color:#4f46e5; background:#f5f3ff; }
+    .btn {
+      padding:11px 14px; border-radius:10px; border:1.5px solid #cbd5e1;
+      background:#ffffff; color:#0f172a; font-weight:700; font-size:13.5px;
+      cursor:pointer; transition:all 0.15s;
     }
-    #rpPlanBtn.btn.primary:disabled { background: #cbd5e1; box-shadow: none; transform: none; filter: none; color: #fff; }
-    .rp-sec-title { font-size:13px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; margin-bottom:10px; }
-    .rp-veh-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    @media (max-width:760px){ .rp-veh-grid { grid-template-columns:1fr; } }
-    .rp-list { max-height:230px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-top:8px; }
-    .rp-veh { display:flex; align-items:center; gap:8px; padding:9px 11px; border-radius:var(--radius-sm);
-      border:1px solid var(--border); background:rgba(255,255,255,0.02); cursor:pointer; font-size:13px; }
-    .rp-veh:hover { border-color:var(--border-bright); }
-    .rp-veh.sel { border-color:#f6711e; background:rgba(246,113,30,0.12); }
-    .rp-veh .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; background:transparent; }
-    .rp-veh .dot.gps { background:var(--status-ok); box-shadow:0 0 6px var(--status-ok); }
-    .rp-veh .nm { font-weight:700; }
-    .rp-veh .meta { color:var(--text-muted); font-size:12px; }
-    .rp-veh .chk { margin-left:auto; color:#f6711e; font-weight:800; display:none; }
-    .rp-veh.sel .chk { display:inline; }
-    .rp-veh .warn { margin-left:auto; color:var(--status-warn); font-size:11px; white-space:nowrap; }
-    .rp-point { margin-bottom:12px; }
-    .rp-point > .lbl { font-size:13px; font-weight:600; margin-bottom:6px; }
-    .rp-ac-wrap { position:relative; }
-    .rp-ac-dd { position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:1200; background:var(--bg-panel-raised);
-      border:1px solid var(--border-bright); border-radius:var(--radius-md); overflow:hidden; display:none;
-      box-shadow:0 12px 30px rgba(0,0,0,0.5); }
-    .rp-ac-dd.open { display:block; }
-    .rp-ac-item { padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--border); }
-    .rp-ac-item:last-child { border-bottom:none; }
-    .rp-ac-item:hover { background:rgba(255,255,255,0.05); }
-    .rp-ac-item .ac-main { font-size:13px; font-weight:600; color:var(--text-primary); }
-    .rp-ac-item .ac-sub { font-size:11px; color:var(--text-muted); }
-    .rp-wp-row { display:flex; gap:8px; align-items:flex-start; margin-bottom:10px; }
-    .rp-wp-row .rp-ac-wrap { flex:1; }
-    .rp-wp-del { background:none; border:1px solid var(--border-bright); color:var(--status-danger);
-      border-radius:var(--radius-sm); cursor:pointer; padding:10px 12px; line-height:1; }
-    .rp-gps-box { padding:12px 14px; border-radius:var(--radius-md); border:1px solid var(--border); background:rgba(255,255,255,0.02); }
-    .main-content[data-theme="light"] .rp-veh,
-    .main-content[data-theme="light"] .rp-gps-box { background:rgba(0,0,0,0.02); }
-    .main-content[data-theme="light"] .rp-ac-dd { background:#fff; }
-    /* HERE prémium funkciók panel */
-    .here-panel-content { max-height:0; overflow:hidden; transition:max-height 0.3s ease; }
-    .here-panel-content.open { max-height:2000px; }
-    .rp-pf { border:1px solid var(--border); border-radius:var(--radius-md); padding:12px; margin-bottom:8px; background:rgba(255,255,255,0.02); }
-    .rp-pbar { height:7px; border-radius:6px; background:rgba(255,255,255,0.10); overflow:hidden; margin-top:8px; }
-    .rp-pbar > i { display:block; height:100%; border-radius:6px; }
-    .fsw { position:relative; display:inline-block; width:42px; height:24px; cursor:pointer; flex-shrink:0; }
-    .fsw input { opacity:0; width:0; height:0; }
-    .fsw-s { position:absolute; inset:0; background:rgba(255,255,255,0.12); border:1px solid var(--border-bright); border-radius:24px; transition:.2s; }
-    .fsw-s:before { content:''; position:absolute; height:18px; width:18px; left:3px; top:2px; background:#94a3b8; border-radius:50%; transition:.2s; }
-    .fsw input:checked + .fsw-s { background:rgba(34,197,94,0.3); border-color:rgba(34,197,94,0.6); }
-    .fsw input:checked + .fsw-s:before { transform:translateX(18px); background:var(--status-ok); }
-    .fsw input:disabled + .fsw-s { opacity:.5; cursor:not-allowed; }
-    /* Logó: „Soft" akcent → napnyugta; „vallor" olvasható a krém háttéren */
-    .vs-logo .soft { color:#fb8c3a; text-shadow:0 0 18px rgba(251,140,58,.45); }
-    .main-content[data-theme="light"] .vs-logo .vallor { color:#2a2018; }
-    .main-content[data-theme="dark"] .vs-logo .vallor { color:#f4ede3; }
+    .btn:hover { border-color:#94a3b8; background:#f8fafc; }
+    .btn.primary {
+      flex:1;
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      color:#ffffff; border-color:#4f46e5;
+      box-shadow: 0 8px 22px -8px rgba(79,70,229,0.55);
+    }
+    .btn.primary:hover { background: linear-gradient(135deg, #4338ca, #5b5ff0); }
+    .btn.primary:disabled { opacity:0.5; cursor:not-allowed; box-shadow:none; }
+
+    .err-note {
+      margin-top:10px; padding:10px 12px; border-radius:9px;
+      background:#fee2e2; border:1px solid #fca5a5; color:#991b1b;
+      font-size:13px; font-weight:600;
+    }
+
+    /* ===== BOTTOM PANEL (eredmény a térkép alján) ===== */
+    #bottomPanel {
+      position:absolute; left:14px; right:14px; bottom:14px; z-index:900;
+      background:#ffffff; color:#0f172a;
+      border:1px solid #e2e8f0; border-radius:14px;
+      box-shadow: 0 -18px 45px -18px rgba(15,23,42,0.24), 0 6px 14px -8px rgba(15,23,42,0.14);
+      padding:14px 16px;
+      max-height: 42vh; overflow:auto;
+      display:none;
+    }
+    #bottomPanel.show { display:block; }
+    .bp-head { display:flex; align-items:center; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
+    .bp-head h2 { font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#334155; margin:0; }
+    .bp-src {
+      margin-left:auto; padding:4px 10px; border-radius:99px;
+      background:#eef2ff; color:#4338ca; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em;
+    }
+    .bp-src.osrm { background:#fef3c7; color:#78350f; }
+    .kpi-row { display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; margin-bottom:12px; }
+    @media (max-width: 720px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+    .kpi { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; }
+    .kpi .k { font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:3px; font-weight:600; }
+    .kpi .v { font-size:19px; font-weight:800; color:#0f172a; letter-spacing:-0.01em; }
+    .cc-table { width:100%; border-collapse:collapse; font-size:13.5px; background:#fff; border-radius:10px; overflow:hidden; border:1px solid #e2e8f0; }
+    .cc-table th { text-align:left; padding:9px 12px; background:#f1f5f9; color:#334155; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; border-bottom:1px solid #e2e8f0; }
+    .cc-table td { padding:9px 12px; border-top:1px solid #f1f5f9; color:#0f172a; }
+    .cc-table tr:hover td { background:#f8fafc; }
+    .cc-table td.num { text-align:right; font-variant-numeric: tabular-nums; font-weight:600; }
+    .cc-flag { display:inline-block; width:22px; text-align:center; margin-right:8px; }
+    .info-note { margin-top:10px; padding:10px 12px; border-radius:9px; background:#fef3c7; border:1px solid #fcd34d; color:#78350f; font-size:12.5px; font-weight:500; }
+
+    /* Spinner */
+    #spin { position:absolute; inset:0; z-index:1400; background:rgba(255,255,255,0.55); display:none; align-items:center; justify-content:center; }
+    #spin.on { display:flex; }
+    #spin div { width:48px; height:48px; border:5px solid #e0e7ff; border-top-color:#4f46e5; border-radius:50%; animation:sp 0.8s linear infinite; }
+    @keyframes sp { to { transform:rotate(360deg); } }
+
+    /* Mobil optimalizálás */
+    @media (max-width: 640px) {
+      #topPanel { top:10px; left:10px; right:10px; width:auto; max-width:none; padding:12px; }
+      #bottomPanel { left:10px; right:10px; bottom:10px; padding:12px; max-height:48vh; }
+      .tp-head .brand { font-size:15px; }
+    }
   </style>
 </head>
 <body>
-<div class="toast-wrap" id="toasts"></div>
 
-<div class="main-content" id="mainContent" data-theme="light" style="min-height:100vh;">
-<script>try{var _vsT=localStorage.getItem('vs-theme');if(_vsT==='light'||_vsT==='dark')document.getElementById('mainContent').setAttribute('data-theme',_vsT);}catch(e){}</script>
+<div id="shell">
+  <div id="map"></div>
 
-  <div class="dash-topbar">
-    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-      <a href="/admin" id="backLink" class="btn ghost" style="text-decoration:none;padding:8px 14px;" data-i18n="common.back">← Vissza</a>
-      <div class="vs-logo sm"><span class="vallor">vallor</span><span class="soft">Soft</span></div>
-      <div class="text-primary" style="font-size:18px;font-weight:800;" data-i18n="rp.title">🗺 Útvonaltervezés</div>
-    </div>
-    <button class="theme-toggle" id="themeToggle" onclick="rpToggleTheme()" title="Téma váltása" data-i18n-title="rp.themeToggle">🌙</button>
-  </div>
-
-  <!-- 1) FUVARFELADAT VÁLASZTÓ -->
-  <div class="glass rp-card">
-    <div class="rp-sec-title text-muted" data-i18n="rp.orderSelector">Fuvarfeladat választó</div>
-    <input class="input" id="rpOrderSearch" placeholder="Keresés azonosító vagy ügyfél alapján..." data-i18n-ph="rp.orderSearchPh" oninput="rpRenderOrderOptions()" style="margin-bottom:8px;">
-    <select class="select" id="rpOrder" onchange="rpOrderChange()">
-      <option value="" data-i18n="rp.chooseOrder">Válassz fuvarfeladatot...</option>
-    </select>
-  </div>
-
-  <!-- 2) VONTATÓ + PÓTKOCSI -->
-  <div class="rp-veh-grid" style="margin-bottom:16px;">
-    <div class="glass rp-card" style="margin-bottom:0;">
-      <div class="rp-sec-title text-primary" data-i18n="rp.tractor">Vontató</div>
-      <input class="input" id="rpTractorSearch" placeholder="Keresés rendszám / márka..." data-i18n-ph="rp.vehSearchPh" oninput="rpRenderTractorList()">
-      <div class="rp-list" id="rpTractorList"></div>
-    </div>
-    <div class="glass rp-card" style="margin-bottom:0;">
-      <div class="rp-sec-title text-primary" data-i18n="rp.trailer">Pótkocsi</div>
-      <input class="input" id="rpTrailerSearch" placeholder="Keresés rendszám / márka..." data-i18n-ph="rp.vehSearchPh" oninput="rpRenderTrailerList()">
-      <div class="rp-list" id="rpTrailerList"></div>
-    </div>
-  </div>
-
-  <!-- 3) TRUCK PARAMÉTER ÖSSZESÍTŐ -->
-  <div class="glass rp-card" id="rpTruckSummary">
-    <div class="text-muted" style="font-size:13px;" data-i18n="rp.pickTractorParams">Válassz vontatót a paraméterek megjelenítéséhez.</div>
-  </div>
-
-  <!-- 4) TÉRKÉP -->
-  <div class="glass" style="padding:0;overflow:hidden;border-radius:var(--radius-lg);margin-bottom:16px;position:relative;">
-    <div id="rpMap" style="width:100%;height:480px;min-height:450px;"></div>
-    <div id="rpSpinner" style="display:none;position:absolute;inset:0;z-index:1000;background:rgba(5,7,11,0.45);align-items:center;justify-content:center;backdrop-filter:blur(2px);">
-      <div style="text-align:center;color:#fff;"><div class="spinner" style="width:32px;height:32px;margin:0 auto 10px;"></div><span data-i18n="rp.calculating">Útvonal számítása...</span></div>
-    </div>
-  </div>
-
-  <!-- 5) ÚTVONAL PONTOK -->
-  <div class="glass rp-card">
-    <div class="rp-sec-title text-muted" data-i18n="rp.routePoints">Útvonal pontok</div>
-
-    <div class="rp-point">
-      <div class="lbl text-primary" data-i18n="rp.startPoint">📍 Kiindulópont</div>
-      <div id="rpGpsBlock" class="rp-gps-box text-muted" style="font-size:13px;" data-i18n="rp.pickTractorGps">Válassz vontatót a GPS pozíció betöltéséhez.</div>
+  <!-- TOP: kereső + köztes pontok -->
+  <section id="topPanel">
+    <div class="tp-head">
+      <div class="brand">vallor<span class="soft">Soft</span></div>
+      <a href="/admin" class="back">← Înapoi</a>
     </div>
 
-    <div class="rp-point">
-      <div class="lbl text-primary" data-i18n="rp.loadingPoint">📦 Felrakó pont</div>
-      <div class="rp-ac-wrap">
-        <input class="input" id="rpLoading" placeholder="Felrakás címe" data-i18n-ph="rp.loadingAddrPh" autocomplete="off" oninput="rpUpdatePlanBtn()">
-        <div class="rp-ac-dd" id="rpLoadingDD"></div>
-      </div>
+    <div id="wpList" class="wp-list"></div>
+    <button class="add-wp" onclick="addWaypoint()">+ Adaugă punct intermediar</button>
+
+    <div class="btn-row">
+      <button class="btn" onclick="resetAll()" style="flex:0 0 auto;">↻ Reset</button>
+      <button id="planBtn" class="btn primary" onclick="planRoute()" disabled>🗺 Calculează traseu</button>
     </div>
 
-    <div class="rp-point">
-      <div class="lbl text-primary" data-i18n="rp.unloadingPoint">🏁 Lerakó pont</div>
-      <div class="rp-ac-wrap">
-        <input class="input" id="rpUnloading" placeholder="Lerakás címe" data-i18n-ph="rp.unloadingAddrPh" autocomplete="off" oninput="rpUpdatePlanBtn()">
-        <div class="rp-ac-dd" id="rpUnloadingDD"></div>
-      </div>
+    <div id="err" class="err-note" style="display:none;"></div>
+  </section>
+
+  <!-- BOTTOM: eredmény -->
+  <section id="bottomPanel">
+    <div class="bp-head">
+      <h2>📊 Rezultat</h2>
+      <span id="kpiSrc" class="bp-src">—</span>
     </div>
-
-    <div id="rpWaypoints"></div>
-    <button class="btn ghost" id="rpAddWp" onclick="rpAddWaypoint()" style="margin-bottom:14px;" data-i18n="rp.addWaypoint">➕ Közbülső cél hozzáadása</button>
-
-    <!-- Útvonal-mód váltó: alapból ingyenes autós, gombbal kamionos (pontos) -->
-    <div style="margin-bottom:12px;">
-      <div class="text-muted" style="font-size:11px;margin-bottom:5px;" data-i18n="rp.routingModeLabel">Útvonal-mód</div>
-      <div style="display:flex;gap:6px;">
-        <button type="button" id="rpModeCar" class="btn primary" onclick="rpSetTruck(false)" style="flex:1;padding:8px;font-size:12.5px;" data-i18n="rp.modeCar">🚗 Autós (ingyenes)</button>
-        <button type="button" id="rpModeTruck" class="btn ghost" onclick="rpSetTruck(true)" style="flex:1;padding:8px;font-size:12.5px;" data-i18n="rp.modeTruck">🚛 Kamion (pontos)</button>
-      </div>
-      <div id="rpModeHint" class="text-muted" style="font-size:11px;margin-top:5px;"></div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="k">Distanță totală</div><div class="v" id="kpiKm">—</div></div>
+      <div class="kpi"><div class="k">Timp estimat</div><div class="v" id="kpiTime">—</div></div>
+      <div class="kpi"><div class="k">Taxă de drum</div><div class="v" id="kpiToll">—</div></div>
+      <div class="kpi"><div class="k">Puncte pe traseu</div><div class="v" id="kpiPts">—</div></div>
     </div>
+    <table class="cc-table" id="ccTable">
+      <thead><tr><th>Țară</th><th style="text-align:right;">Km</th><th style="text-align:right;">Taxă drum</th></tr></thead>
+      <tbody id="ccBody"></tbody>
+    </table>
+    <div id="infoNote" class="info-note" style="display:none;"></div>
+  </section>
 
-    <button class="btn primary" id="rpPlanBtn" onclick="rpPlan()" style="width:100%;" disabled data-i18n="rp.planRoute">🗺 Útvonal tervezése</button>
-  </div>
-
-  <!-- 6) EREDMÉNY PANEL -->
-  <div class="glass rp-card" id="rpResultPanel" style="display:none;">
-    <div class="rp-sec-title text-muted" data-i18n="rp.result">Eredmény</div>
-    <div id="rpProfileNote" class="text-muted" style="font-size:12px;margin-bottom:10px;"></div>
-    <div id="rpWarn" style="display:none;margin-bottom:14px;padding:12px 14px;border-radius:var(--radius-md);
-         background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);color:#fcd34d;font-size:13px;"></div>
-    <div class="grid-3" style="margin-bottom:14px;">
-      <div class="glass stat-tile"><div class="stat-ico">📏</div><div><div class="stat-val text-primary" id="rpDist">—</div><div class="stat-lbl text-muted" data-i18n="rp.totalDistance">Teljes távolság</div></div></div>
-      <div class="glass stat-tile"><div class="stat-ico">⏱️</div><div><div class="stat-val text-primary" id="rpTime">—</div><div class="stat-lbl text-muted" data-i18n="rp.estDriveTime">Becsült menetidő</div></div></div>
-      <div class="glass stat-tile"><div class="stat-ico">⛽</div><div><div class="stat-val text-primary" id="rpFuel">—</div><div class="stat-lbl text-muted" data-i18n="rp.estFuel">Becsült fogyasztás</div></div></div>
-    </div>
-    <div id="rpLegs"></div>
-    <div id="rpPremiumResult" style="margin-top:6px;"></div>
-  </div>
-
-  <!-- Térkép-szolgáltatás infó -->
-  <div class="glass rp-card" style="display:flex;align-items:center;gap:10px;">
-    <span style="font-size:20px;">🆓</span>
-    <div>
-      <div class="text-primary" style="font-size:13px;font-weight:700;" data-i18n="rp.freeMapTitle">Ingyenes térkép és útvonaltervezés</div>
-      <div class="text-muted" style="font-size:12px;" data-i18n-html="rp.freeMapDesc">OpenStreetMap csempék + Photon címkereső + OSRM/OpenRouteService útvonal — díjmentes. <b>Autós profil</b>; ha a szerveren ORS-kulcs van beállítva, <b>kamionos profillal</b> (súly/magasság-korlátokkal) tervez.</div>
-    </div>
-  </div>
-
+  <div id="spin"><div></div></div>
 </div>
 
 <script>
-// ───────── Segéd ─────────
-function gas(fn, args){ return fetch('/api/execute',{method:'POST',headers:{'Content-Type':'application/json'},
-  body:JSON.stringify({functionName:fn,arguments:args||[]})}).then(function(r){return r.json();}).then(function(d){return d.result;}); }
-function toast(m,k){var e=document.createElement('div');e.className='toast '+(k||'');e.textContent=m;
-  document.getElementById('toasts').appendChild(e);setTimeout(function(){e.remove();},4000);}
-function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function val(id){var e=document.getElementById(id);return e?e.value.trim():'';}
-
-// ───────── Állapot ─────────
-var rpMap, rpTileLayer, rpLayer;
-var _orders=[], _vehicles=[], _tractors=[], _trailers=[];
-var selTractor=null, selTrailer=null;     // teljes jármű-objektumok
-var gpsPos=null, gpsManualMode=false;
-var _wpSeq=0, _waypointIds=[];
-
-// ───────── Téma + INGYENES csempék (CartoDB / OpenStreetMap) ─────────
-function rpTheme(){ var mc=document.getElementById('mainContent'); return (mc&&mc.getAttribute('data-theme')==='light')?'light':'dark'; }
-function rpTileUrl(theme){
-  // A térkép MINDIG világos csempével jelenik meg (a felület témájától függetlenül).
-  return 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-}
-function rpTileOpts(){ return {attribution:'© OpenStreetMap © CARTO',maxZoom:19,subdomains:'abcd'}; }
-function rpSyncThemeIcon(){ var b=document.getElementById('themeToggle'); if(!b)return; var l=rpTheme()==='light'; b.textContent=l?'☀️':'🌙'; b.title=l?t('rp.darkMode'):t('rp.lightMode'); }
-function rpToggleTheme(){ var mc=document.getElementById('mainContent'); if(!mc)return; var n=(mc.getAttribute('data-theme')==='light')?'dark':'light';
-  mc.setAttribute('data-theme',n); try{localStorage.setItem('vs-theme',n);}catch(e){} rpSyncThemeIcon();
-  if(rpMap&&rpTileLayer) rpTileLayer.setUrl(rpTileUrl(n)); }
-function rpInitMap(){ rpMap=L.map('rpMap',{zoomControl:true}).setView([45.9432,24.9668],7);
-  rpTileLayer=L.tileLayer(rpTileUrl(rpTheme()),rpTileOpts()).addTo(rpMap);
-  rpLayer=L.layerGroup().addTo(rpMap); setTimeout(function(){rpMap.invalidateSize();},200); }
-
-// ───────── Fuvar választó ─────────
-function rpLoadOrders(){ gas('getOrdersForRoutePlanning').then(function(r){
-  if(!r||!r.ok){ toast((r&&r.err)||t('rp.ordersLoadFail'),'err'); return; }
-  _orders=r.orders||[]; rpRenderOrderOptions();
-}); }
-function rpRenderOrderOptions(){
-  var q=val('rpOrderSearch').toLowerCase();
-  var sel=document.getElementById('rpOrder'); var cur=sel.value;
-  var list=_orders.filter(function(o){ if(!q)return true;
-    return (String(o.id)+' '+(o.client||'')+' '+(o.loc_incarcare||'')+' '+(o.loc_descarcare||'')).toLowerCase().indexOf(q)!==-1; });
-  sel.innerHTML='<option value="">'+esc(t('rp.chooseOrder'))+'</option>'+list.map(function(o){
-    return '<option value="'+esc(o.id)+'">#'+esc(o.id)+' — '+esc(o.client||'—')+' | '+esc(o.loc_incarcare||'?')+' → '+esc(o.loc_descarcare||'?')+'</option>';
-  }).join('');
-  if(cur) sel.value=cur;
-}
-function rpOrderChange(){
-  var o=_orders.find(function(x){return String(x.id)===String(document.getElementById('rpOrder').value);});
-  if(!o)return;
-  document.getElementById('rpLoading').value=o.loc_incarcare||'';
-  document.getElementById('rpUnloading').value=o.loc_descarcare||'';
-  if(o.tractor_id){ var tr=_tractors.find(function(v){return v.id===o.tractor_id;}); if(tr) rpSelectTractor(tr.id); }
-  if(o.trailer_id){ var p=_trailers.find(function(v){return v.id===o.trailer_id;}); if(p) rpSelectTrailer(p.id); }
-  rpUpdatePlanBtn();
+// ===== Segéd =====
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+function debounce(fn, ms){ let t; return function(){ const a=arguments, ctx=this; clearTimeout(t); t=setTimeout(()=>fn.apply(ctx,a), ms); }; }
+async function gas(functionName, args){
+  const r = await fetch('/api/execute', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ functionName, arguments: args||{} }), credentials:'same-origin' });
+  const j = await r.json().catch(()=>({}));
+  return (j && j.result) || {};
 }
 
-// ───────── Jármű szelektorok ─────────
-function rpLoadVehicles(){ gas('getVehiclesForRouting').then(function(r){
-  if(!r||!r.ok){ toast((r&&r.err)||t('rp.vehiclesLoadFail'),'err'); return; }
-  _vehicles=r.vehicles||[];
-  _tractors=_vehicles.filter(function(v){return v.tip==='Vontato';});
-  _trailers=_vehicles.filter(function(v){return v.tip==='Potkocsi';});
-  rpRenderTractorList(); rpRenderTrailerList();
-}); }
-function rpVehItem(v, isSel){
-  var miss = (v.height_cm==null);
-  return '<div class="rp-veh'+(isSel?' sel':'')+'" onclick="'+(v.tip==='Vontato'?'rpSelectTractor':'rpSelectTrailer')+'('+v.id+')">'
-    + '<span class="dot'+(v.has_gps?' gps':'')+'"></span>'
-    + '<span><span class="nm">'+esc(v.rendszam)+'</span> <span class="meta">'+esc([v.marca,v.model].filter(Boolean).join(' ')||(v.nota||''))+'</span></span>'
-    + (miss?'<span class="warn">⚠ '+esc(t('rp.incompleteData'))+'</span>':'<span class="chk">✓</span>')
-    + '</div>';
+// ===== Zászló-emoji országkódból =====
+const CC3 = { ROU:'RO', HUN:'HU', DEU:'DE', AUT:'AT', ITA:'IT', FRA:'FR', ESP:'ES', PRT:'PT', BEL:'BE', NLD:'NL', LUX:'LU', CHE:'CH', POL:'PL', CZE:'CZ', SVK:'SK', SVN:'SI', HRV:'HR', SRB:'RS', BGR:'BG', GRC:'GR', TUR:'TR', UKR:'UA', MDA:'MD', BLR:'BY', LTU:'LT', LVA:'LV', EST:'EE', FIN:'FI', SWE:'SE', NOR:'NO', DNK:'DK', GBR:'GB', IRL:'IE', BIH:'BA', MKD:'MK', ALB:'AL', MNE:'ME', KOS:'XK' };
+const CC_NAME = { RO:'România', HU:'Ungaria', DE:'Germania', AT:'Austria', IT:'Italia', FR:'Franța', ES:'Spania', PT:'Portugalia', BE:'Belgia', NL:'Olanda', LU:'Luxemburg', CH:'Elveția', PL:'Polonia', CZ:'Cehia', SK:'Slovacia', SI:'Slovenia', HR:'Croația', RS:'Serbia', BG:'Bulgaria', GR:'Grecia', TR:'Turcia', UA:'Ucraina', MD:'Moldova', BY:'Belarus', LT:'Lituania', LV:'Letonia', EE:'Estonia', FI:'Finlanda', SE:'Suedia', NO:'Norvegia', DK:'Danemarca', GB:'Marea Britanie', IE:'Irlanda', BA:'Bosnia', MK:'Macedonia', AL:'Albania', ME:'Muntenegru', XK:'Kosovo' };
+function ccNorm(cc){ if (!cc) return '??'; const s = String(cc).toUpperCase(); return CC3[s] || s.slice(0,2); }
+function flagEmoji(cc){
+  const c = ccNorm(cc); if (c.length !== 2 || c === '??') return '🏳';
+  const A = 0x1F1E6, base = 'A'.charCodeAt(0);
+  return String.fromCodePoint(A + (c.charCodeAt(0)-base)) + String.fromCodePoint(A + (c.charCodeAt(1)-base));
 }
-function rpRenderTractorList(){
-  var q=val('rpTractorSearch').toLowerCase();
-  var list=_tractors.filter(function(v){ if(!q)return true; return (v.rendszam+' '+(v.marca||'')+' '+(v.model||'')).toLowerCase().indexOf(q)!==-1; });
-  var box=document.getElementById('rpTractorList');
-  box.innerHTML = list.length ? list.map(function(v){return rpVehItem(v, selTractor&&selTractor.id===v.id);}).join('')
-    : '<div class="text-muted" style="font-size:12px;padding:8px;">'+esc(t('rp.noActiveTractor'))+'</div>';
-}
-function rpRenderTrailerList(){
-  var q=val('rpTrailerSearch').toLowerCase();
-  var list=_trailers.filter(function(v){ if(!q)return true; return (v.rendszam+' '+(v.marca||'')+' '+(v.model||'')).toLowerCase().indexOf(q)!==-1; });
-  var box=document.getElementById('rpTrailerList');
-  var none='<div class="rp-veh'+(!selTrailer?' sel':'')+'" onclick="rpSelectTrailer(null)">'
-    + '<span class="dot"></span><span class="nm">'+esc(t('rp.noTrailer'))+'</span>'+(!selTrailer?'<span class="chk">✓</span>':'')+'</div>';
-  box.innerHTML = none + (list.map(function(v){return rpVehItem(v, selTrailer&&selTrailer.id===v.id);}).join(''));
-}
-function rpSelectTractor(id){
-  selTractor=_tractors.find(function(v){return v.id===id;})||null;
-  rpRenderTractorList(); rpRenderTruckSummary(); rpUpdatePlanBtn();
-  gpsPos=null; gpsManualMode=false;
-  if(selTractor){ rpRenderGps('loading'); rpLoadGps(selTractor.id); }
-  else rpRenderGps('none');
-}
-function rpSelectTrailer(id){
-  selTrailer = id==null ? null : (_trailers.find(function(v){return v.id===id;})||null);
-  rpRenderTrailerList(); rpRenderTruckSummary();
-}
-function rpOpts(list, sel){
-  return list.map(function(o){ return '<option value="'+o[0]+'"'+(String(sel||'')===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('');
-}
-function rpRenderTruckSummary(){
-  var box=document.getElementById('rpTruckSummary');
-  if(!selTractor){ box.innerHTML='<div class="text-muted" style="font-size:13px;">'+esc(t('rp.pickTractorParams'))+'</div>'; return; }
-  var tc=selTractor, p=selTrailer;
-  if(tc.height_cm==null){
-    box.innerHTML='<div style="color:var(--status-warn);font-size:13px;">⚠ '+esc(t('rp.vehDataMissing'))+'</div>';
-    return;
-  }
-  var n=function(x){return (x==null||x==='')?0:Number(x);};
-  // Prefill — NEM ez a végső érték: a HERE a megadott összekapcsolt értékekből tervez.
-  var type = p ? 'tractor' : (tc.truck_type==='tractor' ? 'tractor' : 'straightTruck');
-  var gwDef  = n(tc.weight_kg) + (p?n(p.weight_kg):0);   // induló tipp, szerkeszthető
-  var lenDef = n(tc.length_cm) + (p?n(p.length_cm):0);   // induló (felső becslés), szerkeszthető
-  var tunOpts=[['',t('rp.none')],['B','B'],['C','C'],['D','D'],['E',t('rp.tunnelE')]];
-  var hazOpts=[['',t('rp.none')],['explosive',t('rp.hazExplosive')],['gas',t('rp.hazGas')],['flammable',t('rp.hazFlammable')],['combustible',t('rp.hazCombustible')],['organic',t('rp.hazOrganic')],['poison',t('rp.hazPoison')],['harmfulToWater',t('rp.hazWater')]];
-  var typeOpts=[['straightTruck',t('rp.typeStraight')],['tractor',t('rp.typeTractor')]];
+function ccName(cc){ const c = ccNorm(cc); return CC_NAME[c] || c; }
 
-  box.innerHTML =
-    '<div class="rp-sec-title text-muted" style="margin-bottom:8px;">'+esc(t('rp.planParams'))+'</div>'
-    + '<div class="text-primary" style="font-weight:700;margin-bottom:10px;">🚛 '+esc(tc.rendszam)+(p?(' + '+esc(p.rendszam)):'')+'</div>'
-    + '<div class="field" style="margin-bottom:10px;"><label>'+esc(t('rp.vehType'))+'</label><select class="select" id="rpType" onchange="rpTypeChange()">'+rpOpts(typeOpts,type)+'</select></div>'
-    + '<div class="grid-2">'
-    +   '<div class="field"><label>'+esc(t('rp.grossWeight'))+'</label><input class="input" id="rpGW" type="number" placeholder="'+esc(t('rp.egPl')+' 40000')+'" value="'+(gwDef||'')+'"></div>'
-    +   '<div class="field"><label>'+esc(t('rp.totalLength'))+'</label><input class="input" id="rpLen" type="number" placeholder="'+esc(t('rp.egPl')+' 1650')+'" value="'+(lenDef||'')+'"></div>'
-    + '</div>'
-    + '<div class="grid-2">'
-    +   '<div class="field"><label>'+esc(t('rp.height'))+'</label><input class="input" id="rpH" type="number" value="'+(tc.height_cm!=null?tc.height_cm:'')+'"></div>'
-    +   '<div class="field"><label>'+esc(t('rp.width'))+'</label><input class="input" id="rpW" type="number" value="'+(tc.width_cm!=null?tc.width_cm:'')+'"></div>'
-    + '</div>'
-    + '<div class="grid-3">'
-    +   '<div class="field"><label>'+esc(t('rp.axleLoad'))+'</label><input class="input" id="rpWPA" type="number" value="'+(tc.weight_per_axle_kg!=null?tc.weight_per_axle_kg:'')+'"></div>'
-    +   '<div class="field"><label>'+esc(t('rp.axleCount'))+'</label><input class="input" id="rpAxle" type="number" min="2" max="12" value="'+(tc.axle_count!=null?tc.axle_count:'')+'"></div>'
-    +   '<div class="field"><label>'+esc(t('rp.trailerCount'))+'</label><input class="input" id="rpTrl" type="number" min="0" max="3" value="'+(p?1:0)+'"></div>'
-    + '</div>'
-    + '<div class="grid-2">'
-    +   '<div class="field"><label>'+esc(t('rp.tunnelCat'))+'</label><select class="select" id="rpTun">'+rpOpts(tunOpts,tc.tunnel_category)+'</select></div>'
-    +   '<div class="field"><label>'+esc(t('rp.hazGoods'))+'</label><select class="select" id="rpHaz">'+rpOpts(hazOpts,tc.hazardous_goods)+'</select></div>'
-    + '</div>'
-    + '<div class="text-muted" style="font-size:12px;margin-top:6px;line-height:1.6;">'
-    +   t('rp.carProfileNote')
-    + '</div>';
-}
-function rpTypeChange(){
-  var ty=(document.getElementById('rpType')||{}).value;
-  var trl=document.getElementById('rpTrl');
-  if(trl){ if(ty==='straightTruck') trl.value=0; else if(Number(trl.value)<1) trl.value=1; }
-}
-function rpCollectParams(){
-  var get=function(id){var e=document.getElementById(id);return e?e.value:'';};
-  return {
-    type: get('rpType'),
-    grossWeight: get('rpGW'),
-    length: get('rpLen'),
-    height: get('rpH'),
-    width: get('rpW'),
-    weightPerAxle: get('rpWPA'),
-    axleCount: get('rpAxle'),
-    trailerCount: get('rpTrl'),
-    tunnelCategory: get('rpTun'),
-    hazardousGoods: get('rpHaz')
-  };
-}
+// ===== Térkép =====
+const map = L.map('map', { zoomControl:true }).setView([46.5, 20.0], 5);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  maxZoom: 19, attribution: '&copy; OpenStreetMap contributors, &copy; CARTO', subdomains: 'abcd',
+}).addTo(map);
+let routeLayer = null;
+let markerLayer = L.layerGroup().addTo(map);
 
-// ───────── GPS kiindulópont ─────────
-function rpRelTime(iso){
-  if(!iso) return {txt:'', col:'var(--text-muted)'};
-  var diff=(Date.now()-new Date(iso).getTime())/1000;
-  if(isNaN(diff)) return {txt:'', col:'var(--text-muted)'};
-  var m=Math.round(diff/60);
-  if(m<5) return {txt:(m<=0?t('rp.now'):t('rp.minsAgo',{n:m})), col:'var(--status-ok)'};
-  if(m<60) return {txt:t('rp.minsAgo',{n:m}), col:'var(--status-warn)'};
-  var h=Math.round(m/60);
-  if(h<24) return {txt:t('rp.hoursAgo',{n:h}), col:'var(--status-danger)'};
-  return {txt:t('rp.daysAgo',{n:Math.round(h/24)}), col:'var(--status-danger)'};
-}
-function rpRenderGps(state){
-  var box=document.getElementById('rpGpsBlock');
-  if(state==='none'||!selTractor){ box.innerHTML=esc(t('rp.pickTractorGps')); box.className='rp-gps-box text-muted'; box.style.fontSize='13px'; return; }
-  if(state==='loading'){ box.innerHTML='<span class="spinner" style="width:14px;height:14px;vertical-align:middle;"></span> '+esc(t('rp.gpsLoading')); return; }
-  if(gpsPos){
-    var rt=rpRelTime(gpsPos.updated_at);
-    box.innerHTML='<div style="font-weight:600;color:var(--status-ok);">🟢 '+esc(gpsPos.rendszam)+'</div>'
-      + '<div class="text-muted" style="font-size:12px;margin:4px 0 8px;">'+esc(t('rp.lastPosition'))+': <span style="color:'+rt.col+';font-weight:600;">'+esc(rt.txt||'—')+'</span></div>'
-      + '<button class="btn ghost" style="padding:6px 12px;font-size:12px;" onclick="rpRefreshGps()">🔄 '+esc(t('rp.refreshGps'))+'</button>';
-  } else {
-    box.innerHTML='<div style="color:var(--status-warn);">⚠ '+esc(t('rp.gpsUnavailable'))+'</div>'
-      + '<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;cursor:pointer;" class="text-primary">'
-      + '<input type="checkbox" id="rpManualChk" onchange="rpToggleManual()" '+(gpsManualMode?'checked':'')+'> '+esc(t('rp.manualStart'))+'</label>'
-      + '<div id="rpManualWrap" style="margin-top:8px;'+(gpsManualMode?'':'display:none;')+'">'
-      + '<div class="rp-ac-wrap"><input class="input" id="rpStartManual" placeholder="'+esc(t('rp.startAddrPh'))+'" autocomplete="off"><div class="rp-ac-dd" id="rpStartManualDD"></div></div>'
-      + '</div>';
-    if(gpsManualMode){ var i=document.getElementById('rpStartManual'); if(i) attachAutocomplete(i, document.getElementById('rpStartManualDD')); }
-  }
-}
-function rpToggleManual(){ gpsManualMode=document.getElementById('rpManualChk').checked;
-  var w=document.getElementById('rpManualWrap'); if(w) w.style.display=gpsManualMode?'':'none';
-  if(gpsManualMode){ var i=document.getElementById('rpStartManual'); if(i) attachAutocomplete(i, document.getElementById('rpStartManualDD')); } }
-function rpLoadGps(vehicleId){ gas('getVehicleGpsPosition',[{vehicleId:vehicleId}]).then(function(r){
-  if(!selTractor||selTractor.id!==vehicleId) return; // közben váltott
-  gpsPos = (r&&r.ok)?r:null; rpRenderGps('done');
-}); }
-function rpRefreshGps(){ if(selTractor){ rpRenderGps('loading'); rpLoadGps(selTractor.id); } }
+// ===== Állapot =====
+function nid(){ return 'w' + Math.random().toString(36).slice(2,9); }
+let waypoints = [
+  { id: nid(), label:'', lat:null, lng:null },
+  { id: nid(), label:'', lat:null, lng:null },
+];
 
-// ───────── Közbülső célok ─────────
-function rpAddWaypoint(){
-  if(_waypointIds.length>=5){ toast(t('rp.maxWaypoints'),'err'); return; }
-  var id=++_wpSeq; _waypointIds.push(id);
-  var wrap=document.getElementById('rpWaypoints');
-  var row=document.createElement('div'); row.className='rp-point'; row.id='rpWpRow_'+id;
-  row.innerHTML='<div class="lbl text-primary">🔵 '+esc(t('rp.waypointLabel',{n:_waypointIds.length}))+'</div>'
-    + '<div class="rp-wp-row"><div class="rp-ac-wrap"><input class="input" id="rpWp_'+id+'" placeholder="'+esc(t('rp.waypointAddrPh'))+'" autocomplete="off"><div class="rp-ac-dd" id="rpWpDD_'+id+'"></div></div>'
-    + '<button class="rp-wp-del" onclick="rpRemoveWaypoint('+id+')">✕</button></div>';
-  wrap.appendChild(row);
-  attachAutocomplete(document.getElementById('rpWp_'+id), document.getElementById('rpWpDD_'+id));
-  if(_waypointIds.length>=5){ document.getElementById('rpAddWp').style.display='none'; }
-}
-function rpRemoveWaypoint(id){
-  _waypointIds=_waypointIds.filter(function(x){return x!==id;});
-  var row=document.getElementById('rpWpRow_'+id); if(row) row.remove();
-  document.getElementById('rpAddWp').style.display='';
-  // sorszámok újraírása
-  _waypointIds.forEach(function(wid,i){ var r=document.getElementById('rpWpRow_'+wid); if(r){ var l=r.querySelector('.lbl'); if(l) l.textContent='🔵 '+t('rp.waypointLabel',{n:i+1}); } });
-}
-
-// ───────── HERE Autocomplete ─────────
-function attachAutocomplete(input, dd){
-  if(input._acBound) return; input._acBound=true;
-  var timer=null;
-  input.addEventListener('input', function(){
-    var q=input.value.trim();
-    if(timer) clearTimeout(timer);
-    if(q.length<3){ dd.classList.remove('open'); dd.innerHTML=''; return; }
-    timer=setTimeout(function(){
-      fetch('/api/here-autocomplete?q='+encodeURIComponent(q),{credentials:'same-origin'})
-        .then(function(r){return r.json();}).then(function(d){
-          var items=(d&&d.items)||[];
-          if(!items.length){ dd.classList.remove('open'); dd.innerHTML=''; return; }
-          dd.innerHTML=items.map(function(it){
-            var label=it.label||it.title; var main=it.title||label; var sub=label;
-            return '<div class="rp-ac-item" data-label="'+esc(label)+'"><div class="ac-main">'+esc(main)+'</div><div class="ac-sub">'+esc(sub)+'</div></div>';
-          }).join('');
-          dd.classList.add('open');
-          Array.prototype.forEach.call(dd.querySelectorAll('.rp-ac-item'), function(el){
-            el.addEventListener('mousedown', function(e){ e.preventDefault();
-              input.value=el.getAttribute('data-label'); dd.classList.remove('open'); dd.innerHTML=''; rpUpdatePlanBtn(); });
-          });
-        }).catch(function(){ dd.classList.remove('open'); });
-    },300);
+function render(){
+  const box = document.getElementById('wpList');
+  const arr = [];
+  waypoints.forEach((w, i) => {
+    const pin = i===0 ? '🟢' : (i===waypoints.length-1 ? '🔴' : '🟡');
+    const canDel = waypoints.length > 2 && i>0 && i<waypoints.length-1; // csak köztespont törölhető
+    const ph = i===0 ? 'Punct de plecare' : (i===waypoints.length-1 ? 'Destinație' : 'Punct intermediar');
+    arr.push(
+      '<div class="wp-row" data-id="'+w.id+'">'
+      + '<div class="wp-pin">'+pin+'</div>'
+      + '<div class="wp-input-wrap">'
+      +   '<input class="wp-input" id="in_'+w.id+'" placeholder="'+ph+'" value="'+esc(w.label||'')+'" autocomplete="off">'
+      +   (canDel ? '<button class="wp-clear" data-id="'+w.id+'" title="Elimină">✕</button>' : '')
+      +   '<div class="wp-ac" id="ac_'+w.id+'"></div>'
+      + '</div>'
+      + '</div>'
+    );
   });
-  input.addEventListener('keydown', function(e){ if(e.key==='Escape'){ dd.classList.remove('open'); } });
+  box.innerHTML = arr.join('');
+  waypoints.forEach((w) => attach(w));
+  updatePlanBtn();
 }
-document.addEventListener('click', function(e){
-  Array.prototype.forEach.call(document.querySelectorAll('.rp-ac-dd.open'), function(dd){
-    if(!dd.parentElement.contains(e.target)) dd.classList.remove('open');
+
+function attach(w){
+  const inp = document.getElementById('in_'+w.id);
+  const dd  = document.getElementById('ac_'+w.id);
+  if (!inp) return;
+  const doSearch = debounce(async () => {
+    const q = inp.value.trim();
+    w.label = inp.value;
+    w.lat = null; w.lng = null;
+    updatePlanBtn();
+    if (q.length < 2){ dd.classList.remove('open'); dd.innerHTML=''; return; }
+    const r = await gas('rpAcSearch', { q });
+    if (!r.ok || !Array.isArray(r.items) || !r.items.length){ dd.classList.remove('open'); dd.innerHTML=''; return; }
+    dd.innerHTML = r.items.map((it, idx) =>
+      '<div class="wp-ac-item" data-idx="'+idx+'"><div class="t">'+esc(it.title||it.label)+'</div>'
+      + (it.label && it.label !== it.title ? '<div class="s">'+esc(it.label)+'</div>' : '')
+      + '</div>'
+    ).join('');
+    dd.classList.add('open');
+    dd._items = r.items;
+  }, 220);
+  inp.addEventListener('input', doSearch);
+  inp.addEventListener('blur', () => setTimeout(() => dd.classList.remove('open'), 200));
+  inp.addEventListener('focus', () => { if (dd.innerHTML) dd.classList.add('open'); });
+  dd.addEventListener('mousedown', (e) => {
+    const el = e.target.closest('.wp-ac-item'); if (!el) return;
+    const it = (dd._items || [])[Number(el.getAttribute('data-idx'))];
+    if (!it) return;
+    w.label = it.label; w.lat = it.lat; w.lng = it.lng;
+    inp.value = it.label;
+    dd.classList.remove('open');
+    updatePlanBtn();
+    drawMarkers();
   });
-});
-
-// ───────── Plan gomb állapot ─────────
-function rpUpdatePlanBtn(){
-  var ok = selTractor && val('rpLoading') && val('rpUnloading');
-  document.getElementById('rpPlanBtn').disabled = !ok;
+  const clr = document.querySelector('.wp-clear[data-id="'+w.id+'"]');
+  if (clr) clr.addEventListener('click', () => removeWaypoint(w.id));
 }
 
-// ───────── Útvonal tervezése ─────────
-function rpFmtDur(sec){ sec=Math.round(sec||0); var h=Math.floor(sec/3600), m=Math.round((sec%3600)/60); return (h>0?(h+t('rp.hourAbbr')+' '):'')+m+t('rp.minAbbr'); }
-function rpBuildWaypoints(){
-  var wps=[];
-  if(gpsPos && !gpsManualMode){ wps.push({type:'gps', lat:gpsPos.lat, lng:gpsPos.lng}); }
-  else if(gpsManualMode){ var mv=val('rpStartManual'); if(mv) wps.push({type:'gps', address:mv}); }
-  wps.push({type:'loading', address:val('rpLoading')});
-  wps.push({type:'unloading', address:val('rpUnloading')});
-  _waypointIds.forEach(function(id){ var v=val('rpWp_'+id); if(v) wps.push({type:'waypoint', address:v}); });
-  return wps;
+function updatePlanBtn(){
+  const filled = waypoints.filter(w => (w.label || '').trim().length >= 2).length;
+  document.getElementById('planBtn').disabled = filled < 2;
 }
-// Útvonal-mód: false = ingyenes autós (OSRM, alapértelmezett), true = kamionos (ORS).
-var rpTruck = false;
-function rpSetTruck(on){
-  rpTruck = !!on;
-  var car=document.getElementById('rpModeCar'), tr=document.getElementById('rpModeTruck');
-  if(car) car.className = rpTruck ? 'btn ghost' : 'btn primary';
-  if(tr)  tr.className  = rpTruck ? 'btn primary' : 'btn ghost';
-  var hint=document.getElementById('rpModeHint');
-  if(hint) hint.innerHTML = rpTruck ? t('rp.modeTruckHint') : t('rp.modeCarHint');
+
+function addWaypoint(){
+  waypoints.splice(waypoints.length - 1, 0, { id: nid(), label:'', lat:null, lng:null });
+  render();
 }
-function rpPlan(){
-  if(!selTractor){ toast(t('rp.pickTractorErr'),'err'); return; }
-  if(!val('rpLoading')||!val('rpUnloading')){ toast(t('rp.addAddrsErr'),'err'); return; }
-  var sp=document.getElementById('rpSpinner'); sp.style.display='flex';
-  var btn=document.getElementById('rpPlanBtn'); btn.disabled=true;
-  gas('calculateRoute',[{ tractorId:selTractor.id, trailerId:selTrailer?selTrailer.id:null, truck:rpTruck, params:rpCollectParams(), waypoints:rpBuildWaypoints() }])
-  .then(function(r){
-    sp.style.display='none'; rpUpdatePlanBtn();
-    if(!r||!r.ok){
-      var m=(r&&r.err)||t('rp.planFail');
-      if(/429|too many|limit/i.test(m)) m=t('rp.mapOverloaded');
-      toast(m,'err'); return;
+function removeWaypoint(id){
+  const i = waypoints.findIndex(w => w.id === id);
+  if (i <= 0 || i >= waypoints.length-1) return; // csak köztespont
+  waypoints.splice(i, 1);
+  render();
+  drawMarkers();
+}
+function resetAll(){
+  waypoints = [ { id: nid(), label:'', lat:null, lng:null }, { id: nid(), label:'', lat:null, lng:null } ];
+  render();
+  if (routeLayer){ map.removeLayer(routeLayer); routeLayer = null; }
+  markerLayer.clearLayers();
+  document.getElementById('bottomPanel').classList.remove('show');
+  document.getElementById('err').style.display = 'none';
+  map.setView([46.5, 20.0], 5);
+}
+
+function drawMarkers(){
+  markerLayer.clearLayers();
+  waypoints.forEach((w, i) => {
+    if (w.lat == null || w.lng == null) return;
+    const pin = i===0 ? '🟢' : (i===waypoints.length-1 ? '🔴' : '🟡');
+    L.marker([w.lat, w.lng], { title: w.label,
+      icon: L.divIcon({ className:'', html: '<div style="font-size:26px;line-height:26px;transform:translate(-13px,-24px);">'+pin+'</div>', iconSize:[26,26] })
+    }).addTo(markerLayer);
+  });
+}
+
+async function planRoute(){
+  document.getElementById('err').style.display = 'none';
+  document.getElementById('bottomPanel').classList.remove('show');
+  const pts = waypoints.map(w => ({ label: w.label, lat: w.lat, lng: w.lng })).filter(p => (p.label||'').trim().length >= 2 || (p.lat!=null && p.lng!=null));
+  if (pts.length < 2){ showErr('Sunt necesare cel puțin 2 puncte.'); return; }
+
+  document.getElementById('spin').classList.add('on');
+  const btn = document.getElementById('planBtn'); btn.disabled = true;
+  try {
+    const r = await gas('rpPlanRoute', { waypoints: pts });
+    if (!r.ok){ showErr(r.err || 'Eroare necunoscută'); return; }
+
+    if (routeLayer) map.removeLayer(routeLayer);
+    routeLayer = L.polyline(r.polyline, { color:'#4f46e5', weight:5, opacity:0.85 }).addTo(map);
+
+    if (Array.isArray(r.waypoints)){
+      r.waypoints.forEach((p, i) => {
+        if (waypoints[i]) { waypoints[i].lat = p.lat; waypoints[i].lng = p.lng; waypoints[i].label = p.label || waypoints[i].label; }
+      });
+      render();
     }
-    rpDrawRoute(r);
-  }).catch(function(){ sp.style.display='none'; rpUpdatePlanBtn(); toast(t('rp.netError'),'err'); });
-}
-function rpMarkerColor(type){ return type==='gps'?'#22c55e':type==='loading'?'#f6711e':type==='unloading'?'#e10b1a':'#f59e0b'; }
-function rpDrawRoute(r){
-  _lastRoute=r;
-  rpLayer.clearLayers();
-  var all=[];
-  // tiltott szakaszok kiemelése (halo a vonal ALATT)
-  (r.violations||[]).forEach(function(v){
-    if(v.polyline&&v.polyline.length){
-      L.polyline(v.polyline,{color:'#ff2d55',weight:11,opacity:0.45}).addTo(rpLayer);
+    drawMarkers();
+
+    if (r.bounds){
+      map.fitBounds([[r.bounds.minLat, r.bounds.minLng], [r.bounds.maxLat, r.bounds.maxLng]], { padding: [40, 40] });
     }
-  });
-  // markerek
-  (r.waypoints||[]).forEach(function(w,i){
-    var col=rpMarkerColor(w.type);
-    var tip = w.type==='gps'?((selTractor?selTractor.rendszam:'')+' — '+t('rp.currentPosition'))
-            : w.type==='loading'?(t('rp.loadingShort')+': '+(w.label||''))
-            : w.type==='unloading'?(t('rp.unloadingShort')+': '+(w.label||''))
-            : (t('rp.waypointShort')+': '+(w.label||''));
-    L.circleMarker([w.lat,w.lng],{radius:8,color:col,fillColor:col,fillOpacity:0.9,weight:2}).bindTooltip(tip).addTo(rpLayer);
-    all.push([w.lat,w.lng]);
-  });
-  // szakaszok színezve
-  (r.legs||[]).forEach(function(leg){
-    if(!leg.polyline||!leg.polyline.length) return;
-    var style;
-    if(leg.fromType==='gps') style={color:'#8a97a8',weight:3,dashArray:'8,8',opacity:0.9};
-    else if(leg.fromType==='loading') style={color:'#e10b1a',weight:5,opacity:0.95};
-    else style={color:'#f59e0b',weight:4,opacity:0.95};
-    L.polyline(leg.polyline,style).addTo(rpLayer);
-    leg.polyline.forEach(function(p){all.push(p);});
-  });
-  // tiltott szakasz jelölők (a vonal FÖLÖTT)
-  (r.violations||[]).forEach(function(v){
-    if(!v.polyline||!v.polyline.length) return;
-    var mid=v.polyline[Math.floor(v.polyline.length/2)];
-    var icon=L.divIcon({className:'rp-viol-ico',html:'<div style="font-size:20px;line-height:1;text-shadow:0 0 3px #000;">⛔</div>',iconSize:[24,24],iconAnchor:[12,12]});
-    L.marker(mid,{icon:icon,zIndexOffset:1000}).bindTooltip('⛔ '+esc(v.label)).bindPopup('<b>⛔ '+esc(t('rp.forbiddenSection'))+'</b><br>'+esc(v.label)).addTo(rpLayer);
-  });
-  if(all.length) rpMap.fitBounds(all,{padding:[40,40]});
 
-  // eredmény panel
-  document.getElementById('rpResultPanel').style.display='';
-  // Profil-jelzés: kamionos (ORS) vagy autós (OSRM) tervezés történt
-  var profEl=document.getElementById('rpProfileNote');
-  if(profEl){
-    profEl.innerHTML = r.profile==='truck-ors'
-      ? t('rp.profileTruck')
-      : (r.truckRequested ? t('rp.profileTruckUnavail') : t('rp.profileCar'));
+    // KPI-k
+    document.getElementById('kpiKm').textContent = (r.totalKm||0).toFixed(1) + ' km';
+    const h = Math.floor((r.durationMin||0) / 60), m = (r.durationMin||0) % 60;
+    document.getElementById('kpiTime').textContent = (h ? h + ' h ' : '') + m + ' min';
+    document.getElementById('kpiToll').textContent = ((r.toll && r.toll.total) || 0).toFixed(2) + ' ' + ((r.toll && r.toll.currency) || 'EUR');
+    document.getElementById('kpiPts').textContent = (r.waypoints || pts).length;
+    const srcEl = document.getElementById('kpiSrc');
+    srcEl.textContent = r.source === 'here' ? 'HERE' : 'OSRM';
+    srcEl.className = 'bp-src' + (r.source === 'here' ? '' : ' osrm');
+
+    // Ország-bontás tábla
+    const body = document.getElementById('ccBody');
+    const ccTable = document.getElementById('ccTable');
+    if (r.byCountry && r.byCountry.length){
+      body.innerHTML = r.byCountry.map(c =>
+        '<tr><td><span class="cc-flag">'+flagEmoji(c.cc)+'</span>'+esc(ccName(c.cc))+'</td>'
+        +'<td class="num">'+c.km.toFixed(1)+' km</td>'
+        +'<td class="num">'+(c.tollCost||0).toFixed(2)+' '+((r.toll && r.toll.currency)||'EUR')+'</td></tr>'
+      ).join('');
+      ccTable.style.display = '';
+    } else {
+      ccTable.style.display = 'none';
+    }
+
+    const note = document.getElementById('infoNote');
+    if (r.noHereKey){
+      note.textContent = 'ℹ️ Nu există cheie HERE configurată — traseul e din OSRM, fără detaliere pe țară și fără taxă. Contactează developer-ul pentru a activa HERE.';
+      note.style.display = '';
+    } else if (r.hereError){
+      note.textContent = '⚠️ HERE indisponibil (' + r.hereError + ') — s-a folosit OSRM fără taxă/țară.';
+      note.style.display = '';
+    } else {
+      note.style.display = 'none';
+    }
+    document.getElementById('bottomPanel').classList.add('show');
+  } catch (e) {
+    showErr(e.message || 'Eroare');
+  } finally {
+    document.getElementById('spin').classList.remove('on');
+    updatePlanBtn();
   }
-  document.getElementById('rpDist').textContent=(Math.round((r.distanceMeters||0)/100)/10)+' km';
-  document.getElementById('rpTime').textContent=rpFmtDur(r.durationSeconds);
-  document.getElementById('rpFuel').textContent=(r.fuelEstimateL!=null)?(r.fuelEstimateL+' L'):'—';
-
-  var typeName={gps:t('rp.startShort'),loading:t('rp.loadingShort'),unloading:t('rp.unloadingShort'),waypoint:t('rp.waypointShort')};
-  var legsHtml='';
-  if((r.legs||[]).length>1){
-    legsHtml='<div style="margin-top:6px;display:flex;flex-direction:column;gap:6px;">'+r.legs.map(function(leg){
-      var f=typeName[leg.fromType]||t('rp.pointShort'), tt=typeName[leg.toType]||t('rp.pointShort');
-      return '<div class="glass-soft" style="padding:8px 12px;border-radius:var(--radius-sm);font-size:13px;" class="text-primary">'
-        + '<b>'+esc(f)+' → '+esc(tt)+':</b> '+(Math.round((leg.distanceMeters||0)/100)/10)+' km — '+rpFmtDur(leg.durationSeconds)+'</div>';
-    }).join('')+'</div>';
-  }
-  document.getElementById('rpLegs').innerHTML=legsHtml;
-
-  var warn=document.getElementById('rpWarn');
-  var viol=r.violations||[];
-  if((r.notices&&r.notices.length)||viol.length){
-    warn.style.display='';
-    var detail = viol.length
-      ? viol.map(function(v){return esc(v.label);})
-      : (r.notices||[]).map(function(n){return esc(n.title);});
-    // egyedi címkék
-    detail = detail.filter(function(x,i){return detail.indexOf(x)===i;});
-    warn.innerHTML=t('rp.warnPrefix')+' '+(viol.length?('<b>'+t('rp.warnViolations',{n:viol.length})+'</b>'):t('rp.warnTruckRestriction'))
-      + ' '+t('rp.warnSuffix')+'<br>'
-      + '<span style="font-size:12px;opacity:.9;">'+detail.join(' · ')+'</span>';
-  } else { warn.style.display='none'; warn.innerHTML=''; }
-
 }
 
-// ───────── Nyelvváltás: JS-generált tartalom újrarajzolása ─────────
-var _lastRoute=null;
-window.onLangChange=function(){
-  try{ rpSyncThemeIcon(); }catch(e){}
-  try{ rpRenderOrderOptions(); }catch(e){}
-  try{ rpRenderTractorList(); rpRenderTrailerList(); }catch(e){}
-  try{ rpRenderTruckSummary(); }catch(e){}
-  try{ if(selTractor){ rpRenderGps(gpsPos?'done':(gpsManualMode?'done':'done')); } else { rpRenderGps('none'); } }catch(e){}
-  // közbülső cél címkék
-  try{ _waypointIds.forEach(function(wid,i){ var r=document.getElementById('rpWpRow_'+wid); if(r){ var l=r.querySelector('.lbl'); if(l) l.textContent='🔵 '+t('rp.waypointLabel',{n:i+1}); } }); }catch(e){}
-  try{ if(_lastRoute) rpDrawRoute(_lastRoute); }catch(e){}
-};
+function showErr(m){
+  const el = document.getElementById('err');
+  el.textContent = m; el.style.display = '';
+}
 
-// ───────── Indítás ─────────
-rpSyncThemeIcon();
-attachAutocomplete(document.getElementById('rpLoading'), document.getElementById('rpLoadingDD'));
-attachAutocomplete(document.getElementById('rpUnloading'), document.getElementById('rpUnloadingDD'));
-gas('authMe').then(function(u){ if(!u){ window.location.href='/login'; return; }
-  var b=document.getElementById('backLink'); if(b) b.href=(u.pozicio==='Manager')?'/manager':'/admin'; });
-// Ingyenes csempék — nincs kulcs-betöltés, azonnal indulhat a térkép.
-rpInitMap(); rpLoadOrders(); rpLoadVehicles();
-rpSetTruck(false);   // alapértelmezett: ingyenes autós mód + hint beállítása
+render();
 </script>
 </body>
 </html>

@@ -18,6 +18,7 @@ const handlers = Object.assign(
   require('../handlers/dashboard'),
   require('../handlers/developer'),
   require('../handlers/routePlannerHandlers'),
+  require('../handlers/routeSimple'),
   require('../handlers/hereFeatureHandlers'),
   require('../handlers/billingHandlers'),
   require('../handlers/intakeHandlers'),
