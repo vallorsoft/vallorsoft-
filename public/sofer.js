@@ -5166,20 +5166,20 @@ function _wbHeader(o) {
       '</div>';
   }
   // ── AKTÍV állapot — MOBIL-ELSŐ méretezés ────────────────────────────
-  // A sofőr-app 360-390px széles telefonon fut. Alap-mérés (2026-09-23):
-  // Kártya-sor ~44px, ezért 3 fuvar × 6-stopos teljes lista = ~930px,
-  // ami betölti a képernyőt → csak az első kártya látszik. A régi
-  // fejléc ~80-110px volt. Új szabály:
-  //   ≤ 4 stop  → TELJES lista (≤ ~200px). A klasszikus 1+1 vagy 2+1
-  //               fuvar egészben látszik — a papír-menetlevél élménye
-  //               megmarad, mert nincs sok stop.
-  //   ≥ 5 stop  → KOMPAKT mód: csak a MOST-sor kiemelten + kis
-  //               „lecke-sáv" (utolsó kész / következő) EGY-EGY sorban,
-  //               ~110-130px összesen. A teljes lista a kártya kinyitott
-  //               akkordeon-panelén (`.fd-stop-block`) elérhető marad.
+  // A sofőr-app 360-390px széles telefonon fut. Új szabály (2026-09-23,
+  // 4. iteráció — a sofőr KIFEJEZETT kérése: „mutassa a befejezetteket
+  // is"):
+  //   ≤ 4 stop  → TELJES paper-list minden sor részletesen (≤ ~200px).
+  //   ≥ 5 stop  → KOMPAKT „papír-menetlevél" lista: MINDEN stop egy sor,
+  //               a MOST-sor viszont kinyílva (teljes cím + cégnév).
+  //               Mini sor ~26px, MOST ~60px. 6-stop kártya = 5 mini +
+  //               MOST ≈ 190px, 3 kártya ≈ 570px — a főoldali fuvarok
+  //               ~460-500px területe alatt kevesebbet, de az első kártya
+  //               teljesen látszik és a második is nagyrészt.
   //
-  // Így minden fuvar-kártya belefér ~130px-be, 3 fuvar = ~400px, ami
-  // szépen belefér a főoldal ~460px-es „fuvarok" területébe.
+  // Nagyon hosszú fuvarnál (10+ pending) csak a következő MAX_PENDING_INLINE
+  // (=8) hátralévő stop látszik + „+N további" — így a 20+ stopos fuvar
+  // sem nyúlik el vég nélkül.
   var FULL_LIMIT = 4;
   var rows = [];
   var doneCount = currentIdx;   // hányat csináltunk (0..N-1)
@@ -5195,37 +5195,47 @@ function _wbHeader(o) {
       rows.push(_wbHeaderRow(seq[j], j + 1, st));
     }
   } else {
-    // Hosszú fuvar (5+): kompakt mód — a MOST-sor kap fókuszt, körülötte
-    // opcionális 1-1 kontextus-sor.
+    // Hosszú fuvar (5+): kompakt mód — a MOST-sor kap fókuszt (teljes cím
+    // + cégnév), a többi állomás EGY-EGY soros mini-sor (kész + hátra),
+    // hogy a sofőr a papír-menetlevél élményt kompletten lássa telefonon
+    // is. Mini sor ~26px, MOST-sor ~60px → 6-stop kártya ~190px, 3 kártya
+    // ~570px = a főoldali fuvarok-terület alá esik, de az első fuvar
+    // teljesen látszik és a másodikból is a lényeg.
     //
-    // (A) opc. „utolsó kész" súgás — a sofőr látja, honnan jött.
-    if (currentIdx > 0) {
-      var prev = seq[currentIdx - 1];
-      var prevCity  = _cityOf(prev.loc) || (prev.loc || '');
-      var prevKind  = prev.kind === 'pickup'
+    // Nagyon hosszú (10+ pending) esetén a végét „+N további" jellel
+    // rövidítjük, hogy 20+ stopos fuvar se nyúljon el vég nélkül.
+    var MAX_PENDING_INLINE = 8;
+    // (A) MINDEN elvégzett stop mini-sorként — a sofőr látja, hol tart
+    //     a papír-menetlevélen.
+    for (var d = 0; d < currentIdx; d++) {
+      var dn = seq[d];
+      var dnCity  = _cityOf(dn.loc) || (dn.loc || '');
+      var dnKind  = dn.kind === 'pickup'
         ? (t('sof.wbh.pickup') || 'Felrakó')
         : (t('sof.wbh.delivery') || 'Lerakó');
       rows.push('<div class="wb-hd-mini wb-hd-mini-done">' +
         '<span class="wb-hd-icon">✓</span>' +
-        '<span class="wb-hd-mini-t">' + esc(currentIdx + '. ' + prevKind + ' — ' + prevCity) + '</span>' +
+        '<span class="wb-hd-mini-t">' + esc((d + 1) + '. ' + dnKind + ' — ' + dnCity) + '</span>' +
         '</div>');
     }
-    // (B) a MOST-sor — kiemelt, ez a főszereplő
+    // (B) a MOST-sor — kiemelt, ez a főszereplő (teljes cím + cégnév)
     rows.push(_wbHeaderRow(seq[currentIdx], currentIdx + 1, 'current'));
-    // (C) opc. „következik" súgás — 1 sor a következő stopról
-    if (currentIdx + 1 < N) {
-      var next = seq[currentIdx + 1];
-      var nextCity  = _cityOf(next.loc) || (next.loc || '');
-      var nextKind  = next.kind === 'pickup'
+    // (C) hátralévő stopok mini-sorként — legfeljebb MAX_PENDING_INLINE
+    var pendingStart = currentIdx + 1;
+    var pendingEnd   = Math.min(N, pendingStart + MAX_PENDING_INLINE);
+    for (var p = pendingStart; p < pendingEnd; p++) {
+      var pn = seq[p];
+      var pnCity  = _cityOf(pn.loc) || (pn.loc || '');
+      var pnKind  = pn.kind === 'pickup'
         ? (t('sof.wbh.pickup') || 'Felrakó')
         : (t('sof.wbh.delivery') || 'Lerakó');
       rows.push('<div class="wb-hd-mini wb-hd-mini-next">' +
         '<span class="wb-hd-icon">○</span>' +
-        '<span class="wb-hd-mini-t">' + esc((currentIdx + 2) + '. ' + nextKind + ' — ' + nextCity) + '</span>' +
+        '<span class="wb-hd-mini-t">' + esc((p + 1) + '. ' + pnKind + ' — ' + pnCity) + '</span>' +
         '</div>');
     }
-    // (D) ha van további hátra maradó → „+N további" halvány kis jelzés
-    var remaining = N - (currentIdx + 2);
+    // (D) ha még ezután is van több stop → „+N további" halvány jelzés
+    var remaining = N - pendingEnd;
     if (remaining > 0) {
       rows.push('<div class="wb-hd-skip">+' + remaining + ' ' +
         (t('sof.wbh.moreAhead') || 'további állomás') + '</div>');
