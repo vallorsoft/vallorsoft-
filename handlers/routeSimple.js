@@ -232,14 +232,33 @@ function haversine(a, b) {
 }
 
 // ── HERE Routing v8 ───────────────────────────────────────────────────────
-async function planHere(waypoints, key) {
+// A `truck` opció: `{grossWeight:kg, height:cm, length:cm, width:cm,
+// weightPerAxle:kg, trailerCount, axleCount}` — EU-s szerelvényre alap.
+async function planHere(waypoints, key, truck) {
   const origin = waypoints[0].lat + ',' + waypoints[0].lng;
   const destination = waypoints[waypoints.length - 1].lat + ',' + waypoints[waypoints.length - 1].lng;
   const via = waypoints.slice(1, -1).map((w) => 'via=' + w.lat + ',' + w.lng).join('&');
-  const url = 'https://router.hereapi.com/v8/routes?transportMode=car'
+  const mode = (truck && truck.enabled) ? 'truck' : 'car';
+  let truckPart = '';
+  if (mode === 'truck') {
+    const p = truck || {};
+    const num = (v) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+    const q = [];
+    // HERE v8 truck params: mind alap egységek (kg, cm)
+    if (num(p.grossWeight)     != null) q.push('vehicle[grossWeight]='     + num(p.grossWeight));
+    if (num(p.height)          != null) q.push('vehicle[height]='          + num(p.height));
+    if (num(p.length)          != null) q.push('vehicle[length]='          + num(p.length));
+    if (num(p.width)           != null) q.push('vehicle[width]='           + num(p.width));
+    if (num(p.weightPerAxle)   != null) q.push('vehicle[weightPerAxle]='   + num(p.weightPerAxle));
+    if (num(p.trailerCount)    != null) q.push('vehicle[trailerCount]='    + num(p.trailerCount));
+    if (num(p.axleCount)       != null) q.push('vehicle[axleCount]='       + num(p.axleCount));
+    if (q.length) truckPart = '&' + q.join('&');
+  }
+  const url = 'https://router.hereapi.com/v8/routes?transportMode=' + mode
     + '&origin=' + encodeURIComponent(origin)
     + '&destination=' + encodeURIComponent(destination)
     + (via ? '&' + via : '')
+    + truckPart
     + '&return=polyline,summary,tolls'
     + '&spans=length,countryCode'
     + '&currency=EUR&apikey=' + encodeURIComponent(key);
@@ -410,7 +429,7 @@ async function rpPlanRoute(req, res, args) {
     const cfg = await maps.getConfig(cid);
     if (cfg.vendor === 'here' && cfg.key) {
       try {
-        const r = await planHere(pts, cfg.key);
+        const r = await planHere(pts, cfg.key, (args && args.truck) || null);
         return res.json({ result: { ok: true, ...r, waypoints: pts } });
       } catch (e) {
         // HERE nem elérhető → OSRM-fallback + jelzés a UI-nak

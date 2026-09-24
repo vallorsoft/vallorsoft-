@@ -167,6 +167,26 @@
     </div>
     <div id="mapPickHint" style="display:none;font-size:11.5px;color:#4f46e5;margin-top:6px;background:#eef2ff;padding:6px 10px;border-radius:8px;border:1px solid #c7d2fe;">👆 Click pe hartă pentru a adăuga un punct intermediar. Click din nou pe buton pentru a opri.</div>
 
+    <!-- Kamionos útvonal (HERE truck routing) -->
+    <div style="margin-top:12px;padding:10px 12px;border-radius:10px;background:#fef9c3;border:1px solid #fde047;">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:#78350f;cursor:pointer;">
+        <input type="checkbox" id="truckMode" onchange="toggleTruckPanel()" style="width:16px;height:16px;accent-color:#d97706;">
+        🚛 Rută pentru camion (HERE truck)
+      </label>
+      <div id="truckPanel" style="display:none;margin-top:8px;font-size:12px;color:#78350f;">
+        <div style="font-size:11px;color:#92400e;margin-bottom:6px;">Parametri implicit (camion + semiremorcă EU 40 t). Editabil.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <label>Masă totală (kg)<input type="number" id="tGw"  value="40000" style="width:100%;padding:5px 7px;border:1px solid #fcd34d;border-radius:5px;font-size:12px;font-family:inherit;color:#0f172a;background:#fff;"></label>
+          <label>Înălțime (cm)<input   type="number" id="tH"   value="400"   style="width:100%;padding:5px 7px;border:1px solid #fcd34d;border-radius:5px;font-size:12px;font-family:inherit;color:#0f172a;background:#fff;"></label>
+          <label>Lungime (cm)<input    type="number" id="tL"   value="1650"  style="width:100%;padding:5px 7px;border:1px solid #fcd34d;border-radius:5px;font-size:12px;font-family:inherit;color:#0f172a;background:#fff;"></label>
+          <label>Lățime (cm)<input     type="number" id="tW"   value="255"   style="width:100%;padding:5px 7px;border:1px solid #fcd34d;border-radius:5px;font-size:12px;font-family:inherit;color:#0f172a;background:#fff;"></label>
+          <label>Sarcină/ax max (kg)<input type="number" id="tWpa" value="11500" style="width:100%;padding:5px 7px;border:1px solid #fcd34d;border-radius:5px;font-size:12px;font-family:inherit;color:#0f172a;background:#fff;"></label>
+          <label>Axe totale<input      type="number" id="tAx"  value="5"     style="width:100%;padding:5px 7px;border:1px solid #fcd34d;border-radius:5px;font-size:12px;font-family:inherit;color:#0f172a;background:#fff;"></label>
+        </div>
+        <div style="font-size:10.5px;color:#92400e;margin-top:6px;">💡 Semiremorcă cu 3 axe: max 24 t pe remorcă (implicit).</div>
+      </div>
+    </div>
+
     <div class="btn-row">
       <button class="btn" onclick="resetAll()" style="flex:0 0 auto;">↻ Reset</button>
       <button id="planBtn" class="btn primary" onclick="planRoute()" disabled>🗺 Calculează traseu</button>
@@ -392,6 +412,26 @@ map.on('click', async (e) => {
   } catch (_) { /* címkéz koord-dal marad */ }
 });
 
+// ===== Kamion-mód =====
+function toggleTruckPanel(){
+  const on = document.getElementById('truckMode').checked;
+  document.getElementById('truckPanel').style.display = on ? '' : 'none';
+}
+function readTruckParams(){
+  if (!document.getElementById('truckMode').checked) return null;
+  const val = (id) => { const v = document.getElementById(id).value; const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+  return {
+    enabled: true,
+    grossWeight: val('tGw'),      // kg
+    height: val('tH'),            // cm
+    length: val('tL'),            // cm
+    width: val('tW'),             // cm
+    weightPerAxle: val('tWpa'),   // kg
+    axleCount: val('tAx'),        // db
+    trailerCount: 1,              // szerelvény
+  };
+}
+
 // ===== BNR-alapú RON átváltás =====
 function recomputeRon(){
   const el = document.getElementById('kpiTollRon');
@@ -462,7 +502,7 @@ async function planRoute(){
   document.getElementById('spin').classList.add('on');
   const btn = document.getElementById('planBtn'); btn.disabled = true;
   try {
-    const r = await gas('rpPlanRoute', { waypoints: pts });
+    const r = await gas('rpPlanRoute', { waypoints: pts, truck: readTruckParams() });
     if (!r.ok){ showErr(r.err || 'Eroare necunoscută'); return; }
 
     if (routeLayer) map.removeLayer(routeLayer);
