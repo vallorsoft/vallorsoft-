@@ -4264,10 +4264,7 @@ function toggleTheme() {
   mc.setAttribute('data-theme', next);
   try { localStorage.setItem('vs-theme', next); } catch (e) {}
   syncThemeToggleIcon();
-  // Térkép-csempék cseréje a témához (CartoDB / OpenStreetMap)
-  if (window._dashMap && window._dashTileLayer) {
-    window._dashTileLayer.setUrl(cartoTileUrl(next));
-  }
+  // A vezérlőpult térképe HERE vagy OSM világos csempével fut — a téma nem befolyásolja.
 }
 
 function syncThemeToggleIcon() {
@@ -4524,23 +4521,49 @@ function loadDashVehicleSummary() {
   });
 }
 
-/* ── Térkép (Leaflet + CartoDB) ── */
+/* ── Térkép (Leaflet + HERE csempék, CARTO/OSM fallback) ── */
+function _dashAddFallbackTiles() {
+  if (!window._dashMap) return;
+  // Standard OSM csempék — kulcs nélkül. (A CARTO 2024-től API-kulcsot kér a legtöbb régióra.)
+  window._dashTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(window._dashMap);
+}
+function _dashInitTiles() {
+  if (!window._dashMap) return;
+  // HERE ha van cég-kulcs (session-védett /api/here-config); különben OSM fallback.
+  fetch('/api/here-config', { credentials: 'same-origin' })
+    .then(function (r) { return r.json().catch(function () { return {}; }); })
+    .then(function (j) {
+      if (!window._dashMap) return;
+      if (j && j.apiKey) {
+        window._dashTileLayer = L.tileLayer(
+          'https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png?apiKey=' + encodeURIComponent(j.apiKey) + '&style=explore.day&size=512&features=pois:disabled',
+          { maxZoom: 20, tileSize: 512, zoomOffset: -1,
+            attribution: '&copy; HERE, &copy; OpenStreetMap contributors', errorTileUrl: '' }
+        );
+        window._dashTileLayer.on('tileerror', function once() {
+          try { window._dashMap.removeLayer(window._dashTileLayer); } catch (e) {}
+          window._dashTileLayer.off('tileerror', once);
+          _dashAddFallbackTiles();
+        });
+        window._dashTileLayer.addTo(window._dashMap);
+      } else {
+        _dashAddFallbackTiles();
+      }
+    })
+    .catch(function () { _dashAddFallbackTiles(); });
+}
 function initDashMap() {
   if (typeof L === 'undefined') return;               // Leaflet még nem töltött be
   var el = document.getElementById('dashMap');
   if (!el) return;
   if (window._dashMap) { setTimeout(function () { window._dashMap.invalidateSize(); }, 150); return; }
 
-  var mc = document.getElementById('mainContent');
-  var light = mc && mc.getAttribute('data-theme') === 'light';
-  var theme = light ? 'light' : 'dark';
   window._dashMap = L.map(el, { zoomControl: true })
     .setView([45.9432, 24.9668], 7);                  // Románia közepe
   window._dashMarkers = L.layerGroup().addTo(window._dashMap);
 
-  // OpenStreetMap (CartoDB) csempék — ingyenes, nincs HERE kulcs ezen az oldalon.
-  window._dashTileLayer = L.tileLayer(cartoTileUrl(theme),
-    { attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(window._dashMap);
+  _dashInitTiles();
 
   // A térkép gyakran üresen marad, ha induláskor a konténer mérete még nem véglegesült.
   // Több ütemezett invalidateSize + ablakméret-figyelő biztosítja a csempék kirajzolását.
@@ -4584,12 +4607,35 @@ function refreshDashVehicles() {
     }
     var bounds = [];
     pts.forEach(function (p) {
-      var spd = (p.speed != null) ? Math.round(p.speed) + ' km/h' : '—';
-      var m = L.circleMarker([p.lat, p.lng], {
-        radius: 8, color: '#6366f1', fillColor: '#6366f1', fillOpacity: 0.85, weight: 2
+      var spd = (p.speed != null) ? Math.round(p.speed) : null;
+      var spdTxt = (spd != null) ? spd + ' km/h' : '—';
+      // Álló = <5 km/h VAGY 0 sebesség; mozgó = ≥5 km/h. GPS pontatlanság miatt
+      // néha lassú „ácsorgásokat" ad — a 5 km/h alatti értéket állónak tekintjük.
+      var moving = (spd != null && spd >= 5);
+      var color = moving ? '#16a34a' : '#2563eb';   // zöld ha mozog, kék ha áll
+      var plate = (p.rendszam || p.object_name || '').toString();
+      // Egyedi HTML-marker: kis háromszög „lábbal", felette a rendszám-plate címke.
+      var html =
+        '<div style="position:relative;transform:translate(-50%,-100%);pointer-events:auto;">'
+        + '<div style="padding:3px 8px;background:' + color + ';color:#fff;'
+          + 'font-weight:800;font-size:11.5px;letter-spacing:0.02em;'
+          + 'font-family:\'Inter\',system-ui,sans-serif;'
+          + 'border:2px solid #fff;border-radius:6px;'
+          + 'box-shadow:0 3px 10px rgba(15,23,42,0.35);'
+          + 'white-space:nowrap;line-height:1;">'
+          + esc(plate)
+        + '</div>'
+        + '<div style="width:0;height:0;margin:0 auto;'
+          + 'border-left:5px solid transparent;border-right:5px solid transparent;'
+          + 'border-top:6px solid ' + color + ';'
+          + 'filter: drop-shadow(0 2px 2px rgba(15,23,42,0.25));"></div>'
+        + '</div>';
+      var m = L.marker([p.lat, p.lng], {
+        icon: L.divIcon({ className: 'vs-plate-marker', html: html, iconSize: [0, 0], iconAnchor: [0, 0] })
       });
-      m.bindTooltip('🚛 ' + (p.object_name || p.rendszam) + ' · ' + spd);
-      m.bindPopup('<b>' + esc(p.object_name || p.rendszam) + '</b><br>' + t('dash.speed') + ': ' + spd
+      m.bindTooltip('🚛 ' + plate + ' · ' + (moving ? '🟢 ' : '🔵 ') + spdTxt);
+      m.bindPopup('<b>' + esc(plate) + '</b><br>' + t('dash.speed') + ': ' + spdTxt
+        + '<br>' + (moving ? '🟢 în mișcare' : '🔵 staționar')
         + (p.datetime ? '<br>' + new Date(p.datetime).toLocaleString('hu-HU') : ''));
       m.addTo(window._dashMarkers);
       bounds.push([p.lat, p.lng]);
