@@ -6,6 +6,7 @@ const express = require('express');
 const router = express.Router();
 const { requireLogin } = require('../middleware/auth');
 const fbAdmin = require('../services/firebase');
+const mapsProvider = require('../lib/mapsProvider');
 
 router.get('/api/firebase-config', requireLogin, (req, res) => {
   const pozicio = req.session.user.pozicio;
@@ -24,18 +25,25 @@ router.get('/api/firebase-config', requireLogin, (req, res) => {
   });
 });
 
-// Térkép-konfiguráció — a HERE le lett cserélve INGYENES szolgáltatásokra
-// (CartoDB/OSM csempék + Photon geokódolás + OSRM routing), ezért API-kulcs
-// nincs. A végpont kompatibilitásból megmaradt: a kliens kulcs hiányában
-// automatikusan az ingyenes csempékre vált.
-router.get('/api/here-config', requireLogin, (req, res) => {
-  res.json({ apiKey: null });
+// Térkép-konfiguráció — a HERE-kulcs cégenként a `company_integrations`
+// provider='maps' rekordban (AES-titkosítva). Ha be van állítva, a kliens
+// HERE raszter-csempéket kap; különben az ingyenes CARTO/OSM fallback él.
+// Csak bejelentkezett cég-user érheti el (a session-védelem gátolja a random
+// scraper-t; a kulcs referrer-korlátozott is lehet a HERE-panelen).
+router.get('/api/here-config', requireLogin, async (req, res) => {
+  try {
+    const cid = req.session && req.session.user ? req.session.user.company_id : null;
+    const cfg = await mapsProvider.getConfig(cid);
+    if (cfg.vendor === 'here' && cfg.key) return res.json({ apiKey: cfg.key });
+    return res.json({ apiKey: null });
+  } catch (_) {
+    return res.json({ apiKey: null });
+  }
 });
 
 // Cím-autocomplete (proxy) — Photon (photon.komoot.io), OpenStreetMap alapú,
 // INGYENES, kulcs nélkül. A régi /api/here-autocomplete útvonal megmaradt,
 // hogy a kliens-hívások ne törjenek.
-const mapsProvider = require('../lib/mapsProvider');
 async function geoAutocomplete(req, res) {
   const q = (req.query.q || '').trim();
   if (q.length < 3) return res.json({ items: [] });

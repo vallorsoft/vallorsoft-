@@ -212,9 +212,39 @@ function ccName(cc){ const c = ccNorm(cc); return CC_NAME[c] || c; }
 
 // ===== Térkép =====
 const map = L.map('map', { zoomControl:true }).setView([46.5, 20.0], 5);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  maxZoom: 19, attribution: '&copy; OpenStreetMap contributors, &copy; CARTO', subdomains: 'abcd',
-}).addTo(map);
+let tileLayer = null;
+function addFallbackTiles(){
+  tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors, &copy; CARTO', subdomains: 'abcd',
+  }).addTo(map);
+}
+// HERE raszter-csempék, ha a cégnek van HERE-kulcsa; különben CARTO/OSM fallback.
+(async function initTiles(){
+  try {
+    const r = await fetch('/api/here-config', { credentials:'same-origin' });
+    const j = await r.json().catch(() => ({}));
+    if (j && j.apiKey) {
+      // HERE Raster Tile API v3 — style: explore.day (közúti+útjelzés-erős)
+      tileLayer = L.tileLayer(
+        'https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png?apiKey=' + encodeURIComponent(j.apiKey) + '&style=explore.day&size=512&features=pois:disabled',
+        {
+          maxZoom: 20, tileSize: 512, zoomOffset: -1,
+          attribution: '&copy; HERE, &copy; OpenStreetMap contributors',
+          errorTileUrl: '',
+        }
+      );
+      // Ha a HERE-csempe hibázik (403 stb.), csendben esünk vissza CARTO-ra.
+      tileLayer.on('tileerror', function once(){
+        try { map.removeLayer(tileLayer); } catch(_) {}
+        tileLayer.off('tileerror', once);
+        addFallbackTiles();
+      });
+      tileLayer.addTo(map);
+      return;
+    }
+  } catch(_) { /* fallback */ }
+  addFallbackTiles();
+})();
 let routeLayer = null;
 let markerLayer = L.layerGroup().addTo(map);
 
