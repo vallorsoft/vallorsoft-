@@ -57,6 +57,37 @@
     .wp-btn-del:hover { background:#fee2e2; border-color:#fca5a5; color:#991b1b; }
     .wp-btn-x { width:22px; height:19px; }
 
+    /* Összecsukott köztespont-sáv (3+ köztespontnál) */
+    .wp-collapse-row {
+      display:flex; align-items:center; gap:8px;
+      padding: 6px 10px;
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      border: 1.5px dashed #f59e0b;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .wp-collapse-row:hover { background: linear-gradient(135deg, #fde68a, #fcd34d); border-color:#d97706; }
+    .wp-collapse-row .wp-pin { flex:0 0 28px; padding-top:0; }
+    .wp-collapse-dots { flex:1; display:flex; align-items:center; gap:5px; overflow:hidden; }
+    .wp-collapse-dot {
+      width:9px; height:9px; border-radius:50%;
+      background: #f59e0b; flex:0 0 auto;
+      box-shadow: 0 1px 3px rgba(217,119,6,0.35);
+    }
+    .wp-collapse-lbl { font-size:12px; font-weight:700; color:#78350f; margin-left:auto; padding-right:4px; }
+    .wp-collapse-btn {
+      display:flex; align-items:center; justify-content:center;
+      width:56px; padding: 4px 6px;
+      font-size:11px; font-weight:700; color:#78350f;
+      background:#fff; border:1px solid #d97706; border-radius:6px;
+      cursor:pointer;
+    }
+    .wp-collapse-btn:hover { background:#fef3c7; }
+
+    /* Ha valamiért a mezők túl sokat vinnének, a lista maximum magasságát is korlátozzuk (biztonsági háló). */
+    .wp-list { max-height: 40vh; overflow-y: auto; padding-right: 2px; }
+
     /* Autocomplete lenyíló */
     .wp-ac {
       position:absolute; top: calc(100% + 3px); left:0; right:0;
@@ -289,35 +320,78 @@ let waypoints = [
   { id: nid(), label:'', lat:null, lng:null },
 ];
 
+// Ha 3+ köztespont van, alapból összecsukjuk őket egy chip-sávra
+// (a start és cél mindig látszik; 2 köztes még kifér normál módban).
+let intermediatesCollapsed = true;
+function collapseThreshold(){ return 3; } // 3+ köztespontnál csukjuk össze
+function shouldCollapse(){
+  const midCount = waypoints.length - 2;
+  return midCount >= collapseThreshold() && intermediatesCollapsed;
+}
+
+function renderRow(w, i){
+  const pin = i===0 ? '🟢' : (i===waypoints.length-1 ? '🔴' : '🟡');
+  const canDel = waypoints.length > 2;
+  const canUp = i > 0;
+  const canDown = i < waypoints.length - 1;
+  const ph = i===0 ? 'Punct de plecare' : (i===waypoints.length-1 ? 'Destinație' : 'Punct intermediar #' + i);
+  return '<div class="wp-row" data-id="'+w.id+'">'
+    + '<div class="wp-pin">'+pin+'</div>'
+    + '<div class="wp-input-wrap">'
+    +   '<input class="wp-input" id="in_'+w.id+'" placeholder="'+ph+'" value="'+esc(w.label||'')+'" autocomplete="off">'
+    +   '<div class="wp-ac" id="ac_'+w.id+'"></div>'
+    + '</div>'
+    + '<div class="wp-side">'
+    +   (canUp   ? '<button class="wp-btn" data-mv="up"   data-id="'+w.id+'" title="Sus">▲</button>'   : '<span class="wp-btn-x"></span>')
+    +   (canDown ? '<button class="wp-btn" data-mv="down" data-id="'+w.id+'" title="Jos">▼</button>'  : '<span class="wp-btn-x"></span>')
+    +   (canDel  ? '<button class="wp-btn wp-btn-del" data-del="1" data-id="'+w.id+'" title="Elimină">✕</button>' : '<span class="wp-btn-x"></span>')
+    + '</div>'
+    + '</div>';
+}
+
 function render(){
   const box = document.getElementById('wpList');
   const arr = [];
-  waypoints.forEach((w, i) => {
-    const pin = i===0 ? '🟢' : (i===waypoints.length-1 ? '🔴' : '🟡');
-    const canDel = waypoints.length > 2; // MINDEN pont törölhető, ha van legalább 2 másik
-    const canUp = i > 0;
-    const canDown = i < waypoints.length - 1;
-    const ph = i===0 ? 'Punct de plecare' : (i===waypoints.length-1 ? 'Destinație' : 'Punct intermediar');
+  const collapse = shouldCollapse();
+  const midCount = waypoints.length - 2;
+
+  if (collapse){
+    // Start
+    arr.push(renderRow(waypoints[0], 0));
+    // Csukott köztespont-sáv — N pötty + „Vezi toate" gomb
+    const dots = new Array(midCount).fill('<span class="wp-collapse-dot"></span>').join('');
     arr.push(
-      '<div class="wp-row" data-id="'+w.id+'">'
-      + '<div class="wp-pin">'+pin+'</div>'
-      + '<div class="wp-input-wrap">'
-      +   '<input class="wp-input" id="in_'+w.id+'" placeholder="'+ph+'" value="'+esc(w.label||'')+'" autocomplete="off">'
-      +   '<div class="wp-ac" id="ac_'+w.id+'"></div>'
-      + '</div>'
-      + '<div class="wp-side">'
-      +   (canUp   ? '<button class="wp-btn" data-mv="up"   data-id="'+w.id+'" title="Sus">▲</button>'   : '<span class="wp-btn-x"></span>')
-      +   (canDown ? '<button class="wp-btn" data-mv="down" data-id="'+w.id+'" title="Jos">▼</button>'  : '<span class="wp-btn-x"></span>')
-      +   (canDel  ? '<button class="wp-btn wp-btn-del" data-del="1" data-id="'+w.id+'" title="Elimină">✕</button>' : '<span class="wp-btn-x"></span>')
-      + '</div>'
+      '<div class="wp-collapse-row" onclick="expandMids(event)">'
+      + '<div class="wp-pin">🟡</div>'
+      + '<div class="wp-collapse-dots">'+dots+'</div>'
+      + '<span class="wp-collapse-lbl">'+midCount+' puncte</span>'
+      + '<button class="wp-collapse-btn" onclick="expandMids(event)">Vezi ▾</button>'
       + '</div>'
     );
-  });
+    // Cél
+    arr.push(renderRow(waypoints[waypoints.length - 1], waypoints.length - 1));
+  } else {
+    waypoints.forEach((w, i) => arr.push(renderRow(w, i)));
+    // Ha van elég köztespont ahhoz, hogy csukni érdemes legyen, kínáljunk egy „Restrânge" gombot
+    if (midCount >= collapseThreshold()){
+      arr.push(
+        '<button class="wp-collapse-btn" style="width:100%;padding:7px 10px;margin-top:2px;" onclick="collapseMids()">▲ Restrânge punctele intermediare</button>'
+      );
+    }
+  }
+
   box.innerHTML = arr.join('');
-  waypoints.forEach((w) => attach(w));
-  // Delegált oldal-gombok (fel/le/törlés)
+  // Csak a látható input-mezőkre kapcsoljuk fel a autocomplete-et
+  const visibleIds = new Set();
+  box.querySelectorAll('.wp-input').forEach((el) => {
+    const id = el.id.replace(/^in_/, '');
+    visibleIds.add(id);
+  });
+  waypoints.forEach((w) => { if (visibleIds.has(w.id)) attach(w); });
+
   box.querySelectorAll('.wp-btn').forEach((b) => {
-    b.onclick = () => {
+    b.onclick = (e) => {
+      e.stopPropagation();
       const id = b.getAttribute('data-id');
       if (b.getAttribute('data-del')) return removeWaypoint(id);
       const mv = b.getAttribute('data-mv');
@@ -326,6 +400,9 @@ function render(){
   });
   updatePlanBtn();
 }
+
+function expandMids(e){ if (e) e.stopPropagation(); intermediatesCollapsed = false; render(); }
+function collapseMids(){ intermediatesCollapsed = true; render(); }
 
 function moveWaypoint(id, delta){
   const i = waypoints.findIndex(w => w.id === id);
@@ -498,6 +575,8 @@ map.on('click', async (e) => {
   // Új köztespont a végpont ELÉ (mindig az utolsó pont elé kerül)
   const newWp = { id: nid(), label: lat.toFixed(4) + ', ' + lng.toFixed(4), lat, lng };
   waypoints.splice(waypoints.length - 1, 0, newWp);
+  // Térkép-klikk 3+ pontnál MARADHAT csukva (a felhasználó a térképen dolgozik),
+  // de a chip mostantól élőben mutatja a hozzáadott pötty-öt.
   render();
   drawMarkers();
   // Reverse-geokód a valós címhez
@@ -563,7 +642,12 @@ function recomputeRon(){
 
 function addWaypoint(){
   waypoints.splice(waypoints.length - 1, 0, { id: nid(), label:'', lat:null, lng:null });
+  intermediatesCollapsed = false; // új pontnál kinyitjuk, hogy azonnal beírható legyen
   render();
+  // Auto-focus a most hozzáadott mezőre
+  const w = waypoints[waypoints.length - 2];
+  const el = document.getElementById('in_' + w.id);
+  if (el) el.focus();
 }
 function removeWaypoint(id){
   const i = waypoints.findIndex(w => w.id === id);
