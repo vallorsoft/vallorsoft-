@@ -15,6 +15,7 @@
 //                          HERE-kulcs nélkül: OSRM-fallback (csak polyline+km,
 //                          nincs orszag-bontás/toll — a UI jelzi).
 // ============================================================
+const pool = require('../db');
 const maps = require('../lib/mapsProvider');
 const tollEstimate = require('../lib/tollEstimate');
 // Hivatalos HERE flexible polyline dekóder (a project dep-je: `@here/flexpolyline`).
@@ -85,11 +86,18 @@ async function _photonEuropean(q) {
     const lng = f.geometry && f.geometry.coordinates ? f.geometry.coordinates[0] : null;
     return { label, title: main || label, lat, lng, _rank: isPlace ? (PLACE_RANK[placeType] || 9) : 20 };
   }
+  // Európa-lefedő bbox — a Photon a világon bárhonnan visszaadhat találatot;
+  // itt kliens-oldali szűréssel EU-ra korlátozzuk (west=-25, south=34, east=45, north=71).
+  function inEurope(lat, lng) {
+    if (lat == null || lng == null) return false;
+    return lat >= 34 && lat <= 71 && lng >= -25 && lng <= 45;
+  }
   const seen = new Set();
   const out = [];
   ((placeD && placeD.features) || []).concat((allD && allD.features) || []).forEach((f) => {
     const it = mapFeature(f);
     if (!it.label) return;
+    if (!inEurope(it.lat, it.lng)) return; // Amerika / Ázsia / Afrika / Óceánia kimarad
     const key = it.label.toLowerCase().slice(0, 80);
     if (seen.has(key)) return;
     seen.add(key);
@@ -102,8 +110,10 @@ async function _photonEuropean(q) {
 async function _nominatimEuropean(q) {
   // Nominatim korlátozás NÉLKÜL, egész Európát/világot lefedve.
   // A `class=place` sorok (settlement) elöl.
-  const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=10&accept-language=en&q='
-    + encodeURIComponent(q);
+  // Európa országainak ISO2 kódjai — a keresés kizárólag európai eredményeket ad.
+  const EU_CC = 'al,ad,at,ba,be,bg,by,ch,cy,cz,de,dk,ee,es,fi,fo,fr,gb,ge,gr,hr,hu,ie,is,it,li,lt,lu,lv,md,me,mk,mt,nl,no,pl,pt,ro,rs,ru,se,si,sk,sm,tr,ua,va';
+  const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=10&accept-language=en&countrycodes='
+    + EU_CC + '&q=' + encodeURIComponent(q);
   const d = await jsonGet(url, { 'Accept-Language': 'en' });
   const seen = new Set();
   const out = [];
@@ -140,13 +150,18 @@ async function _hereAutosuggest(q, key) {
   //   3. Discover                → BEJEGYZETT CÉGEK / POI-k (Kaufland, MOL,
   //      Shell, McDonald's, DHL-terminálok stb. — mint a Google Places)
   // Nincs `lang` restriction → a multi-lang matchelés (Bécs → Wien) automatikus.
+  // EURÓPA-CSAK — HERE `in=bbox:west,south,east,north` szűrő.
+  // Európa lefedő bounding box: Izland/Azori-szigetek ↔ Nordkapp ↔ Ural.
+  //   west  -25° (Azori)   south 34° (Ciprus/Málta)
+  //   east   45° (Ural)    north 71° (Nordkapp)
+  const EU_BBOX = '-25,34,45,71';
   const [locD, allD, discD] = await Promise.all([
     jsonGet('https://autosuggest.search.hereapi.com/v1/autosuggest?q=' + encodeURIComponent(q)
-      + '&at=50,15&limit=6&types=area&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
+      + '&at=50,15&in=bbox:' + EU_BBOX + '&limit=6&types=area&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
     jsonGet('https://autosuggest.search.hereapi.com/v1/autosuggest?q=' + encodeURIComponent(q)
-      + '&at=50,15&limit=6&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
+      + '&at=50,15&in=bbox:' + EU_BBOX + '&limit=6&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
     jsonGet('https://discover.search.hereapi.com/v1/discover?q=' + encodeURIComponent(q)
-      + '&at=50,15&limit=8&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
+      + '&at=50,15&in=bbox:' + EU_BBOX + '&limit=8&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
   ]);
 
   // Rangsor: (1) települési találat elöl (city/town), (2) POI/cég (Discover
@@ -228,6 +243,36 @@ function _acCacheSet(key, items) {
   }
 }
 
+// ── Tanult sorok lekérdezése — cégenkénti prefix-match a `route_search_learn`-ből
+// Rangsor: gyakoriság (pick_count) + frissesség (last_used_at) — sűrűn használt
+// és nemrég használt címek legelöl.
+async function _fetchLearned(cid, qNorm) {
+  if (!cid || !qNorm) return [];
+  try {
+    // Exponenciális avulás: 30 napos „félelezés". A pick_count szorzódik a
+    // (1 / (1 + napok / 30)) faktorral, hogy a frissebb pick-ek jobban rangsoroljanak.
+    const r = await pool.query(
+      `SELECT label, title, lat, lng, cat_hint, pick_count, last_used_at,
+              pick_count * 1.0 / (1.0 + EXTRACT(EPOCH FROM (NOW() - last_used_at)) / (30 * 86400.0)) AS score
+       FROM route_search_learn
+       WHERE company_id = $1 AND query_norm LIKE $2 || '%'
+       ORDER BY score DESC, last_used_at DESC
+       LIMIT 5`,
+      [cid, qNorm]);
+    return r.rows.map((row) => ({
+      label: row.label,
+      title: row.title || row.label,
+      lat: row.lat != null ? Number(row.lat) : null,
+      lng: row.lng != null ? Number(row.lng) : null,
+      catHint: row.cat_hint || null,
+      _learned: true,
+      _pickCount: row.pick_count,
+    }));
+  } catch (_) {
+    return []; // migráció nélkül csendben üres marad
+  }
+}
+
 async function rpAcSearch(req, res, args) {
   const q = String((args && args.q) || '').trim();
   if (q.length < 2) return res.json({ result: { ok: true, items: [] } });
@@ -251,10 +296,18 @@ async function rpAcSearch(req, res, args) {
         // Bejegyzett hely (Discover) kategória-hintje, ha van — a UI kis
         // pilulaként mutatja, hogy azonnal látszódjon: „🏢 Kaufland" nem cím.
         catHint: it.catHint || null,
+        // Tanult sorok esetén tovább visszük a jelzést + a pick-számot,
+        // a UI kis „⭐ N×" pilulával jelöli, hány cégen belüli kollega
+        // pickelte már ezt a helyet ugyanerre a query-re.
+        _learned: it._learned || false,
+        _pickCount: it._pickCount || null,
       });
     });
   }
   try {
+    // 1. LÉPÉS — Tanult sorok elsőként. Nem várunk a HERE-re, ha van
+    // erős pick-history a query prefixére, az azonnal megjelenik legelöl.
+    push(await _fetchLearned(cid, q.toLowerCase()));
     // Ha van HERE-kulcs, azt kizárólag használjuk (leggyorsabb + legpontosabb).
     // A Photon/Nominatim csak akkor jön, ha a HERE nem ad eleget.
     const cfg = await maps.getConfig(cid);
@@ -540,4 +593,48 @@ async function rpReverseGeocode(req, res, args) {
   }
 }
 
-module.exports = { rpAcSearch, rpPlanRoute, rpReverseGeocode };
+// ── Pick-rögzítés — tanuló rendszer: a felhasználó által kiválasztott
+// hely az aktuális bevitt query-vel párban `route_search_learn`-be kerül.
+// Legközelebb ugyanannak a prefixnek a beírásakor a hely a lista elején jön.
+// Multi-tenant: minden sor a session cég-jéhez van kötve.
+async function rpAcPick(req, res, args) {
+  try {
+    if (!req.session || !req.session.user) return res.json({ result: { ok: false, err: 'no-session' } });
+    const cid = req.session.user.company_id;
+    const email = (req.session.user.email || '').toLowerCase().slice(0, 254) || null;
+    const q = String((args && args.q) || '').trim().toLowerCase().slice(0, 80);
+    const label = String((args && args.label) || '').trim().slice(0, 500);
+    if (q.length < 2 || !label) return res.json({ result: { ok: false, err: 'invalid-input' } });
+    const title = args.title != null ? String(args.title).slice(0, 300) : null;
+    const lat = args.lat != null && Number.isFinite(Number(args.lat)) ? Number(args.lat) : null;
+    const lng = args.lng != null && Number.isFinite(Number(args.lng)) ? Number(args.lng) : null;
+    const catHint = args.catHint != null ? String(args.catHint).slice(0, 120) : null;
+    // UPSERT: ha a (cég, query_norm, label) hármas már van, pick_count-ot növeljük
+    // és a last_used_at-et frissítjük. A user_email az utolsó pickelőé marad
+    // (informatív, de nem szükséges a rangsoroláshoz).
+    await pool.query(
+      `INSERT INTO route_search_learn
+         (company_id, user_email, query_norm, label, title, lat, lng, cat_hint, pick_count, first_used_at, last_used_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, NOW(), NOW())
+       ON CONFLICT (company_id, query_norm, label)
+       DO UPDATE SET
+         pick_count   = route_search_learn.pick_count + 1,
+         last_used_at = NOW(),
+         user_email   = EXCLUDED.user_email,
+         title        = COALESCE(EXCLUDED.title, route_search_learn.title),
+         lat          = COALESCE(EXCLUDED.lat, route_search_learn.lat),
+         lng          = COALESCE(EXCLUDED.lng, route_search_learn.lng),
+         cat_hint     = COALESCE(EXCLUDED.cat_hint, route_search_learn.cat_hint)`,
+      [cid, email, q, label, title, lat, lng, catHint]);
+    // Cache-ürítés — a tanult sor MÁR nem szerepel a friss válaszban, ne kelljen
+    // 10 percet várni a hatásra. Az _acCache prefix-alapú, ezért az EGY query kulcsot
+    // dobjuk el; a rövidebb/hosszabb prefixek TTL-je maradhat.
+    _acCache.delete(cid + '|' + q);
+    return res.json({ result: { ok: true } });
+  } catch (e) {
+    // Migráció-hiány / bármi más: csendben elnyeljük — a pick nem kritikus.
+    return res.json({ result: { ok: true, warn: e.message || 'noop' } });
+  }
+}
+
+module.exports = { rpAcSearch, rpAcPick, rpPlanRoute, rpReverseGeocode };
