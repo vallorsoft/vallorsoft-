@@ -423,38 +423,71 @@ function _osmTiles(){
     maxZoom: 19, attribution: '&copy; OpenStreetMap contributors',
   });
 }
-function _hereTiles(style){
+// HERE Raster Tile API v3 két elérhető resource:
+//   `base`   → vektor-alapú közúti nézet (explore.day/night, lite.day, logistics.day, topo.day)
+//   `aerial` → műhold-nézet (satellite.day, hybrid.day — HÁTUL a satellite, ELÖL a felirat)
+// A `hybrid.day` a base resource-on 403-at ad; a valós hibrid az `aerial/mc/…?style=satellite.day`
+// (pure satellite) + egy vékony felirat-overlay (base + `lite.day` átlátszóval) — de a HERE hivatalos
+// megoldása: `aerial` + `hybrid.day` style. Kipróbáljuk mindkettőt; ha a hibrid nem megy, pure satellite.
+function _hereBaseTiles(style){
   return L.tileLayer(
-    'https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png?apiKey=' + encodeURIComponent(_hereApiKey) + '&style=' + style + '&size=512&features=pois:disabled',
+    'https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png?apiKey=' + encodeURIComponent(_hereApiKey) + '&style=' + encodeURIComponent(style) + '&size=512&features=pois:disabled',
     { maxZoom: 20, tileSize: 512, zoomOffset: -1,
       attribution: '&copy; HERE, &copy; OpenStreetMap contributors', errorTileUrl: '' });
+}
+function _hereAerialTiles(style){
+  return L.tileLayer(
+    'https://maps.hereapi.com/v3/aerial/mc/{z}/{x}/{y}/png?apiKey=' + encodeURIComponent(_hereApiKey) + '&style=' + encodeURIComponent(style) + '&size=512',
+    { maxZoom: 20, tileSize: 512, zoomOffset: -1,
+      attribution: '&copy; HERE (aerial)', errorTileUrl: '' });
 }
 function setTileMode(mode){
   _tileMode = (mode === 'satellite') ? 'satellite' : 'map';
   if (tileLayer) { try { map.removeLayer(tileLayer); } catch(_){} }
   if (_hereApiKey){
-    // HERE styles:
-    //   explore.day  → közúti nézet
-    //   hybrid.day   → műholdas + felirat
-    const style = _tileMode === 'satellite' ? 'hybrid.day' : 'explore.day';
-    tileLayer = _hereTiles(style);
-    tileLayer.on('tileerror', function once(){
-      try { map.removeLayer(tileLayer); } catch(_){}
-      tileLayer.off('tileerror', once);
-      // Ha a műhold csempe nem elérhető (nincs jog), vissza normálra
-      if (_tileMode === 'satellite'){ _tileMode = 'map'; tileLayer = _hereTiles('explore.day'); tileLayer.addTo(map); }
-      else { tileLayer = _osmTiles(); tileLayer.addTo(map); }
-    });
-    tileLayer.addTo(map);
+    if (_tileMode === 'satellite'){
+      // 1. próbálkozás: aerial/hybrid.day (műhold + felirat egy csempében)
+      tileLayer = _hereAerialTiles('hybrid.day');
+      let downgraded = false;
+      tileLayer.on('tileerror', function once(){
+        if (downgraded) return; downgraded = true;
+        try { map.removeLayer(tileLayer); } catch(_){}
+        tileLayer.off('tileerror', once);
+        // 2. próbálkozás: aerial/satellite.day (pure műhold, felirat nélkül)
+        tileLayer = _hereAerialTiles('satellite.day');
+        let downgraded2 = false;
+        tileLayer.on('tileerror', function once2(){
+          if (downgraded2) return; downgraded2 = true;
+          try { map.removeLayer(tileLayer); } catch(_){}
+          tileLayer.off('tileerror', once2);
+          // Végső fallback: normál közúti (a felhasználó tudja, hogy nincs műhold-jog)
+          _tileMode = 'map';
+          tileLayer = _hereBaseTiles('explore.day');
+          tileLayer.addTo(map);
+          _updateMapModeBtn();
+        });
+        tileLayer.addTo(map);
+      });
+      tileLayer.addTo(map);
+    } else {
+      tileLayer = _hereBaseTiles('explore.day');
+      tileLayer.on('tileerror', function once(){
+        try { map.removeLayer(tileLayer); } catch(_){}
+        tileLayer.off('tileerror', once);
+        tileLayer = _osmTiles(); tileLayer.addTo(map);
+      });
+      tileLayer.addTo(map);
+    }
   } else {
     tileLayer = _osmTiles(); tileLayer.addTo(map);
   }
-  // Gomb-jelzés frissítése
+  _updateMapModeBtn();
+}
+function _updateMapModeBtn(){
   const btn = document.getElementById('mapModeBtn');
-  if (btn){
-    btn.innerHTML = _tileMode === 'satellite' ? '🗺 Hartă' : '🛰 Satelit';
-    btn.title = _tileMode === 'satellite' ? 'Comută la harta rutieră' : 'Comută la vedere satelit';
-  }
+  if (!btn) return;
+  btn.innerHTML = _tileMode === 'satellite' ? '🗺 Hartă' : '🛰 Satelit';
+  btn.title = _tileMode === 'satellite' ? 'Comută la harta rutieră' : 'Comută la vedere satelit';
 }
 (async function initTiles(){
   try {
