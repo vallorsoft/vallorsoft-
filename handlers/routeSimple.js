@@ -16,6 +16,7 @@
 //                          nincs orszag-bontás/toll — a UI jelzi).
 // ============================================================
 const maps = require('../lib/mapsProvider');
+const tollEstimate = require('../lib/tollEstimate');
 
 const UA = 'VallorSoft/1.0 (utvonaltervezo)';
 const TIMEOUT_MS = 20000;
@@ -52,11 +53,14 @@ async function _photonEuropean(q) {
   // 1) Először CSAK települések (osm_tag=place) — így minden Karlsruhe-jellegű
   //    keresés a valódi VÁROS találatokat adja elöl.
   // 2) Külön általános keresés is (címek/POI-k) — a városok mögé rendezve.
+  // A `lang` param csak a VÁLASZ nyelvét befolyásolja — a QUERY multi-lang
+  // matching (name / alt_name / name:xx) az összes OSM name-változatra
+  // automatikusan megy, tehát „Bécs" → Wien, „Kolozsvár" → Cluj is működik.
   const [placeD, allD] = await Promise.all([
     jsonGet('https://photon.komoot.io/api/?q=' + encodeURIComponent(q)
-      + '&limit=8&lang=en&osm_tag=place&lat=50&lon=15&location_bias_scale=0.1').catch(() => ({})),
+      + '&limit=8&osm_tag=place&lat=50&lon=15&location_bias_scale=0.1').catch(() => ({})),
     jsonGet('https://photon.komoot.io/api/?q=' + encodeURIComponent(q)
-      + '&limit=10&lang=en&lat=50&lon=15&location_bias_scale=0.1').catch(() => ({})),
+      + '&limit=10&lat=50&lon=15&location_bias_scale=0.1').catch(() => ({})),
   ]);
   function mapFeature(f) {
     const p = f.properties || {};
@@ -128,11 +132,13 @@ async function _hereAutosuggest(q, key) {
   // HERE Autosuggest — teljes Európát lefedi (bias EU-központ).
   // resultType=locality → CSAK települési találatok elsőként.
   // Külön általános autosuggest is, hogy legyen fallback címekre/POI-kra.
+  // HERE Autosuggest — nincs `lang` restriction, hogy a multi-lang matchelés
+  // működjön (Bécs → Wien, Kolozsvár → Cluj, Prága → Praha stb.)
   const [locD, allD] = await Promise.all([
     jsonGet('https://autosuggest.search.hereapi.com/v1/autosuggest?q=' + encodeURIComponent(q)
-      + '&at=50,15&limit=8&lang=en&types=area&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
+      + '&at=50,15&limit=8&types=area&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
     jsonGet('https://autosuggest.search.hereapi.com/v1/autosuggest?q=' + encodeURIComponent(q)
-      + '&at=50,15&limit=10&lang=en&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
+      + '&at=50,15&limit=10&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
   ]);
   function mapIt(it, isPlace) {
     return {
@@ -355,8 +361,10 @@ async function planHere(waypoints, key) {
   };
 }
 
-// ── OSRM fallback (nincs orszag-bontás, nincs toll) ───────────────────────
-async function planOsrm(waypoints) {
+// ── OSRM fallback + a cég toll_rates ráta táblájából útdíj-becslés ────────
+// (mint a fuvar-kiírásban — orszagonkénti €/km vagy vignette a
+// `toll_rates` táblából, alapértékek `DEFAULT_RATES`-ből)
+async function planOsrm(waypoints, companyId) {
   const coords = waypoints.map((w) => w.lng + ',' + w.lat).join(';');
   const url = 'https://router.project-osrm.org/route/v1/driving/' + coords + '?overview=full&geometries=geojson';
   const data = await jsonGet(url);
@@ -364,12 +372,23 @@ async function planOsrm(waypoints) {
   if (!route) throw new Error('OSRM eroare: nu s-a returnat un traseu');
   const points = (route.geometry.coordinates || []).map((c) => [c[1], c[0]]);
   const bounds = computeBounds(points);
+
+  // Ország-bontás + útdíj a saját ráta-táblából (Photon reverse + toll_rates).
+  let byCountry = [];
+  let tollTotal = 0;
+  try {
+    const est = await tollEstimate.estimateFromPolyline(companyId, points);
+    // Az est.byCountry mezői: {cc, name, km, mode, cost}. A UI byCountry-alakja: {cc, km, tollCost}
+    byCountry = (est.byCountry || []).map((r) => ({ cc: r.cc, km: Math.round(r.km * 10) / 10, tollCost: r.cost, mode: r.mode }));
+    tollTotal = est.total || 0;
+  } catch (_) { /* ha a reverse-geokód nem elérhető, üres marad */ }
+
   return {
     polyline: points,
     totalKm: Math.round(((route.distance || 0) / 1000) * 10) / 10,
     durationMin: Math.round((route.duration || 0) / 60),
-    byCountry: [], // OSRM nem ad orszag-bontást
-    toll: { total: 0, currency: 'EUR' },
+    byCountry,
+    toll: { total: Math.round(tollTotal * 100) / 100, currency: 'EUR' },
     bounds,
     source: 'osrm',
   };
@@ -415,13 +434,13 @@ async function rpPlanRoute(req, res, args) {
         return res.json({ result: { ok: true, ...r, waypoints: pts } });
       } catch (e) {
         // HERE nem elérhető → OSRM-fallback + jelzés a UI-nak
-        const r = await planOsrm(pts).catch(() => null);
+        const r = await planOsrm(pts, cid).catch(() => null);
         if (r) return res.json({ result: { ok: true, ...r, waypoints: pts, hereError: e.message || 'HERE nedisponibil' } });
         return res.json({ result: { ok: false, err: 'HERE eroare: ' + (e.message || 'necunoscut') } });
       }
     }
-    // Nincs HERE-kulcs → OSRM, nincs orszag/toll
-    const r = await planOsrm(pts);
+    // Nincs HERE-kulcs → OSRM + saját toll_rates-alapú útdíj-becslés
+    const r = await planOsrm(pts, cid);
     return res.json({ result: { ok: true, ...r, waypoints: pts, noHereKey: true } });
   } catch (e) {
     return res.json({ result: { ok: false, err: e.message || 'Eroare de server' } });
