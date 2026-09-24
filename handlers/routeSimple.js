@@ -491,44 +491,47 @@ async function planHere(waypoints, key, truck) {
   const allVariants = routes.map(processRoute).filter((v) => v && v.polyline && v.polyline.length);
   if (!allVariants.length) throw new Error('HERE eroare: nu s-a returnat un traseu utilizabil');
 
-  // 3 KÜLÖNBÖZŐ opció kiválasztása:
-  //   1. ✅ Recomandată      — a HERE fő útvonala (index 0)
-  //   2. 🚀 Mai rapidă        — a legrövidebb idő (más útvonal, mint a fő)
-  //   3. 💰 Mai ieftină        — a legalacsonyabb útdíj (más útvonal, mint az 1. és 2.)
-  // Ha a HERE nem ad annyi különböző alternatívát, marad a rendelkezésre álló.
+  // 3 SZEREP-ALAPÚ változat kiválasztása — az összes alternatíván keresve
+  // a leggyorsabbat és legolcsóbbat, függetlenül attól, hogy melyik a HERE
+  // fő útvonala. Így ha a HERE fő útvonala EGYBEN a leggyorsabb ÉS legolcsóbb,
+  // csak 1 változatot mutatunk (összevont címkékkel). Ha külön van, 2-3 chip.
 
+  // Legkisebb idejű és legalacsonyabb tollú index az EGÉSZ tömbön.
+  let iFast = 0, iCheap = 0;
+  allVariants.forEach((v, i) => {
+    if (v.durationMin < allVariants[iFast].durationMin) iFast = i;
+    if ((v.toll.total || 0) < (allVariants[iCheap].toll.total || 0)) iCheap = i;
+  });
+
+  // A 3 szerep-index (recomandată = 0, fast, cheap). Deduplikáció:
+  // ha egy változat több szerepet is betölt, EGY sor lesz, több címkével.
+  const roleMap = new Map(); // idx -> { tags:Set }
+  function addRole(idx, tag) {
+    if (!roleMap.has(idx)) roleMap.set(idx, { tags: new Set() });
+    roleMap.get(idx).tags.add(tag);
+  }
+  addRole(0, 'recommended');
+  addRole(iFast, 'fast');
+  addRole(iCheap, 'cheap');
+
+  // Sorrend a UI-ban: rec → fast → cheap; de ha a rec egyben fast is, akkor
+  // a következő chip lehet cheap (és a fast szerep a rec-hez tapad).
+  const orderPreference = ['recommended', 'fast', 'cheap'];
+  const takenIdx = new Set();
   const selected = [];
-  const usedIdx = new Set();
-
-  // 1) Recomandată — a HERE által elsődlegesnek jelölt (index 0)
-  selected.push(Object.assign({}, allVariants[0], { tag: 'recommended' }));
-  usedIdx.add(0);
-
-  // 2) Mai rapidă — a leggyorsabb, ami nincs még kiválasztva
-  let iFast = -1;
-  allVariants.forEach((v, i) => {
-    if (usedIdx.has(i)) return;
-    if (iFast < 0 || v.durationMin < allVariants[iFast].durationMin) iFast = i;
+  orderPreference.forEach((role) => {
+    for (const [idx, meta] of roleMap.entries()) {
+      if (takenIdx.has(idx)) continue;
+      if (meta.tags.has(role)) {
+        // A ELSŐ szerep-egyezés adja a chip fő címkéjét (tag), a többi az extraTags-be
+        const primaryTag = role;
+        const extraTags = Array.from(meta.tags).filter((t) => t !== primaryTag);
+        selected.push(Object.assign({}, allVariants[idx], { tag: primaryTag, extraTags: extraTags }));
+        takenIdx.add(idx);
+        return; // következő szerep
+      }
+    }
   });
-  // Csak akkor tesszük hozzá, ha érdemben gyorsabb VAGY nem ugyanaz mint az 1.
-  if (iFast >= 0) {
-    selected.push(Object.assign({}, allVariants[iFast], { tag: 'fast' }));
-    usedIdx.add(iFast);
-  }
-
-  // 3) Mai ieftină — a legalacsonyabb útdíjú, ami nincs még kiválasztva
-  let iCheap = -1;
-  allVariants.forEach((v, i) => {
-    if (usedIdx.has(i)) return;
-    if (iCheap < 0 || (v.toll.total || 0) < (allVariants[iCheap].toll.total || 0)) iCheap = i;
-  });
-  if (iCheap >= 0) {
-    selected.push(Object.assign({}, allVariants[iCheap], { tag: 'cheap' }));
-    usedIdx.add(iCheap);
-  }
-
-  // Ha a HERE csak 1 vagy 2 alternatívát adott (kevés váltó útvonal az EU-ban
-  // felrakó → lerakó között), csak annyi opciónk lesz, amennyit adott.
 
   selected.forEach((v, i) => { v.index = i; });
 
