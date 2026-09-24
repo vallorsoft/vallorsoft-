@@ -62,10 +62,11 @@ window.CargoTrackWhereIs = (function () {
       const mapEl = overlay.querySelector('#ctw-map'); mapEl.style.display = '';
       const infoEl = overlay.querySelector('#ctw-info'); infoEl.style.display = '';
 
-      // OpenStreetMap (CartoDB) csempe — ingyenes, NINCS HERE kulcs. A modal világos -> light_all.
+      // HERE csempe, ha van cég-kulcs a developer-integrációban; különben OSM fallback.
       map = L.map(mapEl).setView([p.latitude, p.longitude], 13);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-        { attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
+      if (typeof vsAttachTiles === 'function') vsAttachTiles(map);
+      else L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(map);
       marker = L.marker([p.latitude, p.longitude]).addTo(map);
       // A modál megnyitásakor a konténer mérete késve véglegesül → több ütemezett
       // invalidateSize + ResizeObserver, hogy a csempék a teljes felületet kitöltsék.

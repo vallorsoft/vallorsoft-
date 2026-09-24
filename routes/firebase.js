@@ -30,9 +30,19 @@ router.get('/api/firebase-config', requireLogin, (req, res) => {
 // HERE raszter-csempéket kap; különben az ingyenes CARTO/OSM fallback él.
 // Csak bejelentkezett cég-user érheti el (a session-védelem gátolja a random
 // scraper-t; a kulcs referrer-korlátozott is lehet a HERE-panelen).
-router.get('/api/here-config', requireLogin, async (req, res) => {
+// A kulcsot bármelyik bejelentkezett session-fajta (admin/manager, ügyfél-portál,
+// alvállalkozó-portál) elérheti — mindegyik a saját cég-kontextusából (company_id).
+// Így minden felület (fuvar-kiírás, kezelés, ügyfél-követés, alvállalkozó-portál,
+// vezérlőpult, aktív flotta, GPS-track) UGYANAZT a developer-integrációs
+// HERE-kulcsot kapja.
+router.get('/api/here-config', async (req, res) => {
   try {
-    const cid = req.session && req.session.user ? req.session.user.company_id : null;
+    const s = req.session || {};
+    let cid = null;
+    if (s.user && s.user.company_id) cid = s.user.company_id;
+    else if (s.clientUser && s.clientUser.company_id) cid = s.clientUser.company_id;
+    else if (s.carrierUser && s.carrierUser.company_id) cid = s.carrierUser.company_id;
+    if (!cid) return res.status(401).json({ apiKey: null, reason: 'no-session' });
     // ?fresh=1 → 60s cache átugrása (a developer újramenti a kulcsot,
     // majd itt frissítést kér — ne kelljen 60s várni)
     if (req.query && req.query.fresh) mapsProvider.clearConfigCache(cid);
