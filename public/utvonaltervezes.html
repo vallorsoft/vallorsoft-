@@ -346,12 +346,28 @@
     <div class="kpi-row">
       <div class="kpi"><div class="k">Distanță totală</div><div class="v" id="kpiKm">—</div></div>
       <div class="kpi"><div class="k">Timp estimat</div><div class="v" id="kpiTime">—</div></div>
-      <div class="kpi"><div class="k">Taxă drum (EUR)</div><div class="v" id="kpiToll">—</div></div>
-      <div class="kpi"><div class="k">Taxă drum (RON)</div><div class="v" id="kpiTollRon">—</div></div>
+      <div class="kpi"><div class="k">Taxă drum</div><div class="v" id="kpiToll">—</div><div class="k" id="kpiTollRon" style="font-size:11px;font-weight:600;margin-top:2px;color:#64748b;">—</div></div>
+      <div class="kpi"><div class="k">Combustibil</div><div class="v" id="kpiFuel">—</div><div class="k" id="kpiFuelSub" style="font-size:11px;font-weight:600;margin-top:2px;color:#64748b;">—</div></div>
+      <div class="kpi" style="background:linear-gradient(135deg,#eef2ff,#f5f3ff);border-color:#c7d2fe;"><div class="k" style="color:#4338ca;">TOTAL (EUR)</div><div class="v" id="kpiTotal" style="color:#3730a3;">—</div><div class="k" id="kpiTotalRon" style="font-size:11px;font-weight:700;margin-top:2px;color:#4338ca;">—</div></div>
     </div>
-    <div class="bnr-box" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px 12px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0;">
-      <label style="font-size:12.5px;font-weight:700;color:#334155;">Curs BNR (1 EUR = <input type="number" id="bnrInput" step="0.0001" min="0" style="width:100px;padding:5px 8px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:13px;font-weight:600;text-align:right;font-family:inherit;color:#0f172a;" placeholder="ex. 4.9750" oninput="recomputeRon()"> RON)</label>
-      <span style="font-size:12px;color:#64748b;">Introdu manual — nu se preia automat.</span>
+    <!-- Kézi paraméter-sáv: BNR mindig; üzemanyag-kalkuláció opcionális, checkbox mögött -->
+    <div class="param-box" style="margin-bottom:12px;padding:10px 12px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0;">
+      <label style="display:flex;align-items:center;gap:10px;font-size:12.5px;font-weight:700;color:#334155;">
+        Curs BNR (1 EUR = _ RON)
+        <input type="number" id="bnrInput" step="0.0001" min="0" style="width:100px;padding:5px 8px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:13px;font-weight:600;text-align:right;font-family:inherit;color:#0f172a;" placeholder="ex. 4.9750" oninput="recomputeAll()">
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;font-weight:700;color:#334155;cursor:pointer;">
+        <input type="checkbox" id="fuelEnabled" onchange="toggleFuelPanel();recomputeAll()" style="width:16px;height:16px;accent-color:#4f46e5;">
+        ⛽ Include combustibil în cost total (calcul simplu, nu din HERE)
+      </label>
+      <div id="fuelPanel" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+        <label style="font-size:11.5px;font-weight:700;color:#334155;">Preț combustibil (EUR/L)
+          <input type="number" id="fuelPrice" step="0.01" min="0" value="1.80" style="width:100%;margin-top:3px;padding:6px 8px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:13px;font-weight:600;text-align:right;font-family:inherit;color:#0f172a;" oninput="recomputeAll()">
+        </label>
+        <label style="font-size:11.5px;font-weight:700;color:#334155;">Consum (L/100 km)
+          <input type="number" id="fuelCons" step="0.1" min="0" value="30" style="width:100%;margin-top:3px;padding:6px 8px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:13px;font-weight:600;text-align:right;font-family:inherit;color:#0f172a;" oninput="recomputeAll()">
+        </label>
+      </div>
     </div>
     <table class="cc-table" id="ccTable">
       <thead><tr><th>Țară</th><th style="text-align:right;">Km</th><th style="text-align:right;">Taxă EUR</th><th style="text-align:right;">Taxă RON</th></tr></thead>
@@ -751,24 +767,63 @@ function readTruckParams(){
 }
 
 // ===== BNR-alapú RON átváltás =====
-function recomputeRon(){
-  const el = document.getElementById('kpiTollRon');
-  const eurTxt = (document.getElementById('kpiToll').textContent || '').replace(/[^0-9.,-]/g,'').replace(',','.');
-  const eur = parseFloat(eurTxt);
-  const bnr = parseFloat((document.getElementById('bnrInput').value || '').replace(',','.'));
-  if (!Number.isFinite(eur) || !Number.isFinite(bnr) || bnr <= 0) {
-    el.textContent = '—';
-  } else {
-    el.textContent = (eur * bnr).toFixed(2) + ' RON';
+// A jelenleg megjelenített változat (üzemanyag újraszámoláshoz)
+let _currentActiveVariant = null;
+
+function _getBnr(){
+  const v = parseFloat((document.getElementById('bnrInput').value || '').replace(',','.'));
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
+function _fuelEnabled(){
+  const el = document.getElementById('fuelEnabled');
+  return el ? el.checked : false;
+}
+function _getFuelPrice(){
+  const v = parseFloat((document.getElementById('fuelPrice').value || '').replace(',','.'));
+  return Number.isFinite(v) && v >= 0 ? v : 0;
+}
+function _getFuelCons(){
+  const v = parseFloat((document.getElementById('fuelCons').value || '').replace(',','.'));
+  return Number.isFinite(v) && v >= 0 ? v : 0;
+}
+function _fuelEurFor(km){
+  if (!_fuelEnabled()) return 0;
+  return (km || 0) * _getFuelCons() / 100 * _getFuelPrice();
+}
+function toggleFuelPanel(){
+  const on = _fuelEnabled();
+  document.getElementById('fuelPanel').style.display = on ? 'grid' : 'none';
+  // A KPI-csempéket rejtjük/mutatjuk (fuel + TOTAL)
+  const showKpi = on ? '' : 'none';
+  // A csempéket 4-oszlopos KPI-sorban az index alapján találjuk: 3 = fuel, 4 = total
+  const cells = document.querySelectorAll('.kpi-row .kpi');
+  if (cells[3]) cells[3].style.display = showKpi; // fuel
+  if (cells[4]) cells[4].style.display = showKpi; // total
+}
+
+// Egyetlen kompozit újraszámoló (BNR / fuel / consumption bármelyik változásra)
+function recomputeAll(){
+  const bnr = _getBnr();
+  const v = _currentActiveVariant;
+  if (v){
+    const toll = (v.toll && v.toll.total) || 0;
+    const fuel = _fuelEurFor(v.totalKm);
+    const total = toll + fuel;
+    document.getElementById('kpiToll').textContent    = toll.toFixed(2) + ' EUR';
+    document.getElementById('kpiTollRon').textContent = bnr ? (toll * bnr).toFixed(2) + ' RON' : '—';
+    document.getElementById('kpiFuel').textContent    = fuel.toFixed(2) + ' EUR';
+    document.getElementById('kpiFuelSub').textContent = ((v.totalKm||0) * _getFuelCons() / 100).toFixed(1) + ' L';
+    document.getElementById('kpiTotal').textContent   = total.toFixed(2) + ' EUR';
+    document.getElementById('kpiTotalRon').textContent = bnr ? (total * bnr).toFixed(2) + ' RON' : '—';
   }
-  // Ország-tábla RON oszlopát is frissítjük
+  // Ország-tábla RON oszlopa
   const body = document.getElementById('ccBody');
   if (body && body.dataset.byCountry){
     try {
       const list = JSON.parse(body.dataset.byCountry || '[]');
       body.innerHTML = list.map(c => {
         const eu = c.tollCost || 0;
-        const ron = Number.isFinite(bnr) && bnr > 0 ? (eu * bnr).toFixed(2) + ' RON' : '—';
+        const ron = bnr ? (eu * bnr).toFixed(2) + ' RON' : '—';
         return '<tr><td><span class="cc-flag">'+flagEmoji(c.cc)+'</span>'+esc(ccName(c.cc))+'</td>'
           +'<td class="num">'+c.km.toFixed(1)+' km</td>'
           +'<td class="num">'+eu.toFixed(2)+' EUR</td>'
@@ -776,7 +831,11 @@ function recomputeRon(){
       }).join('');
     } catch(_) {}
   }
+  // Chipek TOTAL-átcímkézése az aktuális fuel-árral
+  renderVarChips(_currentVariants);
 }
+// Legacy alias
+function recomputeRon(){ recomputeAll(); }
 
 function addWaypoint(){
   waypoints.splice(waypoints.length - 1, 0, { id: nid(), label:'', lat:null, lng:null });
@@ -831,23 +890,32 @@ function renderVarChips(variants){
   const box = document.getElementById('varChips');
   if (!box) return;
   _currentVariants = variants || [];
-  if (!variants || variants.length < 2){ box.innerHTML = ''; box.style.display = 'none'; return; }
+  if (!variants || variants.length < 1){ box.innerHTML = ''; box.style.display = 'none'; return; }
+  if (variants.length < 2){ box.innerHTML = ''; box.style.display = 'none'; return; }
+  // TOTAL = fuel + toll — az aktuális kézi ár + fogyasztás alapján
   box.innerHTML = variants.map((v, i) => {
     const meta = VAR_META[v.tag] || { title:'Alternativă ' + (i+1), cls:'' };
-    // Extra címkék (pl. ha a recomandată egyben a leggyorsabb is)
     const extras = Array.isArray(v.extraTags) ? v.extraTags : [];
     const extraTxt = extras.map((t) => (VAR_META[t] && VAR_META[t].title) || t).join(' + ');
     const h = Math.floor((v.durationMin||0) / 60);
     const m = (v.durationMin||0) % 60;
     const timeTxt = (h ? h + ' h ' : '') + m + ' min';
     const kmTxt   = (v.totalKm || 0).toFixed(1) + ' km';
-    const tollTxt = ((v.toll && v.toll.total) || 0).toFixed(2) + ' EUR';
-    return '<button class="var-chip ' + meta.cls + (i===0 ? ' active' : '') + '" data-vi="'+i+'">'
+    const toll    = (v.toll && v.toll.total) || 0;
+    const fuelOn  = _fuelEnabled();
+    const fuel    = fuelOn ? _fuelEurFor(v.totalKm) : 0;
+    const total   = toll + fuel;
+    const isActive = (i === _currentVariantIdx);
+    const bottomLine = fuelOn
+      ? '<div class="vc-toll" style="margin-top:3px;">💶 taxă: ' + toll.toFixed(2) + ' · ⛽ ' + fuel.toFixed(2) + '</div>'
+        + '<div style="font-size:12.5px;font-weight:800;color:#3730a3;margin-top:3px;">Σ ' + total.toFixed(2) + ' EUR</div>'
+      : '<div class="vc-toll" style="margin-top:3px;">💶 ' + toll.toFixed(2) + ' EUR</div>';
+    return '<button class="var-chip ' + meta.cls + (isActive ? ' active' : '') + '" data-vi="'+i+'">'
       + '<div class="vc-title">' + meta.title
       + (extraTxt ? '<div style="font-size:9.5px;font-weight:700;opacity:0.8;margin-top:1px;">+ ' + esc(extraTxt) + '</div>' : '')
       + '</div>'
       + '<div class="vc-sub">' + kmTxt + ' · ' + timeTxt + '</div>'
-      + '<div class="vc-toll">💶 ' + tollTxt + '</div>'
+      + bottomLine
       + '</button>';
   }).join('');
   box.style.display = '';
@@ -863,6 +931,7 @@ function renderVarChips(variants){
 function applyVariant(v, allVariants, idx){
   if (!v) return;
   _currentVariantIdx = idx || 0;
+  _currentActiveVariant = v;
 
   // Chip active-jelzés frissítése
   document.querySelectorAll('#varChips .var-chip').forEach((el) => el.classList.remove('active'));
@@ -878,31 +947,23 @@ function applyVariant(v, allVariants, idx){
     map.fitBounds([[v.bounds.minLat, v.bounds.minLng], [v.bounds.maxLat, v.bounds.maxLng]], { padding: [40, 40] });
   }
 
-  // KPI-k
+  // KPI: km + idő közvetlenül, a többit a recomputeAll állítja
   document.getElementById('kpiKm').textContent = (v.totalKm||0).toFixed(1) + ' km';
   const h = Math.floor((v.durationMin||0) / 60), m = (v.durationMin||0) % 60;
   document.getElementById('kpiTime').textContent = (h ? h + ' h ' : '') + m + ' min';
-  document.getElementById('kpiToll').textContent = ((v.toll && v.toll.total) || 0).toFixed(2) + ' EUR';
-  recomputeRon();
 
-  // Ország-bontás tábla
+  // Ország-bontás tábla — data attribute (a recomputeAll RON-t számol)
   const body = document.getElementById('ccBody');
   const ccTable = document.getElementById('ccTable');
   if (v.byCountry && v.byCountry.length){
-    const bnr = parseFloat((document.getElementById('bnrInput').value || '').replace(',','.'));
-    body.innerHTML = v.byCountry.map(c => {
-      const eur = c.tollCost || 0;
-      const ron = Number.isFinite(bnr) && bnr > 0 ? (eur * bnr).toFixed(2) + ' RON' : '—';
-      return '<tr><td><span class="cc-flag">'+flagEmoji(c.cc)+'</span>'+esc(ccName(c.cc))+'</td>'
-        +'<td class="num">'+c.km.toFixed(1)+' km</td>'
-        +'<td class="num">'+eur.toFixed(2)+' EUR</td>'
-        +'<td class="num">'+ron+'</td></tr>';
-    }).join('');
     body.dataset.byCountry = JSON.stringify(v.byCountry);
     ccTable.style.display = '';
   } else {
+    body.dataset.byCountry = '[]';
     ccTable.style.display = 'none';
   }
+  // Fuel + Toll + Total + RON — mind a recomputeAll-ban egy helyen
+  recomputeAll();
 }
 
 async function planRoute(){
@@ -977,6 +1038,8 @@ function showErr(m){
 }
 
 render();
+// Fuel panel alap: ki (a checkbox nincs bepipálva); a KPI-csempéket elrejtjük
+toggleFuelPanel();
 
 // ═══════════════════════════════════════════════════════════════
 // MOBIL bottom-sheet viselkedés (Google Maps-stílus)
