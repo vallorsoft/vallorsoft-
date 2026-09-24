@@ -171,12 +171,94 @@
     #spin div { width:48px; height:48px; border:5px solid #e0e7ff; border-top-color:#4f46e5; border-radius:50%; animation:sp 0.8s linear infinite; }
     @keyframes sp { to { transform:rotate(360deg); } }
 
-    /* Mobil optimalizálás */
-    @media (max-width: 640px) {
-      #topPanel { top:10px; left:10px; right:10px; width:auto; max-width:none; padding:12px; }
-      #bottomPanel { left:10px; right:10px; bottom:10px; padding:12px; max-height:48vh; }
+    /* ═══════════════════════════════════════════════════════════════
+   MOBIL — Google Maps-stílusú bottom sheet
+   Nagy kijelzőn a top panel a bal felső sarokban lebeg; telefonon a
+   térkép teljes képernyős, alul pedig egy húzható bottom sheet-be
+   kerül minden vezérlő + eredmény. Három állapot:
+     • .peek     — csak a fogantyú + 1 sor cím (a térkép látszik)
+     • .half     — kb. 50vh (kényelmes szerkesztés + minimalisztikus map)
+     • .full     — 85vh (teljes lista + eredmény scrollolva)
+   Fogantyúra kattintva vagy húzva váltanak.
+   ═══════════════════════════════════════════════════════════════ */
+    @media (max-width: 900px) {
+      /* MOBILON: a #bottomPanel a #tpBody-ba kerül JS-el (mobile-merged osztály).
+         Reset: kivesszük a fixed positioning-t, hogy a sheet-en belül folyjon a tartalommal. */
+      #bottomPanel.mobile-merged {
+        position: static !important;
+        left: auto !important; right: auto !important; bottom: auto !important;
+        max-height: none !important;
+        box-shadow: none !important;
+        border: 0 !important;
+        border-top: 1px solid #e2e8f0 !important;
+        border-radius: 0 !important;
+        margin-top: 12px;
+        padding: 12px 0 4px !important;
+      }
+      #bottomPanel.mobile-merged.show { display:block !important; }
+      #bottomPanel.mobile-merged:not(.show) { display:none !important; }
+
+      #topPanel {
+        position: fixed !important;
+        top: auto !important;
+        left: 0 !important; right: 0 !important;
+        bottom: 0 !important;
+        width: auto !important; max-width: none !important;
+        border-radius: 20px 20px 0 0;
+        border-left: 0; border-right: 0; border-bottom: 0;
+        box-shadow: 0 -18px 45px -12px rgba(15,23,42,0.28), 0 -6px 14px -8px rgba(15,23,42,0.14);
+        padding: 0 !important;
+        transition: max-height 0.28s cubic-bezier(0.32,0.72,0,1);
+        display: flex; flex-direction: column;
+        overflow: hidden;
+        max-height: 62vh;  /* alap: half */
+      }
+      #topPanel.peek { max-height: 76px; }
+      #topPanel.half { max-height: 62vh; }
+      #topPanel.full { max-height: 92vh; }
+
+      /* Húzható fogantyú — mint a Google Maps */
+      #topPanel::before {
+        content: '';
+        display: block; margin: 8px auto 6px;
+        width: 44px; height: 5px; border-radius: 3px;
+        background: #cbd5e1; flex: 0 0 auto;
+      }
+      /* Belül scrollolható tartalom */
+      #tpBody {
+        flex: 1 1 auto; overflow-y: auto;
+        padding: 6px 14px 16px;
+        -webkit-overflow-scrolling: touch;
+      }
+      /* A brand-fejléc kompaktabb */
+      .tp-head { padding: 0; margin-bottom: 8px; }
+      .tp-head .brand { font-size: 14px; }
+      .tp-head .back { padding: 5px 8px; font-size: 11px; }
+
+      /* Peek módban CSAK a fogantyú + peek-csík látszik, a törzs elrejtve */
+      #topPanel.peek #tpBody { display: none !important; }
+      #topPanel.peek #tpPeekStrip { display: block !important; padding: 6px 14px 14px; font-size: 13px; color: #334155; font-weight: 600; text-align: center; }
+
+      /* NEM peek módban a peek-csík rejtve */
+      #topPanel:not(.peek) #tpPeekStrip { display: none; }
+
+      /* Fő gombok teljes szélessége telefonon nagyobb */
+      .btn.primary { padding: 12px 14px; font-size: 14px; }
+      .add-wp { padding: 11px 12px; font-size: 13.5px; }
+
+      /* Wp-list belső scroll — a sheet-en belül */
+      .wp-list { max-height: none; overflow: visible; }
+
+      /* Kamionos panel kompaktabb telefonon */
+      .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+
       .tp-head .brand { font-size:15px; }
     }
+    @media (max-width: 640px) {
+      #topPanel.half { max-height: 68vh; }
+    }
+    /* Fogantyús húzás közben ne animáljon */
+    #topPanel.dragging { transition: none !important; }
   </style>
 </head>
 <body>
@@ -184,8 +266,11 @@
 <div id="shell">
   <div id="map"></div>
 
-  <!-- TOP: kereső + köztes pontok -->
+  <!-- TOP: kereső + köztes pontok (mobilon bottom sheet-ként viselkedik) -->
   <section id="topPanel">
+    <!-- Peek-mód rövid összegzés (csak mobil, csak peek osztályban látszik) -->
+    <div id="tpPeekStrip" style="display:none;">Trage sus pentru rută • Trage jos pentru hartă</div>
+    <div id="tpBody">
     <div class="tp-head">
       <div class="brand">vallor<span class="soft">Soft</span></div>
       <a href="/admin" class="back">← Înapoi</a>
@@ -224,6 +309,7 @@
     </div>
 
     <div id="err" class="err-note" style="display:none;"></div>
+    </div><!-- /#tpBody -->
   </section>
 
   <!-- BOTTOM: eredmény -->
@@ -774,6 +860,122 @@ function showErr(m){
 }
 
 render();
+
+// ═══════════════════════════════════════════════════════════════
+// MOBIL bottom-sheet viselkedés (Google Maps-stílus)
+// ═══════════════════════════════════════════════════════════════
+const IS_MOBILE = () => window.matchMedia('(max-width: 900px)').matches;
+let sheetState = 'half'; // 'peek' | 'half' | 'full'
+
+function applySheetState(){
+  const tp = document.getElementById('topPanel');
+  if (!tp) return;
+  if (!IS_MOBILE()){
+    tp.classList.remove('peek','half','full','dragging');
+    return;
+  }
+  tp.classList.remove('peek','half','full');
+  tp.classList.add(sheetState);
+}
+function setSheet(state){
+  sheetState = state;
+  applySheetState();
+  setTimeout(() => { try { map.invalidateSize(); } catch(_){} }, 300);
+}
+window.addEventListener('resize', applySheetState);
+applySheetState();
+
+// Handle-húzás (touch) + kattintás — a fogantyú a topPanel felső 26 px-e
+(function initSheetDrag(){
+  const tp = document.getElementById('topPanel');
+  if (!tp) return;
+  let startY = null, startMax = null, dragActive = false;
+  function onStart(clientY){
+    if (!IS_MOBILE()) return;
+    startY = clientY;
+    startMax = tp.getBoundingClientRect().height;
+    dragActive = true;
+    tp.classList.add('dragging');
+  }
+  function onMove(clientY){
+    if (!dragActive) return;
+    const dy = startY - clientY;
+    const wanted = Math.max(60, startMax + dy);
+    tp.style.maxHeight = Math.min(window.innerHeight * 0.95, wanted) + 'px';
+  }
+  function onEnd(clientY){
+    if (!dragActive) return;
+    dragActive = false;
+    tp.classList.remove('dragging');
+    tp.style.maxHeight = '';
+    const dy = startY - (clientY == null ? startY : clientY);
+    if (dy > 60)      setSheet(sheetState === 'peek' ? 'half' : 'full');
+    else if (dy < -60) setSheet(sheetState === 'full' ? 'half' : 'peek');
+    else               applySheetState();
+    startY = null;
+  }
+  tp.addEventListener('touchstart', (e) => {
+    const t = e.touches[0]; const rect = tp.getBoundingClientRect();
+    if (t.clientY - rect.top > 26) return;
+    onStart(t.clientY);
+  }, { passive: true });
+  tp.addEventListener('touchmove', (e) => {
+    if (!dragActive) return;
+    e.preventDefault();
+    onMove(e.touches[0].clientY);
+  }, { passive: false });
+  tp.addEventListener('touchend', (e) => {
+    const t = (e.changedTouches && e.changedTouches[0]) || null;
+    onEnd(t ? t.clientY : null);
+  });
+  tp.addEventListener('click', (e) => {
+    if (!IS_MOBILE()) return;
+    const rect = tp.getBoundingClientRect();
+    if (e.clientY - rect.top > 26) return;
+    const next = sheetState === 'peek' ? 'half' : (sheetState === 'half' ? 'full' : 'peek');
+    setSheet(next);
+  });
+})();
+
+// Kereső-mező fókusz → sheet teljesen kinyílik (a lenyíló találatok kiférjenek)
+document.getElementById('wpList').addEventListener('focusin', () => {
+  if (IS_MOBILE() && sheetState !== 'full') setSheet('full');
+});
+
+// Az eredmény-panel MOBILON a bottom sheet-be kerül (single-sheet)
+(function integrateResultOnMobile(){
+  const bp = document.getElementById('bottomPanel');
+  if (!bp) return;
+  const origParent = bp.parentNode;
+  function migrate(){
+    if (IS_MOBILE()){
+      bp.classList.add('mobile-merged');
+      const tpBody = document.getElementById('tpBody');
+      if (bp.parentNode !== tpBody) tpBody.appendChild(bp);
+    } else {
+      bp.classList.remove('mobile-merged');
+      if (bp.parentNode !== origParent) origParent.appendChild(bp);
+    }
+  }
+  migrate();
+  window.addEventListener('resize', migrate);
+})();
+
+// Az eredeti planRoute() után automatikus peek → a térkép látszódjon;
+// a felhasználó felhúzhatja a sheet-et.
+const _origPlan = planRoute;
+window.planRoute = async function patchedPlan(){
+  await _origPlan();
+  // Peek-csík friss adattal (km + toll), hogy csukott állapotban is látszódjon.
+  try {
+    const km = document.getElementById('kpiKm').textContent || '—';
+    const toll = document.getElementById('kpiToll').textContent || '—';
+    const strip = document.getElementById('tpPeekStrip');
+    if (strip) strip.innerHTML = '🗺 ' + km + '  •  💶 ' + toll + '  ·  trage sus pentru detalii';
+  } catch(_) {}
+  if (IS_MOBILE()) setSheet('peek');
+};
+
 </script>
 </body>
 </html>
