@@ -33,11 +33,14 @@ router.get('/api/firebase-config', requireLogin, (req, res) => {
 router.get('/api/here-config', requireLogin, async (req, res) => {
   try {
     const cid = req.session && req.session.user ? req.session.user.company_id : null;
+    // ?fresh=1 → 60s cache átugrása (a developer újramenti a kulcsot,
+    // majd itt frissítést kér — ne kelljen 60s várni)
+    if (req.query && req.query.fresh) mapsProvider.clearConfigCache(cid);
     const cfg = await mapsProvider.getConfig(cid);
-    if (cfg.vendor === 'here' && cfg.key) return res.json({ apiKey: cfg.key });
-    return res.json({ apiKey: null });
-  } catch (_) {
-    return res.json({ apiKey: null });
+    if (cfg.vendor === 'here' && cfg.key) return res.json({ apiKey: cfg.key, reason: 'ok' });
+    return res.json({ apiKey: null, reason: cfg.reason || 'unknown' });
+  } catch (e) {
+    return res.json({ apiKey: null, reason: 'error:' + (e.message || 'unknown') });
   }
 });
 
