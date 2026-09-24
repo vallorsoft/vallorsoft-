@@ -834,13 +834,18 @@ function renderVarChips(variants){
   if (!variants || variants.length < 2){ box.innerHTML = ''; box.style.display = 'none'; return; }
   box.innerHTML = variants.map((v, i) => {
     const meta = VAR_META[v.tag] || { title:'Alternativă ' + (i+1), cls:'' };
+    // Extra címkék (pl. ha a recomandată egyben a leggyorsabb is)
+    const extras = Array.isArray(v.extraTags) ? v.extraTags : [];
+    const extraTxt = extras.map((t) => (VAR_META[t] && VAR_META[t].title) || t).join(' + ');
     const h = Math.floor((v.durationMin||0) / 60);
     const m = (v.durationMin||0) % 60;
     const timeTxt = (h ? h + ' h ' : '') + m + ' min';
     const kmTxt   = (v.totalKm || 0).toFixed(1) + ' km';
     const tollTxt = ((v.toll && v.toll.total) || 0).toFixed(2) + ' EUR';
     return '<button class="var-chip ' + meta.cls + (i===0 ? ' active' : '') + '" data-vi="'+i+'">'
-      + '<div class="vc-title">' + meta.title + '</div>'
+      + '<div class="vc-title">' + meta.title
+      + (extraTxt ? '<div style="font-size:9.5px;font-weight:700;opacity:0.8;margin-top:1px;">+ ' + esc(extraTxt) + '</div>' : '')
+      + '</div>'
       + '<div class="vc-sub">' + kmTxt + ' · ' + timeTxt + '</div>'
       + '<div class="vc-toll">💶 ' + tollTxt + '</div>'
       + '</button>';
