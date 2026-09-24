@@ -214,8 +214,10 @@ function ccName(cc){ const c = ccNorm(cc); return CC_NAME[c] || c; }
 const map = L.map('map', { zoomControl:true }).setView([46.5, 20.0], 5);
 let tileLayer = null;
 function addFallbackTiles(){
-  tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors, &copy; CARTO', subdomains: 'abcd',
+  // Standard OSM csempék — kulcs nélkül, ingyenes.
+  // (A CARTO Voyager 2024-től API-kulcsot kér a legtöbb régióra, ezért kerülhető.)
+  tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors',
   }).addTo(map);
 }
 // HERE raszter-csempék, ha a cégnek van HERE-kulcsa; különben CARTO/OSM fallback.

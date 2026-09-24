@@ -41,68 +41,126 @@ async function jsonGet(url, headers) {
 // Az útvonaltervezőben teljes Európát akarunk lefedni, ezért itt saját,
 // szűkítés-mentes lekérdezéseket használunk.
 
+// A találat rangsorolása: HELYSÉG (város/település) ELSŐBBSÉGET kap az utca/házszám előtt.
+// city > town > municipality > county > village > state > country > utca/házszám
+const PLACE_RANK = {
+  city: 1, town: 2, municipality: 3, county: 4, village: 5, region: 6, state: 7, country: 8,
+};
+
 async function _photonEuropean(q) {
   // Photon EU-centrikus bias, korlátozás NÉLKÜL.
-  const url = 'https://photon.komoot.io/api/?q=' + encodeURIComponent(q)
-    + '&limit=10&lang=en&lat=50&lon=15&location_bias_scale=0.1';
-  const d = await jsonGet(url);
-  const seen = new Set();
-  return ((d && d.features) || []).map((f) => {
+  // 1) Először CSAK települések (osm_tag=place) — így minden Karlsruhe-jellegű
+  //    keresés a valódi VÁROS találatokat adja elöl.
+  // 2) Külön általános keresés is (címek/POI-k) — a városok mögé rendezve.
+  const [placeD, allD] = await Promise.all([
+    jsonGet('https://photon.komoot.io/api/?q=' + encodeURIComponent(q)
+      + '&limit=8&lang=en&osm_tag=place&lat=50&lon=15&location_bias_scale=0.1').catch(() => ({})),
+    jsonGet('https://photon.komoot.io/api/?q=' + encodeURIComponent(q)
+      + '&limit=10&lang=en&lat=50&lon=15&location_bias_scale=0.1').catch(() => ({})),
+  ]);
+  function mapFeature(f) {
     const p = f.properties || {};
     const streetAddr = [p.street, p.housenumber].filter(Boolean).join(' ');
+    const isPlace = p.osm_key === 'place';
+    const placeType = isPlace ? p.osm_value : null;
     const main = p.name || streetAddr || p.city || p.country || '';
-    const sub = [streetAddr && streetAddr !== main ? streetAddr : null, p.postcode, p.city, p.state, p.country].filter(Boolean).join(', ');
-    const label = [main, sub].filter((x) => x && x !== main).length ? main + ', ' + sub : (main + (p.country && main !== p.country ? ', ' + p.country : ''));
+    // Települési találatnál a sub tömör: „Bavaria, Germany" — nincs postcode/utca
+    let sub;
+    if (isPlace) {
+      sub = [p.state, p.country].filter(Boolean).join(', ');
+    } else {
+      sub = [streetAddr && streetAddr !== main ? streetAddr : null, p.postcode, p.city, p.state, p.country].filter(Boolean).join(', ');
+    }
+    const label = sub ? (main + ', ' + sub) : main;
     const lat = f.geometry && f.geometry.coordinates ? f.geometry.coordinates[1] : null;
     const lng = f.geometry && f.geometry.coordinates ? f.geometry.coordinates[0] : null;
-    return { label, title: main || label, lat, lng };
-  }).filter((it) => {
-    if (!it.label) return false;
+    return { label, title: main || label, lat, lng, _rank: isPlace ? (PLACE_RANK[placeType] || 9) : 20 };
+  }
+  const seen = new Set();
+  const out = [];
+  ((placeD && placeD.features) || []).concat((allD && allD.features) || []).forEach((f) => {
+    const it = mapFeature(f);
+    if (!it.label) return;
     const key = it.label.toLowerCase().slice(0, 80);
-    if (seen.has(key)) return false;
+    if (seen.has(key)) return;
     seen.add(key);
-    return true;
+    out.push(it);
   });
+  out.sort((a, b) => a._rank - b._rank);
+  return out.map(({ _rank, ...rest }) => rest);
 }
 
 async function _nominatimEuropean(q) {
   // Nominatim korlátozás NÉLKÜL, egész Európát/világot lefedve.
+  // A `class=place` sorok (settlement) elöl.
   const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=10&accept-language=en&q='
     + encodeURIComponent(q);
   const d = await jsonGet(url, { 'Accept-Language': 'en' });
   const seen = new Set();
-  return ((Array.isArray(d) ? d : [])).map((it) => {
+  const out = [];
+  ((Array.isArray(d) ? d : [])).forEach((it) => {
     const a = it.address || {};
+    const isPlace = it.class === 'place';
+    const placeType = isPlace ? it.type : null;
     const main = it.name || a.road || (it.display_name || '').split(',')[0] || '';
     const city = a.city || a.town || a.village || a.municipality || a.county || '';
-    const streetAddr = a.road && a.road !== main ? [a.road, a.house_number].filter(Boolean).join(' ') : null;
-    const sub = [streetAddr, a.postcode, city, a.country].filter(Boolean).join(', ');
+    let sub;
+    if (isPlace) {
+      sub = [a.state, a.country].filter(Boolean).join(', ');
+    } else {
+      const streetAddr = a.road && a.road !== main ? [a.road, a.house_number].filter(Boolean).join(' ') : null;
+      sub = [streetAddr, a.postcode, city, a.country].filter(Boolean).join(', ');
+    }
     const label = [main, sub].filter(Boolean).join(', ') || it.display_name || '';
     const lat = it.lat != null ? parseFloat(it.lat) : null;
     const lng = it.lon != null ? parseFloat(it.lon) : null;
-    return { label, title: main || label, lat, lng };
-  }).filter((it) => {
-    if (!it.label) return false;
-    const key = it.label.toLowerCase().slice(0, 80);
-    if (seen.has(key)) return false;
+    if (!label) return;
+    const key = label.toLowerCase().slice(0, 80);
+    if (seen.has(key)) return;
     seen.add(key);
-    return true;
+    out.push({ label, title: main || label, lat, lng, _rank: isPlace ? (PLACE_RANK[placeType] || 9) : 20 });
   });
+  out.sort((a, b) => a._rank - b._rank);
+  return out.map(({ _rank, ...rest }) => rest);
 }
 
 async function _hereAutosuggest(q, key) {
-  // HERE Autosuggest — teljes Európát lefedi, ha van kulcs (bias EU-központ).
-  const url = 'https://autosuggest.search.hereapi.com/v1/autosuggest?q=' + encodeURIComponent(q)
-    + '&at=50,15&limit=10&lang=en&apiKey=' + encodeURIComponent(key);
-  const d = await jsonGet(url);
-  return ((d && d.items) || []).filter((it) => it.address || it.title)
-    .map((it) => ({
+  // HERE Autosuggest — teljes Európát lefedi (bias EU-központ).
+  // resultType=locality → CSAK települési találatok elsőként.
+  // Külön általános autosuggest is, hogy legyen fallback címekre/POI-kra.
+  const [locD, allD] = await Promise.all([
+    jsonGet('https://autosuggest.search.hereapi.com/v1/autosuggest?q=' + encodeURIComponent(q)
+      + '&at=50,15&limit=8&lang=en&types=area&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
+    jsonGet('https://autosuggest.search.hereapi.com/v1/autosuggest?q=' + encodeURIComponent(q)
+      + '&at=50,15&limit=10&lang=en&apiKey=' + encodeURIComponent(key)).catch(() => ({})),
+  ]);
+  function mapIt(it, isPlace) {
+    return {
       label: (it.address && it.address.label) || it.title,
       title: it.title,
       lat: it.position ? it.position.lat : null,
       lng: it.position ? it.position.lng : null,
-    }))
-    .filter((it) => it.label);
+      _rank: isPlace ? 1 : (it.resultType === 'locality' || it.resultType === 'administrativeArea' ? 2 : 20),
+    };
+  }
+  const seen = new Set();
+  const out = [];
+  ((locD && locD.items) || []).forEach((it) => {
+    const m = mapIt(it, true);
+    if (!m.label) return;
+    const key = m.label.toLowerCase().slice(0, 80);
+    if (seen.has(key)) return;
+    seen.add(key); out.push(m);
+  });
+  ((allD && allD.items) || []).forEach((it) => {
+    const m = mapIt(it, false);
+    if (!m.label) return;
+    const key = m.label.toLowerCase().slice(0, 80);
+    if (seen.has(key)) return;
+    seen.add(key); out.push(m);
+  });
+  out.sort((a, b) => a._rank - b._rank);
+  return out.map(({ _rank, ...rest }) => rest);
 }
 
 async function rpAcSearch(req, res, args) {
