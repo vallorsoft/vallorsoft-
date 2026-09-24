@@ -407,10 +407,10 @@ async function planRoute(){
 
     const note = document.getElementById('infoNote');
     if (r.noHereKey){
-      note.textContent = 'ℹ️ Nu există cheie HERE configurată — traseul e din OSRM, fără detaliere pe țară și fără taxă. Contactează developer-ul pentru a activa HERE.';
+      note.textContent = 'ℹ️ Fără cheie HERE — traseul e din OSRM, taxa de drum e estimată din tarifele tale pe țară (Setări → Tarife taxă). Nu este o valoare oficială.';
       note.style.display = '';
     } else if (r.hereError){
-      note.textContent = '⚠️ HERE indisponibil (' + r.hereError + ') — s-a folosit OSRM fără taxă/țară.';
+      note.textContent = '⚠️ HERE indisponibil (' + r.hereError + ') — s-a folosit OSRM + tarifele tale pe țară pentru taxă.';
       note.style.display = '';
     } else {
       note.style.display = 'none';
