@@ -407,8 +407,23 @@ async function planRoute(){
 
     const note = document.getElementById('infoNote');
     if (r.noHereKey){
-      note.textContent = 'ℹ️ Fără cheie HERE — traseul e din OSRM, taxa de drum e estimată din tarifele tale pe țară (Setări → Tarife taxă). Nu este o valoare oficială.';
+      const reasonTxt = {
+        'no-row': 'nu există înregistrare în company_integrations',
+        'disabled': 'integrarea HERE e dezactivată (enabled=false)',
+        'vendor-free': 'vendor setat pe „free" în meta',
+        'no-credentials': 'lipsește credentials_enc',
+        'decrypt-failed': 'decriptare eșuată (INTEGRATION_ENC_KEY diferit față de momentul salvării?)',
+        'empty-key': 'cheia decriptată e goală',
+      };
+      const why = reasonTxt[r.hereReason] || ('cauza: ' + (r.hereReason || 'necunoscut'));
+      note.innerHTML = 'ℹ️ Fără cheie HERE activă (' + esc(why) + ') — taxa e estimată din tarifele tale pe țară. '
+        + '<button id="reloadKeyBtn" style="margin-left:6px;padding:4px 10px;border:1px solid #d97706;border-radius:6px;background:#fff;color:#78350f;font-weight:700;cursor:pointer;font-size:12px;">🔄 Reîncearcă</button>';
       note.style.display = '';
+      const rb = document.getElementById('reloadKeyBtn');
+      if (rb) rb.onclick = async () => {
+        try { await fetch('/api/here-config?fresh=1', { credentials:'same-origin' }); } catch(_) {}
+        planRoute();
+      };
     } else if (r.hereError){
       note.textContent = '⚠️ HERE indisponibil (' + r.hereError + ') — s-a folosit OSRM + tarifele tale pe țară pentru taxă.';
       note.style.display = '';

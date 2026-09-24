@@ -439,9 +439,10 @@ async function rpPlanRoute(req, res, args) {
         return res.json({ result: { ok: false, err: 'HERE eroare: ' + (e.message || 'necunoscut') } });
       }
     }
-    // Nincs HERE-kulcs → OSRM + saját toll_rates-alapú útdíj-becslés
+    // Nincs használható HERE-kulcs → OSRM + saját toll_rates-alapú útdíj-becslés
+    // (a `cfg.reason` mondja meg PONTOSAN, miért esett vissza — a UI-nak megmutatjuk)
     const r = await planOsrm(pts, cid);
-    return res.json({ result: { ok: true, ...r, waypoints: pts, noHereKey: true } });
+    return res.json({ result: { ok: true, ...r, waypoints: pts, noHereKey: true, hereReason: cfg.reason || 'unknown' } });
   } catch (e) {
     return res.json({ result: { ok: false, err: e.message || 'Eroare de server' } });
   }
