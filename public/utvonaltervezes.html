@@ -361,8 +361,15 @@
         ⛽ Include combustibil în cost total (calcul simplu, nu din HERE)
       </label>
       <div id="fuelPanel" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
-        <label style="font-size:11.5px;font-weight:700;color:#334155;">Preț combustibil (EUR/L)
-          <input type="number" id="fuelPrice" step="0.01" min="0" value="1.80" style="width:100%;margin-top:3px;padding:6px 8px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:13px;font-weight:600;text-align:right;font-family:inherit;color:#0f172a;" oninput="recomputeAll()">
+        <label style="font-size:11.5px;font-weight:700;color:#334155;">Preț motorină (per litru)
+          <div style="display:flex;margin-top:3px;gap:4px;">
+            <input type="number" id="fuelPrice" step="0.01" min="0" value="1.80" style="flex:1;padding:6px 8px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:13px;font-weight:600;text-align:right;font-family:inherit;color:#0f172a;" oninput="recomputeAll()">
+            <select id="fuelCurrency" onchange="recomputeAll()" style="width:70px;padding:6px 6px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:12.5px;font-weight:700;font-family:inherit;color:#0f172a;background:#fff;cursor:pointer;">
+              <option value="EUR">EUR</option>
+              <option value="RON">RON</option>
+            </select>
+          </div>
+          <div id="fuelPriceHint" style="font-size:10.5px;color:#64748b;margin-top:2px;font-weight:500;">Poți introduce în EUR sau RON — conversia foloseste BNR-ul de mai sus.</div>
         </label>
         <label style="font-size:11.5px;font-weight:700;color:#334155;">Consum (L/100 km)
           <input type="number" id="fuelCons" step="0.1" min="0" value="30" style="width:100%;margin-top:3px;padding:6px 8px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:13px;font-weight:600;text-align:right;font-family:inherit;color:#0f172a;" oninput="recomputeAll()">
@@ -778,9 +785,19 @@ function _fuelEnabled(){
   const el = document.getElementById('fuelEnabled');
   return el ? el.checked : false;
 }
+// A benzin/motorina ár EUR-ban ADOTT VAGY RON-ban — a RON automatikusan
+// EUR-ra váltódik az AKTUÁLIS BNR-rel (a felhasználó által megadva feljebb).
+// Ha RON van beírva, de nincs BNR érték, warn: az ár nem konvertálható.
 function _getFuelPrice(){
-  const v = parseFloat((document.getElementById('fuelPrice').value || '').replace(',','.'));
-  return Number.isFinite(v) && v >= 0 ? v : 0;
+  const raw = parseFloat((document.getElementById('fuelPrice').value || '').replace(',','.'));
+  if (!Number.isFinite(raw) || raw < 0) return 0;
+  const cur = (document.getElementById('fuelCurrency').value || 'EUR').toUpperCase();
+  if (cur === 'RON'){
+    const bnr = _getBnr();
+    if (!bnr) return 0; // BNR nélkül a RON ár nem konvertálható EUR-ra
+    return raw / bnr;   // pl. 8.90 RON/L ÷ 4.9750 = 1.789 EUR/L
+  }
+  return raw; // EUR-ban ADOTT
 }
 function _getFuelCons(){
   const v = parseFloat((document.getElementById('fuelCons').value || '').replace(',','.'));
@@ -793,12 +810,31 @@ function _fuelEurFor(km){
 function toggleFuelPanel(){
   const on = _fuelEnabled();
   document.getElementById('fuelPanel').style.display = on ? 'grid' : 'none';
-  // A KPI-csempéket rejtjük/mutatjuk (fuel + TOTAL)
   const showKpi = on ? '' : 'none';
-  // A csempéket 4-oszlopos KPI-sorban az index alapján találjuk: 3 = fuel, 4 = total
   const cells = document.querySelectorAll('.kpi-row .kpi');
   if (cells[3]) cells[3].style.display = showKpi; // fuel
   if (cells[4]) cells[4].style.display = showKpi; // total
+}
+// A hint-sor színe/szövege attól függ, tud-e átváltani (BNR van-e).
+function _syncFuelHint(){
+  const el = document.getElementById('fuelPriceHint');
+  if (!el) return;
+  const cur = (document.getElementById('fuelCurrency').value || 'EUR').toUpperCase();
+  const bnr = _getBnr();
+  if (cur === 'RON' && !bnr){
+    el.textContent = '⚠️ Introdu BNR-ul mai sus pentru a converti prețul în RON.';
+    el.style.color = '#b45309';
+  } else if (cur === 'RON'){
+    const raw = parseFloat((document.getElementById('fuelPrice').value || '').replace(',','.'));
+    const eur = _getFuelPrice();
+    el.textContent = Number.isFinite(raw) && raw > 0
+      ? '≈ ' + eur.toFixed(3) + ' EUR/L (la BNR ' + bnr.toFixed(4) + ')'
+      : 'Introduci prețul în RON; se convertește la BNR-ul de mai sus.';
+    el.style.color = '#059669';
+  } else {
+    el.textContent = 'Poți schimba pe RON — conversia foloseste BNR-ul de mai sus.';
+    el.style.color = '#64748b';
+  }
 }
 
 // Egyetlen kompozit újraszámoló (BNR / fuel / consumption bármelyik változásra)
@@ -831,7 +867,8 @@ function recomputeAll(){
       }).join('');
     } catch(_) {}
   }
-  // Chipek TOTAL-átcímkézése az aktuális fuel-árral
+  // Fuel-hint (EUR ↔ RON) + Chipek TOTAL-átcímkézése az aktuális fuel-árral
+  _syncFuelHint();
   renderVarChips(_currentVariants);
 }
 // Legacy alias
@@ -1040,6 +1077,25 @@ function showErr(m){
 render();
 // Fuel panel alap: ki (a checkbox nincs bepipálva); a KPI-csempéket elrejtjük
 toggleFuelPanel();
+
+// BNR-árfolyam automatikus lekérése (a cég session-jéből, /api/execute-en át
+// az existing getBnrRate handler). A felhasználó nem szükséges kézzel írja.
+(async function fetchBnr(){
+  try {
+    const r = await gas('getBnrRate');
+    if (r && r.ok){
+      const rate = r.bnr_rate || r.company_rate;
+      if (Number.isFinite(Number(rate)) && Number(rate) > 0){
+        const el = document.getElementById('bnrInput');
+        if (el && !el.value){
+          el.value = Number(rate).toFixed(4);
+          el.placeholder = 'Auto: ' + Number(rate).toFixed(4);
+          recomputeAll();
+        }
+      }
+    }
+  } catch(_) { /* csendes fallback — kézzel írható */ }
+})();
 
 // ═══════════════════════════════════════════════════════════════
 // MOBIL bottom-sheet viselkedés (Google Maps-stílus)
