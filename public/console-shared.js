@@ -782,8 +782,9 @@ function initRouteLeaflet(){
   if(typeof L==='undefined'){ toast(t('cs.mapNotLoaded'),'err'); return; }
   if(_rmLeaflet){ setTimeout(function(){ _rmLeaflet.invalidateSize(); },50); return; }
   _rmLeaflet=L.map('rmmMap',{zoomControl:true}).setView([46,25],5);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    { subdomains:'abcd', maxZoom:19, attribution:'© OpenStreetMap, © CARTO' }).addTo(_rmLeaflet);
+  // HERE ha van cég-kulcs; különben OSM fallback.
+  if (typeof vsAttachTiles === 'function') vsAttachTiles(_rmLeaflet);
+  else L.tileLayer(vsOsmFallbackUrl(), { maxZoom:19, attribution:'&copy; OpenStreetMap contributors' }).addTo(_rmLeaflet);
   _rmLayers=L.layerGroup().addTo(_rmLeaflet);
   _rmLeaflet.on('click', function(e){ if(_rmClickAdds && _rmWhich){ routeMapAddVia(_rmWhich,{lat:e.latlng.lat,lng:e.latlng.lng}); } });
   setTimeout(function(){ _rmLeaflet.invalidateSize(); },80);
@@ -4247,14 +4248,67 @@ function uploadOrderDoc(){
 //  Mind az admin, mind a manager konzol ezt használja.
 // ============================================================
 
-/* ── Térkép-csempe URL (OpenStreetMap / CartoDB — ingyenes, NINCS HERE kulcs) ── */
-// A vezérlőpult térképe nem használ HERE-t és nem hívja a /api/here-config-ot.
-// HERE Maps csak a külön Útvonaltervező oldalon (utvonaltervezes.html) van.
-function cartoTileUrl(theme) {
-  // Minden térkép MINDIG világos csempével jelenik meg (kérésre) — a téma
-  // (light/dark) nem befolyásolja a térkép-csempéket.
-  return 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+/* ── Plate-marker default Leaflet-stílus felülírása (nincs 12px fehér doboz + fekete keret) ── */
+(function () {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById('vs-plate-marker-css')) return;
+  var s = document.createElement('style');
+  s.id = 'vs-plate-marker-css';
+  s.textContent =
+    '.leaflet-div-icon.vs-plate-marker{background:transparent!important;border:0!important;padding:0!important;width:auto!important;height:auto!important;overflow:visible!important;}'
+    + '.vs-plate-marker *{box-sizing:border-box;}';
+  document.head.appendChild(s);
+})();
+
+/* ── Térkép-csempe URL — HERE (ha van cég-kulcs), különben OSM ──
+ *
+ * A cég HERE-kulcsát a session-védett /api/here-config szolgálja ki.
+ * Egyszer lekérjük (per lap-betöltés), és promise-t cache-elünk,
+ * hogy MINDEN térkép (vezérlőpult, fuvar-útvonal, aktív flotta,
+ * napi GPS-track, ügyfél-követés, alvállalkozó) UGYANARRA a kulcsra
+ * építsen.
+ */
+window._vsHereKeyPromise = null;
+function vsGetHereKey() {
+  if (window._vsHereKeyPromise) return window._vsHereKeyPromise;
+  window._vsHereKeyPromise = fetch('/api/here-config', { credentials: 'same-origin' })
+    .then(function (r) { return r.json().catch(function () { return {}; }); })
+    .then(function (j) { return (j && j.apiKey) || null; })
+    .catch(function () { return null; });
+  return window._vsHereKeyPromise;
 }
+function vsHereTileUrl(apiKey) {
+  return 'https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png?apiKey='
+    + encodeURIComponent(apiKey)
+    + '&style=explore.day&size=512&features=pois:disabled';
+}
+function vsOsmFallbackUrl() { return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'; }
+/* Egységes „HERE ha van, különben OSM" csemperéteg-létrehozó.
+ * A `map` egy Leaflet térkép; opcionálisan `onLayer(layer)` callback
+ * kap egy hivatkozást, ha valaki később be akarja fecskendezni a state-be. */
+function vsAttachTiles(map, onLayer) {
+  if (!map || typeof L === 'undefined') return;
+  function addOsm() {
+    var lyr = L.tileLayer(vsOsmFallbackUrl(), { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+    if (typeof onLayer === 'function') onLayer(lyr);
+  }
+  vsGetHereKey().then(function (key) {
+    if (!key) { addOsm(); return; }
+    var here = L.tileLayer(vsHereTileUrl(key), {
+      maxZoom: 20, tileSize: 512, zoomOffset: -1,
+      attribution: '&copy; HERE, &copy; OpenStreetMap contributors', errorTileUrl: ''
+    });
+    here.on('tileerror', function once() {
+      try { map.removeLayer(here); } catch (e) {}
+      here.off('tileerror', once);
+      addOsm();
+    });
+    here.addTo(map);
+    if (typeof onLayer === 'function') onLayer(here);
+  });
+}
+/* Legacy alias — pár helyen még hivatkozzák. */
+function cartoTileUrl(theme) { return vsOsmFallbackUrl(); }
 
 /* ── Téma (light/dark) — a .main-content[data-theme] attribútumon ── */
 function toggleTheme() {
@@ -4521,38 +4575,7 @@ function loadDashVehicleSummary() {
   });
 }
 
-/* ── Térkép (Leaflet + HERE csempék, CARTO/OSM fallback) ── */
-function _dashAddFallbackTiles() {
-  if (!window._dashMap) return;
-  // Standard OSM csempék — kulcs nélkül. (A CARTO 2024-től API-kulcsot kér a legtöbb régióra.)
-  window._dashTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(window._dashMap);
-}
-function _dashInitTiles() {
-  if (!window._dashMap) return;
-  // HERE ha van cég-kulcs (session-védett /api/here-config); különben OSM fallback.
-  fetch('/api/here-config', { credentials: 'same-origin' })
-    .then(function (r) { return r.json().catch(function () { return {}; }); })
-    .then(function (j) {
-      if (!window._dashMap) return;
-      if (j && j.apiKey) {
-        window._dashTileLayer = L.tileLayer(
-          'https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png?apiKey=' + encodeURIComponent(j.apiKey) + '&style=explore.day&size=512&features=pois:disabled',
-          { maxZoom: 20, tileSize: 512, zoomOffset: -1,
-            attribution: '&copy; HERE, &copy; OpenStreetMap contributors', errorTileUrl: '' }
-        );
-        window._dashTileLayer.on('tileerror', function once() {
-          try { window._dashMap.removeLayer(window._dashTileLayer); } catch (e) {}
-          window._dashTileLayer.off('tileerror', once);
-          _dashAddFallbackTiles();
-        });
-        window._dashTileLayer.addTo(window._dashMap);
-      } else {
-        _dashAddFallbackTiles();
-      }
-    })
-    .catch(function () { _dashAddFallbackTiles(); });
-}
+/* ── Térkép (Leaflet + HERE csempék, OSM fallback) ── */
 function initDashMap() {
   if (typeof L === 'undefined') return;               // Leaflet még nem töltött be
   var el = document.getElementById('dashMap');
@@ -4563,7 +4586,7 @@ function initDashMap() {
     .setView([45.9432, 24.9668], 7);                  // Románia közepe
   window._dashMarkers = L.layerGroup().addTo(window._dashMap);
 
-  _dashInitTiles();
+  vsAttachTiles(window._dashMap, function (lyr) { window._dashTileLayer = lyr; });
 
   // A térkép gyakran üresen marad, ha induláskor a konténer mérete még nem véglegesült.
   // Több ütemezett invalidateSize + ablakméret-figyelő biztosítja a csempék kirajzolását.
@@ -4630,12 +4653,19 @@ function refreshDashVehicles() {
           + 'border-top:6px solid ' + color + ';'
           + 'filter: drop-shadow(0 2px 2px rgba(15,23,42,0.25));"></div>'
         + '</div>';
+      // A plate szélessége arányos a szöveghosszal (~ 8.2 px/char + 22 px padding);
+      // az iconSize-t közelítőleg beállítjuk, így a Leaflet nem vág le (max 220 px).
+      var estW = Math.min(220, Math.max(56, 22 + plate.length * 8.2));
       var m = L.marker([p.lat, p.lng], {
-        icon: L.divIcon({ className: 'vs-plate-marker', html: html, iconSize: [0, 0], iconAnchor: [0, 0] })
+        icon: L.divIcon({ className: 'vs-plate-marker', html: html, iconSize: [estW, 32], iconAnchor: [estW / 2, 32] })
       });
-      m.bindTooltip('🚛 ' + plate + ' · ' + (moving ? '🟢 ' : '🔵 ') + spdTxt);
+      var fuelTxt = (p.fuel_level != null && Number.isFinite(Number(p.fuel_level)))
+        ? Math.round(Number(p.fuel_level)) + ' L' : null;
+      m.bindTooltip('🚛 ' + plate + ' · ' + (moving ? '🟢 ' : '🔵 ') + spdTxt
+        + (fuelTxt ? ' · ⛽ ' + fuelTxt : ''));
       m.bindPopup('<b>' + esc(plate) + '</b><br>' + t('dash.speed') + ': ' + spdTxt
         + '<br>' + (moving ? '🟢 în mișcare' : '🔵 staționar')
+        + (fuelTxt ? '<br>⛽ Combustibil: ' + esc(fuelTxt) : '')
         + (p.datetime ? '<br>' + new Date(p.datetime).toLocaleString('hu-HU') : ''));
       m.addTo(window._dashMarkers);
       bounds.push([p.lat, p.lng]);

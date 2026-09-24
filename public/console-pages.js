@@ -165,12 +165,14 @@ function initFleetMap(){
   if(window._fleetMap){ setTimeout(function(){ window._fleetMap.invalidateSize(); }, 150); return; }
   window._fleetMap = L.map(el, { zoomControl:true }).setView([45.9432, 24.9668], 7);
   window._fleetMarkers = L.layerGroup().addTo(window._fleetMap);
-  // Mindig világos csempe (projekt-konvenció), a téma-választótól függetlenül.
-  var url = (typeof cartoTileUrl === 'function')
-    ? cartoTileUrl('light')
-    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-  window._fleetTileLayer = L.tileLayer(url,
-    { attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(window._fleetMap);
+  // HERE csempék, ha van cég-kulcs; különben OSM fallback (a `vsAttachTiles`
+  // segéd a console-shared.js-ben — mindkét konzol behúzza).
+  if (typeof vsAttachTiles === 'function') {
+    vsAttachTiles(window._fleetMap, function (lyr) { window._fleetTileLayer = lyr; });
+  } else {
+    window._fleetTileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(window._fleetMap);
+  }
   [0, 150, 400, 800].forEach(function(d){
     setTimeout(function(){ if(window._fleetMap) window._fleetMap.invalidateSize(); }, d);
   });
@@ -218,10 +220,35 @@ function refreshFleetVehicles(){
     }
     var bounds = [];
     pts.forEach(function(p){
-      var spd = (p.speed != null) ? Math.round(p.speed) + ' km/h' : '—';
-      var m = L.circleMarker([p.lat, p.lng], { radius:8, color:'#6366f1', fillColor:'#6366f1', fillOpacity:0.85, weight:2 });
-      m.bindTooltip('🚛 ' + (p.object_name || p.rendszam) + ' · ' + spd);
-      m.bindPopup('<b>' + _cpEsc(p.object_name || p.rendszam) + '</b><br>' + t('dash.speed') + ': ' + spd
+      var spdN = (p.speed != null) ? Math.round(p.speed) : null;
+      var spdTxt = (spdN != null) ? spdN + ' km/h' : '—';
+      var moving = (spdN != null && spdN >= 5);
+      var color = moving ? '#16a34a' : '#2563eb';    // zöld ha mozog, kék ha áll
+      var plate = (p.rendszam || p.object_name || '').toString();
+      var html =
+        '<div style="position:relative;transform:translate(-50%,-100%);pointer-events:auto;">'
+        + '<div style="padding:3px 8px;background:' + color + ';color:#fff;'
+          + 'font-weight:800;font-size:11.5px;letter-spacing:0.02em;'
+          + 'font-family:\'Inter\',system-ui,sans-serif;'
+          + 'border:2px solid #fff;border-radius:6px;'
+          + 'box-shadow:0 3px 10px rgba(15,23,42,0.35);'
+          + 'white-space:nowrap;line-height:1;">' + _cpEsc(plate) + '</div>'
+        + '<div style="width:0;height:0;margin:0 auto;'
+          + 'border-left:5px solid transparent;border-right:5px solid transparent;'
+          + 'border-top:6px solid ' + color + ';'
+          + 'filter:drop-shadow(0 2px 2px rgba(15,23,42,0.25));"></div>'
+        + '</div>';
+      var estW = Math.min(220, Math.max(56, 22 + plate.length * 8.2));
+      var m = L.marker([p.lat, p.lng], {
+        icon: L.divIcon({ className: 'vs-plate-marker', html: html, iconSize: [estW, 32], iconAnchor: [estW/2, 32] })
+      });
+      var fuelTxt = (p.fuel_level != null && Number.isFinite(Number(p.fuel_level)))
+        ? Math.round(Number(p.fuel_level)) + ' L' : null;
+      m.bindTooltip('🚛 ' + plate + ' · ' + (moving ? '🟢 ' : '🔵 ') + spdTxt
+        + (fuelTxt ? ' · ⛽ ' + fuelTxt : ''));
+      m.bindPopup('<b>' + _cpEsc(plate) + '</b><br>' + t('dash.speed') + ': ' + spdTxt
+        + '<br>' + (moving ? '🟢 în mișcare' : '🔵 staționar')
+        + (fuelTxt ? '<br>⛽ Combustibil: ' + _cpEsc(fuelTxt) : '')
         + (p.datetime ? '<br>' + new Date(p.datetime).toLocaleString('hu-HU') : ''));
       m.addTo(window._fleetMarkers);
       bounds.push([p.lat, p.lng]);

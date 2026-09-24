@@ -36,12 +36,13 @@
     var el = document.getElementById('gpsDailyMap');
     if (!el || typeof L === 'undefined') return null;
     _map = L.map(el, { zoomControl: true }).setView([45.94, 24.97], 7);
-    var url = (window.cartoTileUrl ? cartoTileUrl('light') :
-      'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png');
-    _tile = L.tileLayer(url, {
-      attribution: '&copy; OpenStreetMap · &copy; CARTO',
-      subdomains: 'abcd', maxZoom: 19
-    }).addTo(_map);
+    // HERE ha van cég-kulcs (developer-integráció); különben OSM fallback.
+    if (typeof vsAttachTiles === 'function') {
+      vsAttachTiles(_map, function(lyr){ _tile = lyr; });
+    } else {
+      _tile = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { attribution:'&copy; OpenStreetMap contributors', maxZoom: 19 }).addTo(_map);
+    }
     _layers = L.layerGroup().addTo(_map);
     // Térkép-méret javítás async betöltésre.
     setTimeout(function(){ try { _map.invalidateSize(); } catch(_){} }, 50);

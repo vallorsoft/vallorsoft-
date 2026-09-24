@@ -171,8 +171,30 @@
   function ensureMap() {
     if (_map) { setTimeout(function () { _map.invalidateSize(); }, 40); return; }
     _map = L.map('pmap', { zoomControl: true }).setView([46, 25], 5);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-      { subdomains: 'abcd', maxZoom: 19, attribution: '© OpenStreetMap, © CARTO' }).addTo(_map);
+    // HERE csempék, ha van cég-kulcs (a developer-integrációból);
+    // különben OSM fallback.
+    var _osm = function () {
+      return L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(_map);
+    };
+    fetch('/api/here-config', { credentials: 'same-origin' })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (!_map) return;
+        if (j && j.apiKey) {
+          var here = L.tileLayer(
+            'https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png?apiKey=' + encodeURIComponent(j.apiKey) + '&style=explore.day&size=512&features=pois:disabled',
+            { maxZoom: 20, tileSize: 512, zoomOffset: -1,
+              attribution: '&copy; HERE, &copy; OpenStreetMap contributors', errorTileUrl: '' });
+          here.on('tileerror', function once () {
+            try { _map.removeLayer(here); } catch (e) {}
+            here.off('tileerror', once);
+            _osm();
+          });
+          here.addTo(_map);
+        } else { _osm(); }
+      })
+      .catch(function () { _osm(); });
     _mLayer = L.layerGroup().addTo(_map);
     setTimeout(function () { _map.invalidateSize(); }, 60);
   }
