@@ -288,23 +288,38 @@ async function planHere(waypoints, key) {
     void baseOffset;
   });
 
-  // Útdíj: közös parser (tollProvider.parseHereToll)
-  let tollTotal = 0, tollCurrency = 'EUR';
+  // Útdíj — MINDEN pénznemet EUR-ra váltunk (a HERE lokális pénznemekben ad:
+  // Csehország → CZK, Lengyelország → PLN, Svájc → CHF stb.). A UI egy
+  // egységes EUR-értéket vár, és a felhasználó kézzel megadhat BNR-t a RON-hoz.
+  //
+  // Rögzített átváltási arány EUR-ra (nagyságrendileg 2026 eleji szint —
+  // az útdíj-becslés amúgy sem hatósági pontosságú, kézi felülírás mindig kell).
+  const TO_EUR = {
+    EUR: 1, CZK: 0.041, HUF: 0.0026, PLN: 0.23, RON: 0.20, BGN: 0.51,
+    HRK: 0.132, CHF: 1.06, GBP: 1.17, DKK: 0.134, SEK: 0.088, NOK: 0.085,
+    TRY: 0.028, RSD: 0.0085, USD: 0.92,
+  };
+  function toEur(value, cur) {
+    const rate = TO_EUR[String(cur || 'EUR').toUpperCase()];
+    if (rate == null) return value; // ismeretlen pénznem → nem konvertáljuk
+    return value * rate;
+  }
+  let tollTotal = 0;
   const tollByCountry = {};
   (route.sections || []).forEach((sec) => {
     (sec.tolls || []).forEach((toll) => {
       const fares = toll.fares || [];
       if (!fares.length) return;
-      let best = null;
+      let best = null; let bestCur = 'EUR';
       fares.forEach((f) => {
         const v = f.price && f.price.value != null ? parseFloat(f.price.value) : 0;
-        if (f.price && f.price.currency) tollCurrency = f.price.currency;
-        if (best == null || v < best) best = v;
+        const cur = (f.price && f.price.currency) || 'EUR';
+        if (best == null || v < best) { best = v; bestCur = cur; }
       });
-      const cost = best || 0;
-      tollTotal += cost;
+      const costEur = toEur(best || 0, bestCur);
+      tollTotal += costEur;
       const cc = toll.countryCode || '??';
-      tollByCountry[cc] = (tollByCountry[cc] || 0) + cost;
+      tollByCountry[cc] = (tollByCountry[cc] || 0) + costEur;
     });
   });
 
@@ -320,7 +335,7 @@ async function planHere(waypoints, key) {
     totalKm: Math.round((totalMeters / 1000) * 10) / 10,
     durationMin: Math.round(totalDurationSec / 60),
     byCountry,
-    toll: { total: Math.round(tollTotal * 100) / 100, currency: tollCurrency },
+    toll: { total: Math.round(tollTotal * 100) / 100, currency: 'EUR' },
     bounds,
     source: 'here',
   };
@@ -413,4 +428,27 @@ async function rpPlanRoute(req, res, args) {
   }
 }
 
-module.exports = { rpAcSearch, rpPlanRoute };
+// ── Reverse-geokód: térkép-koppintás → cím-címke (Photon reverse, ingyenes)
+async function rpReverseGeocode(req, res, args) {
+  try {
+    const lat = Number(args && args.lat);
+    const lng = Number(args && args.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return res.json({ result: { ok: false, err: 'Coordonate invalide.' } });
+    }
+    const url = 'https://photon.komoot.io/reverse?lat=' + lat + '&lon=' + lng + '&limit=1';
+    const d = await jsonGet(url).catch(() => ({}));
+    const f = ((d && d.features) || [])[0];
+    if (!f) return res.json({ result: { ok: true, label: lat.toFixed(4) + ', ' + lng.toFixed(4), lat, lng } });
+    const p = f.properties || {};
+    const streetAddr = [p.street, p.housenumber].filter(Boolean).join(' ');
+    const main = p.name || streetAddr || p.city || p.country || (lat.toFixed(4) + ', ' + lng.toFixed(4));
+    const sub = [streetAddr && streetAddr !== main ? streetAddr : null, p.postcode, p.city, p.state, p.country].filter(Boolean).join(', ');
+    const label = sub ? (main + ', ' + sub) : main;
+    return res.json({ result: { ok: true, label, lat, lng } });
+  } catch (e) {
+    return res.json({ result: { ok: false, err: e.message || 'Eroare' } });
+  }
+}
+
+module.exports = { rpAcSearch, rpPlanRoute, rpReverseGeocode };

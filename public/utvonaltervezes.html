@@ -50,8 +50,12 @@
     }
     .wp-input:focus { border-color:#4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.15); }
     .wp-input::placeholder { color:#94a3b8; font-weight:400; }
-    .wp-clear { position:absolute; right:6px; top:6px; width:26px; height:26px; border:0; background:transparent; color:#94a3b8; font-size:16px; cursor:pointer; border-radius:6px; }
-    .wp-clear:hover { background:#fee2e2; color:#dc2626; }
+    .wp-side { display:flex; flex-direction:column; gap:2px; }
+    .wp-btn { width:22px; height:19px; border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:5px; cursor:pointer; font-size:10px; padding:0; line-height:1; display:flex; align-items:center; justify-content:center; }
+    .wp-btn:hover { background:#f1f5f9; border-color:#4f46e5; color:#4f46e5; }
+    .wp-btn-del { color:#dc2626; }
+    .wp-btn-del:hover { background:#fee2e2; border-color:#fca5a5; color:#991b1b; }
+    .wp-btn-x { width:22px; height:19px; }
 
     /* Autocomplete lenyíló */
     .wp-ac {
@@ -157,7 +161,11 @@
     </div>
 
     <div id="wpList" class="wp-list"></div>
-    <button class="add-wp" onclick="addWaypoint()">+ Adaugă punct intermediar</button>
+    <div style="display:flex;gap:6px;margin-top:8px;">
+      <button class="add-wp" onclick="addWaypoint()" style="flex:1;margin-top:0;">+ Adaugă punct intermediar</button>
+      <button class="add-wp" id="mapPickBtn" onclick="toggleMapPick()" style="flex:0 0 auto;margin-top:0;width:140px;" title="Click pe hartă pentru a adăuga">🗺️ Alege pe hartă</button>
+    </div>
+    <div id="mapPickHint" style="display:none;font-size:11.5px;color:#4f46e5;margin-top:6px;background:#eef2ff;padding:6px 10px;border-radius:8px;border:1px solid #c7d2fe;">👆 Click pe hartă pentru a adăuga un punct intermediar. Click din nou pe buton pentru a opri.</div>
 
     <div class="btn-row">
       <button class="btn" onclick="resetAll()" style="flex:0 0 auto;">↻ Reset</button>
@@ -176,11 +184,15 @@
     <div class="kpi-row">
       <div class="kpi"><div class="k">Distanță totală</div><div class="v" id="kpiKm">—</div></div>
       <div class="kpi"><div class="k">Timp estimat</div><div class="v" id="kpiTime">—</div></div>
-      <div class="kpi"><div class="k">Taxă de drum</div><div class="v" id="kpiToll">—</div></div>
-      <div class="kpi"><div class="k">Puncte pe traseu</div><div class="v" id="kpiPts">—</div></div>
+      <div class="kpi"><div class="k">Taxă drum (EUR)</div><div class="v" id="kpiToll">—</div></div>
+      <div class="kpi"><div class="k">Taxă drum (RON)</div><div class="v" id="kpiTollRon">—</div></div>
+    </div>
+    <div class="bnr-box" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:10px 12px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0;">
+      <label style="font-size:12.5px;font-weight:700;color:#334155;">Curs BNR (1 EUR = <input type="number" id="bnrInput" step="0.0001" min="0" style="width:100px;padding:5px 8px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:13px;font-weight:600;text-align:right;font-family:inherit;color:#0f172a;" placeholder="ex. 4.9750" oninput="recomputeRon()"> RON)</label>
+      <span style="font-size:12px;color:#64748b;">Introdu manual — nu se preia automat.</span>
     </div>
     <table class="cc-table" id="ccTable">
-      <thead><tr><th>Țară</th><th style="text-align:right;">Km</th><th style="text-align:right;">Taxă drum</th></tr></thead>
+      <thead><tr><th>Țară</th><th style="text-align:right;">Km</th><th style="text-align:right;">Taxă EUR</th><th style="text-align:right;">Taxă RON</th></tr></thead>
       <tbody id="ccBody"></tbody>
     </table>
     <div id="infoNote" class="info-note" style="display:none;"></div>
@@ -262,22 +274,47 @@ function render(){
   const arr = [];
   waypoints.forEach((w, i) => {
     const pin = i===0 ? '🟢' : (i===waypoints.length-1 ? '🔴' : '🟡');
-    const canDel = waypoints.length > 2 && i>0 && i<waypoints.length-1; // csak köztespont törölhető
+    const canDel = waypoints.length > 2; // MINDEN pont törölhető, ha van legalább 2 másik
+    const canUp = i > 0;
+    const canDown = i < waypoints.length - 1;
     const ph = i===0 ? 'Punct de plecare' : (i===waypoints.length-1 ? 'Destinație' : 'Punct intermediar');
     arr.push(
       '<div class="wp-row" data-id="'+w.id+'">'
       + '<div class="wp-pin">'+pin+'</div>'
       + '<div class="wp-input-wrap">'
       +   '<input class="wp-input" id="in_'+w.id+'" placeholder="'+ph+'" value="'+esc(w.label||'')+'" autocomplete="off">'
-      +   (canDel ? '<button class="wp-clear" data-id="'+w.id+'" title="Elimină">✕</button>' : '')
       +   '<div class="wp-ac" id="ac_'+w.id+'"></div>'
+      + '</div>'
+      + '<div class="wp-side">'
+      +   (canUp   ? '<button class="wp-btn" data-mv="up"   data-id="'+w.id+'" title="Sus">▲</button>'   : '<span class="wp-btn-x"></span>')
+      +   (canDown ? '<button class="wp-btn" data-mv="down" data-id="'+w.id+'" title="Jos">▼</button>'  : '<span class="wp-btn-x"></span>')
+      +   (canDel  ? '<button class="wp-btn wp-btn-del" data-del="1" data-id="'+w.id+'" title="Elimină">✕</button>' : '<span class="wp-btn-x"></span>')
       + '</div>'
       + '</div>'
     );
   });
   box.innerHTML = arr.join('');
   waypoints.forEach((w) => attach(w));
+  // Delegált oldal-gombok (fel/le/törlés)
+  box.querySelectorAll('.wp-btn').forEach((b) => {
+    b.onclick = () => {
+      const id = b.getAttribute('data-id');
+      if (b.getAttribute('data-del')) return removeWaypoint(id);
+      const mv = b.getAttribute('data-mv');
+      moveWaypoint(id, mv === 'up' ? -1 : 1);
+    };
+  });
   updatePlanBtn();
+}
+
+function moveWaypoint(id, delta){
+  const i = waypoints.findIndex(w => w.id === id);
+  if (i < 0) return;
+  const j = i + delta;
+  if (j < 0 || j >= waypoints.length) return;
+  const tmp = waypoints[i]; waypoints[i] = waypoints[j]; waypoints[j] = tmp;
+  render();
+  drawMarkers();
 }
 
 function attach(w){
@@ -313,13 +350,74 @@ function attach(w){
     updatePlanBtn();
     drawMarkers();
   });
-  const clr = document.querySelector('.wp-clear[data-id="'+w.id+'"]');
-  if (clr) clr.addEventListener('click', () => removeWaypoint(w.id));
 }
 
 function updatePlanBtn(){
-  const filled = waypoints.filter(w => (w.label || '').trim().length >= 2).length;
+  const filled = waypoints.filter(w => (w.label || '').trim().length >= 2 || (w.lat != null && w.lng != null)).length;
   document.getElementById('planBtn').disabled = filled < 2;
+}
+
+// ===== Térkép-koppintás módú waypoint =====
+let mapPickMode = false;
+function toggleMapPick(){
+  mapPickMode = !mapPickMode;
+  const btn = document.getElementById('mapPickBtn');
+  document.getElementById('mapPickHint').style.display = mapPickMode ? '' : 'none';
+  if (mapPickMode){
+    btn.style.background = '#eef2ff'; btn.style.borderStyle = 'solid'; btn.style.borderColor = '#4f46e5'; btn.style.color = '#4f46e5';
+    map._container.style.cursor = 'crosshair';
+  } else {
+    btn.style.background = ''; btn.style.borderStyle = ''; btn.style.borderColor = ''; btn.style.color = '';
+    map._container.style.cursor = '';
+  }
+}
+map.on('click', async (e) => {
+  if (!mapPickMode) return;
+  const lat = e.latlng.lat, lng = e.latlng.lng;
+  // Új köztespont a végpont ELÉ (mindig az utolsó pont elé kerül)
+  const newWp = { id: nid(), label: lat.toFixed(4) + ', ' + lng.toFixed(4), lat, lng };
+  waypoints.splice(waypoints.length - 1, 0, newWp);
+  render();
+  drawMarkers();
+  // Reverse-geokód a valós címhez
+  try {
+    const r = await gas('rpReverseGeocode', { lat, lng });
+    if (r && r.ok && r.label) {
+      newWp.label = r.label;
+      const inp = document.getElementById('in_' + newWp.id);
+      if (inp) inp.value = r.label;
+      render();
+      drawMarkers();
+    }
+  } catch (_) { /* címkéz koord-dal marad */ }
+});
+
+// ===== BNR-alapú RON átváltás =====
+function recomputeRon(){
+  const el = document.getElementById('kpiTollRon');
+  const eurTxt = (document.getElementById('kpiToll').textContent || '').replace(/[^0-9.,-]/g,'').replace(',','.');
+  const eur = parseFloat(eurTxt);
+  const bnr = parseFloat((document.getElementById('bnrInput').value || '').replace(',','.'));
+  if (!Number.isFinite(eur) || !Number.isFinite(bnr) || bnr <= 0) {
+    el.textContent = '—';
+  } else {
+    el.textContent = (eur * bnr).toFixed(2) + ' RON';
+  }
+  // Ország-tábla RON oszlopát is frissítjük
+  const body = document.getElementById('ccBody');
+  if (body && body.dataset.byCountry){
+    try {
+      const list = JSON.parse(body.dataset.byCountry || '[]');
+      body.innerHTML = list.map(c => {
+        const eu = c.tollCost || 0;
+        const ron = Number.isFinite(bnr) && bnr > 0 ? (eu * bnr).toFixed(2) + ' RON' : '—';
+        return '<tr><td><span class="cc-flag">'+flagEmoji(c.cc)+'</span>'+esc(ccName(c.cc))+'</td>'
+          +'<td class="num">'+c.km.toFixed(1)+' km</td>'
+          +'<td class="num">'+eu.toFixed(2)+' EUR</td>'
+          +'<td class="num">'+ron+'</td></tr>';
+      }).join('');
+    } catch(_) {}
+  }
 }
 
 function addWaypoint(){
@@ -328,7 +426,8 @@ function addWaypoint(){
 }
 function removeWaypoint(id){
   const i = waypoints.findIndex(w => w.id === id);
-  if (i <= 0 || i >= waypoints.length-1) return; // csak köztespont
+  if (i < 0) return;
+  if (waypoints.length <= 2) return; // min 2 pont kell
   waypoints.splice(i, 1);
   render();
   drawMarkers();
@@ -385,8 +484,8 @@ async function planRoute(){
     document.getElementById('kpiKm').textContent = (r.totalKm||0).toFixed(1) + ' km';
     const h = Math.floor((r.durationMin||0) / 60), m = (r.durationMin||0) % 60;
     document.getElementById('kpiTime').textContent = (h ? h + ' h ' : '') + m + ' min';
-    document.getElementById('kpiToll').textContent = ((r.toll && r.toll.total) || 0).toFixed(2) + ' ' + ((r.toll && r.toll.currency) || 'EUR');
-    document.getElementById('kpiPts').textContent = (r.waypoints || pts).length;
+    document.getElementById('kpiToll').textContent = ((r.toll && r.toll.total) || 0).toFixed(2) + ' EUR';
+    recomputeRon();
     const srcEl = document.getElementById('kpiSrc');
     srcEl.textContent = r.source === 'here' ? 'HERE' : 'OSRM';
     srcEl.className = 'bp-src' + (r.source === 'here' ? '' : ' osrm');
@@ -395,11 +494,16 @@ async function planRoute(){
     const body = document.getElementById('ccBody');
     const ccTable = document.getElementById('ccTable');
     if (r.byCountry && r.byCountry.length){
-      body.innerHTML = r.byCountry.map(c =>
-        '<tr><td><span class="cc-flag">'+flagEmoji(c.cc)+'</span>'+esc(ccName(c.cc))+'</td>'
-        +'<td class="num">'+c.km.toFixed(1)+' km</td>'
-        +'<td class="num">'+(c.tollCost||0).toFixed(2)+' '+((r.toll && r.toll.currency)||'EUR')+'</td></tr>'
-      ).join('');
+      const bnr = parseFloat((document.getElementById('bnrInput').value || '').replace(',','.'));
+      body.innerHTML = r.byCountry.map(c => {
+        const eur = c.tollCost || 0;
+        const ron = Number.isFinite(bnr) && bnr > 0 ? (eur * bnr).toFixed(2) + ' RON' : '—';
+        return '<tr><td><span class="cc-flag">'+flagEmoji(c.cc)+'</span>'+esc(ccName(c.cc))+'</td>'
+          +'<td class="num">'+c.km.toFixed(1)+' km</td>'
+          +'<td class="num">'+eur.toFixed(2)+' EUR</td>'
+          +'<td class="num">'+ron+'</td></tr>';
+      }).join('');
+      body.dataset.byCountry = JSON.stringify(r.byCountry);
       ccTable.style.display = '';
     } else {
       ccTable.style.display = 'none';
