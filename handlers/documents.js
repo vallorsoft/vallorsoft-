@@ -423,13 +423,19 @@ handlers.getWaybillDrivers = async function (req, res) {
       const cid = req.session.user.company_id;
       if (!cid) return res.json({ result: { ok: true, drivers: [], current: [] } });
       const r = await pool.query(
-        `SELECT LOWER(f.email_sofer) AS email, MAX(f.nume_sofer) AS nume, COUNT(*)::int AS db,
-                EXISTS(SELECT 1 FROM users u WHERE LOWER(u.email)=LOWER(f.email_sofer) AND u.company_id=$1) AS is_current
-         FROM fuvarlevelek f
-         WHERE (f.company_id=$1 OR LOWER(f.email_sofer) IN (SELECT LOWER(email) FROM users WHERE company_id=$1))
-           AND COALESCE(f.email_sofer,'')<>''
-         GROUP BY LOWER(f.email_sofer)
-         ORDER BY is_current, nume`, [cid]);
+        // A csoportosítás egy al-lekérdezésben történik, az is_current a már
+        // csoportosított e-mailre fut (különben a Postgres „ungrouped column"
+        // hibát dob → a kártya mindig „Eroare de server"-t mutatott).
+        `SELECT g.email, g.nume, g.db,
+                EXISTS(SELECT 1 FROM users u WHERE LOWER(u.email)=g.email AND u.company_id=$1) AS is_current
+         FROM (
+           SELECT LOWER(f.email_sofer) AS email, MAX(f.nume_sofer) AS nume, COUNT(*)::int AS db
+           FROM fuvarlevelek f
+           WHERE (f.company_id=$1 OR LOWER(f.email_sofer) IN (SELECT LOWER(email) FROM users WHERE company_id=$1))
+             AND COALESCE(f.email_sofer,'')<>''
+           GROUP BY LOWER(f.email_sofer)
+         ) g
+         ORDER BY is_current, g.nume`, [cid]);
       const cur = await pool.query(
         `SELECT nume, email FROM users WHERE company_id=$1 AND pozicio='Sofer' ORDER BY nume`, [cid]);
       return res.json({ result: { ok: true, drivers: r.rows, current: cur.rows } });

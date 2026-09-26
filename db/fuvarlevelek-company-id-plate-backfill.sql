@@ -14,6 +14,12 @@
 --  rendszáma miatt rossz céghez kerüljön (nincs cross-tenant elszivárgás).
 -- ============================================================
 
+-- Önálló futhatóság: a fájlnév-sorrendben ez a migráció a
+-- fuvarlevelek-documents-company-id.sql ELŐTT fut, így friss telepítésnél az
+-- oszlop még nem létezne (mindkét menetben elhasalt). Az oszlop-definíció
+-- azonos az alap-migrációéval, ezért ott az ADD COLUMN IF NOT EXISTS no-op.
+ALTER TABLE fuvarlevelek ADD COLUMN IF NOT EXISTS company_id INTEGER;
+
 -- Normalizált rendszám → company_id, CSAK az egyértelmű (egyetlen céghez tartozó) esetekre
 WITH plate_company AS (
   SELECT UPPER(REGEXP_REPLACE(rendszam, '[^A-Za-z0-9]', '', 'g')) AS plate,
