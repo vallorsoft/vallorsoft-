@@ -932,7 +932,7 @@ handlers.devActivatePayment = async function (req, res, args) {
   if (!id) return res.json({ result: { ok: false, err: 'ID hiányzik' } });
 
   const pr = await pool.query(
-    `SELECT pr.*, sp.price_net, sp.billing_interval FROM payment_requests pr
+    `SELECT pr.*, sp.price_net FROM payment_requests pr
      LEFT JOIN subscription_plans sp ON sp.id = pr.plan_id
      WHERE pr.id = $1`, [id]
   );

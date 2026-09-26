@@ -98,7 +98,8 @@ handlers.ecmrCreate = async function (req, res, args) {
     const me = req.session.user;
     if (!isAdminManager(me)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
     const cid = me.company_id;
-    const orderId = parseInt(Array.isArray(args) ? args[0] : (args && args.order_id), 10);
+    // Az orders.id szöveges kulcs (pl. 'CMD-…') — NEM parseInt-eljük.
+    const orderId = String((Array.isArray(args) ? args[0] : (args && args.order_id)) || '').trim().slice(0, 50);
     if (!orderId) return res.json({ result: { ok: false, err: 'Comanda lipsa' } });
 
     // Tenant-ellenőrzés: a fuvar a hívó cégéhez tartozik-e? Különben „A" cég

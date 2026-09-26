@@ -418,9 +418,10 @@ handlers.sendOrderEmail = async function (req, res, args) {
         try {
           var cx = await pool.query(
             `SELECT 1 FROM client_users cu
+              JOIN clients cl ON cl.id = cu.client_id AND cl.company_id = cu.company_id
               JOIN orders o ON o.company_id = cu.company_id
                 AND (o.client_id = cu.client_id
-                     OR (o.client_id IS NULL AND LOWER(o.client) = LOWER(cu.client_nev)))
+                     OR (o.client_id IS NULL AND LOWER(o.client) = LOWER(cl.denumire)))
               WHERE cu.company_id = $1 AND LOWER(cu.email) = $2 AND o.id = $3
               LIMIT 1`,
             [cid, toLc, orderId]);

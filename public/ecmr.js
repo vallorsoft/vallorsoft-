@@ -118,9 +118,9 @@ window.ECmr = (function () {
       var sel = root.querySelector('#ecmrOrderSel');
       if (!sel || !Array.isArray(list)) return;
       var opts = '<option value="">…</option>' + list.map(function (o) {
-        var lbl = '#' + o.id + ' · ' + (o.client || '—') + ' · ' +
+        var lbl = (o.fuvar_no || ('#' + o.id)) + ' · ' + (o.client || '—') + ' · ' +
           (o.loc_incarcare || '') + '→' + (o.loc_descarcare || '');
-        return '<option value="' + o.id + '">' + esc(lbl) + '</option>';
+        return '<option value="' + esc(String(o.id)) + '">' + esc(lbl) + '</option>';
       }).join('');
       sel.innerHTML = opts;
     }).catch(function () {});
@@ -128,7 +128,8 @@ window.ECmr = (function () {
 
   function doCreate() {
     var sel = document.getElementById('ecmrOrderSel');
-    var orderId = sel && parseInt(sel.value, 10);
+    // Az orders.id szöveges kulcs ('CMD-…') — parseInt NaN-t adna.
+    var orderId = sel ? String(sel.value || '').trim() : '';
     if (!orderId) { toast(tt('ecmr.pickOrderFirst', 'Selecteaza o comanda.'), 'err'); return; }
     gas('ecmrCreate', [orderId]).then(function (r) {
       if (r && r.ok) { toast(tt('common.savedOk', 'Salvat'), 'ok'); reload(); }

@@ -1475,10 +1475,13 @@
     },
     fetchBnr: function () {
       gas('getBnrRate').then(function (r) {
-        if (r && r.ok) {
+        // A registry-ben a handlers/bnr.js getBnrRate-je él ({bnr_rate, company_rate});
+        // a régi {rate, date} alakot is elfogadjuk.
+        var rate = r && (r.rate != null ? r.rate : r.bnr_rate);
+        if (r && r.ok && rate != null) {
           var inp = document.getElementById('stEurRon');
-          if (inp) inp.value = r.rate;
-          toast(t('st.t.bnrRate', { date: (r.date || t('st.t.bnrToday')), rate: r.rate }), 'ok');
+          if (inp) inp.value = rate;
+          toast(t('st.t.bnrRate', { date: (r.date || t('st.t.bnrToday')), rate: rate }), 'ok');
         } else toast((r && r.err) || t('st.t.bnrUnavail'), 'err');
       });
     }

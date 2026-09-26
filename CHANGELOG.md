@@ -14,6 +14,23 @@
 
 ---
 
+## 2026-09-26 — Általános hibakereső kör: 6 élesben némán hibázó funkció javítva + SQL séma-drift őr (PR #487)
+
+**Kérés:** „Indíts egy általános hibakeresést — olyan funkciókat keress, ami nem működik vagy nem jól (admin, manager, sofőr oldalak)."
+
+**Módszer:** valós Postgres 16 + a teljes migráció-lánc; minden statikus szerveroldali SQL (1088 db) `PREPARE`-rel típus-ellenőrizve; kliens `gas()`/`fetch`/`onclick`/i18n keresztellenőrzés; headless Chromium füst-teszt Admin/Manager/Sofőr szerepben MINDEN menüponton.
+
+**Javítva:**
+- **e-CMR modul** használhatatlan volt — `order_ecmr.order_id INTEGER` vs `orders.id` `'CMD-…'` → lista/megnyitás „varchar = integer" hiba, létrehozás `parseInt` NaN. Új `db/zz-ecmr-order-id-text.sql` + `handlers/ecmr.js`/`public/ecmr.js` szöveges azonosítóval (választóban fuvar-szám).
+- **Belső sofőrök → Régi sofőr menetleveleinek átrendezése** (`getWaybillDrivers`) — GROUP BY „ungrouped column" → mindig „Eroare de server".
+- **Tervezőtábla alvállalkozói járművek** (`getPlannerData`) — `carriers.denumire` → `nev`; a try/catch elnyelte, sosem jelentek meg.
+- **Email a fuvarról → portál-megosztás** (`sendOrderEmail`) — nem létező `client_users.client_nev` → az ügyfélnek küldött dok. sosem lett megosztva a portálon.
+- **Developer ✅ Aktiválás** (`devActivatePayment`) — nem létező `subscription_plans.billing_interval` → mindig elhasalt.
+- **Hiányzó oszlopok** (`db/missing-columns-reset-token-tractor.sql`, idempotens): `users.reset_token/_expiry` (elfelejtett jelszó) + `orders.tractor_id/trailer_id` (útvonaltervező fuvarlista).
+- Legacy stats BNR-gomb a `getBnrRate` mindkét válaszalakját kezeli; `fuvarlevelek-company-id-plate-backfill.sql` friss telepítésen is lefut.
+
+**Teszt:** új `tests/integration/sql-schema-drift.test.js` (CI-ben minden statikus SQL PREPARE a teljes sémán) + `debug-sweep-fixes-db.test.js`. **1389 Jest zöld** valós DB-vel. Cache-bust `ecmr.js`/`stats.js` `?v=20260926dbg`.
+
 ## 2026-09-23 — Sofőr kártya-fejléc: MINDEN elvégzett stop VISSZA (a sofőr régebbi állomásait is látja)
 
 **Kérés:** „Eddig mutatta az osszeset most miert nm? A befejezeteket" — a PR #464 kompakt módja (5+ stop) csak az EGY közvetlenül előző kész stopot mutatta mini-sorként; a régebbi kész állomások (1-4) eltűntek.
