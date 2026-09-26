@@ -9,6 +9,13 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 23. lépés — Séma-drift audit + e-CMR / jelszó-visszaállítás működőképessé tétele (2026-09-26) ✅ KÉSZ
+
+- **Séma-drift őr:** új `tests/integration/sql-schema-drift.test.js` minden statikus SQL-t PREPARE-rel ellenőriz a teljes sémán. Korábban a try/catch-ek „Eroare de server"-rel vagy üres listával elnyelték a nem létező oszlopra hivatkozó lekérdezéseket (6 ilyen funkció élesben némán hibázott).
+- **Jelszó-visszaállítás:** a `users.reset_token/_expiry` oszlopokat semmi nem hozta létre → a biztonsági reset-út (1 órás token) friss DB-n nem működött; idempotens migrációval pótolva. A token-logika (random 32 byte, lejárat, egyszer használatos) változatlan.
+- **e-CMR tenant-védelem megmaradt:** az `ecmrCreate` továbbra is a fuvar `company_id`-tulajdonát ellenőrzi beszúrás előtt (idegen cég fuvarára tesztelten elutasít); csak az azonosító típusa javult.
+- **Portál-megosztás:** az „Email a fuvarról" címzett-ellenőrzése (ügyfél-portál user a fuvar ügyfeléhez tartozik-e) mostantól ténylegesen lefut — a `company_id`-szűrés változatlan.
+
 ### 22. lépés — Menetlevél: kiadás-kategória fehérlistázás + AdBlue adat-integritás (2026-09-22) ✅ KÉSZ
 
 Két, egymástól független szál: egy ÚJ bemeneti felület fehérlistázása, és egy meglévő derivált mező adat-integritásának helyreállítása.
