@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-09-27 — ÚJ: ismétlődő fuvar-sablonok (📋 Sablonból · 🔁 Újra kiírás · 💾 Mentés sablonként) (PR #PRNUM)
+## 2026-09-27 — ÚJ: ismétlődő fuvar-sablonok (📋 Sablonból · 🔁 Újra kiírás · 💾 Mentés sablonként) (PR #488)
 
 **Kérés:** a hibakereső kör 7. javaslata — gyakori útvonal (ugyanaz az ügyfél, pl. Cluj → Wien) egy kattintással újra kiírható legyen.
 
