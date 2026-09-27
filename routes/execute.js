@@ -67,6 +67,7 @@ const handlers = Object.assign(
   require('../handlers/costCalculator'),
   require('../handlers/pdfWorkspace'),
   require('../handlers/documentRegister'),
+  require('../handlers/orderTemplates'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a
