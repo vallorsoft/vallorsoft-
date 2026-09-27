@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-09-27 — Admin/Manager: beküldött menetlevél törlése — cascade + audit (PR #489, a lezáratlan #309 átemelése)
+
+**Kérés:** „Mainbe" — a 2026-08-04 óta nyitva maradt #309 (menetlevél-törlés) bekerül a mainbe a friss kódbázisra igazítva.
+
+- **`handlers/documents.js` `fuvarlevelDelete(id)`** (Admin/Manager, `company_id`-szűrt, paraméteres SQL, audit `waybill.delete`): a menetlevél végleges törlése; ha az érintett fuvart más menetlevél már nem tartalmazza, a fuvar `order_stops.waybilled_at`-je NULL-ra áll → a fuvar újra a sofőr menetlevél-pickerébe kerül (best-effort, a fő törlést nem buktathatja). A `done_at`, `orders.status` és a POD-fotók érintetlenek.
+- **UI:** 🗑️ Törlés gomb a menetlevél-szerkesztő láblécében (csak szerkesztés-módban), dupla megerősítéssel (`deleteFuvEdit`, `console-shared.js`); 4 új `fed.*` i18n kulcs (RO+HU). Cache-bust `?v=20260927wbdel` (admin/manager).
+- **Átemeléskor:** ütközés csak a cache-bust sorokban (a friss main verziói megtartva). Nincs séma-változás. **1411 Jest zöld** valós Postgres 16-tal (+7 új eset, SQL séma-drift őr is zöld).
+
+---
+
 ## 2026-09-27 — ÚJ: ismétlődő fuvar-sablonok (📋 Sablonból · 🔁 Újra kiírás · 💾 Mentés sablonként) (PR #488)
 
 **Kérés:** a hibakereső kör 7. javaslata — gyakori útvonal (ugyanaz az ügyfél, pl. Cluj → Wien) egy kattintással újra kiírható legyen.

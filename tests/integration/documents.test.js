@@ -290,3 +290,119 @@ describe('fuvarlevelCreate', () => {
     expect(res.body.result.total_km).toBe(0); // Math.max(0, kmSf - kmInc)
   });
 });
+
+// ─── fuvarlevelDelete (Admin/Manager, cascade waybilled_at + audit) ──
+describe('fuvarlevelDelete', () => {
+  test('Sofer nem hívhatja', async () => {
+    setUser(SOFER);
+    const res = await call('fuvarlevelDelete', ['FUV-1']);
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/interzis/i);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  test('id hiányzik → hibaüzenet', async () => {
+    setUser(ADMIN);
+    const res = await call('fuvarlevelDelete', [null]);
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/lipsa/i);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  test('nem lét / más cég → „Nu a fost gasit / acces interzis"', async () => {
+    setUser(ADMIN);
+    // ownership check — üres
+    pool.query.mockResolvedValueOnce(rows([]));
+    const res = await call('fuvarlevelDelete', ['FUV-OTHER']);
+    expect(res.body.result.ok).toBe(false);
+    expect(res.body.result.err).toMatch(/acces interzis|gasit/i);
+    // ownership check egyetlen SELECT — cégre szűrt
+    expect(pool.query).toHaveBeenCalledTimes(1);
+    const [sqlSel, paramsSel] = pool.query.mock.calls[0];
+    expect(String(sqlSel)).toMatch(/SELECT .* FROM fuvarlevelek/is);
+    expect(String(sqlSel)).toMatch(/company_id = \$2/);
+    expect(paramsSel).toEqual(['FUV-OTHER', ADMIN.company_id]);
+  });
+
+  test('sikeres törlés — cascade: érintett fuvar EGYETLEN másik menetlevélen sem szerepel → order_stops.waybilled_at reset', async () => {
+    setUser(ADMIN);
+    pool.query
+      // 1) ownership SELECT
+      .mockResolvedValueOnce(rows([{ id: 'FUV-1', numar_fisa: 'MT-2026-0001', email_sofer: 'sofer@a.hu', order_ids: ['CMD-1'] }]))
+      // 2) DELETE fuvarlevelek
+      .mockResolvedValueOnce({ rowCount: 1 })
+      // 3) "van-e másik menetlevél a CMD-1-re?" → nincs
+      .mockResolvedValueOnce(rows([]))
+      // 4) order_stops.waybilled_at reset
+      .mockResolvedValueOnce({ rowCount: 3 })
+      // 5) audit INSERT
+      .mockResolvedValueOnce({ rowCount: 1 });
+    const res = await call('fuvarlevelDelete', ['FUV-1']);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.id).toBe('FUV-1');
+    expect(res.body.result.stops_reset).toBe(3);
+    expect(res.body.result.released_orders).toEqual(['CMD-1']);
+    // Cascade query — UPDATE order_stops … waybilled_at = NULL
+    const [sqlUpd, paramsUpd] = pool.query.mock.calls[3];
+    expect(String(sqlUpd)).toMatch(/UPDATE order_stops[\s\S]+waybilled_at = NULL/i);
+    expect(paramsUpd).toEqual(['CMD-1', ADMIN.company_id]);
+  });
+
+  test('sikeres törlés — másik menetlevél MÉG hivatkozza a fuvart → stopok érintetlenek', async () => {
+    setUser(MANAGER);
+    pool.query
+      // 1) ownership SELECT
+      .mockResolvedValueOnce(rows([{ id: 'FUV-2', order_ids: ['CMD-9'] }]))
+      // 2) DELETE fuvarlevelek
+      .mockResolvedValueOnce({ rowCount: 1 })
+      // 3) "van-e másik menetlevél a CMD-9-re?" → IGEN
+      .mockResolvedValueOnce(rows([{ '?column?': 1 }]))
+      // 4) audit INSERT
+      .mockResolvedValueOnce({ rowCount: 1 });
+    const res = await call('fuvarlevelDelete', ['FUV-2']);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.stops_reset).toBe(0);
+    expect(res.body.result.released_orders).toEqual([]);
+    // Nem futott UPDATE order_stops (csak SELECT + DELETE + SELECT másik + audit)
+    const calls = pool.query.mock.calls.map(c => String(c[0]));
+    expect(calls.some(s => /UPDATE order_stops/i.test(s))).toBe(false);
+  });
+
+  test('üres order_ids → csak fő törlés + audit', async () => {
+    setUser(ADMIN);
+    pool.query
+      .mockResolvedValueOnce(rows([{ id: 'FUV-3', order_ids: [] }]))
+      .mockResolvedValueOnce({ rowCount: 1 })
+      // NINCS "másik menetlevél" lookup és NINCS UPDATE order_stops
+      .mockResolvedValueOnce({ rowCount: 1 }); // audit
+    const res = await call('fuvarlevelDelete', ['FUV-3']);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.stops_reset).toBe(0);
+    // 3 query: SELECT + DELETE + audit
+    expect(pool.query).toHaveBeenCalledTimes(3);
+  });
+
+  test('cross-tenant: idegen cég menetlevele nem törölhető', async () => {
+    setUser({ ...ADMIN, company_id: 99 });
+    // ownership SELECT — az idegen cégnek szűrve üres
+    pool.query.mockResolvedValueOnce(rows([]));
+    const res = await call('fuvarlevelDelete', ['FUV-FROM-CID-1']);
+    expect(res.body.result.ok).toBe(false);
+    // A SELECT `company_id = 99`-re fut
+    expect(pool.query.mock.calls[0][1][1]).toBe(99);
+    // Sem DELETE, sem cascade nem fut
+    expect(pool.query).toHaveBeenCalledTimes(1);
+  });
+
+  test('cascade hiba → a fő törlés sikeres marad (best-effort)', async () => {
+    setUser(ADMIN);
+    pool.query
+      .mockResolvedValueOnce(rows([{ id: 'FUV-4', order_ids: ['CMD-A'] }])) // ownership
+      .mockResolvedValueOnce({ rowCount: 1 })                                // DELETE
+      .mockRejectedValueOnce(new Error('boom'))                              // "másik menetlevél" lekérés hasal
+      .mockResolvedValueOnce({ rowCount: 1 });                               // audit
+    const res = await call('fuvarlevelDelete', ['FUV-4']);
+    expect(res.body.result.ok).toBe(true);
+    expect(res.body.result.stops_reset).toBe(0);
+  });
+});
