@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-09-27 — ÚJ: ismétlődő fuvar-sablonok (📋 Sablonból · 🔁 Újra kiírás · 💾 Mentés sablonként) (PR #488)
+
+**Kérés:** a hibakereső kör 7. javaslata — gyakori útvonal (ugyanaz az ügyfél, pl. Cluj → Wien) egy kattintással újra kiírható legyen.
+
+- **Migráció `db/order-templates.sql`** (idempotens): `order_templates` (cégenkénti név + `fields` JSONB + használat-számláló).
+- **Handler `handlers/orderTemplates.js`** (registry-be kötve, Admin/Manager, `company_id`-szűrt, paraméteres SQL, audit): `orderTemplateList`/`Build`/`SaveFromOrder`/`Use`/`Rename`/`Delete`. A sablon tartalmát MINDIG a szerver állítja össze egy saját cégbeli fuvarból (a kliens csak azonosítót + nevet küld): ügyfél, állomások a bevitel-sorrendjében (`seq_index`, interleaved is) **dátum nélkül**, FTL/LTL, súly, méretek, ár, km, vontató/pótkocsi rendszám. Referencia/dátum/UIT szándékosan nincs benne. Névütközés kis/nagybetű-független, cégenként max 300 sablon.
+- **Kliens `public/order-templates.js`**: „📋 Din șablon" gomb a fuvar-kiírás tetején (az AI/CSV gombok mellett) → kereshető választó (Használ / ✏️ Átnevezés / 🗑 Törlés); a fuvar ⋯ menüben „🔁 Repetă cursa (copie)" és „💾 Salvează ca șablon" (alapnév: ügyfél · felrakó → lerakó). Kitöltés után a wizard az 1. lépésre ugrik; a jármű-legördülő betöltését megvárja. Új `window.ocLoadStops` a wizardban.
+- **i18n** 15 új kulcs (`otpl.*`, `cs.ol.mRepeat/mSaveTpl`, RO-alap + HU); cache-bust `?v=20260927otpl` (a megosztott `i18n.js` minden oldalon).
+- **Teszt:** `tests/unit/orderTemplates.test.js` (szerep-kapu, validáció, tenant-szűrés, sorrend) + `tests/integration/order-templates-db.test.js` (valós DB: életciklus, interleaved sorrend, izoláció). **1403 Jest zöld** valós DB-vel. Headless Chromiumban végigkattintva: mentés → választó → használat → dátum megadása → új fuvar (`CMD-2026-0002`) helyes adatokkal.
+
 ## 2026-09-26 — Általános hibakereső kör: 6 élesben némán hibázó funkció javítva + SQL séma-drift őr (PR #487)
 
 **Kérés:** „Indíts egy általános hibakeresést — olyan funkciókat keress, ami nem működik vagy nem jól (admin, manager, sofőr oldalak)."

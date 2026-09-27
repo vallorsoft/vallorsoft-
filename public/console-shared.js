@@ -5629,6 +5629,16 @@ function vsPostDeliveryClose(){
 window.vsPostDeliveryOpen = vsPostDeliveryOpen;
 window.vsPostDeliveryClose = vsPostDeliveryClose;
 
+// 💾 Fuvar mentése sablonként — az alapértelmezett nevet (ügyfél · felrakó → lerakó)
+// a betöltött fuvarlista-cache-ből számoljuk, a mentést az OrderTemplates végzi.
+function vsSaveOrderTemplate(id){
+  var c=(typeof _ordersAllCache!=='undefined'&&Array.isArray(_ordersAllCache))?_ordersAllCache.find(function(x){return String(x.id)===String(id);}):null;
+  var parts=[];
+  if(c&&c.client) parts.push(c.client);
+  if(c&&(c.loc_incarcare||c.loc_descarcare)) parts.push(String(c.loc_incarcare||'').split(',')[0]+' → '+String(c.loc_descarcare||'').split(',')[0]);
+  if(window.OrderTemplates) OrderTemplates.saveFromOrder(id, parts.join(' · ').slice(0,120));
+}
+
 // 📧 Sablonból e-mail egy fuvarhoz — a fuvar adatait a _ordersAllCache-ből
 // olvassa (idézőjel-biztos: nem inline-interpolált), és a közös dialógust nyitja.
 function vsSendOrderTplMail(orderId) {
@@ -5833,6 +5843,15 @@ function renderFilteredOrders(list) {
       menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.copyTrack')+'" '+
         'onclick="copyTrackingLink(\''+c.id+'\');closeOrderActions()">'+
         '<span class="vs-act-ico">🌍</span><span class="vs-act-lbl">'+t('cs.ol.mTrack')+'</span></button>';
+    }
+    // 🔁 Újra kiírás + 💾 Mentés sablonként (ismétlődő fuvar-sablonok, order-templates.js)
+    if (window.OrderTemplates) {
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mRepeat')+'" '+
+        'onclick="OrderTemplates.repeatOrder(\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">🔁</span><span class="vs-act-lbl">'+t('cs.ol.mRepeat')+'</span></button>';
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mSaveTpl')+'" '+
+        'onclick="vsSaveOrderTemplate(\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">💾</span><span class="vs-act-lbl">'+t('cs.ol.mSaveTpl')+'</span></button>';
     }
     // ✉️ Email a fuvarról (pipálós: fuvar-adatok + csatolmányok; külső/belső cím)
     if (window.openOrderEmail) {

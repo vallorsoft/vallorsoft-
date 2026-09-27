@@ -97,9 +97,11 @@
     // 3) AI-scan + CSV-import blokkok áthelyezése a wizard tetejére.
     var aiBox = document.getElementById('ordScanBtnBox');
     var csvBox = document.getElementById('ordersImportBtnBox');
+    var tplBox = document.getElementById('ordTplBtnBox');
     var topSlot = shell.querySelector('#ocTopTools');
     if (aiBox && topSlot) topSlot.appendChild(aiBox);
     if (csvBox && topSlot) topSlot.appendChild(csvBox);
+    if (tplBox && topSlot) topSlot.appendChild(tplBox);
 
     // 4) A LEGACY_KEYS-ben szereplő blokkok áthelyezése a step-body-kba.
     Object.keys(LEGACY_KEYS).forEach(function (k) {
@@ -937,6 +939,22 @@
   };
 
   // ── Publikus API (globálisan az onclick-hez) ──
+  // ── Kívülről (sablon / „🔁 Újra kiírás") kapott állomás-lista betöltése ──
+  // A bevitel-sorrendet megtartja, DÁTUM NÉLKÜL (a diszpécser a 2. lépésben
+  // adja meg). A legacy mezőkbe is azonnal szinkronizál, majd az 1. lépésre ugrik.
+  function ocLoadStops(stops) {
+    OC.stops = (Array.isArray(stops) ? stops : []).slice(0, 20).map(function (s) {
+      return { kind: s && s.kind === 'delivery' ? 'delivery' : 'pickup',
+               loc: (s && s.loc) || '', firma: (s && s.firma) || '', data: '', time: '' };
+    });
+    OC.openStopIdx = 0;
+    _commitStopsToLegacy();
+    _renderStopsList();
+    OC.step = 1;
+    _refreshView();
+  }
+
+  window.ocLoadStops = ocLoadStops;
   window.ocInit = ocInit;
   window.ocGoStep = ocGoStep;
   window.ocNext = ocNext;
