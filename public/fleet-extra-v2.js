@@ -1092,13 +1092,28 @@
 
     // Egy csoportos csempe: EUR + RON egymás alatt, egy címke alatt.
     // A 6 külön csempe helyett 3 (Járandóság / Kifizetve / Hátralék) —
-    // átláthatóbb, nincs duplikált címke-sor.
+    // átláthatóbb, nincs duplikált címke-sor. A csempe végén — ha van BNR —
+    // kiírja a KOMBINÁLT teljes értéket EUR + RON egyenértékben is, hogy egy
+    // pillantással látható legyen: pl. 2210 EUR + 1035 RON = 2408 EUR / 12626 RON.
     function gtile(icon, label, eur, ron, tone) {
       // tone: 'ok'|'danger'|'info'|'muted'
       var color = tone === 'ok' ? 'var(--status-ok)'
         : tone === 'danger' ? 'var(--status-danger)'
         : tone === 'info' ? 'var(--status-info)'
         : 'var(--text-primary)';
+      // Kombinált értékek: EUR-egyenérték = eur + ron/BNR; RON-egyenérték = eur×BNR + ron
+      // Csak akkor jelennek meg, ha (a) van BNR, ÉS (b) MINDKÉT valutában van érték
+      // (nulla + valami esetén egyértelmű, nem kell összeadni).
+      var combinedHtml = '';
+      var e = Number(eur || 0), r = Number(ron || 0);
+      if (bnr != null && bnr > 0 && Math.abs(e) > 0.005 && Math.abs(r) > 0.005) {
+        var totalEur = e + r / bnr;
+        var totalRon = e * bnr + r;
+        combinedHtml = '<div class="dc-gtile-combined" style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--panel-border,#e5e7eb);font-size:11px;color:var(--text-muted,#64748b);">'
+          + '≈ <b style="color:' + color + ';">' + n2(totalEur, 2) + ' EUR</b>'
+          + ' &nbsp;·&nbsp; ≈ <b style="color:' + color + ';">' + n2(totalRon, 2) + ' RON</b>'
+          + '</div>';
+      }
       return '<div class="dc-gtile dc-tone-' + esc(tone || 'muted') + '">'
         + '<div class="dc-gtile-l">' + icon + ' ' + label + '</div>'
         + '<div class="dc-gtile-vals">'
@@ -1107,6 +1122,7 @@
         +   '<div class="dc-gtile-v" style="color:' + color + ';">' + n2(ron, 2)
         +     ' <span class="dc-tile-cur">RON</span></div>'
         + '</div>'
+        + combinedHtml
         + '</div>';
     }
 
@@ -1690,6 +1706,9 @@
         +     '<button class="btn ghost dc-print-btn" style="padding:3px 9px;font-size:12px;margin-right:4px;" '
         +       'title="' + t('fe.pg.printGroup') + '" '
         +       'onclick="event.stopPropagation();FleetExtra.dcGroupPrint(' + gid + ')">🖨️</button>'
+        +     '<button class="btn danger" style="padding:3px 9px;font-size:12px;margin-right:4px;" '
+        +       'title="' + t('fe.pg.deleteGroup') + '" '
+        +       'onclick="event.stopPropagation();FleetExtra.dcPgDelete(' + gid + ')">🗑️</button>'
         +     '<span class="dc-pg-chevron" aria-hidden="true">▸</span>'
         +   '</td>'
         + '</tr>'
@@ -1859,6 +1878,18 @@
   function dcPayDelete(id) {
     if (!confirm(t('fe.pm.delConfirm'))) return;
     gas('paymentDelete', [{ id: id }]).then(function (r) {
+      if (r && r.ok) { toast(t('common.deleted'), 'ok'); dcLoad(); }
+      else toast((r && r.err) || t('common.error'), 'err');
+    });
+  }
+  // Csoportos kifizetés törlése — a csoport MINDEN driver_payments sorát törli,
+  // az `earning_id` linket az `ON DELETE CASCADE` viszi ki a group_items-ből, de
+  // a `driver_earnings` sorok érintetlenek → visszakerülnek a kifizetetlenek közé.
+  // Dupla-confirm, mert visszavonhatatlan pénzügyi művelet.
+  function dcPgDelete(gid) {
+    if (!confirm(t('fe.pg.delConfirm'))) return;
+    if (!confirm(t('fe.pg.delConfirm2'))) return;
+    gas('earningPaymentGroupDelete', [{ id: gid }]).then(function (r) {
       if (r && r.ok) { toast(t('common.deleted'), 'ok'); dcLoad(); }
       else toast((r && r.err) || t('common.error'), 'err');
     });
@@ -4781,6 +4812,7 @@
     dcPayBnrChange: dcPayBnrChange,
     dcPaySubmit: dcPaySubmit,
     dcPayDelete: dcPayDelete,
+    dcPgDelete: dcPgDelete,
     // Vezetett kifizetés-allokáció (💵 Részleges / ✅ Teljes → melyik havi
     // járandóságból mennyit, FIFO-előtöltéssel, részleges levonással)
     dcAllocOpen: dcAllocOpen,

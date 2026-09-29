@@ -1978,17 +1978,14 @@ async function _allocateDriver(cid, email, bnrRate) {
   }
   leftoverPool = r2(leftoverPool);
 
-  // 4) SAJÁT-HÓ ELŐSZÖR, majd ÁTCSORDULÁS. Payment-enként: előbb a kifizetés
-  //    saját hónapjának tételeit fedezi (legrégebbi elöl), majd a maradék a
-  //    többi hónap kifizetetlen tételeire (legrégebbi elöl). A fedezetet
-  //    payment-enként rögzítjük (paymentCovers) → „mit fedez" a dokumentumon.
-  function _apply(pid, amt, sameMonth, pmonth) {
+  // 4) MINDIG A LEGRÉGEBBI ELSŐ (strict FIFO). A régi „saját-hó előbb" heurisztikát
+  //    a felhasználó explicit kérése alapján kivettük — a kifizetés MINDIG a
+  //    legrégebbi kifizetetlen tételből vonódik le először, hó-határon átnyúlva.
+  //    Így egy szept.-i kifizetés először egy még nyitott aug.-i tételt fedez,
+  //    NEM egy szept.-i kicsit. Kizárólag oldest-first, `earning_date ASC`.
+  function _apply(pid, amt) {
     for (const e of earns) {
       if (amt <= 0.005) break;
-      // A tétel „elsődleges hónapja" a napjaiban leg-gyakoribb hónap
-      // (több-havi diurna → majority-day); days[] nélkül earning_date.
-      const em = _monthOfEarning(e);
-      if (sameMonth ? (em !== pmonth) : (em === pmonth)) continue;
       const rem = remain.get(e.id) || 0;
       if (rem <= 0.005) continue;
       const take = r2(Math.min(amt, rem));
@@ -1997,7 +1994,7 @@ async function _allocateDriver(cid, email, bnrRate) {
       if (pid != null) {
         if (!paymentCovers.has(pid)) paymentCovers.set(pid, []);
         paymentCovers.get(pid).push({
-          earning_id: e.id, month: em, kind: e.kind, label: e.label,
+          earning_id: e.id, month: _monthOfEarning(e), kind: e.kind, label: e.label,
           currency: e.currency, alloc_ron: take,
           // A hó-átfedést a klienshez adjuk (opcionálisan „N/M zi ale acestei
           // luni fedezve"); backward-kompatibilis (régi kliens nem használja).
@@ -2009,13 +2006,12 @@ async function _allocateDriver(cid, email, bnrRate) {
   }
   for (const p of soloPayments) {
     let amt = p.ron;
-    amt = _apply(p.id, amt, true, p.month);     // A) saját hónap előbb
-    amt = _apply(p.id, amt, false, p.month);    // B) átcsordulás a többi hónapra
-    // A) túlfizetés (amt > 0) — nincs több kifizetetlen tétel: figyelmen kívül.
+    amt = _apply(p.id, amt);   // Strict oldest-first — minden tétel közt
+    // Túlfizetés (amt > 0) — nincs több kifizetetlen tétel: figyelmen kívül.
   }
   // A részleges-csoport maradéka a legrégebbi kifizetetlen tételre (payment-hez
   // nem kötött átcsordulás — a fedezetét a csoport group_items-e mutatja).
-  if (leftoverPool > 0.005) _apply(null, leftoverPool, false, '\u0000');
+  if (leftoverPool > 0.005) _apply(null, leftoverPool);
 
   return { alloc, paymentCovers };
 }

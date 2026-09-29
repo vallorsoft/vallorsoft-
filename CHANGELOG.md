@@ -14,6 +14,24 @@
 
 ---
 
+## 2026-09-29 — Sofőr-elszámolás: STRICT oldest-first + csoport-törlés UI + kombinált EUR/RON a főcsempéken (PR #491)
+
+**Három konkrét user-kérés:**
+1. „van egy ilyen beragadt kifizetes … nem torolheto a kifizetes sem" — a csoportos kifizetés UI-ról hiányzott a törlő gomb (a szerver-oldali `earningPaymentGroupDelete` RPC létezett, de nem volt kliens-kötése).
+2. „es ne a legkisebb ertekkel kezdje hanem a legregebbi ertekbol vonja le mindig eloszor" — az auto-allokátor a régi „saját-hó előbb" heurisztikát törli, mindig strict oldest-first sorrend.
+3. „a kis tablan fel kell tuntetni az ertekek melett az euro es lej teljes oszeadott erteket euroban is es lejben is" — a fő 3-csempés összefoglaló (Járandóság / Kifizetve / Hátralék) minden csempéjén a nyers EUR + RON értékek alatt kombinált EUR + kombinált RON is látszik BNR-en számolva.
+
+**Változások:**
+
+- **STRICT oldest-first allokátor** (`handlers/fleetCompliance.js` `_allocateDriver`): a régi `_apply(pid, amt, sameMonth, pmonth)` „saját-hó előbb + átcsordulás" heurisztika törölve; új `_apply(pid, amt)` egyszerű oldest-first passz. A szeptemberi kifizetés ELŐSZÖR egy még nyitott aug.-i tartozást fedez, csak a maradék megy a szeptemberi tételekre. A regressziós tesztek (`driver-allocation.test.js`, `driver-earnings-payments.test.js`) átírva a strict-FIFO elvárásra (a régi „szept.-i pénz nem megy augusztusra" invariáns az explicit user-kérés miatt kikerült).
+- **Csoportos kifizetés törlő gomb** (`_dcPaymentListHtml` group-row): 🖨️ MELLÉ új 🗑️ danger-gomb; `dcPgDelete(gid)` új kliens-függvény dupla-confirm-mel az `earningPaymentGroupDelete` RPC-hez. Az `ON DELETE CASCADE` viszi a group_items-t; a `driver_earnings` sorok érintetlenek — visszakerülnek a kifizetetlenek közé.
+- **Kombinált EUR/RON a főcsempéken** (`_dcBalanceCard` `gtile`): a nyers EUR+RON sorok alatt új szaggatott-vonalas kiegészítő sor: „≈ X EUR · ≈ Y RON" (mindkét irányú BNR-egyenérték). Csak akkor jelenik meg, ha VAN BNR és mindkét valutában van érték.
+- **i18n** 3 új kulcs (`fe.pg.deleteGroup` / `delConfirm` / `delConfirm2`, RO-alap + HU).
+
+**Tesztek:** 1355 Jest zöld (10 skipped valós-DB). A régi „same-month-first" regressziós tesztek átalakítva strict-FIFO-ra.
+
+---
+
 ## 2026-09-29 — Sofőr-elszámolás nyomtatványok: naptár helyett dátumlista + többhavi diurna arányos beszámítás + egyensúly-banner
 
 **Kérések:**
