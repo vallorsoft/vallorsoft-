@@ -740,12 +740,13 @@ describe('getDriverBalance', () => {
     expect(res.body.result.bnr_source).toBe('payments');
   });
 
-  test('settled_period/remaining_period: az IDŐSZAK tételeit allokáció-alapon számolja (same-month-first) — a szept. kifizetés a szept. tételre megy, nem viszi el az aug. elmaradás', async () => {
+  test('settled_period/remaining_period: az IDŐSZAK tételeit STRICT oldest-first allokáció-alapon számolja (PR #491) — a kifizetés ELŐBB az aug. elmaradást fedezi, a maradék a szept. tételre', async () => {
     // Szcenárió: aug. tétel 500 RON (kifizetetlen) + szept. tétel 480 EUR (=2515.2 @5.24).
-    // 3000 RON solo kifizetés szeptemberben. Same-month-first: a szept. tétel
-    // TELJESEN fedezve (2515.2), a maradék (484.8) az augusztusira csordul.
-    // A gyors-kimutató a SZEPT. IDŐSZAKRA: kifizetve = 480 EUR (2515.2 RON),
-    // hátralék = 0 — NEM a nyers 3000 RON (amiben aug. része is benne van).
+    // 3000 RON solo kifizetés szeptemberben. STRICT oldest-first: elsőnek az
+    // AUG. tétel (500 RON) TELJESEN fedezve, aztán a maradék (2500 RON) a
+    // szept. tételre (2515.2 RON) → részleges (marad 15.2 RON = ~2.9 EUR).
+    // A gyors-kimutató a SZEPT. IDŐSZAKRA: kifizetve = 2500 RON az id=2 tételre,
+    // hátralék = 15.2 RON (~2.9 EUR).
     setUser(fixtures.admin);
     fetchBnrEurRon.mockResolvedValueOnce(5.24);
     const pool = require('../../db');
@@ -774,13 +775,11 @@ describe('getDriverBalance', () => {
     expect(res.body.result.ok).toBe(true);
     // A régi (nyers) mezők megmaradnak (legacy kifizetés-modál)
     expect(res.body.result.paid.ron).toBe(3000);
-    // ÚJ: allokáció-alapú időszak-elszámoltság — a szept. tétel teljesen fedezve
+    // ÚJ: STRICT oldest-first — az aug. tétel elsőnek fedezve (500), a szept.
+    // tétel (2515.2) csak részlegesen (2500), marad 15.2 RON hátralék.
     expect(res.body.result.settled_period).toBeTruthy();
-    expect(res.body.result.settled_period.combined_ron).toBeCloseTo(2515.2, 0);
-    expect(res.body.result.settled_period.eur).toBeCloseTo(480, 1);
-    // Hátralék az IDŐSZAK tételeiből: 0 (nem a nyers −484.8 RON túlfizetés-látszat)
-    expect(res.body.result.remaining_period.combined_ron).toBeCloseTo(0, 1);
-    expect(res.body.result.remaining_period.eur).toBeCloseTo(0, 1);
+    expect(res.body.result.settled_period.combined_ron).toBeCloseTo(2500, 0);
+    expect(res.body.result.remaining_period.combined_ron).toBeCloseTo(15.2, 0);
   });
 });
 

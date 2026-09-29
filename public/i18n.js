@@ -3034,6 +3034,10 @@
     'fe.pg.balanceRemain': { ro: 'Rămas de plată', hu: 'Hátralék' },
     // Napok periódusában eső napok jelzése (Decont oficial / lunar tételes)
     'fe.pg.daysInPeriod':  { ro: '{in}/{tot} zile în această perioadă', hu: '{in}/{tot} nap ebben az időszakban' },
+    // Csoportos kifizetés törlése — dupla-confirm szöveg
+    'fe.pg.deleteGroup':   { ro: 'Șterge grupul de plată', hu: 'Csoport törlése' },
+    'fe.pg.delConfirm':    { ro: 'Sigur ștergi acest grup de plată? Drepturile revin la neplătite.', hu: 'Biztosan törlöd ezt a kifizetés-csoportot? A járandóság visszaáll kifizetetlenre.' },
+    'fe.pg.delConfirm2':   { ro: 'ULTIMĂ CONFIRMARE: se șterg toate plățile din grup. Continuăm?', hu: 'UTOLSÓ MEGERŐSÍTÉS: minden fizetési tétel törlődik a csoportból. Folytatjuk?' },
 
     // Egyéni járandóság-típusok (⚙️ kezelő)
     'fe.dk.title':       { ro: 'Tipuri de câștig', hu: 'Járandóság-típusok' },

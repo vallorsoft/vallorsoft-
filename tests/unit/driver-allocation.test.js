@@ -1,10 +1,11 @@
 // ============================================================
-//  _allocateDriver — kifizetés-allokáció (SAME-MONTH-FIRST)
-//  Regresszió-védelem a felhasználói hibára: a szeptemberi solo
-//  kifizetést NEM viheti el az augusztusi (korábbi havi) elmaradás —
-//  a kifizetés ELŐSZÖR a saját hónapja tételeit fedezi, és csak a
-//  maradéka csordul át a régebbi hónapokra (legrégebbi elöl).
-//  Emellett a payment-enkénti FEDEZET (paymentCovers) is helyes.
+//  _allocateDriver — kifizetés-allokáció (STRICT OLDEST-FIRST)
+//  A felhasználó explicit kérésére (PR #491) a solo kifizetést
+//  MINDIG a LEGRÉGEBBI kifizetetlen tételre allokáljuk, hó-határon
+//  átnyúlva. A régi „saját-hó előbb" heurisztika törölve — így egy
+//  szept.-i kifizetés először egy még nyitott aug.-i tartozást fedez.
+//  A guided (kliens-vezetett) allokáció ettől független — ott a
+//  felhasználó explicit alloc_ron-t ad meg.
 // ============================================================
 jest.mock('../../db', () => require('../helpers/db-mock').pool);
 jest.mock('../../lib/audit', () => ({ record: jest.fn(), fromReq: jest.fn() }));
@@ -27,8 +28,8 @@ function mockDb({ earnings = [], groupItems = [], payments = [] }) {
 
 beforeEach(() => reset());
 
-describe('_allocateDriver — same-month-first solo allokáció', () => {
-  // A felhasználó valós esete: aug. elmaradás + szept. tételek + 3 szept. solo kifizetés.
+describe('_allocateDriver — STRICT oldest-first solo allokáció', () => {
+  // Aug. elmaradás + szept. tételek + 3 szept. solo kifizetés.
   const BNR = 5.24;
   const earnings = [
     { id: 1, earning_date: '2026-08-15', currency: 'RON', total_amount: 937, kind: 'other', label: 'Aug' },
@@ -41,59 +42,51 @@ describe('_allocateDriver — same-month-first solo allokáció', () => {
     { id: 12, paid_at: '2026-09-11', amount: 2500, currency: 'RON', amount_ron: 2500, group_id: null },
   ];
 
-  test('szeptemberi kifizetés a SZEPTEMBERI tételekre megy (nem az augusztusira)', async () => {
+  test('a legelső kifizetés az AUGUSZTUSI tartozásra megy (a legrégebbi kifizetetlen)', async () => {
     mockDb({ earnings, payments });
     const { alloc } = await _allocateDriver(1, 'b@ceg.hu', BNR);
-    // Augusztus (id=1) érintetlen — a szept. pénzt nem viszi el
-    expect((alloc.get(1) || { settled_ron: 0 }).settled_ron).toBe(0);
-    // Szept. kicsi (id=2, 360 EUR = 1886.4 RON) teljesen fedezve
+    // 137 + 800 = 937 RON → aug. (id=1) TELJESEN fedezve
+    expect(alloc.get(1).fully).toBe(true);
+    expect(alloc.get(1).settled_ron).toBeCloseTo(937, 1);
+    // 2500 RON → id=2 (1886.4 RON, sep 1) teljes + id=3 (2515.2 RON, sep 12) részleges
     expect(alloc.get(2).fully).toBe(true);
     expect(alloc.get(2).settled_ron).toBeCloseTo(1886.4, 1);
-    // Salariu (id=3, 480 EUR = 2515.2 RON) a maradékból: 3437 − 1886.4 = 1550.6
-    // (a RÉGI, globális FIFO ezt tévesen 613.6-ra vitte → most 1550.6)
-    expect(alloc.get(3).settled_ron).toBeCloseTo(1550.6, 1);
     expect(alloc.get(3).fully).toBe(false);
+    // p12 maradéka a szept. salariura: 2500 − 1886.4 = 613.6 RON
+    expect(alloc.get(3).settled_ron).toBeCloseTo(613.6, 1);
   });
 
-  test('a régi bug (613.6 RON a Salariun) NEM fordul elő', async () => {
-    mockDb({ earnings, payments });
-    const { alloc } = await _allocateDriver(1, 'b@ceg.hu', BNR);
-    expect(alloc.get(3).settled_ron).not.toBeCloseTo(613.6, 1);
-  });
-
-  test('paymentCovers: minden szept. kifizetés SZEPTEMBERI tételt fedez', async () => {
+  test('paymentCovers: a p10+p11 aug.-i tételt fedez, a p12 szept.-eket', async () => {
     mockDb({ earnings, payments });
     const { paymentCovers } = await _allocateDriver(1, 'b@ceg.hu', BNR);
-    // p10 + p11 a szept. kicsire (id=2, 2026-09)
+    // p10 (137) + p11 (800): az aug.-i id=1-et fedezik
     for (const pid of [10, 11]) {
       const cov = paymentCovers.get(pid) || [];
       expect(cov.length).toBeGreaterThan(0);
-      cov.forEach(c => expect(c.month).toBe('2026-09'));
+      cov.forEach(c => expect(c.earning_id).toBe(1));
+      cov.forEach(c => expect(c.month).toBe('2026-08'));
     }
-    // p12 (2500) fedezi id=2 maradékát + id=3-at, mind szeptember
+    // p12 (2500): id=2 + id=3, mindkét szept.-i
     const cov12 = paymentCovers.get(12) || [];
     const eids = cov12.map(c => c.earning_id).sort();
     expect(eids).toEqual([2, 3]);
-    cov12.forEach(c => expect(c.month).toBe('2026-09'));
-    // Egyetlen kifizetés SEM fedez augusztusi (id=1) tételt
-    for (const pid of [10, 11, 12]) {
-      (paymentCovers.get(pid) || []).forEach(c => expect(c.earning_id).not.toBe(1));
-    }
   });
 
-  test('túlfizetés ÁTCSORDUL a régebbi (augusztusi) elmaradásra', async () => {
-    // Szept. tételek: 360 EUR + 480 EUR = 4401.6 RON. Kifizetés 6000 RON (szept).
+  test('teljes túlfizetés: minden tétel fedezve, a maradék elveszik', async () => {
+    // Szept. tételek: 360 EUR + 480 EUR = 4401.6 RON + aug. 937 = 5338.6 RON.
+    // 6000 RON kifizetés → mindent lefed
     const bigPay = [{ id: 20, paid_at: '2026-09-20', amount: 6000, currency: 'RON', amount_ron: 6000, group_id: null }];
     mockDb({ earnings, payments: bigPay });
     const { alloc, paymentCovers } = await _allocateDriver(1, 'b@ceg.hu', BNR);
-    // Szept. tételek teljesen fedezve
+    expect(alloc.get(1).fully).toBe(true);
     expect(alloc.get(2).fully).toBe(true);
     expect(alloc.get(3).fully).toBe(true);
-    // A maradék (6000 − 4401.6 = 1598.4) az augusztusira csordul (937 → fully)
-    expect(alloc.get(1).fully).toBe(true);
-    // A kifizetés fedezete tartalmaz augusztusi tételt is (átcsordulás)
     const cov = paymentCovers.get(20) || [];
-    expect(cov.some(c => c.earning_id === 1 && c.month === '2026-08')).toBe(true);
+    // Egyetlen kifizetés fedezi mind a hármat, oldest-first sorrendben
+    expect(cov.length).toBe(3);
+    expect(cov[0].earning_id).toBe(1);  // aug. elsőnek
+    expect(cov[1].earning_id).toBe(2);  // sep 1 másodiknak
+    expect(cov[2].earning_id).toBe(3);  // sep 12 utolsónak
   });
 
   test('csoportos (guided) tétel pre-elszámolva marad — a solo NEM nyúl hozzá', async () => {
@@ -103,7 +96,9 @@ describe('_allocateDriver — same-month-first solo allokáció', () => {
     mockDb({ earnings, groupItems: grp, payments: soloSep });
     const { alloc } = await _allocateDriver(1, 'b@ceg.hu', BNR);
     expect(alloc.get(1).fully).toBe(true);              // csoport fedezi az augusztust
-    expect(alloc.get(2).fully).toBe(true);              // a szept. solo a szept. kicsit fedezi
-    expect((alloc.get(3) || { settled_ron: 0 }).settled_ron).toBe(0); // salariura már nem jut
+    // A solo 1886.4 RON az id=1-en már nem tud levonni (csoport fedezi), és
+    // az id=2 is legrégebbi kifizetetlen → oda kerül. id=3 érintetlen.
+    expect(alloc.get(2).fully).toBe(true);
+    expect((alloc.get(3) || { settled_ron: 0 }).settled_ron).toBe(0);
   });
 });
