@@ -14,6 +14,22 @@
 
 ---
 
+## 2026-09-29 — Biztonsági + üzemeltetési hibakör: session-revalidálás, session-fixation, ütemező-vezető, RPC-registry őr (PR #492)
+
+**Kérés:** „Térképezd fel a hibákat és hiányosságokat, a hibákat javítsd."
+
+**Feltárt + javított hibák:**
+1. **A munkamenet 7 napig élt a régi szereppel** — letiltott/törölt/lefokozott user, lejárt/lemondott cég, jelszócsere, letiltott portál-belépő: semmi nem ellenőrizte újra. Új `middleware/sessionRevalidate.js` (≤60 mp, `SESSION_REVALIDATE_MS`), fail-open DB-hibánál; jelszó-ujjlenyomat (`pwf`) → jelszócsere/reset után a többi session kiesik, a saját megmarad (`settingsChangePassword`, `userUpdate`).
+2. **Session-fixation** — `regenerateSession` a fő loginon (jelszó után, 2FA előtt), az ügyfél- és alvállalkozói portál login + set-password útjain.
+3. **Az ütemezők minden Fly-gépen futottak** (duplikált e-mail/push/IMAP) és a migrációk előtt indultak. Új `lib/schedulerLeader.js` + `db/scheduler-leader.sql` — DB-bérlet (pooler-biztos), csak a vezető indít, a migrációk UTÁN; SIGTERM → elengedés. `SCHEDULER_LEADER=off` kikapcsolja.
+4. **`/api/execute` prototípus-lánc** — `functionName:"constructor"` → lógó kérés. Most csak saját, függvény-értékű bejegyzés hívható.
+5. **Duplikált handler-név** — a statisztikás `getBnrRate` holt kód volt (a `bnr.js` felülírta); törölve + őr-teszt (`tests/unit/execute-registry.test.js`).
+6. `authMe` / login-válasz nem adja ki a belső ujjlenyomatot.
+
+**Teszt:** +28 (session-revalidate, execute-registry, scheduler-leader valós DB-vel). **1438 Jest zöld** valós Postgres 16-tal + élő szerveres ellenőrzés.
+
+---
+
 ## 2026-09-29 — Sofőr-elszámolás: STRICT oldest-first + csoport-törlés UI + kombinált EUR/RON a főcsempéken (PR #491)
 
 **Három konkrét user-kérés:**
