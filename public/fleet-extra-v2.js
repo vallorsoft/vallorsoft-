@@ -1208,36 +1208,26 @@
     try { return new Date(Date.UTC(y, m, 1)).toLocaleDateString(t('fe.dd.loc') || 'ro-RO', { month: 'long', year: 'numeric', timeZone: 'UTC' }); }
     catch (_e) { return y + '-' + (m + 1); }
   }
-  // Kis naptár (inline stílus → nyomtatás/e-mail-biztos): a kijelölt napok zölden.
+  // Nap-lista (nyomtatás/e-mail-biztos, inline stílus): a kijelölt napok
+  // dátum-felsorolása. A régi vizuális kis-naptár TÖRÖLVE — a diurna sok napja
+  // fölöslegesen nagy blokkot rajzolt a papírra; a lista tömörebb és sokszorosításban
+  // is jól olvasható. Hosszabb tartományok több hónapra bontva (havi fejléccel).
   function _dcMiniCalHtml(days) {
     if (!days || !days.length) return '';
-    var set = {}; days.forEach(function (d) { set[d] = 1; });
-    var months = {}; days.forEach(function (d) { months[d.slice(0, 7)] = 1; });
-    var wd = _dcWd();
-    var out = Object.keys(months).sort().map(function (ym) {
+    var byMonth = {};
+    days.slice().sort().forEach(function (d) {
+      var ym = d.slice(0, 7);
+      (byMonth[ym] = byMonth[ym] || []).push(d.slice(8, 10) + '.' + d.slice(5, 7) + '.');
+    });
+    var blocks = Object.keys(byMonth).sort().map(function (ym) {
       var y = +ym.slice(0, 4), m = +ym.slice(5, 7) - 1;
-      var first = (new Date(Date.UTC(y, m, 1)).getUTCDay() + 6) % 7;
-      var dim = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
-      var cells = [], i;
-      for (i = 0; i < first; i++) cells.push('<td></td>');
-      for (i = 1; i <= dim; i++) {
-        var key = ym + '-' + (i < 10 ? '0' : '') + i;
-        cells.push(set[key]
-          ? '<td style="background:#16a34a;color:#fff;font-weight:700;border-radius:3px;">' + i + '</td>'
-          : '<td style="color:#94a3b8;">' + i + '</td>');
-      }
-      var rows = '';
-      for (i = 0; i < cells.length; i += 7) rows += '<tr>' + cells.slice(i, i + 7).join('') + '</tr>';
-      return '<table class="dc-minical" style="display:inline-table;border-collapse:separate;border-spacing:1px;'
-        + 'font-size:9px;text-align:center;margin:4px 6px 0 0;vertical-align:top;border:1px solid #e5e7eb;border-radius:4px;">'
-        + '<tr><td colspan="7" style="font-weight:700;color:#0f172a;padding:1px 0;">' + esc(_dcMonthName(y, m)) + '</td></tr>'
-        + '<tr>' + wd.map(function (w) { return '<td style="color:#64748b;font-weight:600;width:14px;">' + esc(w) + '</td>'; }).join('') + '</tr>'
-        + rows + '</table>';
-    }).join('');
-    return '<div class="dc-days" style="margin-top:4px;">'
-      + '<div style="font-size:11px;color:#166534;">' + esc(t('fe.dd.days')) + ': '
-      + days.map(function (d) { return d.slice(8, 10) + '.' + d.slice(5, 7); }).join(', ') + '</div>'
-      + out + '</div>';
+      var label = '<span style="color:#0f172a;font-weight:700;">' + esc(_dcMonthName(y, m)) + '</span>: ';
+      return label + byMonth[ym].join(', ');
+    });
+    return '<div class="dc-days" style="margin-top:4px;font-size:11px;color:#166534;line-height:1.45;">'
+      + '<b>' + esc(t('fe.dd.days')) + ':</b> '
+      + blocks.join(' · ')
+      + '</div>';
   }
   // Rövid dátum-lista (képernyős listához)
   function _dcDaysShort(it) {
@@ -3020,6 +3010,47 @@
       +   '<div style="font-size:11px;color:#6b7280;">' + esc(dr.email || '') + '</div>'
       + '</div>';
 
+    // Egyensúly-banner (Járandóság ↔ Kifizetve ↔ Hátralék) — a szem azonnal
+    // lássa, MENNYI lett ténylegesen lehúzva ebből a csoportos kifizetésből.
+    // Régi (PR #443 előtti) klienshez nem szükséges — a szerver a `summary.balance`
+    // mezőt új néven küldi; hiánya esetén elhagyjuk a bannert (backward-kompat).
+    var bal = (r.summary && r.summary.balance) || null;
+    var balanceBanner = '';
+    if (bal) {
+      var bnrLbl = (bal.bnr_rate != null) ? (' · BNR ' + n2(bal.bnr_rate, 4)) : '';
+      var paidEurTxt = (bal.paid_eur_eq != null)
+        ? (' <span style="font-size:11px;color:#166534;">(≈ ' + n2(bal.paid_eur_eq, 2) + ' EUR)</span>')
+        : '';
+      var remainEurTxt = (bal.remain_eur != null)
+        ? (' <span style="font-size:11px;color:#78350f;">(≈ ' + n2(bal.remain_eur, 2) + ' EUR)</span>')
+        : '';
+      var remainCellStyle = (bal.remain_ron > 0.005)
+        ? 'background:#fef3c7;border:1.5px solid #f59e0b;'
+        : 'background:#dcfce7;border:1.5px solid #22c55e;';
+      balanceBanner =
+        '<div style="margin-bottom:14px;padding:14px 16px;background:linear-gradient(135deg,#eff6ff,#f0f9ff);border:2px solid #3b82f6;border-radius:10px;">'
+        +   '<div style="font-size:10px;color:#1e40af;text-transform:uppercase;letter-spacing:0.5px;font-weight:800;margin-bottom:8px;">'
+        +     '⚖️ ' + t('fe.pg.balanceTitle') + bnrLbl
+        +   '</div>'
+        +   '<table style="width:100%;border-collapse:separate;border-spacing:8px 0;">'
+        +     '<tr>'
+        +       '<td style="width:33%;padding:8px 10px;background:#dbeafe;border:1.5px solid #3b82f6;border-radius:8px;vertical-align:top;">'
+        +         '<div style="font-size:10px;color:#1e40af;font-weight:700;text-transform:uppercase;">' + t('fe.pg.balanceEarned') + '</div>'
+        +         '<div style="font-size:16px;color:#1e3a8a;font-weight:800;margin-top:2px;">' + n2(bal.earned_ron_all, 2) + ' RON</div>'
+        +       '</td>'
+        +       '<td style="width:33%;padding:8px 10px;background:#dcfce7;border:1.5px solid #22c55e;border-radius:8px;vertical-align:top;">'
+        +         '<div style="font-size:10px;color:#166534;font-weight:700;text-transform:uppercase;">' + t('fe.pg.balancePaid') + '</div>'
+        +         '<div style="font-size:16px;color:#14532d;font-weight:800;margin-top:2px;">' + n2(bal.paid_ron_effective, 2) + ' RON' + paidEurTxt + '</div>'
+        +       '</td>'
+        +       '<td style="width:33%;padding:8px 10px;' + remainCellStyle + 'border-radius:8px;vertical-align:top;">'
+        +         '<div style="font-size:10px;color:#78350f;font-weight:700;text-transform:uppercase;">' + t('fe.pg.balanceRemain') + '</div>'
+        +         '<div style="font-size:16px;color:#78350f;font-weight:800;margin-top:2px;">' + n2(bal.remain_ron, 2) + ' RON' + remainEurTxt + '</div>'
+        +       '</td>'
+        +     '</tr>'
+        +   '</table>'
+        + '</div>';
+    }
+
     // Tételek táblázat (változatlan)
     var itemRows = items.map(function (it) {
       var kindKey = it.kind || 'other';
@@ -3160,6 +3191,9 @@
       + '<thead><tr><td><div class="vs-doc-head">' + letterhead + '</div></td></tr></thead>'
       + '<tbody><tr><td>'
       + _dcSec('group', 'driver', t('fe.sec.driver'), driverBlock, gHid)
+      // Egyensúly-banner: MINDIG a fejléc alatt (nem kivehető szakasz — a
+      // jogi/pénzügyi konzisztenciához mindig látnia kell a sofőrnek + cégnek)
+      + balanceBanner
       + (g.note ? _dcSec('group', 'note', t('fe.sec.note'), noteBlock, gHid) : '')
       + _dcSec('group', 'items', t('fe.sec.items'), itemsHtml, gHid)
       + _dcSec('group', 'payments', t('fe.sec.payments'), paymentsHtml, gHid)
@@ -3744,13 +3778,34 @@
         ? ' <span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:8px;'
           + 'background:#dcfce7;color:#166534;font-size:10px;font-weight:800;">✓ ' + t('fe.stof.itemPaid') + '</span>'
         : '';
+      // Periódus-badge: ha a tétel több hónapot érint és csak részlegesen esik
+      // ebbe a jelentés-intervallumba, jelezzük „X/Y nap ebben az időszakban"-nel.
+      // A total_amount ilyenkor is a TELJES tétel-összeg, DE a szerver a
+      // per-tétel `period_amount`-ot is átadja (arányos), és a summary az
+      // arányos összegekből számol.
+      var periodBadge = '';
+      if (it.period_days != null && it.total_days != null
+          && it.period_days > 0 && it.period_days < it.total_days) {
+        periodBadge = ' <span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:8px;'
+          + 'background:#fef3c7;color:#78350f;font-size:10px;font-weight:800;">📆 '
+          + t('fe.pg.daysInPeriod', { in: it.period_days, tot: it.total_days }) + '</span>';
+      }
+      // Az „TÉTEL ÖSSZ" oszlopban a teljes tétel-összeg + kisebb betűvel az
+      // adott hó rész-összege (ha rész-hónapos). Az „Σ" alsó sor a szerver által
+      // számolt arányos összeggel egyezik.
+      var totalCell = '<b>' + n2(it.total_amount, 2) + ' ' + esc(it.currency || 'RON') + '</b>';
+      if (it.period_days != null && it.total_days != null
+          && it.period_days > 0 && it.period_days < it.total_days && it.period_amount != null) {
+        totalCell += '<div style="font-size:10px;color:#78350f;font-weight:600;">↳ '
+          + n2(it.period_amount, 2) + ' ' + esc(it.currency || 'RON') + '</div>';
+      }
       return '<tr' + (it.is_settled ? ' style="background:#f0fdf4;"' : '') + '>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + d2(it.earning_date) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(kindLbl) + '</td>'
-        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(it.label || '—') + paidMark + _dcMiniCalHtml(_dcDaysArr(it)) + '</td>'
+        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(it.label || '—') + paidMark + periodBadge + _dcMiniCalHtml(_dcDaysArr(it)) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">'
-        +   n2(it.total_amount, 2) + ' ' + esc(it.currency || 'RON') + '</td>'
+        +   totalCell + '</td>'
         + '</tr>';
     }).join('') || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#6b7280;font-style:italic;">' + t('fe.de.empty') + '</td></tr>';
 
@@ -4352,13 +4407,27 @@
       var paidMark = it.is_settled
         ? ' <span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;background:#dcfce7;color:#166534;font-size:10px;font-weight:800;">✓ ' + t('fe.stof.itemPaid') + '</span>'
         : '';
+      // Periódus-badge (rész-hónapos tétel jelzése)
+      var periodBadge = '';
+      if (it.period_days != null && it.total_days != null
+          && it.period_days > 0 && it.period_days < it.total_days) {
+        periodBadge = ' <span style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:8px;'
+          + 'background:#fef3c7;color:#78350f;font-size:10px;font-weight:800;">📆 '
+          + t('fe.pg.daysInPeriod', { in: it.period_days, tot: it.total_days }) + '</span>';
+      }
+      var totalCell = '<b>' + n2(it.total_amount, 2) + ' ' + esc(it.currency || 'RON') + '</b>';
+      if (it.period_days != null && it.total_days != null
+          && it.period_days > 0 && it.period_days < it.total_days && it.period_amount != null) {
+        totalCell += '<div style="font-size:10px;color:#78350f;font-weight:600;">↳ '
+          + n2(it.period_amount, 2) + ' ' + esc(it.currency || 'RON') + '</div>';
+      }
       return '<tr>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + d2(it.earning_date) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(kindLbl) + '</td>'
-        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(it.label || '—') + paidMark + _dcMiniCalHtml(_dcDaysArr(it)) + '</td>'
+        + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">' + esc(it.label || '—') + paidMark + periodBadge + _dcMiniCalHtml(_dcDaysArr(it)) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">' + n2(it.quantity, 2) + ' × ' + n2(it.unit_amount, 2) + '</td>'
         + '<td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:700;">'
-        +   n2(it.total_amount, 2) + ' ' + esc(it.currency || 'RON') + '</td>'
+        +   totalCell + '</td>'
         + '</tr>';
     }).join('') || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#6b7280;font-style:italic;">' + t('fe.de.empty') + '</td></tr>';
 
