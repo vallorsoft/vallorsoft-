@@ -183,6 +183,10 @@ app.use(session({
   },
 }));
 
+// Munkamenet-újraellenőrzés: letiltott/törölt/lefokozott user, lejárt cég-előfizetés,
+// jelszócsere, letiltott portál-belépő → a régi session nem él tovább 7 napig.
+app.use(require('./middleware/sessionRevalidate').sessionRevalidate);
+
 // ===== ROUTE-OK MOUNTOLASA =====
 app.use(require('./routes/firebase'));
 app.use(require('./routes/legal'));   // dinamikus jogi oldalak + ack
@@ -228,26 +232,33 @@ app.use((err, req, res, next) => {
   res.status(500).send('Eroare de server');
 });
 
-// E-mail intake (beérkező megrendelések) — csak akkor fut, ha az INTAKE_IMAP_* be van állítva.
+// ===== ÜTEMEZŐK =====
+// Csak a VEZETŐ példány futtatja őket (több Fly-gép → különben duplikált
+// e-mailek/push-ok/IMAP-feldolgozás), és csak a DB-migrációk UTÁN indulnak
+// (friss deploynál az első tick ne fusson hiányzó táblába). lib/schedulerLeader.js
+const schedulerLeader = require('./lib/schedulerLeader');
 const { startIntakeScheduler, startExpiryScheduler, startGpsMileageScheduler, startMonthEndSnapshotScheduler, startServiceDueScheduler, startMonthlyReportScheduler, startEFacturaStatusScheduler, startTrialExpiryScheduler, startTrialReminderScheduler, startCancelReminderScheduler, startStatsReportScheduler, startPaymentDueScheduler, startPdfWorkspaceCleanup, startMorningDigestScheduler, startGpsDailyTrackScheduler } = require('./services/scheduler');
-startIntakeScheduler();
-startExpiryScheduler();
-startGpsMileageScheduler();
-startMonthEndSnapshotScheduler();   // hó-végi GPS km + üzemanyag-szint snapshot (23:59-hez legközelebbi olvasás)
-startServiceDueScheduler();         // km-/dátum-alapú szerviz-esedékesség riasztás (push + e-mail)
-startMonthlyReportScheduler();
-startEFacturaStatusScheduler();
-startTrialExpiryScheduler();       // trial lejárat e-mail értesítő (14. nap)
-startTrialReminderScheduler();     // trial emlékeztető 3d és 1d előtt
-startCancelReminderScheduler();    // lemondás: utolsó-napi emlékeztető + lejárt véglegesítés
-startStatsReportScheduler();       // Statisztika 2.0 időzített riportok (daily/weekly/monthly)
-startPaymentDueScheduler();        // Sofőr csoportos kifizetés: scheduled paid_at napján e-mail az adminnak
-startPdfWorkspaceCleanup();        // Aláírás/pecsét munkatér: >24h dokumentumok törlése (6 óránként)
-startMorningDigestScheduler();     // Reggeli összefoglaló (cégenként állítható, alap 07:00 Europe/Bucharest)
-startGpsDailyTrackScheduler();     // Napi GPS útvonal (breadcrumb) — 10 percenként, mozgás-szűrővel
+function startAllSchedulers() {
+  startIntakeScheduler();
+  startExpiryScheduler();
+  startGpsMileageScheduler();
+  startMonthEndSnapshotScheduler();   // hó-végi GPS km + üzemanyag-szint snapshot (23:59-hez legközelebbi olvasás)
+  startServiceDueScheduler();         // km-/dátum-alapú szerviz-esedékesség riasztás (push + e-mail)
+  startMonthlyReportScheduler();
+  startEFacturaStatusScheduler();
+  startTrialExpiryScheduler();       // trial lejárat e-mail értesítő (14. nap)
+  startTrialReminderScheduler();     // trial emlékeztető 3d és 1d előtt
+  startCancelReminderScheduler();    // lemondás: utolsó-napi emlékeztető + lejárt véglegesítés
+  startStatsReportScheduler();       // Statisztika 2.0 időzített riportok (daily/weekly/monthly)
+  startPaymentDueScheduler();        // Sofőr csoportos kifizetés: scheduled paid_at napján e-mail az adminnak
+  startPdfWorkspaceCleanup();        // Aláírás/pecsét munkatér: >24h dokumentumok törlése (6 óránként)
+  startMorningDigestScheduler();     // Reggeli összefoglaló (cégenként állítható, alap 07:00 Europe/Bucharest)
+  startGpsDailyTrackScheduler();     // Napi GPS útvonal (breadcrumb) — 10 percenként, mozgás-szűrővel
 
-// Opcionális automatikus DB-mentés (alapból KI; BACKUP_ENABLED=true + BACKUP_DIR).
-require('./services/backup').startBackupScheduler();
+  // Opcionális automatikus DB-mentés (alapból KI; BACKUP_ENABLED=true + BACKUP_DIR).
+  require('./services/backup').startBackupScheduler();
+}
+
 
 // (megtartva az eredetibol; jelenleg nincs hasznalatban)
 const getNowStr = () => new Date().toISOString().replace('T', ' ').substring(0, 19);
@@ -262,7 +273,7 @@ const getNowStr = () => new Date().toISOString().replace('T', ' ').substring(0, 
 // előtt) ugyanazon induláson belül feloldódjanak. Hiba NEM állítja meg a
 // szervert — csak naplózódik, és a következő indulásnál újrapróbálódik.
 const fs = require('fs');
-(async () => {
+const migrationsDone = (async () => {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
       filename   TEXT PRIMARY KEY,
@@ -287,6 +298,15 @@ const fs = require('fs');
     console.error('Migráció-futtató hiba (a szerver tovább indul):', e.message);
   }
 })();
+
+// Ütemezők: a migrációk után, csak a vezető példányon.
+migrationsDone.then(() => schedulerLeader.runWhenLeader(pool, startAllSchedulers));
+
+// Leálláskor (Fly: SIGTERM) a vezető-bérlet elengedése → a másik gép azonnal átveszi.
+['SIGTERM', 'SIGINT'].forEach((sig) => process.once(sig, () => {
+  schedulerLeader.release(pool).finally(() => process.exit(0));
+  setTimeout(() => process.exit(0), 3000).unref();
+}));
 
 // ===== SZERVER INDITAS =====
 var PORT = process.env.PORT || 3000;

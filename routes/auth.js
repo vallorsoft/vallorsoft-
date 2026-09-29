@@ -12,6 +12,7 @@ const { sendResetEmail } = require('../services/email');
 const { appBaseUrl } = require('../lib/appUrl');
 const audit = require('../lib/audit');
 const { validatePassword } = require('../lib/passwordPolicy');
+const { regenerateSession, pwFingerprint } = require('../middleware/sessionRevalidate');
 
 // 2FA (TOTP) — opcionális csomagok, ahogy az eredeti server.js-ben
 let speakeasy = null, qrcode = null;
@@ -139,6 +140,11 @@ router.post('/api/login', async (req, res) => {
       }
     }
 
+    // Session-fixation védelem: a jelszó helyes → ÚJ session-azonosító,
+    // mielőtt bármilyen (pre-auth vagy végleges) hitelesítési adat bekerül.
+    await regenerateSession(req);
+    const pwf = pwFingerprint(user.password_hash);
+
     // ===== 2FA KAPU =====
     // A jelszo helyes. Most a 2FA allapot dont.
     // Atmeneti "pre-auth" session - csak a 2FA lepeshez
@@ -150,6 +156,7 @@ router.post('/api/login', async (req, res) => {
           id: user.id, nume: user.nume, email: user.email, tel: user.tel,
           pozicio: user.pozicio, company_id: user.company_id,
           is_dev: user.pozicio_dev || false,
+          pwf: pwf,
         };
         return res.json({ success: true, need2fa: true });
       }
@@ -166,6 +173,7 @@ router.post('/api/login', async (req, res) => {
       pozicio: user.pozicio,
       company_id: user.company_id,
       is_dev: user.pozicio_dev || false,
+      pwf: pwf,   // jelszó-ujjlenyomat: jelszócsere után a régi session-ök kiesnek
     };
     audit.fromReq(req, 'login.success', 'user', user.id);   // best-effort audit
     pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]).catch(() => {}); // utolsó belépés
@@ -179,7 +187,7 @@ router.post('/api/login', async (req, res) => {
     return res.json({
       success: true,
       redirect: redirect,
-      user: req.session.user,
+      user: Object.assign({}, req.session.user, { pwf: undefined }),
     });
 
   } catch (err) {

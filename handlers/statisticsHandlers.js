@@ -366,34 +366,9 @@ handlers.setEurRonRate = async function (req, res, args) {
   }
 };
 
-// ── BNR hivatalos EUR↔RON árfolyam lekérése (segéd a 💱 mezőhöz) ──
-// Forrás: a BNR napi XML-je (nyilvános, kulcs nélkül). 1 órás cache.
-let _bnrCache = null; // { ts, rate, date }
-handlers.getBnrRate = async function (req, res, args) {
-  try {
-    if (!_isAdminOrManager(req)) return _deny(res);
-    if (_bnrCache && Date.now() - _bnrCache.ts < 60 * 60 * 1000) {
-      return res.json({ result: { ok: true, rate: _bnrCache.rate, date: _bnrCache.date } });
-    }
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 10000);
-    let xml;
-    try {
-      const r = await fetch('https://www.bnr.ro/nbrfxrates.xml', {
-        signal: ctrl.signal, headers: { 'User-Agent': 'VallorSoft/1.0' } });
-      xml = await r.text();
-    } finally { clearTimeout(t); }
-    const m = xml.match(/<Rate[^>]*currency="EUR"[^>]*>([\d.]+)<\/Rate>/i);
-    const dm = xml.match(/<Cube[^>]*date="([\d-]+)"/i);
-    if (!m) return res.json({ result: { ok: false, err: 'Cursul BNR nu poate fi citit.' } });
-    const rate = parseFloat(m[1]);
-    _bnrCache = { ts: Date.now(), rate, date: dm ? dm[1] : null };
-    return res.json({ result: { ok: true, rate, date: _bnrCache.date } });
-  } catch (err) {
-    console.error('getBnrRate hiba:', err);
-    return res.json({ result: { ok: false, err: 'BNR nu este disponibil.' } });
-  }
-};
+// A `getBnrRate` RPC a handlers/bnr.js-ben él (services/bnr.js robusztus lekérés +
+// cég-ráta). Az itteni régi változat holt kód volt: a registry Object.assign-je
+// a bnr.js-ével csendben felülírta — ezért törölve (duplikált-név őr: tests).
 
 // ── Pénzügy (stats-finance) — JOGOSULTSÁGHOZ KÖTÖTT ──────────
 handlers.getFinanceStats = async function (req, res, args) {

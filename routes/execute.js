@@ -79,8 +79,14 @@ router.post('/api/execute', function (req, res, next) {
   if (PUBLIC_FUNCTIONS.has((req.body || {}).functionName)) return next();
   return requireLogin(req, res, next);
 }, async (req, res) => {
-  const { functionName, arguments: args } = req.body;
-  const handler = handlers[functionName];
+  const { functionName, arguments: args } = req.body || {};
+  // CSAK saját, függvény-értékű registry-bejegyzés hívható. A sima
+  // `handlers[functionName]` a prototípus-láncot is elérte: pl.
+  // functionName="constructor" → Object(req,res,args) lefutott, de sosem
+  // válaszolt → a kérés a kapcsolat időtúllépéséig lógott (erőforrás-szivárgás).
+  const handler = (typeof functionName === 'string' &&
+    Object.prototype.hasOwnProperty.call(handlers, functionName) &&
+    typeof handlers[functionName] === 'function') ? handlers[functionName] : null;
   if (handler) {
     // Védőháló: egy handler-en kívüli/elkapatlan hiba ne legyen
     // unhandledRejection (process-leállás), hanem normál hibaválasz.
@@ -95,7 +101,9 @@ router.post('/api/execute', function (req, res, next) {
     }
   }
   // Ismeretlen funkcio
-  return res.json({ result: { ok: false, err: 'Functie necunoscuta: ' + functionName } });
+  return res.json({ result: { ok: false, err: 'Functie necunoscuta: ' + String(functionName).slice(0, 80) } });
 });
 
 module.exports = router;
+// Teszthez: a registry (duplikált handler-név őr).
+Object.defineProperty(module.exports, '_handlers', { value: handlers, enumerable: false });

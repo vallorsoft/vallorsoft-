@@ -14,6 +14,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const router = express.Router();
 const pool = require('../db');
+const { regenerateSession } = require('../middleware/sessionRevalidate');
 const { getPositions } = require('../lib/vehiclePositions');
 const { validatePassword } = require('../lib/passwordPolicy');
 
@@ -72,6 +73,7 @@ router.post('/api/portal/login', async (req, res) => {
     if (!cu.activ) return res.json({ ok: false, err: 'Accesul dumneavoastra este blocat. Contactati transportatorul.' });
     if (!(await portalFeatureOn(cu.company_id))) return res.json({ ok: false, err: 'Portalul de client nu este momentan activ. Contactati transportatorul.' });
 
+    await regenerateSession(req);   // session-fixation védelem
     req.session.clientUser = {
       id: cu.id, company_id: cu.company_id, client_id: cu.client_id,
       email: cu.email, nev: cu.nev, client_nev: cu.client_nev, ceg_nev: cu.ceg_nev,
@@ -120,6 +122,7 @@ router.post('/api/portal/set-password', async (req, res) => {
     const cR = await pool.query(
       `SELECT c.denumire AS client_nev, co.nev AS ceg_nev FROM clients c JOIN companies co ON co.id = c.company_id
        WHERE c.id = $1 AND c.company_id = $2`, [cu.client_id, cu.company_id]);
+    await regenerateSession(req);   // session-fixation védelem
     req.session.clientUser = {
       id: cu.id, company_id: cu.company_id, client_id: cu.client_id, email: cu.email, nev: cu.nev,
       client_nev: (cR.rows[0] || {}).client_nev, ceg_nev: (cR.rows[0] || {}).ceg_nev,

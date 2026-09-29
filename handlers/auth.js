@@ -12,7 +12,11 @@ const { validatePassword } = require('../lib/passwordPolicy');
 const handlers = {};
 
 handlers.authMe = async function (req, res, args) {
-    return res.json({ result: req.session.user || null });
+    const u = req.session.user;
+    if (!u) return res.json({ result: null });
+    // Belső session-mezők (jelszó-ujjlenyomat) nem mennek a kliensnek.
+    const { pwf, ...pub } = u;
+    return res.json({ result: pub });
   };
 
 handlers.authLogout = async function (req, res, args) {

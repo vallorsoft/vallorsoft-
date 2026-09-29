@@ -9,6 +9,14 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 24. lépés — Munkamenet-életciklus + többpéldányos üzem (2026-09-29, PR #492) ✅ KÉSZ
+
+- **Session-revalidálás:** eddig a letiltott (`blocked`), törölt vagy lefokozott felhasználó, a lemondott/lejárt előfizetésű cég és a letiltott portál-belépő session-je 7 napig érvényes maradt a belépéskori szereppel (privilege retention). Most `middleware/sessionRevalidate.js` ≤60 mp-enként a DB-ből frissít; jelszócsere/reset után a többi session kiesik (`pwf`). DB-hibánál fail-open (tudatos döntés: elérhetőség > szigor, max. egy ablaknyi késés).
+- **Session-fixation:** `session.regenerate` minden belépési úton (fő, 2FA-előtti, ügyfél-/alvállalkozói portál, set-password).
+- **RPC-registry:** a `handlers[functionName]` prototípus-láncot is elért (`constructor` → soha nem válaszoló kérés, erőforrás-kimerítés). Most `hasOwnProperty` + `typeof function`; duplikált handler-név őr-teszt.
+- **Többpéldányos ütemezés:** DB-bérletes vezető-választás → nincs duplikált e-mail/push/IMAP-feldolgozás több Fly-gépen.
+- **Nyitott (javaslat):** a `routes/invoices.js`/`cargotrack.js` egyes ágai a nyers `e.message`-et adják vissza (provider-hibánál hasznos, DB-hibánál séma-részletet szivárogtathat) — célzott szűrés ajánlott; a migráció-futtató több gépen párhuzamosan indulhat (idempotens, de érdemes a vezetőhöz kötni); CSRF-token hiányzik (jelenleg `sameSite=lax` + JSON-body véd).
+
 ### 23. lépés — Séma-drift audit + e-CMR / jelszó-visszaállítás működőképessé tétele (2026-09-26) ✅ KÉSZ
 
 - **Séma-drift őr:** új `tests/integration/sql-schema-drift.test.js` minden statikus SQL-t PREPARE-rel ellenőriz a teljes sémán. Korábban a try/catch-ek „Eroare de server"-rel vagy üres listával elnyelték a nem létező oszlopra hivatkozó lekérdezéseket (6 ilyen funkció élesben némán hibázott).
