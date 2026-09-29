@@ -558,6 +558,66 @@ async function _saveDays(id, cid, days) {
   } catch (e) { console.warn('driver_earnings.days mentés kihagyva:', e.message); }
 }
 
+// A driver_earnings sor `days` mezőjének normalizált tömbje (ISO YYYY-MM-DD).
+// A JSONB oszlopból már string-tömb / JSON-string / null jöhet.
+function _dbDaysArr(row) {
+  if (!row) return null;
+  let d = row.days;
+  if (d == null) return null;
+  if (typeof d === 'string') { try { d = JSON.parse(d); } catch (_e) { return null; } }
+  if (!Array.isArray(d)) return null;
+  const out = [];
+  for (const v of d) {
+    const s = String(v || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) out.push(s);
+  }
+  return out.length ? out.sort() : null;
+}
+
+// Egy járandóság tétel „ELSŐDLEGES HÓNAPJA" — nem a rögzítési dátum, hanem az
+// a hónap, amiben a LEGTÖBB napja van. Több-havi diurna (pl. aug.28→szept.5)
+// mostantól ahhoz a hónaphoz tartozik, amelyikben a leg-több napja szerepel;
+// döntetlen VAGY days[] hiánya esetén az earning_date hónapja marad (backward-
+// kompatibilis). Ez a same-month-first FIFO allokátorban és a havi bontásban
+// használatos, hogy „a hó elejére rögzített diurna" a helyes hónapba kerüljön.
+function _monthOfEarning(e) {
+  const fallback = String(e && e.earning_date || '').slice(0, 7);
+  const days = _dbDaysArr(e);
+  if (!days || !days.length) return fallback;
+  const cnt = new Map();
+  for (const d of days) {
+    const ym = d.slice(0, 7);
+    cnt.set(ym, (cnt.get(ym) || 0) + 1);
+  }
+  let bestYm = fallback, bestN = -1;
+  for (const [ym, n] of cnt) {
+    if (n > bestN || (n === bestN && ym === fallback)) { bestYm = ym; bestN = n; }
+  }
+  return bestYm;
+}
+
+// Egy járandóság tétel „PERIÓDUS-RÉSZE" — hány nap esik az adott [from,to] naptári
+// intervallumba, és arányosan mekkora összeg tartozik hozzá. days[] nélkül a
+// tétel binárisan besorolt: earning_date ∈ [from,to] → 1.0, egyébként 0.0.
+// Ezzel a többhavi diurna arányosan bekerül minden érintett havi jelentésbe,
+// és nem duplikálódik: a portion·total_amount összegek a teljes total-t adják.
+function _periodPortion(e, from, to) {
+  const days = _dbDaysArr(e);
+  if (!days || !days.length) {
+    const ed = String(e && e.earning_date || '').slice(0, 10);
+    return (ed >= from && ed <= to)
+      ? { days_in: 1, days_total: 1, portion: 1, days_in_arr: [ed] }
+      : { days_in: 0, days_total: 1, portion: 0, days_in_arr: [] };
+  }
+  const inArr = days.filter(d => d >= from && d <= to);
+  return {
+    days_in: inArr.length,
+    days_total: days.length,
+    portion: inArr.length / days.length,
+    days_in_arr: inArr,
+  };
+}
+
 const EARNING_KINDS = new Set(['bonus', 'diurna', 'per_diem', 'salary', 'premium', 'holiday', 'other']);
 const PAYMENT_METHODS = new Set(['cash', 'bank', 'card', 'other']);
 const CURRENCIES = new Set(['RON', 'EUR']);
@@ -1365,11 +1425,37 @@ handlers.earningPaymentGroupGet = async function (req, res, args) {
     }
     const pByCur = {};       // effektív (mai + múltbeli)
     const pSchedByCur = {};  // jövőbeli scheduled
+    let paidRonTotal = 0;    // tényleges kifizetés RON-egyenértékben (effektív)
     for (const p of paysR.rows) {
       const cur = String(p.currency || 'RON').toUpperCase();
       const bucket = p.is_scheduled ? pSchedByCur : pByCur;
       bucket[cur] = (bucket[cur] || 0) + Number(p.amount || 0);
+      if (!p.is_scheduled) paidRonTotal += Number(p.amount_ron || p.amount || 0);
     }
+    // Csoport-szintű allokált RON — a group_items alloc_ron mezőiből
+    let allocRonTotal = 0;
+    for (const it of itemsR.rows) {
+      allocRonTotal += Number(it.alloc_ron || 0);
+    }
+    // Egyensúly-banner: mennyi lett kifizetve ↔ mennyit fedez az összes tétel
+    // ↔ mennyi maradt hátra ennek a csoportos kifizetésnek a keretén belül.
+    // A csoport-szintű nézet: a kifizetés MENNYIT NYOMOTT LE a tételekre.
+    const bnrInfo = await _getEffectiveBnr(cid);
+    const bnrRate = bnrInfo.rate;
+    // Járandóság-összeg egyesítve RON-egyenértékben (a banner nagy „egyensúly"-a)
+    let earnedRonAll = 0;
+    for (const [cur, sum] of Object.entries(eByCur)) {
+      if (cur === 'RON') earnedRonAll += Number(sum || 0);
+      else if (bnrRate != null) earnedRonAll += Number(sum || 0) * bnrRate;
+      else earnedRonAll += Number(sum || 0); // BNR nélkül 1:1 becslés
+    }
+    const remainRonAll = Math.max(0, _round2(earnedRonAll - paidRonTotal));
+    // A hátralék EUR-ban informatívan (ha van BNR)
+    const remainEur = (bnrRate != null && bnrRate > 0)
+      ? _round2(remainRonAll / bnrRate) : null;
+    // Kifizetve EUR-egyenértékben informatívan (a bannerhez)
+    const paidEurEq = (bnrRate != null && bnrRate > 0)
+      ? _round2(paidRonTotal / bnrRate) : null;
 
     return res.json({ result: {
       ok: true,
@@ -1379,7 +1465,18 @@ handlers.earningPaymentGroupGet = async function (req, res, args) {
       summary: {
         earnings_by_currency: Object.fromEntries(Object.entries(eByCur).map(([k, v]) => [k, _round2(v)])),
         payments_by_currency: Object.fromEntries(Object.entries(pByCur).map(([k, v]) => [k, _round2(v)])),
-        scheduled_by_currency: Object.fromEntries(Object.entries(pSchedByCur).map(([k, v]) => [k, _round2(v)]))
+        scheduled_by_currency: Object.fromEntries(Object.entries(pSchedByCur).map(([k, v]) => [k, _round2(v)])),
+        // Új: banner-adat (egyensúly ↔ kifizetve ↔ hátralék)
+        balance: {
+          earned_ron_all: _round2(earnedRonAll),
+          paid_ron_effective: _round2(paidRonTotal),
+          paid_eur_eq: paidEurEq,
+          alloc_ron_total: _round2(allocRonTotal),
+          remain_ron: remainRonAll,
+          remain_eur: remainEur,
+          bnr_rate: bnrRate,
+          bnr_source: bnrInfo.source,
+        },
       }
     } });
   } catch (err) {
@@ -1752,16 +1849,30 @@ async function _allocateDriver(cid, email, bnrRate) {
     : (rate != null ? Number(amt || 0) * rate : Number(amt || 0)); // BNR nélkül 1:1 becslés
   const monthOf = d => String(d || '').slice(0, 7);
   // 1) MINDEN járandóság kronológikus sorrendben (legrégebbi elöl)
+  //    `days` oszlopot is olvasunk, hogy a többhavi diurna a majority-day
+  //    hónapjához kerüljön (nem a rögzítés dátumához) — same-month-first FIFO.
   let earns = [];
   try {
     const er = await pool.query(
-      `SELECT id, earning_date, currency, total_amount, kind, label
+      `SELECT id, earning_date, currency, total_amount, kind, label,
+              (to_jsonb(driver_earnings) -> 'days') AS days
          FROM driver_earnings
         WHERE company_id=$1 AND LOWER(email_sofer)=$2
         ORDER BY earning_date ASC, id ASC`,
       [cid, email]);
     earns = er.rows;
-  } catch (_e) { return { alloc, paymentCovers }; }
+  } catch (_e) {
+    // `days` oszlop hiány esetén (migráció még nem futott) fallback nélkül
+    try {
+      const er2 = await pool.query(
+        `SELECT id, earning_date, currency, total_amount, kind, label
+           FROM driver_earnings
+          WHERE company_id=$1 AND LOWER(email_sofer)=$2
+          ORDER BY earning_date ASC, id ASC`,
+        [cid, email]);
+      earns = er2.rows;
+    } catch (_e2) { return { alloc, paymentCovers }; }
+  }
   const needById = new Map();
   const earnById = new Map();
   for (const e of earns) { needById.set(e.id, ronEq(e.currency, e.total_amount)); earnById.set(e.id, e); }
@@ -1874,7 +1985,9 @@ async function _allocateDriver(cid, email, bnrRate) {
   function _apply(pid, amt, sameMonth, pmonth) {
     for (const e of earns) {
       if (amt <= 0.005) break;
-      const em = monthOf(e.earning_date);
+      // A tétel „elsődleges hónapja" a napjaiban leg-gyakoribb hónap
+      // (több-havi diurna → majority-day); days[] nélkül earning_date.
+      const em = _monthOfEarning(e);
       if (sameMonth ? (em !== pmonth) : (em === pmonth)) continue;
       const rem = remain.get(e.id) || 0;
       if (rem <= 0.005) continue;
@@ -1886,6 +1999,9 @@ async function _allocateDriver(cid, email, bnrRate) {
         paymentCovers.get(pid).push({
           earning_id: e.id, month: em, kind: e.kind, label: e.label,
           currency: e.currency, alloc_ron: take,
+          // A hó-átfedést a klienshez adjuk (opcionálisan „N/M zi ale acestei
+          // luni fedezve"); backward-kompatibilis (régi kliens nem használja).
+          earning_date: e.earning_date,
         });
       }
     }
@@ -1939,13 +2055,25 @@ handlers.getDriverEarningAllocation = async function (req, res, args) {
     let earns = [];
     try {
       const er = await pool.query(
-        `SELECT id, earning_date, kind, label, quantity, unit_amount, total_amount, currency, note
+        `SELECT id, earning_date, kind, label, quantity, unit_amount, total_amount, currency, note,
+                (to_jsonb(driver_earnings) -> 'days') AS days
            FROM driver_earnings
           WHERE company_id=$1 AND LOWER(email_sofer)=$2
           ORDER BY earning_date ASC, id ASC`,
         [cid, email]);
       earns = er.rows;
-    } catch (_e) { earns = []; }
+    } catch (_e) {
+      // `days` oszlop hiány esetén fallback
+      try {
+        const er2 = await pool.query(
+          `SELECT id, earning_date, kind, label, quantity, unit_amount, total_amount, currency, note
+             FROM driver_earnings
+            WHERE company_id=$1 AND LOWER(email_sofer)=$2
+            ORDER BY earning_date ASC, id ASC`,
+          [cid, email]);
+        earns = er2.rows;
+      } catch (_e2) { earns = []; }
+    }
 
     const alloc = await computeDriverAllocation(cid, email, rate);
 
@@ -1957,14 +2085,21 @@ handlers.getDriverEarningAllocation = async function (req, res, args) {
       if (remainRon <= 0.005) continue;   // teljesen kifizetve → nem ajánljuk fel
       const cur = String(e.currency || 'RON').toUpperCase();
       const remainCur = (cur === 'RON') ? remainRon : (rate != null ? r2(remainRon / rate) : remainRon);
-      const key = String(e.earning_date || '').slice(0, 7) || '????-??';
+      // A tétel „elsődleges hónapja" a napjaiban leg-gyakoribb hónap
+      // (több-havi diurna → majority-day). Days[] nélkül earning_date hónapja.
+      const key = _monthOfEarning(e) || '????-??';
       if (!monthsMap.has(key)) monthsMap.set(key, { key, items: [], total_remaining_ron: 0 });
       const m = monthsMap.get(key);
+      const daysArr = _dbDaysArr(e);
       m.items.push({
         id: e.id, earning_date: e.earning_date, kind: e.kind, label: e.label,
         quantity: e.quantity, unit_amount: e.unit_amount, total_amount: e.total_amount,
         currency: cur, total_ron: need, settled_ron: settled,
         remaining_ron: remainRon, remaining_cur: remainCur,
+        // A napok darabszáma + a hónapba eső napok — csak a klienshez
+        // megjelenítéshez (a KFT-elszámoltság igazságforrása a global alloc).
+        days_count: daysArr ? daysArr.length : null,
+        days_in_month: daysArr ? daysArr.filter(d => d.slice(0, 7) === key).length : null,
       });
       m.total_remaining_ron = r2(m.total_remaining_ron + remainRon);
     }
@@ -2087,15 +2222,39 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
     company.logo_data_uri  = branding.logo;
     company.stamp_data_uri = branding.stamp;
 
-    // Járandóság-sorok az időszakra
-    const eR = await pool.query(
-      `SELECT id, earning_date, kind, label, quantity, unit_amount, total_amount, currency, note,
-              (to_jsonb(driver_earnings) -> 'days') AS days
-         FROM driver_earnings
-        WHERE company_id=$1 AND LOWER(email_sofer)=$2
-          AND earning_date >= $3 AND earning_date <= $4
-        ORDER BY earning_date ASC, id ASC`,
-      [cid, email, from, to]);
+    // Járandóság-sorok az időszakra. A többhavi diurna (pl. aug.28→szept.5) is
+    // bekerül a jelentésbe, ha bármelyik napja az időszakba esik — nem csak az
+    // earning_date szerint (ami days[0] = első nap). A `days` JSONB-ből a
+    // `jsonb_array_elements_text` bontja ki a napokat, majd `d BETWEEN from AND to`
+    // szűr. Migráció-tolerancia: ha a `days` oszlop hiányzik, a régi WHERE marad.
+    let eR;
+    try {
+      eR = await pool.query(
+        `SELECT id, earning_date, kind, label, quantity, unit_amount, total_amount, currency, note,
+                (to_jsonb(driver_earnings) -> 'days') AS days
+           FROM driver_earnings
+          WHERE company_id=$1 AND LOWER(email_sofer)=$2
+            AND (
+              (earning_date >= $3 AND earning_date <= $4)
+              OR EXISTS (
+                SELECT 1
+                  FROM jsonb_array_elements_text(
+                    COALESCE(to_jsonb(driver_earnings) -> 'days', '[]'::jsonb)
+                  ) AS d
+                 WHERE d >= $3::text AND d <= $4::text
+              )
+            )
+          ORDER BY earning_date ASC, id ASC`,
+        [cid, email, from, to]);
+    } catch (_e) {
+      eR = await pool.query(
+        `SELECT id, earning_date, kind, label, quantity, unit_amount, total_amount, currency, note
+           FROM driver_earnings
+          WHERE company_id=$1 AND LOWER(email_sofer)=$2
+            AND earning_date >= $3 AND earning_date <= $4
+          ORDER BY earning_date ASC, id ASC`,
+        [cid, email, from, to]);
+    }
     // Kifizetés-sorok az időszakra (group_id-vel, hogy tudjuk, mit fedez)
     let pR;
     try {
@@ -2117,11 +2276,25 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
         [cid, email, from, to]);
     }
 
-    // Összegzés valuta szerint (a szerver-oldali igazságforrás)
+    // Per-tétel „periódus-rész" (portion 0..1) — a többhavi diurna arányosan
+    // kerül a jelentésbe (napok / összes napok). Az EGY-hónapos tételekre 1.0.
+    // A `period_amount` a tétel időszakra eső ARÁNYOS összege (ugyanabban a
+    // valutában, mint a `total_amount`); a kliens ebből képezi a napok szerinti
+    // értéket a nyomtatványon. A `period_days` a tétel adott hónapba eső
+    // napjainak SZÁMA (0 ha days[]-t nem használ ez a fajta earning).
+    // Összegzés valuta szerint (a szerver-oldali igazságforrás) — a period-portion
+    // arányos összegével számol, hogy a többhavi diurna ne duplikálódjon.
     const earned = { EUR: 0, RON: 0 };
     for (const r of eR.rows) {
       const c = _cur(r.currency);
-      earned[c] = (earned[c] || 0) + parseFloat(r.total_amount || 0);
+      const pp = _periodPortion(r, from, to);
+      const periodAmt = _round2(parseFloat(r.total_amount || 0) * pp.portion);
+      // A kliens ezeket a mezőket használja a nyomtatványon
+      r.period_portion  = pp.portion;
+      r.period_days     = pp.days_in;
+      r.total_days      = pp.days_total;
+      r.period_amount   = periodAmt;
+      earned[c] = (earned[c] || 0) + periodAmt;
     }
     // paid_at-alapú kifizetés-összeg — a Decont lunar + Kifizetés-történet
     // lapokhoz marad (azok az adott időszak PÉNZMOZGÁSÁT dokumentálják).
@@ -2151,11 +2324,20 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
     let settledRon = 0, remainRon = 0;
     for (const r of eR.rows) {
       const c = _cur(r.currency);
-      const amt = parseFloat(r.total_amount || 0);
-      const need = (c === 'RON') ? amt : (bnrRate != null ? amt * bnrRate : amt);
+      // A settled/remaining is arányosan (periodus-rész szerint) — így a
+      // többhavi diurna a helyes hónapba kerül a nyomtatványon.
+      const periodAmt = Number(r.period_amount || 0);
+      const need = (c === 'RON') ? periodAmt : (bnrRate != null ? periodAmt * bnrRate : periodAmt);
       const a = alloc.get(r.id);
-      const sr = a ? Math.min(a.settled_ron, need) : 0;   // ebből a tételből kifizetve (RON-egyenérték)
-      const rr = _round2(need - sr);                       // ebből a tételből fennmaradó (RON-egyenérték)
+      // A tétel TELJES fedezetét arányosan bontjuk: ha a hó a tételnek csak
+      // 5/8 napját tartalmazza, a globálisan allokált settled_ron-ből is 5/8-ot
+      // számítunk a hó jelentésébe (a többi másik hónap jelentésébe kerül).
+      const globalSettledRon = a ? Number(a.settled_ron || 0) : 0;
+      const totalNeedRon = (c === 'RON') ? parseFloat(r.total_amount || 0)
+        : (bnrRate != null ? parseFloat(r.total_amount || 0) * bnrRate : parseFloat(r.total_amount || 0));
+      const periodShare = totalNeedRon > 0 ? (need / totalNeedRon) : 0;
+      const sr = Math.min(globalSettledRon * periodShare, need);
+      const rr = _round2(need - sr);
       settledRon += sr; remainRon += rr;
       if (c === 'RON') { settledCur.RON += sr; remainCur.RON += rr; }
       else if (bnrRate != null) { settledCur.EUR += sr / bnrRate; remainCur.EUR += rr / bnrRate; }

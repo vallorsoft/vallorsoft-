@@ -3025,6 +3025,15 @@
     'fe.pg.stampOn':      { ro: 'Ștampilă activă', hu: 'Pecsét bekapcsolva' },
     'fe.pg.stampOff':     { ro: 'Ștampilă dezactivată', hu: 'Pecsét kikapcsolva' },
     'fe.pg.emailDueSubject': { ro: 'Plăți scadente astăzi ({date}) — {n} plată', hu: 'Ma esedékes kifizetések ({date}) — {n} tétel' },
+    // Egyensúly-banner (PR #490): a csoportos kifizetés lapján a szemet
+    // vezető „Járandóság ↔ Kifizetve ↔ Hátralék" nagy sáv — azonnal látszik,
+    // MENNYI lett ténylegesen lehúzva, nem csak a tétel-EUR összeg.
+    'fe.pg.balanceTitle':  { ro: 'Bilanț plată', hu: 'Kifizetés egyenlege' },
+    'fe.pg.balanceEarned': { ro: 'Total drepturi', hu: 'Járandóság összesen' },
+    'fe.pg.balancePaid':   { ro: 'Plătit efectiv', hu: 'Ténylegesen kifizetve' },
+    'fe.pg.balanceRemain': { ro: 'Rămas de plată', hu: 'Hátralék' },
+    // Napok periódusában eső napok jelzése (Decont oficial / lunar tételes)
+    'fe.pg.daysInPeriod':  { ro: '{in}/{tot} zile în această perioadă', hu: '{in}/{tot} nap ebben az időszakban' },
 
     // Egyéni járandóság-típusok (⚙️ kezelő)
     'fe.dk.title':       { ro: 'Tipuri de câștig', hu: 'Járandóság-típusok' },

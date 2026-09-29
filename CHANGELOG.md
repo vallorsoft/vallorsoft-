@@ -14,6 +14,27 @@
 
 ---
 
+## 2026-09-29 — Sofőr-elszámolás nyomtatványok: naptár helyett dátumlista + többhavi diurna arányos beszámítás + egyensúly-banner
+
+**Kérések:**
+1. „azt a naptart ne rakja be csak irja ki a datumokat"
+2. „ne a diurna rogizetsi datumaval dolgozzon hanem az adott napok diurna oszegevel szamoljon vagyis itt van olyan hogy ho elejere is van diurna csk lehetseges kesobb lett rogzitve"
+3. A csoportos kifizetés lapján a 2500 RON kifizetés úgy jelent meg, mintha 530 EUR-t vontunk volna le (a szem nem látta, hogy a fenti Σ EUR csak a tétel-járandóság összege, nem a fizetés).
+
+**Változások:**
+
+- **Mini-naptár TÖRÖLVE mindhárom nyomtatványról** (`public/fleet-extra-v2.js` `_dcMiniCalHtml`): a diurna napjainak vizuális havi táblája helyett tömör dátum-lista (`Szeptember 2026: 07.09., 08.09., 09.09., …`). Egy közös helper — mindhárom lap egyszerre javult (Decont lunar, Decont oficial, Csoportos kifizetés-visszaigazolás). Sok napos diurna nem foglal el fél oldalt.
+- **Többhavi diurna arányos beszámítás** (`handlers/fleetCompliance.js`): új közös `_dbDaysArr`, `_monthOfEarning` (a napok leg-gyakoribb hónapja), `_periodPortion` (napok a [from,to]-ban / összes napok). A `_allocateDriver` FIFO same-month-first passzája mostantól a napok szerinti hónapot használja, nem az `earning_date`-et — így ha egy diurna aug. 28 → szept. 5 tartományban fut, a szeptemberi kifizetés a szeptemberi napokat fedezi elsőnek. A `getMonthlySettlementSheet` WHERE-je kibővítve `EXISTS jsonb_array_elements_text(...)`-tel: a hó jelentésébe minden olyan tétel bekerül, aminek BÁRMELY napja abba a hóba esik (nem csak az earning_date szerint). A summázás arányos (per-tétel `period_amount = total_amount × in-period-days / total-days`) → a többhavi diurna nem duplikálódik a szomszédos hónapok jelentései között.
+- **`_apply` paymentCovers bővítve** `earning_date`-tel (backward-kompat) → a klienshez a fedezet-magyarázatba beékerül a tétel eredeti dátuma is.
+- **Egyensúly-banner a csoportos kifizetés lapján** (`_dcGroupPrintRender`): a driver-blokk után 3-cellás nagy kék sáv (Járandóság — Kifizetve — Hátralék, RON + EUR-egyenérték + BNR). Azonnal látszik, MENNYI lett ténylegesen lehúzva. Zöld sáv, ha a hátralék 0; sárga, ha maradt. Nem kivehető szakasz — jogi/pénzügyi konzisztencia. Szerver: `earningPaymentGroupGet` `summary.balance { earned_ron_all, paid_ron_effective, paid_eur_eq, alloc_ron_total, remain_ron, remain_eur, bnr_rate, bnr_source }` új mező (`_getEffectiveBnr` fallback-lánccal).
+- **Per-tétel „N/M nap ebben az időszakban" badge** (Decont lunar + Decont oficial): a rész-hónapos tétel sárga pilulán jelzi, milyen arányban tartozik ehhez a hó jelentésébe; a „Tétel össz" cellában a teljes összeg alatt a rész-összeg is kis betűvel („↳ 400,00 EUR").
+- **`getDriverEarningAllocation` (vezetett kifizetés-modál)** — a hónap-bucketing mostantól `_monthOfEarning(e)` alapján rendezi a tételeket a hónapok közé; új `days_count` / `days_in_month` per-tétel a klienshez.
+- **i18n** 5 új kulcs (`fe.pg.balanceTitle`/`balanceEarned`/`balancePaid`/`balanceRemain`/`daysInPeriod`, RO-alap + HU).
+
+**Kompatibilitás:** minden migráció-tolerancia megmaradt (a `days` JSONB oszlop hiány esetén a lekérdezések fallback ághoz esnek, a régi viselkedés érvényes). A `_dcMiniCalHtml` visszafelé kompat, csak a HTML-je változott (a hívók számára API-tiszta). **1356 Jest zöld** (10 skipped valós-DB), nincs regresszió; syntax-check tiszta.
+
+---
+
 ## 2026-09-27 — Admin/Manager: beküldött menetlevél törlése — cascade + audit (PR #489, a lezáratlan #309 átemelése)
 
 **Kérés:** „Mainbe" — a 2026-08-04 óta nyitva maradt #309 (menetlevél-törlés) bekerül a mainbe a friss kódbázisra igazítva.
