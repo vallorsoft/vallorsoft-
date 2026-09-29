@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const router = express.Router();
 const pool = require('../db');
+const { regenerateSession } = require('../middleware/sessionRevalidate');
 const { validatePassword } = require('../lib/passwordPolicy');
 const { encrypt } = require('../lib/crypto');
 const { featureEnabled } = require('../lib/featureEnabled');
@@ -53,6 +54,7 @@ router.post('/api/carrier/login', async (req, res) => {
     if (!(await bcrypt.compare(password, cu.pass_hash))) return res.json({ ok: false, err: 'E-mail sau parola incorecta.' });
     if (!cu.activ) return res.json({ ok: false, err: 'Accesul dumneavoastra este blocat.' });
     if (!(await featureOn(cu.company_id))) return res.json({ ok: false, err: 'Portalul de subcontractor nu este momentan activ.' });
+    await regenerateSession(req);   // session-fixation védelem
     req.session.carrierUser = { id: cu.id, company_id: cu.company_id, carrier_id: cu.carrier_id, email: cu.email, nev: cu.nev, carrier_nev: cu.carrier_nev, ceg_nev: cu.ceg_nev };
     await pool.query('UPDATE carrier_users SET last_login=NOW() WHERE id=$1', [cu.id]).catch(() => {});
     return res.json({ ok: true });
@@ -84,6 +86,7 @@ router.post('/api/carrier/set-password', async (req, res) => {
     const hash = await bcrypt.hash(password, 10);
     await pool.query('UPDATE carrier_users SET pass_hash=$1, invite_token=NULL, invite_expires=NULL, activ=TRUE WHERE id=$2', [hash, cu.id]);
     const cR = await pool.query(`SELECT c.nev AS carrier_nev, co.nev AS ceg_nev FROM carriers c JOIN companies co ON co.id=c.company_id WHERE c.id=$1 AND c.company_id=$2`, [cu.carrier_id, cu.company_id]);
+    await regenerateSession(req);   // session-fixation védelem
     req.session.carrierUser = { id: cu.id, company_id: cu.company_id, carrier_id: cu.carrier_id, email: cu.email, nev: cu.nev, carrier_nev: (cR.rows[0] || {}).carrier_nev, ceg_nev: (cR.rows[0] || {}).ceg_nev };
     return res.json({ ok: true });
   } catch (err) { console.error('carrier set-password hiba:', err); return res.json({ ok: false, err: 'Eroare de server' }); }

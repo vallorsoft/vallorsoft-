@@ -7,6 +7,7 @@
 const pool = require('../db');
 const bcrypt = require('bcrypt');
 const { validatePassword } = require('../lib/passwordPolicy');
+const { pwFingerprint } = require('../middleware/sessionRevalidate');
 
 const handlers = {};
 
@@ -224,6 +225,11 @@ handlers.userUpdate = async function (req, res, args) {
         const hash = await bcrypt.hash(fields.jelszo, 10);
         updates.push(`password_hash = $${i++}`);
         values.push(hash);
+        // A felhasználó MÁS session-jei kiesnek (jelszó-ujjlenyomat); ha a saját
+        // jelszavát állítja, a jelenlegi session megmarad.
+        if (req.session.user && String(req.session.user.email || '').toLowerCase() === targetEmail) {
+          req.session.user.pwf = pwFingerprint(hash);
+        }
       }
 
       // Sofőr személyes adatok — a „Decont oficial" hivatalos fejlécéhez.
@@ -360,6 +366,8 @@ handlers.settingsChangePassword = async function (req, res, args) {
 
       const hash = await bcrypt.hash(newPwd, 10);
       await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.session.user.id]);
+      // A többi (pl. elveszett telefonon nyitva maradt) session kiesik; ez marad.
+      req.session.user.pwf = pwFingerprint(hash);
       return res.json({ result: { ok: true } });
     } catch (err) {
       console.error('settingsChangePassword hiba:', err);
