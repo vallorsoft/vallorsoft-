@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-10-01 — Decont sumar: Napidíj + alapbér = teljes − előleg; napidíj = ebből − alapbér (PR #504)
+- `_dcSumBuildSummaryHtml` számítás: **Napidíj + alapbér** = teljes járandóság − kifizetett előleg; **Fennmaradó napidíj** = (teljes − előleg) − alapbér. A végösszeg nem változik, csak a köztes sor most valóban a napidíj + alapbér összegét mutatja.
+- A „Teljes járandóság" mellé kisbetűs, zárójeles jelzés: „(napidíj + alapbér)" (új `fe.sum.totalHint`, RO+HU). Cache-bust `?v=20261001sumar9`.
+
 ## 2026-10-01 — Decont sumar: sorrend Teljes → Előleg → Napidíj+Alapbér → Alapbér → Fennmaradó napidíj (PR #503)
 - A felhasználó kérése szerinti sorrend és felirat (`fe.sum.diurnaCalc` = HU „Napidíj + alapbér”, RO „Diurnă + salariu de bază”); a BNR-árfolyam a táblázat alá került lábjegyzetként. Az értékek változatlanok. Cache-bust `?v=20261001sumar8`.
 

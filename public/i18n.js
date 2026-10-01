@@ -3132,6 +3132,7 @@
     'fe.sum.days':         { ro: 'zile', hu: 'nap' },
     'fe.sum.summaryTitle': { ro: 'Total și decontare', hu: 'Összesítés és elszámolás' },
     'fe.sum.totalRights':  { ro: 'Total drepturi', hu: 'Teljes járandóság' },
+    'fe.sum.totalHint':  { ro: '(diurnă + salariu de bază)', hu: '(napidíj + alapbér)' },
     'fe.sum.advance':      { ro: 'Avans / plăți deja achitate', hu: 'Előleg / már kifizetett' },
     'fe.sum.rest':         { ro: 'Rest de plată', hu: 'Fennmaradó fizetendő' },
     'fe.sum.diurnaCalc': { ro: 'Diurnă + salariu de bază', hu: 'Napidíj + alapbér' },
