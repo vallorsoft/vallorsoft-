@@ -5220,7 +5220,7 @@
       + (hasAdv ? row('💸 ' + t('fe.sum.advance'), '− ' + both(advRon), { top: '#99f6e4', color: '#334155' }) : '')
       + row(t('fe.stof.bnrUsed'), hasBnr ? ('1 EUR = ' + n2(bnr, 4) + ' RON') : '—', { color: '#475569' })
       + row(t('fe.stof.netBaseRon'), both(baseSal), { top: '#99f6e4', color: '#334155' })
-      + row(t('fe.stof.aboveBaseEur'), both(diurnaRon), { top: '#99f6e4' })
+      + row(t('fe.sum.diurnaCalc'), both(diurnaRon), { top: '#99f6e4' })
       + row('🟰 ' + t('fe.sum.restMinusBase'), both(diurnaRest), { top: '#0f766e', bold: true, big: true, color: '#0f766e' })
       + '</table>'
       + (hasAdv ? '<div style="margin-top:8px;font-size:11px;color:#475569;">' + t('fe.sum.advanceNote') + '</div>' : '')
