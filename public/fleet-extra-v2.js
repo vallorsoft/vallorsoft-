@@ -5218,12 +5218,14 @@
       + row(t('fe.sum.totalRights') + (rawLine.length ? '<div style="font-size:12px;font-weight:600;color:#475569;margin-top:2px;">' + rawLine.join(' + ') + '</div>' : ''), both(totalRon))
       // A kifizetett előleg rögtön a teljes alatt, így látszik, miért annyi a fennmaradó napidíj.
       + (hasAdv ? row('💸 ' + t('fe.sum.advance'), '− ' + both(advRon), { top: '#99f6e4', color: '#334155' }) : '')
-      + row(t('fe.stof.bnrUsed'), hasBnr ? ('1 EUR = ' + n2(bnr, 4) + ' RON') : '—', { color: '#475569' })
-      + row(t('fe.stof.netBaseRon'), both(baseSal), { top: '#99f6e4', color: '#334155' })
+      // Sorrend a kérés szerint: Teljes → Előleg → Napidíj+Alapbér → Alapbér → Fennmaradó napidíj.
       + row(t('fe.sum.diurnaCalc'), both(diurnaRon), { top: '#99f6e4' })
+      + row(t('fe.stof.netBaseRon'), both(baseSal), { top: '#99f6e4', color: '#334155' })
       + row('🟰 ' + t('fe.sum.restMinusBase'), both(diurnaRest), { top: '#0f766e', bold: true, big: true, color: '#0f766e' })
       + '</table>'
-      + (hasAdv ? '<div style="margin-top:8px;font-size:11px;color:#475569;">' + t('fe.sum.advanceNote') + '</div>' : '')
+      // A BNR-árfolyam a táblázat alatt, lábjegyzetként (az EUR-egyenértékekhez).
+      + '<div style="margin-top:8px;font-size:12px;color:#475569;">' + t('fe.stof.bnrUsed') + ': ' + (hasBnr ? ('1 EUR = ' + n2(bnr, 4) + ' RON') : '—') + '</div>'
+      + (hasAdv ? '<div style="margin-top:4px;font-size:11px;color:#475569;">' + t('fe.sum.advanceNote') + '</div>' : '')
       + '</div>';
     return _dcSec('sumar', 'summary', t('fe.sum.summaryTitle'), html);
   }
