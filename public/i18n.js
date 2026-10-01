@@ -3134,6 +3134,7 @@
     'fe.sum.totalRights':  { ro: 'Total drepturi', hu: 'Teljes járandóság' },
     'fe.sum.advance':      { ro: 'Avans / plăți deja achitate', hu: 'Előleg / már kifizetett' },
     'fe.sum.rest':         { ro: 'Rest de plată', hu: 'Fennmaradó fizetendő' },
+    'fe.sum.restMinusBase': { ro: 'Rest de plată − salariu de bază', hu: 'Fizetendő − alapbér' },
     'fe.sum.advanceNote':  { ro: 'Avansul este scăzut așa cum a fost alocat la plată, pe drepturile din această perioadă.', hu: 'Az előleg úgy van levonva, ahogy a kifizetéskor az időszak járandóságaira elszámolták.' },
     'fe.stof.title':        { ro: 'Decont oficial', hu: 'Hivatalos elszámolás' },
     'fe.stof.titleRange':   { ro: 'Decont oficial', hu: 'Hivatalos elszámolás' },
