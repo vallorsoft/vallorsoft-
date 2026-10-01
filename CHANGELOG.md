@@ -14,6 +14,9 @@
 
 ---
 
+## 2026-10-01 — Decont sumar: sorrend Teljes → Előleg → Napidíj+Alapbér → Alapbér → Fennmaradó napidíj (PR #PRNUM)
+- A felhasználó kérése szerinti sorrend és felirat (`fe.sum.diurnaCalc` = HU „Napidíj + alapbér”, RO „Diurnă + salariu de bază”); a BNR-árfolyam a táblázat alá került lábjegyzetként. Az értékek változatlanok. Cache-bust `?v=20261001sumar8`.
+
 ## 2026-10-01 — Decont sumar: a Napidíj sor felirata „Napidíj (teljes − alapbér)” (PR #502)
 - Új `fe.sum.diurnaCalc` kulcs (RO „Diurnă (total − salariu de bază)”, HU „Napidíj (teljes − alapbér)”), csak a Decont sumar összesítőjében; az érték változatlan. Cache-bust `?v=20261001sumar7`.
 
