@@ -2096,6 +2096,9 @@ handlers.getDriverEarningAllocation = async function (req, res, args) {
         // megjelenítéshez (a KFT-elszámoltság igazságforrása a global alloc).
         days_count: daysArr ? daysArr.length : null,
         days_in_month: daysArr ? daysArr.filter(d => d.slice(0, 7) === key).length : null,
+        // A napok listája — a kliens időszak-szűrője (mettől–meddig) ezzel
+        // a többhavi diurnát is helyesen sorolja be (bármely napja az időszakban).
+        days: daysArr || null,
       });
       m.total_remaining_ron = r2(m.total_remaining_ron + remainRon);
     }
