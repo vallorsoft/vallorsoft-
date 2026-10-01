@@ -2330,11 +2330,16 @@
     return ds.some(function (d) { return (!f || d >= f) && (!to || d <= to); });
   }
   // A látható (időszakba eső) hónapok + tételek
-  function _dcAllocVisibleMonths() {
+  // Hátralékos (még fizetendő) tétel? A teljesen kifizetett (paid) tételek csak
+  // megjelenítésre jönnek — kalkulációba / allokációba / mentésbe nem kerülnek.
+  function _dcAllocIsOpen(it) { return !it.paid && (+it.remaining_cur || 0) > 0.005; }
+  function _dcAllocVisibleMonths(includePaid) {
     if (!_dcAlloc) return [];
     var out = [];
     _dcAlloc.months.forEach(function (m) {
-      var items = (m.items || []).filter(_dcAllocInPeriod);
+      var items = (m.items || []).filter(function (it) {
+        return _dcAllocInPeriod(it) && (includePaid || _dcAllocIsOpen(it));
+      });
       if (items.length) out.push({ key: m.key, items: items });
     });
     return out;
@@ -2358,6 +2363,18 @@
     _dcAllocVisibleItems().forEach(function (it) { s += _dcAllocOwnToRon(it.currency, it.remaining_cur); });
     return _round2c(s);
   }
+  // Az időszak TELJES járandósága (kifizetett + hátralék) RON-ban
+  function _dcAllocPeriodGrossRon() {
+    var s = 0;
+    _dcAllocVisibleMonths(true).forEach(function (m) {
+      m.items.forEach(function (it) { s += _dcAllocOwnToRon(it.currency, +it.total_amount || 0); });
+    });
+    return _round2c(s);
+  }
+  // Egy tétel már kifizetett része a saját valutájában
+  function _dcAllocPaidOwn(it) {
+    return _round2c(Math.max(0, (+it.total_amount || 0) - (+it.remaining_cur || 0)));
+  }
   // Összeg két valutában: „10 000,00 RON / 2 000,00 EUR"
   function _dcAllocBoth(ron) {
     var eur = _dcAllocRonToEur(ron);
@@ -2371,9 +2388,9 @@
   // mode: 'partial' | 'full'; focusEarningId: opcionális (sor-szintű 💰)
   function dcAllocOpen(mode, focusEarningId) {
     if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
-    gas('getDriverEarningAllocation', [{ email: _dcCurrent.email }]).then(function (r) {
+    gas('getDriverEarningAllocation', [{ email: _dcCurrent.email, include_paid: true }]).then(function (r) {
       if (!r || !r.ok) { toast((r && r.err) || t('common.error'), 'err'); return; }
-      if (!r.months || !r.months.length) {
+      if (!r.months || !r.months.length || !((+r.total_remaining_ron || 0) > 0.005)) {
         // Nincs kifizetetlen járandóság → sima (előleg) kifizetés a régi modállal
         toast(t('fe.al.noUnpaid'), 'info');
         dcOpenPayment(mode === 'full' ? 'full' : 'partial');
@@ -2384,6 +2401,7 @@
       var minD = '', maxD = '';
       r.months.forEach(function (m) {
         (m.items || []).forEach(function (it) {
+          if (it.paid) return;   // az alap-időszak a HÁTRALÉKOS tételekhez igazodik
           _dcAllocItemDates(it).forEach(function (d) {
             if (!minD || d < minD) minD = d;
             if (!maxD || d > maxD) maxD = d;
@@ -2409,7 +2427,7 @@
       var focusItem = null;
       if (focusEarningId != null) {
         for (var mi = 0; mi < r.months.length && !focusItem; mi++) {
-          focusItem = (r.months[mi].items || []).find(function (x) { return x.id === focusEarningId; }) || null;
+          focusItem = (r.months[mi].items || []).find(function (x) { return x.id === focusEarningId && !x.paid; }) || null;
         }
       }
       if (focusItem) {
@@ -2501,27 +2519,47 @@
       + '</div>';
 
     // Hónap-kártyák (legrégebbi elöl) — csak az időszakba eső tételek
-    var vis = _dcAllocVisibleMonths();
+    // A megjelenítés az időszak MINDEN tételét mutatja (a már kifizetetteket is,
+    // megjelölve); a kalkuláció/allokáció csak a hátralékos tételekkel dolgozik.
+    var vis = _dcAllocVisibleMonths(true);
+    var ownWithConv = function (cur, amt) {
+      var conv = (cur !== 'RON')
+        ? n2(_dcAllocOwnToRon(cur, amt), 2) + ' RON'
+        : (_dcAllocRonToEur(amt) != null ? n2(_dcAllocRonToEur(amt), 2) + ' EUR' : '—');
+      return '<b>' + n2(amt, 2) + ' ' + esc(cur) + '</b> <span class="dc-al-ron">(' + conv + ')</span>';
+    };
     var monthsHtml = vis.map(function (m) {
-      var mRem = 0;
+      var mRem = 0, mGross = 0;
       var rows = (m.items || []).map(function (it) {
+        var gross = +it.total_amount || 0;
+        var paidOwn = _dcAllocPaidOwn(it);
+        mGross += _dcAllocOwnToRon(it.currency, gross);
+        var kindLabel = _dcBuiltinKinds.indexOf(it.kind || 'other') >= 0
+          ? t('fe.de.kind.' + (it.kind || 'other')) : (it.kind || 'other');
+        var head = '<div class="dc-al-item-t">' + esc(kindLabel) + (it.label ? ' · ' + esc(it.label) : '')
+          + ' <span class="dc-al-date">' + d2(it.earning_date) + '</span></div>';
+        if (!_dcAllocIsOpen(it)) {
+          // Teljesen kifizetett tétel — csak megjelenítés, nem választható
+          return '<div class="dc-al-item dc-al-item-paid" data-eid="' + it.id + '">'
+            + '<span class="dc-al-paidico" aria-hidden="true">✓</span>'
+            + '<div class="dc-al-item-main">' + head
+            +   '<div class="dc-al-item-sub">' + t('fe.al.entitled') + ': ' + ownWithConv(it.currency, gross) + '</div>'
+            + '</div>'
+            + '<div class="dc-al-item-pay"><span class="dc-al-paidbadge">✓ ' + t('fe.al.paidBadge') + '</span></div>'
+            + '</div>';
+        }
         mRem += _dcAllocOwnToRon(it.currency, it.remaining_cur);
         var allocVal = _dcAllocItemVal(it.id);
         var checked = allocVal > 0.005 ? ' checked' : '';
-        var kindLabel = _dcBuiltinKinds.indexOf(it.kind || 'other') >= 0
-          ? t('fe.de.kind.' + (it.kind || 'other')) : (it.kind || 'other');
+        var partial = paidOwn > 0.005
+          ? '<div class="dc-al-item-sub">' + t('fe.al.entitled') + ': ' + ownWithConv(it.currency, gross)
+            + ' · <span class="dc-al-paidtxt">✓ ' + t('fe.al.alreadyPaid') + ': ' + n2(paidOwn, 2) + ' ' + esc(it.currency) + '</span></div>'
+          : '';
         return '<div class="dc-al-item" data-eid="' + it.id + '">'
           + '<label class="dc-al-chk"><input type="checkbox" id="dcAlChk_' + it.id + '"' + checked
           +   ' onchange="FleetExtra.dcAllocItemToggle(' + it.id + ')"></label>'
-          + '<div class="dc-al-item-main">'
-          +   '<div class="dc-al-item-t">' + esc(kindLabel) + (it.label ? ' · ' + esc(it.label) : '')
-          +     ' <span class="dc-al-date">' + d2(it.earning_date) + '</span></div>'
-          +   '<div class="dc-al-item-sub">' + t('fe.al.remainLbl') + ': <b>'
-          +     n2(it.remaining_cur, 2) + ' ' + esc(it.currency) + '</b>'
-          +     ' <span class="dc-al-ron">(' + (it.currency !== 'RON'
-                  ? n2(_dcAllocOwnToRon(it.currency, it.remaining_cur), 2) + ' RON'
-                  : (_dcAllocRonToEur(it.remaining_cur) != null ? n2(_dcAllocRonToEur(it.remaining_cur), 2) + ' EUR' : '—')) + ')</span>'
-          +   '</div>'
+          + '<div class="dc-al-item-main">' + head + partial
+          +   '<div class="dc-al-item-sub">' + t('fe.al.remainLbl') + ': ' + ownWithConv(it.currency, it.remaining_cur) + '</div>'
           + '</div>'
           + '<div class="dc-al-item-pay">'
           +   '<div class="dc-al-inrow"><input class="input dc-al-amt" id="dcAlItem_' + it.id + '" type="number" min="0" step="0.01" '
@@ -2533,9 +2571,14 @@
           + '</div>'
           + '</div>';
       }).join('');
+      var mPaid = _round2c(Math.max(0, mGross - mRem));
       return '<div class="dc-al-card dc-al-month">'
-        + '<div class="dc-al-card-h">📅 ' + esc(_dcMonthKeyLabel(m.key))
-        +   ' <span class="dc-al-mrem">' + t('fe.al.remainLbl') + ': ' + _dcAllocBoth(_round2c(mRem)) + '</span></div>'
+        + '<div class="dc-al-card-h">📅 ' + esc(_dcMonthKeyLabel(m.key)) + '</div>'
+        + '<div class="dc-al-msum">'
+        +   '<span>' + t('fe.al.entitled') + ': <b>' + _dcAllocBoth(_round2c(mGross)) + '</b></span>'
+        +   (mPaid > 0.005 ? '<span class="dc-al-paidtxt">✓ ' + t('fe.al.alreadyPaid') + ': <b>' + _dcAllocBoth(mPaid) + '</b></span>' : '')
+        +   '<span class="dc-al-mremv">' + t('fe.al.remainLbl') + ': <b>' + _dcAllocBoth(_round2c(mRem)) + '</b></span>'
+        + '</div>'
         + rows
         + '</div>';
     }).join('');
@@ -2653,6 +2696,7 @@
     var mset = {};
     a.months.forEach(function (m) {
       (m.items || []).forEach(function (it) {
+        if (!_dcAllocIsOpen(it)) return;
         var ds = _dcAllocItemDates(it);
         if (!ds.length || _dcAllocInPeriod(it)) return;
         if (!ds.every(function (d) { return d < a.period.from; })) return;
@@ -2785,9 +2829,13 @@
     var raw = {};
     _dcAllocVisibleItems().forEach(function (it) { raw[it.currency] = (raw[it.currency] || 0) + (it.remaining_cur || 0); });
     var rawTxt = Object.keys(raw).sort().map(function (c) { return n2(raw[c], 2) + ' ' + esc(c); }).join(' + ');
+    var grossRon = _dcAllocPeriodGrossRon();
+    var paidRon = _round2c(Math.max(0, grossRon - N.totalRon));
     setH('dcAlPeriodTotal',
-      '<div class="dc-al-total-l">' + t('fe.al.periodTotal') + '</div>'
-      + '<div class="dc-al-total-v">' + _dcAllocBoth(N.totalRon) + '</div>'
+      '<div class="dc-al-total-l">' + t('fe.al.periodGross') + '</div>'
+      + '<div class="dc-al-total-v">' + _dcAllocBoth(grossRon) + '</div>'
+      + (paidRon > 0.005 ? '<div class="dc-al-total-paid">✓ ' + t('fe.al.alreadyPaid') + ': <b>' + _dcAllocBoth(paidRon) + '</b></div>' : '')
+      + '<div class="dc-al-total-rem">' + t('fe.al.periodTotal') + ': <b>' + _dcAllocBoth(N.totalRon) + '</b></div>'
       + (rawTxt ? '<div class="dc-al-total-s">' + t('fe.al.itemsRaw') + ': ' + rawTxt + '</div>' : ''));
     // Elmaradás a kiválasztott időszak ELŐTTI hónapokból (pl. múlt hónap)
     var arr = _dcAllocArrears();
@@ -2835,7 +2883,11 @@
     var a = _dcAlloc;
     var N = _dcAllocNumbers();
     var bnr = _dcAllocBnr();
-    var items = _dcAllocVisibleItems();
+    // A nyomtatványon az időszak MINDEN tétele szerepel (a kifizetettek is, jelölve)
+    var items = [];
+    _dcAllocVisibleMonths(true).forEach(function (m) { items = items.concat(m.items); });
+    var grossRon = _dcAllocPeriodGrossRon();
+    var paidRon = _round2c(Math.max(0, grossRon - N.totalRon));
     var lang = (window.I18N && window.I18N.get && window.I18N.get()) || 'ro';
     var w = window.open('', '_blank', 'width=900,height=1100');
     if (!w) { toast(t('common.error'), 'err'); return; }
@@ -2848,8 +2900,12 @@
       var rows = items.map(function (it) {
         var kindLabel = _dcBuiltinKinds.indexOf(it.kind || 'other') >= 0
           ? t('fe.de.kind.' + (it.kind || 'other')) : (it.kind || 'other');
-        var v = _dcAllocItemVal(it.id);
-        return '<tr><td>' + d2(it.earning_date) + '</td><td>' + esc(kindLabel) + (it.label ? ' · ' + esc(it.label) : '') + '</td>'
+        var v = _dcAllocIsOpen(it) ? _dcAllocItemVal(it.id) : 0;
+        var paidOwn = _dcAllocPaidOwn(it);
+        return '<tr' + (_dcAllocIsOpen(it) ? '' : ' class="paidrow"') + '><td>' + d2(it.earning_date) + '</td><td>' + esc(kindLabel) + (it.label ? ' · ' + esc(it.label) : '')
+          + (_dcAllocIsOpen(it) ? '' : ' <span class="pb">✓ ' + esc(t('fe.al.paidBadge')) + '</span>') + '</td>'
+          + '<td class="r">' + n2(+it.total_amount || 0, 2) + ' ' + esc(it.currency) + '</td>'
+          + '<td class="r">' + (paidOwn > 0.005 ? '✓ ' + n2(paidOwn, 2) + ' ' + esc(it.currency) : '—') + '</td>'
           + '<td class="r">' + n2(it.remaining_cur, 2) + ' ' + esc(it.currency) + '</td>'
           + '<td class="r">' + (v > 0.005 ? n2(v, 2) + ' ' + esc(it.currency) : '—') + '</td>'
           + '<td class="r">' + n2(_round2c(it.remaining_cur - v), 2) + ' ' + esc(it.currency) + '</td></tr>';
@@ -2876,6 +2932,8 @@
         + '.box{border:1.5px solid #cbd5e1;border-radius:10px;padding:10px 12px;width:33%;}'
         + '.box .bl{font-size:11px;color:#475569;font-weight:700;text-transform:uppercase;}'
         + '.box .bv{font-size:17px;font-weight:800;margin-top:4px;}.box .be{font-size:13px;color:#334155;font-weight:700;}'
+        + 'tr.paidrow td{color:#64748b;background:#f0fdf4;}.pb{display:inline-block;padding:1px 7px;border-radius:999px;background:#dcfce7;color:#166534;font-size:10px;font-weight:800;}'
+        + '.box.paid{background:#f0fdf4;border-color:#16a34a;}'
         + '.box.pay{background:#eff6ff;border-color:#2563eb;}.box.rem{background:#fffbeb;border-color:#f59e0b;}'
         + '.sig{width:100%;border-collapse:collapse;margin-top:40px;}.sig td{width:50%;padding:0 12px;vertical-align:bottom;}'
         + '.sig .ln{border-top:1.5px solid #0f172a;padding-top:5px;font-size:11px;color:#475569;}'
@@ -2896,14 +2954,18 @@
         +   ' · <b>' + t('fe.pm.methodLbl') + ':</b> ' + esc(t('fe.pm.method.' + (a.pay.method || 'cash')))
         +   (a.pay.note ? '<br><b>' + t('fld.note') + ':</b> ' + esc(a.pay.note) : '') + '</div>'
         + '<table class="sum"><tr>'
+        +   big(t('fe.al.periodGross'), grossRon, '')
+        +   big('✓ ' + t('fe.al.alreadyPaid'), paidRon, 'paid')
+        + '</tr><tr>'
         +   big(t('fe.al.periodTotal'), N.totalRon, '')
         +   big(t('fe.al.toTransfer'), N.payRon, 'pay')
         +   big(t('fe.al.remainAfter'), N.remRon, 'rem')
         + '</tr></table>'
         + '<table class="t"><thead><tr><th>' + t('fe.de.dateLbl') + '</th><th>' + t('fe.al.itemCol') + '</th>'
+        +   '<th class="r">' + t('fe.al.entitled') + '</th><th class="r">' + t('fe.al.alreadyPaid') + '</th>'
         +   '<th class="r">' + t('fe.al.remainLbl') + '</th><th class="r">' + t('fe.al.paidNowCol') + '</th>'
         +   '<th class="r">' + t('fe.al.staysLbl') + '</th></tr></thead><tbody>'
-        +   (rows || '<tr><td colspan="5">' + t('fe.al.noneInPeriod') + '</td></tr>') + '</tbody></table>'
+        +   (rows || '<tr><td colspan="7">' + t('fe.al.noneInPeriod') + '</td></tr>') + '</tbody></table>'
         + '<table class="sig"><tr><td><div style="height:66px;"></div><div class="ln">' + t('fe.al.sigDriver') + '<br>' + esc(snap.cur.nume || '') + '</div></td>'
         +   '<td><div style="height:66px;text-align:center;">' + (comp.stamp_data_uri ? '<img src="' + comp.stamp_data_uri + '" alt="">' : '') + '</div>'
         +   '<div class="ln">' + t('fe.al.sigCompany') + '<br>' + esc(comp.nev || '') + '</div></td></tr></table>'

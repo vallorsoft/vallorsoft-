@@ -5032,3 +5032,20 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 }
 #dcAllocModal .dc-al-arrears b{ color:#7f1d1d; }
 #dcAllocModal .dc-al-arrbtn{ margin-top:6px; border:1.5px solid #f87171; color:#991b1b; background:#fff; font-weight:700; padding:5px 10px; }
+/* Vezetett kifizetés: már kifizetett tételek megjelenítése (jelölve) */
+#dcAllocModal .dc-al-total-paid{ margin-top:6px; font-size:13px; color:#166534; font-weight:600; }
+#dcAllocModal .dc-al-total-rem{ margin-top:4px; font-size:13.5px; color:#b45309; font-weight:600; }
+#dcAllocModal .dc-al-total-rem b, #dcAllocModal .dc-al-total-paid b{ font-variant-numeric:tabular-nums; }
+#dcAllocModal .dc-al-msum{ display:flex; flex-direction:column; gap:2px; font-size:12px; color:#334155; margin:-4px 0 6px; }
+#dcAllocModal .dc-al-msum b{ font-variant-numeric:tabular-nums; }
+#dcAllocModal .dc-al-mremv{ color:#b45309; }
+#dcAllocModal .dc-al-paidtxt{ color:#15803d; font-weight:600; }
+#dcAllocModal .dc-al-item-paid{ background:#f0fdf4; border-radius:8px; opacity:.85; }
+#dcAllocModal .dc-al-paidico{
+  flex:0 0 22px; height:22px; border-radius:50%; background:#16a34a; color:#fff;
+  display:inline-flex; align-items:center; justify-content:center; font-size:13px; font-weight:800;
+}
+#dcAllocModal .dc-al-paidbadge{
+  display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:800;
+  background:#dcfce7; color:#166534; border:1px solid #86efac;
+}
