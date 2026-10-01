@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-01 — Decont sumar: az Avans sor a Diurna elé került (PR #PRNUM)
+## 2026-10-01 — Decont sumar: az Avans sor a Diurna elé került (PR #499)
 - `_dcSumBuildSummaryHtml`: sorrend Total → BNR → Avans → Diurna → Rest de plată → Salariu de bază → Rest − salariu. Cache-bust `?v=20261001sumar4`. Csak kliens; 1382 Jest zöld.
 
 ## 2026-10-01 — Decont sumar: alapbér a fizetendő alatt + „Fizetendő − alapbér” záró sor (PR #498)
