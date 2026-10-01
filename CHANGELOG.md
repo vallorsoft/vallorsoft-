@@ -14,6 +14,9 @@
 
 ---
 
+## 2026-10-01 — Decont sumar: az Avans sor a Diurna elé került (PR #499)
+- `_dcSumBuildSummaryHtml`: sorrend Total → BNR → Avans → Diurna → Rest de plată → Salariu de bază → Rest − salariu. Cache-bust `?v=20261001sumar4`. Csak kliens; 1382 Jest zöld.
+
 ## 2026-10-01 — Decont sumar: alapbér a fizetendő alatt + „Fizetendő − alapbér” záró sor (PR #498)
 - `public/fleet-extra-v2.js` `_dcSumBuildSummaryHtml`: a Salariu de bază sor a Rest de plată ALÁ került (levonásként), a végére új kiemelt sor: **Rest de plată − salariu de bază** (RON + EUR a BNR-en).
 - Új i18n `fe.sum.restMinusBase` (RO+HU). Cache-bust `?v=20261001sumar3`. Csak kliens; 1382 Jest zöld.
