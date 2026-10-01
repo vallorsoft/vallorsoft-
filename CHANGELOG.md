@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-10-01 — Teljes kifizetés: alapból az aktuális hónap + elmaradás-jelzés a korábbi hónapokból + „mit fedez" hónapcímke-fix (PR #PRNUM)
+
+- **Kérés:** a ✅ Teljes kifizetésnél alapból az aktuális hónap legyen kiválasztva, és jelezze, ha a múlt hónapból elmaradás van.
+- **`public/fleet-extra-v2.js` `dcAllocOpen('full')`:** az időszak alapból az aktuális hónap 1. → utolsó napja; a kifizetendő = ennek a teljes járandósága. Új **⚠️ „Elmaradás a korábbi hónapokból"** piros sáv az időszak-kártyán (`_dcAllocArrears`): az időszak kezdete ELŐTTI hátralékos tételek összege RON + EUR-ban, darabszám, hónapok + „➕ Bevonom az időszakba" gomb (`dcAllocIncludeArrears` → a kezdő dátum a legrégebbi elmaradásra áll, újraszámol). A részleges kifizetésnél is megjelenik, ha az időszak előtt hátralék marad.
+- **Régi hiba javítva:** a fájlban két `_dcMonthLabel` függvény volt; a későbbi (`(y, m)`) felülírta a korábbit (`('YYYY-MM')`), így a vezetett kifizetés hónap-kártyáin és a dokumentumok „mit fedez" sorában „undefined 2026-08" jelent meg. Az előbbi átnevezve `_dcMonthKeyLabel`-re.
+- i18n 3 új `fe.al.arrears*` (RO+HU), CSS `.dc-al-arrears`, cache-bust `?v=20261001alarr`. **1380 Jest zöld** + jsdom-harness.
+
 ## 2026-10-01 — Sofőr-elszámolás részleges kifizetés: időszak-szűrő + kifizetés ⇄ maradék kalkulátor (RON + EUR) + nyomtatható kalkuláció (PR #493)
 
 - **Kérés:** a részleges kifizetésnél látszódjon a teljes járandóság; mettől–meddig időszak megadható, és csak az azon belüli járandóságok jelenjenek meg; összeg beírásakor írja ki, mennyi marad — és fordítva (maradékot beírva a kifizetendőt) —, mindkét valutában (RON + EUR, BNR-en); a végén nyomtatható.

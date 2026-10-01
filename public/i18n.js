@@ -2999,6 +2999,9 @@
     'fe.al.paidNowCol':   { ro: 'Plătit acum', hu: 'Most fizetve' },
     'fe.al.sigDriver':    { ro: 'Semnătura șoferului', hu: 'Sofőr aláírása' },
     'fe.al.sigCompany':   { ro: 'Semnătura și ștampila firmei', hu: 'Cég aláírása, pecsétje' },
+    'fe.al.arrearsTitle': { ro: 'Restanțe din lunile anterioare', hu: 'Elmaradás a korábbi hónapokból' },
+    'fe.al.arrearsItems': { ro: 'poziții', hu: 'tétel' },
+    'fe.al.arrearsInclude':{ ro: 'Include în perioadă', hu: 'Bevonom az időszakba' },
     'fe.al.paidThis':     { ro: 'Achitat', hu: 'Fizetve' },
 
     // Csoportos kifizetés (multi-select + vegyes valuta + több fizetési mód)

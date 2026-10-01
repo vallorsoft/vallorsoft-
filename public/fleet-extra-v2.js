@@ -2281,7 +2281,7 @@
     return (String(cur || 'RON').toUpperCase() === 'RON') ? (ron || 0) : (bnr != null ? (ron || 0) / bnr : (ron || 0));
   }
   function _round2c(v) { return Math.round((+v || 0) * 100) / 100; }
-  function _dcMonthLabel(key) {
+  function _dcMonthKeyLabel(key) {
     if (!/^\d{4}-\d{2}$/.test(key || '')) return key || '—';
     return key.slice(0, 4) + '. ' + key.slice(5, 7) + '.';
   }
@@ -2300,7 +2300,7 @@
       byMonth[mk].push(lbl);
     });
     return Object.keys(byMonth).sort().map(function (mk) {
-      return _dcMonthLabel(mk) + ': ' + byMonth[mk].join(', ');
+      return _dcMonthKeyLabel(mk) + ': ' + byMonth[mk].join(', ');
     }).join(' · ');
   }
   // Egy earning aktuális tervezett allokációja (saját valutában)
@@ -2418,6 +2418,11 @@
         _dcAlloc.pay.amount = _round2c(focusItem.remaining_cur);
         _dcAlloc.alloc[focusItem.id] = _round2c(focusItem.remaining_cur);
       } else if (mode === 'full') {
+        // Teljes kifizetés: alapból az AKTUÁLIS HÓNAP (1. → utolsó nap); a
+        // korábbi hónapok elmaradását a modal külön jelzi (bevonható).
+        var nowD = new Date(td + 'T00:00:00Z');
+        var lastD = new Date(Date.UTC(nowD.getUTCFullYear(), nowD.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
+        _dcAlloc.period = { from: td.slice(0, 8) + '01', to: lastD };
         _dcAlloc.pay.amount = _dcAllocPeriodTotalRon();
         _dcAllocComputeAuto();
       }
@@ -2449,6 +2454,7 @@
       +     '<input class="input" id="dcAlTo" type="date" value="' + esc(a.period.to) + '" onchange="FleetExtra.dcAllocPeriodChange()"></div>'
       + '</div>'
       + '<div class="dc-al-total" id="dcAlPeriodTotal"></div>'
+      + '<div id="dcAlArrears"></div>'
       + '</div>';
 
     // Kifizetés-kártya (összeg ⇄ maradék + valuta + mód + dátum + BNR + Auto gomb)
@@ -2528,7 +2534,7 @@
           + '</div>';
       }).join('');
       return '<div class="dc-al-card dc-al-month">'
-        + '<div class="dc-al-card-h">📅 ' + esc(_dcMonthLabel(m.key))
+        + '<div class="dc-al-card-h">📅 ' + esc(_dcMonthKeyLabel(m.key))
         +   ' <span class="dc-al-mrem">' + t('fe.al.remainLbl') + ': ' + _dcAllocBoth(_round2c(mRem)) + '</span></div>'
         + rows
         + '</div>';
@@ -2638,6 +2644,33 @@
     _dcAllocSyncRemFromPay();
     if (a.autoMode) _dcAllocComputeAuto();
     _dcAllocRender();
+  }
+
+  // Az időszak kezdete ELŐTTI (teljesen előtte lévő) hátralékos tételek
+  function _dcAllocArrears() {
+    var out = { ron: 0, count: 0, months: [], earliest: '' };
+    var a = _dcAlloc; if (!a || !a.period.from) return out;
+    var mset = {};
+    a.months.forEach(function (m) {
+      (m.items || []).forEach(function (it) {
+        var ds = _dcAllocItemDates(it);
+        if (!ds.length || _dcAllocInPeriod(it)) return;
+        if (!ds.every(function (d) { return d < a.period.from; })) return;
+        out.ron += _dcAllocOwnToRon(it.currency, it.remaining_cur);
+        out.count++;
+        mset[m.key] = true;
+        ds.forEach(function (d) { if (!out.earliest || d < out.earliest) out.earliest = d; });
+      });
+    });
+    out.ron = _round2c(out.ron);
+    out.months = Object.keys(mset).sort();
+    return out;
+  }
+  // „Bevonom az időszakba": a kezdő dátum a legrégebbi elmaradásra áll
+  function dcAllocIncludeArrears() {
+    var arr = _dcAllocArrears(); if (!arr.earliest) return;
+    var el = document.getElementById('dcAlFrom'); if (el) el.value = arr.earliest;
+    dcAllocPeriodChange();
   }
 
   // FIFO kitöltés (állapotban): a kifizetés RON-egyenértékét a legrégebbi
@@ -2756,6 +2789,14 @@
       '<div class="dc-al-total-l">' + t('fe.al.periodTotal') + '</div>'
       + '<div class="dc-al-total-v">' + _dcAllocBoth(N.totalRon) + '</div>'
       + (rawTxt ? '<div class="dc-al-total-s">' + t('fe.al.itemsRaw') + ': ' + rawTxt + '</div>' : ''));
+    // Elmaradás a kiválasztott időszak ELŐTTI hónapokból (pl. múlt hónap)
+    var arr = _dcAllocArrears();
+    setH('dcAlArrears', arr.count ? (
+      '<div class="dc-al-arrears">⚠️ <div><b>' + t('fe.al.arrearsTitle') + ':</b> '
+      + _dcAllocBoth(arr.ron) + ' · ' + arr.count + ' ' + t('fe.al.arrearsItems')
+      + ' (' + arr.months.map(function (k) { return _dcMonthKeyLabel(k); }).join(', ') + ')'
+      + '<div><button class="btn ghost dc-al-arrbtn" onclick="FleetExtra.dcAllocIncludeArrears()">➕ '
+      + t('fe.al.arrearsInclude') + '</button></div></div></div>') : '');
     setH('dcAlPayConv', '= ' + _dcAllocBoth(N.payRon));
     setH('dcAlRemConv', '= ' + _dcAllocBoth(N.remRon));
     setH('dcAlCalc',
@@ -5125,6 +5166,7 @@
     dcAllocBnrChange: dcAllocBnrChange,
     dcAllocPeriodChange: dcAllocPeriodChange,
     dcAllocPrint: dcAllocPrint,
+    dcAllocIncludeArrears: dcAllocIncludeArrears,
     dcAllocItemToggle: dcAllocItemToggle,
     dcAllocItemInput: dcAllocItemInput,
     dcAllocSubmit: dcAllocSubmit,
