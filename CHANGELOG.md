@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-10-01 — FIX: járandóság-összegek 0-nak számolódtak (pg DATE → JS Date) + Decont sumar: diurna-dátumok naptár nélküli tételeknél is (PR #497)
+
+- **Bejelentés (kinyomtatott Decont sumar, Gondos Imre · 2026. szeptember):** „Teljes járandóság 0,00 RON", az előleg nem jelent meg, a diurnánál nem voltak dátumok.
+- **Gyökérok:** a `pg` driver a `DATE` oszlopot JS `Date` objektumként adja (a `db.js`-ben nincs type-parser). A `_periodPortion` / `_monthOfEarning` / az allokáció `monthOf(paid_at)` / a „mit fedez" hónap-kulcs `String(date).slice(0,10)`-zel dolgozott → `"Tue Sep 05"` → egyetlen tétel sem esett az időszakba → `totals.earned` = 0 és az időszakra elszámolt előleg (`totals.settled`) is 0; a same-month-first allokáció sem találta a hónapot. A tesztek string-dátumokkal mockoltak, ezért nem jött elő. Érintette a Decont oficial / Decont lunar összegeit is.
+- **Fix (`handlers/fleetCompliance.js`):** új közös `_isoDate(v)` (Date → helyi `YYYY-MM-DD`, string → első 10 karakter); mind a négy helyen erre cserélve. **Regresszió-teszt** valódi `Date` objektumokkal (`settlement-sheet.test.js`) — a fix nélkül pontosan a PDF-beli 0-t adja.
+- **Decont sumar (`public/fleet-extra-v2.js`):** a naptár nélkül (csak mennyiséggel) rögzített diurna/napidíj tételeknél a tétel dátuma + mennyiség (pl. „07.09 ×22") is kiíródik a bejelölt napok mellé; a mennyiség-oszlop napi jogcímnél „zile/nap".
+- Cache-bust `?v=20261001sumar2`. **1382 Jest zöld** (+1).
+
 ## 2026-10-01 — ÚJ dokumentum: „📋 Decont sumar" — tételárak nélküli összesítő (diurna-napok + jogcímek darabszámmal, összegek csak a végén) (PR #496)
 
 - **Kérés:** nyomtatható lap az időszak teljes járandóságáról: tételenként NINCS ár — a diurnánál a bejelölt napok pontosan, a többi jogcímnél csak a darabszám (pl. 5× Încărcare/Descărcare); a végén Total (EUR + BNR + RON), a megadott Salariu de bază KÜLÖN sorban, a levonás utáni Diurna, a már kifizetett előleg (csak ami az időszak tételeire volt elszámolva, úgy, ahogy a kifizetéskor megadták — nem számoljuk át), és a fennmaradó fizetendő.

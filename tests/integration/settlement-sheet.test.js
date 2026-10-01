@@ -169,6 +169,42 @@ describe('getMonthlySettlementSheet', () => {
     expect(tot.earned.combined_ron).toBe(2920);
   });
 
+  test('REGRESSZIÓ: a pg a DATE-et JS Date objektumként adja → a járandóság és az előleg mégis beszámít', async () => {
+    // Korábban `String(date).slice(0,10)` → „Tue Sep 05" → minden tétel portion=0
+    // → a lapon Total 0, előleg 0. Itt valódi Date objektumokkal teszteljük.
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValueOnce(5.0);
+    const pool = require('../../db');
+    const D = (y, m, d) => new Date(y, m - 1, d);
+    pool.query
+      .mockResolvedValueOnce(rows([{ email: 'sofer@ceg.hu', nume: 'Peto', tel: null }]))
+      .mockResolvedValueOnce(rows([{ nev: 'CegKft' }]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([
+        { id: 1, earning_date: D(2026, 9, 5),  kind: 'bonus',  label: 'x', quantity: 1, unit_amount: 500, total_amount: 500, currency: 'EUR', note: null },
+        { id: 2, earning_date: D(2026, 9, 12), kind: 'diurna', label: 'y', quantity: 6, unit_amount: 70,  total_amount: 420, currency: 'RON', note: null },
+      ]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([
+        { id: 1, earning_date: D(2026, 9, 5),  currency: 'EUR', total_amount: 500 },
+        { id: 2, earning_date: D(2026, 9, 12), currency: 'RON', total_amount: 420 },
+      ]))
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([
+        { id: 9, paid_at: D(2026, 9, 20), amount: 1000, currency: 'RON', amount_ron: null, group_id: null },
+      ]));
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getMonthlySettlementSheet',
+      arguments: [{ email: 'sofer@ceg.hu', year: 2026, month: 9 }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    const tot = res.body.result.totals;
+    expect(tot.earned.eur).toBe(500);
+    expect(tot.earned.ron).toBe(420);
+    expect(tot.earned.combined_ron).toBe(2920);
+    expect(tot.settled.combined_ron).toBe(1000);
+  });
+
   test('más hónapra (augusztusra) eső kifizetés NEM szennyezi a szeptemberi lapot', async () => {
     setUser(fixtures.admin);
     fetchBnrEurRon.mockResolvedValueOnce(5.0);
