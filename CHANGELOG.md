@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-10-01 — ÚJ dokumentum: „📋 Decont sumar" — tételárak nélküli összesítő (diurna-napok + jogcímek darabszámmal, összegek csak a végén) (PR #496)
+
+- **Kérés:** nyomtatható lap az időszak teljes járandóságáról: tételenként NINCS ár — a diurnánál a bejelölt napok pontosan, a többi jogcímnél csak a darabszám (pl. 5× Încărcare/Descărcare); a végén Total (EUR + BNR + RON), a megadott Salariu de bază KÜLÖN sorban, a levonás utáni Diurna, a már kifizetett előleg (csak ami az időszak tételeire volt elszámolva, úgy, ahogy a kifizetéskor megadták — nem számoljuk át), és a fennmaradó fizetendő.
+- **`public/fleet-extra-v2.js`:** új 5. kártya a „📄 Nyomtatás / Dokumentum" választóban; a MEGLÉVŐ Decont oficial modal `'sumar'` módja (`_dcOfMode`) — ugyanaz az adatforrás (`getMonthlySettlementSheet`), időszak-presetek, alapbér-mentés (`setDriverBaseSalary`) + kézi BNR, nyomtatás (ismétlődő fejléc), e-mail. Új `_dcSumRightsHtml` (diurna: az időszakba eső napok dátumlistája, napszám; „Egyéb" típus a saját megnevezésén, a többi típus a típusnevén; mennyiség-összeg) és `_dcSumBuildSummaryHtml` (Total drepturi → Curs BNR → Salariu de bază → Diurna = total − alapbér → Avans (`totals.settled`, a kifizetéskori allokáció) → Rest de plată, mind RON + EUR). Kivehető szakaszok külön `sumar` docType-pal. A Decont oficial változatlan.
+- Nincs szerver-/séma-változás. i18n 15 új `fe.doc.sumar*`/`fe.sum.*` (RO+HU), CSS teal kártya-akcent, cache-bust `?v=20261001sumar`. **1381 Jest zöld** + jsdom-harness (napok szűrése, ár-mentesség, BNR-váltás, nyomtatás, mód-váltás vissza oficialra).
+
 ## 2026-10-01 — Kifizetés-modal: az időszak TELJES járandósága, a már kifizetett rész megjelölve (PR #495)
 
 - **Kérés:** a kifizetés ablakban jelenjen meg az adott havi teljes járandóság, a már kifizetett tételek is — csak legyenek megjelölve, hogy már kifizetett rész.

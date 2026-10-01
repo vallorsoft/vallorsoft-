@@ -4041,6 +4041,8 @@
           "FleetExtra.dcDocPickerGo('lunar')", 'blue')
       + _dcDocCardHtml('📑', t('fe.doc.oficialT'),  t('fe.doc.oficialD'),
           "FleetExtra.dcDocPickerGo('oficial')", 'green')
+      + _dcDocCardHtml('📋', t('fe.doc.sumarT'),    t('fe.doc.sumarD'),
+          "FleetExtra.dcDocPickerGo('sumar')", 'teal')
       + _dcDocCardHtml('🧾', t('fe.doc.historyT'),  t('fe.doc.historyD'),
           "FleetExtra.dcDocPickerGo('history')", 'amber')
       + _dcDocCardHtml('💸', t('fe.doc.groupT'),    t('fe.doc.groupD'),
@@ -4051,6 +4053,7 @@
     dcDocPickerClose();
     if (kind === 'lunar')   { dcOpenSettlement();          return; }
     if (kind === 'oficial') { dcOpenOfficialSettlement();  return; }
+    if (kind === 'sumar')   { dcOpenSummarySettlement();   return; }
     if (kind === 'history') { dcOpenPayHistory();          return; }
     if (kind === 'group')   { _dcOpenGroupPicker();        return; }
   }
@@ -4512,6 +4515,11 @@
   var _dcOfSheet = null;      // legutóbbi getMonthlySettlementSheet válasz
   var _dcOfBaseSal = null;    // aktuálisan szerkesztett nettó alapbér (RON)
   var _dcOfBnrOverride = null; // ha a felhasználó kézzel írja be a BNR-t
+  // A modal két lapot rajzol UGYANABBÓL az adatból: 'oficial' (Decont oficial)
+  // vagy 'sumar' (Decont sumar — tételárak nélküli összesítő: diurna-napok +
+  // jogcímek darabszámmal, a végén Total → Salariu de bază → Diurna → Avans →
+  // Rest de plată). Az alapbér/BNR-szerkesztő, nyomtatás, e-mail közös.
+  var _dcOfMode = 'oficial';
 
   // Az utolsó kézi BNR-érték a böngészőben (per-cég) — ha a szerver BNR-t
   // sosem tud lekérni (proxy/WAF-block/időszakos hiba), a felhasználó ne
@@ -4581,8 +4589,11 @@
     for (var i = 0; i < all.length; i++) all[i].classList.toggle('active', all[i].dataset.preset === key);
     dcOfSheetReload();
   }
-  function dcOpenOfficialSettlement() {
+  function dcOpenSummarySettlement() { _dcOfOpen('sumar'); }
+  function dcOpenOfficialSettlement() { _dcOfOpen('oficial'); }
+  function _dcOfOpen(mode) {
     if (!_dcCurrent || !_dcCurrent.email) { toast(t('fe.dc.pickDriver'), 'err'); return; }
+    _dcOfMode = (mode === 'sumar') ? 'sumar' : 'oficial';
     _dcOfEnsureSheetModal();
     var m = document.getElementById('dcOfSheetModal');
     var fEl = document.getElementById('dcOfStFrom');
@@ -4613,7 +4624,7 @@
       var srvBase = r.driver && r.driver.net_base_salary_ron;
       _dcOfBaseSal = (srvBase != null) ? Number(srvBase) : 2700;
       body.innerHTML = _dcRenderOfficialHtml(r);
-      _dcSecBuildBar(body.querySelector('.dc-of-doc'), 'oficial');
+      _dcSecBuildBar(body.querySelector('.dc-of-doc'), _dcOfMode === 'sumar' ? 'sumar' : 'oficial');
     });
   }
 
@@ -4911,7 +4922,9 @@
     // Összegzés-blokk (a kiemelt zárósor) — külön változó, mert a
     // `dcOfBnrChange`/`dcOfSaveBase` élőben újrarajzolja a `#dcOfSummaryBox`
     // konténerbe (az editor-sáv és az input-ok érintetlenek maradnak).
-    var summaryHtml = _dcOfBuildSummaryHtml(r, baseSal, bnr);
+    var isSumar = (_dcOfMode === 'sumar');
+    var docType = isSumar ? 'sumar' : 'oficial';
+    var summaryHtml = isSumar ? _dcSumBuildSummaryHtml(r, baseSal, bnr) : _dcOfBuildSummaryHtml(r, baseSal, bnr);
     // A régi inline `sumBlock` és `finalHighlight` innentől üres (a HTML a
     // `summaryHtml` alatt egyben — `_dcOfBuildSummaryHtml`).
     var sumBlock = '', finalHighlight = '';
@@ -5038,7 +5051,7 @@
       + '</table>';
 
     var footHtml = '<div style="margin-top:24px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:10px;color:#94a3b8;text-align:center;">'
-      +   t('fe.stof.footNote') + ' · VallorSoft'
+      +   (isSumar ? t('fe.sum.title') : t('fe.stof.footNote')) + ' · VallorSoft'
       + '</div>';
 
     return '<div class="dc-sheet-doc dc-of-doc">'
@@ -5056,7 +5069,7 @@
       +     '</td>'
       +     '<td style="vertical-align:middle;text-align:right;width:230px;">'
       +       '<div style="display:inline-block;padding:9px 16px;background:linear-gradient(135deg,#0f766e,#134e4a);color:#fff;border-radius:8px;font-weight:800;font-size:14px;letter-spacing:0.3px;">'
-      +         t(isSingleMonth ? 'fe.stof.title' : 'fe.stof.titleRange')
+      +         (isSumar ? t('fe.sum.title') : t(isSingleMonth ? 'fe.stof.title' : 'fe.stof.titleRange'))
       +       '</div>'
       +       '<div style="font-size:13px;color:#0f172a;font-weight:700;margin-top:6px;">' + esc(monthLbl) + '</div>'
       +       (isSingleMonth
@@ -5070,21 +5083,133 @@
       // ── TÖRZS (.vs-doc-body) ──
       + '<div class="vs-doc-body">'
       // Sofőr adatok (kivehető szakasz)
-      + _dcSec('oficial', 'driver', t('fe.sec.driver'), driverHtml)
+      + _dcSec(docType, 'driver', t('fe.sec.driver'), driverHtml)
       // Alapbér-szerkesztő (csak képernyőn, NEM kivehető szakasz — az adatbevitel eszköze)
       + salaryEditor
-      // Tételes részletezés (kivehető szakasz — Tételek elszámolás)
-      + _dcSec('oficial', 'details', t('fe.sec.details'), detailsHtml)
+      // Tételes részletezés (oficial) VAGY tételárak nélküli jogcím-lista (sumar)
+      + (isSumar
+        ? _dcSec('sumar', 'rights', t('fe.sum.rightsTitle'), _dcSumRightsHtml(r))
+        : _dcSec('oficial', 'details', t('fe.sec.details'), detailsHtml))
       // Összegzés-blokk + Kiemelt záró blokk — dinamikusan cserélhető konténer;
       // a `dcOfBnrChange`/`dcOfSaveBase` innen frissít (a benne lévő szakaszok
       // — totals/paid/summary/remain — a `_dcOfBuildSummaryHtml`-ben kivehetők).
       + '<div id="dcOfSummaryBox">' + summaryHtml + '</div>'
       // Aláíró blokk (kivehető szakasz)
-      + _dcSec('oficial', 'signature', t('fe.sec.signature'), signHtml)
+      + _dcSec(docType, 'signature', t('fe.sec.signature'), signHtml)
       // Lábléc (kivehető szakasz)
-      + _dcSec('oficial', 'footer', t('fe.sec.footer'), footHtml)
+      + _dcSec(docType, 'footer', t('fe.sec.footer'), footHtml)
       + '</div>'   // .vs-doc-body vége
       + '</div>';
+  }
+
+  // ════════════════════════════════════════════════════════
+  //  DECONT SUMAR — tételárak nélküli összesítő
+  //  Jogcímek: diurna → a bejelölt (időszakba eső) napok dátum szerint;
+  //  minden más jogcím típusonként CSAK darabszámmal (pl. „Încărcare 5×").
+  //  Összegek CSAK a végén: Total → BNR → Salariu de bază (külön sor) →
+  //  Diurna (= total − alapbér) → Avans achitat (ahogy a kifizetéskor az
+  //  időszak tételeire elszámolták — nem számoljuk át) → Rest de plată.
+  // ════════════════════════════════════════════════════════
+  function _dcKindLabelOf(kindKey) {
+    var lang = (window.I18N && window.I18N.getLang && window.I18N.getLang()) || 'ro';
+    if (_dcBuiltinKinds.indexOf(kindKey) >= 0) return t('fe.de.kind.' + kindKey);
+    var f = (_dcCustomKinds || []).find(function (k) { return k.key === kindKey; });
+    return f ? ((lang === 'hu' && f.label_hu) ? f.label_hu : (f.label_ro || kindKey)) : kindKey;
+  }
+  function _dcSumRightsHtml(r) {
+    var p = r.period || {};
+    var from = String(p.from || ''), to = String(p.to || '');
+    var groups = [];          // sorrend: első megjelenés
+    var byKey = {};
+    (r.earnings || []).forEach(function (it) {
+      var kind = it.kind || 'other';
+      // Az „Egyéb" típusnál a tétel saját megnevezése a jogcím (pl. „Încărcare/
+      // Descărcare"); a többi típus a típus-nevén csoportosul.
+      var lbl = String(it.label || '').trim();
+      var gKey = (kind === 'other' && lbl) ? ('other:' + lbl.toLowerCase()) : kind;
+      if (!byKey[gKey]) {
+        byKey[gKey] = { kind: kind, name: (kind === 'other' && lbl) ? lbl : null, qty: 0, days: {}, hasDays: false };
+        groups.push(byKey[gKey]);
+      }
+      var g = byKey[gKey];
+      var days = _dcDaysArr(it);
+      if (days.length) {
+        g.hasDays = true;
+        days.forEach(function (d) { if ((!from || d >= from) && (!to || d <= to)) g.days[d] = true; });
+      } else {
+        g.qty += Number(it.quantity || 0) || 1;
+      }
+    });
+    if (!groups.length) {
+      return '<div style="padding:12px;text-align:center;color:#6b7280;font-style:italic;">' + t('fe.de.empty') + '</div>';
+    }
+    var fmtD = function (d) { return d.slice(8, 10) + '.' + d.slice(5, 7); };
+    var rows = groups.map(function (g) {
+      var dayList = Object.keys(g.days).sort();
+      var nDays = dayList.length;
+      var count = (g.hasDays ? nDays : 0) + g.qty;
+      var unit = g.hasDays ? (' ' + t(count === 1 ? 'fe.sum.day' : 'fe.sum.days')) : '×';
+      var detail = dayList.length
+        ? '<div style="font-size:12px;color:#334155;margin-top:4px;line-height:1.6;">'
+          + dayList.map(fmtD).join(', ') + '</div>'
+        : '';
+      return '<tr>'
+        + '<td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top;">'
+        +   '<b style="color:#0f172a;">' + esc(g.name || _dcKindLabelOf(g.kind)) + '</b>' + detail + '</td>'
+        + '<td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;text-align:right;vertical-align:top;white-space:nowrap;font-weight:800;color:#0f172a;">'
+        +   n2(count, count % 1 ? 2 : 0) + unit + '</td>'
+        + '</tr>';
+    }).join('');
+    return '<div style="font-size:14px;font-weight:800;color:#0f172a;margin:12px 0 6px;">📋 ' + t('fe.sum.rightsTitle') + '</div>'
+      + '<table style="width:100%;border-collapse:collapse;font-size:13px;border:1.5px solid #cbd5e1;border-radius:8px;">'
+      +   '<thead><tr style="background:#e0f2fe;color:#0c4a6e;">'
+      +     '<th style="padding:7px 10px;text-align:left;">' + t('fe.sum.colRight') + '</th>'
+      +     '<th style="padding:7px 10px;text-align:right;">' + t('fe.sum.colQty') + '</th>'
+      +   '</tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+  function _dcSumBuildSummaryHtml(r, baseSal, bnr) {
+    var tot = r.totals || {};
+    var totEur = Number((tot.earned || {}).eur || 0);
+    var totRon = Number((tot.earned || {}).ron || 0);
+    var hasBnr = (bnr != null && bnr > 0);
+    var totalRon = hasBnr ? (totEur * bnr + totRon) : null;
+    var toEur = function (ron) { return hasBnr ? ron / bnr : null; };
+    var both = function (ron) {
+      if (ron == null) return '—';
+      var e = toEur(ron);
+      return n2(ron, 2) + ' RON' + (e != null ? '<div style="font-size:13px;font-weight:700;color:#475569;margin-top:2px;">= ' + n2(e, 2) + ' EUR</div>' : '');
+    };
+    // Avans: a szerver allokációja — az időszak tételeire elszámolt kifizetés
+    // (a kifizetéskor megadott fedezet szerint, bármely fizetési dátummal).
+    var settled = tot.settled || {};
+    var advRon = (settled.combined_ron != null) ? Number(settled.combined_ron)
+      : (hasBnr ? Number(settled.eur || 0) * bnr + Number(settled.ron || 0) : null);
+    var hasAdv = advRon != null && advRon > 0.005;
+    var diurnaRon = (totalRon != null) ? (totalRon - baseSal) : null;
+    var restRon = (totalRon != null) ? Math.max(0, totalRon - (hasAdv ? advRon : 0)) : null;
+    var row = function (lbl, val, opt) {
+      opt = opt || {};
+      return '<tr>'
+        + '<td style="padding:9px 0;' + (opt.top ? 'border-top:1.5px solid ' + opt.top + ';' : '') + 'font-weight:' + (opt.bold ? 800 : 700) + ';color:' + (opt.color || '#0f172a') + ';vertical-align:top;">' + lbl + '</td>'
+        + '<td style="padding:9px 0;' + (opt.top ? 'border-top:1.5px solid ' + opt.top + ';' : '') + 'text-align:right;font-weight:900;font-size:' + (opt.big ? 18 : 16) + 'px;color:' + (opt.color || '#0f172a') + ';">' + val + '</td>'
+        + '</tr>';
+    };
+    var rawLine = [];
+    if (totEur > 0.005) rawLine.push(n2(totEur, 2) + ' EUR');
+    if (totRon > 0.005) rawLine.push(n2(totRon, 2) + ' RON');
+    var html = '<div style="margin-top:16px;padding:16px 20px;border:2.5px solid #0f766e;border-radius:10px;background:#f0fdfa;color:#0f172a;">'
+      + '<div style="font-size:13px;font-weight:800;color:#0f766e;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px;">📊 ' + t('fe.sum.summaryTitle') + '</div>'
+      + '<table style="width:100%;border-collapse:collapse;font-size:15px;">'
+      + row(t('fe.sum.totalRights') + (rawLine.length ? '<div style="font-size:12px;font-weight:600;color:#475569;margin-top:2px;">' + rawLine.join(' + ') + '</div>' : ''), both(totalRon))
+      + row(t('fe.stof.bnrUsed'), hasBnr ? ('1 EUR = ' + n2(bnr, 4) + ' RON') : '—', { color: '#475569' })
+      + row(t('fe.stof.netBaseRon'), both(baseSal), { top: '#99f6e4' })
+      + row(t('fe.stof.aboveBaseEur'), both(diurnaRon), { top: '#99f6e4' })
+      + (hasAdv ? row('💸 ' + t('fe.sum.advance'), '− ' + both(advRon), { top: '#99f6e4', color: '#334155' }) : '')
+      + row('⚖️ ' + t('fe.sum.rest'), both(restRon), { top: '#0f766e', bold: true, big: true, color: '#1e3a8a' })
+      + '</table>'
+      + (hasAdv ? '<div style="margin-top:8px;font-size:11px;color:#475569;">' + t('fe.sum.advanceNote') + '</div>' : '')
+      + '</div>';
+    return _dcSec('sumar', 'summary', t('fe.sum.summaryTitle'), html);
   }
 
   // Kézi BNR-változás: csak a helyi state-ben tároljuk, majd re-render.
@@ -5113,7 +5238,9 @@
       : (bnrSrv != null ? Number(bnrSrv)
         : (bnrLastManual != null ? bnrLastManual : null));
     var baseSal = (_dcOfBaseSal != null && isFinite(_dcOfBaseSal)) ? Number(_dcOfBaseSal) : 2700;
-    box.innerHTML = _dcOfBuildSummaryHtml(_dcOfSheet, baseSal, bnr);
+    box.innerHTML = (_dcOfMode === 'sumar')
+      ? _dcSumBuildSummaryHtml(_dcOfSheet, baseSal, bnr)
+      : _dcOfBuildSummaryHtml(_dcOfSheet, baseSal, bnr);
   }
 
   // Alapbér-mentés (per sofőr, `users.net_base_salary_ron`).
@@ -5145,7 +5272,7 @@
     var w = window.open('', '_blank');
     if (!w) { toast(t('fe.st.popupBlocked'), 'err'); return; }
     var lang = (window.I18N && window.I18N.getLang && window.I18N.getLang()) || 'ro';
-    var title = t('fe.stof.title') + ' — ' + (_dcOfSheet.driver.nume || '') + ' — '
+    var title = (_dcOfMode === 'sumar' ? t('fe.sum.title') : t('fe.stof.title')) + ' — ' + (_dcOfSheet.driver.nume || '') + ' — '
       + (_dcOfSheet.period.year && _dcOfSheet.period.month
         ? _dcMonthLabel(_dcOfSheet.period.year, _dcOfSheet.period.month)
         : (_dcOfSheet.period.from + ' → ' + _dcOfSheet.period.to));
@@ -5168,7 +5295,7 @@
     var perLbl = (_dcOfSheet.period.year && _dcOfSheet.period.month)
       ? _dcMonthLabel(_dcOfSheet.period.year, _dcOfSheet.period.month)
       : (_dcOfSheet.period.from + ' → ' + _dcOfSheet.period.to);
-    var subject = t('fe.stof.emailSubject') + ' · ' + perLbl + ' · ' + _dcOfSheet.driver.nume;
+    var subject = (_dcOfMode === 'sumar' ? t('fe.sum.title') : t('fe.stof.emailSubject')) + ' · ' + perLbl + ' · ' + _dcOfSheet.driver.nume;
     gas('sendSettlementSheetEmail', [{ to: to, subject: subject, html: clone.outerHTML }]).then(function (r) {
       if (r && r.ok) toast(t('fe.st.emailSent'), 'ok');
       else toast((r && r.err) || t('common.error'), 'err');
@@ -5219,6 +5346,7 @@
     // Vezetett kifizetés-allokáció (💵 Részleges / ✅ Teljes → melyik havi
     // járandóságból mennyit, FIFO-előtöltéssel, részleges levonással)
     dcAllocOpen: dcAllocOpen,
+    dcOpenSummarySettlement: dcOpenSummarySettlement,
     dcAllocClose: dcAllocClose,
     dcAllocPayChange: dcAllocPayChange,
     dcAllocAutoFill: dcAllocAutoFill,
