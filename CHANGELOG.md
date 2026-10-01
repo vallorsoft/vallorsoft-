@@ -14,6 +14,9 @@
 
 ---
 
+## 2026-10-01 — Decont sumar: a Napidíj sor felirata „Napidíj (teljes − alapbér)” (PR #502)
+- Új `fe.sum.diurnaCalc` kulcs (RO „Diurnă (total − salariu de bază)”, HU „Napidíj (teljes − alapbér)”), csak a Decont sumar összesítőjében; az érték változatlan. Cache-bust `?v=20261001sumar7`.
+
 ## 2026-10-01 — Decont sumar: előleg a teljes alatt + „Fennmaradó napidíj” záró sor (PR #501)
 - Az összesítő új sorrendje: Total drepturi → 💸 Avans (közvetlenül a teljes alatt) → Curs BNR → Salariu de bază → Diurna → 🟰 **Diurnă rămasă de plată / Fennmaradó napidíj** (= Diurna − Avans, RON + EUR).
 - A „⚖️ Rest de plată” (teljes − előleg) sor kivéve — ez okozta a félreértést, mert az alapbért is tartalmazta. Csak kliens-oldal (`public/fleet-extra-v2.js`, `public/i18n.js`), cache-bust `?v=20261001sumar6`.
