@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-01 — Teljes kifizetés: alapból az aktuális hónap + elmaradás-jelzés a korábbi hónapokból + „mit fedez" hónapcímke-fix (PR #PRNUM)
+## 2026-10-01 — Teljes kifizetés: alapból az aktuális hónap + elmaradás-jelzés a korábbi hónapokból + „mit fedez" hónapcímke-fix (PR #494)
 
 - **Kérés:** a ✅ Teljes kifizetésnél alapból az aktuális hónap legyen kiválasztva, és jelezze, ha a múlt hónapból elmaradás van.
 - **`public/fleet-extra-v2.js` `dcAllocOpen('full')`:** az időszak alapból az aktuális hónap 1. → utolsó napja; a kifizetendő = ennek a teljes járandósága. Új **⚠️ „Elmaradás a korábbi hónapokból"** piros sáv az időszak-kártyán (`_dcAllocArrears`): az időszak kezdete ELŐTTI hátralékos tételek összege RON + EUR-ban, darabszám, hónapok + „➕ Bevonom az időszakba" gomb (`dcAllocIncludeArrears` → a kezdő dátum a legrégebbi elmaradásra áll, újraszámol). A részleges kifizetésnél is megjelenik, ha az időszak előtt hátralék marad.
