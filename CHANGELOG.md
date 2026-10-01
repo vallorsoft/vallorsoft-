@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-01 — Sofőr-elszámolás: diurnás napok (benti / kinti) a sofőr kártyáján (PR #PRNUM)
+## 2026-10-01 — Sofőr-elszámolás: diurnás napok (benti / kinti) a sofőr kártyáján (PR #505)
 - `getDriverBalance` új `diurna_days` mező: a sofőr menetleveleiből a kiválasztott időszakra (beírt út-dátum, `eff_date`) összegzett `diurna_interna` / `diurna_externa` + menetlevél-szám; cég-horgony (`company_id`, fallback users-join), best-effort.
 - A részletes sofőr-nézet egyenleg-kártyáján új sor: 🗓️ Diurnás napok — 🏠 Benti / 🌍 Kinti / Σ nap (N menetlevél). Csak kijelzés, nyomtatványba nem kerül. Új `fe.dc.dd*` i18n (RO+HU), cache-bust `?v=20261001ddays`.
 
