@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-10-01 — Sofőr-elszámolás: diurnás napok (benti / kinti) a sofőr kártyáján (PR #505)
+- `getDriverBalance` új `diurna_days` mező: a sofőr menetleveleiből a kiválasztott időszakra (beírt út-dátum, `eff_date`) összegzett `diurna_interna` / `diurna_externa` + menetlevél-szám; cég-horgony (`company_id`, fallback users-join), best-effort.
+- A részletes sofőr-nézet egyenleg-kártyáján új sor: 🗓️ Diurnás napok — 🏠 Benti / 🌍 Kinti / Σ nap (N menetlevél). Csak kijelzés, nyomtatványba nem kerül. Új `fe.dc.dd*` i18n (RO+HU), cache-bust `?v=20261001ddays`.
+
 ## 2026-10-01 — Decont sumar: Napidíj + alapbér = teljes − előleg; napidíj = ebből − alapbér (PR #504)
 - `_dcSumBuildSummaryHtml` számítás: **Napidíj + alapbér** = teljes járandóság − kifizetett előleg; **Fennmaradó napidíj** = (teljes − előleg) − alapbér. A végösszeg nem változik, csak a köztes sor most valóban a napidíj + alapbér összegét mutatja.
 - A „Teljes járandóság" mellé kisbetűs, zárójeles jelzés: „(napidíj + alapbér)" (új `fe.sum.totalHint`, RO+HU). Cache-bust `?v=20261001sumar9`.

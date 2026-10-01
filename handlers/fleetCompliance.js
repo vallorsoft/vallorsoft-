@@ -1718,9 +1718,31 @@ handlers.getDriverBalance = async function (req, res, args) {
       ? _round2(balEur * bnrRate + balRon)
       : null;
 
+    // Diurna-napok az időszakra (benti / kinti) a sofőr menetleveleiből,
+    // a beírt út-dátum (eff_date) szerint — best-effort, csak kijelzés.
+    let diurnaDays = null;
+    try {
+      const dR = await pool.query(
+        `SELECT COALESCE(SUM(f.diurna_externa),0)::numeric AS ext,
+                COALESCE(SUM(f.diurna_interna),0)::numeric AS intern,
+                COUNT(*)::int AS waybills
+           FROM fuvarlevelek f
+          WHERE LOWER(f.email_sofer)=$2
+            AND COALESCE(f.company_id,
+                  (SELECT u.company_id FROM users u WHERE LOWER(u.email)=LOWER(f.email_sofer) LIMIT 1)) = $1
+            AND COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) >= $3::date
+            AND COALESCE(f.erkezes_dt, f.indulas_dt, f.data_completare) < ($4::date + 1)`,
+        [cid, email, from, to]);
+      const d = dR.rows[0] || {};
+      diurnaDays = { ext: Number(d.ext || 0), int: Number(d.intern || 0), waybills: d.waybills || 0 };
+    } catch (e) {
+      console.warn('getDriverBalance diurna-napok:', e.message);
+    }
+
     return res.json({ result: {
       ok: true,
       sofer: { email, nume: ur.rows[0].nume },
+      diurna_days: diurnaDays,
       earned: { eur: _round2(earned.EUR), ron: _round2(earned.RON), count: earned.count },
       paid:   { eur: _round2(paid.EUR),   ron: _round2(paid.RON),   count: paid.count,
                 paid_ron_total: _round2(paid.ron_total) },

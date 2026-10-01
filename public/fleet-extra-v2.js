@@ -1202,7 +1202,21 @@
           : '')
       + '</div>';
 
-    return tiles + crossHtml + bnrLine;
+    // Diurna-napok az időszakra (benti / kinti) — a menetlevelekből, csak kijelzés.
+    var dd = bal.diurna_days;
+    var ddLine = '';
+    if (dd) {
+      var ddTot = Number(dd.ext || 0) + Number(dd.int || 0);
+      ddLine = '<div class="dc-bnr-line" style="flex-wrap:wrap;gap:6px 14px;">'
+        + '<span>🗓️ <b>' + t('fe.dc.ddTitle') + ':</b></span>'
+        + '<span>🏠 ' + t('fe.dc.ddInt') + ': <b>' + n2(dd.int || 0, 0) + '</b></span>'
+        + '<span>🌍 ' + t('fe.dc.ddExt') + ': <b>' + n2(dd.ext || 0, 0) + '</b></span>'
+        + '<span>Σ <b>' + n2(ddTot, 0) + '</b> ' + t('fe.dc.ddDays') + '</span>'
+        + '<span class="text-muted" style="font-size:12px;">(' + (dd.waybills || 0) + ' ' + t('fe.dc.ddWb') + ')</span>'
+        + '</div>';
+    }
+
+    return tiles + ddLine + crossHtml + bnrLine;
   }
 
   // Kliens-oldali 2-jegyű kerekítés (a szerveres _round2 hívása helyett)

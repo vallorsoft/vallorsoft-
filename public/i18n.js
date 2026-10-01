@@ -2855,6 +2855,11 @@
     'fe.dc.grpEarned':    { ro: 'Drepturi totale', hu: 'Járandóság összesen' },
     'fe.dc.grpPaid':      { ro: 'Plătit', hu: 'Kifizetve' },
     'fe.dc.grpRemaining': { ro: 'Rest de plată', hu: 'Hátralék' },
+    'fe.dc.ddTitle': { ro: 'Zile diurnă în perioadă', hu: 'Diurnás napok az időszakban' },
+    'fe.dc.ddInt': { ro: 'În țară', hu: 'Benti' },
+    'fe.dc.ddExt': { ro: 'Externe', hu: 'Kinti' },
+    'fe.dc.ddDays': { ro: 'zile', hu: 'nap' },
+    'fe.dc.ddWb': { ro: 'foi de parcurs', hu: 'menetlevél' },
     // Kártyás elszámolás-landing (sofőr-áttekintő)
     'fe.dc.searchDriver':  { ro: 'Caută șofer (nume, email, telefon)…', hu: 'Sofőr keresése (név, e-mail, telefon)…' },
     'fe.dc.hubHint':       { ro: 'Alege un șofer pentru decont detaliat — drepturi, plăți, documente.', hu: 'Válassz egy sofőrt a részletes elszámoláshoz — járandóság, kifizetések, dokumentumok.' },
