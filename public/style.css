@@ -4996,3 +4996,33 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #dcEarnModal .dc-dp-day.on { background:#16a34a; border-color:#15803d; color:#fff; }
 #dcEarnModal .dc-dp-foot { margin-top:6px; font-size:12px; color:#334155; }
 .main-content[data-theme="dark"] ~ #dcEarnModal .dc-dp, [data-theme="dark"] #dcEarnModal .dc-dp { background:rgba(255,255,255,0.04); border-color:#475569; }
+
+/* ── Sofőr-elszámolás vezetett kifizetés: időszak + kifizetés ⇄ maradék kalkulátor (RON+EUR) ── */
+#dcAllocModal .dc-al-periodcard{ background:#f0fdf4; border-color:#86efac; }
+#dcAllocModal .dc-al-periodcard .dc-al-card-h{ color:#166534; }
+#dcAllocModal .dc-al-total{
+  margin-top:12px; padding:10px 12px; border-radius:10px;
+  background:#fff; border:1.5px solid #4ade80;
+}
+#dcAllocModal .dc-al-total-l{ font-size:11.5px; font-weight:800; color:#166534; text-transform:uppercase; letter-spacing:.3px; }
+#dcAllocModal .dc-al-total-v{ font-size:19px; font-weight:800; color:#0f172a; margin-top:2px; font-variant-numeric:tabular-nums; }
+#dcAllocModal .dc-al-total-s{ font-size:11.5px; color:#475569; margin-top:2px; }
+#dcAllocModal .dc-al-amtcur{ display:flex; gap:6px; }
+#dcAllocModal .dc-al-amtcur .input{ flex:1 1 auto; min-width:0; font-weight:700; text-align:right; font-variant-numeric:tabular-nums; }
+#dcAllocModal .dc-al-amtcur .select{ flex:0 0 78px; }
+#dcAllocModal .dc-al-conv{ font-size:11.5px; color:#1e40af; font-weight:700; margin-top:4px; min-height:15px; font-variant-numeric:tabular-nums; }
+#dcAllocModal .dc-al-calc{
+  margin-top:12px; border-radius:10px; overflow:hidden; border:1.5px solid #93c5fd; background:#fff;
+}
+#dcAllocModal .dc-al-calcrow{
+  display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
+  padding:8px 12px; border-top:1px solid #e2e8f0; font-size:13px; color:#334155;
+}
+#dcAllocModal .dc-al-calcrow:first-child{ border-top:none; }
+#dcAllocModal .dc-al-calcrow b{ color:#0f172a; font-variant-numeric:tabular-nums; }
+#dcAllocModal .dc-al-calc-pay{ background:#eff6ff; }
+#dcAllocModal .dc-al-calc-pay b{ color:#1d4ed8; font-size:15px; }
+#dcAllocModal .dc-al-calc-rem{ background:#fffbeb; }
+#dcAllocModal .dc-al-calc-rem b{ color:#b45309; font-size:15px; }
+#dcAllocModal .dc-al-calcwarn{ padding:7px 12px; font-size:12px; font-weight:700; color:#b45309; background:#fef3c7; }
+#dcAllocModal .dc-al-empty{ text-align:center; color:#64748b; font-weight:600; }
