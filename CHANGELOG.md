@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-01 — ÚJ dokumentum: „📋 Decont sumar" — tételárak nélküli összesítő (diurna-napok + jogcímek darabszámmal, összegek csak a végén) (PR #PRNUM)
+## 2026-10-01 — ÚJ dokumentum: „📋 Decont sumar" — tételárak nélküli összesítő (diurna-napok + jogcímek darabszámmal, összegek csak a végén) (PR #496)
 
 - **Kérés:** nyomtatható lap az időszak teljes járandóságáról: tételenként NINCS ár — a diurnánál a bejelölt napok pontosan, a többi jogcímnél csak a darabszám (pl. 5× Încărcare/Descărcare); a végén Total (EUR + BNR + RON), a megadott Salariu de bază KÜLÖN sorban, a levonás utáni Diurna, a már kifizetett előleg (csak ami az időszak tételeire volt elszámolva, úgy, ahogy a kifizetéskor megadták — nem számoljuk át), és a fennmaradó fizetendő.
 - **`public/fleet-extra-v2.js`:** új 5. kártya a „📄 Nyomtatás / Dokumentum" választóban; a MEGLÉVŐ Decont oficial modal `'sumar'` módja (`_dcOfMode`) — ugyanaz az adatforrás (`getMonthlySettlementSheet`), időszak-presetek, alapbér-mentés (`setDriverBaseSalary`) + kézi BNR, nyomtatás (ismétlődő fejléc), e-mail. Új `_dcSumRightsHtml` (diurna: az időszakba eső napok dátumlistája, napszám; „Egyéb" típus a saját megnevezésén, a többi típus a típusnevén; mennyiség-összeg) és `_dcSumBuildSummaryHtml` (Total drepturi → Curs BNR → Salariu de bază → Diurna = total − alapbér → Avans (`totals.settled`, a kifizetéskori allokáció) → Rest de plată, mind RON + EUR). Kivehető szakaszok külön `sumar` docType-pal. A Decont oficial változatlan.
