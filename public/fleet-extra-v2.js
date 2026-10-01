@@ -5200,8 +5200,8 @@
       : (hasBnr ? Number(settled.eur || 0) * bnr + Number(settled.ron || 0) : null);
     var hasAdv = advRon != null && advRon > 0.005;
     var diurnaRon = (totalRon != null) ? (totalRon - baseSal) : null;
-    var restRon = (totalRon != null) ? Math.max(0, totalRon - (hasAdv ? advRon : 0)) : null;
-    var restMinusBase = (restRon != null) ? (restRon - baseSal) : null;
+    // Fennmaradó napidíj = Diurna − kifizetett előleg.
+    var diurnaRest = (diurnaRon != null) ? (diurnaRon - (hasAdv ? advRon : 0)) : null;
     var row = function (lbl, val, opt) {
       opt = opt || {};
       return '<tr>'
@@ -5216,13 +5216,12 @@
       + '<div style="font-size:13px;font-weight:800;color:#0f766e;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px;">📊 ' + t('fe.sum.summaryTitle') + '</div>'
       + '<table style="width:100%;border-collapse:collapse;font-size:15px;">'
       + row(t('fe.sum.totalRights') + (rawLine.length ? '<div style="font-size:12px;font-weight:600;color:#475569;margin-top:2px;">' + rawLine.join(' + ') + '</div>' : ''), both(totalRon))
-      + row(t('fe.stof.bnrUsed'), hasBnr ? ('1 EUR = ' + n2(bnr, 4) + ' RON') : '—', { color: '#475569' })
+      // A kifizetett előleg rögtön a teljes alatt, így látszik, miért annyi a fennmaradó napidíj.
       + (hasAdv ? row('💸 ' + t('fe.sum.advance'), '− ' + both(advRon), { top: '#99f6e4', color: '#334155' }) : '')
+      + row(t('fe.stof.bnrUsed'), hasBnr ? ('1 EUR = ' + n2(bnr, 4) + ' RON') : '—', { color: '#475569' })
+      + row(t('fe.stof.netBaseRon'), both(baseSal), { top: '#99f6e4', color: '#334155' })
       + row(t('fe.stof.aboveBaseEur'), both(diurnaRon), { top: '#99f6e4' })
-      + row('⚖️ ' + t('fe.sum.rest'), both(restRon), { top: '#0f766e', bold: true, big: true, color: '#1e3a8a' })
-      // Alapbér a fizetendő ALATT, a végén a fizetendő − alapbér különbség.
-      + row(t('fe.stof.netBaseRon'), '− ' + both(baseSal), { top: '#99f6e4', color: '#334155' })
-      + row('🟰 ' + t('fe.sum.restMinusBase'), both(restMinusBase), { top: '#0f766e', bold: true, big: true, color: '#0f766e' })
+      + row('🟰 ' + t('fe.sum.restMinusBase'), both(diurnaRest), { top: '#0f766e', bold: true, big: true, color: '#0f766e' })
       + '</table>'
       + (hasAdv ? '<div style="margin-top:8px;font-size:11px;color:#475569;">' + t('fe.sum.advanceNote') + '</div>' : '')
       + '</div>';
