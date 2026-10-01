@@ -5128,7 +5128,7 @@
       var lbl = String(it.label || '').trim();
       var gKey = (kind === 'other' && lbl) ? ('other:' + lbl.toLowerCase()) : kind;
       if (!byKey[gKey]) {
-        byKey[gKey] = { kind: kind, name: (kind === 'other' && lbl) ? lbl : null, qty: 0, days: {}, hasDays: false };
+        byKey[gKey] = { kind: kind, name: (kind === 'other' && lbl) ? lbl : null, qty: 0, days: {}, hasDays: false, dated: [] };
         groups.push(byKey[gKey]);
       }
       var g = byKey[gKey];
@@ -5137,7 +5137,15 @@
         g.hasDays = true;
         days.forEach(function (d) { if ((!from || d >= from) && (!to || d <= to)) g.days[d] = true; });
       } else {
-        g.qty += Number(it.quantity || 0) || 1;
+        var q = Number(it.quantity || 0) || 1;
+        g.qty += q;
+        // Napi jogcím (diurna/napidíj), de naptár nélkül rögzítve: a tétel
+        // dátumát írjuk ki a mennyiséggel (pl. „07.09 ×22"), hogy a lapon
+        // minden diurna-tételnek legyen dátuma.
+        if (kind === 'diurna' || kind === 'per_diem') {
+          var dt = it.earning_date ? new Date(it.earning_date) : null;
+          if (dt && !isNaN(dt.getTime())) g.dated.push({ t: dt.getTime(), d: dt, q: q });
+        }
       }
     });
     if (!groups.length) {
@@ -5148,10 +5156,16 @@
       var dayList = Object.keys(g.days).sort();
       var nDays = dayList.length;
       var count = (g.hasDays ? nDays : 0) + g.qty;
-      var unit = g.hasDays ? (' ' + t(count === 1 ? 'fe.sum.day' : 'fe.sum.days')) : '×';
-      var detail = dayList.length
+      var unit = (g.hasDays || g.kind === 'diurna' || g.kind === 'per_diem')
+        ? (' ' + t(count === 1 ? 'fe.sum.day' : 'fe.sum.days')) : '×';
+      var pad2 = function (n) { return (n < 10 ? '0' : '') + n; };
+      var datedTxt = g.dated.sort(function (a, b) { return a.t - b.t; }).map(function (x) {
+        return pad2(x.d.getDate()) + '.' + pad2(x.d.getMonth() + 1) + ' ×' + n2(x.q, x.q % 1 ? 2 : 0);
+      });
+      var parts = dayList.map(fmtD).concat(datedTxt);
+      var detail = parts.length
         ? '<div style="font-size:12px;color:#334155;margin-top:4px;line-height:1.6;">'
-          + dayList.map(fmtD).join(', ') + '</div>'
+          + parts.join(', ') + '</div>'
         : '';
       return '<tr>'
         + '<td style="padding:8px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top;">'

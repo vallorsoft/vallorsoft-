@@ -558,6 +558,20 @@ async function _saveDays(id, cid, days) {
   } catch (e) { console.warn('driver_earnings.days mentés kihagyva:', e.message); }
 }
 
+// DATE/TIMESTAMP érték → 'YYYY-MM-DD'. A `pg` driver a DATE oszlopot JS `Date`
+// objektumként adja (nincs type-parser a db.js-ben), amin a `String(d).slice(0,10)`
+// „Tue Sep 01"-et adna — ezért MINDEN dátum-összevetés ezen a segéden megy át.
+// A Date helyi (szerver-zóna) éjfélként érkezik → helyi komponensekből képezzük.
+function _isoDate(v) {
+  if (v == null || v === '') return '';
+  if (v instanceof Date) {
+    if (isNaN(v.getTime())) return '';
+    const pad = n => (n < 10 ? '0' : '') + n;
+    return v.getFullYear() + '-' + pad(v.getMonth() + 1) + '-' + pad(v.getDate());
+  }
+  return String(v).slice(0, 10);
+}
+
 // A driver_earnings sor `days` mezőjének normalizált tömbje (ISO YYYY-MM-DD).
 // A JSONB oszlopból már string-tömb / JSON-string / null jöhet.
 function _dbDaysArr(row) {
@@ -581,7 +595,7 @@ function _dbDaysArr(row) {
 // kompatibilis). Ez a same-month-first FIFO allokátorban és a havi bontásban
 // használatos, hogy „a hó elejére rögzített diurna" a helyes hónapba kerüljön.
 function _monthOfEarning(e) {
-  const fallback = String(e && e.earning_date || '').slice(0, 7);
+  const fallback = _isoDate(e && e.earning_date).slice(0, 7);
   const days = _dbDaysArr(e);
   if (!days || !days.length) return fallback;
   const cnt = new Map();
@@ -604,7 +618,7 @@ function _monthOfEarning(e) {
 function _periodPortion(e, from, to) {
   const days = _dbDaysArr(e);
   if (!days || !days.length) {
-    const ed = String(e && e.earning_date || '').slice(0, 10);
+    const ed = _isoDate(e && e.earning_date);
     return (ed >= from && ed <= to)
       ? { days_in: 1, days_total: 1, portion: 1, days_in_arr: [ed] }
       : { days_in: 0, days_total: 1, portion: 0, days_in_arr: [] };
@@ -1847,7 +1861,7 @@ async function _allocateDriver(cid, email, bnrRate) {
   const ronEq = (cur, amt) => (String(cur || 'RON').toUpperCase() === 'RON')
     ? Number(amt || 0)
     : (rate != null ? Number(amt || 0) * rate : Number(amt || 0)); // BNR nélkül 1:1 becslés
-  const monthOf = d => String(d || '').slice(0, 7);
+  const monthOf = d => _isoDate(d).slice(0, 7);
   // 1) MINDEN járandóság kronológikus sorrendben (legrégebbi elöl)
   //    `days` oszlopot is olvasunk, hogy a többhavi diurna a majority-day
   //    hónapjához kerüljön (nem a rögzítés dátumához) — same-month-first FIFO.
@@ -2385,7 +2399,7 @@ handlers.getMonthlySettlementSheet = async function (req, res, args) {
           const allocRon = (row.alloc_ron == null) ? _round2(need) : _round2(parseFloat(row.alloc_ron));
           byGroup.get(gk).push({
             earning_date: row.earning_date, kind: row.kind, label: row.label,
-            currency: _cur(row.currency), month: String(row.earning_date || '').slice(0, 7),
+            currency: _cur(row.currency), month: _isoDate(row.earning_date).slice(0, 7),
             alloc_ron: allocRon,
           });
         }
