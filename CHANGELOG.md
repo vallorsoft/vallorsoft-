@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-01 — FIX: járandóság-összegek 0-nak számolódtak (pg DATE → JS Date) + Decont sumar: diurna-dátumok naptár nélküli tételeknél is (PR #PRNUM)
+## 2026-10-01 — FIX: járandóság-összegek 0-nak számolódtak (pg DATE → JS Date) + Decont sumar: diurna-dátumok naptár nélküli tételeknél is (PR #497)
 
 - **Bejelentés (kinyomtatott Decont sumar, Gondos Imre · 2026. szeptember):** „Teljes járandóság 0,00 RON", az előleg nem jelent meg, a diurnánál nem voltak dátumok.
 - **Gyökérok:** a `pg` driver a `DATE` oszlopot JS `Date` objektumként adja (a `db.js`-ben nincs type-parser). A `_periodPortion` / `_monthOfEarning` / az allokáció `monthOf(paid_at)` / a „mit fedez" hónap-kulcs `String(date).slice(0,10)`-zel dolgozott → `"Tue Sep 05"` → egyetlen tétel sem esett az időszakba → `totals.earned` = 0 és az időszakra elszámolt előleg (`totals.settled`) is 0; a same-month-first allokáció sem találta a hónapot. A tesztek string-dátumokkal mockoltak, ezért nem jött elő. Érintette a Decont oficial / Decont lunar összegeit is.
