@@ -14,6 +14,9 @@
 
 ---
 
+## 2026-10-01 — Decont sumar: záró sor felirata „Fizetendő − diurna” (PR #500)
+- `fe.sum.restMinusBase` felirat: RO „Rest de plată − diurnă”, HU „Fizetendő − diurna” (az érték változatlan: fizetendő − alapbér). Cache-bust `?v=20261001sumar5`.
+
 ## 2026-10-01 — Decont sumar: az Avans sor a Diurna elé került (PR #499)
 - `_dcSumBuildSummaryHtml`: sorrend Total → BNR → Avans → Diurna → Rest de plată → Salariu de bază → Rest − salariu. Cache-bust `?v=20261001sumar4`. Csak kliens; 1382 Jest zöld.
 
