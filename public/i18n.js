@@ -2984,7 +2984,7 @@
     'fe.al.periodHead':   { ro: 'Perioada drepturilor', hu: 'Járandóság időszaka' },
     'fe.al.from':         { ro: 'De la', hu: 'Mettől' },
     'fe.al.to':           { ro: 'Până la', hu: 'Meddig' },
-    'fe.al.periodTotal':  { ro: 'Total drepturi în perioadă', hu: 'Teljes járandóság az időszakra' },
+    'fe.al.periodTotal':  { ro: 'Rest de plată în perioadă', hu: 'Hátralék (fizetendő) az időszakra' },
     'fe.al.itemsRaw':     { ro: 'pe valute', hu: 'valutánként' },
     'fe.al.payNow':       { ro: 'Sumă de plătit', hu: 'Kifizetendő összeg' },
     'fe.al.remainAfter':  { ro: 'Rămâne de plătit', hu: 'Marad (hátralék)' },
@@ -3002,6 +3002,10 @@
     'fe.al.arrearsTitle': { ro: 'Restanțe din lunile anterioare', hu: 'Elmaradás a korábbi hónapokból' },
     'fe.al.arrearsItems': { ro: 'poziții', hu: 'tétel' },
     'fe.al.arrearsInclude':{ ro: 'Include în perioadă', hu: 'Bevonom az időszakba' },
+    'fe.al.periodGross':  { ro: 'Total drepturi în perioadă (inclusiv achitate)', hu: 'Teljes járandóság az időszakra (kifizetettel együtt)' },
+    'fe.al.entitled':     { ro: 'Drept', hu: 'Járandóság' },
+    'fe.al.alreadyPaid':  { ro: 'Deja achitat', hu: 'Már kifizetve' },
+    'fe.al.paidBadge':    { ro: 'Achitat', hu: 'Kifizetve' },
     'fe.al.paidThis':     { ro: 'Achitat', hu: 'Fizetve' },
 
     // Csoportos kifizetés (multi-select + vegyes valuta + több fizetési mód)

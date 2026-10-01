@@ -332,6 +332,36 @@ describe('getDriverEarningAllocation', () => {
     expect(res.body.result.ok).toBe(true);
     expect(res.body.result.months).toEqual([]); // minden kifizetve → nincs felajánlott hónap
   });
+
+  test('include_paid:true → a kifizetett tétel is jön (paid:true, hátralék 0), a hátralékba nem számít', async () => {
+    setUser(fixtures.admin);
+    fetchBnrEurRon.mockResolvedValue(5.0);
+    const pool = require('../../db');
+    pool.query
+      .mockResolvedValueOnce(rows([{ '?column?': 1 }]))               // users check
+      .mockResolvedValueOnce(rows([                                    // fő earnings SELECT
+        { id: 5, earning_date: '2026-09-02', kind: 'bonus', label: 'A', quantity: 1, unit_amount: 100, currency: 'RON', total_amount: 100 },
+        { id: 6, earning_date: '2026-09-05', kind: 'diurna', label: 'B', quantity: 1, unit_amount: 200, currency: 'RON', total_amount: 200 },
+      ]))
+      .mockResolvedValueOnce(rows([                                    // computeDriverAllocation: earnings
+        { id: 5, earning_date: '2026-09-02', currency: 'RON', total_amount: 100 },
+        { id: 6, earning_date: '2026-09-05', currency: 'RON', total_amount: 200 },
+      ]))
+      .mockResolvedValueOnce(rows([{ group_id: 1, earning_id: 5, alloc_ron: null }])) // #5 teljesen fizetve
+      .mockResolvedValueOnce(rows([]));                               // payments pool
+    const res = await request(app).post('/api/execute').send({
+      functionName: 'getDriverEarningAllocation',
+      arguments: [{ email: 'sofer@ceg.hu', include_paid: true }],
+    });
+    expect(res.body.result.ok).toBe(true);
+    const items = res.body.result.months[0].items;
+    expect(items.map(i => i.id)).toEqual([5, 6]);
+    expect(items[0].paid).toBe(true);
+    expect(items[0].remaining_ron).toBe(0);
+    expect(items[1].paid).toBe(false);
+    expect(res.body.result.months[0].total_remaining_ron).toBeCloseTo(200, 1);
+    expect(res.body.result.total_remaining_ron).toBeCloseTo(200, 1);
+  });
 });
 
 // ═════════════════════════════════════════════

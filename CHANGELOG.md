@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-10-01 — Kifizetés-modal: az időszak TELJES járandósága, a már kifizetett rész megjelölve (PR #495)
+
+- **Kérés:** a kifizetés ablakban jelenjen meg az adott havi teljes járandóság, a már kifizetett tételek is — csak legyenek megjelölve, hogy már kifizetett rész.
+- **Szerver** (`getDriverEarningAllocation`): új opcionális `include_paid:true` — a teljesen kifizetett tételek is visszajönnek `paid:true`, `remaining=0` jelzéssel; a hónap- és össz-hátralékba nem számítanak. Régi hívók (alapértelmezés) változatlanok.
+- **Kliens** (`public/fleet-extra-v2.js` `#dcAllocModal`): az időszak-kártya hármas bontása — **Teljes járandóság (kifizetettel együtt)** / **✓ Már kifizetve** / **Hátralék (fizetendő)**, mind RON + EUR. A hónap-kártya fejléce ugyanígy. A teljesen kifizetett tétel zöld ✓ jellel, halványítva, „✓ Kifizetve" badge-dzsel, pipa és összeg-mező nélkül; a részben kifizetett tételnél „Járandóság · ✓ Már kifizetve" sor a hátralék fölött. A kalkuláció (kifizetendő ⇄ marad), az automatikus kitöltés és a mentés változatlanul CSAK a hátralékos tételekkel dolgozik; az alap-időszak és az elmaradás-jelzés is csak a hátralékos tételekhez igazodik.
+- **Nyomtatás:** a kalkuláció-lapon is minden tétel (kifizetett soron ✓ jelölés + zöld háttér), új oszlopok (Járandóság / Már kifizetve), összegző dobozok: teljes / már kifizetve / hátralék / utalandó / marad.
+- i18n 4 új `fe.al.*` + `fe.al.periodTotal` átfogalmazva „Hátralék (fizetendő)"-re (RO+HU), CSS, cache-bust `?v=20261001alpaid`. **1381 Jest zöld** (+1) + jsdom-harness.
+
 ## 2026-10-01 — Teljes kifizetés: alapból az aktuális hónap + elmaradás-jelzés a korábbi hónapokból + „mit fedez" hónapcímke-fix (PR #494)
 
 - **Kérés:** a ✅ Teljes kifizetésnél alapból az aktuális hónap legyen kiválasztva, és jelezze, ha a múlt hónapból elmaradás van.

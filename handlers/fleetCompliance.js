@@ -2037,6 +2037,10 @@ handlers.getDriverEarningAllocation = async function (req, res, args) {
     const a = _arg(args);
     const email = String(a.email || '').trim().toLowerCase();
     if (!email) return res.json({ result: { ok: false, err: 'Selecteaza un sofer!' } });
+    // include_paid: a TELJESEN kifizetett tételeket is visszaadjuk (paid:true),
+    // hogy a modal az időszak teljes járandóságát mutathassa, a kifizetett
+    // részt megjelölve. Alapból (régi hívók) csak a hátralékos tételek jönnek.
+    const includePaid = a.include_paid === true;
     // Sofőr a cégé? (cross-tenant védelem)
     const ur = await pool.query(
       'SELECT 1 FROM users WHERE LOWER(email)=LOWER($1) AND company_id=$2', [email, cid]);
@@ -2078,7 +2082,8 @@ handlers.getDriverEarningAllocation = async function (req, res, args) {
       const need = r2(ronEq(e.currency, e.total_amount));
       const settled = alloc.has(e.id) ? r2(Math.min(alloc.get(e.id).settled_ron, need)) : 0;
       const remainRon = r2(need - settled);
-      if (remainRon <= 0.005) continue;   // teljesen kifizetve → nem ajánljuk fel
+      const fullyPaid = remainRon <= 0.005;
+      if (fullyPaid && !includePaid) continue;   // teljesen kifizetve → nem ajánljuk fel
       const cur = String(e.currency || 'RON').toUpperCase();
       const remainCur = (cur === 'RON') ? remainRon : (rate != null ? r2(remainRon / rate) : remainRon);
       // A tétel „elsődleges hónapja" a napjaiban leg-gyakoribb hónap
@@ -2091,7 +2096,8 @@ handlers.getDriverEarningAllocation = async function (req, res, args) {
         id: e.id, earning_date: e.earning_date, kind: e.kind, label: e.label,
         quantity: e.quantity, unit_amount: e.unit_amount, total_amount: e.total_amount,
         currency: cur, total_ron: need, settled_ron: settled,
-        remaining_ron: remainRon, remaining_cur: remainCur,
+        remaining_ron: fullyPaid ? 0 : remainRon, remaining_cur: fullyPaid ? 0 : remainCur,
+        paid: fullyPaid,
         // A napok darabszáma + a hónapba eső napok — csak a klienshez
         // megjelenítéshez (a KFT-elszámoltság igazságforrása a global alloc).
         days_count: daysArr ? daysArr.length : null,
@@ -2100,7 +2106,7 @@ handlers.getDriverEarningAllocation = async function (req, res, args) {
         // a többhavi diurnát is helyesen sorolja be (bármely napja az időszakban).
         days: daysArr || null,
       });
-      m.total_remaining_ron = r2(m.total_remaining_ron + remainRon);
+      if (!fullyPaid) m.total_remaining_ron = r2(m.total_remaining_ron + remainRon);
     }
     const months = [...monthsMap.values()].sort((x, y) => x.key.localeCompare(y.key)); // legrégebbi elöl
     return res.json({ result: {
