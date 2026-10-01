@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-01 — Sofőr-elszámolás részleges kifizetés: időszak-szűrő + kifizetés ⇄ maradék kalkulátor (RON + EUR) + nyomtatható kalkuláció (PR #PRNUM)
+## 2026-10-01 — Sofőr-elszámolás részleges kifizetés: időszak-szűrő + kifizetés ⇄ maradék kalkulátor (RON + EUR) + nyomtatható kalkuláció (PR #493)
 
 - **Kérés:** a részleges kifizetésnél látszódjon a teljes járandóság; mettől–meddig időszak megadható, és csak az azon belüli járandóságok jelenjenek meg; összeg beírásakor írja ki, mennyi marad — és fordítva (maradékot beírva a kifizetendőt) —, mindkét valutában (RON + EUR, BNR-en); a végén nyomtatható.
 - **`public/fleet-extra-v2.js` (`#dcAllocModal`, a MEGLÉVŐ vezetett kifizetés-allokáció bővítése):** új 📅 időszak-kártya (alap: legrégebbi hátralékos tétel → ma); a tételek az `earning_date` VAGY bármely `days[]` napja szerint szűrődnek (többhavi diurna). „Teljes járandóság az időszakra" RON + EUR + valutánkénti nyers bontás. A kifizetés-kártyán **Kifizetendő ⇄ Marad** kétirányú mező saját valutával (élő `= X RON / Y EUR` átváltás), BNR-módosításra újraszámol; valuta-váltáskor a beírt érték jelentése megmarad. Az összeg/maradék beírása automatikus FIFO-kitöltést futtat az időszakon belül (kézi tétel-szerkesztés kikapcsolja, az „Auto" gomb visszakapcsolja; fókuszvesztés nélkül). Példa: 2000 EUR @ 5,00 = 10 000 RON; „marad 2000 RON" → utalandó 8000 RON / 1600 EUR.
