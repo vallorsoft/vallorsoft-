@@ -5199,9 +5199,10 @@
     var advRon = (settled.combined_ron != null) ? Number(settled.combined_ron)
       : (hasBnr ? Number(settled.eur || 0) * bnr + Number(settled.ron || 0) : null);
     var hasAdv = advRon != null && advRon > 0.005;
-    var diurnaRon = (totalRon != null) ? (totalRon - baseSal) : null;
-    // Fennmaradó napidíj = Diurna − kifizetett előleg.
-    var diurnaRest = (diurnaRon != null) ? (diurnaRon - (hasAdv ? advRon : 0)) : null;
+    // Napidíj + alapbér = teljes járandóság − kifizetett előleg;
+    // ebből az alapbért levonva marad a (fennmaradó) napidíj.
+    var diurnaRon = (totalRon != null) ? (totalRon - (hasAdv ? advRon : 0)) : null;
+    var diurnaRest = (diurnaRon != null) ? (diurnaRon - baseSal) : null;
     var row = function (lbl, val, opt) {
       opt = opt || {};
       return '<tr>'
@@ -5215,7 +5216,7 @@
     var html = '<div style="margin-top:16px;padding:16px 20px;border:2.5px solid #0f766e;border-radius:10px;background:#f0fdfa;color:#0f172a;">'
       + '<div style="font-size:13px;font-weight:800;color:#0f766e;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.4px;">📊 ' + t('fe.sum.summaryTitle') + '</div>'
       + '<table style="width:100%;border-collapse:collapse;font-size:15px;">'
-      + row(t('fe.sum.totalRights') + (rawLine.length ? '<div style="font-size:12px;font-weight:600;color:#475569;margin-top:2px;">' + rawLine.join(' + ') + '</div>' : ''), both(totalRon))
+      + row(t('fe.sum.totalRights') + ' <span style="font-size:12px;font-weight:500;color:#64748b;">' + t('fe.sum.totalHint') + '</span>' + (rawLine.length ? '<div style="font-size:12px;font-weight:600;color:#475569;margin-top:2px;">' + rawLine.join(' + ') + '</div>' : ''), both(totalRon))
       // A kifizetett előleg rögtön a teljes alatt, így látszik, miért annyi a fennmaradó napidíj.
       + (hasAdv ? row('💸 ' + t('fe.sum.advance'), '− ' + both(advRon), { top: '#99f6e4', color: '#334155' }) : '')
       // Sorrend a kérés szerint: Teljes → Előleg → Napidíj+Alapbér → Alapbér → Fennmaradó napidíj.
