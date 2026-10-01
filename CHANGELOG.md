@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-01 — Kifizetés-modal: az időszak TELJES járandósága, a már kifizetett rész megjelölve (PR #PRNUM)
+## 2026-10-01 — Kifizetés-modal: az időszak TELJES járandósága, a már kifizetett rész megjelölve (PR #495)
 
 - **Kérés:** a kifizetés ablakban jelenjen meg az adott havi teljes járandóság, a már kifizetett tételek is — csak legyenek megjelölve, hogy már kifizetett rész.
 - **Szerver** (`getDriverEarningAllocation`): új opcionális `include_paid:true` — a teljesen kifizetett tételek is visszajönnek `paid:true`, `remaining=0` jelzéssel; a hónap- és össz-hátralékba nem számítanak. Régi hívók (alapértelmezés) változatlanok.
