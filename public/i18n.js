@@ -85,6 +85,7 @@
     'och.fab': { hu: "💬 AI-asszisztens — fuvar kiírása/módosítása vagy e-mail a fuvarról", ro: "💬 Asistent AI — cursă nouă/modificare sau e-mail despre cursă" },
     'och.mailHint': { hu: "E-mailt is írok — fuvarról (pl. „küldd el a CMD-2026-0042 megrendelőjének a számlát emailben”) vagy általánosan (pl. „írj egy e-mailt a Bilkának, hogy jövő héten szabad kapacitásunk van”).", ro: "Scriu și e-mailuri — despre o cursă (ex. „trimite pe mail clientului cursei CMD-2026-0042 factura”) sau generale (ex. „scrie un mail către Bilka că avem capacitate liberă săptămâna viitoare”)." },
     'och.mailPreview': { hu: "E-mail előnézet", ro: "Previzualizare e-mail" },
+    'och.footerPrev': { hu: "Céges lábléc (az arculatból): logó + cégnév, CUI, Reg.Com., telefon, e-mail, cím", ro: "Subsol firmă (din identitate): logo + nume, CUI, Reg.Com., telefon, e-mail, adresă" },
     'och.lookDefault': { hu: "Alapértelmezett kinézeted", ro: "Aspectul tău implicit" },
     'och.lookSave': { hu: "Mentés alapértelmezettként", ro: "Salvează ca implicit" },
     'och.lookReset': { hu: "Eredeti kinézet", ro: "Aspect original" },

@@ -344,11 +344,34 @@ function wrapBrandedEmail(bodyHtml, opts) {
     `</div>`;
 }
 
+// KÖTELEZŐ céges lábléc (lib/mailStyle.companyFooterHtml) a cég arculatából:
+// companies törzsadat + feltöltött logó. Best-effort: hiba/hiányzó cégnév → nincs lábléc.
+async function appendCompanyFooter(html, companyId) {
+  const h = String(html || '');
+  if (!companyId) return h;
+  const ms = require('../lib/mailStyle');
+  if (ms.hasFooter(h)) return h;
+  try {
+    const pool = require('../db');
+    const r = await pool.query('SELECT to_jsonb(c) AS j FROM companies c WHERE c.id=$1', [companyId]);
+    const c = (r.rows[0] && r.rows[0].j) || null;
+    if (!c) return h;
+    let logoUrl = null;
+    try {
+      const b = await pool.query('SELECT 1 FROM company_branding WHERE company_id=$1 AND logo_base64 IS NOT NULL', [companyId]);
+      const base = require('../lib/appUrl').appBaseUrl();
+      if (b.rows.length && base) logoUrl = base + '/branding/logo/' + companyId + '.png';
+    } catch (_) { /* nincs arculat-tábla */ }
+    const f = ms.companyFooterHtml(c, logoUrl);
+    return f ? h + f : h;
+  } catch (_) { return h; }
+}
+
 async function sendClientEmail(opts) {
   if (!BREVO_API_KEY || !BREVO_SENDER) return { ok: false, error: 'BREVO_API_KEY / BREVO_SENDER nu este configurat (.env).' };
   if (!opts || !opts.to) return { ok: false, error: 'Lipsește destinatarul.' };
   const senderName = opts.senderName || 'VallorSoft';
-  const html = wrapBrandedEmail(opts.html, { logoUrl: opts.logoUrl, senderName: senderName, style: opts.style || null });
+  const html = await appendCompanyFooter(wrapBrandedEmail(opts.html, { logoUrl: opts.logoUrl, senderName: senderName, style: opts.style || null }), opts.companyId);
   const payload = {
     sender: { name: senderName, email: BREVO_SENDER },
     to: [{ email: opts.to }],
@@ -528,6 +551,8 @@ async function getCompanyMailer(companyId) {
     const cid = companyId;
     const mtype = opts.mailType || 'builder';
     const subject = opts.subject || '(fără subiect)';
+    // KÖTELEZŐ céges lábléc minden, a cég fiókjáról kimenő levélen.
+    opts = Object.assign({}, opts, { html: await appendCompanyFooter(opts.html || '', cid) });
     // Csatolmányok (opcionális): [{ name, contentBase64 }].
     const atts = Array.isArray(opts.attachments) ? opts.attachments.filter(a => a && a.contentBase64 && a.name) : [];
     try {
@@ -631,4 +656,4 @@ async function sendSubscriptionCancelEmail(opts) {
   }
 }
 
-module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate, loadCompanySender, getCompanyMailer, sendSubscriptionCancelEmail, applyTemplateVars, htmlToPlainText, wrapBrandedEmail };
+module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate, loadCompanySender, getCompanyMailer, sendSubscriptionCancelEmail, applyTemplateVars, htmlToPlainText, wrapBrandedEmail, appendCompanyFooter };

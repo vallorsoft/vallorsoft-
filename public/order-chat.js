@@ -419,18 +419,28 @@
   }
   // Előnézet a szerver lib/mailStyle.js renderStyled-jével azonos szerkezetben.
   function _hx(v, def) { return /^#[0-9a-f]{6}$/i.test(String(v || '')) ? v : def; }
+  // Kontraszt (a szerver lib/mailStyle.js-ével azonos számítás).
+  function _lum(h) {
+    var c = [1, 3, 5].map(function (i) { var v = parseInt(h.slice(i, i + 2), 16) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  }
+  function _contrast(a, b) { var x = _lum(a), y = _lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  function _readableOn(bg) { return _contrast('#111827', bg) >= _contrast('#ffffff', bg) ? '#111827' : '#ffffff'; }
+  function _ensureText(t, bg) { return _contrast(t, bg) >= 4.5 ? t : _readableOn(bg); }
   function _styledPreview(inner, st) {
     st = st || {};
-    var accent = _hx(st.accent, '#f6711e'), bg = _hx(st.bg, '#ffffff'), card = _hx(st.card, '#ffffff'), text = _hx(st.text, '#2a2018');
+    var accent = _hx(st.accent, '#f6711e'), bg = _hx(st.bg, '#ffffff'), card = _hx(st.card, '#ffffff');
+    var text = _ensureText(_hx(st.text, '#2a2018'), card), bandText = _readableOn(accent);
     var align = st.align === 'center' ? 'center' : 'left';
     var font = st.font === 'serif' ? 'Georgia,serif' : 'Arial,sans-serif';
     var name = esc(T('och.lookSender'));
     var head = st.header === 'band'
-      ? '<div style="background:' + accent + ';color:#fff;padding:10px 14px;text-align:' + align + ';border-radius:8px 8px 0 0;font-weight:800;">' + name + '</div>'
+      ? '<div style="background:' + accent + ';color:' + bandText + ';padding:10px 14px;text-align:' + align + ';border-radius:8px 8px 0 0;font-weight:800;">' + name + '</div>'
       : st.header === 'none' ? '' : '<div style="padding:10px 14px 4px;text-align:' + align + ';font-weight:800;">' + name + '</div><div style="height:3px;background:' + accent + ';margin:4px 14px 0;"></div>';
     return '<div class="och-mail-styled" style="background:' + bg + ';padding:10px;border-radius:10px;border:1px solid #e2e8f0;">'
       + '<div style="background:' + card + ';color:' + text + ';font-family:' + font + ';border-radius:8px;">' + head
-      + '<div style="padding:12px 14px;font-size:14px;line-height:1.55;text-align:' + align + ';">' + inner + '</div></div></div>';
+      + '<div style="padding:12px 14px;font-size:14px;line-height:1.55;text-align:' + align + ';">' + inner + '</div></div>'
+      + '<div style="margin-top:8px;padding:8px 12px;background:#f3f4f6;border-top:2px solid #1f2937;border-radius:0 0 6px 6px;color:#111827;font:600 12px Arial,sans-serif;">🏢 ' + esc(T('och.footerPrev')) + '</div></div>';
   }
   function mailSaveLook() {
     if (S.busy) return;
