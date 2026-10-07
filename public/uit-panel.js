@@ -74,42 +74,8 @@ window.UitPanel = (function () {
     } catch (_) { return false; }
   }
 
-  // ── Kamera / fotó → base64 ──
-  function makeFileInput() {
-    const inp = document.createElement('input');
-    inp.type = 'file'; inp.accept = 'image/*';
-    inp.style.display = 'none';
-    document.body.appendChild(inp);
-    return inp;
-  }
-  function fileToDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(String(r.result || ''));
-      r.onerror = () => reject(new Error('Nem sikerült beolvasni a fájlt.'));
-      r.readAsDataURL(file);
-    });
-  }
-  function shrinkImage(dataUrl) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 1600;
-        let w = img.width, h = img.height;
-        if (w > MAX || h > MAX) {
-          if (w > h) { h = Math.round(h * MAX / w); w = MAX; } else { w = Math.round(w * MAX / h); h = MAX; }
-        }
-        const c = document.createElement('canvas'); c.width = w; c.height = h;
-        c.getContext('2d').drawImage(img, 0, 0, w, h);
-        const out = c.toDataURL('image/jpeg', 0.85);
-        const m = out.match(/^data:([^;]+);base64,(.*)$/);
-        if (!m) return resolve({ mime: 'image/jpeg', b64: out });
-        resolve({ mime: m[1], b64: m[2] });
-      };
-      img.onerror = () => resolve(null);
-      img.src = dataUrl;
-    });
-  }
+  // 📷/📎 kiolvasás: közös public/uit-scan.js (UitScan.pick).
+  function T2(k, fb) { var v = window.t ? window.t(k) : k; return (v && v !== k) ? v : fb; }
 
   function open(orderId, rendszam) {
     ensureStyle();
@@ -123,7 +89,8 @@ window.UitPanel = (function () {
           '<div class="uit-add">' +
             '<input class="uit-in" id="uit-new" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19" autocomplete="off">' +
             '<button class="uit-save" id="uit-savebtn">➤ Küldés</button>' +
-            '<button class="uit-cam" id="uit-cambtn">📷 Fotó</button>' +
+            '<button class="uit-cam" id="uit-cambtn">📷 ' + esc(T2('uitscan.photoShort', 'Foto')) + '</button>' +
+            '<button class="uit-cam" id="uit-upbtn">📎 ' + esc(T2('uitscan.uploadShort', 'Fișier')) + '</button>' +
           '</div>' +
           '<div class="uit-status" id="uit-stat"></div>' +
         '</div>' +
@@ -200,58 +167,43 @@ window.UitPanel = (function () {
     $('uit-savebtn').addEventListener('click', addManual);
     $('uit-new').addEventListener('keydown', (e) => { if (e.key === 'Enter') addManual(); });
 
-    // 📷 Fotó → AI-kiolvasás → minden kód külön mentve (fotó mindegyikhez)
-    $('uit-cambtn').addEventListener('click', function () {
-      const f = makeFileInput();
-      f.addEventListener('change', async function () {
-        try {
-          if (!f.files || !f.files[0]) { f.remove(); return; }
-          const file = f.files[0];
-          const camBtn = $('uit-cambtn'); camBtn.disabled = true;
-          setStat('Fotó feldolgozása…');
-          const dataUrl = await fileToDataUrl(file);
-          const shrunk = await shrinkImage(dataUrl);
-          if (!shrunk) { setStat('Nem sikerült a fotó feldolgozása.', 'err'); camBtn.disabled = false; f.remove(); return; }
-          setStat('AI kiolvasás…');
-          const d = await api('POST', '/api/execute', {
-            functionName: 'scanUitFromImage',
-            arguments: [{ mimeType: shrunk.mime, data: shrunk.b64 }]
-          });
-          const r = d && d.result;
-          if (!r || !r.ok) { setStat((r && r.err) || 'AI-hiba.', 'err'); camBtn.disabled = false; f.remove(); return; }
-          const codes = (r && r.codes) || [];
-          if (!codes.length) { setStat('Nincs felismert UIT-kód a képen.', 'err'); camBtn.disabled = false; f.remove(); return; }
-          let savedCount = 0, dupCount = 0, errCount = 0;
-          for (let i = 0; i < codes.length; i++) {
-            try {
-              await api('POST', '/api/orders/' + encodeURIComponent(orderId) + '/uit', {
-                uit_code: codes[i],
-                rendszam: rendszam,
-                source: 'ai-scan',
-                photo_b64: shrunk.b64,
-                photo_mime: shrunk.mime
-              });
-              savedCount++;
-            } catch (e) {
-              if (/deja inregistrat|already/i.test(e.message)) dupCount++;
-              else errCount++;
-            }
+    // 📷 Fotó (kamera) / 📎 Feltöltés (kép vagy PDF) → AI-kiolvasás (közös
+    // UitScan) → minden kód külön mentve, a bizonylat mindegyikhez csatolva.
+    async function scanWith(mode) {
+      const btns = [$('uit-cambtn'), $('uit-upbtn')];
+      try {
+        if (!window.UitScan) throw new Error('UitScan lipsă');
+        const p = await window.UitScan.pick(mode);
+        if (!p) return;
+        btns.forEach((b) => { if (b) b.disabled = true; });
+        setStat(T2('uitscan.reading', 'Citire AI…'));
+        if (!p.codes.length) { setStat(T2('uitscan.none', 'Nu am găsit cod UIT în document.'), 'err'); return; }
+        let savedCount = 0, dupCount = 0, errCount = 0;
+        for (let i = 0; i < p.codes.length; i++) {
+          try {
+            await api('POST', '/api/orders/' + encodeURIComponent(orderId) + '/uit', {
+              uit_code: p.codes[i], rendszam: rendszam, source: 'ai-scan', photo_b64: p.b64, photo_mime: p.mime,
+            });
+            savedCount++;
+          } catch (e) {
+            if (/deja inregistrat|already/i.test(e.message)) dupCount++;
+            else errCount++;
           }
-          let msg = savedCount + ' UIT mentve';
-          if (dupCount) msg += ', ' + dupCount + ' már létezett';
-          if (errCount) msg += ', ' + errCount + ' hiba';
-          setStat(msg, errCount ? 'err' : 'ok');
-          await render();
-        } catch (e) {
-          setStat(e.message || 'Hiba a fotó feldolgozásakor.', 'err');
-        } finally {
-          const camBtn2 = $('uit-cambtn'); if (camBtn2) camBtn2.disabled = false;
-          f.remove();
-          setTimeout(() => setStat(''), 4000);
         }
-      });
-      f.click();
-    });
+        let msg = T2('uitscan.saved', 'UIT salvate: {n}').replace('{n}', savedCount);
+        if (dupCount) msg += ' · ' + T2('uitscan.dup', 'existente: {n}').replace('{n}', dupCount);
+        if (errCount) msg += ' · ' + T2('uitscan.err', 'erori: {n}').replace('{n}', errCount);
+        setStat(msg, errCount ? 'err' : 'ok');
+        await render();
+      } catch (e) {
+        setStat(e.message || 'Eroare', 'err');
+      } finally {
+        btns.forEach((b) => { if (b) b.disabled = false; });
+        setTimeout(() => setStat(''), 4000);
+      }
+    }
+    $('uit-cambtn').addEventListener('click', () => scanWith('camera'));
+    $('uit-upbtn').addEventListener('click', () => scanWith('file'));
 
     render();
   }

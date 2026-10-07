@@ -17,11 +17,10 @@ const express = require('express');
 const pool = require('../db');
 const { requireLogin, requireRole } = require('../middleware/auth');
 const { decrypt } = require('../lib/crypto');
-const { normalizeUit, isValidUit } = require('../lib/uitFormat');
+const { normalizeUit, isValidUit, sanitizeUitPhoto } = require('../lib/uitFormat');
 
 const router = express.Router();
 
-const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 
 async function getGpsCfg(companyId) {
   const { rows } = await pool.query(
@@ -41,15 +40,8 @@ async function objectIdForRendszam(companyId, provider, rendszam) {
 }
 const own = (req) => req.session.user.company_id;
 
-function _sanitizePhoto(body) {
-  const mime = body && body.photo_mime ? String(body.photo_mime).toLowerCase() : '';
-  const b64 = body && body.photo_b64 ? String(body.photo_b64) : '';
-  if (!mime.startsWith('image/')) return { photo_b64: null, photo_mime: null };
-  if (!b64) return { photo_b64: null, photo_mime: null };
-  const approxBytes = Math.floor(b64.length * 0.75);
-  if (approxBytes > MAX_PHOTO_BYTES) return { photo_b64: null, photo_mime: null };
-  return { photo_b64: b64, photo_mime: mime };
-}
+// Kép VAGY PDF (közös szabály: lib/uitFormat.js).
+function _sanitizePhoto(body) { return sanitizeUitPhoto(body); }
 function _sanitizeSource(v) {
   const s = String(v || 'manual').toLowerCase();
   return (s === 'ai-scan' || s === 'manual') ? s : 'manual';

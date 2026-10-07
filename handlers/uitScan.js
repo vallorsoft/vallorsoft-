@@ -14,7 +14,7 @@
 
 const { extractJson } = require('../lib/geminiJson');
 const { featureEnabled } = require('../lib/featureEnabled');
-const { normalizeUit, isValidUit } = require('../lib/uitFormat');
+const { normalizeUit, isValidUit, isUitDocMime } = require('../lib/uitFormat');
 const audit = require('../lib/audit');
 
 const handlers = {};
@@ -26,7 +26,7 @@ const MAX_CODES_PER_PHOTO = 20;
 
 const UIT_PROMPT =
   'Ești un extractor de coduri UIT (Unique Identifier for Transport) — codurile pe care ANAF le emite ' +
-  'pentru declarația e-Transport. Din imaginea primită (o fotografie a unei hârtii/tichete/bon) ' +
+  'pentru declarația e-Transport. Din documentul primit (o fotografie a unei hârtii/tichete/bon SAU un PDF, ex. confirmarea e-Transport) ' +
   'extrage TOATE codurile UIT vizibile. Un cod UIT are între 1 și 16 caractere alfanumerice ' +
   '(A-Z, 0-9), fără spații sau semne. Poate apărea cu sau fără cratime (ex. ABCD-1234-XYZ0). ' +
   'Răspunde STRICT cu un JSON de forma: {"codes":["ABCD1234XYZ0","EFGH5678"],"confidence":0.9}. ' +
@@ -73,8 +73,9 @@ handlers.scanUitFromImage = async function (req, res, args) {
     const a = (args && args[0]) ? args[0] : {};
     const mimeType = String(a.mimeType || '').toLowerCase();
     const base64 = String(a.data || '');
-    if (!mimeType.startsWith('image/')) {
-      return res.json({ result: { ok: false, err: 'Format nesuportat (doar imagine).' } });
+    // Kép (fotó) VAGY PDF (pl. e-Transport visszaigazolás) — a Gemini mindkettőt olvassa.
+    if (!isUitDocMime(mimeType)) {
+      return res.json({ result: { ok: false, err: 'Format nesuportat (doar imagine sau PDF).' } });
     }
     if (!base64) return res.json({ result: { ok: false, err: 'Fisier lipsa.' } });
     const approxBytes = Math.floor(base64.length * 0.75);

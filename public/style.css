@@ -5180,3 +5180,12 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
   .oc-top-tools{ flex-wrap:wrap; }
   .oc-top-tools > div{ flex:1 1 calc(50% - 8px); }
 }
+
+/* ── UIT 📷 fotó / 📎 feltöltés (fuvar-kiírás + szerkesztő) ── */
+.uit-scan-btn{ padding:8px 12px !important; font-size:12px !important; white-space:nowrap; }
+.uit-scan-btn[disabled]{ opacity:.55; cursor:progress; }
+.uit-scan-list{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.uit-scan-list:empty{ display:none; }
+.uit-scan-chip{ display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 10px; border-radius:999px; font:700 12px ui-monospace,monospace; letter-spacing:.4px; background:#eff6ff; color:#1e3a8a; border:1px solid #bfdbfe; }
+.uit-scan-chip button{ border:0; background:transparent; color:#b91c1c; cursor:pointer; font-weight:700; padding:0 4px; }
+.main-content[data-theme="dark"] .uit-scan-chip{ background:rgba(59,130,246,0.14); color:#bfdbfe; border-color:rgba(59,130,246,0.4); }
