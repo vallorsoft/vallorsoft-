@@ -6,8 +6,8 @@
   <title data-i18n="title.manager">vallorSoft - Manager Console</title>
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="/style.css?v=20261001ddays">
-  <script src="/i18n.js?v=20261001ddays"></script>
+  <link rel="stylesheet" href="/style.css?v=20261007och">
+  <script src="/i18n.js?v=20261007och"></script>
   <script src="/expense-cat.js?v=20260922wb"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -241,6 +241,9 @@
           <span class="text-muted" style="font-size:11px;margin-left:8px;" data-i18n="form.aiScanHint">PDF / JPG / PNG — az AI kitölti a mezőket, a fájl a fuvarhoz csatolódik</span>
           <input type="file" id="ordScanInput" accept="application/pdf,image/*" style="display:none;" onchange="orderScanFile(this)">
           <div id="ordScanStatus" style="margin-top:8px;"></div>
+        </div>
+        <div id="ordChatBtnBox" style="margin:-2px 0 16px;">
+          <button class="btn primary" id="ordChatBtn" onclick="OrderChat.open()" style="padding:8px 14px;font-size:13px;" data-i18n="och.btn">💬 Szöveges fuvarkiírás (AI)</button>
         </div>
         <div id="ordTplBtnBox" style="margin:-2px 0 16px;">
           <button class="btn ghost" id="ordTplBtn" onclick="OrderTemplates.openPicker()" style="padding:8px 14px;font-size:13px;" data-i18n="otpl.fromTpl">📋 Din șablon (cursă repetată)</button>
@@ -1504,9 +1507,9 @@
 </div>
 
 <script src="/email-intake-card.js?v=20260616warm2"></script>
-<script src="/feature-catalog.js?v=20260618cgps2"></script>
+<script src="/feature-catalog.js?v=20261007och"></script>
 <script>window.__pwaInstallDefault=false;</script>
-<script src="/console-shared.js?v=20260927wbdel"></script>
+<script src="/console-shared.js?v=20261007och"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 <script src="/console-pages.js?v=20260911c"></script>
 <!-- ===== INTEGRACIOK (Manager: Ugyfelek + "Hol a kocsi?"; szamlazo/beallitas Admin-only) ===== -->
@@ -1550,8 +1553,9 @@
 <script src="/driver-activity.js?v=20260901scan"></script>
 <script src="/entity-detail.js?v=20260715ofc"></script>
 <script src="/planner.js?v=20260614qa"></script>
-<script src="/order-wizard.js?v=20260927otpl"></script>
+<script src="/order-wizard.js?v=20261007och"></script>
 <script src="/order-templates.js?v=20260927otpl"></script>
+<script src="/order-chat.js?v=20261007och"></script>
 <script src="/order-assignment.js?v=20260827oaflow"></script>
 <script src="/cost-calculator.js?v=20260904addbtn"></script>
 <script src="/document-register.js?v=20260917docreg"></script>

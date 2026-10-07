@@ -5051,3 +5051,100 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 }
 #dcDocPickerModal .dc-doc-card.dc-doc-acc-teal:hover{ border-color: #0d9488; }
 #dcDocPickerModal .dc-doc-acc-teal .dc-doc-ico{ background: rgba(13,148,136,0.14); }
+
+/* =========================================================
+   💬 Szöveges fuvarkiírás (AI-chat) — public/order-chat.js
+   A modal a body-hoz fűzött; a témát data-theme attribútumként kapja.
+   ========================================================= */
+#ochModal{ --och-bg:#ffffff; --och-soft:#f8fafc; --och-line:#cbd5e1; --och-text:#0f172a; --och-mut:#475569;
+  --och-acc:#2563eb; --och-me:#2563eb; --och-ai:#f1f5f9; padding:14px; }
+#ochModal[data-theme="dark"]{ --och-bg:#0f172a; --och-soft:#111c2e; --och-line:#334155; --och-text:#e2e8f0; --och-mut:#94a3b8;
+  --och-acc:#60a5fa; --och-me:#2563eb; --och-ai:#1e293b; }
+#ochModal .och-box{ width:min(1180px,100%); height:min(860px,100%); background:var(--och-bg); color:var(--och-text);
+  border:1.5px solid var(--och-line); border-radius:18px; box-shadow:0 24px 60px rgba(15,23,42,.35);
+  display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box; }
+#ochModal .och-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:16px 20px;
+  border-bottom:1.5px solid var(--och-line); }
+#ochModal .och-title{ font-size:18px; font-weight:800; }
+#ochModal .och-sub{ font-size:12.5px; color:var(--och-mut); margin-top:3px; max-width:720px; }
+#ochModal .och-head-btns{ display:flex; gap:8px; flex-shrink:0; }
+#ochModal .och-head-btns .btn{ min-height:38px; padding:7px 12px; font-size:13px; }
+#ochModal .och-body{ flex:1; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.05fr); min-height:0; }
+#ochModal .och-chat{ display:flex; flex-direction:column; min-height:0; border-right:1.5px solid var(--och-line); }
+#ochModal .och-msgs{ flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+#ochModal .och-msg{ max-width:88%; padding:10px 13px; border-radius:14px; font-size:14px; line-height:1.45; white-space:normal; word-break:break-word; }
+#ochModal .och-msg.ai{ background:var(--och-ai); color:var(--och-text); border-top-left-radius:4px; align-self:flex-start; }
+#ochModal .och-msg.me{ background:var(--och-me); color:#fff; border-top-right-radius:4px; align-self:flex-end; }
+#ochModal .och-msg.err{ background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+#ochModal .och-msg.ok{ background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; font-weight:700; }
+#ochModal .och-dots i{ display:inline-block; width:6px; height:6px; margin-right:3px; border-radius:50%; background:var(--och-mut);
+  animation:ochDot 1s infinite ease-in-out; }
+#ochModal .och-dots i:nth-child(2){ animation-delay:.15s; } #ochModal .och-dots i:nth-child(3){ animation-delay:.3s; }
+@keyframes ochDot{ 0%,80%,100%{ opacity:.25; } 40%{ opacity:1; } }
+#ochModal .och-qs{ padding:0 16px; display:flex; flex-direction:column; gap:8px; }
+#ochModal .och-q{ border:1.5px solid #f59e0b; background:rgba(245,158,11,.08); border-radius:12px; padding:9px 12px; }
+#ochModal .och-q-t{ font-size:13.5px; font-weight:600; }
+#ochModal .och-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
+#ochModal .och-chip{ border:1.5px solid var(--och-acc); background:transparent; color:var(--och-acc); border-radius:999px;
+  padding:5px 12px; font-size:13px; font-weight:600; cursor:pointer; }
+#ochModal .och-chip:hover{ background:var(--och-acc); color:#fff; }
+#ochModal .och-input{ display:flex; gap:8px; padding:12px 16px 16px; align-items:flex-end; }
+#ochModal .och-input textarea{ flex:1; resize:vertical; min-height:62px; max-height:220px; padding:10px 12px; font:inherit; font-size:14px;
+  color:var(--och-text); background:var(--och-soft); border:1.5px solid var(--och-line); border-radius:12px; box-sizing:border-box; }
+#ochModal .och-input textarea:focus{ outline:none; border-color:var(--och-acc); box-shadow:0 0 0 3px rgba(37,99,235,.18); }
+#ochModal .och-input .btn{ min-height:46px; padding:8px 18px; }
+#ochModal .och-prev{ overflow-y:auto; padding:16px 18px; background:var(--och-soft); }
+#ochModal .och-prev-h{ font-weight:800; font-size:15px; margin-bottom:10px; }
+#ochModal .och-empty{ color:var(--och-mut); font-size:13.5px; padding:30px 10px; text-align:center; border:1.5px dashed var(--och-line); border-radius:14px; }
+#ochModal .och-card{ background:var(--och-bg); border:1.5px solid var(--och-line); border-radius:14px; overflow:hidden; }
+#ochModal .och-sec{ padding:10px 14px; border-bottom:1px solid var(--och-line); }
+#ochModal .och-sec:last-child{ border-bottom:0; }
+#ochModal .och-sec-h{ font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; color:var(--och-acc); margin-bottom:6px; }
+#ochModal .och-row{ display:grid; grid-template-columns:110px 1fr; gap:10px; padding:4px 0; font-size:13.5px; align-items:baseline; }
+#ochModal .och-l{ color:var(--och-mut); font-weight:600; font-size:12.5px; }
+#ochModal .och-v{ min-width:0; word-break:break-word; }
+#ochModal .och-mut{ color:var(--och-mut); font-size:12px; }
+#ochModal .och-miss{ color:#dc2626; font-weight:700; }
+#ochModal .och-wd{ color:var(--och-mut); font-size:12px; text-transform:capitalize; }
+#ochModal .och-plate{ font-family:ui-monospace,Menlo,Consolas,monospace; font-weight:800; letter-spacing:.5px; }
+#ochModal .och-badge{ display:inline-block; font-size:11px; font-weight:700; padding:1px 8px; border-radius:999px; margin-left:4px; vertical-align:1px; }
+#ochModal .och-badge.ok{ background:#dcfce7; color:#166534; }
+#ochModal .och-badge.warn{ background:#fef3c7; color:#92400e; }
+#ochModal .och-badge.info{ background:#dbeafe; color:#1e40af; }
+#ochModal .och-stops{ display:flex; flex-direction:column; gap:6px; }
+#ochModal .och-stop{ display:flex; gap:10px; padding:8px 10px; border-radius:10px; border:1px solid var(--och-line); border-left:4px solid #16a34a; }
+#ochModal .och-stop.de{ border-left-color:#dc2626; }
+#ochModal .och-stop-n{ width:24px; height:24px; flex-shrink:0; border-radius:50%; background:var(--och-acc); color:#fff; font-size:12px; font-weight:800;
+  display:flex; align-items:center; justify-content:center; }
+#ochModal .och-stop-b{ min-width:0; font-size:13px; }
+#ochModal .och-stop-k{ font-weight:700; }
+#ochModal .och-stop-f, #ochModal .och-stop-a{ margin-top:2px; word-break:break-word; }
+#ochModal .och-missbox{ margin-top:12px; padding:9px 12px; border-radius:10px; background:#fef2f2; color:#991b1b; border:1px solid #fecaca; font-size:13px; font-weight:600; }
+#ochModal .och-hint{ margin-top:10px; font-size:12px; color:var(--och-mut); }
+#ochModal .och-save{ width:100%; margin-top:10px; min-height:50px; font-size:15px; font-weight:800; }
+#ochModal .och-save[disabled]{ opacity:.45; cursor:not-allowed; }
+/* A modal a .main-content-en kívül él → saját, téma-független gomb-stílus. */
+#ochModal .btn{ display:inline-flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; opacity:1;
+  border-radius:10px; font-weight:700; font-size:14px; box-shadow:none; text-shadow:none; filter:none; }
+#ochModal .btn.primary{ background:linear-gradient(135deg,#2563eb,#4f46e5); color:#fff; border:1.5px solid #1d4ed8; }
+#ochModal .btn.primary:hover:not([disabled]){ filter:brightness(1.07); }
+#ochModal .btn.ghost{ background:var(--och-soft); color:var(--och-text); border:1.5px solid var(--och-line); }
+#ochModal .btn.ghost:hover{ border-color:var(--och-acc); color:var(--och-acc); }
+#ochModal .btn[disabled]{ opacity:.45; cursor:not-allowed; }
+@media (max-width:860px){
+  #ochModal{ padding:0; }
+  #ochModal .och-box{ height:100%; border-radius:0; border:0; }
+  #ochModal .och-head{ padding:12px 14px; }
+  #ochModal .och-body{ display:block; overflow-y:auto; }
+  #ochModal .och-chat{ height:72vh; border-right:0; border-bottom:1.5px solid var(--och-line); }
+  #ochModal .och-prev{ overflow:visible; }
+  #ochModal .och-sub{ display:none; }
+  #ochModal .och-input{ padding:10px 12px 12px; }
+  #ochModal .och-input textarea{ min-height:54px; }
+  #ochModal .och-row{ grid-template-columns:92px 1fr; }
+}
+/* A wizard tetején 4 belépő gomb: keskeny kijelzőn 2×2 rácsba törik. */
+@media (max-width:720px){
+  .oc-top-tools{ flex-wrap:wrap; }
+  .oc-top-tools > div{ flex:1 1 calc(50% - 8px); }
+}

@@ -68,6 +68,7 @@ const handlers = Object.assign(
   require('../handlers/pdfWorkspace'),
   require('../handlers/documentRegister'),
   require('../handlers/orderTemplates'),
+  require('../handlers/orderChat'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a

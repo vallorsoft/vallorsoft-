@@ -98,10 +98,12 @@
     var aiBox = document.getElementById('ordScanBtnBox');
     var csvBox = document.getElementById('ordersImportBtnBox');
     var tplBox = document.getElementById('ordTplBtnBox');
+    var chatBox = document.getElementById('ordChatBtnBox');
     var topSlot = shell.querySelector('#ocTopTools');
     if (aiBox && topSlot) topSlot.appendChild(aiBox);
     if (csvBox && topSlot) topSlot.appendChild(csvBox);
     if (tplBox && topSlot) topSlot.appendChild(tplBox);
+    if (chatBox && topSlot) topSlot.appendChild(chatBox);
 
     // 4) A LEGACY_KEYS-ben szereplő blokkok áthelyezése a step-body-kba.
     Object.keys(LEGACY_KEYS).forEach(function (k) {

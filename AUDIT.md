@@ -9,6 +9,13 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 25. lépés — Szöveges fuvarkiírás (AI-chat) adatkezelése (2026-10-07, PR #PRNUM) ✅ KÉSZ
+
+- **Minimális adat az AI-nak:** a Gemini csak a diszpécser beszélgetését + a vázlatot kapja (+ mai dátum); a cég sofőr-/jármű-/ügyfél-listája SOSEM megy ki — a nevek feloldása szerver-oldalon, `company_id`-szűrt, paraméteres SQL-lel.
+- **Megbízhatatlan kliens-vázlat:** a böngészőből visszaküldött `client_id` / `email_sofer` / rendszám minden körben és mentéskor tulajdon-ellenőrzött (idegen cég azonosítója → eldobva; teszt fedi).
+- **ANAF-ügyfélmentés:** csak a saját céghez (`company_id`) szúr be, CUI-egyezés esetén nem duplikál; `client.create` audit `source=order_chat_anaf`. Mentéskor nincs újabb ANAF-hívás.
+- **Napló:** az audit csak metaadatot tárol (kör-szám, kész-e, modell); a beszélgetés szövege nem kerül DB-be/naplóba. Kapu: Admin/Manager + `ai-szoveges-fuvar` csomag-flag; az AI-hibaüzenet 300 karakterre csonkolva.
+
 ### 24. lépés — Munkamenet-életciklus + többpéldányos üzem (2026-09-29, PR #492) ✅ KÉSZ
 
 - **Session-revalidálás:** eddig a letiltott (`blocked`), törölt vagy lefokozott felhasználó, a lemondott/lejárt előfizetésű cég és a letiltott portál-belépő session-je 7 napig érvényes maradt a belépéskori szereppel (privilege retention). Most `middleware/sessionRevalidate.js` ≤60 mp-enként a DB-ből frissít; jelszócsere/reset után a többi session kiesik (`pwf`). DB-hibánál fail-open (tudatos döntés: elérhetőség > szigor, max. egy ablaknyi késés).
