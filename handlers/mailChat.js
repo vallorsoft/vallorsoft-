@@ -28,6 +28,7 @@ const audit = require('../lib/audit');
 const emailSvc = require('../services/email');
 const { appBaseUrl } = require('../lib/appUrl');
 const mailBody = require('../lib/mailBody');
+const mailIntent = require('../lib/mailIntent');
 const mailData = require('../lib/mailData');
 
 const handlers = {};
@@ -45,7 +46,9 @@ const QT = {
   optClient: { ro: 'Clientului', hu: 'Az ügyfélnek' },
   optCarrier:{ ro: 'Subcontractantului', hu: 'Az alvállalkozónak' },
   whoName:   { ro: 'Mai mulți destinatari corespund: „{c}". Care este?', hu: 'Több címzett is illik erre: „{c}". Melyik?' },
-  noName:    { ro: 'Nu găsesc „{c}" printre clienți / subcontractanți / contacte. Scrie adresa de e-mail.', hu: 'Nem találom „{c}"-t az ügyfelek / alvállalkozók / kontaktok között. Írd be az e-mail címet.' },
+  noName:    { ro: 'Nu găsesc „{c}" printre clienți / subcontractanți / contacte / șoferi. Scrie adresa de e-mail.', hu: 'Nem találom „{c}"-t az ügyfelek / alvállalkozók / kontaktok / sofőrök között. Írd be az e-mail címet.' },
+  whichDriver: { ro: 'Mai mulți șoferi corespund. Care este?', hu: 'Több sofőr is illik rá. Melyik?' },
+  tplUsed:   { ro: '🧠 Am folosit modelul învățat (fără AI): {c}.', hu: '🧠 A tanult minta alapján készült (AI nélkül): {c}.' },
   whoToGen:  { ro: 'Cui trimit e-mailul? Scrie numele (client, subcontractant, contact) sau adresa de e-mail.', hu: 'Kinek küldjem? Írd be a nevét (ügyfél, alvállalkozó, kontakt) vagy az e-mail címét.' },
   rateLimit: { ro: 'Prea multe e-mailuri trimise din chat. Încearcă mai târziu.', hu: 'Túl sok levél ment a chatből. Próbáld később.' },
 };
@@ -90,6 +93,7 @@ function sanitizeMail(d) {
     style_init: j.style_init === true,
     style_default: j.style_default === true,
     reply_mail_id: parseInt(j.reply_mail_id, 10) || null,
+    intent: mailIntent.sanitize(j.intent),
   };
 }
 
@@ -141,14 +145,17 @@ const BODY_SYNTAX = [
 
 const CARDS_RULES = [
   'cards: transport-order cards that the SYSTEM inserts into the letter from the database (route, loading, unloading, cargo, vehicle, status…). Use them whenever the dispatcher wants order details in the letter.',
-  '  Format: [{"ref":"CMD-2026-0050"}] or [{"latest":2}] (= the last 2 orders). Short numbers are fine ("050", "2026-049") — the system resolves them.',
+  '  Format: [{"ref":"CMD-2026-0050"}] or [{"latest":2}] (= the last 2 orders) or [{"query":{"driver":"name","vehicle":"plate","client":"name","status":"active|open|Finalizat","from":"YYYY-MM-DD","to":"YYYY-MM-DD"}}]',
+  '  (= ALL matching orders, fetched live by the system — use this for "all orders of driver X / vehicle Y / client Z / in a period"; never list them one by one). Short numbers are fine ("050", "2026-049").',
+  '  Many orders are shown as one compact table automatically.',
   '  NEVER write order data (dates, routes, weights, plates…) into the body yourself and NEVER write placeholders like "[details…]" — use cards. Put "{{cards}}" in the body where the cards should appear (default: at the end).',
   'card_fields: which rows the cards show, from ["route","loading","unloading","cargo","vehicle","status","price","km","ref","client"]; null = default (route, loading, unloading, cargo, vehicle, status). Add "price" only if asked.',
 ].join('\n');
 
 const DATA_TOOLS = [
   'data_requests: if you NEED facts from the company system to answer or to write the letter, ask for them here — ONLY what this request needs:',
-  '  {"type":"orders","latest":N} | {"type":"orders","refs":["050","2026-049"]} | {"type":"orders","client":"name","status":"Finalizat","from":"YYYY-MM-DD","to":"YYYY-MM-DD","latest":N}',
+  '  {"type":"orders","latest":N} | {"type":"orders","refs":["050","2026-049"]} | {"type":"orders","driver":"driver name","vehicle":"plate","client":"name","status":"active|open|Finalizat|Alocat|In Curs","from":"YYYY-MM-DD","to":"YYYY-MM-DD"}',
+  '    driver = one of OUR drivers by name (the system resolves it); "active" = assigned / in progress; no from/to = the WHOLE history (all matching orders). The answer has orders_summary (total count, date range, card_query) — put card_query into cards as {"query":…} to include ALL of them.',
   '  {"type":"order_stats","from":"YYYY-MM-DD","to":"YYYY-MM-DD"} (counts, revenue EUR, km)   {"type":"client","name":"…"} (company data, order count)',
   '  {"type":"invoices","client":"…","order":"…","unpaid":true}   {"type":"sent_mails","latest":1,"to":"name or address part"} (our previously SENT e-mails: id, subject, text)',
   '  {"type":"company"} (our own company: name, CUI, address, IBAN, bank — e.g. for payment details)   {"type":"vehicles"} (our fleet plates/types)',
@@ -171,7 +178,7 @@ function buildGeneralPrompt() {
   return [
     'You write business e-mails for a Romanian/Hungarian road-freight company (TMS). The dispatcher tells you in free text what e-mail to write (offer, information, reminder, thanks, references, order overviews, anything).',
     'Maintain an e-mail DRAFT across the conversation; merge each new message into the previous draft (keep values unless changed).',
-    'recipient: "other" if the dispatcher writes an e-mail address (put it in to_email); otherwise "named" with recipient_name = the company or person name exactly as written (the system looks it up). Keep the previous recipient if not changed; null if never mentioned.',
+    'recipient: "other" if the dispatcher writes an e-mail address (put it in to_email); otherwise "named" with recipient_name = the company or person name exactly as written (the system looks it up among clients, subcontractors, contacts AND our own drivers — e.g. "send it to driver X" → recipient_name "X"). Keep the previous recipient if not changed; null if never mentioned.',
     'lang: "ro" by default, "hu" if the dispatcher asks for Hungarian or the recipient is Hungarian.',
     'Write a professional e-mail (greeting, the message, closing without a person name). Never invent prices, dates or facts — request DATA or use cards.',
     COMMON_RULES,
@@ -252,6 +259,13 @@ async function _findNamed(cid, name) {
   try { add((await pool.query(`SELECT denumire AS name, email FROM clients WHERE company_id=$1 AND denumire ILIKE $2 LIMIT 6`, [cid, q])).rows, 'client'); } catch (_) {}
   try { add((await pool.query(`SELECT nev AS name, email FROM carriers WHERE company_id=$1 AND nev ILIKE $2 LIMIT 6`, [cid, q])).rows, 'carrier'); } catch (_) {}
   try { add((await pool.query(`SELECT name, email FROM email_contacts WHERE company_id=$1 AND (name ILIKE $2 OR email ILIKE $2) LIMIT 6`, [cid, q])).rows, 'contact'); } catch (_) {}
+  // A cég SAJÁT sofőrjei (pl. „küldd el Gondos Imrének a fuvarjait") — névtag / ékezet / rag-tűrő.
+  try {
+    const dr = await mailData.resolveDriver(cid, name);
+    const ems = dr.emails.length ? dr.emails : [];
+    if (ems.length) add((await pool.query(`SELECT nume AS name, email FROM users WHERE company_id=$1 AND pozicio='Sofer' AND LOWER(email)=ANY($2)`, [cid, ems])).rows, 'driver');
+    else if (dr.ambiguous.length) add((await pool.query(`SELECT nume AS name, email FROM users WHERE company_id=$1 AND pozicio='Sofer' AND nume=ANY($2)`, [cid, dr.ambiguous])).rows, 'driver');
+  } catch (_) {}
   const seen = new Set();
   return out.filter((x) => { const k = x.email.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
 }
@@ -297,14 +311,19 @@ function _aiQuestions(out) {
 // ─── AI-kör adat-kérésekkel: ha az AI adatot kér a cég rendszeréből, a szerver
 //     CSAK azt kéri le (company_id-szűrt, csak-olvasó), és újrahívja az AI-t
 //     az adatokkal. Beérkezett levél tartalma soha nem kerül bele.
-async function _runAi(cid, systemPrompt, convText) {
+async function _runAi(cid, systemPrompt, convText, pre) {
+  let labels = [];
+  if (pre && pre.json) {
+    // A szerver már felismerte, mire van szükség → az adat az ELSŐ hívással megy (egy AI-kör spórolva).
+    convText += '\n\nDATA FROM THE COMPANY SYSTEM (already fetched for this request — use it; request more only if really needed):\n' + pre.json;
+    labels = pre.labels || [];
+  }
   let ai = await extractJson({ systemPrompt, parts: [{ text: convText }] });
   let out = (ai && ai.json) || {};
   const reqs = mailData.sanitizeRequests(out.data_requests);
-  let labels = [];
   if (reqs.length) {
     const fetched = await mailData.fetchData(cid, reqs);
-    labels = fetched.labels;
+    labels = labels.concat(fetched.labels);
     const text2 = convText + '\n\nDATA FROM THE COMPANY SYSTEM (only what you requested; use it, do not request more):\n' + fetched.json;
     ai = await extractJson({ systemPrompt, parts: [{ text: text2 }] });
     out = (ai && ai.json) || {};
@@ -339,6 +358,8 @@ const T2 = {
   to: { ro: 'Destinatar: {v}', hu: 'Címzett: {v}' },
   cardsAdd: { ro: 'Carduri curse adăugate: {v}', hu: 'Fuvarkártya bekerült: {v}' },
   cardsDel: { ro: 'Carduri curse eliminate: {v}', hu: 'Fuvarkártya kivéve: {v}' },
+  drvAmb: { ro: '„{v}" se potrivește cu mai mulți șoferi', hu: '„{v}" több sofőrre is illik' },
+  queryEmpty: { ro: 'Nicio cursă pentru: {v}', hu: 'Nincs fuvar erre: {v}' },
   fields: { ro: 'Rânduri pe carduri: {v}', hu: 'Kártya-sorok: {v}' },
   look: { ro: 'Aspect: {v}', hu: 'Kinézet: {v}' },
   restored: { ro: 'Am reîncărcat e-mailul trimis anterior', hu: 'Visszatöltöttem a korábban elküldött levelet' },
@@ -367,8 +388,11 @@ function _changes(prev, d, lang, extra) {
   if (d.to_email && d.to_email !== prev.to_email) out.push(t2(L, 'to', d.to_email));
   if (d.subject && d.subject !== prev.subject) out.push(t2(L, 'subject', d.subject));
   if ((d.body || '') !== (prev.body || '') && d.body) out.push(t2(L, 'body'));
-  const pr = (prev.cards || []).map((c) => c.ref), nr = (d.cards || []).map((c) => c.ref);
-  const add = nr.filter((r) => !pr.includes(r)), del = pr.filter((r) => !nr.includes(r));
+  const lab = (c) => (c.query ? '🔎 ' + mailData.queryLabel(c.query, L) : c.ref);
+  const pk = (prev.cards || []).map(mailData.cardKey), nk = (d.cards || []).map(mailData.cardKey);
+  const nr = nk;
+  const add = (d.cards || []).filter((c) => !pk.includes(mailData.cardKey(c))).map(lab);
+  const del = (prev.cards || []).filter((c) => !nk.includes(mailData.cardKey(c))).map(lab);
   if (add.length) out.push(t2(L, 'cardsAdd', add.join(', ')));
   if (del.length) out.push(t2(L, 'cardsDel', del.join(', ')));
   if (JSON.stringify(prev.card_fields || null) !== JSON.stringify(d.card_fields || null) && nr.length) out.push(t2(L, 'fields', (d.card_fields || mailData.DEFAULT_FIELDS).join(', ')));
@@ -376,7 +400,10 @@ function _changes(prev, d, lang, extra) {
   const sk = Array.from(new Set(Object.keys(ps).concat(Object.keys(ns)))).filter((k) => ps[k] !== ns[k]);
   if (sk.length) out.push(t2(L, 'look', sk.map((k) => ((STYLE_WORDS[k] || {})[L] || k) + (ns[k] ? ' = ' + ns[k] : ' ✕')).join(', ')));
   if (extra.labels && extra.labels.length) out.push(t2(L, 'data', extra.labels.map((x) => (x.n != null ? x.n + ' ' : '') + ((DATA_WORDS[x.k] || {})[L] || x.k)).join(', ')));
-  (extra.cardNotes || []).forEach((n) => out.push(n.type === 'card_ambiguous' ? '⚠️ ' + t2(L, 'cardAmb', n.ref) + ': ' + n.options.join(', ') : '⚠️ ' + t2(L, 'cardMissing', n.ref)));
+  (extra.cardNotes || []).forEach((n) => out.push(
+    n.type === 'driver_ambiguous' ? '⚠️ ' + t2(L, 'drvAmb', n.ref) + ': ' + n.options.join(', ')
+      : n.type === 'card_ambiguous' ? '⚠️ ' + t2(L, 'cardAmb', n.ref) + ': ' + n.options.join(', ')
+      : n.type === 'query_empty' ? '⚠️ ' + t2(L, 'queryEmpty', n.ref) : '⚠️ ' + t2(L, 'cardMissing', n.ref)));
   return out;
 }
 const CLAIM_RE = /(frissít|hozzáad|beállít|módosít|átír|elkészít|betett|beraktam|kivettem|eltávolít|megváltoztat|actualiz|am adăugat|am adaugat|am setat|am modificat|am schimbat|am eliminat|i (have )?(updated|added|changed|removed))/i;
@@ -463,11 +490,59 @@ async function applyStyleTurn(req, d, prev, out) {
 async function generalTurn(req, res, messages, prev, lang) {
   const cid = req.session.user.company_id;
   const userText = messages.filter((m) => m.role === 'user').map((m) => m.text).join('\n');
+  const lastText = messages[messages.length - 1].text;
+  // 1) Determinisztikus felismerés (sofőr / jármű / státusz / időszak) — AI nélkül.
+  let it = null;
+  try { it = await mailIntent.parse(cid, lastText); } catch (_) { it = null; }
+  if (it && !it.driver && it.driver_ambiguous && !it.vehicle) {
+    return res.json({ result: { ok: true, mode: 'email', reply: qt(lang, 'whichDriver'), changes: [], draft: prev, notes: [], missing: ['driver'], ready: false,
+      questions: [{ key: 'other', text: qt(lang, 'whichDriver'), options: it.driver_ambiguous }], attachments_avail: [], builders_avail: [], tracking_available: false } });
+  }
+  const q = it && (it.driver || it.vehicle) ? mailIntent.toQuery(it) : null;
+  // 2) Tanult sablon: ugyanilyen jellegű levél már ment ki, és a kérésben nincs más utasítás → AI nélkül.
+  if (q && !prev.body && !(it.residual || []).length) {
+    let tpl = null;
+    try { tpl = await mailIntent.getTemplate(cid, it, prev.lang || lang); } catch (_) { tpl = null; }
+    if (tpl && tpl.subject && tpl.body) {
+      const L = prev.lang || lang;
+      const f = mailIntent.fillTemplate(tpl, it, L);
+      const d = sanitizeMail(Object.assign({}, prev, { lang: L, subject: f.subject, body: f.body, card_fields: f.card_fields, cards: [{ query: q }],
+        recipient: f.recipient_name ? 'named' : prev.recipient, recipient_name: f.recipient_name || prev.recipient_name, intent: Object.assign({}, it, { tpl: true }) }));
+      d.intent = mailIntent.sanitize(Object.assign({}, it, { tpl: true }));
+      const styleNotes = await applyStyleTurn(req, d, prev, {});
+      const r = await resolveGeneral(cid, d, prev, userText, lang);
+      const fin = await _finish(req, r.draft, prev, { reply: '' }, { restored: false, labels: [], styleNotes });
+      if (fin.placeholders.length) r.missing.push('placeholder');
+      try { await audit.fromReq(req, 'mail.chat_turn', 'mail', null, { turns: messages.length, ready: !r.missing.length, model: 'learned', general: true }); } catch (_) {}
+      return res.json({ result: { ok: true, mode: 'email', reply: qt(L, 'tplUsed', mailData.queryLabel(q, L)), changes: fin.changes, preview_html: fin.previewHtml,
+        placeholders: fin.placeholders, draft: r.draft, questions: r.questions, notes: styleNotes, missing: r.missing, ready: r.missing.length === 0,
+        attachments_avail: [], builders_avail: [], tracking_available: false, learned: true } });
+    }
+  }
+  // 3) AI — az adatot a szerver előre lekéri, így egy AI-kör elég.
+  let pre = null;
+  if (q) { try { pre = await mailData.fetchData(cid, mailData.sanitizeRequests([Object.assign({ type: 'orders' }, q)])); } catch (_) { pre = null; } }
   let ai;
-  try { ai = await _runAi(cid, buildGeneralPrompt(), _conversation(messages, prev)); } catch (e) { return _aiErr(res, e); }
+  try { ai = await _runAi(cid, buildGeneralPrompt(), _conversation(messages, prev), pre); } catch (e) { return _aiErr(res, e); }
   const out = ai.out;
   const d = sanitizeMail(Object.assign({}, out.draft || {}));
   if (!d.lang) d.lang = prev.lang || lang;
+  if (q) {
+    // A felismert lekérdezés MINDEN fuvart hozza: ha az AI csak néhányat sorolt fel, élő lekérdezésre cseréljük.
+    const hasQuery = (d.cards || []).some((c) => c.query);
+    if (!hasQuery) d.cards = [{ query: q }];
+    d.intent = mailIntent.sanitize(it);
+    const fl = mailIntent.fold(lastText);
+    // „neki / lui / him" vagy ragozott név („Imrének") → a címzett maga a sofőr.
+    const dat = it.driver && mailIntent.fold(it.driver).split(' ').some((t) => t.length >= 3 && new RegExp('\\b' + t + '\\w{0,2}(nek|nak)\\b').test(fl));
+    if (!d.recipient && it.driver && (dat || /\b(neki|lui|him)\b/.test(fl))) { d.recipient = 'named'; d.recipient_name = it.driver; }
+    // „részletesen / detaliat" → bővebb kártya-mezők.
+    if (!d.card_fields && /\b(reszletes\w*|detaliat\w*|detalii|detailed|full details|minden adat\w*)\b/.test(fl)) d.card_fields = ['route', 'loading', 'unloading', 'cargo', 'vehicle', 'status', 'ref', 'km', 'client'];
+  } else {
+    d.intent = prev.intent;
+    // Követő kör (pl. „udvariasabban"): az élő lekérdezés-kártya marad, ha az AI kihagyta, de a szövegben még ott a helye.
+    if (!(d.cards || []).length && (prev.cards || []).some((c) => c.query) && /\{\{cards\}\}/.test(d.body || '')) d.cards = prev.cards;
+  }
   const restored = await _restoreSent(cid, out.restore_sent_id, d);
   const styleNotes = await applyStyleTurn(req, d, prev, out);
   // A felhasználó egy felkínált „Név <cím>" opcióra kattintott → az a cím (ha tényleg a listából jön).
@@ -665,6 +740,8 @@ async function _sendGeneral(req, cid, d, isTest) {
   if (!result || !result.ok) return { ok: false, err: (result && result.error) || 'Eroare la trimitere' };
   if (!isTest) {
     try { if (d.recipient === 'named' && d.recipient_name) await memPut(cid, 'mail_pref', 'name:' + _fold(d.recipient_name), { to_email: to, lang: d.lang }); } catch (_) {}
+    // Tanulás: a levél tárgya/szövege sablonként (a név / időszak helyőrzővel) → legközelebb AI nélkül.
+    try { if (d.intent && (d.cards || []).some((c) => c.query)) await mailIntent.learnTemplate(cid, d, d.intent, d.lang || 'ro'); } catch (_) {}
     try { await audit.fromReq(req, 'mail.chat_send', 'mail', null, { general: true }); } catch (_) {}
   }
   return { ok: true };

@@ -69,7 +69,7 @@ describe('mailData — adat-kérések + fuvarkártyák', () => {
     data_incarcare: '2026-05-10', data_descarcare: '2026-05-12', suly_kg: '22000', load_type: 'FTL', rendszam_camion: 'B104VLR', pret: '1800', ref: '<x>' };
   test('csak fehérlistás kérés-típusok, korlátokkal', () => {
     const r = md.sanitizeRequests([{ type: 'orders', latest: 99 }, { type: 'users' }, { type: 'sent_mails', latest: 50 }, { type: 'client' }]);
-    expect(r).toEqual([expect.objectContaining({ type: 'orders', latest: 10 }), expect.objectContaining({ type: 'sent_mails', latest: 5 })]);
+    expect(r).toEqual([expect.objectContaining({ type: 'orders', latest: 50 }), expect.objectContaining({ type: 'sent_mails', latest: 5 })]);
   });
   test('rövid fuvarszám feloldása („050" → CMD-2026-0050), cégre szűrve', async () => {
     mockRows = [{ match: /~ \$2/, rows: (sql, p) => (p[0] === 7 && p[1] === '-[0-9]{4}-0*50$' ? [O50] : []) }];
