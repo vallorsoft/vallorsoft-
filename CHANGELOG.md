@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-07 — ÚJ: 💬 Szöveges fuvarkiírás (AI-chat), Pro csomagtól (PR #PRNUM)
+## 2026-10-07 — ÚJ: 💬 Szöveges fuvarkiírás (AI-chat), Pro csomagtól (PR #506)
 - A Fuvar kiírás tetején új „💬 Szöveges fuvarkiírás (AI)" gomb (admin + manager) → chat-ablak: a diszpécser szabad szöveggel leírja a fuvart, az AI összeállítja, ami nem egyértelmű, arra kattintható válaszgombokkal rákérdez; a javítás is a chatben megy („a második lerakás csütörtök").
 - Jobb oldalt a TELJES fuvar EGYBEN látszik (megrendelő, minden állomás sorrendben dátum + nap-névvel, áru, sofőr, vontató, pótkocsi, ár, km, hiányzó tételek) — nem lépésenként. Mentés: „✅ Fuvar mentése" → a meglévő `comCreate` (fuvar-szám, multi-stop, auto-párosítás változatlan).
 - **Megrendelő CUI-val:** ha még nincs ilyen ügyfél, ANAF-lekérdezéssel a teljes cégadat bekerül és **elmentődik az ügyfelek közé**, a fuvar ehhez kötődik (`orders.client_id`). Meglévő CUI → nincs új ügyfél.

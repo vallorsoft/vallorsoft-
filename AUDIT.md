@@ -9,7 +9,7 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
-### 25. lépés — Szöveges fuvarkiírás (AI-chat) adatkezelése (2026-10-07, PR #PRNUM) ✅ KÉSZ
+### 25. lépés — Szöveges fuvarkiírás (AI-chat) adatkezelése (2026-10-07, PR #506) ✅ KÉSZ
 
 - **Minimális adat az AI-nak:** a Gemini csak a diszpécser beszélgetését + a vázlatot kapja (+ mai dátum); a cég sofőr-/jármű-/ügyfél-listája SOSEM megy ki — a nevek feloldása szerver-oldalon, `company_id`-szűrt, paraméteres SQL-lel.
 - **Megbízhatatlan kliens-vázlat:** a böngészőből visszaküldött `client_id` / `email_sofer` / rendszám minden körben és mentéskor tulajdon-ellenőrzött (idegen cég azonosítója → eldobva; teszt fedi).
