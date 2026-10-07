@@ -175,4 +175,29 @@ async function pollOnce(pool, creds, companyId, opts) {
   return { processed, fetched: collected.length };
 }
 
-module.exports = { pollOnce, testConnection, resolveImap, aiEnabledFor };
+// EGY kiválasztott levél feldolgozása (a felhasználó kattintására — „📄 Megnyit + AI"):
+// nyers forrás → PDF/szöveg → kiolvasás → inbound_orders sor. Visszaadja az új/meglévő id-t.
+async function processSource(pool, companyId, source, uid) {
+  if (!simpleParser) throw new Error('Pachetul mailparser nu este instalat pe server.');
+  const aiEnabled = await aiEnabledFor(pool, companyId);
+  const parsed = await simpleParser(source);
+  const pdfAtt = (parsed.attachments || []).find(a => /pdf$/i.test(a.contentType || '') || /\.pdf$/i.test(a.filename || ''));
+  let pdfBuffer = pdfAtt ? pdfAtt.content : null;
+  const pdfName = pdfAtt ? pdfAtt.filename : null;
+  if (pdfBuffer && pdfBuffer.length > 15 * 1024 * 1024) pdfBuffer = null;
+  let text = (parsed.text || '').trim();
+  if (pdfBuffer) { try { const ex = await pdfx.extractText(pdfBuffer); if (ex.text) text = ex.text; } catch (_) {} }
+  const r = await orderAi.extractFields({ text, pdfBuffer, pdfName, aiEnabled });
+  const ins = await pool.query(
+    `INSERT INTO inbound_orders (company_id, source_email, subject, received_at, message_uid,
+       raw_text, pdf_name, pdf_data, extracted, confidence, ai_used, status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'parsed')
+     ON CONFLICT (company_id, message_uid) DO NOTHING RETURNING id`,
+    [companyId, (parsed.from && parsed.from.text) || null, parsed.subject || null, parsed.date || new Date(),
+      String(uid), text.slice(0, 20000), pdfName, pdfBuffer, JSON.stringify(r.fields || {}), r.confidence, r.ai_used]);
+  if (ins.rows.length) return ins.rows[0].id;
+  const ex = await pool.query('SELECT id FROM inbound_orders WHERE company_id=$1 AND message_uid=$2', [companyId, String(uid)]);
+  return ex.rows[0] ? ex.rows[0].id : null;
+}
+
+module.exports = { pollOnce, testConnection, resolveImap, aiEnabledFor, processSource, makeClient: (cfg) => makeClient(cfg) };

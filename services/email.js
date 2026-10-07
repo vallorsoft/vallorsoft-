@@ -490,6 +490,18 @@ function _smtpTransport(cfg) {
   });
 }
 
+// Message-ID formátumú érték (<...@...>) — fejléc-injekció ellen szigorúan.
+const MSGID_RE = /^<[^<>\s\r\n]{3,250}>$/;
+function _cleanMsgIds(v) {
+  return String(v || '').split(/\s+/).filter((x) => MSGID_RE.test(x)).slice(-20).join(' ');
+}
+function _threadHeaders(opts) {
+  const irt = _cleanMsgIds(opts && opts.inReplyTo).split(' ')[0] || '';
+  if (!irt) return null;
+  const refs = _cleanMsgIds(opts.references) || irt;
+  return { 'In-Reply-To': irt, References: refs.indexOf(irt) >= 0 ? refs : (refs + ' ' + irt).trim() };
+}
+
 async function _brevoSendCompany(cfg, opts) {
   const fromEmail = cfg.from_email || cfg.user;
   const payload = {
@@ -502,6 +514,9 @@ async function _brevoSendCompany(cfg, opts) {
     textContent: htmlToPlainText(opts.html || ''),
   };
   if (opts.replyTo) payload.replyTo = { email: opts.replyTo };
+  // Válasz-levélnél a levélszál-fejlécek (ugyanabba a szálba érkezzen).
+  const th = _threadHeaders(opts);
+  if (th) payload.headers = th;
   // Csatolmányok (opcionális): [{ name, contentBase64 }] -> Brevo formátum.
   if (Array.isArray(opts.attachments) && opts.attachments.length) {
     payload.attachment = opts.attachments
@@ -566,12 +581,14 @@ async function getCompanyMailer(companyId) {
           // levél-nézetben is érvényes maradjon (ne markdown [url](url) legyen).
           text: htmlToPlainText(opts.html || ''),
           replyTo: opts.replyTo || undefined,
+          inReplyTo: (_threadHeaders(opts) || {})['In-Reply-To'] || undefined,
+          references: (_threadHeaders(opts) || {}).References || undefined,
           attachments: atts.length ? atts.map(a => ({ filename: a.name, content: a.contentBase64, encoding: 'base64' })) : undefined,
         });
         _logMail(cid, opts.to, subject, mtype, 'sent', info && info.messageId);
         return { ok: true, messageId: info && info.messageId };
       }
-      const r = await _brevoSendCompany(cfg, { to: opts.to, subject: subject, html: opts.html, senderName: fromName, replyTo: opts.replyTo, attachments: atts });
+      const r = await _brevoSendCompany(cfg, { to: opts.to, subject: subject, html: opts.html, senderName: fromName, replyTo: opts.replyTo, attachments: atts, inReplyTo: opts.inReplyTo, references: opts.references });
       _logMail(cid, opts.to, subject, mtype, r.ok ? 'sent' : 'failed', r.messageId || null);
       return r;
     } catch (err) {

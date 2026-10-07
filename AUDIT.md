@@ -9,6 +9,13 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 32. lépés — Postafiókok + 📥 Levelek + válasz (2026-10-07, PR #515) ✅ KÉSZ
+
+- **Adat-minimalizálás:** a háttér-kör CSAK fejlécet (feladó/tárgy/dátum/Message-ID) tölt le és tárol (`mail_headers`), olvasottnak semmit nem jelöl; a törzs/csatolmány csak a felhasználó kattintására jön élőben az IMAP-ról és nem kerül DB-be. A megrendelés-postafiók sem dolgoz fel automatikusan: a levél a kattintásra kerül a kiolvasóhoz (AI) — a régi automatikus `pollOnce` kör kivezetve.
+- **Feladó-szűrés fiókonként:** csak ügyfél/alvállalkozó/kontakt címek, egyedi lista vagy mind; a nem engedélyezett feladó levele nem is tárolódik. Mappa-fehérlista.
+- **AI-elszigetelés:** a 💬 válasznál az AI semmit nem kap a levélből (feladó/tárgy/szöveg) — csak a chatbe írt szöveget; teszt fedi. A címzettet és a tárgyat a szerver állítja a levélből (kliens-oldali `to_email` figyelmen kívül), levélszál-fejlécek (`In-Reply-To`/`References`) szigorú Message-ID regexszel (fejléc-injekció ellen).
+- Jelszó AES-256-GCM (`creds_enc`), kliensbe csak maszkolt cím; fiók-írás csak Admin; minden lekérdezés `company_id`-szűrt; audit (megnyitás, válasz, fiók-változás); rate-limit 40 válasz/óra/felhasználó; csomag-kapu `mail-inbox`.
+
 ### 31. lépés — Kötelező céges lábléc az e-mailekben (2026-10-07, PR #514) ✅ KÉSZ
 
 - A lábléc adatai a feladó cég SAJÁT `companies` sorából (`id=$1`, paraméteres), minden érték escape-elve, a logó csak http(s) URL. Best-effort: lekérdezés-hiba esetén a levél lábléc nélkül megy, nem bukik.

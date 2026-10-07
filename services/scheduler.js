@@ -69,29 +69,24 @@ function startIntakeScheduler() {
     try { await tickBody(); } finally { running = false; }
   }
 
+  // ADATVÉDELEM: a háttér-kör CSAK fejlécet (feladó/tárgy/dátum) gyűjt a
+  // beállított fiókokból (mail_accounts) — a levél tartalmát és az AI-kiolvasást
+  // a felhasználó indítja kattintással (handlers/mailbox.js).
   async function tickBody() {
+    let mailbox;
+    try { mailbox = require('./mailbox'); } catch (_) { return; }
     let rows;
     try {
-      ({ rows } = await pool.query(
-        `SELECT company_id, credentials_enc, meta FROM company_integrations
-         WHERE provider='email_intake' AND enabled=true AND credentials_enc IS NOT NULL`));
-    } catch (err) { console.error('[Intake] cégek lekérése hiba:', err.message); return; }
-
-    for (const row of rows) {
-      let creds;
-      try { creds = JSON.parse(decrypt(row.credentials_enc)); }
-      catch (e) { console.error('[Intake] cég #' + row.company_id + ' credentials dekódolás hiba:', e.message); continue; }
-      const since = row.meta && row.meta.since ? row.meta.since : null;
+      ({ rows } = await pool.query(`SELECT * FROM mail_accounts WHERE enabled=true`));
+    } catch (err) { console.error('[Intake] fiókok lekérése hiba:', err.message); return; }
+    for (const acc of rows) {
       try {
-        const r = await intake.pollOnce(pool, creds, row.company_id, { since });
-        if (r && r.processed) console.log('[Intake] cég #' + row.company_id + ' — feldolgozott levél:', r.processed);
-        // Sikeres kör után az utolsó lekérdezés idejének frissítése (last_check oszlop).
-        await pool.query(
-          `UPDATE company_integrations SET last_check=now() WHERE company_id=$1 AND provider='email_intake'`,
-          [row.company_id]);
+        const r = await mailbox.syncHeaders(pool, acc);
+        if (r && r.added) console.log('[Intake] fiók #' + acc.id + ' — új levél-fejléc:', r.added);
+        await pool.query('UPDATE mail_accounts SET last_check=now(), last_error=NULL WHERE id=$1', [acc.id]);
       } catch (err) {
-        console.error('[Intake] cég #' + row.company_id + ' lekérdezés hiba:', err.message);
-        // egy cég hibája NE állítsa le a többit
+        console.error('[Intake] fiók #' + acc.id + ' lekérdezés hiba:', err.message);
+        try { await pool.query('UPDATE mail_accounts SET last_error=$2 WHERE id=$1', [acc.id, String(err.message || '').slice(0, 300)]); } catch (_) {}
       }
     }
   }

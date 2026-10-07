@@ -5222,3 +5222,49 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #ochModal[data-theme="dark"] .och-att.on{ background:rgba(246,113,30,0.15); color:#fdba74; }
 #ochModal .och-look{ margin-top:10px; }
 #ochModal .och-look .och-att{ margin-right:4px; }
+
+/* ── 📥 Levelek + 📬 Postafiókok (mail-inbox.js / mail-accounts-card.js) ── */
+.mbx-head{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+.mbx-head .input{flex:1}
+.mbx-note{font-size:12.5px;color:#475569;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;padding:8px 12px;margin-bottom:12px}
+.mbx-list{border:1.5px solid #cbd5e1;border-radius:12px;overflow:hidden;background:#fff}
+.mbx-row{display:grid;grid-template-columns:minmax(160px,1.1fr) 2fr auto;gap:12px;align-items:center;padding:11px 14px;border-top:1px solid #e2e8f0;cursor:pointer;color:#0f172a}
+.mbx-row:first-child{border-top:0}
+.mbx-row:hover{background:#eff6ff}
+.mbx-row.unread .mbx-from,.mbx-row.unread .mbx-subj{font-weight:800}
+.mbx-from,.mbx-subj{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.mbx-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#f6711e;margin-right:7px;vertical-align:middle}
+.mbx-mail{font-size:12px;color:#64748b;font-weight:400}
+.mbx-meta{display:flex;gap:8px;align-items:center;font-size:12px;color:#475569;white-space:nowrap}
+.mbx-acc{color:#94a3b8}
+.mbx-tag{background:#e0e7ff;color:#3730a3;border-radius:999px;padding:2px 8px;font-weight:700}
+.mbx-tag.ok{background:#dcfce7;color:#166534}
+.mbx-empty{padding:18px;color:#475569}
+.mbx-modal{max-width:760px;width:96vw;max-height:90vh;overflow:auto;padding:18px 20px}
+.mbx-mhead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:10px}
+.mbx-msubj{font-size:17px;font-weight:800;color:var(--text-primary,#0f172a)}
+.mbx-text{white-space:pre-wrap;word-break:break-word;font:14px/1.55 Inter,Arial,sans-serif;background:#f8fafc;color:#0f172a;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;max-height:45vh;overflow:auto;margin:0}
+.mbx-order{background:#eef2ff;color:#312e81;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:13px}
+.mbx-atts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.mbx-att{border:1.5px solid #cbd5e1;background:#fff;color:#0f172a;border-radius:999px;padding:6px 12px;cursor:pointer;font-size:13px}
+.mbx-btns{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:14px}
+.mbx-fl{display:flex;gap:10px;font-size:14px;margin-bottom:6px;color:var(--text-primary,#0f172a)}
+.mbx-fl span{min-width:70px;color:#64748b}
+.mbx-chk,.mac-chk{display:flex;align-items:center;gap:8px;font-size:13.5px;margin:6px 0;color:var(--text-primary,#0f172a)}
+.mbx-sec{font-weight:700;margin:10px 0 4px;font-size:13px}
+#mbxReply .textarea,#mbxReply .select{width:100%;margin:8px 0}
+.mac{padding:20px 22px}
+.mac-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+.mac-title{font-weight:800;font-size:16px}
+.mac-acc{border:1.5px solid #cbd5e1;border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.mac-acc-m{font-size:13px;color:#475569;margin-top:4px}
+.mac-acc-b{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+[data-theme="dark"] .mbx-list,[data-theme="dark"] .mbx-att{background:rgba(255,255,255,.03);border-color:#475569}
+[data-theme="dark"] .mbx-row{color:#e2e8f0;border-color:#334155}
+[data-theme="dark"] .mbx-row:hover{background:rgba(59,130,246,.12)}
+[data-theme="dark"] .mbx-note{background:rgba(255,255,255,.05);border-color:#475569;color:#cbd5e1}
+[data-theme="dark"] .mbx-text{background:#0f172a;color:#e2e8f0;border-color:#334155}
+[data-theme="dark"] .mbx-att{color:#e2e8f0}
+[data-theme="dark"] .mac-acc{border-color:#475569}
+[data-theme="dark"] .mac-acc-m{color:#cbd5e1}
+@media(max-width:700px){.mbx-row{grid-template-columns:1fr}.mbx-meta{flex-wrap:wrap}}

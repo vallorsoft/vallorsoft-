@@ -39,6 +39,7 @@ function loadTab(name){
   if(name==='ecmr' && window.ECmr) ECmr.mount('ecmrBox');
   if(name==='doc-register' && window.DocRegister) DocRegister.mount('docRegisterBox');
   if(name==='quotes' && window.Quotes) Quotes.mount('quotesBox');
+  if(name==='mail-inbox' && window.MailInbox) MailInbox.mount('mailInboxBox');
   if(name==='fav-locations' && window.FavLocations) FavLocations.mount('favLocBox');
   if(name==='users') loadUsers();
   if(name==='invites') loadInvites();
@@ -73,7 +74,7 @@ function loadTab(name){
   if(name==='integrations'){
     if(typeof loadGdpr==='function') loadGdpr();
     if(window.EmailSenderCard)  EmailSenderCard.mount('emailSenderCardBox');
-    if(window.EmailIntakeCard)  EmailIntakeCard.mount('emailIntakeCardBox', {readOnly:false});
+    if(window.MailAccountsCard) MailAccountsCard.mount('emailIntakeCardBox');
     if(window.BillingCard)      BillingCard.mount('billingCardBox');
     if(window.CargoTrackCard)   CargoTrackCard.mount('ctCardBox');
     if(window.CargoTrackPairing) CargoTrackPairing.mount('ctPairBox');

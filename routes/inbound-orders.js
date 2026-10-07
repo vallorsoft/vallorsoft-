@@ -5,8 +5,6 @@ const pool = require('../db');
 const { requireLogin, requireRole } = require('../middleware/auth');
 const pdfx = require('../services/pdf-extract');
 const orderAi = require('../services/order-ai');
-const intake = require('../services/email-intake');
-const { decrypt } = require('../lib/crypto');
 const { genDocId } = require('../lib/ids');
 const { nextFuvarNo, resolveOrderSeries } = require('../lib/orderNo');
 const { estimateRoute } = require('../lib/routeEstimate');
@@ -14,17 +12,6 @@ const { featureEnabled } = require('../lib/featureEnabled');
 
 const router = express.Router();
 
-// A cég mentett (titkosított) e-mail intake beállítása -> { creds, since } (vagy null).
-async function loadIntakeCreds(companyId) {
-  const { rows } = await pool.query(
-    `SELECT credentials_enc, meta FROM company_integrations WHERE company_id=$1 AND provider='email_intake' AND enabled=true`, [companyId]);
-  if (!rows.length || !rows[0].credentials_enc) return null;
-  try {
-    const creds = JSON.parse(decrypt(rows[0].credentials_enc));
-    const since = rows[0].meta && rows[0].meta.since ? rows[0].meta.since : null;
-    return { creds, since };
-  } catch (_) { return null; }
-}
 const own = (req) => req.session.user.company_id;
 const LIST_COLS = `id, source_email, subject, received_at, raw_text, pdf_name, extracted,
                    confidence, ai_used, status, created_order_id, created_at`;
@@ -34,8 +21,12 @@ router.get('/api/inbound-orders/settings', requireLogin, requireRole('Admin', 'M
   try {
     const { rows } = await pool.query(
       `SELECT meta FROM company_integrations WHERE company_id=$1 AND provider='order_intake'`, [own(req)]);
-    const cfg = await pool.query(
-      `SELECT 1 FROM company_integrations WHERE company_id=$1 AND provider='email_intake' AND enabled=true AND credentials_enc IS NOT NULL`, [own(req)]);
+    let cfg = { rows: [] };
+    try { cfg = await pool.query(`SELECT 1 FROM mail_accounts WHERE company_id=$1 AND enabled=true AND use_orders=true`, [own(req)]); }
+    catch (_) {
+      cfg = await pool.query(
+        `SELECT 1 FROM company_integrations WHERE company_id=$1 AND provider='email_intake' AND enabled=true AND credentials_enc IS NOT NULL`, [own(req)]);
+    }
     res.json({ ai_enabled: !!(rows[0] && rows[0].meta && rows[0].meta.ai_enabled), intake_configured: cfg.rows.length > 0 });
   } catch (e) { console.error('GET /api/inbound-orders/settings hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
@@ -52,16 +43,24 @@ router.post('/api/inbound-orders/settings', requireLogin, requireRole('Admin'), 
 });
 
 // ---- Kézi lekérdezés (teszthez, fiók beállítása után) ----
+// ---- Kézi lekérdezés: CSAK fejléc (feladó/tárgy) a megrendelés-szerepű fiókokból ----
 router.post('/api/inbound-orders/poll', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
   try {
-    const cfg = await loadIntakeCreds(own(req));
-    if (!cfg) return res.json({ skipped: true });
-    const r = await intake.pollOnce(pool, cfg.creds, own(req), { since: cfg.since });
-    // Kézi lekérdezés is frissítse az utolsó lekérdezés idejét.
-    if (!r.skipped) {
-      await pool.query(`UPDATE company_integrations SET last_check=now() WHERE company_id=$1 AND provider='email_intake'`, [own(req)]).catch(() => {});
+    const mailbox = require('../services/mailbox');
+    const { rows } = await pool.query(
+      `SELECT * FROM mail_accounts WHERE company_id=$1 AND enabled=true AND use_orders=true`, [own(req)]);
+    if (!rows.length) return res.json({ skipped: true });
+    let added = 0;
+    for (const acc of rows) {
+      try {
+        const r = await mailbox.syncHeaders(pool, acc);
+        added += (r && r.added) || 0;
+        await pool.query('UPDATE mail_accounts SET last_check=now(), last_error=NULL WHERE id=$1', [acc.id]);
+      } catch (e) {
+        await pool.query('UPDATE mail_accounts SET last_error=$2 WHERE id=$1', [acc.id, String(e.message || '').slice(0, 300)]).catch(() => {});
+      }
     }
-    res.json(r);
+    res.json({ added });
   } catch (e) { console.error('POST /api/inbound-orders/poll hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 

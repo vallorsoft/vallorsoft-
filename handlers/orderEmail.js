@@ -393,7 +393,8 @@ handlers.sendOrderEmail = async function (req, res, args) {
           ? 'Configurați contul de e-mail (SMTP) în Integrări înainte de a trimite.'
           : ((mailer && mailer.error) || 'Eroare la contul expeditor') } });
       }
-      sent = await mailer.send({ to: toEmail, subject: subject, html: realHtml, attachments: attachments, mailType: 'order' });
+      sent = await mailer.send({ to: toEmail, subject: subject, html: realHtml, attachments: attachments, mailType: a.mail_type === 'reply' ? 'reply' : 'order',
+        inReplyTo: a.in_reply_to, references: a.references });
     }
 
     audit.fromReq(req, 'order.email_send', 'order', orderId, {
