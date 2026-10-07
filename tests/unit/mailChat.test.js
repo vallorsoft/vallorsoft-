@@ -223,3 +223,26 @@ describe('kinézet: színek/elrendezés + alapértelmezett', () => {
     expect(mockSend.mock.calls[0][2][0].style).toEqual({ accent: '#16a34a' });
   });
 });
+
+describe('kötelező céges lábléc + kontraszt', () => {
+  const ms = require('../../lib/mailStyle');
+  test('lábléc: cégnév, CUI, J, telefon, e-mail, cím, logó; escape-elve; jelölővel', () => {
+    const f = ms.companyFooterHtml({ nev: 'Vallor <Team>', cui: 'RO47859317', reg_com: 'J2023000114142', telefon: '0769', email_contact: 'a@b.ro', adresa: 'Arcuș' }, 'https://x.ro/branding/logo/7.png');
+    expect(f).toContain('Vallor &lt;Team&gt;');
+    expect(f).toContain('CUI RO47859317');
+    expect(f).toContain('J2023000114142');
+    expect(f).toContain('Arcuș');
+    expect(f).toContain('https://x.ro/branding/logo/7.png');
+    expect(ms.hasFooter(f)).toBe(true);
+    expect(ms.companyFooterHtml({}, null)).toBe('');
+  });
+  test('kontraszt: sötét háttéren világos, világoson sötét szöveg; rossz szín felülírva', () => {
+    expect(ms.readableOn('#1e3a8a')).toBe('#ffffff');
+    expect(ms.readableOn('#fde68a')).toBe('#111827');
+    expect(ms.ensureText('#ffffff', '#ffffff')).toBe('#111827');
+    expect(ms.ensureText('#1e3a8a', '#ffffff')).toBe('#1e3a8a');
+    const h = ms.renderStyled('x', { card: '#111827', text: '#1f2937', accent: '#fde68a', header: 'band' }, {});
+    expect(h).toContain('color:#ffffff;');          // sötét lapon fehér szöveg
+    expect(h).toContain('background:#fde68a;color:#111827'); // világos sávon sötét felirat
+  });
+});

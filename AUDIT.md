@@ -9,6 +9,10 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 31. lépés — Kötelező céges lábléc az e-mailekben (2026-10-07, PR #514) ✅ KÉSZ
+
+- A lábléc adatai a feladó cég SAJÁT `companies` sorából (`id=$1`, paraméteres), minden érték escape-elve, a logó csak http(s) URL. Best-effort: lekérdezés-hiba esetén a levél lábléc nélkül megy, nem bukik.
+
 ### 30. lépés — AI-chat e-mail kinézet (2026-10-07, PR #513) ✅ KÉSZ
 
 - A felhasználó/AI által megadott stílus a levél HTML-jébe kerül → `lib/mailStyle.js` szigorú fehérlista (csak `#rrggbb` színek, felsorolt igazítás/fejléc/betű/szélesség), a feladónév escape-elve, logó csak http(s)/data:image. Az alapértelmezett kinézet felhasználónkénti (`user:<id>`, `company_id`-szűrt) — más felhasználó nem kapja meg; a mentett sablon-id tulajdon-ellenőrzött.

@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-10-07 — E-mailek: KÖTELEZŐ céges lábléc az arculatból + automatikus kontraszt (PR #514)
+- **Szabály:** minden, a cég nevében kimenő levél (cég saját fiókja / `getCompanyMailer` és a közös feladós `sendClientEmail`, ha cégé a levél) alján fix lábléc: cég-logó + cégnév + CUI · Reg.Com. · ☏ · ✉ · web + cím — a sofőr-elszámolási nyomtatványok fejlécének mintájára, a `companies` + `company_branding` arculatból. Dupla lábléc nincs (jelölő), cégnév nélkül nincs lábléc. A lábléc mindig világos háttér + sötét szöveg.
+- **Kontraszt:** a chatben választott színeknél a szöveg/fejléc-felirat/link színe automatikusan olvashatóra vált (WCAG ≥ 4.5), ha a kért szín beleolvadna a háttérbe; az előnézet ugyanígy számol. Új `lib/mailStyle.js` `contrast`/`readableOn`/`ensureText`/`companyFooterHtml`, `services/email.js` `appendCompanyFooter`. +4 Jest, cache-bust `?v=20261007ochfoot`.
+
 ## 2026-10-07 — 💬 AI-chat e-mail: kinézet (színek/elrendezés) a chatben + felhasználónkénti alapértelmezett kinézet (PR #513)
 - A levél kinézete a chatben állítható („legyen kék fejléc-sávval", „középre", „sötétkék háttér", „serif betű", „szélesebb"): kiemelő szín, háttér, levél-háttér, szövegszín, igazítás, fejléc (logó / színes sáv / nincs), betű, szélesség. Élő előnézet a chatben.
 - „Mentsd el alapértelmezettnek" (vagy ⭐ gomb) → a FELHASZNÁLÓ saját alapértelmezett kinézete (stílus + opc. vizuális sablon); minden új levele ezzel indul, amíg másképp nem kéri; „↺ Eredeti kinézet" törli. Tárolás: `order_chat_memory` (`mail_style`, kulcs `user:<id>`, cégenként).
