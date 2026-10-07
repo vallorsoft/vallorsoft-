@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-07 — Szöveges fuvarkiírás: teljes mobil-optimalizálás (PR #PRNUM)
+## 2026-10-07 — Szöveges fuvarkiírás: teljes mobil-optimalizálás (PR #507)
 - Telefonon (≤860px) két fül: **💬 Chat / 📋 Előnézet** — egyszerre egy panel, teljes képernyő (`100dvh`, notch/safe-area). Az Előnézet fülön jelvény: **⚠️ N** (hiányzó tétel) / **✅** (kész, pulzál). A chatben kész fuvarnál „✅ A fuvar kész — előnézet és mentés →" gomb.
 - A „✅ Fuvar mentése" gomb az előnézet alján fixen látszik (eddig ~500px-szel a képernyő alatt volt); mentés után vissza a chat fülre a siker-üzenettel.
 - Beíró mező 16px (iOS Safari nem közelít rá), rövidebb placeholder, nagyobb érintési felületek (válaszgombok, Küldés), fejlécben az „Új beszélgetés" csak 🔄 ikon. Asztali nézet változatlan. 4 új `och.*` i18n (RO+HU), cache-bust `?v=20261007och2`.
