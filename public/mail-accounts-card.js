@@ -40,6 +40,8 @@
           + (a.last_error ? ' <span class="badge err" title="' + esc(a.last_error) + '">⚠️ ' + esc(T('mac.error')) + '</span>' : '') + '</div>'
           + '<div class="mac-acc-m">' + esc(T('mac.use')) + ': ' + esc(uses) + '</div>'
           + '<div class="mac-acc-m">' + esc(T('mac.folders')) + ': ' + esc(a.folders) + ' · ' + esc(T('mac.allow')) + ': ' + esc(T('mac.allow_' + a.allow_mode)) + '</div>'
+          + '<div class="mac-acc-m">' + esc(T('mac.since')) + ': ' + esc(a.since ? new Date(a.since).toLocaleDateString() : '—')
+          + (a.last_seen != null ? ' · ' + esc(T('mac.stat', { n: a.last_seen, s: a.last_skipped || 0 })) : '') + '</div>'
           + (S.canEdit ? '<div class="mac-acc-b"><button class="btn ghost" type="button" onclick="MailAccountsCard.edit(' + a.id + ')">✏️ ' + esc(T('mac.edit')) + '</button>'
             + '<button class="btn ghost" type="button" onclick="MailAccountsCard.test(' + a.id + ')">🔌 ' + esc(T('mac.test')) + '</button>'
             + '<button class="btn danger" type="button" onclick="MailAccountsCard.del(' + a.id + ')">🗑</button></div>' : '')
@@ -69,6 +71,10 @@
       + '<div class="field"><label>' + esc(T('mac.use')) + '</label>'
       + '<label class="mac-chk"><input type="checkbox" id="macOrders"' + (a.use_orders ? ' checked' : '') + '> 📄 ' + esc(T('mac.useOrders')) + ' <span class="text-muted">— ' + esc(T('mac.useOrdersHint')) + '</span></label>'
       + '<label class="mac-chk"><input type="checkbox" id="macInbox"' + (a.use_inbox ? ' checked' : '') + '> 📥 ' + esc(T('mac.useInbox')) + ' <span class="text-muted">— ' + esc(T('mac.useInboxHint')) + '</span></label></div>'
+      + '<div class="field"><label>' + esc(T('mac.history')) + '</label><select class="select" id="macHist">'
+      + (id ? '<option value="">' + esc(T('mac.histKeep')) + '</option>' : '')
+      + [0, 7, 30, 90, 365].map(function (n) { return '<option value="' + n + '"' + (!id && n === 30 ? ' selected' : '') + '>' + esc(T('mac.hist_' + n)) + '</option>'; }).join('')
+      + '</select><div class="text-muted" style="font-size:12px;">' + esc(T('mac.histHint')) + '</div></div>'
       + '<div class="field"><label>' + esc(T('mac.folders')) + '</label><input class="input" id="macFolders" value="' + esc(a.folders || 'INBOX') + '">'
       + '<div class="text-muted" style="font-size:12px;">' + esc(T('mac.foldersHint')) + '</div></div>'
       + '<div class="field"><label>' + esc(T('mac.allow')) + '</label>' + allow
@@ -85,7 +91,7 @@
       return { id: id, label: $('macLabel').value, provider: $('macProv').value, email: $('macEmail').value.trim(),
         password: $('macPass').value, host: $('macHost').value, port: $('macPort').value, folders: $('macFolders').value,
         use_orders: $('macOrders').checked, use_inbox: $('macInbox').checked, allow_mode: r ? r.value : 'known',
-        allow_list: $('macList2').value, enabled: $('macEnabled').checked };
+        allow_list: $('macList2').value, enabled: $('macEnabled').checked, history_days: $('macHist').value };
     }
     $('macTestBtn').addEventListener('click', function () {
       gas('mailAccountTest', [collect()]).then(function (r) { toastx(r && r.ok ? r.message : ((r && r.err) || 'Eroare'), r && r.ok ? 'ok' : 'err'); });

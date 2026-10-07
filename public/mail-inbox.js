@@ -48,7 +48,7 @@
     if (S.folder === 'sent') return loadSent();
     gas('mailInboxList', [{ kind: 'inbox', q: S.q }]).then(function (r) {
       if (!r || !r.ok) { $('mbxList').innerHTML = '<div class="mbx-empty">' + esc((r && r.err) || T('mb.err')) + '</div>'; return; }
-      S.items = r.items || [];
+      S.items = r.items || []; S.diag = r.diag || null;
       render();
     });
   }
@@ -64,8 +64,30 @@
     }).catch(function () { b.disabled = false; });
   }
 
+  // Üres lista: fiókonként megmondjuk, MIÉRT nincs levél, és mit kell állítani.
+  function emptyHtml() {
+    var d = S.diag;
+    if (!d || !d.length) return '<div class="mbx-empty">' + esc(T('mb.empty')) + '</div>';
+    var fmtD = function (x) { try { return new Date(x).toLocaleDateString(window.I18N && I18N.get() === 'hu' ? 'hu-HU' : 'ro-RO'); } catch (_) { return ''; } };
+    var rows = d.map(function (a) {
+      var why = [];
+      if (!a.enabled) why.push(T('mb.dOff'));
+      else if (!a.use_inbox) why.push(T('mb.dNoInbox'));
+      else if (a.last_error) why.push(T('mb.dError', { e: a.last_error }));
+      else if (!a.last_check) why.push(T('mb.dNotYet'));
+      else {
+        if (a.last_seen === 0) why.push(T('mb.dNoneSince', { d: fmtD(a.since) }));
+        if (a.last_skipped > 0) why.push(T('mb.dSkipped', { n: a.last_skipped }));
+        if (!why.length) why.push(T('mb.dSince', { d: fmtD(a.since) }));
+      }
+      return '<div class="mbx-diag-acc"><b>📬 ' + esc(a.label || '') + '</b><ul>' + why.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul></div>';
+    }).join('');
+    return '<div class="mbx-empty mbx-diag"><div style="font-weight:700;margin-bottom:6px;">' + esc(T('mb.dTitle')) + '</div>' + rows
+      + '<button class="btn primary" type="button" onclick="typeof activateTab===\'function\'&&activateTab(\'integrations\')">⚙️ ' + esc(T('mb.dFix')) + '</button></div>';
+  }
+
   function render() {
-    if (!S.items.length) { $('mbxList').innerHTML = '<div class="mbx-empty">' + esc(T('mb.empty')) + '</div>'; return; }
+    if (!S.items.length) { $('mbxList').innerHTML = emptyHtml(); return; }
     $('mbxList').innerHTML = '<div class="mbx-list">' + S.items.map(function (it) {
       return '<div class="mbx-row' + (it.opened_at ? '' : ' unread') + '" data-id="' + it.id + '" role="button" tabindex="0">'
         + '<div class="mbx-from">' + (it.opened_at ? '' : '<span class="mbx-dot"></span>') + esc(it.from_name || it.from_email)

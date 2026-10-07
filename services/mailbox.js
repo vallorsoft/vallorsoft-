@@ -16,7 +16,7 @@ const intake = require('./email-intake');
 let simpleParser = null;
 try { simpleParser = require('mailparser').simpleParser; } catch (_) { /* npm i mailparser */ }
 
-const MAX_HEADERS_PER_TICK = 200;
+const MAX_HEADERS_PER_TICK = 500;
 const ORDER_REF_RE = /\b([A-Z]{1,10}-\d{4}-\d{1,6})\b/i;
 
 function folderList(acc) {
@@ -64,21 +64,28 @@ async function syncHeaders(pool, acc) {
   const since = acc.since ? new Date(acc.since) : new Date();
   const client = intake.makeClient(cfg);
   await client.connect();
-  let added = 0;
+  let added = 0, seen = 0, skipped = 0;
   try {
     for (const folder of folderList(acc)) {
       let lock;
       try { lock = await client.getMailboxLock(folder); } catch (_) { continue; }
       try {
-        let n = 0;
-        for await (const msg of client.fetch({ since }, { uid: true, envelope: true })) {
-          if (++n > MAX_HEADERS_PER_TICK) break;
+        // A „since" óta érkezett levelek UID-jai; a már ismerteket kihagyjuk,
+        // és a LEGÚJABBAKKAL kezdünk (régen a legrégebbi 200-on ragadt).
+        let uids = [];
+        try { uids = (await client.search({ since }, { uid: true })) || []; } catch (_) { uids = []; }
+        seen += uids.length;
+        if (!uids.length) continue;
+        const known = new Set((await pool.query(
+          'SELECT uid FROM mail_headers WHERE account_id=$1 AND folder=$2', [acc.id, folder])).rows.map((r) => Number(r.uid)));
+        const todo = uids.map(Number).filter((u) => !known.has(u)).sort((a, b) => b - a).slice(0, MAX_HEADERS_PER_TICK);
+        if (!todo.length) continue;
+        for await (const msg of client.fetch(todo.join(','), { uid: true, envelope: true }, { uid: true })) {
           const env = msg.envelope || {};
           const date = env.date ? new Date(env.date) : null;
-          if (date && date < since) continue;
           const from = (env.from && env.from[0]) || {};
           const addr = String(from.address || '').toLowerCase();
-          if (!allow(addr)) continue;            // nem engedélyezett feladó → nem is tároljuk
+          if (!allow(addr)) { skipped++; continue; }   // nem engedélyezett feladó → nem is tároljuk
           const subject = String(env.subject || '').slice(0, 500);
           const refM = ORDER_REF_RE.exec(subject);
           let orderId = null;
@@ -101,7 +108,8 @@ async function syncHeaders(pool, acc) {
       } finally { lock.release(); }
     }
   } finally { await client.logout().catch(() => {}); }
-  return { added };
+  try { await pool.query('UPDATE mail_accounts SET last_seen=$2, last_skipped=$3 WHERE id=$1', [acc.id, seen, skipped]); } catch (_) {}
+  return { added, seen, skipped };
 }
 
 // Egy levél nyers forrása (CSAK a felhasználó kattintására).

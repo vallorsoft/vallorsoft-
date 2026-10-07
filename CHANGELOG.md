@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-10-07 — 📥 Levelek: „üres a lista" javítva — mettől töltse be + miért üres diagnosztika
+
+- **Gyökér (bekötött postafiók, üres lista):** három ok rejtette el csendben a leveleket: (1) a fiók csak a felvétel pillanatától (`since=now()`) töltött be — régi levél sosem; (2) az alapértelmezett „Kiktől: csak ismert feladók" szűrő minden mást kidobott; (3) a régi megrendelés-postafiókból átemelt fiók `use_inbox=false` volt. Ráadásul a lekérdezés a mappa LEGRÉGEBBI 200 levelén ragadt.
+- **`services/mailbox.js` `syncHeaders`**: UID-keresés → a már ismert UID-k kihagyva → a LEGÚJABBAKKAL kezd (max 500/kör); a mappában látott és a szűrő által elrejtett darabszám rögzítve (`db/mail-accounts2-diag.sql`: `last_seen`/`last_skipped`).
+- **Postafiók-űrlap**: új „Mettől töltse be" (csak új / 7 / 30 / 90 nap / 1 év; új fióknál alapból 30 nap), a fiók-kártyán „Mettől" + „legutóbb N levél, ebből M szűrve".
+- **📥 Levelek üres lista**: fiókonként megmondja, MIÉRT üres (kikapcsolva / csak Megrendelésekre állítva / kapcsolódási hiba / még nem kérdezte le / nincs levél a dátum óta / N levelet a szűrő elrejtett) + „Postafiók beállítása" gomb. Csak darabszám, levél-adat nem tárolódik.
+- Teszt: új `tests/unit/mailbox-sync.test.js` (+3). Cache-bust `?v=20261007mbxdiag`.
+
 ## 2026-10-07 — 💬 AI-chat e-mail: teljes formázás + fuvarkártyák a rendszerből + adat-lekérés + félkész-zár
 
 - **Gyökér (képernyőképes eset):** az AI jól értette a kéréseket, de nem volt eszköze → kitalált („keretet adtam" — nem volt keret-opció), és „[Teljes adatok betöltése…]" helykitöltő **ki is ment** az ügyfélnek.
