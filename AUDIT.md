@@ -9,7 +9,7 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
-### 27. lépés — UIT-bizonylat feltöltés (kép / PDF) (2026-10-07, PR #PRNUM) ✅ KÉSZ
+### 27. lépés — UIT-bizonylat feltöltés (kép / PDF) (2026-10-07, PR #509) ✅ KÉSZ
 
 - A UIT-bizonylat MIME-ja eddig csak `image/*` prefix-szel volt szűrve, ami az SVG-t is átengedte (inline kiszolgálva szkriptelhető). Most közös fehérlista (`lib/uitFormat.js` `sanitizeUitPhoto`/`isUitDocMime`: jpeg/png/webp/heic/gif/pdf) a kiolvasásnál, mindkét UIT-mentő route-on és a `comCreate`-ben; base64-ellenőrzés + 8 MB korlát. A letöltés változatlanul `company_id`-szűrt.
 
