@@ -17,6 +17,13 @@ const mockExtract = jest.fn();
 jest.mock('../../lib/geminiJson', () => ({ extractJson: (...a) => mockExtract(...a) }));
 jest.mock('../../handlers/orders', () => ({ comCreate: jest.fn(), comUpdate: jest.fn() }));
 const mockSend = jest.fn(async (req, res) => res.json({ result: { ok: true } }));
+const mockMailerSend = jest.fn(async () => ({ ok: true }));
+const mockClientEmail = jest.fn(async () => ({ ok: true }));
+jest.mock('../../services/email', () => ({
+  getCompanyMailer: async () => ({ ok: true, send: (...a) => mockMailerSend(...a) }),
+  sendClientEmail: (...a) => mockClientEmail(...a),
+  wrapBrandedEmail: (h) => '<wrap>' + h + '</wrap>',
+}));
 const mockData = jest.fn(async (req, res) => res.json({ result: { ok: true,
   attachments: [{ key: 'inv-5', label: 'Factură F 12', kind: 'invoice' }, { key: 'od-3-signed', label: 'CMR — semnat', kind: 'doc' }],
   builder_templates: [{ id: 9, name: 'Napnyugta' }], tracking_available: true } }));
@@ -40,7 +47,7 @@ const ORDER = { id: 'CMD-X1', fuvar_no: 'CMD-2026-0042', client: 'Bilka Steel SR
 beforeEach(() => {
   mockFeatureOn = true;
   mockRules = [{ match: /FROM orders o/, fn: (sql, p) => ({ rows: p[0] === 7 && /CMD-2026-0042|CMD-X1/.test(p[1]) ? [ORDER] : [] }) }];
-  mockDbQuery.mockClear(); mockExtract.mockReset(); mockSend.mockClear(); mockData.mockClear();
+  mockDbQuery.mockClear(); mockExtract.mockReset(); mockSend.mockClear(); mockData.mockClear(); mockMailerSend.mockClear(); mockClientEmail.mockClear();
   mailChat._sendLimiter._reset();
 });
 
@@ -54,14 +61,6 @@ describe('e-mail szándék felismerése', () => {
 });
 
 describe('orderChatTurn — e-mail ág', () => {
-  test('fuvarszám nélkül visszakérdez, AI-hívás nélkül', async () => {
-    const r = await call(orderChat, 'orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'írj levelet az ügyfélnek' }] }]);
-    expect(r.ok).toBe(true);
-    expect(r.mode).toBe('email');
-    expect(r.missing).toContain('order');
-    expect(mockExtract).not.toHaveBeenCalled();
-  });
-
   test('levél-vázlat: címzett a szerverről, ismeretlen csatolmány/sablon eldobva, AI nem kap e-mail címet', async () => {
     mockExtract.mockResolvedValue({ model: 'm', json: { reply: 'Kész.', draft: {
       recipient: 'client', to_email: 'hacker@evil.com', lang: 'ro', subject: 'Factura CMD-2026-0042', body: 'Bună ziua…',
@@ -131,5 +130,53 @@ describe('mailChatSend', () => {
   test('Sofer nem küldhet', async () => {
     const r = await call(mailChat, 'mailChatSend', { ...ADMIN, pozicio: 'Sofer' }, [{ draft: DRAFT }]);
     expect(r.ok).toBe(false);
+  });
+});
+
+describe('fuvar nélküli (általános) levél', () => {
+  const GEN = (draft, reply) => mockExtract.mockResolvedValue({ model: 'm', json: { reply: reply || 'Ok', draft } });
+
+  test('név → a cég saját ügyfél-listájából feloldott cím; AI nem kap listát', async () => {
+    mockRules.push({ match: /FROM clients WHERE company_id/, fn: (sql, p) => ({ rows: p[0] === 7 ? [{ name: 'Bilka Steel SRL', email: 'office@bilka.ro' }] : [] }) });
+    GEN({ recipient: 'named', recipient_name: 'Bilka', subject: 'Capacitate liberă', body: 'Bună ziua…' });
+    const r = await call(orderChat, 'orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'írj egy emailt a Bilkának, hogy jövő héten van szabad kapacitásunk' }] }]);
+    expect(r.ok).toBe(true);
+    expect(r.mode).toBe('email');
+    expect(r.draft.order_id).toBeNull();
+    expect(r.draft.to_email).toBe('office@bilka.ro');
+    expect(r.ready).toBe(true);
+    const sent = mockExtract.mock.calls[0][0];
+    expect(sent.systemPrompt + sent.parts[0].text).not.toContain('office@bilka.ro');
+  });
+
+  test('több találat → választó kérdés, kattintásra a kiválasztott cím', async () => {
+    mockRules.push({ match: /FROM clients WHERE company_id/, rows: [{ name: 'Bilka A', email: 'a@bilka.ro' }, { name: 'Bilka B', email: 'b@bilka.ro' }] });
+    GEN({ recipient: 'named', recipient_name: 'Bilka', subject: 'S', body: 'B' });
+    const r1 = await call(orderChat, 'orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'email a Bilkának' }] }]);
+    expect(r1.draft.to_email).toBeNull();
+    expect(r1.questions[0].options).toEqual(['Bilka A <a@bilka.ro>', 'Bilka B <b@bilka.ro>']);
+    GEN({ recipient: 'named', recipient_name: 'Bilka B', subject: 'S', body: 'B' });
+    const r2 = await call(orderChat, 'orderChatTurn', ADMIN, [{ draft: r1.draft, messages: [
+      { role: 'user', text: 'email a Bilkának' }, { role: 'assistant', text: 'Melyik?' }, { role: 'user', text: 'Bilka B <b@bilka.ro>' }] }]);
+    expect(r2.draft.to_email).toBe('b@bilka.ro');
+    expect(r2.ready).toBe(true);
+  });
+
+  test('ismeretlen név → kéri a címet', async () => {
+    GEN({ recipient: 'named', recipient_name: 'Senki Kft', subject: 'S', body: 'B' });
+    const r = await call(orderChat, 'orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'mail a Senki Kft-nek' }] }]);
+    expect(r.draft.to_email).toBeNull();
+    expect(r.missing).toContain('recipient');
+  });
+
+  test('küldés: a cég saját feladó-fiókjáról, arculattal; teszt a közös címről a saját címre', async () => {
+    const D = { mode: 'email', recipient: 'other', to_email: 'x@y.ro', subject: 'S', body: 'Szia <b>' };
+    const r = await call(mailChat, 'mailChatSend', ADMIN, [{ draft: D }]);
+    expect(r.ok).toBe(true);
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockMailerSend.mock.calls[0][0].to).toBe('x@y.ro');
+    expect(mockMailerSend.mock.calls[0][0].html).toContain('Szia &lt;b&gt;');
+    await call(mailChat, 'mailChatSend', ADMIN, [{ draft: D, test: true }]);
+    expect(mockClientEmail.mock.calls[0][0].to).toBe('a@x.ro');
   });
 });

@@ -14,6 +14,9 @@
 
 ---
 
+## 2026-10-07 — 💬 AI-chat: fuvar nélküli (általános) e-mail is (PR #512)
+- A chat e-mail ága fuvarszám nélkül is ír levelet (ajánlat, tájékoztatás, emlékeztető, bármi): a címzett a beírt e-mail cím, vagy egy név, amit a szerver a cég SAJÁT ügyfél / alvállalkozó / e-mail-kontakt listájából old fel (`company_id`-szűrten; több találatnál választó gombok; az AI a listákat nem kapja meg). Küldés a cég saját feladó-fiókjáról, céges arculattal; teszt a közös címről a saját címre. Tanulás: név → cím (`mail_pref`). Csatolmány/követő-link csak fuvaros levélnél. +4 Jest, cache-bust `?v=20261007ochmail2`.
+
 ## 2026-10-07 — 💬 AI-chat: e-mail a fuvarról ugyanabban a chatben (PR #511)
 - A lebegő 💬 gombbal nyíló chat amit a felhasználó ír, abba kezd: ha e-mailt kér (pl. „küldd el a CMD-2026-0042 megrendelőjének a számlát és a követő-linket emailben"), fuvar-vázlat helyett **levél-vázlat** készül — címzett, tárgy, szöveg, csatolmányok, követő-link, opc. vizuális sablon. Javítás a chatben, a csatolmányok az előnézetben is ki-be kapcsolhatók; **✉️ Teszt magamnak** / **📤 Küldés** (megerősítéssel).
 - Új `handlers/mailChat.js` (`mailChatSend` RPC + az `orderChatTurn` e-mail ága): a fuvar-adatok/csatolmányok a meglévő `getOrderEmailData`-ból, a küldés a meglévő `sendOrderEmail`-en (cég saját SMTP/Brevo, teszt a közös címről). A címzett (ügyfél / alvállalkozó / a felhasználó által beírt cím) a szerveren oldódik fel; az AI e-mail-címet nem kap. Tanulás: `mail_pref` (ügyfélenkénti cím + nyelv) a közös `lib/chatMemory.js`-ben. Rate-limit 20 küldés/óra/felhasználó. Pro csomag (`ai-szoveges-fuvar`). +11 Jest, cache-bust `?v=20261007ochmail`.
