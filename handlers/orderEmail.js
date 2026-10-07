@@ -300,6 +300,14 @@ handlers.sendOrderEmail = async function (req, res, args) {
     var textHtml = bodyText
       ? '<div style="font-size:14px;line-height:1.6;color:#2a2018;white-space:pre-wrap;">' + _esc(bodyText) + '</div>'
       : '';
+    // AI-chat: formázott (jelölt) szöveg + szerver-renderelt fuvarkártyák.
+    // A jelölés escape-elt alapon alakul HTML-lé (lib/mailBody) → nincs injekció.
+    if (a.body_markup === true) {
+      var mData = require('../lib/mailData');
+      var stA = require('../lib/mailStyle').sanitizeStyle(a.style) || {};
+      var cardsHtml = await mData.renderCards(cid, mData.sanitizeCards(a.cards), { lang: a.lang === 'hu' ? 'hu' : 'ro', fields: mData.sanitizeFields(a.card_fields), accent: stA.accent || '#2563eb' });
+      textHtml = (bodyText || cardsHtml) ? require('../lib/mailBody').render(bodyText, { accent: stA.accent, cardsHtml: cardsHtml }) : '';
+    }
     var bodyHtml = builderHtml ? (textHtml + builderHtml) : textHtml;
     if (fieldRows.length) {
       bodyHtml += '<table style="border-collapse:collapse;margin-top:14px;font-size:13px;">' +
@@ -394,7 +402,8 @@ handlers.sendOrderEmail = async function (req, res, args) {
           : ((mailer && mailer.error) || 'Eroare la contul expeditor') } });
       }
       sent = await mailer.send({ to: toEmail, subject: subject, html: realHtml, attachments: attachments, mailType: a.mail_type === 'reply' ? 'reply' : 'order',
-        inReplyTo: a.in_reply_to, references: a.references, orderId: orderId, sentBy: req.session && req.session.user && req.session.user.email });
+        inReplyTo: a.in_reply_to, references: a.references, orderId: orderId,
+        draft: (a.record_draft && typeof a.record_draft === 'object') ? a.record_draft : undefined, sentBy: req.session && req.session.user && req.session.user.email });
     }
 
     audit.fromReq(req, 'order.email_send', 'order', orderId, {

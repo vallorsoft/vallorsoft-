@@ -27,6 +27,8 @@ const { createSlidingWindowLimiter } = require('../lib/slidingWindow');
 const audit = require('../lib/audit');
 const emailSvc = require('../services/email');
 const { appBaseUrl } = require('../lib/appUrl');
+const mailBody = require('../lib/mailBody');
+const mailData = require('../lib/mailData');
 
 const handlers = {};
 const EMAIL_RE = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/;
@@ -75,7 +77,9 @@ function sanitizeMail(d) {
     recipient: rec,
     to_email: to && EMAIL_RE.test(to) ? to : null,
     subject: _str(j.subject, 300),
-    body: j.body == null ? null : String(j.body).slice(0, 8000),
+    body: j.body == null ? null : String(j.body).slice(0, 12000),
+    cards: mailData.sanitizeCards(j.cards),
+    card_fields: mailData.sanitizeFields(j.card_fields),
     lang: j.lang === 'hu' ? 'hu' : (j.lang === 'ro' ? 'ro' : null),
     attachments: (Array.isArray(j.attachments) ? j.attachments : []).map((x) => _str(x, 60)).filter(Boolean).slice(0, MAX_ATT),
     include_tracking: j.include_tracking === true,
@@ -116,23 +120,69 @@ async function _findOrder(cid, ref) {
 
 function _prefKey(o) { return o.client_id ? 'id:' + o.client_id : _fold(o.client); }
 
+// ─── Közös prompt-részek: mit tud a rendszer, hogyan formáz, milyen adatot kérhet ───
+const STYLE_SCHEMA = 'style: the visual look — object with ONLY the keys the dispatcher asks to change: '
+  + '{"accent":"#rrggbb" (header band / lines / buttons / card frames),"bg":"#rrggbb" (outer background),"card":"#rrggbb" (letter background),'
+  + '"text":"#rrggbb","title":"#rrggbb" (company-name color),"border":"#rrggbb" (frame around the whole letter),"border_width":"none|thin|normal|thick",'
+  + '"radius":"none|small|large","logo_bg":"#rrggbb" (background chip behind the logo),'
+  + '"header":"logo|band|name|logo_name|none" (logo = logo only; band = colored band with the logo; name = company name only, no logo; logo_name = logo + company name; none = no header),'
+  + '"align":"left|center","font":"sans|serif|modern|mono","size":"small|normal|large","line":"tight|normal|loose","width":"narrow|normal|wide"}. '
+  + 'Map color words to hex (blue/kék/albastru #2563eb, dark blue/sötétkék #1e3a8a, light blue/világoskék #dbeafe, green/zöld/verde #16a34a, red/piros/roșu #dc2626, '
+  + 'orange/narancs #f6711e, yellow/sárga #facc15, purple/lila #7c3aed, black/fekete #111827, grey/szürke #6b7280, light grey #f3f4f6, white/fehér #ffffff). '
+  + '"frame/keret/chenar around everything" → border (+border_width). Return the previous style unchanged if nothing about the look was asked.';
+
+const BODY_SYNTAX = [
+  'body: the e-mail text in THIS markup (never raw HTML): **bold**, *italic*, __underline__, ~~strike~~, lines starting with "# ", "## ", "### " = headings,',
+  '"- " = bullet list, "1. " = numbered list, "> " = quote, "---" = separator line, [color=#rrggbb]text[/color], [bg=#rrggbb]text[/bg] (highlight),',
+  '[size=small|normal|large|xl]text[/size], [font=sans|serif|modern|mono]text[/font], [center]…[/center], [right]…[/right],',
+  '[box]…[/box] or [box color=#rrggbb]…[/box] (framed colored box), [btn url=https://…]Label[/btn] (button), [label](https://…) (link).',
+  'Use formatting when the dispatcher asks for it (bold, colors, boxes, headings…). Plain text is also fine.',
+].join('\n');
+
+const CARDS_RULES = [
+  'cards: transport-order cards that the SYSTEM inserts into the letter from the database (route, loading, unloading, cargo, vehicle, status…). Use them whenever the dispatcher wants order details in the letter.',
+  '  Format: [{"ref":"CMD-2026-0050"}] or [{"latest":2}] (= the last 2 orders). Short numbers are fine ("050", "2026-049") — the system resolves them.',
+  '  NEVER write order data (dates, routes, weights, plates…) into the body yourself and NEVER write placeholders like "[details…]" — use cards. Put "{{cards}}" in the body where the cards should appear (default: at the end).',
+  'card_fields: which rows the cards show, from ["route","loading","unloading","cargo","vehicle","status","price","km","ref","client"]; null = default (route, loading, unloading, cargo, vehicle, status). Add "price" only if asked.',
+].join('\n');
+
+const DATA_TOOLS = [
+  'data_requests: if you NEED facts from the company system to answer or to write the letter, ask for them here — ONLY what this request needs:',
+  '  {"type":"orders","latest":N} | {"type":"orders","refs":["050","2026-049"]} | {"type":"orders","client":"name","status":"Finalizat","from":"YYYY-MM-DD","to":"YYYY-MM-DD","latest":N}',
+  '  {"type":"order_stats","from":"YYYY-MM-DD","to":"YYYY-MM-DD"} (counts, revenue EUR, km)   {"type":"client","name":"…"} (company data, order count)',
+  '  {"type":"invoices","client":"…","order":"…","unpaid":true}   {"type":"sent_mails","latest":1,"to":"name or address part"} (our previously SENT e-mails: id, subject, text)',
+  '  {"type":"company"} (our own company: name, CUI, address, IBAN, bank — e.g. for payment details)   {"type":"vehicles"} (our fleet plates/types)',
+  '  The system then calls you again with the DATA. Do not guess — request. If DATA is already given below, use it and return "data_requests": [].',
+  'restore_sent_id: the id of a previously SENT e-mail (from DATA sent_mails, "restorable": true) when the dispatcher wants to resend / reuse it — the system loads its exact text, cards and look into the draft. null otherwise.',
+].join('\n');
+
+const HONESTY = [
+  'You CAN: write/rewrite the text with the markup above, change the look via "style", insert order cards, ask for company data, reload a sent e-mail.',
+  'You CANNOT: see received e-mails, attach files that are not offered, use images other than the company logo, animations, or send anything (the dispatcher presses Send).',
+  'If something is not possible, say so briefly in "reply" and offer the closest alternative. NEVER claim a change you did not put into the JSON — the system itself reports what actually changed.',
+  '"reply" = 1-2 short sentences to the dispatcher in THEIR language (Hungarian if they write Hungarian).',
+].join('\n');
+
+const COMMON_RULES = [BODY_SYNTAX, CARDS_RULES, STYLE_SCHEMA, DATA_TOOLS, HONESTY,
+  'Top-level "save_default": true ONLY when the dispatcher asks to keep this look as their default ("mentsd el alapértelmezettnek", "mindig ilyen legyen", "salvează ca implicit"); "reset_default": true to go back to the original look.',
+].join('\n');
+
 function buildGeneralPrompt() {
   return [
-    'You write business e-mails for a Romanian/Hungarian road-freight company (TMS). The dispatcher tells you in free text what e-mail to write. This e-mail is NOT tied to a specific transport order (general message: offer, information, reminder, thanks, anything).',
+    'You write business e-mails for a Romanian/Hungarian road-freight company (TMS). The dispatcher tells you in free text what e-mail to write (offer, information, reminder, thanks, references, order overviews, anything).',
     'Maintain an e-mail DRAFT across the conversation; merge each new message into the previous draft (keep values unless changed).',
-    'recipient: "other" if the dispatcher writes an e-mail address (put it in to_email); otherwise "named" with recipient_name = the company or person name exactly as the dispatcher wrote it (the system looks it up in the customer/subcontractor/contact lists). null if no recipient was mentioned.',
+    'recipient: "other" if the dispatcher writes an e-mail address (put it in to_email); otherwise "named" with recipient_name = the company or person name exactly as written (the system looks it up). Keep the previous recipient if not changed; null if never mentioned.',
     'lang: "ro" by default, "hu" if the dispatcher asks for Hungarian or the recipient is Hungarian.',
-    'Write a short, professional e-mail (greeting, the message, closing without a person name). Never invent prices, dates or facts not given.',
-    'style: visual look of the e-mail that the dispatcher asks to change — object with only the changed keys from {"accent":"#rrggbb","bg":"#rrggbb","card":"#rrggbb","text":"#rrggbb","align":"left|center","header":"logo|band|none","font":"sans|serif","width":"narrow|normal|wide"}. accent = header band / line / link color, bg = outer background, card = letter background. Map color words to hex (blue/kék/albastru #2563eb, dark blue/sötétkék #1e3a8a, green/zöld/verde #16a34a, red/piros/roșu #dc2626, orange/narancs #f6711e, purple/lila #7c3aed, black/fekete #111827, grey/szürke #6b7280, white/fehér #ffffff, light grey #f3f4f6). Return the previous style unchanged if nothing about the look was asked; null if never set.',
-    'Top-level "save_default": true ONLY when the dispatcher asks to keep this look as their default for future e-mails ("mentsd el alapértelmezettnek", "mindig ilyen legyen", "salvează ca implicit"); "reset_default": true when they ask to go back to the original/default VallorSoft look.',
-    'Return ONLY JSON: {"reply":"1-2 short sentences to the dispatcher in THEIR language","save_default":false,"reset_default":false,"draft":{"style":null,"recipient":null,"recipient_name":null,"to_email":null,"lang":"ro","subject":"","body":""},"questions":[{"key":"recipient|other","text":"short question","options":["up to 4 answers"]}]}',
+    'Write a professional e-mail (greeting, the message, closing without a person name). Never invent prices, dates or facts — request DATA or use cards.',
+    COMMON_RULES,
+    'Return ONLY JSON: {"reply":"","save_default":false,"reset_default":false,"data_requests":[],"restore_sent_id":null,"draft":{"style":null,"recipient":null,"recipient_name":null,"to_email":null,"lang":"ro","subject":"","body":"","cards":[],"card_fields":null},"questions":[{"key":"recipient|other","text":"short question","options":["up to 4 answers"]}]}',
     'Ask a question only if really unclear; otherwise "questions": [].',
   ].join('\n');
 }
 
 function buildMailPrompt(o, ctx) {
   return [
-    'You write business e-mails for a Romanian/Hungarian road-freight company (TMS). The dispatcher tells you in free text what e-mail to send about ONE transport order.',
+    'You write business e-mails for a Romanian/Hungarian road-freight company (TMS). The dispatcher tells you in free text what e-mail to send about ONE transport order (more orders can be added as cards).',
     'Maintain an e-mail DRAFT across the conversation; merge each new message into the previous draft (keep values unless changed). Corrections like "more polite", "in Hungarian", "remove the CMR" update only those parts.',
     'ORDER: ' + JSON.stringify({ number: o.fuvar_no, client: o.client, route: [o.loc_incarcare, o.loc_descarcare].filter(Boolean).join(' → '),
       loading_date: o.data_incarcare, unloading_date: o.data_descarcare, status: o.status, reference: o.ref, subcontractor: o.carrier_nev || null }),
@@ -140,23 +190,22 @@ function buildMailPrompt(o, ctx) {
     'SAVED VISUAL TEMPLATES (optional, by id): ' + JSON.stringify(ctx.builders.map((b) => ({ id: b.id, name: b.name }))),
     'Tracking link available: ' + (ctx.tracking ? 'yes' : 'no') + '.',
     'recipient: "client" (the customer who ordered/pays — default for invoices, status, tracking), "carrier" (the subcontractor — order confirmation), or "other" only if the dispatcher writes an e-mail address; then put that address in to_email.',
-    'lang: language of the e-mail — "ro" by default (Romanian customers), "hu" if the dispatcher asks for Hungarian or the customer is Hungarian.',
-    'Write a short, professional e-mail (greeting, 2-5 sentences, closing without a person name). Mention the order number. Do NOT paste the tracking URL yourself — set include_tracking=true when a tracking/status link is wanted. Never invent prices, dates or facts not given.',
+    'lang: "ro" by default, "hu" if the dispatcher asks for Hungarian or the customer is Hungarian.',
+    'Write a professional e-mail (greeting, the content, closing without a person name). Mention the order number. Do NOT paste the tracking URL yourself — set include_tracking=true. Never invent prices, dates or facts.',
     'attachments: keys the dispatcher asks for (e.g. "invoice/számla/factură" → kind invoice; "CMR/aláírt/semnat" → signed doc; "photos/POD" → photo). Empty if none requested.',
-    'style: visual look of the e-mail that the dispatcher asks to change — object with only the changed keys from {"accent":"#rrggbb","bg":"#rrggbb","card":"#rrggbb","text":"#rrggbb","align":"left|center","header":"logo|band|none","font":"sans|serif","width":"narrow|normal|wide"}. accent = header band / line / link color, bg = outer background, card = letter background. Map color words to hex (blue/kék/albastru #2563eb, dark blue/sötétkék #1e3a8a, green/zöld/verde #16a34a, red/piros/roșu #dc2626, orange/narancs #f6711e, purple/lila #7c3aed, black/fekete #111827, grey/szürke #6b7280, white/fehér #ffffff, light grey #f3f4f6). Return the previous style unchanged if nothing about the look was asked; null if never set.',
-    'Top-level "save_default": true ONLY when the dispatcher asks to keep this look as their default for future e-mails ("mentsd el alapértelmezettnek", "mindig ilyen legyen", "salvează ca implicit"); "reset_default": true when they ask to go back to the original/default VallorSoft look.',
-    'Return ONLY JSON: {"reply":"1-2 short sentences to the dispatcher in THEIR language","save_default":false,"reset_default":false,"draft":{"style":null,"recipient":null,"to_email":null,"lang":"ro","subject":"","body":"","attachments":[],"include_tracking":false,"builder_template_id":null},"questions":[{"key":"recipient|other","text":"short question","options":["up to 4 answers"]}]}',
+    COMMON_RULES,
+    'Return ONLY JSON: {"reply":"","save_default":false,"reset_default":false,"data_requests":[],"restore_sent_id":null,"draft":{"style":null,"recipient":null,"to_email":null,"lang":"ro","subject":"","body":"","cards":[],"card_fields":null,"attachments":[],"include_tracking":false,"builder_template_id":null},"questions":[{"key":"recipient|other","text":"short question","options":["up to 4 answers"]}]}',
     'Ask a question only if really unclear; otherwise "questions": [].',
   ].join('\n');
 }
 
 function _conversation(messages, prev) {
   const v = { style: prev.style, recipient: prev.recipient, recipient_name: prev.recipient_name, to_email: prev.recipient === 'other' ? prev.to_email : null, lang: prev.lang,
-    subject: prev.subject, body: prev.body, attachments: prev.attachments, include_tracking: prev.include_tracking,
+    subject: prev.subject, body: prev.body, cards: prev.cards, card_fields: prev.card_fields, attachments: prev.attachments, include_tracking: prev.include_tracking,
     builder_template_id: prev.builder_template_id };
   const lines = ['PREVIOUS DRAFT (JSON):', JSON.stringify(v), '', 'CONVERSATION:'];
   messages.forEach((m) => lines.push((m.role === 'assistant' ? 'ASSISTANT: ' : 'DISPATCHER: ') + m.text));
-  lines.push('', 'Update the e-mail draft with the LAST dispatcher message and answer.');
+  lines.push('', 'Today: ' + new Date().toISOString().slice(0, 10) + '. Update the e-mail draft with the LAST dispatcher message and answer.');
   return lines.join('\n');
 }
 
@@ -245,6 +294,138 @@ function _aiQuestions(out) {
   })).filter((q) => q.text);
 }
 
+// ─── AI-kör adat-kérésekkel: ha az AI adatot kér a cég rendszeréből, a szerver
+//     CSAK azt kéri le (company_id-szűrt, csak-olvasó), és újrahívja az AI-t
+//     az adatokkal. Beérkezett levél tartalma soha nem kerül bele.
+async function _runAi(cid, systemPrompt, convText) {
+  let ai = await extractJson({ systemPrompt, parts: [{ text: convText }] });
+  let out = (ai && ai.json) || {};
+  const reqs = mailData.sanitizeRequests(out.data_requests);
+  let labels = [];
+  if (reqs.length) {
+    const fetched = await mailData.fetchData(cid, reqs);
+    labels = fetched.labels;
+    const text2 = convText + '\n\nDATA FROM THE COMPANY SYSTEM (only what you requested; use it, do not request more):\n' + fetched.json;
+    ai = await extractJson({ systemPrompt, parts: [{ text: text2 }] });
+    out = (ai && ai.json) || {};
+  }
+  return { out, model: ai && ai.model, labels };
+}
+
+function _aiErr(res, e) {
+  const msg = e && e.code === 'NO_KEY' ? 'Serviciul AI nu este configurat.' : String((e && e.message) || 'Eroare AI').slice(0, 300);
+  return res.json({ result: { ok: false, err: msg } });
+}
+
+// „Küldjük újra" — egy korábban ELKÜLDÖTT saját levél vázlatának visszatöltése (cégre szűrt).
+async function _restoreSent(cid, id, d) {
+  const sid = parseInt(id, 10);
+  if (!sid) return false;
+  let row;
+  try { row = (await pool.query('SELECT subject, body_text, draft_json FROM mail_sent WHERE id=$1 AND company_id=$2', [sid, cid])).rows[0]; } catch (_) { return false; }
+  if (!row) return false;
+  const old = row.draft_json ? sanitizeMail(row.draft_json) : null;
+  d.subject = (old && old.subject) || row.subject || d.subject;
+  d.body = (old && old.body) || row.body_text || d.body;
+  if (old && old.cards && old.cards.length) d.cards = old.cards;
+  if (old && old.card_fields) d.card_fields = old.card_fields;
+  if (old && old.style && !d.style) d.style = old.style;
+  return true;
+}
+
+const T2 = {
+  subject: { ro: 'Subiect: „{v}"', hu: 'Tárgy: „{v}"' },
+  body: { ro: 'Textul scrisorii a fost actualizat', hu: 'A levél szövege frissült' },
+  to: { ro: 'Destinatar: {v}', hu: 'Címzett: {v}' },
+  cardsAdd: { ro: 'Carduri curse adăugate: {v}', hu: 'Fuvarkártya bekerült: {v}' },
+  cardsDel: { ro: 'Carduri curse eliminate: {v}', hu: 'Fuvarkártya kivéve: {v}' },
+  fields: { ro: 'Rânduri pe carduri: {v}', hu: 'Kártya-sorok: {v}' },
+  look: { ro: 'Aspect: {v}', hu: 'Kinézet: {v}' },
+  restored: { ro: 'Am reîncărcat e-mailul trimis anterior', hu: 'Visszatöltöttem a korábban elküldött levelet' },
+  data: { ro: 'Date citite din sistem: {v}', hu: 'Adat a rendszerből: {v}' },
+  ph: { ro: 'Text incomplet în scrisoare: {v} — nu se poate trimite așa', hu: 'Félkész rész a levélben: {v} — így nem küldhető' },
+  cardMissing: { ro: 'Nu găsesc cursa {v}', hu: 'Nem találom a(z) {v} fuvart' },
+  cardAmb: { ro: '„{v}" se potrivește cu mai multe curse', hu: '„{v}" több fuvarra is illik' },
+  nothing: { ro: 'Nu s-a schimbat nimic în scrisoare. Formulează altfel, sau spune-mi ce lipsește.', hu: 'A levélben nem változott semmi. Fogalmazd meg másképp, vagy írd le, mi hiányzik.' },
+};
+function t2(lang, k, v) { const e = T2[k] || {}; return String(e[lang === 'hu' ? 'hu' : 'ro'] || '').replace('{v}', v == null ? '' : String(v)); }
+const STYLE_WORDS = {
+  accent: { ro: 'culoare accent', hu: 'kiemelő szín' }, bg: { ro: 'fundal', hu: 'háttér' }, card: { ro: 'fundal scrisoare', hu: 'levél háttere' },
+  text: { ro: 'culoare text', hu: 'szövegszín' }, title: { ro: 'culoare nume firmă', hu: 'cégnév színe' }, border: { ro: 'chenar', hu: 'keret' },
+  border_width: { ro: 'grosime chenar', hu: 'keret vastagsága' }, radius: { ro: 'colțuri', hu: 'sarkok' }, logo_bg: { ro: 'fundal logo', hu: 'logó háttere' },
+  header: { ro: 'antet', hu: 'fejléc' }, align: { ro: 'aliniere', hu: 'igazítás' }, font: { ro: 'font', hu: 'betűtípus' },
+  size: { ro: 'mărime text', hu: 'betűméret' }, line: { ro: 'spațiere', hu: 'sorköz' }, width: { ro: 'lățime', hu: 'szélesség' },
+};
+const DATA_WORDS = { orders: { ro: 'curse', hu: 'fuvar' }, stats: { ro: 'statistici', hu: 'statisztika' }, client: { ro: 'client', hu: 'ügyfél' },
+  invoices: { ro: 'facturi', hu: 'számla' }, sent: { ro: 'e-mail trimis', hu: 'elküldött levél' }, company: { ro: 'date firmă', hu: 'cégadatok' }, vehicles: { ro: 'vehicule', hu: 'jármű' } };
+
+// A ténylegesen megtörtént változások — ezt a SZERVER írja, nem az AI.
+function _changes(prev, d, lang, extra) {
+  const L = lang === 'hu' ? 'hu' : 'ro';
+  const out = [];
+  if (extra.restored) out.push(t2(L, 'restored'));
+  if (d.to_email && d.to_email !== prev.to_email) out.push(t2(L, 'to', d.to_email));
+  if (d.subject && d.subject !== prev.subject) out.push(t2(L, 'subject', d.subject));
+  if ((d.body || '') !== (prev.body || '') && d.body) out.push(t2(L, 'body'));
+  const pr = (prev.cards || []).map((c) => c.ref), nr = (d.cards || []).map((c) => c.ref);
+  const add = nr.filter((r) => !pr.includes(r)), del = pr.filter((r) => !nr.includes(r));
+  if (add.length) out.push(t2(L, 'cardsAdd', add.join(', ')));
+  if (del.length) out.push(t2(L, 'cardsDel', del.join(', ')));
+  if (JSON.stringify(prev.card_fields || null) !== JSON.stringify(d.card_fields || null) && nr.length) out.push(t2(L, 'fields', (d.card_fields || mailData.DEFAULT_FIELDS).join(', ')));
+  const ps = prev.style || {}, ns = d.style || {};
+  const sk = Array.from(new Set(Object.keys(ps).concat(Object.keys(ns)))).filter((k) => ps[k] !== ns[k]);
+  if (sk.length) out.push(t2(L, 'look', sk.map((k) => ((STYLE_WORDS[k] || {})[L] || k) + (ns[k] ? ' = ' + ns[k] : ' ✕')).join(', ')));
+  if (extra.labels && extra.labels.length) out.push(t2(L, 'data', extra.labels.map((x) => (x.n != null ? x.n + ' ' : '') + ((DATA_WORDS[x.k] || {})[L] || x.k)).join(', ')));
+  (extra.cardNotes || []).forEach((n) => out.push(n.type === 'card_ambiguous' ? '⚠️ ' + t2(L, 'cardAmb', n.ref) + ': ' + n.options.join(', ') : '⚠️ ' + t2(L, 'cardMissing', n.ref)));
+  return out;
+}
+const CLAIM_RE = /(frissít|hozzáad|beállít|módosít|átír|elkészít|betett|beraktam|kivettem|eltávolít|megváltoztat|actualiz|am adăugat|am adaugat|am setat|am modificat|am schimbat|am eliminat|i (have )?(updated|added|changed|removed))/i;
+
+// Kártyák feloldása + félkész rész-ellenőrzés + változás-lista + előnézet.
+async function _finish(req, d, prev, out, extra) {
+  const cid = req.session.user.company_id;
+  const lang = d.lang || 'ro';
+  const ex = await mailData.expandCards(cid, d.cards || []);
+  d.cards = ex.cards;
+  const changes = _changes(prev, d, lang, { restored: extra.restored, labels: extra.labels, cardNotes: ex.notes });
+  const ph = mailBody.findPlaceholders(d.body || '');
+  let reply = _str(out.reply, 600) || '';
+  // Az AI nem állíthat olyan változást, ami nem történt meg.
+  if (!changes.length && !extra.styleNotes.length && CLAIM_RE.test(reply)) reply = t2(lang, 'nothing');
+  if (ph.length) changes.push('⛔ ' + t2(lang, 'ph', ph.join(' · ')));
+  const previewHtml = await _previewHtml(req, d).catch(() => '');
+  return { reply, changes, placeholders: ph, previewHtml };
+}
+
+// Előnézet = PONTOSAN az, ami kimegy (valódi logó, cégnév, kártyák, lábléc).
+async function _brand(cid, relative) {
+  let senderName = 'VallorSoft', logoUrl = null;
+  try {
+    const c = await pool.query('SELECT nev FROM companies WHERE id=$1', [cid]);
+    if (c.rows.length && c.rows[0].nev) senderName = c.rows[0].nev;
+    const hl = await pool.query('SELECT 1 FROM company_branding WHERE company_id=$1 AND logo_base64 IS NOT NULL', [cid]);
+    if (hl.rows.length) {
+      if (relative) logoUrl = '/branding/logo/' + cid + '.png';
+      else { const base = appBaseUrl(); if (base) logoUrl = base + '/branding/logo/' + cid + '.png'; }
+    }
+  } catch (_) { /* best-effort */ }
+  return { senderName, logoUrl };
+}
+async function _bodyHtml(cid, d) {
+  const accent = (d.style && d.style.accent) || '#2563eb';
+  const cardsHtml = await mailData.renderCards(cid, d.cards || [], { lang: d.lang, fields: d.card_fields, accent });
+  return mailBody.render(d.body || '', { accent: d.style && d.style.accent, cardsHtml });
+}
+async function _previewHtml(req, d) {
+  if (d.builder_template_id) return '';
+  const cid = req.session.user.company_id;
+  const b = await _brand(cid, true);
+  let inner = await _bodyHtml(cid, d);
+  if (d.include_tracking) inner += '<p style="margin-top:14px;">🌍 <a href="#">' + mailBody.esc(d.lang === 'hu' ? 'Fuvarkövetés' : 'Urmărire transport') + '</a></p>';
+  const html = emailSvc.wrapBrandedEmail(inner, { logoUrl: b.logoUrl, senderName: b.senderName, style: d.style });
+  return emailSvc.appendCompanyFooter(html, cid);
+}
+
 // ─── Kinézet: a felhasználó alapértelmezett stílusa (mentve, amíg másképp nem kéri) ───
 function _styleKey(req) { return 'user:' + req.session.user.id; }
 async function loadUserStyle(req) {
@@ -283,15 +464,11 @@ async function generalTurn(req, res, messages, prev, lang) {
   const cid = req.session.user.company_id;
   const userText = messages.filter((m) => m.role === 'user').map((m) => m.text).join('\n');
   let ai;
-  try {
-    ai = await extractJson({ systemPrompt: buildGeneralPrompt(), parts: [{ text: _conversation(messages, prev) }] });
-  } catch (e) {
-    const msg = e && e.code === 'NO_KEY' ? 'Serviciul AI nu este configurat.' : String((e && e.message) || 'Eroare AI').slice(0, 300);
-    return res.json({ result: { ok: false, err: msg } });
-  }
-  const out = (ai && ai.json) || {};
+  try { ai = await _runAi(cid, buildGeneralPrompt(), _conversation(messages, prev)); } catch (e) { return _aiErr(res, e); }
+  const out = ai.out;
   const d = sanitizeMail(Object.assign({}, out.draft || {}));
   if (!d.lang) d.lang = prev.lang || lang;
+  const restored = await _restoreSent(cid, out.restore_sent_id, d);
   const styleNotes = await applyStyleTurn(req, d, prev, out);
   // A felhasználó egy felkínált „Név <cím>" opcióra kattintott → az a cím (ha tényleg a listából jön).
   const last = messages[messages.length - 1].text;
@@ -305,10 +482,12 @@ async function generalTurn(req, res, messages, prev, lang) {
   } else {
     r = await resolveGeneral(cid, d, prev, userText, lang);
   }
+  const fin = await _finish(req, r.draft, prev, out, { restored, labels: ai.labels, styleNotes });
+  if (fin.placeholders.length) r.missing.push('placeholder');
   const seen = new Set(r.questions.map((q) => q.key));
   const questions = r.questions.concat(_aiQuestions(out).filter((q) => !seen.has(q.key))).slice(0, 3);
-  try { await audit.fromReq(req, 'mail.chat_turn', 'mail', null, { turns: messages.length, ready: !r.missing.length, model: ai.model, general: true }); } catch (_) {}
-  return res.json({ result: { ok: true, mode: 'email', reply: _str(out.reply, 600) || '', draft: r.draft, questions,
+  try { await audit.fromReq(req, 'mail.chat_turn', 'mail', null, { turns: messages.length, ready: !r.missing.length, model: ai.model, general: true, data: ai.labels.map((x) => x.k) }); } catch (_) {}
+  return res.json({ result: { ok: true, mode: 'email', reply: fin.reply, changes: fin.changes, preview_html: fin.previewHtml, placeholders: fin.placeholders, draft: r.draft, questions,
     notes: styleNotes, missing: r.missing, ready: r.missing.length === 0, attachments_avail: [], builders_avail: [], tracking_available: false } });
 }
 
@@ -317,37 +496,39 @@ async function generalTurn(req, res, messages, prev, lang) {
 //     Címzett + tárgy a szerveren (mailbox._replyContext), csak az előnézetbe kerül.
 function buildReplyPrompt() {
   return [
-    'You write a REPLY e-mail body for a Romanian/Hungarian road-freight company. You do NOT see the e-mail being answered — write ONLY from what the dispatcher tells you. Never invent facts, prices, dates or names.',
+    'You write a REPLY e-mail body for a Romanian/Hungarian road-freight company. You do NOT see the e-mail being answered — write ONLY from what the dispatcher tells you (and from company DATA you request). Never invent facts, prices, dates or names.',
     'Maintain the reply DRAFT across the conversation; merge each new message into the previous draft.',
-    'Write a short, professional reply (greeting, the content, closing without a person name). lang: "ro" by default, "hu" if asked.',
-    'style: same rules as before — object with only changed keys from {"accent","bg","card","text" (#rrggbb),"align":"left|center","header":"logo|band|none","font":"sans|serif","width":"narrow|normal|wide"}; previous unchanged if not asked.',
-    'Return ONLY JSON: {"reply":"1-2 short sentences to the dispatcher in THEIR language","save_default":false,"reset_default":false,"draft":{"style":null,"lang":"ro","body":""},"questions":[]}',
+    'Write a professional reply (greeting, the content, closing without a person name). lang: "ro" by default, "hu" if asked.',
+    COMMON_RULES,
+    'Return ONLY JSON: {"reply":"","save_default":false,"reset_default":false,"data_requests":[],"restore_sent_id":null,"draft":{"style":null,"lang":"ro","body":"","cards":[],"card_fields":null},"questions":[]}',
   ].join('\n');
 }
 async function replyTurn(req, res, messages, prev, lang) {
   const ctx = await require('./mailbox')._replyContext(req, prev.reply_mail_id);
   if (!ctx) return res.json({ result: { ok: false, err: 'E-mailul nu a fost găsit.' } });
   let ai;
+  const cid = req.session.user.company_id;
   try {
-    const v = { style: prev.style, lang: prev.lang, body: prev.body };
+    const v = { style: prev.style, lang: prev.lang, body: prev.body, cards: prev.cards, card_fields: prev.card_fields };
     const lines = ['PREVIOUS DRAFT (JSON):', JSON.stringify(v), '', 'CONVERSATION:'];
     messages.forEach((m) => lines.push((m.role === 'assistant' ? 'ASSISTANT: ' : 'DISPATCHER: ') + m.text));
-    ai = await extractJson({ systemPrompt: buildReplyPrompt(), parts: [{ text: lines.join('\n') }] });
-  } catch (e) {
-    const msg = e && e.code === 'NO_KEY' ? 'Serviciul AI nu este configurat.' : String((e && e.message) || 'Eroare AI').slice(0, 300);
-    return res.json({ result: { ok: false, err: msg } });
-  }
-  const out = (ai && ai.json) || {};
+    lines.push('', 'Today: ' + new Date().toISOString().slice(0, 10) + '.');
+    ai = await _runAi(cid, buildReplyPrompt(), lines.join('\n'));
+  } catch (e) { return _aiErr(res, e); }
+  const out = ai.out;
   const d = sanitizeMail(Object.assign({}, out.draft || {}));
   if (!d.lang) d.lang = prev.lang || lang;
+  const restored = await _restoreSent(cid, out.restore_sent_id, d);
   const notes = await applyStyleTurn(req, d, prev, out);
   d.reply_mail_id = ctx.id; d.recipient = 'other'; d.to_email = ctx.to_email; d.recipient_name = ctx.to_name || null;
   const s0 = String(ctx.subject || '');
   d.subject = /^(re|aw)\s*:/i.test(s0) ? s0 : ('Re: ' + s0);
   d.order_id = null; d.attachments = []; d.include_tracking = false;
   const missing = d.body ? [] : ['body'];
+  const fin = await _finish(req, d, prev, out, { restored, labels: ai.labels, styleNotes: notes });
+  if (fin.placeholders.length) missing.push('placeholder');
   try { await audit.fromReq(req, 'mail.chat_turn', 'mail', ctx.id, { turns: messages.length, reply: true, model: ai.model }); } catch (_) {}
-  return res.json({ result: { ok: true, mode: 'email', reply: _str(out.reply, 600) || '', draft: d, questions: [], notes, missing,
+  return res.json({ result: { ok: true, mode: 'email', reply: fin.reply, changes: fin.changes, preview_html: fin.previewHtml, placeholders: fin.placeholders, draft: d, questions: [], notes, missing,
     ready: !missing.length, attachments_avail: [], builders_avail: [], tracking_available: false, reply_to: true } });
 }
 
@@ -375,17 +556,15 @@ async function mailTurn(req, res, a, messages, lang) {
   };
 
   let ai;
-  try {
-    ai = await extractJson({ systemPrompt: buildMailPrompt(o, ctx), parts: [{ text: _conversation(messages, prev) }] });
-  } catch (e) {
-    const msg = e && e.code === 'NO_KEY' ? 'Serviciul AI nu este configurat.' : String((e && e.message) || 'Eroare AI').slice(0, 300);
-    return res.json({ result: { ok: false, err: msg } });
-  }
-  const out = (ai && ai.json) || {};
+  try { ai = await _runAi(cid, buildMailPrompt(o, ctx), _conversation(messages, prev)); } catch (e) { return _aiErr(res, e); }
+  const out = ai.out;
   const d = sanitizeMail(Object.assign({}, out.draft || {}));
   if (!d.lang) d.lang = prev.lang || lang;
+  const restored = await _restoreSent(cid, out.restore_sent_id, d);
   const styleNotes = await applyStyleTurn(req, d, prev, out);
   const r = await resolveMail(cid, d, o, ctx, userText, lang);
+  const fin = await _finish(req, r.draft, prev, out, { restored, labels: ai.labels, styleNotes });
+  if (fin.placeholders.length) r.missing.push('placeholder');
   const aiQ = (Array.isArray(out.questions) ? out.questions : []).slice(0, 2).map((q) => ({
     key: _str(q && q.key, 20) || 'other', text: _str(q && q.text, 300),
     options: (Array.isArray(q && q.options) ? q.options : []).slice(0, 4).map((x) => _str(x, 80)).filter(Boolean),
@@ -394,7 +573,8 @@ async function mailTurn(req, res, a, messages, lang) {
   const questions = r.questions.concat(aiQ.filter((q) => !seen.has(q.key))).slice(0, 3);
   try { await audit.fromReq(req, 'mail.chat_turn', 'order', o.id, { turns: messages.length, ready: !r.missing.length, model: ai.model }); } catch (_) {}
   return res.json({ result: Object.assign(base, {
-    reply: _str(out.reply, 600) || '', draft: r.draft, questions, notes: r.notes.concat(styleNotes), missing: r.missing,
+    reply: fin.reply, changes: fin.changes, preview_html: fin.previewHtml, placeholders: fin.placeholders,
+    draft: r.draft, questions, notes: r.notes.concat(styleNotes), missing: r.missing,
     ready: r.missing.length === 0, attachments_avail: ctx.attachments, builders_avail: ctx.builders,
     tracking_available: ctx.tracking, client: o.client || '',
   }) });
@@ -416,12 +596,19 @@ handlers.mailChatSend = async function (req, res, args) {
       if (!lim.ok) return res.json({ result: { ok: false, err: qt(lang, 'rateLimit') } });
     }
     const cid = req.session.user.company_id;
+    // Félkész rész (helykitöltő) a levélben → valódi küldés tiltva (teszt mehet).
+    const ph = mailBody.findPlaceholders(d.body || '');
+    if (!isTest && ph.length) {
+      return res.json({ result: { ok: false, err: (lang === 'hu' ? 'A levélben félkész rész van, így nem küldhető: ' : 'Scrisoarea conține text incomplet, nu se poate trimite: ') + ph.join(' · ') } });
+    }
+    d.cards = (await mailData.expandCards(cid, d.cards || [])).cards;
     if (d.reply_mail_id) {
       const mb = require('./mailbox');
       const g2 = await mb._gate(req);
       if (g2) return res.json({ result: { ok: false, err: g2 } });
       // Válasz: a címzettet és a tárgyat a szerver adja (a levél feladója), nem a kliens.
-      const r = await require('./mailbox')._sendReply(req, { id: d.reply_mail_id, body: d.body || '', style: d.style, test: isTest });
+      const r = await require('./mailbox')._sendReply(req, { id: d.reply_mail_id, body: d.body || '', style: d.style, test: isTest,
+        markup: true, cards: d.cards, card_fields: d.card_fields, record_draft: _recordable(d) });
       return res.json({ result: r });
     }
     if (!d.order_id) return res.json({ result: await _sendGeneral(req, cid, d, isTest) });
@@ -431,6 +618,7 @@ handlers.mailChatSend = async function (req, res, args) {
       order_id: o.id, to_email: d.to_email, subject: d.subject, body: d.body || '',
       attachments: d.attachments, include_tracking: d.include_tracking,
       builder_template_id: d.builder_template_id, test: isTest, style: d.style,
+      body_markup: true, cards: d.cards, card_fields: d.card_fields, record_draft: _recordable(d), lang: d.lang,
     }]);
     if (r.ok && !isTest) {
       // Tanulás: az ügyfélnek ténylegesen elküldött cím (ha a fuvarhoz kötött ügyfélnek nincs mentett címe).
@@ -448,22 +636,19 @@ handlers.mailChatSend = async function (req, res, args) {
   }
 };
 
+// Az elküldött levél szerkeszthető vázlata (újraküldéshez) — csak tartalom + kinézet.
+function _recordable(d) {
+  return { subject: d.subject, body: d.body, cards: d.cards, card_fields: d.card_fields, style: d.style, lang: d.lang };
+}
+
 // Fuvar nélküli levél küldése: valós → a cég SAJÁT feladó-fiókja; teszt → közös cím a saját címre.
 async function _sendGeneral(req, cid, d, isTest) {
   const u = req.session.user;
   const to = isTest ? String(u.email || '').trim() : d.to_email;
   if (!to || !EMAIL_RE.test(to)) return { ok: false, err: isTest ? 'Adresa dvs. de e-mail lipsește.' : 'E-mail invalid' };
   if (!d.body) return { ok: false, err: 'Mesaj gol.' };
-  let senderName = 'VallorSoft', logoUrl = null;
-  try {
-    const c = await pool.query('SELECT nev FROM companies WHERE id=$1', [cid]);
-    if (c.rows.length && c.rows[0].nev) senderName = c.rows[0].nev;
-    const hl = await pool.query('SELECT 1 FROM company_branding WHERE company_id=$1 AND logo_base64 IS NOT NULL', [cid]);
-    const base = appBaseUrl();
-    if (hl.rows.length && base) logoUrl = base + '/branding/logo/' + cid + '.png';
-  } catch (_) { /* best-effort */ }
-  const esc = (x) => String(x).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]);
-  const bodyHtml = '<div style="font-size:14px;line-height:1.6;white-space:pre-wrap;">' + esc(d.body) + '</div>';
+  const { senderName, logoUrl } = await _brand(cid, false);
+  const bodyHtml = await _bodyHtml(cid, d);
   const subject = d.subject || '(fără subiect)';
   let result;
   if (isTest) {
@@ -475,7 +660,7 @@ async function _sendGeneral(req, cid, d, isTest) {
         ? 'Configurați contul de e-mail (SMTP) în Integrări înainte de a trimite către clienți.'
         : ((mailer && mailer.error) || 'Eroare la contul expeditor') };
     }
-    result = await mailer.send({ to, subject, html: emailSvc.wrapBrandedEmail(bodyHtml, { logoUrl, senderName, style: d.style }), mailType: 'chat', sentBy: req.session && req.session.user && req.session.user.email });
+    result = await mailer.send({ to, subject, html: emailSvc.wrapBrandedEmail(bodyHtml, { logoUrl, senderName, style: d.style }), mailType: 'chat', sentBy: req.session && req.session.user && req.session.user.email, draft: _recordable(d) });
   }
   if (!result || !result.ok) return { ok: false, err: (result && result.error) || 'Eroare la trimitere' };
   if (!isTest) {
@@ -484,6 +669,20 @@ async function _sendGeneral(req, cid, d, isTest) {
   }
   return { ok: true };
 }
+
+// ─── 👁 Előnézet újrarajzolása (a felhasználó a kliensen vett ki kártyát stb.) ───
+handlers.mailChatPreview = async function (req, res, args) {
+  try {
+    const gate = await require('./orderChat')._gate(req);
+    if (gate) return res.json({ result: { ok: false, err: gate } });
+    const d = sanitizeMail(((args && args[0]) || {}).draft);
+    d.cards = (await mailData.expandCards(req.session.user.company_id, d.cards || [])).cards;
+    return res.json({ result: { ok: true, preview_html: await _previewHtml(req, d), placeholders: mailBody.findPlaceholders(d.body || '') } });
+  } catch (e) {
+    console.error('mailChatPreview hiba:', e && e.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
 
 // ─── ⭐ Kinézet mentése alapértelmezettként / visszaállítás (gombról) ───
 // args[0]: { draft, reset }
@@ -517,5 +716,7 @@ Object.defineProperty(handlers, 'mailTurn', { value: mailTurn, enumerable: false
 Object.defineProperty(handlers, 'isEmailIntent', { value: isEmailIntent, enumerable: false });
 Object.defineProperty(handlers, '_sanitizeMail', { value: sanitizeMail, enumerable: false });
 Object.defineProperty(handlers, '_sendLimiter', { value: sendLimiter, enumerable: false });
+Object.defineProperty(handlers, '_changes', { value: _changes, enumerable: false });
+Object.defineProperty(handlers, '_finish', { value: _finish, enumerable: false });
 
 module.exports = handlers;

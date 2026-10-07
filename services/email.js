@@ -333,7 +333,7 @@ function wrapBrandedEmail(bodyHtml, opts) {
   if (opts.style) return require('../lib/mailStyle').renderStyled(bodyHtml, opts.style, opts);
   const senderName = opts.senderName || 'VallorSoft';
   // Logo csak biztonságos URL-sémával kerülhet a levélbe (markup-injektálás ellen)
-  const safeLogo = opts.logoUrl && /^(https?:\/\/|data:image\/)/i.test(String(opts.logoUrl)) ? String(opts.logoUrl) : null;
+  const safeLogo = opts.logoUrl && /^(https?:\/\/|data:image\/|\/branding\/logo\/\d+\.png$)/i.test(String(opts.logoUrl)) ? String(opts.logoUrl) : null;
   const header = safeLogo
     ? `<img src="${escHtml(safeLogo)}" alt="${escHtml(senderName)}" style="max-height:48px;max-width:220px;display:block;margin-bottom:16px;">`
     : `<div style="font-size:24px;font-weight:800;margin-bottom:16px;"><span style="color:#2a2018;">vallor</span><span style="color:#f6711e;">Soft</span></div>`;
@@ -549,6 +549,10 @@ function _appendToSent(companyId, mailOpts, ctx) {
 // 📤 Elküldött-nyilvántartás (mail_sent): a cég fiókjáról kiment levél
 // címzettje/tárgya/szövege + csatolmány-NEVEK — az alkalmazás Elküldött
 // mappájához és a levélszálhoz. Best-effort, a küldést sosem akasztja meg.
+function _draftJson(d) {
+  if (!d || typeof d !== 'object') return null;
+  try { const j = JSON.stringify(d); return j.length <= 30000 ? j : null; } catch (_) { return null; }
+}
 function _recordSent(companyId, rec) {
   if (!companyId) return;
   try {
@@ -556,14 +560,15 @@ function _recordSent(companyId, rec) {
     const irt = _cleanMsgIds(rec.inReplyTo).split(' ')[0] || null;
     const mid = _cleanMsgIds(rec.messageId).split(' ')[0] || null;
     Promise.resolve(db.query(
-      `INSERT INTO mail_sent (company_id, from_email, to_email, subject, body_text, attachments, mail_type, status, error, method, message_id, in_reply_to, order_id, sent_by)
-       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11,$12,$13,$14)`,
+      `INSERT INTO mail_sent (company_id, from_email, to_email, subject, body_text, attachments, mail_type, status, error, method, message_id, in_reply_to, order_id, sent_by, draft_json)
+       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb)`,
       [companyId, rec.from ? String(rec.from).slice(0, 255) : null, rec.to ? String(rec.to).slice(0, 2000) : null,
         String(rec.subject || '').slice(0, 500), String(rec.text || '').slice(0, 60000),
         JSON.stringify((rec.attachments || []).map((a) => String(a.name || a.filename || '').slice(0, 200)).filter(Boolean).slice(0, 30)),
         rec.mailType ? String(rec.mailType).slice(0, 30) : null, rec.ok ? 'sent' : 'failed',
         rec.ok ? null : String(rec.error || '').slice(0, 300), rec.method || null, mid, irt,
-        rec.orderId ? String(rec.orderId).slice(0, 40) : null, rec.sentBy ? String(rec.sentBy).slice(0, 255) : null]))
+        rec.orderId ? String(rec.orderId).slice(0, 40) : null, rec.sentBy ? String(rec.sentBy).slice(0, 255) : null,
+        _draftJson(rec.draft)]))
       .catch((e) => console.warn('[email] mail_sent mentés hiba:', e.message));
   } catch (e) { console.warn('[email] mail_sent mentés hiba:', e.message); }
 }
@@ -603,7 +608,7 @@ async function getCompanyMailer(companyId) {
     // Csatolmányok (opcionális): [{ name, contentBase64 }].
     const atts = Array.isArray(opts.attachments) ? opts.attachments.filter(a => a && a.contentBase64 && a.name) : [];
     const rec = { from: fromEmail, to: opts.to, subject: subject, text: htmlToPlainText(opts.html || ''), attachments: atts,
-      mailType: mtype, inReplyTo: opts.inReplyTo, orderId: opts.orderId, sentBy: opts.sentBy };
+      mailType: mtype, inReplyTo: opts.inReplyTo, orderId: opts.orderId, sentBy: opts.sentBy, draft: opts.draft };
     try {
       if (method === 'smtp') {
         const mailOpts = {

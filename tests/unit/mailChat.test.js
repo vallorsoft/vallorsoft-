@@ -214,7 +214,7 @@ describe('kinézet: színek/elrendezés + alapértelmezett', () => {
   test('a stílus a küldésbe is bekerül (általános levél)', async () => {
     const D = { mode: 'email', recipient: 'other', to_email: 'x@y.ro', subject: 'S', body: 'B', style: { accent: '#16a34a', header: 'band' } };
     await call(mailChat, 'mailChatSend', ADMIN, [{ draft: D }]);
-    expect(mockMailerSend.mock.calls[0][0].html).toBe('<wrap><div style="font-size:14px;line-height:1.6;white-space:pre-wrap;">B</div></wrap>');
+    expect(mockMailerSend.mock.calls[0][0].html).toBe('<wrap><div>B</div></wrap>');
   });
 
   test('fuvaros levélnél a sendOrderEmail megkapja a stílust', async () => {
@@ -244,5 +244,63 @@ describe('kötelező céges lábléc + kontraszt', () => {
     const h = ms.renderStyled('x', { card: '#111827', text: '#1f2937', accent: '#fde68a', header: 'band' }, {});
     expect(h).toContain('color:#ffffff;');          // sötét lapon fehér szöveg
     expect(h).toContain('background:#fde68a;color:#111827'); // világos sávon sötét felirat
+  });
+});
+
+describe('adat a rendszerből + fuvarkártyák + félkész-zár + őszinte visszajelzés', () => {
+  const O50 = { id: 'X50', fuvar_no: 'CMD-2026-0050', client: 'Bilka', status: 'Finalizat', loc_incarcare: 'Arad', loc_descarcare: 'München' };
+  const O49 = { id: 'X49', fuvar_no: 'CMD-2026-0049', client: 'Bilka', status: 'Finalizat', loc_incarcare: 'Cluj', loc_descarcare: 'Wien' };
+
+  test('adat-kérés → a szerver CSAK azt kéri le, és újrahívja az AI-t az adatokkal', async () => {
+    mockRules.unshift({ match: /ORDER BY o\.created_at DESC LIMIT \$2/, rows: [O50, O49] });
+    mockExtract
+      .mockResolvedValueOnce({ model: 'm', json: { reply: '', data_requests: [{ type: 'orders', latest: 2 }], draft: {} } })
+      .mockResolvedValueOnce({ model: 'm', json: { reply: 'Kész', draft: { recipient: 'other', to_email: 'p@x.ro', subject: 'Referenciák', body: 'Kedves Norbert,\n{{cards}}', cards: [{ ref: 'CMD-2026-0050' }, { ref: 'CMD-2026-0049' }] } } });
+    mockRules.unshift({ match: /UPPER\(o\.id\)=\$2/, fn: (sql, p) => ({ rows: [O50, O49].filter((o) => o.fuvar_no === p[1]) }) });
+    const r = await call(orderChat, 'orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'küldj emailt a p@x.ro címre a legutóbbi 2 fuvarral' }] }]);
+    expect(r.ok).toBe(true);
+    expect(mockExtract).toHaveBeenCalledTimes(2);
+    expect(mockExtract.mock.calls[1][0].parts[0].text).toContain('CMD-2026-0050');
+    expect(r.draft.cards.map((c) => c.ref)).toEqual(['CMD-2026-0050', 'CMD-2026-0049']);
+    expect(r.changes.join('\n')).toMatch(/Fuvarkártya bekerült|Carduri/);
+    expect(r.ready).toBe(true);
+  });
+
+  test('helykitöltő a szövegben → nem kész + valódi küldés tiltva', async () => {
+    mockExtract.mockResolvedValue({ model: 'm', json: { reply: 'Frissítettem', draft: { recipient: 'other', to_email: 'p@x.ro', subject: 'S', body: 'Részletek: [Teljes adatok betöltése...]' } } });
+    const r = await call(orderChat, 'orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'email a p@x.ro címre' }] }]);
+    expect(r.ready).toBe(false);
+    expect(r.missing).toContain('placeholder');
+    const s = await call(mailChat, 'mailChatSend', ADMIN, [{ draft: r.draft }]);
+    expect(s.ok).toBe(false);
+    expect(mockMailerSend).not.toHaveBeenCalled();
+  });
+
+  test('az AI nem állíthat valótlant: ha semmi nem változott, a rendszer szól', async () => {
+    const D = { mode: 'email', recipient: 'other', to_email: 'p@x.ro', subject: 'S', body: 'B' };
+    mockExtract.mockResolvedValue({ model: 'm', json: { reply: 'Hozzáadtam a keretet.', draft: { recipient: 'other', to_email: 'p@x.ro', subject: 'S', body: 'B' } } });
+    const r = await call(orderChat, 'orderChatTurn', ADMIN, [{ draft: D, messages: [{ role: 'user', text: 'tegyél animált fejlécet a p@x.ro levélre' }] }]);
+    expect(r.reply).not.toMatch(/Hozzáadtam/);
+    expect(r.reply).toMatch(/nem változott|Nu s-a schimbat/);
+  });
+
+  test('keret kérésre a kinézet ténylegesen változik, és a rendszer jelzi', async () => {
+    const D = { mode: 'email', recipient: 'other', to_email: 'p@x.ro', subject: 'S', body: 'B' };
+    mockExtract.mockResolvedValue({ model: 'm', json: { reply: 'Kész', draft: { recipient: 'other', to_email: 'p@x.ro', subject: 'S', body: 'B', style: { border: '#2563eb', header: 'name' } } } });
+    const r = await call(orderChat, 'orderChatTurn', ADMIN, [{ draft: D, lang: 'hu', messages: [{ role: 'user', text: 'keretet az egész köré a p@x.ro levélnél, csak a cégnév legyen fent' }] }]);
+    expect(r.draft.style).toEqual(expect.objectContaining({ border: '#2563eb', header: 'name' }));
+    expect(r.changes.join(' ')).toMatch(/keret|chenar/);
+  });
+
+  test('küldés: formázott szöveg + kártyák a levélben', async () => {
+    mockRules.unshift({ match: /UPPER\(o\.id\)=\$2/, fn: (sql, p) => ({ rows: [O50].filter((o) => o.fuvar_no === p[1]) }) });
+    const D = { mode: 'email', recipient: 'other', to_email: 'x@y.ro', subject: 'S', body: '**Szia**\n{{cards}}', cards: [{ ref: 'CMD-2026-0050' }] };
+    const r = await call(mailChat, 'mailChatSend', ADMIN, [{ draft: D }]);
+    expect(r.ok).toBe(true);
+    const html = mockMailerSend.mock.calls[0][0].html;
+    expect(html).toContain('<strong>Szia</strong>');
+    expect(html).toContain('CMD-2026-0050');
+    expect(html).toContain('Arad');
+    expect(mockMailerSend.mock.calls[0][0].draft.cards).toEqual([{ ref: 'CMD-2026-0050' }]);
   });
 });

@@ -275,15 +275,16 @@ async function sendReply(req, a) {
   if (!bodyText.trim() && !a.builder_template_id) return { ok: false, err: 'Mesaj gol.' };
   const subj0 = String(h.subject || '').trim();
   const subject = (/^(re|aw|răsp)\s*:/i.test(subj0) ? subj0 : 'Re: ' + subj0).slice(0, 300) || 'Re:';
-  let body = bodyText;
+  let quote = '';
   if (a.quote !== false) {
     try {
       const m = await mailbox.readMessage(h.acc, h.folder, h.uid);
       const when = h.received_at ? new Date(h.received_at).toLocaleString('ro-RO') : '';
-      body += '\n\n' + when + ', ' + (h.from_name || h.from_email) + ':\n' +
+      quote = '\n\n' + when + ', ' + (h.from_name || h.from_email) + ':\n' +
         String(m.text || '').slice(0, 6000).split('\n').map((l) => '> ' + l).join('\n');
     } catch (_) { /* idézet nélkül is megy */ }
   }
+  const body = bodyText + quote;
   const refs = [h.refs, h.message_id].filter(Boolean).join(' ');
   let r;
   if (h.order_id) {
@@ -295,6 +296,7 @@ async function sendReply(req, a) {
         attachments: Array.isArray(a.attachments) ? a.attachments : [], include_tracking: a.include_tracking === true,
         builder_template_id: a.builder_template_id, style: a.style, test: isTest,
         in_reply_to: h.message_id, references: refs, mail_type: 'reply',
+        body_markup: a.markup === true, cards: a.cards, card_fields: a.card_fields, record_draft: a.record_draft,
       }])).catch(() => resolve({ ok: false, err: 'Eroare de server' }));
     });
   } else {
@@ -306,15 +308,26 @@ async function sendReply(req, a) {
       if (hl.rows.length && appBaseUrl()) logoUrl = appBaseUrl() + '/branding/logo/' + cid + '.png';
     } catch (_) {}
     const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
-    const html = '<div style="font-size:14px;line-height:1.6;white-space:pre-wrap;">' + esc(body) + '</div>';
     const style = require('../lib/mailStyle').sanitizeStyle(a.style);
+    let html;
+    if (a.markup === true) {
+      // AI-chat: formázott szöveg + fuvarkártyák; az idézett levél sima, escape-elt szöveg marad.
+      const mData = require('../lib/mailData');
+      const accent = (style && style.accent) || '#2563eb';
+      const cardsHtml = await mData.renderCards(cid, mData.sanitizeCards(a.cards), { fields: mData.sanitizeFields(a.card_fields), accent });
+      html = require('../lib/mailBody').render(bodyText, { accent: style && style.accent, cardsHtml })
+        + (quote ? '<div style="font-size:13px;line-height:1.5;color:#4b5563;white-space:pre-wrap;margin-top:12px;">' + esc(quote.trim()) + '</div>' : '');
+    } else {
+      html = '<div style="font-size:14px;line-height:1.6;white-space:pre-wrap;">' + esc(body) + '</div>';
+    }
     let sent;
     if (isTest) {
       sent = await emailSvc.sendClientEmail({ to: u.email, subject, html, senderName, logoUrl, style, companyId: cid, mailType: 'reply_test' });
     } else {
       const mailer = await emailSvc.getCompanyMailer(cid);
       if (!mailer || !mailer.ok) return { ok: false, err: (mailer && mailer.noConfig) ? 'Configurați contul expeditor (SMTP) în Integrări.' : ((mailer && mailer.error) || 'Eroare la contul expeditor') };
-      sent = await mailer.send({ to: h.from_email, subject, html: emailSvc.wrapBrandedEmail(html, { logoUrl, senderName, style }), mailType: 'reply', inReplyTo: h.message_id, references: refs, sentBy: u.email });
+      sent = await mailer.send({ to: h.from_email, subject, html: emailSvc.wrapBrandedEmail(html, { logoUrl, senderName, style }), mailType: 'reply', inReplyTo: h.message_id, references: refs, sentBy: u.email,
+        draft: (a.record_draft && typeof a.record_draft === 'object') ? a.record_draft : undefined });
     }
     r = sent && sent.ok ? { ok: true } : { ok: false, err: (sent && sent.error) || 'Eroare la trimitere' };
   }
