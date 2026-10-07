@@ -113,3 +113,33 @@ describe('lib/geminiJson', () => {
     delete process.env.GEMINI_MODELS;
   });
 });
+
+describe('lib/geminiJson — elérhető modellek (ListModels)', () => {
+  const g = require('../../lib/geminiJson');
+  const origFetch = global.fetch;
+  beforeEach(() => { process.env.GEMINI_API_KEY = 'k'; process.env.GEMINI_LIST_IN_TEST = '1'; g._resetAvail(); });
+  afterAll(() => { delete process.env.GEMINI_LIST_IN_TEST; global.fetch = origFetch; });
+
+  test('a kivont modelleket kihagyja, az új flash-modelleket hozzáveszi', async () => {
+    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ models: [
+      { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-3-flash', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-3-flash-preview', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/text-embedding-004', supportedGenerationMethods: ['embedContent'] },
+    ] }) }));
+    const chain = await g.resolveChain(['gemini-1.5-flash', 'gemini-2.5-flash']);
+    expect(chain).toEqual(['gemini-2.5-flash', 'gemini-3-flash']);
+  });
+
+  test('ha a lista nem kérhető le, marad az eredeti lánc', async () => {
+    global.fetch = jest.fn(async () => ({ ok: false, status: 403 }));
+    expect(await g.resolveChain(['a', 'b'])).toEqual(['a', 'b']);
+  });
+
+  test('minden modell 404 → érthető üzenet, nem „kvóta”', async () => {
+    delete process.env.GEMINI_LIST_IN_TEST;
+    global.fetch = jest.fn(async () => ({ ok: false, status: 404, text: async () => '{}' }));
+    await expect(g.extractJson({ systemPrompt: 's', parts: [{ text: 'x' }], models: ['m1', 'm2'] }))
+      .rejects.toThrow(/Niciun model AI nu este disponibil/);
+  });
+});
