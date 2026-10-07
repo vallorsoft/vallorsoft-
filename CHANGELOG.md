@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-10-07 — ÚJ: 💬 Szöveges fuvarkiírás (AI-chat), Pro csomagtól (PR #506)
+- A Fuvar kiírás tetején új „💬 Szöveges fuvarkiírás (AI)" gomb (admin + manager) → chat-ablak: a diszpécser szabad szöveggel leírja a fuvart, az AI összeállítja, ami nem egyértelmű, arra kattintható válaszgombokkal rákérdez; a javítás is a chatben megy („a második lerakás csütörtök").
+- Jobb oldalt a TELJES fuvar EGYBEN látszik (megrendelő, minden állomás sorrendben dátum + nap-névvel, áru, sofőr, vontató, pótkocsi, ár, km, hiányzó tételek) — nem lépésenként. Mentés: „✅ Fuvar mentése" → a meglévő `comCreate` (fuvar-szám, multi-stop, auto-párosítás változatlan).
+- **Megrendelő CUI-val:** ha még nincs ilyen ügyfél, ANAF-lekérdezéssel a teljes cégadat bekerül és **elmentődik az ügyfelek közé**, a fuvar ehhez kötődik (`orders.client_id`). Meglévő CUI → nincs új ügyfél.
+- Szerver-oldali feloldás (`handlers/orderChat.js`: `orderChatTurn` / `orderChatCreate`): sofőr név szerint (ékezet-független, több találatnál kérdez), sofőrhöz rendelt vontató + alap pótkocsi, mentett helyszín, automatikus útvonal-km; relatív napok (hétfő/kedd) a mai dátumból (Bukarest). Az AI-hoz CSAK a beszélgetés + vázlat megy — a sofőr-/jármű-/ügyfél-lista nem.
+- Csomag-kapu `ai-szoveges-fuvar` (Pro/Business; Alap+Standard KI — `db/order-chat-plan-feature.sql`), developer cégenként felülírhatja. Új `public/order-chat.js`, ~45 `och.*` i18n (RO+HU), CSS `#ochModal` (világos+sötét, mobil). +16 Jest; valós Postgres 16-on végig-tesztelve.
+
 ## 2026-10-01 — Sofőr-elszámolás: diurnás napok (benti / kinti) a sofőr kártyáján (PR #505)
 - `getDriverBalance` új `diurna_days` mező: a sofőr menetleveleiből a kiválasztott időszakra (beírt út-dátum, `eff_date`) összegzett `diurna_interna` / `diurna_externa` + menetlevél-szám; cég-horgony (`company_id`, fallback users-join), best-effort.
 - A részletes sofőr-nézet egyenleg-kártyáján új sor: 🗓️ Diurnás napok — 🏠 Benti / 🌍 Kinti / Σ nap (N menetlevél). Csak kijelzés, nyomtatványba nem kerül. Új `fe.dc.dd*` i18n (RO+HU), cache-bust `?v=20261001ddays`.

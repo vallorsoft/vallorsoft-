@@ -110,6 +110,9 @@ function applyFeatureFlags(){
       // (handlers/orderScan.js) is ezt a kulcsot kapuzza.
       var _scanBtn=document.getElementById('ordScanBtnBox');
       if(_scanBtn) _scanBtn.style.display = (feats['ai-kiolvasas']===false) ? 'none' : '';
+      // 💬 Szöveges fuvarkiírás (AI-chat) — Pro csomagtól (handlers/orderChat.js is kapuzza)
+      var _chatBtn=document.getElementById('ordChatBtnBox');
+      if(_chatBtn) _chatBtn.style.display = (feats['ai-szoveges-fuvar']===false) ? 'none' : '';
     }
     // A sidebar láthatóság (csomag-kapcsoló + sofőr-mód) egy közös számításból —
     // akkor is lefut (sofőr-mód szűrő), ha a funkció-lekérés hibázott.
