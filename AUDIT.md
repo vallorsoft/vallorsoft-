@@ -9,6 +9,12 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 34. lépés — AI-chat e-mail: formázás, fuvarkártyák, adat-lekérés (2026-10-07) ✅ KÉSZ
+
+- **Injekció ellen:** a levél-jelölés (`lib/mailBody`) teljes escape után csak fehérlistás jelölést alakít HTML-lé; URL csak `http(s)`/`mailto`, szín csak `#rrggbb`; a kinézet fehérlistás (`lib/mailStyle`). A fuvarkártya escape-elt DB-adatból, szerveren renderelődik.
+- **Adat-minimalizálás:** az AI csak a kérdéshez kért adatot kapja, fehérlistás kérés-típusokon (max. 4/kör, kompakt JSON ≤ 9 KB), mind `company_id`-szűrt és csak-olvasó; e-mail cím/telefon/sofőr-személyes adat/beérkezett levél tartalma soha. A régi szabály (címzett feloldása szerveren) változatlan.
+- **Félkész levél nem mehet ki:** szerveroldali zár a valódi küldésen (minden úton: általános / fuvaros / válasz).
+
 ### 33. lépés — 📤 Elküldött levelek + levélszál (2026-10-07) ✅ KÉSZ
 
 - `mail_sent` CSAK a cég saját kimenő leveleit tárolja (szöveg + csatolmány-NÉV, a csatolmány tartalma nem); a beérkezett levelek tartalma továbbra sem kerül DB-be, a szálban csak fejléc. Az AI ezt a táblát nem olvassa.

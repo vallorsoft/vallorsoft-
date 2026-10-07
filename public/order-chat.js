@@ -131,7 +131,7 @@
     if (!box) return;
     var h = '<div class="och-msg ai">' + esc(T('och.welcome')) + '<div class="och-mut" style="margin-top:6px;">✏️ ' + esc(T('och.editHint')) + '</div><div class="och-mut" style="margin-top:4px;">✉️ ' + esc(T('och.mailHint')) + '</div></div>';
     S.messages.forEach(function (m) {
-      h += '<div class="och-msg ' + (m.role === 'assistant' ? 'ai' : 'me') + (m.err ? ' err' : '') + '">' + esc(m.text).replace(/\n/g, '<br>') + '</div>';
+      h += '<div class="och-msg ' + (m.role === 'assistant' ? 'ai' : 'me') + (m.err ? ' err' : '') + (m.sys ? ' sys' : '') + '">' + esc(m.text).replace(/\n/g, '<br>') + '</div>';
     });
     if (S.busy) h += '<div class="och-msg ai busy"><span class="och-dots"><i></i><i></i><i></i></span> ' + esc(T('och.thinking')) + '</div>';
     if (S.ready && !S.saved && !S.busy) {
@@ -278,7 +278,13 @@
         S.missing = r.missing || [];
         S.ready = !!r.ready;
         S.mail = r.mode === 'email' ? { att: r.attachments_avail || [], builders: r.builders_avail || [], tracking: !!r.tracking_available, client: r.client || '' } : null;
+        S.mailHtml = r.mode === 'email' ? (r.preview_html || '') : '';
+        S.placeholders = r.placeholders || [];
         if (r.reply) S.messages.push({ role: 'assistant', text: r.reply });
+        // A ténylegesen megtörtént változások — a rendszer írja, nem az AI.
+        if (r.changes && r.changes.length) {
+          S.messages.push({ role: 'assistant', sys: true, text: r.changes.map(function (c) { return /^[⛔⚠️]/.test(c) ? c : '✅ ' + c; }).join('\n') });
+        }
       }
       renderAll();
     }).catch(function (e) {
@@ -390,7 +396,15 @@
     }
     var inner = (d.body ? esc(d.body).replace(/\n/g, '<br>') : '<span class="och-miss">' + esc(T('och.none')) + '</span>')
       + (d.include_tracking ? '<div style="margin-top:8px;opacity:.75;">🌍 ' + esc(T('och.trackingLine')) + '</div>' : '');
-    var body = d.builder_template_id ? '<div class="och-mail-body">' + inner + '</div>' : _styledPreview(inner, d.style);
+    var body = d.builder_template_id ? '<div class="och-mail-body">' + inner + '</div>'
+      : (S.mailHtml ? '<div class="och-mail-real">' + S.mailHtml + '</div>' : _styledPreview(inner, d.style));
+    var cardsH = (d.cards || []).map(function (c) {
+      return '<span class="och-uit-chip">🚚 ' + esc(c.ref) + ' <button type="button" onclick="OrderChat.mailToggle(\'card\',\'' + esc(c.ref) + '\')" title="✕">✕</button></span>';
+    }).join('');
+    if (cardsH) body = '<div class="och-mut" style="margin:0 0 6px;">' + esc(T('och.cards')) + ': ' + cardsH + '</div>' + body;
+    if (S.placeholders && S.placeholders.length) {
+      body = '<div class="och-missbox">⛔ ' + esc(T('och.phBlock')) + ': <b>' + S.placeholders.map(esc).join(' · ') + '</b></div>' + body;
+    }
     var lookBtns = '<div class="och-look">'
       + (d.style_default ? '<span class="och-badge ok">⭐ ' + esc(T('och.lookDefault')) + '</span>' : '<button type="button" class="och-att" onclick="OrderChat.mailSaveLook()">⭐ ' + esc(T('och.lookSave')) + '</button>')
       + ' <button type="button" class="och-att" onclick="OrderChat.mailResetLook()">↺ ' + esc(T('och.lookReset')) + '</button>'
@@ -468,8 +482,16 @@
       d.attachments = l;
     } else if (what === 'trk') d.include_tracking = !d.include_tracking;
     else if (what === 'tpl') d.builder_template_id = null;
+    else if (what === 'card') d.cards = (d.cards || []).filter(function (c) { return c.ref !== key; });
     S.draft = d;
     renderPrev();
+    if (what === 'card' || what === 'trk') mailRefreshPreview();
+  }
+  // Az előnézet újrarajzolása a szerverről (kártya kivétele / követő-link után).
+  function mailRefreshPreview() {
+    window.gas('mailChatPreview', [{ draft: S.draft }]).then(function (r) {
+      if (r && r.ok) { S.mailHtml = r.preview_html || ''; S.placeholders = r.placeholders || []; renderPrev(); }
+    });
   }
   function mailSend(test) {
     var d = S.draft || {};

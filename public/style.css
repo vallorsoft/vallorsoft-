@@ -5076,6 +5076,10 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #ochModal .och-msg.ai{ background:var(--och-ai); color:var(--och-text); border-top-left-radius:4px; align-self:flex-start; }
 #ochModal .och-msg.me{ background:var(--och-me); color:#fff; border-top-right-radius:4px; align-self:flex-end; }
 #ochModal .och-msg.err{ background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+#ochModal .och-msg.sys{ background:#ecfdf5; color:#065f46; border:1px solid #86efac; font-size:13px; }
+#ochModal .och-mail-real{ border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; background:#ffffff; color:#111827; }
+#ochModal .och-mail-real a{ pointer-events:none; }
+#ochModal .och-mail-real img{ max-width:100%; }
 #ochModal .och-msg.ok{ background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; font-weight:700; }
 #ochModal .och-dots i{ display:inline-block; width:6px; height:6px; margin-right:3px; border-radius:50%; background:var(--och-mut);
   animation:ochDot 1s infinite ease-in-out; }

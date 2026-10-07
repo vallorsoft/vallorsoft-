@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-10-07 — 💬 AI-chat e-mail: teljes formázás + fuvarkártyák a rendszerből + adat-lekérés + félkész-zár
+
+- **Gyökér (képernyőképes eset):** az AI jól értette a kéréseket, de nem volt eszköze → kitalált („keretet adtam" — nem volt keret-opció), és „[Teljes adatok betöltése…]" helykitöltő **ki is ment** az ügyfélnek.
+- **Teljes formázás** (`lib/mailBody.js`): az AI biztonságos jelöléssel ír (félkövér/dőlt/aláhúzott/áthúzott, címek, felsorolás, idézet, elválasztó, szín, kiemelés, méret, betűtípus, igazítás, keretes színes doboz, gomb, link) — minden karakter escape-elve, csak fehérlistás jelölés lesz HTML.
+- **Bővített kinézet** (`lib/mailStyle.js`): keret a levél körül (szín/vastagság), sarkok, fejléc „csak cégnév" / „logó + cégnév", logó-háttér, cégnév-szín, betűméret, sorköz, 4 betűtípus.
+- **Fuvarkártyák** (`lib/mailData.js`): a fuvaradatot a SZERVER rajzolja be a DB-ből (útvonal, fel-/lerakás, áru, jármű, státusz; ár/km/hivatkozás/ügyfél kérésre), rövid fuvarszámmal is („050" / „2026-049" → `CMD-2026-0050`), cégre szűrve. Az AI fuvaradatot nem ír.
+- **Adat-lekérés csak a kérdéshez szükséges részre**: az AI `data_requests`-ben kér (fuvarok, statisztika, ügyfél, számlák, korábban elküldött leveleink, saját cégadat, járművek) → a szerver fehérlistás, csak-olvasó, `company_id`-szűrt lekérdezéssel adja, majd újrahívja az AI-t. E-mail cím, telefon, sofőr-személyes adat, beérkezett levél tartalma soha nem megy az AI-hoz.
+- **Újraküldés**: `mail_sent.draft_json` (`db/mail-sent2-draft.sql`) → „küldjük újra a legutóbbit" pontosan visszatölti a szöveget, kártyákat, kinézetet.
+- **Őszinte visszajelzés**: a változás-listát a szerver írja (mi változott ténylegesen); ha az AI változást állít, de semmi nem változott, a rendszer ezt jelzi. **Félkész-zár**: helykitöltős levél nem küldhető (teszt mehet). Az előnézet a valódi kimenő levél (logó, cégnév, kártyák, lábléc). +16 teszt, 1543+ zöld valós Postgres 16-tal. Cache-bust `?v=20261007mailfmt`.
+
 ## 2026-10-07 — 📤 Elküldött levelek + 💬 levélszál (Gmail-szerű Beérkezett / Elküldött)
 
 - Új menüpont **📤 Elküldött levelek** (admin+manager, a 📥 Beérkezett levelek mellett; `feature-catalog` `mail-sent`). Mindkét fül tetején 📥 Beérkezett / 📤 Elküldött mappaváltó (közös `public/mail-inbox.js`, nincs párhuzamos modul).
