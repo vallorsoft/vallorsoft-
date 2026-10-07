@@ -379,8 +379,8 @@
   function renderMailPrev(d) {
     var M = S.mail || { att: [], builders: [], tracking: false };
     var h = '<div class="och-prev-h">✉️ ' + esc(T('och.mailPreview')) + (d.fuvar_no ? ' · <span class="och-plate">' + esc(d.fuvar_no) + '</span>' : '') + '</div>';
-    if (!d.order_id) return h + '<div class="och-empty">' + esc(T('och.mailNeedOrder')) + '</div>';
-    var to = d.to_email ? '<b>' + esc(d.to_email) + '</b>' + (d.recipient === 'client' ? badge(T('och.client'), 'info') : d.recipient === 'carrier' ? badge(T('och.carrier'), 'info') : '') + (d.learned_to ? badge(T('och.learned'), 'info') : '') : '<span class="och-miss">' + esc(T('och.none')) + '</span>';
+    if (!d.order_id) h += '<div class="och-mut" style="margin:-4px 0 8px;">' + esc(T('och.mailGeneral')) + '</div>';
+    var to = d.to_email ? '<b>' + esc(d.to_email) + '</b>' + (d.recipient === 'client' ? badge(T('och.client'), 'info') : d.recipient === 'carrier' ? badge(T('och.carrier'), 'info') : d.recipient === 'named' && d.recipient_name ? badge(d.recipient_name, 'info') : '') + (d.learned_to ? badge(T('och.learned'), 'info') : '') : '<span class="och-miss">' + esc(T('och.none')) + '</span>';
     var sec = row(T('och.to'), to) + row(T('och.subject'), d.subject ? '<b>' + esc(d.subject) + '</b>' : '<span class="och-miss">' + esc(T('och.none')) + '</span>');
     var tpl = '';
     if (d.builder_template_id) {
@@ -398,7 +398,7 @@
     }
     h += '<div class="och-card"><div class="och-sec">' + sec + tpl + '</div>'
       + '<div class="och-sec"><div class="och-sec-h">📝 ' + esc(T('och.mailBody')) + '</div>' + body + '</div>'
-      + '<div class="och-sec"><div class="och-sec-h">📎 ' + esc(T('och.attach')) + '</div><div class="och-atts">' + (att || '<span class="och-mut">' + esc(T('och.none')) + '</span>') + '</div></div>'
+      + (d.order_id ? '<div class="och-sec"><div class="och-sec-h">📎 ' + esc(T('och.attach')) + '</div><div class="och-atts">' + (att || '<span class="och-mut">' + esc(T('och.none')) + '</span>') + '</div></div>' : '')
       + '</div>';
     if (S.missing && S.missing.length && !S.saved) {
       h += '<div class="och-missbox">⚠️ ' + esc(T('och.missing')) + ': ' + S.missing.map(function (k) { return esc(missingLabel(k)); }).join(', ') + '</div>';
@@ -406,7 +406,7 @@
     if (!S.saved) {
       h += '<div class="och-hint">' + esc(T('och.mailFixHint')) + '</div>'
         + '<div class="och-mail-btns">'
-        + '<button class="btn ghost" type="button" onclick="OrderChat.mailSend(true)"' + (d.order_id && !S.busy ? '' : ' disabled') + '>✉️ ' + esc(T('och.sendTest')) + '</button>'
+        + '<button class="btn ghost" type="button" onclick="OrderChat.mailSend(true)"' + (d.body && !S.busy ? '' : ' disabled') + '>✉️ ' + esc(T('och.sendTest')) + '</button>'
         + '<button class="btn primary och-save" id="ochSave" type="button" onclick="OrderChat.mailSend(false)"' + (S.ready && !S.busy ? '' : ' disabled') + '>📤 ' + esc(T('och.mailSend')) + '</button>'
         + '</div>';
     }
@@ -426,7 +426,7 @@
   }
   function mailSend(test) {
     var d = S.draft || {};
-    if (S.busy || S.saved || !d.order_id) return;
+    if (S.busy || S.saved || !d.body) return;
     if (!test) {
       if (!S.ready) return;
       if (!window.confirm(T('och.mailConfirm', { to: d.to_email }))) return;

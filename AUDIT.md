@@ -9,6 +9,10 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 29. lépés — AI-chat: fuvar nélküli e-mail (2026-10-07, PR #512) ✅ KÉSZ
+
+- Név szerinti címzett-feloldás csak a cég saját `clients`/`carriers`/`email_contacts` soraiból (paraméteres ILIKE, `company_id`-szűrt, LIKE-joker kiszűrve); kattintott „Név <cím>" opciót csak akkor fogad el, ha újrakereséssel a listában van. A levél törzse escape-elve, a valós küldés a cég saját feladó-fiókjáról (nincs új közös-feladós út), rate-limit közös a fuvaros levéllel.
+
 ### 28. lépés — AI-chat e-mail ág (2026-10-07, PR #511) ✅ KÉSZ
 
 - Új küldési belépő (`mailChatSend`), de a küldés a meglévő `sendOrderEmail`-en megy (fuvar-tulajdon, csatolmány-feloldás `company_id`-szűrten, EMAIL_RE). A címzettet a szerver oldja fel (fuvar ügyfele / alvállalkozója); AI által kitalált „más" címet csak akkor fogad el, ha a felhasználó maga írta be. Ismeretlen csatolmány-kulcs / idegen sablon-id eldobva. Az AI nem kap e-mail címet, és sosem küld magától (csak gombnyomás + megerősítés). Rate-limit 20/óra/felhasználó; Admin/Manager + Pro csomag-kapu; audit csak metaadat.

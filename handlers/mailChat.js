@@ -24,6 +24,8 @@ const { extractJson } = require('../lib/geminiJson');
 const { memGet, memPut } = require('../lib/chatMemory');
 const { createSlidingWindowLimiter } = require('../lib/slidingWindow');
 const audit = require('../lib/audit');
+const emailSvc = require('../services/email');
+const { appBaseUrl } = require('../lib/appUrl');
 
 const handlers = {};
 const EMAIL_RE = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/;
@@ -39,6 +41,9 @@ const QT = {
   noCarrierMail: { ro: 'Subcontractantul nu are adresă de e-mail — scrie adresa.', hu: 'Az alvállalkozónak nincs e-mail címe — írd be a címet.' },
   optClient: { ro: 'Clientului', hu: 'Az ügyfélnek' },
   optCarrier:{ ro: 'Subcontractantului', hu: 'Az alvállalkozónak' },
+  whoName:   { ro: 'Mai mulți destinatari corespund: „{c}". Care este?', hu: 'Több címzett is illik erre: „{c}". Melyik?' },
+  noName:    { ro: 'Nu găsesc „{c}" printre clienți / subcontractanți / contacte. Scrie adresa de e-mail.', hu: 'Nem találom „{c}"-t az ügyfelek / alvállalkozók / kontaktok között. Írd be az e-mail címet.' },
+  whoToGen:  { ro: 'Cui trimit e-mailul? Scrie numele (client, subcontractant, contact) sau adresa de e-mail.', hu: 'Kinek küldjem? Írd be a nevét (ügyfél, alvállalkozó, kontakt) vagy az e-mail címét.' },
   rateLimit: { ro: 'Prea multe e-mailuri trimise din chat. Încearcă mai târziu.', hu: 'Túl sok levél ment a chatből. Próbáld később.' },
 };
 function qt(lang, key, c) {
@@ -60,7 +65,7 @@ function isEmailIntent(text) {
 // ─── Vázlat-tisztítás (AI-ból VAGY a kliensről jövő, megbízhatatlan) ───
 function sanitizeMail(d) {
   const j = (d && typeof d === 'object') ? d : {};
-  const rec = ['client', 'carrier', 'other'].includes(j.recipient) ? j.recipient : null;
+  const rec = ['client', 'carrier', 'other', 'named'].includes(j.recipient) ? j.recipient : null;
   const to = _str(j.to_email, 200);
   return {
     mode: 'email',
@@ -75,6 +80,7 @@ function sanitizeMail(d) {
     include_tracking: j.include_tracking === true,
     builder_template_id: parseInt(j.builder_template_id, 10) || null,
     learned_to: j.learned_to === true,
+    recipient_name: _str(j.recipient_name, 120),
   };
 }
 
@@ -105,6 +111,18 @@ async function _findOrder(cid, ref) {
 
 function _prefKey(o) { return o.client_id ? 'id:' + o.client_id : _fold(o.client); }
 
+function buildGeneralPrompt() {
+  return [
+    'You write business e-mails for a Romanian/Hungarian road-freight company (TMS). The dispatcher tells you in free text what e-mail to write. This e-mail is NOT tied to a specific transport order (general message: offer, information, reminder, thanks, anything).',
+    'Maintain an e-mail DRAFT across the conversation; merge each new message into the previous draft (keep values unless changed).',
+    'recipient: "other" if the dispatcher writes an e-mail address (put it in to_email); otherwise "named" with recipient_name = the company or person name exactly as the dispatcher wrote it (the system looks it up in the customer/subcontractor/contact lists). null if no recipient was mentioned.',
+    'lang: "ro" by default, "hu" if the dispatcher asks for Hungarian or the recipient is Hungarian.',
+    'Write a short, professional e-mail (greeting, the message, closing without a person name). Never invent prices, dates or facts not given.',
+    'Return ONLY JSON: {"reply":"1-2 short sentences to the dispatcher in THEIR language","draft":{"recipient":null,"recipient_name":null,"to_email":null,"lang":"ro","subject":"","body":""},"questions":[{"key":"recipient|other","text":"short question","options":["up to 4 answers"]}]}',
+    'Ask a question only if really unclear; otherwise "questions": [].',
+  ].join('\n');
+}
+
 function buildMailPrompt(o, ctx) {
   return [
     'You write business e-mails for a Romanian/Hungarian road-freight company (TMS). The dispatcher tells you in free text what e-mail to send about ONE transport order.',
@@ -124,7 +142,7 @@ function buildMailPrompt(o, ctx) {
 }
 
 function _conversation(messages, prev) {
-  const v = { recipient: prev.recipient, to_email: prev.recipient === 'other' ? prev.to_email : null, lang: prev.lang,
+  const v = { recipient: prev.recipient, recipient_name: prev.recipient_name, to_email: prev.recipient === 'other' ? prev.to_email : null, lang: prev.lang,
     subject: prev.subject, body: prev.body, attachments: prev.attachments, include_tracking: prev.include_tracking,
     builder_template_id: prev.builder_template_id };
   const lines = ['PREVIOUS DRAFT (JSON):', JSON.stringify(v), '', 'CONVERSATION:'];
@@ -167,6 +185,89 @@ async function resolveMail(cid, d, o, ctx, userText, lang) {
   return { draft: d, questions, notes, missing };
 }
 
+// ─── Fuvar nélküli (általános) levél: címzett a cég SAJÁT listáiból (ügyfél /
+//     alvállalkozó / e-mail kontakt), company_id-szűrten — az AI ezeket nem látja.
+async function _findNamed(cid, name) {
+  const q = '%' + String(name).replace(/[%_\\]/g, '').trim() + '%';
+  const out = [];
+  const add = (rows, kind) => rows.forEach((r) => { if (r.email && EMAIL_RE.test(r.email)) out.push({ name: r.name, email: r.email, kind }); });
+  try { add((await pool.query(`SELECT denumire AS name, email FROM clients WHERE company_id=$1 AND denumire ILIKE $2 LIMIT 6`, [cid, q])).rows, 'client'); } catch (_) {}
+  try { add((await pool.query(`SELECT nev AS name, email FROM carriers WHERE company_id=$1 AND nev ILIKE $2 LIMIT 6`, [cid, q])).rows, 'carrier'); } catch (_) {}
+  try { add((await pool.query(`SELECT name, email FROM email_contacts WHERE company_id=$1 AND (name ILIKE $2 OR email ILIKE $2) LIMIT 6`, [cid, q])).rows, 'contact'); } catch (_) {}
+  const seen = new Set();
+  return out.filter((x) => { const k = x.email.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+}
+
+async function resolveGeneral(cid, d, prev, userText, lang) {
+  const questions = []; const missing = [];
+  d.order_id = null; d.fuvar_no = null; d.attachments = []; d.include_tracking = false; d.builder_template_id = null;
+  d.learned_to = false;
+  const typed = _fold(userText);
+  if (d.recipient === 'other') {
+    if (!(d.to_email && typed.includes(d.to_email.toLowerCase()))) d.to_email = null;
+  } else if (d.recipient === 'named' && d.recipient_name) {
+    // Ugyanaz a név, mint az előző körben → a már feloldott cím marad.
+    if (prev.recipient_name && _fold(prev.recipient_name) === _fold(d.recipient_name) && prev.to_email) {
+      d.to_email = prev.to_email;
+    } else {
+      const hits = await _findNamed(cid, d.recipient_name);
+      const pref = await memGet(cid, 'mail_pref', 'name:' + _fold(d.recipient_name));
+      if (hits.length === 1) d.to_email = hits[0].email;
+      else if (hits.length > 1) {
+        d.to_email = null;
+        questions.push({ key: 'recipient', text: qt(lang, 'whoName', d.recipient_name), options: hits.slice(0, 4).map((h) => h.name + ' <' + h.email + '>') });
+      } else if (pref && pref.to_email && EMAIL_RE.test(pref.to_email)) { d.to_email = pref.to_email; d.learned_to = true; }
+      else { d.to_email = null; questions.push({ key: 'recipient', text: qt(lang, 'noName', d.recipient_name), options: [] }); }
+    }
+  } else {
+    d.to_email = null;
+    questions.push({ key: 'recipient', text: qt(lang, 'whoToGen'), options: [] });
+  }
+  if (!d.to_email) missing.push('recipient');
+  if (!d.subject) missing.push('subject');
+  if (!d.body) missing.push('body');
+  return { draft: d, questions, notes: [], missing };
+}
+
+function _aiQuestions(out) {
+  return (Array.isArray(out.questions) ? out.questions : []).slice(0, 2).map((q) => ({
+    key: _str(q && q.key, 20) || 'other', text: _str(q && q.text, 300),
+    options: (Array.isArray(q && q.options) ? q.options : []).slice(0, 4).map((x) => _str(x, 80)).filter(Boolean),
+  })).filter((q) => q.text);
+}
+
+async function generalTurn(req, res, messages, prev, lang) {
+  const cid = req.session.user.company_id;
+  const userText = messages.filter((m) => m.role === 'user').map((m) => m.text).join('\n');
+  let ai;
+  try {
+    ai = await extractJson({ systemPrompt: buildGeneralPrompt(), parts: [{ text: _conversation(messages, prev) }] });
+  } catch (e) {
+    const msg = e && e.code === 'NO_KEY' ? 'Serviciul AI nu este configurat.' : String((e && e.message) || 'Eroare AI').slice(0, 300);
+    return res.json({ result: { ok: false, err: msg } });
+  }
+  const out = (ai && ai.json) || {};
+  const d = sanitizeMail(Object.assign({}, out.draft || {}));
+  if (!d.lang) d.lang = prev.lang || lang;
+  // A felhasználó egy felkínált „Név <cím>" opcióra kattintott → az a cím (ha tényleg a listából jön).
+  const last = messages[messages.length - 1].text;
+  const pickM = /<([^<>\s]+@[^<>\s]+)>\s*$/.exec(last);
+  let r;
+  if (pickM && prev.recipient_name) {
+    const hits = await _findNamed(cid, prev.recipient_name);
+    const hit = hits.find((h) => h.email.toLowerCase() === pickM[1].toLowerCase());
+    d.recipient = 'named'; d.recipient_name = prev.recipient_name;
+    r = await resolveGeneral(cid, Object.assign(d, { recipient_name: prev.recipient_name }), { recipient_name: prev.recipient_name, to_email: hit ? hit.email : null }, userText, lang);
+  } else {
+    r = await resolveGeneral(cid, d, prev, userText, lang);
+  }
+  const seen = new Set(r.questions.map((q) => q.key));
+  const questions = r.questions.concat(_aiQuestions(out).filter((q) => !seen.has(q.key))).slice(0, 3);
+  try { await audit.fromReq(req, 'mail.chat_turn', 'mail', null, { turns: messages.length, ready: !r.missing.length, model: ai.model, general: true }); } catch (_) {}
+  return res.json({ result: { ok: true, mode: 'email', reply: _str(out.reply, 600) || '', draft: r.draft, questions,
+    notes: [], missing: r.missing, ready: r.missing.length === 0, attachments_avail: [], builders_avail: [], tracking_available: false } });
+}
+
 // ─── Egy chat-kör (az orderChatTurn hívja e-mail módban; a kapu már lefutott) ───
 async function mailTurn(req, res, a, messages, lang) {
   const cid = req.session.user.company_id;
@@ -176,10 +277,7 @@ async function mailTurn(req, res, a, messages, lang) {
   const refM = ORDER_REF_RE.exec(last) || (!prev.order_id ? ORDER_REF_RE.exec(userText) : null);
   const ref = refM ? refM[1] : prev.order_id;
   const base = { ok: true, mode: 'email', questions: [], notes: [], ready: false };
-  if (!ref) {
-    return res.json({ result: Object.assign(base, { reply: qt(lang, 'needOrder'), draft: prev, missing: ['order'],
-      questions: [{ key: 'order', text: qt(lang, 'needOrder'), options: [] }] }) });
-  }
+  if (!ref) return generalTurn(req, res, messages, prev, lang);
   const o = await _findOrder(cid, ref);
   if (!o) {
     return res.json({ result: Object.assign(base, { reply: qt(lang, 'notFound', String(ref).toUpperCase()), draft: prev, missing: ['order'] }) });
@@ -227,13 +325,13 @@ handlers.mailChatSend = async function (req, res, args) {
     const lang = a.lang === 'hu' ? 'hu' : 'ro';
     const d = sanitizeMail(a.draft);
     const isTest = a.test === true;
-    if (!d.order_id) return res.json({ result: { ok: false, err: 'Identificator lipsă' } });
     if (!isTest) {
       if (!d.to_email) return res.json({ result: { ok: false, err: 'E-mail invalid' } });
       const lim = sendLimiter.check(String(req.session.user.id || req.session.user.email));
       if (!lim.ok) return res.json({ result: { ok: false, err: qt(lang, 'rateLimit') } });
     }
     const cid = req.session.user.company_id;
+    if (!d.order_id) return res.json({ result: await _sendGeneral(req, cid, d, isTest) });
     const o = await _findOrder(cid, d.order_id);
     if (!o) return res.json({ result: { ok: false, err: 'Comanda nu a fost găsită.' } });
     const r = await _call(require('./orderEmail').sendOrderEmail, req, [{
@@ -256,6 +354,43 @@ handlers.mailChatSend = async function (req, res, args) {
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
+
+// Fuvar nélküli levél küldése: valós → a cég SAJÁT feladó-fiókja; teszt → közös cím a saját címre.
+async function _sendGeneral(req, cid, d, isTest) {
+  const u = req.session.user;
+  const to = isTest ? String(u.email || '').trim() : d.to_email;
+  if (!to || !EMAIL_RE.test(to)) return { ok: false, err: isTest ? 'Adresa dvs. de e-mail lipsește.' : 'E-mail invalid' };
+  if (!d.body) return { ok: false, err: 'Mesaj gol.' };
+  let senderName = 'VallorSoft', logoUrl = null;
+  try {
+    const c = await pool.query('SELECT nev FROM companies WHERE id=$1', [cid]);
+    if (c.rows.length && c.rows[0].nev) senderName = c.rows[0].nev;
+    const hl = await pool.query('SELECT 1 FROM company_branding WHERE company_id=$1 AND logo_base64 IS NOT NULL', [cid]);
+    const base = appBaseUrl();
+    if (hl.rows.length && base) logoUrl = base + '/branding/logo/' + cid + '.png';
+  } catch (_) { /* best-effort */ }
+  const esc = (x) => String(x).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]);
+  const bodyHtml = '<div style="font-size:14px;line-height:1.6;color:#2a2018;white-space:pre-wrap;">' + esc(d.body) + '</div>';
+  const subject = d.subject || '(fără subiect)';
+  let result;
+  if (isTest) {
+    result = await emailSvc.sendClientEmail({ to, subject, html: bodyHtml, senderName, logoUrl, companyId: cid, mailType: 'chat_test' });
+  } else {
+    const mailer = await emailSvc.getCompanyMailer(cid);
+    if (!mailer || !mailer.ok) {
+      return { ok: false, err: (mailer && mailer.noConfig)
+        ? 'Configurați contul de e-mail (SMTP) în Integrări înainte de a trimite către clienți.'
+        : ((mailer && mailer.error) || 'Eroare la contul expeditor') };
+    }
+    result = await mailer.send({ to, subject, html: emailSvc.wrapBrandedEmail(bodyHtml, { logoUrl, senderName }), mailType: 'chat' });
+  }
+  if (!result || !result.ok) return { ok: false, err: (result && result.error) || 'Eroare la trimitere' };
+  if (!isTest) {
+    try { if (d.recipient === 'named' && d.recipient_name) await memPut(cid, 'mail_pref', 'name:' + _fold(d.recipient_name), { to_email: to, lang: d.lang }); } catch (_) {}
+    try { await audit.fromReq(req, 'mail.chat_send', 'mail', null, { general: true }); } catch (_) {}
+  }
+  return { ok: true };
+}
 
 // Belső segédek (nem RPC): az orderChat hívja / a teszt eléri.
 Object.defineProperty(handlers, 'mailTurn', { value: mailTurn, enumerable: false });
