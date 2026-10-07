@@ -372,7 +372,9 @@ handlers.sendOrderEmail = async function (req, res, args) {
     // Cég-arculatos fejléc: a feltöltött céges logó (ha van), különben „vallorSoft".
     // Vizuális sablonnál NEM csomagoljuk be újra (a sablon a saját arculatát hozza,
     // a {{logo}} már behelyettesítve).
-    var realHtml = builderHtml ? bodyHtml : wrapBrandedEmail(bodyHtml, brand);
+    // Egyéni kinézet (az AI-chatből: színek/elrendezés) — fehérlistázva.
+    var style = require('../lib/mailStyle').sanitizeStyle(a.style);
+    var realHtml = builderHtml ? bodyHtml : wrapBrandedEmail(bodyHtml, Object.assign({}, brand, { style: style }));
 
     var sent;
     if (isTest) {
@@ -380,7 +382,7 @@ handlers.sendOrderEmail = async function (req, res, args) {
       // A sendClientEmail maga rakja rá a fejlécet (logó vagy „vallorSoft").
       sent = await sendClientEmail({
         to: toEmail, subject: subject, html: bodyHtml, attachments: attachments,
-        logoUrl: brand.logoUrl, senderName: brand.senderName,
+        logoUrl: brand.logoUrl, senderName: brand.senderName, style: builderHtml ? null : style,
         companyId: cid, mailType: 'order_test',
       });
     } else {

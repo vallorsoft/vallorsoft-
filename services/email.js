@@ -329,6 +329,8 @@ async function sendResetEmail(toEmail, nume, resetUrl, lang, companyId) {
 //   opts: { logoUrl, senderName }
 function wrapBrandedEmail(bodyHtml, opts) {
   opts = opts || {};
+  // Egyéni kinézet (AI-chat: színek/elrendezés, fehérlistázva) → stílusos keret.
+  if (opts.style) return require('../lib/mailStyle').renderStyled(bodyHtml, opts.style, opts);
   const senderName = opts.senderName || 'VallorSoft';
   // Logo csak biztonságos URL-sémával kerülhet a levélbe (markup-injektálás ellen)
   const safeLogo = opts.logoUrl && /^(https?:\/\/|data:image\/)/i.test(String(opts.logoUrl)) ? String(opts.logoUrl) : null;
@@ -346,7 +348,7 @@ async function sendClientEmail(opts) {
   if (!BREVO_API_KEY || !BREVO_SENDER) return { ok: false, error: 'BREVO_API_KEY / BREVO_SENDER nu este configurat (.env).' };
   if (!opts || !opts.to) return { ok: false, error: 'Lipsește destinatarul.' };
   const senderName = opts.senderName || 'VallorSoft';
-  const html = wrapBrandedEmail(opts.html, { logoUrl: opts.logoUrl, senderName: senderName });
+  const html = wrapBrandedEmail(opts.html, { logoUrl: opts.logoUrl, senderName: senderName, style: opts.style || null });
   const payload = {
     sender: { name: senderName, email: BREVO_SENDER },
     to: [{ email: opts.to }],

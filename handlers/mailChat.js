@@ -21,7 +21,8 @@
 
 const pool = require('../db');
 const { extractJson } = require('../lib/geminiJson');
-const { memGet, memPut } = require('../lib/chatMemory');
+const { memGet, memPut, memDel } = require('../lib/chatMemory');
+const mailStyle = require('../lib/mailStyle');
 const { createSlidingWindowLimiter } = require('../lib/slidingWindow');
 const audit = require('../lib/audit');
 const emailSvc = require('../services/email');
@@ -81,6 +82,9 @@ function sanitizeMail(d) {
     builder_template_id: parseInt(j.builder_template_id, 10) || null,
     learned_to: j.learned_to === true,
     recipient_name: _str(j.recipient_name, 120),
+    style: mailStyle.sanitizeStyle(j.style),
+    style_init: j.style_init === true,
+    style_default: j.style_default === true,
   };
 }
 
@@ -118,7 +122,9 @@ function buildGeneralPrompt() {
     'recipient: "other" if the dispatcher writes an e-mail address (put it in to_email); otherwise "named" with recipient_name = the company or person name exactly as the dispatcher wrote it (the system looks it up in the customer/subcontractor/contact lists). null if no recipient was mentioned.',
     'lang: "ro" by default, "hu" if the dispatcher asks for Hungarian or the recipient is Hungarian.',
     'Write a short, professional e-mail (greeting, the message, closing without a person name). Never invent prices, dates or facts not given.',
-    'Return ONLY JSON: {"reply":"1-2 short sentences to the dispatcher in THEIR language","draft":{"recipient":null,"recipient_name":null,"to_email":null,"lang":"ro","subject":"","body":""},"questions":[{"key":"recipient|other","text":"short question","options":["up to 4 answers"]}]}',
+    'style: visual look of the e-mail that the dispatcher asks to change — object with only the changed keys from {"accent":"#rrggbb","bg":"#rrggbb","card":"#rrggbb","text":"#rrggbb","align":"left|center","header":"logo|band|none","font":"sans|serif","width":"narrow|normal|wide"}. accent = header band / line / link color, bg = outer background, card = letter background. Map color words to hex (blue/kék/albastru #2563eb, dark blue/sötétkék #1e3a8a, green/zöld/verde #16a34a, red/piros/roșu #dc2626, orange/narancs #f6711e, purple/lila #7c3aed, black/fekete #111827, grey/szürke #6b7280, white/fehér #ffffff, light grey #f3f4f6). Return the previous style unchanged if nothing about the look was asked; null if never set.',
+    'Top-level "save_default": true ONLY when the dispatcher asks to keep this look as their default for future e-mails ("mentsd el alapértelmezettnek", "mindig ilyen legyen", "salvează ca implicit"); "reset_default": true when they ask to go back to the original/default VallorSoft look.',
+    'Return ONLY JSON: {"reply":"1-2 short sentences to the dispatcher in THEIR language","save_default":false,"reset_default":false,"draft":{"style":null,"recipient":null,"recipient_name":null,"to_email":null,"lang":"ro","subject":"","body":""},"questions":[{"key":"recipient|other","text":"short question","options":["up to 4 answers"]}]}',
     'Ask a question only if really unclear; otherwise "questions": [].',
   ].join('\n');
 }
@@ -136,13 +142,15 @@ function buildMailPrompt(o, ctx) {
     'lang: language of the e-mail — "ro" by default (Romanian customers), "hu" if the dispatcher asks for Hungarian or the customer is Hungarian.',
     'Write a short, professional e-mail (greeting, 2-5 sentences, closing without a person name). Mention the order number. Do NOT paste the tracking URL yourself — set include_tracking=true when a tracking/status link is wanted. Never invent prices, dates or facts not given.',
     'attachments: keys the dispatcher asks for (e.g. "invoice/számla/factură" → kind invoice; "CMR/aláírt/semnat" → signed doc; "photos/POD" → photo). Empty if none requested.',
-    'Return ONLY JSON: {"reply":"1-2 short sentences to the dispatcher in THEIR language","draft":{"recipient":null,"to_email":null,"lang":"ro","subject":"","body":"","attachments":[],"include_tracking":false,"builder_template_id":null},"questions":[{"key":"recipient|other","text":"short question","options":["up to 4 answers"]}]}',
+    'style: visual look of the e-mail that the dispatcher asks to change — object with only the changed keys from {"accent":"#rrggbb","bg":"#rrggbb","card":"#rrggbb","text":"#rrggbb","align":"left|center","header":"logo|band|none","font":"sans|serif","width":"narrow|normal|wide"}. accent = header band / line / link color, bg = outer background, card = letter background. Map color words to hex (blue/kék/albastru #2563eb, dark blue/sötétkék #1e3a8a, green/zöld/verde #16a34a, red/piros/roșu #dc2626, orange/narancs #f6711e, purple/lila #7c3aed, black/fekete #111827, grey/szürke #6b7280, white/fehér #ffffff, light grey #f3f4f6). Return the previous style unchanged if nothing about the look was asked; null if never set.',
+    'Top-level "save_default": true ONLY when the dispatcher asks to keep this look as their default for future e-mails ("mentsd el alapértelmezettnek", "mindig ilyen legyen", "salvează ca implicit"); "reset_default": true when they ask to go back to the original/default VallorSoft look.',
+    'Return ONLY JSON: {"reply":"1-2 short sentences to the dispatcher in THEIR language","save_default":false,"reset_default":false,"draft":{"style":null,"recipient":null,"to_email":null,"lang":"ro","subject":"","body":"","attachments":[],"include_tracking":false,"builder_template_id":null},"questions":[{"key":"recipient|other","text":"short question","options":["up to 4 answers"]}]}',
     'Ask a question only if really unclear; otherwise "questions": [].',
   ].join('\n');
 }
 
 function _conversation(messages, prev) {
-  const v = { recipient: prev.recipient, recipient_name: prev.recipient_name, to_email: prev.recipient === 'other' ? prev.to_email : null, lang: prev.lang,
+  const v = { style: prev.style, recipient: prev.recipient, recipient_name: prev.recipient_name, to_email: prev.recipient === 'other' ? prev.to_email : null, lang: prev.lang,
     subject: prev.subject, body: prev.body, attachments: prev.attachments, include_tracking: prev.include_tracking,
     builder_template_id: prev.builder_template_id };
   const lines = ['PREVIOUS DRAFT (JSON):', JSON.stringify(v), '', 'CONVERSATION:'];
@@ -236,6 +244,40 @@ function _aiQuestions(out) {
   })).filter((q) => q.text);
 }
 
+// ─── Kinézet: a felhasználó alapértelmezett stílusa (mentve, amíg másképp nem kéri) ───
+function _styleKey(req) { return 'user:' + req.session.user.id; }
+async function loadUserStyle(req) {
+  const v = await memGet(req.session.user.company_id, 'mail_style', _styleKey(req));
+  return v && typeof v === 'object' ? v : null;
+}
+// Az AI által kért változások ráhúzása; mentés / visszaállítás kérésre.
+async function applyStyleTurn(req, d, prev, out) {
+  const cid = req.session.user.company_id;
+  let base = prev.style, baseBuilder = prev.builder_template_id;
+  if (!prev.style_init) {
+    const def = await loadUserStyle(req);
+    base = def ? mailStyle.sanitizeStyle(def.style) : null;
+    baseBuilder = def ? (parseInt(def.builder_template_id, 10) || null) : null;
+    d.style_default = !!def;
+    if (!d.builder_template_id && baseBuilder) d.builder_template_id = baseBuilder;
+  } else d.style_default = prev.style_default;
+  d.style = mailStyle.mergeStyle(base, d.style);
+  if (prev.style && d.style && JSON.stringify(prev.style) !== JSON.stringify(d.style)) d.style_default = false;
+  d.style_init = true;
+  const notes = [];
+  if (out && out.reset_default === true) {
+    try { await memDel(cid, 'mail_style', _styleKey(req)); } catch (_) {}
+    d.style = null; d.builder_template_id = d.builder_template_id === baseBuilder ? null : d.builder_template_id;
+    d.style_default = false; notes.push({ type: 'style_reset' });
+  } else if (out && out.save_default === true) {
+    try {
+      await memPut(cid, 'mail_style', _styleKey(req), { style: d.style, builder_template_id: d.builder_template_id || null });
+      d.style_default = true; notes.push({ type: 'style_saved' });
+    } catch (_) { /* migráció hiányzik → nincs mentés */ }
+  }
+  return notes;
+}
+
 async function generalTurn(req, res, messages, prev, lang) {
   const cid = req.session.user.company_id;
   const userText = messages.filter((m) => m.role === 'user').map((m) => m.text).join('\n');
@@ -249,6 +291,7 @@ async function generalTurn(req, res, messages, prev, lang) {
   const out = (ai && ai.json) || {};
   const d = sanitizeMail(Object.assign({}, out.draft || {}));
   if (!d.lang) d.lang = prev.lang || lang;
+  const styleNotes = await applyStyleTurn(req, d, prev, out);
   // A felhasználó egy felkínált „Név <cím>" opcióra kattintott → az a cím (ha tényleg a listából jön).
   const last = messages[messages.length - 1].text;
   const pickM = /<([^<>\s]+@[^<>\s]+)>\s*$/.exec(last);
@@ -265,7 +308,7 @@ async function generalTurn(req, res, messages, prev, lang) {
   const questions = r.questions.concat(_aiQuestions(out).filter((q) => !seen.has(q.key))).slice(0, 3);
   try { await audit.fromReq(req, 'mail.chat_turn', 'mail', null, { turns: messages.length, ready: !r.missing.length, model: ai.model, general: true }); } catch (_) {}
   return res.json({ result: { ok: true, mode: 'email', reply: _str(out.reply, 600) || '', draft: r.draft, questions,
-    notes: [], missing: r.missing, ready: r.missing.length === 0, attachments_avail: [], builders_avail: [], tracking_available: false } });
+    notes: styleNotes, missing: r.missing, ready: r.missing.length === 0, attachments_avail: [], builders_avail: [], tracking_available: false } });
 }
 
 // ─── Egy chat-kör (az orderChatTurn hívja e-mail módban; a kapu már lefutott) ───
@@ -300,6 +343,7 @@ async function mailTurn(req, res, a, messages, lang) {
   const out = (ai && ai.json) || {};
   const d = sanitizeMail(Object.assign({}, out.draft || {}));
   if (!d.lang) d.lang = prev.lang || lang;
+  const styleNotes = await applyStyleTurn(req, d, prev, out);
   const r = await resolveMail(cid, d, o, ctx, userText, lang);
   const aiQ = (Array.isArray(out.questions) ? out.questions : []).slice(0, 2).map((q) => ({
     key: _str(q && q.key, 20) || 'other', text: _str(q && q.text, 300),
@@ -309,7 +353,7 @@ async function mailTurn(req, res, a, messages, lang) {
   const questions = r.questions.concat(aiQ.filter((q) => !seen.has(q.key))).slice(0, 3);
   try { await audit.fromReq(req, 'mail.chat_turn', 'order', o.id, { turns: messages.length, ready: !r.missing.length, model: ai.model }); } catch (_) {}
   return res.json({ result: Object.assign(base, {
-    reply: _str(out.reply, 600) || '', draft: r.draft, questions, notes: r.notes, missing: r.missing,
+    reply: _str(out.reply, 600) || '', draft: r.draft, questions, notes: r.notes.concat(styleNotes), missing: r.missing,
     ready: r.missing.length === 0, attachments_avail: ctx.attachments, builders_avail: ctx.builders,
     tracking_available: ctx.tracking, client: o.client || '',
   }) });
@@ -337,7 +381,7 @@ handlers.mailChatSend = async function (req, res, args) {
     const r = await _call(require('./orderEmail').sendOrderEmail, req, [{
       order_id: o.id, to_email: d.to_email, subject: d.subject, body: d.body || '',
       attachments: d.attachments, include_tracking: d.include_tracking,
-      builder_template_id: d.builder_template_id, test: isTest,
+      builder_template_id: d.builder_template_id, test: isTest, style: d.style,
     }]);
     if (r.ok && !isTest) {
       // Tanulás: az ügyfélnek ténylegesen elküldött cím (ha a fuvarhoz kötött ügyfélnek nincs mentett címe).
@@ -370,11 +414,11 @@ async function _sendGeneral(req, cid, d, isTest) {
     if (hl.rows.length && base) logoUrl = base + '/branding/logo/' + cid + '.png';
   } catch (_) { /* best-effort */ }
   const esc = (x) => String(x).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[m]);
-  const bodyHtml = '<div style="font-size:14px;line-height:1.6;color:#2a2018;white-space:pre-wrap;">' + esc(d.body) + '</div>';
+  const bodyHtml = '<div style="font-size:14px;line-height:1.6;white-space:pre-wrap;">' + esc(d.body) + '</div>';
   const subject = d.subject || '(fără subiect)';
   let result;
   if (isTest) {
-    result = await emailSvc.sendClientEmail({ to, subject, html: bodyHtml, senderName, logoUrl, companyId: cid, mailType: 'chat_test' });
+    result = await emailSvc.sendClientEmail({ to, subject, html: bodyHtml, senderName, logoUrl, style: d.style, companyId: cid, mailType: 'chat_test' });
   } else {
     const mailer = await emailSvc.getCompanyMailer(cid);
     if (!mailer || !mailer.ok) {
@@ -382,7 +426,7 @@ async function _sendGeneral(req, cid, d, isTest) {
         ? 'Configurați contul de e-mail (SMTP) în Integrări înainte de a trimite către clienți.'
         : ((mailer && mailer.error) || 'Eroare la contul expeditor') };
     }
-    result = await mailer.send({ to, subject, html: emailSvc.wrapBrandedEmail(bodyHtml, { logoUrl, senderName }), mailType: 'chat' });
+    result = await mailer.send({ to, subject, html: emailSvc.wrapBrandedEmail(bodyHtml, { logoUrl, senderName, style: d.style }), mailType: 'chat' });
   }
   if (!result || !result.ok) return { ok: false, err: (result && result.error) || 'Eroare la trimitere' };
   if (!isTest) {
@@ -391,6 +435,33 @@ async function _sendGeneral(req, cid, d, isTest) {
   }
   return { ok: true };
 }
+
+// ─── ⭐ Kinézet mentése alapértelmezettként / visszaállítás (gombról) ───
+// args[0]: { draft, reset }
+handlers.mailChatSaveStyle = async function (req, res, args) {
+  try {
+    const gate = await require('./orderChat')._gate(req);
+    if (gate) return res.json({ result: { ok: false, err: gate } });
+    const a = (args && args[0]) || {};
+    const cid = req.session.user.company_id;
+    if (a.reset === true) {
+      await memDel(cid, 'mail_style', _styleKey(req));
+      return res.json({ result: { ok: true, reset: true } });
+    }
+    const d = sanitizeMail(a.draft);
+    let bid = d.builder_template_id;
+    if (bid) {
+      const b = await pool.query('SELECT 1 FROM email_builder_templates WHERE id=$1 AND company_id=$2', [bid, cid]);
+      if (!b.rows.length) bid = null;
+    }
+    await memPut(cid, 'mail_style', _styleKey(req), { style: d.style, builder_template_id: bid || null });
+    try { await audit.fromReq(req, 'mail.style_default', 'user', req.session.user.id, {}); } catch (_) {}
+    return res.json({ result: { ok: true } });
+  } catch (e) {
+    console.error('mailChatSaveStyle hiba:', e && e.message);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
 
 // Belső segédek (nem RPC): az orderChat hívja / a teszt eléri.
 Object.defineProperty(handlers, 'mailTurn', { value: mailTurn, enumerable: false });

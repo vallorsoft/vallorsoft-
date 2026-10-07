@@ -9,6 +9,10 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 30. lépés — AI-chat e-mail kinézet (2026-10-07, PR #513) ✅ KÉSZ
+
+- A felhasználó/AI által megadott stílus a levél HTML-jébe kerül → `lib/mailStyle.js` szigorú fehérlista (csak `#rrggbb` színek, felsorolt igazítás/fejléc/betű/szélesség), a feladónév escape-elve, logó csak http(s)/data:image. Az alapértelmezett kinézet felhasználónkénti (`user:<id>`, `company_id`-szűrt) — más felhasználó nem kapja meg; a mentett sablon-id tulajdon-ellenőrzött.
+
 ### 29. lépés — AI-chat: fuvar nélküli e-mail (2026-10-07, PR #512) ✅ KÉSZ
 
 - Név szerinti címzett-feloldás csak a cég saját `clients`/`carriers`/`email_contacts` soraiból (paraméteres ILIKE, `company_id`-szűrt, LIKE-joker kiszűrve); kattintott „Név <cím>" opciót csak akkor fogad el, ha újrakereséssel a listában van. A levél törzse escape-elve, a valós küldés a cég saját feladó-fiókjáról (nincs új közös-feladós út), rate-limit közös a fuvaros levéllel.

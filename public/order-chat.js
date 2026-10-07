@@ -387,8 +387,13 @@
       var b = (M.builders || []).filter(function (x) { return x.id === d.builder_template_id; })[0];
       tpl = row(T('och.template'), '🎨 ' + esc(b ? b.name : '#' + d.builder_template_id) + ' <button type="button" class="och-x-mini" onclick="OrderChat.mailToggle(\'tpl\')">✕</button>');
     }
-    var body = '<div class="och-mail-body">' + (d.body ? esc(d.body).replace(/\n/g, '<br>') : '<span class="och-miss">' + esc(T('och.none')) + '</span>')
-      + (d.include_tracking ? '<div class="och-mut" style="margin-top:8px;">🌍 ' + esc(T('och.trackingLine')) + '</div>' : '') + '</div>';
+    var inner = (d.body ? esc(d.body).replace(/\n/g, '<br>') : '<span class="och-miss">' + esc(T('och.none')) + '</span>')
+      + (d.include_tracking ? '<div style="margin-top:8px;opacity:.75;">🌍 ' + esc(T('och.trackingLine')) + '</div>' : '');
+    var body = d.builder_template_id ? '<div class="och-mail-body">' + inner + '</div>' : _styledPreview(inner, d.style);
+    var lookBtns = '<div class="och-look">'
+      + (d.style_default ? '<span class="och-badge ok">⭐ ' + esc(T('och.lookDefault')) + '</span>' : '<button type="button" class="och-att" onclick="OrderChat.mailSaveLook()">⭐ ' + esc(T('och.lookSave')) + '</button>')
+      + ' <button type="button" class="och-att" onclick="OrderChat.mailResetLook()">↺ ' + esc(T('och.lookReset')) + '</button>'
+      + '<div class="och-mut" style="margin-top:4px;">🎨 ' + esc(T('och.lookHint')) + '</div></div>';
     var att = (M.att || []).map(function (a) {
       var on = (d.attachments || []).indexOf(a.key) >= 0;
       return '<button type="button" class="och-att' + (on ? ' on' : '') + '" onclick="OrderChat.mailToggle(\'att\',\'' + esc(a.key) + '\')">' + (on ? '✓ ' : '+ ') + esc(a.label) + '</button>';
@@ -397,7 +402,7 @@
       att += '<button type="button" class="och-att' + (d.include_tracking ? ' on' : '') + '" onclick="OrderChat.mailToggle(\'trk\')">' + (d.include_tracking ? '✓ ' : '+ ') + '🌍 ' + esc(T('och.tracking')) + '</button>';
     }
     h += '<div class="och-card"><div class="och-sec">' + sec + tpl + '</div>'
-      + '<div class="och-sec"><div class="och-sec-h">📝 ' + esc(T('och.mailBody')) + '</div>' + body + '</div>'
+      + '<div class="och-sec"><div class="och-sec-h">📝 ' + esc(T('och.mailBody')) + '</div>' + body + lookBtns + '</div>'
       + (d.order_id ? '<div class="och-sec"><div class="och-sec-h">📎 ' + esc(T('och.attach')) + '</div><div class="och-atts">' + (att || '<span class="och-mut">' + esc(T('och.none')) + '</span>') + '</div></div>' : '')
       + '</div>';
     if (S.missing && S.missing.length && !S.saved) {
@@ -411,6 +416,37 @@
         + '</div>';
     }
     return h;
+  }
+  // Előnézet a szerver lib/mailStyle.js renderStyled-jével azonos szerkezetben.
+  function _hx(v, def) { return /^#[0-9a-f]{6}$/i.test(String(v || '')) ? v : def; }
+  function _styledPreview(inner, st) {
+    st = st || {};
+    var accent = _hx(st.accent, '#f6711e'), bg = _hx(st.bg, '#ffffff'), card = _hx(st.card, '#ffffff'), text = _hx(st.text, '#2a2018');
+    var align = st.align === 'center' ? 'center' : 'left';
+    var font = st.font === 'serif' ? 'Georgia,serif' : 'Arial,sans-serif';
+    var name = esc(T('och.lookSender'));
+    var head = st.header === 'band'
+      ? '<div style="background:' + accent + ';color:#fff;padding:10px 14px;text-align:' + align + ';border-radius:8px 8px 0 0;font-weight:800;">' + name + '</div>'
+      : st.header === 'none' ? '' : '<div style="padding:10px 14px 4px;text-align:' + align + ';font-weight:800;">' + name + '</div><div style="height:3px;background:' + accent + ';margin:4px 14px 0;"></div>';
+    return '<div class="och-mail-styled" style="background:' + bg + ';padding:10px;border-radius:10px;border:1px solid #e2e8f0;">'
+      + '<div style="background:' + card + ';color:' + text + ';font-family:' + font + ';border-radius:8px;">' + head
+      + '<div style="padding:12px 14px;font-size:14px;line-height:1.55;text-align:' + align + ';">' + inner + '</div></div></div>';
+  }
+  function mailSaveLook() {
+    if (S.busy) return;
+    window.gas('mailChatSaveStyle', [{ draft: S.draft }]).then(function (r) {
+      if (r && r.ok) { S.draft = Object.assign({}, S.draft, { style_default: true }); S.messages.push({ role: 'assistant', text: '⭐ ' + T('och.lookSaved') }); }
+      else S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
+      renderAll();
+    });
+  }
+  function mailResetLook() {
+    if (S.busy) return;
+    window.gas('mailChatSaveStyle', [{ reset: true }]).then(function (r) {
+      if (r && r.ok) { S.draft = Object.assign({}, S.draft, { style: null, style_default: false }); S.messages.push({ role: 'assistant', text: '↺ ' + T('och.lookResetDone') }); }
+      else S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
+      renderAll();
+    });
   }
   function mailToggle(what, key) {
     if (S.saved || S.busy) return;
@@ -472,5 +508,5 @@
     b.style.display = visible ? '' : 'none';
   }
 
-  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, mailToggle: mailToggle };
+  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
 })();

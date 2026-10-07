@@ -5220,3 +5220,5 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #ochModal[data-theme="dark"] .och-mail-body{ background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.12); color:#e2e8f0; }
 #ochModal[data-theme="dark"] .och-att{ color:#cbd5e1; border-color:#64748b; }
 #ochModal[data-theme="dark"] .och-att.on{ background:rgba(246,113,30,0.15); color:#fdba74; }
+#ochModal .och-look{ margin-top:10px; }
+#ochModal .och-look .och-att{ margin-right:4px; }
