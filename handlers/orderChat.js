@@ -30,6 +30,7 @@ const pool = require('../db');
 const { extractJson } = require('../lib/geminiJson');
 const { featureEnabled } = require('../lib/featureEnabled');
 const { normalizePlate } = require('../lib/plate');
+const { normalizeUit, isValidUit, sanitizeUitPhoto } = require('../lib/uitFormat');
 const clientsSvc = require('../services/clients');
 const audit = require('../lib/audit');
 const orderHandlers = require('./orders');
@@ -127,7 +128,30 @@ function sanitizeDraft(d) {
     edit_fuvar_no: _str(j.edit_fuvar_no, 40),
     // A diszpécser által eredetileg beírt sofőr-név (tanuláshoz: becenév → sofőr).
     driver_raw: _str(j.driver_raw, 120),
+    // UIT-kódok (RO e-Transport): beírva VAGY a chatben 📷/📎 kiolvasva.
+    uit_codes: _uitList(j.uit_codes),
+    edit_uit_existing: _int(j.edit_uit_existing),
   };
+}
+function _uitList(v) {
+  const out = [];
+  (Array.isArray(v) ? v : []).forEach((c) => {
+    const n = normalizeUit(c && typeof c === 'object' ? c.uit_code : c);
+    if (isValidUit(n) && !out.includes(n) && out.length < 20) out.push(n);
+  });
+  return out;
+}
+// A kliensről jövő bizonylatok ({ kód: { b64, mime } }) — csak a vázlat kódjaihoz,
+// a közös fehérlistával (kép / PDF, max 8 MB).
+function _uitRows(codes, docs) {
+  const dd = (docs && typeof docs === 'object') ? docs : {};
+  return codes.map((code) => {
+    const doc = dd[code];
+    const ph = doc ? sanitizeUitPhoto({ photo_b64: doc.b64, photo_mime: doc.mime }) : { photo_b64: null, photo_mime: null };
+    return ph.photo_b64
+      ? { uit_code: code, source: 'ai-scan', photo_b64: ph.photo_b64, photo_mime: ph.photo_mime }
+      : { uit_code: code, source: 'manual' };
+  });
 }
 
 // ─── Tanulás (cégenkénti memória) ────────────────────────────
@@ -208,6 +232,10 @@ async function loadOrderDraft(cid, ref) {
     rendszam_camion: o.rendszam_camion, rendszam_remorca: o.rendszam_remorca,
     edit_order_id: o.id, edit_fuvar_no: o.fuvar_no || o.id,
   });
+  try {
+    const u = await pool.query('SELECT COUNT(*)::int AS n FROM order_uit_codes WHERE order_id=$1 AND company_id=$2', [o.id, cid]);
+    d.edit_uit_existing = u.rows[0] ? u.rows[0].n : 0;
+  } catch (_) { d.edit_uit_existing = 0; }
   return d;
 }
 
@@ -221,10 +249,11 @@ function buildSystemPrompt(today) {
     'Client (megrendelő / beneficiar) is the company that ORDERS and PAYS — it is NOT automatically the loading company. Only fill "client" if the user states it (or says the loader is the client). If the user writes a Romanian CUI/CIF (digits, maybe with RO prefix) for the client, put it in client_cui.',
     'Driver: put the driver name exactly as written into driver_name. If the user says "his/her truck" / "hozzá tartozó autó" / "a lui", leave the plates empty (the system pairs them). Plates only if explicitly written.',
     'The previous draft may be an EXISTING order loaded for editing: then keep every field unchanged except what the dispatcher explicitly asks to change.',
+    'uit_codes: RO e-Transport UIT codes (max 16 letters/digits) — keep the previous list; add only codes the dispatcher explicitly writes; remove one only if asked.',
     'Never invent data. Unknown fields = null. Do not ask about fields the system can derive (km, plates of the assigned truck).',
     'Return ONLY JSON with this shape:',
     '{"reply": "1-2 short sentences to the dispatcher in THEIR language (Hungarian or Romanian), confirming what changed",',
-    ' "draft": {"client": null, "client_cui": null, "ref": null, "stops": [{"kind": "pickup", "loc": null, "firma": null, "data": null}], "load_type": null, "suly_kg": null, "hossz_cm": null, "szel_cm": null, "mag_cm": null, "pret": null, "km": null, "driver_name": null, "rendszam_camion": null, "rendszam_remorca": null},',
+    ' "draft": {"client": null, "client_cui": null, "ref": null, "stops": [{"kind": "pickup", "loc": null, "firma": null, "data": null}], "load_type": null, "suly_kg": null, "hossz_cm": null, "szel_cm": null, "mag_cm": null, "pret": null, "km": null, "driver_name": null, "rendszam_camion": null, "rendszam_remorca": null, "uit_codes": []},',
     ' "questions": [{"key": "client|stops|dates|load_type|dims|driver|price|other", "text": "short question in the user language", "options": ["up to 4 short clickable answers"]}]}',
     'Ask at most 3 questions, only about genuinely missing or ambiguous REQUIRED data: client, stop location, stop date, FTL/LTL, LTL dimensions. Price is optional: never ask about it more than once. If nothing is missing, "questions" must be [].',
   ].join('\n');
@@ -247,6 +276,7 @@ function _aiView(d) {
     load_type: d.load_type, suly_kg: d.suly_kg, hossz_cm: d.hossz_cm, szel_cm: d.szel_cm, mag_cm: d.mag_cm,
     pret: d.pret, km: d.km, driver_name: d.driver_name || d.nume_sofer,
     rendszam_camion: d.rendszam_camion, rendszam_remorca: d.rendszam_remorca,
+    uit_codes: d.uit_codes,
   };
 }
 
@@ -593,6 +623,8 @@ handlers.orderChatTurn = async function (req, res, args) {
     }
     aiDraft.route_sig = prev.route_sig; aiDraft.route_km = prev.route_km; aiDraft.route_geo = prev.route_geo;
     aiDraft.edit_order_id = prev.edit_order_id; aiDraft.edit_fuvar_no = prev.edit_fuvar_no;
+    aiDraft.edit_uit_existing = prev.edit_uit_existing;
+    if (!Array.isArray(out.draft && out.draft.uit_codes)) aiDraft.uit_codes = prev.uit_codes;
     if (aiDraft.driver_name && prev.driver_raw) aiDraft.driver_raw = prev.driver_raw;
 
     const r = await resolveDraft(cid, aiDraft, { req, lang, editing: !!aiDraft.edit_order_id });
@@ -640,7 +672,7 @@ handlers.orderChatCreate = async function (req, res, args) {
     const pickups = d.stops.filter((s) => s.kind === 'pickup');
     const deliveries = d.stops.filter((s) => s.kind === 'delivery');
     const km = d.km != null ? d.km : (d.route_km || 0);
-    if (editing) return await _saveEdit(req, res, cid, d, pickups, deliveries, km);
+    if (editing) return await _saveEdit(req, res, cid, d, pickups, deliveries, km, a.uit_docs);
     const payload = {
       client: d.client,
       ref: d.ref || '',
@@ -658,6 +690,7 @@ handlers.orderChatCreate = async function (req, res, args) {
       rendszam_camion: d.rendszam_camion, rendszam_remorca: d.rendszam_remorca,
       route_geo: d.route_geo || null,
       series_id: a.series_id || null,
+      uit_codes: _uitRows(d.uit_codes, a.uit_docs),
     };
 
     let captured = null;
@@ -685,7 +718,7 @@ handlers.orderChatCreate = async function (req, res, args) {
 // Meglévő fuvar módosítása a MEGLÉVŐ comUpdate-tel. A sofőrt/rendszámot csak
 // akkor küldjük, ha tényleg változott (a külsős kiosztás így érintetlen marad);
 // a stopok cseréje a replaceStopsForOrder-en át megőrzi a sofőr-állomásokat.
-async function _saveEdit(req, res, cid, d, pickups, deliveries, km) {
+async function _saveEdit(req, res, cid, d, pickups, deliveries, km, uitDocs) {
   const id = d.edit_order_id;
   const cur = await pool.query(
     `SELECT status, email_sofer, rendszam_camion, rendszam_remorca, to_jsonb(o)->>'fuvar_no' AS fuvar_no
@@ -723,6 +756,16 @@ async function _saveEdit(req, res, cid, d, pickups, deliveries, km) {
     try { await pool.query('UPDATE orders SET client_id=$1 WHERE id=$2 AND company_id=$3', [d.client_id, id, cid]); }
     catch (_) { /* oszlop hiányzik */ }
   }
+  // Új UIT-kódok (a meglévők érintetlenek; duplikátum nem keletkezik).
+  try {
+    for (const u of _uitRows(d.uit_codes, uitDocs)) {
+      await pool.query(
+        `INSERT INTO order_uit_codes (company_id, order_id, uit_code, rendszam, provider, created_by, source, photo_b64, photo_mime)
+         VALUES ($1,$2,$3,$4,'cargotrack',$5,$6,$7,$8)
+         ON CONFLICT (company_id, order_id, uit_code) DO NOTHING`,
+        [cid, id, u.uit_code, d.rendszam_camion || c.rendszam_camion || null, req.session.user.id, u.source, u.photo_b64 || null, u.photo_mime || null]);
+    }
+  } catch (e) { console.error('orderChat UIT-mentés hiba (a fuvar mentve):', e.message); }
   await learnFromDraft(cid, d);
   try { await audit.fromReq(req, 'order.update_from_chat', 'order', id, { stops: d.stops.length }); } catch (_) {}
   return res.json({ result: { ok: true, id, fuvar_no: c.fuvar_no || d.edit_fuvar_no || id, updated: true } });

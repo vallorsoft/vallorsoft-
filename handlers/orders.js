@@ -14,7 +14,7 @@ const { featureEnabled } = require('../lib/featureEnabled');
 const { hasPerm } = require('./permissions');
 const { normalizePlate } = require('../lib/plate');
 const orderStops = require('../lib/orderStops');
-const { normalizeUit, isValidUit } = require('../lib/uitFormat');
+const { normalizeUit, isValidUit, sanitizeUitPhoto } = require('../lib/uitFormat');
 
 const handlers = {};
 
@@ -714,12 +714,15 @@ handlers.comCreate = async function (req, res, args) {
           const raw = uitList[i] && (uitList[i].uit_code || uitList[i].code || uitList[i]);
           const uit = normalizeUit(raw);
           if (!isValidUit(uit)) continue;
+          // Opcionális bizonylat (fotó/PDF) a kiíráskori 📷/📎 kiolvasásból.
+          const ph = sanitizeUitPhoto(uitList[i]);
+          const src = (uitList[i] && uitList[i].source === 'ai-scan') ? 'ai-scan' : 'manual';
           await pool.query(
             `INSERT INTO order_uit_codes (company_id, order_id, uit_code, rendszam, provider,
-                                          created_by, source)
-             VALUES ($1,$2,$3,$4,$5,$6,'manual')
+                                          created_by, source, photo_b64, photo_mime)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
              ON CONFLICT (company_id, order_id, uit_code) DO NOTHING`,
-            [company_id, id, uit, rendszam_camion || null, 'cargotrack', req.session.user.id]);
+            [company_id, id, uit, rendszam_camion || null, 'cargotrack', req.session.user.id, src, ph.photo_b64, ph.photo_mime]);
         }
       } catch (e) { console.error('UIT-kódok beszúrás hiba (fuvar mentve, de UIT nem):', e); }
 

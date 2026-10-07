@@ -76,50 +76,8 @@ window.SoferUit = (function () {
     } catch (_) { return false; }
   }
 
-  // ── Fotó → base64 (kamera). Egyetlen file-input, capture=environment
-  //    → mobilon a natív kamerát nyitja meg. A képet a Gemini AI-nak
-  //    küldjük scanUitFromImage-en; a válasz codes[] tömb — minden kódra
-  //    külön POST-tal ment a UIT-mentő endpoint (photo_b64 mindegyikkel).
-  function makeFileInput() {
-    var inp = document.createElement('input');
-    inp.type = 'file';
-    inp.accept = 'image/*';
-    inp.capture = 'environment';
-    inp.style.display = 'none';
-    document.body.appendChild(inp);
-    return inp;
-  }
-  function fileToDataUrl(file) {
-    return new Promise(function (resolve, reject) {
-      var r = new FileReader();
-      r.onload = function () { resolve(String(r.result || '')); };
-      r.onerror = function () { reject(new Error('Nem sikerült beolvasni a fájlt.')); };
-      r.readAsDataURL(file);
-    });
-  }
-  // Canvas-alapú átméretezés (max 1600px, JPEG q=0.85) — kompaktabb payload,
-  // gyorsabb feltöltés. A base64 fejlécet (data:image/jpeg;base64,) eltávolítjuk.
-  function shrinkImage(dataUrl) {
-    return new Promise(function (resolve) {
-      var img = new Image();
-      img.onload = function () {
-        var MAX = 1600;
-        var w = img.width, h = img.height;
-        if (w > MAX || h > MAX) {
-          if (w > h) { h = Math.round(h * MAX / w); w = MAX; } else { w = Math.round(w * MAX / h); h = MAX; }
-        }
-        var c = document.createElement('canvas'); c.width = w; c.height = h;
-        var ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
-        var out = c.toDataURL('image/jpeg', 0.85);
-        // out formája: „data:image/jpeg;base64,XXXX"
-        var m = out.match(/^data:([^;]+);base64,(.*)$/);
-        if (!m) { resolve({ mime: 'image/jpeg', b64: out }); return; }
-        resolve({ mime: m[1], b64: m[2] });
-      };
-      img.onerror = function () { resolve(null); };
-      img.src = dataUrl;
-    });
-  }
+  // 📷/📎 kiolvasás: közös public/uit-scan.js (UitScan.pick).
+  function T2(k, fb) { var v = window.t ? window.t(k) : k; return (v && v !== k) ? v : fb; }
 
   function open(orderId, stopId) {
     ensureStyle();
@@ -201,7 +159,8 @@ window.SoferUit = (function () {
           '<div class="su-add-row">' +
             '<input class="su-in" id="suNew" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19" autocomplete="off">' +
             '<button class="su-save" id="suSave">➤ Küldés</button>' +
-            '<button class="su-cam" id="suCam">📷 Fotó</button>' +
+            '<button class="su-cam" id="suCam">📷 ' + esc(T2('uitscan.photoShort', 'Foto')) + '</button>' +
+            '<button class="su-cam" id="suUp">📎 ' + esc(T2('uitscan.uploadShort', 'Fișier')) + '</button>' +
           '</div>' +
           '<div class="su-status" id="suStat"></div>' +
         '</div>';
@@ -231,61 +190,44 @@ window.SoferUit = (function () {
       $('suSave').addEventListener('click', addManual);
       $('suNew').addEventListener('keydown', function(e){ if (e.key === 'Enter') addManual(); });
 
-      // 📷 Fotó → AI-kiolvasás → minden kód külön mentése (photo_b64 mindegyikkel)
-      $('suCam').addEventListener('click', function () {
-        var f = makeFileInput();
-        f.addEventListener('change', async function () {
-          try {
-            if (!f.files || !f.files[0]) { f.remove(); return; }
-            var file = f.files[0];
-            var camBtn = $('suCam'); camBtn.disabled = true;
-            setStat('Fotó feldolgozása…');
-            var dataUrl = await fileToDataUrl(file);
-            var shrunk = await shrinkImage(dataUrl);
-            if (!shrunk) { setStat('Nem sikerült a fotó feldolgozása.', 'err'); camBtn.disabled = false; f.remove(); return; }
-            setStat('AI kiolvasás…');
-            var d = await api('POST', '/api/execute', {
-              functionName: 'scanUitFromImage',
-              arguments: [{ mimeType: shrunk.mime, data: shrunk.b64 }]
-            });
-            var r = d && d.result;
-            if (!r || !r.ok) { setStat((r && r.err) || 'AI-hiba.', 'err'); camBtn.disabled = false; f.remove(); return; }
-            var codes = (r && r.codes) || [];
-            if (!codes.length) { setStat('Nincs felismert UIT-kód a képen.', 'err'); camBtn.disabled = false; f.remove(); return; }
-            // Minden kódra külön POST — a fotó másolata mindegyikhez csatolva.
-            var savedCount = 0, dupCount = 0, errCount = 0;
-            for (var i = 0; i < codes.length; i++) {
-              try {
-                var pl = {
-                  uit_code: codes[i],
-                  source: 'ai-scan',
-                  photo_b64: shrunk.b64,
-                  photo_mime: shrunk.mime
-                };
-                if (sid) pl.stop_id = sid;
-                await api('POST', '/api/sofer/orders/' + encodeURIComponent(orderId) + '/uit', pl);
-                savedCount++;
-              } catch (e) {
-                if (/deja inregistrat|already/i.test(e.message)) dupCount++;
-                else errCount++;
-              }
+      // 📷 Fotó (kamera) / 📎 Feltöltés (kép vagy PDF) → AI-kiolvasás
+      // (közös UitScan) → minden kód külön mentése, a bizonylat mindegyikhez.
+      async function scanWith(mode) {
+        var btns = [$('suCam'), $('suUp')];
+        try {
+          if (!window.UitScan) throw new Error('UitScan lipsă');
+          var p = await window.UitScan.pick(mode);
+          if (!p) return;
+          btns.forEach(function (b) { if (b) b.disabled = true; });
+          setStat(T2('uitscan.reading', 'Citire AI…'));
+          if (!p.codes.length) { setStat(T2('uitscan.none', 'Nu am găsit cod UIT în document.'), 'err'); return; }
+          var savedCount = 0, dupCount = 0, errCount = 0;
+          for (var i = 0; i < p.codes.length; i++) {
+            try {
+              var pl = { uit_code: p.codes[i], source: 'ai-scan', photo_b64: p.b64, photo_mime: p.mime };
+              if (sid) pl.stop_id = sid;
+              await api('POST', '/api/sofer/orders/' + encodeURIComponent(orderId) + '/uit', pl);
+              savedCount++;
+            } catch (e) {
+              if (/deja inregistrat|already/i.test(e.message)) dupCount++;
+              else errCount++;
             }
-            var msg = savedCount + ' UIT mentve';
-            if (dupCount) msg += ', ' + dupCount + ' már létezett';
-            if (errCount) msg += ', ' + errCount + ' hiba';
-            setStat(msg, errCount ? 'err' : 'ok');
-            if (typeof window.__soferUitChanged === 'function') window.__soferUitChanged();
-            await load();
-          } catch (e) {
-            setStat(e.message || 'Hiba a fotó feldolgozásakor.', 'err');
-          } finally {
-            var camBtn2 = $('suCam'); if (camBtn2) camBtn2.disabled = false;
-            f.remove();
-            setTimeout(function () { setStat(''); }, 4000);
           }
-        });
-        f.click();
-      });
+          var msg = T2('uitscan.saved', 'UIT salvate: {n}').replace('{n}', savedCount);
+          if (dupCount) msg += ' · ' + T2('uitscan.dup', 'existente: {n}').replace('{n}', dupCount);
+          if (errCount) msg += ' · ' + T2('uitscan.err', 'erori: {n}').replace('{n}', errCount);
+          setStat(msg, errCount ? 'err' : 'ok');
+          if (typeof window.__soferUitChanged === 'function') window.__soferUitChanged();
+          await load();
+        } catch (e) {
+          setStat(e.message || 'Eroare', 'err');
+        } finally {
+          btns.forEach(function (b) { if (b) b.disabled = false; });
+          setTimeout(function () { setStat(''); }, 4000);
+        }
+      }
+      $('suCam').addEventListener('click', function () { scanWith('camera'); });
+      $('suUp').addEventListener('click', function () { scanWith('file'); });
     }
 
     async function load(){

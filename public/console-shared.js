@@ -1325,6 +1325,10 @@ function createOrder(){
   var _oUitRaw = (document.getElementById('oUit')||{}).value || '';
   var _oUitNorm = (window.UitFmt && window.UitFmt.normalize) ? window.UitFmt.normalize(_oUitRaw) : String(_oUitRaw).toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,16);
   var _uitList = _oUitNorm ? [{ uit_code: _oUitNorm }] : [];
+  // 📷/📎 kiolvasott kódok (a bizonylattal együtt) — duplikátum nélkül.
+  (window._oUitScanned || []).forEach(function (u) {
+    if (!_uitList.some(function (x) { return x.uit_code === u.uit_code; })) _uitList.push(u);
+  });
   const p={
     client:document.getElementById('oClient').value.trim(),
     ref:document.getElementById('oRef').value.trim(),
@@ -1380,7 +1384,7 @@ function createOrder(){
         } catch(_) { /* csendes */ }
       }
       loadOrders();
-      ['oClient','oRef','oPret','oKm','oSuly','oHossz','oSzel','oMag','oLoad','oUnload','oLoadFirma','oUnloadFirma','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon','oUit'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+      ['oClient','oRef','oPret','oKm','oSuly','oHossz','oSzel','oMag','oLoad','oUnload','oLoadFirma','oUnloadFirma','oLoadDate','oUnloadDate','oExternNume','oExternFirma','oExternTelefon','oUit'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});window._oUitScanned=[];_renderOUitScanList();
       const _el=document.getElementById('oExtraStopsList'); if(_el) _el.innerHTML='';
       try { window.__ocStopsSeq = null; } catch (_) {}
       ['oFtl','oLtl'].forEach(id=>{const el=document.getElementById(id);if(el)el.checked=false;});
@@ -6439,7 +6443,7 @@ function loadOeUitList() {
         var prettyCode = (window.UitFmt && window.UitFmt.format) ? window.UitFmt.format(u.uit_code) : u.uit_code;
         var srcLabel = u.source === 'ai-scan' ? '📷 AI' : '✋';
         var photoBtn = u.has_photo
-          ? '<a class="btn ghost" style="padding:4px 10px;font-size:11px;text-decoration:none;" target="_blank" rel="noopener" href="/api/uit/' + u.id + '/photo" title="Fotó megnyitása">🖼️</a>'
+          ? '<a class="btn ghost" style="padding:4px 10px;font-size:11px;text-decoration:none;" target="_blank" rel="noopener" href="/api/uit/' + u.id + '/photo" title="Fotó / PDF">' + (u.photo_mime === 'application/pdf' ? '📄' : '🖼️') + '</a>'
           : '';
         return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;background:rgba(255,255,255,0.03);">' +
           '<span style="font-family:ui-monospace,monospace;font-weight:700;letter-spacing:.5px;flex:1;word-break:break-all;">' + esc(prettyCode) + '</span>' +
@@ -6505,6 +6509,76 @@ function oeAddUit() {
     }
   })
   .catch(function () { toast(t('common.error'), 'err'); });
+}
+
+// ── 📷 Fotó / 📎 Feltöltés → AI-kiolvasás (UIT) ──────────────
+// Közös futtató: gomb-zár + státusz-toast; a kódokat a `onCodes` kapja.
+async function _uitScanRun(mode, onCodes) {
+  if (!window.UitScan) { toast(t('common.error'), 'err'); return; }
+  var btns = document.querySelectorAll('.uit-scan-btn');
+  try {
+    var picked = await window.UitScan.pick(mode);
+    if (!picked) return;
+    btns.forEach(function (b) { b.disabled = true; });
+    if (!picked.codes.length) { toast(t('uitscan.none') || 'Nu am găsit cod UIT în document.', 'err'); return; }
+    await onCodes(picked);
+  } catch (e) {
+    toast((e && e.message) || t('common.error'), 'err');
+  } finally {
+    btns.forEach(function (b) { b.disabled = false; });
+  }
+}
+function _uitFmt(c) { return (window.UitFmt && window.UitFmt.format) ? window.UitFmt.format(c) : c; }
+
+// Fuvar-kiírás: a kiolvasott kódok a mentésig a kliensen várnak (a
+// createOrder a uit_codes[]-be teszi a bizonylattal együtt).
+window._oUitScanned = window._oUitScanned || [];
+function _renderOUitScanList() {
+  var box = document.getElementById('oUitScanList');
+  if (!box) return;
+  box.innerHTML = (window._oUitScanned || []).map(function (u, i) {
+    return '<span class="uit-scan-chip">' + (u.photo_mime === 'application/pdf' ? '📄 ' : '📷 ') + esc(_uitFmt(u.uit_code)) +
+      ' <button type="button" onclick="oRemoveScannedUit(' + i + ')" title="✕">✕</button></span>';
+  }).join('');
+}
+function oRemoveScannedUit(i) { window._oUitScanned.splice(i, 1); _renderOUitScanList(); }
+function oScanUit(mode) {
+  return _uitScanRun(mode, async function (p) {
+    var added = 0;
+    p.codes.forEach(function (c) {
+      var n = (window.UitFmt && window.UitFmt.normalize) ? window.UitFmt.normalize(c) : String(c).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
+      if (!n || window._oUitScanned.some(function (u) { return u.uit_code === n; })) return;
+      window._oUitScanned.push({ uit_code: n, source: 'ai-scan', photo_b64: p.b64, photo_mime: p.mime });
+      added++;
+    });
+    _renderOUitScanList();
+    toast((t('uitscan.found') || 'Coduri UIT găsite: {n}').replace('{n}', added), 'ok');
+  });
+}
+
+// Fuvar-szerkesztő: azonnal a fuvarhoz menti (a kiválasztott lerakóhoz is).
+function oeScanUit(mode) {
+  if (!_oeOrderId) return;
+  return _uitScanRun(mode, async function (p) {
+    var stopSel = document.getElementById('oeUitStop');
+    var sid = stopSel && stopSel.value ? parseInt(stopSel.value, 10) : null;
+    var saved = 0, dup = 0, err = 0;
+    for (var i = 0; i < p.codes.length; i++) {
+      var body = { uit_code: p.codes[i], source: 'ai-scan', photo_b64: p.b64, photo_mime: p.mime };
+      if (sid && sid > 0) body.stop_id = sid;
+      try {
+        var r = await fetch('/api/orders/' + encodeURIComponent(_oeOrderId) + '/uit', {
+          method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        var d = await r.json().catch(function () { return {}; });
+        if (r.ok) saved++; else if (/deja|already/i.test((d && d.error) || '')) dup++; else err++;
+      } catch (_) { err++; }
+    }
+    var msg = (t('uitscan.saved') || 'UIT salvate: {n}').replace('{n}', saved);
+    if (dup) msg += ' · ' + (t('uitscan.dup') || 'existente: {n}').replace('{n}', dup);
+    if (err) msg += ' · ' + (t('uitscan.err') || 'erori: {n}').replace('{n}', err);
+    toast(msg, err ? 'err' : 'ok');
+    loadOeUitList();
+  });
 }
 
 function oeDeleteUit(uid) {

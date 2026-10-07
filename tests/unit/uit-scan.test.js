@@ -49,9 +49,9 @@ describe('handlers.scanUitFromImage — kapuk', () => {
     expect(res._body.result.ok).toBe(false);
     expect(res._body.result.err).toMatch(/Fisier|lipsa/);
   });
-  test('rossz MIME (PDF) → visszautasítás (csak kép)', async () => {
+  test.each(['image/svg+xml', 'text/html', 'application/zip'])('rossz MIME (%s) → visszautasítás', async (mime) => {
     const res = mkRes();
-    await handlers.scanUitFromImage(mkReq('Sofer'), res, [{ mimeType: 'application/pdf', data: 'AAAA' }]);
+    await handlers.scanUitFromImage(mkReq('Sofer'), res, [{ mimeType: mime, data: 'AAAA' }]);
     expect(res._body.result.ok).toBe(false);
     expect(res._body.result.err).toMatch(/Format/i);
   });
@@ -106,5 +106,31 @@ describe('handlers.scanUitFromImage — teljes út (Gemini mock)', () => {
     await handlers.scanUitFromImage(mkReq('Sofer'), res, [{ mimeType: 'image/jpeg', data: Buffer.from('x').toString('base64') }]);
     expect(res._body.result.ok).toBe(false);
     expect(res._body.result.status).toBe(429);
+  });
+});
+
+describe('UIT PDF-feltöltés', () => {
+  beforeEach(() => { process.env.GEMINI_API_KEY = 'test'; extractJson.mockReset(); });
+  test('PDF (pl. e-Transport visszaigazolás) → a Gemini PDF-ként kapja, kódokat ad', async () => {
+    extractJson.mockResolvedValueOnce({ json: { codes: ['ABCD1234EFGH5678'], confidence: 0.95 }, model: 'm' });
+    const res = mkRes();
+    await handlers.scanUitFromImage(mkReq('Admin'), res, [{ mimeType: 'application/pdf', data: Buffer.from('%PDF-1.4').toString('base64') }]);
+    expect(res._body.result.ok).toBe(true);
+    expect(res._body.result.codes).toEqual(['ABCD1234EFGH5678']);
+    expect(extractJson.mock.calls[0][0].parts[0].inlineData.mimeType).toBe('application/pdf');
+  });
+});
+
+describe('lib/uitFormat sanitizeUitPhoto', () => {
+  const { sanitizeUitPhoto } = require('../../lib/uitFormat');
+  test('kép és PDF elfogadva', () => {
+    expect(sanitizeUitPhoto({ photo_mime: 'image/jpeg', photo_b64: 'QUJD' }).photo_mime).toBe('image/jpeg');
+    expect(sanitizeUitPhoto({ photo_mime: 'application/pdf', photo_b64: 'QUJD' }).photo_mime).toBe('application/pdf');
+  });
+  test('SVG / HTML / nem-base64 / túl nagy → nincs csatolmány', () => {
+    expect(sanitizeUitPhoto({ photo_mime: 'image/svg+xml', photo_b64: 'QUJD' }).photo_b64).toBeNull();
+    expect(sanitizeUitPhoto({ photo_mime: 'text/html', photo_b64: 'QUJD' }).photo_b64).toBeNull();
+    expect(sanitizeUitPhoto({ photo_mime: 'image/png', photo_b64: '<script>' }).photo_b64).toBeNull();
+    expect(sanitizeUitPhoto({ photo_mime: 'image/png', photo_b64: 'A'.repeat(12 * 1024 * 1024) }).photo_b64).toBeNull();
   });
 });
