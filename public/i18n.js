@@ -82,6 +82,7 @@
     'och.uitAdded': { hu: "UIT hozzáadva: {codes}", ro: "UIT adăugat: {codes}" },
     'och.uitNone': { hu: "nincs (opcionális)", ro: "niciunul (opțional)" },
     'och.uitExisting': { hu: "+ {n} már rögzítve", ro: "+ {n} deja înregistrate" },
+    'och.fab': { hu: "💬 Szöveges fuvarkiírás (AI) — új fuvar vagy módosítás fuvarszámmal", ro: "💬 Comandă din text (AI) — cursă nouă sau modificare după număr" },
     'och.save': { hu: "✅ Fuvar mentése", ro: "✅ Salvează cursa" },
     'och.saveEdit': { hu: "✅ Módosítás mentése", ro: "✅ Salvează modificarea" },
     'och.updated': { hu: "✅ Fuvar módosítva: {no}", ro: "✅ Cursă modificată: {no}" },

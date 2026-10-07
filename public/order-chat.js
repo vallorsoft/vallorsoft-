@@ -368,5 +368,25 @@
     renderAll();
   }
 
-  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, tab: tab, uit: uit, uitRemove: uitRemove };
+  // ─── Lebegő gomb (mint a 🐛 hibabejelentő) — minden fülön látszik ───
+  // A csomag-kapu (`ai-szoveges-fuvar`) után kapcsolja be az applyFeatureFlags.
+  function setFab(visible) {
+    var b = $('ochFab');
+    if (!b) {
+      if (!visible) return;
+      b = document.createElement('button');
+      b.id = 'ochFab';
+      b.type = 'button';
+      b.className = 'och-fab';
+      b.setAttribute('data-i18n-title', 'och.fab');
+      b.title = T('och.fab');
+      b.setAttribute('aria-label', T('och.fab'));
+      b.innerHTML = '<span class="och-fab-i">💬</span><span class="och-fab-t">AI</span>';
+      b.addEventListener('click', open);
+      document.body.appendChild(b);
+    }
+    b.style.display = visible ? '' : 'none';
+  }
+
+  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab };
 })();

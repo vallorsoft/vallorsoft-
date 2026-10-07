@@ -113,6 +113,7 @@ function applyFeatureFlags(){
       // 💬 Szöveges fuvarkiírás (AI-chat) — Pro csomagtól (handlers/orderChat.js is kapuzza)
       var _chatBtn=document.getElementById('ordChatBtnBox');
       if(_chatBtn) _chatBtn.style.display = (feats['ai-szoveges-fuvar']===false) ? 'none' : '';
+      if(window.OrderChat && typeof window.OrderChat.setFab==='function'){ try{ window.OrderChat.setFab(feats['ai-szoveges-fuvar']!==false); }catch(_){} }
     }
     // A sidebar láthatóság (csomag-kapcsoló + sofőr-mód) egy közös számításból —
     // akkor is lefut (sofőr-mód szűrő), ha a funkció-lekérés hibázott.

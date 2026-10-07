@@ -5197,3 +5197,14 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #ochModal .och-uit-chip{ display:inline-flex; align-items:center; gap:4px; margin:0 6px 4px 0; padding:3px 4px 3px 9px; border-radius:999px; font:700 12px ui-monospace,monospace; background:#eff6ff; color:#1e3a8a; border:1px solid #bfdbfe; }
 #ochModal .och-uit-chip button{ border:0; background:transparent; color:#b91c1c; cursor:pointer; font-weight:700; padding:0 4px; }
 #ochModal[data-theme="dark"] .och-uit-chip{ background:rgba(59,130,246,0.14); color:#bfdbfe; border-color:rgba(59,130,246,0.4); }
+
+/* ── 💬 Szöveges fuvarkiírás: lebegő gomb a 🐛 mellett (minden fülön) ── */
+.och-fab{ position:fixed; right:84px; bottom:24px; z-index:500; width:48px; height:48px; border-radius:50%;
+  border:1px solid rgba(255,255,255,0.35); background:linear-gradient(135deg,#f6711e,#f6517b); color:#fff;
+  cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0;
+  box-shadow:0 6px 20px rgba(246,81,123,0.35), 0 2px 8px rgba(0,0,0,0.25); transition:transform .15s, box-shadow .15s;
+  margin-bottom:env(safe-area-inset-bottom, 0px); }
+.och-fab:hover{ transform:translateY(-2px); box-shadow:0 10px 26px rgba(246,81,123,0.45), 0 2px 8px rgba(0,0,0,0.25); }
+.och-fab:active{ transform:scale(.94); }
+.och-fab .och-fab-i{ font-size:19px; line-height:1; }
+.och-fab .och-fab-t{ font-size:9px; font-weight:800; letter-spacing:.6px; line-height:1; margin-top:1px; }
