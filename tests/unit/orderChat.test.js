@@ -27,7 +27,11 @@ jest.mock('../../lib/routeEstimate', () => ({
   }),
 }));
 const mockComCreate = jest.fn(async (req, res) => res.json({ result: { ok: true, id: 'CMD-X1', fuvar_no: 'CMD-2026-0042' } }));
-jest.mock('../../handlers/orders', () => ({ comCreate: (...a) => mockComCreate(...a) }));
+const mockComUpdate = jest.fn(async (req, res) => res.json({ result: { ok: true } }));
+jest.mock('../../handlers/orders', () => ({
+  comCreate: (...a) => mockComCreate(...a),
+  comUpdate: (...a) => mockComUpdate(...a),
+}));
 
 const h = require('../../handlers/orderChat');
 
@@ -52,7 +56,7 @@ const AI_DRAFT = {
 beforeEach(() => {
   mockFeatureOn = true;
   mockRules = [];
-  mockDbQuery.mockClear(); mockExtract.mockReset(); mockAnaf.mockReset(); mockComCreate.mockClear();
+  mockDbQuery.mockClear(); mockExtract.mockReset(); mockAnaf.mockReset(); mockComCreate.mockClear(); mockComUpdate.mockClear();
 });
 
 describe('kapuk', () => {
@@ -211,5 +215,166 @@ describe('segédek', () => {
   });
   test('belső segédek nem RPC-k', () => {
     expect(Object.keys(h).sort()).toEqual(['orderChatCreate', 'orderChatTurn']);
+  });
+});
+
+describe('tanulás', () => {
+  test('mentés után a cím / felrakó→megrendelő / áru / sofőr-becenév bekerül a memóriába', async () => {
+    const puts = [];
+    mockRules = [
+      { match: /INSERT INTO order_chat_memory/, fn: (sql, p) => { puts.push([p[1], p[2], JSON.parse(p[3])]); return { rows: [] }; } },
+    ];
+    await h._learnFromDraft(7, {
+      client: 'Bilka Steel SRL', client_id: 11, load_type: 'FTL',
+      stops: [{ kind: 'pickup', loc: 'Str. Zizinului 110, Brașov', firma: 'Bilka Steel' }, { kind: 'delivery', loc: 'Bicske', firma: 'X Kft' }],
+      driver_raw: 'Peti', email_sofer: 'peto@x.ro', nume_sofer: 'Pető-Lőrincz Imre',
+    });
+    const kinds = puts.map((x) => x[0] + ':' + x[1]);
+    expect(kinds).toEqual(expect.arrayContaining(['firma_addr:bilka steel', 'pickup_client:bilka steel', 'client_cargo:id:11', 'driver_alias:peti']));
+    expect(kinds).not.toContain('firma_addr:x kft'); // csak városnév → nem tanuljuk
+    expect(puts.every((x) => mockDbQuery.mock.calls.some((c) => c[1][0] === 7))).toBe(true);
+  });
+
+  test('tanult adatok felhasználása: megrendelő, teljes cím, áru-típus, becenév', async () => {
+    const mem = {
+      'pickup_client:bilka steel': { client: 'Bilka Steel SRL', client_id: 11 },
+      'firma_addr:bilka steel': { loc: 'Str. Zizinului 110, Brașov' },
+      'client_cargo:id:11': { load_type: 'FTL' },
+      'driver_alias:peti': { email: 'peto@x.ro' },
+    };
+    mockRules = [
+      { match: /FROM order_chat_memory/, fn: (sql, p) => { const v = mem[p[1] + ':' + p[2]]; return { rows: v ? [{ value: v }] : [] }; } },
+      { match: /FROM clients WHERE id=\$1 AND company_id=\$2/, rows: [{ id: 11, denumire: 'Bilka Steel SRL' }] },
+      { match: /LOWER\(email\)=LOWER\(\$2\)/, rows: [{ email: 'peto@x.ro', nume: 'Pető-Lőrincz Imre' }] },
+    ];
+    const r = await h._resolveDraft(7, h._sanitizeDraft({
+      stops: [{ kind: 'pickup', loc: 'Brasov', firma: 'Bilka Steel', data: '2026-10-12' }, { kind: 'delivery', loc: 'Bicske, HU', data: '2026-10-13' }],
+      driver_name: 'Peti',
+    }), { estimateRoute: false });
+    expect(r.draft.client).toBe('Bilka Steel SRL');
+    expect(r.draft.client_id).toBe(11);
+    expect(r.draft.learned_client).toBe(true);
+    expect(r.draft.stops[0].loc).toBe('Str. Zizinului 110, Brașov');
+    expect(r.draft.stops[0].learned).toBe(true);
+    expect(r.draft.load_type).toBe('FTL');
+    expect(r.draft.email_sofer).toBe('peto@x.ro');
+    expect(r.draft.learned_driver).toBe(true);
+    expect(r.missing).toEqual([]);
+    // minden memória-lekérdezés a cégre szűrt
+    mockDbQuery.mock.calls.filter((c) => /order_chat_memory/.test(c[0])).forEach((c) => expect(c[1][0]).toBe(7));
+  });
+
+  test('a tanult cím nem írja felül a más városra mutató címet', async () => {
+    mockRules = [{ match: /FROM order_chat_memory/, fn: (sql, p) => ({ rows: p[1] === 'firma_addr' ? [{ value: { loc: 'Str. X 1, Brașov' } }] : [] }) }];
+    const r = await h._resolveDraft(7, h._sanitizeDraft({ client: 'C', stops: [{ kind: 'pickup', loc: 'Cluj', firma: 'Bilka', data: '2026-10-12' }] }), { estimateRoute: false });
+    expect(r.draft.stops[0].loc).toBe('Cluj');
+  });
+
+  test('hiányzó memória-tábla → nincs hiba', async () => {
+    mockRules = [{ match: /order_chat_memory/, fn: () => { throw new Error('relation does not exist'); } }];
+    const r = await h._resolveDraft(7, h._sanitizeDraft({ stops: [{ kind: 'pickup', loc: 'Brasov', firma: 'B', data: '2026-10-12' }] }), { estimateRoute: false });
+    expect(r.missing).toContain('client');
+  });
+});
+
+describe('szerkesztés fuvarszámmal', () => {
+  const ORDER_ROW = { j: {
+    id: 'CMD-MT181GD5NBL', fuvar_no: 'CMD-2026-0042', status: 'Alocat', client: 'Bilka Steel SRL', client_id: 11,
+    load_type: 'FTL', pret: '1500', km: 0, email_sofer: 'peto@x.ro', nume_sofer: 'Pető-Lőrincz Imre',
+    rendszam_camion: 'B104VLR', rendszam_remorca: 'CJ36VSN',
+  } };
+  const STOPS = [
+    { kind: 'pickup', loc: 'Brașov, RO', firma: 'Bilka', data: '2026-10-12' },
+    { kind: 'delivery', loc: 'Bicske, HU', firma: 'X', data: '2026-10-13' },
+  ];
+  function editRules(extra) {
+    return (extra || []).concat([
+      { match: /SELECT to_jsonb\(o\) AS j FROM orders/, rows: [ORDER_ROW] },
+      { match: /FROM order_stops/, rows: STOPS },
+      { match: /FROM clients WHERE id=\$1 AND company_id=\$2/, rows: [{ id: 11, denumire: 'Bilka Steel SRL' }] },
+      { match: /LOWER\(email\)=LOWER\(\$2\)/, rows: [{ email: 'peto@x.ro', nume: 'Pető-Lőrincz Imre' }] },
+      { match: /FROM vehicles WHERE company_id=\$1 AND tip=\$2/, fn: (sql, p) => ({ rows: [{ rendszam: p[2] }] }) },
+    ]);
+  }
+
+  test('csak a fuvarszám → betölti a fuvart AI-hívás nélkül, cégre szűrve', async () => {
+    mockRules = editRules();
+    const r = await call('orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'cmd-2026-0042' }], draft: {}, lang: 'hu' }]);
+    expect(r.ok).toBe(true);
+    expect(mockExtract).not.toHaveBeenCalled();
+    expect(r.draft.edit_order_id).toBe('CMD-MT181GD5NBL');
+    expect(r.draft.edit_fuvar_no).toBe('CMD-2026-0042');
+    expect(r.draft.stops).toHaveLength(2);
+    expect(r.draft.email_sofer).toBe('peto@x.ro');
+    expect(r.draft.pret).toBe(1500);
+    expect(r.ready).toBe(true);
+    expect(r.reply).toMatch(/CMD-2026-0042/);
+    const q = mockDbQuery.mock.calls.find((c) => /SELECT to_jsonb\(o\) AS j FROM orders/.test(c[0]));
+    expect(q[1]).toEqual([7, 'CMD-2026-0042']);
+    expect(q[0]).toMatch(/company_id=\$1/);
+    expect(q[0]).toMatch(/<> 'Anulat'/);
+  });
+
+  test('ismeretlen / másik cég fuvara → „nem találom", nincs adat', async () => {
+    mockRules = [{ match: /SELECT to_jsonb\(o\) AS j FROM orders/, rows: [] }];
+    const r = await call('orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'CMD-2026-9999' }], draft: {}, lang: 'ro' }]);
+    expect(r.ok).toBe(true);
+    expect(r.draft.edit_order_id).toBeNull();
+    expect(r.reply).toMatch(/Nu găsesc/);
+    expect(mockExtract).not.toHaveBeenCalled();
+  });
+
+  test('fuvarszám + javítás egy üzenetben → az AI a betöltött fuvaron dolgozik', async () => {
+    mockRules = editRules();
+    mockExtract.mockImplementation(async ({ parts }) => {
+      expect(parts[0].text).toMatch(/Bicske/); // a betöltött fuvar az előző vázlat
+      return { model: 'm', json: { reply: 'Kész.', draft: { client: 'Bilka Steel SRL', stops: [STOPS[0], Object.assign({}, STOPS[1], { data: '2026-10-15' })], load_type: 'FTL', pret: 1500, driver_name: 'Pető-Lőrincz Imre', rendszam_camion: 'B104VLR', rendszam_remorca: 'CJ36VSN' }, questions: [] } };
+    });
+    const r = await call('orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'CMD-2026-0042 a lerakás csütörtökön lesz' }], draft: {}, lang: 'hu' }]);
+    expect(r.ok).toBe(true);
+    expect(r.draft.edit_order_id).toBe('CMD-MT181GD5NBL');
+    expect(r.draft.stops[1].data).toBe('2026-10-15');
+  });
+
+  test('mentés szerkesztés-módban → comUpdate (nem comCreate), változatlan sofőr/rendszám nem megy', async () => {
+    mockRules = editRules([
+      { match: /SELECT status, email_sofer, rendszam_camion/, rows: [{ status: 'Alocat', email_sofer: 'peto@x.ro', rendszam_camion: 'B104VLR', rendszam_remorca: 'CJ36VSN', fuvar_no: 'CMD-2026-0042' }] },
+    ]);
+    const draft = h._sanitizeDraft({
+      edit_order_id: 'CMD-MT181GD5NBL', edit_fuvar_no: 'CMD-2026-0042', client: 'Bilka Steel SRL', client_id: 11,
+      stops: [STOPS[0], Object.assign({}, STOPS[1], { data: '2026-10-15' })], load_type: 'FTL', pret: 1500,
+      email_sofer: 'peto@x.ro', nume_sofer: 'Pető-Lőrincz Imre', driver_name: 'Pető-Lőrincz Imre',
+      rendszam_camion: 'B104VLR', rendszam_remorca: 'CJ36VSN',
+    });
+    const r = await call('orderChatCreate', ADMIN, [{ draft }]);
+    expect(r).toEqual({ ok: true, id: 'CMD-MT181GD5NBL', fuvar_no: 'CMD-2026-0042', updated: true });
+    expect(mockComCreate).not.toHaveBeenCalled();
+    const [, , args] = mockComUpdate.mock.calls[0];
+    expect(args[0]).toBe('CMD-MT181GD5NBL');
+    expect(args[1].data_descarcare).toBe('2026-10-15');
+    expect(args[1].stops).toHaveLength(2);
+    expect(args[1]).not.toHaveProperty('email_sofer');
+    expect(args[1]).not.toHaveProperty('rendszam_camion');
+  });
+
+  test('szerkesztés: idegen / törölt fuvar mentése elutasítva', async () => {
+    mockRules = [{ match: /SELECT status, email_sofer, rendszam_camion/, rows: [] }];
+    const draft = h._sanitizeDraft({ edit_order_id: 'CMD-MASIKCEG01', client: 'C', stops: STOPS, load_type: 'FTL' });
+    const r = await call('orderChatCreate', ADMIN, [{ draft }]);
+    expect(r.ok).toBe(false);
+    expect(mockComUpdate).not.toHaveBeenCalled();
+  });
+
+  test('szerkesztés: új sofőr → Disponibil fuvar Alocat-ra lép (status átadva)', async () => {
+    mockRules = editRules([
+      { match: /SELECT status, email_sofer, rendszam_camion/, rows: [{ status: 'Disponibil', email_sofer: null, rendszam_camion: null, rendszam_remorca: null }] },
+    ]);
+    const draft = h._sanitizeDraft({ edit_order_id: 'CMD-MT181GD5NBL', client: 'Bilka Steel SRL', stops: STOPS, load_type: 'FTL',
+      email_sofer: 'peto@x.ro', nume_sofer: 'Pető-Lőrincz Imre', driver_name: 'Pető-Lőrincz Imre' });
+    await call('orderChatCreate', ADMIN, [{ draft }]);
+    const p = mockComUpdate.mock.calls[0][2][1];
+    expect(p.email_sofer).toBe('peto@x.ro');
+    expect(p.sofer_type).toBe('Intern');
+    expect(p.status).toBe('Disponibil');
   });
 });

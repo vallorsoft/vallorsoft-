@@ -51,6 +51,8 @@ const QT = {
   driverNone:   { ro: 'Nu găsesc șoferul „{c}" printre șoferii interni. Verifică numele sau scrie „fără șofer".', hu: 'Nem találom „{c}" nevű belső sofőrt. Ellenőrizd a nevet, vagy írd: „sofőr nélkül".' },
   truckNone:    { ro: 'Nu găsesc tractorul {c} în flotă.', hu: 'A(z) {c} vontató nincs a flottában.' },
   trailerNone:  { ro: 'Nu găsesc remorca {c} în flotă.', hu: 'A(z) {c} pótkocsi nincs a flottában.' },
+  editLoaded:   { ro: 'Am încărcat cursa {c}. Scrie ce trebuie modificat (ex. „a doua descărcare joi", „alt șofer").', hu: 'Betöltöttem a(z) {c} fuvart. Írd meg, mit módosítsak (pl. „a második lerakás csütörtök", „másik sofőr").' },
+  editNotFound: { ro: 'Nu găsesc cursa {c} (sau este anulată).', hu: 'Nem találom a(z) {c} fuvart (vagy törölve van).' },
 };
 function qt(lang, key, c) {
   const e = QT[key] || {};
@@ -120,7 +122,93 @@ function sanitizeDraft(d) {
     route_sig: _str(j.route_sig, 2000),
     route_km: _int(j.route_km),
     route_geo: (j.route_geo && typeof j.route_geo === 'object') ? j.route_geo : null,
+    // Szerkesztés-mód: a meglévő fuvar belső id-je (a mentéskor újra ellenőrizve).
+    edit_order_id: /^[A-Za-z0-9-]{3,40}$/.test(String(j.edit_order_id || '')) ? String(j.edit_order_id) : null,
+    edit_fuvar_no: _str(j.edit_fuvar_no, 40),
+    // A diszpécser által eredetileg beírt sofőr-név (tanuláshoz: becenév → sofőr).
+    driver_raw: _str(j.driver_raw, 120),
   };
+}
+
+// ─── Tanulás (cégenkénti memória) ────────────────────────────
+// A MENTETT (diszpécser által jóváhagyott) fuvarokból tanul — csak stabil,
+// cég-saját adatot: cég → teljes cím, felrakó cég → megrendelő, megrendelő →
+// áru-típus/méret, sofőr-becenév → sofőr. Az AI-hoz semmi nem kerül belőle:
+// a felhasználás is kizárólag a szerveren, `company_id`-szűrten történik.
+// A beszélgetés szövege SOSEM tárolódik. Self-healing: a legutóbbi mentés felülír.
+async function memGet(cid, kind, key) {
+  if (!key) return null;
+  try {
+    const r = await pool.query(
+      'SELECT value FROM order_chat_memory WHERE company_id=$1 AND kind=$2 AND key_norm=$3', [cid, kind, key]);
+    return r.rows.length ? r.rows[0].value : null;
+  } catch (_) { return null; } // migráció hiányzik → nincs tanulás
+}
+async function memPut(cid, kind, key, value) {
+  if (!key || key.length > 200) return;
+  await pool.query(
+    `INSERT INTO order_chat_memory (company_id, kind, key_norm, value, hits, updated_at)
+     VALUES ($1,$2,$3,$4::jsonb,1,NOW())
+     ON CONFLICT (company_id, kind, key_norm)
+     DO UPDATE SET value=EXCLUDED.value, hits=order_chat_memory.hits+1, updated_at=NOW()`,
+    [cid, kind, key, JSON.stringify(value)]);
+}
+async function learnFromDraft(cid, d) {
+  try {
+    for (const s of d.stops || []) {
+      if (s.firma && s.loc && /\d/.test(s.loc)) await memPut(cid, 'firma_addr', _fold(s.firma), { loc: s.loc });
+    }
+    const pu = (d.stops || []).find((s) => s.kind === 'pickup' && s.firma);
+    if (pu && d.client) await memPut(cid, 'pickup_client', _fold(pu.firma), { client: d.client, client_id: d.client_id || null });
+    const ck = d.client_id ? 'id:' + d.client_id : _fold(d.client);
+    if (ck && d.load_type) {
+      await memPut(cid, 'client_cargo', ck, d.load_type === 'LTL'
+        ? { load_type: 'LTL', hossz_cm: d.hossz_cm, szel_cm: d.szel_cm, mag_cm: d.mag_cm }
+        : { load_type: 'FTL' });
+    }
+    if (d.driver_raw && d.email_sofer && _fold(d.driver_raw) !== _fold(d.nume_sofer)) {
+      await memPut(cid, 'driver_alias', _fold(d.driver_raw), { email: d.email_sofer });
+    }
+  } catch (e) { console.error('orderChat tanulás hiba (a fuvar mentve):', e.message); }
+}
+
+// ─── Szerkesztés: fuvar keresése fuvarszám (CMD-2026-0042) vagy belső id alapján ───
+const ORDER_REF_RE = /\b([A-Z]{1,10}-\d{4}-\d{1,6}|CMD-[A-Z0-9]{8,14})\b/i;
+async function loadOrderDraft(cid, ref) {
+  const key = String(ref || '').trim().toUpperCase();
+  if (!key) return null;
+  const r = await pool.query(
+    `SELECT to_jsonb(o) AS j FROM orders o
+      WHERE o.company_id=$1 AND (UPPER(o.id)=$2 OR UPPER(COALESCE(to_jsonb(o)->>'fuvar_no',''))=$2)
+        AND o.status <> 'Anulat' LIMIT 1`, [cid, key]);
+  if (!r.rows.length) return null;
+  const o = r.rows[0].j || {};
+  let stops = [];
+  try {
+    const s = await pool.query(
+      `SELECT kind, loc, firma, to_char(data,'YYYY-MM-DD') AS data FROM order_stops
+        WHERE order_id=$1 AND company_id=$2
+        ORDER BY COALESCE(seq_index, CASE WHEN kind='pickup' THEN 0 ELSE 1000 END + stop_index), id`,
+      [o.id, cid]);
+    stops = s.rows;
+  } catch (_) { /* régi DB → top-mezők */ }
+  if (!stops.length) {
+    stops = [
+      { kind: 'pickup', loc: o.loc_incarcare, firma: o.firma_incarcare, data: o.data_incarcare },
+      { kind: 'delivery', loc: o.loc_descarcare, firma: o.firma_descarcare, data: o.data_descarcare },
+    ];
+  }
+  const d = sanitizeDraft({
+    client: o.client, client_id: o.client_id, ref: o.ref, stops,
+    load_type: o.load_type, suly_kg: o.suly_kg, hossz_cm: o.hossz_cm, szel_cm: o.szel_cm, mag_cm: o.mag_cm,
+    pret: Number(o.pret) > 0 ? o.pret : null, km: Number(o.km) > 0 ? o.km : null,
+    // Csak a belső sofőr kerül a vázlatba (a külsős/alvállalkozói kiosztás érintetlen marad).
+    driver_name: o.email_sofer ? o.nume_sofer : null,
+    email_sofer: o.email_sofer || null, nume_sofer: o.email_sofer ? o.nume_sofer : null,
+    rendszam_camion: o.rendszam_camion, rendszam_remorca: o.rendszam_remorca,
+    edit_order_id: o.id, edit_fuvar_no: o.fuvar_no || o.id,
+  });
+  return d;
 }
 
 // ─── AI-prompt ───────────────────────────────────────────────
@@ -132,6 +220,7 @@ function buildSystemPrompt(today) {
     'Stops: an ordered list in the order the truck visits them. kind="pickup" (felrakó/felrakás/încărcare) or kind="delivery" (lerakó/lerakás/descărcare). loc = city/address with country code if given (e.g. "Bicske, HU", "Košice, SK", "Brașov, RO"); firma = company name at that stop. "full áru"/"komplett"/"FTL"/"marfă completă" → load_type "FTL"; részrakomány/grupaj/LTL → "LTL".',
     'Client (megrendelő / beneficiar) is the company that ORDERS and PAYS — it is NOT automatically the loading company. Only fill "client" if the user states it (or says the loader is the client). If the user writes a Romanian CUI/CIF (digits, maybe with RO prefix) for the client, put it in client_cui.',
     'Driver: put the driver name exactly as written into driver_name. If the user says "his/her truck" / "hozzá tartozó autó" / "a lui", leave the plates empty (the system pairs them). Plates only if explicitly written.',
+    'The previous draft may be an EXISTING order loaded for editing: then keep every field unchanged except what the dispatcher explicitly asks to change.',
     'Never invent data. Unknown fields = null. Do not ask about fields the system can derive (km, plates of the assigned truck).',
     'Return ONLY JSON with this shape:',
     '{"reply": "1-2 short sentences to the dispatcher in THEIR language (Hungarian or Romanian), confirming what changed",',
@@ -211,6 +300,20 @@ async function resolveDraft(cid, input, opts) {
       }
     }
   }
+  // Tanult: ha nincs megrendelő, de a felrakó cégnél korábban mindig ugyanaz volt.
+  if (!d.client && !cuiN) {
+    const pu = (d.stops || []).find((s) => s.kind === 'pickup' && s.firma);
+    const m = pu ? await memGet(cid, 'pickup_client', _fold(pu.firma)) : null;
+    if (m && m.client) {
+      d.client = String(m.client).slice(0, 200); d.learned_client = true;
+      if (m.client_id) {
+        try {
+          const r = await pool.query('SELECT id, denumire FROM clients WHERE id=$1 AND company_id=$2', [m.client_id, cid]);
+          if (r.rows.length) { d.client_id = r.rows[0].id; d.client = r.rows[0].denumire; }
+        } catch (_) { /* best-effort */ }
+      }
+    }
+  }
   if (!d.client_id && d.client) {
     // Név szerinti egyezés a mentett ügyfelek közt (ékezet-független).
     try {
@@ -238,9 +341,18 @@ async function resolveDraft(cid, input, opts) {
   const stops = d.stops || [];
   if (!stops.some((s) => s.kind === 'pickup')) missing.push('pickup');
   if (!stops.some((s) => s.kind === 'delivery')) missing.push('delivery');
+  // Tanult cím: a cégnél korábban mentett teljes cím, ha most csak városnév
+  // (vagy semmi) van megadva, és a tanult cím ezt a várost tartalmazza.
+  for (const s of stops) {
+    if (!s.firma || (s.loc && /\d/.test(s.loc))) continue;
+    const m = await memGet(cid, 'firma_addr', _fold(s.firma));
+    if (m && m.loc && (!s.loc || _fold(m.loc).includes(_fold(s.loc)))) {
+      s.loc = String(m.loc).slice(0, 200); s.learned = true;
+    }
+  }
   stops.forEach((s, i) => {
     if (!s.loc) missing.push('stop_loc_' + i);
-    if (!s.data) missing.push('stop_date_' + i);
+    if (!s.data && !o.editing) missing.push('stop_date_' + i);
   });
   // Mentett kedvenc helyszín: ha a cég neve pontosan egy mentett helyszín
   // címkéje, és a cím csak városnév (nincs benne szám), a mentett cím kerül be.
@@ -250,12 +362,24 @@ async function resolveDraft(cid, input, opts) {
       if (s.loc && /\d/.test(s.loc)) continue;
       const r = await pool.query(
         `SELECT address FROM favorite_locations WHERE company_id=$1 AND LOWER(label)=LOWER($2) LIMIT 1`, [cid, s.firma]);
-      if (r.rows.length && r.rows[0].address) { s.loc = String(r.rows[0].address).slice(0, 200); s.fav = true; }
+      if (r.rows.length && r.rows[0].address) { s.loc = String(r.rows[0].address).slice(0, 200); s.fav = true; s.learned = false; }
     }
   } catch (_) { /* tábla hiányzik → kihagyjuk */ }
 
   // 3) Áru ───────────────────────────────────────────────────
-  if (!d.load_type) missing.push('load_type');
+  // Tanult: a megrendelő szokásos áru-típusa (és LTL-méretei), ha most nincs megadva.
+  if (!d.load_type && d.client) {
+    const m = await memGet(cid, 'client_cargo', d.client_id ? 'id:' + d.client_id : _fold(d.client));
+    if (m && (m.load_type === 'FTL' || m.load_type === 'LTL')) {
+      d.load_type = m.load_type; d.learned_cargo = true;
+      if (m.load_type === 'LTL') {
+        if (!d.hossz_cm) d.hossz_cm = _int(m.hossz_cm);
+        if (!d.szel_cm) d.szel_cm = _int(m.szel_cm);
+        if (!d.mag_cm) d.mag_cm = _int(m.mag_cm);
+      }
+    }
+  }
+  if (!d.load_type && !o.editing) missing.push('load_type');
   if (d.load_type === 'LTL' && (!d.hossz_cm || !d.szel_cm || !d.mag_cm)) missing.push('dims');
 
   // 4) Sofőr + jármű ─────────────────────────────────────────
@@ -270,6 +394,22 @@ async function resolveDraft(cid, input, opts) {
     } catch (_) { d.email_sofer = null; }
     // Ha a diszpécser más nevet írt, újra feloldjuk.
     if (d.email_sofer && d.driver_name && _fold(d.driver_name) !== _fold(d.nume_sofer)) d.email_sofer = null;
+  }
+  if (!d.email_sofer && d.driver_name) {
+    if (!d.driver_raw) d.driver_raw = d.driver_name;
+    // Tanult becenév („Peti" → az a sofőr, akit legutóbb így jelölt ki a diszpécser).
+    const al = await memGet(cid, 'driver_alias', _fold(d.driver_name));
+    if (al && al.email) {
+      try {
+        const r = await pool.query(
+          `SELECT email, nume FROM users WHERE company_id=$1 AND LOWER(email)=LOWER($2)
+              AND pozicio='Sofer' AND blocked IS NOT TRUE`, [cid, al.email]);
+        if (r.rows.length) {
+          d.email_sofer = String(r.rows[0].email).toLowerCase(); d.nume_sofer = r.rows[0].nume;
+          d.driver_name = r.rows[0].nume; d.learned_driver = true;
+        }
+      } catch (_) { /* best-effort */ }
+    }
   }
   if (!d.email_sofer && d.driver_name) {
     try {
@@ -406,7 +546,31 @@ handlers.orderChatTurn = async function (req, res, args) {
     if (!messages.length || messages[messages.length - 1].role !== 'user') {
       return res.json({ result: { ok: false, err: 'Mesaj gol.' } });
     }
-    const prev = sanitizeDraft(a.draft);
+    let prev = sanitizeDraft(a.draft);
+    const lang = a.lang === 'hu' ? 'hu' : 'ro';
+
+    // ── Szerkesztés: üres vázlatnál egy fuvarszám (CMD-2026-0042 / belső id)
+    //    betölti a meglévő fuvart, a további javítás ugyanígy a chatben megy.
+    const last = messages[messages.length - 1].text;
+    const refM = !prev.edit_order_id && !prev.stops.length ? ORDER_REF_RE.exec(last) : null;
+    if (refM) {
+      let loaded = null;
+      try { loaded = await loadOrderDraft(cid, refM[1]); } catch (e) { console.error('orderChat fuvar-betöltés hiba:', e.message); }
+      if (!loaded) {
+        return res.json({ result: { ok: true, reply: qt(lang, 'editNotFound', refM[1].toUpperCase()),
+          draft: prev, questions: [], notes: [], missing: [], ready: false } });
+      }
+      prev = loaded;
+      // Csak a szám jött → nincs mit az AI-nak értelmeznie.
+      const rest = last.replace(refM[0], '').replace(/[^A-Za-zÀ-ž]/g, '');
+      if (rest.length < 4) {
+        const r0 = await resolveDraft(cid, prev, { req, lang, editing: true });
+        try { await audit.fromReq(req, 'order.chat_edit_load', 'order', prev.edit_order_id, {}); } catch (_) {}
+        return res.json({ result: { ok: true, reply: qt(lang, 'editLoaded', prev.edit_fuvar_no),
+          draft: _clientDraft(r0.draft), questions: r0.questions, notes: r0.notes, missing: r0.missing,
+          ready: r0.missing.length === 0 } });
+      }
+    }
 
     let ai;
     try {
@@ -428,9 +592,10 @@ handlers.orderChatTurn = async function (req, res, args) {
       aiDraft.email_sofer = prev.email_sofer; aiDraft.nume_sofer = prev.nume_sofer;
     }
     aiDraft.route_sig = prev.route_sig; aiDraft.route_km = prev.route_km; aiDraft.route_geo = prev.route_geo;
+    aiDraft.edit_order_id = prev.edit_order_id; aiDraft.edit_fuvar_no = prev.edit_fuvar_no;
+    if (aiDraft.driver_name && prev.driver_raw) aiDraft.driver_raw = prev.driver_raw;
 
-    const lang = a.lang === 'hu' ? 'hu' : 'ro';
-    const r = await resolveDraft(cid, aiDraft, { req, lang });
+    const r = await resolveDraft(cid, aiDraft, { req, lang, editing: !!aiDraft.edit_order_id });
     const aiQ = (Array.isArray(out.questions) ? out.questions : []).slice(0, 3).map((q) => ({
       key: _str(q && q.key, 20) || 'other',
       text: _str(q && q.text, 300),
@@ -465,7 +630,9 @@ handlers.orderChatCreate = async function (req, res, args) {
     const cid = req.session.user.company_id;
     const a = (args && args[0]) || {};
     // Újra-ellenőrzés: a kliensről jövő vázlat megbízhatatlan.
-    const r = await resolveDraft(cid, sanitizeDraft(a.draft), { req, allowAnaf: false, estimateRoute: true });
+    const input = sanitizeDraft(a.draft);
+    const editing = !!input.edit_order_id;
+    const r = await resolveDraft(cid, input, { req, allowAnaf: false, estimateRoute: true, editing });
     const d = r.draft;
     if (r.missing.length) {
       return res.json({ result: { ok: false, err: 'Comanda nu este completă: ' + r.missing.join(', '), missing: r.missing } });
@@ -473,6 +640,7 @@ handlers.orderChatCreate = async function (req, res, args) {
     const pickups = d.stops.filter((s) => s.kind === 'pickup');
     const deliveries = d.stops.filter((s) => s.kind === 'delivery');
     const km = d.km != null ? d.km : (d.route_km || 0);
+    if (editing) return await _saveEdit(req, res, cid, d, pickups, deliveries, km);
     const payload = {
       client: d.client,
       ref: d.ref || '',
@@ -504,6 +672,7 @@ handlers.orderChatCreate = async function (req, res, args) {
       try { await pool.query('UPDATE orders SET client_id=$1 WHERE id=$2 AND company_id=$3', [d.client_id, result.id, cid]); }
       catch (_) { /* oszlop hiányzik → csak név szerint kötött */ }
     }
+    await learnFromDraft(cid, d);
     try { await audit.fromReq(req, 'order.create_from_chat', 'order', result.id, { stops: d.stops.length, client_linked: !!d.client_id }); }
     catch (_) { /* best-effort */ }
     return res.json({ result: { ok: true, id: result.id, fuvar_no: result.fuvar_no || null } });
@@ -513,10 +682,58 @@ handlers.orderChatCreate = async function (req, res, args) {
   }
 };
 
+// Meglévő fuvar módosítása a MEGLÉVŐ comUpdate-tel. A sofőrt/rendszámot csak
+// akkor küldjük, ha tényleg változott (a külsős kiosztás így érintetlen marad);
+// a stopok cseréje a replaceStopsForOrder-en át megőrzi a sofőr-állomásokat.
+async function _saveEdit(req, res, cid, d, pickups, deliveries, km) {
+  const id = d.edit_order_id;
+  const cur = await pool.query(
+    `SELECT status, email_sofer, rendszam_camion, rendszam_remorca, to_jsonb(o)->>'fuvar_no' AS fuvar_no
+       FROM orders o WHERE id=$1 AND company_id=$2`, [id, cid]);
+  if (!cur.rows.length || cur.rows[0].status === 'Anulat') {
+    return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit sau este anulat.' } });
+  }
+  const c = cur.rows[0];
+  const payload = {
+    client: d.client, ref: d.ref || '', pret: d.pret || 0, km,
+    stops: d.stops.map((s) => ({ kind: s.kind, loc: s.loc, firma: s.firma, data: s.data })),
+    loc_incarcare: pickups[0].loc, firma_incarcare: pickups[0].firma, data_incarcare: pickups[0].data,
+    loc_descarcare: deliveries[deliveries.length - 1].loc,
+    firma_descarcare: deliveries[deliveries.length - 1].firma,
+    data_descarcare: deliveries[deliveries.length - 1].data,
+    suly_kg: d.suly_kg,
+  };
+  if (d.load_type) Object.assign(payload, { load_type: d.load_type, hossz_cm: d.hossz_cm, szel_cm: d.szel_cm, mag_cm: d.mag_cm });
+  if (d.route_geo) payload.route_geo = d.route_geo;
+  const curMail = String(c.email_sofer || '').toLowerCase();
+  if (d.email_sofer && d.email_sofer !== curMail) {
+    Object.assign(payload, { sofer_type: 'Intern', email_sofer: d.email_sofer, nume_sofer: d.nume_sofer });
+    if (c.status === 'Disponibil') payload.status = 'Disponibil'; // a comUpdate Alocat-ra lépteti
+  } else if (!d.email_sofer && curMail) {
+    Object.assign(payload, { sofer_type: null, email_sofer: null, nume_sofer: null });
+  }
+  if ((d.rendszam_camion || null) !== (c.rendszam_camion || null)) payload.rendszam_camion = d.rendszam_camion;
+  if ((d.rendszam_remorca || null) !== (c.rendszam_remorca || null)) payload.rendszam_remorca = d.rendszam_remorca;
+
+  let captured = null;
+  await orderHandlers.comUpdate(req, { json: (p) => { captured = p; return p; } }, [id, payload]);
+  const result = (captured && captured.result) || {};
+  if (!result.ok) return res.json({ result: { ok: false, err: result.err || 'Eroare la modificarea comenzii.' } });
+  if (d.client_id) {
+    try { await pool.query('UPDATE orders SET client_id=$1 WHERE id=$2 AND company_id=$3', [d.client_id, id, cid]); }
+    catch (_) { /* oszlop hiányzik */ }
+  }
+  await learnFromDraft(cid, d);
+  try { await audit.fromReq(req, 'order.update_from_chat', 'order', id, { stops: d.stops.length }); } catch (_) {}
+  return res.json({ result: { ok: true, id, fuvar_no: c.fuvar_no || d.edit_fuvar_no || id, updated: true } });
+}
+
 // Belső segédek — a teszt eléri, RPC-n nem hívhatók (nem-enumerable).
 Object.defineProperty(handlers, '_sanitizeDraft', { value: sanitizeDraft, enumerable: false });
 Object.defineProperty(handlers, '_resolveDraft', { value: resolveDraft, enumerable: false });
 Object.defineProperty(handlers, '_today', { value: _today, enumerable: false });
 Object.defineProperty(handlers, '_buildSystemPrompt', { value: buildSystemPrompt, enumerable: false });
+Object.defineProperty(handlers, '_learnFromDraft', { value: learnFromDraft, enumerable: false });
+Object.defineProperty(handlers, '_loadOrderDraft', { value: loadOrderDraft, enumerable: false });
 
 module.exports = handlers;

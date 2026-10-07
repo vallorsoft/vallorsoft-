@@ -65,13 +65,21 @@ handlers.anonymizeUser = async function (req, res, args) {
     // PII törlése (nume/email/tel), tiltás. Developer NEM anonimizálható.
     // A historikus üzemeltetési hivatkozások (pl. fuvar-archívum) megmaradnak.
     const r = await pool.query(
-      `UPDATE users
+      `WITH old AS (SELECT email FROM users WHERE id = $1 AND company_id = $2)
+       UPDATE users
           SET nume = '(anonimizat)', email = $3, tel = NULL, blocked = true
         WHERE id = $1 AND company_id = $2 AND COALESCE(pozicio_dev, false) = false
-        RETURNING id`,
+        RETURNING id, (SELECT email FROM old) AS old_email`,
       [uid, cid, 'deleted-' + uid + '@anonimizat.local']);
     if (!r.rowCount) {
       return res.json({ result: { ok: false, err: 'Utilizatorul nu a fost gasit sau nu poate fi anonimizat.' } });
+    }
+    // Szöveges fuvarkiírás tanult sofőr-becenevei (e-mailt tárolnak) — best-effort.
+    const oldEmail = r.rows[0] && r.rows[0].old_email;
+    if (oldEmail) {
+      await pool.query(
+        `DELETE FROM order_chat_memory WHERE company_id = $1 AND kind = 'driver_alias' AND LOWER(value->>'email') = LOWER($2)`,
+        [cid, oldEmail]).catch(() => {});
     }
     audit.fromReq(req, 'gdpr.anonymize', 'user', uid);
     return res.json({ result: { ok: true } });

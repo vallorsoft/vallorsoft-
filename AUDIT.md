@@ -9,6 +9,11 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 26. lépés — Szöveges fuvarkiírás: tanulás + szerkesztés (2026-10-07, PR #508) ✅ KÉSZ
+
+- **Szerkesztés fuvarszámmal:** a keresés `company_id`-szűrt + `status <> 'Anulat'`; idegen cég fuvarszáma „nem található" (teszt + valós DB fedi). Mentéskor a kliens által küldött `edit_order_id` újra tulajdon-ellenőrzött, a módosítás a meglévő `comUpdate`-en megy (Admin/Manager, Anulat-zár).
+- **Tanulás:** `order_chat_memory` cégenkénti (`UNIQUE company_id+kind+key_norm`), paraméteres SQL; a tanult `client_id` / sofőr-e-mail felhasználás előtt újra tulajdon-ellenőrzött. Az AI semmit nem kap belőle; a beszélgetés szövege nem tárolódik. GDPR: `anonymizeUser` a sofőr tanult beceneveit (`driver_alias`, e-mailt tárol) törli.
+
 ### 25. lépés — Szöveges fuvarkiírás (AI-chat) adatkezelése (2026-10-07, PR #506) ✅ KÉSZ
 
 - **Minimális adat az AI-nak:** a Gemini csak a diszpécser beszélgetését + a vázlatot kapja (+ mai dátum); a cég sofőr-/jármű-/ügyfél-listája SOSEM megy ki — a nevek feloldása szerver-oldalon, `company_id`-szűrt, paraméteres SQL-lel.

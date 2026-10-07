@@ -5119,6 +5119,8 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #ochModal .och-stop-b{ min-width:0; font-size:13px; }
 #ochModal .och-stop-k{ font-weight:700; }
 #ochModal .och-stop-f, #ochModal .och-stop-a{ margin-top:2px; word-break:break-word; }
+#ochModal .och-editbar{ margin:0 0 10px; padding:8px 12px; border-radius:10px; background:#fff7ed; color:#9a3412; border:1px solid #fdba74; font-size:13px; font-weight:700; }
+#ochModal[data-theme="dark"] .och-editbar{ background:rgba(249,115,22,0.14); color:#fdba74; border-color:rgba(249,115,22,0.45); }
 #ochModal .och-missbox{ margin-top:12px; padding:9px 12px; border-radius:10px; background:#fef2f2; color:#991b1b; border:1px solid #fecaca; font-size:13px; font-weight:600; }
 #ochModal .och-hint{ margin-top:10px; font-size:12px; color:var(--och-mut); }
 #ochModal .och-save{ width:100%; margin-top:10px; min-height:50px; font-size:15px; font-weight:800; }
