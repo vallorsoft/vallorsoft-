@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-07 — Szöveges fuvarkiírás: tanulás + meglévő fuvar módosítása fuvarszámmal (PR #PRNUM)
+- **Szerkesztés:** a chatbe csak a fuvarszámot írva (pl. `CMD-2026-0042`, vagy a belső id) a rendszer megkeresi a cég saját fuvarját (`company_id`-szűrt, törölt nem), betölti az előnézetbe, és a javítás ugyanígy a chatben megy (a szám mellé rögtön javítás is írható). Narancs „✏️ Meglévő fuvar módosítása" sáv, „✅ Módosítás mentése" gomb → a MEGLÉVŐ `comUpdate` (stop-csere a `replaceStopsForOrder`-rel, a sofőr-állomások megmaradnak). Sofőrt/rendszámot csak akkor küld, ha változott (külsős kiosztás érintetlen); új sofőr Disponibil fuvaron → Alocat. Módosításnál az FTL/LTL és a dátum nélküli régi stop nem blokkol.
+- **Tanulás (`db/order-chat-memory.sql`, `order_chat_memory`):** a MENTETT fuvarokból cégenként megjegyzi: cég → teljes cím (ha most csak a várost írják), felrakó cég → megrendelő, megrendelő → szokásos áru-típus (+LTL méret), sofőr-becenév („Peti") → sofőr. Az előnézetben „🧠 tanult" jelölés, a chatben javítható; a legutóbbi mentés felülírja (self-healing). Az AI-hoz semmi nem megy belőle, a beszélgetés szövege nem tárolódik. GDPR: az anonimizálás a sofőr tanult beceneveit is törli.
+- 5 új `och.*` i18n (RO+HU), cache-bust `?v=20261007och3`; +10 teszt, valós Postgres 16-on végig verifikálva.
+
 ## 2026-10-07 — Szöveges fuvarkiírás: teljes mobil-optimalizálás (PR #507)
 - Telefonon (≤860px) két fül: **💬 Chat / 📋 Előnézet** — egyszerre egy panel, teljes képernyő (`100dvh`, notch/safe-area). Az Előnézet fülön jelvény: **⚠️ N** (hiányzó tétel) / **✅** (kész, pulzál). A chatben kész fuvarnál „✅ A fuvar kész — előnézet és mentés →" gomb.
 - A „✅ Fuvar mentése" gomb az előnézet alján fixen látszik (eddig ~500px-szel a képernyő alatt volt); mentés után vissza a chat fülre a siker-üzenettel.

@@ -123,7 +123,7 @@
   function renderMsgs() {
     var box = $('ochMsgs');
     if (!box) return;
-    var h = '<div class="och-msg ai">' + esc(T('och.welcome')) + '</div>';
+    var h = '<div class="och-msg ai">' + esc(T('och.welcome')) + '<div class="och-mut" style="margin-top:6px;">✏️ ' + esc(T('och.editHint')) + '</div></div>';
     S.messages.forEach(function (m) {
       h += '<div class="och-msg ' + (m.role === 'assistant' ? 'ai' : 'me') + (m.err ? ' err' : '') + '">' + esc(m.text).replace(/\n/g, '<br>') + '</div>';
     });
@@ -133,7 +133,7 @@
       h += '<button type="button" class="och-ready-cta" onclick="OrderChat.tab(\'prev\')">✅ ' + esc(T('och.readyCta')) + ' →</button>';
     }
     if (S.saved) {
-      h += '<div class="och-msg ai ok">' + esc(T('och.saved', { no: S.saved.fuvar_no || S.saved.id }))
+      h += '<div class="och-msg ai ok">' + esc(T(S.saved.updated ? 'och.updated' : 'och.saved', { no: S.saved.fuvar_no || S.saved.id }))
         + '<div style="margin-top:8px;"><button class="btn primary" type="button" onclick="OrderChat.openList()">' + esc(T('och.openList')) + '</button></div></div>';
     }
     box.innerHTML = h;
@@ -170,6 +170,7 @@
     var stops = d.stops || [];
     var has = S.messages.length > 0;
     var h = '<div class="och-prev-h">' + esc(T('och.preview')) + '</div>';
+    if (d.edit_order_id) h += '<div class="och-editbar">✏️ ' + esc(T('och.editing', { no: d.edit_fuvar_no || d.edit_order_id })) + '</div>';
     if (!has) { box.innerHTML = h + '<div class="och-empty">' + esc(T('och.previewEmpty')) + '</div>'; return; }
 
     // Megrendelő
@@ -180,6 +181,7 @@
       else if (n.type === 'client_new' && !cNote) cNote = badge(T('och.clientNew'), 'warn');
       else if (n.type === 'anaf_error') cNote = badge(T('och.anafErr'), 'warn');
     });
+    if (d.learned_client) cNote = badge(T('och.learned'), 'info') + cNote;
     if (!cNote && d.client_id) cNote = badge(T('och.clientKnown'), 'ok');
     var sec1 = row(T('och.client'), d.client ? '<b>' + esc(d.client) + '</b>' + (d.client_cui ? ' <span class="och-mut">CUI ' + esc(d.client_cui) + '</span>' : '') : '<span class="och-miss">' + esc(T('och.none')) + '</span>', cNote);
     if (d.ref) sec1 += row(T('och.ref'), esc(d.ref));
@@ -194,20 +196,20 @@
         +   '<div class="och-stop-k">' + (pu ? '⬆️ ' + esc(T('och.pickup')) : '⬇️ ' + esc(T('och.delivery')))
         +     ' · ' + (s.data ? fmtDate(s.data) : '<span class="och-miss">📅 ?</span>') + '</div>'
         +   '<div class="och-stop-f">' + (s.firma ? '🏢 ' + esc(s.firma) : '') + '</div>'
-        +   '<div class="och-stop-a">📍 ' + (s.loc ? esc(s.loc) : '<span class="och-miss">?</span>') + (s.fav ? badge(T('och.fav'), 'info') : '') + '</div>'
+        +   '<div class="och-stop-a">📍 ' + (s.loc ? esc(s.loc) : '<span class="och-miss">?</span>') + (s.fav ? badge(T('och.fav'), 'info') : '') + (s.learned ? badge(T('och.learned'), 'info') : '') + '</div>'
         + '</div></div>';
     });
     if (!stops.length) st += '<div class="och-miss">' + esc(T('och.none')) + '</div>';
     st += '</div>';
 
     // Áru
-    var cargo = d.load_type ? '<b>' + esc(d.load_type) + '</b>' : '<span class="och-miss">FTL / LTL ?</span>';
+    var cargo = d.load_type ? '<b>' + esc(d.load_type) + '</b>' + (d.learned_cargo ? badge(T('och.learned'), 'info') : '') : '<span class="och-miss">FTL / LTL ?</span>';
     var sec3 = row(T('och.cargo'), cargo);
     if (d.suly_kg) sec3 += row(T('och.weight'), esc(fmtNum(d.suly_kg)) + ' kg');
     if (d.hossz_cm || d.szel_cm || d.mag_cm) sec3 += row(T('och.dims'), esc((d.hossz_cm || '?') + '×' + (d.szel_cm || '?') + '×' + (d.mag_cm || '?')) + ' cm');
 
     // Kiosztás
-    var sec4 = row(T('och.driver'), d.nume_sofer ? '<b>' + esc(d.nume_sofer) + '</b>' + (d.auto_driver ? badge(T('och.auto'), 'info') : '') : '<span class="och-mut">' + esc(T('och.noDriver')) + '</span>');
+    var sec4 = row(T('och.driver'), d.nume_sofer ? '<b>' + esc(d.nume_sofer) + '</b>' + (d.auto_driver ? badge(T('och.auto'), 'info') : '') + (d.learned_driver ? badge(T('och.learned'), 'info') : '') : '<span class="och-mut">' + esc(T('och.noDriver')) + '</span>');
     sec4 += row(T('och.truck'), d.rendszam_camion ? '<span class="och-plate">' + esc(d.rendszam_camion) + '</span>' + (d.auto_truck ? badge(T('och.auto'), 'info') : '') : esc(T('och.none')));
     sec4 += row(T('och.trailer'), d.rendszam_remorca ? '<span class="och-plate">' + esc(d.rendszam_remorca) + '</span>' + (d.auto_trailer ? badge(T('och.auto'), 'info') : '') : esc(T('och.none')));
 
@@ -229,7 +231,7 @@
     }
     if (!S.saved) {
       h += '<div class="och-hint">' + esc(T('och.fixHint')) + '</div>'
-        + '<button class="btn primary och-save" id="ochSave" type="button" onclick="OrderChat.save()"' + (S.ready && !S.busy ? '' : ' disabled') + '>' + esc(T('och.save')) + '</button>';
+        + '<button class="btn primary och-save" id="ochSave" type="button" onclick="OrderChat.save()"' + (S.ready && !S.busy ? '' : ' disabled') + '>' + esc(T(d.edit_order_id ? 'och.saveEdit' : 'och.save')) + '</button>';
     }
     box.innerHTML = h;
   }
@@ -287,9 +289,9 @@
         renderAll();
         return;
       }
-      S.saved = { id: r.id, fuvar_no: r.fuvar_no };
+      S.saved = { id: r.id, fuvar_no: r.fuvar_no, updated: !!r.updated };
       tab('chat');
-      if (typeof window.toast === 'function') window.toast(T('och.saved', { no: r.fuvar_no || r.id }), 'ok');
+      if (typeof window.toast === 'function') window.toast(T(r.updated ? 'och.updated' : 'och.saved', { no: r.fuvar_no || r.id }), 'ok');
       if (typeof window.loadOrders === 'function') { try { window.loadOrders(); } catch (_) {} }
       renderAll();
     }).catch(function (e) {
