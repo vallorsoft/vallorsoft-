@@ -5294,3 +5294,8 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 [data-theme="dark"] .mbx-tm.out{background:rgba(22,163,74,.10)}
 [data-theme="dark"] .mbx-tm.out.failed{background:rgba(220,38,38,.12)}
 @media(max-width:700px){.mbx-tm.in{margin-right:0}.mbx-tm.out{margin-left:0}}
+/* Levelek: üres lista diagnosztika */
+.mbx-diag { text-align:left; }
+.mbx-diag .mbx-diag-acc { margin:8px 0; }
+.mbx-diag ul { margin:4px 0 0 18px; padding:0; }
+.mbx-diag li { margin:3px 0; }

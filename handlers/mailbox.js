@@ -62,7 +62,8 @@ function _folders(v) {
 function _accView(r) {
   return { id: r.id, label: r.label, email: r.email_masked, provider: r.provider, folders: r.folders,
     use_orders: r.use_orders, use_inbox: r.use_inbox, allow_mode: r.allow_mode, allow_list: r.allow_list || '',
-    since: r.since, enabled: r.enabled, last_check: r.last_check, last_error: r.last_error };
+    since: r.since, enabled: r.enabled, last_check: r.last_check, last_error: r.last_error,
+    last_seen: r.last_seen == null ? null : r.last_seen, last_skipped: r.last_skipped == null ? null : r.last_skipped };
 }
 
 // ─── 📬 Fiókok ───
@@ -94,6 +95,10 @@ handlers.mailAccountSave = async function (req, res, args) {
       ['known', 'list', 'all'].includes(a.allow_mode) ? a.allow_mode : 'known',
       String(a.allow_list || '').slice(0, 4000), a.enabled !== false,
     ];
+    // Mettől töltse be a régebbi leveleket (napok; 0 = csak az újak). Üres = marad.
+    const HD = [0, 7, 30, 90, 365];
+    const hd = a.history_days === undefined || a.history_days === null || a.history_days === '' ? null : parseInt(a.history_days, 10);
+    const histDays = HD.includes(hd) ? hd : null;
     let newId = id;
     if (id) {
       await pool.query(
@@ -104,6 +109,9 @@ handlers.mailAccountSave = async function (req, res, args) {
         `INSERT INTO mail_accounts (label, email_masked, provider, creds_enc, folders, use_orders, use_inbox, allow_mode, allow_list, enabled, company_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`, vals.concat([cid]));
       newId = r.rows[0].id;
+    }
+    if (histDays !== null) {
+      await pool.query(`UPDATE mail_accounts SET since = now() - make_interval(days => $1) WHERE id=$2 AND company_id=$3`, [histDays, newId, cid]);
     }
     try { await audit.fromReq(req, id ? 'mail.account_update' : 'mail.account_create', 'mail_account', newId, { use_orders: vals[5], use_inbox: vals[6], allow_mode: vals[7] }); } catch (_) {}
     return _ok(res, { id: newId });
@@ -181,7 +189,20 @@ handlers.mailInboxList = async function (req, res, args) {
     if (q) { params.push('%' + q.replace(/[%_\\]/g, '') + '%'); sql += ` AND (h.from_email ILIKE $${params.length} OR h.from_name ILIKE $${params.length} OR h.subject ILIKE $${params.length})`; }
     sql += ` ORDER BY h.received_at DESC NULLS LAST LIMIT ${Math.min(parseInt(a.limit, 10) || 100, 300)} OFFSET ${Math.max(parseInt(a.offset, 10) || 0, 0)}`;
     const { rows } = await pool.query(sql, params);
-    return _ok(res, { items: rows });
+    // Üres lista → megmondjuk, MIÉRT (fiókonként: használat, szűrő, mettől, hiba, számok).
+    let diag = null;
+    if (!rows.length && !q && kind === 'inbox') {
+      try {
+        const d = await pool.query(
+          `SELECT id, label, email_masked, use_inbox, use_orders, allow_mode, since, enabled, last_check, last_error,
+                  to_jsonb(mail_accounts)->'last_seen' AS last_seen, to_jsonb(mail_accounts)->'last_skipped' AS last_skipped
+             FROM mail_accounts WHERE company_id=$1 ORDER BY id`, [cid]);
+        diag = d.rows.map((r) => ({ id: r.id, label: r.label || r.email_masked, use_inbox: r.use_inbox, use_orders: r.use_orders,
+          allow_mode: r.allow_mode, since: r.since, enabled: r.enabled, last_check: r.last_check, last_error: r.last_error,
+          last_seen: r.last_seen == null ? null : Number(r.last_seen), last_skipped: r.last_skipped == null ? null : Number(r.last_skipped) }));
+      } catch (_) { diag = []; }
+    }
+    return _ok(res, { items: rows, diag });
   } catch (e) { console.error('mailInboxList hiba:', e.message); return _ok(res, { items: [], migration: true }); }
 };
 
