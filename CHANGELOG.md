@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-07 — 💬 AI-chat e-mail: kinézet (színek/elrendezés) a chatben + felhasználónkénti alapértelmezett kinézet (PR #513)
+- A levél kinézete a chatben állítható („legyen kék fejléc-sávval", „középre", „sötétkék háttér", „serif betű", „szélesebb"): kiemelő szín, háttér, levél-háttér, szövegszín, igazítás, fejléc (logó / színes sáv / nincs), betű, szélesség. Élő előnézet a chatben.
+- „Mentsd el alapértelmezettnek" (vagy ⭐ gomb) → a FELHASZNÁLÓ saját alapértelmezett kinézete (stílus + opc. vizuális sablon); minden új levele ezzel indul, amíg másképp nem kéri; „↺ Eredeti kinézet" törli. Tárolás: `order_chat_memory` (`mail_style`, kulcs `user:<id>`, cégenként).
+- Új `lib/mailStyle.js` (szigorú fehérlista: csak #rrggbb + felsorolt értékek → nincs CSS/markup-injekció); a `wrapBrandedEmail` / `sendClientEmail` / `sendOrderEmail` opcionális `style`-t kap (a régi kinézet változatlan, ha nincs). Új RPC `mailChatSaveStyle`. +5 Jest, cache-bust `?v=20261007ochlook`.
+
 ## 2026-10-07 — 💬 AI-chat: fuvar nélküli (általános) e-mail is (PR #512)
 - A chat e-mail ága fuvarszám nélkül is ír levelet (ajánlat, tájékoztatás, emlékeztető, bármi): a címzett a beírt e-mail cím, vagy egy név, amit a szerver a cég SAJÁT ügyfél / alvállalkozó / e-mail-kontakt listájából old fel (`company_id`-szűrten; több találatnál választó gombok; az AI a listákat nem kapja meg). Küldés a cég saját feladó-fiókjáról, céges arculattal; teszt a közös címről a saját címre. Tanulás: név → cím (`mail_pref`). Csatolmány/követő-link csak fuvaros levélnél. +4 Jest, cache-bust `?v=20261007ochmail2`.
 

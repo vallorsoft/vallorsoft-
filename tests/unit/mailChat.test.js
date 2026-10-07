@@ -180,3 +180,46 @@ describe('fuvar nélküli (általános) levél', () => {
     expect(mockClientEmail.mock.calls[0][0].to).toBe('a@x.ro');
   });
 });
+
+describe('kinézet: színek/elrendezés + alapértelmezett', () => {
+  const ms = require('../../lib/mailStyle');
+
+  test('fehérlista: csak #rrggbb és felsorolt értékek', () => {
+    expect(ms.sanitizeStyle({ accent: '#2563EB', bg: 'red;x:expression()', align: 'center', header: '<script>', width: 'wide' }))
+      .toEqual({ accent: '#2563eb', align: 'center', width: 'wide' });
+    const html = ms.renderStyled('<p>Szia</p>', { accent: '#2563eb', header: 'band', align: 'center' }, { senderName: 'A&B' });
+    expect(html).toContain('background:#2563eb');
+    expect(html).toContain('A&amp;B');
+  });
+
+  test('kért szín + mentés alapértelmezettnek → user-kulcson tárolva, a következő levél ezzel indul', async () => {
+    const store = {};
+    mockRules.push({ match: /INSERT INTO order_chat_memory/, fn: (sql, p) => { store[p[1] + '|' + p[2]] = JSON.parse(p[3]); return { rows: [] }; } });
+    mockRules.push({ match: /SELECT value FROM order_chat_memory/, fn: (sql, p) => ({ rows: store[p[1] + '|' + p[2]] ? [{ value: store[p[1] + '|' + p[2]] }] : [] }) });
+    mockExtract.mockResolvedValue({ model: 'm', json: { save_default: true, draft: { recipient: 'other', to_email: 'x@y.ro', subject: 'S', body: 'B', style: { accent: '#2563eb', header: 'band' } } } });
+    const r1 = await call(orderChat, 'orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'email a x@y.ro címre, kék fejléc-sávval, mentsd el alapértelmezettnek' }] }]);
+    expect(r1.draft.style).toEqual({ accent: '#2563eb', header: 'band' });
+    expect(r1.draft.style_default).toBe(true);
+    expect(store['mail_style|user:1']).toEqual({ style: { accent: '#2563eb', header: 'band' }, builder_template_id: null });
+
+    mockExtract.mockResolvedValue({ model: 'm', json: { draft: { recipient: 'other', to_email: 'z@y.ro', subject: 'S2', body: 'B2', style: null } } });
+    const r2 = await call(orderChat, 'orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'új email a z@y.ro címre' }] }]);
+    expect(r2.draft.style).toEqual({ accent: '#2563eb', header: 'band' });
+    expect(r2.draft.style_default).toBe(true);
+    // más felhasználó nem kapja meg
+    const r3 = await call(orderChat, 'orderChatTurn', { ...ADMIN, id: 2 }, [{ messages: [{ role: 'user', text: 'új email a z@y.ro címre' }] }]);
+    expect(r3.draft.style).toBeNull();
+  });
+
+  test('a stílus a küldésbe is bekerül (általános levél)', async () => {
+    const D = { mode: 'email', recipient: 'other', to_email: 'x@y.ro', subject: 'S', body: 'B', style: { accent: '#16a34a', header: 'band' } };
+    await call(mailChat, 'mailChatSend', ADMIN, [{ draft: D }]);
+    expect(mockMailerSend.mock.calls[0][0].html).toBe('<wrap><div style="font-size:14px;line-height:1.6;white-space:pre-wrap;">B</div></wrap>');
+  });
+
+  test('fuvaros levélnél a sendOrderEmail megkapja a stílust', async () => {
+    const D = { mode: 'email', order_id: 'CMD-X1', recipient: 'client', to_email: 'office@bilka.ro', subject: 'S', body: 'B', style: { accent: '#16a34a' } };
+    await call(mailChat, 'mailChatSend', ADMIN, [{ draft: D }]);
+    expect(mockSend.mock.calls[0][2][0].style).toEqual({ accent: '#16a34a' });
+  });
+});
