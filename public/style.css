@@ -5208,3 +5208,15 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .och-fab:active{ transform:scale(.94); }
 .och-fab .och-fab-i{ font-size:19px; line-height:1; }
 .och-fab .och-fab-t{ font-size:9px; font-weight:800; letter-spacing:.6px; line-height:1; margin-top:1px; }
+
+/* ── 💬 AI-chat: ✉️ e-mail mód (PR: e-mail a chatben) ── */
+#ochModal .och-mail-body{ padding:12px 14px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; color:#1e293b; font-size:14px; line-height:1.55; }
+#ochModal .och-atts{ display:flex; flex-wrap:wrap; gap:6px; }
+#ochModal .och-att{ padding:5px 10px; border-radius:999px; border:1.5px dashed #94a3b8; background:transparent; color:#334155; font-size:12.5px; font-weight:600; cursor:pointer; }
+#ochModal .och-att.on{ border-style:solid; border-color:#f6711e; background:#fff4ec; color:#9a3412; }
+#ochModal .och-mail-btns{ display:flex; gap:8px; }
+#ochModal .och-mail-btns .btn{ flex:1; }
+#ochModal .och-x-mini{ border:0; background:transparent; color:#b91c1c; cursor:pointer; font-weight:700; }
+#ochModal[data-theme="dark"] .och-mail-body{ background:rgba(255,255,255,0.04); border-color:rgba(255,255,255,0.12); color:#e2e8f0; }
+#ochModal[data-theme="dark"] .och-att{ color:#cbd5e1; border-color:#64748b; }
+#ochModal[data-theme="dark"] .och-att.on{ background:rgba(246,113,30,0.15); color:#fdba74; }

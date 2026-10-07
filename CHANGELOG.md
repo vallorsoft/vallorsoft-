@@ -14,6 +14,10 @@
 
 ---
 
+## 2026-10-07 — 💬 AI-chat: e-mail a fuvarról ugyanabban a chatben (PR #511)
+- A lebegő 💬 gombbal nyíló chat amit a felhasználó ír, abba kezd: ha e-mailt kér (pl. „küldd el a CMD-2026-0042 megrendelőjének a számlát és a követő-linket emailben"), fuvar-vázlat helyett **levél-vázlat** készül — címzett, tárgy, szöveg, csatolmányok, követő-link, opc. vizuális sablon. Javítás a chatben, a csatolmányok az előnézetben is ki-be kapcsolhatók; **✉️ Teszt magamnak** / **📤 Küldés** (megerősítéssel).
+- Új `handlers/mailChat.js` (`mailChatSend` RPC + az `orderChatTurn` e-mail ága): a fuvar-adatok/csatolmányok a meglévő `getOrderEmailData`-ból, a küldés a meglévő `sendOrderEmail`-en (cég saját SMTP/Brevo, teszt a közös címről). A címzett (ügyfél / alvállalkozó / a felhasználó által beírt cím) a szerveren oldódik fel; az AI e-mail-címet nem kap. Tanulás: `mail_pref` (ügyfélenkénti cím + nyelv) a közös `lib/chatMemory.js`-ben. Rate-limit 20 küldés/óra/felhasználó. Pro csomag (`ai-szoveges-fuvar`). +11 Jest, cache-bust `?v=20261007ochmail`.
+
 ## 2026-10-07 — Szöveges fuvarkiírás: lebegő 💬 AI gomb minden fülön (a 🐛 mellett) (PR #510)
 - Az admin/manager konzolon a 🐛 hibabejelentő gomb mellett (balra) új kerek **💬 AI** gomb: bármelyik fülről egy kattintással megnyitja a szöveges fuvarkiírás chatet (új fuvar, vagy meglévő módosítása fuvarszámmal). Csak akkor látszik, ha a csomag tartalmazza (`ai-szoveges-fuvar`, Pro-tól) — a meglévő `applyFeatureFlags` kapcsolja. A gombot az `order-chat.js` maga hozza létre (`OrderChat.setFab`), nyitott chatnél a modal takarja. 1 új i18n (`och.fab`, RO+HU), cache-bust `?v=20261007ochfab`. Tisztán kliens-oldali.
 

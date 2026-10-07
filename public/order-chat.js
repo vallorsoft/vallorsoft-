@@ -129,7 +129,7 @@
   function renderMsgs() {
     var box = $('ochMsgs');
     if (!box) return;
-    var h = '<div class="och-msg ai">' + esc(T('och.welcome')) + '<div class="och-mut" style="margin-top:6px;">✏️ ' + esc(T('och.editHint')) + '</div></div>';
+    var h = '<div class="och-msg ai">' + esc(T('och.welcome')) + '<div class="och-mut" style="margin-top:6px;">✏️ ' + esc(T('och.editHint')) + '</div><div class="och-mut" style="margin-top:4px;">✉️ ' + esc(T('och.mailHint')) + '</div></div>';
     S.messages.forEach(function (m) {
       h += '<div class="och-msg ' + (m.role === 'assistant' ? 'ai' : 'me') + (m.err ? ' err' : '') + '">' + esc(m.text).replace(/\n/g, '<br>') + '</div>';
     });
@@ -138,7 +138,9 @@
       // Telefonon az előnézet külön fülön van — innen egy koppintással odaér.
       h += '<button type="button" class="och-ready-cta" onclick="OrderChat.tab(\'prev\')">✅ ' + esc(T('och.readyCta')) + ' →</button>';
     }
-    if (S.saved) {
+    if (S.saved && S.saved.mail) {
+      h += '<div class="och-msg ai ok">' + esc(T('och.mailSent', { to: S.saved.to })) + '</div>';
+    } else if (S.saved) {
       h += '<div class="och-msg ai ok">' + esc(T(S.saved.updated ? 'och.updated' : 'och.saved', { no: S.saved.fuvar_no || S.saved.id }))
         + '<div style="margin-top:8px;"><button class="btn primary" type="button" onclick="OrderChat.openList()">' + esc(T('och.openList')) + '</button></div></div>';
     }
@@ -173,6 +175,7 @@
     var box = $('ochPrev');
     if (!box) return;
     var d = S.draft || {};
+    if (d.mode === 'email') { box.innerHTML = renderMailPrev(d); return; }
     var stops = d.stops || [];
     var has = S.messages.length > 0;
     var h = '<div class="och-prev-h">' + esc(T('och.preview')) + '</div>';
@@ -274,6 +277,7 @@
         S.notes = (r.notes || []).concat((S.notes || []).filter(function (n) { return n.type === 'client_saved'; }));
         S.missing = r.missing || [];
         S.ready = !!r.ready;
+        S.mail = r.mode === 'email' ? { att: r.attachments_avail || [], builders: r.builders_avail || [], tracking: !!r.tracking_available, client: r.client || '' } : null;
         if (r.reply) S.messages.push({ role: 'assistant', text: r.reply });
       }
       renderAll();
@@ -291,6 +295,7 @@
   }
 
   function save() {
+    if (S.draft && S.draft.mode === 'email') return mailSend(false);
     if (!S.ready || S.busy || S.saved) return;
     var btn = $('ochSave');
     if (btn) { btn.disabled = true; btn.textContent = T('och.saving'); }
@@ -368,6 +373,85 @@
     renderAll();
   }
 
+
+  // ─── ✉️ E-mail mód (ugyanaz a chat — amit a felhasználó ír, abba kezd) ───
+  // Szerver: handlers/mailChat.js (a küldés a meglévő sendOrderEmail-en).
+  function renderMailPrev(d) {
+    var M = S.mail || { att: [], builders: [], tracking: false };
+    var h = '<div class="och-prev-h">✉️ ' + esc(T('och.mailPreview')) + (d.fuvar_no ? ' · <span class="och-plate">' + esc(d.fuvar_no) + '</span>' : '') + '</div>';
+    if (!d.order_id) return h + '<div class="och-empty">' + esc(T('och.mailNeedOrder')) + '</div>';
+    var to = d.to_email ? '<b>' + esc(d.to_email) + '</b>' + (d.recipient === 'client' ? badge(T('och.client'), 'info') : d.recipient === 'carrier' ? badge(T('och.carrier'), 'info') : '') + (d.learned_to ? badge(T('och.learned'), 'info') : '') : '<span class="och-miss">' + esc(T('och.none')) + '</span>';
+    var sec = row(T('och.to'), to) + row(T('och.subject'), d.subject ? '<b>' + esc(d.subject) + '</b>' : '<span class="och-miss">' + esc(T('och.none')) + '</span>');
+    var tpl = '';
+    if (d.builder_template_id) {
+      var b = (M.builders || []).filter(function (x) { return x.id === d.builder_template_id; })[0];
+      tpl = row(T('och.template'), '🎨 ' + esc(b ? b.name : '#' + d.builder_template_id) + ' <button type="button" class="och-x-mini" onclick="OrderChat.mailToggle(\'tpl\')">✕</button>');
+    }
+    var body = '<div class="och-mail-body">' + (d.body ? esc(d.body).replace(/\n/g, '<br>') : '<span class="och-miss">' + esc(T('och.none')) + '</span>')
+      + (d.include_tracking ? '<div class="och-mut" style="margin-top:8px;">🌍 ' + esc(T('och.trackingLine')) + '</div>' : '') + '</div>';
+    var att = (M.att || []).map(function (a) {
+      var on = (d.attachments || []).indexOf(a.key) >= 0;
+      return '<button type="button" class="och-att' + (on ? ' on' : '') + '" onclick="OrderChat.mailToggle(\'att\',\'' + esc(a.key) + '\')">' + (on ? '✓ ' : '+ ') + esc(a.label) + '</button>';
+    }).join('');
+    if (M.tracking) {
+      att += '<button type="button" class="och-att' + (d.include_tracking ? ' on' : '') + '" onclick="OrderChat.mailToggle(\'trk\')">' + (d.include_tracking ? '✓ ' : '+ ') + '🌍 ' + esc(T('och.tracking')) + '</button>';
+    }
+    h += '<div class="och-card"><div class="och-sec">' + sec + tpl + '</div>'
+      + '<div class="och-sec"><div class="och-sec-h">📝 ' + esc(T('och.mailBody')) + '</div>' + body + '</div>'
+      + '<div class="och-sec"><div class="och-sec-h">📎 ' + esc(T('och.attach')) + '</div><div class="och-atts">' + (att || '<span class="och-mut">' + esc(T('och.none')) + '</span>') + '</div></div>'
+      + '</div>';
+    if (S.missing && S.missing.length && !S.saved) {
+      h += '<div class="och-missbox">⚠️ ' + esc(T('och.missing')) + ': ' + S.missing.map(function (k) { return esc(missingLabel(k)); }).join(', ') + '</div>';
+    }
+    if (!S.saved) {
+      h += '<div class="och-hint">' + esc(T('och.mailFixHint')) + '</div>'
+        + '<div class="och-mail-btns">'
+        + '<button class="btn ghost" type="button" onclick="OrderChat.mailSend(true)"' + (d.order_id && !S.busy ? '' : ' disabled') + '>✉️ ' + esc(T('och.sendTest')) + '</button>'
+        + '<button class="btn primary och-save" id="ochSave" type="button" onclick="OrderChat.mailSend(false)"' + (S.ready && !S.busy ? '' : ' disabled') + '>📤 ' + esc(T('och.mailSend')) + '</button>'
+        + '</div>';
+    }
+    return h;
+  }
+  function mailToggle(what, key) {
+    if (S.saved || S.busy) return;
+    var d = Object.assign({}, S.draft);
+    if (what === 'att') {
+      var l = (d.attachments || []).slice(), i = l.indexOf(key);
+      if (i >= 0) l.splice(i, 1); else l.push(key);
+      d.attachments = l;
+    } else if (what === 'trk') d.include_tracking = !d.include_tracking;
+    else if (what === 'tpl') d.builder_template_id = null;
+    S.draft = d;
+    renderPrev();
+  }
+  function mailSend(test) {
+    var d = S.draft || {};
+    if (S.busy || S.saved || !d.order_id) return;
+    if (!test) {
+      if (!S.ready) return;
+      if (!window.confirm(T('och.mailConfirm', { to: d.to_email }))) return;
+    }
+    S.busy = true; renderAll();
+    window.gas('mailChatSend', [{ draft: d, test: !!test, lang: lang() }]).then(function (r) {
+      S.busy = false;
+      if (!r || !r.ok) {
+        S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
+      } else if (test) {
+        S.messages.push({ role: 'assistant', text: '✉️ ' + T('och.mailTestSent') });
+        if (typeof window.toast === 'function') window.toast(T('och.mailTestSent'), 'ok');
+      } else {
+        S.saved = { mail: true, to: d.to_email };
+        tab('chat');
+        if (typeof window.toast === 'function') window.toast(T('och.mailSent', { to: d.to_email }), 'ok');
+      }
+      renderAll();
+    }).catch(function (e) {
+      S.busy = false;
+      S.messages.push({ role: 'assistant', text: '⚠️ ' + ((e && e.message) || T('och.err')), err: true });
+      renderAll();
+    });
+  }
+
   // ─── Lebegő gomb (mint a 🐛 hibabejelentő) — minden fülön látszik ───
   // A csomag-kapu (`ai-szoveges-fuvar`) után kapcsolja be az applyFeatureFlags.
   function setFab(visible) {
@@ -388,5 +472,5 @@
     b.style.display = visible ? '' : 'none';
   }
 
-  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab };
+  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, mailToggle: mailToggle };
 })();
