@@ -143,3 +143,44 @@ describe('📤 Elküldött mappa (appendSent)', () => {
     expect(params).toEqual([9]);
   });
 });
+
+describe('📤 Elküldött levelek + 💬 levélszál', () => {
+  test('mailSentList: Sofőr nem éri el', async () => {
+    const r = await call(mailboxH, 'mailSentList', SOFER, [{}]);
+    expect(r.ok).toBe(false);
+  });
+  test('mailSentList: cégre szűr, a teszt-küldés kimarad', async () => {
+    let seen = null;
+    mockRules = [{ match: /FROM mail_sent s/, fn: (sql, p) => { seen = { sql, p }; return { rows: [{ id: 1, to_email: 'x@y.ro', subject: 'S' }] }; } }];
+    const r = await call(mailboxH, 'mailSentList', MANAGER, [{ q: 'x' }]);
+    expect(r.ok).toBe(true);
+    expect(r.items.length).toBe(1);
+    expect(seen.p[0]).toBe(7);
+    expect(seen.sql).toMatch(/s\.company_id=\$1/);
+    expect(seen.sql).toMatch(/builder_test/);
+  });
+  test('mailThread: beérkezett levélhez a mi válaszunk (In-Reply-To), a beérkezett törzse NEM jön', async () => {
+    mockRules = [
+      { match: /SELECT id, message_id, refs FROM mail_headers WHERE id=\$1/, rows: [{ id: 5, message_id: '<a1@kov.ro>', refs: null }] },
+      { match: /FROM mail_headers h JOIN mail_accounts/, rows: [{ id: 5, message_id: '<a1@kov.ro>', refs: null, from_email: 'l@kov.ro', subject: 'Ajánlat', received_at: '2026-10-01T08:00:00Z' }] },
+      { match: /FROM mail_sent WHERE company_id=\$1 AND \(message_id/, fn: (sql, p) => ({ rows: p[1].includes('<a1@kov.ro>') ? [{ id: 9, message_id: '<b2@ceg.ro>', in_reply_to: '<a1@kov.ro>', to_email: 'l@kov.ro', subject: 'Re: Ajánlat', body_text: 'Ok, 8-kor.', attachments: [], status: 'sent', created_at: '2026-10-01T09:00:00Z' }] : [] }) },
+    ];
+    const r = await call(mailboxH, 'mailThread', ADMIN, [{ kind: 'in', id: 5 }]);
+    expect(r.ok).toBe(true);
+    expect(r.items.map((x) => x.dir)).toEqual(['in', 'out']);
+    expect(r.items[0].text).toBeUndefined();
+    expect(r.items[1].text).toBe('Ok, 8-kor.');
+    expect(mockRead).not.toHaveBeenCalled();
+  });
+  test('mailThread: más cég levele → nem található', async () => {
+    mockRules = [];
+    const r = await call(mailboxH, 'mailThread', ADMIN, [{ kind: 'out', id: 999 }]);
+    expect(r.ok).toBe(false);
+  });
+  test('válasz: a küldő (sentBy) rögzítésre kerül', async () => {
+    mockRules = [{ match: /FROM mail_headers h JOIN mail_accounts m ON m.id=h.account_id AND m.company_id=h.company_id\s+WHERE h.id=\$1/, rows: [{ id: 5, from_email: 'l@kov.ro', subject: 'S', message_id: '<a1@kov.ro>', acc: { use_inbox: true } }] }];
+    const r = await call(mailboxH, 'mailReply', ADMIN, [{ id: 5, body: 'Ok', quote: false }]);
+    expect(r.ok).toBe(true);
+    expect(mockMailerSend.mock.calls.slice(-1)[0][0].sentBy).toBe('a@ceg.ro');
+  });
+});

@@ -39,7 +39,8 @@ function loadTab(name){
     if(name==='ecmr' && window.ECmr) ECmr.mount('ecmrBox');
     if(name==='doc-register' && window.DocRegister) DocRegister.mount('docRegisterBox');
     if(name==='quotes' && window.Quotes) Quotes.mount('quotesBox');
-    if(name==='mail-inbox' && window.MailInbox) MailInbox.mount('mailInboxBox');
+    if(name==='mail-inbox' && window.MailInbox) MailInbox.mount('mailInboxBox', { folder: 'inbox' });
+  if(name==='mail-sent' && window.MailInbox) MailInbox.mount('mailSentBox', { folder: 'sent' });
     if(name==='fav-locations' && window.FavLocations) FavLocations.mount('favLocBox');
       if(name==='users') loadUsers();
     if(name==='invites') loadInvites();

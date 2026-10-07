@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-10-07 — 📤 Elküldött levelek + 💬 levélszál (Gmail-szerű Beérkezett / Elküldött)
+
+- Új menüpont **📤 Elküldött levelek** (admin+manager, a 📥 Beérkezett levelek mellett; `feature-catalog` `mail-sent`). Mindkét fül tetején 📥 Beérkezett / 📤 Elküldött mappaváltó (közös `public/mail-inbox.js`, nincs párhuzamos modul).
+- `db/mail-sent.sql` → `mail_sent`: a cég SAJÁT fiókjáról (`getCompanyMailer.send`) kiment MINDEN levél (válasz, fuvar-e-mail, AI-chat, sablon, e-mail szerkesztő) címzettje/tárgya/szövege + csatolmány-NEVEK, státusz (sikertelen is), küldő felhasználó, fuvar, Message-ID / In-Reply-To. Best-effort, a küldést nem akasztja meg.
+- **Levélszál** (`mailThread`): a beérkezett levél + a mi válaszaink + az ügyfél újabb válaszai Message-ID / In-Reply-To / References láncon, időrendben. A beérkezett levelek TARTALMA továbbra sem tárolódik (a szálban csak fejléc, 👁 élőben nyílik); a saját elküldött szövegünk látszik. A Beérkezett lista „↩️ Megválaszolva ×N” jelzést kap.
+- GDPR cég-export kiegészítve a `mail_sent`-tel. +5 teszt; valós Postgres 16-on verifikálva (3 tagú szál). Cache-bust `?v=20261007sent`. (Az Elküldött mappa a bevezetéstől tölt — a korábbi levelek szövege nem volt eltárolva.)
+
 ## 2026-10-07 — FIX: AI „kvóta elfogyott” tévesen — a modell-lánc a kulcshoz ténylegesen elérhető modellekből épül
 
 - A hiba (404) nem kvóta volt, hanem kivont modellek (`gemini-1.5-*` stb.); az üzenet csak az utolsó modell státuszát mutatta. `lib/geminiJson.js`: `ListModels`-ből (6 órás cache) a kivont modellek kimaradnak, MINDEN elérhető szöveges Gemini-modell sorban bekerül (stabil flash/lite → pro → preview; Gemma/TTS/kép/embedding kihagyva); a hibaüzenet a valódi okot mondja (404 = nincs elérhető modell / 429 = kvóta / egyéb: modellenkénti státusz). +3 teszt.

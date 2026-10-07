@@ -9,6 +9,11 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 33. lépés — 📤 Elküldött levelek + levélszál (2026-10-07) ✅ KÉSZ
+
+- `mail_sent` CSAK a cég saját kimenő leveleit tárolja (szöveg + csatolmány-NÉV, a csatolmány tartalma nem); a beérkezett levelek tartalma továbbra sem kerül DB-be, a szálban csak fejléc. Az AI ezt a táblát nem olvassa.
+- `mailSentList`/`mailThread`: Admin/Manager + `mail-inbox` csomag-kapu, minden lekérdezés `company_id`-szűrt és paraméteres (a szál-bővítés is cégen belül, max 4 kör / 200 azonosító); más cég levele „nem található”. GDPR cég-exportba bekötve.
+
 ### 32. lépés — Postafiókok + 📥 Levelek + válasz (2026-10-07, PR #515) ✅ KÉSZ
 
 - **Adat-minimalizálás:** a háttér-kör CSAK fejlécet (feladó/tárgy/dátum/Message-ID) tölt le és tárol (`mail_headers`), olvasottnak semmit nem jelöl; a törzs/csatolmány csak a felhasználó kattintására jön élőben az IMAP-ról és nem kerül DB-be. A megrendelés-postafiók sem dolgoz fel automatikusan: a levél a kattintásra kerül a kiolvasóhoz (AI) — a régi automatikus `pollOnce` kör kivezetve.

@@ -220,6 +220,7 @@ handlers.sendTemplatedEmail = async function (req, res, args) {
         subject: subject || '(fără subiect)',
         html: html,
         mailType: 'template',
+        sentBy: req.session && req.session.user && req.session.user.email,
       });
     }
 

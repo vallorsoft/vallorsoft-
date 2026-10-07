@@ -38,11 +38,13 @@ handlers.exportCompanyData = async function (req, res) {
       notifications: await rows('SELECT id, user_id, type, title, body, link_tab, read_at, created_at FROM notifications WHERE company_id = $1'),
       // Levél-napló — a címzett e-mail (to_email) SZEMÉLYES ADAT → exportálandó.
       mail_log: await rows('SELECT id, to_email, subject, type, status, provider_id, created_at FROM mail_log WHERE company_id = $1'),
+      // Elküldött levelek (a cég fiókjáról) — címzett + szöveg SZEMÉLYES ADAT lehet → exportálandó.
+      mail_sent: await rows('SELECT id, from_email, to_email, subject, body_text, attachments, mail_type, status, order_id, sent_by, created_at FROM mail_sent WHERE company_id = $1'),
     };
     audit.fromReq(req, 'gdpr.export', 'company', cid, { counts: {
       users: data.users.length, clients: data.clients.length, vehicles: data.vehicles.length, orders: data.orders.length,
       client_portal_users: data.client_portal_users.length, carrier_portal_users: data.carrier_portal_users.length,
-      ecmr: data.ecmr.length, notifications: data.notifications.length, mail_log: data.mail_log.length,
+      ecmr: data.ecmr.length, notifications: data.notifications.length, mail_log: data.mail_log.length, mail_sent: data.mail_sent.length,
     } });
     return res.json({ result: { ok: true, generated_at: new Date().toISOString(), data } });
   } catch (err) {

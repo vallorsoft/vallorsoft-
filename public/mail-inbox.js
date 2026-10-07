@@ -15,13 +15,20 @@
   function toastx(m, k) { if (typeof window.toast === 'function') window.toast(m, k); else alert(m); }
   function theme() { var mc = document.getElementById('mainContent') || document.querySelector('.main-content'); return (mc && mc.getAttribute('data-theme')) || 'light'; }
 
-  var S = { root: null, items: [], q: '', mail: null, od: null };
+  var S = { root: null, items: [], q: '', mail: null, od: null, folder: 'inbox' };
 
-  function mount(target) {
+  // opts.folder: 'inbox' (📥 Beérkezett) | 'sent' (📤 Elküldött) — Gmail-szerű mappák.
+  function mount(target, opts) {
     var root = typeof target === 'string' ? $(target) : target;
     if (!root) return;
     S.root = root;
+    S.folder = (opts && opts.folder === 'sent') ? 'sent' : 'inbox';
+    S.q = '';
     root.innerHTML = ''
+      + '<div class="mbx-folders">'
+      +   '<button type="button" class="mbx-fold' + (S.folder === 'inbox' ? ' active' : '') + '" data-f="inbox">📥 ' + esc(T('mb.fInbox')) + '</button>'
+      +   '<button type="button" class="mbx-fold' + (S.folder === 'sent' ? ' active' : '') + '" data-f="sent">📤 ' + esc(T('mb.fSent')) + '</button>'
+      + '</div>'
       + '<div class="mbx-head">'
       +   '<input class="input" id="mbxQ" placeholder="' + esc(T('mb.search')) + '" autocomplete="off" data-lpignore="true">'
       +   '<button class="btn ghost" id="mbxSync" type="button">🔄 ' + esc(T('mb.sync')) + '</button>'
@@ -31,10 +38,14 @@
     var qt;
     $('mbxQ').addEventListener('input', function () { clearTimeout(qt); qt = setTimeout(function () { S.q = $('mbxQ').value.trim(); load(); }, 300); });
     $('mbxSync').addEventListener('click', sync);
+    root.querySelectorAll('.mbx-fold').forEach(function (b) {
+      b.addEventListener('click', function () { if (b.dataset.f !== S.folder) mount(root, { folder: b.dataset.f }); });
+    });
     load();
   }
 
   function load() {
+    if (S.folder === 'sent') return loadSent();
     gas('mailInboxList', [{ kind: 'inbox', q: S.q }]).then(function (r) {
       if (!r || !r.ok) { $('mbxList').innerHTML = '<div class="mbx-empty">' + esc((r && r.err) || T('mb.err')) + '</div>'; return; }
       S.items = r.items || [];
@@ -62,13 +73,71 @@
         + '<div class="mbx-subj">' + esc(it.subject || T('mb.noSubject')) + '</div>'
         + '<div class="mbx-meta">'
         +   (it.fuvar_no ? '<span class="mbx-tag">🚚 ' + esc(it.fuvar_no) + '</span>' : '')
-        +   (it.replied_at ? '<span class="mbx-tag ok">↩️ ' + esc(T('mb.replied')) + '</span>' : '')
+        +   (it.replied_at || it.out_n ? '<span class="mbx-tag ok">↩️ ' + esc(T('mb.replied')) + (it.out_n > 1 ? ' ×' + it.out_n : '') + '</span>' : '')
         +   '<span class="mbx-acc">' + esc(it.account || '') + '</span><span>' + esc(fmtDt(it.received_at)) + '</span>'
         + '</div></div>';
     }).join('') + '</div>';
     S.root.querySelectorAll('.mbx-row').forEach(function (el) {
       el.addEventListener('click', function () { openMail(+el.dataset.id); });
       el.addEventListener('keydown', function (e) { if (e.key === 'Enter') openMail(+el.dataset.id); });
+    });
+  }
+
+  // ─── 📤 Elküldött ───
+  function loadSent() {
+    gas('mailSentList', [{ q: S.q }]).then(function (r) {
+      if (!r || !r.ok) { $('mbxList').innerHTML = '<div class="mbx-empty">' + esc((r && r.err) || T('mb.err')) + '</div>'; return; }
+      S.items = r.items || [];
+      if (!S.items.length) { $('mbxList').innerHTML = '<div class="mbx-empty">' + esc(T('mb.sentEmpty')) + '</div>'; return; }
+      $('mbxList').innerHTML = '<div class="mbx-list">' + S.items.map(function (it) {
+        return '<div class="mbx-row' + (it.status === 'failed' ? ' failed' : '') + '" data-id="' + it.id + '" role="button" tabindex="0">'
+          + '<div class="mbx-from">' + esc(T('mb.toShort')) + ': ' + esc(it.to_email || '') + '</div>'
+          + '<div class="mbx-subj">' + (it.is_reply ? '↩️ ' : '') + esc(it.subject || T('mb.noSubject')) + '</div>'
+          + '<div class="mbx-meta">'
+          +   (it.status === 'failed' ? '<span class="mbx-tag err">⚠️ ' + esc(T('mb.failed')) + '</span>' : '')
+          +   (it.fuvar_no ? '<span class="mbx-tag">🚚 ' + esc(it.fuvar_no) + '</span>' : '')
+          +   (it.att_n ? '<span class="mbx-tag">📎 ' + it.att_n + '</span>' : '')
+          +   '<span class="mbx-acc">' + esc(it.sent_by || '') + '</span><span>' + esc(fmtDt(it.created_at)) + '</span>'
+          + '</div></div>';
+      }).join('') + '</div>';
+      S.root.querySelectorAll('.mbx-row').forEach(function (el) {
+        el.addEventListener('click', function () { openThread('out', +el.dataset.id); });
+        el.addEventListener('keydown', function (e) { if (e.key === 'Enter') openThread('out', +el.dataset.id); });
+      });
+    });
+  }
+
+  // Levélszál-HTML: beérkezett = csak fejléc (kattintásra nyílik élőben), kimenő = a mi szövegünk.
+  function threadHtml(items, curKind, curId) {
+    return '<div class="mbx-thread">' + items.map(function (x) {
+      var cur = x.dir === curKind && x.id === curId;
+      if (x.dir === 'in') {
+        return '<div class="mbx-tm in' + (cur ? ' cur' : '') + '">'
+          + '<div class="mbx-tmh">📥 <b>' + esc(x.from_name || x.from_email) + '</b> <span class="mbx-mail">' + esc(fmtDt(x.at)) + '</span></div>'
+          + '<div class="mbx-subj">' + esc(x.subject || T('mb.noSubject')) + '</div>'
+          + (cur ? '' : '<button class="btn ghost mbx-tmb" type="button" onclick="MailInbox.openIn(' + x.id + ')">👁 ' + esc(T('mb.openMail')) + '</button>')
+          + '</div>';
+      }
+      return '<div class="mbx-tm out' + (cur ? ' cur' : '') + (x.status === 'failed' ? ' failed' : '') + '">'
+        + '<div class="mbx-tmh">📤 ' + esc(T('mb.toShort')) + ': <b>' + esc(x.to_email || '') + '</b> <span class="mbx-mail">' + esc(fmtDt(x.at)) + (x.sent_by ? ' · ' + esc(x.sent_by) : '') + '</span>'
+        + (x.status === 'failed' ? ' <span class="mbx-tag err">⚠️ ' + esc(T('mb.failed')) + '</span>' : '') + '</div>'
+        + '<div class="mbx-subj">' + esc(x.subject || T('mb.noSubject')) + '</div>'
+        + '<pre class="mbx-text">' + esc(x.text || '') + '</pre>'
+        + ((x.attachments || []).length ? '<div class="mbx-mail">📎 ' + x.attachments.map(esc).join(', ') + '</div>' : '')
+        + '</div>';
+    }).join('') + '</div>';
+  }
+
+  function openThread(kind, id) {
+    var m = modal('mbxView', '<div class="text-muted" style="padding:20px;">⏳ ' + esc(T('mb.opening')) + '</div>');
+    gas('mailThread', [{ kind: kind, id: id }]).then(function (r) {
+      if (!r || !r.ok) { m.querySelector('.mbx-modal').innerHTML = '<div class="mbx-empty">' + esc((r && r.err) || T('mb.err')) + '</div><div class="mbx-btns"><button class="btn ghost" onclick="MailInbox.close(\'mbxView\')">✕</button></div>'; return; }
+      var items = r.items || [];
+      m.querySelector('.mbx-modal').innerHTML = ''
+        + '<div class="mbx-mhead"><div class="mbx-msubj">💬 ' + esc(T('mb.thread')) + ' <span class="mbx-mail">(' + items.length + ')</span></div>'
+        + '<button class="btn ghost" type="button" onclick="MailInbox.close(\'mbxView\')">✕</button></div>'
+        + '<div class="mbx-note">🔒 ' + esc(T('mb.threadNote')) + '</div>'
+        + threadHtml(items, kind, id);
     });
   }
 
@@ -90,7 +159,7 @@
     gas('mailOpen', [{ id: id }]).then(function (r) {
       if (!r || !r.ok) { m.querySelector('.mbx-modal').innerHTML = '<div class="mbx-empty">' + esc((r && r.err) || T('mb.err')) + '</div><div class="mbx-btns"><button class="btn ghost" onclick="MailInbox.close(\'mbxView\')">✕</button></div>'; return; }
       var ml = S.mail = r.mail;
-      var row = S.items.filter(function (x) { return x.id === id; })[0]; if (row) row.opened_at = row.opened_at || new Date().toISOString();
+      var row = S.folder !== 'inbox' ? null : S.items.filter(function (x) { return x.id === id; })[0]; if (row) row.opened_at = row.opened_at || new Date().toISOString();
       var atts = (ml.attachments || []).map(function (a) {
         return '<button class="mbx-att" type="button" onclick="MailInbox.att(' + ml.id + ',' + a.idx + ')">📎 ' + esc(a.name) + ' <span class="mbx-mail">' + Math.max(1, Math.round((a.size || 0) / 1024)) + ' KB</span></button>';
       }).join('');
@@ -106,8 +175,14 @@
         +   '<button class="btn ghost" type="button" onclick="MailInbox.dismiss(' + ml.id + ')">🗑 ' + esc(T('mb.hide')) + '</button>'
         +   (window.OrderChat && window.OrderChat.openReply ? '<button class="btn ghost" type="button" onclick="MailInbox.aiReply()">💬 ' + esc(T('mb.aiReply')) + '</button>' : '')
         +   '<button class="btn primary" type="button" onclick="MailInbox.reply()">↩️ ' + esc(T('mb.reply')) + '</button>'
-        + '</div>';
-      render();
+        + '</div>'
+        + '<div id="mbxThreadBox"></div>';
+      if (S.folder === 'inbox') render();
+      gas('mailThread', [{ kind: 'in', id: ml.id }]).then(function (t) {
+        var items = (t && t.ok && t.items) || [];
+        if (items.length < 2 || !$('mbxThreadBox')) return;
+        $('mbxThreadBox').innerHTML = '<div class="mbx-sec">💬 ' + esc(T('mb.thread')) + ' (' + items.length + ')</div>' + threadHtml(items, 'in', ml.id);
+      });
     });
   }
 
@@ -196,5 +271,5 @@
     }).catch(function () { if (b) b.disabled = false; });
   }
 
-  window.MailInbox = { mount: mount, close: closeModal, att: att, dismiss: dismiss, reply: reply, aiReply: aiReply, send: send, reload: load };
+  window.MailInbox = { mount: mount, openIn: openMail, close: closeModal, att: att, dismiss: dismiss, reply: reply, aiReply: aiReply, send: send, reload: load };
 })();

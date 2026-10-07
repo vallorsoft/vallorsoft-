@@ -171,7 +171,8 @@ handlers.mailInboxList = async function (req, res, args) {
     const cid = _u(req).company_id;
     const params = [cid];
     let sql = `SELECT h.id, h.from_email, h.from_name, h.subject, h.received_at, h.order_id, h.opened_at, h.replied_at, h.inbound_id,
-                      COALESCE(to_jsonb(o)->>'fuvar_no', o.id) AS fuvar_no, m.label AS account
+                      COALESCE(to_jsonb(o)->>'fuvar_no', o.id) AS fuvar_no, m.label AS account,
+                      (SELECT COUNT(*)::int FROM mail_sent s WHERE s.company_id=h.company_id AND s.status='sent' AND h.message_id IS NOT NULL AND s.in_reply_to=h.message_id) AS out_n
                  FROM mail_headers h
                  JOIN mail_accounts m ON m.id = h.account_id AND m.company_id = h.company_id
                  LEFT JOIN orders o ON o.id = h.order_id AND o.company_id = h.company_id
@@ -313,7 +314,7 @@ async function sendReply(req, a) {
     } else {
       const mailer = await emailSvc.getCompanyMailer(cid);
       if (!mailer || !mailer.ok) return { ok: false, err: (mailer && mailer.noConfig) ? 'Configurați contul expeditor (SMTP) în Integrări.' : ((mailer && mailer.error) || 'Eroare la contul expeditor') };
-      sent = await mailer.send({ to: h.from_email, subject, html: emailSvc.wrapBrandedEmail(html, { logoUrl, senderName, style }), mailType: 'reply', inReplyTo: h.message_id, references: refs });
+      sent = await mailer.send({ to: h.from_email, subject, html: emailSvc.wrapBrandedEmail(html, { logoUrl, senderName, style }), mailType: 'reply', inReplyTo: h.message_id, references: refs, sentBy: u.email });
     }
     r = sent && sent.ok ? { ok: true } : { ok: false, err: (sent && sent.error) || 'Eroare la trimitere' };
   }
@@ -332,6 +333,83 @@ handlers.mailReply = async function (req, res, args) {
   } catch (e) { console.error('mailReply hiba:', e.message); return _err(res, 'Eroare de server'); }
 };
 
+// ─── 📤 Elküldött: a cég fiókjáról kiment levelek (mail_sent) ───
+// args: { q, status, limit, offset }
+handlers.mailSentList = async function (req, res, args) {
+  try {
+    const g = await _gate(req); if (g) return _err(res, g);
+    const a = _arg(args);
+    const params = [_u(req).company_id];
+    let sql = `SELECT s.id, s.to_email, s.subject, s.mail_type, s.status, s.created_at, s.sent_by, s.order_id,
+                      jsonb_array_length(s.attachments) AS att_n, (s.in_reply_to IS NOT NULL) AS is_reply,
+                      COALESCE(to_jsonb(o)->>'fuvar_no', o.id) AS fuvar_no
+                 FROM mail_sent s
+                 LEFT JOIN orders o ON o.id = s.order_id AND o.company_id = s.company_id
+                WHERE s.company_id=$1 AND COALESCE(s.mail_type,'') <> 'builder_test'`;
+    if (a.status === 'failed') sql += ` AND s.status='failed'`;
+    const q = _str(a.q, 100);
+    if (q) { params.push('%' + q.replace(/[%_\\]/g, '') + '%'); sql += ` AND (s.to_email ILIKE $${params.length} OR s.subject ILIKE $${params.length})`; }
+    sql += ` ORDER BY s.created_at DESC LIMIT ${Math.min(parseInt(a.limit, 10) || 100, 300)} OFFSET ${Math.max(parseInt(a.offset, 10) || 0, 0)}`;
+    const { rows } = await pool.query(sql, params);
+    return _ok(res, { items: rows });
+  } catch (e) { console.error('mailSentList hiba:', e.message); return _ok(res, { items: [], migration: true }); }
+};
+
+// Levélszál: a beérkezett + elküldött levelek Message-ID / In-Reply-To láncon.
+// A beérkezett levelek TARTALMA itt sem jön — csak fejléc; a saját kimenő
+// leveleink szövege igen (azt mi írtuk).
+async function _thread(cid, start) {
+  const ids = new Set();
+  const inMap = new Map(), outMap = new Map();
+  const addIds = (v) => String(v || '').split(/\s+/).filter((x) => /^<[^<>\s]{3,250}>$/.test(x)).forEach((x) => ids.add(x));
+  if (start.kind === 'in') {
+    const r = await pool.query('SELECT id, message_id, refs FROM mail_headers WHERE id=$1 AND company_id=$2', [start.id, cid]);
+    if (!r.rows.length) return null;
+    addIds(r.rows[0].message_id); addIds(r.rows[0].refs);
+  } else {
+    const r = await pool.query('SELECT id, message_id, in_reply_to FROM mail_sent WHERE id=$1 AND company_id=$2', [start.id, cid]);
+    if (!r.rows.length) return null;
+    addIds(r.rows[0].message_id); addIds(r.rows[0].in_reply_to);
+  }
+  for (let round = 0; round < 4 && ids.size; round++) {
+    const before = ids.size;
+    const list = Array.from(ids).slice(0, 200);
+    const h = await pool.query(
+      `SELECT h.id, h.message_id, h.refs, h.from_email, h.from_name, h.subject, h.received_at, h.opened_at
+         FROM mail_headers h JOIN mail_accounts m ON m.id=h.account_id AND m.company_id=h.company_id
+        WHERE h.company_id=$1 AND h.dismissed=false AND m.use_inbox=true
+          AND (h.message_id = ANY($2::text[]) OR string_to_array(COALESCE(h.refs,''), ' ') && $2::text[]) LIMIT 100`, [cid, list]);
+    h.rows.forEach((x) => { inMap.set(x.id, x); addIds(x.message_id); addIds(x.refs); });
+    const o = await pool.query(
+      `SELECT id, message_id, in_reply_to, to_email, subject, body_text, attachments, status, created_at, sent_by
+         FROM mail_sent WHERE company_id=$1 AND (message_id = ANY($2::text[]) OR in_reply_to = ANY($2::text[])) LIMIT 100`, [cid, list]);
+    o.rows.forEach((x) => { outMap.set(x.id, x); addIds(x.message_id); addIds(x.in_reply_to); });
+    if (ids.size === before) break;
+  }
+  if (start.kind === 'out' && !outMap.size) {
+    const r = await pool.query(`SELECT id, message_id, in_reply_to, to_email, subject, body_text, attachments, status, created_at, sent_by
+                                  FROM mail_sent WHERE id=$1 AND company_id=$2`, [start.id, cid]);
+    r.rows.forEach((x) => outMap.set(x.id, x));
+  }
+  const items = [];
+  inMap.forEach((x) => items.push({ dir: 'in', id: x.id, from_email: x.from_email, from_name: x.from_name, subject: x.subject, at: x.received_at, opened: !!x.opened_at }));
+  outMap.forEach((x) => items.push({ dir: 'out', id: x.id, to_email: x.to_email, subject: x.subject, at: x.created_at, status: x.status,
+    sent_by: x.sent_by, text: x.body_text || '', attachments: Array.isArray(x.attachments) ? x.attachments : [] }));
+  items.sort((p, q) => new Date(p.at || 0) - new Date(q.at || 0));
+  return items;
+}
+
+// args: { kind:'in'|'out', id }
+handlers.mailThread = async function (req, res, args) {
+  try {
+    const g = await _gate(req); if (g) return _err(res, g);
+    const a = _arg(args);
+    const items = await _thread(_u(req).company_id, { kind: a.kind === 'out' ? 'out' : 'in', id: parseInt(a.id, 10) || 0 });
+    if (!items) return _err(res, 'E-mailul nu a fost găsit.');
+    return _ok(res, { items });
+  } catch (e) { console.error('mailThread hiba:', e.message); return _err(res, 'Eroare de server'); }
+};
+
 // Válasz-kontextus a chathez: CSAK címzett + tárgy a felhasználó előnézetéhez (az AI nem kapja).
 async function replyContext(req, id) {
   const h = await _loadHeader(_u(req).company_id, id);
@@ -342,5 +420,6 @@ async function replyContext(req, id) {
 Object.defineProperty(handlers, '_sendReply', { value: sendReply, enumerable: false });
 Object.defineProperty(handlers, '_replyContext', { value: replyContext, enumerable: false });
 Object.defineProperty(handlers, '_gate', { value: _gate, enumerable: false });
+Object.defineProperty(handlers, '_thread', { value: _thread, enumerable: false });
 
 module.exports = handlers;
