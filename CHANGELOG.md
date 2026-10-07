@@ -16,6 +16,7 @@
 
 ## 2026-10-07 — UIT-kód fotózással vagy feltöltéssel (kép / PDF) a fuvarhoz (PR #509)
 - **📷 Fotó** és **📎 Feltöltés (kép / PDF)** gomb a UIT-mezőnél MINDENHOL: fuvar-kiírás (a kiolvasott kódok chipként várnak, mentéskor a fuvarhoz kerülnek a bizonylattal), fuvar-szerkesztő (azonnal ment, a kiválasztott lerakóhoz is), ⋯ UIT-panel, sofőr UIT-ablak. Eddig csak kamerás fotó volt, és csak a panelen/sofőrnél.
+- **A 💬 Szöveges fuvarkiírás chatjében is:** a beíró mező alatt **📷 UIT** / **📎 UIT** gomb — a kiolvasott kódok a vázlatba és az előnézetbe kerülnek (chip, ✕-szel levehető, az AI is látja; beírt UIT-kódot is felvesz), mentéskor a bizonylattal együtt a fuvarhoz kerülnek. Meglévő fuvar módosításánál az új kódok hozzáadódnak, a már rögzítettek megmaradnak („+N már rögzítve").
 - A PDF (pl. az ANAF e-Transport visszaigazolás) is kiolvasható: a Gemini PDF-ként kapja; a bizonylat a kód mellett megmarad, 📄 ikonnal megnyitható/letölthető.
 - Közös kliens-segéd `public/uit-scan.js` (a két régi, duplikált kamera-kód helyett); közös szerver-szabály `lib/uitFormat.js` `sanitizeUitPhoto` (fehérlista: jpeg/png/webp/heic/gif/pdf, max 8 MB — SVG szándékosan nem). `comCreate` a kiíráskori kódok bizonylatát is menti. 14 új `uitscan.*` i18n (RO+HU), cache-bust `?v=20261007uitscan`; +6 teszt (1472 zöld valós DB-vel).
 

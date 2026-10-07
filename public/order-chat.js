@@ -12,7 +12,7 @@
 (function () {
   'use strict';
 
-  var S = { messages: [], draft: {}, questions: [], notes: [], missing: [], ready: false, busy: false, saved: null };
+  var S = { messages: [], draft: {}, questions: [], notes: [], missing: [], ready: false, busy: false, saved: null, uitDocs: {} };
 
   function T(k, v) { return (window.t ? window.t(k, v) : k); }
   function lang() { try { return (window.I18N && window.I18N.get()) || 'ro'; } catch (_) { return 'ro'; } }
@@ -83,7 +83,13 @@
       +       '<div class="och-qs" id="ochQs"></div>'
       +       '<div class="och-input">'
       +         '<textarea id="ochInput" rows="3" placeholder="' + esc(T(_isMobile() ? 'och.phMobile' : 'och.ph')) + '" autocomplete="off" data-lpignore="true" data-1p-ignore></textarea>'
-      +         '<button class="btn primary" id="ochSend" type="button" onclick="OrderChat.send()">' + esc(T('och.send')) + '</button>'
+      +         '<div class="och-send-col">'
+      +           '<button class="btn primary" id="ochSend" type="button" onclick="OrderChat.send()">' + esc(T('och.send')) + '</button>'
+      +           '<div class="och-uit-btns">'
+      +             '<button class="btn ghost och-uit-btn" type="button" onclick="OrderChat.uit(\'camera\')" title="' + esc(T('och.uitPhotoTip')) + '">📷 UIT</button>'
+      +             '<button class="btn ghost och-uit-btn" type="button" onclick="OrderChat.uit(\'file\')" title="' + esc(T('och.uitFileTip')) + '">📎 UIT</button>'
+      +           '</div>'
+      +         '</div>'
       +       '</div>'
       +     '</div>'
       +     '<div class="och-prev" id="ochPrev"></div>'
@@ -112,7 +118,7 @@
   }
   function reset(force) {
     if (!force && S.messages.length && !S.saved && !window.confirm(T('och.resetAsk'))) return;
-    S = { messages: [], draft: {}, questions: [], notes: [], missing: [], ready: false, busy: false, saved: null };
+    S = { messages: [], draft: {}, questions: [], notes: [], missing: [], ready: false, busy: false, saved: null, uitDocs: {} };
     var m = $('ochModal');
     if (m) { m.remove(); }
     _tab = 'chat';
@@ -216,6 +222,14 @@
     // Ár + km
     var km = d.km != null ? d.km : d.route_km;
     var sec5 = row(T('och.price'), d.pret != null ? '<b>' + esc(fmtNum(d.pret)) + ' EUR</b>' : esc(T('och.none')));
+    var uits = d.uit_codes || [];
+    var uitH = uits.map(function (c, i) {
+      var doc = S.uitDocs[c];
+      return '<span class="och-uit-chip">' + (doc ? (doc.mime === 'application/pdf' ? '📄 ' : '📷 ') : '') + esc(_uitFmt(c))
+        + ' <button type="button" onclick="OrderChat.uitRemove(' + i + ')" title="✕">✕</button></span>';
+    }).join('');
+    if (d.edit_uit_existing) uitH += '<span class="och-mut"> ' + esc(T('och.uitExisting', { n: d.edit_uit_existing })) + '</span>';
+    var secUit = row('🚛 UIT', uitH || '<span class="och-mut">' + esc(T('och.uitNone')) + '</span>');
     sec5 += row(T('och.km'), km != null ? esc(fmtNum(km)) + ' km' + (d.km == null ? badge(T('och.auto'), 'info') : '') : esc(T('och.none')));
 
     h += '<div class="och-card">'
@@ -224,6 +238,7 @@
       + '<div class="och-sec">' + sec3 + '</div>'
       + '<div class="och-sec">' + sec4 + '</div>'
       + '<div class="och-sec">' + sec5 + '</div>'
+      + '<div class="och-sec">' + secUit + '</div>'
       + '</div>';
 
     if (S.missing && S.missing.length && !S.saved) {
@@ -281,7 +296,7 @@
     if (btn) { btn.disabled = true; btn.textContent = T('och.saving'); }
     S.busy = true;
     var series = document.getElementById('oSeria');
-    window.gas('orderChatCreate', [{ draft: S.draft, series_id: series && series.value ? series.value : null }]).then(function (r) {
+    window.gas('orderChatCreate', [{ draft: S.draft, series_id: series && series.value ? series.value : null, uit_docs: _uitDocsFor(S.draft.uit_codes) }]).then(function (r) {
       S.busy = false;
       if (!r || !r.ok) {
         S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
@@ -304,10 +319,54 @@
   function openList() {
     close();
     if (typeof window.activateTab === 'function') window.activateTab('orders-list');
-    S = { messages: [], draft: {}, questions: [], notes: [], missing: [], ready: false, busy: false, saved: null };
+    S = { messages: [], draft: {}, questions: [], notes: [], missing: [], ready: false, busy: false, saved: null, uitDocs: {} };
     var m = $('ochModal'); if (m) m.remove();
     _tab = 'chat';
   }
 
-  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, tab: tab };
+  // ─── 🚛 UIT: 📷 fotó / 📎 feltöltés (kép vagy PDF) → AI-kiolvasás ───
+  // A kódok a vázlatba kerülnek (az AI is látja), a bizonylat csak a
+  // böngészőben vár, és a mentéskor megy fel a kódok mellé.
+  var DOCS_MAX = 15 * 1024 * 1024; // a kérés-korlát (20 MB) alatt
+  function _uitFmt(c) { return (window.UitFmt && window.UitFmt.format) ? window.UitFmt.format(c) : c; }
+  function _uitNorm(c) { return (window.UitFmt && window.UitFmt.normalize) ? window.UitFmt.normalize(c) : String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16); }
+  function _uitDocsFor(codes) {
+    var out = {}, total = 0;
+    (codes || []).forEach(function (c) {
+      var d = S.uitDocs[c];
+      if (!d || total + d.b64.length > DOCS_MAX) return;
+      out[c] = d; total += d.b64.length;
+    });
+    return out;
+  }
+  function uit(mode) {
+    if (S.busy || S.saved) return;
+    if (!window.UitScan) { S.messages.push({ role: 'assistant', text: '⚠️ ' + T('och.err'), err: true }); renderAll(); return; }
+    window.UitScan.pick(mode).then(function (p) {
+      if (!p) return;
+      if (!p.codes.length) { S.messages.push({ role: 'assistant', text: '⚠️ ' + T('uitscan.none'), err: true }); renderAll(); return; }
+      var list = (S.draft.uit_codes || []).slice(), added = [];
+      p.codes.forEach(function (c) {
+        var n = _uitNorm(c);
+        if (!n) return;
+        S.uitDocs[n] = { b64: p.b64, mime: p.mime };
+        if (list.indexOf(n) === -1) { list.push(n); added.push(_uitFmt(n)); }
+      });
+      S.draft = Object.assign({}, S.draft, { uit_codes: list });
+      S.messages.push({ role: 'assistant', text: '🚛 ' + T('och.uitAdded', { codes: added.length ? added.join(', ') : '—' }) });
+      renderAll();
+    }).catch(function (e) {
+      S.messages.push({ role: 'assistant', text: '⚠️ ' + ((e && e.message) || T('och.err')), err: true });
+      renderAll();
+    });
+  }
+  function uitRemove(i) {
+    var list = (S.draft.uit_codes || []).slice();
+    var c = list.splice(i, 1)[0];
+    if (c) delete S.uitDocs[c];
+    S.draft = Object.assign({}, S.draft, { uit_codes: list });
+    renderAll();
+  }
+
+  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, tab: tab, uit: uit, uitRemove: uitRemove };
 })();

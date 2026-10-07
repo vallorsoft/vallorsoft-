@@ -5189,3 +5189,11 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .uit-scan-chip{ display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 10px; border-radius:999px; font:700 12px ui-monospace,monospace; letter-spacing:.4px; background:#eff6ff; color:#1e3a8a; border:1px solid #bfdbfe; }
 .uit-scan-chip button{ border:0; background:transparent; color:#b91c1c; cursor:pointer; font-weight:700; padding:0 4px; }
 .main-content[data-theme="dark"] .uit-scan-chip{ background:rgba(59,130,246,0.14); color:#bfdbfe; border-color:rgba(59,130,246,0.4); }
+
+/* ── Szöveges fuvarkiírás: 🚛 UIT 📷/📎 ── */
+#ochModal .och-send-col{ display:flex; flex-direction:column; gap:6px; }
+#ochModal .och-uit-btns{ display:flex; gap:6px; }
+#ochModal .och-input .och-uit-btn{ flex:1; min-height:34px; padding:6px 8px !important; font-size:12px !important; white-space:nowrap; }
+#ochModal .och-uit-chip{ display:inline-flex; align-items:center; gap:4px; margin:0 6px 4px 0; padding:3px 4px 3px 9px; border-radius:999px; font:700 12px ui-monospace,monospace; background:#eff6ff; color:#1e3a8a; border:1px solid #bfdbfe; }
+#ochModal .och-uit-chip button{ border:0; background:transparent; color:#b91c1c; cursor:pointer; font-weight:700; padding:0 4px; }
+#ochModal[data-theme="dark"] .och-uit-chip{ background:rgba(59,130,246,0.14); color:#bfdbfe; border-color:rgba(59,130,246,0.4); }

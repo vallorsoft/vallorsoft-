@@ -378,3 +378,37 @@ describe('szerkesztés fuvarszámmal', () => {
     expect(p.status).toBe('Disponibil');
   });
 });
+
+describe('UIT a chatben', () => {
+  const BASE = { client: 'C', stops: [{ kind: 'pickup', loc: 'Brașov, RO', data: '2026-10-12' }, { kind: 'delivery', loc: 'Bicske, HU', data: '2026-10-13' }], load_type: 'FTL' };
+  test('mentés: a kódok + a bizonylat (PDF) a comCreate uit_codes-ában; SVG eldobva, idegen kód kihagyva', async () => {
+    const pdf = Buffer.from('%PDF-1.4').toString('base64');
+    await call('orderChatCreate', ADMIN, [{
+      draft: Object.assign({}, BASE, { uit_codes: ['abcd-1234', 'ZZZZ9999'] }),
+      uit_docs: { ABCD1234: { b64: pdf, mime: 'application/pdf' }, ZZZZ9999: { b64: 'PHN2Zz4=', mime: 'image/svg+xml' }, IDEGEN11: { b64: pdf, mime: 'application/pdf' } },
+    }]);
+    const u = mockComCreate.mock.calls[0][2][0].uit_codes;
+    expect(u).toEqual([
+      { uit_code: 'ABCD1234', source: 'ai-scan', photo_b64: pdf, photo_mime: 'application/pdf' },
+      { uit_code: 'ZZZZ9999', source: 'manual' },
+    ]);
+  });
+  test('ha az AI nem ad uit_codes-t, az előző lista megmarad', async () => {
+    mockExtract.mockResolvedValue({ model: 'm', json: { reply: 'ok', draft: Object.assign({}, BASE), questions: [] } });
+    const r = await call('orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'ár 1500' }], draft: Object.assign({}, BASE, { uit_codes: ['ABCD1234'] }) }]);
+    expect(r.draft.uit_codes).toEqual(['ABCD1234']);
+  });
+  test('szerkesztés: az új UIT a fuvarhoz kerül (cégre szűrve, duplikátum nélkül)', async () => {
+    const ins = [];
+    mockRules = [
+      { match: /SELECT status, email_sofer, rendszam_camion/, rows: [{ status: 'Alocat', email_sofer: null, rendszam_camion: 'B104VLR', rendszam_remorca: null }] },
+      { match: /INSERT INTO order_uit_codes/, fn: (sql, p) => { ins.push({ sql, p }); return { rows: [] }; } },
+    ];
+    const draft = Object.assign({}, BASE, { edit_order_id: 'CMD-MT181GD5NBL', uit_codes: ['QQQQ2222'] });
+    const r = await call('orderChatCreate', ADMIN, [{ draft }]);
+    expect(r.ok).toBe(true);
+    expect(ins).toHaveLength(1);
+    expect(ins[0].p.slice(0, 3)).toEqual([7, 'CMD-MT181GD5NBL', 'QQQQ2222']);
+    expect(ins[0].sql).toMatch(/ON CONFLICT \(company_id, order_id, uit_code\) DO NOTHING/);
+  });
+});
