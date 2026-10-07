@@ -39,6 +39,7 @@ function loadTab(name){
     if(name==='ecmr' && window.ECmr) ECmr.mount('ecmrBox');
     if(name==='doc-register' && window.DocRegister) DocRegister.mount('docRegisterBox');
     if(name==='quotes' && window.Quotes) Quotes.mount('quotesBox');
+    if(name==='mail-inbox' && window.MailInbox) MailInbox.mount('mailInboxBox');
     if(name==='fav-locations' && window.FavLocations) FavLocations.mount('favLocBox');
       if(name==='users') loadUsers();
     if(name==='invites') loadInvites();
@@ -69,7 +70,7 @@ function loadTab(name){
   if(name==='warehouse') loadWarehouseTab();
   if(typeof loadCostCalculator==='function' && name && name.indexOf('vcalc-')===0) loadCostCalculator(name);
   if(name==='billing'){
-    if(window.EmailIntakeCard) EmailIntakeCard.mount('emailIntakeCardBox', {readOnly:true});
+    if(window.MailAccountsCard) MailAccountsCard.mount('emailIntakeCardBox');
   }
   }
 

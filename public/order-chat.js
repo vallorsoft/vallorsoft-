@@ -379,7 +379,8 @@
   function renderMailPrev(d) {
     var M = S.mail || { att: [], builders: [], tracking: false };
     var h = '<div class="och-prev-h">✉️ ' + esc(T('och.mailPreview')) + (d.fuvar_no ? ' · <span class="och-plate">' + esc(d.fuvar_no) + '</span>' : '') + '</div>';
-    if (!d.order_id) h += '<div class="och-mut" style="margin:-4px 0 8px;">' + esc(T('och.mailGeneral')) + '</div>';
+    if (d.reply_mail_id) h += '<div class="och-editbar">↩️ ' + esc(T('och.replyBar')) + '</div><div class="och-mut" style="margin:-4px 0 8px;">🔒 ' + esc(T('och.replyPrivacy')) + '</div>';
+    else if (!d.order_id) h += '<div class="och-mut" style="margin:-4px 0 8px;">' + esc(T('och.mailGeneral')) + '</div>';
     var to = d.to_email ? '<b>' + esc(d.to_email) + '</b>' + (d.recipient === 'client' ? badge(T('och.client'), 'info') : d.recipient === 'carrier' ? badge(T('och.carrier'), 'info') : d.recipient === 'named' && d.recipient_name ? badge(d.recipient_name, 'info') : '') + (d.learned_to ? badge(T('och.learned'), 'info') : '') : '<span class="och-miss">' + esc(T('och.none')) + '</span>';
     var sec = row(T('och.to'), to) + row(T('och.subject'), d.subject ? '<b>' + esc(d.subject) + '</b>' : '<span class="och-miss">' + esc(T('och.none')) + '</span>');
     var tpl = '';
@@ -498,6 +499,22 @@
     });
   }
 
+  // ─── ↩️ Válasz egy megnyitott levélre (a 📥 Levelek fülről). Az AI a levelet
+  //     nem kapja meg — csak azt, amit a felhasználó a chatbe ír. ───
+  function openReply(ctx) {
+    if (!ctx || !ctx.id) return;
+    S = { messages: [], draft: {}, questions: [], notes: [], missing: ['body'], ready: false, busy: false, saved: null, uitDocs: {} };
+    var m = $('ochModal'); if (m) m.remove();
+    _tab = 'chat';
+    var s0 = String(ctx.subject || '');
+    S.draft = { mode: 'email', reply_mail_id: ctx.id, recipient: 'other', to_email: ctx.from_email, recipient_name: ctx.from_name || null,
+      subject: /^(re|aw)\s*:/i.test(s0) ? s0 : 'Re: ' + s0, body: '' };
+    S.mail = { att: [], builders: [], tracking: false };
+    S.messages.push({ role: 'assistant', text: T('och.replyStart', { to: ctx.from_name || ctx.from_email }) });
+    open();
+    renderAll();
+  }
+
   // ─── Lebegő gomb (mint a 🐛 hibabejelentő) — minden fülön látszik ───
   // A csomag-kapu (`ai-szoveges-fuvar`) után kapcsolja be az applyFeatureFlags.
   function setFab(visible) {
@@ -518,5 +535,5 @@
     b.style.display = visible ? '' : 'none';
   }
 
-  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
+  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
 })();

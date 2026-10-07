@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-10-07 — 📬 Több postafiók + 📥 Levelek (csak fejléc) + ↩️ válasz sablonnal / AI-val (PR #515)
+
+- **📤 Elküldött mappa:** a programból küldött válasz / új e-mail / fuvar-e-mail másolata a bekötött postafiók „Elküldött” mappájába is bekerül (IMAP APPEND, `services/mailbox.js` `appendSent`, best-effort); a feladó címével egyező fiókot választja, különben az első „Levelek” fiókot. Gmail/Outlook SMTP-n át küldve kihagyva (a szolgáltató magától menti → nincs dupla).
+- **Postafiókok (Integrációk → 📬):** több IMAP-fiók; fiókonként szerep (📄 Megrendelések / 📥 Levelek + válasz), mappák, engedélyezett feladók (ügyfeleim+alvállalkozóim+kontaktjaim / egyedi lista / mind). A régi egy-fiókos megrendelés-postafiók automatikusan átkerül (`db/mail-accounts.sql`).
+- **Adatvédelem:** a háttér CSAK feladót + tárgyat + dátumot gyűjt (`mail_headers`); a levél tartalma csak kattintásra töltődik be, és nem tárolódik.
+- **Beérkező megrendelések:** a levelek „📄 Megnyit + kiolvas" gombbal kerülnek a kiolvasóhoz (AI) — nincs automatikus feldolgozás.
+- **📥 Levelek fül:** lista → megnyitás (szöveg + csatolmány letöltés + kapcsolt fuvar) → ↩️ Válasz: címzett zárolva a feladóra, „Re:" tárgy, levélszál-fejlécek, idézet, fuvarhoz kötött levélnél sablon + csatolmány + követő-link, előnézet megerősítés küldés előtt, céges lábléc.
+- **💬 Válasz AI-val:** az AI a levelet nem látja, csak a chatbe írt szöveget; címzett/tárgy a szerverről, előnézet a chatben.
+- `services/mailbox.js`, `handlers/mailbox.js`, `public/mail-inbox.js`, `public/mail-accounts-card.js`; `services/email.js` `In-Reply-To`/`References`; feature-kulcs `mail-inbox`; ~75 új i18n (RO+HU); cache-bust `?v=20261007mbx`. **1513 Jest zöld** (+11).
+
 ## 2026-10-07 — E-mailek: KÖTELEZŐ céges lábléc az arculatból + automatikus kontraszt (PR #514)
 - **Szabály:** minden, a cég nevében kimenő levél (cég saját fiókja / `getCompanyMailer` és a közös feladós `sendClientEmail`, ha cégé a levél) alján fix lábléc: cég-logó + cégnév + CUI · Reg.Com. · ☏ · ✉ · web + cím — a sofőr-elszámolási nyomtatványok fejlécének mintájára, a `companies` + `company_branding` arculatból. Dupla lábléc nincs (jelölő), cégnév nélkül nincs lábléc. A lábléc mindig világos háttér + sötét szöveg.
 - **Kontraszt:** a chatben választott színeknél a szöveg/fejléc-felirat/link színe automatikusan olvashatóra vált (WCAG ≥ 4.5), ha a kért szín beleolvadna a háttérbe; az előnézet ugyanígy számol. Új `lib/mailStyle.js` `contrast`/`readableOn`/`ensureText`/`companyFooterHtml`, `services/email.js` `appendCompanyFooter`. +4 Jest, cache-bust `?v=20261007ochfoot`.

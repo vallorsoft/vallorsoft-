@@ -42,6 +42,7 @@ window.InboundOrders = (function () {
       .io-nav{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;background:#f4f7fb;border:1px solid #e3e9f2;border-radius:10px;padding:8px 12px}
       .io-nav .io-count{font-weight:700;font-size:14px;color:#1f2d3d}
       .io-nav .io-sub{font-size:12px;color:#6b7a90}
+      .io-mrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid #eef2f7}.io-mtxt{flex:1;min-width:0;font-size:13px}.io-mtxt div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .io-done{background:#dff3e6;color:#0f7a3a;border:1px solid #bfe6cc;border-radius:10px;padding:14px;font-weight:600}
       @media(max-width:640px){.io-grid{grid-template-columns:1fr}}`;
     document.head.appendChild(s);
@@ -69,6 +70,7 @@ window.InboundOrders = (function () {
       '</div>' +
       '<div id="ioBand" style="margin-bottom:16px;"></div>' +
       '<div id="ioInfo"></div>' +
+      '<div id="ioMail"></div>' +
       '<div id="ioList"><div class="io-empty">Betöltés…</div></div>';
     const $ = (id) => root.querySelector('#' + id);
 
@@ -77,7 +79,7 @@ window.InboundOrders = (function () {
       try {
         const s = await api('GET', '/api/inbound-orders/settings');
         $('ioAi').checked = !!s.ai_enabled;
-        if (!s.intake_configured) $('ioInfo').innerHTML = '<div class="io-warn">A megrendelés-postafiók még nincs beállítva. Állítsd be az <b>Integrációk</b> menüpontban (📧 Megrendelés email fiók). Addig a lista üres marad; a „Lekérdezés most” gomb beállítás után működik.</div>';
+        if (!s.intake_configured) $('ioInfo').innerHTML = '<div class="io-warn">' + esc(t('mb.ioNoAccount')) + '</div>';
       } catch (e) {}
     }
     $('ioAi').addEventListener('change', async function () {
@@ -205,7 +207,39 @@ window.InboundOrders = (function () {
       });
     }
 
+    // ── Beérkezett levelek: CSAK feladó + tárgy. Kattintásra kerül a kiolvasóhoz (AI). ──
+    async function loadMail() {
+      const box = $('ioMail'); if (!box || typeof gas !== 'function') return;
+      let r; try { r = await gas('mailInboxList', [{ kind: 'orders' }]); } catch (_) { return; }
+      const items = (r && r.ok && r.items) || [];
+      if (!items.length) { box.innerHTML = ''; return; }
+      box.innerHTML = '<div class="io-card"><div class="io-meta" style="margin-bottom:6px;"><b>📨 ' + esc(t('mb.ioTitle', { n: items.length })) + '</b></div>' +
+        '<div class="io-sub" style="margin-bottom:8px;">🔒 ' + esc(t('mb.ioHint')) + '</div>' +
+        items.map(function (it) {
+          return '<div class="io-mrow"><div class="io-mtxt"><b>' + esc(it.from_name || it.from_email) + '</b> <span class="io-sub">' + esc(it.from_email) + '</span>' +
+            '<div>' + esc(it.subject || '—') + '</div></div>' +
+            '<span class="io-sub">' + esc(it.received_at ? new Date(it.received_at).toLocaleString() : '') + '</span>' +
+            '<button class="io-btn io-btn--green" data-mopen="' + it.id + '">📄 ' + esc(t('mb.ioOpen')) + '</button>' +
+            '<button class="io-btn io-btn--ghost" data-mhide="' + it.id + '" title="' + esc(t('mb.hide')) + '">✕</button></div>';
+        }).join('') + '</div>';
+      box.querySelectorAll('[data-mopen]').forEach(function (b) {
+        b.addEventListener('click', async function () {
+          b.disabled = true; b.textContent = '⏳';
+          const r2 = await gas('mailToOrder', [{ id: +b.dataset.mopen }]);
+          if (!r2 || !r2.ok) { alert((r2 && r2.err) || 'Eroare'); b.disabled = false; return; }
+          await load();
+        });
+      });
+      box.querySelectorAll('[data-mhide]').forEach(function (b) {
+        b.addEventListener('click', async function () {
+          if (!confirm(t('mb.hideAsk'))) return;
+          await gas('mailDismiss', [{ id: +b.dataset.mhide }]); loadMail();
+        });
+      });
+    }
+
     async function load(keepIdx) {
+      loadMail();
       try {
         // A portál-kérések a külön „Ügyfél kérések" fülre mennek — itt csak e-mail intake.
         const d = await api('GET', '/api/inbound-orders?exclude_source=portal');

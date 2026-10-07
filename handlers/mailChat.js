@@ -85,6 +85,7 @@ function sanitizeMail(d) {
     style: mailStyle.sanitizeStyle(j.style),
     style_init: j.style_init === true,
     style_default: j.style_default === true,
+    reply_mail_id: parseInt(j.reply_mail_id, 10) || null,
   };
 }
 
@@ -311,6 +312,45 @@ async function generalTurn(req, res, messages, prev, lang) {
     notes: styleNotes, missing: r.missing, ready: r.missing.length === 0, attachments_avail: [], builders_avail: [], tracking_available: false } });
 }
 
+// ─── ↩️ Válasz egy megnyitott levélre. Az AI a levelet NEM látja (se feladót,
+//     se tárgyat, se szöveget) — csak a felhasználó chatben írt szövegéből dolgozik.
+//     Címzett + tárgy a szerveren (mailbox._replyContext), csak az előnézetbe kerül.
+function buildReplyPrompt() {
+  return [
+    'You write a REPLY e-mail body for a Romanian/Hungarian road-freight company. You do NOT see the e-mail being answered — write ONLY from what the dispatcher tells you. Never invent facts, prices, dates or names.',
+    'Maintain the reply DRAFT across the conversation; merge each new message into the previous draft.',
+    'Write a short, professional reply (greeting, the content, closing without a person name). lang: "ro" by default, "hu" if asked.',
+    'style: same rules as before — object with only changed keys from {"accent","bg","card","text" (#rrggbb),"align":"left|center","header":"logo|band|none","font":"sans|serif","width":"narrow|normal|wide"}; previous unchanged if not asked.',
+    'Return ONLY JSON: {"reply":"1-2 short sentences to the dispatcher in THEIR language","save_default":false,"reset_default":false,"draft":{"style":null,"lang":"ro","body":""},"questions":[]}',
+  ].join('\n');
+}
+async function replyTurn(req, res, messages, prev, lang) {
+  const ctx = await require('./mailbox')._replyContext(req, prev.reply_mail_id);
+  if (!ctx) return res.json({ result: { ok: false, err: 'E-mailul nu a fost găsit.' } });
+  let ai;
+  try {
+    const v = { style: prev.style, lang: prev.lang, body: prev.body };
+    const lines = ['PREVIOUS DRAFT (JSON):', JSON.stringify(v), '', 'CONVERSATION:'];
+    messages.forEach((m) => lines.push((m.role === 'assistant' ? 'ASSISTANT: ' : 'DISPATCHER: ') + m.text));
+    ai = await extractJson({ systemPrompt: buildReplyPrompt(), parts: [{ text: lines.join('\n') }] });
+  } catch (e) {
+    const msg = e && e.code === 'NO_KEY' ? 'Serviciul AI nu este configurat.' : String((e && e.message) || 'Eroare AI').slice(0, 300);
+    return res.json({ result: { ok: false, err: msg } });
+  }
+  const out = (ai && ai.json) || {};
+  const d = sanitizeMail(Object.assign({}, out.draft || {}));
+  if (!d.lang) d.lang = prev.lang || lang;
+  const notes = await applyStyleTurn(req, d, prev, out);
+  d.reply_mail_id = ctx.id; d.recipient = 'other'; d.to_email = ctx.to_email; d.recipient_name = ctx.to_name || null;
+  const s0 = String(ctx.subject || '');
+  d.subject = /^(re|aw)\s*:/i.test(s0) ? s0 : ('Re: ' + s0);
+  d.order_id = null; d.attachments = []; d.include_tracking = false;
+  const missing = d.body ? [] : ['body'];
+  try { await audit.fromReq(req, 'mail.chat_turn', 'mail', ctx.id, { turns: messages.length, reply: true, model: ai.model }); } catch (_) {}
+  return res.json({ result: { ok: true, mode: 'email', reply: _str(out.reply, 600) || '', draft: d, questions: [], notes, missing,
+    ready: !missing.length, attachments_avail: [], builders_avail: [], tracking_available: false, reply_to: true } });
+}
+
 // ─── Egy chat-kör (az orderChatTurn hívja e-mail módban; a kapu már lefutott) ───
 async function mailTurn(req, res, a, messages, lang) {
   const cid = req.session.user.company_id;
@@ -320,6 +360,7 @@ async function mailTurn(req, res, a, messages, lang) {
   const refM = ORDER_REF_RE.exec(last) || (!prev.order_id ? ORDER_REF_RE.exec(userText) : null);
   const ref = refM ? refM[1] : prev.order_id;
   const base = { ok: true, mode: 'email', questions: [], notes: [], ready: false };
+  if (prev.reply_mail_id) return replyTurn(req, res, messages, prev, lang);
   if (!ref) return generalTurn(req, res, messages, prev, lang);
   const o = await _findOrder(cid, ref);
   if (!o) {
@@ -375,6 +416,14 @@ handlers.mailChatSend = async function (req, res, args) {
       if (!lim.ok) return res.json({ result: { ok: false, err: qt(lang, 'rateLimit') } });
     }
     const cid = req.session.user.company_id;
+    if (d.reply_mail_id) {
+      const mb = require('./mailbox');
+      const g2 = await mb._gate(req);
+      if (g2) return res.json({ result: { ok: false, err: g2 } });
+      // Válasz: a címzettet és a tárgyat a szerver adja (a levél feladója), nem a kliens.
+      const r = await require('./mailbox')._sendReply(req, { id: d.reply_mail_id, body: d.body || '', style: d.style, test: isTest });
+      return res.json({ result: r });
+    }
     if (!d.order_id) return res.json({ result: await _sendGeneral(req, cid, d, isTest) });
     const o = await _findOrder(cid, d.order_id);
     if (!o) return res.json({ result: { ok: false, err: 'Comanda nu a fost găsită.' } });
