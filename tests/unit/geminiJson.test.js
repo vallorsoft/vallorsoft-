@@ -125,10 +125,19 @@ describe('lib/geminiJson — elérhető modellek (ListModels)', () => {
       { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
       { name: 'models/gemini-3-flash', supportedGenerationMethods: ['generateContent'] },
       { name: 'models/gemini-3-flash-preview', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemma-3-27b-it', supportedGenerationMethods: ['generateContent'] },
+      { name: 'models/gemini-2.5-flash-preview-tts', supportedGenerationMethods: ['generateContent'] },
       { name: 'models/text-embedding-004', supportedGenerationMethods: ['embedContent'] },
     ] }) }));
     const chain = await g.resolveChain(['gemini-1.5-flash', 'gemini-2.5-flash']);
-    expect(chain).toEqual(['gemini-2.5-flash', 'gemini-3-flash']);
+    expect(chain).toEqual(['gemini-2.5-flash', 'gemini-3-flash', 'gemini-3-flash-preview']);
+  });
+
+  test('pro és preview is bekerül, a stabil flash után', async () => {
+    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ models: [
+      'gemini-2.5-pro', 'gemini-2.5-flash-lite', 'gemini-3-pro-preview', 'gemini-2.0-flash',
+    ].map((n) => ({ name: 'models/' + n, supportedGenerationMethods: ['generateContent'] })) }) }));
+    expect(await g.resolveChain([])).toEqual(['gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.5-pro', 'gemini-3-pro-preview']);
   });
 
   test('ha a lista nem kérhető le, marad az eredeti lánc', async () => {

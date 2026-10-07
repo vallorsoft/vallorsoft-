@@ -16,7 +16,7 @@
 
 ## 2026-10-07 — FIX: AI „kvóta elfogyott” tévesen — a modell-lánc a kulcshoz ténylegesen elérhető modellekből épül
 
-- A hiba (404) nem kvóta volt, hanem kivont modellek (`gemini-1.5-*` stb.); az üzenet csak az utolsó modell státuszát mutatta. `lib/geminiJson.js`: `ListModels`-ből (6 órás cache) a kivont modellek kimaradnak, az új stabil flash-modellek automatikusan bekerülnek; a hibaüzenet a valódi okot mondja (404 = nincs elérhető modell / 429 = kvóta / egyéb: modellenkénti státusz). +3 teszt.
+- A hiba (404) nem kvóta volt, hanem kivont modellek (`gemini-1.5-*` stb.); az üzenet csak az utolsó modell státuszát mutatta. `lib/geminiJson.js`: `ListModels`-ből (6 órás cache) a kivont modellek kimaradnak, MINDEN elérhető szöveges Gemini-modell sorban bekerül (stabil flash/lite → pro → preview; Gemma/TTS/kép/embedding kihagyva); a hibaüzenet a valódi okot mondja (404 = nincs elérhető modell / 429 = kvóta / egyéb: modellenkénti státusz). +3 teszt.
 
 ## 2026-10-07 — 📬 Több postafiók + 📥 Levelek (csak fejléc) + ↩️ válasz sablonnal / AI-val (PR #515)
 
