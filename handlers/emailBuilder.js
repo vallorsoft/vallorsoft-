@@ -475,6 +475,7 @@ handlers.ebSend = async function (req, res, args) {
           subject: subject || '(fără subiect)',
           html: html,
           mailType: 'builder',
+          sentBy: req.session && req.session.user && req.session.user.email,
         });
         if (r && r.ok) sent++;
         else errors.push({ email: rcpt.email, error: (r && r.error) || 'Eroare la trimitere' });
@@ -614,7 +615,8 @@ handlers.ebSenderTest = async function (req, res) {
       to: to,
       subject: 'VallorSoft — test cont expeditor',
       html: '<p>Test reușit. Contul expeditor al companiei funcționează (metodă: <b>' + mailer.method + '</b>).</p>',
-      mailType: 'builder',
+      mailType: 'builder_test',
+      sentBy: u.email,
     });
     if (r && r.ok) return res.json({ result: { ok: true, method: mailer.method, message: 'Test trimis către ' + to + ' (metodă: ' + mailer.method + ')' } });
     return res.json({ result: { ok: false, err: (r && r.error) || 'Eroare la trimitere' } });

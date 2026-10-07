@@ -394,7 +394,7 @@ handlers.sendOrderEmail = async function (req, res, args) {
           : ((mailer && mailer.error) || 'Eroare la contul expeditor') } });
       }
       sent = await mailer.send({ to: toEmail, subject: subject, html: realHtml, attachments: attachments, mailType: a.mail_type === 'reply' ? 'reply' : 'order',
-        inReplyTo: a.in_reply_to, references: a.references });
+        inReplyTo: a.in_reply_to, references: a.references, orderId: orderId, sentBy: req.session && req.session.user && req.session.user.email });
     }
 
     audit.fromReq(req, 'order.email_send', 'order', orderId, {

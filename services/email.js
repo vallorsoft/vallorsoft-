@@ -546,6 +546,28 @@ function _appendToSent(companyId, mailOpts, ctx) {
   } catch (e) { console.warn('[email] Elküldött-mappa mentés hiba:', e.message); }
 }
 
+// 📤 Elküldött-nyilvántartás (mail_sent): a cég fiókjáról kiment levél
+// címzettje/tárgya/szövege + csatolmány-NEVEK — az alkalmazás Elküldött
+// mappájához és a levélszálhoz. Best-effort, a küldést sosem akasztja meg.
+function _recordSent(companyId, rec) {
+  if (!companyId) return;
+  try {
+    const db = require('../db');
+    const irt = _cleanMsgIds(rec.inReplyTo).split(' ')[0] || null;
+    const mid = _cleanMsgIds(rec.messageId).split(' ')[0] || null;
+    Promise.resolve(db.query(
+      `INSERT INTO mail_sent (company_id, from_email, to_email, subject, body_text, attachments, mail_type, status, error, method, message_id, in_reply_to, order_id, sent_by)
+       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11,$12,$13,$14)`,
+      [companyId, rec.from ? String(rec.from).slice(0, 255) : null, rec.to ? String(rec.to).slice(0, 2000) : null,
+        String(rec.subject || '').slice(0, 500), String(rec.text || '').slice(0, 60000),
+        JSON.stringify((rec.attachments || []).map((a) => String(a.name || a.filename || '').slice(0, 200)).filter(Boolean).slice(0, 30)),
+        rec.mailType ? String(rec.mailType).slice(0, 30) : null, rec.ok ? 'sent' : 'failed',
+        rec.ok ? null : String(rec.error || '').slice(0, 300), rec.method || null, mid, irt,
+        rec.orderId ? String(rec.orderId).slice(0, 40) : null, rec.sentBy ? String(rec.sentBy).slice(0, 255) : null]))
+      .catch((e) => console.warn('[email] mail_sent mentés hiba:', e.message));
+  } catch (e) { console.warn('[email] mail_sent mentés hiba:', e.message); }
+}
+
 async function getCompanyMailer(companyId) {
   const cfg = await loadCompanySender(companyId);
   if (!cfg) return { ok: false, noConfig: true, error: 'Niciun cont expeditor configurat.' };
@@ -580,6 +602,8 @@ async function getCompanyMailer(companyId) {
     opts = Object.assign({}, opts, { html: await appendCompanyFooter(opts.html || '', cid) });
     // Csatolmányok (opcionális): [{ name, contentBase64 }].
     const atts = Array.isArray(opts.attachments) ? opts.attachments.filter(a => a && a.contentBase64 && a.name) : [];
+    const rec = { from: fromEmail, to: opts.to, subject: subject, text: htmlToPlainText(opts.html || ''), attachments: atts,
+      mailType: mtype, inReplyTo: opts.inReplyTo, orderId: opts.orderId, sentBy: opts.sentBy };
     try {
       if (method === 'smtp') {
         const mailOpts = {
@@ -598,10 +622,12 @@ async function getCompanyMailer(companyId) {
         const info = await transport.sendMail(mailOpts);
         _logMail(cid, opts.to, subject, mtype, 'sent', info && info.messageId);
         _appendToSent(cid, Object.assign({}, mailOpts, { messageId: info && info.messageId }), { method: 'smtp', smtpHost: cfg.host });
+        _recordSent(cid, Object.assign(rec, { ok: true, method: 'smtp', messageId: info && info.messageId }));
         return { ok: true, messageId: info && info.messageId };
       }
       const r = await _brevoSendCompany(cfg, { to: opts.to, subject: subject, html: opts.html, senderName: fromName, replyTo: opts.replyTo, attachments: atts, inReplyTo: opts.inReplyTo, references: opts.references });
       _logMail(cid, opts.to, subject, mtype, r.ok ? 'sent' : 'failed', r.messageId || null);
+      _recordSent(cid, Object.assign(rec, { ok: !!r.ok, error: r.error, method: 'brevo', messageId: r.messageId }));
       if (r.ok) {
         const th = _threadHeaders(opts) || {};
         _appendToSent(cid, {
@@ -614,6 +640,7 @@ async function getCompanyMailer(companyId) {
       return r;
     } catch (err) {
       _logMail(cid, opts.to, subject, mtype, 'failed', null);
+      _recordSent(cid, Object.assign(rec, { ok: false, error: err.message, method: method }));
       return { ok: false, error: err.message };
     }
   }
@@ -694,4 +721,4 @@ async function sendSubscriptionCancelEmail(opts) {
   }
 }
 
-module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate, loadCompanySender, getCompanyMailer, sendSubscriptionCancelEmail, applyTemplateVars, htmlToPlainText, wrapBrandedEmail, appendCompanyFooter };
+module.exports = { sendInviteEmail, sendResetEmail, sendClientEmail, buildInviteHtml, sendDeveloperEmail, getEmailTemplate, loadCompanySender, getCompanyMailer, sendSubscriptionCancelEmail, applyTemplateVars, htmlToPlainText, wrapBrandedEmail, appendCompanyFooter, _recordSent };

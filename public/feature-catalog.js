@@ -85,6 +85,7 @@ window.VS_FEATURES = [
   { key: 'toll-becsles',         label: 'Útdíj-becslés 🛣️',             group: 'Fuvarozás & Logisztika' },
   { key: 'ai-kiolvasas',         label: 'AI kiolvasás — e-mail 🤖',     group: 'Fuvarozás & Logisztika' },
   { key: 'mail-inbox',           label: 'Levelek (postafiók + válasz) 📥', group: 'Fuvarozás & Logisztika' },
+  { key: 'mail-sent',            label: 'Elküldött levelek + levélszál 📤', group: 'Fuvarozás & Logisztika' },
   { key: 'ai-szoveges-fuvar',    label: 'Szöveges fuvarkiírás (AI-chat) 💬', group: 'Fuvarozás & Logisztika' },
   { key: 'ai-bon-scan',          label: 'AI bon-szkennelés 📷',         group: 'Fuvarozás & Logisztika' },
   { key: 'gps-integracio',       label: 'GPS integráció 📡',            group: 'Adminisztráció' },

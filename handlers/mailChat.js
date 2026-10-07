@@ -475,7 +475,7 @@ async function _sendGeneral(req, cid, d, isTest) {
         ? 'Configurați contul de e-mail (SMTP) în Integrări înainte de a trimite către clienți.'
         : ((mailer && mailer.error) || 'Eroare la contul expeditor') };
     }
-    result = await mailer.send({ to, subject, html: emailSvc.wrapBrandedEmail(bodyHtml, { logoUrl, senderName, style: d.style }), mailType: 'chat' });
+    result = await mailer.send({ to, subject, html: emailSvc.wrapBrandedEmail(bodyHtml, { logoUrl, senderName, style: d.style }), mailType: 'chat', sentBy: req.session && req.session.user && req.session.user.email });
   }
   if (!result || !result.ok) return { ok: false, err: (result && result.error) || 'Eroare la trimitere' };
   if (!isTest) {
