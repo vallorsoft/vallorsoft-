@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-07 — Szöveges fuvarkiírás: lebegő 💬 AI gomb minden fülön (a 🐛 mellett) (PR #PRNUM)
+## 2026-10-07 — Szöveges fuvarkiírás: lebegő 💬 AI gomb minden fülön (a 🐛 mellett) (PR #510)
 - Az admin/manager konzolon a 🐛 hibabejelentő gomb mellett (balra) új kerek **💬 AI** gomb: bármelyik fülről egy kattintással megnyitja a szöveges fuvarkiírás chatet (új fuvar, vagy meglévő módosítása fuvarszámmal). Csak akkor látszik, ha a csomag tartalmazza (`ai-szoveges-fuvar`, Pro-tól) — a meglévő `applyFeatureFlags` kapcsolja. A gombot az `order-chat.js` maga hozza létre (`OrderChat.setFab`), nyitott chatnél a modal takarja. 1 új i18n (`och.fab`, RO+HU), cache-bust `?v=20261007ochfab`. Tisztán kliens-oldali.
 
 ## 2026-10-07 — UIT-kód fotózással vagy feltöltéssel (kép / PDF) a fuvarhoz (PR #509)
