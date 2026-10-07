@@ -5131,17 +5131,47 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #ochModal .btn.ghost{ background:var(--och-soft); color:var(--och-text); border:1.5px solid var(--och-line); }
 #ochModal .btn.ghost:hover{ border-color:var(--och-acc); color:var(--och-acc); }
 #ochModal .btn[disabled]{ opacity:.45; cursor:not-allowed; }
+/* Telefon-fülek: asztalon rejtve (ott a chat + előnézet egymás mellett). */
+#ochModal .och-tabs{ display:none; }
+#ochModal .och-ready-cta{ align-self:stretch; display:none; margin-top:4px; padding:12px 14px; border-radius:12px;
+  border:1.5px solid #16a34a; background:#ecfdf5; color:#065f46; font:inherit; font-size:14.5px; font-weight:800; cursor:pointer; }
+@keyframes ochPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(22,163,74,.45); } 50%{ box-shadow:0 0 0 5px rgba(22,163,74,0); } }
 @media (max-width:860px){
-  #ochModal{ padding:0; }
-  #ochModal .och-box{ height:100%; border-radius:0; border:0; }
-  #ochModal .och-head{ padding:12px 14px; }
-  #ochModal .och-body{ display:block; overflow-y:auto; }
-  #ochModal .och-chat{ height:72vh; border-right:0; border-bottom:1.5px solid var(--och-line); }
-  #ochModal .och-prev{ overflow:visible; }
+  #ochModal{ padding:0; align-items:stretch; }
+  #ochModal .och-box{ width:100%; height:100vh; height:100dvh; max-height:none; border-radius:0; border:0;
+    padding-bottom:env(safe-area-inset-bottom); }
+  #ochModal .och-head{ padding:10px 12px; padding-top:calc(10px + env(safe-area-inset-top)); align-items:center; }
+  #ochModal .och-title{ font-size:16.5px; line-height:1.2; }
   #ochModal .och-sub{ display:none; }
-  #ochModal .och-input{ padding:10px 12px 12px; }
-  #ochModal .och-input textarea{ min-height:54px; }
-  #ochModal .och-row{ grid-template-columns:92px 1fr; }
+  #ochModal .och-head-btns .btn{ min-height:42px; min-width:42px; padding:6px 10px; font-size:16px; }
+  #ochModal .och-reset-l{ display:none; }
+  /* Fül-sáv */
+  #ochModal .och-tabs{ display:flex; gap:6px; padding:8px 10px; border-bottom:1.5px solid var(--och-line); background:var(--och-bg); }
+  #ochModal .och-tab{ flex:1; min-height:42px; border-radius:10px; border:1.5px solid var(--och-line); background:var(--och-soft);
+    color:var(--och-text); font:inherit; font-size:14.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
+  #ochModal .och-tab.on{ background:var(--och-acc); border-color:var(--och-acc); color:#fff; }
+  #ochModal .och-tab.pulse{ animation:ochPulse 1.6s ease-in-out infinite; border-color:#16a34a; }
+  #ochModal .och-tab-b{ font-size:12px; font-weight:800; padding:1px 7px; border-radius:999px; }
+  #ochModal .och-tab-b:empty{ display:none; }
+  #ochModal .och-tab-b.warn{ background:#fef3c7; color:#92400e; }
+  #ochModal .och-tab-b.ok{ background:#dcfce7; color:#166534; }
+  /* Egyszerre egy panel */
+  #ochModal .och-body{ display:block; position:relative; flex:1; min-height:0; }
+  #ochModal .och-chat{ height:100%; border-right:0; }
+  #ochModal .och-prev{ display:none; height:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:12px 12px 20px; }
+  #ochModal.och-show-prev .och-chat{ display:none; }
+  #ochModal.och-show-prev .och-prev{ display:block; }
+  #ochModal .och-ready-cta{ display:block; }
+  #ochModal .och-msgs{ padding:12px; }
+  #ochModal .och-msg{ max-width:92%; font-size:15px; }
+  #ochModal .och-qs{ padding:0 12px; max-height:38vh; overflow-y:auto; }
+  #ochModal .och-chip{ padding:8px 14px; font-size:14px; min-height:38px; }
+  #ochModal .och-input{ padding:8px 10px 10px; gap:6px; }
+  /* 16px alatt az iOS Safari ráközelít a fókuszált mezőre */
+  #ochModal .och-input textarea{ font-size:16px; min-height:52px; max-height:30vh; resize:none; }
+  #ochModal .och-input .btn{ min-height:52px; padding:8px 14px; }
+  #ochModal .och-row{ grid-template-columns:88px 1fr; font-size:14px; }
+  #ochModal .och-save{ position:sticky; bottom:0; min-height:54px; box-shadow:0 -6px 16px rgba(15,23,42,.12); }
 }
 /* A wizard tetején 4 belépő gomb: keskeny kijelzőn 2×2 rácsba törik. */
 @media (max-width:720px){

@@ -22,6 +22,28 @@
     });
   }
   function $(id) { return document.getElementById(id); }
+  function _isMobile() { try { return window.matchMedia('(max-width: 860px)').matches; } catch (_) { return false; } }
+  var _tab = 'chat';
+  // Telefonon egyszerre egy panel látszik (chat VAGY előnézet) — asztalon mindkettő.
+  function tab(which) {
+    _tab = which === 'prev' ? 'prev' : 'chat';
+    var m = $('ochModal'); if (!m) return;
+    m.classList.toggle('och-show-prev', _tab === 'prev');
+    var a = $('ochTabChat'), b = $('ochTabPrev');
+    if (a) a.classList.toggle('on', _tab === 'chat');
+    if (b) b.classList.toggle('on', _tab === 'prev');
+    if (_tab === 'chat') { var box = $('ochMsgs'); if (box) box.scrollTop = box.scrollHeight; }
+    else { var pv = $('ochPrev'); if (pv) pv.scrollTop = 0; }
+  }
+  // Fül-jelvény: ✅ ha kész, ⚠️N ha hiányzik valami, semmi ha még nincs adat.
+  function renderTabBadge() {
+    var bd = $('ochTabBadge'); if (!bd) return;
+    var tb = $('ochTabPrev');
+    if (S.saved || S.ready) { bd.textContent = '✅'; bd.className = 'och-tab-b ok'; }
+    else if (S.messages.length && S.missing.length) { bd.textContent = '⚠️ ' + S.missing.length; bd.className = 'och-tab-b warn'; }
+    else { bd.textContent = ''; bd.className = 'och-tab-b'; }
+    if (tb) tb.classList.toggle('pulse', !!(S.ready && !S.saved && _tab !== 'prev'));
+  }
 
   // ─── Dátum megjelenítés: 2026-10-12 · hétfő ───
   function fmtDate(d) {
@@ -47,16 +69,20 @@
       +   '<div class="och-head">'
       +     '<div><div class="och-title">' + esc(T('och.title')) + '</div><div class="och-sub">' + esc(T('och.sub')) + '</div></div>'
       +     '<div class="och-head-btns">'
-      +       '<button class="btn ghost" type="button" onclick="OrderChat.reset()">' + esc(T('och.reset')) + '</button>'
+      +       '<button class="btn ghost och-reset" type="button" onclick="OrderChat.reset()" title="' + esc(T('och.reset')) + '">🔄<span class="och-reset-l"> ' + esc(T('och.reset').replace(/^🔄\s*/, '')) + '</span></button>'
       +       '<button class="btn ghost och-x" type="button" onclick="OrderChat.close()" aria-label="close">✕</button>'
       +     '</div>'
+      +   '</div>'
+      +   '<div class="och-tabs" role="tablist">'
+      +     '<button type="button" class="och-tab on" id="ochTabChat" onclick="OrderChat.tab(\'chat\')">💬 ' + esc(T('och.tabChat')) + '</button>'
+      +     '<button type="button" class="och-tab" id="ochTabPrev" onclick="OrderChat.tab(\'prev\')">📋 ' + esc(T('och.tabPrev')) + ' <span class="och-tab-b" id="ochTabBadge"></span></button>'
       +   '</div>'
       +   '<div class="och-body">'
       +     '<div class="och-chat">'
       +       '<div class="och-msgs" id="ochMsgs"></div>'
       +       '<div class="och-qs" id="ochQs"></div>'
       +       '<div class="och-input">'
-      +         '<textarea id="ochInput" rows="3" placeholder="' + esc(T('och.ph')) + '" autocomplete="off" data-lpignore="true" data-1p-ignore></textarea>'
+      +         '<textarea id="ochInput" rows="3" placeholder="' + esc(T(_isMobile() ? 'och.phMobile' : 'och.ph')) + '" autocomplete="off" data-lpignore="true" data-1p-ignore></textarea>'
       +         '<button class="btn primary" id="ochSend" type="button" onclick="OrderChat.send()">' + esc(T('och.send')) + '</button>'
       +       '</div>'
       +     '</div>'
@@ -89,6 +115,7 @@
     S = { messages: [], draft: {}, questions: [], notes: [], missing: [], ready: false, busy: false, saved: null };
     var m = $('ochModal');
     if (m) { m.remove(); }
+    _tab = 'chat';
     open();
   }
 
@@ -101,6 +128,10 @@
       h += '<div class="och-msg ' + (m.role === 'assistant' ? 'ai' : 'me') + (m.err ? ' err' : '') + '">' + esc(m.text).replace(/\n/g, '<br>') + '</div>';
     });
     if (S.busy) h += '<div class="och-msg ai busy"><span class="och-dots"><i></i><i></i><i></i></span> ' + esc(T('och.thinking')) + '</div>';
+    if (S.ready && !S.saved && !S.busy) {
+      // Telefonon az előnézet külön fülön van — innen egy koppintással odaér.
+      h += '<button type="button" class="och-ready-cta" onclick="OrderChat.tab(\'prev\')">✅ ' + esc(T('och.readyCta')) + ' →</button>';
+    }
     if (S.saved) {
       h += '<div class="och-msg ai ok">' + esc(T('och.saved', { no: S.saved.fuvar_no || S.saved.id }))
         + '<div style="margin-top:8px;"><button class="btn primary" type="button" onclick="OrderChat.openList()">' + esc(T('och.openList')) + '</button></div></div>';
@@ -203,7 +234,7 @@
     box.innerHTML = h;
   }
 
-  function renderAll() { renderMsgs(); renderQs(); renderPrev(); }
+  function renderAll() { renderMsgs(); renderQs(); renderPrev(); renderTabBadge(); }
 
   // ─── Küldés ───
   function send(textOverride) {
@@ -252,11 +283,12 @@
       S.busy = false;
       if (!r || !r.ok) {
         S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
-        if (r && r.missing) S.missing = r.missing;
+        if (r && r.missing) { S.missing = r.missing; S.ready = false; }
         renderAll();
         return;
       }
       S.saved = { id: r.id, fuvar_no: r.fuvar_no };
+      tab('chat');
       if (typeof window.toast === 'function') window.toast(T('och.saved', { no: r.fuvar_no || r.id }), 'ok');
       if (typeof window.loadOrders === 'function') { try { window.loadOrders(); } catch (_) {} }
       renderAll();
@@ -272,7 +304,8 @@
     if (typeof window.activateTab === 'function') window.activateTab('orders-list');
     S = { messages: [], draft: {}, questions: [], notes: [], missing: [], ready: false, busy: false, saved: null };
     var m = $('ochModal'); if (m) m.remove();
+    _tab = 'chat';
   }
 
-  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList };
+  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, tab: tab };
 })();
