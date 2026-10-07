@@ -69,6 +69,10 @@
     'och.openList': { hu: "Megnyitás a fuvarlistában", ro: "Deschide în lista de curse" },
     'och.reset': { hu: "🔄 Új beszélgetés", ro: "🔄 Conversație nouă" },
     'och.resetAsk': { hu: "Új beszélgetést kezdesz? A mostani vázlat elvész.", ro: "Începi o conversație nouă? Ciorna actuală se pierde." },
+    'och.tabChat': { hu: "Chat", ro: "Chat" },
+    'och.tabPrev': { hu: "Előnézet", ro: "Previzualizare" },
+    'och.readyCta': { hu: "A fuvar kész — előnézet és mentés", ro: "Cursa e gata — previzualizare și salvare" },
+    'och.phMobile': { hu: "Írd ide a fuvart vagy a javítást…", ro: "Scrie cursa sau corectura…" },
     'och.err': { hu: "Hiba", ro: "Eroare" },
     'och.fixHint': { hu: "Ha valami nem jó, írd meg a chatben (pl. „a második lerakás csütörtök\").", ro: "Dacă ceva nu e corect, scrie în chat (ex. „a doua descărcare e joi\")." },
     // ── Ismétlődő fuvar-sablonok (order-templates.js) ──

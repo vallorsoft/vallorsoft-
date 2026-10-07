@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-07 — Szöveges fuvarkiírás: teljes mobil-optimalizálás (PR #PRNUM)
+- Telefonon (≤860px) két fül: **💬 Chat / 📋 Előnézet** — egyszerre egy panel, teljes képernyő (`100dvh`, notch/safe-area). Az Előnézet fülön jelvény: **⚠️ N** (hiányzó tétel) / **✅** (kész, pulzál). A chatben kész fuvarnál „✅ A fuvar kész — előnézet és mentés →" gomb.
+- A „✅ Fuvar mentése" gomb az előnézet alján fixen látszik (eddig ~500px-szel a képernyő alatt volt); mentés után vissza a chat fülre a siker-üzenettel.
+- Beíró mező 16px (iOS Safari nem közelít rá), rövidebb placeholder, nagyobb érintési felületek (válaszgombok, Küldés), fejlécben az „Új beszélgetés" csak 🔄 ikon. Asztali nézet változatlan. 4 új `och.*` i18n (RO+HU), cache-bust `?v=20261007och2`.
+
 ## 2026-10-07 — ÚJ: 💬 Szöveges fuvarkiírás (AI-chat), Pro csomagtól (PR #506)
 - A Fuvar kiírás tetején új „💬 Szöveges fuvarkiírás (AI)" gomb (admin + manager) → chat-ablak: a diszpécser szabad szöveggel leírja a fuvart, az AI összeállítja, ami nem egyértelmű, arra kattintható válaszgombokkal rákérdez; a javítás is a chatben megy („a második lerakás csütörtök").
 - Jobb oldalt a TELJES fuvar EGYBEN látszik (megrendelő, minden állomás sorrendben dátum + nap-névvel, áru, sofőr, vontató, pótkocsi, ár, km, hiányzó tételek) — nem lépésenként. Mentés: „✅ Fuvar mentése" → a meglévő `comCreate` (fuvar-szám, multi-stop, auto-párosítás változatlan).
