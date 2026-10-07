@@ -9,6 +9,10 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 28. lépés — AI-chat e-mail ág (2026-10-07, PR #511) ✅ KÉSZ
+
+- Új küldési belépő (`mailChatSend`), de a küldés a meglévő `sendOrderEmail`-en megy (fuvar-tulajdon, csatolmány-feloldás `company_id`-szűrten, EMAIL_RE). A címzettet a szerver oldja fel (fuvar ügyfele / alvállalkozója); AI által kitalált „más" címet csak akkor fogad el, ha a felhasználó maga írta be. Ismeretlen csatolmány-kulcs / idegen sablon-id eldobva. Az AI nem kap e-mail címet, és sosem küld magától (csak gombnyomás + megerősítés). Rate-limit 20/óra/felhasználó; Admin/Manager + Pro csomag-kapu; audit csak metaadat.
+
 ### 27. lépés — UIT-bizonylat feltöltés (kép / PDF) (2026-10-07, PR #509) ✅ KÉSZ
 
 - A UIT-bizonylat MIME-ja eddig csak `image/*` prefix-szel volt szűrve, ami az SVG-t is átengedte (inline kiszolgálva szkriptelhető). Most közös fehérlista (`lib/uitFormat.js` `sanitizeUitPhoto`/`isUitDocMime`: jpeg/png/webp/heic/gif/pdf) a kiolvasásnál, mindkét UIT-mentő route-on és a `comCreate`-ben; base64-ellenőrzés + 8 MB korlát. A letöltés változatlanul `company_id`-szűrt.

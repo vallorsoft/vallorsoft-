@@ -34,6 +34,8 @@ const { normalizeUit, isValidUit, sanitizeUitPhoto } = require('../lib/uitFormat
 const clientsSvc = require('../services/clients');
 const audit = require('../lib/audit');
 const orderHandlers = require('./orders');
+const { memGet, memPut } = require('../lib/chatMemory');
+const mailChat = require('./mailChat');
 
 const handlers = {};
 const FEATURE = 'ai-szoveges-fuvar';
@@ -160,23 +162,6 @@ function _uitRows(codes, docs) {
 // áru-típus/méret, sofőr-becenév → sofőr. Az AI-hoz semmi nem kerül belőle:
 // a felhasználás is kizárólag a szerveren, `company_id`-szűrten történik.
 // A beszélgetés szövege SOSEM tárolódik. Self-healing: a legutóbbi mentés felülír.
-async function memGet(cid, kind, key) {
-  if (!key) return null;
-  try {
-    const r = await pool.query(
-      'SELECT value FROM order_chat_memory WHERE company_id=$1 AND kind=$2 AND key_norm=$3', [cid, kind, key]);
-    return r.rows.length ? r.rows[0].value : null;
-  } catch (_) { return null; } // migráció hiányzik → nincs tanulás
-}
-async function memPut(cid, kind, key, value) {
-  if (!key || key.length > 200) return;
-  await pool.query(
-    `INSERT INTO order_chat_memory (company_id, kind, key_norm, value, hits, updated_at)
-     VALUES ($1,$2,$3,$4::jsonb,1,NOW())
-     ON CONFLICT (company_id, kind, key_norm)
-     DO UPDATE SET value=EXCLUDED.value, hits=order_chat_memory.hits+1, updated_at=NOW()`,
-    [cid, kind, key, JSON.stringify(value)]);
-}
 async function learnFromDraft(cid, d) {
   try {
     for (const s of d.stops || []) {
@@ -576,8 +561,16 @@ handlers.orderChatTurn = async function (req, res, args) {
     if (!messages.length || messages[messages.length - 1].role !== 'user') {
       return res.json({ result: { ok: false, err: 'Mesaj gol.' } });
     }
-    let prev = sanitizeDraft(a.draft);
     const lang = a.lang === 'hu' ? 'hu' : 'ro';
+    // ── E-mail ág: amit a felhasználó ír, abba kezd. Üres vázlatnál az e-mail
+    //    szándék („küldd el … levélben / e-mail") a levél-vázlatra vált; az
+    //    e-mail módban lévő vázlat ott is marad (handlers/mailChat.js).
+    const rawDraft = (a.draft && typeof a.draft === 'object') ? a.draft : {};
+    const draftEmpty = !rawDraft.edit_order_id && !(Array.isArray(rawDraft.stops) && rawDraft.stops.some((s) => s && (s.loc || s.firma)));
+    if (rawDraft.mode === 'email' || (draftEmpty && mailChat.isEmailIntent(messages[messages.length - 1].text))) {
+      return await mailChat.mailTurn(req, res, a, messages, lang);
+    }
+    let prev = sanitizeDraft(a.draft);
 
     // ── Szerkesztés: üres vázlatnál egy fuvarszám (CMD-2026-0042 / belső id)
     //    betölti a meglévő fuvart, a további javítás ugyanígy a chatben megy.
@@ -772,6 +765,7 @@ async function _saveEdit(req, res, cid, d, pickups, deliveries, km, uitDocs) {
 }
 
 // Belső segédek — a teszt eléri, RPC-n nem hívhatók (nem-enumerable).
+Object.defineProperty(handlers, '_gate', { value: _gate, enumerable: false });
 Object.defineProperty(handlers, '_sanitizeDraft', { value: sanitizeDraft, enumerable: false });
 Object.defineProperty(handlers, '_resolveDraft', { value: resolveDraft, enumerable: false });
 Object.defineProperty(handlers, '_today', { value: _today, enumerable: false });
