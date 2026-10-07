@@ -16,6 +16,7 @@
 
 ## 2026-10-07 — 📬 Több postafiók + 📥 Levelek (csak fejléc) + ↩️ válasz sablonnal / AI-val (PR #515)
 
+- **📤 Elküldött mappa:** a programból küldött válasz / új e-mail / fuvar-e-mail másolata a bekötött postafiók „Elküldött” mappájába is bekerül (IMAP APPEND, `services/mailbox.js` `appendSent`, best-effort); a feladó címével egyező fiókot választja, különben az első „Levelek” fiókot. Gmail/Outlook SMTP-n át küldve kihagyva (a szolgáltató magától menti → nincs dupla).
 - **Postafiókok (Integrációk → 📬):** több IMAP-fiók; fiókonként szerep (📄 Megrendelések / 📥 Levelek + válasz), mappák, engedélyezett feladók (ügyfeleim+alvállalkozóim+kontaktjaim / egyedi lista / mind). A régi egy-fiókos megrendelés-postafiók automatikusan átkerül (`db/mail-accounts.sql`).
 - **Adatvédelem:** a háttér CSAK feladót + tárgyat + dátumot gyűjt (`mail_headers`); a levél tartalma csak kattintásra töltődik be, és nem tárolódik.
 - **Beérkező megrendelések:** a levelek „📄 Megnyit + kiolvas" gombbal kerülnek a kiolvasóhoz (AI) — nincs automatikus feldolgozás.

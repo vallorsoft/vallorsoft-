@@ -126,3 +126,20 @@ describe('💬 válasz AI-val — az AI a levelet nem látja', () => {
     expect(mockMailerSend.mock.calls[0][0].to).toBe('logistica@kovacs.ro');
   });
 });
+
+describe('📤 Elküldött mappa (appendSent)', () => {
+  test('Gmail SMTP + Gmail IMAP → kihagyja (a szolgáltató maga menti)', () => {
+    expect(svc._autoSavesSent('smtp.gmail.com', 'imap.gmail.com')).toBe(true);
+    expect(svc._autoSavesSent('smtp.ceg.ro', 'imap.gmail.com')).toBe(false);
+    expect(svc._autoSavesSent(undefined, 'imap.ceg.ro')).toBe(false);
+  });
+  test('nincs fiók → nem csatlakozik', async () => {
+    const r = await svc.appendSent({ query: async () => ({ rows: [] }) }, 7, { from: 'a@b.ro', to: 'x@y.ro', subject: 's', html: 'h' }, { method: 'brevo' });
+    expect(r.skipped).toBe('no-account');
+  });
+  test('a lekérdezés cégre szűr', async () => {
+    let params = null;
+    await svc.appendSent({ query: async (sql, p) => { params = p; return { rows: [] }; } }, 9, { from: 'a@b.ro' }, {});
+    expect(params).toEqual([9]);
+  });
+});

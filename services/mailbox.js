@@ -136,4 +136,50 @@ async function readMessage(acc, folder, uid) {
   };
 }
 
-module.exports = { syncHeaders, fetchSource, readMessage, accCreds, folderList, buildAllowFn };
+// ── Elküldött levél → a postafiók „Elküldött" mappája (IMAP APPEND) ──
+// A cég saját fiókjáról (SMTP/Brevo) kimenő levél így a levelezőben is látszik.
+// Fiók-választás: az engedélyezett fiókok közül az, amelyiknek a címe a feladó;
+// ha nincs ilyen, az első „Levelek" szerepű fiók. Gmail/Outlook SMTP-n át küldve
+// a szolgáltató magától menti → ott kihagyjuk (ne legyen dupla).
+const SENT_NAMES = ['Sent', 'Sent Items', 'Sent Messages', 'Elküldött', 'Elküldött levelek', 'Trimise', 'INBOX.Sent', '[Gmail]/Sent Mail'];
+function _addrOf(v) { const m = /<([^>]+)>/.exec(String(v || '')); return (m ? m[1] : String(v || '')).trim().toLowerCase(); }
+function _autoSavesSent(smtpHost, imapHost) {
+  const fam = (h) => { h = String(h || '').toLowerCase(); if (/gmail|googlemail/.test(h)) return 'google'; if (/office365|outlook|hotmail|live\.com/.test(h)) return 'ms'; return null; };
+  const f = fam(smtpHost); return !!f && f === fam(imapHost);
+}
+async function _findSentFolder(client) {
+  const list = await client.list();
+  const special = list.find((b) => b.specialUse === '\\Sent');
+  if (special) return special.path;
+  for (const n of SENT_NAMES) { const b = list.find((x) => x.path.toLowerCase() === n.toLowerCase()); if (b) return b.path; }
+  return null;
+}
+async function appendSent(pool, companyId, mailOpts, ctx) {
+  if (!companyId || !mailOpts) return { skipped: 'no-data' };
+  let rows = [];
+  try {
+    rows = (await pool.query(
+      'SELECT * FROM mail_accounts WHERE company_id=$1 AND enabled=true ORDER BY use_inbox DESC, id ASC', [companyId])).rows;
+  } catch (_) { return { skipped: 'no-table' }; }
+  if (!rows.length) return { skipped: 'no-account' };
+  const from = _addrOf(mailOpts.from);
+  let acc = null, creds = null;
+  for (const a of rows) { const c = accCreds(a); if (c && String(c.email || c.user || '').toLowerCase() === from) { acc = a; creds = c; break; } }
+  if (!acc) { acc = rows.find((a) => a.use_inbox) || rows[0]; creds = accCreds(acc); }
+  if (!creds) return { skipped: 'creds' };
+  const cfg = intake.resolveImap(creds);
+  if (!cfg.host || !cfg.user || !cfg.pass) return { skipped: 'imap-config' };
+  if (ctx && ctx.method === 'smtp' && _autoSavesSent(ctx.smtpHost, cfg.host)) return { skipped: 'provider-saves' };
+  const MailComposer = require('nodemailer/lib/mail-composer');
+  const raw = await new MailComposer(mailOpts).compile().build();
+  const client = intake.makeClient(cfg);
+  await client.connect();
+  try {
+    const folder = await _findSentFolder(client);
+    if (!folder) return { skipped: 'no-sent-folder' };
+    await client.append(folder, raw, ['\\Seen'], new Date());
+    return { ok: true, folder };
+  } finally { await client.logout().catch(() => {}); }
+}
+
+module.exports = { appendSent, _autoSavesSent, syncHeaders, fetchSource, readMessage, accCreds, folderList, buildAllowFn };

@@ -54,6 +54,7 @@ Tesztek zöldek (**106 Jest**, 24 suite). **CI: GitHub Actions** (`.github/workf
 
 **Legújabb kör (2026-10-07 — 📬 Több postafiók + 📥 Levelek (csak fejléc) + ↩️ válasz, PR #515):** *(részletes kész-lista: `CHANGELOG.md`; biztonság: `AUDIT.md` 32. lépés)*
 1. `mail_accounts` (fiókonként szerep/mappák/feladó-szűrés) + `mail_headers` (CSAK feladó/tárgy/dátum). **ÁLLANDÓ SZABÁLY:** levél tartalma csak a felhasználó kattintására jön élőben az IMAP-ról, nem tárolódik; az AI levéltartalmat nem kap (a 💬 válasz csak a chatbe írt szövegből dolgozik); a megrendelés-kiolvasás is csak kattintásra (`mailToOrder`). Új levél-útnál ezt tartsd meg.
+3. **📤 Elküldött mappa:** minden, a cég fiókjáról kimenő levél (válasz/új/fuvar-e-mail) másolata IMAP APPEND-del a bekötött postafiók „Elküldött” mappájába kerül (`services/mailbox.js` `appendSent`, best-effort, a `getCompanyMailer.send` hívja); Gmail/Outlook SMTP esetén kihagyva (a szolgáltató maga menti).
 2. `handlers/mailbox.js` (fiók CRUD csak Admin, lista/megnyitás/válasz Admin/Manager, `mail-inbox` kapu), válasz címzettje a szerverről + `In-Reply-To`/`References`. Cache-bust `?v=20261007mbx`.
 
 **Korábbi kör (2026-10-07 — E-mailek: kötelező céges lábléc + automatikus kontraszt, PR #514):** *(részletes kész-lista: `CHANGELOG.md`)*

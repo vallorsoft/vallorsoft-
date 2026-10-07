@@ -536,6 +536,16 @@ async function _brevoSendCompany(cfg, opts) {
 // Batch-mailer: EGYSZER feloldja a feladási módot (SMTP-verify → szükség esetén
 // cég-Brevo fallback), majd a .send()-del küld minden címzettre + mail_log naplóz.
 // Visszatérés: { ok, noConfig?, error?, method, from, send(opts) } — vagy hiba.
+// Az elküldött levél másolata a cég postafiókjának „Elküldött" mappájába
+// (IMAP APPEND) — best-effort, a küldést sosem akasztja meg.
+function _appendToSent(companyId, mailOpts, ctx) {
+  try {
+    const mb = require('./mailbox');
+    Promise.resolve(mb.appendSent(require('../db'), companyId, mailOpts, ctx))
+      .catch((e) => console.warn('[email] Elküldött-mappa mentés hiba:', e.message));
+  } catch (e) { console.warn('[email] Elküldött-mappa mentés hiba:', e.message); }
+}
+
 async function getCompanyMailer(companyId) {
   const cfg = await loadCompanySender(companyId);
   if (!cfg) return { ok: false, noConfig: true, error: 'Niciun cont expeditor configurat.' };
@@ -572,7 +582,7 @@ async function getCompanyMailer(companyId) {
     const atts = Array.isArray(opts.attachments) ? opts.attachments.filter(a => a && a.contentBase64 && a.name) : [];
     try {
       if (method === 'smtp') {
-        const info = await transport.sendMail({
+        const mailOpts = {
           from: fromName ? '"' + String(fromName).replace(/"/g, '') + '" <' + fromEmail + '>' : fromEmail,
           to: opts.to,
           subject: subject,
@@ -584,12 +594,23 @@ async function getCompanyMailer(companyId) {
           inReplyTo: (_threadHeaders(opts) || {})['In-Reply-To'] || undefined,
           references: (_threadHeaders(opts) || {}).References || undefined,
           attachments: atts.length ? atts.map(a => ({ filename: a.name, content: a.contentBase64, encoding: 'base64' })) : undefined,
-        });
+        };
+        const info = await transport.sendMail(mailOpts);
         _logMail(cid, opts.to, subject, mtype, 'sent', info && info.messageId);
+        _appendToSent(cid, Object.assign({}, mailOpts, { messageId: info && info.messageId }), { method: 'smtp', smtpHost: cfg.host });
         return { ok: true, messageId: info && info.messageId };
       }
       const r = await _brevoSendCompany(cfg, { to: opts.to, subject: subject, html: opts.html, senderName: fromName, replyTo: opts.replyTo, attachments: atts, inReplyTo: opts.inReplyTo, references: opts.references });
       _logMail(cid, opts.to, subject, mtype, r.ok ? 'sent' : 'failed', r.messageId || null);
+      if (r.ok) {
+        const th = _threadHeaders(opts) || {};
+        _appendToSent(cid, {
+          from: fromName ? '"' + String(fromName).replace(/"/g, '') + '" <' + fromEmail + '>' : fromEmail,
+          to: opts.to, subject: subject, html: opts.html || '', text: htmlToPlainText(opts.html || ''),
+          replyTo: opts.replyTo || undefined, inReplyTo: th['In-Reply-To'] || undefined, references: th.References || undefined,
+          attachments: atts.length ? atts.map(a => ({ filename: a.name, content: a.contentBase64, encoding: 'base64' })) : undefined,
+        }, { method: 'brevo' });
+      }
       return r;
     } catch (err) {
       _logMail(cid, opts.to, subject, mtype, 'failed', null);
