@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-10-08 — 💬 Chatből is: tömeges fuvar-műveletek (fizetett / postázva / lezárva / számlaszám) + egy fuvar dokumentum-nyomkövetése (PR #526)
+
+- **Kérés:** „A chatből is lehessen tömegesen fizetettnek jelölni — amit ebben a sessionben készítettél, mindent chatből lehessen vezérelni."
+- **Tömeges művelet a chatben** (`lib/chatOps.js` `detectBulk`): „a szeptemberi összes fuvart jelöld fizetettnek", „toate cursele Bilka din septembrie: finalizează, trimise prin poștă și încasate", „zárd le a múlt havi fuvarokat", „minden szeptemberi lezárt fuvart jelölj fizetettnek". Hónap (HU/RO hónapnév, múlt/e havi, `2026-09`), opcionális ügyfél-szűrő, „lezárt" mint szűrő; egy mondatban több művelet. A kártya megmutatja az időszakot, a fuvarok számát + listáját, a változásokat és figyelmeztet a még nem lezárt fuvarokra — csak ✅-re fut, a MEGLÉVŐ `setOrderPostDeliveryBulk`-kal (ugyanaz a hónap-szabály, mint a Fuvarkezelés 📅 szűrője; fizetettnél a Pénzügy is rendeződik).
+- **Egy fuvar dokumentum-nyomkövetése:** „a 0042-t postáztuk, számlaszám FCT-123", „a 0042 papírjai megérkeztek", „megjegyzés: …" → `setOrderPostDelivery`. A chates egy-fuvaros fizetés (`markOrderPayment`) teljes kifizetésnél a „Kifizetve" nyomkövetést is beállítja.
+- **Biztonság:** a token csak a szűrőt + fehérlistás műveleteket hordozza, végrehajtáskor a fuvar-lista újra lekérdeződik (`company_id`-szűrt, max 500); más cég / felhasználó / lejárt token elutasítva. i18n súgó-példák (RO+HU), cache-bust `i18n.js?v=20261008chatbulk`. **Teszt:** +7 eset; valós Postgres 16-tal **1631 Jest zöld**.
+
 ## 2026-10-08 — ✏️ Fuvarok tömeges szerkesztése (lezárás · számla · posta · fizetés) + hónap-szűrő (PR #525)
 
 - **Kérés:** „Tömeges fuvarszerkesztés van? Pl. a szeptemberi összes fuvart kiszámláztuk, postáztuk a dokumentumokat és beszedtük a pénzt."

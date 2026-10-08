@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 40. lépés — Chat: tömeges + egy-fuvaros dokumentum-nyomkövetés (2026-10-08) ✅ KÉSZ
+- A tömeges művelet-kártya tokenje (HMAC, cég + user + 15 perc) csak a hatókört (hónap, ügyfél-id, „csak lezárt") és a fehérlistás mezőket (`cleanOps`) hordozza — fuvar-id-ket nem; végrehajtáskor a lista újra, `company_id`-szűrten épül, max 500, majd a meglévő `setOrderPostDeliveryBulk` (Admin/Manager, tranzakció, audit) fut. Egy fuvarnál `setOrderPostDelivery` (tulajdon-ellenőrzés a handlerben). Audit `order.chat_action` (type=bulk, darabszám, mezőnevek). Az AI nem kap adatot (a válasz `local`).
+
 ### 39. lépés — Fuvarok tömeges szerkesztése (setOrderPostDeliveryBulk) (2026-10-08) ✅ KÉSZ
 - Admin/Manager kapu; a kijelölt id-k fehérlistázva (`[A-Za-z0-9_-]`, dedup, max 500); minden UPDATE `company_id = $x AND id = ANY(...)` és előtte tulajdon-szűrés (idegen / törölt fuvar kimarad — valós DB-n verifikálva). Tranzakció (BEGIN/COMMIT/ROLLBACK), paraméteres SQL, `payment_status_ext` fehérlista, dátum-validáció. A pénzügyi rendezés csak explicit `sync_finance`-re és csak Finalizat + áras fuvarra. Audit csak metaadattal.
 
