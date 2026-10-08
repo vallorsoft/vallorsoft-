@@ -49,6 +49,7 @@ const handlers = Object.assign(
   require('../handlers/permissions'),
   require('../handlers/paymentSchedule'),
   require('../handlers/companySettings'),
+  require('../handlers/learnedData'),
   require('../handlers/orderSeries'),
   require('../handlers/emailTemplates'),
   require('../handlers/pdfTemplates'),

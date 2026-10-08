@@ -71,6 +71,7 @@ window.VS_FEATURES = [
   { key: 'signature',        label: 'Aláírás és bélyegző',         group: 'Adminisztráció' },
   { key: 'notifications',    label: 'Értesítések 🔔',              group: 'Adminisztráció' },
   { key: 'mail-log',         label: 'Levél-napló ✉️',              group: 'Adminisztráció' },
+  { key: 'learned-data',     label: 'Tanult adatok 🧠',            group: 'Adminisztráció' },
   { key: 'email-templates',  label: 'E-mail sablonok ✉️',          group: 'Adminisztráció' },
   { key: 'email-builder',    label: 'E-mail szerkesztő & kiküldés 📧', group: 'Adminisztráció' },
   { key: 'chat',             label: 'Belső chat',                  group: 'Kommunikáció' },
