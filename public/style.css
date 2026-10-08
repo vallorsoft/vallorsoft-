@@ -5299,3 +5299,46 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 .mbx-diag .mbx-diag-acc { margin:8px 0; }
 .mbx-diag ul { margin:4px 0 0 18px; padding:0; }
 .mbx-diag li { margin:3px 0; }
+
+/* ─── 💬 Szöveges fuvarkiírás: sofőr-információs kártya (lib/driverInfo.js) ─── */
+#ochModal .och-msg.info{ max-width:96%; width:96%; }
+#ochModal .och-info-reply{ font-weight:700; margin-bottom:8px; }
+#ochModal .och-info{ display:flex; flex-direction:column; gap:10px; font-size:13px; }
+#ochModal .och-info-h{ font-weight:800; font-size:14.5px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+#ochModal .och-info-p{ font-weight:600; font-size:12px; padding:2px 8px; border-radius:999px; background:rgba(37,99,235,0.12); color:var(--och-acc); }
+#ochModal .och-info-s{ background:var(--och-bg); border:1.5px solid var(--och-line); border-radius:12px; padding:10px; }
+#ochModal .och-info-st{ font-weight:800; margin-bottom:8px; }
+#ochModal .och-info-sub{ font-weight:700; margin:10px 0 6px; color:var(--och-mut); }
+#ochModal .och-info-tiles{ display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:6px; margin-bottom:8px; }
+#ochModal .och-info-tiles > div{ background:var(--och-soft); border:1px solid var(--och-line); border-radius:10px; padding:7px 8px; display:flex; flex-direction:column; gap:2px; }
+#ochModal .och-info-tiles b{ font-size:15px; font-variant-numeric:tabular-nums; }
+#ochModal .och-info-tiles span{ font-size:11.5px; color:var(--och-mut); }
+#ochModal .och-info-tw{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+#ochModal .och-info-t{ width:100%; border-collapse:collapse; font-size:12.5px; }
+#ochModal .och-info-t th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.3px; color:var(--och-mut); padding:5px 6px; border-bottom:1.5px solid var(--och-line); white-space:nowrap; }
+#ochModal .och-info-t td{ padding:5px 6px; border-bottom:1px solid var(--och-line); vertical-align:top; }
+#ochModal .och-info-empty, #ochModal .och-info-more, #ochModal .och-info-mut{ color:var(--och-mut); font-size:12.5px; }
+#ochModal .och-info-more{ margin-top:4px; }
+#ochModal .och-info-note{ background:#fffbeb; color:#92400e; border:1px solid #fcd34d; border-radius:10px; padding:8px 10px; margin-bottom:6px; }
+#ochModal[data-theme="dark"] .och-info-note{ background:rgba(245,158,11,0.12); color:#fcd34d; border-color:rgba(245,158,11,0.4); }
+#ochModal .och-info-card{ border:1px solid var(--och-line); border-left:4px solid var(--och-acc); border-radius:10px; padding:8px 10px; margin-bottom:8px; background:var(--och-soft); }
+#ochModal .och-info-card.gps{ border-left-color:#16a34a; }
+#ochModal .och-info-ord{ margin-bottom:4px; }
+#ochModal .och-info-next{ margin-bottom:6px; color:var(--och-acc); font-weight:600; }
+#ochModal .och-info-place{ font-weight:700; margin-bottom:2px; }
+#ochModal .och-info-steps{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; }
+#ochModal .och-info-steps li{ padding:5px 8px; border-radius:8px; border:1px solid var(--och-line); background:var(--och-bg); }
+#ochModal .och-info-steps li.done{ opacity:.8; border-color:#86efac; }
+#ochModal .och-info-steps li.now{ border:1.5px solid #f97316; box-shadow:0 0 0 2px rgba(249,115,22,0.15); }
+#ochModal .och-info-steps .k{ font-weight:700; }
+#ochModal .och-info-steps .d{ color:var(--och-mut); font-size:12px; }
+#ochModal .och-info-steps .st{ font-size:12px; color:var(--och-mut); margin-top:2px; }
+#ochModal .och-info-btns{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+#ochModal .och-info-btns:empty{ display:none; }
+#ochModal .och-info-btn{ display:inline-flex; align-items:center; gap:4px; padding:6px 10px; border-radius:8px; border:1.5px solid var(--och-line); background:var(--och-bg); color:var(--och-text); font-size:12.5px; font-weight:700; cursor:pointer; text-decoration:none; }
+#ochModal .och-info-btn:hover{ border-color:var(--och-acc); color:var(--och-acc); }
+#ochModal .och-info-tl{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:3px; }
+#ochModal .och-info-tl li{ font-size:12.5px; }
+#ochModal .och-info-tl .ic{ display:inline-block; width:20px; }
+#ochModal .och-info-tl .d{ color:var(--och-mut); font-variant-numeric:tabular-nums; }
+@media (max-width:860px){ #ochModal .och-msg.info{ max-width:100%; width:100%; } #ochModal .och-info-tiles{ grid-template-columns:repeat(2,1fr); } }

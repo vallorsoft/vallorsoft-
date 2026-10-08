@@ -412,3 +412,25 @@ describe('UIT a chatben', () => {
     expect(ins[0].sql).toMatch(/ON CONFLICT \(company_id, order_id, uit_code\) DO NOTHING/);
   });
 });
+
+describe('orderChatTurn — sofőr-kérdés ág (lib/driverInfo)', () => {
+  test('„Peto hol tart?" → info-kártya, AI nem hívódik, vázlat érintetlen', async () => {
+    mockRules.push({ match: /pozicio='Sofer'/, rows: [{ email: 'peto@x.ro', nume: 'Peto Imre' }] });
+    const r = await call('orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'Peto hol tart a fuvarjával?' }], draft: { stops: [{ kind: 'pickup', loc: 'Cluj' }] }, lang: 'hu' }]);
+    expect(r.ok).toBe(true);
+    expect(r.info).toBe(true);
+    expect(r.info_html).toMatch(/och-info/);
+    expect(r.draft).toBeUndefined();
+    expect(mockExtract).not.toHaveBeenCalled();
+  });
+  test('e-mail szándék továbbra is az e-mail ágra megy', async () => {
+    mockRules.push({ match: /pozicio='Sofer'/, rows: [{ email: 'peto@x.ro', nume: 'Peto Imre' }] });
+    mockExtract.mockResolvedValue({ json: { draft: {}, reply: 'ok' } });
+    const r = await call('orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'küldd el e-mailben Petonak a tankolásait' }], draft: {}, lang: 'hu' }]);
+    expect(r.info).toBeUndefined();
+  });
+  test('Sofer szerep nem kérdezhet', async () => {
+    const r = await call('orderChatTurn', SOFER, [{ messages: [{ role: 'user', text: 'Peto hol tart?' }], draft: {}, lang: 'hu' }]);
+    expect(r.ok).toBe(false);
+  });
+});
