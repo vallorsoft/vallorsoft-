@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 42. lépés — AI ↔ dokumentumok teljes leválasztása (2026-10-08) ✅ KÉSZ
+- A levél-chat (`handlers/mailChat.js`) eddig a fuvar csatolható dokumentumainak fájlnevét/kulcsát az AI-promptba tette; most az AI semmilyen dokumentum-adatot nem kap (sem a promptban, sem az előző vázlatban), a csatolmányt a szerver választja fehérlistás kulcsszó-szabállyal a cég saját, `getOrderEmailData` által adott listájából. Teszt őrzi, hogy a prompt nem tartalmaz fájlnevet/kulcsot. **ÁLLANDÓ SZABÁLY:** tárolt dokumentum (tartalom, fájlnév, metaadat) AI-hoz nem kerülhet.
+
 ### 41. lépés — Fuvar-dokumentumok feltöltés/keresés (handlers/orderDocs.js) (2026-10-08) ✅ KÉSZ
 - Admin/Manager kapu minden RPC-n; feltöltés és átkötés előtt a fuvar tulajdon-ellenőrzése (`orders WHERE id=$1 AND company_id=$2` — cross-tenant write védelem); keresés/törlés/módosítás az `orders` joinon át `company_id`-szűrt. Paraméteres SQL, a LIKE-minta escape-elve. Formátum-fehérlista (PDF/kép/irodai/XML/TXT/CSV/ZIP data URL — HTML/SVG/JS nem), méret-korlát ~15 MB, `doc_type` fehérlista, dátum-validáció, hossz-korlátok. A kliens minden adatot escape-elve renderel. Audit `order_doc.upload/update/delete` (csak metaadat, a fájl tartalma nem).
 

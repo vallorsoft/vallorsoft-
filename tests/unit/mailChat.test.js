@@ -74,6 +74,22 @@ describe('orderChatTurn — e-mail ág', () => {
     expect(r.ready).toBe(true);
     const prompt = mockExtract.mock.calls[0][0].systemPrompt + mockExtract.mock.calls[0][0].parts[0].text;
     expect(prompt).not.toContain('office@bilka.ro');
+    // A dokumentumokhoz az AI egyáltalán nem fér hozzá — a nevük sem kerül a promptba.
+    expect(prompt).not.toContain('Factură F 12');
+    expect(prompt).not.toContain('CMR — semnat');
+    expect(prompt).not.toContain('inv-5');
+  });
+
+  test('csatolmányt a szerver választ kulcsszóból (az AI listája figyelmen kívül)', () => {
+    const avail = [
+      { key: 'inv-5', kind: 'invoice' }, { key: 'od-3-original', kind: 'doc' }, { key: 'od-3-signed', kind: 'doc' }, { key: 'pod-9', kind: 'photo' },
+    ];
+    const pick = mailChat._pickAttachments;
+    expect(pick(avail, [], 'küldd a számlát és az aláírt CMR-t')).toEqual(['inv-5', 'od-3-signed']);
+    expect(pick(avail, ['inv-5', 'od-3-signed'], 'a CMR nélkül')).toEqual(['inv-5']);
+    expect(pick(avail, [], 'trimite toate documentele')).toHaveLength(4);
+    expect(pick(avail, ['inv-5', 'hack-1'], 'legyen udvariasabb')).toEqual(['inv-5']);
+    expect(pick(avail, [], 'pozele de la livrare')).toEqual(['pod-9']);
   });
 
   test('„más" címet csak a felhasználó által beírt címként fogad el', async () => {
