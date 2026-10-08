@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 43. lépés — Számla-kiolvasás AI nélkül (orderDocInspect) (2026-10-08) ✅ KÉSZ
+- Admin/Manager kapu; csak `data:application/pdf` fogadott, ~15 MB korlát; a szöveg kizárólag helyben (`pdf-parse`) dolgozódik fel, harmadik félhez/AI-hoz nem kerül, és nem tárolódik. Fuvar megadásakor tulajdon-ellenőrzés (`orders.id + company_id`), a kliens/alvállalkozó join is cégre szűrt. Csak olvasó művelet → nincs audit-bejegyzés.
+
 ### 42. lépés — AI ↔ dokumentumok teljes leválasztása (2026-10-08) ✅ KÉSZ
 - A levél-chat (`handlers/mailChat.js`) eddig a fuvar csatolható dokumentumainak fájlnevét/kulcsát az AI-promptba tette; most az AI semmilyen dokumentum-adatot nem kap (sem a promptban, sem az előző vázlatban), a csatolmányt a szerver választja fehérlistás kulcsszó-szabállyal a cég saját, `getOrderEmailData` által adott listájából. Teszt őrzi, hogy a prompt nem tartalmaz fájlnevet/kulcsot. **ÁLLANDÓ SZABÁLY:** tárolt dokumentum (tartalom, fájlnév, metaadat) AI-hoz nem kerülhet.
 
