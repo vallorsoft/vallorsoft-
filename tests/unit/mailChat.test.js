@@ -304,3 +304,44 @@ describe('adat a rendszerből + fuvarkártyák + félkész-zár + őszinte vissz
     expect(mockMailerSend.mock.calls[0][0].draft.cards).toEqual([{ ref: 'CMD-2026-0050' }]);
   });
 });
+
+describe('sofőr összes fuvarja e-mailben (determinisztikus felismerés + tanulás)', () => {
+  const DR = [{ email: 'gondos@x.ro', nume: 'Gondos Imre' }];
+  const MANY = Array.from({ length: 14 }, (_, i) => ({ id: 'G' + i, fuvar_no: 'CMD-2026-01' + String(i).padStart(2, '0'), status: 'Alocat', loc_incarcare: 'Arad', loc_descarcare: 'Wien', created_at: new Date() }));
+  beforeEach(() => {
+    mockRules.unshift({ match: /pozicio='Sofer'/, fn: (sql) => ({ rows: /SELECT nume AS name, email/.test(sql) ? [{ name: 'Gondos Imre', email: 'gondos@x.ro' }] : DR }) });
+    mockRules.unshift({ match: /FROM orders o WHERE o.company_id=\$1 AND o.status <> 'Anulat' AND \(LOWER/, fn: (sql, p) => ({ rows: p[0] === 7 ? MANY : [] }) });
+  });
+
+  test('a képernyőképes kérés: MIND a 14 aktív fuvar, a sofőrnek címezve, 1 AI-hívással', async () => {
+    mockExtract.mockResolvedValueOnce({ model: 'm', json: { reply: 'Kész', draft: { subject: 'Fuvarjaid', body: 'Szia Imre,\n{{cards}}', cards: [{ ref: 'CMD-2026-0100' }, { ref: 'CMD-2026-0101' }] } } });
+    const r = await call(orderChat, 'orderChatTurn', ADMIN, [{ lang: 'hu', draft: { mode: 'email' }, messages: [{ role: 'user', text: 'Gondos imre a sofer es a neki kiosztott es meg aktiv fuvarjat kellene reszletesen elkuldeni emailben' }] }]);
+    expect(r.ok).toBe(true);
+    expect(mockExtract).toHaveBeenCalledTimes(1);                   // az adat előre ment → nincs 2. kör
+    const sent = mockExtract.mock.calls[0][0].parts[0].text;
+    expect(sent).toContain('"total":14');
+    expect(sent).not.toContain('gondos@x.ro');                       // a sofőr e-mailje az AI-hoz nem megy
+    expect(r.draft.cards).toEqual([{ query: expect.objectContaining({ driver: 'Gondos Imre', status: 'active', all: true }) }]);
+    expect(r.draft.to_email).toBe('gondos@x.ro');
+    expect(r.changes.join('\n')).toMatch(/🔎 sofőr: Gondos Imre/);
+    expect(r.draft.card_fields).toContain('ref');
+  });
+
+  test('küldés után tanult sablon → legközelebb AI NÉLKÜL', async () => {
+    const mem = {};
+    mockRules.unshift({ match: /INSERT INTO order_chat_memory/, fn: (sql, p) => { mem[p[1] + '|' + p[2]] = JSON.parse(p[3]); return { rows: [] }; } });
+    mockRules.unshift({ match: /SELECT value FROM order_chat_memory/, fn: (sql, p) => ({ rows: mem[p[1] + '|' + p[2]] ? [{ value: mem[p[1] + '|' + p[2]] }] : [] }) });
+    mockExtract.mockResolvedValueOnce({ model: 'm', json: { reply: 'Kész', draft: { recipient: 'named', recipient_name: 'Gondos Imre', lang: 'hu', subject: 'Gondos Imre fuvarjai', body: 'Szia Gondos Imre,\n{{cards}}' } } });
+    const r1 = await call(orderChat, 'orderChatTurn', ADMIN, [{ lang: 'hu', draft: { mode: 'email' }, messages: [{ role: 'user', text: 'küldd el Gondos Imrének az összes fuvarját emailben' }] }]);
+    const s = await call(mailChat, 'mailChatSend', ADMIN, [{ lang: 'hu', draft: r1.draft }]);
+    expect(s.ok).toBe(true);
+    expect(Object.keys(mem).some((k) => k.startsWith('mail_tpl|'))).toBe(true);
+    mockExtract.mockClear();
+    const r2 = await call(orderChat, 'orderChatTurn', ADMIN, [{ lang: 'hu', draft: { mode: 'email' }, messages: [{ role: 'user', text: 'küldd el Gondos Imrének az összes fuvarját emailben' }] }]);
+    expect(mockExtract).not.toHaveBeenCalled();
+    expect(r2.learned).toBe(true);
+    expect(r2.draft.subject).toBe('Gondos Imre fuvarjai');
+    expect(r2.draft.to_email).toBe('gondos@x.ro');
+    expect(r2.ready).toBe(true);
+  });
+});

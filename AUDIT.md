@@ -9,6 +9,11 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 35. lépés — Levél-chat: szűrt fuvar-lekérdezés + tanult sablon (2026-10-07) ✅ KÉSZ
+
+- A sofőr-név → e-mail feloldás és a fuvar-szűrés kizárólag a szerveren, `company_id`-szűrt, paraméteres SQL (`ANY($n)` tömbök, LIKE-escape). Az AI csak összesítőt + fuvar-tételeket kap — sofőr e-mail/telefon soha (teszt őrzi). A kliensről visszajövő `intent`/`query` fehérlistán újratisztítva (`mailIntent.sanitize`, `mailData.sanitizeQuery`). Lista-korlát 500, kártya 300.
+- A tanult sablon (`mail_tpl`) a konkrét nevet helyőrzőre cseréli, a sofőr nevét nem tárolja; fuvarszámot tartalmazó levélből nem lesz sablon.
+
 ### 34. lépés — AI-chat e-mail: formázás, fuvarkártyák, adat-lekérés (2026-10-07) ✅ KÉSZ
 
 - **Injekció ellen:** a levél-jelölés (`lib/mailBody`) teljes escape után csak fehérlistás jelölést alakít HTML-lé; URL csak `http(s)`/`mailto`, szín csak `#rrggbb`; a kinézet fehérlistás (`lib/mailStyle`). A fuvarkártya escape-elt DB-adatból, szerveren renderelődik.

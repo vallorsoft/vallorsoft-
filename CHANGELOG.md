@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-10-07 — 💬 Levél-chat: sofőr / jármű ÖSSZES fuvarja (teljes időszak) + tanulás (kevesebb AI)
+
+- **Gyökér („Gondos Imre fuvarjait nem találom"):** az AI fuvar-adatkérésének NEM volt sofőr-szűrője, a szűrt kérés alapból csak 5 fuvart hozott, az AI-nak menő adat 9000 karakternél félbevágódott, a kártya max 10 volt, és a sofőr címzettként sem volt kereshető.
+- **`lib/mailData.js`**: közös szűrt fuvar-lekérdezés (`sanitizeQuery`/`buildOrderWhere`/`queryOrders`) — **sofőr** (név/névtag/ékezet/rag-tűrő, tanult becenév; feloldás KIZÁRÓLAG szerveren `email_sofer`-re + beírt sofőrnév), **jármű** (rendszám normalizálva), ügyfél, státusz + csoportok (`active` = kiosztott/folyamatban, `open`), időszak; **időszak nélkül = teljes időszak, MINDEN találat** (max 500). Az AI összesítőt kap (darab, első/utolsó dátum, státusz-bontás) + max 40 tételes listát; JSON sosem vágódik félbe.
+- **Élő lekérdezés-kártya** `{"query":{…}}`: küldéskor MINDEN illeszkedő fuvar bekerül; 9 fuvartól egyetlen kompakt táblázat (max 300 sor). Felrakó/lerakó cég is a kártyán.
+- **`lib/mailIntent.js` (ÚJ, AI nélküli felismerés)**: sofőr / rendszám / státusz („kiosztott", „aktív", „lezárt"…) / időszak (összes, ez/múlt hónap, idén, tavaly, hónapnév RO/HU/EN, dátumtartomány, utolsó N nap) a cég saját listáiból. Kétértelmű név → választó kérdés. Felismeréskor az adat **előre** lekérve → 1 AI-hívás 2 helyett, a kártya mindig a teljes listát hozza, „neki / Imrének" → a sofőr a címzett, „részletesen" → bővebb mezők.
+- **Tanulás**: elküldött ilyen levél tárgya/szövege sablonként (`order_chat_memory` `mail_tpl`, név/időszak helyőrzővel, személyes adat nélkül) → ugyanilyen kérésnél **AI nélkül** készül a levél („🧠 tanult minta"). Sofőr is címzett lehet (`_findNamed`).
+- Teszt: `tests/unit/mailIntent.test.js` + 2 új chat-eset; **1563 Jest zöld** valós Postgres 16-tal.
+
 ## 2026-10-07 — 📥 Levelek: „üres a lista" javítva — mettől töltse be + miért üres diagnosztika
 
 - **Gyökér (bekötött postafiók, üres lista):** három ok rejtette el csendben a leveleket: (1) a fiók csak a felvétel pillanatától (`since=now()`) töltött be — régi levél sosem; (2) az alapértelmezett „Kiktől: csak ismert feladók" szűrő minden mást kidobott; (3) a régi megrendelés-postafiókból átemelt fiók `use_inbox=false` volt. Ráadásul a lekérdezés a mappa LEGRÉGEBBI 200 levelén ragadt.
