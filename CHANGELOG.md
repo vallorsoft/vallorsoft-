@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-08 — 💬 Chat: tömeges művelet fuvarszám-tartományra („CMD-2026-0001-től a 0047-ig") (PR #533)
+
+- `lib/chatOps.js` `refRange` + `bulkOrders` tartomány-ág: „cmd-2026-0001 tol a 0047 ig mind postázva, kifizetve", „de la CMD-2026-0003 până la 0010 plătite" → tömeges ✅-kártya az előtag + számtartomány fuvarjaira (`company_id`-szűrt, paraméteres, max 500), végrehajtás a meglévő `setOrderPostDeliveryBulk`-kal. Eddig a chat az első fuvarszámra egyedi fizetést próbált („csak lezárt fuvarra"). Dátum (`2026-10-05`) nem tartomány.
+- Teszt: +2 eset + valós Postgres-en végig (0001–0047 fizetve+postázva, 0048 érintetlen); 1672 Jest zöld.
+
 ## 2026-10-08 — 💬 Chat: „és kifizetve" a beszélgetésben lévő fuvarra vonatkozik (PR #532)
 
 - `lib/chatOps.js` új `detectFocusFollowUp`: fuvarszám nélküli rövid folytatás („és kifizetve", „a számla lett kifizetve", „s-a plătit", „postáztuk", „számlaszám FCT-1") → az előzmény utolsó teljes fuvarszámára ✅-megerősítő kártya (fizetés: `markOrderPayment`, post-delivery: `setOrderPostDelivery`), `focus:true`. Aktív új-fuvar vázlat mellett is ide jön, nem az AI-hoz (eddig: „nincs ilyen mező" + újra feljött a „Ki a megrendelő?" kérdés). Fókusz-fuvar nélkül nem talál ki fuvart.
