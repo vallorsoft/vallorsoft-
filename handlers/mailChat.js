@@ -193,22 +193,21 @@ function buildMailPrompt(o, ctx) {
     'Maintain an e-mail DRAFT across the conversation; merge each new message into the previous draft (keep values unless changed). Corrections like "more polite", "in Hungarian", "remove the CMR" update only those parts.',
     'ORDER: ' + JSON.stringify({ number: o.fuvar_no, client: o.client, route: [o.loc_incarcare, o.loc_descarcare].filter(Boolean).join(' → '),
       loading_date: o.data_incarcare, unloading_date: o.data_descarcare, status: o.status, reference: o.ref, subcontractor: o.carrier_nev || null }),
-    'AVAILABLE ATTACHMENTS (use only these keys): ' + JSON.stringify(ctx.attachments.map((x) => ({ key: x.key, label: x.label, kind: x.kind }))),
     'SAVED VISUAL TEMPLATES (optional, by id): ' + JSON.stringify(ctx.builders.map((b) => ({ id: b.id, name: b.name }))),
     'Tracking link available: ' + (ctx.tracking ? 'yes' : 'no') + '.',
     'recipient: "client" (the customer who ordered/pays — default for invoices, status, tracking), "carrier" (the subcontractor — order confirmation), or "other" only if the dispatcher writes an e-mail address; then put that address in to_email.',
     'lang: "ro" by default, "hu" if the dispatcher asks for Hungarian or the customer is Hungarian.',
     'Write a professional e-mail (greeting, the content, closing without a person name). Mention the order number. Do NOT paste the tracking URL yourself — set include_tracking=true. Never invent prices, dates or facts.',
-    'attachments: keys the dispatcher asks for (e.g. "invoice/számla/factură" → kind invoice; "CMR/aláírt/semnat" → signed doc; "photos/POD" → photo). Empty if none requested.',
+    'You have NO access to documents or attachments (not even their names) — the server attaches them. Never list file names or invent document details.',
     COMMON_RULES,
-    'Return ONLY JSON: {"reply":"","save_default":false,"reset_default":false,"data_requests":[],"restore_sent_id":null,"draft":{"style":null,"recipient":null,"to_email":null,"lang":"ro","subject":"","body":"","cards":[],"card_fields":null,"attachments":[],"include_tracking":false,"builder_template_id":null},"questions":[{"key":"recipient|other","text":"short question","options":["up to 4 answers"]}]}',
+    'Return ONLY JSON: {"reply":"","save_default":false,"reset_default":false,"data_requests":[],"restore_sent_id":null,"draft":{"style":null,"recipient":null,"to_email":null,"lang":"ro","subject":"","body":"","cards":[],"card_fields":null,"include_tracking":false,"builder_template_id":null},"questions":[{"key":"recipient|other","text":"short question","options":["up to 4 answers"]}]}',
     'Ask a question only if really unclear; otherwise "questions": [].',
   ].join('\n');
 }
 
 function _conversation(messages, prev) {
   const v = { style: prev.style, recipient: prev.recipient, recipient_name: prev.recipient_name, to_email: prev.recipient === 'other' ? prev.to_email : null, lang: prev.lang,
-    subject: prev.subject, body: prev.body, cards: prev.cards, card_fields: prev.card_fields, attachments: prev.attachments, include_tracking: prev.include_tracking,
+    subject: prev.subject, body: prev.body, cards: prev.cards, card_fields: prev.card_fields, include_tracking: prev.include_tracking,
     builder_template_id: prev.builder_template_id };
   const lines = ['PREVIOUS DRAFT (JSON):', JSON.stringify(v), '', 'CONVERSATION:'];
   messages.forEach((m) => lines.push((m.role === 'assistant' ? 'ASSISTANT: ' : 'DISPATCHER: ') + m.text));
@@ -216,12 +215,38 @@ function _conversation(messages, prev) {
   return lines.join('\n');
 }
 
+// ─── Csatolmány-választás AI NÉLKÜL ───
+// A dokumentumokhoz (tartalom, fájlnév) az AI egyáltalán nem fér hozzá. A
+// felhasználó utolsó üzenetéből kulcsszavakkal döntünk; a korábbi választás
+// megmarad, a „nélkül / fără / vedd ki" a megnevezett fajtát eltávolítja.
+const ATT_RULES = [
+  { re: /\b(szamla\w*|factur\w*|invoice\w*)/, match: (a) => a.kind === 'invoice' },
+  { re: /\b(cmr\w*|alairt\w*|semnat\w*|stampil\w*|pecset\w*|signed)/, match: (a, all) => a.kind === 'doc' && (/-signed$/.test(a.key) || !all.some((x) => x.kind === 'doc' && /-signed$/.test(x.key))) },
+  { re: /\b(dokumentum\w*|document\w*|megrendelo\w*|comand\w*|contract\w*|szerzodes\w*)/, match: (a) => a.kind === 'doc' && /-original$/.test(a.key) },
+  { re: /\b(foto\w*|poz[ae]\w*|kep\w*|pod|photo\w*)/, match: (a) => a.kind === 'photo' },
+];
+const ATT_ALL_RE = /\b(minden|osszes|toate|all)\b.{0,25}\b(csatolmany\w*|dokumentum\w*|documentel\w*|atasament\w*|attachment\w*)/;
+const ATT_DEL_RE = /\b(nelkul|fara|vedd ki|torold|scoate|elimina|remove|without|ne csatold|nu atasa)/;
+function pickAttachments(avail, prevKeys, text) {
+  const allow = new Set(avail.map((a) => a.key));
+  let keys = (prevKeys || []).filter((k) => allow.has(k));
+  const f = _fold(text);
+  const del = ATT_DEL_RE.test(f);
+  let hit = ATT_ALL_RE.test(f) ? avail.slice() : [];
+  ATT_RULES.forEach((r) => { if (r.re.test(f)) hit = hit.concat(avail.filter((a) => r.match(a, avail))); });
+  const hk = Array.from(new Set(hit.map((a) => a.key)));
+  if (del) keys = keys.filter((k) => !hk.includes(k));
+  else hk.forEach((k) => { if (!keys.includes(k)) keys.push(k); });
+  return keys.slice(0, MAX_ATT);
+}
+
 // Címzett + csatolmány + sablon feloldása a szerveren.
 async function resolveMail(cid, d, o, ctx, userText, lang) {
   const questions = []; const notes = []; const missing = [];
   d.order_id = o.id; d.fuvar_no = o.fuvar_no;
-  const allowAtt = new Set(ctx.attachments.map((x) => x.key));
-  d.attachments = d.attachments.filter((k) => allowAtt.has(k));
+  // A csatolmányt az AI NEM látja és NEM választja: a szerver dönt kulcsszó alapján.
+  d.attachments = pickAttachments(ctx.attachments, d.prev_attachments || [], d.att_text != null ? d.att_text : userText);
+  delete d.prev_attachments; delete d.att_text;
   const allowB = new Set(ctx.builders.map((b) => b.id));
   if (d.builder_template_id && !allowB.has(d.builder_template_id)) d.builder_template_id = null;
   if (!ctx.tracking) d.include_tracking = false;
@@ -637,6 +662,8 @@ async function mailTurn(req, res, a, messages, lang) {
   if (!d.lang) d.lang = prev.lang || lang;
   const restored = await _restoreSent(cid, out.restore_sent_id, d);
   const styleNotes = await applyStyleTurn(req, d, prev, out);
+  d.prev_attachments = prev.attachments || [];
+  d.att_text = (messages.filter((m) => m.role === 'user').pop() || {}).text || '';
   const r = await resolveMail(cid, d, o, ctx, userText, lang);
   const fin = await _finish(req, r.draft, prev, out, { restored, labels: ai.labels, styleNotes });
   if (fin.placeholders.length) r.missing.push('placeholder');
@@ -795,5 +822,6 @@ Object.defineProperty(handlers, '_sanitizeMail', { value: sanitizeMail, enumerab
 Object.defineProperty(handlers, '_sendLimiter', { value: sendLimiter, enumerable: false });
 Object.defineProperty(handlers, '_changes', { value: _changes, enumerable: false });
 Object.defineProperty(handlers, '_finish', { value: _finish, enumerable: false });
+Object.defineProperty(handlers, '_pickAttachments', { value: pickAttachments, enumerable: false });
 
 module.exports = handlers;

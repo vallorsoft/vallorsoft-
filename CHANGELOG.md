@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-10-08 — 🔒 Az AI egyáltalán nem fér hozzá a dokumentumokhoz (PR #528)
+
+- **Kérés:** „Az AI ne férjen hozzá a dokumentumokhoz egyáltalán."
+- **Átvizsgálás:** a tárolt dokumentumok (fuvar-dokumentumok, POD-fotók, számlák, dokumentum-nyilvántartás, PDF-munkatér, beérkezett levelek) tartalma sehol nem jut AI-hoz. Egyetlen rés volt: a 💬 levél-chat a fuvar csatolható dokumentumainak **listáját (fájlnév + kulcs)** átadta az AI-nak, és az AI választotta ki a csatolmányt.
+- **Javítás** (`handlers/mailChat.js`): a csatolmány-lista kikerült a promptból és az előző vázlatból is; a csatolmányt a **szerver választja kulcsszóból** (`pickAttachments`: számla / CMR-aláírt / dokumentum / fotó / „minden dokumentum"; „nélkül / fără / vedd ki" eltávolít), a korábbi és a kézzel bepipált választás megmarad. Az AI-nak kifejezett tiltás: dokumentumot, fájlnevet nem lát, nem találhat ki.
+- A kifejezetten AI-kiolvasásra indított funkciók (megrendelő-, bon-, UIT-szkennelés) csak a felhasználó által éppen kiolvasásra kiválasztott fájlt látják — tárolt dokumentumot nem.
+- **Teszt:** +1 eset + a promptban nincs fájlnév/kulcs; valós Postgres 16-tal **1641 Jest zöld**.
+
 ## 2026-10-08 — 📎 Fuvar-dokumentumok: számla / CMR / bármilyen dokumentum feltöltése fuvarhoz kötve + keresés fuvar vagy dátum szerint (PR #527)
 
 - **Kérés:** „Lehessen számlát vagy bármilyen dokumentumot feltölteni és adott fuvarhoz kötni, utólag fuvartól vagy dátumtól keresve le lehessen tölteni."
