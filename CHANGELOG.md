@@ -14,6 +14,32 @@
 
 ---
 
+## 2026-10-08 — 💬 Chat: teljes átvizsgálás — hibás bekötések javítva, hiányzó válaszok pótolva (PR #536)
+
+- **Módszer:** valós Postgres-en ~110 jellemző HU/RO üzenet a teljes láncon (`orderChatTurn` → `chatOps` → `driverInfo` → levél/AI), műveleteknél a ✅ végrehajtással együtt; statikusan: minden `OrderChat.*` gomb ↔ export, RPC ↔ registry, szerver/kliens i18n-kulcs, CSS-osztály, cache-bust.
+- **Hibák (`lib/chatOps.js`):**
+  - **Dátum ≠ fuvarszám:** a `2026-10-15` dátumból `2026-10` fuvarszám lett, így a dátum-módosítás rossz fuvart kereshetett.
+  - **Pénzösszeg:** „fizetve 1.500 EUR" → 1,5 EUR lett volna. Új `moneyIn`/`parseMoney` a nyers szövegből olvas (ezres elválasztó, tizedes, `€`).
+  - **`dateIn`:** ellenőrzi a hónapot (az „1.500" nem 2030-as dátum), a pénzösszeget nem veszi dátumnak, és elfogadja a „15/10" alakot.
+  - **„Lezárt fuvarok…":** a „lezárt fuvarok…" / „hány lezárt…?" státuszváltó kártyát adott az előzmény fuvarjára. A melléknév már nem ige (`statusAdj`), és a „mută" ige nem illeszkedik a „mutasd"-ra.
+  - **Aktív vázlat:** a fuvarszám nélküli javítás a vázlathoz megy, nem jön „melyik fuvar?" kérdés.
+  - **Súgószövegek:** a példa-fuvarszám kikerült, mert az előzményből fókusz-fuvarnak vette a rendszer.
+  - **Ügyfél-helyzet:** a „Mi a helyzet a VESNA-val?" kérdést a napi összefoglaló nem nyeli el.
+  - **Fuvar-adatlap:** a kártyákról `OrderChat.openOrder`-rel nyílik (a chatet bezárja).
+- **E-mail-szándék (`handlers/mailChat.js`):** a „Peto e-mail címe?" típusú cím-kérdés nem indít levélírást.
+- **Pótolva, AI nélkül:**
+  - **Rövid fuvarszám:** „0002 hol tart?", „a 0003-mal", „ce e cu 0002", „duce 0004".
+  - **Fuvarlisták:** aktív / kiosztásra váró / lezárt (hónapra/évre).
+  - **Elérhetőség:** sofőr és ügyfél (📞 / WhatsApp).
+  - **Köszönés / köszönet / súgó.**
+  - **Új felismert formák:** „Mi jár le?", „add Petőnek", „a 0004 ára 1500 euró", „írj Petőnek, hogy…", árajánlat „1.2 euro/km" rátával.
+- **Egyéb:**
+  - `lib/driverInfo.js`: a „-nak/nek" ragtévesztés javítva.
+  - `entity-detail.js` cache-bust (szeptember óta elavult volt).
+- **Teszt:**
+  - Új `tests/unit/chatAudit.test.js` (13 eset); 1635 Jest zöld.
+  - Valós adatbázison az integrációs tesztek: 983 zöld.
+
 ## 2026-10-08 — 💬 Chat: bármit lehet kérdezni egy fuvarról (fizetve? postázva? milyen dokumentum hiányzik?) (PR #535)
 
 - `lib/chatOps.js` `detectOrderView` kérdés-ág + `orderTopics` + `orderTracking`: egy fuvarról (fuvarszám, „ennek a", vagy az előzmény fókusz-fuvarja) feltett kérdésre közvetlen válasz + kártya „📋 Dokumentum-nyomkövetés" blokkal: lezárva / számla (számlaszám vagy kiállított számla) / postázva / postán visszaérkezett / kifizetve (részben + hátralék pénzügyi joggal) / UIT, és **hiányzó dokumentumok** (megbízás, CMR/POD, számla, UIT). Minden lekérdezés `company_id`-szűrt, paraméteres, opcionális oszlopok `to_jsonb` mintával.
