@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-10-08 — 💬 Chat: „kifizetetlen fuvarok" kérdés = lista, nem fizetés-rögzítés (PR #534)
+
+- `lib/chatOps.js` `NEG_PAY_RE`/`LISTQ_RE`: a „kifizetetlen / nem fizették / neplătit" és a kérdő/listázó üzenet („hány…?", „mutasd") többé NEM indít fizetés-műveletet (`detectAction`, `detectFocusFollowUp`, a tömeges `pdOps` sem jelöl fizetettnek) — eddig „Fizetést csak lezárt fuvarra lehet rögzíteni" jött.
+- Helyette a kintlévőség-kártya: ügyfelenkénti összesítő + ÚJ fuvarszámos lista (legrégebbi elöl, max 30), időszak-szűrővel („idén / ebben az évben", hónapnév). `company_id`-szűrt, paraméteres, pénzügyi-jog kapu változatlan.
+- Teszt: +5 eset + valós Postgres-en ellenőrizve; 1677 Jest zöld.
+
 ## 2026-10-08 — 💬 Chat: tömeges művelet fuvarszám-tartományra („CMD-2026-0001-től a 0047-ig") (PR #533)
 
 - `lib/chatOps.js` `refRange` + `bulkOrders` tartomány-ág: „cmd-2026-0001 tol a 0047 ig mind postázva, kifizetve", „de la CMD-2026-0003 până la 0010 plătite" → tömeges ✅-kártya az előtag + számtartomány fuvarjaira (`company_id`-szűrt, paraméteres, max 500), végrehajtás a meglévő `setOrderPostDeliveryBulk`-kal. Eddig a chat az első fuvarszámra egyedi fizetést próbált („csak lezárt fuvarra"). Dátum (`2026-10-05`) nem tartomány.
