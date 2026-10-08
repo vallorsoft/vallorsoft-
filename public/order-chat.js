@@ -375,6 +375,9 @@
         for (var li = S.messages.length - 1; li >= 0; li--) { if (S.messages[li].role === 'user') { S.messages[li].local = true; break; } }
         S.messages.push({ role: 'assistant', text: r.reply || '', html: r.info_html || '', local: true });
         if (r.questions && r.questions.length) { S._draftQs = _keepQs; S.questions = r.questions; }
+        // Egy MEGLÉVŐ fuvarról szóló válasznál a vázlat kérdései („Ki a megrendelő?") nem
+        // ide tartoznak — elrejtjük, a következő vázlat-üzenetnél visszajönnek.
+        else if (r.focus) { S._draftQs = _keepQs; S.questions = []; }
         else S.questions = _keepQs;
       } else {
         S._draftQs = null;

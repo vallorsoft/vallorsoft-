@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-08 — 💬 Chat: egy meglévő fuvarról lehet beszélgetni (fókusz-fuvar) (PR #531)
+- **Hiba (képernyőkép):** a dokumentum-feltöltő kártya után a „ehhez a fuvarhoz egy megbízást hozzáadunk", „hozd elő ehhez a fuvarhoz a dokumentumokat és adatait", „A 47es" üzenetek az AI-hoz mentek, ami új fuvar-vázlatnak vette őket (hamisan „hozzáadjuk", a „47"-et referenciaként beírta), és a vázlat kérdései („Ki a megrendelő?") ott maradtak.
+- **`lib/chatOps.js`:** új `focusOrder` — a szövegbeli fuvarszám, vagy utalásnál („ehhez / ennek a fuvarnak / acest transport") az előzmény legutóbbi teljes fuvarszáma (cégre szűrve). A dokumentum-feltöltés ezt használja (megbízás → `order` típus, „hozaadunk" elírás is). Új `detectOrderView`: „hozd elő / mutasd / adatai / dokumentumai" vagy csak egy rövid fuvarszám → fuvar-adatlap kártya (státusz, ügyfél, fel-/lerakás, sofőr, díj pénzügyi joggal) + a fuvar dokumentumai ⬇️ letöltéssel + 📎 feltöltés + 🔎 teljes adatlap. A teljes fuvarszám üres vázlatnál továbbra is a szerkesztésre tölti be a fuvart (PR #508). A számlaszám-beírás nem fut feltöltésre.
+- **AI-védőkorlát** (`handlers/orderChat.js`): az AI csak a vázlatot szerkesztheti, dokumentumot/meglévő fuvart nem — nem állíthat ilyet, és csupasz fuvarszámot nem ír referenciába. A fuvarról szóló helyi válasznál (`focus`) a vázlat kérdései elrejtődnek. Teszt +4 (1665 zöld). Cache-bust `order-chat.js?v=20261008chatfocus`.
+
 ## 2026-10-08 — 💬 Chat: dokumentum-feltöltés fuvarhoz + az összefoglaló csak kérésre (PR #530)
 - **Új chat-szándék (AI nélkül, `lib/chatOps.js` `detectDocUpload`)**: „számlát kell feltöltenem a legutóbb befejezett Vesna fuvarhoz" → a szerver megkeresi a fuvart (fuvarszám, vagy ügyfél + legutóbbi lezárt; különben az ügyfél 5 legutóbbi fuvarja), cégre szűrve, és kártyát ad „📎 Feltöltés ehhez" gombbal → a meglévő feltöltő ablak (`OrderDocs.openUpload`, a dokumentum-típus — számla/CMR/POD — előre beállítva; a számla-ellenőrzés AI nélkül fut). Eddig a kérés az AI-hoz ment, ami elutasította.
 - **A napi összefoglaló nem nyílik meg magától** a chat megnyitásakor — csak kérésre („összefoglaló", „mai összefoglaló", „mai teendők", „rezumat").

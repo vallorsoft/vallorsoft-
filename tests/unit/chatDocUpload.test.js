@@ -45,3 +45,44 @@ describe('chat: dokumentum feltöltése fuvarhoz (AI nélkül)', () => {
     expect(!r || r.kind !== 'doc_upload').toBe(true);
   });
 });
+
+describe('chat: beszélgetés egy meglévő fuvarról (fókusz az előzményből)', () => {
+  const ORDER = { id: 'X1', fuvar_no: 'CMD-2026-0047', client: 'VESNA GC SRL', status: 'Finalizat', loc_incarcare: 'Cluj', loc_descarcare: 'Arad', pret: 900 };
+  const hist = ['📎 Dokumentum feltöltése fuvarhoz — #CMD-2026-0047', 'Az utolsó befejezett fuvar...'];
+  beforeEach(() => {
+    pool.query.mockReset();
+    pool.query.mockImplementation(async (sql) => {
+      if (/FROM orders o WHERE o.id = \$1/.test(sql)) return { rows: [ORDER] };
+      if (/fuvar_no|FROM orders/.test(sql)) return { rows: [{ id: 'X1', fuvar_no: 'CMD-2026-0047' }] };
+      if (/order_documents/.test(sql)) return { rows: [{ id: 5, doc_type: 'invoice', file_name: 'f.pdf', doc_date: '2026-10-05' }] };
+      return { rows: [] };
+    });
+  });
+
+  test('csak fuvarszám („A 47es") = fuvar-adatlap, nem új fuvar', () => {
+    expect(co._isPureRef('A 47es')).toBe(true);
+    expect(co._isPureRef('#47')).toBe(true);
+    expect(co._isPureRef('a referencia 47 legyen és FTL')).toBe(false);
+  });
+
+  test('„ehhez a fuvarhoz egy megbízást hozzáadunk" → az előzmény fuvarjára, megbízás típussal', async () => {
+    const r = await co.answer(req, 'Ehhez a fuvarhoz egy megbizast is hozaadunk', hist, 'hu');
+    expect(r.kind).toBe('doc_upload');
+    expect(r.focus).toBe(true);
+    expect(r.html).toContain('data-oid="X1"');
+    expect(r.html).toContain('data-dt="order"');
+  });
+
+  test('„hozd elő ehhez a fuvarhoz a dokumentumokat és az adatait" → adatlap + dokumentum-lista', async () => {
+    const r = await co.answer(req, 'Hoz ele ehez a fuvarhoz a dokumentumokat es a fuvar adatait', hist, 'hu');
+    expect(r.kind).toBe('order_view');
+    expect(r.focus).toBe(true);
+    expect(r.html).toContain('CMD-2026-0047');
+    expect(r.html).toContain('OrderDocs.download');
+  });
+
+  test('utalás nélkül az előzmény fuvarja nem kerül át más kérdésre', async () => {
+    const r = await co.answer(req, 'holnap Cluj felrakó, FTL', hist, 'hu');
+    expect(!r || (r.kind !== 'order_view' && r.kind !== 'doc_upload')).toBe(true);
+  });
+});
