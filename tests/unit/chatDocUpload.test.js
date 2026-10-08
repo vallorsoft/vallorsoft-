@@ -117,3 +117,25 @@ describe('chat: rövid folytatás a fókuszban lévő fuvarról („és kifizetv
     expect(!r || r.action !== 'pay').toBe(true);
   });
 });
+
+describe('chat: fuvarszám-tartomány („CMD-2026-0001-től a 0047-ig")', () => {
+  test('tartomány felismerése (HU/RO, rövid végszám), dátum nem tartomány', () => {
+    expect(co._refRange('A cmd-2026-0001 tol a 0047 ig mind el lett postazva, kilett fizetve')).toEqual({ p: 'CMD-2026-', a: 1, b: 47 });
+    expect(co._refRange('CMD-2026-0001-től a CMD-2026-0047-ig fizetve')).toEqual({ p: 'CMD-2026-', a: 1, b: 47 });
+    expect(co._refRange('de la CMD-2026-0003 până la 0010 plătite')).toEqual({ p: 'CMD-2026-', a: 3, b: 10 });
+    expect(co._refRange('a 0047-et postáztuk 2026-10-05')).toBeNull();
+    expect(co._refRange('CMD-2026-0047 kifizetve')).toBeNull();
+  });
+
+  test('tartomány → tömeges kártya, cégre szűrt, a fizetés + posta is benne', async () => {
+    pool.query.mockReset();
+    pool.query.mockImplementation(async (sql, p) => {
+      if (/LEFT\(x\.fno/.test(sql)) { expect(p).toEqual([7, 'CMD-2026-', 1, 47]); return { rows: [{ id: 'A', status: 'Finalizat', fuvar_no: 'CMD-2026-0001' }, { id: 'B', status: 'Finalizat', fuvar_no: 'CMD-2026-0047' }] }; }
+      return { rows: [] };
+    });
+    const r = await co.answer(req, 'A cmd-2026-0001 tol a 0047 ig mind el lett postazva , kilett fizetve es kilett szamlazva', [], 'hu', new Date('2026-10-08T10:00:00'), { draftActive: true });
+    expect(r.action).toBe('bulk');
+    expect(r.reply).toContain('2 fuvar');
+    expect(r.html).toContain('CMD-2026-0001');
+  });
+});
