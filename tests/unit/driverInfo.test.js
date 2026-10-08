@@ -81,7 +81,7 @@ describe('answer', () => {
     mockRules.push({ match: /FROM orders o WHERE o.company_id = \$1 AND LOWER\(o.email_sofer\)/, rows: [] });
     const r = await di.answer(7, 'Megtudod mutatni hol tart?', ['Peto hol tart a fuvarjával?'], 'hu', NOW);
     expect(r.reply).toMatch(/Pető-Lőrincz Imre/);
-    expect(r.html).toMatch(/nincs aktív fuvarja/);
+    expect(r.html).toMatch(/nem visz aktív fuvart/);
   });
 
   test('tankolás: a tétel saját dátuma szerint szűr, AdBlue külön, escape', async () => {

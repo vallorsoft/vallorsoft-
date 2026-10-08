@@ -38,7 +38,7 @@ const MAX_ATT = 10;
 const sendLimiter = createSlidingWindowLimiter({ windowMs: 60 * 60 * 1000, max: 20 });
 
 const QT = {
-  needOrder: { ro: 'Pentru ce cursă scriu e-mailul? Scrie numărul cursei (ex. CMD-2026-0042).', hu: 'Melyik fuvarról írjam a levelet? Írd be a fuvarszámot (pl. CMD-2026-0042).' },
+  needOrder: { ro: 'Pentru ce cursă scriu e-mailul? Scrie numărul cursei (CMD-AAAA-NNNN sau doar numărul de ordine).', hu: 'Melyik fuvarról írjam a levelet? Írd be a fuvarszámot (CMD-ÉÉÉÉ-SSSS, vagy csak a sorszámát).' },
   notFound:  { ro: 'Nu găsesc cursa {c}.', hu: 'Nem találom a(z) {c} fuvart.' },
   whoTo:     { ro: 'Cui trimit e-mailul?', hu: 'Kinek küldjem a levelet?' },
   noClientMail:  { ro: 'Clientul nu are adresă de e-mail salvată — scrie adresa.', hu: 'Az ügyfélnek nincs mentett e-mail címe — írd be a címet.' },
@@ -63,9 +63,15 @@ function _fold(s) {
 }
 
 // E-mail-szándék a felhasználó szövegéből (ékezet-független).
+// Az e-mail-CÍMRE vonatkozó kérdés („Peto e-mail címe?", „care e emailul lui Ion?")
+// nem levélírás — az a chat elérhetőség-kártyája (lib/chatOps.js detectContact).
+const COMPOSE_RE = /(^|\s)(kuld\w*|irj\w*|ird\w*|irjal\w*|valaszol\w*|tovabbit\w*|trimite\w*|trimit\w*|scrie\w*|raspunde\w*|send|write|reply)(\s|$)/;
+const ADDR_Q_RE = /(^|\s)(e ?mail ?cim\w*|cime|cimet|cimere|cim\w*|adres\w*|e ?mailul|mailul|e ?mail adres\w*)(\s|$)/;
 function isEmailIntent(text) {
   const f = _fold(text);
-  return /(^|\s)(e ?mail\w*|mail\w*|level\w*|scrisoare|scrisoarea)(\s|$)/.test(f) || /@[a-z0-9-]+\./.test(f);
+  if (!(/(^|\s)(e ?mail\w*|mail\w*|level\w*|scrisoare|scrisoarea)(\s|$)/.test(f) || /@[a-z0-9-]+\./.test(f))) return false;
+  if (!COMPOSE_RE.test(f) && ADDR_Q_RE.test(f) && !/@[a-z0-9-]+\./.test(f)) return false;
+  return true;
 }
 
 // ─── Vázlat-tisztítás (AI-ból VAGY a kliensről jövő, megbízhatatlan) ───
