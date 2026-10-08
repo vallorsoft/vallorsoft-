@@ -23,6 +23,7 @@ window.VS_FEATURES = [
   { key: 'driver-docs-pane', label: 'Feltöltött iratok & CMR-ek',  group: 'Fuvarozás & Logisztika' },
   { key: 'ecmr',             label: 'e-CMR (digitális CMR) 📝',     group: 'Dokumentumok' },
   { key: 'doc-register',     label: 'Dokumentum-nyilvántartás 📇',  group: 'Dokumentumok' },
+  { key: 'order-docs',       label: 'Fuvar-dokumentumok 📎',        group: 'Dokumentumok' },
   { key: 'utvonaltervezes',  label: 'Útvonaltervezés',             group: 'Fuvarozás & Logisztika' },
   // OPT-IN (alapból KI): a fuvar-kiírón térképes cím-kiegészítés + auto-km
   // + útvonal-előnézet köztespontokkal. A developer kapcsolja be cégenként.
