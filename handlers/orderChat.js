@@ -237,6 +237,7 @@ function buildSystemPrompt(today) {
     'Driver: put the driver name exactly as written into driver_name. If the user says "his/her truck" / "hozzá tartozó autó" / "a lui", leave the plates empty (the system pairs them). Plates only if explicitly written.',
     'The previous draft may be an EXISTING order loaded for editing: then keep every field unchanged except what the dispatcher explicitly asks to change.',
     'uit_codes: RO e-Transport UIT codes (max 16 letters/digits) — keep the previous list; add only codes the dispatcher explicitly writes; remove one only if asked.',
+    'You can ONLY edit this draft. You CANNOT upload or attach documents, open or look up other existing orders, or change saved orders from here. If the message is not about the draft (e.g. a document, an existing order number, "this order"), do NOT change any field and do NOT claim you did anything — reply briefly that the dispatcher should name the order number (e.g. CMD-2026-0042) or use the 📎 document upload. Never write a bare order number into the ref field unless the user explicitly says it is the reference.',
     'Never invent data. Unknown fields = null. Do not ask about fields the system can derive (km, plates of the assigned truck).',
     'Return ONLY JSON with this shape:',
     '{"reply": "1-2 short sentences to the dispatcher in THEIR language (Hungarian or Romanian), confirming what changed",',
@@ -582,7 +583,7 @@ handlers.orderChatTurn = async function (req, res, args) {
       } catch (e) { console.error('orderChat chatOps hiba:', e && e.message); }
       if (op) {
         try { await audit.fromReq(req, 'order.chat_info', 'chat', null, { kind: op.kind || op.action || 'op' }); } catch (_) {}
-        return res.json({ result: { ok: true, info: true, reply: op.reply, info_html: op.html || '', questions: op.questions || [] } });
+        return res.json({ result: { ok: true, info: true, reply: op.reply, info_html: op.html || '', questions: op.questions || [], focus: !!op.focus } });
       }
       let info = null;
       try {
