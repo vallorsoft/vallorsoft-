@@ -14,7 +14,7 @@
 
 ---
 
-## 2026-10-07 — 💬 Levél-chat: sofőr / jármű ÖSSZES fuvarja (teljes időszak) + tanulás (kevesebb AI)
+## 2026-10-07 — 💬 Levél-chat: sofőr / jármű ÖSSZES fuvarja (teljes időszak) + tanulás (kevesebb AI) (PR #520)
 
 - **Gyökér („Gondos Imre fuvarjait nem találom"):** az AI fuvar-adatkérésének NEM volt sofőr-szűrője, a szűrt kérés alapból csak 5 fuvart hozott, az AI-nak menő adat 9000 karakternél félbevágódott, a kártya max 10 volt, és a sofőr címzettként sem volt kereshető.
 - **`lib/mailData.js`**: közös szűrt fuvar-lekérdezés (`sanitizeQuery`/`buildOrderWhere`/`queryOrders`) — **sofőr** (név/névtag/ékezet/rag-tűrő, tanult becenév; feloldás KIZÁRÓLAG szerveren `email_sofer`-re + beírt sofőrnév), **jármű** (rendszám normalizálva), ügyfél, státusz + csoportok (`active` = kiosztott/folyamatban, `open`), időszak; **időszak nélkül = teljes időszak, MINDEN találat** (max 500). Az AI összesítőt kap (darab, első/utolsó dátum, státusz-bontás) + max 40 tételes listát; JSON sosem vágódik félbe.
