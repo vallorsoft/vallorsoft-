@@ -72,6 +72,7 @@ const handlers = Object.assign(
   require('../handlers/orderChat'),
   require('../handlers/mailChat'),
   require('../handlers/mailbox'),
+  require('../handlers/orderDocs'),
 );
 
 // Publikus (bejelentkezés NÉLKÜL hívható) funkciók — a register.html a

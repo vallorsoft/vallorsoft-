@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20261008chatops">
-  <script src="/i18n.js?v=20261008chatbulk"></script>
+  <script src="/i18n.js?v=20261008odoc"></script>
   <script src="/expense-cat.js?v=20260922wb"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -111,6 +111,7 @@
         <div class="sub-tab" data-tab="received-fuv" data-i18n="nav.waybills">Fuvarlevelek</div>
         <div class="sub-tab" data-tab="driver-docs-pane" data-i18n="nav.driverDocs">Feltöltött Iratok & CMR-ek</div>
         <div class="sub-tab" data-tab="ecmr" data-i18n="nav.ecmr">e-CMR</div>
+        <div class="sub-tab" data-tab="order-docs" data-i18n="nav.orderDocs">📎 Fuvar-dokumentumok</div>
         <div class="sub-tab" data-tab="doc-register" data-i18n="nav.docRegister">📇 Dokumentum-nyilvántartás</div>
         <div class="sub-tab" data-tab="warehouse" data-i18n="nav.warehouse">Raktár</div>
       </div>
@@ -450,6 +451,7 @@
     <div class="pane hidden" data-pane="mail-inbox"><div class="h-title" data-i18n="nav.mailInbox">📥 Levelek</div><div id="mailInboxBox"></div></div>
     <div class="pane hidden" data-pane="mail-sent"><div class="h-title" data-i18n="nav.mailSent">📤 Elküldött levelek</div><div id="mailSentBox"></div></div>
     <div class="pane hidden" data-pane="doc-register"><div id="docRegisterBox"></div></div>
+    <div class="pane hidden" data-pane="order-docs"><div id="orderDocsBox"></div></div>
 
     <div class="pane hidden" data-pane="fav-locations"><div id="favLocBox"></div></div>
 
@@ -1653,7 +1655,7 @@
 
 <script src="/feature-catalog.js?v=20261008learn"></script>
 <script>window.__pwaInstallDefault=false;</script>
-<script src="/console-shared.js?v=20261008bulk"></script>
+<script src="/console-shared.js?v=20261008odoc"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 <script src="/console-pages.js?v=20260911c"></script>
 <!-- ===== INTEGRACIOK (Ugyfelek / CargoTrack / Szamlazas) ===== -->
@@ -1711,6 +1713,7 @@
 <script src="/order-assignment.js?v=20260827oaflow"></script>
 <script src="/cost-calculator.js?v=20260904addbtn"></script>
 <script src="/document-register.js?v=20260917docreg"></script>
+<script src="/order-docs.js?v=20261008odoc"></script>
 <script src="/admin.js?v=20261008learn"></script>
 <script src="/global-search.js?v=20260614qa"></script>
  <!-- ── BUG REPORT FAB ── -->

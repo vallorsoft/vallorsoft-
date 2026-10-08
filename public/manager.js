@@ -38,6 +38,7 @@ function loadTab(name){
     if(name==='driver-docs-pane') loadDriverUploadedDocs();
     if(name==='ecmr' && window.ECmr) ECmr.mount('ecmrBox');
     if(name==='doc-register' && window.DocRegister) DocRegister.mount('docRegisterBox');
+    if(name==='order-docs' && window.OrderDocs) OrderDocs.mount('orderDocsBox');
     if(name==='quotes' && window.Quotes) Quotes.mount('quotesBox');
     if(name==='mail-inbox' && window.MailInbox) MailInbox.mount('mailInboxBox', { folder: 'inbox' });
   if(name==='mail-sent' && window.MailInbox) MailInbox.mount('mailSentBox', { folder: 'sent' });

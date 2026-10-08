@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-10-08 — 📎 Fuvar-dokumentumok: számla / CMR / bármilyen dokumentum feltöltése fuvarhoz kötve + keresés fuvar vagy dátum szerint (PR #527)
+
+- **Kérés:** „Lehessen számlát vagy bármilyen dokumentumot feltölteni és adott fuvarhoz kötni, utólag fuvartól vagy dátumtól keresve le lehessen tölteni."
+- **Új menüpont: Dokumentumok → 📎 Fuvar-dokumentumok** (admin+manager, `order-docs` kapcsoló). Kereső (fuvarszám, ügyfél, fájlnév, dokumentumszám/számlaszám, helyszín, megjegyzés), típus-szűrő, mettől–meddig + gyors-gombok (e hónap / múlt hónap / utolsó 90 nap / mind). Soronként ⬇️ letöltés (aláírt változat is, ha van), ✏️ szerkesztés (típus, dátum, szám, megjegyzés, **átkötés másik fuvarra**), 🗑 törlés.
+- **Feltöltés** (➕ gomb, vagy a fuvar ⋯ menü „📎 Dokumentum feltöltése"): fuvar-választó kereséssel, **több fájl egyszerre** (PDF, kép, Word/Excel, XML, TXT/CSV, ZIP; max 15 MB/fájl), típus (számla, CMR, POD, megrendelő, szerződés, vám, nyugta, egyéb), dokumentum-dátum (alap: ma), dokumentumszám, megjegyzés. A ⋯ menü „🗂️ A fuvar dokumentumai" a fuvarra szűrt listát nyitja.
+- **Nincs párhuzamos tárolás:** a MEGLÉVŐ `order_documents` táblára épül (ugyanaz, amit a fuvar dokumentumai + az aláíró-motor használ), a letöltés a meglévő `orderDocGet`-en megy. Migráció `db/order-documents-meta.sql` (`doc_type`, `doc_date`, `ref_no`, `note`, `file_size` + régi sorok cég-horgonya + index). Új `handlers/orderDocs.js` (`orderDocSearch`/`orderDocOrderPick`/`orderDocAdd`/`orderDocUpdateMeta`/`orderDocDelete`).
+- i18n ~45 új kulcs (RO+HU); cache-bust `?v=20261008odoc`. **Teszt:** +8 eset; valós Postgres 16-tal **1640 Jest zöld**.
+
 ## 2026-10-08 — 💬 Chatből is: tömeges fuvar-műveletek (fizetett / postázva / lezárva / számlaszám) + egy fuvar dokumentum-nyomkövetése (PR #526)
 
 - **Kérés:** „A chatből is lehessen tömegesen fizetettnek jelölni — amit ebben a sessionben készítettél, mindent chatből lehessen vezérelni."

@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 41. lépés — Fuvar-dokumentumok feltöltés/keresés (handlers/orderDocs.js) (2026-10-08) ✅ KÉSZ
+- Admin/Manager kapu minden RPC-n; feltöltés és átkötés előtt a fuvar tulajdon-ellenőrzése (`orders WHERE id=$1 AND company_id=$2` — cross-tenant write védelem); keresés/törlés/módosítás az `orders` joinon át `company_id`-szűrt. Paraméteres SQL, a LIKE-minta escape-elve. Formátum-fehérlista (PDF/kép/irodai/XML/TXT/CSV/ZIP data URL — HTML/SVG/JS nem), méret-korlát ~15 MB, `doc_type` fehérlista, dátum-validáció, hossz-korlátok. A kliens minden adatot escape-elve renderel. Audit `order_doc.upload/update/delete` (csak metaadat, a fájl tartalma nem).
+
 ### 40. lépés — Chat: tömeges + egy-fuvaros dokumentum-nyomkövetés (2026-10-08) ✅ KÉSZ
 - A tömeges művelet-kártya tokenje (HMAC, cég + user + 15 perc) csak a hatókört (hónap, ügyfél-id, „csak lezárt") és a fehérlistás mezőket (`cleanOps`) hordozza — fuvar-id-ket nem; végrehajtáskor a lista újra, `company_id`-szűrten épül, max 500, majd a meglévő `setOrderPostDeliveryBulk` (Admin/Manager, tranzakció, audit) fut. Egy fuvarnál `setOrderPostDelivery` (tulajdon-ellenőrzés a handlerben). Audit `order.chat_action` (type=bulk, darabszám, mezőnevek). Az AI nem kap adatot (a válasz `local`).
 

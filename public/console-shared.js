@@ -5986,6 +5986,15 @@ function renderFilteredOrders(list) {
         'onclick="vsSaveOrderTemplate(\''+c.id+'\');closeOrderActions()">'+
         '<span class="vs-act-ico">💾</span><span class="vs-act-lbl">'+t('cs.ol.mSaveTpl')+'</span></button>';
     }
+    // 📎 Dokumentum (számla/CMR/bármi) feltöltése a fuvarhoz + a fuvar dokumentumai
+    if (window.OrderDocs) {
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mDocUp')+'" '+
+        'onclick="OrderDocs.openUpload(\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">📎</span><span class="vs-act-lbl">'+t('cs.ol.mDocUp')+'</span></button>';
+      menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mDocList')+'" '+
+        'onclick="OrderDocs.showForOrder(\''+c.id+'\');closeOrderActions()">'+
+        '<span class="vs-act-ico">🗂️</span><span class="vs-act-lbl">'+t('cs.ol.mDocList')+'</span></button>';
+    }
     // ✉️ Email a fuvarról (pipálós: fuvar-adatok + csatolmányok; külső/belső cím)
     if (window.openOrderEmail) {
       menuItems += '<button class="vs-act-item" role="menuitem" title="'+t('cs.ol.mOrderMail')+'" '+
