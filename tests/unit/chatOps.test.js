@@ -32,10 +32,13 @@ const mockH = {
   getPlannerMatches: jest.fn((req, res) => res.json({ result: { ok: true, matches: [] } })),
   markOrderPayment: jest.fn((req, res) => res.json({ result: { ok: true } })),
   quoteSave: jest.fn((req, res) => res.json({ result: { ok: true, id: 77 } })),
+  pdBulk: jest.fn((req, res, args) => res.json({ result: { ok: true, count: args[0].order_ids.length, updated: args[0].order_ids.length, finalized: 0, finance_synced: 1, skipped: 0 } })),
+  pdOne: jest.fn((req, res) => res.json({ result: { ok: true } })),
   getOpsCenter: jest.fn((req, res) => res.json({ result: { ok: true, counters: { aktiv: 5, mai_felrakas: 2, mai_lerakas: 1, keso: 1 }, health: { waiting: 3 } } })),
 };
 jest.mock('../../handlers/orders', () => ({ comUpdate: (...a) => mockH.comUpdate(...a), plannerAssign: (...a) => mockH.plannerAssign(...a), getPlannerMatches: (...a) => mockH.getPlannerMatches(...a) }));
 jest.mock('../../handlers/statisticsHandlers', () => ({ markOrderPayment: (...a) => mockH.markOrderPayment(...a) }));
+jest.mock('../../handlers/orderPostDelivery', () => ({ setOrderPostDeliveryBulk: (...a) => mockH.pdBulk(...a), setOrderPostDelivery: (...a) => mockH.pdOne(...a) }));
 jest.mock('../../handlers/quotes', () => ({ quoteSave: (...a) => mockH.quoteSave(...a) }));
 jest.mock('../../handlers/opsCenter', () => ({ getOpsCenter: (...a) => mockH.getOpsCenter(...a) }));
 jest.mock('../../handlers/statsInsights', () => ({ getStatsInsights: (req, res) => res.json({ result: { ok: true, insights: [{ severity: 'danger', title: 'B104VLR', detail: 'ITP lejárt' }] } }) }));
@@ -150,6 +153,71 @@ describe('műveletek', () => {
 
   test('fuvar-leírás (nincs fuvarszám) → nem művelet', async () => {
     expect(await ops.answer(req(), 'Holnap Brassóból Bicskére FTL, Peto vigye, ára 900 EUR', [], 'hu', NOW)).toBeNull();
+  });
+});
+
+describe('tömeges + dokumentum-nyomkövetés', () => {
+  const MONTH = [{ id: 'A1', fuvar_no: 'CMD-2026-0101', status: 'Finalizat', pret: 900, loc_incarcare: 'Cluj', loc_descarcare: 'Arad' },
+    { id: 'A2', fuvar_no: 'CMD-2026-0102', status: 'In Curs', pret: 800, loc_incarcare: 'Iasi', loc_descarcare: 'Bacau' }];
+  let lastScope = null;
+  beforeEach(() => {
+    lastScope = null;
+    mockRules.push({ match: /SELECT id, denumire FROM clients/, rows: [{ id: 5, denumire: 'Bilka Logistik SRL' }] });
+    mockRules.push({ match: /FROM orders o\s+WHERE o.company_id = \$1 AND o.status <> 'Anulat'/, fn: (sql, p) => { lastScope = { sql, p }; return { rows: p[0] === 7 ? MONTH : [] }; } });
+  });
+
+  test('hónap-hatókör: név, múlt hónap, év-visszalépés, YYYY-MM', () => {
+    expect(ops.monthScope('a szeptemberi fuvarok', NOW)).toMatchObject({ from: '2026-09-01', to: '2026-10-01' });
+    expect(ops.monthScope('luna trecuta', NOW).ym).toBe('2026-09');
+    expect(ops.monthScope('decemberi', NOW).ym).toBe('2025-12');
+    expect(ops.monthScope('toate cursele din 2026-08', NOW).ym).toBe('2026-08');
+    expect(ops.monthScope('a mai fuvarok', NOW)).toBeNull();
+  });
+
+  test('„a szeptemberi összes fuvart jelöld fizetettnek" → kártya, majd bulk handler', async () => {
+    const r = await ops.answer(req(), 'A szeptemberi összes fuvart jelöld fizetettnek', [], 'hu', NOW);
+    expect(r.action).toBe('bulk');
+    expect(r.html).toMatch(/2 fuvar/);
+    expect(r.html).toMatch(/még nincs lezárva/);
+    expect(lastScope.p.slice(0, 3)).toEqual([7, '2026-09-01', '2026-10-01']);
+    const x = await ops.executeAction(req(), tokOf(r.html), {}, 'hu');
+    expect(x.ok).toBe(true);
+    const a = mockH.pdBulk.mock.calls[0][2][0];
+    expect(a.order_ids).toEqual(['A1', 'A2']);
+    expect(a).toMatchObject({ payment_status_ext: 'paid', payment_received_at: '2026-10-08', sync_finance: true });
+    expect(x.reply).toMatch(/2 fuvar módosítva/);
+  });
+
+  test('több művelet egy mondatban + ügyfél-szűrő (RO)', async () => {
+    const r = await ops.answer(req(), 'Toate cursele Bilka din septembrie: finalizează, trimise prin poștă și încasate', [], 'ro', NOW);
+    expect(r.action).toBe('bulk');
+    expect(lastScope.p[3]).toBe(5);
+    await ops.executeAction(req(), tokOf(r.html), {}, 'ro');
+    expect(mockH.pdBulk.mock.calls[0][2][0]).toMatchObject({ finalize: true, postal_sent_at: '2026-10-08', payment_status_ext: 'paid' });
+  });
+
+  test('„lezárt" mint szűrő, nem művelet', async () => {
+    const r = await ops.answer(req(), 'Minden szeptemberi lezárt fuvart jelölj fizetettnek', [], 'hu', NOW);
+    expect(r.action).toBe('bulk');
+    expect(lastScope.sql).toMatch(/o.status = 'Finalizat'/);
+  });
+
+  test('művelet nélkül nem tömeges kártya', async () => {
+    const r = await ops.answer(req(), 'Mutasd a szeptemberi összes fuvart', [], 'hu', NOW);
+    expect(r == null || r.action !== 'bulk').toBe(true);
+  });
+
+  test('a tömeges token más cégnél érvénytelen', async () => {
+    const r = await ops.answer(req(), 'A szeptemberi összes fuvart postáztuk', [], 'hu', NOW);
+    expect((await ops.executeAction(req({ company_id: 8 }), tokOf(r.html), {}, 'hu')).ok).toBe(false);
+    expect(mockH.pdBulk).not.toHaveBeenCalled();
+  });
+
+  test('egy fuvar: postázás + számlaszám → setOrderPostDelivery', async () => {
+    const r = await ops.answer(req(), 'A 0042-t postáztuk, számlaszám FCT-123', [], 'hu', NOW);
+    expect(r.action).toBe('pd');
+    await ops.executeAction(req(), tokOf(r.html), {}, 'hu');
+    expect(mockH.pdOne.mock.calls[0][2][0]).toEqual({ order_id: 'CMDX1', postal_sent_at: '2026-10-08', invoice_no: 'FCT-123' });
   });
 });
 
