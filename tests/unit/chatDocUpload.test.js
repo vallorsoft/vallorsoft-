@@ -139,3 +139,33 @@ describe('chat: fuvarszám-tartomány („CMD-2026-0001-től a 0047-ig")', () =>
     expect(r.html).toContain('CMD-2026-0001');
   });
 });
+
+describe('chat: „kifizetetlen" kérdés = lekérdezés, nem fizetés-rögzítés', () => {
+  const hist = ['✅ Kész — 36 fuvar módosítva', 'CMD-2026-0001 tol a 0047 ig mind postazva kifizetve'];
+  beforeEach(() => {
+    pool.query.mockReset();
+    pool.query.mockImplementation(async (sql, p) => {
+      if (/user_permissions/.test(sql)) return { rows: [] };
+      if (/GROUP BY 1/.test(sql)) { expect(p[0]).toBe(7); return { rows: [{ client: 'VESNA', db: 2, unpaid: 300, overdue: 0, oldest: '2026-03-01' }] }; }
+      if (/LIMIT 31/.test(sql)) return { rows: [{ fuvar_no: 'CMD-2026-0002', client: 'VESNA', finalized_at: '2026-04-01', unpaid: 200 }] };
+      return { rows: [] };
+    });
+  });
+
+  test.each(['Meg hany fuvar van kifizetetlenul ebben az evben?', 'Kifizetetlen fuvarokat mutas', 'Câte curse neplătite avem anul acesta?'])('%s → kintlévőség-lista, nincs fizetés-kártya', async (msg) => {
+    const r = await co.answer(req, msg, hist, 'hu', new Date('2026-10-08T10:00:00'), { draftActive: true });
+    expect(r.kind).toBe('debt');
+    expect(r.action).toBeUndefined();
+    expect(r.html).toContain('CMD-2026-0002');
+  });
+
+  test('„ebben az évben" → év-szűrés paraméterként', async () => {
+    await co.answer(req, 'hány kifizetetlen fuvar van ebben az évben?', [], 'hu', new Date('2026-10-08T10:00:00'), {});
+    const call = pool.query.mock.calls.find((c) => /GROUP BY 1/.test(c[0]));
+    expect(call[1]).toEqual(expect.arrayContaining([7, expect.stringMatching(/^\d{4}-01-01$/)]));
+  });
+
+  test('tömeges „kifizetetlen" nem jelöl fizetettnek', () => {
+    expect(co.pdOps('a szeptemberi kifizetetlen fuvarokat postáztuk', new Date('2026-10-08'), true).payment_status_ext).toBeUndefined();
+  });
+});
