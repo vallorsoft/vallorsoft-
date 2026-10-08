@@ -214,8 +214,9 @@ window.OrderDocs = (function () {
   function _pickSet(i) {
     var o = (window._odocPickRows || [])[i]; if (!o) return;
     _pick = { id: o.id, label: orderLabel(o) }; _renderPicked();
+    if (document.getElementById('odocCheck')) _inspect();
   }
-  function _pickClear() { _pick = null; _renderPicked(); _pickSearch(''); }
+  function _pickClear() { _pick = null; _renderPicked(); _pickSearch(''); if (document.getElementById('odocCheck')) _inspect(); }
 
   function metaFields(d) {
     d = d || {};
@@ -248,7 +249,8 @@ window.OrderDocs = (function () {
     ov.innerHTML = '<div class="odoc-mod"><h3>' + esc(tt('odoc.upload', '➕ Încarcă document')) + '</h3>' +
       pickerHtml() +
       '<div class="odoc-fld"><label>' + esc(tt('odoc.files', 'Fișier(e)')) + ' *</label>' +
-        '<input type="file" class="input" id="odocFiles" multiple accept=".pdf,image/*,.doc,.docx,.xls,.xlsx,.xml,.txt,.csv,.zip"></div>' +
+        '<input type="file" class="input" id="odocFiles" multiple accept=".pdf,image/*,.doc,.docx,.xls,.xlsx,.xml,.txt,.csv,.zip" onchange="OrderDocs._inspect()"></div>' +
+      '<div id="odocCheck"></div>' +
       metaFields() +
       '<div class="odoc-sub" id="odocProg"></div>' +
       '<div class="odoc-foot"><button class="btn ghost" onclick="OrderDocs.closeModal()">' + esc(tt('common.cancel', 'Anulează')) + '</button>' +
@@ -265,6 +267,60 @@ window.OrderDocs = (function () {
       r.onerror = function () { rej(new Error('read')); };
       r.readAsDataURL(f);
     });
+  }
+
+  // ── Számla-kiolvasás AI NÉLKÜL (PDF szövegréteg) + megrendelő-egyezés ─────────
+  function fixMime(f, data) {
+    if (data.indexOf('data:;base64,') === 0 || data.indexOf('data:application/octet-stream') === 0) {
+      var ext = (f.name.split('.').pop() || '').toLowerCase();
+      var mt = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', heic: 'image/heic', xml: 'application/xml', txt: 'text/plain', csv: 'text/csv', zip: 'application/zip' }[ext];
+      if (mt) data = 'data:' + mt + ';base64,' + data.split(',')[1];
+    }
+    return data;
+  }
+  function isPdf(f) { return /pdf/i.test(f.type || '') || /\.pdf$/i.test(f.name || ''); }
+  function checkHtml(r) {
+    var box = function (cls, txt) {
+      var c = { ok: '#ecfdf5;color:#065f46;border-color:#6ee7b7', warn: '#fffbeb;color:#92400e;border-color:#fcd34d', info: '#eff6ff;color:#1e40af;border-color:#93c5fd' }[cls];
+      return '<div style="margin:0 0 12px;padding:9px 12px;border:1.5px solid;border-radius:10px;font-size:13px;background:' + c + '">' + txt + '</div>';
+    };
+    if (!r || !r.ok) return '';
+    if (r.supported === false) return box('info', esc(tt('odoc.chk.notPdf', 'Doar PDF-ul generat de programul de facturare poate fi citit automat — completează câmpurile manual.')));
+    if (r.scanned) return box('info', esc(tt('odoc.chk.scanned', 'PDF scanat/fotografiat: nu conține text — completează câmpurile manual.')));
+    var h = '';
+    if (r.invoice_no || r.date) h += '🧾 <b>' + esc(r.invoice_no || '—') + '</b>' + (r.date ? ' · ' + esc(r.date.split('-').reverse().join('.')) : '');
+    else h += esc(tt('odoc.chk.noData', 'Nu am găsit nr. și data facturii în PDF.'));
+    var f = r.found || {}, e = r.expected || {};
+    var who = esc([f.name, f.cui ? 'CUI ' + f.cui : ''].filter(Boolean).join(' · '));
+    if (r.match === 'client') return box('ok', h + '<br>✅ ' + esc(tt('odoc.chk.client', 'Clientul de pe factură corespunde cursei: {n}', { n: e.name || f.name || '' })));
+    if (r.match === 'carrier') return box('ok', h + '<br>✅ ' + esc(tt('odoc.chk.carrier', 'Factură de la subcontractorul cursei: {n}', { n: e.carrier || '' })));
+    if (r.match === 'mismatch') return box('warn', h + '<br>⚠️ ' + esc(tt('odoc.chk.mismatch', 'Atenție, pe factură apare:')) +
+      ' <b>' + who + '</b> — ' + esc(tt('odoc.chk.expected', 'clientul cursei')) + ': <b>' + esc(e.name || '—') + '</b>');
+    if (!_pick) return box('info', h + '<br>' + esc(tt('odoc.chk.pickOrder', 'Alege cursa pentru verificarea clientului.')));
+    return box('info', h);
+  }
+  var _autoFilled = { ref: '', date: '' }, _inspSeq = 0;
+  function _inspect() {
+    var el = document.getElementById('odocCheck'); if (!el) return;
+    var inp = document.getElementById('odocFiles');
+    var files = Array.prototype.slice.call((inp && inp.files) || []);
+    var f = files.filter(isPdf)[0] || files[0];
+    if (!f) { el.innerHTML = ''; return; }
+    if (!isPdf(f)) { el.innerHTML = checkHtml({ ok: true, supported: false }); return; }
+    if (f.size > 15 * 1024 * 1024) { el.innerHTML = ''; return; }
+    var seq = ++_inspSeq;
+    el.innerHTML = '<div class="odoc-sub" style="margin-bottom:10px">⏳ ' + esc(tt('odoc.chk.reading', 'Citesc factura…')) + '</div>';
+    readFile(f).then(function (data) {
+      return gas('orderDocInspect', [{ data: fixMime(f, data), order_id: _pick ? _pick.id : null }]);
+    }).then(function (r) {
+      if (seq !== _inspSeq || !document.getElementById('odocCheck')) return;
+      el.innerHTML = checkHtml(r);
+      if (!r || !r.ok) return;
+      var ref = document.getElementById('odocRef'), dt = document.getElementById('odocDate'), ty = document.getElementById('odocType');
+      if (r.invoice_no && ref && (!ref.value || ref.value === _autoFilled.ref)) { ref.value = r.invoice_no; _autoFilled.ref = r.invoice_no; }
+      if (r.date && dt && (!dt.value || dt.value === today() || dt.value === _autoFilled.date)) { dt.value = r.date; _autoFilled.date = r.date; }
+      if (r.invoice_no && ty) ty.value = 'invoice';
+    }).catch(function () { if (seq === _inspSeq) el.innerHTML = ''; });
   }
 
   function doUpload() {
@@ -287,12 +343,18 @@ window.OrderDocs = (function () {
       var f = files[i++];
       prog.textContent = '⏳ ' + i + '/' + files.length + ' · ' + f.name;
       readFile(f).then(function (data) {
-        if (data.indexOf('data:;base64,') === 0 || data.indexOf('data:application/octet-stream') === 0) {
-          var ext = (f.name.split('.').pop() || '').toLowerCase();
-          var mt = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', heic: 'image/heic', xml: 'application/xml', txt: 'text/plain', csv: 'text/csv', zip: 'application/zip' }[ext];
-          if (mt) data = 'data:' + mt + ';base64,' + data.split(',')[1];
+        data = fixMime(f, data);
+        var m = Object.assign({}, meta);
+        // Több fájlnál minden PDF a SAJÁT számlaszámát/dátumát kapja (AI nélkül kiolvasva).
+        if (files.length > 1 && isPdf(f)) {
+          return gas('orderDocInspect', [{ data: data, order_id: orderId }]).then(function (r) {
+            if (r && r.ok && r.invoice_no) { m.ref_no = r.invoice_no; m.doc_type = 'invoice'; }
+            if (r && r.ok && r.date) m.doc_date = r.date;
+            if (r && r.match === 'mismatch') toast('⚠️ ' + f.name + ': ' + tt('odoc.chk.mismatchShort', 'clientul de pe factură nu corespunde cursei'), 'err');
+            return gas('orderDocAdd', [Object.assign({ order_id: orderId, file_name: f.name, data: data }, m)]);
+          }, function () { return gas('orderDocAdd', [Object.assign({ order_id: orderId, file_name: f.name, data: data }, m)]); });
         }
-        return gas('orderDocAdd', [Object.assign({ order_id: orderId, file_name: f.name, data: data }, meta)]);
+        return gas('orderDocAdd', [Object.assign({ order_id: orderId, file_name: f.name, data: data }, m)]);
       }).then(function (r) {
         if (r && r.ok) ok++;
         else toast(f.name + ': ' + ((r && r.err) || 'Eroare'), 'err');
@@ -326,6 +388,6 @@ window.OrderDocs = (function () {
   return {
     mount: mount, preset: preset, set: set, onQ: onQ, clearOrder: clearOrder, showForOrder: showForOrder,
     download: download, del: del, openUpload: openUpload, doUpload: doUpload, openEdit: openEdit, doEdit: doEdit,
-    closeModal: closeModal, _pickSearch: _pickSearch, _pickSet: _pickSet, _pickClear: _pickClear
+    closeModal: closeModal, _inspect: _inspect, _pickSearch: _pickSearch, _pickSet: _pickSet, _pickClear: _pickClear
   };
 })();

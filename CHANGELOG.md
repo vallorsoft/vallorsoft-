@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-10-08 — 🧾 Feltöltött számla: számlaszám + dátum kiolvasása AI NÉLKÜL + a megrendelővel való egyezés jelzése (PR #529)
+
+- **Kérés:** „Ha feltöltök egy számlát, a rendszer AI nélkül ki tudja venni a dátumot és a számlaszámot? A cégnevet hasonlítsa össze a megrendelővel, és ha nem egyezik, jelezze." (Két minta: e-Factura és sima FGO-elrendezés.)
+- **Új `lib/invoiceText.js`** — a PDF szövegrétegéből (meglévő `services/pdf-extract`) determinisztikus mintákkal: számlaszám (`Factura VLR 01079` / `FACTURA VLR 01079` / `Seria X nr. N` / külön sorban álló `VLR 01079`), kiállítás dátuma (`Data emitere`, tartalék: első érvényes dátum), CUI-k, vevő/szállító neve (`Client`/`Furnizor` fejléc után). A lábléc „Factura circula fara…" mondatát nem veszi számlaszámnak.
+- **Új `orderDocInspect`** (`handlers/orderDocs.js`, Admin/Manager): csak olvas, nem ment; a saját cég CUI-ját kiveszi, a vevőt a fuvar megrendelőjével veti össze (CUI, majd név jogi forma/ékezet nélkül) — ✅ egyezik / ✅ az alvállalkozó számlája / ⚠️ eltér (mi szerepel a számlán és ki a fuvar megrendelője). A feltöltést nem tiltja.
+- **Feltöltő ablak:** fájl kiválasztásakor kiolvas, kitölti a számlaszámot + dátumot + „Számla" típust, és megmutatja az egyezést; fuvarváltáskor újraellenőriz; több PDF-nél mindegyik a saját számát/dátumát kapja. Fotó/szkennelt PDF → jelzi, hogy kézzel kell kitölteni.
+- **Az AI ehhez nem fér hozzá**; a kifejezett AI-kiolvasók (megrendelő, bon, UIT) változatlanok. i18n 10 új `odoc.chk.*` (RO+HU), cache-bust `?v=20261008inv`. **Teszt:** +15 eset (a két valós elrendezés Chromiumban generált PDF-jén is ellenőrizve); valós Postgres 16-tal **1657 Jest zöld**.
+
 ## 2026-10-08 — 🔒 Az AI egyáltalán nem fér hozzá a dokumentumokhoz (PR #528)
 
 - **Kérés:** „Az AI ne férjen hozzá a dokumentumokhoz egyáltalán."

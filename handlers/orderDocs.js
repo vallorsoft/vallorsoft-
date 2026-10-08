@@ -8,6 +8,7 @@
 
 const pool = require('../db');
 const audit = require('../lib/audit');
+const { parseInvoiceText, normName, digits } = require('../lib/invoiceText');
 
 const handlers = {};
 const _am = (u) => u && ['Admin', 'Manager'].includes(u.pozicio);
@@ -171,6 +172,58 @@ handlers.orderDocDelete = async function (req, res, args) {
     return res.json({ result: { ok: true } });
   } catch (err) {
     console.error('orderDocDelete hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// orderDocInspect({ data, order_id? }) — számla-adatok kiolvasása AI NÉLKÜL a PDF
+// szövegrétegéből (lib/invoiceText): számlaszám, kiállítás dátuma, vevő CUI/név; ha van
+// fuvar, összeveti a fuvar megrendelőjével (és az alvállalkozóval). Csak olvas, nem ment.
+handlers.orderDocInspect = async function (req, res, args) {
+  try {
+    const u = req.session.user;
+    if (!_am(u)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const a = (args && args[0]) || {};
+    const data = typeof a.data === 'string' ? a.data : '';
+    if (!/^data:application\/pdf;base64,/i.test(data)) return res.json({ result: { ok: true, supported: false } });
+    if (data.length > MAX_B64) return res.json({ result: { ok: false, err: 'Fișierul este prea mare (max. 15 MB).' } });
+    const buf = Buffer.from(data.slice(data.indexOf(',') + 1), 'base64');
+    const { text, scanned } = await require('../services/pdf-extract').extractText(buf);
+    if (scanned) return res.json({ result: { ok: true, supported: true, scanned: true } });
+    const inv = parseInvoiceText(text);
+    const out = { ok: true, supported: true, scanned: false, invoice_no: inv.invoice_no, date: inv.date,
+      client_name: inv.client_name, cuis: inv.cuis, match: 'unknown', expected: null, found: null };
+
+    const cid = u.company_id;
+    let own = '';
+    try { const c = await pool.query('SELECT cui FROM companies WHERE id = $1', [cid]); own = digits(c.rows[0] && c.rows[0].cui); } catch (_) {}
+    const others = inv.cuis.filter((x) => x !== own);
+    out.found = { name: inv.client_name, cui: others[0] || null };
+
+    const oid = _clip(a.order_id, 40);
+    if (oid) {
+      const o = await pool.query(
+        `SELECT o.client, cl.denumire, cl.cui_cif, ca.nev AS carrier_nev, ca.cui AS carrier_cui
+           FROM orders o
+           LEFT JOIN clients cl ON cl.id = o.client_id AND cl.company_id = o.company_id
+           LEFT JOIN carriers ca ON ca.id = o.carrier_id AND ca.company_id = o.company_id
+          WHERE o.id = $1 AND o.company_id = $2`, [oid, cid]);
+      if (!o.rows.length) return res.json({ result: { ok: false, err: 'Comanda nu a fost găsită.' } });
+      const r = o.rows[0];
+      const expName = r.denumire || r.client || '';
+      const expCui = digits(r.cui_cif);
+      out.expected = { name: expName || null, cui: expCui || null };
+      const nt = normName(text);
+      const nameIn = (n) => { const k = normName(n); return k.length >= 3 && (` ${nt} `).includes(` ${k} `); };
+      if (expCui && inv.cuis.includes(expCui)) out.match = 'client';
+      else if (r.carrier_cui && inv.cuis.includes(digits(r.carrier_cui))) { out.match = 'carrier'; out.expected.carrier = r.carrier_nev; }
+      else if (expName && nameIn(expName)) out.match = 'client';
+      else if (r.carrier_nev && nameIn(r.carrier_nev)) { out.match = 'carrier'; out.expected.carrier = r.carrier_nev; }
+      else if (others.length || inv.client_name) out.match = 'mismatch';
+    }
+    return res.json({ result: out });
+  } catch (err) {
+    console.error('orderDocInspect hiba:', err);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 };
