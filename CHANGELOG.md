@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-08 — 💬 Chat: „és kifizetve" a beszélgetésben lévő fuvarra vonatkozik (PR #532)
+
+- `lib/chatOps.js` új `detectFocusFollowUp`: fuvarszám nélküli rövid folytatás („és kifizetve", „a számla lett kifizetve", „s-a plătit", „postáztuk", „számlaszám FCT-1") → az előzmény utolsó teljes fuvarszámára ✅-megerősítő kártya (fizetés: `markOrderPayment`, post-delivery: `setOrderPostDelivery`), `focus:true`. Aktív új-fuvar vázlat mellett is ide jön, nem az AI-hoz (eddig: „nincs ilyen mező" + újra feljött a „Ki a megrendelő?" kérdés). Fókusz-fuvar nélkül nem talál ki fuvart.
+- Teszt: +5 eset (`chatDocUpload.test.js`); 1670 Jest zöld.
+
 ## 2026-10-08 — 💬 Chat: egy meglévő fuvarról lehet beszélgetni (fókusz-fuvar) (PR #531)
 - **Hiba (képernyőkép):** a dokumentum-feltöltő kártya után a „ehhez a fuvarhoz egy megbízást hozzáadunk", „hozd elő ehhez a fuvarhoz a dokumentumokat és adatait", „A 47es" üzenetek az AI-hoz mentek, ami új fuvar-vázlatnak vette őket (hamisan „hozzáadjuk", a „47"-et referenciaként beírta), és a vázlat kérdései („Ki a megrendelő?") ott maradtak.
 - **`lib/chatOps.js`:** új `focusOrder` — a szövegbeli fuvarszám, vagy utalásnál („ehhez / ennek a fuvarnak / acest transport") az előzmény legutóbbi teljes fuvarszáma (cégre szűrve). A dokumentum-feltöltés ezt használja (megbízás → `order` típus, „hozaadunk" elírás is). Új `detectOrderView`: „hozd elő / mutasd / adatai / dokumentumai" vagy csak egy rövid fuvarszám → fuvar-adatlap kártya (státusz, ügyfél, fel-/lerakás, sofőr, díj pénzügyi joggal) + a fuvar dokumentumai ⬇️ letöltéssel + 📎 feltöltés + 🔎 teljes adatlap. A teljes fuvarszám üres vázlatnál továbbra is a szerkesztésre tölti be a fuvart (PR #508). A számlaszám-beírás nem fut feltöltésre.
