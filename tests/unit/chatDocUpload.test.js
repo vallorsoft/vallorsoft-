@@ -169,3 +169,36 @@ describe('chat: „kifizetetlen" kérdés = lekérdezés, nem fizetés-rögzít�
     expect(co.pdOps('a szeptemberi kifizetetlen fuvarokat postáztuk', new Date('2026-10-08'), true).payment_status_ext).toBeUndefined();
   });
 });
+
+describe('chat: bármilyen kérdés egy fuvarról (fizetve / postázva / hiányzó dokumentum)', () => {
+  const ORDER = { id: 'X1', fuvar_no: 'CMD-2026-0047', client: 'VESNA GC SRL', status: 'Finalizat', pret: 900, paid_amount: 0 };
+  beforeEach(() => {
+    pool.query.mockReset();
+    pool.query.mockImplementation(async (sql, p) => {
+      if (/to_jsonb\(o\)->>'invoice_no'/.test(sql)) { expect(p).toEqual(['X1', 7]); return { rows: [{ status: 'Finalizat', pret: 900, paid_amount: 0, postal_sent_at: '2026-10-03', invoice_no: 'FCT-12', finalized_at: '2026-10-01' }] }; }
+      if (/FROM orders o WHERE o.id = \$1/.test(sql)) return { rows: [ORDER] };
+      if (/FROM orders/.test(sql)) return { rows: [{ id: 'X1', fuvar_no: 'CMD-2026-0047' }] };
+      if (/order_documents/.test(sql)) return { rows: [{ id: 5, doc_type: 'invoice', file_name: 'f.pdf' }] };
+      return { rows: [] };
+    });
+  });
+
+  test('„a CMD-2026-0047 ki van fizetve?" → válasz, NEM fizetés-kártya', async () => {
+    const r = await co.answer(req, 'A CMD-2026-0047 ki van fizetve?', [], 'hu', new Date('2026-10-08T10:00:00'), {});
+    expect(r.kind).toBe('order_view');
+    expect(r.action).toBeUndefined();
+    expect(r.reply).toMatch(/Kifizetve: ❌ nem/);
+  });
+
+  test('fókusz-fuvar: „Milyen dokumentum hiányzik?" → hiánylista', async () => {
+    const r = await co.answer(req, 'Milyen dokumentum hiányzik?', ['🚚 #CMD-2026-0047 — Fuvar'], 'hu', new Date('2026-10-08T10:00:00'), { draftActive: true });
+    expect(r.kind).toBe('order_view');
+    expect(r.focus).toBe(true);
+    expect(r.reply).toMatch(/Hiányzik: Megbízás, CMR/);
+  });
+
+  test('„Postázva van?" → postázás dátummal', async () => {
+    const r = await co.answer(req, 'Postázva van?', ['🚚 #CMD-2026-0047 — Fuvar'], 'hu', new Date('2026-10-08T10:00:00'), { draftActive: true });
+    expect(r.reply).toMatch(/Postázva: ✅ igen/);
+  });
+});

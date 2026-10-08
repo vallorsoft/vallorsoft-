@@ -14,6 +14,12 @@
 
 ---
 
+## 2026-10-08 — 💬 Chat: bármit lehet kérdezni egy fuvarról (fizetve? postázva? milyen dokumentum hiányzik?) (PR #535)
+
+- `lib/chatOps.js` `detectOrderView` kérdés-ág + `orderTopics` + `orderTracking`: egy fuvarról (fuvarszám, „ennek a", vagy az előzmény fókusz-fuvarja) feltett kérdésre közvetlen válasz + kártya „📋 Dokumentum-nyomkövetés" blokkal: lezárva / számla (számlaszám vagy kiállított számla) / postázva / postán visszaérkezett / kifizetve (részben + hátralék pénzügyi joggal) / UIT, és **hiányzó dokumentumok** (megbízás, CMR/POD, számla, UIT). Minden lekérdezés `company_id`-szűrt, paraméteres, opcionális oszlopok `to_jsonb` mintával.
+- Kérdés sosem írás: `detectAction` felszólító ige nélküli kérdésre (`?`/kérdőszó) nem ad műveleti kártyát („a 0047 ki van fizetve?" → válasz, nem fizetés-rögzítés). Több fuvarra vonatkozó kérdés („hány fuvar kifizetetlen?") marad a kintlévőség-ágon.
+- Teszt: +3 eset + valós Postgres-en ellenőrizve; 1680 Jest zöld.
+
 ## 2026-10-08 — 💬 Chat: „kifizetetlen fuvarok" kérdés = lista, nem fizetés-rögzítés (PR #534)
 
 - `lib/chatOps.js` `NEG_PAY_RE`/`LISTQ_RE`: a „kifizetetlen / nem fizették / neplătit" és a kérdő/listázó üzenet („hány…?", „mutasd") többé NEM indít fizetés-műveletet (`detectAction`, `detectFocusFollowUp`, a tömeges `pdOps` sem jelöl fizetettnek) — eddig „Fizetést csak lezárt fuvarra lehet rögzíteni" jött.
