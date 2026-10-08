@@ -7250,9 +7250,9 @@ function clearCompanyWhatsappNumber(){
 }
 
 // ============================================================
-// 🎓 AI bon-szkennelés kártya (Fuvarlevelek pane, Admin/Manager)
+// 🎓 AI bon-szkennelés kártya (🧠 Tanult adatok pane, Admin/Manager)
 // ------------------------------------------------------------
-// - BE/KI kapcsoló a saját cégére (a Menetleveleknél a helyén).
+// - BE/KI kapcsoló a saját cégére (Adminisztráció → Tanult adatok).
 // - „Betanult minták" lista: melyik láncot (MOL/OMV/Kaufland stb.)
 //   ismeri már a rendszer, mikor tanulta utoljára, mennyi bont látott.
 // - 🗑 gomb: rossz mintát eldobhat, a Gemini legközelebb újratanulja.
@@ -7358,6 +7358,76 @@ function deleteBonScanSample(id) {
     if (!r || !r.ok) { alert((r && r.err) || 'Eroare'); return; }
     if (typeof toast === 'function') toast(t('bscan.deleted'), 'ok');
     loadBonScanCard();
+  });
+}
+
+// ============================================================
+// 🧠 Tanult adatok (Adminisztráció) — megrendelés-kiolvasó minták +
+// 💬 AI-chat memória egy helyen, csoportonként lenyitható táblákkal.
+// A bon-scan kártya (#bonScanCard) fölötte, a meglévő függvényekkel.
+// ============================================================
+var _ldOpen = {};
+function loadLearnedData() {
+  var box = document.getElementById('learnedDataBox');
+  if (!box) return;
+  gas('learnedDataList').then(function (r) {
+    if (!r || !r.ok) { box.innerHTML = '<div class="glass" style="padding:22px;color:var(--muted);">' + esc((r && r.err) || t('common.error')) + '</div>'; return; }
+    var groups = [{ key: 'order_scan', title: t('ld.orderScan'), rows: (r.orderScan || []).map(function (x) {
+      return { id: x.id, key: x.label, val: x.summary, hits: x.count, upd: x.updated_at };
+    }) }];
+    (r.kinds || []).forEach(function (k) {
+      groups.push({ key: k, mem: true, title: t('ld.k.' + k), rows: (r.memory || []).filter(function (m) { return m.kind === k; }).map(function (m) {
+        return { id: m.id, key: m.key, val: m.summary, hits: m.hits, upd: m.updated_at };
+      }) });
+    });
+    var html = '<div class="glass" style="padding:22px;">'
+      + '<h2 class="h-title" style="margin-top:0;">' + esc(t('ld.title')) + '</h2>'
+      + '<p style="color:var(--muted);font-size:13px;margin:0 0 14px;">' + esc(t('ld.hint')) + '</p>';
+    groups.forEach(function (g) {
+      var open = !!_ldOpen[g.key];
+      html += '<div style="border-top:1px solid var(--border);padding:10px 0;">'
+        + '<div style="display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="ldToggle(\'' + g.key + '\')">'
+        +   '<span style="width:14px;">' + (open ? '▾' : '▸') + '</span>'
+        +   '<span style="font-weight:700;color:var(--text);flex:1;">' + esc(g.title) + '</span>'
+        +   '<span class="badge info">' + g.rows.length + '</span>'
+        +   (g.mem && g.rows.length ? '<button class="btn ghost" style="padding:5px 10px;font-size:12px;" onclick="event.stopPropagation();ldClearKind(\'' + g.key + '\')">🗑 ' + esc(t('ld.clearKind')) + '</button>' : '')
+        + '</div>';
+      if (open) {
+        if (!g.rows.length) html += '<div style="color:var(--muted);font-size:13px;padding:8px 24px;">' + esc(t('ld.empty')) + '</div>';
+        else {
+          html += '<div style="overflow-x:auto;margin-top:8px;"><table class="table" style="width:100%;font-size:13px;"><thead><tr>'
+            + '<th>' + esc(t('ld.colKey')) + '</th><th>' + esc(t('ld.colValue')) + '</th>'
+            + '<th style="text-align:center;width:70px;">' + esc(t('ld.colHits')) + '</th><th>' + esc(t('ld.colUpdated')) + '</th><th style="width:50px;"></th>'
+            + '</tr></thead><tbody>';
+          g.rows.forEach(function (x) {
+            var src = g.mem ? 'memory' : 'order_scan';
+            html += '<tr><td style="font-weight:600;">' + esc(x.key || '—') + '</td>'
+              + '<td style="color:var(--muted);">' + esc(x.val || '') + '</td>'
+              + '<td style="text-align:center;">' + (x.hits || 0) + '</td>'
+              + '<td style="color:var(--muted);font-size:12px;">' + esc(x.upd ? new Date(x.upd).toLocaleDateString() : '') + '</td>'
+              + '<td style="text-align:right;"><button class="btn ghost" style="padding:6px 10px;font-size:12px;" onclick="ldDelete(\'' + src + '\',' + Number(x.id) + ')">🗑</button></td></tr>';
+          });
+          html += '</tbody></table></div>';
+        }
+      }
+      html += '</div>';
+    });
+    box.innerHTML = html + '</div>';
+  }).catch(function () { box.innerHTML = '<div class="glass" style="padding:22px;color:var(--muted);">' + esc(t('common.error')) + '</div>'; });
+}
+function ldToggle(k) { _ldOpen[k] = !_ldOpen[k]; loadLearnedData(); }
+function ldDelete(source, id) {
+  if (!confirm(t('ld.confirmDelete'))) return;
+  gas('learnedDataDelete', [{ source: source, id: id }]).then(function (r) {
+    if (!r || !r.ok) { toast((r && r.err) || t('common.error'), 'err'); return; }
+    toast(t('ld.deleted'), 'ok'); loadLearnedData();
+  });
+}
+function ldClearKind(kind) {
+  if (!confirm(t('ld.confirmClear'))) return;
+  gas('learnedDataDelete', [{ source: 'memory', kind: kind }]).then(function (r) {
+    if (!r || !r.ok) { toast((r && r.err) || t('common.error'), 'err'); return; }
+    toast(t('ld.deleted'), 'ok'); loadLearnedData();
   });
 }
 

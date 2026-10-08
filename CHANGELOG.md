@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-10-08 — 🧠 Tanult adatok külön fülön (Adminisztráció) (PR #522)
+
+- **Kérés:** a tanult dolgok ne a Menetleveleknél (és máshol) látszódjanak állandóan, hanem az Adminisztrációban, külön fülön.
+- **Új „🧠 Tanult adatok" fül** (admin + manager, Adminisztráció csoport, `learned-data` funkció-kulcs). Ide költözött a Menetlevelek oldal tetejéről az **AI bon-szkennelés kártya** (BE/KI + betanult bon-minták) — a Menetlevelek oldalon már nem látszik.
+- Alatta csoportonként lenyitható táblák (alapból csukva): **megrendelés-kiolvasó ügyfél-minták** (`order_scan_samples`) + a **💬 AI-chat memória** minden fajtája (cég → cím, felrakó → megbízó, megbízó → áru, sofőr-becenév, levél-címzett, levél-kinézet, levél-sablon). Elemenként 🗑 törlés + csoport-törlés; a törölt mintát a rendszer újratanulja.
+- **`handlers/learnedData.js` (ÚJ)**: `learnedDataList` / `learnedDataDelete` — Admin/Manager, `company_id`-szűrt, paraméteres, `kind` fehérlista, törlés audit-naplózva (`learned.delete`), migráció-toleráns. Rövid összegzést ad, nem nyers JSON-t; a sofőr-becenévnél a sofőr NEVE látszik, nem az e-mailje.
+- 21 új i18n kulcs (RO+HU), cache-bust `?v=20261008learn`. Teszt: `tests/unit/learnedData.test.js` (+5); **1569 Jest zöld** valós Postgres 16-tal.
+
 ## 2026-10-07 — 💬 Levél-chat: sofőr / jármű ÖSSZES fuvarja (teljes időszak) + tanulás (kevesebb AI) (PR #520)
 
 - **Gyökér („Gondos Imre fuvarjait nem találom"):** az AI fuvar-adatkérésének NEM volt sofőr-szűrője, a szűrt kérés alapból csak 5 fuvart hozott, az AI-nak menő adat 9000 karakternél félbevágódott, a kártya max 10 volt, és a sofőr címzettként sem volt kereshető.

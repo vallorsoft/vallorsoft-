@@ -9,6 +9,10 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 36. lépés — 🧠 Tanult adatok fül: listázás + törlés (2026-10-08) ✅ KÉSZ
+- `handlers/learnedData.js`: csak Admin/Manager; minden SELECT/DELETE `company_id`-szűrt és paraméteres; csoport-törlés csak fehérlistás `kind`-dal, ismeretlen `source` elutasítva (teszttel védve). Idegen cég elemének törlése 0 sor → hiba.
+- Adat-minimalizálás: rövid összegzés megy a kliensbe, nem nyers JSON; a sofőr-becenévnél a saját cég sofőrjének neve, nem az e-mail. Törlés audit-naplózva (`learned.delete`).
+
 ### 35. lépés — Levél-chat: szűrt fuvar-lekérdezés + tanult sablon (2026-10-07) ✅ KÉSZ
 
 - A sofőr-név → e-mail feloldás és a fuvar-szűrés kizárólag a szerveren, `company_id`-szűrt, paraméteres SQL (`ANY($n)` tömbök, LIKE-escape). Az AI csak összesítőt + fuvar-tételeket kap — sofőr e-mail/telefon soha (teszt őrzi). A kliensről visszajövő `intent`/`query` fehérlistán újratisztítva (`mailIntent.sanitize`, `mailData.sanitizeQuery`). Lista-korlát 500, kártya 300.

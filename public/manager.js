@@ -34,7 +34,7 @@ function loadTab(name){
   if(name==='orders-deleted'){ if(typeof loadDeletedOrders==='function') loadDeletedOrders(); }
   if(name==='inbound' && window.InboundOrders) InboundOrders.mount('inboundBox');
   if(name==='client-requests' && window.ClientRequests) ClientRequests.mount('clientReqBox');
-    if(name==='received-fuv'){loadReceivedFuvarlevelek();loadDocSeries();loadBonScanCard();}
+    if(name==='received-fuv'){loadReceivedFuvarlevelek();loadDocSeries();}
     if(name==='driver-docs-pane') loadDriverUploadedDocs();
     if(name==='ecmr' && window.ECmr) ECmr.mount('ecmrBox');
     if(name==='doc-register' && window.DocRegister) DocRegister.mount('docRegisterBox');
@@ -52,6 +52,7 @@ function loadTab(name){
     if(name==='bnr-rate'){ if(typeof loadBnrRate==='function') loadBnrRate(); }
     if(name==='notifications'){ if(window.Notifications) Notifications.loadPage(); }
     if(name==='mail-log'){ if(typeof loadMailLog==='function') loadMailLog(); }
+  if(name==='learned-data'){ loadBonScanCard(); if(typeof loadLearnedData==='function') loadLearnedData(); }
     if(name==='email-templates' && window.EmailTemplates) EmailTemplates.mount('emailTemplatesBox');
     if(name==='orders-done'){ if(typeof loadOrdersDone==='function') loadOrdersDone(); }
     if(name==='active-fleet'){ if(typeof loadActiveFleet==='function') loadActiveFleet(); }
