@@ -27,7 +27,8 @@
   7. **🎤 Diktálás** — Web Speech API a beíró mező mellett (RO/HU a felület nyelvén; ha a böngésző nem tudja, a gomb nem jelenik meg).
 - **`handlers/orderChat.js`**: a `chatOps` a sofőr-kérdések előtt fut; új RPC-k `orderChatAction` (aláírt token végrehajtása) + `orderChatBrief`. Aktív vázlatnál a művelet csak a mostani üzenetben megadott fuvarszámra indul (a szerkesztés-folyamat érintetlen).
 - **Kliens** (`public/order-chat.js`): `act`/`actCancel`/`prefill`/`mic`, a felhasznált gombok letiltva maradnak; CSS `.och-act*`/`.och-mic`; 4 új i18n kulcs (RO+HU). Cache-bust `?v=20261008chatops`.
-- **Teszt:** új `tests/unit/chatOps.test.js` (+23), valós Postgres 16-on minden új lekérdezés lefutott hibátlanul. **1559 Jest zöld.**
+- **Adat-minimalizálás:** ami AI nélkül lett megválaszolva (sofőr- és cégszintű kérdés, művelet, napi összefoglaló), az a későbbi fuvar-/levél-vázlatnál sem kerül az AI-hoz — az AI csak a vázlathoz tartozó üzeneteket látja (`local` jelölés, szerveren szűrve).
+- **Teszt:** új `tests/unit/chatOps.test.js` (+24), valós Postgres 16-on minden új lekérdezés lefutott hibátlanul. **1560 Jest zöld.**
 
 ## 2026-10-08 — 💬 AI-chat: sofőr-kérdések AI nélkül — hol tart, tankolás, fogyasztás, vásárlás, határ, menetlevél, összesítő (PR #523)
 

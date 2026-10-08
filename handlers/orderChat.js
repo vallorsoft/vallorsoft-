@@ -558,7 +558,7 @@ handlers.orderChatTurn = async function (req, res, args) {
     const cid = req.session.user.company_id;
     const a = (args && args[0]) || {};
     const messages = (Array.isArray(a.messages) ? a.messages : []).slice(-MAX_MSGS)
-      .map((m) => ({ role: m && m.role === 'assistant' ? 'assistant' : 'user', text: String((m && m.text) || '').trim().slice(0, MAX_MSG_LEN) }))
+      .map((m) => ({ role: m && m.role === 'assistant' ? 'assistant' : 'user', text: String((m && m.text) || '').trim().slice(0, MAX_MSG_LEN), local: !!(m && m.local) }))
       .filter((m) => m.text);
     if (!messages.length || messages[messages.length - 1].role !== 'user') {
       return res.json({ result: { ok: false, err: 'Mesaj gol.' } });
@@ -593,8 +593,12 @@ handlers.orderChatTurn = async function (req, res, args) {
         return res.json({ result: { ok: true, info: true, reply: info.reply, info_html: info.html || '', questions: info.questions || [] } });
       }
     }
+    // ── Adat-minimalizálás: ami AI nélkül lett megválaszolva (sofőr-kérdés,
+    //    cégszintű kérdés, művelet, napi összefoglaló), az az AI-hoz SEM kerül —
+    //    az AI csak a fuvar-/levél-vázlathoz tartozó üzeneteket látja.
+    const aiMessages = messages.filter((m, i) => !m.local || i === messages.length - 1);
     if (rawDraft.mode === 'email' || (draftEmpty && mailChat.isEmailIntent(messages[messages.length - 1].text))) {
-      return await mailChat.mailTurn(req, res, a, messages, lang);
+      return await mailChat.mailTurn(req, res, a, aiMessages, lang);
     }
     let prev = sanitizeDraft(a.draft);
 
@@ -625,7 +629,7 @@ handlers.orderChatTurn = async function (req, res, args) {
     try {
       ai = await extractJson({
         systemPrompt: buildSystemPrompt(_today()),
-        parts: [{ text: buildConversation(messages, prev) }],
+        parts: [{ text: buildConversation(aiMessages, prev) }],
       });
     } catch (e) {
       const msg = e && e.code === 'NO_KEY' ? 'Serviciul AI nu este configurat.' : String((e && e.message) || 'Eroare AI').slice(0, 300);

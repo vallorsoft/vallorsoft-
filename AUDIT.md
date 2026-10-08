@@ -12,6 +12,7 @@
 ### 38. lépés — 💬 AI-chat műveletek + cégszintű kérdések (lib/chatOps) (2026-10-08) ✅ KÉSZ
 - **Írás csak megerősítéssel, aláírt tokennel:** a művelet-kártya HMAC-SHA256 (SESSION_SECRET) tokent hordoz (típus + paraméterek + `company_id` + user-id + 15 perces lejárat); `timingSafeEqual` ellenőrzés, más cég / más felhasználó / lejárt / módosított token → elutasítva (teszt őrzi). A kliens nem tud tetszőleges műveletet küldeni.
 - A végrehajtás a MEGLÉVŐ handlereken fut ugyanazzal a req-gel (`comUpdate`/`plannerAssign`/`markOrderPayment`/`quoteSave`) → azok szerep- és `company_id`-ellenőrzése érvényes; sofőr-kiosztásnál a sofőr cég-tagsága végrehajtáskor újra ellenőrizve. Audit `order.chat_action`.
+- **AI-hozzáférés minimalizálva:** a helyben (AI nélkül) megválaszolt kérdés + válasz, a művelet-visszajelzés és a napi összefoglaló `local` jelölést kap, és az `orderChatTurn` kiszűri, mielőtt bármi a Gemini-hez (fuvar- vagy levél-vázlat) kerülne — sofőr-, pénzügyi- és cégadat így nem jut az AI-hoz (teszt őrzi).
 - Pénzügyi adat (kintlévőség, ügyfél-bevétel) csak Admin / `stats_finance` jogú Managernek. Minden lekérdezés `company_id`-szűrt, paraméteres; a kártyák escape-elve, sofőr e-mail nem kerül ki; a WhatsApp-link csak számjegyes telefonszámból.
 
 ### 37. lépés — 💬 AI-chat sofőr-kérdések (lib/driverInfo) (2026-10-08) ✅ KÉSZ

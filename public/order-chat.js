@@ -273,7 +273,7 @@
     S.briefLoaded = true;
     window.gas('orderChatBrief', [{ lang: lang() }]).then(function (r) {
       if (!r || !r.ok || S.messages.length) return;
-      S.messages.push({ role: 'assistant', text: r.reply || '', html: r.info_html || '' });
+      S.messages.push({ role: 'assistant', text: r.reply || '', html: r.info_html || '', local: true });
       renderMsgs();
     }).catch(function () {});
   }
@@ -297,7 +297,7 @@
       S.busy = false;
       if (r && r.ok) {
         S.acted[tok] = 'done';
-        S.messages.push({ role: 'assistant', sys: true, text: r.reply || '✅' });
+        S.messages.push({ role: 'assistant', sys: true, text: r.reply || '✅', local: true });
         if (typeof window.loadOrders === 'function' && r.order_id) { try { window.loadOrders(); } catch (_) {} }
       } else {
         delete S.acted[tok];
@@ -315,7 +315,7 @@
     if (!tok || (S.acted || {})[tok]) return;
     S.acted = S.acted || {};
     S.acted[tok] = 'cancel';
-    S.messages.push({ role: 'assistant', sys: true, text: T('och.actCancelled') });
+    S.messages.push({ role: 'assistant', sys: true, text: T('och.actCancelled'), local: true });
     renderMsgs();
   }
   // Árajánlatból fuvar: a szöveg a beíró mezőbe kerül (a felhasználó küldi el).
@@ -363,14 +363,16 @@
     if (S._draftQs) { S.questions = S._draftQs; S._draftQs = null; }
     var _keepQs = S.questions; S.questions = [];
     renderAll();
-    var hist = S.messages.filter(function (m) { return !m.err; }).map(function (m) { return { role: m.role, text: m.text }; });
+    var hist = S.messages.filter(function (m) { return !m.err; }).map(function (m) { return { role: m.role, text: m.text, local: !!m.local }; });
     window.gas('orderChatTurn', [{ messages: hist, draft: S.draft, lang: lang() }]).then(function (r) {
       S.busy = false;
       if (!r || !r.ok) {
         S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
       } else if (r.info) {
         // Sofőr-kérdés válasza: a fuvar-vázlat / előnézet érintetlen marad.
-        S.messages.push({ role: 'assistant', text: r.reply || '', html: r.info_html || '' });
+        // AI nélkül megválaszolt kérdés: a kérdés és a válasz sem megy később az AI-hoz.
+        for (var li = S.messages.length - 1; li >= 0; li--) { if (S.messages[li].role === 'user') { S.messages[li].local = true; break; } }
+        S.messages.push({ role: 'assistant', text: r.reply || '', html: r.info_html || '', local: true });
         if (r.questions && r.questions.length) { S._draftQs = _keepQs; S.questions = r.questions; }
         else S.questions = _keepQs;
       } else {
