@@ -5342,3 +5342,16 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 #ochModal .och-info-tl .ic{ display:inline-block; width:20px; }
 #ochModal .och-info-tl .d{ color:var(--och-mut); font-variant-numeric:tabular-nums; }
 @media (max-width:860px){ #ochModal .och-msg.info{ max-width:100%; width:100%; } #ochModal .och-info-tiles{ grid-template-columns:repeat(2,1fr); } }
+
+/* ── 💬 Chat-műveletek (lib/chatOps.js): megerősítő kártya, hangbevitel ── */
+#ochModal .och-act{ border-left:4px solid var(--och-acc, #f6711e); }
+#ochModal .och-act-old{ opacity:.65; }
+#ochModal .och-info-btn.och-act-ok{ background:var(--och-acc, #f6711e); border-color:var(--och-acc, #f6711e); color:#fff; }
+#ochModal .och-info-btn.och-act-ok:hover{ filter:brightness(1.05); color:#fff; }
+#ochModal .och-info-btn:disabled, #ochModal .och-info-btn.och-act-used{ opacity:.45; cursor:default; pointer-events:none; }
+#ochModal .och-act-input{ flex:1 1 180px; min-width:140px; padding:6px 10px; border-radius:8px; border:1.5px solid var(--och-line); background:var(--och-bg); color:var(--och-text); font-size:13px; }
+#ochModal .och-msg-prev{ white-space:pre-wrap; padding:10px 12px; border-radius:10px; background:rgba(37,211,102,.10); border:1.5px solid rgba(37,211,102,.45); margin:6px 0; font-size:13.5px; }
+#ochModal .och-bad{ color:#dc2626; }
+#ochModal .och-mic{ min-height:34px; font-size:16px; }
+#ochModal .och-mic.rec{ background:#dc2626; color:#fff; border-color:#dc2626; animation:ochMicPulse 1.2s infinite; }
+@keyframes ochMicPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(220,38,38,.45); } 50%{ box-shadow:0 0 0 6px rgba(220,38,38,0); } }

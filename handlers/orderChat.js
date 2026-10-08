@@ -37,6 +37,7 @@ const orderHandlers = require('./orders');
 const { memGet, memPut } = require('../lib/chatMemory');
 const mailChat = require('./mailChat');
 const driverInfo = require('../lib/driverInfo');
+const chatOps = require('../lib/chatOps');
 
 const handlers = {};
 const FEATURE = 'ai-szoveges-fuvar';
@@ -557,7 +558,7 @@ handlers.orderChatTurn = async function (req, res, args) {
     const cid = req.session.user.company_id;
     const a = (args && args[0]) || {};
     const messages = (Array.isArray(a.messages) ? a.messages : []).slice(-MAX_MSGS)
-      .map((m) => ({ role: m && m.role === 'assistant' ? 'assistant' : 'user', text: String((m && m.text) || '').trim().slice(0, MAX_MSG_LEN) }))
+      .map((m) => ({ role: m && m.role === 'assistant' ? 'assistant' : 'user', text: String((m && m.text) || '').trim().slice(0, MAX_MSG_LEN), local: !!(m && m.local) }))
       .filter((m) => m.text);
     if (!messages.length || messages[messages.length - 1].role !== 'user') {
       return res.json({ result: { ok: false, err: 'Mesaj gol.' } });
@@ -573,6 +574,16 @@ handlers.orderChatTurn = async function (req, res, args) {
     //    (a kliens az `info:true` választ nem írja rá a vázlatra).
     const lastText = messages[messages.length - 1].text;
     if (rawDraft.mode !== 'email' && !mailChat.isEmailIntent(lastText)) {
+      // ── Műveletek / cégszintű kérdések / javaslat / ajánlat / üzenet
+      //    (lib/chatOps.js) — szintén AI nélkül; a művelet csak megerősítésre fut.
+      let op = null;
+      try {
+        op = await chatOps.answer(req, lastText, messages.slice(0, -1).map((m) => m.text).reverse(), lang, null, { draftActive: !draftEmpty });
+      } catch (e) { console.error('orderChat chatOps hiba:', e && e.message); }
+      if (op) {
+        try { await audit.fromReq(req, 'order.chat_info', 'chat', null, { kind: op.kind || op.action || 'op' }); } catch (_) {}
+        return res.json({ result: { ok: true, info: true, reply: op.reply, info_html: op.html || '', questions: op.questions || [] } });
+      }
       let info = null;
       try {
         info = await driverInfo.answer(cid, lastText, messages.slice(0, -1).map((m) => m.text).reverse(), lang);
@@ -582,8 +593,12 @@ handlers.orderChatTurn = async function (req, res, args) {
         return res.json({ result: { ok: true, info: true, reply: info.reply, info_html: info.html || '', questions: info.questions || [] } });
       }
     }
+    // ── Adat-minimalizálás: ami AI nélkül lett megválaszolva (sofőr-kérdés,
+    //    cégszintű kérdés, művelet, napi összefoglaló), az az AI-hoz SEM kerül —
+    //    az AI csak a fuvar-/levél-vázlathoz tartozó üzeneteket látja.
+    const aiMessages = messages.filter((m, i) => !m.local || i === messages.length - 1);
     if (rawDraft.mode === 'email' || (draftEmpty && mailChat.isEmailIntent(messages[messages.length - 1].text))) {
-      return await mailChat.mailTurn(req, res, a, messages, lang);
+      return await mailChat.mailTurn(req, res, a, aiMessages, lang);
     }
     let prev = sanitizeDraft(a.draft);
 
@@ -614,7 +629,7 @@ handlers.orderChatTurn = async function (req, res, args) {
     try {
       ai = await extractJson({
         systemPrompt: buildSystemPrompt(_today()),
-        parts: [{ text: buildConversation(messages, prev) }],
+        parts: [{ text: buildConversation(aiMessages, prev) }],
       });
     } catch (e) {
       const msg = e && e.code === 'NO_KEY' ? 'Serviciul AI nu este configurat.' : String((e && e.message) || 'Eroare AI').slice(0, 300);
@@ -663,6 +678,39 @@ handlers.orderChatTurn = async function (req, res, args) {
 };
 
 // ─── args[0]: { draft } → a fuvar mentése a MEGLÉVŐ comCreate-tel ───
+// ── Megerősített chat-művelet végrehajtása (aláírt token, lib/chatOps.js).
+//    A tényleges írás a meglévő handlerekben fut (comUpdate / plannerAssign /
+//    markOrderPayment / quoteSave) → szerep- és cég-ellenőrzés ott is.
+handlers.orderChatAction = async function (req, res, args) {
+  try {
+    const gateErr = await _gate(req);
+    if (gateErr) return res.json({ result: { ok: false, err: gateErr } });
+    const a = (args && args[0]) || {};
+    const lang = a.lang === 'hu' ? 'hu' : 'ro';
+    const extra = {};
+    if (a.client_name != null) extra.client_name = String(a.client_name).slice(0, 200);
+    const r = await chatOps.executeAction(req, String(a.token || ''), extra, lang);
+    return res.json({ result: r });
+  } catch (err) {
+    console.error('orderChatAction hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
+// ── Napi összefoglaló a chat megnyitásakor.
+handlers.orderChatBrief = async function (req, res, args) {
+  try {
+    const gateErr = await _gate(req);
+    if (gateErr) return res.json({ result: { ok: false, err: gateErr } });
+    const a = (args && args[0]) || {};
+    const b = await chatOps.brief(req, a.lang === 'hu' ? 'hu' : 'ro');
+    return res.json({ result: { ok: true, reply: b.reply, info_html: b.html } });
+  } catch (err) {
+    console.error('orderChatBrief hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 handlers.orderChatCreate = async function (req, res, args) {
   try {
     const gateErr = await _gate(req);

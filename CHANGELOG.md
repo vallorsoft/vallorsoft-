@@ -14,6 +14,22 @@
 
 ---
 
+## 2026-10-08 — 💬 AI-chat bővítés: műveletek megerősítéssel, cégszintű kérdések, kiosztási javaslat, árajánlat, WhatsApp-üzenet, napi összefoglaló, 🎤 diktálás (PR #524)
+
+- **Kérés:** „Csináld meg az összeset" — a chat 7 bővítése.
+- **`lib/chatOps.js` (ÚJ, AI nélkül, determinisztikus):**
+  1. **⚡ Műveletek megerősítéssel** — „rendeld Petőhöz a CMD-2026-0042-t", „B104VLR vigye a 0042-t", „jelöld fizetettnek a 0043-t", „állítsd lezártra…", „a 0042 felrakása holnapra csúszik", „a 0042 ára legyen 1350 EUR". A kártya megmutatja a régi → új értéket; csak ✅-re fut, a MEGLÉVŐ handlerekkel (`comUpdate` / `plannerAssign` / `markOrderPayment`). Sofőr-kiosztásnál a párosított vontató is kitöltődik, a státusz Disponibil → Alocat.
+  2. **Cégszintű kérdések** — ☀️ napi teendők (opsCenter + insights + ma esedékes fel-/lerakások + hiányzó menetlevél), 💰 ki tartozik (pénzügyi joghoz kötve), 🏢 ügyfél-helyzet (aktív fuvarok, 90 napos forgalom, tartozás), ⏰ lejáró dokumentumok (rendszámra is szűrhető), 🔧 esedékes szerviz.
+  3. **💡 Kiosztási javaslat** — „ki vihetné a 0050-et?" → a Visszfuvar-radar legjobb 3 kamionja (távolság, élő GPS, átfedés/túlsúly/FTL jelzés) egy-kattintásos kiosztó gombbal; ha nincs találat, a szabad sofőrök listája.
+  4. **💶 Árajánlat** — „mennyibe kerülne Kolozsvárról Budapestre 13 t?" (HU ragok, nyíl, „de la … la") → km + menetidő + útdíj + üzemanyag (a cég menetleveleinek átlagárából) + a cég korábbi fuvarjainak medián €/km-e → javasolt ár + árrés; 💾 mentés az Árajánlatok közé (`quoteSave`), ➡️ fuvar kiírása belőle.
+  5. **💬 Üzenet a sofőrnek** — „írd meg Petőnek, hogy…" → előnézet + WhatsApp-link előre kitöltött szöveggel (07… → 407…).
+  6. **☀️ Napi összefoglaló** a chat első megnyitásakor (`orderChatBrief`).
+  7. **🎤 Diktálás** — Web Speech API a beíró mező mellett (RO/HU a felület nyelvén; ha a böngésző nem tudja, a gomb nem jelenik meg).
+- **`handlers/orderChat.js`**: a `chatOps` a sofőr-kérdések előtt fut; új RPC-k `orderChatAction` (aláírt token végrehajtása) + `orderChatBrief`. Aktív vázlatnál a művelet csak a mostani üzenetben megadott fuvarszámra indul (a szerkesztés-folyamat érintetlen).
+- **Kliens** (`public/order-chat.js`): `act`/`actCancel`/`prefill`/`mic`, a felhasznált gombok letiltva maradnak; CSS `.och-act*`/`.och-mic`; 4 új i18n kulcs (RO+HU). Cache-bust `?v=20261008chatops`.
+- **Adat-minimalizálás:** ami AI nélkül lett megválaszolva (sofőr- és cégszintű kérdés, művelet, napi összefoglaló), az a későbbi fuvar-/levél-vázlatnál sem kerül az AI-hoz — az AI csak a vázlathoz tartozó üzeneteket látja (`local` jelölés, szerveren szűrve).
+- **Teszt:** új `tests/unit/chatOps.test.js` (+24), valós Postgres 16-on minden új lekérdezés lefutott hibátlanul. **1560 Jest zöld.**
+
 ## 2026-10-08 — 💬 AI-chat: sofőr-kérdések AI nélkül — hol tart, tankolás, fogyasztás, vásárlás, határ, menetlevél, összesítő (PR #523)
 
 - **Kérés:** a chatben („Peto hol tart a fuvarjával?") választ kapjunk, és mindent meg lehessen kérdezni, amit a sofőr csinál: mikor/hol/mennyit tankolt, fogyasztás adott időre stb.

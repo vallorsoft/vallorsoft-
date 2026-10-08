@@ -161,6 +161,20 @@ describe('orderChatTurn — a példa-fuvar', () => {
   });
 });
 
+describe('adat-minimalizálás', () => {
+  test('az AI nélkül megválaszolt (local) üzenetek nem kerülnek az AI-hoz', async () => {
+    mockExtract.mockResolvedValue({ json: { client: null, stops: [] }, model: 'm' });
+    await call('orderChatTurn', ADMIN, [{ messages: [
+      { role: 'user', text: 'Ki tartozik nekünk?', local: true },
+      { role: 'assistant', text: '💰 Kintlévőség: Bilka 1500 EUR', local: true },
+      { role: 'user', text: 'Holnap Brassóból Bicskére FTL' },
+    ] }]);
+    const conv = mockExtract.mock.calls[0][0].parts[0].text;
+    expect(conv).toMatch(/Bicskére/);
+    expect(conv).not.toMatch(/tartozik|Kintlévőség|Bilka 1500/);
+  });
+});
+
 describe('orderChatCreate', () => {
   const READY = Object.assign({}, AI_DRAFT, { client: 'VALLOR TEAM SRL', client_id: 55, driver_name: null, pret: 1500 });
 
@@ -214,7 +228,7 @@ describe('segédek', () => {
     expect(h._today(new Date('2026-10-07T22:30:00Z'))).toEqual({ ymd: '2026-10-08', weekday: 'Thursday' });
   });
   test('belső segédek nem RPC-k', () => {
-    expect(Object.keys(h).sort()).toEqual(['orderChatCreate', 'orderChatTurn']);
+    expect(Object.keys(h).sort()).toEqual(['orderChatAction', 'orderChatBrief', 'orderChatCreate', 'orderChatTurn']);
   });
 });
 
