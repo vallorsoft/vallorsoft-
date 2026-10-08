@@ -302,3 +302,79 @@ describe('checkInvoicePaidExternal', () => {
     expect(res.body.result.err).toMatch(/nu pot fi citite/i);
   });
 });
+
+// ═══ setOrderPostDeliveryBulk ════════════════════════════════
+describe('setOrderPostDeliveryBulk', () => {
+  beforeEach(() => {
+    pool.connect = jest.fn(async () => ({ query: pool.query, release: jest.fn() }));
+  });
+  const sqls = () => pool.query.mock.calls.map((c) => String(c[0]));
+
+  test('Sofer nem éri el', async () => {
+    setUser(SOFER);
+    const res = await call('setOrderPostDeliveryBulk', [{ order_ids: ['A'], invoice_no: 'F1' }]);
+    expect(res.body.result.ok).toBe(false);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  test('üres kijelölés / semmi módosítás → hiba', async () => {
+    setUser(ADMIN);
+    expect((await call('setOrderPostDeliveryBulk', [{ order_ids: [], invoice_no: 'F1' }])).body.result.ok).toBe(false);
+    expect((await call('setOrderPostDeliveryBulk', [{ order_ids: ['A'] }])).body.result.ok).toBe(false);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  test('érvénytelen fizetési státusz → hiba', async () => {
+    setUser(ADMIN);
+    const res = await call('setOrderPostDeliveryBulk', [{ order_ids: ['A'], payment_status_ext: 'hacked' }]);
+    expect(res.body.result.ok).toBe(false);
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  test('szeptemberi fuvarok: lezárás + számla + posta + fizetve + pénzügyi rendezés, cégre szűrve', async () => {
+    setUser(MANAGER);
+    pool.query
+      .mockResolvedValueOnce(rows([]))                                // BEGIN
+      .mockResolvedValueOnce(rows([{ id: 'A' }, { id: 'B' }]))        // saját fuvarok (C idegen)
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })               // finalize
+      .mockResolvedValueOnce({ rows: [], rowCount: 2 })               // post-delivery mezők
+      .mockResolvedValueOnce({ rows: [], rowCount: 2 })               // pénzügyi rendezés
+      .mockResolvedValueOnce(rows([]));                               // COMMIT
+    const res = await call('setOrderPostDeliveryBulk', [{
+      order_ids: ['A', 'B', 'C', 'A'], finalize: true, invoice_no: 'FCT-0900',
+      postal_sent_at: '2026-10-02', payment_status_ext: 'paid', payment_received_at: '2026-10-07', sync_finance: true,
+    }]);
+    expect(res.body.result).toMatchObject({ ok: true, count: 2, finalized: 1, finance_synced: 2, skipped: 1 });
+    const own = pool.query.mock.calls[1];
+    expect(String(own[0])).toMatch(/company_id = \$1 AND id = ANY\(\$2::text\[\]\) AND status <> 'Anulat'/);
+    expect(own[1]).toEqual([CID, ['A', 'B', 'C']]);
+    const s = sqls();
+    expect(s[2]).toMatch(/SET status = 'Finalizat'.*status IN \('Alocat','In Curs','Extern'\)/s);
+    expect(s[3]).toMatch(/invoice_no = \$1/);
+    expect(s[3]).toMatch(/payment_status_ext = \$\d/);
+    expect(pool.query.mock.calls[3][1]).toEqual(expect.arrayContaining(['FCT-0900', '2026-10-02', 'paid', '2026-10-07', CID, ['A', 'B']]));
+    expect(s[4]).toMatch(/payment_status = 'paid'.*status = 'Finalizat'/s);
+    expect(pool.query.mock.calls[4][1]).toEqual([CID, ['A', 'B'], '2026-10-07']);
+    expect(s[5]).toBe('COMMIT');
+  });
+
+  test('pénzügyi rendezés csak kérésre (sync_finance nélkül nincs payment_status írás)', async () => {
+    setUser(ADMIN);
+    pool.query
+      .mockResolvedValueOnce(rows([]))
+      .mockResolvedValueOnce(rows([{ id: 'A' }]))
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce(rows([]));
+    const res = await call('setOrderPostDeliveryBulk', [{ order_ids: ['A'], payment_status_ext: 'paid' }]);
+    expect(res.body.result.ok).toBe(true);
+    expect(sqls().some((q) => /payment_status = 'paid'/.test(q))).toBe(false);
+  });
+
+  test('csak idegen fuvar → hiba, ROLLBACK', async () => {
+    setUser(ADMIN);
+    pool.query.mockResolvedValueOnce(rows([])).mockResolvedValueOnce(rows([])).mockResolvedValueOnce(rows([]));
+    const res = await call('setOrderPostDeliveryBulk', [{ order_ids: ['X'], invoice_no: 'F' }]);
+    expect(res.body.result.ok).toBe(false);
+    expect(sqls()).toContain('ROLLBACK');
+  });
+});
