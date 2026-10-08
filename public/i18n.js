@@ -88,6 +88,7 @@
     'och.micTip': { hu: 'Diktálás (hangbevitel)', ro: 'Dictare (intrare vocală)' },
     'och.actCancelled': { hu: '✕ Művelet elvetve — nem változott semmi.', ro: '✕ Operațiune anulată — nu s-a modificat nimic.' },
     'och.needClient': { hu: 'Add meg az ügyfél nevét az árajánlathoz.', ro: 'Introdu numele clientului pentru ofertă.' },
+    'och.docOff': { hu: 'A dokumentum-feltöltés ezen a felületen nem érhető el (Dokumentumok → Fuvar-dokumentumok).', ro: 'Încărcarea documentelor nu este disponibilă aici (Documente → Documente curse).' },
     'och.infoHint': { hu: "Kérdezhetsz a sofőrökről is (AI nélkül, élő adatból): „Peto hol tart?”, „mikor és hol tankolt Imre szeptemberben?”, „B104VLR fogyasztása a múlt hónapban”, „mit vásárolt Peto?”, „határátlépései”, „menetlevelei”, „mit csinált a héten?”, „ki van úton?”.", ro: "Poți întreba și despre șoferi (fără AI, din date live): „unde e Ion?”, „când și unde a alimentat Ion în septembrie?”, „consumul B104VLR luna trecută”, „ce a cumpărat Ion?”, „frontiere”, „foi de parcurs”, „ce a făcut săptămâna asta?”, „cine e pe drum?”." },
     'och.mailPreview': { hu: "E-mail előnézet", ro: "Previzualizare e-mail" },
     'och.footerPrev': { hu: "Céges lábléc (az arculatból): logó + cégnév, CUI, Reg.Com., telefon, e-mail, cím", ro: "Subsol firmă (din identitate): logo + nume, CUI, Reg.Com., telefon, e-mail, adresă" },
