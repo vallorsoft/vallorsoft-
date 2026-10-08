@@ -9,6 +9,10 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 37. lépés — 💬 AI-chat sofőr-kérdések (lib/driverInfo) (2026-10-08) ✅ KÉSZ
+- Csak Admin/Manager + `ai-szoveges-fuvar` kapu; minden lekérdezés `company_id`-szűrt, paraméteres (teszt ellenőrzi; valós DB-n cég-izoláció verifikálva). A menetlevél-scope a közvetlen `company_id` horgony, régi sornál csak a cég felhasználói.
+- AI NÉLKÜL: az adat nem kerül az AI-hoz; a kártya szerveren, escape-elve renderelődik; sofőr e-mail/telefon nem jelenik meg. Gomb-id fehérlistás (`[A-Za-z0-9_-]`), térkép-link csak számokból. Audit `order.chat_info` csak metaadattal.
+
 ### 36. lépés — 🧠 Tanult adatok fül: listázás + törlés (2026-10-08) ✅ KÉSZ
 - `handlers/learnedData.js`: csak Admin/Manager; minden SELECT/DELETE `company_id`-szűrt és paraméteres; csoport-törlés csak fehérlistás `kind`-dal, ismeretlen `source` elutasítva (teszttel védve). Idegen cég elemének törlése 0 sor → hiba.
 - Adat-minimalizálás: rövid összegzés megy a kliensbe, nem nyers JSON; a sofőr-becenévnél a saját cég sofőrjének neve, nem az e-mail. Törlés audit-naplózva (`learned.delete`).
