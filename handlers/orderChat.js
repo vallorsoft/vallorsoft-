@@ -36,6 +36,7 @@ const audit = require('../lib/audit');
 const orderHandlers = require('./orders');
 const { memGet, memPut } = require('../lib/chatMemory');
 const mailChat = require('./mailChat');
+const driverInfo = require('../lib/driverInfo');
 
 const handlers = {};
 const FEATURE = 'ai-szoveges-fuvar';
@@ -567,6 +568,20 @@ handlers.orderChatTurn = async function (req, res, args) {
     //    e-mail módban lévő vázlat ott is marad (handlers/mailChat.js).
     const rawDraft = (a.draft && typeof a.draft === 'object') ? a.draft : {};
     const draftEmpty = !rawDraft.edit_order_id && !(Array.isArray(rawDraft.stops) && rawDraft.stops.some((s) => s && (s.loc || s.firma)));
+    // ── Sofőr-kérdés ág („Peto hol tart?", „mikor tankolt?", „fogyasztása"…):
+    //    AI NÉLKÜL, szerveren renderelt kártya; a vázlat érintetlen marad
+    //    (a kliens az `info:true` választ nem írja rá a vázlatra).
+    const lastText = messages[messages.length - 1].text;
+    if (rawDraft.mode !== 'email' && !mailChat.isEmailIntent(lastText)) {
+      let info = null;
+      try {
+        info = await driverInfo.answer(cid, lastText, messages.slice(0, -1).map((m) => m.text).reverse(), lang);
+      } catch (e) { console.error('orderChat sofőr-kérdés hiba:', e && e.message); }
+      if (info) {
+        try { await audit.fromReq(req, 'order.chat_info', 'driver', null, { topics: info.topics, entity: (info.meta && info.meta.entity) || null }); } catch (_) {}
+        return res.json({ result: { ok: true, info: true, reply: info.reply, info_html: info.html || '', questions: info.questions || [] } });
+      }
+    }
     if (rawDraft.mode === 'email' || (draftEmpty && mailChat.isEmailIntent(messages[messages.length - 1].text))) {
       return await mailChat.mailTurn(req, res, a, messages, lang);
     }

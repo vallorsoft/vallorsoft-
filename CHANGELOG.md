@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-10-08 — 💬 AI-chat: sofőr-kérdések AI nélkül — hol tart, tankolás, fogyasztás, vásárlás, határ, menetlevél, összesítő (PR #523)
+
+- **Kérés:** a chatben („Peto hol tart a fuvarjával?") választ kapjunk, és mindent meg lehessen kérdezni, amit a sofőr csinál: mikor/hol/mennyit tankolt, fogyasztás adott időre stb.
+- **`lib/driverInfo.js` (ÚJ)** — determinisztikus felismerés (téma + alany + időszak), szerveren renderelt kártya, **az AI nem kap adatot**. Témák: 📍 hol tart (állomás-idővonal + élő GPS hely/sebesség/tank/légvonal a következő állomásig + 🗺️ térkép + külföldön/RO), ⛽ tankolások (tétel saját dátuma szerint, AdBlue külön, ☁️ menetlevélen kívüli bonok), 📉 fogyasztás (súlyozott átlag + menetlevelenként + névleges eltérés), 🛒 vásárlások kategóriánként, 🛂 határátlépések, 📄 menetlevelek/km, 📎 dokumentumok, 📊 összesítő + idővonal, 🚚 „ki van úton?" flotta-lista.
+- Alany: sofőrnév / tanult becenév / rendszám / fuvarszám; utókérdésnél az előzményből. Időszak: hét/nap/hónap/év/tartomány, alapból utolsó 30 nap. Több egyező név → választó gombok.
+- **`handlers/orderChat.js`**: a sofőr-kérdés ág az e-mail ág előtt fut (`info:true` válasz); a fuvar-vázlat/előnézet érintetlen. **`public/order-chat.js`**: kártya a buborékban, a vázlat-kérdések megmaradnak; 🔎 → `EntityDetail.openOrder`. `lib/mailIntent.js` segédek exportálva.
+- i18n `och.infoHint` (RO+HU), CSS `.och-info*`, cache-bust `?v=20261008drvinfo`. Teszt: `tests/unit/driverInfo.test.js` (+20) + `orderChat.test.js` (+3); **1535 Jest zöld**, valós Postgres 16-on ellenőrizve.
+
 ## 2026-10-08 — 🧠 Tanult adatok külön fülön (Adminisztráció) (PR #522)
 
 - **Kérés:** a tanult dolgok ne a Menetleveleknél (és máshol) látszódjanak állandóan, hanem az Adminisztrációban, külön fülön.
