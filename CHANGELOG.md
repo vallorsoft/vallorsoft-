@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-08 — 💬 Chat: dokumentum-feltöltés fuvarhoz + az összefoglaló csak kérésre (PR #530)
+- **Új chat-szándék (AI nélkül, `lib/chatOps.js` `detectDocUpload`)**: „számlát kell feltöltenem a legutóbb befejezett Vesna fuvarhoz" → a szerver megkeresi a fuvart (fuvarszám, vagy ügyfél + legutóbbi lezárt; különben az ügyfél 5 legutóbbi fuvarja), cégre szűrve, és kártyát ad „📎 Feltöltés ehhez" gombbal → a meglévő feltöltő ablak (`OrderDocs.openUpload`, a dokumentum-típus — számla/CMR/POD — előre beállítva; a számla-ellenőrzés AI nélkül fut). Eddig a kérés az AI-hoz ment, ami elutasította.
+- **A napi összefoglaló nem nyílik meg magától** a chat megnyitásakor — csak kérésre („összefoglaló", „mai összefoglaló", „mai teendők", „rezumat").
+- Teszt: `tests/unit/chatDocUpload.test.js` (+4). Cache-bust `?v=20261008chatdoc`.
+
 ## 2026-10-08 — 🧾 Feltöltött számla: számlaszám + dátum kiolvasása AI NÉLKÜL + a megrendelővel való egyezés jelzése (PR #529)
 
 - **Kérés:** „Ha feltöltök egy számlát, a rendszer AI nélkül ki tudja venni a dátumot és a számlaszámot? A cégnevet hasonlítsa össze a megrendelővel, és ha nem egyezik, jelezze." (Két minta: e-Factura és sima FGO-elrendezés.)

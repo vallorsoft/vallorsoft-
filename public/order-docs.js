@@ -236,7 +236,7 @@ window.OrderDocs = (function () {
     };
   }
 
-  function openUpload(orderId, label) {
+  function openUpload(orderId, label, docType) {
     ensureStyle(); closeModal();
     _pick = orderId ? { id: orderId, label: label || orderId } : null;
     if (orderId && !label) {
@@ -256,6 +256,7 @@ window.OrderDocs = (function () {
       '<div class="odoc-foot"><button class="btn ghost" onclick="OrderDocs.closeModal()">' + esc(tt('common.cancel', 'Anulează')) + '</button>' +
       '<button class="btn primary" id="odocGo" onclick="OrderDocs.doUpload()">' + esc(tt('odoc.save', '💾 Salvează')) + '</button></div></div>';
     document.body.appendChild(ov);
+    if (docType) { var ty = document.getElementById('odocType'); if (ty && ty.querySelector('option[value="' + docType + '"]')) ty.value = docType; }
     _renderPicked();
     if (!_pick) _pickSearch('');
   }

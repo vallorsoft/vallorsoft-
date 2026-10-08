@@ -111,7 +111,6 @@
     m.setAttribute('data-theme', (mc && mc.getAttribute('data-theme')) || 'light');
     m.classList.add('open');
     if (!S.messages.length) renderAll();
-    if (!S.messages.length && !S.briefLoaded) loadBrief();
     setTimeout(function () { var ta = $('ochInput'); if (ta) ta.focus(); }, 50);
   }
   function close() {
@@ -268,14 +267,16 @@
   function renderAll() { renderMsgs(); renderQs(); renderPrev(); renderTabBadge(); }
 
   // ─── Küldés ───
-  // ─── Napi összefoglaló (a chat első megnyitásakor) ───
-  function loadBrief() {
-    S.briefLoaded = true;
-    window.gas('orderChatBrief', [{ lang: lang() }]).then(function (r) {
-      if (!r || !r.ok || S.messages.length) return;
-      S.messages.push({ role: 'assistant', text: r.reply || '', html: r.info_html || '', local: true });
-      renderMsgs();
-    }).catch(function () {});
+  // A napi összefoglaló NEM nyílik meg magától — csak kérésre („mai teendők”, „napi összefoglaló”),
+  // a chatOps.detectCompany BRIEF_RE ágán.
+
+  // ─── 📎 Dokumentum feltöltése a chat-kártyáról → a meglévő feltöltő ablak ───
+  function docUp(btn) {
+    if (!window.OrderDocs || !window.OrderDocs.openUpload) {
+      S.messages.push({ role: 'assistant', text: '⚠️ ' + T('och.docOff'), err: true, local: true }); renderMsgs(); return;
+    }
+    var oid = btn && btn.getAttribute('data-oid');
+    window.OrderDocs.openUpload(oid || null, (btn && btn.getAttribute('data-lbl')) || null, (btn && btn.getAttribute('data-dt')) || null);
   }
 
   // ─── Megerősítést kérő chat-művelet (✅ / ✕ gomb a kártyán) ───
@@ -670,5 +671,5 @@
     b.style.display = visible ? '' : 'none';
   }
 
-  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, prefill: prefill, mic: mic, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
+  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, docUp: docUp, prefill: prefill, mic: mic, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
 })();
