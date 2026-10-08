@@ -214,7 +214,7 @@ describe('segédek', () => {
     expect(h._today(new Date('2026-10-07T22:30:00Z'))).toEqual({ ymd: '2026-10-08', weekday: 'Thursday' });
   });
   test('belső segédek nem RPC-k', () => {
-    expect(Object.keys(h).sort()).toEqual(['orderChatCreate', 'orderChatTurn']);
+    expect(Object.keys(h).sort()).toEqual(['orderChatAction', 'orderChatBrief', 'orderChatCreate', 'orderChatTurn']);
   });
 });
 

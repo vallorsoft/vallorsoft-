@@ -85,6 +85,7 @@
       +         '<textarea id="ochInput" rows="3" placeholder="' + esc(T(_isMobile() ? 'och.phMobile' : 'och.ph')) + '" autocomplete="off" data-lpignore="true" data-1p-ignore></textarea>'
       +         '<div class="och-send-col">'
       +           '<button class="btn primary" id="ochSend" type="button" onclick="OrderChat.send()">' + esc(T('och.send')) + '</button>'
+      +           (_speechOk() ? '<button class="btn ghost och-mic" id="ochMic" type="button" onclick="OrderChat.mic()" title="' + esc(T('och.micTip')) + '">🎤</button>' : '')
       +           '<div class="och-uit-btns">'
       +             '<button class="btn ghost och-uit-btn" type="button" onclick="OrderChat.uit(\'camera\')" title="' + esc(T('och.uitPhotoTip')) + '">📷 UIT</button>'
       +             '<button class="btn ghost och-uit-btn" type="button" onclick="OrderChat.uit(\'file\')" title="' + esc(T('och.uitFileTip')) + '">📎 UIT</button>'
@@ -110,6 +111,7 @@
     m.setAttribute('data-theme', (mc && mc.getAttribute('data-theme')) || 'light');
     m.classList.add('open');
     if (!S.messages.length) renderAll();
+    if (!S.messages.length && !S.briefLoaded) loadBrief();
     setTimeout(function () { var ta = $('ochInput'); if (ta) ta.focus(); }, 50);
   }
   function close() {
@@ -129,7 +131,7 @@
   function renderMsgs() {
     var box = $('ochMsgs');
     if (!box) return;
-    var h = '<div class="och-msg ai">' + esc(T('och.welcome')) + '<div class="och-mut" style="margin-top:6px;">✏️ ' + esc(T('och.editHint')) + '</div><div class="och-mut" style="margin-top:4px;">✉️ ' + esc(T('och.mailHint')) + '</div><div class="och-mut" style="margin-top:4px;">📍 ' + esc(T('och.infoHint')) + '</div></div>';
+    var h = '<div class="och-msg ai">' + esc(T('och.welcome')) + '<div class="och-mut" style="margin-top:6px;">✏️ ' + esc(T('och.editHint')) + '</div><div class="och-mut" style="margin-top:4px;">✉️ ' + esc(T('och.mailHint')) + '</div><div class="och-mut" style="margin-top:4px;">📍 ' + esc(T('och.infoHint')) + '</div><div class="och-mut" style="margin-top:4px;">⚡ ' + esc(T('och.opsHint')) + '</div></div>';
     S.messages.forEach(function (m) {
       // m.html: a szerver által renderelt (escape-elt) sofőr-információs kártya.
       h += '<div class="och-msg ' + (m.role === 'assistant' ? 'ai' : 'me') + (m.err ? ' err' : '') + (m.sys ? ' sys' : '') + (m.html ? ' info' : '') + '">'
@@ -147,7 +149,14 @@
         + '<div style="margin-top:8px;"><button class="btn primary" type="button" onclick="OrderChat.openList()">' + esc(T('och.openList')) + '</button></div></div>';
     }
     box.innerHTML = h;
+    _applyActed(box);
     box.scrollTop = box.scrollHeight;
+  }
+  function _applyActed(box) {
+    var acted = S.acted || {};
+    Array.prototype.forEach.call(box.querySelectorAll('[data-tok]'), function (b) {
+      if (acted[b.getAttribute('data-tok')]) { b.disabled = true; b.classList.add('och-act-used'); }
+    });
   }
 
   function renderQs() {
@@ -259,6 +268,90 @@
   function renderAll() { renderMsgs(); renderQs(); renderPrev(); renderTabBadge(); }
 
   // ─── Küldés ───
+  // ─── Napi összefoglaló (a chat első megnyitásakor) ───
+  function loadBrief() {
+    S.briefLoaded = true;
+    window.gas('orderChatBrief', [{ lang: lang() }]).then(function (r) {
+      if (!r || !r.ok || S.messages.length) return;
+      S.messages.push({ role: 'assistant', text: r.reply || '', html: r.info_html || '' });
+      renderMsgs();
+    }).catch(function () {});
+  }
+
+  // ─── Megerősítést kérő chat-művelet (✅ / ✕ gomb a kártyán) ───
+  function act(btn) {
+    var tok = btn && btn.getAttribute('data-tok');
+    if (!tok || S.busy || (S.acted || {})[tok]) return;
+    var args = { token: tok, lang: lang() };
+    var inpId = btn.getAttribute('data-input');
+    if (inpId) {
+      var inp = $(inpId);
+      var v = inp ? String(inp.value || '').trim() : '';
+      if (!v) { if (inp) inp.focus(); S.messages.push({ role: 'assistant', text: '⚠️ ' + T('och.needClient'), err: true }); renderMsgs(); return; }
+      args.client_name = v;
+    }
+    S.acted = S.acted || {};
+    S.acted[tok] = 'busy';
+    S.busy = true; renderMsgs();
+    window.gas('orderChatAction', [args]).then(function (r) {
+      S.busy = false;
+      if (r && r.ok) {
+        S.acted[tok] = 'done';
+        S.messages.push({ role: 'assistant', sys: true, text: r.reply || '✅' });
+        if (typeof window.loadOrders === 'function' && r.order_id) { try { window.loadOrders(); } catch (_) {} }
+      } else {
+        delete S.acted[tok];
+        S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
+      }
+      renderMsgs();
+    }).catch(function (e) {
+      S.busy = false; delete S.acted[tok];
+      S.messages.push({ role: 'assistant', text: '⚠️ ' + ((e && e.message) || T('och.err')), err: true });
+      renderMsgs();
+    });
+  }
+  function actCancel(btn) {
+    var tok = btn && btn.getAttribute('data-tok');
+    if (!tok || (S.acted || {})[tok]) return;
+    S.acted = S.acted || {};
+    S.acted[tok] = 'cancel';
+    S.messages.push({ role: 'assistant', sys: true, text: T('och.actCancelled') });
+    renderMsgs();
+  }
+  // Árajánlatból fuvar: a szöveg a beíró mezőbe kerül (a felhasználó küldi el).
+  function prefill(btn) {
+    var txt = btn && btn.getAttribute('data-text');
+    var ta = $('ochInput');
+    if (!txt || !ta) return;
+    ta.value = txt; ta.focus();
+    if (_isMobile()) tab('chat');
+  }
+
+  // ─── 🎤 Hangbevitel (Web Speech API; ha nincs, a gomb nem jelenik meg) ───
+  function _speechOk() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
+  var _rec = null;
+  function mic() {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    var btn = $('ochMic');
+    if (_rec) { try { _rec.stop(); } catch (_) {} return; }
+    var ta = $('ochInput');
+    var base = ta ? ta.value : '';
+    _rec = new SR();
+    _rec.lang = lang() === 'hu' ? 'hu-HU' : 'ro-RO';
+    _rec.interimResults = true;
+    _rec.continuous = false;
+    _rec.onresult = function (e) {
+      var txt = '';
+      for (var i = 0; i < e.results.length; i++) txt += e.results[i][0].transcript;
+      if (ta) ta.value = (base ? base.replace(/\s+$/, '') + ' ' : '') + txt;
+    };
+    _rec.onend = function () { _rec = null; if (btn) btn.classList.remove('rec'); if (ta) ta.focus(); };
+    _rec.onerror = function () { _rec = null; if (btn) btn.classList.remove('rec'); };
+    if (btn) btn.classList.add('rec');
+    try { _rec.start(); } catch (_) { _rec = null; if (btn) btn.classList.remove('rec'); }
+  }
+
   function send(textOverride) {
     if (S.busy || S.saved) return;
     var ta = $('ochInput');
@@ -575,5 +668,5 @@
     b.style.display = visible ? '' : 'none';
   }
 
-  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
+  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, prefill: prefill, mic: mic, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
 })();

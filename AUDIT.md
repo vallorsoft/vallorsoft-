@@ -9,6 +9,11 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 38. lépés — 💬 AI-chat műveletek + cégszintű kérdések (lib/chatOps) (2026-10-08) ✅ KÉSZ
+- **Írás csak megerősítéssel, aláírt tokennel:** a művelet-kártya HMAC-SHA256 (SESSION_SECRET) tokent hordoz (típus + paraméterek + `company_id` + user-id + 15 perces lejárat); `timingSafeEqual` ellenőrzés, más cég / más felhasználó / lejárt / módosított token → elutasítva (teszt őrzi). A kliens nem tud tetszőleges műveletet küldeni.
+- A végrehajtás a MEGLÉVŐ handlereken fut ugyanazzal a req-gel (`comUpdate`/`plannerAssign`/`markOrderPayment`/`quoteSave`) → azok szerep- és `company_id`-ellenőrzése érvényes; sofőr-kiosztásnál a sofőr cég-tagsága végrehajtáskor újra ellenőrizve. Audit `order.chat_action`.
+- Pénzügyi adat (kintlévőség, ügyfél-bevétel) csak Admin / `stats_finance` jogú Managernek. Minden lekérdezés `company_id`-szűrt, paraméteres; a kártyák escape-elve, sofőr e-mail nem kerül ki; a WhatsApp-link csak számjegyes telefonszámból.
+
 ### 37. lépés — 💬 AI-chat sofőr-kérdések (lib/driverInfo) (2026-10-08) ✅ KÉSZ
 - Csak Admin/Manager + `ai-szoveges-fuvar` kapu; minden lekérdezés `company_id`-szűrt, paraméteres (teszt ellenőrzi; valós DB-n cég-izoláció verifikálva). A menetlevél-scope a közvetlen `company_id` horgony, régi sornál csak a cég felhasználói.
 - AI NÉLKÜL: az adat nem kerül az AI-hoz; a kártya szerveren, escape-elve renderelődik; sofőr e-mail/telefon nem jelenik meg. Gomb-id fehérlistás (`[A-Za-z0-9_-]`), térkép-link csak számokból. Audit `order.chat_info` csak metaadattal.
