@@ -86,3 +86,34 @@ describe('chat: beszélgetés egy meglévő fuvarról (fókusz az előzményből
     expect(!r || (r.kind !== 'order_view' && r.kind !== 'doc_upload')).toBe(true);
   });
 });
+
+describe('chat: rövid folytatás a fókuszban lévő fuvarról („és kifizetve")', () => {
+  const ORDER = { id: 'X1', fuvar_no: 'CMD-2026-0047', client: 'VESNA GC SRL', status: 'Finalizat', pret: 900, paid_amount: 0 };
+  const hist = ['✅ Kész.', '📎 Dokumentum feltöltése fuvarhoz — #CMD-2026-0047'];
+  beforeEach(() => {
+    pool.query.mockReset();
+    pool.query.mockImplementation(async (sql, p) => {
+      if (/FROM orders o WHERE o.id = \$1/.test(sql)) { expect(p[1]).toBe(7); return { rows: [ORDER] }; }
+      if (/FROM orders/.test(sql)) return { rows: [{ id: 'X1', fuvar_no: 'CMD-2026-0047' }] };
+      return { rows: [] };
+    });
+  });
+
+  test.each(['Es kifizetve', 'A szamla lett kifizetve', 'și a fost plătită'])('%s → fizetés-kártya a fókusz-fuvarra, aktív vázlat mellett is', async (msg) => {
+    const r = await co.answer(req, msg, hist, 'hu', new Date('2026-10-08T10:00:00'), { draftActive: true });
+    expect(r.action).toBe('pay');
+    expect(r.focus).toBe(true);
+    expect(r.html).toContain('CMD-2026-0047');
+  });
+
+  test('„postáztuk" → post-delivery kártya a fókusz-fuvarra', async () => {
+    const r = await co.answer(req, 'postán elküldtük', hist, 'hu', new Date('2026-10-08T10:00:00'), { draftActive: true });
+    expect(r.action).toBe('pd');
+    expect(r.focus).toBe(true);
+  });
+
+  test('fókusz-fuvar nélkül nem talál ki fuvart', async () => {
+    const r = await co.answer(req, 'Es kifizetve', ['Szia'], 'hu', new Date('2026-10-08T10:00:00'), { draftActive: true });
+    expect(!r || r.action !== 'pay').toBe(true);
+  });
+});
