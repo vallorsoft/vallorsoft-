@@ -9,6 +9,13 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 44. lépés — Chat-átvizsgálás: rossz fuvarra / rossz összeggel induló írás kizárva (2026-10-08) ✅ KÉSZ
+- **Rossz fuvar:** egy dátum (`2026-10-15`) fuvarszámként (`2026-10` → CMD-…-0010) is feloldódhatott, így a ✅-kártya rossz fuvart javasolt módosításra. A `REF_RE` a dátumot kizárja.
+- **Rossz összeg:** a fizetés-rögzítés a hajtogatott szövegből olvasta az összeget, így az „1.500 EUR" 1,5 EUR lett volna. Az új `moneyIn` a nyers szövegből olvas.
+- **Kérdésből írás:** a „lezárt fuvarok…" kérdés az előzmény fuvarjára státuszváltást javasolt. A melléknév már nem ige.
+- **Közös:** minden írás továbbra is HMAC-tokenes ✅-megerősítéssel, a meglévő handlereken át fut.
+- **Új lekérdezések** (fuvarlisták, elérhetőség): Admin/Manager kapu (`_gate`), `company_id`-szűrt, paraméteres, csak olvasás. Az AI semmilyen adatot nem kap.
+
 ### 43. lépés — Számla-kiolvasás AI nélkül (orderDocInspect) (2026-10-08) ✅ KÉSZ
 - Admin/Manager kapu; csak `data:application/pdf` fogadott, ~15 MB korlát; a szöveg kizárólag helyben (`pdf-parse`) dolgozódik fel, harmadik félhez/AI-hoz nem kerül, és nem tárolódik. Fuvar megadásakor tulajdon-ellenőrzés (`orders.id + company_id`), a kliens/alvállalkozó join is cégre szűrt. Csak olvasó művelet → nincs audit-bejegyzés.
 

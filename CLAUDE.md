@@ -52,7 +52,20 @@ Tesztek zöldek (**106 Jest**, 24 suite). **CI: GitHub Actions** (`.github/workf
 
 > **Hiánylista — a 2026-06-13-i ütemterv LEZÁRVA:** **(1) ✅ CI + valódi tesztek** (mock + valós-DB, 106 teszt); **(2) ✅ teherautó-routing váltó** (ORS `driving-hgv`, alap ingyenes OSRM) **+ ✅ valós útdíj váltó** (HERE „Pontos", alap becslés); **(3) ✅ UIT CargoTrack deep-link** (ANAF-integráció helyett, providerkénti URL-sablon — `uit_deeplink_templates` JSONB; `cargotrack-et.js`/`fomco-et.js` törölve); **(4) ✅ üzemeltetés** (health-check `/healthz`+`/readyz`, strukturált log, opcionális Sentry, opcionális pg_dump backup); **(5) ✅ leg ↔ `orders.email_sofer` szinkron**; **(6) ✅ SaaS-vízvezeték** (csomag-limit kikényszerítés, audit-napló, GDPR export/anonimizálás, Stripe-váz); **(7) ✅ e-Factura státusz automatikus lekérdezés** (3 órás scheduler, SmartBill/Oblio `getInvoice` implementálva, `efactura_last_raw`/`efactura_checked_at` tárolás); **(8) ✅ ANAF CUI strukturált cím** (utca/helység/megye külön mezők, `adresa_sediu_social` alapján). **Nyitott jövőbeli munka:** Stripe éles bekötés (kulcsok + price_xxx — utolsó lépés, nem sürgős), SAF-T D406 XML (jövőbeli javaslat, a könyvelő SAGA/WinMentor CSV-ből generál egyelőre). **RO megfelelőség:** a rendszer megfelel — minden ANAF-kommunikáció (e-Factura SPV-beküldés) a számlázó-providereken (FGO/SmartBill/Oblio stb.) keresztül történik, saját ANAF-kapcsolat NEM kell és NEM is akarunk. Az UIT-kódot sem mi generáljuk — a sofőr/cég a CargoTrack/Fomco deep-linken keresztül intézi. A GPS→ANAF élő e-Transport-transzmisszió NEM feladatunk.
 
-**Legújabb kör (2026-10-08 — 💬 Chat: bármilyen kérdés egy fuvarról — fizetve / postázva / hiányzó dokumentum, PR #535):** *(részletes kész-lista: `CHANGELOG.md`)*
+**Legújabb kör (2026-10-08 — 💬 Chat: teljes átvizsgálás — hibás bekötések javítva, hiányzó válaszok pótolva, PR #536):** *(részletes kész-lista: `CHANGELOG.md`; biztonság: `AUDIT.md` 44. lépés)*
+1. **Javítva (`lib/chatOps.js`):**
+   - a dátum már nem fuvarszám;
+   - a pénzösszeg a nyers szövegből jön (`moneyIn`: az „1.500 EUR" nem 1,5);
+   - a `dateIn` ellenőrzi a hónapot;
+   - a „lezárt" melléknév nem ige;
+   - aktív vázlat mellett a fuvarszám nélküli javítás a vázlathoz megy;
+   - nincs példa-fuvarszám a válaszszövegekben.
+2. **Pótolva, AI nélkül:** rövid fuvarszám („0002 hol tart?"), fuvarlisták (aktív / kiosztásra váró / lezárt), sofőr- és ügyfél-elérhetőség, köszönés és súgó.
+3. **Szabályok:**
+   - Pénzt és dátumot mindig a nyers szövegből olvass, ne a `fold()` kimenetéből (az törli a `/ , € ?` jeleket).
+   - A chat válaszszövegébe ne kerüljön valódinak tűnő példa-fuvarszám, mert az előzmény-fókusz azt is felveszi.
+
+**Korábbi kör (2026-10-08 — 💬 Chat: bármilyen kérdés egy fuvarról — fizetve / postázva / hiányzó dokumentum, PR #535):** *(részletes kész-lista: `CHANGELOG.md`)*
 1. `lib/chatOps.js` `orderTopics` + `orderTracking` (lezárás/számla/posta/fizetés/UIT + hiányzó dokumentumok) a `detectOrderView` kártyán, közvetlen válasz-sorral. **Szabály:** új fuvar-kérdés-téma = új kulcs az `orderTopics`-ban + sor az `orderTracking`-ben; a kérdés sosem indít írást.
 
 **Korábbi kör (2026-10-08 — 💬 Chat: „kifizetetlen fuvarok" = lista, nem fizetés-rögzítés, PR #534):** *(részletes kész-lista: `CHANGELOG.md`)*
