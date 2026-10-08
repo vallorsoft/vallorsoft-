@@ -14,6 +14,13 @@
 
 ---
 
+## 2026-10-08 — ✏️ Fuvarok tömeges szerkesztése (lezárás · számla · posta · fizetés) + hónap-szűrő (PR #525)
+
+- **Kérés:** „Tömeges fuvarszerkesztés van? Pl. a szeptemberi összes fuvart kiszámláztuk, postáztuk a dokumentumokat és beszedtük a pénzt."
+- **Fuvarkezelés:** új 📅 **hónap-szűrő** (lerakás → felrakás → lezárás dátuma szerint) → „Mind kijelöl" → a kijelölő sávban új **✏️ Tömeges szerkesztés** gomb. A modalban csak a bepipált mezők változnak: 🏁 lezárás (Alocat/In Curs/Extern → Finalizat), 🧾 számlaszám (pl. gyűjtőszámla), 📬 posta elküldve, 📥 posta átvéve, 💶 fizetési státusz + beérkezés dátuma (opcionálisan a Pénzügy kintlévőségből is rendezve), 📝 megjegyzés.
+- **Szerver:** `setOrderPostDeliveryBulk` (`handlers/orderPostDelivery.js`, a meglévő dokumentum-nyomkövetés tömeges párja) — Admin/Manager, max 500 fuvar, tranzakcióban; csak a saját cég nem törölt fuvarjai (idegen id kimarad), paraméteres SQL, audit `order.post_delivery.bulk`. A `comList` visszaadja a fel-/lerakás dátumát + a lezárás napját (a hónap-szűrőhöz).
+- i18n 15 új `list.*` kulcs (RO+HU), a kijelölő-sáv számlálója is fordítva; cache-bust `?v=20261008bulk`. **Teszt:** +6 eset; valós Postgres 16-on is ellenőrizve (idegen cég fuvarja érintetlen). **1566 Jest zöld** (valós DB-vel 1624).
+
 ## 2026-10-08 — 💬 AI-chat bővítés: műveletek megerősítéssel, cégszintű kérdések, kiosztási javaslat, árajánlat, WhatsApp-üzenet, napi összefoglaló, 🎤 diktálás (PR #524)
 
 - **Kérés:** „Csináld meg az összeset" — a chat 7 bővítése.

@@ -1558,13 +1558,20 @@ function chipOrdersFilter(key) {
   } catch (_) {}
   filterOrders();
 }
+// A fuvar „hónapja" a hónap-szűrőhöz: lerakás → felrakás → lezárás dátuma.
+function _orderMonthOf(c){
+  var d = c.data_descarcare || c.data_incarcare || c.finalized_day || c.created_at || '';
+  return String(d).slice(0,7);
+}
 function filterOrders() {
   var q = ((document.getElementById('orderSearch')||{}).value||'').toLowerCase();
   var st = (document.getElementById('orderStatusFilter')||{}).value||'';
   var chipKey = window._orderChipFilter || 'all';
   var chipStatuses = Object.prototype.hasOwnProperty.call(_ORDER_CHIP_GROUPS, chipKey) ? _ORDER_CHIP_GROUPS[chipKey] : null;
   var chipPredicate = Object.prototype.hasOwnProperty.call(_ORDER_PD_FILTERS, chipKey) ? _ORDER_PD_FILTERS[chipKey] : null;
+  var month = ((document.getElementById('orderMonthFilter')||{}).value||'').slice(0,7);
   var filtered = _ordersAllCache.filter(function(c){
+    if (month && _orderMonthOf(c) !== month) return false;
     var txt = [c.id,c.fuvar_no,c.client,c.ref,c.loc_incarcare,c.loc_descarcare,
                c.email_sofer,c.nume_sofer,c.rendszam_camion].join(' ').toLowerCase();
     if (q && !txt.includes(q)) return false;
@@ -4256,7 +4263,7 @@ function updateOrderSelBar() {
   if (!bar) return;
   if (checked.length > 0) {
     bar.style.display = 'block';
-    cnt.textContent = checked.length + ' fuvar kiválasztva';
+    cnt.textContent = t('list.selCount', { n: checked.length });
   } else {
     bar.style.display = 'none';
     var sa = document.getElementById('selectAllOrders');
@@ -5516,6 +5523,90 @@ function _vsPdSteps(c){
     { key: 'paid',      label: t('cs.pd.stepPaid')||'Kifizetve',           done: (c.payment_status_ext||'pending') === 'paid' }
   ];
 }
+// ─── Tömeges szerkesztés a kijelölt fuvarokra (dokumentum-nyomkövetés) ───
+// Pl. „a szeptemberi összes fuvart kiszámláztuk, postáztuk, beszedtük":
+// hónap-szűrő → „Mind kijelöl" → ✏️ Tömeges szerkesztés. Csak a kitöltött
+// mezők változnak; a szerver (setOrderPostDeliveryBulk) cégre szűr.
+function openOrderBulkEdit(){
+  var ids = Array.prototype.map.call(document.querySelectorAll('.orderRowCb:checked'), function(c){ return c.value; });
+  if(!ids.length){ toast(t('list.bulkNone'), 'err'); return; }
+  var old = document.getElementById('vsBulkBack'); if(old) old.remove();
+  var cache = window._ordersAllCache || [];
+  var sel = cache.filter(function(c){ return ids.indexOf(String(c.id)) !== -1; });
+  var notFinal = sel.filter(function(c){ return ['Alocat','In Curs','Extern'].indexOf(c.status) !== -1; }).length;
+  var sum = sel.reduce(function(a,c){ return a + (parseFloat(c.pret)||0); }, 0);
+  var today = new Date(); var iso = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  var back = document.createElement('div');
+  back.id = 'vsBulkBack'; back.className = 'modal-back';
+  back.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9998;padding:16px;';
+  function row(id, icon, label, input){
+    return '<div class="vs-bulk-row"><label class="vs-bulk-chk"><input type="checkbox" id="'+id+'On" onchange="_vsBulkToggle(\''+id+'\')"> '+icon+' '+esc(label)+'</label><div class="vs-bulk-in" id="'+id+'Box" style="opacity:.45;pointer-events:none;">'+input+'</div></div>';
+  }
+  back.innerHTML = '<div class="modal glass" style="max-width:600px;width:100%;max-height:90vh;overflow:auto;padding:20px;border-radius:14px;">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><h3 style="margin:0;font-size:16px;">✏️ '+esc(t('list.bulkTitle'))+'</h3>'
+    + '<button type="button" class="btn ghost" onclick="closeOrderBulkEdit()" style="font-size:20px;line-height:1;padding:4px 10px;">×</button></div>'
+    + '<div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">'+esc(t('list.bulkSub', { n: ids.length, sum: sum.toLocaleString('ro-RO',{maximumFractionDigits:2}) }))+'</div>'
+    + '<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">'+esc(t('list.bulkHint'))+'</div>'
+    + (notFinal ? row('vsBulkFin', '🏁', t('list.bulkFinalize', { n: notFinal }), '<div style="font-size:12px;color:var(--muted);">'+esc(t('list.bulkFinalizeHint'))+'</div>') : '')
+    + row('vsBulkInv', '🧾', t('cs.pd.invoiceNo')||'Számlaszám', '<input class="input" id="vsBulkInv" type="text" maxlength="50" placeholder="'+esc(t('list.bulkInvPh'))+'">')
+    + row('vsBulkSent', '📬', t('cs.pd.postSent')||'Posta elküldve', '<input class="input" id="vsBulkSent" type="date" value="'+iso+'">')
+    + row('vsBulkRecv', '📥', t('cs.pd.postRecv')||'Posta átvéve', '<input class="input" id="vsBulkRecv" type="date" value="'+iso+'">')
+    + row('vsBulkPay', '💶', t('cs.pd.payStatus')||'Fizetési státusz',
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;"><select class="select" id="vsBulkPay" onchange="_vsBulkPayChange()" style="flex:1;min-width:150px;">'
+        + '<option value="paid">✓ '+esc(t('cs.pd.psPaid')||'Kifizetve')+'</option>'
+        + '<option value="pending">⏳ '+esc(t('cs.pd.psPending')||'Fizetésre vár')+'</option>'
+        + '<option value="delayed">⚠️ '+esc(t('cs.pd.psDelayed')||'Késés / részleges')+'</option></select>'
+        + '<input class="input" id="vsBulkPayDate" type="date" value="'+iso+'" title="'+esc(t('cs.pd.payReceived')||'')+'" style="flex:1;min-width:140px;"></div>'
+        + '<label id="vsBulkSyncLbl" style="display:flex;gap:7px;align-items:center;font-size:12.5px;margin-top:8px;"><input type="checkbox" id="vsBulkSync" checked> '+esc(t('list.bulkSync'))+'</label>')
+    + row('vsBulkNote', '📝', t('cs.pd.notes')||'Megjegyzés', '<textarea class="textarea" id="vsBulkNote" rows="2" maxlength="2000"></textarea>')
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;"><button type="button" class="btn ghost" onclick="closeOrderBulkEdit()">'+esc(t('common.cancel')||'Mégse')+'</button>'
+    + '<button type="button" class="btn primary" id="vsBulkSave" onclick="saveOrderBulkEdit()">💾 '+esc(t('list.bulkSave', { n: ids.length }))+'</button></div>'
+    + '<div id="vsBulkStat" style="font-size:12.5px;margin-top:8px;"></div></div>';
+  back.addEventListener('click', function(e){ if(e.target === back) closeOrderBulkEdit(); });
+  document.body.appendChild(back);
+  back._ids = ids;
+}
+function _vsBulkToggle(id){
+  var on = document.getElementById(id+'On').checked, box = document.getElementById(id+'Box');
+  if(box){ box.style.opacity = on ? '1' : '.45'; box.style.pointerEvents = on ? 'auto' : 'none'; }
+}
+function _vsBulkPayChange(){
+  var v = document.getElementById('vsBulkPay').value, lbl = document.getElementById('vsBulkSyncLbl');
+  if(lbl) lbl.style.display = v === 'paid' ? 'flex' : 'none';
+}
+function closeOrderBulkEdit(){ var b = document.getElementById('vsBulkBack'); if(b) b.remove(); }
+function saveOrderBulkEdit(){
+  var back = document.getElementById('vsBulkBack'); if(!back) return;
+  var on = function(id){ var e = document.getElementById(id+'On'); return !!(e && e.checked); };
+  var val = function(id){ return (document.getElementById(id)||{}).value || ''; };
+  var p = { order_ids: back._ids };
+  if(on('vsBulkFin')) p.finalize = true;
+  if(on('vsBulkInv')) p.invoice_no = val('vsBulkInv').trim();
+  if(on('vsBulkSent')) p.postal_sent_at = val('vsBulkSent') || null;
+  if(on('vsBulkRecv')) p.postal_received_at = val('vsBulkRecv') || null;
+  if(on('vsBulkPay')){
+    p.payment_status_ext = val('vsBulkPay');
+    p.payment_received_at = p.payment_status_ext === 'paid' ? (val('vsBulkPayDate') || null) : null;
+    p.sync_finance = p.payment_status_ext === 'paid' && !!(document.getElementById('vsBulkSync')||{}).checked;
+  }
+  if(on('vsBulkNote')) p.post_notes = val('vsBulkNote').trim();
+  if(Object.keys(p).length < 2){ toast(t('list.bulkNothing'), 'err'); return; }
+  if(!confirm(t('list.bulkConfirm', { n: back._ids.length }))) return;
+  var btn = document.getElementById('vsBulkSave'); if(btn) btn.disabled = true;
+  var stat = document.getElementById('vsBulkStat'); if(stat) stat.textContent = t('common.saving')||'…';
+  gas('setOrderPostDeliveryBulk', [p]).then(function(r){
+    if(r && r.ok){
+      toast(t('list.bulkDone', { n: r.count, f: r.finalized||0, s: r.finance_synced||0 }), 'ok');
+      closeOrderBulkEdit();
+      if(typeof clearOrderSel === 'function') clearOrderSel();
+      if(typeof loadOrders === 'function') loadOrders();
+    } else {
+      if(btn) btn.disabled = false;
+      if(stat){ stat.textContent = (r && r.err) || (t('common.error')||'Hiba'); stat.style.color = '#dc2626'; }
+    }
+  }).catch(function(){ if(btn) btn.disabled = false; if(stat) stat.textContent = t('common.error')||'Hiba'; });
+}
+
 function vsPostDeliveryOpen(orderId){
   var c = (window._ordersAllCache || []).find(function(x){ return String(x.id) === String(orderId); });
   if(!c){ toast(t('common.notFound')||'Nem található', 'err'); return; }

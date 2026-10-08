@@ -9,6 +9,9 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 39. lépés — Fuvarok tömeges szerkesztése (setOrderPostDeliveryBulk) (2026-10-08) ✅ KÉSZ
+- Admin/Manager kapu; a kijelölt id-k fehérlistázva (`[A-Za-z0-9_-]`, dedup, max 500); minden UPDATE `company_id = $x AND id = ANY(...)` és előtte tulajdon-szűrés (idegen / törölt fuvar kimarad — valós DB-n verifikálva). Tranzakció (BEGIN/COMMIT/ROLLBACK), paraméteres SQL, `payment_status_ext` fehérlista, dátum-validáció. A pénzügyi rendezés csak explicit `sync_finance`-re és csak Finalizat + áras fuvarra. Audit csak metaadattal.
+
 ### 38. lépés — 💬 AI-chat műveletek + cégszintű kérdések (lib/chatOps) (2026-10-08) ✅ KÉSZ
 - **Írás csak megerősítéssel, aláírt tokennel:** a művelet-kártya HMAC-SHA256 (SESSION_SECRET) tokent hordoz (típus + paraméterek + `company_id` + user-id + 15 perces lejárat); `timingSafeEqual` ellenőrzés, más cég / más felhasználó / lejárt / módosított token → elutasítva (teszt őrzi). A kliens nem tud tetszőleges műveletet küldeni.
 - A végrehajtás a MEGLÉVŐ handlereken fut ugyanazzal a req-gel (`comUpdate`/`plannerAssign`/`markOrderPayment`/`quoteSave`) → azok szerep- és `company_id`-ellenőrzése érvényes; sofőr-kiosztásnál a sofőr cég-tagsága végrehajtáskor újra ellenőrizve. Audit `order.chat_action`.

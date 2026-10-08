@@ -160,4 +160,95 @@ handlers.checkInvoicePaidExternal = async function (req, res, args) {
   }
 };
 
+// ─── Tömeges dokumentum-nyomkövetés ─────────────────────────────────────
+// setOrderPostDeliveryBulk({ order_ids:[...], finalize?, invoice_no?,
+//   postal_sent_at?, postal_received_at?, payment_status_ext?,
+//   payment_received_at?, post_notes?, sync_finance? })
+// Pl. „a szeptemberi összes fuvart kiszámláztuk, postáztuk, beszedtük".
+// Csak a megadott (nem `undefined`) mezőket írja, mind a kijelölt fuvarokra.
+// `finalize` → Alocat/In Curs/Extern fuvar Finalizat-ra (a trigger tölti a
+// finalized_at-et). `sync_finance` + paid → a Pénzügy kintlévőség is rendeződik
+// (orders.payment_status/paid_amount — csak Finalizat, áras fuvarnál).
+const BULK_MAX = 500;
+handlers.setOrderPostDeliveryBulk = async function (req, res, args) {
+  try {
+    if (!_am(req.session.user)) return res.json({ result: { ok: false, err: 'Acces interzis' } });
+    const a = (args && args[0]) || {};
+    const ids = [...new Set((Array.isArray(a.order_ids) ? a.order_ids : [])
+      .map((x) => String(x || '').trim()).filter((x) => /^[A-Za-z0-9_-]{1,60}$/.test(x)))];
+    if (!ids.length) return res.json({ result: { ok: false, err: 'Nu ați selectat nicio cursă.' } });
+    if (ids.length > BULK_MAX) return res.json({ result: { ok: false, err: 'Maximum ' + BULK_MAX + ' curse odată.' } });
+    const cid = _own(req);
+
+    const sets = [];
+    const vals = [];
+    let i = 1;
+    if (a.invoice_no !== undefined)          { sets.push(`invoice_no = $${i++}`);          vals.push(_clip(a.invoice_no, 50)); }
+    if (a.postal_sent_at !== undefined)      { sets.push(`postal_sent_at = $${i++}`);      vals.push(_dateOrNull(a.postal_sent_at)); }
+    if (a.postal_received_at !== undefined)  { sets.push(`postal_received_at = $${i++}`);  vals.push(_dateOrNull(a.postal_received_at)); }
+    let paid = false;
+    if (a.payment_status_ext !== undefined) {
+      const v = _clip(a.payment_status_ext, 20);
+      if (!v || !PS_VALID.includes(v)) return res.json({ result: { ok: false, err: 'payment_status_ext invalid' } });
+      paid = v === 'paid';
+      sets.push(`payment_status_ext = $${i++}`); vals.push(v);
+      sets.push(`payment_ext_source = 'manual'`);
+      sets.push(`payment_ext_checked_at = NOW()`);
+    }
+    if (a.payment_received_at !== undefined) { sets.push(`payment_received_at = $${i++}`); vals.push(_dateOrNull(a.payment_received_at)); }
+    if (a.post_notes !== undefined)          { sets.push(`post_notes = $${i++}`);          vals.push(_clip(a.post_notes, 2000)); }
+    const finalize = a.finalize === true;
+    if (!sets.length && !finalize) return res.json({ result: { ok: false, err: 'Nu s-au trimis modificari.' } });
+
+    const client = await pool.connect();
+    let updated = 0, finalized = 0, financeSynced = 0;
+    try {
+      await client.query('BEGIN');
+      // Csak a saját cég (nem törölt) fuvarjai — idegen id egyszerűen kimarad.
+      const own = await client.query(
+        `SELECT id FROM orders WHERE company_id = $1 AND id = ANY($2::text[]) AND status <> 'Anulat'`, [cid, ids]);
+      const ownIds = own.rows.map((r) => r.id);
+      if (!ownIds.length) { await client.query('ROLLBACK'); return res.json({ result: { ok: false, err: 'Transportul nu a fost gasit.' } }); }
+      if (finalize) {
+        const f = await client.query(
+          `UPDATE orders SET status = 'Finalizat', updated_at = NOW()
+            WHERE company_id = $1 AND id = ANY($2::text[]) AND status IN ('Alocat','In Curs','Extern')`, [cid, ownIds]);
+        finalized = f.rowCount || 0;
+      }
+      if (sets.length) {
+        const u = await client.query(
+          `UPDATE orders SET ${sets.join(', ')} WHERE company_id = $${i} AND id = ANY($${i + 1}::text[])`,
+          vals.concat([cid, ownIds]));
+        updated = u.rowCount || 0;
+      }
+      if (paid && a.sync_finance === true) {
+        const recv = _dateOrNull(a.payment_received_at);
+        const s = await client.query(
+          `UPDATE orders SET payment_status = 'paid',
+                  paid_amount = GREATEST(COALESCE(pret,0), COALESCE(paid_amount,0)),
+                  paid_at = COALESCE(paid_at, $3::date::timestamp, NOW()), updated_at = NOW()
+            WHERE company_id = $1 AND id = ANY($2::text[]) AND status = 'Finalizat'
+              AND COALESCE(pret,0) > 0 AND COALESCE(payment_status,'unpaid') <> 'paid'`,
+          [cid, ownIds, recv]);
+        financeSynced = s.rowCount || 0;
+      }
+      await client.query('COMMIT');
+      try {
+        audit.fromReq(req, 'order.post_delivery.bulk', 'order', null, {
+          count: ownIds.length, finalized, finance_synced: financeSynced,
+          fields: Object.keys(a).filter((k) => k !== 'order_ids'),
+        });
+      } catch (_) {}
+      return res.json({ result: { ok: true, count: ownIds.length, updated, finalized, finance_synced: financeSynced,
+        skipped: ids.length - ownIds.length } });
+    } catch (e) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      throw e;
+    } finally { client.release(); }
+  } catch (err) {
+    console.error('setOrderPostDeliveryBulk hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 module.exports = handlers;

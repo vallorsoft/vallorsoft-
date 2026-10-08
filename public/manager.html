@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/icon192.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="/style.css?v=20261008chatops">
-  <script src="/i18n.js?v=20261008chatops"></script>
+  <script src="/i18n.js?v=20261008bulk"></script>
   <script src="/expense-cat.js?v=20260922wb"></script>
    <!-- Inter betutipus (Google Fonts) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -360,6 +360,7 @@
               <option value="In Curs">In Curs</option>
               <option value="Finalizat">Finalizat</option>
             </select>
+            <input class="input" id="orderMonthFilter" type="month" onchange="filterOrders()" title="Hónap" data-i18n-title="list.monthTip" style="max-width:160px;">
             <button class="btn ghost" style="padding:0 12px;font-size:12px;white-space:nowrap;" onclick="resetOrderColumns()" title="↔" data-i18n="cs.colReset">↔ Oszlopszélesség</button>
           </div>
           <div style="overflow-x:auto;">
@@ -374,6 +375,7 @@
               <span id="orderSelCount" style="font-size:13px;font-weight:700;color:#fff;">0 fuvar kiválasztva</span>
               <div style="display:flex;gap:8px;">
                 <button class="btn ghost" style="padding:7px 14px;font-size:13px;" onclick="clearOrderSel()" data-i18n="list.clearSel">✕ Törlés</button>
+                <button class="btn" style="padding:7px 14px;font-size:13px;" onclick="openOrderBulkEdit()" data-i18n="list.bulkEdit">✏️ Tömeges szerkesztés</button>
                 <button class="btn primary" style="padding:7px 16px;font-size:13px;" onclick="downloadSelectedOrders()" data-i18n="list.download">⬇️ Letöltés (nyomtatható)</button>
               </div>
             </div>
@@ -1517,7 +1519,7 @@
 <script src="/email-intake-card.js?v=20260616warm2"></script>
 <script src="/feature-catalog.js?v=20261008learn"></script>
 <script>window.__pwaInstallDefault=false;</script>
-<script src="/console-shared.js?v=20261008learn"></script>
+<script src="/console-shared.js?v=20261008bulk"></script>
 <script src="/pwa-install.js?v=20260714pwa"></script>
 <script src="/console-pages.js?v=20260911c"></script>
 <!-- ===== INTEGRACIOK (Manager: Ugyfelek + "Hol a kocsi?"; szamlazo/beallitas Admin-only) ===== -->
