@@ -227,6 +227,14 @@ async function loadOrderDraft(cid, ref) {
 }
 
 // ─── AI-prompt ───────────────────────────────────────────────
+// Beszélgetős hangnem: a folytatásokat a beszélgetésből értse, ne ismételje magát.
+const CHAT_STYLE = [
+  'CONVERSATION STYLE: talk like a friendly, experienced dispatcher colleague, not like a form. Match the dispatcher\'s tone (informal "te" / "tu" if they write informally).',
+  'Understand the conversation as a whole: short follow-ups and references ("and the second one?", "same day", "same place", "ugyanoda", "ugyanaznap", "az is", "ő", "neki", "acolo", "tot acolo", "la fel", "și el") refer to things said earlier — resolve them from the conversation and the previous draft instead of asking again.',
+  'Do not repeat the same sentence you already wrote, vary your wording, mention only what changed, and never recite every field. Ask questions the way a person would ("Melyik nap rakodnak?", "Când se încarcă?"), not "Please provide…".',
+  'If the dispatcher only chats, thanks you or reacts ("ok", "szuper", "mersi"), answer in one short natural sentence and leave the draft unchanged.',
+].join('\n');
+
 function buildSystemPrompt(today) {
   return [
     'You are a freight-dispatch assistant inside a Romanian/Hungarian TMS. The dispatcher describes ONE road-freight order in free text (Hungarian or Romanian, often informal, no accents).',
@@ -239,8 +247,9 @@ function buildSystemPrompt(today) {
     'uit_codes: RO e-Transport UIT codes (max 16 letters/digits) — keep the previous list; add only codes the dispatcher explicitly writes; remove one only if asked.',
     'You can ONLY edit this draft. You CANNOT upload or attach documents, open or look up other existing orders, or change saved orders from here. If the message is not about the draft (e.g. a document, an existing order number, "this order"), do NOT change any field and do NOT claim you did anything — reply briefly that the dispatcher should name the order number (e.g. CMD-2026-0042) or use the 📎 document upload. Never write a bare order number into the ref field unless the user explicitly says it is the reference.',
     'Never invent data. Unknown fields = null. Do not ask about fields the system can derive (km, plates of the assigned truck).',
+    CHAT_STYLE,
     'Return ONLY JSON with this shape:',
-    '{"reply": "1-2 short sentences to the dispatcher in THEIR language (Hungarian or Romanian), confirming what changed",',
+    '{"reply": "1-2 short, natural sentences to the dispatcher in THEIR language (Hungarian or Romanian) — say what you understood/changed like a colleague would, not as a field list",',
     ' "draft": {"client": null, "client_cui": null, "ref": null, "stops": [{"kind": "pickup", "loc": null, "firma": null, "data": null}], "load_type": null, "suly_kg": null, "hossz_cm": null, "szel_cm": null, "mag_cm": null, "pret": null, "km": null, "driver_name": null, "rendszam_camion": null, "rendszam_remorca": null, "uit_codes": []},',
     ' "questions": [{"key": "client|stops|dates|load_type|dims|driver|price|other", "text": "short question in the user language", "options": ["up to 4 short clickable answers"]}]}',
     'Ask at most 3 questions, only about genuinely missing or ambiguous REQUIRED data: client, stop location, stop date, FTL/LTL, LTL dimensions. Price is optional: never ask about it more than once. If nothing is missing, "questions" must be [].',
@@ -248,9 +257,11 @@ function buildSystemPrompt(today) {
 }
 
 // A beszélgetés szövegként (a geminiJson egyetlen user-turnt küld).
+const HIDDEN_NOTE = 'NOTE: (some side messages here were answered by the system itself; their content is intentionally hidden — ignore them, do not change the draft because of them)';
 function buildConversation(messages, draft) {
   const lines = ['PREVIOUS DRAFT (JSON):', JSON.stringify(_aiView(draft)), '', 'CONVERSATION:'];
   messages.forEach((m) => {
+    if (m.hidden) { lines.push(HIDDEN_NOTE); return; }
     lines.push((m.role === 'assistant' ? 'ASSISTANT: ' : 'DISPATCHER: ') + m.text);
   });
   lines.push('', 'Update the draft with the LAST dispatcher message and answer.');
@@ -577,9 +588,14 @@ handlers.orderChatTurn = async function (req, res, args) {
     if (rawDraft.mode !== 'email' && !mailChat.isEmailIntent(lastText)) {
       // ── Műveletek / cégszintű kérdések / javaslat / ajánlat / üzenet
       //    (lib/chatOps.js) — szintén AI nélkül; a művelet csak megerősítésre fut.
+      // Beszélgetés-folytatás („és a 0005?", „a 0006-ot is", „és Kovács?") → az előző
+      // kérdés/utasítás az új alannyal; ha helyben nem válaszolható, az AI az EREDETI szöveget kapja.
+      const prevUsers = messages.slice(0, -1).filter((m) => m.role !== 'assistant').map((m) => m.text).reverse();
+      let qText = lastText;
+      try { qText = (await chatOps.carryOver(cid, lastText, prevUsers)) || lastText; } catch (e) { qText = lastText; }
       let op = null;
       try {
-        op = await chatOps.answer(req, lastText, messages.slice(0, -1).map((m) => m.text).reverse(), lang, null, { draftActive: !draftEmpty });
+        op = await chatOps.answer(req, qText, messages.slice(0, -1).map((m) => m.text).reverse(), lang, null, { draftActive: !draftEmpty });
       } catch (e) { console.error('orderChat chatOps hiba:', e && e.message); }
       if (op) {
         try { await audit.fromReq(req, 'order.chat_info', 'chat', null, { kind: op.kind || op.action || 'op' }); } catch (_) {}
@@ -587,7 +603,7 @@ handlers.orderChatTurn = async function (req, res, args) {
       }
       let info = null;
       try {
-        info = await driverInfo.answer(cid, lastText, messages.slice(0, -1).map((m) => m.text).reverse(), lang);
+        info = await driverInfo.answer(cid, qText, messages.slice(0, -1).map((m) => m.text).reverse(), lang);
       } catch (e) { console.error('orderChat sofőr-kérdés hiba:', e && e.message); }
       if (info) {
         try { await audit.fromReq(req, 'order.chat_info', 'driver', null, { topics: info.topics, entity: (info.meta && info.meta.entity) || null }); } catch (_) {}
@@ -597,7 +613,14 @@ handlers.orderChatTurn = async function (req, res, args) {
     // ── Adat-minimalizálás: ami AI nélkül lett megválaszolva (sofőr-kérdés,
     //    cégszintű kérdés, művelet, napi összefoglaló), az az AI-hoz SEM kerül —
     //    az AI csak a fuvar-/levél-vázlathoz tartozó üzeneteket látja.
-    const aiMessages = messages.filter((m, i) => !m.local || i === messages.length - 1);
+    //    Helyettük egyetlen, TARTALOM NÉLKÜLI jelölő kerül a beszélgetésbe, hogy az AI tudja:
+    //    közben más téma is szóba került (így a folytatást nem keveri össze vele).
+    const aiMessages = [];
+    messages.forEach((m, i) => {
+      if (!m.local || i === messages.length - 1) { aiMessages.push(m); return; }
+      const lastM = aiMessages[aiMessages.length - 1];
+      if (!(lastM && lastM.hidden)) aiMessages.push({ role: 'system', hidden: true, text: '' });
+    });
     if (rawDraft.mode === 'email' || (draftEmpty && mailChat.isEmailIntent(messages[messages.length - 1].text))) {
       return await mailChat.mailTurn(req, res, a, aiMessages, lang);
     }

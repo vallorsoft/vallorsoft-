@@ -187,18 +187,18 @@ describe('chat: bármilyen kérdés egy fuvarról (fizetve / postázva / hiányz
     const r = await co.answer(req, 'A CMD-2026-0047 ki van fizetve?', [], 'hu', new Date('2026-10-08T10:00:00'), {});
     expect(r.kind).toBe('order_view');
     expect(r.action).toBeUndefined();
-    expect(r.reply).toMatch(/Kifizetve: ❌ nem/);
+    expect(r.reply).toMatch(/Nem, a CMD-2026-0047 még nincs kifizetve/);
   });
 
   test('fókusz-fuvar: „Milyen dokumentum hiányzik?" → hiánylista', async () => {
     const r = await co.answer(req, 'Milyen dokumentum hiányzik?', ['🚚 #CMD-2026-0047 — Fuvar'], 'hu', new Date('2026-10-08T10:00:00'), { draftActive: true });
     expect(r.kind).toBe('order_view');
     expect(r.focus).toBe(true);
-    expect(r.reply).toMatch(/Hiányzik: Megbízás, CMR/);
+    expect(r.reply).toMatch(/CMD-2026-0047 — Ami még hiányzik: Megbízás, CMR/);
   });
 
   test('„Postázva van?" → postázás dátummal', async () => {
     const r = await co.answer(req, 'Postázva van?', ['🚚 #CMD-2026-0047 — Fuvar'], 'hu', new Date('2026-10-08T10:00:00'), { draftActive: true });
-    expect(r.reply).toMatch(/Postázva: ✅ igen/);
+    expect(r.reply).toMatch(/számláját már postáztuk \(03\.10\.2026\)/);
   });
 });

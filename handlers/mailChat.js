@@ -177,6 +177,7 @@ const HONESTY = [
 ].join('\n');
 
 const COMMON_RULES = [BODY_SYNTAX, CARDS_RULES, STYLE_SCHEMA, DATA_TOOLS, HONESTY,
+  'reply: 1-2 short, natural sentences like a colleague ("Kész, udvariasabbra vettem és betettem a fuvar adatait."), in the dispatcher\'s language and tone; vary the wording, do not repeat yourself. Understand short follow-ups from the conversation ("a másiknak is", "ugyanezt románul", "și lui", "mai scurt") instead of asking again. If the dispatcher only thanks you or chats, answer naturally and leave the draft unchanged.',
   'Top-level "save_default": true ONLY when the dispatcher asks to keep this look as their default ("mentsd el alapértelmezettnek", "mindig ilyen legyen", "salvează ca implicit"); "reset_default": true to go back to the original look.',
 ].join('\n');
 
@@ -211,12 +212,14 @@ function buildMailPrompt(o, ctx) {
   ].join('\n');
 }
 
+// A helyben (AI nélkül) megválaszolt üzenetek helyén álló, TARTALOM NÉLKÜLI jelölő.
+const HIDDEN_NOTE = 'NOTE: (some side messages here were answered by the system itself; their content is intentionally hidden — ignore them, do not change the draft because of them)';
 function _conversation(messages, prev) {
   const v = { style: prev.style, recipient: prev.recipient, recipient_name: prev.recipient_name, to_email: prev.recipient === 'other' ? prev.to_email : null, lang: prev.lang,
     subject: prev.subject, body: prev.body, cards: prev.cards, card_fields: prev.card_fields, include_tracking: prev.include_tracking,
     builder_template_id: prev.builder_template_id };
   const lines = ['PREVIOUS DRAFT (JSON):', JSON.stringify(v), '', 'CONVERSATION:'];
-  messages.forEach((m) => lines.push((m.role === 'assistant' ? 'ASSISTANT: ' : 'DISPATCHER: ') + m.text));
+  messages.forEach((m) => lines.push(m.hidden ? HIDDEN_NOTE : (m.role === 'assistant' ? 'ASSISTANT: ' : 'DISPATCHER: ') + m.text));
   lines.push('', 'Today: ' + new Date().toISOString().slice(0, 10) + '. Update the e-mail draft with the LAST dispatcher message and answer.');
   return lines.join('\n');
 }
