@@ -95,14 +95,23 @@ async function learnedDataList(req, res) {
       }));
     } catch (_) { memory = []; }
 
-    return res.json({ result: { ok: true, orderScan, memory, kinds: MEM_KINDS } });
+    // AI-chat 2.0: nem értett mondatok (30 nap) + megerősített mondat → képesség párok.
+    let chatMiss = []; let chatIntent = [];
+    try {
+      const r = await pool.query(`SELECT id, text, suggestions, resolved_tool, created_at FROM chat_miss_log WHERE company_id=$1 ORDER BY created_at DESC LIMIT $2`, [cid, MAX_ROWS]);
+      chatMiss = r.rows.map(x => ({ id: Number(x.id), key: _clip(x.text, 160), summary: x.resolved_tool ? '→ ' + x.resolved_tool : (Array.isArray(x.suggestions) ? x.suggestions.join(' | ') : ''), hits: 1, updated_at: x.created_at }));
+      const r2 = await pool.query(`SELECT id, text, tool, hits, updated_at FROM chat_learned_intents WHERE company_id=$1 ORDER BY updated_at DESC LIMIT $2`, [cid, MAX_ROWS]);
+      chatIntent = r2.rows.map(x => ({ id: Number(x.id), key: _clip(x.text, 160), summary: '→ ' + x.tool, hits: x.hits || 0, updated_at: x.updated_at }));
+    } catch (_) { /* migráció előtt */ }
+
+    return res.json({ result: { ok: true, orderScan, memory, kinds: MEM_KINDS, chatMiss, chatIntent } });
   } catch (e) {
     console.error('learnedDataList hiba:', e);
     return res.json({ result: { ok: false, err: 'Eroare de server' } });
   }
 }
 
-// Törlés: { source:'order_scan'|'memory', id } VAGY { source:'memory', kind } (a teljes csoport).
+// Törlés: { source:'order_scan'|'memory'|'chat_miss'|'chat_intent', id } VAGY { source:'memory', kind } / { source:'chat_miss'|'chat_intent' } (a teljes csoport).
 async function learnedDataDelete(req, res, args) {
   try {
     const u = _u(req);
@@ -124,6 +133,12 @@ async function learnedDataDelete(req, res, args) {
         const r = await pool.query('DELETE FROM order_chat_memory WHERE company_id=$1 AND kind=$2', [cid, a.kind]);
         n = r.rowCount;
       } else return res.json({ result: { ok: false, err: 'Parametri invalizi' } });
+    } else if (source === 'chat_miss' || source === 'chat_intent') {
+      const tbl = source === 'chat_miss' ? 'chat_miss_log' : 'chat_learned_intents';
+      const r = id > 0
+        ? await pool.query(`DELETE FROM ${tbl} WHERE id=$1 AND company_id=$2`, [id, cid])
+        : await pool.query(`DELETE FROM ${tbl} WHERE company_id=$1`, [cid]);
+      n = r.rowCount;
     } else return res.json({ result: { ok: false, err: 'Sursă invalidă' } });
     if (!n && id > 0) return res.json({ result: { ok: false, err: 'Înregistrarea nu a fost găsită' } });
     try { await audit.fromReq(req, 'learned.delete', source, id > 0 ? String(id) : null, { kind: a.kind || null, count: n }); } catch (_) {}

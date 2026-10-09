@@ -14,15 +14,17 @@
 
 ---
 
-## 2026-10-09 — 💬 AI-chat 2.0 (1–3. fázis): képesség-katalógus + AI-útválasztó + navigáció (PR #541)
+## 2026-10-09 — 💬 AI-chat 2.0: a teljes admin/manager konzol chatből (1–8. fázis, PR #541)
 
-- **Terv:** `CHAT-AI-TERV.md` — a teljes konzol chatből irányítható (csak Admin/Manager felület).
-- **`lib/chatTools/`** képesség-katalógus: olvasás / írás (✅) / veszélyes írás (be kell írni: IGEN) / navigáció; szerep + granulált jog + csomag-kapu, végrehajtáskor újra ellenőrizve; a végrehajtás a meglévő handlereken. Névfeloldás szerveren (`resolve.js`).
+- **Terv:** `CHAT-AI-TERV.md` — csak Admin/Manager felület (a sofőr nem kap chat-irányítást).
+- **`lib/chatTools/`** képesség-katalógus (75 funkció): olvasás / írás (✅) / veszélyes írás (be kell írni: IGEN/DA) / navigáció; szerep + granulált jog (`orders_delete`, `stats_finance`, `invoice_issue`, `users_manage`) + csomag-kapu, végrehajtáskor újra ellenőrizve; a végrehajtás a meglévő handlereken. Névfeloldás szerveren (`resolve.js`: fuvar/fuvarok/sofőr/jármű/vontató/pótkocsi/ügyfél/alvállalkozó/dátum/időszak/összeg).
 - **`lib/chatRouter.js`** AI-szándékfelismerés csak tool-sémákkal (cég-adat nélkül), több lépés egy mondatban, „erre gondoltál?” gombok — a nem értett kérés többé nem esik az új-fuvar vázlatba. Limit: 60 AI-hívás / 10 perc / felhasználó.
-- **26 képesség:** minden menüpont megnyitása, súgó, fuvar-lista szűrőkkel, kiosztási javaslat, követő-link, fuvar megnyitása (adatlap/szerkesztő/dokumentumok/e-mail/leadás/megbízás), bármely mező módosítása, státusz, kiosztás és visszavonása, alvállalkozó, fizetés, dokumentum-nyomkövetés, törlés/visszaállítás, lezárás visszavonása, útdíj, leadás-kérés, sablonok, árajánlatok.
-- **Kliens:** a nyitott fül, a megnyitott fuvar és a kijelölt sorok kontextusa; fehérlistás UI-parancsok. Cache-bust `?v=20261009chat2`.
-- **Tanulás:** `db/chat-learning.sql` (`chat_miss_log` 30 nap, `chat_learned_intents`), kapcsoló `chat-learning`; GDPR export + anonimizálás.
-- **Teszt:** új `tests/unit/chatTools.test.js` (23) + `orderChat.test.js` +4.
+- **Területek:** navigáció (minden menüpont) + súgó · fuvarok (lista, mezők, státusz, kiosztás, alvállalkozó, fizetés, dokumentum-nyomkövetés, törlés/visszaállítás, lezárás visszavonása, útdíj, leadás-kérés, sablonok, árajánlatok, követő-link, kiosztási javaslat) · flotta (járművek, párosítás, élő GPS, lejáratok, szerviz rögzítés/halasztás/elvégezve, üzemanyagkártya) · sofőrök (elszámolás, járandóság diurna-napokkal, kifizetés, alapbér, meghívó) · pénzügy (BNR, bevétel, fizetési ütemterv, kimenő számlák, **számla kiállítás / storno** dupla megerősítéssel, anomáliák) · ügyfelek (ANAF-ból felvétel, módosítás) · alvállalkozók (+ bejövő számla rögzítés/fizetés) · dokumentumok (keresés, hiányzó menetlevél, sorszám-foglalás) · raktár · levelek (csak fejléc) · értesítések · operatív összefoglaló · kedvenc helyek.
+- **Terv-kártya:** több írás egy ✅-vel, hibánál megáll. **Visszavonás:** `db/chat-action-log.sql`, „↩️ Visszavonás” gomb + „vond vissza az előzőt” (24 órán belül, saját művelet).
+- **Kliens:** a nyitott fül, a megnyitott fuvar és a kijelölt sorok kontextusa; fehérlistás UI-parancsok (`OrderChat.runUi`). Cache-bust `?v=20261009chat3`.
+- **Tanulás:** `db/chat-learning.sql` (`chat_miss_log` 30 nap, `chat_learned_intents`), kapcsoló `chat-learning`; a 🧠 Tanult adatok fülön látható/törölhető; GDPR export + anonimizálás.
+- **Javítva menet közben:** a sofőr-kiosztás a `plannerAssign` helyett `comUpdate`-en megy (a `plannerAssign` csak rendszámot fogad — a valódi-DB teszt tárta fel).
+- **Teszt:** `tests/unit/chatTools.test.js` (28), `tests/integration/chat-tools-db.test.js` (5, valódi Postgres), `orderChat.test.js` +4, `learnedData.test.js` +1. Valódi DB-vel 1763 teszt zöld.
 
 ## 2026-10-09 — 🌐 Sofőr-fordító: komoly, általános tolmács + „Mit hall a másik?” visszaellenőrzés (PR #540)
 

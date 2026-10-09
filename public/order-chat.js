@@ -298,7 +298,8 @@
       S.busy = false;
       if (r && r.ok) {
         S.acted[tok] = 'done';
-        S.messages.push({ role: 'assistant', sys: true, text: r.reply || '✅', local: true });
+        S.messages.push({ role: 'assistant', sys: true, text: r.reply || '✅', local: true,
+          html: r.undoable ? '<div class="och-info-btns"><button type="button" class="och-info-btn" onclick="OrderChat.undo()">↩️ ' + esc(T('och.undo')) + '</button></div>' : '' });
         if (typeof window.loadOrders === 'function' && r.order_id) { try { window.loadOrders(); } catch (_) {} }
         if (r.ui) setTimeout(function () { runUi(r.ui); }, 30);
       } else {
@@ -311,6 +312,17 @@
       S.messages.push({ role: 'assistant', text: '⚠️ ' + ((e && e.message) || T('och.err')), err: true });
       renderMsgs();
     });
+  }
+  // Az utolsó chat-művelet visszavonása: előnézet-kártya (szerver, AI nélkül), majd ✅.
+  function undo() {
+    if (S.busy) return;
+    S.busy = true; renderMsgs();
+    window.gas('orderChatUndo', [{ lang: lang() }]).then(function (r) {
+      S.busy = false;
+      if (r && r.ok) S.messages.push({ role: 'assistant', text: r.reply || '', html: r.info_html || '', local: true });
+      else S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
+      renderMsgs();
+    }).catch(function (e) { S.busy = false; S.messages.push({ role: 'assistant', text: '⚠️ ' + ((e && e.message) || T('och.err')), err: true }); renderMsgs(); });
   }
   function actCancel(btn) {
     var tok = btn && btn.getAttribute('data-tok');
@@ -719,5 +731,5 @@
     b.style.display = visible ? '' : 'none';
   }
 
-  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, runUi: runUi, docUp: docUp, prefill: prefill, mic: mic, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
+  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, runUi: runUi, undo: undo, docUp: docUp, prefill: prefill, mic: mic, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
 })();

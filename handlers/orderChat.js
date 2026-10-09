@@ -762,6 +762,23 @@ handlers.orderChatAction = async function (req, res, args) {
   }
 };
 
+// ── AI-chat 2.0: az utolsó chat-művelet visszavonásának előnézete (AI nélkül).
+handlers.orderChatUndo = async function (req, res, args) {
+  try {
+    const gateErr = await _gate(req);
+    if (gateErr) return res.json({ result: { ok: false, err: gateErr } });
+    const a = (args && args[0]) || {};
+    const lang = a.lang === 'hu' ? 'hu' : 'ro';
+    const tools = require('../lib/chatTools');
+    const ctx = chatRouter.makeCtx(req, lang, '', [], {}, null);
+    const r = await tools.prepare(ctx, { tool: 'chat.undo', args: {} });
+    return res.json({ result: { ok: true, info: true, reply: r.reply || '', info_html: r.html || '', questions: [] } });
+  } catch (err) {
+    console.error('orderChatUndo hiba:', err);
+    return res.json({ result: { ok: false, err: 'Eroare de server' } });
+  }
+};
+
 // ── Napi összefoglaló a chat megnyitásakor.
 handlers.orderChatBrief = async function (req, res, args) {
   try {
@@ -902,3 +919,5 @@ Object.defineProperty(handlers, '_learnFromDraft', { value: learnFromDraft, enum
 Object.defineProperty(handlers, '_loadOrderDraft', { value: loadOrderDraft, enumerable: false });
 
 module.exports = handlers;
+// AI-chat 2.0: az ügyfél ANAF-ból mentése a chat-katalógusból is (lib/chatTools/more.js).
+Object.defineProperty(handlers, '_saveAnafClient', { value: _saveAnafClient, enumerable: false });

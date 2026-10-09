@@ -74,3 +74,20 @@ test('törlés: teljes csoport csak fehérlistás kind-dal; rossz forrás elutas
   expect((await call(H.learnedDataDelete, ADMIN, [{ source: 'users', id: 1 }])).ok).toBe(false);
   expect(pool.query).toHaveBeenCalledTimes(1);
 });
+
+describe('AI-chat tanulás (chat_miss / chat_intent)', () => {
+  test('törlés cégre szűrve, egy sor vagy a teljes csoport', async () => {
+    const calls = [];
+    const pool = require('../../db');
+    const orig = pool.query;
+    pool.query = jest.fn(async (sql, p) => { calls.push([sql, p]); return { rows: [], rowCount: 2 }; });
+    const u = { id: 1, company_id: 7, pozicio: 'Admin' };
+    expect((await call(H.learnedDataDelete, u, [{ source: 'chat_miss', id: 5 }])).ok).toBe(true);
+    expect(calls[0][0]).toMatch(/DELETE FROM chat_miss_log WHERE id=\$1 AND company_id=\$2/);
+    expect(calls[0][1]).toEqual([5, 7]);
+    expect((await call(H.learnedDataDelete, u, [{ source: 'chat_intent' }])).ok).toBe(true);
+    expect(calls[1][0]).toMatch(/DELETE FROM chat_learned_intents WHERE company_id=\$1/);
+    expect(calls[1][1]).toEqual([7]);
+    pool.query = orig;
+  });
+});

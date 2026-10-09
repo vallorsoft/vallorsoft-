@@ -10,9 +10,10 @@
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
 <<<<<<< HEAD
-### 47. lépés — AI-chat 2.0: képesség-katalógus + AI-útválasztó (2026-10-09) ✅ KÉSZ
+### 47. lépés — AI-chat 2.0: a konzol chatből irányítható (2026-10-09) ✅ KÉSZ
 - **Írási felület:** minden chatből indított írás HMAC-aláírt, user+cég-hez kötött, 15 perces tokennel fut (`signAction`), a token a szerveren FELOLDOTT argumentumokat hordozza. Végrehajtáskor a szerep, a granulált jog (`orders_delete`, `stats_finance`) és a csomag-kapcsoló újra ellenőrzött (jog-elvétel után a régi token nem fut), és a meglévő handler is ellenőriz (company_id).
-- **Veszélyes műveletek** (`kind:'danger'`, pl. fuvar törlése): csak a beírt IGEN/DA megerősítéssel futnak.
+- **Veszélyes műveletek** (`kind:'danger'`: fuvar/jármű törlése, számla kiállítás és storno): csak a beírt IGEN/DA megerősítéssel futnak, és nem kerülhetnek több lépéses tervbe. Számla: `invoice_issue` jog + `szamlazas-integracio` csomag.
+- **Visszavonás** (`chat_action_log`): csak a saját, 24 órán belüli művelet; a visszavonás ugyanazzal a jog-ellenőrzéssel fut, mint az eredeti; a napló csak a módosított mezők előző értékét tárolja.
 - **AI-adatáramlás:** az útválasztó AI csak a felhasználónak elérhető tool-sémákat és a felhasználó saját mondatait kapja (a helyben megválaszolt üzenetek továbbra sem); nevet, rendszámot, e-mailt, fuvar-adatot, dokumentumot nem. Az AI által adott tool-név fehérlistán szűrt; az argumentumok feloldása cégre szűrt SQL-lel történik.
 - **Kliens-UI-parancsok:** csak fehérlistás műveletek, azonosító-mintával szűrve (`runUi`); a felület-kontextus (fül, fuvar, kijelölés) a szerveren mintára szűrve.
 - **Visszaélés:** 60 AI-útválasztás / 10 perc / felhasználó. **GDPR:** a nem értett mondatok (`chat_miss_log`) 30 napig, kikapcsolható, exportban szerepel, anonimizáláskor törlődik.

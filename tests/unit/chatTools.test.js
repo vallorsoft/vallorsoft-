@@ -28,6 +28,14 @@ const mockH = {
   comDelete: jest.fn((req, res) => res.json({ result: { ok: true } })),
   plannerAssign: jest.fn((req, res) => res.json({ result: { ok: true } })),
 };
+const mockFC = {
+  earningCreate: jest.fn((req, res) => res.json({ result: { ok: true, id: 55 } })),
+  earningDelete: jest.fn((req, res) => res.json({ result: { ok: true } })),
+  expirySave: jest.fn((req, res) => res.json({ result: { ok: true } })),
+};
+jest.mock('../../handlers/fleetCompliance', () => ({
+  earningCreate: (...a) => mockFC.earningCreate(...a), earningDelete: (...a) => mockFC.earningDelete(...a), expirySave: (...a) => mockFC.expirySave(...a),
+}));
 jest.mock('../../handlers/orders', () => ({
   comUpdate: (...a) => mockH.comUpdate(...a), comDelete: (...a) => mockH.comDelete(...a), plannerAssign: (...a) => mockH.plannerAssign(...a),
   restoreOrder: (req, res) => res.json({ result: { ok: true } }), resetOrderMilestones: (req, res) => res.json({ result: { ok: true } }),
@@ -56,6 +64,11 @@ function baseRules() {
     { match: /SELECT rendszam FROM vehicles WHERE company_id=\$1$/, rows: [{ rendszam: 'B104VLR' }] },
     { match: /SELECT id, rendszam, tip, marca, model FROM vehicles/, rows: [{ id: 1, rendszam: 'B104VLR', tip: 'Vontato' }, { id: 2, rendszam: 'CJ36VSN', tip: 'Potkocsi' }] },
     { match: /chat_learned_intents/, rows: [] },
+    { match: /INSERT INTO chat_action_log/, fn: (sql, p) => { mockLog.push({ id: mockLog.length + 1, company_id: p[0], user_id: p[1], tool: p[2], before: JSON.parse(p[5]), result: JSON.parse(p[6]), created_at: new Date(), undone_at: null }); return { rows: [{ id: mockLog.length }] }; } },
+    { match: /FROM chat_action_log\s+WHERE company_id = \$1 AND user_id = \$2 AND undone_at IS NULL AND created_at/, fn: (sql, p) => ({ rows: mockLog.filter((x) => x.company_id === p[0] && x.user_id === p[1] && !x.undone_at).slice(-1) }) },
+    { match: /FROM chat_action_log WHERE id = \$1 AND company_id = \$2 AND user_id = \$3/, fn: (sql, p) => ({ rows: mockLog.filter((x) => x.id === p[0] && x.company_id === p[1] && x.user_id === p[2] && !x.undone_at) }) },
+    { match: /UPDATE chat_action_log SET undone_at/, fn: (sql, p) => { const x = mockLog.find((y) => y.id === p[0]); if (x) x.undone_at = new Date(); return { rows: [] }; } },
+    { match: /FROM document_expiries WHERE company_id = \$1 AND entity_type/, rows: [] },
     { match: /AS no FROM orders o WHERE o\.company_id = \$1 AND o\.id = \$2/, fn: (sql, p) => ({ rows: mockOrders.filter((o) => o.id === p[1] && p[0] === 7).map((o) => ({ id: o.id, no: o.fuvar_no })) }) },
   ];
 }
@@ -67,7 +80,10 @@ beforeEach(() => {
   mockPerm = false;
   mockExtract.mockReset();
   Object.values(mockH).forEach((f) => f.mockClear());
+  Object.values(mockFC).forEach((f) => f.mockClear());
+  mockLog = [];
 });
+let mockLog = [];
 
 const ctxOf = (u, ui) => router.makeCtx(req(u), 'hu', 'teszt', [], router.cleanUi(ui, (u || ADMIN).pozicio), NOW);
 
@@ -208,7 +224,7 @@ describe('prepare + execute', () => {
     const tok = /data-tok="([^"]+)"/.exec(r.html)[1];
     const x = await ops.executeAction(req(ADMIN), tok, {}, 'hu');
     expect(x.ok).toBe(true);
-    expect(mockH.plannerAssign).toHaveBeenCalledWith(expect.anything(), expect.anything(), ['CMDX1', { sofer_type: 'Intern', email_sofer: 'peto@x.ro', nume_sofer: 'Pető-Lőrincz Imre' }]);
+    expect(mockH.comUpdate).toHaveBeenCalledWith(expect.anything(), expect.anything(), ['CMDX1', { sofer_type: 'Intern', email_sofer: 'peto@x.ro', nume_sofer: 'Pető-Lőrincz Imre', status: 'Disponibil' }]);
   });
   test('navigáció: ismert fül → UI-parancs; ismeretlen → hiba', async () => {
     const r = await tools.prepare(ctxOf(ADMIN, {}), { tool: 'nav.open', args: { page: 'tervezőtábla' } });
@@ -248,5 +264,58 @@ describe('router', () => {
   test('ui-kontextus tisztítva (rossz azonosítók eldobva)', () => {
     expect(router.cleanUi({ tab: 'orders-list', order: 'X; DROP', selected: ['A1', '<b>', 'B2'] }, 'Admin'))
       .toEqual({ tab: 'orders-list', order: null, selected_ids: ['A1', 'B2'], selected: 2, role: 'Admin' });
+  });
+});
+
+describe('terv + visszavonás + flotta/pénzügy', () => {
+  const tokOf = (html) => /data-tok="([^"]+)"/.exec(html)[1];
+  test('két írás egy mondatban → egyetlen terv-kártya, egy ✅ mindkettőt futtatja', async () => {
+    mockExtract.mockResolvedValue({ model: 'm', json: { steps: [
+      { tool: 'order.update', args: { order: '0042', pret: 1400 } }, { tool: 'order.assign', args: { order: '0042', driver: 'Peto' } }], confidence: 0.9 } });
+    const r = await router.route(req(ADMIN), 'ár 1400 és add Petőnek', { lang: 'hu', now: NOW });
+    expect(r.html.match(/data-tok=/g).length).toBe(2); // ✅ + mégse ugyanazzal a tokennel
+    expect(r.html).toContain('och-plan');
+    const x = await ops.executeAction(req(ADMIN), tokOf(r.html), {}, 'hu');
+    expect(x.ok).toBe(true);
+    expect(mockH.comUpdate).toHaveBeenCalledTimes(2); // ár + sofőr
+    expect(mockH.comUpdate.mock.calls[1][2][1]).toMatchObject({ email_sofer: 'peto@x.ro' });
+    expect(x.undoable).toBe(true);
+  });
+  test('visszavonás: az előző értékek visszaállnak, csak a saját műveletre', async () => {
+    const r = await tools.prepare(ctxOf(ADMIN, {}), { tool: 'order.update', args: { order: '0042', pret: 1350 } });
+    const x = await ops.executeAction(req(ADMIN), tokOf(r.html), {}, 'hu');
+    expect(x.undoable).toBe(true);
+    // Más felhasználó nem látja / nem vonhatja vissza.
+    const other = await tools.prepare(ctxOf({ id: 77, company_id: 7, pozicio: 'Admin' }, {}), { tool: 'chat.undo', args: {} });
+    expect(other.html).toBe('');
+    const u = await tools.prepare(ctxOf(ADMIN, {}), { tool: 'chat.undo', args: {} });
+    expect(u.html).toContain('data-tok=');
+    mockH.comUpdate.mockClear();
+    const y = await ops.executeAction(req(ADMIN), tokOf(u.html), {}, 'hu');
+    expect(y.ok).toBe(true);
+    expect(mockH.comUpdate).toHaveBeenCalledWith(expect.anything(), expect.anything(), ['CMDX1', { pret: 1200 }]);
+    const again = await tools.prepare(ctxOf(ADMIN, {}), { tool: 'chat.undo', args: {} });
+    expect(again.html).toBe('');
+  });
+  test('diurna napokkal: a napok száma a mennyiség, visszavonás törli a tételt', async () => {
+    const r = await tools.prepare(ctxOf(ADMIN, {}), { tool: 'driver.earning_add', args: { driver: 'Peto', kind: 'diurna', unit_amount: 70, currency: 'EUR', days: '2026-10-01..2026-10-04' } });
+    expect(r.html).toContain('280');
+    const x = await ops.executeAction(req(ADMIN), tokOf(r.html), {}, 'hu');
+    expect(x.ok).toBe(true);
+    expect(mockFC.earningCreate.mock.calls[0][2][0]).toMatchObject({ email_sofer: 'peto@x.ro', kind: 'diurna', days: ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04'] });
+    const u = await tools.prepare(ctxOf(ADMIN, {}), { tool: 'chat.undo', args: {} });
+    await ops.executeAction(req(ADMIN), tokOf(u.html), {}, 'hu');
+    expect(mockFC.earningDelete).toHaveBeenCalledWith(expect.anything(), expect.anything(), [{ id: 55 }]);
+  });
+  test('lejárat: járműre a felület nyelvén tárolt felirattal', async () => {
+    const r = await tools.prepare(ctxOf(ADMIN, {}), { tool: 'expiry.set', args: { vehicle: 'B104VLR', doc_type: 'itp', expiry_date: '2027-03-15' } });
+    await ops.executeAction(req(ADMIN), tokOf(r.html), {}, 'hu');
+    expect(mockFC.expirySave.mock.calls[0][2]).toEqual([null, expect.objectContaining({ entity_type: 'vehicle', entity_label: 'B104VLR', doc_type: 'ITP (műszaki)', expiry_date: '2027-03-15' })]);
+  });
+  test('Manager: számla kiállítás invoice_issue jog nélkül nem elérhető', async () => {
+    const names = (await tools.available(req(MANAGER))).map((t) => t.name);
+    expect(names).not.toContain('finance.invoice_issue');
+    expect(names).not.toContain('finance.revenue');
+    expect(names).toContain('driver.earning_add');
   });
 });
