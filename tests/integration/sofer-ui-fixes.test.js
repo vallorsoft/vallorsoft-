@@ -131,7 +131,11 @@ describe('_SOF_MODALS — közös modál-nyilvántartás', () => {
   test('minden nyilvántartott modál záró-útja létezik', () => {
     const sb = load();
     sb._SOF_MODALS.forEach(entry => {
-      if (entry.close) expect(typeof sb[entry.close]).toBe('function');
+      // Külön fájlban élő modál (pl. a 🌐 fordító): a záró-függvény ott van definiálva.
+      if (entry.close && entry.ext) {
+        const src = fs.readFileSync(path.join(__dirname, '../../public', entry.ext), 'utf8');
+        expect(src).toContain('window.' + entry.close + ' = function');
+      } else if (entry.close) expect(typeof sb[entry.close]).toBe('function');
       else expect(typeof entry.btn).toBe('string');
     });
   });
