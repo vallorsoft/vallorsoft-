@@ -1040,6 +1040,7 @@ function goSec(id) {
 // az egyik helyen elfelejteni. A sorrend a beágyazottságot követi: a
 // legfelül nyíló (generikus megerősítő) modálok elöl.
 var _SOF_MODALS = [
+  { id: 'trModal',            close: 'trClose', ext: 'sofer-translate.js' }, // 🌐 fordító — a záró-függvény abban a fájlban él
   { id: 'sofTimeModal',       close: 'sofTimeCancel' },
   { id: 'sofConfirmModal',    close: 'sofConfirmCancel' },
   { id: 'sofChoiceModal',     close: 'sofChoiceCancel' },

@@ -58,6 +58,7 @@ const handlers = Object.assign(
   require('../handlers/receiptScan'),
   require('../handlers/orderScan'),
   require('../handlers/uitScan'),
+  require('../handlers/translate'),
   require('../handlers/orderPostDelivery'),
   require('../handlers/morningDigest'),
   require('../handlers/gpsDailyTrack'),

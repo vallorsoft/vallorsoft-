@@ -90,6 +90,7 @@ window.VS_FEATURES = [
   { key: 'mail-sent',            label: 'Elküldött levelek + levélszál 📤', group: 'Fuvarozás & Logisztika' },
   { key: 'ai-szoveges-fuvar',    label: 'Szöveges fuvarkiírás (AI-chat) 💬', group: 'Fuvarozás & Logisztika' },
   { key: 'ai-bon-scan',          label: 'AI bon-szkennelés 📷',         group: 'Fuvarozás & Logisztika' },
+  { key: 'ai-forditas',          label: 'AI fordító — sofőr (szöveg + beszélgetés) 🌐', group: 'Fuvarozás & Logisztika' },
   { key: 'gps-integracio',       label: 'GPS integráció 📡',            group: 'Adminisztráció' },
   { key: 'szamlazas-integracio', label: 'Számlázó integráció 🧾',        group: 'Adminisztráció' },
   { key: 'konyvelo-szerepkor',   label: 'Könyvelő szerepkör 📚',        group: 'Adminisztráció' },
