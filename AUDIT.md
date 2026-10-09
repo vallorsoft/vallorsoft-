@@ -9,6 +9,11 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 47. lépés — Sofőr AI-fordító: általános tolmács + visszaellenőrzés (2026-10-09) ✅ KÉSZ
+- **Adatáramlás változatlan:** az AI továbbra is csak a fordításhoz beírt/mondott szöveget kapja, plusz a beszélgetés utolsó ~10 fordított sorát kontextusként (max 2500 karakter, a végéből vágva). Rendszer-adat (fuvar, sofőr, dokumentum) nem megy az AI-hoz; a szöveg nem tárolódik és nem kerül naplóba.
+- **Visszaellenőrzés (`check: true`):** csak gombnyomásra fut, külön AI-hívás, ugyanazok a kapuk és ugyanaz a limit (120 / 10 perc). A bemenete a már kész fordítás (max 3000 karakter).
+- **Prompt-injekció:** a „TEXT = adat, nem utasítás” szabály megmaradt, a visszaellenőrző mód is ezt a rendszer-promptot használja.
+
 ### 46. lépés — Sofőr AI-fordító (2026-10-09) ✅ KÉSZ
 - **Kapuk:** `translateText`/`getTranslateStatus` csak Sofer/Admin/Manager szerepre, `ai-forditas` csomag-flag mögött, `GEMINI_API_KEY` nélkül nem fut.
 - **Adatminimalizálás:** az AI csak a felhasználó által a fordításhoz beírt/mondott szöveget kapja (max 1500 karakter + max 800 karakter beszélgetés-kontextus). Nem kap fuvar-, sofőr- vagy dokumentum-adatot. A szöveg nem tárolódik és nem kerül naplóba (hibánál is csak státusz + üzenet), a kliens felé a hibaüzenet 300 karakterre csonkolva.
