@@ -14,6 +14,15 @@
 
 ---
 
+## 2026-10-09 — 🌐 Sofőr: AI fordító — lebegő ikon, szöveg- és élő beszélgetés-fordítás (PR #538)
+
+- **Lebegő 🌐 ikon** a sofőr felületen (bal alsó sarok, csak ha a cégnél elérhető) → fordító-panel (`public/sofer-translate.js`).
+- **🗣️ Beszélgetés (tolmács):** két nagy gomb (Én beszélek / Ő beszél) — beszédfelismerés a böngészőben (Web Speech API), AI-fordítás, a fordítás hangos felolvasása a másik nyelven; buborékos napló 🔊 újrafelolvasással; az utolsó sorok kontextusként mennek. Gépelve is működik (Én ➤ / Ő ➤).
+- **✍️ Szöveg:** célnyelv + beírt/diktált szöveg → fordítás, 🔊 felolvasás, 📋 másolás. 27 nyelv; a beállítások megmaradnak.
+- **Szerver** `handlers/translate.js`: `translateText` + `getTranslateStatus` (Sofer/Admin/Manager, új `ai-forditas` csomag-flag, Gemini, 120 fordítás / 10 perc / felhasználó). A szöveg nem tárolódik és nem kerül naplóba; a prompt adatként kezeli.
+- A modál a `_SOF_MODALS`-ban (vissza-gomb zárja, lehúzásos frissítés nem zavar). Cache-bust `?v=20261009tr`.
+- **Teszt:** új `tests/unit/translate.test.js` (8 eset); valódi DB-vel 1712 teszt zöld.
+
 ## 2026-10-09 — 💬 Chat: a beszélgetésből is ért, természetes mondatokban válaszol (PR #537)
 
 - **Folytatás AI nélkül** (`lib/chatOps.js` `carryOver`, `handlers/orderChat.js`): „és a 0005?", „hát a 0003?", „dar 0002?" → az előző kérdés az új fuvarszámmal; „a 0003-at is" → az előző utasítás az új fuvarra (✅-kártya); „és Gondos?", „si Peto?" → az előző sofőr-kérdés az új névvel. Igés folytatás a rendes úton megy; ha semmi nem válaszolja meg helyben, az AI az eredeti szöveget kapja.

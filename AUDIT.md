@@ -9,6 +9,12 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 46. lépés — Sofőr AI-fordító (2026-10-09) ✅ KÉSZ
+- **Kapuk:** `translateText`/`getTranslateStatus` csak Sofer/Admin/Manager szerepre, `ai-forditas` csomag-flag mögött, `GEMINI_API_KEY` nélkül nem fut.
+- **Adatminimalizálás:** az AI csak a felhasználó által a fordításhoz beírt/mondott szöveget kapja (max 1500 karakter + max 800 karakter beszélgetés-kontextus). Nem kap fuvar-, sofőr- vagy dokumentum-adatot. A szöveg nem tárolódik és nem kerül naplóba (hibánál is csak státusz + üzenet), a kliens felé a hibaüzenet 300 karakterre csonkolva.
+- **Prompt-injekció:** a rendszer-prompt a szöveget adatként kezeli (nem válaszol rá, nem követ benne utasítást).
+- **Visszaélés:** csúszóablakos limit, 120 fordítás / 10 perc / felhasználó. A beszédfelismerés és a felolvasás a böngészőben fut, hang nem megy a szerverre.
+
 ### 45. lépés — Chat: beszélgetés-folytatás + AI-hangnem (2026-10-09) ✅ KÉSZ
 - **Folytatás („és a 0005?", „a 0003-at is", „és Gondos?"):** csak a SZÖVEGET írja át szerveren (`chatOps.carryOver`), a válasz a meglévő utakon jön. Írás továbbra is kizárólag HMAC-tokenes ✅-re; igés folytatás nem írja át; helyben nem válaszolható esetben az AI az EREDETI szöveget kapja.
 - **Névmás („add neki", „és a telefonja?"):** a sofőr/ügyfél feloldása szerveren, a cégre szűrt névlistából (`findEntity`/`findClient`), az AI nem kap nevet/telefont.
