@@ -1,6 +1,6 @@
 # 💬 AI-chat 2.0 — a teljes rendszer irányítása chatből (kidolgozás)
 
-> Állapot: **TERV** (2026-10-09). Még nincs implementálva. A cél: az admin/manager
+> Állapot: **FOLYAMATBAN** (2026-10-09) — 1–3. fázis kész (PR #541): katalógus, AI-útválasztó, navigáció, fuvar-képességek. A cél: az admin/manager
 > konzol MINDEN funkcióját, menüpontját és gombját a chatből, természetes nyelven
 > lehessen használni — úgy, hogy a biztonsági szabályok (multi-tenant, szerep,
 > ✅-megerősítés, „az AI nem lát dokumentumot / személyes adatot") megmaradjanak.

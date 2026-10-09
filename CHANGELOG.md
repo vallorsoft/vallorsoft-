@@ -14,6 +14,16 @@
 
 ---
 
+## 2026-10-09 — 💬 AI-chat 2.0 (1–3. fázis): képesség-katalógus + AI-útválasztó + navigáció (PR #541)
+
+- **Terv:** `CHAT-AI-TERV.md` — a teljes konzol chatből irányítható (csak Admin/Manager felület).
+- **`lib/chatTools/`** képesség-katalógus: olvasás / írás (✅) / veszélyes írás (be kell írni: IGEN) / navigáció; szerep + granulált jog + csomag-kapu, végrehajtáskor újra ellenőrizve; a végrehajtás a meglévő handlereken. Névfeloldás szerveren (`resolve.js`).
+- **`lib/chatRouter.js`** AI-szándékfelismerés csak tool-sémákkal (cég-adat nélkül), több lépés egy mondatban, „erre gondoltál?” gombok — a nem értett kérés többé nem esik az új-fuvar vázlatba. Limit: 60 AI-hívás / 10 perc / felhasználó.
+- **26 képesség:** minden menüpont megnyitása, súgó, fuvar-lista szűrőkkel, kiosztási javaslat, követő-link, fuvar megnyitása (adatlap/szerkesztő/dokumentumok/e-mail/leadás/megbízás), bármely mező módosítása, státusz, kiosztás és visszavonása, alvállalkozó, fizetés, dokumentum-nyomkövetés, törlés/visszaállítás, lezárás visszavonása, útdíj, leadás-kérés, sablonok, árajánlatok.
+- **Kliens:** a nyitott fül, a megnyitott fuvar és a kijelölt sorok kontextusa; fehérlistás UI-parancsok. Cache-bust `?v=20261009chat2`.
+- **Tanulás:** `db/chat-learning.sql` (`chat_miss_log` 30 nap, `chat_learned_intents`), kapcsoló `chat-learning`; GDPR export + anonimizálás.
+- **Teszt:** új `tests/unit/chatTools.test.js` (23) + `orderChat.test.js` +4.
+
 ## 2026-10-09 — 🌐 Sofőr-fordító: sofőr-szleng értése + partner-gomb a partner nyelvén (PR #539)
 
 - `handlers/translate.js`: a prompt érti a sofőr-szlenget és a német/angol jövevényszavakat, és a célnyelv szakszavára fordít (pl. „spanifer”/„spanngurt”/„chingă” = rakományrögzítő heveder → PL „pas transportowy”; ponyva/prelată, rámpa, raklap, élvédő, csúszásgátló, CMR).

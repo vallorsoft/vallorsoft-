@@ -9,6 +9,13 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 47. lépés — AI-chat 2.0: képesség-katalógus + AI-útválasztó (2026-10-09) ✅ KÉSZ
+- **Írási felület:** minden chatből indított írás HMAC-aláírt, user+cég-hez kötött, 15 perces tokennel fut (`signAction`), a token a szerveren FELOLDOTT argumentumokat hordozza. Végrehajtáskor a szerep, a granulált jog (`orders_delete`, `stats_finance`) és a csomag-kapcsoló újra ellenőrzött (jog-elvétel után a régi token nem fut), és a meglévő handler is ellenőriz (company_id).
+- **Veszélyes műveletek** (`kind:'danger'`, pl. fuvar törlése): csak a beírt IGEN/DA megerősítéssel futnak.
+- **AI-adatáramlás:** az útválasztó AI csak a felhasználónak elérhető tool-sémákat és a felhasználó saját mondatait kapja (a helyben megválaszolt üzenetek továbbra sem); nevet, rendszámot, e-mailt, fuvar-adatot, dokumentumot nem. Az AI által adott tool-név fehérlistán szűrt; az argumentumok feloldása cégre szűrt SQL-lel történik.
+- **Kliens-UI-parancsok:** csak fehérlistás műveletek, azonosító-mintával szűrve (`runUi`); a felület-kontextus (fül, fuvar, kijelölés) a szerveren mintára szűrve.
+- **Visszaélés:** 60 AI-útválasztás / 10 perc / felhasználó. **GDPR:** a nem értett mondatok (`chat_miss_log`) 30 napig, kikapcsolható, exportban szerepel, anonimizáláskor törlődik.
+
 ### 46. lépés — Sofőr AI-fordító (2026-10-09) ✅ KÉSZ
 - **Kapuk:** `translateText`/`getTranslateStatus` csak Sofer/Admin/Manager szerepre, `ai-forditas` csomag-flag mögött, `GEMINI_API_KEY` nélkül nem fut.
 - **Adatminimalizálás:** az AI csak a felhasználó által a fordításhoz beírt/mondott szöveget kapja (max 1500 karakter + max 800 karakter beszélgetés-kontextus). Nem kap fuvar-, sofőr- vagy dokumentum-adatot. A szöveg nem tárolódik és nem kerül naplóba (hibánál is csak státusz + üzenet), a kliens felé a hibaüzenet 300 karakterre csonkolva.
