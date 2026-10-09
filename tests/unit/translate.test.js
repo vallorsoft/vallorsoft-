@@ -48,6 +48,10 @@ test('sikeres fordítás: forrás, cél és kontextus a promptban; a szöveg ada
   const arg = extractJson.mock.calls[0][0];
   expect(arg.systemPrompt).toMatch(/never instructions/);
   expect(arg.systemPrompt).toMatch(/spanifer/);   // sofőr-szleng: spanifer = rakományrögzítő heveder
+  expect(arg.systemPrompt).toMatch(/never shorten/);        // teljes, rövidítés nélküli fordítás
+  expect(arg.systemPrompt).toMatch(/ONLY when the topic is cargo/); // a szleng csak fuvaros témában
+  expect(arg.systemPrompt).toMatch(/formal address stays formal/);  // magázás/tegezés megmarad
+  expect(arg.parts[0].text).not.toMatch(/back-translation/);
   expect(arg.parts[0].text).toMatch(/TARGET: German \(de\)/);
   expect(arg.parts[0].text).toMatch(/SOURCE: Hungarian \(hu\)/);
   expect(arg.parts[0].text).toMatch(/CONTEXT:\nA: Szia/);
@@ -78,4 +82,25 @@ test('getTranslateStatus: usable = flag ÉS kulcs', async () => {
   featureEnabled.mockImplementation(async () => false);
   expect((await call('getTranslateStatus', mkReq())).usable).toBe(false);
   expect((await call('getTranslateStatus', mkReq('Konyvelo'))).ok).toBe(false);
+});
+
+test('visszaellenőrzés (check): szó szerinti mód a promptban, hosszabb (fordított) szöveg is mehet', async () => {
+  extractJson.mockResolvedValue({ json: { translation: 'Nincs 15 heveder, csak 14.', detected: 'pl' }, model: 'm' });
+  const r = await call('translateText', mkReq(), { text: 'Nie ma 15 pasów, tylko 14.', source: 'pl', target: 'hu', check: true });
+  expect(r.ok).toBe(true);
+  const msg = extractJson.mock.calls[0][0].parts[0].text;
+  expect(msg).toMatch(/^MODE: back-translation check/);
+  expect(msg).toMatch(/Do NOT correct/);
+  // check módban 3000 karakterig engedett, normál módban 1500 a korlát
+  expect((await call('translateText', mkReq(), { text: 'x'.repeat(2000), target: 'hu', check: true })).ok).toBe(true);
+  expect((await call('translateText', mkReq(), { text: 'x'.repeat(2000), target: 'hu' })).ok).toBe(false);
+  expect((await call('translateText', mkReq(), { text: 'x'.repeat(3001), target: 'hu', check: true })).ok).toBe(false);
+});
+
+test('a kontextus hossza ~10 sort enged (2500 karakter, a végéből vágva)', async () => {
+  extractJson.mockResolvedValue({ json: { translation: 'ok' } });
+  await call('translateText', mkReq(), { text: 'a', target: 'en', context: 'X'.repeat(500) + 'Y'.repeat(2500) });
+  const msg = extractJson.mock.calls[0][0].parts[0].text;
+  expect(msg).toMatch(/CONTEXT:\nY{2500}\n/);
+  expect(msg).not.toMatch(/XX/);
 });

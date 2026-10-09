@@ -114,22 +114,25 @@
   function status(s) { var el = $('trStat'); if (el) el.textContent = s || ''; }
 
   // ── Fordítás (szerver) ──
-  function translate(text, source, target, context) {
-    S.busy++; status('⏳ ' + tt('sof.tr.translating'));
-    return rpc('translateText', { text: text, source: source, target: target, context: context || '' })
+  function translate(text, source, target, context, check) {
+    S.busy++; status('⏳ ' + tt(check ? 'sof.tr.checking' : 'sof.tr.translating'));
+    return rpc('translateText', { text: text, source: source, target: target, context: context || '', check: !!check })
       .then(function (r) { S.busy--; if (!S.busy) status(''); return r; })
       .catch(function () { S.busy--; if (!S.busy) status(''); return { ok: false, err: tt('sof.tr.error') }; });
   }
 
   // ── Beszélgetés ──
+  // Az utolsó 10 sor (eredeti → fordítás) — a névmások, a magázás/tegezés és
+  // a szóhasználat így végig egységes marad a beszélgetésben.
+  var CTX_LINES = 10;
   function convContext() {
-    return S.log.slice(-4).map(function (e) { return (e.side === 'me' ? 'A: ' : 'B: ') + e.src + (e.tr ? ' → ' + e.tr : ''); }).join('\n');
+    return S.log.filter(function (e) { return e.tr; }).slice(-CTX_LINES).map(function (e) { return (e.side === 'me' ? 'A: ' : 'B: ') + e.src + (e.tr ? ' → ' + e.tr : ''); }).join('\n');
   }
   function utter(side, text) {
     var src = side === 'me' ? S.me : S.other;
     var dst = side === 'me' ? S.other : S.me;
     var ctx = convContext();
-    var e = { side: side, src: text, tr: null, dst: dst, err: null };
+    var e = { side: side, src: text, tr: null, srcLang: src, dst: dst, err: null, back: null, backBusy: false };
     S.log.push(e); if (S.log.length > 60) S.log.shift();
     paintLog();
     translate(text, src, dst, ctx).then(function (r) {
@@ -146,10 +149,28 @@
         + '<div class="tr-src">' + esc(e.src) + '</div>'
         + (e.tr ? '<div class="tr-tr">' + esc(e.tr) + '</div>'
           + '<button type="button" class="tr-say" onclick="trSayLog(' + i + ')" aria-label="' + esc(tt('sof.tr.speak')) + '">🔊</button>'
+          + backHtml(e, 'trCheckLog(' + i + ')')
           : e.err ? '<div class="tr-err">⚠️ ' + esc(e.err) + '</div>' : '<div class="tr-wait">…</div>')
         + '</div>';
     }).join('');
     box.scrollTop = box.scrollHeight;
+  }
+  // „↩️ Mit hall a másik?" — a fordítás visszafordítva a beszélő nyelvére.
+  // Csak gombnyomásra fut (külön AI-hívás), az eredmény a buborék alján marad.
+  function backHtml(e, onclick) {
+    if (e.back) return '<div class="tr-back"><span>↩️ ' + esc(tt('sof.tr.checkLabel')) + ':</span> ' + esc(e.back) + '</div>';
+    if (e.backErr) return '<div class="tr-err">⚠️ ' + esc(e.backErr) + '</div>';
+    return '<button type="button" class="tr-chk"' + (e.backBusy ? ' disabled' : '') + ' onclick="' + onclick + '">'
+      + (e.backBusy ? '⏳ ' + esc(tt('sof.tr.checking')) : '↩️ ' + esc(tt('sof.tr.check'))) + '</button>';
+  }
+  function runCheck(e, repaint) {
+    if (!e || !e.tr || e.backBusy || e.back) return;
+    e.backBusy = true; e.backErr = null; repaint();
+    translate(e.tr, e.dst, e.srcLang, '', true).then(function (r) {
+      e.backBusy = false;
+      if (r && r.ok) e.back = r.translation; else e.backErr = (r && r.err) || tt('sof.tr.error');
+      repaint();
+    });
   }
   function paintMics() {
     var bm = $('trMicMe'), bo = $('trMicOther'), bt = $('trTxtMic');
@@ -207,7 +228,8 @@
       + '<button type="button" class="tr-btn" onclick="trDoText()">🌐 ' + esc(tt('sof.tr.translate')) + '</button></div>'
       + '<div class="tr-res" id="trRes" style="display:none"><div id="trResTxt" class="tr-res-txt"></div>'
       + '<div class="tr-row"><button type="button" class="tr-btn ghost" onclick="trSayRes()">🔊 ' + esc(tt('sof.tr.speak')) + '</button>'
-      + '<button type="button" class="tr-btn ghost" onclick="trCopyRes()">📋 ' + esc(tt('sof.tr.copy')) + '</button></div></div>';
+      + '<button type="button" class="tr-btn ghost" onclick="trCopyRes()">📋 ' + esc(tt('sof.tr.copy')) + '</button></div>'
+      + '<div id="trResBack"></div></div>';
   }
 
   // ── Globális (onclick) belépési pontok ──
@@ -227,20 +249,28 @@
     if (!v) return; inp.value = ''; utter(side === 'other' ? 'other' : 'me', v);
   };
   window.trSayLog = function (i) { var e = S.log[i]; if (e && e.tr) speak(e.tr, e.dst); };
+  window.trCheckLog = function (i) { runCheck(S.log[i], paintLog); };
   window.trDictate = function () {
     listen('text', function (txt) { var ta = $('trTxt'); if (ta) { ta.value = (ta.value ? ta.value + ' ' : '') + txt; } window.trDoText(); });
   };
   var _res = '';
+  var _resE = null;   // a szöveg-fül eredménye a visszaellenőrzéshez
+  function paintResBack() { var b = $('trResBack'); if (b) b.innerHTML = _resE ? backHtml(_resE, 'trCheckRes()') : ''; }
   window.trDoText = function () {
     var ta = $('trTxt'); var v = ta ? ta.value.trim() : '';
     if (!v) { note(tt('sof.tr.empty'), 'err'); return; }
     translate(v, null, S.target, '').then(function (r) {
       var box = $('trRes'), t = $('trResTxt'); if (!box || !t) return;
       box.style.display = 'block';
-      if (r && r.ok) { _res = r.translation; t.textContent = _res; t.classList.remove('err'); if (S.auto) speak(_res, S.target); }
-      else { _res = ''; t.textContent = '⚠️ ' + ((r && r.err) || tt('sof.tr.error')); t.classList.add('err'); }
+      if (r && r.ok) {
+        _res = r.translation; t.textContent = _res; t.classList.remove('err'); if (S.auto) speak(_res, S.target);
+        // A visszaellenőrzés a felismert forrásnyelvre (ennek hiányában a sofőr nyelvére) fordít.
+        _resE = { tr: _res, dst: S.target, srcLang: r.detected || S.me || (uiLang() === 'hu' ? 'hu' : 'ro'), back: null, backBusy: false };
+      } else { _res = ''; _resE = null; t.textContent = '⚠️ ' + ((r && r.err) || tt('sof.tr.error')); t.classList.add('err'); }
+      paintResBack();
     });
   };
+  window.trCheckRes = function () { runCheck(_resE, paintResBack); };
   window.trSayRes = function () { if (_res) speak(_res, S.target); };
   window.trCopyRes = function () {
     if (!_res) return;
