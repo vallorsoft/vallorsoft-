@@ -24,6 +24,12 @@
 - **Tanulás:** `db/chat-learning.sql` (`chat_miss_log` 30 nap, `chat_learned_intents`), kapcsoló `chat-learning`; GDPR export + anonimizálás.
 - **Teszt:** új `tests/unit/chatTools.test.js` (23) + `orderChat.test.js` +4.
 
+## 2026-10-09 — 🌐 Sofőr-fordító: komoly, általános tolmács + „Mit hall a másik?” visszaellenőrzés (PR #540)
+
+- `handlers/translate.js`: új tolmács-utasítás — teljes, rövidítés nélküli fordítás; hangnem, magázás/tegezés, nem és szólások (értelem szerint) megtartva; beszédfelismerési hibák csendes javítása, de tartalom nem kitalálható. A sofőr-szleng csak fuvaros témában szakszó (a „sarkon vagyok” = utcasarok, nem élvédő). Kontextus 800 → 2500 karakter.
+- Új `check: true` mód: szó szerinti visszafordítás, amiben a fordítás hibája látszik (nem simít ki semmit).
+- `public/sofer-translate.js`: beszélgetésben az utolsó 10 lefordított sor a kontextus; minden lefordított buborékon és a Szöveg-fül eredményén „↩️ Mit hall a másik?” gomb → a fordítás visszafordítva a beszélő nyelvére. 3 új `sof.tr.*` kulcs (RO+HU), cache-bust `?v=20261009tr3`. +2 teszt.
+
 ## 2026-10-09 — 🌐 Sofőr-fordító: sofőr-szleng értése + partner-gomb a partner nyelvén (PR #539)
 
 - `handlers/translate.js`: a prompt érti a sofőr-szlenget és a német/angol jövevényszavakat, és a célnyelv szakszavára fordít (pl. „spanifer”/„spanngurt”/„chingă” = rakományrögzítő heveder → PL „pas transportowy”; ponyva/prelată, rámpa, raklap, élvédő, csúszásgátló, CMR).
