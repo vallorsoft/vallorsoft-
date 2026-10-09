@@ -25,6 +25,15 @@
     ['lv', 'lv-LV', 'Latviešu'], ['et', 'et-EE', 'Eesti'], ['sv', 'sv-SE', 'Svenska'],
     ['da', 'da-DK', 'Dansk'], ['no', 'nb-NO', 'Norsk'], ['fi', 'fi-FI', 'Suomi'],
   ];
+  // „Most én beszélek" a PARTNER saját nyelvén — hogy a külföldi fél is
+  // tudja, melyik gombot nyomja meg (a sofőr nyelvén alatta kicsiben).
+  var SPEAK = {
+    ro: 'Vorbesc eu', hu: 'Én beszélek', en: "I'm speaking", de: 'Ich spreche', fr: 'Je parle', it: 'Parlo io',
+    es: 'Hablo yo', pt: 'Eu falo', nl: 'Ik spreek', pl: 'Mówię ja', cs: 'Mluvím já', sk: 'Hovorím ja',
+    sl: 'Govorim jaz', hr: 'Ja govorim', sr: 'Ja govorim', bg: 'Аз говоря', el: 'Μιλάω εγώ', tr: 'Ben konuşuyorum',
+    uk: 'Я говорю', ru: 'Я говорю', lt: 'Kalbu aš', lv: 'Es runāju', et: 'Mina räägin', sv: 'Jag pratar',
+    da: 'Jeg taler', no: 'Jeg snakker', fi: 'Minä puhun',
+  };
   function langRow(c) { for (var i = 0; i < LANGS.length; i++) if (LANGS[i][0] === c) return LANGS[i]; return null; }
   function bcp(c) { var r = langRow(c); return r ? r[1] : c; }
   function lname(c) { var r = langRow(c); return r ? r[2] : c; }
@@ -145,7 +154,7 @@
   function paintMics() {
     var bm = $('trMicMe'), bo = $('trMicOther'), bt = $('trTxtMic');
     if (bm) { bm.classList.toggle('on', S.recSide === 'me'); bm.innerHTML = '🎤 ' + esc(tt('sof.tr.meSpeaks')) + '<small>' + esc(lname(S.me)) + '</small>'; }
-    if (bo) { bo.classList.toggle('on', S.recSide === 'other'); bo.innerHTML = '🎤 ' + esc(tt('sof.tr.otherSpeaks')) + '<small>' + esc(lname(S.other)) + '</small>'; }
+    if (bo) { bo.classList.toggle('on', S.recSide === 'other'); bo.innerHTML = '🎤 ' + esc(SPEAK[S.other] || lname(S.other)) + '<small>' + esc(tt('sof.tr.otherSpeaks') + ' · ' + lname(S.other)) + '</small>'; }
     if (bt) bt.classList.toggle('on', S.recSide === 'text');
   }
 

@@ -54,6 +54,7 @@ Tesztek zöldek (**106 Jest**, 24 suite). **CI: GitHub Actions** (`.github/workf
 
 **Legújabb kör (2026-10-09 — 🌐 Sofőr: AI fordító — lebegő ikon, szöveg- és élő beszélgetés-fordítás, PR #538):** *(részletes kész-lista: `CHANGELOG.md`; biztonság: `AUDIT.md` 46. lépés)*
 1. `public/sofer-translate.js` — lebegő 🌐 ikon (bal alul) → panel: 🗣️ Beszélgetés (tolmács: Én / Ő mikrofon-gomb, böngészős beszédfelismerés + felolvasás) és ✍️ Szöveg. `handlers/translate.js` `translateText`/`getTranslateStatus` (Sofer/Admin/Manager, `ai-forditas` csomag-flag, Gemini, csúszóablakos limit).
+3. **Kiegészítés (PR #539):** a prompt érti a sofőr-szlenget (pl. „spanifer” = rakományrögzítő heveder); a partner gombja a partner nyelvén („Mówię ja”). Új szleng-szó = új példa a `translate.js` promptjában.
 2. **Szabályok:** a fordítandó szöveg nem tárolódik és nem kerül naplóba; rendszer-adat nem megy az AI-hoz. Külön fájlban élő sofőr-modál: `_SOF_MODALS` bejegyzés `ext: '<fájl>'` jelöléssel (a regresszió-teszt ott keresi a záró-függvényt).
 
 **Korábbi kör (2026-10-09 — 💬 Chat: a beszélgetésből is ért, természetes mondatokban válaszol, PR #537):** *(részletes kész-lista: `CHANGELOG.md`; biztonság: `AUDIT.md` 45. lépés)*

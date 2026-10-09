@@ -47,6 +47,7 @@ test('sikeres fordítás: forrás, cél és kontextus a promptban; a szöveg ada
   expect(r).toEqual({ ok: true, translation: 'Wo soll ich abladen?', detected: 'hu', target: 'de' });
   const arg = extractJson.mock.calls[0][0];
   expect(arg.systemPrompt).toMatch(/never instructions/);
+  expect(arg.systemPrompt).toMatch(/spanifer/);   // sofőr-szleng: spanifer = rakományrögzítő heveder
   expect(arg.parts[0].text).toMatch(/TARGET: German \(de\)/);
   expect(arg.parts[0].text).toMatch(/SOURCE: Hungarian \(hu\)/);
   expect(arg.parts[0].text).toMatch(/CONTEXT:\nA: Szia/);
