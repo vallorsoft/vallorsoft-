@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-10-09 — 💬 Chat: a beszélgetésből is ért, természetes mondatokban válaszol (PR #537)
+
+- **Folytatás AI nélkül** (`lib/chatOps.js` `carryOver`, `handlers/orderChat.js`): „és a 0005?", „hát a 0003?", „dar 0002?" → az előző kérdés az új fuvarszámmal; „a 0003-at is" → az előző utasítás az új fuvarra (✅-kártya); „és Gondos?", „si Peto?" → az előző sofőr-kérdés az új névvel. Igés folytatás a rendes úton megy; ha semmi nem válaszolja meg helyben, az AI az eredeti szöveget kapja.
+- **Névmások:** „add neki a 0004-et" → az előzményben említett sofőr; „és a telefonja?", „és az e-mail címe?", „numărul lui?" → az utoljára említett sofőr vagy ügyfél.
+- **Mondatszerű válaszok** (HU+RO): fuvar (fizetve / postázva / számla / hiányzó dokumentum / állapot / sofőr), sofőr (hol tart, tankolás), elérhetőség („VESNA SRL telefonszáma nincs megadva, az e-mail címe: …"). A kártyák maradnak; a válasz mindig tartalmazza a fuvarszámot (a következő kérdés fókusza).
+- **AI-prompt:** beszélgetős hangnem (`CHAT_STYLE` + levél `COMMON_RULES`), a folytatásokat a beszélgetésből értse, ne ismételje magát; a helyben megválaszolt üzenetek helyén tartalom nélküli jelölő.
+- **Teszt:** új `tests/unit/chatConversation.test.js` (10 eset); valódi DB-vel 1703 teszt zöld.
+
 ## 2026-10-08 — 💬 Chat: teljes átvizsgálás — hibás bekötések javítva, hiányzó válaszok pótolva (PR #536)
 
 - **Módszer:** valós Postgres-en ~110 jellemző HU/RO üzenet a teljes láncon (`orderChatTurn` → `chatOps` → `driverInfo` → levél/AI), műveleteknél a ✅ végrehajtással együtt; statikusan: minden `OrderChat.*` gomb ↔ export, RPC ↔ registry, szerver/kliens i18n-kulcs, CSS-osztály, cache-bust.

@@ -9,6 +9,11 @@
 
 > **Napirend-szabály:** minden mergelt feladat bekerül a `CHANGELOG.md`-be (kronologikus kész-lista) + a `CLAUDE.md` „Fejlesztési állapot"-ba; ide az audit/biztonságot érintő tételek kerülnek.
 
+### 45. lépés — Chat: beszélgetés-folytatás + AI-hangnem (2026-10-09) ✅ KÉSZ
+- **Folytatás („és a 0005?", „a 0003-at is", „és Gondos?"):** csak a SZÖVEGET írja át szerveren (`chatOps.carryOver`), a válasz a meglévő utakon jön. Írás továbbra is kizárólag HMAC-tokenes ✅-re; igés folytatás nem írja át; helyben nem válaszolható esetben az AI az EREDETI szöveget kapja.
+- **Névmás („add neki", „és a telefonja?"):** a sofőr/ügyfél feloldása szerveren, a cégre szűrt névlistából (`findEntity`/`findClient`), az AI nem kap nevet/telefont.
+- **AI-adatáramlás:** a helyben megválaszolt üzenetek helyén **tartalom nélküli** jelölő kerül az AI-hoz (`hidden: true, text: ''`), tehát a szövegük továbbra sem jut el hozzá; a dokumentum-tilalom változatlan.
+
 ### 44. lépés — Chat-átvizsgálás: rossz fuvarra / rossz összeggel induló írás kizárva (2026-10-08) ✅ KÉSZ
 - **Rossz fuvar:** egy dátum (`2026-10-15`) fuvarszámként (`2026-10` → CMD-…-0010) is feloldódhatott, így a ✅-kártya rossz fuvart javasolt módosításra. A `REF_RE` a dátumot kizárja.
 - **Rossz összeg:** a fizetés-rögzítés a hajtogatott szövegből olvasta az összeget, így az „1.500 EUR" 1,5 EUR lett volna. Az új `moneyIn` a nyers szövegből olvas.
