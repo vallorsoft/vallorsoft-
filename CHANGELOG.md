@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-10-09 — 💬 AI-chat 2.0, 2. kör: a maradék konzol-funkciók chatből (85 funkció)
+
+- **`lib/chatTools/admin.js`** (+10 funkció): `order.bulk_post_delivery` (a kijelölt vagy felsorolt fuvarokon lezárás / számlaszám / postázás / fizetés / megjegyzés egy ✅-vel, a meglévő `setOrderPostDeliveryBulk`-on), `order.uit_add` + `order.uit_list`, `order.leg_add` (útközbeni átadás másik sofőrnek/járműnek), `ecmr.create` (utána az e-CMR oldal nyílik az aláíráshoz), `vcalc.order_cost` (egy fuvar költsége és várható eredménye a mentett költségtételekből, megadott gázolaj-árral) + `vcalc.order_cost_save`, `stats.goal_set` és `company.settings_update` (csak Admin), `docs.register_update` (bejegyzés módosítása / sztornó).
+- **Visszavonás:** mindegyik új írásnál (a tömeges lezárás kivételével), és a `vehicle.create`-nél is (csak ha a járművet még nem használja fuvar).
+- **Javítva:** a UIT-felvitel (`POST /api/orders/:id/uit`) nem ellenőrizte a fuvar tulajdonjogát — a közös `addUitCode` most ellenőrzi (404). A chat a cégadat- és a nyilvántartás-mentésnél kiegészíti a kérést a meglévő értékekkel, így nem nulláz más mezőt.
+- **Súgó:** új „🧰 Tömeges, UIT, kalkuláció, beállítások” példacsoport. AUDIT.md: a mainen bent maradt merge-jelölő rendbe téve (48. = chat 1. kör, 49. = ez a kör).
+- **Teszt:** `chat-tools-db.test.js` +1 nagy valódi-DB eset (írás → DB → visszavonás minden új funkcióra, cross-tenant, Manager-tiltás). Valódi DB-vel 1765 teszt zöld.
+
 ## 2026-10-09 — 💬 AI-chat 2.0: a teljes admin/manager konzol chatből (1–8. fázis, PR #541)
 
 - **Terv:** `CHAT-AI-TERV.md` — csak Admin/Manager felület (a sofőr nem kap chat-irányítást).
