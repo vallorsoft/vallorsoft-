@@ -14,6 +14,11 @@
 
 ---
 
+## 2026-10-09 — 🌐 Sofőr-fordító: sofőr-szleng értése + partner-gomb a partner nyelvén (PR #539)
+
+- `handlers/translate.js`: a prompt érti a sofőr-szlenget és a német/angol jövevényszavakat, és a célnyelv szakszavára fordít (pl. „spanifer”/„spanngurt”/„chingă” = rakományrögzítő heveder → PL „pas transportowy”; ponyva/prelată, rámpa, raklap, élvédő, csúszásgátló, CMR).
+- `public/sofer-translate.js`: a partner gombja a partner saját nyelvén jelenik meg (pl. lengyelül „🎤 Mówię ja”), alatta kicsiben a sofőr nyelvén; 27 nyelv. Cache-bust `sofer-translate.js?v=20261009tr2`.
+
 ## 2026-10-09 — 🌐 Sofőr: AI fordító — lebegő ikon, szöveg- és élő beszélgetés-fordítás (PR #538)
 
 - **Lebegő 🌐 ikon** a sofőr felületen (bal alsó sarok, csak ha a cégnél elérhető) → fordító-panel (`public/sofer-translate.js`).
