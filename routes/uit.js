@@ -123,34 +123,41 @@ router.get('/api/uit/:uid/photo', requireLogin, async (req, res) => {
   } catch (e) { console.error('GET /api/uit/:uid/photo hiba:', e); res.status(500).send('Eroare de server'); }
 });
 
-// ---- HOZZÁADÁS (Admin/Manager) — opc. stop_id ----
+// ---- HOZZÁADÁS — közös logika (REST + chat: lib/chatTools/admin.js) ----
+// A fuvar tulajdonjogát ellenőrzi (cross-tenant védelem), majd beszúr.
+// Kimenet: { item } | { status, error }
+async function addUitCode(cid, userId, orderId, body) {
+  body = body || {};
+  const uit = normalizeUit(body.uit_code);
+  if (!isValidUit(uit)) return { status: 400, error: 'Codul UIT este obligatoriu (max 16 caractere alfanumerice).' };
+  const o = await pool.query(`SELECT rendszam_camion FROM orders WHERE id=$1 AND company_id=$2`, [orderId, cid]);
+  if (!o.rows.length) return { status: 404, error: 'Transportul nu a fost gasit.' };
+  const rendszam = String(body.rendszam || '').trim() || o.rows[0].rendszam_camion || '';
+  const gpsCfg = await getGpsCfg(cid);
+  const objectId = await objectIdForRendszam(cid, gpsCfg ? gpsCfg.provider : null, rendszam);
+  const provider = gpsCfg ? gpsCfg.provider : 'cargotrack';
+  const validUntil = body.valid_until || null;
+  const { photo_b64, photo_mime } = _sanitizePhoto(body);
+  const source = _sanitizeSource(body.source);
+  const stopId = await _validStopId(cid, orderId, body.stop_id);
+  const { rows } = await pool.query(
+    `INSERT INTO order_uit_codes (company_id, order_id, uit_code, rendszam, object_id, provider, valid_until,
+                                  created_by, photo_b64, photo_mime, source, stop_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+     ON CONFLICT (company_id, order_id, uit_code) DO NOTHING
+     RETURNING id, uit_code, rendszam, object_id, status, valid_until, last_message, sent_at, stopped_at,
+               source, (photo_b64 IS NOT NULL) AS has_photo, photo_mime, stop_id, created_by, created_at`,
+    [cid, orderId, uit, rendszam || null, objectId, provider, validUntil,
+     userId, photo_b64, photo_mime, source, stopId]);
+  if (!rows.length) return { status: 409, error: 'Acest UIT este deja inregistrat la aceasta cursa.' };
+  return { item: rows[0] };
+}
+
 router.post('/api/orders/:id/uit', requireLogin, requireRole('Admin', 'Manager'), async (req, res) => {
-  const uit = normalizeUit(req.body && req.body.uit_code);
-  if (!isValidUit(uit)) return res.status(400).json({ error: 'Codul UIT este obligatoriu (max 16 caractere alfanumerice).' });
   try {
-    let rendszam = (req.body.rendszam || '').trim();
-    if (!rendszam) {
-      const o = await pool.query(`SELECT rendszam_camion FROM orders WHERE id=$1 AND company_id=$2`, [req.params.id, own(req)]);
-      rendszam = o.rows.length ? (o.rows[0].rendszam_camion || '') : '';
-    }
-    const gpsCfg = await getGpsCfg(own(req));
-    const objectId = await objectIdForRendszam(own(req), gpsCfg ? gpsCfg.provider : null, rendszam);
-    const provider = gpsCfg ? gpsCfg.provider : 'cargotrack';
-    const validUntil = req.body.valid_until || null;
-    const { photo_b64, photo_mime } = _sanitizePhoto(req.body);
-    const source = _sanitizeSource(req.body && req.body.source);
-    const stopId = await _validStopId(own(req), req.params.id, req.body && req.body.stop_id);
-    const { rows } = await pool.query(
-      `INSERT INTO order_uit_codes (company_id, order_id, uit_code, rendszam, object_id, provider, valid_until,
-                                    created_by, photo_b64, photo_mime, source, stop_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-       ON CONFLICT (company_id, order_id, uit_code) DO NOTHING
-       RETURNING id, uit_code, rendszam, object_id, status, valid_until, last_message, sent_at, stopped_at,
-                 source, (photo_b64 IS NOT NULL) AS has_photo, photo_mime, stop_id, created_by, created_at`,
-      [own(req), req.params.id, uit, rendszam || null, objectId, provider, validUntil,
-       req.session.user.id, photo_b64, photo_mime, source, stopId]);
-    if (!rows.length) return res.status(409).json({ error: 'Acest UIT este deja inregistrat la aceasta cursa.' });
-    res.json({ item: rows[0] });
+    const r = await addUitCode(own(req), req.session.user.id, req.params.id, req.body);
+    if (r.error) return res.status(r.status).json({ error: r.error });
+    res.json({ item: r.item });
   } catch (e) { console.error('POST /api/orders/:id/uit hiba:', e); res.status(500).json({ error: 'Eroare de server' }); }
 });
 
@@ -253,3 +260,4 @@ router.delete('/api/sofer/uit/:uid', requireLogin, requireRole('Sofer'), async (
 });
 
 module.exports = router;
+module.exports.addUitCode = addUitCode;
