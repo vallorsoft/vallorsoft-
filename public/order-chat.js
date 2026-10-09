@@ -130,7 +130,7 @@
   function renderMsgs() {
     var box = $('ochMsgs');
     if (!box) return;
-    var h = '<div class="och-msg ai">' + esc(T('och.welcome')) + '<div class="och-mut" style="margin-top:6px;">✏️ ' + esc(T('och.editHint')) + '</div><div class="och-mut" style="margin-top:4px;">✉️ ' + esc(T('och.mailHint')) + '</div><div class="och-mut" style="margin-top:4px;">📍 ' + esc(T('och.infoHint')) + '</div><div class="och-mut" style="margin-top:4px;">⚡ ' + esc(T('och.opsHint')) + '</div></div>';
+    var h = '<div class="och-msg ai">' + esc(T('och.welcome')) + '<div class="och-mut" style="margin-top:6px;">✏️ ' + esc(T('och.editHint')) + '</div><div class="och-mut" style="margin-top:4px;">✉️ ' + esc(T('och.mailHint')) + '</div><div class="och-mut" style="margin-top:4px;">📍 ' + esc(T('och.infoHint')) + '</div><div class="och-mut" style="margin-top:4px;">⚡ ' + esc(T('och.opsHint')) + '</div><div class="och-mut" style="margin-top:4px;">🧭 ' + esc(T('och.anyHint')) + '</div></div>';
     S.messages.forEach(function (m) {
       // m.html: a szerver által renderelt (escape-elt) sofőr-információs kártya.
       h += '<div class="och-msg ' + (m.role === 'assistant' ? 'ai' : 'me') + (m.err ? ' err' : '') + (m.sys ? ' sys' : '') + (m.html ? ' info' : '') + '">'
@@ -288,8 +288,8 @@
     if (inpId) {
       var inp = $(inpId);
       var v = inp ? String(inp.value || '').trim() : '';
-      if (!v) { if (inp) inp.focus(); S.messages.push({ role: 'assistant', text: '⚠️ ' + T('och.needClient'), err: true }); renderMsgs(); return; }
-      args.client_name = v;
+      if (!v) { if (inp) inp.focus(); S.messages.push({ role: 'assistant', text: '⚠️ ' + T(inp && inp.getAttribute('data-need') === 'confirm' ? 'och.typeConfirm' : 'och.needClient'), err: true }); renderMsgs(); return; }
+      args.client_name = v; args.input = v;
     }
     S.acted = S.acted || {};
     S.acted[tok] = 'busy';
@@ -300,6 +300,7 @@
         S.acted[tok] = 'done';
         S.messages.push({ role: 'assistant', sys: true, text: r.reply || '✅', local: true });
         if (typeof window.loadOrders === 'function' && r.order_id) { try { window.loadOrders(); } catch (_) {} }
+        if (r.ui) setTimeout(function () { runUi(r.ui); }, 30);
       } else {
         delete S.acted[tok];
         S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
@@ -353,6 +354,49 @@
     try { _rec.start(); } catch (_) { _rec = null; if (btn) btn.classList.remove('rec'); }
   }
 
+  // ── AI-chat 2.0: a felület kontextusa (melyik fül, nyitott fuvar, kijelölt sorok) ──
+  function _uiCtx() {
+    var c = { tab: null, order: null, selected: [] };
+    try {
+      var act = document.querySelector('.sidebar .sub-tab.active, .sidebar .tab.active');
+      c.tab = act ? act.getAttribute('data-tab') : null;
+      var em = document.getElementById('orderEditModal');
+      if (em && em.classList.contains('open') && typeof window._oeOrderId !== 'undefined' && window._oeOrderId) c.order = String(window._oeOrderId);
+      Array.prototype.forEach.call(document.querySelectorAll('.orderRowCb:checked'), function (cb) { if (c.selected.length < 500) c.selected.push(String(cb.value)); });
+    } catch (_) {}
+    return c;
+  }
+  // A szerver UI-parancsai — CSAK fehérlistás műveletek, ismert függvényekkel.
+  function _call(fn) { try { fn(); } catch (e) { if (window.console) console.warn('OrderChat UI:', e && e.message); } }
+  var SAFE_ID = /^[A-Za-z0-9_@.\-]{1,120}$/;
+  function runUi(u) {
+    if (!u || typeof u !== 'object') return;
+    var id = u.id != null && SAFE_ID.test(String(u.id)) ? String(u.id) : null;
+    var tabOk = /^[a-z0-9-]{1,40}$/.test(String(u.tab || ''));
+    if (_isMobile()) close();
+    switch (u.op) {
+      case 'tab': if (tabOk && typeof window.activateTab === 'function') _call(function () { window.activateTab(u.tab); }); break;
+      case 'openOrder': if (id && window.EntityDetail) _call(function () { window.EntityDetail.openOrder(id); }); break;
+      case 'editOrder': if (id && typeof window.openOrderEdit === 'function') _call(function () { window.openOrderEdit(id); }); break;
+      case 'postDelivery': if (id && typeof window.vsPostDeliveryOpen === 'function') _call(function () { window.vsPostDeliveryOpen(id); }); break;
+      case 'orderEmail': if (id && typeof window.openOrderEmail === 'function') _call(function () { window.openOrderEmail(id); }); break;
+      case 'handover': if (id && typeof window.openHandoverModal === 'function') _call(function () { window.openHandoverModal(id); }); break;
+      case 'assignment': if (id && window.OrderAssignment) _call(function () { window.OrderAssignment.open(id); }); break;
+      case 'vehicle': if (id && window.EntityDetail) _call(function () { window.EntityDetail.openVehicle(id); }); break;
+      case 'driver': if (id && window.EntityDetail) _call(function () { window.EntityDetail.openDriver(id, String(u.name || '').slice(0, 120)); }); break;
+      case 'client': if (id && window.EntityDetail) _call(function () { window.EntityDetail.openClient(id, String(u.name || '').slice(0, 200)); }); break;
+      case 'decont':
+        if (typeof window.activateTab === 'function') _call(function () { window.activateTab('decont'); });
+        if (id && window.FleetExtra && window.FleetExtra.dcOpenDriver) setTimeout(function () { _call(function () { window.FleetExtra.dcOpenDriver(id); }); }, 600);
+        break;
+      case 'svDecide':
+        if (typeof window.activateTab === 'function') _call(function () { window.activateTab('service-log'); });
+        if (id && window.FleetExtra && window.FleetExtra.svOpenDecide) setTimeout(function () { _call(function () { window.FleetExtra.svOpenDecide(id); }); }, 600);
+        break;
+      default: break;
+    }
+  }
+
   function send(textOverride) {
     if (S.busy || S.saved) return;
     var ta = $('ochInput');
@@ -365,7 +409,7 @@
     var _keepQs = S.questions; S.questions = [];
     renderAll();
     var hist = S.messages.filter(function (m) { return !m.err; }).map(function (m) { return { role: m.role, text: m.text, local: !!m.local }; });
-    window.gas('orderChatTurn', [{ messages: hist, draft: S.draft, lang: lang() }]).then(function (r) {
+    window.gas('orderChatTurn', [{ messages: hist, draft: S.draft, lang: lang(), ui: _uiCtx() }]).then(function (r) {
       S.busy = false;
       if (!r || !r.ok) {
         S.messages.push({ role: 'assistant', text: '⚠️ ' + ((r && r.err) || T('och.err')), err: true });
@@ -374,6 +418,7 @@
         // AI nélkül megválaszolt kérdés: a kérdés és a válasz sem megy később az AI-hoz.
         for (var li = S.messages.length - 1; li >= 0; li--) { if (S.messages[li].role === 'user') { S.messages[li].local = true; break; } }
         S.messages.push({ role: 'assistant', text: r.reply || '', html: r.info_html || '', local: true });
+        if (r.ui) setTimeout(function () { runUi(r.ui); }, 30);
         if (r.questions && r.questions.length) { S._draftQs = _keepQs; S.questions = r.questions; }
         // Egy MEGLÉVŐ fuvarról szóló válasznál a vázlat kérdései („Ki a megrendelő?") nem
         // ide tartoznak — elrejtjük, a következő vázlat-üzenetnél visszajönnek.
@@ -674,5 +719,5 @@
     b.style.display = visible ? '' : 'none';
   }
 
-  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, docUp: docUp, prefill: prefill, mic: mic, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
+  window.OrderChat = { open: open, close: close, reset: reset, send: send, pick: pick, save: save, openList: openList, openOrder: openOrder, tab: tab, uit: uit, uitRemove: uitRemove, setFab: setFab, mailSend: mailSend, openReply: openReply, act: act, actCancel: actCancel, runUi: runUi, docUp: docUp, prefill: prefill, mic: mic, mailToggle: mailToggle, mailSaveLook: mailSaveLook, mailResetLook: mailResetLook };
 })();

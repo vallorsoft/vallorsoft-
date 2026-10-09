@@ -15,6 +15,9 @@ let mockFeatureOn = true;
 jest.mock('../../lib/featureEnabled', () => ({ featureEnabled: async () => mockFeatureOn }));
 const mockExtract = jest.fn();
 jest.mock('../../lib/geminiJson', () => ({ extractJson: (...a) => mockExtract(...a) }));
+// Az AI-útválasztás (lib/chatRouter) külön tesztelt — itt a fuvar-vázlat útját nézzük.
+const mockRoute = jest.fn(async () => ({ delegate: 'draft' }));
+jest.mock('../../lib/chatRouter', () => ({ route: (...a) => mockRoute(...a) }));
 const mockAnaf = jest.fn();
 jest.mock('../../services/clients', () => {
   const real = jest.requireActual('../../services/clients');
@@ -446,5 +449,40 @@ describe('orderChatTurn — sofőr-kérdés ág (lib/driverInfo)', () => {
   test('Sofer szerep nem kérdezhet', async () => {
     const r = await call('orderChatTurn', SOFER, [{ messages: [{ role: 'user', text: 'Peto hol tart?' }], draft: {}, lang: 'hu' }]);
     expect(r.ok).toBe(false);
+  });
+});
+
+describe('AI-chat 2.0 — képesség-katalógus bekötése', () => {
+  beforeEach(() => { mockRoute.mockReset(); mockExtract.mockReset(); });
+  test('üres vázlat: a router válasza (kártya + UI-parancs) megy vissza, a vázlat-AI nem fut', async () => {
+    mockRoute.mockResolvedValue({ reply: '🧭 Megnyitottam: Tervezőtábla', html: '', questions: [], ui: { op: 'tab', tab: 'orders-planner' } });
+    const r = await call('orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'nyisd meg a tervezőtáblát' }], draft: {}, lang: 'hu', ui: { tab: 'dash' } }]);
+    expect(r.ok).toBe(true);
+    expect(r.info).toBe(true);
+    expect(r.ui).toEqual({ op: 'tab', tab: 'orders-planner' });
+    expect(mockExtract).not.toHaveBeenCalled();
+    expect(mockRoute.mock.calls[0][2].ui).toEqual({ tab: 'dash' });
+  });
+  test('új fuvar leírása → nincs router, egyenesen a vázlat', async () => {
+    mockExtract.mockResolvedValue({ model: 'm', json: { reply: 'ok', draft: {}, questions: [] } });
+    await call('orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'Holnap felrakás Arad, lerakás Győr 22 raklap' }], draft: {}, lang: 'hu' }]);
+    expect(mockRoute).not.toHaveBeenCalled();
+    expect(mockExtract).toHaveBeenCalled();
+  });
+  test('aktív vázlat + off_topic → router, a vázlat érintetlen', async () => {
+    mockExtract.mockResolvedValue({ model: 'm', json: { off_topic: true, reply: '', draft: {} } });
+    mockRoute.mockResolvedValue({ reply: 'Lejáratok…', html: '<div></div>', questions: [] });
+    const draft = { stops: [{ kind: 'pickup', loc: 'Arad', data: '2026-10-10' }] };
+    const r = await call('orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'nyisd meg a tervezőtáblát' }], draft, lang: 'hu' }]);
+    expect(r.info).toBe(true);
+    expect(r.reply).toBe('Lejáratok…');
+    expect(r.draft).toBeUndefined();
+  });
+  test('router-hiba → visszaesik a régi vázlat-útra', async () => {
+    mockRoute.mockResolvedValue({ err: 'AI' });
+    mockExtract.mockResolvedValue({ model: 'm', json: { reply: 'ok', draft: {}, questions: [] } });
+    const r = await call('orderChatTurn', ADMIN, [{ messages: [{ role: 'user', text: 'valami' }], draft: {}, lang: 'hu' }]);
+    expect(r.ok).toBe(true);
+    expect(mockExtract).toHaveBeenCalled();
   });
 });

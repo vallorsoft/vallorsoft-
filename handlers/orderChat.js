@@ -38,6 +38,33 @@ const { memGet, memPut } = require('../lib/chatMemory');
 const mailChat = require('./mailChat');
 const driverInfo = require('../lib/driverInfo');
 const chatOps = require('../lib/chatOps');
+const chatRouter = require('../lib/chatRouter');
+
+// Új fuvar leírásának tűnő szöveg (felrakás/lerakás + útvonal/dátum, kérdés nélkül) →
+// egyenesen a fuvar-vázlatba megy, nem kell hozzá külön AI-útválasztás.
+const NEW_ORDER_RE = /\b(felrak\w*|lerak\w*|incarc\w*|descarc\w*|rakodas\w*|ftl|ltl|raklap\w*|palet\w*)\b/;
+const LIST_Q_RE = /\b(mutasd|listazd|list\w*|hany|mennyi|arata|cate|cat|keresd|nyisd|deschide|mi|melyik|ki |cine|unde|hol)\b/;
+function looksLikeNewOrder(text) {
+  const f = _fold(text);
+  if (String(text || '').includes('?') || LIST_Q_RE.test(f)) return false;
+  if (chatOps._refIn(text)) return false;
+  return NEW_ORDER_RE.test(f) && (/(->|→|–|\s-\s)/.test(String(text)) || /\d/.test(f) || f.split(/\s+/).length >= 6);
+}
+
+// AI-útválasztás (lib/chatRouter) — a determinisztikus felismerők után.
+// Kimenet: válasz-objektum (info) | { delegate } | null (hiba → marad a régi út).
+async function _route(req, a, messages, lang) {
+  const last = messages[messages.length - 1].text;
+  const aiHistory = messages.slice(0, -1).filter((m) => m.role === 'user' && !m.local).map((m) => m.text);
+  let r;
+  try {
+    r = await chatRouter.route(req, last, { lang, history: messages.slice(0, -1).map((m) => m.text).reverse(), aiHistory, ui: a.ui });
+  } catch (e) { console.error('orderChat router hiba:', e && e.message); return null; }
+  if (!r || r.err) return null;
+  if (r.delegate) return r;
+  try { await audit.fromReq(req, 'order.chat_info', 'chat', null, { kind: 'router', tools: r.tools || [], miss: !!r.miss }); } catch (_) {}
+  return { ok: true, info: true, reply: r.reply || '', info_html: r.html || '', questions: r.questions || [], ui: r.ui || null, miss: !!r.miss };
+}
 
 const handlers = {};
 const FEATURE = 'ai-szoveges-fuvar';
@@ -248,8 +275,9 @@ function buildSystemPrompt(today) {
     'You can ONLY edit this draft. You CANNOT upload or attach documents, open or look up other existing orders, or change saved orders from here. If the message is not about the draft (e.g. a document, an existing order number, "this order"), do NOT change any field and do NOT claim you did anything — reply briefly that the dispatcher should name the order number (e.g. CMD-2026-0042) or use the 📎 document upload. Never write a bare order number into the ref field unless the user explicitly says it is the reference.',
     'Never invent data. Unknown fields = null. Do not ask about fields the system can derive (km, plates of the assigned truck).',
     CHAT_STYLE,
+    'If the LAST dispatcher message is clearly NOT about this draft (a question about other data, an action on another existing order, opening a page, anything else), set "off_topic": true and leave the draft unchanged.',
     'Return ONLY JSON with this shape:',
-    '{"reply": "1-2 short, natural sentences to the dispatcher in THEIR language (Hungarian or Romanian) — say what you understood/changed like a colleague would, not as a field list",',
+    '{"off_topic": false, "reply": "1-2 short, natural sentences to the dispatcher in THEIR language (Hungarian or Romanian) — say what you understood/changed like a colleague would, not as a field list",',
     ' "draft": {"client": null, "client_cui": null, "ref": null, "stops": [{"kind": "pickup", "loc": null, "firma": null, "data": null}], "load_type": null, "suly_kg": null, "hossz_cm": null, "szel_cm": null, "mag_cm": null, "pret": null, "km": null, "driver_name": null, "rendszam_camion": null, "rendszam_remorca": null, "uit_codes": []},',
     ' "questions": [{"key": "client|stops|dates|load_type|dims|driver|price|other", "text": "short question in the user language", "options": ["up to 4 short clickable answers"]}]}',
     'Ask at most 3 questions, only about genuinely missing or ambiguous REQUIRED data: client, stop location, stop date, FTL/LTL, LTL dimensions. Price is optional: never ask about it more than once. If nothing is missing, "questions" must be [].',
@@ -624,6 +652,13 @@ handlers.orderChatTurn = async function (req, res, args) {
     if (rawDraft.mode === 'email' || (draftEmpty && mailChat.isEmailIntent(messages[messages.length - 1].text))) {
       return await mailChat.mailTurn(req, res, a, aiMessages, lang);
     }
+    // ── AI-chat 2.0: üres vázlatnál bármilyen kérés a képesség-katalógusra megy
+    //    (lib/chatTools) — nem esik többé csendben az új-fuvar vázlatba.
+    if (draftEmpty && rawDraft.mode !== 'email' && !looksLikeNewOrder(lastText) && !chatOps._isPureRef(lastText)) {
+      const rr = await _route(req, a, messages, lang);
+      if (rr && rr.delegate === 'mail') return await mailChat.mailTurn(req, res, a, aiMessages, lang);
+      if (rr && !rr.delegate) return res.json({ result: rr });
+    }
     let prev = sanitizeDraft(a.draft);
 
     // ── Szerkesztés: üres vázlatnál egy fuvarszám (CMD-2026-0042 / belső id)
@@ -660,6 +695,11 @@ handlers.orderChatTurn = async function (req, res, args) {
       return res.json({ result: { ok: false, err: msg } });
     }
     const out = (ai && ai.json) || {};
+    // A vázlat-AI jelzi, ha az üzenet nem a vázlatról szól → képesség-katalógus, a vázlat érintetlen.
+    if (out.off_topic === true && !draftEmpty) {
+      const rr = await _route(req, a, messages, lang);
+      if (rr && !rr.delegate) return res.json({ result: rr });
+    }
     const aiDraft = sanitizeDraft(out.draft || {});
     // A szerver által feloldott (belső) mezők megőrzése, ha az AI nem változtatott rajtuk.
     if (prev.client_id && aiDraft.client && _fold(aiDraft.client) === _fold(prev.client)) aiDraft.client_id = prev.client_id;
@@ -713,6 +753,7 @@ handlers.orderChatAction = async function (req, res, args) {
     const lang = a.lang === 'hu' ? 'hu' : 'ro';
     const extra = {};
     if (a.client_name != null) extra.client_name = String(a.client_name).slice(0, 200);
+    if (a.input != null) extra.input = String(a.input).slice(0, 40);
     const r = await chatOps.executeAction(req, String(a.token || ''), extra, lang);
     return res.json({ result: r });
   } catch (err) {

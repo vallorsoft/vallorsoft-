@@ -40,6 +40,8 @@ handlers.exportCompanyData = async function (req, res) {
       mail_log: await rows('SELECT id, to_email, subject, type, status, provider_id, created_at FROM mail_log WHERE company_id = $1'),
       // Elküldött levelek (a cég fiókjáról) — címzett + szöveg SZEMÉLYES ADAT lehet → exportálandó.
       mail_sent: await rows('SELECT id, from_email, to_email, subject, body_text, attachments, mail_type, status, order_id, sent_by, created_at FROM mail_sent WHERE company_id = $1'),
+      // AI-chat: a chat által nem értett mondatok (a felhasználó saját szövege, 30 napig).
+      chat_miss_log: await rows('SELECT id, user_id, text, resolved_tool, created_at FROM chat_miss_log WHERE company_id = $1'),
     };
     audit.fromReq(req, 'gdpr.export', 'company', cid, { counts: {
       users: data.users.length, clients: data.clients.length, vehicles: data.vehicles.length, orders: data.orders.length,
@@ -83,6 +85,8 @@ handlers.anonymizeUser = async function (req, res, args) {
         `DELETE FROM order_chat_memory WHERE company_id = $1 AND kind = 'driver_alias' AND LOWER(value->>'email') = LOWER($2)`,
         [cid, oldEmail]).catch(() => {});
     }
+    // AI-chat: a felhasználó nem értett mondatai (saját szöveg) — törlés.
+    await pool.query(`DELETE FROM chat_miss_log WHERE company_id = $1 AND user_id = $2`, [cid, uid]).catch(() => {});
     audit.fromReq(req, 'gdpr.anonymize', 'user', uid);
     return res.json({ result: { ok: true } });
   } catch (err) {
