@@ -5346,6 +5346,10 @@ body.vs-dm .theme-toggle{ width:48px; height:48px; font-size:22px; }
 /* ── 💬 Chat-műveletek (lib/chatOps.js): megerősítő kártya, hangbevitel ── */
 #ochModal .och-act{ border-left:4px solid var(--och-acc, #f6711e); }
 #ochModal .och-act-old{ opacity:.65; }
+#ochModal .och-act.och-danger{ border-left-color:#dc2626; }
+#ochModal .och-plan-step{ margin-top:8px; }
+#ochModal .och-plan-n{ font-weight:700; font-size:12.5px; margin-bottom:3px; }
+#ochModal .och-danger .och-info-btn.och-act-ok{ background:#dc2626; border-color:#dc2626; }
 #ochModal .och-info-btn.och-act-ok{ background:var(--och-acc, #f6711e); border-color:var(--och-acc, #f6711e); color:#fff; }
 #ochModal .och-info-btn.och-act-ok:hover{ filter:brightness(1.05); color:#fff; }
 #ochModal .och-info-btn:disabled, #ochModal .och-info-btn.och-act-used{ opacity:.45; cursor:default; pointer-events:none; }

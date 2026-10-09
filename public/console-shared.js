@@ -7475,6 +7475,9 @@ function loadLearnedData() {
     var groups = [{ key: 'order_scan', title: t('ld.orderScan'), rows: (r.orderScan || []).map(function (x) {
       return { id: x.id, key: x.label, val: x.summary, hits: x.count, upd: x.updated_at };
     }) }];
+    // AI-chat 2.0: megerősített mondat → képesség párok + nem értett mondatok (30 nap).
+    groups.push({ key: 'chat_intent', src: 'chat_intent', clear: true, title: t('ld.chatIntent'), rows: (r.chatIntent || []).map(function (x) { return { id: x.id, key: x.key, val: x.summary, hits: x.hits, upd: x.updated_at }; }) });
+    groups.push({ key: 'chat_miss', src: 'chat_miss', clear: true, title: t('ld.chatMiss'), rows: (r.chatMiss || []).map(function (x) { return { id: x.id, key: x.key, val: x.summary, hits: x.hits, upd: x.updated_at }; }) });
     (r.kinds || []).forEach(function (k) {
       groups.push({ key: k, mem: true, title: t('ld.k.' + k), rows: (r.memory || []).filter(function (m) { return m.kind === k; }).map(function (m) {
         return { id: m.id, key: m.key, val: m.summary, hits: m.hits, upd: m.updated_at };
@@ -7490,7 +7493,7 @@ function loadLearnedData() {
         +   '<span style="width:14px;">' + (open ? '▾' : '▸') + '</span>'
         +   '<span style="font-weight:700;color:var(--text);flex:1;">' + esc(g.title) + '</span>'
         +   '<span class="badge info">' + g.rows.length + '</span>'
-        +   (g.mem && g.rows.length ? '<button class="btn ghost" style="padding:5px 10px;font-size:12px;" onclick="event.stopPropagation();ldClearKind(\'' + g.key + '\')">🗑 ' + esc(t('ld.clearKind')) + '</button>' : '')
+        +   ((g.mem || g.clear) && g.rows.length ? '<button class="btn ghost" style="padding:5px 10px;font-size:12px;" onclick="event.stopPropagation();ldClearKind(\'' + g.key + '\')">🗑 ' + esc(t('ld.clearKind')) + '</button>' : '')
         + '</div>';
       if (open) {
         if (!g.rows.length) html += '<div style="color:var(--muted);font-size:13px;padding:8px 24px;">' + esc(t('ld.empty')) + '</div>';
@@ -7500,7 +7503,7 @@ function loadLearnedData() {
             + '<th style="text-align:center;width:70px;">' + esc(t('ld.colHits')) + '</th><th>' + esc(t('ld.colUpdated')) + '</th><th style="width:50px;"></th>'
             + '</tr></thead><tbody>';
           g.rows.forEach(function (x) {
-            var src = g.mem ? 'memory' : 'order_scan';
+            var src = g.src || (g.mem ? 'memory' : 'order_scan');
             html += '<tr><td style="font-weight:600;">' + esc(x.key || '—') + '</td>'
               + '<td style="color:var(--muted);">' + esc(x.val || '') + '</td>'
               + '<td style="text-align:center;">' + (x.hits || 0) + '</td>'
@@ -7525,7 +7528,8 @@ function ldDelete(source, id) {
 }
 function ldClearKind(kind) {
   if (!confirm(t('ld.confirmClear'))) return;
-  gas('learnedDataDelete', [{ source: 'memory', kind: kind }]).then(function (r) {
+  var arg = (kind === 'chat_miss' || kind === 'chat_intent') ? { source: kind } : { source: 'memory', kind: kind };
+  gas('learnedDataDelete', [arg]).then(function (r) {
     if (!r || !r.ok) { toast((r && r.err) || t('common.error'), 'err'); return; }
     toast(t('ld.deleted'), 'ok'); loadLearnedData();
   });

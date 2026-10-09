@@ -1,0 +1,520 @@
+[
+ {
+  "tab": "dash",
+  "hu": "Vezérlőpult",
+  "ro": "Panou de control",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "ops-center",
+  "hu": "Operatív központ",
+  "ro": "Centru operațional",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "orders-form",
+  "hu": "Kiírás",
+  "ro": "Creare",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "orders-list",
+  "hu": "Kezelés",
+  "ro": "Gestionare",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "orders-deleted",
+  "hu": "Törölt fuvarok",
+  "ro": "Curse anulate",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "orders-done",
+  "hu": "Teljesített fuvarok",
+  "ro": "Curse efectuate",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "quotes",
+  "hu": "Árajánlatok",
+  "ro": "Cotații",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "mail-inbox",
+  "hu": "Beérkezett levelek",
+  "ro": "Email-uri primite",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "mail-sent",
+  "hu": "Elküldött levelek",
+  "ro": "Email-uri trimise",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "orders-planner",
+  "hu": "Tervezőtábla",
+  "ro": "Planificator",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "inbound",
+  "hu": "Megrendelések",
+  "ro": "Comenzi primite",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "client-requests",
+  "hu": "Ügyfél kérések",
+  "ro": "Cereri clienți",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "vehicles",
+  "hu": "Járművek",
+  "ro": "Vehicule",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "internal-drivers",
+  "hu": "Belső sofőrök",
+  "ro": "oferi interni",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "external-drivers",
+  "hu": "Külső sofőrök",
+  "ro": "oferi externi",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "active-fleet",
+  "hu": "Aktív flotta",
+  "ro": "Flotă activă",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "gps-daily-track",
+  "hu": "Napi útvonal (GPS)",
+  "ro": "Traseu zilnic (GPS)",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "sofer-activity",
+  "hu": "Sofőr-aktivitás",
+  "ro": "Activitate șoferi",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "expiries",
+  "hu": "Lejáratok",
+  "ro": "Expirări",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "service-log",
+  "hu": "Szerviz & karbantartás",
+  "ro": "Service & întreținere",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "fuel-import",
+  "hu": "Üzemanyagkártya",
+  "ro": "Card carburant",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "stats-finance",
+  "hu": "Pénzügy",
+  "ro": "Financiar",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "invoices-out",
+  "hu": "Kimenő számlák",
+  "ro": "Facturi emise",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "invoices-in",
+  "hu": "Bejövő számlák",
+  "ro": "Facturi primite",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "bnr-rate",
+  "hu": "BNR árfolyam",
+  "ro": "Curs BNR",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "payment-schedule",
+  "hu": "Fizetési ütemterv",
+  "ro": "Calendar de plăți",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "decont",
+  "hu": "Sofőr-elszámolás",
+  "ro": "Decont șofer",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "vcalc-run",
+  "hu": "Kalkuláció",
+  "ro": "Calcul",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "vcalc-saved",
+  "hu": "Mentett kalkulációk",
+  "ro": "Calcule salvate",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "vcalc-vehicle-costs",
+  "hu": "Jármű-költségek",
+  "ro": "Costuri vehicul",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "vcalc-driver-costs",
+  "hu": "Sofőr-költségek",
+  "ro": "Costuri șofer",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "vcalc-company-costs",
+  "hu": "Cég-költségek",
+  "ro": "Costuri firmă",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "vcalc-settings",
+  "hu": "Beállítások",
+  "ro": "Setări",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "clients",
+  "hu": "Ügyfelek",
+  "ro": "Clienți",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "received-fuv",
+  "hu": "Fuvarlevelek",
+  "ro": "Foi de parcurs",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "driver-docs-pane",
+  "hu": "Feltöltött Iratok & CMR-ek",
+  "ro": "Documente & CMR-uri",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "ecmr",
+  "hu": "e-CMR",
+  "ro": "e-CMR",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "order-docs",
+  "hu": "Fuvar-dokumentumok",
+  "ro": "Documente curse",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "doc-register",
+  "hu": "Dokumentum-nyilvántartás",
+  "ro": "Registru documente",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "warehouse",
+  "hu": "Raktár",
+  "ro": "Depozit",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "stats-v2",
+  "hu": "Statisztika 2.0",
+  "ro": "Statistici 2.0",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "chat",
+  "hu": "Belső Chat",
+  "ro": "Chat intern",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "users",
+  "hu": "Munkatársak kezelése",
+  "ro": "Gestionare angajați",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "invites",
+  "hu": "Meghívókódok",
+  "ro": "Coduri de invitație",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "stats-permissions",
+  "hu": "Jogosultságok",
+  "ro": "Permisiuni",
+  "roles": [
+   "Admin"
+  ]
+ },
+ {
+  "tab": "integrations",
+  "hu": "Integrációk",
+  "ro": "Integrări",
+  "roles": [
+   "Admin"
+  ]
+ },
+ {
+  "tab": "signature",
+  "hu": "Aláírás és Bélyegző",
+  "ro": "Semnătură și ștampilă",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "notifications",
+  "hu": "Értesítések",
+  "ro": "Notificări",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "mail-log",
+  "hu": "Levél-napló",
+  "ro": "Jurnal e-mail",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "learned-data",
+  "hu": "Tanult adatok",
+  "ro": "Date învățate",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "email-templates",
+  "hu": "E-mail sablonok",
+  "ro": "abloane e-mail",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "settings",
+  "hu": "Fiók",
+  "ro": "Cont",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "company-settings",
+  "hu": "Cég & arculat",
+  "ro": "Firmă & branding",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "pdf-settings",
+  "hu": "PDF-sablonok",
+  "ro": "abloane PDF",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "morning-digest",
+  "hu": "Reggeli összefoglaló",
+  "ro": "Sumar zilnic",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "elofizetesek",
+  "hu": "Előfizetés",
+  "ro": "Abonament",
+  "roles": [
+   "Admin"
+  ]
+ },
+ {
+  "tab": "fav-locations",
+  "hu": "Kedvenc helyszínek",
+  "ro": "Locații favorite",
+  "roles": [
+   "Admin",
+   "Manager"
+  ]
+ },
+ {
+  "tab": "billing",
+  "hu": "Számlázó",
+  "ro": "Facturare",
+  "roles": [
+   "Manager"
+  ]
+ }
+]
